@@ -14,7 +14,7 @@ data Color
     deriving (Eq, Show, Generic, ShowX)
 
 {-# ANN module (DataReprAnn
-                  (TT ''Color)
+                  $(reprType [t|Color|])
                   2
                   [ ConstrRepr
                       'Red
@@ -34,7 +34,7 @@ data Color
                   ]) #-}
 
 {-# ANN module (DataReprAnn
-                 (TN ''Maybe [TT ''Color])
+                  $(reprType [t|Maybe Color|])
                  2
                  -- How do we represent our constructors?
                  [ ConstrRepr

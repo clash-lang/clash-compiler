@@ -400,7 +400,7 @@ reorderCustom
   -> [(Pat, Term)]
 reorderCustom tcm reprs (coreView tcm -> Just ty) alts =
   reorderCustom tcm reprs ty alts
-reorderCustom _tcm reprs (coreToTypeName' -> Right typeName) alts =
+reorderCustom _tcm reprs (coreToType' -> Right typeName) alts =
   case getDataRepr typeName reprs of
     Just (DataRepr' _name _size _constrReprs) ->
       sortOn (patPos reprs . fst) alts

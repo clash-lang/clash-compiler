@@ -33,7 +33,7 @@ import           Unbound.Generics.LocallyNameless
 import qualified Unbound.Generics.LocallyNameless as Unbound
 
 import           Clash.Annotations.BitRepresentation.Internal
-  (CustomReprs, ConstrRepr'(..), DataRepr'(..), coreToTypeName', getDataRepr,
+  (CustomReprs, ConstrRepr'(..), DataRepr'(..), coreToType', getDataRepr,
    getConstrRepr)
 import           Clash.Annotations.TopEntity (PortName (..), TopEntity (..))
 import           Clash.Driver.Types
@@ -191,7 +191,7 @@ fixCustomRepr
   -> Type
   -> HWType
   -> HWType
-fixCustomRepr reprs (coreToTypeName' -> Right tyName) sum_@(Sum name subtys) =
+fixCustomRepr reprs (coreToType' -> Right tyName) sum_@(Sum name subtys) =
   case getDataRepr tyName reprs of
     Just (DataRepr' name' size constrs) ->
       if length constrs == length subtys then
@@ -216,7 +216,7 @@ fixCustomRepr reprs (coreToTypeName' -> Right tyName) sum_@(Sum name subtys) =
       -- No custom representation found
       sum_
 
-fixCustomRepr reprs (coreToTypeName' -> Right tyName) sp@(SP name subtys) =
+fixCustomRepr reprs (coreToType' -> Right tyName) sp@(SP name subtys) =
   case getDataRepr tyName reprs of
     Just (DataRepr' name' size constrs) ->
       if length constrs == length subtys then

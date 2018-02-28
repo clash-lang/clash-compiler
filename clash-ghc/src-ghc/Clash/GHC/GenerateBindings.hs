@@ -142,18 +142,18 @@ parseConstrRepr src n (App (App (App (App _constr thname) mask) value) fieldmask
     (map parseIntegerLit $ parseList fieldmasks)
 parseConstrRepr _src _n cr = error $ $(curLoc) ++ "Expected ConstrRepr, but got: " ++ show cr
 
-stripDataRepr :: TypeName' -> TypeName'
-stripDataRepr (TypeName' _dataRepr [tn]) = tn
+stripDataRepr :: Type' -> Type'
+stripDataRepr (AppTy' _dataRepr tn) = tn
 stripDataRepr e = error $ "Unexpected type: " ++ show e
 
-coreToTypeName'' :: Type -> TypeName'
-coreToTypeName'' typ =
-  case coreToTypeName' typ of
+coreToType'' :: Type -> Type'
+coreToType'' typ =
+  case coreToType' typ of
     Right typ' ->
       typ'
     Left err ->
       error $ concat [ $(curLoc), "Could not translate type: ", show typ, "."
-                     , "\n\n", "coreToTypeName' reported: ", err, "." ]
+                     , "\n\n", "coreToType' reported: ", err, "." ]
 
 parseDataRepr
   :: BindingMap
@@ -165,7 +165,7 @@ parseDataRepr bindings (_name, typ, srcspan, _, (deref bindings -> reprsTerm)) =
     (App (App _constr size) reprs) ->
       let reprs' = [parseConstrRepr srcspan i r | (i, r) <- zip [0..] (parseList reprs)] in
       let size'  = parseIntegerLit size in
-      let typ'   = stripDataRepr $ coreToTypeName'' typ in
+      let typ'   = stripDataRepr $ coreToType'' typ in
       deepseq (reprs', size', typ') (DataRepr' typ' size' reprs')
     _ ->
       error $ $(curLoc) ++ "Expected DataRepr, but got: " ++ show reprsTerm

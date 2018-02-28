@@ -28,10 +28,10 @@ import           Data.Maybe                  (fromMaybe, isJust, isNothing,
 import           Data.Word                   (Word8)
 import qualified Data.Text.Lazy              as Text
 import           Language.Haskell.TH.Syntax  (OccName(..), Name(..),
-                                              NameFlavour(..), ModName(..))
+                                              NameFlavour(..), ModName(..),
+                                              Type(..), TyLit(..))
 import           System.Directory            (createDirectoryIfMissing)
 import           System.FilePath.Posix       ((<.>), (</>))
-
 
 
 -- GHC API
@@ -212,7 +212,7 @@ loadExprFromIface hdl bndr = do
 
 toDataRepr' :: DataReprAnn -> DataRepr'
 toDataRepr' (DataReprAnn typ size constrs) =
-  DataRepr' (toTypeName' typ) size (zipWith toConstrRepr' [0..] constrs)
+  DataRepr' (toType' typ) size (zipWith toConstrRepr' [0..] constrs)
     where
       toConstrRepr' :: Int -> ConstrRepr -> ConstrRepr'
       toConstrRepr' n (ConstrRepr name mask value fieldanns) =
@@ -223,9 +223,15 @@ toDataRepr' (DataReprAnn typ size constrs) =
         Text.pack $ modName ++ "." ++ name'
       thToText name' = error $ $(curLoc) ++ "Unexpected pattern: " ++ show name'
 
-      toTypeName' :: TypeName -> TypeName'
-      toTypeName' (TT name')      = TypeName' (thToText name') []
-      toTypeName' (TN name' subs) = TypeName' (thToText name') (map toTypeName' subs)
+      toType' :: Type -> Type'
+      toType' ty = go ty
+        where
+          go (ConT name')   = ConstTy' (thToText name')
+          go (AppT ty1 ty2) = AppTy' (go ty1) (go ty2)
+          go (LitT (NumTyLit n)) = LitTy' n
+          go _ = error $ $(curLoc) ++ "Unsupported type: " ++ show ty
+
+
 
 loadCustomReprAnnotations
   :: [Annotations.Annotation]

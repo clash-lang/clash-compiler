@@ -14,13 +14,13 @@ Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
 module Clash.Annotations.BitRepresentation.Internal
   ( DataRepr'(..)
   , ConstrRepr'(..)
-  , TypeName'(..)
+  , Type'(..)
   , BitMask'
   , CustomReprs
   , getDataRepr
   , getConstrRepr
   , buildCustomReprs
-  , coreToTypeName'
+  , coreToType'
   ) where
 
 import qualified Data.Map       as Map
@@ -33,7 +33,7 @@ import Data.Hashable (Hashable)
 
 import Clash.Util (curLoc)
 import Clash.Core.Name (name2String)
-import Clash.Core.Type (Type (..), ConstTy (TyCon))
+import Clash.Core.Type (Type (..), ConstTy (TyCon), LitTy(..))
 
 import Prelude
 
@@ -43,11 +43,11 @@ type Size'    = Integer
 
 type FieldAnn' = BitMask'
 
-type CustomReprs = ( Map.Map TypeName' DataRepr'
+type CustomReprs = ( Map.Map Type' DataRepr'
                    , Map.Map Text.Text ConstrRepr'
                    )
 
-getDataRepr :: TypeName' -> CustomReprs -> Maybe DataRepr'
+getDataRepr :: Type' -> CustomReprs -> Maybe DataRepr'
 getDataRepr name (reprs, _) = Map.lookup name reprs
 
 getConstrRepr :: Text.Text -> CustomReprs -> Maybe ConstrRepr'
@@ -61,44 +61,45 @@ buildCustomRepr d@(DataRepr' name _size constrReprs) (dMap, cMap) =
 buildCustomReprs :: [DataRepr'] -> CustomReprs
 buildCustomReprs = foldr buildCustomRepr (Map.empty, Map.empty)
 
-coreToTypeName' :: Type -> Either String TypeName'
-coreToTypeName' (AppTy t1 t2) = do
-  (TypeName' name names) <- coreToTypeName' t1
-  t2typeName            <- coreToTypeName' t2
-  return $ TypeName' name (names ++ [t2typeName])
-coreToTypeName' (ConstTy (TyCon name)) =
-  return $ TypeName' (Text.pack $ name2String name) []
-coreToTypeName' e =
+coreToType' :: Type -> Either String Type'
+coreToType' (AppTy t1 t2) = AppTy' <$> coreToType' t1 <*> coreToType' t2
+coreToType' (ConstTy (TyCon name)) =
+   return $ ConstTy' (Text.pack $ name2String name)
+coreToType' (LitTy (NumTy n)) =
+   return $ LitTy' n
+coreToType' e =
   Left $ $(curLoc) ++ "Unexpected type: " ++ show e
 
+
 -- |
-data TypeName' =
-  TypeName' Text.Text [TypeName']
-    deriving (Generic, NFData, Eq, Typeable, Hashable, Ord)
+data Type' = AppTy' Type' Type'
+           | ConstTy' Text.Text
+           | LitTy' Integer
+    deriving (Generic, NFData, Eq, Typeable, Hashable, Ord    , Show)
 
-showTypeName'
-  :: Bool
-  -- ^ Wrap in parentheses?
-  -> TypeName'
-  -- ^ TypeName' to pretty print
-  -> Text.Text
--- Terminal: ignore request for parentheses
-showTypeName' _ (TypeName' name []) =
-  name
--- Wrap in parentheses, and move on:
-showTypeName' True typeName =
-  Text.concat ["(", showTypeName' False typeName, ")"]
--- Separate names by spaces:
-showTypeName' False (TypeName' name names) =
-  Text.intercalate " " $ name : map (showTypeName' True) names
-
-instance Show TypeName' where
-  show tn = concat [ "TypeName'<", Text.unpack $ showTypeName' False tn, ">" ]
+-- showType'
+--   :: Bool
+--   -- ^ Wrap in parentheses?
+--   -> Type'
+--   -- ^ Type' to pretty print
+--   -> Text.Text
+-- -- Terminal: ignore request for parentheses
+-- showType' _ (Type' name []) =
+--   name
+-- -- Wrap in parentheses, and move on:
+-- showType' True typeName =
+--   Text.concat ["(", showType' False typeName, ")"]
+-- -- Separate names by spaces:
+-- showType' False (Type' name names) =
+--   Text.intercalate " " $ name : map (showType' True) names
+--
+-- instance Show Type' where
+--   show tn = concat [ "Type'<", Text.unpack $ showType' False tn, ">" ]
 
 -- |
 data DataRepr' =
   DataRepr'
-    TypeName'
+    Type'
     -- ^ Qualified name of type (recursive)
     Size'
     -- ^ Size of data type
