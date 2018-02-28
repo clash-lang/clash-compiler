@@ -12,6 +12,9 @@ data types.
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE RankNTypes #-}
+{-# LANGUAGE DeriveLift #-}
+{-# LANGUAGE StandaloneDeriving #-}
+{-# OPTIONS_GHC -Wno-orphans #-}
 
 module Clash.Annotations.BitRepresentation
  ( DataRepr(..)
@@ -36,6 +39,19 @@ data TypeName = TN TH.Name [TypeName]
               | TT TH.Name
               -- ^ Type name terminal; equivalent to TN with an empty list
                  deriving (Show, Data, Typeable)
+
+deriving instance TH.Lift TypeName
+
+-- instances we need to derive Lift TypeName
+-- NOTE: Don't import these from Language.Haskell.TH.Instances
+--       Doing so will also import `instance Lift Exp`
+--       And that changes certain TH mistakes from compile to run time errors.
+deriving instance TH.Lift TH.Name
+deriving instance TH.Lift TH.OccName
+deriving instance TH.Lift TH.NameFlavour
+deriving instance TH.Lift TH.ModName
+deriving instance TH.Lift TH.NameSpace
+deriving instance TH.Lift TH.PkgName
 
 -- | Type annotation for inline annotations. Example usage:
 --
