@@ -19,6 +19,7 @@ module Clash.Netlist.BlackBox where
 import           Control.Exception             (throw)
 import           Control.Lens                  ((.=),(<<%=))
 import qualified Control.Lens                  as Lens
+import           Control.Monad.IO.Class        (liftIO)
 import           Data.Char                     (ord)
 import           Data.Either                   (lefts)
 import qualified Data.HashMap.Lazy             as HashMap
@@ -151,7 +152,9 @@ mkPrimitive :: Bool -- ^ Put BlackBox expression in parenthesis
 mkPrimitive bbEParen bbEasD dst nm args ty = do
   bbM <- HashMap.lookup nm <$> Lens.use primitives
   case bbM of
-    Just p@(P.BlackBox {outputReg = wr}) -> do
+    Just p@(P.BlackBox { warning = wn, outputReg = wr}) -> do
+      -- Print blackbox warning
+      maybe (pure ()) (liftIO . putStrLn . ("Warning: " ++) . unpack) wn
       case template p of
         (Left tempD) -> do
           let pNm = name p
