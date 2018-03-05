@@ -14,12 +14,10 @@ module Clash.Annotations.BitRepresentation.Deriving
 import GHC.Exts
 import GHC.Integer.Logarithms
 
-import Control.Monad (zipWithM)
-
 import Data.List (mapAccumL)
 import Data.Bits (shiftL, shiftR)
 import Data.Proxy (Proxy(..))
-import Data.Maybe (catMaybes, fromJust)
+import Data.Maybe (fromJust)
 
 import qualified Data.Map as Map
 import qualified Data.Text.Lazy as Text
@@ -28,7 +26,7 @@ import Language.Haskell.TH
 import Language.Haskell.TH.Syntax
 import GHC.TypeLits (natVal)
 
-import Clash.Sized.BitVector (BitVector(..), high, low)
+import Clash.Sized.BitVector (BitVector, high, low)
 import Clash.Class.Resize  (resize)
 import Clash.Class.BitPack (BitPack, BitSize, pack)
 import Clash.Annotations.BitRepresentation ( DataReprAnn(..)
@@ -223,6 +221,7 @@ bitsToExpr bits =
     (\v1 v2 -> [| $v1 ++# $v2 |])
     (map bitToExpr' $ group bits)
 
+numTyLit' :: Integral a => a -> Q Type
 numTyLit' n = LitT <$> (numTyLit $ fromIntegral n)
 
 -- | Select a list of ranges from a bitvector expression
@@ -260,9 +259,9 @@ select
   -> BitOrigin
   -- ^ Select bits
   -> Q Exp
-select fields (Lit []) =
+select _fields (Lit []) =
   error $ {-$(curLoc) ++-} "Unexpected empty literal."
-select fields (Lit lits) = do
+select _fields (Lit lits) = do
   let size = fromIntegral $ length lits
   vec <- bitsToExpr lits
   return $ SigE
@@ -278,7 +277,7 @@ buildPackMatch
   :: Integer
   -> ConstrRepr'
   -> Q Match
-buildPackMatch dataSize constrRepr@(ConstrRepr' qName constrN mask value fieldanns) = do
+buildPackMatch dataSize (ConstrRepr' qName _constrN mask value fieldanns) = do
   constr <- fromJust <$> lookupValueName (Text.unpack qName)
 
   fieldNames <-
@@ -302,7 +301,7 @@ buildPack
   :: Type
   -> DataRepr'
   -> Q [Dec]
-buildPack argTy dataRepr@(DataRepr' _name size constrs) = do
+buildPack argTy (DataRepr' _name size constrs) = do
   argName      <- newName "toBePacked"
   let resTy     = AppT (ConT ''BitVector) (LitT $ NumTyLit size)
   let funcName  = mkName "pack"
@@ -326,7 +325,7 @@ buildUnpackIfE
   -> Integer
   -> ConstrRepr'
   -> Q (Guard, Exp)
-buildUnpackIfE valueName dataSize constrRepr@(ConstrRepr' qName constrN mask value fieldanns) = do
+buildUnpackIfE valueName _dataSize (ConstrRepr' qName _constrN mask value fieldanns) = do
   let valueName' = return $ VarE valueName
   constr <- ConE <$> (fromJust <$> (lookupValueName (Text.unpack qName)))
   guard  <- NormalG <$> [| ((.&.) $valueName' mask) == value |]
@@ -338,7 +337,7 @@ buildUnpack
   :: Type
   -> DataRepr'
   -> Q [Dec]
-buildUnpack resTy dataRepr@(DataRepr' _name size constrs) = do
+buildUnpack resTy (DataRepr' _name size constrs) = do
   argName <- newName "toBeUnpacked"
   let funcName = mkName "unpack"
   let argTy    = AppT (ConT ''BitVector) (LitT $ NumTyLit size)
