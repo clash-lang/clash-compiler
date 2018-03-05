@@ -32,6 +32,7 @@ module Clash.Annotations.BitRepresentation
  , dataReprAnnToDataRepr'
  , getConstrRepr
  , getDataRepr
+ , thTypeToType'
  ) where
 
 import GHC.Generics (Generic)
@@ -170,25 +171,24 @@ data ConstrRepr' =
 
 dataReprAnnToDataRepr' :: DataReprAnn -> DataRepr'
 dataReprAnnToDataRepr' (DataReprAnn typ size constrs) =
-  DataRepr' (toType' typ) size (zipWith toConstrRepr' [0..] constrs)
+  DataRepr' (thTypeToType' typ) size (zipWith toConstrRepr' [0..] constrs)
     where
       toConstrRepr' :: Int -> ConstrRepr -> ConstrRepr'
       toConstrRepr' n (ConstrRepr name mask value fieldanns) =
         ConstrRepr' (thToText name) n (fromIntegral mask) value (map fromIntegral fieldanns)
 
-      thToText :: TH.Name -> Text.Text
-      thToText (TH.Name (TH.OccName name') (TH.NameG _namespace _pkgName (TH.ModName modName))) =
-        Text.pack $ modName ++ "." ++ name'
-      thToText name' = error $ {-$(curLoc) ++-} "Unexpected pattern: " ++ show name'
+thToText :: TH.Name -> Text.Text
+thToText (TH.Name (TH.OccName name') (TH.NameG _namespace _pkgName (TH.ModName modName))) =
+  Text.pack $ modName ++ "." ++ name'
+thToText name' = error $ {-$(curLoc) ++-} "Unexpected pattern: " ++ show name'
 
-      toType' :: TH.Type -> Type'
-      toType' ty = go ty
-        where
-          go (TH.ConT name')   = ConstTy' (thToText name')
-          go (TH.AppT ty1 ty2) = AppTy' (go ty1) (go ty2)
-          go (TH.LitT (TH.NumTyLit n)) = LitTy' n
-          go _ = error $ {-$(curLoc) ++-} "Unsupported type: " ++ show ty
-
+thTypeToType' :: TH.Type -> Type'
+thTypeToType' ty = go ty
+  where
+    go (TH.ConT name')   = ConstTy' (thToText name')
+    go (TH.AppT ty1 ty2) = AppTy' (go ty1) (go ty2)
+    go (TH.LitT (TH.NumTyLit n)) = LitTy' n
+    go _ = error $ {-$(curLoc) ++-} "Unsupported type: " ++ show ty
 
 type CustomReprs = ( Map.Map Type' DataRepr'
                    , Map.Map Text.Text ConstrRepr'
