@@ -13,7 +13,7 @@ import Clash.Backend.SystemVerilog
 import Clash.Backend.VHDL
 import Clash.Backend.Verilog
 import Clash.Netlist.BlackBox.Types
-import Clash.Annotations.BitRepresentation.Internal (buildCustomReprs)
+import Clash.Annotations.BitRepresentation (buildCustomReprs)
 
 import Control.DeepSeq
 import qualified Data.Time.Clock as Clock
