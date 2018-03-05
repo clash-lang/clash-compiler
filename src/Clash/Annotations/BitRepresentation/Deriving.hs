@@ -100,11 +100,17 @@ buildConstrRepr dataSize constrSize constrName fieldSizes constrN = [|
     constrName
     $mask
     $value
-    $(return $ ListE fieldSizes)
+    $(ListE <$> fanns)
   |]
   where
-    mask = [| bitmask ($dataSize - 1) constrSize |]
+    mask  = [| bitmask ($dataSize - 1) constrSize |]
     value = [| shiftL constrN (fromIntegral $ $dataSize - 1)|]
+    fanns =
+      sequence $ snd
+               $ mapAccumL
+                    (\start size -> ([| $start - $size |], [| bitmask $start $size |]))
+                    [| $dataSize - constrSize - 1 |]
+                    (map return fieldSizes)
 
 
 fieldTypes :: Con -> [Type]
