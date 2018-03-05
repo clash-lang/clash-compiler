@@ -336,13 +336,16 @@ inst_ (BlackBoxD _ _ _ Nothing bs bbCtx) = do
   fmap Just (string t)
 
 inst_ (BlackBoxD _ _ _ (Just (nm,inc)) bs bbCtx) = do
-  inc' <- renderBlackBox inc bbCtx
   iw <- use intWidth
-  let incHash = hash inc'
+  incForHash <- renderBlackBox inc (bbCtx {bbQsysIncName = Just "~QSYSINCLUDENAME"})
+  let incHash = hash incForHash
       nm'     = Text.concat [ Text.fromStrict nm
                             , Text.pack (printf ("%0" ++ show (iw `div` 4) ++ "X") incHash)
                             ]
-  t <- renderBlackBox bs (bbCtx {bbQsysIncName = Just nm'})
+      bbNamedCtx = bbCtx {bbQsysIncName = Just nm'}
+
+  inc' <- renderBlackBox inc bbNamedCtx
+  t <- renderBlackBox bs bbNamedCtx
   inc'' <- text inc'
   includes %= ((unpack nm', inc''):)
   fmap Just (string t)
