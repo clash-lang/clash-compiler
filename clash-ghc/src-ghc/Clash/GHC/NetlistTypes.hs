@@ -32,7 +32,7 @@ import Clash.Netlist.Types              (HWType(..), PortDirection (..))
 import Clash.Signal.Internal            (ClockKind (..), ResetKind (..))
 import Clash.Util                       (curLoc)
 
-import Clash.Annotations.BitRepresentation.Internal (CustomReprs)
+import Clash.Annotations.BitRepresentation (CustomReprs)
 
 ghcTypeToHWType
   :: Int

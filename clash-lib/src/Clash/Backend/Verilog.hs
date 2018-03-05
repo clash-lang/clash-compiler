@@ -49,14 +49,17 @@ import           Clash.Netlist.Util                   hiding (mkIdentifier, exte
 import           Clash.Signal.Internal                (ClockKind (..))
 import           Clash.Util                           (curLoc, (<:>),on,first)
 
-import Clash.Annotations.BitRepresentation.Internal   ( ConstrRepr'(..)
-                                                      , BitMask'
+
+import Clash.Annotations.BitRepresentation            ( ConstrRepr'(..)
+                                                      , BitMask
                                                       )
 import Clash.Annotations.BitRepresentation.Util       ( BitOrigin(Lit, Field)
                                                       , bitOrigins
                                                       , bitRanges
                                                       , isContinuousMask
                                                       )
+
+import Clash.Annotations.BitRepresentation.Internal   (bitsToBits)
 
 #ifdef CABAL
 import qualified Paths_clash_lib
@@ -600,9 +603,9 @@ expr_ _ (DataCon (CustomSP name' size args) (DC (_,constrNr)) es) =
   braces $ hcat $ punctuate ", " $ mapM range' origins
     where
       (cRepr, _, _) = args !! constrNr
-      (ConstrRepr' _name _n _mask _value anns) = cRepr
+      (ConstrRepr' _name _n mask value anns) = cRepr
 
-      errOnNonContinuous :: Int -> [BitMask'] -> Maybe a
+      errOnNonContinuous :: Int -> [BitMask] -> Maybe a
       errOnNonContinuous _ [] = Nothing
       errOnNonContinuous fieldnr (ann:anns') =
         if isContinuousMask ann then
@@ -623,12 +626,12 @@ expr_ _ (DataCon (CustomSP name' size args) (DC (_,constrNr)) es) =
       argExprs = map (expr_ False) es :: [VerilogM Doc]
 
       -- Spread bits of constructor arguments using masks
-      origins = bitOrigins size cRepr :: [BitOrigin]
+      origins = bitOrigins size (mask, value, anns) :: [BitOrigin]
 
       range'
         :: BitOrigin
         -> VerilogM Doc
-      range' (Lit ns) =
+      range' (Lit (bitsToBits -> ns)) =
         int (length ns) <> squote <> "sb" <> hcat (mapM bit_char ns)
       range' (Field n _start _end) =
         argExprs !! n

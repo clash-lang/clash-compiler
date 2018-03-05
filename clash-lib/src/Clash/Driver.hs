@@ -69,7 +69,7 @@ import           Clash.Normalize.Util             (callGraph)
 import           Clash.Primitives.Types
 import           Clash.Util                       (first, second)
 
-import Clash.Annotations.BitRepresentation.Internal (CustomReprs)
+import Clash.Annotations.BitRepresentation        (CustomReprs)
 
 -- | Create a set of target HDL files for a set of functions
 generateHDL

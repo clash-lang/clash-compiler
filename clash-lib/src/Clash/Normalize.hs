@@ -68,7 +68,7 @@ import           Clash.Rewrite.Util               (isUntranslatableType,
 import Clash.Signal.Internal                      (ResetKind (..))
 import           Clash.Util
 
-import Clash.Annotations.BitRepresentation.Internal (CustomReprs)
+import Clash.Annotations.BitRepresentation (CustomReprs)
 
 -- | Run a NormalizeSession in a given environment
 runNormalization

@@ -14,7 +14,6 @@
 module Clash.GHC.LoadInterfaceFiles
   ( loadExternalExprs
   , primitiveFilePath
-  , toDataRepr'
   )
 where
 
@@ -26,13 +25,8 @@ import           Data.List                   (elemIndex, foldl', partition)
 import           Data.Maybe                  (fromMaybe, isJust, isNothing,
                                               mapMaybe, catMaybes)
 import           Data.Word                   (Word8)
-import qualified Data.Text.Lazy              as Text
-import           Language.Haskell.TH.Syntax  (OccName(..), Name(..),
-                                              NameFlavour(..), ModName(..),
-                                              Type(..), TyLit(..))
 import           System.Directory            (createDirectoryIfMissing)
 import           System.FilePath.Posix       ((<.>), (</>))
-
 
 -- GHC API
 import           Annotations (Annotation(..), getAnnTargetName_maybe)
@@ -70,7 +64,6 @@ import qualified VarSet
 -- Internal Modules
 import           Clash.Annotations.Primitive
 import           Clash.Annotations.BitRepresentation
-import           Clash.Annotations.BitRepresentation.Internal
 import           Clash.Util                                   (curLoc, traceIf)
 
 runIfl :: GHC.GhcMonad m => GHC.Module -> TcRnTypes.IfL a -> m a
@@ -210,28 +203,6 @@ loadExprFromIface hdl bndr = do
             _ -> return (Right bndr,primFPs,reprs)
     Nothing -> return (Right bndr,[],[])
 
-toDataRepr' :: DataReprAnn -> DataRepr'
-toDataRepr' (DataReprAnn typ size constrs) =
-  DataRepr' (toType' typ) size (zipWith toConstrRepr' [0..] constrs)
-    where
-      toConstrRepr' :: Int -> ConstrRepr -> ConstrRepr'
-      toConstrRepr' n (ConstrRepr name mask value fieldanns) =
-        ConstrRepr' (thToText name) n (fromIntegral mask) value (map fromIntegral fieldanns)
-
-      thToText :: Name -> Text.Text
-      thToText (Name (OccName name') (NameG _namespace _pkgName (ModName modName))) =
-        Text.pack $ modName ++ "." ++ name'
-      thToText name' = error $ $(curLoc) ++ "Unexpected pattern: " ++ show name'
-
-      toType' :: Type -> Type'
-      toType' ty = go ty
-        where
-          go (ConT name')   = ConstTy' (thToText name')
-          go (AppT ty1 ty2) = AppTy' (go ty1) (go ty2)
-          go (LitT (NumTyLit n)) = LitTy' n
-          go _ = error $ $(curLoc) ++ "Unsupported type: " ++ show ty
-
-
 
 loadCustomReprAnnotations
   :: [Annotations.Annotation]
@@ -255,7 +226,7 @@ loadCustomReprAnnotations anns =
           :: (Name.Name, [DataReprAnn])
           -> Maybe DataRepr'
         go (_name, [])      = Nothing
-        go (_name,  [repr]) = Just $ toDataRepr' repr
+        go (_name,  [repr]) = Just $ dataReprAnnToDataRepr' repr
         go (name, reprs')   =
           error $ $(curLoc) ++ "Multiple DataReprAnn annotations for same type: \n\n"
                             ++ (Outputable.showPpr DynFlags.unsafeGlobalDynFlags name)

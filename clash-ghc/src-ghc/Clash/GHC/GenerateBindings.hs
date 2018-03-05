@@ -39,9 +39,11 @@ import qualified TysWiredIn              as GHC
 import qualified Var                     as GHC
 import qualified SrcLoc                  as GHC
 
+import           Clash.Annotations.BitRepresentation
 import           Clash.Annotations.BitRepresentation.Internal
 import           Clash.Annotations.TopEntity (TopEntity)
 import           Clash.Annotations.Primitive (HDL)
+
 import           Clash.Core.FreeVars     (termFreeIds)
 import           Clash.Core.Name         (Name (..), string2SystemName, name2String)
 import           Clash.Core.Term         (Term (..), TmName, TmOccName)

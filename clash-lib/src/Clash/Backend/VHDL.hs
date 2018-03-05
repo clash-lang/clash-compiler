@@ -50,11 +50,12 @@ import           Clash.Netlist.Util                   hiding (mkIdentifier)
 import           Clash.Signal.Internal                (ClockKind (..))
 import           Clash.Util                           (clogBase, curLoc, first, makeCached, on, (<:>))
 
-import           Clash.Annotations.BitRepresentation.Internal
+import           Clash.Annotations.BitRepresentation
   (ConstrRepr'(..))
+import           Clash.Annotations.BitRepresentation.Internal
+  (bitsToBits)
 import           Clash.Annotations.BitRepresentation.Util
   (BitOrigin(Lit, Field), bitOrigins, bitRanges)
-
 
 #ifdef CABAL
 import qualified Paths_clash_lib
@@ -1019,18 +1020,18 @@ expr_ _ (DataCon ty@(CustomSum _ _ tys) (DC (_,i)) []) =
 expr_ _ (DataCon (CustomSP _ size args) (DC (_,i)) es) =
   hcat $ punctuate " & " $ mapM range origins
     where
-      (cRepr, _, argTys) = args !! i
+      (ConstrRepr' _name _n mask value anns, _, argTys) = args !! i
 
       -- Build bit representations for all constructor arguments
       argExprs = zipWith toSLV argTys es :: [VHDLM Doc]
 
       -- Spread bits of constructor arguments using masks
-      origins = bitOrigins size cRepr :: [BitOrigin]
+      origins = bitOrigins size (mask, value, anns) :: [BitOrigin]
 
       range
         :: BitOrigin
         -> VHDLM Doc
-      range (Lit ns) =
+      range (Lit (bitsToBits -> ns)) =
         dquotes $ hcat $ mapM bit_char ns
       range (Field n start end) =
         -- We want to select the bits starting from 'start' downto and including

@@ -130,7 +130,6 @@ Library
                       unordered-containers    >= 0.2.3.3  && < 0.3
 
   Exposed-modules:    Clash.Annotations.BitRepresentation.Internal
-                      Clash.Annotations.BitRepresentation.Util
 
                       Clash.Backend
                       Clash.Backend.SystemVerilog

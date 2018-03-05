@@ -79,12 +79,11 @@ import qualified UniqSet
 import qualified Var
 
 -- Internal Modules
-import           Clash.Annotations.BitRepresentation          (DataReprAnn)
-import           Clash.Annotations.BitRepresentation.Internal (DataRepr')
+import           Clash.Annotations.BitRepresentation          (DataReprAnn, DataRepr')
 import           Clash.GHC.GHC2Core                           (modNameM)
-import           Clash.GHC.LoadInterfaceFiles
-import           Clash.GHC.LoadInterfaceFiles                 (loadExternalExprs, toDataRepr')
+import           Clash.GHC.LoadInterfaceFiles                 (loadExternalExprs, primitiveFilePath)
 import           Clash.Util                                   (curLoc)
+import           Clash.Annotations.BitRepresentation          (dataReprAnnToDataRepr')
 
 ghcLibDir :: IO FilePath
 ghcLibDir = do
@@ -367,7 +366,7 @@ findCustomReprAnnotations = do
   let deserialized = Annotations.deserializeAnns deserializer ann_env
   let reprs        = concat $ UniqFM.nonDetEltsUFM deserialized
 
-  return $ map toDataRepr' reprs
+  return $ map dataReprAnnToDataRepr' reprs
 
 findSynthesizeAnnotations
   :: GHC.GhcMonad m

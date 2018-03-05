@@ -10,9 +10,11 @@
 {-# LANGUAGE DeriveAnyClass             #-}
 {-# LANGUAGE DeriveGeneric              #-}
 {-# LANGUAGE DerivingStrategies         #-}
+{-# LANGUAGE DeriveLift                 #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE PatternSynonyms            #-}
 {-# LANGUAGE TemplateHaskell            #-}
+{-# LANGUAGE DeriveDataTypeable         #-}
 
 {-# OPTIONS_GHC -Wno-orphans #-}
 
@@ -29,7 +31,9 @@ import Data.HashMap.Lazy                    (HashMap)
 import Data.IntMap.Lazy                     (IntMap, empty)
 import qualified Data.Text                  as S
 import Data.Text.Lazy                       (Text, pack)
+import Data.Typeable                        (Typeable)
 import GHC.Generics                         (Generic)
+import Language.Haskell.TH.Syntax           (Lift)
 import Unbound.Generics.LocallyNameless     (Fresh, FreshMT)
 
 import SrcLoc                               (SrcSpan)
@@ -45,8 +49,8 @@ import Clash.Primitives.Types               (PrimMap)
 import Clash.Signal.Internal                (ClockKind, ResetKind)
 import Clash.Util
 
-import Clash.Annotations.BitRepresentation.Internal ( CustomReprs
-                                                    , ConstrRepr' )
+import Clash.Annotations.BitRepresentation
+  (CustomReprs, ConstrRepr')
 
 -- | Monad that caches generated components (StateT) and remembers hidden inputs
 -- of components that are being generated (WriterT)
@@ -237,7 +241,7 @@ data Bit
   | L -- ^ Low
   | U -- ^ Undefined
   | Z -- ^ High-impedance
-  deriving (Eq,Show)
+  deriving (Eq,Show,Typeable,Lift)
 
 -- | Context used to fill in the holes of a BlackBox template
 data BlackBoxContext

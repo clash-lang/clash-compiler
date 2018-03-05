@@ -66,6 +66,7 @@ import           Clash.Netlist.Util
 import           Clash.Primitives.Types           as P
 import           Clash.Util
 
+import Clash.Annotations.BitRepresentation
 import Clash.Annotations.BitRepresentation.Internal
 
 -- | Generate a hierarchical netlist out of a set of global binders with
