@@ -873,7 +873,7 @@ expr_ :: Bool -- ^ Enclose in parenthesis?
 expr_ _ (Literal sizeM lit) = exprLit sizeM lit
 expr_ _ (Identifier id_ Nothing) = pretty id_
 expr_ _ (Identifier id_ (Just (Indexed (CustomSP _id _size args,dcI,fI)))) =
-  hcat $ punctuate " & " $ sequence ranges
+  "unsigned" <> parens ("std_logic_vector'" <> parens (hcat $ punctuate " & " $ sequence ranges))
     where
       (ConstrRepr' _name _n _mask _value anns, _, _argTys) = args !! dcI
 
