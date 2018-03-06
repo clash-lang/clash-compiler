@@ -770,13 +770,16 @@ inst_ (BlackBoxD _ libs packs Nothing bs bbCtx) = do
 inst_ (BlackBoxD _ libs packs (Just (nm,inc)) bs bbCtx) = do
   libraries %= ((map T.fromStrict libs) ++)
   packages  %= ((map T.fromStrict packs) ++)
-  inc' <- renderBlackBox inc bbCtx
+  incForHash <- renderBlackBox inc (bbCtx {bbQsysIncName = Just "~QSYSINCLUDENAME"})
   iw <- use intWidth
-  let incHash = hash inc'
+  let incHash = hash incForHash
       nm'     = T.concat [ T.fromStrict nm
                          , T.pack (printf ("%0" ++ show (iw `div` 4) ++ "X") incHash)
                          ]
-  t <- renderBlackBox bs (bbCtx {bbQsysIncName = Just nm'})
+      bbNamedCtx = bbCtx {bbQsysIncName = Just nm'}
+
+  inc' <- renderBlackBox inc bbNamedCtx
+  t <- renderBlackBox bs bbNamedCtx
   inc'' <- text inc'
   includes %= ((unpack nm', inc''):)
   fmap Just (string t)
