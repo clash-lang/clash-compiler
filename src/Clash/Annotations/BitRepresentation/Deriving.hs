@@ -8,14 +8,21 @@
 
 module Clash.Annotations.BitRepresentation.Deriving
   ( deriveDefaultAnnotation
+  , deriveAnnotation
   , deriveBitPack
+  , simpleDerivators
+  , Derivator
+  , DataReprAnnExp
+  , ConstructorType(..)
+  , FieldsType(..)
   ) where
 
 import GHC.Exts
 import GHC.Integer.Logarithms
 
-import Data.List (mapAccumL)
-import Data.Bits (shiftL, shiftR)
+import Data.Bits ((.&.))
+import Data.List (mapAccumL, zipWith4)
+import Data.Bits (shiftL, shiftR, complement)
 import Data.Proxy (Proxy(..))
 import Data.Maybe (fromJust)
 
@@ -26,13 +33,15 @@ import Language.Haskell.TH
 import Language.Haskell.TH.Syntax
 import GHC.TypeLits (natVal)
 
-import Clash.Sized.BitVector (BitVector, high, low)
+import Clash.Sized.BitVector (BitVector, high, low, (++#))
 import Clash.Class.Resize  (resize)
 import Clash.Class.BitPack (BitPack, BitSize, pack)
 import Clash.Annotations.BitRepresentation ( DataReprAnn(..)
                                            , DataRepr'(..)
                                            , ConstrRepr'(..)
                                            , ConstrRepr(..)
+                                           , BitMask
+                                           , Value
                                            , reprType
                                            , thTypeToType'
                                            , dataReprAnnToDataRepr'
@@ -46,6 +55,32 @@ import Clash.Annotations.BitRepresentation.Util ( bitOrigins
 
 type NameMap = Map.Map Name Type
 
+type DataReprAnnExp = Exp
+type Derivator      = Type -> Q DataReprAnnExp
+
+data ConstructorType
+  = Count
+  -- ^ First constructor will be encoded as 0b0, the second as 0b1, the third
+  -- as 0b10, etc.
+  | OneHot
+  -- ^ Reserve a single bit for each constructor marker.
+
+data FieldsType
+  = Overlap
+  -- ^ Store fields of different constructors at (possibly) overlapping bit
+  -- positions. That is, a data type with two constructors with each two fields
+  -- of each one bit will take /two/ bits for its whole representation (plus
+  -- constructor bits). This is the default behaviour of Clash.
+  | Wide
+  -- ^ Store fields of different constructs at non-overlapping positions. That
+  -- is, a data type with two constructors with each two fields of each one bit
+  -- will take /four/ bits for its whole representation (plus constructor bits).
+
+-- TODO: Inefficient implementation of determining the most significant bit set
+msb :: Integer -> Integer
+msb 0 = error $ "Most significant bit does not exist for zero."
+msb 1 = 0
+msb n = 1 + msb (shiftR n 1)
 
 integerLog2Ceil :: Integer -> Integer
 integerLog2Ceil n =
@@ -101,33 +136,26 @@ bitmask start  size = shiftL (2^size - 1) $ fromIntegral (start - (size - 1))
 
 buildConstrRepr
   :: Q Exp
-  -- ^ Data size
-  -> Integer
-  -- ^ Number of bits reserved for constructor
+  -- ^ Data size (excluding constructor size)
   -> Name
   -- ^ Constr name
   -> [Exp]
-  -- ^ Field sizes
-  -> Integer
-  -- ^ Constructor number
+  -- ^ Field masks
+  -> BitMask
+  -- ^ Constructor mask
+  -> Value
+  -- ^ Constructor value
   -> Q Exp
-buildConstrRepr dataSize constrSize constrName fieldSizes constrN = [|
+buildConstrRepr dataSize constrName fieldAnns constrMask constrValue = [|
   ConstrRepr
     constrName
     $mask
     $value
-    $(ListE <$> fanns)
+    $(return $ ListE fieldAnns)
   |]
   where
-    mask  = [| bitmask ($dataSize - 1) constrSize |]
-    value = [| shiftL constrN (fromIntegral $ $dataSize - 1)|]
-    fanns =
-      sequence $ snd
-               $ mapAccumL
-                    (\start size -> ([| $start - $size |], [| bitmask $start $size |]))
-                    [| $dataSize - constrSize - 1 |]
-                    (map return fieldSizes)
-
+    mask  = [| shiftL constrMask  (fromIntegral $ $dataSize)|]
+    value = [| shiftL constrValue (fromIntegral $ $dataSize)|]
 
 fieldTypes :: Con -> [Type]
 fieldTypes (NormalC _nm bTys) =
@@ -153,9 +181,63 @@ constrFieldSizes con = do
   fieldSizes <- mapM typeSize (fieldTypes con)
   return (conName con, fieldSizes)
 
+countConstructor :: [Integer] -> [(BitMask, Value)]
+countConstructor ns = zip (repeat mask) ns
+  where
+    maskSize = integerLog2Ceil $ maximum ns
+    mask = 2^maskSize - 1
+
+oneHotConstructor :: [Integer] -> [(BitMask, Value)]
+oneHotConstructor ns = zip values values
+  where
+    values = [shiftL 1 (fromIntegral n) | n <- ns]
+
+overlapFieldAnns :: [[Exp]] -> [Q [Exp]]
+overlapFieldAnns fieldSizess = map go fieldSizess
+  where
+    fieldSizess'  = ListE $ map ListE fieldSizess
+    constructorSizes = [| map sum $(return fieldSizess') |]
+    go fieldSizes =
+      sequence $
+      snd $
+      mapAccumL
+        (\start size -> ([| $start - $size |], [| bitmask $start $size |]))
+        [| maximum $constructorSizes - 1 |]
+        (map return fieldSizes)
+
+wideFieldAnns :: [[Exp]] -> [Q [Exp]]
+wideFieldAnns fieldSizess = zipWith id (map go constructorOffsets) fieldSizess
+  where
+    constructorSizes =
+      map (AppE (VarE 'sum)) (map ListE fieldSizess)
+
+    constructorOffsets :: [Q Exp]
+    constructorOffsets =
+      init $
+      scanl
+        (\offset size -> [| $offset + $size |])
+        [| 0 |]
+        (map return constructorSizes)
+
+    dataSize = [| sum $(return $ ListE constructorSizes) |]
+
+    go :: Q Exp -> [Exp] -> Q [Exp]
+    go offset fieldSizes =
+      sequence $
+      snd $
+      mapAccumL
+        (\start size -> ([| $start - $size |], [| bitmask $start $size |]))
+        [| $dataSize - 1 - $offset |]
+        (map return fieldSizes)
+
 -- | Derive DataRepr' for a specific type.
-deriveDataRepr :: Type -> Q Exp
-deriveDataRepr typ = do
+deriveDataRepr
+  :: ([Integer] -> [(BitMask, Value)])
+  -- ^ Constructor derivator
+  -> ([[Exp]] -> [Q [Exp]])
+  -- ^ Field derivator
+  -> Derivator
+deriveDataRepr constrDerivator fieldsDerivator typ = do
   info <- reify tyConstrName
   case info of
     (TyConI (DataD [] _constrName vars _kind dConstructors _clauses)) ->
@@ -166,27 +248,62 @@ deriveDataRepr typ = do
       (constrNames, fieldSizess) <-
         unzip <$> (mapM constrFieldSizes resolvedConstructors)
 
-      let fieldSizess'  = ListE <$> fieldSizess
-      let fieldSizess'' = ListE fieldSizess'
+      let
+        (constrMasks, constrValues) =
+          unzip $ constrDerivator [0..fromIntegral $ length dConstructors - 1]
 
-      -- Determine size of whole datatype
-      let constructorSizes = [| map sum $(return fieldSizess'') |]
-      let constrSize = integerLog2Ceil (fromIntegral $ length dConstructors)
-      let dataSize = [| constrSize + (maximum $constructorSizes) |]
+      let constrSize    = 1 + (msb $ maximum constrMasks)
+      fieldAnns        <- sequence $ fieldsDerivator fieldSizess
+      let fieldAnnsFlat = return $ ListE $ concat fieldAnns
+
+      let dataSize | null $ concat fieldAnns = [| 0 |]
+                   | otherwise = [| 1 + (msb $ maximum $ $fieldAnnsFlat) |]
+
 
       -- Determine at which bits various fields start
-      let constrReprs = zipWith3
-                          (buildConstrRepr dataSize constrSize)
+      let constrReprs = zipWith4
+                          (buildConstrRepr dataSize)
                           constrNames
-                          fieldSizess
-                          [0..]
+                          fieldAnns
+                          constrMasks
+                          constrValues
 
-      [| DataReprAnn $(reprType $ return typ)  $dataSize $(listE constrReprs)  |]
+      [| DataReprAnn
+          $(reprType $ return typ)
+          ($dataSize + constrSize)
+          $(listE constrReprs) |]
     _ ->
       error $ {-$(curLoc) ++-} "Could not derive dataRepr for: " ++ show info
 
     where
       (ConT tyConstrName, typeArgs) = collectTypeArgs typ
+
+simpleDerivators :: ConstructorType -> FieldsType -> Derivator
+simpleDerivators ctype ftype = deriveDataRepr constrDerivator fieldsDerivator
+  where
+    constrDerivator =
+      case ctype of
+        Count -> countConstructor
+        OneHot -> oneHotConstructor
+
+    fieldsDerivator =
+      case ftype of
+        Overlap -> overlapFieldAnns
+        Wide -> wideFieldAnns
+
+defaultDerivator :: Derivator
+defaultDerivator = simpleDerivators Count Overlap
+
+deriveDefaultAnnotation :: Q Type -> Q [Dec]
+deriveDefaultAnnotation = deriveAnnotation defaultDerivator
+
+deriveAnnotation :: Derivator -> Q Type -> Q [Dec]
+deriveAnnotation deriv typ =
+  return <$> pragAnnD ModuleAnnotation (deriv =<< typ)
+
+----------------------------------------------------
+------------ DERIVING BITPACK INSTANCES ------------
+----------------------------------------------------
 
 -- | Collect data reprs of current module
 collectDataReprs :: Q [DataRepr']
@@ -347,10 +464,6 @@ buildUnpack resTy (DataRepr' _name size constrs) = do
   let body     = MultiIfE $ matches ++ [(NormalG (ConE 'True), err)]
   let func     = FunD funcName [Clause [VarP argName] (NormalB body) []]
   return $ [funcSig, func]
-
-deriveDefaultAnnotation :: Q Type -> Q [Dec]
-deriveDefaultAnnotation typ =
-  return <$> pragAnnD ModuleAnnotation (deriveDataRepr =<< typ)
 
 -- | Derives BitPack instances for given type. Will account for custom bit
 -- representation annotations in the module where the splice is ran. Note that
