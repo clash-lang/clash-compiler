@@ -17,8 +17,7 @@ data types.
 {-# OPTIONS_GHC -Wno-orphans #-}
 
 module Clash.Annotations.BitRepresentation
- ( DataRepr(..)
- , DataRepr'(..)
+ ( DataRepr'(..)
  , ConstrRepr'(..)
  , DataReprAnn(..)
  , ConstrRepr(..)
@@ -99,31 +98,7 @@ data DataReprAnn =
     -- ^ Constructors
       deriving (Show, Data, Typeable)
 
--- | Type annotation for annotations specified in a separate file, interpreted
--- by Clash using '-fclash-custom-reprs <path>'.
---
--- @
--- data Color = R | G | B
--- colorAnn = DataRepr 2 [...] :: DataRepr Color
--- @
---
--- To annotate composed types, simply extend /colorAnn/s type. For example, if
--- we want to annotate `Maybe Color`:
---
--- @
--- data Color = R | G | B
--- colorAnn = DataRepr 2 [...] :: DataRepr (Maybe Color)
--- @
 
-data DataRepr a =
-  DataRepr
-    Size
-    -- ^ Size of type
-    [ConstrRepr]
-    -- ^ Constructors
-      deriving (Show, Data, Typeable)
-
--- | Constructor annotation.
 data ConstrRepr =
   ConstrRepr
     TH.Name
