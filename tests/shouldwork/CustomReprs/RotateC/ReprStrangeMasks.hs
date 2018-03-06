@@ -2,19 +2,19 @@
 {-# LANGUAGE BinaryLiterals #-}
 
 module ReprStrangeMasks
-  ( colorRepr
-  , maybeColorRepr
+  ( topEntity
+  , testBench
   ) where
 
-import RotateC
-import Clash.Annotations.BitRepresentation
+import Prelude
 import Data.Maybe
+import RotateC (Color(..), MaybeColor(..))
+import qualified RotateC
+import Clash.Annotations.BitRepresentation
 
-import Prelude (undefined)
-
-colorRepr :: DataRepr Color
-colorRepr =
-  DataRepr
+{-# ANN module (
+  DataReprAnn
+    $(reprType [t| Color |])
     2
     [ ConstrRepr
         'Red
@@ -31,11 +31,11 @@ colorRepr =
         0b11
         0b01
         []
-    ]
+    ]) #-}
 
-maybeColorRepr :: DataRepr MaybeColor
-maybeColorRepr =
-  DataRepr
+{-# ANN module (
+  DataReprAnn
+    $(reprType [t| MaybeColor |])
     5
     [ ConstrRepr
         'NothingC
@@ -47,4 +47,8 @@ maybeColorRepr =
         0b10101   -- Mask
         0b10101   -- Value
         [0b01010] -- Masks
-    ]
+    ]) #-}
+
+
+topEntity = RotateC.topEntity
+testBench = RotateC.testBench

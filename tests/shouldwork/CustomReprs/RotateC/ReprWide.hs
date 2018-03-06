@@ -1,19 +1,20 @@
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE BinaryLiterals #-}
 
-module ReprCompactWide
-  ( colorRepr
+module ReprWide
+  ( topEntity
+  , testBench
   ) where
 
-import RotateC
-import Clash.Annotations.BitRepresentation
+import Prelude
 import Data.Maybe
+import RotateC (Color(..), MaybeColor(..))
+import qualified RotateC
+import Clash.Annotations.BitRepresentation
 
-import Prelude (undefined)
-
-colorRepr :: DataRepr Color
-colorRepr =
-  DataRepr
+{-# ANN module (
+  DataReprAnn
+    $(reprType [t| Color |])
     3
     [ ConstrRepr
         'Red
@@ -30,5 +31,7 @@ colorRepr =
         0b001
         0b001
         []
-    ]
+    ]) #-}
 
+topEntity = RotateC.topEntity
+testBench = RotateC.testBench

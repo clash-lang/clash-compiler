@@ -2,18 +2,19 @@
 {-# LANGUAGE BinaryLiterals #-}
 
 module ReprLastBitConstructor
-  ( maybeColorRepr
+  ( topEntity
+  , testBench
   ) where
 
-import RotateC
-import Clash.Annotations.BitRepresentation
+import Prelude
 import Data.Maybe
+import RotateC (Color(..), MaybeColor(..))
+import qualified RotateC
+import Clash.Annotations.BitRepresentation
 
-import Prelude (undefined)
-
-maybeColorRepr :: DataRepr MaybeColor
-maybeColorRepr =
-  DataRepr
+{-# ANN module (
+  DataReprAnn
+    $(reprType [t| MaybeColor |])
     3
     [ ConstrRepr
         'NothingC
@@ -25,6 +26,7 @@ maybeColorRepr =
         0b001   -- Mask
         0b001   -- Value
         [0b110] -- Masks
-    ]
+    ]) #-}
 
-
+topEntity = RotateC.topEntity
+testBench = RotateC.testBench

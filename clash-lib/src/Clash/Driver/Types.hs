@@ -59,7 +59,6 @@ data ClashOpts = ClashOpts { opt_inlineLimit :: Int
                            , opt_floatSupport :: Bool
                            , opt_importPaths :: [FilePath]
                            , opt_componentPrefix :: Maybe String
-                           , opt_customReprs :: [FilePath]
                            }
 
 
@@ -81,7 +80,6 @@ defClashOpts
   , opt_floatSupport        = False
   , opt_importPaths         = []
   , opt_componentPrefix     = Nothing
-  , opt_customReprs         = []
   }
 
 data ClashException = ClashException SrcSpan String (Maybe String)

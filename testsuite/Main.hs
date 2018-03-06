@@ -105,21 +105,17 @@ main = do
             , runTest ("tests" </> "shouldwork" </> "CoSim") Verilog ["-i../../../clash-cosim/src/prims/verilog"] "Register" (["","Register_testBench"],"Register_testBench",True)
             ]
 #endif
-        , let env = ("tests" </> "shouldwork" </> "CustomReprs") in testGroup "CustomReprs" (
-            [ runTest (env </> "Annotated") defBuild [] "Rotate" (["", "Rotate_testBench"],"Rotate_testBench",True)
-            , runTest (env </> "RotateC") defBuild [] "RotateC" (["", "RotateC_testBench"],"RotateC_testBench",True)
-            , runTest (env </> "RotateC") defBuild ["-fclash-custom-reprs", "../.." </> env </> "RotateC" </> "ReprCompact.hs"] "RotateC" (["", "RotateC_testBench"],"RotateC_testBench",True)
-            , runTest (env </> "RotateC") defBuild ["-fclash-custom-reprs", "../.." </> env </> "RotateC" </> "ReprCompactScrambled.hs"] "RotateC" (["", "RotateC_testBench"],"RotateC_testBench",True)
-            , runTest (env </> "RotateC") defBuild ["-fclash-custom-reprs", "../.." </> env </> "RotateC" </> "ReprWide.hs"] "RotateC" (["", "RotateC_testBench"],"RotateC_testBench",True)
-            , runTest (env </> "RotateC") VHDL ["-fclash-custom-reprs", "../.." </> env </> "RotateC" </> "ReprStrangeMasks.hs"] "RotateC" (["", "RotateC_testBench"],"RotateC_testBench",True)
-            , runTest (env </> "RotateC") defBuild ["-fclash-custom-reprs", "../.." </> env </> "RotateC" </> "ReprLastBitConstructor.hs"] "RotateC" (["", "RotateC_testBench"],"RotateC_testBench",True)
-            , runTest (env </> "RotateC") defBuild [] "RotateCScrambled" (["", "RotateCScrambled_testBench"],"RotateCScrambled_testBench",True)
-            , runTest (env </> "RotateC") defBuild ["-fclash-custom-reprs", "../.." </> env </> "RotateC" </> "RotateCScrambledRepr.hs"] "RotateCScrambled" (["", "RotateCScrambled_testBench"],"RotateCScrambled_testBench",False)
-            , runTest (env </> "RotateCNested") defBuild [] "RotateCNested" (["", "RotateCNested_testBench"],"RotateCNested_testBench",True)
-            , runTest (env </> "RotateCNested") defBuild ["-fclash-custom-reprs", "../.." </> env </> "RotateCNested" </> "ReprCompact.hs"] "RotateCNested" (["", "RotateCNested_testBench"],"RotateCNested_testBench",True)
-            , runTest (env </> "Rotate") defBuild [] "Rotate" (["", "Rotate_testBench"],"Rotate_testBench",True)
-            , runTest (env </> "Rotate") defBuild ["-fclash-custom-reprs", "../.." </> env </> "Rotate" </> "ReprCompact.hs"] "Rotate" (["", "Rotate_testBench"],"Rotate_testBench",True)
-            ] ++ (if defBuild == All then [runTest (env </> "RotateC") VHDL ["-fclash-custom-reprs", "../.." </> env </> "RotateC" </> "ReprStrangeMasks.hs"] "RotateC" (["", "RotateC_testBench"],"RotateC_testBench",True)] else []))
+        , testGroup "CustomReprs"
+            [ runTest ("tests" </> "shouldwork" </> "CustomReprs" </> "RotateC") defBuild [] "RotateC" (["", "RotateC_testBench"],"RotateC_testBench",True)
+            , runTest ("tests" </> "shouldwork" </> "CustomReprs" </> "RotateC") defBuild [] "ReprCompact" (["", "ReprCompact_testBench"],"ReprCompact_testBench",True)
+            , runTest ("tests" </> "shouldwork" </> "CustomReprs" </> "RotateC") defBuild [] "ReprCompactScrambled" (["", "ReprCompactScrambled_testBench"],"ReprCompactScrambled_testBench",True)
+            , runTest ("tests" </> "shouldwork" </> "CustomReprs" </> "RotateC") defBuild [] "ReprLastBitConstructor" (["", "ReprLastBitConstructor_testBench"],"ReprLastBitConstructor_testBench",True)
+            , runTest ("tests" </> "shouldwork" </> "CustomReprs" </> "RotateC") VHDL     [] "ReprStrangeMasks" (["", "ReprStrangeMasks_testBench"],"ReprStrangeMasks_testBench",True)
+            , runTest ("tests" </> "shouldwork" </> "CustomReprs" </> "RotateC") defBuild [] "ReprWide" (["", "ReprWide_testBench"],"ReprWide_testBench",True)
+            , runTest ("tests" </> "shouldwork" </> "CustomReprs" </> "RotateC") defBuild [] "RotateCScrambled" (["", "RotateCScrambled_testBench"],"RotateCScrambled_testBench",True)
+            , runTest ("tests" </> "shouldwork" </> "CustomReprs" </> "RotateCNested") defBuild [] "RotateCNested" (["", "RotateCNested_testBench"],"RotateCNested_testBench",True)
+            , runTest ("tests" </> "shouldwork" </> "CustomReprs" </> "Rotate") defBuild [] "Rotate" (["", "Rotate_testBench"],"Rotate_testBench",True)
+            ]
         , testGroup "Feedback" -- Broken on GHC 8.0 due to: https://ghc.haskell.org/trac/ghc/ticket/11525
             [ runTest ("tests" </> "shouldwork" </> "Feedback") defBuild [] "Fib" (["","Fib_testBench"],"Fib_testBench",True)
             ]

@@ -12,12 +12,49 @@ data Color
   = Red
   | Green
   | Blue
-    deriving (Eq, Show{-, Generic, ShowX-})
+    deriving (Eq, Show, Generic, ShowX)
 
 data MaybeColor
   = NothingC
   | JustC Color
-    deriving (Eq, Show{-, Generic, ShowX-})
+    deriving (Eq, Show, Generic, ShowX)
+
+{-# ANN module (
+  DataReprAnn
+    $(reprType [t| Color |])
+    2
+    [ ConstrRepr
+        'Red
+        0b11
+        0b00
+        []
+    , ConstrRepr
+        'Blue
+        0b11
+        0b10
+        []
+    , ConstrRepr
+        'Green
+        0b11
+        0b01
+        []
+    ]) #-}
+
+{-# ANN module (
+  DataReprAnn
+    $(reprType [t| MaybeColor |])
+    2
+    [ ConstrRepr
+        'NothingC
+        0b11 -- Mask
+        0b11 -- Value
+        []
+    , ConstrRepr
+        'JustC
+        0b00   -- Mask
+        0b00   -- Value
+        [0b11] -- Masks
+    ]) #-}
 
 -- Test functions:
 rotateColor
@@ -29,18 +66,11 @@ rotateColor c =
     Green -> Blue
     Blue  -> Red
 
-colorToInt
-  :: Color
-  -> Int
-colorToInt Red   = 33
-colorToInt Green = 34
-colorToInt Blue  = 35
-
 topEntity
   :: SystemClockReset
   => Signal System (Maybe MaybeColor)
-  -> Signal System Int
-topEntity = fmap (colorToInt . f)
+  -> Signal System Color
+topEntity = fmap f
   where
     f cM =
       case cM of
@@ -60,11 +90,11 @@ testBench = done'
                                :> Just (JustC Blue)
                                :> Nil
 
-    expectedOutput = outputVerifier $ 33 -- Red
-                                   :> 35 -- Blue
-                                   :> 34 -- Green
-                                   :> 35 -- Blue
-                                   :> 33 -- Red
+    expectedOutput = outputVerifier $ Red
+                                   :> Blue
+                                   :> Green
+                                   :> Blue
+                                   :> Red
                                    :> Nil
 
     done  = expectedOutput (topEntity testInput)

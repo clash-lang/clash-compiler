@@ -2,19 +2,20 @@
 {-# LANGUAGE BinaryLiterals #-}
 
 module ReprCompactScrambled
-  ( colorRepr
-  , maybeColorRepr
+  ( testBench
+  , topEntity
   ) where
 
-import RotateC
-import Clash.Annotations.BitRepresentation
+
+import Prelude
 import Data.Maybe
+import RotateC (Color(..), MaybeColor(..))
+import qualified RotateC
+import Clash.Annotations.BitRepresentation
 
-import Prelude (undefined)
-
-colorRepr :: DataRepr Color
-colorRepr =
-  DataRepr
+{-# ANN module (
+  DataReprAnn
+    $(reprType [t| Color |])
     2
     [ ConstrRepr
         'Red
@@ -31,11 +32,11 @@ colorRepr =
         0b11
         0b10
         []
-    ]
+    ]) #-}
 
-maybeColorRepr :: DataRepr MaybeColor
-maybeColorRepr =
-  DataRepr
+{-# ANN module (
+  DataReprAnn
+    $(reprType [t| MaybeColor |])
     2
     [ ConstrRepr
         'NothingC
@@ -47,6 +48,8 @@ maybeColorRepr =
         0b00   -- Mask
         0b00   -- Value
         [0b11] -- Masks
-    ]
+    ]) #-}
 
 
+topEntity = RotateC.topEntity
+testBench = RotateC.testBench
