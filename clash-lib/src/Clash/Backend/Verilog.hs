@@ -751,7 +751,7 @@ bits = hcat . mapM bit_char
 bit_char' :: Bit -> Char
 bit_char' H = '1'
 bit_char' L = '0'
-bit_char' U = 'x'
+bit_char' U = '0' -- HACK: use 0 to represent 'undefined' to prevent simulator errors
 bit_char' Z = 'z'
 
 bit_char :: Bit -> VerilogM Doc

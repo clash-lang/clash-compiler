@@ -1114,7 +1114,7 @@ bits = hcat . mapM bit_char
 bit_char :: Bit -> SystemVerilogM Doc
 bit_char H = char '1'
 bit_char L = char '0'
-bit_char U = char 'x'
+bit_char U = char '0' -- HACK: use 0 to represent 'undefined' to prevent simulator errors
 bit_char Z = char 'z'
 
 toSLV :: HWType -> Expr -> SystemVerilogM Doc
