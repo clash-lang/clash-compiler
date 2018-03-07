@@ -1,3 +1,69 @@
+{-|
+Copyright  :  (C) 2017, Google Inc.
+License    :  BSD2 (see the file LICENSE)
+Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
+
+This module houses functions deriving BitPack instances given a custom bit
+representation and function to derive some (alternative) representations
+automatically.
+
+For example, we can pack a Maybe Color (where Color is a type with 3 possible
+values) in only 2 bits using:
+
+@
+data Color
+  = Red
+  | Green
+  | Blue
+
+{-# ANN module (
+  DataReprAnn
+    $(reprType [t| Color |])
+    2
+    [ ConstrRepr
+        'Red
+        0b11
+        0b00
+        []
+    , ConstrRepr
+        'Green
+        0b11
+        0b01
+        []
+    , ConstrRepr
+        'Blue
+        0b11
+        0b10
+        []
+    ]) #-}
+
+{-# ANN module (
+  DataReprAnn
+    $(reprType [t| Maybe Color |])
+    -- ^ Type to annotate
+    2
+    -- ^ Size of whole data type
+    [ ConstrRepr
+        'Nothing
+        0b11
+        -- ^ Mask for this constructor
+        0b11
+        -- ^ Value to match this constructor on
+        []
+    , ConstrRepr
+        'Just
+        0b00
+        -- ^ Mask for this constructor
+        0b00
+        -- ^ Value to match this constructor on
+        [0b11]
+        -- ^ Masks of fields of Just
+    ]) #-}
+@
+
+To derive BitPack instances from these annotations, see
+Clash.Annotations.BitRepresentation.Deriving.
+-}
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE QuasiQuotes #-}
 {-# LANGUAGE MagicHash #-}
@@ -10,7 +76,7 @@ module Clash.Annotations.BitRepresentation.Deriving
   ( deriveDefaultAnnotation
   , deriveAnnotation
   , deriveBitPack
-  , simpleDerivators
+  , simpleDerivator
   , Derivator
   , DataReprAnnExp
   , ConstructorType(..)
@@ -55,9 +121,13 @@ import Clash.Annotations.BitRepresentation.Util ( bitOrigins
 
 type NameMap = Map.Map Name Type
 
+-- | DataReprAnn as template haskell expression
 type DataReprAnnExp = Exp
-type Derivator      = Type -> Q DataReprAnnExp
 
+-- | A derivator derives a bit representation given a type
+type Derivator = Type -> Q DataReprAnnExp
+
+-- | Indicates how to pack constructor for simpleDerivator
 data ConstructorType
   = Count
   -- ^ First constructor will be encoded as 0b0, the second as 0b1, the third
@@ -65,6 +135,7 @@ data ConstructorType
   | OneHot
   -- ^ Reserve a single bit for each constructor marker.
 
+-- | Indicates how to pack (constructor) fields for simpleDerivator
 data FieldsType
   = Overlap
   -- ^ Store fields of different constructors at (possibly) overlapping bit
@@ -76,12 +147,16 @@ data FieldsType
   -- is, a data type with two constructors with each two fields of each one bit
   -- will take /four/ bits for its whole representation (plus constructor bits).
 
--- TODO: Inefficient implementation of determining the most significant bit set
+-- | Determine most significant bit set for given integer.
+--
+-- TODO: Current complexity is O(n). We could probably use machine instructions
+-- for ~constant complexity.
 msb :: Integer -> Integer
 msb 0 = error $ "Most significant bit does not exist for zero."
 msb 1 = 0
 msb n = 1 + msb (shiftR n 1)
 
+-- | Integer version of (ceil . log2). Can handle arguments up to 2^(2^WORDWIDTH).
 integerLog2Ceil :: Integer -> Integer
 integerLog2Ceil n =
   let nlog2 = fromIntegral $ I# (integerLog2# n) in
@@ -112,6 +187,9 @@ collectTypeArgs (AppT t1 t2) =
 collectTypeArgs t =
   error $ {-$(curLoc) ++-} "Unexpected type: " ++ show t
 
+-- | Returns size in number of bits of given type. Relies on the presence of a
+-- BitSize implementation. Tries to recognize literal values and return a simple
+-- expression.
 typeSize :: Type -> Q Exp
 typeSize typ = do
   bitSizeInstances <- reifyInstances ''BitSize [typ]
@@ -127,12 +205,19 @@ typeSize typ = do
     unexp ->
       error $ {-$(curLoc) ++ -} "Unexpected result from reifyInstances: " ++ show unexp
 
+-- | Generate bitmask from a given bit, with a certain size
 bitmask
   :: Integer
+  -- ^ Bitmask starts at bit /n/
   -> Integer
+  -- ^ Bitmask has size /m/
   -> Integer
 bitmask _start 0    = 0
-bitmask start  size = shiftL (2^size - 1) $ fromIntegral (start - (size - 1))
+bitmask start  size
+  | start < 0        = error $ "Start cannot be <0. Was: " ++ show start
+  | size < 0         = error $ "Size cannot be <0. Was: " ++ show size
+  | start + 1 < size = error $ "Start + 1 (" ++ show start ++ " - 1) cannot be smaller than size (" ++ show size ++  ")."
+  | otherwise        = shiftL (2^size - 1) $ fromIntegral (start - (size - 1))
 
 buildConstrRepr
   :: Q Exp
@@ -278,8 +363,10 @@ deriveDataRepr constrDerivator fieldsDerivator typ = do
     where
       (ConT tyConstrName, typeArgs) = collectTypeArgs typ
 
-simpleDerivators :: ConstructorType -> FieldsType -> Derivator
-simpleDerivators ctype ftype = deriveDataRepr constrDerivator fieldsDerivator
+-- | Simple derivators change the (default) way Clash stores data types. It
+-- assumes no overlap between constructors and fields.
+simpleDerivator :: ConstructorType -> FieldsType -> Derivator
+simpleDerivator ctype ftype = deriveDataRepr constrDerivator fieldsDerivator
   where
     constrDerivator =
       case ctype of
@@ -291,9 +378,13 @@ simpleDerivators ctype ftype = deriveDataRepr constrDerivator fieldsDerivator
         Overlap -> overlapFieldAnns
         Wide -> wideFieldAnns
 
+-- | Derives bit representation corresponding to the default manner in which
+-- Clash stores types.
 defaultDerivator :: Derivator
-defaultDerivator = simpleDerivators Count Overlap
+defaultDerivator = simpleDerivator Count Overlap
 
+-- | Derives bit representation corresponding to the default manner in which
+-- Clash stores types.
 deriveDefaultAnnotation :: Q Type -> Q [Dec]
 deriveDefaultAnnotation = deriveAnnotation defaultDerivator
 
