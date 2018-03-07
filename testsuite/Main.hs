@@ -119,6 +119,7 @@ main = do
             , runTest ("tests" </> "shouldwork" </> "CustomReprs" </> "RotateC") defBuild [] "RotateCScrambled" (["", "RotateCScrambled_testBench"],"RotateCScrambled_testBench",True)
             , runTest ("tests" </> "shouldwork" </> "CustomReprs" </> "RotateCNested") defBuild [] "RotateCNested" (["", "RotateCNested_testBench"],"RotateCNested_testBench",True)
             , runTest ("tests" </> "shouldwork" </> "CustomReprs" </> "Rotate") defBuild [] "Rotate" (["", "Rotate_testBench"],"Rotate_testBench",True)
+            , runTest ("tests" </> "shouldwork" </> "CustomReprs" </> "Deriving") defBuild [] "BitPackDerivation" (["", "BitPackDerivation_testBench"],"BitPackDerivation_testBench",True)
             ]
         , testGroup "CustomReprsDeriving" DerivingDataRepr.tests
         , testGroup "Feedback" -- Broken on GHC 8.0 due to: https://ghc.haskell.org/trac/ghc/ticket/11525
