@@ -35,7 +35,7 @@ import GHC.TypeLits (natVal)
 
 import Clash.Sized.BitVector (BitVector, high, low, (++#))
 import Clash.Class.Resize  (resize)
-import Clash.Class.BitPack (BitPack, BitSize, pack)
+import Clash.Class.BitPack (BitPack, BitSize, pack, unpack)
 import Clash.Annotations.BitRepresentation ( DataReprAnn(..)
                                            , DataRepr'(..)
                                            , ConstrRepr'(..)
@@ -421,11 +421,10 @@ buildPack
 buildPack argTy (DataRepr' _name size constrs) = do
   argName      <- newName "toBePacked"
   let resTy     = AppT (ConT ''BitVector) (LitT $ NumTyLit size)
-  let funcName  = mkName "pack"
-  let funcSig   = SigD funcName (AppT (AppT ArrowT argTy) resTy)
+  let funcSig   = SigD 'pack (AppT (AppT ArrowT argTy) resTy)
   constrs'     <- mapM (buildPackMatch size) constrs
   let body      = CaseE (VarE argName) constrs'
-  let func      = FunD funcName [Clause [VarP argName] (NormalB body) []]
+  let func      = FunD 'pack [Clause [VarP argName] (NormalB body) []]
   return $ [funcSig, func]
 
 buildUnpackField
@@ -456,13 +455,12 @@ buildUnpack
   -> Q [Dec]
 buildUnpack resTy (DataRepr' _name size constrs) = do
   argName <- newName "toBeUnpacked"
-  let funcName = mkName "unpack"
   let argTy    = AppT (ConT ''BitVector) (LitT $ NumTyLit size)
-  let funcSig  = SigD funcName (AppT (AppT ArrowT argTy) resTy)
+  let funcSig  = SigD 'unpack (AppT (AppT ArrowT argTy) resTy)
   matches     <- mapM (buildUnpackIfE argName size) constrs
   err         <- [| error $ "Could not match constructor for: " ++ show $(varE argName) |]
   let body     = MultiIfE $ matches ++ [(NormalG (ConE 'True), err)]
-  let func     = FunD funcName [Clause [VarP argName] (NormalB body) []]
+  let func     = FunD 'unpack [Clause [VarP argName] (NormalB body) []]
   return $ [funcSig, func]
 
 -- | Derives BitPack instances for given type. Will account for custom bit
