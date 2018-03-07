@@ -6,7 +6,6 @@
 
 module DerivingDataReprTrain where
 
-import Data.Int
 import Clash.Sized.Unsigned
 
 type SmallInt = Unsigned 2

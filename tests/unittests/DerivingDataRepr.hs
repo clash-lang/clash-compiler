@@ -19,7 +19,7 @@ import Clash.Annotations.BitRepresentation.Deriving
 import DerivingDataReprTrain (Train)
 
 oneHotOverlapRepr :: DataReprAnn
-oneHotOverlapRepr = $( (simpleDerivators OneHot Overlap) =<< [t| Train |] )
+oneHotOverlapRepr = $( (simpleDerivator OneHot Overlap) =<< [t| Train |] )
 
 oneHotOverlapRepr' :: DataRepr'
 oneHotOverlapRepr' =
@@ -33,7 +33,7 @@ oneHotOverlapRepr' =
     ]
 
 oneHotWideRepr :: DataReprAnn
-oneHotWideRepr = $( (simpleDerivators OneHot Wide) =<< [t| Train |] )
+oneHotWideRepr = $( (simpleDerivator OneHot Wide) =<< [t| Train |] )
 
 oneHotWideRepr' :: DataRepr'
 oneHotWideRepr' =
@@ -47,7 +47,7 @@ oneHotWideRepr' =
     ]
 
 countOverlapRepr :: DataReprAnn
-countOverlapRepr = $( (simpleDerivators Count Overlap) =<< [t| Train |] )
+countOverlapRepr = $( (simpleDerivator Count Overlap) =<< [t| Train |] )
 
 countOverlapRepr' :: DataRepr'
 countOverlapRepr' =
@@ -61,7 +61,7 @@ countOverlapRepr' =
     ]
 
 countWideRepr :: DataReprAnn
-countWideRepr = $( (simpleDerivators Count Wide) =<< [t| Train |] )
+countWideRepr = $( (simpleDerivator Count Wide) =<< [t| Train |] )
 
 countWideRepr' :: DataRepr'
 countWideRepr' =

@@ -8,7 +8,7 @@ import Clash.Sized.Internal.BitVector
 import Clash.Annotations.BitRepresentation
 import Clash.Annotations.BitRepresentation.Deriving
 
-deriveAnnotation (simpleDerivators OneHot Overlap) [t| Train |]
+deriveAnnotation (simpleDerivator OneHot Overlap) [t| Train |]
 deriveBitPack [t| Train |]
 
 topEntity
