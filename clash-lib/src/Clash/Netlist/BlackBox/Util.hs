@@ -284,13 +284,6 @@ renderElem b (IF c t f) = do
                     in case ty of
                        Reset _ _ Synchronous -> 1
                        _ -> 0
-      (IsBit nM)  -> let ty = case nM of
-                                Just n | (_,ty',_) <- bbInputs b !! n -> ty'
-                                _ -> snd (bbResult b)
-                     in case ty of
-                        BitVector 1 -> 1
-                        Bit -> 1
-                        _ -> 0
       (StrCmp [C t1] n) ->
         let (e,_,_) = bbInputs b !! n
         in  case exprToText e of
@@ -534,8 +527,6 @@ prettyElem (IsLit i) = (displayT . renderOneLine) <$> (text "~ISLIT" <> brackets
 prettyElem (IsVar i) = (displayT . renderOneLine) <$> (text "~ISVAR" <> brackets (int i))
 prettyElem (IsGated i) = (displayT . renderOneLine) <$> (text "~ISGATED" <> brackets (int i))
 prettyElem (IsSync i) = (displayT . renderOneLine) <$> (text "~ISSYNC" <> brackets (int i))
-prettyElem (IsBit Nothing) = return "~ISBITO"
-prettyElem (IsBit (Just i)) = (displayT . renderOneLine) <$> (text "~ISBIT" <> brackets (int i))
 prettyElem (StrCmp es i) = do
   es' <- prettyBlackBox es
   (displayT . renderOneLine) <$> (text "~STRCMP" <> brackets (text es') <> brackets (int i))

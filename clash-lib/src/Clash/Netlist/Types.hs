@@ -95,7 +95,6 @@ data HWType
   = Void -- ^ Empty type
   | String -- ^ String type
   | Bool -- ^ Boolean type
-  | Bit -- ^ Bit type
   | BitVector !Size -- ^ BitVector of a specified size
   | Index    !Integer -- ^ Unsigned integer with specified (exclusive) upper bounder
   | Signed   !Size -- ^ Signed integer of a specified size

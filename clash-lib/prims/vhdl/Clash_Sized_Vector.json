@@ -381,7 +381,12 @@ end generate;
 "concatBitVector# :: (KnownNat n,KnownNat m) -- (ARG[0],ARG[1])
                   => Vec n (BitVector m)     -- ARG[2]
                   -> BitVector (n * m)"
-    , "templateE" : "~IF~ISBITO~THEN~VAR[v][2](0)~ELSE~TOBV[~ARG[2]][~TYP[2]]~FI"
+    , "templateD" :
+"-- concatBitVector begin
+~GENSYM[concatBitVectorIter_loop][2] : for ~GENSYM[i][3] in ~VAR[vec][2]'range generate
+  ~RESULT(((~SYM[3] * ~LIT[1]) + ~LIT[1] - 1) downto (~SYM[3] * ~LIT[1])) <= ~TYPMO'(~VAR[vec][2](~VAR[vec][2]'high - ~SYM[3]));
+end generate;
+-- concatBitVector end"
     }
   }
 , { "BlackBox" :
@@ -390,7 +395,12 @@ end generate;
 "unconcatBitVector# :: (KnownNat n, KnownNat m) -- (ARG[0],ARG[1])
                     => BitVector (n * m)        -- ARG[2]
                     -> Vec n (BitVector m)"
-    , "templateE" : "~IF~ISBIT[2]~THEN~TYPMO'(0 => ~ARG[2])~ELSE~FROMBV[~ARG[2]][~TYPO]~FI"
+    , "templateD" :
+"-- unconcatBitVector begin
+~GENSYM[unconcatBitVectorIter_loop][2] : for ~GENSYM[i][3] in ~RESULT'range generate
+  ~RESULT(~RESULT'high - ~SYM[3]) <= ~VAR[vec][2](((~SYM[3] * ~LIT[1]) + ~LIT[1] - 1) downto (~SYM[3] * ~LIT[1]));
+end generate;
+-- unconcatBitVector end"
     }
   }
 , { "BlackBox" :

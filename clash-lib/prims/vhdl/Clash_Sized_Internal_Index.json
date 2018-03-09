@@ -1,13 +1,13 @@
 [ { "BlackBox" :
     { "name"      : "Clash.Sized.Internal.Index.pack#"
     , "type"      : "pack# :: Index n -> BitVector (CLog 2 n)"
-    , "templateE" : "~IF~ISBITO~THEN~VAR[i][0](0)~ELSEstd_logic_vector(~ARG[0])~FI"
+    , "templateE" : "std_logic_vector(~ARG[0])"
     }
   }
 , { "BlackBox" :
     { "name"      : "Clash.Sized.Internal.Index.unpack#"
     , "type"      : "unpack# :: KnownNat n => BitVector (CLog 2 n) -> Index n"
-    , "templateE" : "~IF~ISBIT[1]~THENunsigned'(0 => ~ARG[1])~ELSEunsigned(~ARG[1])~FI"
+    , "templateE" : "unsigned(~ARG[1])"
     }
   }
 , { "BlackBox" :

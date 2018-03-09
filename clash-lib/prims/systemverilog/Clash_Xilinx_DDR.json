@@ -16,24 +16,8 @@
 ~SIGD[~GENSYM[dataout_h][2]][6];
 ~SIGD[~GENSYM[d][3]][6];
 assign ~SYM[3] = ~ARG[6];
-~IF~ISBIT[6]~THEN
-IDDR #(
-  .DDR_CLK_EDGE(\"SAME_EDGE\"),
-  .INIT_Q1(1'b0),
-  .INIT_Q2(1'b0),
-  .SRTYPE(~IF ~ISSYNC[5] ~THEN \"SYNC\" ~ELSE \"ASYNC\" ~FI)
-) ~GENSYM[~COMPNAME_IDDR][9] (
-  .Q1(~SYM[1]),
-  .Q2(~SYM[2]),~IF ~ISGATED[6] ~THEN
-  .C(~ARG[4][1]),
-  .CE(~ARG[4][0]),~ELSE
-  .C(~ARG[4]),
-  .CE(1'b1),~FI
-  .D(~SYM[3]),
-  .R(~ARG[5]),
-  .S(1'b0)
-);
-~ELSEgenvar ~GENSYM[i][8];
+
+genvar ~GENSYM[i][8];
 ~GENERATE
 for (~SYM[8]=0; ~SYM[8] < ~SIZE[~TYP[6]]; ~SYM[8]=~SYM[8]+1) begin : ~GENSYM[ddri_array][7]
   IDDR #(
@@ -41,7 +25,7 @@ for (~SYM[8]=0; ~SYM[8] < ~SIZE[~TYP[6]]; ~SYM[8]=~SYM[8]+1) begin : ~GENSYM[ddr
     .INIT_Q1(1'b0),
     .INIT_Q2(1'b0),
     .SRTYPE(~IF ~ISSYNC[5] ~THEN \"SYNC\" ~ELSE \"ASYNC\" ~FI)
-  ) ~SYM[9] (
+  ) ~GENSYM[~COMPNAME_IDDR][9] (
     .Q1(~SYM[1][~SYM[8]]),
     .Q2(~SYM[2][~SYM[8]]),~IF ~ISGATED[6] ~THEN
     .C(~ARG[4][1]),
@@ -53,7 +37,7 @@ for (~SYM[8]=0; ~SYM[8] < ~SIZE[~TYP[6]]; ~SYM[8]=~SYM[8]+1) begin : ~GENSYM[ddr
     .S(1'b0)
   );
 end
-~ENDGENERATE~FI
+~ENDGENERATE
 
 assign ~RESULT = {~SYM[2],~SYM[1]};
 // iddr end"
@@ -79,30 +63,15 @@ assign ~RESULT = {~SYM[2],~SYM[1]};
 
 assign ~SYM[1] = ~ARG[5];
 assign ~SYM[2] = ~ARG[6];
-~IF~ISBIT[5]~THEN
-ODDR #(
-  .DDR_CLK_EDGE(\"SAME_EDGE\"),
-  .INIT(1'b0),
-  .SRTYPE(~IF ~ISSYNC[4] ~THEN \"SYNC\" ~ELSE \"ASYNC\" ~FI)
-) ~GENSYM[~COMPNAME_ODDR][9] (
-  .Q(~SYM[3]),~IF ~ISGATED[3] ~THEN
-  .C(~ARG[3][1]),
-  .CE(~ARG[3][0]),~ELSE
-  .C(~ARG[3]),
-  .CE(1'b1),~FI
-  .D1(~SYM[1]),
-  .D2(~SYM[2]),
-  .R(~ARG[4]),
-  .S(1'b0)
-);
-~ELSEgenvar ~GENSYM[i][8];
+
+genvar ~GENSYM[i][8];
 ~GENERATE
 for (~SYM[8]=0; ~SYM[8] < ~SIZE[~TYP[6]]; ~SYM[8]=~SYM[8]+1) begin : ~GENSYM[ddro_array][7]
   ODDR #(
     .DDR_CLK_EDGE(\"SAME_EDGE\"),
     .INIT(1'b0),
     .SRTYPE(~IF ~ISSYNC[4] ~THEN \"SYNC\" ~ELSE \"ASYNC\" ~FI)
-  ) ~SYM[9] (
+  ) ~GENSYM[~COMPNAME_ODDR][9] (
     .Q(~SYM[3][~SYM[8]]),~IF ~ISGATED[3] ~THEN
     .C(~ARG[3][1]),
     .CE(~ARG[3][0]),~ELSE
@@ -114,7 +83,7 @@ for (~SYM[8]=0; ~SYM[8] < ~SIZE[~TYP[6]]; ~SYM[8]=~SYM[8]+1) begin : ~GENSYM[ddr
     .S(1'b0)
   );
 end
-~ENDGENERATE~FI
+~ENDGENERATE
 
 assign ~RESULT = ~SYM[3];
 // oddr end"
