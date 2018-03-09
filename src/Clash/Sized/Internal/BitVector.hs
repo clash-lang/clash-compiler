@@ -504,35 +504,17 @@ setSlice# (BV i) m n (BV j) = BV ((i .&. mask) .|. j')
     j'   = shiftL j (fromInteger n')
     mask = complement ((2 ^ (m' + 1) - 1) `xor` (2 ^ n' - 1))
 
-split#
-  :: KnownNat n
-  => BitVector (m + n)
-  -> (BitVector m, BitVector n)
-split# bv = (splitL# bv, splitR# bv)
-{-# INLINE split# #-}
-
-splitL#
-  :: forall n m
-   . KnownNat n
-  => BitVector (m + n)
-  -> BitVector m
-splitL# (BV i) = BV l
- where
-  n     = fromInteger (natVal (Proxy @n))
-  l     = i `shiftR` n
-{-# NOINLINE splitL# #-}
-
-splitR#
-  :: forall n m
-   . KnownNat n
-  => BitVector (m + n)
-  -> BitVector n
-splitR# (BV i) = BV r
- where
-  n     = fromInteger (natVal (Proxy @n))
-  mask  = 1 `shiftL` n
-  r     = i `mod` mask
-{-# NOINLINE splitR# #-}
+{-# NOINLINE split# #-}
+split# :: forall n m . KnownNat n
+       => BitVector (m + n) -> (BitVector m, BitVector n)
+split# (BV i) = (BV l, BV r)
+  where
+    n     = fromInteger (natVal (Proxy @n))
+    mask  = 1 `shiftL` n
+    -- The code below is faster than:
+    -- > (l,r) = i `divMod` mask
+    r    = i `mod` mask
+    l    = i `shiftR` n
 
 and#, or#, xor# :: BitVector n -> BitVector n -> BitVector n
 {-# NOINLINE and# #-}
