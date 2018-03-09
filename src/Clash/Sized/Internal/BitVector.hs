@@ -25,25 +25,44 @@ Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
 {-# OPTIONS_HADDOCK show-extensions not-home #-}
 
 module Clash.Sized.Internal.BitVector
-  ( -- * Datatypes
-    BitVector (..)
-  , Bit
-    -- * Accessors
-    -- ** Length information
-  , size#
-  , maxIndex#
-    -- * Construction
-    -- ** Initialisation
+  ( -- * Bit
+    Bit (..)
+    -- ** Construction
   , high
   , low
+    -- ** Type classes
+    -- *** Eq
+  , eq##
+  , neq##
+    -- *** Ord
+  , lt##
+  , ge##
+  , gt##
+  , le##
+    -- *** Num
+  , fromInteger##
+    -- *** Bits
+  , and##
+  , or##
+  , xor##
+  , complement##
+    -- *** BitPack
+  , pack#
+  , unpack#
+    -- * BitVector
+  , BitVector (..)
+    -- ** Accessors
+  , size#
+  , maxIndex#
+    -- ** Construction
   , bLit
     -- ** Concatenation
   , (++#)
-    -- * Reduction
+    -- ** Reduction
   , reduceAnd#
   , reduceOr#
   , reduceXor#
-    -- * Indexing
+    -- ** Indexing
   , index#
   , replaceBit#
   , setSlice#
@@ -51,38 +70,38 @@ module Clash.Sized.Internal.BitVector
   , split#
   , msb#
   , lsb#
-    -- * Type classes
-    -- ** Eq
+    -- ** Type classes
+    -- **** Eq
   , eq#
   , neq#
-    -- ** Ord
+    -- *** Ord
   , lt#
   , ge#
   , gt#
   , le#
-    -- ** Enum (not synthesisable)
+    -- *** Enum (not synthesisable)
   , enumFrom#
   , enumFromThen#
   , enumFromTo#
   , enumFromThenTo#
-    -- ** Bounded
+    -- *** Bounded
   , minBound#
   , maxBound#
-    -- ** Num
+    -- *** Num
   , (+#)
   , (-#)
   , (*#)
   , negate#
   , fromInteger#
-    -- ** ExtendingNum
+    -- *** ExtendingNum
   , plus#
   , minus#
   , times#
-    -- ** Integral
+    -- *** Integral
   , quot#
   , rem#
   , toInteger#
-    -- ** Bits
+    -- *** Bits
   , and#
   , or#
   , xor#
@@ -92,12 +111,12 @@ module Clash.Sized.Internal.BitVector
   , rotateL#
   , rotateR#
   , popCountBV
-    -- ** FiniteBits
+    -- *** FiniteBits
   , countLeadingZerosBV
   , countTrailingZerosBV
-    -- ** Resize
+    -- *** Resize
   , resize#
-    -- ** QuickCheck
+    -- *** QuickCheck
   , shrinkSizedUnsigned
   )
 where
@@ -147,8 +166,154 @@ newtype BitVector (n :: Nat) =
     BV { unsafeToInteger :: Integer}
   deriving (Data)
 
--- | 'Bit': a 'BitVector' of length 1
-type Bit = BitVector 1
+-- * Bit
+
+-- | Bit
+newtype Bit =
+  -- | The constructor, 'Bit', and  the field, 'unsafeToInteger#', are not
+  -- synthesisable.
+  Bit { unsafeToInteger# :: Integer}
+  deriving (Data)
+
+-- * Constructions
+-- ** Initialisation
+{-# NOINLINE high #-}
+-- | logic '1'
+high :: Bit
+high = Bit 1
+
+{-# NOINLINE low #-}
+-- | logic '0'
+low :: Bit
+low = Bit 0
+
+-- ** Instances
+instance NFData Bit where
+  rnf (Bit i) = rnf i `seq` ()
+  {-# NOINLINE rnf #-}
+
+instance Show Bit where
+  show (Bit b) =
+    case b of
+      0 -> "0"
+      _ -> "1"
+
+instance ShowX Bit where
+  showsPrecX = showsPrecXWith showsPrec
+
+instance Lift Bit where
+  lift (Bit i) = if i == 0 then [| low |] else [| high |]
+  {-# NOINLINE lift #-}
+
+instance Eq Bit where
+  (==) = eq##
+  (/=) = neq##
+
+eq## :: Bit -> Bit -> Bool
+eq## (Bit b1) (Bit b2) = b1 == b2
+{-# NOINLINE eq## #-}
+
+neq## :: Bit -> Bit -> Bool
+neq## (Bit b1) (Bit b2) = b1 == b2
+{-# NOINLINE neq## #-}
+
+instance Ord Bit where
+  (<)  = lt##
+  (<=) = le##
+  (>)  = gt##
+  (>=) = ge##
+
+lt##,ge##,gt##,le## :: Bit -> Bit -> Bool
+lt## (Bit n) (Bit m) = n < m
+{-# NOINLINE lt## #-}
+ge## (Bit n) (Bit m) = n >= m
+{-# NOINLINE ge## #-}
+gt## (Bit n) (Bit m) = n > m
+{-# NOINLINE gt## #-}
+le## (Bit n) (Bit m) = n <= m
+{-# NOINLINE le## #-}
+
+instance Enum Bit where
+  toEnum     = fromInteger## . toInteger
+  fromEnum b = if eq## b low then 0 else 1
+
+instance Bounded Bit where
+  minBound = low
+  maxBound = high
+
+instance Num Bit where
+  (+)         = xor##
+  (-)         = xor##
+  (*)         = and##
+  negate      = complement##
+  abs         = id
+  signum b    = b
+  fromInteger = fromInteger##
+
+fromInteger## :: Integer -> Bit
+fromInteger## i = Bit (i `mod` 2)
+{-# NOINLINE fromInteger## #-}
+
+instance Real Bit where
+  toRational b = if eq## b low then 0 else 1
+
+instance Integral Bit where
+  quot    a _ = a
+  rem     _ _ = low
+  div     a _ = a
+  mod     _ _ = low
+  quotRem n _ = (n,low)
+  divMod  n _ = (n,low)
+  toInteger b = if eq## b low then 0 else 1
+
+instance Bits Bit where
+  (.&.)             = and##
+  (.|.)             = or##
+  xor               = xor##
+  complement        = complement##
+  zeroBits          = low
+  bit i             = if i == 0 then high else low
+  setBit _ i        = if i == 0 then high else low
+  clearBit _ i      = if i == 0 then low  else high
+  complementBit b i = if i == 0 then complement## b else b
+  testBit b i       = if i == 0 then eq## b high else False
+  bitSizeMaybe _    = Just 1
+  bitSize _         = 1
+  isSigned _        = False
+  shiftL b i        = if i == 0 then b else low
+  shiftR b i        = if i == 0 then b else low
+  rotateL b _       = b
+  rotateR b _       = b
+  popCount b        = if eq## b low then 0 else 1
+
+instance FiniteBits Bit where
+  finiteBitSize _      = 1
+  countLeadingZeros b  = if eq## b low then 1 else 0
+  countTrailingZeros b = if eq## b low then 1 else 0
+
+and##, or##, xor## :: Bit -> Bit -> Bit
+and## (Bit v1) (Bit v2) = Bit (v1 .&. v2)
+{-# NOINLINE and## #-}
+
+or## (Bit v1) (Bit v2) = Bit (v1 .|. v2)
+{-# NOINLINE or## #-}
+
+xor## (Bit v1) (Bit v2) = Bit (v1 `xor` v2)
+{-# NOINLINE xor## #-}
+
+complement## :: Bit -> Bit
+complement## (Bit 0) = Bit 1
+complement## _       = Bit 0
+{-# NOINLINE complement## #-}
+
+-- *** BitPack
+pack# :: Bit -> BitVector 1
+pack# (Bit b) = BV b
+{-# NOINLINE pack# #-}
+
+unpack# :: BitVector 1 -> Bit
+unpack# (BV b) = Bit b
+{-# NOINLINE unpack# #-}
 
 -- * Instances
 instance NFData (BitVector n) where
@@ -275,7 +440,7 @@ instance KnownNat n => Num (BitVector n) where
   (*)         = (*#)
   negate      = negate#
   abs         = id
-  signum bv   = resize# (reduceOr# bv)
+  signum bv   = resize# (pack# (reduceOr# bv))
   fromInteger = fromInteger#
 
 (+#),(-#),(*#) :: forall n . KnownNat n => BitVector n -> BitVector n -> BitVector n
@@ -364,8 +529,8 @@ instance KnownNat n => Bits (BitVector n) where
   bit i             = replaceBit# 0 i high
   setBit v i        = replaceBit# v i high
   clearBit v i      = replaceBit# v i low
-  complementBit v i = replaceBit# v i (complement# (index# v i))
-  testBit v i       = eq# (index# v i) high
+  complementBit v i = replaceBit# v i (complement## (index# v i))
+  testBit v i       = eq## (index# v i) high
   bitSizeMaybe v    = Just (size# v)
   bitSize           = size#
   isSigned _        = False
@@ -373,7 +538,7 @@ instance KnownNat n => Bits (BitVector n) where
   shiftR v i        = shiftR# v i
   rotateL v i       = rotateL# v i
   rotateR v i       = rotateR# v i
-  popCount bv       = fromInteger (I.toInteger# (popCountBV (bv ++# (0 :: Bit))))
+  popCount bv       = fromInteger (I.toInteger# (popCountBV (bv ++# (0 :: BitVector 1))))
 
 instance KnownNat n => FiniteBits (BitVector n) where
   finiteBitSize       = size#
@@ -381,16 +546,16 @@ instance KnownNat n => FiniteBits (BitVector n) where
   countTrailingZeros  = fromInteger . I.toInteger# . countTrailingZerosBV
 
 countLeadingZerosBV :: KnownNat n => BitVector n -> I.Index (n+1)
-countLeadingZerosBV = V.foldr (\l r -> if eq# l low then 1 + r else 0) 0 . V.bv2v
+countLeadingZerosBV = V.foldr (\l r -> if eq## l low then 1 + r else 0) 0 . V.bv2v
 {-# INLINE countLeadingZerosBV #-}
 
 countTrailingZerosBV :: KnownNat n => BitVector n -> I.Index (n+1)
-countTrailingZerosBV = V.foldl (\l r -> if eq# r low then 1 + l else 0) 0 . V.bv2v
+countTrailingZerosBV = V.foldl (\l r -> if eq## r low then 1 + l else 0) 0 . V.bv2v
 {-# INLINE countTrailingZerosBV #-}
 
 {-# NOINLINE reduceAnd# #-}
-reduceAnd# :: KnownNat n => BitVector n -> BitVector 1
-reduceAnd# bv@(BV i) = BV (smallInteger (dataToTag# check))
+reduceAnd# :: KnownNat n => BitVector n -> Bit
+reduceAnd# bv@(BV i) = Bit (smallInteger (dataToTag# check))
   where
     check = i == maxI
 
@@ -398,14 +563,14 @@ reduceAnd# bv@(BV i) = BV (smallInteger (dataToTag# check))
     maxI  = (2 ^ sz) - 1
 
 {-# NOINLINE reduceOr# #-}
-reduceOr# :: BitVector n -> BitVector 1
-reduceOr# (BV i) = BV (smallInteger (dataToTag# check))
+reduceOr# :: BitVector n -> Bit
+reduceOr# (BV i) = Bit (smallInteger (dataToTag# check))
   where
     check = i /= 0
 
 {-# NOINLINE reduceXor# #-}
-reduceXor# :: BitVector n -> BitVector 1
-reduceXor# (BV i) = BV (toInteger (popCount i `mod` 2))
+reduceXor# :: BitVector n -> Bit
+reduceXor# (BV i) = Bit (toInteger (popCount i `mod` 2))
 
 instance Default (BitVector n) where
   def = minBound#
@@ -424,9 +589,9 @@ maxIndex# bv = fromInteger (natVal bv) - 1
 {-# NOINLINE index# #-}
 index# :: KnownNat n => BitVector n -> Int -> Bit
 index# bv@(BV v) i
-    | i >= 0 && i < sz = BV (smallInteger
-                            (dataToTag#
-                            (testBit v i)))
+    | i >= 0 && i < sz = Bit (smallInteger
+                             (dataToTag#
+                             (testBit v i)))
     | otherwise        = err
   where
     sz  = fromInteger (natVal bv)
@@ -442,12 +607,12 @@ index# bv@(BV v) i
 msb# :: forall n . KnownNat n => BitVector n -> Bit
 msb# (BV v)
   = let i = fromInteger (natVal (Proxy @n) - 1)
-    in  BV (smallInteger (dataToTag# (testBit v i)))
+    in  Bit (smallInteger (dataToTag# (testBit v i)))
 
 {-# NOINLINE lsb# #-}
 -- | LSB
 lsb# :: BitVector n -> Bit
-lsb# (BV v) = BV (smallInteger (dataToTag# (testBit v 0)))
+lsb# (BV v) = Bit (smallInteger (dataToTag# (testBit v 0)))
 
 {-# NOINLINE slice# #-}
 slice# :: BitVector (m + 1 + i) -> SNat m -> SNat n -> BitVector (m + 1 - n)
@@ -459,16 +624,6 @@ slice# (BV i) m n = BV (shiftR (i .&. mask) n')
     mask = 2 ^ (m' + 1) - 1
 
 -- * Constructions
--- ** Initialisation
-{-# NOINLINE high #-}
--- | logic '1'
-high :: Bit
-high = BV 1
-
-{-# NOINLINE low #-}
--- | logic '0'
-low :: Bit
-low = BV 0
 
 -- ** Concatenation
 {-# NOINLINE (++#) #-}
@@ -481,7 +636,7 @@ low = BV 0
 -- * Modifying BitVectors
 {-# NOINLINE replaceBit# #-}
 replaceBit# :: KnownNat n => BitVector n -> Int -> Bit -> BitVector n
-replaceBit# bv@(BV v) i (BV b)
+replaceBit# bv@(BV v) i (Bit b)
     | i >= 0 && i < sz = BV (if b == 1 then setBit v i else clearBit v i)
     | otherwise        = err
   where
@@ -570,14 +725,13 @@ rotateR# bv@(BV n) b   = fromInteger_INLINE (l .|. r)
 popCountBV :: forall n . KnownNat n => BitVector (n+1) -> I.Index (n+2)
 popCountBV bv =
   let v = V.bv2v bv
-  in  sum (V.map fromIntegral v)
+  in  sum (V.map (fromIntegral . pack#) v)
 {-# INLINE popCountBV #-}
 
 instance Resize BitVector where
   resize     = resize#
   zeroExtend = extend
-  signExtend = \ bv -> (case msb# bv of 0 -> id
-                                        _ -> complement) 0 ++# bv
+  signExtend = \bv -> (if msb# bv == low then id else complement) 0 ++# bv
   truncateB  = resize#
 
 {-# NOINLINE resize# #-}
@@ -596,21 +750,21 @@ instance KnownNat n => SaturatingNum (BitVector n) where
   satPlus SatWrap a b = a +# b
   satPlus SatZero a b =
     let r = plus# a b
-    in  case msb# r of
-          0 -> resize# r
-          _ -> minBound#
+    in  if msb# r == low
+           then resize# r
+           else minBound#
   satPlus _ a b =
     let r  = plus# a b
-    in  case msb# r of
-          0 -> resize# r
-          _ -> maxBound#
+    in  if msb# r == low
+           then resize# r
+           else maxBound#
 
   satMin SatWrap a b = a -# b
   satMin _ a b =
     let r = minus# a b
-    in  case msb# r of
-          0 -> resize# r
-          _ -> minBound#
+    in  if msb# r == low
+           then resize# r
+           else minBound#
 
   satMult SatWrap a b = a *# b
   satMult SatZero a b =
