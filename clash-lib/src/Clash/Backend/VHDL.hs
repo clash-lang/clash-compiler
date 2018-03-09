@@ -104,7 +104,9 @@ instance Backend VHDLState where
   toBV _ id_      = do
     nm <- use modNm
     text (T.toLower $ T.pack nm) <> "_types.toSLV" <> parens (text id_)
-  fromBV hty id_  = fromSLV hty id_ (typeSize hty - 1) 0
+  fromBV _ id_  = do
+    nm <- use modNm
+    text (T.toLower $ T.pack nm) <> "_types.fromSLV" <> parens (text id_)
   hdlSyn          = use hdlsyn
   mkIdentifier    = return go
     where
@@ -270,8 +272,10 @@ normaliseType ty@(SP _ elTys)      = do
   return (BitVector (typeSize ty))
 normaliseType ty@(Index _)     = return (Unsigned (typeSize ty))
 normaliseType ty@(Sum _ _)     = return (Unsigned (typeSize ty))
-normaliseType (Clock nm rt Gated) =
-  return (Product "GatedClock" [Clock nm rt Source,Bool])
+normaliseType (Clock _ _ Gated) =
+  return (Product "GatedClock" [Bit,Bool])
+normaliseType (Clock {}) = return Bit
+normaliseType (Reset {}) = return Bit
 normaliseType ty = return ty
 
 mkVecZ :: HWType -> HWType
@@ -349,6 +353,22 @@ funDec _ Bool = Just
                                 ,  indent 2 ("return" <+> "to_signed" <> parens (int 0 <> comma <> (use intWidth >>= int)) <> semi)
                                 ,"end" <+> "if" <> semi
                                 ]) <$>
+    "end" <> semi
+  )
+
+funDec _ Bit = Just
+  ( "function" <+> "toSLV" <+> parens ("sl" <+> colon <+> "in" <+> "std_logic") <+> "return" <+> "std_logic_vector" <> semi <$>
+    "function" <+> "fromSLV" <+> parens ("slv" <+> colon <+> "in" <+> "std_logic_vector") <+> "return" <+> "std_logic" <> semi
+  , "function" <+> "toSLV" <+> parens ("sl" <+> colon <+> "in" <+> "std_logic") <+> "return" <+> "std_logic_vector" <+> "is" <$>
+    "begin" <$>
+      indent 2 ("return" <+> "std_logic_vector'" <> parens (int 0 <+> rarrow <+> "sl") <> semi) <$>
+    "end" <> semi <$>
+    "function" <+> "fromSLV" <+> parens ("slv" <+> colon <+> "in" <+> "std_logic_vector") <+> "return" <+> "std_logic" <+> "is" <$>
+      indent 2
+        ( "alias islv : std_logic_vector (0 to slv'length - 1) is slv;"
+        ) <$>
+    "begin" <$>
+      indent 2 ("return" <+> "islv" <> parens (int 0) <> semi) <$>
     "end" <> semi
   )
 
@@ -464,20 +484,6 @@ funDec _ (BitVector _) = Just
     "end" <> semi
   )
 
-funDec _ (Clock {}) = Just
-  ( "function" <+> "toSLV" <+> parens ("sl" <+> colon <+> "in" <+> "std_logic") <+> "return" <+> "std_logic_vector" <> semi <$>
-    "function" <+> "fromSLV" <+> parens ("slv" <+> colon <+> "in" <+> "std_logic_vector") <+> "return" <+> "std_logic" <> semi
-  , "function" <+> "toSLV" <+> parens ("sl" <+> colon <+> "in" <+> "std_logic") <+> "return" <+> "std_logic_vector" <+> "is" <$>
-    "begin" <$>
-      indent 2 ("return" <+> "(0 => sl)" <> semi) <$>
-    "end" <> semi <$>
-    "function" <+> "fromSLV" <+> parens ("slv" <+> colon <+> "in" <+> "std_logic_vector") <+> "return" <+> "std_logic" <+> "is" <$>
-      indent 2 "alias islv : std_logic_vector(0 to slv'length - 1) is slv;" <$>
-    "begin" <$>
-      indent 2 ("return" <+> "islv(0)" <> semi) <$>
-    "end" <> semi
-  )
-
 funDec syn t@(RTree _ elTy) = Just
   ( "function" <+> "toSLV" <+> parens ("value : " <+> vhdlTypeMark t) <+> "return std_logic_vector" <> semi <$>
     "function" <+> "fromSLV" <+> parens ("slv" <+> colon <+> "in" <+> "std_logic_vector") <+> "return" <+> vhdlTypeMark t <> semi
@@ -579,6 +585,7 @@ vhdlType hwty = do
   where
     go :: HWType -> VHDLM Doc
     go Bool            = "boolean"
+    go Bit             = "std_logic"
     go (Clock {})      = "std_logic"
     go (Reset {})      = "std_logic"
     go (BitVector n)   = case n of
@@ -614,6 +621,7 @@ vhdlTypeMark hwty = do
   go hwty'
   where
     go Bool            = "boolean"
+    go Bit             = "std_logic"
     go (Clock {})      = "std_logic"
     go (Reset {})      = "std_logic"
     go (BitVector _)   = "std_logic_vector"
@@ -632,6 +640,7 @@ vhdlTypeMark hwty = do
 
 tyName :: HWType -> VHDLM Doc
 tyName Bool              = "boolean"
+tyName Bit               = "std_logic"
 tyName (Clock {})        = "std_logic"
 tyName (Reset {})        = "std_logic"
 tyName (Vector n elTy)   = "array_of_" <> int n <> "_" <> tyName elTy
@@ -670,6 +679,7 @@ tyName _ = empty
 -- | Convert a Netlist HWType to an error VHDL value for that type
 vhdlTypeErrValue :: HWType -> VHDLM Doc
 vhdlTypeErrValue Bool                = "true"
+vhdlTypeErrValue Bit                 = "'-'"
 vhdlTypeErrValue t@(Vector n elTy)   = do
   syn <-hdlSyn
   case syn of
@@ -935,6 +945,11 @@ expr_ _ (BlackBoxE pNm _ _ _ _ bbCtx _)
   = exprLit (Just (BitVector (fromInteger n),fromInteger n)) i
 
 expr_ _ (BlackBoxE pNm _ _ _ _ bbCtx _)
+  | pNm == "Clash.Sized.Internal.BitVector.fromInteger##"
+  , [Literal _ i] <- extractLiterals bbCtx
+  = exprLit (Just (Bit,1)) i
+
+expr_ _ (BlackBoxE pNm _ _ _ _ bbCtx _)
   | pNm == "Clash.Sized.Internal.Index.fromInteger#"
   , [Literal _ (NumLit n), Literal _ i] <- extractLiterals bbCtx
   , Just k <- clogBase 2 n
@@ -1058,6 +1073,7 @@ exprLit (Just (hty,sz)) (NumLit i) = case hty of
     | i < 2^(31 :: Integer) && i > (-2^(31 :: Integer)) -> "to_signed" <> parens (integer i <> "," <> int n)
     | otherwise -> "signed'" <> parens lit
   BitVector _ -> "std_logic_vector'" <> parens lit
+  Bit         -> squotes (int (fromInteger i `mod` 2))
   _           -> blit
 
   where
@@ -1076,6 +1092,7 @@ exprLit _             (StringLit s) = text . T.pack $ show s
 exprLit _             l             = error $ $(curLoc) ++ "exprLit: " ++ show l
 
 patLit :: HWType -> Literal -> VHDLM Doc
+patLit Bit (NumLit i) = if i == 0 then "'0'" else "'1'"
 patLit hwTy (NumLit i) =
   let sz = conSize hwTy
   in  case sz `mod` 4 of
@@ -1113,6 +1130,9 @@ bit_char Z = char 'Z'
 
 toSLV :: HWType -> Expr -> VHDLM Doc
 toSLV Bool         e = do
+  nm <- use modNm
+  text (T.toLower $ T.pack nm) <> "_types.toSLV" <> parens (expr_ False e)
+toSLV Bit          e = do
   nm <- use modNm
   text (T.toLower $ T.pack nm) <> "_types.toSLV" <> parens (expr_ False e)
 toSLV (Clock {})    e = do
@@ -1159,6 +1179,7 @@ fromSLV :: HWType -> Identifier -> Int -> Int -> VHDLM Doc
 fromSLV Bool              id_ start _   = do
   nm <- use modNm
   text (T.toLower $ T.pack nm) <> "_types.fromSLV" <> parens (text id_ <> parens (int start <+> "downto" <+> int start))
+fromSLV Bit               id_ start _   = text id_ <> parens (int start)
 fromSLV (BitVector _)     id_ start end = text id_ <> parens (int start <+> "downto" <+> int end)
 fromSLV (Index _)         id_ start end = "unsigned" <> parens (text id_ <> parens (int start <+> "downto" <+> int end))
 fromSLV (Signed _)        id_ start end = "signed" <> parens (text id_ <> parens (int start <+> "downto" <+> int end))

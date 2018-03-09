@@ -535,7 +535,8 @@ normalizeType tcMap = go
       -> go elTy
       -- These Clash types are implemented with newtypes.
       -- We need to keep these newtypes because they define the width of the numbers.
-      | name2String tcNm == "Clash.Sized.Internal.BitVector.BitVector" ||
+      | name2String tcNm == "Clash.Sized.Internal.BitVector.Bit" ||
+        name2String tcNm == "Clash.Sized.Internal.BitVector.BitVector" ||
         name2String tcNm == "Clash.Sized.Internal.Index.Index"         ||
         name2String tcNm == "Clash.Sized.Internal.Signed.Signed"       ||
         name2String tcNm == "Clash.Sized.Internal.Unsigned.Unsigned"

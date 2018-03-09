@@ -130,14 +130,14 @@ byteMasterT s@(ByteS {_srState = ShiftRegister {..}, ..})
         shiftsr    .= True
     Read -> when coreAck $ do
       shiftsr .= True
-      coreTxd .= pack ackIn
+      coreTxd .= bitCoerce ackIn
       if cntDone then do
         byteStateM .= Ack
         coreCmd    .= I2Cwrite
       else do
         coreCmd    .= I2Cread
     Ack -> if coreAck then do
-        ackOut  .= unpack coreRxd
+        ackOut  .= bitCoerce coreRxd
         coreTxd .= high
         -- check for stop; Should a STOP command be generated?
         if stop then do
@@ -149,7 +149,7 @@ byteMasterT s@(ByteS {_srState = ShiftRegister {..}, ..})
           -- generate command acknowledge signal
           hostAck    .= True
       else
-        coreTxd .= pack ackIn
+        coreTxd .= bitCoerce ackIn
     Stop -> when coreAck $ do
       byteStateM .= Idle
       coreCmd    .= I2Cnop

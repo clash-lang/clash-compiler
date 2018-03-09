@@ -11,39 +11,9 @@
     }
   }
 , { "BlackBox" :
-    { "name"      : "Clash.Sized.Internal.BitVector.high"
-    , "type"      : "high :: Bit"
-    , "templateE" : "1'b1"
-    }
-  }
-, { "BlackBox" :
-    { "name"      : "Clash.Sized.Internal.BitVector.low"
-    , "type"      : "low :: Bit"
-    , "templateE" : "1'b0"
-    }
-  }
-, { "BlackBox" :
     { "name"      : "Clash.Sized.Internal.BitVector.++#"
     , "type"      : "(++#) :: KnownNat m => BitVector n -> BitVector m -> BitVector (n + m)"
     , "templateE" : "{~ARG[1],~ARG[2]}"
-    }
-  }
-, { "BlackBox" :
-    { "name"      : "Clash.Sized.Internal.BitVector.reduceAnd#"
-    , "type"      : "reduceAnd# :: KnownNat n => BitVector n -> BitVector 1"
-    , "templateE" : "& (~ARG[1])"
-    }
-  }
-, { "BlackBox" :
-    { "name"      : "Clash.Sized.Internal.BitVector.reduceOr#"
-    , "type"      : "reduceOr# :: BitVector n -> BitVector 1"
-    , "templateE" : "| (~ARG[0])"
-    }
-  }
-, { "BlackBox" :
-    { "name"      : "Clash.Sized.Internal.BitVector.reduceXor#"
-    , "type"      : "reduceXor# :: BitVector n -> BitVector 1"
-    , "templateE" : "^ (~ARG[0])"
     }
   }
 , { "BlackBox" :

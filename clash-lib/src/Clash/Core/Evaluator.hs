@@ -410,6 +410,7 @@ primop
   -> Maybe State
 primop eval gbl tcm h k nm ty tys vs v []
   | nm `elem` ["Clash.Sized.Internal.BitVector.fromInteger#"
+              ,"Clash.Sized.Internal.BitVector.fromInteger##"
               ,"Clash.Sized.Internal.Index.fromInteger#"
               ,"Clash.Sized.Internal.Signed.fromInteger#"
               ,"Clash.Sized.Internal.Unsigned.fromInteger#"

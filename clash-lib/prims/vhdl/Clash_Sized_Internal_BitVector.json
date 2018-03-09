@@ -13,13 +13,91 @@
 , { "BlackBox" :
     { "name"      : "Clash.Sized.Internal.BitVector.high"
     , "type"      : "high :: Bit"
-    , "templateE" : "std_logic_vector'(\"1\")"
+    , "templateE" : "'1'"
     }
   }
 , { "BlackBox" :
     { "name"      : "Clash.Sized.Internal.BitVector.low"
     , "type"      : "low :: Bit"
-    , "templateE" : "std_logic_vector'(\"0\")"
+    , "templateE" : "'0'"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "Clash.Sized.Internal.BitVector.pack#"
+    , "type"      : "pack# :: Bit -> BitVector 1"
+    , "templateE" : "std_logic_vector'(0 => ~ARG[0])"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "Clash.Sized.Internal.BitVector.unpack#"
+    , "type"      : "unpack# :: BitVector 1 -> Bit"
+    , "templateE" : "~VAR[bv][0](0)"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "Clash.Sized.Internal.BitVector.eq##"
+    , "type"      : "eq## :: Bit -> Bit -> Bool"
+    , "templateE" : "~ARG[0] = ~ARG[1]"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "Clash.Sized.Internal.BitVector.neq##"
+    , "type"      : "neq## :: Bit -> Bit -> Bool"
+    , "templateE" : "~ARG[0] /= ~ARG[1]"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "Clash.Sized.Internal.BitVector.lt##"
+    , "type"      : "lt## :: Bit -> Bit -> Bool"
+    , "templateE" : "~ARG[0] < ~ARG[1]"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "Clash.Sized.Internal.BitVector.ge##"
+    , "type"      : "ge## :: Bit -> Bit -> Bool"
+    , "templateE" : "~ARG[0] >= ~ARG[1]"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "Clash.Sized.Internal.BitVector.gt##"
+    , "type"      : "gt## :: Bit -> Bit -> Bool"
+    , "templateE" : "~ARG[0] > ~ARG[1]"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "Clash.Sized.Internal.BitVector.le##"
+    , "type"      : "le## :: Bit -> Bit -> Bool"
+    , "templateE" : "~ARG[0] <= ~ARG[1]"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "Clash.Sized.Internal.BitVector.fromInteger##"
+    , "type"      : "fromInteger# :: Integer -> Bit"
+    , "templateE" : "~VAR[i][0](0)"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "Clash.Sized.Internal.BitVector.and##"
+    , "type"      : "and## :: Bit -> Bit -> Bit"
+    , "templateE" : "~ARG[0] and ~ARG[1]"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "Clash.Sized.Internal.BitVector.or##"
+    , "type"      : "or## :: Bit -> Bit -> Bit"
+    , "templateE" : "~ARG[0] or ~ARG[1]"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "Clash.Sized.Internal.BitVector.xor##"
+    , "type"      : "xor## :: Bit -> Bit -> Bit"
+    , "templateE" : "~ARG[0] xor ~ARG[1]"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "Clash.Sized.Internal.BitVector.complement##"
+    , "type"      : "complement## :: Bit -> Bit"
+    , "templateE" : "not ~ARG[0]"
     }
   }
 , { "BlackBox" :
@@ -30,7 +108,7 @@
   }
 , { "BlackBox" :
     { "name"      : "Clash.Sized.Internal.BitVector.reduceAnd#"
-    , "type"      : "reduceAnd# :: KnownNat n => BitVector n -> BitVector 1"
+    , "type"      : "reduceAnd# :: KnownNat n => BitVector n -> Bit"
     , "templateD" :
 "-- reduceAnd begin
 ~GENSYM[reduceAnd][0] : block
@@ -56,14 +134,14 @@
     return result;
   end;
 begin
-  ~RESULT <= (0 => and_reduce(~ARG[1]));
+  ~RESULT <= and_reduce(~ARG[1]);
 end block;
 -- reduceAnd end"
     }
   }
 , { "BlackBox" :
     { "name"      : "Clash.Sized.Internal.BitVector.reduceOr#"
-    , "type"      : "reduceOr# :: BitVector n -> BitVector 1"
+    , "type"      : "reduceOr# :: BitVector n -> Bit"
     , "templateD" :
 "-- reduceOr begin
 ~GENSYM[reduceOr][0] : block
@@ -89,14 +167,14 @@ end block;
     return result;
   end;
 begin
-  ~RESULT <= (0 => or_reduce(~ARG[0]));
+  ~RESULT <= or_reduce(~ARG[0]);
 end block;
 -- reduceOr end"
     }
   }
 , { "BlackBox" :
     { "name"      : "Clash.Sized.Internal.BitVector.reduceXor#"
-    , "type"      : "reduceXor# :: BitVector n -> BitVector 1"
+    , "type"      : "reduceXor# :: BitVector n -> Bit"
     , "templateD" :
 "-- reduceXor begin
 ~GENSYM[reduceXor][0] : block
@@ -122,7 +200,7 @@ end block;
     return result;
   end;
 begin
-  ~RESULT <= (0 => xor_reduce(~ARG[0]));
+  ~RESULT <= xor_reduce(~ARG[0]);
 end block;
 -- reduceXor end"
     }
@@ -156,7 +234,7 @@ begin
   -- pragma translate_on
                ;
 
-  ~RESULT(0) <= ~VAR[bv][1](~SYM[1]);
+  ~RESULT <= ~VAR[bv][1](~SYM[1]);
 end block;~FI
 -- indexBitVector end"
     }
@@ -184,7 +262,7 @@ begin
     variable ~GENSYM[ivec][2] : ~TYP[1];
   begin
     ~SYM[2] := ~ARG[1];
-    ~SYM[2](~SYM[1]) := ~VAR[b][3](0);
+    ~SYM[2](~SYM[1]) := ~ARG[3];
     ~RESULT <= ~SYM[2];
   end process;
 end block;
@@ -236,7 +314,7 @@ end process;
 "msb# :: KnownNat n  -- ARG[0]
       => BitVector n -- ARG[1]
       -> Bit"
-    , "templateE" : "~IF ~LIT[0] ~THEN ~VAR[bv][1](~VAR[bv][1]'high downto ~VAR[bv][1]'high) ~ELSE \"0\" ~FI"
+    , "templateE" : "~IF ~LIT[0] ~THEN ~VAR[bv][1](~VAR[bv][1]'high) ~ELSE \"0\" ~FI"
     }
   }
 , { "BlackBox" :
@@ -244,7 +322,7 @@ end process;
     , "type" :
 "lsb# :: BitVector n -- ARG[0]
       -> Bit"
-    , "templateE" : "~IF ~SIZE[~TYP[0]] ~THEN ~VAR[bv][0](0 downto 0) ~ELSE \"0\" ~FI"
+    , "templateE" : "~IF ~SIZE[~TYP[0]] ~THEN ~VAR[bv][0](0) ~ELSE \"0\" ~FI"
     }
   }
 , { "BlackBox" :

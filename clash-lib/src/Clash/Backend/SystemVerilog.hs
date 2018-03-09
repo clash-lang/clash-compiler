@@ -81,6 +81,7 @@ instance Backend SystemVerilogState where
   hdlKind         = const SystemVerilog
   primDirs        = const $ do root <- primsRoot
                                return [ root System.FilePath.</> "common"
+                                      , root System.FilePath.</> "commonverilog"
                                       , root System.FilePath.</> "systemverilog"
                                       ]
   extractTypes    = _tyCache
@@ -219,12 +220,13 @@ mkTyPackage_ modName hwtys =
     eqReprTy (RTree n ty1) (RTree m ty2)
       | m == n    = eqReprTy ty1 ty2
       | otherwise = False
+    eqReprTy Bit  ty2 = ty2 `elem` [Bit,Bool]
+    eqReprTy Bool ty2 = ty2 `elem` [Bit,Bool]
     eqReprTy ty1 ty2
       | isUnsigned ty1 && isUnsigned ty2 = typeSize ty1 == typeSize ty2
       | otherwise                        = ty1 == ty2
 
     isUnsigned :: HWType -> Bool
-    isUnsigned Bool          = True
     isUnsigned (Unsigned _)  = True
     isUnsigned (BitVector _) = True
     isUnsigned (Index _)     = True
@@ -238,7 +240,7 @@ mkUsedTys v@(Vector _ elTy)   = v : mkUsedTys elTy
 mkUsedTys t@(RTree _ elTy)    = t : mkUsedTys elTy
 mkUsedTys p@(Product _ elTys) = p : concatMap mkUsedTys elTys
 mkUsedTys sp@(SP _ elTys)     = sp : concatMap mkUsedTys (concatMap snd elTys)
-mkUsedTys c@(Clock n r Gated) = [c,Clock n r Source,Bool]
+mkUsedTys c@(Clock _ _ Gated) = [c,Bit,Bool]
 mkUsedTys t                   = [t]
 
 topSortHWTys :: [HWType]
@@ -313,7 +315,7 @@ tyDec ty@(Product _ tys) | typeSize ty > 0 = Just A.<$> prodDec
 tyDec _ = pure Nothing
 
 gatedClockType :: HWType -> HWType
-gatedClockType (Clock nm rt Gated) = Product ("GatedClock" `Text.append` (pack (show (nm,rt)))) [Clock nm rt Source,Bool]
+gatedClockType (Clock nm rt Gated) = Product ("GatedClock" `Text.append` (pack (show (nm,rt)))) [Bit,Bool]
 gatedClockType ty = ty
 {-# INLINE gatedClockType #-}
 
@@ -325,6 +327,8 @@ splitVecTy = fmap splitElemTy . go
       Vector _ _  -> error $ $(curLoc) ++ "impossible"
       Clock {}    -> (ns, verilogType t)
       Reset {}    -> (ns, "logic")
+      Bool        -> (ns, "logic")
+      Bit         -> (ns, "logic")
       String      -> (ns, "string")
       Signed n    -> (ns ++ [Left n],"logic signed")
       _           -> (ns ++ [Left (typeSize t)], "logic")
@@ -514,6 +518,8 @@ verilogType t = do
     Clock _ _ Gated -> verilogType (gatedClockType t)
     Clock {}      -> "logic"
     Reset {}      -> "logic"
+    Bit           -> "logic"
+    Bool          -> "logic"
     String        -> "string"
     _ -> "logic" <+> brackets (int (typeSize t -1) <> colon <> int 0)
 
@@ -533,7 +539,8 @@ verilogTypeMark t = do
     _ -> empty
 
 tyName :: HWType -> SystemVerilogM Doc
-tyName Bool              = "logic_vector_1"
+tyName Bool              = "logic"
+tyName Bit               = "logic"
 tyName (Vector n elTy)   = "array_of_" <> int n <> "_" <> tyName elTy
 tyName (RTree n elTy)    = "tree_of_" <> int n <> "_" <> tyName elTy
 tyName (BitVector n)     = "logic_vector_" <> int n
@@ -706,8 +713,8 @@ expr_ _ (Identifier id_ (Just (Indexed (ty@(Product _ tys),_,fI)))) = do
   id'<- fmap (displayT . renderOneLine) (text id_ <> dot <> tyName ty <> "_sel" <> int fI)
   simpleFromSLV (tys !! fI) id'
 
-expr_ _ (Identifier id_ (Just (Indexed (ty@(Clock nm rt Gated),_,fI)))) = do
-  let tys = [Clock nm rt Source, Bool]
+expr_ _ (Identifier id_ (Just (Indexed (ty@(Clock _ _ Gated),_,fI)))) = do
+  let tys = [Bit, Bool]
       ty' = gatedClockType ty
   id'<- fmap (displayT . renderOneLine) (text id_ <> dot <> tyName ty' <> "_sel" <> int fI)
   simpleFromSLV (tys !! fI) id'
@@ -810,6 +817,11 @@ expr_ _ (BlackBoxE pNm _ _ _ _ bbCtx _)
   | pNm == "Clash.Sized.Internal.BitVector.fromInteger#"
   , [Literal _ (NumLit n), Literal _ i] <- extractLiterals bbCtx
   = exprLit (Just (BitVector (fromInteger n),fromInteger n)) i
+
+expr_ _ (BlackBoxE pNm _ _ _ _ bbCtx _)
+  | pNm == "Clash.Sized.Internal.BitVector.fromInteger##"
+  , [Literal _ i] <- extractLiterals bbCtx
+  = exprLit (Just (Bit,1)) i
 
 expr_ _ (BlackBoxE pNm _ _ _ _ bbCtx _)
   | pNm == "Clash.Sized.Internal.Index.fromInteger#"

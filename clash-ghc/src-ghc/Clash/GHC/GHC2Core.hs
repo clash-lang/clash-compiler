@@ -423,7 +423,8 @@ hasPrimCo co@(AxiomInstCo _ _ coers) = do
   where
     isPrimTc (TyConApp tc _) = do
       tcNm <- qualfiedNameString (tyConName tc)
-      return (tcNm `elem` ["Clash.Sized.Internal.BitVector.BitVector"
+      return (tcNm `elem` ["Clash.Sized.Internal.BitVector.Bit"
+                          ,"Clash.Sized.Internal.BitVector.BitVector"
                           ,"Clash.Sized.Internal.Index.Index"
                           ,"Clash.Sized.Internal.Signed.Signed"
                           ,"Clash.Sized.Internal.Unsigned.Unsigned"

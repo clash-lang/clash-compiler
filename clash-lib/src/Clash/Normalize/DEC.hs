@@ -473,7 +473,8 @@ interestingToLift inScope eval e@(Prim nm pty) args =
 
     isPow2 x = x /= 0 && (x .&. (complement x + 1)) == x
 
-    isFromInteger x = x `elem` ["Clash.Sized.Internal.BitVector.fromInteger#"
+    isFromInteger x = x `elem` ["Clash.Sized.Internal.BitVector.fromInteger##"
+                               ,"Clash.Sized.Internal.BitVector.fromInteger#"
                                ,"Clash.Sized.Integer.Index.fromInteger"
                                ,"Clash.Sized.Internal.Signed.fromInteger#"
                                ,"Clash.Sized.Internal.Unsigned.fromInteger#"
