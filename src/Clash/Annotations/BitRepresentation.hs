@@ -183,7 +183,7 @@ dataReprAnnToDataRepr' (DataReprAnn typ size constrs) =
     where
       toConstrRepr' :: Int -> ConstrRepr -> ConstrRepr'
       toConstrRepr' n (ConstrRepr name mask value fieldanns) =
-        ConstrRepr' (thToText name) n (fromIntegral mask) value (map fromIntegral fieldanns)
+        ConstrRepr' (thToText name) n mask value (map fromIntegral fieldanns)
 
 thToText :: TH.Name -> Text.Text
 thToText (TH.Name (TH.OccName name') (TH.NameG _namespace _pkgName (TH.ModName modName))) =
