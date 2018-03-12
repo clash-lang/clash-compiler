@@ -35,6 +35,8 @@ import           Unbound.Generics.LocallyNameless (unembed, runLFreshM)
 import           BasicTypes                       (InlineSpec (..))
 import           SrcLoc                           (SrcSpan,noSrcSpan)
 
+import           Clash.Annotations.BitRepresentation.Internal
+  (CustomReprs)
 import           Clash.Core.Evaluator             (PrimEvaluator)
 import           Clash.Core.FreeVars              (termFreeIds)
 import           Clash.Core.Name                  (Name (..), NameSort (..))
@@ -67,8 +69,6 @@ import           Clash.Rewrite.Util               (isUntranslatableType,
                                                    runRewriteSession)
 import Clash.Signal.Internal                      (ResetKind (..))
 import           Clash.Util
-
-import Clash.Annotations.BitRepresentation (CustomReprs)
 
 -- | Run a NormalizeSession in a given environment
 runNormalization

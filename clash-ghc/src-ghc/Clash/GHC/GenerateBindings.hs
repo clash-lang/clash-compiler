@@ -37,7 +37,7 @@ import qualified TysWiredIn              as GHC
 import qualified Var                     as GHC
 import qualified SrcLoc                  as GHC
 
-import           Clash.Annotations.BitRepresentation (DataRepr')
+import           Clash.Annotations.BitRepresentation.Internal (DataRepr')
 import           Clash.Annotations.TopEntity (TopEntity)
 import           Clash.Annotations.Primitive (HDL)
 

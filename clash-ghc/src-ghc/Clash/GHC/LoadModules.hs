@@ -79,11 +79,12 @@ import qualified UniqSet
 import qualified Var
 
 -- Internal Modules
-import           Clash.Annotations.BitRepresentation          (DataReprAnn, DataRepr')
+import           Clash.Annotations.BitRepresentation          (DataReprAnn)
 import           Clash.GHC.GHC2Core                           (modNameM)
 import           Clash.GHC.LoadInterfaceFiles                 (loadExternalExprs, primitiveFilePath)
 import           Clash.Util                                   (curLoc)
-import           Clash.Annotations.BitRepresentation          (dataReprAnnToDataRepr')
+import           Clash.Annotations.BitRepresentation.Internal
+  (DataRepr', dataReprAnnToDataRepr')
 
 ghcLibDir :: IO FilePath
 ghcLibDir = do

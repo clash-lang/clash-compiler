@@ -40,7 +40,7 @@ import Clash.Driver.Types        (BindingMap, DebugLevel)
 import Clash.Netlist.Types       (HWType)
 import Clash.Util
 
-import Clash.Annotations.BitRepresentation (CustomReprs)
+import Clash.Annotations.BitRepresentation.Internal (CustomReprs)
 
 -- | Context in which a term appears
 data CoreContext

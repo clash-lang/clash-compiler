@@ -49,7 +49,7 @@ import Clash.Primitives.Types               (PrimMap)
 import Clash.Signal.Internal                (ClockKind, ResetKind)
 import Clash.Util
 
-import Clash.Annotations.BitRepresentation
+import Clash.Annotations.BitRepresentation.Internal
   (CustomReprs, ConstrRepr')
 
 -- | Monad that caches generated components (StateT) and remembers hidden inputs
@@ -109,9 +109,6 @@ instance NFData Component where
 
 -- | Size indication of a type (e.g. bit-size or number of elements)
 type Size = Int
-
-data CustomConstr
-  = CustomConstr
 
 -- | Representable hardware types
 data HWType

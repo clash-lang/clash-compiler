@@ -14,8 +14,7 @@ import Test.Tasty.HUnit
 import Prelude ((=<<), ($))
 import Clash.Annotations.BitRepresentation
 import Clash.Annotations.BitRepresentation.Deriving
--- import qualified Language.Haskell.TH as TH
--- import qualified Language.Haskell.TH.Syntax as TH
+import Clash.Annotations.BitRepresentation.Internal
 import DerivingDataReprTrain (Train)
 
 oneHotOverlapRepr :: DataReprAnn

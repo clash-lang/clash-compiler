@@ -62,9 +62,11 @@ import qualified VarSet
 #endif
 
 -- Internal Modules
+import           Clash.Annotations.BitRepresentation.Internal
+  (DataRepr', dataReprAnnToDataRepr')
 import           Clash.Annotations.Primitive
-import           Clash.Annotations.BitRepresentation
-import           Clash.Util                                   (curLoc, traceIf)
+import           Clash.Annotations.BitRepresentation (DataReprAnn)
+import           Clash.Util                          (curLoc, traceIf)
 
 runIfl :: GHC.GhcMonad m => GHC.Module -> TcRnTypes.IfL a -> m a
 runIfl modName action = do

@@ -42,6 +42,12 @@ import qualified Data.Version
 import qualified System.FilePath
 
 import           Clash.Annotations.Primitive          (HDL (..))
+import           Clash.Annotations.BitRepresentation.Internal
+  (ConstrRepr'(..))
+import           Clash.Annotations.BitRepresentation.ClashLib
+  (bitsToBits)
+import           Clash.Annotations.BitRepresentation.Util
+  (BitOrigin(Lit, Field), bitOrigins, bitRanges)
 import           Clash.Backend
 import           Clash.Backend.Verilog                (include)
 import           Clash.Driver.Types                   (SrcSpan, noSrcSpan)
@@ -52,13 +58,6 @@ import           Clash.Netlist.Types                  hiding (_intWidth, intWidt
 import           Clash.Netlist.Util                   hiding (mkIdentifier, extendIdentifier)
 import           Clash.Signal.Internal                (ClockKind (..))
 import           Clash.Util                           (curLoc, makeCached, (<:>), first, on)
-
-import Clash.Annotations.BitRepresentation            ( ConstrRepr'(..))
-import Clash.Annotations.BitRepresentation.Internal   ( bitsToBits )
-import Clash.Annotations.BitRepresentation.Util       ( BitOrigin(Lit, Field)
-                                                      , bitOrigins
-                                                      , bitRanges
-                                                      )
 
 #ifdef CABAL
 import qualified Paths_clash_lib

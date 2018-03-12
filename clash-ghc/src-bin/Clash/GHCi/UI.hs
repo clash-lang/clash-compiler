@@ -147,7 +147,7 @@ import           Clash.Util (clashLibVersion)
 import qualified Data.Time.Clock as Clock
 import qualified Paths_clash_ghc
 
-import           Clash.Annotations.BitRepresentation (buildCustomReprs)
+import           Clash.Annotations.BitRepresentation.Internal (buildCustomReprs)
 
 -----------------------------------------------------------------------------
 

@@ -32,9 +32,9 @@ import           Unbound.Generics.LocallyNameless
   (Embed, Fresh, embed, unbind, unembed, unrec)
 import qualified Unbound.Generics.LocallyNameless as Unbound
 
-import           Clash.Annotations.BitRepresentation.Internal
+import           Clash.Annotations.BitRepresentation.ClashLib
   (coreToType')
-import           Clash.Annotations.BitRepresentation
+import           Clash.Annotations.BitRepresentation.Internal
   (CustomReprs, ConstrRepr'(..), DataRepr'(..), getDataRepr, getConstrRepr)
 import           Clash.Annotations.TopEntity (PortName (..), TopEntity (..))
 import           Clash.Driver.Types

@@ -49,6 +49,8 @@ import           Text.Read                        (readMaybe)
 import           GHC.BasicTypes.Extra             ()
 
 import           Clash.Annotations.Primitive      (HDL (..))
+import           Clash.Annotations.BitRepresentation.Internal
+  (CustomReprs)
 import           Clash.Annotations.TopEntity      (TopEntity (..))
 import           Clash.Annotations.TopEntity.Extra ()
 import           Clash.Backend
@@ -68,8 +70,6 @@ import           Clash.Normalize                  (checkNonRecursive, cleanupGra
 import           Clash.Normalize.Util             (callGraph)
 import           Clash.Primitives.Types
 import           Clash.Util                       (first, second)
-
-import Clash.Annotations.BitRepresentation        (CustomReprs)
 
 -- | Create a set of target HDL files for a set of functions
 generateHDL

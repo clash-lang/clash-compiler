@@ -42,6 +42,10 @@ import           Unbound.Generics.LocallyNameless
 import           Outputable                       (ppr, showSDocUnsafe)
 import           SrcLoc                           (SrcSpan,isGoodSrcSpan,noSrcSpan)
 
+import           Clash.Annotations.BitRepresentation.ClashLib
+  (coreToType')
+import           Clash.Annotations.BitRepresentation.Internal
+  (CustomReprs, DataRepr'(..), ConstrRepr'(..), getDataRepr, getConstrRepr)
 import           Clash.Annotations.TopEntity      (TopEntity (..))
 import           Clash.Core.DataCon               (DataCon (..))
 import           Clash.Core.FreeVars              (typeFreeVars)
@@ -66,8 +70,6 @@ import           Clash.Netlist.Util
 import           Clash.Primitives.Types           as P
 import           Clash.Util
 
-import Clash.Annotations.BitRepresentation
-import Clash.Annotations.BitRepresentation.Internal
 
 -- | Generate a hierarchical netlist out of a set of global binders with
 -- @topEntity@ at the top.
