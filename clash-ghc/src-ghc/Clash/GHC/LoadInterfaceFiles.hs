@@ -208,7 +208,6 @@ loadCustomReprAnnotations
   :: [Annotations.Annotation]
   -> [DataRepr']
 loadCustomReprAnnotations anns =
---  traceShow (length anns) $
   catMaybes $ map go $ catMaybes $ zipWith filterNameless anns reprs
     where
         env         = Annotations.mkAnnEnv anns

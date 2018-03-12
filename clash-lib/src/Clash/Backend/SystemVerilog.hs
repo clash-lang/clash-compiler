@@ -828,7 +828,6 @@ expr_ _ (Identifier id_ Nothing)                      = string id_
 expr_ _ (Identifier id_ (Just (Indexed (CustomSP _id _size args,dcI,fI)))) =
   braces $ hcat $ punctuate ", " $ sequence ranges
     where
-      -- TODO: what if subconstructutor is bigger? We would need to add zeroes.
       (ConstrRepr' _name _n _mask _value anns, _, _argTys) = args !! dcI
 
       ranges =
