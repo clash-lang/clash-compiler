@@ -1,123 +1,61 @@
 {-|
-Copyright  :  (C) 2017, Google Inc.
+Copyright  :  (C) 2018, Google Inc.
 License    :  BSD2 (see the file LICENSE)
 Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
 
-This module houses functions deriving BitPack instances given a custom bit
-representation and function to derive some (alternative) representations
-automatically.
+This module contains:
 
-For example, we can pack a Maybe Color (where Color is a type with 3 possible
-values) in only 2 bits using:
+  * Template Haskell functions for deriving 'BitPack' instances given a
+    custom bit representation as those defined in
+    'Clash.Annotations.BitRepresentation'.
 
-@
-data Color
-  = Red
-  | Green
-  | Blue
+  * Template Haskell functions for deriving custom bit representations,
+    e.g. one-hot, for a data type.
 
-{-# ANN module (
-  DataReprAnn
-    $(reprType [t| Color |])
-    2
-    [ ConstrRepr
-        'Red
-        0b11
-        0b00
-        []
-    , ConstrRepr
-        'Green
-        0b11
-        0b01
-        []
-    , ConstrRepr
-        'Blue
-        0b11
-        0b10
-        []
-    ]) #-}
-
-{-# ANN module (
-  DataReprAnn
-    $(reprType [t| Maybe Color |])
-    -- ^ Type to annotate
-    2
-    -- ^ Size of whole data type
-    [ ConstrRepr
-        'Nothing
-        0b11
-        -- ^ Mask for this constructor
-        0b11
-        -- ^ Value to match this constructor on
-        []
-    , ConstrRepr
-        'Just
-        0b00
-        -- ^ Mask for this constructor
-        0b00
-        -- ^ Value to match this constructor on
-        [0b11]
-        -- ^ Masks of fields of Just
-    ]) #-}
-@
-
-To derive BitPack instances from these annotations, see
-Clash.Annotations.BitRepresentation.Deriving.
 -}
-{-# LANGUAGE TemplateHaskell #-}
-{-# LANGUAGE QuasiQuotes #-}
-{-# LANGUAGE MagicHash #-}
-{-# LANGUAGE ViewPatterns #-}
-{-# LANGUAGE DataKinds #-}
+{-# LANGUAGE DataKinds          #-}
+{-# LANGUAGE DeriveLift         #-}
+{-# LANGUAGE MagicHash          #-}
+{-# LANGUAGE QuasiQuotes        #-}
 {-# LANGUAGE StandaloneDeriving #-}
-{-# LANGUAGE DeriveLift #-}
+{-# LANGUAGE TemplateHaskell    #-}
+{-# LANGUAGE ViewPatterns       #-}
 
 module Clash.Annotations.BitRepresentation.Deriving
-  ( deriveDefaultAnnotation
-  , deriveAnnotation
+  (
+  -- * Derivation functions and their accociated types
+    deriveAnnotation
+  , deriveDefaultAnnotation
   , deriveBitPack
   , simpleDerivator
-  , Derivator
-  , DataReprAnnExp
   , ConstructorType(..)
   , FieldsType(..)
+  -- * Convenience type synonyms
+  , Derivator
+  , DataReprAnnExp
   ) where
 
-import GHC.Exts
-import GHC.Integer.Logarithms
+import Clash.Annotations.BitRepresentation
+  (DataReprAnn(..), DataRepr'(..), ConstrRepr'(..), ConstrRepr(..), BitMask,
+   Value, reprType, thTypeToType', dataReprAnnToDataRepr')
+import Clash.Annotations.BitRepresentation.Util
+  (bitOrigins, BitOrigin(..), bitRanges, Bit(..))
 
-import Data.Bits ((.&.))
-import Data.List (mapAccumL, zipWith4)
-import Data.Bits (shiftL, shiftR, complement)
-import Data.Proxy (Proxy(..))
-import Data.Maybe (fromJust)
-
-import qualified Data.Map as Map
-import qualified Data.Text.Lazy as Text
-
-import Language.Haskell.TH
-import Language.Haskell.TH.Syntax
-import GHC.TypeLits (natVal)
-
-import Clash.Sized.BitVector (BitVector, high, low, (++#))
-import Clash.Class.Resize  (resize)
-import Clash.Class.BitPack (BitPack, BitSize, pack, unpack)
-import Clash.Annotations.BitRepresentation ( DataReprAnn(..)
-                                           , DataRepr'(..)
-                                           , ConstrRepr'(..)
-                                           , ConstrRepr(..)
-                                           , BitMask
-                                           , Value
-                                           , reprType
-                                           , thTypeToType'
-                                           , dataReprAnnToDataRepr'
-                                           )
-
-import Clash.Annotations.BitRepresentation.Util ( bitOrigins
-                                                , BitOrigin(..)
-                                                , bitRanges
-                                                , Bit(..)
-                                                )
+import           Clash.Class.BitPack        (BitPack, BitSize, pack, unpack)
+import           Clash.Class.Resize         (resize)
+import           Clash.Sized.BitVector      (BitVector, high, low, (++#))
+import           Data.Bits                  ((.&.))
+import           Data.Bits                  (shiftL, shiftR, complement)
+import           Data.List                  (mapAccumL, zipWith4)
+import qualified Data.Map                   as Map
+import           Data.Maybe                 (fromJust)
+import           Data.Proxy                 (Proxy(..))
+import qualified Data.Text.Lazy             as Text
+import           GHC.Exts                   (Int(I#))
+import           GHC.Integer.Logarithms     (integerLog2#)
+import           GHC.TypeLits               (natVal)
+import           Language.Haskell.TH
+import           Language.Haskell.TH.Syntax
 
 type NameMap = Map.Map Name Type
 
@@ -171,13 +109,13 @@ resolve :: NameMap -> Type -> Type
 resolve nmap (VarT n) = nmap Map.! n
 resolve nmap (AppT t1 t2) = AppT (resolve nmap t1) (resolve nmap t2)
 resolve _nmap t@(ConT _) = t
-resolve _nmap t = error $ {-$(curLoc) ++-} "Unexpected type: " ++ show t
+resolve _nmap t = error $ "Unexpected type: " ++ show t
 
 resolveCon :: NameMap -> Con -> Con
 resolveCon nmap (NormalC t (unzip -> (bangs, fTypes))) =
   NormalC t $ zip bangs $ map (resolve nmap) fTypes
 resolveCon _name constr =
-  error $ {-$(curLoc) ++-} "Unexpected constructor: " ++ show constr
+  error $ "Unexpected constructor: " ++ show constr
 
 collectTypeArgs :: Type -> (Type, [Type])
 collectTypeArgs t@(ConT _name) = (t, [])
@@ -185,7 +123,7 @@ collectTypeArgs (AppT t1 t2) =
   let (base, args) = collectTypeArgs t1 in
   (base, args ++ [t2])
 collectTypeArgs t =
-  error $ {-$(curLoc) ++-} "Unexpected type: " ++ show t
+  error $ "Unexpected type: " ++ show t
 
 -- | Returns size in number of bits of given type. Relies on the presence of a
 -- BitSize implementation. Tries to recognize literal values and return a simple
@@ -195,7 +133,7 @@ typeSize typ = do
   bitSizeInstances <- reifyInstances ''BitSize [typ]
   case bitSizeInstances of
     [] ->
-      error $ {-$(curLoc) ++ -} unwords [
+      error $ unwords [
           "Could not find custom bit representation nor BitSize instance"
         , "for", show typ ++ "." ]
     [TySynInstD _ (TySynEqn _ (LitT (NumTyLit n)))] ->
@@ -203,7 +141,7 @@ typeSize typ = do
     [_impl] ->
       [| natVal (Proxy :: Proxy (BitSize $(return typ))) |]
     unexp ->
-      error $ {-$(curLoc) ++ -} "Unexpected result from reifyInstances: " ++ show unexp
+      error $ "Unexpected result from reifyInstances: " ++ show unexp
 
 -- | Generate bitmask from a given bit, with a certain size
 bitmask
@@ -250,14 +188,14 @@ fieldTypes (RecC _nm bTys) =
 fieldTypes (InfixC (_, ty1) _nm (_, ty2)) =
   [ty1, ty2]
 fieldTypes con =
-  error $ {-$(curLoc) ++-} "Unexpected constructor type: " ++ show con
+  error $ "Unexpected constructor type: " ++ show con
 
 conName :: Con -> Name
 conName c = case c of
   NormalC nm _  -> nm
   RecC    nm _  -> nm
   InfixC _ nm _ -> nm
-  _ -> error $ {-$(curLoc) ++-} "No GADT support"
+  _ -> error $ "No GADT support"
 
 constrFieldSizes
   :: Con
@@ -358,7 +296,7 @@ deriveDataRepr constrDerivator fieldsDerivator typ = do
           ($dataSize + constrSize)
           $(listE constrReprs) |]
     _ ->
-      error $ {-$(curLoc) ++-} "Could not derive dataRepr for: " ++ show info
+      error $ "Could not derive dataRepr for: " ++ show info
 
     where
       (ConT tyConstrName, typeArgs) = collectTypeArgs typ
@@ -411,7 +349,7 @@ group bs = (length head', head bs) : rest
     rest  = group tail'
 
 bitToExpr' :: (Int, Bit) -> Q Exp
-bitToExpr' (0, _) = error $ {-$(curLoc) ++-} "Unexpected group length: 0"
+bitToExpr' (0, _) = error $ "Unexpected group length: 0"
 bitToExpr' (1, H) = lift high
 bitToExpr' (1, L) = lift low
 bitToExpr' (1, _) = lift low
@@ -423,7 +361,7 @@ bitToExpr' (numTyLit' -> n, _) =
   [| resize $(lift low) :: BitVector $n |]
 
 bitsToExpr :: [Bit] -> Q Exp
-bitsToExpr [] = error $ {-$(curLoc) ++-} "Unexpected empty bit list"
+bitsToExpr [] = error $ "Unexpected empty bit list"
 bitsToExpr bits =
   foldl1
     (\v1 v2 -> [| $v1 ++# $v2 |])
@@ -438,7 +376,7 @@ select'
   -> [(Int, Int)]
   -> Q Exp
 select' _vec [] =
-  error $ {-$(curLoc) ++ -}"Unexpected empty list of intervals"
+  error $ "Unexpected empty list of intervals"
 select' vec ranges =
   foldl1 (\v1 v2 -> [| $v1 ++# $v2 |]) $ map (return . select'') ranges
     where
@@ -468,7 +406,7 @@ select
   -- ^ Select bits
   -> Q Exp
 select _fields (Lit []) =
-  error $ {-$(curLoc) ++-} "Unexpected empty literal."
+  error $ "Unexpected empty literal."
 select _fields (Lit lits) = do
   let size = fromIntegral $ length lits
   vec <- bitsToExpr lits
@@ -539,7 +477,7 @@ buildUnpackIfE valueName _dataSize (ConstrRepr' qName _constrN mask value fielda
   fields <- mapM (buildUnpackField valueName) fieldanns
   return $ (guard, foldl AppE constr fields)
 
----- | Build an /unpack/ function corresponding to given DataRepr
+-- | Build an /unpack/ function corresponding to given DataRepr
 buildUnpack
   :: Type
   -> DataRepr'
@@ -567,8 +505,8 @@ deriveBitPack typQ = do
 
   let ann = case filter (\(DataRepr' t _ _) -> t == typ') anns of
               [a] -> a
-              []  -> error $ {-$(curLoc) ++-} "No custom bit annotation found."
-              _   -> error $ {-$(curLoc) ++-} "Overlapping bit annotations found."
+              []  -> error $ "No custom bit annotation found."
+              _   -> error $ "Overlapping bit annotations found."
 
   packFunc   <- buildPack typ ann
   unpackFunc <- buildUnpack typ ann
@@ -583,13 +521,13 @@ deriveBitPack typQ = do
 
   let bpInst = [ InstanceD
                    (Just Overlapping)
-                   -- ^ Overlap
+                   -- Overlap
                    []
-                   -- ^ Context
+                   -- Context
                    (AppT (ConT ''BitPack) typ)
-                   -- ^ Type
+                   -- Type
                    (bitSizeInst : packFunc ++ unpackFunc)
-                   -- ^ Declarations
+                   -- Declarations
                ]
   alreadyIsInstance <- isInstance ''BitPack [typ]
   if alreadyIsInstance then

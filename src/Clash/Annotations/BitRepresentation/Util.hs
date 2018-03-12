@@ -1,4 +1,4 @@
-{-# LANGUAGE TemplateHaskell   #-}
+{-# LANGUAGE TemplateHaskell #-}
 module Clash.Annotations.BitRepresentation.Util
   ( bitOrigins
   , bitRanges
@@ -12,21 +12,29 @@ import Data.Tuple (swap)
 import Data.List  (findIndex, group, mapAccumL)
 import Data.Bits  (Bits, testBit, testBit, shiftR)
 
-data Bit = H
-         | L
-         | U
-          deriving (Show,Eq)
+data Bit
+  -- | High
+  = H
+  -- | Low
+  | L
+  -- | Undefined
+  | U
+    deriving (Show,Eq)
 
--- |
+-- | Result of various utilty functions. Indicates the origin of a certain bit:
+-- either a literal from the constructor (or an undefined bit), or from a
+-- literal.
 data BitOrigin
+  -- | Literal (high, low, undefind)
   = Lit [Bit]
+  -- | Bits originate from a field. Field /fieldnr/ /from/ /downto/.
   | Field
       Int
-      -- ^ Field number
+      -- Field number
       Int
-      -- ^ Start bit (from..)
+      -- Start bit (from..)
       Int
-      -- ^ End bit (inclusive, ..downto)
+      -- End bit (inclusive, ..downto)
         deriving (Show)
 
 -- | Given a type size and one of its constructor this function will yield a
