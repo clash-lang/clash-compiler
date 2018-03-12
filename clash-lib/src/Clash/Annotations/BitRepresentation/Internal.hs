@@ -1,15 +1,15 @@
 {-|
-Copyright  :  (C) 2017, Google Inc.
+Copyright  :  (C) 2018, Google Inc.
 License    :  BSD2 (see the file LICENSE)
 Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
 -}
 
-{-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE TemplateHaskell #-}
-{-# LANGUAGE DeriveAnyClass #-}
-{-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE DeriveAnyClass     #-}
 {-# LANGUAGE DeriveDataTypeable #-}
-{-# LANGUAGE RankNTypes #-}
+{-# LANGUAGE DeriveGeneric      #-}
+{-# LANGUAGE OverloadedStrings  #-}
+{-# LANGUAGE RankNTypes         #-}
+{-# LANGUAGE TemplateHaskell    #-}
 
 module Clash.Annotations.BitRepresentation.Internal
   ( coreToType'
@@ -17,17 +17,14 @@ module Clash.Annotations.BitRepresentation.Internal
   , bitsToBits
   ) where
 
-import Clash.Util (curLoc)
-import Clash.Core.Name (name2String)
-import qualified Clash.Core.Type as C
+import           Clash.Annotations.BitRepresentation
+  (Type'(AppTy', LitTy', ConstTy'))
 import qualified Clash.Annotations.BitRepresentation.Util as BitRepresentation
-import qualified Clash.Netlist.Types as Netlist
-
-import Clash.Annotations.BitRepresentation ( Type'(..) )
-
-import qualified Data.Text.Lazy as Text
-
-import Prelude
+import qualified Clash.Core.Type                          as C
+import           Clash.Core.Name                          (name2String)
+import qualified Clash.Netlist.Types                      as Netlist
+import           Clash.Util                               (curLoc)
+import qualified Data.Text.Lazy                           as Text
 
 bitToBit
   :: BitRepresentation.Bit
@@ -36,12 +33,13 @@ bitToBit BitRepresentation.H = Netlist.H
 bitToBit BitRepresentation.L = Netlist.L
 bitToBit BitRepresentation.U = Netlist.U
 
+-- | Converts a list of /BitRepresentation.Bit/s to their Netlist counterpart.
 bitsToBits
   :: [BitRepresentation.Bit]
   -> [Netlist.Bit]
 bitsToBits = map bitToBit
 
-
+-- Convert (GHC) core type to our own simple type representation Type'
 coreToType'
   :: C.Type
   -- ^ Type to convert to bit representation type
