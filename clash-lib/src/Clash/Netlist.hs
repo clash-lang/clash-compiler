@@ -677,7 +677,7 @@ mkDcApplication dstHType bndr dc args = do
           GT -> error $ $(curLoc) ++ "Under-applied constructor"
       Sum _ _ ->
         return (HW.DataCon dstHType (DC (dstHType,dcTag dc - 1)) [])
-      CustomSP _ _ dcArgsTups -> do
+      CustomSP _ _ _ dcArgsTups -> do
         -- Safely get item from list, or err with note
         let dcI    = dcTag dc - 1
         let note   = $(curLoc) ++ "No DC with tag: " ++ show dcI
@@ -689,7 +689,7 @@ mkDcApplication dstHType bndr dc args = do
           LT -> error $ $(curLoc) ++ "Over-applied constructor"
           GT -> error $ $(curLoc) ++ "Under-applied constructor"
 
-      CustomSum _ _ _ ->
+      CustomSum _ _ _ _ ->
         return (HW.DataCon dstHType (DC (dstHType, dcTag dc - 1)) [])
       Bool ->
         let dc' = case dcTag dc of

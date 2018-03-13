@@ -194,10 +194,11 @@ fixCustomRepr
   -> HWType
 fixCustomRepr reprs (coreToType' -> Right tyName) sum_@(Sum name subtys) =
   case getDataRepr tyName reprs of
-    Just (DataRepr' name' size constrs) ->
+    Just dRepr@(DataRepr' name' size constrs) ->
       if length constrs == length subtys then
         CustomSum
           name
+          dRepr
           (fromIntegral size)
           [packSum reprs ty | ty <- subtys]
       else
@@ -219,10 +220,11 @@ fixCustomRepr reprs (coreToType' -> Right tyName) sum_@(Sum name subtys) =
 
 fixCustomRepr reprs (coreToType' -> Right tyName) sp@(SP name subtys) =
   case getDataRepr tyName reprs of
-    Just (DataRepr' name' size constrs) ->
+    Just dRepr@(DataRepr' name' size constrs) ->
       if length constrs == length subtys then
         CustomSP
           name
+          dRepr
           (fromIntegral size)
           [packSP reprs ty | ty <- subtys]
       else
@@ -373,8 +375,8 @@ typeSize (Sum _ dcs) = fromMaybe 0 . clogBase 2 . toInteger $ length dcs
 typeSize (Product _ tys) = sum $ map typeSize tys
 typeSize (BiDirectional In h) = typeSize h
 typeSize (BiDirectional Out _) = 0
-typeSize (CustomSP _ size _) = fromIntegral size
-typeSize (CustomSum _ size _) = fromIntegral size
+typeSize (CustomSP _ _ size _) = fromIntegral size
+typeSize (CustomSum _ _ size _) = fromIntegral size
 
 -- | Determines the bitsize of the constructor of a type
 conSize :: HWType

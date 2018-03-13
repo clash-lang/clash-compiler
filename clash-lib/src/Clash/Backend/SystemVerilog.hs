@@ -260,14 +260,15 @@ mkTyPackage_ modName hwtys =
       | otherwise                        = ty1 == ty2
 
     isUnsigned :: HWType -> Bool
-    isUnsigned (Unsigned _)      = True
-    isUnsigned (BitVector _)     = True
-    isUnsigned (Index _)         = True
-    isUnsigned (Sum _ _)         = True
-    isUnsigned (CustomSum _ _ _) = True
-    isUnsigned (SP _ _)          = True
-    isUnsigned (CustomSP _ _ _)  = True
-    isUnsigned _                 = False
+    isUnsigned Bool                = True
+    isUnsigned (Unsigned _)        = True
+    isUnsigned (BitVector _)       = True
+    isUnsigned (Index _)           = True
+    isUnsigned (Sum _ _)           = True
+    isUnsigned (CustomSum _ _ _ _) = True
+    isUnsigned (SP _ _)            = True
+    isUnsigned (CustomSP _ _ _ _)  = True
+    isUnsigned _                   = False
 
 mkUsedTys :: HWType
         -> [HWType]
@@ -600,18 +601,18 @@ verilogTypeMark t = do
     _ -> emptyDoc
 
 tyName :: HWType -> SystemVerilogM Doc
-tyName Bool                = "logic"
-tyName Bit                 = "logic"
-tyName (Vector n elTy)     = "array_of_" <> int n <> "_" <> tyName elTy
-tyName (RTree n elTy)      = "tree_of_" <> int n <> "_" <> tyName elTy
-tyName (BitVector n)       = "logic_vector_" <> int n
-tyName t@(Index _)         = "logic_vector_" <> int (typeSize t)
-tyName (Signed n)          = "signed_" <> int n
-tyName (Unsigned n)        = "logic_vector_" <> int n
-tyName t@(Sum _ _)         = "logic_vector_" <> int (typeSize t)
-tyName t@(CustomSum _ _ _) = "logic_vector_" <> int (typeSize t)
-tyName t@(CustomSP _ _ _)  = "logic_vector_" <> int (typeSize t)
-tyName t@(Product nm _)    = Mon (makeCached t nameCache prodName)
+tyName Bool                  = "logic"
+tyName Bit                   = "logic"
+tyName (Vector n elTy)       = "array_of_" <> int n <> "_" <> tyName elTy
+tyName (RTree n elTy)        = "tree_of_" <> int n <> "_" <> tyName elTy
+tyName (BitVector n)         = "logic_vector_" <> int n
+tyName t@(Index _)           = "logic_vector_" <> int (typeSize t)
+tyName (Signed n)            = "signed_" <> int n
+tyName (Unsigned n)          = "logic_vector_" <> int n
+tyName t@(Sum _ _)           = "logic_vector_" <> int (typeSize t)
+tyName t@(CustomSum _ _ _ _) = "logic_vector_" <> int (typeSize t)
+tyName t@(CustomSP _ _ _ _)  = "logic_vector_" <> int (typeSize t)
+tyName t@(Product nm _)      = Mon (makeCached t nameCache prodName)
   where
     prodName = do
       seen <- use tySeen
@@ -705,12 +706,12 @@ patLitCustom
   -> HWType
   -> Literal
   -> SystemVerilogM Doc
-patLitCustom var (CustomSum _name size reprs) (NumLit (fromIntegral -> i)) =
+patLitCustom var (CustomSum _name _dataRepr size reprs) (NumLit (fromIntegral -> i)) =
   patLitCustom' var size mask value
     where
       ((ConstrRepr' _name _n mask value _anns), _id) = reprs !! i
 
-patLitCustom var (CustomSP _name size reprs) (NumLit (fromIntegral -> i)) =
+patLitCustom var (CustomSP _name _dataRepr size reprs) (NumLit (fromIntegral -> i)) =
   patLitCustom' var size mask value
     where
       ((ConstrRepr' _name _n mask value _anns), _id, _tys) = reprs !! i
@@ -775,10 +776,10 @@ inst_ (CondAssignment id_ ty scrut _ [(Just (BoolLit b), l),(_,r)]) = fmap Just 
   where
     (t,f) = if b then (l,r) else (r,l)
 
-inst_ (CondAssignment id_ _ scrut scrutTy@(CustomSP _ _ _) es) =
+inst_ (CondAssignment id_ _ scrut scrutTy@(CustomSP _ _ _ _) es) =
   inst_' id_ scrut scrutTy es
 
-inst_ (CondAssignment id_ _ scrut scrutTy@(CustomSum _ _ _) es) =
+inst_ (CondAssignment id_ _ scrut scrutTy@(CustomSum _ _ _ _) es) =
   inst_' id_ scrut scrutTy es
 
 inst_ (CondAssignment id_ ty scrut scrutTy es) = fmap Just $ do
@@ -824,7 +825,7 @@ expr_ :: Bool -- ^ Enclose in parenthesis?
       -> SystemVerilogM Doc
 expr_ _ (Literal sizeM lit)                           = exprLit sizeM lit
 expr_ _ (Identifier id_ Nothing)                      = string id_
-expr_ _ (Identifier id_ (Just (Indexed (CustomSP _id _size args,dcI,fI)))) =
+expr_ _ (Identifier id_ (Just (Indexed (CustomSP _id _dataRepr _size args,dcI,fI)))) =
   braces $ hcat $ punctuate ", " $ sequence ranges
     where
       (ConstrRepr' _name _n _mask _value anns, _, _argTys) = args !! dcI
@@ -933,19 +934,19 @@ expr_ _ (DataCon ty@(SP _ args) (DC (_,i)) es) = assignExpr
     assignExpr = braces (hcat $ punctuate comma $ sequence (dcExpr:argExprs ++ extraArg))
 
 expr_ _ (DataCon ty@(Sum _ _) (DC (_,i)) []) = int (typeSize ty) <> "'d" <> int i
-expr_ _ (DataCon ty@(CustomSum _ _ tys) (DC (_,i)) []) =
+expr_ _ (DataCon ty@(CustomSum _ _ _ tys) (DC (_,i)) []) =
   let (ConstrRepr' _ _ _ value _) = fst $ tys !! i in
   int (typeSize ty) <> squote <> "sd" <> int (fromIntegral value)
-expr_ _ (DataCon (CustomSP _ size args) (DC (_,i)) es) =
+expr_ _ (DataCon (CustomSP _ dataRepr size args) (DC (_,i)) es) =
   braces $ hcat $ punctuate ", " $ mapM range' origins
     where
-      (ConstrRepr' _name _n mask value anns, _, argTys) = args !! i
+      (cRepr, _, argTys) = args !! i
 
       -- Build bit representations for all constructor arguments
       argExprs = zipWith toSLV argTys es :: [SystemVerilogM Doc]
 
       -- Spread bits of constructor arguments using masks
-      origins = bitOrigins size (mask, value, anns) :: [BitOrigin]
+      origins = bitOrigins dataRepr cRepr :: [BitOrigin]
 
       range'
         :: BitOrigin
@@ -1112,7 +1113,7 @@ bits = hcat . mapM bit_char
 bit_char :: Bit -> SystemVerilogM Doc
 bit_char H = char '1'
 bit_char L = char '0'
-bit_char U = char '0' -- HACK: use 0 to represent 'undefined' to prevent simulator errors
+bit_char U = char 'x'
 bit_char Z = char 'z'
 
 toSLV :: HWType -> Expr -> SystemVerilogM Doc

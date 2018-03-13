@@ -369,12 +369,12 @@ patLitCustom
   -> HWType
   -> Literal
   -> VerilogM Doc
-patLitCustom var (CustomSum _name size reprs) (NumLit (fromIntegral -> i)) =
+patLitCustom var (CustomSum _name _dataRepr size reprs) (NumLit (fromIntegral -> i)) =
   patLitCustom' var size mask value
     where
       ((ConstrRepr' _name _n mask value _anns), _id) = reprs !! i
 
-patLitCustom var (CustomSP _name size reprs) (NumLit (fromIntegral -> i)) =
+patLitCustom var (CustomSP _name _dataRepr size reprs) (NumLit (fromIntegral -> i)) =
   patLitCustom' var size mask value
     where
       ((ConstrRepr' _name _n mask value _anns), _id, _tys) = reprs !! i
@@ -424,10 +424,10 @@ inst_ (CondAssignment id_ _ scrut _ [(Just (BoolLit b), l),(_,r)]) = fmap Just $
   where
     (t,f) = if b then (l,r) else (r,l)
 
-inst_ (CondAssignment id_ _ scrut scrutTy@(CustomSP _ _ _) es) =
+inst_ (CondAssignment id_ _ scrut scrutTy@(CustomSP _ _ _ _) es) =
   inst_' id_ scrut scrutTy es
 
-inst_ (CondAssignment id_ _ scrut scrutTy@(CustomSum _ _ _) es) =
+inst_ (CondAssignment id_ _ scrut scrutTy@(CustomSum _ _ _ _) es) =
   inst_' id_ scrut scrutTy es
 
 inst_ (CondAssignment id_ _ scrut scrutTy es) = fmap Just $
@@ -552,7 +552,7 @@ expr_ _ (Literal sizeM lit) = exprLit sizeM lit
 
 expr_ _ (Identifier id_ Nothing) = string id_
 
-expr_ _ (Identifier id_ (Just (Indexed (CustomSP _id _size args,dcI,fI)))) =
+expr_ _ (Identifier id_ (Just (Indexed (CustomSP _id _dataRepr _size args,dcI,fI)))) =
   braces $ hcat $ punctuate ", " $ sequence ranges
     where
       (ConstrRepr' _name _n _mask _value anns, _, _argTys) = args !! dcI
@@ -592,15 +592,15 @@ expr_ _ (DataCon ty@(SP _ args) (DC (_,i)) es) = assignExpr
 
 expr_ _ (DataCon ty@(Sum _ _) (DC (_,i)) []) = int (typeSize ty) <> "'d" <> int i
 
-expr_ _ (DataCon ty@(CustomSum _ _ tys) (DC (_,i)) []) =
+expr_ _ (DataCon ty@(CustomSum _ _ _ tys) (DC (_,i)) []) =
   let (ConstrRepr' _ _ _ value _) = fst $ tys !! i in
   int (typeSize ty) <> squote <> "sd" <> int (fromIntegral value)
-expr_ _ (DataCon (CustomSP name' size args) (DC (_,constrNr)) es) =
+expr_ _ (DataCon (CustomSP name' dataRepr size args) (DC (_,constrNr)) es) =
   (flip fromMaybe) (errOnNonContinuous 0 anns) $
   braces $ hcat $ punctuate ", " $ mapM range' origins
     where
       (cRepr, _, _) = args !! constrNr
-      (ConstrRepr' _name _n mask value anns) = cRepr
+      (ConstrRepr' _name _n _mask _value anns) = cRepr
 
       errOnNonContinuous :: Int -> [BitMask] -> Maybe a
       errOnNonContinuous _ [] = Nothing
@@ -623,7 +623,7 @@ expr_ _ (DataCon (CustomSP name' size args) (DC (_,constrNr)) es) =
       argExprs = map (expr_ False) es :: [VerilogM Doc]
 
       -- Spread bits of constructor arguments using masks
-      origins = bitOrigins size (mask, value, anns) :: [BitOrigin]
+      origins = bitOrigins dataRepr cRepr :: [BitOrigin]
 
       range'
         :: BitOrigin
@@ -748,7 +748,7 @@ bits = hcat . mapM bit_char
 bit_char' :: Bit -> Char
 bit_char' H = '1'
 bit_char' L = '0'
-bit_char' U = '0' -- HACK: use 0 to represent 'undefined' to prevent simulator errors
+bit_char' U = 'x'
 bit_char' Z = 'z'
 
 bit_char :: Bit -> VerilogM Doc

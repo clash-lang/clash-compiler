@@ -50,7 +50,7 @@ import Clash.Signal.Internal                (ClockKind, ResetKind)
 import Clash.Util
 
 import Clash.Annotations.BitRepresentation.Internal
-  (CustomReprs, ConstrRepr')
+  (CustomReprs, DataRepr', ConstrRepr')
 
 -- | Monad that caches generated components (StateT) and remembers hidden inputs
 -- of components that are being generated (WriterT)
@@ -146,10 +146,10 @@ data HWType
   -- ^ Reset type corresponding to clock with a specified name and period
   | BiDirectional !PortDirection !HWType
   -- ^ Tagging type indicating a bidirectional (inout) port
-  | CustomSP !Identifier !Size [(ConstrRepr', Identifier, [HWType])]
+  | CustomSP !Identifier !DataRepr' !Size [(ConstrRepr', Identifier, [HWType])]
   -- ^ Same as Sum-Of-Product, but with a user specified bit representation. For
   -- more info, see: Clash.Annotations.BitRepresentations.
-  | CustomSum !Identifier !Size [(ConstrRepr', Identifier)]
+  | CustomSum !Identifier !DataRepr' !Size [(ConstrRepr', Identifier)]
   -- ^ Same as Sum, but with a user specified bit representation. For more info,
   -- see: Clash.Annotations.BitRepresentations.
   deriving (Eq,Ord,Show,Generic)

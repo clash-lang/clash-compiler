@@ -283,12 +283,12 @@ normaliseType (Product nm tys) = Product nm <$> (mapM normaliseType tys)
 normaliseType ty@(SP _ elTys)      = do
   Mon $ mapM_ ((tyCache %=) . HashSet.insert) (concatMap snd elTys)
   return (BitVector (typeSize ty))
-normaliseType (CustomSP _ size elTys) = do
+normaliseType (CustomSP _ _dataRepr size elTys) = do
   Mon $ mapM_ ((tyCache %=) . HashSet.insert) [ty | (_, _, subTys) <- elTys, ty <- subTys]
   return (BitVector size)
-normaliseType ty@(Index _)     = return (Unsigned (typeSize ty))
-normaliseType ty@(Sum _ _)     = return (BitVector (typeSize ty))
-normaliseType ty@(CustomSum _ _ _) = return (BitVector (typeSize ty))
+normaliseType ty@(Index _) = return (Unsigned (typeSize ty))
+normaliseType ty@(Sum _ _) = return (BitVector (typeSize ty))
+normaliseType ty@(CustomSum _ _ _ _) = return (BitVector (typeSize ty))
 normaliseType (Clock _ _ Gated) =
   return (Product "GatedClock" [Bit,Bool])
 normaliseType (Clock {}) = return Bit
@@ -778,12 +778,12 @@ patLitCustom
   -> HWType
   -> Literal
   -> VHDLM Doc
-patLitCustom var (CustomSum _name size reprs) (NumLit (fromIntegral -> i)) =
+patLitCustom var (CustomSum _name _dataRepr size reprs) (NumLit (fromIntegral -> i)) =
   patLitCustom' var size mask value
     where
       ((ConstrRepr' _name _n mask value _anns), _id) = reprs !! i
 
-patLitCustom var (CustomSP _name size reprs) (NumLit (fromIntegral -> i)) =
+patLitCustom var (CustomSP _name _dataRepr size reprs) (NumLit (fromIntegral -> i)) =
   patLitCustom' var size mask value
     where
       ((ConstrRepr' _name _n mask value _anns), _id, _tys) = reprs !! i
@@ -829,10 +829,10 @@ inst_ (CondAssignment id_ _ scrut _ [(Just (BoolLit b), l),(_,r)]) = fmap Just $
   where
     (t,f) = if b then (l,r) else (r,l)
 
-inst_ (CondAssignment id_ _ scrut scrutTy@(CustomSP _ _ _) es) =
+inst_ (CondAssignment id_ _ scrut scrutTy@(CustomSP _ _ _ _) es) =
   inst_' id_ scrut scrutTy es
 
-inst_ (CondAssignment id_ _ scrut scrutTy@(CustomSum _ _ _) es) =
+inst_ (CondAssignment id_ _ scrut scrutTy@(CustomSum _ _ _ _) es) =
   inst_' id_ scrut scrutTy es
 
 inst_ (CondAssignment id_ _sig scrut scrutTy es) = fmap Just $
@@ -871,7 +871,7 @@ expr_ :: Bool -- ^ Enclose in parenthesis?
      -> VHDLM Doc
 expr_ _ (Literal sizeM lit) = exprLit sizeM lit
 expr_ _ (Identifier id_ Nothing) = pretty id_
-expr_ _ (Identifier id_ (Just (Indexed (CustomSP _id _size args,dcI,fI)))) =
+expr_ _ (Identifier id_ (Just (Indexed (CustomSP _id _dataRepr _size args,dcI,fI)))) =
   "unsigned" <> parens ("std_logic_vector'" <> parens (hcat $ punctuate " & " $ sequence ranges))
     where
       (ConstrRepr' _name _n _mask _value anns, _, _argTys) = args !! dcI
@@ -1013,19 +1013,19 @@ expr_ _ (DataCon ty@(SP _ args) (DC (_,i)) es) = assignExpr
 
 expr_ _ (DataCon ty@(Sum _ _) (DC (_,i)) []) =
   expr_ False (dcToExpr ty i)
-expr_ _ (DataCon ty@(CustomSum _ _ tys) (DC (_,i)) []) =
+expr_ _ (DataCon ty@(CustomSum _ _ _ tys) (DC (_,i)) []) =
   let (ConstrRepr' _ _ _ value _) = fst $ tys !! i in
   "std_logic_vector" <> parens ("to_unsigned" <> parens (int (fromIntegral value) <> comma <> int (typeSize ty)))
-expr_ _ (DataCon (CustomSP _ size args) (DC (_,i)) es) =
+expr_ _ (DataCon (CustomSP _ dataRepr size args) (DC (_,i)) es) =
   hcat $ punctuate " & " $ mapM range origins
     where
-      (ConstrRepr' _name _n mask value anns, _, argTys) = args !! i
+      (cRepr, _, argTys) = args !! i
 
       -- Build bit representations for all constructor arguments
       argExprs = zipWith toSLV argTys es :: [VHDLM Doc]
 
       -- Spread bits of constructor arguments using masks
-      origins = bitOrigins size (mask, value, anns) :: [BitOrigin]
+      origins = bitOrigins dataRepr cRepr :: [BitOrigin]
 
       range
         :: BitOrigin
@@ -1265,7 +1265,7 @@ toSLV (Signed _)   e = "std_logic_vector" <> parens (expr_ False e)
 toSLV (Unsigned _) e = "std_logic_vector" <> parens (expr_ False e)
 toSLV (Index _)    e = "std_logic_vector" <> parens (expr_ False e)
 toSLV (Sum _ _)    e = expr_ False e
-toSLV (CustomSum _ size reprs) (DataCon _ (DC (_,i)) _) =
+toSLV (CustomSum _ _dataRepr size reprs) (DataCon _ (DC (_,i)) _) =
   let (ConstrRepr' _ _ _ value _) = fst $ reprs !! i in
   let unsigned = "to_unsigned" <> parens (int (fromIntegral value) <> comma <> int size) in
   "std_logic_vector" <> parens unsigned
@@ -1282,7 +1282,7 @@ toSLV (Product _ _) e = do
   nm <- Mon $ use modNm
   pretty (T.toLower $ T.pack nm) <> "_types.toSLV" <> parens (expr_ False e)
 toSLV (SP _ _) e       = expr_ False e
-toSLV (CustomSP _ _ _) e = expr_ False e
+toSLV (CustomSP _ _ _ _) e = expr_ False e
 toSLV (Vector n elTy) (Identifier id_ Nothing) = do
     selIds' <- sequence selIds
     syn <- Mon hdlSyn
@@ -1303,13 +1303,13 @@ fromSLV :: HasCallStack => HWType -> Identifier -> Int -> Int -> VHDLM Doc
 fromSLV Bool              id_ start _   = do
   nm <- Mon $ use modNm
   pretty (T.toLower $ T.pack nm) <> "_types.fromSLV" <> parens (pretty id_ <> parens (int start <+> "downto" <+> int start))
-fromSLV Bit               id_ start _   = pretty id_ <> parens (int start)
-fromSLV (BitVector _)     id_ start end = pretty id_ <> parens (int start <+> "downto" <+> int end)
-fromSLV (Index _)         id_ start end = "unsigned" <> parens (pretty id_ <> parens (int start <+> "downto" <+> int end))
-fromSLV (Signed _)        id_ start end = "signed" <> parens (pretty id_ <> parens (int start <+> "downto" <+> int end))
-fromSLV (Unsigned _)      id_ start end = "unsigned" <> parens (pretty id_ <> parens (int start <+> "downto" <+> int end))
-fromSLV (Sum _ _)         id_ start end = pretty id_ <> parens (int start <+> "downto" <+> int end)
-fromSLV (CustomSum _ _ _) id_ start end = pretty id_ <> parens (int start <+> "downto" <+> int end)
+fromSLV Bit                 id_ start _   = pretty id_ <> parens (int start)
+fromSLV (BitVector _)       id_ start end = pretty id_ <> parens (int start <+> "downto" <+> int end)
+fromSLV (Index _)           id_ start end = "unsigned" <> parens (pretty id_ <> parens (int start <+> "downto" <+> int end))
+fromSLV (Signed _)          id_ start end = "signed" <> parens (pretty id_ <> parens (int start <+> "downto" <+> int end))
+fromSLV (Unsigned _)        id_ start end = "unsigned" <> parens (pretty id_ <> parens (int start <+> "downto" <+> int end))
+fromSLV (Sum _ _)           id_ start end = pretty id_ <> parens (int start <+> "downto" <+> int end)
+fromSLV (CustomSum _ _ _ _) id_ start end = pretty id_ <> parens (int start <+> "downto" <+> int end)
 fromSLV t@(Product _ tys) id_ start _ = do
     tupled $ zipWithM (\s e -> s <+> rarrow <+> e) selNames args
   where
@@ -1320,9 +1320,9 @@ fromSLV t@(Product _ tys) id_ start _ = do
     ends       = map (+1) (tail starts)
     args       = zipWith3 (`fromSLV` id_) tys starts ends
 
-fromSLV (CustomSP _ _ _)  id_ start end = pretty id_ <> parens (int start <+> "downto" <+> int end)
-fromSLV (SP _ _)          id_ start end = pretty id_ <> parens (int start <+> "downto" <+> int end)
-fromSLV (Vector n elTy)   id_ start _   =
+fromSLV (CustomSP _ _ _ _)  id_ start end = pretty id_ <> parens (int start <+> "downto" <+> int end)
+fromSLV (SP _ _)            id_ start end = pretty id_ <> parens (int start <+> "downto" <+> int end)
+fromSLV (Vector n elTy)     id_ start _   =
     if n > 1 then tupled args
              else parens (int 0 <+> rarrow <+> fmap head args)
   where
