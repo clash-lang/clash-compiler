@@ -21,6 +21,7 @@ import           Control.Applicative                  (liftA2)
 import           Control.Lens                         hiding (Indexed)
 import           Control.Monad                        (forM,join,liftM,zipWithM)
 import           Control.Monad.State                  (State)
+import           Data.Bits                            (testBit, Bits)
 import           Data.Graph.Inductive                 (Gr, mkGraph, topsort')
 import           Data.HashMap.Lazy                    (HashMap)
 import qualified Data.HashMap.Lazy                    as HashMap
@@ -753,25 +754,35 @@ decl l (NetDecl' noteM _ id_ ty) = Just <$> (,fromIntegral (T.length id_)) <$>
 
 decl _ _ = return Nothing
 
+stdMatch
+  :: Bits a
+  => Int
+  -> a
+  -> a
+  -> String
+stdMatch 0 _mask _value = []
+stdMatch size mask value =
+  symbol : stdMatch (size - 1) mask value
+  where
+    symbol =
+      if testBit mask (size - 1) then
+        if testBit value (size - 1) then
+          '1'
+        else
+          '0'
+      else
+        '-'
+
 patLitCustom'
-  :: Integral a
+  :: Bits a
   => VHDLM Doc
   -> Int
   -> a
   -> a
   -> VHDLM Doc
 patLitCustom' var size mask value =
-  if isUseLessMask mask then
-    -- A mask of all ones will result in the same value when AND-ed with another
-    -- value. We therefore leave out the mask completely.
-    var <+> "=" <+> (bits' value)
-  else
-    -- Select 'right' bits by AND-ing with mask and comparing it with the value
-    parens (var <+> "and" <+> (bits' mask)) <+> "=" <+> (bits' value)
-
-    where
-      bits'         = bits . (toBits size)
-      isUseLessMask = (all (== H)) . (toBits size)
+  let mask' = text $ T.pack $ stdMatch size mask value in
+  "std_match" <> parens (dquotes mask' <> comma <+> var)
 
 patLitCustom
   :: VHDLM Doc
