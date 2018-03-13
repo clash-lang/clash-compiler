@@ -14,6 +14,7 @@ This module contains:
 
 -}
 {-# LANGUAGE DataKinds          #-}
+{-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE DeriveLift         #-}
 {-# LANGUAGE MagicHash          #-}
 {-# LANGUAGE QuasiQuotes        #-}
@@ -26,8 +27,10 @@ module Clash.Annotations.BitRepresentation.Deriving
   -- * Derivation functions and their accociated types
     deriveAnnotation
   , deriveDefaultAnnotation
+  , derivePackedAnnotation
   , deriveBitPack
   , simpleDerivator
+  , packedDerivator
   , ConstructorType(..)
   , FieldsType(..)
   -- * Convenience type synonyms
@@ -46,9 +49,11 @@ import           Clash.Class.BitPack        (BitPack, BitSize, pack, unpack)
 import           Clash.Class.Resize         (resize)
 import           Clash.Sized.BitVector      (BitVector, high, low, (++#))
 import           Control.Monad              (zipWithM)
-import           Data.Bits                  ((.&.))
-import           Data.Bits                  (shiftL, shiftR, complement)
-import           Data.List                  (mapAccumL, zipWith4)
+import           Data.Bits
+  (shiftL, shiftR, complement, (.&.), (.|.), zeroBits, popCount, bit, testBit)
+import           Data.Data                  (Data)
+import           Data.List                  (mapAccumL, zipWith4, sortOn)
+import           Data.Typeable              (Typeable)
 import qualified Data.Map                   as Map
 import           Data.Proxy                 (Proxy(..))
 import           GHC.Exts                   (Int(I#))
@@ -56,6 +61,18 @@ import           GHC.Integer.Logarithms     (integerLog2#)
 import           GHC.TypeLits               (natVal)
 import           Language.Haskell.TH
 import           Language.Haskell.TH.Syntax
+
+-- | Used to track constructor bits in packed derivation
+data BitMaskOrigin
+  = External
+  -- ^ Constructor bit should be stored externally
+  | Embedded BitMask Value
+  -- ^ Constructor bit should be stored in one of the constructor's fields
+    deriving (Show, Data, Typeable, Lift)
+
+isExternal :: BitMaskOrigin -> Bool
+isExternal External = True
+isExternal _        = False
 
 type NameMap = Map.Map Name Type
 
@@ -99,6 +116,12 @@ integerLog2Ceil :: Integer -> Integer
 integerLog2Ceil n =
   let nlog2 = fromIntegral $ I# (integerLog2# n) in
   if n > 2^nlog2 then nlog2 + 1 else nlog2
+
+-- | Determine number of bits needed to represent /n/ options
+bitsNeeded :: Integer -> Integer
+bitsNeeded 0 = 0
+bitsNeeded 1 = 1
+bitsNeeded n = integerLog2Ceil n
 
 tyVarBndrName :: TyVarBndr -> Name
 tyVarBndrName (PlainTV n) = n
@@ -157,28 +180,6 @@ bitmask start  size
   | start + 1 < size = error $ "Start + 1 (" ++ show start ++ " - 1) cannot be smaller than size (" ++ show size ++  ")."
   | otherwise        = shiftL (2^size - 1) $ fromIntegral (start - (size - 1))
 
-buildConstrRepr
-  :: Q Exp
-  -- ^ Data size (excluding constructor size)
-  -> Name
-  -- ^ Constr name
-  -> [Exp]
-  -- ^ Field masks
-  -> BitMask
-  -- ^ Constructor mask
-  -> Value
-  -- ^ Constructor value
-  -> Q Exp
-buildConstrRepr dataSize constrName fieldAnns constrMask constrValue = [|
-  ConstrRepr
-    constrName
-    $mask
-    $value
-    $(return $ ListE fieldAnns)
-  |]
-  where
-    mask  = [| shiftL constrMask  (fromIntegral $ $dataSize)|]
-    value = [| shiftL constrValue (fromIntegral $ $dataSize)|]
 
 fieldTypes :: Con -> [Type]
 fieldTypes (NormalC _nm bTys) =
@@ -203,6 +204,45 @@ constrFieldSizes
 constrFieldSizes con = do
   fieldSizes <- mapM typeSize (fieldTypes con)
   return (conName con, fieldSizes)
+
+complementInteger :: Int -> Integer -> Integer
+complementInteger 0 _i = 0
+complementInteger size i =
+  let size' = size - 1 in
+  if testBit i size' then
+    complementInteger size' i
+  else
+    (.|.) (bit size') (complementInteger size' i)
+
+deriveAnnotation :: Derivator -> Q Type -> Q [Dec]
+deriveAnnotation deriv typ =
+  return <$> pragAnnD ModuleAnnotation (deriv =<< typ)
+
+--------------------------------------------
+------------ SIMPLE DERIVATIONS ------------
+--------------------------------------------
+buildConstrRepr
+  :: Q Exp
+  -- ^ Data size (excluding constructor size)
+  -> Name
+  -- ^ Constr name
+  -> [Exp]
+  -- ^ Field masks
+  -> BitMask
+  -- ^ Constructor mask
+  -> Value
+  -- ^ Constructor value
+  -> Q Exp
+buildConstrRepr dataSize constrName fieldAnns constrMask constrValue = [|
+  ConstrRepr
+    constrName
+    $mask
+    $value
+    $(return $ ListE fieldAnns)
+  |]
+  where
+    mask  = [| shiftL constrMask  (fromIntegral $ $dataSize)|]
+    value = [| shiftL constrValue (fromIntegral $ $dataSize)|]
 
 countConstructor :: [Integer] -> [(BitMask, Value)]
 countConstructor ns = zip (repeat mask) ns
@@ -326,9 +366,127 @@ defaultDerivator = simpleDerivator Binary Overlap
 deriveDefaultAnnotation :: Q Type -> Q [Dec]
 deriveDefaultAnnotation = deriveAnnotation defaultDerivator
 
-deriveAnnotation :: Derivator -> Q Type -> Q [Dec]
-deriveAnnotation deriv typ =
-  return <$> pragAnnD ModuleAnnotation (deriv =<< typ)
+---------------------------------------------------------
+------------ DERIVING PACKED REPRESENTATIONS ------------
+---------------------------------------------------------
+packedConstrRepr
+  :: Int
+  -- ^ Data width
+  -> Integer
+  -- ^ External constructor width
+  -> Integer
+  -- ^ nth External so far
+  -> [(BitMaskOrigin, ConstrRepr)]
+  -> [ConstrRepr]
+packedConstrRepr _ _ _ [] = []
+packedConstrRepr dataWidth constrWidth n ((External, ConstrRepr name _ _ anns) : constrs) =
+  constr : packedConstrRepr dataWidth constrWidth (n+1) constrs
+  where
+    constr =
+      ConstrRepr
+        name
+        (shiftL (2^constrWidth - 1) dataWidth)
+        (shiftL n dataWidth)
+        anns
+
+packedConstrRepr dataWidth constrWidth n ((Embedded mask value, ConstrRepr name _ _ anns) : constrs) =
+  constr : packedConstrRepr (fromIntegral dataWidth) constrWidth n constrs
+  where
+    constr =
+      ConstrRepr
+        name
+        mask
+        value
+        anns
+
+packedDataRepr
+  :: Type
+  -> Integer
+  -> [(BitMaskOrigin, ConstrRepr)]
+  -> DataReprAnn
+packedDataRepr typ dataWidth constrs =
+  DataReprAnn
+    typ
+    (dataWidth + constrWidth)
+    (packedConstrRepr (fromIntegral dataWidth) constrWidth 0 constrs)
+  where
+    external    = filter isExternal (map fst constrs)
+    constrWidth = bitsNeeded $ toInteger $ length external
+
+-- | Try to distribute constructor bits over fields
+storeInFields
+  :: Int
+  -- ^ data width
+  -> BitMask
+  -- ^ Additional mask gathered so far
+  -> [BitMask]
+  -- ^ Repr bitmasks to try and pack
+  -> [BitMaskOrigin]
+storeInFields _dataWidth _additionalMask [] = []
+storeInFields _dataWidth _additionalMask [_] =
+  -- Last constructor is implict
+  [Embedded 0 0]
+storeInFields dataWidth additionalMask constrs =
+  if commonMask == fullMask then
+    -- We can't store the constructor anywhere special, so we need a special
+    -- constructor bit stored besides fields
+    External : storeInFields dataWidth additionalMask (tail constrs)
+  else
+    -- Hooray, we can store it somewhere.
+    maskOrigins ++ (storeInFields dataWidth additionalMask' (drop storeSize constrs))
+
+  where
+    headMask   = head constrs
+    commonMask = (.|.) headMask additionalMask
+
+    -- Variables for the case that we can store something:
+    storeMask       = complementInteger dataWidth commonMask
+    additionalMask' = (.|.) additionalMask storeMask
+    storeSize       = 2^(popCount storeMask) - 1
+    maskOrigins     = [Embedded storeMask (toInteger n) | n <- [1..storeSize]]
+
+    -- BitMask which spans the complete data size
+    fullMask = 2^dataWidth - 1
+
+derivePackedAnnotation' :: DataReprAnn -> DataReprAnn
+derivePackedAnnotation' (DataReprAnn typ size constrs) =
+  dataRepr
+  where
+    constrWidth = bitsNeeded $ toInteger $ length constrs
+    dataWidth   = size - constrWidth
+    fieldMasks  = [foldl (.|.) zeroBits anns | ConstrRepr _ _ _ anns <- constrs]
+
+    -- Default annotation will overlap "to the left", so sorting on size will
+    -- actually provide us with the 'fullest' constructors first and the
+    -- 'empties' last.
+    sortedMasks = reverse $ sortOn fst $ zip fieldMasks constrs
+    origins     = storeInFields (fromInteger dataWidth) zeroBits (map fst sortedMasks)
+    constrs'    = zip origins $ map snd sortedMasks
+    dataRepr    = packedDataRepr typ dataWidth constrs'
+
+-- | This derivator tries to distribute its constructor bits over space left
+-- by the difference in constructor sizes. Example:
+--
+-- @
+-- type SmallInt = Unsigned 2
+--
+-- data Train
+--    = Passegner SmallInt
+--    | Freight SmallInt SmallInt
+--    | Maintenance
+--    | Toy
+-- @
+--
+-- The packed representation of this data type needs only a single constructor
+-- bit. The first bit discriminates between @Freight@ and non-@Freight@
+-- constructors. All other constructors do not use their last two bits; the
+-- packed representation will store the rest of the constructor bits there.
+packedDerivator :: Derivator
+packedDerivator typ =
+  [| derivePackedAnnotation' $(defaultDerivator typ ) |]
+
+derivePackedAnnotation :: Q Type -> Q [Dec]
+derivePackedAnnotation = deriveAnnotation packedDerivator
 
 ----------------------------------------------------
 ------------ DERIVING BITPACK INSTANCES ------------
