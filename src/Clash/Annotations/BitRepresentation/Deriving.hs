@@ -37,12 +37,15 @@ module Clash.Annotations.BitRepresentation.Deriving
 
 import Clash.Annotations.BitRepresentation
   (DataReprAnn(..), ConstrRepr(..), BitMask, Value, reprType)
+import Clash.Annotations.BitRepresentation.Internal
+  (dataReprAnnToDataRepr', thTypeToType', DataRepr'(..), ConstrRepr'(..))
 import Clash.Annotations.BitRepresentation.Util
   (bitOrigins, BitOrigin(..), bitRanges, Bit(..))
 
 import           Clash.Class.BitPack        (BitPack, BitSize, pack, unpack)
 import           Clash.Class.Resize         (resize)
 import           Clash.Sized.BitVector      (BitVector, high, low, (++#))
+import           Control.Monad              (zipWithM)
 import           Data.Bits                  ((.&.))
 import           Data.Bits                  (shiftL, shiftR, complement)
 import           Data.List                  (mapAccumL, zipWith4)
@@ -332,10 +335,16 @@ deriveAnnotation deriv typ =
 ----------------------------------------------------
 
 -- | Collect data reprs of current module
-collectDataReprs :: Q [DataReprAnn]
+collectDataReprs :: Q [([Name], DataRepr')]
 collectDataReprs = do
   thisMod <- thisModule
-  reifyAnnotations (AnnLookupModule thisMod)
+  (map toDataRepr') <$> reifyAnnotations (AnnLookupModule thisMod)
+  where
+    toDataRepr' :: DataReprAnn -> ([Name], DataRepr')
+    toDataRepr' dataRepr@(DataReprAnn _ _ constrs) =
+      ( [n | ConstrRepr n _ _ _ <- constrs]
+      , dataReprAnnToDataRepr' dataRepr
+      )
 
 group :: [Bit] -> [(Int, Bit)]
 group [] = []
@@ -349,6 +358,7 @@ bitToExpr' :: (Int, Bit) -> Q Exp
 bitToExpr' (0, _) = error $ "Unexpected group length: 0"
 bitToExpr' (1, H) = lift high
 bitToExpr' (1, L) = lift low
+-- TODO / Evaluate: Undefined bit values should not be converted
 bitToExpr' (1, _) = lift low
 bitToExpr' (numTyLit' -> n, H) =
   [| complement (resize $(lift low) :: BitVector $n) |]
@@ -417,10 +427,11 @@ select fields (Field fieldn from downto) =
   select' (fields !! fieldn) [(from, downto)]
 
 buildPackMatch
-  :: Integer
-  -> ConstrRepr
+  :: DataRepr'
+  -> ConstrRepr'
+  -> Name
   -> Q Match
-buildPackMatch dataSize (ConstrRepr qName mask value fieldanns) = do
+buildPackMatch dataRepr cRepr@(ConstrRepr' _ _ _ _ fieldanns) qName = do
   fieldNames <-
     mapM (\n -> newName $ "field" ++ show n) [0..length fieldanns-1]
   fieldPackedNames <-
@@ -429,7 +440,7 @@ buildPackMatch dataSize (ConstrRepr qName mask value fieldanns) = do
   let packed fName = AppE (VarE 'pack) (VarE fName)
   let pack' pName fName = ValD (VarP pName) (NormalB $ packed fName) []
   let fieldPackedDecls = zipWith pack' fieldPackedNames fieldNames
-  let origins = bitOrigins (fromIntegral dataSize) (mask, value, fieldanns)
+  let origins = bitOrigins dataRepr cRepr
 
   vec <- foldl1
               (\v1 v2 -> [| $v1 ++# $v2 |])
@@ -440,13 +451,14 @@ buildPackMatch dataSize (ConstrRepr qName mask value fieldanns) = do
 -- | Build a /pack/ function corresponding to given DataRepr
 buildPack
   :: Type
-  -> DataReprAnn
+  -> [Name]
+  -> DataRepr'
   -> Q [Dec]
-buildPack argTy (DataReprAnn _name size constrs) = do
+buildPack argTy constrNames dataRepr@(DataRepr' _name size constrs) = do
   argName      <- newName "toBePacked"
   let resTy     = AppT (ConT ''BitVector) (LitT $ NumTyLit size)
   let funcSig   = SigD 'pack (AppT (AppT ArrowT argTy) resTy)
-  constrs'     <- mapM (buildPackMatch size) constrs
+  constrs'     <- zipWithM (buildPackMatch dataRepr) constrs constrNames
   let body      = CaseE (VarE argName) constrs'
   let func      = FunD 'pack [Clause [VarP argName] (NormalB body) []]
   return $ [funcSig, func]
@@ -462,26 +474,26 @@ buildUnpackField valueName mask =
 
 buildUnpackIfE
   :: Name
-  -> Integer
-  -> ConstrRepr
+  -> ConstrRepr'
+  -> Name
   -> Q (Guard, Exp)
-buildUnpackIfE valueName _dataSize (ConstrRepr qName mask value fieldanns) = do
+buildUnpackIfE valueName (ConstrRepr' _ _ mask value fieldanns) qName = do
   let valueName' = return $ VarE valueName
-  let constr = ConE qName
   guard  <- NormalG <$> [| ((.&.) $valueName' mask) == value |]
   fields <- mapM (buildUnpackField valueName) fieldanns
-  return $ (guard, foldl AppE constr fields)
+  return $ (guard, foldl AppE (ConE qName) fields)
 
 -- | Build an /unpack/ function corresponding to given DataRepr
 buildUnpack
   :: Type
-  -> DataReprAnn
+  -> [Name]
+  -> DataRepr'
   -> Q [Dec]
-buildUnpack resTy (DataReprAnn _name size constrs) = do
+buildUnpack resTy constrNames (DataRepr' _name size constrs) = do
   argName <- newName "toBeUnpacked"
   let argTy    = AppT (ConT ''BitVector) (LitT $ NumTyLit size)
   let funcSig  = SigD 'unpack (AppT (AppT ArrowT argTy) resTy)
-  matches     <- mapM (buildUnpackIfE argName size) constrs
+  matches     <- zipWithM (buildUnpackIfE argName) constrs constrNames
   err         <- [| error $ "Could not match constructor for: " ++ show $(varE argName) |]
   let body     = MultiIfE $ matches ++ [(NormalG (ConE 'True), err)]
   let func     = FunD 'unpack [Clause [VarP argName] (NormalB body) []]
@@ -496,16 +508,17 @@ deriveBitPack :: Q Type -> Q [Dec]
 deriveBitPack typQ = do
   anns <- collectDataReprs
   typ  <- typQ
+  let typ' = thTypeToType' typ
 
-  let ann = case filter (\(DataReprAnn t _ _) -> t == typ) anns of
+  let ann = case filter (\(_names, DataRepr' t _ _) -> t == typ') anns of
               [a] -> a
               []  -> error $ "No custom bit annotation found."
               _   -> error $ "Overlapping bit annotations found."
 
-  packFunc   <- buildPack typ ann
-  unpackFunc <- buildUnpack typ ann
+  packFunc   <- (uncurry (buildPack typ)) ann
+  unpackFunc <- (uncurry (buildUnpack typ)) ann
 
-  let (DataReprAnn _name dataSize _constrs) = ann
+  let (DataRepr' _name dataSize _constrs) = snd ann
 
   let bitSizeInst = TySynInstD
                       ''BitSize

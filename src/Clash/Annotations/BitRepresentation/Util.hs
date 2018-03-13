@@ -15,9 +15,11 @@ module Clash.Annotations.BitRepresentation.Util
   ) where
 
 
-import Data.Tuple (swap)
+import Clash.Annotations.BitRepresentation.Internal
+  (DataRepr'(..), ConstrRepr'(..))
+import Data.Bits  (Bits, testBit, testBit, shiftR, (.|.))
 import Data.List  (findIndex, group, mapAccumL)
-import Data.Bits  (Bits, testBit, testBit, shiftR)
+import Data.Tuple (swap)
 
 data Bit
   -- | High
@@ -49,13 +51,14 @@ data BitOrigin
 -- construction plan on how to make the whole data structure, given its
 -- individual constructor fields.
 bitOrigins
-  :: Int
-  -> (Integer, Integer, [Integer])
-  -- ^ (mask, value, fields) from CustomRepr or CustomRepr'
+  :: DataRepr'
+  -> ConstrRepr'
   -> [BitOrigin]
-bitOrigins size cRepr = mergeOrigins origins
+bitOrigins (DataRepr' _ size constrs) (ConstrRepr' _ _ mask value fields) =
+  mergeOrigins origins
     where
-      origins = map (bitOrigin cRepr) (reverse [0..fromIntegral $ size - 1])
+      commonMask = foldl (.|.) 0 [m | ConstrRepr' _ _ m _ _ <- constrs]
+      origins = map bitOrigin (reverse [0..fromIntegral $ size - 1])
 
       -- | Merge consequtive Constructor and Field fields (if applicable).
       mergeOrigins :: [BitOrigin] -> [BitOrigin]
@@ -72,14 +75,24 @@ bitOrigins size cRepr = mergeOrigins origins
       mergeOrigins []     = []
 
       -- | Determine origin of single bit
-      bitOrigin :: (Integer, Integer, [Integer]) -> Int -> BitOrigin
-      bitOrigin (mask, value, fields) n =
+      bitOrigin :: Int -> BitOrigin
+      bitOrigin n =
         if testBit mask n then
           Lit [if testBit value n then H else L]
         else
           case findIndex (\fmask -> testBit fmask n) fields of
             Nothing ->
-              Lit [U]
+              if testBit commonMask n then
+                -- This bit is not used in this constructor, nor is it part of
+                -- a field. We cannot leave this value uninitialized though, as
+                -- this would result in undefined behavior when matching other
+                -- constructors. We therefore take a /default/ bit value.
+                Lit [if testBit value n then H else L]
+              else
+                -- This bit is not used in this constructor, nor is it part of
+                -- a field, nor is it used in other constructors. It is safe to
+                -- leave this bit uninitialized.
+                Lit [U]
             Just fieldn ->
               let fieldbitn = length $ filter id
                                      $ take n
