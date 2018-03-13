@@ -608,18 +608,15 @@ buildPackMatch dataRepr cRepr@(ConstrRepr' _ _ _ _ fieldanns) qName = do
 
 -- | Build a /pack/ function corresponding to given DataRepr
 buildPack
-  :: Type
-  -> [Name]
+  :: [Name]
   -> DataRepr'
   -> Q [Dec]
-buildPack argTy constrNames dataRepr@(DataRepr' _name size constrs) = do
+buildPack constrNames dataRepr@(DataRepr' _name _size constrs) = do
   argName      <- newName "toBePacked"
-  let resTy     = AppT (ConT ''BitVector) (LitT $ NumTyLit size)
-  let funcSig   = SigD 'pack (AppT (AppT ArrowT argTy) resTy)
   constrs'     <- zipWithM (buildPackMatch dataRepr) constrs constrNames
   let body      = CaseE (VarE argName) constrs'
   let func      = FunD 'pack [Clause [VarP argName] (NormalB body) []]
-  return $ [funcSig, func]
+  return [func]
 
 buildUnpackField
   :: Name
@@ -639,23 +636,20 @@ buildUnpackIfE valueName (ConstrRepr' _ _ mask value fieldanns) qName = do
   let valueName' = return $ VarE valueName
   guard  <- NormalG <$> [| ((.&.) $valueName' mask) == value |]
   fields <- mapM (buildUnpackField valueName) fieldanns
-  return $ (guard, foldl AppE (ConE qName) fields)
+  return (guard, foldl AppE (ConE qName) fields)
 
 -- | Build an /unpack/ function corresponding to given DataRepr
 buildUnpack
-  :: Type
-  -> [Name]
+  :: [Name]
   -> DataRepr'
   -> Q [Dec]
-buildUnpack resTy constrNames (DataRepr' _name size constrs) = do
+buildUnpack constrNames (DataRepr' _name _size constrs) = do
   argName <- newName "toBeUnpacked"
-  let argTy    = AppT (ConT ''BitVector) (LitT $ NumTyLit size)
-  let funcSig  = SigD 'unpack (AppT (AppT ArrowT argTy) resTy)
   matches     <- zipWithM (buildUnpackIfE argName) constrs constrNames
   err         <- [| error $ "Could not match constructor for: " ++ show $(varE argName) |]
   let body     = MultiIfE $ matches ++ [(NormalG (ConE 'True), err)]
   let func     = FunD 'unpack [Clause [VarP argName] (NormalB body) []]
-  return $ [funcSig, func]
+  return [func]
 
 -- | Derives BitPack instances for given type. Will account for custom bit
 -- representation annotations in the module where the splice is ran. Note that
@@ -673,8 +667,8 @@ deriveBitPack typQ = do
               []  -> error $ "No custom bit annotation found."
               _   -> error $ "Overlapping bit annotations found."
 
-  packFunc   <- (uncurry (buildPack typ)) ann
-  unpackFunc <- (uncurry (buildUnpack typ)) ann
+  packFunc   <- (uncurry buildPack) ann
+  unpackFunc <- (uncurry buildUnpack) ann
 
   let (DataRepr' _name dataSize _constrs) = snd ann
 
