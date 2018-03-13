@@ -30,7 +30,6 @@ import           Data.Hashable                            (Hashable)
 import qualified Data.Map                                 as Map
 import qualified Data.Text.Lazy                           as Text
 import           Data.Typeable                            (Typeable)
-import qualified Language.Haskell.TH.Lib                  as TH
 import qualified Language.Haskell.TH.Syntax               as TH
 import           GHC.Generics                             (Generic)
 
