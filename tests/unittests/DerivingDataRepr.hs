@@ -46,7 +46,7 @@ oneHotWideRepr' =
     ]
 
 countOverlapRepr :: DataReprAnn
-countOverlapRepr = $( (simpleDerivator Count Overlap) =<< [t| Train |] )
+countOverlapRepr = $( (simpleDerivator Binary Overlap) =<< [t| Train |] )
 
 countOverlapRepr' :: DataRepr'
 countOverlapRepr' =
@@ -60,7 +60,7 @@ countOverlapRepr' =
     ]
 
 countWideRepr :: DataReprAnn
-countWideRepr = $( (simpleDerivator Count Wide) =<< [t| Train |] )
+countWideRepr = $( (simpleDerivator Binary Wide) =<< [t| Train |] )
 
 countWideRepr' :: DataRepr'
 countWideRepr' =
@@ -77,6 +77,6 @@ tests :: [TestTree]
 tests =
   [ testCase "OneHotOverlap" $ dataReprAnnToDataRepr' oneHotOverlapRepr @?= oneHotOverlapRepr'
   , testCase "OneHotWide"    $ dataReprAnnToDataRepr' oneHotWideRepr    @?= oneHotWideRepr'
-  , testCase "CountOverlap"  $ dataReprAnnToDataRepr' countOverlapRepr  @?= countOverlapRepr'
-  , testCase "CountWide"     $ dataReprAnnToDataRepr' countWideRepr     @?= countWideRepr'
+  , testCase "BinaryOverlap" $ dataReprAnnToDataRepr' countOverlapRepr  @?= countOverlapRepr'
+  , testCase "BinaryWide"    $ dataReprAnnToDataRepr' countWideRepr     @?= countWideRepr'
   ]
