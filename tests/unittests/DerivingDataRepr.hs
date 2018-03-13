@@ -8,7 +8,6 @@
 
 module DerivingDataRepr where
 
-
 import Test.Tasty
 import Test.Tasty.HUnit
 import Prelude ((=<<), ($))
@@ -73,10 +72,25 @@ countWideRepr' =
     , ConstrRepr' "DerivingDataReprTrain.Toy"         3 0b11000000 0b11000000 []
     ]
 
+packedRepr :: DataReprAnn
+packedRepr = $( packedDerivator =<< [t| Train |] )
+
+packedRepr' :: DataRepr'
+packedRepr' =
+  DataRepr'
+    (ConstTy' "DerivingDataReprTrain.Train")
+    5
+    [ ConstrRepr' "DerivingDataReprTrain.Freight"     0 0b10000 0 [12,3]
+    , ConstrRepr' "DerivingDataReprTrain.Passegner"   1 3       1 [12]
+    , ConstrRepr' "DerivingDataReprTrain.Toy"         2 3       2 []
+    , ConstrRepr' "DerivingDataReprTrain.Maintenance" 3 3       3 []
+    ]
+
 tests :: [TestTree]
 tests =
   [ testCase "OneHotOverlap" $ dataReprAnnToDataRepr' oneHotOverlapRepr @?= oneHotOverlapRepr'
   , testCase "OneHotWide"    $ dataReprAnnToDataRepr' oneHotWideRepr    @?= oneHotWideRepr'
   , testCase "BinaryOverlap" $ dataReprAnnToDataRepr' countOverlapRepr  @?= countOverlapRepr'
   , testCase "BinaryWide"    $ dataReprAnnToDataRepr' countWideRepr     @?= countWideRepr'
+  , testCase "Packed"        $ dataReprAnnToDataRepr' packedRepr        @?= packedRepr'
   ]
