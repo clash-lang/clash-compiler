@@ -781,7 +781,7 @@ patLitCustom'
   -> a
   -> VHDLM Doc
 patLitCustom' var size mask value =
-  let mask' = text $ T.pack $ stdMatch size mask value in
+  let mask' = string $ T.pack $ stdMatch size mask value in
   "std_match" <> parens (dquotes mask' <> comma <+> var)
 
 patLitCustom
