@@ -22,6 +22,7 @@ import qualified Control.Applicative                  as A
 import           Control.Lens                         hiding (Indexed)
 import           Control.Monad                        (forM,liftM,zipWithM)
 import           Control.Monad.State                  (State)
+import           Data.Bits                            (Bits, testBit)
 import           Data.Graph.Inductive                 (Gr, mkGraph, topsort')
 import           Data.HashMap.Lazy                    (HashMap)
 import qualified Data.HashMap.Lazy                    as HashMap
@@ -681,42 +682,44 @@ insts :: [Declaration] -> SystemVerilogM Doc
 insts [] = emptyDoc
 insts is = indent 2 . vcat . punctuate line . fmap catMaybes $ mapM inst_ is
 
-patLitCustom'
-  :: Integral a
-  => SystemVerilogM Doc
-  -> Int
+stdMatch
+  :: Bits a
+  => Int
   -> a
   -> a
-  -> SystemVerilogM Doc
-patLitCustom' var size mask value =
-  if isUseLessMask mask then
-    -- A mask of all ones will result in the same value when AND-ed with another
-    -- value. We therefore leave out the mask completely.
-    var <+> "==" <+> (bits' value)
-  else
-    -- Select 'right' bits by AND-ing with mask and comparing it with the value
-    parens (var <+> "&" <+> bits' mask) <+> "==" <+> bits' value
+  -> String
+stdMatch 0 _mask _value = []
+stdMatch size mask value =
+  symbol : stdMatch (size - 1) mask value
+  where
+    symbol =
+      if testBit mask (size - 1) then
+        if testBit value (size - 1) then
+          '1'
+        else
+          '0'
+      else
+        '?'
 
-    where
-      bits' value'  = int size <> squote <> "b" <> bits (toBits size value')
-      isUseLessMask = (all (== H)) . (toBits size)
+patLitCustom'
+  :: Int
+  -> ConstrRepr'
+  -> SystemVerilogM Doc
+patLitCustom' size (ConstrRepr' _name _n mask value _anns) =
+  int size <> squote <> "b" <> (string $ Text.pack $ stdMatch size mask value)
 
 patLitCustom
-  :: SystemVerilogM Doc
-  -> HWType
+  :: HWType
   -> Literal
   -> SystemVerilogM Doc
-patLitCustom var (CustomSum _name _dataRepr size reprs) (NumLit (fromIntegral -> i)) =
-  patLitCustom' var size mask value
-    where
-      ((ConstrRepr' _name _n mask value _anns), _id) = reprs !! i
+patLitCustom (CustomSum _name _dataRepr size reprs) (NumLit (fromIntegral -> i)) =
+  patLitCustom' size (fst $ reprs !! i)
 
-patLitCustom var (CustomSP _name _dataRepr size reprs) (NumLit (fromIntegral -> i)) =
-  patLitCustom' var size mask value
-    where
-      ((ConstrRepr' _name _n mask value _anns), _id, _tys) = reprs !! i
+patLitCustom (CustomSP _name _dataRepr size reprs) (NumLit (fromIntegral -> i)) =
+  let (cRepr, _id, _tys) = reprs !! i in
+  patLitCustom' size cRepr
 
-patLitCustom _ x y = error $ $(curLoc) ++ unwords
+patLitCustom x y = error $ $(curLoc) ++ unwords
   [ "You can only pass CustomSP / CustomSum and a NumLit to this function,"
   , "not", show x, "and", show y]
 
@@ -727,9 +730,12 @@ patMod _ l = l
 -- | Helper function for inst_, handling CustomSP and CustomSum
 inst_' :: Text.Text -> Expr -> HWType -> [(Maybe Literal, Expr)] -> SystemVerilogM (Maybe Doc)
 inst_' id_ scrut scrutTy es = fmap Just $
-  "always_comb begin" <> line <> indent 2 assignment <> line <> "end"
+  "always_comb begin" <> line <> indent 2 casez <> line <> "end"
     where
-      assignment = string id_ <+> equals <+> align (conds esNub) <> semi
+      casez =
+        "casez" <+> parens var <> line <>
+          indent 2 (conds esNub) <> line <>
+        "endcase"
 
       esMod = map (first (fmap (patMod scrutTy))) es
       esNub = nubBy ((==) `on` fst) esMod
@@ -737,14 +743,12 @@ inst_' id_ scrut scrutTy es = fmap Just $
 
       conds :: [(Maybe Literal,Expr)] -> SystemVerilogM Doc
       conds []                = error $ $(curLoc) ++ "Empty list of conditions invalid."
-      conds [(_,e)]           = expr_ False e
-      conds ((Nothing,e):_)   = expr_ False e
+      conds [(_,e)]           = "default" <+> ":" <+> string id_ <+> "=" <+> expr_ False e <> ";"
+      conds ((Nothing,e):_)   = "default" <+> ":" <+> string id_ <+> "=" <+> expr_ False e <> ";"
       conds ((Just c ,e):es') =
-        parens $ parens predicate <+> "?" <+> parens expr' <+> ":" <> line <> others
+        mask' <+> ":" <+> string id_ <+> "=" <+> expr_ False e <> ";" <> line <> conds es'
           where
-            predicate = patLitCustom var scrutTy c
-            expr'     = expr_ False e
-            others    = conds es'
+            mask' = patLitCustom scrutTy c
 
 -- | Turn a Netlist Declaration to a SystemVerilog concurrent block
 inst_ :: Declaration -> SystemVerilogM (Maybe Doc)
