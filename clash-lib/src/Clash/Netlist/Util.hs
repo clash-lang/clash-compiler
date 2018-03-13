@@ -50,6 +50,10 @@ import           Clash.Netlist.Types     as HW
 import           Clash.Signal.Internal   (ClockKind (..))
 import           Clash.Util
 
+isVoid :: HWType -> Bool
+isVoid (Void {}) = True
+isVoid _         = False
+
 mkIdentifier :: IdType -> Identifier -> NetlistMonad Identifier
 mkIdentifier typ nm = Lens.use mkIdentifierFn <*> pure typ <*> pure nm
 
@@ -163,10 +167,13 @@ mkADT builtInTranslation m tyString tc args = case tyConDataCons (m HashMap.! na
         argSubts     = map ((`zip` args) . map nameOcc) argTVss
         substArgTyss = zipWith (\s tys -> map (substTys s) tys) argSubts argTyss
     argHTyss         <- mapM (mapM (coreTypeToHWType builtInTranslation m)) substArgTyss
-    case (dcs,argHTyss) of
+    let argHTyss'    = map (filter (not . isVoid)) argHTyss
+    case (dcs,argHTyss') of
       (_:[],[[elemTy]])      -> return elemTy
       (_:[],[elemTys@(_:_)]) -> return $ Product tcName elemTys
-      (_   ,concat -> [])    -> return $ Sum tcName $ map (pack . name2String . dcName) dcs
+      (_   ,concat -> [])
+        | length dcs < 2     -> return (Void Nothing)
+        | otherwise          -> return $ Sum tcName $ map (pack . name2String . dcName) dcs
       (_   ,elemHTys)        -> return $ SP tcName
                                       $ zipWith (\dc tys ->
                                                   ( pack . name2String $ dcName dc
@@ -193,31 +200,21 @@ representableType
   -> HashMap TyConOccName TyCon
   -> Type
   -> Bool
-representableType builtInTranslation allowZero stringRepresentable m =
+representableType builtInTranslation _allowZero stringRepresentable m =
     either (const False) isRepresentable . coreTypeToHWType builtInTranslation m
   where
     isRepresentable hty = case hty of
       String          -> stringRepresentable
-      Bool            -> True
-      Bit             -> True
-      BitVector n     -> (n > 0) || allowZero
-      Index n         -> (n > 0) || allowZero
-      Signed n        -> (n > 0) || allowZero
-      Unsigned  n     -> (n > 0) || allowZero
-      Vector n elTy
-        | n > 0 || allowZero -> isRepresentable elTy
-      RTree _n elTy   -> isRepresentable elTy
-      Sum {}          -> True
+      Vector _ elTy   -> isRepresentable elTy
+      RTree  _ elTy   -> isRepresentable elTy
       Product _ elTys -> all isRepresentable elTys
       SP _ elTyss     -> all (all isRepresentable . snd) elTyss
-      Clock {}        -> True
-      Reset {}        -> True
-      _               -> False
+      _               -> True
 
 -- | Determines the bitsize of a type
 typeSize :: HWType
          -> Int
-typeSize Void = 0
+typeSize (Void {}) = 0
 typeSize String = 1
 typeSize Bool = 1
 typeSize Bit = 1
@@ -233,7 +230,7 @@ typeSize (Vector n el) = n * typeSize el
 typeSize (RTree d el) = (2^d) * typeSize el
 typeSize t@(SP _ cons) = conSize t +
   maximum (map (sum . map typeSize . snd) cons)
-typeSize (Sum _ dcs) = max 1 (fromMaybe 0 . clogBase 2 . toInteger $ length dcs)
+typeSize (Sum _ dcs) = fromMaybe 0 . clogBase 2 . toInteger $ length dcs
 typeSize (Product _ tys) = sum $ map typeSize tys
 
 -- | Determines the bitsize of the constructor of a type
@@ -328,7 +325,7 @@ mkUniqueArguments Nothing args = do
 
 mkUniqueArguments (Just teM) args = do
   let iPortSupply = maybe (repeat Nothing) (extendPorts . t_inputs) teM
-  (ports,decls,subst) <- unzip3 <$> zipWithM go iPortSupply args
+  (ports,decls,subst) <- unzip3 . catMaybes <$> zipWithM go iPortSupply args
   let ports' = concat ports
   return (ports', concat decls, subst)
   where
@@ -340,7 +337,9 @@ mkUniqueArguments (Just teM) args = do
           ty   = unembed (varType var)
           hwty = unsafeCoreTypeToHWType $(curLoc) typeTrans tcm ty
       (ports,decls,_,pN) <- mkInput pM (i',hwty)
-      return (ports,decls,(nameOcc i, Var ty (repName (unpack pN) i)))
+      if isVoid hwty
+         then return Nothing
+         else return (Just (ports,decls,(nameOcc i, Var ty (repName (unpack pN) i))))
 
 mkUniqueResult
   :: Maybe (Maybe TopEntity)

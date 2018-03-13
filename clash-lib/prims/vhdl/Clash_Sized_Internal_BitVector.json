@@ -328,37 +328,37 @@ end process;
 , { "BlackBox" :
     { "name"      : "Clash.Sized.Internal.BitVector.eq#"
     , "type"      : "eq# :: BitVector n -> BitVector n -> Bool"
-    , "templateE" : "~ARG[0] = ~ARG[1]"
+    , "templateE" : "~IF~SIZE[~TYP[0]]~THEN~ARG[0] = ~ARG[1]~ELSEtrue~FI"
     }
   }
 , { "BlackBox" :
     { "name"      : "Clash.Sized.Internal.BitVector.neq#"
     , "type"      : "neq# :: BitVector n -> BitVector n -> Bool"
-    , "templateE" : "~ARG[0] /= ~ARG[1]"
+    , "templateE" : "~IF~SIZE[~TYP[0]]~THEN~ARG[0] /= ~ARG[1]~ELSEfalse~FI"
     }
   }
 , { "BlackBox" :
     { "name"      : "Clash.Sized.Internal.BitVector.lt#"
     , "type"      : "lt# :: BitVector n -> BitVector n -> Bool"
-    , "templateE" : "~ARG[0] < ~ARG[1]"
+    , "templateE" : "~IF~SIZE[~TYP[0]]~THEN~ARG[0] < ~ARG[1]~ELSEfalse~FI"
     }
   }
 , { "BlackBox" :
     { "name"      : "Clash.Sized.Internal.BitVector.ge#"
     , "type"      : "ge# :: BitVector n -> BitVector n -> Bool"
-    , "templateE" : "~ARG[0] >= ~ARG[1]"
+    , "templateE" : "~IF~SIZE[~TYP[0]]~THEN~ARG[0] >= ~ARG[1]~ELSEtrue~FI"
     }
   }
 , { "BlackBox" :
     { "name"      : "Clash.Sized.Internal.BitVector.gt#"
     , "type"      : "gt# :: BitVector n -> BitVector n -> Bool"
-    , "templateE" : "~ARG[0] > ~ARG[1]"
+    , "templateE" : "~IF~SIZE[~TYP[0]]~THEN~ARG[0] > ~ARG[1]~ELSEfalse~FI"
     }
   }
 , { "BlackBox" :
     { "name"      : "Clash.Sized.Internal.BitVector.le#"
     , "type"      : "le# :: BitVector n -> BitVector n -> Bool"
-    , "templateE" : "~ARG[0] <= ~ARG[1]"
+    , "templateE" : "~IF~SIZE[~TYP[0]]~THEN~ARG[0] <= ~ARG[1]~ELSEtrue~FI"
     }
   }
 , { "BlackBox" :
@@ -438,7 +438,7 @@ end process;
 , { "BlackBox" :
     { "name"      : "Clash.Sized.Internal.BitVector.toInteger#"
     , "type"      : "toInteger# :: BitVector n -> Integer"
-    , "templateE" : "signed(std_logic_vector(resize(unsigned(~ARG[0]),~SIZE[~TYPO])))"
+    , "templateE" : "~IF~SIZE[~TYP[0]]~THENsigned(std_logic_vector(resize(unsigned(~ARG[0]),~SIZE[~TYPO])))~ELSEto_signed(0,64)~FI"
     }
   }
 , { "BlackBox" :

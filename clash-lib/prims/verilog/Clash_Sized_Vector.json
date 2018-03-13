@@ -85,11 +85,10 @@ end
 "// map begin
 genvar ~GENSYM[i][1];
 ~GENERATE
-for (~SYM[1]=0; ~SYM[1] < ~LENGTH[~TYPO]; ~SYM[1] = ~SYM[1] + 1) begin : ~GENSYM[map][2]
+for (~SYM[1]=0; ~SYM[1] < ~LENGTH[~TYPO]; ~SYM[1] = ~SYM[1] + 1) begin : ~GENSYM[map][2]~IF~SIZE[~TYP[1]]~THEN
   wire ~TYPEL[~TYP[1]] ~GENSYM[map_in][3];
+  assign ~SYM[3] = ~VAR[vec][1][~SYM[1]*~SIZE[~TYPEL[~TYP[1]]]+:~SIZE[~TYPEL[~TYP[1]]]];~ELSE ~FI
   ~OUTPUTWIREREG[0] ~TYPEL[~TYPO] ~GENSYM[map_out][4];
-
-  assign ~SYM[3] = ~VAR[vec][1][~SYM[1]*~SIZE[~TYPEL[~TYP[1]]]+:~SIZE[~TYPEL[~TYP[1]]]];
   ~INST 0
     ~OUTPUT <= ~SYM[4]~ ~TYPEL[~TYPO]~
     ~INPUT  <= ~SYM[3]~ ~TYPEL[~TYP[1]]~
@@ -108,12 +107,12 @@ end
 genvar ~GENSYM[i][1];
 ~GENERATE
 for (~SYM[1]=0; ~SYM[1] < ~LENGTH[~TYPO]; ~SYM[1] = ~SYM[1] + 1) begin : ~GENSYM[imap][2]
-  wire [~SIZE[~INDEXTYPE[~LIT[0]]]-1:0] ~GENSYM[map_index][3];
+  wire [~SIZE[~INDEXTYPE[~LIT[0]]]-1:0] ~GENSYM[map_index][3];~IF~SIZE[~TYP[2]]~THEN
   wire ~TYPEL[~TYP[2]] ~GENSYM[map_in][4];
+  assign ~SYM[4] = ~VAR[vec][2][~SYM[1]*~SIZE[~TYPEL[~TYP[2]]]+:~SIZE[~TYPEL[~TYP[2]]]];~ELSE ~FI
   ~OUTPUTWIREREG[1] ~TYPEL[~TYPO] ~GENSYM[map_out][5];
 
   assign ~SYM[3] = ~LENGTH[~TYPO] - 1 - ~SYM[1];
-  assign ~SYM[4] = ~VAR[vec][2][~SYM[1]*~SIZE[~TYPEL[~TYP[2]]]+:~SIZE[~TYPEL[~TYP[2]]]];
   ~INST 1
     ~OUTPUT <= ~SYM[5]~ ~TYPEL[~TYPO]~
     ~INPUT  <= ~SYM[3]~ ~INDEXTYPE[~LIT[0]]~
@@ -133,12 +132,12 @@ end
 genvar ~GENSYM[i][1];
 ~GENERATE
 for (~SYM[1]=0; ~SYM[1] < ~LENGTH[~TYPO]; ~SYM[1] = ~SYM[1] + 1) begin : ~GENSYM[imap][2]
-  wire ~TYP[0] ~GENSYM[map_index][3];
+  wire ~TYP[0] ~GENSYM[map_index][3];~IF~SIZE[~TYP[2]]~THEN
   wire ~TYPEL[~TYP[2]] ~GENSYM[map_in][4];
+  assign ~SYM[4] = ~VAR[vec][2][~SYM[1]*~SIZE[~TYPEL[~TYP[2]]]+:~SIZE[~TYPEL[~TYP[2]]]];~ELSE ~FI
   ~OUTPUTWIREREG[1] ~TYPEL[~TYPO] ~GENSYM[map_out][5];
 
   assign ~SYM[3] = ~LENGTH[~TYPO] - 1 - ~SYM[1] + ~ARG[0];
-  assign ~SYM[4] = ~VAR[vec][2][~SYM[1]*~SIZE[~TYPEL[~TYP[2]]]+:~SIZE[~TYPEL[~TYP[2]]]];
   ~INST 1
     ~OUTPUT <= ~SYM[5]~ ~TYPEL[~TYPO]~
     ~INPUT  <= ~SYM[3]~ ~TYP[0]~
@@ -157,13 +156,12 @@ end
 "// zipWith start
 genvar ~GENSYM[i][2];
 ~GENERATE
-for (~SYM[2] = 0; ~SYM[2] < ~LENGTH[~TYPO]; ~SYM[2] = ~SYM[2] + 1) begin : ~GENSYM[zipWith][6]
+for (~SYM[2] = 0; ~SYM[2] < ~LENGTH[~TYPO]; ~SYM[2] = ~SYM[2] + 1) begin : ~GENSYM[zipWith][6]~IF~SIZE[~TYP[1]]~THEN
   wire ~TYPEL[~TYP[1]] ~GENSYM[zipWith_in1][3];
+  assign ~SYM[3] = ~VAR[vec1][1][~SYM[2]*~SIZE[~TYPEL[~TYP[1]]]+:~SIZE[~TYPEL[~TYP[1]]]];~ELSE ~FI~IF~SIZE[~TYP[2]]~THEN
   wire ~TYPEL[~TYP[2]] ~GENSYM[zipWith_in2][4];
+  assign ~SYM[4] = ~VAR[vec2][2][~SYM[2]*~SIZE[~TYPEL[~TYP[2]]]+:~SIZE[~TYPEL[~TYP[2]]]];~ELSE ~FI
   ~OUTPUTWIREREG[0] ~TYPEL[~TYPO] ~SYM[5];
-
-  assign ~SYM[3] = ~VAR[vec1][1][~SYM[2]*~SIZE[~TYPEL[~TYP[1]]]+:~SIZE[~TYPEL[~TYP[1]]]];
-  assign ~SYM[4] = ~VAR[vec2][2][~SYM[2]*~SIZE[~TYPEL[~TYP[2]]]+:~SIZE[~TYPEL[~TYP[2]]]];
   ~INST 0
     ~OUTPUT <= ~SYM[5]~ ~TYPEL[~TYPO]~
     ~INPUT  <= ~SYM[3]~ ~TYPEL[~TYP[1]]~
@@ -185,12 +183,12 @@ assign ~SYM[0][~LENGTH[~TYP[2]]] = ~ARG[1];
 
 genvar ~GENSYM[i][3];
 ~GENERATE
-for (~SYM[3]=0; ~SYM[3] < ~LENGTH[~TYP[2]]; ~SYM[3]=~SYM[3]+1) begin : ~GENSYM[foldr][4]
+for (~SYM[3]=0; ~SYM[3] < ~LENGTH[~TYP[2]]; ~SYM[3]=~SYM[3]+1) begin : ~GENSYM[foldr][4]~IF~SIZE[~TYP[2]]~THEN
   wire ~TYPEL[~TYP[2]] ~GENSYM[foldr_in1][5];
+  assign ~SYM[5] = ~VAR[xs][2][(~LENGTH[~TYP[2]]-1-~SYM[3])*~SIZE[~TYPEL[~TYP[2]]]+:~SIZE[~TYPEL[~TYP[2]]]];~ELSE ~FI
   wire ~TYPO ~GENSYM[foldr_in2][6];
   ~OUTPUTWIREREG[0] ~TYPO ~GENSYM[foldr_out][7];
 
-  assign ~SYM[5] = ~VAR[xs][2][(~LENGTH[~TYP[2]]-1-~SYM[3])*~SIZE[~TYPEL[~TYP[2]]]+:~SIZE[~TYPEL[~TYP[2]]]];
   assign ~SYM[6] = ~SYM[0][~SYM[3]+1];
   ~INST 0
     ~OUTPUT <= ~SYM[7]~ ~TYP[1]~

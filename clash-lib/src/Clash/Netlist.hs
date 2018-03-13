@@ -26,6 +26,7 @@ import           Data.Either                      (lefts,partitionEithers)
 import           Data.HashMap.Lazy                (HashMap)
 import qualified Data.HashMap.Lazy                as HashMap
 import           Data.List                        (elemIndex)
+import           Data.Maybe                       (catMaybes)
 import qualified Data.Text.Lazy                   as Text
 import           System.FilePath                  ((</>), (<.>))
 import           Text.Read                        (readMaybe)
@@ -183,10 +184,10 @@ genComponentT compName componentExpr = do
       Right normalized -> mkUniqueNormalized topEntMM normalized
       Left err         -> throw (ClashException sp err Nothing)
 
-  netDecls <- mapM mkNetDecl $ filter ((/= result) . varName . fst) binders
+  netDecls <- fmap catMaybes . mapM mkNetDecl $ filter ((/= result) . varName . fst) binders
   decls    <- concat <$> mapM (uncurry mkDeclarations . second unembed) binders
 
-  (NetDecl' _ rw _ _) <- mkNetDecl . head $ filter ((==result) . varName . fst) binders
+  Just (NetDecl' _ rw _ _) <- mkNetDecl . head $ filter ((==result) . varName . fst) binders
 
   let (compOutps',resUnwrappers') = case compOutps of
         [oport] -> ([(rw,oport)],resUnwrappers)
@@ -198,11 +199,13 @@ genComponentT compName componentExpr = do
                          (netDecls ++ argWrappers ++ decls ++ resUnwrappers')
   return (sp,component)
 
-mkNetDecl :: (Id, Embed Term) -> NetlistMonad Declaration
+mkNetDecl :: (Id, Embed Term) -> NetlistMonad (Maybe Declaration)
 mkNetDecl (id_,tm) = do
   hwTy <- unsafeCoreTypeToHWTypeM $(curLoc) (unembed (varType id_))
   wr   <- wireOrReg (unembed tm)
-  return $ NetDecl' (addSrcNote (nameLoc nm))
+  if isVoid hwTy
+     then return Nothing
+     else return . Just $ NetDecl' (addSrcNote (nameLoc nm))
              wr
              (Text.pack (name2String nm))
              (Right hwTy)
@@ -223,20 +226,37 @@ mkNetDecl (id_,tm) = do
                         then Just (Text.pack (showSDocUnsafe (ppr loc)))
                         else Nothing
 
--- | Generate a list of Declarations for a let-binder
-mkDeclarations :: Id -- ^ LHS of the let-binder
-               -> Term -- ^ RHS of the let-binder
-               -> NetlistMonad [Declaration]
-mkDeclarations bndr (Var _ v) = mkFunApp bndr v []
+-- | Generate a list of Declarations for a let-binder, return an empty list
+-- if the bound expression is represented by 0 bits
+mkDeclarations
+  :: Id
+  -- ^ LHS of the let-binder
+  -> Term
+  -- ^ RHS of the let-binder
+  -> NetlistMonad [Declaration]
+mkDeclarations bndr e = do
+  hty <- unsafeCoreTypeToHWTypeM $(curLoc) (unembed (varType bndr))
+  case hty of
+    Void {} -> return []
+    _       -> mkDeclarations' bndr e
 
-mkDeclarations _ e@(Case _ _ []) = do
+-- | Generate a list of Declarations for a let-binder
+mkDeclarations'
+  :: Id
+  -- ^ LHS of the let-binder
+  -> Term
+  -- ^ RHS of the let-binder
+  -> NetlistMonad [Declaration]
+mkDeclarations' bndr (Var _ v) = mkFunApp bndr v []
+
+mkDeclarations' _ e@(Case _ _ []) = do
   (_,sp) <- Lens.use curCompNm
   throw (ClashException sp ($(curLoc) ++ "Not in normal form: Case-decompositions with an empty list of alternatives not supported:\n\n" ++ showDoc e) Nothing)
 
-mkDeclarations bndr (Case scrut altTy alts@(_:_:_)) =
+mkDeclarations' bndr (Case scrut altTy alts@(_:_:_)) =
   mkSelection bndr scrut altTy alts
 
-mkDeclarations bndr app =
+mkDeclarations' bndr app =
   let (appF,(args,tyArgs)) = second partitionEithers $ collectArgs app
   in case appF of
     Var _ f
@@ -325,10 +345,16 @@ mkFunApp dst fun args = do
       , length fArgTys == length args
       -> do
         let dstId = Text.pack . name2String $ varName dst
+        argHWTys <- mapM (unsafeCoreTypeToHWTypeM $(curLoc)) fArgTys
+        -- Filter out the arguments of hwtype `Void` and only translate them
+        -- to the intermediate HDL afterwards
+        let argsBundled   = zip argHWTys (zip args fArgTys)
+            argsFiltered  = filter (not . isVoid . fst) argsBundled
+            argsFiltered' = map snd argsFiltered
+            hWTysFiltered = filter (not . isVoid) argHWTys
         (argExprs,argDecls) <- second concat . unzip <$>
                                  mapM (\(e,t) -> mkExpr False (Left dstId) t e)
-                                 (zip args fArgTys)
-        argHWTys <- mapM (unsafeCoreTypeToHWTypeM $(curLoc)) fArgTys
+                                 argsFiltered'
         dstHWty  <- unsafeCoreTypeToHWTypeM $(curLoc) fResTy
         env  <- Lens.use hdlDir
         manFile <- case annM of
@@ -339,7 +365,7 @@ mkFunApp dst fun args = do
             return (env </> (Text.unpack topName) <.> "manifest")
         Just man <- readMaybe <$> liftIO (readFile manFile)
         instDecls <- mkTopUnWrapper fun annM man (dstId,dstHWty)
-                       (zip argExprs argHWTys)
+                       (zip argExprs hWTysFiltered)
         return (argDecls ++ instDecls)
 
       | otherwise -> error $ $(curLoc) ++ "under-applied TopEntity"
@@ -349,15 +375,23 @@ mkFunApp dst fun args = do
         Just _ -> do
           (_,Component compName compInps [snd -> compOutp] _) <- preserveVarEnv $ genComponent (nameOcc fun)
           if length args == length compInps
-            then do argTys                <- mapM (termType tcm) args
-                    let dstId = Text.pack . name2String $ varName dst
-                    (argExprs,argDecls)   <- fmap (second concat . unzip) $! mapM (\(e,t) -> mkExpr False (Left dstId) t e) (zip args argTys)
-                    (argExprs',argDecls') <- (second concat . unzip) <$> mapM (toSimpleVar dst) (zip argExprs argTys)
-                    let inpAssigns    = zipWith (\(i,t) e -> (Identifier i Nothing,In,t,e)) compInps argExprs'
-                        outpAssign    = (Identifier (fst compOutp) Nothing,Out,snd compOutp,Identifier dstId Nothing)
-                    instLabel <- extendIdentifier Basic compName (Text.pack "_" `Text.append` dstId)
-                    let instDecl      = InstDecl Nothing compName instLabel (outpAssign:inpAssigns)
-                    return (argDecls ++ argDecls' ++ [instDecl])
+            then do
+              argTys   <- mapM (termType tcm) args
+              argHWTys <- mapM coreTypeToHWTypeM argTys
+              -- Filter out the arguments of hwtype `Void` and only translate
+              -- them to the intermediate HDL afterwards
+              let argsBundled   = zip argHWTys (zip args argTys)
+                  argsFiltered  = filter (maybe True (not . isVoid) . fst) argsBundled
+                  argsFiltered' = map snd argsFiltered
+                  tysFiltered   = map snd argsFiltered'
+              let dstId = Text.pack . name2String $ varName dst
+              (argExprs,argDecls)   <- fmap (second concat . unzip) $! mapM (\(e,t) -> mkExpr False (Left dstId) t e) argsFiltered'
+              (argExprs',argDecls') <- (second concat . unzip) <$> mapM (toSimpleVar dst) (zip argExprs tysFiltered)
+              let inpAssigns    = zipWith (\(i,t) e -> (Identifier i Nothing,In,t,e)) compInps argExprs'
+                  outpAssign    = (Identifier (fst compOutp) Nothing,Out,snd compOutp,Identifier dstId Nothing)
+              instLabel <- extendIdentifier Basic compName (Text.pack "_" `Text.append` dstId)
+              let instDecl      = InstDecl Nothing compName instLabel (outpAssign:inpAssigns)
+              return (argDecls ++ argDecls' ++ [instDecl])
             else error $ $(curLoc) ++ "under-applied normalized function"
         Nothing -> case args of
           [] -> do
@@ -477,7 +511,7 @@ mkProjection mkDec bndr scrut altTy alt = do
                 | sHwTy /= vHwTy -> nestModifier modM (Just (Indexed (sHwTy,dcTag dc - 1,fI)))
                 -- When element and subject have the same HW-type,
                 -- then the projections is just the identity
-                | otherwise      -> nestModifier modM (Just (DC (Void,0)))
+                | otherwise      -> nestModifier modM (Just (DC (Void Nothing,0)))
         _ -> throw (ClashException sp ($(curLoc) ++ "Not in normal form: Unexpected pattern in case-projection:\n\n" ++ showDoc e) Nothing)
       extractExpr = Identifier (maybe altVarId (const selId) modifier) modifier
   case bndr of
@@ -503,12 +537,18 @@ mkDcApplication dstHType bndr dc args = do
   tcm                 <- Lens.use tcCache
   argTys              <- mapM (termType tcm) args
   argNm <- either return (\b -> extendIdentifier Extended (Text.pack (name2String (varName b))) (Text.pack "_dc_arg")) bndr
-  (argExprs,argDecls) <- fmap (second concat . unzip) $! mapM (\(e,t) -> mkExpr False (Left argNm) t e) (zip args argTys)
   argHWTys            <- mapM coreTypeToHWTypeM argTys
-  fmap (,argDecls) $! case (argHWTys,argExprs) of
+  -- Filter out the arguments of hwtype `Void` and only translate
+  -- them to the intermediate HDL afterwards
+  let argsBundled   = zip argHWTys (zip args argTys)
+      argsFiltered  = filter (maybe True (not . isVoid) . fst) argsBundled
+      argsFiltered' = map snd argsFiltered
+      hWTysFiltered = filter (maybe True (not . isVoid)) argHWTys
+  (argExprs,argDecls) <- fmap (second concat . unzip) $! mapM (\(e,t) -> mkExpr False (Left argNm) t e) argsFiltered'
+  fmap (,argDecls) $! case (hWTysFiltered,argExprs) of
     -- Is the DC just a newtype wrapper?
     ([Just argHwTy],[argExpr]) | argHwTy == dstHType ->
-      return (HW.DataCon dstHType (DC (Void,-1)) [argExpr])
+      return (HW.DataCon dstHType (DC (Void Nothing,-1)) [argExpr])
     _ -> case dstHType of
       SP _ dcArgPairs -> do
         let dcI      = dcTag dc - 1
@@ -532,20 +572,21 @@ mkDcApplication dstHType bndr dc args = do
         in  return dc'
       Vector 0 _ -> return (HW.DataCon dstHType VecAppend [])
       Vector 1 _ -> case argExprs of
-                      [_,e,_] -> return (HW.DataCon dstHType VecAppend [e])
-                      _       -> error $ $(curLoc) ++ "Unexpected number of arguments for `Cons`: " ++ showDoc args
+                      [e] -> return (HW.DataCon dstHType VecAppend [e])
+                      _     -> error $ $(curLoc) ++ "Unexpected number of arguments for `Cons`: " ++ showDoc args
       Vector _ _ -> case argExprs of
-                      [_,e1,e2] -> return (HW.DataCon dstHType VecAppend [e1,e2])
+                      [e1,e2] -> return (HW.DataCon dstHType VecAppend [e1,e2])
                       _         -> error $ $(curLoc) ++ "Unexpected number of arguments for `Cons`: " ++ showDoc args
       RTree 0 _ -> case argExprs of
-                      [_,e] -> return (HW.DataCon dstHType RTreeAppend [e])
+                      [e] -> return (HW.DataCon dstHType RTreeAppend [e])
                       _ -> error $ $(curLoc) ++ "Unexpected number of arguments for `LR`: " ++ showDoc args
       RTree _ _ -> case argExprs of
-                      [_,e1,e2] -> return (HW.DataCon dstHType RTreeAppend [e1,e2])
+                      [e1,e2] -> return (HW.DataCon dstHType RTreeAppend [e1,e2])
                       _ -> error $ $(curLoc) ++ "Unexpected number of arguments for `BR`: " ++ showDoc args
       String ->
         let dc' = case dcTag dc of
                     1 -> HW.Literal Nothing (StringLit "")
                     _ -> error $ $(curLoc) ++ "mkDcApplication undefined for: " ++ show (dstHType,dc,dcTag dc,args,argHWTys)
         in  return dc'
+      Void {} -> return (Identifier (Text.pack "__VOID__") Nothing)
       _ -> error $ $(curLoc) ++ "mkDcApplication undefined for: " ++ show (dstHType,dc,args,argHWTys)

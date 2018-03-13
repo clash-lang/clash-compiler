@@ -1,0 +1,43 @@
+[ { "BlackBox" :
+    { "name"      : "Clash.Sized.Internal.Unsigned.eq#"
+    , "type"      : "eq# :: Unsigned n -> Unsigned n -> Bool"
+    , "templateE" : "~IF~SIZE[~TYP[0]]~THEN~ARG[0] == ~ARG[1]~ELSE1'b1~FI"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "Clash.Sized.Internal.Unsigned.neq#"
+    , "type"      : "neq# :: Unsigned n -> Unsigned n -> Bool"
+    , "templateE" : "~IF~SIZE[~TYP[0]]~THEN~ARG[0] != ~ARG[1]~ELSE1'b0~FI"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "Clash.Sized.Internal.Unsigned.lt#"
+    , "type"      : "lt# :: Unsigned n -> Unsigned n -> Bool"
+    , "templateE" : "~IF~SIZE[~TYP[0]]~THEN~ARG[0] < ~ARG[1]~ELSE1'b0~FI"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "Clash.Sized.Internal.Unsigned.ge#"
+    , "type"      : "ge# :: Unsigned n -> Unsigned n -> Bool"
+    , "templateE" : "~IF~SIZE[~TYP[0]]~THEN~ARG[0] >= ~ARG[1]~ELSE1'b1~FI"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "Clash.Sized.Internal.Unsigned.gt#"
+    , "type"      : "gt# :: Unsigned n -> Unsigned n -> Bool"
+    , "templateE" : "~IF~SIZE[~TYP[0]]~THEN~ARG[0] > ~ARG[1]~ELSE1'b0~FI"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "Clash.Sized.Internal.Unsigned.le#"
+    , "type"      : "le# :: Unsigned n -> Unsigned n -> Bool"
+    , "templateE" : "~IF~SIZE[~TYP[0]]~THEN~ARG[0] <= ~ARG[1]~ELSE1'b1~FI"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "Clash.Sized.Internal.Unsigned.toInteger#"
+    , "type"      : "toInteger# :: Unsigned n -> Integer"
+    , "templateD" : "assign ~RESULT = ~IF~SIZE[~TYP[0]]~THEN$unsigned(~ARG[0])~ELSE64'sd0~FI;"
+    }
+  }
+]

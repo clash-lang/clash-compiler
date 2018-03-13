@@ -17,42 +17,6 @@
     }
   }
 , { "BlackBox" :
-    { "name"      : "Clash.Sized.Internal.Unsigned.eq#"
-    , "type"      : "eq# :: Unsigned n -> Unsigned n -> Bool"
-    , "templateE" : "~ARG[0] == ~ARG[1]"
-    }
-  }
-, { "BlackBox" :
-    { "name"      : "Clash.Sized.Internal.Unsigned.neq#"
-    , "type"      : "neq# :: Unsigned n -> Unsigned n -> Bool"
-    , "templateE" : "~ARG[0] != ~ARG[1]"
-    }
-  }
-, { "BlackBox" :
-    { "name"      : "Clash.Sized.Internal.Unsigned.lt#"
-    , "type"      : "lt# :: Unsigned n -> Unsigned n -> Bool"
-    , "templateE" : "~ARG[0] < ~ARG[1]"
-    }
-  }
-, { "BlackBox" :
-    { "name"      : "Clash.Sized.Internal.Unsigned.ge#"
-    , "type"      : "ge# :: Unsigned n -> Unsigned n -> Bool"
-    , "templateE" : "~ARG[0] >= ~ARG[1]"
-    }
-  }
-, { "BlackBox" :
-    { "name"      : "Clash.Sized.Internal.Unsigned.gt#"
-    , "type"      : "gt# :: Unsigned n -> Unsigned n -> Bool"
-    , "templateE" : "~ARG[0] > ~ARG[1]"
-    }
-  }
-, { "BlackBox" :
-    { "name"      : "Clash.Sized.Internal.Unsigned.le#"
-    , "type"      : "le# :: Unsigned n -> Unsigned n -> Bool"
-    , "templateE" : "~ARG[0] <= ~ARG[1]"
-    }
-  }
-, { "BlackBox" :
     { "name"      : "Clash.Sized.Internal.Unsigned.minBound#"
     , "type"      : "minBound# :: Unsigned n"
     , "templateE" : "~SIZE[~TYPO]'d0"
@@ -122,12 +86,6 @@
     { "name"      : "Clash.Sized.Internal.Unsigned.rem#"
     , "type"      : "rem# :: Unsigned n -> Unsigned n -> Unsigned n"
     , "templateE" : "~ARG[0] % ~ARG[1]"
-    }
-  }
-, { "BlackBox" :
-    { "name"      : "Clash.Sized.Internal.Unsigned.toInteger#"
-    , "type"      : "toInteger# :: Unsigned n -> Integer"
-    , "templateD" : "assign ~RESULT = $unsigned(~ARG[0]);"
     }
   }
 , { "BlackBox" :

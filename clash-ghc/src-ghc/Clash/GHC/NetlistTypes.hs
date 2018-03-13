@@ -90,9 +90,9 @@ ghcTypeToHWType iw floatSupport = go
         "GHC.Types.Bool"                -> return Bool
         "GHC.Types.Float" | floatSupport-> return (BitVector 32)
         "GHC.Types.Double" | floatSupport -> return (BitVector 64)
-        "GHC.Prim.~#"                   -> return (Sum "GHC.Prim.~#" ["GHC.Types.Eq#"])
+        "GHC.Prim.~#"                   -> return (Void Nothing)
 
-        "GHC.Prim.Any" -> return (BitVector 1)
+        "GHC.Prim.Any" -> return (Void Nothing)
 
         "Clash.Signal.Internal.Signal" ->
           ExceptT $ return $ coreTypeToHWType go m (args !! 1)
@@ -111,29 +111,46 @@ ghcTypeToHWType iw floatSupport = go
 
         "Clash.Sized.Internal.BitVector.Bit" -> return Bit
 
-        "Clash.Sized.Internal.BitVector.BitVector" ->
-          (BitVector . fromInteger) <$> mapExceptT (Just . coerce) (tyNatSize m (head args))
+        "Clash.Sized.Internal.BitVector.BitVector" -> do
+          n <- mapExceptT (Just . coerce) (tyNatSize m (head args))
+          case n of
+            0 -> return (Void Nothing)
+            _ -> return (BitVector (fromInteger n))
 
-        "Clash.Sized.Internal.Index.Index" ->
-          Index <$> mapExceptT (Just . coerce) (tyNatSize m (head args))
+        "Clash.Sized.Internal.Index.Index" -> do
+          n <- mapExceptT (Just . coerce) (tyNatSize m (head args))
+          if n < 2
+             then return (Void Nothing)
+             else return (Index (fromInteger n))
 
-        "Clash.Sized.Internal.Signed.Signed" ->
-          (Signed . fromInteger) <$> mapExceptT (Just . coerce) (tyNatSize m (head args))
+        "Clash.Sized.Internal.Signed.Signed" -> do
+          n <- mapExceptT (Just . coerce) (tyNatSize m (head args))
+          if n == 0
+             then return (Void Nothing)
+             else return (Signed (fromInteger n))
 
-        "Clash.Sized.Internal.Unsigned.Unsigned" ->
-          (Unsigned . fromInteger) <$> mapExceptT (Just . coerce) (tyNatSize m (head args))
+        "Clash.Sized.Internal.Unsigned.Unsigned" -> do
+          n <- mapExceptT (Just .coerce) (tyNatSize m (head args))
+          if n == 0
+             then return (Void Nothing)
+             else return (Unsigned (fromInteger n))
 
         "Clash.Sized.Vector.Vec" -> do
           let [szTy,elTy] = args
           sz     <- mapExceptT (Just . coerce) (tyNatSize m szTy)
           elHWTy <- ExceptT $ return $ coreTypeToHWType go m elTy
-          return $ Vector (fromInteger sz) elHWTy
+          case elHWTy of
+            Void {}     -> return (Void (Just (fromInteger sz)))
+            _ | sz == 0 -> return (Void (Just (fromInteger sz)))
+            _           -> return $ Vector (fromInteger sz) elHWTy
 
         "Clash.Sized.RTree.RTree" -> do
           let [szTy,elTy] = args
           sz     <- mapExceptT (Just . coerce) (tyNatSize m szTy)
           elHWTy <- ExceptT $ return $ coreTypeToHWType go m elTy
-          return $ RTree (fromInteger sz) elHWTy
+          case elHWTy of
+            Void {} -> return (Void Nothing)
+            _       -> return $ RTree (fromInteger sz) elHWTy
 
         "String" -> return String
         "GHC.Types.[]" -> case tyView (head args) of

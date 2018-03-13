@@ -771,7 +771,7 @@ expr_ b (Identifier id_ (Just (Nested m1 m2))) = case nestM m1 m2 of
 
 expr_ _ (Identifier id_ (Just _))                      = text id_
 
-expr_ b (DataCon _ (DC (Void, -1)) [e]) =  expr_ b e
+expr_ b (DataCon _ (DC (Void {}, -1)) [e]) =  expr_ b e
 
 expr_ _ (DataCon ty@(Vector 0 _) _ _) = verilogTypeErrValue ty
 

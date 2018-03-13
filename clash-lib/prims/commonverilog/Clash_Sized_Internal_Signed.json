@@ -1,0 +1,43 @@
+[ { "BlackBox" :
+    { "name"      : "Clash.Sized.Internal.Signed.eq#"
+    , "type"      : "eq# :: Signed n -> Signed n -> Bool"
+    , "templateE" : "~IF~SIZE[~TYP[0]]~THEN~ARG[0] == ~ARG[1]~ELSE1'b1~FI"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "Clash.Sized.Internal.Signed.neq#"
+    , "type"      : "neq# :: Signed n -> Signed n -> Bool"
+    , "templateE" : "~IF~SIZE[~TYP[0]]~THEN~ARG[0] != ~ARG[1]~ELSE1'b0~FI"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "Clash.Sized.Internal.Signed.lt#"
+    , "type"      : "lt# :: Signed n -> Signed n -> Bool"
+    , "templateE" : "~IF~SIZE[~TYP[0]]~THEN~ARG[0] < ~ARG[1]~ELSE1'b0~FI"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "Clash.Sized.Internal.Signed.ge#"
+    , "type"      : "ge# :: Signed n -> Signed n -> Bool"
+    , "templateE" : "~IF~SIZE[~TYP[0]]~THEN~ARG[0] >= ~ARG[1]~ELSE1'b1~FI"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "Clash.Sized.Internal.Signed.gt#"
+    , "type"      : "gt# :: Signed n -> Signed n -> Bool"
+    , "templateE" : "~IF~SIZE[~TYP[0]]~THEN~ARG[0] > ~ARG[1]~ELSE1'b0~FI"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "Clash.Sized.Internal.Signed.le#"
+    , "type"      : "le# :: Signed n -> Signed n -> Bool"
+    , "templateE" : "~IF~SIZE[~TYP[0]]~THEN~ARG[0] <= ~ARG[1]~ELSE1'b1~FI"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "Clash.Sized.Internal.Signed.toInteger#"
+    , "type"      : "toInteger# :: Signed n -> Integer"
+    , "templateD" : "assign ~RESULT = ~IF~SIZE[~TYP[0]]~THEN$unsigned(~ARG[0])~ELSE64'sd0~FI;"
+    }
+  }
+]

@@ -19,37 +19,37 @@
 , { "BlackBox" :
     { "name"      : "Clash.Sized.Internal.Unsigned.eq#"
     , "type"      : "eq# :: Unsigned n -> Unsigned n -> Bool"
-    , "templateE" : "~ARG[0] = ~ARG[1]"
+    , "templateE" : "~IF~SIZE[~TYP[0]]~THEN~ARG[0] = ~ARG[1]~ELSEtrue~FI"
     }
   }
 , { "BlackBox" :
     { "name"      : "Clash.Sized.Internal.Unsigned.neq#"
     , "type"      : "neq# :: Unsigned n -> Unsigned n -> Bool"
-    , "templateE" : "~ARG[0] /= ~ARG[1]"
+    , "templateE" : "~IF~SIZE[~TYP[0]]~THEN~ARG[0] /= ~ARG[1]~ELSEfalse~FI"
     }
   }
 , { "BlackBox" :
     { "name"      : "Clash.Sized.Internal.Unsigned.lt#"
     , "type"      : "lt# :: Unsigned n -> Unsigned n -> Bool"
-    , "templateE" : "~ARG[0] < ~ARG[1]"
+    , "templateE" : "~IF~SIZE[~TYP[0]]~THEN~ARG[0] < ~ARG[1]~ELSEfalse~FI"
     }
   }
 , { "BlackBox" :
     { "name"      : "Clash.Sized.Internal.Unsigned.ge#"
     , "type"      : "ge# :: Unsigned n -> Unsigned n -> Bool"
-    , "templateE" : "~ARG[0] >= ~ARG[1]"
+    , "templateE" : "~IF~SIZE[~TYP[0]]~THEN~ARG[0] >= ~ARG[1]~ELSEtrue~FI"
     }
   }
 , { "BlackBox" :
     { "name"      : "Clash.Sized.Internal.Unsigned.gt#"
     , "type"      : "gt# :: Unsigned n -> Unsigned n -> Bool"
-    , "templateE" : "~ARG[0] > ~ARG[1]"
+    , "templateE" : "~IF~SIZE[~TYP[0]]~THEN~ARG[0] > ~ARG[1]~ELSEfalse~FI"
     }
   }
 , { "BlackBox" :
     { "name"      : "Clash.Sized.Internal.Unsigned.le#"
     , "type"      : "le# :: Unsigned n -> Unsigned n -> Bool"
-    , "templateE" : "~ARG[0] <= ~ARG[1]"
+    , "templateE" : "~IF~SIZE[~TYP[0]]~THEN~ARG[0] <= ~ARG[1]~ELSEtrue~FI"
     }
   }
 , { "BlackBox" :
@@ -129,7 +129,7 @@
 , { "BlackBox" :
     { "name"      : "Clash.Sized.Internal.Unsigned.toInteger#"
     , "type"      : "toInteger# :: Unsigned n -> Integer"
-    , "templateE" : "signed(std_logic_vector(resize(~ARG[0],~SIZE[~TYPO])))"
+    , "templateE" : "~IF~SIZE[~TYP[0]]~THENsigned(std_logic_vector(resize(~ARG[0],~SIZE[~TYPO])))~ELSEto_signed(0,64)~FI"
     }
   }
 , { "BlackBox" :
