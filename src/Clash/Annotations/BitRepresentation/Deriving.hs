@@ -67,7 +67,7 @@ type Derivator = Type -> Q DataReprAnnExp
 
 -- | Indicates how to pack constructor for simpleDerivator
 data ConstructorType
-  = Count
+  = Binary
   -- ^ First constructor will be encoded as 0b0, the second as 0b1, the third
   -- as 0b10, etc.
   | OneHot
@@ -308,7 +308,7 @@ simpleDerivator ctype ftype = deriveDataRepr constrDerivator fieldsDerivator
   where
     constrDerivator =
       case ctype of
-        Count -> countConstructor
+        Binary -> countConstructor
         OneHot -> oneHotConstructor
 
     fieldsDerivator =
@@ -319,7 +319,7 @@ simpleDerivator ctype ftype = deriveDataRepr constrDerivator fieldsDerivator
 -- | Derives bit representation corresponding to the default manner in which
 -- Clash stores types.
 defaultDerivator :: Derivator
-defaultDerivator = simpleDerivator Count Overlap
+defaultDerivator = simpleDerivator Binary Overlap
 
 -- | Derives bit representation corresponding to the default manner in which
 -- Clash stores types.
