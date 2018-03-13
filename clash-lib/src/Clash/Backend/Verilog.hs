@@ -361,7 +361,7 @@ patLitCustom' var size mask value =
     parens (var <+> "&" <+> bits' mask) <+> "==" <+> bits' value
 
     where
-      bits' value'  = int size <> squote <> "sb" <> bits (toBits size value')
+      bits' value'  = int size <> squote <> "b" <> bits (toBits size value')
       isUseLessMask = (all (== H)) . (toBits size)
 
 patLitCustom
@@ -594,7 +594,7 @@ expr_ _ (DataCon ty@(Sum _ _) (DC (_,i)) []) = int (typeSize ty) <> "'d" <> int 
 
 expr_ _ (DataCon ty@(CustomSum _ _ _ tys) (DC (_,i)) []) =
   let (ConstrRepr' _ _ _ value _) = fst $ tys !! i in
-  int (typeSize ty) <> squote <> "sd" <> int (fromIntegral value)
+  int (typeSize ty) <> squote <> "d" <> int (fromIntegral value)
 expr_ _ (DataCon (CustomSP name' dataRepr size args) (DC (_,constrNr)) es) =
   (flip fromMaybe) (errOnNonContinuous 0 anns) $
   braces $ hcat $ punctuate ", " $ mapM range' origins
@@ -629,7 +629,7 @@ expr_ _ (DataCon (CustomSP name' dataRepr size args) (DC (_,constrNr)) es) =
         :: BitOrigin
         -> VerilogM Doc
       range' (Lit (bitsToBits -> ns)) =
-        int (length ns) <> squote <> "sb" <> hcat (mapM bit_char ns)
+        int (length ns) <> squote <> "b" <> hcat (mapM bit_char ns)
       range' (Field n _start _end) =
         argExprs !! n
 

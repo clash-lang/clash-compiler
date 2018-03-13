@@ -698,7 +698,7 @@ patLitCustom' var size mask value =
     parens (var <+> "&" <+> bits' mask) <+> "==" <+> bits' value
 
     where
-      bits' value'  = int size <> squote <> "sb" <> bits (toBits size value')
+      bits' value'  = int size <> squote <> "b" <> bits (toBits size value')
       isUseLessMask = (all (== H)) . (toBits size)
 
 patLitCustom
@@ -936,7 +936,7 @@ expr_ _ (DataCon ty@(SP _ args) (DC (_,i)) es) = assignExpr
 expr_ _ (DataCon ty@(Sum _ _) (DC (_,i)) []) = int (typeSize ty) <> "'d" <> int i
 expr_ _ (DataCon ty@(CustomSum _ _ _ tys) (DC (_,i)) []) =
   let (ConstrRepr' _ _ _ value _) = fst $ tys !! i in
-  int (typeSize ty) <> squote <> "sd" <> int (fromIntegral value)
+  int (typeSize ty) <> squote <> "d" <> int (fromIntegral value)
 expr_ _ (DataCon (CustomSP _ dataRepr size args) (DC (_,i)) es) =
   braces $ hcat $ punctuate ", " $ mapM range' origins
     where
@@ -952,7 +952,7 @@ expr_ _ (DataCon (CustomSP _ dataRepr size args) (DC (_,i)) es) =
         :: BitOrigin
         -> SystemVerilogM Doc
       range' (Lit (bitsToBits -> ns)) =
-        int (length ns) <> squote <> "sb" <> hcat (mapM bit_char ns)
+        int (length ns) <> squote <> "b" <> hcat (mapM bit_char ns)
       range' (Field n start end) =
         -- We want to select the bits starting from 'start' downto and including
         -- 'end'. We cannot use "(start downto end)" in VHDL, as the preceeding
