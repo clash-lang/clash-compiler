@@ -41,8 +41,9 @@ import GHC.Generics
 import Prelude                        hiding (map)
 
 import Clash.Class.Resize             (zeroExtend)
-import Clash.Sized.BitVector          (BitVector, (++#), high, low)
-import Clash.Sized.Internal.BitVector (unsafeToInteger, split#)
+import Clash.Sized.BitVector
+  (Bit, BitVector, (++#), high, low)
+import Clash.Sized.Internal.BitVector (pack#, split#, unpack#, unsafeToInteger)
 
 {- $setup
 >>> :set -XDataKinds
@@ -105,15 +106,20 @@ bitCoerce = unpack . pack
 
 instance BitPack Bool where
   type BitSize Bool = 1
-  pack True  = high
-  pack False = low
+  pack True  = 1
+  pack False = 0
 
-  unpack bv  = if bv == high then True else False
+  unpack bv  = if bv == 1 then True else False
 
 instance BitPack (BitVector n) where
   type BitSize (BitVector n) = n
   pack   v = v
   unpack v = v
+
+instance BitPack Bit where
+  type BitSize Bit = 1
+  pack   = pack#
+  unpack = unpack#
 
 instance BitPack Int where
   type BitSize Int = WORD_SIZE_IN_BITS
@@ -254,14 +260,14 @@ instance (KnownNat (BitSize h), BitPack (a,b,c,d,e,f,g), BitPack h) =>
 
 instance (BitPack a, KnownNat (BitSize a)) => BitPack (Maybe a) where
   type BitSize (Maybe a) = 1 + BitSize a
-  pack Nothing  = low  ++# 0
+  pack Nothing  = pack# low ++# 0
   -- We cannot do `low ++# undefined`, because `BitVector`s underlying
   -- representation is `Integer`, so `low ++# undefined` would make the
   -- entire `BitVector` undefined.
-  pack (Just x) = high ++# pack x
+  pack (Just x) = pack# high ++# pack x
   unpack x = case split# x of
-    (c,rest) | c == low  -> Nothing
-             | otherwise -> Just (unpack rest)
+    (c,rest) | unpack# c == low -> Nothing
+             | otherwise        -> Just (unpack rest)
 
 class GBitPack f where
   type GBitSize f :: Nat

@@ -30,7 +30,7 @@ import Prelude               hiding (head, map, tail)
 
 import Clash.NamedTypes      ((:::))
 import Clash.Signal.Internal (Domain, Signal (..))
-import Clash.Sized.BitVector (BitVector)
+import Clash.Sized.BitVector (Bit, BitVector)
 import Clash.Sized.Fixed     (Fixed)
 import Clash.Sized.Index     (Index)
 import Clash.Sized.Signed    (Signed)
@@ -114,6 +114,7 @@ instance Bundle Double
 instance Bundle (Maybe a)
 instance Bundle (Either a b)
 
+instance Bundle Bit
 instance Bundle (BitVector n)
 instance Bundle (Index n)
 instance Bundle (Fixed rep int frac)

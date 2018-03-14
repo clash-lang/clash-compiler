@@ -13,4 +13,4 @@ import GHC.TypeLits (Nat)
 
 type role BitVector phantom
 data BitVector :: Nat -> *
-type Bit = BitVector 1
+data Bit

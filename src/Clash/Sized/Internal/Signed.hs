@@ -357,7 +357,7 @@ instance KnownNat n => Bits (Signed n) where
   bit i             = replaceBit i high 0
   setBit v i        = replaceBit i high v
   clearBit v i      = replaceBit i low  v
-  complementBit v i = replaceBit i (BV.complement# (v ! i)) v
+  complementBit v i = replaceBit i (BV.complement## (v ! i)) v
   testBit v i       = v ! i == 1
   bitSizeMaybe v    = Just (size# v)
   bitSize           = size#
@@ -482,7 +482,7 @@ instance KnownNat n => SaturatingNum (Signed n) where
         (_,r') = split r
     in  case msb r `xor` msb r' of
           0 -> unpack# r'
-          _ -> case msb a ++# msb b of
+          _ -> case BV.pack# (msb a) ++# BV.pack# (msb b) of
             2 -> minBound#
             _ -> maxBound#
   satMin SatZero a b =
@@ -496,7 +496,7 @@ instance KnownNat n => SaturatingNum (Signed n) where
         (_,r') = split r
     in  case msb r `xor` msb r' of
           0 -> unpack# r'
-          _ -> case msb a ++# msb b of
+          _ -> case BV.pack# (msb a) ++# BV.pack# (msb b) of
             2 -> minBoundSym#
             _ -> maxBound#
 
@@ -504,8 +504,8 @@ instance KnownNat n => SaturatingNum (Signed n) where
   satMult SatBound a b =
     let r        = times# a b
         (rL,rR)  = split r
-        overflow = complement (reduceOr (msb rR ++# pack rL)) .|.
-                              reduceAnd (msb rR ++# pack rL)
+        overflow = complement (reduceOr (BV.pack# (msb rR) ++# pack rL)) .|.
+                              reduceAnd (BV.pack# (msb rR) ++# pack rL)
     in  case overflow of
           1 -> unpack# rR
           _ -> case msb rL of
@@ -514,16 +514,16 @@ instance KnownNat n => SaturatingNum (Signed n) where
   satMult SatZero a b =
     let r        = times# a b
         (rL,rR)  = split r
-        overflow = complement (reduceOr (msb rR ++# pack rL)) .|.
-                              reduceAnd (msb rR ++# pack rL)
+        overflow = complement (reduceOr (BV.pack# (msb rR) ++# pack rL)) .|.
+                              reduceAnd (BV.pack# (msb rR) ++# pack rL)
     in  case overflow of
           1 -> unpack# rR
           _ -> fromInteger# 0
   satMult SatSymmetric a b =
     let r        = times# a b
         (rL,rR)  = split r
-        overflow = complement (reduceOr (msb rR ++# pack rL)) .|.
-                              reduceAnd (msb rR ++# pack rL)
+        overflow = complement (reduceOr (BV.pack# (msb rR) ++# pack rL)) .|.
+                              reduceAnd (BV.pack# (msb rR) ++# pack rL)
     in  case overflow of
           1 -> unpack# rR
           _ -> case msb rL of

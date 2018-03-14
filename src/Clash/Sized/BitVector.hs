@@ -11,17 +11,19 @@ Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
 {-# OPTIONS_HADDOCK show-extensions #-}
 
 module Clash.Sized.BitVector
-  ( -- * Datatypes
-    BitVector
-  , Bit
-    -- * Accessors
-    -- ** Length information
-  , size#
-  , maxIndex#
-    -- * Construction
-    -- ** Initialisation
+  ( -- * Bit
+    Bit
+    -- ** Construction
+    -- *** Initialisation
   , high
   , low
+    -- * BitVector
+  , BitVector
+    -- ** Accessors
+    -- *** Length information
+  , size#
+  , maxIndex#
+    -- ** Construction
   , bLit
     -- ** Concatenation
   , (++#)

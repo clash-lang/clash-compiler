@@ -243,7 +243,7 @@ instance KnownNat n => Num (Unsigned n) where
   (*)         = (*#)
   negate      = negate#
   abs         = id
-  signum bv   = resize# (unpack# (reduceOr bv))
+  signum bv   = resize# (unpack# (BV.pack# (reduceOr bv)))
   fromInteger = fromInteger#
 
 (+#),(-#),(*#) :: forall n . KnownNat n => Unsigned n -> Unsigned n -> Unsigned n
@@ -332,7 +332,7 @@ instance KnownNat n => Bits (Unsigned n) where
   bit i             = replaceBit i high 0
   setBit v i        = replaceBit i high v
   clearBit v i      = replaceBit i low  v
-  complementBit v i = replaceBit i (BV.complement# (v ! i)) v
+  complementBit v i = replaceBit i (BV.complement## (v ! i)) v
   testBit v i       = v ! i == high
   bitSizeMaybe v    = Just (size# v)
   bitSize           = size#
