@@ -2,6 +2,9 @@
 Copyright  :  (C) 2018, Google Inc.
 License    :  BSD2 (see the file LICENSE)
 Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
+
+Houses internal BitRepresentation code which cannot be housed in clash-prelude
+due to its dependencies.
 -}
 
 {-# LANGUAGE TemplateHaskell #-}
@@ -21,7 +24,7 @@ import           Clash.Util                               (curLoc)
 import qualified Data.Text.Lazy                           as Text
 
 
--- Convert (GHC) core type to our own simple type representation Type'
+-- Convert Core type to BitRepresentation type
 coreToType'
   :: C.Type
   -- ^ Type to convert to bit representation type
