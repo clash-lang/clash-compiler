@@ -25,27 +25,10 @@ begin~IF ~ISGATED[4] ~THEN
   (~SYM[4],~SYM[5]) <= ~ARG[4];
   ~SYM[6] <= '1' when (~SYM[5]) else '0';~ELSE ~FI
   ~SYM[3] <= ~ARG[6];
-~IF~ISBIT[6]~THEN
-  ~GENSYM[~COMPNAME_IDDR_inst][9] : IDDR
-  generic map (
-    DDR_CLK_EDGE => \"SAME_EDGE\",
-    INIT_Q1      => '0',
-    INIT_Q2      => '0',
-    SRTYPE       => ~IF ~ISSYNC[5] ~THEN \"SYNC\" ~ELSE \"ASYNC\" ~FI)
-  port map (
-    Q1 => ~SYM[1],   -- 1-bit output for positive edge of clock
-    Q2 => ~SYM[2],   -- 1-bit output for negative edge of clock~IF ~ISGATED[4] ~THEN
-    C  => ~SYM[4],   -- 1-bit clock input
-    CE => ~SYM[6],   -- 1-bit clock enable input~ELSE
-    C  => ~ARG[4],   -- 1-bit clock input
-    CE => '1',       -- 1-bit clock enable input~FI
-    D  => ~SYM[3],   -- 1-bit DDR data input
-    R  => ~ARG[5],   -- 1-bit reset
-    S  => '0'        -- 1-bit set
-  );~ELSE
+
   ~GENSYM[gen_iddr][7] : for ~GENSYM[i][8] in ~SYM[3]'range generate
   begin
-    ~SYM[9] : IDDR
+    ~GENSYM[~COMPNAME_IDDR_inst][9] : IDDR
     generic map (
       DDR_CLK_EDGE => \"SAME_EDGE\",
       INIT_Q1      => '0',
@@ -62,7 +45,7 @@ begin~IF ~ISGATED[4] ~THEN
       R  => ~ARG[5],   -- 1-bit reset
       S  => '0'        -- 1-bit set
     );
-  end generate;~FI
+  end generate;
 
   ~RESULT <= (~SYM[2], ~SYM[1]);
 end block;
@@ -97,25 +80,10 @@ begin~IF ~ISGATED[3] ~THEN
   ~SYM[6] <= '1' when (~SYM[5]) else '0';~ELSE ~FI
   ~SYM[1] <= ~ARG[5];
   ~SYM[2] <= ~ARG[6];
-  ~IF~ISBIT[6]~THEN
-  generic map(
-    DDR_CLK_EDGE => \"SAME_EDGE\",
-    INIT => '0',
-    SRTYPE => ~IF ~ISSYNC[4] ~THEN \"SYNC\" ~ELSE \"ASYNC\" ~FI)
-  port map (
-    Q  => ~SYM[3],   -- 1-bit DDR output~IF ~ISGATED[3] ~THEN
-    C  => ~SYM[4],   -- 1-bit clock input
-    CE => ~SYM[6],   -- 1-bit clock enable input~ELSE
-    C  => ~ARG[3],   -- 1-bit clock input
-    CE => '1',       -- 1-bit clock enable input~FI
-    D1 => ~SYM[1],   -- 1-bit data input (positive edge)
-    D2 => ~SYM[2],   -- 1-bit data input (negative edge)
-    R  => ~ARG[4],   -- 1-bit reset input
-    S  => '0'        -- 1-bit set input
-  );~ELSE
+
   ~GENSYM[gen_iddr][7] : for ~GENSYM[i][8] in ~SYM[3]'range generate
   begin
-    ~SYM[9] : ODDR
+    ~GENSYM[~COMPNAME_ODDR_inst][9] : ODDR
     generic map(
       DDR_CLK_EDGE => \"SAME_EDGE\",
       INIT => '0',
@@ -131,7 +99,7 @@ begin~IF ~ISGATED[3] ~THEN
       R  => ~ARG[4],    -- 1-bit reset input
       S  => '0'         -- 1-bit set input
     );
-  end generate;~FI
+  end generate;
 
   ~RESULT <= ~SYM[3];
 end block;

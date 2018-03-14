@@ -109,11 +109,10 @@ ghcTypeToHWType iw floatSupport = go
                 synchronous <- resetKind m rstKind
                 return (Reset (pack nm) rate synchronous)
 
-        "Clash.Sized.Internal.BitVector.BitVector" -> do
-          n <- mapExceptT (Just . coerce) (tyNatSize m (head args))
-          case n of
-            1 -> return Bit
-            _ -> return (BitVector (fromInteger n))
+        "Clash.Sized.Internal.BitVector.Bit" -> return Bit
+
+        "Clash.Sized.Internal.BitVector.BitVector" ->
+          (BitVector . fromInteger) <$> mapExceptT (Just . coerce) (tyNatSize m (head args))
 
         "Clash.Sized.Internal.Index.Index" ->
           Index <$> mapExceptT (Just . coerce) (tyNatSize m (head args))

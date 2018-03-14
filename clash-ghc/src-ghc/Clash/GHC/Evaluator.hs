@@ -975,12 +975,51 @@ reduceConstant isSubj gbl tcm h k nm ty tys args = case nm of
        in  reduce (mkApps (Data intCon) [Left (Literal (IntLiteral (kn-1)))])
 
 -- Construction
-  "Clash.Sized.Internal.BitVector.high"
+  "Clash.Sized.Internal.BitVector.high" -- :: Bit
+    -> reduce (mkBitLit ty 1)
+  "Clash.Sized.Internal.BitVector.low" -- :: Bit
+    -> reduce (mkBitLit ty 0)
+
+-- Eq
+  "Clash.Sized.Internal.BitVector.eq##" | [i,j] <- bitLiterals args
+    -> reduce (boolToBoolLiteral tcm ty (i == j))
+  "Clash.Sized.Internal.BitVector.neq##" | [i,j] <- bitLiterals args
+    -> reduce (boolToBoolLiteral tcm ty (i /= j))
+
+-- Ord
+  "Clash.Sized.Internal.BitVector.lt##" | [i,j] <- bitLiterals args
+    -> reduce (boolToBoolLiteral tcm ty (i <  j))
+  "Clash.Sized.Internal.BitVector.ge##" | [i,j] <- bitLiterals args
+    -> reduce (boolToBoolLiteral tcm ty (i >= j))
+  "Clash.Sized.Internal.BitVector.gt##" | [i,j] <- bitLiterals args
+    -> reduce (boolToBoolLiteral tcm ty (i >  j))
+  "Clash.Sized.Internal.BitVector.le##" | [i,j] <- bitLiterals args
+    -> reduce (boolToBoolLiteral tcm ty (i <= j))
+
+-- Bits
+  "Clash.Sized.Internal.BitVector.and##"
+    | [i,j] <- bitLiterals args
+    -> reduce (mkBitLit ty (i .&. j))
+  "Clash.Sized.Internal.BitVector.or##"
+    | [i,j] <- bitLiterals args
+    -> reduce (mkBitLit ty (i .|. j))
+  "Clash.Sized.Internal.BitVector.xor##"
+    | [i,j] <- bitLiterals args
+    -> reduce (mkBitLit ty (i `xor` j))
+
+  "Clash.Sized.Internal.BitVector.complement##"
+    | [i] <- bitLiterals args
+    -> reduce (mkBitLit ty (complement i))
+
+-- Pack
+  "Clash.Sized.Internal.BitVector.pack#"
+    | [i] <- bitLiterals args
     -> let resTyInfo = extractTySizeInfo tcm ty tys
-    in reduce (mkBitVectorLit' resTyInfo 1)
-  "Clash.Sized.Internal.BitVector.low"
-    -> let resTyInfo = extractTySizeInfo tcm ty tys
-    in reduce (mkBitVectorLit' resTyInfo 0)
+       in  reduce (mkBitVectorLit' resTyInfo i)
+
+  "Clash.Sized.Internal.BitVector.unpack#"
+    | [i] <- bitVectorLiterals' args
+    -> reduce (mkBitLit ty i)
 
 -- Concatenation
   "Clash.Sized.Internal.BitVector.++#" -- :: KnownNat m => BitVector n -> BitVector m -> BitVector (n + m)
@@ -991,30 +1030,30 @@ reduceConstant isSubj gbl tcm h k nm ty tys args = case nm of
     in reduce (mkBitVectorLit' resTyInfo val)
 
 -- Reduction
-  "Clash.Sized.Internal.BitVector.reduceAnd#" -- :: KnownNat n => BitVector n -> BitVector 1
+  "Clash.Sized.Internal.BitVector.reduceAnd#" -- :: KnownNat n => BitVector n -> Bit
     | [i] <- bitVectorLiterals' args
     , Just (_, kn) <- extractKnownNat tcm tys
-    -> let resTyInfo = extractTySizeInfo tcm ty tys
+    -> let resTy = getResultTy tcm ty tys
            val = reifyNat kn (op (fromInteger i))
-    in reduce (mkBitVectorLit' resTyInfo val)
+    in reduce (mkBitLit resTy val)
     where
       op :: KnownNat n => BitVector n -> Proxy n -> Integer
       op u _ = toInteger (BitVector.reduceAnd# u)
-  "Clash.Sized.Internal.BitVector.reduceOr#" -- :: KnownNat n => BitVector n -> BitVector 1
+  "Clash.Sized.Internal.BitVector.reduceOr#" -- :: KnownNat n => BitVector n -> Bit
     | [i] <- bitVectorLiterals' args
     , Just (_, kn) <- extractKnownNat tcm tys
-    -> let resTyInfo = extractTySizeInfo tcm ty tys
+    -> let resTy = getResultTy tcm ty tys
            val = reifyNat kn (op (fromInteger i))
-    in reduce (mkBitVectorLit' resTyInfo val)
+    in reduce (mkBitLit resTy val)
     where
       op :: KnownNat n => BitVector n -> Proxy n -> Integer
       op u _ = toInteger (BitVector.reduceOr# u)
-  "Clash.Sized.Internal.BitVector.reduceXor#" -- :: KnownNat n => BitVector n -> BitVector 1
+  "Clash.Sized.Internal.BitVector.reduceXor#" -- :: KnownNat n => BitVector n -> Bit
     | [i] <- bitVectorLiterals' args
     , Just (_, kn) <- extractKnownNat tcm tys
-    -> let resTyInfo = extractTySizeInfo tcm ty tys
+    -> let resTy = getResultTy tcm ty tys
            val = reifyNat kn (op (fromInteger i))
-    in reduce (mkBitVectorLit' resTyInfo val)
+    in reduce (mkBitLit resTy val)
     where
       op :: KnownNat n => BitVector n -> Proxy n -> Integer
       op u _ = toInteger (BitVector.reduceXor# u)
@@ -1023,9 +1062,9 @@ reduceConstant isSubj gbl tcm h k nm ty tys args = case nm of
 -- Indexing
   "Clash.Sized.Internal.BitVector.index#" -- :: KnownNat n => BitVector n -> Int -> Bit
     | Just (_,kn,i,j) <- bitVectorLitIntLit tcm tys args
-      -> let resTyInfo = extractTySizeInfo tcm ty tys
+      -> let resTy = getResultTy tcm ty tys
              val = reifyNat kn (op (fromInteger i) (fromInteger j))
-      in reduce (mkBitVectorLit' resTyInfo val)
+         in  reduce (mkBitLit resTy val)
       where
         op :: KnownNat n => BitVector n -> Int -> Proxy n -> Integer
         op u i _ = toInteger (BitVector.index# u i)
@@ -1034,10 +1073,10 @@ reduceConstant isSubj gbl tcm h k nm ty tys args = case nm of
     , [ _
       , PrimVal bvNm _ _ [_, Lit (IntegerLiteral bv)]
       , valArgs -> Just [Literal (IntLiteral i)]
-      , PrimVal bNm  _ _ [_, Lit (IntegerLiteral b)]
+      , PrimVal bNm  _ _ [Lit (IntegerLiteral b)]
       ] <- args
     , bvNm == "Clash.Sized.Internal.BitVector.fromInteger#"
-    , bNm  == "Clash.Sized.Internal.BitVector.fromInteger#"
+    , bNm  == "Clash.Sized.Internal.BitVector.fromInteger##"
       -> let resTyInfo = extractTySizeInfo tcm ty tys
              val = reifyNat n (op (fromInteger bv) (fromInteger i) (fromInteger b))
       in reduce (mkBitVectorLit' resTyInfo val)
@@ -1065,41 +1104,39 @@ reduceConstant isSubj gbl tcm h k nm ty tys args = case nm of
                $ BitVector.slice# (BV i) (unsafeSNat m) (unsafeSNat n)
            resTyInfo = extractTySizeInfo tcm ty tys
        in  reduce (mkBitVectorLit' resTyInfo val)
-  "Clash.Sized.Internal.BitVector.splitL#"
-  -- :: forall n m. KnownNat n => BitVector (m + n) -> BitVector m
-   | nTy : mTy : _ <- tys
-   , Right n <-  runExcept (tyNatSize tcm nTy)
-   , Right m <-  runExcept (tyNatSize tcm mTy)
-   , [i] <- bitVectorLiterals' args
-   -> let ty' = List.foldl' ((runFreshM .) . applyTy tcm) ty tys
-          (_,bvTy) = splitFunForallTy ty'
-          valM = i `shiftR` fromInteger n
-      in reduce (mkBitVectorLit bvTy mTy m valM)
-  "Clash.Sized.Internal.BitVector.splitR#"
-  -- :: forall n m. KnownNat n => BitVector (m + n) -> BitVector n
-   | nTy : _ : _ <- tys
-   , Right n <-  runExcept (tyNatSize tcm nTy)
-   , [i] <- bitVectorLiterals' args
-   -> let ty' = List.foldl' ((runFreshM .) . applyTy tcm) ty tys
-          (_,bvTy) = splitFunForallTy ty'
-          valN = i .&. mask
-          mask = bit (fromInteger n) - 1
-      in reduce (mkBitVectorLit bvTy nTy n valN)
+  "Clash.Sized.Internal.BitVector.split#" -- :: forall n m. KnownNat n => BitVector (m + n) -> (BitVector m, BitVector n)
+    | nTy : mTy : _ <- tys
+    , Right n <-  runExcept (tyNatSize tcm nTy)
+    , Right m <-  runExcept (tyNatSize tcm mTy)
+    , [i] <- bitVectorLiterals' args
+    -> let ty' = List.foldl' ((runFreshM .) . applyTy tcm) ty tys
+           (_,tyView -> TyConApp tupTcNm tyArgs) = splitFunForallTy ty'
+           (Just tupTc) = HashMap.lookup (nameOcc tupTcNm) tcm
+           [tupDc] = tyConDataCons tupTc
+           bvTy : _ = tyArgs
+           valM = i `shiftR` fromInteger n
+           valN = i .&. mask
+           mask = bit (fromInteger n) - 1
+    in reduce $
+       mkApps (Data tupDc) (map Right tyArgs ++
+                [ Left (mkBitVectorLit bvTy mTy m valM)
+                , Left (mkBitVectorLit bvTy nTy n valN)])
+
   "Clash.Sized.Internal.BitVector.msb#" -- :: forall n. KnownNat n => BitVector n -> Bit
     | [i] <- bitVectorLiterals' args
     , Just (_, kn) <- extractKnownNat tcm tys
-    -> let resTyInfo = extractTySizeInfo tcm ty tys
+    -> let resTy = getResultTy tcm ty tys
            val = reifyNat kn (op (fromInteger i))
-    in reduce (mkBitVectorLit' resTyInfo val)
+       in reduce (mkBitLit resTy val)
     where
       op :: KnownNat n => BitVector n -> Proxy n -> Integer
       op u _ = toInteger (BitVector.msb# u)
   "Clash.Sized.Internal.BitVector.lsb#" -- BitVector n -> Bit
     | [i] <- bitVectorLiterals' args
     , Just (_, kn) <- extractKnownNat tcm tys
-    -> let resTyInfo = extractTySizeInfo tcm ty tys
+    -> let resTy = getResultTy tcm ty tys
            val = reifyNat kn (op (fromInteger i))
-    in reduce (mkBitVectorLit' resTyInfo val)
+    in reduce (mkBitLit resTy val)
     where
       op :: KnownNat n => BitVector n -> Proxy n -> Integer
       op u _ = toInteger (BitVector.lsb# u)
@@ -2835,6 +2872,16 @@ sizedLiteral szCon val = case val of
   PrimVal nm  _ _ [_, Lit (IntegerLiteral i)] | nm == szCon -> Just i
   _ -> Nothing
 
+bitLiterals
+  :: [Value]
+  -> [Integer]
+bitLiterals = typedLiterals' go
+ where
+  go val = case val of
+    PrimVal nm _ _ [_, Lit (IntegerLiteral i)]
+      | nm == "Clash.Sized.Internal.BitVector.fromInteger##"
+      -> Just i
+    _ -> Nothing
 
 bitVectorLiterals, indexLiterals, signedLiterals, unsignedLiterals
   :: [Value] -> Maybe (Integer,Integer)
@@ -2904,6 +2951,17 @@ mkSizedLit conPrim ty nTy kn val
   = mkApps (conPrim sTy) [Right nTy,Left (Literal (NaturalLiteral kn)),Left (Literal (IntegerLiteral ( val)))]
   where
     (_,sTy) = splitFunForallTy ty
+
+mkBitLit
+  :: Type
+  -- ^ Result type
+  -> Integer
+  -- ^ Value
+  -> Term
+mkBitLit ty val =
+  mkApps (bConPrim sTy) [Left (Literal (IntegerLiteral val))]
+ where
+  (_,sTy) = splitFunForallTy ty
 
 mkBitVectorLit, mkSignedLit, mkUnsignedLit
   :: Type    -- result type
@@ -3024,6 +3082,13 @@ integerToWordLiteral = Literal . WordLiteral . toInteger . (fromInteger :: Integ
 integerToIntegerLiteral :: Integer -> Term
 integerToIntegerLiteral = Literal . IntegerLiteral
 
+bConPrim :: Type -> Term
+bConPrim (tyView -> TyConApp bTcNm _)
+  = Prim "Clash.Sized.Internal.BitVector.fromInteger##" funTy
+  where
+    funTy      = foldr1 mkFunTy [integerPrimTy,mkTyConApp bTcNm []]
+bConPrim _ = error $ $(curLoc) ++ "called with incorrect type"
+
 bvConPrim :: Type -> Term
 bvConPrim (tyView -> TyConApp bvTcNm _)
   = Prim "Clash.Sized.Internal.BitVector.fromInteger#" (ForAllTy (bind nTV funTy))
@@ -3132,6 +3197,16 @@ extractTySizeInfo tcm ty tys = (resTy,resSizeTy,resSize)
     (_,resTy) = splitFunForallTy ty'
     TyConApp _ [resSizeTy] = tyView resTy
     Right resSize = runExcept (tyNatSize tcm resSizeTy)
+
+getResultTy
+  :: TyConMap
+  -> Type
+  -> [Type]
+  -> Type
+getResultTy tcm ty tys = resTy
+ where
+  ty' = List.foldl' ((runFreshM .) . applyTy tcm) ty tys
+  (_,resTy) = splitFunForallTy ty'
 
 liftDDI :: (Double# -> Double# -> Int#) -> [Value] -> Maybe Term
 liftDDI f args = case doubleLiterals' args of

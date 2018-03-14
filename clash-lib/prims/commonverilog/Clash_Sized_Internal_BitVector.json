@@ -1,0 +1,109 @@
+[ { "BlackBox" :
+    { "name"      : "Clash.Sized.Internal.BitVector.high"
+    , "type"      : "high :: Bit"
+    , "templateE" : "1'b1"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "Clash.Sized.Internal.BitVector.low"
+    , "type"      : "low :: Bit"
+    , "templateE" : "1'b0"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "Clash.Sized.Internal.BitVector.pack#"
+    , "type"      : "pack# :: Bit -> BitVector 1"
+    , "templateE" : "~ARG[0]"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "Clash.Sized.Internal.BitVector.unpack#"
+    , "type"      : "unpack# :: BitVector 1 -> Bit"
+    , "templateE" : "~ARG[0]"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "Clash.Sized.Internal.BitVector.reduceAnd#"
+    , "type"      : "reduceAnd# :: KnownNat n => BitVector n -> Bit"
+    , "templateE" : "& (~ARG[1])"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "Clash.Sized.Internal.BitVector.reduceOr#"
+    , "type"      : "reduceOr# :: BitVector n -> Bit"
+    , "templateE" : "| (~ARG[0])"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "Clash.Sized.Internal.BitVector.reduceXor#"
+    , "type"      : "reduceXor# :: BitVector n -> Bit"
+    , "templateE" : "^ (~ARG[0])"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "Clash.Sized.Internal.BitVector.eq##"
+    , "type"      : "eq## :: Bit -> Bit -> Bool"
+    , "templateE" : "~ARG[0] == ~ARG[1]"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "Clash.Sized.Internal.BitVector.neq##"
+    , "type"      : "neq## :: Bit -> Bit -> Bool"
+    , "templateE" : "~ARG[0] != ~ARG[1]"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "Clash.Sized.Internal.BitVector.lt##"
+    , "type"      : "lt## :: Bit -> Bit -> Bool"
+    , "templateE" : "~ARG[0] < ~ARG[1]"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "Clash.Sized.Internal.BitVector.ge##"
+    , "type"      : "ge## :: Bit -> Bit -> Bool"
+    , "templateE" : "~ARG[0] >= ~ARG[1]"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "Clash.Sized.Internal.BitVector.gt##"
+    , "type"      : "gt## :: Bit -> Bit -> Bool"
+    , "templateE" : "~ARG[0] > ~ARG[1]"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "Clash.Sized.Internal.BitVector.le##"
+    , "type"      : "le## :: Bit -> Bit -> Bool"
+    , "templateE" : "~ARG[0] <= ~ARG[1]"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "Clash.Sized.Internal.BitVector.fromInteger##"
+    , "type"      : "fromInteger# :: Integer -> Bit"
+    , "templateE" : "~VAR[i][0][0]"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "Clash.Sized.Internal.BitVector.and##"
+    , "type"      : "and## :: Bit -> Bit -> Bit"
+    , "templateE" : "~ARG[0] & ~ARG[1]"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "Clash.Sized.Internal.BitVector.or##"
+    , "type"      : "or## :: Bit -> Bit -> Bit"
+    , "templateE" : "~ARG[0] | ~ARG[1]"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "Clash.Sized.Internal.BitVector.xor##"
+    , "type"      : "xor## :: Bit -> Bit -> Bit"
+    , "templateE" : "~ARG[0] ^ ~ARG[1]"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "Clash.Sized.Internal.BitVector.complement##"
+    , "type"      : "complement## :: Bit -> Bit"
+    , "templateE" : "~ ~ARG[0]"
+    }
+  }
+]

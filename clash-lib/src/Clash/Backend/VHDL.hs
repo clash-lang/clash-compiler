@@ -104,7 +104,7 @@ instance Backend VHDLState where
   toBV _ id_      = do
     nm <- use modNm
     text (T.toLower $ T.pack nm) <> "_types.toSLV" <> parens (text id_)
-  fromBV _ id_    = do
+  fromBV _ id_  = do
     nm <- use modNm
     text (T.toLower $ T.pack nm) <> "_types.fromSLV" <> parens (text id_)
   hdlSyn          = use hdlsyn
@@ -234,6 +234,7 @@ mkTyPackage_ modName hwtys = do
     eqTypM (Signed _) (Signed _)         = True
     eqTypM (Unsigned _) (Unsigned _)     = True
     eqTypM (BitVector _) (BitVector _)   = True
+    eqTypM (Clock _ _ g) (Clock _ _ g')  = g == g'
     eqTypM ty1 ty2 = ty1 == ty2
 
 mkUsedTys :: HWType
@@ -270,7 +271,7 @@ normaliseType ty@(SP _ elTys)      = do
   mapM_ ((tyCache %=) . HashSet.insert) (concatMap snd elTys)
   return (BitVector (typeSize ty))
 normaliseType ty@(Index _)     = return (Unsigned (typeSize ty))
-normaliseType ty@(Sum _ _)     = return (BitVector (typeSize ty))
+normaliseType ty@(Sum _ _)     = return (Unsigned (typeSize ty))
 normaliseType (Clock _ _ Gated) =
   return (Product "GatedClock" [Bit,Bool])
 normaliseType (Clock {}) = return Bit
@@ -648,7 +649,7 @@ tyName (BitVector n)     = "std_logic_vector_" <> int n
 tyName t@(Index _)       = "unsigned_" <> int (typeSize t)
 tyName (Signed n)        = "signed_" <> int n
 tyName (Unsigned n)      = "unsigned_" <> int n
-tyName t@(Sum _ _)       = "std_logic_vector_" <> int (typeSize t)
+tyName t@(Sum _ _)       = "unsigned_" <> int (typeSize t)
 tyName t@(Product nm _)  = do
     tN <- normaliseType t
     makeCached tN nameCache prodName
@@ -920,10 +921,7 @@ expr_ _ (DataCon ty@(SP _ args) (DC (_,i)) es) = assignExpr
                    n -> [bits (replicate n U)]
     assignExpr = "std_logic_vector'" <> parens (hcat $ punctuate " & " $ sequence (dcExpr:argExprs ++ extraArg))
 
-expr_ _ (DataCon ty@(Sum _ _) (DC (_,i)) []) =
-  let n = typeSize ty
-  in  exprLit (Just (BitVector n, n)) (NumLit (toInteger i))
-
+expr_ _ (DataCon ty@(Sum _ _) (DC (_,i)) []) = "to_unsigned" <> tupled (sequence [int i,int (typeSize ty)])
 expr_ _ (DataCon ty@(Product _ _) _ es) =
     tupled $ zipWithM (\i e' -> tyName ty <> "_sel" <> int i <+> rarrow <+> expr_ False e') [0..] es
 
@@ -943,10 +941,13 @@ expr_ _ (BlackBoxE pNm _ _ _ _ bbCtx _)
 
 expr_ _ (BlackBoxE pNm _ _ _ _ bbCtx _)
   | pNm == "Clash.Sized.Internal.BitVector.fromInteger#"
-  , [Literal _ (NumLit n), Literal _ i@(NumLit b)] <- extractLiterals bbCtx
-  = case n of
-      1 -> exprLit Nothing (if b == 0 then BitLit L else BitLit H)
-      _ -> exprLit (Just (BitVector (fromInteger n),fromInteger n)) i
+  , [Literal _ (NumLit n), Literal _ i] <- extractLiterals bbCtx
+  = exprLit (Just (BitVector (fromInteger n),fromInteger n)) i
+
+expr_ _ (BlackBoxE pNm _ _ _ _ bbCtx _)
+  | pNm == "Clash.Sized.Internal.BitVector.fromInteger##"
+  , [Literal _ i] <- extractLiterals bbCtx
+  = exprLit (Just (Bit,1)) i
 
 expr_ _ (BlackBoxE pNm _ _ _ _ bbCtx _)
   | pNm == "Clash.Sized.Internal.Index.fromInteger#"
@@ -999,10 +1000,10 @@ expr_ _ (DataTag Bool (Left id_)) = "tagToEnum" <> parens (text id_)
 expr_ _ (DataTag Bool (Right id_)) = "dataToTag" <> parens (text id_)
 
 expr_ _ (DataTag hty@(Sum _ _) (Left id_)) =
-  "std_logic_vector" <> parens ("resize" <> parens ("unsigned" <> parens ("std_logic_vector" <> parens (text id_)) <> "," <> int (typeSize hty)))
+  "resize" <> parens ("unsigned" <> parens ("std_logic_vector" <> parens (text id_)) <> "," <> int (typeSize hty))
 expr_ _ (DataTag (Sum _ _) (Right id_)) = do
   iw <- use intWidth
-  "signed" <> parens ("std_logic_vector" <> parens ("resize" <> parens ("unsigned" <> parens (text id_) <> "," <> int iw)))
+  "signed" <> parens ("std_logic_vector" <> parens ("resize" <> parens (text id_ <> "," <> int iw)))
 
 expr_ _ (DataTag (Product _ _) (Right _))  = do
   iw <- use intWidth
@@ -1072,6 +1073,7 @@ exprLit (Just (hty,sz)) (NumLit i) = case hty of
     | i < 2^(31 :: Integer) && i > (-2^(31 :: Integer)) -> "to_signed" <> parens (integer i <> "," <> int n)
     | otherwise -> "signed'" <> parens lit
   BitVector _ -> "std_logic_vector'" <> parens lit
+  Bit         -> squotes (int (fromInteger i `mod` 2))
   _           -> blit
 
   where
@@ -1130,7 +1132,7 @@ toSLV :: HWType -> Expr -> VHDLM Doc
 toSLV Bool         e = do
   nm <- use modNm
   text (T.toLower $ T.pack nm) <> "_types.toSLV" <> parens (expr_ False e)
-toSLV Bit e = do
+toSLV Bit          e = do
   nm <- use modNm
   text (T.toLower $ T.pack nm) <> "_types.toSLV" <> parens (expr_ False e)
 toSLV (Clock {})    e = do
@@ -1143,7 +1145,7 @@ toSLV (BitVector _) e = expr_ False e
 toSLV (Signed _)   e = "std_logic_vector" <> parens (expr_ False e)
 toSLV (Unsigned _) e = "std_logic_vector" <> parens (expr_ False e)
 toSLV (Index _)    e = "std_logic_vector" <> parens (expr_ False e)
-toSLV (Sum _ _)    e = expr_ False e
+toSLV (Sum _ _)    e = "std_logic_vector" <> parens (expr_ False e)
 toSLV t@(Product _ tys) (Identifier id_ Nothing) = do
     selIds' <- sequence selIds
     encloseSep lparen rparen " & " (zipWithM toSLV tys selIds')
@@ -1182,7 +1184,7 @@ fromSLV (BitVector _)     id_ start end = text id_ <> parens (int start <+> "dow
 fromSLV (Index _)         id_ start end = "unsigned" <> parens (text id_ <> parens (int start <+> "downto" <+> int end))
 fromSLV (Signed _)        id_ start end = "signed" <> parens (text id_ <> parens (int start <+> "downto" <+> int end))
 fromSLV (Unsigned _)      id_ start end = "unsigned" <> parens (text id_ <> parens (int start <+> "downto" <+> int end))
-fromSLV (Sum _ _)         id_ start end = text id_ <> parens (int start <+> "downto" <+> int end)
+fromSLV (Sum _ _)         id_ start end = "unsigned" <> parens (text id_ <> parens (int start <+> "downto" <+> int end))
 fromSLV t@(Product _ tys) id_ start _ = do
     tupled $ zipWithM (\s e -> s <+> rarrow <+> e) selNames args
   where

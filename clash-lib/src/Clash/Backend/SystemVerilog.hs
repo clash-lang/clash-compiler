@@ -81,6 +81,7 @@ instance Backend SystemVerilogState where
   hdlKind         = const SystemVerilog
   primDirs        = const $ do root <- primsRoot
                                return [ root System.FilePath.</> "common"
+                                      , root System.FilePath.</> "commonverilog"
                                       , root System.FilePath.</> "systemverilog"
                                       ]
   extractTypes    = _tyCache
@@ -219,13 +220,13 @@ mkTyPackage_ modName hwtys =
     eqReprTy (RTree n ty1) (RTree m ty2)
       | m == n    = eqReprTy ty1 ty2
       | otherwise = False
+    eqReprTy Bit  ty2 = ty2 `elem` [Bit,Bool]
+    eqReprTy Bool ty2 = ty2 `elem` [Bit,Bool]
     eqReprTy ty1 ty2
       | isUnsigned ty1 && isUnsigned ty2 = typeSize ty1 == typeSize ty2
       | otherwise                        = ty1 == ty2
 
     isUnsigned :: HWType -> Bool
-    isUnsigned Bool          = True
-    isUnsigned Bit           = True
     isUnsigned (Unsigned _)  = True
     isUnsigned (BitVector _) = True
     isUnsigned (Index _)     = True
@@ -326,6 +327,7 @@ splitVecTy = fmap splitElemTy . go
       Vector _ _  -> error $ $(curLoc) ++ "impossible"
       Clock {}    -> (ns, verilogType t)
       Reset {}    -> (ns, "logic")
+      Bool        -> (ns, "logic")
       Bit         -> (ns, "logic")
       String      -> (ns, "string")
       Signed n    -> (ns ++ [Left n],"logic signed")
@@ -517,6 +519,7 @@ verilogType t = do
     Clock {}      -> "logic"
     Reset {}      -> "logic"
     Bit           -> "logic"
+    Bool          -> "logic"
     String        -> "string"
     _ -> "logic" <+> brackets (int (typeSize t -1) <> colon <> int 0)
 
@@ -797,8 +800,8 @@ expr_ _ (DataCon ty@(SP _ args) (DC (_,i)) es) = assignExpr
 
 expr_ _ (DataCon ty@(Sum _ _) (DC (_,i)) []) = int (typeSize ty) <> "'d" <> int i
 expr_ _ (DataCon (Product _ tys) _ es) = listBraces (zipWithM toSLV tys es)
-expr_ _ (DataCon (Clock _ _ Gated) _ es) =
-  listBraces (zipWithM toSLV [Bit,Bool] es)
+expr_ _ (DataCon (Clock nm rt Gated) _ es) =
+  listBraces (zipWithM toSLV [Clock nm rt Source,Bool] es)
 
 expr_ _ (BlackBoxE pNm _ _ _ _ bbCtx _)
   | pNm == "Clash.Sized.Internal.Signed.fromInteger#"
@@ -814,6 +817,11 @@ expr_ _ (BlackBoxE pNm _ _ _ _ bbCtx _)
   | pNm == "Clash.Sized.Internal.BitVector.fromInteger#"
   , [Literal _ (NumLit n), Literal _ i] <- extractLiterals bbCtx
   = exprLit (Just (BitVector (fromInteger n),fromInteger n)) i
+
+expr_ _ (BlackBoxE pNm _ _ _ _ bbCtx _)
+  | pNm == "Clash.Sized.Internal.BitVector.fromInteger##"
+  , [Literal _ i] <- extractLiterals bbCtx
+  = exprLit (Just (Bit,1)) i
 
 expr_ _ (BlackBoxE pNm _ _ _ _ bbCtx _)
   | pNm == "Clash.Sized.Internal.Index.fromInteger#"

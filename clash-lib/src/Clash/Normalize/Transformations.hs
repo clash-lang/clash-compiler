@@ -500,11 +500,7 @@ removeUnusedExpr _ e@(collectArgs -> (p@(Prim nm _),args)) = do
   bbM <- HashMap.lookup nm <$> Lens.use (extra.primitives)
   case bbM of
     Just (BlackBox pNm _ _ _ inc templ) -> do
-      let usedArgs = if pNm `elem` ["Clash.Sized.Internal.Signed.fromInteger#"
-                                   ,"Clash.Sized.Internal.Unsigned.fromInteger#"
-                                   ,"Clash.Sized.Internal.BitVector.fromInteger#"
-                                   ,"Clash.Sized.Internal.Index.fromInteger#"
-                                   ]
+      let usedArgs = if isFromInt pNm
                         then [0,1]
                         else either usedArguments usedArguments templ ++
                              maybe [] (usedArguments . snd) inc
@@ -926,7 +922,8 @@ isEq nm = nm == "Clash.Sized.Internal.BitVector.eq#" ||
           nm == "Clash.Sized.Internal.Unsigned.eq#"
 
 isFromInt :: Text -> Bool
-isFromInt nm = nm == "Clash.Sized.Internal.BitVector.fromInteger#" ||
+isFromInt nm = nm == "Clash.Sized.Internal.BitVector.fromInteger##" ||
+               nm == "Clash.Sized.Internal.BitVector.fromInteger#" ||
                nm == "Clash.Sized.Internal.Index.fromInteger#" ||
                nm == "Clash.Sized.Internal.Signed.fromInteger#" ||
                nm == "Clash.Sized.Internal.Unsigned.fromInteger#"
@@ -1186,7 +1183,7 @@ reduceBinders processed body ((id_,expr):binders) = case List.find ((== expr) . 
     Nothing -> reduceBinders ((id_,expr):processed) body binders
 
 reduceConst :: NormRewrite
-reduceConst _ e
+reduceConst _ e@(App _ _)
   | isConstant e
   , (conPrim, _) <- collectArgs e
   , isPrim conPrim

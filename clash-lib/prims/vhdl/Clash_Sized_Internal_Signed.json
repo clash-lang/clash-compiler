@@ -7,13 +7,13 @@
 , { "BlackBox" :
     { "name"      : "Clash.Sized.Internal.Signed.pack#"
     , "type"      : "pack# :: KnownNat n => Signed n -> BitVector n"
-    , "templateE" : "~IF~ISBITO~THEN~VAR[s][1](0)~ELSEstd_logic_vector(~ARG[1])~FI"
+    , "templateE" : "std_logic_vector(~ARG[1])"
     }
   }
 , { "BlackBox" :
     { "name"      : "Clash.Sized.Internal.Signed.unpack#"
     , "type"      : "unpack# :: KnownNat n => BitVector n -> Signed n"
-    , "templateE" : "~IF~ISBIT[1]~THENsigned'(0 => ~ARG[1])~ELSEsigned(~ARG[1])~FI"
+    , "templateE" : "signed(~ARG[1])"
     }
   }
 , { "BlackBox" :

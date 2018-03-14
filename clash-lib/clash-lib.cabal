@@ -60,6 +60,7 @@ Extra-source-files:
 
 Data-files:
   prims/common/*.json,
+  prims/commonverilog/*.json,
   prims/verilog/*.json,
   prims/systemverilog/*.json,
   prims/vhdl/*.json

@@ -3,7 +3,7 @@ module LambdaDrop where
 import Clash.Prelude
 
 topEntity :: Signal System (BitVector 2)
-topEntity = (++#) <$> outport1 <*> outport2
+topEntity = (++#) <$> (pack <$> outport1) <*> (pack <$> outport2)
   where
     (outport1, outResp1) = gpio (decodeReq 1 req)
     (outport2, outResp2) = gpio (decodeReq 2 req)

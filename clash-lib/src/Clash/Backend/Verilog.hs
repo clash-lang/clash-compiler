@@ -75,6 +75,7 @@ instance Backend VerilogState where
   hdlKind         = const Verilog
   primDirs        = const $ do root <- primsRoot
                                return [ root System.FilePath.</> "common"
+                                      , root System.FilePath.</> "commonverilog"
                                       , root System.FilePath.</> "verilog"
                                       ]
   extractTypes    = const HashSet.empty
@@ -249,11 +250,12 @@ verilogType' isDecl t =
       getVerilogTy _          = (empty,    typeSize t)
 
   in case t of
-       -- special case: Bit, clocks and resets
+       -- special case: Bit, Bool, clocks and resets
        Clock _ _ Gated -> verilogType' isDecl (gatedClockType t)
        Clock {} -> empty
        Reset {} -> empty
        Bit      -> empty
+       Bool     -> empty
 
        -- otherwise, print the type and prefix
        ty | (prefix, sz) <- getVerilogTy ty
@@ -502,6 +504,11 @@ expr_ _ (BlackBoxE pNm _ _ _ _ bbCtx _)
   | pNm == "Clash.Sized.Internal.BitVector.fromInteger#"
   , [Literal _ (NumLit n), Literal _ i] <- extractLiterals bbCtx
   = exprLit (Just (BitVector (fromInteger n),fromInteger n)) i
+
+expr_ _ (BlackBoxE pNm _ _ _ _ bbCtx _)
+  | pNm == "Clash.Sized.Internal.BitVector.fromInteger##"
+  , [Literal _ i] <- extractLiterals bbCtx
+  = exprLit (Just (Bit,1)) i
 
 expr_ _ (BlackBoxE pNm _ _ _ _ bbCtx _)
   | pNm == "Clash.Sized.Internal.Index.fromInteger#"

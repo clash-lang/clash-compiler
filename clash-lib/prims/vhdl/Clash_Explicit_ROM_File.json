@@ -39,9 +39,8 @@ begin
   ~GENSYM[romFileSync][7] : process (~SYM[5])
   begin
     if (rising_edge(~SYM[5])) then
-      if ~SYM[6] then~IF~ISBITO~THEN
-        ~RESULT <= to_stdulogic(~SYM[2](~SYM[3])(0))~ELSE
-        ~RESULT <= to_stdlogicvector(~SYM[2](~SYM[3]))~FI
+      if ~SYM[6] then
+        ~RESULT <= to_stdlogicvector(~SYM[2](~SYM[3]))
         -- pragma translate_off
         after 1 ps
         -- pragma translate_on
@@ -51,9 +50,8 @@ begin
   end process;~ELSE
   ~SYM[7] : process (~ARG[1])
   begin
-    if (rising_edge(~ARG[1])) then~IF~ISBITO~THEN
-      ~RESULT <= to_stdlogicvector(~SYM[2](~SYM[3])(0))~ELSE
-      ~RESULT <= to_stdlogicvector(~SYM[2](~SYM[3]))~FI
+    if (rising_edge(~ARG[1])) then
+      ~RESULT <= to_stdlogicvector(~SYM[2](~SYM[3]))
       -- pragma translate_off
       after 1 ps
       -- pragma translate_on
