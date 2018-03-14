@@ -31,6 +31,7 @@ module Clash.Annotations.BitRepresentation.Deriving
   , deriveBitPack
   , simpleDerivator
   , packedDerivator
+  , dontApplyInHDL
   , ConstructorType(..)
   , FieldsType(..)
   -- * Convenience type synonyms
@@ -471,7 +472,7 @@ derivePackedAnnotation' (DataReprAnn typ size constrs) =
 -- type SmallInt = Unsigned 2
 --
 -- data Train
---    = Passegner SmallInt
+--    = Passenger SmallInt
 --    | Freight SmallInt SmallInt
 --    | Maintenance
 --    | Toy
@@ -612,11 +613,24 @@ buildPack
   -> DataRepr'
   -> Q [Dec]
 buildPack constrNames dataRepr@(DataRepr' _name _size constrs) = do
+  argNameIn    <- newName "toBePackedIn"
   argName      <- newName "toBePacked"
   constrs'     <- zipWithM (buildPackMatch dataRepr) constrs constrNames
-  let body      = CaseE (VarE argName) constrs'
-  let func      = FunD 'pack [Clause [VarP argName] (NormalB body) []]
+  let packBody    = CaseE (VarE argName) constrs'
+  let packLambda  = LamE [VarP argName] packBody
+  let packApplied = (VarE 'dontApplyInHDL) `AppE` packLambda `AppE` (VarE argNameIn)
+  let func        = FunD 'pack [Clause [VarP argNameIn] (NormalB packApplied) []]
   return [func]
+
+
+-- | In Haskell apply the first argument to the second argument,
+--   in HDL just return the second argument.
+--
+-- This is used in the generated pack/unpack to not do anything in HDL.
+dontApplyInHDL :: (a -> b) -> a -> b
+dontApplyInHDL f a = f a
+{-# NOINLINE dontApplyInHDL #-}
+
 
 buildUnpackField
   :: Name
@@ -644,11 +658,14 @@ buildUnpack
   -> DataRepr'
   -> Q [Dec]
 buildUnpack constrNames (DataRepr' _name _size constrs) = do
-  argName <- newName "toBeUnpacked"
+  argNameIn   <- newName "toBeUnpackedIn"
+  argName     <- newName "toBeUnpacked"
   matches     <- zipWithM (buildUnpackIfE argName) constrs constrNames
   err         <- [| error $ "Could not match constructor for: " ++ show $(varE argName) |]
-  let body     = MultiIfE $ matches ++ [(NormalG (ConE 'True), err)]
-  let func     = FunD 'unpack [Clause [VarP argName] (NormalB body) []]
+  let unpackBody    = MultiIfE $ matches ++ [(NormalG (ConE 'True), err)]
+  let unpackLambda  = LamE [VarP argName] unpackBody
+  let unpackApplied = (VarE 'dontApplyInHDL) `AppE` unpackLambda `AppE` (VarE argNameIn)
+  let func          = FunD 'unpack [Clause [VarP argNameIn] (NormalB unpackApplied) []]
   return [func]
 
 -- | Derives BitPack instances for given type. Will account for custom bit
