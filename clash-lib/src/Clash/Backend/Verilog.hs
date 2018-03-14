@@ -186,7 +186,7 @@ filterReserved s = if s `elem` reservedWords
   then s `Text.append` "_r"
   else s
 
--- | Generate VHDL for a Netlist component
+-- | Generate Verilog for a Netlist component
 genVerilog :: SrcSpan -> Component -> VerilogM ((String,Doc),[(String,Doc)])
 genVerilog sp c = do
     Mon (setSrcSpan sp)
@@ -311,7 +311,7 @@ sigDecl d t = verilogType t <+> d
 verilogTypeMark :: HWType -> VerilogM Doc
 verilogTypeMark = const emptyDoc
 
--- | Convert a Netlist HWType to an error VHDL value for that type
+-- | Convert a Netlist HWType to an error Verilog value for that type
 verilogTypeErrValue :: HWType -> VerilogM Doc
 verilogTypeErrValue ty = braces (int (typeSize ty) <+> braces "1'bx")
 

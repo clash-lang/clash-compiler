@@ -208,7 +208,7 @@ filterReserved s = if s `elem` reservedWords
   then s `Text.append` "_r"
   else s
 
--- | Generate VHDL for a Netlist component
+-- | Generate SystemVerilog for a Netlist component
 genVerilog :: String -> SrcSpan -> Component -> SystemVerilogM ((String,Doc),[(String,Doc)])
 genVerilog _ sp c = do
     Mon $ setSrcSpan sp
@@ -639,7 +639,7 @@ tyName (Clock {})  = "logic"
 tyName (Reset {})  = "logic"
 tyName t =  error $ $(curLoc) ++ "tyName: " ++ show t
 
--- | Convert a Netlist HWType to an error VHDL value for that type
+-- | Convert a Netlist HWType to an error SystemVerilog value for that type
 verilogTypeErrValue :: HWType -> SystemVerilogM Doc
 verilogTypeErrValue (Vector n elTy) = do
   syn <- Mon hdlSyn
@@ -959,9 +959,8 @@ expr_ _ (DataCon (CustomSP _ dataRepr size args) (DC (_,i)) es) =
         int (length ns) <> squote <> "b" <> hcat (mapM bit_char ns)
       range' (Field n start end) =
         -- We want to select the bits starting from 'start' downto and including
-        -- 'end'. We cannot use "(start downto end)" in VHDL, as the preceeding
-        -- expression might be anything. This notation only works on identifiers
-        -- unfortunately.
+        -- 'end'. We cannot use slice notation in Verilog, as the preceding
+        -- expression might not be an identifier.
         let fsize = start - end + 1 in
         let expr' = argExprs !! n in
 
