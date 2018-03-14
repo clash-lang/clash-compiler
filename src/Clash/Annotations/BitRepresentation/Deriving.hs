@@ -133,6 +133,7 @@ resolve :: NameMap -> Type -> Type
 resolve nmap (VarT n) = nmap Map.! n
 resolve nmap (AppT t1 t2) = AppT (resolve nmap t1) (resolve nmap t2)
 resolve _nmap t@(ConT _) = t
+resolve _nmap t@(LitT _) = t
 resolve _nmap t = error $ "Unexpected type: " ++ show t
 
 resolveCon :: NameMap -> Con -> Con
