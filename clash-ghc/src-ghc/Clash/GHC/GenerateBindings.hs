@@ -5,9 +5,9 @@
   Maintainer  :  Christiaan Baaij <christiaan.baaij@gmail.com>
 -}
 
-{-# LANGUAGE LambdaCase #-}
-{-# LANGUAGE ViewPatterns #-}
+{-# LANGUAGE LambdaCase      #-}
 {-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE ViewPatterns    #-}
 
 module Clash.GHC.GenerateBindings
   (generateBindings)

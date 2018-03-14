@@ -8,12 +8,12 @@
 -}
 
 {-# LANGUAGE CPP               #-}
+{-# LANGUAGE MultiWayIf        #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecursiveDo       #-}
 {-# LANGUAGE TemplateHaskell   #-}
 {-# LANGUAGE TupleSections     #-}
 {-# LANGUAGE ViewPatterns      #-}
-{-# LANGUAGE MultiWayIf        #-}
 
 module Clash.Backend.VHDL (VHDLState) where
 
