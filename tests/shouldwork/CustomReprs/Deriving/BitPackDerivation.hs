@@ -7,7 +7,7 @@ import Clash.Annotations.BitRepresentation.Deriving
 type SmallInt = Unsigned 2
 
 data Train
-  = Passegner
+  = Passenger
       SmallInt
       -- ^ Number of wagons
   | Freight
@@ -35,7 +35,7 @@ testBench = done'
     testInput = stimuliGenerator $ Toy
                                 :> Maintenance
                                 :> Freight 2 3
-                                :> Passegner 1
+                                :> Passenger 1
                                 :> Nil
 
     expectedOutput = outputVerifier $ 0b10000000

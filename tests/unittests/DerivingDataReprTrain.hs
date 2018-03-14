@@ -11,7 +11,7 @@ import Clash.Sized.Unsigned
 type SmallInt = Unsigned 2
 
 data Train
-  = Passegner
+  = Passenger
       SmallInt
       -- ^ Number of wagons
   | Freight
@@ -21,4 +21,3 @@ data Train
       -- ^ Max weight
   | Maintenance
   | Toy
-

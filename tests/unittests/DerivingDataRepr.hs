@@ -24,7 +24,7 @@ oneHotOverlapRepr' =
   DataRepr'
     (ConstTy' "DerivingDataReprTrain.Train")
     8
-    [ ConstrRepr' "DerivingDataReprTrain.Passegner"   0 16  16  [0b1100]
+    [ ConstrRepr' "DerivingDataReprTrain.Passenger"   0 16  16  [0b1100]
     , ConstrRepr' "DerivingDataReprTrain.Freight"     1 32  32  [0b1100, 0b0011]
     , ConstrRepr' "DerivingDataReprTrain.Maintenance" 2 64  64  []
     , ConstrRepr' "DerivingDataReprTrain.Toy"         3 128 128 []
@@ -38,7 +38,7 @@ oneHotWideRepr' =
   DataRepr'
     (ConstTy' "DerivingDataReprTrain.Train")
     10
-    [ ConstrRepr' "DerivingDataReprTrain.Passegner"   0 64  64  [0b110000]
+    [ ConstrRepr' "DerivingDataReprTrain.Passenger"   0 64  64  [0b110000]
     , ConstrRepr' "DerivingDataReprTrain.Freight"     1 128 128 [0b001100, 0b000011]
     , ConstrRepr' "DerivingDataReprTrain.Maintenance" 2 256 256 []
     , ConstrRepr' "DerivingDataReprTrain.Toy"         3 512 512 []
@@ -52,7 +52,7 @@ countOverlapRepr' =
   DataRepr'
     (ConstTy' "DerivingDataReprTrain.Train")
     6
-    [ ConstrRepr' "DerivingDataReprTrain.Passegner"   0 0b110000 0b000000 [0b001100]
+    [ ConstrRepr' "DerivingDataReprTrain.Passenger"   0 0b110000 0b000000 [0b001100]
     , ConstrRepr' "DerivingDataReprTrain.Freight"     1 0b110000 0b010000 [0b001100,0b000011]
     , ConstrRepr' "DerivingDataReprTrain.Maintenance" 2 0b110000 0b100000 []
     , ConstrRepr' "DerivingDataReprTrain.Toy"         3 0b110000 0b110000 []
@@ -66,7 +66,7 @@ countWideRepr' =
   DataRepr'
     (ConstTy' "DerivingDataReprTrain.Train")
     8
-    [ ConstrRepr' "DerivingDataReprTrain.Passegner"   0 0b11000000 0b00000000 [0b110000]
+    [ ConstrRepr' "DerivingDataReprTrain.Passenger"   0 0b11000000 0b00000000 [0b110000]
     , ConstrRepr' "DerivingDataReprTrain.Freight"     1 0b11000000 0b01000000 [0b001100,0b000011]
     , ConstrRepr' "DerivingDataReprTrain.Maintenance" 2 0b11000000 0b10000000 []
     , ConstrRepr' "DerivingDataReprTrain.Toy"         3 0b11000000 0b11000000 []
@@ -81,7 +81,7 @@ packedRepr' =
     (ConstTy' "DerivingDataReprTrain.Train")
     5
     [ ConstrRepr' "DerivingDataReprTrain.Freight"     0 0b10000 0 [12,3]
-    , ConstrRepr' "DerivingDataReprTrain.Passegner"   1 3       1 [12]
+    , ConstrRepr' "DerivingDataReprTrain.Passenger"   1 3       1 [12]
     , ConstrRepr' "DerivingDataReprTrain.Toy"         2 3       2 []
     , ConstrRepr' "DerivingDataReprTrain.Maintenance" 3 3       3 []
     ]
