@@ -167,11 +167,11 @@ instance BitPack (Unsigned n) where
 
 {-# NOINLINE pack# #-}
 pack# :: Unsigned n -> BitVector n
-pack# (U i) = BV i
+pack# (U i) = BV 0 i
 
 {-# NOINLINE unpack# #-}
 unpack# :: BitVector n -> Unsigned n
-unpack# (BV i) = U i
+unpack# (BV _ i) = U i
 
 instance Eq (Unsigned n) where
   (==) = eq#

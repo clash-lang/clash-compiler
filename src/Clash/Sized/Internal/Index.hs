@@ -140,11 +140,11 @@ fromSNat = snatToNum
 
 {-# NOINLINE pack# #-}
 pack# :: Index n -> BitVector (CLog 2 n)
-pack# (I i) = BV i
+pack# (I i) = BV 0 i
 
 {-# NOINLINE unpack# #-}
 unpack# :: KnownNat n => BitVector (CLog 2 n) -> Index n
-unpack# (BV i) = fromInteger_INLINE i
+unpack# (BV _ i) = fromInteger_INLINE i
 
 instance Eq (Index n) where
   (==) = eq#

@@ -179,11 +179,11 @@ instance KnownNat n => BitPack (Signed n) where
 {-# NOINLINE pack# #-}
 pack# :: forall n . KnownNat n => Signed n -> BitVector n
 pack# (S i) = let m = 1 `shiftL` fromInteger (natVal (Proxy @n))
-              in  if i < 0 then BV (m + i) else BV i
+              in  if i < 0 then BV 0 (m + i) else BV 0 i
 
 {-# NOINLINE unpack# #-}
 unpack# :: forall n . KnownNat n => BitVector n -> Signed n
-unpack# (BV i) =
+unpack# (BV _ i) =
   let m = 1 `shiftL` fromInteger (natVal (Proxy @n) - 1)
   in  if i >= m then S (i-2*m) else S i
 
