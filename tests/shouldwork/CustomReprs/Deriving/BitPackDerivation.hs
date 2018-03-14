@@ -1,12 +1,22 @@
-{-# LANGUAGE InstanceSigs #-}
 module BitPackDerivation where
 
-import Train
-import Clash.Prelude.Testbench
 import Clash.Prelude
-import Clash.Sized.Internal.BitVector
-import Clash.Annotations.BitRepresentation
+import Clash.Prelude.Testbench
 import Clash.Annotations.BitRepresentation.Deriving
+
+type SmallInt = Unsigned 2
+
+data Train
+  = Passegner
+      SmallInt
+      -- ^ Number of wagons
+  | Freight
+      SmallInt
+      -- ^ Number of wagons
+      SmallInt
+      -- ^ Max weight
+  | Maintenance
+  | Toy
 
 deriveAnnotation (simpleDerivator OneHot Overlap) [t| Train |]
 deriveBitPack [t| Train |]
@@ -19,7 +29,6 @@ topEntity trains = pack <$> trains
 {-# NOINLINE topEntity #-}
 
 testBench
---   :: SystemClockReset
   :: Signal System Bool
 testBench = done'
   where
@@ -36,4 +45,3 @@ testBench = done'
                                    :> Nil
     done  = expectedOutput (topEntity testInput)
     done' = withClockReset (tbSystemClockGen (not <$> done')) systemResetGen done
-
