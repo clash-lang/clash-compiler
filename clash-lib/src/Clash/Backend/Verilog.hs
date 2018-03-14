@@ -457,7 +457,7 @@ expr_ _ (Identifier id_ (Just m)) = case modifier 0 m of
   Nothing          -> text id_
   Just (start,end) -> text id_ <> brackets (int start <> colon <> int end)
 
-expr_ b (DataCon _ (DC (Void, -1)) [e]) = expr_ b e
+expr_ b (DataCon _ (DC (Void {}, -1)) [e]) = expr_ b e
 
 expr_ _ (DataCon ty@(Vector 0 _) _ _) = verilogTypeErrValue ty
 

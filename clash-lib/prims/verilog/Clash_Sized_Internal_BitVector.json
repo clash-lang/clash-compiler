@@ -11,39 +11,9 @@
     }
   }
 , { "BlackBox" :
-    { "name"      : "Clash.Sized.Internal.BitVector.high"
-    , "type"      : "high :: Bit"
-    , "templateE" : "1'b1"
-    }
-  }
-, { "BlackBox" :
-    { "name"      : "Clash.Sized.Internal.BitVector.low"
-    , "type"      : "low :: Bit"
-    , "templateE" : "1'b0"
-    }
-  }
-, { "BlackBox" :
     { "name"      : "Clash.Sized.Internal.BitVector.++#"
     , "type"      : "(++#) :: KnownNat m => BitVector n -> BitVector m -> BitVector (n + m)"
     , "templateE" : "{~ARG[1],~ARG[2]}"
-    }
-  }
-, { "BlackBox" :
-    { "name"      : "Clash.Sized.Internal.BitVector.reduceAnd#"
-    , "type"      : "reduceAnd# :: KnownNat n => BitVector n -> BitVector 1"
-    , "templateE" : "& (~ARG[1])"
-    }
-  }
-, { "BlackBox" :
-    { "name"      : "Clash.Sized.Internal.BitVector.reduceOr#"
-    , "type"      : "reduceOr# :: BitVector n -> BitVector 1"
-    , "templateE" : "| (~ARG[0])"
-    }
-  }
-, { "BlackBox" :
-    { "name"      : "Clash.Sized.Internal.BitVector.reduceXor#"
-    , "type"      : "reduceXor# :: BitVector n -> BitVector 1"
-    , "templateE" : "^ (~ARG[0])"
     }
   }
 , { "BlackBox" :
@@ -129,42 +99,6 @@ end
     }
   }
 , { "BlackBox" :
-    { "name"      : "Clash.Sized.Internal.BitVector.eq#"
-    , "type"      : "eq# :: BitVector n -> BitVector n -> Bool"
-    , "templateE" : "~ARG[0] == ~ARG[1]"
-    }
-  }
-, { "BlackBox" :
-    { "name"      : "Clash.Sized.Internal.BitVector.neq#"
-    , "type"      : "neq# :: BitVector n -> BitVector n -> Bool"
-    , "templateE" : "~ARG[0] != ~ARG[1]"
-    }
-  }
-, { "BlackBox" :
-    { "name"      : "Clash.Sized.Internal.BitVector.lt#"
-    , "type"      : "lt# :: BitVector n -> BitVector n -> Bool"
-    , "templateE" : "~ARG[0] < ~ARG[1]"
-    }
-  }
-, { "BlackBox" :
-    { "name"      : "Clash.Sized.Internal.BitVector.ge#"
-    , "type"      : "ge# :: BitVector n -> BitVector n -> Bool"
-    , "templateE" : "~ARG[0] >= ~ARG[1]"
-    }
-  }
-, { "BlackBox" :
-    { "name"      : "Clash.Sized.Internal.BitVector.gt#"
-    , "type"      : "gt# :: BitVector n -> BitVector n -> Bool"
-    , "templateE" : "~ARG[0] > ~ARG[1]"
-    }
-  }
-, { "BlackBox" :
-    { "name"      : "Clash.Sized.Internal.BitVector.le#"
-    , "type"      : "le# :: BitVector n -> BitVector n -> Bool"
-    , "templateE" : "~ARG[0] <= ~ARG[1]"
-    }
-  }
-, { "BlackBox" :
     { "name"      : "Clash.Sized.Internal.BitVector.minBound#"
     , "type"      : "minBound# :: BitVector n"
     , "templateE" : "~SIZE[~TYPO]'d0"
@@ -234,12 +168,6 @@ end
     { "name"      : "Clash.Sized.Internal.BitVector.rem#"
     , "type"      : "rem# :: BitVector n -> BitVector n -> BitVector n"
     , "templateE" : "~ARG[0] % ~ARG[1]"
-    }
-  }
-, { "BlackBox" :
-    { "name"      : "Clash.Sized.Internal.BitVector.toInteger#"
-    , "type"      : "toInteger# :: BitVector n -> Integer"
-    , "templateD" : "assign ~RESULT = $unsigned(~ARG[0]);"
     }
   }
 , { "BlackBox" :

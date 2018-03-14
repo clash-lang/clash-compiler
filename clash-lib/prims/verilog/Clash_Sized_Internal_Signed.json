@@ -17,42 +17,6 @@
     }
   }
 , { "BlackBox" :
-    { "name"      : "Clash.Sized.Internal.Signed.eq#"
-    , "type"      : "eq# :: Signed n -> Signed n -> Bool"
-    , "templateE" : "~ARG[0] == ~ARG[1]"
-    }
-  }
-, { "BlackBox" :
-    { "name"      : "Clash.Sized.Internal.Signed.neq#"
-    , "type"      : "neq# :: Signed n -> Signed n -> Bool"
-    , "templateE" : "~ARG[0] != ~ARG[1]"
-    }
-  }
-, { "BlackBox" :
-    { "name"      : "Clash.Sized.Internal.Signed.lt#"
-    , "type"      : "lt# :: Signed n -> Signed n -> Bool"
-    , "templateE" : "~ARG[0] < ~ARG[1]"
-    }
-  }
-, { "BlackBox" :
-    { "name"      : "Clash.Sized.Internal.Signed.ge#"
-    , "type"      : "ge# :: Signed n -> Signed n -> Bool"
-    , "templateE" : "~ARG[0] >= ~ARG[1]"
-    }
-  }
-, { "BlackBox" :
-    { "name"      : "Clash.Sized.Internal.Signed.gt#"
-    , "type"      : "gt# :: Signed n -> Signed n -> Bool"
-    , "templateE" : "~ARG[0] > ~ARG[1]"
-    }
-  }
-, { "BlackBox" :
-    { "name"      : "Clash.Sized.Internal.Signed.le#"
-    , "type"      : "le# :: Signed n -> Signed n -> Bool"
-    , "templateE" : "~ARG[0] <= ~ARG[1]"
-    }
-  }
-, { "BlackBox" :
     { "name"      : "Clash.Sized.Internal.Signed.minBound#"
     , "type"      : "minBound# :: KnownNat n => Signed n"
     , "comment"   : "Generates incorrect SV for n=0"
@@ -160,12 +124,6 @@ assign ~RESULT = (~VAR[dividend][0][~SIZE[~TYPO]-1] == ~VAR[divider][1][~SIZE[~T
                  ~SYM[0] :
                  (~VAR[dividend][0] == ~SIZE[~TYPO]'sd0 ? ~SIZE[~TYPO]'sd0 : ~SYM[0] + ~VAR[divider][1]);
 // modSigned end"
-    }
-  }
-, { "BlackBox" :
-    { "name"      : "Clash.Sized.Internal.Signed.toInteger#"
-    , "type"      : "toInteger# :: Signed n -> Integer"
-    , "templateD" : "assign ~RESULT = $signed(~ARG[0]);"
     }
   }
 , { "BlackBox" :

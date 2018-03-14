@@ -61,7 +61,7 @@ end generate;
 , { "BlackBox" :
     { "name"      : "Clash.Sized.Vector.splitAt"
     , "type"      : "splitAt :: SNat m -> Vec (m + n) a -> (Vec m a, Vec n a)"
-    , "templateE" : "(~VAR[vec][1](0 to ~LIT[0]-1),~VAR[vec][1](~LIT[0] to ~VAR[vec][1]'high))"
+    , "templateE" : "~IF~LENGTH[~TYPO]~THEN~ARG[1]~ELSE(~VAR[vec][1](0 to ~LIT[0]-1),~VAR[vec][1](~LIT[0] to ~VAR[vec][1]'high))~FI"
     }
   }
 , { "BlackBox" :
@@ -86,11 +86,11 @@ end generate;
     , "type"      : "map :: (a -> b) -> Vec n a -> Vec n b"
     , "templateD" :
 "-- map begin
-~GENSYM[map][0] : for ~GENSYM[i][1] in ~RESULT'range generate~IF ~VIVADO ~THEN
-  signal ~GENSYM[map_in][2]  : ~TYPEL[~TYP[1]];
+~GENSYM[map][0] : for ~GENSYM[i][1] in ~RESULT'range generate~IF ~VIVADO ~THEN~IF~SIZE[~TYP[1]]~THEN
+  signal ~GENSYM[map_in][2]  : ~TYPEL[~TYP[1]];~ELSE ~FI
   signal ~GENSYM[map_out][3] : ~TYPEL[~TYPO];
-begin
-  ~SYM[2] <= fromSLV(~VAR[vec][1](~SYM[1]));
+begin~IF~SIZE[~TYP[1]]~THEN
+  ~SYM[2] <= fromSLV(~VAR[vec][1](~SYM[1]));~ELSE ~FI
   ~INST 0
     ~OUTPUT <= ~SYM[3]~ ~TYPEL[~TYPO]~
     ~INPUT  <= ~SYM[2]~ ~TYPEL[~TYP[1]]~
@@ -119,15 +119,15 @@ end generate;~FI
     end if;
   end function;
 begin
-  ~GENSYM[imap][5] : for ~GENSYM[i][1] in ~RESULT'range generate~IF ~VIVADO ~THEN
-    signal ~GENSYM[map_in][2]  : ~TYPEL[~TYP[2]];
+  ~GENSYM[imap][5] : for ~GENSYM[i][1] in ~RESULT'range generate~IF ~VIVADO ~THEN~IF~SIZE[~TYP[2]]~THEN
+    signal ~GENSYM[map_in][2]  : ~TYPEL[~TYP[2]];~ELSE ~FI
     signal ~GENSYM[map_out][3] : ~TYPEL[~TYPO];
-  begin
-    ~SYM[2] <= fromSLV(~VAR[vec][2](~SYM[1]));
+  begin~IF~SIZE[~TYP[2]]~THEN
+    ~SYM[2] <= fromSLV(~VAR[vec][2](~SYM[1]));~ELSE ~FI
     ~INST 1
       ~OUTPUT <= ~SYM[3]~ ~TYPEL[~TYPO]~
       ~INPUT  <= to_unsigned(~SYM[1],~SYM[6](1,integer(ceil(log2(real(~LIT[0]))))))~ ~INDEXTYPE[~LIT[0]]~
-      ~INPUT  <= ~SYM[2]~ ~TYPEL[~TYP[1]]~
+      ~INPUT  <= ~SYM[2]~ ~TYPEL[~TYP[2]]~
     ~INST
     ~RESULT(~SYM[1]) <= ~TOBV[~SYM[3]][~TYPEL[~TYPO]];
   end generate;~ELSE
@@ -135,7 +135,7 @@ begin
     ~INST 1
       ~OUTPUT <= ~RESULT(~SYM[1])~ ~TYPEL[~TYPO]~
       ~INPUT  <= to_unsigned(~SYM[1],~SYM[6](1,integer(ceil(log2(real(~LIT[0]))))))~ ~INDEXTYPE[~LIT[0]]~
-      ~INPUT  <= ~VAR[vec][2](~SYM[1])~ ~TYPEL[~TYP[1]]~
+      ~INPUT  <= ~VAR[vec][2](~SYM[1])~ ~TYPEL[~TYP[2]]~
     ~INST
   end generate;~FI
 end block;
@@ -146,18 +146,18 @@ end block;
     { "name"      : "Clash.Sized.Vector.imap_go"
     , "type"      : "imap_go :: Index n -> (Index n -> a -> b) -> Vec m a -> Vec m b"
     , "templateD" :
-"-- imap begin
-~GENSYM[imap][5] : for ~GENSYM[i][1] in ~RESULT'range generate~IF ~VIVADO ~THEN
-  signal ~GENSYM[map_in][2]  : ~TYPEL[~TYP[2]];
+"-- imap_go begin
+~GENSYM[imap][5] : for ~GENSYM[i][1] in ~RESULT'range generate~IF ~VIVADO ~THEN~IF~SIZE[~TYP[2]]~THEN
+  signal ~GENSYM[map_in][2]  : ~TYPEL[~TYP[2]];~ELSE ~FI
   signal ~GENSYM[map_out][3] : ~TYPEL[~TYPO];
   signal ~GENSYM[i2][4]      : ~TYP[0];
-begin
-  ~SYM[2] <= fromSLV(~VAR[vec][2](~SYM[1]));
+begin~IF~SIZE[~TYP[2]]~THEN
+  ~SYM[2] <= fromSLV(~VAR[vec][2](~SYM[1]));~ELSE ~FI
   ~SYM[4] <= ~ARG[0] + to_unsigned(~SYM[1],~SIZE[~TYP[0]]);
   ~INST 1
     ~OUTPUT <= ~SYM[3]~ ~TYPEL[~TYPO]~
     ~INPUT  <= ~SYM[4]~ ~TYP[0]~
-    ~INPUT  <= ~SYM[2]~ ~TYPEL[~TYP[1]]~
+    ~INPUT  <= ~SYM[2]~ ~TYPEL[~TYP[2]]~
   ~INST
   ~RESULT(~SYM[1]) <= ~TOBV[~SYM[3]][~TYPEL[~TYPO]];
 end generate;~ELSE
@@ -167,10 +167,10 @@ begin
   ~INST 1
     ~OUTPUT <= ~RESULT(~SYM[1])~ ~TYPEL[~TYPO]~
     ~INPUT  <= ~SYM[4]~ ~TYP[0]~
-    ~INPUT  <= ~VAR[vec][2](~SYM[1])~ ~TYPEL[~TYP[1]]~
+    ~INPUT  <= ~VAR[vec][2](~SYM[1])~ ~TYPEL[~TYP[2]]~
   ~INST
 end generate;~FI
--- imap end"
+-- imap_go end"
     }
   }
 , { "BlackBox" :
@@ -178,13 +178,13 @@ end generate;~FI
     , "type"      : "zipWith :: (a -> b -> c) -> Vec n a -> Vec n b -> Vec n c"
     , "templateD" :
 "-- zipWith begin
-~GENSYM[zipWith][0] : for ~GENSYM[i][1] in ~RESULT'range generate~IF ~VIVADO ~THEN
-  signal ~GENSYM[zipWith_in1][2] : ~TYPEL[~TYP[1]];
-  signal ~GENSYM[zipWith_in2][6] : ~TYPEL[~TYP[2]];
+~GENSYM[zipWith][0] : for ~GENSYM[i][1] in ~RESULT'range generate~IF ~VIVADO ~THEN~IF~SIZE[~TYP[1]]~THEN
+  signal ~GENSYM[zipWith_in1][2] : ~TYPEL[~TYP[1]];~ELSE ~FI~IF~SIZE[~TYP[2]]~THEN
+  signal ~GENSYM[zipWith_in2][6] : ~TYPEL[~TYP[2]];~ELSE ~FI
   signal ~GENSYM[zipWith_out][3] : ~TYPEL[~TYPO];
-begin
-  ~SYM[2] <= fromSLV(~VAR[vec1][1](~SYM[1]));
-  ~SYM[6] <= fromSLV(~VAR[vec2][2](~SYM[1]));
+begin~IF~SIZE[~TYP[1]]~THEN
+  ~SYM[2] <= fromSLV(~VAR[vec1][1](~SYM[1]));~ELSE ~FI~IF~SIZE[~TYP[2]]~THEN
+  ~SYM[6] <= fromSLV(~VAR[vec2][2](~SYM[1]));~ELSE ~FI
   ~INST 0
     ~OUTPUT <= ~SYM[3]~ ~TYPEL[~TYPO]~
     ~INPUT  <= ~SYM[2]~ ~TYPEL[~TYP[1]]~
@@ -213,10 +213,10 @@ end generate;~FI
 begin
   ~SYM[2](~LENGTH[~TYP[2]]) <= ~ARG[1];
 
-  foldr_loop : for ~GENSYM[i][3] in ~VAR[vec][2]'range generate~IF ~VIVADO ~THEN
-    signal ~GENSYM[foldr_in][4] : ~TYPEL[~TYP[2]];
-  begin
-    ~SYM[4] <= fromSLV(~VAR[vec][2](~SYM[3]));
+  foldr_loop : for ~GENSYM[i][3] in ~VAR[vec][2]'range generate~IF ~VIVADO ~THEN~IF~SIZE[~TYP[2]]~THEN
+    signal ~GENSYM[foldr_in][4] : ~TYPEL[~TYP[2]];~ELSE ~FI
+  begin~IF~SIZE[~TYP[2]]~THEN
+    ~SYM[4] <= fromSLV(~VAR[vec][2](~SYM[3]));~ELSE ~FI
     ~INST 0
       ~OUTPUT <= ~SYM[2](~SYM[3])~ ~TYP[1]~
       ~INPUT  <= ~SYM[4]~ ~TYPEL[~TYP[2]]~

@@ -92,7 +92,10 @@ type Size = Int
 
 -- | Representable hardware types
 data HWType
-  = Void -- ^ Empty type
+  = Void (Maybe Size)
+  -- ^ Empty type. @Just Size@ for "empty" Vectors so we can still have
+  -- primitives that can traverse e.g. Vectors of unit and know the lenght of
+  -- that vector.
   | String -- ^ String type
   | Bool -- ^ Boolean type
   | Bit -- ^ Bit type
@@ -209,6 +212,6 @@ data BlackBoxContext
   deriving Show
 
 emptyBBContext :: BlackBoxContext
-emptyBBContext = Context (Identifier (pack "__EMPTY__") Nothing, Void) [] empty Nothing
+emptyBBContext = Context (Identifier (pack "__EMPTY__") Nothing, Void Nothing) [] empty Nothing
 
 makeLenses ''NetlistState

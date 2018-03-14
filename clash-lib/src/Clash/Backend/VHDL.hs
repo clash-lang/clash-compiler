@@ -606,7 +606,7 @@ vhdlType hwty = do
     go t@(Product _ _) = do
       nm <- use modNm
       text (T.toLower $ T.pack nm) <> "_types." <> tyName t
-    go Void            = "std_logic_vector" <> parens (int (-1) <+> "downto 0")
+    go (Void {})       = "std_logic_vector" <> parens (int (-1) <+> "downto 0")
     go String          = "string"
     go ty              = error $ $(curLoc) ++ "vhdlType: type is not normalised: " ++ show ty
 
@@ -698,7 +698,7 @@ vhdlTypeErrValue t@(Product _ elTys) = vhdlTypeMark t <> "'" <> tupled (mapM vhd
 vhdlTypeErrValue (Reset {})          = "'-'"
 vhdlTypeErrValue (Clock _ _ Source)  = "'-'"
 vhdlTypeErrValue (Clock _ _ Gated)   = "('-',false)"
-vhdlTypeErrValue Void                = "std_logic_vector'(0 downto 1 => '-')"
+vhdlTypeErrValue (Void {})           = "std_logic_vector'(0 downto 1 => '-')"
 vhdlTypeErrValue String              = "\"ERROR\""
 vhdlTypeErrValue t                   = vhdlTypeMark t <> "'" <> parens (int 0 <+> "to" <+> int (typeSize t - 1) <+> rarrow <+> "'-'")
 
@@ -881,7 +881,7 @@ expr_ b (Identifier id_ (Just (Nested m1 m2))) = case nestM m1 m2 of
 
 expr_ _ (Identifier id_ (Just _)) = text id_
 
-expr_ b (DataCon _ (DC (Void, -1)) [e]) =  expr_ b e
+expr_ b (DataCon _ (DC (Void {}, -1)) [e]) =  expr_ b e
 
 expr_ _ (DataCon ty@(Vector 0 _) _ _) = vhdlTypeErrValue ty
 

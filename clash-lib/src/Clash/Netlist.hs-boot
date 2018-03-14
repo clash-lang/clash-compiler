@@ -52,6 +52,6 @@ mkSelection
   -> [Alt]
   -> NetlistMonad [Declaration]
 
-mkNetDecl :: LetBinding -> NetlistMonad Declaration
+mkNetDecl :: LetBinding -> NetlistMonad (Maybe Declaration)
 
 mkDeclarations :: Id -> Term -> NetlistMonad [Declaration]

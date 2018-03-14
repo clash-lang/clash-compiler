@@ -98,43 +98,7 @@ assign ~RESULT = { ~VAR[bv][1][$high(~VAR[bv][1]) : ~LIT[0]]
     , "type" :
 "lsb# :: BitVector n -- ARG[0]
       -> Bit"
-    , "templateE" :"~IF ~SIZE[~TYP[0]] ~THEN ~VAR[bv][0][0] ~ELSE 1'b0 ~FI"
-    }
-  }
-, { "BlackBox" :
-    { "name"      : "Clash.Sized.Internal.BitVector.eq#"
-    , "type"      : "eq# :: BitVector n -> BitVector n -> Bool"
-    , "templateE" : "~ARG[0] == ~ARG[1]"
-    }
-  }
-, { "BlackBox" :
-    { "name"      : "Clash.Sized.Internal.BitVector.neq#"
-    , "type"      : "neq# :: BitVector n -> BitVector n -> Bool"
-    , "templateE" : "~ARG[0] != ~ARG[1]"
-    }
-  }
-, { "BlackBox" :
-    { "name"      : "Clash.Sized.Internal.BitVector.lt#"
-    , "type"      : "lt# :: BitVector n -> BitVector n -> Bool"
-    , "templateE" : "~ARG[0] < ~ARG[1]"
-    }
-  }
-, { "BlackBox" :
-    { "name"      : "Clash.Sized.Internal.BitVector.ge#"
-    , "type"      : "ge# :: BitVector n -> BitVector n -> Bool"
-    , "templateE" : "~ARG[0] >= ~ARG[1]"
-    }
-  }
-, { "BlackBox" :
-    { "name"      : "Clash.Sized.Internal.BitVector.gt#"
-    , "type"      : "gt# :: BitVector n -> BitVector n -> Bool"
-    , "templateE" : "~ARG[0] > ~ARG[1]"
-    }
-  }
-, { "BlackBox" :
-    { "name"      : "Clash.Sized.Internal.BitVector.le#"
-    , "type"      : "le# :: BitVector n -> BitVector n -> Bool"
-    , "templateE" : "~ARG[0] <= ~ARG[1]"
+    , "templateE" : "~IF ~SIZE[~TYP[0]] ~THEN ~VAR[bv][0][0] ~ELSE 1'b0 ~FI"
     }
   }
 , { "BlackBox" :
@@ -188,7 +152,7 @@ assign ~RESULT = { ~VAR[bv][1][$high(~VAR[bv][1]) : ~LIT[0]]
 , { "BlackBox" :
     { "name"      : "Clash.Sized.Internal.BitVector.minus#"
     , "type"      : "minus# :: (KnownNat m, KnownNat n) => BitVector m -> BitVector n -> BitVector (Max m n + 1)"
-    , "templateE" : "assign ~RESULT = ~ARG[2] - ~ARG[3];"
+    , "templateD" : "assign ~RESULT = ~ARG[2] - ~ARG[3];"
     }
   }
 , { "BlackBox" :
@@ -207,12 +171,6 @@ assign ~RESULT = { ~VAR[bv][1][$high(~VAR[bv][1]) : ~LIT[0]]
     { "name"      : "Clash.Sized.Internal.BitVector.rem#"
     , "type"      : "rem# :: BitVector n -> BitVector n -> BitVector n"
     , "templateE" : "~ARG[0] % ~ARG[1]"
-    }
-  }
-, { "BlackBox" :
-    { "name"      : "Clash.Sized.Internal.BitVector.toInteger#"
-    , "type"      : "toInteger# :: BitVector n -> Integer"
-    , "templateD" : "assign ~RESULT = $unsigned(~ARG[0]);"
     }
   }
 , { "BlackBox" :

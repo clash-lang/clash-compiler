@@ -244,7 +244,9 @@ renderElem b (IF c t f) = do
       (Size e)   -> typeSize (lineToType b [e])
       (Length e) -> case lineToType b [e] of
                        (Vector n _) -> n
-                       _ -> error $ $(curLoc) ++ "IF: veclen of a non-vector type"
+                       Void (Just n) -> n
+                       _ -> 0 -- HACK: So we can test in splitAt if one of the
+                              -- vectors in the tuple had a zero length
       (L n) -> case bbInputs b !! n of
         (l,_,_)
           | Literal _ l' <- l ->
@@ -360,8 +362,8 @@ renderTag b (L n)           = let (e,_,_) = bbInputs b !! n
   where
     mkLit (Literal (Just (Signed _,_)) i)   = Literal Nothing i
     mkLit (Literal (Just (Unsigned _,_)) i) = Literal Nothing i
-    mkLit (DataCon _ (DC (Void, _)) [Literal (Just (Signed _,_)) i]) = Literal Nothing i
-    mkLit (DataCon _ (DC (Void, _)) [Literal (Just (Unsigned _,_)) i]) = Literal Nothing i
+    mkLit (DataCon _ (DC (Void {}, _)) [Literal (Just (Signed _,_)) i]) = Literal Nothing i
+    mkLit (DataCon _ (DC (Void {}, _)) [Literal (Just (Unsigned _,_)) i]) = Literal Nothing i
     mkLit i                               = i
 
 renderTag _ (Var [C t] _) = return t

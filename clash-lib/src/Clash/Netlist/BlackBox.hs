@@ -23,6 +23,7 @@ import           Data.Char                     (ord)
 import           Data.Either                   (lefts)
 import qualified Data.HashMap.Lazy             as HashMap
 import qualified Data.IntMap                   as IntMap
+import           Data.Maybe                    (catMaybes)
 import           Data.Text.Lazy                (fromStrict, pack)
 import qualified Data.Text.Lazy                as Text
 import           Data.Text                     (unpack)
@@ -114,7 +115,7 @@ mkArgument bndr e = do
     ((e',t,l),d) <- case hwTyM of
       Nothing   ->
         return ((Identifier (error ($(curLoc) ++ "Forced to evaluate untranslatable type: " ++ eTyMsg)) Nothing
-                ,Void,False),[])
+                ,Void Nothing,False),[])
       Just hwTy -> case collectArgs e of
         (C.Var _ v,[]) -> return ((Identifier (pack (name2String v)) Nothing,hwTy,False),[])
         (C.Literal (IntegerLiteral i),[]) -> return ((N.Literal (Just (Signed iw,iw)) (N.NumLit i),hwTy,True),[])
@@ -156,25 +157,38 @@ mkPrimitive bbEParen bbEasD dst nm args ty = do
         (Left tempD) -> do
           let pNm = name p
               wr' = if wr then Reg else Wire
-          (dst',dstNm,dstDecl) <- resBndr True wr' dst
-          (bbCtx,ctxDcls) <- mkBlackBoxContext dst' (lefts args)
-          (templ,templDecl) <- prepareBlackBox pNm tempD bbCtx
-          let bbDecl = N.BlackBoxD pNm (library p) (imports p) (qsysInclude p) templ bbCtx
-          return (Identifier dstNm Nothing,dstDecl ++ ctxDcls ++ templDecl ++ [bbDecl])
+          resM <- resBndr True wr' dst
+          case resM of
+            Just (dst',dstNm,dstDecl) -> do
+              (bbCtx,ctxDcls)   <- mkBlackBoxContext dst' (lefts args)
+              (templ,templDecl) <- prepareBlackBox pNm tempD bbCtx
+              let bbDecl = N.BlackBoxD pNm (library p) (imports p)
+                                       (qsysInclude p) templ bbCtx
+              return (Identifier dstNm Nothing,dstDecl ++ ctxDcls ++ templDecl ++ [bbDecl])
+            Nothing -> return (Identifier "__VOID__" Nothing,[])
         (Right tempE) -> do
           let pNm = name p
           if bbEasD
             then do
-              (dst',dstNm,dstDecl) <- resBndr True Wire dst
-              (bbCtx,ctxDcls) <- mkBlackBoxContext dst' (lefts args)
-              (bbTempl,templDecl) <- prepareBlackBox pNm tempE bbCtx
-              let tmpAssgn = Assignment dstNm (BlackBoxE pNm (library p) (imports p) (qsysInclude p) bbTempl bbCtx bbEParen)
-              return (Identifier dstNm Nothing, dstDecl ++ ctxDcls ++ templDecl ++ [tmpAssgn])
+              resM <- resBndr True Wire dst
+              case resM of
+                Just (dst',dstNm,dstDecl) -> do
+                  (bbCtx,ctxDcls)     <- mkBlackBoxContext dst' (lefts args)
+                  (bbTempl,templDecl) <- prepareBlackBox pNm tempE bbCtx
+                  let tmpAssgn = Assignment dstNm
+                                    (BlackBoxE pNm (library p) (imports p)
+                                               (qsysInclude p) bbTempl bbCtx
+                                               bbEParen)
+                  return (Identifier dstNm Nothing, dstDecl ++ ctxDcls ++ templDecl ++ [tmpAssgn])
+                Nothing -> return (Identifier "__VOID__" Nothing,[])
             else do
-              (dst',_,_) <- resBndr False Wire dst
-              (bbCtx,ctxDcls) <- mkBlackBoxContext dst' (lefts args)
-              (bbTempl,templDecl) <- prepareBlackBox pNm tempE bbCtx
-              return (BlackBoxE pNm (library p) (imports p) (qsysInclude p) bbTempl bbCtx bbEParen,ctxDcls ++ templDecl)
+              resM <- resBndr False Wire dst
+              case resM of
+                Just (dst',_,_) -> do
+                  (bbCtx,ctxDcls)     <- mkBlackBoxContext dst' (lefts args)
+                  (bbTempl,templDecl) <- prepareBlackBox pNm tempE bbCtx
+                  return (BlackBoxE pNm (library p) (imports p) (qsysInclude p) bbTempl bbCtx bbEParen,ctxDcls ++ templDecl)
+                Nothing -> return (Identifier "__VOID__" Nothing,[])
     Just (P.Primitive pNm _)
       | pNm == "GHC.Prim.tagToEnum#" -> do
           hwTy <- N.unsafeCoreTypeToHWTypeM $(curLoc) ty
@@ -220,13 +234,18 @@ mkPrimitive bbEParen bbEasD dst nm args ty = do
       (_,sp) <- Lens.use curCompNm
       throw (ClashException sp ($(curLoc) ++ "No blackbox found for: " ++ unpack nm) Nothing)
   where
-    resBndr :: Bool -> WireOrReg -> (Either Identifier Id) -> NetlistMonad (Id,Identifier,[Declaration])
+    resBndr
+      :: Bool
+      -> WireOrReg
+      -> (Either Identifier Id)
+      -> NetlistMonad (Maybe (Id,Identifier,[Declaration]))
+      -- Nothing when the binder would have type `Void`
     resBndr mkDec wr dst' = case dst' of
       Left dstL -> case mkDec of
         False -> do
           let nm' = Text.unpack dstL
               id_ = Id (string2SystemName nm') (embed ty)
-          return (id_,dstL,[])
+          return (Just (id_,dstL,[]))
         True -> do
           nm'  <- extendIdentifier Extended dstL "_res"
           nm'' <- mkUniqueIdentifier Extended nm'
@@ -234,8 +253,10 @@ mkPrimitive bbEParen bbEasD dst nm args ty = do
           hwTy <- N.unsafeCoreTypeToHWTypeM $(curLoc) ty
           let id_ = Id nm3 (embed ty)
               idDecl = NetDecl' Nothing wr nm'' (Right hwTy)
-          return (id_,nm'',[idDecl])
-      Right dstR -> return (dstR,Text.pack . name2String . varName $ dstR,[])
+          case hwTy of
+            Void {} -> return Nothing
+            _       -> return (Just (id_,nm'',[idDecl]))
+      Right dstR -> return (Just (dstR,Text.pack . name2String . varName $ dstR,[]))
 
 -- | Create an template instantiation text and a partial blackbox content for an
 -- argument term, given that the term is a function. Errors if the term is not
@@ -349,9 +370,9 @@ mkFunInput resId e = do
         Right norm -> mkUniqueNormalized Nothing norm
         Left err -> error err
       let binders' = map (\(id_,tm) -> (goR result id_,tm)) binders
-      netDecls <- mapM mkNetDecl $ filter ((/= result) . varName . fst) binders
+      netDecls <- fmap catMaybes . mapM mkNetDecl $ filter ((/= result) . varName . fst) binders
       decls    <- concat <$> mapM (uncurry mkDeclarations . second unembed) binders'
-      (NetDecl' _ rw _ _) <- mkNetDecl . head $ filter ((==result) . varName . fst) binders
+      Just (NetDecl' _ rw _ _) <- mkNetDecl . head $ filter ((==result) . varName . fst) binders
       nm <- mkUniqueIdentifier Basic "fun"
       return (Right ((nm,netDecls ++ decls),rw))
       where
