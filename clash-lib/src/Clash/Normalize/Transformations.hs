@@ -588,7 +588,7 @@ removeUnusedExpr _ e@(collectArgs -> (p@(Prim nm _),args)) = do
   case bbM of
     Just (BlackBox pNm _ _ _ inc templ) -> do
       let usedArgs = if isFromInt pNm
-                        then [0,1]
+                        then [0,1,2]
                         else either usedArguments usedArguments templ ++
                              concatMap (usedArguments . snd) inc
       tcm <- Lens.view tcCache
@@ -1687,6 +1687,14 @@ inlineCleanup _ (Letrec b) = do
             -> True
           Case _ _ [_] -> True
           Data _ -> True
+          _ -> False
+      | nameOcc (varName id_) `notElem` bodyFVs
+      = case tm of
+          -- Inlines WW projection that exposes internals of the BitVector types
+          Case _ _ [unsafeUnbind -> (DataPat dcE _,_)]
+            -> let nm = (name2String $ dcName $ unembed dcE)
+               in nm == "Clash.Sized.Internal.BitVector.BV"  ||
+                  nm == "Clash.Sized.Internal.BitVector.Bit"
           _ -> False
 
     isInteresting _ _ _ _ = False

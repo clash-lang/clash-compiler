@@ -470,12 +470,16 @@ interestingToLift inScope eval e@(Prim nm pty) args =
       a -> case collectArgs a of
         (Prim nm' _,[Right _,Left _,Left (Literal (IntegerLiteral n))])
           | isFromInteger nm' -> isPow2 n
+        (Prim nm' _,[Right _,Left _,Left _,Left (Literal (IntegerLiteral n))])
+          | nm' == "Clash.Sized.Internal.BitVector.fromInteger#"  -> isPow2 n
+        (Prim nm' _,[Right _,       Left _,Left (Literal (IntegerLiteral n))])
+          | nm' == "Clash.Sized.Internal.BitVector.fromInteger##" -> isPow2 n
+
         _ -> False
 
     isPow2 x = x /= 0 && (x .&. (complement x + 1)) == x
 
-    isFromInteger x = x `elem` ["Clash.Sized.Internal.BitVector.fromInteger##"
-                               ,"Clash.Sized.Internal.BitVector.fromInteger#"
+    isFromInteger x = x `elem` ["Clash.Sized.Internal.BitVector.fromInteger#"
                                ,"Clash.Sized.Integer.Index.fromInteger"
                                ,"Clash.Sized.Internal.Signed.fromInteger#"
                                ,"Clash.Sized.Internal.Unsigned.fromInteger#"

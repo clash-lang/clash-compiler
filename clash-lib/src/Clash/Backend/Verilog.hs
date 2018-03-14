@@ -660,7 +660,7 @@ expr_ _ (BlackBoxE pNm _ _ _ _ bbCtx _)
 
 expr_ _ (BlackBoxE pNm _ _ _ _ bbCtx _)
   | pNm == "Clash.Sized.Internal.BitVector.fromInteger#"
-  , [Literal _ (NumLit n), Literal _ i] <- extractLiterals bbCtx
+  , [Literal _ (NumLit n), _, Literal _ i] <- extractLiterals bbCtx
   = exprLit (Just (BitVector (fromInteger n),fromInteger n)) i
 
 expr_ _ (BlackBoxE pNm _ _ _ _ bbCtx _)

@@ -1,4 +1,11 @@
 [ { "BlackBox" :
+    { "name"      : "Clash.Sized.Internal.BitVector.BV"
+    , "type"      : "fromInteger# :: Integer -> Integer -> BitVector n"
+    , "comment"   : "THIS IS ONLY USED WHEN WW EXPOSES BITVECTOR INTERNALS"
+    , "templateE" : "~ARG[1]"
+    }
+  }
+, { "BlackBox" :
     { "name"      : "Clash.Sized.Internal.BitVector.size#"
     , "type"      : "size# :: KnownNat n => BitVector n -> Int"
     , "templateE" : "to_signed(~LIT[0],~SIZE[~TYPO])"
@@ -399,8 +406,8 @@ end process;
   }
 , { "BlackBox" :
     { "name"      : "Clash.Sized.Internal.BitVector.fromInteger#"
-    , "type"      : "fromInteger# :: KnownNat n => Integer -> BitVector n"
-    , "templateE" : "std_logic_vector(resize(unsigned(std_logic_vector(~ARG[1])),~LIT[0]))"
+    , "type"      : "fromInteger# :: KnownNat n => Integer -> Integer -> BitVector n"
+    , "templateE" : "std_logic_vector(resize(unsigned(std_logic_vector(~ARG[2])),~LIT[0]))"
     }
   }
 , { "BlackBox" :
