@@ -124,10 +124,8 @@ where
 import Control.DeepSeq            (NFData (..))
 import Control.Lens               (Index, Ixed (..), IxValue)
 import Data.Bits                  (Bits (..), FiniteBits (..))
-import Data.Char                  (digitToInt)
 import Data.Data                  (Data)
 import Data.Default               (Default (..))
-import Data.Maybe                 (listToMaybe)
 import Data.Proxy                 (Proxy (..))
 import GHC.Integer                (smallInteger)
 import GHC.Prim                   (dataToTag#)
@@ -135,7 +133,6 @@ import GHC.TypeLits               (KnownNat, Nat, type (+), type (-), natVal)
 import GHC.TypeLits.Extra         (Max)
 import Language.Haskell.TH        (Q, TExp, TypeQ, appT, conT, litT, numTyLit, sigE)
 import Language.Haskell.TH.Syntax (Lift(..))
-import Numeric                    (readInt)
 import Test.QuickCheck.Arbitrary  (Arbitrary (..), CoArbitrary (..),
                                    arbitraryBoundedIntegral,
                                    coarbitraryIntegral, shrinkIntegral)
@@ -331,13 +328,15 @@ instance NFData (BitVector n) where
   -- coercion
 
 instance KnownNat n => Show (BitVector n) where
-  show bv@(BV _ i) = reverse . underScore . reverse $ showBV (natVal bv) i []
+  show bv@(BV msk i) = reverse . underScore . reverse $ showBV (natVal bv) msk i []
     where
-      showBV 0 _ s = s
-      showBV n v s = let (a,b) = divMod v 2
-                     in  case b of
-                           1 -> showBV (n - 1) a ('1':s)
-                           _ -> showBV (n - 1) a ('0':s)
+      showBV 0 _ _ s = s
+      showBV n m v s = let (v',vBit) = divMod v 2
+                           (m',mBit) = divMod m 2
+                       in  case (mBit,vBit) of
+                           (0,0) -> showBV (n - 1) m' v' ('0':s)
+                           (0,_) -> showBV (n - 1) m' v' ('1':s)
+                           _     -> showBV (n - 1) m' v' ('.':s)
 
       underScore xs = case splitAt 5 xs of
                         ([a,b,c,d,e],rest) -> [a,b,c,d,'_'] ++ underScore (e:rest)
@@ -365,16 +364,33 @@ instance KnownNat n => ShowX (BitVector n) where
 -- >>> import qualified Data.List as List
 -- >>> $$(bLit (List.replicate 4 '1')) :: BitVector 4
 -- 1111
-bLit :: KnownNat n => String -> Q (TExp (BitVector n))
-bLit s = [|| fromInteger# 0 i' ||]
+--
+-- Also 'bLit' can handle don't care bits:
+--
+-- >>> $$(bLit "1.0.") :: BitVector 4
+-- 1.0.
+bLit :: forall n. KnownNat n => String -> Q (TExp (BitVector n))
+bLit s = [|| fromInteger# m i ||]
   where
-    i :: Maybe Integer
-    i = fmap fst . listToMaybe . (readInt 2 (`elem` "01") digitToInt) $ filter (/= '_') s
+    bv :: BitVector n
+    bv = read# s
 
-    i' :: Integer
-    i' = case i of
-           Just j -> j
-           _      -> error "Failed to parse: " s
+    m,i :: Integer
+    BV m i = bv
+
+read# :: KnownNat n => String -> BitVector n
+read# cs = BV m v
+  where
+    (vs,ms) = unzip . map readBit . filter (/= '_') $ cs
+    combineBits = foldl (\b a -> b*2+a) 0
+    v = combineBits vs
+    m = combineBits ms
+    readBit c = case c of
+      '0' -> (0,0)
+      '1' -> (1,0)
+      '.' -> (0,1)
+      _   -> error $ "Clash.Sized.Internal.bLit: unknown character: " ++ show c ++ " in input: " ++ cs
+
 
 instance Eq (BitVector n) where
   (==) = eq#
