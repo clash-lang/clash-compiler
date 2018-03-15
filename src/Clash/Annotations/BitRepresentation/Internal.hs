@@ -17,10 +17,10 @@ module Clash.Annotations.BitRepresentation.Internal
   , getConstrRepr
   , getDataRepr
   , thTypeToType'
- , ConstrRepr'(..)
- , DataRepr'(..)
- , Type'(..)
- , CustomReprs
+  , ConstrRepr'(..)
+  , DataRepr'(..)
+  , Type'(..)
+  , CustomReprs
   ) where
 
 import           Clash.Annotations.BitRepresentation
