@@ -19,9 +19,6 @@ import           System.IO.Temp   (createTempDirectory)
 import Control.Concurrent.Lock    ( Lock, newAcquired )
 
 
--- Tests:
-import qualified DerivingDataRepr
-
 data BuildTarget
   = VHDL | Verilog | SystemVerilog | Both | All
   deriving (Show,Eq)
@@ -122,7 +119,6 @@ main = do
             , runTest ("tests" </> "shouldwork" </> "CustomReprs" </> "Deriving") defBuild [] "BitPackDerivation" (["", "BitPackDerivation_testBench"],"BitPackDerivation_testBench",True)
             , runTest ("tests" </> "shouldwork" </> "CustomReprs" </> "Indexed") defBuild [] "Indexed" (["", "Indexed_testBench"],"Indexed_testBench",True)
             ]
-        , testGroup "CustomReprsDeriving" DerivingDataRepr.tests
         , testGroup "Feedback" -- Broken on GHC 8.0 due to: https://ghc.haskell.org/trac/ghc/ticket/11525
             [ runTest ("tests" </> "shouldwork" </> "Feedback") defBuild [] "Fib" (["","Fib_testBench"],"Fib_testBench",True)
             ]
