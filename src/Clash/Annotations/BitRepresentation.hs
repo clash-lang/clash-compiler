@@ -115,7 +115,7 @@ data DataReprAnn =
     Size
     -- Constructors:
     [ConstrRepr]
-      deriving (Show, Data, Typeable)
+      deriving (Show, Data, Typeable, Eq)
 
 -- | Annotation for constructors. Indicates how to match this constructor based
 -- off of the whole datatype.
@@ -129,4 +129,4 @@ data ConstrRepr =
     Value
     -- Masks for fields. Indicates where fields are stored:
     [FieldAnn]
-      deriving (Show, Data, Typeable)
+      deriving (Show, Data, Typeable, Eq)
