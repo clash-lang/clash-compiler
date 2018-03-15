@@ -201,10 +201,9 @@ conName c = case c of
 
 constrFieldSizes
   :: Con
-  -> Q (Name, [Exp])
+  -> (Name, [Q Exp])
 constrFieldSizes con = do
-  fieldSizes <- mapM typeSize (fieldTypes con)
-  return (conName con, fieldSizes)
+  (conName con, map typeSize $ fieldTypes con)
 
 complementInteger :: Int -> Integer -> Integer
 complementInteger 0 _i = 0
@@ -227,7 +226,7 @@ buildConstrRepr
   -- ^ Data size (excluding constructor size)
   -> Name
   -- ^ Constr name
-  -> [Exp]
+  -> [Q Exp]
   -- ^ Field masks
   -> BitMask
   -- ^ Constructor mask
@@ -239,7 +238,7 @@ buildConstrRepr dataSize constrName fieldAnns constrMask constrValue = [|
     constrName
     $mask
     $value
-    $(return $ ListE fieldAnns)
+    $(listE fieldAnns)
   |]
   where
     mask  = [| shiftL constrMask  (fromIntegral $ $dataSize)|]
@@ -256,24 +255,23 @@ oneHotConstructor ns = zip values values
   where
     values = [shiftL 1 (fromIntegral n) | n <- ns]
 
-overlapFieldAnns :: [[Exp]] -> [Q [Exp]]
+overlapFieldAnns :: [[Q Exp]] -> [[Q Exp]]
 overlapFieldAnns fieldSizess = map go fieldSizess
   where
-    fieldSizess'  = ListE $ map ListE fieldSizess
-    constructorSizes = [| map sum $(return fieldSizess') |]
+    fieldSizess'  = listE $ map listE fieldSizess
+    constructorSizes = [| map sum $fieldSizess' |]
     go fieldSizes =
-      sequence $
       snd $
       mapAccumL
         (\start size -> ([| $start - $size |], [| bitmask $start $size |]))
         [| maximum $constructorSizes - 1 |]
-        (map return fieldSizes)
+        fieldSizes
 
-wideFieldAnns :: [[Exp]] -> [Q [Exp]]
+wideFieldAnns :: [[Q Exp]] -> [[Q Exp]]
 wideFieldAnns fieldSizess = zipWith id (map go constructorOffsets) fieldSizess
   where
     constructorSizes =
-      map (AppE (VarE 'sum)) (map ListE fieldSizess)
+      map (AppE (VarE 'sum) <$>) (map listE fieldSizess)
 
     constructorOffsets :: [Q Exp]
     constructorOffsets =
@@ -281,24 +279,23 @@ wideFieldAnns fieldSizess = zipWith id (map go constructorOffsets) fieldSizess
       scanl
         (\offset size -> [| $offset + $size |])
         [| 0 |]
-        (map return constructorSizes)
+        constructorSizes
 
-    dataSize = [| sum $(return $ ListE constructorSizes) |]
+    dataSize = [| sum $(listE constructorSizes) |]
 
-    go :: Q Exp -> [Exp] -> Q [Exp]
+    go :: Q Exp -> [Q Exp] -> [Q Exp]
     go offset fieldSizes =
-      sequence $
       snd $
       mapAccumL
         (\start size -> ([| $start - $size |], [| bitmask $start $size |]))
         [| $dataSize - 1 - $offset |]
-        (map return fieldSizes)
+        fieldSizes
 
 -- | Derive DataRepr' for a specific type.
 deriveDataRepr
   :: ([Integer] -> [(BitMask, Value)])
   -- ^ Constructor derivator
-  -> ([[Exp]] -> [Q [Exp]])
+  -> ([[Q Exp]] -> [[Q Exp]])
   -- ^ Field derivator
   -> Derivator
 deriveDataRepr constrDerivator fieldsDerivator typ = do
@@ -309,20 +306,20 @@ deriveDataRepr constrDerivator fieldsDerivator typ = do
       let resolvedConstructors = map (resolveCon varMap) dConstructors in do
 
       -- Get sizes and names of all constructors
-      (constrNames, fieldSizess) <-
-        unzip <$> (mapM constrFieldSizes resolvedConstructors)
+      let
+        (constrNames, fieldSizess) =
+          unzip $ map constrFieldSizes resolvedConstructors
 
       let
         (constrMasks, constrValues) =
           unzip $ constrDerivator [0..fromIntegral $ length dConstructors - 1]
 
       let constrSize    = 1 + (msb $ maximum constrMasks)
-      fieldAnns        <- sequence $ fieldsDerivator fieldSizess
-      let fieldAnnsFlat = return $ ListE $ concat fieldAnns
+      let fieldAnns     = fieldsDerivator fieldSizess
+      let fieldAnnsFlat = listE $ concat fieldAnns
 
       let dataSize | null $ concat fieldAnns = [| 0 |]
                    | otherwise = [| 1 + (msb $ maximum $ $fieldAnnsFlat) |]
-
 
       -- Determine at which bits various fields start
       let constrReprs = zipWith4
