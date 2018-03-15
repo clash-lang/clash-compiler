@@ -660,8 +660,10 @@ expr_ _ (BlackBoxE pNm _ _ _ _ bbCtx _)
 
 expr_ _ (BlackBoxE pNm _ _ _ _ bbCtx _)
   | pNm == "Clash.Sized.Internal.BitVector.fromInteger#"
-  , [Literal _ (NumLit n), _, Literal _ i] <- extractLiterals bbCtx
-  = exprLit (Just (BitVector (fromInteger n),fromInteger n)) i
+  , [Literal _ (NumLit n), Literal _ m, Literal _ i] <- extractLiterals bbCtx
+  = let NumLit m' = m
+        NumLit i' = i
+    in exprLit (Just (BitVector (fromInteger n),fromInteger n)) (BitVecLit m' i')
 
 expr_ _ (BlackBoxE pNm _ _ _ _ bbCtx _)
   | pNm == "Clash.Sized.Internal.BitVector.fromInteger##"
@@ -741,6 +743,10 @@ exprLit (Just (hty,sz)) (NumLit i) = case hty of
   _ -> int sz <> "'b" <> blit
   where
     blit = bits (toBits sz i)
+exprLit (Just (hty,sz)) (BitVecLit m i) = int sz <> "'b" <> bvlit
+  where
+    bvlit = bits (toBits' sz m i)
+
 exprLit _             (BoolLit t)   = if t then "1'b1" else "1'b0"
 exprLit _             (BitLit b)    = "1'b" <> bit_char b
 exprLit _             (StringLit s) = string . pack $ show s
@@ -752,6 +758,15 @@ toBits size val = map (\x -> if odd x then H else L)
                 $ take size
                 $ map (`mod` 2)
                 $ iterate (`div` 2) val
+
+toBits' :: Integral a => Int -> a -> a -> [Bit]
+toBits' size msk val = map (\(m,i) -> if odd m then U else (if odd i then H else L))
+                $
+                ( reverse . take size)
+                $ zip
+                  ( map (`mod` 2) $ iterate (`div` 2) msk)
+                  ( map (`mod` 2) $ iterate (`div` 2) val)
+
 
 bits :: [Bit] -> VerilogM Doc
 bits = hcat . mapM bit_char

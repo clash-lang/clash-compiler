@@ -1095,8 +1095,10 @@ expr_ _ (BlackBoxE pNm _ _ _ _ bbCtx _)
 
 expr_ _ (BlackBoxE pNm _ _ _ _ bbCtx _)
   | pNm == "Clash.Sized.Internal.BitVector.fromInteger#"
-  , [Literal _ (NumLit n), _, Literal _ i] <- extractLiterals bbCtx
-  = exprLit (Just (BitVector (fromInteger n),fromInteger n)) i
+  , [Literal _ (NumLit n), Literal _ m, Literal _ i] <- extractLiterals bbCtx
+  = let NumLit m' = m
+        NumLit i' = i
+    in exprLit (Just (BitVector (fromInteger n),fromInteger n)) (BitVecLit m' i')
 
 expr_ _ (BlackBoxE pNm _ _ _ _ bbCtx _)
   | pNm == "Clash.Sized.Internal.BitVector.fromInteger##"
@@ -1223,6 +1225,14 @@ exprLit (Just (hty,sz)) (NumLit i) = case hty of
                         | otherwise -> i'' - mask
              _ -> i `mod` 2^sz
     hlit = (if i' < 0 then "-" else emptyDoc) <> hex (toHex sz i')
+
+exprLit (Just (hty,sz)) (BitVecLit m i) = case m of
+  0 -> exprLit (Just (hty,sz)) (NumLit i)
+  _ -> "std_logic_vector'" <> parens bvlit
+  where
+    bvlit = bits (toBits' sz m i)
+
+
 exprLit _             (BoolLit t)   = if t then "true" else "false"
 exprLit _             (BitLit b)    = squotes $ bit_char b
 exprLit _             (StringLit s) = pretty . T.pack $ show s
@@ -1247,6 +1257,14 @@ toBits size val = map (\x -> if odd x then H else L)
                 $ take size
                 $ map (`mod` 2)
                 $ iterate (`div` 2) val
+
+toBits' :: Integral a => Int -> a -> a -> [Bit]
+toBits' size msk val = map (\(m,i) -> if odd m then U else (if odd i then H else L))
+                $
+                ( reverse . take size)
+                $ zip
+                  ( map (`mod` 2) $ iterate (`div` 2) msk)
+                  ( map (`mod` 2) $ iterate (`div` 2) val)
 
 bits :: [Bit] -> VHDLM Doc
 bits = dquotes . hcat . mapM bit_char
