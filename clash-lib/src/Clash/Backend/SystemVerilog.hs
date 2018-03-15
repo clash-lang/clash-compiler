@@ -830,15 +830,12 @@ expr_ :: Bool -- ^ Enclose in parenthesis?
 expr_ _ (Literal sizeM lit)                           = exprLit sizeM lit
 expr_ _ (Identifier id_ Nothing)                      = string id_
 expr_ _ (Identifier id_ (Just (Indexed (CustomSP _id _dataRepr _size args,dcI,fI)))) =
-  braces $ hcat $ punctuate ", " $ sequence ranges
+  expFromSLV resultType (braces $ hcat $ punctuate ", " $ sequence ranges)
     where
-      (ConstrRepr' _name _n _mask _value anns, _, _argTys) = args !! dcI
-
-      ranges =
-        map range' $ bitRanges (anns !! fI)
-
-      range' (start, end) =
-        string id_ <> brackets (int start <> ":" <> int end)
+      (ConstrRepr' _name _n _mask _value anns, _, argTys) = args !! dcI
+      resultType = argTys !! fI
+      ranges = map range' $ bitRanges (anns !! fI)
+      range' (start, end) = string id_ <> brackets (int start <> ":" <> int end)
 expr_ _ (Identifier id_ (Just (Indexed (ty@(SP _ args),dcI,fI)))) = fromSLV argTy id_ start end
   where
     argTys   = snd $ args !! dcI
@@ -1136,6 +1133,12 @@ simpleFromSLV t@(Vector _ _) id_ = verilogTypeMark t <> "_from_lv" <> parens (st
 simpleFromSLV t@(RTree _ _) id_ = verilogTypeMark t <> "_from_lv" <> parens (string id_)
 simpleFromSLV (Signed _) id_ = "$signed" <> parens (string id_)
 simpleFromSLV _ id_ = string id_
+
+expFromSLV :: HWType -> SystemVerilogM Doc -> SystemVerilogM Doc
+expFromSLV t@(Vector _ _) exp_ = verilogTypeMark t <> "_from_lv" <> parens exp_
+expFromSLV t@(RTree _ _) exp_ = verilogTypeMark t <> "_from_lv" <> parens exp_
+expFromSLV (Signed _) exp_ = "$signed" <> parens exp_
+expFromSLV _ exp_ = exp_
 
 dcToExpr :: HWType -> Int -> Expr
 dcToExpr ty i = Literal (Just (ty,conSize ty)) (NumLit (toInteger i))

@@ -78,6 +78,9 @@ data VHDLState =
 
 makeLenses ''VHDLState
 
+squote :: Mon (State VHDLState) Doc
+squote = string "'"
+
 primsRoot :: IO FilePath
 #ifdef CABAL
 primsRoot = Paths_clash_lib.getDataFileName "prims"
@@ -882,13 +885,17 @@ expr_ :: Bool -- ^ Enclose in parenthesis?
      -> VHDLM Doc
 expr_ _ (Literal sizeM lit) = exprLit sizeM lit
 expr_ _ (Identifier id_ Nothing) = pretty id_
-expr_ _ (Identifier id_ (Just (Indexed (CustomSP _id _dataRepr _size args,dcI,fI)))) =
-  "unsigned" <> parens ("std_logic_vector'" <> parens (hcat $ punctuate " & " $ sequence ranges))
+expr_ _ (Identifier id_ (Just (Indexed (CustomSP _id _dataRepr _size args,dcI,fI)))) = do
+  nm <- Mon $ use modNm
+  let cast = vhdlTypeMark resultType <> squote
+  let fSLV = string (T.toLower $ T.pack nm) <> "_types.fromSLV"
+  cast <> parens (fSLV <> parens (hcat $ punctuate " & " $ ranges))
     where
-      (ConstrRepr' _name _n _mask _value anns, _, _argTys) = args !! dcI
+      resultType = fieldTypes !! fI
+      (ConstrRepr' _name _n _mask _value anns, _, fieldTypes) = args !! dcI
 
       ranges =
-        map range $ bitRanges (anns !! fI)
+        mapM range $ bitRanges (anns !! fI)
 
       range (start, end) =
         pretty id_ <> parens (int start <+> "downto" <+> int end)
@@ -1028,7 +1035,7 @@ expr_ _ (DataCon ty@(CustomSum _ _ _ tys) (DC (_,i)) []) =
   let (ConstrRepr' _ _ _ value _) = fst $ tys !! i in
   "std_logic_vector" <> parens ("to_unsigned" <> parens (int (fromIntegral value) <> comma <> int (typeSize ty)))
 expr_ _ (DataCon (CustomSP _ dataRepr size args) (DC (_,i)) es) =
-  hcat $ punctuate " & " $ mapM range origins
+  "std_logic_vector'" <> parens (hcat $ punctuate " & " $ mapM range origins)
     where
       (cRepr, _, argTys) = args !! i
 
@@ -1304,7 +1311,8 @@ toSLV (Vector n elTy) (Identifier id_ Nothing) = do
   where
     selNames = map (fmap renderOneLine ) $ [pretty id_ <> parens (int i) | i <- [0 .. (n-1)]]
     selIds   = map (fmap (`Identifier` Nothing)) selNames
-toSLV (Vector n elTy) (DataCon _ _ es) = parens $ vcat $ punctuate " & " (zipWithM toSLV [elTy,Vector (n-1) elTy] es)
+toSLV (Vector n elTy) (DataCon _ _ es) =
+  "std_logic_vector'" <> (parens $ vcat $ punctuate " & " (zipWithM toSLV [elTy,Vector (n-1) elTy] es))
 toSLV (Vector _ _) e = do
   nm <- Mon $ use modNm
   pretty (T.toLower $ T.pack nm) <> "_types.toSLV" <> parens (expr_ False e)
