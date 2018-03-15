@@ -118,11 +118,10 @@ integerLog2Ceil n =
   let nlog2 = fromIntegral $ I# (integerLog2# n) in
   if n > 2^nlog2 then nlog2 + 1 else nlog2
 
--- | Determine number of bits needed to represent /n/ options
+-- | Determine number of bits needed to represent /n/ options. Alias for
+-- integerLog2Ceil to increase readability of programmer intentention.
 bitsNeeded :: Integer -> Integer
-bitsNeeded 0 = 0
-bitsNeeded 1 = 1
-bitsNeeded n = integerLog2Ceil n
+bitsNeeded = integerLog2Ceil
 
 tyVarBndrName :: TyVarBndr -> Name
 tyVarBndrName (PlainTV n) = n
@@ -249,7 +248,7 @@ buildConstrRepr dataSize constrName fieldAnns constrMask constrValue = [|
 countConstructor :: [Integer] -> [(BitMask, Value)]
 countConstructor ns = zip (repeat mask) ns
   where
-    maskSize = integerLog2Ceil $ maximum ns
+    maskSize = bitsNeeded $ maximum ns + 1
     mask = 2^maskSize - 1
 
 oneHotConstructor :: [Integer] -> [(BitMask, Value)]
@@ -413,7 +412,7 @@ packedDataRepr typ dataWidth constrs =
     (packedConstrRepr (fromIntegral dataWidth) constrWidth 0 constrs)
   where
     external    = filter isExternal (map fst constrs)
-    constrWidth = bitsNeeded $ toInteger $ length external
+    constrWidth = bitsNeeded $ toInteger $ min (length external + 1) (length constrs)
 
 -- | Try to distribute constructor bits over fields
 storeInFields
