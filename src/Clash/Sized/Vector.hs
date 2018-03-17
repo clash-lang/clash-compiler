@@ -1654,9 +1654,10 @@ lazyV = lazyV' (repeat undefined)
 --
 -- we get a type error:
 --
--- >>> let append' xs ys = foldr (:>) ys xs
--- <BLANKLINE>
--- <interactive>:...
+-- @
+-- __>>> let append' xs ys = foldr (:>) ys xs__
+--
+-- \<interactive\>:...
 --     • Occurs check: cannot construct the infinite type: ... ~ ... + 1
 --       Expected type: a -> Vec ... a -> Vec ... a
 --         Actual type: a -> Vec ... a -> Vec (... + 1) a
@@ -1667,6 +1668,7 @@ lazyV = lazyV' (repeat undefined)
 --         ys :: Vec ... a (bound at ...)
 --         append' :: Vec n a -> Vec ... a -> Vec ... a
 --           (bound at ...)
+-- @
 --
 -- The reason is that the type of 'foldr' is:
 --
