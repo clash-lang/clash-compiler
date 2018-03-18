@@ -37,8 +37,10 @@ import           System.FilePath                  ((</>), (<.>))
 import qualified System.FilePath                  as FilePath
 import qualified System.IO                        as IO
 import           System.IO.Error                  (isDoesNotExistError)
+import qualified Text.PrettyPrint.ANSI.Leijen     as ANSI
 import           Text.PrettyPrint.Leijen.Text     (Doc, renderPretty, text)
 import           Text.PrettyPrint.Leijen.Text.Monadic (displayT, renderOneLine)
+import           Text.Trifecta.Result
 import           Text.Read                        (readMaybe)
 
 import           GHC.BasicTypes.Extra             ()
@@ -235,13 +237,16 @@ generateHDL bindingsMap hdlState primMap tcm tupTcm typeTrans eval topEntities
 
 parsePrimitive :: Primitive Text -> Primitive BlackBoxTemplate
 parsePrimitive (BlackBox pNm oReg libM imps inc templT) =
-  let (templ,err) = either (first Left . runParse) (first Right . runParse) templT
-      inc'        = case fmap (second runParse) inc of
-                      Just (x,(t,[])) -> Just (x,t)
-                      _ -> Nothing
-  in  case err of
-        [] -> BlackBox pNm oReg libM imps inc' templ
-        _  -> error $ "Errors in template for: " ++ show pNm ++ ":\n" ++ show err
+  case either (fmap Left . runParse) (fmap Right . runParse) templT of
+    Failure errInfo
+      -> error (ANSI.displayS (ANSI.renderCompact (_errDoc errInfo)) "")
+    Success templ
+      -> BlackBox pNm oReg libM imps inc' templ
+ where
+  inc' = case fmap (second runParse) inc of
+    Just (x,Success t) -> Just (x,t)
+    _ -> Nothing
+
 parsePrimitive (Primitive pNm typ) = Primitive pNm typ
 
 -- | Pretty print Components to HDL Documents

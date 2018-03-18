@@ -28,11 +28,13 @@ import qualified Data.Text.Lazy                       as Text
 import           System.FilePath                      (replaceBaseName,
                                                        takeBaseName,
                                                        takeFileName)
+import qualified Text.PrettyPrint.ANSI.Leijen         as ANSI
 import           Text.PrettyPrint.Leijen.Text.Monadic (displayT, renderCompact,
                                                        renderOneLine, brackets,
                                                        int, (<>), text, (<+>),
                                                        vcat, (<$$>), nest)
 import qualified Text.PrettyPrint.Leijen.Text.Monadic as PP
+import           Text.Trifecta.Result                 hiding (Err)
 
 import           Clash.Backend                        (Backend (..), Usage (..))
 import           Clash.Driver.Types                   (ClashException (..))
@@ -302,8 +304,9 @@ renderElem b e = renderTag b e
 
 parseFail :: Text -> BlackBoxTemplate
 parseFail t = case runParse t of
-                    (templ,err) | null err  -> templ
-                                | otherwise -> error $ $(curLoc) ++ "\nTemplate:\n" ++ show t ++ "\nHas errors:\n" ++ show err
+  Failure errInfo ->
+    error (ANSI.displayS (ANSI.renderCompact (_errDoc errInfo)) "")
+  Success templ -> templ
 
 idToExpr
   :: (Text,HWType)
