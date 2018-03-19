@@ -606,7 +606,7 @@ vhdlType hwty = do
     go t@(Product _ _) = do
       nm <- use modNm
       text (T.toLower $ T.pack nm) <> "_types." <> tyName t
-    go (Void {})       = "std_logic_vector" <> parens (int (-1) <+> "downto 0")
+    go (Void {})       = "std_logic_vector (0 downto 1)"
     go String          = "string"
     go ty              = error $ $(curLoc) ++ "vhdlType: type is not normalised: " ++ show ty
 

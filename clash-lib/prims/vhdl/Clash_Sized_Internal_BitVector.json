@@ -364,15 +364,13 @@ end process;
 , { "BlackBox" :
     { "name"      : "Clash.Sized.Internal.BitVector.minBound#"
     , "type"      : "minBound# :: BitVector n"
-    , "comment"   : "Generates incorrect VDHL for n=0"
-    , "templateE" : "std_logic_vector'(~SIZE[~TYPO]-1 downto 0 => '0')"
+    , "templateE" : "~IF~SIZE[~TYPO]~THENstd_logic_vector'(~SIZE[~TYPO]-1 downto 0 => '0')~ELSEstd_logic_vector'(0 downto 1 => '0')~FI"
     }
   }
 , { "BlackBox" :
     { "name"      : "Clash.Sized.Internal.BitVector.maxBound#"
     , "type"      : "maxBound# :: KnownNat n => BitVector n"
-    , "comment"   : "Generates incorrect VDHL for n=0"
-    , "templateE" : "std_logic_vector'(~LIT[0]-1 downto 0 => '1')"
+    , "templateE" : "~IF~SIZE[~TYPO]~THENstd_logic_vector'(~SIZE[~TYPO]-1 downto 0 => '1')~ELSEstd_logic_vector'(0 downto 1 => '1')~FI"
     }
   }
 , { "BlackBox" :

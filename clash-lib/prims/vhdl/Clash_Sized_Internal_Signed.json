@@ -55,17 +55,15 @@
 , { "BlackBox" :
     { "name"      : "Clash.Sized.Internal.Signed.minBound#"
     , "type"      : "minBound# :: KnownNat n => Signed n"
-    , "comment"   : "Generates incorrect VDHL for n=0"
-    , "comment2"  : "the quantification with signed gives the array an ascending index"
-    , "templateE" : "signed'(0 => '1', 1 to ~LIT[0]-1 => '0')"
+    , "comment"   : "the quantification with signed gives the array an ascending index"
+    , "templateE" : "~IF~SIZE[~TYPO]~THENsigned'(0 => '1', 1 to ~LIT[0]-1 => '0')~ELSEsigned'(1 downto 0 => '0')~FI"
     }
   }
 , { "BlackBox" :
     { "name"      : "Clash.Sized.Internal.Signed.maxBound#"
     , "type"      : "maxBound# :: KnownNat n => Signed n"
-    , "comment"   : "Generates incorrect VDHL for n=0"
-    , "comment2"  : "the quantification with signed gives the array an ascending index"
-    , "templateE" : "signed'(0 => '0', 1 to ~LIT[0]-1  => '1')"
+    , "comment"   : "the quantification with signed gives the array an ascending index"
+    , "templateE" : "~IF~SIZE[~TYPO]~THENsigned'(0 => '0', 1 to ~LIT[0]-1  => '1')~ELSEsigned'(1 downto 0 => '0')~FI"
     }
   }
 , { "BlackBox" :
@@ -218,7 +216,7 @@ end block;
 , { "BlackBox" :
     { "name"      : "Clash.Sized.Internal.Signed.truncateB#"
     , "type"      : "truncateB# :: KnownNat m => Signed (n + m) -> Signed m"
-    , "templateE" : "~VAR[s][1](~LIT[0]-1 downto 0)"
+    , "templateE" : "~IF~SIZE[~TYPO]~THEN~VAR[s][1](~LIT[0]-1 downto 0)~ELSEsigned'(0 downto 1 => '0')~FI"
     }
   }
 ]

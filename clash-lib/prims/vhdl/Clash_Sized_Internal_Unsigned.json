@@ -55,15 +55,13 @@
 , { "BlackBox" :
     { "name"      : "Clash.Sized.Internal.Unsigned.minBound#"
     , "type"      : "minBound# :: Unsigned n"
-    , "comment"   : "Generates incorrect VDHL for n=0"
-    , "templateE" : "unsigned'(~SIZE[~TYPO]-1 downto 0 => '0')"
+    , "templateE" : "~IF~SIZE[~TYPO]~THENunsigned'(~SIZE[~TYPO]-1 downto 0 => '0')~ELSEunsigned'(0 downto 1 => '0')~FI"
     }
   }
 , { "BlackBox" :
     { "name"      : "Clash.Sized.Internal.Unsigned.maxBound#"
     , "type"      : "maxBound# :: KnownNat n => Unsigned n"
-    , "comment"   : "Generates incorrect VDHL for n=0"
-    , "templateE" : "unsigned'(~LIT[0]-1 downto 0 => '1')"
+    , "templateE" : "~IF~SIZE[~TYPO]~THENunsigned'(~LIT[0]-1 downto 0 => '1')~ELSEunsigned'(0 downto 1 => '1')~FI"
     }
   }
 , { "BlackBox" :
