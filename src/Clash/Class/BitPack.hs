@@ -28,6 +28,7 @@ module Clash.Class.BitPack
   , bitCoerce
   , boolToBV
   , boolToBit
+  , bitToBool
   )
 where
 
@@ -304,3 +305,7 @@ boolToBV = zeroExtend . pack
 -- | Convert a Bool to a Bit
 boolToBit :: Bool -> Bit
 boolToBit = bitCoerce
+
+-- | Convert a Bool to a Bit
+bitToBool :: Bit -> Bool
+bitToBool = bitCoerce
