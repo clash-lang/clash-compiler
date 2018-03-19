@@ -24,6 +24,7 @@ import           Data.Either                   (lefts)
 import qualified Data.HashMap.Lazy             as HashMap
 import qualified Data.IntMap                   as IntMap
 import           Data.Maybe                    (catMaybes)
+import           Data.Semigroup.Monad
 import           Data.Text.Lazy                (fromStrict, pack)
 import qualified Data.Text.Lazy                as Text
 import           Data.Text                     (unpack)
@@ -96,7 +97,7 @@ prepareBlackBox pNm templ bbCtx =
         return (t3,decls)
      else do
        (_,sp) <- Lens.use curCompNm
-       templ' <- prettyBlackBox templ
+       templ' <- getMon (prettyBlackBox templ)
        let msg = $(curLoc) ++ "Can't match template for " ++ show pNm ++ " :\n\n" ++ Text.unpack templ' ++
                 "\n\nwith context:\n\n" ++ show bbCtx
        throw (ClashException sp msg Nothing)
@@ -331,7 +332,7 @@ mkFunInput resId e = do
       l'' <- collectFilePaths bbCtx l'
       return ((Left l'',if oreg then Reg else Wire,bbCtx),dcls ++ templDecl)
     Left (_, _, Right templ') -> do
-      templ'' <- prettyBlackBox templ'
+      templ'' <- getMon $ prettyBlackBox templ'
       let ass = Assignment (pack "~RESULT") (Identifier templ'' Nothing)
       return ((Right ("",[ass]),Wire,bbCtx),dcls)
     Right (decl,wr) ->

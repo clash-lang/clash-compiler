@@ -117,15 +117,16 @@ Library
                       mtl                     >= 2.1.2    && < 2.3,
                       parsers                 >= 0.12.8   && < 1.0,
                       pretty                  >= 1.1.1.0  && < 1.2,
+                      prettyprinter           >= 1.2.0.1  && < 2.0,
                       process                 >= 1.1.0.2  && < 1.7,
+                      reducers                >= 3.12.2   && < 4.0,
                       template-haskell        >= 2.8.0.0  && < 2.14,
                       text                    >= 0.11.3.1 && < 1.3,
                       time                    >= 1.4.0.1  && < 1.9,
                       transformers            >= 0.3.0.0  && < 0.6,
                       trifecta                >= 1.7.1.1  && < 2.0,
                       unbound-generics        >= 0.1      && < 0.4,
-                      unordered-containers    >= 0.2.3.3  && < 0.3,
-                      wl-pprint-text          >= 1.1.0.0  && < 1.2
+                      unordered-containers    >= 0.2.3.3  && < 0.3
 
   Exposed-modules:    Clash.Backend
                       Clash.Backend.SystemVerilog
@@ -177,6 +178,8 @@ Library
 
   Other-Modules:      Clash.Annotations.TopEntity.Extra
                       Data.Aeson.Extra
+                      Data.Semigroup.Monad.Extra
+                      Data.Text.Prettyprint.Doc.Extra
                       GHC.BasicTypes.Extra
                       GHC.SrcLoc.Extra
                       Paths_clash_lib
