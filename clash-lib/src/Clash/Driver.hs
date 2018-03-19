@@ -28,9 +28,14 @@ import qualified Data.HashMap.Strict              as HM
 import qualified Data.HashSet                     as HashSet
 import           Data.IntMap                      (IntMap)
 import           Data.Maybe                       (fromMaybe)
+import           Data.Semigroup.Monad
 import           Data.Text.Lazy                   (Text)
 import qualified Data.Text.Lazy                   as Text
 import qualified Data.Text.Lazy.IO                as Text
+import           Data.Text.Prettyprint.Doc        (pretty)
+import           Data.Text.Prettyprint.Doc.Extra
+  (Doc, LayoutOptions (..), PageWidth (..) , layoutPretty, renderLazy,
+   renderOneLine)
 import qualified Data.Time.Clock                  as Clock
 import qualified System.Directory                 as Directory
 import           System.FilePath                  ((</>), (<.>))
@@ -38,8 +43,6 @@ import qualified System.FilePath                  as FilePath
 import qualified System.IO                        as IO
 import           System.IO.Error                  (isDoesNotExistError)
 import qualified Text.PrettyPrint.ANSI.Leijen     as ANSI
-import           Text.PrettyPrint.Leijen.Text     (Doc, renderPretty, text)
-import           Text.PrettyPrint.Leijen.Text.Monadic (displayT, renderOneLine)
 import           Text.Trifecta.Result
 import           Text.Read                        (readMaybe)
 
@@ -268,9 +271,9 @@ createHDL
   -> ([(String,Doc)],Manifest)
   -- ^ The pretty-printed HDL documents
   -- + The update manifest file
-createHDL backend modName components top (topName,manifestE) = flip evalState backend $ do
+createHDL backend modName components top (topName,manifestE) = flip evalState backend $ getMon $ do
   (hdlNmDocs,incs) <- unzip <$> mapM (uncurry (genHDL modName)) components
-  hwtys <- HashSet.toList <$> extractTypes <$> get
+  hwtys <- HashSet.toList <$> extractTypes <$> Mon get
   typesPkg <- mkTyPackage modName hwtys
   let hdl   = map (first (<.> Clash.Backend.extension backend)) (typesPkg ++ hdlNmDocs)
       qincs = map (first (<.> "qsys")) (concat incs)
@@ -278,9 +281,9 @@ createHDL backend modName components top (topName,manifestE) = flip evalState ba
   manifest <- either return (\m -> do
       let topName' = Text.pack topName
       let topInNames  = map fst (inputs top)
-      topInTypes  <- mapM (fmap (displayT . renderOneLine) . hdlType (External topName') . snd) (inputs top)
+      topInTypes  <- mapM (fmap renderOneLine . hdlType (External topName') . snd) (inputs top)
       let topOutNames = map (fst . snd) (outputs top)
-      topOutTypes <- mapM (fmap (displayT . renderOneLine) . hdlType (External topName') . snd . snd) (outputs top)
+      topOutTypes <- mapM (fmap renderOneLine . hdlType (External topName') . snd . snd) (outputs top)
       let compNames = map (componentName.snd) components
       return (m { portInNames    = topInNames
                 , portInTypes    = topInTypes
@@ -290,7 +293,7 @@ createHDL backend modName components top (topName,manifestE) = flip evalState ba
                 })
     ) manifestE
   let manDoc = ( topName <.> "manifest"
-               , text (Text.pack (show manifest)))
+               , pretty (Text.pack (show manifest)))
   return (manDoc:topFiles,manifest)
 
 -- | Prepares the directory for writing HDL files. This means creating the
@@ -315,7 +318,7 @@ prepareDir cleanhdl ext dir = do
 -- | Writes a HDL file to the given directory
 writeHDL :: FilePath -> (String, Doc) -> IO ()
 writeHDL dir (cname, hdl) = do
-  let rendered = displayT (renderPretty 0.4 120 hdl)
+  let rendered = renderLazy (layoutPretty (LayoutOptions (AvailablePerLine 120 0.4)) hdl)
       -- remove blank lines to keep things clean
       clean = Text.unlines
             . map (\t -> if Text.all (==' ') t then Text.empty else t)
