@@ -40,7 +40,7 @@ module Clash.Annotations.BitRepresentation.Deriving
   ) where
 
 import Clash.Annotations.BitRepresentation
-  (DataReprAnn(..), ConstrRepr(..), BitMask, Value, reprType)
+  (DataReprAnn(..), ConstrRepr(..), BitMask, Value, Size, reprType)
 import Clash.Annotations.BitRepresentation.Internal
   (dataReprAnnToDataRepr', thTypeToType', DataRepr'(..), ConstrRepr'(..))
 import Clash.Annotations.BitRepresentation.Util
@@ -107,20 +107,20 @@ data FieldsType
 --
 -- TODO: Current complexity is O(n). We could probably use machine instructions
 -- for ~constant complexity.
-msb :: Integer -> Integer
+msb :: Integer -> Int
 msb 0 = error $ "Most significant bit does not exist for zero."
 msb 1 = 0
 msb n = 1 + msb (shiftR n 1)
 
 -- | Integer version of (ceil . log2). Can handle arguments up to 2^(2^WORDWIDTH).
-integerLog2Ceil :: Integer -> Integer
+integerLog2Ceil :: Integer -> Int
 integerLog2Ceil n =
   let nlog2 = fromIntegral $ I# (integerLog2# n) in
   if n > 2^nlog2 then nlog2 + 1 else nlog2
 
 -- | Determine number of bits needed to represent /n/ options. Alias for
 -- integerLog2Ceil to increase readability of programmer intentention.
-bitsNeeded :: Integer -> Integer
+bitsNeeded :: Integer -> Int
 bitsNeeded = integerLog2Ceil
 
 tyVarBndrName :: TyVarBndr -> Name
@@ -163,15 +163,15 @@ typeSize typ = do
     [TySynInstD _ (TySynEqn _ (LitT (NumTyLit n)))] ->
       [| n |]
     [_impl] ->
-      [| natVal (Proxy :: Proxy (BitSize $(return typ))) |]
+      [| fromIntegral $ natVal (Proxy :: Proxy (BitSize $(return typ))) |]
     unexp ->
       error $ "Unexpected result from reifyInstances: " ++ show unexp
 
 -- | Generate bitmask from a given bit, with a certain size
 bitmask
-  :: Integer
+  :: Int
   -- ^ Bitmask starts at bit /n/
-  -> Integer
+  -> Int
   -- ^ Bitmask has size /m/
   -> Integer
 bitmask _start 0    = 0
@@ -179,7 +179,7 @@ bitmask start  size
   | start < 0        = error $ "Start cannot be <0. Was: " ++ show start
   | size < 0         = error $ "Size cannot be <0. Was: " ++ show size
   | start + 1 < size = error $ "Start + 1 (" ++ show start ++ " - 1) cannot be smaller than size (" ++ show size ++  ")."
-  | otherwise        = shiftL (2^size - 1) $ fromIntegral (start - (size - 1))
+  | otherwise        = shiftL (2^(toInteger size) - 1) (start - (size - 1))
 
 
 fieldTypes :: Con -> [Type]
@@ -241,19 +241,19 @@ buildConstrRepr dataSize constrName fieldAnns constrMask constrValue = [|
     $(listE fieldAnns)
   |]
   where
-    mask  = [| shiftL constrMask  (fromIntegral $ $dataSize)|]
-    value = [| shiftL constrValue (fromIntegral $ $dataSize)|]
+    mask  = [| shiftL constrMask  ($dataSize)|]
+    value = [| shiftL constrValue ($dataSize)|]
 
-countConstructor :: [Integer] -> [(BitMask, Value)]
-countConstructor ns = zip (repeat mask) ns
+countConstructor :: [Int] -> [(BitMask, Value)]
+countConstructor ns = zip (repeat mask) (map toInteger ns)
   where
-    maskSize = bitsNeeded $ maximum ns + 1
+    maskSize = bitsNeeded $ toInteger $ maximum ns + 1
     mask = 2^maskSize - 1
 
-oneHotConstructor :: [Integer] -> [(BitMask, Value)]
+oneHotConstructor :: [Int] -> [(BitMask, Value)]
 oneHotConstructor ns = zip values values
   where
-    values = [shiftL 1 (fromIntegral n) | n <- ns]
+    values = [shiftL 1 n | n <- ns]
 
 overlapFieldAnns :: [[Q Exp]] -> [[Q Exp]]
 overlapFieldAnns fieldSizess = map go fieldSizess
@@ -293,7 +293,7 @@ wideFieldAnns fieldSizess = zipWith id (map go constructorOffsets) fieldSizess
 
 -- | Derive DataRepr' for a specific type.
 deriveDataRepr
-  :: ([Integer] -> [(BitMask, Value)])
+  :: ([Int] -> [(BitMask, Value)])
   -- ^ Constructor derivator
   -> ([[Q Exp]] -> [[Q Exp]])
   -- ^ Field derivator
@@ -312,7 +312,7 @@ deriveDataRepr constrDerivator fieldsDerivator typ = do
 
       let
         (constrMasks, constrValues) =
-          unzip $ constrDerivator [0..fromIntegral $ length dConstructors - 1]
+          unzip $ constrDerivator [0..length dConstructors - 1]
 
       let constrSize    = 1 + (msb $ maximum constrMasks)
       let fieldAnns     = fieldsDerivator fieldSizess
@@ -370,9 +370,9 @@ deriveDefaultAnnotation = deriveAnnotation defaultDerivator
 packedConstrRepr
   :: Int
   -- ^ Data width
-  -> Integer
+  -> Int
   -- ^ External constructor width
-  -> Integer
+  -> Int
   -- ^ nth External so far
   -> [(BitMaskOrigin, ConstrRepr)]
   -> [ConstrRepr]
@@ -384,11 +384,11 @@ packedConstrRepr dataWidth constrWidth n ((External, ConstrRepr name _ _ anns) :
       ConstrRepr
         name
         (shiftL (2^constrWidth - 1) dataWidth)
-        (shiftL n dataWidth)
+        (shiftL (toInteger n) dataWidth)
         anns
 
 packedConstrRepr dataWidth constrWidth n ((Embedded mask value, ConstrRepr name _ _ anns) : constrs) =
-  constr : packedConstrRepr (fromIntegral dataWidth) constrWidth n constrs
+  constr : packedConstrRepr dataWidth constrWidth n constrs
   where
     constr =
       ConstrRepr
@@ -399,14 +399,14 @@ packedConstrRepr dataWidth constrWidth n ((Embedded mask value, ConstrRepr name 
 
 packedDataRepr
   :: Type
-  -> Integer
+  -> Size
   -> [(BitMaskOrigin, ConstrRepr)]
   -> DataReprAnn
 packedDataRepr typ dataWidth constrs =
   DataReprAnn
     typ
     (dataWidth + constrWidth)
-    (packedConstrRepr (fromIntegral dataWidth) constrWidth 0 constrs)
+    (packedConstrRepr dataWidth constrWidth 0 constrs)
   where
     external    = filter isExternal (map fst constrs)
     constrWidth = bitsNeeded $ toInteger $ min (length external + 1) (length constrs)
@@ -458,7 +458,7 @@ derivePackedAnnotation' (DataReprAnn typ size constrs) =
     -- actually provide us with the 'fullest' constructors first and the
     -- 'empties' last.
     sortedMasks = reverse $ sortOn fst $ zip fieldMasks constrs
-    origins     = storeInFields (fromInteger dataWidth) zeroBits (map fst sortedMasks)
+    origins     = storeInFields dataWidth zeroBits (map fst sortedMasks)
     constrs'    = zip origins $ map snd sortedMasks
     dataRepr    = packedDataRepr typ dataWidth constrs'
 
@@ -531,7 +531,7 @@ bitsToExpr bits =
     (map bitToExpr' $ group bits)
 
 numTyLit' :: Integral a => a -> Q Type
-numTyLit' n = LitT <$> (numTyLit $ fromIntegral n)
+numTyLit' n = LitT <$> (numTyLit $ toInteger n)
 
 -- | Select a list of ranges from a bitvector expression
 select'
@@ -553,13 +553,13 @@ select' vec ranges =
             | otherwise =
                 AppE
                   (AppE (VarE 'shiftR) vec)
-                  (LitE $ IntegerL $ fromIntegral downto) in
+                  (LitE $ IntegerL $ toInteger downto) in
 
         SigE
           -- Select from whole vector
           (AppE (VarE 'resize) shifted)
           -- Type signature:
-          (AppT (ConT ''BitVector) (LitT $ NumTyLit $ fromIntegral size))
+          (AppT (ConT ''BitVector) (LitT $ NumTyLit $ toInteger size))
 
 -- | Select a range (bitorigin) from a bitvector
 select
@@ -571,13 +571,13 @@ select
 select _fields (Lit []) =
   error $ "Unexpected empty literal."
 select _fields (Lit lits) = do
-  let size = fromIntegral $ length lits
+  let size = length lits
   vec <- bitsToExpr lits
   return $ SigE
             -- Apply bLit to literal string
             vec
             -- Type signature:
-            (AppT (ConT ''BitVector) (LitT $ NumTyLit size))
+            (AppT (ConT ''BitVector) (LitT $ NumTyLit $ toInteger size))
 
 select fields (Field fieldn from downto) =
   select' (fields !! fieldn) [(from, downto)]
@@ -690,7 +690,7 @@ deriveBitPack typQ = do
                       ''BitSize
                       (TySynEqn
                         [typ]
-                        (LitT (NumTyLit $ fromIntegral dataSize)))
+                        (LitT (NumTyLit $ toInteger dataSize)))
 
   let bpInst = [ InstanceD
                    (Just Overlapping)

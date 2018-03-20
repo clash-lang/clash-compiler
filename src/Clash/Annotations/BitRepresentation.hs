@@ -41,7 +41,7 @@ import qualified Language.Haskell.TH.Syntax as TH
 
 type BitMask  = Integer
 type Value    = Integer
-type Size     = Integer
+type Size     = Int
 
 type FieldAnn = BitMask
 
