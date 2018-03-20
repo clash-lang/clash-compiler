@@ -809,14 +809,14 @@ expr_ _ (Identifier id_ (Just (Indexed (ty@(Clock _ _ Gated),_,fI)))) = do
   ty' <- normaliseType ty
   text id_ <> dot <> tyName ty' <> "_sel" <> int fI
 
-expr_ _ (Identifier id_ (Just (Indexed ((Vector _ elTy),1,1)))) = do
+expr_ _ (Identifier id_ (Just (Indexed ((Vector _ elTy),1,0)))) = do
   syn <- hdlSyn
   case syn of
     Vivado -> do
       id' <- fmap (displayT . renderOneLine) (text id_ <> parens (int 0))
       fromSLV elTy id' (typeSize elTy - 1) 0
     _ -> text id_ <> parens (int 0)
-expr_ _ (Identifier id_ (Just (Indexed ((Vector n _),1,2)))) = text id_ <> parens (int 1 <+> "to" <+> int (n-1))
+expr_ _ (Identifier id_ (Just (Indexed ((Vector n _),1,1)))) = text id_ <> parens (int 1 <+> "to" <+> int (n-1))
 
 -- This is a "Hack", we cannot construct trees with a negative depth. This is
 -- here so that we can recognise merged RTree modifiers. See the code in
@@ -824,17 +824,17 @@ expr_ _ (Identifier id_ (Just (Indexed ((Vector n _),1,2)))) = text id_ <> paren
 expr_ _ (Identifier id_ (Just (Indexed (RTree (-1) _,l,r)))) =
   text id_ <> parens (int l <+> "to" <+> int (r-1))
 
-expr_ _ (Identifier id_ (Just (Indexed ((RTree 0 elTy),0,1)))) = do
+expr_ _ (Identifier id_ (Just (Indexed ((RTree 0 elTy),0,0)))) = do
   syn <- hdlSyn
   case syn of
     Vivado -> do
       id' <- fmap (displayT . renderOneLine) (text id_ <> parens (int 0))
       fromSLV elTy id' (typeSize elTy - 1) 0
     _ -> text id_ <> parens (int 0)
-expr_ _ (Identifier id_ (Just (Indexed ((RTree n _),1,1)))) =
+expr_ _ (Identifier id_ (Just (Indexed ((RTree n _),1,0)))) =
   let z = 2^(n-1)
   in  text id_ <> parens (int 0 <+> "to" <+> int (z-1))
-expr_ _ (Identifier id_ (Just (Indexed ((RTree n _),1,2)))) =
+expr_ _ (Identifier id_ (Just (Indexed ((RTree n _),1,1)))) =
   let z  = 2^(n-1)
       z' = 2^n
   in  text id_ <> parens (int z <+> "to" <+> int (z'-1))

@@ -719,11 +719,11 @@ expr_ _ (Identifier id_ (Just (Indexed (ty@(Clock _ _ Gated),_,fI)))) = do
   id'<- fmap (displayT . renderOneLine) (text id_ <> dot <> tyName ty' <> "_sel" <> int fI)
   simpleFromSLV (tys !! fI) id'
 
-expr_ _ (Identifier id_ (Just (Indexed ((Vector _ elTy),1,1)))) = do
+expr_ _ (Identifier id_ (Just (Indexed ((Vector _ elTy),1,0)))) = do
   id' <- fmap (displayT . renderOneLine) (text id_ <> brackets (int 0))
   simpleFromSLV elTy id'
 
-expr_ _ (Identifier id_ (Just (Indexed ((Vector n _),1,2)))) = text id_ <> brackets (int 1 <> colon <> int (n-1))
+expr_ _ (Identifier id_ (Just (Indexed ((Vector n _),1,1)))) = text id_ <> brackets (int 1 <> colon <> int (n-1))
 
 -- This is a "Hack", we cannot construct trees with a negative depth. This is
 -- here so that we can recognise merged RTree modifiers. See the code in
@@ -731,15 +731,15 @@ expr_ _ (Identifier id_ (Just (Indexed ((Vector n _),1,2)))) = text id_ <> brack
 expr_ _ (Identifier id_ (Just (Indexed (RTree (-1) _,l,r)))) =
   text id_ <> brackets (int l <> colon <> int (r-1))
 
-expr_ _ (Identifier id_ (Just (Indexed ((RTree 0 elTy),0,1)))) = do
+expr_ _ (Identifier id_ (Just (Indexed ((RTree 0 elTy),0,0)))) = do
   id' <- fmap (displayT . renderOneLine) (text id_ <> brackets (int 0))
   simpleFromSLV elTy id'
 
-expr_ _ (Identifier id_ (Just (Indexed ((RTree n _),1,1)))) =
+expr_ _ (Identifier id_ (Just (Indexed ((RTree n _),1,0)))) =
   let z = 2^(n-1)
   in  text id_ <> brackets (int 0 <> colon <> int (z-1))
 
-expr_ _ (Identifier id_ (Just (Indexed ((RTree n _),1,2)))) =
+expr_ _ (Identifier id_ (Just (Indexed ((RTree n _),1,1)))) =
   let z  = 2^(n-1)
       z' = 2^n
   in text id_ <> brackets (int z <> colon <> int (z'-1))

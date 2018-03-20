@@ -496,8 +496,8 @@ mkProjection mkDec bndr scrut altTy alt = do
         return (scrutNm',Nothing,newDecls ++ [scrutDecl,scrutAssn])
 
   let altVarId = Text.pack $ name2String varTm
-      modifier = case pat of
-        DataPat (Embed dc) ids ->
+  modifier <- case pat of
+        DataPat (Embed dc) ids -> do
           let (exts,tms) = unrebind ids
               tmsTys     = map (unembed . varType) tms
               tmsFVs     = concatMap (Lens.toListOf typeFreeVars) tmsTys
@@ -505,15 +505,19 @@ mkProjection mkDec bndr scrut altTy alt = do
               tms'       = if any (`elem` tmsFVs) extNms
                               then throw (ClashException sp ($(curLoc) ++ "Not in normal form: Pattern binds existential variables:\n\n" ++ showDoc e) Nothing)
                               else tms
-          in case elemIndex (Id varTm (Embed altTy)) tms' of
-               Nothing -> Nothing
+          argHWTys <- mapM coreTypeToHWTypeM tmsTys
+          let tmsBundled   = zip argHWTys tms'
+              tmsFiltered  = filter (maybe False (not . isVoid) . fst) tmsBundled
+              tmsFiltered' = map snd tmsFiltered
+          case elemIndex (Id varTm (Embed altTy)) tmsFiltered' of
+               Nothing -> pure Nothing
                Just fI
-                | sHwTy /= vHwTy -> nestModifier modM (Just (Indexed (sHwTy,dcTag dc - 1,fI)))
+                | sHwTy /= vHwTy -> pure $ nestModifier modM (Just (Indexed (sHwTy,dcTag dc - 1,fI)))
                 -- When element and subject have the same HW-type,
                 -- then the projections is just the identity
-                | otherwise      -> nestModifier modM (Just (DC (Void Nothing,0)))
+                | otherwise      -> pure $ nestModifier modM (Just (DC (Void Nothing,0)))
         _ -> throw (ClashException sp ($(curLoc) ++ "Not in normal form: Unexpected pattern in case-projection:\n\n" ++ showDoc e) Nothing)
-      extractExpr = Identifier (maybe altVarId (const selId) modifier) modifier
+  let extractExpr = Identifier (maybe altVarId (const selId) modifier) modifier
   case bndr of
     Left scrutNm | mkDec -> do
       scrutNm' <- mkUniqueIdentifier Extended scrutNm

@@ -387,27 +387,27 @@ modifier offset (Indexed (ty@(Clock _ _ Gated),_,fI)) = Just (start+offset,end+o
     start   = typeSize ty - 1 - otherSz
     end     = start - argSize + 1
 
-modifier offset (Indexed (ty@(Vector _ argTy),1,1)) = Just (start+offset,end+offset)
+modifier offset (Indexed (ty@(Vector _ argTy),1,0)) = Just (start+offset,end+offset)
   where
     argSize = typeSize argTy
     start   = typeSize ty - 1
     end     = start - argSize + 1
 
-modifier offset (Indexed (ty@(Vector _ argTy),1,2)) = Just (start+offset,offset)
+modifier offset (Indexed (ty@(Vector _ argTy),1,1)) = Just (start+offset,offset)
   where
     argSize = typeSize argTy
     start   = typeSize ty - argSize - 1
 
-modifier offset (Indexed (ty@(RTree 0 _),0,1)) = Just (start+offset,offset)
+modifier offset (Indexed (ty@(RTree 0 _),0,0)) = Just (start+offset,offset)
   where
     start   = typeSize ty - 1
 
-modifier offset (Indexed (ty@(RTree _ _),1,1)) = Just (start+offset,end+offset)
+modifier offset (Indexed (ty@(RTree _ _),1,0)) = Just (start+offset,end+offset)
   where
     start   = typeSize ty - 1
     end     = typeSize ty `div` 2
 
-modifier offset (Indexed (ty@(RTree _ _),1,2)) = Just (start+offset,offset)
+modifier offset (Indexed (ty@(RTree _ _),1,1)) = Just (start+offset,offset)
   where
     start   = (typeSize ty `div` 2) - 1
 
