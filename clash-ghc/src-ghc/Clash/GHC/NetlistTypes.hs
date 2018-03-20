@@ -35,11 +35,12 @@ ghcTypeToHWType
   :: Int
   -> Bool
   -> HashMap TyConOccName TyCon
+  -> Bool
   -> Type
   -> Maybe (Either String HWType)
 ghcTypeToHWType iw floatSupport = go
   where
-    go m ty@(tyView -> TyConApp tc args) = runExceptT $
+    go m keepVoid ty@(tyView -> TyConApp tc args) = runExceptT $
       case name2String tc of
         "GHC.Int.Int8"                  -> return (Signed 8)
         "GHC.Int.Int16"                 -> return (Signed 16)
@@ -95,7 +96,7 @@ ghcTypeToHWType iw floatSupport = go
         "GHC.Prim.Any" -> return (Void Nothing)
 
         "Clash.Signal.Internal.Signal" ->
-          ExceptT $ return $ coreTypeToHWType go m (args !! 1)
+          ExceptT $ return $ coreTypeToHWType go m keepVoid (args !! 1)
 
         "Clash.Signal.Internal.Clock"
           | [dom,clkKind] <- args
@@ -138,7 +139,7 @@ ghcTypeToHWType iw floatSupport = go
         "Clash.Sized.Vector.Vec" -> do
           let [szTy,elTy] = args
           sz     <- mapExceptT (Just . coerce) (tyNatSize m szTy)
-          elHWTy <- ExceptT $ return $ coreTypeToHWType go m elTy
+          elHWTy <- ExceptT $ return $ coreTypeToHWType go m keepVoid elTy
           case elHWTy of
             Void {}     -> return (Void (Just (fromInteger sz)))
             _ | sz == 0 -> return (Void (Just (fromInteger sz)))
@@ -147,7 +148,7 @@ ghcTypeToHWType iw floatSupport = go
         "Clash.Sized.RTree.RTree" -> do
           let [szTy,elTy] = args
           sz     <- mapExceptT (Just . coerce) (tyNatSize m szTy)
-          elHWTy <- ExceptT $ return $ coreTypeToHWType go m elTy
+          elHWTy <- ExceptT $ return $ coreTypeToHWType go m keepVoid elTy
           case elHWTy of
             Void {} -> return (Void Nothing)
             _       -> return $ RTree (fromInteger sz) elHWTy
@@ -159,7 +160,7 @@ ghcTypeToHWType iw floatSupport = go
 
         _ -> ExceptT Nothing
 
-    go _ _ = Nothing
+    go _ _ _ = Nothing
 
 domain
   :: HashMap TyConOccName TyCon

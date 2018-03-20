@@ -54,7 +54,7 @@ data NetlistState
   , _varCount       :: !Int -- ^ Number of signal declarations
   , _components     :: HashMap TmOccName (SrcSpan,Component) -- ^ Cached components
   , _primitives     :: PrimMap BlackBoxTemplate -- ^ Primitive Definitions
-  , _typeTranslator :: HashMap TyConOccName TyCon -> Type -> Maybe (Either String HWType)
+  , _typeTranslator :: HashMap TyConOccName TyCon -> Bool -> Type -> Maybe (Either String HWType)
   -- ^ Hardcoded Type -> HWType translator
   , _tcCache        :: HashMap TyConOccName TyCon -- ^ TyCon cache
   , _curCompNm      :: !(Identifier,SrcSpan)

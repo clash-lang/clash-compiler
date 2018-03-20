@@ -75,7 +75,7 @@ generateHDL
   -- ^ TyCon cache
   -> IntMap TyConName
   -- ^ Tuple TyCon cache
-  -> (HashMap TyConOccName TyCon -> Type -> Maybe (Either String HWType))
+  -> (HashMap TyConOccName TyCon -> Bool -> Type -> Maybe (Either String HWType))
   -- ^ Hardcoded 'Type' -> 'HWType' translator
   -> PrimEvaluator
   -- ^ Hardcoded evaluator (delta-reduction)
@@ -364,7 +364,7 @@ normalizeEntity
   -- ^ TyCon cache
   -> IntMap TyConName
   -- ^ Tuple TyCon cache
-  -> (HashMap TyConOccName TyCon -> Type -> Maybe (Either String HWType))
+  -> (HashMap TyConOccName TyCon -> Bool -> Type -> Maybe (Either String HWType))
   -- ^ Hardcoded 'Type' -> 'HWType' translator
   -> PrimEvaluator
   -- ^ Hardcoded evaluator (delta-reduction)

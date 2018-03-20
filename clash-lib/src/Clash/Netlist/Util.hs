@@ -88,23 +88,33 @@ splitNormalized tcm expr = do
 
 -- | Converts a Core type to a HWType given a function that translates certain
 -- builtin types. Errors if the Core type is not translatable.
-unsafeCoreTypeToHWType :: String
-                       -> (HashMap TyConOccName TyCon -> Type -> Maybe (Either String HWType))
-                       -> HashMap TyConOccName TyCon
-                       -> Type
-                       -> HWType
-unsafeCoreTypeToHWType loc builtInTranslation m = either (error . (loc ++)) id . coreTypeToHWType builtInTranslation m
+unsafeCoreTypeToHWType
+  :: String
+  -> (HashMap TyConOccName TyCon -> Bool -> Type -> Maybe (Either String HWType))
+  -> HashMap TyConOccName TyCon
+  -> Bool
+  -> Type
+  -> HWType
+unsafeCoreTypeToHWType loc builtInTranslation m keepVoid =
+  either (error . (loc ++)) id . coreTypeToHWType builtInTranslation m keepVoid
 
 -- | Converts a Core type to a HWType within the NetlistMonad; errors on failure
-unsafeCoreTypeToHWTypeM :: String
-                        -> Type
-                        -> NetlistMonad HWType
-unsafeCoreTypeToHWTypeM loc ty = unsafeCoreTypeToHWType loc <$> Lens.use typeTranslator <*> Lens.use tcCache <*> pure ty
+unsafeCoreTypeToHWTypeM
+  :: String
+  -> Type
+  -> NetlistMonad HWType
+unsafeCoreTypeToHWTypeM loc ty =
+  unsafeCoreTypeToHWType loc
+    <$> Lens.use typeTranslator
+    <*> Lens.use tcCache
+    <*> pure False
+    <*> pure ty
 
 -- | Converts a Core type to a HWType within the NetlistMonad; 'Nothing' on failure
-coreTypeToHWTypeM :: Type
-                  -> NetlistMonad (Maybe HWType)
-coreTypeToHWTypeM ty = hush <$> (coreTypeToHWType <$> Lens.use typeTranslator <*> Lens.use tcCache <*> pure ty)
+coreTypeToHWTypeM
+  :: Type
+  -> NetlistMonad (Maybe HWType)
+coreTypeToHWTypeM ty = hush <$> (coreTypeToHWType <$> Lens.use typeTranslator <*> Lens.use tcCache <*> pure False <*> pure ty)
 
 -- | Returns the name and period of the clock corresponding to a type
 synchronizedClk :: HashMap TyConOccName TyCon -- ^ TyCon cache
@@ -138,27 +148,40 @@ synchronizedClk tcm ty
 -- | Converts a Core type to a HWType given a function that translates certain
 -- builtin types. Returns a string containing the error message when the Core
 -- type is not translatable.
-coreTypeToHWType :: (HashMap TyConOccName TyCon -> Type -> Maybe (Either String HWType))
-                 -> HashMap TyConOccName TyCon
-                 -> Type
-                 -> Either String HWType
-coreTypeToHWType builtInTranslation m (builtInTranslation m -> Just hty) = hty
-coreTypeToHWType builtInTranslation m (coreView m -> Just ty) = coreTypeToHWType builtInTranslation m ty
-coreTypeToHWType builtInTranslation m ty@(tyView -> TyConApp tc args) = mkADT builtInTranslation m (showDoc ty) tc args
-coreTypeToHWType _ _ ty = Left $ "Can't translate non-tycon type: " ++ showDoc ty
+coreTypeToHWType
+  :: (HashMap TyConOccName TyCon -> Bool -> Type -> Maybe (Either String HWType))
+  -> HashMap TyConOccName TyCon
+  -> Bool
+  -> Type
+  -> Either String HWType
+coreTypeToHWType builtInTranslation m keepVoid (builtInTranslation m keepVoid -> Just hty) =
+  hty
+coreTypeToHWType builtInTranslation m keepVoid (coreView m -> Just ty) =
+  coreTypeToHWType builtInTranslation m keepVoid ty
+coreTypeToHWType builtInTranslation m keepVoid ty@(tyView -> TyConApp tc args) =
+  mkADT builtInTranslation m (showDoc ty) keepVoid tc args
+coreTypeToHWType _ _ _ ty = Left $ "Can't translate non-tycon type: " ++ showDoc ty
 
 -- | Converts an algebraic Core type (split into a TyCon and its argument) to a HWType.
-mkADT :: (HashMap TyConOccName TyCon -> Type -> Maybe (Either String HWType)) -- ^ Hardcoded Type -> HWType translator
-      -> HashMap TyConOccName TyCon -- ^ TyCon cache
-      -> String -- ^ String representation of the Core type for error messages
-      -> TyConName -- ^ The TyCon
-      -> [Type] -- ^ Its applied arguments
-      -> Either String HWType
-mkADT _ m tyString tc _
+mkADT
+  :: (HashMap TyConOccName TyCon -> Bool -> Type -> Maybe (Either String HWType))
+  -- ^ Hardcoded Type -> HWType translator
+  -> HashMap TyConOccName TyCon
+  -- ^ TyCon cache
+  -> String
+  -- ^ String representation of the Core type for error messages
+  -> Bool
+  -- ^ Keep Void
+  -> TyConName
+  -- ^ The TyCon
+  -> [Type]
+  -- ^ Its applied arguments
+  -> Either String HWType
+mkADT _ m tyString _ tc _
   | isRecursiveTy m tc
   = Left $ $(curLoc) ++ "Can't translate recursive type: " ++ tyString
 
-mkADT builtInTranslation m tyString tc args = case tyConDataCons (m HashMap.! nameOcc tc) of
+mkADT builtInTranslation m tyString keepVoid tc args = case tyConDataCons (m HashMap.! nameOcc tc) of
   []  -> Left $ $(curLoc) ++ "Can't translate empty type: " ++ tyString
   dcs -> do
     let tcName       = pack $ name2String tc
@@ -166,8 +189,10 @@ mkADT builtInTranslation m tyString tc args = case tyConDataCons (m HashMap.! na
         argTVss      = map dcUnivTyVars dcs
         argSubts     = map ((`zip` args) . map nameOcc) argTVss
         substArgTyss = zipWith (\s tys -> map (substTys s) tys) argSubts argTyss
-    argHTyss         <- mapM (mapM (coreTypeToHWType builtInTranslation m)) substArgTyss
-    let argHTyss'    = map (filter (not . isVoid)) argHTyss
+    argHTyss         <- mapM (mapM (coreTypeToHWType builtInTranslation m keepVoid)) substArgTyss
+    let argHTyss'    = if keepVoid
+                          then argHTyss
+                          else map (filter (not . isVoid)) argHTyss
     case (dcs,argHTyss') of
       (_:[],[[elemTy]])      -> return elemTy
       (_:[],[elemTys@(_:_)]) -> return $ Product tcName elemTys
@@ -192,7 +217,7 @@ isRecursiveTy m tc = case tyConDataCons (m HashMap.! nameOcc tc) of
 -- | Determines if a Core type is translatable to a HWType given a function that
 -- translates certain builtin types.
 representableType
-  :: (HashMap TyConOccName TyCon -> Type -> Maybe (Either String HWType))
+  :: (HashMap TyConOccName TyCon -> Bool -> Type -> Maybe (Either String HWType))
   -> Bool
   -- ^ Allow zero-bit things
   -> Bool
@@ -201,7 +226,7 @@ representableType
   -> Type
   -> Bool
 representableType builtInTranslation _allowZero stringRepresentable m =
-    either (const False) isRepresentable . coreTypeToHWType builtInTranslation m
+    either (const False) isRepresentable . coreTypeToHWType builtInTranslation m False
   where
     isRepresentable hty = case hty of
       String          -> stringRepresentable
@@ -335,7 +360,7 @@ mkUniqueArguments (Just teM) args = do
       let i    = varName var
           i'   = pack (name2String i)
           ty   = unembed (varType var)
-          hwty = unsafeCoreTypeToHWType $(curLoc) typeTrans tcm ty
+          hwty = unsafeCoreTypeToHWType $(curLoc) typeTrans tcm True ty
       (ports,decls,_,pN) <- mkInput pM (i',hwty)
       if isVoid hwty
          then return Nothing
@@ -356,7 +381,7 @@ mkUniqueResult (Just teM) res = do
   let o    = varName res
       o'   = pack (name2String o)
       ty   = unembed (varType res)
-      hwty = unsafeCoreTypeToHWType $(curLoc) typeTrans tcm ty
+      hwty = unsafeCoreTypeToHWType $(curLoc) typeTrans tcm True ty
       oPortSupply = fmap t_output teM
   (ports,decls,pN) <- mkOutput oPortSupply (o',hwty)
   let pO = repName (unpack pN) o
@@ -370,7 +395,7 @@ idToPort var = do
           ty = unembed (varType var)
       return
         ( pack $ name2String i
-        , unsafeCoreTypeToHWType $(curLoc) typeTrans tcm ty
+        , unsafeCoreTypeToHWType $(curLoc) typeTrans tcm False ty
         )
 
 repName :: String -> Name a -> Name a
@@ -550,11 +575,22 @@ mkInput pM = case pM of
 
         Product _ hwtys -> do
           arguments <- zipWithM appendIdentifier (map (pN,) hwtys) [0..]
-          (ports,_,exprs,_) <- unzip4 <$> zipWithM mkInput (extendPorts ps) arguments
-          let netdecl  = NetDecl Nothing pN hwty
-              dcExpr   = DataCon hwty (DC (hwty,0)) exprs
-              netassgn = Assignment pN dcExpr
-          return (concat ports,[netdecl,netassgn],dcExpr,pN)
+          let argumentsBundled   = zip hwtys (zip (extendPorts ps) arguments)
+              argumentsFiltered  = filter (not . isVoid . fst) argumentsBundled
+              argumentsFiltered' = unzip (map snd argumentsFiltered)
+          (ports,_,exprs,_) <- unzip4 <$> uncurry (zipWithM mkInput) argumentsFiltered'
+          case exprs of
+            [expr] ->
+                 let hwty'    = filterVoid hwty
+                     netdecl  = NetDecl Nothing pN hwty'
+                     dcExpr   = expr
+                     netassgn = Assignment pN expr
+                 in  return (concat ports,[netdecl,netassgn],dcExpr,pN)
+            _ -> let hwty'    = filterVoid hwty
+                     netdecl  = NetDecl Nothing pN hwty'
+                     dcExpr   = DataCon hwty' (DC (hwty',0)) exprs
+                     netassgn = Assignment pN dcExpr
+                 in  return (concat ports,[netdecl,netassgn],dcExpr,pN)
 
         Clock nm rt Gated -> do
           let hwtys = [Clock nm rt Source, Bool]
@@ -566,6 +602,18 @@ mkInput pM = case pM of
           return (concat ports,[netdecl,netassgn],dcExpr,pN)
 
         _ -> return ([(pN,hwty)],[],Identifier pN Nothing,pN)
+
+filterVoid
+  :: HWType
+  -> HWType
+filterVoid t = case t of
+  Product nm hwtys
+    | null hwtys'        -> Void Nothing
+    | length hwtys' == 1 -> head hwtys'
+    | otherwise          -> Product nm hwtys'
+    where
+      hwtys' = filter (not . isVoid) (map filterVoid hwtys)
+  _ -> t
 
 -- | Create a Vector chain for a list of 'Identifier's
 mkVectorChain :: Int
@@ -668,10 +716,19 @@ mkOutput pM = case pM of
 
         Product _ hwtys -> do
           results <- zipWithM appendIdentifier (map (pN,) hwtys) [0..]
-          (ports,decls,ids) <- unzip3 <$> zipWithM mkOutput (extendPorts ps) results
-          let netdecl = NetDecl Nothing pN hwty
-              assigns = zipWith (assignId pN hwty 0) ids [0..]
-          return (concat ports,netdecl:assigns ++ concat decls,pN)
+          let resultsBundled   = zip hwtys (zip (extendPorts ps) results)
+              resultsFiltered  = filter (not . isVoid . fst) resultsBundled
+              resultsFiltered' = unzip (map snd resultsFiltered)
+          (ports,decls,ids) <- unzip3 <$> uncurry (zipWithM mkOutput) resultsFiltered'
+          case ids of
+            [i] -> let hwty'   = filterVoid hwty
+                       netdecl = NetDecl Nothing pN hwty'
+                       assign  = Assignment i (Identifier pN Nothing)
+                   in  return (concat ports,netdecl:assign:concat decls,pN)
+            _   -> let hwty'   = filterVoid hwty
+                       netdecl = NetDecl Nothing pN hwty'
+                       assigns = zipWith (assignId pN hwty' 0) ids [0..]
+                   in  return (concat ports,netdecl:assigns ++ concat decls,pN)
 
         _ -> return ([(pN,hwty)],[],pN)
 

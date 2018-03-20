@@ -75,7 +75,7 @@ runNormalization
   -- ^ UniqueSupply
   -> BindingMap
   -- ^ Global Binders
-  -> (HashMap TyConOccName TyCon -> Type -> Maybe (Either String HWType))
+  -> (HashMap TyConOccName TyCon -> Bool -> Type -> Maybe (Either String HWType))
   -- ^ Hardcoded Type -> HWType translator
   -> HashMap TyConOccName TyCon
   -- ^ TyCon cache
@@ -365,7 +365,7 @@ callTreeToList visited (CBranch (nm,bndr) used)
 -- * There are 2 or more reset arguments in scope that have the same reset
 --   domain annotation, and at least one of them is an asynchronous reset.
 clockResetErrors
-  :: (HashMap TyConOccName TyCon -> Type -> Maybe (Either String HWType))
+  :: (HashMap TyConOccName TyCon -> Bool -> Type -> Maybe (Either String HWType))
   -> HashMap TyConOccName TyCon
   -> Type
   -> [String]
@@ -374,7 +374,7 @@ clockResetErrors tyTran tcm ty =
   where
     (args,_)  = splitCoreFunForallTy tcm ty
     (_,args') = partitionEithers args
-    hwArgs    = zip (map (unsafeCoreTypeToHWType $(curLoc) tyTran tcm) args') args'
+    hwArgs    = zip (map (unsafeCoreTypeToHWType $(curLoc) tyTran tcm False) args') args'
     clks      = groupBy ((==) `on` fst) . sortBy (compare `on` fst)
               $ [ ((nm,i),ty') | (Clock nm i _,ty') <- hwArgs]
     rsts      = groupBy ((==) `on` (fst.fst)) . sortBy (compare `on` (fst.fst))

@@ -70,7 +70,7 @@ genNetlist :: BindingMap
            -- ^ Primitive definitions
            -> HashMap TyConOccName TyCon
            -- ^ TyCon cache
-           -> (HashMap TyConOccName TyCon -> Type -> Maybe (Either String HWType))
+           -> (HashMap TyConOccName TyCon -> Bool -> Type -> Maybe (Either String HWType))
            -- ^ Hardcoded Type -> HWType translator
            -> [(String,FilePath)]
            -- ^ Set of collected data-files
@@ -106,7 +106,7 @@ runNetlistMonad :: BindingMap
                 -- ^ Primitive Definitions
                 -> HashMap TyConOccName TyCon
                 -- ^ TyCon cache
-                -> (HashMap TyConOccName TyCon -> Type -> Maybe (Either String HWType))
+                -> (HashMap TyConOccName TyCon -> Bool -> Type -> Maybe (Either String HWType))
                 -- ^ Hardcode Type -> HWType translator
                 -> [(String,FilePath)]
                 -- ^ Set of collected data-files
