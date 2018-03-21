@@ -25,7 +25,9 @@ import           Control.Monad.State                  (State)
 import           Data.Hashable                        (Hashable (..))
 import qualified Data.HashSet                         as HashSet
 import           Data.Maybe                           (catMaybes,fromMaybe,mapMaybe)
+#if !MIN_VERSION_base(4,11,0)
 import           Data.Monoid                          hiding (Product, Sum)
+#endif
 import           Data.Semigroup.Monad
 import           Data.Text.Lazy                       (pack, unpack)
 import qualified Data.Text.Lazy                       as Text

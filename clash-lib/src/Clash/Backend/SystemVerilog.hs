@@ -29,7 +29,9 @@ import           Data.HashSet                         (HashSet)
 import qualified Data.HashSet                         as HashSet
 import           Data.List                            (nubBy)
 import           Data.Maybe                           (catMaybes,fromMaybe,mapMaybe)
+#if !MIN_VERSION_base(4,11,0)
 import           Data.Monoid                          hiding (Sum, Product)
+#endif
 import           Data.Semigroup.Monad
 import           Data.Text.Lazy                       (pack,unpack)
 import qualified Data.Text.Lazy                       as Text
