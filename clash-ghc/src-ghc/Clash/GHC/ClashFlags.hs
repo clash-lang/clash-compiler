@@ -5,6 +5,7 @@
   Maintainer  :  Christiaan Baaij <christiaan.baaij@gmail.com>
 -}
 
+{-# LANGUAGE CPP           #-}
 {-# LANGUAGE TupleSections #-}
 
 module Clash.GHC.ClashFlags
@@ -23,16 +24,32 @@ import Clash.Netlist.BlackBox.Types (HdlSyn (..))
 import Text.Read (readMaybe)
 
 parseClashFlags :: IORef ClashOpts -> [Located String]
-                -> IO ([Located String],[Located String])
+                -> IO ([Located String]
+#if MIN_VERSION_ghc(8,4,1)
+                      ,[Warn])
+#else
+                      ,[Located String])
+#endif
 parseClashFlags r = parseClashFlagsFull (flagsClash r)
 
 parseClashFlagsFull :: [Flag IO] -> [Located String]
-                    -> IO ([Located String],[Located String])
+                    -> IO ([Located String]
+#if MIN_VERSION_ghc(8,4,1)
+                          ,[Warn])
+#else
+                          ,[Located String])
+#endif
 parseClashFlagsFull flagsAvialable args = do
   (leftovers,errs,warns) <- processArgs flagsAvialable args
 
   unless (null errs) $ throwGhcExceptionIO $
-    errorsToGhcException . map (("on the commandline", ) . unLoc) $ errs
+    errorsToGhcException . map (("on the commandline", ) .
+#if MIN_VERSION_ghc(8,4,1)
+                               unLoc . errMsg)
+#else
+                               unLoc)
+#endif
+                         $ errs
 
   return (leftovers, warns)
 

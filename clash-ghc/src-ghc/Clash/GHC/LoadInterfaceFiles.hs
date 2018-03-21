@@ -44,7 +44,11 @@ import qualified Module
 import qualified MonadUtils
 import qualified Name
 import           Outputable  (showPpr, showSDoc, text)
+#if MIN_VERSION_ghc(8,4,1)
+import qualified GhcPlugins
+#else
 import qualified Serialized
+#endif
 import qualified TcIface
 import qualified TcRnMonad
 import qualified TcRnTypes
@@ -195,7 +199,11 @@ loadPrimitiveAnnotations hdl anns = mapMaybe toFP (concat prims)
   where
     annEnv       = Annotations.mkAnnEnv anns
     prims        = UniqFM.eltsUFM (Annotations.deserializeAnns deserializer annEnv)
+#if MIN_VERSION_ghc(8,4,1)
+    deserializer = GhcPlugins.deserializeWithData :: ([Word8] -> Primitive)
+#else
     deserializer = Serialized.deserializeWithData :: ([Word8] -> Primitive)
+#endif
     toFP (Primitive hdl' fp)
       | hdl == hdl'
       = Just fp
