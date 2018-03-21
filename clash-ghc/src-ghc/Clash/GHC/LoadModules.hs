@@ -49,7 +49,11 @@ import qualified HscMain
 import qualified HscTypes
 import qualified MonadUtils
 import qualified Panic
+#if MIN_VERSION_ghc(8,4,1)
+import qualified GhcPlugins
+#else
 import qualified Serialized
+#endif
 import qualified TidyPgm
 import qualified TcRnMonad
 import qualified TcRnTypes
@@ -175,7 +179,11 @@ loadModules hdl modName dflagsM = do
     target <- GHC.guessTarget modName Nothing
     GHC.setTargets [target]
     modGraph <- GHC.depanal [] False
+#if MIN_VERSION_ghc(8,4,1)
+    let modGraph' = GHC.mapMG disableOptimizationsFlags modGraph
+#else
     let modGraph' = map disableOptimizationsFlags modGraph
+#endif
         -- 'topSortModuleGraph' ensures that modGraph2, and hence tidiedMods
         -- are in topological order, i.e. the root module is last.
         modGraph2 = Digraph.flattenSCCs (GHC.topSortModuleGraph True modGraph' Nothing)
@@ -200,7 +208,11 @@ loadModules hdl modName dflagsM = do
                                  ; tcMod' <- GHC.loadModule tcMod
                                  ; dsMod <- fmap GHC.coreModule $ GHC.desugarModule tcMod'
                                  ; hsc_env <- GHC.getSession
+#if MIN_VERSION_ghc(8,4,1)
+                                 ; simpl_guts <- MonadUtils.liftIO $ HscMain.hscSimplify hsc_env [] dsMod
+#else
                                  ; simpl_guts <- MonadUtils.liftIO $ HscMain.hscSimplify hsc_env dsMod
+#endif
                                  ; (tidy_guts,_) <- MonadUtils.liftIO $ TidyPgm.tidyProgram hsc_env simpl_guts
                                  ; let pgm        = HscTypes.cg_binds tidy_guts
                                  ; let modFamInstEnv = TcRnTypes.tcg_fam_inst_env $ fst $ GHC.tm_internals_ tcMod
@@ -273,9 +285,17 @@ makeRecursiveGroups
     makeNode
       :: (CoreSyn.CoreBndr,CoreSyn.CoreExpr)
       -> Digraph.Node Unique.Unique (CoreSyn.CoreBndr,CoreSyn.CoreExpr)
-    makeNode (b,e) = ((b,e)
-                     ,Var.varUnique b
-                     ,UniqSet.nonDetKeysUniqSet (CoreFVs.exprFreeIds e))
+    makeNode (b,e) =
+#if MIN_VERSION_ghc(8,4,1)
+      Digraph.DigraphNode
+        (b,e)
+        (Var.varUnique b)
+        (UniqSet.nonDetKeysUniqSet (CoreFVs.exprFreeIds e))
+#else
+      ((b,e)
+      ,Var.varUnique b
+      ,UniqSet.nonDetKeysUniqSet (CoreFVs.exprFreeIds e))
+#endif
 
     makeBind
       :: Digraph.SCC (CoreSyn.CoreBndr,CoreSyn.CoreExpr)
@@ -288,7 +308,11 @@ findTopEntityAnnotations
   => [CoreSyn.CoreBndr]
   -> m [(CoreSyn.CoreBndr,Maybe TopEntity)]
 findTopEntityAnnotations bndrs = do
+#if MIN_VERSION_ghc(8,4,1)
+  let deserializer = GhcPlugins.deserializeWithData :: ([Word8] -> TopEntity)
+#else
   let deserializer = Serialized.deserializeWithData :: ([Word8] -> TopEntity)
+#endif
       targets      = map (Annotations.NamedTarget . Var.varName) bndrs
 
   anns <- mapM (GHC.findGlobalAnns deserializer) targets
@@ -304,7 +328,11 @@ findTestBenchAnnotations
   => [CoreSyn.CoreBndr]
   -> m [(CoreSyn.CoreBndr,CoreSyn.CoreBndr)]
 findTestBenchAnnotations bndrs = do
+#if MIN_VERSION_ghc(8,4,1)
+  let deserializer = GhcPlugins.deserializeWithData :: ([Word8] -> TestBench)
+#else
   let deserializer = Serialized.deserializeWithData :: ([Word8] -> TestBench)
+#endif
       targets      = map (Annotations.NamedTarget . Var.varName) bndrs
 
   anns <- mapM (GHC.findGlobalAnns deserializer) targets
