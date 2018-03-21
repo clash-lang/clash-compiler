@@ -92,7 +92,7 @@ type Size = Int
 
 -- | Representable hardware types
 data HWType
-  = Void (Maybe Size)
+  = Void (Maybe HWType)
   -- ^ Empty type. @Just Size@ for "empty" Vectors so we can still have
   -- primitives that can traverse e.g. Vectors of unit and know the lenght of
   -- that vector.

@@ -98,8 +98,9 @@ import           Clash.Core.Util
 import           Clash.Core.Var              (Id, Var (..))
 import           Clash.Driver.Types          (DebugLevel (..), ClashException (..))
 import           Clash.Netlist.BlackBox.Util (usedArguments)
-import           Clash.Netlist.Util          (representableType,
-                                              splitNormalized)
+import           Clash.Netlist.Types         (HWType (..))
+import           Clash.Netlist.Util
+  (coreTypeToHWType, representableType, splitNormalized)
 import           Clash.Normalize.DEC
 import           Clash.Normalize.PrimitiveReductions
 import           Clash.Normalize.Types
@@ -342,11 +343,28 @@ caseCon ctx e@(Case subj ty alts)
         (Prim nm _,[])
           | nm `elem` ["EmptyCase"] ->
             changed (Prim nm ty)
-        _ -> traceIf (lvl > DebugNone && isConstant e)
-                     ("Irreducible constant as case subject: " ++ showDoc subj ++ "\nCan be reduced to: " ++ showDoc subj')
-                     (caseOneAlt e)
+        _ -> do
+          subjTy <- termType tcm subj
+          tran   <- Lens.view typeTranslator
+          case coreTypeToHWType tran tcm False subjTy of
+            Right (Void (Just hty))
+              | hty `elem` [BitVector 0, Unsigned 0, Signed 0, Index 1]
+              -> caseCon ctx (Case (Literal (IntegerLiteral 0)) ty alts)
+            _ -> traceIf (lvl > DebugNone && isConstant e)
+                   ("Irreducible constant as case subject: " ++ showDoc subj ++ "\nCan be reduced to: " ++ showDoc subj')
+                   (caseOneAlt e)
 
-caseCon _ e = caseOneAlt e
+caseCon ctx e@(Case subj ty alts) = do
+  tcm <- Lens.view tcCache
+  subjTy <- termType tcm subj
+  tran <- Lens.view typeTranslator
+  case coreTypeToHWType tran tcm False subjTy of
+    Right (Void (Just hty))
+      | hty `elem` [BitVector 0, Unsigned 0, Signed 0, Index 1]
+      -> caseCon ctx (Case (Literal (IntegerLiteral 0)) ty alts)
+    _ -> caseOneAlt e
+
+caseCon _ e = return e
 
 matchLiteralContructor
   :: Term

@@ -115,25 +115,25 @@ ghcTypeToHWType iw floatSupport = go
         "Clash.Sized.Internal.BitVector.BitVector" -> do
           n <- mapExceptT (Just . coerce) (tyNatSize m (head args))
           case n of
-            0 -> return (Void Nothing)
+            0 -> return (Void (Just (BitVector (fromInteger n))))
             _ -> return (BitVector (fromInteger n))
 
         "Clash.Sized.Internal.Index.Index" -> do
           n <- mapExceptT (Just . coerce) (tyNatSize m (head args))
           if n < 2
-             then return (Void Nothing)
+             then return (Void (Just (Index (fromInteger n))))
              else return (Index (fromInteger n))
 
         "Clash.Sized.Internal.Signed.Signed" -> do
           n <- mapExceptT (Just . coerce) (tyNatSize m (head args))
           if n == 0
-             then return (Void Nothing)
+             then return (Void (Just (Signed (fromInteger n))))
              else return (Signed (fromInteger n))
 
         "Clash.Sized.Internal.Unsigned.Unsigned" -> do
           n <- mapExceptT (Just .coerce) (tyNatSize m (head args))
           if n == 0
-             then return (Void Nothing)
+             then return (Void (Just (Unsigned (fromInteger n))))
              else return (Unsigned (fromInteger n))
 
         "Clash.Sized.Vector.Vec" -> do
@@ -141,8 +141,8 @@ ghcTypeToHWType iw floatSupport = go
           sz     <- mapExceptT (Just . coerce) (tyNatSize m szTy)
           elHWTy <- ExceptT $ return $ coreTypeToHWType go m keepVoid elTy
           case elHWTy of
-            Void {}     -> return (Void (Just (fromInteger sz)))
-            _ | sz == 0 -> return (Void (Just (fromInteger sz)))
+            Void {}     -> return (Void (Just (Vector (fromInteger sz) elHWTy)))
+            _ | sz == 0 -> return (Void (Just (Vector (fromInteger sz) elHWTy)))
             _           -> return $ Vector (fromInteger sz) elHWTy
 
         "Clash.Sized.RTree.RTree" -> do
@@ -150,7 +150,7 @@ ghcTypeToHWType iw floatSupport = go
           sz     <- mapExceptT (Just . coerce) (tyNatSize m szTy)
           elHWTy <- ExceptT $ return $ coreTypeToHWType go m keepVoid elTy
           case elHWTy of
-            Void {} -> return (Void Nothing)
+            Void {} -> return (Void (Just (RTree (fromInteger sz) elHWTy)))
             _       -> return $ RTree (fromInteger sz) elHWTy
 
         "String" -> return String
