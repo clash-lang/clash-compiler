@@ -8,6 +8,7 @@
   in templates
 -}
 
+{-# LANGUAGE CPP               #-}
 {-# LANGUAGE FlexibleContexts  #-}
 {-# LANGUAGE LambdaCase        #-}
 {-# LANGUAGE OverloadedStrings #-}
@@ -23,7 +24,9 @@ import           Data.Bool                            (bool)
 import           Data.Foldable                        (foldrM)
 import qualified Data.IntMap                          as IntMap
 import           Data.List                            (mapAccumL, nub)
+#if !MIN_VERSION_base(4,11,0)
 import           Data.Monoid
+#endif
 import           Data.Semigroup.Monad
 import           Data.Text.Prettyprint.Doc.Extra
 import           Data.Text.Lazy                       (Text)
