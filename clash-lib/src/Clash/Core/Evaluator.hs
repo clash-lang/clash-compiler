@@ -26,8 +26,8 @@ import           Data.Map
   (Map,delete,fromList,insert,lookup,union)
 import qualified Data.Map                                as M
 import           Data.Text                               (Text)
+import           Data.Text.Prettyprint.Doc               (hsep)
 import           Debug.Trace                             (trace)
-import           Text.PrettyPrint                        (hsep)
 import           Clash.Core.DataCon
 import           Clash.Core.Literal
 import           Clash.Core.Name

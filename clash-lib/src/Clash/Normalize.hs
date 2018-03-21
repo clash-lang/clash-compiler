@@ -28,8 +28,8 @@ import qualified Data.Maybe                       as Maybe
 import qualified Data.Set                         as Set
 import qualified Data.Set.Lens                    as Lens
 import           Data.Semigroup                   ((<>))
+import           Data.Text.Prettyprint.Doc        (vcat)
 import           Unbound.Generics.LocallyNameless (unembed, runLFreshM)
-import           Text.PrettyPrint                 (vcat)
 
 import           BasicTypes                       (InlineSpec (..))
 import           SrcLoc                           (SrcSpan,noSrcSpan)
