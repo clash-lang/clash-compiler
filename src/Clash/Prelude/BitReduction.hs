@@ -48,7 +48,7 @@ reduceAnd v = reduceAnd# (pack v)
 -- 00_0000
 -- >>> reduceOr (0 :: Signed 6)
 -- 0
-reduceOr :: BitPack a => a -> Bit
+reduceOr :: (BitPack a, KnownNat (BitSize a)) => a -> Bit
 reduceOr v = reduceOr# (pack v)
 
 {-# INLINE reduceXor #-}
@@ -66,5 +66,5 @@ reduceOr v = reduceOr# (pack v)
 -- 11_1011
 -- >>> reduceXor (-5 :: Signed 6)
 -- 1
-reduceXor :: BitPack a => a -> Bit
+reduceXor :: (BitPack a, KnownNat (BitSize a)) => a -> Bit
 reduceXor v = reduceXor# (pack v)
