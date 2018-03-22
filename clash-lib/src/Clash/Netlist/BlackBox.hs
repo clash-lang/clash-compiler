@@ -298,6 +298,12 @@ mkFunInput resId e = do
                       dcApp  = DataCon resHTy (DC (resHTy,1)) dcInps
                       dcAss  = Assignment (pack "~RESULT") dcApp
                   return (Right (("",[dcAss]),Wire))
+                -- The following happens for things like `Maybe ()`
+                Just resHTy@(Sum _ _) -> do
+                  let dcI   = dcTag dc - 1
+                      dcApp = DataCon resHTy (DC (resHTy,dcI)) []
+                      dcAss = Assignment (pack "~RESULT") dcApp
+                  return (Right (("",[dcAss]),Wire))
                 _ -> error $ $(curLoc) ++ "Cannot make function input for: " ++ showDoc e
             C.Var _ (nameOcc -> fun) -> do
               normalized <- Lens.use bindings
