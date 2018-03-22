@@ -517,26 +517,40 @@ mkInput pM = case pM of
         Vector sz hwty' -> do
           arguments <- mapM (appendIdentifier (i',hwty')) [0..sz-1]
           (ports,_,exprs,_) <- unzip4 <$> mapM (mkInput Nothing) arguments
-          let netdecl  = NetDecl Nothing i' hwty
-              vecExpr  = mkVectorChain sz hwty' exprs
+          let hwty2    = filterVoid hwty'
+              netdecl  = NetDecl Nothing i' (Vector sz hwty2)
+              vecExpr  = mkVectorChain sz hwty2 exprs
               netassgn = Assignment i' vecExpr
           return (concat ports,[netdecl,netassgn],vecExpr,i')
 
         RTree d hwty' -> do
           arguments <- mapM (appendIdentifier (i',hwty')) [0..2^d-1]
           (ports,_,exprs,_) <- unzip4 <$> mapM (mkInput Nothing) arguments
-          let netdecl  = NetDecl Nothing i' hwty
-              trExpr   = mkRTreeChain d hwty' exprs
+          let hwty2    = filterVoid hwty'
+              netdecl  = NetDecl Nothing i' (RTree d hwty2)
+              trExpr   = mkRTreeChain d hwty2 exprs
               netassgn = Assignment i' trExpr
           return (concat ports,[netdecl,netassgn],trExpr,i')
 
         Product _ hwtys -> do
           arguments <- zipWithM appendIdentifier (map (i',) hwtys) [0..]
-          (ports,_,exprs,_) <- unzip4 <$> mapM (mkInput Nothing) arguments
-          let netdecl  = NetDecl Nothing i' hwty
-              dcExpr   = DataCon hwty (DC (hwty,0)) exprs
-              netassgn = Assignment i' dcExpr
-          return (concat ports,[netdecl,netassgn],dcExpr,i')
+          let argumentsBundled   = zip hwtys arguments
+              argumentsFiltered  = filter (not . isVoid . fst) argumentsBundled
+              argumentsFiltered' = map snd argumentsFiltered
+          (ports,_,exprs,_) <- unzip4 <$> mapM (mkInput Nothing) argumentsFiltered'
+          case exprs of
+            [expr] ->
+              let hwty'    = filterVoid hwty
+                  netdecl  = NetDecl Nothing i' hwty'
+                  dcExpr   = expr
+                  netassgn = Assignment i' expr
+              in  return (concat ports,[netdecl,netassgn],dcExpr,i')
+            _ ->
+              let hwty'    = filterVoid hwty
+                  netdecl  = NetDecl Nothing i' hwty'
+                  dcExpr   = DataCon hwty' (DC (hwty',0)) exprs
+                  netassgn = Assignment i' dcExpr
+              in  return (concat ports,[netdecl,netassgn],dcExpr,i')
 
         Clock nm rt Gated -> do
           let hwtys = [Clock nm rt Source,Bool]
@@ -560,16 +574,18 @@ mkInput pM = case pM of
         Vector sz hwty' -> do
           arguments <- mapM (appendIdentifier (pN,hwty')) [0..sz-1]
           (ports,_,exprs,_) <- unzip4 <$> zipWithM mkInput (extendPorts ps) arguments
-          let netdecl  = NetDecl Nothing pN hwty
-              vecExpr  = mkVectorChain sz hwty' exprs
+          let hwty2    = filterVoid hwty'
+              netdecl  = NetDecl Nothing pN (Vector sz hwty2)
+              vecExpr  = mkVectorChain sz hwty2 exprs
               netassgn = Assignment pN vecExpr
           return (concat ports,[netdecl,netassgn],vecExpr,pN)
 
         RTree d hwty' -> do
           arguments <- mapM (appendIdentifier (pN,hwty')) [0..2^d-1]
           (ports,_,exprs,_) <- unzip4 <$> zipWithM mkInput (extendPorts ps) arguments
-          let netdecl  = NetDecl Nothing pN hwty
-              trExpr  = mkRTreeChain d hwty' exprs
+          let hwty2    = filterVoid hwty'
+              netdecl  = NetDecl Nothing pN (RTree d hwty2)
+              trExpr   = mkRTreeChain d hwty2 exprs
               netassgn = Assignment pN trExpr
           return (concat ports,[netdecl,netassgn],trExpr,pN)
 
@@ -673,23 +689,36 @@ mkOutput pM = case pM of
         Vector sz hwty' -> do
           results <- mapM (appendIdentifier (o',hwty')) [0..sz-1]
           (ports,decls,ids) <- unzip3 <$> mapM (mkOutput Nothing) results
-          let netdecl = NetDecl Nothing o' hwty
-              assigns = zipWith (assignId o' hwty 10) ids [0..]
+          let hwty2   = Vector sz (filterVoid hwty')
+              netdecl = NetDecl Nothing o' hwty2
+              assigns = zipWith (assignId o' hwty2 10) ids [0..]
           return (concat ports,netdecl:assigns ++ concat decls,o')
 
         RTree d hwty' -> do
           results <- mapM (appendIdentifier (o',hwty')) [0..2^d-1]
           (ports,decls,ids) <- unzip3 <$> mapM (mkOutput Nothing) results
-          let netdecl = NetDecl Nothing o' hwty
-              assigns = zipWith (assignId o' hwty 10) ids [0..]
+          let hwty2   = RTree d (filterVoid hwty')
+              netdecl = NetDecl Nothing o' hwty2
+              assigns = zipWith (assignId o' hwty2 10) ids [0..]
           return (concat ports,netdecl:assigns ++ concat decls,o')
 
         Product _ hwtys -> do
           results <- zipWithM appendIdentifier (map (o,) hwtys) [0..]
-          (ports,decls,ids) <- unzip3 <$> mapM (mkOutput Nothing) results
-          let netdecl = NetDecl Nothing o' hwty
-              assigns = zipWith (assignId o' hwty 0) ids [0..]
-          return (concat ports,netdecl:assigns ++ concat decls,o')
+          let resultsBundled   = zip hwtys results
+              resultsFiltered  = filter (not . isVoid . fst) resultsBundled
+              resultsFiltered' = map snd resultsFiltered
+          (ports,decls,ids) <- unzip3 <$> mapM (mkOutput Nothing) resultsFiltered'
+          case ids of
+            [i] ->
+              let hwty'   = filterVoid hwty
+                  netdecl = NetDecl Nothing o' hwty'
+                  assign  = Assignment i (Identifier o' Nothing)
+              in  return (concat ports,netdecl:assign:concat decls,o')
+            _   ->
+              let hwty'   = filterVoid hwty
+                  netdecl = NetDecl Nothing o' hwty'
+                  assigns = zipWith (assignId o' hwty' 0) ids [0..]
+              in  return (concat ports,netdecl:assigns ++ concat decls,o')
 
         _ -> return ([(o',hwty)],[],o')
 
@@ -703,15 +732,17 @@ mkOutput pM = case pM of
         Vector sz hwty' -> do
           results <- mapM (appendIdentifier (pN,hwty')) [0..sz-1]
           (ports,decls,ids) <- unzip3 <$> zipWithM mkOutput (extendPorts ps) results
-          let netdecl = NetDecl Nothing pN hwty
-              assigns = zipWith (assignId pN hwty 10) ids [0..]
+          let hwty2   = Vector sz (filterVoid hwty')
+              netdecl = NetDecl Nothing pN hwty2
+              assigns = zipWith (assignId pN hwty2 10) ids [0..]
           return (concat ports,netdecl:assigns ++ concat decls,pN)
 
         RTree d hwty' -> do
           results <- mapM (appendIdentifier (pN,hwty')) [0..2^d-1]
           (ports,decls,ids) <- unzip3 <$> zipWithM mkOutput (extendPorts ps) results
-          let netdecl = NetDecl Nothing pN hwty
-              assigns = zipWith (assignId pN hwty 10) ids [0..]
+          let hwty2   = RTree d (filterVoid hwty')
+              netdecl = NetDecl Nothing pN hwty2
+              assigns = zipWith (assignId pN hwty2 10) ids [0..]
           return (concat ports,netdecl:assigns ++ concat decls,pN)
 
         Product _ hwtys -> do
