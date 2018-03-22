@@ -1,8 +1,12 @@
-{-# LANGUAGE UndecidableInstances #-}
+{-# LANGUAGE CPP, UndecidableInstances #-}
 module DTFold where
 
 import Clash.Prelude
+#if MIN_VERSION_singletons(2,4,0)
+import Data.Singletons.Prelude hiding (type (+))
+#else
 import Data.Singletons.Prelude
+#endif
 import Data.Proxy
 
 data IIndex (f :: TyFun Nat *) :: *

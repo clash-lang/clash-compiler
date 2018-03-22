@@ -1,11 +1,15 @@
-{-# LANGUAGE ScopedTypeVariables, UndecidableInstances #-}
+{-# LANGUAGE CPP, ScopedTypeVariables, UndecidableInstances #-}
 module TFold where
 
 import Clash.Prelude
 import GHC.TypeLits.Extra
 
 import Data.Proxy
+#if MIN_VERSION_singletons(2,4,0)
+import Data.Singletons.Prelude hiding (type (+))
+#else
 import Data.Singletons.Prelude
+#endif
 
 data IIndex (f :: TyFun Nat *) :: *
 type instance Apply IIndex l = Index ((2^l)+1)
