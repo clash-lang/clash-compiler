@@ -108,38 +108,38 @@
   }
 , { "BlackBox" :
     { "name"      : "Clash.Sized.Internal.BitVector.eq#"
-    , "type"      : "eq# :: BitVector n -> BitVector n -> Bool"
-    , "templateE" : "~IF~SIZE[~TYP[0]]~THEN~ARG[0] == ~ARG[1]~ELSE1'b1~FI"
+    , "type"      : "eq# :: KnownNat n => BitVector n -> BitVector n -> Bool"
+    , "templateE" : "~IF~SIZE[~TYP[1]]~THEN~ARG[1] == ~ARG[2]~ELSE1'b1~FI"
     }
   }
 , { "BlackBox" :
     { "name"      : "Clash.Sized.Internal.BitVector.neq#"
-    , "type"      : "neq# :: BitVector n -> BitVector n -> Bool"
-    , "templateE" : "~IF~SIZE[~TYP[0]]~THEN~ARG[0] != ~ARG[1]~ELSE1'b0~FI"
+    , "type"      : "neq# :: KnownNat n => BitVector n -> BitVector n -> Bool"
+    , "templateE" : "~IF~SIZE[~TYP[1]]~THEN~ARG[1] != ~ARG[2]~ELSE1'b0~FI"
     }
   }
 , { "BlackBox" :
     { "name"      : "Clash.Sized.Internal.BitVector.lt#"
-    , "type"      : "lt# :: BitVector n -> BitVector n -> Bool"
-    , "templateE" : "~IF~SIZE[~TYP[0]]~THEN~ARG[0] < ~ARG[1]~ELSE1'b0~FI"
+    , "type"      : "lt# :: KnownNat n => BitVector n -> BitVector n -> Bool"
+    , "templateE" : "~IF~SIZE[~TYP[1]]~THEN~ARG[1] < ~ARG[2]~ELSE1'b0~FI"
     }
   }
 , { "BlackBox" :
     { "name"      : "Clash.Sized.Internal.BitVector.ge#"
-    , "type"      : "ge# :: BitVector n -> BitVector n -> Bool"
-    , "templateE" : "~IF~SIZE[~TYP[0]]~THEN~ARG[0] >= ~ARG[1]~ELSE1'b1~FI"
+    , "type"      : "ge# :: KnownNat n => BitVector n -> BitVector n -> Bool"
+    , "templateE" : "~IF~SIZE[~TYP[1]]~THEN~ARG[1] >= ~ARG[2]~ELSE1'b1~FI"
     }
   }
 , { "BlackBox" :
     { "name"      : "Clash.Sized.Internal.BitVector.gt#"
-    , "type"      : "gt# :: BitVector n -> BitVector n -> Bool"
-    , "templateE" : "~IF~SIZE[~TYP[0]]~THEN~ARG[0] > ~ARG[1]~ELSE1'b0~FI"
+    , "type"      : "gt# :: KnownNat n => BitVector n -> BitVector n -> Bool"
+    , "templateE" : "~IF~SIZE[~TYP[1]]~THEN~ARG[1] > ~ARG[2]~ELSE1'b0~FI"
     }
   }
 , { "BlackBox" :
     { "name"      : "Clash.Sized.Internal.BitVector.le#"
-    , "type"      : "le# :: BitVector n -> BitVector n -> Bool"
-    , "templateE" : "~IF~SIZE[~TYP[0]]~THEN~ARG[0] <= ~ARG[1]~ELSE1'b1~FI"
+    , "type"      : "le# :: KnownNat n => BitVector n -> BitVector n -> Bool"
+    , "templateE" : "~IF~SIZE[~TYP[1]]~THEN~ARG[1] <= ~ARG[2]~ELSE1'b1~FI"
     }
   }
 , { "BlackBox" :
