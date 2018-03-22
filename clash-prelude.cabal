@@ -255,7 +255,7 @@ test-suite unittests
       tasty-hunit
 
   Other-Modules: Clash.Tests.DerivingDataRepr
-                 Clash.Tests.DerivingDataReprTrain
+                 Clash.Tests.DerivingDataReprTypes
 
 
 benchmark benchmark-clash-prelude

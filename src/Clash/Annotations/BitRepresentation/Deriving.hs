@@ -14,24 +14,38 @@ This module contains:
 
 -}
 {-# LANGUAGE DataKinds          #-}
+{-# LANGUAGE DeriveAnyClass     #-}
 {-# LANGUAGE DeriveDataTypeable #-}
+{-# LANGUAGE DeriveGeneric      #-}
 {-# LANGUAGE DeriveLift         #-}
+{-# LANGUAGE LambdaCase         #-}
 {-# LANGUAGE MagicHash          #-}
+{-# LANGUAGE MultiWayIf         #-}
 {-# LANGUAGE QuasiQuotes        #-}
 {-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE TemplateHaskell    #-}
 {-# LANGUAGE ViewPatterns       #-}
 
+-- See: https://ghc.haskell.org/trac/ghc/ticket/14959. TODO: Consider putting
+-- the offending function (bitsToInteger') in a separate module.
+{-# OPTIONS_GHC -O0 #-}
+
 module Clash.Annotations.BitRepresentation.Deriving
   (
-  -- * Derivation functions and their accociated types
+  -- * Derivation functions
     deriveAnnotation
+  , deriveBitPack
   , deriveDefaultAnnotation
   , derivePackedAnnotation
-  , deriveBitPack
-  , simpleDerivator
+  , derivePackedMaybeAnnotation
+  -- * Derivators
+  , defaultDerivator
   , packedDerivator
+  , packedMaybeDerivator
+  , simpleDerivator
+  -- * Util functions
   , dontApplyInHDL
+  -- * Types associated with various functions
   , ConstructorType(..)
   , FieldsType(..)
   -- * Convenience type synonyms
@@ -42,22 +56,30 @@ module Clash.Annotations.BitRepresentation.Deriving
 import Clash.Annotations.BitRepresentation
   (DataReprAnn(..), ConstrRepr(..), BitMask, Value, Size, reprType)
 import Clash.Annotations.BitRepresentation.Internal
-  (dataReprAnnToDataRepr', thTypeToType', DataRepr'(..), ConstrRepr'(..))
+  (dataReprAnnToDataRepr', constrReprToConstrRepr', DataRepr'(..))
 import Clash.Annotations.BitRepresentation.Util
-  (bitOrigins, BitOrigin(..), bitRanges, Bit(..))
+  (bitOrigins, bitOrigins', BitOrigin(..), bitRanges, Bit)
+import qualified Clash.Annotations.BitRepresentation.Util
+  as Util
 
 import           Clash.Class.BitPack        (BitPack, BitSize, pack, unpack)
 import           Clash.Class.Resize         (resize)
 import           Clash.Sized.BitVector      (BitVector, high, low, (++#))
-import           Control.Monad              (zipWithM)
+import           Control.DeepSeq            (NFData)
+import           Control.Monad              (forM)
 import           Data.Bits
-  (shiftL, shiftR, complement, (.&.), (.|.), zeroBits, popCount, bit, testBit)
+  (shiftL, shiftR, complement, (.&.), (.|.), zeroBits, popCount, bit, testBit,
+   Bits, setBit)
 import           Data.Data                  (Data)
-import           Data.List                  (mapAccumL, zipWith4, sortOn)
+import           Data.List
+  (mapAccumL, zipWith4, sortOn, partition)
 import           Data.Typeable              (Typeable)
 import qualified Data.Map                   as Map
+import           Data.Maybe                 (fromMaybe)
+import qualified Data.Set                   as Set
 import           Data.Proxy                 (Proxy(..))
 import           GHC.Exts                   (Int(I#))
+import           GHC.Generics               (Generic)
 import           GHC.Integer.Logarithms     (integerLog2#)
 import           GHC.TypeLits               (natVal)
 import           Language.Haskell.TH
@@ -74,6 +96,8 @@ data BitMaskOrigin
 isExternal :: BitMaskOrigin -> Bool
 isExternal External = True
 isExternal _        = False
+
+type ReprAnnCache = Map.Map Type DataReprAnn
 
 type NameMap = Map.Map Name Type
 
@@ -111,6 +135,10 @@ msb :: Integer -> Int
 msb 0 = error $ "Most significant bit does not exist for zero."
 msb 1 = 0
 msb n = 1 + msb (shiftR n 1)
+
+mkReprAnnCache :: [DataReprAnn] -> ReprAnnCache
+mkReprAnnCache anns =
+  Map.fromList [(typ, rAnn) | rAnn@(DataReprAnn typ _ _) <- anns]
 
 -- | Integer version of (ceil . log2). Can handle arguments up to 2^(2^WORDWIDTH).
 integerLog2Ceil :: Integer -> Int
@@ -364,6 +392,160 @@ defaultDerivator = simpleDerivator Binary Overlap
 deriveDefaultAnnotation :: Q Type -> Q [Dec]
 deriveDefaultAnnotation = deriveAnnotation defaultDerivator
 
+---------------------------------------------------------------
+------------ DERIVING PACKED MAYBE REPRESENTATIONS ------------
+---------------------------------------------------------------
+toBits'
+  :: Bits a
+  => Size
+  -> a
+  -> [Bit']
+toBits' 0 _ = []
+toBits' size bits = bit' : toBits' (size - 1) bits
+  where bit' = if testBit bits (size - 1) then H else L
+
+bitsToInteger' :: (Bit' -> Bool) -> [Bit'] -> Integer
+bitsToInteger' predFunc bits = foldl setBit 0 toSet
+  where
+    toSet = [n | (n, b) <- zip [0..] (reverse bits), predFunc b]
+
+bitsToInteger :: [Bit'] -> Integer
+bitsToInteger = bitsToInteger' (==H)
+
+bitsToMask :: [Bit'] -> Integer
+bitsToMask = bitsToInteger' (\b -> b == H || b == L)
+
+data Bit'
+  = X
+  -- ^ Could be both 1 or 0
+  | L
+  -- ^ 0
+  | H
+  -- ^ 1
+  | U
+  -- ^ Unused
+    deriving (Show, Eq, Generic, NFData)
+
+-- | Given a number of possible values, construct a list of all complement values.
+-- For example, Given a list:
+--
+-- @
+-- [[HH, HH], [LL, LL]]
+-- @
+--
+-- then:
+--
+-- @
+-- [[HH, LL], [LL, HH]]
+-- @
+--
+-- would be complements.
+complementValues
+  :: Size
+  -> [[Bit']]
+  -> [[Bit']]
+complementValues 0 _ = []
+complementValues 1 xs
+  | X `elem` xs'                 = []
+  | H `elem` xs' && L `elem` xs' = []
+  | H `elem` xs'                 = [[L]]
+  | otherwise                    = [[H]]
+  where
+    xs' = map head xs
+complementValues size [] = [replicate size U]
+complementValues size values =
+  if | all (==U) (map head values') -> map (U:) (recc (map tail values'))
+     | any (==X) (map head values') -> map (X:) (recc (map tail values'))
+     | otherwise ->
+        (map (L:) (recc (map tail lows))) ++
+        (map (H:) (recc (map tail highs')))
+  where
+    values'       = filter (any (/= U)) values
+    recc          = complementValues (size - 1)
+    (highs, lows) = partition ((== H) . head) values'
+    highs'        = highs ++ filter ((`elem` [X, U]) . head) values'
+
+-- | Generate all bitvalues the given type can assume.
+possibleValues
+  :: ReprAnnCache
+  -> Type
+  -> Size
+  -> Q [[Bit']]
+possibleValues typeMap typ size =
+  let (ConT typeName, _typeArgs) = collectTypeArgs typ in
+
+  case Map.lookup typ typeMap of
+    -- No custom data representation found.
+    Nothing -> do
+      info <- reify typeName
+      case info of
+        -- TODO: check if fields have custom bit representations
+        (TyConI (DataD [] _constrName _vars _kind dConstructors _clauses)) ->
+          let nConstrBits = bitsNeeded (toInteger $ length dConstructors) in
+          let fieldBits = replicate (size - nConstrBits) X in
+          let constrBits = [toBits' nConstrBits n | n <- [0..length dConstructors - 1]] in
+          return $ zipWith (++) constrBits (repeat fieldBits)
+        _ ->
+          return [replicate size X]
+
+    Just (dataReprAnnToDataRepr' -> dataRepr) ->
+      -- TODO: check if fields have custom bit representations
+      let (DataRepr' _name _size constrs) = dataRepr in
+      forM constrs $ \constr -> do
+        return $
+          map
+            (\case { Lit [Util.H] -> H;
+                     Lit [Util.L] -> L;
+                     Lit [Util.U] -> U;
+                     Field _ _ _  -> X;
+                     c -> error $ "possibleValues (2): unexpected: " ++ show c; })
+            (bitOrigins' dataRepr constr)
+
+packedMaybe :: Size -> Type -> Q (Maybe DataReprAnn)
+packedMaybe size typ = do
+  cache <- mkReprAnnCache <$> collectDataReprs
+  values <- possibleValues cache typ size
+  return $ case complementValues size values of
+             (value:_) ->
+               Just $ DataReprAnn
+                        (AppT (ConT ''Maybe) typ)
+                        size
+                        [ ConstrRepr
+                            'Nothing
+                            (bitsToMask value)
+                            (bitsToInteger value)
+                            []
+                        , ConstrRepr
+                            'Just
+                            0
+                            0
+                            [bitmask (size - 1) size] ]
+             [] ->
+               Nothing
+
+
+packedMaybeDerivator :: DataReprAnn -> Derivator
+packedMaybeDerivator (DataReprAnn _ size _) typ =
+  case maybeCon of
+    ConT nm ->
+      if nm == ''Maybe then
+        let err = unwords [ "Could not derive packed maybe for:", show typ
+                          , ";", "Does its subtype have any space left to store"
+                          , "the constructor in?" ] in
+        lift =<< (fromMaybe $ error err) <$> (packedMaybe (size - 1) maybeTyp)
+      else
+        error $ unwords [ "You can only pass Maybe types to packedMaybeDerivator,"
+                        , "not", show nm]
+    unexpected ->
+      error $ "packedMaybeDerivator: unexpected constructor: " ++ show unexpected
+  where
+    (maybeCon, head -> maybeTyp) = collectTypeArgs typ
+
+-- | Derive a compactly represented version of @Maybe a@.
+derivePackedMaybeAnnotation :: DataReprAnn -> Q [Dec]
+derivePackedMaybeAnnotation defaultDataRepr@(DataReprAnn typ _ _) = do
+  deriveAnnotation (packedMaybeDerivator defaultDataRepr) (return typ)
+
 ---------------------------------------------------------
 ------------ DERIVING PACKED REPRESENTATIONS ------------
 ---------------------------------------------------------
@@ -491,16 +673,18 @@ derivePackedAnnotation = deriveAnnotation packedDerivator
 ----------------------------------------------------
 
 -- | Collect data reprs of current module
-collectDataReprs :: Q [([Name], DataRepr')]
+collectDataReprs :: Q [DataReprAnn]
 collectDataReprs = do
   thisMod <- thisModule
-  (map toDataRepr') <$> reifyAnnotations (AnnLookupModule thisMod)
+  go [thisMod] Set.empty []
   where
-    toDataRepr' :: DataReprAnn -> ([Name], DataRepr')
-    toDataRepr' dataRepr@(DataReprAnn _ _ constrs) =
-      ( [n | ConstrRepr n _ _ _ <- constrs]
-      , dataReprAnnToDataRepr' dataRepr
-      )
+    go []     _visited acc = return acc
+    go (x:xs) visited  acc
+      | x `Set.member` visited = go xs visited acc
+      | otherwise = do
+          ModuleInfo newMods <- reifyModule x
+          newAnns <- reifyAnnotations $ AnnLookupModule x
+          go (newMods ++ xs) (x `Set.insert` visited) (newAnns ++ acc)
 
 group :: [Bit] -> [(Int, Bit)]
 group [] = []
@@ -512,13 +696,13 @@ group bs = (length head', head bs) : rest
 
 bitToExpr' :: (Int, Bit) -> Q Exp
 bitToExpr' (0, _) = error $ "Unexpected group length: 0"
-bitToExpr' (1, H) = lift high
-bitToExpr' (1, L) = lift low
+bitToExpr' (1, Util.H) = lift high
+bitToExpr' (1, Util.L) = lift low
 -- TODO / Evaluate: Undefined bit values should not be converted
 bitToExpr' (1, _) = lift low
-bitToExpr' (numTyLit' -> n, H) =
+bitToExpr' (numTyLit' -> n, Util.H) =
   [| complement (resize $(lift low) :: BitVector $n) |]
-bitToExpr' (numTyLit' -> n, L) =
+bitToExpr' (numTyLit' -> n, Util.L) =
   [| resize $(lift low) :: BitVector $n |]
 bitToExpr' (numTyLit' -> n, _) =
   [| resize $(lift low) :: BitVector $n |]
@@ -583,11 +767,10 @@ select fields (Field fieldn from downto) =
   select' (fields !! fieldn) [(from, downto)]
 
 buildPackMatch
-  :: DataRepr'
-  -> ConstrRepr'
-  -> Name
+  :: DataReprAnn
+  -> ConstrRepr
   -> Q Match
-buildPackMatch dataRepr cRepr@(ConstrRepr' _ _ _ _ fieldanns) qName = do
+buildPackMatch dataRepr cRepr@(ConstrRepr name _ _ fieldanns) = do
   fieldNames <-
     mapM (\n -> newName $ "field" ++ show n) [0..length fieldanns-1]
   fieldPackedNames <-
@@ -596,23 +779,24 @@ buildPackMatch dataRepr cRepr@(ConstrRepr' _ _ _ _ fieldanns) qName = do
   let packed fName = AppE (VarE 'pack) (VarE fName)
   let pack' pName fName = ValD (VarP pName) (NormalB $ packed fName) []
   let fieldPackedDecls = zipWith pack' fieldPackedNames fieldNames
-  let origins = bitOrigins dataRepr cRepr
+  let origins = bitOrigins
+                  (dataReprAnnToDataRepr' dataRepr)
+                  (constrReprToConstrRepr' undefined cRepr)
 
   vec <- foldl1
               (\v1 v2 -> [| $v1 ++# $v2 |])
               (map (select $ map VarE fieldPackedNames) origins)
 
-  return $ Match (ConP qName (VarP <$> fieldNames)) (NormalB vec) fieldPackedDecls
+  return $ Match (ConP name (VarP <$> fieldNames)) (NormalB vec) fieldPackedDecls
 
 -- | Build a /pack/ function corresponding to given DataRepr
 buildPack
-  :: [Name]
-  -> DataRepr'
+  :: DataReprAnn
   -> Q [Dec]
-buildPack constrNames dataRepr@(DataRepr' _name _size constrs) = do
+buildPack dataRepr@(DataReprAnn _name _size constrs) = do
   argNameIn    <- newName "toBePackedIn"
   argName      <- newName "toBePacked"
-  constrs'     <- zipWithM (buildPackMatch dataRepr) constrs constrNames
+  constrs'     <- mapM (buildPackMatch dataRepr) constrs
   let packBody    = CaseE (VarE argName) constrs'
   let packLambda  = LamE [VarP argName] packBody
   let packApplied = (VarE 'dontApplyInHDL) `AppE` packLambda `AppE` (VarE argNameIn)
@@ -628,7 +812,6 @@ dontApplyInHDL :: (a -> b) -> a -> b
 dontApplyInHDL f a = f a
 {-# NOINLINE dontApplyInHDL #-}
 
-
 buildUnpackField
   :: Name
   -> Integer
@@ -640,24 +823,22 @@ buildUnpackField valueName mask =
 
 buildUnpackIfE
   :: Name
-  -> ConstrRepr'
-  -> Name
+  -> ConstrRepr
   -> Q (Guard, Exp)
-buildUnpackIfE valueName (ConstrRepr' _ _ mask value fieldanns) qName = do
+buildUnpackIfE valueName (ConstrRepr name mask value fieldanns) = do
   let valueName' = return $ VarE valueName
   guard  <- NormalG <$> [| ((.&.) $valueName' mask) == value |]
   fields <- mapM (buildUnpackField valueName) fieldanns
-  return (guard, foldl AppE (ConE qName) fields)
+  return (guard, foldl AppE (ConE name) fields)
 
 -- | Build an /unpack/ function corresponding to given DataRepr
 buildUnpack
-  :: [Name]
-  -> DataRepr'
+  :: DataReprAnn
   -> Q [Dec]
-buildUnpack constrNames (DataRepr' _name _size constrs) = do
+buildUnpack (DataReprAnn _name _size constrs) = do
   argNameIn   <- newName "toBeUnpackedIn"
   argName     <- newName "toBeUnpacked"
-  matches     <- zipWithM (buildUnpackIfE argName) constrs constrNames
+  matches     <- mapM (buildUnpackIfE argName) constrs
   err         <- [| error $ "Could not match constructor for: " ++ show $(varE argName) |]
   let unpackBody    = MultiIfE $ matches ++ [(NormalG (ConE 'True), err)]
   let unpackLambda  = LamE [VarP argName] unpackBody
@@ -674,17 +855,16 @@ deriveBitPack :: Q Type -> Q [Dec]
 deriveBitPack typQ = do
   anns <- collectDataReprs
   typ  <- typQ
-  let typ' = thTypeToType' typ
 
-  let ann = case filter (\(_names, DataRepr' t _ _) -> t == typ') anns of
+  let ann = case filter (\(DataReprAnn t _ _) -> t == typ) anns of
               [a] -> a
               []  -> error $ "No custom bit annotation found."
               _   -> error $ "Overlapping bit annotations found."
 
-  packFunc   <- (uncurry buildPack) ann
-  unpackFunc <- (uncurry buildUnpack) ann
+  packFunc   <- buildPack ann
+  unpackFunc <- buildUnpack ann
 
-  let (DataRepr' _name dataSize _constrs) = snd ann
+  let (DataReprAnn _name dataSize _constrs) = ann
 
   let bitSizeInst = TySynInstD
                       ''BitSize

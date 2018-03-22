@@ -14,6 +14,7 @@ Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
 module Clash.Annotations.BitRepresentation.Internal
   ( buildCustomReprs
   , dataReprAnnToDataRepr'
+  , constrReprToConstrRepr'
   , getConstrRepr
   , getDataRepr
   , thTypeToType'
@@ -70,13 +71,13 @@ data ConstrRepr' =
     [FieldAnn]
       deriving (Show, Generic, NFData, Eq, Typeable, Ord, Hashable)
 
+constrReprToConstrRepr' :: Int -> ConstrRepr -> ConstrRepr'
+constrReprToConstrRepr' n (ConstrRepr name mask value fieldanns) =
+  ConstrRepr' (thToText name) n mask value (map fromIntegral fieldanns)
+
 dataReprAnnToDataRepr' :: DataReprAnn -> DataRepr'
 dataReprAnnToDataRepr' (DataReprAnn typ size constrs) =
-  DataRepr' (thTypeToType' typ) size (zipWith toConstrRepr' [0..] constrs)
-    where
-      toConstrRepr' :: Int -> ConstrRepr -> ConstrRepr'
-      toConstrRepr' n (ConstrRepr name mask value fieldanns) =
-        ConstrRepr' (thToText name) n mask value (map fromIntegral fieldanns)
+  DataRepr' (thTypeToType' typ) size (zipWith constrReprToConstrRepr' [0..] constrs)
 
 thToText :: TH.Name -> Text.Text
 thToText (TH.Name (TH.OccName name') (TH.NameG _namespace _pkgName (TH.ModName modName))) =

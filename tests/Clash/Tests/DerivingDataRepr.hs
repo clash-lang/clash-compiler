@@ -13,8 +13,12 @@ import Test.Tasty.HUnit
 import Prelude ((=<<), ($))
 import Clash.Annotations.BitRepresentation
 import Clash.Annotations.BitRepresentation.Deriving
-import Clash.Tests.DerivingDataReprTrain (Train(..))
+import Clash.Tests.DerivingDataReprTypes (Train(..), RGB(..))
+import Data.Maybe (Maybe(..))
 
+---------------------------------------------------------
+------------ DERIVING SIMPLE REPRESENTATIONS ------------
+---------------------------------------------------------
 oneHotOverlapRepr :: DataReprAnn
 oneHotOverlapRepr = $( (simpleDerivator OneHot Overlap) =<< [t| Train |] )
 
@@ -71,6 +75,10 @@ countWideRepr' =
     , ConstrRepr 'Toy         0b11000000 0b11000000 []
     ]
 
+------------------------------------------------
+------------ PACKED REPRESENTATIONS ------------
+------------------------------------------------
+
 packedRepr :: DataReprAnn
 packedRepr = $( packedDerivator =<< [t| Train |] )
 
@@ -85,6 +93,23 @@ packedRepr' =
     , ConstrRepr 'Maintenance 3       3 []
     ]
 
+------------------------------------------------------
+------------ PACKED MAYBE REPRESENTATIONS ------------
+------------------------------------------------------
+
+packedMaybeRGB :: DataReprAnn
+packedMaybeRGB = $( packedMaybeDerivator $(defaultDerivator =<< [t| Maybe RGB |]) =<< [t| Maybe RGB |] )
+
+packedMaybeRGB' :: DataReprAnn
+packedMaybeRGB' =
+  DataReprAnn
+    $(reprType [t| Maybe RGB |])
+    2
+    [ ConstrRepr 'Nothing 0b11 0b11 []
+    , ConstrRepr 'Just    0b00 0b00 [0b11]
+    ]
+
+-- MAIN
 tests :: TestTree
 tests = testGroup "DerivingDataRepr"
   [ testCase "OneHotOverlap" $ oneHotOverlapRepr @?= oneHotOverlapRepr'
@@ -92,4 +117,5 @@ tests = testGroup "DerivingDataRepr"
   , testCase "BinaryOverlap" $ countOverlapRepr  @?= countOverlapRepr'
   , testCase "BinaryWide"    $ countWideRepr     @?= countWideRepr'
   , testCase "Packed"        $ packedRepr        @?= packedRepr'
+  , testCase "PackedMaybe"   $ packedMaybeRGB    @?= packedMaybeRGB'
   ]

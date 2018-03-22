@@ -38,6 +38,7 @@ import           Data.Typeable              (Typeable)
 import qualified Language.Haskell.TH.Lib    as TH
 import qualified Language.Haskell.TH.Lift   ()
 import qualified Language.Haskell.TH.Syntax as TH
+import           GHC.Generics               (Generic)
 
 type BitMask  = Integer
 type Value    = Integer
@@ -115,7 +116,7 @@ data DataReprAnn =
     Size
     -- Constructors:
     [ConstrRepr]
-      deriving (Show, Data, Typeable, Eq)
+      deriving (Show, Data, Typeable, Eq, Generic, TH.Lift)
 
 -- | Annotation for constructors. Indicates how to match this constructor based
 -- off of the whole datatype.
@@ -129,4 +130,4 @@ data ConstrRepr =
     Value
     -- Masks for fields. Indicates where fields are stored:
     [FieldAnn]
-      deriving (Show, Data, Typeable, Eq)
+      deriving (Show, Data, Typeable, Eq, Generic, TH.Lift)
