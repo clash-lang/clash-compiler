@@ -2,7 +2,8 @@ module Fib where
 
 import Clash.Prelude
 
-fib :: HasClockReset dom gated synchronous => Signal dom (Unsigned 64)
+-- TODO: revert this back to (HasClockReset dom gated synchronous)
+fib :: (HasClock dom gated, HasReset dom synchronous) => Signal dom (Unsigned 64)
 fib = register 1 fib + register 0 (register 0 fib)
 
 topEntity
