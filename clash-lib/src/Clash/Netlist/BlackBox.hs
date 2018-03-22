@@ -304,6 +304,11 @@ mkFunInput resId e = do
                       dcApp = DataCon resHTy (DC (resHTy,dcI)) []
                       dcAss = Assignment (pack "~RESULT") dcApp
                   return (Right (("",[dcAss]),Wire))
+                -- The following happens for things like `(1,())`
+                Just _ -> do
+                  let inp   = Identifier (pack ("~ARG[0]")) Nothing
+                      assgn = Assignment (pack "~RESULT") inp
+                  return (Right (("",[assgn]),Wire))
                 _ -> error $ $(curLoc) ++ "Cannot make function input for: " ++ showDoc e
             C.Var _ (nameOcc -> fun) -> do
               normalized <- Lens.use bindings
