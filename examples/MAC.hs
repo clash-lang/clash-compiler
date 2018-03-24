@@ -1,6 +1,7 @@
 module MAC where
 
 import Clash.Prelude
+import Clash.Explicit.Testbench
 
 ma acc (x,y) = acc + x * y
 
@@ -9,19 +10,24 @@ macT acc (x,y) = (acc',o)
     acc' = ma acc (x,y)
     o    = acc
 
+mac :: HiddenClockReset System => Signal System (Signed 9, Signed 9) -> Signal System (Signed 9)
 mac = macT `mealy` 0
 
 topEntity
-  :: SystemClockReset
-  => Signal System (Signed 9,Signed 9)
+  :: Clock System Source
+  -> Reset System Asynchronous
+  -> Signal System (Signed 9,Signed 9)
   -> Signal System (Signed 9)
-topEntity = mac
+topEntity clk rst xy = r
+  where
+    r = exposeClockReset mac clk rst xy
 {-# NOINLINE topEntity #-}
 
 testBench :: Signal System Bool
-testBench = done'
+testBench = done
   where
-    testInput      = stimuliGenerator $(listToVecTH [(1,1) :: (Signed 9,Signed 9),(2,2),(3,3),(4,4)])
-    expectedOutput = outputVerifier $(listToVecTH [0 :: Signed 9,1,5,14])
-    done           = expectedOutput (topEntity testInput)
-    done'          = withClockReset (tbSystemClockGen (not <$> done')) systemResetGen done
+    testInput      = stimuliGenerator clk rst $(listToVecTH [(1,1) :: (Signed 9,Signed 9),(2,2),(3,3),(4,4)])
+    expectedOutput = outputVerifier clk rst $(listToVecTH [0 :: Signed 9,1,5,14])
+    done           = expectedOutput (topEntity clk rst testInput)
+    clk            = tbSystemClockGen (not <$> done)
+    rst            = systemResetGen

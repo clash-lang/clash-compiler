@@ -1,6 +1,7 @@
 module FIR where
 
 import Clash.Prelude
+import Clash.Explicit.Testbench
 
 dotp :: SaturatingNum a
      => Vec (n + 1) a
@@ -9,7 +10,7 @@ dotp :: SaturatingNum a
 dotp as bs = fold boundedPlus (zipWith boundedMult as bs)
 
 fir
-  :: (Default a, KnownNat n, SaturatingNum a, HasClockReset domain gated synchronous)
+  :: (Default a, KnownNat n, SaturatingNum a, HiddenClockReset domain)
   => Vec (n + 1) a -> Signal domain a -> Signal domain a
 fir coeffs x_t = y_t
   where
@@ -17,16 +18,18 @@ fir coeffs x_t = y_t
     xs  = window x_t
 
 topEntity
-  :: SystemClockReset
-  => Signal System (Signed 16)
+  :: Clock  System Source
+  -> Reset  System Asynchronous
   -> Signal System (Signed 16)
-topEntity = fir (2:>3:>(-2):>8:>Nil)
+  -> Signal System (Signed 16)
+topEntity = exposeClockReset (fir (2:>3:>(-2):>8:>Nil))
 {-# NOINLINE topEntity #-}
 
 testBench :: Signal System Bool
-testBench = done'
+testBench = done
   where
-    testInput      = stimuliGenerator (2:>3:>(-2):>8:>Nil)
-    expectedOutput = outputVerifier (4:>12:>1:>20:>Nil)
-    done           = expectedOutput (topEntity testInput)
-    done'          = withClockReset (tbSystemClockGen (not <$> done')) systemResetGen done
+    testInput      = stimuliGenerator clk rst (2:>3:>(-2):>8:>Nil)
+    expectedOutput = outputVerifier clk rst (4:>12:>1:>20:>Nil)
+    done           = expectedOutput (topEntity clk rst testInput)
+    clk            = tbSystemClockGen (not <$> done)
+    rst            = systemResetGen

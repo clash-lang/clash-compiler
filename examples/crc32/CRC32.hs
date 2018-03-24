@@ -1,6 +1,7 @@
 module CRC32 where
 
 import Clash.Prelude
+import Clash.Explicit.Testbench
 import Data.Char
 import qualified Data.List as L
 
@@ -14,22 +15,26 @@ crc32Step prevCRC byte = entry `xor` (prevCRC `shiftR` 8)
     entry = asyncRom $(lift crc32Table) (truncateB prevCRC `xor` byte)
 
 crc32
-  :: HasClockReset domain gated synchronous
+  :: HiddenClockReset domain
   => Signal domain (BitVector 8) -> Signal domain (BitVector 32)
 crc32 = moore crc32Step complement 0xFFFFFFFF . register 0
 
 -- show CRC values as 32-bit unsigned numbers
-topEntity :: SystemClockReset => Signal System (BitVector 8) -> Signal System (Unsigned 32)
-topEntity = fmap unpack . crc32
+topEntity
+  :: Clock System Source
+  -> Reset System Asynchronous
+  -> Signal System (BitVector 8) -> Signal System (Unsigned 32)
+topEntity = exposeClockReset (fmap unpack . crc32)
 {-# NOINLINE topEntity #-}
 
 -- test bench
 testBench :: Signal System Bool
-testBench = done'
+testBench = done
   where
-    testInput      = stimuliGenerator $(listToVecTH (L.map (fromIntegral . ord) "CLaSH" :: [BitVector 8]))
-    expectedOutput = outputVerifier (0 :> 3523407757 :> 2920022741 :> 1535101039 :>
+    testInput      = stimuliGenerator clk rst $(listToVecTH (L.map (fromIntegral . ord) "CLaSH" :: [BitVector 8]))
+    expectedOutput = outputVerifier clk rst (0 :> 3523407757 :> 2920022741 :> 1535101039 :>
                         903986498 :> 3095867074 :> 3755410077 :> Nil)
-    done           = expectedOutput (topEntity testInput)
-    done'          = withClockReset (tbSystemClockGen (not <$> done')) systemResetGen done
+    done           = expectedOutput (topEntity clk rst testInput)
+    clk            = tbSystemClockGen (not <$> done)
+    rst            = systemResetGen
 

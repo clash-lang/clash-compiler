@@ -34,10 +34,8 @@ type ByteMasterO = (Bool,Bool,BitVector 8,BitCtrlSig)
 {-# ANN byteMaster
   (defTop
     { t_name     = "bytemaster"
-    , t_inputs   = [ PortField ""
-                      [ PortName "clk"
-                      , PortName "arst"
-                      ]
+    , t_inputs   = [ PortName "clk"
+                   , PortName "arst"
                    , PortField ""
                       [ PortName "rst"
                       , PortName "start"
@@ -56,10 +54,11 @@ type ByteMasterO = (Bool,Bool,BitVector 8,BitCtrlSig)
                      ]
     }) #-}
 byteMaster
-  :: SystemClockReset
-  => Unbundled System ByteMasterI
+  :: Clock System Source
+  -> Reset System Asynchronous
+  -> Unbundled System ByteMasterI
   -> Unbundled System ByteMasterO
-byteMaster = mealyB byteMasterT byteMasterInit
+byteMaster = exposeClockReset (mealyB byteMasterT byteMasterInit)
 {-# NOINLINE byteMaster #-}
 
 {-# INLINE byteMasterInit #-}

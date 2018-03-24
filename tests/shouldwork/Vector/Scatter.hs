@@ -1,6 +1,7 @@
 module Scatter where
 
 import Clash.Prelude
+import Clash.Explicit.Testbench
 
 topEntity :: Vec 5 (Unsigned 10) -> Vec 5 (Unsigned 10)
 topEntity = scatter defvec to
@@ -10,9 +11,10 @@ topEntity = scatter defvec to
 {-# NOINLINE topEntity #-}
 
 testBench :: Signal System Bool
-testBench = done'
+testBench = done
   where
-    testInput      = stimuliGenerator ((1 :> 2 :> 3 :> 4 :> 5 :> Nil) :> Nil)
-    expectedOutput = outputVerifier   ((1 :> 5 :> 3 :> 4 :> 2 :> Nil) :> Nil)
+    testInput      = stimuliGenerator clk rst ((1 :> 2 :> 3 :> 4 :> 5 :> Nil) :> Nil)
+    expectedOutput = outputVerifier   clk rst ((1 :> 5 :> 3 :> 4 :> 2 :> Nil) :> Nil)
     done           = expectedOutput (topEntity <$> testInput)
-    done'          = withClockReset (tbSystemClockGen (not <$> done')) systemResetGen done
+    clk            = tbSystemClockGen (not <$> done)
+    rst            = systemResetGen

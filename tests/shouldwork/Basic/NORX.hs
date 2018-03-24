@@ -1,6 +1,7 @@
 module NORX where
 import Data.Bits
 import Clash.Prelude
+import Clash.Explicit.Testbench
 
 type W = Unsigned 32
 
@@ -48,10 +49,11 @@ topEntity = norx
 {-# NOINLINE topEntity #-}
 
 testBench :: Signal System Bool
-testBench = done'
+testBench = done
   where
-    testInput      = stimuliGenerator ((0:>1:>2:>3:>4:>5:>6:>7:>8:>9:>10:>11:>12:>13:>14:>15:>Nil):>Nil)
-    expectedOutput = outputVerifier   ((   0x99a0283a
+    testInput      = stimuliGenerator clk rst ((0:>1:>2:>3:>4:>5:>6:>7:>8:>9:>10:>11:>12:>13:>14:>15:>Nil):>Nil)
+    expectedOutput = outputVerifier   clk rst
+                                      ((   0x99a0283a
                                         :> 0x16c4b42e
                                         :> 0x6e7fa00b
                                         :> 0x7d075c66
@@ -69,4 +71,5 @@ testBench = done'
                                         :> 0x9ce6be37
                                         :> Nil) :> Nil)
     done           = expectedOutput (topEntity <$> testInput)
-    done'          = withClockReset (tbSystemClockGen (not <$> done')) systemResetGen done
+    clk            = tbSystemClockGen (not <$> done)
+    rst            = systemResetGen
