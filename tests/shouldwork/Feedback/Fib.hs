@@ -3,7 +3,7 @@ module Fib where
 import Clash.Prelude
 import Clash.Explicit.Testbench
 
-fib :: HiddenClockReset dom => Signal dom (Unsigned 64)
+fib :: HiddenClockReset dom gated synchronous => Signal dom (Unsigned 64)
 fib = register 1 fib + register 0 (register 0 fib)
 
 topEntity

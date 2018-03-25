@@ -70,7 +70,7 @@ import qualified Data.Set.Lens               as Lens
 import           Data.Text                   (Text, unpack)
 import           Debug.Trace                 (trace)
 import           Unbound.Generics.LocallyNameless
-  (Bind, Embed (..), bind, embed, rec, unbind, unembed, unrebind, unrec)
+  (Bind, Embed (..), bind, embed, rec, runFreshM, unbind, unembed, unrebind, unrec)
 import           Unbound.Generics.LocallyNameless.Unsafe (unsafeUnbind)
 
 import           BasicTypes                  (InlineSpec (..))
@@ -94,7 +94,7 @@ import           Clash.Core.Type             (TypeView (..), applyFunTy,
 import           Clash.Core.TyCon            (tyConDataCons)
 import           Clash.Core.Util
   (collectArgs, idToVar, isClockOrReset, isCon, isFun, isLet, isPolyFun, isPrim,
-   isSignalType, isVar, mkApps, mkLams, mkTmApps, mkVec, termSize, termType,
+   isSignalType, isVar, mkApps, mkLams, mkVec, termSize, termType,
    tyNatSize)
 import           Clash.Core.Var              (Id, Var (..))
 import           Clash.Driver.Types          (DebugLevel (..), ClashException (..))
@@ -1152,8 +1152,9 @@ recToLetRec [] e = do
   normalizedE <- splitNormalized tcm e
   case (normalizedE,bodyM) of
     (Right (args,bndrs,res), Just (_,bodyTy,_,_,_)) -> do
-      let appF              = mkTmApps (Var bodyTy fn) (map idToVar args)
-          (toInline,others) = List.partition ((==) appF . unembed . snd) bndrs
+      let v                 = Var bodyTy fn
+          args'             = map idToVar args
+          (toInline,others) = List.partition (eqApp tcm v args' . unembed . snd) bndrs
           resV              = idToVar res
       case (toInline,others) of
         (_:_,_:_) -> do
@@ -1162,6 +1163,40 @@ recToLetRec [] e = do
           changed $ mkLams (Letrec $ bind (rec others') resV) args
         _ -> return e
     _ -> return e
+  where
+    -- This checks whether things are semantically equal
+    --
+    -- i.e. that
+    --
+    -- xs == (fst xs, snd xs)
+    --
+    -- TODO: this is far from complete
+    eqApp tcm v args (collectArgs -> (v',args'))
+      | v == v'
+      , let args2 = Either.lefts args'
+      , length args == length args2
+      = and (zipWith (eqArg tcm) args args2)
+      | otherwise
+      = False
+
+    eqArg _ v1 v2@(Var _ _)
+      = v1 == v2
+    eqArg tcm v1 v2@(collectArgs -> (Data _,args'))
+      | runFreshM (termType tcm v1) == runFreshM (termType tcm v2)
+      = and (zipWith (isNthProjection v1) [0..] (Either.lefts args'))
+    eqArg _ _ _
+      = False
+
+    -- `isNthProjection s n c` checks that `c` is the `n`th projection
+    -- of `s`.
+    isNthProjection :: Term -> Int -> Term -> Bool
+    isNthProjection v n (Case v' altTy [alt])
+      | v == v'
+      , (DataPat _ pxs,Var _ s) <- unsafeUnbind alt
+      , let (_,xs) = unrebind pxs
+      , Just n' <- List.elemIndex (Id s (embed altTy)) xs
+      = n == n'
+    isNthProjection _ _ _ = False
 
 recToLetRec _ e = return e
 

@@ -10,7 +10,10 @@ macT acc (x,y) = (acc',o)
     acc' = ma acc (x,y)
     o    = acc
 
-mac :: HiddenClockReset System => Signal System (Signed 9, Signed 9) -> Signal System (Signed 9)
+mac
+  :: HiddenClockReset System Source Asynchronous
+  => Signal System (Signed 9, Signed 9)
+  -> Signal System (Signed 9)
 mac = macT `mealy` 0
 
 topEntity

@@ -5,7 +5,7 @@ import qualified Clash.Explicit.Prelude as Explicit
 import Clash.Explicit.Testbench
 
 zeroAt0
-  :: HiddenClockReset domain
+  :: HiddenClockReset domain gated synchronous
   => Signal domain (Unsigned 8)
   -> Signal domain (Unsigned 8)
 zeroAt0 a = mux en a 0

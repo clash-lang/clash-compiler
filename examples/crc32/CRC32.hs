@@ -15,7 +15,7 @@ crc32Step prevCRC byte = entry `xor` (prevCRC `shiftR` 8)
     entry = asyncRom $(lift crc32Table) (truncateB prevCRC `xor` byte)
 
 crc32
-  :: HiddenClockReset domain
+  :: HiddenClockReset domain gated synchronous
   => Signal domain (BitVector 8) -> Signal domain (BitVector 32)
 crc32 = moore crc32Step complement 0xFFFFFFFF . register 0
 
