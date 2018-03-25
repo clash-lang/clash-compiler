@@ -258,7 +258,7 @@ asyncRomFile# sz file = (content !) -- Leave "(content !)" eta-reduced, see
 -- * See "Clash.Sized.Fixed#creatingdatafiles" for ideas on how to create your
 -- own data files.
 romFile
-  :: (KnownNat m, KnownNat n, HiddenClock domain)
+  :: (KnownNat m, KnownNat n, HiddenClock domain gated)
   => SNat n               -- ^ Size of the ROM
   -> FilePath             -- ^ File describing the content of the ROM
   -> Signal domain (Unsigned n)  -- ^ Read address @rd@
@@ -291,8 +291,8 @@ romFile = hideClock E.romFile
 -- * See "Clash.Sized.Fixed#creatingdatafiles" for ideas on how to create your
 -- own data files.
 romFilePow2
-  :: forall n m domain
-   . (KnownNat m, KnownNat n, HiddenClock domain)
+  :: forall n m domain gated
+   . (KnownNat m, KnownNat n, HiddenClock domain gated)
   => FilePath                    -- ^ File describing the content of the ROM
   -> Signal domain (Unsigned n)  -- ^ Read address @rd@
   -> Signal domain (BitVector m)

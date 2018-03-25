@@ -116,7 +116,7 @@ alu CmpGt x y = if x > y then 1 else 0
 We initially create a memory out of simple registers:
 
 @
-dataMem :: HiddenClockReset domain
+dataMem :: HiddenClockReset domain gated synchronous
         => Signal domain MemAddr                 -- ^ Read address
         -> Signal domain (Maybe (MemAddr,Value)) -- ^ (write address, data in)
         -> Signal domain Value                   -- ^ data out
@@ -133,7 +133,7 @@ dataMem rd wrM = 'Clash.Prelude.Mealy.mealy' dataMemT ('replicate' d32 0) (bundl
 And then connect everything:
 
 @
-system :: (KnownNat n, HiddenClockReset domain) => Vec n Instruction -> Signal domain Value
+system :: (KnownNat n, HiddenClockReset domain gated synchronous) => Vec n Instruction -> Signal domain Value
 system instrs = memOut
   where
     memOut = dataMem rdAddr dout
@@ -195,7 +195,7 @@ Instead it is preferable to use the 'Clash.Prelude.RAM.asyncRam' function which
 has the potential to be translated to a more efficient structure:
 
 @
-system2 :: (KnownNat n, HiddenClockReset domain) => Vec n Instruction -> Signal domain Value
+system2 :: (KnownNat n, HiddenClockReset domain gated synchronous) => Vec n Instruction -> Signal domain Value
 system2 instrs = memOut
   where
     memOut = 'Clash.Prelude.RAM.asyncRam' d32 rdAddr dout
@@ -277,7 +277,7 @@ cpu2 (regbank,ldRegD) (memOut,instr) = ((regbank',ldRegD'),(rdAddr,(,aluOut) '<$
 We can now finally instantiate our system with a 'blockRam':
 
 @
-system3 :: (KnownNat n, HiddenClockReset domain) => Vec n Instruction -> Signal domain Value
+system3 :: (KnownNat n, HiddenClockReset domain gated synchronous) => Vec n Instruction -> Signal domain Value
 system3 instrs = memOut
   where
     memOut = 'blockRam' (replicate d32 0) rdAddr dout
@@ -468,7 +468,7 @@ cpu regbank (memOut,instr) = (regbank',(rdAddr,(,aluOut) <$> wrAddrM,fromIntegra
 
 >>> :{
 dataMem
-  :: HiddenClockReset domain
+  :: HiddenClockReset domain gated synchronous
   => Signal domain MemAddr
   -> Signal domain (Maybe (MemAddr,Value))
   -> Signal domain Value
@@ -484,7 +484,7 @@ dataMem rd wrM = mealy dataMemT (C.replicate d32 0) (bundle (rd,wrM))
 
 >>> :{
 system
-  :: (KnownNat n, HiddenClockReset domain)
+  :: (KnownNat n, HiddenClockReset domain gated synchronous)
   => Vec n Instruction
   -> Signal domain Value
 system instrs = memOut
@@ -528,7 +528,7 @@ prog = -- 0 := 4
 
 >>> :{
 system2
-  :: (KnownNat n, HiddenClockReset domain)
+  :: (KnownNat n, HiddenClockReset domain gated synchronous)
   => Vec n Instruction
   -> Signal domain Value
 system2 instrs = memOut
@@ -575,7 +575,7 @@ cpu2 (regbank,ldRegD) (memOut,instr) = ((regbank',ldRegD'),(rdAddr,(,aluOut) <$>
 
 >>> :{
 system3
-  :: (KnownNat n, HiddenClockReset domain)
+  :: (KnownNat n, HiddenClockReset domain gated synchronous)
   => Vec n Instruction
   -> Signal domain Value
 system3 instrs = memOut
@@ -639,7 +639,7 @@ prog2 = -- 0 := 4
 -- Block RAM.
 -- * Use the adapter 'readNew' for obtaining write-before-read semantics like this: @readNew (blockRam inits) rd wrM@.
 blockRam
-  :: (Enum addr, HiddenClock domain, HasCallStack)
+  :: (Enum addr, HiddenClock domain gated, HasCallStack)
   => Vec n a     -- ^ Initial content of the BRAM, also
                  -- determines the size, @n@, of the BRAM.
                  --
@@ -674,7 +674,7 @@ blockRam = \cnt rd wrM -> withFrozenCallStack
 -- Block RAM.
 -- * Use the adapter 'readNew' for obtaining write-before-read semantics like this: @readNew (blockRamPow2 inits) rd wrM@.
 blockRamPow2
-  :: (KnownNat n, HiddenClock domain, HasCallStack)
+  :: (KnownNat n, HiddenClock domain gated, HasCallStack)
   => Vec (2^n) a         -- ^ Initial content of the BRAM, also
                          -- determines the size, @2^n@, of the BRAM.
                          --
@@ -695,10 +695,11 @@ blockRamPow2 = \cnt rd wrM -> withFrozenCallStack
 -- >>> :t readNew (blockRam (0 :> 1 :> Nil))
 -- readNew (blockRam (0 :> 1 :> Nil))
 --   :: ...
+--      ...
 --      ... =>
 --      Signal domain addr
 --      -> Signal domain (Maybe (addr, a)) -> Signal domain a
-readNew :: (Eq addr, HiddenClockReset domain)
+readNew :: (Eq addr, HiddenClockReset domain gated synchronous)
         => (Signal domain addr -> Signal domain (Maybe (addr, a)) -> Signal domain a)
         -- ^ The @ram@ component
         -> Signal domain addr              -- ^ Read address @r@

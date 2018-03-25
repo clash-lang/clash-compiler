@@ -106,6 +106,8 @@ Library
                       Clash.Explicit.Synchronizer
                       Clash.Explicit.Testbench
 
+                      Clash.Hidden
+
                       Clash.Intel.ClockGen
                       Clash.Intel.DDR
 

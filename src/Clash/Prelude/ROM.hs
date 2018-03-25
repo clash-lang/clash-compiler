@@ -91,7 +91,7 @@ asyncRom# content rd = arr ! rd
 -- * See "Clash.Sized.Fixed#creatingdatafiles" and "Clash.Prelude.BlockRam#usingrams"
 -- for ideas on how to use ROMs and RAMs
 rom
-  :: (KnownNat n, KnownNat m, HiddenClock domain)
+  :: (KnownNat n, KnownNat m, HiddenClock domain gated)
   => Vec n a               -- ^ ROM content
                            --
                            -- __NB:__ must be a constant
@@ -110,7 +110,7 @@ rom = hideClock E.rom
 -- * See "Clash.Sized.Fixed#creatingdatafiles" and "Clash.Prelude.BlockRam#usingrams"
 -- for ideas on how to use ROMs and RAMs
 romPow2
-  :: (KnownNat n, HiddenClock domain)
+  :: (KnownNat n, HiddenClock domain gated)
   => Vec (2^n) a         -- ^ ROM content
                          --
                          -- __NB:__ must be a constant

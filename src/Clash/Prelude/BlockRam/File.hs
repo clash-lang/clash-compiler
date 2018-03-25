@@ -121,8 +121,8 @@ import           Clash.Sized.Unsigned         (Unsigned)
 -- * See "Clash.Sized.Fixed#creatingdatafiles" for ideas on how to create your
 -- own data files.
 blockRamFilePow2
-  :: forall domain n m
-   . (KnownNat m, KnownNat n, HiddenClock domain, HasCallStack)
+  :: forall domain gated n m
+   . (KnownNat m, KnownNat n, HiddenClock domain gated, HasCallStack)
   => FilePath
   -- ^ File describing the initial content of the blockRAM
   -> Signal domain (Unsigned n)
@@ -163,7 +163,7 @@ blockRamFilePow2 = \fp rd wrM -> withFrozenCallStack
 -- * See "Clash.Sized.Fixed#creatingdatafiles" for ideas on how to create your
 -- own data files.
 blockRamFile
-  :: (KnownNat m, Enum addr, HiddenClock domain, HasCallStack)
+  :: (KnownNat m, Enum addr, HiddenClock domain gated, HasCallStack)
   => SNat n
   -- ^ Size of the blockRAM
   -> FilePath

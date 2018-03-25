@@ -104,6 +104,8 @@ module Clash.Prelude.Safe
   , E.undefined
     -- ** Named types
   , module Clash.NamedTypes
+    -- ** Hidden arguments
+  , module Clash.Hidden
     -- ** Haskell Prelude
     -- $hiding
   , module Prelude
@@ -123,6 +125,7 @@ import           Clash.Annotations.TopEntity
 import           Clash.Class.BitPack
 import           Clash.Class.Num
 import           Clash.Class.Resize
+import           Clash.Hidden
 import           Clash.NamedTypes
 import           Clash.Prelude.BitIndex
 import           Clash.Prelude.BitReduction
@@ -164,7 +167,7 @@ It instead exports the identically named functions defined in terms of
 
 -- | Create a 'register' function for product-type like signals (e.g. '(Signal a, Signal b)')
 --
--- > rP :: HiddenClockReset domain
+-- > rP :: HiddenClockReset domain gated synchronous
 -- >    => (Signal domain Int, Signal domain Int)
 -- >    -> (Signal domain Int, Signal domain Int)
 -- > rP = registerB (8,8)
@@ -173,7 +176,7 @@ It instead exports the identically named functions defined in terms of
 -- [(8,8),(1,1),(2,2),(3,3)...
 -- ...
 registerB
-  :: (HiddenClockReset domain, Bundle a)
+  :: (HiddenClockReset domain gated synchronous, Bundle a)
   => a
   -> Unbundled domain a
   -> Unbundled domain a
@@ -183,7 +186,7 @@ infixr 3 `registerB`
 
 -- | Give a pulse when the 'Signal' goes from 'minBound' to 'maxBound'
 isRising
-  :: (HiddenClockReset domain, Bounded a, Eq a)
+  :: (HiddenClockReset domain gated synchronous, Bounded a, Eq a)
   => a -- ^ Starting value
   -> Signal domain a
   -> Signal domain Bool
@@ -192,7 +195,7 @@ isRising = hideClockReset E.isRising
 
 -- | Give a pulse when the 'Signal' goes from 'maxBound' to 'minBound'
 isFalling
-  :: (HiddenClockReset domain, Bounded a, Eq a)
+  :: (HiddenClockReset domain gated synchronous, Bounded a, Eq a)
   => a -- ^ Starting value
   -> Signal domain a
   -> Signal domain Bool
@@ -217,7 +220,7 @@ isFalling = hideClockReset E.isFalling
 -- counter = 'Clash.Signal.regEn' 0 ('riseEvery' ('SNat' :: 'SNat' 10000000)) (counter + 1)
 -- @
 riseEvery
-  :: HiddenClockReset domain
+  :: HiddenClockReset domain gated synchronous
   => SNat n
   -> Signal domain Bool
 riseEvery = hideClockReset E.riseEvery
@@ -245,7 +248,7 @@ riseEvery = hideClockReset E.riseEvery
 -- >>> sample' (oscillate False d1) == sample' osc'
 -- True
 oscillate
-  :: HiddenClockReset domain
+  :: HiddenClockReset domain gated synchronous
   => Bool
   -> SNat n
   -> Signal domain Bool

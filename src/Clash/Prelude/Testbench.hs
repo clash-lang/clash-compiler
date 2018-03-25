@@ -43,7 +43,7 @@ import Clash.XException                   (ShowX)
 --
 -- __NB__: This function /can/ be used in synthesizable designs.
 assert
-  :: (Eq a,ShowX a,HiddenClockReset domain)
+  :: (Eq a,ShowX a,HiddenClockReset domain gated synchronous)
   => String   -- ^ Additional message
   -> Signal domain a -- ^ Checked value
   -> Signal domain a -- ^ Expected value
@@ -60,7 +60,7 @@ assert = hideClockReset E.assert
 --
 -- @
 -- testInput
---   :: HiddenClockReset domain
+--   :: HiddenClockReset domain gated synchronous
 --   => 'Signal' domain Int
 -- testInput = 'stimuliGenerator' $('Clash.Sized.Vector.listToVecTH' [(1::Int),3..21])
 -- @
@@ -68,7 +68,7 @@ assert = hideClockReset E.assert
 -- >>> sampleN 13 testInput
 -- [1,3,5,7,9,11,13,15,17,19,21,21,21]
 stimuliGenerator
-  :: (KnownNat l, HiddenClockReset domain)
+  :: (KnownNat l, HiddenClockReset domain gated synchronous)
   => Vec l a  -- ^ Samples to generate
   -> Signal domain a -- ^ Signal of given samples
 stimuliGenerator = hideClockReset E.stimuliGenerator
@@ -82,7 +82,7 @@ stimuliGenerator = hideClockReset E.stimuliGenerator
 --
 -- @
 -- expectedOutput
---   :: HiddenClockReset domain
+--   :: HiddenClockReset domain gated synchronous
 --   -> 'Signal' domain Int -> 'Signal' domain Bool
 -- expectedOutput = 'outputVerifier' $('Clash.Sized.Vector.listToVecTH' ([70,99,2,3,4,5,7,8,9,10]::[Int]))
 -- @
@@ -109,7 +109,7 @@ stimuliGenerator = hideClockReset E.stimuliGenerator
 -- expected value: 10, not equal to actual value: 9
 -- ,False,True,True]
 outputVerifier
-  :: (KnownNat l, Eq a, ShowX a, HiddenClockReset domain)
+  :: (KnownNat l, Eq a, ShowX a, HiddenClockReset domain gated synchronous)
   => Vec l a     -- ^ Samples to compare with
   -> Signal domain a    -- ^ Signal to verify
   -> Signal domain Bool -- ^ Indicator that all samples are verified

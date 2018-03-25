@@ -50,7 +50,7 @@ let macT s (x,y) = (s',s)
 --   where
 --     s' = x * y + s
 --
--- mac :: HiddenClockReset domain => 'Signal' domain (Int, Int) -> 'Signal' domain Int
+-- mac :: HiddenClockReset domain gated synchronous => 'Signal' domain (Int, Int) -> 'Signal' domain Int
 -- mac = 'mealy' macT 0
 -- @
 --
@@ -63,7 +63,7 @@ let macT s (x,y) = (s',s)
 --
 -- @
 -- dualMac
---   :: HiddenClockReset domain
+--   :: HiddenClockReset domain gated synchronous
 --   => ('Signal' domain Int, 'Signal' domain Int)
 --   -> ('Signal' domain Int, 'Signal' domain Int)
 --   -> 'Signal' domain Int
@@ -72,7 +72,7 @@ let macT s (x,y) = (s',s)
 --     s1 = 'mealy' mac 0 ('Clash.Signal.bundle' (a,x))
 --     s2 = 'mealy' mac 0 ('Clash.Signal.bundle' (b,y))
 -- @
-mealy :: HiddenClockReset domain
+mealy :: HiddenClockReset domain gated synchronous
       => (s -> i -> (s,o)) -- ^ Transfer function in mealy machine form:
                            -- @state -> input -> (newstate,output)@
       -> s                 -- ^ Initial state
@@ -108,7 +108,7 @@ mealy = hideClockReset E.mealy
 --     (i1,b1) = 'mealyB' f 0 (a,b)
 --     (i2,b2) = 'mealyB' f 3 (i1,c)
 -- @
-mealyB :: (Bundle i, Bundle o, HiddenClockReset domain)
+mealyB :: (Bundle i, Bundle o, HiddenClockReset domain gated synchronous)
        => (s -> i -> (s,o)) -- ^ Transfer function in mealy machine form:
                             -- @state -> input -> (newstate,output)@
        -> s                 -- ^ Initial state
@@ -119,7 +119,7 @@ mealyB = hideClockReset E.mealyB
 {-# INLINE mealyB #-}
 
 -- | Infix version of 'mealyB'
-(<^>) :: (Bundle i, Bundle o, HiddenClockReset domain)
+(<^>) :: (Bundle i, Bundle o, HiddenClockReset domain gated synchronous)
       => (s -> i -> (s,o)) -- ^ Transfer function in mealy machine form:
                            -- @state -> input -> (newstate,output)@
       -> s                 -- ^ Initial state

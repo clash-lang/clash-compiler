@@ -48,7 +48,7 @@ import            Clash.Signal
 >>> :set -XDataKinds -XTypeOperators -XTypeApplications -XFlexibleContexts
 >>> import Clash.Prelude
 >>> let delay3 = delayed (0 :> 0 :> 0 :> Nil)
->>> let delay2 = delayedI :: HiddenClockReset domain => DSignal domain n Int -> DSignal domain (n + 2) Int
+>>> let delay2 = delayedI :: HiddenClockReset domain gated synchronous => DSignal domain n Int -> DSignal domain (n + 2) Int
 -}
 
 -- | Delay a 'DSignal' for @d@ periods.
@@ -61,7 +61,7 @@ import            Clash.Signal
 -- >>> sampleN 6 (toSignal (delay3 (dfromList [1..])))
 -- [0,0,0,1,2,3]
 delayed
-  :: (KnownNat d, HiddenClockReset domain)
+  :: (KnownNat d, HiddenClockReset domain gated synchronous)
   => Vec d a
   -> DSignal domain n a
   -> DSignal domain (n + d) a
@@ -77,7 +77,7 @@ delayed = hideClockReset E.delayed
 -- >>> sampleN 6 (toSignal (delay2 (dfromList [1..])))
 -- [0,0,1,2,3,4]
 delayedI
-  :: (Default a, KnownNat d, HiddenClockReset domain)
+  :: (Default a, KnownNat d, HiddenClockReset domain gated synchronous)
   => DSignal domain n a
   -> DSignal domain (n + d) a
 delayedI = hideClockReset E.delayedI

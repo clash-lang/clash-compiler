@@ -47,7 +47,7 @@ let macT s (x,y) = x * y + s
 --      -> Int        -- Updated state
 -- macT s (x,y) = x * y + s
 --
--- mac :: HiddenClockReset domain => 'Signal' domain (Int, Int) -> 'Signal' domain Int
+-- mac :: HiddenClockReset domain gated synchronous => 'Signal' domain (Int, Int) -> 'Signal' domain Int
 -- mac = 'moore' mac id 0
 -- @
 --
@@ -60,7 +60,7 @@ let macT s (x,y) = x * y + s
 --
 -- @
 -- dualMac
---   :: HiddenClockReset domain
+--   :: HiddenClockReset domain gated synchronous
 --   => ('Signal' domain Int, 'Signal' domain Int)
 --   -> ('Signal' domain Int, 'Signal' domain Int)
 --   -> 'Signal' domain Int
@@ -70,7 +70,7 @@ let macT s (x,y) = x * y + s
 --     s2 = 'moore' mac id 0 ('Clash.Signal.bundle' (b,y))
 -- @
 moore
-  :: HiddenClockReset domain
+  :: HiddenClockReset domain gated synchronous
   => (s -> i -> s) -- ^ Transfer function in moore machine form:
                    -- @state -> input -> newstate@
   -> (s -> o)      -- ^ Output function in moore machine form:
@@ -86,7 +86,7 @@ moore = hideClockReset E.moore
 -- | Create a synchronous function from a combinational function describing
 -- a moore machine without any output logic
 medvedev
-  :: HiddenClockReset domain
+  :: HiddenClockReset domain gated synchronous
   => (s -> i -> s)
   -> s
   -> (Signal domain i -> Signal domain s)
@@ -121,7 +121,7 @@ medvedev tr st = moore tr id st
 --     (i2,b2) = 'mooreB' t o 3 (i1,c)
 -- @
 mooreB
-  :: (Bundle i, Bundle o,HiddenClockReset domain)
+  :: (Bundle i, Bundle o,HiddenClockReset domain gated synchronous)
   => (s -> i -> s) -- ^ Transfer function in moore machine form:
                    -- @state -> input -> newstate@
   -> (s -> o)      -- ^ Output function in moore machine form:
@@ -135,7 +135,7 @@ mooreB = hideClockReset E.mooreB
 
 -- | A version of 'medvedev' that does automatic 'Bundle'ing
 medvedevB
-  :: (Bundle i, Bundle s, HiddenClockReset domain)
+  :: (Bundle i, Bundle s, HiddenClockReset domain gated synchronous)
   => (s -> i -> s)
   -> s
   -> (Unbundled domain i -> Unbundled domain s)
