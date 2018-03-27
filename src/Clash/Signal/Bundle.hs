@@ -69,7 +69,7 @@ import Clash.Sized.RTree     (RTree, lazyT)
 -- @
 --
 class Bundle a where
-  type Unbundled (domain :: Domain) a = res | res -> domain
+  type Unbundled (domain :: Domain) a = res | res -> domain a
   type Unbundled domain a = Signal domain a
   -- | Example:
   --
