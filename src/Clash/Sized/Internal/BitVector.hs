@@ -241,6 +241,9 @@ instance Bounded Bit where
   minBound = low
   maxBound = high
 
+instance Default Bit where
+  def = low
+
 instance Num Bit where
   (+)         = xor##
   (-)         = xor##

@@ -27,6 +27,8 @@ module Clash.Class.BitPack
   ( BitPack (..)
   , bitCoerce
   , boolToBV
+  , boolToBit
+  , bitToBool
   )
 where
 
@@ -299,3 +301,11 @@ instance (BitPack c) => GBitPack (K1 i c) where
 -- 00_0000
 boolToBV :: KnownNat n => Bool -> BitVector (n + 1)
 boolToBV = zeroExtend . pack
+
+-- | Convert a Bool to a Bit
+boolToBit :: Bool -> Bit
+boolToBit = bitCoerce
+
+-- | Convert a Bool to a Bit
+bitToBool :: Bit -> Bool
+bitToBool = bitCoerce
