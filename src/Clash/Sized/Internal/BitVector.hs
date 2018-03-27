@@ -119,6 +119,9 @@ module Clash.Sized.Internal.BitVector
   , resize#
     -- *** QuickCheck
   , shrinkSizedUnsigned
+  -- ** Other
+  , undefError
+  , checkUnpackUndef
   )
 where
 
@@ -128,9 +131,10 @@ import Data.Bits                  (Bits (..), FiniteBits (..))
 import Data.Data                  (Data)
 import Data.Default               (Default (..))
 import Data.Proxy                 (Proxy (..))
+import Data.Typeable              (Typeable, typeOf)
 import GHC.Integer                (smallInteger)
 import GHC.Prim                   (dataToTag#)
-import GHC.Stack                  (HasCallStack)
+import GHC.Stack                  (HasCallStack, withFrozenCallStack)
 import GHC.TypeLits               (KnownNat, Nat, type (+), type (-), natVal)
 import GHC.TypeLits.Extra         (Max)
 import Language.Haskell.TH        (Q, TExp, TypeQ, appT, conT, litT, numTyLit, sigE)
@@ -148,6 +152,7 @@ import Clash.XException
 
 import {-# SOURCE #-} qualified Clash.Sized.Vector         as V
 import {-# SOURCE #-} qualified Clash.Sized.Internal.Index as I
+import                qualified Data.List                  as L
 
 {- $setup
 >>> :set -XTemplateHaskell
@@ -890,27 +895,49 @@ instance KnownNat n => Ixed (BitVector n) where
 
 -- error for infix operator
 undefErrorI :: (HasCallStack, KnownNat m, KnownNat n) => String -> BitVector m -> BitVector n -> a
-undefErrorI op bv1 bv2 = errorX $ "Clash.Sized.BitVector." ++ op
-                              ++ " with (partially) undefined arguments: "
-                              ++ show bv1 ++ " " ++ op ++" " ++ show bv2
+undefErrorI op bv1 bv2 = withFrozenCallStack $
+  errorX $ "Clash.Sized.BitVector." ++ op
+  ++ " called with (partially) undefined arguments: "
+  ++ show bv1 ++ " " ++ op ++" " ++ show bv2
 
 -- error for prefix operator/function
 undefErrorP :: (HasCallStack, KnownNat m, KnownNat n) => String -> BitVector m -> BitVector n -> a
-undefErrorP op bv1 bv2 = errorX $ "Clash.Sized.BitVector." ++ op
-                              ++ " called with (partially) undefined arguments: "
-                              ++ show bv1 ++ " " ++ show bv2
+undefErrorP op bv1 bv2 = withFrozenCallStack $
+  errorX $ "Clash.Sized.BitVector." ++ op
+  ++ " called with (partially) undefined arguments: "
+  ++ show bv1 ++ " " ++ show bv2
 
 -- error for prefix operator/function
 undefErrorP3 :: (HasCallStack, KnownNat m, KnownNat n, KnownNat o) => String -> BitVector m -> BitVector n -> BitVector o -> a
-undefErrorP3 op bv1 bv2 bv3 = errorX $ "Clash.Sized.BitVector." ++ op
-                              ++ " called with (partially) undefined arguments: "
-                              ++ show bv1 ++ " " ++ show bv2 ++ " " ++ show bv3
+undefErrorP3 op bv1 bv2 bv3 = withFrozenCallStack $
+  errorX $ "Clash.Sized.BitVector." ++ op
+  ++ " called with (partially) undefined arguments: "
+  ++ show bv1 ++ " " ++ show bv2 ++ " " ++ show bv3
 
 -- error for unary operator/function
 undefErrorU :: (HasCallStack, KnownNat n) => String -> BitVector n -> a
-undefErrorU op bv1 = errorX $ "Clash.Sized.BitVector." ++ op
-                              ++ " called with (partially) undefined argument: "
-                              ++ show bv1
+-- undefErrorU op bv1 = undefError ("Clash.Sized.BitVector." ++ op) [bv1]
+undefErrorU op bv1 = withFrozenCallStack $
+  errorX $ "Clash.Sized.BitVector." ++ op
+  ++ " called with (partially) undefined argument: "
+  ++ show bv1
+
+undefError :: (HasCallStack, KnownNat n) => String -> [BitVector n] -> a
+undefError op bvs = withFrozenCallStack $
+  errorX $ op
+  ++ " called with (partially) undefined arguments: "
+  ++ unwords (L.map show bvs)
+
+
+-- | Implement BitVector undefinedness checking for unpack funtions
+checkUnpackUndef :: (KnownNat n, Typeable a)
+                 => (BitVector n -> a) -- ^ unpack function
+                 -> BitVector n -> a
+checkUnpackUndef f bv@(BV 0 _) = f bv
+checkUnpackUndef _ bv = res
+  where
+    ty = typeOf res
+    res = undefError (show ty ++ ".unpack") [bv]
 
 
 -- | Create a BitVector with all its bits undefined

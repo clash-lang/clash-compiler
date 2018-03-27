@@ -105,7 +105,7 @@ import Clash.Class.Num                (ExtendingNum (..), SaturatingNum (..),
 import Clash.Class.Resize             (Resize (..))
 import Clash.Prelude.BitIndex         ((!), msb, replaceBit, split)
 import Clash.Prelude.BitReduction     (reduceAnd, reduceOr)
-import Clash.Sized.Internal.BitVector (BitVector (BV), Bit, (++#), high, low)
+import Clash.Sized.Internal.BitVector (BitVector (BV), Bit, (++#), high, low, undefError)
 import qualified Clash.Sized.Internal.BitVector as BV
 import Clash.XException               (ShowX (..), Undefined, showsPrecXWith)
 
@@ -183,9 +183,10 @@ pack# (S i) = let m = 1 `shiftL` fromInteger (natVal (Proxy @n))
 
 {-# NOINLINE unpack# #-}
 unpack# :: forall n . KnownNat n => BitVector n -> Signed n
-unpack# (BV _ i) =
+unpack# (BV 0 i) =
   let m = 1 `shiftL` fromInteger (natVal (Proxy @n) - 1)
   in  if i >= m then S (i-2*m) else S i
+unpack# bv = undefError "Signed.unpack" [bv]
 
 instance Eq (Signed n) where
   (==) = eq#

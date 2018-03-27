@@ -9,6 +9,7 @@ Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
 {-# LANGUAGE DataKinds             #-}
 {-# LANGUAGE DeriveAnyClass        #-}
 {-# LANGUAGE DeriveDataTypeable    #-}
+{-# LANGUAGE FlexibleContexts      #-}
 {-# LANGUAGE KindSignatures        #-}
 {-# LANGUAGE MagicHash             #-}
 {-# LANGUAGE ScopedTypeVariables   #-}
@@ -90,7 +91,7 @@ import Clash.Class.BitPack        (BitPack (..))
 import Clash.Class.Num            (ExtendingNum (..), SaturatingNum (..),
                                    SaturationMode (..))
 import Clash.Class.Resize         (Resize (..))
-import {-# SOURCE #-} Clash.Sized.Internal.BitVector (BitVector (BV))
+import {-# SOURCE #-} Clash.Sized.Internal.BitVector (BitVector (BV),undefError)
 import Clash.Promoted.Nat         (SNat, snatToNum, leToPlusKN)
 import Clash.XException           (ShowX (..), Undefined, showsPrecXWith)
 
@@ -129,7 +130,7 @@ instance NFData (Index n) where
   -- NOINLINE is needed so that Clash doesn't trip on the "Index ~# Integer"
   -- coercion
 
-instance KnownNat n => BitPack (Index n) where
+instance (KnownNat n, 1 <= n) => BitPack (Index n) where
   type BitSize (Index n) = CLog 2 n
   pack   = pack#
   unpack = unpack#
@@ -143,8 +144,9 @@ pack# :: Index n -> BitVector (CLog 2 n)
 pack# (I i) = BV 0 i
 
 {-# NOINLINE unpack# #-}
-unpack# :: KnownNat n => BitVector (CLog 2 n) -> Index n
-unpack# (BV _ i) = fromInteger_INLINE i
+unpack# :: (KnownNat n, 1 <= n) => BitVector (CLog 2 n) -> Index n
+unpack# (BV 0 i) = fromInteger_INLINE i
+unpack# bv = undefError "Index.unpack" [bv]
 
 instance Eq (Index n) where
   (==) = eq#
