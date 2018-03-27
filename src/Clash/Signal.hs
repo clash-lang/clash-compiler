@@ -464,9 +464,9 @@ sample
   -- (and reset)
   -> [a]
 sample s =
-  let clk = unsafeCoerce @(Clock System 'Source)
+  let clk = unsafeCoerce @(Clock System 'Gated)
                          @(Clock domain gated)
-                         (Clock @System SSymbol SNat)
+                         (GatedClock @System SSymbol SNat (pure True))
       rst = unsafeCoerce @(Reset System 'Asynchronous)
                          @(Reset domain synchronous)
                          (Async (True :- pure False))
@@ -490,9 +490,9 @@ sampleN
   -- (and reset)
   -> [a]
 sampleN n s =
-  let clk = unsafeCoerce @(Clock System 'Source)
+  let clk = unsafeCoerce @(Clock System 'Gated)
                          @(Clock domain gated)
-                         (Clock @System SSymbol SNat)
+                         (GatedClock @System SSymbol SNat (pure True))
       rst = unsafeCoerce @(Reset System 'Asynchronous)
                          @(Reset domain synchronous)
                          (Async (True :- pure False))
@@ -513,9 +513,9 @@ sample_lazy
   -- (and reset)
   -> [a]
 sample_lazy s =
-  let clk = unsafeCoerce @(Clock System 'Source)
+  let clk = unsafeCoerce @(Clock System 'Gated)
                          @(Clock domain gated)
-                         (Clock @System SSymbol SNat)
+                         (GatedClock @System SSymbol SNat (pure True))
       rst = unsafeCoerce @(Reset System 'Asynchronous)
                          @(Reset domain synchronous)
                          (Async (True :- pure False))
@@ -538,9 +538,9 @@ sampleN_lazy
   -- (and reset)
   -> [a]
 sampleN_lazy n s =
-  let clk = unsafeCoerce @(Clock System 'Source)
+  let clk = unsafeCoerce @(Clock System 'Gated)
                          @(Clock domain gated)
-                         (Clock @System SSymbol SNat)
+                         (GatedClock @System SSymbol SNat (pure True))
       rst = unsafeCoerce @(Reset System 'Asynchronous)
                          @(Reset domain synchronous)
                          (Async (True :- pure False))
@@ -566,9 +566,9 @@ simulate
   -> [a]
   -> [b]
 simulate f =
-  let clk = unsafeCoerce @(Clock System 'Source)
+  let clk = unsafeCoerce @(Clock System 'Gated)
                          @(Clock domain gated)
-                         (Clock @System SSymbol SNat)
+                         (GatedClock @System SSymbol SNat (pure True))
       rst = unsafeCoerce @(Reset System 'Asynchronous)
                          @(Reset domain synchronous)
                          (Async (True :- pure False))
@@ -591,9 +591,9 @@ simulate_lazy
   -> [a]
   -> [b]
 simulate_lazy f =
-  let clk = unsafeCoerce @(Clock System 'Source)
+  let clk = unsafeCoerce @(Clock System 'Gated)
                          @(Clock domain gated)
-                         (Clock @System SSymbol SNat)
+                         (GatedClock @System SSymbol SNat (pure True))
       rst = unsafeCoerce @(Reset System 'Asynchronous)
                          @(Reset domain synchronous)
                          (Async (True :- pure False))
@@ -617,9 +617,9 @@ simulateB
   -> [a]
   -> [b]
 simulateB f =
-  let clk = unsafeCoerce @(Clock System 'Source)
+  let clk = unsafeCoerce @(Clock System 'Gated)
                          @(Clock domain gated)
-                         (Clock @System SSymbol SNat)
+                         (GatedClock @System SSymbol SNat (pure True))
       rst = unsafeCoerce @(Reset System 'Asynchronous)
                          @(Reset domain synchronous)
                          (Async (True :- pure False))
@@ -643,9 +643,9 @@ simulateB_lazy
   -> [a]
   -> [b]
 simulateB_lazy f =
-  let clk = unsafeCoerce @(Clock System 'Source)
+  let clk = unsafeCoerce @(Clock System 'Gated)
                          @(Clock domain gated)
-                         (Clock @System SSymbol SNat)
+                         (GatedClock @System SSymbol SNat (pure True))
       rst = unsafeCoerce @(Reset System 'Asynchronous)
                          @(Reset domain synchronous)
                          (Async (True :- pure False))
