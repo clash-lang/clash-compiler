@@ -1984,7 +1984,7 @@ Here is a list of Haskell features for which the CλaSH compiler has only
 
         To get the first 10 numbers, we do the following:
 
-        >>> sampleN 10 fibS
+        >>> sampleN @Source @Asynchronous 10 fibS
         [0,1,1,2,3,5,8,13,21,34]
 
         Unlike the @fibR@ function, the above @fibS@ function /is/ synthesisable

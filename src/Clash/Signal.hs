@@ -457,7 +457,7 @@ regEn = \initial en i -> withFrozenCallStack
 --
 -- __NB__: This function is not synthesisable
 sample
-  :: forall domain gated synchronous a
+  :: forall gated synchronous domain a
    . NFData a
   => (HiddenClockReset domain gated synchronous => Signal domain a)
   -- ^ 'Signal' we want to sample, whose source potentially has a hidden clock
@@ -481,7 +481,7 @@ sample s =
 --
 -- __NB__: This function is not synthesisable
 sampleN
-  :: forall domain gated synchronous a
+  :: forall gated synchronous domain a
    . NFData a
   => Int
   -- ^ The number of samples we want to see
@@ -507,7 +507,7 @@ sampleN n s =
 --
 -- __NB__: This function is not synthesisable
 sample_lazy
-  :: forall domain gated synchronous a
+  :: forall gated synchronous domain a
    . (HiddenClockReset domain gated synchronous => Signal domain a)
   -- ^ 'Signal' we want to sample, whose source potentially has a hidden clock
   -- (and reset)
@@ -531,7 +531,7 @@ sample_lazy s =
 --
 -- __NB__: This function is not synthesisable
 sampleN_lazy
-  :: forall domain gated synchronous a
+  :: forall gated synchronous domain a
    . Int
   -> (HiddenClockReset domain gated synchronous => Signal domain a)
   -- ^ 'Signal' we want to sample, whose source potentially has a hidden clock
@@ -557,7 +557,7 @@ sampleN_lazy n s =
 --
 -- __NB__: This function is not synthesisable
 simulate
-  :: forall domain gated synchronous a b
+  :: forall gated synchronous domain a b
    . (NFData a, NFData b)
   => (HiddenClockReset domain gated synchronous =>
       Signal domain a -> Signal domain b)
@@ -583,7 +583,7 @@ simulate f =
 --
 -- __NB__: This function is not synthesisable
 simulate_lazy
-  :: forall domain gated synchronous a b
+  :: forall gated synchronous domain a b
    . (HiddenClockReset domain gated synchronous =>
       Signal domain a -> Signal domain b)
   -- ^ Function we want to simulate, whose components potentially have a hidden
@@ -608,7 +608,7 @@ simulate_lazy f =
 --
 -- __NB__: This function is not synthesisable
 simulateB
-  :: forall domain gated synchronous a b
+  :: forall gated synchronous domain a b
    . (Bundle a, Bundle b, NFData a, NFData b)
   => (HiddenClockReset domain gated synchronous =>
       Unbundled domain a -> Unbundled domain b)
@@ -634,7 +634,7 @@ simulateB f =
 --
 -- __NB__: This function is not synthesisable
 simulateB_lazy
-  :: forall domain gated synchronous a b
+  :: forall gated synchronous domain a b
    . (Bundle a, Bundle b)
   => (HiddenClockReset domain gated synchronous =>
       Unbundled domain a -> Unbundled domain b)
