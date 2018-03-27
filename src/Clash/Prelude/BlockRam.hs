@@ -695,7 +695,6 @@ blockRamPow2 = \cnt rd wrM -> withFrozenCallStack
 -- >>> :t readNew (blockRam (0 :> 1 :> Nil))
 -- readNew (blockRam (0 :> 1 :> Nil))
 --   :: ...
---      ...
 --      ... =>
 --      Signal domain addr
 --      -> Signal domain (Maybe (addr, a)) -> Signal domain a

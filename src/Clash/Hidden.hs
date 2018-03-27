@@ -7,6 +7,7 @@ Hidden arguments
 -}
 
 {-# LANGUAGE AllowAmbiguousTypes    #-}
+{-# LANGUAGE ConstraintKinds        #-}
 {-# LANGUAGE DataKinds              #-}
 {-# LANGUAGE FunctionalDependencies #-}
 {-# LANGUAGE KindSignatures         #-}
@@ -25,11 +26,11 @@ module Clash.Hidden
   )
 where
 
+import qualified GHC.Classes
 import GHC.TypeLits
 import Unsafe.Coerce
 
-class Hidden (x :: Symbol) a | x -> a where
-  hidden :: a
+type Hidden (x :: Symbol) a = GHC.Classes.IP x a
 
 newtype Secret x a r = Secret (Hidden x a => r)
 
@@ -39,5 +40,5 @@ expose k = unsafeCoerce (Secret @x @a @r k)
 
 
 fromLabel :: forall x a . Hidden x a => a
-fromLabel = hidden @x
+fromLabel = GHC.Classes.ip @x
 {-# INLINE fromLabel #-}
