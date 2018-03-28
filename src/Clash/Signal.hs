@@ -72,14 +72,19 @@ module Clash.Signal
   , HiddenClock
   , hideClock
   , exposeClock
+  , withClock
+  , hasClock
     -- ** Hidden reset
   , HiddenReset
   , hideReset
   , exposeReset
+  , withReset
+  , hasReset
     -- ** Hidden clock and reset
   , HiddenClockReset
   , hideClockReset
   , exposeClockReset
+  , withClockReset
   , SystemClockReset
     -- * Basic circuit functions
   , delay
@@ -210,6 +215,13 @@ You hide the clock and reset arguments by:
 g = 'hideClockReset' f
 @
 
+Or, alternatively, by:
+
+@
+-- h :: HiddenClockReset domain gated synchronous => Signal domain a -> ...
+h = f 'hasClock' 'hasReset'
+@
+
 === Assigning explicit clock and reset arguments to hidden clocks and resets
 
 Given a component:
@@ -228,6 +240,13 @@ arguments so that we can explicitly apply them:
 g = 'exposeClockReset' f
 @
 
+or, alternatively, by:
+
+@
+-- h :: Clock domain gated -> Reset domain synchronous -> Signal domain Int -> Signal domain Int
+h clk rst = withClock clk rst f
+@
+
 Similarly, there are 'exposeClock' and 'exposeReset' to connect just expose
 the hidden clock or the hidden reset argument.
 
@@ -244,6 +263,20 @@ topEntity clk rst =
   let (pllOut,pllStable) = 'Clash.Intel.ClockGen.altpll' (SSymbol \@\"altpll50\") clk rst
       rstSync            = 'resetSynchronizer' pllOut ('unsafeToAsyncReset' pllStable)
   in  'exposeClockReset' f pllOut rstSync
+@
+
+or, using the alternative method:
+
+@
+topEntity2
+  :: Clock System Source
+  -> Reset System Asynchronous
+  -> Signal System Int
+  -> Signal System Int
+topEntity2 clk rst =
+  let (pllOut,pllStable) = 'Clash.Intel.ClockGen.altpll' (SSymbol \@\"altpll50\") clk rst
+      rstSync            = 'resetSynchronizer' pllOut ('unsafeToAsyncReset' pllStable)
+  in  'withClockReset' pllOut rstSync f
 @
 
 -}
@@ -283,6 +316,8 @@ exposeClock = \f clk -> expose @"clk" f clk
 {-# INLINE exposeClock #-}
 
 -- | Hide the 'Clock' argument of a component, so it can be routed implicitly.
+--
+-- <Clash-Signal.html#hiddenclockandreset Click here to read more about hidden clocks and resets>
 hideClock
   :: HiddenClock domain gated
   => (Clock domain gated -> r)
@@ -290,6 +325,30 @@ hideClock
   -> r
 hideClock = \f -> f #clk
 {-# INLINE hideClock #-}
+
+-- | Connect an explicit 'Clock' to a function with a hidden 'Clock' argument.
+--
+-- @
+-- withClock = 'flip' exposeClock
+-- @
+withClock
+  :: Clock domain gated
+  -- ^ The 'Clock' we want to connect
+  -> (HiddenClock domain gated => r)
+  -- ^ The function with a hidden 'Clock' argument
+  -> r
+withClock = \clk f -> expose @"clk" f clk
+{-# INLINE withClock #-}
+
+-- | Connect a hidden 'Clock' to an argument where a normal 'Clock' argument
+-- was expected.
+--
+-- <Clash-Signal.html#hiddenclockandreset Click here to read more about hidden clocks and resets>
+hasClock
+  :: HiddenClock domain gated
+  => Clock domain gated
+hasClock = #clk
+{-# INLINE hasClock #-}
 
 -- | Expose the hidden 'Reset' argument of a component, so it can be applied
 -- explicitly
@@ -304,6 +363,8 @@ exposeReset = \f rst -> expose @"rst" f rst
 {-# INLINE exposeReset #-}
 
 -- | Hide the 'Reset' argument of a component, so it can be routed implicitly.
+--
+-- <Clash-Signal.html#hiddenclockandreset Click here to read more about hidden clocks and resets>
 hideReset
   :: HiddenReset domain synchronous
   => (Reset domain synchronous -> r)
@@ -311,6 +372,32 @@ hideReset
   -> r
 hideReset = \f -> f #rst
 {-# INLINE hideReset #-}
+
+-- | Connect an explicit 'Reset' to a function with a hidden 'Reset' argument.
+--
+-- @
+-- withReset = 'flip' exposeReset
+-- @
+--
+-- <Clash-Signal.html#hiddenclockandreset Click here to read more about hidden clocks and resets>
+withReset
+  :: Reset domain synchronous
+  -- ^ The 'Reset' we want to connect
+  -> (HiddenReset domain synchronous => r)
+  -- ^ The function with a hidden 'Reset' argument
+  -> r
+withReset = \rst f -> expose @"rst" f rst
+{-# INLINE withReset #-}
+
+-- | Connect a hidden 'Reset' to an argument where a normal 'Reset' argument
+-- was expected.
+--
+-- <Clash-Signal.html#hiddenclockandreset Click here to read more about hidden clocks and resets>
+hasReset
+  :: HiddenReset domain synchronous
+  => Reset domain synchronous
+hasReset = #rst
+{-# INLINE hasReset #-}
 
 -- | Expose the hidden 'Clock' and 'Reset' arguments of a component, so they can
 -- be applied explicitly
@@ -342,6 +429,8 @@ exposeClockReset = \f clk rst -> expose @"rst" (expose @"clk" f clk) rst
 
 -- -- | Hide the 'Clock' and 'Reset' arguments of a component, so they can be
 -- -- routed implicitly
+--
+-- <Clash-Signal.html#hiddenclockandreset Click here to read more about hidden clocks and resets>
 hideClockReset
   :: HiddenClockReset domain gated synchronous
   => (Clock domain gated -> Reset domain synchronous -> r)
@@ -349,6 +438,21 @@ hideClockReset
   -> r
 hideClockReset = \f -> f #clk #rst
 {-# INLINE hideClockReset #-}
+
+-- | Connect an explicit 'Clock' and 'Reset' to a function with a hidden
+-- 'Clock' and 'Reset' argument.
+--
+-- <Clash-Signal.html#hiddenclockandreset Click here to read more about hidden clocks and resets>
+withClockReset
+  :: Clock domain gated
+  -- ^ The 'Clock' we want to connect
+  -> Reset domain synchronous
+  -- ^ The 'Reset' we want to connect
+  -> (HiddenClockReset domain gated synchronous => r)
+  -- ^ The function with a hidden 'Clock' and hidden 'Reset' argument
+  -> r
+withClockReset = \clk rst f -> expose @"rst" (expose @"clk" f clk) rst
+{-# INLINE withClockReset #-}
 
 -- * Basic circuit functions
 
