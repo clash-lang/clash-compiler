@@ -64,7 +64,8 @@ import qualified Clash.Annotations.BitRepresentation.Util
 
 import           Clash.Class.BitPack        (BitPack, BitSize, pack, unpack)
 import           Clash.Class.Resize         (resize)
-import           Clash.Sized.BitVector      (BitVector, high, low, (++#))
+import           Clash.Sized.BitVector      (BitVector, low, (++#))
+import           Clash.Sized.Internal.BitVector (undefined#)
 import           Control.DeepSeq            (NFData)
 import           Control.Monad              (forM)
 import           Data.Bits
@@ -694,20 +695,16 @@ group bs = (length head', head bs) : rest
     head' = takeWhile (==head bs) bs
     rest  = group tail'
 
-bitToExpr' :: (Int, Bit) -> Q Exp
+bitToExpr' :: (Int, Bit) -> Q Exp -- BitVector n
 bitToExpr' (0, _) = error $ "Unexpected group length: 0"
-bitToExpr' (1, Util.H) = lift (pack high)
-bitToExpr' (1, Util.L) = lift (pack low)
--- TODO / Evaluate: Undefined bit values should not be converted
-bitToExpr' (1, _) = lift (pack low)
 bitToExpr' (numTyLit' -> n, Util.H) =
-  [| complement (resize $(lift (pack low)) :: BitVector $n) |]
+  [| complement (resize (pack low) :: BitVector $n) |]
 bitToExpr' (numTyLit' -> n, Util.L) =
-  [| resize $(lift (pack low)) :: BitVector $n |]
+  [| resize (pack low) :: BitVector $n |]
 bitToExpr' (numTyLit' -> n, _) =
-  [| resize $(lift (pack low)) :: BitVector $n |]
+  [| undefined# :: BitVector $n |]
 
-bitsToExpr :: [Bit] -> Q Exp
+bitsToExpr :: [Bit] -> Q Exp -- BitVector n
 bitsToExpr [] = error $ "Unexpected empty bit list"
 bitsToExpr bits =
   foldl1
