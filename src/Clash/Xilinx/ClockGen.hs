@@ -6,8 +6,9 @@ Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
 PLL and other clock-related components for Xilinx FPGAs
 -}
 
-{-# LANGUAGE DataKinds #-}
-{-# LANGUAGE GADTs     #-}
+{-# LANGUAGE DataKinds      #-}
+{-# LANGUAGE ExplicitForAll #-}
+{-# LANGUAGE GADTs          #-}
 module Clash.Xilinx.ClockGen where
 
 import Clash.Promoted.Symbol
@@ -24,8 +25,18 @@ import Unsafe.Coerce
 -- * 1 output clock
 -- * a reset port
 -- * a locked port
+--
+-- You must use type applications to specify the output clock domain, e.g.:
+--
+-- @
+-- type Dom100MHz = Dom \"A\" 10000
+--
+-- -- outputs a clock running at 100 MHz
+-- clockWizard @@Dom100MHz (SSymbol @@"clkWizard50to100") clk50 rst
+-- @
 clockWizard
-  :: SSymbol name
+  :: forall pllOut pllIn name
+   . SSymbol name
   -- ^ Name of the component, must correspond to the name entered in the
   -- \"Clock Wizard\" dialog.
   --
@@ -52,8 +63,18 @@ clockWizard _ clk (Async rst) =
 -- * 1 output clock
 -- * a reset port
 -- * a locked port
+--
+-- You must use type applications to specify the output clock domain, e.g.:
+--
+-- @
+-- type Dom100MHz = Dom \"A\" 10000
+--
+-- -- outputs a clock running at 100 MHz
+-- clockWizardDifferential @@Dom100MHz (SSymbol @@"clkWizardD50to100") clk50N clk50P rst
+-- @
 clockWizardDifferential
-  :: SSymbol name
+  :: forall pllOut pllIn name
+   . SSymbol name
   -- ^ Name of the component, must correspond to the name entered in the
   -- \"Clock Wizard\" dialog.
   --

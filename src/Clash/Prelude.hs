@@ -74,10 +74,6 @@ module Clash.Prelude
   , windowD
   , isRising
   , isFalling
-    -- * Testbench functions
-  , assert
-  , stimuliGenerator
-  , outputVerifier
     -- * Exported modules
     -- ** Synchronous signals
   , module Clash.Signal
@@ -123,6 +119,8 @@ module Clash.Prelude
   , undefined
     -- ** Named types
   , module Clash.NamedTypes
+    -- ** Hidden arguments
+  , module Clash.Hidden
     -- ** Haskell Prelude
     -- $hiding
   , module Prelude
@@ -145,6 +143,7 @@ import           Clash.Class.BitPack
 import           Clash.Class.Num
 import           Clash.Class.Resize
 import qualified Clash.Explicit.Prelude      as E
+import           Clash.Hidden
 import           Clash.NamedTypes
 import           Clash.Prelude.BitIndex
 import           Clash.Prelude.BitReduction
@@ -152,7 +151,6 @@ import           Clash.Prelude.BlockRam.File
 import           Clash.Prelude.DataFlow
 import           Clash.Prelude.ROM.File
 import           Clash.Prelude.Safe
-import           Clash.Prelude.Testbench
 import           Clash.Promoted.Nat
 import           Clash.Promoted.Nat.TH
 import           Clash.Promoted.Nat.Literals
@@ -168,9 +166,9 @@ import           Clash.Signal.Delayed
 import           Clash.XException
 
 {- $setup
->>> :set -XDataKinds
->>> let window4  = window  :: HasClockReset domain gated synchronous => Signal domain Int -> Vec 4 (Signal domain Int)
->>> let windowD3 = windowD :: HasClockReset domain gated synchronous => Signal domain Int -> Vec 3 (Signal domain Int)
+>>> :set -XDataKinds -XFlexibleContexts
+>>> let window4  = window  :: HiddenClockReset domain gated synchronous => Signal domain Int -> Vec 4 (Signal domain Int)
+>>> let windowD3 = windowD :: HiddenClockReset domain gated synchronous => Signal domain Int -> Vec 3 (Signal domain Int)
 -}
 
 {- $hiding
@@ -186,7 +184,7 @@ It instead exports the identically named functions defined in terms of
 
 -- | Give a window over a 'Signal'
 --
--- > window4 :: HasClockReset domain gated synchronous
+-- > window4 :: HiddenClockReset domain gated synchronous
 -- >         => Signal domain Int -> Vec 4 (Signal domain Int)
 -- > window4 = window
 --
@@ -194,15 +192,15 @@ It instead exports the identically named functions defined in terms of
 -- [<1,0,0,0>,<2,1,0,0>,<3,2,1,0>,<4,3,2,1>,<5,4,3,2>...
 -- ...
 window
-  :: (KnownNat n, Default a, HasClockReset domain gated synchronous)
+  :: (KnownNat n, Default a, HiddenClockReset domain gated synchronous)
   => Signal domain a                -- ^ Signal to create a window over
   -> Vec (n + 1) (Signal domain a)  -- ^ Window of at least size 1
-window = E.window hasClock hasReset
+window = hideClockReset E.window
 {-# INLINE window #-}
 
 -- | Give a delayed window over a 'Signal'
 --
--- > windowD3 :: HasClockReset domain gated synchronous
+-- > windowD3 :: HiddenClockReset domain gated synchronous
 -- >          => Signal domain Int -> Vec 3 (Signal domain Int)
 -- > windowD3 = windowD
 --
@@ -210,8 +208,8 @@ window = E.window hasClock hasReset
 -- [<0,0,0>,<1,0,0>,<2,1,0>,<3,2,1>,<4,3,2>...
 -- ...
 windowD
-  :: (KnownNat n, Default a, HasClockReset domain gated synchronous)
+  :: (KnownNat n, Default a, HiddenClockReset domain gated synchronous)
   => Signal domain a               -- ^ Signal to create a window over
   -> Vec (n + 1) (Signal domain a) -- ^ Window of at least size 1
-windowD = E.windowD hasClock hasReset
+windowD = hideClockReset E.windowD
 {-# INLINE windowD #-}

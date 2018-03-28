@@ -27,12 +27,12 @@ import Clash.Explicit.Signal (Bundle (..), Clock, Reset, Signal, register)
 >>> import Clash.Explicit.Prelude
 >>> import qualified Data.List as L
 >>> :{
-let mac s (x,y) = (s',s)
+let macT s (x,y) = (s',s)
       where
         s' = x * y + s
 :}
 
->>> let topEntity clk rst = mealy clk rst mac 0
+>>> let mac clk rst = mealy clk rst macT 0
 -}
 
 -- | Create a synchronous function from a combinational function describing
@@ -41,22 +41,23 @@ let mac s (x,y) = (s',s)
 -- @
 -- import qualified Data.List as L
 --
--- mac :: Int        -- Current state
---     -> (Int,Int)  -- Input
---     -> (Int,Int)  -- (Updated state, output)
--- mac s (x,y) = (s',s)
+-- macT
+--   :: Int        -- Current state
+--   -> (Int,Int)  -- Input
+--   -> (Int,Int)  -- (Updated state, output)
+-- macT s (x,y) = (s',s)
 --   where
 --     s' = x * y + s
 --
--- topEntity
---   :: 'Clock' System Source
---   -> 'Reset' System Asynchronous
---   -> 'Signal' System (Int, Int)
---   -> 'Signal' System Int
--- topEntity clk rst = 'mealy' clk rst mac 0
+-- mac
+--   :: 'Clock' domain Source
+--   -> 'Reset' domain Asynchronous
+--   -> 'Signal' domain (Int, Int)
+--   -> 'Signal' domain Int
+-- mac clk rst = 'mealy' clk rst macT 0
 -- @
 --
--- >>> simulate (topEntity systemClockGen systemResetGen) [(1,1),(2,2),(3,3),(4,4)]
+-- >>> simulate (mac systemClockGen systemResetGen) [(1,1),(2,2),(3,3),(4,4)]
 -- [0,1,5,14...
 -- ...
 --

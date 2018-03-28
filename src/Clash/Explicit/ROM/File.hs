@@ -33,18 +33,18 @@ We can instantiate a synchronous ROM using the content of the above file like
 so:
 
 @
-topEntity
-  :: Clock  System Source
-  -> Signal System (Unsigned 3)
-  -> Signal System (Unsigned 9)
-topEntity clk rd = 'Clash.Class.BitPack.unpack' '<$>' 'romFile' clk d7 \"memory.bin\" rd
+f
+  :: Clock  domain gated
+  -> Signal domain (Unsigned 3)
+  -> Signal domain (Unsigned 9)
+f clk rd = 'Clash.Class.BitPack.unpack' '<$>' 'romFile' clk d7 \"memory.bin\" rd
 @
 
 And see that it works as expected:
 
 @
 __>>> import qualified Data.List as L__
-__>>> L.tail $ sampleN 4 $ topEntity systemClockGen (fromList [3..5])__
+__>>> L.tail $ sampleN 4 $ f systemClockGen (fromList [3..5])__
 [10,11,12]
 @
 
@@ -52,18 +52,18 @@ However, we can also interpret the same data as a tuple of a 6-bit unsigned
 number, and a 3-bit signed number:
 
 @
-topEntity2
-  :: Clock  System Source
-  -> Signal System (Unsigned 3)
-  -> Signal System (Unsigned 6,Signed 3)
-topEntity2 clk rd = 'Clash.Class.BitPack.unpack' '<$>' 'romFile' clk d7 \"memory.bin\" rd
+g
+  :: Clock  domain Source
+  -> Signal domain (Unsigned 3)
+  -> Signal domain (Unsigned 6,Signed 3)
+g clk rd = 'Clash.Class.BitPack.unpack' '<$>' 'romFile' clk d7 \"memory.bin\" rd
 @
 
 And then we would see:
 
 @
 __>>> import qualified Data.List as L__
-__>>> L.tail $ sampleN 4 $ topEntity2 systemClockGen (fromList [3..5])__
+__>>> L.tail $ sampleN 4 $ g systemClockGen (fromList [3..5])__
 [(1,2),(1,3)(1,-4)]
 @
 -}

@@ -27,28 +27,29 @@ import Clash.Explicit.Signal (Bundle (..), Clock, Reset, Signal, register)
 {- $setup
 >>> :set -XDataKinds -XTypeApplications
 >>> import Clash.Explicit.Prelude
->>> let mac s (x,y) = x * y + s
->>> let topEntity clk rst = moore clk rst mac id 0
+>>> let macT s (x,y) = x * y + s
+>>> let mac clk rst = moore clk rst macT id 0
 -}
 
 -- | Create a synchronous function from a combinational function describing
 -- a moore machine
 --
 -- @
--- mac :: Int        -- Current state
---     -> (Int,Int)  -- Input
---     -> (Int,Int)  -- Updated state
--- mac s (x,y) = x * y + s
+-- macT
+--   :: Int        -- Current state
+--   -> (Int,Int)  -- Input
+--   -> (Int,Int)  -- Updated state
+-- macT s (x,y) = x * y + s
 --
--- topEntity
---   :: 'Clock' System Source
---   -> 'Reset' System Asynchronous
---   -> 'Signal' System (Int, Int)
---   -> 'Signal' System Int
--- topEntity clk rst = 'moore' clk rst mac id 0
+-- mac
+--   :: 'Clock' mac Source
+--   -> 'Reset' mac Asynchronous
+--   -> 'Signal' mac (Int, Int)
+--   -> 'Signal' mac Int
+-- mac clk rst = 'moore' clk rst macT id 0
 -- @
 --
--- >>> simulate (topEntity systemClockGen systemResetGen) [(1,1),(2,2),(3,3),(4,4)]
+-- >>> simulate (mac systemClockGen systemResetGen) [(1,1),(2,2),(3,3),(4,4)]
 -- [0,1,5,14...
 -- ...
 --

@@ -120,13 +120,13 @@ We initially create a memory out of simple registers:
 
 @
 dataMem
-  :: Clock System gated
-  -> Reset System synchronous
-  -> Signal MemAddr
+  :: Clock domain gated
+  -> Reset domain synchronous
+  -> Signal domain MemAddr
   -- ^ Read address
-  -> Signal (Maybe (MemAddr,Value))
+  -> Signal domain (Maybe (MemAddr,Value))
   -- ^ (write address, data in)
-  -> Signal Value
+  -> Signal domain Value
   -- ^ data out
 dataMem clk rst rd wrM = 'Clash.Explicit.Mealy.mealy' clk rst dataMemT ('Clash.Sized.Vector.replicate' d32 0) (bundle (rd,wrM))
   where
@@ -144,9 +144,9 @@ And then connect everything:
 system
   :: KnownNat n
   => Vec n Instruction
-  -> Clock System gated
-  -> Reset System synchronous
-  -> Signal System Value
+  -> Clock domain gated
+  -> Reset domain synchronous
+  -> Signal domain Value
 system instrs clk rst = memOut
   where
     memOut = dataMem clk rst rdAddr dout
@@ -211,9 +211,9 @@ has the potential to be translated to a more efficient structure:
 system2
   :: KnownNat n
   => Vec n Instruction
-  -> Clock System gated
-  -> Reset System synchronous
-  -> Signal System Value
+  -> Clock domain gated
+  -> Reset domain synchronous
+  -> Signal domain Value
 system2 instrs clk rst = memOut
   where
     memOut = 'Clash.Explicit.RAM.asyncRam' clk clk d32 rdAddr dout
@@ -301,9 +301,9 @@ We can now finally instantiate our system with a 'blockRam':
 system3
   :: KnownNat n
   => Vec n Instruction
-  -> Clock System gated
-  -> Reset System synchronous
-  -> Signal System Value
+  -> Clock domain gated
+  -> Reset domain synchronous
+  -> Signal domain Value
 system3 instrs clk rst = memOut
   where
     memOut = 'blockRam' clk (replicate d32 0) rdAddr dout
@@ -505,11 +505,11 @@ cpu regbank (memOut,instr) = (regbank',(rdAddr,(,aluOut) <$> wrAddrM,fromIntegra
 
 >>> :{
 dataMem
-  :: Clock  System gated
-  -> Reset  System synchronous
-  -> Signal System MemAddr
-  -> Signal System (Maybe (MemAddr,Value))
-  -> Signal System Value
+  :: Clock  domain gated
+  -> Reset  domain synchronous
+  -> Signal domain MemAddr
+  -> Signal domain (Maybe (MemAddr,Value))
+  -> Signal domain Value
 dataMem clk rst rd wrM = mealy clk rst dataMemT (C.replicate d32 0) (bundle (rd,wrM))
   where
     dataMemT mem (rd,wrM) = (mem',dout)
@@ -524,9 +524,9 @@ dataMem clk rst rd wrM = mealy clk rst dataMemT (C.replicate d32 0) (bundle (rd,
 system
   :: KnownNat n
   => Vec n Instruction
-  -> Clock System gated
-  -> Reset System synchronous
-  -> Signal System Value
+  -> Clock domain gated
+  -> Reset domain synchronous
+  -> Signal domain Value
 system instrs clk rst = memOut
   where
     memOut = dataMem clk rst rdAddr dout
@@ -570,9 +570,9 @@ prog = -- 0 := 4
 system2
   :: KnownNat n
   => Vec n Instruction
-  -> Clock System gated
-  -> Reset System synchronous
-  -> Signal System Value
+  -> Clock domain gated
+  -> Reset domain synchronous
+  -> Signal domain Value
 system2 instrs clk rst = memOut
   where
     memOut = asyncRam clk clk d32 rdAddr dout
@@ -619,9 +619,9 @@ cpu2 (regbank,ldRegD) (memOut,instr) = ((regbank',ldRegD'),(rdAddr,(,aluOut) <$>
 system3
   :: KnownNat n
   => Vec n Instruction
-  -> Clock System gated
-  -> Reset System synchronous
-  -> Signal System Value
+  -> Clock domain gated
+  -> Reset domain synchronous
+  -> Signal domain Value
 system3 instrs clk rst = memOut
   where
     memOut = blockRam clk (C.replicate d32 0) rdAddr dout
@@ -669,10 +669,10 @@ prog2 = -- 0 := 4
 -- * __NB__: Initial output value is 'undefined'
 --
 -- @
--- bram40 :: 'Clock'  System gated
---        -> 'Signal' System ('Unsigned' 6)
---        -> 'Signal' System (Maybe ('Unsigned' 6, 'Clash.Sized.BitVector.Bit'))
---        -> 'Signal' System 'Clash.Sized.BitVector.Bit'
+-- bram40 :: 'Clock'  domain gated
+--        -> 'Signal' domain ('Unsigned' 6)
+--        -> 'Signal' domain (Maybe ('Unsigned' 6, 'Clash.Sized.BitVector.Bit'))
+--        -> 'Signal' domain 'Clash.Sized.BitVector.Bit'
 -- bram40 clk = 'blockRam' clk ('Clash.Sized.Vector.replicate' d40 1)
 -- @
 --
@@ -709,9 +709,9 @@ blockRam = \clk content rd wrM ->
 -- * __NB__: Initial output value is 'undefined'
 --
 -- @
--- bram32 :: 'Signal' System ('Unsigned' 5)
---        -> 'Signal' System (Maybe ('Unsigned' 5, 'Clash.Sized.BitVector.Bit'))
---        -> 'Signal' System 'Clash.Sized.BitVector.Bit'
+-- bram32 :: 'Signal' domain ('Unsigned' 5)
+--        -> 'Signal' domain (Maybe ('Unsigned' 5, 'Clash.Sized.BitVector.Bit'))
+--        -> 'Signal' domain 'Clash.Sized.BitVector.Bit'
 -- bram32 clk = 'blockRamPow2' clk ('Clash.Sized.Vector.replicate' d32 1)
 -- @
 --

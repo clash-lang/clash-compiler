@@ -34,7 +34,7 @@ never create a clock that goes any faster!
 
 === Explicit clocks and resets, and meta-stability #metastability#
 
-When <Clash-Signal.html#implicitclockandreset clocks and resets are implicitly routed>
+When <Clash-Signal.html#hiddenclockandreset clocks and resets are implicitly routed>
 using the mechanisms provided by the __clash-prelude__, then clocks and resets
 are also implicitly unique.
 
@@ -252,12 +252,13 @@ systemClockGen = clockGen
 -- topEntity = concat
 --
 -- testBench :: Signal System Bool
--- testBench = done'
+-- testBench = done
 --   where
 --     testInput      = pure ((1 :> 2 :> 3 :> Nil) :> (4 :> 5 :> 6 :> Nil) :> Nil)
 --     expectedOutput = outputVerifier ((1:>2:>3:>4:>5:>6:>Nil):>Nil)
---     done           = expectedOutput (topEntity <$> testInput)
---     done'          = withClockReset ('tbSystemClockGen' (not <\$\> done')) systemResetGen done
+--     done           = exposeClockReset (expectedOutput (topEntity <$> testInput)) clk rst
+--     clk            = 'tbSystemClockGen' (not <\$\> done)
+--     rst            = systemResetGen
 -- @
 tbSystemClockGen
   :: Signal System Bool
@@ -275,12 +276,13 @@ tbSystemClockGen = tbClockGen
 -- topEntity = concat
 --
 -- testBench :: Signal System Bool
--- testBench = done'
+-- testBench = done
 --   where
 --     testInput      = pure ((1 :> 2 :> 3 :> Nil) :> (4 :> 5 :> 6 :> Nil) :> Nil)
 --     expectedOutput = outputVerifier ((1:>2:>3:>4:>5:>6:>Nil):>Nil)
---     done           = expectedOutput (topEntity <$> testInput)
---     done'          = withClockReset (tbSystemClockGen (not <\$\> done')) 'systemResetGen' done
+--     done           = exposeClockReset (expectedOutput (topEntity <$> testInput)) clk rst
+--     clk            = tbSystemClockGen (not <\$\> done)
+--     rst            = 'systemResetGen'
 -- @
 systemResetGen :: Reset System 'Asynchronous
 systemResetGen = asyncResetGen
@@ -313,7 +315,7 @@ systemResetGen = asyncResetGen
 -- topEntity clk rst key1 =
 --     let  (pllOut,pllStable) = altpll (SSymbol @ "altpll50") clk rst
 --          rstSync            = 'resetSynchronizer' pllOut (unsafeToAsyncReset pllStable)
---     in   withClockReset pllOut rstSync leds
+--     in   exposeClockReset leds pllOut rstSync
 --   where
 --     key1R  = isRising 1 key1
 --     leds   = mealy blinkerT (1,False,0) key1R
