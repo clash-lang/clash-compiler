@@ -1,6 +1,6 @@
 module Bounds where
 import Clash.Prelude
-
+import Clash.Explicit.Testbench
 
 expected
     =     0 :>  42
@@ -18,8 +18,11 @@ actual
     :> toInteger (unFixed (minBound :: UFixed 3 4)) :> toInteger (unFixed (maxBound :: UFixed 3 4))
     :> Nil
 
-topEntity :: SystemClockReset => Signal System () -> Signal System Integer
-topEntity = mealy loop actual
+topEntity
+  :: Clock System Source
+  -> Reset System Asynchronous
+  -> Signal System () -> Signal System Integer
+topEntity = exposeClockReset (mealy loop actual)
 {-# NOINLINE topEntity #-}
 
 loop :: Vec (n+2) a -> () -> (Vec (n+2) a, a)
@@ -27,9 +30,10 @@ loop :: Vec (n+2) a -> () -> (Vec (n+2) a, a)
 loop xs _ = (xs <<+ last xs, head xs)
 
 testBench :: Signal System Bool
-testBench = done'
+testBench = done
   where
     testInput      = pure ()
-    expectedOutput = outputVerifier expected
-    done           = expectedOutput (topEntity testInput)
-    done'          = withClockReset (tbSystemClockGen (not <$> done')) systemResetGen done
+    expectedOutput = outputVerifier clk rst expected
+    done           = expectedOutput (topEntity clk rst testInput)
+    clk            = tbSystemClockGen (not <$> done)
+    rst            = systemResetGen

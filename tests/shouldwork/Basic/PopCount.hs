@@ -2,6 +2,7 @@
 module PopCount where
 
 import Clash.Prelude
+import Clash.Explicit.Testbench
 import GHC.Word
 import Data.Bits
 
@@ -10,9 +11,10 @@ topEntity = popCount
 {-# NOINLINE topEntity #-}
 
 testBench :: Signal System Bool
-testBench = done'
+testBench = done
   where
-    testInput      = stimuliGenerator $(listToVecTH [1::Word,3,8,50,0])
-    expectedOutput = outputVerifier   $(listToVecTH ([1,2,1,3,0]::[Int]))
+    testInput      = stimuliGenerator clk rst $(listToVecTH [1::Word,3,8,50,0])
+    expectedOutput = outputVerifier   clk rst $(listToVecTH ([1,2,1,3,0]::[Int]))
     done           = expectedOutput (topEntity <$> testInput)
-    done'          = withClockReset (tbSystemClockGen (not <$> done')) systemResetGen done
+    clk            = tbSystemClockGen (not <$> done)
+    rst            = systemResetGen

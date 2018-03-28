@@ -17,7 +17,8 @@ import Data.Coerce                      (coerce)
 import Data.Functor.Identity            (Identity (..))
 import Data.HashMap.Strict              (HashMap,(!))
 import Data.Text.Lazy                   (pack)
-import Control.Monad.Trans.Except       (ExceptT (..), mapExceptT, runExceptT)
+import Control.Monad.Trans.Except
+  (ExceptT (..), mapExceptT, runExceptT, throwE)
 
 import Clash.Core.DataCon               (DataCon (..))
 import Clash.Core.Name                  (Name (..), name2String)
@@ -51,13 +52,13 @@ ghcTypeToHWType iw floatSupport = go
                     [dc] -> case dcArgTys dc of
                       [tyView -> TyConApp nm _]
                         | name2String nm == "GHC.Prim.Int#"   ->
-                            error $ unlines ["Int64 not supported in forced 32-bit mode on a 64-bit machine."
-                                            ,"Run Clash with `-fclash-intwidth=64`."
-                                            ]
+                            throwE $ unlines ["Int64 not supported in forced 32-bit mode on a 64-bit machine."
+                                             ,"Run Clash with `-fclash-intwidth=64`."
+                                             ]
                         | name2String nm == "GHC.Prim.Int64#" ->
                             return (Signed 64)
-                      _  -> error $ $(curLoc) ++ "Int64 DC has unexpected amount of arguments"
-                    _    -> error $ $(curLoc) ++ "Int64 TC has unexpected amount of DCs"
+                      _  -> throwE $ $(curLoc) ++ "Int64 DC has unexpected amount of arguments"
+                    _    -> throwE $ $(curLoc) ++ "Int64 TC has unexpected amount of DCs"
              else return (Signed 64)
         "GHC.Word.Word8"                -> return (Unsigned 8)
         "GHC.Word.Word16"               -> return (Unsigned 16)
@@ -68,13 +69,13 @@ ghcTypeToHWType iw floatSupport = go
                     [dc] -> case dcArgTys dc of
                       [tyView -> TyConApp nm _]
                         | name2String nm == "GHC.Prim.Word#"   ->
-                            error $ unlines ["Word64 not supported in forced 32-bit mode on a 64-bit machine."
-                                            ,"Run Clash with `-fclash-intwidth=64`."
-                                            ]
+                            throwE $ unlines ["Word64 not supported in forced 32-bit mode on a 64-bit machine."
+                                             ,"Run Clash with `-fclash-intwidth=64`."
+                                             ]
                         | name2String nm == "GHC.Prim.Word64#" ->
                             return (Unsigned 64)
-                      _  -> error $ $(curLoc) ++ "Word64 DC has unexpected amount of arguments"
-                    _    -> error $ $(curLoc) ++ "Word64 TC has unexpected amount of DCs"
+                      _  -> throwE $ $(curLoc) ++ "Word64 DC has unexpected amount of arguments"
+                    _    -> throwE $ $(curLoc) ++ "Word64 TC has unexpected amount of DCs"
              else return (Unsigned 64)
         "GHC.Integer.Type.Integer"      -> return (Signed iw)
         "GHC.Natural.Natural"           -> return (Unsigned iw)
@@ -86,7 +87,7 @@ ghcTypeToHWType iw floatSupport = go
         "GHC.Prim.Float#" | floatSupport -> return (BitVector 32)
         "GHC.Prim.Double#" | floatSupport -> return (BitVector 64)
         "GHC.Prim.ByteArray#"           ->
-          fail $ "Can't translate type: " ++ showDoc ty
+          throwE $ "Can't translate type: " ++ showDoc ty
 
         "GHC.Types.Bool"                -> return Bool
         "GHC.Types.Float" | floatSupport-> return (BitVector 32)
@@ -156,7 +157,7 @@ ghcTypeToHWType iw floatSupport = go
         "String" -> return String
         "GHC.Types.[]" -> case tyView (head args) of
           (TyConApp (name2String -> "GHC.Types.Char") []) -> return String
-          _ -> fail $ "Can't translate type: " ++ showDoc ty
+          _ -> throwE $ "Can't translate type: " ++ showDoc ty
 
         _ -> ExceptT Nothing
 
@@ -171,7 +172,7 @@ domain m (tyView -> TyConApp tcNm [LitTy (SymTy nm),rateTy])
   | name2String tcNm == "Clash.Signal.Internal.Dom"
   = do rate <- mapExceptT (Just . coerce) (tyNatSize m rateTy)
        return (nm,rate)
-domain _ ty = fail $ "Can't translate domain: " ++ showDoc ty
+domain _ ty = throwE $ "Can't translate domain: " ++ showDoc ty
 
 clockKind
   :: HashMap TyConOccName TyCon
@@ -183,7 +184,7 @@ clockKind _ (tyView -> TyConApp tcNm [])
   = return Source
   | name2String tcNm == "Clash.Signal.Internal.Gated"
   = return Gated
-clockKind _ ty = fail $ "Can't translate ClockKind" ++ showDoc ty
+clockKind _ ty = throwE $ "Can't translate ClockKind" ++ showDoc ty
 
 resetKind
   :: HashMap TyConOccName TyCon
@@ -195,4 +196,4 @@ resetKind _ (tyView -> TyConApp tcNm [])
   = return Synchronous
   | name2String tcNm == "Clash.Signal.Internal.Asynchronous"
   = return Asynchronous
-resetKind _ ty = fail $ "Can't translate ResetKind" ++ showDoc ty
+resetKind _ ty = throwE $ "Can't translate ResetKind" ++ showDoc ty
