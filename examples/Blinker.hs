@@ -16,14 +16,16 @@ type Dom50 = Dom "System" 20000
                  ]
     , t_output = PortName "LED"
     }) #-}
-topEntity :: Clock Dom50 Source -> Reset Dom50 Asynchronous -> Signal Dom50 Bit -> Signal Dom50 (BitVector 8)
-topEntity clk rst key1 =
-    let  (pllOut,pllStable) = altpll (SSymbol @ "altpll50") clk rst
-         rstSync            = resetSynchronizer pllOut (unsafeToAsyncReset pllStable)
-    in   withClockReset pllOut rstSync leds
+topEntity
+  :: Clock Dom50 Source
+  -> Reset Dom50 Asynchronous
+  -> Signal Dom50 Bit
+  -> Signal Dom50 (BitVector 8)
+topEntity clk rst =
+    exposeClockReset (mealy blinkerT (1,False,0) . isRising 1) pllOut rstSync
   where
-    key1R  = isRising 1 key1
-    leds   = mealy blinkerT (1,False,0) key1R
+    (pllOut,pllStable) = altpll @Dom50 (SSymbol @ "altpll50") clk rst
+    rstSync            = resetSynchronizer pllOut (unsafeToAsyncReset pllStable)
 
 blinkerT (leds,mode,cntr) key1R = ((leds',mode',cntr'),leds)
   where

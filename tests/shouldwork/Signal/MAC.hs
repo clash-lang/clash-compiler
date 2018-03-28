@@ -3,11 +3,12 @@ module MAC where
 import Clash.Prelude
 
 topEntity
-  :: SystemClockReset
-  => Integer
+  :: Integer
+  -> Clock System Source
+  -> Reset System Asynchronous
   -> (Signal System Integer, Signal System Integer)
   -> Signal System Integer
-topEntity i = macT <^> i
+topEntity i = exposeClockReset (macT <^> i)
 
 macT s (x,y) = (s',o)
   where

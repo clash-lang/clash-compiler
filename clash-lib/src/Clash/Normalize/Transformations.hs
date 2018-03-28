@@ -55,7 +55,8 @@ import           Control.Concurrent.Supply   (splitSupply)
 import           Control.Exception           (throw)
 import qualified Control.Lens                as Lens
 import qualified Control.Monad               as Monad
-import           Control.Monad.Writer        (WriterT (..), lift, listen, tell)
+import           Control.Monad.Writer
+  (WriterT (..), censor, lift, listen, tell)
 import           Control.Monad.Trans.Except  (runExcept)
 import           Data.Bits                   ((.&.), complement)
 import qualified Data.Either                 as Either
@@ -69,7 +70,7 @@ import qualified Data.Set.Lens               as Lens
 import           Data.Text                   (Text, unpack)
 import           Debug.Trace                 (trace)
 import           Unbound.Generics.LocallyNameless
-  (Bind, Embed (..), bind, embed, rec, unbind, unembed, unrebind, unrec)
+  (Bind, Embed (..), bind, embed, rec, runFreshM, unbind, unembed, unrebind, unrec)
 import           Unbound.Generics.LocallyNameless.Unsafe (unsafeUnbind)
 
 import           BasicTypes                  (InlineSpec (..))
@@ -93,7 +94,7 @@ import           Clash.Core.Type             (TypeView (..), applyFunTy,
 import           Clash.Core.TyCon            (tyConDataCons)
 import           Clash.Core.Util
   (collectArgs, idToVar, isClockOrReset, isCon, isFun, isLet, isPolyFun, isPrim,
-   isSignalType, isVar, mkApps, mkLams, mkTmApps, mkVec, termSize, termType,
+   isSignalType, isVar, mkApps, mkLams, mkVec, termSize, termType,
    tyNatSize)
 import           Clash.Core.Var              (Id, Var (..))
 import           Clash.Driver.Types          (DebugLevel (..), ClashException (..))
@@ -194,8 +195,33 @@ nonRepSpec ctx e@(App e1 e2)
                                               <*> Lens.view tcCache
                                               <*> pure e2Ty)
        if nonRepE2 && not localVar
-         then specializeNorm ctx e
+         then do
+           e2' <- inlineInternalSpecialisationArgument e2
+           specializeNorm ctx (App e1 e2')
          else return e
+  where
+    -- | If the argument on which we're specialising ia an internal function,
+    -- one created by the compiler, then inline that function before we
+    -- specialise.
+    --
+    -- We need to do this because otherwise the specialisation history won't
+    -- recognize the new specialisation argument as something the function has
+    -- already been specialised on
+    inlineInternalSpecialisationArgument
+      :: Term
+      -> NormalizeSession Term
+    inlineInternalSpecialisationArgument app
+      | (Var _ f,fArgs) <- collectArgs app
+      = do
+        fTmM <- fmap (HashMap.lookup (nameOcc f)) $ Lens.use bindings
+        case fTmM of
+          Just (fNm,_,_,_,tm)
+            | nameSort fNm == Internal
+            -> do
+              tm' <- censor (const mempty) (bottomupR appProp ctx (mkApps tm fArgs))
+              return tm'
+          _ -> return app
+      | otherwise = return app
 
 nonRepSpec _ e = return e
 
@@ -1126,8 +1152,9 @@ recToLetRec [] e = do
   normalizedE <- splitNormalized tcm e
   case (normalizedE,bodyM) of
     (Right (args,bndrs,res), Just (_,bodyTy,_,_,_)) -> do
-      let appF              = mkTmApps (Var bodyTy fn) (map idToVar args)
-          (toInline,others) = List.partition ((==) appF . unembed . snd) bndrs
+      let v                 = Var bodyTy fn
+          args'             = map idToVar args
+          (toInline,others) = List.partition (eqApp tcm v args' . unembed . snd) bndrs
           resV              = idToVar res
       case (toInline,others) of
         (_:_,_:_) -> do
@@ -1136,6 +1163,40 @@ recToLetRec [] e = do
           changed $ mkLams (Letrec $ bind (rec others') resV) args
         _ -> return e
     _ -> return e
+  where
+    -- This checks whether things are semantically equal
+    --
+    -- i.e. that
+    --
+    -- xs == (fst xs, snd xs)
+    --
+    -- TODO: this is far from complete
+    eqApp tcm v args (collectArgs -> (v',args'))
+      | v == v'
+      , let args2 = Either.lefts args'
+      , length args == length args2
+      = and (zipWith (eqArg tcm) args args2)
+      | otherwise
+      = False
+
+    eqArg _ v1 v2@(Var _ _)
+      = v1 == v2
+    eqArg tcm v1 v2@(collectArgs -> (Data _,args'))
+      | runFreshM (termType tcm v1) == runFreshM (termType tcm v2)
+      = and (zipWith (isNthProjection v1) [0..] (Either.lefts args'))
+    eqArg _ _ _
+      = False
+
+    -- `isNthProjection s n c` checks that `c` is the `n`th projection
+    -- of `s`.
+    isNthProjection :: Term -> Int -> Term -> Bool
+    isNthProjection v n (Case v' altTy [alt])
+      | v == v'
+      , (DataPat _ pxs,Var _ s) <- unsafeUnbind alt
+      , let (_,xs) = unrebind pxs
+      , Just n' <- List.elemIndex (Id s (embed altTy)) xs
+      = n == n'
+    isNthProjection _ _ _ = False
 
 recToLetRec _ e = return e
 

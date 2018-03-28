@@ -7,118 +7,117 @@
   Parser definitions for BlackBox templates
 -}
 
+{-# LANGUAGE OverloadedStrings #-}
+
 module Clash.Netlist.BlackBox.Parser
   (runParse)
 where
 
-import           Data.Text.Lazy                           (Text, pack)
-import qualified Data.Text.Lazy                           as Text
-import           Text.ParserCombinators.UU
-import           Text.ParserCombinators.UU.BasicInstances hiding (Parser)
-import qualified Text.ParserCombinators.UU.Core           as PCC (parse)
-import           Text.ParserCombinators.UU.Utils          hiding (pBrackets)
+import           Control.Applicative
+import           Data.Text.Lazy               (Text, pack, unpack)
+import qualified Data.Text.Lazy               as Text
+import           Text.Parser.Combinators
+import           Text.Trifecta                hiding (Err)
+import           Text.Trifecta.Delta
 
 import           Clash.Netlist.BlackBox.Types
 
-type Parser a = P (Str Char Text LineColPos) a
-
-
 -- | Parse a text as a BlackBoxTemplate, returns a list of errors in case
 -- parsing fails
-runParse :: Text -> (BlackBoxTemplate, [Error LineColPos])
-runParse = PCC.parse ((,) <$> pBlackBoxD <*> pEnd)
-         . createStr (LineColPos 0 0 0)
+-- runParse :: Text -> (BlackBoxTemplate, [Error LineColPos])
+-- runParse = PCC.parse ((,) <$> pBlackBoxD <*> pEnd)
+--          . createStr (LineColPos 0 0 0)
+runParse :: Text -> Result BlackBoxTemplate
+runParse = parseString pBlackBoxD (Directed "" 0 0 0 0) . unpack
 
 -- | Parse a BlackBoxTemplate (Declarations and Expressions)
 pBlackBoxD :: Parser BlackBoxTemplate
-pBlackBoxD = pSome pElement
+pBlackBoxD = some pElement
 
 -- | Parse a single Template Element
 pElement :: Parser Element
 pElement  =  pTagD
          <|> C <$> pText
-         <|> C <$> (pack <$> pToken "~ ")
+         <|> C <$> (pack <$> string "~ ")
 
 -- | Parse the Text part of a Template
 pText :: Parser Text
-pText = pack <$> pList1 (pRange ('\000','\125'))
+pText = pack <$> some (satisfyRange '\000' '\125')
 
 -- | Parse a Declaration or Expression element
 pTagD :: Parser Element
-pTagD =  IF <$> (pTokenWS "~IF" *> pTagE)
-            <*> (pSpaces *> (pToken "~THEN" *> pBlackBoxD))
-            <*> (pToken "~ELSE" *> pBlackBoxD <* pToken "~FI")
+pTagD =  IF <$> (symbol "~IF" *> pTagE)
+            <*> (spaces *> (string "~THEN" *> pBlackBoxD))
+            <*> (string "~ELSE" *> pBlackBoxD <* string "~FI")
      <|> D <$> pDecl
      <|> pTagE
 
 -- | Parse a Declaration
 pDecl :: Parser Decl
-pDecl = Decl <$> (pTokenWS "~INST" *> pNatural) <*>
-        ((:) <$> pOutput <*> pList pInput) <* pToken "~INST"
+pDecl = Decl <$> (symbol "~INST" *> natural') <*>
+        ((:) <$> pOutput <*> many pInput) <* string "~INST"
 
 -- | Parse the output tag of Declaration
 pOutput :: Parser (BlackBoxTemplate,BlackBoxTemplate)
-pOutput = pTokenWS "~OUTPUT" *> pTokenWS "<=" *> ((,) <$> (pBlackBoxE <* pTokenWS "~") <*> pBlackBoxE) <* pTokenWS "~"
+pOutput = symbol "~OUTPUT" *> symbol "<=" *> ((,) <$> (pBlackBoxE <* symbol "~") <*> pBlackBoxE) <* symbol "~"
 
 -- | Parse the input tag of Declaration
 pInput :: Parser (BlackBoxTemplate,BlackBoxTemplate)
-pInput = pTokenWS "~INPUT" *> pTokenWS "<=" *> ((,) <$> (pBlackBoxE <* pTokenWS "~") <*> pBlackBoxE) <* pTokenWS "~"
+pInput = symbol "~INPUT" *> symbol "<=" *> ((,) <$> (pBlackBoxE <* symbol "~") <*> pBlackBoxE) <* symbol "~"
 
 -- | Parse an Expression element
 pTagE :: Parser Element
-pTagE =  O True            <$  pToken "~ERESULT"
-     <|> O False           <$  pToken "~RESULT"
-     <|> I True            <$> (pToken "~EARG" *> pBrackets pNatural)
-     <|> I False           <$> (pToken "~ARG" *> pBrackets pNatural)
-     <|> L                 <$> (pToken "~LIT" *> pBrackets pNatural)
-     <|> N                 <$> (pToken "~NAME" *> pBrackets pNatural)
-     <|> Var               <$> (pToken "~VAR" *> pBrackets pSigD) <*> pBrackets pNatural
-     <|> (Sym Text.empty)  <$> (pToken "~SYM" *> pBrackets pNatural)
-     <|> Typ Nothing       <$  pToken "~TYPO"
-     <|> (Typ . Just)      <$> (pToken "~TYP" *> pBrackets pNatural)
-     <|> TypM Nothing      <$  pToken "~TYPMO"
-     <|> (TypM . Just)     <$> (pToken "~TYPM" *> pBrackets pNatural)
-     <|> Err Nothing       <$  pToken "~ERRORO"
-     <|> (Err . Just)      <$> (pToken "~ERROR" *> pBrackets pNatural)
-     <|> TypElem           <$> (pToken "~TYPEL" *> pBrackets pTagE)
-     <|> IndexType         <$> (pToken "~INDEXTYPE" *> pBrackets pTagE)
-     <|> CompName          <$  pToken "~COMPNAME"
-     <|> QSysIncludeName   <$  pToken "~QSYSINCLUDENAME"
-     <|> Size              <$> (pToken "~SIZE" *> pBrackets pTagE)
-     <|> Length            <$> (pToken "~LENGTH" *> pBrackets pTagE)
-     <|> Depth             <$> (pToken "~DEPTH" *> pBrackets pTagE)
-     <|> FilePath          <$> (pToken "~FILE" *> pBrackets pTagE)
-     <|> Gen               <$> (True <$ pToken "~GENERATE")
-     <|> Gen               <$> (False <$ pToken "~ENDGENERATE")
-     <|> SigD              <$> (pToken "~SIGD" *> pBrackets pSigD) <*> (Just <$> (pBrackets pNatural))
-     <|> (`SigD` Nothing)  <$> (pToken "~SIGDO" *> pBrackets pSigD)
-     <|> IW64              <$  pToken "~IW64"
-     <|> (HdlSyn Vivado)   <$  pToken "~VIVADO"
-     <|> (HdlSyn Other)    <$  pToken "~OTHERSYN"
-     <|> (BV True)         <$> (pToken "~TOBV" *> pBrackets pSigD) <*> pBrackets pTagE
-     <|> (BV False)        <$> (pToken "~FROMBV" *> pBrackets pSigD) <*> pBrackets pTagE
-     <|> IsLit             <$> (pToken "~ISLIT" *> pBrackets pNatural)
-     <|> IsVar             <$> (pToken "~ISVAR" *> pBrackets pNatural)
-     <|> IsGated           <$> (pToken "~ISGATED" *> pBrackets pNatural)
-     <|> IsSync            <$> (pToken "~ISSYNC" *> pBrackets pNatural)
-     <|> StrCmp            <$> (pToken "~STRCMP" *> pBrackets pSigD) <*> pBrackets pNatural
-     <|> OutputWireReg     <$> (pToken "~OUTPUTWIREREG" *> pBrackets pNatural)
-     <|> GenSym            <$> (pToken "~GENSYM" *> pBrackets pSigD) <*> pBrackets pNatural
-     <|> And               <$> (pToken "~AND" *> listParser pTagE)
-     <|> Vars              <$> (pToken "~VARS" *> pBrackets pNatural)
+pTagE =  O True            <$  string "~ERESULT"
+     <|> O False           <$  string "~RESULT"
+     <|> I True            <$> (string "~EARG" *> brackets' natural')
+     <|> I False           <$> (string "~ARG" *> brackets' natural')
+     <|> L                 <$> (string "~LIT" *> brackets' natural')
+     <|> N                 <$> (string "~NAME" *> brackets' natural')
+     <|> Var               <$> try (string "~VAR" *> brackets' pSigD) <*> brackets' natural'
+     <|> (Sym Text.empty)  <$> (string "~SYM" *> brackets' natural')
+     <|> Typ Nothing       <$  string "~TYPO"
+     <|> (Typ . Just)      <$> try (string "~TYP" *> brackets' natural')
+     <|> TypM Nothing      <$  string "~TYPMO"
+     <|> (TypM . Just)     <$> (string "~TYPM" *> brackets' natural')
+     <|> Err Nothing       <$  string "~ERRORO"
+     <|> (Err . Just)      <$> (string "~ERROR" *> brackets' natural')
+     <|> TypElem           <$> (string "~TYPEL" *> brackets' pTagE)
+     <|> IndexType         <$> (string "~INDEXTYPE" *> brackets' pTagE)
+     <|> CompName          <$  string "~COMPNAME"
+     <|> QSysIncludeName   <$  string "~QSYSINCLUDENAME"
+     <|> Size              <$> (string "~SIZE" *> brackets' pTagE)
+     <|> Length            <$> (string "~LENGTH" *> brackets' pTagE)
+     <|> Depth             <$> (string "~DEPTH" *> brackets' pTagE)
+     <|> FilePath          <$> (string "~FILE" *> brackets' pTagE)
+     <|> Gen               <$> (True <$ string "~GENERATE")
+     <|> Gen               <$> (False <$ string "~ENDGENERATE")
+     <|> (`SigD` Nothing)  <$> (string "~SIGDO" *> brackets' pSigD)
+     <|> SigD              <$> (string "~SIGD" *> brackets' pSigD) <*> (Just <$> (brackets' natural'))
+     <|> IW64              <$  string "~IW64"
+     <|> (HdlSyn Vivado)   <$  string "~VIVADO"
+     <|> (HdlSyn Other)    <$  string "~OTHERSYN"
+     <|> (BV True)         <$> (string "~TOBV" *> brackets' pSigD) <*> brackets' pTagE
+     <|> (BV False)        <$> (string "~FROMBV" *> brackets' pSigD) <*> brackets' pTagE
+     <|> IsLit             <$> (string "~ISLIT" *> brackets' natural')
+     <|> IsVar             <$> (string "~ISVAR" *> brackets' natural')
+     <|> IsGated           <$> (string "~ISGATED" *> brackets' natural')
+     <|> IsSync            <$> (string "~ISSYNC" *> brackets' natural')
+     <|> StrCmp            <$> (string "~STRCMP" *> brackets' pSigD) <*> brackets' natural'
+     <|> OutputWireReg     <$> (string "~OUTPUTWIREREG" *> brackets' natural')
+     <|> GenSym            <$> (string "~GENSYM" *> brackets' pSigD) <*> brackets' natural'
+     <|> And               <$> (string "~AND" *> brackets' (commaSep pTagE))
+     <|> Vars              <$> (string "~VARS" *> brackets' natural')
 
+natural' :: TokenParsing m => m Int
+natural' = fmap fromInteger natural
 
 -- | Parse a bracketed text
-pBrackets :: Parser a -> Parser a
-pBrackets p = pSym '[' *> p <* pSym ']'
-
--- | Parse a token and eat trailing whitespace
-pTokenWS :: String -> Parser String
-pTokenWS keyw = pToken keyw <* pSpaces
+brackets' :: Parser a -> Parser a
+brackets' p = char '[' *> p <* char ']'
 
 -- | Parse the expression part of Blackbox Templates
 pBlackBoxE :: Parser BlackBoxTemplate
-pBlackBoxE = pSome pElemE
+pBlackBoxE = some pElemE
 
 -- | Parse an Expression or Text
 pElemE :: Parser Element
@@ -127,7 +126,7 @@ pElemE = pTagE
 
 -- | Parse SigD
 pSigD :: Parser [Element]
-pSigD = pSome (pTagE <|> (C (pack "[") <$ (pack <$> pToken "[\\"))
-                     <|> (C (pack "]") <$ (pack <$> pToken "\\]"))
-                     <|> (C <$> (pack <$> pList1 (pRange ('\000','\90'))))
-                     <|> (C <$> (pack <$> pList1 (pRange ('\94','\125')))))
+pSigD = some (pTagE <|> (C (pack "[") <$ (pack <$> string "[\\"))
+                    <|> (C (pack "]") <$ (pack <$> string "\\]"))
+                    <|> (C <$> (pack <$> some (satisfyRange '\000' '\90')))
+                    <|> (C <$> (pack <$> some (satisfyRange '\94' '\125'))))

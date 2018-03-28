@@ -8,6 +8,7 @@
   in templates
 -}
 
+{-# LANGUAGE CPP               #-}
 {-# LANGUAGE FlexibleContexts  #-}
 {-# LANGUAGE LambdaCase        #-}
 {-# LANGUAGE OverloadedStrings #-}
@@ -23,16 +24,18 @@ import           Data.Bool                            (bool)
 import           Data.Foldable                        (foldrM)
 import qualified Data.IntMap                          as IntMap
 import           Data.List                            (mapAccumL, nub)
+#if !MIN_VERSION_base(4,11,0)
+import           Data.Monoid
+#endif
+import           Data.Semigroup.Monad
+import           Data.Text.Prettyprint.Doc.Extra
 import           Data.Text.Lazy                       (Text)
 import qualified Data.Text.Lazy                       as Text
 import           System.FilePath                      (replaceBaseName,
                                                        takeBaseName,
                                                        takeFileName)
-import           Text.PrettyPrint.Leijen.Text.Monadic (displayT, renderCompact,
-                                                       renderOneLine, brackets,
-                                                       int, (<>), text, (<+>),
-                                                       vcat, (<$$>), nest)
-import qualified Text.PrettyPrint.Leijen.Text.Monadic as PP
+import qualified Text.PrettyPrint.ANSI.Leijen         as ANSI
+import           Text.Trifecta.Result                 hiding (Err)
 
 import           Clash.Backend                        (Backend (..), Usage (..))
 import           Clash.Driver.Types                   (ClashException (..))
@@ -216,8 +219,8 @@ renderElem b (D (Decl n (l:ls))) = do
       b' = pCtx { bbResult = (o,oTy), bbInputs = bbInputs pCtx ++ is }
   templ' <- case templ of
               Left t        -> return t
-              Right (nm,ds) -> do block <- blockDecl nm ds
-                                  return . parseFail . displayT $ renderCompact block
+              Right (nm,ds) -> do block <- getMon $ blockDecl nm ds
+                                  return . parseFail . renderLazy $ layoutCompact block
   let t2 = setSimpleVar b' templ'
   if verifyBlackBoxContext b' t2
     then Text.concat <$> mapM (renderElem b') t2
@@ -231,8 +234,8 @@ renderElem b (SigD e m) = do
              Nothing -> snd $ bbResult b
              Just n  -> let (_,ty',_) = bbInputs b !! n
                         in  ty'
-  t  <- hdlSig e' ty
-  return (displayT $ renderOneLine t)
+  t  <- getMon (hdlSig e' ty)
+  return (renderOneLine t)
 
 renderElem b (IF c t f) = do
   iw <- iwWidth
@@ -302,8 +305,9 @@ renderElem b e = renderTag b e
 
 parseFail :: Text -> BlackBoxTemplate
 parseFail t = case runParse t of
-                    (templ,err) | null err  -> templ
-                                | otherwise -> error $ $(curLoc) ++ "\nTemplate:\n" ++ show t ++ "\nHas errors:\n" ++ show err
+  Failure errInfo ->
+    error (ANSI.displayS (ANSI.renderCompact (_errDoc errInfo)) "")
+  Success templ -> templ
 
 idToExpr
   :: (Text,HWType)
@@ -347,18 +351,18 @@ renderTag :: Backend backend
 renderTag _ (C t)           = return t
 renderTag b (O esc)         = do
   escape <- if esc then unextend else pure id
-  fmap (escape . displayT . renderOneLine) . expr False . fst $ bbResult b
+  fmap (escape . renderOneLine) . getMon . expr False . fst $ bbResult b
 renderTag b (I esc n)       = do
   let (e,_,_) = bbInputs b !! n
   escape <- if esc then unextend else pure id
-  (escape . displayT . renderOneLine) <$> expr False e
+  (escape . renderOneLine) <$> getMon (expr False e)
 renderTag b (N n)           = let (e,_,_) = bbInputs b !! n
                               in  case exprToText e of
                                      Just t -> return t
                                      _ -> error $ $(curLoc) ++ "Expected a string literal: " ++ show e
 
 renderTag b (L n)           = let (e,_,_) = bbInputs b !! n
-                              in  (displayT . renderOneLine) <$> expr False (mkLit e)
+                              in  renderOneLine <$> getMon (expr False (mkLit e))
   where
     mkLit (Literal (Just (Signed _,_)) i)   = Literal Nothing i
     mkLit (Literal (Just (Unsigned _,_)) i) = Literal Nothing i
@@ -372,21 +376,21 @@ renderTag _ (Sym t _) = return t
 renderTag b (BV True es e) = do
   e' <- Text.concat <$> mapM (renderElem b) es
   let ty = lineToType b [e]
-  (displayT . renderOneLine) <$> toBV ty e'
+  renderOneLine <$> getMon (toBV ty e')
 renderTag b (BV False es e) = do
   e' <- Text.concat <$> mapM (renderElem b) es
   let ty = lineToType b [e]
-  (displayT . renderOneLine) <$> fromBV ty e'
+  renderOneLine <$> getMon (fromBV ty e')
 
-renderTag b (Typ Nothing)   = fmap (displayT . renderOneLine) . hdlType Internal . snd $ bbResult b
+renderTag b (Typ Nothing)   = fmap renderOneLine . getMon . hdlType Internal . snd $ bbResult b
 renderTag b (Typ (Just n))  = let (_,ty,_) = bbInputs b !! n
-                              in  (displayT . renderOneLine) <$> hdlType Internal ty
-renderTag b (TypM Nothing)  = fmap (displayT . renderOneLine) . hdlTypeMark . snd $ bbResult b
+                              in  renderOneLine <$> getMon (hdlType Internal ty)
+renderTag b (TypM Nothing)  = fmap renderOneLine . getMon . hdlTypeMark . snd $ bbResult b
 renderTag b (TypM (Just n)) = let (_,ty,_) = bbInputs b !! n
-                              in  (displayT . renderOneLine) <$> hdlTypeMark ty
-renderTag b (Err Nothing)   = fmap (displayT . renderOneLine) . hdlTypeErrValue . snd $ bbResult b
+                              in  renderOneLine <$> getMon (hdlTypeMark ty)
+renderTag b (Err Nothing)   = fmap renderOneLine . getMon . hdlTypeErrValue . snd $ bbResult b
 renderTag b (Err (Just n))  = let (_,ty,_) = bbInputs b !! n
-                              in  (displayT . renderOneLine) <$> hdlTypeErrValue ty
+                              in  renderOneLine <$> getMon (hdlTypeErrValue ty)
 renderTag b (Size e)        = return . Text.pack . show . typeSize $ lineToType b [e]
 renderTag b (Length e)      = return . Text.pack . show . vecLen $ lineToType b [e]
   where
@@ -397,8 +401,8 @@ renderTag b (Depth e)      = return . Text.pack . show . treeDepth $ lineToType 
     treeDepth (RTree n _) = n
     treeDepth _           = error $ $(curLoc) ++ "treeDepth of a non-tree type"
 renderTag b e@(TypElem _)   = let ty = lineToType b [e]
-                              in  (displayT . renderOneLine) <$> hdlType Internal ty
-renderTag _ (Gen b)         = displayT . renderOneLine <$> genStmt b
+                              in  renderOneLine <$> getMon (hdlType Internal ty)
+renderTag _ (Gen b)         = renderOneLine <$> genStmt b
 renderTag _ (GenSym [C t] _) = return t
 renderTag b (Vars n)        =
   let (e,_,_) = bbInputs b !! n
@@ -416,18 +420,18 @@ renderTag b (IndexType (L n)) =
   case bbInputs b !! n of
     (Literal _ (NumLit n'),_,_) ->
       let hty = Index (fromInteger n')
-      in  fmap (displayT . renderOneLine) (hdlType Internal hty)
+      in  fmap renderOneLine (getMon (hdlType Internal hty))
     x -> error $ $(curLoc) ++ "Index type not given a literal: " ++ show x
 renderTag b (FilePath e)    = case e of
   L n -> do
     let (e',_,_) = bbInputs b !! n
-    e2  <- prettyElem e
+    e2  <- getMon (prettyElem e)
     case e' of
       BlackBoxE "GHC.CString.unpackCString#" _ _ _ _ bbCtx' _ -> case bbInputs bbCtx' of
         [(Literal Nothing (StringLit _),_,_)] -> error $ $(curLoc) ++ "argument of ~FILEPATH:" ++ show e2 ++  "does not reduce to a string"
         _ ->  error $ $(curLoc) ++ "argument of ~FILEPATH:" ++ show e2 ++  "does not reduce to a string"
       _ -> error $ $(curLoc) ++ "argument of ~FILEPATH:" ++ show e2 ++  "does not reduce to a string"
-  _ -> do e' <- prettyElem e
+  _ -> do e' <- getMon (prettyElem e)
           error $ $(curLoc) ++ "~FILEPATH expects a ~LIT[N] argument, but got: " ++ show e'
 renderTag b QSysIncludeName = case bbQsysIncName b of
   Just nm -> return nm
@@ -435,7 +439,7 @@ renderTag b QSysIncludeName = case bbQsysIncName b of
 renderTag b (OutputWireReg n) = case IntMap.lookup n (bbFunctions b) of
   Just (_,rw,_) -> case rw of {N.Wire -> return "wire"; N.Reg -> return "reg"}
   _ -> error $ $(curLoc) ++ "~OUTPUTWIREREG[" ++ show n ++ "] used where argument " ++ show n ++ " is not a function"
-renderTag _ e = do e' <- prettyElem e
+renderTag _ e = do e' <- getMon (prettyElem e)
                    error $ $(curLoc) ++ "Unable to evaluate: " ++ show e'
 
 exprToText
@@ -452,68 +456,68 @@ exprToText _ = Nothing
 
 prettyBlackBox :: Monad m
                => BlackBoxTemplate
-               -> m Text
+               -> Mon m Text
 prettyBlackBox bbT = Text.concat <$> mapM prettyElem bbT
 
 prettyElem :: Monad m
            => Element
-           -> m Text
+           -> Mon m Text
 prettyElem (C t) = return t
 prettyElem (D (Decl i args)) = do
   args' <- mapM (\(a,b) -> (,) <$> prettyBlackBox a <*> prettyBlackBox b) args
-  (displayT . renderOneLine) <$>
-    (nest 2 (text "~INST" <+> int i <$$>
-        text "~OUTPUT" <+> text "=>" <+> text (fst (head args')) <+> text (snd (head args')) <+> text "~" <$$>
-        vcat (mapM (\(a,b) -> text "~INPUT" <+> text "=>" <+> text a <+> text b <+> text "~") (tail args')))
-      PP.<$$> text "~INST")
+  renderOneLine <$>
+    (nest 2 (string "~INST" <+> int i <> line <>
+        string "~OUTPUT" <+> string "=>" <+> string (fst (head args')) <+> string (snd (head args')) <+> string "~" <> line <>
+        vcat (mapM (\(a,b) -> string "~INPUT" <+> string "=>" <+> string a <+> string b <+> string "~") (tail args')))
+      <> line <> string "~INST")
 prettyElem (O b) = if b then return "~ERESULT" else return "~RESULT"
-prettyElem (I b i) = (displayT . renderOneLine) <$> (if b then text "~EARG" else text "~ARG" <> brackets (int i))
-prettyElem (L i) = (displayT . renderOneLine) <$> (text "~LIT" <> brackets (int i))
-prettyElem (N i) = (displayT . renderOneLine) <$> (text "~NAME" <> brackets (int i))
+prettyElem (I b i) = renderOneLine <$> (if b then string "~EARG" else string "~ARG" <> brackets (int i))
+prettyElem (L i) = renderOneLine <$> (string "~LIT" <> brackets (int i))
+prettyElem (N i) = renderOneLine <$> (string "~NAME" <> brackets (int i))
 prettyElem (Var es i) = do
   es' <- prettyBlackBox es
-  (displayT .renderOneLine) <$> (text "~VAR" <> brackets (text es') <> brackets (int i))
-prettyElem (Sym _ i) = (displayT . renderOneLine) <$> (text "~SYM" <> brackets (int i))
+  renderOneLine <$> (string "~VAR" <> brackets (string es') <> brackets (int i))
+prettyElem (Sym _ i) = renderOneLine <$> (string "~SYM" <> brackets (int i))
 prettyElem (Typ Nothing) = return "~TYPO"
-prettyElem (Typ (Just i)) = (displayT . renderOneLine) <$> (text "~TYP" <> brackets (int i))
+prettyElem (Typ (Just i)) = renderOneLine <$> (string "~TYP" <> brackets (int i))
 prettyElem (TypM Nothing) = return "~TYPMO"
-prettyElem (TypM (Just i)) = (displayT . renderOneLine) <$> (text "~TYPM" <> brackets (int i))
+prettyElem (TypM (Just i)) = renderOneLine <$> (string "~TYPM" <> brackets (int i))
 prettyElem (Err Nothing) = return "~ERRORO"
-prettyElem (Err (Just i)) = (displayT . renderOneLine) <$> (text "~ERROR" <> brackets (int i))
+prettyElem (Err (Just i)) = renderOneLine <$> (string "~ERROR" <> brackets (int i))
 prettyElem (TypElem e) = do
   e' <- prettyElem e
-  (displayT . renderOneLine) <$> (text "~TYPEL" <> brackets (text e'))
+  renderOneLine <$> (string "~TYPEL" <> brackets (string e'))
 prettyElem CompName = return "~COMPNAME"
 prettyElem QSysIncludeName = return "~QSYSINCLUDENAME"
 prettyElem (IndexType e) = do
   e' <- prettyElem e
-  (displayT . renderOneLine) <$> (text "~INDEXTYPE" <> brackets (text e'))
+  renderOneLine <$> (string "~INDEXTYPE" <> brackets (string e'))
 prettyElem (Size e) = do
   e' <- prettyElem e
-  (displayT . renderOneLine) <$> (text "~SIZE" <> brackets (text e'))
+  renderOneLine <$> (string "~SIZE" <> brackets (string e'))
 prettyElem (Length e) = do
   e' <- prettyElem e
-  (displayT . renderOneLine) <$> (text "~LENGTH" <> brackets (text e'))
+  renderOneLine <$> (string "~LENGTH" <> brackets (string e'))
 prettyElem (Depth e) = do
   e' <- prettyElem e
-  (displayT . renderOneLine) <$> (text "~DEPTH" <> brackets (text e'))
+  renderOneLine <$> (string "~DEPTH" <> brackets (string e'))
 prettyElem (FilePath e) = do
   e' <- prettyElem e
-  (displayT . renderOneLine) <$> (text "~FILE" <> brackets (text e'))
+  renderOneLine <$> (string "~FILE" <> brackets (string e'))
 prettyElem (Gen b) = if b then return "~GENERATE" else return "~ENDGENERATE"
 prettyElem (IF b esT esF) = do
   b' <- prettyElem b
   esT' <- prettyBlackBox esT
   esF' <- prettyBlackBox esF
-  (displayT . renderCompact) <$>
-    (text "~IF" <+> text b' <+> text "~THEN" <>
-     text esT' <>
-     text "~ELSE" <>
-     text esF' <>
-     text "~FI")
+  (renderLazy . layoutCompact) <$>
+    (string "~IF" <+> string b' <+> string "~THEN" <>
+     string esT' <>
+     string "~ELSE" <>
+     string esF' <>
+     string "~FI")
 prettyElem (And es) =
-  (displayT . renderCompact) <$>
-  (PP.brackets (PP.tupled $ mapM (text <=< prettyElem) es))
+  (renderLazy . layoutCompact) <$>
+  (brackets (tupled $ mapM (string <=< prettyElem) es))
 prettyElem IW64 = return "~IW64"
 prettyElem (HdlSyn s) = case s of
   Vivado -> return "~VIVADO"
@@ -521,28 +525,28 @@ prettyElem (HdlSyn s) = case s of
 prettyElem (BV b es e) = do
   es' <- prettyBlackBox es
   e'  <- prettyBlackBox [e]
-  (displayT . renderOneLine) <$>
+  renderOneLine <$>
     if b
-       then text "~TOBV" <> brackets (text es') <> brackets (text e')
-       else text "~FROMBV" <> brackets (text es') <> brackets (text e')
-prettyElem (IsLit i) = (displayT . renderOneLine) <$> (text "~ISLIT" <> brackets (int i))
-prettyElem (IsVar i) = (displayT . renderOneLine) <$> (text "~ISVAR" <> brackets (int i))
-prettyElem (IsGated i) = (displayT . renderOneLine) <$> (text "~ISGATED" <> brackets (int i))
-prettyElem (IsSync i) = (displayT . renderOneLine) <$> (text "~ISSYNC" <> brackets (int i))
+       then string "~TOBV" <> brackets (string es') <> brackets (string e')
+       else string "~FROMBV" <> brackets (string es') <> brackets (string e')
+prettyElem (IsLit i) = renderOneLine <$> (string "~ISLIT" <> brackets (int i))
+prettyElem (IsVar i) = renderOneLine <$> (string "~ISVAR" <> brackets (int i))
+prettyElem (IsGated i) = renderOneLine <$> (string "~ISGATED" <> brackets (int i))
+prettyElem (IsSync i) = renderOneLine <$> (string "~ISSYNC" <> brackets (int i))
 prettyElem (StrCmp es i) = do
   es' <- prettyBlackBox es
-  (displayT . renderOneLine) <$> (text "~STRCMP" <> brackets (text es') <> brackets (int i))
+  renderOneLine <$> (string "~STRCMP" <> brackets (string es') <> brackets (int i))
 prettyElem (GenSym es i) = do
   es' <- prettyBlackBox es
-  (displayT . renderOneLine) <$> (text "~GENSYM" <> brackets (text es') <> brackets (int i))
+  renderOneLine <$> (string "~GENSYM" <> brackets (string es') <> brackets (int i))
 prettyElem (SigD es mI) = do
   es' <- prettyBlackBox es
-  (displayT . renderOneLine) <$>
-    (maybe (text "~SIGDO" <> brackets (text es'))
-           (((text "~SIGD" <> brackets (text es')) <>) . int)
+  renderOneLine <$>
+    (maybe (string "~SIGDO" <> brackets (string es'))
+           (((string "~SIGD" <> brackets (string es')) <>) . int)
            mI)
-prettyElem (Vars i) = (displayT . renderOneLine) <$> (text "~VARS" <> brackets (int i))
-prettyElem (OutputWireReg i) = (displayT . renderOneLine) <$> (text "~RESULTWIREREG" <> brackets (int i))
+prettyElem (Vars i) = renderOneLine <$> (string "~VARS" <> brackets (int i))
+prettyElem (OutputWireReg i) = renderOneLine <$> (string "~RESULTWIREREG" <> brackets (int i))
 
 usedArguments :: BlackBoxTemplate
               -> [Int]

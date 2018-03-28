@@ -8,6 +8,7 @@
   Utilities for rewriting: e.g. inlining, specialisation, etc.
 -}
 
+{-# LANGUAGE CPP                      #-}
 {-# LANGUAGE NondecreasingIndentation #-}
 {-# LANGUAGE Rank2Types               #-}
 {-# LANGUAGE TemplateHaskell          #-}
@@ -441,7 +442,13 @@ liftBinding gamma delta (Id idName tyE,eE) = do
                                     -- (termination, CSE and DEC oppertunities,
                                     -- ,etc.)
                                     (newBodyId {nameSort = Internal}
-                                    ,newBodyTy,sp,EmptyInlineSpec,newBody)
+                                    ,newBodyTy,sp
+#if MIN_VERSION_ghc(8,4,1)
+                                    ,NoUserInline
+#else
+                                    ,EmptyInlineSpec
+#endif
+                                    ,newBody)
              -- Return the new binder
              return (Id idName tyE, embed newExpr)
     -- If it does, use the existing binder
@@ -680,11 +687,18 @@ specialise' specMapLbl specHistLbl specLimitLbl ctx e (Var _ f, args) specArgIn 
         Nothing -> return e
   where
     unsafeCollectBndrs :: Term -> [Name a]
-    unsafeCollectBndrs = map (either (coerceName . varName) (coerceName . varName)) . go []
+    unsafeCollectBndrs =
+        map (either (coerceName . varName) (coerceName . varName)) . reverse . go []
       where
-        go bs (Lam b)   = let (v,e')  = unsafeUnbind b in go (Left v:bs)   e'
-        go bs (TyLam b) = let (tv,e') = unsafeUnbind b in go (Right tv:bs) e'
-        go bs _         = reverse bs
+        go bs (Lam b)    = let (v,e')  = unsafeUnbind b in go (Left v:bs)   e'
+        go bs (TyLam b)  = let (tv,e') = unsafeUnbind b in go (Right tv:bs) e'
+        go bs (App e' _) = case go [] e' of
+          []  -> bs
+          bs' -> init bs' ++ bs
+        go bs (TyApp e' _) = case go [] e' of
+          []  -> bs
+          bs' -> init bs' ++ bs
+        go bs _ = bs
 
 specialise' _ _ _ ctx _ (appE,args) (Left specArg) = do
   -- Create binders and variable references for free variables in 'specArg'
@@ -698,7 +712,13 @@ specialise' _ _ _ ctx _ (appE,args) (Left specArg) = do
   newf <- case HML.toList existing of
     [] -> do (cf,sp) <- Lens.use curFun
              mkFunction (appendToName cf "_specF")
-                        sp EmptyInlineSpec newBody
+                        sp
+#if MIN_VERSION_ghc(8,4,1)
+                        NoUserInline
+#else
+                        EmptyInlineSpec
+#endif
+                        newBody
     ((_,(k,kTy,_,_,_)):_) -> return (k,kTy)
   -- Create specialized argument
   let newArg  = Left $ mkApps ((uncurry . flip) Var newf) specVars

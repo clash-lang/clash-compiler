@@ -1,15 +1,17 @@
 module Minimum where
 
 import Clash.Prelude
+import Clash.Explicit.Testbench
 
 topEntity :: Vec 3 Int -> Int
 topEntity = minimum
 {-# NOINLINE topEntity #-}
 
 testBench :: Signal System Bool
-testBench = done'
+testBench = done
   where
     testInput      = pure (4 :> 8 :> (-2) :> Nil)
-    expectedOutput = outputVerifier (singleton (-2))
+    expectedOutput = outputVerifier clk rst (singleton (-2))
     done           = expectedOutput (topEntity <$> testInput)
-    done'          = withClockReset (tbSystemClockGen (not <$> done')) systemResetGen done
+    clk            = tbSystemClockGen (not <$> done)
+    rst            = systemResetGen

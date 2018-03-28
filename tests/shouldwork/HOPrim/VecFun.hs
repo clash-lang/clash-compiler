@@ -1,6 +1,7 @@
 module VecFun where
 
 import Clash.Prelude
+import Clash.Explicit.Testbench
 
 topEntity = work
 {-# NOINLINE topEntity #-}
@@ -12,9 +13,10 @@ work xs = zipWith sel xs funs where
     sel x f = f x
 
 testBench :: Signal System Bool
-testBench = done'
+testBench = done
   where
     testInput      = pure (1:>2:>3:>Nil)
-    expectedOutput = outputVerifier ((2:>3:>4:>Nil):>Nil)
+    expectedOutput = outputVerifier clk rst ((2:>3:>4:>Nil):>Nil)
     done           = expectedOutput (topEntity <$> testInput)
-    done'          = withClockReset (tbSystemClockGen (not <$> done')) systemResetGen done
+    clk            = tbSystemClockGen (not <$> done)
+    rst            = systemResetGen

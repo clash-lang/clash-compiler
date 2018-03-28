@@ -28,8 +28,8 @@ import qualified Data.Maybe                       as Maybe
 import qualified Data.Set                         as Set
 import qualified Data.Set.Lens                    as Lens
 import           Data.Semigroup                   ((<>))
+import           Data.Text.Prettyprint.Doc        (vcat)
 import           Unbound.Generics.LocallyNameless (unembed, runLFreshM)
-import           Text.PrettyPrint                 (vcat)
 
 import           BasicTypes                       (InlineSpec (..))
 import           SrcLoc                           (SrcSpan,noSrcSpan)
@@ -160,7 +160,7 @@ normalize' nm = do
                             , showDoc (tmNorm ^. _5) ])
                     (return ())
             tyTrans <- Lens.view typeTranslator
-            case clockResetErrors tyTrans tcm ty of
+            case clockResetErrors sp tyTrans tcm ty of
               msgs@(_:_) -> traceIf True (concat (nmS:" (:: ":showDoc (tmNorm ^. _2)
                               :")\nhas potentially dangerous meta-stability issues:\n\n"
                               :msgs))
@@ -365,16 +365,17 @@ callTreeToList visited (CBranch (nm,bndr) used)
 -- * There are 2 or more reset arguments in scope that have the same reset
 --   domain annotation, and at least one of them is an asynchronous reset.
 clockResetErrors
-  :: (HashMap TyConOccName TyCon -> Bool -> Type -> Maybe (Either String HWType))
+  :: SrcSpan
+  -> (HashMap TyConOccName TyCon -> Bool -> Type -> Maybe (Either String HWType))
   -> HashMap TyConOccName TyCon
   -> Type
   -> [String]
-clockResetErrors tyTran tcm ty =
+clockResetErrors sp tyTran tcm ty =
    (Maybe.mapMaybe reportClock clks ++ Maybe.mapMaybe reportResets rsts)
   where
     (args,_)  = splitCoreFunForallTy tcm ty
     (_,args') = partitionEithers args
-    hwArgs    = zip (map (unsafeCoreTypeToHWType $(curLoc) tyTran tcm False) args') args'
+    hwArgs    = zip (map (unsafeCoreTypeToHWType sp $(curLoc) tyTran tcm False) args') args'
     clks      = groupBy ((==) `on` fst) . sortBy (compare `on` fst)
               $ [ ((nm,i),ty') | (Clock nm i _,ty') <- hwArgs]
     rsts      = groupBy ((==) `on` (fst.fst)) . sortBy (compare `on` (fst.fst))

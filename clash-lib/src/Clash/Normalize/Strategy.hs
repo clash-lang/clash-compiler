@@ -17,7 +17,7 @@ import Clash.Rewrite.Util
 -- | Normalisation transformation
 normalization :: NormRewrite
 normalization = rmDeadcode >-> constantPropgation >-> etaTL >-> rmUnusedExpr >-!-> anf >-!-> rmDeadcode >->
-                bindConst >-> letTL >-> evalConst >-!-> cse >-!-> recLetRec >-> cleanup
+                bindConst >-> letTL >-> evalConst >-!-> cse >-!-> cleanup >-> recLetRec
   where
     etaTL      = apply "etaTL" etaExpansionTL !-> innerMost (apply "applicationPropagation" appProp)
     anf        = topdownR (apply "nonRepANF" nonRepANF) >-> apply "ANF" makeANF

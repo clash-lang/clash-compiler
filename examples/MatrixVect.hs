@@ -1,6 +1,7 @@
 module MatrixVect where
 
 import Clash.Prelude
+import Clash.Explicit.Testbench
 import qualified Data.List as L
 
 row1 = 1 :> 2 :> 3 :> Nil
@@ -18,9 +19,10 @@ topEntity = matrixVector matrix
 {-# NOINLINE topEntity #-}
 
 testBench :: Signal System Bool
-testBench = done'
+testBench = done
   where
-    testInput      = stimuliGenerator ((2 :> 3 :> 4 :> Nil) :> Nil)
-    expectedOutput = outputVerifier   ((20 :> 47 :> 74 :> Nil) :> Nil)
+    testInput      = stimuliGenerator clk rst ((2 :> 3 :> 4 :> Nil) :> Nil)
+    expectedOutput = outputVerifier clk rst ((20 :> 47 :> 74 :> Nil) :> Nil)
     done           = expectedOutput (topEntity <$> testInput)
-    done'          = withClockReset (tbSystemClockGen (not <$> done')) systemResetGen done
+    clk            = tbSystemClockGen (not <$> done)
+    rst            = systemResetGen

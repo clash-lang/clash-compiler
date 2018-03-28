@@ -1,6 +1,7 @@
 module Box where
 
 import Clash.Prelude
+import Clash.Explicit.Testbench
 
 topEntity :: BitVector 16 -> (BitVector 16,BitVector 8,Vec 8 Bit)
 topEntity vec = (pack  tup
@@ -13,9 +14,10 @@ topEntity vec = (pack  tup
 {-# NOINLINE topEntity #-}
 
 testBench :: Signal System Bool
-testBench = done'
+testBench = done
   where
     testInput      = pure (0x00FF)
-    expectedOutput = outputVerifier ((0x00FF,0x0F,1:>1:>1:>1:>0:>0:>0:>0:>Nil):>Nil)
+    expectedOutput = outputVerifier clk rst ((0x00FF,0x0F,1:>1:>1:>1:>0:>0:>0:>0:>Nil):>Nil)
     done           = expectedOutput (topEntity <$> testInput)
-    done'          = withClockReset (tbSystemClockGen (not <$> done')) systemResetGen done
+    clk            = tbSystemClockGen (not <$> done)
+    rst            = systemResetGen
