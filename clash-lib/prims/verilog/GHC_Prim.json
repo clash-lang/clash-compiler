@@ -305,22 +305,27 @@ assign ~RESULT = {~SYM[0],~SYM[1]};
 , { "BlackBox" :
     { "name"      : "GHC.Prim.popCnt8#"
     , "type"      : "popCnt8# :: Word# -> Word#"
+    , "imports"   : ["~INCLUDENAME.inc"]
+    , "include" :
+      { "name" : "clog2"
+      , "extension" : "inc"
+      , "content" :
+"// ceiling of log2
+function integer ~INCLUDENAME;
+  input integer value;
+  begin
+    value = value-1;
+    for (~INCLUDENAME=0; value>0; ~INCLUDENAME=~INCLUDENAME+1)
+      value = value>>1;
+  end
+endfunction"
+      }
     , "templateD" :
 "// popCnt8 begin
 localparam ~GENSYM[width][0] = 8;
 
-// ceiling of log2
-function integer ~GENSYM[log2][1];
-  input integer value;
-  begin
-    value = value-1;
-    for (~SYM[1]=0; value>0; ~SYM[1]=~SYM[1]+1)
-      value = value>>1;
-  end
-endfunction
-
 // depth of the tree
-localparam ~GENSYM[levels][2] = ~SYM[1](~SYM[0]);
+localparam ~GENSYM[levels][2] = ~INCLUDENAME(~SYM[0]);
 
 wire [~SYM[2]:0] ~GENSYM[intermediate][3] [0:(2*~SYM[0])-2];
 
@@ -364,22 +369,27 @@ assign ~RESULT = $unsigned(~SYM[3][(2*~SYM[0])-2]);
 , { "BlackBox" :
     { "name"      : "GHC.Prim.popCnt16#"
     , "type"      : "popCnt16# :: Word# -> Word#"
+    , "imports"   : ["~INCLUDENAME.inc"]
+    , "include" :
+      { "name" : "clog2"
+      , "extension" : "inc"
+      , "content" :
+"// ceiling of log2
+function integer ~INCLUDENAME;
+  input integer value;
+  begin
+    value = value-1;
+    for (~INCLUDENAME=0; value>0; ~INCLUDENAME=~INCLUDENAME+1)
+      value = value>>1;
+  end
+endfunction"
+      }
     , "templateD" :
 "// popCnt16 begin
 localparam ~GENSYM[width][0] = 16;
 
-// ceiling of log2
-function integer ~GENSYM[log2][1];
-  input integer value;
-  begin
-    value = value-1;
-    for (~SYM[1]=0; value>0; ~SYM[1]=~SYM[1]+1)
-      value = value>>1;
-  end
-endfunction
-
 // depth of the tree
-localparam ~GENSYM[levels][2] = ~SYM[1](~SYM[0]);
+localparam ~GENSYM[levels][2] = ~INCLUDENAME(~SYM[0]);
 
 wire [~SYM[2]:0] ~GENSYM[intermediate][3] [0:(2*~SYM[0])-2];
 
@@ -423,22 +433,27 @@ assign ~RESULT = $unsigned(~SYM[3][(2*~SYM[0])-2]);
 , { "BlackBox" :
     { "name"      : "GHC.Prim.popCnt32#"
     , "type"      : "popCnt32# :: Word# -> Word#"
+    , "imports"   : ["~INCLUDENAME.inc"]
+    , "include" :
+      { "name" : "clog2"
+      , "extension" : "inc"
+      , "content" :
+"// ceiling of log2
+function integer ~INCLUDENAME;
+  input integer value;
+  begin
+    value = value-1;
+    for (~INCLUDENAME=0; value>0; ~INCLUDENAME=~INCLUDENAME+1)
+      value = value>>1;
+  end
+endfunction"
+      }
     , "templateD" :
 "// popCnt32 begin
 localparam ~GENSYM[width][0] = 32;
 
-// ceiling of log2
-function integer ~GENSYM[log2][1];
-  input integer value;
-  begin
-    value = value-1;
-    for (~SYM[1]=0; value>0; ~SYM[1]=~SYM[1]+1)
-      value = value>>1;
-  end
-endfunction
-
 // depth of the tree
-localparam ~GENSYM[levels][2] = ~SYM[1](~SYM[0]);
+localparam ~GENSYM[levels][2] = ~INCLUDENAME(~SYM[0]);
 
 wire [~SYM[2]:0] ~GENSYM[intermediate][3] [0:(2*~SYM[0])-2];
 
@@ -482,22 +497,27 @@ assign ~RESULT = $unsigned(~SYM[3][(2*~SYM[0])-2]);
 , { "BlackBox" :
     { "name"      : "GHC.Prim.popCnt64#"
     , "type"      : "popCnt64# :: Word# -> Word#"
+    , "imports"   : ["~INCLUDENAME.inc"]
+    , "include" :
+      { "name" : "clog2"
+      , "extension" : "inc"
+      , "content" :
+"// ceiling of log2
+function integer ~INCLUDENAME;
+  input integer value;
+  begin
+    value = value-1;
+    for (~INCLUDENAME=0; value>0; ~INCLUDENAME=~INCLUDENAME+1)
+      value = value>>1;
+  end
+endfunction"
+      }
     , "templateD" :
 "// popCnt64 begin
 localparam ~GENSYM[width][0] = 64;
 
-// ceiling of log2
-function integer ~GENSYM[log2][1];
-  input integer value;
-  begin
-    value = value-1;
-    for (~SYM[1]=0; value>0; ~SYM[1]=~SYM[1]+1)
-      value = value>>1;
-  end
-endfunction
-
 // depth of the tree
-localparam ~GENSYM[levels][2] = ~SYM[1](~SYM[0]);
+localparam ~GENSYM[levels][2] = ~INCLUDENAME(~SYM[0]);
 
 wire [~SYM[2]:0] ~GENSYM[intermediate][3] [0:(2*~SYM[0])-2];
 
@@ -541,22 +561,27 @@ assign ~RESULT = $unsigned(~SYM[3][(2*~SYM[0])-2]);
 , { "BlackBox" :
     { "name"      : "GHC.Prim.popCnt#"
     , "type"      : "popCnt8# :: Word# -> Word#"
+    , "imports"   : ["~INCLUDENAME.inc"]
+    , "include" :
+      { "name" : "clog2"
+      , "extension" : "inc"
+      , "content" :
+"// ceiling of log2
+function integer ~INCLUDENAME;
+  input integer value;
+  begin
+    value = value-1;
+    for (~INCLUDENAME=0; value>0; ~INCLUDENAME=~INCLUDENAME+1)
+      value = value>>1;
+  end
+endfunction"
+      }
     , "templateD" :
 "// popCnt begin
 localparam ~GENSYM[width][0] = ~SIZE[~TYPO];
 
-// ceiling of log2
-function integer ~GENSYM[log2][1];
-  input integer value;
-  begin
-    value = value-1;
-    for (~SYM[1]=0; value>0; ~SYM[1]=~SYM[1]+1)
-      value = value>>1;
-  end
-endfunction
-
 // depth of the tree
-localparam ~GENSYM[levels][2] = ~SYM[1](~SYM[0]);
+localparam ~GENSYM[levels][2] = ~INCLUDENAME(~SYM[0]);
 
 wire [~SYM[2]:0] ~GENSYM[intermediate][3] [0:(2*~SYM[0])-2];
 

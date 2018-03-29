@@ -209,6 +209,21 @@ assign ~RESULT = ~ARG[1];
     { "name"      : "Clash.Sized.Vector.fold"
     , "type"      : "fold :: (a -> a -> a) -> Vec (n+1) a -> a"
     , "comment"   : "THIS ONLY WORKS FOR POWER OF TWO LENGTH VECTORS"
+    , "imports"   : ["~INCLUDENAME.inc"]
+    , "include" :
+      { "name" : "clog2"
+      , "extension" : "inc"
+      , "content" :
+"// ceiling of log2
+function integer ~INCLUDENAME;
+  input integer value;
+  begin
+    value = value-1;
+    for (~INCLUDENAME=0; value>0; ~INCLUDENAME=~INCLUDENAME+1)
+      value = value>>1;
+  end
+endfunction"
+      }
     , "templateD" :
 "// fold begin
 // put flat input array into the first half of the intermediate array
@@ -222,16 +237,7 @@ end
 ~ENDGENERATE
 
 // calculate the depth of the tree
-function integer ~GENSYM[log2][14];
-  input integer value;
-  begin
-    value = value-1;
-    for (~SYM[14]=0; value>0; ~SYM[14]=~SYM[14]+1)
-      value = value>>1;
-  end
-endfunction
-
-localparam ~GENSYM[levels][4] = ~SYM[14](~LENGTH[~TYP[1]]);
+localparam ~GENSYM[levels][4] = ~INCLUDENAME(~LENGTH[~TYP[1]]);
 
 // given a level and a depth, calculate the corresponding index into the
 // intermediate array
