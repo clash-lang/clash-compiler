@@ -164,7 +164,7 @@ mkPrimitive bbEParen bbEasD dst nm args ty = do
               (bbCtx,ctxDcls)   <- mkBlackBoxContext dst' (lefts args)
               (templ,templDecl) <- prepareBlackBox pNm tempD bbCtx
               let bbDecl = N.BlackBoxD pNm (library p) (imports p)
-                                       (qsysInclude p) templ bbCtx
+                                       (include p) templ bbCtx
               return (Identifier dstNm Nothing,dstDecl ++ ctxDcls ++ templDecl ++ [bbDecl])
             Nothing -> return (Identifier "__VOID__" Nothing,[])
         (Right tempE) -> do
@@ -178,7 +178,7 @@ mkPrimitive bbEParen bbEasD dst nm args ty = do
                   (bbTempl,templDecl) <- prepareBlackBox pNm tempE bbCtx
                   let tmpAssgn = Assignment dstNm
                                     (BlackBoxE pNm (library p) (imports p)
-                                               (qsysInclude p) bbTempl bbCtx
+                                               (include p) bbTempl bbCtx
                                                bbEParen)
                   return (Identifier dstNm Nothing, dstDecl ++ ctxDcls ++ templDecl ++ [tmpAssgn])
                 Nothing -> return (Identifier "__VOID__" Nothing,[])
@@ -188,7 +188,7 @@ mkPrimitive bbEParen bbEasD dst nm args ty = do
                 Just (dst',_,_) -> do
                   (bbCtx,ctxDcls)     <- mkBlackBoxContext dst' (lefts args)
                   (bbTempl,templDecl) <- prepareBlackBox pNm tempE bbCtx
-                  return (BlackBoxE pNm (library p) (imports p) (qsysInclude p) bbTempl bbCtx bbEParen,ctxDcls ++ templDecl)
+                  return (BlackBoxE pNm (library p) (imports p) (include p) bbTempl bbCtx bbEParen,ctxDcls ++ templDecl)
                 Nothing -> return (Identifier "__VOID__" Nothing,[])
     Just (P.Primitive pNm _)
       | pNm == "GHC.Prim.tagToEnum#" -> do
@@ -262,9 +262,19 @@ mkPrimitive bbEParen bbEasD dst nm args ty = do
 -- | Create an template instantiation text and a partial blackbox content for an
 -- argument term, given that the term is a function. Errors if the term is not
 -- a function
-mkFunInput :: Id   -- ^ Identifier binding the encompassing primitive/blackbox application
-           -> Term -- ^ The function argument term
-           -> NetlistMonad ((Either BlackBoxTemplate (Identifier,[Declaration]),WireOrReg,BlackBoxContext),[Declaration])
+mkFunInput
+  :: Id
+  -- ^ Identifier binding the encompassing primitive/blackbox application
+  -> Term
+  -- ^ The function argument term
+  -> NetlistMonad
+      ((Either BlackBoxTemplate (Identifier,[Declaration])
+       ,WireOrReg
+       ,[BlackBoxTemplate]
+       ,[BlackBoxTemplate]
+       ,Maybe ((TextS.Text,TextS.Text),BlackBoxTemplate)
+       ,BlackBoxContext)
+      ,[Declaration])
 mkFunInput resId e = do
   let (appE,args) = collectArgs e
   (bbCtx,dcls) <- mkBlackBoxContext resId (lefts args)
@@ -273,7 +283,7 @@ mkFunInput resId e = do
               bbM <- fmap (HashMap.lookup nm) $ Lens.use primitives
               (_,sp) <- Lens.use curCompNm
               let templ = case bbM of
-                            Just (P.BlackBox {..}) -> Left (name, outputReg, template)
+                            Just (P.BlackBox {..}) -> Left (outputReg,library,imports,include,template)
                             _ -> throw (ClashException sp ($(curLoc) ++ "No blackbox found for: " ++ unpack nm) Nothing)
               return templ
             Data dc -> do
@@ -326,17 +336,17 @@ mkFunInput resId e = do
             C.Lam _ -> go 0 appE
             _ -> error $ $(curLoc) ++ "Cannot make function input for: " ++ showDoc e
   case templ of
-    Left (_, oreg, Left templ') -> do
+    Left (oreg,libs,imps,incM,Left templ') -> do
       l   <- instantiateCompName templ'
       (l',templDecl)  <- setSym bbCtx l
       l'' <- collectFilePaths bbCtx l'
-      return ((Left l'',if oreg then Reg else Wire,bbCtx),dcls ++ templDecl)
-    Left (_, _, Right templ') -> do
+      return ((Left l'',if oreg then Reg else Wire,libs,imps,incM,bbCtx),dcls ++ templDecl)
+    Left (_,libs,imps,incM,Right templ') -> do
       templ'' <- getMon $ prettyBlackBox templ'
       let ass = Assignment (pack "~RESULT") (Identifier templ'' Nothing)
-      return ((Right ("",[ass]),Wire,bbCtx),dcls)
+      return ((Right ("",[ass]),Wire,libs,imps,incM,bbCtx),dcls)
     Right (decl,wr) ->
-      return ((Right decl,wr,bbCtx),dcls)
+      return ((Right decl,wr,[],[],Nothing,bbCtx),dcls)
   where
     go n (Lam b) = do
       (id_,e') <- unbind b

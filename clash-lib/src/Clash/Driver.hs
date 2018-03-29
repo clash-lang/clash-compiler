@@ -244,11 +244,18 @@ parsePrimitive (BlackBox pNm oReg libM imps inc templT) =
     Failure errInfo
       -> error (ANSI.displayS (ANSI.renderCompact (_errDoc errInfo)) "")
     Success templ
-      -> BlackBox pNm oReg libM imps inc' templ
+      -> BlackBox pNm oReg (map parseBB libM) (map parseBB imps) inc' templ
  where
   inc' = case fmap (second runParse) inc of
     Just (x,Success t) -> Just (x,t)
     _ -> Nothing
+
+  parseBB :: Text -> BlackBoxTemplate
+  parseBB t = case runParse t of
+    Failure errInfo
+      -> error (ANSI.displayS (ANSI.renderCompact (_errDoc errInfo)) "")
+    Success templ
+      -> templ
 
 parsePrimitive (Primitive pNm typ) = Primitive pNm typ
 
@@ -276,7 +283,7 @@ createHDL backend modName components top (topName,manifestE) = flip evalState ba
   hwtys <- HashSet.toList <$> extractTypes <$> Mon get
   typesPkg <- mkTyPackage modName hwtys
   let hdl   = map (first (<.> Clash.Backend.extension backend)) (typesPkg ++ hdlNmDocs)
-      qincs = map (first (<.> "qsys")) (concat incs)
+      qincs = concat incs
       topFiles = hdl ++ qincs
   manifest <- either return (\m -> do
       let topName' = Text.pack topName

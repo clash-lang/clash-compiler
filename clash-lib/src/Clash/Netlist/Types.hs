@@ -139,7 +139,7 @@ data Declaration
   --
   -- * List of: (Maybe expression scrutinized expression is compared with,RHS of alternative)
   | InstDecl (Maybe Identifier) !Identifier !Identifier [(Expr,PortDirection,HWType,Expr)] -- ^ Instantiation of another component
-  | BlackBoxD !S.Text [S.Text] [S.Text] (Maybe (S.Text,BlackBoxTemplate)) !BlackBoxTemplate BlackBoxContext -- ^ Instantiation of blackbox declaration
+  | BlackBoxD !S.Text [BlackBoxTemplate] [BlackBoxTemplate] (Maybe ((S.Text,S.Text),BlackBoxTemplate)) !BlackBoxTemplate BlackBoxContext -- ^ Instantiation of blackbox declaration
   | NetDecl' (Maybe Identifier) WireOrReg !Identifier (Either Identifier HWType) -- ^ Signal declaration
   deriving Show
 
@@ -174,7 +174,7 @@ data Expr
   | DataCon    !HWType       !Modifier  [Expr] -- ^ DataCon application
   | Identifier !Identifier   !(Maybe Modifier) -- ^ Signal reference
   | DataTag    !HWType       !(Either Identifier Identifier) -- ^ @Left e@: tagToEnum#, @Right e@: dataToTag#
-  | BlackBoxE !S.Text [S.Text] [S.Text] (Maybe (S.Text,BlackBoxTemplate)) !BlackBoxTemplate !BlackBoxContext !Bool -- ^ Instantiation of a BlackBox expression
+  | BlackBoxE !S.Text [BlackBoxTemplate] [BlackBoxTemplate] (Maybe ((S.Text,S.Text),BlackBoxTemplate)) !BlackBoxTemplate !BlackBoxContext !Bool -- ^ Instantiation of a BlackBox expression
   | ConvBV     (Maybe Identifier) HWType Bool Expr
   deriving Show
 
@@ -200,7 +200,11 @@ data BlackBoxContext
   = Context
   { bbResult    :: (Expr,HWType) -- ^ Result name and type
   , bbInputs    :: [(Expr,HWType,Bool)] -- ^ Argument names, types, and whether it is a literal
-  , bbFunctions :: IntMap (Either BlackBoxTemplate (Identifier,[Declaration]),WireOrReg,BlackBoxContext)
+  , bbFunctions :: IntMap (Either BlackBoxTemplate (Identifier,[Declaration])
+                          ,WireOrReg
+                          ,[BlackBoxTemplate]
+                          ,[BlackBoxTemplate]
+                          ,Maybe ((S.Text,S.Text),BlackBoxTemplate),BlackBoxContext)
   -- ^ Function arguments (subset of inputs):
   --
   -- * ( Blackbox Template

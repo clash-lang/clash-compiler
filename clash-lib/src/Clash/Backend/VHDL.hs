@@ -21,7 +21,6 @@ import           Control.Lens                         hiding (Indexed)
 import           Control.Monad                        (forM,join,liftM,zipWithM)
 import           Control.Monad.State                  (State)
 import           Data.Graph.Inductive                 (Gr, mkGraph, topsort')
-import           Data.Hashable                        (Hashable (..))
 import           Data.HashMap.Lazy                    (HashMap)
 import qualified Data.HashMap.Lazy                    as HashMap
 import           Data.HashSet                         (HashSet)
@@ -142,6 +141,9 @@ instance Backend VHDLState where
                 insts ds) <> line <>
             "end block" <> semi
   unextend = return rmSlash
+  addInclude inc = includes %= (inc:)
+  addLibraries libs = libraries %= (libs ++)
+  addImports imps = packages %= (imps ++)
 
 rmSlash :: Identifier -> Identifier
 rmSlash nm = fromMaybe nm $ do
@@ -763,29 +765,8 @@ inst_ (InstDecl libM nm lbl pms) = do
     formalLength (Identifier i _) = fromIntegral (T.length i)
     formalLength _                = 0
 
-
-inst_ (BlackBoxD _ libs packs Nothing bs bbCtx) = do
-  Mon (libraries %= ((map T.fromStrict libs) ++))
-  Mon (packages  %= ((map T.fromStrict packs) ++))
-  t <- Mon $ renderBlackBox bs bbCtx
-  fmap Just (string t)
-
-inst_ (BlackBoxD _ libs packs (Just (nm,inc)) bs bbCtx) = do
-  Mon (libraries %= ((map T.fromStrict libs) ++))
-  Mon (packages  %= ((map T.fromStrict packs) ++))
-  incForHash <- Mon $ renderBlackBox inc (bbCtx {bbQsysIncName = Just "~QSYSINCLUDENAME"})
-  iw <- Mon $ use intWidth
-  let incHash = hash incForHash
-      nm'     = T.concat [ T.fromStrict nm
-                         , T.pack (printf ("%0" ++ show (iw `div` 4) ++ "X") incHash)
-                         ]
-      bbNamedCtx = bbCtx {bbQsysIncName = Just nm'}
-
-  inc' <- Mon $ renderBlackBox inc bbNamedCtx
-  t <- Mon $ renderBlackBox bs bbNamedCtx
-  inc'' <- pretty inc'
-  Mon (includes %= ((unpack nm', inc''):))
-  fmap Just (string t)
+inst_ (BlackBoxD _ libs imps inc bs bbCtx) =
+  fmap Just (Mon (renderBlackBox libs imps inc bs bbCtx))
 
 inst_ _ = return Nothing
 
@@ -978,25 +959,8 @@ expr_ _ (BlackBoxE pNm _ _ _ _ bbCtx _)
   = do iw <- Mon $ use intWidth
        exprLit (Just (Unsigned iw,iw)) (NumLit n)
 
-expr_ b (BlackBoxE _ libs packs Nothing bs bbCtx b') = do
-  Mon (libraries %= ((map T.fromStrict libs) ++))
-  Mon (packages  %= ((map T.fromStrict packs) ++))
-  t <- Mon $ renderBlackBox bs bbCtx
-  parenIf (b || b') $ string t
-
-expr_ b (BlackBoxE _ libs packs (Just (nm,inc)) bs bbCtx b') = do
-  Mon (libraries %= ((map T.fromStrict libs) ++))
-  Mon (packages  %= ((map T.fromStrict packs) ++))
-  inc' <- Mon $ renderBlackBox inc bbCtx
-  iw <- Mon $ use intWidth
-  let incHash = hash inc'
-      nm'     = T.concat [ T.fromStrict nm
-                         , T.pack (printf ("%0" ++ show (iw `div` 4) ++ "X") incHash)
-                         ]
-  t <- Mon $ renderBlackBox bs (bbCtx {bbQsysIncName = Just nm'})
-  inc'' <- pretty inc'
-  Mon (includes %= ((unpack nm', inc''):))
-  parenIf (b || b') $ string t
+expr_ b (BlackBoxE _ libs imps inc bs bbCtx b') = do
+  parenIf (b || b') (Mon (renderBlackBox libs imps inc bs bbCtx))
 
 expr_ _ (DataTag Bool (Left id_)) = "tagToEnum" <> parens (pretty id_)
 expr_ _ (DataTag Bool (Right id_)) = "dataToTag" <> parens (pretty id_)

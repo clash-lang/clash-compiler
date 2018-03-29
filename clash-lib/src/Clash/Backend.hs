@@ -95,6 +95,9 @@ class Backend state where
   blockDecl        :: Text -> [Declaration] -> Mon (State state) Doc
   -- | unextend/unescape identifier
   unextend         :: State state (Identifier -> Identifier)
+  addInclude       :: (String, Doc) -> State state ()
+  addLibraries     :: [Text] -> State state ()
+  addImports       :: [Text] -> State state ()
 
 -- | Try to merge nested modifiers into a single modifier, needed by the VHDL
 -- and SystemVerilog backend.

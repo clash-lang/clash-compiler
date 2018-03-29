@@ -22,9 +22,9 @@ import qualified Control.Applicative                  as A
 import           Control.Lens                         ((+=),(-=),(.=),(%=), makeLenses, use)
 import           Control.Monad                        (forM)
 import           Control.Monad.State                  (State)
-import           Data.Hashable                        (Hashable (..))
 import qualified Data.HashSet                         as HashSet
 import           Data.Maybe                           (catMaybes,fromMaybe,mapMaybe)
+import           Data.List                            (nub)
 #if !MIN_VERSION_base(4,11,0)
 import           Data.Monoid                          hiding (Product, Sum)
 #endif
@@ -36,7 +36,6 @@ import           Data.Text.Prettyprint.Doc.Extra
 import qualified Data.Version
 #endif
 import qualified System.FilePath
-import           Text.Printf
 
 import           Clash.Annotations.Primitive          (HDL (..))
 import           Clash.Backend
@@ -60,6 +59,7 @@ data VerilogState =
     , _idSeen    :: [Identifier]
     , _srcSpan   :: SrcSpan
     , _includes  :: [(String,Doc)]
+    , _imports   :: [Text.Text]
     , _intWidth  :: Int -- ^ Int/Word/Integer bit-width
     , _hdlsyn    :: HdlSyn
     }
@@ -74,7 +74,7 @@ primsRoot = return ("clash-lib" System.FilePath.</> "prims")
 #endif
 
 instance Backend VerilogState where
-  initBackend     = VerilogState 0 [] noSrcSpan []
+  initBackend     = VerilogState 0 [] noSrcSpan [] []
   hdlKind         = const Verilog
   primDirs        = const $ do root <- primsRoot
                                return [ root System.FilePath.</> "common"
@@ -131,6 +131,9 @@ instance Backend VerilogState where
     decls ds <> line <>
     insts ds
   unextend = return rmSlash
+  addInclude inc = includes %= (inc:)
+  addLibraries _ = return ()
+  addImports inps = imports %= (inps ++)
 
 rmSlash :: Identifier -> Identifier
 rmSlash nm = fromMaybe nm $ do
@@ -183,9 +186,12 @@ genVerilog sp c = do
       <> line <> "*/"
 
 module_ :: Component -> VerilogM Doc
-module_ c = addSeen c *> modVerilog <* Mon (idSeen .= [])
+module_ c = addSeen c *> modVerilog <* Mon (idSeen .= [] >> imports .= [])
   where
-    modVerilog = modHeader <> line <> modPorts <> line <> modBody <> line <> modEnding
+    modVerilog = do
+      body <- modBody
+      imps <- Mon $ use imports
+      modHeader <> line <> modPorts <> line <> include (nub imps) <> pure body <> line <> modEnding
 
     modHeader  = "module" <+> string (componentName c)
     modPorts   = indent 4 (tupleInputs inPorts <> line <> tupleOutputs outPorts <> semi)
@@ -221,6 +227,11 @@ module_ c = addSeen c *> modVerilog <* Mon (idSeen .= [])
                          else string "  " <> pure x)
                   <> line <> vcat (forM xs commafy)
                   <> line <> rparen
+
+    include :: [Text.Text] -> VerilogM Doc
+    include [] = emptyDoc
+    include xs =
+      indent 2 (vcat (mapM (\i -> string "`include" <+> dquotes (string i)) xs)) <> line
 
 wireOrReg :: WireOrReg -> VerilogM Doc
 wireOrReg Wire = "wire"
@@ -336,24 +347,8 @@ inst_ (InstDecl _ nm lbl pms) = fmap Just $
   where
     pms' = tupled $ sequence [dot <> expr_ False i <+> parens (expr_ False e) | (i,_,_,e) <- pms]
 
-inst_ (BlackBoxD _ _ _ Nothing bs bbCtx) = do
-  t <- Mon (renderBlackBox bs bbCtx)
-  fmap Just (string t)
-
-inst_ (BlackBoxD _ _ _ (Just (nm,inc)) bs bbCtx) = do
-  iw <- Mon $ use intWidth
-  incForHash <- Mon (renderBlackBox inc (bbCtx {bbQsysIncName = Just "~QSYSINCLUDENAME"}))
-  let incHash = hash incForHash
-      nm'     = Text.concat [ Text.fromStrict nm
-                            , Text.pack (printf ("%0" ++ show (iw `div` 4) ++ "X") incHash)
-                            ]
-      bbNamedCtx = bbCtx {bbQsysIncName = Just nm'}
-
-  inc' <- Mon (renderBlackBox inc bbNamedCtx)
-  t <- Mon (renderBlackBox bs bbNamedCtx)
-  inc'' <- string inc'
-  Mon $ includes %= ((unpack nm', inc''):)
-  fmap Just (string t)
+inst_ (BlackBoxD _ libs imps inc bs bbCtx) =
+  fmap Just (Mon (renderBlackBox libs imps inc bs bbCtx))
 
 inst_ (NetDecl' _ _ _ _) = return Nothing
 
@@ -518,21 +513,8 @@ expr_ _ (BlackBoxE pNm _ _ _ _ bbCtx _)
   , [Literal _ (NumLit n), Literal _ i] <- extractLiterals bbCtx
   = exprLit (Just (Index (fromInteger n),fromInteger n)) i
 
-expr_ b (BlackBoxE _ _ _ Nothing bs bbCtx b') = do
-  t <- Mon (renderBlackBox bs bbCtx)
-  parenIf (b || b') $ string t
-
-expr_ b (BlackBoxE _ _ _ (Just (nm,inc)) bs bbCtx b') = do
-  inc' <- Mon (renderBlackBox inc bbCtx)
-  iw <- Mon (use intWidth)
-  let incHash = hash inc'
-      nm'     = Text.concat [ Text.fromStrict nm
-                            , Text.pack (printf ("%0" ++ show (iw `div` 4) ++ "X") incHash)
-                            ]
-  t <- Mon (renderBlackBox bs (bbCtx {bbQsysIncName = Just nm'}))
-  inc'' <- string inc'
-  Mon (includes %= ((unpack nm', inc''):))
-  parenIf (b || b') $ string t
+expr_ b (BlackBoxE _ libs imps inc bs bbCtx b') = do
+  parenIf (b || b') (Mon (renderBlackBox libs imps inc bs bbCtx))
 
 expr_ _ (DataTag Bool (Left id_))          = string id_ <> brackets (int 0)
 expr_ _ (DataTag Bool (Right id_))         = do

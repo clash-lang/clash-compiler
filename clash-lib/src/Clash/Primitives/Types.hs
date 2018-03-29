@@ -33,11 +33,11 @@ data Primitive a
     -- ^ Verilog only: whether the result should be a /reg/(@True@) or /wire/
     -- (@False@); when not specified in the /.json/ file, the value will default
     -- to @False@ (i.e. /wire/).
-  , library  :: [S.Text]
+  , library  :: [a]
     -- ^ VHDL only: add /library/ declarations for the given names
-  , imports  :: [S.Text]
+  , imports  :: [a]
     -- ^ VHDL only: add /use/ declarations for the given names
-  , qsysInclude :: Maybe (S.Text,a)
+  , include :: Maybe ((S.Text,S.Text),a)
     -- ^ Intel/Quartus only: create a /.qsys/ file from the given template.
     -- Defaults to @Nothing@ when not specified in the /.json/ file
   , template :: !(Either a a) -- ^ Either a /declaration/ or an /expression/ template.
@@ -56,7 +56,7 @@ instance FromJSON (Primitive Text) where
                               <*> conVal .:? "outputReg" .!= False
                               <*> conVal .:? "libraries" .!= []
                               <*> conVal .:? "imports" .!= []
-                              <*> (conVal .:? "qsysInclude" >>= parseInclude)
+                              <*> (conVal .:? "include" >>= parseInclude)
                               <*> ((Left <$> conVal .: "templateD") <|> (Right <$> conVal .: "templateE"))
       "Primitive" -> Primitive <$> conVal .: "name" <*> conVal .: "primType"
       _ -> error "Expected: BlackBox or Primitive object"
@@ -64,5 +64,5 @@ instance FromJSON (Primitive Text) where
     where
       parseInclude Nothing  = pure Nothing
       parseInclude (Just c) =
-        Just <$> ((,) <$> c .: "name" <*> c .: "content")
+        Just <$> ((,) <$> ((,) <$> c .: "name" <*> c .: "extension") <*> c .: "content")
   parseJSON _ = error "Expected: BlackBox or Primitive object"

@@ -22,19 +22,23 @@ import           Control.Lens                         (_1,_2,(%=),use)
 import           Control.Monad.State                  (State, StateT (..), lift)
 import           Data.Bool                            (bool)
 import           Data.Foldable                        (foldrM)
+import           Data.Hashable                        (Hashable (..))
 import qualified Data.IntMap                          as IntMap
 import           Data.List                            (mapAccumL, nub)
 #if !MIN_VERSION_base(4,11,0)
 import           Data.Monoid
 #endif
 import           Data.Semigroup.Monad
+import qualified Data.Text
 import           Data.Text.Prettyprint.Doc.Extra
 import           Data.Text.Lazy                       (Text)
 import qualified Data.Text.Lazy                       as Text
 import           System.FilePath                      (replaceBaseName,
                                                        takeBaseName,
-                                                       takeFileName)
+                                                       takeFileName,
+                                                       (<.>))
 import qualified Text.PrettyPrint.ANSI.Leijen         as ANSI
+import           Text.Printf
 import           Text.Trifecta.Result                 hiding (Err)
 
 import           Clash.Backend                        (Backend (..), Usage (..))
@@ -173,13 +177,49 @@ renderFilePath fs f = ((f'',f):fs,C (Text.pack $ show f''))
 
 -- | Render a blackbox given a certain context. Returns a filled out template
 -- and a list of 'hidden' inputs that must be added to the encompassing component.
-renderBlackBox :: Backend backend
+renderTemplate :: Backend backend
                => BlackBoxTemplate -- ^ Blackbox template
                -> BlackBoxContext -- ^ Context used to fill in the hole
                -> State backend Text
-renderBlackBox l bbCtx
+renderTemplate l bbCtx
   = fmap Text.concat
   $ mapM (renderElem bbCtx) l
+
+renderBlackBox
+  :: Backend backend
+  => [BlackBoxTemplate]
+  -> [BlackBoxTemplate]
+  -> Maybe ((Data.Text.Text,Data.Text.Text), BlackBoxTemplate)
+  -> BlackBoxTemplate
+  -> BlackBoxContext
+  -> State backend Doc
+renderBlackBox libs imps Nothing bs bbCtx = do
+  libs' <- mapM (`renderTemplate` bbCtx) libs
+  imps' <- mapM (`renderTemplate` bbCtx) imps
+  addLibraries libs'
+  addImports imps'
+  t <- renderTemplate bs bbCtx
+  string t
+
+renderBlackBox libs imps (Just ((nm,ext),inc)) bs bbCtx = do
+  incForHash <- renderTemplate inc (bbCtx {bbQsysIncName = Just "~INCLUDENAME"})
+  iw <- iwWidth
+  let incHash = hash incForHash
+      nm'     = Text.concat
+                  [ Text.fromStrict nm
+                  , Text.pack (printf ("%0" ++ show (iw `div` 4) ++ "X") incHash)
+                  ]
+      bbNamedCtx = bbCtx {bbQsysIncName = Just nm'}
+
+  inc' <-renderTemplate inc bbNamedCtx
+  t <- renderTemplate bs bbNamedCtx
+  inc'' <- pretty inc'
+  addInclude (Text.unpack nm' <.> Data.Text.unpack ext, inc'')
+  libs' <- mapM (`renderTemplate` bbNamedCtx) libs
+  imps' <- mapM (`renderTemplate` bbNamedCtx) imps
+  addLibraries libs'
+  addImports imps'
+  string t
 
 -- | Assign @Var@ holes in the context of a primitive HDL template that is
 -- passed as an argument of a higher-order HDL template. For the general case,
@@ -215,15 +255,18 @@ renderElem :: Backend backend
 renderElem b (D (Decl n (l:ls))) = do
   (o,oTy,_) <- idToExpr <$> combineM (lineToIdentifier b) (return . lineToType b) l
   is <- mapM (fmap idToExpr . combineM (lineToIdentifier b) (return . lineToType b)) ls
-  let Just (templ,_,pCtx)  = IntMap.lookup n (bbFunctions b)
+  -- let Just (templ,libs,imps,incM,pCtx)
+  let Just (templ,_,libs,imps,incM,pCtx)  = IntMap.lookup n (bbFunctions b)
       b' = pCtx { bbResult = (o,oTy), bbInputs = bbInputs pCtx ++ is }
   templ' <- case templ of
               Left t        -> return t
               Right (nm,ds) -> do block <- getMon $ blockDecl nm ds
-                                  return . parseFail . renderLazy $ layoutCompact block
+                                  return . parseFail . renderLazy $ (layoutPretty (LayoutOptions (AvailablePerLine 120 0.4)) block)
   let t2 = setSimpleVar b' templ'
   if verifyBlackBoxContext b' t2
-    then Text.concat <$> mapM (renderElem b') t2
+    then do
+      bb <- renderBlackBox libs imps incM t2 b'
+      return $ renderLazy (layoutPretty (LayoutOptions (AvailablePerLine 120 0.4)) bb)
     else do
       sp <- getSrcSpan
       throw (ClashException sp ($(curLoc) ++ "\nCan't match context:\n" ++ show b' ++ "\nwith template:\n" ++ show templ) Nothing)
@@ -241,7 +284,7 @@ renderElem b (IF c t f) = do
   iw <- iwWidth
   syn <- hdlSyn
   let c' = check iw syn c
-  if c' > 0 then renderBlackBox t b else renderBlackBox f b
+  if c' > 0 then renderTemplate t b else renderTemplate f b
   where
     check iw syn c' = case c' of
       (Size e)   -> typeSize (lineToType b [e])
@@ -433,11 +476,11 @@ renderTag b (FilePath e)    = case e of
       _ -> error $ $(curLoc) ++ "argument of ~FILEPATH:" ++ show e2 ++  "does not reduce to a string"
   _ -> do e' <- getMon (prettyElem e)
           error $ $(curLoc) ++ "~FILEPATH expects a ~LIT[N] argument, but got: " ++ show e'
-renderTag b QSysIncludeName = case bbQsysIncName b of
+renderTag b IncludeName = case bbQsysIncName b of
   Just nm -> return nm
-  _ -> error $ $(curLoc) ++ "~QSYSINCLUDENAME used where no 'qysInclude' was specified in the primitive definition"
+  _ -> error $ $(curLoc) ++ "~INCLUDENAME used where no 'qysInclude' was specified in the primitive definition"
 renderTag b (OutputWireReg n) = case IntMap.lookup n (bbFunctions b) of
-  Just (_,rw,_) -> case rw of {N.Wire -> return "wire"; N.Reg -> return "reg"}
+  Just (_,rw,_,_,_,_) -> case rw of {N.Wire -> return "wire"; N.Reg -> return "reg"}
   _ -> error $ $(curLoc) ++ "~OUTPUTWIREREG[" ++ show n ++ "] used where argument " ++ show n ++ " is not a function"
 renderTag _ e = do e' <- getMon (prettyElem e)
                    error $ $(curLoc) ++ "Unable to evaluate: " ++ show e'
@@ -488,7 +531,7 @@ prettyElem (TypElem e) = do
   e' <- prettyElem e
   renderOneLine <$> (string "~TYPEL" <> brackets (string e'))
 prettyElem CompName = return "~COMPNAME"
-prettyElem QSysIncludeName = return "~QSYSINCLUDENAME"
+prettyElem IncludeName = return "~INCLUDENAME"
 prettyElem (IndexType e) = do
   e' <- prettyElem e
   renderOneLine <$> (string "~INDEXTYPE" <> brackets (string e'))
