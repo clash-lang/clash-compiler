@@ -15,7 +15,7 @@
 {-# LANGUAGE TupleSections     #-}
 {-# LANGUAGE ViewPatterns      #-}
 
-module Clash.Backend.Verilog (VerilogState) where
+module Clash.Backend.Verilog (VerilogState, include) where
 
 import           Control.Applicative                  ((<*), (*>))
 import qualified Control.Applicative                  as A
@@ -228,10 +228,10 @@ module_ c = addSeen c *> modVerilog <* Mon (idSeen .= [] >> imports .= [])
                   <> line <> vcat (forM xs commafy)
                   <> line <> rparen
 
-    include :: [Text.Text] -> VerilogM Doc
-    include [] = emptyDoc
-    include xs =
-      indent 2 (vcat (mapM (\i -> string "`include" <+> dquotes (string i)) xs)) <> line
+include :: Monad m => [Text.Text] -> Mon m Doc
+include [] = emptyDoc
+include xs =
+  indent 2 (vcat (mapM (\i -> string "`include" <+> dquotes (string i)) xs)) <> line
 
 wireOrReg :: WireOrReg -> VerilogM Doc
 wireOrReg Wire = "wire"

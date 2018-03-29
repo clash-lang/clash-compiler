@@ -10,18 +10,21 @@
                                                      => SNat base -- ARG[2]
                                                      -> SNat x    -- ARG[3]
                                                      -> SNat (FLog base x"
-    , "templateD" :
-"// flogBaseSNat begin
-function integer ~GENSYM[flogBase][0];
+    , "imports"   : ["~INCLUDENAME.inc"]
+    , "include" :
+      { "name" : "flogBase"
+      , "extension" : "inc"
+      , "content" :
+"// floor of logBase
+function integer ~INCLUDENAME;
   input integer base, value;
   begin
-    for (~SYM[0] = 0; value >= base; ~SYM[0]=~SYM[0]+1)
+    for (~INCLUDENAME = 0; value >= base; ~INCLUDENAME=~INCLUDENAME+1)
       value = value / base;
   end
-endfunction
-
-assign ~RESULT = ~SYM[0](~LIT[2],~LIT[3]);
-// flogBaseSNat end"
+endfunction"
+      }
+    , "templateE" : "~INCLUDENAME(~LIT[2],~LIT[3])"
     }
   }
 , { "BlackBox" :
@@ -30,17 +33,20 @@ assign ~RESULT = ~SYM[0](~LIT[2],~LIT[3]);
                                                      => SNat base -- ARG[2]
                                                      -> SNat x    -- ARG[3]
                                                      -> SNat (CLog base x"
-    , "templateD" :
-"// clogBaseSNat begin
-function integer ~GENSYM[clogBase][0];
+    , "imports"   : ["~INCLUDENAME.inc"]
+    , "include" :
+      { "name" : "clogBase"
+      , "extension" : "inc"
+      , "content" :
+"// ceiling of logBase
+function integer ~INCLUDENAME;
   input integer base, value;
   begin
-    for (~SYM[0] = 0; base ** ~SYM[0] < value; ~SYM[0]=~SYM[0]+1);
+    for (~INCLUDENAME = 0; base ** ~INCLUDENAME < value; ~~INCLUDENAME=~INCLUDENAME+1);
   end
-endfunction
-
-assign ~RESULT = ~SYM[0](~LIT[2],~LIT[3]);
-// clogBaseSNat end"
+endfunction"
+      }
+    , "templateE" : "~INCLUDENAME(~LIT[2],~LIT[3])"
     }
   }
 , { "BlackBox" :
@@ -49,18 +55,21 @@ assign ~RESULT = ~SYM[0](~LIT[2],~LIT[3]);
                                                     => SNat base -- ARG[1]
                                                     -> SNat x    -- ARG[2]
                                                     -> SNat (Log base x)"
-    , "templateD" :
+    , "imports"   : ["~INCLUDENAME.inc"]
+    , "include" :
+      { "name" : "clogBase"
+      , "extension" : "inc"
+      , "content" :
 "// logBaseSNat begin
-function integer ~GENSYM[logBase][0];
+function integer ~INCLUDENAME;
   input integer base, value;
   begin
-    for (~SYM[0] = 0; value >= base; ~SYM[0]=~SYM[0]+1)
+    for (~INCLUDENAME = 0; value >= base; ~INCLUDENAME=~INCLUDENAME+1)
       value = value / base;
   end
-endfunction
-
-assign ~RESULT = ~SYM[0](~LIT[1],~LIT[2]);
-// logBaseSNat end"
+endfunction"
+      }
+    , "templateE" :  "~INCLUDENAME(~LIT[1],~LIT[2])"
     }
   }
 ]

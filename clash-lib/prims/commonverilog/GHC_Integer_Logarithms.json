@@ -1,0 +1,21 @@
+[ { "BlackBox" :
+    { "name"      : "GHC.Integer.Logarithms.integerLogBase#"
+    , "type"      : "integerLogBase# :: Integer -> Integer -> Int#"
+    , "imports"   : ["~INCLUDENAME.inc"]
+    , "include" :
+      { "name" : "integerLogBase"
+      , "extension" : "inc"
+      , "content" :
+"// integer logBase
+function integer ~INCLUDENAME;
+  input integer base, value;
+  begin
+    for (~INCLUDENAME = 0; value >= base; ~INCLUDENAME=~INCLUDENAME+1)
+      value = value / base;
+  end
+endfunction"
+      }
+    , "templateE" : "~INCLUDENAME(~ARG[0],~ARG[1])"
+    }
+  }
+]

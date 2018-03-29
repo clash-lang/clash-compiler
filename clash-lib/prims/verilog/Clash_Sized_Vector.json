@@ -211,17 +211,26 @@ assign ~RESULT = ~ARG[1];
     , "comment"   : "THIS ONLY WORKS FOR POWER OF TWO LENGTH VECTORS"
     , "imports"   : ["~INCLUDENAME.inc"]
     , "include" :
-      { "name" : "clog2"
+      { "name" : "fold"
       , "extension" : "inc"
       , "content" :
 "// ceiling of log2
-function integer ~INCLUDENAME;
+function integer ~INCLUDENAME_clog2;
   input integer value;
   begin
     value = value-1;
-    for (~INCLUDENAME=0; value>0; ~INCLUDENAME=~INCLUDENAME+1)
+    for (~INCLUDENAME_clog2=0; value>0; ~INCLUDENAME_clog2=~INCLUDENAME_clog2+1)
       value = value>>1;
   end
+endfunction
+
+// given a level and a depth, calculate the corresponding index into the
+// intermediate array
+function integer ~INCLUDENAME_depth2Index;
+  input integer levels;
+  input integer depth;
+
+  ~INCLUDENAME_depth2Index = (2 ** levels) - (2 ** depth);
 endfunction"
       }
     , "templateD" :
@@ -237,16 +246,7 @@ end
 ~ENDGENERATE
 
 // calculate the depth of the tree
-localparam ~GENSYM[levels][4] = ~INCLUDENAME(~LENGTH[~TYP[1]]);
-
-// given a level and a depth, calculate the corresponding index into the
-// intermediate array
-function integer ~GENSYM[depth2Index][13];
-  input integer levels;
-  input integer depth;
-
-  ~SYM[13] = (2 ** levels) - (2 ** depth);
-endfunction
+localparam ~GENSYM[levels][4] = ~INCLUDENAME_clog2(~LENGTH[~TYP[1]]);
 
 // Create the tree of instantiated components
 genvar ~GENSYM[d][5];
@@ -259,14 +259,14 @@ if (~SYM[4] != 0) begin : ~GENSYM[make_tree][7]
       wire ~TYPO ~GENSYM[fold_in2][9];
       ~OUTPUTWIREREG[0] ~TYPO ~GENSYM[fold_out][10];
 
-      assign ~SYM[8] = ~SYM[0][~SYM[13](~SYM[4]+1,~SYM[5]+2)+(2*~SYM[6])];
-      assign ~SYM[9] = ~SYM[0][~SYM[13](~SYM[4]+1,~SYM[5]+2)+(2*~SYM[6])+1];
+      assign ~SYM[8] = ~SYM[0][~INCLUDENAME_depth2Index(~SYM[4]+1,~SYM[5]+2)+(2*~SYM[6])];
+      assign ~SYM[9] = ~SYM[0][~INCLUDENAME_depth2Index(~SYM[4]+1,~SYM[5]+2)+(2*~SYM[6])+1];
       ~INST 0
         ~OUTPUT <= ~SYM[10]~ ~TYPO~
         ~INPUT  <= ~SYM[8]~ ~TYPO~
         ~INPUT  <= ~SYM[9]~ ~TYPO~
       ~INST
-      assign ~SYM[0][~SYM[13](~SYM[4]+1,~SYM[5]+1)+~SYM[6]] = ~SYM[10];
+      assign ~SYM[0][~INCLUDENAME_depth2Index(~SYM[4]+1,~SYM[5]+1)+~SYM[6]] = ~SYM[10];
     end
   end
 end

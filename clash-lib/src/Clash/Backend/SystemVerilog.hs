@@ -26,7 +26,7 @@ import           Data.HashMap.Lazy                    (HashMap)
 import qualified Data.HashMap.Lazy                    as HashMap
 import           Data.HashSet                         (HashSet)
 import qualified Data.HashSet                         as HashSet
-import           Data.List                            (nubBy)
+import           Data.List                            (nub, nubBy)
 import           Data.Maybe                           (catMaybes,fromMaybe,mapMaybe)
 #if !MIN_VERSION_base(4,11,0)
 import           Data.Monoid                          hiding (Sum, Product)
@@ -39,6 +39,7 @@ import qualified System.FilePath
 
 import           Clash.Annotations.Primitive          (HDL (..))
 import           Clash.Backend
+import           Clash.Backend.Verilog                (include)
 import           Clash.Driver.Types                   (SrcSpan, noSrcSpan)
 import           Clash.Netlist.BlackBox.Types         (HdlSyn (..))
 import           Clash.Netlist.BlackBox.Util          (extractLiterals, renderBlackBox)
@@ -64,6 +65,7 @@ data SystemVerilogState =
     , _oports    :: [Identifier]
     , _srcSpan   :: SrcSpan
     , _includes  :: [(String,Doc)]
+    , _imports   :: [Text.Text]
     , _intWidth  :: Int -- ^ Int/Word/Integer bit-width
     , _hdlsyn    :: HdlSyn
     }
@@ -78,7 +80,7 @@ primsRoot = return ("clash-lib" System.FilePath.</> "prims")
 #endif
 
 instance Backend SystemVerilogState where
-  initBackend     = SystemVerilogState HashSet.empty [] HashMap.empty 0 "" [] [] noSrcSpan []
+  initBackend     = SystemVerilogState HashSet.empty [] HashMap.empty 0 "" [] [] noSrcSpan [] []
   hdlKind         = const SystemVerilog
   primDirs        = const $ do root <- primsRoot
                                return [ root System.FilePath.</> "common"
@@ -137,7 +139,7 @@ instance Backend SystemVerilogState where
   unextend = return rmSlash
   addInclude inc = includes %= (inc:)
   addLibraries _ = return ()
-  addImports _ = return ()
+  addImports inps = imports %= (inps ++)
 
 rmSlash :: Identifier -> Identifier
 rmSlash nm = fromMaybe nm $ do
@@ -458,11 +460,15 @@ funDec _ = pure Nothing
 module_ :: Component -> SystemVerilogM Doc
 module_ c = do
     { addSeen c
+    ; ds <- decls (declarations c)
+    ; is <- insts (declarations c)
+    ; imps <- Mon $ use imports
     ; m <- "module" <+> string (componentName c) <> tupled ports <> semi <> line <>
-           indent 2 (inputPorts <> line <> outputPorts <> line <> decls (declarations c)) <> line <> insts (declarations c) <> line <>
+           indent 2 (inputPorts <> line <> outputPorts <> line <> include (nub imps) <> pure ds) <> line <> pure is <> line <>
            "endmodule"
     ; Mon (idSeen .= [])
     ; Mon (oports .= [])
+    ; Mon (imports .= [])
     ; return m
     }
   where

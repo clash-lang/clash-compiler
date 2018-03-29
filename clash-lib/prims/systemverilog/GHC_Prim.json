@@ -305,6 +305,20 @@ assign ~RESULT = {~SYM[0],~SYM[1]};
 , { "BlackBox" :
     { "name"      : "GHC.Prim.popCnt8#"
     , "type"      : "popCnt8# :: Word# -> Word#"
+    , "imports"   : ["~INCLUDENAME.inc"]
+    , "include" :
+      { "name" : "depth2Index"
+      , "extension" : "inc"
+      , "content" :
+"// given a level and a depth, calculate the corresponding index into the
+// intermediate array
+function integer ~INCLUDENAME;
+  input integer levels;
+  input integer depth;
+
+  ~INCLUDENAME = (2 ** levels) - (2 ** depth);
+endfunction"
+      }
     , "templateD" :
 "// popCnt8 begin
 localparam ~GENSYM[width][0] = 8;
@@ -322,15 +336,6 @@ for (~SYM[4] = 0; ~SYM[4] < ~SYM[0]; ~SYM[4]=~SYM[4]+1) begin : ~GENSYM[mk_array
 end
 ~ENDGENERATE
 
-// given a level and a depth, calculate the corresponding index into the
-// intermediate array
-function integer ~GENSYM[depth2Index][5];
-  input integer levels;
-  input integer depth;
-
-  ~SYM[5] = (2 ** levels) - (2 ** depth);
-endfunction
-
 // Create the tree of instantiated components
 genvar ~GENSYM[d][6];
 genvar ~GENSYM[i][7];
@@ -338,9 +343,9 @@ genvar ~GENSYM[i][7];
 if (~SYM[2] != 0) begin : ~GENSYM[make_tree][8]
   for (~SYM[6] = (~SYM[2] - 1); ~SYM[6] >= 0; ~SYM[6]=~SYM[6]-1) begin : ~GENSYM[tree_depth][9]
     for (~SYM[7] = 0; ~SYM[7] < (2**~SYM[6]); ~SYM[7] = ~SYM[7]+1) begin : ~GENSYM[tree_depth_loop][10]
-      assign ~SYM[3][~SYM[5](~SYM[2]+1,~SYM[6]+1)+~SYM[7]] =
-             ~SYM[3][~SYM[5](~SYM[2]+1,~SYM[6]+2)+(2*~SYM[7])] +
-             ~SYM[3][~SYM[5](~SYM[2]+1,~SYM[6]+2)+(2*~SYM[7])+1];
+      assign ~SYM[3][~INCLUDENAME(~SYM[2]+1,~SYM[6]+1)+~SYM[7]] =
+             ~SYM[3][~INCLUDENAME(~SYM[2]+1,~SYM[6]+2)+(2*~SYM[7])] +
+             ~SYM[3][~INCLUDENAME(~SYM[2]+1,~SYM[6]+2)+(2*~SYM[7])+1];
     end
   end
 end
@@ -354,6 +359,20 @@ assign ~RESULT = $unsigned(~SYM[3][(2*~SYM[0])-2]);
 , { "BlackBox" :
     { "name"      : "GHC.Prim.popCnt16#"
     , "type"      : "popCnt16# :: Word# -> Word#"
+    , "imports"   : ["~INCLUDENAME.inc"]
+    , "include" :
+      { "name" : "depth2Index"
+      , "extension" : "inc"
+      , "content" :
+"// given a level and a depth, calculate the corresponding index into the
+// intermediate array
+function integer ~INCLUDENAME;
+  input integer levels;
+  input integer depth;
+
+  ~INCLUDENAME = (2 ** levels) - (2 ** depth);
+endfunction"
+      }
     , "templateD" :
 "// popCnt16 begin
 localparam ~GENSYM[width][0] = 16;
@@ -371,15 +390,6 @@ for (~SYM[4] = 0; ~SYM[4] < ~SYM[0]; ~SYM[4]=~SYM[4]+1) begin : ~GENSYM[mk_array
 end
 ~ENDGENERATE
 
-// given a level and a depth, calculate the corresponding index into the
-// intermediate array
-function integer ~GENSYM[depth2Index][5];
-  input integer levels;
-  input integer depth;
-
-  ~SYM[5] = (2 ** levels) - (2 ** depth);
-endfunction
-
 // Create the tree of instantiated components
 genvar ~GENSYM[d][6];
 genvar ~GENSYM[i][7];
@@ -387,9 +397,9 @@ genvar ~GENSYM[i][7];
 if (~SYM[2] != 0) begin : ~GENSYM[make_tree][8]
   for (~SYM[6] = (~SYM[2] - 1); ~SYM[6] >= 0; ~SYM[6]=~SYM[6]-1) begin : ~GENSYM[tree_depth][9]
     for (~SYM[7] = 0; ~SYM[7] < (2**~SYM[6]); ~SYM[7] = ~SYM[7]+1) begin : ~GENSYM[tree_depth_loop][10]
-      assign ~SYM[3][~SYM[5](~SYM[2]+1,~SYM[6]+1)+~SYM[7]] =
-             ~SYM[3][~SYM[5](~SYM[2]+1,~SYM[6]+2)+(2*~SYM[7])] +
-             ~SYM[3][~SYM[5](~SYM[2]+1,~SYM[6]+2)+(2*~SYM[7])+1];
+      assign ~SYM[3][~INCLUDENAME(~SYM[2]+1,~SYM[6]+1)+~SYM[7]] =
+             ~SYM[3][~INCLUDENAME(~SYM[2]+1,~SYM[6]+2)+(2*~SYM[7])] +
+             ~SYM[3][~INCLUDENAME(~SYM[2]+1,~SYM[6]+2)+(2*~SYM[7])+1];
     end
   end
 end
@@ -403,6 +413,20 @@ assign ~RESULT = $unsigned(~SYM[3][(2*~SYM[0])-2]);
 , { "BlackBox" :
     { "name"      : "GHC.Prim.popCnt32#"
     , "type"      : "popCnt32# :: Word# -> Word#"
+    , "imports"   : ["~INCLUDENAME.inc"]
+    , "include" :
+      { "name" : "depth2Index"
+      , "extension" : "inc"
+      , "content" :
+"// given a level and a depth, calculate the corresponding index into the
+// intermediate array
+function integer ~INCLUDENAME;
+  input integer levels;
+  input integer depth;
+
+  ~INCLUDENAME = (2 ** levels) - (2 ** depth);
+endfunction"
+      }
     , "templateD" :
 "// popCnt32 begin
 localparam ~GENSYM[width][0] = 32;
@@ -420,15 +444,6 @@ for (~SYM[4] = 0; ~SYM[4] < ~SYM[0]; ~SYM[4]=~SYM[4]+1) begin : ~GENSYM[mk_array
 end
 ~ENDGENERATE
 
-// given a level and a depth, calculate the corresponding index into the
-// intermediate array
-function integer ~GENSYM[depth2Index][5];
-  input integer levels;
-  input integer depth;
-
-  ~SYM[5] = (2 ** levels) - (2 ** depth);
-endfunction
-
 // Create the tree of instantiated components
 genvar ~GENSYM[d][6];
 genvar ~GENSYM[i][7];
@@ -436,9 +451,9 @@ genvar ~GENSYM[i][7];
 if (~SYM[2] != 0) begin : ~GENSYM[make_tree][8]
   for (~SYM[6] = (~SYM[2] - 1); ~SYM[6] >= 0; ~SYM[6]=~SYM[6]-1) begin : ~GENSYM[tree_depth][9]
     for (~SYM[7] = 0; ~SYM[7] < (2**~SYM[6]); ~SYM[7] = ~SYM[7]+1) begin : ~GENSYM[tree_depth_loop][10]
-      assign ~SYM[3][~SYM[5](~SYM[2]+1,~SYM[6]+1)+~SYM[7]] =
-             ~SYM[3][~SYM[5](~SYM[2]+1,~SYM[6]+2)+(2*~SYM[7])] +
-             ~SYM[3][~SYM[5](~SYM[2]+1,~SYM[6]+2)+(2*~SYM[7])+1];
+      assign ~SYM[3][~INCLUDENAME(~SYM[2]+1,~SYM[6]+1)+~SYM[7]] =
+             ~SYM[3][~INCLUDENAME(~SYM[2]+1,~SYM[6]+2)+(2*~SYM[7])] +
+             ~SYM[3][~INCLUDENAME(~SYM[2]+1,~SYM[6]+2)+(2*~SYM[7])+1];
     end
   end
 end
@@ -452,6 +467,20 @@ assign ~RESULT = $unsigned(~SYM[3][(2*~SYM[0])-2]);
 , { "BlackBox" :
     { "name"      : "GHC.Prim.popCnt64#"
     , "type"      : "popCnt64# :: Word# -> Word#"
+    , "imports"   : ["~INCLUDENAME.inc"]
+    , "include" :
+      { "name" : "depth2Index"
+      , "extension" : "inc"
+      , "content" :
+"// given a level and a depth, calculate the corresponding index into the
+// intermediate array
+function integer ~INCLUDENAME;
+  input integer levels;
+  input integer depth;
+
+  ~INCLUDENAME = (2 ** levels) - (2 ** depth);
+endfunction"
+      }
     , "templateD" :
 "// popCnt64 begin
 localparam ~GENSYM[width][0] = 64;
@@ -469,15 +498,6 @@ for (~SYM[4] = 0; ~SYM[4] < ~SYM[0]; ~SYM[4]=~SYM[4]+1) begin : ~GENSYM[mk_array
 end
 ~ENDGENERATE
 
-// given a level and a depth, calculate the corresponding index into the
-// intermediate array
-function integer ~GENSYM[depth2Index][5];
-  input integer levels;
-  input integer depth;
-
-  ~SYM[5] = (2 ** levels) - (2 ** depth);
-endfunction
-
 // Create the tree of instantiated components
 genvar ~GENSYM[d][6];
 genvar ~GENSYM[i][7];
@@ -485,9 +505,9 @@ genvar ~GENSYM[i][7];
 if (~SYM[2] != 0) begin : ~GENSYM[make_tree][8]
   for (~SYM[6] = (~SYM[2] - 1); ~SYM[6] >= 0; ~SYM[6]=~SYM[6]-1) begin : ~GENSYM[tree_depth][9]
     for (~SYM[7] = 0; ~SYM[7] < (2**~SYM[6]); ~SYM[7] = ~SYM[7]+1) begin : ~GENSYM[tree_depth_loop][10]
-      assign ~SYM[3][~SYM[5](~SYM[2]+1,~SYM[6]+1)+~SYM[7]] =
-             ~SYM[3][~SYM[5](~SYM[2]+1,~SYM[6]+2)+(2*~SYM[7])] +
-             ~SYM[3][~SYM[5](~SYM[2]+1,~SYM[6]+2)+(2*~SYM[7])+1];
+      assign ~SYM[3][~INCLUDENAME(~SYM[2]+1,~SYM[6]+1)+~SYM[7]] =
+             ~SYM[3][~INCLUDENAME(~SYM[2]+1,~SYM[6]+2)+(2*~SYM[7])] +
+             ~SYM[3][~INCLUDENAME(~SYM[2]+1,~SYM[6]+2)+(2*~SYM[7])+1];
     end
   end
 end
@@ -501,6 +521,20 @@ assign ~RESULT = $unsigned(~SYM[3][(2*~SYM[0])-2]);
 , { "BlackBox" :
     { "name"      : "GHC.Prim.popCnt#"
     , "type"      : "popCnt8# :: Word# -> Word#"
+    , "imports"   : ["~INCLUDENAME.inc"]
+    , "include" :
+      { "name" : "depth2Index"
+      , "extension" : "inc"
+      , "content" :
+"// given a level and a depth, calculate the corresponding index into the
+// intermediate array
+function integer ~INCLUDENAME;
+  input integer levels;
+  input integer depth;
+
+  ~INCLUDENAME = (2 ** levels) - (2 ** depth);
+endfunction"
+      }
     , "templateD" :
 "// popCnt begin
 localparam ~GENSYM[width][0] = ~SIZE[~TYPO];
@@ -518,15 +552,6 @@ for (~SYM[4] = 0; ~SYM[4] < ~SYM[0]; ~SYM[4]=~SYM[4]+1) begin : ~GENSYM[mk_array
 end
 ~ENDGENERATE
 
-// given a level and a depth, calculate the corresponding index into the
-// intermediate array
-function integer ~GENSYM[depth2Index][5];
-  input integer levels;
-  input integer depth;
-
-  ~SYM[5] = (2 ** levels) - (2 ** depth);
-endfunction
-
 // Create the tree of instantiated components
 genvar ~GENSYM[d][6];
 genvar ~GENSYM[i][7];
@@ -534,9 +559,9 @@ genvar ~GENSYM[i][7];
 if (~SYM[2] != 0) begin : ~GENSYM[make_tree][8]
   for (~SYM[6] = (~SYM[2] - 1); ~SYM[6] >= 0; ~SYM[6]=~SYM[6]-1) begin : ~GENSYM[tree_depth][9]
     for (~SYM[7] = 0; ~SYM[7] < (2**~SYM[6]); ~SYM[7] = ~SYM[7]+1) begin : ~GENSYM[tree_depth_loop][10]
-      assign ~SYM[3][~SYM[5](~SYM[2]+1,~SYM[6]+1)+~SYM[7]] =
-             ~SYM[3][~SYM[5](~SYM[2]+1,~SYM[6]+2)+(2*~SYM[7])] +
-             ~SYM[3][~SYM[5](~SYM[2]+1,~SYM[6]+2)+(2*~SYM[7])+1];
+      assign ~SYM[3][~INCLUDENAME(~SYM[2]+1,~SYM[6]+1)+~SYM[7]] =
+             ~SYM[3][~INCLUDENAME(~SYM[2]+1,~SYM[6]+2)+(2*~SYM[7])] +
+             ~SYM[3][~INCLUDENAME(~SYM[2]+1,~SYM[6]+2)+(2*~SYM[7])+1];
     end
   end
 end
@@ -550,18 +575,23 @@ assign ~RESULT = $unsigned(~SYM[3][(2*~SYM[0])-2]);
 , { "BlackBox" :
     { "name"      : "GHC.Prim.clz8#"
     , "type"      : "clz8 :: Word# -> Word#"
-    , "templateD" :
-"// clz8 begin
-function [1:0] ~GENSYM[enc][0];
+    , "imports"   : ["~INCLUDENAME.inc"]
+    , "include" :
+      { "name" : "enc"
+      , "extension" : "inc"
+      , "content" :
+"function [1:0] ~INCLUDENAME;
   input [1:0] a;
   case (a)
-    2'b00:   ~SYM[0] = 2'b10;
-    2'b01:   ~SYM[0] = 2'b01;
-    2'b10:   ~SYM[0] = 2'b00;
-    default: ~SYM[0] = 2'b00;
+    2'b00:   ~INCLUDENAME = 2'b10;
+    2'b01:   ~INCLUDENAME = 2'b01;
+    2'b10:   ~INCLUDENAME = 2'b00;
+    default: ~INCLUDENAME = 2'b00;
   endcase
-endfunction
-
+endfunction"
+      }
+    , "templateD" :
+"// clz8 begin
 logic [0:7] ~GENSYM[v][1];
 assign ~SYM[1] = ~ARG[0][7:0];
 
@@ -569,7 +599,7 @@ logic [0:7] ~GENSYM[e][2];
 genvar ~GENSYM[n][3];
 ~GENERATE
 for (~SYM[3]=0;~SYM[3]<4;~SYM[3]=~SYM[3]+1) begin : ~GENSYM[enc_stage][8]
-  assign ~SYM[2][~SYM[3]*2:~SYM[3]*2+1] = ~SYM[0](~SYM[1][~SYM[3]*2:~SYM[3]*2+1]);
+  assign ~SYM[2][~SYM[3]*2:~SYM[3]*2+1] = ~INCLUDENAME(~SYM[1][~SYM[3]*2:~SYM[3]*2+1]);
 end
 ~ENDGENERATE
 
@@ -611,18 +641,23 @@ assign ~RESULT = $unsigned(~SYM[7]);
 , { "BlackBox" :
     { "name"      : "GHC.Prim.clz16#"
     , "type"      : "clz16 :: Word# -> Word#"
-    , "templateD" :
-"// clz16 begin
-function [1:0] ~GENSYM[enc][0];
+    , "imports"   : ["~INCLUDENAME.inc"]
+    , "include" :
+      { "name" : "enc"
+      , "extension" : "inc"
+      , "content" :
+"function [1:0] ~INCLUDENAME;
   input [1:0] a;
   case (a)
-    2'b00:   ~SYM[0] = 2'b10;
-    2'b01:   ~SYM[0] = 2'b01;
-    2'b10:   ~SYM[0] = 2'b00;
-    default: ~SYM[0] = 2'b00;
+    2'b00:   ~INCLUDENAME = 2'b10;
+    2'b01:   ~INCLUDENAME = 2'b01;
+    2'b10:   ~INCLUDENAME = 2'b00;
+    default: ~INCLUDENAME = 2'b00;
   endcase
-endfunction
-
+endfunction"
+      }
+    , "templateD" :
+"// clz16 begin
 logic [0:15] ~GENSYM[v][1];
 assign ~SYM[1] = ~ARG[0][15:0];
 
@@ -630,7 +665,7 @@ logic [0:15] ~GENSYM[e][2];
 genvar ~GENSYM[i][3];
 ~GENERATE
 for (~SYM[3]=0;~SYM[3]<8;~SYM[3]=~SYM[3]+1) begin : ~GENSYM[enc_stage][8]
-  assign ~SYM[2][~SYM[3]*2:~SYM[3]*2+1] = ~SYM[0](~SYM[1][~SYM[3]*2:~SYM[3]*2+1]);
+  assign ~SYM[2][~SYM[3]*2:~SYM[3]*2+1] = ~INCLUDENAME(~SYM[1][~SYM[3]*2:~SYM[3]*2+1]);
 end
 ~ENDGENERATE
 
@@ -688,18 +723,23 @@ assign ~RESULT = $unsigned(~SYM[7]);
 , { "BlackBox" :
     { "name"      : "GHC.Prim.clz32#"
     , "type"      : "clz32 :: Word# -> Word#"
-    , "templateD" :
-"// clz32 begin
-function [1:0] ~GENSYM[enc][0];
+    , "imports"   : ["~INCLUDENAME.inc"]
+    , "include" :
+      { "name" : "enc"
+      , "extension" : "inc"
+      , "content" :
+"function [1:0] ~INCLUDENAME;
   input [1:0] a;
   case (a)
-    2'b00:   ~SYM[0] = 2'b10;
-    2'b01:   ~SYM[0] = 2'b01;
-    2'b10:   ~SYM[0] = 2'b00;
-    default: ~SYM[0] = 2'b00;
+    2'b00:   ~INCLUDENAME = 2'b10;
+    2'b01:   ~INCLUDENAME = 2'b01;
+    2'b10:   ~INCLUDENAME = 2'b00;
+    default: ~INCLUDENAME = 2'b00;
   endcase
-endfunction
-
+endfunction"
+      }
+    , "templateD" :
+"// clz32 begin
 logic [0:31] ~GENSYM[v][1];
 assign ~SYM[1] = ~ARG[0][31:0];
 
@@ -707,7 +747,7 @@ logic [0:31] ~GENSYM[e][2];
 genvar ~GENSYM[i][3];
 ~GENERATE
 for (~SYM[3]=0;~SYM[3]<16;~SYM[3]=~SYM[3]+1) begin : ~GENSYM[enc_stage][8]
-  assign ~SYM[2][~SYM[3]*2:~SYM[3]*2+1] = ~SYM[0](~SYM[1][~SYM[3]*2:~SYM[3]*2+1]);
+  assign ~SYM[2][~SYM[3]*2:~SYM[3]*2+1] = ~INCLUDENAME(~SYM[1][~SYM[3]*2:~SYM[3]*2+1]);
 end
 ~ENDGENERATE
 
@@ -781,18 +821,23 @@ assign ~RESULT = $unsigned(~SYM[7]);
 , { "BlackBox" :
     { "name"      : "GHC.Prim.clz64#"
     , "type"      : "clz64 :: Word# -> Word#"
-    , "templateD" :
-"// clz64 begin
-function [1:0] ~GENSYM[enc][0];
+    , "imports"   : ["~INCLUDENAME.inc"]
+    , "include" :
+      { "name" : "enc"
+      , "extension" : "inc"
+      , "content" :
+"function [1:0] ~INCLUDENAME;
   input [1:0] a;
   case (a)
-    2'b00:   ~SYM[0] = 2'b10;
-    2'b01:   ~SYM[0] = 2'b01;
-    2'b10:   ~SYM[0] = 2'b00;
-    default: ~SYM[0] = 2'b00;
+    2'b00:   ~INCLUDENAME = 2'b10;
+    2'b01:   ~INCLUDENAME = 2'b01;
+    2'b10:   ~INCLUDENAME = 2'b00;
+    default: ~INCLUDENAME = 2'b00;
   endcase
-endfunction
-
+endfunction"
+      }
+    , "templateD" :
+"// clz64 begin
 logic [0:63] ~GENSYM[v][1];
 assign ~SYM[1] = ~ARG[0][63:0];
 
@@ -800,7 +845,7 @@ logic [0:63] ~GENSYM[e][2];
 genvar ~GENSYM[i][3];
 ~GENERATE
 for (~SYM[3]=0;~SYM[3]<32;~SYM[3]=~SYM[3]+1) begin : ~GENSYM[enc_stage][8]
-  assign ~SYM[2][~SYM[3]*2:~SYM[3]*2+1] = ~SYM[0](~SYM[1][~SYM[3]*2:~SYM[3]*2+1]);
+  assign ~SYM[2][~SYM[3]*2:~SYM[3]*2+1] = ~INCLUDENAME(~SYM[1][~SYM[3]*2:~SYM[3]*2+1]);
 end
 ~ENDGENERATE
 
@@ -890,17 +935,23 @@ assign ~RESULT = $unsigned(~SYM[7]);
 , { "BlackBox" :
     { "name"      : "GHC.Prim.clz#"
     , "type"      : "clz :: Word# -> Word#"
-    , "templateD" :
-"// clz begin
-function [1:0] ~GENSYM[enc][0];
+    , "imports"   : ["~INCLUDENAME.inc"]
+    , "include" :
+      { "name" : "enc"
+      , "extension" : "inc"
+      , "content" :
+"function [1:0] ~INCLUDENAME;
   input [1:0] a;
   case (a)
-    2'b00:   ~SYM[0] = 2'b10;
-    2'b01:   ~SYM[0] = 2'b01;
-    2'b10:   ~SYM[0] = 2'b00;
-    default: ~SYM[0] = 2'b00;
+    2'b00:   ~INCLUDENAME = 2'b10;
+    2'b01:   ~INCLUDENAME = 2'b01;
+    2'b10:   ~INCLUDENAME = 2'b00;
+    default: ~INCLUDENAME = 2'b00;
   endcase
-endfunction
+endfunction"
+      }
+    , "templateD" :
+"// clz begin
 ~IF ~IW64 ~THEN
 logic [0:63] ~GENSYM[v][1];
 assign ~SYM[1] = ~ARG[0][63:0];
@@ -909,7 +960,7 @@ logic [0:63] ~GENSYM[e][2];
 genvar ~GENSYM[i][3];
 ~GENERATE
 for (~SYM[3]=0;~SYM[3]<32;~SYM[3]=~SYM[3]+1) begin : ~GENSYM[enc_stage][8]
-  assign ~SYM[2][~SYM[3]*2:~SYM[3]*2+1] = ~SYM[0](~SYM[1][~SYM[3]*2:~SYM[3]*2+1]);
+  assign ~SYM[2][~SYM[3]*2:~SYM[3]*2+1] = ~INCLUDENAME(~SYM[1][~SYM[3]*2:~SYM[3]*2+1]);
 end
 ~ENDGENERATE
 
@@ -999,7 +1050,7 @@ logic [0:31] ~SYM[2];
 genvar ~SYM[3];
 ~GENERATE
 for (~SYM[3]=0;~SYM[3]<16;~SYM[3]=~SYM[3]+1) begin : ~SYM[8]
-  assign ~SYM[2][~SYM[3]*2:~SYM[3]*2+1] = ~SYM[0](~SYM[1][~SYM[3]*2:~SYM[3]*2+1]);
+  assign ~SYM[2][~SYM[3]*2:~SYM[3]*2+1] = ~INCLUDENAME(~SYM[1][~SYM[3]*2:~SYM[3]*2+1]);
 end
 ~ENDGENERATE
 
@@ -1073,18 +1124,23 @@ assign ~RESULT = $unsigned(~SYM[7]);
 , { "BlackBox" :
     { "name"      : "GHC.Prim.ctz8#"
     , "type"      : "ctz8 :: Word# -> Word#"
-    , "templateD" :
-"// ctz8 begin
-function [1:0] ~GENSYM[enc][0];
+    , "imports"   : ["~INCLUDENAME.inc"]
+    , "include" :
+      { "name" : "enc"
+      , "extension" : "inc"
+      , "content" :
+"function [1:0] ~INCLUDENAME;
   input [1:0] a;
   case (a)
-    2'b00:   ~SYM[0] = 2'b10;
-    2'b01:   ~SYM[0] = 2'b01;
-    2'b10:   ~SYM[0] = 2'b00;
-    default: ~SYM[0] = 2'b00;
+    2'b00:   ~INCLUDENAME = 2'b10;
+    2'b01:   ~INCLUDENAME = 2'b01;
+    2'b10:   ~INCLUDENAME = 2'b00;
+    default: ~INCLUDENAME = 2'b00;
   endcase
-endfunction
-
+endfunction"
+      }
+    , "templateD" :
+"// ctz8 begin
 logic [0:7] ~GENSYM[v][1];
 genvar ~GENSYM[k][18];
 ~GENERATE
@@ -1097,7 +1153,7 @@ logic [0:7] ~GENSYM[e][2];
 genvar ~GENSYM[i][3];
 ~GENERATE
 for (~SYM[3]=0;~SYM[3]<4;~SYM[3]=~SYM[3]+1) begin : ~GENSYM[enc_stage][8]
-  assign ~SYM[2][~SYM[3]*2:~SYM[3]*2+1] = ~SYM[0](~SYM[1][~SYM[3]*2:~SYM[3]*2+1]);
+  assign ~SYM[2][~SYM[3]*2:~SYM[3]*2+1] = ~INCLUDENAME(~SYM[1][~SYM[3]*2:~SYM[3]*2+1]);
 end
 ~ENDGENERATE
 
@@ -1139,18 +1195,23 @@ assign ~RESULT = $unsigned(~SYM[7]);
 , { "BlackBox" :
     { "name"      : "GHC.Prim.ctz16#"
     , "type"      : "ctz16 :: Word# -> Word#"
-    , "templateD" :
-"// ctz16 begin
-function [1:0] ~GENSYM[enc][0];
+    , "imports"   : ["~INCLUDENAME.inc"]
+    , "include" :
+      { "name" : "enc"
+      , "extension" : "inc"
+      , "content" :
+"function [1:0] ~INCLUDENAME;
   input [1:0] a;
   case (a)
-    2'b00:   ~SYM[0] = 2'b10;
-    2'b01:   ~SYM[0] = 2'b01;
-    2'b10:   ~SYM[0] = 2'b00;
-    default: ~SYM[0] = 2'b00;
+    2'b00:   ~INCLUDENAME = 2'b10;
+    2'b01:   ~INCLUDENAME = 2'b01;
+    2'b10:   ~INCLUDENAME = 2'b00;
+    default: ~INCLUDENAME = 2'b00;
   endcase
-endfunction
-
+endfunction"
+      }
+    , "templateD" :
+"// ctz16 begin
 logic [0:15] ~GENSYM[v][1];
 genvar ~GENSYM[k][18];
 ~GENERATE
@@ -1163,7 +1224,7 @@ logic [0:15] ~GENSYM[e][2];
 genvar ~GENSYM[i][3];
 ~GENERATE
 for (~SYM[3]=0;~SYM[3]<8;~SYM[3]=~SYM[3]+1) begin : ~GENSYM[enc_stage][8]
-  assign ~SYM[2][~SYM[3]*2:~SYM[3]*2+1] = ~SYM[0](~SYM[1][~SYM[3]*2:~SYM[3]*2+1]);
+  assign ~SYM[2][~SYM[3]*2:~SYM[3]*2+1] = ~INCLUDENAME(~SYM[1][~SYM[3]*2:~SYM[3]*2+1]);
 end
 ~ENDGENERATE
 
@@ -1221,18 +1282,23 @@ assign ~RESULT = $unsigned(~SYM[7]);
 , { "BlackBox" :
     { "name"      : "GHC.Prim.ctz32#"
     , "type"      : "ctz32 :: Word# -> Word#"
-    , "templateD" :
-"// ctz32 begin
-function [1:0] ~GENSYM[enc][0];
+    , "imports"   : ["~INCLUDENAME.inc"]
+    , "include" :
+      { "name" : "enc"
+      , "extension" : "inc"
+      , "content" :
+"function [1:0] ~INCLUDENAME;
   input [1:0] a;
   case (a)
-    2'b00:   ~SYM[0] = 2'b10;
-    2'b01:   ~SYM[0] = 2'b01;
-    2'b10:   ~SYM[0] = 2'b00;
-    default: ~SYM[0] = 2'b00;
+    2'b00:   ~INCLUDENAME = 2'b10;
+    2'b01:   ~INCLUDENAME = 2'b01;
+    2'b10:   ~INCLUDENAME = 2'b00;
+    default: ~INCLUDENAME = 2'b00;
   endcase
-endfunction
-
+endfunction"
+      }
+    , "templateD" :
+"// ctz32 begin
 logic [0:31] ~GENSYM[v][1];
 genvar ~GENSYM[k][18];
 ~GENERATE
@@ -1245,7 +1311,7 @@ logic [0:31] ~GENSYM[e][2];
 genvar ~GENSYM[i][3];
 ~GENERATE
 for (~SYM[3]=0;~SYM[3]<16;~SYM[3]=~SYM[3]+1) begin : ~GENSYM[enc_stage][8]
-  assign ~SYM[2][~SYM[3]*2:~SYM[3]*2+1] = ~SYM[0](~SYM[1][~SYM[3]*2:~SYM[3]*2+1]);
+  assign ~SYM[2][~SYM[3]*2:~SYM[3]*2+1] = ~INCLUDENAME(~SYM[1][~SYM[3]*2:~SYM[3]*2+1]);
 end
 ~ENDGENERATE
 
@@ -1319,18 +1385,23 @@ assign ~RESULT = $unsigned(~SYM[7]);
 , { "BlackBox" :
     { "name"      : "GHC.Prim.ctz64#"
     , "type"      : "ctz64 :: Word# -> Word#"
-    , "templateD" :
-"// ctz64 begin
-function [1:0] ~GENSYM[enc][0];
+    , "imports"   : ["~INCLUDENAME.inc"]
+    , "include" :
+      { "name" : "enc"
+      , "extension" : "inc"
+      , "content" :
+"function [1:0] ~INCLUDENAME;
   input [1:0] a;
   case (a)
-    2'b00:   ~SYM[0] = 2'b10;
-    2'b01:   ~SYM[0] = 2'b01;
-    2'b10:   ~SYM[0] = 2'b00;
-    default: ~SYM[0] = 2'b00;
+    2'b00:   ~INCLUDENAME = 2'b10;
+    2'b01:   ~INCLUDENAME = 2'b01;
+    2'b10:   ~INCLUDENAME = 2'b00;
+    default: ~INCLUDENAME = 2'b00;
   endcase
-endfunction
-
+endfunction"
+      }
+    , "templateD" :
+"// ctz64 begin
 logic [0:63] ~GENSYM[v][1];
 genvar ~GENSYM[k][18];
 ~GENERATE
@@ -1343,7 +1414,7 @@ logic [0:63] ~GENSYM[e][2];
 genvar ~GENSYM[i][3];
 ~GENERATE
 for (~SYM[3]=0;~SYM[3]<32;~SYM[3]=~SYM[3]+1) begin : ~GENSYM[enc_stage][8]
-  assign ~SYM[2][~SYM[3]*2:~SYM[3]*2+1] = ~SYM[0](~SYM[1][~SYM[3]*2:~SYM[3]*2+1]);
+  assign ~SYM[2][~SYM[3]*2:~SYM[3]*2+1] = ~INCLUDENAME(~SYM[1][~SYM[3]*2:~SYM[3]*2+1]);
 end
 ~ENDGENERATE
 
@@ -1433,17 +1504,23 @@ assign ~RESULT = $unsigned(~SYM[7]);
 , { "BlackBox" :
     { "name"      : "GHC.Prim.ctz#"
     , "type"      : "ctz :: Word# -> Word#"
-    , "templateD" :
-"// ctz begin
-function [1:0] ~GENSYM[enc][0];
+    , "imports"   : ["~INCLUDENAME.inc"]
+    , "include" :
+      { "name" : "enc"
+      , "extension" : "inc"
+      , "content" :
+"function [1:0] ~INCLUDENAME;
   input [1:0] a;
   case (a)
-    2'b00:   ~SYM[0] = 2'b10;
-    2'b01:   ~SYM[0] = 2'b01;
-    2'b10:   ~SYM[0] = 2'b00;
-    default: ~SYM[0] = 2'b00;
+    2'b00:   ~INCLUDENAME = 2'b10;
+    2'b01:   ~INCLUDENAME = 2'b01;
+    2'b10:   ~INCLUDENAME = 2'b00;
+    default: ~INCLUDENAME = 2'b00;
   endcase
-endfunction
+endfunction"
+      }
+    , "templateD" :
+"// ctz begin
 ~IF ~IW64 ~THEN
 logic [0:63] ~GENSYM[v][1];
 genvar ~GENSYM[k][18];
@@ -1457,7 +1534,7 @@ logic [0:63] ~GENSYM[e][2];
 genvar ~GENSYM[i][3];
 ~GENERATE
 for (~SYM[3]=0;~SYM[3]<32;~SYM[3]=~SYM[3]+1) begin : ~GENSYM[enc_stage][8]
-  assign ~SYM[2][~SYM[3]*2:~SYM[3]*2+1] = ~SYM[0](~SYM[1][~SYM[3]*2:~SYM[3]*2+1]);
+  assign ~SYM[2][~SYM[3]*2:~SYM[3]*2+1] = ~INCLUDENAME(~SYM[1][~SYM[3]*2:~SYM[3]*2+1]);
 end
 ~ENDGENERATE
 
@@ -1552,7 +1629,7 @@ logic [0:31] ~SYM[2];
 genvar ~SYM[3];
 ~GENERATE
 for (~SYM[3]=0;~SYM[3]<16;~SYM[3]=~SYM[3]+1) begin : ~SYM[8]
-  assign ~SYM[2][~SYM[3]*2:~SYM[3]*2+1] = ~SYM[0](~SYM[1][~SYM[3]*2:~SYM[3]*2+1]);
+  assign ~SYM[2][~SYM[3]*2:~SYM[3]*2+1] = ~INCLUDENAME(~SYM[1][~SYM[3]*2:~SYM[3]*2+1]);
 end
 ~ENDGENERATE
 
