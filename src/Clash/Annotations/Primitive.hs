@@ -72,4 +72,8 @@ data HDL
 -- @ANN@ pragma's if you want to add more primitive templates for other HDLs
 data Primitive
   = Primitive HDL FilePath
+  -- ^ Description of a primitive for a given 'HDL' in a file at 'FilePath'
+  | InlinePrimitive HDL String
+  -- ^ Description of a primitive for a given 'HDL' as an inline 'String'
+  -- (intended to be used within @ANN@ pragmas)
   deriving (Show, Read, Data)
