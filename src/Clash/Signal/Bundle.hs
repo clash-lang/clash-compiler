@@ -41,7 +41,7 @@ import Clash.Sized.RTree     (RTree, lazyT)
 -- | Isomorphism between a 'Clash.Signal.Signal' of a product type (e.g. a tuple) and a
 -- product type of 'Clash.Signal.Signal''s.
 --
--- Instances of 'bundle must satisfy the following laws:
+-- Instances of 'Bundle' must satisfy the following laws:
 --
 -- @
 -- 'bundle' . 'unbundle' = 'id'
@@ -54,7 +54,7 @@ import Clash.Sized.RTree     (RTree, lazyT)
 -- @
 -- data D = A | B
 --
--- instance 'bundle D
+-- instance Bundle D
 -- @
 --
 -- is the same as:
@@ -62,7 +62,7 @@ import Clash.Sized.RTree     (RTree, lazyT)
 -- @
 -- data D = A | B
 --
--- instance 'bundle D where
+-- instance Bundle D where
 --   type 'Unbundled'' clk D = 'Signal'' clk D
 --   'bundle'   _ s = s
 --   'unbundle' _ s = s
