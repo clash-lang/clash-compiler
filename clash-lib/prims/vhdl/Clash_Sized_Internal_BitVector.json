@@ -223,7 +223,7 @@ begin
   -- pragma translate_on
                ;
 
-  ~RESULT(0) <= ~ARG[1](~SYM[1]);
+  ~RESULT <= ~ARG[1](~SYM[1]);
 end block;~ELSE
 ~SYM[0] : block
   signal ~SYM[1] : integer range 0 to ~LIT[0]-1;
