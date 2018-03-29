@@ -2,13 +2,13 @@
     { "name" : "Clash.Explicit.Testbench.assert"
     , "type" :
 "assert
-  :: (Eq a,Show a)            -- (ARG[0],ARG[1])
+  :: (Eq a,ShowX a)           -- (ARG[0],ARG[1])
   => Clock domain gated       -- ARG[2]
   -> Reset domain synchronous -- ARG[3]
   -> String                   -- ARG[4]
-  -> Signal domain a          -- Checked value (ARG[5])
+  -> Signal domain a          -- Checked value  (ARG[5])
   -> Signal domain a          -- Expected value (ARG[6])
-  -> Signal domain b          -- Return valued (ARG[7])
+  -> Signal domain b          -- Return valued  (ARG[7])
   -> Signal domain b"
     , "templateD" :
 "-- assert begin
@@ -41,7 +41,7 @@ begin
   process(~IF ~ISGATED[2] ~THEN~SYM[4]~ELSE~ARG[2]~FI~IF ~ISSYNC[3] ~THEN ~ELSE,~ARG[3]~FI) is
   begin
     if (rising_edge(~IF ~ISGATED[2] ~THEN~SYM[4]~ELSE~ARG[2]~FI)~IF ~ISSYNC[3] ~THEN ~ELSE or falling_edge(~ARG[3])~FI) then
-      assert (std_match(toSLV(~SYM[2]),toSLV(~SYM[3]))) report (~LIT[4] & \", expected: \" & ~SYM[1](toSLV(~SYM[3])) & \", actual: \" & ~SYM[1](toSLV(~SYM[2]))) severity error;
+      assert (toSLV(~SYM[2]) = toSLV(~SYM[3])) report (~LIT[4] & \", expected: \" & ~SYM[1](toSLV(~SYM[3])) & \", actual: \" & ~SYM[1](toSLV(~SYM[2]))) severity error;
     end if;
   end process;
   -- pragma translate_on
