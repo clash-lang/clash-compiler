@@ -2,7 +2,7 @@
     { "name" : "Clash.Explicit.Testbench.assert"
     , "type" :
 "assert
-  :: (Eq a,Show a)            -- (ARG[0],ARG[1])
+  :: (Eq a,ShowX a)           -- (ARG[0],ARG[1])
   => Clock domain gated       -- ARG[2]
   -> Reset domain synchronous -- ARG[3]
   -> String                   -- ARG[4]
@@ -22,6 +22,35 @@ end
 // pragma translate_on
 assign ~RESULT = ~ARG[7];
 // assert end"
+    }
+  }
+, { "BlackBox" :
+    { "name" : "Clash.Explicit.Testbench.assertBitVector"
+    , "type" :
+"assertBitVector
+  :: KnownNat n                  --                 ARG[0]
+  => Clock domain gated          --                 ARG[1]
+  -> Reset domain synchronous    --                 ARG[2]
+  -> String                      --                 ARG[3]
+  -> Signal domain (BitVector n) -- Checked value  (ARG[4])
+  -> Signal domain (BitVector n) -- Expected value (ARG[5])
+  -> Signal domain b             -- Return valued  (ARG[6])
+  -> Signal domain b"
+    , "templateD" :
+"// assertBitVector begin
+// pragma translate_off
+wire ~TYP[5] ~GENSYM[maskOr][0] = ~ARG[5] ^ ~ARG[5];
+wire ~TYP[5] ~GENSYM[maskAnd][1] = ~ ~SYM[0];
+
+always @(posedge ~IF ~ISGATED[1] ~THEN ~ARG[1][1] ~ELSE ~ARG[1] ~FI~IF ~ISSYNC[2] ~THEN ~ELSE or negedge ~ARG[2]~FI) begin
+  if ((~SYM[1] & ~ARG[4] | ~SYM[0]) !== (~SYM[1] & ~ARG[5] | ~SYM[0])) begin
+    $display(\"@%0tns: %s, expected: %b, actual: %b\", $time, ~LIT[3], ~TOBV[~ARG[5]][~TYP[5]], ~TOBV[~ARG[4]][~TYP[4]]);
+    $stop;
+  end
+end
+// pragma translate_on
+assign ~RESULT = ~ARG[6];
+// assertBitVector end"
     }
   }
 ]
