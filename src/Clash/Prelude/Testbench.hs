@@ -17,6 +17,7 @@ module Clash.Prelude.Testbench
     assert
   , stimuliGenerator
   , outputVerifier
+  , outputVerifierBitVector
   )
 where
 
@@ -25,6 +26,7 @@ import GHC.TypeLits                       (KnownNat)
 import qualified Clash.Explicit.Testbench as E
 import           Clash.Signal
   (HiddenClockReset, Signal, hideClockReset)
+import Clash.Sized.BitVector              (BitVector)
 import Clash.Sized.Vector                 (Vec)
 import Clash.XException                   (ShowX)
 
@@ -108,6 +110,8 @@ stimuliGenerator = hideClockReset E.stimuliGenerator
 -- cycle(system10000): 9, outputVerifier
 -- expected value: 10, not equal to actual value: 9
 -- ,False,True,True]
+--
+-- If your working with 'BitVector's containing don't care bit you should use 'outputVerifierBitVector'.
 outputVerifier
   :: (KnownNat l, Eq a, ShowX a, HiddenClockReset domain gated synchronous)
   => Vec l a     -- ^ Samples to compare with
@@ -115,3 +119,14 @@ outputVerifier
   -> Signal domain Bool -- ^ Indicator that all samples are verified
 outputVerifier = hideClockReset E.outputVerifier
 {-# INLINE outputVerifier #-}
+
+
+-- | Same as 'outputVerifier',
+-- but can handle don't care bits in it's expected values.
+outputVerifierBitVector
+  :: (KnownNat l, KnownNat n, HiddenClockReset domain gated synchronous)
+  => Vec l (BitVector n)     -- ^ Samples to compare with
+  -> Signal domain (BitVector n)    -- ^ Signal to verify
+  -> Signal domain Bool -- ^ Indicator that all samples are verified
+outputVerifierBitVector = hideClockReset E.outputVerifierBitVector
+{-# INLINE outputVerifierBitVector #-}

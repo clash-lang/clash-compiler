@@ -75,6 +75,7 @@ module Clash.Sized.Internal.BitVector
     -- **** Eq
   , eq#
   , neq#
+  , isLike
     -- *** Ord
   , lt#
   , ge#
@@ -944,3 +945,25 @@ checkUnpackUndef _ bv = res
 undefined# :: forall n . KnownNat n => BitVector n
 undefined# = let m = 1 `shiftL` fromInteger (natVal (Proxy @n))
             in  BV (m-1) 0
+
+-- | Check if one BitVector is like another.
+-- Undefined bits in the second argument are interpreted as don't care bits.
+--
+-- >>> let expected = $$(bLit "1.") :: BitVector 2
+-- >>> let checked  = $$(bLit "11") :: BitVector 2
+-- >>> checked  `isLike` expected
+-- True
+-- >>> expected `isLike` checked
+-- False
+--
+-- __NB__: Not synthesisable
+isLike :: BitVector n -> BitVector n -> Bool
+isLike (BV cMask c) (BV eMask e) = e' == c' && e' == c''
+  where
+    -- | set don't care bits to 0
+    e' = e .&. complement eMask
+
+    -- | checked with undefined bits set to 0
+    c' = (c .&. complement cMask) .&. complement eMask
+    -- | checked with undefined bits set to 1
+    c'' = (c .|. cMask) .&. complement eMask
