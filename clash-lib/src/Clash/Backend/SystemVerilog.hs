@@ -652,7 +652,7 @@ insts is = indent 2 . vcat . punctuate line . fmap catMaybes $ mapM inst_ is
 -- | Turn a Netlist Declaration to a SystemVerilog concurrent block
 inst_ :: Declaration -> SystemVerilogM (Maybe Doc)
 inst_ (Assignment id_ e) = fmap Just $
-  "assign" <+> string id_ <+> equals <+> expr_ False e <> semi
+  "assign" <+> string id_ <+> equals <+> align (expr_ False e <> semi)
 
 inst_ (CondAssignment id_ ty scrut _ [(Just (BoolLit b), l),(_,r)]) = fmap Just $ do
     { syn <- Mon hdlSyn
@@ -988,7 +988,7 @@ dcToExpr :: HWType -> Int -> Expr
 dcToExpr ty i = Literal (Just (ty,conSize ty)) (NumLit (toInteger i))
 
 listBraces :: Monad m => m [Doc] -> m Doc
-listBraces = encloseSep lbrace rbrace comma
+listBraces = align . encloseSep lbrace rbrace comma
 
 parenIf :: Monad m => Bool -> m Doc -> m Doc
 parenIf True  = parens

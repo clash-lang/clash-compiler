@@ -729,7 +729,7 @@ insts is = vcat . punctuate line . fmap catMaybes $ mapM inst_ is
 -- | Turn a Netlist Declaration to a VHDL concurrent block
 inst_ :: Declaration -> VHDLM (Maybe Doc)
 inst_ (Assignment id_ e) = fmap Just $
-  pretty id_ <+> larrow <+> expr_ False e <> semi
+  pretty id_ <+> larrow <+> align (expr_ False e) <> semi
 
 inst_ (CondAssignment id_ _ scrut _ [(Just (BoolLit b), l),(_,r)]) = fmap Just $
   pretty id_ <+> larrow
@@ -877,10 +877,10 @@ expr_ _ e@(DataCon ty@(Vector _ elTy) _ [e1,e2]) = do
   syn <- Mon hdlSyn
   case syn of
     Vivado -> vhdlTypeMark ty <> "'" <> case vectorChain e of
-      Just es -> tupled (mapM (toSLV elTy) es)
+      Just es -> align (tupled (mapM (toSLV elTy) es))
       Nothing -> parens ("std_logic_vector'" <> parens (toSLV elTy e1) <+> "&" <+> expr_ False e2)
     _ -> vhdlTypeMark ty <> "'" <> case vectorChain e of
-            Just es -> tupled (mapM (expr_ False) es)
+            Just es -> align (tupled (mapM (expr_ False) es))
             Nothing -> parens (vhdlTypeMark elTy <> "'" <> parens (expr_ False e1) <+> "&" <+> expr_ False e2)
 
 expr_ _ (DataCon ty@(RTree 0 elTy) _ [e]) = do
