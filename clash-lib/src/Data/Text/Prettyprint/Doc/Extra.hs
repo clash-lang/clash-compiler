@@ -161,5 +161,11 @@ isEmpty _     = False
 fill :: Applicative f => Int -> f Doc -> f Doc
 fill = fmap . PP.fill
 
+column :: Functor f => f (Int -> Doc) -> f Doc
+column = fmap PP.column
+
+nesting :: Functor f => f (Int -> Doc) -> f Doc
+nesting = fmap PP.nesting
+
 instance Applicative f => IsString (f Doc) where
   fromString = string . fromString

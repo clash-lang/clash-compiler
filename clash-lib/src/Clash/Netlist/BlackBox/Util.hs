@@ -30,6 +30,7 @@ import           Data.Monoid
 #endif
 import           Data.Semigroup.Monad
 import qualified Data.Text
+import qualified Data.Text.Prettyprint.Doc            as PP
 import           Data.Text.Prettyprint.Doc.Extra
 import           Data.Text.Lazy                       (Text)
 import qualified Data.Text.Lazy                       as Text
@@ -177,13 +178,14 @@ renderFilePath fs f = ((f'',f):fs,C (Text.pack $ show f''))
 
 -- | Render a blackbox given a certain context. Returns a filled out template
 -- and a list of 'hidden' inputs that must be added to the encompassing component.
-renderTemplate :: Backend backend
-               => BlackBoxTemplate -- ^ Blackbox template
-               -> BlackBoxContext -- ^ Context used to fill in the hole
-               -> State backend Text
-renderTemplate l bbCtx
-  = fmap Text.concat
-  $ mapM (renderElem bbCtx) l
+renderTemplate
+  :: Backend backend
+  => BlackBoxContext -- ^ Context used to fill in the hole
+  -> BlackBoxTemplate -- ^ Blackbox template
+  -> State backend (Int -> Text)
+renderTemplate bbCtx l = do
+  l' <- mapM (renderElem bbCtx) l
+  return (\col -> Text.concat (map ($ col) l'))
 
 renderBlackBox
   :: Backend backend
@@ -192,34 +194,34 @@ renderBlackBox
   -> Maybe ((Data.Text.Text,Data.Text.Text), BlackBoxTemplate)
   -> BlackBoxTemplate
   -> BlackBoxContext
-  -> State backend Doc
+  -> State backend (Int -> Doc)
 renderBlackBox libs imps Nothing bs bbCtx = do
-  libs' <- mapM (`renderTemplate` bbCtx) libs
-  imps' <- mapM (`renderTemplate` bbCtx) imps
+  libs' <- mapM (fmap ($ 0) . renderTemplate bbCtx) libs
+  imps' <- mapM (fmap ($ 0) . renderTemplate bbCtx) imps
   addLibraries libs'
   addImports imps'
-  t <- renderTemplate bs bbCtx
-  string t
+  t <- renderTemplate bbCtx bs
+  return (\col -> PP.nest (col-2) (PP.pretty (t (col+2))))
 
 renderBlackBox libs imps (Just ((nm,ext),inc)) bs bbCtx = do
-  incForHash <- renderTemplate inc (bbCtx {bbQsysIncName = Just "~INCLUDENAME"})
+  incForHash <- renderTemplate (bbCtx {bbQsysIncName = Just "~INCLUDENAME"}) inc
   iw <- iwWidth
-  let incHash = hash incForHash
+  let incHash = hash (incForHash 0)
       nm'     = Text.concat
                   [ Text.fromStrict nm
                   , Text.pack (printf ("%0" ++ show (iw `div` 4) ++ "X") incHash)
                   ]
       bbNamedCtx = bbCtx {bbQsysIncName = Just nm'}
 
-  inc' <-renderTemplate inc bbNamedCtx
-  t <- renderTemplate bs bbNamedCtx
-  inc'' <- pretty inc'
+  inc' <-renderTemplate bbNamedCtx inc
+  t <- renderTemplate bbNamedCtx bs
+  inc'' <- pretty (inc' 0)
   addInclude (Text.unpack nm' <.> Data.Text.unpack ext, inc'')
-  libs' <- mapM (`renderTemplate` bbNamedCtx) libs
-  imps' <- mapM (`renderTemplate` bbNamedCtx) imps
+  libs' <- mapM (fmap ($ 0) . renderTemplate bbNamedCtx) libs
+  imps' <- mapM (fmap ($ 0) . renderTemplate bbNamedCtx) imps
   addLibraries libs'
   addImports imps'
-  string t
+  return (\col -> PP.nest (col-2) (PP.pretty (t (col+2))))
 
 -- | Assign @Var@ holes in the context of a primitive HDL template that is
 -- passed as an argument of a higher-order HDL template. For the general case,
@@ -251,7 +253,7 @@ setSimpleVar bbCtx = map go
 renderElem :: Backend backend
            => BlackBoxContext
            -> Element
-           -> State backend Text
+           -> State backend (Int -> Text)
 renderElem b (D (Decl n (l:ls))) = do
   (o,oTy,_) <- idToExpr <$> combineM (lineToIdentifier b) (return . lineToType b) l
   is <- mapM (fmap idToExpr . combineM (lineToIdentifier b) (return . lineToType b)) ls
@@ -266,25 +268,25 @@ renderElem b (D (Decl n (l:ls))) = do
   if verifyBlackBoxContext b' t2
     then do
       bb <- renderBlackBox libs imps incM t2 b'
-      return $ renderLazy (layoutPretty (LayoutOptions (AvailablePerLine 120 0.4)) bb)
+      return (renderLazy . layoutPretty (LayoutOptions (AvailablePerLine 120 0.4)) . bb)
     else do
       sp <- getSrcSpan
       throw (ClashException sp ($(curLoc) ++ "\nCan't match context:\n" ++ show b' ++ "\nwith template:\n" ++ show templ) Nothing)
 
 renderElem b (SigD e m) = do
-  e' <- Text.concat <$> mapM (renderElem b) e
+  e' <- Text.concat <$> mapM (fmap ($ 0) . renderElem b) e
   let ty = case m of
              Nothing -> snd $ bbResult b
              Just n  -> let (_,ty',_) = bbInputs b !! n
                         in  ty'
   t  <- getMon (hdlSig e' ty)
-  return (renderOneLine t)
+  return (const (renderOneLine t))
 
 renderElem b (IF c t f) = do
   iw <- iwWidth
   syn <- hdlSyn
   let c' = check iw syn c
-  if c' > 0 then renderTemplate t b else renderTemplate f b
+  if c' > 0 then renderTemplate b t else renderTemplate b f
   where
     check iw syn c' = case c' of
       (Size e)   -> typeSize (lineToType b [e])
@@ -344,7 +346,7 @@ renderElem b (IF c t f) = do
                        else 0
       _ -> error $ $(curLoc) ++ "IF: condition must be: SIZE, LENGTH, IW64, LIT, ISLIT, or ISARG"
 
-renderElem b e = renderTag b e
+renderElem b e = fmap const (renderTag b e)
 
 parseFail :: Text -> BlackBoxTemplate
 parseFail t = case runParse t of
@@ -417,11 +419,11 @@ renderTag _ (Var [C t] _) = return t
 renderTag _ (Sym t _) = return t
 
 renderTag b (BV True es e) = do
-  e' <- Text.concat <$> mapM (renderElem b) es
+  e' <- Text.concat <$> mapM (fmap ($ 0) . renderElem b) es
   let ty = lineToType b [e]
   renderOneLine <$> getMon (toBV ty e')
 renderTag b (BV False es e) = do
-  e' <- Text.concat <$> mapM (renderElem b) es
+  e' <- Text.concat <$> (mapM (fmap ($ 0) . renderElem b) es)
   let ty = lineToType b [e]
   renderOneLine <$> getMon (fromBV ty e')
 

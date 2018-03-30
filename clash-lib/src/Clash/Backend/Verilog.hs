@@ -348,7 +348,7 @@ inst_ (InstDecl _ nm lbl pms) = fmap Just $
     pms' = tupled $ sequence [dot <> expr_ False i <+> parens (expr_ False e) | (i,_,_,e) <- pms]
 
 inst_ (BlackBoxD _ libs imps inc bs bbCtx) =
-  fmap Just (Mon (renderBlackBox libs imps inc bs bbCtx))
+  fmap Just (Mon (column (renderBlackBox libs imps inc bs bbCtx)))
 
 inst_ (NetDecl' _ _ _ _) = return Nothing
 
@@ -514,7 +514,7 @@ expr_ _ (BlackBoxE pNm _ _ _ _ bbCtx _)
   = exprLit (Just (Index (fromInteger n),fromInteger n)) i
 
 expr_ b (BlackBoxE _ libs imps inc bs bbCtx b') = do
-  parenIf (b || b') (Mon (renderBlackBox libs imps inc bs bbCtx))
+  parenIf (b || b') (Mon (renderBlackBox libs imps inc bs bbCtx <*> pure 0))
 
 expr_ _ (DataTag Bool (Left id_))          = string id_ <> brackets (int 0)
 expr_ _ (DataTag Bool (Right id_))         = do

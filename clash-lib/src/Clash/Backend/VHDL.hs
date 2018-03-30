@@ -766,7 +766,7 @@ inst_ (InstDecl libM nm lbl pms) = do
     formalLength _                = 0
 
 inst_ (BlackBoxD _ libs imps inc bs bbCtx) =
-  fmap Just (Mon (renderBlackBox libs imps inc bs bbCtx))
+  fmap Just (Mon (column (renderBlackBox libs imps inc bs bbCtx)))
 
 inst_ _ = return Nothing
 
@@ -960,7 +960,7 @@ expr_ _ (BlackBoxE pNm _ _ _ _ bbCtx _)
        exprLit (Just (Unsigned iw,iw)) (NumLit n)
 
 expr_ b (BlackBoxE _ libs imps inc bs bbCtx b') = do
-  parenIf (b || b') (Mon (renderBlackBox libs imps inc bs bbCtx))
+  parenIf (b || b') (Mon (renderBlackBox libs imps inc bs bbCtx <*> pure 0))
 
 expr_ _ (DataTag Bool (Left id_)) = "tagToEnum" <> parens (pretty id_)
 expr_ _ (DataTag Bool (Right id_)) = "dataToTag" <> parens (pretty id_)
