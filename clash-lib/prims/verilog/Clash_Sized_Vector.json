@@ -261,11 +261,11 @@ if (~SYM[4] != 0) begin : ~GENSYM[make_tree][7]
 
       assign ~SYM[8] = ~SYM[0][~INCLUDENAME_depth2Index(~SYM[4]+1,~SYM[5]+2)+(2*~SYM[6])];
       assign ~SYM[9] = ~SYM[0][~INCLUDENAME_depth2Index(~SYM[4]+1,~SYM[5]+2)+(2*~SYM[6])+1];
-      ~INST 0
-        ~OUTPUT <= ~SYM[10]~ ~TYPO~
-        ~INPUT  <= ~SYM[8]~ ~TYPO~
-        ~INPUT  <= ~SYM[9]~ ~TYPO~
-      ~INST
+    ~INST 0
+      ~OUTPUT <= ~SYM[10]~ ~TYPO~
+      ~INPUT  <= ~SYM[8]~ ~TYPO~
+      ~INPUT  <= ~SYM[9]~ ~TYPO~
+    ~INST
       assign ~SYM[0][~INCLUDENAME_depth2Index(~SYM[4]+1,~SYM[5]+1)+~SYM[6]] = ~SYM[10];
     end
   end
