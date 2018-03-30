@@ -208,7 +208,7 @@ data TopEntity
   -- ^ Name assigned in-order to the outputs of the component. As a Haskell
   -- function can only truly return a single value -- with multiple values
   -- \"wrapped\" by a tuple -- this field is not a list, but a single
-  -- @'PortName'@. Use @'PortField'@ to give names to the individual components
+  -- @'PortName'@. Use @'PortProduct'@ to give names to the individual components
   -- of the output tuple.
   } deriving (Data,Show,Read,Generic)
 
@@ -260,15 +260,15 @@ data TopEntity
 -- end;
 -- @
 --
--- If we want to name fields for tuples/records we have to use 'PortField'
+-- If we want to name fields for tuples/records we have to use 'PortProduct'
 --
 -- @
 -- {\-\# ANN topEntity
 --    (defTop
 --       { t_name = \"f\"
 --       , t_inputs = [ PortName \"a\"
---                    , PortField \"\" [ PortName \"b\", PortName \"c\" ] ]
---       , t_output = PortField \"res\" [PortName \"q\"] }) \#-\}
+--                    , PortProduct \"\" [ PortName \"b\", PortName \"c\" ] ]
+--       , t_output = PortProduct \"res\" [PortName \"q\"] }) \#-\}
 -- f :: Int -> T -> (T,Bool)
 -- f a b = ...
 -- @
@@ -286,20 +286,20 @@ data TopEntity
 -- @
 --
 -- Notice how we didn't name the second field of the result, and the second
--- output port got 'PortField' name, \"res\", as a prefix for its name.
+-- output port got 'PortProduct' name, \"res\", as a prefix for its name.
 data PortName
   = PortName String
   -- ^ You want a port, with the given name, for the entire argument\/type
   --
   -- You can use an empty String ,\"\" , in case you want an auto-generated name.
-  | PortField String [PortName]
-  -- ^ You want to assign ports to fields of an argument\/type
+  | PortProduct String [PortName]
+  -- ^ You want to assign ports to fields of a product argument\/type
   --
-  -- The first argument of 'PortField' is the name of:
+  -- The first argument of 'PortProduct' is the name of:
   --
   -- 1. The signal/wire to which the individual ports are aggregated.
   --
-  -- 2. The prefix for any unnamed ports below the 'PortField'
+  -- 2. The prefix for any unnamed ports below the 'PortProduct'
   --
   -- You can use an empty String ,\"\" , in case you want an auto-generated name.
   deriving (Data,Show,Read,Generic)
