@@ -22,6 +22,7 @@ cabal.config
 *.aux
 *.hp
 .stack-work/
+.ghc.environment.*
 
 *~
 *.DS_Store
