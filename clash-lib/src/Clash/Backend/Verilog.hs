@@ -265,7 +265,7 @@ verilogType' isDecl t =
         | otherwise        = brackets (int l <> colon <> int 0)
 
       -- signed types have to be rendered specially
-      getVerilogTy (Signed n) = ("signed", n)
+      getVerilogTy (Signed n) = ("signed" <> space, n)
       getVerilogTy _          = (emptyDoc,    typeSize t)
 
   in case t of
@@ -278,7 +278,7 @@ verilogType' isDecl t =
 
        -- otherwise, print the type and prefix
        ty | (prefix, sz) <- getVerilogTy ty
-         -> prefix <+> renderVerilogTySize (sz-1)
+         -> prefix <> renderVerilogTySize (sz-1)
 
 gatedClockType :: HWType -> HWType
 gatedClockType (Clock _ _ Gated) = Product "GatedClock" [Bit,Bool]
