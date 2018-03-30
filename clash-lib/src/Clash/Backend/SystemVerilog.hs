@@ -136,9 +136,13 @@ instance Backend SystemVerilogState where
   setModName nm s = s {_modNm = nm}
   setSrcSpan      = (srcSpan .=)
   getSrcSpan      = use srcSpan
-  blockDecl _ ds  =
-    decls ds <> line <>
-    insts ds
+  blockDecl _ ds  = do
+    decs <- decls ds
+    if isEmpty decs
+      then insts ds
+      else
+        pure decs <> line <>
+        insts ds
   unextend = return rmSlash
   addInclude inc = includes %= (inc:)
   addLibraries _ = return ()
