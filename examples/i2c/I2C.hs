@@ -21,13 +21,13 @@ import I2C.Types
                    , PortName "ackIn"
                    , PortName "din"
                    , PortName "i2cI"]
-    , t_output   = PortField ""
+    , t_output   = PortProduct ""
                      [ PortName "dout"
                      , PortName "hostAck"
                      , PortName "busy"
                      , PortName "al"
                      , PortName "ackOut"
-                     , PortField "" [PortName "i2cO_clk"]
+                     , PortProduct "" [PortName "i2cO_clk"]
                      ]
     }) #-}
 i2c clk arst rst ena clkCnt start stop read write ackIn din i2cI = (dout,hostAck,busy,al,ackOut,i2cO)

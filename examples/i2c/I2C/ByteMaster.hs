@@ -36,7 +36,7 @@ type ByteMasterO = (Bool,Bool,BitVector 8,BitCtrlSig)
     { t_name     = "bytemaster"
     , t_inputs   = [ PortName "clk"
                    , PortName "arst"
-                   , PortField ""
+                   , PortProduct ""
                       [ PortName "rst"
                       , PortName "start"
                       , PortName "stop"
@@ -46,7 +46,7 @@ type ByteMasterO = (Bool,Bool,BitVector 8,BitCtrlSig)
                       , PortName "din"
                       , PortName "bitResp" ]
                    ]
-    , t_output   = PortField ""
+    , t_output   = PortProduct ""
                      [ PortName "hostAck"
                      , PortName "ackOut"
                      , PortName "dout"

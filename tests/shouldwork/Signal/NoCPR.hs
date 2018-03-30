@@ -8,7 +8,7 @@ import           Clash.Prelude
   (defTop { t_name = "example"
           , t_inputs = [ PortName "a"
                        ]
-          , t_output = PortField ""
+          , t_output = PortProduct ""
                          [ PortName "b"
                          , PortName "c"
                          ]

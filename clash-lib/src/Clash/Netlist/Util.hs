@@ -577,7 +577,7 @@ mkInput pM = case pM of
       pN <- uniquePortName p i
       return ([(pN,hwty)],[],Identifier pN Nothing,pN)
 
-    go' (PortField p ps) (i,hwty) = do
+    go' (PortProduct p ps) (i,hwty) = do
       pN <- uniquePortName p i
       case hwty of
         Vector sz hwty' -> do
@@ -735,7 +735,7 @@ mkOutput pM = case pM of
       pN <- uniquePortName p o
       return ([(pN,hwty)],[],pN)
 
-    go' (PortField p ps) (o,hwty) = do
+    go' (PortProduct p ps) (o,hwty) = do
       pN <- uniquePortName p o
       case hwty of
         Vector sz hwty' -> do
@@ -963,7 +963,7 @@ mkTopInput topM inps pM = case pM of
 
     go' (PortName _) [] _ = error "This shouldnt happen"
 
-    go' (PortField p ps) inps' (i,hwty) = do
+    go' (PortProduct p ps) inps' (i,hwty) = do
       let pN = portName p i
       pN' <- mkUniqueIdentifier Extended pN
       let pDecl = NetDecl Nothing pN' hwty
@@ -1075,7 +1075,7 @@ mkTopOutput topM outps pM = case pM of
 
     go' (PortName _) [] _ = error "This shouldnt happen"
 
-    go' (PortField p ps) outps' (o,hwty) = do
+    go' (PortProduct p ps) outps' (o,hwty) = do
       let pN = portName p o
       pN' <- mkUniqueIdentifier Extended pN
       let pDecl = NetDecl Nothing pN' hwty

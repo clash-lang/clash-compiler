@@ -33,17 +33,17 @@ type BitMasterO = (BitRespSig,Bool,I2COut)
     { t_name     = "bitmaster"
     , t_inputs   = [ PortName "clk"
                    , PortName "arst"
-                   , PortField ""
+                   , PortProduct ""
                       [ PortName "rst"
                       , PortName "ena"
                       , PortName "clkCnt"
-                      , PortField ""
+                      , PortProduct ""
                           [ PortName "cmd"
                           , PortName "din" ]
                       , PortName "i2cI" ]
                    ]
-    , t_output   = PortField ""
-                     [ PortField ""
+    , t_output   = PortProduct ""
+                     [ PortProduct ""
                         [ PortName "cmdAck"
                         , PortName "al"
                         , PortName "dout" ]
