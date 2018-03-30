@@ -225,13 +225,14 @@ module_ c = addSeen c *> modVerilog <* Mon (idSeen .= [] >> imports .= [])
                   <> line <> (if (length (inputs c)) > 0
                          then comma <> space <> pure x
                          else string "  " <> pure x)
-                  <> line <> vcat (forM xs commafy)
+                  <> (if null xs then emptyDoc else line <> vcat (forM xs commafy))
                   <> line <> rparen
 
 include :: Monad m => [Text.Text] -> Mon m Doc
 include [] = emptyDoc
-include xs =
-  indent 2 (vcat (mapM (\i -> string "`include" <+> dquotes (string i)) xs)) <> line
+include xs = line <>
+  indent 2 (vcat (mapM (\i -> string "`include" <+> dquotes (string i)) xs))
+  <> line <> line
 
 wireOrReg :: WireOrReg -> VerilogM Doc
 wireOrReg Wire = "wire"
