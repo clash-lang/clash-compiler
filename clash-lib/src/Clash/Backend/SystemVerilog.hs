@@ -711,7 +711,7 @@ inst_ (CondAssignment id_ ty scrut scrutTy es) = fmap Just $ do
     conds i ((Just c ,e):es') = (exprLit (Just (scrutTy,conSize scrutTy)) c <+> colon <+> string i <+> equals <+> expr_ False e) <:> conds i es'
 
 inst_ (InstDecl _ nm lbl pms) = fmap Just $
-    string nm <+> string lbl <> line <> pms' <> semi
+    nest 2 (string nm <+> string lbl <> line <> pms' <> semi)
   where
     pms' = tupled $ sequence [dot <> expr_ False i <+> parens (expr_ False e) | (i,_,_,e) <- pms]
 
@@ -1002,7 +1002,7 @@ punctuate' :: Monad m => Mon m Doc -> Mon m [Doc] -> Mon m Doc
 punctuate' s d = vcat (punctuate s d) <> s
 
 encodingNote :: HWType -> SystemVerilogM Doc
-encodingNote (Clock _ _ Gated) = "// gated clock" <> line
-encodingNote (Clock {})        = "// clock" <> line
-encodingNote (Reset {})        = "// asynchronous reset: active high" <> line
+encodingNote (Clock _ _ Gated) = "// gated clock"
+encodingNote (Clock {})        = "// clock"
+encodingNote (Reset {})        = "// asynchronous reset: active high"
 encodingNote _                 = emptyDoc

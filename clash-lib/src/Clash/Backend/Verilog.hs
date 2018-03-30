@@ -306,7 +306,7 @@ decls ds = do
 
 decl :: Declaration -> VerilogM (Maybe Doc)
 decl (NetDecl' noteM wr id_ tyE) =
-  Just <$> line <> maybe id addNote noteM (wireOrReg wr <+> tyDec tyE)
+  Just <$> maybe id addNote noteM (wireOrReg wr <+> tyDec tyE)
   where
     tyDec (Left  ty) = string ty <+> string id_
     tyDec (Right ty) = sigDecl (string id_) ty
@@ -348,7 +348,7 @@ inst_ (CondAssignment id_ _ scrut scrutTy es) = fmap Just $
     conds i ((Just c ,e):es') = (exprLit (Just (scrutTy,conSize scrutTy)) c <+> colon <+> string i <+> equals <+> expr_ False e) <:> conds i es'
 
 inst_ (InstDecl _ nm lbl pms) = fmap Just $
-    string nm <+> string lbl <> line <> pms' <> semi
+    nest 2 (string nm <+> string lbl <> line <> pms' <> semi)
   where
     pms' = tupled $ sequence [dot <> expr_ False i <+> parens (expr_ False e) | (i,_,_,e) <- pms]
 
