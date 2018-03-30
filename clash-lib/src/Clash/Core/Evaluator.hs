@@ -16,7 +16,7 @@
 
 module Clash.Core.Evaluator where
 
-import           Control.Arrow                           ((***), second)
+import           Control.Arrow                           (second)
 import           Control.Concurrent.Supply               (Supply, freshId)
 import           Data.Either                             (lefts,rights)
 import qualified Data.HashMap.Lazy                       as HM
@@ -41,7 +41,7 @@ import           Clash.Core.Var
 import           Clash.Driver.Types                      (BindingMap)
 import           Prelude                                 hiding (lookup)
 import           Clash.Util                              (curLoc)
-import           Unbound.Generics.LocallyNameless
+import           Unbound.Generics.LocallyNameless        as Unbound
 import           Unbound.Generics.LocallyNameless.Unsafe
 
 -- | The heap
@@ -465,7 +465,36 @@ substAlt dc pxs args e =
 -- | Allocate let-bindings on the heap
 allocate :: Heap -> Stack -> (Bind (Rec [LetBinding]) Term) -> State
 allocate (Heap h ids) k b =
-  let (xesR,e) = unsafeUnbind b
-      xes      = unrec xesR
-      xes'     = map ((nameOcc . varName) *** unembed) xes
-  in  (Heap (h `union` fromList xes') ids,k,e)
+  (Heap (h `union` fromList xes') ids',k,e')
+ where
+  (xesR,e) = unsafeUnbind b
+  xes      = unrec xesR
+  (ids',s) = mapAccumL (letSubst h) ids (map fst xes)
+  (nms,s') = unzip s
+  xes'     = zip nms (map (substTms s' . unembed . snd) xes)
+  e'       = substTms s' e
+
+-- | Create a unique name and substitution for a let-binder
+letSubst
+  :: PureHeap
+  -> Supply
+  -> Id
+  -> ( Supply
+     , (TmOccName,(TmOccName,Term)))
+letSubst h acc id_ =
+  let nm = nameOcc (varName id_)
+      (acc',nm') = uniqueInHeap h acc nm
+  in  (acc',(nameOcc nm',(nm,Var (unembed (varType id_)) nm')))
+
+-- | Create a name that's unique in the heap
+uniqueInHeap
+  :: PureHeap
+  -> Supply
+  -> TmOccName
+  -> (Supply, TmName)
+uniqueInHeap h ids nm =
+  let (i,ids') = freshId ids
+      nm'      = makeSystemName (Unbound.name2String nm) (toInteger i)
+  in  case nameOcc nm' `M.member` h of
+        True -> uniqueInHeap h ids' nm
+        _    -> (ids',nm')
