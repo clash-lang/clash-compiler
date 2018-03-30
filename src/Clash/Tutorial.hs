@@ -206,25 +206,24 @@ our first circuit.
 
 {- $installation
 The CλaSH compiler and Prelude library for circuit design only work with the
-<http://haskell.org/ghc GHC> Haskell compiler version 8.0 (lower versions of
-GHC are not supported).
+<http://haskell.org/ghc GHC> Haskell compiler version 8.2.1 or higher.
 
-  (1) Install __GHC 8.2__
+  (1) Install __GHC 8.2.1 or higher__
 
-      * Download and install <https://www.haskell.org/ghc/download_ghc_8_2_1 GHC for your platform>.
+      * Download and install <https://www.haskell.org/ghc/download_ghc_8_4_1 GHC for your platform>.
         Unix user can use @./configure prefix=\<LOCATION\>@ to set the installation
         location.
 
       * Make sure that the @bin@ directory of __GHC__ is in your @PATH@.
 
-    In case you cannot find what you are looking for on <https://www.haskell.org/ghc/download_ghc_8_2_1>,
+    In case you cannot find what you are looking for on <https://www.haskell.org/ghc/download_ghc_8_4_1>,
     you can, /alternatively/, use the following instructions:
 
       * Ubuntu:
 
           * Run: @sudo add-apt-repository -y ppa:hvr/ghc@
           * Run: @sudo apt-get update@
-          * Run: @sudo apt-get install cabal-install-2.0 ghc-8.2.1 libtinfo-dev@
+          * Run: @sudo apt-get install cabal-install-2.2 ghc-8.4.1 libtinfo-dev@
           * Update your @PATH@ with: @\/opt\/ghc\/bin@, @\/opt\/cabal\/bin@, and @\$HOME\/.cabal\/bin@
           * Run: @cabal update@
           * Skip step 2.
@@ -243,7 +242,7 @@ GHC are not supported).
           * Run: @cabal update@
           * Skip step 2.
 
-  (2) Install __Cabal (version 1.24 or higher)__
+  (2) Install __Cabal (version 2.2 or higher)__
 
       * Binary, when available:
 
@@ -530,7 +529,10 @@ following restrictions in order for the CλaSH compiler to work:
 
   * It must be completely monomorphic
   * It must be completely first-order
-  * The clock and reset arguments must be explicit
+  * Although not strictly necessary, it is recommended to /expose/ 'Hidden'
+    clock and reset arguments, as it makes user-controlled
+    <Clash-Tutorial.html#annotations name assignment> in the generated HDL
+    easier to do.
 
 Our 'topEntity' meets those restrictions, and so we can convert it successfully
 to VHDL by executing the @:vhdl@ command in the interpreter. This will create
@@ -848,7 +850,7 @@ The general rule of thumb is: always use 'mealy', unless you do pattern matching
 or construction of product types, then use 'mealyB'.
 -}
 
-{- $annotations
+{- $annotations #annotations#
 'TopEntity' annotations allow us to control hierarchy and naming aspects of the
 CλaSH compiler, specifically, they allow us to:
 
@@ -1028,12 +1030,15 @@ CλaSH compiler. You can take a look at the files in
 (or <https://github.com/clash-lang/clash-compiler/tree/master/clash-lib/prims/verilog>
 for the Verilog primitives or <https://github.com/clash-lang/clash-compiler/tree/master/clash-lib/prims/systemverilog>
 for the SystemVerilog primitives) if you want to know which functions are defined
-as \"regular\" primitives. The compiler looks for primitives in three locations:
+as \"regular\" primitives. The compiler looks for primitives in four locations:
 
 * The official install location: e.g.
+  * @$CABAL_DIR\/share\/\<GHC_VERSION\>\/clash-lib\-<VERSION\>\/prims\/common@
+  * @$CABAL_DIR\/share\/\<GHC_VERSION\>\/clash-lib\-<VERSION\>\/prims\/commonverilog@
   * @$CABAL_DIR\/share\/\<GHC_VERSION\>\/clash-lib\-<VERSION\>\/prims\/systemverilog@
   * @$CABAL_DIR\/share\/\<GHC_VERSION\>\/clash-lib\-<VERSION\>\/prims\/verilog@
   * @$CABAL_DIR\/share\/\<GHC_VERSION\>\/clash-lib\-<VERSION\>\/prims\/vhdl@
+* Directories indicated by a 'Clash.Annotations.Primitive.Primitive' annotation
 * The current directory (the location given by @pwd@)
 * The include directories specified on the command-line: @-i\<DIR\>@
 
