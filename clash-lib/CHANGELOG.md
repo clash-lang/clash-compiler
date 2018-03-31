@@ -1,5 +1,19 @@
 # Changelog for the [`clash-lib`](http://hackage.haskell.org/package/clash-lib) package
 
+## 0.99 *March 31st 2018*
+* New features:
+  * Support for `clash-prelude-0.99`:
+      * Explicit clock and reset arguments
+      * Overhaul of `TopEntity` annotations
+  * Hierarchies with multiple synthesisable boundaries by allowing more than one
+    function in scope to have a `Synthesize` annotation.
+    * Local caching of functions with a `Synthesize` annotation
+  * `Bit` type is mapped to a HDL scalar type (e.g. `std_logic` in VHDL)
+  * Improved name preservation
+  * Zero-bit values are filtered out of the generated HDL
+  * Improved compile-time computation
+* Many bug fixes
+
 ## 0.7.1 *April 11th 2017*
 * New features:
   * Support distribution of primitive templates with Cabal/Hackage packages [commit](https://github.com/clash-lang/clash-compiler/commit/82cd31863aafcbaf3bdbf7746d89d13859af5aaf)

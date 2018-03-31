@@ -1,5 +1,19 @@
 # Changelog for the [`clash-ghc`](http://hackage.haskell.org/package/clash-ghc) package
 
+## 0.99 *March 31st 2018*
+* New features:
+  * Support for `clash-prelude-0.99`:
+      * Explicit clock and reset arguments
+      * Overhaul of `TopEntity` annotations
+  * Hierarchies with multiple synthesisable boundaries by allowing more than one
+    function in scope to have a `Synthesize` annotation.
+    * Local caching of functions with a `Synthesize` annotation
+  * `Bit` type is mapped to a HDL scalar type (e.g. `std_logic` in VHDL)
+  * Improved name preservation
+  * Zero-bit values are filtered out of the generated HDL
+  * Improved compile-time computation
+* Many bug fixes
+
 ## 0.7.2
 * New features:
   * Sum-of-product types: unused bits now "don't-care" [#212](https://github.com/clash-lang/clash-compiler/commit/fabf745793491ce3baf84ef0066b4ccf0753d503)
