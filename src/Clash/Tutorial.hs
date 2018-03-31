@@ -67,6 +67,9 @@ module Clash.Tutorial (
 
   -- * CλaSH vs Lava
   -- $vslava
+
+  -- * Migration guide from Clash 0.7
+  -- $migration
   )
 where
 
@@ -2189,4 +2192,210 @@ function. This enables the following features not available to Lava:
 Although there are Lava alternatives to some of the above features (e.g.
 first-class patterns to replace pattern matching) they are not as \"beautiful\"
 and / or easy to use as the standard Haskell features.
+-}
+
+{- $migration
+
+* The top name in the module hierarchy has changed from \"@CLaSH@\" to
+  \"@Clash@\".
+
+* There is no longer any distinction between @Signal@ and @Signal'@, there is
+  only 'Signal' which has a /domain/ and /value/ type variable.
+
+    @
+    data Signal (dom :: Domain) a
+    @
+
+* The \"@Clash.Prelude.Explicit@\" module has been removed because all 'Signal's
+  have a /domain/ annotation now. There is a "Clash.Explicit.Prelude" module,
+  but it serves a different purpose: it exports a prelude where all synchronous
+  components have an explicit clock (and reset) value; "Clash.Prelude" exports
+  synchronous components with <Clash-Signal.html#hiddenclockandreset hidden clock and reset> arguments.
+  Note that "Clash.Prelude" and "Clash.Explicit.Prelude" have overlapping
+  definitions, meaning you must use /qualified/ imports to disambiguate.
+
+* All synchronous components have clock and reset arguments now, they appear as
+  <Clash-Signal.html#hiddenclockandreset hidden> arguments when you use
+  "Clash.Prelude", and as normal arguments when you use "Clash.Explicit.Prelude".
+
+* HDL Testbench generation is no longer predicated on the existence of a
+  top-level /testInput/ and /expectedOutput/ function. Instead, top-level functions
+  called /testBench/ are now picked up as the entry-point for HDL test benches.
+  Alternatively you can use a 'Clash.Annotations.TestBench' /ANN/ pragma.
+
+* 'Clash.Annotations.TopEntity' annotations have received a complete overhaul,
+  and you should just rewrite them from scratch. Additionally, designs can
+  contain multiple 'Clash.Annotations.TopEntity' to split generated HDL over
+  multiple output directories.
+
+* With the overhaul of 'Clash.Annotations.TopEntity' annotations and the
+  introduction of explicit clock and reset arguments, PLLs and other clock
+  sources are now regular Clash function such as those found in
+  "Clash.Intel.ClockGen" and "Clash.Xilinx.ClockGen"
+
+
+=== Examples
+
+==== FIR filter
+
+FIR filter in Clash 0.7:
+
+@
+module FIR where
+
+import CLaSH.Prelude
+
+dotp :: SaturatingNum a
+     => Vec (n + 1) a
+     -> Vec (n + 1) a
+     -> a
+dotp as bs = fold boundedPlus (zipWith boundedMult as bs)
+
+fir :: (Default a, KnownNat n, SaturatingNum a)
+    => Vec (n + 1) a -> Signal a -> Signal a
+fir coeffs x_t = y_t
+  where
+    y_t = dotp coeffs \<$\> bundle xs
+    xs  = window x_t
+
+topEntity :: Signal (Signed 16) -> Signal (Signed 16)
+topEntity = fir (2:>3:>(-2):>8:>Nil)
+
+testInput :: Signal (Signed 16)
+testInput = stimuliGenerator (2:>3:>(-2):>8:>Nil)
+
+expectedOutput :: Signal (Signed 16) -> Signal Bool
+expectedOutput = outputVerifier (4:>12:>1:>20:>Nil)
+@
+
+FIR filter in current version:
+
+@
+module FIR where
+
+import Clash.Prelude
+import Clash.Explicit.Testbench
+
+dotp :: SaturatingNum a
+     => Vec (n + 1) a
+     -> Vec (n + 1) a
+     -> a
+dotp as bs = fold boundedPlus (zipWith boundedMult as bs)
+
+fir
+  :: (Default a, KnownNat n, SaturatingNum a, HiddenClockReset domain gated synchronous)
+  => Vec (n + 1) a -> Signal domain a -> Signal domain a
+fir coeffs x_t = y_t
+  where
+    y_t = dotp coeffs \<$\> bundle xs
+    xs  = window x_t
+
+topEntity
+  :: Clock  System Source
+  -> Reset  System Asynchronous
+  -> Signal System (Signed 16)
+  -> Signal System (Signed 16)
+topEntity = exposeClockReset (fir (2:>3:>(-2):>8:>Nil))
+{\-\# NOINLINE topEntity \#-\}
+
+testBench :: Signal System Bool
+testBench = done
+  where
+    testInput      = stimuliGenerator clk rst (2:>3:>(-2):>8:>Nil)
+    expectedOutput = outputVerifier clk rst (4:>12:>1:>20:>Nil)
+    done           = expectedOutput (topEntity clk rst testInput)
+    clk            = tbSystemClockGen (not \<$\> done)
+    rst            = systemResetGen
+@
+
+==== Blinker circuit
+
+Blinker circuit in Clash 0.7:
+
+@
+module Blinker where
+
+import CLaSH.Prelude
+
+{\-\# ANN topEntity
+  (defTop
+    { t_name     = "blinker"
+    , t_inputs   = [\"KEY1\"]
+    , t_outputs  = [\"LED\"]
+    , t_extraIn  = [ (\"CLOCK_50\", 1)
+                   , (\"KEY0\"    , 1)
+                   ]
+    , t_clocks   = [ altpll "altpll50" "CLOCK_50(0)" "not KEY0(0)" ]
+    }) \#-\}
+topEntity :: Signal Bit -> Signal (BitVector 8)
+topEntity key1 = leds
+  where
+    key1R = isRising 1 key1
+    leds  = mealy blinkerT (1,False,0) key1R
+
+blinkerT (leds,mode,cntr) key1R = ((leds',mode',cntr'),leds)
+  where
+    -- clock frequency = 50e6  (50 MHz)
+    -- led update rate = 333e-3 (every 333ms)
+    cnt_max = 16650000 -- 50e6 * 333e-3
+
+    cntr' | cntr == cnt_max = 0
+          | otherwise       = cntr + 1
+
+    mode' | key1R     = not mode
+          | otherwise = mode
+
+    leds' | cntr == 0 = if mode then complement leds
+                                else rotateL leds 1
+          | otherwise = leds
+@
+
+Blinker circuit in the current version:
+
+@
+module Blinker where
+
+import Clash.Prelude
+import Clash.Promoted.Symbol
+import Clash.Intel.ClockGen
+
+type Dom50 = Dom \"System\" 20000
+
+{\-\# ANN topEntity
+  (defTop
+    { t_name   = "blinker"
+    , t_inputs = [ PortName \"CLOCK_50\"
+                 , PortName \"KEY0\"
+                 , PortName \"KEY1\"
+                 ]
+    , t_output = PortName \"LED\"
+    }) \#-\}
+topEntity
+  :: Clock Dom50 Source
+  -> Reset Dom50 Asynchronous
+  -> Signal Dom50 Bit
+  -> Signal Dom50 (BitVector 8)
+topEntity clk rst =
+    exposeClockReset (mealy blinkerT (1,False,0) . isRising 1) pllOut rstSync
+  where
+    (pllOut,pllStable) = altpll \@Dom50 (SSymbol \@ "altpll50") clk rst
+    rstSync            = resetSynchronizer pllOut (unsafeToAsyncReset pllStable)
+
+blinkerT (leds,mode,cntr) key1R = ((leds',mode',cntr'),leds)
+  where
+    -- clock frequency = 50e6  (50 MHz)
+    -- led update rate = 333e-3 (every 333ms)
+    cnt_max = 16650000 -- 50e6 * 333e-3
+
+    cntr' | cntr == cnt_max = 0
+          | otherwise       = cntr + 1
+
+    mode' | key1R     = not mode
+          | otherwise = mode
+
+    leds' | cntr == 0 = if mode then complement leds
+                                else rotateL leds 1
+          | otherwise = leds
+@
+
 -}
