@@ -5,7 +5,8 @@ module NoCPR where
 import           Clash.Prelude
 
 {-# ANN example
-  (defTop { t_name = "example"
+  (Synthesize
+          { t_name   = "example"
           , t_inputs = [ PortName "a"
                        ]
           , t_output = PortProduct ""

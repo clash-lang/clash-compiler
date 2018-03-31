@@ -8,7 +8,7 @@ import Clash.Intel.ClockGen
 type Dom50 = Dom "System" 20000
 
 {-# ANN topEntity
-  (defTop
+  (Synthesize
     { t_name   = "blinker"
     , t_inputs = [ PortName "CLOCK_50"
                  , PortName "KEY0"

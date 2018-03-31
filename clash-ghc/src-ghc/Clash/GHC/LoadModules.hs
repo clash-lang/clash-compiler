@@ -30,7 +30,7 @@ import           Data.List                    (foldl', lookup, nub)
 import           Data.Maybe                   (listToMaybe)
 import           Data.Word                    (Word8)
 import           Clash.Annotations.Primitive  (HDL)
-import           Clash.Annotations.TopEntity  (TopEntity, TestBench (..))
+import           Clash.Annotations.TopEntity  (TopEntity (..))
 import           System.Exit                  (ExitCode (..))
 import           System.IO                    (hGetLine)
 import           System.IO.Error              (tryIOError)
@@ -241,26 +241,26 @@ loadModules hdl modName dflagsM = do
         rootIds    = map fst . CoreSyn.flattenBinds $ last binders
 
     -- Because tidiedMods is in topological order, binders is also, and hence
-    -- allAnn is in topological order. This means that the "root" 'topEntity'
+    -- allSyn is in topological order. This means that the "root" 'topEntity'
     -- will be compiled last.
-    allAnn   <- findTopEntityAnnotations binderIds
+    allSyn   <- findSynthesizeAnnotations binderIds
     benchAnn <- findTestBenchAnnotations binderIds
-    topAnn   <- findTopEntityAnnotations rootIds
+    topSyn   <- findSynthesizeAnnotations rootIds
     let varNameString = OccName.occNameString . Name.nameOccName . Var.varName
         topEntities = filter ((== "topEntity") . varNameString) rootIds
         benches     = filter ((== "testBench") . varNameString) rootIds
         mergeBench (x,y) = (x,y,lookup x benchAnn)
-        allAnn'     = map mergeBench allAnn
+        allSyn'     = map mergeBench allSyn
     topEntities' <- case topEntities of
-      [] -> case topAnn of
-        [] -> Panic.pgmError $ "No 'topEntity', nor function with a 'TopEntity' annotation found in root module: " ++
+      [] -> case topSyn of
+        [] -> Panic.pgmError $ "No 'topEntity', nor function with a 'Synthesize' annotation found in root module: " ++
                                 (Outputable.showSDocUnsafe (ppr rootModule))
-        _ -> return allAnn'
-      [x] -> case lookup x topAnn of
+        _ -> return allSyn'
+      [x] -> case lookup x topSyn of
         Nothing -> case lookup x benchAnn of
-          Nothing -> return ((x,Nothing,listToMaybe benches):allAnn')
-          Just y  -> return ((x,Nothing,Just y):allAnn')
-        Just _  -> return allAnn'
+          Nothing -> return ((x,Nothing,listToMaybe benches):allSyn')
+          Just y  -> return ((x,Nothing,Just y):allSyn')
+        Just _  -> return allSyn'
       _ -> Panic.pgmError $ $(curLoc) ++ "Multiple 'topEntities' found."
 
     return (bindersC ++ makeRecursiveGroups externalBndrs,clsOps,unlocatable,(fst famInstEnvs,modFamInstEnvs'),topEntities',nub pFP)
@@ -303,11 +303,11 @@ makeRecursiveGroups
     makeBind (Digraph.AcyclicSCC (b,e)) = CoreSyn.NonRec b e
     makeBind (Digraph.CyclicSCC bs)     = CoreSyn.Rec bs
 
-findTopEntityAnnotations
+findSynthesizeAnnotations
   :: GHC.GhcMonad m
   => [CoreSyn.CoreBndr]
   -> m [(CoreSyn.CoreBndr,Maybe TopEntity)]
-findTopEntityAnnotations bndrs = do
+findSynthesizeAnnotations bndrs = do
 #if MIN_VERSION_ghc(8,4,1)
   let deserializer = GhcPlugins.deserializeWithData :: ([Word8] -> TopEntity)
 #else
@@ -316,11 +316,14 @@ findTopEntityAnnotations bndrs = do
       targets      = map (Annotations.NamedTarget . Var.varName) bndrs
 
   anns <- mapM (GHC.findGlobalAnns deserializer) targets
-  let annBndrs = filter (not . null . snd) (zip bndrs anns)
+  let isSyn (Synthesize {}) = True
+      isSyn _               = False
+      anns'    = map (filter isSyn) anns
+      annBndrs = filter (not . null . snd) (zip bndrs anns')
   case filter ((> 1) . length . snd) annBndrs of
     [] -> return (map (second listToMaybe) annBndrs)
     as -> Panic.pgmError $
-            "The following functions have multiple 'TopEntity' annotations: " ++
+            "The following functions have multiple 'Synthesize' annotations: " ++
             Outputable.showSDocUnsafe (ppr (map fst as))
 
 findTestBenchAnnotations
@@ -329,14 +332,17 @@ findTestBenchAnnotations
   -> m [(CoreSyn.CoreBndr,CoreSyn.CoreBndr)]
 findTestBenchAnnotations bndrs = do
 #if MIN_VERSION_ghc(8,4,1)
-  let deserializer = GhcPlugins.deserializeWithData :: ([Word8] -> TestBench)
+  let deserializer = GhcPlugins.deserializeWithData :: ([Word8] -> TopEntity)
 #else
-  let deserializer = Serialized.deserializeWithData :: ([Word8] -> TestBench)
+  let deserializer = Serialized.deserializeWithData :: ([Word8] -> TopEntity)
 #endif
       targets      = map (Annotations.NamedTarget . Var.varName) bndrs
 
   anns <- mapM (GHC.findGlobalAnns deserializer) targets
-  let annBndrs  = filter (not . null . snd) (zip bndrs anns)
+  let isTB (TestBench {}) = True
+      isTB _              = False
+      anns'     = map (filter isTB) anns
+      annBndrs  = filter (not . null . snd) (zip bndrs anns')
       annBndrs' = case filter ((> 1) . length . snd) annBndrs of
         [] -> map (second head) annBndrs
         as -> Panic.pgmError $
@@ -344,11 +350,12 @@ findTestBenchAnnotations bndrs = do
           Outputable.showSDocUnsafe (ppr (map fst as))
   return (map (second findTB) annBndrs')
   where
-    findTB :: TestBench -> CoreSyn.CoreBndr
+    findTB :: TopEntity -> CoreSyn.CoreBndr
     findTB (TestBench tb) = case listToMaybe (filter (eqNm tb) bndrs) of
       Just tb' -> tb'
       Nothing  -> Panic.pgmError $
         "TestBench named: " ++ show tb ++ " not found"
+    findTB _ = Panic.pgmError "Unexpected Synthesize"
 
     eqNm thNm bndr = show thNm == qualNm
       where

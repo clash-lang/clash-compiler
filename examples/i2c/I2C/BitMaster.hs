@@ -29,7 +29,7 @@ type BitMasterI = (Bool,Bool,Unsigned 16,BitCtrlSig,I2CIn)
 type BitMasterO = (BitRespSig,Bool,I2COut)
 
 {-# ANN bitMaster
-  (defTop
+  (Synthesize
     { t_name     = "bitmaster"
     , t_inputs   = [ PortName "clk"
                    , PortName "arst"

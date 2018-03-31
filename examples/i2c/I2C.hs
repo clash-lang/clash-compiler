@@ -7,7 +7,7 @@ import I2C.ByteMaster
 import I2C.Types
 
 {-# ANN i2c
-  (defTop
+  (Synthesize
     { t_name     = "i2c"
     , t_inputs   = [ PortName "arst"
                    , PortName "clk"

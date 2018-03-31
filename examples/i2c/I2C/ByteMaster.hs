@@ -32,7 +32,7 @@ type ByteMasterI = (Bool,Bool,Bool,Bool,Bool,Bool,BitVector 8,BitRespSig)
 type ByteMasterO = (Bool,Bool,BitVector 8,BitCtrlSig)
 
 {-# ANN byteMaster
-  (defTop
+  (Synthesize
     { t_name     = "bytemaster"
     , t_inputs   = [ PortName "clk"
                    , PortName "arst"
