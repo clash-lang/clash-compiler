@@ -41,7 +41,7 @@ module Clash.Tutorial (
   -- * Composition of sequential circuits
   -- $composition_sequential
 
-  -- * TopEntity annotations: controlling the VHDL\/(System)Verilog generation.
+  -- * Synthesize annotations: controlling the VHDL\/(System)Verilog generation.
   -- $annotations
 
   -- * Multiple clock domains
@@ -560,7 +560,7 @@ order for the CλaSH compiler to do this you need to do one of the following:
 
   * Create a function called /testBench/ in the root module.
   * Annotate your /topEntity/ function (or function with a
-    <Clash-Tutorial.html#g:12 TopEntity> annotation)
+    <Clash-Tutorial.html#g:12 Synthesize> annotation)
     with a 'TestBench' annotation.
 
 For example, you can test the earlier defined /topEntity/ by:
@@ -854,7 +854,7 @@ or construction of product types, then use 'mealyB'.
 -}
 
 {- $annotations #annotations#
-'TopEntity' annotations allow us to control hierarchy and naming aspects of the
+'Synthesize' annotations allow us to control hierarchy and naming aspects of the
 CλaSH compiler, specifically, they allow us to:
 
     * Assign names to entities (VHDL) \/ modules ((System)Verilog), and their
@@ -866,36 +866,36 @@ CλaSH compiler, specifically, they allow us to:
       means deleting the cache; changing this file will result in /undefined/
       behaviour.
 
-Functions with a 'TopEntity' annotation do must adhere to the following
+Functions with a 'Synthesize' annotation do must adhere to the following
 restrictions:
 
-    * Although functions with a 'TopEntity' annotation can of course depend
-      on functions with another 'TopEntity' annotation, they must not be
+    * Although functions with a 'Synthesize' annotation can of course depend
+      on functions with another 'Synthesize' annotation, they must not be
       mutually recursive.
-    * Functions with a 'TopEntity' annotation must be completely /monomorphic/
+    * Functions with a 'Synthesize' annotation must be completely /monomorphic/
       and /first-order/, and cannot have any /non-representable/ arguments or
       result.
 
-Also take the following into account when using 'TopEntity' annotations.
+Also take the following into account when using 'Synthesize' annotations.
 
     * The CλaSH compiler is based on the GHC Haskell compiler, and the GHC
-      machinery does not understand 'TopEntity' annotations and it might
+      machinery does not understand 'Synthesize' annotations and it might
       subsequently decide to inline those functions. You should therefor also
       add a @{\-\# NOINLINE f \#-\}@ pragma to the functions which you give
-      a 'TopEntity' functions.
-    * Functions with a 'TopEntity' annotation will not be specialised
+      a 'Synthesize' functions.
+    * Functions with a 'Synthesize' annotation will not be specialised
       on constants.
 
 Finally, the root module, the module which you pass as an argument to the
 CλaSH compiler must either have:
 
-    * A function with a 'TopEntity' annotation.
+    * A function with a 'Synthesize' annotation.
     * A function called /topEntity/.
 
-You apply 'TopEntity' annotations to functions using an @ANN@ pragma:
+You apply 'Synthesize' annotations to functions using an @ANN@ pragma:
 
 @
-{\-\# ANN topEntity (TopEntity {t_name = ..., ...  }) \#-\}
+{\-\# ANN topEntity (Synthesize {t_name = ..., ...  }) \#-\}
 topEntity x = ...
 @
 
@@ -970,11 +970,11 @@ begin
 end;
 @
 
-However, if we add the following 'TopEntity' annotation in the file:
+However, if we add the following 'Synthesize' annotation in the file:
 
 @
 {\-\# ANN topEntity
-  ('defTop'
+  ('Synthesize'
     { t_name   = "blinker"
     , t_inputs = [PortName \"CLOCK_50\", PortName \"KEY0\", PortName \"KEY1\"]
     , t_output = PortName \"LED\"
@@ -1018,7 +1018,7 @@ Where we now have:
 * A top-level component that is called @blinker@.
 * Inputs and outputs that have a /user/-chosen name: @CLOCK_50@, @KEY0@, @KEY1@, @LED@, etc.
 
-See the documentation of 'TopEntity' for the meaning of all its fields.
+See the documentation of 'Synthesize' for the meaning of all its fields.
 -}
 
 {- $primitives #primitives#
@@ -2225,7 +2225,7 @@ and / or easy to use as the standard Haskell features.
 
 * 'Clash.Annotations.TopEntity' annotations have received a complete overhaul,
   and you should just rewrite them from scratch. Additionally, designs can
-  contain multiple 'Clash.Annotations.TopEntity' to split generated HDL over
+  contain multiple 'Clash.Annotations.Synthesize' to split generated HDL over
   multiple output directories.
 
 * With the overhaul of 'Clash.Annotations.TopEntity' annotations and the
@@ -2362,7 +2362,7 @@ import Clash.Intel.ClockGen
 type Dom50 = Dom \"System\" 20000
 
 {\-\# ANN topEntity
-  (defTop
+  (Synthesize
     { t_name   = "blinker"
     , t_inputs = [ PortName \"CLOCK_50\"
                  , PortName \"KEY0\"

@@ -5,7 +5,11 @@ License    :  BSD2 (see the file LICENSE)
 Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
 
 'TopEntity' annotations allow us to control hierarchy and naming aspects of the
-CλaSH compiler, specifically, they allow us to:
+CλaSH compiler. We have the 'Synthesize' and 'TestBench' annotation.
+
+=== 'Synthesize' annotation
+
+The 'Synthesize' annotation allows us to:
 
     * Assign names to entities (VHDL) \/ modules ((System)Verilog), and their
       ports.
@@ -16,36 +20,36 @@ CλaSH compiler, specifically, they allow us to:
       means deleting the cache; changing this file will result in /undefined/
       behaviour.
 
-Functions with a 'TopEntity' annotation do must adhere to the following
+Functions with a 'Synthesize' annotation do must adhere to the following
 restrictions:
 
-    * Although functions with a 'TopEntity' annotation can of course depend
-      on functions with another 'TopEntity' annotation, they must not be
+    * Although functions with a 'Synthesize' annotation can of course depend
+      on functions with another 'Synthesize' annotation, they must not be
       mutually recursive.
-    * Functions with a 'TopEntity' annotation must be completely /monomorphic/
+    * Functions with a 'Synthesize' annotation must be completely /monomorphic/
       and /first-order/, and cannot have any /non-representable/ arguments or
       result.
 
-Also take the following into account when using 'TopEntity' annotations.
+Also take the following into account when using 'Synthesize' annotations.
 
     * The CλaSH compiler is based on the GHC Haskell compiler, and the GHC
-      machinery does not understand 'TopEntity' annotations and it might
+      machinery does not understand 'Synthesize' annotations and it might
       subsequently decide to inline those functions. You should therefor also
       add a @{\-\# NOINLINE f \#-\}@ pragma to the functions which you give
-      a 'TopEntity' functions.
-    * Functions with a 'TopEntity' annotation will not be specialised
+      a 'Synthesize' functions.
+    * Functions with a 'Synthesize' annotation will not be specialised
       on constants.
 
 Finally, the root module, the module which you pass as an argument to the
 CλaSH compiler must either have:
 
-    * A function with a 'TopEntity' annotation.
+    * A function with a 'Synthesize' annotation.
     * A function called /topEntity/.
 
-You apply 'TopEntity' annotations to functions using an @ANN@ pragma:
+You apply 'Synthesize' annotations to functions using an @ANN@ pragma:
 
 @
-{\-\# ANN f (TopEntity {t_name = ..., ...  }) \#-\}
+{\-\# ANN f (Synthesize {t_name = ..., ...  }) \#-\}
 f x = ...
 @
 
@@ -122,11 +126,11 @@ begin
 end;
 @
 
-However, if we add the following 'TopEntity' annotation in the file:
+However, if we add the following 'Synthesize' annotation in the file:
 
 @
 {\-\# ANN topEntity
-  ('defTop'
+  ('Synthesize'
     { t_name   = "blinker"
     , t_inputs = [ PortName \"CLOCK_50\"
                  , PortName \"KEY0\"
@@ -172,7 +176,25 @@ Where we now have:
 * A top-level component that is called @blinker@.
 * Inputs and outputs that have a /user/-chosen name: @CLOCK_50@, @KEY0@, @KEY1@, @LED@, etc.
 
-See the documentation of 'TopEntity' for the meaning of all its fields.
+See the documentation of 'Synthesize' for the meaning of all its fields.
+
+=== 'TestBench' annotation
+
+Tell what binder is the 'TestBench' for a 'Synthesize'-annotated binder.
+
+So in the following example, /f/ has a 'Synthesize' annotation, and /g/ is
+the HDL test bench for /f/.
+
+@
+f :: Bool -> Bool
+f = ...
+{\-\# ANN f (defSyn "f") \#-\}
+{\-\# ANN f (TestBench \'g) \#-\}
+
+g :: Signal Bool
+g = ...
+@
+
 -}
 
 {-# LANGUAGE DeriveDataTypeable #-}
@@ -186,9 +208,8 @@ module Clash.Annotations.TopEntity
   ( -- * Data types
     TopEntity (..)
   , PortName (..)
-  , TestBench (..)
     -- * Convenience functions
-  , defTop
+  , defSyn
   )
 where
 
@@ -198,7 +219,9 @@ import           Data.Data
 
 -- | TopEntity annotation
 data TopEntity
-  = TopEntity
+  -- | Instruct the Clash compiler to use this top-level function as a separately
+  -- synthesizable component.
+  = Synthesize
   { t_name    :: String
   -- ^ The name the top-level component should have, put in a correspondingly
   -- named file.
@@ -210,7 +233,23 @@ data TopEntity
   -- \"wrapped\" by a tuple -- this field is not a list, but a single
   -- @'PortName'@. Use @'PortProduct'@ to give names to the individual components
   -- of the output tuple.
-  } deriving (Data,Show,Read,Generic)
+  }
+  -- | Tell what binder is the 'TestBench' for a 'Synthesize'-annotated binder.
+  --
+  -- So in the following example, /f/ has a 'Synthesize' annotation, and /g/ is
+  -- the HDL test bench for /f/.
+  --
+  -- @
+  -- f :: Bool -> Bool
+  -- f = ...
+  -- {\-\# ANN f (defSyn "f") \#-\}
+  -- {\-\# ANN f (TestBench \'g) \#-\}
+  --
+  -- g :: Signal Bool
+  -- g = ...
+  -- @
+  | TestBench TH.Name
+  deriving (Data,Show,Generic)
 
 -- | Give port names for arguments/results.
 --
@@ -219,7 +258,7 @@ data TopEntity
 -- @
 -- data T = MkT Int Bool
 --
--- {\-\# ANN topEntity (defTop {t_name = \"f\",}) \#-\}
+-- {\-\# ANN topEntity (defSyn "f") \#-\}
 -- f :: Int -> T -> (T,Bool)
 -- f a b = ...
 -- @
@@ -241,8 +280,8 @@ data TopEntity
 --
 -- @
 -- {\-\# ANN topEntity
---    (defTop
---       { t_name = \"f\"
+--    (Synthesize
+--       { t_name   = "f"
 --       , t_inputs = [ PortName \"a\"
 --                    , PortName \"b\" ]
 --       , t_output = PortName \"res\" }) \#-\}
@@ -264,8 +303,8 @@ data TopEntity
 --
 -- @
 -- {\-\# ANN topEntity
---    (defTop
---       { t_name = \"f\"
+--    (Synthesize
+--       { t_name   = "f"
 --       , t_inputs = [ PortName \"a\"
 --                    , PortProduct \"\" [ PortName \"b\", PortName \"c\" ] ]
 --       , t_output = PortProduct \"res\" [PortName \"q\"] }) \#-\}
@@ -302,34 +341,16 @@ data PortName
   -- 2. The prefix for any unnamed ports below the 'PortProduct'
   --
   -- You can use an empty String ,\"\" , in case you want an auto-generated name.
-  deriving (Data,Show,Read,Generic)
+  deriving (Data,Show,Generic)
 
--- | Tell what binder is the 'TestBench' for a 'TopEntity' binder.
+-- | Default 'Synthesize' annotation which has no specified names for the input
+-- and output ports.
 --
--- So in the following example, /f/ is the 'TopEntity', and /g/ is the
--- 'TestBench'
---
--- @
--- f :: Bool -> Bool
--- f = ...
--- {\-\# ANN f (defTop {t_name = "f"}) \#-\}
--- {\-\# ANN f (TestBench \'g) \#-\}
---
--- g :: Signal Bool
--- g = ...
--- @
-data TestBench
-  = TestBench TH.Name
-  deriving (Data,Show)
-
--- | Default 'TopEntity' which has no specified names for the input and output
--- ports.
---
--- >>> defTop
--- TopEntity {t_name = "topentity", t_inputs = [], t_output = PortName ""}
-defTop :: TopEntity
-defTop = TopEntity
-  { t_name   = "topentity"
+-- >>> defSyn "foo"
+-- Synthesize {t_name = "foo", t_inputs = [], t_output = PortName ""}
+defSyn :: String -> TopEntity
+defSyn name = Synthesize
+  { t_name   = name
   , t_inputs = []
   , t_output = PortName ""
   }
