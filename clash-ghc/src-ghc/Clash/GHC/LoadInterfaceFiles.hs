@@ -20,7 +20,8 @@ import           Control.Monad.IO.Class      (MonadIO (..))
 import           Data.Char                   (toLower)
 import           Data.Either                 (partitionEithers)
 import           Data.List                   (elemIndex, foldl', partition)
-import           Data.Maybe                  (isJust, isNothing, mapMaybe)
+import           Data.Maybe                  (fromMaybe, isJust, isNothing,
+                                              mapMaybe)
 import           Data.Word                   (Word8)
 import           System.Directory            (createDirectoryIfMissing)
 import           System.FilePath.Posix       ((<.>), (</>))
@@ -172,7 +173,11 @@ loadExprFromIface ::
        ,[FilePath]
        )
 loadExprFromIface hdl bndr = do
-  let moduleM = Name.nameModule_maybe $ Var.varName bndr
+  dflags <- GHC.getSessionDynFlags
+
+  let -- Using the stub directory as the output directory for inline primitives
+      outDir = fromMaybe "." $ GHC.stubDir dflags
+      moduleM = Name.nameModule_maybe $ Var.varName bndr
   case moduleM of
     Just nameMod -> runIfl nameMod $ do
       ifaceM <- loadIface nameMod
@@ -187,7 +192,7 @@ loadExprFromIface hdl bndr = do
           let declM = filter ((== nameFun) . IfaceSyn.ifName) decls
 #endif
           anns <- TcIface.tcIfaceAnnotations (GHC.mi_anns iface)
-          primFPs <- loadPrimitiveAnnotations hdl anns
+          primFPs <- loadPrimitiveAnnotations hdl outDir anns
           case declM of
             [namedDecl] -> do
               tyThing <- loadDecl namedDecl
@@ -198,9 +203,10 @@ loadExprFromIface hdl bndr = do
 loadPrimitiveAnnotations ::
   MonadIO m
   => HDL
+  -> FilePath
   -> [Annotations.Annotation]
   -> m [FilePath]
-loadPrimitiveAnnotations hdl anns = sequence $ mapMaybe toFP prims
+loadPrimitiveAnnotations hdl outDir anns = sequence $ mapMaybe toFP prims
   where
     prims = mapMaybe filterPrim anns
     filterPrim (Annotations.Annotation target value) =
@@ -220,7 +226,8 @@ loadPrimitiveAnnotations hdl anns = sequence $ mapMaybe toFP prims
     toFP (name, InlinePrimitive hdl' content)
       | hdl == hdl'
       = Just . liftIO $ do
-          let inlinePrimsDir = "inline_primitives" </> map toLower (show hdl)
+          let inlinePrimsDir =
+                outDir </> "inline_primitives" </> map toLower (show hdl)
               primFile = inlinePrimsDir </> name <.> "json"
           createDirectoryIfMissing True inlinePrimsDir
           writeFile primFile content
