@@ -214,11 +214,15 @@ loadPrimitiveAnnotations hdl outDir anns = sequence $ mapMaybe toFP prims
             case target of
               Annotations.NamedTarget name -> Name.nameStableString name
               Annotations.ModuleTarget mod -> Module.moduleStableString mod
-      in (qualifiedName,) <$> Serialized.fromSerialized deserializer value
+      in (qualifiedName,) <$> deserialize value
 #if MIN_VERSION_ghc(8,4,1)
-    deserializer = GhcPlugins.deserializeWithData :: ([Word8] -> Primitive)
+    deserialize =
+      GhcPlugins.fromSerialized
+        (GhcPlugins.deserializeWithData :: [Word8] -> Primitive)
 #else
-    deserializer = Serialized.deserializeWithData :: ([Word8] -> Primitive)
+    deserialize =
+      Serialized.fromSerialized
+        (Serialized.deserializeWithData :: [Word8] -> Primitive)
 #endif
     toFP (_, Primitive hdl' fp)
       | hdl == hdl'
@@ -245,7 +249,7 @@ loadExprFromTyThing bndr tyThing = case tyThing of
         unfolding  = IdInfo.unfoldingInfo _idInfo
         inlineInfo = IdInfo.inlinePragInfo _idInfo
     in case unfolding of
-      (CoreSyn.CoreUnfolding {}) ->
+      CoreSyn.CoreUnfolding {} ->
         case (BasicTypes.inl_inline inlineInfo,BasicTypes.inl_act inlineInfo) of
           (BasicTypes.NoInline,BasicTypes.AlwaysActive) -> Right bndr
           (BasicTypes.NoInline,BasicTypes.NeverActive)  -> Right bndr
@@ -257,13 +261,16 @@ loadExprFromTyThing bndr tyThing = case tyThing of
         in Left (bndr,dfExpr)
       CoreSyn.NoUnfolding
         | Demand.isBottomingSig $ IdInfo.strictnessInfo _idInfo
+        -> Left
+            ( bndr
 #if MIN_VERSION_ghc(8,2,2)
-        -> Left (bndr, MkCore.mkAbsentErrorApp
+            , MkCore.mkAbsentErrorApp
 #else
-        -> Left (bndr, MkCore.mkRuntimeErrorApp MkCore.aBSENT_ERROR_ID
+            , MkCore.mkRuntimeErrorApp
+                MkCore.aBSENT_ERROR_ID
 #endif
-                                                (Var.varType _id)
-                                                ("no_unfolding " ++ showPpr unsafeGlobalDynFlags bndr)
-                )
+                (Var.varType _id)
+                ("no_unfolding " ++ showPpr unsafeGlobalDynFlags bndr)
+            )
       _ -> Right bndr
   _ -> Right bndr
