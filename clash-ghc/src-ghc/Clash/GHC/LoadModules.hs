@@ -24,25 +24,26 @@ where
 #endif
 
 -- External Modules
-import           Control.Arrow                (second)
+import           Clash.Annotations.Primitive     (HDL, Primitive (..))
+import           Clash.Annotations.TopEntity     (TopEntity (..))
+import           Control.Arrow                   (second)
 import           Data.Generics.Uniplate.DataOnly (transform)
-import           Data.List                    (foldl', lookup, nub)
-import           Data.Maybe                   (fromMaybe, listToMaybe, mapMaybe, catMaybes)
-import           Data.Word                    (Word8)
-import           Clash.Annotations.Primitive  (HDL, Primitive (..))
-import           Clash.Annotations.TopEntity  (TopEntity (..))
-import           System.Exit                  (ExitCode (..))
-import           System.IO                    (hGetLine)
-import           System.IO.Error              (tryIOError)
-import           System.Process               (runInteractiveCommand,
-                                               waitForProcess)
+import           Data.List                       (foldl', lookup, nub)
+import           Data.Maybe                      (catMaybes, fromMaybe,
+                                                  listToMaybe, mapMaybe)
+import           Data.Word                       (Word8)
+import           System.Exit                     (ExitCode (..))
+import           System.IO                       (hGetLine)
+import           System.IO.Error                 (tryIOError)
+import           System.Process                  (runInteractiveCommand,
+                                                  waitForProcess)
 
 -- GHC API
 import qualified Annotations
-import qualified CoreSyn
 import qualified CoreFVs
+import qualified CoreSyn
 import qualified Digraph
-import           DynFlags                     (GeneralFlag (..))
+import           DynFlags                        (GeneralFlag (..))
 import qualified DynFlags
 import qualified GHC
 import qualified HscMain
@@ -54,29 +55,29 @@ import qualified GhcPlugins
 #else
 import qualified Serialized
 #endif
-import qualified TidyPgm
 import qualified TcRnMonad
 import qualified TcRnTypes
+import qualified TidyPgm
 import qualified Unique
 #if MIN_VERSION_ghc(8,2,0)
 import qualified UniqDFM
 #else
 import qualified UniqFM
 #endif
-import qualified UniqSet
-import qualified Var
 import qualified FamInst
 import qualified FamInstEnv
+import qualified GHC.LanguageExtensions          as LangExt
 import qualified Name
-import           Outputable                   (ppr)
-import qualified Outputable
 import qualified OccName
-import qualified GHC.LanguageExtensions       as LangExt
+import           Outputable                      (ppr)
+import qualified Outputable
+import qualified UniqSet
+import qualified Var
 
 -- Internal Modules
-import           Clash.GHC.GHC2Core           (modNameM)
+import           Clash.GHC.GHC2Core              (modNameM)
 import           Clash.GHC.LoadInterfaceFiles
-import           Clash.Util                   (curLoc)
+import           Clash.Util                      (curLoc)
 
 ghcLibDir :: IO FilePath
 ghcLibDir = do
@@ -158,16 +159,16 @@ loadModules hdl modName dflagsM = do
                   return dfPlug
 
     let dflags1 = dflags
-#if __GLASGOW_HASKELL__ >= 711
-                    { DynFlags.reductionDepth = 1000
-#else
-                    { DynFlags.ctxtStkDepth = 1000
-#endif
-                    , DynFlags.optLevel = 2
+                    { DynFlags.optLevel = 2
                     , DynFlags.ghcMode  = GHC.CompManager
                     , DynFlags.ghcLink  = GHC.LinkInMemory
                     , DynFlags.hscTarget = DynFlags.defaultObjectTarget
                                              (DynFlags.targetPlatform dflags)
+#if __GLASGOW_HASKELL__ >= 711
+                    , DynFlags.reductionDepth = 1000
+#else
+                    , DynFlags.ctxtStkDepth = 1000
+#endif
                     }
     let dflags2 = wantedOptimizationFlags dflags1
     let ghcDynamic = case lookup "GHC Dynamic" (DynFlags.compilerInfo dflags) of
@@ -519,7 +520,7 @@ removeStrictnessAnnotations pm =
 
     rmHSD :: GHC.DataId name => GHC.HsDecl name -> GHC.HsDecl name
     rmHSD (GHC.TyClD tyClDecl) = GHC.TyClD (rmTyClD tyClDecl)
-    rmHSD hsd = hsd
+    rmHSD hsd                  = hsd
 
     rmTyClD :: GHC.DataId name => GHC.TyClDecl name -> GHC.TyClDecl name
     rmTyClD dc@(GHC.DataDecl {}) = dc {GHC.tcdDataDefn = rmDataDefn (GHC.tcdDataDefn dc)}
@@ -546,7 +547,7 @@ removeStrictnessAnnotations pm =
     rmHsType = transform go
       where
         go (GHC.unLoc -> GHC.HsBangTy _ ty) = ty
-        go ty = ty
+        go ty                               = ty
 
     rmConDeclF :: GHC.DataId name => GHC.ConDeclField name -> GHC.ConDeclField name
     rmConDeclF cdf = cdf {GHC.cd_fld_type = rmHsType (GHC.cd_fld_type cdf)}
