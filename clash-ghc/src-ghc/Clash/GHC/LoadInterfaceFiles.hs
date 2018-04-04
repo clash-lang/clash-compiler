@@ -12,7 +12,9 @@
 {-# LANGUAGE TupleSections       #-}
 
 module Clash.GHC.LoadInterfaceFiles
-  (loadExternalExprs)
+  ( loadExternalExprs
+  , primitiveFilePath
+  )
 where
 
 -- External Modules
@@ -206,15 +208,12 @@ loadPrimitiveAnnotations ::
   -> FilePath
   -> [Annotations.Annotation]
   -> m [FilePath]
-loadPrimitiveAnnotations hdl outDir anns = sequence $ mapMaybe toFP prims
+loadPrimitiveAnnotations hdl outDir anns =
+  sequence $ mapMaybe (primitiveFilePath hdl outDir) prims
   where
     prims = mapMaybe filterPrim anns
     filterPrim (Annotations.Annotation target value) =
-      let qualifiedName =
-            case target of
-              Annotations.NamedTarget name -> Name.nameStableString name
-              Annotations.ModuleTarget mod -> Module.moduleStableString mod
-      in (qualifiedName,) <$> deserialize value
+      (target,) <$> deserialize value
 #if MIN_VERSION_ghc(8,4,1)
     deserialize =
       GhcPlugins.fromSerialized
@@ -224,19 +223,30 @@ loadPrimitiveAnnotations hdl outDir anns = sequence $ mapMaybe toFP prims
       Serialized.fromSerialized
         (Serialized.deserializeWithData :: [Word8] -> Primitive)
 #endif
-    toFP (_, Primitive hdl' fp)
-      | hdl == hdl'
-      = Just $ pure fp
-    toFP (name, InlinePrimitive hdl' content)
-      | hdl == hdl'
-      = Just . liftIO $ do
-          let inlinePrimsDir =
-                outDir </> "inline_primitives" </> map toLower (show hdl)
-              primFile = inlinePrimsDir </> name <.> "json"
-          createDirectoryIfMissing True inlinePrimsDir
-          writeFile primFile content
-          return inlinePrimsDir
-    toFP _ = Nothing
+
+primitiveFilePath ::
+  MonadIO m
+  => HDL
+  -> FilePath
+  -> (Annotations.CoreAnnTarget, Primitive)
+  -> Maybe (m FilePath)
+primitiveFilePath hdl outDir targetPrim =
+  case targetPrim of
+    (_, Primitive hdl' fp)
+      | hdl == hdl' -> Just $ pure fp
+    (target, InlinePrimitive hdl' content)
+      | hdl == hdl' -> Just . liftIO $ do
+        let qualifiedName =
+              case target of
+                Annotations.NamedTarget name -> Name.nameStableString name
+                Annotations.ModuleTarget mod' -> Module.moduleStableString mod'
+            inlinePrimsDir =
+              outDir </> "inline_primitives" </> map toLower (show hdl)
+            primFile = inlinePrimsDir </> qualifiedName <.> "json"
+        createDirectoryIfMissing True inlinePrimsDir
+        writeFile primFile content
+        return inlinePrimsDir
+    _ -> Nothing
 
 loadExprFromTyThing :: CoreSyn.CoreBndr
                     -> GHC.TyThing
