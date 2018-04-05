@@ -103,6 +103,8 @@ module Clash.Prelude
   , module Clash.Promoted.Nat
   , module Clash.Promoted.Nat.Literals
   , module Clash.Promoted.Nat.TH
+    -- ** Type-level strings
+  , module Clash.Promoted.Symbol
     -- ** Template Haskell
   , Lift (..)
     -- ** Type classes
@@ -154,6 +156,7 @@ import           Clash.Prelude.Safe
 import           Clash.Promoted.Nat
 import           Clash.Promoted.Nat.TH
 import           Clash.Promoted.Nat.Literals
+import           Clash.Promoted.Symbol
 import           Clash.Sized.BitVector
 import           Clash.Sized.Fixed
 import           Clash.Sized.Index

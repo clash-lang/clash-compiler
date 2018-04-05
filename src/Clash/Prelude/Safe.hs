@@ -91,6 +91,8 @@ module Clash.Prelude.Safe
   , module Clash.Promoted.Nat
   , module Clash.Promoted.Nat.Literals
   , module Clash.Promoted.Nat.TH
+    -- ** Type-level strings
+  , module Clash.Promoted.Symbol
     -- ** Type classes
     -- *** Clash
   , module Clash.Class.BitPack
@@ -139,6 +141,7 @@ import           Clash.Prelude.DataFlow
 import           Clash.Promoted.Nat
 import           Clash.Promoted.Nat.TH
 import           Clash.Promoted.Nat.Literals
+import           Clash.Promoted.Symbol
 import           Clash.Sized.BitVector
 import           Clash.Sized.Fixed
 import           Clash.Sized.Index

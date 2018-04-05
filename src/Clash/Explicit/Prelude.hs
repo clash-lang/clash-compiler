@@ -87,6 +87,7 @@ module Clash.Explicit.Prelude
   , module Clash.Promoted.Nat
   , module Clash.Promoted.Nat.Literals
   , module Clash.Promoted.Nat.TH
+    -- ** Type-level strings
   , module Clash.Promoted.Symbol
     -- ** Template Haskell
   , Lift (..)

@@ -109,7 +109,6 @@ import Clash.XException           (XException, errorX, seqX)
 >>> :set -XMagicHash
 >>> :set -XTypeApplications
 >>> import Clash.Promoted.Nat
->>> import Clash.Promoted.Symbol
 >>> import Clash.XException
 >>> type System = Dom "System" 10000
 >>> let systemClockGen = clockGen @System
