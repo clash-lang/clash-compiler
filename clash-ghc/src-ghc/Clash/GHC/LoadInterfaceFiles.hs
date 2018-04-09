@@ -12,14 +12,21 @@
 {-# LANGUAGE TupleSections       #-}
 
 module Clash.GHC.LoadInterfaceFiles
-  (loadExternalExprs)
+  ( loadExternalExprs
+  , primitiveFilePath
+  )
 where
 
 -- External Modules
-import           Data.Either (partitionEithers)
-import           Data.List   (elemIndex, foldl', partition)
-import           Data.Maybe  (isJust, isNothing, mapMaybe)
-import           Data.Word   (Word8)
+import           Control.Monad.IO.Class      (MonadIO (..))
+import           Data.Char                   (toLower)
+import           Data.Either                 (partitionEithers)
+import           Data.List                   (elemIndex, foldl', partition)
+import           Data.Maybe                  (fromMaybe, isJust, isNothing,
+                                              mapMaybe)
+import           Data.Word                   (Word8)
+import           System.Directory            (createDirectoryIfMissing)
+import           System.FilePath.Posix       ((<.>), (</>))
 
 import           Clash.Annotations.Primitive
 
@@ -30,7 +37,7 @@ import qualified Class
 import qualified CoreFVs
 import qualified CoreSyn
 import qualified Demand
-import           DynFlags    (unsafeGlobalDynFlags)
+import           DynFlags                    (unsafeGlobalDynFlags)
 import qualified GHC
 import qualified Id
 import qualified IdInfo
@@ -43,7 +50,7 @@ import qualified Module
 #endif
 import qualified MonadUtils
 import qualified Name
-import           Outputable  (showPpr, showSDoc, text)
+import           Outputable                  (showPpr, showSDoc, text)
 #if MIN_VERSION_ghc(8,4,1)
 import qualified GhcPlugins
 #else
@@ -60,7 +67,7 @@ import qualified VarSet
 #endif
 
 -- Internal Modules
-import           Clash.Util  ((***), curLoc, traceIf)
+import           Clash.Util                  (curLoc, traceIf, (***))
 
 runIfl :: GHC.GhcMonad m => GHC.Module -> TcRnTypes.IfL a -> m a
 runIfl modName action = do
@@ -168,7 +175,11 @@ loadExprFromIface ::
        ,[FilePath]
        )
 loadExprFromIface hdl bndr = do
-  let moduleM = Name.nameModule_maybe $ Var.varName bndr
+  dflags <- GHC.getSessionDynFlags
+
+  let -- Using the stub directory as the output directory for inline primitives
+      outDir = fromMaybe "." $ GHC.stubDir dflags
+      moduleM = Name.nameModule_maybe $ Var.varName bndr
   case moduleM of
     Just nameMod -> runIfl nameMod $ do
       ifaceM <- loadIface nameMod
@@ -183,7 +194,7 @@ loadExprFromIface hdl bndr = do
           let declM = filter ((== nameFun) . IfaceSyn.ifName) decls
 #endif
           anns <- TcIface.tcIfaceAnnotations (GHC.mi_anns iface)
-          let primFPs = loadPrimitiveAnnotations hdl anns
+          primFPs <- loadPrimitiveAnnotations hdl outDir anns
           case declM of
             [namedDecl] -> do
               tyThing <- loadDecl namedDecl
@@ -191,23 +202,51 @@ loadExprFromIface hdl bndr = do
             _ -> return (Right bndr,primFPs)
     Nothing -> return (Right bndr,[])
 
-loadPrimitiveAnnotations
-  :: HDL
+loadPrimitiveAnnotations ::
+  MonadIO m
+  => HDL
+  -> FilePath
   -> [Annotations.Annotation]
-  -> [FilePath]
-loadPrimitiveAnnotations hdl anns = mapMaybe toFP (concat prims)
+  -> m [FilePath]
+loadPrimitiveAnnotations hdl outDir anns =
+  sequence $ mapMaybe (primitiveFilePath hdl outDir) prims
   where
-    annEnv       = Annotations.mkAnnEnv anns
-    prims        = UniqFM.eltsUFM (Annotations.deserializeAnns deserializer annEnv)
+    prims = mapMaybe filterPrim anns
+    filterPrim (Annotations.Annotation target value) =
+      (target,) <$> deserialize value
 #if MIN_VERSION_ghc(8,4,1)
-    deserializer = GhcPlugins.deserializeWithData :: ([Word8] -> Primitive)
+    deserialize =
+      GhcPlugins.fromSerialized
+        (GhcPlugins.deserializeWithData :: [Word8] -> Primitive)
 #else
-    deserializer = Serialized.deserializeWithData :: ([Word8] -> Primitive)
+    deserialize =
+      Serialized.fromSerialized
+        (Serialized.deserializeWithData :: [Word8] -> Primitive)
 #endif
-    toFP (Primitive hdl' fp)
-      | hdl == hdl'
-      = Just fp
-    toFP _ = Nothing
+
+primitiveFilePath ::
+  MonadIO m
+  => HDL
+  -> FilePath
+  -> (Annotations.CoreAnnTarget, Primitive)
+  -> Maybe (m FilePath)
+primitiveFilePath hdl outDir targetPrim =
+  case targetPrim of
+    (_, Primitive hdl' fp)
+      | hdl == hdl' -> Just $ pure fp
+    (target, InlinePrimitive hdl' content)
+      | hdl == hdl' -> Just . liftIO $ do
+        let qualifiedName =
+              case target of
+                Annotations.NamedTarget name -> Name.nameStableString name
+                Annotations.ModuleTarget mod' -> Module.moduleStableString mod'
+            inlinePrimsDir =
+              outDir </> "inline_primitives" </> map toLower (show hdl)
+            primFile = inlinePrimsDir </> qualifiedName <.> "json"
+        createDirectoryIfMissing True inlinePrimsDir
+        writeFile primFile content
+        return inlinePrimsDir
+    _ -> Nothing
 
 loadExprFromTyThing :: CoreSyn.CoreBndr
                     -> GHC.TyThing
@@ -220,7 +259,7 @@ loadExprFromTyThing bndr tyThing = case tyThing of
         unfolding  = IdInfo.unfoldingInfo _idInfo
         inlineInfo = IdInfo.inlinePragInfo _idInfo
     in case unfolding of
-      (CoreSyn.CoreUnfolding {}) ->
+      CoreSyn.CoreUnfolding {} ->
         case (BasicTypes.inl_inline inlineInfo,BasicTypes.inl_act inlineInfo) of
           (BasicTypes.NoInline,BasicTypes.AlwaysActive) -> Right bndr
           (BasicTypes.NoInline,BasicTypes.NeverActive)  -> Right bndr
@@ -232,13 +271,16 @@ loadExprFromTyThing bndr tyThing = case tyThing of
         in Left (bndr,dfExpr)
       CoreSyn.NoUnfolding
         | Demand.isBottomingSig $ IdInfo.strictnessInfo _idInfo
+        -> Left
+            ( bndr
 #if MIN_VERSION_ghc(8,2,2)
-        -> Left (bndr, MkCore.mkAbsentErrorApp
+            , MkCore.mkAbsentErrorApp
 #else
-        -> Left (bndr, MkCore.mkRuntimeErrorApp MkCore.aBSENT_ERROR_ID
+            , MkCore.mkRuntimeErrorApp
+                MkCore.aBSENT_ERROR_ID
 #endif
-                                                (Var.varType _id)
-                                                ("no_unfolding " ++ showPpr unsafeGlobalDynFlags bndr)
-                )
+                (Var.varType _id)
+                ("no_unfolding " ++ showPpr unsafeGlobalDynFlags bndr)
+            )
       _ -> Right bndr
   _ -> Right bndr
