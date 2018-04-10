@@ -1250,11 +1250,11 @@ a general listing of the available template holes:
 * @~VIVADO@: /1/ when CλaSH compiler is invoked with the @-fclash-xilinx@ or
   @-fclash-vivado@ flag. To be used with in an @~IF .. ~THEN .. ~ElSE .. ~FI@
   statement.
-* @~FROMBV[\<HOLE\>][\<TYPE\>]@: create conversion code that so that the
+* @~TOBV[\<HOLE\>][\<TYPE\>]@: create conversion code that so that the
   expression in @\<HOLE\>@ is converted to a bit vector (@std_logic_vector@).
   The @\<TYPE\>@ hole indicates the type of the expression and must be either
   @~TYP[N]@, @~TYPO@, or @~TYPELEM[\<HOLE\>]@.
-* @~TOBV[\<HOLE\>][\<TYPE\>]@: create conversion code that so that the
+* @~FROMBV[\<HOLE\>][\<TYPE\>]@: create conversion code that so that the
   expression in @\<HOLE\>@, which has a bit vector (@std_logic_vector@) type, is
   converted to type indicated by @\<TYPE\>@. The @\<TYPE\>@ hole indicates the
   must be either @~TYP[N]@, @~TYPO@, or @~TYPELEM[\<HOLE\>]@.
