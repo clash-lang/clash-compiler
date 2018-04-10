@@ -40,10 +40,10 @@ testBench = done'
 
     expectedOutput :: SystemClockReset
                    => Signal System (BitVector 8) -> Signal System Bool
-    expectedOutput = outputVerifier $ ($$(bLit "1000....") :: BitVector 8)
-                                   :> ($$(bLit "0100....") :: BitVector 8)
-                                   :> ($$(bLit "00101011") :: BitVector 8)
-                                   :> ($$(bLit "000101..") :: BitVector 8)
-                                   :> Nil
+    expectedOutput = outputVerifierBitVector $ ($$(bLit "1000....") :: BitVector 8)
+                                            :> ($$(bLit "0100....") :: BitVector 8)
+                                            :> ($$(bLit "00101011") :: BitVector 8)
+                                            :> ($$(bLit "000101..") :: BitVector 8)
+                                            :> Nil
     done  = expectedOutput (topEntity testInput)
     done' = withClockReset (tbSystemClockGen (not <$> done')) systemResetGen done
