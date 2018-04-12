@@ -79,6 +79,8 @@ topEntity clk rst = readFromBiSignal bus'
     bus' = veryUnsafeToBiSignalIn bus
 @
 -}
+
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE MagicHash #-}
 {-# LANGUAGE TypeOperators #-}
@@ -158,12 +160,19 @@ data BiSignalIn (ds :: BiSignalDefault) (dom :: Domain) (n :: Nat)
 newtype BiSignalOut (ds :: BiSignalDefault) (dom :: Domain) (n :: Nat)
   = BiSignalOut [Signal dom (Maybe (BitVector n))]
 
+#if MIN_VERSION_base(4,11,0)
+instance Semigroup (BiSignalOut defaultState dom n) where
+  (BiSignalOut b1) <> (BiSignalOut b2) = BiSignalOut (b1 ++ b2)
+#endif
+
 -- | Monoid instance to support concatenating
 --
 -- __NB__ Not synthesizable
 instance Monoid (BiSignalOut defaultState dom n) where
   mempty                                    = BiSignalOut []
+#if !MIN_VERSION_base(4,11,0)
   mappend (BiSignalOut b1) (BiSignalOut b2) = BiSignalOut $ b1 ++ b2
+#endif
 
 -- /Lazily/ prepend a value to a 'BiSignalIn'.
 --
