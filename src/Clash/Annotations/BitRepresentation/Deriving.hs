@@ -696,16 +696,16 @@ group bs = (length head', head bs) : rest
 
 bitToExpr' :: (Int, Bit) -> Q Exp
 bitToExpr' (0, _) = error $ "Unexpected group length: 0"
-bitToExpr' (1, Util.H) = lift high
-bitToExpr' (1, Util.L) = lift low
+bitToExpr' (1, Util.H) = lift (pack high)
+bitToExpr' (1, Util.L) = lift (pack low)
 -- TODO / Evaluate: Undefined bit values should not be converted
-bitToExpr' (1, _) = lift low
+bitToExpr' (1, _) = lift (pack low)
 bitToExpr' (numTyLit' -> n, Util.H) =
-  [| complement (resize $(lift low) :: BitVector $n) |]
+  [| complement (resize $(lift (pack low)) :: BitVector $n) |]
 bitToExpr' (numTyLit' -> n, Util.L) =
-  [| resize $(lift low) :: BitVector $n |]
+  [| resize $(lift (pack low)) :: BitVector $n |]
 bitToExpr' (numTyLit' -> n, _) =
-  [| resize $(lift low) :: BitVector $n |]
+  [| resize $(lift (pack low)) :: BitVector $n |]
 
 bitsToExpr :: [Bit] -> Q Exp
 bitsToExpr [] = error $ "Unexpected empty bit list"
