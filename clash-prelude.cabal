@@ -250,8 +250,8 @@ test-suite unittests
       clash-prelude,
 
       base          >= 4        && < 5,
-      doctest       >= 0.9.1    && < 0.14,
-      tasty         >= 0.10.1.2 && < 0.12,
+      doctest       >= 0.9.1    && < 0.16,
+      tasty         >= 0.10.1.2 && < 2.0,
       tasty-hunit
 
   Other-Modules: Clash.Tests.DerivingDataRepr
