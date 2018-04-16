@@ -34,6 +34,7 @@ import           Data.Proxy          (Proxy)
 import           Data.Reflection     (reifyNat)
 import           Data.Text           (Text)
 import qualified Data.Vector.Primitive as Vector
+import           Debug.Trace         (trace)
 import           GHC.Float
 import           GHC.Int
 import           GHC.Integer         (decodeDoubleInteger,encodeDoubleInteger)
@@ -88,6 +89,7 @@ import qualified Clash.Sized.Internal.Unsigned  as Unsigned
 import Clash.Sized.Internal.BitVector(BitVector(..), Bit(..))
 import Clash.Sized.Internal.Signed   (Signed   (..))
 import Clash.Sized.Internal.Unsigned (Unsigned (..))
+import Clash.XException (isX)
 
 newtype PrimEvalMonad a = PEM { runPEM :: Supply -> (a,Supply) }
 
@@ -3052,7 +3054,9 @@ reduceConstant isSubj gbl tcm h k nm ty tys args = case nm of
          _ -> Nothing
   _ -> Nothing
   where
-    reduce = Just . (h,k,)
+    reduce e = case isX e of
+      Left msg -> trace (unlines ["Warning: Not evaluating constant expression:", show nm, "Because doing so generates an XException:", msg]) Nothing
+      Right e' -> Just (h,k,e')
     reduceWHNF e = let (h2,[],e') = whnf reduceConstant gbl tcm isSubj (h,[],e)
                    in  Just (h2,k,e')
     reduceWHNF' h' e = let (h2,[],e') = whnf reduceConstant gbl tcm isSubj (h',[],e)
