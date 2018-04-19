@@ -956,9 +956,8 @@ appProp _ e = return e
 --        3 -> fromInteger 0
 -- @
 caseFlat :: NormRewrite
-caseFlat _ e@(Case (collectArgs -> (Prim nm _,args)) ty _)
-  | isEq nm
-  = do let (Left scrut') = args !! 1
+caseFlat _ e@(Case (collectEqArgs -> Just (scrut',_)) ty _)
+  = do
        case collectFlat scrut' e of
          Just alts' -> changed (Case scrut' ty (last alts' : init alts'))
          Nothing    -> return e
@@ -966,9 +965,8 @@ caseFlat _ e@(Case (collectArgs -> (Prim nm _,args)) ty _)
 caseFlat _ e = return e
 
 collectFlat :: Term -> Term -> Maybe [Bind Pat Term]
-collectFlat scrut (Case (collectArgs -> (Prim nm _,args)) _ty [lAlt,rAlt])
-  | isEq nm
-  , scrut' == scrut
+collectFlat scrut (Case (collectEqArgs -> Just (scrut', val)) _ty [lAlt,rAlt])
+  | scrut' == scrut
   = case collectArgs val of
       (Prim nm' _,args') | isFromInt nm'
         -> case last args' of
@@ -989,9 +987,6 @@ collectFlat scrut (Case (collectArgs -> (Prim nm _,args)) _ty [lAlt,rAlt])
             _ -> Nothing
       _ -> Nothing
   where
-    (Left scrut') = args !! 1
-    (Left val)    = args !! 2
-
     isFalseDcPat (DataPat p _)
       = ((== "GHC.Types.False") . name2String . dcName . unembed) p
     isFalseDcPat _ = False
@@ -1002,11 +997,18 @@ collectFlat scrut (Case (collectArgs -> (Prim nm _,args)) _ty [lAlt,rAlt])
 
 collectFlat _ _ = Nothing
 
-isEq :: Text -> Bool
-isEq nm = nm == "Clash.Sized.Internal.BitVector.eq#" ||
-          nm == "Clash.Sized.Internal.Index.eq#" ||
-          nm == "Clash.Sized.Internal.Signed.eq#" ||
-          nm == "Clash.Sized.Internal.Unsigned.eq#"
+collectEqArgs :: Term -> Maybe (Term,Term)
+collectEqArgs (collectArgs -> (Prim nm _, args))
+  | nm == "Clash.Sized.Internal.BitVector.eq#"
+    = let [_,_,Left scrut,Left val] = args
+      in Just (scrut,val)
+  | nm == "Clash.Sized.Internal.Index.eq#"  ||
+    nm == "Clash.Sized.Internal.Signed.eq#" ||
+    nm == "Clash.Sized.Internal.Unsigned.eq#"
+    = let [_,Left scrut,Left val] = args
+      in Just (scrut,val)
+collectEqArgs _ = Nothing
+
 
 isFromInt :: Text -> Bool
 isFromInt nm = nm == "Clash.Sized.Internal.BitVector.fromInteger##" ||
