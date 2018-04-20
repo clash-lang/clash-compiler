@@ -26,6 +26,7 @@ where
 
 import Control.DeepSeq
 import Control.Monad.State.Strict           (MonadIO, MonadState, StateT)
+import Data.Bits                            (testBit)
 import Data.Hashable
 import Data.HashMap.Lazy                    (HashMap)
 import Data.IntMap.Lazy                     (IntMap, empty)
@@ -240,6 +241,14 @@ data Bit
   | U -- ^ Undefined
   | Z -- ^ High-impedance
   deriving (Eq,Show,Typeable,Lift)
+
+
+toBit :: Integer -- ^ mask
+      -> Integer -- ^ value
+      -> Bit
+toBit m i = if testBit m 0
+            then U
+            else if testBit i 0 then H else L
 
 -- | Context used to fill in the holes of a BlackBox template
 data BlackBoxContext
