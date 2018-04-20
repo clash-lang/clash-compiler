@@ -50,7 +50,7 @@ import           Clash.Annotations.BitRepresentation.ClashLib
 import           Clash.Annotations.BitRepresentation.Util
   (BitOrigin(Lit, Field), bitOrigins, bitRanges)
 import           Clash.Backend
-import           Clash.Backend.Verilog                (include)
+import           Clash.Backend.Verilog                (bits, bit_char, exprLit, include)
 import           Clash.Driver.Types                   (SrcSpan, noSrcSpan)
 import           Clash.Netlist.BlackBox.Types         (HdlSyn (..))
 import           Clash.Netlist.BlackBox.Util          (extractLiterals, renderBlackBox)
@@ -1082,39 +1082,6 @@ rtreeChain (DataCon (RTree 0 _) _ [e])     = Just [e]
 rtreeChain (DataCon (RTree _ _) _ [e1,e2]) = A.liftA2 (++) (rtreeChain e1)
                                                            (rtreeChain e2)
 rtreeChain _                               = Nothing
-
-exprLit :: Maybe (HWType,Size) -> Literal -> SystemVerilogM Doc
-exprLit Nothing (NumLit i) = integer i
-
-exprLit (Just (hty,sz)) (NumLit i) = case hty of
-  Unsigned _ -> int sz <> "'d" <> integer i
-  Index _ -> int (typeSize hty) <> "'d" <> integer i
-  Signed _
-   | i < 0     -> "-" <> int sz <> "'sd" <> integer (abs i)
-   | otherwise -> int sz <> "'sd" <> integer i
-  _ -> int sz <> "'b" <> blit
-  where
-    blit = bits (toBits sz i)
-exprLit _             (BoolLit t)   = if t then "1'b1" else "1'b0"
-exprLit _             (BitLit b)    = "1'b" <> bit_char b
-exprLit _             (StringLit s) = string . pack $ show s
-exprLit _             l             = error $ $(curLoc) ++ "exprLit: " ++ show l
-
-toBits :: Integral a => Int -> a -> [Bit]
-toBits size val = map (\x -> if odd x then H else L)
-                $ reverse
-                $ take size
-                $ map (`mod` 2)
-                $ iterate (`div` 2) val
-
-bits :: [Bit] -> SystemVerilogM Doc
-bits = hcat . mapM bit_char
-
-bit_char :: Bit -> SystemVerilogM Doc
-bit_char H = char '1'
-bit_char L = char '0'
-bit_char U = char 'x'
-bit_char Z = char 'z'
 
 toSLV :: HWType -> Expr -> SystemVerilogM Doc
 toSLV t e = case t of

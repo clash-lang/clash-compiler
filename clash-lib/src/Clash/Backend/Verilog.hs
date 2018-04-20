@@ -16,7 +16,14 @@
 {-# LANGUAGE TupleSections     #-}
 {-# LANGUAGE ViewPatterns      #-}
 
-module Clash.Backend.Verilog (VerilogState, include) where
+module Clash.Backend.Verilog
+  ( VerilogState
+  , include
+  , exprLit
+  , bits
+  , bit_char
+  )
+where
 
 import           Control.Applicative                  ((<*), (*>))
 import qualified Control.Applicative                  as A
@@ -731,24 +738,24 @@ rtreeChain (DataCon (RTree 0 _) _ [e])     = Just [e]
 rtreeChain (DataCon (RTree _ _) _ [e1,e2]) = Just e1 <:> rtreeChain e2
 rtreeChain _                               = Nothing
 
-exprLit :: Maybe (HWType,Size) -> Literal -> VerilogM Doc
+exprLit :: (Applicative m, Monoid (m Doc) ) => Maybe (HWType,Size) -> Literal -> m Doc
 exprLit Nothing (NumLit i) = integer i
 
 exprLit (Just (hty,sz)) (NumLit i) = case hty of
-  Unsigned _ -> int sz <> "'d" <> integer i
-  Index _ -> int (typeSize hty) <> "'d" <> integer i
+  Unsigned _ -> int sz <> string "'d" <> integer i
+  Index _ -> int (typeSize hty) <> string "'d" <> integer i
   Signed _
-   | i < 0     -> "-" <> int sz <> "'sd" <> integer (abs i)
-   | otherwise -> int sz <> "'sd" <> integer i
-  _ -> int sz <> "'b" <> blit
+   | i < 0     -> string "-" <> int sz <> string "'sd" <> integer (abs i)
+   | otherwise -> int sz <> string "'sd" <> integer i
+  _ -> int sz <> string "'b" <> blit
   where
     blit = bits (toBits sz i)
-exprLit (Just (hty,sz)) (BitVecLit m i) = int sz <> "'b" <> bvlit
+exprLit (Just (_,sz)) (BitVecLit m i) = int sz <> string "'b" <> bvlit
   where
     bvlit = bits (toBits' sz m i)
 
-exprLit _             (BoolLit t)   = if t then "1'b1" else "1'b0"
-exprLit _             (BitLit b)    = "1'b" <> bit_char b
+exprLit _             (BoolLit t)   = string $ if t then "1'b1" else "1'b0"
+exprLit _             (BitLit b)    = string "1'b" <> bit_char b
 exprLit _             (StringLit s) = string . pack $ show s
 exprLit _             l             = error $ $(curLoc) ++ "exprLit: " ++ show l
 
@@ -768,8 +775,8 @@ toBits' size msk val = map (\(m,i) -> if odd m then U else (if odd i then H else
                   ( map (`mod` 2) $ iterate (`div` 2) val)
 
 
-bits :: [Bit] -> VerilogM Doc
-bits = hcat . mapM bit_char
+bits :: Applicative m => [Bit] -> m Doc
+bits = hcat . traverse bit_char
 
 bit_char' :: Bit -> Char
 bit_char' H = '1'
@@ -777,7 +784,7 @@ bit_char' L = '0'
 bit_char' U = 'x'
 bit_char' Z = 'z'
 
-bit_char :: Bit -> VerilogM Doc
+bit_char :: Applicative m => Bit -> m Doc
 bit_char = char . bit_char'
 
 dcToExpr :: HWType -> Int -> Expr
