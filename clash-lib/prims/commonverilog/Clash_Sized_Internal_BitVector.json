@@ -78,8 +78,8 @@
   }
 , { "BlackBox" :
     { "name"      : "Clash.Sized.Internal.BitVector.fromInteger##"
-    , "type"      : "fromInteger# :: Integer -> Bit"
-    , "templateE" : "~VAR[i][0][0]"
+    , "type"      : "fromInteger## :: Integer -> Integer -> Bit"
+    , "templateE" : "~VAR[i][0][0] ? 1'bx : ~VAR[i][1][0]"
     }
   }
 , { "BlackBox" :
