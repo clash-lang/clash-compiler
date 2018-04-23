@@ -1102,8 +1102,10 @@ expr_ _ (BlackBoxE pNm _ _ _ _ bbCtx _)
 
 expr_ _ (BlackBoxE pNm _ _ _ _ bbCtx _)
   | pNm == "Clash.Sized.Internal.BitVector.fromInteger##"
-  , [Literal _ i] <- extractLiterals bbCtx
-  = exprLit (Just (Bit,1)) i
+  , [Literal _ m, Literal _ i] <- extractLiterals bbCtx
+  = let NumLit m' = m
+        NumLit i' = i
+    in exprLit (Just (Bit,1)) (BitLit $ toBit m' i')
 
 expr_ _ (BlackBoxE pNm _ _ _ _ bbCtx _)
   | pNm == "Clash.Sized.Internal.Index.fromInteger#"
