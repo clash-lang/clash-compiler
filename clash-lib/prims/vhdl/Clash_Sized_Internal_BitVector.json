@@ -1,6 +1,6 @@
 [ { "BlackBox" :
     { "name"      : "Clash.Sized.Internal.BitVector.BV"
-    , "type"      : "fromInteger# :: Integer -> Integer -> BitVector n"
+    , "type"      : "BV :: Integer -> Integer -> BitVector n"
     , "comment"   : "THIS IS ONLY USED WHEN WW EXPOSES BITVECTOR INTERNALS"
     , "templateE" : "~ARG[1]"
     }
