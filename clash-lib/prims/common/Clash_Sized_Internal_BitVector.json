@@ -1,0 +1,15 @@
+[ { "BlackBox" :
+    { "name"      : "Clash.Sized.Internal.BitVector.BV"
+    , "type"      : "BV :: Integer -> Integer -> BitVector n"
+    , "comment"   : "THIS IS ONLY USED WHEN WW EXPOSES BITVECTOR INTERNALS"
+    , "templateE" : "~ARG[1]"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "Clash.Sized.Internal.BitVector.Bit"
+    , "type"      : "Bit :: Integer -> Integer -> BitVector n"
+    , "comment"   : "THIS IS ONLY USED WHEN WW EXPOSES BIT INTERNALS"
+    , "templateE" : "~ARG[1]"
+    }
+  }
+]

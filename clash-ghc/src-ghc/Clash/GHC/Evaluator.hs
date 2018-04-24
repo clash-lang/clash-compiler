@@ -1199,7 +1199,10 @@ reduceConstant isSubj gbl tcm h k nm ty tys args = case nm of
     , Just (m,i) <- integerLiterals args
     -> let resTyInfo = extractTySizeInfo tcm ty tys
        in  reduce (mkBitVectorLit' resTyInfo m i)
--- TODO add Bit?
+
+  "Clash.Sized.Internal.BitVector.Bit"
+    | Just (m,i) <- integerLiterals args
+    -> reduce (mkBitLit ty m i)
 
 -- Initialisation
   "Clash.Sized.Internal.BitVector.size#"

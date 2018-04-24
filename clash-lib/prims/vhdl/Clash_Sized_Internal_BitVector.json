@@ -1,11 +1,4 @@
 [ { "BlackBox" :
-    { "name"      : "Clash.Sized.Internal.BitVector.BV"
-    , "type"      : "BV :: Integer -> Integer -> BitVector n"
-    , "comment"   : "THIS IS ONLY USED WHEN WW EXPOSES BITVECTOR INTERNALS"
-    , "templateE" : "~ARG[1]"
-    }
-  }
-, { "BlackBox" :
     { "name"      : "Clash.Sized.Internal.BitVector.size#"
     , "type"      : "size# :: KnownNat n => BitVector n -> Int"
     , "templateE" : "to_signed(~LIT[0],~SIZE[~TYPO])"
