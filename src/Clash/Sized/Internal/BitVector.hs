@@ -215,11 +215,11 @@ instance Eq Bit where
   (/=) = neq##
 
 eq## :: Bit -> Bit -> Bool
-eq## (Bit _ b1) (Bit _ b2) = b1 == b2
+eq## b1 b2 = eq# (pack# b1) (pack# b2)
 {-# NOINLINE eq## #-}
 
 neq## :: Bit -> Bit -> Bool
-neq## (Bit _ b1) (Bit _ b2) = b1 == b2
+neq## b1 b2 = neq# (pack# b1) (pack# b2)
 {-# NOINLINE neq## #-}
 
 instance Ord Bit where
@@ -229,13 +229,13 @@ instance Ord Bit where
   (>=) = ge##
 
 lt##,ge##,gt##,le## :: Bit -> Bit -> Bool
-lt## (Bit _ n) (Bit _ m) = n < m
+lt## b1 b2 = lt# (pack# b1) (pack# b2)
 {-# NOINLINE lt## #-}
-ge## (Bit _ n) (Bit _ m) = n >= m
+ge## b1 b2 = ge# (pack# b1) (pack# b2)
 {-# NOINLINE ge## #-}
-gt## (Bit _ n) (Bit _ m) = n > m
+gt## b1 b2 = gt# (pack# b1) (pack# b2)
 {-# NOINLINE gt## #-}
-le## (Bit _ n) (Bit _ m) = n <= m
+le## b1 b2 = le# (pack# b1) (pack# b2)
 {-# NOINLINE le## #-}
 
 instance Enum Bit where
@@ -300,18 +300,17 @@ instance FiniteBits Bit where
   countTrailingZeros b = if eq## b low then 1 else 0
 
 and##, or##, xor## :: Bit -> Bit -> Bit
-and## (Bit _ v1) (Bit _ v2) = Bit 0 (v1 .&. v2)
+and## b1 b2 = unpack# $ and# (pack# b1) (pack# b2)
 {-# NOINLINE and## #-}
 
-or## (Bit _ v1) (Bit _ v2) = Bit 0 (v1 .|. v2)
+or## b1 b2 = unpack# $ or# (pack# b1) (pack# b2)
 {-# NOINLINE or## #-}
 
-xor## (Bit _ v1) (Bit _ v2) = Bit 0 (v1 `xor` v2)
+xor## b1 b2 = unpack# $ xor# (pack# b1) (pack# b2)
 {-# NOINLINE xor## #-}
 
 complement## :: Bit -> Bit
-complement## (Bit _ 0) = Bit 0 1
-complement## _         = Bit 0 0
+complement## = unpack# . complement# . pack#
 {-# NOINLINE complement## #-}
 
 -- *** BitPack
