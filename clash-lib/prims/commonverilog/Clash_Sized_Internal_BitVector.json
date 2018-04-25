@@ -30,14 +30,14 @@
   }
 , { "BlackBox" :
     { "name"      : "Clash.Sized.Internal.BitVector.reduceOr#"
-    , "type"      : "reduceOr# :: BitVector n -> Bit"
-    , "templateE" : "| (~ARG[0])"
+    , "type"      : "reduceOr# :: KnownNat n => BitVector n -> Bit"
+    , "templateE" : "| (~ARG[1])"
     }
   }
 , { "BlackBox" :
     { "name"      : "Clash.Sized.Internal.BitVector.reduceXor#"
-    , "type"      : "reduceXor# :: BitVector n -> Bit"
-    , "templateE" : "^ (~ARG[0])"
+    , "type"      : "reduceXor# :: KnownNat n => BitVector n -> Bit"
+    , "templateE" : "^ (~ARG[1])"
     }
   }
 , { "BlackBox" :
@@ -144,8 +144,8 @@
   }
 , { "BlackBox" :
     { "name"      : "Clash.Sized.Internal.BitVector.toInteger#"
-    , "type"      : "toInteger# :: BitVector n -> Integer"
-    , "templateD" : "assign ~RESULT = ~IF~SIZE[~TYP[0]]~THEN$unsigned(~ARG[0])~ELSE64'sd0~FI;"
+    , "type"      : "toInteger# :: KnownNat n => BitVector n -> Integer"
+    , "templateD" : "assign ~RESULT = ~IF~SIZE[~TYP[1]]~THEN$unsigned(~ARG[1])~ELSE64'sd0~FI;"
     }
   }
 , { "BlackBox" :
