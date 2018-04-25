@@ -115,7 +115,7 @@ instance BitPack Bool where
   pack True  = 1
   pack False = 0
 
-  unpack = checkUnpackUndef $ \bv -> if bv == 1 then True else False
+  unpack bv = if bv == 1 then True else False
 
 instance BitPack (BitVector n) where
   type BitSize (BitVector n) = n
@@ -130,92 +130,92 @@ instance BitPack Bit where
 instance BitPack Int where
   type BitSize Int = WORD_SIZE_IN_BITS
   pack   = fromIntegral
-  unpack = checkUnpackUndef fromIntegral
+  unpack = fromIntegral
 
 instance BitPack Int8 where
   type BitSize Int8 = 8
   pack   = fromIntegral
-  unpack = checkUnpackUndef fromIntegral
+  unpack = fromIntegral
 
 instance BitPack Int16 where
   type BitSize Int16 = 16
   pack   = fromIntegral
-  unpack = checkUnpackUndef fromIntegral
+  unpack = fromIntegral
 
 instance BitPack Int32 where
   type BitSize Int32 = 32
   pack   = fromIntegral
-  unpack = checkUnpackUndef fromIntegral
+  unpack = fromIntegral
 
 #if WORD_SIZE_IN_BITS >= 64
 instance BitPack Int64 where
   type BitSize Int64 = 64
   pack   = fromIntegral
-  unpack = checkUnpackUndef fromIntegral
+  unpack = fromIntegral
 #endif
 
 instance BitPack Word where
   type BitSize Word = WORD_SIZE_IN_BITS
   pack   = fromIntegral
-  unpack = checkUnpackUndef fromIntegral
+  unpack = fromIntegral
 
 instance BitPack Word8 where
   type BitSize Word8 = 8
   pack   = fromIntegral
-  unpack = checkUnpackUndef fromIntegral
+  unpack = fromIntegral
 
 instance BitPack Word16 where
   type BitSize Word16 = 16
   pack   = fromIntegral
-  unpack = checkUnpackUndef fromIntegral
+  unpack = fromIntegral
 
 instance BitPack Word32 where
   type BitSize Word32 = 32
   pack   = fromIntegral
-  unpack = checkUnpackUndef fromIntegral
+  unpack = fromIntegral
 
 #if WORD_SIZE_IN_BITS >= 64
 instance BitPack Word64 where
   type BitSize Word64 = 64
   pack   = fromIntegral
-  unpack = checkUnpackUndef fromIntegral
+  unpack = fromIntegral
 #endif
 
 instance BitPack Float where
   type BitSize Float = 32
   pack   = packFloat#
-  unpack = checkUnpackUndef unpackFloat#
+  unpack = unpackFloat#
 
 packFloat# :: Float -> BitVector 32
 packFloat# = fromIntegral . floatToWord
 {-# NOINLINE packFloat# #-}
 
 unpackFloat# :: BitVector 32 -> Float
-unpackFloat# = wordToFloat . fromInteger . unsafeToInteger
+unpackFloat# = checkUnpackUndef $ wordToFloat . fromInteger . unsafeToInteger
 {-# NOINLINE unpackFloat# #-}
 
 instance BitPack Double where
   type BitSize Double = 64
   pack   = packDouble#
-  unpack = checkUnpackUndef unpackDouble#
+  unpack = unpackDouble#
 
 packDouble# :: Double -> BitVector 64
 packDouble# = fromIntegral . doubleToWord
 {-# NOINLINE packDouble# #-}
 
 unpackDouble# :: BitVector 64 -> Double
-unpackDouble# = wordToDouble . fromInteger . unsafeToInteger
+unpackDouble# = checkUnpackUndef $ wordToDouble . fromInteger . unsafeToInteger
 {-# NOINLINE unpackDouble# #-}
 
 instance BitPack CUShort where
   type BitSize CUShort = 16
   pack   = fromIntegral
-  unpack = checkUnpackUndef fromIntegral
+  unpack = fromIntegral
 
 instance BitPack Half where
   type BitSize Half = 16
   pack (Half x) = pack x
-  unpack        = checkUnpackUndef $ \x -> Half (unpack x)
+  unpack        = Half . unpack
 
 instance BitPack () where
   type BitSize () = 0
