@@ -1224,36 +1224,35 @@ reduceConstant isSubj gbl tcm h k nm ty tys args = case nm of
   "Clash.Sized.Internal.BitVector.low"
     -> reduce (mkBitLit ty 0 0)
 
---TODO handle undef Bits
 -- Eq
-  "Clash.Sized.Internal.BitVector.eq##" | [i,j] <- bitLiterals args
+  "Clash.Sized.Internal.BitVector.eq##" | [(0,i),(0,j)] <- bitLiterals args
     -> reduce (boolToBoolLiteral tcm ty (i == j))
-  "Clash.Sized.Internal.BitVector.neq##" | [i,j] <- bitLiterals args
+  "Clash.Sized.Internal.BitVector.neq##" | [(0,i),(0,j)] <- bitLiterals args
     -> reduce (boolToBoolLiteral tcm ty (i /= j))
 
 -- Ord
-  "Clash.Sized.Internal.BitVector.lt##" | [i,j] <- bitLiterals args
+  "Clash.Sized.Internal.BitVector.lt##" | [(0,i),(0,j)] <- bitLiterals args
     -> reduce (boolToBoolLiteral tcm ty (i <  j))
-  "Clash.Sized.Internal.BitVector.ge##" | [i,j] <- bitLiterals args
+  "Clash.Sized.Internal.BitVector.ge##" | [(0,i),(0,j)] <- bitLiterals args
     -> reduce (boolToBoolLiteral tcm ty (i >= j))
-  "Clash.Sized.Internal.BitVector.gt##" | [i,j] <- bitLiterals args
+  "Clash.Sized.Internal.BitVector.gt##" | [(0,i),(0,j)] <- bitLiterals args
     -> reduce (boolToBoolLiteral tcm ty (i >  j))
-  "Clash.Sized.Internal.BitVector.le##" | [i,j] <- bitLiterals args
+  "Clash.Sized.Internal.BitVector.le##" | [(0,i),(0,j)] <- bitLiterals args
     -> reduce (boolToBoolLiteral tcm ty (i <= j))
 
 -- Bits
   "Clash.Sized.Internal.BitVector.and##"
-    | [(_,i),(_,j)] <- bitLiterals args
+    | [(0,i),(0,j)] <- bitLiterals args
     -> reduce (mkBitLit ty 0 (i .&. j))
   "Clash.Sized.Internal.BitVector.or##"
-    | [(_,i),(_,j)] <- bitLiterals args
+    | [(0,i),(0,j)] <- bitLiterals args
     -> reduce (mkBitLit ty 0 (i .|. j))
   "Clash.Sized.Internal.BitVector.xor##"
-    | [(_,i),(_,j)] <- bitLiterals args
+    | [(0,i),(0,j)] <- bitLiterals args
     -> reduce (mkBitLit ty 0 (i `xor` j))
 
   "Clash.Sized.Internal.BitVector.complement##"
-    | [(_,i)] <- bitLiterals args
+    | [(0,i)] <- bitLiterals args
     -> reduce (mkBitLit ty 0 (complement i))
 
 -- Pack
