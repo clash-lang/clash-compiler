@@ -1,6 +1,7 @@
 module SyncTB where
 
 import Clash.Explicit.Prelude
+import Clash.Signal (mux)
 
 type Dom2 = Dom "dom" 2
 type Dom7 = Dom "dom" 7
@@ -21,11 +22,21 @@ testBench = done
   where
     testInput      = stimuliGenerator clk7 rst7 $(listToVecTH [(1::Integer)..10])
     expectedOutput = outputVerifier   clk9 rst9
-                        ((undefined :> undefined :> Nil) ++ $(listToVecTH ([2,3,4,5,7,8,9,10]::[Integer])))
-    done           = expectedOutput (topEntity clk2 clk7 clk9 testInput)
+                        (0 :> 0 :>  $(listToVecTH ([2,3,4,5,7,8,9,10]::[Integer])))
+    done           = expectedOutput (zeroFirst2 clk9 rst9 $ topEntity clk2 clk7 clk9 testInput)
     done'          = not <$> done
     clk2           = tbClockGen @Dom2 (unsafeSynchronizer clk9 clk2 done')
     clk7           = tbClockGen @Dom7 (unsafeSynchronizer clk9 clk7 done')
     clk9           = tbClockGen @Dom9 done'
     rst7           = asyncResetGen @Dom7
     rst9           = asyncResetGen @Dom9
+
+-- The two delay's produce undefined values, which outputVerifier can't test for.
+-- Ignore the first two values and replace them with zeros.
+zeroFirst2
+  :: Num a
+  => Clock domain gated -> Reset domain sync
+  -> Signal domain a -> Signal domain a
+zeroFirst2 clk rst a = mux en a 0
+  where
+    en = register clk rst False $ register clk rst False $ pure True
