@@ -200,6 +200,8 @@ g = ...
 {-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE DeriveGeneric      #-}
 
+{-# LANGUAGE TemplateHaskellQuotes #-}
+
 {-# LANGUAGE Safe #-}
 
 {-# OPTIONS_HADDOCK show-extensions #-}
@@ -214,7 +216,8 @@ module Clash.Annotations.TopEntity
 where
 
 import           GHC.Generics
-import qualified Language.Haskell.TH as TH
+import qualified Language.Haskell.TH        as TH
+import           Language.Haskell.TH.Syntax (Lift(lift))
 import           Data.Data
 
 -- | TopEntity annotation
@@ -250,6 +253,16 @@ data TopEntity
   -- @
   | TestBench TH.Name
   deriving (Data,Show,Generic)
+
+instance Lift TopEntity where
+  lift (Synthesize name inputs output) =
+    TH.appsE
+      [ TH.conE 'Synthesize
+      , TH.stringE name
+      , TH.listE (map lift inputs)
+      , lift output
+      ]
+  lift (TestBench _) = error "Cannot lift a TestBench"
 
 -- | Give port names for arguments/results.
 --
@@ -342,6 +355,16 @@ data PortName
   --
   -- You can use an empty String ,\"\" , in case you want an auto-generated name.
   deriving (Data,Show,Generic)
+
+instance Lift PortName where
+  lift (PortName name) =
+    TH.appE (TH.conE 'PortName) (TH.stringE name)
+  lift (PortProduct name ports) =
+    TH.appsE
+      [ TH.conE 'PortProduct
+      , TH.stringE name
+      , TH.listE $ map lift ports
+      ]
 
 -- | Default 'Synthesize' annotation which has no specified names for the input
 -- and output ports.
