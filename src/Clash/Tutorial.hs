@@ -2230,8 +2230,8 @@ and / or easy to use as the standard Haskell features.
 
 * With the overhaul of 'Clash.Annotations.TopEntity' annotations and the
   introduction of explicit clock and reset arguments, PLLs and other clock
-  sources are now regular Clash function such as those found in
-  "Clash.Intel.ClockGen" and "Clash.Xilinx.ClockGen"
+  sources are now regular Clash functions such as those found in
+  "Clash.Intel.ClockGen" and "Clash.Xilinx.ClockGen".
 
 
 === Examples
