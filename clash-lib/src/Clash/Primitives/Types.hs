@@ -38,7 +38,8 @@ data Primitive a
   , imports  :: [a]
     -- ^ VHDL only: add /use/ declarations for the given names
   , include :: Maybe ((S.Text,S.Text),a)
-    -- ^ Intel/Quartus only: create a /.qsys/ file from the given template.
+    -- ^ Create a file to be included with the generated primitive. The fields
+    -- are ((name, extension), content), where content is a template of the file
     -- Defaults to @Nothing@ when not specified in the /.json/ file
   , template :: !(Either a a) -- ^ Either a /declaration/ or an /expression/ template.
   }
