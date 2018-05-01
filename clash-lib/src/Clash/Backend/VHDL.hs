@@ -97,6 +97,7 @@ instance Backend VHDLState where
     _           -> vhdlType ty
   hdlTypeErrValue = vhdlTypeErrValue
   hdlTypeMark     = vhdlTypeMark
+  hdlRecSel       = vhdlRecSel
   hdlSig t ty     = sigDecl (pretty t) ty
   genStmt         = const emptyDoc
   inst            = inst_
@@ -705,6 +706,12 @@ vhdlTypeErrValue (Clock _ _ Gated)   = "('-',false)"
 vhdlTypeErrValue (Void {})           = "std_logic_vector'(0 downto 1 => '-')"
 vhdlTypeErrValue String              = "\"ERROR\""
 vhdlTypeErrValue t                   = vhdlTypeMark t <> "'" <> parens (int 0 <+> "to" <+> int (typeSize t - 1) <+> rarrow <+> "'-'")
+
+vhdlRecSel
+  :: HWType
+  -> Int
+  -> VHDLM Doc
+vhdlRecSel ty i = tyName ty <> "_sel" <> int i
 
 decls :: [Declaration] -> VHDLM Doc
 decls [] = emptyDoc

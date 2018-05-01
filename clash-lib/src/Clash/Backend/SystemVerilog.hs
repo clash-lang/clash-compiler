@@ -99,6 +99,7 @@ instance Backend SystemVerilogState where
   hdlType _       = verilogType
   hdlTypeErrValue = verilogTypeErrValue
   hdlTypeMark     = verilogTypeMark
+  hdlRecSel       = verilogRecSel
   hdlSig t ty     = sigDecl (string t) ty
   genStmt True    = do cnt <- use genDepth
                        genDepth += 1
@@ -630,6 +631,12 @@ verilogTypeErrValue (RTree n elTy) = do
     _ -> char '\'' <> braces (int (2^n) <+> braces (verilogTypeErrValue elTy))
 verilogTypeErrValue String = "\"ERROR\""
 verilogTypeErrValue ty  = braces (int (typeSize ty) <+> braces "1'bx")
+
+verilogRecSel
+  :: HWType
+  -> Int
+  -> SystemVerilogM Doc
+verilogRecSel ty i = tyName ty <> "_sel" <> int i
 
 decls :: [Declaration] -> SystemVerilogM Doc
 decls [] = emptyDoc
