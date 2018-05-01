@@ -74,6 +74,8 @@ module Clash.Prelude
   , windowD
   , isRising
   , isFalling
+  , riseEvery
+  , oscillate
     -- * Exported modules
     -- ** Synchronous signals
   , module Clash.Signal
