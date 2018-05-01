@@ -1270,7 +1270,7 @@ a general listing of the available template holes:
   expression in @\<HOLE\>@, which has a bit vector (@std_logic_vector@) type, is
   converted to type indicated by @\<TYPE\>@. The @\<TYPE\>@ hole indicates the
   must be either @~TYP[N]@, @~TYPO@, or @~TYPELEM[\<HOLE\>]@.
-* @~QSysIncludeName@: the generated name of the included QSys component.
+* @~INCLUDENAME@: the generated name of the included component.
 * @~FILEPATH[\<HOLE\>]@: The argument mentioned in @\<HOLE\>@ is a file which
   must be copied to the location of the generated HDL.
 * @~GENERATE@: Verilog: create a /generate/ statement, except when already in
