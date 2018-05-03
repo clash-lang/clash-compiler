@@ -619,4 +619,5 @@ usedArguments = nub . concatMap go
       SigD es _ -> usedArguments es
       BV _ es _ -> usedArguments es
       StrCmp _ i -> [i]
+      GenSym es _ -> usedArguments es
       _ -> []
