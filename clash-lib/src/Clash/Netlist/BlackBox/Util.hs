@@ -139,6 +139,9 @@ setSym bbCtx l = do
             . map (\case { C t -> t
                          ; O _ | Identifier t _ <- fst (bbResult bbCtx)
                                -> t
+                         ; N n | let (e,_,_) = bbInputs bbCtx !! n
+                               , Just t <- exprToText e
+                               -> t
                          ; _   -> error "unexpected element in GENSYM"})
 
 setCompName :: Identifier -> BlackBoxTemplate -> BlackBoxTemplate
