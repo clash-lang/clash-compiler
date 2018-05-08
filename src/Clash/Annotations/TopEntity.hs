@@ -20,7 +20,7 @@ The 'Synthesize' annotation allows us to:
       means deleting the cache; changing this file will result in /undefined/
       behaviour.
 
-Functions with a 'Synthesize' annotation do must adhere to the following
+Functions with a 'Synthesize' annotation must adhere to the following
 restrictions:
 
     * Although functions with a 'Synthesize' annotation can of course depend
