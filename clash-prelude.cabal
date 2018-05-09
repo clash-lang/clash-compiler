@@ -220,7 +220,8 @@ test-suite doctests
   else
     build-depends:
       base    >= 4     && < 5,
-      doctest >= 0.9.1 && < 0.16
+      doctest >= 0.9.1 && < 0.16,
+      clash-prelude
 
 benchmark benchmark-clash-prelude
   type:             exitcode-stdio-1.0
