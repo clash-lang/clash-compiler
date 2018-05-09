@@ -3,7 +3,7 @@
 -- preferred by the solver over other versions.
 packages: ./*/*.cabal
 
-allow-newer: *:base, *:template-haskell, *:ghc-typelits-natnormalise, *:ghc-typelits-knownnat, *:ghc-typelits-extra
+allow-newer: *:base, *:template-haskell, *:ghc-typelits-natnormalise, *:ghc-typelits-knownnat, *:ghc-typelits-extra, *:ghc-tcplugins-extra
 
 repository head.hackage
   url: http://head.hackage.haskell.org/
@@ -16,4 +16,4 @@ repository head.hackage
 -- index state, to go along with the cabal.project.freeze file. update the index
 -- state by running `cabal update` twice and looking at the index state it
 -- displays to you (as the second update will be a no-op)
-index-state: 2018-03-18T09:48:18Z
+index-state: 2018-05-09T10:20:14Z
