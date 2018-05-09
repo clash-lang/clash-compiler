@@ -1,5 +1,5 @@
 packages: "."
-allow-newer: *:base, *:template-haskell, *:ghc-typelits-natnormalise, *:ghc-typelits-knownnat, *:ghc-typelits-extra
+allow-newer: *:base, *:template-haskell, *:ghc-typelits-natnormalise, *:ghc-typelits-knownnat, *:ghc-typelits-extra, *:ghc-tcplugins-extra
 repository head.hackage
   url: http://head.hackage.haskell.org/
   secure: True
@@ -10,3 +10,4 @@ repository head.hackage
 optional-packages: ghc-typelits-extra/ghc-typelits-extra.cabal
                    ghc-typelits-knownnat/ghc-typelits-knownnat.cabal
                    ghc-typelits-natnormalise/ghc-typelits-natnormalise.cabal
+                   ghc-tcplugins-extra/ghc-tcplugins-extra.cabal

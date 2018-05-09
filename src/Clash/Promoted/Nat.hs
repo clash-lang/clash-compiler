@@ -18,7 +18,9 @@ Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
 
 {-# LANGUAGE Trustworthy #-}
 
-{-# OPTIONS_GHC -fplugin GHC.TypeLits.Normalise -fplugin GHC.TypeLits.KnownNat.Solver #-}
+{-# OPTIONS_GHC -fplugin GHC.TypeLits.KnownNat.Solver #-}
+{-# OPTIONS_GHC -fplugin GHC.TypeLits.Normalise       #-}
+
 {-# OPTIONS_HADDOCK show-extensions #-}
 
 module Clash.Promoted.Nat
@@ -374,18 +376,11 @@ succBNat (B1 a) = B0 (succBNat a)
 -- | Predecessor of a base-2 encoded natural number
 --
 -- __NB__: Not synthesisable
-predBNat :: BNat (n+1) -> (BNat n)
+predBNat :: (1 <= n) => BNat n -> BNat (n-1)
 predBNat (B1 a) = case stripZeros a of
   BT -> BT
   a' -> B0 a'
-predBNat (B0 x)  = B1 (go x)
-  where
-    go :: BNat m -> BNat (m-1)
-    go (B1 a) = case stripZeros a of
-      BT -> BT
-      a' -> B0 a'
-    go (B0 a)  = B1 (go a)
-    go BT      = error "impossible: 0 ~ 0 - 1"
+predBNat (B0 x) = B1 (predBNat x)
 
 -- | Divide a base-2 encoded natural number by 2
 --
