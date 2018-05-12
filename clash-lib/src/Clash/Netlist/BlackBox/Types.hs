@@ -47,6 +47,7 @@ data Element = C   !Text         -- ^ Constant
              | HdlSyn HdlSyn     -- ^ Hole indicating which synthesis tool we're
                                  -- generating HDL for
              | BV !Bool [Element] !Element -- ^ Convert to (True)/from(False) a bit-vector
+             | Sel !Element !Int -- ^ Record selector of a type
              | IsLit !Int
              | IsVar !Int
              | IsGated !Int

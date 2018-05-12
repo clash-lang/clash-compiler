@@ -139,6 +139,9 @@ setSym bbCtx l = do
             . map (\case { C t -> t
                          ; O _ | Identifier t _ <- fst (bbResult bbCtx)
                                -> t
+                         ; N n | let (e,_,_) = bbInputs bbCtx !! n
+                               , Just t <- exprToText e
+                               -> t
                          ; _   -> error "unexpected element in GENSYM"})
 
 setCompName :: Identifier -> BlackBoxTemplate -> BlackBoxTemplate
@@ -427,6 +430,10 @@ renderTag b (BV False es e) = do
   let ty = lineToType b [e]
   renderOneLine <$> getMon (fromBV ty e')
 
+renderTag b (Sel e n) =
+  let ty = lineToType b [e]
+  in  renderOneLine <$> getMon (hdlRecSel ty n)
+
 renderTag b (Typ Nothing)   = fmap renderOneLine . getMon . hdlType Internal . snd $ bbResult b
 renderTag b (Typ (Just n))  = let (_,ty,_) = bbInputs b !! n
                               in  renderOneLine <$> getMon (hdlType Internal ty)
@@ -574,6 +581,9 @@ prettyElem (BV b es e) = do
     if b
        then string "~TOBV" <> brackets (string es') <> brackets (string e')
        else string "~FROMBV" <> brackets (string es') <> brackets (string e')
+prettyElem (Sel e i) = do
+  e' <- prettyElem e
+  renderOneLine <$> (string "~SEL" <> brackets (string e') <> brackets (int i))
 prettyElem (IsLit i) = renderOneLine <$> (string "~ISLIT" <> brackets (int i))
 prettyElem (IsVar i) = renderOneLine <$> (string "~ISVAR" <> brackets (int i))
 prettyElem (IsGated i) = renderOneLine <$> (string "~ISGATED" <> brackets (int i))
@@ -609,4 +619,5 @@ usedArguments = nub . concatMap go
       SigD es _ -> usedArguments es
       BV _ es _ -> usedArguments es
       StrCmp _ i -> [i]
+      GenSym es _ -> usedArguments es
       _ -> []

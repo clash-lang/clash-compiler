@@ -24,25 +24,26 @@ where
 #endif
 
 -- External Modules
-import           Control.Arrow                (second)
+import           Clash.Annotations.Primitive     (HDL, Primitive (..))
+import           Clash.Annotations.TopEntity     (TopEntity (..))
+import           Control.Arrow                   (second)
 import           Data.Generics.Uniplate.DataOnly (transform)
-import           Data.List                    (foldl', lookup, nub)
-import           Data.Maybe                   (listToMaybe)
-import           Data.Word                    (Word8)
-import           Clash.Annotations.Primitive  (HDL)
-import           Clash.Annotations.TopEntity  (TopEntity (..))
-import           System.Exit                  (ExitCode (..))
-import           System.IO                    (hGetLine)
-import           System.IO.Error              (tryIOError)
-import           System.Process               (runInteractiveCommand,
-                                               waitForProcess)
+import           Data.List                       (foldl', lookup, nub)
+import           Data.Maybe                      (catMaybes, fromMaybe,
+                                                  listToMaybe, mapMaybe)
+import           Data.Word                       (Word8)
+import           System.Exit                     (ExitCode (..))
+import           System.IO                       (hGetLine)
+import           System.IO.Error                 (tryIOError)
+import           System.Process                  (runInteractiveCommand,
+                                                  waitForProcess)
 
 -- GHC API
 import qualified Annotations
-import qualified CoreSyn
 import qualified CoreFVs
+import qualified CoreSyn
 import qualified Digraph
-import           DynFlags                     (GeneralFlag (..))
+import           DynFlags                        (GeneralFlag (..))
 import qualified DynFlags
 import qualified GHC
 import qualified HscMain
@@ -54,29 +55,29 @@ import qualified GhcPlugins
 #else
 import qualified Serialized
 #endif
-import qualified TidyPgm
 import qualified TcRnMonad
 import qualified TcRnTypes
+import qualified TidyPgm
 import qualified Unique
 #if MIN_VERSION_ghc(8,2,0)
 import qualified UniqDFM
 #else
 import qualified UniqFM
 #endif
-import qualified UniqSet
-import qualified Var
 import qualified FamInst
 import qualified FamInstEnv
+import qualified GHC.LanguageExtensions          as LangExt
 import qualified Name
-import           Outputable                   (ppr)
-import qualified Outputable
 import qualified OccName
-import qualified GHC.LanguageExtensions       as LangExt
+import           Outputable                      (ppr)
+import qualified Outputable
+import qualified UniqSet
+import qualified Var
 
 -- Internal Modules
-import           Clash.GHC.GHC2Core           (modNameM)
+import           Clash.GHC.GHC2Core              (modNameM)
 import           Clash.GHC.LoadInterfaceFiles
-import           Clash.Util                   (curLoc)
+import           Clash.Util                      (curLoc)
 
 ghcLibDir :: IO FilePath
 ghcLibDir = do
@@ -158,16 +159,16 @@ loadModules hdl modName dflagsM = do
                   return dfPlug
 
     let dflags1 = dflags
-#if __GLASGOW_HASKELL__ >= 711
-                    { DynFlags.reductionDepth = 1000
-#else
-                    { DynFlags.ctxtStkDepth = 1000
-#endif
-                    , DynFlags.optLevel = 2
+                    { DynFlags.optLevel = 2
                     , DynFlags.ghcMode  = GHC.CompManager
                     , DynFlags.ghcLink  = GHC.LinkInMemory
                     , DynFlags.hscTarget = DynFlags.defaultObjectTarget
                                              (DynFlags.targetPlatform dflags)
+#if __GLASGOW_HASKELL__ >= 711
+                    , DynFlags.reductionDepth = 1000
+#else
+                    , DynFlags.ctxtStkDepth = 1000
+#endif
                     }
     let dflags2 = wantedOptimizationFlags dflags1
     let ghcDynamic = case lookup "GHC Dynamic" (DynFlags.compilerInfo dflags) of
@@ -232,6 +233,9 @@ loadModules hdl modName dflagsM = do
     (externalBndrs,clsOps,unlocatable,pFP) <-
       loadExternalExprs hdl (UniqSet.mkUniqSet binderIds) bindersC
 
+    -- Find local primitive annotations
+    pFP' <- findPrimitiveAnnotations hdl binderIds
+
     hscEnv <- GHC.getSession
     famInstEnvs <- TcRnMonad.liftIO $ TcRnMonad.initTcForLookup hscEnv FamInst.tcGetFamInstEnvs
 
@@ -263,7 +267,7 @@ loadModules hdl modName dflagsM = do
         Just _  -> return allSyn'
       _ -> Panic.pgmError $ $(curLoc) ++ "Multiple 'topEntities' found."
 
-    return (bindersC ++ makeRecursiveGroups externalBndrs,clsOps,unlocatable,(fst famInstEnvs,modFamInstEnvs'),topEntities',nub pFP)
+    return (bindersC ++ makeRecursiveGroups externalBndrs,clsOps,unlocatable,(fst famInstEnvs,modFamInstEnvs'),topEntities',nub $ pFP ++ pFP')
 
 -- | Given a set of bindings, make explicit non-recursive bindings and
 -- recursive binding groups.
@@ -362,6 +366,34 @@ findTestBenchAnnotations bndrs = do
         bndrNm  = Var.varName bndr
         qualNm  = maybe occName (\modName -> modName ++ ('.':occName)) (modNameM bndrNm)
         occName = OccName.occNameString (Name.nameOccName bndrNm)
+
+findPrimitiveAnnotations
+  :: GHC.GhcMonad m
+  => HDL
+  -> [CoreSyn.CoreBndr]
+  -> m [FilePath]
+findPrimitiveAnnotations hdl bndrs = do
+  dflags <- GHC.getSessionDynFlags
+
+  let -- Using the stub directory as the output directory for inline primitives
+      outDir = fromMaybe "." $ GHC.stubDir dflags
+#if MIN_VERSION_ghc(8,4,1)
+      deserializer = GhcPlugins.deserializeWithData :: ([Word8] -> Primitive)
+#else
+      deserializer = Serialized.deserializeWithData :: ([Word8] -> Primitive)
+#endif
+      targets =
+        concatMap
+          ( (\v -> catMaybes
+            [ Just $ Annotations.NamedTarget v
+            , Annotations.ModuleTarget <$> Name.nameModule_maybe v
+            ]) . Var.varName
+          ) bndrs
+
+  anns <- mapM (GHC.findGlobalAnns deserializer) targets
+  sequence $
+    mapMaybe (primitiveFilePath hdl outDir)
+    (concat $ zipWith (\t -> map ((,) t)) targets anns)
 
 parseModule :: GHC.GhcMonad m => GHC.ModSummary -> m GHC.ParsedModule
 parseModule modSum = do
@@ -488,7 +520,7 @@ removeStrictnessAnnotations pm =
 
     rmHSD :: GHC.DataId name => GHC.HsDecl name -> GHC.HsDecl name
     rmHSD (GHC.TyClD tyClDecl) = GHC.TyClD (rmTyClD tyClDecl)
-    rmHSD hsd = hsd
+    rmHSD hsd                  = hsd
 
     rmTyClD :: GHC.DataId name => GHC.TyClDecl name -> GHC.TyClDecl name
     rmTyClD dc@(GHC.DataDecl {}) = dc {GHC.tcdDataDefn = rmDataDefn (GHC.tcdDataDefn dc)}
@@ -515,7 +547,7 @@ removeStrictnessAnnotations pm =
     rmHsType = transform go
       where
         go (GHC.unLoc -> GHC.HsBangTy _ ty) = ty
-        go ty = ty
+        go ty                               = ty
 
     rmConDeclF :: GHC.DataId name => GHC.ConDeclField name -> GHC.ConDeclField name
     rmConDeclF cdf = cdf {GHC.cd_fld_type = rmHsType (GHC.cd_fld_type cdf)}
