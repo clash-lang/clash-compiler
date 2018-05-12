@@ -1,5 +1,9 @@
 # Changelog for the [`clash-lib`](http://hackage.haskell.org/package/clash-lib) package
 
+## 0.99.1 *May 12th 2018*
+* Allow `~NAME[N]` tag inside `~GENSYM[X]`
+* Support HDL record selector generation [#313](https://github.com/clash-lang/clash-compiler/pull/313)
+
 ## 0.99 *March 31st 2018*
 * New features:
   * Support for `clash-prelude-0.99`:
