@@ -355,7 +355,11 @@ findCustomReprAnnotations = do
   hsc_env <- GHC.getSession
   ann_env <- liftIO $ HscTypes.prepareAnnotations hsc_env Nothing
 
-  let deserializer = Serialized.deserializeWithData :: ([Word8] -> DataReprAnn)
+#if MIN_VERSION_ghc(8,4,1)
+  let deserializer = GhcPlugins.deserializeWithData :: [Word8] -> DataReprAnn
+#else
+  let deserializer = Serialized.deserializeWithData :: [Word8] -> DataReprAnn
+#endif
   let deserialized = Annotations.deserializeAnns deserializer ann_env
   let reprs        = concat $ UniqFM.nonDetEltsUFM deserialized
 
