@@ -129,7 +129,7 @@ library
                       integer-gmp               >= 1.0.1.0  && < 2.0
 
   if os(windows)
-    Build-Depends:    Win32                     >= 2.3.1    && < 2.6
+    Build-Depends:    Win32                     >= 2.3.1    && < 2.7
   else
     Build-Depends:    unix                      >= 2.7.1    && < 2.8
 
