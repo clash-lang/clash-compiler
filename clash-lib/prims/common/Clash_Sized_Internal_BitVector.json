@@ -13,6 +13,12 @@
     }
   }
 , { "BlackBox" :
+    { "name"      : "Clash.Sized.Internal.BitVector.undefined#"
+    , "type"      : "undefined# :: forall n . KnownNat n => BitVector n"
+    , "templateE" : "~ERRORO"
+    }
+  }
+, { "BlackBox" :
     { "name"      : "Clash.Sized.Internal.BitVector.checkUnpackUndef"
     , "type"      :
 "checkUnpackUndef
