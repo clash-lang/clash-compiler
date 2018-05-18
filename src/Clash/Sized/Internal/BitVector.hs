@@ -939,7 +939,7 @@ checkUnpackUndef _ bv = res
   where
     ty = typeOf res
     res = undefError (show ty ++ ".unpack") [bv]
-
+{-# NOINLINE checkUnpackUndef #-}
 
 -- | Create a BitVector with all its bits undefined
 undefined# :: forall n . KnownNat n => BitVector n
