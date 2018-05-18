@@ -943,8 +943,10 @@ checkUnpackUndef _ bv = res
 
 -- | Create a BitVector with all its bits undefined
 undefined# :: forall n . KnownNat n => BitVector n
-undefined# = let m = 1 `shiftL` fromInteger (natVal (Proxy @n))
-            in  BV (m-1) 0
+undefined# =
+  let m = 1 `shiftL` fromInteger (natVal (Proxy @n))
+  in  BV (m-1) 0
+{-# NOINLINE undefined# #-}
 
 -- | Check if one BitVector is like another.
 -- Undefined bits in the second argument are interpreted as don't care bits.
@@ -967,3 +969,4 @@ isLike (BV cMask c) (BV eMask e) = e' == c' && e' == c''
     c' = (c .&. complement cMask) .&. complement eMask
     -- | checked with undefined bits set to 1
     c'' = (c .|. cMask) .&. complement eMask
+{-# NOINLINE isLike #-}
