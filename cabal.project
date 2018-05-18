@@ -17,3 +17,6 @@ repository head.hackage
 -- state by running `cabal update` twice and looking at the index state it
 -- displays to you (as the second update will be a no-op)
 index-state: 2018-05-09T10:20:14Z
+
+package clash-ghc
+  executable-dynamic: True
