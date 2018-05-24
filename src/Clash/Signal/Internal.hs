@@ -102,7 +102,7 @@ import Test.QuickCheck            (Arbitrary (..), CoArbitrary(..), Property,
 
 import Clash.Promoted.Nat         (SNat (..), snatToInteger, snatToNum)
 import Clash.Promoted.Symbol      (SSymbol (..))
-import Clash.XException           (XException, errorX, seqX)
+import Clash.XException           (Undefined (..), XException, errorX, seqX)
 
 {- $setup
 >>> :set -XDataKinds
@@ -553,15 +553,15 @@ infixr 3 .&&.
 -- need to 'seq' it explicitly.
 
 delay#
-  :: HasCallStack
+  :: (HasCallStack, Undefined a)
   => Clock  domain gated
   -> Signal domain a
   -> Signal domain a
 delay# Clock {} =
-  \s -> withFrozenCallStack (errorX "delay: initial value undefined") :- s
+  \s -> withFrozenCallStack (deepErrorX "delay: initial value undefined") :- s
 
 delay# (GatedClock _ _ en) =
-    go (withFrozenCallStack (errorX "delay: initial value undefined")) en
+    go (withFrozenCallStack (deepErrorX "delay: initial value undefined")) en
   where
     go o (e :- es) as@(~(x :- xs)) =
       -- See [Note: register strictness annotations]
@@ -569,14 +569,14 @@ delay# (GatedClock _ _ en) =
 {-# NOINLINE delay# #-}
 
 register#
-  :: HasCallStack
+  :: (HasCallStack, Undefined a)
   => Clock domain gated
   -> Reset domain synchronous
   -> a
   -> Signal domain a
   -> Signal domain a
 register# Clock {} (Sync rst) i =
-    go (withFrozenCallStack (errorX "register: initial value undefined")) rst
+    go (withFrozenCallStack (deepErrorX "register: initial value undefined")) rst
   where
     go o rt@(~(r :- rs)) as@(~(x :- xs)) =
       let o' = if r then i else x
@@ -584,7 +584,7 @@ register# Clock {} (Sync rst) i =
       in  o `seqX` o :- (rt `seq` as `seq` go o' rs xs)
 
 register# Clock {} (Async rst) i =
-    go (withFrozenCallStack (errorX "register: initial value undefined")) rst
+    go (withFrozenCallStack (deepErrorX "register: initial value undefined")) rst
   where
     go o (r :- rs) as@(~(x :- xs)) =
       let o' = if r then i else o
@@ -592,7 +592,7 @@ register# Clock {} (Async rst) i =
       in  o' `seqX` o' :- (as `seq` go x rs xs)
 
 register# (GatedClock _ _ ena) (Sync rst)  i =
-    go (withFrozenCallStack (errorX "register: initial value undefined")) rst ena
+    go (withFrozenCallStack (deepErrorX "register: initial value undefined")) rst ena
   where
     go o rt@(~(r :- rs)) enas@(~(e :- es)) as@(~(x :- xs)) =
       let oE = if e then x else o
@@ -601,7 +601,7 @@ register# (GatedClock _ _ ena) (Sync rst)  i =
       in  o `seqX` o :- (rt `seq` enas `seq` as `seq` go oR rs es xs)
 
 register# (GatedClock _ _ ena) (Async rst) i =
-    go (withFrozenCallStack (errorX "register: initial value undefined")) rst ena
+    go (withFrozenCallStack (deepErrorX "register: initial value undefined")) rst ena
   where
     go o (r :- rs) enas@(~(e :- es)) as@(~(x :- xs)) =
       let oR = if r then i else o

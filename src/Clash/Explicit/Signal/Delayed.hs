@@ -56,6 +56,7 @@ import Clash.Sized.Vector
 import Clash.Explicit.Signal
   (Clock, Domain, Reset, Signal, register, fromList, fromList_lazy, bundle,
    unbundle)
+import Clash.XException           (Undefined)
 
 {- $setup
 >>> :set -XDataKinds
@@ -124,7 +125,7 @@ dfromList_lazy = coerce . fromList_lazy
 -- [0,0,0,1,2,3]
 delayed
   :: forall domain gated synchronous a n d
-   . KnownNat d
+   . (KnownNat d, Undefined a)
   => Clock domain gated
   -> Reset domain synchronous
   -> Vec d a
@@ -151,7 +152,7 @@ delayed clk rst m ds = coerce (delaySignal (coerce ds))
 -- >>> sampleN 6 (delay2 systemClockGen systemResetGen (dfromList [1..]))
 -- [0,0,1,2,3,4]
 delayedI
-  :: (Default a, KnownNat d)
+  :: (Default a, KnownNat d, Undefined a)
   => Clock domain gated
   -> Reset domain synchronous
   -> DSignal domain n a

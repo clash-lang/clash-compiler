@@ -197,7 +197,7 @@ It instead exports the identically named functions defined in terms of
 -- [<1,0,0,0>,<2,1,0,0>,<3,2,1,0>,<4,3,2,1>,<5,4,3,2>...
 -- ...
 window
-  :: (KnownNat n, Default a, HiddenClockReset domain gated synchronous)
+  :: (KnownNat n, Default a, Undefined a, HiddenClockReset domain gated synchronous)
   => Signal domain a                -- ^ Signal to create a window over
   -> Vec (n + 1) (Signal domain a)  -- ^ Window of at least size 1
 window = hideClockReset E.window
@@ -213,7 +213,7 @@ window = hideClockReset E.window
 -- [<0,0,0>,<1,0,0>,<2,1,0>,<3,2,1>,<4,3,2>...
 -- ...
 windowD
-  :: (KnownNat n, Default a, HiddenClockReset domain gated synchronous)
+  :: (KnownNat n, Default a, Undefined a, HiddenClockReset domain gated synchronous)
   => Signal domain a               -- ^ Signal to create a window over
   -> Vec (n + 1) (Signal domain a) -- ^ Window of at least size 1
 windowD = hideClockReset E.windowD

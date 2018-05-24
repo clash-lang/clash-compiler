@@ -18,7 +18,7 @@ We start with the definition of the Instructions, Register names and machine
 codes:
 
 @
-{\-\# LANGUAGE RecordWildCards, TupleSections \#-\}
+{\-\# LANGUAGE RecordWildCards, TupleSections, DeriveAnyClass \#-\}
 module CPU where
 
 import Clash.Explicit.Prelude
@@ -403,12 +403,12 @@ import Clash.Signal.Internal
 import Clash.Signal.Bundle    (unbundle)
 import Clash.Sized.Unsigned   (Unsigned)
 import Clash.Sized.Vector     (Vec, toList)
-import Clash.XException       (errorX, maybeX, seqX)
+import Clash.XException       (Undefined, errorX, maybeX, seqX)
 
 {- $setup
 >>> import Clash.Explicit.Prelude as C
 >>> import qualified Data.List as L
->>> :set -XDataKinds -XRecordWildCards -XTupleSections
+>>> :set -XDataKinds -XRecordWildCards -XTupleSections -XDeriveAnyClass
 >>> type InstrAddr = Unsigned 8
 >>> type MemAddr = Unsigned 5
 >>> type Value = Signed 8
@@ -421,7 +421,7 @@ data Reg
   | RegC
   | RegD
   | RegE
-  deriving (Eq,Show,Enum)
+  deriving (Eq,Show,Enum,Undefined)
 :}
 
 >>> :{
@@ -786,7 +786,7 @@ blockRam# clk content rd wen = case clockEnable clk of
 
 -- | Create read-after-write blockRAM from a read-before-write one
 readNew
-  :: Eq addr
+  :: (Eq addr, Undefined a)
   => Reset domain synchronous
   -> Clock domain gated
   -> (Signal domain addr -> Signal domain (Maybe (addr, a)) -> Signal domain a)

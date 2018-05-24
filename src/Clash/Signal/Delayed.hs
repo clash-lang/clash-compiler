@@ -43,6 +43,7 @@ import           Clash.Explicit.Signal.Delayed
 import            Clash.Sized.Vector           (Vec)
 import            Clash.Signal
   (HiddenClockReset, hideClockReset)
+import            Clash.XException
 
 {- $setup
 >>> :set -XDataKinds -XTypeOperators -XTypeApplications -XFlexibleContexts
@@ -61,7 +62,7 @@ import            Clash.Signal
 -- >>> sampleN 6 (toSignal (delay3 (dfromList [1..])))
 -- [0,0,0,1,2,3]
 delayed
-  :: (KnownNat d, HiddenClockReset domain gated synchronous)
+  :: (KnownNat d, Undefined a, HiddenClockReset domain gated synchronous)
   => Vec d a
   -> DSignal domain n a
   -> DSignal domain (n + d) a
@@ -77,7 +78,7 @@ delayed = hideClockReset E.delayed
 -- >>> sampleN 6 (toSignal (delay2 (dfromList [1..])))
 -- [0,0,1,2,3,4]
 delayedI
-  :: (Default a, KnownNat d, HiddenClockReset domain gated synchronous)
+  :: (Default a, KnownNat d, Undefined a, HiddenClockReset domain gated synchronous)
   => DSignal domain n a
   -> DSignal domain (n + d) a
 delayedI = hideClockReset E.delayedI

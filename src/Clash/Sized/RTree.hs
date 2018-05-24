@@ -73,7 +73,8 @@ import Clash.Promoted.Nat          (SNat (..), UNat (..), pow2SNat, snatToNum,
 import Clash.Promoted.Nat.Literals (d1)
 import Clash.Sized.Index           (Index)
 import Clash.Sized.Vector          (Vec (..), (!!), (++), dtfold, replace)
-import Clash.XException            (ShowX (..), showsX, showsPrecXWith)
+import Clash.XException
+  (ShowX (..), Undefined (..), showsX, showsPrecXWith)
 
 {- $setup
 >>> :set -XDataKinds
@@ -212,6 +213,9 @@ instance (KnownNat d, Arbitrary a) => Arbitrary (RTree d a) where
 
 instance (KnownNat d, CoArbitrary a) => CoArbitrary (RTree d a) where
   coarbitrary = coarbitrary . toList
+
+instance (KnownNat d, Undefined a) => Undefined (RTree d a) where
+  deepErrorX x = pure (deepErrorX x)
 
 -- | A /dependently/ typed fold over trees.
 --

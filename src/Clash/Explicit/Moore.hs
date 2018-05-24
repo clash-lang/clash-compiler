@@ -23,6 +23,7 @@ module Clash.Explicit.Moore
 where
 
 import Clash.Explicit.Signal (Bundle (..), Clock, Reset, Signal, register)
+import Clash.XException      (Undefined)
 
 {- $setup
 >>> :set -XDataKinds -XTypeApplications
@@ -69,7 +70,8 @@ import Clash.Explicit.Signal (Bundle (..), Clock, Reset, Signal, register)
 --     s2 = 'moore' clk rst mac id 0 ('bundle' (b,y))
 -- @
 moore
-  :: Clock domain gated       -- ^ 'Clock' to synchronize to
+  :: Undefined s
+  => Clock domain gated       -- ^ 'Clock' to synchronize to
   -> Reset domain synchronous
   -> (s -> i -> s)         -- ^ Transfer function in moore machine form:
                            -- @state -> input -> newstate@
@@ -88,7 +90,8 @@ moore clk rst ft fo iS =
 -- | Create a synchronous function from a combinational function describing
 -- a moore machine without any output logic
 medvedev
-  :: Clock domain gated
+  :: Undefined s
+  => Clock domain gated
   -> Reset domain synchronous
   -> (s -> i -> s)
   -> s
@@ -124,7 +127,7 @@ medvedev clk rst tr st = moore clk rst tr id st
 --     (i2,b2) = 'mooreB' clk rst t o 3 (i1,c)
 -- @
 mooreB
-  :: (Bundle i, Bundle o)
+  :: (Bundle i, Bundle o, Undefined s)
   => Clock domain gated
   -> Reset domain synchronous
   -> (s -> i -> s) -- ^ Transfer function in moore machine form:
@@ -140,7 +143,7 @@ mooreB clk rst ft fo iS i = unbundle (moore clk rst ft fo iS (bundle i))
 
 -- | A version of 'medvedev' that does automatic 'Bundle'ing
 medvedevB
-  :: (Bundle i, Bundle s)
+  :: (Bundle i, Bundle s, Undefined s)
   => Clock domain gated
   -> Reset domain synchronous
   -> (s -> i -> s)

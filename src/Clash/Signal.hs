@@ -147,6 +147,7 @@ import           Clash.Signal.Bundle   (Bundle (..))
 import           Clash.Signal.Internal hiding
   (sample, sample_lazy, sampleN, sampleN_lazy, simulate, simulate_lazy, testFor)
 import qualified Clash.Signal.Internal as S
+import           Clash.XException      (Undefined)
 
 {- $setup
 >>> :set -XFlexibleContexts -XTypeApplications
@@ -462,7 +463,7 @@ withClockReset = \clk rst f -> expose @"rst" (expose @"clk" f clk) rst
 -- >>> printX (sampleN 3 (delay (fromList [1,2,3,4])))
 -- [X,1,2]
 delay
-  :: (HiddenClock domain gated, HasCallStack)
+  :: (HasCallStack, Undefined a, HiddenClock domain gated)
   => Signal domain a
   -- ^ Signal to delay
   -> Signal domain a
@@ -475,7 +476,7 @@ delay = \i -> withFrozenCallStack (delay# #clk i)
 -- >>> sampleN 3 (register 8 (fromList [1,2,3,4]))
 -- [8,1,2]
 register
-  :: (HiddenClockReset domain gated synchronous, HasCallStack)
+  :: (HasCallStack, Undefined a, HiddenClockReset domain gated synchronous)
   => a
   -- ^ Reset value
   --
@@ -509,7 +510,7 @@ infixr 3 `register`
 -- >>> sampleN 8 countSometimes
 -- [0,0,1,1,2,2,3,3]
 regMaybe
-  :: (HiddenClockReset domain gated synchronous, HasCallStack)
+  :: (HasCallStack, Undefined a, HiddenClockReset domain gated synchronous)
   => a
   -- ^ Reset value
   --
@@ -537,7 +538,7 @@ infixr 3 `regMaybe`
 -- >>> sampleN 8 count
 -- [0,0,1,1,2,2,3,3]
 regEn
-  :: (HiddenClockReset domain gated synchronous, HasCallStack)
+  :: (HasCallStack, Undefined a, HiddenClockReset domain gated synchronous)
   => a
   -- ^ Reset value
   --

@@ -6,6 +6,7 @@ Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
 -}
 
 {-# LANGUAGE DataKinds             #-}
+{-# LANGUAGE DeriveAnyClass        #-}
 {-# LANGUAGE DeriveDataTypeable    #-}
 {-# LANGUAGE KindSignatures        #-}
 {-# LANGUAGE MagicHash             #-}
@@ -86,7 +87,7 @@ import Clash.Class.Num            (ExtendingNum (..), SaturatingNum (..),
 import Clash.Class.Resize         (Resize (..))
 import {-# SOURCE #-} Clash.Sized.Internal.BitVector (BitVector (BV))
 import Clash.Promoted.Nat         (SNat, snatToNum, leToPlusKN)
-import Clash.XException           (ShowX (..), showsPrecXWith)
+import Clash.XException           (ShowX (..), Undefined, showsPrecXWith)
 
 -- | Arbitrary-bounded unsigned integer represented by @ceil(log_2(n))@ bits.
 --
@@ -115,7 +116,7 @@ newtype Index (n :: Nat) =
     -- | The constructor, 'I', and the field, 'unsafeToInteger', are not
     -- synthesisable.
     I { unsafeToInteger :: Integer }
-  deriving Data
+  deriving (Data,Undefined)
 
 instance NFData (Index n) where
   rnf (I i) = rnf i `seq` ()

@@ -178,7 +178,7 @@ import Clash.XException
 -- [<1,0,0,0>,<2,1,0,0>,<3,2,1,0>,<4,3,2,1>,<5,4,3,2>...
 -- ...
 window
-  :: (KnownNat n, Default a)
+  :: (KnownNat n, Default a, Undefined a)
   => Clock domain gated
   -- ^ Clock to which the incoming signal is synchronized
   -> Reset domain synchronous
@@ -205,7 +205,7 @@ window clk rst x = res
 -- [<0,0,0>,<1,0,0>,<2,1,0>,<3,2,1>,<4,3,2>...
 -- ...
 windowD
-  :: (KnownNat n, Default a)
+  :: (KnownNat n, Default a, Undefined a)
   => Clock domain gated
   -- ^ Clock to which the incoming signal is synchronized
   -> Reset domain synchronous
