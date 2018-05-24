@@ -3,7 +3,7 @@ module MovingAvg where
 import Clash.Prelude
 
 windowN
-  :: (Default a,KnownNat n, HiddenClockReset domain gated synchronous)
+  :: (Default a, Undefined a, KnownNat n, HiddenClockReset domain gated synchronous)
   => SNat (n+1)
   -> Signal domain a
   -> Vec (n + 1) (Signal domain a)

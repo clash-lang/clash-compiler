@@ -1,4 +1,4 @@
-{-# LANGUAGE RecordWildCards #-}
+{-# LANGUAGE RecordWildCards, DeriveAnyClass #-}
 module I2C.ByteMaster (byteMaster) where
 
 import Clash.Prelude
@@ -25,6 +25,7 @@ data ByteMasterS
   , _hostAck    :: Bool             -- host cmd acknowlegde register
   , _ackOut     :: Bool             -- slave ack register
   }
+  deriving Undefined
 
 makeLenses ''ByteMasterS
 

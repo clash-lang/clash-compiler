@@ -31,7 +31,7 @@ blinkerT (leds,mode,cntr) key1R = ((leds',mode',cntr'),leds)
   where
     -- clock frequency = 50e6  (50 MHz)
     -- led update rate = 333e-3 (every 333ms)
-    cnt_max = 16650000 -- 50e6 * 333e-3
+    cnt_max = 16650000 :: (Index 16650001) -- 50e6 * 333e-3
 
     cntr' | cntr == cnt_max = 0
           | otherwise       = cntr + 1

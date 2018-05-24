@@ -1,23 +1,23 @@
 [ { "BlackBox" :
     { "name" : "Clash.Signal.Internal.delay#"
     , "type" :
-"register#
-  :: HasCallStack             -- ARG[0]
-  => Clock domain gated       -- ARG[1]
-  -> Signal clk a             -- ARG[2]
+"delay#
+  :: (HasCallStack, Undefined a) -- (ARG[0],ARG[1])
+  => Clock domain gated       -- ARG[2]
+  -> Signal clk a             -- ARG[3]
   -> Signal clk a"
     , "templateD" :
-"-- register begin~IF ~ISGATED[1] ~THEN
+"-- delay begin~IF ~ISGATED[2] ~THEN
 ~GENSYM[~COMPNAME_delay][0] : block
   signal ~GENSYM[clk][1] : std_logic;
   signal ~GENSYM[ce][2]  : boolean;
 begin
-  (~SYM[1],~SYM[2]) <= ~ARG[1];
+  (~SYM[1],~SYM[2]) <= ~ARG[2];
   ~GENSYM[~COMPNAME_dly][3] : process(~SYM[1])
   begin
     if rising_edge(~SYM[1]) then
       if ~SYM[2] then
-        ~RESULT <= ~ARG[2]
+        ~RESULT <= ~ARG[3]
         -- pragma translate_off
         after 1 ps
         -- pragma translate_on
@@ -26,47 +26,47 @@ begin
     end if;
   end process;
 end block;~ELSE
-~SYM[0] : process(~ARG[1])
+~SYM[0] : process(~ARG[2])
 begin
-  if rising_edge(~ARG[1]) then
-    ~RESULT <= ~ARG[2]
+  if rising_edge(~ARG[2]) then
+    ~RESULT <= ~ARG[3]
     -- pragma translate_off
     after 1 ps
     -- pragma translate_on
     ;
   end if;
 end process;~FI
--- register end"
+-- delay end"
     }
   }
 , { "BlackBox" :
     { "name" : "Clash.Signal.Internal.register#"
     , "type" :
 "register#
-  :: HasCallStack             -- ARG[0]
-  => Clock domain gated       -- ARG[1]
-  -> Reset domain synchronous -- ARG[2]
-  -> a                        -- ARG[3]
-  -> Signal clk a             -- ARG[4]
+  :: (HasCallStack,Undefined a) -- (ARG[0],ARG[1])
+  => Clock domain gated       -- ARG[2]
+  -> Reset domain synchronous -- ARG[3]
+  -> a                        -- ARG[4]
+  -> Signal clk a             -- ARG[5]
   -> Signal clk a"
     , "templateD" :
-"-- register begin~IF ~ISGATED[1] ~THEN
+"-- register begin~IF ~ISGATED[2] ~THEN
 ~GENSYM[~COMPNAME_register][0] : block
   signal ~GENSYM[clk][1] : std_logic;
   signal ~GENSYM[ce][2] : boolean;
 begin
-  (~SYM[1],~SYM[2]) <= ~ARG[1];~IF ~ISSYNC[2] ~THEN
+  (~SYM[1],~SYM[2]) <= ~ARG[2];~IF ~ISSYNC[3] ~THEN
   ~GENSYM[~COMPNAME_reg][3] : process(~SYM[1])
   begin
     if rising_edge(~SYM[1]) then
-      if ~ARG[2] = '1' then
-        ~RESULT <= ~ARG[3]
+      if ~ARG[3] = '1' then
+        ~RESULT <= ~ARG[4]
         -- pragma translate_off
         after 1 ps
         -- pragma translate_on
         ;
       elsif ~SYM[2] then
-        ~RESULT <= ~ARG[4]
+        ~RESULT <= ~ARG[5]
         -- pragma translate_off
         after 1 ps
         -- pragma translate_on
@@ -74,13 +74,13 @@ begin
       end if;
     end if;
   end process;~ELSE
-  ~SYM[3] : process(~SYM[1],~ARG[2]~VARS[3])
+  ~SYM[3] : process(~SYM[1],~ARG[3]~VARS[4])
   begin
-    if ~ARG[2] = '1' then
-      ~RESULT <= ~ARG[3];
+    if ~ARG[3] = '1' then
+      ~RESULT <= ~ARG[4];
     elsif rising_edge(~SYM[1]) then
       if ~SYM[2] then
-        ~RESULT <= ~ARG[4]
+        ~RESULT <= ~ARG[5]
         -- pragma translate_off
         after 1 ps
         -- pragma translate_on
@@ -88,18 +88,18 @@ begin
       end if;
     end if;
   end process;~FI
-end block;~ELSE ~IF ~ISSYNC[2] ~THEN
-~SYM[0] : process(~ARG[1])
+end block;~ELSE ~IF ~ISSYNC[3] ~THEN
+~SYM[0] : process(~ARG[2])
 begin
-  if rising_edge(~ARG[1]) then
-    if ~ARG[2] = '1' then
-      ~RESULT <= ~ARG[3]
+  if rising_edge(~ARG[2]) then
+    if ~ARG[3] = '1' then
+      ~RESULT <= ~ARG[4]
       -- pragma translate_off
       after 1 ps
       -- pragma translate_on
       ;
     else
-      ~RESULT <= ~ARG[4]
+      ~RESULT <= ~ARG[5]
       -- pragma translate_off
       after 1 ps
       -- pragma translate_on
@@ -107,16 +107,16 @@ begin
     end if;
   end if;
 end process;~ELSE
-~SYM[0] : process(~ARG[1],~ARG[2]~VARS[3])
+~SYM[0] : process(~ARG[2],~ARG[3]~VARS[4])
 begin
-  if ~ARG[2] = '1' then
-    ~RESULT <= ~ARG[3]
+  if ~ARG[3] = '1' then
+    ~RESULT <= ~ARG[4]
     -- pragma translate_off
     after 1 ps
     -- pragma translate_on
     ;
-  elsif rising_edge(~ARG[1]) then
-    ~RESULT <= ~ARG[4]
+  elsif rising_edge(~ARG[2]) then
+    ~RESULT <= ~ARG[5]
     -- pragma translate_off
     after 1 ps
     -- pragma translate_on

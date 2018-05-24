@@ -43,7 +43,7 @@ frm (ws,ts,hist) vs = ((ws',ts',hist') , y)
 c_frm (ws,ts,hist) vs = ((ws',ts',hist'),y)
   where
     zcs = zipWith (/=) (map (>=0) ws) (map (>=0) vs)
-    ts' = zipWith (%)  zcs (map (+1) ts)
+    ts' = zipWith (%)  zcs (map (+(1::Int)) ts)
 
     zts = zip zcs ts
 

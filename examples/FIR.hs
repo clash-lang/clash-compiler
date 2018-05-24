@@ -10,7 +10,7 @@ dotp :: SaturatingNum a
 dotp as bs = fold boundedPlus (zipWith boundedMult as bs)
 
 fir
-  :: (Default a, KnownNat n, SaturatingNum a, HiddenClockReset domain gated synchronous)
+  :: (Default a, KnownNat n, SaturatingNum a, Undefined a, HiddenClockReset domain gated synchronous)
   => Vec (n + 1) a -> Signal domain a -> Signal domain a
 fir coeffs x_t = y_t
   where

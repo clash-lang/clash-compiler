@@ -2,20 +2,20 @@
     { "name" : "Clash.Signal.Internal.delay#"
     , "type" :
 "delay#
-  :: HasCallStack             -- ARG[0]
-  => Clock domain gated       -- ARG[1]
-  -> Signal clk a             -- ARG[2]
+  :: (HasCallStack,Undefined a) -- (ARG[0],ARG[1])
+  => Clock domain gated       -- ARG[2]
+  -> Signal clk a             -- ARG[3]
   -> Signal clk a"
     , "outputReg" : true
     , "templateD" :
-"// delay begin~IF ~ISGATED[1] ~THEN
-always @(posedge ~ARG[1][1]) begin : ~GENSYM[~COMPNAME_delay][1]
-  if (~ARG[1][0]) begin
-    ~RESULT <= ~ARG[2];
+"// delay begin~IF ~ISGATED[2] ~THEN
+always @(posedge ~ARG[2][1]) begin : ~GENSYM[~COMPNAME_delay][1]
+  if (~ARG[2][0]) begin
+    ~RESULT <= ~ARG[3];
   end
 end~ELSE
-always @(posedge ~ARG[1]) begin : ~SYM[1]
-  ~RESULT <= ~ARG[2];
+always @(posedge ~ARG[2]) begin : ~SYM[1]
+  ~RESULT <= ~ARG[3];
 end~FI
 // delay end"
     }
@@ -24,27 +24,27 @@ end~FI
     { "name" : "Clash.Signal.Internal.register#"
     , "type" :
 "register#
-  :: HasCallStack             -- ARG[0]
-  => Clock domain gated       -- ARG[1]
-  -> Reset domain synchronous -- ARG[2]
-  -> a                        -- ARG[3]
-  -> Signal clk a             -- ARG[4]
+  :: (HasCallStack, Undefined a) -- (ARG[0], ARG[1])
+  => Clock domain gated       -- ARG[2]
+  -> Reset domain synchronous -- ARG[3]
+  -> a                        -- ARG[4]
+  -> Signal clk a             -- ARG[5]
   -> Signal clk a"
     , "outputReg" : true
     , "templateD" :
-"// register begin~IF ~ISGATED[1] ~THEN
-always @(posedge ~ARG[1][1]~IF ~ISSYNC[2] ~THEN ~ELSE or posedge ~ARG[2]~FI) begin : ~GENSYM[~COMPNAME_register][1]
-  if (~ARG[2]) begin
-    ~RESULT <= ~ARG[3];
-  end else if (~ARG[1][0]) begin
+"// register begin~IF ~ISGATED[2] ~THEN
+always @(posedge ~ARG[2][1]~IF ~ISSYNC[3] ~THEN ~ELSE or posedge ~ARG[3]~FI) begin : ~GENSYM[~COMPNAME_register][1]
+  if (~ARG[3]) begin
     ~RESULT <= ~ARG[4];
+  end else if (~ARG[2][0]) begin
+    ~RESULT <= ~ARG[5];
   end
 end~ELSE
-always @(posedge ~ARG[1]~IF ~ISSYNC[2] ~THEN ~ELSE or posedge ~ARG[2]~FI) begin : ~SYM[1]
-  if (~ARG[2]) begin
-    ~RESULT <= ~ARG[3];
-  end else begin
+always @(posedge ~ARG[2]~IF ~ISSYNC[3] ~THEN ~ELSE or posedge ~ARG[3]~FI) begin : ~SYM[1]
+  if (~ARG[3]) begin
     ~RESULT <= ~ARG[4];
+  end else begin
+    ~RESULT <= ~ARG[5];
   end
 end~FI
 // register end"
