@@ -249,9 +249,8 @@ makeAlgTyConRhs algTcRhs = case algTcRhs of
   AbstractTyCon {} -> return Nothing
   TupleTyCon {}    -> error "Cannot handle tuple tycons"
 
-
 coreToTerm
-  :: PrimMap a
+  :: PrimMap (Primitive a b c)
   -> [Var]
   -> SrcSpan
   -> CoreExpr
@@ -373,7 +372,9 @@ coreToTerm primMap unlocs srcsp coreExpr = Reader.runReaderT (term coreExpr) src
               | f == pack "GHC.Magic.runRW#"                 -> return (runRWTerm xType)
               | otherwise                                    -> return (C.Prim xNameS xType)
             Just (BlackBox {}) ->
-              return (C.Prim xNameS xType)
+              return $ C.Prim xNameS xType
+            Just (BlackBoxHaskell {}) ->
+              return $ C.Prim xNameS xType
             Nothing
               | x `elem` unlocs -> return (C.Prim xNameS xType)
               | pack "$cshow" `isInfixOf` xNameS -> return (C.Prim xNameS xType)

@@ -7,9 +7,53 @@
   Types used in BlackBox modules
 -}
 
-module Clash.Netlist.BlackBox.Types where
+module Clash.Netlist.BlackBox.Types
+ ( BlackBoxMeta(..)
+ , emptyBlackBoxMeta
+ , BlackBoxFunction
+ , BlackBoxTemplate
+ , Element(..)
+ , Decl(..)
+ , HdlSyn(Vivado, Other)
+ ) where
 
-import Data.Text.Lazy (Text)
+import                Data.Text.Lazy             (Text)
+import qualified      Data.Text                  as S
+
+import                Clash.Core.Term            (Term)
+import                Clash.Core.Type            (Type)
+import                Clash.Core.Var             (Id)
+import {-# SOURCE #-} Clash.Netlist.Types        (Identifier)
+
+-- | See @Clash.Primitives.Types.BlackBox@ for documentation on this record's
+-- fields. (They are intentionally renamed to prevent name clashes.)
+data BlackBoxMeta =
+  BlackBoxMeta { bbOutputReg :: Bool
+               , bbLibrary   :: [BlackBoxTemplate]
+               , bbImports   :: [BlackBoxTemplate]
+               , bbIncludes  :: [((S.Text, S.Text), BlackBoxTemplate)]
+               }
+
+-- | Use this value in your blackbox template function if you do want to
+-- accept the defaults as documented in @Clash.Primitives.Types.BlackBox@.
+emptyBlackBoxMeta :: BlackBoxMeta
+emptyBlackBoxMeta = BlackBoxMeta False [] [] []
+
+-- | A BlackBox function generates a blackbox template, given the inputs and
+-- result type of the function it should provide a blackbox for. This is useful
+-- when having a need for blackbox functions, ... TODO: docs
+type BlackBoxFunction
+   = Bool
+  -- ^ Treat BlackBox expression as declaration
+  -> (Either Identifier Id)
+  -- ^ Id to assign the result to
+  -> S.Text
+  -- ^ Name of primitive
+  -> [Either Term Type]
+  -- ^ Arguments
+  -> Type
+  -- ^ Result type
+  -> Either String (BlackBoxMeta, BlackBoxTemplate)
 
 -- | A BlackBox Template is a List of Elements
 type BlackBoxTemplate = [Element]

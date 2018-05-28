@@ -22,7 +22,6 @@ import qualified Data.HashMap.Strict     as HashMap
 import           Data.IntMap.Strict      (IntMap)
 import qualified Data.IntMap.Strict      as IM
 import           Data.List               (foldl')
-import qualified Data.Text.Lazy          as Text
 import qualified Data.Set                as Set
 import qualified Data.Set.Lens           as Lens
 import           Unbound.Generics.LocallyNameless (bind,embed,rec,runFreshM,unembed)
@@ -54,7 +53,7 @@ import           Clash.Driver.Types      (BindingMap)
 import           Clash.GHC.GHC2Core      (GHC2CoreState, tyConMap, coreToId, coreToName, coreToTerm,
                                           makeAllTyCons, qualfiedNameString, emptyGHC2CoreState)
 import           Clash.GHC.LoadModules   (loadModules)
-import           Clash.Primitives.Types  (PrimMap)
+import           Clash.Primitives.Types  (PrimMap, ResolvedPrimMap, Primitive)
 import           Clash.Primitives.Util   (generatePrimMap)
 import           Clash.Rewrite.Util      (mkInternalVar, mkSelectorCase)
 import           Clash.Util              ((***),first)
@@ -76,7 +75,7 @@ generateBindings
            , Maybe TopEntity -- (maybe) TopEntity annotation
            , Maybe TmName    -- (maybe) associated testbench
            )]
-        , PrimMap Text.Text  -- The primitives found in '.' and 'primDir'
+        , ResolvedPrimMap  -- The primitives found in '.' and 'primDir'
         , [DataRepr']
         )
 generateBindings primDirs importDirs hdl modName dflagsM = do
@@ -99,7 +98,7 @@ generateBindings primDirs importDirs hdl modName dflagsM = do
                                               Nothing       -> error "This shouldn't happen"
                                           ) topEntities'
 
-  return (retypedBindings,allTcCache,tupTcCache,topEntities'',primMap,reprs)
+  return (retypedBindings, allTcCache, tupTcCache, topEntities'', primMap, reprs)
 
 retypeBindings
   :: HashMap TyConOccName TyCon
@@ -138,7 +137,7 @@ retype tcm (visited,bindings) current = (visited', HashMap.insert current (nm,ty
     ty'                  = runFreshM (termType tcm tm')
 
 mkBindings
-  :: PrimMap a
+  :: PrimMap (Primitive a b c)
   -> [GHC.CoreBind]
   -- Binders
   -> [(GHC.CoreBndr,Int)]

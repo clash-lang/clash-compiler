@@ -46,7 +46,7 @@ import Clash.Core.TyCon                     (TyCon, TyConOccName)
 import Clash.Driver.Types                   (BindingMap)
 import Clash.Netlist.BlackBox.Types         hiding (L)
 import Clash.Netlist.Id                     (IdType)
-import Clash.Primitives.Types               (PrimMap)
+import Clash.Primitives.Types               (CompiledPrimMap)
 import Clash.Signal.Internal                (ClockKind, ResetKind)
 import Clash.Util
 
@@ -65,7 +65,7 @@ data NetlistState
   { _bindings       :: BindingMap -- ^ Global binders
   , _varCount       :: !Int -- ^ Number of signal declarations
   , _components     :: HashMap TmOccName (SrcSpan,Component) -- ^ Cached components
-  , _primitives     :: PrimMap BlackBoxTemplate -- ^ Primitive Definitions
+  , _primitives     :: CompiledPrimMap -- ^ Primitive Definitions
   , _typeTranslator :: CustomReprs -> HashMap TyConOccName TyCon -> Bool -> Type -> Maybe (Either String HWType)
   -- ^ Hardcoded Type -> HWType translator
   , _tcCache        :: HashMap TyConOccName TyCon -- ^ TyCon cache

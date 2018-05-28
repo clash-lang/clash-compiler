@@ -63,7 +63,6 @@ import           Clash.Core.Var                   (Id, Var (..))
 import           Clash.Driver.Types
   (BindingMap, ClashException (..))
 import           Clash.Netlist.BlackBox
-import           Clash.Netlist.BlackBox.Types     (BlackBoxTemplate)
 import           Clash.Netlist.Id
 import           Clash.Netlist.Types              as HW
 import           Clash.Netlist.Util
@@ -78,7 +77,7 @@ genNetlist :: CustomReprs
            -- ^ Global binders
            -> [(TmName,Type,Maybe TopEntity,Maybe TmName)]
            -- ^ All the TopEntities
-           -> PrimMap BlackBoxTemplate
+           -> CompiledPrimMap
            -- ^ Primitive definitions
            -> HashMap TyConOccName TyCon
            -- ^ TyCon cache
@@ -123,7 +122,7 @@ runNetlistMonad :: CustomReprs
                 -- ^ Global binders
                 -> HashMap TmOccName (Type, Maybe TopEntity)
                 -- ^ TopEntity annotations
-                -> PrimMap BlackBoxTemplate
+                -> CompiledPrimMap
                 -- ^ Primitive Definitions
                 -> HashMap TyConOccName TyCon
                 -- ^ TyCon cache

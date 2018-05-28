@@ -17,23 +17,31 @@ import Clash.Annotations.BitRepresentation.Internal (buildCustomReprs)
 
 import Control.DeepSeq
 import qualified Data.Time.Clock as Clock
+import qualified Data.HashMap.Strict as HM
 
-genSystemVerilog :: String
-                 -> IO ()
+import GHC.Stack (HasCallStack)
+
+genSystemVerilog
+  :: String
+  -> IO ()
 genSystemVerilog = doHDL (initBackend WORD_SIZE_IN_BITS HDLSYN :: SystemVerilogState)
 
-genVHDL :: String
-        -> IO ()
+genVHDL
+  :: String
+  -> IO ()
 genVHDL = doHDL (initBackend WORD_SIZE_IN_BITS HDLSYN :: VHDLState)
 
-genVerilog :: String
-           -> IO ()
+genVerilog
+  :: String
+  -> IO ()
 genVerilog = doHDL (initBackend WORD_SIZE_IN_BITS HDLSYN :: VerilogState)
 
-doHDL :: Backend s
-       => s
-       -> String
-       -> IO ()
+doHDL
+  :: HasCallStack
+  => Backend s
+  => s
+  -> String
+  -> IO ()
 doHDL b src = do
   startTime <- Clock.getCurrentTime
   pd      <- primDirs b
@@ -41,8 +49,16 @@ doHDL b src = do
   prepTime <- startTime `deepseq` bindingsMap `deepseq` tcm `deepseq` reprs `deepseq` Clock.getCurrentTime
   let prepStartDiff = Clock.diffUTCTime prepTime startTime
   putStrLn $ "Loading dependencies took " ++ show prepStartDiff
-  generateHDL (buildCustomReprs reprs) bindingsMap (Just b) primMap tcm tupTcm (ghcTypeToHWType WORD_SIZE_IN_BITS True) reduceConstant topEntities
-    (ClashOpts 20 20 15 0 DebugFinal False True WORD_SIZE_IN_BITS Nothing HDLSYN True True ["."] Nothing) (startTime,prepTime)
+
+  -- Parse primitives:
+  startTime' <- Clock.getCurrentTime
+  primMap2   <- sequence $ HM.map compilePrimitive primMap
+  prepTime'  <- startTime `deepseq` primMap2 `seq` Clock.getCurrentTime
+  let prepStartDiff' = Clock.diffUTCTime prepTime' startTime'
+  putStrLn $ "Parsing primitives took " ++ show prepStartDiff'
+
+  generateHDL (buildCustomReprs reprs) bindingsMap (Just b) primMap2 tcm tupTcm (ghcTypeToHWType WORD_SIZE_IN_BITS True) reduceConstant topEntities
+    (ClashOpts 20 20 15 0 DebugNone False True WORD_SIZE_IN_BITS Nothing HDLSYN True True ["."] Nothing) (startTime,prepTime)
 
 main :: IO ()
 main = genVHDL "./examples/FIR.hs"

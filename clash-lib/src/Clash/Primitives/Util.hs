@@ -1,40 +1,74 @@
 {-|
   Copyright  :  (C) 2012-2016, University of Twente,
                     2017     , Myrtle Software Ltd
+                    2018     , Google Inc.
   License    :  BSD2 (see the file LICENSE)
   Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
 
   Utility functions to generate Primitives
 -}
 
-module Clash.Primitives.Util where
+{-# LANGUAGE RecordWildCards #-}
 
-import           Data.Aeson             (FromJSON)
+module Clash.Primitives.Util (generatePrimMap) where
+
 import           Data.Aeson.Extra       (decodeOrErr)
 import qualified Data.ByteString.Lazy   as LZ
 import qualified Data.HashMap.Lazy      as HashMap
-import           Data.List              (isSuffixOf)
 import           Data.Maybe             (fromMaybe)
+import           Data.List              (isSuffixOf)
 import           Data.Text.Lazy         (Text)
+import qualified Data.Text.Lazy.IO      as T
+import           Data.Traversable       (mapM)
+import           GHC.Stack              (HasCallStack)
 import qualified System.Directory       as Directory
 import qualified System.FilePath        as FilePath
+import           System.IO.Error        (tryIOError)
 
 import           Clash.Primitives.Types
-import           Clash.Util
 
-parsePrimitive :: (FromJSON a)
-               => FilePath
-               -> IO [a]
-parsePrimitive filename = ( return
-                          . fromMaybe []
-                          . decodeOrErr filename
-                        <=< LZ.readFile
-                          ) filename
+resolveTemplateSource
+  :: HasCallStack
+  => FilePath
+  -> TemplateSource
+  -> IO Text
+resolveTemplateSource _metaPath (TInline text) =
+  return text
+resolveTemplateSource metaPath (TFile path) =
+  let path' = FilePath.replaceFileName metaPath path in
+  either (error . show) id <$> (tryIOError $ T.readFile path')
+
+-- | Replace file pointers with file contents
+resolvePrimitive'
+  :: HasCallStack
+  => FilePath
+  -> UnresolvedPrimitive
+  -> IO ResolvedPrimitive
+resolvePrimitive' _metaPath (Primitive name primType) =
+  return $ Primitive name primType
+resolvePrimitive' metaPath BlackBox{template=t, ..} =
+  let resolved = mapM (resolveTemplateSource metaPath) t in
+  BlackBox name outputReg libraries imports includes <$> resolved
+resolvePrimitive' metaPath (BlackBoxHaskell bbName funcName t) =
+  BlackBoxHaskell bbName funcName <$> (mapM (mapM (resolveTemplateSource metaPath)) t)
+
+-- | Interprets contents of json file as list of @Primitive@s.
+resolvePrimitive
+  :: HasCallStack
+  => FilePath
+  -> IO [ResolvedPrimitive]
+resolvePrimitive fileName = do
+  let decode = fromMaybe [] . decodeOrErr fileName
+  prims <- decode <$> LZ.readFile fileName
+  mapM (resolvePrimitive' fileName) prims
 
 -- | Generate a set of primitives that are found in the primitive definition
 -- files in the given directories.
-generatePrimMap :: [FilePath] -- ^ Directories to search for primitive definitions
-                -> IO (PrimMap Text)
+generatePrimMap
+  :: HasCallStack
+  => [FilePath]
+  -- ^ Directories to search for primitive definitions
+  -> IO ResolvedPrimMap
 generatePrimMap filePaths = do
   primitiveFiles <- fmap concat $ mapM
      (\filePath -> do
@@ -48,8 +82,5 @@ generatePrimMap filePaths = do
              return []
      ) filePaths
 
-  primitives <- fmap concat $ mapM parsePrimitive primitiveFiles
-
-  let primMap = HashMap.fromList $ zip (map name primitives) primitives
-
-  return primMap
+  primitives <- fmap concat $ mapM resolvePrimitive primitiveFiles
+  return $ HashMap.fromList $ zip (map name primitives) primitives

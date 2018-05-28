@@ -50,7 +50,6 @@ import           Clash.Core.Util                  (collectArgs, mkApps, termType
 import           Clash.Core.Var                   (Id,varName)
 import           Clash.Driver.Types
   (BindingMap, ClashOpts (..), DebugLevel (..))
-import           Clash.Netlist.BlackBox.Types     (BlackBoxTemplate)
 import           Clash.Netlist.Types              (HWType (..))
 import           Clash.Netlist.Util
   (splitNormalized, unsafeCoreTypeToHWType)
@@ -59,7 +58,7 @@ import           Clash.Normalize.Transformations
   (appProp, bindConstantVar, caseCon, flattenLet, reduceConst, topLet)
 import           Clash.Normalize.Types
 import           Clash.Normalize.Util
-import           Clash.Primitives.Types           (PrimMap)
+import           Clash.Primitives.Types           (CompiledPrimMap)
 import           Clash.Rewrite.Combinators        ((>->),(!->))
 import           Clash.Rewrite.Types
   (RewriteEnv (..), RewriteState (..), bindings, curFun, dbgLevel, extra,
@@ -87,7 +86,7 @@ runNormalization
   -- ^ Tuple TyCon cache
   -> PrimEvaluator
   -- ^ Hardcoded evaluator (delta-reduction)
-  -> PrimMap BlackBoxTemplate
+  -> CompiledPrimMap
   -- ^ Primitive Definitions
   -> HashMap TmOccName Bool
   -- ^ Map telling whether a components is part of a recursive group
