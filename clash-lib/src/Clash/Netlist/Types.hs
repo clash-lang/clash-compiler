@@ -44,11 +44,11 @@ import Clash.Core.Term                      (TmOccName)
 import Clash.Core.Type                      (Type)
 import Clash.Core.TyCon                     (TyCon, TyConOccName)
 import Clash.Driver.Types                   (BindingMap)
-import Clash.Netlist.BlackBox.Types         hiding (L)
+import Clash.Netlist.BlackBox.Types         (BlackBoxTemplate)
 import Clash.Netlist.Id                     (IdType)
 import Clash.Primitives.Types               (CompiledPrimMap)
 import Clash.Signal.Internal                (ClockKind, ResetKind)
-import Clash.Util
+import Clash.Util                           (makeLenses)
 
 import Clash.Annotations.BitRepresentation.Internal
   (CustomReprs, DataRepr', ConstrRepr')
@@ -183,7 +183,23 @@ data Declaration
   -- * List of: (Maybe expression scrutinized expression is compared with,RHS of alternative)
   | InstDecl (Maybe Identifier) !Identifier !Identifier [(Expr,PortDirection,HWType,Expr)]
   -- ^ Instantiation of another component
-  | BlackBoxD !S.Text [BlackBoxTemplate] [BlackBoxTemplate] [((S.Text,S.Text),BlackBoxTemplate)] !BlackBoxTemplate BlackBoxContext
+-- <<<<<<< 709bb96b1c1c828afe2184c3520177480f01b248
+--   | BlackBoxD !S.Text [BlackBoxTemplate] [BlackBoxTemplate] [((S.Text,S.Text),BlackBoxTemplate)] !BlackBoxTemplate BlackBoxContext
+-- =======
+  | BlackBoxD
+      -- Primitive name:
+      !S.Text
+      -- VHDL only: add /library/ declarations:
+      [BlackBoxTemplate]
+      -- VHDL only: add /use/ declarations:
+      [BlackBoxTemplate]
+      -- Intel/Quartus only: create a /.qsys/ file from given template:
+      [((S.Text,S.Text),BlackBoxTemplate)]
+      -- Template tokens:
+      !BlackBoxTemplate
+      -- Context in which tokens should be rendered:
+      BlackBoxContext
+-- >>>>>>> Small documentation cleanup in `Netlist/Types.hs`
   -- ^ Instantiation of blackbox declaration
   | NetDecl' (Maybe Identifier) WireOrReg !Identifier (Either Identifier HWType)
   -- ^ Signal declaration
@@ -220,7 +236,22 @@ data Expr
   | DataCon    !HWType       !Modifier  [Expr] -- ^ DataCon application
   | Identifier !Identifier   !(Maybe Modifier) -- ^ Signal reference
   | DataTag    !HWType       !(Either Identifier Identifier) -- ^ @Left e@: tagToEnum#, @Right e@: dataToTag#
-  | BlackBoxE !S.Text [BlackBoxTemplate] [BlackBoxTemplate] [((S.Text,S.Text),BlackBoxTemplate)] !BlackBoxTemplate !BlackBoxContext !Bool -- ^ Instantiation of a BlackBox expression
+  | BlackBoxE
+      -- Primitive name:
+      !S.Text
+      -- VHDL only: add /library/ declarations:
+      [BlackBoxTemplate]
+      -- VHDL only: add /use/ declarations:
+      [BlackBoxTemplate]
+      -- Intel/Quartus only: create a /.qsys/ file from given template.
+      [((S.Text,S.Text),BlackBoxTemplate)]
+      -- Template tokens:
+      !BlackBoxTemplate
+      -- Context in which tokens should be rendered:
+      !BlackBoxContext
+      -- Wrap in paretheses?:
+      !Bool
+  -- ^ Instantiation of a BlackBox expression
   | ConvBV     (Maybe Identifier) HWType Bool Expr
   deriving Show
 
