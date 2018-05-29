@@ -43,6 +43,7 @@ import Control.Exception (Exception, catch, evaluate, throw)
 import Control.DeepSeq   (NFData, rnf)
 import Data.Complex      (Complex)
 import Data.Int          (Int8,Int16,Int32,Int64)
+import Data.Ord          (Down (Down))
 import Data.Ratio        (Ratio)
 import Data.Word         (Word8,Word16,Word32,Word64)
 import GHC.Exts          (Char (C#), Double (D#), Float (F#), Int (I#), Word (W#))
@@ -232,6 +233,9 @@ instance ShowX Bool
 
 instance ShowX Double where
   showsPrecX = showsPrecXWith showsPrec
+
+instance ShowX a => ShowX (Down a) where
+  showsPrecX = showsPrecXWith showsPrecX
 
 instance (ShowX a, ShowX b) => ShowX (Either a b)
 
@@ -446,6 +450,9 @@ instance (Undefined a, Undefined b, Undefined c, Undefined d, Undefined e
                  ,deepErrorX x,deepErrorX x,deepErrorX x,deepErrorX x
                  ,deepErrorX x,deepErrorX x,deepErrorX x,deepErrorX x
                  ,deepErrorX x,deepErrorX x,deepErrorX x)
+
+instance Undefined a => Undefined (Down a) where
+  deepErrorX = Down . deepErrorX
 
 instance Undefined [a]
 instance Undefined Char
