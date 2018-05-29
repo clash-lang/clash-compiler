@@ -42,9 +42,11 @@ where
 import Control.Exception (Exception, catch, evaluate, throw)
 import Control.DeepSeq   (NFData, rnf)
 import Data.Complex      (Complex)
+import Data.Foldable     (toList)
 import Data.Int          (Int8,Int16,Int32,Int64)
 import Data.Ord          (Down (Down))
 import Data.Ratio        (Ratio)
+import Data.Sequence     (Seq)
 import Data.Word         (Word8,Word16,Word32,Word64)
 import GHC.Exts          (Char (C#), Double (D#), Float (F#), Int (I#), Word (W#))
 import GHC.Generics
@@ -260,6 +262,9 @@ instance ShowX Int64 where
 instance ShowX Integer where
   showsPrecX = showsPrecXWith showsPrec
 
+instance ShowX a => ShowX (Seq a) where
+  showsPrecX _ = showListX . toList
+
 instance ShowX Word where
   showsPrecX = showsPrecXWith showsPrec
 
@@ -466,6 +471,7 @@ instance Undefined Int16
 instance Undefined Int32
 instance Undefined Int64
 instance Undefined Integer
+instance Undefined (Seq a)
 instance Undefined Word
 instance Undefined Word8
 instance Undefined Word16
