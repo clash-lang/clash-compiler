@@ -2878,7 +2878,7 @@ bitLiterals
 bitLiterals = typedLiterals' go
  where
   go val = case val of
-    PrimVal nm _ _ [_, Lit (IntegerLiteral i)]
+    PrimVal nm _ _ [Lit (IntegerLiteral i)]
       | nm == "Clash.Sized.Internal.BitVector.fromInteger##"
       -> Just i
     _ -> Nothing
