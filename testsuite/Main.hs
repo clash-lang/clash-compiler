@@ -127,6 +127,7 @@ main = do
             ]
         , testGroup "Polymorphism"
             [ runTest ("tests" </> "shouldwork" </> "Polymorphism") defBuild [] "ExistentialBoxed" ([""],"ExistentialBoxed_topEntity",False)
+            , runTest ("tests" </> "shouldwork" </> "Polymorphism") defBuild [] "GADTExistential"  ([""],"GADTExistential_topEntity",False)
             , runTest ("tests" </> "shouldwork" </> "Polymorphism") defBuild [] "LocalPoly"        ([""],"LocalPoly_topEntity",False)
             ]
         , testGroup "RTree"

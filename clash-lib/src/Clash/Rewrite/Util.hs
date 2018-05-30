@@ -175,9 +175,10 @@ contextEnv = go HML.empty HML.empty
       where
         delta' = addToDelta delta tv
 
-    go gamma delta (CaseAlt ids:ctx)    = go gamma' delta ctx
+    go gamma delta (CaseAlt tvs ids:ctx) = go gamma' delta' ctx
       where
         gamma' = foldl addToGamma gamma ids
+        delta' = foldl addToDelta delta tvs
 
     go gamma delta (_:ctx) = go gamma delta ctx
 

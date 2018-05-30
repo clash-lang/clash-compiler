@@ -40,7 +40,8 @@ executable clash-testsuite
                        regex-pcre-text    >=0.9      && <1,
                        concurrent-extra   >=0.7      && <0.8,
                        temporary,
-                       text
+                       text,
+                       generic-lens
 
   -- hs-source-dirs:
   default-language:    Haskell2010
