@@ -77,7 +77,8 @@ allR rf trans c (Case scrut ty alts) = do
   where
     rewriteAlt :: (Pat, Term) -> m (Pat, Term)
     rewriteAlt (p,e) = do
-      e' <- trans (CaseAlt (patIds p):c) e
+      let (tvs,ids) = patIds p
+      e' <- trans (CaseAlt tvs ids:c) e
       return (p,e')
 
 infixr 6 >->

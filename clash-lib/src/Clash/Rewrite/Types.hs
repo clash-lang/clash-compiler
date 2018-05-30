@@ -50,8 +50,9 @@ data CoreContext
   | LamBody    Id    -- ^ Body of a lambda-term with the abstracted variable
   | TyLamBody  TyVar -- ^ Body of a TyLambda-term with the abstracted
                      -- type-variable
-  | CaseAlt    [Id]  -- ^ RHS of a case-alternative with the variables bound by
-                     -- the pattern on the LHS
+  | CaseAlt [TyVar] [Id]
+  -- ^ RHS of a case-alternative with the variables bound by
+  -- the pattern on the LHS
   | CaseScrut        -- ^ Subject of a case-decomposition
   | CastBody         -- ^ Body of a Cast
   deriving (Eq,Show)

@@ -112,9 +112,9 @@ applyTypeToArgs m opTy (Left e:args)   = case splitFunTy m opTy of
                            ]
 
 -- | Get the list of term-binders out of a DataType pattern
-patIds :: Pat -> [Id]
-patIds (DataPat _ ids) = snd $ unrebind ids
-patIds _               = []
+patIds :: Pat -> ([TyVar],[Id])
+patIds (DataPat _ ids) = unrebind ids
+patIds _               = ([],[])
 
 -- | Make a type variable
 mkTyVar :: Kind
