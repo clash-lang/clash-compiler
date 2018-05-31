@@ -110,7 +110,7 @@ import Clash.Sized.BitVector (BitVector)
 import Clash.Signal.Internal (Clock, Signal (..), (.&&.), clockEnable)
 import Clash.Signal.Bundle   (unbundle)
 import Clash.Sized.Unsigned  (Unsigned)
-import Clash.XException      (errorX, seqX)
+import Clash.XException      (errorX, maybeX, seqX)
 
 
 -- | Create a blockRAM with space for 2^@n@ elements
@@ -230,21 +230,27 @@ blockRamFile# clk _sz file rd wen = case clockEnable clk of
   Just ena ->
     go' ramI
        (withFrozenCallStack (errorX "blockRamFile#: intial value undefined"))
-       ena rd (wen .&&. ena)
+       ena rd (ena .&&. wen)
   where
     -- no clock enable
     go !ram o (r :- rs) (e :- en) (w :- wr) (d :- din) =
-      let ram' = upd ram e w d
+      let ram' = upd ram e (fromEnum w) d
           o'   = ram V.! r
       in  o `seqX` o :- go ram' o' rs en wr din
     -- clock enable
     go' !ram o (re :- res) (r :- rs) (e :- en) (w :- wr) (d :- din) =
-      let ram' = upd ram e w d
+      let ram' = upd ram e (fromEnum w) d
           o'   = if re then ram V.! r else o
       in  o `seqX` o :- go' ram' o' res rs en wr din
 
-    upd ram True  addr d = ram V.// [(addr,d)]
-    upd ram False _    _ = ram
+    upd ram we waddr d = case maybeX we of
+      Nothing -> case maybeX waddr of
+        Nothing -> V.map (const (seq waddr d)) ram
+        Just wa -> ram V.// [(wa,d)]
+      Just True -> case maybeX waddr of
+        Nothing -> V.map (const (seq waddr d)) ram
+        Just wa -> ram V.// [(wa,d)]
+      _ -> ram
 
     content = unsafePerformIO (initMem file)
     ramI    = V.fromList content

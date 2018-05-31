@@ -43,7 +43,7 @@ import Clash.Explicit.Signal ((.&&.), unbundle, unsafeSynchronizer)
 import Clash.Promoted.Nat    (SNat (..), snatToNum, pow2SNat)
 import Clash.Signal.Internal (Clock (..), Signal (..), clockEnable)
 import Clash.Sized.Unsigned  (Unsigned)
-import Clash.XException      (errorX)
+import Clash.XException      (errorX, maybeX)
 
 -- | Create a RAM with space for 2^@n@ elements
 --
@@ -122,16 +122,22 @@ asyncRam# wclk rclk sz rd en wr din =
               (withFrozenCallStack (errorX "asyncRam#: initial value undefined"))
     en'  = case clockEnable wclk of
              Nothing  -> en
-             Just wgt -> en .&&. wgt
+             Just wgt -> wgt .&&. en
     dout = go ramI rd' en' wr din
 
     go :: V.Vector a -> Signal wdom Int -> Signal wdom Bool
        -> Signal wdom Int -> Signal wdom a -> Signal wdom a
     go !ram (r :- rs) (e :- es) (w :- ws) (d :- ds) =
-      let ram' = upd ram e w d
+      let ram' = upd ram e (fromEnum w) d
           o    = ram V.! r
       in  o :- go ram' rs es ws ds
 
-    upd ram True  addr d = ram V.// [(addr,d)]
-    upd ram False _    _ = ram
+    upd ram we waddr d = case maybeX we of
+      Nothing -> case maybeX waddr of
+        Nothing -> V.map (const (seq waddr d)) ram
+        Just wa -> ram V.// [(wa,d)]
+      Just True -> case maybeX waddr of
+        Nothing -> V.map (const (seq waddr d)) ram
+        Just wa -> ram V.// [(wa,d)]
+      _ -> ram
 {-# NOINLINE asyncRam# #-}

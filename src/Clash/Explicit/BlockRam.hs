@@ -403,7 +403,7 @@ import Clash.Signal.Internal
 import Clash.Signal.Bundle    (unbundle)
 import Clash.Sized.Unsigned   (Unsigned)
 import Clash.Sized.Vector     (Vec, toList)
-import Clash.XException       (errorX, seqX)
+import Clash.XException       (errorX, maybeX, seqX)
 
 {- $setup
 >>> import Clash.Explicit.Prelude as C
@@ -761,21 +761,27 @@ blockRam# clk content rd wen = case clockEnable clk of
   Just ena ->
     go' (V.fromList (toList content))
        (withFrozenCallStack (errorX "blockRam: intial value undefined"))
-       ena rd (wen .&&. ena)
+       ena rd (ena .&&. wen)
   where
     -- no clock enable
     go !ram o (r :- rs) (e :- en) (w :- wr) (d :- din) =
-      let ram' = upd ram e w d
+      let ram' = upd ram e (fromEnum w) d
           o'   = ram V.! r
       in  o `seqX` o :- go ram' o' rs en wr din
     -- clock enable
     go' !ram o (re :- res) (r :- rs) (e :- en) (w :- wr) (d :- din) =
-      let ram' = upd ram e w d
+      let ram' = upd ram e (fromEnum w) d
           o'   = if re then ram V.! r else o
       in  o `seqX` o :- go' ram' o' res rs en wr din
 
-    upd ram True  addr d = ram V.// [(addr,d)]
-    upd ram False _    _ = ram
+    upd ram we waddr d = case maybeX we of
+      Nothing -> case maybeX waddr of
+        Nothing -> V.map (const (seq waddr d)) ram
+        Just wa -> ram V.// [(wa,d)]
+      Just True -> case maybeX waddr of
+        Nothing -> V.map (const (seq waddr d)) ram
+        Just wa -> ram V.// [(wa,d)]
+      _ -> ram
 {-# NOINLINE blockRam# #-}
 
 -- | Create read-after-write blockRAM from a read-before-write one
