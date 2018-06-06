@@ -586,7 +586,7 @@ register# Clock {} (Sync rst) i =
 register# Clock {} (Async rst) i =
     go (withFrozenCallStack (errorX "register: initial value undefined")) rst
   where
-    go o ~(r :- rs) as@(~(x :- xs)) =
+    go o (r :- rs) as@(~(x :- xs)) =
       let o' = if r then i else o
           -- [Note: register strictness annotations]
       in  o' `seqX` o' :- (as `seq` go x rs xs)
@@ -594,20 +594,20 @@ register# Clock {} (Async rst) i =
 register# (GatedClock _ _ ena) (Sync rst)  i =
     go (withFrozenCallStack (errorX "register: initial value undefined")) rst ena
   where
-    go o rt@(~(r :- rs)) ~(e :- es) as@(~(x :- xs)) =
-      let o' = if r then i else x
+    go o rt@(~(r :- rs)) enas@(~(e :- es)) as@(~(x :- xs)) =
+      let oE = if e then x else o
+          oR = if r then i else oE
           -- [Note: register strictness annotations]
-      in  o `seqX` o :- (rt `seq` as `seq` if e then go o' rs es xs
-                                                else go o  rs es xs)
+      in  o `seqX` o :- (rt `seq` enas `seq` as `seq` go oR rs es xs)
 
 register# (GatedClock _ _ ena) (Async rst) i =
     go (withFrozenCallStack (errorX "register: initial value undefined")) rst ena
   where
-    go o ~(r :- rs) ~(e :- es) as@(~(x :- xs)) =
-      let o' = if r then i else o
+    go o (r :- rs) enas@(~(e :- es)) as@(~(x :- xs)) =
+      let oR = if r then i else o
+          oE = if e then x else oR
           -- [Note: register strictness annotations]
-      in  o' `seqX` o' :- (as `seq` if e then go x  rs es xs
-                                         else go o' rs es xs)
+      in  oR `seqX` oR :- (as `seq` enas `seq` go oE rs es xs)
 {-# NOINLINE register# #-}
 
 {-# INLINE mux #-}
