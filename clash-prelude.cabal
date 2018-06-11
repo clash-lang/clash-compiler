@@ -103,6 +103,7 @@ Library
                       Clash.Explicit.Prelude.Safe
                       Clash.Explicit.Signal
                       Clash.Explicit.Signal.Delayed
+                      Clash.Explicit.Signal.Delayed.Bundle
                       Clash.Explicit.Synchronizer
                       Clash.Explicit.Testbench
 
