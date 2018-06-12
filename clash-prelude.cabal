@@ -161,6 +161,7 @@ Library
                       Clash.Examples
 
   other-modules:      Clash.Class.BitPack.Internal
+                      Clash.Signal.Bundle.Internal
 
   other-extensions:   CPP
                       BangPatterns
