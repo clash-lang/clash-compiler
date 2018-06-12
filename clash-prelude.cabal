@@ -160,6 +160,8 @@ Library
                       Clash.Tutorial
                       Clash.Examples
 
+  other-modules:      Clash.Class.BitPack.Internal
+
   other-extensions:   CPP
                       BangPatterns
                       ConstraintKinds
