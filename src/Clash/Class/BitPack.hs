@@ -11,6 +11,7 @@ Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
 {-# LANGUAGE FlexibleContexts     #-}
 {-# LANGUAGE MagicHash            #-}
 {-# LANGUAGE ScopedTypeVariables  #-}
+{-# LANGUAGE TemplateHaskell      #-}
 {-# LANGUAGE TypeFamilies         #-}
 {-# LANGUAGE TypeOperators        #-}
 {-# LANGUAGE UndecidableInstances #-}
@@ -42,6 +43,7 @@ import Numeric.Half                   (Half (..))
 import GHC.Generics
 import Prelude                        hiding (map)
 
+import Clash.Class.BitPack.Internal   (deriveBitPackTuples)
 import Clash.Class.Resize             (zeroExtend)
 import Clash.Sized.BitVector
   (Bit, BitVector, (++#), high, low)
@@ -224,42 +226,6 @@ instance (KnownNat (BitSize b), BitPack a, BitPack b) =>
   pack (a,b) = pack a ++# pack b
   unpack ab  = let (a,b) = split# ab in (unpack a, unpack b)
 
-instance (KnownNat (BitSize c), BitPack (a,b), BitPack c) =>
-    BitPack (a,b,c) where
-  type BitSize (a,b,c) = BitSize (a,b) + BitSize c
-  pack (a,b,c) = pack (a,b) ++# pack c
-  unpack (unpack -> ((a,b), c)) = (a,b,c)
-
-instance (KnownNat (BitSize d), BitPack (a,b,c), BitPack d) =>
-    BitPack (a,b,c,d) where
-  type BitSize (a,b,c,d) = BitSize (a,b,c) + BitSize d
-  pack (a,b,c,d) = pack (a,b,c) ++# pack d
-  unpack (unpack -> ((a,b,c), d)) = (a,b,c,d)
-
-instance (KnownNat (BitSize e), BitPack (a,b,c,d), BitPack e) =>
-    BitPack (a,b,c,d,e) where
-  type BitSize (a,b,c,d,e) = BitSize (a,b,c,d) + BitSize e
-  pack (a,b,c,d,e) = pack (a,b,c,d) ++# pack e
-  unpack (unpack -> ((a,b,c,d), e)) = (a,b,c,d,e)
-
-instance (KnownNat (BitSize f), BitPack (a,b,c,d,e), BitPack f) =>
-    BitPack (a,b,c,d,e,f) where
-  type BitSize (a,b,c,d,e,f) = BitSize (a,b,c,d,e) + BitSize f
-  pack (a,b,c,d,e,f) = pack (a,b,c,d,e) ++# pack f
-  unpack (unpack -> ((a,b,c,d,e), f)) = (a,b,c,d,e,f)
-
-instance (KnownNat (BitSize g), BitPack (a,b,c,d,e,f), BitPack g) =>
-    BitPack (a,b,c,d,e,f,g) where
-  type BitSize (a,b,c,d,e,f,g) = BitSize (a,b,c,d,e,f) + BitSize g
-  pack (a,b,c,d,e,f,g) = pack (a,b,c,d,e,f) ++# pack g
-  unpack (unpack -> ((a,b,c,d,e,f), g)) = (a,b,c,d,e,f,g)
-
-instance (KnownNat (BitSize h), BitPack (a,b,c,d,e,f,g), BitPack h) =>
-    BitPack (a,b,c,d,e,f,g,h) where
-  type BitSize (a,b,c,d,e,f,g,h) = BitSize (a,b,c,d,e,f,g) + BitSize h
-  pack (a,b,c,d,e,f,g,h) = pack (a,b,c,d,e,f,g) ++# pack h
-  unpack (unpack -> ((a,b,c,d,e,f,g), h)) = (a,b,c,d,e,f,g,h)
-
 instance (BitPack a, KnownNat (BitSize a)) => BitPack (Maybe a) where
   type BitSize (Maybe a) = 1 + BitSize a
   pack Nothing  = pack# low ++# 0
@@ -309,3 +275,6 @@ boolToBit = bitCoerce
 -- | Convert a Bool to a Bit
 bitToBool :: Bit -> Bool
 bitToBool = bitCoerce
+
+-- Derive the BitPack instance for tuples of size 3 to 62
+deriveBitPackTuples ''BitPack ''BitSize 'pack 'unpack '(++#)
