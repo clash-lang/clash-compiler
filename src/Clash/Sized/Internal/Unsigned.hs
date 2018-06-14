@@ -6,6 +6,7 @@ Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
 -}
 
 {-# LANGUAGE DataKinds                  #-}
+{-# LANGUAGE DeriveAnyClass             #-}
 {-# LANGUAGE DeriveDataTypeable         #-}
 {-# LANGUAGE MagicHash                  #-}
 {-# LANGUAGE MultiParamTypeClasses      #-}
@@ -98,7 +99,7 @@ import Clash.Prelude.BitIndex         ((!), msb, replaceBit, split)
 import Clash.Prelude.BitReduction     (reduceOr)
 import Clash.Sized.Internal.BitVector (BitVector (BV), Bit, high, low)
 import qualified Clash.Sized.Internal.BitVector as BV
-import Clash.XException               (ShowX (..), showsPrecXWith)
+import Clash.XException               (ShowX (..), Undefined, showsPrecXWith)
 
 -- | Arbitrary-width unsigned integer represented by @n@ bits
 --
@@ -135,7 +136,7 @@ newtype Unsigned (n :: Nat) =
     -- | The constructor, 'U', and the field, 'unsafeToInteger', are not
     -- synthesisable.
     U { unsafeToInteger :: Integer }
-  deriving Data
+  deriving (Data, Undefined)
 
 {-# NOINLINE size# #-}
 size# :: KnownNat n => Unsigned n -> Int

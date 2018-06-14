@@ -60,6 +60,7 @@ import Clash.Promoted.Nat          (SNat (..), pow2SNat)
 import Clash.Promoted.Nat.Literals (d0)
 import Clash.Signal                (mux)
 import Clash.Sized.BitVector       (BitVector, (++#))
+import Clash.XException            (Undefined)
 
 -- * Dual flip-flop synchronizer
 
@@ -86,7 +87,8 @@ import Clash.Sized.BitVector       (BitVector, (++#))
 --      If you want to have /safe/ __word__-synchronisation use
 --      'asyncFIFOSynchronizer'.
 dualFlipFlopSynchronizer
-  :: Clock domain1 gated1
+  :: Undefined a
+  => Clock domain1 gated1
   -- ^ 'Clock' to which the incoming  data is synchronised
   -> Clock domain2 gated2
   -- ^ 'Clock' to which the outgoing data is synchronised

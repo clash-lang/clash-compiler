@@ -7,7 +7,7 @@ Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
 
 {-# LANGUAGE DataKinds                  #-}
 {-# LANGUAGE DeriveDataTypeable         #-}
-{-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE DeriveAnyClass             #-}
 {-# LANGUAGE KindSignatures             #-}
 {-# LANGUAGE MagicHash                  #-}
 {-# LANGUAGE MultiParamTypeClasses      #-}
@@ -144,7 +144,7 @@ import Clash.Class.Num            (ExtendingNum (..), SaturatingNum (..),
                                    SaturationMode (..))
 import Clash.Class.Resize         (Resize (..))
 import Clash.Promoted.Nat         (SNat, snatToInteger, snatToNum)
-import Clash.XException           (ShowX (..), showsPrecXWith)
+import Clash.XException           (ShowX (..), Undefined, showsPrecXWith)
 
 import {-# SOURCE #-} qualified Clash.Sized.Vector         as V
 import {-# SOURCE #-} qualified Clash.Sized.Internal.Index as I
@@ -164,7 +164,7 @@ newtype BitVector (n :: Nat) =
     -- | The constructor, 'BV', and  the field, 'unsafeToInteger', are not
     -- synthesisable.
     BV { unsafeToInteger :: Integer}
-  deriving (Data)
+  deriving (Data,Undefined)
 
 -- * Bit
 
@@ -173,7 +173,7 @@ newtype Bit =
   -- | The constructor, 'Bit', and  the field, 'unsafeToInteger#', are not
   -- synthesisable.
   Bit { unsafeToInteger# :: Integer}
-  deriving (Data)
+  deriving (Data,Undefined)
 
 -- * Constructions
 -- ** Initialisation

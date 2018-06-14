@@ -201,6 +201,8 @@ import GHC.Stack             (HasCallStack, withFrozenCallStack)
 import Clash.Signal.Internal
 import Clash.Signal.Bundle   (Bundle (..))
 
+import Clash.XException      (Undefined)
+
 {- $setup
 >>> :set -XDataKinds -XTypeApplications
 >>> import Clash.Explicit.Prelude
@@ -457,7 +459,7 @@ repSchedule high low = take low $ repSchedule' low high 1
 -- >>> printX (sampleN 3 (delay systemClockGen (fromList [1,2,3,4])))
 -- [X,1,2]
 delay
-  :: HasCallStack
+  :: (HasCallStack, Undefined a)
   => Clock domain gated
   -- ^ Clock
   -> Signal domain a
@@ -471,7 +473,7 @@ delay = \clk i -> withFrozenCallStack (delay# clk i)
 -- >>> sampleN 3 (register systemClockGen systemResetGen 8 (fromList [1,2,3,4]))
 -- [8,1,2]
 register
-  :: HasCallStack
+  :: (HasCallStack, Undefined a)
   => Clock domain gated
   -- ^ clock
   -> Reset domain synchronous
@@ -507,7 +509,7 @@ register = \clk rst initial i -> withFrozenCallStack
 -- >>> sampleN 8 (count systemClockGen systemResetGen)
 -- [0,0,1,1,2,2,3,3]
 regMaybe
-  :: HasCallStack
+  :: (HasCallStack, Undefined a)
   => Clock domain gated
   -- ^ Clock
   -> Reset domain synchronous
@@ -536,7 +538,8 @@ regMaybe = \clk rst initial iM -> withFrozenCallStack
 -- >>> sampleN 8 (count systemClockGen systemResetGen)
 -- [0,0,1,1,2,2,3,3]
 regEn
-  :: Clock domain clk
+  :: Undefined a
+  => Clock domain clk
   -- ^ Clock
   -> Reset domain synchronous
   -- ^ Reset (active-high), 'regEn' outputs the reset value when the

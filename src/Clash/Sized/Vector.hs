@@ -131,7 +131,7 @@ import Clash.Sized.Internal.BitVector (Bit, BitVector, (++#), split#)
 import Clash.Sized.Index          (Index)
 
 import Clash.Class.BitPack (BitPack (..))
-import Clash.XException    (ShowX (..), showsX, showsPrecXWith)
+import Clash.XException    (ShowX (..), Undefined (..), showsX, showsPrecXWith)
 
 {- $setup
 >>> :set -XDataKinds
@@ -299,6 +299,9 @@ traverse# f (x `Cons` xs) = Cons <$> f x <*> traverse# f xs
 
 instance (Default a, KnownNat n) => Default (Vec n a) where
   def = repeat def
+
+instance (Undefined a, KnownNat n) => Undefined (Vec n a) where
+  deepErrorX x = repeat (deepErrorX x)
 
 {-# INLINE singleton #-}
 -- | Create a vector of one element

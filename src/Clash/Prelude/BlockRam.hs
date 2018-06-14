@@ -18,7 +18,7 @@ We start with the definition of the Instructions, Register names and machine
 codes:
 
 @
-{\-\# LANGUAGE RecordWildCards, TupleSections \#-\}
+{\-\# LANGUAGE RecordWildCards, TupleSections, DeriveAnyClass \#-\}
 module CPU where
 
 import Clash.Prelude
@@ -44,7 +44,7 @@ data Reg
   | RegC
   | RegD
   | RegE
-  deriving (Eq,Show,Enum)
+  deriving (Eq,Show,Enum,Undefined)
 
 data Operator = Add | Sub | Incr | Imm | CmpGt
   deriving (Eq,Show)
@@ -367,11 +367,12 @@ import qualified Clash.Explicit.BlockRam as E
 import           Clash.Signal
 import           Clash.Sized.Unsigned    (Unsigned)
 import           Clash.Sized.Vector      (Vec)
+import           Clash.XException        (Undefined)
 
 {- $setup
 >>> import Clash.Prelude as C
 >>> import qualified Data.List as L
->>> :set -XDataKinds -XRecordWildCards -XTupleSections -XTypeApplications -XFlexibleContexts
+>>> :set -XDataKinds -XRecordWildCards -XTupleSections -XTypeApplications -XFlexibleContexts -XDeriveAnyClass
 >>> type InstrAddr = Unsigned 8
 >>> type MemAddr = Unsigned 5
 >>> type Value = Signed 8
@@ -384,7 +385,7 @@ data Reg
   | RegC
   | RegD
   | RegE
-  deriving (Eq,Show,Enum)
+  deriving (Eq,Show,Enum,Undefined)
 :}
 
 >>> :{
@@ -698,7 +699,7 @@ blockRamPow2 = \cnt rd wrM -> withFrozenCallStack
 --      ... =>
 --      Signal domain addr
 --      -> Signal domain (Maybe (addr, a)) -> Signal domain a
-readNew :: (Eq addr, HiddenClockReset domain gated synchronous)
+readNew :: (Eq addr, Undefined a, HiddenClockReset domain gated synchronous)
         => (Signal domain addr -> Signal domain (Maybe (addr, a)) -> Signal domain a)
         -- ^ The @ram@ component
         -> Signal domain addr              -- ^ Read address @r@

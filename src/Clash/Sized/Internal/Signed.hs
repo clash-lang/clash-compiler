@@ -6,8 +6,8 @@ Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
 -}
 
 {-# LANGUAGE DataKinds                  #-}
+{-# LANGUAGE DeriveAnyClass             #-}
 {-# LANGUAGE DeriveDataTypeable         #-}
-{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE KindSignatures             #-}
 {-# LANGUAGE MagicHash                  #-}
 {-# LANGUAGE MultiParamTypeClasses      #-}
@@ -107,7 +107,7 @@ import Clash.Prelude.BitIndex         ((!), msb, replaceBit, split)
 import Clash.Prelude.BitReduction     (reduceAnd, reduceOr)
 import Clash.Sized.Internal.BitVector (BitVector (BV), Bit, (++#), high, low)
 import qualified Clash.Sized.Internal.BitVector as BV
-import Clash.XException               (ShowX (..), showsPrecXWith)
+import Clash.XException               (ShowX (..), Undefined, showsPrecXWith)
 
 -- | Arbitrary-width signed integer represented by @n@ bits, including the sign
 -- bit.
@@ -148,7 +148,7 @@ newtype Signed (n :: Nat) =
     -- | The constructor, 'S', and the field, 'unsafeToInteger', are not
     -- synthesisable.
     S { unsafeToInteger :: Integer}
-  deriving (Data)
+  deriving (Data, Undefined)
 
 {-# NOINLINE size# #-}
 size# :: KnownNat n => Signed n -> Int

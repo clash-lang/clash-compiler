@@ -179,7 +179,7 @@ It instead exports the identically named functions defined in terms of
 -- [(8,8),(1,1),(2,2),(3,3)...
 -- ...
 registerB
-  :: (HiddenClockReset domain gated synchronous, Bundle a)
+  :: (Bundle a, Undefined a, HiddenClockReset domain gated synchronous)
   => a
   -> Unbundled domain a
   -> Unbundled domain a
@@ -189,7 +189,7 @@ infixr 3 `registerB`
 
 -- | Give a pulse when the 'Signal' goes from 'minBound' to 'maxBound'
 isRising
-  :: (HiddenClockReset domain gated synchronous, Bounded a, Eq a)
+  :: (Bounded a, Eq a, Undefined a, HiddenClockReset domain gated synchronous)
   => a -- ^ Starting value
   -> Signal domain a
   -> Signal domain Bool
@@ -198,7 +198,7 @@ isRising = hideClockReset E.isRising
 
 -- | Give a pulse when the 'Signal' goes from 'maxBound' to 'minBound'
 isFalling
-  :: (HiddenClockReset domain gated synchronous, Bounded a, Eq a)
+  :: (Bounded a, Eq a, Undefined a, HiddenClockReset domain gated synchronous)
   => a -- ^ Starting value
   -> Signal domain a
   -> Signal domain Bool

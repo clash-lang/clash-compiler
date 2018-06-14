@@ -8,10 +8,11 @@ ROMs
 -}
 
 {-# LANGUAGE DataKinds     #-}
+{-# LANGUAGE GADTs         #-}
 {-# LANGUAGE MagicHash     #-}
 {-# LANGUAGE TypeOperators #-}
 
-{-# LANGUAGE Safe #-}
+{-# LANGUAGE Trustworthy #-}
 
 {-# OPTIONS_GHC -fplugin GHC.TypeLits.KnownNat.Solver #-}
 {-# OPTIONS_HADDOCK show-extensions #-}
@@ -26,18 +27,14 @@ module Clash.Explicit.ROM
 where
 
 import Data.Array             ((!),listArray)
+import GHC.Stack              (withFrozenCallStack)
 import GHC.TypeLits           (KnownNat, type (^))
 import Prelude hiding         (length)
 
--- import Clash.Signal           (Signal)
--- import Clash.Signal.Explicit  (Signal', SClock, systemClockGen)
-import Clash.Explicit.Signal  (Clock, Signal, delay)
-
+import Clash.Signal.Internal  (Clock (..), Signal (..))
 import Clash.Sized.Unsigned   (Unsigned)
--- import Clash.Signal.Explicit  (register')
 import Clash.Sized.Vector     (Vec, length, toList)
--- import Clash.XException       (errorX)
-
+import Clash.XException       (errorX, seqX)
 
 -- | A ROM with a synchronous read port, with space for 2^@n@ elements
 --
@@ -90,8 +87,21 @@ rom#
   -> Signal domain Int  -- ^ Read address @rd@
   -> Signal domain a
   -- ^ The value of the ROM at address @rd@ from the previous clock cycle
-rom# clk content rd = delay clk ((arr !) <$> rd)
+rom# clk content rd = go clk ((arr !) <$> rd)
   where
     szI = length content
     arr = listArray (0,szI-1) (toList content)
+
+    go :: Clock domain gated
+       -> Signal domain a
+       -> Signal domain a
+    go Clock {} =
+      \s -> withFrozenCallStack (errorX "rom: initial value undefined") :- s
+
+    go (GatedClock _ _ en) =
+      go' (withFrozenCallStack (errorX "rom: initial value undefined")) en
+
+    go' o (e :- es) as@(~(x :- xs)) =
+      -- See [Note: register strictness annotations]
+      o `seqX` o :- (as `seq` if e then go' x es xs else go' o es xs)
 {-# NOINLINE rom# #-}
