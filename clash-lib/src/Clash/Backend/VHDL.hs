@@ -142,7 +142,7 @@ instance Backend VHDLState where
                 insts ds) <> line <>
             "end block" <> semi
   unextend = return rmSlash
-  addInclude inc = includes %= (inc:)
+  addIncludes inc = includes %= (inc++)
   addLibraries libs = libraries %= (libs ++)
   addImports imps = packages %= (imps ++)
 

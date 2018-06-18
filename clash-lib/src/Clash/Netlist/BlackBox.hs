@@ -72,7 +72,7 @@ mkBlackBoxContext resId args = do
     let res = Identifier resNm Nothing
     resTy <- unsafeCoreTypeToHWTypeM $(curLoc) (unembed $ V.varType resId)
 
-    return ( Context (res,resTy) imps funs Nothing
+    return ( Context (res,resTy) imps funs []
            , concat impDecls ++ concat funDecls
            )
   where
@@ -163,8 +163,8 @@ mkPrimitive bbEParen bbEasD dst nm args ty = do
             Just (dst',dstNm,dstDecl) -> do
               (bbCtx,ctxDcls)   <- mkBlackBoxContext dst' (lefts args)
               (templ,templDecl) <- prepareBlackBox pNm tempD bbCtx
-              let bbDecl = N.BlackBoxD pNm (library p) (imports p)
-                                       (include p) templ bbCtx
+              let bbDecl = N.BlackBoxD pNm (libraries p) (imports p)
+                                       (includes p) templ bbCtx
               return (Identifier dstNm Nothing,dstDecl ++ ctxDcls ++ templDecl ++ [bbDecl])
             Nothing -> return (Identifier "__VOID__" Nothing,[])
         (Right tempE) -> do
@@ -177,8 +177,8 @@ mkPrimitive bbEParen bbEasD dst nm args ty = do
                   (bbCtx,ctxDcls)     <- mkBlackBoxContext dst' (lefts args)
                   (bbTempl,templDecl) <- prepareBlackBox pNm tempE bbCtx
                   let tmpAssgn = Assignment dstNm
-                                    (BlackBoxE pNm (library p) (imports p)
-                                               (include p) bbTempl bbCtx
+                                    (BlackBoxE pNm (libraries p) (imports p)
+                                               (includes p) bbTempl bbCtx
                                                bbEParen)
                   return (Identifier dstNm Nothing, dstDecl ++ ctxDcls ++ templDecl ++ [tmpAssgn])
                 Nothing -> return (Identifier "__VOID__" Nothing,[])
@@ -188,7 +188,7 @@ mkPrimitive bbEParen bbEasD dst nm args ty = do
                 Just (dst',_,_) -> do
                   (bbCtx,ctxDcls)     <- mkBlackBoxContext dst' (lefts args)
                   (bbTempl,templDecl) <- prepareBlackBox pNm tempE bbCtx
-                  return (BlackBoxE pNm (library p) (imports p) (include p) bbTempl bbCtx bbEParen,ctxDcls ++ templDecl)
+                  return (BlackBoxE pNm (libraries p) (imports p) (includes p) bbTempl bbCtx bbEParen,ctxDcls ++ templDecl)
                 Nothing -> return (Identifier "__VOID__" Nothing,[])
     Just (P.Primitive pNm _)
       | pNm == "GHC.Prim.tagToEnum#" -> do
@@ -230,7 +230,7 @@ mkPrimitive bbEParen bbEasD dst nm args ty = do
                     netAssignRhs = Assignment tmpRhs scrutExpr
                 return (DataTag scrutHTy (Right tmpRhs),[netDeclRhs,netAssignRhs] ++ scrutDecls)
           _ -> error $ $(curLoc) ++ "dataToTag: " ++ show (map (either showDoc showDoc) args)
-      | otherwise -> return (BlackBoxE "" [] [] Nothing [C $ mconcat ["NO_TRANSLATION_FOR:",fromStrict pNm]] emptyBBContext False,[])
+      | otherwise -> return (BlackBoxE "" [] [] [] [C $ mconcat ["NO_TRANSLATION_FOR:",fromStrict pNm]] emptyBBContext False,[])
     _ -> do
       (_,sp) <- Lens.use curCompNm
       throw (ClashException sp ($(curLoc) ++ "No blackbox found for: " ++ unpack nm) Nothing)
@@ -272,7 +272,7 @@ mkFunInput
        ,WireOrReg
        ,[BlackBoxTemplate]
        ,[BlackBoxTemplate]
-       ,Maybe ((TextS.Text,TextS.Text),BlackBoxTemplate)
+       ,[((TextS.Text,TextS.Text),BlackBoxTemplate)]
        ,BlackBoxContext)
       ,[Declaration])
 mkFunInput resId e = do
@@ -283,7 +283,7 @@ mkFunInput resId e = do
               bbM <- fmap (HashMap.lookup nm) $ Lens.use primitives
               (_,sp) <- Lens.use curCompNm
               let templ = case bbM of
-                            Just (P.BlackBox {..}) -> Left (outputReg,library,imports,include,template)
+                            Just (P.BlackBox {..}) -> Left (outputReg,libraries,imports,includes,template)
                             _ -> throw (ClashException sp ($(curLoc) ++ "No blackbox found for: " ++ unpack nm) Nothing)
               return templ
             Data dc -> do
@@ -336,17 +336,17 @@ mkFunInput resId e = do
             C.Lam _ -> go 0 appE
             _ -> error $ $(curLoc) ++ "Cannot make function input for: " ++ showDoc e
   case templ of
-    Left (oreg,libs,imps,incM,Left templ') -> do
+    Left (oreg,libs,imps,inc,Left templ') -> do
       l   <- instantiateCompName templ'
       (l',templDecl)  <- setSym bbCtx l
       l'' <- collectFilePaths bbCtx l'
-      return ((Left l'',if oreg then Reg else Wire,libs,imps,incM,bbCtx),dcls ++ templDecl)
-    Left (_,libs,imps,incM,Right templ') -> do
+      return ((Left l'',if oreg then Reg else Wire,libs,imps,inc,bbCtx),dcls ++ templDecl)
+    Left (_,libs,imps,inc,Right templ') -> do
       templ'' <- getMon $ prettyBlackBox templ'
       let ass = Assignment (pack "~RESULT") (Identifier templ'' Nothing)
-      return ((Right ("",[ass]),Wire,libs,imps,incM,bbCtx),dcls)
+      return ((Right ("",[ass]),Wire,libs,imps,inc,bbCtx),dcls)
     Right (decl,wr) ->
-      return ((Right decl,wr,[],[],Nothing,bbCtx),dcls)
+      return ((Right decl,wr,[],[],[],bbCtx),dcls)
   where
     go n (Lam b) = do
       (id_,e') <- unbind b

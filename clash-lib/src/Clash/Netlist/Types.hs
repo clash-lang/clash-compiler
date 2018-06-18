@@ -139,7 +139,7 @@ data Declaration
   --
   -- * List of: (Maybe expression scrutinized expression is compared with,RHS of alternative)
   | InstDecl (Maybe Identifier) !Identifier !Identifier [(Expr,PortDirection,HWType,Expr)] -- ^ Instantiation of another component
-  | BlackBoxD !S.Text [BlackBoxTemplate] [BlackBoxTemplate] (Maybe ((S.Text,S.Text),BlackBoxTemplate)) !BlackBoxTemplate BlackBoxContext -- ^ Instantiation of blackbox declaration
+  | BlackBoxD !S.Text [BlackBoxTemplate] [BlackBoxTemplate] [((S.Text,S.Text),BlackBoxTemplate)] !BlackBoxTemplate BlackBoxContext -- ^ Instantiation of blackbox declaration
   | NetDecl' (Maybe Identifier) WireOrReg !Identifier (Either Identifier HWType) -- ^ Signal declaration
   deriving Show
 
@@ -174,7 +174,7 @@ data Expr
   | DataCon    !HWType       !Modifier  [Expr] -- ^ DataCon application
   | Identifier !Identifier   !(Maybe Modifier) -- ^ Signal reference
   | DataTag    !HWType       !(Either Identifier Identifier) -- ^ @Left e@: tagToEnum#, @Right e@: dataToTag#
-  | BlackBoxE !S.Text [BlackBoxTemplate] [BlackBoxTemplate] (Maybe ((S.Text,S.Text),BlackBoxTemplate)) !BlackBoxTemplate !BlackBoxContext !Bool -- ^ Instantiation of a BlackBox expression
+  | BlackBoxE !S.Text [BlackBoxTemplate] [BlackBoxTemplate] [((S.Text,S.Text),BlackBoxTemplate)] !BlackBoxTemplate !BlackBoxContext !Bool -- ^ Instantiation of a BlackBox expression
   | ConvBV     (Maybe Identifier) HWType Bool Expr
   deriving Show
 
@@ -204,18 +204,19 @@ data BlackBoxContext
                           ,WireOrReg
                           ,[BlackBoxTemplate]
                           ,[BlackBoxTemplate]
-                          ,Maybe ((S.Text,S.Text),BlackBoxTemplate),BlackBoxContext)
+                          ,[((S.Text,S.Text),BlackBoxTemplate)]
+                          ,BlackBoxContext)
   -- ^ Function arguments (subset of inputs):
   --
   -- * ( Blackbox Template
   --   , Whether the result should be /reg/ or a /wire/ (Verilog only)
   --   , Partial Blackbox Context
   --   )
-  , bbQsysIncName :: Maybe Identifier
+  , bbQsysIncName :: [Identifier]
   }
   deriving Show
 
 emptyBBContext :: BlackBoxContext
-emptyBBContext = Context (Identifier (pack "__EMPTY__") Nothing, Void Nothing) [] empty Nothing
+emptyBBContext = Context (Identifier (pack "__EMPTY__") Nothing, Void Nothing) [] empty []
 
 makeLenses ''NetlistState

@@ -27,26 +27,26 @@ type PrimMap a = HashMap S.Text (Primitive a)
 data Primitive a
   -- | A primitive that has a template that can be filled out by the backend render
   = BlackBox
-  { name     :: !S.Text
+  { name      :: !S.Text
     -- ^ Name of the primitive
   , outputReg :: Bool
     -- ^ Verilog only: whether the result should be a /reg/(@True@) or /wire/
     -- (@False@); when not specified in the /.json/ file, the value will default
     -- to @False@ (i.e. /wire/).
-  , library  :: [a]
+  , libraries :: [a]
     -- ^ VHDL only: add /library/ declarations for the given names
-  , imports  :: [a]
+  , imports   :: [a]
     -- ^ VHDL only: add /use/ declarations for the given names
-  , include :: Maybe ((S.Text,S.Text),a)
-    -- ^ Create a file to be included with the generated primitive. The fields
+  , includes  :: [((S.Text,S.Text),a)]
+    -- ^ Create files to be included with the generated primitive. The fields
     -- are ((name, extension), content), where content is a template of the file
-    -- Defaults to @Nothing@ when not specified in the /.json/ file
-  , template :: !(Either a a) -- ^ Either a /declaration/ or an /expression/ template.
+    -- Defaults to @[]@ when not specified in the /.json/ file
+  , template  :: !(Either a a) -- ^ Either a /declaration/ or an /expression/ template.
   }
   -- | A primitive that carries additional information
   | Primitive
-  { name     :: !S.Text -- ^ Name of the primitive
-  , primType :: !Text -- ^ Additional information
+  { name      :: !S.Text -- ^ Name of the primitive
+  , primType  :: !Text -- ^ Additional information
   }
   deriving Show
 
@@ -57,13 +57,12 @@ instance FromJSON (Primitive Text) where
                               <*> conVal .:? "outputReg" .!= False
                               <*> conVal .:? "libraries" .!= []
                               <*> conVal .:? "imports" .!= []
-                              <*> (conVal .:? "include" >>= parseInclude)
+                              <*> (conVal .:? "includes" .!= [] >>= traverse parseInclude)
                               <*> ((Left <$> conVal .: "templateD") <|> (Right <$> conVal .: "templateE"))
       "Primitive" -> Primitive <$> conVal .: "name" <*> conVal .: "primType"
       _ -> error "Expected: BlackBox or Primitive object"
     _ -> error "Expected: BlackBox or Primitive object"
     where
-      parseInclude Nothing  = pure Nothing
-      parseInclude (Just c) =
-        Just <$> ((,) <$> ((,) <$> c .: "name" <*> c .: "extension") <*> c .: "content")
+      parseInclude c =
+        (,) <$> ((,) <$> c .: "name" <*> c .: "extension") <*> c .: "content"
   parseJSON _ = error "Expected: BlackBox or Primitive object"

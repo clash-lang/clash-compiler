@@ -31,7 +31,7 @@ data Element = C   !Text         -- ^ Constant
              | TypElem !Element  -- ^ Select element type from a vector type
              | CompName          -- ^ Hole for the name of the component in which
                                  -- the blackbox is instantiated
-             | IncludeName
+             | IncludeName !Int
              | IndexType !Element -- ^ Index data type hole, the field is the
                                   -- (exclusive) maximum index
              | Size !Element     -- ^ Size of a type hole

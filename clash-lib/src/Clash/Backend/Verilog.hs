@@ -136,7 +136,7 @@ instance Backend VerilogState where
         pure decs <> line <>
         insts ds
   unextend = return rmSlash
-  addInclude inc = includes %= (inc:)
+  addIncludes inc = includes %= (inc++)
   addLibraries _ = return ()
   addImports inps = imports %= (inps ++)
 
