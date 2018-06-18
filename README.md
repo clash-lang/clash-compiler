@@ -5,7 +5,12 @@
 [![Hackage Dependencies](https://img.shields.io/hackage-deps/v/clash-prelude.svg?style=flat)](http://packdeps.haskellers.com/feed?needle=exact%3Aclash-prelude)
 
 __WARNING__
-Only works with GHC-8.0.* (http://www.haskell.org/ghc/download_ghc_8_0_2)!
+Only works with GHC-8.2+
+([GHC 8.2.1](https://www.haskell.org/ghc/download_ghc_8_2_1),
+ [GHC 8.2.2](https://www.haskell.org/ghc/download_ghc_8_2_2),
+ [GHC 8.4.1](https://www.haskell.org/ghc/download_ghc_8_4_1),
+ [GHC 8.4.2](https://www.haskell.org/ghc/download_ghc_8_4_2),
+ [GHC 8.4.3](https://www.haskell.org/ghc/download_ghc_8_4_3))!
 
 CλaSH (pronounced ‘clash’) is a functional hardware description language that
 borrows both its syntax and semantics from the functional programming language
