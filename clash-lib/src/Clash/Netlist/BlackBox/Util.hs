@@ -106,9 +106,11 @@ setSym bbCtx l = do
           case varM of
             Nothing -> do
               nm' <- lift (mkUniqueIdentifier Extended (concatT (C "#":nm)))
-              let decls = [N.NetDecl Nothing nm' hwTy
-                          ,N.Assignment nm' e'
-                          ]
+              let decls = case typeSize hwTy of
+                    0 -> []
+                    _ -> [N.NetDecl Nothing nm' hwTy
+                         ,N.Assignment nm' e'
+                         ]
               _2 %= (IntMap.insert i (nm',decls))
               return (Var [C nm'] i)
             Just (nm',_) -> return (Var [C nm'] i)
