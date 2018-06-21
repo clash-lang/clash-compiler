@@ -239,17 +239,14 @@ generateHDL bindingsMap hdlState primMap tcm tupTcm typeTrans eval topEntities
   go benchTime seen' topEntities'
 
 parsePrimitive :: Primitive Text -> Primitive BlackBoxTemplate
-parsePrimitive (BlackBox pNm oReg libM imps inc templT) =
+parsePrimitive (BlackBox pNm oReg libM imps incs templT) =
   case either (fmap Left . runParse) (fmap Right . runParse) templT of
     Failure errInfo
       -> error (ANSI.displayS (ANSI.renderCompact (_errDoc errInfo)) "")
     Success templ
-      -> BlackBox pNm oReg (map parseBB libM) (map parseBB imps) inc' templ
+      -> BlackBox pNm oReg (map parseBB libM) (map parseBB imps)
+                  (map (second parseBB) incs) templ
  where
-  inc' = case fmap (second runParse) inc of
-    Just (x,Success t) -> Just (x,t)
-    _ -> Nothing
-
   parseBB :: Text -> BlackBoxTemplate
   parseBB t = case runParse t of
     Failure errInfo

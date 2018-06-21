@@ -84,7 +84,7 @@ pTagE =  O True            <$  string "~ERESULT"
      <|> TypElem           <$> (string "~TYPEL" *> brackets' pTagE)
      <|> IndexType         <$> (string "~INDEXTYPE" *> brackets' pTagE)
      <|> CompName          <$  string "~COMPNAME"
-     <|> IncludeName       <$  string "~INCLUDENAME"
+     <|> IncludeName       <$> (string "~INCLUDENAME" *> brackets' natural')
      <|> Size              <$> (string "~SIZE" *> brackets' pTagE)
      <|> Length            <$> (string "~LENGTH" *> brackets' pTagE)
      <|> Depth             <$> (string "~DEPTH" *> brackets' pTagE)

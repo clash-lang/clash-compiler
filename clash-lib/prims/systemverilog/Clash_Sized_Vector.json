@@ -224,20 +224,21 @@ assign ~RESULT = ~ARG[1];
     { "name"      : "Clash.Sized.Vector.fold"
     , "type"      : "fold :: (a -> a -> a) -> Vec (n+1) a -> a"
     , "comment"   : "THIS ONLY WORKS FOR POWER OF TWO LENGTH VECTORS"
-    , "imports"   : ["~INCLUDENAME.inc"]
-    , "include" :
-      { "name" : "depth2Index"
-      , "extension" : "inc"
-      , "content" :
+    , "imports"   : ["~INCLUDENAME[0].inc"]
+    , "includes" :
+      [ { "name" : "depth2Index"
+        , "extension" : "inc"
+        , "content" :
 "// given a level and a depth, calculate the corresponding index into the
 // intermediate array
-function integer ~INCLUDENAME;
+function integer ~INCLUDENAME[0];
   input integer levels;
   input integer depth;
 
-  ~INCLUDENAME = (2 ** levels) - (2 ** depth);
+  ~INCLUDENAME[0] = (2 ** levels) - (2 ** depth);
 endfunction"
-      }
+        }
+      ]
     , "templateD" :
 "// fold begin
 // put flat input array into the first half of the intermediate array
@@ -255,9 +256,9 @@ if (~SYM[4] != 0) begin : ~GENSYM[make_tree][7]
   for (~SYM[5] = (~SYM[4] - 1); ~SYM[5] >= 0; ~SYM[5]=~SYM[5]-1) begin : tree_depth
     for (~SYM[6] = 0; ~SYM[6] < (2**~SYM[5]); ~SYM[6] = ~SYM[6]+1) begin : tree_depth_loop
     ~INST 0
-      ~OUTPUT <= ~SYM[0][~INCLUDENAME(~SYM[4]+1,~SYM[5]+1)+~SYM[6]]~ ~TYPO~
-      ~INPUT  <= ~SYM[0][~INCLUDENAME(~SYM[4]+1,~SYM[5]+2)+(2*~SYM[6])]~ ~TYPO~
-      ~INPUT  <= ~SYM[0][~INCLUDENAME(~SYM[4]+1,~SYM[5]+2)+(2*~SYM[6])+1]~ ~TYPO~
+      ~OUTPUT <= ~SYM[0][~INCLUDENAME[0](~SYM[4]+1,~SYM[5]+1)+~SYM[6]]~ ~TYPO~
+      ~INPUT  <= ~SYM[0][~INCLUDENAME[0](~SYM[4]+1,~SYM[5]+2)+(2*~SYM[6])]~ ~TYPO~
+      ~INPUT  <= ~SYM[0][~INCLUDENAME[0](~SYM[4]+1,~SYM[5]+2)+(2*~SYM[6])+1]~ ~TYPO~
     ~INST
     end
   end

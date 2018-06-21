@@ -547,7 +547,7 @@ removeUnusedExpr _ e@(collectArgs -> (p@(Prim nm _),args)) = do
       let usedArgs = if isFromInt pNm
                         then [0,1]
                         else either usedArguments usedArguments templ ++
-                             maybe [] (usedArguments . snd) inc
+                             concatMap (usedArguments . snd) inc
       tcm <- Lens.view tcCache
       args' <- go tcm 0 usedArgs args
       if args == args'

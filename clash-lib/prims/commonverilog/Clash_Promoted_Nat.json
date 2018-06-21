@@ -10,21 +10,22 @@
                                                      => SNat base -- ARG[2]
                                                      -> SNat x    -- ARG[3]
                                                      -> SNat (FLog base x"
-    , "imports"   : ["~INCLUDENAME.inc"]
-    , "include" :
-      { "name" : "flogBase"
-      , "extension" : "inc"
-      , "content" :
+    , "imports"   : ["~INCLUDENAME[0].inc"]
+    , "includes" :
+      [ { "name" : "flogBase"
+        , "extension" : "inc"
+        , "content" :
 "// floor of logBase
-function integer ~INCLUDENAME;
+function integer ~INCLUDENAME[0];
   input integer base, value;
   begin
-    for (~INCLUDENAME = 0; value >= base; ~INCLUDENAME=~INCLUDENAME+1)
+    for (~INCLUDENAME[0] = 0; value >= base; ~INCLUDENAME[0]=~INCLUDENAME[0]+1)
       value = value / base;
   end
 endfunction"
-      }
-    , "templateE" : "~INCLUDENAME(~LIT[2],~LIT[3])"
+        }
+      ]
+    , "templateE" : "~INCLUDENAME[0](~LIT[2],~LIT[3])"
     }
   }
 , { "BlackBox" :
@@ -33,20 +34,21 @@ endfunction"
                                                      => SNat base -- ARG[2]
                                                      -> SNat x    -- ARG[3]
                                                      -> SNat (CLog base x"
-    , "imports"   : ["~INCLUDENAME.inc"]
-    , "include" :
-      { "name" : "clogBase"
-      , "extension" : "inc"
-      , "content" :
+    , "imports"   : ["~INCLUDENAME[0].inc"]
+    , "includes" :
+      [ { "name" : "clogBase"
+        , "extension" : "inc"
+        , "content" :
 "// ceiling of logBase
-function integer ~INCLUDENAME;
+function integer ~INCLUDENAME[0];
   input integer base, value;
   begin
-    for (~INCLUDENAME = 0; base ** ~INCLUDENAME < value; ~~INCLUDENAME=~INCLUDENAME+1);
+    for (~INCLUDENAME[0] = 0; base ** ~INCLUDENAME[0] < value; ~~INCLUDENAME[0]=~INCLUDENAME[0]+1);
   end
 endfunction"
-      }
-    , "templateE" : "~INCLUDENAME(~LIT[2],~LIT[3])"
+        }
+      ]
+    , "templateE" : "~INCLUDENAME[0](~LIT[2],~LIT[3])"
     }
   }
 , { "BlackBox" :
@@ -55,21 +57,22 @@ endfunction"
                                                     => SNat base -- ARG[1]
                                                     -> SNat x    -- ARG[2]
                                                     -> SNat (Log base x)"
-    , "imports"   : ["~INCLUDENAME.inc"]
-    , "include" :
-      { "name" : "clogBase"
-      , "extension" : "inc"
-      , "content" :
+    , "imports"   : ["~INCLUDENAME[0].inc"]
+    , "includes" :
+      [ { "name" : "clogBase"
+        , "extension" : "inc"
+        , "content" :
 "// logBaseSNat begin
-function integer ~INCLUDENAME;
+function integer ~INCLUDENAME[0];
   input integer base, value;
   begin
-    for (~INCLUDENAME = 0; value >= base; ~INCLUDENAME=~INCLUDENAME+1)
+    for (~INCLUDENAME[0] = 0; value >= base; ~INCLUDENAME[0]=~INCLUDENAME[0]+1)
       value = value / base;
   end
 endfunction"
-      }
-    , "templateE" :  "~INCLUDENAME(~LIT[1],~LIT[2])"
+        }
+      ]
+    , "templateE" :  "~INCLUDENAME[0](~LIT[1],~LIT[2])"
     }
   }
 ]
