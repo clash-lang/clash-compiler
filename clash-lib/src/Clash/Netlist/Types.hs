@@ -67,6 +67,8 @@ data NetlistState
   , _componentNames :: HashMap TmOccName Identifier
   , _topEntityAnns  :: HashMap TmOccName (Type, Maybe TopEntity)
   , _hdlDir         :: FilePath
+  , _curBBlvl       :: Int
+  -- ^ The current scoping level assigned to black box contexts
   }
 
 -- | Signal reference
@@ -213,10 +215,14 @@ data BlackBoxContext
   --   , Partial Blackbox Context
   --   )
   , bbQsysIncName :: [Identifier]
+  , bbLevel :: Int
+  -- ^ The scoping level this context is associated with, ensures that
+  -- @~ARGN[k][n]@ holes are only filled with values from this context if @k@
+  -- is equal to the scoping level of this context.
   }
   deriving Show
 
 emptyBBContext :: BlackBoxContext
-emptyBBContext = Context (Identifier (pack "__EMPTY__") Nothing, Void Nothing) [] empty []
+emptyBBContext = Context (Identifier (pack "__EMPTY__") Nothing, Void Nothing) [] empty [] (-1)
 
 makeLenses ''NetlistState
