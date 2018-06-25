@@ -21,6 +21,8 @@ data Element = C   !Text         -- ^ Constant
              -- ^ Output hole; @Bool@ asserts escape marker stripping
              | I   !Bool !Int
              -- ^ Input hole; @Bool@ asserts escape marker stripping
+             | Arg !Int !Int
+             -- ^ Generated input hole, first argument is the scoping level
              | N   !Int          -- ^ Name hole
              | L   !Int          -- ^ Literal hole
              | Var [Element] !Int    --

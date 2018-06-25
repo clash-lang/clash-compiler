@@ -70,6 +70,7 @@ pTagE :: Parser Element
 pTagE =  O True            <$  string "~ERESULT"
      <|> O False           <$  string "~RESULT"
      <|> I True            <$> (string "~EARG" *> brackets' natural')
+     <|> Arg               <$> (string "~ARGN" *> brackets' natural') <*> brackets' natural'
      <|> I False           <$> (string "~ARG" *> brackets' natural')
      <|> L                 <$> (string "~LIT" *> brackets' natural')
      <|> N                 <$> (string "~NAME" *> brackets' natural')

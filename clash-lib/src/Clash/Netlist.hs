@@ -128,7 +128,7 @@ runNetlistMonad s tops p tcm typeTrans dfiles iw mkId extId seenIds_ env
   . flip runStateT s'
   . runNetlist
   where
-    s' = NetlistState s 0 HashMap.empty p typeTrans tcm (Text.empty,noSrcSpan) dfiles iw mkId extId [] seenIds' names tops env
+    s' = NetlistState s 0 HashMap.empty p typeTrans tcm (Text.empty,noSrcSpan) dfiles iw mkId extId [] seenIds' names tops env 0
     (seenIds',names) = genNames mkId seenIds_ HashMap.empty (HashMap.elems (HashMap.map (^. _1) s))
 
 genNames :: (IdType -> Identifier -> Identifier)

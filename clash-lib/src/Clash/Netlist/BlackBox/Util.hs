@@ -406,6 +406,14 @@ renderTag b (I esc n)       = do
   let (e,_,_) = bbInputs b !! n
   escape <- if esc then unextend else pure id
   (escape . renderOneLine) <$> getMon (expr False e)
+
+renderTag b t@(Arg k n)
+  | k == bbLevel b
+  , let (e,_,_) = bbInputs b !! n
+  = renderOneLine <$> getMon (expr False e)
+  | otherwise
+  = getMon (prettyElem t)
+
 renderTag b (N n)           = let (e,_,_) = bbInputs b !! n
                               in  case exprToText e of
                                      Just t -> return t
@@ -604,6 +612,8 @@ prettyElem (SigD es mI) = do
            mI)
 prettyElem (Vars i) = renderOneLine <$> (string "~VARS" <> brackets (int i))
 prettyElem (OutputWireReg i) = renderOneLine <$> (string "~RESULTWIREREG" <> brackets (int i))
+prettyElem (Arg n x) =
+  renderOneLine <$> (string "~ARGN" <> brackets (int n) <> brackets (int x))
 
 usedArguments :: BlackBoxTemplate
               -> [Int]

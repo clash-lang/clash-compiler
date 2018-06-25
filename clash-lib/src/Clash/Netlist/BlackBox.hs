@@ -72,14 +72,18 @@ mkBlackBoxContext resId args = do
     let res = Identifier resNm Nothing
     resTy <- unsafeCoreTypeToHWTypeM $(curLoc) (unembed $ V.varType resId)
 
-    return ( Context (res,resTy) imps funs Nothing
+    lvl <- Lens.use curBBlvl
+
+    return ( Context (res,resTy) imps funs Nothing lvl
            , concat impDecls ++ concat funDecls
            )
   where
     addFunction tcm im (arg,i) = do
       isF <- isFun tcm arg
       if isF
-         then do (f,d) <- mkFunInput resId arg
+         then do curBBlvl Lens.+= 1
+                 (f,d) <- mkFunInput resId arg
+                 curBBlvl Lens.-= 1
                  let im' = IntMap.insert i f im
                  return (im',d)
          else return (im,[])
@@ -350,10 +354,11 @@ mkFunInput resId e = do
   where
     go n (Lam b) = do
       (id_,e') <- unbind b
+      lvl      <- Lens.use curBBlvl
       let nm  = varName id_
           e'' = substTm (nameOcc nm)
                         (C.Var (unembed (varType id_))
-                               (string2SystemName ("~ARG[" ++ show n ++ "]")))
+                               (string2SystemName ("~ARGN[" ++ show lvl ++ "][" ++ show n ++ "]")))
                         e'
       go (n+(1::Int)) e''
 
