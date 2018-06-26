@@ -187,8 +187,8 @@ mkADT _ m tyString _ tc _
   | isRecursiveTy m tc
   = Left $ $(curLoc) ++ "Can't translate recursive type: " ++ tyString
 
-mkADT builtInTranslation m tyString keepVoid tc args = case tyConDataCons (m HashMap.! nameOcc tc) of
-  []  -> Left $ $(curLoc) ++ "Can't translate empty type: " ++ tyString
+mkADT builtInTranslation m _tyString keepVoid tc args = case tyConDataCons (m HashMap.! nameOcc tc) of
+  []  -> return (Void Nothing) -- Left $ $(curLoc) ++ "Can't translate empty type: " ++ tyString
   dcs -> do
     let tcName       = pack $ name2String tc
         argTyss      = map dcArgTys dcs
