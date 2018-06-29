@@ -54,7 +54,7 @@ module Clash.Annotations.BitRepresentation.Deriving
   ) where
 
 import Clash.Annotations.BitRepresentation
-  (DataReprAnn(..), ConstrRepr(..), BitMask, Value, Size, reprType)
+  (DataReprAnn(..), ConstrRepr(..), BitMask, Value, Size, liftQ)
 import Clash.Annotations.BitRepresentation.Internal
   (dataReprAnnToDataRepr', constrReprToConstrRepr', DataRepr'(..))
 import Clash.Annotations.BitRepresentation.Util
@@ -359,7 +359,7 @@ deriveDataRepr constrDerivator fieldsDerivator typ = do
                           constrValues
 
       [| DataReprAnn
-          $(reprType $ return typ)
+          $(liftQ $ return typ)
           ($dataSize + constrSize)
           $(listE constrReprs) |]
     _ ->

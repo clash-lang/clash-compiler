@@ -4,11 +4,10 @@ License    :  BSD2 (see the file LICENSE)
 Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
 
 Using /ANN/ pragma's you can tell the Clash compiler to use a custom
-bit-representation for a data type. See @DataReprAnn@ for documentation.
+bit representation for a data type. See @DataReprAnn@ for documentation.
 
 -}
 
-{-# LANGUAGE DeriveAnyClass     #-}
 {-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE DeriveGeneric      #-}
 {-# LANGUAGE DeriveLift         #-}
@@ -30,12 +29,11 @@ module Clash.Annotations.BitRepresentation
  , FieldAnn
 
  -- * Functions
- , reprType
+ , liftQ
  ) where
 
 import           Data.Data                  (Data)
 import           Data.Typeable              (Typeable)
-import qualified Language.Haskell.TH.Lib    as TH
 import qualified Language.Haskell.TH.Lift   ()
 import qualified Language.Haskell.TH.Syntax as TH
 import           GHC.Generics               (Generic)
@@ -46,8 +44,9 @@ type Size     = Int
 
 type FieldAnn = BitMask
 
-reprType :: TH.TypeQ -> TH.ExpQ
-reprType qty = qty >>= TH.lift
+-- | Lift values inside of 'TH.Q' to a Template Haskell expression
+liftQ :: TH.Lift a => TH.Q a -> TH.Q TH.Exp
+liftQ = (>>= TH.lift)
 
 deriving instance TH.Lift TH.Type
 deriving instance TH.Lift TH.TyVarBndr
@@ -76,7 +75,7 @@ deriving instance TH.Lift TH.TyLit
 -- @
 -- data Color = R | G | B
 -- {-# ANN module (DataReprAnn
---                   $(reprType [t|Color|])
+--                   $(liftQ [t|Color|])
 --                   2
 --                   [ ConstrRepr 'R 0b11 0b00 []
 --                   , ConstrRepr 'G 0b11 0b01 []
@@ -93,7 +92,7 @@ deriving instance TH.Lift TH.TyLit
 --
 -- @
 -- {-# ANN module ( DataReprAnn
---                    $(reprType [t|Maybe Color|])
+--                    $(liftQ [t|Maybe Color|])
 --                    2
 --                    [ ConstRepr 'Nothing 0b11 0b11 []
 --                    , ConstRepr 'Just 0b00 0b00 [0b11]
