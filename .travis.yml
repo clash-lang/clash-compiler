@@ -75,6 +75,8 @@ install:
   - travis_retry cabal update -v
   - "sed -i.bak 's/^jobs:/-- jobs:/' ${HOME}/.cabal/config"
   - rm -fv cabal.project cabal.project.local
+  - "printf 'packages: \"./*/*.cabal\"\\n' > cabal.project"
+  - cat cabal.project
   # Overlay Hackage Package Index for GHC HEAD: https://github.com/hvr/head.hackage
   - |
     if $GHCHEAD; then
@@ -91,8 +93,6 @@ install:
       cabal new-update head.hackage -v
     fi
   - grep -Ev -- '^\s*--' ${HOME}/.cabal/config | grep -Ev '^\s*$'
-  - "printf 'packages: \"./*/*.cabal\"\\n' > cabal.project"
-  - cat cabal.project
   - if [ -f "./configure.ac" ]; then
       (cd "." && autoreconf -i);
     fi
