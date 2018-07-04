@@ -213,20 +213,20 @@ The CλaSH compiler and Prelude library for circuit design only work with the
 
   (1) Install __GHC 8.2.1 or higher__
 
-      * Download and install <https://www.haskell.org/ghc/download_ghc_8_4_1 GHC for your platform>.
+      * Download and install <https://www.haskell.org/ghc/download_ghc_8_4_3 GHC for your platform>.
         Unix user can use @./configure prefix=\<LOCATION\>@ to set the installation
         location.
 
       * Make sure that the @bin@ directory of __GHC__ is in your @PATH@.
 
-    In case you cannot find what you are looking for on <https://www.haskell.org/ghc/download_ghc_8_4_1>,
+    In case you cannot find what you are looking for on <https://www.haskell.org/ghc/download_ghc_8_4_3>,
     you can, /alternatively/, use the following instructions:
 
       * Ubuntu:
 
           * Run: @sudo add-apt-repository -y ppa:hvr/ghc@
           * Run: @sudo apt-get update@
-          * Run: @sudo apt-get install cabal-install-2.2 ghc-8.4.1 libtinfo-dev@
+          * Run: @sudo apt-get install cabal-install-2.2 ghc-8.4.3 libtinfo-dev@
           * Update your @PATH@ with: @\/opt\/ghc\/bin@, @\/opt\/cabal\/bin@, and @\$HOME\/.cabal\/bin@
           * Run: @cabal update@
           * Skip step 2.
@@ -269,7 +269,7 @@ The CλaSH compiler and Prelude library for circuit design only work with the
 
       * Run:
 
-          * /i386/ Linux: @cabal install clash-ghc --enable-documentation --enable-executable-dynamic@
+          * Linux: @cabal install clash-ghc --enable-documentation --enable-executable-dynamic@
           * Other: @cabal install clash-ghc --enable-documentation@
 
       * /This is going to take awhile, so have a refreshment/
@@ -952,21 +952,15 @@ use work.blinker_types.all;
 
 entity blinker_topentity is
   port(-- clock
-       input_0  : in std_logic;
+       clk    : in std_logic;
        -- asynchronous reset: active high
-       input_1  : in std_logic;
-       input_2  : in std_logic_vector(0 downto 0);
-       output_0 : out std_logic_vector(7 downto 0));
+       rst    : in std_logic;
+       x      : in std_logic;
+       result : out std_logic_vector(7 downto 0));
 end;
 
 architecture structural of blinker_topentity is
-begin
-  blinker_topentity_0_inst : entity blinker_topentity_0
-    port map
-      (clk    => input_0
-      ,rst    => input_1
-      ,key1   => input_2
-      ,result => output_0);
+ ...
 end;
 @
 
@@ -998,18 +992,12 @@ entity blinker is
        CLOCK_50 : in std_logic;
        -- asynchronous reset: active high
        KEY0     : in std_logic;
-       KEY1     : in std_logic_vector(0 downto 0);
+       KEY1     : in std_logic;
        LED      : out std_logic_vector(7 downto 0));
 end;
 
 architecture structural of blinker is
-begin
-  blinker_topentity_inst : entity blinker_topentity
-    port map
-      (clk    => CLOCK_50
-      ,rst    => KEY0
-      ,key1   => KEY1
-      ,result => LED);
+ ...
 end;
 @
 
