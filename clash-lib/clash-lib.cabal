@@ -96,7 +96,7 @@ Library
                       TupleSections
                       ViewPatterns
 
-  Build-depends:      aeson                   >= 0.6.2.0  && < 1.4,
+  Build-depends:      aeson                   >= 0.6.2.0  && < 1.5,
                       ansi-wl-pprint          >= 0.6.8.2  && < 1.0,
                       attoparsec              >= 0.10.4.0 && < 0.14,
                       base                    >= 4.8      && < 5,
@@ -113,7 +113,7 @@ Library
                       ghc                     >= 8.0.2    && < 8.6,
                       hashable                >= 1.2.1.0  && < 1.3,
                       integer-gmp             >= 1.0      && < 1.1,
-                      lens                    >= 3.9.2    && < 4.17,
+                      lens                    >= 3.9.2    && < 4.18,
                       mtl                     >= 2.1.2    && < 2.3,
                       parsers                 >= 0.12.8   && < 1.0,
                       prettyprinter           >= 1.2.0.1  && < 2.0,
