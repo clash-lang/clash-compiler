@@ -16,7 +16,12 @@ repository head.hackage
 -- index state, to go along with the cabal.project.freeze file. update the index
 -- state by running `cabal update` twice and looking at the index state it
 -- displays to you (as the second update will be a no-op)
-index-state: 2018-05-09T10:20:14Z
+index-state: 2018-07-03T07:02:43Z
 
 package clash-ghc
   executable-dynamic: True
+
+optional-packages: ghc-typelits-extra/ghc-typelits-extra.cabal
+                   ghc-typelits-knownnat/ghc-typelits-knownnat.cabal
+                   ghc-typelits-natnormalise/ghc-typelits-natnormalise.cabal
+                   ghc-tcplugins-extra/ghc-tcplugins-extra.cabal
