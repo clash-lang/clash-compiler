@@ -280,7 +280,7 @@ instance (KnownNat d, Undefined a) => Undefined (RTree d a) where
 --
 -- In order to accommodate the type of our 'Clash.Class.Num.plus', where the
 -- result is larger than the arguments, we must use a dependently typed fold in
--- the the form of 'dtfold':
+-- the form of 'dtfold':
 --
 -- @
 -- {\-\# LANGUAGE UndecidableInstances \#-\}

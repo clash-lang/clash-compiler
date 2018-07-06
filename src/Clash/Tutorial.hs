@@ -607,7 +607,7 @@ We can see that for the first 4 samples, everything is working as expected,
 after which warnings are being reported. The reason is that 'stimuliGenerator'
 will keep on producing the last sample, (4,4), while the 'outputVerifier' will
 keep on expecting the last sample, 14. In the VHDL testbench these errors won't
-show, as the the global clock will be stopped after 4 ticks.
+show, as the global clock will be stopped after 4 ticks.
 
 You should now again run @:vhdl@ in the interpreter; this time the compiler
 will take a bit longer to generate all the circuits. Inside the @.\/vhdl\/MAC@
@@ -1452,7 +1452,7 @@ What is /not/ possible is:
       cnt = 'Clash.Explicit.Signal.register' clk rst 0 (cnt + 1)
   @
 
-  As it is not possible to convert the the individual bits to a 'Clock'.
+  As it is not possible to convert the individual bits to a 'Clock'.
 
   However! What is possible is to do the following:
 
