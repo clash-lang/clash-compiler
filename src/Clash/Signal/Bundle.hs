@@ -76,7 +76,7 @@ class Bundle a where
   -- | Example:
   --
   -- @
-  -- __bundle__ :: ('Signal' domain a, 'Signal' domain b) -> 'Signal' clk (a,b)
+  -- __bundle__ :: ('Signal' domain a, 'Signal' domain b) -> 'Signal' domain (a,b)
   -- @
   --
   -- However:
