@@ -801,7 +801,7 @@ and can be converted from, or to, the other using 'bundle' and 'unbundle'.
 
 Instances of this 'Bundle' type-class are defined as /isomorphisms/ for:
 
-  * All tuples until and including 8-tuples
+  * All tuples up to and including 62-tuples (GHC limit)
   * The 'Vec'tor type
 
 But they are defined as /identities/ for:
@@ -1805,7 +1805,7 @@ A list of often encountered errors and their solutions:
 
     Product types supported by 'bundle' are:
 
-    * All tuples until and including 8-tuples
+    * All tuples up to and including 62-tuples (GHC limit)
     * The 'Vec'tor type
 
 * __Type error: Couldn't match expected type @('Signal' domain a, 'Signal' domain b)@ with__
@@ -1828,7 +1828,7 @@ A list of often encountered errors and their solutions:
 
     Product types supported by 'unbundle' are:
 
-    * All tuples until and including 8-tuples
+    * All tuples up to and including 62-tuples (GHC limit)
     * The 'Vec'tor type
 
 * __Clash.Netlist(..): Not in normal form: \<REASON\>: \<EXPR\>__:
