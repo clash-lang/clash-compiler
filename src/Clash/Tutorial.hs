@@ -1235,13 +1235,13 @@ a general listing of the available template holes:
 * @~SIGDO[\<HOLE\>]@: Create a signal declaration, using @\<HOLE\>@ as the name
   of the signal, and the type of the result.
 * @~TYPELEM[\<HOLE\>]@: The element type of the vector type represented by @\<HOLE\>@.
-  The content of @\<HOLE\>@ must either be: @TYPM[N]@, @TYPO@, or @TYPELEM[\<HOLE\>]@.
+  The content of @\<HOLE\>@ must either be: @TYP[N]@, @TYPO@, or @TYPELEM[\<HOLE\>]@.
 * @~COMPNAME@: The name of the component in which the primitive is instantiated.
 * @~LENGTH[\<HOLE\>]@: The vector length of the type represented by @\<HOLE\>@.
 * @~DEPTH[\<HOLE\>]@: The tree depth of the type represented by @\<HOLE\>@.
-  The content of @\<HOLE\>@ must either be: @TYPM[N]@, @TYPO@, or @TYPELEM[\<HOLE\>]@.
+  The content of @\<HOLE\>@ must either be: @TYP[N]@, @TYPO@, or @TYPELEM[\<HOLE\>]@.
 * @~SIZE[\<HOLE\>]@: The number of bits needed to encode the type represented by @\<HOLE\>@.
-  The content of @\<HOLE\>@ must either be: @TYPM[N]@, @TYPO@, or @TYPELEM[\<HOLE\>]@.
+  The content of @\<HOLE\>@ must either be: @TYP[N]@, @TYPO@, or @TYPELEM[\<HOLE\>]@.
 * @~IF \<CONDITION\> ~THEN \<THEN\> ~ELSE \<ELSE\> ~FI@: renders the \<ELSE\>
   part when \<CONDITION\> evaluates to /0/, and renders the \<THEN\> in all
   other cases. Valid @\<CONDITION\>@s are @~LENGTH[\<HOLE\>]@, @~SIZE[\<HOLE\>]@,
@@ -1258,7 +1258,7 @@ a general listing of the available template holes:
   expression in @\<HOLE\>@, which has a bit vector (@std_logic_vector@) type, is
   converted to type indicated by @\<TYPE\>@. The @\<TYPE\>@ hole indicates the
   must be either @~TYP[N]@, @~TYPO@, or @~TYPELEM[\<HOLE\>]@.
-* @~INCLUDENAME@: the generated name of the included component.
+* @~INCLUDENAME[N]@: the generated name of the @N@'th included component.
 * @~FILEPATH[\<HOLE\>]@: The argument mentioned in @\<HOLE\>@ is a file which
   must be copied to the location of the generated HDL.
 * @~GENERATE@: Verilog: create a /generate/ statement, except when already in
