@@ -58,6 +58,15 @@ module Clash.Explicit.Prelude
   , assert
   , stimuliGenerator
   , outputVerifier
+    -- * Tracing
+    -- ** Simple
+  , traceSignal1
+  , traceVecSignal1
+    -- ** Tracing in a multi-clock environment
+  , traceSignal
+  , traceVecSignal
+    -- ** VCD dump functions
+  , dumpVCD
     -- * Exported modules
     -- ** Synchronous signals
   , module Clash.Explicit.Signal
@@ -149,6 +158,7 @@ import Clash.Promoted.Nat
 import Clash.Promoted.Nat.TH
 import Clash.Promoted.Nat.Literals
 import Clash.Promoted.Symbol
+import Clash.Signal.Trace
 import Clash.Sized.BitVector
 import Clash.Sized.Fixed
 import Clash.Sized.Index

@@ -111,7 +111,6 @@ Library
                       Clash.Explicit.Signal
                       Clash.Explicit.Signal.Delayed
                       Clash.Explicit.Signal.Delayed.Bundle
-                      Clash.Explicit.Signal.Trace
                       Clash.Explicit.Synchronizer
                       Clash.Explicit.Testbench
 

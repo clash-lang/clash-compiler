@@ -76,6 +76,15 @@ module Clash.Prelude
   , isFalling
   , riseEvery
   , oscillate
+    -- * Tracing
+    -- ** Simple
+  , traceSignal1
+  , traceVecSignal1
+    -- ** Tracing in a multi-clock environment
+  , traceSignal
+  , traceVecSignal
+    -- ** VCD dump functions
+  , dumpVCD
     -- * Exported modules
     -- ** Synchronous signals
   , module Clash.Signal
@@ -168,6 +177,7 @@ import           Clash.Sized.Unsigned
 import           Clash.Sized.Vector
 import           Clash.Signal
 import           Clash.Signal.Delayed
+import           Clash.Signal.Trace
 import           Clash.XException
 
 {- $setup
