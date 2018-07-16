@@ -1,11 +1,12 @@
 [ { "BlackBox" :
     { "name" : "Clash.Prelude.ROM.asyncRom#"
+    , "kind" : "Declaration"
     , "type" :
 "asyncRom# :: KnownNat n -- ^ ARG[0]
            => Vec n a    -- ^ ARG[1]
            -> Int        -- ^ ARG[2]
            -> a"
-    , "templateD" :
+    , "template" :
 "// asyncRom begin
 wire ~TYPO ~GENSYM[ROM][0] [0:~LIT[0]-1];
 

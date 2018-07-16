@@ -1,133 +1,8 @@
 [ { "BlackBox" :
-    { "name"      : "Clash.Sized.Internal.Unsigned.size#"
-    , "type"      : "size# :: KnownNat n => Unsigned n -> Int"
-    , "templateE" : "~SIZE[~TYPO]'sd~LIT[0]"
-    }
-  }
-, { "BlackBox" :
-    { "name"      : "Clash.Sized.Internal.Unsigned.pack#"
-    , "type"      : "pack# :: Unsigned n -> BitVector n"
-    , "templateE" : "~ARG[0]"
-    }
-  }
-, { "BlackBox" :
-    { "name"      : "Clash.Sized.Internal.Unsigned.unpack#"
-    , "type"      : "unpack# :: KnownNat n => BitVector n -> Unsigned n"
-    , "templateE" : "~ARG[1]"
-    }
-  }
-, { "BlackBox" :
-    { "name"      : "Clash.Sized.Internal.Unsigned.minBound#"
-    , "type"      : "minBound# :: Unsigned n"
-    , "templateE" : "~SIZE[~TYPO]'d0"
-    }
-  }
-, { "BlackBox" :
-    { "name"      : "Clash.Sized.Internal.Unsigned.maxBound#"
-    , "type"      : "maxBound# :: KnownNat n => Unsigned n"
-    , "templateE" : "{~LIT[0] {1'b1}}"
-    }
-  }
-, { "BlackBox" :
-    { "name"      : "Clash.Sized.Internal.Unsigned.+#"
-    , "type"      : "(+#) :: KnownNat n => Unsigned n -> Unsigned n -> Unsigned n"
-    , "templateE" : "~ARG[1] + ~ARG[2]"
-    }
-  }
-, { "BlackBox" :
-    { "name"      : "Clash.Sized.Internal.Unsigned.-#"
-    , "type"      : "(-#) :: KnownNat n => Unsigned n -> Unsigned n -> Unsigned n"
-    , "templateE" : "~ARG[1] - ~ARG[2]"
-    }
-  }
-, { "BlackBox" :
-    { "name"      : "Clash.Sized.Internal.Unsigned.*#"
-    , "type"      : "(*#) :: KnownNat n => Unsigned n -> Unsigned n -> Unsigned n"
-    , "templateE" : "~ARG[1] * ~ARG[2]"
-    }
-  }
-, { "BlackBox" :
-    { "name"      : "Clash.Sized.Internal.Unsigned.negate#"
-    , "type"      : "negate# :: KnownNat n => Unsigned n -> Unsigned n"
-    , "templateE" : "- ~ARG[1]"
-    }
-  }
-, { "BlackBox" :
-    { "name"      : "Clash.Sized.Internal.Unsigned.fromInteger#"
-    , "type"      : "fromInteger# :: KnownNat n => Integer -> Unsigned n"
-    , "templateE" : "$unsigned(~ARG[1][(~LIT[0]-1):0])"
-    }
-  }
-, { "BlackBox" :
-    { "name"      : "Clash.Sized.Internal.Unsigned.plus#"
-    , "type"      : "plus# :: Unsigned m -> Unsigned n -> Unsigned (1 + Max m n)"
-    , "templateD" : "assign ~RESULT = ~ARG[0] + ~ARG[1];"
-    }
-  }
-, { "BlackBox" :
-    { "name"      : "Clash.Sized.Internal.Unsigned.minus#"
-    , "type"      : "minus# :: (KnownNat m, KnownNat n) => Unsigned m -> Unsigned n -> Unsigned (1 + Max m n)"
-    , "templateD" : "assign ~RESULT = ~ARG[2] - ~ARG[3];"
-    }
-  }
-, { "BlackBox" :
-    { "name"      : "Clash.Sized.Internal.Unsigned.times#"
-    , "type"      : "times# :: Unsigned m -> Unsigned n -> Unsigned (m + n)"
-    , "templateD" : "assign ~RESULT = ~ARG[0] * ~ARG[1];"
-    }
-  }
-, { "BlackBox" :
-    { "name"      : "Clash.Sized.Internal.Unsigned.quot#"
-    , "type"      : "quot# :: Unsigned n -> Unsigned n -> Unsigned n"
-    , "templateE" : "~ARG[0] / ~ARG[1]"
-    }
-  }
-, { "BlackBox" :
-    { "name"      : "Clash.Sized.Internal.Unsigned.rem#"
-    , "type"      : "rem# :: Unsigned n -> Unsigned n -> Unsigned n"
-    , "templateE" : "~ARG[0] % ~ARG[1]"
-    }
-  }
-, { "BlackBox" :
-    { "name"      : "Clash.Sized.Internal.Unsigned.and#"
-    , "type"      : "and# :: Unsigned n -> Unsigned n -> Unsigned n"
-    , "templateE" : "~ARG[0] & ~ARG[1]"
-    }
-  }
-, { "BlackBox" :
-    { "name"      : "Clash.Sized.Internal.Unsigned.or#"
-    , "type"      : "or# :: Unsigned n -> Unsigned n -> Unsigned n"
-    , "templateE" : "~ARG[0] | ~ARG[1]"
-    }
-  }
-, { "BlackBox" :
-    { "name"      : "Clash.Sized.Internal.Unsigned.xor#"
-    , "type"      : "xor# :: Unsigned n -> Unsigned n -> Unsigned n"
-    , "templateE" : "~ARG[0] ^ ~ARG[1]"
-    }
-  }
-, { "BlackBox" :
-    { "name"      : "Clash.Sized.Internal.Unsigned.complement#"
-    , "type"      : "complement# :: KnownNat n => Unsigned n -> Unsigned n"
-    , "templateE" : "~ ~ARG[1]"
-    }
-  }
-, { "BlackBox" :
-    { "name"      : "Clash.Sized.Internal.Unsigned.shiftL#"
-    , "type"      : "shiftL# :: KnownNat n => Unsigned n -> Int -> Unsigned n"
-    , "templateE" : "~ARG[1] << ~ARG[2]"
-    }
-  }
-, { "BlackBox" :
-    { "name"      : "Clash.Sized.Internal.Unsigned.shiftR#"
-    , "type"      : "shiftR# :: KnownNat n => Unsigned n -> Int -> Unsigned n"
-    , "templateE" : "~ARG[1] >> ~ARG[2]"
-    }
-  }
-, { "BlackBox" :
     { "name"      : "Clash.Sized.Internal.Unsigned.rotateL#"
+    , "kind"      : "Declaration"
     , "type"      : "rotateL# :: KnownNat n => Unsigned n -> Int -> Unsigned n"
-    , "templateD" :
+    , "template"  :
 "// rotateL begin
 wire [2*~LIT[0]-1:0] ~GENSYM[u][0];
 assign ~SYM[0] = {~ARG[1],~ARG[1]} << ~ARG[2];
@@ -137,8 +12,9 @@ assign ~RESULT = ~SYM[0][~LIT[0]-1 : 0];
   }
 , { "BlackBox" :
     { "name"      : "Clash.Sized.Internal.Unsigned.rotateR#"
+    , "kind"      : "Declaration"
     , "type"      : "rotateR# :: KnownNat n => Unsigned n -> Int -> Unsigned n"
-    , "templateD" :
+    , "template"  :
 "// rotateR begin
 wire [2*~LIT[0]-1:0] ~GENSYM[u][0];
 assign ~SYM[0] = {~ARG[1],~ARG[1]} >> ~ARG[2];

@@ -18,7 +18,7 @@
 
 module Clash.Primitives.Types
   ( TemplateSource(..)
-  , TemplateType(..)
+  , TemplateKind(..)
   , BlackBoxFunctionName(..)
   , Primitive(..)
   , PrimMap
@@ -27,11 +27,10 @@ module Clash.Primitives.Types
   , ResolvedPrimMap
   , CompiledPrimitive
   , CompiledPrimMap
-  , removeTypeTag
   ) where
 
 import           Clash.Netlist.BlackBox.Types
-  (BlackBoxTemplate, BlackBoxFunction)
+  (BlackBoxTemplate, BlackBoxFunction, TemplateKind (..))
 import           Control.Applicative          ((<|>))
 import           Data.Aeson
   (FromJSON (..), Value (..), (.:), (.:?), (.!=))
@@ -59,15 +58,6 @@ type CompiledPrimMap   = PrimMap CompiledPrimitive
 
 -- | A @PrimMap@ maps primitive names to a @Primitive@
 type PrimMap a = HashMap S.Text a
-
-data TemplateType a
-  = TDecl a
-  | TExpr a
-  deriving (Show, Eq, Functor, Foldable, Traversable)
-
-removeTypeTag :: TemplateType a -> a
-removeTypeTag (TDecl a) = a
-removeTypeTag (TExpr a) = a
 
 -- | A BBFN is a parsed version of a fully qualified function name. It is
 -- guaranteed to have at least one module name which is not /Main/.
@@ -129,6 +119,8 @@ data Primitive a b c
   = BlackBox
   { name      :: !S.Text
     -- ^ Name of the primitive
+  , kind      :: TemplateKind
+    -- ^ Whether this results in an expression or a declaration
   , outputReg :: Bool
     -- ^ Verilog only: whether the result should be a /reg/(@True@) or /wire/
     -- (@False@); when not specified in the /.json/ file, the value will default
@@ -141,7 +133,7 @@ data Primitive a b c
     -- ^ Create files to be included with the generated primitive. The fields
     -- are ((name, extension), content), where content is a template of the file
     -- Defaults to @[]@ when not specified in the /.json/ file
-  , template :: TemplateType b
+  , template :: b
     -- ^ Used to indiciate type of template (declaration or expression). Will be
     -- filled with @Template@ or an @Either decl expr@.
   }
@@ -150,7 +142,7 @@ data Primitive a b c
   { name :: !S.Text
     -- ^ Name of the primitive
   , functionName :: BlackBoxFunctionName
-  , function :: TemplateType c
+  , function :: c
     -- ^ Used to indiciate type of template (declaration or expression).
   }
   -- | A primitive that carries additional information
@@ -170,26 +162,22 @@ instance FromJSON UnresolvedPrimitive where
           "BlackBoxHaskell"  -> do
             name' <- conVal .: "name"
             fName <- conVal .: "functionName"
-            isDecl <- conVal .:? "isDeclaration" .!= True
             templ <- (Just . TInline <$> conVal .: "template")
-                 <|> (Just . TFile <$> conVal .: "templateFile")
+                 <|> (Just . TFile   <$> conVal .: "file")
                  <|> (pure Nothing)
 
-            let templ' = (if isDecl then TDecl else TExpr) templ
             let fName' = either error id (parseBBFN fName)
 
-            return (BlackBoxHaskell name' fName' templ')
+            return (BlackBoxHaskell name' fName' templ)
           "BlackBox"  ->
             BlackBox <$> conVal .: "name"
+                     <*> (conVal .: "kind" >>= parseTemplateKind)
                      <*> conVal .:? "outputReg" .!= False
                      <*> conVal .:? "libraries" .!= []
                      <*> conVal .:? "imports" .!= []
                      <*> (conVal .:? "includes" .!= [] >>= traverse parseInclude)
-                     <*> ( (TDecl . TInline <$> conVal .: "templateD")
-                       <|> (TExpr . TInline <$> conVal .: "templateE")
-                       <|> (TDecl . TFile   <$> conVal .: "templateFileD")
-                       <|> (TDecl . TFile   <$> conVal .: "templateFileE")
-                         )
+                     <*> (    TInline <$> conVal .: "template"
+                          <|> TFile   <$> conVal .: "file" )
           "Primitive" ->
             Primitive <$> conVal .: "name"
                       <*> conVal .: "primType"
@@ -201,5 +189,10 @@ instance FromJSON UnresolvedPrimitive where
         (,) <$> ((,) <$> c .: "name" <*> c .: "extension")
             <*> (TInline <$> c .: "content" <|>
                  TFile   <$> c .: "file")
+
+      parseTemplateKind (String "Declaration") = pure TDecl
+      parseTemplateKind (String "Expression")  = pure TExpr
+      parseTemplateKind c = error ("[4] Expected: Declaration or Expression, got " ++ show c)
+
   parseJSON unexpected =
     error $ "[3] Expected: BlackBox or Primitive object, got: " ++ show unexpected

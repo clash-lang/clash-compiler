@@ -1,5 +1,6 @@
 [ { "BlackBox" :
     { "name" : "Clash.Intel.DDR.altddioIn"
+    , "kind" : "Declaration"
     , "type" :
 "altddioIn
   :: ( HasCallStack               -- ARG[0]
@@ -13,7 +14,7 @@
   -> Signal slow (BitVector m,BitVector m)"
     , "libraries" : ["altera_mf"]
     , "imports" : ["altera_mf.altera_mf_components.all"]
-    , "templateD" :
+    , "template" :
 "-- altddioIn begin
 ~GENSYM[~COMPNAME_ALTDDIO_IN][0] : block
   signal ~GENSYM[dataout_l][1] : ~TYP[7];
@@ -50,6 +51,7 @@ end block;
   }
 , { "BlackBox" :
     { "name" : "Clash.Intel.DDR.altddioOut#"
+    , "kind" : "Declaration"
     , "type" :
 "altddioOut#
   :: ( HasCallStack             -- ARG[0]
@@ -64,7 +66,7 @@ end block;
   -> Signal fast (BitVector m)"
     , "libraries" : ["altera_mf"]
     , "imports" : ["altera_mf.altera_mf_components.all"]
-    , "templateD" :
+    , "template" :
 "-- altddioOut begin
 ~GENSYM[~COMPNAME_ALTDDIO_OUT][0] : block ~IF ~ISGATED[5] ~THEN
   signal ~GENSYM[clk][1]            : std_logic;

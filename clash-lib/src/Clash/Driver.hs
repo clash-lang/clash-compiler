@@ -265,7 +265,7 @@ compilePrimitive
   -> IO CompiledPrimitive
 compilePrimitive (BlackBoxHaskell bbName bbGenName source) = do
   -- Compile a blackbox template function or fetch it from an already compiled file.
-  r <- Hint.runInterpreter (go $ removeTypeTag source)
+  r <- Hint.runInterpreter (go source)
 
   case r of
     Left (Hint.GhcException err) ->
@@ -277,7 +277,7 @@ compilePrimitive (BlackBoxHaskell bbName bbGenName source) = do
     Left (Hint.WontCompile ghcErrs) ->
       error' "compilation errors" (intercalate "\n\n" $ map Hint.errMsg ghcErrs)
     Right f ->
-      return $ BlackBoxHaskell bbName bbGenName (const f <$> source)
+      return $ BlackBoxHaskell bbName bbGenName f
 
   where
     error' errType report =
@@ -323,15 +323,14 @@ compilePrimitive (BlackBoxHaskell bbName bbGenName source) = do
       Hint.setImports [ "Clash.Netlist.BlackBox.Types",  qualMod]
       Hint.unsafeInterpret funcName "BlackBoxFunction"
 
-compilePrimitive (BlackBox pNm oReg libM imps incs templT) =
+compilePrimitive (BlackBox pNm tkind oReg libM imps incs templT) =
   -- Parse a blackbox template
-  case removeTypeTag $ runParse <$> templT of
+  case runParse templT of
     Failure errInfo ->
       error (ANSI.displayS (ANSI.renderCompact (_errDoc errInfo)) "")
     Success templ ->
-      let templ' = const templ <$> templT in
-      return $ BlackBox pNm oReg (map parseBB libM) (map parseBB imps)
-                        (map (second parseBB) incs) templ'
+      return $ BlackBox pNm tkind oReg (map parseBB libM) (map parseBB imps)
+                        (map (second parseBB) incs) templ
  where
   parseBB :: Text -> BlackBoxTemplate
   parseBB t = case runParse t of

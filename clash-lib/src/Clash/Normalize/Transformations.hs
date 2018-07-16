@@ -112,7 +112,7 @@ import           Clash.Normalize.PrimitiveReductions
 import           Clash.Normalize.Types
 import           Clash.Normalize.Util
 import           Clash.Primitives.Types
-  (Primitive(..), PrimMap, TemplateType(TExpr), removeTypeTag)
+  (Primitive(..), PrimMap, TemplateKind(TExpr))
 import           Clash.Rewrite.Combinators
 import           Clash.Rewrite.Types
 import           Clash.Rewrite.Util
@@ -587,10 +587,10 @@ removeUnusedExpr :: NormRewrite
 removeUnusedExpr _ e@(collectArgs -> (p@(Prim nm _),args)) = do
   bbM <- HashMap.lookup nm <$> Lens.use (extra.primitives)
   case bbM of
-    Just (BlackBox pNm _ _ _ inc templ) -> do
+    Just (BlackBox pNm _ _ _ _ inc templ) -> do
       let usedArgs = if isFromInt pNm
                         then [0,1,2]
-                        else usedArguments (removeTypeTag templ) ++
+                        else usedArguments templ ++
                              concatMap (usedArguments . snd) inc
       tcm <- Lens.view tcCache
       args' <- go tcm 0 usedArgs args
@@ -1684,7 +1684,7 @@ inlineCleanup _ (Letrec b) = do
       = case tm of
           Prim nm _
             | Just p@(BlackBox {}) <- HashMap.lookup nm prims
-            , TExpr _ <- template p
+            , TExpr <- kind p
             , Just occ <- HashMap.lookup (nameOcc (varName id_)) allOccs
             , occ < 2
             -> True

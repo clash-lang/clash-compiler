@@ -1,5 +1,6 @@
 [ { "BlackBox" :
     { "name" : "Clash.Explicit.DDR.ddrIn#"
+    , "kind" : "Declaration"
     , "type" :
 "ddrIn# :: forall a slow fast n pFast gated synchronous.
            ( HasCallStack                         -- ARG[0]
@@ -12,7 +13,7 @@
         -> a                                      -- ARG[7]
         -> Signal fast a                          -- ARG[8]
         -> Signal slow (a,a)"
-    , "templateD" :
+    , "template" :
 "-- ddrIn begin
 ~GENSYM[~COMPNAME_ddrIn][0] : block
   signal ~GENSYM[data_Pos][1]       : ~TYP[8];
@@ -166,6 +167,7 @@ end block;
   }
 , { "BlackBox" :
     { "name" : "Clash.Explicit.DDR.ddrOut#"
+    , "kind" : "Declaration"
     , "type" :
 "ddrOut# :: ( HasCallStack               -- ARG[0]
             , fast ~ Dom n pFast         -- ARG[1]
@@ -176,7 +178,7 @@ end block;
          -> Signal slow a                -- ARG[6]
          -> Signal slow a                -- ARG[7]
          -> Signal fast a"
-    , "templateD" :
+    , "template" :
 "-- ddrOut begin
 ~GENSYM[~COMPNAME_ddrIn][0] : block
   signal ~GENSYM[data_Pos][1] : ~TYP[5];

@@ -48,10 +48,10 @@ resolvePrimitive' _metaPath (Primitive name primType) =
   return $ Primitive name primType
 resolvePrimitive' metaPath BlackBox{template=t, includes=i, ..} = do
   let resolvedIncludes = mapM (traverse (resolveTemplateSource metaPath)) i
-      resolved         = mapM (resolveTemplateSource metaPath) t
-  BlackBox name outputReg libraries imports <$> resolvedIncludes <*> resolved
+      resolved         = resolveTemplateSource metaPath t
+  BlackBox name kind outputReg libraries imports <$> resolvedIncludes <*> resolved
 resolvePrimitive' metaPath (BlackBoxHaskell bbName funcName t) =
-  BlackBoxHaskell bbName funcName <$> (mapM (mapM (resolveTemplateSource metaPath)) t)
+  BlackBoxHaskell bbName funcName <$> (mapM (resolveTemplateSource metaPath) t)
 
 -- | Interprets contents of json file as list of @Primitive@s.
 resolvePrimitive

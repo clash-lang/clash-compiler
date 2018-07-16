@@ -1,7 +1,8 @@
 [ { "BlackBox" :
     { "name"      : "Clash.Promoted.Nat.Unsafe.unsafeSNat"
+    , "kind"      : "Expression"
     , "type"      : "Clash.Promoted.Nat.Unsafe.unsafeSNat :: Integer -> SNat k"
-    , "templateE" : "~LIT[0]"
+    , "template"  : "~LIT[0]"
     }
   }
 ]

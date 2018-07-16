@@ -175,8 +175,7 @@ mkPrimitive bbEParen bbEasD dst nm args ty = do
     go =
       \case
         Just (P.BlackBoxHaskell bbName funcName func) ->
-          let func' = removeTypeTag func in
-          case func' bbEasD dst nm args ty of
+          case func bbEasD dst nm args ty of
             Left err -> do
               -- Blackbox template function returned an error:
               let err' = unwords [ $(curLoc) ++ "Could not create blackbox"
@@ -188,12 +187,14 @@ mkPrimitive bbEParen bbEasD dst nm args ty = do
             Right ((BlackBoxMeta {..}), bbTemplate) ->
               -- Blackbox template generation succesful. Rerun 'go', but this time
               -- around with a 'normal' @BlackBox@
-              let bb = P.BlackBox bbName bbOutputReg bbLibrary bbImports bbIncludes in
-              go $ Just $ bb $ (const bbTemplate) <$> func
+              go (Just (P.BlackBox bbName bbKind bbOutputReg bbLibrary bbImports bbIncludes bbTemplate))
+              -- let bb = P.BlackBox bbName bbKind bbOutputReg bbLibrary bbImports bbIncludes in
+              -- go $ Just $ bb $ (const bbTemplate) <$> func
         Just p@(P.BlackBox {outputReg = wr}) -> do
-          case template p of
-            (TDecl tempD) -> do
-              let pNm = name p
+          case kind p of
+            TDecl -> do
+              let tempD = template p
+                  pNm = name p
                   wr' = if wr then Reg else Wire
               resM <- resBndr True wr' dst
               case resM of
@@ -204,8 +205,9 @@ mkPrimitive bbEParen bbEasD dst nm args ty = do
                                            (includes p) templ bbCtx
                   return (Identifier dstNm Nothing,dstDecl ++ ctxDcls ++ templDecl ++ [bbDecl])
                 Nothing -> return (Identifier "__VOID__" Nothing,[])
-            (TExpr tempE) -> do
-              let pNm = name p
+            TExpr -> do
+              let tempE = template p
+                  pNm = name p
               if bbEasD
                 then do
                   resM <- resBndr True Wire dst
@@ -320,7 +322,7 @@ mkFunInput resId e = do
               bbM <- fmap (HashMap.lookup nm) $ Lens.use primitives
               (_,sp) <- Lens.use curCompNm
               let templ = case bbM of
-                            Just (P.BlackBox {..}) -> Left (outputReg,libraries,imports,includes,template)
+                            Just (P.BlackBox {..}) -> Left (kind,outputReg,libraries,imports,includes,template)
                             _ -> throw (ClashException sp ($(curLoc) ++ "No blackbox found for: " ++ unpack nm) Nothing)
               return templ
             Data dc -> do
@@ -373,12 +375,12 @@ mkFunInput resId e = do
             C.Lam _ -> go 0 appE
             _ -> error $ $(curLoc) ++ "Cannot make function input for: " ++ showDoc e
   case templ of
-    Left (oreg,libs,imps,inc,TDecl templ') -> do
+    Left (TDecl,oreg,libs,imps,inc,templ') -> do
       l   <- instantiateCompName templ'
       (l',templDecl)  <- setSym bbCtx l
       l'' <- collectFilePaths bbCtx l'
       return ((Left l'',if oreg then Reg else Wire,libs,imps,inc,bbCtx),dcls ++ templDecl)
-    Left (_,libs,imps,inc,TExpr templ') -> do
+    Left (TExpr,_,libs,imps,inc,templ') -> do
       templ'' <- getMon $ prettyBlackBox templ'
       let ass = Assignment (pack "~RESULT") (Identifier templ'' Nothing)
       return ((Right ("",[ass]),Wire,libs,imps,inc,bbCtx),dcls)

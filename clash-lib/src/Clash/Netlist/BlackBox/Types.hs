@@ -12,6 +12,7 @@ module Clash.Netlist.BlackBox.Types
  , emptyBlackBoxMeta
  , BlackBoxFunction
  , BlackBoxTemplate
+ , TemplateKind (..)
  , Element(..)
  , Decl(..)
  , HdlSyn(Vivado, Other)
@@ -25,10 +26,16 @@ import                Clash.Core.Type            (Type)
 import                Clash.Core.Var             (Id)
 import {-# SOURCE #-} Clash.Netlist.Types        (Identifier)
 
+data TemplateKind
+  = TDecl
+  | TExpr
+  deriving (Show, Eq)
+
 -- | See @Clash.Primitives.Types.BlackBox@ for documentation on this record's
 -- fields. (They are intentionally renamed to prevent name clashes.)
 data BlackBoxMeta =
   BlackBoxMeta { bbOutputReg :: Bool
+               , bbKind      :: TemplateKind
                , bbLibrary   :: [BlackBoxTemplate]
                , bbImports   :: [BlackBoxTemplate]
                , bbIncludes  :: [((S.Text, S.Text), BlackBoxTemplate)]
@@ -37,7 +44,7 @@ data BlackBoxMeta =
 -- | Use this value in your blackbox template function if you do want to
 -- accept the defaults as documented in @Clash.Primitives.Types.BlackBox@.
 emptyBlackBoxMeta :: BlackBoxMeta
-emptyBlackBoxMeta = BlackBoxMeta False [] [] []
+emptyBlackBoxMeta = BlackBoxMeta False TExpr [] [] []
 
 -- | A BlackBox function generates a blackbox template, given the inputs and
 -- result type of the function it should provide a blackbox for. This is useful

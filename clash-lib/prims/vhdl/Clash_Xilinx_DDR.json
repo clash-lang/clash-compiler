@@ -1,5 +1,6 @@
 [ { "BlackBox" :
     { "name" : "Clash.Xilinx.DDR.iddr"
+    , "kind" : "Declaration"
     , "type" :
 "iddr
   :: ( HasCallStack               -- ARG[0]
@@ -12,7 +13,7 @@
   -> Signal slow (BitVector m,BitVector m)"
     , "libraries" : ["UNISIM"]
     , "imports" : ["UNISIM.vcomponents.all"]
-    , "templateD" :
+    , "template" :
 "-- iddr begin
 ~GENSYM[~COMPNAME_IDDR][0] : block
   signal ~GENSYM[dataout_l][1] : ~TYP[6];
@@ -54,6 +55,7 @@ end block;
   }
 , { "BlackBox" :
     { "name" : "Clash.Xilinx.DDR.oddr#"
+    , "kind" : "Declaration"
     , "type" :
 "oddr#
   :: ( slow ~ Dom n (2*pFast)           -- ARG[0]
@@ -66,7 +68,7 @@ end block;
   -> Signal fast (BitVector m)"
     , "libraries" : ["UNISIM"]
     , "imports" : ["UNISIM.vcomponents.all"]
-    , "templateD" :
+    , "template" :
 "-- oddr begin
 ~GENSYM[~COMPNAME_ODDR][0] : block
   signal ~GENSYM[dataout_l][1] : ~TYPO;

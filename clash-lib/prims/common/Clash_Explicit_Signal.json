@@ -1,12 +1,13 @@
 [ { "BlackBox" :
     { "name"      : "Clash.Explicit.Signal.unsafeSynchronizer"
+    , "kind"      : "Expression"
     , "type" :
 "unsafeSynchronizer
   :: Clock dom1 g1
   -> Clock dom2 g2
   -> Signal dom1 a -- ARG[2]
   -> Signal dom2 a"
-    , "templateE" : "~ARG[2]"
+    , "template"  : "~ARG[2]"
     }
   }
 ]

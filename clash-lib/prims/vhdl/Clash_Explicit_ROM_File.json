@@ -1,5 +1,6 @@
 [ { "BlackBox" :
     { "name" : "Clash.Explicit.ROM.File.romFile#"
+    , "kind" : "Declaration"
     , "type" :
 "romFile# :: KnownNat m      -- ARG[0]
           => Clock dom gated -- clk,  ARG[1]
@@ -7,7 +8,7 @@
           -> FilePath        -- file, ARG[3]
           -> Signal dom Int  -- rd,   ARG[4]
           -> Signal dom (BitVector m)"
-    , "templateD" :
+    , "template" :
 "-- romFile begin
 ~GENSYM[~COMPNAME_romFile][0] : block
   type ~GENSYM[RomType][4] is array(natural range <>) of bit_vector(~LIT[0]-1 downto 0);

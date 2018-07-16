@@ -1,5 +1,6 @@
 [ { "BlackBox" :
     { "name" : "Clash.Explicit.RAM.asyncRam#"
+    , "kind" : "Declaration"
     , "type" :
 "asyncRam#
   :: HasCallStack      -- ARG[0]
@@ -11,7 +12,7 @@
   -> Signal wdom Int   -- ^ wr,   ARG[6]
   -> Signal wdom a     -- ^ din,  ARG[7]
   -> Signal rdom a"
-    , "templateD" :
+    , "template" :
 "-- asyncRam begin
 ~GENSYM[~COMPNAME_asyncRam][0] : block~IF ~VIVADO ~THEN
   type ~GENSYM[RamType][4] is array(natural range <>) of std_logic_vector(~SIZE[~TYP[7]]-1 downto 0);~ELSE

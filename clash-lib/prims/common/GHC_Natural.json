@@ -5,8 +5,9 @@
   }
 , { "BlackBox" :
     { "name"      : "GHC.Natural.underflowError"
+    , "kind"      : "Expression"
     , "type"      : "underflowError :: a"
-    , "templateE" : "~ERRORO"
+    , "template"  : "~ERRORO"
     }
   }
 ]

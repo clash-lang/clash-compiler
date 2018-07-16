@@ -1,61 +1,43 @@
 [ { "BlackBox" :
     { "name"      : "GHC.Classes.eqInt"
+    , "kind"      : "Expression"
     , "type"      : "eqInt :: Int -> Int -> Bool"
-    , "templateE" : "~ARG[0] = ~ARG[1]"
+    , "template"  : "~ARG[0] = ~ARG[1]"
     }
   }
 , { "BlackBox" :
     { "name"      : "GHC.Classes.neInt"
+    , "kind"      : "Expression"
     , "type"      : "neInt :: Int -> Int -> Bool"
-    , "templateE" : "~ARG[0] /= ~ARG[1]"
-    }
-  }
-, { "BlackBox" :
-    { "name"      : "GHC.Classes.gtInt"
-    , "type"      : "gtInt :: Int -> Int -> Bool"
-    , "templateE" : "~ARG[0] > ~ARG[1]"
-    }
-  }
-, { "BlackBox" :
-    { "name"      : "GHC.Classes.geInt"
-    , "type"      : "geInt :: Int -> Int -> Bool"
-    , "templateE" : "~ARG[0] >= ~ARG[1]"
-    }
-  }
-, { "BlackBox" :
-    { "name"      : "GHC.Classes.ltInt"
-    , "type"      : "ltInt :: Int -> Int -> Bool"
-    , "templateE" : "~ARG[0] < ~ARG[1]"
-    }
-  }
-, { "BlackBox" :
-    { "name"      : "GHC.Classes.leInt"
-    , "type"      : "leInt :: Int -> Int -> Bool"
-    , "templateE" : "~ARG[0] <= ~ARG[1]"
+    , "template"  : "~ARG[0] /= ~ARG[1]"
     }
   }
 , { "BlackBox" :
     { "name"      : "GHC.Classes.&&"
+    , "kind"      : "Expression"
     , "type"      : "(&&) :: Bool -> Bool -> Bool"
-    , "templateE" : "~ARG[0] and ~ARG[1]"
+    , "template"  : "~ARG[0] and ~ARG[1]"
     }
   }
 , { "BlackBox" :
     { "name"      : "GHC.Classes.||"
+    , "kind"      : "Expression"
     , "type"      : "(::) :: Bool -> Bool -> Bool"
-    , "templateE" : "~ARG[0] or ~ARG[1]"
+    , "template"  : "~ARG[0] or ~ARG[1]"
     }
   }
 , { "BlackBox" :
     { "name"      : "GHC.Classes.not"
+    , "kind"      : "Expression"
     , "type"      : "not :: Bool -> Bool"
-    , "templateE" : "not ~ARG[0]"
+    , "template"  : "not ~ARG[0]"
     }
   }
 , { "BlackBox" :
     { "name"      : "GHC.Classes.divInt#"
+    , "kind"      : "Declaration"
     , "type"      : "divInt# :: Int# -> Int# -> Int#"
-    , "templateD" :
+    , "template"  :
 "-- divInt begin
 ~GENSYM[divInt][0] : block
   signal ~GENSYM[quot_res][1] : ~TYP[1];
@@ -69,8 +51,9 @@ end block;
   }
 , { "BlackBox" :
     { "name"      : "GHC.Classes.modInt#"
+    , "kind"      : "Expression"
     , "type"      : "modInt# :: Int# -> Int# -> Int#"
-    , "templateE" : "~ARG[0] mod ~ARG[1]"
+    , "template"  : "~ARG[0] mod ~ARG[1]"
     }
   }
 ]

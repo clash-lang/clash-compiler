@@ -1,5 +1,6 @@
 [ { "BlackBox" :
     { "name"      : "GHC.Integer.Logarithms.integerLogBase#"
+    , "kind"      : "Expression"
     , "type"      : "integerLogBase# :: Integer -> Integer -> Int#"
     , "imports"   : ["~INCLUDENAME[0].inc"]
     , "includes" :
@@ -16,7 +17,7 @@ function integer ~INCLUDENAME[0];
 endfunction"
         }
       ]
-    , "templateE" : "~INCLUDENAME[0](~ARG[0],~ARG[1])"
+    , "template"  : "~INCLUDENAME[0](~ARG[0],~ARG[1])"
     }
   }
 ]

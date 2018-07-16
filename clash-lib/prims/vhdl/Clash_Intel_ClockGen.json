@@ -1,12 +1,13 @@
 [ { "BlackBox" :
     { "name"      : "Clash.Intel.ClockGen.altpll"
+    , "kind"      : "Declaration"
     , "type"      :
 "altpll
   :: SSymbol name               -- ARG[0]
   -> Clock  pllIn 'Source       -- ARG[1]
   -> Reset  pllIn 'Asynchronous -- ARG[2]
   -> (Clock pllOut 'Source, Signal pllOut Bool)"
-    , "templateD" :
+    , "template" :
 "-- altpll begin
 ~GENSYM[altpll][0] : block
   signal ~GENSYM[pllOut][1]  : std_logic;
@@ -29,13 +30,14 @@ end block;
   }
 , { "BlackBox" :
     { "name"      : "Clash.Intel.ClockGen.alteraPll"
+    , "kind"      : "Declaration"
     , "type"      :
 "alteraPll
   :: SSymbol name               -- ARG[0]
   -> Clock  pllIn 'Source       -- ARG[1]
   -> Reset  pllIn 'Asynchronous -- ARG[2]
   -> (Clock pllOut 'Source, Signal pllOut Bool)"
-    , "templateD" :
+    , "template" :
 "-- alteraPll begin
 ~GENSYM[alteraPll][0] : block
   signal ~GENSYM[pllOut][1]  : std_logic;

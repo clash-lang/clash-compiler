@@ -1,12 +1,13 @@
 [ { "BlackBox" :
     { "name" : "Clash.Prelude.ROM.File.asyncRomFile#"
+    , "kind" : "Declaration"
     , "type" :
 "asyncRomFile# :: KnownNat m -- ARG[0]
                => SNat n     -- sz,   ARG[1]
                -> FilePath   -- file, ARG[2]
                -> Int        -- rd,   ARG[3]
                -> BitVector m"
-    , "templateD" :
+    , "template" :
 "-- asyncRomFile begin
 ~GENSYM[asyncROMFile][0] : block
   type ~GENSYM[RomType][4] is array(natural range <>) of bit_vector(~LIT[0]-1 downto 0);

@@ -1,24 +1,8 @@
-[ { "Primitive" :
-    { "name"      : "GHC.Base.$"
-    , "primType"  : "Function"
-    }
-  }
-, { "BlackBox" :
-    { "name"      : "GHC.Base.quotInt"
-    , "type"      : "quotInt :: Int -> Int -> Int"
-    , "templateE" : "~ARG[0] / ~ARG[1]"
-    }
-  }
-, { "BlackBox" :
-    { "name"      : "GHC.Base.remInt"
-    , "type"      : "remInt :: Int -> Int -> Int"
-    , "templateE" : "~ARG[0] % ~ARG[1]"
-    }
-  }
-, { "BlackBox" :
+[ { "BlackBox" :
     { "name"      : "GHC.Base.divInt"
+    , "kind"      : "Declaration"
     , "type"      : "divInt :: Int -> Int -> Int"
-    , "templateD" :
+    , "template"  :
 "// divInt begin
 // divide (rounds towards zero)
 wire ~SIGD[~GENSYM[quot_res][0]][0];
@@ -31,8 +15,9 @@ assign ~RESULT = (~VAR[dividend][0][~SIZE[~TYPO]-1] == ~VAR[divider][1][~SIZE[~T
   }
 , { "BlackBox" :
     { "name"      : "GHC.Base.modInt"
+    , "kind"      : "Declaration"
     , "type"      : "modInt :: Int -> Int -> Int"
-    , "templateD" :
+    , "template" :
 "// modInt begin
 // remainder
 wire ~SIGD[~GENSYM[rem_res][0]][0];

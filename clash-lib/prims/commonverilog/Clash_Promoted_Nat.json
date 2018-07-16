@@ -1,11 +1,6 @@
 [ { "BlackBox" :
-    { "name"      : "Clash.Promoted.Nat.powSNat"
-    , "type"      : "Clash.Promoted.Nat.powSNat :: SNat a -> SNat b -> SNat (a^b)"
-    , "templateE" : "~LIT[0] ** ~LIT[1]"
-    }
-  }
-, { "BlackBox" :
     { "name"      : "Clash.Promoted.Nat.flogBaseSNat"
+    , "kind"      : "Expression"
     , "type"      : "Clash.Promoted.Nat.flogBaseSNat :: (2 <= base, 1 <= x)
                                                      => SNat base -- ARG[2]
                                                      -> SNat x    -- ARG[3]
@@ -25,11 +20,12 @@ function integer ~INCLUDENAME[0];
 endfunction"
         }
       ]
-    , "templateE" : "~INCLUDENAME[0](~LIT[2],~LIT[3])"
+    , "template"  : "~INCLUDENAME[0](~LIT[2],~LIT[3])"
     }
   }
 , { "BlackBox" :
     { "name"      : "Clash.Promoted.Nat.clogBaseSNat"
+    , "kind"      : "Expression"
     , "type"      : "Clash.Promoted.Nat.clogBaseSNat :: (2 <= base, 1 <= x)
                                                      => SNat base -- ARG[2]
                                                      -> SNat x    -- ARG[3]
@@ -48,11 +44,12 @@ function integer ~INCLUDENAME[0];
 endfunction"
         }
       ]
-    , "templateE" : "~INCLUDENAME[0](~LIT[2],~LIT[3])"
+    , "template"  : "~INCLUDENAME[0](~LIT[2],~LIT[3])"
     }
   }
 , { "BlackBox" :
     { "name"      : "Clash.Promoted.Nat.logBaseSNat"
+    , "kind"      : "Expression"
     , "type"      : "Clash.Promoted.Nat.logBaseSNat :: (FLog base x ~ CLog base x)
                                                     => SNat base -- ARG[1]
                                                     -> SNat x    -- ARG[2]
@@ -72,7 +69,7 @@ function integer ~INCLUDENAME[0];
 endfunction"
         }
       ]
-    , "templateE" :  "~INCLUDENAME[0](~LIT[1],~LIT[2])"
+    , "template"  :  "~INCLUDENAME[0](~LIT[1],~LIT[2])"
     }
   }
 ]

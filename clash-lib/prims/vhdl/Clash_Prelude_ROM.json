@@ -1,11 +1,12 @@
 [ { "BlackBox" :
     { "name" : "Clash.Prelude.ROM.asyncRom#"
+    , "kind" : "Declaration"
     , "type" :
 "asyncRom# :: KnownNat n -- ^ ARG[0]
            => Vec n a    -- ^ ARG[1]
            -> Int        -- ^ ARG[2]
            -> a"
-    , "templateD" :
+    , "template" :
 "-- asyncRom begin
 ~GENSYM[asyncRom][0] : block
   signal ~GENSYM[ROM][1] : ~TYP[1];

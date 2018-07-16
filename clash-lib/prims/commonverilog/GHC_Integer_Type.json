@@ -1,0 +1,127 @@
+[ { "BlackBox" :
+    { "name"      : "GHC.Integer.Type.smallInteger"
+    , "kind"      : "Declaration"
+    , "type"      : "smallInteger :: Int# -> Integer"
+    , "template"  : "assign ~RESULT = $signed(~ARG[0]);"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "GHC.Integer.Type.integerToInt"
+    , "kind"      : "Declaration"
+    , "type"      : "integerToInt :: Integer -> Int#"
+    , "template"  : "assign ~RESULT = $signed(~ARG[0]);"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "GHC.Integer.Type.timesInteger"
+    , "kind"      : "Expression"
+    , "type"      : "timesInteger :: Integer -> Integer -> Integer"
+    , "template"  : "~ARG[0] * ~ARG[1]"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "GHC.Integer.Type.negateInteger"
+    , "kind"      : "Expression"
+    , "type"      : "negateInteger :: Integer -> Integer"
+    , "template"  : "-~ARG[0]"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "GHC.Integer.Type.absInteger"
+    , "kind"      : "Expression"
+    , "type"      : "absInteger :: Integer -> Integer"
+    , "template"  : "(~ARG[0] < ~SIZE[~TYPO]'sd0) ? -~ARG[0] : ~ARG[0]"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "GHC.Integer.Type.remInteger"
+    , "kind"      : "Expression"
+    , "type"      : "remInteger :: Integer -> Integer -> Integer"
+    , "template"  : "~ARG[0] % ~ARG[1]"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "GHC.Integer.Type.eqInteger"
+    , "kind"      : "Expression"
+    , "type"      : "eqInteger :: Integer -> Integer -> Bool"
+    , "template"  : "~ARG[0] == ~ARG[1]"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "GHC.Integer.Type.neqInteger"
+    , "kind"      : "Expression"
+    , "type"      : "neqInteger :: Integer -> Integer -> Bool"
+    , "template"  : "~ARG[0] != ~ARG[1]"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "GHC.Integer.Type.eqInteger#"
+    , "kind"      : "Expression"
+    , "type"      : "eqInteger :: Integer -> Integer -> Bool"
+    , "template"  : "(~ARG[0] == ~ARG[1]) ? ~SIZE[~TYPO]'sd1 : ~SIZE[~TYPO]'sd0"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "GHC.Integer.Type.neqInteger#"
+    , "kind"      : "Expression"
+    , "type"      : "neqInteger :: Integer -> Integer -> Bool"
+    , "template"  : "(~ARG[0] != ~ARG[1]) ? ~SIZE[~TYPO]'sd1 : ~SIZE[~TYPO]'sd0"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "GHC.Integer.Type.leInteger#"
+    , "kind"      : "Expression"
+    , "type"      : "leInteger :: Integer -> Integer -> Bool"
+    , "template"  : "(~ARG[0] <= ~ARG[1]) ? ~SIZE[~TYPO]'sd1 : ~SIZE[~TYPO]'sd0"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "GHC.Integer.Type.gtInteger#"
+    , "kind"      : "Expression"
+    , "type"      : "gtInteger :: Integer -> Integer -> Bool"
+    , "template"  : "(~ARG[0] > ~ARG[1] ? ~SIZE[~TYPO]'sd1 : ~SIZE[~TYPO]'sd0"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "GHC.Integer.Type.ltInteger#"
+    , "kind"      : "Expression"
+    , "type"      : "ltInteger :: Integer -> Integer -> Bool"
+    , "template"  : "(~ARG[0] < ~ARG[1]) ? ~SIZE[~TYPO]'sd1 : ~SIZE[~TYPO]'sd0"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "GHC.Integer.Type.geInteger#"
+    , "kind"      : "Expression"
+    , "type"      : "geInteger :: Integer -> Integer -> Bool"
+    , "template"  : "(~ARG[0] >= ~ARG[1]) ? ~SIZE[~TYPO]'sd1 : ~SIZE[~TYPO]'sd0"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "GHC.Integer.Type.shiftRInteger"
+    , "kind"      : "Expression"
+    , "type"      : "shiftRInteger :: Integer -> Int# -> Integer"
+    , "template"  : "~ARG[0] >>> ~ARG[1]"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "GHC.Integer.Type.shiftLInteger"
+    , "kind"      : "Expression"
+    , "type"      : "shiftLInteger :: Integer -> Int# -> Integer"
+    , "template"  : "~ARG[0] <<< ~ARG[1]"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "GHC.Integer.Type.wordToInteger"
+    , "kind"      : "Declaration"
+    , "type"      : "wordToInteger :: Word# -> Integer"
+    , "template"  : "assign ~RESULT = $signed(~ARG[0]);"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "GHC.Integer.Type.integerToWord"
+    , "kind"      : "Declaration"
+    , "type"      : "integerToWord :: Integer -> Word#"
+    , "template"  : "assign ~RESULT = $unsigned(~ARG[0]);"
+    }
+  }
+]

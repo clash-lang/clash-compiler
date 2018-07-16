@@ -1,5 +1,6 @@
 [ { "BlackBox" :
     { "name" : "Clash.Explicit.BlockRam.File.blockRamFile#"
+    , "kind" : "Declaration"
     , "type" :
 "blockRamFile#
   :: (KnownNat m, HasCallStack)-- (ARG[0],ARG]1)
@@ -11,7 +12,7 @@
   -> Signal dom Int           -- wr,   ARG[7]
   -> Signal dom (BitVector m) -- din,  ARG[8]
   -> Signal dom (BitVector m)"
-    , "templateD" :
+    , "template" :
 "-- blockRamFile begin
 ~GENSYM[~COMPNAME_blockRamFile][0] : block
   type ~GENSYM[RamType][6] is array(natural range <>) of bit_vector(~LIT[0]-1 downto 0);
