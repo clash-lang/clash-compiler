@@ -137,7 +137,7 @@ data Primitive a b c
     -- ^ VHDL only: add /library/ declarations for the given names
   , imports   :: [a]
     -- ^ VHDL only: add /use/ declarations for the given names
-  , includes  :: [((S.Text,S.Text),a)]
+  , includes  :: [((S.Text,S.Text),b)]
     -- ^ Create files to be included with the generated primitive. The fields
     -- are ((name, extension), content), where content is a template of the file
     -- Defaults to @[]@ when not specified in the /.json/ file
@@ -198,6 +198,8 @@ instance FromJSON UnresolvedPrimitive where
       e -> error $ "[2] Expected: BlackBox or Primitive object, got: " ++ show e
     where
       parseInclude c =
-        (,) <$> ((,) <$> c .: "name" <*> c .: "extension") <*> c .: "content"
+        (,) <$> ((,) <$> c .: "name" <*> c .: "extension")
+            <*> (TInline <$> c .: "content" <|>
+                 TFile   <$> c .: "file")
   parseJSON unexpected =
     error $ "[3] Expected: BlackBox or Primitive object, got: " ++ show unexpected
