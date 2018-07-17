@@ -4,8 +4,14 @@
   Maintainer  :  Christiaan Baaij <christiaan.baaij@gmail.com>
 -}
 
-module Clash.Netlist.Types (Identifier) where
+module Clash.Netlist.Types where
 
 import Data.Text.Lazy (Text)
 
 type Identifier = Text
+
+data HWType
+data Declaration
+data Component
+data Expr
+data BlackBox

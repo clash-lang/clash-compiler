@@ -9,7 +9,7 @@
     , "includes" :
       [ { "name" : "flogBase"
         , "extension" : "inc"
-        , "content" :
+        , "template" :
 "// floor of logBase
 function integer ~INCLUDENAME[0];
   input integer base, value;
@@ -34,7 +34,7 @@ endfunction"
     , "includes" :
       [ { "name" : "clogBase"
         , "extension" : "inc"
-        , "content" :
+        , "template" :
 "// ceiling of logBase
 function integer ~INCLUDENAME[0];
   input integer base, value;
@@ -58,7 +58,7 @@ endfunction"
     , "includes" :
       [ { "name" : "clogBase"
         , "extension" : "inc"
-        , "content" :
+        , "template" :
 "// logBaseSNat begin
 function integer ~INCLUDENAME[0];
   input integer base, value;

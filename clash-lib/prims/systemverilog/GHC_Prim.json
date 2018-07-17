@@ -36,7 +36,7 @@ assign ~RESULT = {~SYM[0],~SYM[1]};
     , "includes" :
       [ { "name" : "depth2Index"
         , "extension" : "inc"
-        , "content" :
+        , "template" :
 "// given a level and a depth, calculate the corresponding index into the
 // intermediate array
 function integer ~INCLUDENAME[0];
@@ -92,7 +92,7 @@ assign ~RESULT = $unsigned(~SYM[3][(2*~SYM[0])-2]);
     , "includes" :
       [ { "name" : "depth2Index"
         , "extension" : "inc"
-        , "content" :
+        , "template" :
 "// given a level and a depth, calculate the corresponding index into the
 // intermediate array
 function integer ~INCLUDENAME[0];
@@ -148,7 +148,7 @@ assign ~RESULT = $unsigned(~SYM[3][(2*~SYM[0])-2]);
     , "includes" :
       [ { "name" : "depth2Index"
         , "extension" : "inc"
-        , "content" :
+        , "template" :
 "// given a level and a depth, calculate the corresponding index into the
 // intermediate array
 function integer ~INCLUDENAME[0];
@@ -204,7 +204,7 @@ assign ~RESULT = $unsigned(~SYM[3][(2*~SYM[0])-2]);
     , "includes" :
       [ { "name" : "depth2Index"
         , "extension" : "inc"
-        , "content" :
+        , "template" :
 "// given a level and a depth, calculate the corresponding index into the
 // intermediate array
 function integer ~INCLUDENAME[0];
@@ -260,7 +260,7 @@ assign ~RESULT = $unsigned(~SYM[3][(2*~SYM[0])-2]);
     , "includes" :
       [ { "name" : "depth2Index"
         , "extension" : "inc"
-        , "content" :
+        , "template" :
 "// given a level and a depth, calculate the corresponding index into the
 // intermediate array
 function integer ~INCLUDENAME[0];
@@ -316,7 +316,7 @@ assign ~RESULT = $unsigned(~SYM[3][(2*~SYM[0])-2]);
     , "includes" :
       [ { "name" : "enc"
         , "extension" : "inc"
-        , "content" :
+        , "template" :
 "function [1:0] ~INCLUDENAME[0];
   input [1:0] a;
   case (a)
@@ -384,7 +384,7 @@ assign ~RESULT = $unsigned(~SYM[7]);
     , "includes" :
       [ { "name" : "enc"
         , "extension" : "inc"
-        , "content" :
+        , "template" :
 "function [1:0] ~INCLUDENAME[0];
   input [1:0] a;
   case (a)
@@ -468,7 +468,7 @@ assign ~RESULT = $unsigned(~SYM[7]);
     , "includes" :
       [ { "name" : "enc"
         , "extension" : "inc"
-        , "content" :
+        , "template" :
 "function [1:0] ~INCLUDENAME[0];
   input [1:0] a;
   case (a)
@@ -568,7 +568,7 @@ assign ~RESULT = $unsigned(~SYM[7]);
     , "includes" :
       [ { "name" : "enc"
         , "extension" : "inc"
-        , "content" :
+        , "template" :
 "function [1:0] ~INCLUDENAME[0];
   input [1:0] a;
   case (a)
@@ -684,7 +684,7 @@ assign ~RESULT = $unsigned(~SYM[7]);
     , "includes" :
       [ { "name" : "enc"
         , "extension" : "inc"
-        , "content" :
+        , "template" :
 "function [1:0] ~INCLUDENAME[0];
   input [1:0] a;
   case (a)
@@ -875,7 +875,7 @@ assign ~RESULT = $unsigned(~SYM[7]);
     , "includes" :
       [ { "name" : "enc"
         , "extension" : "inc"
-        , "content" :
+        , "template" :
 "function [1:0] ~INCLUDENAME[0];
   input [1:0] a;
   case (a)
@@ -948,7 +948,7 @@ assign ~RESULT = $unsigned(~SYM[7]);
     , "includes" :
       [ { "name" : "enc"
         , "extension" : "inc"
-        , "content" :
+        , "template" :
 "function [1:0] ~INCLUDENAME[0];
   input [1:0] a;
   case (a)
@@ -1037,7 +1037,7 @@ assign ~RESULT = $unsigned(~SYM[7]);
     , "includes" :
       [ { "name" : "enc"
         , "extension" : "inc"
-        , "content" :
+        , "template" :
 "function [1:0] ~INCLUDENAME[0];
   input [1:0] a;
   case (a)
@@ -1142,7 +1142,7 @@ assign ~RESULT = $unsigned(~SYM[7]);
     , "includes" :
       [ { "name" : "enc"
         , "extension" : "inc"
-        , "content" :
+        , "template" :
 "function [1:0] ~INCLUDENAME[0];
   input [1:0] a;
   case (a)
@@ -1263,7 +1263,7 @@ assign ~RESULT = $unsigned(~SYM[7]);
     , "includes" :
       [ { "name" : "enc"
         , "extension" : "inc"
-        , "content" :
+        , "template" :
 "function [1:0] ~INCLUDENAME[0];
   input [1:0] a;
   case (a)

@@ -19,6 +19,7 @@
 module Clash.Primitives.Types
   ( TemplateSource(..)
   , TemplateKind(..)
+  , TemplateFormat(..)
   , BlackBoxFunctionName(..)
   , Primitive(..)
   , PrimMap
@@ -29,6 +30,7 @@ module Clash.Primitives.Types
   , CompiledPrimMap
   ) where
 
+import {-# SOURCE #-} Clash.Netlist.Types
 import           Clash.Netlist.BlackBox.Types
   (BlackBoxTemplate, BlackBoxFunction, TemplateKind (..))
 import           Control.Applicative          ((<|>))
@@ -44,16 +46,16 @@ import           Data.Text.Lazy               (Text)
 import           GHC.Stack                    (HasCallStack)
 
 -- | An unresolved primitive still contains pointers to files.
-type UnresolvedPrimitive = Primitive Text TemplateSource (Maybe TemplateSource)
+type UnresolvedPrimitive = Primitive Text ((TemplateFormat,BlackBoxFunctionName),Maybe TemplateSource) (Maybe TemplateSource)
 
 -- | A parsed primitive does not contain pointers to filesystem files anymore,
 -- but holds uncompiled @BlackBoxTemplate@s and @BlackBoxFunction@s.
-type ResolvedPrimitive = Primitive Text Text (Maybe Text)
+type ResolvedPrimitive = Primitive Text ((TemplateFormat,BlackBoxFunctionName),Maybe Text) (Maybe Text)
 type ResolvedPrimMap   = PrimMap ResolvedPrimitive
 
 -- | A compiled primitive has compiled all templates and functions from its
 -- @ResolvedPrimitive@ counterpart.
-type CompiledPrimitive = Primitive BlackBoxTemplate BlackBoxTemplate BlackBoxFunction
+type CompiledPrimitive = Primitive BlackBoxTemplate BlackBox BlackBoxFunction
 type CompiledPrimMap   = PrimMap CompiledPrimitive
 
 -- | A @PrimMap@ maps primitive names to a @Primitive@
@@ -113,6 +115,12 @@ data TemplateSource
   -- ^ Template stored inline
   deriving (Show, Eq)
 
+
+data TemplateFormat
+  = TTemplate
+  | THaskell
+  deriving Show
+
 -- | Externally defined primitive
 data Primitive a b c
   -- | Primitive template written in a Clash specific templating language
@@ -161,7 +169,7 @@ instance FromJSON UnresolvedPrimitive where
         case conKey of
           "BlackBoxHaskell"  -> do
             name' <- conVal .: "name"
-            fName <- conVal .: "functionName"
+            fName <- conVal .: "templateFunction"
             templ <- (Just . TInline <$> conVal .: "template")
                  <|> (Just . TFile   <$> conVal .: "file")
                  <|> (pure Nothing)
@@ -176,8 +184,7 @@ instance FromJSON UnresolvedPrimitive where
                      <*> conVal .:? "libraries" .!= []
                      <*> conVal .:? "imports" .!= []
                      <*> (conVal .:? "includes" .!= [] >>= traverse parseInclude)
-                     <*> (    TInline <$> conVal .: "template"
-                          <|> TFile   <$> conVal .: "file" )
+                     <*> parseTemplate conVal
           "Primitive" ->
             Primitive <$> conVal .: "name"
                       <*> conVal .: "primType"
@@ -185,14 +192,28 @@ instance FromJSON UnresolvedPrimitive where
           e -> error $ "[1] Expected: BlackBox or Primitive object, got: " ++ show e
       e -> error $ "[2] Expected: BlackBox or Primitive object, got: " ++ show e
     where
+      parseTemplate c =
+        (,) <$> ((,) <$> (c .:? "format" >>= traverse parseTemplateFormat) .!= TTemplate
+                     <*> (c .:? "templateFunction" >>= traverse parseBBFN') .!= defTemplateFunction)
+            <*> (Just . TInline <$> c .: "template" <|>
+                 Just . TFile   <$> c .: "file" <|>
+                 pure Nothing)
+
       parseInclude c =
         (,) <$> ((,) <$> c .: "name" <*> c .: "extension")
-            <*> (TInline <$> c .: "content" <|>
-                 TFile   <$> c .: "file")
+            <*> parseTemplate c
 
       parseTemplateKind (String "Declaration") = pure TDecl
       parseTemplateKind (String "Expression")  = pure TExpr
       parseTemplateKind c = error ("[4] Expected: Declaration or Expression, got " ++ show c)
+
+      parseTemplateFormat (String "Template") = pure TTemplate
+      parseTemplateFormat (String "Haskell")  = pure THaskell
+      parseTemplateFormat c = error ("[5] unexpected format: " ++ show c)
+
+      parseBBFN' = either error return . parseBBFN
+
+      defTemplateFunction = BlackBoxFunctionName ["Template"] "template"
 
   parseJSON unexpected =
     error $ "[3] Expected: BlackBox or Primitive object, got: " ++ show unexpected

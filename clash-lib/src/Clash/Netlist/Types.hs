@@ -11,8 +11,10 @@
 {-# LANGUAGE DeriveGeneric              #-}
 {-# LANGUAGE DerivingStrategies         #-}
 {-# LANGUAGE DeriveLift                 #-}
+{-# LANGUAGE GADTs                      #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE PatternSynonyms            #-}
+{-# LANGUAGE RankNTypes                 #-}
 {-# LANGUAGE TemplateHaskell            #-}
 {-# LANGUAGE DeriveDataTypeable         #-}
 
@@ -25,6 +27,7 @@ module Clash.Netlist.Types
 where
 
 import Control.DeepSeq
+import Control.Monad.State                  (State)
 import Control.Monad.State.Strict           (MonadIO, MonadState, StateT)
 import Data.Bits                            (testBit)
 import Data.Hashable
@@ -33,6 +36,7 @@ import Data.IntMap.Lazy                     (IntMap, empty)
 import qualified Data.Text                  as S
 import Data.Text.Lazy                       (Text, pack)
 import Data.Typeable                        (Typeable)
+import Data.Text.Prettyprint.Doc.Extra      (Doc)
 import GHC.Generics                         (Generic)
 import Language.Haskell.TH.Syntax           (Lift)
 import Unbound.Generics.LocallyNameless     (Fresh, FreshMT)
@@ -40,6 +44,7 @@ import Unbound.Generics.LocallyNameless     (Fresh, FreshMT)
 import SrcLoc                               (SrcSpan)
 
 import Clash.Annotations.TopEntity          (TopEntity)
+import Clash.Backend                        (Backend)
 import Clash.Core.Term                      (TmOccName)
 import Clash.Core.Type                      (Type)
 import Clash.Core.TyCon                     (TyCon, TyConOccName)
@@ -183,9 +188,6 @@ data Declaration
   -- * List of: (Maybe expression scrutinized expression is compared with,RHS of alternative)
   | InstDecl (Maybe Identifier) !Identifier !Identifier [(Expr,PortDirection,HWType,Expr)]
   -- ^ Instantiation of another component
--- <<<<<<< 709bb96b1c1c828afe2184c3520177480f01b248
---   | BlackBoxD !S.Text [BlackBoxTemplate] [BlackBoxTemplate] [((S.Text,S.Text),BlackBoxTemplate)] !BlackBoxTemplate BlackBoxContext
--- =======
   | BlackBoxD
       -- Primitive name:
       !S.Text
@@ -194,9 +196,9 @@ data Declaration
       -- VHDL only: add /use/ declarations:
       [BlackBoxTemplate]
       -- Intel/Quartus only: create a /.qsys/ file from given template:
-      [((S.Text,S.Text),BlackBoxTemplate)]
+      [((S.Text,S.Text),BlackBox)]
       -- Template tokens:
-      !BlackBoxTemplate
+      !BlackBox
       -- Context in which tokens should be rendered:
       BlackBoxContext
 -- >>>>>>> Small documentation cleanup in `Netlist/Types.hs`
@@ -244,9 +246,9 @@ data Expr
       -- VHDL only: add /use/ declarations:
       [BlackBoxTemplate]
       -- Intel/Quartus only: create a /.qsys/ file from given template.
-      [((S.Text,S.Text),BlackBoxTemplate)]
+      [((S.Text,S.Text),BlackBox)]
       -- Template tokens:
-      !BlackBoxTemplate
+      !BlackBox
       -- Context in which tokens should be rendered:
       !BlackBoxContext
       -- Wrap in paretheses?:
@@ -286,11 +288,11 @@ data BlackBoxContext
   = Context
   { bbResult    :: (Expr,HWType) -- ^ Result name and type
   , bbInputs    :: [(Expr,HWType,Bool)] -- ^ Argument names, types, and whether it is a literal
-  , bbFunctions :: IntMap (Either BlackBoxTemplate (Identifier,[Declaration])
+  , bbFunctions :: IntMap (Either BlackBox (Identifier,[Declaration])
                           ,WireOrReg
                           ,[BlackBoxTemplate]
                           ,[BlackBoxTemplate]
-                          ,[((S.Text,S.Text),BlackBoxTemplate)]
+                          ,[((S.Text,S.Text),BlackBox)]
                           ,BlackBoxContext)
   -- ^ Function arguments (subset of inputs):
   --
@@ -305,6 +307,21 @@ data BlackBoxContext
   -- is equal to the scoping level of this context.
   }
   deriving Show
+
+data BlackBox
+  = BBTemplate BlackBoxTemplate
+  | BBFunction TemplateFunction
+
+data TemplateFunction where
+  TemplateFunction
+    :: [Int]
+    -> (BlackBoxContext -> Bool)
+    -> (forall s . Backend s => BlackBoxContext -> State s Doc)
+    -> TemplateFunction
+
+instance Show BlackBox where
+  show (BBTemplate t)  = show t
+  show (BBFunction {}) = "TemplateFunction"
 
 emptyBBContext :: BlackBoxContext
 emptyBBContext = Context (Identifier (pack "__EMPTY__") Nothing, Void Nothing) [] empty [] (-1)

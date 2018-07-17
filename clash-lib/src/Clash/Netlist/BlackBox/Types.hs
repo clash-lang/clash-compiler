@@ -24,7 +24,7 @@ import qualified      Data.Text                  as S
 import                Clash.Core.Term            (Term)
 import                Clash.Core.Type            (Type)
 import                Clash.Core.Var             (Id)
-import {-# SOURCE #-} Clash.Netlist.Types        (Identifier)
+import {-# SOURCE #-} Clash.Netlist.Types        (BlackBox, Identifier)
 
 data TemplateKind
   = TDecl
@@ -38,7 +38,7 @@ data BlackBoxMeta =
                , bbKind      :: TemplateKind
                , bbLibrary   :: [BlackBoxTemplate]
                , bbImports   :: [BlackBoxTemplate]
-               , bbIncludes  :: [((S.Text, S.Text), BlackBoxTemplate)]
+               , bbIncludes  :: [((S.Text, S.Text), BlackBox)]
                }
 
 -- | Use this value in your blackbox template function if you do want to
@@ -60,7 +60,7 @@ type BlackBoxFunction
   -- ^ Arguments
   -> Type
   -- ^ Result type
-  -> Either String (BlackBoxMeta, BlackBoxTemplate)
+  -> Either String (BlackBoxMeta, BlackBox)
 
 -- | A BlackBox Template is a List of Elements
 type BlackBoxTemplate = [Element]

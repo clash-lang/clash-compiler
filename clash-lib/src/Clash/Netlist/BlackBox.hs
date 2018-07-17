@@ -49,6 +49,7 @@ import           Clash.Driver.Types            (ClashException (..))
 import {-# SOURCE #-} Clash.Netlist
   (genComponent, mkDcApplication, mkDeclarations, mkExpr, mkNetDecl,
    mkProjection, mkSelection)
+import qualified Clash.Backend                 as Backend
 import           Clash.Netlist.BlackBox.Types  as B
 import           Clash.Netlist.BlackBox.Util   as B
 import           Clash.Netlist.Id              (IdType (..))
@@ -95,19 +96,25 @@ mkBlackBoxContext resId args = do
 
 prepareBlackBox
   :: TextS.Text
-  -> BlackBoxTemplate
+  -> BlackBox
   -> BlackBoxContext
-  -> NetlistMonad (BlackBoxTemplate,[Declaration])
+  -> NetlistMonad (BlackBox,[Declaration])
 prepareBlackBox pNm templ bbCtx =
   if verifyBlackBoxContext bbCtx templ
      then do
         t1 <- instantiateCompName templ
-        (t2,decls) <- setSym bbCtx t1
-        t3 <- collectFilePaths bbCtx t2
+        (t2,decls) <- onBlackBox (fmap (first BBTemplate) . setSym bbCtx)
+                                 (pure . (,[]) . BBFunction)
+                                 t1
+        t3 <- onBlackBox (fmap BBTemplate . collectFilePaths bbCtx)
+                         (pure . BBFunction)
+                         t2
         return (t3,decls)
      else do
        (_,sp) <- Lens.use curCompNm
-       templ' <- getMon (prettyBlackBox templ)
+       templ' <- onBlackBox (getMon . prettyBlackBox)
+                            (const (pure "TemplateFunction"))
+                            templ
        let msg = $(curLoc) ++ "Can't match template for " ++ show pNm ++ " :\n\n" ++ Text.unpack templ' ++
                 "\n\nwith context:\n\n" ++ show bbCtx
        throw (ClashException sp msg Nothing)
@@ -269,7 +276,10 @@ mkPrimitive bbEParen bbEasD dst nm args ty = do
                         netAssignRhs = Assignment tmpRhs scrutExpr
                     return (DataTag scrutHTy (Right tmpRhs),[netDeclRhs,netAssignRhs] ++ scrutDecls)
               _ -> error $ $(curLoc) ++ "dataToTag: " ++ show (map (either showDoc showDoc) args)
-          | otherwise -> return (BlackBoxE "" [] [] [] [C $ mconcat ["NO_TRANSLATION_FOR:",fromStrict pNm]] emptyBBContext False,[])
+          | otherwise ->
+              return (BlackBoxE "" [] [] []
+                        (BBTemplate [C $ mconcat ["NO_TRANSLATION_FOR:",fromStrict pNm]])
+                        emptyBBContext False,[])
         _ -> do
           (_,sp) <- Lens.use curCompNm
           throw (ClashException sp ($(curLoc) ++ "No blackbox found for: " ++ unpack nm) Nothing)
@@ -307,11 +317,11 @@ mkFunInput
   -> Term
   -- ^ The function argument term
   -> NetlistMonad
-      ((Either BlackBoxTemplate (Identifier,[Declaration])
+      ((Either BlackBox (Identifier,[Declaration])
        ,WireOrReg
        ,[BlackBoxTemplate]
        ,[BlackBoxTemplate]
-       ,[((TextS.Text,TextS.Text),BlackBoxTemplate)]
+       ,[((TextS.Text,TextS.Text),BlackBox)]
        ,BlackBoxContext)
       ,[Declaration])
 mkFunInput resId e = do
@@ -322,7 +332,7 @@ mkFunInput resId e = do
               bbM <- fmap (HashMap.lookup nm) $ Lens.use primitives
               (_,sp) <- Lens.use curCompNm
               let templ = case bbM of
-                            Just (P.BlackBox {..}) -> Left (kind,outputReg,libraries,imports,includes,template)
+                            Just (P.BlackBox {..}) -> Left (kind,outputReg,libraries,imports,includes,nm,template)
                             _ -> throw (ClashException sp ($(curLoc) ++ "No blackbox found for: " ++ unpack nm) Nothing)
               return templ
             Data dc -> do
@@ -375,15 +385,37 @@ mkFunInput resId e = do
             C.Lam _ -> go 0 appE
             _ -> error $ $(curLoc) ++ "Cannot make function input for: " ++ showDoc e
   case templ of
-    Left (TDecl,oreg,libs,imps,inc,templ') -> do
+    Left (TDecl,oreg,libs,imps,inc,_,templ') -> do
       l   <- instantiateCompName templ'
-      (l',templDecl)  <- setSym bbCtx l
-      l'' <- collectFilePaths bbCtx l'
+      (l',templDecl)  <- onBlackBox (fmap (first BBTemplate) . setSym bbCtx)
+                                    (pure . (,[]) . BBFunction)
+                                    l
+      l'' <- onBlackBox (fmap BBTemplate . collectFilePaths bbCtx)
+                        (pure . BBFunction)
+                        l'
       return ((Left l'',if oreg then Reg else Wire,libs,imps,inc,bbCtx),dcls ++ templDecl)
-    Left (TExpr,_,libs,imps,inc,templ') -> do
-      templ'' <- getMon $ prettyBlackBox templ'
-      let ass = Assignment (pack "~RESULT") (Identifier templ'' Nothing)
-      return ((Right ("",[ass]),Wire,libs,imps,inc,bbCtx),dcls)
+    Left (TExpr,_,libs,imps,inc,nm,templ') -> do
+      onBlackBox
+        (\t -> do t' <- getMon (prettyBlackBox t)
+                  let assn = Assignment (pack "~RESULT") (Identifier t' Nothing)
+                  return ((Right ("",[assn]),Wire,libs,imps,inc,bbCtx),dcls))
+        (\(TemplateFunction k g _) -> do
+          let f' bbCtx' = do
+                let assn = Assignment (pack "~RESULT")
+                            (BlackBoxE nm libs imps inc templ' bbCtx' False)
+                p <- getMon (Backend.blockDecl "" [assn])
+                return p
+          return ((Left (BBFunction (TemplateFunction k g f'))
+                  ,Wire
+                  ,[]
+                  ,[]
+                  ,[]
+                  ,bbCtx
+                  )
+                 ,dcls
+                 )
+        )
+        templ'
     Right (decl,wr) ->
       return ((Right decl,wr,[],[],[],bbCtx),dcls)
   where
@@ -448,11 +480,13 @@ mkFunInput resId e = do
 
 
 instantiateCompName
-  :: BlackBoxTemplate
-  -> NetlistMonad BlackBoxTemplate
-instantiateCompName l = do
+  :: BlackBox
+  -> NetlistMonad BlackBox
+instantiateCompName bb = do
   (nm,_) <- Lens.use curCompNm
-  return (setCompName nm l)
+  onBlackBox (pure . BBTemplate . setCompName nm)
+             (pure . BBFunction)
+             bb
 
 collectFilePaths
     :: BlackBoxContext

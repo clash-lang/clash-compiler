@@ -8,6 +8,7 @@
 -}
 
 {-# LANGUAGE FlexibleContexts  #-}
+{-# LANGUAGE MultiWayIf        #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TemplateHaskell   #-}
 {-# LANGUAGE TupleSections     #-}
@@ -1363,3 +1364,45 @@ concatPortDecls3
      ,[Either Identifier (Identifier,HWType)])
 concatPortDecls3 portDecls = case unzip3 portDecls of
   (ps,decls,ids) -> (concat ps, concat decls, ids)
+
+-- | Try to merge nested modifiers into a single modifier, needed by the VHDL
+-- and SystemVerilog backend.
+nestM :: Modifier -> Modifier -> Maybe Modifier
+nestM (Nested a b) m2
+  | Just m1  <- nestM a b  = maybe (Just (Nested m1 m2)) Just (nestM m1 m2)
+  | Just m2' <- nestM b m2 = maybe (Just (Nested a m2')) Just (nestM a m2')
+
+nestM (Indexed (Vector n t1,1,1)) (Indexed (Vector _ t2,1,0))
+  | t1 == t2 = Just (Indexed (Vector n t1,10,1))
+
+nestM (Indexed (Vector n t1,1,1)) (Indexed (Vector _ t2,10,k))
+  | t1 == t2 = Just (Indexed (Vector n t1,10,k+1))
+
+nestM (Indexed (RTree d1 t1,1,n)) (Indexed (RTree d2 t2,0,0))
+  | t1 == t2
+  , d1 >= 0
+  , d2 >= 0
+  = Just (Indexed (RTree d1 t1,10,n))
+
+nestM (Indexed (RTree d1 t1,1,n)) (Indexed (RTree d2 t2,1,m))
+  | t1 == t2
+  , d1 >= 0
+  , d2 >= 0
+  = if | n == 1 && m == 1 -> let r = 2 ^ d1
+                                 l = r - (2 ^ (d1-1) `div` 2)
+                             in  Just (Indexed (RTree (-1) t1, l, r))
+       | n == 1 && m == 0 -> let l = 2 ^ (d1-1)
+                                 r = l + (l `div` 2)
+                             in  Just (Indexed (RTree (-1) t1, l, r))
+       | n == 0 && m == 1 -> let l = (2 ^ (d1-1)) `div` 2
+                                 r = 2 ^ (d1-1)
+                             in  Just (Indexed (RTree (-1) t1, l, r))
+       | n == 0 && m == 0 -> let l = 0
+                                 r = (2 ^ (d1-1)) `div` 2
+                             in  Just (Indexed (RTree (-1) t1, l, r))
+nestM (Indexed (RTree (-1) t1,l,_)) (Indexed (RTree d t2,10,k))
+  | t1 == t2
+  , d  >= 0
+  = Just (Indexed (RTree d t1,10,l+k))
+
+nestM _ _ = Nothing

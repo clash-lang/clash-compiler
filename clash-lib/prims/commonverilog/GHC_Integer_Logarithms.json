@@ -6,7 +6,7 @@
     , "includes" :
       [ { "name" : "integerLogBase"
         , "extension" : "inc"
-        , "content" :
+        , "template" :
 "// integer logBase
 function integer ~INCLUDENAME[0];
   input integer base, value;

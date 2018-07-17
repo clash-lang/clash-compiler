@@ -228,7 +228,7 @@ assign ~RESULT = ~ARG[1];
     , "includes" :
       [ { "name" : "fold"
         , "extension" : "inc"
-        , "content" :
+        , "template" :
 "// ceiling of log2
 function integer ~INCLUDENAME[0]_clog2;
   input integer value;

@@ -36,7 +36,7 @@ assign ~RESULT = {~SYM[0],~SYM[1]};
     , "includes" :
       [ { "name" : "popCnt8"
         , "extension" : "inc"
-        , "content" :
+        , "template" :
 "// ceiling of log2
 function integer ~INCLUDENAME[0]_clog2;
   input integer value;
@@ -102,7 +102,7 @@ assign ~RESULT = $unsigned(~SYM[3][(2*~SYM[0])-2]);
     , "includes" :
       [ { "name" : "popCnt16"
         , "extension" : "inc"
-        , "content" :
+        , "template" :
 "// ceiling of log2
 function integer ~INCLUDENAME[0]_clog2;
   input integer value;
@@ -168,7 +168,7 @@ assign ~RESULT = $unsigned(~SYM[3][(2*~SYM[0])-2]);
     , "includes" :
       [ { "name" : "popCnt32"
         , "extension" : "inc"
-        , "content" :
+        , "template" :
 "// ceiling of log2
 function integer ~INCLUDENAME[0]_clog2;
   input integer value;
@@ -234,7 +234,7 @@ assign ~RESULT = $unsigned(~SYM[3][(2*~SYM[0])-2]);
     , "includes" :
       [ { "name" : "popCnt64"
         , "extension" : "inc"
-        , "content" :
+        , "template" :
 "// ceiling of log2
 function integer ~INCLUDENAME[0]_clog2;
   input integer value;
@@ -300,7 +300,7 @@ assign ~RESULT = $unsigned(~SYM[3][(2*~SYM[0])-2]);
     , "includes" :
       [ { "name" : "popCnt"
         , "extension" : "inc"
-        , "content" :
+        , "template" :
 "// ceiling of log2
 function integer ~INCLUDENAME[0]_clog2;
   input integer value;
@@ -366,7 +366,7 @@ assign ~RESULT = $unsigned(~SYM[3][(2*~SYM[0])-2]);
     , "includes" :
       [ { "name" : "enc"
         , "extension" : "inc"
-        , "content" :
+        , "template" :
 "function [1:0] ~INCLUDENAME[0];
   input [1:0] a;
   case (a)
@@ -434,7 +434,7 @@ assign ~RESULT = $unsigned(~SYM[7]);
     , "includes" :
       [ { "name" : "enc"
         , "extension" : "inc"
-        , "content" :
+        , "template" :
 "function [1:0] ~INCLUDENAME[0];
   input [1:0] a;
   case (a)
@@ -518,7 +518,7 @@ assign ~RESULT = $unsigned(~SYM[7]);
     , "includes" :
       [ { "name" : "enc"
         , "extension" : "inc"
-        , "content" :
+        , "template" :
 "function [1:0] ~INCLUDENAME[0];
   input [1:0] a;
   case (a)
@@ -618,7 +618,7 @@ assign ~RESULT = $unsigned(~SYM[7]);
     , "includes" :
       [ { "name" : "enc"
         , "extension" : "inc"
-        , "content" :
+        , "template" :
 "function [1:0] ~INCLUDENAME[0];
   input [1:0] a;
   case (a)
@@ -734,7 +734,7 @@ assign ~RESULT = $unsigned(~SYM[7]);
     , "includes" :
       [ { "name" : "enc"
         , "extension" : "inc"
-        , "content" :
+        , "template" :
 "function [1:0] ~INCLUDENAME[0];
   input [1:0] a;
   case (a)
@@ -924,7 +924,7 @@ assign ~RESULT = $unsigned(~SYM[7]);
     , "includes" :
       [ { "name" : "enc"
         , "extension" : "inc"
-        , "content" :
+        , "template" :
 "function [1:0] ~INCLUDENAME[0];
   input [1:0] a;
   case (a)
@@ -997,7 +997,7 @@ assign ~RESULT = $unsigned(~SYM[7]);
     , "includes" :
       [ { "name" : "enc"
         , "extension" : "inc"
-        , "content" :
+        , "template" :
 "function [1:0] ~INCLUDENAME[0];
   input [1:0] a;
   case (a)
@@ -1086,7 +1086,7 @@ assign ~RESULT = $unsigned(~SYM[7]);
     , "includes" :
       [ { "name" : "enc"
         , "extension" : "inc"
-        , "content" :
+        , "template" :
 "function [1:0] ~INCLUDENAME[0];
   input [1:0] a;
   case (a)
@@ -1191,7 +1191,7 @@ assign ~RESULT = $unsigned(~SYM[7]);
     , "includes" :
       [ { "name" : "enc"
         , "extension" : "inc"
-        , "content" :
+        , "template" :
 "function [1:0] ~INCLUDENAME[0];
   input [1:0] a;
   case (a)
@@ -1312,7 +1312,7 @@ assign ~RESULT = $unsigned(~SYM[7]);
     , "includes" :
       [ { "name" : "enc"
         , "extension" : "inc"
-        , "content" :
+        , "template" :
 "function [1:0] ~INCLUDENAME[0];
   input [1:0] a;
   case (a)

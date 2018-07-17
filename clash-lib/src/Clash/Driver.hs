@@ -30,6 +30,7 @@ import           Data.IntMap                      (IntMap)
 import           Data.List                        (intercalate)
 import           Data.Maybe                       (fromMaybe)
 import           Data.Semigroup.Monad
+import qualified Data.Text
 import           Data.Text.Lazy                   (Text)
 import qualified Data.Text.Lazy                   as Text
 import qualified Data.Text.Lazy.IO                as Text
@@ -69,12 +70,13 @@ import           Clash.Netlist                    (genNetlist)
 import           Clash.Netlist.Util               (genComponentName, genTopComponentName)
 import           Clash.Netlist.BlackBox.Parser    (runParse)
 import           Clash.Netlist.BlackBox.Types     (BlackBoxTemplate, BlackBoxFunction)
-import           Clash.Netlist.Types              (Component (..), HWType)
+import           Clash.Netlist.Types
+  (BlackBox (..), Component (..), HWType)
 import           Clash.Normalize                  (checkNonRecursive, cleanupGraph,
                                                    normalize, runNormalization)
 import           Clash.Normalize.Util             (callGraph)
 import           Clash.Primitives.Types
-import           Clash.Util                       (first, second)
+import           Clash.Util                       (first)
 
 
 -- | Create a set of target HDL files for a set of functions
@@ -266,25 +268,8 @@ compilePrimitive
 compilePrimitive (BlackBoxHaskell bbName bbGenName source) = do
   -- Compile a blackbox template function or fetch it from an already compiled file.
   r <- Hint.runInterpreter (go source)
-
-  case r of
-    Left (Hint.GhcException err) ->
-      error' "GHC Exception" err
-    Left (Hint.NotAllowed err) ->
-      error' "NotAllowed error" err
-    Left (Hint.UnknownError err) ->
-      error' "an unknown error" err
-    Left (Hint.WontCompile ghcErrs) ->
-      error' "compilation errors" (intercalate "\n\n" $ map Hint.errMsg ghcErrs)
-    Right f ->
-      return $ BlackBoxHaskell bbName bbGenName f
-
+  processHintError (show bbGenName) bbName (BlackBoxHaskell bbName bbGenName) r
   where
-    error' errType report =
-      error $ unwords [ "Encountered", errType, "while compiling blackbox template"
-                      , "function", show bbGenName, "for function", show bbName ++ "."
-                      , "Compilation reported: \n\n" ++ report ]
-
     qualMod = intercalate "." modNames
     BlackBoxFunctionName modNames funcName = bbGenName
 
@@ -323,24 +308,73 @@ compilePrimitive (BlackBoxHaskell bbName bbGenName source) = do
       Hint.setImports [ "Clash.Netlist.BlackBox.Types",  qualMod]
       Hint.unsafeInterpret funcName "BlackBoxFunction"
 
-compilePrimitive (BlackBox pNm tkind oReg libM imps incs templT) =
-  -- Parse a blackbox template
-  case runParse templT of
-    Failure errInfo ->
-      error (ANSI.displayS (ANSI.renderCompact (_errDoc errInfo)) "")
-    Success templ ->
-      return $ BlackBox pNm tkind oReg (map parseBB libM) (map parseBB imps)
-                        (map (second parseBB) incs) templ
+compilePrimitive (BlackBox pNm tkind oReg libM imps incs templ) = do
+  libM'  <- mapM parseTempl libM
+  imps'  <- mapM parseTempl imps
+  incs'  <- mapM (traverse parseBB) incs
+  templ' <- parseBB templ
+  return (BlackBox pNm tkind oReg libM' imps' incs' templ')
  where
-  parseBB :: Text -> BlackBoxTemplate
-  parseBB t = case runParse t of
+  parseTempl :: Applicative m => Text -> m BlackBoxTemplate
+  parseTempl t = case runParse t of
     Failure errInfo
       -> error (ANSI.displayS (ANSI.renderCompact (_errDoc errInfo)) "")
-    Success templ
-      -> templ
+    Success t'
+      -> pure t'
+
+  parseBB :: ((TemplateFormat,BlackBoxFunctionName),Maybe Text) -> IO BlackBox
+  parseBB ((TTemplate,_),Just t)     = BBTemplate <$> parseTempl t
+  parseBB ((TTemplate,_),Nothing)    =
+    error ("No template specified for blackbox: " ++ show pNm)
+  parseBB ((THaskell,bbGenName),Just source) = do
+    let BlackBoxFunctionName modNames funcName = bbGenName
+        qualMod = intercalate "." modNames
+    tmpDir <- getCanonicalTemporaryDirectory
+    r <- withTempDirectory tmpDir "clash-prim-compile" $ \tmpDir' -> do
+      let modDir = foldl (</>) tmpDir' (init modNames)
+      Directory.createDirectoryIfMissing True modDir
+      Text.writeFile (modDir </> last modNames <.>  "hs") source
+      Hint.runInterpreter $ do
+        iPaths <- (tmpDir':) <$> Hint.get Hint.searchPath
+        Hint.set [Hint.searchPath Hint.:= iPaths]
+        Hint.loadModules [qualMod]
+        Hint.setImports [ "Clash.Netlist.Types" , qualMod ]
+        Hint.unsafeInterpret funcName "TemplateFunction"
+    processHintError (show bbGenName) pNm BBFunction r
+  parseBB ((THaskell,bbGenName),Nothing) = do
+    let BlackBoxFunctionName modNames funcName = bbGenName
+        qualMod = intercalate "." modNames
+    r <- Hint.runInterpreter $ do
+      Hint.setImports [ "Clash.Netlist.Types" , qualMod ]
+      Hint.unsafeInterpret funcName "TemplateFunction"
+    processHintError (show bbGenName) pNm BBFunction r
 
 compilePrimitive (Primitive pNm typ) =
   return $ Primitive pNm typ
+
+processHintError
+  :: Monad m
+  => String
+  -> Data.Text.Text
+  -> (t -> r)
+  -> Either Hint.InterpreterError t
+  -> m r
+processHintError fun bb go r = case r of
+  Left (Hint.GhcException err) ->
+    error' "GHC Exception" err
+  Left (Hint.NotAllowed err) ->
+    error' "NotAllowed error" err
+  Left (Hint.UnknownError err) ->
+    error' "an unknown error" err
+  Left (Hint.WontCompile ghcErrs) ->
+    error' "compilation errors" (intercalate "\n\n" $ map Hint.errMsg ghcErrs)
+  Right f ->
+    return $ go f
+ where
+  error' errType report =
+    error $ unwords [ "Encountered", errType, "while compiling blackbox template"
+                    , "function", show fun, "for function", show bb ++ "."
+                    , "Compilation reported: \n\n" ++ report ]
 
 -- | Pretty print Components to HDL Documents
 createHDL

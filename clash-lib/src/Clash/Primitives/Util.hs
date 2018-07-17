@@ -47,8 +47,8 @@ resolvePrimitive'
 resolvePrimitive' _metaPath (Primitive name primType) =
   return $ Primitive name primType
 resolvePrimitive' metaPath BlackBox{template=t, includes=i, ..} = do
-  let resolvedIncludes = mapM (traverse (resolveTemplateSource metaPath)) i
-      resolved         = resolveTemplateSource metaPath t
+  let resolvedIncludes = mapM (traverse (traverse (traverse (resolveTemplateSource metaPath)))) i
+      resolved         = traverse (traverse (resolveTemplateSource metaPath)) t
   BlackBox name kind outputReg libraries imports <$> resolvedIncludes <*> resolved
 resolvePrimitive' metaPath (BlackBoxHaskell bbName funcName t) =
   BlackBoxHaskell bbName funcName <$> (mapM (resolveTemplateSource metaPath) t)

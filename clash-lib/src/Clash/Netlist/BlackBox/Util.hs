@@ -61,10 +61,14 @@ import           Clash.Util
 -- | Determine if the number of normal/literal/function inputs of a blackbox
 -- context at least matches the number of argument that is expected by the
 -- template.
-verifyBlackBoxContext :: BlackBoxContext -- ^ Blackbox to verify
-                      -> BlackBoxTemplate -- ^ Template to check against
-                      -> Bool
-verifyBlackBoxContext bbCtx = all verify'
+verifyBlackBoxContext
+  :: BlackBoxContext
+  -- ^ Blackbox to verify
+  -> N.BlackBox
+  -- ^ Template to check against
+  -> Bool
+verifyBlackBoxContext bbCtx (N.BBFunction (N.TemplateFunction _ f _)) = f bbCtx
+verifyBlackBoxContext bbCtx (N.BBTemplate t) = all verify' t
   where
     verify' (I _ n)         = n < length (bbInputs bbCtx)
     verify' (L n)           = case indexMaybe (bbInputs bbCtx) n of
@@ -74,9 +78,9 @@ verifyBlackBoxContext bbCtx = all verify'
     verify' (TypM (Just n)) = n < length (bbInputs bbCtx)
     verify' (Err (Just n))  = n < length (bbInputs bbCtx)
     verify' (D (Decl n l')) = case IntMap.lookup n (bbFunctions bbCtx) of
-                                Just _ -> all (\(x,y) -> verifyBlackBoxContext bbCtx x &&
-                                                         verifyBlackBoxContext bbCtx y) l'
-                                _      -> False
+      Just _ -> all (\(x,y) -> verifyBlackBoxContext bbCtx (N.BBTemplate x) &&
+                               verifyBlackBoxContext bbCtx (N.BBTemplate y)) l'
+      _      -> False
     verify' _               = True
 
 extractLiterals :: BlackBoxContext
@@ -253,17 +257,24 @@ renderBlackBox
   :: Backend backend
   => [BlackBoxTemplate]
   -> [BlackBoxTemplate]
-  -> [((Data.Text.Text,Data.Text.Text), BlackBoxTemplate)]
-  -> BlackBoxTemplate
+  -> [((Data.Text.Text,Data.Text.Text), N.BlackBox)]
+  -> N.BlackBox
   -> BlackBoxContext
   -> State backend (Int -> Doc)
-renderBlackBox libs imps includes bs bbCtx = do
+renderBlackBox libs imps includes bb bbCtx = do
   let nms' = zipWith (\_ i -> "~INCLUDENAME[" <> Text.pack (show i) <> "]")
                      includes
                      [(0 :: Int)..]
+      layout = LayoutOptions (AvailablePerLine 120 0.4)
   nms <-
     forM includes $ \((nm,_),inc) -> do
-      incForHash <- renderTemplate (bbCtx {bbQsysIncName = nms'}) inc
+      let bbCtx' = bbCtx {bbQsysIncName = nms'}
+      incForHash <- onBlackBox (renderTemplate bbCtx')
+                               (\(N.TemplateFunction _ _ f) -> do
+                                  t <- f bbCtx'
+                                  let t' = renderLazy (layoutPretty layout t)
+                                  return (const t'))
+                               inc
       iw <- iwWidth
       let incHash = hash (incForHash 0)
           nm'     = Text.concat
@@ -274,14 +285,23 @@ renderBlackBox libs imps includes bs bbCtx = do
 
   let bbNamedCtx = bbCtx {bbQsysIncName = nms}
       incs = snd <$> includes
-  t <- renderTemplate bbNamedCtx bs
-  incs' <- mapM (fmap (PP.pretty . ($ 0)) . renderTemplate bbNamedCtx) incs
+  bb' <- case bb of
+        N.BBTemplate bt   -> do
+          t <- renderTemplate bbNamedCtx bt
+          return (\col -> PP.nest (col-2) (PP.pretty (t (col + 2))))
+        N.BBFunction (N.TemplateFunction _ _ bf)  -> do
+          t <- bf bbNamedCtx
+          return (\_ -> t)
+
+  incs' <- mapM (onBlackBox (fmap (PP.pretty . ($ 0)) . renderTemplate bbNamedCtx)
+                            (\(N.TemplateFunction _ _ f) -> f bbNamedCtx))
+                incs
   libs' <- mapM (fmap ($ 0) . renderTemplate bbNamedCtx) libs
   imps' <- mapM (fmap ($ 0) . renderTemplate bbNamedCtx) imps
   addIncludes $ zipWith3 (\nm' ((_, ext), _) inc -> (Text.unpack nm' <.> Data.Text.unpack ext, inc)) nms includes incs'
   addLibraries libs'
   addImports imps'
-  return (\col -> PP.nest (col-2) (PP.pretty (t (col+2))))
+  return bb'
 
 -- | Assign @Var@ holes in the context of a primitive HDL template that is
 -- passed as an argument of a higher-order HDL template. For the general case,
@@ -322,8 +342,8 @@ renderElem b (D (Decl n (l:ls))) = do
   templ' <- case templ of
               Left t        -> return t
               Right (nm,ds) -> do block <- getMon $ blockDecl nm ds
-                                  return . parseFail . renderLazy $ (layoutPretty (LayoutOptions (AvailablePerLine 120 0.4)) block)
-  let t2 = setSimpleVar b' templ'
+                                  return . N.BBTemplate . parseFail . renderLazy $ (layoutPretty (LayoutOptions (AvailablePerLine 120 0.4)) block)
+  let t2 = onBlackBox (N.BBTemplate . setSimpleVar b') N.BBFunction templ'
   if verifyBlackBoxContext b' t2
     then do
       bb <- renderBlackBox libs imps inc t2 b'
@@ -749,23 +769,32 @@ prettyElem (Template bbname source) = do
                                   <> brackets (string $ Text.concat bbname')
                                   <> brackets (string $ Text.concat source'))
 
-usedArguments :: BlackBoxTemplate
+usedArguments :: N.BlackBox
               -> [Int]
-usedArguments = nub . concatMap go
+usedArguments (N.BBFunction (N.TemplateFunction k _ _)) = k
+usedArguments (N.BBTemplate t) = nub (concatMap go t)
   where
     go x = case x of
-      D (Decl i args) -> i : concatMap (\(a,b) -> usedArguments a ++ usedArguments b) args
+      D (Decl i args) -> i : concatMap (\(a,b) -> concatMap go a ++ concatMap go b) args
       I _ i -> [i]
       L i -> [i]
       N i -> [i]
       Var _ i -> [i]
       IndexType e -> go e
       FilePath e -> go e
-      Template bbname source -> usedArguments bbname ++ usedArguments source
-      IF b esT esF -> go b ++ usedArguments esT ++ usedArguments esF
-      SigD es _ -> usedArguments es
-      BV _ es _ -> usedArguments es
+      Template bbname source -> concatMap go bbname ++ concatMap go source
+      IF b esT esF -> go b ++ concatMap go esT ++ concatMap go esF
+      SigD es _ -> concatMap go es
+      BV _ es _ -> concatMap go es
       StrCmp _ i -> [i]
-      GenSym es _ -> usedArguments es
-      DevNull es -> usedArguments es
+      GenSym es _ -> concatMap go es
+      DevNull es -> concatMap go es
       _ -> []
+
+onBlackBox
+  :: (BlackBoxTemplate -> r)
+  -> (N.TemplateFunction -> r)
+  -> N.BlackBox
+  -> r
+onBlackBox f _ (N.BBTemplate t) = f t
+onBlackBox _ g (N.BBFunction t) = g t
