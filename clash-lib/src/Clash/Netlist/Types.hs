@@ -305,6 +305,8 @@ data BlackBoxContext
   -- ^ The scoping level this context is associated with, ensures that
   -- @~ARGN[k][n]@ holes are only filled with values from this context if @k@
   -- is equal to the scoping level of this context.
+  , bbCompName :: Identifier
+  -- ^ The component the BlackBox is instantiated in
   }
   deriving Show
 
@@ -324,6 +326,14 @@ instance Show BlackBox where
   show (BBFunction {}) = "TemplateFunction"
 
 emptyBBContext :: BlackBoxContext
-emptyBBContext = Context (Identifier (pack "__EMPTY__") Nothing, Void Nothing) [] empty [] (-1)
+emptyBBContext
+  = Context
+  { bbResult      = (Identifier (pack "__EMPTY__") Nothing, Void Nothing)
+  , bbInputs      = []
+  , bbFunctions   = empty
+  , bbQsysIncName = []
+  , bbLevel       = (-1)
+  , bbCompName    = pack "__NOCOMPNAME__"
+  }
 
 makeLenses ''NetlistState

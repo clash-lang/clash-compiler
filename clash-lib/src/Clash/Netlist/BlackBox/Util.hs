@@ -154,18 +154,8 @@ setSym bbCtx l = do
                                                                ++ " to string:" ++ msg
                          ; O _ | Identifier t _ <- fst (bbResult bbCtx)
                                -> t
+                         ; CompName -> bbCompName bbCtx
                          ; _   -> error "unexpected element in GENSYM"})
-
-setCompName :: Identifier -> BlackBoxTemplate -> BlackBoxTemplate
-setCompName nm = map setCompName'
-  where
-    setCompName' CompName       = C nm
-    setCompName' (D (Decl n l)) = D (Decl n (map (setCompName nm *** setCompName nm) l))
-    setCompName' (IF c t f)     = IF c (setCompName nm t) (setCompName nm f)
-    setCompName' (GenSym es i)  = GenSym (setCompName nm es) i
-    setCompName' (BV t e m)     = BV t (setCompName nm e) (setCompName' m)
-    setCompName' e              = e
-
 
 findAndSetDataFiles
     :: BlackBoxContext
@@ -594,6 +584,8 @@ renderTag b (DevNull es) = do
 
 renderTag _ (Template _ _) =
   error $ $(curLoc) ++ "~TEMPLATE constructs should have been removed by prepareBlackBox."
+
+renderTag b CompName = pure (bbCompName b)
 
 renderTag _ e = do e' <- getMon (prettyElem e)
                    error $ $(curLoc) ++ "Unable to evaluate: " ++ show e'

@@ -79,8 +79,9 @@ mkBlackBoxContext resId args = do
     resTy <- unsafeCoreTypeToHWTypeM $(curLoc) (unembed $ V.varType resId)
 
     lvl <- Lens.use curBBlvl
+    (nm,_) <- Lens.use curCompNm
 
-    return ( Context (res,resTy) imps funs [] lvl
+    return ( Context (res,resTy) imps funs [] lvl nm
            , concat impDecls ++ concat funDecls
            )
   where
@@ -102,10 +103,9 @@ prepareBlackBox
 prepareBlackBox pNm templ bbCtx =
   if verifyBlackBoxContext bbCtx templ
      then do
-        t1 <- instantiateCompName templ
         (t2,decls) <- onBlackBox (fmap (first BBTemplate) . setSym bbCtx)
                                  (pure . (,[]) . BBFunction)
-                                 t1
+                                 templ
         t3 <- onBlackBox (fmap BBTemplate . collectFilePaths bbCtx)
                          (pure . BBFunction)
                          t2
@@ -386,10 +386,9 @@ mkFunInput resId e = do
             _ -> error $ $(curLoc) ++ "Cannot make function input for: " ++ showDoc e
   case templ of
     Left (TDecl,oreg,libs,imps,inc,_,templ') -> do
-      l   <- instantiateCompName templ'
       (l',templDecl)  <- onBlackBox (fmap (first BBTemplate) . setSym bbCtx)
                                     (pure . (,[]) . BBFunction)
-                                    l
+                                    templ'
       l'' <- onBlackBox (fmap BBTemplate . collectFilePaths bbCtx)
                         (pure . BBFunction)
                         l'
@@ -477,16 +476,6 @@ mkFunInput resId e = do
                   | otherwise        = id_
 
     go _ e' = error $ $(curLoc) ++ "Cannot make function input for: " ++ showDoc e'
-
-
-instantiateCompName
-  :: BlackBox
-  -> NetlistMonad BlackBox
-instantiateCompName bb = do
-  (nm,_) <- Lens.use curCompNm
-  onBlackBox (pure . BBTemplate . setCompName nm)
-             (pure . BBFunction)
-             bb
 
 collectFilePaths
     :: BlackBoxContext
