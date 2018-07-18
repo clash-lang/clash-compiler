@@ -195,8 +195,8 @@ generateHDL reprs bindingsMap hdlState primMap tcm tupTcm typeTrans eval topEnti
       putStrLn $ "Normalisation took " ++ show prepNormDiff
 
       -- 2. Generate netlist for topEntity
-      (netlist,dfiles,mfiles,seen') <- genNetlist reprs transformedBindings topEntities primMap
-                                tcm typeTrans [] [] iw mkId extId seen
+      (netlist,seen') <- genNetlist reprs transformedBindings topEntities primMap
+                                tcm typeTrans iw mkId extId seen
                                 hdlDir prefixM (nameOcc topEntity)
 
       netlistTime <- netlist `deepseq` Clock.getCurrentTime
@@ -205,7 +205,7 @@ generateHDL reprs bindingsMap hdlState primMap tcm tupTcm typeTrans eval topEnti
 
       -- 3. Generate topEntity wrapper
       let topComponent = snd . head $ filter (Text.isSuffixOf topNm . componentName . snd) netlist
-          (hdlDocs,manifest')  = createHDL hdlState' modName netlist topComponent
+          (hdlDocs,manifest',dfiles,mfiles)  = createHDL hdlState' modName netlist topComponent
                                    (topNmU, Right manifest)
           dir = hdlDir </> maybe "" (const modName) annM
       prepareDir (opt_cleanhdl opts) (extension hdlState') dir
@@ -231,8 +231,8 @@ generateHDL reprs bindingsMap hdlState primMap tcm tupTcm typeTrans eval topEnti
       putStrLn $ "Testbench normalisation took " ++ show prepNormDiff
 
       -- 2. Generate netlist for topEntity
-      (netlist,dfiles,mfiles,_) <- genNetlist reprs transformedBindings topEntities primMap
-                              tcm typeTrans [] [] iw mkId extId seen'
+      (netlist,_) <- genNetlist reprs transformedBindings topEntities primMap
+                              tcm typeTrans iw mkId extId seen'
                               hdlDir prefixM (nameOcc tb)
 
       netlistTime <- netlist `deepseq` Clock.getCurrentTime
@@ -240,7 +240,7 @@ generateHDL reprs bindingsMap hdlState primMap tcm tupTcm typeTrans eval topEnti
       putStrLn $ "Testbench netlist generation took " ++ show normNetDiff
 
       -- 3. Write HDL
-      let (hdlDocs,_) = createHDL hdlState2 modName' netlist undefined
+      let (hdlDocs,_,dfiles,mfiles) = createHDL hdlState2 modName' netlist undefined
                            (topNmU, Left manifest')
           dir = hdlDir </> maybe "" t_name annM </> modName'
       prepareDir (opt_cleanhdl opts) (extension hdlState2) dir
@@ -392,13 +392,17 @@ createHDL
   -- + Either:
   --   * Left manifest:  Only write/update the hashes of the @manifest@
   --   * Right manifest: Update all fields of the @manifest@
-  -> ([(String,Doc)],Manifest)
+  -> ([(String,Doc)],Manifest,[(String,FilePath)],[(String,String)])
   -- ^ The pretty-printed HDL documents
   -- + The update manifest file
+  -- + The data files that need to be copied
+  -- + The files that need to be created
 createHDL backend modName components top (topName,manifestE) = flip evalState backend $ getMon $ do
   (hdlNmDocs,incs) <- unzip <$> mapM (uncurry (genHDL modName)) components
   hwtys <- HashSet.toList <$> extractTypes <$> Mon get
   typesPkg <- mkTyPackage modName hwtys
+  dataFiles <- Mon getDataFiles
+  memFiles  <- Mon getMemoryDataFiles
   let hdl   = map (first (<.> Clash.Backend.extension backend)) (typesPkg ++ hdlNmDocs)
       qincs = concat incs
       topFiles = hdl ++ qincs
@@ -418,7 +422,7 @@ createHDL backend modName components top (topName,manifestE) = flip evalState ba
     ) manifestE
   let manDoc = ( topName <.> "manifest"
                , pretty (Text.pack (show manifest)))
-  return (manDoc:topFiles,manifest)
+  return (manDoc:topFiles,manifest,dataFiles,memFiles)
 
 -- | Prepares the directory for writing HDL files. This means creating the
 --   dir if it does not exist and removing all existing .hdl files from it.

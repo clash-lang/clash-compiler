@@ -99,6 +99,10 @@ class Backend state where
   addIncludes      :: [(String, Doc)] -> State state ()
   addLibraries     :: [Text] -> State state ()
   addImports       :: [Text] -> State state ()
+  addAndSetData    :: FilePath -> State state String
+  getDataFiles     :: State state [(String,FilePath)]
+  addMemoryDataFile  :: (String,String) -> State state ()
+  getMemoryDataFiles :: State state [(String,String)]
 
 -- | Replace a normal HDL template placeholder with an unescaped/unextended
 -- template placeholder.

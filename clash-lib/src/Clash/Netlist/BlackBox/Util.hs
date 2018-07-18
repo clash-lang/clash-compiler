@@ -25,7 +25,7 @@ import           Data.Bool                       (bool)
 import           Data.Foldable                   (foldrM)
 import           Data.Hashable                   (Hashable (..))
 import qualified Data.IntMap                     as IntMap
-import           Data.List                       (mapAccumL, nub)
+import           Data.List                       (nub)
 #if !MIN_VERSION_base(4,11,0)
 import           Data.Monoid
 #endif
@@ -157,60 +157,6 @@ setSym bbCtx l = do
                          ; CompName -> bbCompName bbCtx
                          ; _   -> error "unexpected element in GENSYM"})
 
-findAndSetDataFiles
-    :: BlackBoxContext
-    -> [(String,FilePath)]
-    -> BlackBoxTemplate
-    -> ([(String,FilePath)],BlackBoxTemplate)
-findAndSetDataFiles bbCtx fs = mapAccumL findAndSet fs
-  where
-    findAndSet fs' (FilePath (L n)) =
-        case Text.unpack <$> elementToText bbCtx (L n) of
-            Left msg -> error $ $(curLoc) ++ msg
-            Right s  -> renderFilePath fs' s
-    findAndSet fs' l = (fs', l)
-
-findAndSetMemoryDataFile
-    :: BlackBoxContext
-    -> [(String, String)]
-    -> Element
-    -> ([(String, String)], Element)
-findAndSetMemoryDataFile bbCtx fs (Template filenameL sourceL) =
-    case file of
-        Left msg ->
-            error $ $(curLoc) ++ unwords [ "Name or source in ~TEMPLATE construct"
-                                         , "did not reduce to a string."
-                                         , "'elementToText' reported:"
-                                         , msg ]
-        Right fstup@(filename, _source) ->
-          if elem filename (map fst fs)
-            then if not (elem fstup fs)
-              then error $ $(curLoc) ++ unwords [ "Multiple ~TEMPLATE constructs"
-                                                 , "specifiy the same filename"
-                                                 , "but different contents. Make"
-                                                 , "sure these names are unique." ]
-            -- We replace the Template element with an empty constant, so nothing
-            -- ends up in the generated HDL.
-              else (fs, C (Text.pack ""))
-            else (fstup:fs, C (Text.pack ""))
-
-        where
-            file = do
-                filename <- elementsToText bbCtx filenameL
-                source   <- elementsToText bbCtx sourceL
-                return (Text.unpack filename, Text.unpack source)
-findAndSetMemoryDataFile _bbCtx fs l = (fs, l)
-
-
-findAndSetMemoryDataFiles
-     :: BlackBoxContext
-    -> [(String, String)]
-    -> BlackBoxTemplate
-    -> ([(String, String)],BlackBoxTemplate)
-findAndSetMemoryDataFiles bbCtx fs elements =
-    mapAccumL (findAndSetMemoryDataFile bbCtx) fs elements
-
-
 selectNewName
     :: Foldable t
     => t String
@@ -222,12 +168,8 @@ selectNewName as a
   | elem a as = selectNewName as (replaceBaseName a (takeBaseName a ++ "_"))
   | otherwise = a
 
-
-renderFilePath
-    :: [(String, FilePath)]
-    -> String
-    -> ([(String, FilePath)], Element)
-renderFilePath fs f = ((f'',f):fs,C (Text.pack $ show f''))
+renderFilePath :: [(String,FilePath)] -> String -> ([(String,FilePath)],String)
+renderFilePath fs f = ((f'',f):fs, f'')
   where
     f'  = takeFileName f
     f'' = selectNewName (map fst fs) f'
@@ -405,9 +347,9 @@ renderElem b (IF c t f) = do
                        _                     -> 0
       (StrCmp [C t1] n) ->
         let (e,_,_) = bbInputs b !! n
-        in  case exprToText e of
+        in  case exprToString e of
               Just t2
-                | t1 == t2  -> 1
+                | t1 == Text.pack t2 -> 1
                 | otherwise -> 0
               Nothing -> error $ $(curLoc) ++ "Expected a string literal: " ++ show e
       (And es)   -> if all (==1) (map (check iw syn) es)
@@ -556,12 +498,13 @@ renderTag b (IndexType (L n)) =
 renderTag b (FilePath e)    = case e of
   L n -> do
     let (e',_,_) = bbInputs b !! n
-    e2  <- getMon (prettyElem e)
-    case e' of
-      BlackBoxE "GHC.CString.unpackCString#" _ _ _ _ bbCtx' _ -> case bbInputs bbCtx' of
-        [(Literal Nothing (StringLit _),_,_)] -> error $ $(curLoc) ++ "argument of ~FILEPATH:" ++ show e2 ++  "does not reduce to a string"
-        _ ->  error $ $(curLoc) ++ "argument of ~FILEPATH:" ++ show e2 ++  "does not reduce to a string"
-      _ -> error $ $(curLoc) ++ "argument of ~FILEPATH:" ++ show e2 ++  "does not reduce to a string"
+    case exprToString e' of
+      Just s -> do
+        s' <- addAndSetData s
+        return (Text.pack (show s'))
+      _ -> do
+        e2  <- getMon (prettyElem e)
+        error $ $(curLoc) ++ "argument of ~FILEPATH:" ++ show e2 ++  "does not reduce to a string"
   _ -> do e' <- getMon (prettyElem e)
           error $ $(curLoc) ++ "~FILEPATH expects a ~LIT[N] argument, but got: " ++ show e'
 renderTag b (IncludeName n) = case indexMaybe (bbQsysIncName b) n of
@@ -582,8 +525,32 @@ renderTag b (DevNull es) = do
   _ <- mapM (renderElem b) es
   return $ Text.empty
 
-renderTag _ (Template _ _) =
-  error $ $(curLoc) ++ "~TEMPLATE constructs should have been removed by prepareBlackBox."
+renderTag b (Template filenameL sourceL) = case file of
+  Left msg ->
+      error $ $(curLoc) ++ unwords [ "Name or source in ~TEMPLATE construct"
+                                   , "did not reduce to a string."
+                                   , "'elementToText' reported:"
+                                   , msg ]
+  Right fstup@(filename, _source) -> do
+    fs <- getMemoryDataFiles
+    if elem filename (map fst fs)
+      then if not (elem fstup fs)
+        then error $ $(curLoc) ++ unwords [ "Multiple ~TEMPLATE constructs"
+                                           , "specifiy the same filename"
+                                           , "but different contents. Make"
+                                           , "sure these names are unique." ]
+      -- We replace the Template element with an empty constant, so nothing
+      -- ends up in the generated HDL.
+        else return (Text.pack "")
+      else do
+        addMemoryDataFile fstup
+        return (Text.pack "")
+
+  where
+      file = do
+          filename <- elementsToText b filenameL
+          source   <- elementsToText b sourceL
+          return (Text.unpack filename, Text.unpack source)
 
 renderTag b CompName = pure (bbCompName b)
 
@@ -612,9 +579,9 @@ elementToText _bbCtx (C t) = return $ t
 elementToText bbCtx  (L n) =
     case bbInputs bbCtx ^? element n of
         Just (e,_,_) ->
-            case exprToText e of
+            case exprToString e of
                 Just t ->
-                    Right $ t
+                    Right $ Text.pack t
                 Nothing ->
                     Left $ $(curLoc) ++ unwords [ "Could not extract string from"
                                                 , show e, "referred to by"
@@ -627,17 +594,17 @@ elementToText bbCtx  (L n) =
 elementToText _bbCtx e = error $ "Unexpected string like: " ++ show e
 
 -- | Extracts string from SSymbol or string literals
-exprToText
+exprToString
   :: Expr
-  -> Maybe Text
-exprToText (Literal _ (StringLit l)) = Just (Text.pack l)
-exprToText (BlackBoxE "Clash.Promoted.Symbol.SSymbol" _ _ _ _ ctx _) =
+  -> Maybe String
+exprToString (Literal _ (StringLit l)) = Just l
+exprToString (BlackBoxE "Clash.Promoted.Symbol.SSymbol" _ _ _ _ ctx _) =
   let (e',_,_) = head (bbInputs ctx)
-  in  exprToText e'
-exprToText (BlackBoxE "GHC.CString.unpackCString#" _ _ _ _ ctx _) =
+  in  exprToString e'
+exprToString (BlackBoxE "GHC.CString.unpackCString#" _ _ _ _ ctx _) =
   let (e',_,_) = head (bbInputs ctx)
-  in  exprToText e'
-exprToText _ = Nothing
+  in  exprToString e'
+exprToString _ = Nothing
 
 prettyBlackBox :: Monad m
                => BlackBoxTemplate

@@ -53,7 +53,8 @@ import           Clash.Backend
 import           Clash.Backend.Verilog                (bits, bit_char, exprLit, include)
 import           Clash.Driver.Types                   (SrcSpan, noSrcSpan)
 import           Clash.Netlist.BlackBox.Types         (HdlSyn (..))
-import           Clash.Netlist.BlackBox.Util          (extractLiterals, renderBlackBox)
+import           Clash.Netlist.BlackBox.Util
+  (extractLiterals, renderBlackBox, renderFilePath)
 import           Clash.Netlist.Id                     (IdType (..), mkBasicId')
 import           Clash.Netlist.Types                  hiding (_intWidth, intWidth)
 import           Clash.Netlist.Util                   hiding (mkIdentifier, extendIdentifier)
@@ -77,6 +78,11 @@ data SystemVerilogState =
     , _srcSpan   :: SrcSpan
     , _includes  :: [(String,Doc)]
     , _imports   :: [Text.Text]
+    , _dataFiles      :: [(String,FilePath)]
+    -- ^ Files to be copied: (filename, old path)
+    , _memoryDataFiles:: [(String,String)]
+    -- ^ Files to be stored: (filename, contents). These files are generated
+    -- during the execution of 'genNetlist'.
     , _intWidth  :: Int -- ^ Int/Word/Integer bit-width
     , _hdlsyn    :: HdlSyn
     }
@@ -94,7 +100,7 @@ primsRoot = return ("clash-lib" System.FilePath.</> "prims")
 #endif
 
 instance Backend SystemVerilogState where
-  initBackend     = SystemVerilogState HashSet.empty [] HashMap.empty 0 "" [] [] noSrcSpan [] []
+  initBackend     = SystemVerilogState HashSet.empty [] HashMap.empty 0 "" [] [] noSrcSpan [] [] [] []
   hdlKind         = const SystemVerilog
   primDirs        = const $ do root <- primsRoot
                                return [ root System.FilePath.</> "common"
@@ -159,6 +165,14 @@ instance Backend SystemVerilogState where
   addIncludes inc = includes %= (inc++)
   addLibraries _ = return ()
   addImports inps = imports %= (inps ++)
+  addAndSetData f = do
+    fs <- use dataFiles
+    let (fs',f') = renderFilePath fs f
+    dataFiles .= fs'
+    return f'
+  getDataFiles = use dataFiles
+  addMemoryDataFile f = memoryDataFiles %= (f:)
+  getMemoryDataFiles = use memoryDataFiles
 
 rmSlash :: Identifier -> Identifier
 rmSlash nm = fromMaybe nm $ do

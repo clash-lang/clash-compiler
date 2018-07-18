@@ -57,7 +57,8 @@ import           Clash.Annotations.BitRepresentation.Util
 import           Clash.Backend
 import           Clash.Driver.Types                   (SrcSpan, noSrcSpan)
 import           Clash.Netlist.BlackBox.Types         (HdlSyn)
-import           Clash.Netlist.BlackBox.Util          (extractLiterals, renderBlackBox)
+import           Clash.Netlist.BlackBox.Util
+  (extractLiterals, renderBlackBox, renderFilePath)
 import           Clash.Netlist.Id                     (IdType (..), mkBasicId')
 import           Clash.Netlist.Types                  hiding (_intWidth, intWidth)
 import           Clash.Netlist.Util                   hiding (mkIdentifier, extendIdentifier)
@@ -79,6 +80,11 @@ data VerilogState =
     , _srcSpan   :: SrcSpan
     , _includes  :: [(String,Doc)]
     , _imports   :: [Text.Text]
+    , _dataFiles      :: [(String,FilePath)]
+    -- ^ Files to be copied: (filename, old path)
+    , _memoryDataFiles:: [(String,String)]
+    -- ^ Files to be stored: (filename, contents). These files are generated
+    -- during the execution of 'genNetlist'.
     , _intWidth  :: Int -- ^ Int/Word/Integer bit-width
     , _hdlsyn    :: HdlSyn
     }
@@ -96,7 +102,7 @@ primsRoot = return ("clash-lib" System.FilePath.</> "prims")
 #endif
 
 instance Backend VerilogState where
-  initBackend     = VerilogState 0 [] noSrcSpan [] []
+  initBackend     = VerilogState 0 [] noSrcSpan [] [] [] []
   hdlKind         = const Verilog
   primDirs        = const $ do root <- primsRoot
                                return [ root System.FilePath.</> "common"
@@ -161,6 +167,14 @@ instance Backend VerilogState where
   addIncludes inc = includes %= (inc++)
   addLibraries _ = return ()
   addImports inps = imports %= (inps ++)
+  addAndSetData f = do
+    fs <- use dataFiles
+    let (fs',f') = renderFilePath fs f
+    dataFiles .= fs'
+    return f'
+  getDataFiles = use dataFiles
+  addMemoryDataFile f = memoryDataFiles %= (f:)
+  getMemoryDataFiles = use memoryDataFiles
 
 rmSlash :: Identifier -> Identifier
 rmSlash nm = fromMaybe nm $ do

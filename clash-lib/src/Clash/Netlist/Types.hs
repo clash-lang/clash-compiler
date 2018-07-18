@@ -75,11 +75,6 @@ data NetlistState
   -- ^ Hardcoded Type -> HWType translator
   , _tcCache        :: HashMap TyConOccName TyCon -- ^ TyCon cache
   , _curCompNm      :: !(Identifier,SrcSpan)
-  , _dataFiles      :: [(String,FilePath)]
-  -- ^ Files to be copied: (filename, old path)
-  , _memoryDataFiles:: [(String,String)]
-  -- ^ Files to be stored: (filename, contents). These files are generated
-  -- during the execution of 'genNetlist'.
   , _intWidth       :: Int
   , _mkIdentifierFn :: IdType -> Identifier -> Identifier
   , _extendIdentifierFn :: IdType -> Identifier -> Identifier -> Identifier
