@@ -101,7 +101,6 @@ runNormalization opts supply globals typeTrans tcm tupTcm eval primMap rcsMap to
                   tcm
                   tupTcm
                   eval
-                  (opt_allowZero opts)
                   (HashSet.fromList topEnts)
 
     rwState   = RewriteState

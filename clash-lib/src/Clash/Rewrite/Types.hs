@@ -92,8 +92,6 @@ data RewriteEnv
   -- ^ Tuple TyCon cache
   , _evaluator      :: PrimEvaluator
   -- ^ Hardcoded evaluator (delta-reduction)}
-  , _allowZero      :: Bool
-  -- ^ Zero bit wide things are representable
   , _topEntities    :: HashSet TmOccName
   -- ^ Functions that are considered TopEntities
   }

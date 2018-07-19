@@ -225,13 +225,11 @@ isRecursiveTy m tc = case tyConDataCons (m HashMap.! nameOcc tc) of
 representableType
   :: (HashMap TyConOccName TyCon -> Bool -> Type -> Maybe (Either String HWType))
   -> Bool
-  -- ^ Allow zero-bit things
-  -> Bool
   -- ^ String considered representable
   -> HashMap TyConOccName TyCon
   -> Type
   -> Bool
-representableType builtInTranslation _allowZero stringRepresentable m =
+representableType builtInTranslation stringRepresentable m =
     either (const False) isRepresentable . coreTypeToHWType builtInTranslation m False
   where
     isRepresentable hty = case hty of

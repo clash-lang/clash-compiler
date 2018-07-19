@@ -134,6 +134,6 @@ setFloatSupport :: IORef ClashOpts -> IO ()
 setFloatSupport r = modifyIORef r (\c -> c {opt_floatSupport = True})
 
 setAllowZeroWidth :: IORef ClashOpts -> EwM IO ()
-setAllowZeroWidth r = do
+setAllowZeroWidth _ = do
   addWarn ("-fclash-allow-zero-width is deprecated and will be removed in Clash 1.0")
-  liftEwM (modifyIORef r (\c -> c {opt_allowZero = True}))
+  -- liftEwM (modifyIORef r (\c -> c {opt_allowZero = True}))

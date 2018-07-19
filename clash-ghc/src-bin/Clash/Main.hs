@@ -146,7 +146,6 @@ defaultMain = flip withArgs $ do
                              , opt_hdlSyn      = Other
                              , opt_errorExtra  = False
                              , opt_floatSupport = False
-                             , opt_allowZero   = False
                              , opt_importPaths = []
                              })
     (argv2, clashFlagWarnings) <- parseClashFlags r argv1

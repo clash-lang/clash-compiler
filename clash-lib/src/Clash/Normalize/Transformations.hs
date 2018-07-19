@@ -118,7 +118,6 @@ inlineOrLiftNonRep = inlineOrLiftBinders nonRepTest inlineTest
     nonRepTest :: (Var Term, Embed Term) -> RewriteMonad extra Bool
     nonRepTest ((Id _ tyE), _)
       = not <$> (representableType <$> Lens.view typeTranslator
-                                   <*> Lens.view allowZero
                                    <*> pure False
                                    <*> Lens.view tcCache
                                    <*> pure (unembed tyE))
@@ -190,7 +189,6 @@ nonRepSpec ctx e@(App e1 e2)
        e2Ty <- termType tcm e2
        localVar <- isLocalVar e2
        nonRepE2 <- not <$> (representableType <$> Lens.view typeTranslator
-                                              <*> Lens.view allowZero
                                               <*> pure False
                                               <*> Lens.view tcCache
                                               <*> pure e2Ty)
@@ -238,7 +236,6 @@ caseCase :: NormRewrite
 caseCase _ e@(Case (Case scrut alts1Ty alts1) alts2Ty alts2)
   = do
     ty1Rep <- representableType <$> Lens.view typeTranslator
-                                <*> Lens.view allowZero
                                 <*> pure False
                                 <*> Lens.view tcCache
                                 <*> pure alts1Ty
@@ -282,7 +279,6 @@ inlineNonRep _ e@(Case scrut altsTy alts)
       else do
         bodyMaybe   <- fmap (HashMap.lookup f) $ Lens.use bindings
         nonRepScrut <- not <$> (representableType <$> Lens.view typeTranslator
-                                                  <*> Lens.view allowZero
                                                   <*> pure False
                                                   <*> Lens.view tcCache
                                                   <*> pure scrutTy)
