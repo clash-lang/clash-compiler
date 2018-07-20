@@ -187,17 +187,25 @@ genComponentT compName componentExpr = do
   netDecls <- fmap catMaybes . mapM mkNetDecl $ filter ((/= result) . varName . fst) binders
   decls    <- concat <$> mapM (uncurry mkDeclarations . second unembed) binders
 
-  Just (NetDecl' _ rw _ _) <- mkNetDecl . head $ filter ((==result) . varName . fst) binders
+  resDecl <- mkNetDecl . head $ filter ((==result) . varName . fst) binders
 
-  let (compOutps',resUnwrappers') = case compOutps of
-        [oport] -> ([(rw,oport)],resUnwrappers)
-        _       -> let NetDecl n res resTy = head resUnwrappers
-                   in  (map (Wire,) compOutps
-                       ,NetDecl' n rw res (Right resTy):tail resUnwrappers
-                       )
-      component      = Component componentName2 compInps compOutps'
-                         (netDecls ++ argWrappers ++ decls ++ resUnwrappers')
-  return (sp,component)
+  case resDecl of
+    Just (NetDecl' _ rw _ _) -> do
+      let (compOutps',resUnwrappers') = case compOutps of
+            [oport] -> ([(rw,oport)],resUnwrappers)
+            _       -> let NetDecl n res resTy = head resUnwrappers
+                       in  (map (Wire,) compOutps
+                           ,NetDecl' n rw res (Right resTy):tail resUnwrappers
+                           )
+          component      = Component componentName2 compInps compOutps'
+                             (netDecls ++ argWrappers ++ decls ++ resUnwrappers')
+      return (sp,component)
+    -- No result declaration means that the result is empty, this only happens
+    -- when the TopEntity has an empty result. We just create an empty component
+    -- in this case.
+    _ -> do
+      let component = Component componentName2 compInps [] []
+      return  (sp, component)
 
 mkNetDecl :: (Id, Embed Term) -> NetlistMonad (Maybe Declaration)
 mkNetDecl (id_,tm) = do
