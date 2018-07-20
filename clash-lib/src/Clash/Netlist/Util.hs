@@ -1033,6 +1033,22 @@ mkTopUnWrapper topEntity annM man dstId args = do
 
   let iResult = inpAssigns ++ concat wrappers
       result = ("result",snd dstId)
+-- <<<<<<< dec2f2b67e90232b55b01fdadee384c7232a44e6
+-- =======
+--   (_,(oports,unwrappers,idsO)) <- mkTopOutput topM (zip outNames outTys)
+--                                     (head oPortSupply) result
+--   let outpAssign = Assignment (fst dstId) (resBV topM idsO)
+
+--   instLabel <- extendIdentifier Basic topName' ("_" `append` fst dstId)
+--   let topCompDecl =
+--         InstDecl
+--           Entity
+--           (Just topName')
+--           topName'
+--           instLabel
+--           (map (\(p,i,t) -> (Identifier p Nothing,In, t,Identifier i Nothing)) (concat iports) ++
+--            map (\(p,o,t) -> (Identifier p Nothing,Out,t,Identifier o Nothing)) oports)
+-- >>>>>>> VHDL: component decls and component mappings
 
   topOutputM <- mkTopOutput
                   topM
@@ -1046,6 +1062,7 @@ mkTopUnWrapper topEntity annM man dstId args = do
         instLabel <- extendIdentifier Basic topName ("_" `append` fst dstId)
         let outpAssign = Assignment (fst dstId) (resBV topM idsO)
         let topCompDecl = InstDecl
+                            Entity
                             (Just topName)
                             topName
                             instLabel

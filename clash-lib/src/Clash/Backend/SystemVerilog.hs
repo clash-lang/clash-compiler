@@ -829,7 +829,7 @@ inst_ (CondAssignment id_ ty scrut scrutTy es) = fmap Just $ do
     conds i ((Nothing,e):_)   = ("default" <+> colon <+> string i <+> equals <+> expr_ False e) <:> return []
     conds i ((Just c ,e):es') = (exprLit (Just (scrutTy,conSize scrutTy)) c <+> colon <+> string i <+> equals <+> expr_ False e) <:> conds i es'
 
-inst_ (InstDecl _ nm lbl pms) = fmap Just $
+inst_ (InstDecl _ _ nm lbl pms) = fmap Just $
     nest 2 (string nm <+> string lbl <> line <> pms' <> semi)
   where
     pms' = tupled $ sequence [dot <> expr_ False i <+> parens (expr_ False e) | (i,_,_,e) <- pms]

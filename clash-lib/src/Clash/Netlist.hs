@@ -483,7 +483,7 @@ mkFunApp dst fun args = do
                     Nothing -> []
                     Just (id_,hwtype) -> [(Identifier id_ Nothing,Out,hwtype,Identifier dstId Nothing)]
               instLabel <- extendIdentifier Basic compName (Text.pack "_" `Text.append` dstId)
-              let instDecl      = InstDecl Nothing compName instLabel (outpAssign ++ inpAssigns)
+              let instDecl      = InstDecl Entity Nothing compName instLabel (outpAssign ++ inpAssigns)
               return (argDecls ++ argDecls' ++ [instDecl])
             else error $ $(curLoc) ++ "under-applied normalized function"
         Nothing -> case args of

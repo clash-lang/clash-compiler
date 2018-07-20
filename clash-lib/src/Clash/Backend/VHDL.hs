@@ -772,6 +772,19 @@ decl l (NetDecl' noteM _ id_ ty) = Just <$> (,fromIntegral (T.length id_)) <$>
   where
     addNote n = mappend ("--" <+> pretty n <> line)
 
+decl _ (InstDecl Comp _ nm _ pms) = fmap (Just . (,0)) $ do
+  { rec (p,ls) <- fmap unzip $ sequence [ (,formalLength i) <$> fill (maximum ls) (expr_ False i) <+> colon <+> portDir dir <+> vhdlType ty | (i,dir,ty,_) <- pms ]
+  ; "component" <+> pretty nm <> line <>
+      indent 2 ("port" <+> tupledSemi (pure p) <> semi) <> line <>
+    "end component"
+  }
+ where
+    formalLength (Identifier i _) = fromIntegral (T.length i)
+    formalLength _                = 0
+
+    portDir In  = "in"
+    portDir Out = "out"
+
 decl _ _ = return Nothing
 
 stdMatch
@@ -879,10 +892,10 @@ inst_ (CondAssignment id_ _sig scrut scrutTy es) = fmap Just $
     conds ((Nothing,e):_)   = expr_ False e <+> "when" <+> "others" <:> return []
     conds ((Just c ,e):es') = expr_ False e <+> "when" <+> patLit scrutTy c <:> conds es'
 
-inst_ (InstDecl libM nm lbl pms) = do
+inst_ (InstDecl entOrComp libM nm lbl pms) = do
     maybe (return ()) (\lib -> Mon (libraries %= (lib:))) libM
     fmap Just $
-      nest 2 $ pretty lbl <+> colon <+> "entity"
+      nest 2 $ pretty lbl <+> colon <+> entOrComp'
                 <+> maybe emptyDoc ((<> ".") . pretty) libM <> pretty nm <> line <> pms' <> semi
   where
     pms' = do
@@ -890,6 +903,7 @@ inst_ (InstDecl libM nm lbl pms) = do
       nest 2 $ "port map" <> line <> tupled (pure p)
     formalLength (Identifier i _) = fromIntegral (T.length i)
     formalLength _                = 0
+    entOrComp' = case entOrComp of { Entity ->"entity"; _ -> "component" }
 
 inst_ (BlackBoxD _ libs imps inc bs bbCtx) =
   fmap Just (Mon (column (renderBlackBox libs imps inc bs bbCtx)))
@@ -1415,3 +1429,8 @@ encodingNote (Clock _ _ Gated) = "-- gated clock" <> line
 encodingNote (Clock {})        = "-- clock" <> line
 encodingNote (Reset {})        = "-- asynchronous reset: active high" <> line
 encodingNote _                 = emptyDoc
+
+tupledSemi :: Applicative f => f [Doc] -> f Doc
+tupledSemi = align . encloseSep (flatAlt (lparen <+> emptyDoc) lparen)
+                                (flatAlt (emptyDoc <+> rparen) rparen)
+                                (semi <+> emptyDoc)

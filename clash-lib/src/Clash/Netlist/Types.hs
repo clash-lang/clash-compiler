@@ -181,7 +181,7 @@ data Declaration
   -- * Type of the scrutinee
   --
   -- * List of: (Maybe expression scrutinized expression is compared with,RHS of alternative)
-  | InstDecl (Maybe Identifier) !Identifier !Identifier [(Expr,PortDirection,HWType,Expr)]
+  | InstDecl EntityOrComponent (Maybe Identifier) !Identifier !Identifier [(Expr,PortDirection,HWType,Expr)]
   -- ^ Instantiation of another component
   | BlackBoxD
       -- Primitive name:
@@ -199,6 +199,9 @@ data Declaration
   -- ^ Instantiation of blackbox declaration
   | NetDecl' (Maybe Identifier) WireOrReg !Identifier (Either Identifier HWType)
   -- ^ Signal declaration
+  deriving Show
+
+data EntityOrComponent = Entity | Comp
   deriving Show
 
 data WireOrReg = Wire | Reg
