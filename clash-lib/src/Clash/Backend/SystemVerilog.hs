@@ -173,6 +173,7 @@ instance Backend SystemVerilogState where
   getDataFiles = use dataFiles
   addMemoryDataFile f = memoryDataFiles %= (f:)
   getMemoryDataFiles = use memoryDataFiles
+  seenIdentifiers = idSeen
 
 rmSlash :: Identifier -> Identifier
 rmSlash nm = fromMaybe nm $ do
@@ -223,8 +224,9 @@ filterReserved s = if s `elem` reservedWords
   else s
 
 -- | Generate SystemVerilog for a Netlist component
-genVerilog :: String -> SrcSpan -> Component -> SystemVerilogM ((String,Doc),[(String,Doc)])
-genVerilog _ sp c = do
+genVerilog :: String -> SrcSpan -> [Identifier] -> Component -> SystemVerilogM ((String,Doc),[(String,Doc)])
+genVerilog _ sp seen c = preserveSeen $ do
+    Mon $ idSeen .= seen
     Mon $ setSrcSpan sp
     v    <- verilog
     incs <- Mon $ use includes
@@ -504,7 +506,7 @@ funDec _ = pure Nothing
 
 module_ :: Component -> SystemVerilogM Doc
 module_ c =
-  addSeen c *> modVerilog <* Mon (idSeen .= [] >> imports .= [] >> oports .= [])
+  addSeen c *> modVerilog <* Mon (imports .= [] >> oports .= [])
  where
   modVerilog = do
     body <- modBody

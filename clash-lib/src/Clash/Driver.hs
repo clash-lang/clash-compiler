@@ -18,7 +18,7 @@ module Clash.Driver where
 import qualified Control.Concurrent.Supply        as Supply
 import           Control.DeepSeq
 import           Control.Exception                (tryJust, bracket)
-import           Control.Lens                     ((^.), _5)
+import           Control.Lens                     (view, (^.), _3, _5)
 import           Control.Monad                    (guard, when, unless, join, foldM)
 import           Control.Monad.State              (evalState, get)
 import           Data.Hashable                    (hash)
@@ -71,7 +71,7 @@ import           Clash.Netlist.Util               (genComponentName, genTopCompo
 import           Clash.Netlist.BlackBox.Parser    (runParse)
 import           Clash.Netlist.BlackBox.Types     (BlackBoxTemplate, BlackBoxFunction)
 import           Clash.Netlist.Types
-  (BlackBox (..), Component (..), HWType)
+  (BlackBox (..), Component (..), HWType, Identifier)
 import           Clash.Normalize                  (checkNonRecursive, cleanupGraph,
                                                    normalize, runNormalization)
 import           Clash.Normalize.Util             (callGraph)
@@ -204,8 +204,8 @@ generateHDL reprs bindingsMap hdlState primMap tcm tupTcm typeTrans eval topEnti
       putStrLn $ "Netlist generation took " ++ show normNetDiff
 
       -- 3. Generate topEntity wrapper
-      let topComponent = snd . head $ filter (Text.isSuffixOf topNm . componentName . snd) netlist
-          (hdlDocs,manifest',dfiles,mfiles)  = createHDL hdlState' modName netlist topComponent
+      let topComponent = view _3 . head $ filter (Text.isSuffixOf topNm . componentName . view _3) netlist
+          (hdlDocs,manifest',dfiles,mfiles)  = createHDL hdlState' modName seen' netlist topComponent
                                    (topNmU, Right manifest)
           dir = hdlDir </> maybe "" (const modName) annM
       prepareDir (opt_cleanhdl opts) (extension hdlState') dir
@@ -231,7 +231,7 @@ generateHDL reprs bindingsMap hdlState primMap tcm tupTcm typeTrans eval topEnti
       putStrLn $ "Testbench normalisation took " ++ show prepNormDiff
 
       -- 2. Generate netlist for topEntity
-      (netlist,_) <- genNetlist reprs transformedBindings topEntities primMap
+      (netlist,seen'') <- genNetlist reprs transformedBindings topEntities primMap
                               tcm typeTrans iw mkId extId seen'
                               hdlDir prefixM (nameOcc tb)
 
@@ -240,7 +240,7 @@ generateHDL reprs bindingsMap hdlState primMap tcm tupTcm typeTrans eval topEnti
       putStrLn $ "Testbench netlist generation took " ++ show normNetDiff
 
       -- 3. Write HDL
-      let (hdlDocs,_,dfiles,mfiles) = createHDL hdlState2 modName' netlist undefined
+      let (hdlDocs,_,dfiles,mfiles) = createHDL hdlState2 modName' seen'' netlist undefined
                            (topNmU, Left manifest')
           dir = hdlDir </> maybe "" t_name annM </> modName'
       prepareDir (opt_cleanhdl opts) (extension hdlState2) dir
@@ -383,7 +383,9 @@ createHDL
   -- ^ Backend
   -> String
   -- ^ Module hierarchy root
-  -> [(SrcSpan,Component)]
+  -> [Identifier]
+  -- ^ Component names
+  -> [(SrcSpan,[Identifier],Component)]
   -- ^ List of components
   -> Component
   -- ^ Top component
@@ -396,9 +398,8 @@ createHDL
   -- ^ The pretty-printed HDL documents
   -- + The update manifest file
   -- + The data files that need to be copied
-  -- + The files that need to be created
-createHDL backend modName components top (topName,manifestE) = flip evalState backend $ getMon $ do
-  (hdlNmDocs,incs) <- unzip <$> mapM (uncurry (genHDL modName)) components
+createHDL backend modName seen components top (topName,manifestE) = flip evalState backend $ getMon $ do
+  (hdlNmDocs,incs) <- unzip <$> mapM (\(sp,ids,comp) -> genHDL modName sp (seen ++ ids) comp) components
   hwtys <- HashSet.toList <$> extractTypes <$> Mon get
   typesPkg <- mkTyPackage modName hwtys
   dataFiles <- Mon getDataFiles
@@ -412,7 +413,7 @@ createHDL backend modName components top (topName,manifestE) = flip evalState ba
       topInTypes  <- mapM (fmap renderOneLine . hdlType (External topName') . snd) (inputs top)
       let topOutNames = map (fst . snd) (outputs top)
       topOutTypes <- mapM (fmap renderOneLine . hdlType (External topName') . snd . snd) (outputs top)
-      let compNames = map (componentName.snd) components
+      let compNames = map (componentName . view _3) components
       return (m { portInNames    = topInNames
                 , portInTypes    = topInTypes
                 , portOutNames   = topOutNames

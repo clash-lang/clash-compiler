@@ -9,9 +9,11 @@
 
 module Clash.Backend where
 
+import Control.Lens                         (Lens')
+import qualified  Control.Lens              as Lens
 import Data.HashSet                         (HashSet)
 import Data.Maybe                           (fromMaybe)
-import Data.Semigroup.Monad                 (Mon)
+import Data.Semigroup.Monad                 (Mon (..))
 import qualified Data.Text.Lazy             as T
 import Data.Text.Lazy                       (Text)
 import Control.Monad.State                  (State)
@@ -55,7 +57,7 @@ class Backend state where
   extractTypes     :: state -> HashSet HWType
 
   -- | Generate HDL for a Netlist component
-  genHDL           :: String -> SrcSpan -> Component -> Mon (State state) ((String, Doc),[(String,Doc)])
+  genHDL           :: String -> SrcSpan -> [Identifier] -> Component -> Mon (State state) ((String, Doc),[(String,Doc)])
   -- | Generate a HDL package containing type definitions for the given HWTypes
   mkTyPackage      :: String -> [HWType] -> Mon (State state) [(String, Doc)]
   -- | Convert a Netlist HWType to a target HDL type
@@ -103,6 +105,7 @@ class Backend state where
   getDataFiles     :: State state [(String,FilePath)]
   addMemoryDataFile  :: (String,String) -> State state ()
   getMemoryDataFiles :: State state [(String,String)]
+  seenIdentifiers  :: Lens' state [Identifier]
 
 -- | Replace a normal HDL template placeholder with an unescaped/unextended
 -- template placeholder.
@@ -116,3 +119,35 @@ escapeTemplate t = fromMaybe t $ do
   t1 <- T.stripPrefix "~ARG[" t
   n  <- T.stripSuffix "]" t1
   pure (T.concat ["~EARG[",n,"]"])
+
+mkUniqueIdentifier
+  :: Backend s
+  => IdType
+  -> Identifier
+  -> State s Identifier
+mkUniqueIdentifier typ nm = do
+  mkId     <- mkIdentifier
+  extendId <- extendIdentifier
+  seen     <- Lens.use seenIdentifiers
+  let i = mkId typ nm
+  if i `elem` seen
+     then go extendId (0::Int) seen i
+     else do seenIdentifiers Lens.%= (i:)
+             return i
+ where
+  go extendId n seen i = do
+    let i' = extendId typ i (T.pack ('_':show n))
+    if i' `elem` seen
+       then go extendId (n+1) seen i
+       else do seenIdentifiers Lens.%= (i':)
+               return i'
+
+preserveSeen
+  :: Backend s
+  => Mon (State s) a
+  -> Mon (State s) a
+preserveSeen m = do
+  s <- Mon (Lens.use seenIdentifiers)
+  a <- m
+  Mon (seenIdentifiers Lens..= s)
+  return a

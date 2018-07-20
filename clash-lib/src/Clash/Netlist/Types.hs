@@ -69,7 +69,7 @@ data NetlistState
   = NetlistState
   { _bindings       :: BindingMap -- ^ Global binders
   , _varCount       :: !Int -- ^ Number of signal declarations
-  , _components     :: HashMap TmOccName (SrcSpan,Component) -- ^ Cached components
+  , _components     :: HashMap TmOccName (SrcSpan,[Identifier],Component) -- ^ Cached components
   , _primitives     :: CompiledPrimMap -- ^ Primitive Definitions
   , _typeTranslator :: CustomReprs -> HashMap TyConOccName TyCon -> Bool -> Type -> Maybe (Either String HWType)
   -- ^ Hardcoded Type -> HWType translator
@@ -196,7 +196,6 @@ data Declaration
       !BlackBox
       -- Context in which tokens should be rendered:
       BlackBoxContext
--- >>>>>>> Small documentation cleanup in `Netlist/Types.hs`
   -- ^ Instantiation of blackbox declaration
   | NetDecl' (Maybe Identifier) WireOrReg !Identifier (Either Identifier HWType)
   -- ^ Signal declaration

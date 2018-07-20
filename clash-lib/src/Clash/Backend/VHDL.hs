@@ -78,6 +78,7 @@ data VHDLState =
   , _memoryDataFiles:: [(String,String)]
   -- ^ Files to be stored: (filename, contents). These files are generated
   -- during the execution of 'genNetlist'.
+  , _idSeen    :: [Identifier]
   , _intWidth  :: Int                  -- ^ Int/Word/Integer bit-width
   , _hdlsyn    :: HdlSyn               -- ^ For which HDL synthesis tool are we generating VHDL
   }
@@ -95,7 +96,7 @@ primsRoot = return ("clash-lib" System.FilePath.</> "prims")
 #endif
 
 instance Backend VHDLState where
-  initBackend     = VHDLState HashSet.empty [] HashMap.empty "" noSrcSpan [] [] [] [] []
+  initBackend     = VHDLState HashSet.empty [] HashMap.empty "" noSrcSpan [] [] [] [] [] []
   hdlKind         = const VHDL
   primDirs        = const $ do root <- primsRoot
                                return [ root System.FilePath.</> "common"
@@ -171,6 +172,7 @@ instance Backend VHDLState where
   getDataFiles = use dataFiles
   addMemoryDataFile f = memoryDataFiles %= (f:)
   getMemoryDataFiles = use memoryDataFiles
+  seenIdentifiers = idSeen
 
 rmSlash :: Identifier -> Identifier
 rmSlash nm = fromMaybe nm $ do
@@ -207,8 +209,9 @@ filterReserved s = if s `elem` reservedWords
   else s
 
 -- | Generate VHDL for a Netlist component
-genVHDL :: String -> SrcSpan -> Component -> VHDLM ((String,Doc),[(String,Doc)])
-genVHDL nm sp c = do
+genVHDL :: String -> SrcSpan -> [Identifier] -> Component -> VHDLM ((String,Doc),[(String,Doc)])
+genVHDL nm sp seen c = preserveSeen $ do
+    Mon $ idSeen .= seen
     Mon $ setSrcSpan sp
     v <- vhdl
     i <- Mon $ use includes

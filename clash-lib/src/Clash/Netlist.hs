@@ -97,7 +97,7 @@ genNetlist :: CustomReprs
            -- ^ Component name prefix
            -> TmOccName
            -- ^ Name of the @topEntity@
-           -> IO ([(SrcSpan,Component)],[Identifier])
+           -> IO ([(SrcSpan,[Identifier],Component)],[Identifier])
 genNetlist reprs globals tops primMap tcm typeTrans iw mkId extId seen env prefixM topEntity = do
   (_,s) <- runNetlistMonad reprs globals (mkTopEntityMap tops) primMap tcm typeTrans
              iw mkId extId seen env prefixM $ genComponent topEntity
@@ -163,7 +163,7 @@ genNames mkId prefixM = go
 genComponent
   :: TmOccName
   -- ^ Name of the function
-  -> NetlistMonad (SrcSpan,Component)
+  -> NetlistMonad (SrcSpan,[Identifier],Component)
 genComponent compName = do
   compExprM <- fmap (HashMap.lookup compName) $ Lens.use bindings
   case compExprM of
@@ -179,7 +179,7 @@ genComponentT
   -- ^ Name of the function
   -> Term
   -- ^ Corresponding term
-  -> NetlistMonad (SrcSpan,Component)
+  -> NetlistMonad (SrcSpan,[Identifier],Component)
 genComponentT compName componentExpr = do
   varCount .= 0
   componentName1 <- (HashMap.! compName) <$> Lens.use componentNames
@@ -216,13 +216,15 @@ genComponentT compName componentExpr = do
                            )
           component      = Component componentName2 compInps compOutps'
                              (netDecls ++ argWrappers ++ decls ++ resUnwrappers')
-      return (sp,component)
+      ids <- Lens.use seenIds
+      return (sp, ids, component)
     -- No result declaration means that the result is empty, this only happens
     -- when the TopEntity has an empty result. We just create an empty component
     -- in this case.
     Nothing -> do
       let component = Component componentName2 compInps [] (netDecls ++ argWrappers ++ decls)
-      return (sp, component)
+      ids <- Lens.use seenIds
+      return (sp, ids, component)
 
 mkNetDecl :: (Id, Embed Term) -> NetlistMonad (Maybe Declaration)
 mkNetDecl (id_,tm) = do
@@ -461,7 +463,7 @@ mkFunApp dst fun args = do
       normalized <- Lens.use bindings
       case HashMap.lookup (nameOcc fun) normalized of
         Just _ -> do
-          (_,Component compName compInps co _) <- preserveVarEnv $ genComponent (nameOcc fun)
+          (_,_,Component compName compInps co _) <- preserveVarEnv $ genComponent (nameOcc fun)
           argTys   <- mapM (termType tcm) args
           argHWTys <- mapM coreTypeToHWTypeM argTys
           -- Filter out the arguments of hwtype `Void` and only translate
