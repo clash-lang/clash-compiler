@@ -51,11 +51,7 @@ import qualified Module
 import qualified MonadUtils
 import qualified Name
 import           Outputable                  (showPpr, showSDoc, text)
-#if MIN_VERSION_ghc(8,4,1)
-import qualified GhcPlugins
-#else
-import qualified Serialized
-#endif
+import qualified GhcPlugins                  (deserializeWithData, fromSerialized)
 import qualified TcIface
 import qualified TcRnMonad
 import qualified TcRnTypes
@@ -214,15 +210,9 @@ loadPrimitiveAnnotations hdl outDir anns =
     prims = mapMaybe filterPrim anns
     filterPrim (Annotations.Annotation target value) =
       (target,) <$> deserialize value
-#if MIN_VERSION_ghc(8,4,1)
     deserialize =
       GhcPlugins.fromSerialized
         (GhcPlugins.deserializeWithData :: [Word8] -> Primitive)
-#else
-    deserialize =
-      Serialized.fromSerialized
-        (Serialized.deserializeWithData :: [Word8] -> Primitive)
-#endif
 
 primitiveFilePath ::
   MonadIO m

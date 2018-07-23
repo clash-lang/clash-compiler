@@ -50,11 +50,7 @@ import qualified HscMain
 import qualified HscTypes
 import qualified MonadUtils
 import qualified Panic
-#if MIN_VERSION_ghc(8,4,1)
-import qualified GhcPlugins
-#else
-import qualified Serialized
-#endif
+import qualified GhcPlugins                      (deserializeWithData)
 import qualified TcRnMonad
 import qualified TcRnTypes
 import qualified TidyPgm
@@ -312,11 +308,7 @@ findSynthesizeAnnotations
   => [CoreSyn.CoreBndr]
   -> m [(CoreSyn.CoreBndr,Maybe TopEntity)]
 findSynthesizeAnnotations bndrs = do
-#if MIN_VERSION_ghc(8,4,1)
   let deserializer = GhcPlugins.deserializeWithData :: ([Word8] -> TopEntity)
-#else
-  let deserializer = Serialized.deserializeWithData :: ([Word8] -> TopEntity)
-#endif
       targets      = map (Annotations.NamedTarget . Var.varName) bndrs
 
   anns <- mapM (GHC.findGlobalAnns deserializer) targets
@@ -335,11 +327,7 @@ findTestBenchAnnotations
   => [CoreSyn.CoreBndr]
   -> m [(CoreSyn.CoreBndr,CoreSyn.CoreBndr)]
 findTestBenchAnnotations bndrs = do
-#if MIN_VERSION_ghc(8,4,1)
   let deserializer = GhcPlugins.deserializeWithData :: ([Word8] -> TopEntity)
-#else
-  let deserializer = Serialized.deserializeWithData :: ([Word8] -> TopEntity)
-#endif
       targets      = map (Annotations.NamedTarget . Var.varName) bndrs
 
   anns <- mapM (GHC.findGlobalAnns deserializer) targets
@@ -377,11 +365,7 @@ findPrimitiveAnnotations hdl bndrs = do
 
   let -- Using the stub directory as the output directory for inline primitives
       outDir = fromMaybe "." $ GHC.stubDir dflags
-#if MIN_VERSION_ghc(8,4,1)
       deserializer = GhcPlugins.deserializeWithData :: ([Word8] -> Primitive)
-#else
-      deserializer = Serialized.deserializeWithData :: ([Word8] -> Primitive)
-#endif
       targets =
         concatMap
           ( (\v -> catMaybes
