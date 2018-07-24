@@ -20,6 +20,7 @@ import           Data.Either                      (partitionEithers)
 import           Data.HashMap.Strict              (HashMap)
 import qualified Data.HashMap.Strict              as HashMap
 import qualified Data.HashSet                     as HashSet
+import qualified Data.IntMap                      as IntMap
 import           Data.IntMap.Strict               (IntMap)
 import           Data.List
   (groupBy, intersect, mapAccumL, sortBy)
@@ -109,6 +110,7 @@ runNormalization opts supply globals typeTrans tcm tupTcm eval primMap rcsMap to
                   supply
                   (error $ $(curLoc) ++ "Report as bug: no curFun",noSrcSpan)
                   0
+                  (IntMap.empty, 0)
                   normState
 
     normState = NormalizeState

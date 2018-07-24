@@ -22,6 +22,7 @@ import           Data.Either                             (lefts,rights)
 import qualified Data.HashMap.Lazy                       as HM
 import           Data.List
   (foldl',mapAccumL,uncons)
+import           Data.IntMap                             (IntMap)
 import           Data.Map
   (Map,delete,fromList,insert,lookup,union)
 import qualified Data.Map                                as M
@@ -45,10 +46,13 @@ import           Unbound.Generics.LocallyNameless        as Unbound
 import           Unbound.Generics.LocallyNameless.Unsafe
 
 -- | The heap
-data Heap     = Heap PureHeap Supply
+data Heap     = Heap GlobalHeap PureHeap Supply
   deriving (Show)
 
 type PureHeap = Map TmOccName Term
+
+-- | Global heap
+type GlobalHeap = (IntMap Term, Int)
 
 -- | The stack
 type Stack    = [StackFrame]
@@ -122,13 +126,14 @@ whnf'
   :: PrimEvaluator
   -> BindingMap
   -> TyConMap
+  -> GlobalHeap
   -> Supply
   -> Bool
   -> Term
-  -> Term
-whnf' eval gbl tcm ids isSubj e
-  = case whnf eval gbl tcm isSubj (Heap (fromList []) ids,[],e) of
-      (_,_,e') -> e'
+  -> (GlobalHeap, Term)
+whnf' eval gbl tcm gh ids isSubj e
+  = case whnf eval gbl tcm isSubj (Heap gh (fromList []) ids,[],e) of
+      (Heap gh' _ _,_,e') -> (gh',e')
 
 -- | Evaluate to WHNF given an existing Heap and Stack
 whnf
@@ -164,7 +169,7 @@ isScrut _ = False
 -- | Completely unwind the stack to get back the complete term
 unwindStack :: State -> Maybe State
 unwindStack s@(_,[],_) = Just s
-unwindStack (h@(Heap h' _),(kf:k'),e) = case kf of
+unwindStack (h@(Heap _ h' _),(kf:k'),e) = case kf of
   PrimApply nm ty tys vs tms ->
     unwindStack
       (h,k'
@@ -273,7 +278,11 @@ step eval gbl tcm (h, k, e) = case e of
                in  step eval gbl tcm (h2,k,e')
          GT -> Just (h,Instantiate ty:k,e1)
   (Data dc) -> unwind eval gbl tcm h k (DC dc [])
-  (Prim nm ty') -> eval (isScrut k) gbl tcm h k nm ty' [] []
+  (Prim nm ty')
+    | nm `elem` ["GHC.Prim.realWorld#"]
+    -> unwind eval gbl tcm h k (PrimVal nm ty' [] [])
+    | otherwise
+    -> eval (isScrut k) gbl tcm h k nm ty' [] []
   (App e1 e2)  -> let (h2,id_) = newLetBinding tcm h e2
                   in  Just (h2,Apply id_:k,e1)
   (TyApp e1 ty) -> Just (h,Instantiate ty:k,e1)
@@ -287,12 +296,12 @@ newLetBinding
   -> Heap
   -> Term
   -> (Heap,Id)
-newLetBinding tcm h@(Heap h' ids) e
+newLetBinding tcm h@(Heap gh h' ids) e
   | Var ty' nm' <- e
   , Just _ <- lookup (nameOcc nm') h'
   = (h, Id nm' (embed ty'))
   | otherwise
-  = (Heap (insert (nameOcc nm) e h') ids',Id nm (embed ty))
+  = (Heap gh (insert (nameOcc nm) e h') ids',Id nm (embed ty))
   where
     (i,ids') = freshId ids
     nm       = makeSystemName "x" (toInteger i)
@@ -317,19 +326,19 @@ mkAbstr = foldr go
   where
     go (Left tv)  (h,e)          =
       (h,TyLam (bind tv (TyApp e (VarTy (unembed (varKind tv)) (varName tv)))))
-    go (Right ty) (Heap h ids,e) =
+    go (Right ty) (Heap gh h ids,e) =
       let (i,ids') = freshId ids
           nm       = makeSystemName "x" (toInteger i)
           id_      = Id nm (embed ty)
-      in  (Heap h ids',Lam (bind id_ (App e (Var ty nm))))
+      in  (Heap gh h ids',Lam (bind id_ (App e (Var ty nm))))
 
 -- | Force the evaluation of a variable.
 force :: BindingMap -> Heap -> Stack -> Id -> Maybe State
-force gbl (Heap h ids) k x' = case lookup nm h of
+force gbl (Heap gh h ids) k x' = case lookup nm h of
     Nothing -> case HM.lookup nm gbl of
       Nothing          -> Nothing
-      Just (_,_,_,_,e) -> Just (Heap h ids,k,e)
-    Just e -> Just (Heap (delete nm h) ids,Update x':k,e)
+      Just (_,_,_,_,e) -> Just (Heap  gh h ids,k,e)
+    Just e -> Just (Heap gh (delete nm h) ids,Update x':k,e)
     -- Removing the heap-bound value on a force ensures we do not get stuck on
     -- expressions such as: "let x = x in x"
   where
@@ -352,7 +361,7 @@ unwind eval gbl tcm h k v = do
 
 -- | Update the Heap with the evaluated term
 update :: Heap -> Stack -> Id -> Value -> State
-update (Heap h ids) k x v = (Heap (insert (nameOcc (varName x)) v' h) ids,k,v')
+update (Heap gh h ids) k x v = (Heap gh (insert (nameOcc (varName x)) v' h) ids,k,v')
   where
     v' = valToTerm v
 
@@ -416,6 +425,7 @@ primop eval gbl tcm h k nm ty tys vs v []
               ,"Clash.Sized.Internal.Unsigned.fromInteger#"
               ,"GHC.CString.unpackCString#"
               ,"Clash.Transformations.removedArg"
+              ,"GHC.Prim.MutableByteArray#"
               ]
               -- The above primitives are actually values, and not operations.
   = unwind eval gbl tcm h k (PrimVal nm ty tys (vs ++ [v]))
@@ -464,8 +474,8 @@ substAlt dc pxs args e =
 
 -- | Allocate let-bindings on the heap
 allocate :: Heap -> Stack -> (Bind (Rec [LetBinding]) Term) -> State
-allocate (Heap h ids) k b =
-  (Heap (h `union` fromList xes') ids',k,e')
+allocate (Heap gh h ids) k b =
+  (Heap gh (h `union` fromList xes') ids',k,e')
  where
   (xesR,e) = unsafeUnbind b
   xes      = unrec xesR

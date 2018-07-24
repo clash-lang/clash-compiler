@@ -21,6 +21,8 @@ where
 
 import Control.DeepSeq                        (NFData (..))
 import Data.Hashable                          (Hashable)
+import Data.Vector.Primitive.Extra            (Vector)
+import Data.Word                              (Word8)
 import GHC.Generics                           (Generic)
 import Unbound.Generics.LocallyNameless.Extra ()
 import Unbound.Generics.LocallyNameless       (Alpha (..), Subst (..))
@@ -31,7 +33,7 @@ import Clash.Core.TysPrim                     (intPrimTy, integerPrimTy,
                                                wordPrimTy,
                                                int64PrimTy, word64PrimTy,
                                                floatPrimTy, doublePrimTy,
-                                               naturalPrimTy)
+                                               naturalPrimTy, byteArrayPrimTy)
 
 -- | Term Literal
 data Literal
@@ -45,6 +47,7 @@ data Literal
   | DoubleLiteral   !Rational
   | CharLiteral     !Char
   | NaturalLiteral  !Integer
+  | ByteArrayLiteral !(Vector Word8)
   deriving (Eq,Ord,Show,Generic,NFData,Hashable)
 
 instance Alpha Literal where
@@ -67,3 +70,4 @@ literalType (CharLiteral     _) = charPrimTy
 literalType (Int64Literal    _) = int64PrimTy
 literalType (Word64Literal   _) = word64PrimTy
 literalType (NaturalLiteral  _) = naturalPrimTy
+literalType (ByteArrayLiteral _) = byteArrayPrimTy

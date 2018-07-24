@@ -117,6 +117,7 @@ Library
                       mtl                     >= 2.1.2    && < 2.3,
                       parsers                 >= 0.12.8   && < 1.0,
                       prettyprinter           >= 1.2.0.1  && < 2.0,
+                      primitive               >= 0.5.0.1  && < 1.0,
                       process                 >= 1.1.0.2  && < 1.7,
                       reducers                >= 3.12.2   && < 4.0,
                       template-haskell        >= 2.8.0.0  && < 2.14,
@@ -124,6 +125,7 @@ Library
                       time                    >= 1.4.0.1  && < 1.10,
                       transformers            >= 0.3.0.0  && < 0.6,
                       trifecta                >= 1.7.1.1  && < 2.0,
+                      vector                  >= 0.11     && < 1.0,
                       unbound-generics        >= 0.1      && < 0.4,
                       unordered-containers    >= 0.2.3.3  && < 0.3
 
@@ -179,6 +181,7 @@ Library
                       Data.Aeson.Extra
                       Data.Semigroup.Monad.Extra
                       Data.Text.Prettyprint.Doc.Extra
+                      Data.Vector.Primitive.Extra
                       GHC.BasicTypes.Extra
                       GHC.SrcLoc.Extra
                       Paths_clash_lib

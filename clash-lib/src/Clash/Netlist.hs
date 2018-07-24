@@ -8,6 +8,7 @@
   Create Netlists out of normalized CoreHW Terms
 -}
 
+{-# LANGUAGE MagicHash       #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE TupleSections   #-}
@@ -27,7 +28,10 @@ import           Data.HashMap.Lazy                (HashMap)
 import qualified Data.HashMap.Lazy                as HashMap
 import           Data.List                        (elemIndex)
 import           Data.Maybe                       (catMaybes)
+import           Data.Primitive.ByteArray         (ByteArray (..))
 import qualified Data.Text.Lazy                   as Text
+import qualified Data.Vector.Primitive            as PV
+import           GHC.Integer.GMP.Internals        (Integer (..), BigNat (..))
 import           System.FilePath                  ((</>), (<.>))
 import           Text.Read                        (readMaybe)
 import           Unbound.Generics.LocallyNameless
@@ -443,6 +447,7 @@ mkExpr _ _ _ (Core.Literal l) = do
                             i = toInteger (doubleToWord d)
                         in  return (HW.Literal (Just (BitVector 64,64)) (NumLit i), [])
     NaturalLiteral n -> return (HW.Literal (Just (Unsigned iw,iw)) $ NumLit n, [])
+    ByteArrayLiteral (PV.Vector _ _ (ByteArray ba)) -> return (HW.Literal Nothing (NumLit (Jp# (BN# ba))),[])
     _ -> error $ $(curLoc) ++ "not an integer or char literal"
 
 mkExpr bbEasD bndr ty app = do
@@ -546,6 +551,7 @@ mkDcApplication :: HWType -- ^ HWType of the LHS of the let-binder
                 -> [Term] -- ^ DataCon Arguments
                 -> NetlistMonad (Expr,[Declaration]) -- ^ Returned expression and a list of generate BlackBox declarations
 mkDcApplication dstHType bndr dc args = do
+  let dcNm = name2String (dcName dc)
   tcm                 <- Lens.use tcCache
   argTys              <- mapM (termType tcm) args
   argNm <- either return (\b -> extendIdentifier Extended (Text.pack (name2String (varName b))) (Text.pack "_dc_arg")) bndr
@@ -601,4 +607,17 @@ mkDcApplication dstHType bndr dc args = do
                     _ -> error $ $(curLoc) ++ "mkDcApplication undefined for: " ++ show (dstHType,dc,dcTag dc,args,argHWTys)
         in  return dc'
       Void {} -> return (Identifier (Text.pack "__VOID__") Nothing)
+      Signed _
+        | dcNm == "GHC.Integer.Type.S#"
+        -> pure (head argExprs)
+        | dcNm == "GHC.Integer.Type.Jp#"
+        -> pure (head argExprs)
+        | dcNm == "GHC.Integer.Type.Jn#"
+        , HW.Literal Nothing (NumLit i) <- head argExprs
+        -> pure (HW.Literal Nothing (NumLit (negate i)))
+      Unsigned _
+        | dcNm == "GHC.Natural.NatS#"
+        -> pure (head argExprs)
+        | dcNm == "GHC.Natural.NatJ#"
+        -> pure (head argExprs)
       _ -> error $ $(curLoc) ++ "mkDcApplication undefined for: " ++ show (dstHType,dc,args,argHWTys)

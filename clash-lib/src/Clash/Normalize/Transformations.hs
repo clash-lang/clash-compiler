@@ -8,8 +8,10 @@
   Transformations of the Normalization process
 -}
 
+{-# LANGUAGE BangPatterns      #-}
 {-# LANGUAGE CPP               #-}
 {-# LANGUAGE LambdaCase        #-}
+{-# LANGUAGE MagicHash         #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TemplateHaskell   #-}
 {-# LANGUAGE ViewPatterns      #-}
@@ -65,10 +67,13 @@ import qualified Data.HashSet                as HashSet
 import qualified Data.List                   as List
 import qualified Data.Maybe                  as Maybe
 import qualified Data.Monoid                 as Monoid
+import qualified Data.Primitive.ByteArray    as BA
 import qualified Data.Set                    as Set
 import qualified Data.Set.Lens               as Lens
 import           Data.Text                   (Text, unpack)
+import qualified Data.Vector.Primitive       as PV
 import           Debug.Trace                 (trace)
+import           GHC.Integer.GMP.Internals   (Integer (..), BigNat (..))
 import           Unbound.Generics.LocallyNameless
   (Bind, Embed (..), bind, embed, rec, runFreshM, unbind, unembed, unrebind, unrec)
 import           Unbound.Generics.LocallyNameless.Unsafe (unsafeUnbind)
@@ -338,43 +343,45 @@ caseCon ctx e@(Case subj ty alts)
     ids <- Lens.use uniqSupply
     let (ids1,ids2) = splitSupply ids
     uniqSupply Lens..= ids2
+    gh <- Lens.use globalHeap
     lvl <- Lens.view dbgLevel
-    case whnf' primEval bndrs tcm ids1 True subj of
-      Literal l -> caseCon ctx (Case (Literal l) ty alts)
-      subj' -> case collectArgs subj' of
-        (Data _,_) -> caseCon ctx (Case subj' ty alts)
+    case whnf' primEval bndrs tcm gh ids1 True subj of
+      (gh',v) -> globalHeap Lens..= gh' >> case v of
+        Literal l -> caseCon ctx (Case (Literal l) ty alts)
+        subj' -> case collectArgs subj' of
+          (Data _,_) -> caseCon ctx (Case subj' ty alts)
 #if MIN_VERSION_ghc(8,2,2)
-        (Prim nm ty',_:msgOrCallStack:_)
-          | nm == "Control.Exception.Base.absentError" ->
-            let e' = mkApps (Prim nm ty') [Right ty,msgOrCallStack]
-            in  changed e'
+          (Prim nm ty',_:msgOrCallStack:_)
+            | nm == "Control.Exception.Base.absentError" ->
+              let e' = mkApps (Prim nm ty') [Right ty,msgOrCallStack]
+              in  changed e'
 #endif
 
-        (Prim nm ty',repTy:_:msgOrCallStack:_)
-          | nm `elem` ["Control.Exception.Base.patError"
+          (Prim nm ty',repTy:_:msgOrCallStack:_)
+            | nm `elem` ["Control.Exception.Base.patError"
 #if !MIN_VERSION_ghc(8,2,2)
-                      ,"Control.Exception.Base.absentError"
+                        ,"Control.Exception.Base.absentError"
 #endif
-                      ,"GHC.Err.undefined"] ->
-            let e' = mkApps (Prim nm ty') [repTy,Right ty,msgOrCallStack]
-            in  changed e'
-        (Prim nm ty',[_])
-          | nm `elem` ["Clash.Transformations.undefined"] ->
-            let e' = mkApps (Prim nm ty') [Right ty]
-            in changed e'
-        (Prim nm _,[])
-          | nm `elem` ["EmptyCase"] ->
-            changed (Prim nm ty)
-        _ -> do
-          subjTy <- termType tcm subj
-          tran   <- Lens.view typeTranslator
-          case coreTypeToHWType tran tcm False subjTy of
-            Right (Void (Just hty))
-              | hty `elem` [BitVector 0, Unsigned 0, Signed 0, Index 1]
-              -> caseCon ctx (Case (Literal (IntegerLiteral 0)) ty alts)
-            _ -> traceIf (lvl > DebugNone && isConstant e)
-                   ("Irreducible constant as case subject: " ++ showDoc subj ++ "\nCan be reduced to: " ++ showDoc subj')
-                   (caseOneAlt e)
+                        ,"GHC.Err.undefined"] ->
+              let e' = mkApps (Prim nm ty') [repTy,Right ty,msgOrCallStack]
+              in  changed e'
+          (Prim nm ty',[_])
+            | nm `elem` ["Clash.Transformations.undefined"] ->
+              let e' = mkApps (Prim nm ty') [Right ty]
+              in changed e'
+          (Prim nm _,[])
+            | nm `elem` ["EmptyCase"] ->
+              changed (Prim nm ty)
+          _ -> do
+            subjTy <- termType tcm subj
+            tran   <- Lens.view typeTranslator
+            case coreTypeToHWType tran tcm False subjTy of
+              Right (Void (Just hty))
+                | hty `elem` [BitVector 0, Unsigned 0, Signed 0, Index 1]
+                -> caseCon ctx (Case (Literal (IntegerLiteral 0)) ty alts)
+              _ -> traceIf (lvl > DebugNone && isConstant e)
+                     ("Irreducible constant as case subject: " ++ showDoc subj ++ "\nCan be reduced to: " ++ showDoc subj')
+                     (caseOneAlt e)
 
 caseCon ctx e@(Case subj ty alts) = do
   tcm <- Lens.view tcCache
@@ -393,11 +400,13 @@ matchLiteralContructor
   -> Literal
   -> [(Pat,Term)]
   -> NormalizeSession Term
-matchLiteralContructor c (IntegerLiteral l) alts = do
-  let dcAltM = List.find (smallInt . fst) alts
-  case dcAltM of
-    Just (DataPat _ pxs, e) ->
-      let ([],xs)   = unrebind pxs
+matchLiteralContructor c (IntegerLiteral l) alts = go (reverse alts)
+ where
+  go [(DefaultPat,e)] = changed e
+  go ((DataPat dc pxs,e):alts')
+    | dcTag (unembed dc) == 1
+    , l >= ((-2)^(63::Int)) &&  l < 2^(63::Int)
+    = let ([],xs)   = unrebind pxs
           fvs       = Lens.toListOf  termFreeIds e
           (binds,_) = List.partition ((`elem` fvs) . nameOcc . varName . fst)
                     $ zip xs [Literal (IntLiteral l)]
@@ -405,37 +414,69 @@ matchLiteralContructor c (IntegerLiteral l) alts = do
                  [] -> e
                  _  -> Letrec $ bind (rec $ map (second embed) binds) e
       in changed e'
-    _ -> matchLiteralDefault c alts
-  where
-    smallInt (DataPat dc _)
-      | dcTag (unembed dc) == 1
-      , l < 2^(63 :: Int)
-      = True
-    smallInt _ = False
-matchLiteralContructor c (NaturalLiteral l) alts = do
-  let dcAltM = List.find (smallNat . fst) alts
-  case dcAltM of
-    Just (DataPat _ pxs, e) ->
-      let ([],xs)   = unrebind pxs
+    | dcTag (unembed dc) == 2
+    , l >= 2^(63::Int)
+    = let !(Jp# !(BN# ba)) = l
+          ba'       = BA.ByteArray ba
+          bv        = PV.Vector 0 (BA.sizeofByteArray ba') ba'
+          ([],xs)   = unrebind pxs
           fvs       = Lens.toListOf  termFreeIds e
           (binds,_) = List.partition ((`elem` fvs) . nameOcc . varName . fst)
-                    $ zip xs [Literal (WordLiteral (toInteger l))]
+                    $ zip xs [Literal (ByteArrayLiteral bv)]
           e' = case binds of
                  [] -> e
                  _  -> Letrec $ bind (rec $ map (second embed) binds) e
       in changed e'
-    _ -> matchLiteralDefault c alts
-  where
-    smallNat (DataPat dc _)
-      | dcTag (unembed dc) == 1
-      , l < 2^(63 :: Int)
-      = True
-    smallNat _ = False
-matchLiteralContructor c _ alts = matchLiteralDefault c alts
+    | dcTag (unembed dc) == 3
+    , l < ((-2)^(63::Int))
+    = let !(Jn# !(BN# ba)) = l
+          ba'       = BA.ByteArray ba
+          bv        = PV.Vector 0 (BA.sizeofByteArray ba') ba'
+          ([],xs)   = unrebind pxs
+          fvs       = Lens.toListOf  termFreeIds e
+          (binds,_) = List.partition ((`elem` fvs) . nameOcc . varName . fst)
+                    $ zip xs [Literal (ByteArrayLiteral bv)]
+          e' = case binds of
+                 [] -> e
+                 _  -> Letrec $ bind (rec $ map (second embed) binds) e
+      in changed e'
+    | otherwise
+    = go alts'
+  go _ = error $ $(curLoc) ++ "Report as bug: caseCon error: " ++ showDoc c
 
-matchLiteralDefault :: Term -> [(Pat,Term)] -> NormalizeSession Term
-matchLiteralDefault _ ((DefaultPat,e):_) = changed e
-matchLiteralDefault c _ =
+matchLiteralContructor c (NaturalLiteral l) alts = go (reverse alts)
+ where
+  go [(DefaultPat,e)] = changed e
+  go ((DataPat dc pxs,e):alts')
+    | dcTag (unembed dc) == 1
+    , l >= 0 && l < 2^(64::Int)
+    = let ([],xs)   = unrebind pxs
+          fvs       = Lens.toListOf  termFreeIds e
+          (binds,_) = List.partition ((`elem` fvs) . nameOcc . varName . fst)
+                    $ zip xs [Literal (WordLiteral l)]
+          e' = case binds of
+                 [] -> e
+                 _  -> Letrec $ bind (rec $ map (second embed) binds) e
+      in changed e'
+    | dcTag (unembed dc) == 2
+    , l >= 2^(64::Int)
+    = let !(Jp# !(BN# ba)) = l
+          ba'       = BA.ByteArray ba
+          bv        = PV.Vector 0 (BA.sizeofByteArray ba') ba'
+          ([],xs)   = unrebind pxs
+          fvs       = Lens.toListOf  termFreeIds e
+          (binds,_) = List.partition ((`elem` fvs) . nameOcc . varName . fst)
+                    $ zip xs [Literal (ByteArrayLiteral bv)]
+          e' = case binds of
+                 [] -> e
+                 _  -> Letrec $ bind (rec $ map (second embed) binds) e
+      in changed e'
+    | otherwise
+    = go alts'
+  go _ = error $ $(curLoc) ++ "Report as bug: caseCon error: " ++ showDoc c
+
+matchLiteralContructor _ _ ((DefaultPat,e):_) = changed e
+matchLiteralContructor c _ _ =
   error $ $(curLoc) ++ "Report as bug: caseCon error: " ++ showDoc c
 
 caseOneAlt :: Term -> RewriteMonad extra Term
@@ -1269,14 +1310,18 @@ reduceConst _ e@(App _ _)
     ids <- Lens.use uniqSupply
     let (ids1,ids2) = splitSupply ids
     uniqSupply Lens..= ids2
-    case whnf' primEval bndrs tcm ids1 False e of
-      e'@(Literal _) -> changed e'
-      e'@(collectArgs -> (Prim nm _, _))
-        | isFromInt nm
-        , e /= e'
-        -> changed e'
-      e'@(collectArgs -> (Data _,_)) -> changed e'
-      _              -> return e
+    gh <- Lens.use globalHeap
+    case whnf' primEval bndrs tcm gh ids1 False e of
+      (gh',e') -> do
+        globalHeap Lens..= gh'
+        case e' of
+          (Literal _) -> changed e'
+          (collectArgs -> (Prim nm _, _))
+            | isFromInt nm
+            , e /= e'
+            -> changed e'
+          (collectArgs -> (Data _,_)) -> changed e'
+          _                           -> return e
 
 reduceConst _ e = return e
 

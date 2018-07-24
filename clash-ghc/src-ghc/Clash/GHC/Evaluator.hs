@@ -25,19 +25,24 @@ import           Data.Bits
 import           Data.Char           (chr,ord)
 import qualified Data.Either         as Either
 import qualified Data.HashMap.Strict as HashMap
+import qualified Data.IntMap         as IntMap
 import           Data.Maybe
   (fromMaybe, mapMaybe)
 import qualified Data.List           as List
+import qualified Data.Primitive.ByteArray as ByteArray
 import           Data.Proxy          (Proxy)
 import           Data.Reflection     (reifyNat)
 import           Data.Text           (Text)
+import qualified Data.Vector.Primitive as Vector
 import           GHC.Float
 import           GHC.Int
 import           GHC.Integer         (decodeDoubleInteger,encodeDoubleInteger)
 import           GHC.Prim
 import           GHC.Real            (Ratio (..))
 import           GHC.TypeLits        (KnownNat)
+import           GHC.Types           (IO (..))
 import           GHC.Word
+import           System.IO.Unsafe    (unsafeDupablePerformIO)
 import qualified Unbound.Generics.LocallyNameless.Name as U
 import           Unbound.Generics.LocallyNameless
   (Fresh (..), bind, embed, rebind, runFreshM, makeName)
@@ -574,6 +579,194 @@ reduceConstant isSubj gbl tcm h k nm ty tys args = case nm of
     -> let !(F# a) = fromRational i
            r = float2Double# a
        in  reduce . Literal . DoubleLiteral . toRational $ D# r
+
+
+  "GHC.Prim.newByteArray#"
+    | [iV,PrimVal rwNm rwTy _ _] <- args
+    , [i] <- intLiterals' [iV]
+    -> let (_,tyView -> TyConApp tupTcNm tyArgs) = splitFunForallTy ty
+           (Just tupTc) = HashMap.lookup (nameOcc tupTcNm) tcm
+           [tupDc] = tyConDataCons tupTc
+           Heap (gh,p) ph ids = h
+           lit = Literal (ByteArrayLiteral (Vector.replicate (fromInteger i) 0))
+           h' = Heap (IntMap.insert p lit gh,p+1) ph ids
+           mbaTy = mkFunTy intPrimTy (last tyArgs)
+           newE = mkApps (Data tupDc) (map Right tyArgs ++
+                    [Left (Prim rwNm rwTy)
+                    ,Left (mkApps (Prim "GHC.Prim.MutableByteArray#" mbaTy)
+                                  [Left (Literal . IntLiteral $ toInteger p)])
+                    ])
+       in Just (h',k,newE)
+
+  "GHC.Prim.setByteArray#"
+    | [PrimVal _mbaNm _mbaTy _ [baV]
+      ,offV,lenV,cV
+      ,PrimVal rwNm rwTy _ _
+      ] <- args
+    , [ba,off,len,c] <- intLiterals' [baV,offV,lenV,cV]
+    -> let Heap (gh,p) ph ids = h
+           Just (Literal (ByteArrayLiteral (Vector.Vector voff vlen ba1))) =
+              IntMap.lookup (fromInteger ba) gh
+           !(I# off') = fromInteger off
+           !(I# len') = fromInteger len
+           !(I# c')   = fromInteger c
+           ba2 = unsafeDupablePerformIO $ do
+                  ByteArray.MutableByteArray mba <- ByteArray.unsafeThawByteArray ba1
+                  svoid (setByteArray# mba off' len' c')
+                  ByteArray.unsafeFreezeByteArray (ByteArray.MutableByteArray mba)
+           ba3 = Literal (ByteArrayLiteral (Vector.Vector voff vlen ba2))
+           h'  = Heap (IntMap.insert (fromInteger ba) ba3 gh,p) ph ids
+       in Just (h',k,Prim rwNm rwTy)
+
+  "GHC.Prim.writeWordArray#"
+    | [PrimVal _mbaNm _mbaTy _  [baV]
+      ,iV,wV
+      ,PrimVal rwNm rwTy _ _
+      ] <- args
+    , [ba,i] <- intLiterals' [baV,iV]
+    , [w] <- wordLiterals' [wV]
+    -> let Heap (gh,p) ph ids = h
+           Just (Literal (ByteArrayLiteral (Vector.Vector off len ba1))) =
+              IntMap.lookup (fromInteger ba) gh
+           !(I# i') = fromInteger i
+           !(W# w') = fromIntegral w
+           ba2 = unsafeDupablePerformIO $ do
+                  ByteArray.MutableByteArray mba <- ByteArray.unsafeThawByteArray ba1
+                  svoid (writeWordArray# mba i' w')
+                  ByteArray.unsafeFreezeByteArray (ByteArray.MutableByteArray mba)
+           ba3 = Literal (ByteArrayLiteral (Vector.Vector off len ba2))
+           h'  = Heap (IntMap.insert (fromInteger ba) ba3 gh,p) ph ids
+       in Just (h',k,Prim rwNm rwTy)
+
+  "GHC.Prim.unsafeFreezeByteArray#"
+    | [PrimVal _mbaNm _mbaTy _ [baV]
+      ,PrimVal rwNm rwTy _ _
+      ] <- args
+    , [ba] <-  intLiterals' [baV]
+    -> let (_,tyView -> TyConApp tupTcNm tyArgs) = splitFunForallTy ty
+           (Just tupTc) = HashMap.lookup (nameOcc tupTcNm) tcm
+           [tupDc] = tyConDataCons tupTc
+           Heap (gh,_) _ _ = h
+           Just ba' = IntMap.lookup (fromInteger ba) gh
+       in  reduce $ mkApps (Data tupDc) (map Right tyArgs ++
+                      [Left (Prim rwNm rwTy)
+                      ,Left ba'])
+
+  "GHC.Prim.sizeofByteArray#"
+    | [Lit (ByteArrayLiteral ba)] <- args
+    -> reduce (Literal (IntLiteral (toInteger (Vector.length ba))))
+
+  "GHC.Prim.indexWordArray#"
+    | [Lit (ByteArrayLiteral (Vector.Vector _ _ (ByteArray.ByteArray ba))),iV] <- args
+    , [i] <- intLiterals' [iV]
+    -> let !(I# i') = fromInteger i
+           !w       = indexWordArray# ba i'
+       in  reduce (Literal (WordLiteral (toInteger (W# w))))
+
+  "GHC.Prim.getSizeofMutBigNat#"
+    | [PrimVal _mbaNm _mbaTy _ [baV]
+      ,PrimVal rwNm rwTy _ _
+      ] <- args
+    , [ba] <- intLiterals' [baV]
+    -> let (_,tyView -> TyConApp tupTcNm tyArgs) = splitFunForallTy ty
+           (Just tupTc) = HashMap.lookup (nameOcc tupTcNm) tcm
+           [tupDc] = tyConDataCons tupTc
+           Heap (gh,_) _ _ = h
+           Just (Literal (ByteArrayLiteral ba')) = IntMap.lookup (fromInteger ba) gh
+           lit = Literal (IntLiteral (toInteger (Vector.length ba')))
+       in  reduce $ mkApps (Data tupDc) (map Right tyArgs ++
+                      [Left (Prim rwNm rwTy)
+                      ,Left lit])
+
+  "GHC.Prim.resizeMutableByteArray#"
+    | [PrimVal mbaNm mbaTy _ [baV]
+      ,iV
+      ,PrimVal rwNm rwTy _ _
+      ] <- args
+    , [ba,i] <- intLiterals' [baV,iV]
+    -> let (_,tyView -> TyConApp tupTcNm tyArgs) = splitFunForallTy ty
+           (Just tupTc) = HashMap.lookup (nameOcc tupTcNm) tcm
+           [tupDc] = tyConDataCons tupTc
+           Heap (gh,p) ph ids = h
+           Just (Literal (ByteArrayLiteral (Vector.Vector 0 _ ba1)))
+            = IntMap.lookup (fromInteger ba) gh
+           !(I# i') = fromInteger i
+           ba2 = unsafeDupablePerformIO $ do
+                   ByteArray.MutableByteArray mba <- ByteArray.unsafeThawByteArray ba1
+                   mba' <- IO (\s -> case resizeMutableByteArray# mba i' s of
+                                 (# s', mba' #) -> (# s', ByteArray.MutableByteArray mba' #))
+                   ByteArray.unsafeFreezeByteArray mba'
+           ba3 = Literal (ByteArrayLiteral (Vector.Vector 0 (I# i') ba2))
+           h'  = Heap (IntMap.insert p ba3 gh,p+1) ph ids
+           newE = mkApps (Data tupDc) (map Right tyArgs ++
+                    [Left (Prim rwNm rwTy)
+                    ,Left (mkApps (Prim mbaNm mbaTy)
+                                  [Left (Literal . IntLiteral $ toInteger p)])
+                    ])
+       in  Just (h',k,newE)
+
+  "GHC.Prim.shrinkMutableByteArray#"
+    | [PrimVal _mbaNm _mbaTy _ [baV]
+      ,lenV
+      ,PrimVal rwNm rwTy _ _
+      ] <- args
+    , [ba,len] <- intLiterals' [baV,lenV]
+    -> let Heap (gh,p) ph ids = h
+           Just (Literal (ByteArrayLiteral (Vector.Vector voff vlen ba1))) =
+              IntMap.lookup (fromInteger ba) gh
+           !(I# len') = fromInteger len
+           ba2 = unsafeDupablePerformIO $ do
+                  ByteArray.MutableByteArray mba <- ByteArray.unsafeThawByteArray ba1
+                  svoid (shrinkMutableByteArray# mba len')
+                  ByteArray.unsafeFreezeByteArray (ByteArray.MutableByteArray mba)
+           ba3 = Literal (ByteArrayLiteral (Vector.Vector voff vlen ba2))
+           h'  = Heap (IntMap.insert (fromInteger ba) ba3 gh,p) ph ids
+       in Just (h',k,Prim rwNm rwTy)
+
+  "GHC.Prim.copyByteArray#"
+    | [Lit (ByteArrayLiteral (Vector.Vector _ _ (ByteArray.ByteArray src_ba)))
+      ,src_offV
+      ,PrimVal _mbaNm _mbaTy _ [dst_mbaV]
+      ,dst_offV, nV
+      ,PrimVal rwNm rwTy _ _
+      ] <- args
+    , [src_off,dst_mba,dst_off,n] <- intLiterals' [src_offV,dst_mbaV,dst_offV,nV]
+    -> let Heap (gh,p) ph ids = h
+           Just (Literal (ByteArrayLiteral (Vector.Vector voff vlen dst_ba))) =
+              IntMap.lookup (fromInteger dst_mba) gh
+           !(I# src_off') = fromInteger src_off
+           !(I# dst_off') = fromInteger dst_off
+           !(I# n')       = fromInteger n
+           ba2 = unsafeDupablePerformIO $ do
+                  ByteArray.MutableByteArray dst_mba1 <- ByteArray.unsafeThawByteArray dst_ba
+                  svoid (copyByteArray# src_ba src_off' dst_mba1 dst_off' n')
+                  ByteArray.unsafeFreezeByteArray (ByteArray.MutableByteArray dst_mba1)
+           ba3 = Literal (ByteArrayLiteral (Vector.Vector voff vlen ba2))
+           h'  = Heap (IntMap.insert (fromInteger dst_mba) ba3 gh,p) ph ids
+       in Just (h',k,Prim rwNm rwTy)
+
+  "GHC.Prim.readWordArray#"
+    | [PrimVal _mbaNm _mbaTy _  [baV]
+      ,offV
+      ,PrimVal rwNm rwTy _ _
+      ] <- args
+    , [ba,off] <- intLiterals' [baV,offV]
+    -> let (_,tyView -> TyConApp tupTcNm tyArgs) = splitFunForallTy ty
+           (Just tupTc) = HashMap.lookup (nameOcc tupTcNm) tcm
+           [tupDc] = tyConDataCons tupTc
+           Heap (gh,_) _ _ = h
+           Just (Literal (ByteArrayLiteral (Vector.Vector _ _ ba1))) =
+              IntMap.lookup (fromInteger ba) gh
+           !(I# off') = fromInteger off
+           w = unsafeDupablePerformIO $ do
+                  ByteArray.MutableByteArray mba <- ByteArray.unsafeThawByteArray ba1
+                  IO (\s -> case readWordArray# mba off' s of
+                        (# s', w' #) -> (# s',  W# w' #))
+           newE = mkApps (Data tupDc) (map Right tyArgs ++
+                    [Left (Prim rwNm rwTy)
+                    ,Left (Literal (WordLiteral (toInteger w)))
+                    ])
+       in reduce newE
 
 -- decodeFloat_Int# :: Float# -> (#Int#, Int##)
   "GHC.Prim.decodeFloat_Int#" | [i] <- floatLiterals' args
@@ -2665,7 +2858,7 @@ reduceConstant isSubj gbl tcm h k nm ty tys args = case nm of
     , Right n <- runExcept (tyNatSize tcm nTy)
     -> case n of
          0 -> let (pureF,ids') = runPEM (mkSelectorCase $(curLoc) tcm (valToTerm apDict) 1 1) ids
-              in  reduceWHNF' (Heap h' ids') $
+              in  reduceWHNF' (Heap gh h' ids') $
                   mkApps pureF
                          [Right (mkTyConApp (vecTcNm) [nTy,bTy])
                          ,Left  (mkVecNil dc bTy)]
@@ -2676,7 +2869,7 @@ reduceConstant isSubj gbl tcm h k nm ty tys args = case nm of
                     return (fmapF',apF')
                   n'ty = LitTy (NumTy (n-1))
                   Just (consCoTy : _) = dataConInstArgTys dc [nTy,bTy,n'ty]
-              in  reduceWHNF' (Heap h' ids') $
+              in  reduceWHNF' (Heap gh h' ids') $
                   mkApps apF
                          [Right (mkTyConApp vecTcNm [n'ty,bTy])
                          ,Right (mkTyConApp vecTcNm [nTy,bTy])
@@ -2705,7 +2898,7 @@ reduceConstant isSubj gbl tcm h k nm ty tys args = case nm of
     where
       (tyArgs,_)         = splitFunForallTy ty
       TyConApp vecTcNm _ = tyView (Either.rights tyArgs !! 2)
-      Heap h' ids        = h
+      Heap gh h' ids     = h
 
 -- BitPack
   "Clash.Sized.Vector.concatBitVector#"
@@ -3526,3 +3719,6 @@ ghcTyconToTyConName tc =
     n'      = fromMaybe "_INTERNAL_" (modNameM n) ++ ('.':occName)
     occName = occNameString $ nameOccName n
     n       = TyCon.tyConName tc
+
+svoid :: (State# RealWorld -> State# RealWorld) -> IO ()
+svoid m0 = IO (\s -> case m0 s of s' -> (# s', () #))
