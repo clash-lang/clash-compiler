@@ -31,7 +31,7 @@ import Unbound.Generics.LocallyNameless.Name (Name (..))
 
 import SrcLoc (SrcSpan)
 
-import Clash.Core.Evaluator      (PrimEvaluator)
+import Clash.Core.Evaluator      (GlobalHeap, PrimEvaluator)
 import Clash.Core.Term           (Term, TmName, TmOccName)
 import Clash.Core.Type           (Type)
 import Clash.Core.TyCon          (TyCon, TyConName, TyConOccName)
@@ -70,6 +70,8 @@ data RewriteState extra
   -- ^ Function which is currently normalized
   , _nameCounter      :: {-# UNPACK #-} !Int
   -- ^ Used for 'Fresh'
+  , _globalHeap       :: GlobalHeap
+  -- ^ Used as a heap for compile-time evaluation of primitives that live in I/O
   , _extra            :: !extra
   -- ^ Additional state
   }

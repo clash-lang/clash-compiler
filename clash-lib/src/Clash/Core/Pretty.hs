@@ -149,6 +149,7 @@ instance Pretty Literal where
     CharLiteral c     -> return $ PP.pretty c
     StringLiteral s   -> return $ vcat $ map PP.pretty $ showMultiLineString s
     NaturalLiteral n  -> return $ PP.pretty n
+    ByteArrayLiteral s -> return $ PP.pretty $ show s
 
 instance Pretty Pat where
   pprPrec prec pat = case pat of

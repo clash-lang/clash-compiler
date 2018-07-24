@@ -73,7 +73,7 @@ import Clash.Core.Util       (collectArgs, mkApps, termType)
 import Clash.Normalize.Types (NormalizeState)
 import Clash.Normalize.Util  (isConstant)
 import Clash.Rewrite.Types
-  (RewriteMonad, bindings, evaluator, tcCache, tupleTcCache, uniqSupply)
+  (RewriteMonad, bindings, evaluator, globalHeap, tcCache, tupleTcCache, uniqSupply)
 import Clash.Rewrite.Util    (mkInternalVar, mkSelectorCase,
                               isUntranslatableType)
 import Clash.Util
@@ -138,10 +138,11 @@ collectGlobals inScope substitution seen e@(collectArgs -> (fun, args@(_:_)))
     tcm <- Lens.view tcCache
     bndrs <- Lens.use bindings
     primEval <- Lens.view evaluator
+    gh <- Lens.use globalHeap
     ids <- Lens.use uniqSupply
     let (ids1,ids2) = splitSupply ids
     uniqSupply Lens..= ids2
-    let eval = whnf' primEval bndrs tcm ids1 False
+    let eval = snd . whnf' primEval bndrs tcm gh ids1 False
     eTy <- termType tcm e
     untran <- isUntranslatableType False eTy
     case untran of

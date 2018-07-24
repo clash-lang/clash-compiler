@@ -24,6 +24,7 @@ module Clash.Core.TysPrim
   , floatPrimTy
   , doublePrimTy
   , naturalPrimTy
+  , byteArrayPrimTy
   , tysPrimMap
   )
 where
@@ -65,7 +66,7 @@ uniqueToInteger = toInteger . getKey
 intPrimTyConName, integerPrimTyConName, charPrimTyConName, stringPrimTyConName,
   voidPrimTyConName, wordPrimTyConName, int64PrimTyConName,
   word64PrimTyConName, floatPrimTyConName, doublePrimTyConName,
-  naturalPrimTyConName :: TyConName
+  naturalPrimTyConName, byteArrayPrimTyConName :: TyConName
 intPrimTyConName     = makeSystemName "GHC.Prim.Int#"
                                 (uniqueToInteger intPrimTyConKey)
 integerPrimTyConName = makeSystemName "GHC.Integer.Type.Integer"
@@ -90,6 +91,8 @@ naturalPrimTyConName = makeSystemName "GHC.Natural.Natural"
 #else
 naturalPrimTyConName = string2SystemName "GHC.Natural.Natural"
 #endif
+byteArrayPrimTyConName = makeSystemName "GHC.Prim.ByteArray#"
+                          (uniqueToInteger byteArrayPrimTyConKey)
 
 liftedPrimTC :: TyConName
              -> TyCon
@@ -97,7 +100,8 @@ liftedPrimTC name = PrimTyCon name liftedTypeKind 0
 
 -- | Builtin Type
 intPrimTc, integerPrimTc, charPrimTc, stringPrimTc, voidPrimTc, wordPrimTc,
-  int64PrimTc, word64PrimTc, floatPrimTc, doublePrimTc, naturalPrimTc :: TyCon
+  int64PrimTc, word64PrimTc, floatPrimTc, doublePrimTc, naturalPrimTc,
+  byteArrayPrimTc :: TyCon
 intPrimTc     = liftedPrimTC intPrimTyConName
 integerPrimTc = liftedPrimTC integerPrimTyConName
 charPrimTc    = liftedPrimTC charPrimTyConName
@@ -109,9 +113,11 @@ word64PrimTc  = liftedPrimTC word64PrimTyConName
 floatPrimTc   = liftedPrimTC floatPrimTyConName
 doublePrimTc  = liftedPrimTC doublePrimTyConName
 naturalPrimTc = liftedPrimTC naturalPrimTyConName
+byteArrayPrimTc = liftedPrimTC  byteArrayPrimTyConName
 
 intPrimTy, integerPrimTy, charPrimTy, stringPrimTy, voidPrimTy, wordPrimTy,
-  int64PrimTy, word64PrimTy, floatPrimTy, doublePrimTy, naturalPrimTy :: Type
+  int64PrimTy, word64PrimTy, floatPrimTy, doublePrimTy, naturalPrimTy,
+  byteArrayPrimTy :: Type
 intPrimTy     = mkTyConTy intPrimTyConName
 integerPrimTy = mkTyConTy integerPrimTyConName
 charPrimTy    = mkTyConTy charPrimTyConName
@@ -123,6 +129,7 @@ word64PrimTy  = mkTyConTy word64PrimTyConName
 floatPrimTy   = mkTyConTy floatPrimTyConName
 doublePrimTy  = mkTyConTy doublePrimTyConName
 naturalPrimTy = mkTyConTy naturalPrimTyConName
+byteArrayPrimTy = mkTyConTy byteArrayPrimTyConName
 
 tysPrimMap :: HashMap TyConOccName TyCon
 tysPrimMap = HashMap.fromList $ map (first nameOcc)
@@ -141,4 +148,5 @@ tysPrimMap = HashMap.fromList $ map (first nameOcc)
   , (floatPrimTyConName,floatPrimTc)
   , (doublePrimTyConName,doublePrimTc)
   , (naturalPrimTyConName,naturalPrimTc)
+  , (byteArrayPrimTyConName,byteArrayPrimTc)
   ]

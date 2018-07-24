@@ -855,7 +855,7 @@ runRWTerm (C.ForAllTy tvRTy) =
     (C.FunTy rwTy _) = C.tyView fTy
     fName            = C.string2SystemName "f"
     fId              = C.Id fName (embed fTy)
-    rwNm             = pack "Clash.GHC.GHC2Core.realWorld#"
+    rwNm             = pack "GHC.Prim.realWorld#"
 
 runRWTerm ty = error $ $(curLoc) ++ show ty
 
