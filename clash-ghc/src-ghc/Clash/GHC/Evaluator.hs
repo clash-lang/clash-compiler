@@ -37,6 +37,7 @@ import qualified Data.Vector.Primitive as Vector
 import           GHC.Float
 import           GHC.Int
 import           GHC.Integer         (decodeDoubleInteger,encodeDoubleInteger)
+import           GHC.Integer.GMP.Internals (Integer (..), BigNat (..))
 import           GHC.Prim
 import           GHC.Real            (Ratio (..))
 import           GHC.TypeLits        (KnownNat)
@@ -825,7 +826,7 @@ reduceConstant isSubj gbl tcm h k nm ty tys args = case nm of
     -> reduce (Literal (IntegerLiteral i))
 
   "GHC.Integer.Type.integerToInt"
-    | [Lit (IntegerLiteral i)] <- args
+    | [i] <- integerLiterals' args
     -> reduce (integerToIntLiteral i)
 
   "GHC.Integer.Type.decodeDoubleInteger" -- :: Double# -> (#Integer, Int##)
@@ -841,13 +842,14 @@ reduceConstant isSubj gbl tcm h k nm ty tys args = case nm of
                 , Left (integerToIntLiteral . toInteger $ I# c)])
 
   "GHC.Integer.Type.encodeDoubleInteger" -- :: Integer -> Int# -> Double#
-    | [Lit (IntegerLiteral i), Lit (IntLiteral j)] <- args
+    | [iV, Lit (IntLiteral j)] <- args
+    , [i] <- integerLiterals' [iV]
     -> let !(I# k') = fromInteger j
            r = encodeDoubleInteger i k'
     in  reduce . Literal . DoubleLiteral . toRational $ D# r
 
   "GHC.Integer.Type.quotRemInteger" -- :: Integer -> Integer -> (#Integer, Integer#)
-    | [Lit (IntegerLiteral i), Lit (IntegerLiteral j)] <- args
+    | [i, j] <- integerLiterals' args
     -> let (_,tyView -> TyConApp tupTcNm tyArgs) = splitFunForallTy ty
            (Just tupTc) = HashMap.lookup (nameOcc tupTcNm) tcm
            [tupDc] = tyConDataCons tupTc
@@ -867,7 +869,7 @@ reduceConstant isSubj gbl tcm h k nm ty tys args = case nm of
     -> reduce (integerToIntegerLiteral (i*j))
 
   "GHC.Integer.Type.negateInteger"
-    | [Lit (IntegerLiteral i)] <- args
+    | [i] <- integerLiterals' args
     -> reduce (integerToIntegerLiteral (negate i))
 
   "GHC.Integer.Type.divInteger" | Just (i,j) <- integerLiterals args
@@ -931,11 +933,13 @@ reduceConstant isSubj gbl tcm h k nm ty tys args = case nm of
     -> reduce (boolToIntLiteral (i <= j))
 
   "GHC.Integer.Type.shiftRInteger"
-    | [Lit (IntegerLiteral i), Lit (IntLiteral j)] <- args
+    | [iV, Lit (IntLiteral j)] <- args
+    , [i] <- integerLiterals' [iV]
     -> reduce (integerToIntegerLiteral (i `shiftR` fromInteger j))
 
   "GHC.Integer.Type.shiftLInteger"
-    | [Lit (IntegerLiteral i), Lit (IntLiteral j)] <- args
+    | [iV, Lit (IntLiteral j)] <- args
+    , [i] <- integerLiterals' [iV]
     -> reduce (integerToIntegerLiteral (i `shiftL` fromInteger j))
 
   "GHC.Integer.Type.wordToInteger"
@@ -949,10 +953,11 @@ reduceConstant isSubj gbl tcm h k nm ty tys args = case nm of
   -- GHC.Real.^  -- XXX: Very fragile
   --   ^_f, $wf, $wf1 are specialisations of the internal function f in the implementation of (^) in GHC.Real
   "GHC.Real.^_f"  -- :: Integer -> Integer -> Integer
-    | [Lit (IntegerLiteral i), Lit (IntegerLiteral j)] <- args
+    | [i,j] <- integerLiterals' args
     -> reduce (integerToIntegerLiteral $ i ^ j)
   "GHC.Real.$wf"  -- :: Integer -> Int# -> Integer
-    | [Lit (IntegerLiteral i), Lit (IntLiteral j)] <- args
+    | [iV, Lit (IntLiteral j)] <- args
+    , [i] <- integerLiterals' [iV]
     -> reduce (integerToIntegerLiteral $ i ^ j)
   "GHC.Real.$wf1" -- :: Int# -> Int# -> Int#
     | [Lit (IntLiteral i), Lit (IntLiteral j)] <- args
@@ -1049,8 +1054,9 @@ reduceConstant isSubj gbl tcm h k nm ty tys args = case nm of
   "GHC.Float.$w$sfromRat''" -- XXX: Very fragile
     | [Lit (IntLiteral _minEx)
       ,Lit (IntLiteral matDigs)
-      ,Lit (IntegerLiteral n)
-      ,Lit (IntegerLiteral d)] <- args
+      ,nV
+      ,dV] <- args
+    , [n,d] <- integerLiterals' [nV,dV]
     -> case fromInteger matDigs of
           matDigs'
             | matDigs' == floatDigits (undefined :: Float)
@@ -1062,8 +1068,9 @@ reduceConstant isSubj gbl tcm h k nm ty tys args = case nm of
   "GHC.Float.$w$sfromRat''1" -- XXX: Very fragile
     | [Lit (IntLiteral _minEx)
       ,Lit (IntLiteral matDigs)
-      ,Lit (IntegerLiteral n)
-      ,Lit (IntegerLiteral d)] <- args
+      ,nV
+      ,dV] <- args
+    , [n,d] <- integerLiterals' [nV,dV]
     -> case fromInteger matDigs of
           matDigs'
             | matDigs' == floatDigits (undefined :: Float)
@@ -1073,7 +1080,7 @@ reduceConstant isSubj gbl tcm h k nm ty tys args = case nm of
           _ -> error $ $(curLoc) ++ "GHC.Float.$w$sfromRat'': Not a Float or Double"
 
   "GHC.Integer.Type.doubleFromInteger"
-    | [Lit (IntegerLiteral i)] <- args
+    | [i] <- integerLiterals' args
     -> reduce (Literal (DoubleLiteral (toRational (fromInteger i :: Double))))
 
   "GHC.Base.eqString"
@@ -3002,9 +3009,24 @@ floatLiterals' = typedLiterals' floatLiteral
       _ -> Nothing
 
 integerLiterals :: [Value] -> Maybe (Integer,Integer)
-integerLiterals args = case args of
-  [Lit (IntegerLiteral i), Lit (IntegerLiteral j)] -> Just (i,j)
+integerLiterals args = case integerLiterals' args of
+  [i,j] -> Just (i,j)
   _ -> Nothing
+
+integerLiterals' :: [Value] -> [Integer]
+integerLiterals' = typedLiterals' integerLiteral
+ where
+  integerLiteral x = case x of
+    Lit (IntegerLiteral i)      -> Just i
+    DC dc [Left (Literal (IntLiteral i))]
+      | dcTag dc == 1
+      -> Just i
+    DC dc [Left (Literal (ByteArrayLiteral (Vector.Vector _ _ (ByteArray.ByteArray ba))))]
+      | dcTag dc == 2
+      -> Just (Jp# (BN# ba))
+      | dcTag dc == 3
+      -> Just (Jn# (BN# ba))
+    _ -> Nothing
 
 intLiterals :: [Value] -> Maybe (Integer,Integer)
 intLiterals args = case args of
