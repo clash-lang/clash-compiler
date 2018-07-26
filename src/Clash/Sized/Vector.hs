@@ -6,6 +6,7 @@ Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
 -}
 
 {-# LANGUAGE BangPatterns         #-}
+{-# LANGUAGE CPP                  #-}
 {-# LANGUAGE DataKinds            #-}
 {-# LANGUAGE GADTs                #-}
 {-# LANGUAGE KindSignatures       #-}
@@ -20,6 +21,9 @@ Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
 {-# LANGUAGE TypeOperators        #-}
 {-# LANGUAGE UndecidableInstances #-}
 {-# LANGUAGE ViewPatterns         #-}
+#if __GLASGOW_HASKELL__ >= 806
+{-# LANGUAGE NoStarIsType #-}
+#endif
 
 {-# LANGUAGE Trustworthy #-}
 
@@ -105,6 +109,7 @@ import qualified Control.Lens     as Lens hiding (pattern (:>), pattern (:<))
 import Data.Default               (Default (..))
 import qualified Data.Foldable    as F
 import Data.Bifunctor.Flip        (Flip (..))
+import Data.Kind                  (Type)
 import Data.Proxy                 (Proxy (..))
 import Data.Singletons.Prelude    (TyFun,Apply,type (@@))
 import GHC.TypeLits               (CmpNat, KnownNat, Nat, type (+), type (-), type (*),
@@ -192,7 +197,7 @@ infixr 5 `Cons`
 -- * Lists with their length encoded in their type
 -- * 'Vec'tor elements have an __ASCENDING__ subscript starting from 0 and
 --   ending at @'length' - 1@.
-data Vec :: Nat -> * -> * where
+data Vec :: Nat -> Type -> Type where
   Nil  :: Vec 0 a
   Cons :: a -> Vec n a -> Vec (n + 1) a
 
@@ -1715,7 +1720,7 @@ lazyV = lazyV' (repeat undefined)
 -- or delay, of O(@'length' xs@). Look at 'dtfold' for a /dependently/ typed
 -- fold that produces a structure with a depth of O(log_2(@'length' xs@)).
 dfold :: forall p k a . KnownNat k
-      => Proxy (p :: TyFun Nat * -> *) -- ^ The /motive/
+      => Proxy (p :: TyFun Nat Type -> Type) -- ^ The /motive/
       -> (forall l . SNat l -> a -> (p @@ l) -> (p @@ (l + 1)))
       -- ^ Function to fold.
       --
@@ -1833,7 +1838,7 @@ dfold _ f z xs = go (snatProxy (asNatProxy xs)) xs
 -- __NB__: The depth, or delay, of the structure produced by
 -- \"@'dtfold' m f g xs@\" is O(log_2(@'length' xs@)).
 dtfold :: forall p k a . KnownNat k
-       => Proxy (p :: TyFun Nat * -> *) -- ^ The /motive/
+       => Proxy (p :: TyFun Nat Type -> Type) -- ^ The /motive/
        -> (a -> (p @@ 0)) -- ^ Function to apply to every element
        -> (forall l . SNat l -> (p @@ l) -> (p @@ l) -> (p @@ (l + 1)))
        -- ^ Function to combine results.
@@ -1864,7 +1869,7 @@ dtfold _ f g = go (SNat :: SNat k)
 -- map' :: forall n a b . KnownNat n => (a -> b) -> Vec n a -> Vec n b
 -- map' f = 'dfold' (Proxy @('VCons' b)) (\_ x xs -> f x :> xs)
 -- @
-data VCons (a :: *) (f :: TyFun Nat *) :: *
+data VCons (a :: Type) (f :: TyFun Nat Type) :: Type
 type instance Apply (VCons a) l = Vec l a
 
 -- | Specialised version of 'dfold' that builds a triangular computational

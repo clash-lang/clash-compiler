@@ -17,11 +17,15 @@ dedicated hardware resources use the functions from "Clash.Intel.DDR"
 or "Clash.Xilinx.DDR".
 -}
 
+{-# LANGUAGE CPP                 #-}
 {-# LANGUAGE DataKinds           #-}
 {-# LANGUAGE MagicHash           #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeFamilies        #-}
 {-# LANGUAGE TypeOperators       #-}
+#if __GLASGOW_HASKELL__ >= 806
+{-# LANGUAGE NoStarIsType #-}
+#endif
 
 module Clash.Explicit.DDR
   ( ddrIn

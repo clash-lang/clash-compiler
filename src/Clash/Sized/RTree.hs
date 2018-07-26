@@ -4,6 +4,7 @@ License    :  BSD2 (see the file LICENSE)
 Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
 -}
 
+{-# LANGUAGE CPP                  #-}
 {-# LANGUAGE DataKinds            #-}
 {-# LANGUAGE GADTs                #-}
 {-# LANGUAGE InstanceSigs         #-}
@@ -18,6 +19,9 @@ Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
 {-# LANGUAGE TypeOperators        #-}
 {-# LANGUAGE UndecidableInstances #-}
 {-# LANGUAGE ViewPatterns         #-}
+#if __GLASGOW_HASKELL__ >= 806
+{-# LANGUAGE NoStarIsType #-}
+#endif
 
 {-# LANGUAGE Trustworthy #-}
 
@@ -59,6 +63,7 @@ import Control.Applicative         (liftA2)
 import qualified Control.Lens      as Lens
 import Data.Default                (Default (..))
 import Data.Foldable               (toList)
+import Data.Kind                   (Type)
 import Data.Singletons.Prelude     (Apply, TyFun, type (@@))
 import Data.Proxy                  (Proxy (..))
 import GHC.TypeLits                (KnownNat, Nat, type (+), type (^), type (*))
@@ -101,7 +106,7 @@ let populationCount' :: (KnownNat k, KnownNat (2^k)) => BitVector (2^k) -> Index
 --
 -- * Only has elements at the leaf of the tree
 -- * A tree of depth /d/ has /2^d/ elements.
-data RTree :: Nat -> * -> * where
+data RTree :: Nat -> Type -> Type where
   LR_ :: a -> RTree 0 a
   BR_ :: RTree d a -> RTree d a -> RTree (d+1) a
 
@@ -180,7 +185,7 @@ instance KnownNat d => Applicative (RTree d) where
 instance KnownNat d => Foldable (RTree d) where
   foldMap f = tfold f mappend
 
-data TraversableTree (g :: * -> *) (a :: *) (f :: TyFun Nat *) :: *
+data TraversableTree (g :: Type -> Type) (a :: Type) (f :: TyFun Nat Type) :: Type
 type instance Apply (TraversableTree f a) d = f (RTree d a)
 
 instance KnownNat d => Traversable (RTree d) where
@@ -305,7 +310,7 @@ instance (KnownNat d, Undefined a) => Undefined (RTree d a) where
 -- >>> populationCount' (7 :: BitVector 16)
 -- 3
 tdfold :: forall p k a . KnownNat k
-       => Proxy (p :: TyFun Nat * -> *) -- ^ The /motive/
+       => Proxy (p :: TyFun Nat Type -> Type) -- ^ The /motive/
        -> (a -> (p @@ 0)) -- ^ Function to apply to the elements on the leafs
        -> (forall l . SNat l -> (p @@ l) -> (p @@ l) -> (p @@ (l+1)))
        -- ^ Function to fold the branches with.
@@ -321,7 +326,7 @@ tdfold _ f g = go SNat
                       in  g sn' (go sn' l) (go sn' r)
 {-# NOINLINE tdfold #-}
 
-data TfoldTree (a :: *) (f :: TyFun Nat *) :: *
+data TfoldTree (a :: Type) (f :: TyFun Nat Type) :: Type
 type instance Apply (TfoldTree a) d = a
 
 -- | Reduce a tree to a single element
@@ -357,7 +362,7 @@ treplicate sn a = go (toUNat sn)
 trepeat :: KnownNat d => a -> RTree d a
 trepeat = treplicate SNat
 
-data MapTree (a :: *) (f :: TyFun Nat *) :: *
+data MapTree (a :: Type) (f :: TyFun Nat Type) :: Type
 type instance Apply (MapTree a) d = RTree d a
 
 -- | \"'tmap' @f t@\" is the tree obtained by apply /f/ to each element of /t/,
@@ -378,7 +383,7 @@ tindices =
          (\s@SNat l r -> BR l (tmap (+(snatToNum (pow2SNat s))) r))
          (treplicate SNat 0)
 
-data V2TTree (a :: *) (f :: TyFun Nat *) :: *
+data V2TTree (a :: Type) (f :: TyFun Nat Type) :: Type
 type instance Apply (V2TTree a) d = RTree d a
 
 -- | Convert a vector with /2^d/ elements to a tree of depth /d/.
@@ -390,7 +395,7 @@ type instance Apply (V2TTree a) d = RTree d a
 v2t :: forall d a . KnownNat d => Vec (2^d) a -> RTree d a
 v2t = dtfold (Proxy @(V2TTree a)) LR (const BR)
 
-data T2VTree (a :: *) (f :: TyFun Nat *) :: *
+data T2VTree (a :: Type) (f :: TyFun Nat Type) :: Type
 type instance Apply (T2VTree a) d = Vec (2^d) a
 
 -- | Convert a tree of depth /d/ to a vector of /2^d/ elements
@@ -433,7 +438,7 @@ indexTree t i = (t2v t) !! i
 replaceTree :: (KnownNat d, Enum i) => i -> a -> RTree d a -> RTree d a
 replaceTree i a = v2t . replace i a . t2v
 
-data ZipWithTree (b :: *) (c :: *) (f :: TyFun Nat *) :: *
+data ZipWithTree (b :: Type) (c :: Type) (f :: TyFun Nat Type) :: Type
 type instance Apply (ZipWithTree b c) d = RTree d b -> RTree d c
 
 -- | 'tzipWith' generalises 'tzip' by zipping with the function given as the
@@ -460,7 +465,7 @@ tzipWith f = tdfold (Proxy @(ZipWithTree b c)) lr br
 tzip :: KnownNat d => RTree d a -> RTree d b -> RTree d (a,b)
 tzip = tzipWith (,)
 
-data UnzipTree (a :: *) (b :: *) (f :: TyFun Nat *) :: *
+data UnzipTree (a :: Type) (b :: Type) (f :: TyFun Nat Type) :: Type
 type instance Apply (UnzipTree a b) d = (RTree d a, RTree d b)
 
 -- | 'tunzip' transforms a tree of pairs into a tree of first components and a

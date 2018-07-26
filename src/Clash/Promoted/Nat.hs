@@ -6,6 +6,7 @@ Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
 -}
 
 {-# LANGUAGE AllowAmbiguousTypes #-}
+{-# LANGUAGE CPP                 #-}
 {-# LANGUAGE DataKinds           #-}
 {-# LANGUAGE GADTs               #-}
 {-# LANGUAGE KindSignatures      #-}
@@ -15,6 +16,9 @@ Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
 {-# LANGUAGE TypeApplications    #-}
 {-# LANGUAGE TypeOperators       #-}
 {-# LANGUAGE RankNTypes          #-}
+#if __GLASGOW_HASKELL__ >= 806
+{-# LANGUAGE NoStarIsType #-}
+#endif
 
 {-# LANGUAGE Trustworthy #-}
 
@@ -72,6 +76,7 @@ module Clash.Promoted.Nat
   )
 where
 
+import Data.Kind          (Type)
 import GHC.TypeLits       (KnownNat, Nat, type (+), type (-), type (*),
                            type (^), type (<=), natVal)
 import GHC.TypeLits.Extra (CLog, FLog, Div, Log, Mod)
@@ -125,7 +130,7 @@ snatToNum p@SNat = fromInteger (natVal p)
 -- | Unary representation of a type-level natural
 --
 -- __NB__: Not synthesisable
-data UNat :: Nat -> * where
+data UNat :: Nat -> Type where
   UZero :: UNat 0
   USucc :: UNat n -> UNat (n + 1)
 
@@ -283,7 +288,7 @@ pow2SNat SNat = SNat
 --      @
 --      __B1__ :: 'BNat' n -> 'BNat' ((2 '*' n) '+' 1)
 --      @
-data BNat :: Nat -> * where
+data BNat :: Nat -> Type where
   BT :: BNat 0
   B0 :: BNat n -> BNat (2*n)
   B1 :: BNat n -> BNat ((2*n) + 1)

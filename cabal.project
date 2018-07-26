@@ -1,5 +1,10 @@
 packages: "."
-allow-newer: *:base, *:template-haskell, *:ghc-typelits-natnormalise, *:ghc-typelits-knownnat, *:ghc-typelits-extra, *:ghc-tcplugins-extra
+allow-newer: *:Cabal, *:array, *:base, *:binary, *:bytestring, *:containers, *:deepseq,
+             *:directory, *:filepath, *:ghc, *:ghc-boot, *:ghc-boot-th, *:ghc-compact,
+             *:ghc-heap, *:ghc-prim, *:ghci, *:haskeline, *:hpc, *:integer-gmp,
+             *:libiserv, *:mtl, *:parsec, *:pretty, *:process, *:stm, *:template-haskell,
+             *:terminfo, *:text, *:time, *:transformers, *:unix *:ghc-typelits-natnormalise,
+             *:ghc-typelits-knownnat, *:ghc-typelits-extra, *:ghc-tcplugins-extra
 repository head.hackage
   url: http://head.hackage.haskell.org/
   secure: True
@@ -11,6 +16,8 @@ optional-packages: ghc-typelits-extra/ghc-typelits-extra.cabal
                    ghc-typelits-knownnat/ghc-typelits-knownnat.cabal
                    ghc-typelits-natnormalise/ghc-typelits-natnormalise.cabal
                    ghc-tcplugins-extra/ghc-tcplugins-extra.cabal
+                   singletons/th-desugar/th-desugar.cabal
+                   singletons/singletons.cabal
 -- Build documentation for all dependencies so we can upload docs to hackage
 -- with proper links
 package *
