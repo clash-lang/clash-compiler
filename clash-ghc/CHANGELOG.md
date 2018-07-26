@@ -1,5 +1,15 @@
 # Changelog for the [`clash-ghc`](http://hackage.haskell.org/package/clash-ghc) package
 
+## 0.99.3 *July 28th 2018*
+* Fixes bugs:
+  * Evaluator recognizes `Bit` literals [#329](https://github.com/clash-lang/clash-compiler/issues/329)
+  * Use existential type-variables in context of GADT pattern match
+  * Do not create zero-bit temporary variables in generated HDL
+  * Use correct arguments in nested primitives [#323](https://github.com/clash-lang/clash-compiler/issues/329)
+  * Zero-constructor data type needs 0 bits [#238](https://github.com/clash-lang/clash-compiler/issues/238)
+  * Create empty component when result needs 0 bits
+  * Evaluator performs BigNat arithmetic
+
 ## 0.99.1 *May 12th 2018*
 * Allow `~NAME[N]` tag inside `~GENSYM[X]`
 * Support HDL record selector generation [#313](https://github.com/clash-lang/clash-compiler/pull/313)
