@@ -379,7 +379,7 @@ caseCon ctx e@(Case subj ty alts)
               Right (Void (Just hty))
                 | hty `elem` [BitVector 0, Unsigned 0, Signed 0, Index 1]
                 -> caseCon ctx (Case (Literal (IntegerLiteral 0)) ty alts)
-              _ -> traceIf (lvl > DebugNone && isConstant e)
+              _ -> traceIf (lvl > DebugNone && isConstant subj)
                      ("Irreducible constant as case subject: " ++ showDoc subj ++ "\nCan be reduced to: " ++ showDoc subj')
                      (caseOneAlt e)
 
