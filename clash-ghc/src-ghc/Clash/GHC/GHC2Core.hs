@@ -65,6 +65,9 @@ import FastString (unpackFS)
 import Id         (isDataConId_maybe)
 import IdInfo     (IdDetails (..), unfoldingInfo)
 import Literal    (Literal (..))
+#if MIN_VERSION_ghc(8,6,0)
+import Literal    (LitNumType (..))
+#endif
 import Module     (moduleName, moduleNameString)
 import Name       (Name, nameModule_maybe,
                    nameOccName, nameUnique, getSrcSpan)
@@ -226,9 +229,17 @@ makeTyCon fiEnvs tc = tycon
 makeAlgTyConRhs :: AlgTyConRhs
                 -> State GHC2CoreState (Maybe C.AlgTyConRhs)
 makeAlgTyConRhs algTcRhs = case algTcRhs of
+#if MIN_VERSION_ghc(8,6,0)
+  DataTyCon dcs _ _ -> Just <$> C.DataTyCon <$> mapM coreToDataCon dcs
+#else
   DataTyCon dcs _ -> Just <$> C.DataTyCon <$> mapM coreToDataCon dcs
+#endif
 #if MIN_VERSION_ghc(8,2,0)
+#if MIN_VERSION_ghc(8,6,0)
+  SumTyCon dcs _ -> Just <$> C.DataTyCon <$> mapM coreToDataCon dcs
+#else
   SumTyCon dcs -> Just <$> C.DataTyCon <$> mapM coreToDataCon dcs
+#endif
 #endif
   NewTyCon dc _ (rhsTvs,rhsEtad) _ -> Just <$> (C.NewTyCon <$> coreToDataCon dc
                                                            <*> ((,) <$> mapM coreToVar rhsTvs
@@ -380,11 +391,21 @@ coreToTerm primMap unlocs srcsp coreExpr = Reader.runReaderT (term coreExpr) src
     coreToLiteral l = case l of
       MachStr    fs  -> C.StringLiteral (Char8.unpack fs)
       MachChar   c   -> C.CharLiteral c
+#if MIN_VERSION_ghc(8,6,0)
+      LitNumber lt i _ -> case lt of
+        LitNumInteger -> C.IntegerLiteral i
+        LitNumNatural -> C.NaturalLiteral i
+        LitNumInt     -> C.IntLiteral i
+        LitNumInt64   -> C.IntLiteral i
+        LitNumWord    -> C.WordLiteral i
+        LitNumWord64  -> C.WordLiteral i
+#else
       MachInt    i   -> C.IntLiteral i
       MachInt64  i   -> C.IntLiteral i
       MachWord   i   -> C.WordLiteral i
       MachWord64 i   -> C.WordLiteral i
       LitInteger i _ -> C.IntegerLiteral i
+#endif
       MachFloat r    -> C.FloatLiteral r
       MachDouble r   -> C.DoubleLiteral r
       MachNullAddr   -> C.StringLiteral []
@@ -443,7 +464,11 @@ hasPrimCo (AxiomRuleCo _ coers) = do
   tcs <- catMaybes <$> mapM hasPrimCo coers
   return (listToMaybe tcs)
 
+#if MIN_VERSION_ghc(8,6,0)
+hasPrimCo (NthCo _ _ co)  = hasPrimCo co
+#else
 hasPrimCo (NthCo _ co)  = hasPrimCo co
+#endif
 hasPrimCo (LRCo _ co)   = hasPrimCo co
 hasPrimCo (InstCo co _) = hasPrimCo co
 hasPrimCo (SubCo co)    = hasPrimCo co

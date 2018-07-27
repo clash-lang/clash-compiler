@@ -38,6 +38,9 @@ import           GHC.Float
 import           GHC.Int
 import           GHC.Integer         (decodeDoubleInteger,encodeDoubleInteger)
 import           GHC.Integer.GMP.Internals (Integer (..), BigNat (..))
+#if MIN_VERSION_base(4,12,0)
+import           GHC.Natural
+#endif
 import           GHC.Prim
 import           GHC.Real            (Ratio (..))
 import           GHC.TypeLits        (KnownNat)
@@ -576,6 +579,20 @@ reduceConstant isSubj gbl tcm h k nm ty tys args = case nm of
   "GHC.Prim.powerFloat#"  | Just r <- liftFFF powerFloat# args
     -> reduce r
 
+#if MIN_VERSION_base(4,12,0)
+  -- GHC.Float.asinh  -- XXX: Very fragile
+  --  $w$casinh is the Double specialisation of asinh
+  --  $w$casinh1 is the Float specialisation of asinh
+  "GHC.Float.$w$casinh" | Just r <- liftDD go args
+    -> reduce r
+    where go f = case asinh (D# f) of
+                   D# f' -> f'
+  "GHC.Float.$w$casinh1" | Just r <- liftFF go args
+    -> reduce r
+    where go f = case asinh (F# f) of
+                   F# f' -> f'
+#endif
+
   "GHC.Prim.float2Double#" | [i] <- floatLiterals' args
     -> let !(F# a) = fromRational i
            r = float2Double# a
@@ -949,6 +966,20 @@ reduceConstant isSubj gbl tcm h k nm ty tys args = case nm of
   "GHC.Natural.NatS#"
     | [Lit (WordLiteral w)] <- args
     -> reduce (Literal (NaturalLiteral w))
+
+#if MIN_VERSION_base(4,12,0)
+  "GHC.Natural.naturalToInteger"
+    | [i] <- naturalLiterals' args
+    -> reduce (Literal (IntegerLiteral i))
+
+  -- GHC.shiftLNatural --- XXX: Fragile worker of GHC.shiflLNatural
+  "GHC.Natural.$wshiftLNatural"
+    | [nV,iV] <- args
+    , [n] <- naturalLiterals' [nV]
+    , [i] <- intLiterals' [iV]
+    -> let r = shiftLNatural (fromInteger n) (fromInteger i)
+       in  reduce (Literal (NaturalLiteral (toInteger r)))
+#endif
 
   -- GHC.Real.^  -- XXX: Very fragile
   --   ^_f, $wf, $wf1 are specialisations of the internal function f in the implementation of (^) in GHC.Real
@@ -3026,6 +3057,19 @@ integerLiterals' = typedLiterals' integerLiteral
       -> Just (Jp# (BN# ba))
       | dcTag dc == 3
       -> Just (Jn# (BN# ba))
+    _ -> Nothing
+
+naturalLiterals' :: [Value] -> [Integer]
+naturalLiterals' = typedLiterals' naturalLiteral
+ where
+  naturalLiteral x = case x of
+    Lit (NaturalLiteral i) -> Just i
+    DC dc [Left (Literal (WordLiteral i))]
+      | dcTag dc == 1
+      -> Just i
+    DC dc [Left (Literal (ByteArrayLiteral (Vector.Vector _ _ (ByteArray.ByteArray ba))))]
+      | dcTag dc == 2
+      -> Just (Jp# (BN# ba))
     _ -> Nothing
 
 intLiterals :: [Value] -> Maybe (Integer,Integer)
