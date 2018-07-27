@@ -35,13 +35,29 @@ package clash-ghc
 package clash-testsuite
   flags: cosim
 
-optional-packages: ghc-typelits-extra/ghc-typelits-extra.cabal
-                   ghc-typelits-knownnat/ghc-typelits-knownnat.cabal
-                   ghc-typelits-natnormalise/ghc-typelits-natnormalise.cabal
-                   ghc-tcplugins-extra/ghc-tcplugins-extra.cabal
-                   singletons/th-desugar/th-desugar.cabal
+optional-packages: singletons/th-desugar/th-desugar.cabal
                    singletons/singletons.cabal
                    clash-cosim/clash-cosim.cabal
+
+source-repository-package
+  type: git
+  location: https://github.com/clash-lang/ghc-typelits-extra
+  tag: b9333c256151132eb97f72b262ddb23bd6a62446
+
+source-repository-package
+  type: git
+  location: https://github.com/clash-lang/ghc-typelits-knownnat
+  tag: 9731ed3ae9c87a8930dd40eedced7c0128cb5e82
+
+source-repository-package
+  type: git
+  location: https://github.com/clash-lang/ghc-typelits-natnormalise
+  tag: b4951d4d9b7307154eac0984530bf2d70bca3358
+
+source-repository-package
+  type: git
+  location: https://github.com/clash-lang/ghc-tcplugins-extra
+  tag: 4f2defb334da089100a16c8e75ba462b06c9d465
 
 -- Build documentation for all dependencies so we can upload docs to hackage
 -- with proper links
