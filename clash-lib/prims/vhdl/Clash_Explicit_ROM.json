@@ -11,11 +11,11 @@
 "-- rom begin
 ~GENSYM[~COMPNAME_rom][0] : block
   signal ~GENSYM[ROM][1] : ~TYP[2];
-  signal ~GENSYM[rd][2] : integer range 0 to ~LIT[0]-1;~IF ~ISGATED[1] ~THEN
+  signal ~GENSYM[rd][2]  : integer range 0 to ~LIT[0]-1;~IF ~ISGATED[1] ~THEN
   signal ~GENSYM[clk][3] : std_logic;
   signal ~GENSYM[ce][4]  : boolean;~ELSE ~FI
 begin
-  ~SYM[1] <= ~ARG[2];
+  ~SYM[1] <= ~LIT[2];
 
   ~SYM[2] <= to_integer(~ARG[3])
   -- pragma translate_off

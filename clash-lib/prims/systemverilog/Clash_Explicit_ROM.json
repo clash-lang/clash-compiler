@@ -10,7 +10,7 @@
     , "template" :
 "// rom begin
 ~SIGD[~GENSYM[ROM][0]][2];
-assign ~SYM[0] = ~ARG[2];
+assign ~SYM[0] = ~LIT[2];
 
 logic [~SIZE[~TYPO]-1:0] ~GENSYM[~RESULT_q][1];~IF ~ISGATED[1] ~THEN
 always @(posedge ~ARG[1][1]) begin : ~GENSYM[~COMPNAME_rom][2]

@@ -12,7 +12,7 @@
   signal ~GENSYM[ROM][1] : ~TYP[1];
   signal ~GENSYM[rd][2] : integer range 0 to ~LIT[0]-1;
 begin
-  ~SYM[1] <= ~ARG[1];
+  ~SYM[1] <= ~LIT[1];
 
   ~SYM[2] <= to_integer(~ARG[2])
   -- pragma translate_off

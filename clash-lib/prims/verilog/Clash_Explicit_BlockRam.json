@@ -19,7 +19,7 @@ reg ~TYPO ~GENSYM[RAM][0] [0:~LENGTH[~TYP[2]]-1];
 reg ~TYP[2] ~GENSYM[ram_init][2];
 integer ~GENSYM[i][3];
 initial begin
-  ~SYM[2] = ~ARG[2];
+  ~SYM[2] = ~LIT[2];
   for (~SYM[3]=0; ~SYM[3] < ~LENGTH[~TYP[2]]; ~SYM[3] = ~SYM[3] + 1) begin
     ~SYM[0][~LENGTH[~TYP[2]]-1-~SYM[3]] = ~SYM[2][~SYM[3]*~SIZE[~TYPO]+:~SIZE[~TYPO]];
   end
