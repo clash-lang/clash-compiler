@@ -3,7 +3,10 @@
 -- preferred by the solver over other versions.
 packages: ./*/*.cabal
 
-allow-newer: *:base, *:template-haskell, *:ghc-typelits-natnormalise, *:ghc-typelits-knownnat, *:ghc-typelits-extra, *:ghc-tcplugins-extra
+allow-newer:
+  *:base, *:template-haskell,
+  *:ghc-typelits-natnormalise, *:ghc-typelits-knownnat, *:ghc-typelits-extra,
+  *:ghc-tcplugins-extra
 
 repository head.hackage
   url: http://head.hackage.haskell.org/
@@ -21,10 +24,11 @@ index-state: 2018-07-03T07:02:43Z
 package clash-ghc
   executable-dynamic: True
 
-optional-packages: ghc-typelits-extra/ghc-typelits-extra.cabal
-                   ghc-typelits-knownnat/ghc-typelits-knownnat.cabal
-                   ghc-typelits-natnormalise/ghc-typelits-natnormalise.cabal
-                   ghc-tcplugins-extra/ghc-tcplugins-extra.cabal
+optional-packages:
+  ghc-typelits-extra/ghc-typelits-extra.cabal
+  ghc-typelits-knownnat/ghc-typelits-knownnat.cabal
+  ghc-typelits-natnormalise/ghc-typelits-natnormalise.cabal
+  ghc-tcplugins-extra/ghc-tcplugins-extra.cabal
 
 -- Build documentation for all dependencies so we can upload docs to hackage
 -- with proper links
