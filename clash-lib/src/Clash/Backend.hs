@@ -136,6 +136,7 @@ nestM (Indexed (RTree d1 t1,1,n)) (Indexed (RTree d2 t2,1,m))
        | n == 0 && m == 0 -> let l = 0
                                  r = (2 ^ (d1-1)) `div` 2
                              in  Just (Indexed (RTree (-1) t1, l, r))
+       | otherwise        -> error "nestM: unexpected RTree nesting"
 nestM (Indexed (RTree (-1) t1,l,_)) (Indexed (RTree d t2,10,k))
   | t1 == t2
   , d  >= 0

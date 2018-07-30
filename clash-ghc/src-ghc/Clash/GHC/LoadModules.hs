@@ -27,6 +27,9 @@ where
 import           Clash.Annotations.Primitive     (HDL, Primitive (..))
 import           Clash.Annotations.TopEntity     (TopEntity (..))
 import           Control.Arrow                   (second)
+#if MIN_VERSION_ghc(8,6,0)
+import           Control.Exception               (throwIO)
+#endif
 import           Data.Generics.Uniplate.DataOnly (transform)
 import           Data.List                       (foldl', lookup, nub)
 import           Data.Maybe                      (catMaybes, fromMaybe,
@@ -43,6 +46,9 @@ import qualified Annotations
 import qualified CoreFVs
 import qualified CoreSyn
 import qualified Digraph
+#if MIN_VERSION_ghc(8,6,0)
+import qualified DynamicLoading
+#endif
 import           DynFlags                        (GeneralFlag (..))
 import qualified DynFlags
 import qualified GHC
@@ -120,7 +126,15 @@ loadModules hdl modName dflagsM = do
     dflags <- case dflagsM of
                 Just df -> return df
                 Nothing -> do
+#if MIN_VERSION_ghc(8,6,0)
+                  -- Make sure we read the .ghc environment files
+                  df <- do { df <- GHC.getSessionDynFlags
+                           ; _ <- GHC.setSessionDynFlags df {DynFlags.pkgDatabase = Nothing}
+                           ; GHC.getSessionDynFlags
+                           }
+#else
                   df <- GHC.getSessionDynFlags
+#endif
                   let dfEn = foldl DynFlags.xopt_set df
                                 [ LangExt.TemplateHaskell
                                 , LangExt.TemplateHaskellQuotes
@@ -172,7 +186,13 @@ loadModules hdl modName dflagsM = do
                       _          -> False
     let dflags3 = if ghcDynamic then DynFlags.gopt_set dflags2 DynFlags.Opt_BuildDynamicToo
                                 else dflags2
+#if MIN_VERSION_ghc(8,6,0)
+    hscenv <- GHC.getSession
+    dflags4 <- MonadUtils.liftIO (DynamicLoading.initializePlugins hscenv dflags3)
+    _ <- GHC.setSessionDynFlags dflags4
+#else
     _ <- GHC.setSessionDynFlags dflags3
+#endif
     target <- GHC.guessTarget modName Nothing
     GHC.setTargets [target]
     modGraph <- GHC.depanal [] False
@@ -233,7 +253,15 @@ loadModules hdl modName dflagsM = do
     pFP' <- findPrimitiveAnnotations hdl binderIds
 
     hscEnv <- GHC.getSession
+#if MIN_VERSION_ghc(8,6,0)
+    famInstEnvs <- do { (msgs,m) <- TcRnMonad.liftIO $ TcRnMonad.initTcInteractive hscEnv FamInst.tcGetFamInstEnvs
+                      ; case m of
+                          Nothing -> TcRnMonad.liftIO $ throwIO (HscTypes.mkSrcErr (snd msgs))
+                          Just x  -> return x
+                      }
+#else
     famInstEnvs <- TcRnMonad.liftIO $ TcRnMonad.initTcForLookup hscEnv FamInst.tcGetFamInstEnvs
+#endif
 
     -- Because tidiedMods is in topological order, binders is also, and hence
     -- the binders belonging to the "root" module are the last binders
@@ -430,8 +458,10 @@ wantedOptimizationFlags df =
                , Opt_DoEtaReduction -- We want eta-expansion
                , Opt_UnboxStrictFields -- Unboxed types are not handled properly: avoid
                , Opt_UnboxSmallStrictFields -- Unboxed types are not handled properly: avoid
+#if !MIN_VERSION_ghc(8,6,0)
                , Opt_Vectorise -- Don't care
                , Opt_VectorisationAvoidance -- Don't care
+#endif
                , Opt_RegsGraph -- Don't care
                , Opt_RegsGraph -- Don't care
                , Opt_PedanticBottoms -- Stops eta-expansion through case: avoid
@@ -499,39 +529,57 @@ removeStrictnessAnnotations ::
 removeStrictnessAnnotations pm =
     pm {GHC.pm_parsed_source = fmap rmPS (GHC.pm_parsed_source pm)}
   where
-    rmPS :: GHC.DataId name => GHC.HsModule name -> GHC.HsModule name
+    -- rmPS :: GHC.DataId name => GHC.HsModule name -> GHC.HsModule name
     rmPS hsm = hsm {GHC.hsmodDecls = (fmap . fmap) rmHSD (GHC.hsmodDecls hsm)}
 
-    rmHSD :: GHC.DataId name => GHC.HsDecl name -> GHC.HsDecl name
+    -- rmHSD :: GHC.DataId name => GHC.HsDecl name -> GHC.HsDecl name
+#if MIN_VERSION_ghc(8,6,0)
+    rmHSD (GHC.TyClD x tyClDecl) = GHC.TyClD x (rmTyClD tyClDecl)
+#else
     rmHSD (GHC.TyClD tyClDecl) = GHC.TyClD (rmTyClD tyClDecl)
+#endif
     rmHSD hsd                  = hsd
 
-    rmTyClD :: GHC.DataId name => GHC.TyClDecl name -> GHC.TyClDecl name
+    -- rmTyClD :: GHC.DataId name => GHC.TyClDecl name -> GHC.TyClDecl name
     rmTyClD dc@(GHC.DataDecl {}) = dc {GHC.tcdDataDefn = rmDataDefn (GHC.tcdDataDefn dc)}
     rmTyClD tyClD = tyClD
 
-    rmDataDefn :: GHC.DataId name => GHC.HsDataDefn name -> GHC.HsDataDefn name
+    -- rmDataDefn :: GHC.DataId name => GHC.HsDataDefn name -> GHC.HsDataDefn name
     rmDataDefn hdf = hdf {GHC.dd_cons = (fmap . fmap) rmCD (GHC.dd_cons hdf)}
 
-    rmCD :: GHC.DataId name => GHC.ConDecl name -> GHC.ConDecl name
+    -- rmCD :: GHC.DataId name => GHC.ConDecl name -> GHC.ConDecl name
+#if MIN_VERSION_ghc(8,6,0)
+    rmCD gadt@(GHC.ConDeclGADT {}) = gadt {GHC.con_res_ty = rmHsType (GHC.con_res_ty gadt)
+                                          ,GHC.con_args   = rmConDetails (GHC.con_args gadt)
+                                          }
+    rmCD h98@(GHC.ConDeclH98 {})   = h98  {GHC.con_args = rmConDetails (GHC.con_args h98)}
+    rmCD xcon                      = xcon
+#else
     rmCD gadt@(GHC.ConDeclGADT {}) = gadt {GHC.con_type = rmSigType (GHC.con_type gadt)}
     rmCD h98@(GHC.ConDeclH98 {})   = h98  {GHC.con_details = rmConDetails (GHC.con_details h98)}
+#endif
 
     -- type LHsSigType name = HsImplicitBndrs name (LHsType name)
-    rmSigType :: GHC.DataId name => GHC.LHsSigType name -> GHC.LHsSigType name
+    -- rmSigType :: GHC.DataId name => GHC.LHsSigType name -> GHC.LHsSigType name
+#if !MIN_VERSION_ghc(8,6,0)
     rmSigType hsIB = hsIB {GHC.hsib_body = rmHsType (GHC.hsib_body hsIB)}
+#endif
 
     -- type HsConDeclDetails name = HsConDetails (LBangType name) (Located [LConDeclField name])
-    rmConDetails :: GHC.DataId name => GHC.HsConDeclDetails name -> GHC.HsConDeclDetails name
+    -- rmConDetails :: GHC.DataId name => GHC.HsConDeclDetails name -> GHC.HsConDeclDetails name
     rmConDetails (GHC.PrefixCon args) = GHC.PrefixCon (fmap rmHsType args)
     rmConDetails (GHC.RecCon rec)     = GHC.RecCon ((fmap . fmap . fmap) rmConDeclF rec)
     rmConDetails (GHC.InfixCon l r)   = GHC.InfixCon (rmHsType l) (rmHsType r)
 
-    rmHsType :: GHC.DataId name => GHC.Located (GHC.HsType name) -> GHC.Located (GHC.HsType name)
+    -- rmHsType :: GHC.DataId name => GHC.Located (GHC.HsType name) -> GHC.Located (GHC.HsType name)
     rmHsType = transform go
       where
+#if MIN_VERSION_ghc(8,6,0)
+        go (GHC.unLoc -> GHC.HsBangTy _ _ ty) = ty
+#else
         go (GHC.unLoc -> GHC.HsBangTy _ ty) = ty
+#endif
         go ty                               = ty
 
-    rmConDeclF :: GHC.DataId name => GHC.ConDeclField name -> GHC.ConDeclField name
+    -- rmConDeclF :: GHC.DataId name => GHC.ConDeclField name -> GHC.ConDeclField name
     rmConDeclF cdf = cdf {GHC.cd_fld_type = rmHsType (GHC.cd_fld_type cdf)}
