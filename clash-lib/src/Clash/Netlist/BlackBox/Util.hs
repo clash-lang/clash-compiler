@@ -28,6 +28,7 @@ import           Data.List                       (mapAccumL, nub)
 #if !MIN_VERSION_base(4,11,0)
 import           Data.Monoid
 #endif
+import           Data.Maybe                      (mapMaybe)
 import           Data.Semigroup.Monad
 import qualified Data.Text
 import           Data.Text.Lazy                  (Text)
@@ -468,7 +469,11 @@ renderTag b (Vars n)        =
       go (Identifier i _) = [i]
       go (DataCon _ _ es) = concatMap go es
       go (DataTag _ e')   = [either id id e']
-      go _                = []
+      go (Literal {})     = []
+      go (ConvBV _ _ _ e') = go e'
+      go (BlackBoxE _ _ _ _ t b' _) =
+        let usedArgs = mapMaybe (indexMaybe (bbInputs b')) (usedArguments t)
+        in  concatMap (\(e',_,_) -> go e') usedArgs
 
       vars    = go e
   in  case vars of
