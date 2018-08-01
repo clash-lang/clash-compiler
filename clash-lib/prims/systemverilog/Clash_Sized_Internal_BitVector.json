@@ -231,10 +231,4 @@ assign ~RESULT = ~SYM[0][~LIT[0]-1 : 0];
 // rotateR end"
     }
   }
-, { "BlackBox" :
-    { "name"      : "Clash.Sized.Internal.BitVector.resize#"
-    , "type"      : "resize# :: KnownNat m => BitVector n -> BitVector m"
-    , "templateD" : "assign ~RESULT = $unsigned(~ARG[1]);"
-    }
-  }
 ]

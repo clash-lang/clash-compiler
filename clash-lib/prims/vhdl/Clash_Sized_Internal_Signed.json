@@ -210,7 +210,7 @@ end block;
 , { "BlackBox" :
     { "name"      : "Clash.Sized.Internal.Signed.resize#"
     , "type"      : "resize# :: (KnownNat n, KnownNat m) => Signed n -> Signed m"
-    , "templateE" : "resize(~ARG[2],~LIT[1])"
+    , "templateE" : "~IF~SIZE[~TYP[2]]~THENresize(~ARG[2],~LIT[1])~ELSEsigned'(~SIZE[~TYPO]-1 downto 0 => '0')~FI"
     }
   }
 , { "BlackBox" :

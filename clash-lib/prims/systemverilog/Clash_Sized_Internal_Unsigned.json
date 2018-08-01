@@ -146,10 +146,4 @@ assign ~RESULT = ~SYM[0][~LIT[0]-1 : 0];
 // rotateR end"
     }
   }
-, { "BlackBox" :
-    { "name"      : "Clash.Sized.Internal.Unsigned.resize#"
-    , "type"      : "resize# :: KnownNat m => Unsigned n -> Unsigned m"
-    , "templateD" : "assign ~RESULT = $unsigned(~ARG[1]);"
-    }
-  }
 ]

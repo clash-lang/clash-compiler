@@ -40,4 +40,23 @@
     , "templateD" : "assign ~RESULT = ~IF~SIZE[~TYP[0]]~THEN$unsigned(~ARG[0])~ELSE64'sd0~FI;"
     }
   }
+, { "BlackBox" :
+    { "name"      : "Clash.Sized.Internal.Signed.resize#"
+    , "type"      : "resize# :: (KnownNat n, KnownNat m) => Signed n -> Signed m"
+    , "comment"   : "Back-end should only use this code when the result is smaller than the argument"
+    , "templateD" :
+"// resize begin~IF~SIZE[~TYP[2]]~THEN
+~GENERATE
+  if (~LIT[1] < ~LIT[0]) begin
+    // truncate, sign preserving
+    assign ~RESULT = $signed({~VAR[s][2][~LIT[0]-1],~VAR[s][2][(~LIT[1]-2):0]});
+  end else begin
+    // sign-extend
+    assign ~RESULT = $signed(~VAR[s][2]);
+  end
+~ENDGENERATE~ELSE
+assign ~RESULT = ~SIZE[~TYPO]'d0;~FI
+// resize end"
+    }
+  }
 ]

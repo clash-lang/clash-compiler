@@ -148,4 +148,10 @@
     , "templateD" : "assign ~RESULT = ~IF~SIZE[~TYP[0]]~THEN$unsigned(~ARG[0])~ELSE64'sd0~FI;"
     }
   }
+, { "BlackBox" :
+    { "name"      : "Clash.Sized.Internal.BitVector.resize#"
+    , "type"      : "resize# :: KnownNat m => BitVector n -> BitVector m"
+    , "templateD" : "assign ~RESULT = ~IF~SIZE[~TYP[1]]~THEN$unsigned(~ARG[1])~ELSE~SIZE[~TYPO]'d0~FI;"
+    }
+  }
 ]

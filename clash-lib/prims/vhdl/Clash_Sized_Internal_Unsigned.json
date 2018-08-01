@@ -181,7 +181,7 @@
 , { "BlackBox" :
     { "name"      : "Clash.Sized.Internal.Unsigned.resize#"
     , "type"      : "resize# :: KnownNat m => Unsigned n -> Unsigned m"
-    , "templateE" : "resize(~ARG[1],~LIT[0])"
+    , "templateE" : "~IF~SIZE[~TYP[1]]~THENresize(~ARG[1],~LIT[0])~ELSEunsigned'(~SIZE[~TYPO]-1 downto 0 => '0')~FI"
     }
   }
 ]

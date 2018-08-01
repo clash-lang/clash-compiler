@@ -490,7 +490,7 @@ end process;
 , { "BlackBox" :
     { "name"      : "Clash.Sized.Internal.BitVector.resize#"
     , "type"      : "resize# :: KnownNat m => BitVector n -> BitVector m"
-    , "templateE" : "std_logic_vector(resize(unsigned(~ARG[1]),~LIT[0]))"
+    , "templateE" : "~IF~SIZE[~TYP[1]]~THENstd_logic_vector(resize(unsigned(~ARG[1]),~LIT[0]))~ELSEstd_logic_vector'(~SIZE[~TYPO]-1 downto 0 => '0')~FI"
     }
   }
 ]

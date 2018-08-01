@@ -115,7 +115,7 @@
 , { "BlackBox" :
     { "name"      : "Clash.Sized.Internal.Index.resize#"
     , "type"      : "resize# :: KnownNat m => Index n -> Index m"
-    , "templateE" : "resize(~ARG[1],~SIZE[~TYPO])"
+    , "templateE" : "~IF~SIZE[~TYP[1]]~THENresize(~ARG[1],~LIT[0])~ELSEunsigned'(~SIZE[~TYPO]-1 downto 0 => '0')~FI"
     }
   }
 ]
