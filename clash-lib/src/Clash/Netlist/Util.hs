@@ -304,40 +304,44 @@ mkUniqueNormalized
       ,[(Identifier,HWType)]
       ,[Declaration]
       ,[LetBinding]
-      ,TmName)
+      ,Maybe TmName)
 mkUniqueNormalized topMM (args,binds,res) = do
   -- Make arguments unique
   (iports,iwrappers,substArgs) <- mkUniqueArguments topMM args
   -- Make result unique
-  (oports,owrappers,res1,substRes) <- mkUniqueResult topMM res
-  let subst' = substRes:substArgs
-      bndrs = map fst binds
-      exprs = map (unembed . snd) binds
-      usesOutput = concatMap (filter ( == (nameOcc . varName) res)
-                                     . Lens.toListOf termFreeIds
-                                     ) exprs
-  -- If the let-binder carrying the result is used in a feedback loop
-  -- rename the let-binder to "<X>_rec", and assign the "<X>_rec" to
-  -- "<X>". We do this because output ports in most HDLs cannot be read.
-  (res2,subst'',extraBndr) <- case usesOutput of
-    [] -> return (varName res1
-                 ,(nameOcc $ varName res, Var (unembed $ varType res1) (varName res1)):subst'
-                 ,[] :: [(Id, Embed Term)])
-    _  -> do
-      ([res3],_) <- mkUnique [] [modifyVarName (`appendToName` "_rec") res]
-      return (varName res3,(nameOcc $ varName res,Var (unembed $ varType res3) (varName res3)):subst'
-             ,[(res1,embed $ Var (unembed $ varType res) (varName res3))])
-  -- Replace occurences of "<X>" by "<X>_rec"
-  let resN    = varName res
-      bndrs'  = map (\i -> if varName i == resN then modifyVarName (const res2) i else i) bndrs
-      (bndrsL,r:bndrsR) = break ((== res2).varName) bndrs'
-  -- Make let-binders unique
-  (bndrsL',substL) <- mkUnique subst'' bndrsL
-  (bndrsR',substR) <- mkUnique substL  bndrsR
-  -- Replace old IDs by updated unique IDs in the RHSs of the let-binders
-  let exprs' = map (embed . substTms substR) exprs
-  -- Return the uniquely named arguments, let-binders, and result
-  return (iports,iwrappers,oports,owrappers,zip (bndrsL' ++ r:bndrsR') exprs' ++ extraBndr,varName res1)
+  resM <- mkUniqueResult topMM res
+  case resM of
+    Just (oports,owrappers,res1,substRes) -> do
+      let subst' = substRes:substArgs
+          bndrs = map fst binds
+          exprs = map (unembed . snd) binds
+          usesOutput = concatMap (filter ( == (nameOcc . varName) res)
+                                         . Lens.toListOf termFreeIds
+                                         ) exprs
+      -- If the let-binder carrying the result is used in a feedback loop
+      -- rename the let-binder to "<X>_rec", and assign the "<X>_rec" to
+      -- "<X>". We do this because output ports in most HDLs cannot be read.
+      (res2,subst'',extraBndr) <- case usesOutput of
+        [] -> return (varName res1
+                     ,(nameOcc $ varName res, Var (unembed $ varType res1) (varName res1)):subst'
+                     ,[] :: [(Id, Embed Term)])
+        _  -> do
+          ([res3],_) <- mkUnique [] [modifyVarName (`appendToName` "_rec") res]
+          return (varName res3,(nameOcc $ varName res,Var (unembed $ varType res3) (varName res3)):subst'
+                 ,[(res1,embed $ Var (unembed $ varType res) (varName res3))])
+      -- Replace occurences of "<X>" by "<X>_rec"
+      let resN    = varName res
+          bndrs'  = map (\i -> if varName i == resN then modifyVarName (const res2) i else i) bndrs
+          (bndrsL,r:bndrsR) = break ((== res2).varName) bndrs'
+      -- Make let-binders unique
+      (bndrsL',substL) <- mkUnique subst'' bndrsL
+      (bndrsR',substR) <- mkUnique substL  bndrsR
+      -- Replace old IDs by updated unique IDs in the RHSs of the let-binders
+      let exprs' = map (embed . substTms substR) exprs
+      -- Return the uniquely named arguments, let-binders, and result
+      return (iports,iwrappers,oports,owrappers,zip (bndrsL' ++ r:bndrsR') exprs' ++ extraBndr,Just (varName res1))
+    Nothing ->
+      return (iports,[],[],[],[],Nothing)
 
 mkUniqueArguments
   :: Maybe (Maybe TopEntity)
@@ -350,7 +354,7 @@ mkUniqueArguments
 mkUniqueArguments Nothing args = do
   (args',subst) <- mkUnique [] args
   ports <- mapM idToPort args'
-  return (ports,[],subst)
+  return (catMaybes ports,[],subst)
 
 mkUniqueArguments (Just teM) args = do
   let iPortSupply = maybe (repeat Nothing) (extendPorts . t_inputs) teM
@@ -374,11 +378,13 @@ mkUniqueArguments (Just teM) args = do
 mkUniqueResult
   :: Maybe (Maybe TopEntity)
   -> Id
-  -> NetlistMonad ([(Identifier,HWType)],[Declaration],Id,(TmOccName,Term))
+  -> NetlistMonad (Maybe ([(Identifier,HWType)],[Declaration],Id,(TmOccName,Term)))
 mkUniqueResult Nothing res = do
   ([res'],[subst]) <- mkUnique [] [res]
-  port <- idToPort res'
-  return ([port],[],res',subst)
+  portM <- idToPort res'
+  case portM of
+    Just port -> return (Just ([port],[],res',subst))
+    _         -> return Nothing
 
 mkUniqueResult (Just teM) res = do
   tcm       <- Lens.use tcCache
@@ -389,21 +395,27 @@ mkUniqueResult (Just teM) res = do
       ty   = unembed (varType res)
       hwty = unsafeCoreTypeToHWType sp $(curLoc) typeTrans tcm True ty
       oPortSupply = fmap t_output teM
-  (ports,decls,pN) <- mkOutput oPortSupply (o',hwty)
-  let pO = repName (unpack pN) o
-  return (ports,decls,Id pO (embed ty),(nameOcc o,Var ty pO))
+  if not (isVoid hwty)
+     then do
+        (ports,decls,pN) <- mkOutput oPortSupply (o',hwty)
+        let pO = repName (unpack pN) o
+        return (Just (ports,decls,Id pO (embed ty),(nameOcc o,Var ty pO)))
+     else return Nothing
 
-idToPort :: Id -> NetlistMonad (Identifier,HWType)
+idToPort :: Id -> NetlistMonad (Maybe (Identifier,HWType))
 idToPort var = do
-      tcm <- Lens.use tcCache
-      typeTrans <- Lens.use typeTranslator
-      (_,sp) <- Lens.use curCompNm
-      let i  = varName var
-          ty = unembed (varType var)
-      return
-        ( pack $ name2String i
-        , unsafeCoreTypeToHWType sp $(curLoc) typeTrans tcm False ty
-        )
+  tcm <- Lens.use tcCache
+  typeTrans <- Lens.use typeTranslator
+  (_,sp) <- Lens.use curCompNm
+  let i  = varName var
+      ty = unembed (varType var)
+      hwTy = unsafeCoreTypeToHWType sp $(curLoc) typeTrans tcm False ty
+  if isVoid hwTy
+    then return Nothing
+    else return . Just $
+      ( pack $ name2String i
+      , unsafeCoreTypeToHWType sp $(curLoc) typeTrans tcm False ty
+      )
 
 repName :: String -> Name a -> Name a
 repName s (Name sort _ loc) = Name sort (Unbound.string2Name s) loc

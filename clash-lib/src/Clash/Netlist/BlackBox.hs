@@ -393,15 +393,18 @@ mkFunInput resId e = do
     go _ e'@(Letrec _) = do
       tcm <- Lens.use tcCache
       normE <- splitNormalized tcm e'
-      ([],[],_,[],binders,result)  <- case normE of
+      ([],[],_,[],binders,resultM) <- case normE of
         Right norm -> mkUniqueNormalized Nothing norm
         Left err -> error err
-      let binders' = map (\(id_,tm) -> (goR result id_,tm)) binders
-      netDecls <- fmap catMaybes . mapM mkNetDecl $ filter ((/= result) . varName . fst) binders
-      decls    <- concat <$> mapM (uncurry mkDeclarations . second unembed) binders'
-      Just (NetDecl' _ rw _ _) <- mkNetDecl . head $ filter ((==result) . varName . fst) binders
-      nm <- mkUniqueIdentifier Basic "fun"
-      return (Right ((nm,netDecls ++ decls),rw))
+      case resultM of
+        Just result -> do
+          let binders' = map (\(id_,tm) -> (goR result id_,tm)) binders
+          netDecls <- fmap catMaybes . mapM mkNetDecl $ filter ((/= result) . varName . fst) binders
+          decls    <- concat <$> mapM (uncurry mkDeclarations . second unembed) binders'
+          Just (NetDecl' _ rw _ _) <- mkNetDecl . head $ filter ((==result) . varName . fst) binders
+          nm <- mkUniqueIdentifier Basic "fun"
+          return (Right ((nm,netDecls ++ decls),rw))
+        Nothing -> return (Right (("",[]),Wire))
       where
         goR r id_ | varName id_ == r = id_ {varName = string2SystemName "~RESULT"}
                   | otherwise        = id_

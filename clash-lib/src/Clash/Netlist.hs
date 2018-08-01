@@ -182,19 +182,18 @@ genComponentT compName componentExpr = do
   tcm <- Lens.use tcCache
 
   seenIds .= []
-  (compInps,argWrappers,compOutps,resUnwrappers,binders,result) <- do
+  (compInps,argWrappers,compOutps,resUnwrappers,binders,resultM) <- do
     normalizedM <- splitNormalized tcm componentExpr
     case normalizedM of
       Right normalized -> mkUniqueNormalized topEntMM normalized
       Left err         -> throw (ClashException sp err Nothing)
+  case resultM of
+    Just result -> do
+      netDecls <- fmap catMaybes . mapM mkNetDecl $ filter ((/= result) . varName . fst) binders
+      decls    <- concat <$> mapM (uncurry mkDeclarations . second unembed) binders
 
-  netDecls <- fmap catMaybes . mapM mkNetDecl $ filter ((/= result) . varName . fst) binders
-  decls    <- concat <$> mapM (uncurry mkDeclarations . second unembed) binders
+      Just (NetDecl' _ rw _ _) <- mkNetDecl . head $ filter ((==result) . varName . fst) binders
 
-  resDecl <- mkNetDecl . head $ filter ((==result) . varName . fst) binders
-
-  case resDecl of
-    Just (NetDecl' _ rw _ _) -> do
       let (compOutps',resUnwrappers') = case compOutps of
             [oport] -> ([(rw,oport)],resUnwrappers)
             _       -> let NetDecl n res resTy = head resUnwrappers
@@ -207,9 +206,9 @@ genComponentT compName componentExpr = do
     -- No result declaration means that the result is empty, this only happens
     -- when the TopEntity has an empty result. We just create an empty component
     -- in this case.
-    _ -> do
+    Nothing -> do
       let component = Component componentName2 compInps [] []
-      return  (sp, component)
+      return (sp, component)
 
 mkNetDecl :: (Id, Embed Term) -> NetlistMonad (Maybe Declaration)
 mkNetDecl (id_,tm) = do
@@ -386,16 +385,16 @@ mkFunApp dst fun args = do
       case HashMap.lookup (nameOcc fun) normalized of
         Just _ -> do
           (_,Component compName compInps [snd -> compOutp] _) <- preserveVarEnv $ genComponent (nameOcc fun)
-          if length args == length compInps
+          argTys   <- mapM (termType tcm) args
+          argHWTys <- mapM coreTypeToHWTypeM argTys
+          -- Filter out the arguments of hwtype `Void` and only translate
+          -- them to the intermediate HDL afterwards
+          let argsBundled   = zip argHWTys (zip args argTys)
+              argsFiltered  = filter (maybe True (not . isVoid) . fst) argsBundled
+              argsFiltered' = map snd argsFiltered
+              tysFiltered   = map snd argsFiltered'
+          if length tysFiltered == length compInps
             then do
-              argTys   <- mapM (termType tcm) args
-              argHWTys <- mapM coreTypeToHWTypeM argTys
-              -- Filter out the arguments of hwtype `Void` and only translate
-              -- them to the intermediate HDL afterwards
-              let argsBundled   = zip argHWTys (zip args argTys)
-                  argsFiltered  = filter (maybe True (not . isVoid) . fst) argsBundled
-                  argsFiltered' = map snd argsFiltered
-                  tysFiltered   = map snd argsFiltered'
               let dstId = Text.pack . name2String $ varName dst
               (argExprs,argDecls)   <- fmap (second concat . unzip) $! mapM (\(e,t) -> mkExpr False (Left dstId) t e) argsFiltered'
               (argExprs',argDecls') <- (second concat . unzip) <$> mapM (toSimpleVar dst) (zip argExprs tysFiltered)
