@@ -44,7 +44,7 @@ main = do
       ,runTest "examples"             defBuild [] "BlockRamTest" ([""],"BlockRamTest_topEntity",False)
       ,runTest "examples"             defBuild [] "Calculator"   (["","Calculator_testBench"],"Calculator_testBench",True )
       ,runTest "examples"             defBuild [] "CochleaPlus"  ([""],"CochleaPlus_topEntity",False) -- Broken on GHC 8.0 due to: https://ghc.haskell.org/trac/ghc/ticket/11525
-      ,runTest "examples"             defBuild [] "FIR"          (["","FIR_testBench"],"FIR_testBench",True ) -- Broken on GHC 8.0 due to: https://ghc.haskell.org/trac/ghc/ticket/11525
+      ,runTest "examples"             defBuild ["-fclash-component-prefix","test"] "FIR" (["","test_FIR_testBench"],"test_FIR_testBench",True ) -- Broken on GHC 8.0 due to: https://ghc.haskell.org/trac/ghc/ticket/11525
       ,runTest "examples"             defBuild [] "Fifo"         ([""],"Fifo_topEntity",False) -- Broken on GHC 8.0 due to: https://ghc.haskell.org/trac/ghc/ticket/11525
       ,runTest "examples"             defBuild [] "MAC"          (["","MAC_testBench"],"MAC_testBench",True)
       ,runTest "examples"             defBuild [] "MatrixVect"   (["","MatrixVect_testBench"],"MatrixVect_testBench",True)
@@ -53,7 +53,7 @@ main = do
       ,runTest "examples"             defBuild [] "Sprockell"    ([""],"Sprockell_topEntity",False)
       ,runTest "examples"             defBuild [] "Windows"      ([""],"Windows_topEntity",False) -- Broken on GHC 8.0 due to: https://ghc.haskell.org/trac/ghc/ticket/11525
       ,runTest ("examples" </> "crc32") defBuild [] "CRC32"      (["","CRC32_testBench"],"CRC32_testBench",True)  -- Broken on GHC 8.0 due to: https://ghc.haskell.org/trac/ghc/ticket/11525
-      ,runTest ("examples" </> "i2c") defBuild ["-O2"] "I2C"     (["i2c","bitmaster","bytemaster"],"i2c",False)
+      ,runTest ("examples" </> "i2c") defBuild ["-O2","-fclash-component-prefix","test"] "I2C" (["test_i2c","test_bitmaster","test_bytemaster"],"test_i2c",False)
       ]
     , testGroup "unit-tests"
         [ testGroup "Basic"
@@ -269,7 +269,7 @@ ghdlLibrary env modName lib cwd =
         args = ("-i":("--work="++workName):("--workdir="++workdir):"--std=93":hdlFiles "vhdl" cwd env lib')
 
         lib' = map toLower lib
-        workName = case lib' of {[] -> map toLower modName ++ "_topentity"; k -> k}
+        workName = case lib' of {[] -> case modName of {"FIR" -> "test_fir_topentity"; _ -> map toLower modName ++ "_topentity"}; k -> k}
         workdir  = case lib' of {[] -> "."; k -> k}
 
 ghdlImport

@@ -677,12 +677,18 @@ mkRTreeChain d elTy es =
         , mkRTreeChain (d-1) elTy esR
         ]
 
-genComponentName :: [Identifier] -> (IdType -> Identifier -> Identifier) -> TmName -> Identifier
-genComponentName seen mkId nm =
+genComponentName
+  :: [Identifier]
+  -> (IdType -> Identifier -> Identifier)
+  -> (Maybe Identifier,Maybe Identifier)
+  -> TmName
+  -> Identifier
+genComponentName seen mkId prefixM nm =
   let nm' = Text.splitOn (Text.pack ".") (Text.pack (name2String nm))
       fn  = mkId Basic (stripDollarPrefixes (last nm'))
       fn' = if Text.null fn then Text.pack "Component" else fn
-      nm2 = Text.concat (intersperse (Text.pack "_") (init nm' ++ [fn']))
+      prefix = maybe id (:) (snd prefixM) (init nm')
+      nm2 = Text.concat (intersperse (Text.pack "_") (prefix ++ [fn']))
       nm3 = mkId Basic nm2
   in  if nm3 `elem` seen then go 0 nm3 else nm3
   where
@@ -692,6 +698,19 @@ genComponentName seen mkId nm =
       in  if i' `elem` seen
              then go (n+1) i
              else i'
+
+genTopComponentName
+  :: (IdType -> Identifier -> Identifier)
+  -> (Maybe Identifier,Maybe Identifier)
+  -> Maybe TopEntity
+  -> TmName
+  -> Identifier
+genTopComponentName _mkId prefixM (Just ann) _nm =
+  case prefixM of
+    (Just p,_) -> p `Text.append` Text.pack ('_':t_name ann)
+    _          -> Text.pack (t_name ann)
+genTopComponentName mkId prefixM Nothing nm =
+  genComponentName [] mkId prefixM nm
 
 -- | Generate output port mappings
 mkOutput
@@ -806,9 +825,9 @@ mkTopUnWrapper topEntity annM man dstId args = do
 
   -- component name
   mkId <- Lens.use mkIdentifierFn
-  let topName  = genComponentName [] mkId topEntity
-      topName' = maybe topName (pack . t_name) annM
-      topM     = fmap (const topName') annM
+  prefixM <- Lens.use componentPrefix
+  let topName = genTopComponentName mkId prefixM annM topEntity
+      topM    = fmap (const topName) annM
 
   -- inputs
   let iPortSupply = maybe (repeat Nothing)
@@ -831,11 +850,11 @@ mkTopUnWrapper topEntity annM man dstId args = do
                                     (head oPortSupply) result
   let outpAssign = Assignment (fst dstId) (resBV topM idsO)
 
-  instLabel <- extendIdentifier Basic topName' ("_" `append` fst dstId)
+  instLabel <- extendIdentifier Basic topName ("_" `append` fst dstId)
   let topCompDecl =
         InstDecl
-          (Just topName')
-          topName'
+          (Just topName)
+          topName
           instLabel
           (map (\(p,i,t) -> (Identifier p Nothing,In, t,Identifier i Nothing)) (concat iports) ++
            map (\(p,o,t) -> (Identifier p Nothing,Out,t,Identifier o Nothing)) oports)

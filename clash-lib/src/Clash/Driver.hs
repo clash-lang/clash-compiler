@@ -48,6 +48,7 @@ import           Text.Read                        (readMaybe)
 
 import           GHC.BasicTypes.Extra             ()
 
+import           Clash.Annotations.Primitive      (HDL (..))
 import           Clash.Annotations.TopEntity      (TopEntity (..))
 import           Clash.Annotations.TopEntity.Extra ()
 import           Clash.Backend
@@ -58,7 +59,7 @@ import           Clash.Core.Type                  (Type)
 import           Clash.Core.TyCon                 (TyCon, TyConName, TyConOccName)
 import           Clash.Driver.Types
 import           Clash.Netlist                    (genNetlist)
-import           Clash.Netlist.Util               (genComponentName)
+import           Clash.Netlist.Util               (genComponentName, genTopComponentName)
 import           Clash.Netlist.BlackBox.Parser    (runParse)
 import           Clash.Netlist.BlackBox.Types     (BlackBoxTemplate)
 import           Clash.Netlist.Types              (Component (..), HWType)
@@ -110,7 +111,26 @@ generateHDL bindingsMap hdlState primMap tcm tupTcm typeTrans eval topEntities
   putStrLn $ "Compiling: " ++ name2String topEntity
 
   -- Some initial setup
-  let modName   = maybe (takeWhile (/= '.') (name2String topEntity)) t_name annM
+  let modName1 = takeWhile (/= '.') (name2String topEntity)
+      (modName,prefixM) = case opt_componentPrefix opts of
+        Just p
+          | not (null p) -> case annM of
+            -- Prefix top names with 'p', prefix other with 'p_tname'
+            Just ann ->
+              let nm = p ++ ('_':t_name ann)
+              in  (nm,(Just (Text.pack p),Just (Text.pack nm)))
+            -- Prefix top names with 'p', prefix other with 'p'
+            _ ->  (p ++ '_':modName1,(Just (Text.pack p),Just (Text.pack p)))
+          | Just ann <- annM -> case hdlKind (undefined :: backend) of
+              -- Prefix other with 't_name'
+              VHDL -> (t_name ann,(Nothing,Just (Text.pack (t_name ann))))
+              _    -> (t_name ann,(Nothing,Nothing))
+        _ -> case annM of
+          Just ann -> case hdlKind (undefined :: backend) of
+            VHDL -> (t_name ann, (Nothing,Nothing))
+            -- Prefix other with 't_name'
+            _    -> (t_name ann, (Nothing,Just (Text.pack (t_name ann))))
+          _ -> (modName1, (Nothing,Nothing))
       iw        = opt_intWidth opts
       hdlsyn    = opt_hdlSyn opts
       hdlState' = setModName modName
@@ -120,10 +140,8 @@ generateHDL bindingsMap hdlState primMap tcm tupTcm typeTrans eval topEntities
                         takeWhile (/= '.') (name2String topEntity)
       mkId      = evalState mkIdentifier hdlState'
       extId     = evalState extendIdentifier hdlState'
-      topName   = genComponentName [] mkId topEntity
-      topNm     = maybe topName
-                        (Text.pack . t_name)
-                        annM
+      topNm     = genTopComponentName mkId prefixM annM topEntity
+      topNmU    = Text.unpack topNm
 
   unless (opt_cachehdl opts) $ putStrLn "Ignoring .manifest files"
 
@@ -132,10 +150,9 @@ generateHDL bindingsMap hdlState primMap tcm tupTcm typeTrans eval topEntities
     let topHash    = hash (annM,callGraphBindings bindingsMap (nameOcc topEntity))
         benchHashM = fmap (hash . (annM,) . callGraphBindings bindingsMap . nameOcc) benchM
         manifestI  = Manifest (topHash,benchHashM) [] [] [] [] []
-
-        manFile = maybe (hdlDir </> Text.unpack topNm <.> "manifest")
-                        (\ann -> hdlDir </> t_name ann </> t_name ann <.> "manifest")
-                        annM
+        manFile    = case annM of
+                       Nothing -> hdlDir </> topNmU <.> "manifest"
+                       _       -> hdlDir </> topNmU </> topNmU <.> "manifest"
     manM <- if not (opt_cachehdl opts)
             then return Nothing -- ignore manifest file because -fclash-nocache
             else (>>= readMaybe) . either (const Nothing) Just <$>
@@ -171,22 +188,17 @@ generateHDL bindingsMap hdlState primMap tcm tupTcm typeTrans eval topEntities
       -- 2. Generate netlist for topEntity
       (netlist,dfiles,seen') <- genNetlist transformedBindings topEntities primMap'
                                 tcm typeTrans [] iw mkId extId seen
-                                hdlDir (nameOcc topEntity)
+                                hdlDir prefixM (nameOcc topEntity)
 
       netlistTime <- netlist `deepseq` Clock.getCurrentTime
       let normNetDiff = Clock.diffUTCTime netlistTime normTime
       putStrLn $ "Netlist generation took " ++ show normNetDiff
 
       -- 3. Generate topEntity wrapper
-      let topComponent = snd . head $
-            filter (\(_,Component cName _ _ _) -> maybe
-              (Text.isSuffixOf (genComponentName [] mkId topEntity))
-              (\te n -> n == Text.pack (t_name te)) annM
-                cName)
-              netlist
+      let topComponent = snd . head $ filter (Text.isSuffixOf topNm . componentName . snd) netlist
           (hdlDocs,manifest')  = createHDL hdlState' modName netlist topComponent
-                                   (Text.unpack topNm, Right manifest)
-          dir = hdlDir </> maybe "" t_name annM
+                                   (topNmU, Right manifest)
+          dir = hdlDir </> maybe "" (const modName) annM
       prepareDir (opt_cleanhdl opts) (extension hdlState') dir
       mapM_ (writeHDL dir) hdlDocs
       copyDataFiles (opt_importPaths opts) dir dfiles
@@ -198,7 +210,7 @@ generateHDL bindingsMap hdlState primMap tcm tupTcm typeTrans eval topEntities
     Just tb | not sameBenchHash -> do
       putStrLn $ "Compiling: " ++ name2String tb
 
-      let modName'  = Text.unpack (genComponentName [] mkId tb)
+      let modName'  = Text.unpack (genComponentName [] mkId prefixM tb)
           hdlState2 = setModName modName' hdlState'
 
       -- 1. Normalise testBench
@@ -211,7 +223,7 @@ generateHDL bindingsMap hdlState primMap tcm tupTcm typeTrans eval topEntities
       -- 2. Generate netlist for topEntity
       (netlist,dfiles,_) <- genNetlist transformedBindings topEntities primMap'
                               tcm typeTrans [] iw mkId extId seen'
-                              hdlDir (nameOcc tb)
+                              hdlDir prefixM (nameOcc tb)
 
       netlistTime <- netlist `deepseq` Clock.getCurrentTime
       let normNetDiff = Clock.diffUTCTime netlistTime normTime
@@ -219,7 +231,7 @@ generateHDL bindingsMap hdlState primMap tcm tupTcm typeTrans eval topEntities
 
       -- 3. Write HDL
       let (hdlDocs,_) = createHDL hdlState2 modName' netlist undefined
-                           (Text.unpack topNm, Left manifest')
+                           (topNmU, Left manifest')
           dir = hdlDir </> maybe "" t_name annM </> modName'
       prepareDir (opt_cleanhdl opts) (extension hdlState2) dir
       writeHDL (hdlDir </> maybe "" t_name annM) (head hdlDocs)

@@ -8,11 +8,16 @@
   Type definitions used by the Driver module
 -}
 
+{-# LANGUAGE CPP #-}
+
 module Clash.Driver.Types
   (module Clash.Driver.Types
   ,SrcSpan, noSrcSpan
   )
 where
+
+-- For Int/Word size
+#include "MachDeps.h"
 
 import Control.Exception (Exception)
 import Data.HashMap.Lazy (HashMap)
@@ -24,7 +29,7 @@ import SrcLoc            (SrcSpan, noSrcSpan)
 import Clash.Core.Term   (Term,TmName,TmOccName)
 import Clash.Core.Type   (Type)
 
-import Clash.Netlist.BlackBox.Types (HdlSyn)
+import Clash.Netlist.BlackBox.Types (HdlSyn (..))
 
 -- | Global function binders
 --
@@ -53,7 +58,29 @@ data ClashOpts = ClashOpts { opt_inlineLimit :: Int
                            , opt_errorExtra  :: Bool
                            , opt_floatSupport :: Bool
                            , opt_importPaths :: [FilePath]
+                           , opt_componentPrefix :: Maybe String
                            }
+
+
+defClashOpts
+  :: ClashOpts
+defClashOpts
+  = ClashOpts
+  { opt_dbgLevel            = DebugNone
+  , opt_inlineLimit         = 20
+  , opt_specLimit           = 20
+  , opt_inlineFunctionLimit = 15
+  , opt_inlineConstantLimit = 0
+  , opt_cachehdl            = True
+  , opt_cleanhdl            = True
+  , opt_intWidth            = WORD_SIZE_IN_BITS
+  , opt_hdlDir              = Nothing
+  , opt_hdlSyn              = Other
+  , opt_errorExtra          = False
+  , opt_floatSupport        = False
+  , opt_importPaths         = []
+  , opt_componentPrefix     = Nothing
+  }
 
 data ClashException = ClashException SrcSpan String (Maybe String)
 

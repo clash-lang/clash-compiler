@@ -93,7 +93,7 @@ import           Clash.Backend.SystemVerilog (SystemVerilogState)
 import           Clash.Backend.VHDL    (VHDLState)
 import           Clash.Backend.Verilog (VerilogState)
 import           Clash.Driver.Types
-  (ClashOpts (..), ClashException (..), DebugLevel (..))
+  (ClashOpts (..), ClashException (..), defClashOpts)
 import           Clash.GHC.ClashFlags
 import           Clash.Netlist.BlackBox.Types (HdlSyn (..))
 import           Clash.Util (clashLibVersion)
@@ -134,20 +134,7 @@ defaultMain = flip withArgs $ do
     libDir <- ghcLibDir
 
     let argv1 = map (mkGeneralLocated "on the commandline") argv0
-    r <- newIORef (ClashOpts { opt_dbgLevel    = DebugNone
-                             , opt_inlineLimit = 20
-                             , opt_specLimit   = 20
-                             , opt_inlineFunctionLimit = 15
-                             , opt_inlineConstantLimit = 0
-                             , opt_cachehdl    = True
-                             , opt_cleanhdl    = True
-                             , opt_intWidth    = WORD_SIZE_IN_BITS
-                             , opt_hdlDir      = Nothing
-                             , opt_hdlSyn      = Other
-                             , opt_errorExtra  = False
-                             , opt_floatSupport = False
-                             , opt_importPaths = []
-                             })
+    r <- newIORef defClashOpts
     (argv2, clashFlagWarnings) <- parseClashFlags r argv1
 
     -- 2. Parse the "mode" flags (--make, --interactive etc.)

@@ -19,6 +19,7 @@ module Clash.Netlist where
 import           Control.Exception                (throw)
 import           Control.Lens                     ((.=),(^.),_1,_3)
 import qualified Control.Lens                     as Lens
+import           Control.Monad                    (join)
 import           Control.Monad.IO.Class           (liftIO)
 import           Control.Monad.State.Strict       (runStateT)
 import           Data.Binary.IEEE754              (floatToWord, doubleToWord)
@@ -88,12 +89,14 @@ genNetlist :: BindingMap
            -- ^ Seen components
            -> FilePath
            -- ^ HDL dir
+           -> (Maybe Identifier,Maybe Identifier)
+           -- ^ Component name prefix
            -> TmOccName
            -- ^ Name of the @topEntity@
            -> IO ([(SrcSpan,Component)],[(String,FilePath)],[Identifier])
-genNetlist globals tops primMap tcm typeTrans dfiles iw mkId extId seen env topEntity = do
+genNetlist globals tops primMap tcm typeTrans dfiles iw mkId extId seen env prefixM topEntity = do
   (_,s) <- runNetlistMonad globals (mkTopEntityMap tops) primMap tcm typeTrans
-             dfiles iw mkId extId seen env $ genComponent topEntity
+             dfiles iw mkId extId seen env prefixM $ genComponent topEntity
   return (HashMap.elems $ _components s, _dataFiles s, _seenComps s)
   where
     mkTopEntityMap
@@ -124,26 +127,29 @@ runNetlistMonad :: BindingMap
                 -- ^ Seen components
                 -> FilePath
                 -- ^ HDL dir
+                -> (Maybe Identifier,Maybe Identifier)
+                -- ^ Component name prefix
                 -> NetlistMonad a
                 -- ^ Action to run
                 -> IO (a, NetlistState)
-runNetlistMonad s tops p tcm typeTrans dfiles iw mkId extId seenIds_ env
+runNetlistMonad s tops p tcm typeTrans dfiles iw mkId extId seenIds_ env prefixM
   = runFreshMT
   . flip runStateT s'
   . runNetlist
   where
-    s' = NetlistState s 0 HashMap.empty p typeTrans tcm (Text.empty,noSrcSpan) dfiles iw mkId extId [] seenIds' names tops env 0
-    (seenIds',names) = genNames mkId seenIds_ HashMap.empty (HashMap.elems (HashMap.map (^. _1) s))
+    s' = NetlistState s 0 HashMap.empty p typeTrans tcm (Text.empty,noSrcSpan) dfiles iw mkId extId [] seenIds' names tops env 0 prefixM
+    (seenIds',names) = genNames mkId prefixM seenIds_ HashMap.empty (HashMap.elems (HashMap.map (^. _1) s))
 
 genNames :: (IdType -> Identifier -> Identifier)
+         -> (Maybe Identifier,Maybe Identifier)
          -> [Identifier]
          -> HashMap TmOccName Identifier
          -> [TmName]
          -> ([Identifier], HashMap TmOccName Identifier)
-genNames mkId = go
+genNames mkId prefixM = go
   where
     go s m []       = (s,m)
-    go s m (nm:nms) = let nm' = genComponentName s mkId nm
+    go s m (nm:nms) = let nm' = genComponentName s mkId prefixM nm
                           s'  = nm':s
                           m'  = HashMap.insert (nameOcc nm) nm' m
                       in  go s' m' nms
@@ -173,9 +179,11 @@ genComponentT compName componentExpr = do
   varCount .= 0
   componentName1 <- (HashMap.! compName) <$> Lens.use componentNames
   topEntMM <- fmap snd . HashMap.lookup compName <$> Lens.use topEntityAnns
-  let componentName2 = maybe componentName1
-                             (maybe componentName1 (Text.pack . t_name))
-                             topEntMM
+  prefixM <- Lens.use componentPrefix
+  let componentName2 = case (prefixM,join topEntMM) of
+                         ((Just p,_),Just ann) -> p `Text.append` Text.pack ('_':t_name ann)
+                         (_,Just ann) -> Text.pack (t_name ann)
+                         _ -> componentName1
   sp <- ((^. _3) . (HashMap.! compName)) <$> Lens.use bindings
   curCompNm .= (componentName2,sp)
 
@@ -368,12 +376,12 @@ mkFunApp dst fun args = do
                                  argsFiltered'
         dstHWty  <- unsafeCoreTypeToHWTypeM $(curLoc) fResTy
         env  <- Lens.use hdlDir
+        mkId <- Lens.use mkIdentifierFn
+        prefixM <- Lens.use componentPrefix
+        let topName = Text.unpack (genTopComponentName mkId prefixM annM fun)
         manFile <- case annM of
-          Just ann -> return (env </> t_name ann </> t_name ann <.> "manifest")
-          Nothing  -> do
-            mkId <- Lens.use mkIdentifierFn
-            let topName = genComponentName [] mkId fun
-            return (env </> (Text.unpack topName) <.> "manifest")
+          Just _  -> return (env </> topName </> topName <.> "manifest")
+          Nothing -> return (env </> topName <.> "manifest")
         Just man <- readMaybe <$> liftIO (readFile manFile)
         instDecls <- mkTopUnWrapper fun annM man (dstId,dstHWty)
                        (zip argExprs hWTysFiltered)

@@ -69,6 +69,8 @@ data NetlistState
   , _hdlDir         :: FilePath
   , _curBBlvl       :: Int
   -- ^ The current scoping level assigned to black box contexts
+  , _componentPrefix :: (Maybe Identifier,Maybe Identifier)
+  -- ^ Prefix for top-level components, and prefix for all other components
   }
 
 -- | Signal reference
