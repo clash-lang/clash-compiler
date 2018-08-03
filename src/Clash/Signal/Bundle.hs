@@ -25,7 +25,6 @@ module Clash.Signal.Bundle
   )
 where
 
-import Control.Applicative          (liftA2)
 import GHC.TypeLits                 (KnownNat)
 import Prelude                      hiding (head, map, tail)
 
