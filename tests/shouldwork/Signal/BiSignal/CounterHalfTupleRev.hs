@@ -29,8 +29,8 @@ counter (write, prevread) i = ((write', prevread'), output)
 -- | Write on odd cyles
 f :: Clock System Source
   -> Reset System Asynchronous
-  -> BiSignalIn  Undefined System (BitSize Int)
-  -> ( BiSignalOut Undefined System (BitSize Int)
+  -> BiSignalIn 'Undefined System (BitSize Int)
+  -> ( BiSignalOut 'Undefined System (BitSize Int)
      , Signal System Int
      )
 f clk rst s = (writeToBiSignal s (mealy clk rst counter (False, 0) (readFromBiSignal s)), 6)
@@ -39,8 +39,8 @@ f clk rst s = (writeToBiSignal s (mealy clk rst counter (False, 0) (readFromBiSi
 -- | Write on even cyles
 g :: Clock System Source
   -> Reset System Asynchronous
-  -> BiSignalIn  Undefined System (BitSize Int)
-  -> ( BiSignalOut Undefined System (BitSize Int)
+  -> BiSignalIn 'Undefined System (BitSize Int)
+  -> ( BiSignalOut 'Undefined System (BitSize Int)
      , Signal System Int
      )
 g clk rst s = (writeToBiSignal s (mealy clk rst counter (True, 0) (readFromBiSignal s)), 7)

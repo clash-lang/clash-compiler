@@ -28,15 +28,15 @@ counter (write, prevread) i = ((write', prevread'), output)
 -- | Write on odd cyles
 odd :: Clock System Source
   -> Reset System Asynchronous
-  -> BiSignalIn  Undefined System (BitSize Int)
-  -> BiSignalOut Undefined System (BitSize Int)
+  -> BiSignalIn  'Undefined System (BitSize Int)
+  -> BiSignalOut 'Undefined System (BitSize Int)
 odd clk rst s = writeToBiSignal s (mealy clk rst counter (False, 0) (readFromBiSignal s))
 
 -- | Write on even cyles
 even :: Clock System Source
   -> Reset System Asynchronous
-  -> BiSignalIn  Undefined System (BitSize Int)
-  -> BiSignalOut Undefined System (BitSize Int)
+  -> BiSignalIn  'Undefined System (BitSize Int)
+  -> BiSignalOut 'Undefined System (BitSize Int)
 even clk rst s = writeToBiSignal s (mealy clk rst counter (True, 0) (readFromBiSignal s))
 
 
