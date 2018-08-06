@@ -78,6 +78,7 @@ import Data.Proxy                 (Proxy (..))
 import Text.Read                  (Read (..), ReadPrec)
 import Language.Haskell.TH        (TypeQ, appT, conT, litT, numTyLit, sigE)
 import Language.Haskell.TH.Syntax (Lift(..))
+import Numeric.Natural            (Natural)
 import GHC.TypeLits               (CmpNat, KnownNat, Nat, type (+), type (-),
                                    type (*), type (<=), natVal)
 import GHC.TypeLits.Extra         (CLog)
@@ -362,7 +363,7 @@ instance ShowX (Index n) where
 
 -- | None of the 'Read' class' methods are synthesisable.
 instance KnownNat n => Read (Index n) where
-  readPrec = fromIntegral <$> (readPrec :: ReadPrec Word)
+  readPrec = fromIntegral <$> (readPrec :: ReadPrec Natural)
 
 instance KnownNat n => Default (Index n) where
   def = fromInteger# 0

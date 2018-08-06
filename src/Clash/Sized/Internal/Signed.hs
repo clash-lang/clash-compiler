@@ -169,7 +169,7 @@ instance ShowX (Signed n) where
 
 -- | None of the 'Read' class' methods are synthesisable.
 instance KnownNat n => Read (Signed n) where
-  readPrec = fromIntegral <$> (readPrec :: ReadPrec Int)
+  readPrec = fromIntegral <$> (readPrec :: ReadPrec Integer)
 
 instance KnownNat n => BitPack (Signed n) where
   type BitSize (Signed n) = n

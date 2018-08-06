@@ -87,6 +87,7 @@ import GHC.TypeLits                   (KnownNat, Nat, type (+), natVal)
 import GHC.TypeLits.Extra             (Max)
 import Language.Haskell.TH            (TypeQ, appT, conT, litT, numTyLit, sigE)
 import Language.Haskell.TH.Syntax     (Lift(..))
+import Numeric.Natural                (Natural)
 import Test.QuickCheck.Arbitrary      (Arbitrary (..), CoArbitrary (..),
                                        arbitraryBoundedIntegral,
                                        coarbitraryIntegral)
@@ -157,7 +158,7 @@ instance ShowX (Unsigned n) where
 
 -- | None of the 'Read' class' methods are synthesisable.
 instance KnownNat n => Read (Unsigned n) where
-  readPrec = fromIntegral <$> (readPrec :: ReadPrec Word)
+  readPrec = fromIntegral <$> (readPrec :: ReadPrec Natural)
 
 instance BitPack (Unsigned n) where
   type BitSize (Unsigned n) = n
