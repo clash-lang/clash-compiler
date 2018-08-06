@@ -132,9 +132,12 @@ mkArgument bndr e = do
     hwTyM <- N.termHWTypeM e
     let eTyMsg = "(" ++ showPpr e ++ " :: " ++ showPpr ty ++ ")"
     ((e',t,l),d) <- case hwTyM of
-      Nothing   ->
-        return ((Identifier (error ($(curLoc) ++ "Forced to evaluate untranslatable type: " ++ eTyMsg)) Nothing
-                ,Void Nothing,False),[])
+      Nothing
+        | (Prim nm _,_) <- collectArgs e
+        , nm == "Clash.Transformations.removedArg"
+        -> return ((Identifier (Text.fromStrict nm) Nothing, Void Nothing, False),[])
+        | otherwise
+        -> return ((error ($(curLoc) ++ "Forced to evaluate untranslatable type: " ++ eTyMsg), Void Nothing, False), [])
       Just hwTy -> case collectArgs e of
         (C.Var v,[]) -> return ((Identifier (nameOcc (varName v)) Nothing,hwTy,False),[])
         (C.Literal (IntegerLiteral i),[]) -> return ((N.Literal (Just (Signed iw,iw)) (N.NumLit i),hwTy,True),[])
