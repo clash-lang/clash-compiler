@@ -202,13 +202,13 @@ genComponentT compName componentExpr = do
 
   case resultM of
     Just result -> do
-      Just (NetDecl' _ _ rw _ _) <- mkNetDecl . head $ filter ((==result) . varName . fst) binders
+      Just (NetDecl' _ rw _ _) <- mkNetDecl . head $ filter ((==result) . varName . fst) binders
 
       let (compOutps',resUnwrappers') = case compOutps of
             [oport] -> ([(rw,oport)],resUnwrappers)
-            _       -> let NetDecl n isBidir res resTy = head resUnwrappers
+            _       -> let NetDecl n res resTy = head resUnwrappers
                        in  (map (Wire,) compOutps
-                           ,NetDecl' n isBidir rw res (Right resTy):tail resUnwrappers
+                           ,NetDecl' n rw res (Right resTy):tail resUnwrappers
                            )
           component      = Component componentName2 compInps compOutps'
                              (netDecls ++ argWrappers ++ decls ++ resUnwrappers')
@@ -223,13 +223,11 @@ genComponentT compName componentExpr = do
 mkNetDecl :: (Id, Embed Term) -> NetlistMonad (Maybe Declaration)
 mkNetDecl (id_,tm) = do
   let typ             = unembed (varType id_)
-      isBidirectional = containsBiSignalIn typ
   hwTy <- unsafeCoreTypeToHWTypeM $(curLoc) typ
   wr   <- termToWireOrReg (unembed tm)
   if isVoid hwTy
      then return Nothing
      else return . Just $ NetDecl' (addSrcNote (nameLoc nm))
-             isBidirectional
              wr
              (id2identifier id_)
              (Right hwTy)
@@ -252,10 +250,9 @@ mkNetDecl (id_,tm) = do
 
 
 isWriteToBiSignalPrimitive :: Term -> Bool
-isWriteToBiSignalPrimitive (App t _)   = isWriteToBiSignalPrimitive t
-isWriteToBiSignalPrimitive (TyApp t _) = isWriteToBiSignalPrimitive t
-isWriteToBiSignalPrimitive (Prim t _)  = t == StrictText.pack "Clash.Signal.BiSignal.writeToBiSignal#"
-isWriteToBiSignalPrimitive _           = False
+isWriteToBiSignalPrimitive e = case collectArgs e of
+  (Prim nm _,_) -> nm == StrictText.pack "Clash.Signal.BiSignal.writeToBiSignal#"
+  _             -> False
 
 -- | Generate a list of Declarations for a let-binder, return an empty list
 -- if the bound expression is represented by 0 bits
@@ -267,9 +264,9 @@ mkDeclarations
   -> NetlistMonad [Declaration]
 mkDeclarations bndr e = do
   hty <- unsafeCoreTypeToHWTypeM $(curLoc) (unembed (varType bndr))
-  case hty of
-    Void {} -> return []
-    _       -> mkDeclarations' bndr e
+  if isVoid hty && not (isBiSignalOut hty)
+     then return []
+     else mkDeclarations' bndr e
 
 -- | Generate a list of Declarations for a let-binder
 mkDeclarations'
@@ -307,15 +304,19 @@ mkDeclarations' bndr app =
     -- when writing to a BiSignal using the primitive 'writeToBiSignal'. In
     -- the generate HDL it will write to an inout port, NOT the variable
     -- having the actual type BiSignalOut.
-    _ | isBiSignalOut (id2type bndr) && (not $ isWriteToBiSignalPrimitive app) ->
-        return []
+    -- _ | isBiSignalOut (id2type bndr) && (not $ isWriteToBiSignalPrimitive app) ->
+    --     return []
     _ -> do
-      (exprApp,declsApp) <- mkExpr False (Right bndr) (unembed $ varType bndr) app
-      let dstId = id2identifier bndr
-          assn  = case exprApp of
-                    Identifier _ Nothing -> []
-                    _ -> [Assignment dstId exprApp]
-      return (declsApp ++ assn)
+      hwTy <- unsafeCoreTypeToHWTypeM $(curLoc) (id2type bndr)
+      if isBiSignalOut hwTy && not (isWriteToBiSignalPrimitive app)
+         then return []
+         else do
+          (exprApp,declsApp) <- mkExpr False (Right bndr) (unembed $ varType bndr) app
+          let dstId = id2identifier bndr
+              assn  = case exprApp of
+                        Identifier _ Nothing -> []
+                        _ -> [Assignment dstId exprApp]
+          return (declsApp ++ assn)
 
 -- | Generate a declaration that selects an alternative based on the value of
 -- the scrutinee
@@ -433,7 +434,7 @@ mkFunApp dst fun args = do
               let dstId = Text.pack . name2String $ varName dst
               (argExprs,argDecls)   <- fmap (second concat . unzip) $! mapM (\(e,t) -> mkExpr False (Left dstId) t e) argsFiltered'
               (argExprs',argDecls') <- (second concat . unzip) <$> mapM (toSimpleVar dst) (zip argExprs tysFiltered)
-              let inpAssigns    = zipWith (\(_,i,t) e -> (Identifier i Nothing,In,t,e)) compInps argExprs'
+              let inpAssigns    = zipWith (\(i,t) e -> (Identifier i Nothing,In,t,e)) compInps argExprs'
                   outpAssign    = case compOutp of
                     Nothing -> []
                     Just (id_,hwtype) -> [(Identifier id_ Nothing,Out,hwtype,Identifier dstId Nothing)]
@@ -457,8 +458,7 @@ toSimpleVar dst (e,ty) = do
              (Text.pack "_fun_arg")
   argNm' <- mkUniqueIdentifier Extended argNm
   hTy <- unsafeCoreTypeToHWTypeM $(curLoc) ty
-  let isBidirectional = isBiSignalIn ty
-      argDecl         = NetDecl Nothing isBidirectional argNm' hTy
+  let argDecl         = NetDecl Nothing argNm' hTy
       argAssn         = Assignment argNm' e
   return (Identifier argNm' Nothing,[argDecl,argAssn])
 
@@ -541,7 +541,7 @@ mkProjection mkDec bndr scrut altTy alt = do
       Identifier newId modM -> return (newId,modM,newDecls)
       _ -> do
         scrutNm' <- mkUniqueIdentifier Extended scrutNm
-        let scrutDecl = NetDecl Nothing False scrutNm' sHwTy
+        let scrutDecl = NetDecl Nothing scrutNm' sHwTy
             scrutAssn = Assignment scrutNm' scrutExpr
         return (scrutNm',Nothing,newDecls ++ [scrutDecl,scrutAssn])
 
@@ -571,7 +571,7 @@ mkProjection mkDec bndr scrut altTy alt = do
   case bndr of
     Left scrutNm | mkDec -> do
       scrutNm' <- mkUniqueIdentifier Extended scrutNm
-      let scrutDecl = NetDecl Nothing False scrutNm' vHwTy
+      let scrutDecl = NetDecl Nothing scrutNm' vHwTy
           scrutAssn = Assignment scrutNm' extractExpr
       return (Identifier scrutNm' Nothing,scrutDecl:scrutAssn:decls)
     _ -> return (extractExpr,decls)
@@ -595,7 +595,6 @@ mkDcApplication
     -- ^ Returned expression and a list of generate BlackBox declarations
 mkDcApplication dstHType bndr dc args = do
   let dcNm = name2String (dcName dc)
-  (_, sp)             <- Lens.use curCompNm
   tcm                 <- Lens.use tcCache
   argTys              <- mapM (termType tcm) args
   argNm <- either return (\b -> extendIdentifier Extended (Text.pack (name2String (varName b))) (Text.pack "_dc_arg")) bndr
@@ -603,11 +602,9 @@ mkDcApplication dstHType bndr dc args = do
   -- Filter out the arguments of hwtype `Void` and only translate
   -- them to the intermediate HDL afterwards
   let argsBundled   = zip argHWTys (zip args argTys)
-      argsFiltered  = filter (maybe True (not . isVoid) . fst) argsBundled
-  -- Filter out bisignals
-      argsFiltered1 = filter (not . isBiSignalOut . snd . snd) argsFiltered
-      (hWTysFiltered,argsFiltered2) = unzip argsFiltered1
-  (argExprs,argDecls) <- fmap (second concat . unzip) $! mapM (\(e,t) -> mkExpr False (Left argNm) t e) argsFiltered2
+      (hWTysFiltered,argsFiltered) = unzip
+        (filter (maybe True (not . isVoid) . fst) argsBundled)
+  (argExprs,argDecls) <- fmap (second concat . unzip) $! mapM (\(e,t) -> mkExpr False (Left argNm) t e) argsFiltered
   fmap (,argDecls) $! case (hWTysFiltered,argExprs) of
     -- Is the DC just a newtype wrapper?
     ([Just argHwTy],[argExpr]) | argHwTy == dstHType ->
@@ -636,31 +633,15 @@ mkDcApplication dstHType bndr dc args = do
       Vector 0 _ -> return (HW.DataCon dstHType VecAppend [])
       Vector 1 _ -> case argExprs of
                       [e] -> return (HW.DataCon dstHType VecAppend [e])
-                      _ | length argsFiltered /= length argsFiltered1
-                        -> return (HW.DataCon dstHType (DC (Void Nothing, -1)) [])
                       _ -> error $ $(curLoc) ++ "Unexpected number of arguments for `Cons`: " ++ showDoc args
       Vector _ _ -> case argExprs of
                       [e1,e2] -> return (HW.DataCon dstHType VecAppend [e1,e2])
-                      _ | length argsFiltered /= length argsFiltered1
-                        -> return (HW.DataCon dstHType (DC (Void Nothing, -1)) [])
                       _ -> error $ $(curLoc) ++ "Unexpected number of arguments for `Cons`: " ++ showDoc args
       RTree 0 _ -> case argExprs of
                       [e] -> return (HW.DataCon dstHType RTreeAppend [e])
-                      _ | length argsFiltered /= length argsFiltered1
-                        -> throw $ ClashException sp (unwords $
-                            [ "Unexpected number of arguments for RTree. This was"
-                            , "probably caused by illegally using BiSignalOut values"
-                            , "in an RTree."
-                            ]) Nothing
                       _ -> error $ $(curLoc) ++ "Unexpected number of arguments for `LR`: " ++ showDoc args
       RTree _ _ -> case argExprs of
                       [e1,e2] -> return (HW.DataCon dstHType RTreeAppend [e1,e2])
-                      _ | length argsFiltered /= length argsFiltered1
-                        -> throw $ ClashException sp (unwords $
-                            [ "Unexpected number of arguments for RTree. This was"
-                            , "probably caused by illegally using BiSignalOut values"
-                            , "in an RTree."
-                            ]) Nothing
                       _ -> error $ $(curLoc) ++ "Unexpected number of arguments for `BR`: " ++ showDoc args
       String ->
         let dc' = case dcTag dc of

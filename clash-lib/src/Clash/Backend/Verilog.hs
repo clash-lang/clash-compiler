@@ -191,16 +191,15 @@ genVerilog sp c = do
       <> line <> "*/"
 
 sigPort :: Maybe WireOrReg
-        -> Bool
         -> Text.Text
         -> HWType
         -> VerilogM Doc
-sigPort wor isBidirectional pName hwType = portType <+> verilogType' True hwType <+> string pName <+> encodingNote hwType
+sigPort wor pName hwType = portType <+> verilogType' True hwType <+> string pName <+> encodingNote hwType
   where
     portType = case wor of
-                 Nothing     -> if isBidirectional then "inout" else "input"
-                 (Just Wire) -> (if isBidirectional then "inout" else "output") <+> "wire"
-                 (Just Reg)  -> (if isBidirectional then error "Register cannot be inout" else "output") <+> "reg"
+                 Nothing   -> if isBiSignalIn hwType then "inout" else "input"
+                 Just Wire -> "output" <+> "wire"
+                 Just Reg  -> "output" <+> "reg"
 
 module_ :: Component -> VerilogM Doc
 module_ c = addSeen c *> modVerilog <* Mon (idSeen .= [] >> imports .= [])
@@ -215,8 +214,8 @@ module_ c = addSeen c *> modVerilog <* Mon (idSeen .= [] >> imports .= [])
     modBody    = indent 2 (decls (declarations c)) <> line <> line <> insts (declarations c)
     modEnding  = "endmodule"
 
-    inPorts  = sequence [ sigPort Nothing isBidirectional id_ hwType | (isBidirectional, id_, hwType) <- inputs c  ]
-    outPorts = sequence [ sigPort (Just wireOrReg) False id_ hwType | (wireOrReg, (id_, hwType)) <- outputs c ]
+    inPorts  = sequence [ sigPort Nothing id_ hwType | (id_, hwType) <- inputs c  ]
+    outPorts = sequence [ sigPort (Just wireOrReg) id_ hwType | (wireOrReg, (id_, hwType)) <- outputs c ]
 
     -- slightly more readable than 'tupled', makes the output Haskell-y-er
     commafy v = (comma <> space) <> pure v
@@ -249,9 +248,9 @@ wireOrRegDoc Reg  = "reg"
 
 addSeen :: Component -> VerilogM ()
 addSeen c = do
-  let iport = [iName | (_, iName, _) <- inputs c]
+  let iport = [iName | (iName, _) <- inputs c]
       oport = [oName | (_, (oName, _)) <- outputs c]
-      nets  = mapMaybe (\case {NetDecl' _ _ _ i _ -> Just i; _ -> Nothing}) $ declarations c
+      nets  = mapMaybe (\case {NetDecl' _ _ i _ -> Just i; _ -> Nothing}) $ declarations c
   Mon $ idSeen .= concat [iport,oport,nets]
 
 -- render a type; by default, removing zero-sizes is an aesthetic operation
@@ -318,7 +317,7 @@ decls ds = do
       _  -> punctuate' semi (A.pure dsDoc)
 
 decl :: Declaration -> VerilogM (Maybe Doc)
-decl (NetDecl' noteM _ wr id_ tyE) =
+decl (NetDecl' noteM wr id_ tyE) =
   Just A.<$> maybe id addNote noteM (wireOrRegDoc wr <+> tyDec tyE)
   where
     tyDec (Left  ty) = string ty <+> string id_
@@ -368,7 +367,7 @@ inst_ (InstDecl _ nm lbl pms) = fmap Just $
 inst_ (BlackBoxD _ libs imps inc bs bbCtx) =
   fmap Just (Mon (column (renderBlackBox libs imps inc bs bbCtx)))
 
-inst_ (NetDecl' _ _ _ _ _) = return Nothing
+inst_ (NetDecl' _ _ _ _) = return Nothing
 
 -- | Calculate the beginning and end index into a variable, to get the
 -- desired field.
@@ -568,13 +567,6 @@ expr_ _ (DataTag (RTree _ _) (Right _)) = do
   int iw <> "'sd1"
 
 expr_ b (ConvBV _ _ _ e) = expr_ b e
-
-expr_ _ (DataCon (Vector _ (BiDirectional _)) (DC (Void Nothing,-1)) []) =
-    string $ pack $ unwords [ "This is a hack to support bidirectional signals."
-                          , "If you ever read this message in a target HDL,"
-                          , "please submit a bug report along with the code"
-                          , "causing this defect."
-                          ]
 
 expr_ _ e = error $ $(curLoc) ++ (show e) -- empty
 

@@ -19,12 +19,12 @@ import           Control.Error           (hush)
 import           Control.Exception       (throw)
 import           Control.Lens            ((.=),(%=))
 import qualified Control.Lens            as Lens
-import           Control.Monad           (zipWithM)
+import           Control.Monad           (when, zipWithM)
 import           Control.Monad.Trans.Except (runExcept)
 import           Data.Either             (partitionEithers)
 import           Data.HashMap.Strict     (HashMap)
 import qualified Data.HashMap.Strict     as HashMap
-import           Data.List               (intersperse, unzip4,isPrefixOf)
+import           Data.List               (intersperse, unzip4)
 import           Data.Maybe              (catMaybes,fromMaybe)
 import           Data.Text.Lazy          (append,pack,unpack)
 import qualified Data.Text.Lazy          as Text
@@ -53,8 +53,14 @@ import           Clash.Signal.Internal   (ClockKind (..))
 import           Clash.Util
 
 isVoid :: HWType -> Bool
-isVoid (Void {}) = True
-isVoid _         = False
+isVoid Void {} = True
+isVoid _       = False
+
+isBiSignalOut :: HWType -> Bool
+isBiSignalOut (Void (Just (BiDirectional Out _))) = True
+isBiSignalOut (Vector n ty) | n /= 0              = isBiSignalOut ty
+isBiSignalOut (RTree _ ty)                        = isBiSignalOut ty
+isBiSignalOut _                                   = False
 
 mkIdentifier :: IdType -> Identifier -> NetlistMonad Identifier
 mkIdentifier typ nm = Lens.use mkIdentifierFn <*> pure typ <*> pure nm
@@ -168,10 +174,6 @@ coreTypeToHWType builtInTranslation m keepVoid ty@(tyView -> TyConApp tc args) =
   mkADT builtInTranslation m (showDoc ty) keepVoid tc args
 coreTypeToHWType _ _ _ ty = Left $ "Can't translate non-tycon type: " ++ showDoc ty
 
-bidirectional :: HWType -> Bool
-bidirectional (BiDirectional _) = True
-bidirectional _                 = False
-
 -- | Converts an algebraic Core type (split into a TyCon and its argument) to a HWType.
 mkADT
   :: (HashMap TyConOccName TyCon -> Bool -> Type -> Maybe (Either String HWType))
@@ -203,10 +205,7 @@ mkADT builtInTranslation m _tyString keepVoid tc args = case tyConDataCons (m Ha
     let argHTyss1    = if keepVoid
                           then argHTyss
                           else map (filter (not . isVoid)) argHTyss
---     -- Filter BiSignalOut arguments (marked by GHC/NetlistTypes.hs) as they will
---     -- amount to loose wires in the produced HDL otherwise.
-        argHTyss2 = map (filter (not . bidirectional)) argHTyss1
-    case (dcs,argHTyss2) of
+    case (dcs,argHTyss1) of
       (_:[],[[elemTy]]) ->
         return elemTy
 
@@ -250,7 +249,7 @@ representableType builtInTranslation stringRepresentable m =
       RTree  _ elTy   -> isRepresentable elTy
       Product _ elTys -> all isRepresentable elTys
       SP _ elTyss     -> all (all isRepresentable . snd) elTyss
-      BiDirectional t -> isRepresentable t
+      BiDirectional _ t -> isRepresentable t
       _               -> True
 
 -- | Determines the bitsize of a type
@@ -274,7 +273,8 @@ typeSize t@(SP _ cons) = conSize t +
   maximum (map (sum . map typeSize . snd) cons)
 typeSize (Sum _ dcs) = fromMaybe 0 . clogBase 2 . toInteger $ length dcs
 typeSize (Product _ tys) = sum $ map typeSize tys
-typeSize (BiDirectional h) = typeSize h
+typeSize (BiDirectional In h) = typeSize h
+typeSize (BiDirectional Out _) = 0
 
 -- | Determines the bitsize of the constructor of a type
 conSize :: HWType
@@ -307,68 +307,19 @@ termHWTypeM e = do
   ty <- termType m e
   coreTypeToHWTypeM ty
 
--- | Is this type a Clash.Signal.BiSignal.BiSignalIn?
-isBiSignalIn :: Type -> Bool
-isBiSignalIn (tyView -> TyConApp tc _)
-  = name2String tc == "Clash.Signal.BiSignal.BiSignalIn"
-isBiSignalIn _ = False
+isBiSignalIn :: HWType -> Bool
+isBiSignalIn (BiDirectional In _) = True
+isBiSignalIn _                    = False
 
--- | Is this type a Clash.Signal.BiSignal.BiSignalIn? Alternatively, is any
--- of its subtypes?
-containsBiSignalIn :: Type -> Bool
-containsBiSignalIn typ@(tyView -> TyConApp _constr subTypes)
-  = isBiSignalIn typ || any containsBiSignalIn subTypes
-containsBiSignalIn _ = False
-
--- | Check if a type is a GHC tuple
-isTuple :: Type -> Bool
-isTuple (tyView -> TyConApp constr _subTypes) =
-  "GHC.Tuple" `isPrefixOf` name2String constr
-isTuple _type = False
-
--- | Check if a type is either a BiSignalOut or a tuple having one or more
--- BiSignalOut members. This function will return 'True' if any of these
--- assumptions is violated. We use this check to prevent user from using
--- BiSignalOut is such a way that it is very difficult to eliminate them
--- from the final HDL design.
-isIllegalRes :: Type -> Bool
-isIllegalRes typ@(tyView -> TyConApp _constr subTypes) =
-  if isTuple typ
-    then
-      any (\e -> not (isBiSignalOut e) && containsBiSignalOut e) subTypes
-    else
-      not (isBiSignalOut typ) && any containsBiSignalOut subTypes
-isIllegalRes _ = False
-
--- | A type is considered 'empty' if it is a BiSignalOut, or a tuple
--- of solely BiSignalOuts.
-isEmptyType :: Type -> Bool
-isEmptyType typ@(tyView -> TyConApp _constr subTypes) =
-  if isTuple typ
-    then
-      all isBiSignalOut subTypes
-    else
-      isBiSignalOut typ
-isEmptyType _ = False
-
--- | Is this type a Clash.Signal.BiSignal.BiSignalOut?
-isBiSignalOut :: Type -> Bool
-isBiSignalOut (tyView -> TyConApp constr _args)
-  = name2String constr == "Clash.Signal.BiSignal.BiSignalOut"
-isBiSignalOut _ = False
-
--- | Is this type a Clash.Signal.BiSignal.BiSignalOut? Alternatively, is any
--- of its subtypes?
-containsBiSignalOut :: Type -> Bool
-containsBiSignalOut typ@(tyView -> TyConApp _constr args)
-  = isBiSignalOut typ || any containsBiSignalOut args
-containsBiSignalOut _ = False
-
-containsBiSignal :: Type -> Bool
-containsBiSignal typ = containsBiSignalIn typ || containsBiSignalOut typ
-
-isBiSignal :: Type -> Bool
-isBiSignal typ = isBiSignalIn typ || isBiSignalOut typ
+containsBiSignalIn
+  :: HWType
+  -> Bool
+containsBiSignalIn (BiDirectional In _) = True
+containsBiSignalIn (Product _ tys) = any containsBiSignalIn tys
+containsBiSignalIn (SP _ tyss)     = any (any containsBiSignalIn . snd) tyss
+containsBiSignalIn (Vector _ ty)   = containsBiSignalIn ty
+containsBiSignalIn (RTree _ ty)    = containsBiSignalIn ty
+containsBiSignalIn _               = False
 
 -- | Uniquely rename all the variables and their references in a normalized
 -- term
@@ -379,7 +330,7 @@ mkUniqueNormalized
      , Id
      )
   -> NetlistMonad
-      ([(IsBidirectional,Identifier,HWType)]
+      ([(Identifier,HWType)]
       ,[Declaration]
       ,[(Identifier,HWType)]
       ,[Declaration]
@@ -431,7 +382,7 @@ mkUniqueArguments
   :: Maybe (Maybe TopEntity)
   -> [Id]
   -> NetlistMonad
-       ([(IsBidirectional,Identifier,HWType)]
+       ([(Identifier,HWType)]
        ,[Declaration]
        ,[(TmOccName,Term)]
        )
@@ -454,13 +405,10 @@ mkUniqueArguments (Just teM) args = do
           i'   = id2identifier var
           ty   = unembed (varType var)
           hwty = unsafeCoreTypeToHWType sp $(curLoc) typeTrans tcm True ty
-      (ports,decls,_,pN) <- mkInput pM (isBiSignalIn ty,i',hwty)
+      (ports,decls,_,pN) <- mkInput pM (i',hwty)
       if isVoid hwty
          then return Nothing
-         else
-          return $ if containsBiSignalOut ty
-                      then throw (ClashException sp ($(curLoc) ++ "You cannot use BiSignalOut in function arguments.") Nothing)
-                      else Just (ports,decls,(nameOcc i, Var ty (repName (unpack pN) i)))
+         else return (Just (ports,decls,(nameOcc i, Var ty (repName (unpack pN) i))))
 
 
 mkUniqueResult
@@ -468,24 +416,11 @@ mkUniqueResult
   -> Id
   -> NetlistMonad (Maybe ([(Identifier,HWType)],[Declaration],Id,(TmOccName,Term)))
 mkUniqueResult Nothing res = do
-  (_, srcspan) <- Lens.use curCompNm
-
-  let ty   = id2type res
-  let err  = "BiSignalIn cannot be a function's result. Use 'readFromBiSignal'."
-  let err2 = "BiSignalOut cannot be part of a composite type other than tuple."
-
-  if containsBiSignalIn ty
-    then throw (ClashException srcspan ($(curLoc) ++ err) Nothing)
-    else if isIllegalRes ty
-      then throw (ClashException srcspan ($(curLoc) ++ err2) Nothing)
-      else if isEmptyType (id2type res)
-        then return Nothing
-        else do
-            ([res'],[subst]) <- mkUnique [] [res]
-            portM <- idToOutPort res'
-            case portM of
-              Just port -> return (Just ([port],[],res',subst))
-              _         -> return Nothing
+  ([res'],[subst]) <- mkUnique [] [res]
+  portM <- idToOutPort res'
+  case portM of
+    Just port -> return (Just ([port],[],res',subst))
+    _         -> return Nothing
 
 mkUniqueResult (Just teM) res = do
   tcm       <- Lens.use tcCache
@@ -496,48 +431,40 @@ mkUniqueResult (Just teM) res = do
       ty   = unembed (varType res)
       hwty = unsafeCoreTypeToHWType sp $(curLoc) typeTrans tcm True ty
       oPortSupply = fmap t_output teM
+  when (containsBiSignalIn hwty)
+    (throw (ClashException sp ($(curLoc) ++ "BiSignalIn cannot be part of a function's result. Use 'readFromBiSignal'.") Nothing))
+  output <- mkOutput oPortSupply (o',hwty)
+  case output of
+    Just (ports, decls, pN) -> do
+      let pO = repName (unpack pN) o
+      return (Just (ports,decls,Id pO (embed ty),(nameOcc o, Var ty pO)))
+    _ -> return Nothing
 
-  let err  = "BiSignalIn cannot be a function's result. Use 'readFromBiSignal'."
-  let err2 = "BiSignalOut cannot be part of a composite type other than tuple."
-
-  if containsBiSignalIn ty
-    then throw (ClashException sp ($(curLoc) ++ err) Nothing)
-    else if isIllegalRes ty
-      then throw (ClashException sp ($(curLoc) ++ err2) Nothing)
-      else if isEmptyType ty || isVoid hwty
-        then return Nothing
-        else do
-          output <- mkOutput oPortSupply (o', hwty)
-          return $ case output of
-            Nothing -> Nothing
-            Just (ports, decls, pN) ->
-              let pO = repName (unpack pN) o in
-              Just (ports,decls,Id pO (embed ty),(nameOcc o,Var ty pO))
-
--- | Same as idToPort, but:
---    * Additionally indicates if the port is bidirectional
---    * Throws an error if port is of type BiSignalOut
-idToInPort :: Id -> NetlistMonad (Maybe (IsBidirectional,Identifier,HWType))
+-- | Same as idToPort, but
+--    * Throws an error if the port is a composite type with a BiSignalIn
+idToInPort :: Id -> NetlistMonad (Maybe (Identifier,HWType))
 idToInPort var = do
-  let ty = unembed (varType var)
-  (_, srcspan) <- Lens.use curCompNm
+  (_, sp) <- Lens.use curCompNm
   portM <- idToPort var
-  return $ if not $ containsBiSignalOut ty
-              then fmap (\(a,b) -> (containsBiSignalIn ty,a,b)) portM
-              else
-                let err = "You cannot use BiSignalOut in function arguments." in
-                throw (ClashException srcspan ($(curLoc) ++ err) Nothing)
+  case portM of
+    Just (_,hty) -> do
+      when (containsBiSignalIn hty && not (isBiSignalIn hty))
+        (throw (ClashException sp ($(curLoc) ++ "BiSignalIn currently cannot be part of a composite type when it's a function's argument") Nothing))
+      return portM
+    _ -> return Nothing
 
 -- | Same as idToPort, but:
 --    * Throws an error if port is of type BiSignalIn
 idToOutPort :: Id -> NetlistMonad (Maybe (Identifier,HWType))
 idToOutPort var = do
-  let ty = unembed (varType var)
   (_, srcspan) <- Lens.use curCompNm
   portM <- idToPort var
-  return $ if containsBiSignalIn ty
-              then throw (ClashException srcspan ($(curLoc) ++ "BiSignalIn cannot be part of a function's result. Use 'readFromBiSignal'.") Nothing)
-              else portM
+  case portM of
+    Just (_,hty) -> do
+      when (containsBiSignalIn hty)
+        (throw (ClashException srcspan ($(curLoc) ++ "BiSignalIn cannot be part of a function's result. Use 'readFromBiSignal'.") Nothing))
+      return portM
+    _ -> return Nothing
 
 idToPort :: Id -> NetlistMonad (Maybe (Identifier,HWType))
 idToPort var = do
@@ -655,12 +582,6 @@ appendIdentifier
 appendIdentifier (nm,hwty) i =
   (,hwty) <$> extendIdentifier Extended nm (pack ('_':show i))
 
-appendPortDirection
-  :: IsBidirectional
-  -> (Identifier,HWType)
-  -> (IsBidirectional,Identifier,HWType)
-appendPortDirection a (b, c) = (a, b, c)
-
 uniquePortName
   :: String
   -> Identifier
@@ -673,38 +594,35 @@ uniquePortName x  _ = do
 
 mkInput
   :: Maybe PortName
-  -> (IsBidirectional,Identifier,HWType)
-  -> NetlistMonad ([(IsBidirectional,Identifier,HWType)],[Declaration],Expr,Identifier)
+  -> (Identifier,HWType)
+  -> NetlistMonad ([(Identifier,HWType)],[Declaration],Expr,Identifier)
 mkInput pM = case pM of
   Nothing -> go
   Just p  -> go' p
   where
-    go (isBidirectional,i,hwty) = do
+    go (i,hwty) = do
       i' <- mkUniqueIdentifier Extended i
       case hwty of
         Vector sz hwty' -> do
-          arguments <- map (appendPortDirection isBidirectional) <$>
-                       mapM (appendIdentifier (i',hwty')) [0..sz-1]
+          arguments <- mapM (appendIdentifier (i',hwty')) [0..sz-1]
           (ports,_,exprs,_) <- unzip4 <$> mapM (mkInput Nothing) arguments
           let hwty2    = filterVoid hwty'
-              netdecl  = NetDecl Nothing isBidirectional i' (Vector sz hwty2)
+              netdecl  = NetDecl Nothing i' (Vector sz hwty2)
               vecExpr  = mkVectorChain sz hwty2 exprs
               netassgn = Assignment i' vecExpr
           return (concat ports,[netdecl,netassgn],vecExpr,i')
 
         RTree d hwty' -> do
-          arguments <- map (appendPortDirection isBidirectional) <$>
-                       mapM (appendIdentifier (i',hwty')) [0..2^d-1]
+          arguments <- mapM (appendIdentifier (i',hwty')) [0..2^d-1]
           (ports,_,exprs,_) <- unzip4 <$> mapM (mkInput Nothing) arguments
           let hwty2    = filterVoid hwty'
-              netdecl  = NetDecl Nothing isBidirectional i' (RTree d hwty2)
+              netdecl  = NetDecl Nothing i' (RTree d hwty2)
               trExpr   = mkRTreeChain d hwty2 exprs
               netassgn = Assignment i' trExpr
           return (concat ports,[netdecl,netassgn],trExpr,i')
 
         Product _ hwtys -> do
-          arguments <- map (appendPortDirection isBidirectional) <$>
-                       zipWithM appendIdentifier (map (i',) hwtys) [0..]
+          arguments <- zipWithM appendIdentifier (map (i',) hwtys) [0..]
           let argumentsBundled   = zip hwtys arguments
               argumentsFiltered  = filter (not . isVoid . fst) argumentsBundled
               argumentsFiltered' = map snd argumentsFiltered
@@ -712,60 +630,56 @@ mkInput pM = case pM of
           case exprs of
             [expr] ->
               let hwty'    = filterVoid hwty
-                  netdecl  = NetDecl Nothing isBidirectional i' hwty'
+                  netdecl  = NetDecl Nothing i' hwty'
                   dcExpr   = expr
                   netassgn = Assignment i' expr
               in  return (concat ports,[netdecl,netassgn],dcExpr,i')
             _ ->
               let hwty'    = filterVoid hwty
-                  netdecl  = NetDecl Nothing isBidirectional i' hwty'
+                  netdecl  = NetDecl Nothing i' hwty'
                   dcExpr   = DataCon hwty' (DC (hwty',0)) exprs
                   netassgn = Assignment i' dcExpr
               in  return (concat ports,[netdecl,netassgn],dcExpr,i')
 
         Clock nm rt Gated -> do
           let hwtys = [Clock nm rt Source,Bool]
-          arguments <- map (appendPortDirection isBidirectional) <$>
-                       zipWithM appendIdentifier (map (i',) hwtys) [0..]
+          arguments <- zipWithM appendIdentifier (map (i',) hwtys) [0..]
           (ports,_,exprs,_) <- unzip4 <$> mapM (mkInput Nothing) arguments
-          let netdecl  = NetDecl Nothing isBidirectional i' hwty
+          let netdecl  = NetDecl Nothing i' hwty
               dcExpr   = DataCon hwty (DC (hwty,0)) exprs
               netassgn = Assignment i' dcExpr
           return (concat ports,[netdecl,netassgn],dcExpr,i')
 
-        _ -> return ([(isBidirectional,i',hwty)],[],Identifier i' Nothing,i')
+        _ -> return ([(i',hwty)],[],Identifier i' Nothing,i')
 
 
-    go' (PortName p) (isBidirectional,i,hwty) = do
+    go' (PortName p) (i,hwty) = do
       pN <- uniquePortName p i
-      return ([(isBidirectional,pN,hwty)],[],Identifier pN Nothing,pN)
+      return ([(pN,hwty)],[],Identifier pN Nothing,pN)
 
-    go' (PortProduct p ps) (isBidirectional,i,hwty) = do
+    go' (PortProduct p ps) (i,hwty) = do
       pN <- uniquePortName p i
       case hwty of
         Vector sz hwty' -> do
-          arguments <- map (appendPortDirection isBidirectional) <$>
-                       mapM (appendIdentifier (pN,hwty')) [0..sz-1]
+          arguments <- mapM (appendIdentifier (pN,hwty')) [0..sz-1]
           (ports,_,exprs,_) <- unzip4 <$> zipWithM mkInput (extendPorts ps) arguments
           let hwty2    = filterVoid hwty'
-              netdecl  = NetDecl Nothing isBidirectional pN (Vector sz hwty2)
+              netdecl  = NetDecl Nothing pN (Vector sz hwty2)
               vecExpr  = mkVectorChain sz hwty2 exprs
               netassgn = Assignment pN vecExpr
           return (concat ports,[netdecl,netassgn],vecExpr,pN)
 
         RTree d hwty' -> do
-          arguments <- map (appendPortDirection isBidirectional) <$>
-                       mapM (appendIdentifier (pN,hwty')) [0..2^d-1]
+          arguments <- mapM (appendIdentifier (pN,hwty')) [0..2^d-1]
           (ports,_,exprs,_) <- unzip4 <$> zipWithM mkInput (extendPorts ps) arguments
           let hwty2    = filterVoid hwty'
-              netdecl  = NetDecl Nothing isBidirectional pN (RTree d hwty2)
+              netdecl  = NetDecl Nothing pN (RTree d hwty2)
               trExpr   = mkRTreeChain d hwty2 exprs
               netassgn = Assignment pN trExpr
           return (concat ports,[netdecl,netassgn],trExpr,pN)
 
         Product _ hwtys -> do
-          arguments <- map (appendPortDirection isBidirectional) <$>
-                       zipWithM appendIdentifier (map (pN,) hwtys) [0..]
+          arguments <- zipWithM appendIdentifier (map (pN,) hwtys) [0..]
           let argumentsBundled   = zip hwtys (zip (extendPorts ps) arguments)
               argumentsFiltered  = filter (not . isVoid . fst) argumentsBundled
               argumentsFiltered' = unzip (map snd argumentsFiltered)
@@ -773,27 +687,26 @@ mkInput pM = case pM of
           case exprs of
             [expr] ->
                  let hwty'    = filterVoid hwty
-                     netdecl  = NetDecl Nothing isBidirectional pN hwty'
+                     netdecl  = NetDecl Nothing pN hwty'
                      dcExpr   = expr
                      netassgn = Assignment pN expr
                  in  return (concat ports,[netdecl,netassgn],dcExpr,pN)
             _ -> let hwty'    = filterVoid hwty
-                     netdecl  = NetDecl Nothing isBidirectional pN hwty'
+                     netdecl  = NetDecl Nothing pN hwty'
                      dcExpr   = DataCon hwty' (DC (hwty',0)) exprs
                      netassgn = Assignment pN dcExpr
                  in  return (concat ports,[netdecl,netassgn],dcExpr,pN)
 
         Clock nm rt Gated -> do
           let hwtys = [Clock nm rt Source, Bool]
-          arguments <- map (appendPortDirection isBidirectional) <$>
-                       zipWithM appendIdentifier (map (pN,) hwtys) [0..]
+          arguments <- zipWithM appendIdentifier (map (pN,) hwtys) [0..]
           (ports,_,exprs,_) <- unzip4 <$> zipWithM mkInput (extendPorts ps) arguments
-          let netdecl  = NetDecl Nothing isBidirectional pN hwty
+          let netdecl  = NetDecl Nothing pN hwty
               dcExpr   = DataCon hwty (DC (hwty,0)) exprs
               netassgn = Assignment pN dcExpr
           return (concat ports,[netdecl,netassgn],dcExpr,pN)
 
-        _ -> return ([(isBidirectional,pN,hwty)],[],Identifier pN Nothing,pN)
+        _ -> return ([(pN,hwty)],[],Identifier pN Nothing,pN)
 
 filterVoid
   :: HWType
@@ -870,14 +783,14 @@ genTopComponentName mkId prefixM Nothing nm =
   genComponentName [] mkId prefixM nm
 
 -- | Generate output port mappings. Will yield Nothing if the only output is
--- a bidirectional signal. This signal should also be present as an "input",
--- thus it is filtered out here.
+-- Void.
 mkOutput
   :: Maybe PortName
   -> (Identifier,HWType)
   -> NetlistMonad (Maybe ([(Identifier,HWType)],[Declaration],Identifier))
-mkOutput _pM (_o, (BiDirectional _ )) = return Nothing
-mkOutput pM  (o,  hwty)               = Just <$> mkOutput' pM (o, hwty)
+mkOutput _pM (_o, (BiDirectional Out _)) = return Nothing
+mkOutput _pM (_o, (Void _))  = return Nothing
+mkOutput pM  (o,  hwty)      = Just <$> mkOutput' pM (o, hwty)
 
 mkOutput'
   :: Maybe PortName
@@ -894,7 +807,7 @@ mkOutput' pM = case pM of
           results <- mapM (appendIdentifier (o',hwty')) [0..sz-1]
           (ports,decls,ids) <- unzip3 <$> mapM (mkOutput' Nothing) results
           let hwty2   = Vector sz (filterVoid hwty')
-              netdecl = NetDecl Nothing False o' hwty2
+              netdecl = NetDecl Nothing o' hwty2
               assigns = zipWith (assignId o' hwty2 10) ids [0..]
           return (concat ports,netdecl:assigns ++ concat decls,o')
 
@@ -902,7 +815,7 @@ mkOutput' pM = case pM of
           results <- mapM (appendIdentifier (o',hwty')) [0..2^d-1]
           (ports,decls,ids) <- unzip3 <$> mapM (mkOutput' Nothing) results
           let hwty2   = RTree d (filterVoid hwty')
-              netdecl = NetDecl Nothing False o' hwty2
+              netdecl = NetDecl Nothing o' hwty2
               assigns = zipWith (assignId o' hwty2 10) ids [0..]
           return (concat ports,netdecl:assigns ++ concat decls,o')
 
@@ -915,12 +828,12 @@ mkOutput' pM = case pM of
           case ids of
             [i] ->
               let hwty'   = filterVoid hwty
-                  netdecl = NetDecl Nothing False o' hwty'
+                  netdecl = NetDecl Nothing o' hwty'
                   assign  = Assignment i (Identifier o' Nothing)
               in  return (concat ports,netdecl:assign:concat decls,o')
             _   ->
               let hwty'   = filterVoid hwty
-                  netdecl = NetDecl Nothing False o' hwty'
+                  netdecl = NetDecl Nothing o' hwty'
                   assigns = zipWith (assignId o' hwty' 0) ids [0..]
               in  return (concat ports,netdecl:assigns ++ concat decls,o')
 
@@ -937,7 +850,7 @@ mkOutput' pM = case pM of
           results <- mapM (appendIdentifier (pN,hwty')) [0..sz-1]
           (ports,decls,ids) <- unzip3 <$> zipWithM mkOutput' (extendPorts ps) results
           let hwty2   = Vector sz (filterVoid hwty')
-              netdecl = NetDecl Nothing False pN hwty2
+              netdecl = NetDecl Nothing pN hwty2
               assigns = zipWith (assignId pN hwty2 10) ids [0..]
           return (concat ports,netdecl:assigns ++ concat decls,pN)
 
@@ -945,7 +858,7 @@ mkOutput' pM = case pM of
           results <- mapM (appendIdentifier (pN,hwty')) [0..2^d-1]
           (ports,decls,ids) <- unzip3 <$> zipWithM mkOutput' (extendPorts ps) results
           let hwty2   = RTree d (filterVoid hwty')
-              netdecl = NetDecl Nothing False pN hwty2
+              netdecl = NetDecl Nothing pN hwty2
               assigns = zipWith (assignId pN hwty2 10) ids [0..]
           return (concat ports,netdecl:assigns ++ concat decls,pN)
 
@@ -957,11 +870,11 @@ mkOutput' pM = case pM of
           (ports,decls,ids) <- unzip3 <$> uncurry (zipWithM mkOutput') resultsFiltered'
           case ids of
             [i] -> let hwty'   = filterVoid hwty
-                       netdecl = NetDecl Nothing False pN hwty'
+                       netdecl = NetDecl Nothing pN hwty'
                        assign  = Assignment i (Identifier pN Nothing)
                    in  return (concat ports,netdecl:assign:concat decls,pN)
             _   -> let hwty'   = filterVoid hwty
-                       netdecl = NetDecl Nothing False pN hwty'
+                       netdecl = NetDecl Nothing pN hwty'
                        assigns = zipWith (assignId pN hwty' 0) ids [0..]
                    in  return (concat ports,netdecl:assigns ++ concat decls,pN)
 
@@ -1011,15 +924,6 @@ mkTopUnWrapper topEntity annM man dstId args = do
                       (repeat Nothing)
                       (extendPorts . (:[]) . t_output)
                       annM
-
-  -- instLabel <- extendIdentifier Basic topName ("_" `append` fst dstId)
-  -- let topCompDecl =
-  --       InstDecl
-  --         (Just topName)
-  --         topName
-  --         instLabel
-  --         (map (\(p,i,t) -> (Identifier p Nothing,In, t,Identifier i Nothing)) (concat iports) ++
-  --          map (\(p,o,t) -> (Identifier p Nothing,Out,t,Identifier o Nothing)) oports)
 
   let iResult = inpAssigns ++ concat wrappers
       result = ("result",snd dstId)
@@ -1122,7 +1026,7 @@ mkTopInput topM inps pM = case pM of
     -- No @PortName@
     go inps'@((iN,_):rest) (i,hwty) = do
       i' <- mkUniqueIdentifier Basic i
-      let iDecl = NetDecl Nothing False i' hwty
+      let iDecl = NetDecl Nothing i' hwty
       case hwty of
         Vector sz hwty' -> do
           arguments <- mapM (appendIdentifier (i',hwty')) [0..sz-1]
@@ -1169,7 +1073,7 @@ mkTopInput topM inps pM = case pM of
     go' (PortName _) ((iN,iTy):inps') (_,hwty) = do
       iN' <- mkUniqueIdentifier Extended iN
       return (inps',([(iN,iN',hwty)]
-                    ,[NetDecl' Nothing False Wire iN' (Left iTy)]
+                    ,[NetDecl' Nothing Wire iN' (Left iTy)]
                     ,Right (iN',hwty)))
 
     go' (PortName _) [] _ = error "This shouldnt happen"
@@ -1177,7 +1081,7 @@ mkTopInput topM inps pM = case pM of
     go' (PortProduct p ps) inps' (i,hwty) = do
       let pN = portName p i
       pN' <- mkUniqueIdentifier Extended pN
-      let pDecl = NetDecl Nothing False pN' hwty
+      let pDecl = NetDecl Nothing pN' hwty
       case hwty of
         Vector sz hwty' -> do
           arguments <- mapM (appendIdentifier (pN',hwty')) [0..sz-1]
@@ -1227,7 +1131,7 @@ mkTopInput topM inps pM = case pM of
         _ -> return (tail inps',([(pN,pN',hwty)],[pDecl],Left pN'))
 
 -- | Generate output port mappings for the TopEntity. Yields /Nothing/ if
--- the sole output of the function is a BiSignalOut.
+-- the output is Void
 mkTopOutput
   :: Maybe Identifier
   -- ^ (maybe) Name of the _TopEntity_
@@ -1243,7 +1147,8 @@ mkTopOutput
                             )
                           )
                   )
-mkTopOutput _topM _outps _pM (_id, BiDirectional _) = return Nothing
+mkTopOutput _topM _outps _pM (_id, BiDirectional Out _) = return Nothing
+mkTopOutput _topM _outps _pM (_id, Void _) = return Nothing
 mkTopOutput topM outps pM (o, hwty) =
     Just <$> mkTopOutput' topM outps pM (o, hwty)
 
@@ -1256,11 +1161,10 @@ mkTopOutput'
   -> Maybe PortName
   -- ^ (maybe) The @PortName@ of a _TopEntity_ annotation for this output
   -> (Identifier,HWType)
-  -> NetlistMonad ( [(Identifier, Identifier)]
-                  , ( [(Identifier, Identifier, HWType)]
-                    , [Declaration]
-                    , Either Identifier (Identifier,HWType)
-                    )
+  -> NetlistMonad ([(Identifier,Identifier)]
+                  ,([(Identifier,Identifier,HWType)]
+                   ,[Declaration]
+                   ,Either Identifier (Identifier,HWType))
                   )
 mkTopOutput' topM outps pM = case pM of
   Nothing -> go outps
@@ -1269,7 +1173,7 @@ mkTopOutput' topM outps pM = case pM of
     -- No @PortName@
     go outps'@((oN,_):rest) (o,hwty) = do
       o' <- mkUniqueIdentifier Extended o
-      let oDecl = NetDecl Nothing False o' hwty
+      let oDecl = NetDecl Nothing o' hwty
       case hwty of
         Vector sz hwty' -> do
           results <- mapM (appendIdentifier (o',hwty')) [0..sz-1]
@@ -1303,7 +1207,7 @@ mkTopOutput' topM outps pM = case pM of
     go' (PortName _) ((oN,oTy):outps') (_,hwty) = do
       oN' <- mkUniqueIdentifier Extended oN
       return (outps',([(oN,oN',hwty)]
-                     ,[NetDecl' Nothing False Wire oN' (Left oTy)]
+                     ,[NetDecl' Nothing Wire oN' (Left oTy)]
                      ,Right (oN',hwty)))
 
     go' (PortName _) [] _ = error "This shouldnt happen"
@@ -1311,7 +1215,7 @@ mkTopOutput' topM outps pM = case pM of
     go' (PortProduct p ps) outps' (o,hwty) = do
       let pN = portName p o
       pN' <- mkUniqueIdentifier Extended pN
-      let pDecl = NetDecl Nothing False pN' hwty
+      let pDecl = NetDecl Nothing pN' hwty
       case hwty of
         Vector sz hwty' -> do
           results <- mapM (appendIdentifier (pN',hwty')) [0..sz-1]

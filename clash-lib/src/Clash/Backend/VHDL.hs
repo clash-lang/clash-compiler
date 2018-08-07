@@ -281,7 +281,7 @@ normaliseType (Clock _ _ Gated) =
   return (Product "GatedClock" [Bit,Bool])
 normaliseType (Clock {}) = return Bit
 normaliseType (Reset {}) = return Bit
-normaliseType (BiDirectional ty) = normaliseType ty
+normaliseType (BiDirectional _ ty) = normaliseType ty
 normaliseType ty = return ty
 
 mkVecZ :: HWType -> HWType
@@ -557,17 +557,16 @@ tyImports nm = do
 
 -- TODO: Way too much happening on a single line
 port :: Num t
-     => Bool
-     -> T.Text
+     => T.Text
      -> HWType
      -> VHDLM Doc
      -> Int
      -> VHDLM (Doc, t)
-port isBidirectional elName hwType portDirection fillToN =
+port elName hwType portDirection fillToN =
   (,fromIntegral $ T.length elName) <$> (encodingNote hwType <> fill fillToN (pretty elName) <+> colon <+> direction <+> vhdlType hwType)
  where
-  direction | isBidirectional = "inout"
-            | otherwise       = portDirection
+  direction | isBiSignalIn hwType = "inout"
+            | otherwise           = portDirection
 
 entity :: Component -> VHDLM Doc
 entity c = do
@@ -581,8 +580,8 @@ entity c = do
       ) <> line <>
       "end" <> semi
   where
-    ports l = sequence $ [port isBidirectional iName hwType "in" l | (isBidirectional, iName, hwType) <- inputs c]
-                      ++ [port False oName hwType "out" l | (_, (oName, hwType)) <- outputs c]
+    ports l = sequence $ [port iName hwType "in" l | (iName, hwType) <- inputs c]
+                      ++ [port oName hwType "out" l | (_, (oName, hwType)) <- outputs c]
 
 architecture :: Component -> VHDLM Doc
 architecture c =
@@ -735,7 +734,7 @@ decls ds = do
       _  -> punctuate' semi (pure dsDoc)
 
 decl :: Int ->  Declaration -> VHDLM (Maybe (Doc,Int))
-decl l (NetDecl' noteM _ _ id_ ty) = Just <$> (,fromIntegral (T.length id_)) <$>
+decl l (NetDecl' noteM _ id_ ty) = Just <$> (,fromIntegral (T.length id_)) <$>
   maybe id addNote noteM ("signal" <+> fill l (pretty id_) <+> colon <+> either pretty vhdlType ty)
   where
     addNote n = mappend ("--" <+> pretty n <> line)
@@ -1029,13 +1028,6 @@ expr_ _ (ConvBV topM _ False e) = do
   nm <- Mon $ use modNm
   maybe (pretty (T.pack nm) <> "_types" ) (\t -> pretty t <> dot <> pretty t <> "_types") topM <> dot <>
     "fromSLV" <> parens (expr_ False e)
-
-expr_ _ (DataCon (Vector _ (BiDirectional _)) (DC (Void Nothing,-1)) []) =
-    string $ T.pack $ unwords [ "This is a hack to support bidirectional signals."
-                            , "If you ever read this message in a target HDL,"
-                            , "please submit a bug report along with the code"
-                            , "causing this defect."
-                            ]
 
 expr_ _ e = error $ $(curLoc) ++ (show e) -- empty
 

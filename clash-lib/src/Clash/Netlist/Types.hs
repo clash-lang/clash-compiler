@@ -7,7 +7,9 @@
   Type and instance definitions for Netlist modules
 -}
 
+{-# LANGUAGE DeriveAnyClass             #-}
 {-# LANGUAGE DeriveGeneric              #-}
+{-# LANGUAGE DerivingStrategies         #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE PatternSynonyms            #-}
 {-# LANGUAGE TemplateHaskell            #-}
@@ -45,7 +47,7 @@ import Clash.Util
 -- of components that are being generated (WriterT)
 newtype NetlistMonad a =
   NetlistMonad { runNetlist :: StateT NetlistState (FreshMT IO) a }
-  deriving (Functor, Monad, Applicative, MonadState NetlistState, Fresh, MonadIO)
+  deriving newtype (Functor, Monad, Applicative, MonadState NetlistState, Fresh, MonadIO)
 
 -- | State of the NetlistMonad
 data NetlistState
@@ -76,14 +78,11 @@ data NetlistState
 -- | Signal reference
 type Identifier = Text
 
--- | Whether this port is an inout port
-type IsBidirectional = Bool
-
 -- | Component: base unit of a Netlist
 data Component
   = Component
   { componentName :: !Identifier -- ^ Name of the component
-  , inputs        :: [(IsBidirectional,Identifier,HWType)] -- ^ Input ports
+  , inputs        :: [(Identifier,HWType)] -- ^ Input ports
   , outputs       :: [(WireOrReg,(Identifier,HWType))] -- ^ Output ports
   , declarations  :: [Declaration] -- ^ Internal declarations
   }
@@ -131,7 +130,7 @@ data HWType
   -- ^ Clock type with specified name and period
   | Reset         !Identifier !Integer !ResetKind
   -- ^ Reset type corresponding to clock with a specified name and period
-  | BiDirectional !HWType
+  | BiDirectional !PortDirection !HWType
   -- ^ Tagging type indicating a bidirectional (inout) port
   deriving (Eq,Ord,Show,Generic)
 
@@ -165,7 +164,7 @@ data Declaration
   -- ^ Instantiation of another component
   | BlackBoxD !S.Text [BlackBoxTemplate] [BlackBoxTemplate] [((S.Text,S.Text),BlackBoxTemplate)] !BlackBoxTemplate BlackBoxContext
   -- ^ Instantiation of blackbox declaration
-  | NetDecl' (Maybe Identifier) IsBidirectional WireOrReg !Identifier (Either Identifier HWType)
+  | NetDecl' (Maybe Identifier) WireOrReg !Identifier (Either Identifier HWType)
   -- ^ Signal declaration
   deriving Show
 
@@ -174,13 +173,13 @@ data WireOrReg = Wire | Reg
 
 instance NFData WireOrReg
 
-pattern NetDecl :: Maybe Identifier -> IsBidirectional -> Identifier -> HWType -> Declaration
-pattern NetDecl note isBidirectional d ty <- NetDecl' note isBidirectional Wire d (Right ty)
+pattern NetDecl :: Maybe Identifier -> Identifier -> HWType -> Declaration
+pattern NetDecl note d ty <- NetDecl' note Wire d (Right ty)
   where
-    NetDecl note isBidirectional d ty = NetDecl' note isBidirectional Wire d (Right ty)
+    NetDecl note d ty = NetDecl' note Wire d (Right ty)
 
 data PortDirection = In | Out
-  deriving Show
+  deriving (Eq,Ord,Show,Generic,NFData,Hashable)
 
 instance NFData Declaration where
   rnf a = a `seq` ()

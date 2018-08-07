@@ -28,7 +28,7 @@ import Clash.Core.Type
   (LitTy (..), Type (..), TypeView (..), coreView, tyView)
 import Clash.Core.Util                  (tyNatSize)
 import Clash.Netlist.Util               (coreTypeToHWType)
-import Clash.Netlist.Types              (HWType(..))
+import Clash.Netlist.Types              (HWType(..), PortDirection (..))
 import Clash.Signal.Internal            (ClockKind (..), ResetKind (..))
 import Clash.Util                       (curLoc)
 
@@ -101,11 +101,11 @@ ghcTypeToHWType iw floatSupport = go
 
         "Clash.Signal.BiSignal.BiSignalIn" -> do
           let [_, _, szTy] = args
-          (BitVector . fromInteger) <$> mapExceptT (Just .coerce) (tyNatSize m szTy)
+          (BiDirectional In . BitVector . fromInteger) <$> mapExceptT (Just .coerce) (tyNatSize m szTy)
 
         "Clash.Signal.BiSignal.BiSignalOut" -> do
           let [_, _, szTy] = args
-          (BiDirectional . BitVector . fromInteger) <$>
+          (Void . Just . BiDirectional Out . BitVector . fromInteger) <$>
             mapExceptT (Just .coerce) (tyNatSize m szTy)
 
         "Clash.Signal.Internal.Clock"

@@ -213,7 +213,7 @@ mkPrimitive bbEParen bbEasD dst nm args ty = do
                 _ -> do
                   scrutHTy <- unsafeCoreTypeToHWTypeM $(curLoc) scrutTy
                   tmpRhs <- mkUniqueIdentifier Extended (pack "#tte_rhs")
-                  let netDeclRhs   = NetDecl Nothing False tmpRhs scrutHTy
+                  let netDeclRhs   = NetDecl Nothing tmpRhs scrutHTy
                       netAssignRhs = Assignment tmpRhs scrutExpr
                   return (DataTag hwTy (Left tmpRhs),[netDeclRhs,netAssignRhs] ++ scrutDecls)
             _ -> error $ $(curLoc) ++ "tagToEnum: " ++ show (map (either showDoc showDoc) args)
@@ -230,7 +230,7 @@ mkPrimitive bbEParen bbEasD dst nm args ty = do
               Identifier id_ Nothing -> return (DataTag scrutHTy (Right id_),scrutDecls)
               _ -> do
                 tmpRhs  <- mkUniqueIdentifier Extended "#dtt_rhs"
-                let netDeclRhs   = NetDecl Nothing False tmpRhs scrutHTy
+                let netDeclRhs   = NetDecl Nothing tmpRhs scrutHTy
                     netAssignRhs = Assignment tmpRhs scrutExpr
                 return (DataTag scrutHTy (Right tmpRhs),[netDeclRhs,netAssignRhs] ++ scrutDecls)
           _ -> error $ $(curLoc) ++ "dataToTag: " ++ show (map (either showDoc showDoc) args)
@@ -257,7 +257,7 @@ mkPrimitive bbEParen bbEasD dst nm args ty = do
           let nm3 = (string2SystemName (Text.unpack nm'')) { nameSort = Internal }
           hwTy <- N.unsafeCoreTypeToHWTypeM $(curLoc) ty
           let id_ = Id nm3 (embed ty)
-              idDecl = NetDecl' Nothing False wr nm'' (Right hwTy)
+              idDecl = NetDecl' Nothing wr nm'' (Right hwTy)
           case hwTy of
             Void {} -> return Nothing
             _       -> return (Just (id_,nm'',[idDecl]))
@@ -330,7 +330,7 @@ mkFunInput resId e = do
               case HashMap.lookup fun normalized of
                 Just _ -> do
                   (_,Component compName compInps [snd -> compOutp] _) <- preserveVarEnv $ genComponent fun
-                  let inpAssigns    = zipWith (\(_,i,t) e' -> (Identifier i Nothing,In,t,e')) compInps [ Identifier (pack ("~ARG[" ++ show x ++ "]")) Nothing | x <- [(0::Int)..] ]
+                  let inpAssigns    = zipWith (\(i,t) e' -> (Identifier i Nothing,In,t,e')) compInps [ Identifier (pack ("~ARG[" ++ show x ++ "]")) Nothing | x <- [(0::Int)..] ]
                       outpAssign    = (Identifier (fst compOutp) Nothing,Out,snd compOutp,Identifier (pack "~RESULT") Nothing)
                   i <- varCount <<%= (+1)
                   let instLabel     = Text.concat [compName,pack ("_" ++ show i)]
@@ -401,7 +401,7 @@ mkFunInput resId e = do
           let binders' = map (\(id_,tm) -> (goR result id_,tm)) binders
           netDecls <- fmap catMaybes . mapM mkNetDecl $ filter ((/= result) . varName . fst) binders
           decls    <- concat <$> mapM (uncurry mkDeclarations . second unembed) binders'
-          Just (NetDecl' _ _ rw _ _) <- mkNetDecl . head $ filter ((==result) . varName . fst) binders
+          Just (NetDecl' _ rw _ _) <- mkNetDecl . head $ filter ((==result) . varName . fst) binders
           nm <- mkUniqueIdentifier Basic "fun"
           return (Right ((nm,netDecls ++ decls),rw))
         Nothing -> return (Right (("",[]),Wire))

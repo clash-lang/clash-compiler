@@ -18,7 +18,7 @@ module Clash.Driver where
 import qualified Control.Concurrent.Supply        as Supply
 import           Control.DeepSeq
 import           Control.Exception                (tryJust, bracket)
-import           Control.Lens                     ((^.), _2, _3, _5)
+import           Control.Lens                     ((^.), _5)
 import           Control.Monad                    (guard, when, unless)
 import           Control.Monad.State              (evalState, get)
 import           Data.Hashable                    (hash)
@@ -296,8 +296,8 @@ createHDL backend modName components top (topName,manifestE) = flip evalState ba
       topFiles = hdl ++ qincs
   manifest <- either return (\m -> do
       let topName' = Text.pack topName
-      let topInNames = map (^. _2) (inputs top)
-      topInTypes  <- mapM (fmap renderOneLine . hdlType (External topName') . (^. _3)) (inputs top)
+      let topInNames = map fst (inputs top)
+      topInTypes  <- mapM (fmap renderOneLine . hdlType (External topName') . snd) (inputs top)
       let topOutNames = map (fst . snd) (outputs top)
       topOutTypes <- mapM (fmap renderOneLine . hdlType (External topName') . snd . snd) (outputs top)
       let compNames = map (componentName.snd) components
