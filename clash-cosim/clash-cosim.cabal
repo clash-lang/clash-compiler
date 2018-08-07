@@ -11,7 +11,7 @@ Synopsis:       Co-simulation in Clash
 Description:    clash-cosim implements Verilog cosimulation in Haskell and
                 integrates with Clash natively. Cosimulation allows a user to
                 write inline Verilog code and still produce an executable. For
-                user documentation, see: <https://github.com/QBayLogic/clash-cosim-qbl>.
+                user documentation, see: <https://github.com/clash-lang/clash-cosim>.
 Build-Type:     Custom
 tested-with:    GHC == 8.2.2, GHC == 8.4.3, GHC == 8.6.1
 
