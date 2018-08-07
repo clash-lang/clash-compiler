@@ -22,13 +22,13 @@ import qualified Data.Text.IO as Text
 
 import Distribution.Simple ( Args
                            , postClean
-                           , postBuild
+                           , postConf
                            , simpleUserHooks
                            , defaultMainWithHooks
                            , UserHooks
                            )
 
-import Distribution.Simple.Setup          (BuildFlags)
+import Distribution.Simple.Setup          (ConfigFlags)
 import Distribution.Simple.Setup          (CleanFlags)
 import Distribution.PackageDescription    (PackageDescription, ccOptions)
 import Distribution.PackageDescription    (HookedBuildInfo, setupBuildInfo)
@@ -53,7 +53,7 @@ __COSIM_PRIMITIVE_PATH__ = "src/prims/verilog/Clash_CoSim_CoSimInstances.json"
 main = do
     setEnv "COSIM_MAX_NUMBER_OF_ARGUMENTS" $ show __COSIM_MAX_NUMBER_OF_ARGUMENTS__
     setEnv "COSIM_MAX_NUMBER_OF_CLOCKS" $ show __COSIM_MAX_NUMBER_OF_CLOCKS__
-    defaultMainWithHooks simpleUserHooks { postBuild = cosimBuild
+    defaultMainWithHooks simpleUserHooks { postConf  = cosimBuild
                                          , postClean = cosimClean
                                          }
 
@@ -74,12 +74,12 @@ trySome = try
 -- | Runs Makefile
 cosimBuild
     :: Args
-    -> BuildFlags
+    -> ConfigFlags
     -> PackageDescription
     -> LocalBuildInfo
     -> IO ()
 cosimBuild args flags pkgDescription localBuildInfo = do
-    postBuild simpleUserHooks args flags pkgDescription localBuildInfo
+    postConf simpleUserHooks args flags pkgDescription localBuildInfo
 
     -- Check if correct vvp version is installed
     vvpHelp <- tryIO $ readProcessWithExitCode "vvp" ["-h"] []
