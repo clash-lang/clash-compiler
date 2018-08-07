@@ -52,6 +52,9 @@ never create a clock that goes any faster!
 module Clash.Signal
   ( -- * Synchronous signals
     Signal
+  , BiSignalIn
+  , BiSignalOut
+  , BiSignalDefault(..)
   , Domain (..)
   , System
     -- * Clock
@@ -125,6 +128,11 @@ module Clash.Signal
   , (.==.), (./=.)
     -- ** 'Ord'-like
   , (.<.), (.<=.), (.>=.), (.>.)
+    -- * Bisignal functions
+  , veryUnsafeToBiSignalIn
+  , readFromBiSignal
+  , writeToBiSignal
+  , mergeBiSignalOuts
   )
 where
 
@@ -144,6 +152,7 @@ import           Clash.Hidden
 import           Clash.Promoted.Nat    (SNat (..))
 import           Clash.Promoted.Symbol (SSymbol (..))
 import           Clash.Signal.Bundle   (Bundle (..))
+import           Clash.Signal.BiSignal --(BisignalIn, BisignalOut, )
 import           Clash.Signal.Internal hiding
   (sample, sample_lazy, sampleN, sampleN_lazy, simulate, simulate_lazy, testFor)
 import qualified Clash.Signal.Internal as S

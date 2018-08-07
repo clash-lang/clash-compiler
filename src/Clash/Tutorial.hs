@@ -1277,6 +1277,9 @@ a general listing of the available template holes:
 * @~NAME[N]@: Render the @(N+1)@'th string literal argument as an identifier
   instead of a string literal. Fails when the @(N+1)@'th argument is not a
   string literal.
+* @~DEVNULL[\<HOLE\>]@: Render all dependencies of @\<HOLE\>@, but disregard direct output
+* @~REPEAT[\<HOLE\>][N]@: Repeat literal value of @\<HOLE\>@ a total of @N@ times.
+
 
 
 Some final remarks to end this section: VHDL primitives are there to instruct the

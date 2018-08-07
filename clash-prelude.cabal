@@ -136,6 +136,7 @@ Library
 
                       Clash.Signal
                       Clash.Signal.Bundle
+                      Clash.Signal.BiSignal
                       Clash.Signal.Delayed
                       Clash.Signal.Internal
 
