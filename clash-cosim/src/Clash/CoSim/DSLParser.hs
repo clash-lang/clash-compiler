@@ -1,6 +1,7 @@
 module Clash.CoSim.DSLParser
   ( toVerilog
   , vars
+  , clks
   , parse
   ) where
 
@@ -32,6 +33,10 @@ data CoSimDSLToken = HDL String
                    -- ^ Named argument
                    | VarNum Int
                    -- ^ Anonymous argument
+                   | ClkName String
+                   -- ^ Named clock argument
+                   | ClkNum Int
+                   -- ^ Anonymous clock argument
                       deriving (Show)
 
 
@@ -42,7 +47,7 @@ type CoSimDSL = [CoSimDSLToken]
 --------------------------------------
 -- | Parse any text up until a possible variable
 hdlParser :: Parsec String st String
-hdlParser = many1 (noneOf "$")
+hdlParser = many1 (noneOf "$#")
 
 -- | Parse Haskell id: [_a-z][A-Za-z0-9_]*
 varNameParser :: Parsec String st String
@@ -51,6 +56,11 @@ varNameParser = (:) <$> (lower <|> char '_') <*> many (alphaNum <|> char '_')
 -- | Parse anonymous argument id: [0-9]+
 varNumParser :: Parsec String st Int
 varNumParser = read <$> many1 digit
+
+clkParser = try (string "#{") *> numOrName <*  (string "}")
+    where
+        numOrName = (ClkName <$> varNameParser)
+                <|> (ClkNum <$> varNumParser)
 
 -- | Parse construction "${<id>}" or "${<num>}"
 varParser :: Parsec String st CoSimDSLToken
@@ -63,7 +73,9 @@ varParser = try (string "${") *> numOrName <*  (string "}")
 sourceParser :: Parsec String st CoSimDSL
 sourceParser = many (
         varParser
+    <|> clkParser
     <|> try (HDL <$> string "$")
+    <|> try (HDL <$> string "#")
     <|> HDL <$> hdlParser
     )
 
@@ -130,6 +142,14 @@ varNames []                   = []
 varNames (VarName s : tokens) = nub $ s : varNames tokens
 varNames (_ : tokens)         = nub $ varNames tokens
 
+clkNames
+  :: CoSimDSL
+  -> [String]
+clkNames = nub . foldr go []
+ where
+  go (ClkName s) ts = s : ts
+  go _           ts = ts
+
 -- | Number of anonymous arguments used in this DSL. It will pick out the highest
 -- arugment number, even if not all arguments are used. For example, if ${0} and
 -- ${5} had been specified but not all number in between, this function would
@@ -138,6 +158,12 @@ nVarNums :: CoSimDSL -> Int
 nVarNums []                  = 0
 nVarNums (VarNum n : tokens) = max (succ n) (nVarNums tokens)
 nVarNums (_ : tokens)        = nVarNums tokens
+
+nClkNums :: CoSimDSL -> Int
+nClkNums = foldr go 0
+ where
+  go (ClkNum n) tokens = max (succ n) tokens
+  go _          tokens = tokens
 
 -- | Generate a list of named arguments and anonymous arguments mentioned in a
 -- parsed HDL template.
@@ -151,6 +177,15 @@ vars
 vars tokens =
     let varNames' = varNames tokens in
     (varNames', anonymousNames (nVarNums tokens) varNames')
+
+clks
+  :: CoSimDSL
+  -> ( [String] -- Names clocks
+     , [String] -- Anonymous clocks
+     )
+clks tokens = (clkNames', anonymousNames (nClkNums tokens) clkNames')
+ where
+  clkNames' = clkNames tokens
 
 -- Generate a unique name for each anonymous argument. Names will be
 -- generated according to this scheme: aa0, aa1, ... In case of conflicts
@@ -172,11 +207,14 @@ tokensToString :: CoSimDSL -> String
 tokensToString tokens = concatMap tokenToString tokens
     where
         (_varNames', anonymousNames') = vars tokens
+        (_clkNames', anonymousClkNames') = clks tokens
 
         tokenToString :: CoSimDSLToken -> String
         tokenToString (HDL s)     = s
         tokenToString (VarName s) = s
         tokenToString (VarNum n)  = anonymousNames' !! n
+        tokenToString (ClkName s) = s
+        tokenToString (ClkNum n)  = anonymousClkNames' !! n
 
 -- | Reassemble parsed HDL template into HDL module. Add a header including
 -- the detected variables in the HDL template. The module header will always
@@ -191,7 +229,7 @@ toVerilog
 toVerilog dsl moduleName =
     concat [ printf
                  "module %s (%sresult);"
-                 moduleName (concatMap (++", ") $ uncurry (++) (vars dsl))
+                 moduleName (concatMap (++", ") $ uncurry (++) (clks dsl) ++ uncurry (++) (vars dsl))
            , "\n"
            , tokensToString dsl
            , "\n"

@@ -1,3 +1,4 @@
+{-# LANGUAGE DataKinds #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE QuasiQuotes #-}
 {-# LANGUAGE RecordWildCards #-}
@@ -35,6 +36,7 @@ import qualified Data.Text as T
 
 -- Clash
 import qualified Clash.Prelude as CP
+import qualified Clash.Signal.Internal as CS
 
 -- FFI
 import Foreign
@@ -347,21 +349,36 @@ wordUnpack' x y = (shiftL x 32) .|. (4294967295 .&. (fromIntegral y))
 
 parseInput
     :: CoSimType t
-    => [SignalStream]
+    => Bool
+    -> [SignalStream]
     -> t
     -> [SignalStream]
-parseInput streams x = toSignalStream x : streams
+parseInput doDup streams x = dup (toSignalStream x) : streams
+  where
+    dup | doDup     = go
+        | otherwise = id
+    go (x:xs) = (x:x:go xs)
+
+parseClock
+  :: [SignalStream]
+  -> CS.Clock dom gated
+  -> [SignalStream]
+parseClock streams clk = (cycle [[0],[1]]) : streams
 
 parseOutput
     :: CoSimType t
-    => ([SignalStream] -> SignalStream)
+    => Bool
+    -> ([SignalStream] -> SignalStream)
     -> [SignalStream]
     -> t
-parseOutput f streams = res
+parseOutput doUndup f streams = res
         where
-            qs  = f (reverse streams)
+            qs  = undup (f (reverse streams))
             res = fromSignalStream $ qs
-
+            undup
+              | doUndup   = go
+              | otherwise = id
+            go (x:_:xs) = x:go xs
 
 
 --------------------------------------
@@ -378,20 +395,24 @@ coSimN
     -- ^ Simulation settings
     -> r
 coSimN source' modName' settings =
-    coSim (source', modName', settings) []
+    coSim False (source', modName', settings) []
 {-# INLINE coSimN #-}
 
 class CoSim r where
     coSim
-      :: CoSimRun
+      :: Bool
+      -> CoSimRun
       -> [SignalStream]
       -> r
 
 instance {-# OVERLAPPABLE #-} CoSimType r => CoSim r where
-    coSim s = parseOutput (coSimStart s)
+    coSim b s = parseOutput b (coSimStart s)
+
+instance {-# OVERLAPPING #-} (CoSim r) => CoSim (CS.Clock dom 'CS.Source -> r) where
+    coSim _ s streams = coSim True s . parseClock streams
 
 instance {-# OVERLAPPING #-} (CoSimType t, CoSim r) => CoSim (t -> r) where
-    coSim s streams = coSim s . parseInput streams
+    coSim b s streams = coSim b s . parseInput b streams
 
 class CoSimType t where
     -- | Return the number of bits in the type of the argument. The actual value of

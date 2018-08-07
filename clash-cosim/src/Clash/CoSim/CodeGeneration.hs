@@ -16,11 +16,15 @@ module Clash.CoSim.CodeGeneration
     , applyE
     ) where
 
+#ifdef CABAL
 import Paths_clash_cosim
+#else
+import Clash.CoSim.Paths_clash_cosim
+#endif
 
 import Clash.Annotations.Primitive (Primitive(..), HDL(..))
 import Clash.CoSim.Types
-import Clash.Prelude (Signal)
+import Clash.Prelude (Clock, ClockKind (..), Signal)
 import System.Environment (getEnv)
 import Language.Haskell.TH
 import Control.Monad (replicateM)
@@ -55,20 +59,22 @@ coSimGen = do
 #ifdef CABAL
     -- We're running in a CABAL environment, so we know this environment
     -- variable is set:
+    m <- read <$> runIO (getEnv "COSIM_MAX_NUMBER_OF_CLOCKS")
     n <- read <$> runIO (getEnv "COSIM_MAX_NUMBER_OF_ARGUMENTS")
 #else
+    let m = 1
     let n = 16
 #endif
 
 
-    concat <$> (sequence $ map coSimGen' [1..n])
+    concat <$> (sequence  [coSimGen' clks args | clks <- [0..m], args <-  [1..n]])
 
-coSimGen' :: Int -> Q [Dec]
-coSimGen' n = do
-    let coSimName = mkName $ "coSim" ++ (show n)
+coSimGen' :: Int -> Int -> Q [Dec]
+coSimGen' clks args = do
+    let coSimName = mkName $ "coSimC" ++ show clks ++ "_A" ++ show args
 
     -- Type signature
-    coSimType <- SigD coSimName <$> coSimTypeGen n
+    coSimType <- SigD coSimName <$> coSimTypeGen clks args
 
     -- Function declaration and body
     let coSim = FunD coSimName [Clause [] (NormalB $ VarE $ mkName "coSimN") []]
@@ -84,22 +90,26 @@ coSimGen' n = do
     return [coSimType, coSim, inline, blackboxAnn]
 
 
+
+
 -- | Generate type signature of coSim function
 coSimTypeGen
     :: Int
+    -- ^ The number of clock arguments
+    -> Int
     -- ^ Type signature for coSimN
     -> Q Type
-coSimTypeGen n = do
+coSimTypeGen clks args = do
     -- Generate "random" names for type variables
     let ids = concat $ drop 1 $ (`replicateM` ['a'..'z']) <$> [0..]
-    let argNames     = map mkName (take n ids)
+    let argNames     = map mkName (take args ids)
     let argTypeNames = map (return . VarT) argNames
 
     let resultName = mkName "result"
     let result     = return $ VarT resultName
 
-    let clkName = mkName "clk"
-    let clk     = return $ VarT clkName
+    let domName = mkName "dom"
+    let dom     = return $ VarT domName
 
     -- Generate contraints:
     argConstraints <- sequence $ map (\name -> [t| ClashType $name |]) argTypeNames
@@ -108,11 +118,12 @@ coSimTypeGen n = do
 
     -- Generate type:
     fixedArgs      <- sequence [[t| String |], [t| String |], [t| CoSimSettings |]]
-    argSignalTypes <- sequence $ map (\name -> [t| Signal $clk $name |]) argTypeNames
-    resSignalType  <- [t| Signal $clk $result |]
+    clkSignalTypes <- sequence (replicate clks [t|Clock $dom 'Source|])
+    argSignalTypes <- sequence $ map (\name -> [t| Signal $dom $name |]) argTypeNames
+    resSignalType  <- [t| Signal $dom $result |]
 
-    let ctx = (fixedArgs ++ argSignalTypes) `arrowsR` resSignalType
-    let varNames = resultName : clkName : argNames
+    let ctx = (fixedArgs ++ clkSignalTypes ++ argSignalTypes) `arrowsR` resSignalType
+    let varNames = resultName : domName : argNames
     return $ ForallT (map PlainTV varNames) constraints ctx
 
 

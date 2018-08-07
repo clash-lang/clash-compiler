@@ -59,24 +59,29 @@ compileVerilog explicitSettings source = do
   -- where a1, a2, .. are explicitely named arguments and aa1, aa2, .. are
   -- anonymous arugments (thus allowing dot-free notation).
   settingsArg   <- newName "settings"
+  namedClocks   <- mapM newName clkNames
+  anonymousClocks <- mapM newName anonymousClkNames
   namedArgs     <- sequence $ map newName varNames
   anonymousArgs <- sequence $ map newName anonymousNames
 
-  let wrapperArgs = concat [ map varP namedArgs
+  let wrapperArgs = concat [ map varP namedClocks
+                           , map varP namedArgs
                            , [varP settingsArg]
+                           , map varP anonymousClocks
                            , map varP anonymousArgs ]
 
   -- TODO: Find a better way to do this..
-  let coSimFunc = qCoSim $ length $ namedArgs ++ anonymousArgs
+  let coSimFunc = qCoSim (length $ namedClocks ++ anonymousClocks)
+                         (length $ namedArgs ++ anonymousArgs)
 
   -- Fully apply actual coSim call to verilog source, verilog module name,
   -- settings argument from wrapper and argument variables from wrapper
   let coSimFunc'  = [| $coSimFunc verilogSource verilogModName $(varE settingsArg) |]
-  let coSimFunc'' = applyE coSimFunc' (namedArgs ++ anonymousArgs)
+  let coSimFunc'' = applyE coSimFunc' (namedClocks ++ anonymousClocks ++ namedArgs ++ anonymousArgs)
 
   -- Create wrapper which calls actual coSim function
   let coSimWrapper   = lamE wrapperArgs coSimFunc''
-  let appliedWrapper = applyE coSimWrapper (map mkName varNames)
+  let appliedWrapper = applyE coSimWrapper (map mkName (clkNames ++ varNames))
 
   -- Add default settings to wrapper call if user does not supply their
   -- own settings record
@@ -102,6 +107,7 @@ compileVerilog explicitSettings source = do
 
         -- Get variables from DSL, create names we can use in quasiquoters
         (varNames, anonymousNames) = DSL.vars dsl
+        (clkNames, anonymousClkNames) = DSL.clks dsl
 
         -- XXXXX
         verilogModName = fromMaybe randName name

@@ -1,3 +1,4 @@
+{-# LANGUAGE DataKinds #-}
 {-# LANGUAGE QuasiQuotes #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE ViewPatterns #-}
@@ -27,8 +28,8 @@ import Language.Haskell.TH.Syntax ( Exp(VarE), Name(..), OccName(..) )
 $(coSimGen)
 
 -- |
-qCoSim :: Int -> Q Exp
-qCoSim n = do
+qCoSim :: Int -> Int -> Q Exp
+qCoSim clks args = do
     coSim1Ref <- [| qCoSim |]
 
     return $
@@ -36,7 +37,7 @@ qCoSim n = do
             -- Get 'magic' values from statically deduced referal to qCoSim. Then,
             -- replace the name of the function, with one of our generated ones.
             VarE (Name (OccName _) nf) ->
-                VarE (Name (OccName $ "coSim" ++ show n) nf)
+                VarE (Name (OccName $ "coSimC" ++ show clks ++ "_A" ++ show args) nf)
             (Text.pack . show -> e) -> error $ Text.unpack [text|
               An error occured in Clash.CoSim.CoSimInstances.qCoSim. This is an
               error in the cosim pacakge itself. We expected a datastructure:

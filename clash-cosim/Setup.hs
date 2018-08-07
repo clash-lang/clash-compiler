@@ -47,10 +47,12 @@ import qualified Data.Text.Lazy.Encoding as TL
 
 
 __COSIM_MAX_NUMBER_OF_ARGUMENTS__ = 16
+__COSIM_MAX_NUMBER_OF_CLOCKS__ = 1
 __COSIM_PRIMITIVE_PATH__ = "src/prims/verilog/Clash_CoSim_CoSimInstances.json"
 
 main = do
     setEnv "COSIM_MAX_NUMBER_OF_ARGUMENTS" $ show __COSIM_MAX_NUMBER_OF_ARGUMENTS__
+    setEnv "COSIM_MAX_NUMBER_OF_CLOCKS" $ show __COSIM_MAX_NUMBER_OF_CLOCKS__
     defaultMainWithHooks simpleUserHooks { postBuild = cosimBuild
                                          , postClean = cosimClean
                                          }
@@ -155,7 +157,7 @@ cosimBuild args flags pkgDescription localBuildInfo = do
 
     writeFile
         __COSIM_PRIMITIVE_PATH__
-        (blackboxJsonString __COSIM_MAX_NUMBER_OF_ARGUMENTS__)
+        (blackboxJsonString __COSIM_MAX_NUMBER_OF_CLOCKS__ __COSIM_MAX_NUMBER_OF_ARGUMENTS__)
 
 -- | Cleans binaries made by cosimPostBuild
 cosimClean
@@ -199,14 +201,16 @@ blackboxObject bbname type_ templateD =
 -- | Create blackbox for a given number of arguments
 blackboxJson'
     :: Int
+    -- ^ Number of clocks of coSimN
+    -> Int
     -- ^ Number of arguments of coSimN
     -> Value
     -- ^ Blackbox object
-blackboxJson' n = blackboxObject bbname "" templateD
+blackboxJson' clks args = blackboxObject bbname "" templateD
     where
       -- Offset where 'real' arguments start, instead of constraints
       argsOffset = 1 -- result constraint
-                 + n -- argument constraints
+                 + args -- argument constraints
 
       -- Offset where signal arguments start
       signalOffset = argsOffset -- constraints
@@ -215,26 +219,30 @@ blackboxJson' n = blackboxObject bbname "" templateD
       sourceOffset = argsOffset
       moduleOffset = argsOffset + 1
 
-      bbname    = "Clash.CoSim.CoSimInstances.coSim" ++ show n
-      args      = concat [printf "~ARG[%d], " i | i <- [signalOffset..signalOffset+n-1]] :: String
+      bbname    = "Clash.CoSim.CoSimInstances.coSimC" ++ show clks ++ "_A" ++ show args
+      arguments = concat [printf "~ARG[%d], " i | i <- [signalOffset..signalOffset+(clks+args)-1]] :: String
       template  = printf "~TEMPLATE[~LIT[%d].v][~LIT[%d]]" moduleOffset sourceOffset
       compname  = printf "~NAME[%d]" moduleOffset
-      instanc_  = printf "~GENSYM[~NAME[%d]_inst][0] (%s~RESULT)" moduleOffset args
+      instanc_  = printf "~GENSYM[~NAME[%d]_inst][0] (%s~RESULT)" moduleOffset arguments
       templateD = unwords [template, compname, instanc_, ";"]
 
 -- | Create blackbox for all coSim functions up to n
 blackboxJson
     :: Int
-    -- ^ Number of blackboxes to generate
+    -- ^ Number of clock arguments
+    -> Int
+    -- ^ Number of non-clock arguments
     -> Value
     -- ^ Array of blackbox objects
-blackboxJson n = Array $ fromList $ map blackboxJson' [1..n]
+blackboxJson clks args = Array $ fromList [blackboxJson' clk arg | clk <- [0..clks], arg <- [1..args] ]
 
 -- | Create blackbox for all coSim functions up to n. This function will encode
 -- the json structure as a string, using a pretty printer.
 blackboxJsonString
     :: Int
-    -- ^ Number of blackboxes to generate
+    -- ^ Number of clock arguments
+    -> Int
+    -- ^ Number of non-clock arguments
     -> String
     -- ^ Encoded json file
-blackboxJsonString = TL.unpack . TL.decodeUtf8 . encodePretty . blackboxJson
+blackboxJsonString clks = TL.unpack . TL.decodeUtf8 . encodePretty . blackboxJson clks
