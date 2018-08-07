@@ -1,2 +1,31 @@
 packages: ./clash-cosim.cabal
-optional-packages: ./clash-prelude/clash-prelude.cabal
+
+allow-newer: *:Cabal, *:array, *:base, *:binary, *:bytestring, *:containers,
+  *:deepseq, *:directory, *:filepath, *:ghc, *:ghc-boot, *:ghc-boot-th,
+  *:ghc-compact, *:ghc-heap, *:ghc-prim, *:ghci, *:haskeline, *:hpc,
+  *:integer-gmp, *:libiserv, *:mtl, *:parsec, *:pretty, *:process, *:stm,
+  *:template-haskell, *:terminfo, *:text, *:time, *:transformers, *:unix,
+  *:xhtml, *:ghc-tcplugins-extra, *:ghc-typelits-natnormalise,
+  *:ghc-typelits-knownnat, *:ghc-typelits-extra
+
+repository head.hackage
+  url: http://head.hackage.haskell.org/
+  secure: True
+  root-keys: 07c59cb65787dedfaef5bd5f987ceb5f7e5ebf88b904bbd4c5cbdeb2ff71b740
+             2e8555dde16ebd8df076f1a8ef13b8f14c66bad8eafefd7d9e37d0ed711821fb
+             8f79fd2389ab2967354407ec852cbe73f2e8635793ac446d09461ffb99527f6e
+  key-threshold: 3
+
+source-repository-package
+  type: git
+  location: https://github.com/clash-lang/clash-prelude
+  tag: bd0c50b7e8051fcfb9318cc70971f48daa8b56da
+
+-- Build documentation for all dependencies so we can upload docs to hackage
+-- with proper links
+package *
+  documentation: True
+
+-- The fail package is empty for GHC 8+, and haddock errors out on it
+package fail
+  documentation: False

@@ -7,6 +7,7 @@
 import Control.DeepSeq (NFData)
 
 import Clash.Prelude
+import Clash.Prelude.Testbench
 import Clash.CoSim (verilog, verilogWithSettings, period, defaultSettings)
 
 import Data.List as L
