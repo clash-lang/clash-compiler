@@ -1,6 +1,6 @@
 Name:           clash-cosim
 Version:        0.1
-Cabal-Version:  >= 2.0
+Cabal-Version:  2.0
 License:        BSD2
 License-File:   LICENSE
 Author:         John Verheij <https://github.com/jgjverheij>
