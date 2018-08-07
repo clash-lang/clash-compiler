@@ -7,7 +7,9 @@
   Type and instance definitions for Netlist modules
 -}
 
+{-# LANGUAGE DeriveAnyClass             #-}
 {-# LANGUAGE DeriveGeneric              #-}
+{-# LANGUAGE DerivingStrategies         #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE PatternSynonyms            #-}
 {-# LANGUAGE TemplateHaskell            #-}
@@ -45,7 +47,7 @@ import Clash.Util
 -- of components that are being generated (WriterT)
 newtype NetlistMonad a =
   NetlistMonad { runNetlist :: StateT NetlistState (FreshMT IO) a }
-  deriving (Functor, Monad, Applicative, MonadState NetlistState, Fresh, MonadIO)
+  deriving newtype (Functor, Monad, Applicative, MonadState NetlistState, Fresh, MonadIO)
 
 -- | State of the NetlistMonad
 data NetlistState
@@ -100,20 +102,36 @@ data HWType
   -- ^ Empty type. @Just Size@ for "empty" Vectors so we can still have
   -- primitives that can traverse e.g. Vectors of unit and know the lenght of
   -- that vector.
-  | String -- ^ String type
-  | Bool -- ^ Boolean type
-  | Bit -- ^ Bit type
-  | BitVector !Size -- ^ BitVector of a specified size
-  | Index    !Integer -- ^ Unsigned integer with specified (exclusive) upper bounder
-  | Signed   !Size -- ^ Signed integer of a specified size
-  | Unsigned !Size -- ^ Unsigned integer of a specified size
-  | Vector   !Size       !HWType -- ^ Vector type
-  | RTree    !Size       !HWType -- ^ RTree type
-  | Sum      !Identifier [Identifier] -- ^ Sum type: Name and Constructor names
-  | Product  !Identifier [HWType] -- ^ Product type: Name and field types
-  | SP       !Identifier [(Identifier,[HWType])] -- ^ Sum-of-Product type: Name and Constructor names + field types
-  | Clock    !Identifier !Integer !ClockKind -- ^ Clock type with specified name and period
-  | Reset    !Identifier !Integer !ResetKind -- ^ Reset type corresponding to clock with a specified name and period
+  | String
+  -- ^ String type
+  | Bool
+  -- ^ Boolean type
+  | Bit
+  -- ^ Bit type
+  | BitVector     !Size
+  -- ^ BitVector of a specified size
+  | Index         !Integer
+  -- ^ Unsigned integer with specified (exclusive) upper bounder
+  | Signed        !Size
+  -- ^ Signed integer of a specified size
+  | Unsigned      !Size
+  -- ^ Unsigned integer of a specified size
+  | Vector        !Size       !HWType
+  -- ^ Vector type
+  | RTree         !Size       !HWType
+  -- ^ RTree type
+  | Sum           !Identifier [Identifier]
+  -- ^ Sum type: Name and Constructor names
+  | Product       !Identifier [HWType]
+  -- ^ Product type: Name and field types
+  | SP            !Identifier [(Identifier,[HWType])]
+  -- ^ Sum-of-Product type: Name and Constructor names + field types
+  | Clock         !Identifier !Integer !ClockKind
+  -- ^ Clock type with specified name and period
+  | Reset         !Identifier !Integer !ResetKind
+  -- ^ Reset type corresponding to clock with a specified name and period
+  | BiDirectional !PortDirection !HWType
+  -- ^ Tagging type indicating a bidirectional (inout) port
   deriving (Eq,Ord,Show,Generic)
 
 instance Hashable ClockKind
@@ -142,9 +160,12 @@ data Declaration
   -- * Type of the scrutinee
   --
   -- * List of: (Maybe expression scrutinized expression is compared with,RHS of alternative)
-  | InstDecl (Maybe Identifier) !Identifier !Identifier [(Expr,PortDirection,HWType,Expr)] -- ^ Instantiation of another component
-  | BlackBoxD !S.Text [BlackBoxTemplate] [BlackBoxTemplate] [((S.Text,S.Text),BlackBoxTemplate)] !BlackBoxTemplate BlackBoxContext -- ^ Instantiation of blackbox declaration
-  | NetDecl' (Maybe Identifier) WireOrReg !Identifier (Either Identifier HWType) -- ^ Signal declaration
+  | InstDecl (Maybe Identifier) !Identifier !Identifier [(Expr,PortDirection,HWType,Expr)]
+  -- ^ Instantiation of another component
+  | BlackBoxD !S.Text [BlackBoxTemplate] [BlackBoxTemplate] [((S.Text,S.Text),BlackBoxTemplate)] !BlackBoxTemplate BlackBoxContext
+  -- ^ Instantiation of blackbox declaration
+  | NetDecl' (Maybe Identifier) WireOrReg !Identifier (Either Identifier HWType)
+  -- ^ Signal declaration
   deriving Show
 
 data WireOrReg = Wire | Reg
@@ -158,7 +179,7 @@ pattern NetDecl note d ty <- NetDecl' note Wire d (Right ty)
     NetDecl note d ty = NetDecl' note Wire d (Right ty)
 
 data PortDirection = In | Out
-  deriving Show
+  deriving (Eq,Ord,Show,Generic,NFData,Hashable)
 
 instance NFData Declaration where
   rnf a = a `seq` ()

@@ -488,12 +488,16 @@ module_ c =
   modBody    = indent 2 (decls (declarations c)) <> line <> line <> insts (declarations c)
   modEnding  = "endmodule"
 
-  inPorts  = sequence [ sigPort Nothing   p | p       <- inputs c  ]
-  outPorts = sequence [ sigPort (Just wr) p | (wr, p) <- outputs c ]
+  inPorts  = sequence [ sigPort (Nothing,isBiSignalIn ty) (i,ty) | (i,ty)  <- inputs c  ]
+  outPorts = sequence [ sigPort (Just wr,False) p | (wr, p) <- outputs c ]
 
-  wr2ty Nothing     = "input"
-  wr2ty (Just Wire) = "output"
-  wr2ty (Just Reg)  = "output"
+  wr2ty (Nothing,isBidirectional)
+    | isBidirectional
+    = "inout"
+    | otherwise
+    = "input"
+  wr2ty (Just _,_)
+    = "output"
 
   -- map a port to its verilog type, port name, and any encoding notes
   sigPort (wr2ty -> portTy) (nm, hwTy)
@@ -519,7 +523,7 @@ module_ c =
 
 addSeen :: Component -> SystemVerilogM ()
 addSeen c = do
-  let iport = map fst $ inputs c
+  let iport = map fst (inputs c)
       oport = map (fst.snd) $ outputs c
       nets  = mapMaybe (\case {NetDecl' _ _ i _ -> Just i; _ -> Nothing}) $ declarations c
   Mon (idSeen .= concat [iport,oport,nets])
@@ -547,6 +551,8 @@ mkUniqueId i = do
 verilogType :: HWType -> SystemVerilogM Doc
 verilogType t = do
   Mon (tyCache %= HashSet.insert t)
+  let logicOrWire | isBiSignalIn t = "wire"
+                  | otherwise      = "logic"
   case t of
     Product _ _   -> do
       nm <- Mon $ use modNm
@@ -557,14 +563,14 @@ verilogType t = do
     RTree _ _ -> do
       nm <- Mon $ use modNm
       string (pack nm) <> "_types::" <> tyName t
-    Signed n      -> "logic signed" <+> brackets (int (n-1) <> colon <> int 0)
+    Signed n      -> logicOrWire <+> "signed" <+> brackets (int (n-1) <> colon <> int 0)
     Clock _ _ Gated -> verilogType (gatedClockType t)
     Clock {}      -> "logic"
     Reset {}      -> "logic"
     Bit           -> "logic"
     Bool          -> "logic"
     String        -> "string"
-    _ -> "logic" <+> brackets (int (typeSize t -1) <> colon <> int 0)
+    _ -> logicOrWire <+> brackets (int (typeSize t -1) <> colon <> int 0)
 
 sigDecl :: SystemVerilogM Doc -> HWType -> SystemVerilogM Doc
 sigDecl d t = verilogType t <+> d

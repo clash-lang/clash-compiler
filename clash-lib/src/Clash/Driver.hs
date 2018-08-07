@@ -296,7 +296,7 @@ createHDL backend modName components top (topName,manifestE) = flip evalState ba
       topFiles = hdl ++ qincs
   manifest <- either return (\m -> do
       let topName' = Text.pack topName
-      let topInNames  = map fst (inputs top)
+      let topInNames = map fst (inputs top)
       topInTypes  <- mapM (fmap renderOneLine . hdlType (External topName') . snd) (inputs top)
       let topOutNames = map (fst . snd) (outputs top)
       topOutTypes <- mapM (fmap renderOneLine . hdlType (External topName') . snd . snd) (outputs top)

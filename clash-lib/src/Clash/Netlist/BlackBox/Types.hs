@@ -58,6 +58,8 @@ data Element = C   !Text         -- ^ Constant
              | OutputWireReg !Int
              | Vars !Int
              | GenSym [Element] !Int
+             | Repeat [Element] [Element] -- ^ Repeat <hole> n times
+             | DevNull [Element]          -- ^ Evaluate <hole> but swallow output
              | SigD [Element] !(Maybe Int)
   deriving Show
 

@@ -1,0 +1,31 @@
+[ { "BlackBox" :
+    { "name" : "Clash.Signal.BiSignal.writeToBiSignal#",
+      "type" :
+"writeToBiSignal#
+  :: HasCallStack                   -- ARG[0]
+  => BiSignalIn ds d n              -- ARG[1]
+  -> Signal d (Maybe (BitVector n)) -- ARG[2]
+  -> Signal d Bool                  -- ARG[3]
+  -> Signal d (BitVector n)         -- ARG[4]
+  -> BiSignalOut ds d n",
+      "templateD":
+"// writeToBiSignal# begin
+assign ~ARG[1] = (~ARG[3] == 1'b1) ? ~ARG[4] : {~SIZE[~TYP[1]] {1'bz}};
+// writeToBiSignal# end"
+    }
+  }
+, { "BlackBox" :
+    { "name" : "Clash.Signal.BiSignal.readFromBiSignal#"
+    , "type" :
+"readFromBiSignal#
+  :: ( HasCallStack    -- ARG[0]
+     , KnownNat n)     -- ARG[1]
+  => BiSignalIn ds d n -- ARG[2]
+  -> Signal d (BitVector n)"
+    , "templateD" :
+"// readFromBiSignal begin
+assign ~RESULT = ~ARG[2];
+// readFromBiSignal end"
+    }
+  }
+]
