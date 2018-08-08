@@ -213,11 +213,7 @@ loadCustomReprAnnotations anns =
   catMaybes $ map go $ catMaybes $ zipWith filterNameless anns reprs
     where
         env         = Annotations.mkAnnEnv anns
-#if MIN_VERSION_ghc(8,4,1)
         deserialize = GhcPlugins.deserializeWithData :: [Word8] -> DataReprAnn
-#else
-        deserialize = Serialized.deserializeWithData :: [Word8] -> DataReprAnn
-#endif
         reprs       = UniqFM.eltsUFM (Annotations.deserializeAnns deserialize env)
 
         filterNameless
