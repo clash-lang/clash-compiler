@@ -34,6 +34,7 @@ module Clash.Annotations.BitRepresentation
 
 import           Data.Data                  (Data)
 import           Data.Typeable              (Typeable)
+import           Language.Haskell.TH.Instances ()
 import qualified Language.Haskell.TH.Lift   ()
 import qualified Language.Haskell.TH.Syntax as TH
 import           GHC.Generics               (Generic)
@@ -47,10 +48,6 @@ type FieldAnn = BitMask
 -- | Lift values inside of 'TH.Q' to a Template Haskell expression
 liftQ :: TH.Lift a => TH.Q a -> TH.Q TH.Exp
 liftQ = (>>= TH.lift)
-
-deriving instance TH.Lift TH.Type
-deriving instance TH.Lift TH.TyVarBndr
-deriving instance TH.Lift TH.TyLit
 
 -- NOTE: The following instances are imported from Language.Haskell.TH.Lift.
 -- This module also implements 'instance Lift Exp', which might make debugging
