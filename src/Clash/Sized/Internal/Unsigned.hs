@@ -98,7 +98,7 @@ import Clash.Class.Num                (ExtendingNum (..), SaturatingNum (..),
 import Clash.Class.Resize             (Resize (..))
 import Clash.Prelude.BitIndex         ((!), msb, replaceBit, split)
 import Clash.Prelude.BitReduction     (reduceOr)
-import Clash.Sized.Internal.BitVector (BitVector (BV), Bit, high, low)
+import Clash.Sized.Internal.BitVector (BitVector (BV), Bit, high, low, undefError)
 import qualified Clash.Sized.Internal.BitVector as BV
 import Clash.XException               (ShowX (..), Undefined, showsPrecXWith)
 
@@ -160,18 +160,19 @@ instance ShowX (Unsigned n) where
 instance KnownNat n => Read (Unsigned n) where
   readPrec = fromIntegral <$> (readPrec :: ReadPrec Natural)
 
-instance BitPack (Unsigned n) where
+instance KnownNat n => BitPack (Unsigned n) where
   type BitSize (Unsigned n) = n
   pack   = pack#
   unpack = unpack#
 
 {-# NOINLINE pack# #-}
 pack# :: Unsigned n -> BitVector n
-pack# (U i) = BV i
+pack# (U i) = BV 0 i
 
 {-# NOINLINE unpack# #-}
-unpack# :: BitVector n -> Unsigned n
-unpack# (BV i) = U i
+unpack# :: KnownNat n => BitVector n -> Unsigned n
+unpack# (BV 0 i) = U i
+unpack# bv = undefError "Unsigned.unpack" [bv]
 
 instance Eq (Unsigned n) where
   (==) = eq#

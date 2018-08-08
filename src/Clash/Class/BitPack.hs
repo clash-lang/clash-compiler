@@ -47,7 +47,9 @@ import Clash.Class.BitPack.Internal   (deriveBitPackTuples)
 import Clash.Class.Resize             (zeroExtend)
 import Clash.Sized.BitVector
   (Bit, BitVector, (++#), high, low)
-import Clash.Sized.Internal.BitVector (pack#, split#, unpack#, unsafeToInteger)
+import Clash.Sized.Internal.BitVector
+  (BitVector (BV), pack#, split#, checkUnpackUndef, undefError, undefined#,
+   unpack#, unsafeToInteger)
 
 {- $setup
 >>> :set -XDataKinds
@@ -113,7 +115,7 @@ instance BitPack Bool where
   pack True  = 1
   pack False = 0
 
-  unpack bv  = if bv == 1 then True else False
+  unpack = checkUnpackUndef $ \bv -> if bv == 1 then True else False
 
 instance BitPack (BitVector n) where
   type BitSize (BitVector n) = n
@@ -128,61 +130,61 @@ instance BitPack Bit where
 instance BitPack Int where
   type BitSize Int = WORD_SIZE_IN_BITS
   pack   = fromIntegral
-  unpack = fromIntegral
+  unpack = checkUnpackUndef fromIntegral
 
 instance BitPack Int8 where
   type BitSize Int8 = 8
   pack   = fromIntegral
-  unpack = fromIntegral
+  unpack = checkUnpackUndef fromIntegral
 
 instance BitPack Int16 where
   type BitSize Int16 = 16
   pack   = fromIntegral
-  unpack = fromIntegral
+  unpack = checkUnpackUndef fromIntegral
 
 instance BitPack Int32 where
   type BitSize Int32 = 32
   pack   = fromIntegral
-  unpack = fromIntegral
+  unpack = checkUnpackUndef fromIntegral
 
 #if WORD_SIZE_IN_BITS >= 64
 instance BitPack Int64 where
   type BitSize Int64 = 64
   pack   = fromIntegral
-  unpack = fromIntegral
+  unpack = checkUnpackUndef fromIntegral
 #endif
 
 instance BitPack Word where
   type BitSize Word = WORD_SIZE_IN_BITS
   pack   = fromIntegral
-  unpack = fromIntegral
+  unpack = checkUnpackUndef fromIntegral
 
 instance BitPack Word8 where
   type BitSize Word8 = 8
   pack   = fromIntegral
-  unpack = fromIntegral
+  unpack = checkUnpackUndef fromIntegral
 
 instance BitPack Word16 where
   type BitSize Word16 = 16
   pack   = fromIntegral
-  unpack = fromIntegral
+  unpack = checkUnpackUndef fromIntegral
 
 instance BitPack Word32 where
   type BitSize Word32 = 32
   pack   = fromIntegral
-  unpack = fromIntegral
+  unpack = checkUnpackUndef fromIntegral
 
 #if WORD_SIZE_IN_BITS >= 64
 instance BitPack Word64 where
   type BitSize Word64 = 64
   pack   = fromIntegral
-  unpack = fromIntegral
+  unpack = checkUnpackUndef fromIntegral
 #endif
 
 instance BitPack Float where
   type BitSize Float = 32
   pack   = packFloat#
-  unpack = unpackFloat#
+  unpack = checkUnpackUndef unpackFloat#
 
 packFloat# :: Float -> BitVector 32
 packFloat# = fromIntegral . floatToWord
@@ -195,7 +197,7 @@ unpackFloat# = wordToFloat . fromInteger . unsafeToInteger
 instance BitPack Double where
   type BitSize Double = 64
   pack   = packDouble#
-  unpack = unpackDouble#
+  unpack = checkUnpackUndef unpackDouble#
 
 packDouble# :: Double -> BitVector 64
 packDouble# = fromIntegral . doubleToWord
@@ -208,12 +210,12 @@ unpackDouble# = wordToDouble . fromInteger . unsafeToInteger
 instance BitPack CUShort where
   type BitSize CUShort = 16
   pack   = fromIntegral
-  unpack = fromIntegral
+  unpack = checkUnpackUndef fromIntegral
 
 instance BitPack Half where
   type BitSize Half = 16
   pack (Half x) = pack x
-  unpack x      = Half (unpack x)
+  unpack        = checkUnpackUndef $ \x -> Half (unpack x)
 
 instance BitPack () where
   type BitSize () = 0
@@ -228,14 +230,12 @@ instance (KnownNat (BitSize b), BitPack a, BitPack b) =>
 
 instance (BitPack a, KnownNat (BitSize a)) => BitPack (Maybe a) where
   type BitSize (Maybe a) = 1 + BitSize a
-  pack Nothing  = pack# low ++# 0
-  -- We cannot do `low ++# undefined`, because `BitVector`s underlying
-  -- representation is `Integer`, so `low ++# undefined` would make the
-  -- entire `BitVector` undefined.
+  pack Nothing  = pack# low ++# undefined#
   pack (Just x) = pack# high ++# pack x
   unpack x = case split# x of
-    (c,rest) | unpack# c == low -> Nothing
-             | otherwise        -> Just (unpack rest)
+    (c@(BV 0 _),rest) | unpack# c == low -> Nothing
+                      | otherwise        -> Just (unpack rest)
+    (_,_) -> undefError "Maybe.unpack" [x]
 
 class GBitPack f where
   type GBitSize f :: Nat

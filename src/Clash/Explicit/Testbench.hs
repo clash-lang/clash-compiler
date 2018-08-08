@@ -16,6 +16,7 @@ module Clash.Explicit.Testbench
     assert
   , stimuliGenerator
   , outputVerifier
+  , outputVerifierBitVector
   )
 where
 
@@ -28,6 +29,8 @@ import System.IO.Unsafe      (unsafeDupablePerformIO)
 import Clash.Explicit.Signal
   (Clock, Reset, Signal, fromList, register, unbundle)
 import Clash.Sized.Index     (Index)
+import Clash.Sized.Internal.BitVector
+  (BitVector, isLike)
 import Clash.Sized.Vector    (Vec, (!!), length)
 import Clash.XException      (ShowX (..), XException)
 
@@ -49,7 +52,7 @@ assert
   :: (Eq a,ShowX a)
   => Clock domain gated
   -> Reset domain synchronous
-  -> String      -- ^ Additional message
+  -> String          -- ^ Additional message
   -> Signal domain a -- ^ Checked value
   -> Signal domain a -- ^ Expected value
   -> Signal domain b -- ^ Return value
@@ -72,6 +75,37 @@ assert clk _rst msg checked expected returned =
     eqX a b = unsafeDupablePerformIO (catch (evaluate (a == b))
                                             (\(_ :: XException) -> return False))
 {-# NOINLINE assert #-}
+
+-- | The same as 'assert', but can handle don't care bits in it's expected value.
+assertBitVector
+  :: (KnownNat n)
+  => Clock domain gated
+  -> Reset domain synchronous
+  -> String                      -- ^ Additional message
+  -> Signal domain (BitVector n) -- ^ Checked value
+  -> Signal domain (BitVector n) -- ^ Expected value
+  -> Signal domain b             -- ^ Return value
+  -> Signal domain b
+assertBitVector clk _rst msg checked expected returned =
+  (\c e cnt r ->
+      if eqX c e
+         then r
+         else trace (concat [ "\ncycle(" ++ show clk ++ "): "
+                            , show cnt
+                            , ", "
+                            , msg
+                            , "\nexpected value: "
+                            , showX e
+                            , ", not equal to actual value: "
+                            , showX c
+                            ]) r)
+  <$> checked <*> expected <*> fromList [(0::Integer)..] <*> returned
+  where
+    eqX a b = unsafeDupablePerformIO (catch (evaluate (a `isLike` b))
+                                            (\(_ :: XException) -> return False))
+{-# NOINLINE assertBitVector #-}
+
+
 
 -- | To be used as one of the functions to create the \"magical\" 'testInput'
 -- value, which the CλaSH compiler looks for to create the stimulus generator
@@ -144,6 +178,8 @@ stimuliGenerator clk rst samples =
 -- cycle(system10000): 9, outputVerifier
 -- expected value: 10, not equal to actual value: 9
 -- ,False,True,True]
+--
+-- If your working with 'BitVector's containing don't care bit you should use 'outputVerifierBitVector'.
 outputVerifier
   :: forall l domain gated synchronous a
    . (KnownNat l, Eq a, ShowX a)
@@ -169,3 +205,31 @@ outputVerifier clk rst samples i =
 
         finished = s == maxI
 {-# INLINABLE outputVerifier #-}
+
+-- | Same as 'outputVerifier',
+-- but can handle don't care bits in it's expected values.
+outputVerifierBitVector
+  :: forall l n domain gated synchronous
+   . (KnownNat l, KnownNat n)
+  => Clock domain gated
+  -- ^ Clock to which the input signal is synchronized to
+  -> Reset domain synchronous
+  -> Vec l (BitVector n)         -- ^ Samples to compare with
+  -> Signal domain (BitVector n) -- ^ Signal to verify
+  -> Signal domain Bool          -- ^ Indicator that all samples are verified
+outputVerifierBitVector clk rst samples i =
+    let (s,o) = unbundle (genT <$> register clk rst 0 s)
+        (e,f) = unbundle o
+    in  assertBitVector clk rst "outputVerifierBitVector" i e (register clk rst False f)
+  where
+    genT :: Index l -> (Index l,(BitVector n,Bool))
+    genT s = (s',(samples !! s,finished))
+      where
+        maxI = toEnum (length samples - 1)
+
+        s' = if s < maxI
+                then s + 1
+                else s
+
+        finished = s == maxI
+{-# INLINABLE outputVerifierBitVector #-}

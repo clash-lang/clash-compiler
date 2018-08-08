@@ -9,8 +9,11 @@ Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
 {-# LANGUAGE RoleAnnotations #-}
 module Clash.Sized.Internal.BitVector where
 
-import GHC.TypeLits (Nat)
+import GHC.TypeLits (KnownNat,Nat)
+import GHC.Stack    (HasCallStack)
 
 type role BitVector phantom
 data BitVector :: Nat -> *
 data Bit
+
+undefError :: (HasCallStack, KnownNat n) => String -> [BitVector n] -> a
