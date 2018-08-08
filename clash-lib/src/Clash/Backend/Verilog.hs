@@ -9,22 +9,31 @@
 
 {-# LANGUAGE CPP               #-}
 {-# LANGUAGE LambdaCase        #-}
+{-# LANGUAGE MultiWayIf        #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecursiveDo       #-}
 {-# LANGUAGE TemplateHaskell   #-}
 {-# LANGUAGE TupleSections     #-}
 {-# LANGUAGE ViewPatterns      #-}
 
-module Clash.Backend.Verilog (VerilogState, include) where
+module Clash.Backend.Verilog
+  ( VerilogState
+  , include
+  , exprLit
+  , bits
+  , bit_char
+  )
+where
 
 import           Control.Applicative                  ((<*), (*>))
 import qualified Control.Applicative                  as A
 import           Control.Lens                         ((+=),(-=),(.=),(%=), makeLenses, use)
 import           Control.Monad                        (forM)
 import           Control.Monad.State                  (State)
+import           Data.Bits                            (Bits, testBit)
 import qualified Data.HashSet                         as HashSet
 import           Data.Maybe                           (catMaybes,fromMaybe,mapMaybe)
-import           Data.List                            (nub)
+import           Data.List                            (nub, nubBy)
 #if !MIN_VERSION_base(4,11,0)
 import           Data.Monoid                          hiding (Product, Sum)
 #endif
@@ -38,6 +47,13 @@ import qualified Data.Version
 import qualified System.FilePath
 
 import           Clash.Annotations.Primitive          (HDL (..))
+import           Clash.Annotations.BitRepresentation  (BitMask)
+import           Clash.Annotations.BitRepresentation.ClashLib
+  (bitsToBits)
+import           Clash.Annotations.BitRepresentation.Internal
+  (ConstrRepr'(..))
+import           Clash.Annotations.BitRepresentation.Util
+  (BitOrigin(Lit, Field), bitOrigins, bitRanges, isContinuousMask)
 import           Clash.Backend
 import           Clash.Driver.Types                   (SrcSpan, noSrcSpan)
 import           Clash.Netlist.BlackBox.Types         (HdlSyn)
@@ -46,7 +62,10 @@ import           Clash.Netlist.Id                     (IdType (..), mkBasicId')
 import           Clash.Netlist.Types                  hiding (_intWidth, intWidth)
 import           Clash.Netlist.Util                   hiding (mkIdentifier, extendIdentifier)
 import           Clash.Signal.Internal                (ClockKind (..))
-import           Clash.Util                           (curLoc, (<:>))
+import           Clash.Util                           (curLoc, (<:>),on,first)
+
+
+
 
 #ifdef CABAL
 import qualified Paths_clash_lib
@@ -65,6 +84,9 @@ data VerilogState =
     }
 
 makeLenses ''VerilogState
+
+squote :: Mon (State VerilogState) Doc
+squote = string "'"
 
 primsRoot :: IO FilePath
 #ifdef CABAL
@@ -171,7 +193,7 @@ filterReserved s = if s `elem` reservedWords
   then s `Text.append` "_r"
   else s
 
--- | Generate VHDL for a Netlist component
+-- | Generate Verilog for a Netlist component
 genVerilog :: SrcSpan -> Component -> VerilogM ((String,Doc),[(String,Doc)])
 genVerilog sp c = do
     Mon (setSrcSpan sp)
@@ -296,7 +318,7 @@ sigDecl d t = verilogType t <+> d
 verilogTypeMark :: HWType -> VerilogM Doc
 verilogTypeMark = const emptyDoc
 
--- | Convert a Netlist HWType to an error VHDL value for that type
+-- | Convert a Netlist HWType to an error Verilog value for that type
 verilogTypeErrValue :: HWType -> VerilogM Doc
 verilogTypeErrValue ty = braces (int (typeSize ty) <+> braces "1'bx")
 
@@ -330,7 +352,82 @@ insts :: [Declaration] -> VerilogM Doc
 insts [] = emptyDoc
 insts is = indent 2 . vcat . punctuate line . fmap catMaybes $ mapM inst_ is
 
--- | Turn a Netlist Declaration to a SystemVerilog concurrent block
+stdMatch
+  :: Bits a
+  => Int
+  -> a
+  -> a
+  -> String
+stdMatch 0 _mask _value = []
+stdMatch size mask value =
+  symbol : stdMatch (size - 1) mask value
+  where
+    symbol =
+      if testBit mask (size - 1) then
+        if testBit value (size - 1) then
+          '1'
+        else
+          '0'
+      else
+        '?'
+
+patLitCustom'
+  :: Int
+  -> ConstrRepr'
+  -> VerilogM Doc
+patLitCustom' size (ConstrRepr' _name _n mask value _anns) =
+  int size <> squote <> "b" <> (string $ Text.pack $ stdMatch size mask value)
+
+patLitCustom
+  :: HWType
+  -> Literal
+  -> VerilogM Doc
+patLitCustom (CustomSum _name _dataRepr size reprs) (NumLit (fromIntegral -> i)) =
+  patLitCustom' size (fst $ reprs !! i)
+
+patLitCustom (CustomSP _name _dataRepr size reprs) (NumLit (fromIntegral -> i)) =
+  let (cRepr, _id, _tys) = reprs !! i in
+  patLitCustom' size cRepr
+
+patLitCustom x y = error $ $(curLoc) ++ unwords
+  [ "You can only pass CustomSP / CustomSum and a NumLit to this function,"
+  , "not", show x, "and", show y]
+
+patMod :: HWType -> Literal -> Literal
+patMod hwTy (NumLit i) = NumLit (i `mod` (2 ^ typeSize hwTy))
+patMod _ l = l
+
+-- | Helper function for inst_, handling CustomSP and CustomSum
+inst_'
+  :: Text.Text
+  -> Expr
+  -> HWType
+  -> [(Maybe Literal, Expr)]
+  -> VerilogM (Maybe Doc)
+inst_' id_ scrut scrutTy es = fmap Just $
+  "always @(*) begin" <> line <>
+    indent 2 casez <> line <>
+  "end"
+    where
+      casez =
+        "casez" <+> parens var <> line <>
+          indent 2 (conds esNub) <> line <>
+        "endcase"
+
+      esMod = map (first (fmap (patMod scrutTy))) es
+      esNub = nubBy ((==) `on` fst) esMod
+      var   = expr_ True scrut
+
+      conds :: [(Maybe Literal,Expr)] -> VerilogM Doc
+      conds []                = error $ $(curLoc) ++ "Empty list of conditions invalid."
+      conds [(_,e)]           = "default" <+> ":" <+> string id_ <+> "=" <+> expr_ False e <> ";"
+      conds ((Nothing,e):_)   = "default" <+> ":" <+> string id_ <+> "=" <+> expr_ False e <> ";"
+      conds ((Just c ,e):es') =
+        mask' <+> ":" <+> string id_ <+> "=" <+> expr_ False e <> ";" <> line <> conds es'
+          where
+            mask' = patLitCustom scrutTy c
+
+-- | Turn a Netlist Declaration to a Verilog concurrent block
 inst_ :: Declaration -> VerilogM (Maybe Doc)
 inst_ (Assignment id_ e) = fmap Just $
   "assign" <+> string id_ <+> equals <+> expr_ False e <> semi
@@ -345,6 +442,11 @@ inst_ (CondAssignment id_ _ scrut _ [(Just (BoolLit b), l),(_,r)]) = fmap Just $
   where
     (t,f) = if b then (l,r) else (r,l)
 
+inst_ (CondAssignment id_ _ scrut scrutTy@(CustomSP _ _ _ _) es) =
+  inst_' id_ scrut scrutTy es
+
+inst_ (CondAssignment id_ _ scrut scrutTy@(CustomSum _ _ _ _) es) =
+  inst_' id_ scrut scrutTy es
 
 inst_ (CondAssignment id_ _ scrut scrutTy es) = fmap Just $
     "always @(*) begin" <> line <>
@@ -460,13 +562,20 @@ modifier offset (Nested m1 m2) = do
 
 modifier _ _ = Nothing
 
--- | Turn a Netlist expression into a SystemVerilog expression
+-- | Turn a Netlist expression into a Verilog expression
 expr_ :: Bool -- ^ Enclose in parenthesis?
       -> Expr -- ^ Expr to convert
       -> VerilogM Doc
 expr_ _ (Literal sizeM lit) = exprLit sizeM lit
 
 expr_ _ (Identifier id_ Nothing) = string id_
+
+expr_ _ (Identifier id_ (Just (Indexed (CustomSP _id _dataRepr _size args,dcI,fI)))) =
+  braces $ hcat $ punctuate ", " $ sequence ranges
+    where
+      (ConstrRepr' _name _n _mask _value anns, _, _argTys) = args !! dcI
+      ranges = map range' $ bitRanges (anns !! fI)
+      range' (start, end) = string id_ <> brackets (int start <> ":" <> int end)
 
 expr_ _ (Identifier id_ (Just m)) = case modifier 0 m of
   Nothing          -> string id_
@@ -501,6 +610,47 @@ expr_ _ (DataCon ty@(SP _ args) (DC (_,i)) es) = assignExpr
 
 expr_ _ (DataCon ty@(Sum _ _) (DC (_,i)) []) = int (typeSize ty) <> "'d" <> int i
 
+expr_ _ (DataCon ty@(CustomSum _ _ _ tys) (DC (_,i)) []) =
+  let (ConstrRepr' _ _ _ value _) = fst $ tys !! i in
+  int (typeSize ty) <> squote <> "d" <> int (fromIntegral value)
+expr_ _ (DataCon (CustomSP name' dataRepr size args) (DC (_,constrNr)) es) =
+  (flip fromMaybe) (errOnNonContinuous 0 anns) $
+  braces $ hcat $ punctuate ", " $ mapM range' origins
+    where
+      (cRepr, _, _) = args !! constrNr
+      (ConstrRepr' _name _n _mask _value anns) = cRepr
+
+      errOnNonContinuous :: Int -> [BitMask] -> Maybe a
+      errOnNonContinuous _ [] = Nothing
+      errOnNonContinuous fieldnr (ann:anns') =
+        if isContinuousMask ann then
+          errOnNonContinuous (fieldnr + 1) anns'
+        else
+          error $ $(curLoc) ++ unlines [
+              "Error while processing custom bit representation:\n"
+            , unwords ["Field", show fieldnr, "of constructor", show constrNr, "of type\n"]
+            , "  " ++ show name' ++ "\n"
+            , "has a non-continuous fieldmask:\n"
+            , "  " ++ (map bit_char' $ toBits size ann) ++ "\n"
+            , unwords [ "This is not supported in Verilog. Change the mask to a"
+                      , "continuous one, or render using VHDL or SystemVerilog."
+                      ]
+            ]
+
+      -- Build bit representations for all constructor arguments
+      argExprs = map (expr_ False) es :: [VerilogM Doc]
+
+      -- Spread bits of constructor arguments using masks
+      origins = bitOrigins dataRepr cRepr :: [BitOrigin]
+
+      range'
+        :: BitOrigin
+        -> VerilogM Doc
+      range' (Lit (bitsToBits -> ns)) =
+        int (length ns) <> squote <> "b" <> hcat (mapM bit_char ns)
+      range' (Field n _start _end) =
+        argExprs !! n
+
 expr_ _ (DataCon (Product _ _) _ es) = listBraces (mapM (expr_ False) es)
 
 expr_ _ (DataCon (Clock _ _ Gated) _ es) = listBraces (mapM (expr_ False) es)
@@ -517,13 +667,17 @@ expr_ _ (BlackBoxE pNm _ _ _ _ bbCtx _)
 
 expr_ _ (BlackBoxE pNm _ _ _ _ bbCtx _)
   | pNm == "Clash.Sized.Internal.BitVector.fromInteger#"
-  , [Literal _ (NumLit n), Literal _ i] <- extractLiterals bbCtx
-  = exprLit (Just (BitVector (fromInteger n),fromInteger n)) i
+  , [Literal _ (NumLit n), Literal _ m, Literal _ i] <- extractLiterals bbCtx
+  = let NumLit m' = m
+        NumLit i' = i
+    in exprLit (Just (BitVector (fromInteger n),fromInteger n)) (BitVecLit m' i')
 
 expr_ _ (BlackBoxE pNm _ _ _ _ bbCtx _)
   | pNm == "Clash.Sized.Internal.BitVector.fromInteger##"
-  , [Literal _ i] <- extractLiterals bbCtx
-  = exprLit (Just (Bit,1)) i
+  , [Literal _ m, Literal _ i] <- extractLiterals bbCtx
+  = let NumLit m' = m
+        NumLit i' = i
+    in exprLit (Just (Bit,1)) (BitLit $ toBit m' i')
 
 expr_ _ (BlackBoxE pNm _ _ _ _ bbCtx _)
   | pNm == "Clash.Sized.Internal.Index.fromInteger#"
@@ -586,20 +740,24 @@ rtreeChain (DataCon (RTree 0 _) _ [e])     = Just [e]
 rtreeChain (DataCon (RTree _ _) _ [e1,e2]) = Just e1 <:> rtreeChain e2
 rtreeChain _                               = Nothing
 
-exprLit :: Maybe (HWType,Size) -> Literal -> VerilogM Doc
+exprLit :: (Applicative m, Monoid (m Doc) ) => Maybe (HWType,Size) -> Literal -> m Doc
 exprLit Nothing (NumLit i) = integer i
 
 exprLit (Just (hty,sz)) (NumLit i) = case hty of
-  Unsigned _ -> int sz <> "'d" <> integer i
-  Index _ -> int (typeSize hty) <> "'d" <> integer i
+  Unsigned _ -> int sz <> string "'d" <> integer i
+  Index _ -> int (typeSize hty) <> string "'d" <> integer i
   Signed _
-   | i < 0     -> "-" <> int sz <> "'sd" <> integer (abs i)
-   | otherwise -> int sz <> "'sd" <> integer i
-  _ -> int sz <> "'b" <> blit
+   | i < 0     -> string "-" <> int sz <> string "'sd" <> integer (abs i)
+   | otherwise -> int sz <> string "'sd" <> integer i
+  _ -> int sz <> string "'b" <> blit
   where
     blit = bits (toBits sz i)
-exprLit _             (BoolLit t)   = if t then "1'b1" else "1'b0"
-exprLit _             (BitLit b)    = "1'b" <> bit_char b
+exprLit (Just (_,sz)) (BitVecLit m i) = int sz <> string "'b" <> bvlit
+  where
+    bvlit = bits (toBits' sz m i)
+
+exprLit _             (BoolLit t)   = string $ if t then "1'b1" else "1'b0"
+exprLit _             (BitLit b)    = string "1'b" <> bit_char b
 exprLit _             (StringLit s) = string . pack $ show s
 exprLit _             l             = error $ $(curLoc) ++ "exprLit: " ++ show l
 
@@ -610,14 +768,26 @@ toBits size val = map (\x -> if odd x then H else L)
                 $ map (`mod` 2)
                 $ iterate (`div` 2) val
 
-bits :: [Bit] -> VerilogM Doc
-bits = hcat . mapM bit_char
+toBits' :: Integral a => Int -> a -> a -> [Bit]
+toBits' size msk val = map (\(m,i) -> if odd m then U else (if odd i then H else L))
+                $
+                ( reverse . take size)
+                $ zip
+                  ( map (`mod` 2) $ iterate (`div` 2) msk)
+                  ( map (`mod` 2) $ iterate (`div` 2) val)
 
-bit_char :: Bit -> VerilogM Doc
-bit_char H = char '1'
-bit_char L = char '0'
-bit_char U = char 'x'
-bit_char Z = char 'z'
+
+bits :: Applicative m => [Bit] -> m Doc
+bits = hcat . traverse bit_char
+
+bit_char' :: Bit -> Char
+bit_char' H = '1'
+bit_char' L = '0'
+bit_char' U = 'x'
+bit_char' Z = 'z'
+
+bit_char :: Applicative m => Bit -> m Doc
+bit_char = char . bit_char'
 
 dcToExpr :: HWType -> Int -> Expr
 dcToExpr ty i = Literal (Just (ty,conSize ty)) (NumLit (toInteger i))

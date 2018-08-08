@@ -1,0 +1,37 @@
+[ { "BlackBox" :
+    { "name"      : "Clash.Sized.Internal.BitVector.BV"
+    , "type"      : "BV :: Integer -> Integer -> BitVector n"
+    , "comment"   : "THIS IS ONLY USED WHEN WW EXPOSES BITVECTOR INTERNALS"
+    , "templateE" : "~ARG[1]"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "Clash.Sized.Internal.BitVector.Bit"
+    , "type"      : "Bit :: Integer -> Integer -> BitVector n"
+    , "comment"   : "THIS IS ONLY USED WHEN WW EXPOSES BIT INTERNALS"
+    , "templateE" : "~ARG[1]"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "Clash.Sized.Internal.BitVector.undefined#"
+    , "type"      : "undefined# :: forall n . KnownNat n => BitVector n"
+    , "templateE" : "~ERRORO"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "Clash.Sized.Internal.BitVector.checkUnpackUndef"
+    , "type"      :
+"checkUnpackUndef
+  :: ( KnownNat n        -- ARG[0]
+     , Typeable a)       -- ARG[1]
+  => (BitVector n -> a)  -- ARG[2]
+  -> BitVector n         -- ARG[3]
+  -> a"
+    , "templateD" :
+"~INST 2
+  ~OUTPUT <= ~RESULT~ ~TYPO~
+  ~INPUT  <= ~ARG[3]~ ~TYP[3]~
+~INST"
+    }
+  }
+]

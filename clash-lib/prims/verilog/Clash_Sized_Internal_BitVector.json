@@ -136,14 +136,14 @@ end
   }
 , { "BlackBox" :
     { "name"      : "Clash.Sized.Internal.BitVector.fromInteger#"
-    , "type"      : "fromInteger# :: KnownNat n => Integer -> BitVector n"
-    , "templateE" : "$unsigned(~ARG[1][(~LIT[0]-1):0])"
+    , "type"      : "fromInteger# :: KnownNat n => Integer -> Integer -> BitVector n"
+    , "templateE" : "$unsigned(~ARG[2][(~LIT[0]-1):0])"
     }
   }
 , { "BlackBox" :
     { "name"      : "Clash.Sized.Internal.BitVector.plus#"
-    , "type"      : "plus# :: BitVector m -> BitVector n -> BitVector (Max m n + 1)"
-    , "templateD" : "assign ~RESULT = ~ARG[0] + ~ARG[1];"
+    , "type"      : "plus# :: (KnownNat m, KnownNat n) => BitVector m -> BitVector n -> BitVector (Max m n + 1)"
+    , "templateD" : "assign ~RESULT = ~ARG[2] + ~ARG[3];"
     }
   }
 , { "BlackBox" :
@@ -154,20 +154,20 @@ end
   }
 , { "BlackBox" :
     { "name"      : "Clash.Sized.Internal.BitVector.times#"
-    , "type"      : "times# :: KnownNat (m + n) => BitVector m -> BitVector n -> BitVector (m + n)"
-    , "templateD" : "assign ~RESULT = ~ARG[0] * ~ARG[1];"
+    , "type"      : "times# :: (KnownNat m, KnownNat n) => BitVector m -> BitVector n -> BitVector (m + n)"
+    , "templateD" : "assign ~RESULT = ~ARG[2] * ~ARG[3];"
     }
   }
 , { "BlackBox" :
     { "name"      : "Clash.Sized.Internal.BitVector.quot#"
-    , "type"      : "quot# :: BitVector n -> BitVector n -> BitVector n"
-    , "templateE" : "~ARG[0] / ~ARG[1]"
+    , "type"      : "quot# :: KnownNat n => BitVector n -> BitVector n -> BitVector n"
+    , "templateE" : "~ARG[1] / ~ARG[2]"
     }
   }
 , { "BlackBox" :
     { "name"      : "Clash.Sized.Internal.BitVector.rem#"
-    , "type"      : "rem# :: BitVector n -> BitVector n -> BitVector n"
-    , "templateE" : "~ARG[0] % ~ARG[1]"
+    , "type"      : "rem# :: KnownNat n => BitVector n -> BitVector n -> BitVector n"
+    , "templateE" : "~ARG[1] % ~ARG[2]"
     }
   }
 , { "BlackBox" :

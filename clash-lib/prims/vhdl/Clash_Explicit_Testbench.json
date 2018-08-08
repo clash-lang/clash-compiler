@@ -2,13 +2,13 @@
     { "name" : "Clash.Explicit.Testbench.assert"
     , "type" :
 "assert
-  :: (Eq a,Show a)            -- (ARG[0],ARG[1])
+  :: (Eq a,ShowX a)           -- (ARG[0],ARG[1])
   => Clock domain gated       -- ARG[2]
   -> Reset domain synchronous -- ARG[3]
   -> String                   -- ARG[4]
-  -> Signal domain a          -- Checked value (ARG[5])
+  -> Signal domain a          -- Checked value  (ARG[5])
   -> Signal domain a          -- Expected value (ARG[6])
-  -> Signal domain b          -- Return valued (ARG[7])
+  -> Signal domain b          -- Return valued  (ARG[7])
   -> Signal domain b"
     , "templateD" :
 "-- assert begin
@@ -41,7 +41,7 @@ begin
   process(~IF ~ISGATED[2] ~THEN~SYM[4]~ELSE~ARG[2]~FI~IF ~ISSYNC[3] ~THEN ~ELSE,~ARG[3]~FI) is
   begin
     if (rising_edge(~IF ~ISGATED[2] ~THEN~SYM[4]~ELSE~ARG[2]~FI)~IF ~ISSYNC[3] ~THEN ~ELSE or falling_edge(~ARG[3])~FI) then
-      assert (std_match(toSLV(~SYM[2]),toSLV(~SYM[3]))) report (~LIT[4] & \", expected: \" & ~SYM[1](toSLV(~SYM[3])) & \", actual: \" & ~SYM[1](toSLV(~SYM[2]))) severity error;
+      assert (toSLV(~SYM[2]) = toSLV(~SYM[3])) report (~LIT[4] & \", expected: \" & ~SYM[1](toSLV(~SYM[3])) & \", actual: \" & ~SYM[1](toSLV(~SYM[2]))) severity error;
     end if;
   end process;
   -- pragma translate_on
@@ -51,6 +51,110 @@ begin
   ~RESULT <= ~ARG[7];
 end block;
 -- assert end"
+    }
+  }
+,{ "BlackBox" :
+    { "name" : "Clash.Explicit.Testbench.assertBitVector"
+    , "comment" : "TODO after https://github.com/clash-lang/clash-compiler/commit/95694dd8a85699901c78b81612cfecf36d7fc7b6
+                   put non_std_match in its own file?
+                  "
+    , "type" :
+"assertBitVector
+  :: KnownNat n                  --                 ARG[0]
+  => Clock domain gated          --                 ARG[1]
+  -> Reset domain synchronous    --                 ARG[2]
+  -> String                      --                 ARG[3]
+  -> Signal domain (BitVector n) -- Checked value  (ARG[4])
+  -> Signal domain (BitVector n) -- Expected value (ARG[5])
+  -> Signal domain b             -- Return valued  (ARG[6])
+  -> Signal domain b"
+    , "templateD" :
+"-- assertBitVector begin
+~GENSYM[assert][0] : block
+  -- pragma translate_off
+  type match_table_type is array (std_ulogic, std_ulogic) of boolean;
+  constant match_table: match_table_type :=
+    ('0' | 'L' => ('0' | 'L' | '-' => true, others => false),
+     '1' | 'H' => ('1' | 'H' | '-' => true, others => false),
+     '-' => ('-' => true, others => false),
+     others => ('-' => true, others => false));
+
+  function non_std_match (l, r : std_logic_vector) return boolean
+  is
+     alias la : std_logic_vector (l'length downto 1) is l;
+     alias ra : std_logic_vector (r'length downto 1) is r;
+  begin
+     if la'left = 0 or ra'left = 0 then
+        assert false
+          report \"NUMERIC_STD.STD_MATCH: null argument, returning false\"
+          severity warning;
+        return false;
+     elsif la'left /= ra'left then
+        assert false
+          report \"NUMERIC_STD.STD_MATCH: args length mismatch, returning false\"
+          severity warning;
+        return false;
+     else
+        for i in la'range loop
+           if not match_table (la (i), ra (i)) then
+             return false;
+           end if;
+        end loop;
+        return true;
+     end if;
+  end non_std_match;
+
+  function custom_match (l, r : std_logic_vector) return boolean
+  is
+    alias la : std_logic_vector (l'length downto 1) is l;
+    alias ra : std_logic_vector (r'length downto 1) is r;
+  begin
+    for i in l'range loop
+       if not match_table (l (i), r (i)) then
+         return false;
+       end if;
+    end loop;
+    return true;
+  end custom_match;
+
+
+  function ~GENSYM[slv2string][1] (slv : std_logic_vector) return STRING is
+     variable result : string (1 to slv'length);
+     variable res_l : string (1 to 3);
+     variable r : integer;
+   begin
+     r := 1;
+     for i in slv'range loop
+        res_l := std_logic'image(slv(i));
+        result(r) := res_l(2);
+        r := r + 1;
+     end loop;
+     return result;
+  end;
+  signal ~GENSYM[actual][2] : ~TYP[4];
+  signal ~GENSYM[expected][3] : ~TYP[5];
+~IF ~ISGATED[1] ~THEN
+  signal ~GENSYM[clk][4] : std_logic;
+  signal ~GENSYM[ce][5]  : boolean;
+~ELSE ~FI
+  -- pragma translate_on
+begin
+  -- pragma translate_off
+  ~SYM[2] <= ~ARG[4];
+  ~SYM[3] <= ~ARG[5];
+  process(~IF ~ISGATED[1] ~THEN~SYM[4]~ELSE~ARG[1]~FI~IF ~ISSYNC[2] ~THEN ~ELSE,~ARG[2]~FI) is
+  begin
+    if (rising_edge(~IF ~ISGATED[1] ~THEN~SYM[4]~ELSE~ARG[1]~FI)~IF ~ISSYNC[2] ~THEN ~ELSE or falling_edge(~ARG[2])~FI) then
+      assert (custom_match(toSLV(~SYM[2]),toSLV(~SYM[3]))) report (~LIT[3] & \", expected: \" & ~SYM[1](toSLV(~SYM[3])) & \", actual: \" & ~SYM[1](toSLV(~SYM[2]))) severity error;
+    end if;
+  end process;
+  -- pragma translate_on
+~IF ~ISGATED[1] ~THEN
+  (~SYM[4],~SYM[5]) <= ~ARG[1];
+~ELSE ~FI
+  ~RESULT <= ~ARG[6];
+end block;
+-- assertBitVector end"
     }
   }
 ]

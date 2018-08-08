@@ -35,6 +35,8 @@ import           Unbound.Generics.LocallyNameless (unembed, runLFreshM)
 import           BasicTypes                       (InlineSpec (..))
 import           SrcLoc                           (SrcSpan,noSrcSpan)
 
+import           Clash.Annotations.BitRepresentation.Internal
+  (CustomReprs)
 import           Clash.Core.Evaluator             (PrimEvaluator)
 import           Clash.Core.FreeVars              (termFreeIds)
 import           Clash.Core.Name                  (Name (..), NameSort (..))
@@ -61,7 +63,7 @@ import           Clash.Primitives.Types           (PrimMap)
 import           Clash.Rewrite.Combinators        ((>->),(!->))
 import           Clash.Rewrite.Types
   (RewriteEnv (..), RewriteState (..), bindings, curFun, dbgLevel, extra,
-   tcCache, topEntities, typeTranslator)
+   tcCache, topEntities, typeTranslator, customReprs)
 import           Clash.Rewrite.Util               (isUntranslatableType,
                                                    runRewrite,
                                                    runRewriteSession)
@@ -76,8 +78,9 @@ runNormalization
   -- ^ UniqueSupply
   -> BindingMap
   -- ^ Global Binders
-  -> (HashMap TyConOccName TyCon -> Bool -> Type -> Maybe (Either String HWType))
+  -> (CustomReprs -> HashMap TyConOccName TyCon -> Bool -> Type -> Maybe (Either String HWType))
   -- ^ Hardcoded Type -> HWType translator
+  -> CustomReprs
   -> HashMap TyConOccName TyCon
   -- ^ TyCon cache
   -> IntMap TyConName
@@ -93,7 +96,7 @@ runNormalization
   -> NormalizeSession a
   -- ^ NormalizeSession to run
   -> a
-runNormalization opts supply globals typeTrans tcm tupTcm eval primMap rcsMap topEnts
+runNormalization opts supply globals typeTrans reprs tcm tupTcm eval primMap rcsMap topEnts
   = runRewriteSession rwEnv rwState
   where
     rwEnv     = RewriteEnv
@@ -103,6 +106,7 @@ runNormalization opts supply globals typeTrans tcm tupTcm eval primMap rcsMap to
                   tupTcm
                   eval
                   (HashSet.fromList topEnts)
+                  reprs
 
     rwState   = RewriteState
                   0
@@ -144,6 +148,7 @@ normalize' nm = do
   case exprM of
     Just (nm',ty,sp,inl,tm) -> do
       tcm <- Lens.view tcCache
+      reprs <- Lens.view customReprs
       let (_,resTy) = splitCoreFunForallTy tcm ty
       resTyRep <- not <$> isUntranslatableType False resTy
       if resTyRep
@@ -161,7 +166,7 @@ normalize' nm = do
                             , showDoc (tmNorm ^. _5) ])
                     (return ())
             tyTrans <- Lens.view typeTranslator
-            case clockResetErrors sp tyTrans tcm ty of
+            case clockResetErrors sp reprs tyTrans tcm ty of
               msgs@(_:_) -> traceIf True (concat (nmS:" (:: ":showDoc (tmNorm ^. _2)
                               :")\nhas potentially dangerous meta-stability issues:\n\n"
                               :msgs))
@@ -367,16 +372,17 @@ callTreeToList visited (CBranch (nm,bndr) used)
 --   domain annotation, and at least one of them is an asynchronous reset.
 clockResetErrors
   :: SrcSpan
-  -> (HashMap TyConOccName TyCon -> Bool -> Type -> Maybe (Either String HWType))
+  -> CustomReprs
+  -> (CustomReprs -> HashMap TyConOccName TyCon -> Bool -> Type -> Maybe (Either String HWType))
   -> HashMap TyConOccName TyCon
   -> Type
   -> [String]
-clockResetErrors sp tyTran tcm ty =
+clockResetErrors sp reprs tyTran tcm ty =
    (Maybe.mapMaybe reportClock clks ++ Maybe.mapMaybe reportResets rsts)
   where
     (args,_)  = splitCoreFunForallTy tcm ty
     (_,args') = partitionEithers args
-    hwArgs    = zip (map (unsafeCoreTypeToHWType sp $(curLoc) tyTran tcm False) args') args'
+    hwArgs    = zip (map (unsafeCoreTypeToHWType sp $(curLoc) tyTran reprs tcm False) args') args'
     clks      = groupBy ((==) `on` fst) . sortBy (compare `on` fst)
               $ [ ((nm,i),ty') | (Clock nm i _,ty') <- hwArgs]
     rsts      = groupBy ((==) `on` (fst.fst)) . sortBy (compare `on` (fst.fst))

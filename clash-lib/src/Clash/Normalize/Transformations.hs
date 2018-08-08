@@ -123,6 +123,7 @@ inlineOrLiftNonRep = inlineOrLiftBinders nonRepTest inlineTest
     nonRepTest :: (Var Term, Embed Term) -> RewriteMonad extra Bool
     nonRepTest ((Id _ tyE), _)
       = not <$> (representableType <$> Lens.view typeTranslator
+                                   <*> Lens.view customReprs
                                    <*> pure False
                                    <*> Lens.view tcCache
                                    <*> pure (unembed tyE))
@@ -194,6 +195,7 @@ nonRepSpec ctx e@(App e1 e2)
        e2Ty <- termType tcm e2
        localVar <- isLocalVar e2
        nonRepE2 <- not <$> (representableType <$> Lens.view typeTranslator
+                                              <*> Lens.view customReprs
                                               <*> pure False
                                               <*> Lens.view tcCache
                                               <*> pure e2Ty)
@@ -241,6 +243,7 @@ caseCase :: NormRewrite
 caseCase _ e@(Case (Case scrut alts1Ty alts1) alts2Ty alts2)
   = do
     ty1Rep <- representableType <$> Lens.view typeTranslator
+                                <*> Lens.view customReprs
                                 <*> pure False
                                 <*> Lens.view tcCache
                                 <*> pure alts1Ty
@@ -284,6 +287,7 @@ inlineNonRep _ e@(Case scrut altsTy alts)
       else do
         bodyMaybe   <- fmap (HashMap.lookup f) $ Lens.use bindings
         nonRepScrut <- not <$> (representableType <$> Lens.view typeTranslator
+                                                  <*> Lens.view customReprs
                                                   <*> pure False
                                                   <*> Lens.view tcCache
                                                   <*> pure scrutTy)
@@ -337,6 +341,7 @@ caseCon _ c@(Case (Literal l) _ alts) = do
 
 caseCon ctx e@(Case subj ty alts)
   | (Prim _ _,_) <- collectArgs subj = do
+    reprs <- Lens.view customReprs
     tcm <- Lens.view tcCache
     bndrs <- Lens.use bindings
     primEval <- Lens.view evaluator
@@ -375,7 +380,7 @@ caseCon ctx e@(Case subj ty alts)
           _ -> do
             subjTy <- termType tcm subj
             tran   <- Lens.view typeTranslator
-            case coreTypeToHWType tran tcm False subjTy of
+            case coreTypeToHWType tran reprs tcm False subjTy of
               Right (Void (Just hty))
                 | hty `elem` [BitVector 0, Unsigned 0, Signed 0, Index 1]
                 -> caseCon ctx (Case (Literal (IntegerLiteral 0)) ty alts)
@@ -384,10 +389,11 @@ caseCon ctx e@(Case subj ty alts)
                      (caseOneAlt e)
 
 caseCon ctx e@(Case subj ty alts) = do
+  reprs <- Lens.view customReprs
   tcm <- Lens.view tcCache
   subjTy <- termType tcm subj
   tran <- Lens.view typeTranslator
-  case coreTypeToHWType tran tcm False subjTy of
+  case coreTypeToHWType tran reprs tcm False subjTy of
     Right (Void (Just hty))
       | hty `elem` [BitVector 0, Unsigned 0, Signed 0, Index 1]
       -> caseCon ctx (Case (Literal (IntegerLiteral 0)) ty alts)
@@ -582,7 +588,7 @@ removeUnusedExpr _ e@(collectArgs -> (p@(Prim nm _),args)) = do
   case bbM of
     Just (BlackBox pNm _ _ _ inc templ) -> do
       let usedArgs = if isFromInt pNm
-                        then [0,1]
+                        then [0,1,2]
                         else either usedArguments usedArguments templ ++
                              concatMap (usedArguments . snd) inc
       tcm <- Lens.view tcCache
@@ -950,9 +956,8 @@ appProp _ e = return e
 --        3 -> fromInteger 0
 -- @
 caseFlat :: NormRewrite
-caseFlat _ e@(Case (collectArgs -> (Prim nm _,args)) ty _)
-  | isEq nm
-  = do let (Left scrut') = args !! 1
+caseFlat _ e@(Case (collectEqArgs -> Just (scrut',_)) ty _)
+  = do
        case collectFlat scrut' e of
          Just alts' -> changed (Case scrut' ty (last alts' : init alts'))
          Nothing    -> return e
@@ -960,9 +965,8 @@ caseFlat _ e@(Case (collectArgs -> (Prim nm _,args)) ty _)
 caseFlat _ e = return e
 
 collectFlat :: Term -> Term -> Maybe [Bind Pat Term]
-collectFlat scrut (Case (collectArgs -> (Prim nm _,args)) _ty [lAlt,rAlt])
-  | isEq nm
-  , scrut' == scrut
+collectFlat scrut (Case (collectEqArgs -> Just (scrut', val)) _ty [lAlt,rAlt])
+  | scrut' == scrut
   = case collectArgs val of
       (Prim nm' _,args') | isFromInt nm'
         -> case last args' of
@@ -983,9 +987,6 @@ collectFlat scrut (Case (collectArgs -> (Prim nm _,args)) _ty [lAlt,rAlt])
             _ -> Nothing
       _ -> Nothing
   where
-    (Left scrut') = args !! 1
-    (Left val)    = args !! 2
-
     isFalseDcPat (DataPat p _)
       = ((== "GHC.Types.False") . name2String . dcName . unembed) p
     isFalseDcPat _ = False
@@ -996,11 +997,18 @@ collectFlat scrut (Case (collectArgs -> (Prim nm _,args)) _ty [lAlt,rAlt])
 
 collectFlat _ _ = Nothing
 
-isEq :: Text -> Bool
-isEq nm = nm == "Clash.Sized.Internal.BitVector.eq#" ||
-          nm == "Clash.Sized.Internal.Index.eq#" ||
-          nm == "Clash.Sized.Internal.Signed.eq#" ||
-          nm == "Clash.Sized.Internal.Unsigned.eq#"
+collectEqArgs :: Term -> Maybe (Term,Term)
+collectEqArgs (collectArgs -> (Prim nm _, args))
+  | nm == "Clash.Sized.Internal.BitVector.eq#"
+    = let [_,_,Left scrut,Left val] = args
+      in Just (scrut,val)
+  | nm == "Clash.Sized.Internal.Index.eq#"  ||
+    nm == "Clash.Sized.Internal.Signed.eq#" ||
+    nm == "Clash.Sized.Internal.Unsigned.eq#"
+    = let [_,Left scrut,Left val] = args
+      in Just (scrut,val)
+collectEqArgs _ = Nothing
+
 
 isFromInt :: Text -> Bool
 isFromInt nm = nm == "Clash.Sized.Internal.BitVector.fromInteger##" ||
@@ -1681,6 +1689,14 @@ inlineCleanup _ (Letrec b) = do
             -> True
           Case _ _ [_] -> True
           Data _ -> True
+          _ -> False
+      | nameOcc (varName id_) `notElem` bodyFVs
+      = case tm of
+          -- Inlines WW projection that exposes internals of the BitVector types
+          Case _ _ [unsafeUnbind -> (DataPat dcE _,_)]
+            -> let nm = (name2String $ dcName $ unembed dcE)
+               in nm == "Clash.Sized.Internal.BitVector.BV"  ||
+                  nm == "Clash.Sized.Internal.BitVector.Bit"
           _ -> False
 
     isInteresting _ _ _ _ = False

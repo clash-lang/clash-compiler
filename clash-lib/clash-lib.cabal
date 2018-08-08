@@ -129,7 +129,9 @@ Library
                       unbound-generics        >= 0.1      && < 0.4,
                       unordered-containers    >= 0.2.3.3  && < 0.3
 
-  Exposed-modules:    Clash.Backend
+  Exposed-modules:    Clash.Annotations.BitRepresentation.ClashLib
+
+                      Clash.Backend
                       Clash.Backend.SystemVerilog
                       Clash.Backend.Verilog
                       Clash.Backend.VHDL

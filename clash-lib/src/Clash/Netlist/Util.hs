@@ -24,7 +24,7 @@ import           Control.Monad.Trans.Except (runExcept)
 import           Data.Either             (partitionEithers)
 import           Data.HashMap.Strict     (HashMap)
 import qualified Data.HashMap.Strict     as HashMap
-import           Data.List               (intersperse, unzip4)
+import           Data.List               (intersperse, unzip4, sort)
 import           Data.Maybe              (catMaybes,fromMaybe)
 import           Data.Text.Lazy          (append,pack,unpack)
 import qualified Data.Text.Lazy          as Text
@@ -32,6 +32,10 @@ import           Unbound.Generics.LocallyNameless
   (Embed, Fresh, embed, unbind, unembed, unrec)
 import qualified Unbound.Generics.LocallyNameless as Unbound
 
+import           Clash.Annotations.BitRepresentation.ClashLib
+  (coreToType')
+import           Clash.Annotations.BitRepresentation.Internal
+  (CustomReprs, ConstrRepr'(..), DataRepr'(..), getDataRepr, getConstrRepr)
 import           Clash.Annotations.TopEntity (PortName (..), TopEntity (..))
 import           Clash.Driver.Types
   (ClashException (..), Manifest (..), SrcSpan)
@@ -99,14 +103,15 @@ splitNormalized tcm expr = do
 unsafeCoreTypeToHWType
   :: SrcSpan
   -> String
-  -> (HashMap TyConOccName TyCon -> Bool -> Type -> Maybe (Either String HWType))
+  -> (CustomReprs -> HashMap TyConOccName TyCon -> Bool -> Type -> Maybe (Either String HWType))
+  -> CustomReprs
   -> HashMap TyConOccName TyCon
   -> Bool
   -> Type
   -> HWType
-unsafeCoreTypeToHWType sp loc builtInTranslation m keepVoid =
+unsafeCoreTypeToHWType sp loc builtInTranslation reprs m keepVoid =
   either (\msg -> throw (ClashException sp (loc ++ msg) Nothing)) id .
-  coreTypeToHWType builtInTranslation m keepVoid
+  coreTypeToHWType builtInTranslation reprs m keepVoid
 
 -- | Converts a Core type to a HWType within the NetlistMonad; errors on failure
 unsafeCoreTypeToHWTypeM
@@ -118,6 +123,7 @@ unsafeCoreTypeToHWTypeM loc ty =
     <$> (snd <$> Lens.use curCompNm)
     <*> pure loc
     <*> Lens.use typeTranslator
+    <*> Lens.use customReprs
     <*> Lens.use tcCache
     <*> pure False
     <*> pure ty
@@ -126,7 +132,11 @@ unsafeCoreTypeToHWTypeM loc ty =
 coreTypeToHWTypeM
   :: Type
   -> NetlistMonad (Maybe HWType)
-coreTypeToHWTypeM ty = hush <$> (coreTypeToHWType <$> Lens.use typeTranslator <*> Lens.use tcCache <*> pure False <*> pure ty)
+coreTypeToHWTypeM ty = hush <$> (coreTypeToHWType <$> Lens.use typeTranslator
+                                                  <*> Lens.use customReprs
+                                                  <*> Lens.use tcCache
+                                                  <*> pure False
+                                                  <*> pure ty)
 
 -- | Returns the name and period of the clock corresponding to a type
 synchronizedClk :: HashMap TyConOccName TyCon -- ^ TyCon cache
@@ -157,27 +167,116 @@ synchronizedClk tcm ty
   | otherwise
   = Nothing
 
+packSP
+  :: CustomReprs
+  -> (Text.Text, c)
+  -> (ConstrRepr', Text.Text, c)
+packSP reprs (name, tys) =
+  case getConstrRepr name reprs of
+    Just repr -> (repr, name, tys)
+    Nothing   -> error $ $(curLoc) ++ unwords
+      [ "Could not find custom representation for", Text.unpack name ]
+
+packSum
+  :: CustomReprs
+  -> Text.Text
+  -> (ConstrRepr', Text.Text)
+packSum reprs name =
+  case getConstrRepr name reprs of
+    Just repr -> (repr, name)
+    Nothing   -> error $ $(curLoc) ++ unwords
+      [ "Could not find custom representation for", Text.unpack name ]
+
+fixCustomRepr
+  :: CustomReprs
+  -> Type
+  -> HWType
+  -> HWType
+fixCustomRepr reprs (coreToType' -> Right tyName) sum_@(Sum name subtys) =
+  case getDataRepr tyName reprs of
+    Just dRepr@(DataRepr' name' size constrs) ->
+      if length constrs == length subtys then
+        CustomSum
+          name
+          dRepr
+          (fromIntegral size)
+          [packSum reprs ty | ty <- subtys]
+      else
+        error $ $(curLoc) ++ (Text.unpack $ Text.unwords
+          [ "Type "
+          , Text.pack $ show name'
+          , "has"
+          , Text.pack $ show $ length subtys
+          , "constructors: \n\n"
+          , Text.intercalate "\n" $ sort [Text.append " * " id_ | id_ <- subtys]
+          , "\n\nBut the custom bit representation only specified"
+          , Text.pack $ show $ length constrs
+          , "constructors:\n\n"
+          , Text.intercalate "\n" $ sort [Text.append " * " id_ | (ConstrRepr' id_ _ _ _ _) <- constrs]
+          ])
+    Nothing ->
+      -- No custom representation found
+      sum_
+
+fixCustomRepr reprs (coreToType' -> Right tyName) sp@(SP name subtys) =
+  case getDataRepr tyName reprs of
+    Just dRepr@(DataRepr' name' size constrs) ->
+      if length constrs == length subtys then
+        CustomSP
+          name
+          dRepr
+          (fromIntegral size)
+          [packSP reprs ty | ty <- subtys]
+      else
+        error $ $(curLoc) ++ (Text.unpack $ Text.unwords
+          [ "Type "
+          , Text.pack $ show $ name'
+          , "has"
+          , Text.pack $ show $ length subtys
+          , "constructors: \n\n"
+          , Text.intercalate "\n" $ sort [Text.append " * " id_ | (id_, _) <- subtys]
+          , "\n\nBut the custom bit representation only specified"
+          , Text.pack $ show $ length constrs, "constructors:\n\n"
+          , Text.intercalate "\n" $ sort [Text.append " * " id_ | (ConstrRepr' id_ _ _ _ _) <- constrs]
+          ])
+    Nothing ->
+      -- No custom representation found
+      sp
+
+fixCustomRepr _ _ typ = typ
+
 -- | Converts a Core type to a HWType given a function that translates certain
 -- builtin types. Returns a string containing the error message when the Core
 -- type is not translatable.
 coreTypeToHWType
-  :: (HashMap TyConOccName TyCon -> Bool -> Type -> Maybe (Either String HWType))
+  :: (CustomReprs -> HashMap TyConOccName TyCon -> Bool -> Type -> Maybe (Either String HWType))
+  -> CustomReprs
   -> HashMap TyConOccName TyCon
   -> Bool
   -> Type
   -> Either String HWType
-coreTypeToHWType builtInTranslation m keepVoid (builtInTranslation m keepVoid -> Just hty) =
-  hty
-coreTypeToHWType builtInTranslation m keepVoid (coreView m -> Just ty) =
-  coreTypeToHWType builtInTranslation m keepVoid ty
-coreTypeToHWType builtInTranslation m keepVoid ty@(tyView -> TyConApp tc args) =
-  mkADT builtInTranslation m (showDoc ty) keepVoid tc args
-coreTypeToHWType _ _ _ ty = Left $ "Can't translate non-tycon type: " ++ showDoc ty
+coreTypeToHWType builtInTranslation reprs m keepVoid ty = go' ty
+  where
+    -- Try builtin translation; for now this is hardcoded to be the one in ghcTypeToHWType
+    go' :: Type -> Either String HWType
+    go' (builtInTranslation reprs m keepVoid -> Just hty) =
+      fixCustomRepr reprs ty <$> hty
+    -- Strip transparant types:
+    go' (coreView m -> Just ty') =
+      coreTypeToHWType builtInTranslation reprs m keepVoid ty'
+    -- Try to create hwtype based on AST:
+    go' (tyView -> TyConApp tc args) = do
+      hwty <- mkADT builtInTranslation reprs m (showDoc ty) keepVoid tc args
+      return $ fixCustomRepr reprs ty hwty
+    -- All methods failed:
+    go' _ = Left $ "Can't translate non-tycon type: " ++ showDoc ty
+
 
 -- | Converts an algebraic Core type (split into a TyCon and its argument) to a HWType.
 mkADT
-  :: (HashMap TyConOccName TyCon -> Bool -> Type -> Maybe (Either String HWType))
+  :: (CustomReprs -> HashMap TyConOccName TyCon -> Bool -> Type -> Maybe (Either String HWType))
   -- ^ Hardcoded Type -> HWType translator
+  -> CustomReprs
   -> HashMap TyConOccName TyCon
   -- ^ TyCon cache
   -> String
@@ -189,11 +288,11 @@ mkADT
   -> [Type]
   -- ^ Its applied arguments
   -> Either String HWType
-mkADT _ m tyString _ tc _
+mkADT _ _ m tyString _ tc _
   | isRecursiveTy m tc
   = Left $ $(curLoc) ++ "Can't translate recursive type: " ++ tyString
 
-mkADT builtInTranslation m _tyString keepVoid tc args = case tyConDataCons (m HashMap.! nameOcc tc) of
+mkADT builtInTranslation reprs m _tyString keepVoid tc args = case tyConDataCons (m HashMap.! nameOcc tc) of
   []  -> return (Void Nothing) -- Left $ $(curLoc) ++ "Can't translate empty type: " ++ tyString
   dcs -> do
     let tcName       = pack $ name2String tc
@@ -201,7 +300,7 @@ mkADT builtInTranslation m _tyString keepVoid tc args = case tyConDataCons (m Ha
         argTVss      = map dcUnivTyVars dcs
         argSubts     = map ((`zip` args) . map nameOcc) argTVss
         substArgTyss = zipWith (\s tys -> map (substTys s) tys) argSubts argTyss
-    argHTyss         <- mapM (mapM (coreTypeToHWType builtInTranslation m keepVoid)) substArgTyss
+    argHTyss         <- mapM (mapM (coreTypeToHWType builtInTranslation reprs m keepVoid)) substArgTyss
     let argHTyss1    = if keepVoid
                           then argHTyss
                           else map (filter (not . isVoid)) argHTyss
@@ -234,14 +333,15 @@ isRecursiveTy m tc = case tyConDataCons (m HashMap.! nameOcc tc) of
 -- | Determines if a Core type is translatable to a HWType given a function that
 -- translates certain builtin types.
 representableType
-  :: (HashMap TyConOccName TyCon -> Bool -> Type -> Maybe (Either String HWType))
+  :: (CustomReprs -> HashMap TyConOccName TyCon -> Bool -> Type -> Maybe (Either String HWType))
+  -> CustomReprs
   -> Bool
   -- ^ String considered representable
   -> HashMap TyConOccName TyCon
   -> Type
   -> Bool
-representableType builtInTranslation stringRepresentable m =
-    either (const False) isRepresentable . coreTypeToHWType builtInTranslation m False
+representableType builtInTranslation reprs stringRepresentable m =
+    either (const False) isRepresentable . coreTypeToHWType builtInTranslation reprs m False
   where
     isRepresentable hty = case hty of
       String          -> stringRepresentable
@@ -275,6 +375,8 @@ typeSize (Sum _ dcs) = fromMaybe 0 . clogBase 2 . toInteger $ length dcs
 typeSize (Product _ tys) = sum $ map typeSize tys
 typeSize (BiDirectional In h) = typeSize h
 typeSize (BiDirectional Out _) = 0
+typeSize (CustomSP _ _ size _) = fromIntegral size
+typeSize (CustomSum _ _ size _) = fromIntegral size
 
 -- | Determines the bitsize of the constructor of a type
 conSize :: HWType
@@ -400,11 +502,12 @@ mkUniqueArguments (Just teM) args = do
     go pM var = do
       tcm       <- Lens.use tcCache
       typeTrans <- Lens.use typeTranslator
+      reprs     <- Lens.use customReprs
       (_,sp)    <- Lens.use curCompNm
       let i    = varName var
           i'   = id2identifier var
           ty   = unembed (varType var)
-          hwty = unsafeCoreTypeToHWType sp $(curLoc) typeTrans tcm True ty
+          hwty = unsafeCoreTypeToHWType sp $(curLoc) typeTrans reprs tcm True ty
       (ports,decls,_,pN) <- mkInput pM (i',hwty)
       if isVoid hwty
          then return Nothing
@@ -425,11 +528,12 @@ mkUniqueResult Nothing res = do
 mkUniqueResult (Just teM) res = do
   tcm       <- Lens.use tcCache
   typeTrans <- Lens.use typeTranslator
+  reprs     <- Lens.use customReprs
   (_,sp)    <- Lens.use curCompNm
   let o    = varName res
       o'   = id2identifier res
       ty   = unembed (varType res)
-      hwty = unsafeCoreTypeToHWType sp $(curLoc) typeTrans tcm True ty
+      hwty = unsafeCoreTypeToHWType sp $(curLoc) typeTrans reprs tcm True ty
       oPortSupply = fmap t_output teM
   when (containsBiSignalIn hwty)
     (throw (ClashException sp ($(curLoc) ++ "BiSignalIn cannot be part of a function's result. Use 'readFromBiSignal'.") Nothing))
@@ -471,14 +575,15 @@ idToPort var = do
   tcm <- Lens.use tcCache
   typeTrans <- Lens.use typeTranslator
   (_,sp) <- Lens.use curCompNm
+  reprs <- Lens.use customReprs
   let i  = varName var
       ty = unembed (varType var)
-      hwTy = unsafeCoreTypeToHWType sp $(curLoc) typeTrans tcm False ty
+      hwTy = unsafeCoreTypeToHWType sp $(curLoc) typeTrans reprs tcm False ty
   if isVoid hwTy
     then return Nothing
     else return . Just $
       ( pack $ name2String i
-      , unsafeCoreTypeToHWType sp $(curLoc) typeTrans tcm False ty
+      , unsafeCoreTypeToHWType sp $(curLoc) typeTrans reprs tcm False ty
       )
 
 id2type :: Id -> Type
@@ -488,7 +593,7 @@ id2identifier :: Id -> Identifier
 id2identifier = pack . name2String . varName
 
 repName :: String -> Name a -> Name a
-repName s (Name sort _ loc) = Name sort (Unbound.string2Name s) loc
+repName s (Name sort' _ loc) = Name sort' (Unbound.string2Name s) loc
 
 -- | Make a set of IDs unique; also returns a substitution from old ID to new
 -- updated unique ID.

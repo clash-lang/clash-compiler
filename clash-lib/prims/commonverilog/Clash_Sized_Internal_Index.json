@@ -6,8 +6,8 @@
   }
 , { "BlackBox" :
     { "name"      : "Clash.Sized.Internal.Index.unpack#"
-    , "type"      : "unpack# :: KnownNat n => BitVector (CLog 2 n) -> Index n"
-    , "templateE" : "~ARG[1]"
+    , "type"      : "unpack# :: (KnownNat n, 1 <= n) => BitVector (CLog 2 n) -> Index n"
+    , "templateE" : "~ARG[2]"
     }
   }
 , { "BlackBox" :

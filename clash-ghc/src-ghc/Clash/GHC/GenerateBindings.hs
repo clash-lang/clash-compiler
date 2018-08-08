@@ -5,8 +5,9 @@
   Maintainer  :  Christiaan Baaij <christiaan.baaij@gmail.com>
 -}
 
-{-# LANGUAGE LambdaCase   #-}
-{-# LANGUAGE ViewPatterns #-}
+{-# LANGUAGE LambdaCase      #-}
+{-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE ViewPatterns    #-}
 
 module Clash.GHC.GenerateBindings
   (generateBindings)
@@ -21,7 +22,7 @@ import qualified Data.HashMap.Strict     as HashMap
 import           Data.IntMap.Strict      (IntMap)
 import qualified Data.IntMap.Strict      as IM
 import           Data.List               (foldl')
-import           Data.Text.Lazy          (Text)
+import qualified Data.Text.Lazy          as Text
 import qualified Data.Set                as Set
 import qualified Data.Set.Lens           as Lens
 import           Unbound.Generics.LocallyNameless (bind,embed,rec,runFreshM,unembed)
@@ -36,12 +37,14 @@ import qualified TysWiredIn              as GHC
 import qualified Var                     as GHC
 import qualified SrcLoc                  as GHC
 
+import           Clash.Annotations.BitRepresentation.Internal (DataRepr')
 import           Clash.Annotations.TopEntity (TopEntity)
 import           Clash.Annotations.Primitive (HDL)
+
 import           Clash.Core.FreeVars     (termFreeIds)
 import           Clash.Core.Name         (Name (..), string2SystemName)
 import           Clash.Core.Term         (Term (..), TmName, TmOccName)
-import           Clash.Core.Type         (Type, TypeView (..), mkFunTy, splitFunForallTy, tyView)
+import           Clash.Core.Type         (Type (..), TypeView (..), mkFunTy, splitFunForallTy, tyView)
 import           Clash.Core.TyCon        (TyCon, TyConName, TyConOccName)
 import           Clash.Core.TysPrim      (tysPrimMap)
 import           Clash.Core.Subst        (substTms)
@@ -56,20 +59,28 @@ import           Clash.Primitives.Util   (generatePrimMap)
 import           Clash.Rewrite.Util      (mkInternalVar, mkSelectorCase)
 import           Clash.Util              ((***),first)
 
-generateBindings ::
-     [FilePath]  -- ^ primitives (blackbox) directory
+generateBindings
+  :: [FilePath]
+  -- ^ primitives (blackbox) directories
   -> [FilePath]
+  -- ^ import directories (-i flag)
   -> HDL
+  -- ^ HDL target
   -> String
   -> Maybe  (GHC.DynFlags)
-  -> IO (BindingMap,HashMap TyConOccName TyCon,IntMap TyConName
-        ,[( TmName          -- topEntity bndr
-          , Type            -- type of the topEntity bndr
-          , Maybe TopEntity -- (maybe) TopEntity annotation
-          , Maybe TmName)]  -- (maybe) associated testbench
-        ,PrimMap Text)      -- The primitives found in '.' and 'primDir'
+  -> IO ( BindingMap
+        , HashMap TyConOccName TyCon
+        , IntMap TyConName
+        , [( TmName          -- topEntity bndr
+           , Type            -- type of the topEntity bndr
+           , Maybe TopEntity -- (maybe) TopEntity annotation
+           , Maybe TmName    -- (maybe) associated testbench
+           )]
+        , PrimMap Text.Text  -- The primitives found in '.' and 'primDir'
+        , [DataRepr']
+        )
 generateBindings primDirs importDirs hdl modName dflagsM = do
-  (bindings,clsOps,unlocatable,fiEnvs,topEntities,pFP) <- loadModules hdl modName dflagsM
+  (bindings,clsOps,unlocatable,fiEnvs,topEntities,pFP,reprs) <- loadModules hdl modName dflagsM
   primMap <- generatePrimMap $ concat [pFP, primDirs, importDirs]
   let ((bindingsMap,clsVMap),tcMap) = State.runState (mkBindings primMap bindings clsOps unlocatable) emptyGHC2CoreState
       (tcMap',tupTcCache)           = mkTupTyCons tcMap
@@ -88,7 +99,7 @@ generateBindings primDirs importDirs hdl modName dflagsM = do
                                               Nothing       -> error "This shouldn't happen"
                                           ) topEntities'
 
-  return (retypedBindings,allTcCache,tupTcCache,topEntities'',primMap)
+  return (retypedBindings,allTcCache,tupTcCache,topEntities'',primMap,reprs)
 
 retypeBindings
   :: HashMap TyConOccName TyCon

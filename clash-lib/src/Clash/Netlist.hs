@@ -27,7 +27,7 @@ import           Data.Char                        (ord)
 import           Data.Either                      (lefts,partitionEithers)
 import           Data.HashMap.Lazy                (HashMap)
 import qualified Data.HashMap.Lazy                as HashMap
-import           Data.List                        (elemIndex)
+import           Data.List                        (elemIndex, sortOn)
 import           Data.Maybe                       (catMaybes, listToMaybe)
 import           Data.Primitive.ByteArray         (ByteArray (..))
 import qualified Data.Text                        as StrictText
@@ -42,6 +42,10 @@ import           Unbound.Generics.LocallyNameless
 import           Outputable                       (ppr, showSDocUnsafe)
 import           SrcLoc                           (SrcSpan,isGoodSrcSpan,noSrcSpan)
 
+import           Clash.Annotations.BitRepresentation.ClashLib
+  (coreToType')
+import           Clash.Annotations.BitRepresentation.Internal
+  (CustomReprs, DataRepr'(..), ConstrRepr'(..), getDataRepr, getConstrRepr)
 import           Clash.Annotations.TopEntity      (TopEntity (..))
 import           Clash.Core.DataCon               (DataCon (..))
 import           Clash.Core.FreeVars              (typeFreeVars)
@@ -51,7 +55,7 @@ import           Clash.Core.Pretty                (showDoc)
 import           Clash.Core.Term
   (Alt, Pat (..), Term (..), TmName, TmOccName)
 import qualified Clash.Core.Term                  as Core
-import           Clash.Core.Type                  (Type (..), splitFunTys)
+import           Clash.Core.Type                  (Type (..), splitFunTys, coreView)
 import           Clash.Core.TyCon
   (TyCon, TyConOccName)
 import           Clash.Core.Util                  (collectArgs, termType)
@@ -66,9 +70,11 @@ import           Clash.Netlist.Util
 import           Clash.Primitives.Types           as P
 import           Clash.Util
 
+
 -- | Generate a hierarchical netlist out of a set of global binders with
 -- @topEntity@ at the top.
-genNetlist :: BindingMap
+genNetlist :: CustomReprs
+           -> BindingMap
            -- ^ Global binders
            -> [(TmName,Type,Maybe TopEntity,Maybe TmName)]
            -- ^ All the TopEntities
@@ -76,7 +82,7 @@ genNetlist :: BindingMap
            -- ^ Primitive definitions
            -> HashMap TyConOccName TyCon
            -- ^ TyCon cache
-           -> (HashMap TyConOccName TyCon -> Bool -> Type -> Maybe (Either String HWType))
+           -> (CustomReprs -> HashMap TyConOccName TyCon -> Bool -> Type -> Maybe (Either String HWType))
            -- ^ Hardcoded Type -> HWType translator
            -> [(String,FilePath)]
            -- ^ Set of collected data-files
@@ -97,8 +103,8 @@ genNetlist :: BindingMap
            -> TmOccName
            -- ^ Name of the @topEntity@
            -> IO ([(SrcSpan,Component)],[(String,FilePath)],[(String,String)],[Identifier])
-genNetlist globals tops primMap tcm typeTrans dfiles mfiles iw mkId extId seen env prefixM topEntity = do
-  (_,s) <- runNetlistMonad globals (mkTopEntityMap tops) primMap tcm typeTrans
+genNetlist reprs globals tops primMap tcm typeTrans dfiles mfiles iw mkId extId seen env prefixM topEntity = do
+  (_,s) <- runNetlistMonad reprs globals (mkTopEntityMap tops) primMap tcm typeTrans
              dfiles mfiles iw mkId extId seen env prefixM $ genComponent topEntity
   return ( HashMap.elems $ _components s
          , _dataFiles s
@@ -112,7 +118,8 @@ genNetlist globals tops primMap tcm typeTrans dfiles mfiles iw mkId extId seen e
     mkTopEntityMap = HashMap.fromList . map (\(a,b,c,_) -> (nameOcc a,(b,c)))
 
 -- | Run a NetlistMonad action in a given environment
-runNetlistMonad :: BindingMap
+runNetlistMonad :: CustomReprs
+                -> BindingMap
                 -- ^ Global binders
                 -> HashMap TmOccName (Type, Maybe TopEntity)
                 -- ^ TopEntity annotations
@@ -120,7 +127,7 @@ runNetlistMonad :: BindingMap
                 -- ^ Primitive Definitions
                 -> HashMap TyConOccName TyCon
                 -- ^ TyCon cache
-                -> (HashMap TyConOccName TyCon -> Bool -> Type -> Maybe (Either String HWType))
+                -> (CustomReprs -> HashMap TyConOccName TyCon -> Bool -> Type -> Maybe (Either String HWType))
                 -- ^ Hardcode Type -> HWType translator
                 -> [(String,FilePath)]
                 -- ^ Set of collected data-files
@@ -141,12 +148,12 @@ runNetlistMonad :: BindingMap
                 -> NetlistMonad a
                 -- ^ Action to run
                 -> IO (a, NetlistState)
-runNetlistMonad s tops p tcm typeTrans dfiles mfiles iw mkId extId seenIds_ env prefixM
+runNetlistMonad reprs s tops p tcm typeTrans dfiles mfiles iw mkId extId seenIds_ env prefixM
   = runFreshMT
   . flip runStateT s'
   . runNetlist
   where
-    s' = NetlistState s 0 HashMap.empty p typeTrans tcm (Text.empty,noSrcSpan) dfiles mfiles iw mkId extId [] seenIds' names tops env 0 prefixM
+    s' = NetlistState s 0 HashMap.empty p typeTrans tcm (Text.empty,noSrcSpan) dfiles mfiles iw mkId extId [] seenIds' names tops env 0 prefixM reprs
     (seenIds',names) = genNames mkId prefixM seenIds_ HashMap.empty (HashMap.elems (HashMap.map (^. _1) s))
 
 genNames :: (IdType -> Identifier -> Identifier)
@@ -335,9 +342,11 @@ mkSelection
   -> [Alt]
   -> NetlistMonad [Declaration]
 mkSelection bndr scrut altTy alts = do
-  alts'                  <- reorderPats <$> mapM unbind alts
   tcm                    <- Lens.use tcCache
+  reprs                  <- Lens.use customReprs
   scrutTy                <- termType tcm scrut
+  alts'                  <- (reorderDefault . reorderCustom tcm reprs scrutTy)
+                            <$> mapM unbind alts
   scrutHTy               <- unsafeCoreTypeToHWTypeM $(curLoc) scrutTy
   altHTy                 <- unsafeCoreTypeToHWTypeM $(curLoc) altTy
   scrutId                <- extendIdentifier Extended
@@ -378,11 +387,47 @@ mkSelection bndr scrut altTy alts = do
                                   _ -> throw (ClashException sp ($(curLoc) ++ "Not in normal form: Not a variable reference or primitive as subject of a case-statement:\n\n" ++ show scrutE) Nothing)
       _ -> scrutE
 
-    -- GHC puts default patterns in the first position, we want them in the
-    -- last position.
-    reorderPats :: [(Pat,Term)] -> [(Pat,Term)]
-    reorderPats ((DefaultPat,e):alts') = alts' ++ [(DefaultPat,e)]
-    reorderPats alts'                  = alts'
+-- GHC puts default patterns in the first position, we want them in the
+-- last position.
+reorderDefault
+  :: [(Pat, Term)]
+  -> [(Pat, Term)]
+reorderDefault ((DefaultPat,e):alts') = alts' ++ [(DefaultPat,e)]
+reorderDefault alts'                  = alts'
+
+reorderCustom
+  :: HashMap TyConOccName TyCon
+  -> CustomReprs
+  -> Type
+  -> [(Pat, Term)]
+  -> [(Pat, Term)]
+reorderCustom tcm reprs (coreView tcm -> Just ty) alts =
+  reorderCustom tcm reprs ty alts
+reorderCustom _tcm reprs (coreToType' -> Right typeName) alts =
+  case getDataRepr typeName reprs of
+    Just (DataRepr' _name _size _constrReprs) ->
+      sortOn (patPos reprs . fst) alts
+    Nothing ->
+      alts
+reorderCustom _tcm _reprs _type alts =
+  alts
+
+patPos
+  :: CustomReprs
+  -> Pat
+  -> Int
+patPos _reprs DefaultPat = -1
+patPos _reprs (LitPat _) = 0
+patPos reprs pat@(DataPat (Embed dataCon) _) =
+  -- We sort data patterns by their syntactical order
+  let name = Text.pack $ name2String $ dcName dataCon in
+  case getConstrRepr name reprs of
+    Nothing ->
+      -- TODO: err
+      error $ $(curLoc) ++ (show pat)
+    Just (ConstrRepr' _name n _mask _value _anns) ->
+      n
+
 
 -- | Generate a list of Declarations for a let-binder where the RHS is a function application
 mkFunApp
@@ -632,6 +677,20 @@ mkDcApplication dstHType bndr dc args = do
           GT -> error $ $(curLoc) ++ "Under-applied constructor"
       Sum _ _ ->
         return (HW.DataCon dstHType (DC (dstHType,dcTag dc - 1)) [])
+      CustomSP _ _ _ dcArgsTups -> do
+        -- Safely get item from list, or err with note
+        let dcI    = dcTag dc - 1
+        let note   = $(curLoc) ++ "No DC with tag: " ++ show dcI
+        let argTup = indexNote note dcArgsTups dcI
+        let (_, _, dcArgs) = argTup
+
+        case compare (length dcArgs) (length argExprs) of
+          EQ -> return (HW.DataCon dstHType (DC (dstHType, dcI)) argExprs)
+          LT -> error $ $(curLoc) ++ "Over-applied constructor"
+          GT -> error $ $(curLoc) ++ "Under-applied constructor"
+
+      CustomSum _ _ _ _ ->
+        return (HW.DataCon dstHType (DC (dstHType, dcTag dc - 1)) [])
       Bool ->
         let dc' = case dcTag dc of
                    1  -> HW.Literal Nothing (BoolLit False)

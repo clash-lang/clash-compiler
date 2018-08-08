@@ -18,9 +18,10 @@ import qualified System.IO.Unsafe as Unsafe
 import           System.IO.Temp   (createTempDirectory)
 import Control.Concurrent.Lock    ( Lock, newAcquired )
 
+
 data BuildTarget
   = VHDL | Verilog | SystemVerilog | Both | All
-  deriving Show
+  deriving (Show,Eq)
 
 
 defBuild :: BuildTarget
@@ -105,6 +106,19 @@ main = do
             , runTest ("tests" </> "shouldwork" </> "CoSim") Verilog ["-i../../../clash-cosim/src/prims/verilog"] "Register" (["","Register_testBench"],"Register_testBench",True)
             ]
 #endif
+        , testGroup "CustomReprs"
+            [ runTest ("tests" </> "shouldwork" </> "CustomReprs" </> "RotateC") defBuild [] "RotateC" (["", "RotateC_testBench"],"RotateC_testBench",True)
+            , runTest ("tests" </> "shouldwork" </> "CustomReprs" </> "RotateC") defBuild [] "ReprCompact" (["", "ReprCompact_testBench"],"ReprCompact_testBench",True)
+            , runTest ("tests" </> "shouldwork" </> "CustomReprs" </> "RotateC") defBuild [] "ReprCompactScrambled" (["", "ReprCompactScrambled_testBench"],"ReprCompactScrambled_testBench",True)
+            , runTest ("tests" </> "shouldwork" </> "CustomReprs" </> "RotateC") defBuild [] "ReprLastBitConstructor" (["", "ReprLastBitConstructor_testBench"],"ReprLastBitConstructor_testBench",True)
+            , runTest ("tests" </> "shouldwork" </> "CustomReprs" </> "RotateC") VHDL     [] "ReprStrangeMasks" (["", "ReprStrangeMasks_testBench"],"ReprStrangeMasks_testBench",True)
+            , runTest ("tests" </> "shouldwork" </> "CustomReprs" </> "RotateC") defBuild [] "ReprWide" (["", "ReprWide_testBench"],"ReprWide_testBench",True)
+            , runTest ("tests" </> "shouldwork" </> "CustomReprs" </> "RotateC") defBuild [] "RotateCScrambled" (["", "RotateCScrambled_testBench"],"RotateCScrambled_testBench",True)
+            , runTest ("tests" </> "shouldwork" </> "CustomReprs" </> "RotateCNested") defBuild [] "RotateCNested" (["", "RotateCNested_testBench"],"RotateCNested_testBench",True)
+            , runTest ("tests" </> "shouldwork" </> "CustomReprs" </> "Rotate") defBuild [] "Rotate" (["", "Rotate_testBench"],"Rotate_testBench",True)
+            , runTest ("tests" </> "shouldwork" </> "CustomReprs" </> "Deriving") defBuild [] "BitPackDerivation" (["", "BitPackDerivation_testBench"],"BitPackDerivation_testBench",True)
+            , runTest ("tests" </> "shouldwork" </> "CustomReprs" </> "Indexed") defBuild [] "Indexed" (["", "Indexed_testBench"],"Indexed_testBench",True)
+            ]
         , testGroup "Feedback" -- Broken on GHC 8.0 due to: https://ghc.haskell.org/trac/ghc/ticket/11525
             [ runTest ("tests" </> "shouldwork" </> "Feedback") defBuild [] "Fib" (["","Fib_testBench"],"Fib_testBench",True)
             ]
@@ -263,7 +277,7 @@ clashHDL
   -> SeqTestTree
 clashHDL t sourceDir extraArgs modName =
   let (cmd, args) = clashCmd t sourceDir extraArgs modName in
-  testProgram "clash" cmd args PrintStdErr False
+  testProgram (List.intercalate " " $ "clash" : extraArgs) cmd args PrintStdErr False
 
 ghdlLibrary
   :: FilePath

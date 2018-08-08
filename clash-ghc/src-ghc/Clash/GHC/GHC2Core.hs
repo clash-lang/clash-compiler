@@ -249,11 +249,13 @@ makeAlgTyConRhs algTcRhs = case algTcRhs of
   AbstractTyCon {} -> return Nothing
   TupleTyCon {}    -> error "Cannot handle tuple tycons"
 
-coreToTerm :: PrimMap a
-           -> [Var]
-           -> SrcSpan
-           -> CoreExpr
-           -> State GHC2CoreState C.Term
+
+coreToTerm
+  :: PrimMap a
+  -> [Var]
+  -> SrcSpan
+  -> CoreExpr
+  -> State GHC2CoreState C.Term
 coreToTerm primMap unlocs srcsp coreExpr = Reader.runReaderT (term coreExpr) srcsp
   where
     term :: CoreExpr -> ReaderT SrcSpan (State GHC2CoreState) C.Term
@@ -315,12 +317,13 @@ coreToTerm primMap unlocs srcsp coreExpr = Reader.runReaderT (term coreExpr) src
 
     term' (Case _ _ ty [])  = C.Prim (pack "EmptyCase") <$> lift (coreToType ty)
     term' (Case e b ty alts) = do
-     let usesBndr = any ( not . isEmptyVarSet . exprSomeFreeVars (`elem` [b]))
+     let usesBndr = any ( not . isEmptyVarSet . exprSomeFreeVars (== b))
                   $ rhssOfAlts alts
      b'  <- lift (coreToId b)
      e'  <- addUsefull (getSrcSpan b) (term e)
      ty' <- lift (coreToType ty)
-     let caseTerm v = C.Case v ty' <$> mapM (addUsefull (getSrcSpan b) . alt) alts
+     let caseTerm v =
+             C.Case v ty' <$> mapM (addUsefull (getSrcSpan b) . alt) alts
      if usesBndr
       then do
         ct <- caseTerm (C.Var (unembed $ C.varType b') (C.varName b'))

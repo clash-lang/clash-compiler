@@ -49,6 +49,8 @@ import           Text.Read                        (readMaybe)
 import           GHC.BasicTypes.Extra             ()
 
 import           Clash.Annotations.Primitive      (HDL (..))
+import           Clash.Annotations.BitRepresentation.Internal
+  (CustomReprs)
 import           Clash.Annotations.TopEntity      (TopEntity (..))
 import           Clash.Annotations.TopEntity.Extra ()
 import           Clash.Backend
@@ -72,7 +74,8 @@ import           Clash.Util                       (first, second)
 -- | Create a set of target HDL files for a set of functions
 generateHDL
   :: forall backend . Backend backend
-  => BindingMap
+  => CustomReprs
+  -> BindingMap
   -- ^ Set of functions
   -> Maybe backend
   -> PrimMap (Text.Text)
@@ -81,7 +84,7 @@ generateHDL
   -- ^ TyCon cache
   -> IntMap TyConName
   -- ^ Tuple TyCon cache
-  -> (HashMap TyConOccName TyCon -> Bool -> Type -> Maybe (Either String HWType))
+  -> (CustomReprs -> HashMap TyConOccName TyCon -> Bool -> Type -> Maybe (Either String HWType))
   -- ^ Hardcoded 'Type' -> 'HWType' translator
   -> PrimEvaluator
   -- ^ Hardcoded evaluator (delta-reduction)
@@ -97,7 +100,7 @@ generateHDL
   -- ^ Debug information level for the normalization process
   -> (Clock.UTCTime,Clock.UTCTime)
   -> IO ()
-generateHDL bindingsMap hdlState primMap tcm tupTcm typeTrans eval topEntities
+generateHDL reprs bindingsMap hdlState primMap tcm tupTcm typeTrans eval topEntities
   opts (startTime,prepTime) = go prepTime [] topEntities where
 
   primMap' = HM.map parsePrimitive primMap
@@ -177,7 +180,7 @@ generateHDL bindingsMap hdlState primMap tcm tupTcm typeTrans eval topEntities
       return (topTime,manifest,componentNames manifest ++ seen)
     else do
       -- 1. Normalise topEntity
-      let transformedBindings = normalizeEntity bindingsMap primMap' tcm tupTcm
+      let transformedBindings = normalizeEntity reprs bindingsMap primMap' tcm tupTcm
                                   typeTrans eval topEntityNames opts supplyN
                                   (nameOcc topEntity)
 
@@ -186,7 +189,7 @@ generateHDL bindingsMap hdlState primMap tcm tupTcm typeTrans eval topEntities
       putStrLn $ "Normalisation took " ++ show prepNormDiff
 
       -- 2. Generate netlist for topEntity
-      (netlist,dfiles,mfiles,seen') <- genNetlist transformedBindings topEntities primMap'
+      (netlist,dfiles,mfiles,seen') <- genNetlist reprs transformedBindings topEntities primMap'
                                 tcm typeTrans [] [] iw mkId extId seen
                                 hdlDir prefixM (nameOcc topEntity)
 
@@ -215,14 +218,14 @@ generateHDL bindingsMap hdlState primMap tcm tupTcm typeTrans eval topEntities
           hdlState2 = setModName modName' hdlState'
 
       -- 1. Normalise testBench
-      let transformedBindings = normalizeEntity bindingsMap primMap' tcm tupTcm
+      let transformedBindings = normalizeEntity reprs bindingsMap primMap' tcm tupTcm
                                   typeTrans eval topEntityNames opts supplyTB (nameOcc tb)
       normTime <- transformedBindings `deepseq` Clock.getCurrentTime
       let prepNormDiff = Clock.diffUTCTime normTime topTime
       putStrLn $ "Testbench normalisation took " ++ show prepNormDiff
 
       -- 2. Generate netlist for topEntity
-      (netlist,dfiles,mfiles,_) <- genNetlist transformedBindings topEntities primMap'
+      (netlist,dfiles,mfiles,_) <- genNetlist reprs transformedBindings topEntities primMap'
                               tcm typeTrans [] [] iw mkId extId seen'
                               hdlDir prefixM (nameOcc tb)
 
@@ -398,7 +401,8 @@ callGraphBindings bindingsMap tm =
 
 -- | Normalize a complete hierarchy
 normalizeEntity
-  :: BindingMap
+  :: CustomReprs
+  -> BindingMap
   -- ^ All bindings
   -> PrimMap BlackBoxTemplate
   -- ^ BlackBox HDL templates
@@ -406,7 +410,7 @@ normalizeEntity
   -- ^ TyCon cache
   -> IntMap TyConName
   -- ^ Tuple TyCon cache
-  -> (HashMap TyConOccName TyCon -> Bool -> Type -> Maybe (Either String HWType))
+  -> (CustomReprs -> HashMap TyConOccName TyCon -> Bool -> Type -> Maybe (Either String HWType))
   -- ^ Hardcoded 'Type' -> 'HWType' translator
   -> PrimEvaluator
   -- ^ Hardcoded evaluator (delta-reduction)
@@ -419,12 +423,12 @@ normalizeEntity
   -> TmOccName
   -- ^ root of the hierarchy
   -> BindingMap
-normalizeEntity bindingsMap primMap tcm tupTcm typeTrans eval topEntities
+normalizeEntity reprs bindingsMap primMap tcm tupTcm typeTrans eval topEntities
   opts supply tm = transformedBindings
   where
     doNorm = do norm <- normalize [tm]
                 let normChecked = checkNonRecursive norm
                 cleanupGraph tm normChecked
     transformedBindings = runNormalization opts supply bindingsMap
-                            typeTrans tcm tupTcm eval primMap HML.empty
+                            typeTrans reprs tcm tupTcm eval primMap HML.empty
                             topEntities doNorm

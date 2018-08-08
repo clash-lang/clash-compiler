@@ -41,6 +41,7 @@ executable clash-testsuite
                        filepath           >=1.4      && <1.5,
                        process            >=1.2      && <1.7,
                        tasty              >=0.10.1.2 && <2.0,
+                       tasty-hunit,
                        neat-interpolation >=0.3      && <0.4,
                        regex-pcre-builtin >=0.9      && <1,
                        regex-pcre-text    >=0.9      && <1,

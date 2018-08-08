@@ -10,25 +10,32 @@
 {-# LANGUAGE DeriveAnyClass             #-}
 {-# LANGUAGE DeriveGeneric              #-}
 {-# LANGUAGE DerivingStrategies         #-}
+{-# LANGUAGE DeriveLift                 #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE PatternSynonyms            #-}
 {-# LANGUAGE TemplateHaskell            #-}
+{-# LANGUAGE DeriveDataTypeable         #-}
 
 {-# OPTIONS_GHC -Wno-orphans #-}
 
 module Clash.Netlist.Types
-  (Declaration (..,NetDecl), module Clash.Netlist.Types)
+  ( Declaration (..,NetDecl)
+  , module Clash.Netlist.Types
+  )
 where
 
 import Control.DeepSeq
 import Control.Monad.State.Strict           (MonadIO, MonadState, StateT)
+import Data.Bits                            (testBit)
 import Data.Hashable
 import Data.HashMap.Lazy                    (HashMap)
 import Data.IntMap.Lazy                     (IntMap, empty)
 import qualified Data.Text                  as S
 import Data.Text.Lazy                       (Text, pack)
+import Data.Typeable                        (Typeable)
 import GHC.Generics                         (Generic)
-import Unbound.Generics.LocallyNameless              (Fresh, FreshMT)
+import Language.Haskell.TH.Syntax           (Lift)
+import Unbound.Generics.LocallyNameless     (Fresh, FreshMT)
 
 import SrcLoc                               (SrcSpan)
 
@@ -37,11 +44,14 @@ import Clash.Core.Term                      (TmOccName)
 import Clash.Core.Type                      (Type)
 import Clash.Core.TyCon                     (TyCon, TyConOccName)
 import Clash.Driver.Types                   (BindingMap)
-import Clash.Netlist.BlackBox.Types
+import Clash.Netlist.BlackBox.Types         hiding (L)
 import Clash.Netlist.Id                     (IdType)
 import Clash.Primitives.Types               (PrimMap)
 import Clash.Signal.Internal                (ClockKind, ResetKind)
 import Clash.Util
+
+import Clash.Annotations.BitRepresentation.Internal
+  (CustomReprs, DataRepr', ConstrRepr')
 
 -- | Monad that caches generated components (StateT) and remembers hidden inputs
 -- of components that are being generated (WriterT)
@@ -56,7 +66,7 @@ data NetlistState
   , _varCount       :: !Int -- ^ Number of signal declarations
   , _components     :: HashMap TmOccName (SrcSpan,Component) -- ^ Cached components
   , _primitives     :: PrimMap BlackBoxTemplate -- ^ Primitive Definitions
-  , _typeTranslator :: HashMap TyConOccName TyCon -> Bool -> Type -> Maybe (Either String HWType)
+  , _typeTranslator :: CustomReprs -> HashMap TyConOccName TyCon -> Bool -> Type -> Maybe (Either String HWType)
   -- ^ Hardcoded Type -> HWType translator
   , _tcCache        :: HashMap TyConOccName TyCon -- ^ TyCon cache
   , _curCompNm      :: !(Identifier,SrcSpan)
@@ -77,6 +87,7 @@ data NetlistState
   -- ^ The current scoping level assigned to black box contexts
   , _componentPrefix :: (Maybe Identifier,Maybe Identifier)
   -- ^ Prefix for top-level components, and prefix for all other components
+  , _customReprs    :: CustomReprs
   }
 
 -- | Signal reference
@@ -104,7 +115,7 @@ type Size = Int
 data HWType
   = Void (Maybe HWType)
   -- ^ Empty type. @Just Size@ for "empty" Vectors so we can still have
-  -- primitives that can traverse e.g. Vectors of unit and know the lenght of
+  -- primitives that can traverse e.g. Vectors of unit and know the length of
   -- that vector.
   | String
   -- ^ String type
@@ -136,6 +147,12 @@ data HWType
   -- ^ Reset type corresponding to clock with a specified name and period
   | BiDirectional !PortDirection !HWType
   -- ^ Tagging type indicating a bidirectional (inout) port
+  | CustomSP !Identifier !DataRepr' !Size [(ConstrRepr', Identifier, [HWType])]
+  -- ^ Same as Sum-Of-Product, but with a user specified bit representation. For
+  -- more info, see: Clash.Annotations.BitRepresentations.
+  | CustomSum !Identifier !DataRepr' !Size [(ConstrRepr', Identifier)]
+  -- ^ Same as Sum, but with a user specified bit representation. For more info,
+  -- see: Clash.Annotations.BitRepresentations.
   deriving (Eq,Ord,Show,Generic)
 
 instance Hashable ClockKind
@@ -209,11 +226,12 @@ data Expr
 
 -- | Literals used in an expression
 data Literal
-  = NumLit    !Integer   -- ^ Number literal
-  | BitLit    !Bit       -- ^ Bit literal
-  | BoolLit   !Bool      -- ^ Boolean literal
-  | VecLit    [Literal] -- ^ Vector literal
-  | StringLit !String    -- ^ String literal
+  = NumLit    !Integer          -- ^ Number literal
+  | BitLit    !Bit              -- ^ Bit literal
+  | BitVecLit !Integer !Integer -- ^ BitVector literal
+  | BoolLit   !Bool             -- ^ Boolean literal
+  | VecLit    [Literal]         -- ^ Vector literal
+  | StringLit !String           -- ^ String literal
   deriving (Eq,Show)
 
 -- | Bit literal
@@ -222,7 +240,15 @@ data Bit
   | L -- ^ Low
   | U -- ^ Undefined
   | Z -- ^ High-impedance
-  deriving (Eq,Show)
+  deriving (Eq,Show,Typeable,Lift)
+
+
+toBit :: Integer -- ^ mask
+      -> Integer -- ^ value
+      -> Bit
+toBit m i = if testBit m 0
+            then U
+            else if testBit i 0 then H else L
 
 -- | Context used to fill in the holes of a BlackBox template
 data BlackBoxContext

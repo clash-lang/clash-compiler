@@ -12,8 +12,8 @@
   }
 , { "BlackBox" :
     { "name"      : "Clash.Sized.Internal.Unsigned.unpack#"
-    , "type"      : "unpack# :: BitVector n -> Unsigned n"
-    , "templateE" : "unsigned(~ARG[0])"
+    , "type"      : "unpack# :: KnownNat n => BitVector n -> Unsigned n"
+    , "templateE" : "unsigned(~ARG[1])"
     }
   }
 , { "BlackBox" :

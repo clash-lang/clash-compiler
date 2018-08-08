@@ -517,6 +517,7 @@ isUntranslatable
 isUntranslatable stringRepresentable tm = do
   tcm <- Lens.view tcCache
   not <$> (representableType <$> Lens.view typeTranslator
+                             <*> Lens.view customReprs
                              <*> pure stringRepresentable
                              <*> pure tcm
                              <*> termType tcm tm)
@@ -530,6 +531,7 @@ isUntranslatableType
   -> RewriteMonad extra Bool
 isUntranslatableType stringRepresentable ty =
   not <$> (representableType <$> Lens.view typeTranslator
+                             <*> Lens.view customReprs
                              <*> pure stringRepresentable
                              <*> Lens.view tcCache
                              <*> pure ty)

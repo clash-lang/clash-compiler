@@ -30,14 +30,14 @@
   }
 , { "BlackBox" :
     { "name"      : "Clash.Sized.Internal.BitVector.reduceOr#"
-    , "type"      : "reduceOr# :: BitVector n -> Bit"
-    , "templateE" : "| (~ARG[0])"
+    , "type"      : "reduceOr# :: KnownNat n => BitVector n -> Bit"
+    , "templateE" : "| (~ARG[1])"
     }
   }
 , { "BlackBox" :
     { "name"      : "Clash.Sized.Internal.BitVector.reduceXor#"
-    , "type"      : "reduceXor# :: BitVector n -> Bit"
-    , "templateE" : "^ (~ARG[0])"
+    , "type"      : "reduceXor# :: KnownNat n => BitVector n -> Bit"
+    , "templateE" : "^ (~ARG[1])"
     }
   }
 , { "BlackBox" :
@@ -78,8 +78,8 @@
   }
 , { "BlackBox" :
     { "name"      : "Clash.Sized.Internal.BitVector.fromInteger##"
-    , "type"      : "fromInteger# :: Integer -> Bit"
-    , "templateE" : "~VAR[i][0][0]"
+    , "type"      : "fromInteger## :: Integer -> Integer -> Bit"
+    , "templateE" : "~VAR[i][0][0] ? 1'bx : ~VAR[i][1][0]"
     }
   }
 , { "BlackBox" :
@@ -108,44 +108,44 @@
   }
 , { "BlackBox" :
     { "name"      : "Clash.Sized.Internal.BitVector.eq#"
-    , "type"      : "eq# :: BitVector n -> BitVector n -> Bool"
-    , "templateE" : "~IF~SIZE[~TYP[0]]~THEN~ARG[0] == ~ARG[1]~ELSE1'b1~FI"
+    , "type"      : "eq# :: KnownNat n => BitVector n -> BitVector n -> Bool"
+    , "templateE" : "~IF~SIZE[~TYP[1]]~THEN~ARG[1] == ~ARG[2]~ELSE1'b1~FI"
     }
   }
 , { "BlackBox" :
     { "name"      : "Clash.Sized.Internal.BitVector.neq#"
-    , "type"      : "neq# :: BitVector n -> BitVector n -> Bool"
-    , "templateE" : "~IF~SIZE[~TYP[0]]~THEN~ARG[0] != ~ARG[1]~ELSE1'b0~FI"
+    , "type"      : "neq# :: KnownNat n => BitVector n -> BitVector n -> Bool"
+    , "templateE" : "~IF~SIZE[~TYP[1]]~THEN~ARG[1] != ~ARG[2]~ELSE1'b0~FI"
     }
   }
 , { "BlackBox" :
     { "name"      : "Clash.Sized.Internal.BitVector.lt#"
-    , "type"      : "lt# :: BitVector n -> BitVector n -> Bool"
-    , "templateE" : "~IF~SIZE[~TYP[0]]~THEN~ARG[0] < ~ARG[1]~ELSE1'b0~FI"
+    , "type"      : "lt# :: KnownNat n => BitVector n -> BitVector n -> Bool"
+    , "templateE" : "~IF~SIZE[~TYP[1]]~THEN~ARG[1] < ~ARG[2]~ELSE1'b0~FI"
     }
   }
 , { "BlackBox" :
     { "name"      : "Clash.Sized.Internal.BitVector.ge#"
-    , "type"      : "ge# :: BitVector n -> BitVector n -> Bool"
-    , "templateE" : "~IF~SIZE[~TYP[0]]~THEN~ARG[0] >= ~ARG[1]~ELSE1'b1~FI"
+    , "type"      : "ge# :: KnownNat n => BitVector n -> BitVector n -> Bool"
+    , "templateE" : "~IF~SIZE[~TYP[1]]~THEN~ARG[1] >= ~ARG[2]~ELSE1'b1~FI"
     }
   }
 , { "BlackBox" :
     { "name"      : "Clash.Sized.Internal.BitVector.gt#"
-    , "type"      : "gt# :: BitVector n -> BitVector n -> Bool"
-    , "templateE" : "~IF~SIZE[~TYP[0]]~THEN~ARG[0] > ~ARG[1]~ELSE1'b0~FI"
+    , "type"      : "gt# :: KnownNat n => BitVector n -> BitVector n -> Bool"
+    , "templateE" : "~IF~SIZE[~TYP[1]]~THEN~ARG[1] > ~ARG[2]~ELSE1'b0~FI"
     }
   }
 , { "BlackBox" :
     { "name"      : "Clash.Sized.Internal.BitVector.le#"
-    , "type"      : "le# :: BitVector n -> BitVector n -> Bool"
-    , "templateE" : "~IF~SIZE[~TYP[0]]~THEN~ARG[0] <= ~ARG[1]~ELSE1'b1~FI"
+    , "type"      : "le# :: KnownNat n => BitVector n -> BitVector n -> Bool"
+    , "templateE" : "~IF~SIZE[~TYP[1]]~THEN~ARG[1] <= ~ARG[2]~ELSE1'b1~FI"
     }
   }
 , { "BlackBox" :
     { "name"      : "Clash.Sized.Internal.BitVector.toInteger#"
-    , "type"      : "toInteger# :: BitVector n -> Integer"
-    , "templateD" : "assign ~RESULT = ~IF~SIZE[~TYP[0]]~THEN$unsigned(~ARG[0])~ELSE64'sd0~FI;"
+    , "type"      : "toInteger# :: KnownNat n => BitVector n -> Integer"
+    , "templateD" : "assign ~RESULT = ~IF~SIZE[~TYP[1]]~THEN$unsigned(~ARG[1])~ELSE64'sd0~FI;"
     }
   }
 , { "BlackBox" :
