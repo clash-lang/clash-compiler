@@ -1,0 +1,37 @@
+name:                clash-profiling-prepare
+version:             0.1.0
+synopsis:            Runs ghc frontend and prepares input for clash-profile-normalization-run
+-- description:
+homepage:            http://www.clash-lang.org/
+license:             BSD2
+author:              Leon Schoorl
+category:            Testing
+build-type:          Simple
+cabal-version:       >=1.10
+
+library
+  HS-Source-Dirs:      instances
+  default-language:    Haskell2010
+  ghc-options:         -Wall
+  Exposed-Modules:     SerialiseInstances
+  build-depends:       base                  >= 4.8      && < 5,
+                       binary                >= 0.8.5    && < 0.11,
+                       hashable              >= 1.1.2.3  && < 1.3,
+                       template-haskell      >= 2.12.0.0 && < 2.15,
+                       unordered-containers  >= 0.2.3.3  && < 0.3,
+
+                       clash-lib,
+                       clash-prelude
+
+executable clash-profile-normalization-prepare
+  main-is:             profile-normalization-prepare.hs
+  default-language:    Haskell2010
+  ghc-options:         -Wall
+  build-depends:       base                  >= 4.8      && < 5,
+                       binary                >= 0.8.5    && < 0.11,
+                       bytestring            >= 0.10.0.2 && < 0.11,
+                       filepath              >= 1.4      && < 1.5,
+                       ghc                   >= 8.2.0    && < 8.6,
+
+                       clash-benchmark,
+                       clash-profiling-prepare
