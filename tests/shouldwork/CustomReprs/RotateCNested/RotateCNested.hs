@@ -21,7 +21,7 @@ data MaybeColor
 
 {-# ANN module (
   DataReprAnn
-    $(reprType [t| Color |])
+    $(liftQ [t| Color |])
     2
     [ ConstrRepr
         'Red
@@ -42,7 +42,7 @@ data MaybeColor
 
 {-# ANN module (
   DataReprAnn
-    $(reprType [t| MaybeColor |])
+    $(liftQ [t| MaybeColor |])
     2
     [ ConstrRepr
         'NothingC

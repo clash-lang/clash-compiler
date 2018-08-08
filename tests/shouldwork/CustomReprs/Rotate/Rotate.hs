@@ -16,7 +16,7 @@ data Color
 
 {-# ANN module (
   DataReprAnn
-    $(reprType [t| Color |])
+    $(liftQ [t| Color |])
     2
     [ ConstrRepr
         'Red
@@ -37,7 +37,7 @@ data Color
 
 {-# ANN module (
   DataReprAnn
-    $(reprType [t| Maybe Color |])
+    $(liftQ [t| Maybe Color |])
     2
     -- How do we represent our constructors?
     [ ConstrRepr

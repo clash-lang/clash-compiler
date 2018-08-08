@@ -14,7 +14,7 @@ import Clash.Annotations.BitRepresentation
 
 {-# ANN module (
   DataReprAnn
-    $(reprType [t| MaybeColor |])
+    $(liftQ [t| MaybeColor |])
     3
     [ ConstrRepr
         'NothingC
