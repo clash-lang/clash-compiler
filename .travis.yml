@@ -65,7 +65,6 @@ before_install:
   - vvp -V
 
 install:
-  - git clone https://github.com/clash-lang/clash-cosim.git
   - cabal --version
   - echo "$(${HC} --version) [$(${HC} --print-project-git-commit-id 2> /dev/null || echo '?')]"
   - BENCH=${BENCH---enable-benchmarks}
