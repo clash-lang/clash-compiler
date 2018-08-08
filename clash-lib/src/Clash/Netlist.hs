@@ -80,6 +80,8 @@ genNetlist :: BindingMap
            -- ^ Hardcoded Type -> HWType translator
            -> [(String,FilePath)]
            -- ^ Set of collected data-files
+           -> [(String,String)]
+           -- ^ Set of collected in-memory data-files: (filename, contents)
            -> Int
            -- ^ Int/Word/Integer bit-width
            -> (IdType -> Identifier -> Identifier)
@@ -94,11 +96,15 @@ genNetlist :: BindingMap
            -- ^ Component name prefix
            -> TmOccName
            -- ^ Name of the @topEntity@
-           -> IO ([(SrcSpan,Component)],[(String,FilePath)],[Identifier])
-genNetlist globals tops primMap tcm typeTrans dfiles iw mkId extId seen env prefixM topEntity = do
+           -> IO ([(SrcSpan,Component)],[(String,FilePath)],[(String,String)],[Identifier])
+genNetlist globals tops primMap tcm typeTrans dfiles mfiles iw mkId extId seen env prefixM topEntity = do
   (_,s) <- runNetlistMonad globals (mkTopEntityMap tops) primMap tcm typeTrans
-             dfiles iw mkId extId seen env prefixM $ genComponent topEntity
-  return (HashMap.elems $ _components s, _dataFiles s, _seenComps s)
+             dfiles mfiles iw mkId extId seen env prefixM $ genComponent topEntity
+  return ( HashMap.elems $ _components s
+         , _dataFiles s
+         , _memoryDataFiles s
+         , _seenComps s
+         )
   where
     mkTopEntityMap
       :: [(TmName,Type,Maybe TopEntity,Maybe TmName)]
@@ -118,6 +124,8 @@ runNetlistMonad :: BindingMap
                 -- ^ Hardcode Type -> HWType translator
                 -> [(String,FilePath)]
                 -- ^ Set of collected data-files
+                -> [(String, String)]
+                -- ^ Set of collected in-memory data-files: (filename, contents)
                 -> Int
                 -- ^ Int/Word/Integer bit-width
                 -> (IdType -> Identifier -> Identifier)
@@ -133,12 +141,12 @@ runNetlistMonad :: BindingMap
                 -> NetlistMonad a
                 -- ^ Action to run
                 -> IO (a, NetlistState)
-runNetlistMonad s tops p tcm typeTrans dfiles iw mkId extId seenIds_ env prefixM
+runNetlistMonad s tops p tcm typeTrans dfiles mfiles iw mkId extId seenIds_ env prefixM
   = runFreshMT
   . flip runStateT s'
   . runNetlist
   where
-    s' = NetlistState s 0 HashMap.empty p typeTrans tcm (Text.empty,noSrcSpan) dfiles iw mkId extId [] seenIds' names tops env 0 prefixM
+    s' = NetlistState s 0 HashMap.empty p typeTrans tcm (Text.empty,noSrcSpan) dfiles mfiles iw mkId extId [] seenIds' names tops env 0 prefixM
     (seenIds',names) = genNames mkId prefixM seenIds_ HashMap.empty (HashMap.elems (HashMap.map (^. _1) s))
 
 genNames :: (IdType -> Identifier -> Identifier)

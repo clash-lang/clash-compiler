@@ -17,7 +17,8 @@
 module Clash.Netlist.BlackBox.Util where
 
 import           Control.Exception               (throw)
-import           Control.Lens                    (use, (%=), _1, _2)
+import           Control.Lens
+  (use, (%=), _1, _2, element, (^?))
 import           Control.Monad                   (forM)
 import           Control.Monad.State             (State, StateT (..), lift)
 import           Data.Bool                       (bool)
@@ -140,10 +141,14 @@ setSym bbCtx l = do
     concatT :: [Element] -> Text
     concatT = Text.concat
             . map (\case { C t -> t
+                         ; N i -> case elementToText bbCtx (N i) of
+                                         Right t ->
+                                             t
+                                         Left msg ->
+                                             error $ $(curLoc) ++  "Could not convert "
+                                                               ++ "~NAME[" ++ show i ++ "]"
+                                                               ++ " to string:" ++ msg
                          ; O _ | Identifier t _ <- fst (bbResult bbCtx)
-                               -> t
-                         ; N n | let (e,_,_) = bbInputs bbCtx !! n
-                               , Just t <- exprToText e
                                -> t
                          ; _   -> error "unexpected element in GENSYM"})
 
@@ -157,30 +162,81 @@ setCompName nm = map setCompName'
     setCompName' (BV t e m)     = BV t (setCompName nm e) (setCompName' m)
     setCompName' e              = e
 
-findAndSetDataFiles :: BlackBoxContext -> [(String,FilePath)] -> BlackBoxTemplate -> ([(String,FilePath)],BlackBoxTemplate)
+
+findAndSetDataFiles
+    :: BlackBoxContext
+    -> [(String,FilePath)]
+    -> BlackBoxTemplate
+    -> ([(String,FilePath)],BlackBoxTemplate)
 findAndSetDataFiles bbCtx fs = mapAccumL findAndSet fs
   where
-    findAndSet fs' (FilePath e) = case e of
-      (L n) ->
-        let (e',_,_) = bbInputs bbCtx !! n
-        in case e' of
-          BlackBoxE "GHC.CString.unpackCString#" _ _ _ _ bbCtx' _ -> case bbInputs bbCtx' of
-            [(Literal Nothing (StringLit s'),_,_)] -> renderFilePath fs s'
-            _                                      -> (fs',FilePath e)
-          Literal Nothing (StringLit s') -> renderFilePath fs s'
-          _ -> (fs',FilePath e)
-      _ -> (fs',FilePath e)
-    findAndSet fs' l = (fs',l)
+    findAndSet fs' (FilePath (L n)) =
+        case Text.unpack <$> elementToText bbCtx (L n) of
+            Left msg -> error $ $(curLoc) ++ msg
+            Right s  -> renderFilePath fs' s
+    findAndSet fs' l = (fs', l)
 
-renderFilePath :: [(String,FilePath)] -> String -> ([(String,FilePath)],Element)
+findAndSetMemoryDataFile
+    :: BlackBoxContext
+    -> [(String, String)]
+    -> Element
+    -> ([(String, String)], Element)
+findAndSetMemoryDataFile bbCtx fs (Template filenameL sourceL) =
+    case file of
+        Left msg ->
+            error $ $(curLoc) ++ unwords [ "Name or source in ~TEMPLATE construct"
+                                         , "did not reduce to a string."
+                                         , "'elementToText' reported:"
+                                         , msg ]
+        Right fstup@(filename, _source) ->
+          if elem filename (map fst fs)
+            then if not (elem fstup fs)
+              then error $ $(curLoc) ++ unwords [ "Multiple ~TEMPLATE constructs"
+                                                 , "specifiy the same filename"
+                                                 , "but different contents. Make"
+                                                 , "sure these names are unique." ]
+            -- We replace the Template element with an empty constant, so nothing
+            -- ends up in the generated HDL.
+              else (fs, C (Text.pack ""))
+            else (fstup:fs, C (Text.pack ""))
+
+        where
+            file = do
+                filename <- elementsToText bbCtx filenameL
+                source   <- elementsToText bbCtx sourceL
+                return (Text.unpack filename, Text.unpack source)
+findAndSetMemoryDataFile _bbCtx fs l = (fs, l)
+
+
+findAndSetMemoryDataFiles
+     :: BlackBoxContext
+    -> [(String, String)]
+    -> BlackBoxTemplate
+    -> ([(String, String)],BlackBoxTemplate)
+findAndSetMemoryDataFiles bbCtx fs elements =
+    mapAccumL (findAndSetMemoryDataFile bbCtx) fs elements
+
+
+selectNewName
+    :: Foldable t
+    => t String
+    -- ^ Set of existing names
+    -> FilePath
+    -- ^ Name for new file (
+    -> String
+selectNewName as a
+  | elem a as = selectNewName as (replaceBaseName a (takeBaseName a ++ "_"))
+  | otherwise = a
+
+
+renderFilePath
+    :: [(String, FilePath)]
+    -> String
+    -> ([(String, FilePath)], Element)
 renderFilePath fs f = ((f'',f):fs,C (Text.pack $ show f''))
   where
     f'  = takeFileName f
     f'' = selectNewName (map fst fs) f'
-
-    selectNewName as a
-      | elem a as = selectNewName as (replaceBaseName a (takeBaseName a ++ "_"))
-      | otherwise = a
 
 -- | Render a blackbox given a certain context. Returns a filled out template
 -- and a list of 'hidden' inputs that must be added to the encompassing component.
@@ -412,11 +468,6 @@ renderTag b t@(Arg k n)
   | otherwise
   = getMon (prettyElem t)
 
-renderTag b (N n)           = let (e,_,_) = bbInputs b !! n
-                              in  case exprToText e of
-                                     Just t -> return t
-                                     _ -> error $ $(curLoc) ++ "Expected a string literal: " ++ show e
-
 renderTag b (L n)           = let (e,_,_) = bbInputs b !! n
                               in  renderOneLine <$> getMon (expr False (mkLit e))
   where
@@ -425,6 +476,12 @@ renderTag b (L n)           = let (e,_,_) = bbInputs b !! n
     mkLit (DataCon _ (DC (Void {}, _)) [Literal (Just (Signed _,_)) i]) = Literal Nothing i
     mkLit (DataCon _ (DC (Void {}, _)) [Literal (Just (Unsigned _,_)) i]) = Literal Nothing i
     mkLit i                               = i
+
+renderTag b e@(N _i) =
+  case elementToText b e of
+      Right s  -> return s
+      Left msg -> error $ $(curLoc) ++ unwords [ "Error when reducing to string"
+                                               , "in ~NAME construct:", msg ]
 
 renderTag _ (Var [C t] _) = return t
 renderTag _ (Sym t _) = return t
@@ -515,9 +572,49 @@ renderTag b (DevNull es) = do
   _ <- mapM (renderElem b) es
   return $ Text.empty
 
+renderTag _ (Template _ _) =
+  error $ $(curLoc) ++ "~TEMPLATE constructs should have been removed by prepareBlackBox."
+
 renderTag _ e = do e' <- getMon (prettyElem e)
                    error $ $(curLoc) ++ "Unable to evaluate: " ++ show e'
 
+-- | Compute string from a list of elements. Can interpret ~NAME string literals
+-- on template level (constants).
+elementsToText
+    :: BlackBoxContext
+    -> [Element]
+    -> Either String Text
+elementsToText bbCtx elements =
+    foldl (\txt el -> case txt of
+                          -- Append new string (if no error) to string so far
+                          Right s -> (Text.append s) <$> elementToText bbCtx el
+                          -- If previous iteration resulted in an error: stop.
+                          msg -> msg) (Right $ Text.pack "") elements
+
+elementToText
+    :: BlackBoxContext
+    -> Element
+    -> Either String Text
+elementToText bbCtx  (N n) = elementToText bbCtx (L n)
+elementToText _bbCtx (C t) = return $ t
+elementToText bbCtx  (L n) =
+    case bbInputs bbCtx ^? element n of
+        Just (e,_,_) ->
+            case exprToText e of
+                Just t ->
+                    Right $ t
+                Nothing ->
+                    Left $ $(curLoc) ++ unwords [ "Could not extract string from"
+                                                , show e, "referred to by"
+                                                , show (L n) ]
+        Nothing ->
+            Left $ $(curLoc) ++ unwords [ "Invalid literal", show (L n)
+                                        , "used in blackbox with context:"
+                                        , show bbCtx, "." ]
+
+elementToText _bbCtx e = error $ "Unexpected string like: " ++ show e
+
+-- | Extracts string from SSymbol or string literals
 exprToText
   :: Expr
   -> Maybe Text
@@ -645,6 +742,12 @@ prettyElem (Vars i) = renderOneLine <$> (string "~VARS" <> brackets (int i))
 prettyElem (OutputWireReg i) = renderOneLine <$> (string "~RESULTWIREREG" <> brackets (int i))
 prettyElem (Arg n x) =
   renderOneLine <$> (string "~ARGN" <> brackets (int n) <> brackets (int x))
+prettyElem (Template bbname source) = do
+  bbname' <- mapM prettyElem bbname
+  source' <- mapM prettyElem source
+  renderOneLine <$> (string "~TEMPLATE"
+                                  <> brackets (string $ Text.concat bbname')
+                                  <> brackets (string $ Text.concat source'))
 
 usedArguments :: BlackBoxTemplate
               -> [Int]
@@ -658,6 +761,7 @@ usedArguments = nub . concatMap go
       Var _ i -> [i]
       IndexType e -> go e
       FilePath e -> go e
+      Template bbname source -> usedArguments bbname ++ usedArguments source
       IF b esT esF -> go b ++ usedArguments esT ++ usedArguments esF
       SigD es _ -> usedArguments es
       BV _ es _ -> usedArguments es

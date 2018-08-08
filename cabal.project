@@ -1,7 +1,7 @@
 -- there are no top level packages. any package can be checked out under the
 -- root directory (i.e. patched copies, or forks) and will automatically be
 -- preferred by the solver over other versions.
-packages: ./*/*.cabal
+packages: ./clash-ghc/*.cabal, ./clash-lib/*.cabal, ./clash-prelude/*.cabal, ./testsuite/*.cabal
 
 allow-newer: *:Cabal, *:array, *:base, *:binary, *:bytestring, *:containers,
   *:deepseq, *:directory, *:filepath, *:ghc, *:ghc-boot, *:ghc-boot-th,
@@ -27,12 +27,16 @@ index-state: 2018-07-03T07:02:43Z
 package clash-ghc
   executable-dynamic: True
 
+package clash-testsuite
+  flags: cosim
+
 optional-packages: ghc-typelits-extra/ghc-typelits-extra.cabal
                    ghc-typelits-knownnat/ghc-typelits-knownnat.cabal
                    ghc-typelits-natnormalise/ghc-typelits-natnormalise.cabal
                    ghc-tcplugins-extra/ghc-tcplugins-extra.cabal
                    singletons/th-desugar/th-desugar.cabal
                    singletons/singletons.cabal
+                   clash-cosim/clash-cosim.cabal
 
 -- Build documentation for all dependencies so we can upload docs to hackage
 -- with proper links

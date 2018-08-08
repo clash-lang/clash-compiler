@@ -107,6 +107,7 @@ pTagE =  O True            <$  string "~ERESULT"
      <|> StrCmp            <$> (string "~STRCMP" *> brackets' pSigD) <*> brackets' natural'
      <|> OutputWireReg     <$> (string "~OUTPUTWIREREG" *> brackets' natural')
      <|> GenSym            <$> (string "~GENSYM" *> brackets' pSigD) <*> brackets' natural'
+     <|> Template          <$> (string "~TEMPLATE" *> brackets' pSigD) <*> brackets' pSigD
      <|> Repeat            <$> (string "~REPEAT" *> brackets' pSigD) <*> brackets' pSigD
      <|> DevNull           <$> (string "~DEVNULL" *> brackets' pSigD)
      <|> And               <$> (string "~AND" *> brackets' (commaSep pTagE))

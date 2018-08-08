@@ -179,6 +179,7 @@ defaultMain = flip withArgs $ do
                                     , LangExt.ScopedTypeVariables
                                     , LangExt.MagicHash
                                     , LangExt.ExplicitForAll
+                                    , LangExt.QuasiQuotes
                                     ]
                 dflagsExtra1 = foldl DynFlags.xopt_unset dflagsExtra
                                      [ LangExt.ImplicitPrelude

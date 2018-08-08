@@ -22,6 +22,12 @@ flag travisci
    default: False
    manual: True
 
+flag cosim
+   description:
+     Run the co-simulation tests
+   default: False
+   manual: True
+
 executable clash-testsuite
   main-is:             Main.hs
   ghc-options:         -Wall
@@ -47,3 +53,5 @@ executable clash-testsuite
   default-language:    Haskell2010
   if flag(travisci)
     ghc-options:       -DTRAVISBUILD
+  if flag(cosim)
+    ghc-options:       -DCOSIM
