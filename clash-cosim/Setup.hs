@@ -194,8 +194,9 @@ blackboxObject
 blackboxObject bbname type_ templateD =
   Object (fromList [("BlackBox", Object (fromList [
       ("name", String $ Text.pack bbname)
+    , ("kind", "Declaration")
     , ("type", String $ Text.pack type_)
-    , ("templateD", String $ Text.pack templateD)
+    , ("template", String $ Text.pack templateD)
     ]))])
 
 -- | Create blackbox for a given number of arguments
