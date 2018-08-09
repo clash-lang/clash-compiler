@@ -73,11 +73,11 @@ module Clash.Sized.Vector
     -- ** Mapping
   , map, imap, smap
     -- ** Zipping
-  , zipWith, zipWith3
-  , zip, zip3
+  , zipWith, zipWith3, zipWith4, zipWith5, zipWith6, zipWith7
+  , zip, zip3, zip4, zip5, zip6, zip7
   , izipWith
     -- ** Unzipping
-  , unzip, unzip3
+  , unzip, unzip3, unzip4, unzip5, unzip6, unzip7
     -- * Folding
   , foldr, foldl, foldr1, foldl1, fold
   , ifoldr, ifoldl
@@ -757,6 +757,76 @@ zipWith3 :: (a -> b -> c -> d) -> Vec n a -> Vec n b -> Vec n c -> Vec n d
 zipWith3 f us vs ws = zipWith (\a (b,c) -> f a b c) us (zip vs ws)
 {-# INLINE zipWith3 #-}
 
+-- 'zipWith4' is analogous to 'zipWith3', but with four vectors.
+--
+-- __NB:__ 'zipWith4' is /strict/ in its second argument, and /lazy/ its following
+-- arguments. This matters when 'zipWith4' is used in a recursive setting. See
+-- 'lazyV' for more information.
+zipWith4
+  :: (a -> b -> c -> d -> e)
+  -> Vec n a
+  -> Vec n b
+  -> Vec n c
+  -> Vec n d
+  -> Vec n e
+zipWith4 f us vs ws xs =
+  zipWith (\a (b,c,d) -> f a b c d) us (zip3 vs ws xs)
+{-# INLINE zipWith4 #-}
+
+-- 'zipWith5' is analogous to 'zipWith3', but with five vectors.
+--
+-- __NB:__ 'zipWith5' is /strict/ in its second argument, and /lazy/ its following
+-- arguments. This matters when 'zipWith5' is used in a recursive setting. See
+-- 'lazyV' for more information.
+zipWith5
+  :: (a -> b -> c -> d -> e -> f)
+  -> Vec n a
+  -> Vec n b
+  -> Vec n c
+  -> Vec n d
+  -> Vec n e
+  -> Vec n f
+zipWith5 f us vs ws xs ys =
+  zipWith (\a (b,c,d,e) -> f a b c d e) us (zip4 vs ws xs ys)
+{-# INLINE zipWith5 #-}
+
+-- 'zipWith6' is analogous to 'zipWith3', but with six vectors.
+--
+-- __NB:__ 'zipWith6' is /strict/ in its second argument, and /lazy/ its following
+-- arguments. This matters when 'zipWith6' is used in a recursive setting. See
+-- 'lazyV' for more information.
+zipWith6
+  :: (a -> b -> c -> d -> e -> f -> g)
+  -> Vec n a
+  -> Vec n b
+  -> Vec n c
+  -> Vec n d
+  -> Vec n e
+  -> Vec n f
+  -> Vec n g
+zipWith6 f us vs ws xs ys zs =
+  zipWith (\u (v,w,x,y,z) -> f u v w x y z) us (zip5 vs ws xs ys zs)
+{-# INLINE zipWith6 #-}
+
+-- 'zipWith7' is analogous to 'zipWith3', but with seven vectors.
+--
+-- __NB:__ 'zipWith7' is /strict/ in its second argument, and /lazy/ its following
+-- arguments. This matters when 'zipWith7' is used in a recursive setting. See
+-- 'lazyV' for more information.
+zipWith7
+  :: (a -> b -> c -> d -> e -> f -> g -> h)
+  -> Vec n a
+  -> Vec n b
+  -> Vec n c
+  -> Vec n d
+  -> Vec n e
+  -> Vec n f
+  -> Vec n g
+  -> Vec n h
+zipWith7 f ts us vs ws xs ys zs =
+  zipWith (\t (u,v,w,x,y,z) -> f t u v w x y z) ts (zip6 us vs ws xs ys zs)
+{-# INLINE zipWith7 #-}
+
 -- | 'foldr', applied to a binary operator, a starting value (typically
 -- the right-identity of the operator), and a vector, reduces the vector
 -- using the binary operator, from right to left:
@@ -993,13 +1063,52 @@ zip :: Vec n a -> Vec n b -> Vec n (a,b)
 zip = zipWith (,)
 {-# INLINE zip #-}
 
--- | 'zip' takes three vectors and returns a vector of corresponding triplets.
+-- | 'zip3' takes three vectors and returns a vector of corresponding triplets.
 --
 -- >>> zip3 (1:>2:>3:>4:>Nil) (4:>3:>2:>1:>Nil) (5:>6:>7:>8:>Nil)
 -- <(1,4,5),(2,3,6),(3,2,7),(4,1,8)>
 zip3 :: Vec n a -> Vec n b -> Vec n c -> Vec n (a,b,c)
 zip3 = zipWith3 (,,)
 {-# INLINE zip3 #-}
+
+-- | 'zip4' takes four vectors and returns a list of quadruples, analogous
+-- to 'zip'.
+zip4 :: Vec n a -> Vec n b -> Vec n c -> Vec n d -> Vec n (a,b,c,d)
+zip4 = zipWith4 (,,,)
+{-# INLINE zip4 #-}
+
+-- | 'zip5' takes five vectors and returns a list of five-tuples, analogous
+-- to 'zip'.
+zip5 :: Vec n a -> Vec n b -> Vec n c -> Vec n d -> Vec n e -> Vec n (a,b,c,d,e)
+zip5 = zipWith5 (,,,,)
+{-# INLINE zip5 #-}
+
+-- | 'zip6' takes six vectors and returns a list of six-tuples, analogous
+-- to 'zip'.
+zip6
+  :: Vec n a
+  -> Vec n b
+  -> Vec n c
+  -> Vec n d
+  -> Vec n e
+  -> Vec n f
+  -> Vec n (a,b,c,d,e,f)
+zip6 = zipWith6 (,,,,,)
+{-# INLINE zip6 #-}
+
+-- | 'zip7' takes seven vectors and returns a list of seven-tuples, analogous
+-- to 'zip'.
+zip7
+  :: Vec n a
+  -> Vec n b
+  -> Vec n c
+  -> Vec n d
+  -> Vec n e
+  -> Vec n f
+  -> Vec n g
+  -> Vec n (a,b,c,d,e,f,g)
+zip7 = zipWith7 (,,,,,,)
+{-# INLINE zip7 #-}
 
 -- | 'unzip' transforms a vector of pairs into a vector of first components
 -- and a vector of second components.
@@ -1021,6 +1130,57 @@ unzip3 xs = ( map (\(x,_,_) -> x) xs
             , map (\(_,_,z) -> z) xs
             )
 {-# INLINE unzip3 #-}
+
+-- | 'unzip4' takes a vector of quadruples and returns four vectors, analogous
+-- to 'unzip'.
+unzip4 :: Vec n (a,b,c,d) -> (Vec n a, Vec n b, Vec n c, Vec n d)
+unzip4 xs = ( map (\(w,_,_,_) -> w) xs
+            , map (\(_,x,_,_) -> x) xs
+            , map (\(_,_,y,_) -> y) xs
+            , map (\(_,_,_,z) -> z) xs
+            )
+{-# INLINE unzip4 #-}
+
+-- | 'unzip5' takes a vector of five-tuples and returns five vectors, analogous
+-- to 'unzip'.
+unzip5 :: Vec n (a,b,c,d,e) -> (Vec n a, Vec n b, Vec n c, Vec n d, Vec n e)
+unzip5 xs = ( map (\(v,_,_,_,_) -> v) xs
+            , map (\(_,w,_,_,_) -> w) xs
+            , map (\(_,_,x,_,_) -> x) xs
+            , map (\(_,_,_,y,_) -> y) xs
+            , map (\(_,_,_,_,z) -> z) xs
+            )
+{-# INLINE unzip5 #-}
+
+-- | 'unzip6' takes a vector of six-tuples and returns six vectors, analogous
+-- to 'unzip'.
+unzip6
+  :: Vec n (a,b,c,d,e,f)
+  -> (Vec n a, Vec n b, Vec n c, Vec n d, Vec n e, Vec n f)
+unzip6 xs = ( map (\(u,_,_,_,_,_) -> u) xs
+            , map (\(_,v,_,_,_,_) -> v) xs
+            , map (\(_,_,w,_,_,_) -> w) xs
+            , map (\(_,_,_,x,_,_) -> x) xs
+            , map (\(_,_,_,_,y,_) -> y) xs
+            , map (\(_,_,_,_,_,z) -> z) xs
+            )
+{-# INLINE unzip6 #-}
+
+-- | 'unzip7' takes a vector of seven-tuples and returns seven vectors, analogous
+-- to 'unzip'.
+unzip7
+  :: Vec n (a,b,c,d,e,f,g)
+  -> (Vec n a, Vec n b, Vec n c, Vec n d, Vec n e, Vec n f, Vec n g)
+unzip7 xs = ( map (\(t,_,_,_,_,_,_) -> t) xs
+            , map (\(_,u,_,_,_,_,_) -> u) xs
+            , map (\(_,_,v,_,_,_,_) -> v) xs
+            , map (\(_,_,_,w,_,_,_) -> w) xs
+            , map (\(_,_,_,_,x,_,_) -> x) xs
+            , map (\(_,_,_,_,_,y,_) -> y) xs
+            , map (\(_,_,_,_,_,_,z) -> z) xs
+            )
+{-# INLINE unzip7 #-}
+
 
 index_int :: KnownNat n => Vec n a -> Int -> a
 index_int xs i@(I# n0)
