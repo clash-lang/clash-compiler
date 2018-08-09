@@ -95,6 +95,9 @@ Library
                       Clash.Class.Num
                       Clash.Class.Resize
 
+                      Clash.Clocks
+                      Clash.Clocks.Deriving
+
                       Clash.Explicit.BlockRam
                       Clash.Explicit.BlockRam.File
                       Clash.Explicit.DDR
