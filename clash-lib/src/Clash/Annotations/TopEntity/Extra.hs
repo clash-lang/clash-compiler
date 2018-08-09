@@ -12,6 +12,7 @@ import Clash.Annotations.TopEntity (TopEntity, PortName)
 import Language.Haskell.TH.Syntax
   (ModName, Name, NameFlavour, NameSpace, PkgName, OccName)
 import Data.Hashable               (Hashable)
+import Control.DeepSeq             (NFData)
 
 instance Hashable TopEntity
 instance Hashable PortName
@@ -22,3 +23,13 @@ instance Hashable NameFlavour
 instance Hashable NameSpace
 instance Hashable PkgName
 instance Hashable OccName
+
+instance NFData TopEntity
+instance NFData PortName
+
+instance NFData ModName
+instance NFData Name
+instance NFData NameFlavour
+instance NFData NameSpace
+instance NFData PkgName
+instance NFData OccName

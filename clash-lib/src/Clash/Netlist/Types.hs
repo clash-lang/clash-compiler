@@ -310,6 +310,7 @@ data BlackBoxContext
 data BlackBox
   = BBTemplate BlackBoxTemplate
   | BBFunction TemplateFunction
+  deriving (Generic,NFData)
 
 data TemplateFunction where
   TemplateFunction
@@ -321,6 +322,9 @@ data TemplateFunction where
 instance Show BlackBox where
   show (BBTemplate t)  = show t
   show (BBFunction {}) = "TemplateFunction"
+
+instance NFData TemplateFunction where
+  rnf (TemplateFunction is f _) = rnf is `seq` f `seq` ()
 
 emptyBBContext :: BlackBoxContext
 emptyBBContext

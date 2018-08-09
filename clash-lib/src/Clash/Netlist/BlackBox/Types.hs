@@ -7,6 +7,9 @@
   Types used in BlackBox modules
 -}
 
+{-# LANGUAGE DeriveAnyClass #-}
+{-# LANGUAGE DeriveGeneric  #-}
+
 module Clash.Netlist.BlackBox.Types
  ( BlackBoxMeta(..)
  , emptyBlackBoxMeta
@@ -18,8 +21,10 @@ module Clash.Netlist.BlackBox.Types
  , HdlSyn(Vivado, Other)
  ) where
 
+import                Control.DeepSeq            (NFData)
 import                Data.Text.Lazy             (Text)
 import qualified      Data.Text                  as S
+import                GHC.Generics               (Generic)
 
 import                Clash.Core.Term            (Term)
 import                Clash.Core.Type            (Type)
@@ -29,7 +34,7 @@ import {-# SOURCE #-} Clash.Netlist.Types        (BlackBox, Identifier)
 data TemplateKind
   = TDecl
   | TExpr
-  deriving (Show, Eq)
+  deriving (Show, Eq, Generic, NFData)
 
 -- | See @Clash.Primitives.Types.BlackBox@ for documentation on this record's
 -- fields. (They are intentionally renamed to prevent name clashes.)
@@ -114,7 +119,7 @@ data Element = C   !Text         -- ^ Constant
              | Repeat [Element] [Element] -- ^ Repeat <hole> n times
              | DevNull [Element]          -- ^ Evaluate <hole> but swallow output
              | SigD [Element] !(Maybe Int)
-  deriving Show
+  deriving (Show, Generic, NFData)
 
 -- | Component instantiation hole. First argument indicates which function argument
 -- to instantiate. Second argument corresponds to output and input assignments,
@@ -124,7 +129,7 @@ data Element = C   !Text         -- ^ Constant
 -- The LHS of the tuple is the name of the signal, while the RHS of the tuple
 -- is the type of the signal
 data Decl = Decl !Int [(BlackBoxTemplate,BlackBoxTemplate)]
-  deriving Show
+  deriving (Show, Generic, NFData)
 
 data HdlSyn = Vivado | Other
-  deriving (Eq,Show,Read)
+  deriving (Eq, Show, Read, Generic, NFData)
