@@ -1,7 +1,8 @@
 [ { "BlackBox" :
     { "name"      : "GHC.TypeNats.natVal"
+    , "kind"      : "Expression"
     , "type"      : "natVal :: forall n proxy. KnownNat n => proxy n -> Natural"
-    , "templateE" : "~ARG[0]"
+    , "template"  : "~ARG[0]"
     }
   }
 ]

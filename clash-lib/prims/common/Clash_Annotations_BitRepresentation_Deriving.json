@@ -1,7 +1,8 @@
 [ { "BlackBox" :
     { "name"      : "Clash.Annotations.BitRepresentation.Deriving.dontApplyInHDL"
+    , "kind"      : "Expression"
     , "type"      : "dontApplyInHDL :: (a -> b) -> a -> b"
-    , "templateE" : "~ARG[1]"
+    , "template"  : "~ARG[1]"
     }
   }
 ]

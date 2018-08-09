@@ -1,141 +1,143 @@
 [ { "BlackBox" :
     { "name"      : "Clash.Sized.Internal.Signed.size#"
+    , "kind"      : "Expression"
     , "type"      : "size# :: KnownNat n => Signed n -> Int"
-    , "templateE" : "to_signed(~LIT[0],~SIZE[~TYPO])"
+    , "template"   : "to_signed(~LIT[0],~SIZE[~TYPO])"
     }
   }
 , { "BlackBox" :
     { "name"      : "Clash.Sized.Internal.Signed.pack#"
+    , "kind"      : "Expression"
     , "type"      : "pack# :: KnownNat n => Signed n -> BitVector n"
-    , "templateE" : "std_logic_vector(~ARG[1])"
+    , "template"  : "std_logic_vector(~ARG[1])"
     }
   }
 , { "BlackBox" :
     { "name"      : "Clash.Sized.Internal.Signed.unpack#"
+    , "kind"      : "Expression"
     , "type"      : "unpack# :: KnownNat n => BitVector n -> Signed n"
-    , "templateE" : "signed(~ARG[1])"
+    , "template"  : "signed(~ARG[1])"
     }
   }
 , { "BlackBox" :
     { "name"      : "Clash.Sized.Internal.Signed.eq#"
+    , "kind"      : "Expression"
     , "type"      : "eq# :: Signed n -> Signed n -> Bool"
-    , "templateE" : "~IF~SIZE[~TYP[0]]~THEN~ARG[0] = ~ARG[1]~ELSEtrue~FI"
+    , "template"  : "~IF~SIZE[~TYP[0]]~THEN~ARG[0] = ~ARG[1]~ELSEtrue~FI"
     }
   }
 , { "BlackBox" :
     { "name"      : "Clash.Sized.Internal.Signed.neq#"
+    , "kind"      : "Expression"
     , "type"      : "neq# :: Signed n -> Signed n -> Bool"
-    , "templateE" : "~IF~SIZE[~TYP[0]]~THEN~ARG[0] /= ~ARG[1]~ELSEfalse~FI"
+    , "template"  : "~IF~SIZE[~TYP[0]]~THEN~ARG[0] /= ~ARG[1]~ELSEfalse~FI"
     }
   }
 , { "BlackBox" :
     { "name"      : "Clash.Sized.Internal.Signed.lt#"
+    , "kind"      : "Expression"
     , "type"      : "lt# :: Signed n -> Signed n -> Bool"
-    , "templateE" : "~IF~SIZE[~TYP[0]]~THEN~ARG[0] < ~ARG[1]~ELSEfalse~FI"
+    , "template"  : "~IF~SIZE[~TYP[0]]~THEN~ARG[0] < ~ARG[1]~ELSEfalse~FI"
     }
   }
 , { "BlackBox" :
     { "name"      : "Clash.Sized.Internal.Signed.ge#"
+    , "kind"      : "Expression"
     , "type"      : "ge# :: Signed n -> Signed n -> Bool"
-    , "templateE" : "~IF~SIZE[~TYP[0]]~THEN~ARG[0] >= ~ARG[1]~ELSEtrue~FI"
+    , "template"  : "~IF~SIZE[~TYP[0]]~THEN~ARG[0] >= ~ARG[1]~ELSEtrue~FI"
     }
   }
 , { "BlackBox" :
     { "name"      : "Clash.Sized.Internal.Signed.gt#"
+    , "kind"      : "Expression"
     , "type"      : "gt# :: Signed n -> Signed n -> Bool"
-    , "templateE" : "~IF~SIZE[~TYP[0]]~THEN~ARG[0] > ~ARG[1]~ELSEfalse~FI"
+    , "template"  : "~IF~SIZE[~TYP[0]]~THEN~ARG[0] > ~ARG[1]~ELSEfalse~FI"
     }
   }
 , { "BlackBox" :
     { "name"      : "Clash.Sized.Internal.Signed.le#"
+    , "kind"      : "Expression"
     , "type"      : "le# :: Signed n -> Signed n -> Bool"
-    , "templateE" : "~IF~SIZE[~TYP[0]]~THEN~ARG[0] <= ~ARG[1]~ELSEtrue~FI"
+    , "template"  : "~IF~SIZE[~TYP[0]]~THEN~ARG[0] <= ~ARG[1]~ELSEtrue~FI"
     }
   }
 , { "BlackBox" :
     { "name"      : "Clash.Sized.Internal.Signed.minBound#"
+    , "kind"      : "Expression"
     , "type"      : "minBound# :: KnownNat n => Signed n"
     , "comment"   : "the quantification with signed gives the array an ascending index"
-    , "templateE" : "~IF~SIZE[~TYPO]~THENsigned'(0 => '1', 1 to ~LIT[0]-1 => '0')~ELSEsigned'(1 downto 0 => '0')~FI"
+    , "template"  : "~IF~SIZE[~TYPO]~THENsigned'(0 => '1', 1 to ~LIT[0]-1 => '0')~ELSEsigned'(1 downto 0 => '0')~FI"
     }
   }
 , { "BlackBox" :
     { "name"      : "Clash.Sized.Internal.Signed.maxBound#"
+    , "kind"      : "Expression"
     , "type"      : "maxBound# :: KnownNat n => Signed n"
     , "comment"   : "the quantification with signed gives the array an ascending index"
-    , "templateE" : "~IF~SIZE[~TYPO]~THENsigned'(0 => '0', 1 to ~LIT[0]-1  => '1')~ELSEsigned'(1 downto 0 => '0')~FI"
-    }
-  }
-, { "BlackBox" :
-    { "name"      : "Clash.Sized.Internal.Signed.+#"
-    , "type"      : "(+#) :: KnownNat n => Signed n -> Signed n -> Signed n"
-    , "templateE" : "~ARG[1] + ~ARG[2]"
-    }
-  }
-, { "BlackBox" :
-    { "name"      : "Clash.Sized.Internal.Signed.-#"
-    , "type"      : "(-#) :: KnownNat n => Signed n -> Signed n -> Signed n"
-    , "templateE" : "~ARG[1] - ~ARG[2]"
+    , "template"  : "~IF~SIZE[~TYPO]~THENsigned'(0 => '0', 1 to ~LIT[0]-1  => '1')~ELSEsigned'(1 downto 0 => '0')~FI"
     }
   }
 , { "BlackBox" :
     { "name"      : "Clash.Sized.Internal.Signed.*#"
+    , "kind"      : "Expression"
     , "type"      : "(*#) :: KnownNat n => Signed n -> Signed n -> Signed n"
-    , "templateE" : "resize(~ARG[1] * ~ARG[2], ~LIT[0])"
+    , "template"  : "resize(~ARG[1] * ~ARG[2], ~LIT[0])"
     }
   }
 , { "BlackBox" :
     { "name"      : "Clash.Sized.Internal.Signed.negate#"
+    , "kind"      : "Expression"
     , "type"      : "negate# :: KnownNat n => Signed n -> Signed n"
-    , "templateE" : "-~ARG[1]"
+    , "template"  : "-~ARG[1]"
     }
   }
 , { "BlackBox" :
     { "name"      : "Clash.Sized.Internal.Signed.abs#"
+    , "kind"      : "Expression"
     , "type"      : "abs# :: KnownNat n => Signed n -> Signed n"
-    , "templateE" : "abs ~ARG[1]"
+    , "template"  : "abs ~ARG[1]"
     }
   }
 , { "BlackBox" :
     { "name"      : "Clash.Sized.Internal.Signed.fromInteger#"
+    , "kind"      : "Expression"
     , "type"      : "fromInteger# :: KnownNat n => Integer -> Signed (n :: Nat)"
-    , "templateE" : "resize(~ARG[1],~LIT[0])"
+    , "template"  : "resize(~ARG[1],~LIT[0])"
     }
   }
 , { "BlackBox" :
     { "name"      : "Clash.Sized.Internal.Signed.plus#"
+    , "kind"      : "Expression"
     , "type"      : "plus# :: Signed m -> Signed n -> Signed (1 + Max m n)"
-    , "templateE" : "resize(~ARG[0],~SIZE[~TYPO]) + resize(~ARG[1],~SIZE[~TYPO])"
+    , "template"  : "resize(~ARG[0],~SIZE[~TYPO]) + resize(~ARG[1],~SIZE[~TYPO])"
     }
   }
 , { "BlackBox" :
     { "name"      : "Clash.Sized.Internal.Signed.minus#"
+    , "kind"      : "Expression"
     , "type"      : "minus# :: Signed m -> Signed n -> Signed (1 + Max m n)"
-    , "templateE" : "resize(~ARG[0],~SIZE[~TYPO]) - resize(~ARG[1],~SIZE[~TYPO])"
+    , "template"  : "resize(~ARG[0],~SIZE[~TYPO]) - resize(~ARG[1],~SIZE[~TYPO])"
     }
   }
 , { "BlackBox" :
     { "name"      : "Clash.Sized.Internal.Signed.times#"
+    , "kind"      : "Expression"
     , "type"      : "times# :: Signed m -> Signed n -> Signed (m + n)"
-    , "templateE" : "~ARG[0] * ~ARG[1]"
-    }
-  }
-, { "BlackBox" :
-    { "name"      : "Clash.Sized.Internal.Signed.quot#"
-    , "type"      : "quot# :: Signed n -> Signed n -> Signed n"
-    , "templateE" : "~ARG[0] / ~ARG[1]"
+    , "template"  : "~ARG[0] * ~ARG[1]"
     }
   }
 , { "BlackBox" :
     { "name"      : "Clash.Sized.Internal.Signed.rem#"
+    , "kind"      : "Expression"
     , "type"      : "rem# :: Signed n -> Signed n -> Signed n"
-    , "templateE" : "~ARG[0] rem ~ARG[1]"
+    , "template"  : "~ARG[0] rem ~ARG[1]"
     }
   }
 , { "BlackBox" :
     { "name"      : "Clash.Sized.Internal.Signed.div#"
+    , "kind"      : "Declaration"
     , "type"      : "div# :: Signed n -> Signed n -> Signed n"
-    , "templateD" :
+    , "template"  :
 "-- divSigned begin
 ~GENSYM[divSigned][0] : block
   signal ~GENSYM[quot_res][3] : ~TYP[0];
@@ -149,74 +151,86 @@ end block;
   }
 , { "BlackBox" :
     { "name"      : "Clash.Sized.Internal.Signed.mod#"
+    , "kind"      : "Expression"
     , "type"      : "mod# :: Signed n -> Signed n -> Signed n"
-    , "templateE" : "~ARG[0] mod ~ARG[1]"
+    , "template"  : "~ARG[0] mod ~ARG[1]"
     }
   }
 , { "BlackBox" :
     { "name"      : "Clash.Sized.Internal.Signed.toInteger#"
+    , "kind"      : "Expression"
     , "type"      : "toInteger# :: Signed n -> Integer"
-    , "templateE" : "~IF~SIZE[~TYP[0]]~THENresize(~ARG[0],~SIZE[~TYPO])~ELSEto_signed(0,64)~FI"
+    , "template"  : "~IF~SIZE[~TYP[0]]~THENresize(~ARG[0],~SIZE[~TYPO])~ELSEto_signed(0,64)~FI"
     }
   }
 , { "BlackBox" :
     { "name"      : "Clash.Sized.Internal.Signed.and#"
+    , "kind"      : "Expression"
     , "type"      : "and# :: KnownNat n => Signed n -> Signed n -> Signed n"
-    , "templateE" : "~ARG[1] and ~ARG[2]"
+    , "template"  : "~ARG[1] and ~ARG[2]"
     }
   }
 , { "BlackBox" :
     { "name"      : "Clash.Sized.Internal.Signed.or#"
+    , "kind"      : "Expression"
     , "type"      : "or# :: KnownNat n => Signed n -> Signed n -> Signed n"
-    , "templateE" : "~ARG[1] or ~ARG[2]"
+    , "template"  : "~ARG[1] or ~ARG[2]"
     }
   }
 , { "BlackBox" :
     { "name"      : "Clash.Sized.Internal.Signed.xor#"
+    , "kind"      : "Expression"
     , "type"      : "xor# :: KnownNat n => Signed n -> Signed n -> Signed n"
-    , "templateE" : "~ARG[1] xor ~ARG[2]"
+    , "template"  : "~ARG[1] xor ~ARG[2]"
     }
   }
 , { "BlackBox" :
     { "name"      : "Clash.Sized.Internal.Signed.complement#"
+    , "kind"      : "Expression"
     , "type"      : "complement# :: KnownNat n => Signed n -> Signed n"
-    , "templateE" : "not ~ARG[1]"
+    , "template"  : "not ~ARG[1]"
     }
   }
 , { "BlackBox" :
     { "name"      : "Clash.Sized.Internal.Signed.shiftL#"
+    , "kind"      : "Expression"
     , "type"      : "shiftL# :: KnownNat n => Signed n -> Int -> Signed n"
-    , "templateE" : "shift_left(~ARG[1],to_integer(~ARG[2]))"
+    , "template"  : "shift_left(~ARG[1],to_integer(~ARG[2]))"
     }
   }
 , { "BlackBox" :
     { "name"      : "Clash.Sized.Internal.Signed.shiftR#"
+    , "kind"      : "Expression"
     , "type"      : "shiftR# :: KnownNat n => Signed n -> Int -> Signed n"
-    , "templateE" : "shift_right(~ARG[1],to_integer(~ARG[2]))"
+    , "template"  : "shift_right(~ARG[1],to_integer(~ARG[2]))"
     }
   }
 , { "BlackBox" :
     { "name"      : "Clash.Sized.Internal.Signed.rotateL#"
+    , "kind"      : "Expression"
     , "type"      : "rotateL# :: KnownNat n => Signed n -> Int -> Signed n"
-    , "templateE" : "rotate_left(~ARG[1],to_integer(~ARG[2]))"
+    , "template"  : "rotate_left(~ARG[1],to_integer(~ARG[2]))"
     }
   }
 , { "BlackBox" :
     { "name"      : "Clash.Sized.Internal.Signed.rotateR#"
+    , "kind"      : "Expression"
     , "type"      : "rotateR# :: KnownNat n => Signed n -> Int -> Signed n"
-    , "templateE" : "rotate_right(~ARG[1],to_integer(~ARG[2]))"
+    , "template"  : "rotate_right(~ARG[1],to_integer(~ARG[2]))"
     }
   }
 , { "BlackBox" :
     { "name"      : "Clash.Sized.Internal.Signed.resize#"
+    , "kind"      : "Expression"
     , "type"      : "resize# :: (KnownNat n, KnownNat m) => Signed n -> Signed m"
-    , "templateE" : "~IF~SIZE[~TYP[2]]~THENresize(~ARG[2],~LIT[1])~ELSEsigned'(~SIZE[~TYPO]-1 downto 0 => '0')~FI"
+    , "template"  : "~IF~SIZE[~TYP[2]]~THENresize(~ARG[2],~LIT[1])~ELSEsigned'(~SIZE[~TYPO]-1 downto 0 => '0')~FI"
     }
   }
 , { "BlackBox" :
     { "name"      : "Clash.Sized.Internal.Signed.truncateB#"
+    , "kind"      : "Expression"
     , "type"      : "truncateB# :: KnownNat m => Signed (n + m) -> Signed m"
-    , "templateE" : "~IF~SIZE[~TYPO]~THEN~VAR[s][1](~LIT[0]-1 downto 0)~ELSEsigned'(0 downto 1 => '0')~FI"
+    , "template"  : "~IF~SIZE[~TYPO]~THEN~VAR[s][1](~LIT[0]-1 downto 0)~ELSEsigned'(0 downto 1 => '0')~FI"
     }
   }
 ]

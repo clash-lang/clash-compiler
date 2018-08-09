@@ -23,7 +23,7 @@ import Clash.Netlist.Types  (Expr, HWType, Identifier, NetlistMonad, Component,
                              Declaration)
 
 genComponent :: TmOccName
-             -> NetlistMonad (SrcSpan,Component)
+             -> NetlistMonad (SrcSpan,[Identifier],Component)
 
 mkExpr :: Bool
        -> Either Identifier Id

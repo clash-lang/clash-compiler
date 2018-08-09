@@ -1,7 +1,7 @@
 {-|
   Copyright  :  (C) 2012-2016, University of Twente,
                     2016-2017, Myrtle Software Ltd,
-                    2017     , Google Inc.
+                    2017-2018, Google Inc.
   License    :  BSD2 (see the file LICENSE)
   Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
 
@@ -111,7 +111,8 @@ import           Clash.Normalize.DEC
 import           Clash.Normalize.PrimitiveReductions
 import           Clash.Normalize.Types
 import           Clash.Normalize.Util
-import           Clash.Primitives.Types      (Primitive (..), PrimMap)
+import           Clash.Primitives.Types
+  (Primitive(..), PrimMap, TemplateKind(TExpr))
 import           Clash.Rewrite.Combinators
 import           Clash.Rewrite.Types
 import           Clash.Rewrite.Util
@@ -586,10 +587,10 @@ removeUnusedExpr :: NormRewrite
 removeUnusedExpr _ e@(collectArgs -> (p@(Prim nm _),args)) = do
   bbM <- HashMap.lookup nm <$> Lens.use (extra.primitives)
   case bbM of
-    Just (BlackBox pNm _ _ _ inc templ) -> do
+    Just (BlackBox pNm _ _ _ _ inc templ) -> do
       let usedArgs = if isFromInt pNm
                         then [0,1,2]
-                        else either usedArguments usedArguments templ ++
+                        else usedArguments templ ++
                              concatMap (usedArguments . snd) inc
       tcm <- Lens.view tcCache
       args' <- go tcm 0 usedArgs args
@@ -1673,7 +1674,7 @@ inlineCleanup _ (Letrec b) = do
     -- Determine whether a let-binding is interesting to inline
     isInteresting
       :: HashMap.HashMap TmOccName Int
-      -> PrimMap a
+      -> PrimMap (Primitive a b c)
       -> [TmOccName]
       -> (Id,Embed Term)
       -> Bool
@@ -1683,7 +1684,7 @@ inlineCleanup _ (Letrec b) = do
       = case tm of
           Prim nm _
             | Just p@(BlackBox {}) <- HashMap.lookup nm prims
-            , Right _ <- template p
+            , TExpr <- kind p
             , Just occ <- HashMap.lookup (nameOcc (varName id_)) allOccs
             , occ < 2
             -> True

@@ -1,12 +1,13 @@
 [ { "BlackBox" :
     { "name" : "Clash.Signal.Internal.delay#"
+    , "kind" : "Declaration"
     , "type" :
 "delay#
   :: (HasCallStack, Undefined a) -- (ARG[0],ARG[1])
   => Clock domain gated       -- ARG[2]
   -> Signal clk a             -- ARG[3]
   -> Signal clk a"
-    , "templateD" :
+    , "template" :
 "-- delay begin~IF ~ISGATED[2] ~THEN
 ~GENSYM[~COMPNAME_delay][0] : block
   signal ~GENSYM[clk][1] : std_logic;
@@ -41,6 +42,7 @@ end process;~FI
   }
 , { "BlackBox" :
     { "name" : "Clash.Signal.Internal.register#"
+    , "kind" : "Declaration"
     , "type" :
 "register#
   :: (HasCallStack,Undefined a) -- (ARG[0],ARG[1])
@@ -49,7 +51,7 @@ end process;~FI
   -> a                        -- ARG[4]
   -> Signal clk a             -- ARG[5]
   -> Signal clk a"
-    , "templateD" :
+    , "template" :
 "-- register begin~IF ~ISGATED[2] ~THEN
 ~GENSYM[~COMPNAME_register][0] : block
   signal ~GENSYM[clk][1] : std_logic;
@@ -128,12 +130,13 @@ end process;~FI~FI
   }
 , { "BlackBox" :
     { "name" : "Clash.Signal.Internal.clockGate"
+    , "kind" : "Declaration"
     , "type" :
 "clockGate
   :: Clock domain gated -- ARG[0]
   -> Signal domain Bool -- ARG[1]
   -> Clcok domain 'Gated"
-    , "templateD" :
+    , "template" :
 "-- clockGate begin~IF ~ISGATED[0] ~THEN
 ~RESULT <= (~ARG[0].~TYPM[0]_sel0,~ARG[0].~TYPM[0]_sel1 and ~ARG[1]);~ELSE
 ~RESULT <= (~ARG[0],~ARG[1]);~FI
@@ -142,13 +145,14 @@ end process;~FI~FI
   }
 , { "BlackBox" :
     { "name"      : "Clash.Signal.Internal.clockGen"
+    , "kind" : "Declaration"
     , "type" :
 "clockGen
   :: (domain ~ Dom nm period -- ARG[0]
      ,KnownSymbol nm         -- ARG[1]
      ,KnownNat period)       -- ARG[2]
   => Clock domain Source"
-    , "templateD" :
+    , "template" :
 "-- pragma translate_off
 ~GENSYM[clkGen][0] : process is
   constant ~GENSYM[half_period][1] : time := ~LIT[2]0 ps / 2;
@@ -168,6 +172,7 @@ end process;
   }
 , { "BlackBox" :
     { "name"      : "Clash.Signal.Internal.tbClockGen"
+    , "kind" : "Declaration"
     , "type" :
 "tbClockGen
   :: (domain ~ Dom nm period -- ARG[0]
@@ -175,7 +180,7 @@ end process;
      ,KnownNat period)       -- ARG[2]
   => Signal domain Bool      -- ARG[3]
   -> Clock domain Source"
-    , "templateD" :
+    , "template" :
 "-- pragma translate_off
 ~GENSYM[clkGen][0] : process is
   constant ~GENSYM[half_period][1] : time := ~LIT[2]0 ps / 2;
@@ -195,9 +200,10 @@ end process;
   }
 , { "BlackBox" :
     { "name"      : "Clash.Signal.Internal.asyncResetGen"
+    , "kind" : "Declaration"
     , "type" :
 "asyncResetGen :: Reset domain 'Asynchronous"
-    , "templateD" :
+    , "template" :
 "-- pragma translate_off
 ~RESULT <= '1',
            '0' after 2000 ps;
@@ -206,11 +212,12 @@ end process;
   }
 , { "BlackBox" :
     { "name"      : "Clash.Signal.Internal.syncResetGen"
+    , "kind" : "Declaration"
     , "type" :
 "syncResetGen :: ( domain ~ 'Dom n clkPeriod
                  , KnownNat clkPeriod )
               => Reset domain 'Synchronous"
-    , "templateD" :
+    , "template" :
 "-- pragma translate_off
 ~RESULT <= '1',
            '0' after (2999 ps + ~LIT[1]0 ps);
@@ -219,60 +226,34 @@ end process;
   }
 , { "BlackBox" :
     { "name"      : "Clash.Signal.Internal.unsafeFromAsyncReset"
+    , "kind" : "Declaration"
     , "type" :
 "unsafeFromAsyncReset :: Reset domain Asynchronous -> Signal domain Bool"
-    , "templateD" : "~RESULT <= true when ~ARG[0] = '1' else false;"
+    , "template" : "~RESULT <= true when ~ARG[0] = '1' else false;"
     }
   }
 , { "BlackBox" :
     { "name"      : "Clash.Signal.Internal.unsafeToAsyncReset"
+    , "kind" : "Declaration"
     , "type" :
 "unsafeToAsyncReset :: Signal domain Bool -> Reset domain Asynchronous"
-    , "templateD" : "~RESULT <= '1' when ~ARG[0] else '0';"
+    , "template" : "~RESULT <= '1' when ~ARG[0] else '0';"
     }
   }
 , { "BlackBox" :
     { "name"      : "Clash.Signal.Internal.fromSyncReset"
+    , "kind" : "Declaration"
     , "type" :
 "fromSyncReset :: Reset domain Synchronous -> Signal domain Bool"
-    , "templateD" : "~RESULT <= true when ~ARG[0] = '1' else false;"
+    , "template" : "~RESULT <= true when ~ARG[0] = '1' else false;"
     }
   }
 , { "BlackBox" :
     { "name"      : "Clash.Signal.Internal.unsafeToSyncReset"
+    , "kind" : "Declaration"
     , "type" :
 "unsafeToSyncReset :: Signal domain Bool -> Reset domain Synchronous"
-    , "templateD" : "~RESULT <= '1' when ~ARG[0] else '0';"
-    }
-  }
-, { "Primitive" :
-    { "name"      : "Clash.Signal.Internal.signal#"
-    , "primType"  : "Function"
-    }
-  }
-, { "Primitive" :
-    { "name"      : "Clash.Signal.Internal.mapSignal#"
-    , "primType"  : "Function"
-    }
-  }
-, { "Primitive" :
-    { "name"      : "Clash.Signal.Internal.appSignal#"
-    , "primType"  : "Function"
-    }
-  }
-, { "Primitive" :
-    { "name"      : "Clash.Signal.Internal.foldr#"
-    , "primType"  : "Function"
-    }
-  }
-, { "Primitive" :
-    { "name"      : "Clash.Signal.Internal.traverse#"
-    , "primType"  : "Function"
-    }
-  }
-, { "Primitive" :
-    { "name"      : "Clash.Signal.Internal.joinSignal#"
-    , "primType"  : "Function"
+    , "template" : "~RESULT <= '1' when ~ARG[0] else '0';"
     }
   }
 ]

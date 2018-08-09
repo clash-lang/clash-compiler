@@ -1,121 +1,134 @@
 [ { "BlackBox" :
     { "name"      : "Clash.Sized.Internal.Index.pack#"
+    , "kind"      : "Expression"
     , "type"      : "pack# :: Index n -> BitVector (CLog 2 n)"
-    , "templateE" : "~ARG[0]"
+    , "template"  : "~ARG[0]"
     }
   }
 , { "BlackBox" :
     { "name"      : "Clash.Sized.Internal.Index.unpack#"
+    , "kind"      : "Expression"
     , "type"      : "unpack# :: (KnownNat n, 1 <= n) => BitVector (CLog 2 n) -> Index n"
-    , "templateE" : "~ARG[2]"
+    , "template"  : "~ARG[2]"
     }
   }
 , { "BlackBox" :
     { "name"      : "Clash.Sized.Internal.Index.eq#"
+    , "kind"      : "Expression"
     , "type"      : "eq# :: Index n -> Index n -> Bool"
-    , "templateE" : "~IF~SIZE[~TYP[0]]~THEN~ARG[0] == ~ARG[1]~ELSE1'b1~FI"
+    , "template"  : "~IF~SIZE[~TYP[0]]~THEN~ARG[0] == ~ARG[1]~ELSE1'b1~FI"
     }
   }
 , { "BlackBox" :
     { "name"      : "Clash.Sized.Internal.Index.neq#"
+    , "kind"      : "Expression"
     , "type"      : "neq# :: Index n -> Index n -> Bool"
-    , "templateE" : "~IF~SIZE[~TYP[0]]~THEN~ARG[0] != ~ARG[1]~ELSE1'b0~FI"
+    , "template"  : "~IF~SIZE[~TYP[0]]~THEN~ARG[0] != ~ARG[1]~ELSE1'b0~FI"
     }
   }
 , { "BlackBox" :
     { "name"      : "Clash.Sized.Internal.Index.lt#"
+    , "kind"      : "Expression"
     , "type"      : "lt# :: Index n -> Index n -> Bool"
-    , "templateE" : "~IF~SIZE[~TYP[0]]~THEN~ARG[0] < ~ARG[1]~ELSE1'b0~FI"
+    , "template"  : "~IF~SIZE[~TYP[0]]~THEN~ARG[0] < ~ARG[1]~ELSE1'b0~FI"
     }
   }
 , { "BlackBox" :
     { "name"      : "Clash.Sized.Internal.Index.ge#"
+    , "kind"      : "Expression"
     , "type"      : "ge# :: Index n -> Index n -> Bool"
-    , "templateE" : "~IF~SIZE[~TYP[0]]~THEN~ARG[0] >= ~ARG[1]~ELSE1'b1~FI"
+    , "template"  : "~IF~SIZE[~TYP[0]]~THEN~ARG[0] >= ~ARG[1]~ELSE1'b1~FI"
     }
   }
 , { "BlackBox" :
     { "name"      : "Clash.Sized.Internal.Index.gt#"
+    , "kind"      : "Expression"
     , "type"      : "gt# :: Index n -> Index n -> Bool"
-    , "templateE" : "~IF~SIZE[~TYP[0]]~THEN~ARG[0] > ~ARG[1]~ELSE1'b0~FI"
+    , "template"  : "~IF~SIZE[~TYP[0]]~THEN~ARG[0] > ~ARG[1]~ELSE1'b0~FI"
     }
   }
 , { "BlackBox" :
     { "name"      : "Clash.Sized.Internal.Index.le#"
+    , "kind"      : "Expression"
     , "type"      : "le# :: Index n -> Index n -> Bool"
-    , "templateE" : "~IF~SIZE[~TYP[0]]~THEN~ARG[0] <= ~ARG[1]~ELSE1'b1~FI"
+    , "template"  : "~IF~SIZE[~TYP[0]]~THEN~ARG[0] <= ~ARG[1]~ELSE1'b1~FI"
     }
   }
 , { "BlackBox" :
     { "name"      : "Clash.Sized.Internal.Index.maxBound#"
+    , "kind"      : "Expression"
     , "type"      : "maxBound# :: KnownNat n => Index n"
-    , "templateE" : "~ARG[0]-~SIZE[~TYPO]'d1"
+    , "template"  : "~ARG[0]-~SIZE[~TYPO]'d1"
     }
   }
 , { "BlackBox" :
     { "name"      : "Clash.Sized.Internal.Index.+#"
+    , "kind"      : "Expression"
     , "type"      : "(+#) :: KnownNat n => Index n -> Index n -> Index n"
-    , "templateE" : "~ARG[1] + ~ARG[2]"
+    , "template"  : "~ARG[1] + ~ARG[2]"
     }
   }
 , { "BlackBox" :
     { "name"      : "Clash.Sized.Internal.Index.-#"
+    , "kind"      : "Expression"
     , "type"      : "(-#) :: KnownNat n => Index n -> Index n -> Index n"
-    , "templateE" : "~ARG[1] - ~ARG[2]"
+    , "template"  : "~ARG[1] - ~ARG[2]"
     }
   }
 , { "BlackBox" :
     { "name"      : "Clash.Sized.Internal.Index.*#"
+    , "kind"      : "Expression"
     , "type"      : "(*#) :: KnownNat n => Index n -> Index n -> Index n"
-    , "templateE" : "~ARG[1] * ~ARG[2]"
+    , "template"  : "~ARG[1] * ~ARG[2]"
     }
   }
 , { "BlackBox" :
     { "name"      : "Clash.Sized.Internal.Index.fromInteger#"
+    , "kind"      : "Expression"
     , "type"      : "fromInteger# :: KnownNat n => Integer -> Index n"
-    , "templateE" : "$unsigned(~ARG[1][(~SIZE[~TYPO]-1):0])"
+    , "template"  : "$unsigned(~ARG[1][(~SIZE[~TYPO]-1):0])"
     }
   }
 , { "BlackBox" :
     { "name"      : "Clash.Sized.Internal.Index.plus#"
+    , "kind"      : "Declaration"
     , "type"      : "Index m -> Index n -> Index (m + n - 1)"
-    , "templateD" : "assign ~RESULT = ~ARG[0] + ~ARG[1];"
+    , "template"  : "assign ~RESULT = ~ARG[0] + ~ARG[1];"
     }
   }
 , { "BlackBox" :
     { "name"      : "Clash.Sized.Internal.Index.minus#"
+    , "kind"      : "Declaration"
     , "type"      : "Index m -> Index n -> Index (m + n - 1)"
-    , "templateD" : "assign ~RESULT = ~ARG[0] - ~ARG[1];"
+    , "template"  : "assign ~RESULT = ~ARG[0] - ~ARG[1];"
     }
   }
 , { "BlackBox" :
     { "name"      : "Clash.Sized.Internal.Index.times#"
+    , "kind"      : "Declaration"
     , "type"      : "Index m -> Index n -> Index (((m-1) * (n-1)) + 1)"
-    , "templateD" : "assign ~RESULT = ~ARG[0] * ~ARG[1];"
-    }
-  }
-, { "BlackBox" :
-    { "name"      : "Clash.Sized.Internal.Index.quot#"
-    , "type"      : "quot# :: Index n -> Index n -> Index n"
-    , "templateE" : "~ARG[0] / ~ARG[1]"
+    , "template"  : "assign ~RESULT = ~ARG[0] * ~ARG[1];"
     }
   }
 , { "BlackBox" :
     { "name"      : "Clash.Sized.Internal.Index.rem#"
+    , "kind"      : "Expression"
     , "type"      : "rem# :: Index n -> Index n -> Index n"
-    , "templateE" : "~ARG[0] % ~ARG[1]"
+    , "template"  : "~ARG[0] % ~ARG[1]"
     }
   }
 , { "BlackBox" :
     { "name"      : "Clash.Sized.Internal.Index.toInteger#"
+    , "kind"      : "Declaration"
     , "type"      : "toInteger# :: Index n -> Integer"
-    , "templateD" : "assign ~RESULT = ~IF~SIZE[~TYP[0]]~THEN$unsigned(~ARG[0])~ELSE64'sd0~FI;"
+    , "template"  : "assign ~RESULT = ~IF~SIZE[~TYP[0]]~THEN$unsigned(~ARG[0])~ELSE64'sd0~FI;"
     }
   }
 , { "BlackBox" :
     { "name"      : "Clash.Sized.Internal.Index.resize#"
+    , "kind"      : "Declaration"
     , "type"      : "resize# :: KnownNat m => Index n -> Index m"
-    , "templateD" : "assign ~RESULT = ~IF~SIZE[~TYP[1]]~THEN$unsigned(~ARG[1])~ELSE~SIZE[~TYPO]'d0~FI;"
+    , "template"  : "assign ~RESULT = ~IF~SIZE[~TYP[1]]~THEN$unsigned(~ARG[1])~ELSE~SIZE[~TYPO]'d0~FI;"
     }
   }
 ]

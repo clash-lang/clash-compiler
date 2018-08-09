@@ -1,25 +1,29 @@
 [ { "BlackBox" :
     { "name"      : "GHC.Int.I8#"
+    , "kind"      : "Declaration"
     , "type"      : "I8# :: Int# -> Int8"
-    , "templateD" : "assign ~RESULT = $signed(~ARG[0]);"
+    , "template"  : "assign ~RESULT = $signed(~ARG[0]);"
     }
   }
 , { "BlackBox" :
     { "name"      : "GHC.Int.I16#"
+    , "kind"      : "Declaration"
     , "type"      : "I16# :: Int# -> Int16"
-    , "templateD" : "assign ~RESULT = $signed(~ARG[0]);"
+    , "template"  : "assign ~RESULT = $signed(~ARG[0]);"
     }
   }
 , { "BlackBox" :
     { "name"      : "GHC.Int.I32#"
+    , "kind"      : "Declaration"
     , "type"      : "I32# :: Int# -> Int32"
-    , "templateD" : "assign ~RESULT = $signed(~ARG[0]);"
+    , "template"  : "assign ~RESULT = $signed(~ARG[0]);"
     }
   }
 , { "BlackBox" :
     { "name"      : "GHC.Int.I64#"
+    , "kind"      : "Declaration"
     , "type"      : "I64# :: Int# -> Int64"
-    , "templateD" : "assign ~RESULT = $signed(~ARG[0]);"
+    , "template"  : "assign ~RESULT = $signed(~ARG[0]);"
     }
   }
 ]

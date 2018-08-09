@@ -1,5 +1,6 @@
 [ { "BlackBox" :
     { "name" : "Clash.Explicit.RAM.asyncRam#"
+    , "kind" : "Declaration"
     , "type" :
 "asyncRam#
   :: HasCallStack      -- ARG[0]
@@ -11,7 +12,7 @@
   -> Signal wdom Int   -- ^ wr,   ARG[6]
   -> Signal wdom a     -- ^ din,  ARG[7]
   -> Signal rdom a"
-    , "templateD" :
+    , "template" :
 "// asyncRam begin
 reg ~TYPO ~GENSYM[RAM][0] [0:~LIT[3]-1];
 ~IF ~ISGATED[1] ~THEN

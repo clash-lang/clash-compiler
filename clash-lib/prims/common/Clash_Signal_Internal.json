@@ -1,0 +1,31 @@
+[ { "Primitive" :
+    { "name"      : "Clash.Signal.Internal.signal#"
+    , "primType"  : "Function"
+    }
+  }
+, { "Primitive" :
+    { "name"      : "Clash.Signal.Internal.mapSignal#"
+    , "primType"  : "Function"
+    }
+  }
+, { "Primitive" :
+    { "name"      : "Clash.Signal.Internal.appSignal#"
+    , "primType"  : "Function"
+    }
+  }
+, { "Primitive" :
+    { "name"      : "Clash.Signal.Internal.foldr#"
+    , "primType"  : "Function"
+    }
+  }
+, { "Primitive" :
+    { "name"      : "Clash.Signal.Internal.traverse#"
+    , "primType"  : "Function"
+    }
+  }
+, { "Primitive" :
+    { "name"      : "Clash.Signal.Internal.joinSignal#"
+    , "primType"  : "Function"
+    }
+  }
+]

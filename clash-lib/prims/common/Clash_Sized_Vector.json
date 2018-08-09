@@ -1,0 +1,8 @@
+[ { "BlackBox" :
+    { "name"      : "Clash.Sized.Vector.lazyV"
+    , "kind"      : "Expression"
+    , "type"      : "lazyV :: KnownNat n => Vec n a -> Vec n a"
+    , "template"  : "~ARG[1]"
+    }
+  }
+]

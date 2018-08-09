@@ -5,20 +5,23 @@
   }
 , { "BlackBox" :
     { "name"      : "GHC.Types.C#"
-    , "type"      : "C# :: Char# -> Char"
-    , "templateE" : "~ARG[0]"
+    , "kind"      : "Expression"
+    , "type"      : "I# :: Char# -> Char"
+    , "template"  : "~ARG[0]"
     }
   }
 , { "BlackBox" :
     { "name"      : "GHC.Types.I#"
+    , "kind"      : "Expression"
     , "type"      : "I# :: Int# -> Int"
-    , "templateE" : "~ARG[0]"
+    , "template"  : "~ARG[0]"
     }
   }
 , { "BlackBox" :
     { "name"      : "GHC.Types.W#"
+    , "kind"      : "Expression"
     , "type"      : "W# :: Word# -> Word"
-    , "templateE" : "~ARG[0]"
+    , "template"  : "~ARG[0]"
     }
   }
 ]

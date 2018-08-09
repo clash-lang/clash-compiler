@@ -1,29 +1,34 @@
 [ { "BlackBox" :
     { "name"      : "Clash.Sized.Vector.head"
+    , "kind"      : "Expression"
     , "type"      : "head :: Vec (n + 1) a -> a"
-    , "templateE" : "~VAR[vec][0][~SIZE[~TYP[0]]-1 -: ~SIZE[~TYPO]]"
+    , "template"  : "~VAR[vec][0][~SIZE[~TYP[0]]-1 -: ~SIZE[~TYPO]]"
     }
   }
 , { "BlackBox" :
     { "name"      : "Clash.Sized.Vector.tail"
+    , "kind"      : "Expression"
     , "type"      : "tail :: Vec (n + 1) a -> Vec n a"
-    , "templateE" : "~VAR[vec][0][~SIZE[~TYPO]-1 : 0]"
+    , "template"  : "~VAR[vec][0][~SIZE[~TYPO]-1 : 0]"
     }
   }
 , { "BlackBox" :
     { "name"      : "Clash.Sized.Vector.last"
+    , "kind"      : "Expression"
     , "type"      : "Vec (n + 1) a -> a"
-    , "templateE" : "~VAR[vec][0][~SIZE[~TYPO]-1:0]"
+    , "template"  : "~VAR[vec][0][~SIZE[~TYPO]-1:0]"
     }
   }
 , { "BlackBox" :
     { "name"      : "Clash.Sized.Vector.init"
+    , "kind"      : "Expression"
     , "type"      : "Vec (n + 1) a -> Vec n a"
-    , "templateE" : "~VAR[vec][0][~SIZE[~TYP[0]]-1 : ~SIZE[~TYPEL[~TYP[0]]]]"
+    , "template"  : "~VAR[vec][0][~SIZE[~TYP[0]]-1 : ~SIZE[~TYPEL[~TYP[0]]]]"
     }
   }
 , { "BlackBox" :
     { "name" : "Clash.Sized.Vector.select"
+    , "kind" : "Declaration"
     , "type" :
 "select :: (CmpNat (i + s) (s * n) ~ GT) -- ARG[0]
         => SNat f                        -- ARG[1]
@@ -31,7 +36,7 @@
         -> SNat n                        -- ARG[3]
         -> Vec i a                       -- ARG[4]
         -> Vec n a"
-    , "templateD" :
+    , "template" :
 "// select begin
 wire ~TYPEL[~TYPO] ~SYM[1] [0:~LENGTH[~TYP[4]]-1];
 genvar ~GENSYM[i][2];
@@ -52,36 +57,41 @@ end
   }
 , { "BlackBox" :
     { "name"      : "Clash.Sized.Vector.++"
+    , "kind"      : "Expression"
     , "type"      : "(++) :: Vec n a -> Vec m a -> Vec (n + m) a"
-    , "templateE" : "{~ARG[0],~ARG[1]}"
+    , "template"  : "{~ARG[0],~ARG[1]}"
     }
   }
 , { "BlackBox" :
     { "name"      : "Clash.Sized.Vector.concat"
+    , "kind"      : "Expression"
     , "type"      : "concat :: Vec n (Vec m a) -> Vec (n * m) a"
-    , "templateE" : "~ARG[0]"
+    , "template"  : "~ARG[0]"
     }
   }
 , { "BlackBox" :
     { "name"      : "Clash.Sized.Vector.splitAt"
+    , "kind"      : "Expression"
     , "type"      : "splitAt :: SNat m -> Vec (m + n) a -> (Vec m a, Vec n a)"
-    , "templateE" : "~ARG[1]"
+    , "template"  : "~ARG[1]"
     }
   }
 , { "BlackBox" :
     { "name" : "Clash.Sized.Vector.unconcat"
+    , "kind" : "Expression"
     , "type" :
  "unconcat :: KnownNat n     -- ARG[0]
            => SNat m         -- ARG[1]
            -> Vec (n * m) a  -- ARG[2]
            -> Vec n (Vec m a)"
-    , "templateE" : "~ARG[2]"
+    , "template" : "~ARG[2]"
     }
   }
 , { "BlackBox" :
     { "name"      : "Clash.Sized.Vector.map"
+    , "kind"      : "Declaration"
     , "type"      : "map :: (a -> b) -> Vec n a -> Vec n b"
-    , "templateD" :
+    , "template"  :
 "// map begin
 genvar ~GENSYM[i][1];
 ~GENERATE
@@ -101,8 +111,9 @@ end
   }
 , { "BlackBox" :
     { "name"      : "Clash.Sized.Vector.imap"
+    , "kind"      : "Declaration"
     , "type"      : "imap :: KnownNat n => (Index n -> a -> b) -> Vec n a -> Vec n b"
-    , "templateD" :
+    , "template"  :
 "// imap begin
 genvar ~GENSYM[i][1];
 ~GENERATE
@@ -126,8 +137,9 @@ end
   }
 , { "BlackBox" :
     { "name"      : "Clash.Sized.Vector.imap_go"
+    , "kind"      : "Declaration"
     , "type"      : "imap :: Index n -> (Index n -> a -> b) -> Vec m a -> Vec m b"
-    , "templateD" :
+    , "template"  :
 "// imap begin
 genvar ~GENSYM[i][1];
 ~GENERATE
@@ -151,8 +163,9 @@ end
   }
 , { "BlackBox" :
     { "name"      : "Clash.Sized.Vector.zipWith"
+    , "kind"      : "Declaration"
     , "type"      : "zipWith :: (a -> b -> c) -> Vec n a -> Vec n b -> Vec n c"
-    , "templateD" :
+    , "template"  :
 "// zipWith start
 genvar ~GENSYM[i][2];
 ~GENERATE
@@ -175,8 +188,9 @@ end
   }
 , { "BlackBox" :
     { "name"      : "Clash.Sized.Vector.foldr"
+    , "kind"      : "Declaration"
     , "type"      : "foldr :: (a -> b -> b) -> b -> Vec n a -> b"
-    , "templateD" :
+    , "template"  :
 "// foldr start~IF ~LENGTH[~TYP[2]] ~THEN
 wire ~TYPO ~GENSYM[intermediate][0] [0:~LENGTH[~TYP[2]]];
 assign ~SYM[0][~LENGTH[~TYP[2]]] = ~ARG[1];
@@ -207,13 +221,14 @@ assign ~RESULT = ~ARG[1];
   }
 , { "BlackBox" :
     { "name"      : "Clash.Sized.Vector.fold"
+    , "kind"      : "Declaration"
     , "type"      : "fold :: (a -> a -> a) -> Vec (n+1) a -> a"
     , "comment"   : "THIS ONLY WORKS FOR POWER OF TWO LENGTH VECTORS"
     , "imports"   : ["~INCLUDENAME[0].inc"]
     , "includes" :
       [ { "name" : "fold"
         , "extension" : "inc"
-        , "content" :
+        , "template" :
 "// ceiling of log2
 function integer ~INCLUDENAME[0]_clog2;
   input integer value;
@@ -234,7 +249,7 @@ function integer ~INCLUDENAME[0]_depth2Index;
 endfunction"
         }
       ]
-    , "templateD" :
+    , "template" :
 "// fold begin
 // put flat input array into the first half of the intermediate array
 wire ~TYPO ~GENSYM[intermediate][0] [0:(2*~LENGTH[~TYP[1]])-2];
@@ -280,8 +295,9 @@ assign ~RESULT = ~SYM[0][(2*~LENGTH[~TYP[1]])-2];
   }
 , { "BlackBox" :
     { "name"      : "Clash.Sized.Vector.index_int"
+    , "kind"      : "Declaration"
     , "type"      : "index_integer :: KnownNat n => Vec n a -> Int -> a"
-    , "templateD" :
+    , "template"  :
 "// indexVec begin
 wire ~TYPO ~GENSYM[vec][0] [0:~LIT[0]-1];
 
@@ -298,8 +314,9 @@ assign ~RESULT = ~SYM[0][~ARG[2]];
   }
 , { "BlackBox" :
     { "name"      : "Clash.Sized.Vector.replace_int"
+    , "kind"      : "Declaration"
     , "type"      : "replace_int :: KnownNat n => Vec n a -> Int -> a -> Vec n a"
-    , "templateD" :
+    , "template"  :
 "// replaceVec start
 reg ~TYP[3] ~GENSYM[vec][1] [0:~LIT[0]-1];
 integer ~GENSYM[i][2];
@@ -321,26 +338,30 @@ end
   }
 , { "BlackBox" :
     { "name"      : "Clash.Sized.Vector.maxIndex"
+    , "kind"      : "Expression"
     , "type"      : "maxIndex :: KnownNat n => Vec n a -> Int"
-    , "templateE" : "~SIZE[~TYPO]'sd~LIT[0] - ~SIZE[~TYPO]'d1"
+    , "template"  : "~SIZE[~TYPO]'sd~LIT[0] - ~SIZE[~TYPO]'d1"
     }
   }
 , { "BlackBox" :
     { "name"      : "Clash.Sized.Vector.length"
+    , "kind"      : "Expression"
     , "type"      : "length :: KnownNat n => Vec n a -> Int"
-    , "templateE" : "~SIZE[~TYPO]'sd~LIT[0]"
+    , "template"  : "~SIZE[~TYPO]'sd~LIT[0]"
     }
   }
 , { "BlackBox" :
     { "name"      : "Clash.Sized.Vector.replicate"
+    , "kind"      : "Expression"
     , "type"      : "replicate :: SNat n -> a -> Vec n a"
-    , "templateE" : "{~LIT[0] {~ARG[1]}}"
+    , "template"  : "{~LIT[0] {~ARG[1]}}"
     }
   }
 , { "BlackBox" :
     { "name"      : "Clash.Sized.Vector.transpose"
+    , "kind"      : "Declaration"
     , "type"      : "transpose :: KnownNat n => Vec m (Vec n a) -> Vec n (Vec m a)"
-    , "templateD" :
+    , "template"  :
 "// transpose begin
 genvar ~GENSYM[row_index][1];
 genvar ~GENSYM[col_index][2];
@@ -356,8 +377,9 @@ end
   }
 , { "BlackBox" :
     { "name"      : "Clash.Sized.Vector.reverse"
+    , "kind"      : "Declaration"
     , "type"      : "reverse :: Vec n a -> Vec n a"
-    , "templateD" :
+    , "template"  :
 "// reverse begin
 genvar ~GENSYM[i][1];
 ~GENERATE
@@ -369,33 +391,30 @@ end
     }
   }
 , { "BlackBox" :
-    { "name"      : "Clash.Sized.Vector.lazyV"
-    , "type"      : "lazyV :: KnownNat n => Vec n a -> Vec n a"
-    , "templateE" : "~ARG[1]"
-    }
-  }
-, { "BlackBox" :
     { "name" : "Clash.Sized.Vector.concatBitVector#"
+    , "kind" : "Expression"
     , "type" :
 "concatBitVector# :: (KnownNat n, KnownNat m) -- (ARG[0],ARG[1])
                   => Vec n (BitVector m)      -- ARG[2]
                   -> BitVector (n * m)"
-    , "templateE" : "~ARG[2]"
+    , "template" : "~ARG[2]"
     }
   }
 , { "BlackBox" :
     { "name" : "Clash.Sized.Vector.unconcatBitVector#"
+    , "kind" : "Expression"
     , "type" :
 "unconcatBitVector# :: (KnownNat n, KnownNat m) -- (ARG[0],ARG[1])
                     => BitVector (n * m)        -- ARG[2]
                     -> Vec n (BitVector m)"
-    , "templateE" : "~ARG[2]"
+    , "template" : "~ARG[2]"
     }
   }
 , { "BlackBox" :
     { "name"      : "Clash.Sized.Vector.rotateLeftS"
+    , "kind"      : "Declaration"
     , "type"      : "rotateLeftS :: KnownNat n => Vec n a -> SNat d -> Vec n a"
-    , "templateD" :
+    , "template"  :
 "// rotateLeftS begin
 localparam ~GENSYM[shift_amount][2] = ~LIT[2] % ~LIT[0];
 
@@ -413,8 +432,9 @@ end
   }
 , { "BlackBox" :
     { "name"      : "Clash.Sized.Vector.rotateRightS"
+    , "kind"      : "Declaration"
     , "type"      : "rotateRightS :: KnownNat n => Vec n a -> SNat d -> Vec n a"
-    , "templateD" :
+    , "template"  :
 "// rotateRightS begin
 localparam ~GENSYM[shift_amount][2] = ~LIT[2] % ~LIT[0];
 

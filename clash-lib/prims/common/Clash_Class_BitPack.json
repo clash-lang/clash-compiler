@@ -1,29 +1,33 @@
 [ { "BlackBox" :
     { "name"      : "Clash.Class.BitPack.packFloat#"
+    , "kind"      : "Expression"
     , "type" :
 "packFloat# :: Float -> BitVector 32"
-    , "templateE" : "~ARG[0]"
+    , "template"  : "~ARG[0]"
     }
   }
 , { "BlackBox" :
     { "name"      : "Clash.Class.BitPack.unpackFloat#"
+    , "kind"      : "Expression"
     , "type" :
 "packFloat# :: BitVector 32 -> Float"
-    , "templateE" : "~ARG[0]"
+    , "template"  : "~ARG[0]"
     }
   }
 , { "BlackBox" :
     { "name"      : "Clash.Class.BitPack.packDouble#"
+    , "kind"      : "Expression"
     , "type" :
 "packFloat# :: Double -> BitVector 64"
-    , "templateE" : "~ARG[0]"
+    , "template"  : "~ARG[0]"
     }
   }
 , { "BlackBox" :
     { "name"      : "Clash.Class.BitPack.unpackDouble#"
+    , "kind"      : "Expression"
     , "type" :
 "packFloat# :: BitVector 64 -> Double"
-    , "templateE" : "~ARG[0]"
+    , "template"  : "~ARG[0]"
     }
   }
 ]

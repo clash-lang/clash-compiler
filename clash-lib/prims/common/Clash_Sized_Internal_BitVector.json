@@ -1,25 +1,29 @@
 [ { "BlackBox" :
     { "name"      : "Clash.Sized.Internal.BitVector.BV"
+    , "kind"      : "Expression"
     , "type"      : "BV :: Integer -> Integer -> BitVector n"
     , "comment"   : "THIS IS ONLY USED WHEN WW EXPOSES BITVECTOR INTERNALS"
-    , "templateE" : "~ARG[1]"
+    , "template"  : "~ARG[1]"
     }
   }
 , { "BlackBox" :
     { "name"      : "Clash.Sized.Internal.BitVector.Bit"
+    , "kind"      : "Expression"
     , "type"      : "Bit :: Integer -> Integer -> BitVector n"
     , "comment"   : "THIS IS ONLY USED WHEN WW EXPOSES BIT INTERNALS"
-    , "templateE" : "~ARG[1]"
+    , "template"  : "~ARG[1]"
     }
   }
 , { "BlackBox" :
     { "name"      : "Clash.Sized.Internal.BitVector.undefined#"
+    , "kind"      : "Expression"
     , "type"      : "undefined# :: forall n . KnownNat n => BitVector n"
-    , "templateE" : "~ERRORO"
+    , "template"  : "~ERRORO"
     }
   }
 , { "BlackBox" :
     { "name"      : "Clash.Sized.Internal.BitVector.checkUnpackUndef"
+    , "kind"      : "Declaration"
     , "type"      :
 "checkUnpackUndef
   :: ( KnownNat n        -- ARG[0]
@@ -27,11 +31,39 @@
   => (BitVector n -> a)  -- ARG[2]
   -> BitVector n         -- ARG[3]
   -> a"
-    , "templateD" :
+    , "template"  :
 "~INST 2
   ~OUTPUT <= ~RESULT~ ~TYPO~
   ~INPUT  <= ~ARG[3]~ ~TYP[3]~
 ~INST"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "Clash.Sized.Internal.BitVector.lt##"
+    , "kind"      : "Expression"
+    , "type"      : "lt## :: Bit -> Bit -> Bool"
+    , "template"  : "~ARG[0] < ~ARG[1]"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "Clash.Sized.Internal.BitVector.ge##"
+    , "kind"      : "Expression"
+    , "type"      : "ge## :: Bit -> Bit -> Bool"
+    , "template"  : "~ARG[0] >= ~ARG[1]"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "Clash.Sized.Internal.BitVector.gt##"
+    , "kind"      : "Expression"
+    , "type"      : "gt## :: Bit -> Bit -> Bool"
+    , "template"  : "~ARG[0] > ~ARG[1]"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "Clash.Sized.Internal.BitVector.le##"
+    , "kind"      : "Expression"
+    , "type"      : "le## :: Bit -> Bit -> Bool"
+    , "template"  : "~ARG[0] <= ~ARG[1]"
     }
   }
 ]

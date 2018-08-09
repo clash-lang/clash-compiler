@@ -146,6 +146,7 @@ import           Clash.GHC.GenerateBindings
 import           Clash.GHC.NetlistTypes
 import           Clash.Netlist.BlackBox.Types (HdlSyn)
 import           Clash.Util (clashLibVersion)
+import qualified Data.HashMap.Strict as HM
 import qualified Data.Time.Clock as Clock
 import qualified Paths_clash_ghc
 
@@ -1954,17 +1955,26 @@ makeHDL backend optsRef srcs = do
               primDirs <- Clash.Backend.primDirs backend'
 
               forM_ srcs $ \src -> do
+                -- Generate bindings:
                 (bindingsMap,tcm,tupTcm,topEntities,primMap,reprs) <-
                   generateBindings primDirs idirs hdl src (Just dflags)
                 prepTime <- startTime `deepseq` bindingsMap `deepseq` tcm `deepseq` Clock.getCurrentTime
                 let prepStartDiff = Clock.diffUTCTime prepTime startTime
                 putStrLn $ "Loading dependencies took " ++ show prepStartDiff
 
+                -- Parsing / compiling primitives:
+                startTime' <- Clock.getCurrentTime
+                primMap'   <- sequence $ HM.map Clash.Driver.compilePrimitive primMap
+                prepTime'  <- startTime' `deepseq` primMap' `seq` Clock.getCurrentTime
+                let prepStartDiff' = Clock.diffUTCTime prepTime' startTime'
+                putStrLn $ "Parsing and compiling primitives took " ++ show prepStartDiff'
+
+                -- Generate HDL:
                 Clash.Driver.generateHDL
                   (buildCustomReprs reprs)
                   bindingsMap
                   (Just backend')
-                  primMap
+                  primMap'
                   tcm
                   tupTcm
                   (ghcTypeToHWType iw fp)

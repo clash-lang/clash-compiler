@@ -50,7 +50,8 @@ import           Clash.Annotations.BitRepresentation.Util
 import           Clash.Backend
 import           Clash.Driver.Types                   (SrcSpan, noSrcSpan)
 import           Clash.Netlist.BlackBox.Types         (HdlSyn (..))
-import           Clash.Netlist.BlackBox.Util          (extractLiterals, renderBlackBox)
+import           Clash.Netlist.BlackBox.Util
+  (extractLiterals, renderBlackBox, renderFilePath)
 import           Clash.Netlist.Id                     (IdType (..), mkBasicId')
 import           Clash.Netlist.Types                  hiding (_intWidth, intWidth)
 import           Clash.Netlist.Util                   hiding (mkIdentifier)
@@ -72,6 +73,12 @@ data VHDLState =
   , _libraries :: [T.Text]
   , _packages  :: [T.Text]
   , _includes  :: [(String,Doc)]
+  , _dataFiles      :: [(String,FilePath)]
+  -- ^ Files to be copied: (filename, old path)
+  , _memoryDataFiles:: [(String,String)]
+  -- ^ Files to be stored: (filename, contents). These files are generated
+  -- during the execution of 'genNetlist'.
+  , _idSeen    :: [Identifier]
   , _intWidth  :: Int                  -- ^ Int/Word/Integer bit-width
   , _hdlsyn    :: HdlSyn               -- ^ For which HDL synthesis tool are we generating VHDL
   }
@@ -89,7 +96,7 @@ primsRoot = return ("clash-lib" System.FilePath.</> "prims")
 #endif
 
 instance Backend VHDLState where
-  initBackend     = VHDLState HashSet.empty [] HashMap.empty "" noSrcSpan [] [] []
+  initBackend     = VHDLState HashSet.empty [] HashMap.empty "" noSrcSpan [] [] [] [] [] []
   hdlKind         = const VHDL
   primDirs        = const $ do root <- primsRoot
                                return [ root System.FilePath.</> "common"
@@ -157,6 +164,15 @@ instance Backend VHDLState where
   addIncludes inc = includes %= (inc++)
   addLibraries libs = libraries %= (libs ++)
   addImports imps = packages %= (imps ++)
+  addAndSetData f = do
+    fs <- use dataFiles
+    let (fs',f') = renderFilePath fs f
+    dataFiles .= fs'
+    return f'
+  getDataFiles = use dataFiles
+  addMemoryDataFile f = memoryDataFiles %= (f:)
+  getMemoryDataFiles = use memoryDataFiles
+  seenIdentifiers = idSeen
 
 rmSlash :: Identifier -> Identifier
 rmSlash nm = fromMaybe nm $ do
@@ -193,8 +209,9 @@ filterReserved s = if s `elem` reservedWords
   else s
 
 -- | Generate VHDL for a Netlist component
-genVHDL :: String -> SrcSpan -> Component -> VHDLM ((String,Doc),[(String,Doc)])
-genVHDL nm sp c = do
+genVHDL :: String -> SrcSpan -> [Identifier] -> Component -> VHDLM ((String,Doc),[(String,Doc)])
+genVHDL nm sp seen c = preserveSeen $ do
+    Mon $ idSeen .= seen
     Mon $ setSrcSpan sp
     v <- vhdl
     i <- Mon $ use includes
@@ -755,6 +772,19 @@ decl l (NetDecl' noteM _ id_ ty) = Just <$> (,fromIntegral (T.length id_)) <$>
   where
     addNote n = mappend ("--" <+> pretty n <> line)
 
+decl _ (InstDecl Comp _ nm _ pms) = fmap (Just . (,0)) $ do
+  { rec (p,ls) <- fmap unzip $ sequence [ (,formalLength i) <$> fill (maximum ls) (expr_ False i) <+> colon <+> portDir dir <+> vhdlType ty | (i,dir,ty,_) <- pms ]
+  ; "component" <+> pretty nm <> line <>
+      indent 2 ("port" <+> tupledSemi (pure p) <> semi) <> line <>
+    "end component"
+  }
+ where
+    formalLength (Identifier i _) = fromIntegral (T.length i)
+    formalLength _                = 0
+
+    portDir In  = "in"
+    portDir Out = "out"
+
 decl _ _ = return Nothing
 
 stdMatch
@@ -862,10 +892,10 @@ inst_ (CondAssignment id_ _sig scrut scrutTy es) = fmap Just $
     conds ((Nothing,e):_)   = expr_ False e <+> "when" <+> "others" <:> return []
     conds ((Just c ,e):es') = expr_ False e <+> "when" <+> patLit scrutTy c <:> conds es'
 
-inst_ (InstDecl libM nm lbl pms) = do
+inst_ (InstDecl entOrComp libM nm lbl pms) = do
     maybe (return ()) (\lib -> Mon (libraries %= (lib:))) libM
     fmap Just $
-      nest 2 $ pretty lbl <+> colon <+> "entity"
+      nest 2 $ pretty lbl <+> colon <+> entOrComp'
                 <+> maybe emptyDoc ((<> ".") . pretty) libM <> pretty nm <> line <> pms' <> semi
   where
     pms' = do
@@ -873,6 +903,7 @@ inst_ (InstDecl libM nm lbl pms) = do
       nest 2 $ "port map" <> line <> tupled (pure p)
     formalLength (Identifier i _) = fromIntegral (T.length i)
     formalLength _                = 0
+    entOrComp' = case entOrComp of { Entity ->"entity"; _ -> "component" }
 
 inst_ (BlackBoxD _ libs imps inc bs bbCtx) =
   fmap Just (Mon (column (renderBlackBox libs imps inc bs bbCtx)))
@@ -1398,3 +1429,8 @@ encodingNote (Clock _ _ Gated) = "-- gated clock" <> line
 encodingNote (Clock {})        = "-- clock" <> line
 encodingNote (Reset {})        = "-- asynchronous reset: active high" <> line
 encodingNote _                 = emptyDoc
+
+tupledSemi :: Applicative f => f [Doc] -> f Doc
+tupledSemi = align . encloseSep (flatAlt (lparen <+> emptyDoc) lparen)
+                                (flatAlt (emptyDoc <+> rparen) rparen)
+                                (semi <+> emptyDoc)

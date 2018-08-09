@@ -1982,9 +1982,10 @@ makeHDL backend optsRef srcs = do
   dflags <- GHC.getSessionDynFlags
   liftIO $ do startTime <- Clock.getCurrentTime
               opts  <- readIORef optsRef
-              let iw = opt_intWidth opts
-                  fp = opt_floatSupport opts
+              let iw  = opt_intWidth opts
+                  fp  = opt_floatSupport opts
                   syn = opt_hdlSyn opts
+                  hdl = Clash.Backend.hdlKind backend'
                   -- determine whether `-outputdir` was used
                   outputDir = do odir <- objectDir dflags
                                  hidir <- hiDir dflags
@@ -1997,15 +1998,37 @@ makeHDL backend optsRef srcs = do
                   opts' = opts {opt_hdlDir = maybe outputDir Just (opt_hdlDir opts)
                                ,opt_importPaths = idirs}
                   backend' = backend iw syn
+
               primDirs <- Clash.Backend.primDirs backend'
+
               forM_ srcs $ \src -> do
-                (bindingsMap,tcm,tupTcm,topEntities,primMap) <-
-                  generateBindings primDirs idirs (Clash.Backend.hdlKind backend') src (Just dflags)
+                -- Generate bindings:
+                (bindingsMap,tcm,tupTcm,topEntities,primMap,reprs) <-
+                  generateBindings primDirs idirs hdl src (Just dflags)
                 prepTime <- startTime `deepseq` bindingsMap `deepseq` tcm `deepseq` Clock.getCurrentTime
                 let prepStartDiff = Clock.diffUTCTime prepTime startTime
                 putStrLn $ "Loading dependencies took " ++ show prepStartDiff
-                Clash.Driver.generateHDL bindingsMap (Just backend') primMap tcm
-                  tupTcm (ghcTypeToHWType iw fp) reduceConstant topEntities opts' (startTime,prepTime)
+
+                -- Parsing / compiling primitives:
+                startTime' <- Clock.getCurrentTime
+                primMap'   <- sequence $ HM.map Clash.Driver.compilePrimitive primMap
+                prepTime'  <- startTime' `deepseq` primMap' `seq` Clock.getCurrentTime
+                let prepStartDiff' = Clock.diffUTCTime prepTime' startTime'
+                putStrLn $ "Parsing and compiling primitives took " ++ show prepStartDiff'
+
+                -- Generate HDL:
+                Clash.Driver.generateHDL
+                  (buildCustomReprs reprs)
+                  bindingsMap
+                  (Just backend')
+                  primMap'
+                  tcm
+                  tupTcm
+                  (ghcTypeToHWType iw fp)
+                  reduceConstant
+                  topEntities
+                  opts'
+                  (startTime,prepTime)
 
 makeVHDL :: IORef ClashOpts -> [FilePath] -> InputT GHCi ()
 makeVHDL = makeHDL' (Clash.Backend.initBackend :: Int -> HdlSyn -> VHDLState)

@@ -11,8 +11,10 @@
 {-# LANGUAGE DeriveGeneric              #-}
 {-# LANGUAGE DerivingStrategies         #-}
 {-# LANGUAGE DeriveLift                 #-}
+{-# LANGUAGE GADTs                      #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE PatternSynonyms            #-}
+{-# LANGUAGE RankNTypes                 #-}
 {-# LANGUAGE TemplateHaskell            #-}
 {-# LANGUAGE DeriveDataTypeable         #-}
 
@@ -25,6 +27,7 @@ module Clash.Netlist.Types
 where
 
 import Control.DeepSeq
+import Control.Monad.State                  (State)
 import Control.Monad.State.Strict           (MonadIO, MonadState, StateT)
 import Data.Bits                            (testBit)
 import Data.Hashable
@@ -33,6 +36,7 @@ import Data.IntMap.Lazy                     (IntMap, empty)
 import qualified Data.Text                  as S
 import Data.Text.Lazy                       (Text, pack)
 import Data.Typeable                        (Typeable)
+import Data.Text.Prettyprint.Doc.Extra      (Doc)
 import GHC.Generics                         (Generic)
 import Language.Haskell.TH.Syntax           (Lift)
 import Unbound.Generics.LocallyNameless     (Fresh, FreshMT)
@@ -40,15 +44,16 @@ import Unbound.Generics.LocallyNameless     (Fresh, FreshMT)
 import SrcLoc                               (SrcSpan)
 
 import Clash.Annotations.TopEntity          (TopEntity)
+import Clash.Backend                        (Backend)
 import Clash.Core.Term                      (TmOccName)
 import Clash.Core.Type                      (Type)
 import Clash.Core.TyCon                     (TyCon, TyConOccName)
 import Clash.Driver.Types                   (BindingMap)
-import Clash.Netlist.BlackBox.Types         hiding (L)
+import Clash.Netlist.BlackBox.Types         (BlackBoxTemplate)
 import Clash.Netlist.Id                     (IdType)
-import Clash.Primitives.Types               (PrimMap)
+import Clash.Primitives.Types               (CompiledPrimMap)
 import Clash.Signal.Internal                (ClockKind, ResetKind)
-import Clash.Util
+import Clash.Util                           (makeLenses)
 
 import Clash.Annotations.BitRepresentation.Internal
   (CustomReprs, DataRepr', ConstrRepr')
@@ -64,17 +69,12 @@ data NetlistState
   = NetlistState
   { _bindings       :: BindingMap -- ^ Global binders
   , _varCount       :: !Int -- ^ Number of signal declarations
-  , _components     :: HashMap TmOccName (SrcSpan,Component) -- ^ Cached components
-  , _primitives     :: PrimMap BlackBoxTemplate -- ^ Primitive Definitions
+  , _components     :: HashMap TmOccName (SrcSpan,[Identifier],Component) -- ^ Cached components
+  , _primitives     :: CompiledPrimMap -- ^ Primitive Definitions
   , _typeTranslator :: CustomReprs -> HashMap TyConOccName TyCon -> Bool -> Type -> Maybe (Either String HWType)
   -- ^ Hardcoded Type -> HWType translator
   , _tcCache        :: HashMap TyConOccName TyCon -- ^ TyCon cache
   , _curCompNm      :: !(Identifier,SrcSpan)
-  , _dataFiles      :: [(String,FilePath)]
-  -- ^ Files to be copied: (filename, old path)
-  , _memoryDataFiles:: [(String,String)]
-  -- ^ Files to be stored: (filename, contents). These files are generated
-  -- during the execution of 'genNetlist'.
   , _intWidth       :: Int
   , _mkIdentifierFn :: IdType -> Identifier -> Identifier
   , _extendIdentifierFn :: IdType -> Identifier -> Identifier -> Identifier
@@ -181,12 +181,27 @@ data Declaration
   -- * Type of the scrutinee
   --
   -- * List of: (Maybe expression scrutinized expression is compared with,RHS of alternative)
-  | InstDecl (Maybe Identifier) !Identifier !Identifier [(Expr,PortDirection,HWType,Expr)]
+  | InstDecl EntityOrComponent (Maybe Identifier) !Identifier !Identifier [(Expr,PortDirection,HWType,Expr)]
   -- ^ Instantiation of another component
-  | BlackBoxD !S.Text [BlackBoxTemplate] [BlackBoxTemplate] [((S.Text,S.Text),BlackBoxTemplate)] !BlackBoxTemplate BlackBoxContext
+  | BlackBoxD
+      -- Primitive name:
+      !S.Text
+      -- VHDL only: add /library/ declarations:
+      [BlackBoxTemplate]
+      -- VHDL only: add /use/ declarations:
+      [BlackBoxTemplate]
+      -- Intel/Quartus only: create a /.qsys/ file from given template:
+      [((S.Text,S.Text),BlackBox)]
+      -- Template tokens:
+      !BlackBox
+      -- Context in which tokens should be rendered:
+      BlackBoxContext
   -- ^ Instantiation of blackbox declaration
   | NetDecl' (Maybe Identifier) WireOrReg !Identifier (Either Identifier HWType)
   -- ^ Signal declaration
+  deriving Show
+
+data EntityOrComponent = Entity | Comp
   deriving Show
 
 data WireOrReg = Wire | Reg
@@ -220,7 +235,22 @@ data Expr
   | DataCon    !HWType       !Modifier  [Expr] -- ^ DataCon application
   | Identifier !Identifier   !(Maybe Modifier) -- ^ Signal reference
   | DataTag    !HWType       !(Either Identifier Identifier) -- ^ @Left e@: tagToEnum#, @Right e@: dataToTag#
-  | BlackBoxE !S.Text [BlackBoxTemplate] [BlackBoxTemplate] [((S.Text,S.Text),BlackBoxTemplate)] !BlackBoxTemplate !BlackBoxContext !Bool -- ^ Instantiation of a BlackBox expression
+  | BlackBoxE
+      -- Primitive name:
+      !S.Text
+      -- VHDL only: add /library/ declarations:
+      [BlackBoxTemplate]
+      -- VHDL only: add /use/ declarations:
+      [BlackBoxTemplate]
+      -- Intel/Quartus only: create a /.qsys/ file from given template.
+      [((S.Text,S.Text),BlackBox)]
+      -- Template tokens:
+      !BlackBox
+      -- Context in which tokens should be rendered:
+      !BlackBoxContext
+      -- Wrap in paretheses?:
+      !Bool
+  -- ^ Instantiation of a BlackBox expression
   | ConvBV     (Maybe Identifier) HWType Bool Expr
   deriving Show
 
@@ -255,11 +285,11 @@ data BlackBoxContext
   = Context
   { bbResult    :: (Expr,HWType) -- ^ Result name and type
   , bbInputs    :: [(Expr,HWType,Bool)] -- ^ Argument names, types, and whether it is a literal
-  , bbFunctions :: IntMap (Either BlackBoxTemplate (Identifier,[Declaration])
+  , bbFunctions :: IntMap (Either BlackBox (Identifier,[Declaration])
                           ,WireOrReg
                           ,[BlackBoxTemplate]
                           ,[BlackBoxTemplate]
-                          ,[((S.Text,S.Text),BlackBoxTemplate)]
+                          ,[((S.Text,S.Text),BlackBox)]
                           ,BlackBoxContext)
   -- ^ Function arguments (subset of inputs):
   --
@@ -272,10 +302,35 @@ data BlackBoxContext
   -- ^ The scoping level this context is associated with, ensures that
   -- @~ARGN[k][n]@ holes are only filled with values from this context if @k@
   -- is equal to the scoping level of this context.
+  , bbCompName :: Identifier
+  -- ^ The component the BlackBox is instantiated in
   }
   deriving Show
 
+data BlackBox
+  = BBTemplate BlackBoxTemplate
+  | BBFunction TemplateFunction
+
+data TemplateFunction where
+  TemplateFunction
+    :: [Int]
+    -> (BlackBoxContext -> Bool)
+    -> (forall s . Backend s => BlackBoxContext -> State s Doc)
+    -> TemplateFunction
+
+instance Show BlackBox where
+  show (BBTemplate t)  = show t
+  show (BBFunction {}) = "TemplateFunction"
+
 emptyBBContext :: BlackBoxContext
-emptyBBContext = Context (Identifier (pack "__EMPTY__") Nothing, Void Nothing) [] empty [] (-1)
+emptyBBContext
+  = Context
+  { bbResult      = (Identifier (pack "__EMPTY__") Nothing, Void Nothing)
+  , bbInputs      = []
+  , bbFunctions   = empty
+  , bbQsysIncName = []
+  , bbLevel       = (-1)
+  , bbCompName    = pack "__NOCOMPNAME__"
+  }
 
 makeLenses ''NetlistState

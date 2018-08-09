@@ -1,61 +1,8 @@
 [ { "BlackBox" :
-    { "name"      : "GHC.Classes.eqInt"
-    , "type"      : "eqInt :: Int -> Int -> Bool"
-    , "templateE" : "~ARG[0] == ~ARG[1]"
-    }
-  }
-, { "BlackBox" :
-    { "name"      : "GHC.Classes.neInt"
-    , "type"      : "neInt :: Int -> Int -> Bool"
-    , "templateE" : "~ARG[0] != ~ARG[1]"
-    }
-  }
-, { "BlackBox" :
-    { "name"      : "GHC.Classes.gtInt"
-    , "type"      : "gtInt :: Int -> Int -> Bool"
-    , "templateE" : "~ARG[0] > ~ARG[1]"
-    }
-  }
-, { "BlackBox" :
-    { "name"      : "GHC.Classes.geInt"
-    , "type"      : "geInt :: Int -> Int -> Bool"
-    , "templateE" : "~ARG[0] >= ~ARG[1]"
-    }
-  }
-, { "BlackBox" :
-    { "name"      : "GHC.Classes.ltInt"
-    , "type"      : "ltInt :: Int -> Int -> Bool"
-    , "templateE" : "~ARG[0] < ~ARG[1]"
-    }
-  }
-, { "BlackBox" :
-    { "name"      : "GHC.Classes.leInt"
-    , "type"      : "leInt :: Int -> Int -> Bool"
-    , "templateE" : "~ARG[0] <= ~ARG[1]"
-    }
-  }
-, { "BlackBox" :
-    { "name"      : "GHC.Classes.&&"
-    , "type"      : "(&&) :: Bool -> Bool -> Bool"
-    , "templateE" : "~ARG[0] & ~ARG[1]"
-    }
-  }
-, { "BlackBox" :
-    { "name"      : "GHC.Classes.||"
-    , "type"      : "(::) :: Bool -> Bool -> Bool"
-    , "templateE" : "~ARG[0] | ~ARG[1]"
-    }
-  }
-, { "BlackBox" :
-    { "name"      : "GHC.Classes.not"
-    , "type"      : "not :: Bool -> Bool"
-    , "templateE" : "~ ~ARG[0]"
-    }
-  }
-, { "BlackBox" :
     { "name"      : "GHC.Classes.divInt#"
+    , "kind"      : "Declaration"
     , "type"      : "divInt# :: Int# -> Int# -> Int#"
-    , "templateD" :
+    , "template"  :
 "// divInt# begin
 // divide (rounds towards zero)
 ~SIGD[~GENSYM[quot_res][0]][0];
@@ -68,8 +15,9 @@ assign ~RESULT = (~VAR[dividend][0][~SIZE[~TYPO]-1] == ~VAR[divider][1][~SIZE[~T
   }
 , { "BlackBox" :
     { "name"      : "GHC.Classes.modInt#"
+    , "kind"      : "Declaration"
     , "type"      : "modInt# :: Int# -> Int# -> Int#"
-    , "templateD" :
+    , "template"  :
 "// modInt# begin
 // remainder
 ~SIGD[~GENSYM[rem_res][0]][0];

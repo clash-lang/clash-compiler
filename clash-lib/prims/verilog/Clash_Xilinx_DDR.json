@@ -1,5 +1,6 @@
 [ { "BlackBox" :
     { "name" : "Clash.Xilinx.DDR.iddr"
+    , "kind" : "Declaration"
     , "type" :
 "iddr
   :: ( HasCallStack               -- ARG[0]
@@ -10,7 +11,7 @@
   -> Reset slow synchronous       -- ARG[5]
   -> Signal fast (BitVector m)    -- ARG[6]
   -> Signal slow (BitVector m,BitVector m)"
-    , "templateD" :
+    , "template" :
 "// iddr begin
 wire ~SIGD[~GENSYM[dataout_l][1]][6];
 wire ~SIGD[~GENSYM[dataout_h][2]][6];
@@ -45,6 +46,7 @@ assign ~RESULT = {~SYM[2],~SYM[1]};
   }
 , { "BlackBox" :
     { "name" : "Clash.Xilinx.DDR.oddr#"
+    , "kind" : "Declaration"
     , "type" :
 "oddr#
   :: ( slow ~ Dom n (2*pFast)           -- ARG[0]
@@ -55,7 +57,7 @@ assign ~RESULT = {~SYM[2],~SYM[1]};
   -> Signal slow (BitVector m)          -- ARG[5]
   -> Signal slow (BitVector m)          -- ARG[6]
   -> Signal fast (BitVector m)"
-    , "templateD" :
+    , "template" :
 "// oddr begin
 wire ~SIGD[~GENSYM[datain_l][1]][6];
 wire ~SIGD[~GENSYM[datain_h][2]][6];

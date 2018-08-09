@@ -1,25 +1,29 @@
 [ { "BlackBox" :
     { "name"      : "GHC.Int.I8#"
+    , "kind"      : "Expression"
     , "type"      : "I8# :: Int# -> Int8"
-    , "templateE" : "resize(~ARG[0],8)"
+    , "template"  : "resize(~ARG[0],8)"
     }
   }
 , { "BlackBox" :
     { "name"      : "GHC.Int.I16#"
+    , "kind"      : "Expression"
     , "type"      : "I16# :: Int# -> Int16"
-    , "templateE" : "resize(~ARG[0],16)"
+    , "template"  : "resize(~ARG[0],16)"
     }
   }
 , { "BlackBox" :
     { "name"      : "GHC.Int.I32#"
+    , "kind"      : "Expression"
     , "type"      : "I32# :: Int# -> Int32"
-    , "templateE" : "resize(~ARG[0],32)"
+    , "template"  : "resize(~ARG[0],32)"
     }
   }
 , { "BlackBox" :
     { "name"      : "GHC.Int.I64#"
+    , "kind"      : "Expression"
     , "type"      : "I64# :: Int# -> Int64"
-    , "templateE" : "resize(~ARG[0],64)"
+    , "template"  : "resize(~ARG[0],64)"
     }
   }
 ]

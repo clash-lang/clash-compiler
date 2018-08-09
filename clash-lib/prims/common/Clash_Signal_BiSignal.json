@@ -1,5 +1,6 @@
 [ { "BlackBox" :
     { "name" : "Clash.Signal.BiSignal.veryUnsafeToBiSignalIn"
+    , "kind" : "Declaration"
     , "type" :
 "veryUnsafeToBiSignalIn
   :: ( HasCallStack                -- ARG[0]
@@ -8,11 +9,12 @@
      )
   => BiSignalOut ds d n            -- ARG[3]
   -> BiSignalIn ds d n"
-    , "templateD" : "~DEVNULL[~ARG[3]]"
+    , "template" : "~DEVNULL[~ARG[3]]"
     }
   }
 , { "BlackBox" :
     { "name" : "Clash.Signal.BiSignal.mergeBiSignalOuts"
+    , "kind" : "Expression"
     , "type" :
 "mergeBiSignalOuts
   :: ( HasCallStack                         -- ARG[0]
@@ -20,7 +22,7 @@
      )
   => Vec n (BiSignalOut defaultState dom m) -- ARG[2]
   -> BiSignalOut defaultState dom m"
-    , "templateE" : "~DEVNULL[~ARG[2]]"
+    , "template" : "~DEVNULL[~ARG[2]]"
     }
   }
 ]

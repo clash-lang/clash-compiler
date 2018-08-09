@@ -1,5 +1,6 @@
 [ { "BlackBox" :
     { "name" : "Clash.Explicit.Testbench.assert"
+    , "kind" : "Declaration"
     , "type" :
 "assert
   :: (Eq a,ShowX a)           -- (ARG[0],ARG[1])
@@ -10,7 +11,7 @@
   -> Signal domain a          -- Expected value (ARG[6])
   -> Signal domain b          -- Return valued  (ARG[7])
   -> Signal domain b"
-    , "templateD" :
+    , "template" :
 "-- assert begin
 ~GENSYM[assert][0] : block
   -- pragma translate_off
@@ -55,6 +56,7 @@ end block;
   }
 ,{ "BlackBox" :
     { "name" : "Clash.Explicit.Testbench.assertBitVector"
+    , "kind" : "Declaration"
     , "comment" : "TODO after https://github.com/clash-lang/clash-compiler/commit/95694dd8a85699901c78b81612cfecf36d7fc7b6
                    put non_std_match in its own file?
                   "
@@ -68,7 +70,7 @@ end block;
   -> Signal domain (BitVector n) -- Expected value (ARG[5])
   -> Signal domain b             -- Return valued  (ARG[6])
   -> Signal domain b"
-    , "templateD" :
+    , "template" :
 "-- assertBitVector begin
 ~GENSYM[assert][0] : block
   -- pragma translate_off

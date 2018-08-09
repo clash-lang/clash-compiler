@@ -18,8 +18,7 @@ import Data.Map            (Map)
 import Clash.Core.Term        (Term, TmName, TmOccName)
 import Clash.Core.Type        (Type)
 import Clash.Driver.Types     (BindingMap)
-import Clash.Netlist.BlackBox.Types (BlackBoxTemplate)
-import Clash.Primitives.Types (PrimMap)
+import Clash.Primitives.Types (CompiledPrimMap)
 import Clash.Rewrite.Types    (Rewrite, RewriteMonad)
 import Clash.Util
 
@@ -51,7 +50,7 @@ data NormalizeState
   -- recursive
   , _inlineConstantLimit :: !Word
   -- ^ Size of a constant below which it is always inlined; 0 = no limit
-  , _primitives :: PrimMap BlackBoxTemplate -- ^ Primitive Definitions
+  , _primitives :: CompiledPrimMap -- ^ Primitive Definitions
   , _recursiveComponents :: HashMap TmOccName Bool
   -- ^ Map telling whether a components is recursively defined.
   --

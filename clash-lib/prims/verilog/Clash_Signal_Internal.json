@@ -1,5 +1,6 @@
 [ { "BlackBox" :
     { "name" : "Clash.Signal.Internal.delay#"
+    , "kind" : "Declaration"
     , "type" :
 "delay#
   :: (HasCallStack,Undefined a) -- (ARG[0],ARG[1])
@@ -7,7 +8,7 @@
   -> Signal clk a             -- ARG[3]
   -> Signal clk a"
     , "outputReg" : true
-    , "templateD" :
+    , "template" :
 "// delay begin~IF ~ISGATED[2] ~THEN
 always @(posedge ~ARG[2][1]) begin : ~GENSYM[~COMPNAME_delay][1]
   if (~ARG[2][0]) begin
@@ -22,6 +23,7 @@ end~FI
   }
 , { "BlackBox" :
     { "name" : "Clash.Signal.Internal.register#"
+    , "kind" : "Declaration"
     , "type" :
 "register#
   :: (HasCallStack, Undefined a) -- (ARG[0], ARG[1])
@@ -31,7 +33,7 @@ end~FI
   -> Signal clk a             -- ARG[5]
   -> Signal clk a"
     , "outputReg" : true
-    , "templateD" :
+    , "template" :
 "// register begin~IF ~ISGATED[2] ~THEN
 always @(posedge ~ARG[2][1]~IF ~ISSYNC[3] ~THEN ~ELSE or posedge ~ARG[3]~FI) begin : ~GENSYM[~COMPNAME_register][1]
   if (~ARG[3]) begin
@@ -51,28 +53,15 @@ end~FI
     }
   }
 , { "BlackBox" :
-    { "name" : "Clash.Signal.Internal.clockGate"
-    , "type" :
-"clockGate
-  :: Clock domain gated -- ARG[0]
-  -> Signal domain Bool -- ARG[1]
-  -> Clcok domain 'Gated"
-    , "templateD" :
-"// clockGate begin ~IF ~ISGATED[0] ~THEN
-assign ~RESULT = {~ARG[0][1],~ARG[0][0] & ~ARG[1]};~ELSE
-assign ~RESULT = {~ARG[0],~ARG[1]};~FI
-// clockGate end"
-    }
-  }
-, { "BlackBox" :
     { "name"      : "Clash.Signal.Internal.clockGen"
+    , "kind" : "Declaration"
     , "type" :
 "clockGen
   :: (domain ~ Dom nm period -- ARG[0]
      ,KnownSymbol nm         -- ARG[1]
      ,KnownNat period)       -- ARG[2]
   => Clock domain Source"
-    , "templateD" :
+    , "template" :
 "// pragma translate_off
 reg ~TYPO ~GENSYM[clk][0];
 // 1 = 0.1ps
@@ -92,6 +81,7 @@ assign ~RESULT = ~SYM[0];
   }
 , { "BlackBox" :
     { "name"      : "Clash.Signal.Internal.tbClockGen"
+    , "kind" : "Declaration"
     , "type" :
 "tbClockGen
   :: (domain ~ Dom nm period -- ARG[0]
@@ -99,7 +89,7 @@ assign ~RESULT = ~SYM[0];
      ,KnownNat period)       -- ARG[2]
   => Signal domain Bool      -- ARG[3]
   -> Clock domain Source"
-    , "templateD" :
+    , "template" :
 "// pragma translate_off
 reg ~TYPO ~GENSYM[clk][0];
 // 1 = 0.1ps
@@ -122,9 +112,10 @@ assign ~RESULT = ~SYM[0];
   }
 , { "BlackBox" :
     { "name"      : "Clash.Signal.Internal.asyncResetGen"
+    , "kind" : "Declaration"
     , "type" :
 "asyncResetGen :: Reset domain 'Asynchronous"
-    , "templateD" :
+    , "template" :
 "// pragma translate_off
 reg ~TYPO ~GENSYM[rst][0];
 initial begin
@@ -137,9 +128,10 @@ assign ~RESULT = ~SYM[0];
   }
 , { "BlackBox" :
     { "name"      : "Clash.Signal.Internal.syncResetGen"
+    , "kind" : "Declaration"
     , "type" :
 "asyncResetGen :: Reset domain 'Synchronous"
-    , "templateD" :
+    , "template" :
 "// pragma translate_off
 reg ~TYPO ~GENSYM[rst][0];
 localparam ~GENSYM[reset_period][1] = 2998 + ~LIT[1]0;
@@ -149,64 +141,6 @@ initial begin
 end
 assign ~RESULT = ~SYM[0];
 // pragma translate_on"
-    }
-  }
-, { "BlackBox" :
-    { "name"      : "Clash.Signal.Internal.unsafeFromAsyncReset"
-    , "type" :
-"unsafeFromAsyncReset :: Reset domain Asynchronous -> Signal domain Bool"
-    , "templateE" : "~ARG[0]"
-    }
-  }
-, { "BlackBox" :
-    { "name"      : "Clash.Signal.Internal.unsafeToAsyncReset"
-    , "type" :
-"unsafeToAsyncReset :: Signal domain Bool -> Reset domain Asynchronous"
-    , "templateE" : "~ARG[0]"
-    }
-  }
-, { "BlackBox" :
-    { "name"      : "Clash.Signal.Internal.fromSyncReset"
-    , "type" :
-"fromSyncReset :: Reset domain Synchronous -> Signal domain Bool"
-    , "templateE" : "~ARG[0]"
-    }
-  }
-, { "BlackBox" :
-    { "name"      : "Clash.Signal.Internal.unsafeToSyncReset"
-    , "type" :
-"unsafeToSyncReset :: Signal domain Bool -> Reset domain Synchronous"
-    , "templateE" : "~ARG[0]"
-    }
-  }
-, { "Primitive" :
-    { "name"      : "Clash.Signal.Internal.signal#"
-    , "primType"  : "Function"
-    }
-  }
-, { "Primitive" :
-    { "name"      : "Clash.Signal.Internal.mapSignal#"
-    , "primType"  : "Function"
-    }
-  }
-, { "Primitive" :
-    { "name"      : "Clash.Signal.Internal.appSignal#"
-    , "primType"  : "Function"
-    }
-  }
-, { "Primitive" :
-    { "name"      : "Clash.Signal.Internal.foldr#"
-    , "primType"  : "Function"
-    }
-  }
-, { "Primitive" :
-    { "name"      : "Clash.Signal.Internal.traverse#"
-    , "primType"  : "Function"
-    }
-  }
-, { "Primitive" :
-    { "name"      : "Clash.Signal.Internal.joinSignal#"
-    , "primType"  : "Function"
     }
   }
 ]

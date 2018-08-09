@@ -1,0 +1,386 @@
+[ { "BlackBox" :
+    { "name"      : "GHC.Prim.gtChar#"
+    , "kind"      : "Expression"
+     , "type"     : "gtChar# :: Char# -> Char# -> Int#"
+    , "template"  : "(~ARG[0] > ~ARG[1]) ? ~SIZE[~TYPO]'sd1 : ~SIZE[~TYPO]'sd0"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "GHC.Prim.geChar#"
+    , "kind"      : "Expression"
+    , "type"      : "geChar# :: Char# -> Char# -> Int#"
+    , "template"  : "(~ARG[0] >= ~ARG[1]) ? ~SIZE[~TYPO]'sd1 : ~SIZE[~TYPO]'sd0"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "GHC.Prim.eqChar#"
+    , "kind"      : "Expression"
+    , "type"      : "eqChar# :: Char# -> Char# -> Int#"
+    , "template"  : "(~ARG[0] == ~ARG[1]) ? ~SIZE[~TYPO]'sd1 : ~SIZE[~TYPO]'sd0"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "GHC.Prim.neChar#"
+    , "kind"      : "Expression"
+    , "type"      : "neChar# :: Char# -> Char# -> Int#"
+    , "template"  : "(~ARG[0] != ~ARG[1]) ? ~SIZE[~TYPO]'sd1 : ~SIZE[~TYPO]'sd0"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "GHC.Prim.ltChar#"
+    , "kind"      : "Expression"
+    , "type"      : "ltChar# :: Char# -> Char# -> Int#"
+    , "template"  : "(~ARG[0] < ~ARG[1]) ? ~SIZE[~TYPO]'sd1 : ~SIZE[~TYPO]'sd0"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "GHC.Prim.leChar#"
+    , "kind"      : "Expression"
+    , "type"      : "leChar# :: Char# -> Char# -> Int#"
+    , "template"  : "(~ARG[0] <= ~ARG[1]) ? ~SIZE[~TYPO]'sd1 : ~SIZE[~TYPO]'sd0"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "GHC.Prim.ord#"
+    , "kind"      : "Declaration"
+    , "type"      : "ord :: Char# -> Int#"
+    , "template"  : "assign ~RESULT = $unsigned(~ARG[0]);"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "GHC.Prim.*#"
+    , "kind"      : "Expression"
+    , "type"      : "(*#) :: Int# -> Int# -> Int#"
+    , "template"  : "~ARG[0] * ~ARG[1]"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "GHC.Prim.remInt#"
+    , "kind"      : "Expression"
+    , "type"      : "remInt# :: Int# -> Int# -> Int#"
+    , "template"  : "~ARG[0] % ~ARG[1]"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "GHC.Prim.andI#"
+    , "kind"      : "Expression"
+    , "type"      : "andI# :: Int# -> Int# -> Int#"
+    , "template"  : "~ARG[0] & ~ARG[1]"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "GHC.Prim.orI#"
+    , "kind"      : "Expression"
+    , "type"      : "orI# :: Int# -> Int# -> Int#"
+    , "template"  : "~ARG[0] | ~ARG[1]"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "GHC.Prim.xorI#"
+    , "kind"      : "Expression"
+    , "type"      : "xorI# :: Int# -> Int# -> Int#"
+    , "template"  : "~ARG[0] ^ ~ARG[1]"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "GHC.Prim.notI#"
+    , "kind"      : "Expression"
+    , "type"      : "notI# :: Int# -> Int#"
+    , "template"  : "~ ~ARG[0]"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "GHC.Prim.negateInt#"
+    , "kind"      : "Expression"
+    , "type"      : "negateInt# :: Int# -> Int#"
+    , "template"  : "-(~ARG[0])"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "GHC.Prim.>#"
+    , "kind"      : "Expression"
+     , "type"     : "(>#) :: Int# -> Int# -> Int#"
+    , "template"  : "(~ARG[0] > ~ARG[1]) ? ~SIZE[~TYPO]'sd1 : ~SIZE[~TYPO]'sd0"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "GHC.Prim.>=#"
+    , "kind"      : "Expression"
+    , "type"      : "(>=#) :: Int# -> Int# -> Int#"
+    , "template"  : "(~ARG[0] >= ~ARG[1]) ? ~SIZE[~TYPO]'sd1 : ~SIZE[~TYPO]'sd0"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "GHC.Prim.==#"
+    , "kind"      : "Expression"
+    , "type"      : "(==) :: Int# -> Int# -> Int#"
+    , "template"  : "(~ARG[0] == ~ARG[1]) ? ~SIZE[~TYPO]'sd1 : ~SIZE[~TYPO]'sd0"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "GHC.Prim./=#"
+    , "kind"      : "Expression"
+    , "type"      : "(/=#) :: Int# -> Int# -> Int#"
+    , "template"  : "(~ARG[0] != ~ARG[1]) ? ~SIZE[~TYPO]'sd1 : ~SIZE[~TYPO]'sd0"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "GHC.Prim.<#"
+    , "kind"      : "Expression"
+    , "type"      : "(<#) :: Int# -> Int# -> Int#"
+    , "template"  : "(~ARG[0] < ~ARG[1]) ? ~SIZE[~TYPO]'sd1 : ~SIZE[~TYPO]'sd0"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "GHC.Prim.<=#"
+    , "kind"      : "Expression"
+    , "type"      : "(<=#) :: Int# -> Int# -> Int#"
+    , "template"  : "(~ARG[0] <= ~ARG[1]) ? ~SIZE[~TYPO]'sd1 : ~SIZE[~TYPO]'sd0"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "GHC.Prim.chr#"
+    , "kind"      : "Declaration"
+    , "type"      : "ord :: Int# -> Char#"
+    , "template"  : "assign ~RESULT = $unsigned(~ARG[0]);"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "GHC.Prim.int2Word#"
+    , "kind"      : "Expression"
+    , "type"      : "int2Word# :: Int# -> Word#"
+    , "template"  : "$unsigned(~ARG[0])"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "GHC.Prim.uncheckedIShiftL#"
+    , "kind"      : "Expression"
+    , "type"      : "uncheckedIShiftL# :: Int# -> Int# -> Int#"
+    , "template"  : "~ARG[0] <<< ~ARG[1]"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "GHC.Prim.uncheckedIShiftRA#"
+    , "kind"      : "Expression"
+    , "type"      : "uncheckedIShiftRA# :: Int# -> Int# -> Int#"
+    , "template"  : "~ARG[0] >>> ~ARG[1]"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "GHC.Prim.uncheckedIShiftRL#"
+    , "kind"      : "Expression"
+    , "type"      : "uncheckedIShiftRL# :: Int# -> Int# -> Int#"
+    , "template"  : "~ARG[0] >> ~ARG[1]"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "GHC.Prim.timesWord#"
+    , "kind"      : "Expression"
+    , "type"      : "timesWord# :: Word# -> Word# -> Word#"
+    , "template"  : "~ARG[0] * ~ARG[1]"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "GHC.Prim.remWord#"
+    , "kind"      : "Expression"
+    , "type"      : "remWord# :: Word# -> Word# -> Word#"
+    , "template"  : "~ARG[0] % ~ARG[1]"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "GHC.Prim.and#"
+    , "kind"      : "Expression"
+    , "type"      : "and# :: Word# -> Word# -> Word#"
+    , "template"  : "~ARG[0] & ~ARG[1]"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "GHC.Prim.or#"
+    , "kind"      : "Expression"
+    , "type"      : "or# :: Word# -> Word# -> Word#"
+    , "template"  : "~ARG[0] | ~ARG[1]"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "GHC.Prim.xor#"
+    , "kind"      : "Expression"
+    , "type"      : "xor# :: Word# -> Word# -> Word#"
+    , "template"  : "~ARG[0] ^ ~ARG[1]"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "GHC.Prim.not#"
+    , "kind"      : "Expression"
+    , "type"      : "not# :: Word# -> Word#"
+    , "template"  : "~ ~ARG[0]"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "GHC.Prim.uncheckedShiftL#"
+    , "kind"      : "Expression"
+    , "type"      : "uncheckedShiftL# :: Word# -> Int# -> Word#"
+    , "template"  : "~ARG[0] << ~ARG[1]"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "GHC.Prim.uncheckedShiftRL#"
+    , "kind"      : "Expression"
+    , "type"      : "uncheckedShiftRL# :: Word# -> Int# -> Word#"
+    , "template"  : "~ARG[0] >> ~ARG[1]"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "GHC.Prim.word2Int#"
+    , "kind"      : "Expression"
+    , "type"      : "int2Word# :: Word# -> Int#"
+    , "template"  : "$signed(~ARG[0])"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "GHC.Prim.gtWord#"
+    , "kind"      : "Expression"
+     , "type"     : "gtWord# :: Word# -> Word# -> Int#"
+    , "template"  : "(~ARG[0] > ~ARG[1]) ? ~SIZE[~TYPO]'sd1 : ~SIZE[~TYPO]'sd0"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "GHC.Prim.geWord#"
+    , "kind"      : "Expression"
+    , "type"      : "geWord# :: Word# -> Word# -> Int#"
+    , "template"  : "(~ARG[0] >= ~ARG[1]) ? ~SIZE[~TYPO]'sd1 : ~SIZE[~TYPO]'sd0"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "GHC.Prim.eqWord#"
+    , "kind"      : "Expression"
+    , "type"      : "eqWord# :: Word# -> Word# -> Int#"
+    , "template"  : "(~ARG[0] == ~ARG[1]) ? ~SIZE[~TYPO]'sd1 : ~SIZE[~TYPO]'sd0"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "GHC.Prim.neWord#"
+    , "kind"      : "Expression"
+    , "type"      : "neWord# :: Word# -> Word# -> Int#"
+    , "template"  : "(~ARG[0] != ~ARG[1]) ? ~SIZE[~TYPO]'sd1 : ~SIZE[~TYPO]'sd0"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "GHC.Prim.ltWord#"
+    , "kind"      : "Expression"
+    , "type"      : "ltWord# :: Word# -> Word# -> Int#"
+    , "template"  : "(~ARG[0] < ~ARG[1]) ? ~SIZE[~TYPO]'sd1 : ~SIZE[~TYPO]'sd0"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "GHC.Prim.leWord#"
+    , "kind"      : "Expression"
+    , "type"      : "leWord# :: Word# -> Word# -> Int#"
+    , "template"  : "(~ARG[0] <= ~ARG[1]) ? ~SIZE[~TYPO]'sd1 : ~SIZE[~TYPO]'sd0"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "GHC.Prim.byteSwap16#"
+    , "kind"      : "Declaration"
+    , "type"      : "byteSwap16# :: Word# -> Word#"
+    , "template"  :
+"// byteSwap16 begin~IF ~IW64 ~THEN
+assign ~RESULT = {~VAR[w][0][63:16],~VAR[w][0][7:0],~VAR[w][0][15:8]};~ELSE
+assign ~RESULT = {~VAR[w][0][31:16],~VAR[w][0][7:0],~VAR[w][0][15:8]};~FI
+// byteSwap16 end"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "GHC.Prim.byteSwap32#"
+    , "kind"      : "Declaration"
+    , "type"      : "byteSwap32# :: Word# -> Word#"
+    , "template"  :
+"// byteSwap32 begin~IF ~IW64 ~THEN
+assign ~RESULT = {~VAR[w][0][63:32],~VAR[w][0][7:0],~VAR[w][0][15:8],~VAR[w][0][23:16],~VAR[w][0][31:24]};~ELSE
+assign ~RESULT = {~VAR[w][0][7:0],~VAR[w][0][15:8],~VAR[w][0][23:16],~VAR[w][0][31:24]};~FI
+// byteSwap32 end"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "GHC.Prim.byteSwap64#"
+    , "kind"      : "Declaration"
+    , "type"      : "byteSwap64# :: Word# -> Word#"
+    , "template"  :
+"// byteSwap64 begin
+assign ~RESULT = {~VAR[w][0][7:0],~VAR[w][0][15:8],~VAR[w][0][23:16],~VAR[w][0][31:24]
+                 ,~VAR[w][0][39:32],~VAR[w][0][47:40],~VAR[w][0][55:48],~VAR[w][0][63:56]};
+// byteSwap64 end"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "GHC.Prim.byteSwap#"
+    , "kind"      : "Declaration"
+    , "type"      : "byteSwap# :: Word# -> Word#"
+    , "template"  :
+"// byteSwap begin~IF ~IW64 ~THEN
+assign ~RESULT = {~VAR[w][0][7:0],~VAR[w][0][15:8],~VAR[w][0][23:16],~VAR[w][0][31:24]
+                 ,~VAR[w][0][39:32],~VAR[w][0][47:40],~VAR[w][0][55:48],~VAR[w][0][63:56]};~ELSE
+assign ~RESULT = {~VAR[w][0][7:0],~VAR[w][0][15:8],~VAR[w][0][23:16],~VAR[w][0][31:24]};~FI
+// byteSwap end"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "GHC.Prim.narrow8Int#"
+    , "kind"      : "Declaration"
+    , "type"      : "narrow8Int# :: Int# -> Int#"
+    , "template"  :
+"// narrow8Int begin
+assign ~RESULT = $signed(~VAR[i][0][7:0]);
+// narrow8Int end"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "GHC.Prim.narrow16Int#"
+    , "kind"      : "Declaration"
+    , "type"      : "narrow16Int# :: Int# -> Int#"
+    , "template"  :
+"// narrow16Int begin
+assign ~RESULT = $signed(~VAR[i][0][15:0]);
+// narrow16Int end"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "GHC.Prim.narrow32Int#"
+    , "kind"      : "Declaration"
+    , "type"      : "narrow32Int# :: Int# -> Int#"
+    , "template"  :
+"// narrow32Int begin
+assign ~RESULT = $signed(~VAR[i][0][31:0]);
+// narrow32Int end"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "GHC.Prim.narrow8Word#"
+    , "kind"      : "Declaration"
+    , "type"      : "narrow8Int# :: Word# -> Word#"
+    , "template"  :
+"// narrow8Word begin
+assign ~RESULT = $unsigned(~VAR[w][0][7:0]);
+// narrow8Word end"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "GHC.Prim.narrow16Word#"
+    , "kind"      : "Declaration"
+    , "type"      : "narrow16Word# :: Word# -> Word#"
+    , "template"  :
+"// narrow16Word begin
+assign ~RESULT = $unsigned(~VAR[w][0][15:0]);
+// narrow16Word end"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "GHC.Prim.narrow32Word#"
+    , "kind"      : "Declaration"
+    , "type"      : "narrow32Int# :: Word# -> Word#"
+    , "template"  :
+"// narrow32Word begin
+assign ~RESULT = $unsigned(~VAR[w][0][31:0]);
+// narrow32Word end"
+    }
+  }
+]

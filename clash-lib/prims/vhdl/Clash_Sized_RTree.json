@@ -1,19 +1,22 @@
 [ { "BlackBox" :
     { "name"      : "Clash.Sized.RTree.treplicate"
+    , "kind"      : "Expression"
     , "type"      : "replicate :: SNat n -> a -> RTree d a"
-    , "templateE" : "~TYPMO'(0 to (2**~LIT[0])-1 => ~ARG[1])"
+    , "template"  : "~TYPMO'(0 to (2**~LIT[0])-1 => ~ARG[1])"
     }
   }
 , { "BlackBox" :
     { "name"      : "Clash.Sized.RTree.textract"
+    , "kind"      : "Expression"
     , "type"      : "textract :: RTree 0 a -> a"
-    , "templateE" : "~IF ~VIVADO ~THEN ~FROMBV[~VAR[t][0]][~TYPO] ~ELSE ~VAR[t][0](0) ~FI"
+    , "template"  : "~IF ~VIVADO ~THEN ~FROMBV[~VAR[t][0]][~TYPO] ~ELSE ~VAR[t][0](0) ~FI"
     }
   }
 , { "BlackBox" :
     { "name"      : "Clash.Sized.RTree.tsplit"
+    , "kind"      : "Expression"
     , "type"      : "tsplit:: RTree (d+1) a -> (RTree d a,RTree d a)"
-    , "templateE" : "(~VAR[t][0](0 to (2**(~DEPTH[~TYP[0]]-1))-1) ,~VAR[t][0](2**(~DEPTH[~TYP[0]]-1) to (2**~DEPTH[~TYP[0]])-1))"
+    , "template"  : "(~VAR[t][0](0 to (2**(~DEPTH[~TYP[0]]-1))-1) ,~VAR[t][0](2**(~DEPTH[~TYP[0]]-1) to (2**~DEPTH[~TYP[0]])-1))"
     }
   }
 ]

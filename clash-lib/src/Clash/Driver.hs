@@ -18,8 +18,8 @@ module Clash.Driver where
 import qualified Control.Concurrent.Supply        as Supply
 import           Control.DeepSeq
 import           Control.Exception                (tryJust, bracket)
-import           Control.Lens                     ((^.), _5)
-import           Control.Monad                    (guard, when, unless)
+import           Control.Lens                     (view, (^.), _3, _5)
+import           Control.Monad                    (guard, when, unless, join, foldM)
 import           Control.Monad.State              (evalState, get)
 import           Data.Hashable                    (hash)
 import qualified Data.HashMap.Lazy                as HML
@@ -27,8 +27,10 @@ import           Data.HashMap.Strict              (HashMap)
 import qualified Data.HashMap.Strict              as HM
 import qualified Data.HashSet                     as HashSet
 import           Data.IntMap                      (IntMap)
+import           Data.List                        (intercalate)
 import           Data.Maybe                       (fromMaybe)
 import           Data.Semigroup.Monad
+import qualified Data.Text
 import           Data.Text.Lazy                   (Text)
 import qualified Data.Text.Lazy                   as Text
 import qualified Data.Text.Lazy.IO                as Text
@@ -37,15 +39,19 @@ import           Data.Text.Prettyprint.Doc.Extra
   (Doc, LayoutOptions (..), PageWidth (..) , layoutPretty, renderLazy,
    renderOneLine)
 import qualified Data.Time.Clock                  as Clock
+import qualified Language.Haskell.Interpreter     as Hint
+import qualified Language.Haskell.Interpreter.Unsafe as Hint
 import qualified System.Directory                 as Directory
 import           System.FilePath                  ((</>), (<.>))
 import qualified System.FilePath                  as FilePath
 import qualified System.IO                        as IO
 import           System.IO.Error                  (isDoesNotExistError)
+import           System.IO.Temp
+  (getCanonicalTemporaryDirectory, withTempDirectory)
 import qualified Text.PrettyPrint.ANSI.Leijen     as ANSI
 import           Text.Trifecta.Result
+  (Result(Success, Failure), _errDoc)
 import           Text.Read                        (readMaybe)
-
 import           GHC.BasicTypes.Extra             ()
 
 import           Clash.Annotations.Primitive      (HDL (..))
@@ -63,13 +69,15 @@ import           Clash.Driver.Types
 import           Clash.Netlist                    (genNetlist)
 import           Clash.Netlist.Util               (genComponentName, genTopComponentName)
 import           Clash.Netlist.BlackBox.Parser    (runParse)
-import           Clash.Netlist.BlackBox.Types     (BlackBoxTemplate)
-import           Clash.Netlist.Types              (Component (..), HWType)
+import           Clash.Netlist.BlackBox.Types     (BlackBoxTemplate, BlackBoxFunction)
+import           Clash.Netlist.Types
+  (BlackBox (..), Component (..), HWType, Identifier)
 import           Clash.Normalize                  (checkNonRecursive, cleanupGraph,
                                                    normalize, runNormalization)
 import           Clash.Normalize.Util             (callGraph)
 import           Clash.Primitives.Types
-import           Clash.Util                       (first, second)
+import           Clash.Util                       (first)
+
 
 -- | Create a set of target HDL files for a set of functions
 generateHDL
@@ -78,7 +86,7 @@ generateHDL
   -> BindingMap
   -- ^ Set of functions
   -> Maybe backend
-  -> PrimMap (Text.Text)
+  -> CompiledPrimMap
   -- ^ Primitive / BlackBox Definitions
   -> HashMap TyConOccName TyCon
   -- ^ TyCon cache
@@ -102,8 +110,6 @@ generateHDL
   -> IO ()
 generateHDL reprs bindingsMap hdlState primMap tcm tupTcm typeTrans eval topEntities
   opts (startTime,prepTime) = go prepTime [] topEntities where
-
-  primMap' = HM.map parsePrimitive primMap
 
   -- No more TopEntities to process
   go prevTime _ [] = putStrLn $ "Total compilation took " ++
@@ -180,7 +186,7 @@ generateHDL reprs bindingsMap hdlState primMap tcm tupTcm typeTrans eval topEnti
       return (topTime,manifest,componentNames manifest ++ seen)
     else do
       -- 1. Normalise topEntity
-      let transformedBindings = normalizeEntity reprs bindingsMap primMap' tcm tupTcm
+      let transformedBindings = normalizeEntity reprs bindingsMap primMap tcm tupTcm
                                   typeTrans eval topEntityNames opts supplyN
                                   (nameOcc topEntity)
 
@@ -189,8 +195,8 @@ generateHDL reprs bindingsMap hdlState primMap tcm tupTcm typeTrans eval topEnti
       putStrLn $ "Normalisation took " ++ show prepNormDiff
 
       -- 2. Generate netlist for topEntity
-      (netlist,dfiles,mfiles,seen') <- genNetlist reprs transformedBindings topEntities primMap'
-                                tcm typeTrans [] [] iw mkId extId seen
+      (netlist,seen') <- genNetlist reprs transformedBindings topEntities primMap
+                                tcm typeTrans iw mkId extId seen
                                 hdlDir prefixM (nameOcc topEntity)
 
       netlistTime <- netlist `deepseq` Clock.getCurrentTime
@@ -198,8 +204,8 @@ generateHDL reprs bindingsMap hdlState primMap tcm tupTcm typeTrans eval topEnti
       putStrLn $ "Netlist generation took " ++ show normNetDiff
 
       -- 3. Generate topEntity wrapper
-      let topComponent = snd . head $ filter (Text.isSuffixOf topNm . componentName . snd) netlist
-          (hdlDocs,manifest')  = createHDL hdlState' modName netlist topComponent
+      let topComponent = view _3 . head $ filter (Text.isSuffixOf topNm . componentName . view _3) netlist
+          (hdlDocs,manifest',dfiles,mfiles)  = createHDL hdlState' modName seen' netlist topComponent
                                    (topNmU, Right manifest)
           dir = hdlDir </> maybe "" (const modName) annM
       prepareDir (opt_cleanhdl opts) (extension hdlState') dir
@@ -218,15 +224,15 @@ generateHDL reprs bindingsMap hdlState primMap tcm tupTcm typeTrans eval topEnti
           hdlState2 = setModName modName' hdlState'
 
       -- 1. Normalise testBench
-      let transformedBindings = normalizeEntity reprs bindingsMap primMap' tcm tupTcm
+      let transformedBindings = normalizeEntity reprs bindingsMap primMap tcm tupTcm
                                   typeTrans eval topEntityNames opts supplyTB (nameOcc tb)
       normTime <- transformedBindings `deepseq` Clock.getCurrentTime
       let prepNormDiff = Clock.diffUTCTime normTime topTime
       putStrLn $ "Testbench normalisation took " ++ show prepNormDiff
 
       -- 2. Generate netlist for topEntity
-      (netlist,dfiles,mfiles,_) <- genNetlist reprs transformedBindings topEntities primMap'
-                              tcm typeTrans [] [] iw mkId extId seen'
+      (netlist,seen'') <- genNetlist reprs transformedBindings topEntities primMap
+                              tcm typeTrans iw mkId extId seen'
                               hdlDir prefixM (nameOcc tb)
 
       netlistTime <- netlist `deepseq` Clock.getCurrentTime
@@ -234,7 +240,7 @@ generateHDL reprs bindingsMap hdlState primMap tcm tupTcm typeTrans eval topEnti
       putStrLn $ "Testbench netlist generation took " ++ show normNetDiff
 
       -- 3. Write HDL
-      let (hdlDocs,_) = createHDL hdlState2 modName' netlist undefined
+      let (hdlDocs,_,dfiles,mfiles) = createHDL hdlState2 modName' seen'' netlist undefined
                            (topNmU, Left manifest')
           dir = hdlDir </> maybe "" t_name annM </> modName'
       prepareDir (opt_cleanhdl opts) (extension hdlState2) dir
@@ -255,23 +261,120 @@ generateHDL reprs bindingsMap hdlState primMap tcm tupTcm typeTrans eval topEnti
 
   go benchTime seen' topEntities'
 
-parsePrimitive :: Primitive Text -> Primitive BlackBoxTemplate
-parsePrimitive (BlackBox pNm oReg libM imps incs templT) =
-  case either (fmap Left . runParse) (fmap Right . runParse) templT of
-    Failure errInfo
-      -> error (ANSI.displayS (ANSI.renderCompact (_errDoc errInfo)) "")
-    Success templ
-      -> BlackBox pNm oReg (map parseBB libM) (map parseBB imps)
-                  (map (second parseBB) incs) templ
- where
-  parseBB :: Text -> BlackBoxTemplate
-  parseBB t = case runParse t of
-    Failure errInfo
-      -> error (ANSI.displayS (ANSI.renderCompact (_errDoc errInfo)) "")
-    Success templ
-      -> templ
+-- | Compiles blackbox functions and parses blackbox templates.
+compilePrimitive
+  :: ResolvedPrimitive
+  -> IO CompiledPrimitive
+compilePrimitive (BlackBoxHaskell bbName bbGenName source) = do
+  -- Compile a blackbox template function or fetch it from an already compiled file.
+  r <- Hint.runInterpreter (go source)
+  processHintError (show bbGenName) bbName (BlackBoxHaskell bbName bbGenName) r
+  where
+    qualMod = intercalate "." modNames
+    BlackBoxFunctionName modNames funcName = bbGenName
 
-parsePrimitive (Primitive pNm typ) = Primitive pNm typ
+    -- | Create directory based on base name and directory. Return path
+    -- of directory just created.
+    createDirectory'
+      :: FilePath
+      -> FilePath
+      -> IO FilePath
+    createDirectory' base sub =
+      let new = base </> sub in
+      Directory.createDirectory new >> return new
+
+    -- |
+    go
+      :: Maybe Text
+      -> Hint.Interpreter BlackBoxFunction
+    go (Just source') = do
+      -- Create a temporary directory with user module in it, add it to the
+      -- list of import direcotries, and run as if it were a "normal" compiled
+      -- module.
+      join $ Hint.liftIO $ do
+        tmpDir' <- getCanonicalTemporaryDirectory
+        withTempDirectory tmpDir' "clash-prim-compile" $ \tmpDir'' -> do
+          modDir <- foldM createDirectory' tmpDir'' (init modNames)
+          Text.writeFile (modDir </> (last modNames ++ ".hs")) source'
+          return $ do
+            -- Set import path for GHC interpreter and load module
+            iPaths <- (tmpDir'':) <$> Hint.get Hint.searchPath
+            Hint.set [Hint.searchPath Hint.:= iPaths]
+            Hint.loadModules [qualMod]
+            go Nothing
+
+    go Nothing = do
+      -- Either
+      Hint.setImports [ "Clash.Netlist.BlackBox.Types",  qualMod]
+      Hint.unsafeInterpret funcName "BlackBoxFunction"
+
+compilePrimitive (BlackBox pNm tkind oReg libM imps incs templ) = do
+  libM'  <- mapM parseTempl libM
+  imps'  <- mapM parseTempl imps
+  incs'  <- mapM (traverse parseBB) incs
+  templ' <- parseBB templ
+  return (BlackBox pNm tkind oReg libM' imps' incs' templ')
+ where
+  parseTempl :: Applicative m => Text -> m BlackBoxTemplate
+  parseTempl t = case runParse t of
+    Failure errInfo
+      -> error (ANSI.displayS (ANSI.renderCompact (_errDoc errInfo)) "")
+    Success t'
+      -> pure t'
+
+  parseBB :: ((TemplateFormat,BlackBoxFunctionName),Maybe Text) -> IO BlackBox
+  parseBB ((TTemplate,_),Just t)     = BBTemplate <$> parseTempl t
+  parseBB ((TTemplate,_),Nothing)    =
+    error ("No template specified for blackbox: " ++ show pNm)
+  parseBB ((THaskell,bbGenName),Just source) = do
+    let BlackBoxFunctionName modNames funcName = bbGenName
+        qualMod = intercalate "." modNames
+    tmpDir <- getCanonicalTemporaryDirectory
+    r <- withTempDirectory tmpDir "clash-prim-compile" $ \tmpDir' -> do
+      let modDir = foldl (</>) tmpDir' (init modNames)
+      Directory.createDirectoryIfMissing True modDir
+      Text.writeFile (modDir </> last modNames <.>  "hs") source
+      Hint.runInterpreter $ do
+        iPaths <- (tmpDir':) <$> Hint.get Hint.searchPath
+        Hint.set [Hint.searchPath Hint.:= iPaths]
+        Hint.loadModules [qualMod]
+        Hint.setImports [ "Clash.Netlist.Types" , qualMod ]
+        Hint.unsafeInterpret funcName "TemplateFunction"
+    processHintError (show bbGenName) pNm BBFunction r
+  parseBB ((THaskell,bbGenName),Nothing) = do
+    let BlackBoxFunctionName modNames funcName = bbGenName
+        qualMod = intercalate "." modNames
+    r <- Hint.runInterpreter $ do
+      Hint.setImports [ "Clash.Netlist.Types" , qualMod ]
+      Hint.unsafeInterpret funcName "TemplateFunction"
+    processHintError (show bbGenName) pNm BBFunction r
+
+compilePrimitive (Primitive pNm typ) =
+  return $ Primitive pNm typ
+
+processHintError
+  :: Monad m
+  => String
+  -> Data.Text.Text
+  -> (t -> r)
+  -> Either Hint.InterpreterError t
+  -> m r
+processHintError fun bb go r = case r of
+  Left (Hint.GhcException err) ->
+    error' "GHC Exception" err
+  Left (Hint.NotAllowed err) ->
+    error' "NotAllowed error" err
+  Left (Hint.UnknownError err) ->
+    error' "an unknown error" err
+  Left (Hint.WontCompile ghcErrs) ->
+    error' "compilation errors" (intercalate "\n\n" $ map Hint.errMsg ghcErrs)
+  Right f ->
+    return $ go f
+ where
+  error' errType report =
+    error $ unwords [ "Encountered", errType, "while compiling blackbox template"
+                    , "function", show fun, "for function", show bb ++ "."
+                    , "Compilation reported: \n\n" ++ report ]
 
 -- | Pretty print Components to HDL Documents
 createHDL
@@ -280,7 +383,9 @@ createHDL
   -- ^ Backend
   -> String
   -- ^ Module hierarchy root
-  -> [(SrcSpan,Component)]
+  -> [Identifier]
+  -- ^ Component names
+  -> [(SrcSpan,[Identifier],Component)]
   -- ^ List of components
   -> Component
   -- ^ Top component
@@ -289,13 +394,16 @@ createHDL
   -- + Either:
   --   * Left manifest:  Only write/update the hashes of the @manifest@
   --   * Right manifest: Update all fields of the @manifest@
-  -> ([(String,Doc)],Manifest)
+  -> ([(String,Doc)],Manifest,[(String,FilePath)],[(String,String)])
   -- ^ The pretty-printed HDL documents
   -- + The update manifest file
-createHDL backend modName components top (topName,manifestE) = flip evalState backend $ getMon $ do
-  (hdlNmDocs,incs) <- unzip <$> mapM (uncurry (genHDL modName)) components
+  -- + The data files that need to be copied
+createHDL backend modName seen components top (topName,manifestE) = flip evalState backend $ getMon $ do
+  (hdlNmDocs,incs) <- unzip <$> mapM (\(sp,ids,comp) -> genHDL modName sp (seen ++ ids) comp) components
   hwtys <- HashSet.toList <$> extractTypes <$> Mon get
   typesPkg <- mkTyPackage modName hwtys
+  dataFiles <- Mon getDataFiles
+  memFiles  <- Mon getMemoryDataFiles
   let hdl   = map (first (<.> Clash.Backend.extension backend)) (typesPkg ++ hdlNmDocs)
       qincs = concat incs
       topFiles = hdl ++ qincs
@@ -305,7 +413,7 @@ createHDL backend modName components top (topName,manifestE) = flip evalState ba
       topInTypes  <- mapM (fmap renderOneLine . hdlType (External topName') . snd) (inputs top)
       let topOutNames = map (fst . snd) (outputs top)
       topOutTypes <- mapM (fmap renderOneLine . hdlType (External topName') . snd . snd) (outputs top)
-      let compNames = map (componentName.snd) components
+      let compNames = map (componentName . view _3) components
       return (m { portInNames    = topInNames
                 , portInTypes    = topInTypes
                 , portOutNames   = topOutNames
@@ -315,7 +423,7 @@ createHDL backend modName components top (topName,manifestE) = flip evalState ba
     ) manifestE
   let manDoc = ( topName <.> "manifest"
                , pretty (Text.pack (show manifest)))
-  return (manDoc:topFiles,manifest)
+  return (manDoc:topFiles,manifest,dataFiles,memFiles)
 
 -- | Prepares the directory for writing HDL files. This means creating the
 --   dir if it does not exist and removing all existing .hdl files from it.
@@ -404,7 +512,7 @@ normalizeEntity
   :: CustomReprs
   -> BindingMap
   -- ^ All bindings
-  -> PrimMap BlackBoxTemplate
+  -> CompiledPrimMap
   -- ^ BlackBox HDL templates
   -> HashMap TyConOccName TyCon
   -- ^ TyCon cache

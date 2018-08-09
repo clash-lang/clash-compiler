@@ -1,19 +1,22 @@
 [ { "BlackBox" :
     { "name"      : "Clash.Sized.RTree.treplicate"
+    , "kind"      : "Expression"
     , "type"      : "replicate :: SNat d -> a -> RTree d a"
-    , "templateE" : "'{(2**~LIT[0]) {~TOBV[~ARG[1]][~TYP[1]]}}"
+    , "template"  : "'{(2**~LIT[0]) {~TOBV[~ARG[1]][~TYP[1]]}}"
     }
   }
 , { "BlackBox" :
     { "name"      : "Clash.Sized.RTree.textract"
+    , "kind"      : "Expression"
     , "type"      : "textract :: RTree 0 a -> a"
-    , "templateE" : "~FROMBV[~VAR[tree][0][\\0\\]][~TYPO]"
+    , "template"  : "~FROMBV[~VAR[tree][0][\\0\\]][~TYPO]"
     }
   }
 , { "BlackBox" :
     { "name"      : "Clash.Sized.RTree.tsplit"
+    , "kind"      : "Expression"
     , "type"      : "tsplit:: RTree (d+1) a -> (RTree d a,RTree d a)"
-    , "templateE" : "~TOBV[~VAR[tree][0]][~TYP[0]]"
+    , "template"  : "~TOBV[~VAR[tree][0]][~TYP[0]]"
     }
   }
 ]

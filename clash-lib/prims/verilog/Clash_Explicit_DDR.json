@@ -1,5 +1,6 @@
 [ { "BlackBox" :
     { "name" : "Clash.Explicit.DDR.ddrIn#"
+    , "kind" : "Declaration"
     , "type" :
 "ddrIn# :: forall a slow fast n pFast gated synchronous.
            ( HasCallStack                         -- ARG[0]
@@ -12,7 +13,7 @@
         -> a                                      -- ARG[7]
         -> Signal fast a                          -- ARG[8]
         -> Signal slow (a,a)"
-    , "templateD" :
+    , "template" :
 "// ddrIn begin
 reg ~SIGD[~GENSYM[data_Pos][1]][8];
 reg ~SIGD[~GENSYM[data_Neg][2]][8];
@@ -69,6 +70,7 @@ assign ~RESULT = {~SYM[3], ~SYM[1]};
   }
 , { "BlackBox" :
     { "name" : "Clash.Explicit.DDR.ddrOut#"
+    , "kind" : "Declaration"
     , "type" :
 "ddrOut# :: ( HasCallStack               -- ARG[0]
             , fast ~ Dom n pFast         -- ARG[1]
@@ -79,7 +81,7 @@ assign ~RESULT = {~SYM[3], ~SYM[1]};
          -> Signal slow a                -- ARG[6]
          -> Signal slow a                -- ARG[7]
          -> Signal fast a"
-    , "templateD" :
+    , "template" :
 "// ddrOut begin
 reg ~SIGD[~GENSYM[data_Pos][1]][5];
 reg ~SIGD[~GENSYM[data_Neg][2]][5];

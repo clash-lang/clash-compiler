@@ -1,5 +1,6 @@
 [ { "BlackBox" :
     { "name" : "Clash.Explicit.BlockRam.blockRam#"
+    , "kind" : "Declaration"
     , "type" :
 "blockRam#
   :: HasCallStack    -- ARG[0]
@@ -11,7 +12,7 @@
   -> Signal dom a    -- din,  ARG[6]
   -> Signal dom a"
     , "outputReg" : true
-    , "templateD" :
+    , "template" :
 "// blockRam begin
 reg ~TYPO ~GENSYM[RAM][0] [0:~LENGTH[~TYP[2]]-1];
 

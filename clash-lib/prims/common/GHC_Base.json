@@ -1,0 +1,13 @@
+[ { "Primitive" :
+    { "name"      : "GHC.Base.$"
+    , "primType"  : "Function"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "GHC.Base.quotInt"
+    , "kind"      : "Expression"
+    , "type"      : "quotInt :: Int -> Int -> Int"
+    , "template"  : "~ARG[0] / ~ARG[1]"
+    }
+  }
+]

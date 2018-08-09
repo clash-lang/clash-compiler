@@ -1,6 +1,7 @@
 [ { "BlackBox" :
     { "name"      : "EmptyCase"
-    , "templateE" : "~ERRORO"
+    , "kind"      : "Expression"
+    , "template"  : "~ERRORO"
     }
   }
 , { "Primitive" :

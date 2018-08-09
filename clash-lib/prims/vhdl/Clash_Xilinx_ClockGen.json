@@ -1,12 +1,13 @@
 [ { "BlackBox" :
     { "name"      : "Clash.Xilinx.ClockGen.clockWizard"
+    , "kind"      : "Declaration"
     , "type"      :
 "clockWizard
   :: SSymbol name               -- ARG[0]
   -> Clock  pllIn 'Source       -- ARG[1]
   -> Reset  pllIn 'Asynchronous -- ARG[2]
   -> (Clock pllOut 'Source, Signal pllOut Bool)"
-    , "templateD" :
+    , "template" :
 "-- clockWizard begin
 ~GENSYM[clockWizard][0] : block
   signal ~GENSYM[pllOut][1]  : std_logic;
@@ -29,6 +30,7 @@ end block;
   }
 , { "BlackBox" :
     { "name"      : "Clash.Xilinx.ClockGen.clockWizardDifferential"
+    , "kind"      : "Declaration"
     , "type"      :
 "clockWizardDifferential
   :: SSymbol name              -- ARG[0]
@@ -36,7 +38,7 @@ end block;
   -> Clock pllIn 'Source       -- ARG[2]
   -> Reset pllIn 'Asynchronous -- ARG[3]
   -> (Clock pllOut 'Source, Signal pllOut Bool)"
-    , "templateD" :
+    , "template" :
 "-- clockWizardDifferential begin
 ~GENSYM[clockWizardDifferential][0] : block
   signal ~GENSYM[pllOut][1]  : std_logic;

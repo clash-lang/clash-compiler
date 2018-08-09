@@ -1,0 +1,8 @@
+[ { "BlackBox" :
+    { "name"      : "GHC.Base.remInt"
+    , "kind"      : "Expression"
+    , "type"      : "remInt :: Int -> Int -> Int"
+    , "template"  : "~ARG[0] % ~ARG[1]"
+    }
+  }
+]

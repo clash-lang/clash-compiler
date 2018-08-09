@@ -1,5 +1,6 @@
 [ { "BlackBox" :
     { "name" : "Clash.Explicit.ROM.File.romFile#"
+    , "kind" : "Declaration"
     , "type" :
 "romFile# :: KnownNat m      -- ARG[0]
           => Clock dom gated -- clk,  ARG[1]
@@ -8,7 +9,7 @@
           -> Signal dom Int  -- rd,   ARG[4]
           -> Signal dom (BitVector m)"
     , "outputReg" : true
-    , "templateD" :
+    , "template" :
 "// romFile begin
 reg ~TYPO ~GENSYM[ROM][0] [0:~LIT[2]-1];
 

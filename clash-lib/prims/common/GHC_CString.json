@@ -1,11 +1,13 @@
 [ { "BlackBox" :
     { "name"      : "GHC.CString.unpackCString#"
-    , "templateE" : "~LIT[0]"
+    , "kind"      : "Expression"
+    , "template"  : "~LIT[0]"
     }
   }
 , { "BlackBox" :
     { "name"      : "GHC.CString.unpackFoldrCString#"
-    , "templateE" : "~LIT[0]"
+    , "kind"      : "Expression"
+    , "template"  : "~LIT[0]"
     }
   }
 , { "Primitive" :

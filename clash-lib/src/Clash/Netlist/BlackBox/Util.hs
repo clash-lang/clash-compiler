@@ -25,7 +25,7 @@ import           Data.Bool                       (bool)
 import           Data.Foldable                   (foldrM)
 import           Data.Hashable                   (Hashable (..))
 import qualified Data.IntMap                     as IntMap
-import           Data.List                       (mapAccumL, nub)
+import           Data.List                       (nub)
 #if !MIN_VERSION_base(4,11,0)
 import           Data.Monoid
 #endif
@@ -61,10 +61,14 @@ import           Clash.Util
 -- | Determine if the number of normal/literal/function inputs of a blackbox
 -- context at least matches the number of argument that is expected by the
 -- template.
-verifyBlackBoxContext :: BlackBoxContext -- ^ Blackbox to verify
-                      -> BlackBoxTemplate -- ^ Template to check against
-                      -> Bool
-verifyBlackBoxContext bbCtx = all verify'
+verifyBlackBoxContext
+  :: BlackBoxContext
+  -- ^ Blackbox to verify
+  -> N.BlackBox
+  -- ^ Template to check against
+  -> Bool
+verifyBlackBoxContext bbCtx (N.BBFunction (N.TemplateFunction _ f _)) = f bbCtx
+verifyBlackBoxContext bbCtx (N.BBTemplate t) = all verify' t
   where
     verify' (I _ n)         = n < length (bbInputs bbCtx)
     verify' (L n)           = case indexMaybe (bbInputs bbCtx) n of
@@ -74,9 +78,9 @@ verifyBlackBoxContext bbCtx = all verify'
     verify' (TypM (Just n)) = n < length (bbInputs bbCtx)
     verify' (Err (Just n))  = n < length (bbInputs bbCtx)
     verify' (D (Decl n l')) = case IntMap.lookup n (bbFunctions bbCtx) of
-                                Just _ -> all (\(x,y) -> verifyBlackBoxContext bbCtx x &&
-                                                         verifyBlackBoxContext bbCtx y) l'
-                                _      -> False
+      Just _ -> all (\(x,y) -> verifyBlackBoxContext bbCtx (N.BBTemplate x) &&
+                               verifyBlackBoxContext bbCtx (N.BBTemplate y)) l'
+      _      -> False
     verify' _               = True
 
 extractLiterals :: BlackBoxContext
@@ -150,72 +154,8 @@ setSym bbCtx l = do
                                                                ++ " to string:" ++ msg
                          ; O _ | Identifier t _ <- fst (bbResult bbCtx)
                                -> t
+                         ; CompName -> bbCompName bbCtx
                          ; _   -> error "unexpected element in GENSYM"})
-
-setCompName :: Identifier -> BlackBoxTemplate -> BlackBoxTemplate
-setCompName nm = map setCompName'
-  where
-    setCompName' CompName       = C nm
-    setCompName' (D (Decl n l)) = D (Decl n (map (setCompName nm *** setCompName nm) l))
-    setCompName' (IF c t f)     = IF c (setCompName nm t) (setCompName nm f)
-    setCompName' (GenSym es i)  = GenSym (setCompName nm es) i
-    setCompName' (BV t e m)     = BV t (setCompName nm e) (setCompName' m)
-    setCompName' e              = e
-
-
-findAndSetDataFiles
-    :: BlackBoxContext
-    -> [(String,FilePath)]
-    -> BlackBoxTemplate
-    -> ([(String,FilePath)],BlackBoxTemplate)
-findAndSetDataFiles bbCtx fs = mapAccumL findAndSet fs
-  where
-    findAndSet fs' (FilePath (L n)) =
-        case Text.unpack <$> elementToText bbCtx (L n) of
-            Left msg -> error $ $(curLoc) ++ msg
-            Right s  -> renderFilePath fs' s
-    findAndSet fs' l = (fs', l)
-
-findAndSetMemoryDataFile
-    :: BlackBoxContext
-    -> [(String, String)]
-    -> Element
-    -> ([(String, String)], Element)
-findAndSetMemoryDataFile bbCtx fs (Template filenameL sourceL) =
-    case file of
-        Left msg ->
-            error $ $(curLoc) ++ unwords [ "Name or source in ~TEMPLATE construct"
-                                         , "did not reduce to a string."
-                                         , "'elementToText' reported:"
-                                         , msg ]
-        Right fstup@(filename, _source) ->
-          if elem filename (map fst fs)
-            then if not (elem fstup fs)
-              then error $ $(curLoc) ++ unwords [ "Multiple ~TEMPLATE constructs"
-                                                 , "specifiy the same filename"
-                                                 , "but different contents. Make"
-                                                 , "sure these names are unique." ]
-            -- We replace the Template element with an empty constant, so nothing
-            -- ends up in the generated HDL.
-              else (fs, C (Text.pack ""))
-            else (fstup:fs, C (Text.pack ""))
-
-        where
-            file = do
-                filename <- elementsToText bbCtx filenameL
-                source   <- elementsToText bbCtx sourceL
-                return (Text.unpack filename, Text.unpack source)
-findAndSetMemoryDataFile _bbCtx fs l = (fs, l)
-
-
-findAndSetMemoryDataFiles
-     :: BlackBoxContext
-    -> [(String, String)]
-    -> BlackBoxTemplate
-    -> ([(String, String)],BlackBoxTemplate)
-findAndSetMemoryDataFiles bbCtx fs elements =
-    mapAccumL (findAndSetMemoryDataFile bbCtx) fs elements
-
 
 selectNewName
     :: Foldable t
@@ -228,12 +168,8 @@ selectNewName as a
   | elem a as = selectNewName as (replaceBaseName a (takeBaseName a ++ "_"))
   | otherwise = a
 
-
-renderFilePath
-    :: [(String, FilePath)]
-    -> String
-    -> ([(String, FilePath)], Element)
-renderFilePath fs f = ((f'',f):fs,C (Text.pack $ show f''))
+renderFilePath :: [(String,FilePath)] -> String -> ([(String,FilePath)],String)
+renderFilePath fs f = ((f'',f):fs, f'')
   where
     f'  = takeFileName f
     f'' = selectNewName (map fst fs) f'
@@ -253,17 +189,24 @@ renderBlackBox
   :: Backend backend
   => [BlackBoxTemplate]
   -> [BlackBoxTemplate]
-  -> [((Data.Text.Text,Data.Text.Text), BlackBoxTemplate)]
-  -> BlackBoxTemplate
+  -> [((Data.Text.Text,Data.Text.Text), N.BlackBox)]
+  -> N.BlackBox
   -> BlackBoxContext
   -> State backend (Int -> Doc)
-renderBlackBox libs imps includes bs bbCtx = do
+renderBlackBox libs imps includes bb bbCtx = do
   let nms' = zipWith (\_ i -> "~INCLUDENAME[" <> Text.pack (show i) <> "]")
                      includes
                      [(0 :: Int)..]
+      layout = LayoutOptions (AvailablePerLine 120 0.4)
   nms <-
     forM includes $ \((nm,_),inc) -> do
-      incForHash <- renderTemplate (bbCtx {bbQsysIncName = nms'}) inc
+      let bbCtx' = bbCtx {bbQsysIncName = nms'}
+      incForHash <- onBlackBox (renderTemplate bbCtx')
+                               (\(N.TemplateFunction _ _ f) -> do
+                                  t <- f bbCtx'
+                                  let t' = renderLazy (layoutPretty layout t)
+                                  return (const t'))
+                               inc
       iw <- iwWidth
       let incHash = hash (incForHash 0)
           nm'     = Text.concat
@@ -274,14 +217,23 @@ renderBlackBox libs imps includes bs bbCtx = do
 
   let bbNamedCtx = bbCtx {bbQsysIncName = nms}
       incs = snd <$> includes
-  t <- renderTemplate bbNamedCtx bs
-  incs' <- mapM (fmap (PP.pretty . ($ 0)) . renderTemplate bbNamedCtx) incs
+  bb' <- case bb of
+        N.BBTemplate bt   -> do
+          t <- renderTemplate bbNamedCtx bt
+          return (\col -> PP.nest (col-2) (PP.pretty (t (col + 2))))
+        N.BBFunction (N.TemplateFunction _ _ bf)  -> do
+          t <- bf bbNamedCtx
+          return (\_ -> t)
+
+  incs' <- mapM (onBlackBox (fmap (PP.pretty . ($ 0)) . renderTemplate bbNamedCtx)
+                            (\(N.TemplateFunction _ _ f) -> f bbNamedCtx))
+                incs
   libs' <- mapM (fmap ($ 0) . renderTemplate bbNamedCtx) libs
   imps' <- mapM (fmap ($ 0) . renderTemplate bbNamedCtx) imps
   addIncludes $ zipWith3 (\nm' ((_, ext), _) inc -> (Text.unpack nm' <.> Data.Text.unpack ext, inc)) nms includes incs'
   addLibraries libs'
   addImports imps'
-  return (\col -> PP.nest (col-2) (PP.pretty (t (col+2))))
+  return bb'
 
 -- | Assign @Var@ holes in the context of a primitive HDL template that is
 -- passed as an argument of a higher-order HDL template. For the general case,
@@ -322,8 +274,8 @@ renderElem b (D (Decl n (l:ls))) = do
   templ' <- case templ of
               Left t        -> return t
               Right (nm,ds) -> do block <- getMon $ blockDecl nm ds
-                                  return . parseFail . renderLazy $ (layoutPretty (LayoutOptions (AvailablePerLine 120 0.4)) block)
-  let t2 = setSimpleVar b' templ'
+                                  return . N.BBTemplate . parseFail . renderLazy $ (layoutPretty (LayoutOptions (AvailablePerLine 120 0.4)) block)
+  let t2 = onBlackBox (N.BBTemplate . setSimpleVar b') N.BBFunction templ'
   if verifyBlackBoxContext b' t2
     then do
       bb <- renderBlackBox libs imps inc t2 b'
@@ -395,9 +347,9 @@ renderElem b (IF c t f) = do
                        _                     -> 0
       (StrCmp [C t1] n) ->
         let (e,_,_) = bbInputs b !! n
-        in  case exprToText e of
+        in  case exprToString e of
               Just t2
-                | t1 == t2  -> 1
+                | t1 == Text.pack t2 -> 1
                 | otherwise -> 0
               Nothing -> error $ $(curLoc) ++ "Expected a string literal: " ++ show e
       (And es)   -> if all (==1) (map (check iw syn) es)
@@ -546,12 +498,13 @@ renderTag b (IndexType (L n)) =
 renderTag b (FilePath e)    = case e of
   L n -> do
     let (e',_,_) = bbInputs b !! n
-    e2  <- getMon (prettyElem e)
-    case e' of
-      BlackBoxE "GHC.CString.unpackCString#" _ _ _ _ bbCtx' _ -> case bbInputs bbCtx' of
-        [(Literal Nothing (StringLit _),_,_)] -> error $ $(curLoc) ++ "argument of ~FILEPATH:" ++ show e2 ++  "does not reduce to a string"
-        _ ->  error $ $(curLoc) ++ "argument of ~FILEPATH:" ++ show e2 ++  "does not reduce to a string"
-      _ -> error $ $(curLoc) ++ "argument of ~FILEPATH:" ++ show e2 ++  "does not reduce to a string"
+    case exprToString e' of
+      Just s -> do
+        s' <- addAndSetData s
+        return (Text.pack (show s'))
+      _ -> do
+        e2  <- getMon (prettyElem e)
+        error $ $(curLoc) ++ "argument of ~FILEPATH:" ++ show e2 ++  "does not reduce to a string"
   _ -> do e' <- getMon (prettyElem e)
           error $ $(curLoc) ++ "~FILEPATH expects a ~LIT[N] argument, but got: " ++ show e'
 renderTag b (IncludeName n) = case indexMaybe (bbQsysIncName b) n of
@@ -572,8 +525,34 @@ renderTag b (DevNull es) = do
   _ <- mapM (renderElem b) es
   return $ Text.empty
 
-renderTag _ (Template _ _) =
-  error $ $(curLoc) ++ "~TEMPLATE constructs should have been removed by prepareBlackBox."
+renderTag b (Template filenameL sourceL) = case file of
+  Left msg ->
+      error $ $(curLoc) ++ unwords [ "Name or source in ~TEMPLATE construct"
+                                   , "did not reduce to a string."
+                                   , "'elementToText' reported:"
+                                   , msg ]
+  Right fstup@(filename, _source) -> do
+    fs <- getMemoryDataFiles
+    if elem filename (map fst fs)
+      then if not (elem fstup fs)
+        then error $ $(curLoc) ++ unwords [ "Multiple ~TEMPLATE constructs"
+                                           , "specifiy the same filename"
+                                           , "but different contents. Make"
+                                           , "sure these names are unique." ]
+      -- We replace the Template element with an empty constant, so nothing
+      -- ends up in the generated HDL.
+        else return (Text.pack "")
+      else do
+        addMemoryDataFile fstup
+        return (Text.pack "")
+
+  where
+      file = do
+          filename <- elementsToText b filenameL
+          source   <- elementsToText b sourceL
+          return (Text.unpack filename, Text.unpack source)
+
+renderTag b CompName = pure (bbCompName b)
 
 renderTag _ e = do e' <- getMon (prettyElem e)
                    error $ $(curLoc) ++ "Unable to evaluate: " ++ show e'
@@ -600,9 +579,9 @@ elementToText _bbCtx (C t) = return $ t
 elementToText bbCtx  (L n) =
     case bbInputs bbCtx ^? element n of
         Just (e,_,_) ->
-            case exprToText e of
+            case exprToString e of
                 Just t ->
-                    Right $ t
+                    Right $ Text.pack t
                 Nothing ->
                     Left $ $(curLoc) ++ unwords [ "Could not extract string from"
                                                 , show e, "referred to by"
@@ -615,17 +594,17 @@ elementToText bbCtx  (L n) =
 elementToText _bbCtx e = error $ "Unexpected string like: " ++ show e
 
 -- | Extracts string from SSymbol or string literals
-exprToText
+exprToString
   :: Expr
-  -> Maybe Text
-exprToText (Literal _ (StringLit l)) = Just (Text.pack l)
-exprToText (BlackBoxE "Clash.Promoted.Symbol.SSymbol" _ _ _ _ ctx _) =
+  -> Maybe String
+exprToString (Literal _ (StringLit l)) = Just l
+exprToString (BlackBoxE "Clash.Promoted.Symbol.SSymbol" _ _ _ _ ctx _) =
   let (e',_,_) = head (bbInputs ctx)
-  in  exprToText e'
-exprToText (BlackBoxE "GHC.CString.unpackCString#" _ _ _ _ ctx _) =
+  in  exprToString e'
+exprToString (BlackBoxE "GHC.CString.unpackCString#" _ _ _ _ ctx _) =
   let (e',_,_) = head (bbInputs ctx)
-  in  exprToText e'
-exprToText _ = Nothing
+  in  exprToString e'
+exprToString _ = Nothing
 
 prettyBlackBox :: Monad m
                => BlackBoxTemplate
@@ -749,23 +728,32 @@ prettyElem (Template bbname source) = do
                                   <> brackets (string $ Text.concat bbname')
                                   <> brackets (string $ Text.concat source'))
 
-usedArguments :: BlackBoxTemplate
+usedArguments :: N.BlackBox
               -> [Int]
-usedArguments = nub . concatMap go
+usedArguments (N.BBFunction (N.TemplateFunction k _ _)) = k
+usedArguments (N.BBTemplate t) = nub (concatMap go t)
   where
     go x = case x of
-      D (Decl i args) -> i : concatMap (\(a,b) -> usedArguments a ++ usedArguments b) args
+      D (Decl i args) -> i : concatMap (\(a,b) -> concatMap go a ++ concatMap go b) args
       I _ i -> [i]
       L i -> [i]
       N i -> [i]
       Var _ i -> [i]
       IndexType e -> go e
       FilePath e -> go e
-      Template bbname source -> usedArguments bbname ++ usedArguments source
-      IF b esT esF -> go b ++ usedArguments esT ++ usedArguments esF
-      SigD es _ -> usedArguments es
-      BV _ es _ -> usedArguments es
+      Template bbname source -> concatMap go bbname ++ concatMap go source
+      IF b esT esF -> go b ++ concatMap go esT ++ concatMap go esF
+      SigD es _ -> concatMap go es
+      BV _ es _ -> concatMap go es
       StrCmp _ i -> [i]
-      GenSym es _ -> usedArguments es
-      DevNull es -> usedArguments es
+      GenSym es _ -> concatMap go es
+      DevNull es -> concatMap go es
       _ -> []
+
+onBlackBox
+  :: (BlackBoxTemplate -> r)
+  -> (N.TemplateFunction -> r)
+  -> N.BlackBox
+  -> r
+onBlackBox f _ (N.BBTemplate t) = f t
+onBlackBox _ g (N.BBFunction t) = g t

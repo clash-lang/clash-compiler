@@ -63,7 +63,6 @@ import           Clash.Core.Var                   (Id, Var (..))
 import           Clash.Driver.Types
   (BindingMap, ClashException (..))
 import           Clash.Netlist.BlackBox
-import           Clash.Netlist.BlackBox.Types     (BlackBoxTemplate)
 import           Clash.Netlist.Id
 import           Clash.Netlist.Types              as HW
 import           Clash.Netlist.Util
@@ -78,16 +77,12 @@ genNetlist :: CustomReprs
            -- ^ Global binders
            -> [(TmName,Type,Maybe TopEntity,Maybe TmName)]
            -- ^ All the TopEntities
-           -> PrimMap BlackBoxTemplate
+           -> CompiledPrimMap
            -- ^ Primitive definitions
            -> HashMap TyConOccName TyCon
            -- ^ TyCon cache
            -> (CustomReprs -> HashMap TyConOccName TyCon -> Bool -> Type -> Maybe (Either String HWType))
            -- ^ Hardcoded Type -> HWType translator
-           -> [(String,FilePath)]
-           -- ^ Set of collected data-files
-           -> [(String,String)]
-           -- ^ Set of collected in-memory data-files: (filename, contents)
            -> Int
            -- ^ Int/Word/Integer bit-width
            -> (IdType -> Identifier -> Identifier)
@@ -102,13 +97,11 @@ genNetlist :: CustomReprs
            -- ^ Component name prefix
            -> TmOccName
            -- ^ Name of the @topEntity@
-           -> IO ([(SrcSpan,Component)],[(String,FilePath)],[(String,String)],[Identifier])
-genNetlist reprs globals tops primMap tcm typeTrans dfiles mfiles iw mkId extId seen env prefixM topEntity = do
+           -> IO ([(SrcSpan,[Identifier],Component)],[Identifier])
+genNetlist reprs globals tops primMap tcm typeTrans iw mkId extId seen env prefixM topEntity = do
   (_,s) <- runNetlistMonad reprs globals (mkTopEntityMap tops) primMap tcm typeTrans
-             dfiles mfiles iw mkId extId seen env prefixM $ genComponent topEntity
+             iw mkId extId seen env prefixM $ genComponent topEntity
   return ( HashMap.elems $ _components s
-         , _dataFiles s
-         , _memoryDataFiles s
          , _seenComps s
          )
   where
@@ -123,16 +116,12 @@ runNetlistMonad :: CustomReprs
                 -- ^ Global binders
                 -> HashMap TmOccName (Type, Maybe TopEntity)
                 -- ^ TopEntity annotations
-                -> PrimMap BlackBoxTemplate
+                -> CompiledPrimMap
                 -- ^ Primitive Definitions
                 -> HashMap TyConOccName TyCon
                 -- ^ TyCon cache
                 -> (CustomReprs -> HashMap TyConOccName TyCon -> Bool -> Type -> Maybe (Either String HWType))
                 -- ^ Hardcode Type -> HWType translator
-                -> [(String,FilePath)]
-                -- ^ Set of collected data-files
-                -> [(String, String)]
-                -- ^ Set of collected in-memory data-files: (filename, contents)
                 -> Int
                 -- ^ Int/Word/Integer bit-width
                 -> (IdType -> Identifier -> Identifier)
@@ -148,12 +137,12 @@ runNetlistMonad :: CustomReprs
                 -> NetlistMonad a
                 -- ^ Action to run
                 -> IO (a, NetlistState)
-runNetlistMonad reprs s tops p tcm typeTrans dfiles mfiles iw mkId extId seenIds_ env prefixM
+runNetlistMonad reprs s tops p tcm typeTrans iw mkId extId seenIds_ env prefixM
   = runFreshMT
   . flip runStateT s'
   . runNetlist
   where
-    s' = NetlistState s 0 HashMap.empty p typeTrans tcm (Text.empty,noSrcSpan) dfiles mfiles iw mkId extId [] seenIds' names tops env 0 prefixM reprs
+    s' = NetlistState s 0 HashMap.empty p typeTrans tcm (Text.empty,noSrcSpan) iw mkId extId [] seenIds' names tops env 0 prefixM reprs
     (seenIds',names) = genNames mkId prefixM seenIds_ HashMap.empty (HashMap.elems (HashMap.map (^. _1) s))
 
 genNames :: (IdType -> Identifier -> Identifier)
@@ -174,7 +163,7 @@ genNames mkId prefixM = go
 genComponent
   :: TmOccName
   -- ^ Name of the function
-  -> NetlistMonad (SrcSpan,Component)
+  -> NetlistMonad (SrcSpan,[Identifier],Component)
 genComponent compName = do
   compExprM <- fmap (HashMap.lookup compName) $ Lens.use bindings
   case compExprM of
@@ -190,7 +179,7 @@ genComponentT
   -- ^ Name of the function
   -> Term
   -- ^ Corresponding term
-  -> NetlistMonad (SrcSpan,Component)
+  -> NetlistMonad (SrcSpan,[Identifier],Component)
 genComponentT compName componentExpr = do
   varCount .= 0
   componentName1 <- (HashMap.! compName) <$> Lens.use componentNames
@@ -227,13 +216,15 @@ genComponentT compName componentExpr = do
                            )
           component      = Component componentName2 compInps compOutps'
                              (netDecls ++ argWrappers ++ decls ++ resUnwrappers')
-      return (sp,component)
+      ids <- Lens.use seenIds
+      return (sp, ids, component)
     -- No result declaration means that the result is empty, this only happens
     -- when the TopEntity has an empty result. We just create an empty component
     -- in this case.
     Nothing -> do
       let component = Component componentName2 compInps [] (netDecls ++ argWrappers ++ decls)
-      return (sp, component)
+      ids <- Lens.use seenIds
+      return (sp, ids, component)
 
 mkNetDecl :: (Id, Embed Term) -> NetlistMonad (Maybe Declaration)
 mkNetDecl (id_,tm) = do
@@ -472,7 +463,7 @@ mkFunApp dst fun args = do
       normalized <- Lens.use bindings
       case HashMap.lookup (nameOcc fun) normalized of
         Just _ -> do
-          (_,Component compName compInps co _) <- preserveVarEnv $ genComponent (nameOcc fun)
+          (_,_,Component compName compInps co _) <- preserveVarEnv $ genComponent (nameOcc fun)
           argTys   <- mapM (termType tcm) args
           argHWTys <- mapM coreTypeToHWTypeM argTys
           -- Filter out the arguments of hwtype `Void` and only translate
@@ -492,7 +483,7 @@ mkFunApp dst fun args = do
                     Nothing -> []
                     Just (id_,hwtype) -> [(Identifier id_ Nothing,Out,hwtype,Identifier dstId Nothing)]
               instLabel <- extendIdentifier Basic compName (Text.pack "_" `Text.append` dstId)
-              let instDecl      = InstDecl Nothing compName instLabel (outpAssign ++ inpAssigns)
+              let instDecl      = InstDecl Entity Nothing compName instLabel (outpAssign ++ inpAssigns)
               return (argDecls ++ argDecls' ++ [instDecl])
             else error $ $(curLoc) ++ "under-applied normalized function"
         Nothing -> case args of

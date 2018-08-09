@@ -1,5 +1,6 @@
 [ { "BlackBox" :
     { "name" : "Clash.Explicit.Testbench.assert"
+    , "kind" : "Declaration"
     , "type" :
 "assert
   :: (Eq a,ShowX a)           -- (ARG[0],ARG[1])
@@ -10,7 +11,7 @@
   -> Signal domain a          -- Expected value (ARG[6])
   -> Signal domain b          -- Return valued  (ARG[7])
   -> Signal domain b"
-    , "templateD" :
+    , "template" :
 "// assert begin
 // pragma translate_off
 always @(posedge ~IF ~ISGATED[2] ~THEN ~ARG[2][1] ~ELSE ~ARG[2] ~FI~IF ~ISSYNC[3] ~THEN ~ELSE or negedge ~ARG[3]~FI) begin
@@ -26,6 +27,7 @@ assign ~RESULT = ~ARG[7];
   }
 , { "BlackBox" :
     { "name" : "Clash.Explicit.Testbench.assertBitVector"
+    , "kind" : "Declaration"
     , "type" :
 "assertBitVector
   :: KnownNat n                  --                 ARG[0]
@@ -36,7 +38,7 @@ assign ~RESULT = ~ARG[7];
   -> Signal domain (BitVector n) -- Expected value (ARG[5])
   -> Signal domain b             -- Return valued  (ARG[6])
   -> Signal domain b"
-    , "templateD" :
+    , "template" :
 "// assertBitVector begin
 // pragma translate_off
 wire ~TYP[5] ~GENSYM[maskOr][0] = ~ARG[5] ^ ~ARG[5];

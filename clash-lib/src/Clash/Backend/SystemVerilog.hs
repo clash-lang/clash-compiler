@@ -53,7 +53,8 @@ import           Clash.Backend
 import           Clash.Backend.Verilog                (bits, bit_char, exprLit, include)
 import           Clash.Driver.Types                   (SrcSpan, noSrcSpan)
 import           Clash.Netlist.BlackBox.Types         (HdlSyn (..))
-import           Clash.Netlist.BlackBox.Util          (extractLiterals, renderBlackBox)
+import           Clash.Netlist.BlackBox.Util
+  (extractLiterals, renderBlackBox, renderFilePath)
 import           Clash.Netlist.Id                     (IdType (..), mkBasicId')
 import           Clash.Netlist.Types                  hiding (_intWidth, intWidth)
 import           Clash.Netlist.Util                   hiding (mkIdentifier, extendIdentifier)
@@ -77,6 +78,11 @@ data SystemVerilogState =
     , _srcSpan   :: SrcSpan
     , _includes  :: [(String,Doc)]
     , _imports   :: [Text.Text]
+    , _dataFiles      :: [(String,FilePath)]
+    -- ^ Files to be copied: (filename, old path)
+    , _memoryDataFiles:: [(String,String)]
+    -- ^ Files to be stored: (filename, contents). These files are generated
+    -- during the execution of 'genNetlist'.
     , _intWidth  :: Int -- ^ Int/Word/Integer bit-width
     , _hdlsyn    :: HdlSyn
     }
@@ -94,7 +100,7 @@ primsRoot = return ("clash-lib" System.FilePath.</> "prims")
 #endif
 
 instance Backend SystemVerilogState where
-  initBackend     = SystemVerilogState HashSet.empty [] HashMap.empty 0 "" [] [] noSrcSpan [] []
+  initBackend     = SystemVerilogState HashSet.empty [] HashMap.empty 0 "" [] [] noSrcSpan [] [] [] []
   hdlKind         = const SystemVerilog
   primDirs        = const $ do root <- primsRoot
                                return [ root System.FilePath.</> "common"
@@ -159,6 +165,15 @@ instance Backend SystemVerilogState where
   addIncludes inc = includes %= (inc++)
   addLibraries _ = return ()
   addImports inps = imports %= (inps ++)
+  addAndSetData f = do
+    fs <- use dataFiles
+    let (fs',f') = renderFilePath fs f
+    dataFiles .= fs'
+    return f'
+  getDataFiles = use dataFiles
+  addMemoryDataFile f = memoryDataFiles %= (f:)
+  getMemoryDataFiles = use memoryDataFiles
+  seenIdentifiers = idSeen
 
 rmSlash :: Identifier -> Identifier
 rmSlash nm = fromMaybe nm $ do
@@ -209,8 +224,9 @@ filterReserved s = if s `elem` reservedWords
   else s
 
 -- | Generate SystemVerilog for a Netlist component
-genVerilog :: String -> SrcSpan -> Component -> SystemVerilogM ((String,Doc),[(String,Doc)])
-genVerilog _ sp c = do
+genVerilog :: String -> SrcSpan -> [Identifier] -> Component -> SystemVerilogM ((String,Doc),[(String,Doc)])
+genVerilog _ sp seen c = preserveSeen $ do
+    Mon $ idSeen .= seen
     Mon $ setSrcSpan sp
     v    <- verilog
     incs <- Mon $ use includes
@@ -490,7 +506,7 @@ funDec _ = pure Nothing
 
 module_ :: Component -> SystemVerilogM Doc
 module_ c =
-  addSeen c *> modVerilog <* Mon (idSeen .= [] >> imports .= [] >> oports .= [])
+  addSeen c *> modVerilog <* Mon (imports .= [] >> oports .= [])
  where
   modVerilog = do
     body <- modBody
@@ -813,7 +829,7 @@ inst_ (CondAssignment id_ ty scrut scrutTy es) = fmap Just $ do
     conds i ((Nothing,e):_)   = ("default" <+> colon <+> string i <+> equals <+> expr_ False e) <:> return []
     conds i ((Just c ,e):es') = (exprLit (Just (scrutTy,conSize scrutTy)) c <+> colon <+> string i <+> equals <+> expr_ False e) <:> conds i es'
 
-inst_ (InstDecl _ nm lbl pms) = fmap Just $
+inst_ (InstDecl _ _ nm lbl pms) = fmap Just $
     nest 2 (string nm <+> string lbl <> line <> pms' <> semi)
   where
     pms' = tupled $ sequence [dot <> expr_ False i <+> parens (expr_ False e) | (i,_,_,e) <- pms]

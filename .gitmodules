@@ -1,3 +1,6 @@
 [submodule "clash-prelude"]
 	path = clash-prelude
 	url = ../clash-prelude.git
+[submodule "clash-cosim"]
+	path = clash-cosim
+	url = ../clash-cosim.git

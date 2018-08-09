@@ -1,19 +1,22 @@
 [ { "BlackBox" :
     { "name"      : "GHC.Err.error"
+    , "kind"      : "Expression"
     , "type"      : "error :: [Char] -> a"
-    , "templateE" : "~ERRORO"
+    , "template"  : "~ERRORO"
     }
   }
 , { "BlackBox" :
     { "name"      : "GHC.Err.errorWithoutStackTrace"
+    , "kind"      : "Expression"
     , "type"      : "errorWithoutStackTrace :: [Char] -> a"
-    , "templateE" : "~ERRORO"
+    , "template"  : "~ERRORO"
     }
   }
 , { "BlackBox" :
     { "name"      : "GHC.Err.undefined"
+    , "kind"      : "Expression"
     , "type"      : "undefined :: a"
-    , "templateE" : "~ERRORO"
+    , "template"  : "~ERRORO"
     }
   }
 ]

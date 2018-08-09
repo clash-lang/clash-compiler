@@ -1,79 +1,8 @@
 [ { "BlackBox" :
-    { "name"      : "GHC.Prim.gtChar#"
-     , "type"     : "gtChar# :: Char# -> Char# -> Int#"
-    , "templateE" : "(~ARG[0] > ~ARG[1]) ? ~SIZE[~TYPO]'sd1 : ~SIZE[~TYPO]'sd0"
-    }
-  }
-, { "BlackBox" :
-    { "name"      : "GHC.Prim.geChar#"
-    , "type"      : "geChar# :: Char# -> Char# -> Int#"
-    , "templateE" : "(~ARG[0] >= ~ARG[1]) ? ~SIZE[~TYPO]'sd1 : ~SIZE[~TYPO]'sd0"
-    }
-  }
-, { "BlackBox" :
-    { "name"      : "GHC.Prim.eqChar#"
-    , "type"      : "eqChar# :: Char# -> Char# -> Int#"
-    , "templateE" : "(~ARG[0] == ~ARG[1]) ? ~SIZE[~TYPO]'sd1 : ~SIZE[~TYPO]'sd0"
-    }
-  }
-, { "BlackBox" :
-    { "name"      : "GHC.Prim.neChar#"
-    , "type"      : "neChar# :: Char# -> Char# -> Int#"
-    , "templateE" : "(~ARG[0] != ~ARG[1]) ? ~SIZE[~TYPO]'sd1 : ~SIZE[~TYPO]'sd0"
-    }
-  }
-, { "BlackBox" :
-    { "name"      : "GHC.Prim.ltChar#"
-    , "type"      : "ltChar# :: Char# -> Char# -> Int#"
-    , "templateE" : "(~ARG[0] < ~ARG[1]) ? ~SIZE[~TYPO]'sd1 : ~SIZE[~TYPO]'sd0"
-    }
-  }
-, { "BlackBox" :
-    { "name"      : "GHC.Prim.leChar#"
-    , "type"      : "leChar# :: Char# -> Char# -> Int#"
-    , "templateE" : "(~ARG[0] <= ~ARG[1]) ? ~SIZE[~TYPO]'sd1 : ~SIZE[~TYPO]'sd0"
-    }
-  }
-, { "BlackBox" :
-    { "name"      : "GHC.Prim.ord#"
-    , "type"      : "ord :: Char# -> Int#"
-    , "templateD" : "assign ~RESULT = $unsigned(~ARG[0]);"
-    }
-  }
-, { "BlackBox" :
-    { "name"      : "GHC.Prim.+#"
-    , "type"      : "(+#) :: Int# -> Int# -> Int#"
-    , "templateE" : "~ARG[0] + ~ARG[1]"
-    }
-  }
-, { "BlackBox" :
-    { "name"      : "GHC.Prim.-#"
-    , "type"      : "(-#) :: Int# -> Int# -> Int#"
-    , "templateE" : "~ARG[0] - ~ARG[1]"
-    }
-  }
-, { "BlackBox" :
-    { "name"      : "GHC.Prim.*#"
-    , "type"      : "(*#) :: Int# -> Int# -> Int#"
-    , "templateE" : "~ARG[0] * ~ARG[1]"
-    }
-  }
-, { "BlackBox" :
-    { "name"      : "GHC.Prim.quotInt#"
-    , "type"      : "quotInt# :: Int# -> Int# -> Int#"
-    , "templateE" : "~ARG[0] / ~ARG[1]"
-    }
-  }
-, { "BlackBox" :
-    { "name"      : "GHC.Prim.remInt#"
-    , "type"      : "remInt# :: Int# -> Int# -> Int#"
-    , "templateE" : "~ARG[0] % ~ARG[1]"
-    }
-  }
-, { "BlackBox" :
     { "name"      : "GHC.Prim.quotRemInt#"
+    , "kind"      : "Declaration"
     , "type"      : "quotRemInt# :: Int# -> Int# -> (#Int#, Int##)"
-    , "templateD" :
+    , "template"  :
 "// quotRemInt begin
 wire ~SIGD[~GENSYM[quot_res][0]][0];
 wire ~SIGD[~GENSYM[rem_res][1]][0];
@@ -85,135 +14,10 @@ assign ~RESULT = {~SYM[0],~SYM[1]};
     }
   }
 , { "BlackBox" :
-    { "name"      : "GHC.Prim.andI#"
-    , "type"      : "andI# :: Int# -> Int# -> Int#"
-    , "templateE" : "~ARG[0] & ~ARG[1]"
-    }
-  }
-, { "BlackBox" :
-    { "name"      : "GHC.Prim.orI#"
-    , "type"      : "orI# :: Int# -> Int# -> Int#"
-    , "templateE" : "~ARG[0] | ~ARG[1]"
-    }
-  }
-, { "BlackBox" :
-    { "name"      : "GHC.Prim.xorI#"
-    , "type"      : "xorI# :: Int# -> Int# -> Int#"
-    , "templateE" : "~ARG[0] ^ ~ARG[1]"
-    }
-  }
-, { "BlackBox" :
-    { "name"      : "GHC.Prim.notI#"
-    , "type"      : "notI# :: Int# -> Int#"
-    , "templateE" : "~ ~ARG[0]"
-    }
-  }
-, { "BlackBox" :
-    { "name"      : "GHC.Prim.negateInt#"
-    , "type"      : "negateInt# :: Int# -> Int#"
-    , "templateE" : "-(~ARG[0])"
-    }
-  }
-, { "BlackBox" :
-    { "name"      : "GHC.Prim.>#"
-     , "type"     : "(>#) :: Int# -> Int# -> Int#"
-    , "templateE" : "(~ARG[0] > ~ARG[1]) ? ~SIZE[~TYPO]'sd1 : ~SIZE[~TYPO]'sd0"
-    }
-  }
-, { "BlackBox" :
-    { "name"      : "GHC.Prim.>=#"
-    , "type"      : "(>=#) :: Int# -> Int# -> Int#"
-    , "templateE" : "(~ARG[0] >= ~ARG[1]) ? ~SIZE[~TYPO]'sd1 : ~SIZE[~TYPO]'sd0"
-    }
-  }
-, { "BlackBox" :
-    { "name"      : "GHC.Prim.==#"
-    , "type"      : "(==) :: Int# -> Int# -> Int#"
-    , "templateE" : "(~ARG[0] == ~ARG[1]) ? ~SIZE[~TYPO]'sd1 : ~SIZE[~TYPO]'sd0"
-    }
-  }
-, { "BlackBox" :
-    { "name"      : "GHC.Prim./=#"
-    , "type"      : "(/=#) :: Int# -> Int# -> Int#"
-    , "templateE" : "(~ARG[0] != ~ARG[1]) ? ~SIZE[~TYPO]'sd1 : ~SIZE[~TYPO]'sd0"
-    }
-  }
-, { "BlackBox" :
-    { "name"      : "GHC.Prim.<#"
-    , "type"      : "(<#) :: Int# -> Int# -> Int#"
-    , "templateE" : "(~ARG[0] < ~ARG[1]) ? ~SIZE[~TYPO]'sd1 : ~SIZE[~TYPO]'sd0"
-    }
-  }
-, { "BlackBox" :
-    { "name"      : "GHC.Prim.<=#"
-    , "type"      : "(<=#) :: Int# -> Int# -> Int#"
-    , "templateE" : "(~ARG[0] <= ~ARG[1]) ? ~SIZE[~TYPO]'sd1 : ~SIZE[~TYPO]'sd0"
-    }
-  }
-, { "BlackBox" :
-    { "name"      : "GHC.Prim.chr#"
-    , "type"      : "ord :: Int# -> Char#"
-    , "templateD" : "assign ~RESULT = $unsigned(~ARG[0]);"
-    }
-  }
-, { "BlackBox" :
-    { "name"      : "GHC.Prim.int2Word#"
-    , "type"      : "int2Word# :: Int# -> Word#"
-    , "templateE" : "$unsigned(~ARG[0])"
-    }
-  }
-, { "BlackBox" :
-    { "name"      : "GHC.Prim.uncheckedIShiftL#"
-    , "type"      : "uncheckedIShiftL# :: Int# -> Int# -> Int#"
-    , "templateE" : "~ARG[0] <<< ~ARG[1]"
-    }
-  }
-, { "BlackBox" :
-    { "name"      : "GHC.Prim.uncheckedIShiftRA#"
-    , "type"      : "uncheckedIShiftRA# :: Int# -> Int# -> Int#"
-    , "templateE" : "~ARG[0] >>> ~ARG[1]"
-    }
-  }
-, { "BlackBox" :
-    { "name"      : "GHC.Prim.uncheckedIShiftRL#"
-    , "type"      : "uncheckedIShiftRL# :: Int# -> Int# -> Int#"
-    , "templateE" : "~ARG[0] >> ~ARG[1]"
-    }
-  }
-, { "BlackBox" :
-    { "name"      : "GHC.Prim.plusWord#"
-    , "type"      : "plusWord# :: Word# -> Word# -> Word#"
-    , "templateE" : "~ARG[0] + ~ARG[1]"
-    }
-  }
-, { "BlackBox" :
-    { "name"      : "GHC.Prim.minusWord#"
-    , "type"      : "minusWord# :: Word# -> Word# -> Word#"
-    , "templateE" : "~ARG[0] - ~ARG[1]"
-    }
-  }
-, { "BlackBox" :
-    { "name"      : "GHC.Prim.timesWord#"
-    , "type"      : "timesWord# :: Word# -> Word# -> Word#"
-    , "templateE" : "~ARG[0] * ~ARG[1]"
-    }
-  }
-, { "BlackBox" :
-    { "name"      : "GHC.Prim.quotWord#"
-    , "type"      : "quotWord# :: Word# -> Word# -> Word#"
-    , "templateE" : "~ARG[0] / ~ARG[1]"
-    }
-  }
-, { "BlackBox" :
-    { "name"      : "GHC.Prim.remWord#"
-    , "type"      : "remWord# :: Word# -> Word# -> Word#"
-    , "templateE" : "~ARG[0] % ~ARG[1]"
-    }
-  }
-, { "BlackBox" :
     { "name"      : "GHC.Prim.quotRemWord#"
+    , "kind"      : "Declaration"
     , "type"      : "quotRemWord# :: Word# -> Word# -> (#Word#, Word##)"
-    , "templateD" :
+    , "template"  :
 "// quotRemWord begin
 wire ~SIGD[~GENSYM[quot_res][0]][0];
 wire ~SIGD[~GENSYM[rem_res][1]][0];
@@ -225,91 +29,14 @@ assign ~RESULT = {~SYM[0],~SYM[1]};
     }
   }
 , { "BlackBox" :
-    { "name"      : "GHC.Prim.and#"
-    , "type"      : "and# :: Word# -> Word# -> Word#"
-    , "templateE" : "~ARG[0] & ~ARG[1]"
-    }
-  }
-, { "BlackBox" :
-    { "name"      : "GHC.Prim.or#"
-    , "type"      : "or# :: Word# -> Word# -> Word#"
-    , "templateE" : "~ARG[0] | ~ARG[1]"
-    }
-  }
-, { "BlackBox" :
-    { "name"      : "GHC.Prim.xor#"
-    , "type"      : "xor# :: Word# -> Word# -> Word#"
-    , "templateE" : "~ARG[0] ^ ~ARG[1]"
-    }
-  }
-, { "BlackBox" :
-    { "name"      : "GHC.Prim.not#"
-    , "type"      : "not# :: Word# -> Word#"
-    , "templateE" : "~ ~ARG[0]"
-    }
-  }
-, { "BlackBox" :
-    { "name"      : "GHC.Prim.uncheckedShiftL#"
-    , "type"      : "uncheckedShiftL# :: Word# -> Int# -> Word#"
-    , "templateE" : "~ARG[0] << ~ARG[1]"
-    }
-  }
-, { "BlackBox" :
-    { "name"      : "GHC.Prim.uncheckedShiftRL#"
-    , "type"      : "uncheckedShiftRL# :: Word# -> Int# -> Word#"
-    , "templateE" : "~ARG[0] >> ~ARG[1]"
-    }
-  }
-, { "BlackBox" :
-    { "name"      : "GHC.Prim.word2Int#"
-    , "type"      : "int2Word# :: Word# -> Int#"
-    , "templateE" : "$signed(~ARG[0])"
-    }
-  }
-, { "BlackBox" :
-    { "name"      : "GHC.Prim.gtWord#"
-     , "type"     : "gtWord# :: Word# -> Word# -> Int#"
-    , "templateE" : "(~ARG[0] > ~ARG[1]) ? ~SIZE[~TYPO]'sd1 : ~SIZE[~TYPO]'sd0"
-    }
-  }
-, { "BlackBox" :
-    { "name"      : "GHC.Prim.geWord#"
-    , "type"      : "geWord# :: Word# -> Word# -> Int#"
-    , "templateE" : "(~ARG[0] >= ~ARG[1]) ? ~SIZE[~TYPO]'sd1 : ~SIZE[~TYPO]'sd0"
-    }
-  }
-, { "BlackBox" :
-    { "name"      : "GHC.Prim.eqWord#"
-    , "type"      : "eqWord# :: Word# -> Word# -> Int#"
-    , "templateE" : "(~ARG[0] == ~ARG[1]) ? ~SIZE[~TYPO]'sd1 : ~SIZE[~TYPO]'sd0"
-    }
-  }
-, { "BlackBox" :
-    { "name"      : "GHC.Prim.neWord#"
-    , "type"      : "neWord# :: Word# -> Word# -> Int#"
-    , "templateE" : "(~ARG[0] != ~ARG[1]) ? ~SIZE[~TYPO]'sd1 : ~SIZE[~TYPO]'sd0"
-    }
-  }
-, { "BlackBox" :
-    { "name"      : "GHC.Prim.ltWord#"
-    , "type"      : "ltWord# :: Word# -> Word# -> Int#"
-    , "templateE" : "(~ARG[0] < ~ARG[1]) ? ~SIZE[~TYPO]'sd1 : ~SIZE[~TYPO]'sd0"
-    }
-  }
-, { "BlackBox" :
-    { "name"      : "GHC.Prim.leWord#"
-    , "type"      : "leWord# :: Word# -> Word# -> Int#"
-    , "templateE" : "(~ARG[0] <= ~ARG[1]) ? ~SIZE[~TYPO]'sd1 : ~SIZE[~TYPO]'sd0"
-    }
-  }
-, { "BlackBox" :
     { "name"      : "GHC.Prim.popCnt8#"
+    , "kind"      : "Declaration"
     , "type"      : "popCnt8# :: Word# -> Word#"
     , "imports"   : ["~INCLUDENAME[0].inc"]
     , "includes" :
       [ { "name" : "popCnt8"
         , "extension" : "inc"
-        , "content" :
+        , "template" :
 "// ceiling of log2
 function integer ~INCLUDENAME[0]_clog2;
   input integer value;
@@ -330,7 +57,7 @@ function integer ~INCLUDENAME[0]_depth2Index;
 endfunction"
         }
       ]
-    , "templateD" :
+    , "template" :
 "// popCnt8 begin
 localparam ~GENSYM[width][0] = 8;
 
@@ -369,12 +96,13 @@ assign ~RESULT = $unsigned(~SYM[3][(2*~SYM[0])-2]);
   }
 , { "BlackBox" :
     { "name"      : "GHC.Prim.popCnt16#"
+    , "kind"      : "Declaration"
     , "type"      : "popCnt16# :: Word# -> Word#"
     , "imports"   : ["~INCLUDENAME[0].inc"]
     , "includes" :
       [ { "name" : "popCnt16"
         , "extension" : "inc"
-        , "content" :
+        , "template" :
 "// ceiling of log2
 function integer ~INCLUDENAME[0]_clog2;
   input integer value;
@@ -395,7 +123,7 @@ function integer ~INCLUDENAME[0]_depth2Index;
 endfunction"
         }
       ]
-    , "templateD" :
+    , "template" :
 "// popCnt16 begin
 localparam ~GENSYM[width][0] = 16;
 
@@ -434,12 +162,13 @@ assign ~RESULT = $unsigned(~SYM[3][(2*~SYM[0])-2]);
   }
 , { "BlackBox" :
     { "name"      : "GHC.Prim.popCnt32#"
+    , "kind"      : "Declaration"
     , "type"      : "popCnt32# :: Word# -> Word#"
     , "imports"   : ["~INCLUDENAME[0].inc"]
     , "includes" :
       [ { "name" : "popCnt32"
         , "extension" : "inc"
-        , "content" :
+        , "template" :
 "// ceiling of log2
 function integer ~INCLUDENAME[0]_clog2;
   input integer value;
@@ -460,7 +189,7 @@ function integer ~INCLUDENAME[0]_depth2Index;
 endfunction"
         }
       ]
-    , "templateD" :
+    , "template" :
 "// popCnt32 begin
 localparam ~GENSYM[width][0] = 32;
 
@@ -499,12 +228,13 @@ assign ~RESULT = $unsigned(~SYM[3][(2*~SYM[0])-2]);
   }
 , { "BlackBox" :
     { "name"      : "GHC.Prim.popCnt64#"
+    , "kind"      : "Declaration"
     , "type"      : "popCnt64# :: Word# -> Word#"
     , "imports"   : ["~INCLUDENAME[0].inc"]
     , "includes" :
       [ { "name" : "popCnt64"
         , "extension" : "inc"
-        , "content" :
+        , "template" :
 "// ceiling of log2
 function integer ~INCLUDENAME[0]_clog2;
   input integer value;
@@ -525,7 +255,7 @@ function integer ~INCLUDENAME[0]_depth2Index;
 endfunction"
         }
       ]
-    , "templateD" :
+    , "template" :
 "// popCnt64 begin
 localparam ~GENSYM[width][0] = 64;
 
@@ -564,12 +294,13 @@ assign ~RESULT = $unsigned(~SYM[3][(2*~SYM[0])-2]);
   }
 , { "BlackBox" :
     { "name"      : "GHC.Prim.popCnt#"
+    , "kind"      : "Declaration"
     , "type"      : "popCnt8# :: Word# -> Word#"
     , "imports"   : ["~INCLUDENAME[0].inc"]
     , "includes" :
       [ { "name" : "popCnt"
         , "extension" : "inc"
-        , "content" :
+        , "template" :
 "// ceiling of log2
 function integer ~INCLUDENAME[0]_clog2;
   input integer value;
@@ -590,7 +321,7 @@ function integer ~INCLUDENAME[0]_depth2Index;
 endfunction"
         }
       ]
-    , "templateD" :
+    , "template" :
 "// popCnt begin
 localparam ~GENSYM[width][0] = ~SIZE[~TYPO];
 
@@ -629,12 +360,13 @@ assign ~RESULT = $unsigned(~SYM[3][(2*~SYM[0])-2]);
   }
 , { "BlackBox" :
     { "name"      : "GHC.Prim.clz8#"
+    , "kind"      : "Declaration"
     , "type"      : "clz8 :: Word# -> Word#"
     , "imports"   : ["~INCLUDENAME[0].inc"]
     , "includes" :
       [ { "name" : "enc"
         , "extension" : "inc"
-        , "content" :
+        , "template" :
 "function [1:0] ~INCLUDENAME[0];
   input [1:0] a;
   case (a)
@@ -646,7 +378,7 @@ assign ~RESULT = $unsigned(~SYM[3][(2*~SYM[0])-2]);
 endfunction"
         }
       ]
-    , "templateD" :
+    , "template" :
 "// clz8 begin
 wire [0:7] ~GENSYM[v][1];
 assign ~SYM[1] = ~ARG[0][7:0];
@@ -696,12 +428,13 @@ assign ~RESULT = $unsigned(~SYM[7]);
   }
 , { "BlackBox" :
     { "name"      : "GHC.Prim.clz16#"
+    , "kind"      : "Declaration"
     , "type"      : "clz16 :: Word# -> Word#"
     , "imports"   : ["~INCLUDENAME[0].inc"]
     , "includes" :
       [ { "name" : "enc"
         , "extension" : "inc"
-        , "content" :
+        , "template" :
 "function [1:0] ~INCLUDENAME[0];
   input [1:0] a;
   case (a)
@@ -713,7 +446,7 @@ assign ~RESULT = $unsigned(~SYM[7]);
 endfunction"
         }
       ]
-    , "templateD" :
+    , "template" :
 "// clz16 begin
 wire [0:15] ~GENSYM[v][1];
 assign ~SYM[1] = ~ARG[0][15:0];
@@ -779,12 +512,13 @@ assign ~RESULT = $unsigned(~SYM[7]);
   }
 , { "BlackBox" :
     { "name"      : "GHC.Prim.clz32#"
+    , "kind"      : "Declaration"
     , "type"      : "clz32 :: Word# -> Word#"
     , "imports"   : ["~INCLUDENAME[0].inc"]
     , "includes" :
       [ { "name" : "enc"
         , "extension" : "inc"
-        , "content" :
+        , "template" :
 "function [1:0] ~INCLUDENAME[0];
   input [1:0] a;
   case (a)
@@ -796,7 +530,7 @@ assign ~RESULT = $unsigned(~SYM[7]);
 endfunction"
         }
       ]
-    , "templateD" :
+    , "template" :
 "// clz32 begin
 wire [0:31] ~GENSYM[v][1];
 assign ~SYM[1] = ~ARG[0][31:0];
@@ -878,12 +612,13 @@ assign ~RESULT = $unsigned(~SYM[7]);
   }
 , { "BlackBox" :
     { "name"      : "GHC.Prim.clz64#"
+    , "kind"      : "Declaration"
     , "type"      : "clz64 :: Word# -> Word#"
     , "imports"   : ["~INCLUDENAME[0].inc"]
     , "includes" :
       [ { "name" : "enc"
         , "extension" : "inc"
-        , "content" :
+        , "template" :
 "function [1:0] ~INCLUDENAME[0];
   input [1:0] a;
   case (a)
@@ -895,7 +630,7 @@ assign ~RESULT = $unsigned(~SYM[7]);
 endfunction"
         }
       ]
-    , "templateD" :
+    , "template" :
 "// clz64 begin
 wire [0:63] ~GENSYM[v][1];
 assign ~SYM[1] = ~ARG[0][63:0];
@@ -993,12 +728,13 @@ assign ~RESULT = $unsigned(~SYM[7]);
   }
 , { "BlackBox" :
     { "name"      : "GHC.Prim.clz#"
+    , "kind"      : "Declaration"
     , "type"      : "clz :: Word# -> Word#"
     , "imports"   : ["~INCLUDENAME[0].inc"]
     , "includes" :
       [ { "name" : "enc"
         , "extension" : "inc"
-        , "content" :
+        , "template" :
 "function [1:0] ~INCLUDENAME[0];
   input [1:0] a;
   case (a)
@@ -1010,7 +746,7 @@ assign ~RESULT = $unsigned(~SYM[7]);
 endfunction"
         }
       ]
-    , "templateD" :
+    , "template" :
 "// clz begin~IF ~IW64 ~THEN
 wire [0:63] ~GENSYM[v][1];
 assign ~SYM[1] = ~ARG[0][63:0];
@@ -1182,12 +918,13 @@ assign ~RESULT = $unsigned(~SYM[7]);
   }
 , { "BlackBox" :
     { "name"      : "GHC.Prim.ctz8#"
+    , "kind"      : "Declaration"
     , "type"      : "ctz8 :: Word# -> Word#"
     , "imports"   : ["~INCLUDENAME[0].inc"]
     , "includes" :
       [ { "name" : "enc"
         , "extension" : "inc"
-        , "content" :
+        , "template" :
 "function [1:0] ~INCLUDENAME[0];
   input [1:0] a;
   case (a)
@@ -1199,7 +936,7 @@ assign ~RESULT = $unsigned(~SYM[7]);
 endfunction"
         }
       ]
-    , "templateD" :
+    , "template" :
 "// ctz8 begin
 wire [0:7] ~GENSYM[v][1];
 genvar ~GENSYM[k][18];
@@ -1254,12 +991,13 @@ assign ~RESULT = $unsigned(~SYM[7]);
   }
 , { "BlackBox" :
     { "name"      : "GHC.Prim.ctz16#"
+    , "kind"      : "Declaration"
     , "type"      : "ctz16 :: Word# -> Word#"
     , "imports"   : ["~INCLUDENAME[0].inc"]
     , "includes" :
       [ { "name" : "enc"
         , "extension" : "inc"
-        , "content" :
+        , "template" :
 "function [1:0] ~INCLUDENAME[0];
   input [1:0] a;
   case (a)
@@ -1271,7 +1009,7 @@ assign ~RESULT = $unsigned(~SYM[7]);
 endfunction"
         }
       ]
-    , "templateD" :
+    , "template" :
 "// ctz16 begin
 wire [0:15] ~GENSYM[v][1];
 genvar ~GENSYM[k][18];
@@ -1342,12 +1080,13 @@ assign ~RESULT = $unsigned(~SYM[7]);
   }
 , { "BlackBox" :
     { "name"      : "GHC.Prim.ctz32#"
+    , "kind"      : "Declaration"
     , "type"      : "ctz32 :: Word# -> Word#"
     , "imports"   : ["~INCLUDENAME[0].inc"]
     , "includes" :
       [ { "name" : "enc"
         , "extension" : "inc"
-        , "content" :
+        , "template" :
 "function [1:0] ~INCLUDENAME[0];
   input [1:0] a;
   case (a)
@@ -1359,7 +1098,7 @@ assign ~RESULT = $unsigned(~SYM[7]);
 endfunction"
         }
       ]
-    , "templateD" :
+    , "template" :
 "// ctz32 begin
 wire [0:31] ~GENSYM[v][1];
 genvar ~GENSYM[k][18];
@@ -1446,12 +1185,13 @@ assign ~RESULT = $unsigned(~SYM[7]);
   }
 , { "BlackBox" :
     { "name"      : "GHC.Prim.ctz64#"
+    , "kind"      : "Declaration"
     , "type"      : "ctz64 :: Word# -> Word#"
     , "imports"   : ["~INCLUDENAME[0].inc"]
     , "includes" :
       [ { "name" : "enc"
         , "extension" : "inc"
-        , "content" :
+        , "template" :
 "function [1:0] ~INCLUDENAME[0];
   input [1:0] a;
   case (a)
@@ -1463,7 +1203,7 @@ assign ~RESULT = $unsigned(~SYM[7]);
 endfunction"
         }
       ]
-    , "templateD" :
+    , "template" :
 "// ctz64 begin
 wire [0:63] ~GENSYM[v][1];
 genvar ~GENSYM[k][18];
@@ -1566,12 +1306,13 @@ assign ~RESULT = $unsigned(~SYM[7]);
   }
 , { "BlackBox" :
     { "name"      : "GHC.Prim.ctz#"
+    , "kind"      : "Declaration"
     , "type"      : "ctz :: Word# -> Word#"
     , "imports"   : ["~INCLUDENAME[0].inc"]
     , "includes" :
       [ { "name" : "enc"
         , "extension" : "inc"
-        , "content" :
+        , "template" :
 "function [1:0] ~INCLUDENAME[0];
   input [1:0] a;
   case (a)
@@ -1583,7 +1324,7 @@ assign ~RESULT = $unsigned(~SYM[7]);
 endfunction"
         }
       ]
-    , "templateD" :
+    , "template" :
 "// ctz begin~IF ~IW64 ~THEN
 wire [0:63] ~GENSYM[v][1];
 genvar ~GENSYM[k][18];
@@ -1761,117 +1502,6 @@ end
 ~FI
 assign ~RESULT = $unsigned(~SYM[7]);
 // ctz end"
-    }
-  }
-, { "BlackBox" :
-    { "name"      : "GHC.Prim.byteSwap16#"
-    , "type"      : "byteSwap16# :: Word# -> Word#"
-    , "templateD" :
-"// byteSwap16 begin~IF ~IW64 ~THEN
-assign ~RESULT = {~VAR[w][0][63:16],~VAR[w][0][7:0],~VAR[w][0][15:8]};~ELSE
-assign ~RESULT = {~VAR[w][0][31:16],~VAR[w][0][7:0],~VAR[w][0][15:8]};~FI
-// byteSwap16 end"
-    }
-  }
-, { "BlackBox" :
-    { "name"      : "GHC.Prim.byteSwap32#"
-    , "type"      : "byteSwap32# :: Word# -> Word#"
-    , "templateD" :
-"// byteSwap32 begin~IF ~IW64 ~THEN
-assign ~RESULT = {~VAR[w][0][63:32],~VAR[w][0][7:0],~VAR[w][0][15:8],~VAR[w][0][23:16],~VAR[w][0][31:24]};~ELSE
-assign ~RESULT = {~VAR[w][0][7:0],~VAR[w][0][15:8],~VAR[w][0][23:16],~VAR[w][0][31:24]};~FI
-// byteSwap32 end"
-    }
-  }
-, { "BlackBox" :
-    { "name"      : "GHC.Prim.byteSwap64#"
-    , "type"      : "byteSwap64# :: Word# -> Word#"
-    , "templateD" :
-"// byteSwap64 begin
-assign ~RESULT = {~VAR[w][0][7:0],~VAR[w][0][15:8],~VAR[w][0][23:16],~VAR[w][0][31:24]
-                 ,~VAR[w][0][39:32],~VAR[w][0][47:40],~VAR[w][0][55:48],~VAR[w][0][63:56]};
-// byteSwap64 end"
-    }
-  }
-, { "BlackBox" :
-    { "name"      : "GHC.Prim.byteSwap#"
-    , "type"      : "byteSwap# :: Word# -> Word#"
-    , "templateD" :
-"// byteSwap begin~IF ~IW64 ~THEN
-assign ~RESULT = {~VAR[w][0][7:0],~VAR[w][0][15:8],~VAR[w][0][23:16],~VAR[w][0][31:24]
-                 ,~VAR[w][0][39:32],~VAR[w][0][47:40],~VAR[w][0][55:48],~VAR[w][0][63:56]};~ELSE
-assign ~RESULT = {~VAR[w][0][7:0],~VAR[w][0][15:8],~VAR[w][0][23:16],~VAR[w][0][31:24]};~FI
-// byteSwap end"
-    }
-  }
-, { "BlackBox" :
-    { "name"      : "GHC.Prim.narrow8Int#"
-    , "type"      : "narrow8Int# :: Int# -> Int#"
-    , "templateD" :
-"// narrow8Int begin
-assign ~RESULT = $signed(~VAR[i][0][7:0]);
-// narrow8Int end"
-    }
-  }
-, { "BlackBox" :
-    { "name"      : "GHC.Prim.narrow16Int#"
-    , "type"      : "narrow16Int# :: Int# -> Int#"
-    , "templateD" :
-"// narrow16Int begin
-assign ~RESULT = $signed(~VAR[i][0][15:0]);
-// narrow16Int end"
-    }
-  }
-, { "BlackBox" :
-    { "name"      : "GHC.Prim.narrow32Int#"
-    , "type"      : "narrow32Int# :: Int# -> Int#"
-    , "templateD" :
-"// narrow32Int begin
-assign ~RESULT = $signed(~VAR[i][0][31:0]);
-// narrow32Int end"
-    }
-  }
-, { "BlackBox" :
-    { "name"      : "GHC.Prim.narrow8Word#"
-    , "type"      : "narrow8Int# :: Word# -> Word#"
-    , "templateD" :
-"// narrow8Word begin
-assign ~RESULT = $unsigned(~VAR[w][0][7:0]);
-// narrow8Word end"
-    }
-  }
-, { "BlackBox" :
-    { "name"      : "GHC.Prim.narrow16Word#"
-    , "type"      : "narrow16Word# :: Word# -> Word#"
-    , "templateD" :
-"// narrow16Word begin
-assign ~RESULT = $unsigned(~VAR[w][0][15:0]);
-// narrow16Word end"
-    }
-  }
-, { "BlackBox" :
-    { "name"      : "GHC.Prim.narrow32Word#"
-    , "type"      : "narrow32Int# :: Word# -> Word#"
-    , "templateD" :
-"// narrow32Word begin
-assign ~RESULT = $unsigned(~VAR[w][0][31:0]);
-// narrow32Word end"
-    }
-  }
-, { "Primitive" :
-    { "name"     : "GHC.Prim.dataToTag#"
-    , "primType" : "Function"
-    }
-  }
-, { "Primitive" :
-    { "name"     : "GHC.Prim.tagToEnum#"
-    , "primType" : "Function"
-    }
-  }
-, { "BlackBox" :
-    { "name"      : "GHC.Prim.unsafeCoerce#"
-    , "type"      : "unsafeCoerce# :: a -> b"
-    , "templateE" : "~ARG[0]"
     }
   }
 ]

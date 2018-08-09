@@ -8,6 +8,7 @@
   Functions to create BlackBox Contexts and fill in BlackBox templates
 -}
 
+{-# LANGUAGE LambdaCase        #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecordWildCards   #-}
 {-# LANGUAGE TemplateHaskell   #-}
@@ -17,7 +18,7 @@
 module Clash.Netlist.BlackBox where
 
 import           Control.Exception             (throw)
-import           Control.Lens                  ((.=),(<<%=))
+import           Control.Lens                  ((<<%=))
 import qualified Control.Lens                  as Lens
 import           Data.Char                     (ord)
 import           Data.Either                   (lefts)
@@ -48,6 +49,7 @@ import           Clash.Driver.Types            (ClashException (..))
 import {-# SOURCE #-} Clash.Netlist
   (genComponent, mkDcApplication, mkDeclarations, mkExpr, mkNetDecl,
    mkProjection, mkSelection)
+import qualified Clash.Backend                 as Backend
 import           Clash.Netlist.BlackBox.Types  as B
 import           Clash.Netlist.BlackBox.Util   as B
 import           Clash.Netlist.Id              (IdType (..))
@@ -57,10 +59,14 @@ import           Clash.Normalize.Util          (isConstant)
 import           Clash.Primitives.Types        as P
 import           Clash.Util
 
+
 -- | Generate the context for a BlackBox instantiation.
-mkBlackBoxContext :: Id -- ^ Identifier binding the primitive/blackbox application
-                  -> [Term] -- ^ Arguments of the primitive/blackbox application
-                  -> NetlistMonad (BlackBoxContext,[Declaration])
+mkBlackBoxContext
+  :: Id
+  -- ^ Identifier binding the primitive/blackbox application
+  -> [Term]
+  -- ^ Arguments of the primitive/blackbox application
+  -> NetlistMonad (BlackBoxContext,[Declaration])
 mkBlackBoxContext resId args = do
     -- Make context inputs
     tcm             <- Lens.use tcCache
@@ -73,8 +79,9 @@ mkBlackBoxContext resId args = do
     resTy <- unsafeCoreTypeToHWTypeM $(curLoc) (unembed $ V.varType resId)
 
     lvl <- Lens.use curBBlvl
+    (nm,_) <- Lens.use curCompNm
 
-    return ( Context (res,resTy) imps funs [] lvl
+    return ( Context (res,resTy) imps funs [] lvl nm
            , concat impDecls ++ concat funDecls
            )
   where
@@ -88,29 +95,34 @@ mkBlackBoxContext resId args = do
                  return (im',d)
          else return (im,[])
 
-prepareBlackBox :: TextS.Text
-                -> BlackBoxTemplate
-                -> BlackBoxContext
-                -> NetlistMonad (BlackBoxTemplate,[Declaration])
+prepareBlackBox
+  :: TextS.Text
+  -> BlackBox
+  -> BlackBoxContext
+  -> NetlistMonad (BlackBox,[Declaration])
 prepareBlackBox pNm templ bbCtx =
   if verifyBlackBoxContext bbCtx templ
      then do
-        t1 <- instantiateCompName templ
-        (t2,decls) <- setSym bbCtx t1
-        t3 <- collectFilePaths bbCtx t2
-        return (t3,decls)
+        (t2,decls) <- onBlackBox (fmap (first BBTemplate) . setSym bbCtx)
+                                 (pure . (,[]) . BBFunction)
+                                 templ
+        return (t2,decls)
      else do
        (_,sp) <- Lens.use curCompNm
-       templ' <- getMon (prettyBlackBox templ)
+       templ' <- onBlackBox (getMon . prettyBlackBox)
+                            (const (pure "TemplateFunction"))
+                            templ
        let msg = $(curLoc) ++ "Can't match template for " ++ show pNm ++ " :\n\n" ++ Text.unpack templ' ++
                 "\n\nwith context:\n\n" ++ show bbCtx
        throw (ClashException sp msg Nothing)
 
-mkArgument :: Identifier -- ^ LHS of the original let-binder
-           -> Term
-           -> NetlistMonad ( (Expr,HWType,Bool)
-                           , [Declaration]
-                           )
+mkArgument
+  :: Identifier
+  -- ^ LHS of the original let-binder
+  -> Term
+  -> NetlistMonad ( (Expr,HWType,Bool)
+                  , [Declaration]
+                  )
 mkArgument bndr e = do
     tcm   <- Lens.use tcCache
     ty    <- termType tcm e
@@ -147,98 +159,128 @@ mkArgument bndr e = do
                   ,hwTy,False),[])
     return ((e',t,l),d)
 
-mkPrimitive :: Bool -- ^ Put BlackBox expression in parenthesis
-            -> Bool -- ^ Treat BlackBox expression as declaration
-            -> (Either Identifier Id) -- ^ Id to assign the result to
-            -> TextS.Text
-            -> [Either Term Type]
-            -> Type
-            -> NetlistMonad (Expr,[Declaration])
+mkPrimitive
+  :: Bool
+  -- ^ Put BlackBox expression in parenthesis
+  -> Bool
+  -- ^ Treat BlackBox expression as declaration
+  -> (Either Identifier Id)
+  -- ^ Id to assign the result to
+  -> TextS.Text
+  -- ^ Name of primitive
+  -> [Either Term Type]
+  -- ^ Arguments
+  -> Type
+  -- ^ Result type
+  -> NetlistMonad (Expr,[Declaration])
 mkPrimitive bbEParen bbEasD dst nm args ty = do
-  bbM <- HashMap.lookup nm <$> Lens.use primitives
-  case bbM of
-    Just p@(P.BlackBox {outputReg = wr}) -> do
-      case template p of
-        (Left tempD) -> do
-          let pNm = name p
-              wr' = if wr then Reg else Wire
-          resM <- resBndr True wr' dst
-          case resM of
-            Just (dst',dstNm,dstDecl) -> do
-              (bbCtx,ctxDcls)   <- mkBlackBoxContext dst' (lefts args)
-              (templ,templDecl) <- prepareBlackBox pNm tempD bbCtx
-              let bbDecl = N.BlackBoxD pNm (libraries p) (imports p)
-                                       (includes p) templ bbCtx
-              return (Identifier dstNm Nothing,dstDecl ++ ctxDcls ++ templDecl ++ [bbDecl])
-            Nothing -> return (Identifier "__VOID__" Nothing,[])
-        (Right tempE) -> do
-          let pNm = name p
-          if bbEasD
-            then do
-              resM <- resBndr True Wire dst
+  go =<< HashMap.lookup nm <$> Lens.use primitives
+  where
+    go =
+      \case
+        Just (P.BlackBoxHaskell bbName funcName func) ->
+          case func bbEasD dst nm args ty of
+            Left err -> do
+              -- Blackbox template function returned an error:
+              let err' = unwords [ $(curLoc) ++ "Could not create blackbox"
+                                 , "template using", show funcName, "for"
+                                 , show bbName ++ ".", "Function reported: \n\n"
+                                 , err ]
+              (_,sp) <- Lens.use curCompNm
+              throw (ClashException sp err' Nothing)
+            Right ((BlackBoxMeta {..}), bbTemplate) ->
+              -- Blackbox template generation succesful. Rerun 'go', but this time
+              -- around with a 'normal' @BlackBox@
+              go (Just (P.BlackBox bbName bbKind bbOutputReg bbLibrary bbImports bbIncludes bbTemplate))
+              -- let bb = P.BlackBox bbName bbKind bbOutputReg bbLibrary bbImports bbIncludes in
+              -- go $ Just $ bb $ (const bbTemplate) <$> func
+        Just p@(P.BlackBox {outputReg = wr}) -> do
+          case kind p of
+            TDecl -> do
+              let tempD = template p
+                  pNm = name p
+                  wr' = if wr then Reg else Wire
+              resM <- resBndr True wr' dst
               case resM of
                 Just (dst',dstNm,dstDecl) -> do
-                  (bbCtx,ctxDcls)     <- mkBlackBoxContext dst' (lefts args)
-                  (bbTempl,templDecl) <- prepareBlackBox pNm tempE bbCtx
-                  let tmpAssgn = Assignment dstNm
-                                    (BlackBoxE pNm (libraries p) (imports p)
-                                               (includes p) bbTempl bbCtx
-                                               bbEParen)
-                  return (Identifier dstNm Nothing, dstDecl ++ ctxDcls ++ templDecl ++ [tmpAssgn])
+                  (bbCtx,ctxDcls)   <- mkBlackBoxContext dst' (lefts args)
+                  (templ,templDecl) <- prepareBlackBox pNm tempD bbCtx
+                  let bbDecl = N.BlackBoxD pNm (libraries p) (imports p)
+                                           (includes p) templ bbCtx
+                  return (Identifier dstNm Nothing,dstDecl ++ ctxDcls ++ templDecl ++ [bbDecl])
                 Nothing -> return (Identifier "__VOID__" Nothing,[])
-            else do
-              resM <- resBndr False Wire dst
-              case resM of
-                Just (dst',_,_) -> do
-                  (bbCtx,ctxDcls)     <- mkBlackBoxContext dst' (lefts args)
-                  (bbTempl,templDecl) <- prepareBlackBox pNm tempE bbCtx
-                  return (BlackBoxE pNm (libraries p) (imports p) (includes p) bbTempl bbCtx bbEParen,ctxDcls ++ templDecl)
-                Nothing -> return (Identifier "__VOID__" Nothing,[])
-    Just (P.Primitive pNm _)
-      | pNm == "GHC.Prim.tagToEnum#" -> do
-          hwTy <- N.unsafeCoreTypeToHWTypeM $(curLoc) ty
-          case args of
-            [Right (ConstTy (TyCon tcN)), Left (C.Literal (IntLiteral i))] -> do
-              tcm <- Lens.use tcCache
-              let dcs = tyConDataCons (tcm HashMap.! nameOcc tcN)
-                  dc  = dcs !! fromInteger i
-              (exprN,dcDecls) <- mkDcApplication hwTy dst dc []
-              return (exprN,dcDecls)
-            [Right _, Left scrut] -> do
-              tcm     <- Lens.use tcCache
-              scrutTy <- termType tcm scrut
-              (scrutExpr,scrutDecls) <- mkExpr False (Left "#tte_rhs") scrutTy scrut
-              case scrutExpr of
-                Identifier id_ Nothing -> return (DataTag hwTy (Left id_),scrutDecls)
-                _ -> do
-                  scrutHTy <- unsafeCoreTypeToHWTypeM $(curLoc) scrutTy
-                  tmpRhs <- mkUniqueIdentifier Extended (pack "#tte_rhs")
-                  let netDeclRhs   = NetDecl Nothing tmpRhs scrutHTy
-                      netAssignRhs = Assignment tmpRhs scrutExpr
-                  return (DataTag hwTy (Left tmpRhs),[netDeclRhs,netAssignRhs] ++ scrutDecls)
-            _ -> error $ $(curLoc) ++ "tagToEnum: " ++ show (map (either showDoc showDoc) args)
-      | pNm == "GHC.Prim.dataToTag#" -> case args of
-          [Right _,Left (Data dc)] -> do
-            iw <- Lens.use intWidth
-            return (N.Literal (Just (Signed iw,iw)) (NumLit $ toInteger $ dcTag dc - 1),[])
-          [Right _,Left scrut] -> do
-            tcm      <- Lens.use tcCache
-            scrutTy  <- termType tcm scrut
-            scrutHTy <- unsafeCoreTypeToHWTypeM $(curLoc) scrutTy
-            (scrutExpr,scrutDecls) <- mkExpr False (Left "#dtt_rhs") scrutTy scrut
-            case scrutExpr of
-              Identifier id_ Nothing -> return (DataTag scrutHTy (Right id_),scrutDecls)
-              _ -> do
-                tmpRhs  <- mkUniqueIdentifier Extended "#dtt_rhs"
-                let netDeclRhs   = NetDecl Nothing tmpRhs scrutHTy
-                    netAssignRhs = Assignment tmpRhs scrutExpr
-                return (DataTag scrutHTy (Right tmpRhs),[netDeclRhs,netAssignRhs] ++ scrutDecls)
-          _ -> error $ $(curLoc) ++ "dataToTag: " ++ show (map (either showDoc showDoc) args)
-      | otherwise -> return (BlackBoxE "" [] [] [] [C $ mconcat ["NO_TRANSLATION_FOR:",fromStrict pNm]] emptyBBContext False,[])
-    _ -> do
-      (_,sp) <- Lens.use curCompNm
-      throw (ClashException sp ($(curLoc) ++ "No blackbox found for: " ++ unpack nm) Nothing)
-  where
+            TExpr -> do
+              let tempE = template p
+                  pNm = name p
+              if bbEasD
+                then do
+                  resM <- resBndr True Wire dst
+                  case resM of
+                    Just (dst',dstNm,dstDecl) -> do
+                      (bbCtx,ctxDcls)     <- mkBlackBoxContext dst' (lefts args)
+                      (bbTempl,templDecl) <- prepareBlackBox pNm tempE bbCtx
+                      let tmpAssgn = Assignment dstNm
+                                        (BlackBoxE pNm (libraries p) (imports p)
+                                                   (includes p) bbTempl bbCtx
+                                                   bbEParen)
+                      return (Identifier dstNm Nothing, dstDecl ++ ctxDcls ++ templDecl ++ [tmpAssgn])
+                    Nothing -> return (Identifier "__VOID__" Nothing,[])
+                else do
+                  resM <- resBndr False Wire dst
+                  case resM of
+                    Just (dst',_,_) -> do
+                      (bbCtx,ctxDcls)     <- mkBlackBoxContext dst' (lefts args)
+                      (bbTempl,templDecl) <- prepareBlackBox pNm tempE bbCtx
+                      return (BlackBoxE pNm (libraries p) (imports p) (includes p) bbTempl bbCtx bbEParen,ctxDcls ++ templDecl)
+                    Nothing -> return (Identifier "__VOID__" Nothing,[])
+        Just (P.Primitive pNm _)
+          | pNm == "GHC.Prim.tagToEnum#" -> do
+              hwTy <- N.unsafeCoreTypeToHWTypeM $(curLoc) ty
+              case args of
+                [Right (ConstTy (TyCon tcN)), Left (C.Literal (IntLiteral i))] -> do
+                  tcm <- Lens.use tcCache
+                  let dcs = tyConDataCons (tcm HashMap.! nameOcc tcN)
+                      dc  = dcs !! fromInteger i
+                  (exprN,dcDecls) <- mkDcApplication hwTy dst dc []
+                  return (exprN,dcDecls)
+                [Right _, Left scrut] -> do
+                  tcm     <- Lens.use tcCache
+                  scrutTy <- termType tcm scrut
+                  (scrutExpr,scrutDecls) <- mkExpr False (Left "#tte_rhs") scrutTy scrut
+                  case scrutExpr of
+                    Identifier id_ Nothing -> return (DataTag hwTy (Left id_),scrutDecls)
+                    _ -> do
+                      scrutHTy <- unsafeCoreTypeToHWTypeM $(curLoc) scrutTy
+                      tmpRhs <- mkUniqueIdentifier Extended (pack "#tte_rhs")
+                      let netDeclRhs   = NetDecl Nothing tmpRhs scrutHTy
+                          netAssignRhs = Assignment tmpRhs scrutExpr
+                      return (DataTag hwTy (Left tmpRhs),[netDeclRhs,netAssignRhs] ++ scrutDecls)
+                _ -> error $ $(curLoc) ++ "tagToEnum: " ++ show (map (either showDoc showDoc) args)
+          | pNm == "GHC.Prim.dataToTag#" -> case args of
+              [Right _,Left (Data dc)] -> do
+                iw <- Lens.use intWidth
+                return (N.Literal (Just (Signed iw,iw)) (NumLit $ toInteger $ dcTag dc - 1),[])
+              [Right _,Left scrut] -> do
+                tcm      <- Lens.use tcCache
+                scrutTy  <- termType tcm scrut
+                scrutHTy <- unsafeCoreTypeToHWTypeM $(curLoc) scrutTy
+                (scrutExpr,scrutDecls) <- mkExpr False (Left "#dtt_rhs") scrutTy scrut
+                case scrutExpr of
+                  Identifier id_ Nothing -> return (DataTag scrutHTy (Right id_),scrutDecls)
+                  _ -> do
+                    tmpRhs  <- mkUniqueIdentifier Extended "#dtt_rhs"
+                    let netDeclRhs   = NetDecl Nothing tmpRhs scrutHTy
+                        netAssignRhs = Assignment tmpRhs scrutExpr
+                    return (DataTag scrutHTy (Right tmpRhs),[netDeclRhs,netAssignRhs] ++ scrutDecls)
+              _ -> error $ $(curLoc) ++ "dataToTag: " ++ show (map (either showDoc showDoc) args)
+          | otherwise ->
+              return (BlackBoxE "" [] [] []
+                        (BBTemplate [C $ mconcat ["NO_TRANSLATION_FOR:",fromStrict pNm]])
+                        emptyBBContext False,[])
+        _ -> do
+          (_,sp) <- Lens.use curCompNm
+          throw (ClashException sp ($(curLoc) ++ "No blackbox found for: " ++ unpack nm) Nothing)
+
     resBndr
       :: Bool
       -> WireOrReg
@@ -272,11 +314,11 @@ mkFunInput
   -> Term
   -- ^ The function argument term
   -> NetlistMonad
-      ((Either BlackBoxTemplate (Identifier,[Declaration])
+      ((Either BlackBox (Identifier,[Declaration])
        ,WireOrReg
        ,[BlackBoxTemplate]
        ,[BlackBoxTemplate]
-       ,[((TextS.Text,TextS.Text),BlackBoxTemplate)]
+       ,[((TextS.Text,TextS.Text),BlackBox)]
        ,BlackBoxContext)
       ,[Declaration])
 mkFunInput resId e = do
@@ -287,7 +329,7 @@ mkFunInput resId e = do
               bbM <- fmap (HashMap.lookup nm) $ Lens.use primitives
               (_,sp) <- Lens.use curCompNm
               let templ = case bbM of
-                            Just (P.BlackBox {..}) -> Left (outputReg,libraries,imports,includes,template)
+                            Just (P.BlackBox {..}) -> Left (kind,outputReg,libraries,imports,includes,nm,template)
                             _ -> throw (ClashException sp ($(curLoc) ++ "No blackbox found for: " ++ unpack nm) Nothing)
               return templ
             Data dc -> do
@@ -329,26 +371,44 @@ mkFunInput resId e = do
               normalized <- Lens.use bindings
               case HashMap.lookup fun normalized of
                 Just _ -> do
-                  (_,Component compName compInps [snd -> compOutp] _) <- preserveVarEnv $ genComponent fun
+                  (_,_,Component compName compInps [snd -> compOutp] _) <- preserveVarEnv $ genComponent fun
                   let inpAssigns    = zipWith (\(i,t) e' -> (Identifier i Nothing,In,t,e')) compInps [ Identifier (pack ("~ARG[" ++ show x ++ "]")) Nothing | x <- [(0::Int)..] ]
                       outpAssign    = (Identifier (fst compOutp) Nothing,Out,snd compOutp,Identifier (pack "~RESULT") Nothing)
                   i <- varCount <<%= (+1)
                   let instLabel     = Text.concat [compName,pack ("_" ++ show i)]
-                      instDecl      = InstDecl Nothing compName instLabel (outpAssign:inpAssigns)
+                      instDecl      = InstDecl Entity Nothing compName instLabel (outpAssign:inpAssigns)
                   return (Right (("",[instDecl]),Wire))
                 Nothing -> error $ $(curLoc) ++ "Cannot make function input for: " ++ showDoc e
             C.Lam _ -> go 0 appE
             _ -> error $ $(curLoc) ++ "Cannot make function input for: " ++ showDoc e
   case templ of
-    Left (oreg,libs,imps,inc,Left templ') -> do
-      l   <- instantiateCompName templ'
-      (l',templDecl)  <- setSym bbCtx l
-      l'' <- collectFilePaths bbCtx l'
-      return ((Left l'',if oreg then Reg else Wire,libs,imps,inc,bbCtx),dcls ++ templDecl)
-    Left (_,libs,imps,inc,Right templ') -> do
-      templ'' <- getMon $ prettyBlackBox templ'
-      let ass = Assignment (pack "~RESULT") (Identifier templ'' Nothing)
-      return ((Right ("",[ass]),Wire,libs,imps,inc,bbCtx),dcls)
+    Left (TDecl,oreg,libs,imps,inc,_,templ') -> do
+      (l',templDecl)  <- onBlackBox (fmap (first BBTemplate) . setSym bbCtx)
+                                    (pure . (,[]) . BBFunction)
+                                    templ'
+      return ((Left l',if oreg then Reg else Wire,libs,imps,inc,bbCtx),dcls ++ templDecl)
+    Left (TExpr,_,libs,imps,inc,nm,templ') -> do
+      onBlackBox
+        (\t -> do t' <- getMon (prettyBlackBox t)
+                  let assn = Assignment (pack "~RESULT") (Identifier t' Nothing)
+                  return ((Right ("",[assn]),Wire,libs,imps,inc,bbCtx),dcls))
+        (\(TemplateFunction k g _) -> do
+          let f' bbCtx' = do
+                let assn = Assignment (pack "~RESULT")
+                            (BlackBoxE nm libs imps inc templ' bbCtx' False)
+                p <- getMon (Backend.blockDecl "" [assn])
+                return p
+          return ((Left (BBFunction (TemplateFunction k g f'))
+                  ,Wire
+                  ,[]
+                  ,[]
+                  ,[]
+                  ,bbCtx
+                  )
+                 ,dcls
+                 )
+        )
+        templ'
     Right (decl,wr) ->
       return ((Right decl,wr,[],[],[],bbCtx),dcls)
   where
@@ -410,27 +470,3 @@ mkFunInput resId e = do
                   | otherwise        = id_
 
     go _ e' = error $ $(curLoc) ++ "Cannot make function input for: " ++ showDoc e'
-
-
-instantiateCompName :: BlackBoxTemplate
-                    -> NetlistMonad BlackBoxTemplate
-instantiateCompName l = do
-  (nm,_) <- Lens.use curCompNm
-  return (setCompName nm l)
-
-collectFilePaths
-    :: BlackBoxContext
-    -> BlackBoxTemplate
-    -> NetlistMonad BlackBoxTemplate
-collectFilePaths bbCtx elements = do
-  -- Files included using ~FILEPATH
-  files  <- Lens.use dataFiles
-  let (files',elements') = findAndSetDataFiles bbCtx files elements
-  dataFiles .= files'
-
-  -- Files generated by using ~TEMPLATE
-  memFiles <- Lens.use memoryDataFiles
-  let (memFiles',elements'') = findAndSetMemoryDataFiles bbCtx memFiles elements'
-  memoryDataFiles .= memFiles'
-
-  return elements''

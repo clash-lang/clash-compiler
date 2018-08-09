@@ -167,5 +167,8 @@ column = fmap PP.column
 nesting :: Functor f => f (Int -> Doc) -> f Doc
 nesting = fmap PP.nesting
 
+flatAlt :: Applicative f => f Doc -> f Doc -> f Doc
+flatAlt = liftA2 PP.flatAlt
+
 instance Applicative f => IsString (f Doc) where
   fromString = string . fromString

@@ -1,105 +1,8 @@
 [ { "BlackBox" :
-    { "name"      : "Clash.Sized.Internal.Signed.size#"
-    , "type"      : "size# :: KnownNat n => Signed n -> Int"
-    , "templateE" : "~SIZE[~TYPO]'sd~LIT[0]"
-    }
-  }
-, { "BlackBox" :
-    { "name"      : "Clash.Sized.Internal.Signed.pack#"
-    , "type"      : "pack# :: KnownNat n => Signed n -> BitVector n"
-    , "templateE" : "$unsigned(~ARG[1])"
-    }
-  }
-, { "BlackBox" :
-    { "name"      : "Clash.Sized.Internal.Signed.unpack#"
-    , "type"      : "unpack# :: KnownNat n => BitVector n -> Signed n"
-    , "templateE" : "$signed(~ARG[1])"
-    }
-  }
-, { "BlackBox" :
-    { "name"      : "Clash.Sized.Internal.Signed.minBound#"
-    , "type"      : "minBound# :: KnownNat n => Signed n"
-    , "comment"   : "Generates incorrect SV for n=0"
-    , "templateE" : "$signed({1'b1, {(~LIT[0]-1) {1'b0}}})"
-    }
-  }
-, { "BlackBox" :
-    { "name"      : "Clash.Sized.Internal.Signed.maxBound#"
-    , "type"      : "maxBound# :: KnownNat n => Signed n"
-    , "comment"   : "Generates incorrect SV for n=0"
-    , "templateE" : "$signed({1'b0, {(~LIT[0]-1) {1'b1}}})"
-    }
-  }
-, { "BlackBox" :
-    { "name"      : "Clash.Sized.Internal.Signed.+#"
-    , "type"      : "(+#) :: KnownNat n => Signed n -> Signed n -> Signed n"
-    , "templateE" : "~ARG[1] + ~ARG[2]"
-    }
-  }
-, { "BlackBox" :
-    { "name"      : "Clash.Sized.Internal.Signed.-#"
-    , "type"      : "(-#) :: KnownNat n => Signed n -> Signed n -> Signed n"
-    , "templateE" : "~ARG[1] - ~ARG[2]"
-    }
-  }
-, { "BlackBox" :
-    { "name"      : "Clash.Sized.Internal.Signed.*#"
-    , "type"      : "(*#) :: KnownNat n => Signed n -> Signed n -> Signed n"
-    , "templateE" : "~ARG[1] * ~ARG[2]"
-    }
-  }
-, { "BlackBox" :
-    { "name"      : "Clash.Sized.Internal.Signed.negate#"
-    , "type"      : "negate# :: KnownNat n => Signed n -> Signed n"
-    , "templateE" : "-~ARG[1]"
-    }
-  }
-, { "BlackBox" :
-    { "name"      : "Clash.Sized.Internal.Signed.abs#"
-    , "type"      : "abs# :: KnownNat n => Signed n -> Signed n"
-    , "templateE" : "(~ARG[1] < ~LIT[0]'sd0) ? -~ARG[1] : ~ARG[1]"
-    }
-  }
-, { "BlackBox" :
-    { "name"      : "Clash.Sized.Internal.Signed.fromInteger#"
-    , "type"      : "fromInteger# :: KnownNat n => Integer -> Signed (n :: Nat)"
-    , "templateE" : "$signed(~ARG[1][(~LIT[0]-1):0])"
-    }
-  }
-, { "BlackBox" :
-    { "name"      : "Clash.Sized.Internal.Signed.plus#"
-    , "type"      : "plus# :: Signed m -> Signed n -> Signed (1 + Max m n)"
-    , "templateD" : "assign ~RESULT = ~ARG[0] + ~ARG[1];"
-    }
-  }
-, { "BlackBox" :
-    { "name"      : "Clash.Sized.Internal.Signed.minus#"
-    , "type"      : "minus# :: Signed m -> Signed n -> Signed (1 + Max m n)"
-    , "templateD" : "assign ~RESULT = ~ARG[0] - ~ARG[1];"
-    }
-  }
-, { "BlackBox" :
-    { "name"      : "Clash.Sized.Internal.Signed.times#"
-    , "type"      : "times# :: Signed m -> Signed n -> Signed (m + n)"
-    , "templateD" : "assign ~RESULT = ~ARG[0] * ~ARG[1];"
-    }
-  }
-, { "BlackBox" :
-    { "name"      : "Clash.Sized.Internal.Signed.quot#"
-    , "type"      : "quot# :: Signed n -> Signed n -> Signed n"
-    , "templateE" : "~ARG[0] / ~ARG[1]"
-    }
-  }
-, { "BlackBox" :
-    { "name"      : "Clash.Sized.Internal.Signed.rem#"
-    , "type"      : "rem# :: Signed n -> Signed n -> Signed n"
-    , "templateE" : "~ARG[0] % ~ARG[1]"
-    }
-  }
-, { "BlackBox" :
     { "name"      : "Clash.Sized.Internal.Signed.div#"
+    , "kind"      : "Declaration"
     , "type"      : "div# :: Signed n -> Signed n -> Signed n"
-    , "templateD" :
+    , "template"  :
 "// divSigned begin
 // divide (rounds towards zero)
 wire ~SIGD[~GENSYM[quot_res][0]][1];
@@ -112,8 +15,9 @@ assign ~RESULT = (~VAR[dividend][1][~LIT[0]-1] == ~VAR[divider][2][~LIT[0]-1]) ?
   }
 , { "BlackBox" :
     { "name"      : "Clash.Sized.Internal.Signed.mod#"
+    , "kind"      : "Declaration"
     , "type"      : "mod# :: Signed n -> Signed n -> Signed n"
-    , "templateD" :
+    , "template"  :
 "// modSigned begin
 // remainder
 ~SIGD[~GENSYM[rem_res][0]][0];
@@ -127,45 +31,10 @@ assign ~RESULT = (~VAR[dividend][0][~SIZE[~TYPO]-1] == ~VAR[divider][1][~SIZE[~T
     }
   }
 , { "BlackBox" :
-    { "name"      : "Clash.Sized.Internal.Signed.and#"
-    , "type"      : "and# :: KnownNat n => Signed n -> Signed n -> Signed n"
-    , "templateE" : "~ARG[1] & ~ARG[2]"
-    }
-  }
-, { "BlackBox" :
-    { "name"      : "Clash.Sized.Internal.Signed.or#"
-    , "type"      : "or# :: KnownNat n => Signed n -> Signed n -> Signed n"
-    , "templateE" : "~ARG[1] | ~ARG[2]"
-    }
-  }
-, { "BlackBox" :
-    { "name"      : "Clash.Sized.Internal.Signed.xor#"
-    , "type"      : "xor# :: KnownNat n => Signed n -> Signed n -> Signed n"
-    , "templateE" : "~ARG[1] ^ ~ARG[2]"
-    }
-  }
-, { "BlackBox" :
-    { "name"      : "Clash.Sized.Internal.Signed.complement#"
-    , "type"      : "complement# :: KnownNat n => Signed n -> Signed n"
-    , "templateE" : "~ ~ARG[1]"
-    }
-  }
-, { "BlackBox" :
-    { "name"      : "Clash.Sized.Internal.Signed.shiftL#"
-    , "type"      : "shiftL# :: KnownNat n => Signed n -> Int -> Signed n"
-    , "templateE" : "~ARG[1] <<< ~ARG[2]"
-    }
-  }
-, { "BlackBox" :
-    { "name"      : "Clash.Sized.Internal.Signed.shiftR#"
-    , "type"      : "shiftR# :: KnownNat n => Signed n -> Int -> Signed n"
-    , "templateE" : "~ARG[1] >>> ~ARG[2]"
-    }
-  }
-, { "BlackBox" :
     { "name"      : "Clash.Sized.Internal.Signed.rotateL#"
+    , "kind"      : "Declaration"
     , "type"      : "rotateL# :: KnownNat n => Signed n -> Int -> Signed n"
-    , "templateD" :
+    , "template"  :
 "// rotateL begin
 wire [2*~LIT[0]-1:0] ~SYM[0];
 assign ~SYM[0] = {~ARG[1],~ARG[1]} << ~ARG[2];
@@ -175,19 +44,14 @@ assign ~RESULT = $signed(~SYM[0][~LIT[0]-1 : 0]);
   }
 , { "BlackBox" :
     { "name"      : "Clash.Sized.Internal.Signed.rotateR#"
+    , "kind"      : "Declaration"
     , "type"      : "rotateR# :: KnownNat n => Signed n -> Int -> Signed n"
-    , "templateD" :
+    , "template"  :
 "// rotateR begin
 wire [2*~LIT[0]-1:0] ~GENSYM[s][0];
 assign ~SYM[0] = {~ARG[1],~ARG[1]} >> ~ARG[2];
 assign ~RESULT = $signed(~SYM[0][~LIT[0]-1 : 0]);
 // rotateR end"
-    }
-  }
-, { "BlackBox" :
-    { "name"      : "Clash.Sized.Internal.Signed.truncateB#"
-    , "type"      : "truncateB# :: KnownNat m => Signed (n + m) -> Signed m"
-    , "templateD" : "assign ~RESULT = $signed(~ARG[1]);"
     }
   }
 ]
