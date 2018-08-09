@@ -41,11 +41,12 @@ assign ~RESULT = ~ARG[7];
     , "template" :
 "// assertBitVector begin
 // pragma translate_off
-wire ~TYP[5] ~GENSYM[maskOr][0] = ~ARG[5] ^ ~ARG[5];
-wire ~TYP[5] ~GENSYM[maskAnd][1] = ~ ~SYM[0];
+wire ~TYP[5] ~GENSYM[maskXor][0]  = ~ARG[5] ^ ~ARG[5];
+wire ~TYP[5] ~GENSYM[checked][1]  = ~ARG[4] ^ ~SYM[0];
+wire ~TYP[5] ~GENSYM[expected][2] = ~ARG[5] ^ ~SYM[0];
 
 always @(posedge ~IF ~ISGATED[1] ~THEN ~ARG[1][1] ~ELSE ~ARG[1] ~FI~IF ~ISSYNC[2] ~THEN ~ELSE or negedge ~ARG[2]~FI) begin
-  if ((~SYM[1] & ~ARG[4] | ~SYM[0]) !== (~SYM[1] & ~ARG[5] | ~SYM[0])) begin
+  if (~SYM[1] !== ~SYM[2]) begin
     $display(\"@%0tns: %s, expected: %b, actual: %b\", $time, ~LIT[3], ~TOBV[~ARG[5]][~TYP[5]], ~TOBV[~ARG[4]][~TYP[4]]);
     $stop;
   end

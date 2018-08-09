@@ -57,9 +57,6 @@ end block;
 ,{ "BlackBox" :
     { "name" : "Clash.Explicit.Testbench.assertBitVector"
     , "kind" : "Declaration"
-    , "comment" : "TODO after https://github.com/clash-lang/clash-compiler/commit/95694dd8a85699901c78b81612cfecf36d7fc7b6
-                   put non_std_match in its own file?
-                  "
     , "type" :
 "assertBitVector
   :: KnownNat n                  --                 ARG[0]
@@ -70,44 +67,30 @@ end block;
   -> Signal domain (BitVector n) -- Expected value (ARG[5])
   -> Signal domain b             -- Return valued  (ARG[6])
   -> Signal domain b"
-    , "template" :
-"-- assertBitVector begin
-~GENSYM[assert][0] : block
-  -- pragma translate_off
+    , "imports" : ["~INCLUDENAME[0].all"]
+    , "includes" :
+      [{ "name" : "non_std_match"
+      , "extension" : "vhdl"
+      , "template" :
+"
+library IEEE;
+use IEEE.STD_LOGIC_1164.ALL;
+
+package ~INCLUDENAME[0] is
+  function non_std_match (l, r : std_logic_vector) return boolean;
+end;
+
+package body ~INCLUDENAME[0] is
   type match_table_type is array (std_ulogic, std_ulogic) of boolean;
   constant match_table: match_table_type :=
     ('0' | 'L' => ('0' | 'L' | '-' => true, others => false),
      '1' | 'H' => ('1' | 'H' | '-' => true, others => false),
      '-' => ('-' => true, others => false),
-     others => ('-' => true, others => false));
-
-  function non_std_match (l, r : std_logic_vector) return boolean
-  is
-     alias la : std_logic_vector (l'length downto 1) is l;
-     alias ra : std_logic_vector (r'length downto 1) is r;
-  begin
-     if la'left = 0 or ra'left = 0 then
-        assert false
-          report \"NUMERIC_STD.STD_MATCH: null argument, returning false\"
-          severity warning;
-        return false;
-     elsif la'left /= ra'left then
-        assert false
-          report \"NUMERIC_STD.STD_MATCH: args length mismatch, returning false\"
-          severity warning;
-        return false;
-     else
-        for i in la'range loop
-           if not match_table (la (i), ra (i)) then
-             return false;
-           end if;
-        end loop;
-        return true;
-     end if;
-  end non_std_match;
-
-  function custom_match (l, r : std_logic_vector) return boolean
-  is
+     others    =>             ('-' => true, others => false)
+    );
+  -- non_std_match is like std_match
+  -- But only accepts '-' as don't care in its the second argument r.
+  function non_std_match (l, r : std_logic_vector) return boolean is
     alias la : std_logic_vector (l'length downto 1) is l;
     alias ra : std_logic_vector (r'length downto 1) is r;
   begin
@@ -117,9 +100,14 @@ end block;
        end if;
     end loop;
     return true;
-  end custom_match;
-
-
+  end non_std_match;
+end;
+"
+      }]
+    , "template" :
+"-- assertBitVector begin
+~GENSYM[assert][0] : block
+  -- pragma translate_off
   function ~GENSYM[slv2string][1] (slv : std_logic_vector) return STRING is
      variable result : string (1 to slv'length);
      variable res_l : string (1 to 3);
@@ -147,7 +135,7 @@ begin
   process(~IF ~ISGATED[1] ~THEN~SYM[4]~ELSE~ARG[1]~FI~IF ~ISSYNC[2] ~THEN ~ELSE,~ARG[2]~FI) is
   begin
     if (rising_edge(~IF ~ISGATED[1] ~THEN~SYM[4]~ELSE~ARG[1]~FI)~IF ~ISSYNC[2] ~THEN ~ELSE or falling_edge(~ARG[2])~FI) then
-      assert (custom_match(toSLV(~SYM[2]),toSLV(~SYM[3]))) report (~LIT[3] & \", expected: \" & ~SYM[1](toSLV(~SYM[3])) & \", actual: \" & ~SYM[1](toSLV(~SYM[2]))) severity error;
+      assert (non_std_match(toSLV(~SYM[2]),toSLV(~SYM[3]))) report (~LIT[3] & \", expected: \" & ~SYM[1](toSLV(~SYM[3])) & \", actual: \" & ~SYM[1](toSLV(~SYM[2]))) severity error;
     end if;
   end process;
   -- pragma translate_on
