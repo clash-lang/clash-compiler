@@ -179,7 +179,15 @@ loadModules hdl modName dflagsM = do
                     { DynFlags.optLevel = 2
                     , DynFlags.ghcMode  = GHC.CompManager
                     , DynFlags.ghcLink  = GHC.NoLink
+#if MIN_VERSION_ghc(8,2,0)
+                    , DynFlags.hscTarget
+                        = if DynFlags.rtsIsProfiled
+                             then DynFlags.HscNothing
+                             else DynFlags.defaultObjectTarget
+                                    (DynFlags.targetPlatform dflags)
+#else
                     , DynFlags.hscTarget = DynFlags.HscNothing
+#endif
 #if __GLASGOW_HASKELL__ >= 711
                     , DynFlags.reductionDepth = 1000
 #else
