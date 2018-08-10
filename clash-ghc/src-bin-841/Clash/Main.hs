@@ -232,9 +232,9 @@ main' postLoadMode dflags0 args flagWarnings clashOpts = do
                DoBackpack      -> (CompManager, dflt_target,    LinkBinary)
                DoMkDependHS    -> (MkDepend,    dflt_target,    LinkBinary)
                DoAbiHash       -> (OneShot,     dflt_target,    LinkBinary)
-               DoVHDL          -> (CompManager, dflt_target,    LinkInMemory)
-               DoVerilog       -> (CompManager, dflt_target,    LinkInMemory)
-               DoSystemVerilog -> (CompManager, dflt_target,    LinkInMemory)
+               DoVHDL          -> (CompManager, HscNothing,     NoLink)
+               DoVerilog       -> (CompManager, HscNothing,     NoLink)
+               DoSystemVerilog -> (CompManager, HscNothing,     NoLink)
                _               -> (OneShot,     dflt_target,    LinkBinary)
 
   let dflags1 = dflags0{ ghcMode   = mode,
@@ -651,9 +651,6 @@ isLinkMode (StopBefore StopLn) = True
 isLinkMode DoMake              = True
 isLinkMode DoInteractive       = True
 isLinkMode (DoEval _)          = True
-isLinkMode DoVHDL              = True
-isLinkMode DoVerilog           = True
-isLinkMode DoSystemVerilog     = True
 isLinkMode _                   = False
 
 isCompManagerMode :: PostLoadMode -> Bool
