@@ -178,7 +178,7 @@ loadModules hdl modName dflagsM = do
     let dflags1 = dflags
                     { DynFlags.optLevel = 2
                     , DynFlags.ghcMode  = GHC.CompManager
-                    , DynFlags.ghcLink  = GHC.NoLink
+                    , DynFlags.ghcLink  = GHC.LinkInMemory
 #if MIN_VERSION_ghc(8,2,0)
                     , DynFlags.hscTarget
                         = if DynFlags.rtsIsProfiled
