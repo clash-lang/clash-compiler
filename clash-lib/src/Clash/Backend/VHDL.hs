@@ -632,7 +632,8 @@ entity c = do
          [] -> emptyDoc
          _  -> case syn of
           -- See: [Note] Hack entity attributes in architecture
-          Other -> indent 2 (rports p <> line <> line <> attrs) <> line <> "end" <> semi
+          Other -> indent 2 (rports p <> if null attrs then emptyDoc else
+                              line <> line <> rattrs) <> line <> "end" <> semi
           _     -> indent 2 (rports p) <> "end" <> semi
       )
   where
@@ -641,7 +642,8 @@ entity c = do
 
     rports p = "port" <> (parens (align (vcat (punctuate semi (pure p))))) <> semi
 
-    attrs       = renderAttrs $ inputAttrs ++ outputAttrs
+    rattrs      = renderAttrs attrs
+    attrs       = inputAttrs ++ outputAttrs
     inputAttrs  = [(id_, attr) | (id_, hwtype) <- inputs c, attr <- hwTypeAttrs hwtype]
     outputAttrs = [(id_, attr) | (_wireOrReg, (id_, hwtype)) <- outputs c, attr <- hwTypeAttrs hwtype]
 
@@ -736,7 +738,7 @@ renderAttrs (attrMap -> attrs) =
   renderAttrGroup (attrname, (typ, elems)) =
     ("attribute" <+> string attrname <+> colon <+> string typ <> semi)
     <> line <>
-    (hcat $ sequence $ map (renderAttrDecl attrname) elems)
+    (vcat $ sequence $ map (renderAttrDecl attrname) elems)
 
   renderAttrDecl
     :: T.Text
@@ -749,7 +751,7 @@ renderAttrs (attrMap -> attrs) =
                                              <+> colon
                                              <+> "signal is"
                                              <+> string value
-                                             <+> semi
+                                             <> semi
 
 -- | Return all key/value pairs in the map in arbitrary key order.
 assocs :: Eq a => Hashable a => HashMap a b -> [(a,b)]
