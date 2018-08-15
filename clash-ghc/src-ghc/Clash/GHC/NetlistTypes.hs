@@ -15,21 +15,21 @@ where
 
 import Data.Coerce                      (coerce)
 import Data.Functor.Identity            (Identity (..))
-import Data.HashMap.Strict              (HashMap,(!))
-import Data.Text.Lazy                   (pack)
+import Data.Text                        (pack)
 import Control.Monad.Trans.Except
   (ExceptT (..), mapExceptT, runExceptT, throwE)
 
 import Clash.Core.DataCon               (DataCon (..))
-import Clash.Core.Name                  (Name (..), name2String)
-import Clash.Core.Pretty                (showDoc)
-import Clash.Core.TyCon                 (TyCon (..), TyConOccName, tyConDataCons)
+import Clash.Core.Name                  (Name (..))
+import Clash.Core.Pretty                (showPpr)
+import Clash.Core.TyCon                 (TyConMap, tyConDataCons)
 import Clash.Core.Type
   (LitTy (..), Type (..), TypeView (..), coreView, tyView)
 import Clash.Core.Util                  (tyNatSize)
 import Clash.Netlist.Util               (coreTypeToHWType)
 import Clash.Netlist.Types              (HWType(..), PortDirection (..))
 import Clash.Signal.Internal            (ClockKind (..), ResetKind (..))
+import Clash.Unique                     (lookupUniqMap')
 import Clash.Util                       (curLoc)
 
 import Clash.Annotations.BitRepresentation.Internal
@@ -39,7 +39,7 @@ ghcTypeToHWType
   :: Int
   -> Bool
   -> CustomReprs
-  -> HashMap TyConOccName TyCon
+  -> TyConMap
   -> Bool
   -> Type
   -> Maybe (Either String HWType)
@@ -50,20 +50,20 @@ ghcTypeToHWType iw floatSupport = go
       return $ Annotated attrs typ'
 
     go reprs m keepVoid ty@(tyView -> TyConApp tc args) = runExceptT $
-      case name2String tc of
+      case nameOcc tc of
         "GHC.Int.Int8"                  -> return (Signed 8)
         "GHC.Int.Int16"                 -> return (Signed 16)
         "GHC.Int.Int32"                 -> return (Signed 32)
         "GHC.Int.Int64"                 ->
           if iw < 64
-             then case tyConDataCons (m ! nameOcc tc) of
+             then case tyConDataCons (m `lookupUniqMap'` tc) of
                     [dc] -> case dcArgTys dc of
                       [tyView -> TyConApp nm _]
-                        | name2String nm == "GHC.Prim.Int#"   ->
+                        | nameOcc nm == "GHC.Prim.Int#"   ->
                             throwE $ unlines ["Int64 not supported in forced 32-bit mode on a 64-bit machine."
                                              ,"Run Clash with `-fclash-intwidth=64`."
                                              ]
-                        | name2String nm == "GHC.Prim.Int64#" ->
+                        | nameOcc nm == "GHC.Prim.Int64#" ->
                             return (Signed 64)
                       _  -> throwE $ $(curLoc) ++ "Int64 DC has unexpected amount of arguments"
                     _    -> throwE $ $(curLoc) ++ "Int64 TC has unexpected amount of DCs"
@@ -73,14 +73,14 @@ ghcTypeToHWType iw floatSupport = go
         "GHC.Word.Word32"               -> return (Unsigned 32)
         "GHC.Word.Word64"               ->
           if iw < 64
-             then case tyConDataCons (m ! nameOcc tc) of
+             then case tyConDataCons (m `lookupUniqMap'` tc) of
                     [dc] -> case dcArgTys dc of
                       [tyView -> TyConApp nm _]
-                        | name2String nm == "GHC.Prim.Word#"   ->
+                        | nameOcc nm == "GHC.Prim.Word#"   ->
                             throwE $ unlines ["Word64 not supported in forced 32-bit mode on a 64-bit machine."
                                              ,"Run Clash with `-fclash-intwidth=64`."
                                              ]
-                        | name2String nm == "GHC.Prim.Word64#" ->
+                        | nameOcc nm == "GHC.Prim.Word64#" ->
                             return (Unsigned 64)
                       _  -> throwE $ $(curLoc) ++ "Word64 DC has unexpected amount of arguments"
                     _    -> throwE $ $(curLoc) ++ "Word64 TC has unexpected amount of DCs"
@@ -95,7 +95,7 @@ ghcTypeToHWType iw floatSupport = go
         "GHC.Prim.Float#" | floatSupport -> return (BitVector 32)
         "GHC.Prim.Double#" | floatSupport -> return (BitVector 64)
         "GHC.Prim.ByteArray#"           ->
-          throwE $ "Can't translate type: " ++ showDoc ty
+          throwE $ "Can't translate type: " ++ showPpr ty
 
         "GHC.Types.Bool"                -> return Bool
         "GHC.Types.Float" | floatSupport-> return (BitVector 32)
@@ -173,44 +173,44 @@ ghcTypeToHWType iw floatSupport = go
 
         "String" -> return String
         "GHC.Types.[]" -> case tyView (head args) of
-          (TyConApp (name2String -> "GHC.Types.Char") []) -> return String
-          _ -> throwE $ "Can't translate type: " ++ showDoc ty
+          (TyConApp (nameOcc -> "GHC.Types.Char") []) -> return String
+          _ -> throwE $ "Can't translate type: " ++ showPpr ty
 
         _ -> ExceptT Nothing
 
     go _ _ _ _ = Nothing
 
 domain
-  :: HashMap TyConOccName TyCon
+  :: TyConMap
   -> Type
   -> ExceptT String Maybe (String,Integer)
 domain m (coreView m -> Just ty') = domain m ty'
 domain m (tyView -> TyConApp tcNm [LitTy (SymTy nm),rateTy])
-  | name2String tcNm == "Clash.Signal.Internal.Dom"
+  | nameOcc tcNm == "Clash.Signal.Internal.Dom"
   = do rate <- mapExceptT (Just . coerce) (tyNatSize m rateTy)
        return (nm,rate)
-domain _ ty = throwE $ "Can't translate domain: " ++ showDoc ty
+domain _ ty = throwE $ "Can't translate domain: " ++ showPpr ty
 
 clockKind
-  :: HashMap TyConOccName TyCon
+  :: TyConMap
   -> Type
   -> ExceptT String Maybe ClockKind
 clockKind m (coreView m -> Just ty') = clockKind m ty'
 clockKind _ (tyView -> TyConApp tcNm [])
-  | name2String tcNm == "Clash.Signal.Internal.Source"
+  | nameOcc tcNm == "Clash.Signal.Internal.Source"
   = return Source
-  | name2String tcNm == "Clash.Signal.Internal.Gated"
+  | nameOcc tcNm == "Clash.Signal.Internal.Gated"
   = return Gated
-clockKind _ ty = throwE $ "Can't translate ClockKind" ++ showDoc ty
+clockKind _ ty = throwE $ "Can't translate ClockKind" ++ showPpr ty
 
 resetKind
-  :: HashMap TyConOccName TyCon
+  :: TyConMap
   -> Type
   -> ExceptT String Maybe ResetKind
 resetKind m (coreView m -> Just ty') = resetKind m ty'
 resetKind _ (tyView -> TyConApp tcNm [])
-  | name2String tcNm == "Clash.Signal.Internal.Synchronous"
+  | nameOcc tcNm == "Clash.Signal.Internal.Synchronous"
   = return Synchronous
-  | name2String tcNm == "Clash.Signal.Internal.Asynchronous"
+  | nameOcc tcNm == "Clash.Signal.Internal.Asynchronous"
   = return Asynchronous
-resetKind _ ty = throwE $ "Can't translate ResetKind" ++ showDoc ty
+resetKind _ ty = throwE $ "Can't translate ResetKind" ++ showPpr ty

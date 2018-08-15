@@ -10,31 +10,26 @@
 
 {-# LANGUAGE CPP #-}
 
-module Clash.Driver.Types
-  (module Clash.Driver.Types
-  ,SrcSpan, noSrcSpan
-  )
-where
+module Clash.Driver.Types where
 
 -- For Int/Word size
 #include "MachDeps.h"
 
-import Control.Exception (Exception)
-import Data.HashMap.Lazy (HashMap)
-import Data.Text.Lazy    (Text)
+import Data.Text         (Text)
 
 import BasicTypes        (InlineSpec)
-import SrcLoc            (SrcSpan, noSrcSpan)
+import SrcLoc            (SrcSpan)
 
-import Clash.Core.Term   (Term,TmName,TmOccName)
-import Clash.Core.Type   (Type)
+import Clash.Core.Term   (Term)
+import Clash.Core.Var    (Id)
+import Clash.Core.VarEnv (VarEnv)
 
 import Clash.Netlist.BlackBox.Types (HdlSyn (..))
 
 -- | Global function binders
 --
 -- Global functions cannot be mutually recursive, only self-recursive
-type BindingMap = HashMap TmOccName (TmName,Type,SrcSpan,InlineSpec,Term)
+type BindingMap = VarEnv (Id,SrcSpan,InlineSpec,Term)
 
 -- | Debug Message Verbosity
 data DebugLevel
@@ -81,13 +76,6 @@ defClashOpts
   , opt_importPaths         = []
   , opt_componentPrefix     = Nothing
   }
-
-data ClashException = ClashException SrcSpan String (Maybe String)
-
-instance Show ClashException where
-  show (ClashException _ s eM) = s ++ "\n" ++ maybe "" id eM
-
-instance Exception ClashException
 
 -- | Information about the generated HDL between (sub)runs of the compiler
 data Manifest

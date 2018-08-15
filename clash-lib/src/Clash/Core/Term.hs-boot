@@ -12,6 +12,7 @@ import GHC.Generics    (Generic)
 import Clash.Core.Name (Name)
 
 data Term
+
 type TmName = Name Term
 
 instance Generic Term

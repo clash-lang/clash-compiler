@@ -33,24 +33,21 @@ import Control.Monad.State.Strict           (MonadIO, MonadState, StateT)
 import Data.Bits                            (testBit)
 import Data.Binary                          (Binary(..))
 import Data.Hashable
-import Data.HashMap.Lazy                    (HashMap)
-import Data.IntMap.Lazy                     (IntMap, empty)
-import qualified Data.Text                  as S
-import Data.Text.Lazy                       (Text, pack)
+import Data.IntMap                          (IntMap, empty)
+import Data.Text                            (Text, pack)
 import Data.Typeable                        (Typeable)
 import Data.Text.Prettyprint.Doc.Extra      (Doc)
 import GHC.Generics                         (Generic)
 import Language.Haskell.TH.Syntax           (Lift)
-import Unbound.Generics.LocallyNameless     (Fresh, FreshMT)
 
 import SrcLoc                               (SrcSpan)
 
 import Clash.Annotations.TopEntity          (TopEntity)
 import Clash.Backend                        (Backend)
-import Clash.Core.Term                      (TmOccName)
 import Clash.Core.Type                      (Type)
-import Clash.Core.TyCon                     (TyCon, TyConOccName)
 import Clash.Core.Var                       (Attr')
+import Clash.Core.TyCon                     (TyConMap)
+import Clash.Core.VarEnv                    (VarEnv, InScopeSet)
 import Clash.Driver.Types                   (BindingMap)
 import Clash.Netlist.BlackBox.Types         (BlackBoxTemplate)
 import Clash.Netlist.Id                     (IdType)
@@ -64,33 +61,34 @@ import Clash.Annotations.BitRepresentation.Internal
 -- | Monad that caches generated components (StateT) and remembers hidden inputs
 -- of components that are being generated (WriterT)
 newtype NetlistMonad a =
-  NetlistMonad { runNetlist :: StateT NetlistState (FreshMT IO) a }
-  deriving newtype (Functor, Monad, Applicative, MonadState NetlistState, Fresh, MonadIO)
+  NetlistMonad { runNetlist :: StateT NetlistState IO a }
+  deriving newtype (Functor, Monad, Applicative, MonadState NetlistState, MonadIO)
 
 -- | State of the NetlistMonad
 data NetlistState
   = NetlistState
   { _bindings       :: BindingMap -- ^ Global binders
   , _varCount       :: !Int -- ^ Number of signal declarations
-  , _components     :: HashMap TmOccName (SrcSpan,[Identifier],Component) -- ^ Cached components
+  , _components     :: VarEnv (SrcSpan,[Identifier],Component) -- ^ Cached components
   , _primitives     :: CompiledPrimMap -- ^ Primitive Definitions
-  , _typeTranslator :: CustomReprs -> HashMap TyConOccName TyCon -> Bool -> Type -> Maybe (Either String HWType)
+  , _typeTranslator :: CustomReprs -> TyConMap -> Bool -> Type -> Maybe (Either String HWType)
   -- ^ Hardcoded Type -> HWType translator
-  , _tcCache        :: HashMap TyConOccName TyCon -- ^ TyCon cache
+  , _tcCache        :: TyConMap-- ^ TyCon cache
   , _curCompNm      :: !(Identifier,SrcSpan)
   , _intWidth       :: Int
   , _mkIdentifierFn :: IdType -> Identifier -> Identifier
   , _extendIdentifierFn :: IdType -> Identifier -> Identifier -> Identifier
   , _seenIds        :: [Identifier]
   , _seenComps      :: [Identifier]
-  , _componentNames :: HashMap TmOccName Identifier
-  , _topEntityAnns  :: HashMap TmOccName (Type, Maybe TopEntity)
+  , _componentNames :: VarEnv Identifier
+  , _topEntityAnns  :: VarEnv (Type, Maybe TopEntity)
   , _hdlDir         :: FilePath
   , _curBBlvl       :: Int
   -- ^ The current scoping level assigned to black box contexts
   , _componentPrefix :: (Maybe Identifier,Maybe Identifier)
   -- ^ Prefix for top-level components, and prefix for all other components
   , _customReprs    :: CustomReprs
+  , _globalInScope  :: InScopeSet
   }
 
 -- | Signal reference
@@ -196,13 +194,13 @@ data Declaration
   -- ^ Instantiation of another component
   | BlackBoxD
       -- Primitive name:
-      !S.Text
+      !Text
       -- VHDL only: add /library/ declarations:
       [BlackBoxTemplate]
       -- VHDL only: add /use/ declarations:
       [BlackBoxTemplate]
       -- Intel/Quartus only: create a /.qsys/ file from given template:
-      [((S.Text,S.Text),BlackBox)]
+      [((Text,Text),BlackBox)]
       -- Template tokens:
       !BlackBox
       -- Context in which tokens should be rendered:
@@ -259,13 +257,13 @@ data Expr
   | DataTag    !HWType       !(Either Identifier Identifier) -- ^ @Left e@: tagToEnum#, @Right e@: dataToTag#
   | BlackBoxE
       -- Primitive name:
-      !S.Text
+      !Text
       -- VHDL only: add /library/ declarations:
       [BlackBoxTemplate]
       -- VHDL only: add /use/ declarations:
       [BlackBoxTemplate]
       -- Intel/Quartus only: create a /.qsys/ file from given template.
-      [((S.Text,S.Text),BlackBox)]
+      [((Text,Text),BlackBox)]
       -- Template tokens:
       !BlackBox
       -- Context in which tokens should be rendered:
@@ -311,7 +309,7 @@ data BlackBoxContext
                           ,WireOrReg
                           ,[BlackBoxTemplate]
                           ,[BlackBoxTemplate]
-                          ,[((S.Text,S.Text),BlackBox)]
+                          ,[((Text,Text),BlackBox)]
                           ,BlackBoxContext)
   -- ^ Function arguments (subset of inputs):
   --

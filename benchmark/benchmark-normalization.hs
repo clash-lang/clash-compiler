@@ -5,10 +5,8 @@
 
 import           Clash.Annotations.BitRepresentation.Internal (CustomReprs)
 import           Clash.Annotations.TopEntity
-import           Clash.Core.Name
-import           Clash.Core.Term
 import           Clash.Core.TyCon
-import           Clash.Core.Type
+import           Clash.Core.Var
 import           Clash.Driver
 import           Clash.Driver.Types
 import           Clash.GHC.Evaluator          (reduceConstant)
@@ -18,7 +16,6 @@ import           Criterion.Main
 
 import qualified Control.Concurrent.Supply    as Supply
 import           Control.DeepSeq              (NFData(rnf),rwhnf)
-import           Data.HashMap.Strict          (HashMap)
 import           Data.IntMap.Strict           (IntMap)
 import           Data.List                    (break, isPrefixOf)
 import           System.Environment           (getArgs, withArgs)
@@ -45,15 +42,15 @@ benchFile src =
   env (setupEnv src) $
     \ ~((bindingsMap,tcm,tupTcm,_topEntities,primMap,reprs,topEntityNames,topEntity),supplyN) -> do
       bench ("normalization of " ++ src)
-            (nf (normalizeEntity reprs bindingsMap primMap tcm tupTcm typeTrans
+            (nf (fst . normalizeEntity reprs bindingsMap primMap tcm tupTcm typeTrans
                                  reduceConstant topEntityNames
                                  opts supplyN :: _ -> BindingMap) topEntity)
 
 setupEnv
   :: FilePath
-  -> IO ((BindingMap, HashMap TyConOccName TyCon, IntMap TyConName
-         ,[(TmName, Type, Maybe TopEntity, Maybe TmName)]
-         ,CompiledPrimMap, CustomReprs, [OccName Term], TmOccName
+  -> IO ((BindingMap, TyConMap, IntMap TyConName
+         ,[(Id, Maybe TopEntity, Maybe Id)]
+         ,CompiledPrimMap, CustomReprs, [Id], Id
          )
         ,Supply.Supply
         )

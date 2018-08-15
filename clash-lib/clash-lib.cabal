@@ -57,6 +57,7 @@ Build-type:           Simple
 Extra-source-files:
   README.md,
   CHANGELOG.md
+  src/ClashDebug.h
 
 Data-files:
   prims/common/*.json,
@@ -70,6 +71,12 @@ Cabal-version:        >=1.10
 source-repository head
   type: git
   location: https://github.com/clash-lang/clash-compiler.git
+
+flag debug
+   description:
+     Build a debug compiler
+   default: False
+   manual: True
 
 Library
   HS-Source-Dirs:     src
@@ -130,7 +137,6 @@ Library
                       trifecta                >= 1.7.1.1  && < 2.0,
                       vector                  >= 0.11     && < 1.0,
                       vector-binary-instances >= 0.2.3.5  && < 0.3,
-                      unbound-generics        >= 0.1      && < 0.4,
                       unordered-containers    >= 0.2.3.3  && < 0.3
 
   Exposed-modules:    Clash.Annotations.BitRepresentation.ClashLib
@@ -153,6 +159,7 @@ Library
                       Clash.Core.TysPrim
                       Clash.Core.Util
                       Clash.Core.Var
+                      Clash.Core.VarEnv
 
                       Clash.Driver
                       Clash.Driver.Types
@@ -183,6 +190,7 @@ Library
                       Clash.Rewrite.Types
                       Clash.Rewrite.Util
 
+                      Clash.Unique
                       Clash.Util
 
                       Data.Text.Prettyprint.Doc.Extra
@@ -194,4 +202,6 @@ Library
                       GHC.BasicTypes.Extra
                       GHC.SrcLoc.Extra
                       Paths_clash_lib
-                      Unbound.Generics.LocallyNameless.Extra
+
+  if flag(debug)
+    cpp-options:      -DDEBUG

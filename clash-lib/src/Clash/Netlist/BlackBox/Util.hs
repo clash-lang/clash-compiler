@@ -44,7 +44,6 @@ import           Text.Read                       (readEither)
 import           Text.Trifecta.Result            hiding (Err)
 
 import           Clash.Backend                   (Backend (..), Usage (..))
-import           Clash.Driver.Types              (ClashException (..))
 import           Clash.Netlist.BlackBox.Parser
 import           Clash.Netlist.BlackBox.Types
 import           Clash.Netlist.Id                (IdType (..))
@@ -106,35 +105,35 @@ setSym bbCtx l = do
                       Element
     setSym' e = case e of
       Var nm i | i < length (bbInputs bbCtx) -> case bbInputs bbCtx !! i of
-        (Identifier nm' Nothing,_,_) -> return (Var [C nm'] i)
+        (Identifier nm' Nothing,_,_) -> return (Var [C (Text.fromStrict nm')] i)
         (e',hwTy,_) -> do
           varM <- IntMap.lookup i <$> use _2
           case varM of
             Nothing -> do
-              nm' <- lift (mkUniqueIdentifier Extended (concatT (C "#":nm)))
+              nm' <- lift (mkUniqueIdentifier Extended (Text.toStrict (concatT (C "#":nm))))
               let decls = case typeSize hwTy of
                     0 -> []
                     _ -> [N.NetDecl Nothing nm' hwTy
                          ,N.Assignment nm' e'
                          ]
               _2 %= (IntMap.insert i (nm',decls))
-              return (Var [C nm'] i)
-            Just (nm',_) -> return (Var [C nm'] i)
+              return (Var [C (Text.fromStrict nm')] i)
+            Just (nm',_) -> return (Var [C (Text.fromStrict nm')] i)
       Sym _ i -> do
         symM <- IntMap.lookup i <$> use _1
         case symM of
           Nothing -> do
-            t <- lift (mkUniqueIdentifier Extended (Text.pack "#n"))
+            t <- lift (mkUniqueIdentifier Extended "#n")
             _1 %= (IntMap.insert i t)
-            return (Sym t i)
-          Just t -> return (Sym t i)
+            return (Sym (Text.fromStrict t) i)
+          Just t -> return (Sym (Text.fromStrict t) i)
       GenSym t i -> do
         symM <- IntMap.lookup i <$> use _1
         case symM of
           Nothing -> do
-            t' <- lift (mkUniqueIdentifier Basic (concatT t))
+            t' <- lift (mkUniqueIdentifier Basic (Text.toStrict (concatT t)))
             _1 %= (IntMap.insert i t')
-            return (GenSym [C t'] i)
+            return (GenSym [C (Text.fromStrict t')] i)
           Just _ -> error ("Symbol #" ++ show (t,i) ++ " is already defined")
       D (Decl n l') -> D <$> (Decl n <$> mapM (combineM (mapM setSym') (mapM setSym')) l')
       IF c t f      -> IF <$> pure c <*> mapM setSym' t <*> mapM setSym' f
@@ -153,8 +152,8 @@ setSym bbCtx l = do
                                                                ++ "~NAME[" ++ show i ++ "]"
                                                                ++ " to string:" ++ msg
                          ; O _ | Identifier t _ <- fst (bbResult bbCtx)
-                               -> t
-                         ; CompName -> bbCompName bbCtx
+                               -> Text.fromStrict t
+                         ; CompName -> Text.fromStrict (bbCompName bbCtx)
                          ; _   -> error "unexpected element in GENSYM"})
 
 selectNewName
@@ -200,7 +199,7 @@ renderBlackBox libs imps includes bb bbCtx = do
       layout = LayoutOptions (AvailablePerLine 120 0.4)
   nms <-
     forM includes $ \((nm,_),inc) -> do
-      let bbCtx' = bbCtx {bbQsysIncName = nms'}
+      let bbCtx' = bbCtx {bbQsysIncName = map Text.toStrict nms'}
       incForHash <- onBlackBox (renderTemplate bbCtx')
                                (\_name _hash (N.TemplateFunction _ _ f) -> do
                                   t <- f bbCtx'
@@ -215,7 +214,7 @@ renderBlackBox libs imps includes bb bbCtx = do
                       ]
       pure nm'
 
-  let bbNamedCtx = bbCtx {bbQsysIncName = nms}
+  let bbNamedCtx = bbCtx {bbQsysIncName = map Text.toStrict nms}
       incs = snd <$> includes
   bb' <- case bb of
         N.BBTemplate bt   -> do
@@ -252,7 +251,7 @@ setSimpleVar bbCtx = map go
       Var _ i
         | i < length (bbInputs bbCtx)
         , (Identifier nm' Nothing,_,_) <- bbInputs bbCtx !! i
-        -> Var [C nm'] i
+        -> Var [C (Text.fromStrict nm')] i
         | otherwise
         -> error $ $(curLoc) ++ "You can only pass variables to function arguments in a higher-order primitive"
       D (Decl n l') -> D (Decl n (map (map go *** map go) l'))
@@ -368,7 +367,7 @@ parseFail t = case runParse t of
 idToExpr
   :: (Text,HWType)
   -> (Expr,HWType,Bool)
-idToExpr (t,ty) = (Identifier t Nothing,ty,False)
+idToExpr (t,ty) = (Identifier (Text.toStrict t) Nothing,ty,False)
 
 -- | Fill out the template corresponding to an output/input assignment of a
 -- component instantiation, and turn it into a single identifier so it can
@@ -407,11 +406,11 @@ renderTag :: Backend backend
 renderTag _ (C t)           = return t
 renderTag b (O esc)         = do
   escape <- if esc then unextend else pure id
-  fmap (escape . renderOneLine) . getMon . expr False . fst $ bbResult b
+  fmap (Text.fromStrict . escape . Text.toStrict . renderOneLine) . getMon . expr False . fst $ bbResult b
 renderTag b (I esc n)       = do
   let (e,_,_) = bbInputs b !! n
   escape <- if esc then unextend else pure id
-  (escape . renderOneLine) <$> getMon (expr False e)
+  (Text.fromStrict . escape . Text.toStrict . renderOneLine) <$> getMon (expr False e)
 
 renderTag b t@(Arg k n)
   | k == bbLevel b
@@ -488,7 +487,7 @@ renderTag b (Vars n)        =
       vars    = go e
   in  case vars of
         [] -> return Text.empty
-        _  -> return (Text.concat $ map (Text.cons ',') vars)
+        _  -> return (Text.concat $ map (Text.cons ',' . Text.fromStrict) vars)
 renderTag b (IndexType (L n)) =
   case bbInputs b !! n of
     (Literal _ (NumLit n'),_,_) ->
@@ -508,7 +507,7 @@ renderTag b (FilePath e)    = case e of
   _ -> do e' <- getMon (prettyElem e)
           error $ $(curLoc) ++ "~FILEPATH expects a ~LIT[N] argument, but got: " ++ show e'
 renderTag b (IncludeName n) = case indexMaybe (bbQsysIncName b) n of
-  Just nm -> return nm
+  Just nm -> return (Text.fromStrict nm)
   _ -> error $ $(curLoc) ++ "~INCLUDENAME[" ++ show n ++ "] does not correspond to any index of the 'includes' field that is specified in the primitive definition"
 renderTag b (OutputWireReg n) = case IntMap.lookup n (bbFunctions b) of
   Just (_,rw,_,_,_,_) -> case rw of {N.Wire -> return "wire"; N.Reg -> return "reg"}
@@ -552,7 +551,7 @@ renderTag b (Template filenameL sourceL) = case file of
           source   <- elementsToText b sourceL
           return (Text.unpack filename, Text.unpack source)
 
-renderTag b CompName = pure (bbCompName b)
+renderTag b CompName = pure (Text.fromStrict (bbCompName b))
 
 renderTag _ e = do e' <- getMon (prettyElem e)
                    error $ $(curLoc) ++ "Unable to evaluate: " ++ show e'

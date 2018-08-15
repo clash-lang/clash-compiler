@@ -6,7 +6,7 @@
 
 module Clash.Netlist.Types where
 
-import Data.Text.Lazy (Text)
+import Data.Text (Text)
 
 type Identifier = Text
 

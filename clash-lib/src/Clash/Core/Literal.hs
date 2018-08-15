@@ -26,8 +26,6 @@ import Data.Hashable                          (Hashable)
 import Data.Vector.Primitive.Extra            (Vector)
 import Data.Word                              (Word8)
 import GHC.Generics                           (Generic)
-import Unbound.Generics.LocallyNameless.Extra ()
-import Unbound.Generics.LocallyNameless       (Alpha (..), Subst (..))
 
 import {-# SOURCE #-} Clash.Core.Type         (Type)
 import Clash.Core.TysPrim                     (intPrimTy, integerPrimTy,
@@ -51,13 +49,6 @@ data Literal
   | NaturalLiteral  !Integer
   | ByteArrayLiteral !(Vector Word8)
   deriving (Eq,Ord,Show,Generic,NFData,Hashable,Binary)
-
-instance Alpha Literal where
-  fvAny' _ _ l = pure l
-
-instance Subst a Literal where
-  subst _ _ l = l
-  substs _ l  = l
 
 -- | Determines the Type of a Literal
 literalType :: Literal

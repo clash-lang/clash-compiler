@@ -26,26 +26,27 @@ import qualified Data.HashMap.Lazy             as HashMap
 import qualified Data.IntMap                   as IntMap
 import           Data.Maybe                    (catMaybes)
 import           Data.Semigroup.Monad
-import           Data.Text.Lazy                (fromStrict, pack)
+import           Data.Text.Lazy                (fromStrict)
 import qualified Data.Text.Lazy                as Text
 import           Data.Text                     (unpack)
 import qualified Data.Text                     as TextS
-import           Unbound.Generics.LocallyNameless (embed, unbind, unembed)
 
 -- import           Clash.Backend                 as N
 import           Clash.Core.DataCon            as D (dcTag)
+import           Clash.Core.FreeVars           (termFreeIds)
 import           Clash.Core.Literal            as L (Literal (..))
 import           Clash.Core.Name
-  (Name (..), NameSort (..), name2String, string2SystemName)
-import           Clash.Core.Pretty             (showDoc)
-import           Clash.Core.Subst              (substTm)
+  (Name (..), mkUnsafeSystemName)
+import           Clash.Core.Pretty             (showPpr)
+import           Clash.Core.Subst              (extendIdSubst, mkSubst, substTm)
 import           Clash.Core.Term               as C (Term (..))
 import           Clash.Core.Type               as C (Type (..), ConstTy (..),
                                                 splitFunTys)
 import           Clash.Core.TyCon              as C (tyConDataCons)
 import           Clash.Core.Util               (collectArgs, isFun, termType)
-import           Clash.Core.Var                as V (Id, Var (..))
-import           Clash.Driver.Types            (ClashException (..))
+import           Clash.Core.Var                as V (Id, Var (..), mkId, modifyVarName)
+import           Clash.Core.VarEnv
+  (extendInScopeSet, mkInScopeSet, lookupVarEnv, unionInScope, uniqAway, unitVarSet)
 import {-# SOURCE #-} Clash.Netlist
   (genComponent, mkDcApplication, mkDeclarations, mkExpr, mkNetDecl,
    mkProjection, mkSelection)
@@ -57,6 +58,7 @@ import           Clash.Netlist.Types           as N
 import           Clash.Netlist.Util            as N
 import           Clash.Normalize.Util          (isConstant)
 import           Clash.Primitives.Types        as P
+import           Clash.Unique                  (lookupUniqMap')
 import           Clash.Util
 
 
@@ -70,13 +72,13 @@ mkBlackBoxContext
 mkBlackBoxContext resId args = do
     -- Make context inputs
     tcm             <- Lens.use tcCache
-    let resNm = Text.pack . name2String $ varName resId
+    let resNm = nameOcc (varName resId)
     (imps,impDecls) <- unzip <$> mapM (mkArgument resNm) args
     (funs,funDecls) <- mapAccumLM (addFunction tcm) IntMap.empty (zip args [0..])
 
     -- Make context result
     let res = Identifier resNm Nothing
-    resTy <- unsafeCoreTypeToHWTypeM $(curLoc) (unembed $ V.varType resId)
+    resTy <- unsafeCoreTypeToHWTypeM $(curLoc) (V.varType resId)
 
     lvl <- Lens.use curBBlvl
     (nm,_) <- Lens.use curCompNm
@@ -85,15 +87,13 @@ mkBlackBoxContext resId args = do
            , concat impDecls ++ concat funDecls
            )
   where
-    addFunction tcm im (arg,i) = do
-      isF <- isFun tcm arg
-      if isF
-         then do curBBlvl Lens.+= 1
-                 (f,d) <- mkFunInput resId arg
-                 curBBlvl Lens.-= 1
-                 let im' = IntMap.insert i f im
-                 return (im',d)
-         else return (im,[])
+    addFunction tcm im (arg,i) = if isFun tcm arg
+      then do curBBlvl Lens.+= 1
+              (f,d) <- mkFunInput resId arg
+              curBBlvl Lens.-= 1
+              let im' = IntMap.insert i f im
+              return (im',d)
+      else return (im,[])
 
 prepareBlackBox
   :: TextS.Text
@@ -127,16 +127,16 @@ mkArgument
                   )
 mkArgument bndr e = do
     tcm   <- Lens.use tcCache
-    ty    <- termType tcm e
+    let ty = termType tcm e
     iw    <- Lens.use intWidth
     hwTyM <- N.termHWTypeM e
-    let eTyMsg = "(" ++ showDoc e ++ " :: " ++ showDoc ty ++ ")"
+    let eTyMsg = "(" ++ showPpr e ++ " :: " ++ showPpr ty ++ ")"
     ((e',t,l),d) <- case hwTyM of
       Nothing   ->
         return ((Identifier (error ($(curLoc) ++ "Forced to evaluate untranslatable type: " ++ eTyMsg)) Nothing
                 ,Void Nothing,False),[])
       Just hwTy -> case collectArgs e of
-        (C.Var _ v,[]) -> return ((Identifier (pack (name2String v)) Nothing,hwTy,False),[])
+        (C.Var v,[]) -> return ((Identifier (nameOcc (varName v)) Nothing,hwTy,False),[])
         (C.Literal (IntegerLiteral i),[]) -> return ((N.Literal (Just (Signed iw,iw)) (N.NumLit i),hwTy,True),[])
         (C.Literal (IntLiteral i), []) -> return ((N.Literal (Just (Signed iw,iw)) (N.NumLit i),hwTy,True),[])
         (C.Literal (WordLiteral w), []) -> return ((N.Literal (Just (Unsigned iw,iw)) (N.NumLit w),hwTy,True),[])
@@ -225,30 +225,30 @@ mkPrimitive bbEParen bbEasD dst nm args ty = do
               case args of
                 [Right (ConstTy (TyCon tcN)), Left (C.Literal (IntLiteral i))] -> do
                   tcm <- Lens.use tcCache
-                  let dcs = tyConDataCons (tcm HashMap.! nameOcc tcN)
+                  let dcs = tyConDataCons (tcm `lookupUniqMap'` tcN)
                       dc  = dcs !! fromInteger i
                   (exprN,dcDecls) <- mkDcApplication hwTy dst dc []
                   return (exprN,dcDecls)
                 [Right _, Left scrut] -> do
                   tcm     <- Lens.use tcCache
-                  scrutTy <- termType tcm scrut
+                  let scrutTy = termType tcm scrut
                   (scrutExpr,scrutDecls) <- mkExpr False (Left "#tte_rhs") scrutTy scrut
                   case scrutExpr of
                     Identifier id_ Nothing -> return (DataTag hwTy (Left id_),scrutDecls)
                     _ -> do
                       scrutHTy <- unsafeCoreTypeToHWTypeM $(curLoc) scrutTy
-                      tmpRhs <- mkUniqueIdentifier Extended (pack "#tte_rhs")
+                      tmpRhs <- mkUniqueIdentifier Extended "#tte_rhs"
                       let netDeclRhs   = NetDecl Nothing tmpRhs scrutHTy
                           netAssignRhs = Assignment tmpRhs scrutExpr
                       return (DataTag hwTy (Left tmpRhs),[netDeclRhs,netAssignRhs] ++ scrutDecls)
-                _ -> error $ $(curLoc) ++ "tagToEnum: " ++ show (map (either showDoc showDoc) args)
+                _ -> error $ $(curLoc) ++ "tagToEnum: " ++ show (map (either showPpr showPpr) args)
           | pNm == "GHC.Prim.dataToTag#" -> case args of
               [Right _,Left (Data dc)] -> do
                 iw <- Lens.use intWidth
                 return (N.Literal (Just (Signed iw,iw)) (NumLit $ toInteger $ dcTag dc - 1),[])
               [Right _,Left scrut] -> do
                 tcm      <- Lens.use tcCache
-                scrutTy  <- termType tcm scrut
+                let scrutTy = termType tcm scrut
                 scrutHTy <- unsafeCoreTypeToHWTypeM $(curLoc) scrutTy
                 (scrutExpr,scrutDecls) <- mkExpr False (Left "#dtt_rhs") scrutTy scrut
                 case scrutExpr of
@@ -258,7 +258,7 @@ mkPrimitive bbEParen bbEasD dst nm args ty = do
                     let netDeclRhs   = NetDecl Nothing tmpRhs scrutHTy
                         netAssignRhs = Assignment tmpRhs scrutExpr
                     return (DataTag scrutHTy (Right tmpRhs),[netDeclRhs,netAssignRhs] ++ scrutDecls)
-              _ -> error $ $(curLoc) ++ "dataToTag: " ++ show (map (either showDoc showDoc) args)
+              _ -> error $ $(curLoc) ++ "dataToTag: " ++ show (map (either showPpr showPpr) args)
           | otherwise ->
               return (BlackBoxE "" [] [] []
                         (BBTemplate [C $ mconcat ["NO_TRANSLATION_FOR:",fromStrict pNm]])
@@ -276,20 +276,22 @@ mkPrimitive bbEParen bbEasD dst nm args ty = do
     resBndr mkDec wr dst' = case dst' of
       Left dstL -> case mkDec of
         False -> do
-          let nm' = Text.unpack dstL
-              id_ = Id (string2SystemName nm') (embed ty)
+          -- TODO: check that it's okay to use `mkUnsafeSystemName`
+          let nm' = mkUnsafeSystemName dstL 0
+              id_ = mkId ty nm'
           return (Just (id_,dstL,[]))
         True -> do
           nm'  <- extendIdentifier Extended dstL "_res"
           nm'' <- mkUniqueIdentifier Extended nm'
-          let nm3 = (string2SystemName (Text.unpack nm'')) { nameSort = Internal }
+          -- TODO: check that it's okay to use `mkUnsafeInternalName`
+          let nm3 = mkUnsafeSystemName nm'' 0
           hwTy <- N.unsafeCoreTypeToHWTypeM $(curLoc) ty
-          let id_ = Id nm3 (embed ty)
+          let id_    = mkId ty nm3
               idDecl = NetDecl' Nothing wr nm'' (Right hwTy)
           case hwTy of
             Void {} -> return Nothing
             _       -> return (Just (id_,nm'',[idDecl]))
-      Right dstR -> return (Just (dstR,Text.pack . name2String . varName $ dstR,[]))
+      Right dstR -> return (Just (dstR,nameOcc . varName $ dstR,[]))
 
 -- | Create an template instantiation text and a partial blackbox content for an
 -- argument term, given that the term is a function. Errors if the term is not
@@ -320,53 +322,55 @@ mkFunInput resId e = do
               return templ
             Data dc -> do
               tcm <- Lens.use tcCache
-              eTy <- termType tcm e
-              let (_,resTy) = splitFunTys tcm eTy
+              let eTy = termType tcm e
+                  (_,resTy) = splitFunTys tcm eTy
               resHTyM <- coreTypeToHWTypeM resTy
               case resHTyM of
                 Just resHTy@(SP _ dcArgPairs) -> do
                   let dcI      = dcTag dc - 1
                       dcArgs   = snd $ indexNote ($(curLoc) ++ "No DC with tag: " ++ show dcI) dcArgPairs dcI
-                      dcInps   = [ Identifier (pack ("~ARG[" ++ show x ++ "]")) Nothing | x <- [(0::Int)..(length dcArgs - 1)]]
+                      dcInps   = [ Identifier (TextS.pack ("~ARG[" ++ show x ++ "]")) Nothing | x <- [(0::Int)..(length dcArgs - 1)]]
                       dcApp    = DataCon resHTy (DC (resHTy,dcI)) dcInps
-                      dcAss    = Assignment (pack "~RESULT") dcApp
+                      dcAss    = Assignment "~RESULT" dcApp
                   return (Right (("",[dcAss]),Wire))
                 Just resHTy@(Product _ dcArgs) -> do
-                  let dcInps = [ Identifier (pack ("~ARG[" ++ show x ++ "]")) Nothing | x <- [(0::Int)..(length dcArgs - 1)]]
+                  let dcInps = [ Identifier (TextS.pack ("~ARG[" ++ show x ++ "]")) Nothing | x <- [(0::Int)..(length dcArgs - 1)]]
                       dcApp  = DataCon resHTy (DC (resHTy,0)) dcInps
-                      dcAss  = Assignment (pack "~RESULT") dcApp
+                      dcAss  = Assignment "~RESULT" dcApp
                   return (Right (("",[dcAss]),Wire))
                 Just resHTy@(Vector _ _) -> do
-                  let dcInps = [ Identifier (pack ("~ARG[" ++ show x ++ "]")) Nothing | x <- [(1::Int)..2] ]
+                  let dcInps = [ Identifier (TextS.pack ("~ARG[" ++ show x ++ "]")) Nothing | x <- [(1::Int)..2] ]
                       dcApp  = DataCon resHTy (DC (resHTy,1)) dcInps
-                      dcAss  = Assignment (pack "~RESULT") dcApp
+                      dcAss  = Assignment "~RESULT" dcApp
                   return (Right (("",[dcAss]),Wire))
                 -- The following happens for things like `Maybe ()`
                 Just resHTy@(Sum _ _) -> do
                   let dcI   = dcTag dc - 1
                       dcApp = DataCon resHTy (DC (resHTy,dcI)) []
-                      dcAss = Assignment (pack "~RESULT") dcApp
+                      dcAss = Assignment "~RESULT" dcApp
                   return (Right (("",[dcAss]),Wire))
                 -- The following happens for things like `(1,())`
                 Just _ -> do
-                  let inp   = Identifier (pack ("~ARG[0]")) Nothing
-                      assgn = Assignment (pack "~RESULT") inp
+                  let inp   = Identifier "~ARG[0]" Nothing
+                      assgn = Assignment "~RESULT" inp
                   return (Right (("",[assgn]),Wire))
-                _ -> error $ $(curLoc) ++ "Cannot make function input for: " ++ showDoc e
-            C.Var _ (nameOcc -> fun) -> do
+                _ -> error $ $(curLoc) ++ "Cannot make function input for: " ++ showPpr e
+            C.Var fun -> do
               normalized <- Lens.use bindings
-              case HashMap.lookup fun normalized of
+              case lookupVarEnv fun normalized of
                 Just _ -> do
                   (_,_,Component compName compInps [snd -> compOutp] _) <- preserveVarEnv $ genComponent fun
-                  let inpAssigns    = zipWith (\(i,t) e' -> (Identifier i Nothing,In,t,e')) compInps [ Identifier (pack ("~ARG[" ++ show x ++ "]")) Nothing | x <- [(0::Int)..] ]
-                      outpAssign    = (Identifier (fst compOutp) Nothing,Out,snd compOutp,Identifier (pack "~RESULT") Nothing)
+                  let inpAssigns    = zipWith (\(i,t) e' -> (Identifier i Nothing,In,t,e')) compInps [ Identifier (TextS.pack ("~ARG[" ++ show x ++ "]")) Nothing | x <- [(0::Int)..] ]
+                      outpAssign    = (Identifier (fst compOutp) Nothing,Out,snd compOutp,Identifier "~RESULT" Nothing)
                   i <- varCount <<%= (+1)
-                  let instLabel     = Text.concat [compName,pack ("_" ++ show i)]
+                  let instLabel     = TextS.concat [compName,TextS.pack ("_" ++ show i)]
                       instDecl      = InstDecl Entity Nothing compName instLabel (outpAssign:inpAssigns)
                   return (Right (("",[instDecl]),Wire))
-                Nothing -> error $ $(curLoc) ++ "Cannot make function input for: " ++ showDoc e
-            C.Lam _ -> go 0 appE
-            _ -> error $ $(curLoc) ++ "Cannot make function input for: " ++ showDoc e
+                Nothing -> error $ $(curLoc) ++ "Cannot make function input for: " ++ showPpr e
+            C.Lam {} -> do
+              let is0 = mkInScopeSet (Lens.foldMapOf termFreeIds unitVarSet appE)
+              go is0 0 appE
+            _ -> error $ $(curLoc) ++ "Cannot make function input for: " ++ showPpr e
   case templ of
     Left (TDecl,oreg,libs,imps,inc,_,templ') -> do
       (l',templDecl)
@@ -378,11 +382,11 @@ mkFunInput resId e = do
     Left (TExpr,_,libs,imps,inc,nm,templ') -> do
       onBlackBox
         (\t -> do t' <- getMon (prettyBlackBox t)
-                  let assn = Assignment (pack "~RESULT") (Identifier t' Nothing)
+                  let assn = Assignment "~RESULT" (Identifier (Text.toStrict t') Nothing)
                   return ((Right ("",[assn]),Wire,libs,imps,inc,bbCtx),dcls))
         (\bbName bbHash (TemplateFunction k g _) -> do
           let f' bbCtx' = do
-                let assn = Assignment (pack "~RESULT")
+                let assn = Assignment "~RESULT"
                             (BlackBoxE nm libs imps inc templ' bbCtx' False)
                 p <- getMon (Backend.blockDecl "" [assn])
                 return p
@@ -400,61 +404,68 @@ mkFunInput resId e = do
     Right (decl,wr) ->
       return ((Right decl,wr,[],[],[],bbCtx),dcls)
   where
-    go n (Lam b) = do
-      (id_,e') <- unbind b
-      lvl      <- Lens.use curBBlvl
-      let nm  = varName id_
-          e'' = substTm (nameOcc nm)
-                        (C.Var (unembed (varType id_))
-                               (string2SystemName ("~ARGN[" ++ show lvl ++ "][" ++ show n ++ "]")))
-                        e'
-      go (n+(1::Int)) e''
+    go is0 n (Lam id_ e') = do
+      lvl <- Lens.use curBBlvl
+      let nm    = TextS.concat
+                    ["~ARGN[",TextS.pack (show lvl),"][",TextS.pack (show n),"]"]
+          v'    = uniqAway is0 (modifyVarName (\v -> v {nameOcc = nm}) id_)
+          subst = extendIdSubst (mkSubst is0) id_ (C.Var v')
+          e''   = substTm "mkFunInput.goLam" subst e'
+          is1   = extendInScopeSet is0 v'
+      go is1 (n+(1::Int)) e''
 
-    go _ (C.Var _ nm) = do
-      let assn = Assignment (pack "~RESULT") (Identifier (pack (name2String nm)) Nothing)
+    go _ _ (C.Var v) = do
+      let assn = Assignment "~RESULT" (Identifier (nameOcc (varName v)) Nothing)
       return (Right (("",[assn]),Wire))
 
-    go _ (Case scrut ty [alt]) = do
+    go _ _ (Case scrut ty [alt]) = do
       (projection,decls) <- mkProjection False (Left "#bb_res") scrut ty alt
-      let assn = Assignment (pack "~RESULT") projection
+      let assn = Assignment "~RESULT" projection
       nm <- if null decls
                then return ""
                else mkUniqueIdentifier Basic "projection"
       return (Right ((nm,decls ++ [assn]),Wire))
 
-    go _ (Case scrut ty alts@(_:_:_)) = do
-      let resId'  = resId {varName = string2SystemName "~RESULT"}
+    go _ _ (Case scrut ty alts@(_:_:_)) = do
+      -- TODO: check that it's okay to use `mkUnsafeSystemName`
+      let resId'  = resId {varName = mkUnsafeSystemName "~RESULT" 0}
       selectionDecls <- mkSelection resId' scrut ty alts
       nm <- mkUniqueIdentifier Basic "selection"
       return (Right ((nm,selectionDecls),Reg))
 
-    go _ e'@(App _ _) = do
+    go _ _ e'@(App _ _) = do
       tcm <- Lens.use tcCache
-      eType <- termType tcm e'
+      let eType = termType tcm e'
       (appExpr,appDecls) <- mkExpr False (Left "#bb_res") eType e'
-      let assn = Assignment (pack "~RESULT") appExpr
+      let assn = Assignment "~RESULT" appExpr
       nm <- if null appDecls
                then return ""
                else mkUniqueIdentifier Basic "block"
       return (Right ((nm,appDecls ++ [assn]),Wire))
 
-    go _ e'@(Letrec _) = do
+    go is0 _ e'@(Letrec {}) = do
       tcm <- Lens.use tcCache
-      normE <- splitNormalized tcm e'
+      let normE = splitNormalized tcm e'
       ([],[],_,[],binders,resultM) <- case normE of
-        Right norm -> mkUniqueNormalized Nothing norm
+        Right norm -> do
+          isCur <- Lens.use globalInScope
+          globalInScope Lens..= is0 `unionInScope` isCur
+          norm' <- mkUniqueNormalized Nothing norm
+          globalInScope Lens..= isCur
+          return norm'
         Left err -> error err
       case resultM of
         Just result -> do
           let binders' = map (\(id_,tm) -> (goR result id_,tm)) binders
-          netDecls <- fmap catMaybes . mapM mkNetDecl $ filter ((/= result) . varName . fst) binders
-          decls    <- concat <$> mapM (uncurry mkDeclarations . second unembed) binders'
-          Just (NetDecl' _ rw _ _) <- mkNetDecl . head $ filter ((==result) . varName . fst) binders
+          netDecls <- fmap catMaybes . mapM mkNetDecl $ filter ((/= result) . fst) binders
+          decls    <- concat <$> mapM (uncurry mkDeclarations) binders'
+          Just (NetDecl' _ rw _ _) <- mkNetDecl . head $ filter ((==result) . fst) binders
           nm <- mkUniqueIdentifier Basic "fun"
           return (Right ((nm,netDecls ++ decls),rw))
         Nothing -> return (Right (("",[]),Wire))
       where
-        goR r id_ | varName id_ == r = id_ {varName = string2SystemName "~RESULT"}
-                  | otherwise        = id_
+        -- TODO: check that it's okay to use `mkUnsafeSystemName`
+        goR r id_ | id_ == r  = id_ {varName = mkUnsafeSystemName "~RESULT" 0}
+                  | otherwise = id_
 
-    go _ e' = error $ $(curLoc) ++ "Cannot make function input for: " ++ showDoc e'
+    go _ _ e' = error $ $(curLoc) ++ "Cannot make function input for: " ++ showPpr e'

@@ -13,59 +13,57 @@
 
 module Clash.Normalize.Util where
 
-import           Control.Lens            ((&),(+~),(%=),(^.),_5)
+import           Control.Lens            ((&),(+~),(%=),(^.),_4)
 import qualified Control.Lens            as Lens
-import           Data.HashMap.Lazy       (HashMap)
-import qualified Data.HashMap.Lazy       as HashMap
 import qualified Data.List               as List
-import           Unbound.Generics.LocallyNameless        (Fresh, unembed ,unrec)
-import           Unbound.Generics.LocallyNameless.Unsafe (unsafeUnbind)
 
-import           Clash.Core.FreeVars     (termFreeIds)
-import           Clash.Core.Term         (Term (..), TmOccName)
-import           Clash.Core.TyCon        (TyCon, TyConOccName)
+import           Clash.Core.FreeVars     (idOccursIn, termFreeIds)
+import           Clash.Core.Term         (Term (..))
+import           Clash.Core.TyCon        (TyConMap)
+import           Clash.Core.Var          (Id, Var (..))
+import           Clash.Core.VarEnv
 import           Clash.Core.Util
   (collectArgs, isClockOrReset, isPolyFun, termType)
 import           Clash.Driver.Types      (BindingMap)
 import           Clash.Normalize.Types
 import           Clash.Rewrite.Types     (bindings,extra,tcCache)
 import           Clash.Rewrite.Util      (specialise)
+import           Clash.Unique
 
 -- | Determine if a function is already inlined in the context of the 'NetlistMonad'
 alreadyInlined
-  :: TmOccName
+  :: Id
   -- ^ Function we want to inline
-  -> TmOccName
+  -> Id
   -- ^ Function in which we want to perform the inlining
   -> NormalizeMonad (Maybe Int)
 alreadyInlined f cf = do
   inlinedHM <- Lens.use inlineHistory
-  case HashMap.lookup cf inlinedHM of
+  case lookupVarEnv cf inlinedHM of
     Nothing       -> return Nothing
-    Just inlined' -> return (HashMap.lookup f inlined')
+    Just inlined' -> return (lookupVarEnv f inlined')
 
 addNewInline
-  :: TmOccName
+  :: Id
   -- ^ Function we want to inline
-  -> TmOccName
+  -> Id
   -- ^ Function in which we want to perform the inlining
   -> NormalizeMonad ()
 addNewInline f cf =
-  inlineHistory %= HashMap.insertWith
-                     (\_ hm -> HashMap.insertWith (+) f 1 hm)
+  inlineHistory %= extendVarEnvWith
                      cf
-                     (HashMap.singleton f 1)
+                     (unitVarEnv f 1)
+                     (\_ hm -> extendVarEnvWith f 1 (+) hm)
 
 -- | Specialize under the Normalization Monad
 specializeNorm :: NormRewrite
 specializeNorm = specialise specialisationCache specialisationHistory specialisationLimit
 
 -- | Determine if a term is closed
-isClosed :: Fresh m
-         => HashMap TyConOccName TyCon
+isClosed :: TyConMap
          -> Term
-         -> m Bool
-isClosed tcm = fmap not . isPolyFun tcm
+         -> Bool
+isClosed tcm = not . isPolyFun tcm
 
 -- | Determine if a term represents a constant
 isConstant :: Term -> Bool
@@ -78,52 +76,49 @@ isConstant e = case collectArgs e of
 isConstantNotClockReset :: Term -> NormalizeSession Bool
 isConstantNotClockReset e = do
   tcm <- Lens.view tcCache
-  eTy <- termType tcm e
+  let eTy = termType tcm e
   if isClockOrReset tcm eTy
      then return False
      else return (isConstant e)
 
 -- | Assert whether a name is a reference to a recursive binder.
 isRecursiveBndr
-  :: TmOccName
+  :: Id
   -> NormalizeSession Bool
 isRecursiveBndr f = do
   cg <- Lens.use (extra.recursiveComponents)
-  case HashMap.lookup f cg of
+  case lookupVarEnv f cg of
     Just isR -> return isR
     Nothing -> do
-      fBodyM <- HashMap.lookup f <$> Lens.use bindings
+      fBodyM <- lookupVarEnv f <$> Lens.use bindings
       case fBodyM of
         Nothing -> return False
-        Just (_,_,_,_,fBody) -> do
+        Just (_,_,_,fBody) -> do
           -- There are no global mutually-recursive functions, only self-recursive
           -- ones, so checking whether 'f' is part of the free variables of the
           -- body of 'f' is sufficient.
-          let used = Lens.toListOf termFreeIds fBody
-              isR  = f `elem` used
-          (extra.recursiveComponents) %= HashMap.insert f isR
+          let isR = f `idOccursIn` fBody
+          (extra.recursiveComponents) %= extendVarEnv f isR
           return isR
 
 -- | A call graph counts the number of occurrences that a functions 'g' is used
 -- in 'f'.
-type CallGraph = HashMap TmOccName (HashMap TmOccName Word)
+type CallGraph = VarEnv (VarEnv Word)
 
 -- | Create a call graph for a set of global binders, given a root
 callGraph
   :: BindingMap
-  -> TmOccName
+  -> Id
   -> CallGraph
-callGraph bndrs = go HashMap.empty
+callGraph bndrs rt = go emptyVarEnv (varUniq rt)
   where
     go cg root
-      | Nothing     <- HashMap.lookup root cg
-      , Just rootTm <- HashMap.lookup root bndrs =
-      let used = List.foldl'
-                   (\m k -> HashMap.insertWith (+) k 1 m)
-                   HashMap.empty
-                   (Lens.toListOf termFreeIds (rootTm ^. _5))
-          cg'  = HashMap.insert root used cg
-      in  List.foldl' go cg' (HashMap.keys used)
+      | Nothing     <- lookupUniqMap root cg
+      , Just rootTm <- lookupUniqMap root bndrs =
+      let used = Lens.foldMapByOf termFreeIds (unionVarEnvWith (+))
+                  emptyVarEnv (`unitUniqMap` 1) (rootTm ^. _4)
+          cg'  = extendUniqMap root used cg
+      in  List.foldl' go cg' (keysUniqMap used)
     go cg _ = cg
 
 -- | Give a "performance/size" classification of a function in normal form.
@@ -132,15 +127,12 @@ classifyFunction
   -> TermClassification
 classifyFunction = go (TermClassification 0 0 0)
   where
-    go !c (Lam b)    = let (_,e) = unsafeUnbind b in go c e
-    go !c (TyLam b)  = let (_,e) = unsafeUnbind b in go c e
-    go !c (Letrec b) =
-      let (bndsR,_) = unsafeUnbind b
-          es        = map (unembed . snd) (unrec bndsR)
-      in  List.foldl' go c es
-    go !c e@(App _ _) = case fst (collectArgs e) of
-      Prim _ _ -> c & primitive +~ 1
-      Var _ _  -> c & function +~ 1
+    go !c (Lam _ e)     = go c e
+    go !c (TyLam _ e)   = go c e
+    go !c (Letrec bs _) = List.foldl' go c (map snd bs)
+    go !c e@(App {}) = case fst (collectArgs e) of
+      Prim {} -> c & primitive +~ 1
+      Var {}  -> c & function +~ 1
       _ -> c
     go !c (Case _ _ alts) = case alts of
       (_:_:_) -> c & selection  +~ 1

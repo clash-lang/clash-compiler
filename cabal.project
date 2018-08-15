@@ -35,6 +35,9 @@ package clash-ghc
 package clash-testsuite
   flags: cosim
 
+package clash-lib
+  flags: debug
+
 optional-packages: singletons/th-desugar/th-desugar.cabal
                    singletons/singletons.cabal
                    clash-cosim/clash-cosim.cabal

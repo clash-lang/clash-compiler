@@ -29,7 +29,7 @@ import           Clash.Annotations.BitRepresentation
 import           Control.DeepSeq                          (NFData)
 import           Data.Hashable                            (Hashable)
 import qualified Data.Map                                 as Map
-import qualified Data.Text.Lazy                           as Text
+import qualified Data.Text                                as Text
 import           Data.Typeable                            (Typeable)
 import qualified Language.Haskell.TH.Syntax               as TH
 import           GHC.Generics                             (Generic)

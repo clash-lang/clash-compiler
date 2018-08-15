@@ -15,14 +15,15 @@ module Clash.Netlist
   ) where
 
 import Clash.Core.DataCon   (DataCon)
-import Clash.Core.Term      (Alt,LetBinding,Term,TmOccName)
+import Clash.Core.Term      (Alt,LetBinding,Term)
 import Clash.Core.Type      (Type)
 import Clash.Core.Var       (Id)
-import Clash.Driver.Types   (SrcSpan)
 import Clash.Netlist.Types  (Expr, HWType, Identifier, NetlistMonad, Component,
                              Declaration)
+import SrcLoc               (SrcSpan)
 
-genComponent :: TmOccName
+
+genComponent :: Id
              -> NetlistMonad (SrcSpan,[Identifier],Component)
 
 mkExpr :: Bool

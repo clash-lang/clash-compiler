@@ -37,14 +37,12 @@
 module Clash.Normalize.PrimitiveReductions where
 
 import qualified Control.Lens                     as Lens
-import qualified Data.HashMap.Lazy                as HashMap
+import           Data.List                        (mapAccumR)
 import qualified Data.Maybe                       as Maybe
-import           Unbound.Generics.LocallyNameless (bind, embed, rec, rebind)
 
 import           Clash.Core.DataCon               (DataCon, dataConInstArgTys)
 import           Clash.Core.Literal               (Literal (..))
-import           Clash.Core.Name
-import           Clash.Core.Pretty                (showDoc)
+import           Clash.Core.Pretty                (showPpr)
 import           Clash.Core.Term                  (Term (..), Pat (..))
 import           Clash.Core.Type                  (LitTy (..), Type (..),
                                                    TypeView (..), coreView,
@@ -53,103 +51,119 @@ import           Clash.Core.Type                  (LitTy (..), Type (..),
                                                    undefinedTy)
 import           Clash.Core.TyCon                 (TyConName, tyConDataCons)
 import           Clash.Core.TysPrim               (integerPrimTy, typeNatKind)
-import           Clash.Core.Util                  (appendToVec, extractElems,
-                                                   extractTElems, idToVar,
-                                                   mkApps, mkRTree, mkVec,
-                                                   termType)
+import           Clash.Core.Util
+  (appendToVec, extractElems, extractTElems, idToVar, mkApps, mkRTree,
+   mkUniqInternalId, mkUniqSystemTyVar, mkVec, termType)
 import           Clash.Core.Var                   (Var (..))
+import           Clash.Core.VarEnv
+  (InScopeSet, extendInScopeSetList)
 
 import           Clash.Normalize.Types
 import           Clash.Rewrite.Types
 import           Clash.Rewrite.Util
+import           Clash.Unique
 import           Clash.Util
 
 -- | Replace an application of the @Clash.Sized.Vector.zipWith@ primitive on
 -- vectors of a known length @n@, by the fully unrolled recursive "definition"
 -- of @Clash.Sized.Vector.zipWith@
-reduceZipWith :: Integer  -- ^ Length of the vector(s)
-              -> Type -- ^ Type of the lhs of the function
-              -> Type -- ^ Type of the rhs of the function
-              -> Type -- ^ Type of the result of the function
-              -> Term -- ^ The zipWith'd functions
-              -> Term -- ^ The 1st vector argument
-              -> Term -- ^ The 2nd vector argument
-              -> NormalizeSession Term
-reduceZipWith n lhsElTy rhsElTy resElTy fun lhsArg rhsArg = do
+reduceZipWith
+  :: InScopeSet
+  -> Integer  -- ^ Length of the vector(s)
+  -> Type -- ^ Type of the lhs of the function
+  -> Type -- ^ Type of the rhs of the function
+  -> Type -- ^ Type of the result of the function
+  -> Term -- ^ The zipWith'd functions
+  -> Term -- ^ The 1st vector argument
+  -> Term -- ^ The 2nd vector argument
+  -> NormalizeSession Term
+reduceZipWith inScope0 n lhsElTy rhsElTy resElTy fun lhsArg rhsArg = do
     tcm <- Lens.view tcCache
-    ty  <- termType tcm lhsArg
+    let ty = termType tcm lhsArg
     go tcm ty
   where
     go tcm (coreView tcm -> Just ty') = go tcm ty'
     go tcm (tyView -> TyConApp vecTcNm _)
-      | (Just vecTc) <- HashMap.lookup (nameOcc vecTcNm) tcm
+      | (Just vecTc) <- lookupUniqMap vecTcNm tcm
       , [nilCon,consCon] <- tyConDataCons vecTc
-      = let (varsL,elemsL)   = second concat . unzip
-                             $ extractElems consCon lhsElTy 'L' n lhsArg
-            (varsR,elemsR)   = second concat . unzip
-                             $ extractElems consCon rhsElTy 'R' n rhsArg
+      = do
+        uniqs0 <- Lens.use uniqSupply
+        let (uniqs1,(varsL,elemsL)) = second (second concat . unzip)
+                                    $ extractElems uniqs0 inScope0 consCon lhsElTy 'L' n lhsArg
+            inScope1 = extendInScopeSetList inScope0 (map fst elemsL)
+            (uniqs2,(varsR,elemsR)) = second (second concat . unzip)
+                                    $ extractElems uniqs1 inScope1 consCon rhsElTy 'R' n rhsArg
             funApps          = zipWith (\l r -> mkApps fun [Left l,Left r]) varsL varsR
             lbody            = mkVec nilCon consCon resElTy n funApps
-            lb               = Letrec (bind (rec (init elemsL ++ init elemsR)) lbody)
-        in  changed lb
-    go _ ty = error $ $(curLoc) ++ "reduceZipWith: argument does not have a vector type: " ++ showDoc ty
+            lb               = Letrec (init elemsL ++ init elemsR) lbody
+        uniqSupply Lens..= uniqs2
+        changed lb
+    go _ ty = error $ $(curLoc) ++ "reduceZipWith: argument does not have a vector type: " ++ showPpr ty
 
 -- | Replace an application of the @Clash.Sized.Vector.map@ primitive on vectors
 -- of a known length @n@, by the fully unrolled recursive "definition" of
 -- @Clash.Sized.Vector.map@
-reduceMap :: Integer  -- ^ Length of the vector
-          -> Type -- ^ Argument type of the function
-          -> Type -- ^ Result type of the function
-          -> Term -- ^ The map'd function
-          -> Term -- ^ The map'd over vector
-          -> NormalizeSession Term
-reduceMap n argElTy resElTy fun arg = do
+reduceMap
+  :: InScopeSet
+  -> Integer  -- ^ Length of the vector
+  -> Type -- ^ Argument type of the function
+  -> Type -- ^ Result type of the function
+  -> Term -- ^ The map'd function
+  -> Term -- ^ The map'd over vector
+  -> NormalizeSession Term
+reduceMap inScope n argElTy resElTy fun arg = do
     tcm <- Lens.view tcCache
-    ty  <- termType tcm arg
+    let ty = termType tcm arg
     go tcm ty
   where
     go tcm (coreView tcm -> Just ty') = go tcm ty'
     go tcm (tyView -> TyConApp vecTcNm _)
-      | (Just vecTc)     <- HashMap.lookup (nameOcc vecTcNm) tcm
+      | (Just vecTc)     <- lookupUniqMap vecTcNm tcm
       , [nilCon,consCon] <- tyConDataCons vecTc
-      = let (vars,elems)     = second concat . unzip
-                             $ extractElems consCon argElTy 'A' n arg
+      = do
+        uniqs0 <- Lens.use uniqSupply
+        let (uniqs1,(vars,elems)) = second (second concat . unzip)
+                                  $ extractElems uniqs0 inScope consCon argElTy 'A' n arg
             funApps          = map (fun `App`) vars
             lbody            = mkVec nilCon consCon resElTy n funApps
-            lb               = Letrec (bind (rec (init elems)) lbody)
-        in  changed lb
-    go _ ty = error $ $(curLoc) ++ "reduceMap: argument does not have a vector type: " ++ showDoc ty
+            lb               = Letrec (init elems) lbody
+        uniqSupply Lens..= uniqs1
+        changed lb
+    go _ ty = error $ $(curLoc) ++ "reduceMap: argument does not have a vector type: " ++ showPpr ty
 
 -- | Replace an application of the @Clash.Sized.Vector.imap@ primitive on vectors
 -- of a known length @n@, by the fully unrolled recursive "definition" of
 -- @Clash.Sized.Vector.imap@
-reduceImap :: Integer  -- ^ Length of the vector
-           -> Type -- ^ Argument type of the function
-           -> Type -- ^ Result type of the function
-           -> Term -- ^ The imap'd function
-           -> Term -- ^ The imap'd over vector
-           -> NormalizeSession Term
-reduceImap n argElTy resElTy fun arg = do
+reduceImap
+  :: InScopeSet
+  -> Integer  -- ^ Length of the vector
+  -> Type -- ^ Argument type of the function
+  -> Type -- ^ Result type of the function
+  -> Term -- ^ The imap'd function
+  -> Term -- ^ The imap'd over vector
+  -> NormalizeSession Term
+reduceImap inScope n argElTy resElTy fun arg = do
     tcm <- Lens.view tcCache
-    ty  <- termType tcm arg
+    let ty = termType tcm arg
     go tcm ty
   where
     go tcm (coreView tcm -> Just ty') = go tcm ty'
     go tcm (tyView -> TyConApp vecTcNm _)
-      | (Just vecTc)     <- HashMap.lookup (nameOcc vecTcNm) tcm
+      | (Just vecTc)     <- lookupUniqMap vecTcNm tcm
       , [nilCon,consCon] <- tyConDataCons vecTc
       = do
-        let (vars,elems)     = second concat . unzip
-                             $ extractElems consCon argElTy 'I' n arg
-        (Right idxTy:_,_) <- splitFunForallTy <$> termType tcm fun
-        let (TyConApp idxTcNm _) = tyView idxTy
-            nTv              = string2InternalName "n"
+        uniqs0 <- Lens.use uniqSupply
+        let (uniqs1,nTv)     = mkUniqSystemTyVar (uniqs0,inScope) ("n",typeNatKind)
+            (uniqs2,(vars,elems)) = second (second concat . unzip)
+                                  $ uncurry extractElems uniqs1 consCon argElTy 'I' n arg
+            (Right idxTy:_,_) = splitFunForallTy (termType tcm fun)
+            (TyConApp idxTcNm _) = tyView idxTy
             -- fromInteger# :: KnownNat n => Integer -> Index n
-            idxFromIntegerTy = ForAllTy (bind (TyVar nTv (embed typeNatKind))
-                                         (foldr mkFunTy
-                                                (mkTyConApp idxTcNm
-                                                            [VarTy typeNatKind nTv])
-                                                [integerPrimTy,integerPrimTy]))
+            idxFromIntegerTy = ForAllTy nTv
+                                        (foldr mkFunTy
+                                               (mkTyConApp idxTcNm
+                                                           [VarTy nTv])
+                                               [integerPrimTy,integerPrimTy])
             idxFromInteger   = Prim "Clash.Sized.Internal.Index.fromInteger#"
                                     idxFromIntegerTy
             idxs             = map (App (App (TyApp idxFromInteger (LitTy (NumTy n)))
@@ -158,87 +172,91 @@ reduceImap n argElTy resElTy fun arg = do
 
             funApps          = zipWith (\i v -> App (App fun i) v) idxs vars
             lbody            = mkVec nilCon consCon resElTy n funApps
-            lb               = Letrec (bind (rec (init elems)) lbody)
+            lb               = Letrec (init elems) lbody
+        uniqSupply Lens..= uniqs2
         changed lb
-    go _ ty = error $ $(curLoc) ++ "reduceImap: argument does not have a vector type: " ++ showDoc ty
+    go _ ty = error $ $(curLoc) ++ "reduceImap: argument does not have a vector type: " ++ showPpr ty
 
 -- | Replace an application of the @Clash.Sized.Vector.traverse#@ primitive on
 -- vectors of a known length @n@, by the fully unrolled recursive "definition"
 -- of @Clash.Sized.Vector.traverse#@
-reduceTraverse :: Integer  -- ^ Length of the vector
-               -> Type -- ^ Element type of the argument vector
-               -> Type -- ^ The type of the applicative
-               -> Type -- ^ Element type of the result vector
-               -> Term -- ^ The @Applicative@ dictionary
-               -> Term -- ^ The function to traverse with
-               -> Term -- ^ The argument vector
-               -> NormalizeSession Term
-reduceTraverse n aTy fTy bTy dict fun arg = do
+reduceTraverse
+  :: InScopeSet
+  -> Integer  -- ^ Length of the vector
+  -> Type -- ^ Element type of the argument vector
+  -> Type -- ^ The type of the applicative
+  -> Type -- ^ Element type of the result vector
+  -> Term -- ^ The @Applicative@ dictionary
+  -> Term -- ^ The function to traverse with
+  -> Term -- ^ The argument vector
+  -> NormalizeSession Term
+reduceTraverse inScope n aTy fTy bTy dict fun arg = do
     tcm <- Lens.view tcCache
-    (TyConApp apDictTcNm _) <- tyView <$> termType tcm dict
-    ty <- termType tcm arg
+    let (TyConApp apDictTcNm _) = tyView (termType tcm dict)
+        ty = termType tcm arg
     go tcm apDictTcNm ty
   where
     go tcm apDictTcNm (coreView tcm -> Just ty') = go tcm apDictTcNm ty'
     go tcm apDictTcNm (tyView -> TyConApp vecTcNm _)
-      | (Just vecTc) <- HashMap.lookup (nameOcc vecTcNm) tcm
+      | (Just vecTc) <- lookupUniqMap vecTcNm tcm
       , [nilCon,consCon] <- tyConDataCons vecTc
-      = let (Just apDictTc)    = HashMap.lookup (nameOcc apDictTcNm) tcm
+      = do
+        uniqs0 <- Lens.use uniqSupply
+        let (Just apDictTc)    = lookupUniqMap apDictTcNm tcm
             [apDictCon]        = tyConDataCons apDictTc
             (Just apDictIdTys) = dataConInstArgTys apDictCon [fTy]
-            apDictIds          = zipWith Id (map string2InternalName
-                                                 ["functorDict"
-                                                 ,"pure"
-                                                 ,"ap"
-                                                 ,"apConstL"
-                                                 ,"apConstR"])
-                                            (map embed apDictIdTys)
+            (uniqs1,apDictIds@[functorDictId,pureId,apId,_,_]) =
+              mapAccumR mkUniqInternalId (uniqs0,inScope)
+                (zip ["functorDict","pure","ap","apConstL","apConstR"]
+                     apDictIdTys)
 
             (TyConApp funcDictTcNm _) = tyView (head apDictIdTys)
-            (Just funcDictTc) = HashMap.lookup (nameOcc funcDictTcNm) tcm
+            (Just funcDictTc) = lookupUniqMap funcDictTcNm tcm
             [funcDictCon] = tyConDataCons funcDictTc
             (Just funcDictIdTys) = dataConInstArgTys funcDictCon [fTy]
-            funcDicIds    = zipWith Id (map string2InternalName ["fmap","fmapConst"])
-                                       (map embed funcDictIdTys)
+            (uniqs2,funcDicIds@[fmapId,_]) =
+              mapAccumR mkUniqInternalId uniqs1
+                (zip ["fmap","fmapConst"] funcDictIdTys)
 
-            apPat    = DataPat (embed apDictCon) (rebind [] apDictIds)
-            fnPat    = DataPat (embed funcDictCon) (rebind [] funcDicIds)
+            apPat    = DataPat apDictCon   [] apDictIds
+            fnPat    = DataPat funcDictCon [] funcDicIds
 
             -- Extract the 'pure' function from the Applicative dictionary
-            pureTy = apDictIdTys!!1
-            pureTm = Case dict pureTy [bind apPat (Var pureTy (string2InternalName "pure"))]
+            pureTy = varType pureId
+            pureTm = Case dict pureTy [(apPat,Var pureId)]
 
             -- Extract the '<*>' function from the Applicative dictionary
-            apTy   = apDictIdTys!!2
-            apTm   = Case dict apTy [bind apPat (Var apTy (string2InternalName "ap"))]
+            apTy   = varType apId
+            apTm   = Case dict apTy [(apPat, Var apId)]
 
             -- Extract the Functor dictionary from the Applicative dictionary
-            funcTy = (head apDictIdTys)
+            funcTy = varType functorDictId
             funcTm = Case dict funcTy
-                               [bind apPat (Var funcTy (string2InternalName "functorDict"))]
+                               [(apPat,Var functorDictId)]
 
             -- Extract the 'fmap' function from the Functor dictionary
-            fmapTy = (head funcDictIdTys)
-            fmapTm = Case (Var funcTy (string2InternalName "functorDict")) fmapTy
-                          [bind fnPat (Var fmapTy (string2InternalName "fmap"))]
+            fmapTy = varType fmapId
+            fmapTm = Case (Var functorDictId) fmapTy
+                          [(fnPat, Var fmapId)]
 
-            (vars,elems) = second concat . unzip
-                         $ extractElems consCon aTy 'T' n arg
+            (uniqs3,(vars,elems)) = second (second concat . unzip)
+                                  $ uncurry extractElems uniqs2 consCon aTy 'T' n arg
 
             funApps = map (fun `App`) vars
 
-            lbody   = mkTravVec vecTcNm nilCon consCon (idToVar (apDictIds!!1))
-                                                       (idToVar (apDictIds!!2))
-                                                       (idToVar (funcDicIds!!0))
+            lbody   = mkTravVec vecTcNm nilCon consCon (Var (apDictIds!!1))
+                                                       (Var (apDictIds!!2))
+                                                       (Var (funcDicIds!!0))
                                                        bTy n funApps
 
-            lb      = Letrec (bind (rec ([((apDictIds!!0),embed funcTm)
-                                         ,((apDictIds!!1),embed pureTm)
-                                         ,((apDictIds!!2),embed apTm)
-                                         ,((funcDicIds!!0),embed fmapTm)
-                                         ] ++ init elems)) lbody)
-          in  changed lb
-    go _ _ ty = error $ $(curLoc) ++ "reduceTraverse: argument does not have a vector type: " ++ showDoc ty
+            lb      = Letrec ([((apDictIds!!0), funcTm)
+                              ,((apDictIds!!1), pureTm)
+                              ,((apDictIds!!2), apTm)
+                              ,((funcDicIds!!0), fmapTm)
+                              ] ++ init elems) lbody
+        uniqSupply Lens..= uniqs3
+        changed lb
+    go _ _ ty = error $ $(curLoc) ++ "reduceTraverse: argument does not have a vector type: " ++ showPpr ty
 
 -- | Create the traversable vector
 --
@@ -291,7 +309,8 @@ mkTravVec vecTc nilCon consCon pureTm apTm fmapTm bTy = go
 -- vectors of a known length @n@, by the fully unrolled recursive "definition"
 -- of @Clash.Sized.Vector.foldr@
 reduceFoldr
-  :: Integer
+  :: InScopeSet
+  -> Integer
   -- ^ Length of the vector
   -> Type
   -- ^ Element type of the argument vector
@@ -302,28 +321,32 @@ reduceFoldr
   -> Term
   -- ^ The argument vector
   -> NormalizeSession Term
-reduceFoldr 0 _ _ start _ = changed start
-reduceFoldr n aTy fun start arg = do
+reduceFoldr _ 0 _ _ start _ = changed start
+reduceFoldr inScope n aTy fun start arg = do
     tcm <- Lens.view tcCache
-    ty  <- termType tcm arg
+    let ty = termType tcm arg
     go tcm ty
   where
     go tcm (coreView tcm -> Just ty') = go tcm ty'
     go tcm (tyView -> TyConApp vecTcNm _)
-      | (Just vecTc) <- HashMap.lookup (nameOcc vecTcNm) tcm
+      | (Just vecTc) <- lookupUniqMap vecTcNm tcm
       , [_,consCon] <- tyConDataCons vecTc
-      = let (vars,elems)     = second concat . unzip
-                             $ extractElems consCon aTy 'G' n arg
+      = do
+        uniqs0 <- Lens.use uniqSupply
+        let (uniqs1,(vars,elems)) = second (second concat . unzip)
+                                  $ extractElems uniqs0 inScope consCon aTy 'G' n arg
             lbody            = foldr (\l r -> mkApps fun [Left l,Left r]) start vars
-            lb               = Letrec (bind (rec (init elems)) lbody)
-        in  changed lb
-    go _ ty = error $ $(curLoc) ++ "reduceFoldr: argument does not have a vector type: " ++ showDoc ty
+            lb               = Letrec (init elems) lbody
+        uniqSupply Lens..= uniqs1
+        changed lb
+    go _ ty = error $ $(curLoc) ++ "reduceFoldr: argument does not have a vector type: " ++ showPpr ty
 
 -- | Replace an application of the @Clash.Sized.Vector.fold@ primitive on
 -- vectors of a known length @n@, by the fully unrolled recursive "definition"
 -- of @Clash.Sized.Vector.fold@
 reduceFold
-  :: Integer
+  :: InScopeSet
+  -> Integer
   -- ^ Length of the vector
   -> Type
   -- ^ Element type of the argument vector
@@ -332,21 +355,24 @@ reduceFold
   -> Term
   -- ^ The argument vector
   -> NormalizeSession Term
-reduceFold n aTy fun arg = do
+reduceFold inScope n aTy fun arg = do
     tcm <- Lens.view tcCache
-    ty  <- termType tcm arg
+    let ty = termType tcm arg
     go tcm ty
   where
     go tcm (coreView tcm -> Just ty') = go tcm ty'
     go tcm (tyView -> TyConApp vecTcNm _)
-      | (Just vecTc) <- HashMap.lookup (nameOcc vecTcNm) tcm
+      | (Just vecTc) <- lookupUniqMap vecTcNm tcm
       , [_,consCon]  <- tyConDataCons vecTc
-      = let (vars,elems)     = second concat . unzip
-                             $ extractElems consCon aTy 'F' n arg
+      = do
+        uniqs0 <- Lens.use uniqSupply
+        let (uniqs1,(vars,elems)) = second (second concat . unzip)
+                                  $ extractElems uniqs0 inScope consCon aTy 'F' n arg
             lbody            = foldV vars
-            lb               = Letrec (bind (rec (init elems)) lbody)
-        in  changed lb
-    go _ ty = error $ $(curLoc) ++ "reduceFold: argument does not have a vector type: " ++ showDoc ty
+            lb               = Letrec (init elems) lbody
+        uniqSupply Lens..= uniqs1
+        changed lb
+    go _ ty = error $ $(curLoc) ++ "reduceFold: argument does not have a vector type: " ++ showPpr ty
 
     foldV [a] = a
     foldV as  = let (l,r) = splitAt (length as `div` 2) as
@@ -358,7 +384,8 @@ reduceFold n aTy fun arg = do
 -- vectors of a known length @n@, by the fully unrolled recursive "definition"
 -- of @Clash.Sized.Vector.dfold@
 reduceDFold
-  :: Integer
+  :: InScopeSet
+  -> Integer
   -- ^ Length of the vector
   -> Type
   -- ^ Element type of the argument vector
@@ -369,27 +396,29 @@ reduceDFold
   -> Term
   -- ^ The vector to fold
   -> NormalizeSession Term
-reduceDFold 0 _ _ start _ = changed start
-reduceDFold n aTy fun start arg = do
+reduceDFold _ 0 _ _ start _ = changed start
+reduceDFold inScope n aTy fun start arg = do
     tcm <- Lens.view tcCache
-    ty  <- termType tcm arg
+    let ty = termType tcm arg
     go tcm ty
   where
     go tcm (coreView tcm -> Just ty') = go tcm ty'
     go tcm (tyView -> TyConApp vecTcNm _)
-      | (Just vecTc) <- HashMap.lookup (nameOcc vecTcNm) tcm
+      | (Just vecTc) <- lookupUniqMap vecTcNm tcm
       , [_,consCon]  <- tyConDataCons vecTc
       = do
-        let  (vars,elems)     = second concat . unzip
-                         $ extractElems consCon aTy 'D' n arg
-        (_ltv:Right snTy:_,_) <- splitFunForallTy <$> termType tcm fun
-        let (TyConApp snatTcNm _) = tyView snTy
-            (Just snatTc)         = HashMap.lookup (nameOcc snatTcNm) tcm
+        uniqs0 <- Lens.use uniqSupply
+        let (uniqs1,(vars,elems)) = second (second concat . unzip)
+                                  $ extractElems uniqs0 inScope consCon aTy 'D' n arg
+            (_ltv:Right snTy:_,_) = splitFunForallTy (termType tcm fun)
+            (TyConApp snatTcNm _) = tyView snTy
+            (Just snatTc)         = lookupUniqMap snatTcNm tcm
             [snatDc]              = tyConDataCons snatTc
             lbody = doFold (buildSNat snatDc) (n-1) vars
-            lb    = Letrec (bind (rec (init elems)) lbody)
+            lb    = Letrec (init elems) lbody
+        uniqSupply Lens..= uniqs1
         changed lb
-    go _ ty = error $ $(curLoc) ++ "reduceDFold: argument does not have a vector type: " ++ showDoc ty
+    go _ ty = error $ $(curLoc) ++ "reduceDFold: argument does not have a vector type: " ++ showPpr ty
 
     doFold _    _ []     = start
     doFold snDc k (x:xs) = mkApps fun
@@ -402,124 +431,149 @@ reduceDFold n aTy fun start arg = do
 -- | Replace an application of the @Clash.Sized.Vector.head@ primitive on
 -- vectors of a known length @n@, by a projection of the first element of a
 -- vector.
-reduceHead :: Integer  -- ^ Length of the vector
-           -> Type -- ^ Element type of the vector
-           -> Term -- ^ The argument vector
-           -> NormalizeSession Term
-reduceHead n aTy vArg = do
+reduceHead
+  :: InScopeSet
+  -> Integer  -- ^ Length of the vector
+  -> Type -- ^ Element type of the vector
+  -> Term -- ^ The argument vector
+  -> NormalizeSession Term
+reduceHead inScope n aTy vArg = do
     tcm <- Lens.view tcCache
-    ty  <- termType tcm vArg
+    let ty = termType tcm vArg
     go tcm ty
   where
     go tcm (coreView tcm -> Just ty') = go tcm ty'
     go tcm (tyView -> TyConApp vecTcNm _)
-      | (Just vecTc) <- HashMap.lookup (nameOcc vecTcNm) tcm
+      | (Just vecTc) <- lookupUniqMap vecTcNm tcm
       , [_,consCon]  <- tyConDataCons vecTc
-      = let (vars,elems)  = second concat . unzip
-                          $ extractElems consCon aTy 'H' n vArg
-            lb = Letrec (bind (rec [head elems]) (head vars))
-        in  changed lb
-    go _ ty = error $ $(curLoc) ++ "reduceHead: argument does not have a vector type: " ++ showDoc ty
+      = do
+        uniqs0 <- Lens.use uniqSupply
+        let (uniqs1,(vars,elems)) = second (second concat . unzip)
+                                  $ extractElems uniqs0 inScope consCon aTy 'H' n vArg
+            lb = Letrec [head elems] (head vars)
+        uniqSupply Lens..= uniqs1
+        changed lb
+    go _ ty = error $ $(curLoc) ++ "reduceHead: argument does not have a vector type: " ++ showPpr ty
 
 -- | Replace an application of the @Clash.Sized.Vector.tail@ primitive on
 -- vectors of a known length @n@, by a projection of the tail of a
 -- vector.
-reduceTail :: Integer  -- ^ Length of the vector
-           -> Type -- ^ Element type of the vector
-           -> Term -- ^ The argument vector
-           -> NormalizeSession Term
-reduceTail n aTy vArg = do
+reduceTail
+  :: InScopeSet
+  -> Integer  -- ^ Length of the vector
+  -> Type -- ^ Element type of the vector
+  -> Term -- ^ The argument vector
+  -> NormalizeSession Term
+reduceTail inScope n aTy vArg = do
     tcm <- Lens.view tcCache
-    ty  <- termType tcm vArg
+    let ty = termType tcm vArg
     go tcm ty
   where
     go tcm (coreView tcm -> Just ty') = go tcm ty'
     go tcm (tyView -> TyConApp vecTcNm _)
-      | (Just vecTc) <- HashMap.lookup (nameOcc vecTcNm) tcm
+      | (Just vecTc) <- lookupUniqMap vecTcNm tcm
       , [_,consCon]  <- tyConDataCons vecTc
-      = let (_,elems)    = second concat . unzip
-                         $ extractElems consCon aTy 'L' n vArg
+      = do
+        uniqs0 <- Lens.use uniqSupply
+        let (uniqs1,(_,elems)) = second (second concat . unzip)
+                               $ extractElems uniqs0 inScope consCon aTy 'L' n vArg
             b@(tB,_)     = elems !! 1
-            lb           = Letrec (bind (rec [b]) (idToVar tB))
-        in  changed lb
-    go _ ty = error $ $(curLoc) ++ "reduceTail: argument does not have a vector type: " ++ showDoc ty
+            lb           = Letrec [b] (Var tB)
+        uniqSupply Lens..= uniqs1
+        changed lb
+    go _ ty = error $ $(curLoc) ++ "reduceTail: argument does not have a vector type: " ++ showPpr ty
 
 -- | Replace an application of the @Clash.Sized.Vector.last@ primitive on
 -- vectors of a known length @n@, by a projection of the last element of a
 -- vector.
-reduceLast :: Integer  -- ^ Length of the vector
-           -> Type -- ^ Element type of the vector
-           -> Term -- ^ The argument vector
-           -> NormalizeSession Term
-reduceLast n aTy vArg = do
+reduceLast
+  :: InScopeSet
+  -> Integer  -- ^ Length of the vector
+  -> Type -- ^ Element type of the vector
+  -> Term -- ^ The argument vector
+  -> NormalizeSession Term
+reduceLast inScope n aTy vArg = do
     tcm <- Lens.view tcCache
-    ty  <- termType tcm vArg
+    let ty = termType tcm vArg
     go tcm ty
   where
     go tcm (coreView tcm -> Just ty') = go tcm ty'
     go tcm (tyView -> TyConApp vecTcNm _)
-      | (Just vecTc) <- HashMap.lookup (nameOcc vecTcNm) tcm
+      | (Just vecTc) <- lookupUniqMap vecTcNm tcm
       , [_,consCon]  <- tyConDataCons vecTc
-      = let (_,elems)    = unzip
-                         $ extractElems consCon aTy 'L' n vArg
+      = do
+        uniqs0 <- Lens.use uniqSupply
+        let (uniqs1,(_,elems)) = second unzip
+                               $ extractElems uniqs0 inScope consCon aTy 'L' n vArg
             (tB,_)       = head (last elems)
-        in case n of
-            0 -> changed (mkApps (Prim "Clash.Transformations.undefined" undefinedTy) [Right aTy])
-            _ -> changed (Letrec (bind (rec (init (concat elems))) (idToVar tB)))
-    go _ ty = error $ $(curLoc) ++ "reduceLast: argument does not have a vector type: " ++ showDoc ty
+        uniqSupply Lens..= uniqs1
+        case n of
+         0 -> changed (mkApps (Prim "Clash.Transformations.undefined" undefinedTy) [Right aTy])
+         _ -> changed (Letrec (init (concat elems)) (Var tB))
+    go _ ty = error $ $(curLoc) ++ "reduceLast: argument does not have a vector type: " ++ showPpr ty
 
 -- | Replace an application of the @Clash.Sized.Vector.init@ primitive on
 -- vectors of a known length @n@, by a projection of the init of a
 -- vector.
-reduceInit :: Integer  -- ^ Length of the vector
-           -> Type -- ^ Element type of the vector
-           -> Term -- ^ The argument vector
-           -> NormalizeSession Term
-reduceInit n aTy vArg = do
+reduceInit
+  :: InScopeSet
+  -> Integer  -- ^ Length of the vector
+  -> Type -- ^ Element type of the vector
+  -> Term -- ^ The argument vector
+  -> NormalizeSession Term
+reduceInit inScope n aTy vArg = do
     tcm <- Lens.view tcCache
-    ty  <- termType tcm vArg
+    let ty = termType tcm vArg
     go tcm ty
   where
     go tcm (coreView tcm -> Just ty') = go tcm ty'
     go tcm (tyView -> TyConApp vecTcNm _)
-      | (Just vecTc) <- HashMap.lookup (nameOcc vecTcNm) tcm
+      | (Just vecTc) <- lookupUniqMap vecTcNm tcm
       , [nilCon,consCon]  <- tyConDataCons vecTc
-      = let (_,elems)    = unzip
-                         $ extractElems consCon aTy 'L' n vArg
-        in case n of
-            0 -> changed (mkApps (Prim "Clash.Transformations.undefined" undefinedTy) [Right aTy])
-            1 -> changed (mkVec nilCon consCon aTy 0 [])
-            _ -> let el = init elems
-                     iv = mkVec nilCon consCon aTy (n-1) (map (idToVar . fst . head) el)
-                     lb = rec (init (concat el))
-                 in  changed (Letrec (bind lb iv))
+      = do
+        uniqs0 <- Lens.use uniqSupply
+        let (uniqs1,(_,elems)) = second unzip
+                               $ extractElems uniqs0 inScope consCon aTy 'L' n vArg
+        uniqSupply Lens..= uniqs1
+        case n of
+         0 -> changed (mkApps (Prim "Clash.Transformations.undefined" undefinedTy) [Right aTy])
+         1 -> changed (mkVec nilCon consCon aTy 0 [])
+         _ -> let el = init elems
+                  iv = mkVec nilCon consCon aTy (n-1) (map (idToVar . fst . head) el)
+                  lb = init (concat el)
+              in  changed (Letrec lb iv)
 
-    go _ ty = error $ $(curLoc) ++ "reduceInit: argument does not have a vector type: " ++ showDoc ty
+    go _ ty = error $ $(curLoc) ++ "reduceInit: argument does not have a vector type: " ++ showPpr ty
 
 -- | Replace an application of the @Clash.Sized.Vector.(++)@ primitive on
 -- vectors of a known length @n@, by the fully unrolled recursive "definition"
 -- of @Clash.Sized.Vector.(++)@
-reduceAppend :: Integer  -- ^ Length of the LHS arg
-             -> Integer  -- ^ Lenght of the RHS arg
-             -> Type -- ^ Element type of the vectors
-             -> Term -- ^ The LHS argument
-             -> Term -- ^ The RHS argument
-             -> NormalizeSession Term
-reduceAppend n m aTy lArg rArg = do
+reduceAppend
+  :: InScopeSet
+  -> Integer  -- ^ Length of the LHS arg
+  -> Integer  -- ^ Lenght of the RHS arg
+  -> Type -- ^ Element type of the vectors
+  -> Term -- ^ The LHS argument
+  -> Term -- ^ The RHS argument
+  -> NormalizeSession Term
+reduceAppend inScope n m aTy lArg rArg = do
     tcm <- Lens.view tcCache
-    ty  <- termType tcm lArg
+    let ty = termType tcm lArg
     go tcm ty
   where
     go tcm (coreView tcm -> Just ty') = go tcm ty'
     go tcm (tyView -> TyConApp vecTcNm _)
-      | (Just vecTc) <- HashMap.lookup (nameOcc vecTcNm) tcm
+      | (Just vecTc) <- lookupUniqMap vecTcNm tcm
       , [_,consCon]  <- tyConDataCons vecTc
-      = let (vars,elems) = second concat . unzip
-                         $ extractElems consCon aTy 'C' n lArg
-            lbody        = appendToVec consCon aTy rArg (n+m) vars
-            lb           = Letrec (bind (rec (init elems)) lbody)
-        in  changed lb
-    go _ ty = error $ $(curLoc) ++ "reduceAppend: argument does not have a vector type: " ++ showDoc ty
+      = do uniqs0 <- Lens.use uniqSupply
+           let (uniqs1,(vars,elems)) = second (second concat . unzip)
+                                     $ extractElems uniqs0 inScope consCon aTy
+                                         'C' n lArg
+               lbody        = appendToVec consCon aTy rArg (n+m) vars
+               lb           = Letrec (init elems) lbody
+           uniqSupply Lens..= uniqs1
+           changed lb
+    go _ ty = error $ $(curLoc) ++ "reduceAppend: argument does not have a vector type: " ++ showPpr ty
 
 -- | Replace an application of the @Clash.Sized.Vector.unconcat@ primitive on
 -- vectors of a known length @n@, by the fully unrolled recursive "definition"
@@ -531,18 +585,18 @@ reduceUnconcat :: Integer  -- ^ Length of the result vector
                -> NormalizeSession Term
 reduceUnconcat n 0 aTy arg = do
     tcm <- Lens.view tcCache
-    ty  <- termType tcm arg
+    let ty = termType tcm arg
     go tcm ty
   where
     go tcm (coreView tcm -> Just ty') = go tcm ty'
     go tcm (tyView -> TyConApp vecTcNm _)
-      | (Just vecTc)     <- HashMap.lookup (nameOcc vecTcNm) tcm
+      | (Just vecTc)     <- lookupUniqMap vecTcNm tcm
       , [nilCon,consCon] <- tyConDataCons vecTc
       = let nilVec           = mkVec nilCon consCon aTy 0 []
             innerVecTy       = mkTyConApp vecTcNm [LitTy (NumTy 0), aTy]
             retVec           = mkVec nilCon consCon innerVecTy n (replicate (fromInteger n) nilVec)
         in  changed retVec
-    go _ ty = error $ $(curLoc) ++ "reduceUnconcat: argument does not have a vector type: " ++ showDoc ty
+    go _ ty = error $ $(curLoc) ++ "reduceUnconcat: argument does not have a vector type: " ++ showPpr ty
 
 reduceUnconcat _ _ _ _ = error $ $(curLoc) ++ "reduceUnconcat: unimplemented"
 
@@ -556,18 +610,18 @@ reduceTranspose :: Integer  -- ^ Length of the result vector
                 -> NormalizeSession Term
 reduceTranspose n 0 aTy arg = do
     tcm <- Lens.view tcCache
-    ty  <- termType tcm arg
+    let ty = termType tcm arg
     go tcm ty
   where
     go tcm (coreView tcm -> Just ty') = go tcm ty'
     go tcm (tyView -> TyConApp vecTcNm _)
-      | (Just vecTc)     <- HashMap.lookup (nameOcc vecTcNm) tcm
+      | (Just vecTc)     <- lookupUniqMap vecTcNm tcm
       , [nilCon,consCon] <- tyConDataCons vecTc
       = let nilVec           = mkVec nilCon consCon aTy 0 []
             innerVecTy       = mkTyConApp vecTcNm [LitTy (NumTy 0), aTy]
             retVec           = mkVec nilCon consCon innerVecTy n (replicate (fromInteger n) nilVec)
         in  changed retVec
-    go _ ty = error $ $(curLoc) ++ "reduceTranspose: argument does not have a vector type: " ++ showDoc ty
+    go _ ty = error $ $(curLoc) ++ "reduceTranspose: argument does not have a vector type: " ++ showPpr ty
 
 reduceTranspose _ _ _ _ = error $ $(curLoc) ++ "reduceTranspose: unimplemented"
 
@@ -582,40 +636,45 @@ reduceReplicate n aTy eTy arg = do
   where
     go tcm (coreView tcm -> Just ty') = go tcm ty'
     go tcm (tyView -> TyConApp vecTcNm _)
-      | (Just vecTc)     <- HashMap.lookup (nameOcc vecTcNm) tcm
+      | (Just vecTc)     <- lookupUniqMap vecTcNm tcm
       , [nilCon,consCon] <- tyConDataCons vecTc
       = let retVec = mkVec nilCon consCon aTy n (replicate (fromInteger n) arg)
         in  changed retVec
-    go _ ty = error $ $(curLoc) ++ "reduceReplicate: argument does not have a vector type: " ++ showDoc ty
+    go _ ty = error $ $(curLoc) ++ "reduceReplicate: argument does not have a vector type: " ++ showPpr ty
 
 -- | Replace an application of the @Clash.Sized.Vector.dtfold@ primitive on
 -- vectors of a known length @n@, by the fully unrolled recursive "definition"
 -- of @Clash.Sized.Vector.dtfold@
-reduceDTFold :: Integer  -- ^ Length of the vector
-             -> Type     -- ^ Element type of the argument vector
-             -> Term     -- ^ Function to convert elements with
-             -> Term     -- ^ Function to combine branches with
-             -> Term     -- ^ The vector to fold
-             -> NormalizeSession Term
-reduceDTFold n aTy lrFun brFun arg = do
+reduceDTFold
+  :: InScopeSet
+  -> Integer  -- ^ Length of the vector
+  -> Type     -- ^ Element type of the argument vector
+  -> Term     -- ^ Function to convert elements with
+  -> Term     -- ^ Function to combine branches with
+  -> Term     -- ^ The vector to fold
+  -> NormalizeSession Term
+reduceDTFold inScope n aTy lrFun brFun arg = do
     tcm <- Lens.view tcCache
-    ty  <- termType tcm arg
+    let ty = termType tcm arg
     go tcm ty
   where
     go tcm (coreView tcm -> Just ty') = go tcm ty'
     go tcm (tyView -> TyConApp vecTcNm _)
-      | (Just vecTc) <- HashMap.lookup (nameOcc vecTcNm) tcm
+      | (Just vecTc) <- lookupUniqMap vecTcNm tcm
       , [_,consCon]  <- tyConDataCons vecTc
-      = do let (vars,elems) = second concat . unzip
-                            $ extractElems consCon aTy 'T' (2^n) arg
-           (_ltv:Right snTy:_,_) <- splitFunForallTy <$> termType tcm brFun
-           let (TyConApp snatTcNm _) = tyView snTy
-               (Just snatTc)         = HashMap.lookup (nameOcc snatTcNm) tcm
+      = do uniqs0 <- Lens.use uniqSupply
+           let (uniqs1,(vars,elems)) = second (second concat . unzip)
+                                     $ extractElems uniqs0 inScope consCon aTy
+                                         'T' (2^n) arg
+               (_ltv:Right snTy:_,_) = splitFunForallTy (termType tcm brFun)
+               (TyConApp snatTcNm _) = tyView snTy
+               (Just snatTc)         = lookupUniqMap snatTcNm tcm
                [snatDc]              = tyConDataCons snatTc
                lbody = doFold (buildSNat snatDc) (n-1) vars
-               lb    = Letrec (bind (rec (init elems)) lbody)
+               lb    = Letrec (init elems) lbody
+           uniqSupply Lens..= uniqs1
            changed lb
-    go _ ty = error $ $(curLoc) ++ "reduceDTFold: argument does not have a vector type: " ++ showDoc ty
+    go _ ty = error $ $(curLoc) ++ "reduceDTFold: argument does not have a vector type: " ++ showPpr ty
 
     doFold :: (Integer -> Term) -> Integer -> [Term] -> Term
     doFold _    _ [x] = mkApps lrFun [Left x]
@@ -633,30 +692,34 @@ reduceDTFold n aTy lrFun brFun arg = do
 -- | Replace an application of the @Clash.Sized.RTree.tdfold@ primitive on
 -- trees of a known depth @n@, by the fully unrolled recursive "definition"
 -- of @Clash.Sized.RTree.tdfold@
-reduceTFold :: Integer -- ^ Depth of the tree
-            -> Type    -- ^ Element type of the argument tree
-            -> Term    -- ^ Function to convert elements with
-            -> Term    -- ^ Function to combine branches with
-            -> Term    -- ^ The tree to fold
-            -> NormalizeSession Term
-reduceTFold n aTy lrFun brFun arg = do
+reduceTFold
+  :: InScopeSet
+  -> Integer -- ^ Depth of the tree
+  -> Type    -- ^ Element type of the argument tree
+  -> Term    -- ^ Function to convert elements with
+  -> Term    -- ^ Function to combine branches with
+  -> Term    -- ^ The tree to fold
+  -> NormalizeSession Term
+reduceTFold inScope n aTy lrFun brFun arg = do
     tcm <- Lens.view tcCache
-    ty  <- termType tcm arg
+    let ty = termType tcm arg
     go tcm ty
   where
     go tcm (coreView tcm -> Just ty') = go tcm ty'
     go tcm (tyView -> TyConApp treeTcNm _)
-      | (Just treeTc) <- HashMap.lookup (nameOcc treeTcNm) tcm
+      | (Just treeTc) <- lookupUniqMap treeTcNm tcm
       , [lrCon,brCon] <- tyConDataCons treeTc
-      = do let (vars,elems)     = extractTElems lrCon brCon aTy 'T' n arg
-           (_ltv:Right snTy:_,_) <- splitFunForallTy <$> termType tcm brFun
-           let (TyConApp snatTcNm _) = tyView snTy
-               (Just snatTc)         = HashMap.lookup (nameOcc snatTcNm) tcm
+      = do uniqs0 <- Lens.use uniqSupply
+           let (uniqs1,(vars,elems)) = extractTElems uniqs0 inScope lrCon brCon aTy 'T' n arg
+               (_ltv:Right snTy:_,_) = splitFunForallTy (termType tcm brFun)
+               (TyConApp snatTcNm _) = tyView snTy
+               (Just snatTc)         = lookupUniqMap snatTcNm tcm
                [snatDc]              = tyConDataCons snatTc
                lbody = doFold (buildSNat snatDc) (n-1) vars
-               lb    = Letrec (bind (rec elems) lbody)
+               lb    = Letrec elems lbody
+           uniqSupply Lens..= uniqs1
            changed lb
-    go _ ty = error $ $(curLoc) ++ "reduceTFold: argument does not have a tree type: " ++ showDoc ty
+    go _ ty = error $ $(curLoc) ++ "reduceTFold: argument does not have a tree type: " ++ showPpr ty
 
     doFold _    _ [x] = mkApps lrFun [Left x]
     doFold snDc k xs  =
@@ -681,11 +744,11 @@ reduceTReplicate n aTy eTy arg = do
   where
     go tcm (coreView tcm -> Just ty') = go tcm ty'
     go tcm (tyView -> TyConApp treeTcNm _)
-      | (Just treeTc) <- HashMap.lookup (nameOcc treeTcNm) tcm
+      | (Just treeTc) <- lookupUniqMap treeTcNm tcm
       , [lrCon,brCon] <- tyConDataCons treeTc
       = let retVec = mkRTree lrCon brCon aTy n (replicate (2^n) arg)
         in  changed retVec
-    go _ ty = error $ $(curLoc) ++ "reduceTReplicate: argument does not have a vector type: " ++ showDoc ty
+    go _ ty = error $ $(curLoc) ++ "reduceTReplicate: argument does not have a vector type: " ++ showPpr ty
 
 buildSNat :: DataCon -> Integer -> Term
 buildSNat snatDc i =

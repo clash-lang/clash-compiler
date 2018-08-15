@@ -21,8 +21,8 @@ where
 #error MIN_VERSION_text undefined
 #endif
 
-import Data.Char      (isAsciiLower,isAsciiUpper,isDigit)
-import Data.Text.Lazy as Text
+import Data.Char (isAsciiLower,isAsciiUpper,isDigit)
+import Data.Text as Text
 
 data IdType = Basic | Extended
 

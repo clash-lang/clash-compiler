@@ -18,13 +18,10 @@ module Clash.Driver where
 import qualified Control.Concurrent.Supply        as Supply
 import           Control.DeepSeq
 import           Control.Exception                (tryJust, bracket)
-import           Control.Lens                     (view, (^.), _3, _5)
+import           Control.Lens                     (use, view, (^.), _3, _4)
 import           Control.Monad                    (guard, when, unless, join, foldM)
 import           Control.Monad.State              (evalState, get)
 import           Data.Hashable                    (hash)
-import qualified Data.HashMap.Lazy                as HML
-import           Data.HashMap.Strict              (HashMap)
-import qualified Data.HashMap.Strict              as HM
 import qualified Data.HashSet                     as HashSet
 import           Data.IntMap                      (IntMap)
 import           Data.List                        (intercalate)
@@ -53,6 +50,7 @@ import qualified Text.PrettyPrint.ANSI.Leijen     as ANSI
 import           Text.Trifecta.Result
   (Result(Success, Failure), _errDoc)
 import           Text.Read                        (readMaybe)
+import           SrcLoc                           (SrcSpan)
 import           GHC.BasicTypes.Extra             ()
 
 import           Clash.Annotations.Primitive      (HDL (..))
@@ -62,10 +60,12 @@ import           Clash.Annotations.TopEntity      (TopEntity (..))
 import           Clash.Annotations.TopEntity.Extra ()
 import           Clash.Backend
 import           Clash.Core.Evaluator             (PrimEvaluator)
-import           Clash.Core.Name                  (Name (..), name2String)
-import           Clash.Core.Term                  (Term, TmName, TmOccName)
+import           Clash.Core.Name                  (Name (..))
+import           Clash.Core.Term                  (Term)
 import           Clash.Core.Type                  (Type)
-import           Clash.Core.TyCon                 (TyCon, TyConName, TyConOccName)
+import           Clash.Core.TyCon                 (TyConMap, TyConName)
+import           Clash.Core.Var                   (Id, varName)
+import           Clash.Core.VarEnv                (InScopeSet, emptyVarEnv)
 import           Clash.Driver.Types
 import           Clash.Netlist                    (genNetlist)
 import           Clash.Netlist.Util               (genComponentName, genTopComponentName)
@@ -76,8 +76,10 @@ import           Clash.Netlist.Types
 import           Clash.Normalize                  (checkNonRecursive, cleanupGraph,
                                                    normalize, runNormalization)
 import           Clash.Normalize.Util             (callGraph)
+import           Clash.Rewrite.Types              (globalInScope)
 import           Clash.Primitives.Types
 import           Clash.Primitives.Util            (hashCompiledPrimMap)
+import           Clash.Unique                     (keysUniqMap, lookupUniqMap')
 import           Clash.Util                       (first)
 
 -- | Get modification data of current clash binary.
@@ -93,18 +95,17 @@ generateHDL
   -> Maybe backend
   -> CompiledPrimMap
   -- ^ Primitive / BlackBox Definitions
-  -> HashMap TyConOccName TyCon
+  -> TyConMap
   -- ^ TyCon cache
   -> IntMap TyConName
   -- ^ Tuple TyCon cache
-  -> (CustomReprs -> HashMap TyConOccName TyCon -> Bool -> Type -> Maybe (Either String HWType))
+  -> (CustomReprs -> TyConMap -> Bool -> Type -> Maybe (Either String HWType))
   -- ^ Hardcoded 'Type' -> 'HWType' translator
   -> PrimEvaluator
   -- ^ Hardcoded evaluator (delta-reduction)
-  -> [( TmName
-      , Type
+  -> [( Id
       , Maybe TopEntity
-      , Maybe TmName
+      , Maybe Id
       )]
   -- ^ topEntity bndr
   -- + (maybe) TopEntity annotation
@@ -121,41 +122,42 @@ generateHDL reprs bindingsMap hdlState primMap tcm tupTcm typeTrans eval topEnti
                               show (Clock.diffUTCTime prevTime startTime)
 
   -- Process the next TopEntity
-  go prevTime seen ((topEntity,_,annM,benchM):topEntities') = do
-  putStrLn $ "Compiling: " ++ name2String topEntity
+  go prevTime seen ((topEntity,annM,benchM):topEntities') = do
+  let topEntityS = Data.Text.unpack (nameOcc (varName topEntity))
+  putStrLn $ "Compiling: " ++ topEntityS
 
   -- Some initial setup
-  let modName1 = takeWhile (/= '.') (name2String topEntity)
+  let modName1 = takeWhile (/= '.') topEntityS
       (modName,prefixM) = case opt_componentPrefix opts of
         Just p
           | not (null p) -> case annM of
             -- Prefix top names with 'p', prefix other with 'p_tname'
             Just ann ->
               let nm = p ++ ('_':t_name ann)
-              in  (nm,(Just (Text.pack p),Just (Text.pack nm)))
+              in  (nm,(Just (Data.Text.pack p),Just (Data.Text.pack nm)))
             -- Prefix top names with 'p', prefix other with 'p'
-            _ ->  (p ++ '_':modName1,(Just (Text.pack p),Just (Text.pack p)))
+            _ ->  (p ++ '_':modName1,(Just (Data.Text.pack p),Just (Data.Text.pack p)))
           | Just ann <- annM -> case hdlKind (undefined :: backend) of
               -- Prefix other with 't_name'
-              VHDL -> (t_name ann,(Nothing,Just (Text.pack (t_name ann))))
+              VHDL -> (t_name ann,(Nothing,Just (Data.Text.pack (t_name ann))))
               _    -> (t_name ann,(Nothing,Nothing))
         _ -> case annM of
           Just ann -> case hdlKind (undefined :: backend) of
             VHDL -> (t_name ann, (Nothing,Nothing))
             -- Prefix other with 't_name'
-            _    -> (t_name ann, (Nothing,Just (Text.pack (t_name ann))))
+            _    -> (t_name ann, (Nothing,Just (Data.Text.pack (t_name ann))))
           _ -> (modName1, (Nothing,Nothing))
       iw        = opt_intWidth opts
       hdlsyn    = opt_hdlSyn opts
-      hdlState' = setModName modName
+      hdlState' = setModName (Data.Text.pack modName)
                 $ fromMaybe (initBackend iw hdlsyn :: backend) hdlState
       hdlDir    = fromMaybe "." (opt_hdlDir opts) </>
                         Clash.Backend.name hdlState' </>
-                        takeWhile (/= '.') (name2String topEntity)
+                        takeWhile (/= '.') topEntityS
       mkId      = evalState mkIdentifier hdlState'
       extId     = evalState extendIdentifier hdlState'
       topNm     = genTopComponentName mkId prefixM annM topEntity
-      topNmU    = Text.unpack topNm
+      topNmU    = Data.Text.unpack topNm
 
   unless (opt_cachehdl opts) $ putStrLn "Ignoring .manifest files"
 
@@ -170,7 +172,7 @@ generateHDL reprs bindingsMap hdlState primMap tcm tupTcm typeTrans eval topEnti
         hash ( annM
              , primMapHash
              , show clashModDate
-             , callGraphBindings bindingsMap (nameOcc topEntity)
+             , callGraphBindings bindingsMap topEntity
              )
 
     let
@@ -178,7 +180,7 @@ generateHDL reprs bindingsMap hdlState primMap tcm tupTcm typeTrans eval topEnti
         case benchM of
           Nothing -> Nothing
           Just bench ->
-            let terms = callGraphBindings bindingsMap (nameOcc bench) in
+            let terms = callGraphBindings bindingsMap bench in
             Just (hash (annM, primMapHash, show clashModDate, terms))
 
     let manifestI  = Manifest (topHash,benchHashM) [] [] [] [] []
@@ -204,36 +206,36 @@ generateHDL reprs bindingsMap hdlState primMap tcm tupTcm typeTrans eval topEnti
                     . snd
                     . Supply.freshId
                    <$> Supply.newSupply
-  let topEntityNames = map (\(x,_,_,_) -> nameOcc x) topEntities
+  let topEntityNames = map (\(x,_,_) -> x) topEntities
 
   (topTime,manifest',seen') <- if sameTopHash
     then do
-      putStrLn ("Using cached result for: " ++ name2String topEntity)
+      putStrLn ("Using cached result for: " ++ Data.Text.unpack (nameOcc (varName topEntity)))
       topTime <- Clock.getCurrentTime
       return (topTime,manifest,componentNames manifest ++ seen)
     else do
       -- 1. Normalise topEntity
-      let transformedBindings = normalizeEntity reprs bindingsMap primMap tcm tupTcm
+      let (transformedBindings,is0) = normalizeEntity reprs bindingsMap primMap tcm tupTcm
                                   typeTrans eval topEntityNames opts supplyN
-                                  (nameOcc topEntity)
+                                  topEntity
 
       normTime <- transformedBindings `deepseq` Clock.getCurrentTime
       let prepNormDiff = Clock.diffUTCTime normTime prevTime
       putStrLn $ "Normalisation took " ++ show prepNormDiff
 
       -- 2. Generate netlist for topEntity
-      (netlist,seen') <- genNetlist reprs transformedBindings topEntities primMap
+      (netlist,seen') <- genNetlist reprs transformedBindings is0 topEntities primMap
                                 tcm typeTrans iw mkId extId seen
-                                hdlDir prefixM (nameOcc topEntity)
+                                hdlDir prefixM topEntity
 
       netlistTime <- netlist `deepseq` Clock.getCurrentTime
       let normNetDiff = Clock.diffUTCTime netlistTime normTime
       putStrLn $ "Netlist generation took " ++ show normNetDiff
 
       -- 3. Generate topEntity wrapper
-      let topComponent = view _3 . head $ filter (Text.isSuffixOf topNm . componentName . view _3) netlist
-          (hdlDocs,manifest',dfiles,mfiles)  = createHDL hdlState' modName seen' netlist topComponent
-                                   (topNmU, Right manifest)
+      let topComponent = view _3 . head $ filter (Data.Text.isSuffixOf topNm . componentName . view _3) netlist
+          (hdlDocs,manifest',dfiles,mfiles)  = createHDL hdlState' (Data.Text.pack modName) seen' netlist topComponent
+                                   (topNm, Right manifest)
           dir = hdlDir </> maybe "" (const modName) annM
       prepareDir (opt_cleanhdl opts) (extension hdlState') dir
       mapM_ (writeHDL dir) hdlDocs
@@ -245,22 +247,22 @@ generateHDL reprs bindingsMap hdlState primMap tcm tupTcm typeTrans eval topEnti
 
   benchTime <- case benchM of
     Just tb | not sameBenchHash -> do
-      putStrLn $ "Compiling: " ++ name2String tb
+      putStrLn $ "Compiling: " ++ Data.Text.unpack (nameOcc (varName tb))
 
-      let modName'  = Text.unpack (genComponentName [] mkId prefixM tb)
+      let modName'  = genComponentName [] mkId prefixM tb
           hdlState2 = setModName modName' hdlState'
 
       -- 1. Normalise testBench
-      let transformedBindings = normalizeEntity reprs bindingsMap primMap tcm tupTcm
-                                  typeTrans eval topEntityNames opts supplyTB (nameOcc tb)
+      let (transformedBindings,is0) = normalizeEntity reprs bindingsMap primMap tcm tupTcm
+                                  typeTrans eval topEntityNames opts supplyTB tb
       normTime <- transformedBindings `deepseq` Clock.getCurrentTime
       let prepNormDiff = Clock.diffUTCTime normTime topTime
       putStrLn $ "Testbench normalisation took " ++ show prepNormDiff
 
       -- 2. Generate netlist for topEntity
-      (netlist,seen'') <- genNetlist reprs transformedBindings topEntities primMap
+      (netlist,seen'') <- genNetlist reprs transformedBindings is0 topEntities primMap
                               tcm typeTrans iw mkId extId seen'
-                              hdlDir prefixM (nameOcc tb)
+                              hdlDir prefixM tb
 
       netlistTime <- netlist `deepseq` Clock.getCurrentTime
       let normNetDiff = Clock.diffUTCTime netlistTime normTime
@@ -268,8 +270,8 @@ generateHDL reprs bindingsMap hdlState primMap tcm tupTcm typeTrans eval topEnti
 
       -- 3. Write HDL
       let (hdlDocs,_,dfiles,mfiles) = createHDL hdlState2 modName' seen'' netlist undefined
-                           (topNmU, Left manifest')
-          dir = hdlDir </> maybe "" t_name annM </> modName'
+                           (topNm, Left manifest')
+          dir = hdlDir </> maybe "" t_name annM </> Data.Text.unpack modName'
       prepareDir (opt_cleanhdl opts) (extension hdlState2) dir
       writeHDL (hdlDir </> maybe "" t_name annM) (head hdlDocs)
       mapM_ (writeHDL dir) (tail hdlDocs)
@@ -279,7 +281,7 @@ generateHDL reprs bindingsMap hdlState primMap tcm tupTcm typeTrans eval topEnti
       hdlDocs `seq` Clock.getCurrentTime
 
     Just tb -> do
-      let tb' = name2String tb
+      let tb' = Data.Text.unpack (nameOcc (varName tb))
       putStrLn ("Compiling: " ++ tb')
       putStrLn ("Using cached result for: " ++ tb')
       return topTime
@@ -419,7 +421,7 @@ createHDL
   :: Backend backend
   => backend
   -- ^ Backend
-  -> String
+  -> Identifier
   -- ^ Module hierarchy root
   -> [Identifier]
   -- ^ Component names
@@ -427,7 +429,7 @@ createHDL
   -- ^ List of components
   -> Component
   -- ^ Top component
-  -> (String, Either Manifest Manifest)
+  -> (Identifier, Either Manifest Manifest)
   -- ^ Name of the manifest file
   -- + Either:
   --   * Left manifest:  Only write/update the hashes of the @manifest@
@@ -446,11 +448,12 @@ createHDL backend modName seen components top (topName,manifestE) = flip evalSta
       qincs = concat incs
       topFiles = hdl ++ qincs
   manifest <- either return (\m -> do
-      let topName' = Text.pack topName
       let topInNames = map fst (inputs top)
-      topInTypes  <- mapM (fmap renderOneLine . hdlType (External topName') . snd) (inputs top)
+      topInTypes  <- mapM (fmap (Text.toStrict . renderOneLine) .
+                           hdlType (External topName) . snd) (inputs top)
       let topOutNames = map (fst . snd) (outputs top)
-      topOutTypes <- mapM (fmap renderOneLine . hdlType (External topName') . snd . snd) (outputs top)
+      topOutTypes <- mapM (fmap (Text.toStrict . renderOneLine) .
+                           hdlType (External topName) . snd . snd) (outputs top)
       let compNames = map (componentName . view _3) components
       return (m { portInNames    = topInNames
                 , portInTypes    = topInTypes
@@ -459,7 +462,7 @@ createHDL backend modName seen components top (topName,manifestE) = flip evalSta
                 , componentNames = compNames
                 })
     ) manifestE
-  let manDoc = ( topName <.> "manifest"
+  let manDoc = ( Data.Text.unpack topName <.> "manifest"
                , pretty (Text.pack (show manifest)))
   return (manDoc:topFiles,manifest,dataFiles,memFiles)
 
@@ -537,11 +540,11 @@ copyDataFiles idirs dir = mapM_ (copyFile' idirs)
 callGraphBindings
   :: BindingMap
   -- ^ All bindings
-  -> TmOccName
+  -> Id
   -- ^ Root of the call graph
   -> [Term]
 callGraphBindings bindingsMap tm =
-  map ((^. _5) . (bindingsMap HM.!)) (HM.keys cg)
+  map ((^. _4) . (bindingsMap `lookupUniqMap'`)) (keysUniqMap cg)
   where
     cg = callGraph bindingsMap tm
 
@@ -552,29 +555,31 @@ normalizeEntity
   -- ^ All bindings
   -> CompiledPrimMap
   -- ^ BlackBox HDL templates
-  -> HashMap TyConOccName TyCon
+  -> TyConMap
   -- ^ TyCon cache
   -> IntMap TyConName
   -- ^ Tuple TyCon cache
-  -> (CustomReprs -> HashMap TyConOccName TyCon -> Bool -> Type -> Maybe (Either String HWType))
+  -> (CustomReprs -> TyConMap -> Bool -> Type -> Maybe (Either String HWType))
   -- ^ Hardcoded 'Type' -> 'HWType' translator
   -> PrimEvaluator
   -- ^ Hardcoded evaluator (delta-reduction)
-  -> [TmOccName]
+  -> [Id]
   -- ^ TopEntities
   -> ClashOpts
   -- ^ Debug information level for the normalization process
   -> Supply.Supply
   -- ^ Unique supply
-  -> TmOccName
+  -> Id
   -- ^ root of the hierarchy
-  -> BindingMap
+  -> (BindingMap, InScopeSet)
 normalizeEntity reprs bindingsMap primMap tcm tupTcm typeTrans eval topEntities
   opts supply tm = transformedBindings
   where
     doNorm = do norm <- normalize [tm]
                 let normChecked = checkNonRecursive norm
-                cleanupGraph tm normChecked
+                cleaned <- cleanupGraph tm normChecked
+                is0 <- use globalInScope
+                return (cleaned,is0)
     transformedBindings = runNormalization opts supply bindingsMap
-                            typeTrans reprs tcm tupTcm eval primMap HML.empty
+                            typeTrans reprs tcm tupTcm eval primMap emptyVarEnv
                             topEntities doNorm
