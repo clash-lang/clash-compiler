@@ -36,8 +36,8 @@ import           Data.Maybe                           (catMaybes,fromMaybe,mapMa
 import           Data.Monoid                          hiding (Sum, Product)
 #endif
 import           Data.Semigroup.Monad.Extra
-import           Data.Text.Lazy                       (unpack)
 import qualified Data.Text.Lazy                       as T
+import qualified Data.Text                            as TextS
 import           Data.Text.Prettyprint.Doc.Extra
 import           GHC.Stack                            (HasCallStack)
 import qualified System.FilePath
@@ -52,7 +52,6 @@ import           Clash.Annotations.BitRepresentation.Util
   (BitOrigin(Lit, Field), bitOrigins, bitRanges)
 import           Clash.Backend
 import           Clash.Core.Var                       (Attr'(..),attrName)
-import           Clash.Driver.Types                   (SrcSpan, noSrcSpan)
 import           Clash.Netlist.BlackBox.Types         (HdlSyn (..))
 import           Clash.Netlist.BlackBox.Util
   (extractLiterals, renderBlackBox, renderFilePath)
@@ -61,7 +60,7 @@ import           Clash.Netlist.Types                  hiding (_intWidth, intWidt
 import           Clash.Netlist.Util                   hiding (mkIdentifier)
 import           Clash.Signal.Internal                (ClockKind (..))
 import           Clash.Util
-  (clogBase, curLoc, first, makeCached, on, traceIf, (<:>))
+  (SrcSpan, noSrcSpan, clogBase, curLoc, first, makeCached, on, traceIf, (<:>))
 
 #ifdef CABAL
 import qualified Paths_clash_lib
@@ -73,7 +72,7 @@ data VHDLState =
   { _tyCache   :: (HashSet HWType)     -- ^ Previously encountered HWTypes
   , _tySeen    :: [Identifier]         -- ^ Generated product types
   , _nameCache :: (HashMap HWType Doc) -- ^ Cache for previously generated product type names
-  , _modNm     :: String
+  , _modNm     :: Identifier
   , _srcSpan   :: SrcSpan
   , _libraries :: [T.Text]
   , _packages  :: [T.Text]
@@ -129,26 +128,26 @@ instance Backend VHDLState where
   iwWidth         = use intWidth
   toBV _ id_      = do
     nm <- Mon $ use modNm
-    pretty (T.toLower $ T.pack nm) <> "_types.toSLV" <> parens (pretty id_)
+    pretty (TextS.toLower nm) <> "_types.toSLV" <> parens (pretty id_)
   fromBV _ id_  = do
     nm <- Mon $ use modNm
-    pretty (T.toLower $ T.pack nm) <> "_types.fromSLV" <> parens (pretty id_)
+    pretty (TextS.toLower nm) <> "_types.fromSLV" <> parens (pretty id_)
   hdlSyn          = use hdlsyn
   mkIdentifier    = return go
     where
-      go Basic    nm = filterReserved (T.toLower (mkBasicId' True nm))
+      go Basic    nm = filterReserved (TextS.toLower (mkBasicId' True nm))
       go Extended (rmSlash -> nm) = case go Basic nm of
-        nm' | nm /= nm' -> T.concat ["\\",nm,"\\"]
+        nm' | nm /= nm' -> TextS.concat ["\\",nm,"\\"]
             |otherwise  -> nm'
   extendIdentifier = return go
     where
-      go Basic nm ext = filterReserved (T.toLower (mkBasicId' True (nm `T.append` ext)))
+      go Basic nm ext = filterReserved (TextS.toLower (mkBasicId' True (nm `TextS.append` ext)))
       go Extended ((rmSlash . escapeTemplate) -> nm) ext =
-        let nmExt = nm `T.append` ext
+        let nmExt = nm `TextS.append` ext
         in  case go Basic nm ext of
-              nm' | nm' /= nmExt -> case T.head nmExt of
-                      '#' -> T.concat ["\\",nmExt,"\\"]
-                      _   -> T.concat ["\\#",nmExt,"\\"]
+              nm' | nm' /= nmExt -> case TextS.head nmExt of
+                      '#' -> TextS.concat ["\\",nmExt,"\\"]
+                      _   -> TextS.concat ["\\#",nmExt,"\\"]
                   | otherwise    -> nm'
 
   setModName nm s = s {_modNm = nm}
@@ -181,8 +180,8 @@ instance Backend VHDLState where
 
 rmSlash :: Identifier -> Identifier
 rmSlash nm = fromMaybe nm $ do
-  nm1 <- T.stripPrefix "\\" nm
-  pure (T.filter (not . (== '\\')) nm1)
+  nm1 <- TextS.stripPrefix "\\" nm
+  pure (TextS.filter (not . (== '\\')) nm1)
 
 type VHDLM a = Mon (State VHDLState) a
 
@@ -210,11 +209,11 @@ reservedWords = ["abs","access","after","alias","all","and","architecture"
 
 filterReserved :: Identifier -> Identifier
 filterReserved s = if s `elem` reservedWords
-  then s `T.append` "_r"
+  then s `TextS.append` "_r"
   else s
 
 -- | Generate VHDL for a Netlist component
-genVHDL :: String -> SrcSpan -> [Identifier] -> Component -> VHDLM ((String,Doc),[(String,Doc)])
+genVHDL :: Identifier -> SrcSpan -> [Identifier] -> Component -> VHDLM ((String,Doc),[(String,Doc)])
 genVHDL nm sp seen c = preserveSeen $ do
     Mon $ idSeen .= seen
     Mon $ setSrcSpan sp
@@ -222,7 +221,7 @@ genVHDL nm sp seen c = preserveSeen $ do
     i <- Mon $ use includes
     Mon $ libraries .= []
     Mon $ packages  .= []
-    return ((unpack cName,v),i)
+    return ((TextS.unpack cName,v),i)
   where
     cName   = componentName c
     vhdl    = do
@@ -235,7 +234,7 @@ genVHDL nm sp seen c = preserveSeen $ do
        pure arch)
 
 -- | Generate a VHDL package containing type definitions for the given HWTypes
-mkTyPackage_ :: String
+mkTyPackage_ :: Identifier
              -> [HWType]
              -> VHDLM [(String,Doc)]
 mkTyPackage_ modName hwtys = do
@@ -247,11 +246,11 @@ mkTyPackage_ modName hwtys = do
           packageDec  = vcat $ mapM tyDec sortedTys
           (funDecs,funBodies) = unzip . mapMaybe (funDec syn) $ nubBy eqTypM sortedTys
 
-    ; (:[]) <$> (unpack $ mkId (T.pack modName `T.append` "_types"),) <$>
+    ; (:[]) <$> (TextS.unpack $ mkId (modName `TextS.append` "_types"),) <$>
       "library IEEE;" <> line <>
       "use IEEE.STD_LOGIC_1164.ALL;" <> line <>
       "use IEEE.NUMERIC_STD.ALL;" <> line <> line <>
-      "package" <+> pretty (mkId (T.pack modName `T.append` "_types")) <+> "is" <> line <>
+      "package" <+> pretty (mkId (modName `TextS.append` "_types")) <+> "is" <> line <>
          indent 2 ( packageDec <> line <>
                     vcat (sequence funDecs)
                   ) <> line <>
@@ -264,7 +263,7 @@ mkTyPackage_ modName hwtys = do
       _  -> do
         { mkId <- Mon (mkIdentifier <*> pure Basic)
         ; line <> line <>
-         "package" <+> "body" <+> pretty (mkId (T.pack modName `T.append` "_types")) <+> "is" <> line <>
+         "package" <+> "body" <+> pretty (mkId (modName `TextS.append` "_types")) <+> "is" <> line <>
            indent 2 (vcat (sequence funBodies)) <> line <>
          "end" <> semi
         }
@@ -577,7 +576,7 @@ funDec syn t@(RTree _ elTy) = Just
 
 funDec _ _ = Nothing
 
-tyImports :: String -> VHDLM Doc
+tyImports :: Identifier -> VHDLM Doc
 tyImports nm = do
   mkId <- Mon (mkIdentifier <*> pure Basic)
   libs <- Mon $ use libraries
@@ -589,20 +588,20 @@ tyImports nm = do
      , "use IEEE.MATH_REAL.ALL"
      , "use std.textio.all"
      , "use work.all"
-     , "use work." <> pretty (mkId (T.pack nm `T.append` "_types")) <> ".all"
+     , "use work." <> pretty (mkId (nm `TextS.append` "_types")) <> ".all"
      ] ++ (map (("library" <+>) . pretty) (nub libs))
        ++ (map (("use" <+>) . pretty) (nub packs)))
 
 
 -- TODO: Way too much happening on a single line
 port :: Num t
-     => T.Text
+     => TextS.Text
      -> HWType
      -> VHDLM Doc
      -> Int
      -> VHDLM (Doc, t)
 port elName hwType portDirection fillToN =
-  (,fromIntegral $ T.length elName) <$> (encodingNote hwType <> fill fillToN (pretty elName) <+> colon <+> direction <+> vhdlType hwType)
+  (,fromIntegral $ TextS.length elName) <$> (encodingNote hwType <> fill fillToN (pretty elName) <+> colon <+> direction <+> vhdlType hwType)
  where
   direction | isBiSignalIn hwType = "inout"
             | otherwise           = portDirection
@@ -704,8 +703,8 @@ attrTypes = foldl attrType HashMap.empty
 -- types are assigned to the same name.
 attrMap
   :: forall t
-   . t ~ HashMap T.Text (T.Text, [(T.Text, T.Text)])
-  => [(T.Text, Attr')]
+   . t ~ HashMap T.Text (T.Text, [(TextS.Text, T.Text)])
+  => [(TextS.Text, Attr')]
   -> t
 attrMap attrs = foldl go empty' attrs
  where
@@ -713,27 +712,27 @@ attrMap attrs = foldl go empty' attrs
            [(k, (types HashMap.! k, [])) | k <- HashMap.keys types]
   types = attrTypes (map snd attrs)
 
-  go :: t -> (T.Text, Attr') -> t
+  go :: t -> (TextS.Text, Attr') -> t
   go map' attr = HashMap.adjust
                    (go' attr)
                    (T.pack $ attrName $ snd attr)
                    map'
 
   go'
-    :: (T.Text, Attr')
-    -> (T.Text, [(T.Text, T.Text)])
-    -> (T.Text, [(T.Text, T.Text)])
+    :: (TextS.Text, Attr')
+    -> (T.Text, [(TextS.Text, T.Text)])
+    -> (T.Text, [(TextS.Text, T.Text)])
   go' (signalName, attr) (typ, elems) =
     (typ, (signalName, renderAttr attr) : elems)
 
 renderAttrs
-  :: [(T.Text, Attr')]
+  :: [(TextS.Text, Attr')]
   -> VHDLM Doc
 renderAttrs (attrMap -> attrs) =
   vcat $ sequence $ intersperse " " $ map renderAttrGroup (assocs attrs)
  where
   renderAttrGroup
-    :: (T.Text, (T.Text, [(T.Text, T.Text)]))
+    :: (T.Text, (T.Text, [(TextS.Text, T.Text)]))
     -> VHDLM Doc
   renderAttrGroup (attrname, (typ, elems)) =
     ("attribute" <+> string attrname <+> colon <+> string typ <> semi)
@@ -742,12 +741,12 @@ renderAttrs (attrMap -> attrs) =
 
   renderAttrDecl
     :: T.Text
-    -> (T.Text, T.Text)
+    -> (TextS.Text, T.Text)
     -> VHDLM Doc
   renderAttrDecl attrname (signalName, value) = "attribute"
                                              <+> string attrname
                                              <+> "of"
-                                             <+> string signalName
+                                             <+> stringS signalName
                                              <+> colon
                                              <+> "signal is"
                                              <+> string value
@@ -790,13 +789,13 @@ vhdlType hwty = do
                            _ -> "unsigned" <> parens ( int (n-1) <+> "downto 0")
     go (Vector n elTy) = do
       nm <- Mon $ use modNm
-      pretty (T.toLower $ T.pack nm) <> "_types.array_of_" <> tyName elTy <> parens ("0 to " <> int (n-1))
+      pretty (TextS.toLower nm) <> "_types.array_of_" <> tyName elTy <> parens ("0 to " <> int (n-1))
     go (RTree d elTy)  = do
       nm <- Mon $ use modNm
-      pretty (T.toLower $ T.pack nm) <> "_types.tree_of_" <> tyName elTy <> parens ("0 to " <> int ((2^d)-1))
+      pretty (TextS.toLower nm) <> "_types.tree_of_" <> tyName elTy <> parens ("0 to " <> int ((2^d)-1))
     go t@(Product _ _) = do
       nm <- Mon $ use modNm
-      pretty (T.toLower $ T.pack nm) <> "_types." <> tyName t
+      pretty (TextS.toLower nm) <> "_types." <> tyName t
     go (Void {})       = "std_logic_vector (0 downto 1)"
     go String          = "string"
     go ty              = error $ $(curLoc) ++ "vhdlType: type is not normalised: " ++ show ty
@@ -820,13 +819,13 @@ vhdlTypeMark hwty = do
     go (Unsigned _)    = "unsigned"
     go (Vector _ elTy) = do
       nm <- Mon $ use modNm
-      pretty (T.toLower $ T.pack nm) <> "_types.array_of_" <> tyName elTy
+      pretty (TextS.toLower nm) <> "_types.array_of_" <> tyName elTy
     go (RTree _ elTy)  = do
       nm <- Mon $ use modNm
-      pretty (T.toLower $ T.pack nm) <> "_types.tree_of_" <> tyName elTy
+      pretty (TextS.toLower nm) <> "_types.tree_of_" <> tyName elTy
     go t@(Product _ _) = do
       nm <- Mon $ use modNm
-      pretty (T.toLower $ T.pack nm) <> "_types." <> tyName t
+      pretty (TextS.toLower nm) <> "_types." <> tyName t
     go t               = error $ $(curLoc) ++ "vhdlTypeMark: " ++ show t
 
 tyName :: HWType -> VHDLM Doc
@@ -849,8 +848,8 @@ tyName t@(Product nm _)  = do
       tyCache %= HashSet.insert t
       seen <- use tySeen
       mkId <- mkIdentifier <*> pure Basic
-      let nm'  = (mkId . last . T.splitOn ".") nm
-          nm'' = if T.null nm'
+      let nm'  = (mkId . last . TextS.splitOn ".") nm
+          nm'' = if TextS.null nm'
                     then "product"
                     else nm'
           nm3  = if nm'' `elem` seen
@@ -860,7 +859,7 @@ tyName t@(Product nm _)  = do
       pretty nm3
 
     go mkId s i n =
-      let n' = n `T.append` T.pack ('_':show i)
+      let n' = n `TextS.append` TextS.pack ('_':show i)
       in  if n' `elem` s
              then go mkId s (i+1) n
              else n'
@@ -908,7 +907,7 @@ decls ds = do
       _  -> punctuate' semi (pure dsDoc)
 
 decl :: Int ->  Declaration -> VHDLM (Maybe (Doc,Int))
-decl l (NetDecl' noteM _ id_ ty) = Just <$> (,fromIntegral (T.length id_)) <$>
+decl l (NetDecl' noteM _ id_ ty) = Just <$> (,fromIntegral (TextS.length id_)) <$>
   maybe id addNote noteM ("signal" <+> fill l (pretty id_) <+> colon <+> either pretty vhdlType ty)
   where
     addNote n = mappend ("--" <+> pretty n <> line)
@@ -920,7 +919,7 @@ decl _ (InstDecl Comp _ nm _ pms) = fmap (Just . (,0)) $ do
     "end component"
   }
  where
-    formalLength (Identifier i _) = fromIntegral (T.length i)
+    formalLength (Identifier i _) = fromIntegral (TextS.length i)
     formalLength _                = 0
 
     portDir In  = "in"
@@ -982,7 +981,7 @@ insts [] = emptyDoc
 insts is = vcat . punctuate line . fmap catMaybes $ mapM inst_ is
 
 -- | Helper function for inst_, handling CustomSP and CustomSum
-inst_' :: T.Text -> Expr -> HWType -> [(Maybe Literal, Expr)] -> VHDLM (Maybe Doc)
+inst_' :: TextS.Text -> Expr -> HWType -> [(Maybe Literal, Expr)] -> VHDLM (Maybe Doc)
 inst_' id_ scrut scrutTy es = fmap Just $
   (pretty id_ <+> larrow <+> align (vcat (conds esNub) <> semi))
     where
@@ -1034,7 +1033,7 @@ inst_ (CondAssignment id_ _sig scrut scrutTy es) = fmap Just $
     conds ((Just c ,e):es') = expr_ False e <+> "when" <+> patLit scrutTy c <:> conds es'
 
 inst_ (InstDecl entOrComp libM nm lbl pms) = do
-    maybe (return ()) (\lib -> Mon (libraries %= (lib:))) libM
+    maybe (return ()) (\lib -> Mon (libraries %= (T.fromStrict lib:))) libM
     fmap Just $
       nest 2 $ pretty lbl <+> colon <+> entOrComp'
                 <+> maybe emptyDoc ((<> ".") . pretty) libM <> pretty nm <> line <> pms' <> semi
@@ -1042,7 +1041,7 @@ inst_ (InstDecl entOrComp libM nm lbl pms) = do
     pms' = do
       rec (p,ls) <- fmap unzip $ sequence [ (,formalLength i) <$> fill (maximum ls) (expr_ False i) <+> "=>" <+> expr_ False e | (i,_,_,e) <- pms]
       nest 2 $ "port map" <> line <> tupled (pure p)
-    formalLength (Identifier i _) = fromIntegral (T.length i)
+    formalLength (Identifier i _) = fromIntegral (TextS.length i)
     formalLength _                = 0
     entOrComp' = case entOrComp of { Entity ->"entity"; _ -> "component" }
 
@@ -1060,7 +1059,7 @@ expr_ _ (Identifier id_ Nothing) = pretty id_
 expr_ _ (Identifier id_ (Just (Indexed (CustomSP _id _dataRepr _size args,dcI,fI)))) = do
   nm <- Mon $ use modNm
   let cast = vhdlTypeMark resultType <> squote
-  let fSLV = string (T.toLower $ T.pack nm) <> "_types.fromSLV"
+  let fSLV = stringS (TextS.toLower nm) <> "_types.fromSLV"
   cast <> parens (fSLV <> parens (hcat $ punctuate " & " $ ranges))
     where
       resultType = fieldTypes !! fI
@@ -1093,7 +1092,7 @@ expr_ _ (Identifier id_ (Just (Indexed ((Vector _ elTy),1,0)))) = do
   syn <- Mon hdlSyn
   case syn of
     Vivado -> do
-      id' <- fmap renderOneLine (pretty id_ <> parens (int 0))
+      id' <- fmap (T.toStrict . renderOneLine) (pretty id_ <> parens (int 0))
       fromSLV elTy id' (typeSize elTy - 1) 0
     _ -> pretty id_ <> parens (int 0)
 expr_ _ (Identifier id_ (Just (Indexed ((Vector n _),1,1)))) = pretty id_ <> parens (int 1 <+> "to" <+> int (n-1))
@@ -1108,7 +1107,7 @@ expr_ _ (Identifier id_ (Just (Indexed ((RTree 0 elTy),0,0)))) = do
   syn <- Mon hdlSyn
   case syn of
     Vivado -> do
-      id' <- fmap renderOneLine (pretty id_ <> parens (int 0))
+      id' <- fmap (T.toStrict . renderOneLine) (pretty id_ <> parens (int 0))
       fromSLV elTy id' (typeSize elTy - 1) 0
     _ -> pretty id_ <> parens (int 0)
 expr_ _ (Identifier id_ (Just (Indexed ((RTree n _),1,0)))) =
@@ -1126,7 +1125,7 @@ expr_ _ (Identifier id_ (Just (Indexed ((Vector _ elTy),10,fI)))) = do
   syn <- Mon hdlSyn
   case syn of
     Vivado -> do
-      id' <- fmap renderOneLine (pretty id_ <> parens (int fI))
+      id' <- fmap (T.toStrict . renderOneLine) (pretty id_ <> parens (int fI))
       fromSLV elTy id' (typeSize elTy - 1) 0
     _ -> pretty id_ <> parens (int fI)
 
@@ -1137,7 +1136,7 @@ expr_ _ (Identifier id_ (Just (Indexed ((RTree _ elTy),10,fI)))) = do
   syn <- Mon hdlSyn
   case syn of
     Vivado -> do
-      id' <- fmap renderOneLine (pretty id_ <> parens (int fI))
+      id' <- fmap (T.toStrict . renderOneLine) (pretty id_ <> parens (int fI))
       fromSLV elTy id' (typeSize elTy - 1) 0
     _ -> pretty id_ <> parens (int fI)
 
@@ -1219,7 +1218,7 @@ expr_ b (Identifier id_ (Just (Nested m1 m2))) = case nestM m1 m2 of
   Just m3 -> expr_ b (Identifier id_ (Just m3))
   _ -> do
     k <- expr_ b (Identifier id_ (Just m1))
-    expr_ b (Identifier (renderOneLine k) (Just m2))
+    expr_ b (Identifier (T.toStrict $ renderOneLine k) (Just m2))
 
 expr_ _ (Identifier id_ (Just _)) = pretty id_
 
@@ -1410,13 +1409,13 @@ expr_ _ (DataTag (RTree _ _) (Right _)) = do
 expr_ _ (ConvBV topM hwty True e) = do
   nm <- Mon $ use modNm
   case topM of
-    Nothing -> pretty (T.pack nm) <> "_types" <> dot <> "toSLV" <>
+    Nothing -> pretty nm <> "_types" <> dot <> "toSLV" <>
                parens (vhdlTypeMark hwty <> "'" <> parens (expr_ False e))
     Just t  -> pretty t <> dot <> pretty t <> "_types" <> dot <> "toSLV" <> parens (expr_ False e)
 
 expr_ _ (ConvBV topM _ False e) = do
   nm <- Mon $ use modNm
-  maybe (pretty (T.pack nm) <> "_types" ) (\t -> pretty t <> dot <> pretty t <> "_types") topM <> dot <>
+  maybe (pretty nm <> "_types" ) (\t -> pretty t <> dot <> pretty t <> "_types") topM <> dot <>
     "fromSLV" <> parens (expr_ False e)
 
 expr_ _ e = error $ $(curLoc) ++ (show e) -- empty
@@ -1522,16 +1521,16 @@ bit_char Z = char 'Z'
 toSLV :: HWType -> Expr -> VHDLM Doc
 toSLV Bool         e = do
   nm <- Mon $ use modNm
-  pretty (T.toLower $ T.pack nm) <> "_types.toSLV" <> parens (expr_ False e)
+  pretty (TextS.toLower nm) <> "_types.toSLV" <> parens (expr_ False e)
 toSLV Bit          e = do
   nm <- Mon $ use modNm
-  pretty (T.toLower $ T.pack nm) <> "_types.toSLV" <> parens (expr_ False e)
+  pretty (TextS.toLower nm) <> "_types.toSLV" <> parens (expr_ False e)
 toSLV (Clock {})    e = do
   nm <- Mon $ use modNm
-  pretty (T.toLower $ T.pack nm) <> "_types.toSLV" <> parens (expr_ False e)
+  pretty (TextS.toLower nm) <> "_types.toSLV" <> parens (expr_ False e)
 toSLV (Reset {})    e = do
   nm <- Mon $ use modNm
-  pretty (T.toLower $ T.pack nm) <> "_types.toSLV" <> parens (expr_ False e)
+  pretty (TextS.toLower nm) <> "_types.toSLV" <> parens (expr_ False e)
 toSLV (BitVector _) e = expr_ True e
 toSLV (Signed _)   e = "std_logic_vector" <> parens (expr_ False e)
 toSLV (Unsigned _) e = "std_logic_vector" <> parens (expr_ False e)
@@ -1546,13 +1545,13 @@ toSLV t@(Product _ tys) (Identifier id_ Nothing) = do
     encloseSep lparen rparen " & " (zipWithM toSLV tys selIds')
   where
     tName    = tyName t
-    selNames = map (fmap renderOneLine ) [pretty id_ <> dot <> tName <> "_sel" <> int i | i <- [0..(length tys)-1]]
+    selNames = map (fmap (T.toStrict . renderOneLine) ) [pretty id_ <> dot <> tName <> "_sel" <> int i | i <- [0..(length tys)-1]]
     selIds   = map (fmap (\n -> Identifier n Nothing)) selNames
 toSLV (Product _ tys) (DataCon _ _ es) = do
   encloseSep lparen rparen " & " (zipWithM toSLV tys es)
 toSLV (Product _ _) e = do
   nm <- Mon $ use modNm
-  pretty (T.toLower $ T.pack nm) <> "_types.toSLV" <> parens (expr_ False e)
+  pretty (TextS.toLower nm) <> "_types.toSLV" <> parens (expr_ False e)
 toSLV (SP _ _) e       = expr_ False e
 toSLV (CustomSP _ _ _ _) e = expr_ False e
 toSLV (Vector n elTy) (Identifier id_ Nothing) = do
@@ -1563,19 +1562,19 @@ toSLV (Vector n elTy) (Identifier id_ Nothing) = do
         Vivado -> mapM (expr_ False) selIds'
         _ -> mapM (toSLV elTy) selIds'))
   where
-    selNames = map (fmap renderOneLine ) $ [pretty id_ <> parens (int i) | i <- [0 .. (n-1)]]
+    selNames = map (fmap (T.toStrict . renderOneLine) ) $ [pretty id_ <> parens (int i) | i <- [0 .. (n-1)]]
     selIds   = map (fmap (`Identifier` Nothing)) selNames
 toSLV (Vector n elTy) (DataCon _ _ es) =
   "std_logic_vector'" <> (parens $ vcat $ punctuate " & " (zipWithM toSLV [elTy,Vector (n-1) elTy] es))
 toSLV (Vector _ _) e = do
   nm <- Mon $ use modNm
-  pretty (T.toLower $ T.pack nm) <> "_types.toSLV" <> parens (expr_ False e)
+  pretty (TextS.toLower nm) <> "_types.toSLV" <> parens (expr_ False e)
 toSLV hty e = error $ $(curLoc) ++  "toSLV:\n\nType: " ++ show hty ++ "\n\nExpression: " ++ show e
 
 fromSLV :: HasCallStack => HWType -> Identifier -> Int -> Int -> VHDLM Doc
 fromSLV Bool              id_ start _   = do
   nm <- Mon $ use modNm
-  pretty (T.toLower $ T.pack nm) <> "_types.fromSLV" <> parens (pretty id_ <> parens (int start <+> "downto" <+> int start))
+  pretty (TextS.toLower nm) <> "_types.fromSLV" <> parens (pretty id_ <> parens (int start <+> "downto" <+> int start))
 fromSLV Bit                 id_ start _   = pretty id_ <> parens (int start)
 fromSLV (BitVector _)       id_ start end = pretty id_ <> parens (int start <+> "downto" <+> int end)
 fromSLV (Index _)           id_ start end = "unsigned" <> parens (pretty id_ <> parens (int start <+> "downto" <+> int end))

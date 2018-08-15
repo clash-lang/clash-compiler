@@ -16,26 +16,23 @@
 module Clash.Rewrite.Types where
 
 import Control.Concurrent.Supply             (Supply, freshId)
-import Control.Lens                          (use, (.=), (<<%=))
+import Control.Lens                          (use, (.=))
 import Control.Monad
 import Control.Monad.Fix                     (MonadFix (..), fix)
 import Control.Monad.Reader                  (MonadReader (..))
 import Control.Monad.State                   (MonadState (..))
 import Control.Monad.Writer                  (MonadWriter (..))
-import Data.HashMap.Strict                   (HashMap)
-import Data.HashSet                          (HashSet)
 import Data.IntMap.Strict                    (IntMap)
 import Data.Monoid                           (Any)
-import Unbound.Generics.LocallyNameless      (Fresh (..))
-import Unbound.Generics.LocallyNameless.Name (Name (..))
 
 import SrcLoc (SrcSpan)
 
 import Clash.Core.Evaluator      (GlobalHeap, PrimEvaluator)
-import Clash.Core.Term           (Term, TmName, TmOccName)
+import Clash.Core.Term           (Term)
 import Clash.Core.Type           (Type)
-import Clash.Core.TyCon          (TyCon, TyConName, TyConOccName)
+import Clash.Core.TyCon          (TyConName, TyConMap)
 import Clash.Core.Var            (Id, TyVar)
+import Clash.Core.VarEnv         (InScopeSet, VarSet)
 import Clash.Driver.Types        (BindingMap, DebugLevel)
 import Clash.Netlist.Types       (HWType)
 import Clash.Util
@@ -68,12 +65,14 @@ data RewriteState extra
   -- ^ Global binders
   , _uniqSupply       :: !Supply
   -- ^ Supply of unique numbers
-  , _curFun           :: (TmName,SrcSpan) -- Initially set to undefined: no strictness annotation
+  , _curFun           :: (Id,SrcSpan) -- Initially set to undefined: no strictness annotation
   -- ^ Function which is currently normalized
   , _nameCounter      :: {-# UNPACK #-} !Int
   -- ^ Used for 'Fresh'
   , _globalHeap       :: GlobalHeap
   -- ^ Used as a heap for compile-time evaluation of primitives that live in I/O
+  , _globalInScope    :: !InScopeSet
+  -- ^ Superset of global binders
   , _extra            :: !extra
   -- ^ Additional state
   }
@@ -88,18 +87,18 @@ data RewriteEnv
   { _dbgLevel       :: DebugLevel
   -- ^ Lvl at which we print debugging messages
   , _typeTranslator :: CustomReprs
-                    -> HashMap TyConOccName TyCon
+                    -> TyConMap
                     -> Bool
                     -> Type
                     -> Maybe (Either String HWType)
   -- ^ Hardcode Type -> HWType translator
-  , _tcCache        :: HashMap TyConOccName TyCon
+  , _tcCache        :: TyConMap
   -- ^ TyCon cache
   , _tupleTcCache   :: IntMap TyConName
   -- ^ Tuple TyCon cache
   , _evaluator      :: PrimEvaluator
   -- ^ Hardcoded evaluator (delta-reduction)}
-  , _topEntities    :: HashSet TmOccName
+  , _topEntities    :: VarSet
   -- ^ Functions that are considered TopEntities
   , _customReprs    :: CustomReprs
   }
@@ -131,13 +130,6 @@ instance MonadState (RewriteState extra) (RewriteMonad extra) where
   put s   = R (\_ _ -> ((),s,mempty))
   state f = R (\_ s -> case f s of (a,s') -> (a,s',mempty))
 
-instance Fresh (RewriteMonad extra) where
-  fresh (Fn s _) = do
-    n <- nameCounter <<%= (+1)
-    let n' = toInteger n
-    n' `seq` return (Fn s n')
-  fresh nm@(Bn {}) = return nm
-
 instance MonadUnique (RewriteMonad extra) where
   getUniqueM = do
     sup <- use uniqSupply
@@ -159,8 +151,14 @@ instance MonadReader RewriteEnv (RewriteMonad extra) where
 instance MonadFix (RewriteMonad extra) where
   mfix f = R (\r s -> fix $ \ ~(a,_,_) -> runR (f a) r s)
 
+data TransformContext
+  = TransformContext
+  { tfInScope     :: !InScopeSet
+  , tfCoreContext :: [CoreContext]
+  }
+
 -- | Monadic action that transforms a term given a certain context
-type Transform m = [CoreContext] -> Term -> m Term
+type Transform m = TransformContext -> Term -> m Term
 
 -- | A 'Transform' action in the context of the 'RewriteMonad'
 type Rewrite extra = Transform (RewriteMonad extra)

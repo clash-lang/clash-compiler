@@ -19,17 +19,14 @@ module Clash.Core.Evaluator where
 import           Control.Arrow                           (second)
 import           Control.Concurrent.Supply               (Supply, freshId)
 import           Data.Either                             (lefts,rights)
-import qualified Data.HashMap.Lazy                       as HM
 import           Data.List
   (foldl',mapAccumL,uncons)
 import           Data.IntMap                             (IntMap)
-import           Data.Map
-  (Map,delete,fromList,insert,lookup,union)
-import qualified Data.Map                                as M
 import           Data.Text                               (Text)
-import           Data.Text.Prettyprint.Doc               (hsep)
+import           Data.Text.Prettyprint.Doc
 import           Debug.Trace                             (trace)
 import           Clash.Core.DataCon
+import           Clash.Core.FreeVars
 import           Clash.Core.Literal
 import           Clash.Core.Name
 import           Clash.Core.Pretty
@@ -39,23 +36,22 @@ import           Clash.Core.TyCon
 import           Clash.Core.Type
 import           Clash.Core.Util
 import           Clash.Core.Var
+import           Clash.Core.VarEnv
 import           Clash.Driver.Types                      (BindingMap)
 import           Prelude                                 hiding (lookup)
+import           Clash.Unique
 import           Clash.Util                              (curLoc)
-import           Unbound.Generics.LocallyNameless        as Unbound
-import           Unbound.Generics.LocallyNameless.Unsafe
 
 -- | The heap
-data Heap     = Heap GlobalHeap PureHeap Supply
-  deriving (Show)
+data Heap = Heap GlobalHeap PureHeap Supply InScopeSet
 
-type PureHeap = Map TmOccName Term
+type PureHeap = VarEnv Term
 
 -- | Global heap
 type GlobalHeap = (IntMap Term, Int)
 
 -- | The stack
-type Stack    = [StackFrame]
+type Stack = [StackFrame]
 
 data StackFrame
   = Update Id
@@ -66,35 +62,22 @@ data StackFrame
   deriving Show
 
 instance Pretty StackFrame where
-  pprPrec _ (Update i) = do
-    i' <- ppr i
-    pure (hsep ["Update", i'])
-  pprPrec _ (Apply i) = do
-    i' <- ppr i
-    pure (hsep ["Apply", i'])
-  pprPrec _ (Instantiate t) = do
-    t' <- ppr t
-    pure (hsep ["Instantiate", t'])
-  pprPrec _ (PrimApply a b c d e) = do
-      a' <- ppr a
-      b' <- ppr b
-      c' <- ppr c
-      d' <- ppr (map valToTerm d)
-      e' <- ppr e
-      pure $ hsep ["PrimApply", a', "::", b',
-                   "; type args=", c',
-                   "; val args=", d',
-                   "term args=", e']
-  pprPrec _ (Scrutinise a b) = do
-      a' <- ppr a
-      b' <- ppr (Case (Literal (CharLiteral '_')) a b)
-      pure $ hsep ["Scrutinise ", a', b']
+  pretty (Update i) = hsep ["Update", ppr i]
+  pretty (Apply i) = hsep ["Apply", ppr i]
+  pretty (Instantiate t) = hsep ["Instantiate", ppr t]
+  pretty (PrimApply a b c d e) = do
+    hsep ["PrimApply", pretty a, "::", ppr b,
+          "; type args=", ppr c,
+          "; val args=", ppr (map valToTerm d),
+          "term args=", ppr e]
+  pretty (Scrutinise a b) =
+    hsep ["Scrutinise ", ppr a, ppr (Case (Literal (CharLiteral '_')) a b)]
 
 -- Values
 data Value
-  = Lambda (Bind Id      Term)
+  = Lambda Id Term
   -- ^ Functions
-  | TyLambda (Bind TyVar   Term)
+  | TyLambda TyVar Term
   -- ^ Type abstractions
   | DC DataCon [Either Term Type]
   -- ^ Data constructors
@@ -128,12 +111,13 @@ whnf'
   -> TyConMap
   -> GlobalHeap
   -> Supply
+  -> InScopeSet
   -> Bool
   -> Term
   -> (GlobalHeap, Term)
-whnf' eval gbl tcm gh ids isSubj e
-  = case whnf eval gbl tcm isSubj (Heap gh (fromList []) ids,[],e) of
-      (Heap gh' _ _,_,e') -> (gh',e')
+whnf' eval gbl tcm gh ids is isSubj e
+  = case whnf eval gbl tcm isSubj (Heap gh emptyVarEnv ids is,[],e) of
+      (Heap gh' _ _ _,_,e') -> (gh',e')
 
 -- | Evaluate to WHNF given an existing Heap and Stack
 whnf
@@ -148,7 +132,7 @@ whnf eval gbl tcm isSubj (h,k,e) =
        then go (h,Scrutinise ty []:k,e) -- See [Note: empty case expressions]
        else go (h,k,e)
   where
-    ty = runFreshM $ termType tcm e
+    ty = termType tcm e
 
     go s = case step eval gbl tcm s of
       Just s' -> go s'
@@ -156,7 +140,7 @@ whnf eval gbl tcm isSubj (h,k,e) =
         | Just e' <- unwindStack s
         -> e'
         | otherwise
-        -> error $ showDoc e
+        -> error $ showDoc $ ppr e
 
 -- | Are we in a context where special primitives must be forced.
 --
@@ -169,7 +153,7 @@ isScrut _ = False
 -- | Completely unwind the stack to get back the complete term
 unwindStack :: State -> Maybe State
 unwindStack s@(_,[],_) = Just s
-unwindStack (h@(Heap _ h' _),(kf:k'),e) = case kf of
+unwindStack (h@(Heap _ h' _ _),(kf:k'),e) = case kf of
   PrimApply nm ty tys vs tms ->
     unwindStack
       (h,k'
@@ -179,21 +163,19 @@ unwindStack (h@(Heap _ h' _),(kf:k'),e) = case kf of
   Instantiate ty ->
     unwindStack (h,k',TyApp e ty)
   Apply id_ -> do
-    case lookup (nameOcc (varName id_)) h' of
+    case lookupVarEnv id_ h' of
       Just e' -> unwindStack (h,k',App e e')
       Nothing -> error $ unlines
                        $ [ "Clash.Core.Evaluator.unwindStack:"
                          , "Stack:"
                          ] ++
-                         [ "  "++showDoc frame | frame <- kf:k'] ++
+                         [ "  "++ showDoc (pretty frame) | frame <- kf:k'] ++
                          [ ""
                          , "Expression:"
-                         , showDoc e
+                         , showDoc $ ppr e
                          , ""
                          , "Heap:"
-                         ] ++
-                         [ "  "++show name ++ "  ===  " ++ showDoc value
-                         | (name,value) <- M.toList h'
+                         , showDoc (pretty h')
                          ]
   Scrutinise _ [] ->
     unwindStack (h,k',e)
@@ -235,16 +217,17 @@ step
   -> State
   -> Maybe State
 step eval gbl tcm (h, k, e) = case e of
-  Var ty nm    -> force gbl h k (Id nm (embed ty))
-  (Lam b)      -> unwind eval gbl tcm h k (Lambda b)
-  (TyLam b)    -> unwind eval gbl tcm h k (TyLambda b)
+  Var v        -> force gbl h k v
+  (Lam x e')   -> unwind eval gbl tcm h k (Lambda x e')
+  (TyLam x e') -> unwind eval gbl tcm h k (TyLambda x e')
   (Literal l)  -> unwind eval gbl tcm h k (Lit l)
   (App e1 e2)
     | (Data dc,args) <- collectArgs e
     , (tys,_) <- splitFunForallTy (dcType dc)
     -> case compare (length args) (length tys) of
          EQ -> unwind eval gbl tcm h k (DC dc args)
-         LT -> let (h2,e') = mkAbstr (h,e) (drop (length args) tys)
+         LT -> let (tys',_) = splitFunForallTy (termType tcm e)
+                   (h2,e')  = mkAbstr (h,e) tys'
                in  step eval gbl tcm (h2,k,e')
          GT -> error "Overapplied DC"
     | (Prim nm ty,args) <- collectArgs e
@@ -252,7 +235,8 @@ step eval gbl tcm (h, k, e) = case e of
     -> case compare (length args) (length tys) of
          EQ -> let (e':es) = lefts args
                in  Just (h,PrimApply nm ty (rights args) [] es:k,e')
-         LT -> let (h2,e') = mkAbstr (h,e) (drop (length args) tys)
+         LT -> let (tys',_) = splitFunForallTy (termType tcm e)
+                   (h2,e') = mkAbstr (h,e) tys'
                in  step eval gbl tcm (h2,k,e')
          GT -> let (h2,id_) = newLetBinding tcm h e2
                in  Just (h2,Apply id_:k,e1)
@@ -261,7 +245,8 @@ step eval gbl tcm (h, k, e) = case e of
     , (tys,_) <- splitFunForallTy (dcType dc)
     -> case compare (length args) (length tys) of
          EQ -> unwind eval gbl tcm h k (DC dc args)
-         LT -> let (h2,e') = mkAbstr (h,e) (drop (length args) tys)
+         LT -> let (tys',_) = splitFunForallTy (termType tcm e)
+                   (h2,e') = mkAbstr (h,e) tys'
                in  step eval gbl tcm (h2,k,e')
          GT -> error "Overapplied DC"
     | (Prim nm ty',args) <- collectArgs e
@@ -274,7 +259,8 @@ step eval gbl tcm (h, k, e) = case e of
                  | otherwise
                  -> eval (isScrut k) gbl tcm h k nm ty' (rights args) []
               (e':es) -> Just (h,PrimApply nm ty' (rights args) [] es:k,e')
-         LT -> let (h2,e') = mkAbstr (h,e) (drop (length args) tys)
+         LT -> let (tys',_) = splitFunForallTy (termType tcm e)
+                   (h2,e') = mkAbstr (h,e) tys'
                in  step eval gbl tcm (h2,k,e')
          GT -> Just (h,Instantiate ty:k,e1)
   (Data dc) -> unwind eval gbl tcm h k (DC dc [])
@@ -287,7 +273,7 @@ step eval gbl tcm (h, k, e) = case e of
                   in  Just (h2,Apply id_:k,e1)
   (TyApp e1 ty) -> Just (h,Instantiate ty:k,e1)
   (Case scrut ty alts) -> Just (h,Scrutinise ty alts:k,scrut)
-  (Letrec bs)   -> Just (allocate h k bs)
+  (Letrec bs e') -> Just (allocate h k bs e')
   Cast _ _ _ -> trace (unlines ["WARNING: " ++ $(curLoc) ++ "Clash currently can't symbolically evaluate casts"
                                     ,"If you have testcase that produces this message, please open an issue about it."]) Nothing
 
@@ -296,16 +282,15 @@ newLetBinding
   -> Heap
   -> Term
   -> (Heap,Id)
-newLetBinding tcm h@(Heap gh h' ids) e
-  | Var ty' nm' <- e
-  , Just _ <- lookup (nameOcc nm') h'
-  = (h, Id nm' (embed ty'))
+newLetBinding tcm h@(Heap gh h' ids is0) e
+  | Var v <- e
+  , Just _ <- lookupVarEnv v h'
+  = (h, v)
   | otherwise
-  = (Heap gh (insert (nameOcc nm) e h') ids',Id nm (embed ty))
+  = (Heap gh (extendVarEnv id_ e h') ids' is1,id_)
   where
-    (i,ids') = freshId ids
-    nm       = makeSystemName "x" (toInteger i)
-    ty       = runFreshM (termType tcm e)
+    ty = termType tcm e
+    ((ids',is1),id_) = mkUniqSystemId (ids,is0) ("x",ty)
 
 newLetBindings'
   :: TyConMap
@@ -325,24 +310,20 @@ mkAbstr
 mkAbstr = foldr go
   where
     go (Left tv)  (h,e)          =
-      (h,TyLam (bind tv (TyApp e (VarTy (unembed (varKind tv)) (varName tv)))))
-    go (Right ty) (Heap gh h ids,e) =
-      let (i,ids') = freshId ids
-          nm       = makeSystemName "x" (toInteger i)
-          id_      = Id nm (embed ty)
-      in  (Heap gh h ids',Lam (bind id_ (App e (Var ty nm))))
+      (h,TyLam tv (TyApp e (VarTy tv)))
+    go (Right ty) (Heap gh h ids is,e) =
+      let ((ids',_),id_) = mkUniqSystemId (ids,is) ("x",ty)
+      in  (Heap gh h ids' is,Lam id_ (App e (Var id_)))
 
 -- | Force the evaluation of a variable.
 force :: BindingMap -> Heap -> Stack -> Id -> Maybe State
-force gbl (Heap gh h ids) k x' = case lookup nm h of
-    Nothing -> case HM.lookup nm gbl of
-      Nothing          -> Nothing
-      Just (_,_,_,_,e) -> Just (Heap  gh h ids,k,e)
-    Just e -> Just (Heap gh (delete nm h) ids,Update x':k,e)
+force gbl (Heap gh h ids is) k x' = case lookupVarEnv x' h of
+    Nothing -> case lookupUniqMap x' gbl of
+      Nothing        -> Nothing
+      Just (_,_,_,e) -> Just (Heap  gh h ids is,k,e)
+    Just e -> Just (Heap gh (delVarEnv h x') ids is,Update x':k,e)
     -- Removing the heap-bound value on a force ensures we do not get stuck on
     -- expressions such as: "let x = x in x"
-  where
-    nm = nameOcc (varName x')
 
 -- | Unwind the stack by 1
 unwind
@@ -361,14 +342,14 @@ unwind eval gbl tcm h k v = do
 
 -- | Update the Heap with the evaluated term
 update :: Heap -> Stack -> Id -> Value -> State
-update (Heap gh h ids) k x v = (Heap gh (insert (nameOcc (varName x)) v' h) ids,k,v')
+update (Heap gh h ids is) k x v = (Heap gh (extendVarEnv x v' h) ids is,k,v')
   where
     v' = valToTerm v
 
 valToTerm :: Value -> Term
 valToTerm v = case v of
-  Lambda b             -> Lam b
-  TyLambda b           -> TyLam b
+  Lambda x e           -> Lam x e
+  TyLambda x e         -> TyLam x e
   DC dc pxs            -> foldl' (\e a -> either (App e) (TyApp e) a)
                                  (Data dc) pxs
   Lit l                -> Literal l
@@ -376,25 +357,25 @@ valToTerm v = case v of
                                  (map valToTerm vs)
 
 toVar :: Id -> Term
-toVar x = Var (unembed (varType x)) (varName x)
+toVar x = Var x
 
 toType :: TyVar -> Type
-toType x = VarTy (unembed (varKind x)) (varName x)
+toType x = VarTy x
 
 -- | Apply a value to a function
 apply :: Heap -> Stack -> Value -> Id -> State
-apply h k (Lambda b) x = (h,k,subst nm (toVar x) e)
-  where
-    (x',e) = unsafeUnbind b
-    nm     = nameOcc (varName x')
+apply h@(Heap _ _ _ is0) k (Lambda x' e) x = (h,k,substTm "Evaluator.apply" subst e)
+ where
+  subst  = extendIdSubst subst0 x' (Var x)
+  subst0 = mkSubst (extendInScopeSet is0 x)
 apply _ _ _ _ = error "not a lambda"
 
 -- | Instantiate a type-abstraction
 instantiate :: Heap -> Stack -> Value -> Type -> State
-instantiate h k (TyLambda b) ty = (h,k,subst nm ty e)
-  where
-    (x,e) = unsafeUnbind b
-    nm    = nameOcc (varName x)
+instantiate h k (TyLambda x e) ty = (h,k,substTm "Evaluator.instantiate" subst e)
+ where
+  subst  = extendTvSubst subst0 x ty
+  subst0 = mkSubst (mkInScopeSet (tyFVsOfTypes [ty]))
 instantiate _ _ _ _ = error "not a ty lambda"
 
 -- | Evaluation of primitive operations
@@ -435,15 +416,15 @@ primop _ _ _ h k nm ty tys vs v (e:es) =
 
 -- | Evaluate a case-expression
 scrutinise :: Heap -> Stack -> Value -> [Alt] -> State
-scrutinise h k (Lit l) (map unsafeUnbind -> alts)
+scrutinise h k (Lit l) alts
   | altE:_ <-
-    [altE | (LitPat (unembed -> altL),altE) <- alts, altL == l ] ++
-    [altE | (DataPat (unembed -> altDc) _,altE) <- alts, matchLit altDc l ] ++
+    [altE | (LitPat altL,altE) <- alts, altL == l ] ++
+    [altE | (DataPat altDc _ _,altE) <- alts, matchLit altDc l ] ++
     [altE | (DefaultPat,altE) <- alts ]
   = (h,k,altE)
-scrutinise h k (DC dc xs) (map unsafeUnbind -> alts)
-  | altE:_ <- [substAlt altDc pxs xs altE
-              | (DataPat (unembed -> altDc) pxs,altE) <- alts, altDc == dc ] ++
+scrutinise h k (DC dc xs) alts
+  | altE:_ <- [substAlt altDc tvs pxs xs altE
+              | (DataPat altDc tvs pxs,altE) <- alts, altDc == dc ] ++
               [altE | (DefaultPat,altE) <- alts ]
   = (h,k,altE)
 scrutinise h k v [] = (h,k,valToTerm v)
@@ -464,25 +445,31 @@ matchLit dc (NaturalLiteral l)
   = l < 2^(64::Int)
 matchLit _ _ = False
 
-substAlt :: DataCon -> Rebind [TyVar] [Id] -> [Either Term Type] -> Term -> Term
-substAlt dc pxs args e =
-  let (tvs,xs)   = unrebind pxs
-      substTyMap = zip (map (nameOcc.varName) tvs)
-                       (drop (length (dcUnivTyVars dc)) (rights args))
-      substTmMap = zip (map (nameOcc.varName) xs) (lefts args)
-  in  substTysinTm substTyMap (substTms substTmMap e)
+substAlt :: DataCon -> [TyVar] -> [Id] -> [Either Term Type] -> Term -> Term
+substAlt dc tvs xs args e = substTm "Evaluator.substAlt" subst e
+ where
+  tys        = rights args
+  tms        = lefts args
+  substTyMap = zip tvs (drop (length (dcUnivTyVars dc)) tys)
+  substTmMap = zip xs tms
+  inScope    = tyFVsOfTypes tys `unionVarSet` fVsOfTerms (e:tms)
+  subst      = extendTvSubstList (extendIdSubstList subst0 substTmMap) substTyMap
+  subst0     = mkSubst (mkInScopeSet inScope)
 
 -- | Allocate let-bindings on the heap
-allocate :: Heap -> Stack -> (Bind (Rec [LetBinding]) Term) -> State
-allocate (Heap gh h ids) k b =
-  (Heap gh (h `union` fromList xes') ids',k,e')
+allocate :: Heap -> Stack -> [LetBinding] -> Term -> State
+allocate (Heap gh h ids is0) k xes e =
+  (Heap gh (h `extendVarEnvList` xes') ids' isN,k,e')
  where
-  (xesR,e) = unsafeUnbind b
-  xes      = unrec xesR
-  (ids',s) = mapAccumL (letSubst h) ids (map fst xes)
+  xNms     = map fst xes
+  is1      = extendInScopeSetList is0 xNms
+  (ids',s) = mapAccumL (letSubst h) ids xNms
   (nms,s') = unzip s
-  xes'     = zip nms (map (substTms s' . unembed . snd) xes)
-  e'       = substTms s' e
+  isN      = extendInScopeSetList is1 nms
+  subst    = extendIdSubstList subst0 s'
+  subst0   = mkSubst (foldl' extendInScopeSet is1 nms)
+  xes'     = zip nms (map (substTm "Evaluator.allocate0" subst . snd) xes)
+  e'       = substTm "Evaluator.allocate1" subst e
 
 -- | Create a unique name and substitution for a let-binder
 letSubst
@@ -490,21 +477,20 @@ letSubst
   -> Supply
   -> Id
   -> ( Supply
-     , (TmOccName,(TmOccName,Term)))
-letSubst h acc id_ =
-  let nm = nameOcc (varName id_)
-      (acc',nm') = uniqueInHeap h acc nm
-  in  (acc',(nameOcc nm',(nm,Var (unembed (varType id_)) nm')))
+     , (Id,(Id,Term)))
+letSubst h acc id0 =
+  let (acc',id1) = uniqueInHeap h acc id0
+  in  (acc',(id1,(id0,Var id1)))
 
 -- | Create a name that's unique in the heap
 uniqueInHeap
   :: PureHeap
   -> Supply
-  -> TmOccName
-  -> (Supply, TmName)
-uniqueInHeap h ids nm =
-  let (i,ids') = freshId ids
-      nm'      = makeSystemName (Unbound.name2String nm) (toInteger i)
-  in  case nameOcc nm' `M.member` h of
-        True -> uniqueInHeap h ids' nm
-        _    -> (ids',nm')
+  -> Id
+  -> (Supply, Id)
+uniqueInHeap h ids x = case lookupVarEnv x' h of
+  Just _ -> uniqueInHeap h ids' x
+  _ -> (ids',x')
+ where
+  (i,ids') = freshId ids
+  x'       = modifyVarName (\nm -> nm {nameUniq = i}) x

@@ -93,10 +93,10 @@ import           Clash.Backend.SystemVerilog (SystemVerilogState)
 import           Clash.Backend.VHDL    (VHDLState)
 import           Clash.Backend.Verilog (VerilogState)
 import           Clash.Driver.Types
-  (ClashOpts (..), ClashException (..), defClashOpts)
+  (ClashOpts (..), defClashOpts)
 import           Clash.GHC.ClashFlags
 import           Clash.Netlist.BlackBox.Types (HdlSyn (..))
-import           Clash.Util (clashLibVersion)
+import           Clash.Util (ClashException (..), clashLibVersion)
 import           Clash.GHC.LoadModules (ghcLibDir)
 
 -----------------------------------------------------------------------------

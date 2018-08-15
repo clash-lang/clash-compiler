@@ -222,7 +222,7 @@ liftNonRep.
 
 -- | Topdown traversal, stops upon first success
 topdownSucR :: Rewrite extra -> Rewrite extra
-topdownSucR r = r >-! (allR True (topdownSucR r))
+topdownSucR r = r >-! (allR (topdownSucR r))
 
 innerMost :: Rewrite extra -> Rewrite extra
 innerMost r = bottomupR (r !-> innerMost r)

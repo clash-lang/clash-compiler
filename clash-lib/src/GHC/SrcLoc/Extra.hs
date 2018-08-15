@@ -23,13 +23,9 @@ import SrcLoc
    srcLocFile, srcLocLine, srcLocCol,
    srcSpanFile, srcSpanStartLine, srcSpanEndLine, srcSpanStartCol, srcSpanEndCol)
 import FastString                           (FastString (..), bytesFS, mkFastStringByteList)
-import Unbound.Generics.LocallyNameless     (Alpha (..))
-import Unbound.Generics.LocallyNameless.TH
 
 deriving instance Generic SrcSpan
 instance Hashable SrcSpan
-
-makeClosedAlpha ''SrcSpan
 
 instance Hashable RealSrcSpan where
   hashWithSalt salt rss =

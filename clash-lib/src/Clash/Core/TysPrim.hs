@@ -7,7 +7,8 @@
   Builtin Type and Kind definitions
 -}
 
-{-# LANGUAGE CPP #-}
+{-# LANGUAGE CPP               #-}
+{-# LANGUAGE OverloadedStrings #-}
 
 module Clash.Core.TysPrim
   ( liftedTypeKind
@@ -29,30 +30,29 @@ module Clash.Core.TysPrim
   )
 where
 
-import           Control.Arrow                    (first)
-import           Data.HashMap.Strict              (HashMap)
-import qualified Data.HashMap.Strict              as HashMap
+import qualified Data.List            as List
 
 import           PrelNames
-import           Unique                           (Unique, getKey)
+import           Unique               (getKey)
 
 import           Clash.Core.Name
 import           Clash.Core.TyCon
 import {-# SOURCE #-} Clash.Core.Type
+import           Clash.Unique
 
 -- | Builtin Name
 tySuperKindTyConName, liftedTypeKindTyConName, typeNatKindTyConName, typeSymbolKindTyConName :: TyConName
-tySuperKindTyConName      = string2SystemName "BOX"
-liftedTypeKindTyConName   = string2SystemName "*"
-typeNatKindTyConName      = string2SystemName "Nat"
-typeSymbolKindTyConName   = string2SystemName "Symbol"
+tySuperKindTyConName      = mkUnsafeSystemName "tYPE" (getKey tYPETyConKey)
+liftedTypeKindTyConName   = mkUnsafeSystemName "*" (getKey liftedTypeKindTyConKey)
+typeNatKindTyConName      = mkUnsafeSystemName "Nat" (getKey typeNatKindConNameKey)
+typeSymbolKindTyConName   = mkUnsafeSystemName "Symbol" (getKey typeSymbolKindConNameKey)
 
 -- | Builtin Kind
-liftedTypeKindtc, tySuperKindtc, typeNatKindtc, typeSymbolKindtc :: TyCon
-tySuperKindtc    = SuperKindTyCon tySuperKindTyConName
-liftedTypeKindtc = mkKindTyCon liftedTypeKindTyConName tySuperKind
-typeNatKindtc    = mkKindTyCon typeNatKindTyConName tySuperKind
-typeSymbolKindtc = mkKindTyCon typeSymbolKindTyConName tySuperKind
+liftedTypeKindTc, tySuperKindTc, typeNatKindTc, typeSymbolKindTc :: TyCon
+tySuperKindTc    = SuperKindTyCon (nameUniq tySuperKindTyConName) tySuperKindTyConName
+liftedTypeKindTc = mkKindTyCon liftedTypeKindTyConName tySuperKind
+typeNatKindTc    = mkKindTyCon typeNatKindTyConName tySuperKind
+typeSymbolKindTc = mkKindTyCon typeSymbolKindTyConName tySuperKind
 
 liftedTypeKind, tySuperKind, typeNatKind, typeSymbolKind :: Type
 tySuperKind    = mkTyConTy tySuperKindTyConName
@@ -60,43 +60,40 @@ liftedTypeKind = mkTyConTy liftedTypeKindTyConName
 typeNatKind    = mkTyConTy typeNatKindTyConName
 typeSymbolKind = mkTyConTy typeSymbolKindTyConName
 
-uniqueToInteger :: Unique -> Integer
-uniqueToInteger = toInteger . getKey
-
 intPrimTyConName, integerPrimTyConName, charPrimTyConName, stringPrimTyConName,
   voidPrimTyConName, wordPrimTyConName, int64PrimTyConName,
   word64PrimTyConName, floatPrimTyConName, doublePrimTyConName,
   naturalPrimTyConName, byteArrayPrimTyConName :: TyConName
-intPrimTyConName     = makeSystemName "GHC.Prim.Int#"
-                                (uniqueToInteger intPrimTyConKey)
-integerPrimTyConName = makeSystemName "GHC.Integer.Type.Integer"
-                                (uniqueToInteger integerTyConKey)
-stringPrimTyConName  = string2SystemName "String"
-charPrimTyConName    = makeSystemName "GHC.Prim.Char#"
-                                (uniqueToInteger charPrimTyConKey)
-voidPrimTyConName    = string2SystemName "VOID"
-wordPrimTyConName    = makeSystemName "GHC.Prim.Word#"
-                                (uniqueToInteger wordPrimTyConKey)
-int64PrimTyConName   = makeSystemName "GHC.Prim.Int64#"
-                                (uniqueToInteger int64PrimTyConKey)
-word64PrimTyConName  = makeSystemName "GHC.Prim.Word64#"
-                                (uniqueToInteger word64PrimTyConKey)
-floatPrimTyConName   = makeSystemName "GHC.Prim.Float#"
-                                (uniqueToInteger floatPrimTyConKey)
-doublePrimTyConName  = makeSystemName "GHC.Prim.Double#"
-                                (uniqueToInteger doublePrimTyConKey)
+intPrimTyConName     = mkUnsafeSystemName "GHC.Prim.Int#"
+                                (getKey intPrimTyConKey)
+integerPrimTyConName = mkUnsafeSystemName "GHC.Integer.Type.Integer"
+                                (getKey integerTyConKey)
+stringPrimTyConName  = mkUnsafeSystemName "GHC.Prim.Addr#" (getKey addrPrimTyConKey)
+charPrimTyConName    = mkUnsafeSystemName "GHC.Prim.Char#"
+                                (getKey charPrimTyConKey)
+voidPrimTyConName    = mkUnsafeSystemName "Void#" (getKey voidPrimTyConKey)
+wordPrimTyConName    = mkUnsafeSystemName "GHC.Prim.Word#"
+                                (getKey wordPrimTyConKey)
+int64PrimTyConName   = mkUnsafeSystemName "GHC.Prim.Int64#"
+                                (getKey int64PrimTyConKey)
+word64PrimTyConName  = mkUnsafeSystemName "GHC.Prim.Word64#"
+                                (getKey word64PrimTyConKey)
+floatPrimTyConName   = mkUnsafeSystemName "GHC.Prim.Float#"
+                                (getKey floatPrimTyConKey)
+doublePrimTyConName  = mkUnsafeSystemName "GHC.Prim.Double#"
+                                (getKey doublePrimTyConKey)
 #if MIN_VERSION_ghc(8,2,0)
-naturalPrimTyConName = makeSystemName "GHC.Natural.Natural"
-                                (uniqueToInteger naturalTyConKey)
+naturalPrimTyConName = mkUnsafeSystemName "GHC.Natural.Natural"
+                                (getKey naturalTyConKey)
 #else
 naturalPrimTyConName = string2SystemName "GHC.Natural.Natural"
 #endif
-byteArrayPrimTyConName = makeSystemName "GHC.Prim.ByteArray#"
-                          (uniqueToInteger byteArrayPrimTyConKey)
+byteArrayPrimTyConName = mkUnsafeSystemName "GHC.Prim.ByteArray#"
+                          (getKey byteArrayPrimTyConKey)
 
 liftedPrimTC :: TyConName
              -> TyCon
-liftedPrimTC name = PrimTyCon name liftedTypeKind 0
+liftedPrimTC name = PrimTyCon (nameUniq name) name liftedTypeKind 0
 
 -- | Builtin Type
 intPrimTc, integerPrimTc, charPrimTc, stringPrimTc, voidPrimTc, wordPrimTc,
@@ -131,22 +128,22 @@ doublePrimTy  = mkTyConTy doublePrimTyConName
 naturalPrimTy = mkTyConTy naturalPrimTyConName
 byteArrayPrimTy = mkTyConTy byteArrayPrimTyConName
 
-tysPrimMap :: HashMap TyConOccName TyCon
-tysPrimMap = HashMap.fromList $ map (first nameOcc)
-  [ (tySuperKindTyConName,tySuperKindtc)
-  , (liftedTypeKindTyConName,liftedTypeKindtc)
-  , (typeNatKindTyConName,typeNatKindtc)
-  , (typeSymbolKindTyConName,typeSymbolKindtc)
-  , (intPrimTyConName,intPrimTc)
-  , (integerPrimTyConName,integerPrimTc)
-  , (charPrimTyConName,charPrimTc)
-  , (stringPrimTyConName,stringPrimTc)
-  , (voidPrimTyConName,voidPrimTc)
-  , (wordPrimTyConName,wordPrimTc)
-  , (int64PrimTyConName,int64PrimTc)
-  , (word64PrimTyConName,word64PrimTc)
-  , (floatPrimTyConName,floatPrimTc)
-  , (doublePrimTyConName,doublePrimTc)
-  , (naturalPrimTyConName,naturalPrimTc)
-  , (byteArrayPrimTyConName,byteArrayPrimTc)
+tysPrimMap :: TyConMap
+tysPrimMap = List.foldl' (\s (k,x) -> extendUniqMap k x s) emptyUniqMap
+  [  (tySuperKindTyConName , tySuperKindTc)
+  ,  (liftedTypeKindTyConName , liftedTypeKindTc)
+  ,  (typeNatKindTyConName , typeNatKindTc)
+  ,  (typeSymbolKindTyConName , typeSymbolKindTc)
+  ,  (intPrimTyConName , intPrimTc)
+  ,  (integerPrimTyConName , integerPrimTc)
+  ,  (charPrimTyConName , charPrimTc)
+  ,  (stringPrimTyConName , stringPrimTc)
+  ,  (voidPrimTyConName , voidPrimTc)
+  ,  (wordPrimTyConName , wordPrimTc)
+  ,  (int64PrimTyConName , int64PrimTc)
+  ,  (word64PrimTyConName , word64PrimTc)
+  ,  (floatPrimTyConName , floatPrimTc)
+  ,  (doublePrimTyConName , doublePrimTc)
+  ,  (naturalPrimTyConName , naturalPrimTc)
+  ,  (byteArrayPrimTyConName , byteArrayPrimTc)
   ]

@@ -30,28 +30,25 @@ import Control.DeepSeq                        (NFData(..))
 import Data.Binary                            (Binary)
 import Data.Hashable                          (Hashable)
 import GHC.Generics                           (Generic)
-import Unbound.Generics.LocallyNameless       (Alpha(..),Subst(..))
-import Unbound.Generics.LocallyNameless.Extra ()
-#if MIN_VERSION_unbound_generics(0,3,0)
-import Data.Monoid                            (All (..))
-import Unbound.Generics.LocallyNameless       (NthPatFind (..),
-                                               NamePatFind (..))
-#endif
 
 import Clash.Core.Name                        (Name (..))
-import {-# SOURCE #-} Clash.Core.Type         (TyName, Type)
+import {-# SOURCE #-} Clash.Core.Subst        (substTyWith)
+import {-# SOURCE #-} Clash.Core.Type         (Type)
+import Clash.Core.Var                         (TyVar)
+import Clash.Unique
 import Clash.Util
 
 -- | Data Constructor
 data DataCon
   = MkData
   { dcName       :: !DcName  -- ^ Name of the DataCon
+  , dcUniq       :: {-# UNPACK #-} !Unique
   , dcTag        :: !ConTag  -- ^ Syntactical position in the type definition
   , dcType       :: !Type    -- ^ Type of the 'DataCon
-  , dcUnivTyVars :: [TyName] -- ^ Universally quantified type-variables,
+  , dcUnivTyVars :: [TyVar]  -- ^ Universally quantified type-variables,
                              -- these type variables are also part of the
                              -- result type of the DataCon
-  , dcExtTyVars  :: [TyName] -- ^ Existentially quantified type-variables,
+  , dcExtTyVars  :: [TyVar]  -- ^ Existentially quantified type-variables,
                              -- these type variables are not part of the result
                              -- of the DataCon, but only of the arguments.
   , dcArgTys     :: [Type]   -- ^ Argument types
@@ -61,45 +58,19 @@ instance Show DataCon where
   show = show . dcName
 
 instance Eq DataCon where
-  (==) = (==) `on` dcName
+  (==) = (==) `on` dcUniq
+  (/=) = (/=) `on` dcUniq
 
 instance Ord DataCon where
-  compare = compare `on` dcName
+  compare = compare `on` dcUniq
+
+instance Uniquable DataCon where
+  getUnique = dcUniq
 
 -- | Syntactical position of the DataCon in the type definition
 type ConTag = Int
 -- | DataCon reference
 type DcName = Name DataCon
-
-instance Alpha DataCon where
-  aeq' c dc1 dc2      = aeq' c (dcName dc1) (dcName dc2)
-
-  fvAny' _ _ dc       = pure dc
-
-  close _ _ dc        = dc
-  open _ _ dc         = dc
-
-  isPat _             = mempty
-
-#if MIN_VERSION_unbound_generics(0,3,0)
-  isTerm _            = All True
-  nthPatFind _        = NthPatFind Left
-  namePatFind _       = NamePatFind (const (Left 0))
-#else
-  isTerm _            = True
-  nthPatFind _        = Left
-  namePatFind _ _     = Left 0
-#endif
-
-  swaps' _ _ dc       = dc
-  lfreshen' _ dc cont = cont dc mempty
-  freshen' _ dc       = return (dc,mempty)
-
-  acompare' c dc1 dc2 = acompare' c (dcName dc1) (dcName dc2)
-
-instance Subst a DataCon where
-  subst _ _ dc = dc
-  substs _ dc  = dc
 
 -- | Given a DataCon and a list of types, the type variables of the DataCon
 -- type are substituted for the list of types. The argument types are returned.
@@ -113,10 +84,10 @@ dataConInstArgTys (MkData { dcArgTys     = arg_tys
                           })
                   inst_tys
   | length tyvars == length inst_tys
-  = Just (map (substs (zip tyvars inst_tys)) arg_tys)
+  = Just (map (substTyWith tyvars inst_tys) arg_tys)
 
   | otherwise
   = Nothing
 
   where
-    tyvars = map nameOcc (univ_tvs ++ ex_tvs)
+    tyvars = univ_tvs ++ ex_tvs

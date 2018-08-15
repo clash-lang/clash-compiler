@@ -8,6 +8,7 @@
 
 {-# LANGUAGE CPP              #-}
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TemplateHaskell  #-}
 {-# LANGUAGE TupleSections    #-}
 {-# LANGUAGE ViewPatterns     #-}
@@ -40,11 +41,9 @@ import           Data.HashMap.Lazy           (HashMap)
 import qualified Data.HashMap.Lazy           as HashMap
 import qualified Data.HashMap.Strict         as HSM
 import           Data.Maybe                  (catMaybes,fromMaybe,listToMaybe)
-import           Data.Text                   (isInfixOf,pack)
+import           Data.Text                   (Text, isInfixOf,pack)
+import qualified Data.Text                   as Text
 import qualified Data.Traversable            as T
-import           Unbound.Generics.LocallyNameless
-  (bind, embed, rebind, rec, runFreshM, unbind, unembed)
-import qualified Unbound.Generics.LocallyNameless     as Unbound
 
 -- GHC API
 import CoAxiom    (CoAxiom (co_ax_branches), CoAxBranch (cab_lhs,cab_rhs),
@@ -75,7 +74,7 @@ import PrelNames  (tYPETyConKey)
 import OccName    (occNameString)
 import Outputable (showPpr)
 import Pair       (Pair (..))
-import SrcLoc     (isGoodSrcSpan)
+import SrcLoc     (SrcSpan, isGoodSrcSpan)
 import TyCon      (AlgTyConRhs (..), TyCon, tyConName,
                    algTyConRhs, isAlgTyCon, isFamilyTyCon,
                    isFunTyCon, isNewTyCon,
@@ -108,8 +107,8 @@ import qualified Clash.Core.Term             as C
 import qualified Clash.Core.TyCon            as C
 import qualified Clash.Core.Type             as C
 import qualified Clash.Core.Var              as C
-import           Clash.Driver.Types
 import           Clash.Primitives.Types
+import qualified Clash.Unique                as C
 import           Clash.Util
 
 instance Hashable Name where
@@ -117,27 +116,27 @@ instance Hashable Name where
 
 data GHC2CoreState
   = GHC2CoreState
-  { _tyConMap :: HashMap C.TyConOccName TyCon
-  , _nameMap  :: HashMap Name String
+  { _tyConMap :: C.UniqMap TyCon
+  , _nameMap  :: HashMap Name Text
   }
 
 makeLenses ''GHC2CoreState
 
 emptyGHC2CoreState :: GHC2CoreState
-emptyGHC2CoreState = GHC2CoreState HSM.empty HSM.empty
+emptyGHC2CoreState = GHC2CoreState C.emptyUniqMap HSM.empty
 
 makeAllTyCons
   :: GHC2CoreState
   -> FamInstEnvs
-  -> HashMap C.TyConOccName C.TyCon
+  -> C.UniqMap C.TyCon
 makeAllTyCons hm fiEnvs = go hm hm
   where
     go old new
-        | HSM.null (new ^. tyConMap) = HSM.empty
-        | otherwise                  = tcm `HSM.union` tcm'
+        | C.nullUniqMap (new ^. tyConMap) = C.emptyUniqMap
+        | otherwise                       = tcm `C.unionUniqMap` tcm'
       where
         (tcm,old') = State.runState (T.mapM (makeTyCon fiEnvs) (new ^. tyConMap)) old
-        tcm'       = go old' (old' & tyConMap %~ (`HSM.difference` (old ^. tyConMap)))
+        tcm'       = go old' (old' & tyConMap %~ (`C.differenceUniqMap` (old ^. tyConMap)))
 
 makeTyCon :: FamInstEnvs
           -> TyCon
@@ -162,12 +161,13 @@ makeTyCon fiEnvs tc = tycon
             Just tcRhs ->
               return
                 C.AlgTyCon
-                { C.tyConName   = tcName
+                { C.tyConUniq   = C.nameUniq tcName
+                , C.tyConName   = tcName
                 , C.tyConKind   = tcKind
                 , C.tyConArity  = tcArity
                 , C.algTcRhs    = tcRhs
                 }
-            Nothing -> return (C.PrimTyCon tcName tcKind tcArity)
+            Nothing -> return (C.PrimTyCon (C.nameUniq tcName) tcName tcKind tcArity)
 
         mkFunTyCon = do
           tcName <- coreToName tyConName tyConUnique qualfiedNameString tc
@@ -181,7 +181,8 @@ makeTyCon fiEnvs tc = tycon
                                 bx
           return
             C.FunTyCon
-            { C.tyConName  = tcName
+            { C.tyConUniq  = C.nameUniq tcName
+            , C.tyConName  = tcName
             , C.tyConKind  = tcKind
             , C.tyConArity = tcArity
             , C.tyConSubst = substs
@@ -193,7 +194,8 @@ makeTyCon fiEnvs tc = tycon
           tcDc   <- fmap (C.DataTyCon . (:[])) . coreToDataCon . head . tyConDataCons $ tc
           return
             C.AlgTyCon
-            { C.tyConName   = tcName
+            { C.tyConUniq   = C.nameUniq tcName
+            , C.tyConName   = tcName
             , C.tyConKind   = tcKind
             , C.tyConArity  = tcArity
             , C.algTcRhs    = tcDc
@@ -204,7 +206,8 @@ makeTyCon fiEnvs tc = tycon
           tcKind <- coreToType (tyConKind tc)
           return
             C.PrimTyCon
-            { C.tyConName    = tcName
+            { C.tyConUniq    = C.nameUniq tcName
+            , C.tyConName    = tcName
             , C.tyConKind    = tcKind
             , C.tyConArity   = tcArity
             }
@@ -212,13 +215,14 @@ makeTyCon fiEnvs tc = tycon
         mkSuperKindTyCon = do
           tcName <- coreToName tyConName tyConUnique qualfiedNameString tc
           return C.SuperKindTyCon
-                   { C.tyConName = tcName
+                   { C.tyConUniq = C.nameUniq tcName
+                   , C.tyConName = tcName
                    }
 
         mkVoidTyCon = do
           tcName <- coreToName tyConName tyConUnique qualfiedNameString tc
           tcKind <- coreToType (tyConKind tc)
-          return (C.PrimTyCon tcName tcKind tcArity)
+          return (C.PrimTyCon (C.nameUniq tcName) tcName tcKind tcArity)
 
         famInstToSubst :: FamInst -> State GHC2CoreState ([C.Type],C.Type)
         famInstToSubst fi = do
@@ -242,7 +246,7 @@ makeAlgTyConRhs algTcRhs = case algTcRhs of
 #endif
 #endif
   NewTyCon dc _ (rhsTvs,rhsEtad) _ -> Just <$> (C.NewTyCon <$> coreToDataCon dc
-                                                           <*> ((,) <$> mapM coreToVar rhsTvs
+                                                           <*> ((,) <$> mapM coreToTyVar rhsTvs
                                                                     <*> coreToType rhsEtad
                                                                )
                                                )
@@ -298,21 +302,21 @@ coreToTerm primMap unlocs srcsp coreExpr = Reader.runReaderT (term coreExpr) src
     term' (Lit l)                 = return $ C.Literal (coreToLiteral l)
     term' (App eFun (Type tyArg)) = C.TyApp <$> term eFun <*> lift (coreToType tyArg)
     term' (App eFun eArg)         = C.App   <$> term eFun <*> term eArg
-    term' (Lam x e) | isTyVar x   = C.TyLam <$> (bind <$> lift (coreToTyVar x) <*> addUsefull (getSrcSpan x) (term e))
-                    | otherwise   = C.Lam   <$> (bind <$> lift (coreToId x)    <*> addUsefull (getSrcSpan x) (term e))
+    term' (Lam x e) | isTyVar x   = C.TyLam <$> lift (coreToTyVar x) <*> addUsefull (getSrcSpan x) (term e)
+                    | otherwise   = C.Lam   <$> lift (coreToId x) <*> addUsefull (getSrcSpan x) (term e)
     term' (Let (NonRec x e1) e2)  = do
       x'  <- lift (coreToId x)
       e1' <- addUsefull (getSrcSpan x) (term e1)
       e2' <- term e2
-      return $ C.Letrec $ bind (rec [(x', embed e1')]) e2'
+      return (C.Letrec [(x', e1')] e2')
 
     term' (Let (Rec xes) e) = do
       xes' <- mapM (\(x,b) -> (,) <$> lift (coreToId x)
                                   <*> addUsefull (getSrcSpan x)
-                                                 (embed <$> term b))
+                                                 (term b))
                    xes
       e'   <- term e
-      return $ C.Letrec $ bind (rec xes') e'
+      return (C.Letrec xes' e')
 
     term' (Case _ _ ty [])  = C.Prim (pack "EmptyCase") <$> lift (coreToType ty)
     term' (Case e b ty alts) = do
@@ -325,8 +329,8 @@ coreToTerm primMap unlocs srcsp coreExpr = Reader.runReaderT (term coreExpr) src
              C.Case v ty' <$> mapM (addUsefull (getSrcSpan b) . alt) alts
      if usesBndr
       then do
-        ct <- caseTerm (C.Var (unembed $ C.varType b') (C.varName b'))
-        return $ C.Letrec $ bind (rec [(b',embed e')]) ct
+        ct <- caseTerm (C.Var b')
+        return (C.Letrec [(b', e')] ct)
       else caseTerm e'
 
     term' (Cast e co) = do
@@ -343,9 +347,8 @@ coreToTerm primMap unlocs srcsp coreExpr = Reader.runReaderT (term coreExpr) src
     term' (Coercion co)     = C.Prim (pack "_CO_") <$> lift (coreToType (coercionType co))
 
     var srcsp' x = do
-        xVar   <- coreToVar x
         xPrim  <- coreToPrimVar x
-        let xNameS = pack $ C.name2String xPrim
+        let xNameS = C.nameOcc xPrim
         xType  <- coreToType (varType x)
         case isDataConId_maybe x of
           Just dc -> case HashMap.lookup xNameS primMap of
@@ -378,17 +381,16 @@ coreToTerm primMap unlocs srcsp coreExpr = Reader.runReaderT (term coreExpr) src
             Nothing
               | x `elem` unlocs -> return (C.Prim xNameS xType)
               | pack "$cshow" `isInfixOf` xNameS -> return (C.Prim xNameS xType)
-              | otherwise       -> return  (C.Var xType xVar)
+              | otherwise       -> C.Var <$> coreToId x
 
-    alt (DEFAULT   , _ , e) = bind C.DefaultPat <$> term e
-    alt (LitAlt l  , _ , e) = bind (C.LitPat . embed $ coreToLiteral l) <$> term e
+    alt (DEFAULT   , _ , e) = (C.DefaultPat,) <$> term e
+    alt (LitAlt l  , _ , e) = (C.LitPat (coreToLiteral l),) <$> term e
     alt (DataAlt dc, xs, e) = case span isTyVar xs of
-      (tyvs,tmvs) -> bind <$> (C.DataPat . embed <$>
+      (tyvs,tmvs) -> (,) <$> (C.DataPat <$>
                                 lift (coreToDataCon dc) <*>
-                                (rebind <$>
-                                  lift (mapM coreToTyVar tyvs) <*>
-                                  lift (mapM coreToId tmvs))) <*>
-                              term e
+                                lift (mapM coreToTyVar tyvs) <*>
+                                lift (mapM coreToId tmvs))
+                         <*> term e
 
     coreToLiteral :: Literal
                   -> C.Literal
@@ -488,10 +490,11 @@ coreToDataCon dc = do
   where
     mkDc dcTy repTys = do
       nm   <- coreToName dataConName getUnique qualfiedNameString dc
-      uTvs <- mapM coreToVar (dataConUnivTyVars dc)
-      eTvs <- mapM coreToVar (dataConExTyVars dc)
+      uTvs <- mapM coreToTyVar (dataConUnivTyVars dc)
+      eTvs <- mapM coreToTyVar (dataConExTyVars dc)
       return $ C.MkData
              { C.dcName       = nm
+             , C.dcUniq       = C.nameUniq nm
              , C.dcTag        = dataConTag dc
              , C.dcType       = dcTy
              , C.dcArgTys     = repTys
@@ -503,7 +506,7 @@ typeConstructorToString
   :: TyCon
   -> State GHC2CoreState String
 typeConstructorToString constructor =
-    C.name2String <$> coreToName tyConName tyConUnique qualfiedNameString constructor
+   Text.unpack . C.nameOcc <$> coreToName tyConName tyConUnique qualfiedNameString constructor
 
 _ATTR_NAME :: String
 _ATTR_NAME = "Clash.Annotations.SynthesisAttributes.Attr"
@@ -660,7 +663,7 @@ coreToType ty = ty'' >>= annotateType ty
 coreToType'
   :: Type
   -> State GHC2CoreState C.Type
-coreToType' (TyVarTy tv) = C.VarTy <$> coreToType (varType tv) <*> (coreToVar tv)
+coreToType' (TyVarTy tv) = C.VarTy <$> coreToTyVar tv
 coreToType' (TyConApp tc args)
   | isFunTyCon tc = foldl C.AppTy (C.ConstTy C.Arrow) <$> mapM coreToType args
   | otherwise     = case expandSynTyCon_maybe tc args of
@@ -670,13 +673,13 @@ coreToType' (TyConApp tc args)
                         foldl C.AppTy <$> coreToType synTy' <*> mapM coreToType remArgs
                       _ -> do
                         tcName <- coreToName tyConName tyConUnique qualfiedNameString tc
-                        tyConMap %= (HSM.insert (C.nameOcc tcName) tc)
+                        tyConMap %= (C.extendUniqMap tcName tc)
                         C.mkTyConApp <$> (pure tcName) <*> mapM coreToType args
 #if MIN_VERSION_ghc(8,2,0)
-coreToType' (ForAllTy (TvBndr tv _) ty) = C.ForAllTy <$> (bind <$> coreToTyVar tv <*> coreToType ty)
+coreToType' (ForAllTy (TvBndr tv _) ty) = C.ForAllTy <$> coreToTyVar tv <*> coreToType ty
 coreToType' (FunTy ty1 ty2)             = C.mkFunTy <$> coreToType ty1 <*> coreToType ty2
 #else
-coreToType' (ForAllTy (Named tv _) ty) = C.ForAllTy <$> (bind <$> coreToTyVar tv <*> coreToType ty)
+coreToType' (ForAllTy (Named tv _) ty) = C.ForAllTy <$> coreToTyVar tv <*> coreToType ty
 coreToType' (ForAllTy (Anon ty1) ty2)  = C.mkFunTy <$> coreToType ty1 <*> coreToType ty2
 #endif
 coreToType' (LitTy tyLit)    = return $ C.LitTy (coreToTyLit tyLit)
@@ -692,12 +695,12 @@ coreToTyLit (StrTyLit s) = C.SymTy (unpackFS s)
 coreToTyVar :: TyVar
             -> State GHC2CoreState C.TyVar
 coreToTyVar tv =
-  C.TyVar <$> (coreToVar tv) <*> (embed <$> coreToType (varType tv))
+  C.mkTyVar <$> coreToType (varType tv) <*> coreToVar tv
 
 coreToId :: Id
          -> State GHC2CoreState C.Id
 coreToId i =
-  C.Id <$> (coreToVar i) <*> (embed <$> coreToType (varType i))
+  C.mkId <$> coreToType (varType i) <*> coreToVar i
 
 coreToVar :: Var
           -> State GHC2CoreState (C.Name a)
@@ -707,37 +710,42 @@ coreToPrimVar :: Var
               -> State GHC2CoreState (C.Name C.Term)
 coreToPrimVar = coreToName varName varUnique qualfiedNameString
 
-coreToName :: (b -> Name)
-           -> (b -> Unique)
-           -> (Name -> State GHC2CoreState String)
-           -> b
-           -> State GHC2CoreState (C.Name a)
+coreToName
+  :: (b -> Name)
+  -> (b -> Unique)
+  -> (Name -> State GHC2CoreState Text)
+  -> b
+  -> State GHC2CoreState (C.Name a)
 coreToName toName toUnique toString v = do
   ns <- toString (toName v)
-  let nm  = Unbound.makeName ns (toInteger . getKey . toUnique $ v)
+  let key = getKey (toUnique v)
       loc = getSrcSpan (toName v)
-  return (C.Name C.User nm loc)
+  return (C.Name C.User ns key loc)
 
-qualfiedNameString :: Name
-                   -> State GHC2CoreState String
-qualfiedNameString n = makeCached n nameMap
-                     $ return (fromMaybe "_INTERNAL_" (modNameM n) ++ ('.':occName))
-  where
-    occName = occNameString $ nameOccName n
+qualfiedNameString
+  :: Name
+  -> State GHC2CoreState Text
+qualfiedNameString n =
+  makeCached n nameMap $
+  return (fromMaybe "_INTERNAL_" (modNameM n) `Text.append` ('.' `Text.cons` occName))
+ where
+  occName = pack (occNameString (nameOccName n))
 
-qualfiedNameStringM :: Name
-                    -> State GHC2CoreState String
-qualfiedNameStringM n = makeCached n nameMap
-                      $ return (maybe occName (\modName -> modName ++ ('.':occName)) (modNameM n))
-  where
-    occName = occNameString $ nameOccName n
+qualfiedNameStringM
+  :: Name
+  -> State GHC2CoreState Text
+qualfiedNameStringM n =
+  makeCached n nameMap $
+  return (maybe occName (\modName -> modName `Text.append` ('.' `Text.cons` occName)) (modNameM n))
+ where
+  occName = pack (occNameString (nameOccName n))
 
 modNameM :: Name
-         -> Maybe String
+         -> Maybe Text
 modNameM n = do
-      module_ <- nameModule_maybe n
-      let moduleNm = moduleName module_
-      return (moduleNameString moduleNm)
+  module_ <- nameModule_maybe n
+  let moduleNm = moduleName module_
+  return (pack (moduleNameString moduleNm))
 
 -- | Given the type:
 --
@@ -751,27 +759,21 @@ modNameM n = do
 -- @
 mapSignalTerm :: C.Type
               -> C.Term
-mapSignalTerm (C.ForAllTy tvATy) =
-    C.TyLam (bind aTV (
-    C.TyLam (bind bTV (
-    C.TyLam (bind clkTV (
-    C.Lam   (bind fId (
-    C.Lam   (bind xId (
-    C.App (C.Var fTy fName) (C.Var aTy xName)))))))))))
+mapSignalTerm (C.ForAllTy aTV (C.ForAllTy bTV (C.ForAllTy clkTV funTy))) =
+    C.TyLam aTV (
+    C.TyLam bTV (
+    C.TyLam clkTV (
+    C.Lam   fId (
+    C.Lam   xId (
+    C.App (C.Var fId) (C.Var xId))))))
   where
-    (aTV,bTV,clkTV,funTy) = runFreshM $ do
-      { (aTV',C.ForAllTy tvBTy)   <- unbind tvATy
-      ; (bTV',C.ForAllTy tvClkTy) <- unbind tvBTy
-      ; (clkTV',funTy')           <- unbind tvClkTy
-      ; return (aTV',bTV',clkTV',funTy')
-      }
     (C.FunTy _ funTy'') = C.tyView funTy
     (C.FunTy aTy bTy)   = C.tyView funTy''
-    fName = C.string2SystemName "f"
-    xName = C.string2SystemName "x"
+    fName = C.mkUnsafeSystemName "f" 0
+    xName = C.mkUnsafeSystemName "x" 1
     fTy   = C.mkFunTy aTy bTy
-    fId   = C.Id fName (embed fTy)
-    xId   = C.Id xName (embed aTy)
+    fId   = C.mkId fTy fName
+    xId   = C.mkId aTy xName
 
 mapSignalTerm ty = error $ $(curLoc) ++ show ty
 
@@ -784,20 +786,15 @@ mapSignalTerm ty = error $ $(curLoc) ++ show ty
 -- @/\(a:*)./\(clk:Clock).\(x:Signal' clk a).x@
 signalTerm :: C.Type
            -> C.Term
-signalTerm (C.ForAllTy tvATy) =
-    C.TyLam (bind aTV (
-    C.TyLam (bind clkTV (
-    C.Lam   (bind xId (
-    C.Var   aTy xName))))))
+signalTerm (C.ForAllTy aTV (C.ForAllTy clkTV funTy)) =
+    C.TyLam aTV (
+    C.TyLam clkTV (
+    C.Lam   xId (
+    C.Var   xId)))
   where
-    (aTV,clkTV,funTy) = runFreshM $ do
-      { (aTV', C.ForAllTy tvClkTy) <- unbind tvATy
-      ; (clkTV', funTy')           <- unbind tvClkTy
-      ; return (aTV',clkTV',funTy')
-      }
     (C.FunTy _ aTy) = C.tyView funTy
-    xName = C.string2SystemName "x"
-    xId   = C.Id xName (embed aTy)
+    xName = C.mkUnsafeSystemName "x" 0
+    xId   = C.mkId aTy xName
 
 signalTerm ty = error $ $(curLoc) ++ show ty
 
@@ -816,27 +813,21 @@ signalTerm ty = error $ $(curLoc) ++ show ty
 -- @
 appSignalTerm :: C.Type
               -> C.Term
-appSignalTerm (C.ForAllTy tvClkTy) =
-    C.TyLam (bind clkTV (
-    C.TyLam (bind aTV (
-    C.TyLam (bind bTV (
-    C.Lam   (bind fId (
-    C.Lam   (bind xId (
-    C.App (C.Var fTy fName) (C.Var aTy xName)))))))))))
+appSignalTerm (C.ForAllTy clkTV (C.ForAllTy aTV (C.ForAllTy bTV funTy))) =
+    C.TyLam clkTV (
+    C.TyLam aTV (
+    C.TyLam bTV (
+    C.Lam   fId (
+    C.Lam   xId (
+    C.App (C.Var fId) (C.Var xId))))))
   where
-    (clkTV,aTV,bTV,funTy) = runFreshM $ do
-      { (clkTV',C.ForAllTy tvATy) <- unbind tvClkTy
-      ; (aTV',C.ForAllTy tvBTy)   <- unbind tvATy
-      ; (bTV',funTy')           <- unbind tvBTy
-      ; return (clkTV',aTV',bTV',funTy')
-      }
     (C.FunTy _ funTy'') = C.tyView funTy
     (C.FunTy aTy bTy)   = C.tyView funTy''
-    fName = C.string2SystemName "f"
-    xName = C.string2SystemName "x"
+    fName = C.mkUnsafeSystemName "f" 0
+    xName = C.mkUnsafeSystemName "x" 1
     fTy   = C.mkFunTy aTy bTy
-    fId   = C.Id fName (embed fTy)
-    xId   = C.Id xName (embed aTy)
+    fId   = C.mkId fTy fName
+    xId   = C.mkId aTy xName
 
 appSignalTerm ty = error $ $(curLoc) ++ show ty
 
@@ -854,22 +845,16 @@ appSignalTerm ty = error $ $(curLoc) ++ show ty
 -- @
 vecUnwrapTerm :: C.Type
               -> C.Term
-vecUnwrapTerm (C.ForAllTy tvTTy) =
-    C.TyLam (bind tTV (
-    C.TyLam (bind nTV (
-    C.TyLam (bind aTV (
-    C.Lam   (bind vsId (
-    C.Var vsTy vsName))))))))
+vecUnwrapTerm (C.ForAllTy tTV (C.ForAllTy nTV (C.ForAllTy aTV funTy))) =
+    C.TyLam tTV (
+    C.TyLam nTV (
+    C.TyLam aTV (
+    C.Lam   vsId (
+    C.Var vsId))))
   where
-    (tTV,nTV,aTV,funTy) = runFreshM $ do
-      { (tTV',C.ForAllTy tvNTy) <- unbind tvTTy
-      ; (nTV',C.ForAllTy tvATy) <- unbind tvNTy
-      ; (aTV',funTy')           <- unbind tvATy
-      ; return (tTV',nTV',aTV',funTy')
-      }
     (C.FunTy _ vsTy) = C.tyView funTy
-    vsName           = C.string2SystemName "vs"
-    vsId             = C.Id vsName   (embed vsTy)
+    vsName           = C.mkUnsafeSystemName "vs" 0
+    vsId             = C.mkId vsTy vsName
 
 vecUnwrapTerm ty = error $ $(curLoc) ++ show ty
 
@@ -888,32 +873,25 @@ vecUnwrapTerm ty = error $ $(curLoc) ++ show ty
 -- @
 traverseTerm :: C.Type
              -> C.Term
-traverseTerm (C.ForAllTy tvFTy) =
-    C.TyLam (bind fTV (
-    C.TyLam (bind aTV (
-    C.TyLam (bind bTV (
-    C.TyLam (bind clkTV (
-    C.Lam   (bind dictId (
-    C.Lam   (bind gId (
-    C.Lam   (bind xId (
-    C.App (C.Var gTy gName) (C.Var xTy xName)))))))))))))))
+traverseTerm (C.ForAllTy fTV (C.ForAllTy aTV (C.ForAllTy bTV (C.ForAllTy clkTV funTy)))) =
+    C.TyLam fTV (
+    C.TyLam aTV (
+    C.TyLam bTV (
+    C.TyLam clkTV (
+    C.Lam   dictId (
+    C.Lam   gId (
+    C.Lam   xId (
+    C.App (C.Var gId) (C.Var xId))))))))
   where
-    (fTV,aTV,bTV,clkTV,funTy) = runFreshM $ do
-      { (fTV',C.ForAllTy tvATy) <- unbind tvFTy
-      ; (aTV',C.ForAllTy tvBTy) <- unbind tvATy
-      ; (bTV',C.ForAllTy tvClkTy) <- unbind tvBTy
-      ; (clkTV',funTy') <- unbind tvClkTy
-      ; return (fTV',aTV',bTV',clkTV',funTy')
-      }
     (C.FunTy dictTy funTy1) = C.tyView funTy
     (C.FunTy gTy    funTy2) = C.tyView funTy1
     (C.FunTy xTy    _)      = C.tyView funTy2
-    dictName = C.string2SystemName "dict"
-    gName    = C.string2SystemName "g"
-    xName    = C.string2SystemName "x"
-    dictId   = C.Id dictName (embed dictTy)
-    gId      = C.Id gName (embed gTy)
-    xId      = C.Id xName (embed xTy)
+    dictName = C.mkUnsafeSystemName "dict" 0
+    gName    = C.mkUnsafeSystemName "g" 1
+    xName    = C.mkUnsafeSystemName "x" 2
+    dictId   = C.mkId dictTy dictName
+    gId      = C.mkId gTy gName
+    xId      = C.mkId xTy xName
 
 traverseTerm ty = error $ $(curLoc) ++ show ty
 
@@ -932,26 +910,20 @@ traverseTerm ty = error $ $(curLoc) ++ show ty
 -- @/\(r:Rep)/\(a:TYPE Lifted)./\(b:TYPE r).\(f : (a -> b)).\(x : a).f x@
 dollarTerm :: C.Type
            -> C.Term
-dollarTerm (C.ForAllTy tvRTy) =
-    C.TyLam (bind rTV (
-    C.TyLam (bind aTV (
-    C.TyLam (bind bTV (
-    C.Lam   (bind fId (
-    C.Lam   (bind xId (
-    C.App (C.Var fTy fName) (C.Var aTy xName)))))))))))
+dollarTerm (C.ForAllTy rTV (C.ForAllTy aTV (C.ForAllTy bTV funTy))) =
+    C.TyLam rTV (
+    C.TyLam aTV (
+    C.TyLam bTV (
+    C.Lam   fId (
+    C.Lam   xId (
+    C.App (C.Var fId) (C.Var xId))))))
   where
-    (rTV,aTV,bTV,funTy) = runFreshM $ do
-      { (rTV',C.ForAllTy tvATy) <- unbind tvRTy
-      ; (aTV',C.ForAllTy tvBTy) <- unbind tvATy
-      ; (bTV',funTy')           <- unbind tvBTy
-      ; return (rTV',aTV',bTV',funTy')
-      }
     (C.FunTy fTy funTy'') = C.tyView funTy
     (C.FunTy aTy _)       = C.tyView funTy''
-    fName = C.string2SystemName "f"
-    xName = C.string2SystemName "x"
-    fId   = C.Id fName (embed fTy)
-    xId   = C.Id xName (embed aTy)
+    fName = C.mkUnsafeSystemName "f" 0
+    xName = C.mkUnsafeSystemName "x" 1
+    fId   = C.mkId fTy fName
+    xId   = C.mkId aTy xName
 
 dollarTerm ty = error $ $(curLoc) ++ show ty
 
@@ -964,7 +936,7 @@ dollarTerm ty = error $ $(curLoc) ++ show ty
 -- @/\(a:*)./\(clk:Clock).\(x:Signal' clk a).x@
 joinTerm :: C.Type
          -> C.Term
-joinTerm ty@(C.ForAllTy _) = signalTerm ty
+joinTerm ty@(C.ForAllTy {}) = signalTerm ty
 joinTerm ty = error $ $(curLoc) ++ show ty
 
 -- | Given the type:
@@ -977,18 +949,17 @@ joinTerm ty = error $ $(curLoc) ++ show ty
 withFrozenCallStackTerm
   :: C.Type
   -> C.Term
-withFrozenCallStackTerm (C.ForAllTy tvATy) =
-  C.TyLam (bind aTV (
-  C.Lam   (bind callStackId (
-  C.Lam   (bind fId (
-  C.App (C.Var fTy fName) (C.Var callStackTy callStackName)))))))
+withFrozenCallStackTerm (C.ForAllTy aTV funTy) =
+  C.TyLam  aTV (
+  C.Lam    callStackId (
+  C.Lam    fId (
+  C.App (C.Var fId) (C.Var callStackId))))
   where
-    (aTV,funTy) = runFreshM (unbind tvATy)
     (C.FunTy callStackTy fTy) = C.tyView funTy
-    callStackName = C.string2SystemName "callStack"
-    fName         = C.string2SystemName "f"
-    callStackId   = C.Id callStackName (embed callStackTy)
-    fId           = C.Id fName (embed fTy)
+    callStackName = C.mkUnsafeSystemName "callStack" 0
+    fName         = C.mkUnsafeSystemName "f" 1
+    callStackId   = C.mkId callStackTy callStackName
+    fId           = C.mkId fTy fName
 
 withFrozenCallStackTerm ty = error $ $(curLoc) ++ show ty
 
@@ -1002,15 +973,14 @@ withFrozenCallStackTerm ty = error $ $(curLoc) ++ show ty
 idTerm
   :: C.Type
   -> C.Term
-idTerm (C.ForAllTy tvATy) =
-  C.TyLam (bind aTV (
-  C.Lam   (bind xId (
-  C.Var xTy xName))))
+idTerm (C.ForAllTy aTV funTy) =
+  C.TyLam aTV (
+  C.Lam   xId (
+  C.Var xId))
   where
-    (aTV,funTy)     = runFreshM (unbind tvATy)
     (C.FunTy xTy _) = C.tyView funTy
-    xName           = C.string2SystemName "x"
-    xId             = C.Id xName (embed xTy)
+    xName           = C.mkUnsafeSystemName "x" 0
+    xId             = C.mkId xTy xName
 
 idTerm ty = error $ $(curLoc) ++ show ty
 
@@ -1024,21 +994,16 @@ idTerm ty = error $ $(curLoc) ++ show ty
 runRWTerm
   :: C.Type
   -> C.Term
-runRWTerm (C.ForAllTy tvRTy) =
-  C.TyLam (bind rTV (
-  C.TyLam (bind oTV (
-  C.Lam   (bind fId (
-  (C.App (C.Var fTy fName) (C.Prim rwNm rwTy))))))))
+runRWTerm (C.ForAllTy rTV (C.ForAllTy oTV funTy)) =
+  C.TyLam rTV (
+  C.TyLam oTV (
+  C.Lam   fId (
+  (C.App (C.Var fId) (C.Prim rwNm rwTy)))))
   where
-    (rTV,oTV,funTy) = runFreshM $ do
-      { (rTV',C.ForAllTy tvOTy) <- unbind tvRTy
-      ; (oTV',funTy')           <- unbind tvOTy
-      ; return (rTV',oTV',funTy')
-      }
     (C.FunTy fTy _)  = C.tyView funTy
     (C.FunTy rwTy _) = C.tyView fTy
-    fName            = C.string2SystemName "f"
-    fId              = C.Id fName (embed fTy)
+    fName            = C.mkUnsafeSystemName "f" 0
+    fId              = C.mkId fTy fName
     rwNm             = pack "GHC.Prim.realWorld#"
 
 runRWTerm ty = error $ $(curLoc) ++ show ty

@@ -38,8 +38,9 @@ import           Data.List                            (nub, nubBy)
 import           Data.Monoid                          hiding (Product, Sum)
 #endif
 import           Data.Semigroup.Monad
-import           Data.Text.Lazy                       (pack, unpack, intercalate)
+import           Data.Text.Lazy                       (pack)
 import qualified Data.Text.Lazy                       as Text
+import qualified Data.Text                            as TextS
 import           Data.Text.Prettyprint.Doc.Extra
 #ifdef CABAL
 import qualified Data.Version
@@ -56,7 +57,6 @@ import           Clash.Annotations.BitRepresentation.Util
   (BitOrigin(Lit, Field), bitOrigins, bitRanges, isContinuousMask)
 import           Clash.Core.Var                       (Attr'(..))
 import           Clash.Backend
-import           Clash.Driver.Types                   (SrcSpan, noSrcSpan)
 import           Clash.Netlist.BlackBox.Types         (HdlSyn)
 import           Clash.Netlist.BlackBox.Util
   (extractLiterals, renderBlackBox, renderFilePath)
@@ -65,7 +65,7 @@ import           Clash.Netlist.Types                  hiding (_intWidth, intWidt
 import           Clash.Netlist.Util                   hiding (mkIdentifier, extendIdentifier)
 import           Clash.Signal.Internal                (ClockKind (..))
 import           Clash.Util
-  (curLoc, first, on, traceIf, (<:>))
+  (SrcSpan, noSrcSpan, curLoc, traceIf, (<:>),on,first)
 
 
 
@@ -142,17 +142,17 @@ instance Backend VerilogState where
     where
       go Basic    nm = filterReserved (mkBasicId' True nm)
       go Extended (rmSlash -> nm) = case go Basic nm of
-        nm' | nm /= nm' -> Text.concat ["\\",nm," "]
+        nm' | nm /= nm' -> TextS.concat ["\\",nm," "]
             |otherwise  -> nm'
   extendIdentifier = return go
     where
-      go Basic nm ext = filterReserved (mkBasicId' True (nm `Text.append` ext))
+      go Basic nm ext = filterReserved (mkBasicId' True (nm `TextS.append` ext))
       go Extended (rmSlash . escapeTemplate -> nm) ext =
-        let nmExt = nm `Text.append` ext
+        let nmExt = nm `TextS.append` ext
         in  case go Basic nm ext of
-              nm' | nm' /= nmExt -> case Text.head nmExt of
-                      '#' -> Text.concat ["\\",nmExt," "]
-                      _   -> Text.concat ["\\#",nmExt," "]
+              nm' | nm' /= nmExt -> case TextS.head nmExt of
+                      '#' -> TextS.concat ["\\",nmExt," "]
+                      _   -> TextS.concat ["\\#",nmExt," "]
                   | otherwise    -> nm'
 
   setModName _    = id
@@ -181,8 +181,8 @@ instance Backend VerilogState where
 
 rmSlash :: Identifier -> Identifier
 rmSlash nm = fromMaybe nm $ do
-  nm1 <- Text.stripPrefix "\\" nm
-  pure (Text.filter (not . (== ' ')) nm1)
+  nm1 <- TextS.stripPrefix "\\" nm
+  pure (TextS.filter (not . (== ' ')) nm1)
 
 type VerilogM a = Mon (State VerilogState) a
 
@@ -207,7 +207,7 @@ reservedWords = ["always","and","assign","automatic","begin","buf","bufif0"
 
 filterReserved :: Identifier -> Identifier
 filterReserved s = if s `elem` reservedWords
-  then s `Text.append` "_r"
+  then s `TextS.append` "_r"
   else s
 
 -- | Generate VHDL for a Netlist component
@@ -217,7 +217,7 @@ genVerilog sp seen c = preserveSeen $ do
     Mon (setSrcSpan sp)
     v    <- commentHeader <> line <> module_ c
     incs <- Mon $ use includes
-    return ((unpack cName,v),incs)
+    return ((TextS.unpack cName,v),incs)
   where
 #ifdef CABAL
     clashVer = Data.Version.showVersion Paths_clash_lib.version
@@ -231,12 +231,12 @@ genVerilog sp seen c = preserveSeen $ do
       <> line <> "*/"
 
 sigPort :: Maybe WireOrReg
-        -> Text.Text
+        -> TextS.Text
         -> HWType
         -> VerilogM Doc
 sigPort wor pName hwType =
     addAttrs (hwTypeAttrs hwType)
-      (portType <+> verilogType' True hwType <+> string pName <+> encodingNote hwType)
+      (portType <+> verilogType' True hwType <+> stringS pName <+> encodingNote hwType)
   where
     portType = case wor of
                  Nothing   -> if isBiSignalIn hwType then "inout" else "input"
@@ -251,7 +251,7 @@ module_ c = addSeen c *> modVerilog <* Mon (imports .= [])
       imps <- Mon $ use imports
       modHeader <> line <> modPorts <> line <> include (nub imps) <> pure body <> line <> modEnding
 
-    modHeader  = "module" <+> string (componentName c)
+    modHeader  = "module" <+> stringS (componentName c)
     modPorts   = indent 4 (tupleInputs inPorts <> line <> tupleOutputs outPorts <> semi)
     modBody    = indent 2 (decls (declarations c)) <> line <> line <> insts (declarations c)
     modEnding  = "endmodule"
@@ -367,7 +367,7 @@ addAttrs []     t = t
 addAttrs attrs' t =
   "(*" <+> attrs'' <+> "*)" <+> t
  where
-  attrs'' = string $ intercalate ", " (map renderAttr attrs')
+  attrs'' = string $ Text.intercalate ", " (map renderAttr attrs')
 
 -- | Convert single attribute to verilog syntax
 renderAttr :: Attr' -> Text.Text
@@ -381,9 +381,9 @@ decl :: Declaration -> VerilogM (Maybe Doc)
 decl (NetDecl' noteM wr id_ tyE) =
   Just A.<$> maybe id addNote noteM (addAttrs attrs (wireOrRegDoc wr <+> tyDec tyE))
   where
-    tyDec (Left  ty) = string ty <+> string id_
-    tyDec (Right ty) = sigDecl (string id_) ty
-    addNote n = mappend ("//" <+> string n <> line)
+    tyDec (Left  ty) = stringS ty <+> stringS id_
+    tyDec (Right ty) = sigDecl (stringS id_) ty
+    addNote n = mappend ("//" <+> stringS n <> line)
     attrs = fromMaybe [] (hwTypeAttrs A.<$> either (const Nothing) Just tyE)
 
 decl _ = return Nothing
@@ -439,7 +439,7 @@ patMod _ l = l
 
 -- | Helper function for inst_, handling CustomSP and CustomSum
 inst_'
-  :: Text.Text
+  :: TextS.Text
   -> Expr
   -> HWType
   -> [(Maybe Literal, Expr)]
@@ -460,24 +460,24 @@ inst_' id_ scrut scrutTy es = fmap Just $
 
       conds :: [(Maybe Literal,Expr)] -> VerilogM Doc
       conds []                = error $ $(curLoc) ++ "Empty list of conditions invalid."
-      conds [(_,e)]           = "default" <+> ":" <+> string id_ <+> "=" <+> expr_ False e <> ";"
-      conds ((Nothing,e):_)   = "default" <+> ":" <+> string id_ <+> "=" <+> expr_ False e <> ";"
+      conds [(_,e)]           = "default" <+> ":" <+> stringS id_ <+> "=" <+> expr_ False e <> ";"
+      conds ((Nothing,e):_)   = "default" <+> ":" <+> stringS id_ <+> "=" <+> expr_ False e <> ";"
       conds ((Just c ,e):es') =
-        mask' <+> ":" <+> string id_ <+> "=" <+> expr_ False e <> ";" <> line <> conds es'
+        mask' <+> ":" <+> stringS id_ <+> "=" <+> expr_ False e <> ";" <> line <> conds es'
           where
             mask' = patLitCustom scrutTy c
 
 -- | Turn a Netlist Declaration to a Verilog concurrent block
 inst_ :: Declaration -> VerilogM (Maybe Doc)
 inst_ (Assignment id_ e) = fmap Just $
-  "assign" <+> string id_ <+> equals <+> expr_ False e <> semi
+  "assign" <+> stringS id_ <+> equals <+> expr_ False e <> semi
 
 inst_ (CondAssignment id_ _ scrut _ [(Just (BoolLit b), l),(_,r)]) = fmap Just $
    "always @(*) begin" <> line <>
    indent 2 ("if" <> parens (expr_ True scrut) <> line <>
-               (indent 2 $ string id_ <+> equals <+> expr_ False t <> semi) <> line <>
+               (indent 2 $ stringS id_ <+> equals <+> expr_ False t <> semi) <> line <>
             "else" <> line <>
-               (indent 2 $ string id_ <+> equals <+> expr_ False f <> semi)) <> line <>
+               (indent 2 $ stringS id_ <+> equals <+> expr_ False f <> semi)) <> line <>
    "end"
   where
     (t,f) = if b then (l,r) else (r,l)
@@ -497,12 +497,12 @@ inst_ (CondAssignment id_ _ scrut scrutTy es) = fmap Just $
   where
     conds :: Identifier -> [(Maybe Literal,Expr)] -> VerilogM [Doc]
     conds _ []                = return []
-    conds i [(_,e)]           = ("default" <+> colon <+> string i <+> equals <+> expr_ False e) <:> return []
-    conds i ((Nothing,e):_)   = ("default" <+> colon <+> string i <+> equals <+> expr_ False e) <:> return []
-    conds i ((Just c ,e):es') = (exprLit (Just (scrutTy,conSize scrutTy)) c <+> colon <+> string i <+> equals <+> expr_ False e) <:> conds i es'
+    conds i [(_,e)]           = ("default" <+> colon <+> stringS i <+> equals <+> expr_ False e) <:> return []
+    conds i ((Nothing,e):_)   = ("default" <+> colon <+> stringS i <+> equals <+> expr_ False e) <:> return []
+    conds i ((Just c ,e):es') = (exprLit (Just (scrutTy,conSize scrutTy)) c <+> colon <+> stringS i <+> equals <+> expr_ False e) <:> conds i es'
 
 inst_ (InstDecl _ _ nm lbl pms) = fmap Just $
-    nest 2 (string nm <+> string lbl <> line <> pms' <> semi)
+    nest 2 (stringS nm <+> stringS lbl <> line <> pms' <> semi)
   where
     pms' = tupled $ sequence [dot <> expr_ False i <+> parens (expr_ False e) | (i,_,_,e) <- pms]
 
@@ -608,26 +608,26 @@ expr_ :: Bool -- ^ Enclose in parenthesis?
       -> VerilogM Doc
 expr_ _ (Literal sizeM lit) = exprLit sizeM lit
 
-expr_ _ (Identifier id_ Nothing) = string id_
+expr_ _ (Identifier id_ Nothing) = stringS id_
 
 expr_ _ (Identifier id_ (Just (Indexed (CustomSP _id _dataRepr _size args,dcI,fI)))) =
   braces $ hcat $ punctuate ", " $ sequence ranges
     where
       (ConstrRepr' _name _n _mask _value anns, _, _argTys) = args !! dcI
       ranges = map range' $ bitRanges (anns !! fI)
-      range' (start, end) = string id_ <> brackets (int start <> ":" <> int end)
+      range' (start, end) = stringS id_ <> brackets (int start <> ":" <> int end)
 
 -- See [Note] integer projection
 expr_ _ (Identifier id_ (Just (Indexed ((Signed w),_,_))))  = do
   iw <- Mon $ use intWidth
   traceIf (iw < w) ($(curLoc) ++ "WARNING: result smaller than argument") $
-    string id_
+    stringS id_
 
 -- See [Note] integer projection
 expr_ _ (Identifier id_ (Just (Indexed ((Unsigned w),_,_))))  = do
   iw <- Mon $ use intWidth
   traceIf (iw < w) ($(curLoc) ++ "WARNING: result smaller than argument") $
-    string id_
+    stringS id_
 
 -- See [Note] mask projection
 expr_ _ (Identifier _ (Just (Indexed ((BitVector _),_,0)))) = do
@@ -639,11 +639,11 @@ expr_ _ (Identifier _ (Just (Indexed ((BitVector _),_,0)))) = do
 expr_ _ (Identifier id_ (Just (Indexed ((BitVector w),_,1)))) = do
   iw <- Mon $ use intWidth
   traceIf (iw < w) ($(curLoc) ++ "WARNING: result smaller than argument") $
-    string id_
+    stringS id_
 
 expr_ _ (Identifier id_ (Just m)) = case modifier 0 m of
-  Nothing          -> string id_
-  Just (start,end) -> string id_ <> brackets (int start <> colon <> int end)
+  Nothing          -> stringS id_
+  Just (start,end) -> stringS id_ <> brackets (int start <> colon <> int end)
 
 expr_ b (DataCon _ (DC (Void {}, -1)) [e]) = expr_ b e
 
@@ -751,20 +751,20 @@ expr_ _ (BlackBoxE pNm _ _ _ _ bbCtx _)
 expr_ b (BlackBoxE _ libs imps inc bs bbCtx b') = do
   parenIf (b || b') (Mon (renderBlackBox libs imps inc bs bbCtx <*> pure 0))
 
-expr_ _ (DataTag Bool (Left id_))          = string id_ <> brackets (int 0)
+expr_ _ (DataTag Bool (Left id_))          = stringS id_ <> brackets (int 0)
 expr_ _ (DataTag Bool (Right id_))         = do
   iw <- Mon (use intWidth)
-  "$unsigned" <> parens (listBraces (sequence [braces (int (iw-1) <+> braces "1'b0"),string id_]))
+  "$unsigned" <> parens (listBraces (sequence [braces (int (iw-1) <+> braces "1'b0"),stringS id_]))
 
-expr_ _ (DataTag (Sum _ _) (Left id_))     = "$unsigned" <> parens (string id_)
-expr_ _ (DataTag (Sum _ _) (Right id_))    = "$unsigned" <> parens (string id_)
+expr_ _ (DataTag (Sum _ _) (Left id_))     = "$unsigned" <> parens (stringS id_)
+expr_ _ (DataTag (Sum _ _) (Right id_))    = "$unsigned" <> parens (stringS id_)
 
 expr_ _ (DataTag (Product _ _) (Right _))  = do
   iw <- Mon (use intWidth)
   int iw <> "'sd0"
 
 expr_ _ (DataTag hty@(SP _ _) (Right id_)) = "$unsigned" <> parens
-                                               (string id_ <> brackets
+                                               (stringS id_ <> brackets
                                                (int start <> colon <> int end))
   where
     start = typeSize hty - 1

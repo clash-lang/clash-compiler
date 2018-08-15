@@ -15,7 +15,8 @@ where
 
 import           Control.Applicative
 import           Data.String                           (IsString (..))
-import           Data.Text.Lazy                        as T
+import           Data.Text                             as T
+import           Data.Text.Lazy                        as LT
 import qualified Data.Text.Prettyprint.Doc             as PP
 import           Data.Text.Prettyprint.Doc.Internal    hiding (Doc)
 import           Data.Text.Prettyprint.Doc.Render.Text
@@ -45,7 +46,7 @@ layoutOneLine doc = scan 0 [doc]
 
 renderOneLine
   :: PP.Doc ann
-  -> Text
+  -> LT.Text
 renderOneLine = renderLazy . layoutOneLine
 
 int :: Applicative f => Int -> f Doc
@@ -139,7 +140,10 @@ softline' = pure PP.softline'
 pretty :: (Applicative f, Pretty a) => a -> f Doc
 pretty = pure . PP.pretty
 
-string :: Applicative f => Text -> f Doc
+stringS :: Applicative f => T.Text -> f Doc
+stringS = pure . PP.pretty
+
+string :: Applicative f => LT.Text -> f Doc
 string = pure . PP.pretty
 
 squotes :: Applicative f => f Doc -> f Doc

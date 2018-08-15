@@ -25,41 +25,45 @@ import qualified Control.Lens            as Lens
 import           Control.Monad           (unless, when, zipWithM, join)
 import           Control.Monad.Trans.Except (runExcept)
 import           Data.Either             (partitionEithers)
-import           Data.HashMap.Strict     (HashMap)
-import qualified Data.HashMap.Strict     as HashMap
-import           Data.List               (intersperse, unzip4, sort, intercalate)
-import           Data.Maybe              (catMaybes,fromMaybe)
-import           Data.Monoid             ((<>))
-import           Data.Text.Lazy          (append,pack,unpack)
-import qualified Data.Text.Lazy          as Text
 import           Data.String             (fromString)
-import           Unbound.Generics.LocallyNameless
-  (Embed, Fresh, embed, unbind, unembed, unrec)
-import qualified Unbound.Generics.LocallyNameless as Unbound
+import           Data.List               (intersperse, unzip4, sort, intercalate)
+import qualified Data.List               as List
+import           Data.Maybe              (catMaybes,fromMaybe)
 import           Text.Printf             (printf)
+import           Data.Text               (Text)
+import qualified Data.Text               as Text
+import           Data.Text.Prettyprint.Doc (Doc)
+
+import           SrcLoc                  (SrcSpan)
 
 import           Clash.Annotations.BitRepresentation.ClashLib
   (coreToType')
 import           Clash.Annotations.BitRepresentation.Internal
   (CustomReprs, ConstrRepr'(..), DataRepr'(..), getDataRepr, getConstrRepr)
 import           Clash.Annotations.TopEntity (PortName (..), TopEntity (..))
-import           Clash.Driver.Types
-  (ClashException (..), Manifest (..), SrcSpan)
+import           Clash.Driver.Types      (Manifest (..))
 import           Clash.Core.DataCon      (DataCon (..))
 import           Clash.Core.FreeVars     (termFreeIds, typeFreeVars)
-import           Clash.Core.Name         (Name (..), appendToName, name2String)
-import           Clash.Core.Pretty       (showDoc)
-import           Clash.Core.Subst        (substTms, substTys)
-import           Clash.Core.Term         (LetBinding, Term (..), TmName, TmOccName)
+import           Clash.Core.Name
+  (Name (..), appendToName, nameOcc)
+import           Clash.Core.Pretty       (showPpr)
+import           Clash.Core.Subst
+  (Subst (..), extendIdSubst, extendIdSubstList, extendInScopeId,
+   extendInScopeIdList, extendTvSubstList, mkSubst, substTm, substTy, substTyWith)
+import           Clash.Core.Term         (LetBinding, Term (..))
 import           Clash.Core.TyCon
-  (TyCon (..), TyConName, TyConOccName, tyConDataCons)
+  (TyConName, TyConMap, tyConDataCons)
 import           Clash.Core.Type         (Type (..), TypeView (..), LitTy (..),
                                           coreView, splitTyConAppM, tyView)
 import           Clash.Core.Util         (collectBndrs, termType, tyNatSize)
-import           Clash.Core.Var          (Id, Var (..),modifyVarName,Attr')
+import           Clash.Core.Var          (Id, Var (..), mkId, modifyVarName, Attr')
+import           Clash.Core.VarEnv
+  (emptyVarSet, extendInScopeSetList, mkInScopeSet, unionVarSet, uniqAway,
+   unitVarSet, mkVarSet)
 import           Clash.Netlist.Id        (IdType (..), stripDollarPrefixes)
 import           Clash.Netlist.Types     as HW
 import           Clash.Signal.Internal   (ClockKind (..))
+import           Clash.Unique
 import           Clash.Util
 
 isVoid :: HWType -> Bool
@@ -86,32 +90,30 @@ extendIdentifier typ nm ext =
 -- | Split a normalized term into: a list of arguments, a list of let-bindings,
 -- and a variable reference that is the body of the let-binding. Returns a
 -- String containing the error is the term was not in a normalized form.
-splitNormalized :: Fresh m
-                => HashMap TyConOccName TyCon
-                -> Term
-                -> m (Either String ([Id],[LetBinding],Id))
-splitNormalized tcm expr = do
-  (args,letExpr) <- fmap (first partitionEithers) $ collectBndrs expr
-  case letExpr of
-    Letrec b
-      | (tmArgs,[]) <- args -> do
-          (xes,e) <- unbind b
-          case e of
-            Var t v -> return $! Right (tmArgs,unrec xes,Id v (embed t))
-            _ -> return $! Left ($(curLoc) ++ "Not in normal form: res not simple var")
-      | otherwise -> return $! Left ($(curLoc) ++ "Not in normal form: tyArgs")
-    _ -> do
-      ty <- termType tcm expr
-      return $! Left ($(curLoc) ++ "Not in normal form: no Letrec:\n\n" ++ showDoc expr ++ "\n\nWhich has type:\n\n"  ++ showDoc ty)
+splitNormalized
+  :: TyConMap
+  -> Term
+  -> (Either String ([Id],[LetBinding],Id))
+splitNormalized tcm expr = case collectBndrs expr of
+  (args,Letrec xes e)
+    | (tmArgs,[]) <- partitionEithers args -> case e of
+        Var v -> Right (tmArgs,xes,v)
+        _     -> Left ($(curLoc) ++ "Not in normal form: res not simple var")
+    | otherwise -> Left ($(curLoc) ++ "Not in normal form: tyArgs")
+  _ ->
+    Left ($(curLoc) ++ "Not in normal form: no Letrec:\n\n" ++ showPpr expr ++
+          "\n\nWhich has type:\n\n" ++ showPpr ty)
+ where
+  ty = termType tcm expr
 
 -- | Converts a Core type to a HWType given a function that translates certain
 -- builtin types. Errors if the Core type is not translatable.
 unsafeCoreTypeToHWType
   :: SrcSpan
   -> String
-  -> (CustomReprs -> HashMap TyConOccName TyCon -> Bool -> Type -> Maybe (Either String HWType))
+  -> (CustomReprs -> TyConMap -> Bool -> Type -> Maybe (Either String HWType))
   -> CustomReprs
-  -> HashMap TyConOccName TyCon
+  -> TyConMap
   -> Bool
   -> Type
   -> HWType
@@ -145,38 +147,40 @@ coreTypeToHWTypeM ty = hush <$> (coreTypeToHWType <$> Lens.use typeTranslator
                                                   <*> pure ty)
 
 -- | Returns the name and period of the clock corresponding to a type
-synchronizedClk :: HashMap TyConOccName TyCon -- ^ TyCon cache
-                -> Type
-                -> Maybe (Identifier,Integer)
+synchronizedClk
+  :: TyConMap
+  -- ^ TyCon cache
+  -> Type
+  -> Maybe (Identifier,Integer)
 synchronizedClk tcm ty
   | not . null . Lens.toListOf typeFreeVars $ ty = Nothing
-  | Just (tyCon,args) <- splitTyConAppM ty
-  = case name2String tyCon of
-      "Clash.Sized.Vector.Vec"        -> synchronizedClk tcm (args!!1)
+  | Just (tcNm,args) <- splitTyConAppM ty
+  = case nameOcc tcNm of
+      "Clash.Sized.Vector.Vec"       -> synchronizedClk tcm (args!!1)
       "Clash.Signal.Internal.SClock" -> case splitTyConAppM (head args) of
         Just (_,[LitTy (SymTy s),litTy])
-          | Right i <- runExcept (tyNatSize tcm litTy) -> Just (pack s,i)
-        _ -> error $ $(curLoc) ++ "Clock period not a simple literal: " ++ showDoc ty
+          | Right i <- runExcept (tyNatSize tcm litTy) -> Just (Text.pack s,i)
+        _ -> error $ $(curLoc) ++ "Clock period not a simple literal: " ++ showPpr ty
       "Clash.Signal.Internal.Signal" -> case splitTyConAppM (head args) of
         Just (_,[LitTy (SymTy s),litTy])
-          | Right i <- runExcept (tyNatSize tcm litTy) -> Just (pack s,i)
-        _ -> error $ $(curLoc) ++ "Clock period not a simple literal: " ++ showDoc ty
-      _                               -> case tyConDataCons (tcm HashMap.! nameOcc tyCon) of
-                                           [dc] -> let argTys   = dcArgTys dc
-                                                       argTVs   = map nameOcc (dcUnivTyVars dc)
-                                                       argSubts = zip argTVs args
-                                                       args'    = map (substTys argSubts) argTys
-                                                   in case args' of
-                                                      (arg:_) -> synchronizedClk tcm arg
-                                                      _ -> Nothing
-                                           _    -> Nothing
+          | Right i <- runExcept (tyNatSize tcm litTy) -> Just (Text.pack s,i)
+        _ -> error $ $(curLoc) ++ "Clock period not a simple literal: " ++ showPpr ty
+      _ -> case tyConDataCons (tcm `lookupUniqMap'` tcNm) of
+             [dc] -> let argTys   = dcArgTys dc
+                         argTVs   = dcUnivTyVars dc
+                         -- argSubts = zip argTVs args
+                         args'    = map (substTyWith argTVs args) argTys
+                     in case args' of
+                        (arg:_) -> synchronizedClk tcm arg
+                        _ -> Nothing
+             _    -> Nothing
   | otherwise
   = Nothing
 
 packSP
   :: CustomReprs
-  -> (Text.Text, c)
-  -> (ConstrRepr', Text.Text, c)
+  -> (Text, c)
+  -> (ConstrRepr', Text, c)
 packSP reprs (name, tys) =
   case getConstrRepr name reprs of
     Just repr -> (repr, name, tys)
@@ -185,8 +189,8 @@ packSP reprs (name, tys) =
 
 packSum
   :: CustomReprs
-  -> Text.Text
-  -> (ConstrRepr', Text.Text)
+  -> Text
+  -> (ConstrRepr', Text)
 packSum reprs name =
   case getConstrRepr name reprs of
     Just repr -> (repr, name)
@@ -255,9 +259,9 @@ fixCustomRepr _ _ typ = typ
 -- builtin types. Returns a string containing the error message when the Core
 -- type is not translatable.
 coreTypeToHWType
-  :: (CustomReprs -> HashMap TyConOccName TyCon -> Bool -> Type -> Maybe (Either String HWType))
+  :: (CustomReprs -> TyConMap -> Bool -> Type -> Maybe (Either String HWType))
   -> CustomReprs
-  -> HashMap TyConOccName TyCon
+  -> TyConMap
   -> Bool
   -> Type
   -> Either String HWType
@@ -272,18 +276,18 @@ coreTypeToHWType builtInTranslation reprs m keepVoid ty = go' ty
       coreTypeToHWType builtInTranslation reprs m keepVoid ty'
     -- Try to create hwtype based on AST:
     go' (tyView -> TyConApp tc args) = do
-      hwty <- mkADT builtInTranslation reprs m (showDoc ty) keepVoid tc args
+      hwty <- mkADT builtInTranslation reprs m (showPpr ty) keepVoid tc args
       return $ fixCustomRepr reprs ty hwty
     -- All methods failed:
-    go' _ = Left $ "Can't translate non-tycon type: " ++ showDoc ty
+    go' _ = Left $ "Can't translate non-tycon type: " ++ showPpr ty
 
 
 -- | Converts an algebraic Core type (split into a TyCon and its argument) to a HWType.
 mkADT
-  :: (CustomReprs -> HashMap TyConOccName TyCon -> Bool -> Type -> Maybe (Either String HWType))
+  :: (CustomReprs -> TyConMap -> Bool -> Type -> Maybe (Either String HWType))
   -- ^ Hardcoded Type -> HWType translator
   -> CustomReprs
-  -> HashMap TyConOccName TyCon
+  -> TyConMap
   -- ^ TyCon cache
   -> String
   -- ^ String representation of the Core type for error messages
@@ -298,14 +302,11 @@ mkADT _ _ m tyString _ tc _
   | isRecursiveTy m tc
   = Left $ $(curLoc) ++ "Can't translate recursive type: " ++ tyString
 
-mkADT builtInTranslation reprs m _tyString keepVoid tc args = case tyConDataCons (m HashMap.! nameOcc tc) of
-  []  -> return (Void Nothing) -- Left $ $(curLoc) ++ "Can't translate empty type: " ++ tyString
+mkADT builtInTranslation reprs m _tyString keepVoid tc args = case tyConDataCons (m `lookupUniqMap'` tc) of
+  []  -> return (Void Nothing)
   dcs -> do
-    let tcName       = pack $ name2String tc
-        argTyss      = map dcArgTys dcs
-        argTVss      = map dcUnivTyVars dcs
-        argSubts     = map ((`zip` args) . map nameOcc) argTVss
-        substArgTyss = zipWith (\s tys -> map (substTys s) tys) argSubts argTyss
+    let tcName       = nameOcc tc
+        substArgTyss = map substArgTys dcs
     argHTyss         <- mapM (mapM (coreTypeToHWType builtInTranslation reprs m keepVoid)) substArgTyss
     let argHTyss1    = if keepVoid
                           then argHTyss
@@ -321,16 +322,27 @@ mkADT builtInTranslation reprs m _tyString keepVoid tc args = case tyConDataCons
         | length dcs < 2 ->
           return (Void Nothing)
         | otherwise ->
-          return $ Sum tcName $ map (pack . name2String . dcName) dcs
+          return $ Sum tcName $ map (nameOcc . dcName) dcs
 
       (_   ,elemHTys) ->
         return $ SP tcName $ zipWith
-          (\dc tys ->  ( pack . name2String $ dcName dc, tys))
+          (\dc tys ->  ( nameOcc (dcName dc), tys))
           dcs elemHTys
+ where
+  argsFVs = List.foldl' unionVarSet emptyVarSet
+                (map (Lens.foldMapOf typeFreeVars unitVarSet) args)
+
+  substArgTys dc =
+    let univTVs = dcUnivTyVars dc
+        extTVs  = dcExtTyVars dc
+        is      = mkInScopeSet (argsFVs `unionVarSet` mkVarSet extTVs)
+        -- See Note [The substitution invariant]
+        subst   = extendTvSubstList (mkSubst is) (univTVs `zipEqual` args)
+    in  map (substTy subst) (dcArgTys dc)
 
 -- | Simple check if a TyCon is recursively defined.
-isRecursiveTy :: HashMap TyConOccName TyCon -> TyConName -> Bool
-isRecursiveTy m tc = case tyConDataCons (m HashMap.! nameOcc tc) of
+isRecursiveTy :: TyConMap -> TyConName -> Bool
+isRecursiveTy m tc = case tyConDataCons (m `lookupUniqMap'` tc) of
     []  -> False
     dcs -> let argTyss      = map dcArgTys dcs
                argTycons    = (map fst . catMaybes) $ (concatMap . map) splitTyConAppM argTyss
@@ -339,11 +351,11 @@ isRecursiveTy m tc = case tyConDataCons (m HashMap.! nameOcc tc) of
 -- | Determines if a Core type is translatable to a HWType given a function that
 -- translates certain builtin types.
 representableType
-  :: (CustomReprs -> HashMap TyConOccName TyCon -> Bool -> Type -> Maybe (Either String HWType))
+  :: (CustomReprs -> TyConMap -> Bool -> Type -> Maybe (Either String HWType))
   -> CustomReprs
   -> Bool
   -- ^ String considered representable
-  -> HashMap TyConOccName TyCon
+  -> TyConMap
   -> Type
   -> Bool
 representableType builtInTranslation reprs stringRepresentable m =
@@ -404,8 +416,8 @@ termHWType :: String
            -> Term
            -> NetlistMonad HWType
 termHWType loc e = do
-  m  <- Lens.use tcCache
-  ty <- termType m e
+  m <- Lens.use tcCache
+  let ty = termType m e
   unsafeCoreTypeToHWTypeM loc ty
 
 -- | Gives the HWType corresponding to a term. Returns 'Nothing' if the term has
@@ -414,7 +426,7 @@ termHWTypeM :: Term
             -> NetlistMonad (Maybe HWType)
 termHWTypeM e = do
   m  <- Lens.use tcCache
-  ty <- termType m e
+  let ty = termType m e
   coreTypeToHWTypeM ty
 
 isBiSignalIn :: HWType -> Bool
@@ -471,7 +483,7 @@ mkUniqueNormalized
       ,[(Identifier,HWType)]
       ,[Declaration]
       ,[LetBinding]
-      ,Maybe TmName)
+      ,Maybe Id)
 mkUniqueNormalized topMM (args,binds,res) = do
   -- Add user define port names to list of seen ids to prevent name collisions.
   let
@@ -482,19 +494,19 @@ mkUniqueNormalized topMM (args,binds,res) = do
 
   seenIds %= (portNames++)
 
-  -- Make arguments unique
-  (iports,iwrappers,substArgs) <- mkUniqueArguments topMM args
+  let (bndrs,exprs) = unzip binds
 
-  let (bndrs,map unembed -> exprs) = unzip binds
+  -- Make arguments unique
+  is0 <- (`extendInScopeSetList` (args ++ bndrs)) <$> Lens.use globalInScope
+  (iports,iwrappers,substArgs) <- mkUniqueArguments (mkSubst is0) topMM args
 
   -- Make result unique. This might yield 'Nothing' in which case the result
   -- was a single BiSignalOut. This is superfluous in the HDL, as the argument
   -- will already contain a bidirectional signal complementing the BiSignalOut.
-  resM <- mkUniqueResult topMM res
+  resM <- mkUniqueResult substArgs topMM res
   case resM of
     Just (oports,owrappers,res1,substRes) -> do
-      let subst' = substRes:substArgs
-          usesOutput = concatMap (filter ( == (nameOcc . varName) res)
+      let usesOutput = concatMap (filter ( == res)
                                          . Lens.toListOf termFreeIds
                                          ) exprs
       -- If the let-binder carrying the result is used in a feedback loop
@@ -502,12 +514,12 @@ mkUniqueNormalized topMM (args,binds,res) = do
       -- "<X>". We do this because output ports in most HDLs cannot be read.
       (res2,subst'',extraBndr) <- case usesOutput of
         [] -> return (varName res1
-                     ,(nameOcc $ varName res, Var (unembed $ varType res1) (varName res1)):subst'
-                     ,[] :: [(Id, Embed Term)])
+                     ,substRes
+                     ,[] :: [(Id, Term)])
         _  -> do
-          ([res3],_) <- mkUnique [] [modifyVarName (`appendToName` "_rec") res]
-          return (varName res3,(nameOcc $ varName res,Var (unembed $ varType res3) (varName res3)):subst'
-                 ,[(res1,embed $ Var (unembed $ varType res) (varName res3))])
+          ([res3],substRes') <- mkUnique substRes [modifyVarName (`appendToName` "_rec") res]
+          return (varName res3,substRes'
+                 ,[(res1, Var res3)])
       -- Replace occurences of "<X>" by "<X>_rec"
       let resN    = varName res
           bndrs'  = map (\i -> if varName i == resN then modifyVarName (const res2) i else i) bndrs
@@ -516,31 +528,34 @@ mkUniqueNormalized topMM (args,binds,res) = do
       (bndrsL',substL) <- mkUnique subst'' bndrsL
       (bndrsR',substR) <- mkUnique substL  bndrsR
       -- Replace old IDs by updated unique IDs in the RHSs of the let-binders
-      let exprs' = map (embed . substTms substR) exprs
+      let exprs' = map (substTm ("mkUniqueNormalized1" :: Doc ()) substR) exprs
       -- Return the uniquely named arguments, let-binders, and result
-      return (iports,iwrappers,oports,owrappers,zip (bndrsL' ++ r:bndrsR') exprs' ++ extraBndr,Just (varName res1))
+      return (iports,iwrappers,oports,owrappers,zip (bndrsL' ++ r:bndrsR') exprs' ++ extraBndr,Just res1)
     Nothing -> do
       (bndrs', substArgs') <- mkUnique substArgs bndrs
-      return (iports,iwrappers,[],[],zip bndrs' (map (embed . substTms substArgs') exprs),Nothing)
+      return (iports,iwrappers,[],[],zip bndrs' (map (substTm ("mkUniqueNormalized2" :: Doc ()) substArgs') exprs),Nothing)
 
 mkUniqueArguments
-  :: Maybe (Maybe TopEntity)
+  :: Subst
+  -> Maybe (Maybe TopEntity)
   -> [Id]
   -> NetlistMonad
        ([(Identifier,HWType)]
        ,[Declaration]
-       ,[(TmOccName,Term)]
+       ,Subst
        )
-mkUniqueArguments Nothing args = do
-  (args',subst) <- mkUnique [] args
+mkUniqueArguments subst0 Nothing args = do
+  (args',subst1) <- mkUnique subst0 args
   ports <- mapM idToInPort args'
-  return (catMaybes ports,[],subst)
+  return (catMaybes ports,[],subst1)
 
-mkUniqueArguments (Just teM) args = do
+mkUniqueArguments subst0 (Just teM) args = do
   let iPortSupply = maybe (repeat Nothing) (extendPorts . t_inputs) teM
   (ports,decls,subst) <- unzip3 . catMaybes <$> zipWithM go iPortSupply args
   let ports' = concat ports
-  return (ports', concat decls, subst)
+  return ( ports', concat decls
+         , extendInScopeIdList (extendIdSubstList subst0 (map snd subst))
+                               (map fst subst))
   where
     go pM var = do
       tcm       <- Lens.use tcCache
@@ -548,34 +563,36 @@ mkUniqueArguments (Just teM) args = do
       reprs     <- Lens.use customReprs
       (_,sp)    <- Lens.use curCompNm
       let i    = varName var
-          i'   = id2identifier var
-          ty   = unembed (varType var)
+          i'   = nameOcc i
+          ty   = varType var
           hwty = unsafeCoreTypeToHWType sp $(curLoc) typeTrans reprs tcm True ty
       (ports,decls,_,pN) <- mkInput pM (i',hwty)
+      let pId  = mkId ty (repName pN i)
       if isVoid hwty
          then return Nothing
-         else return (Just (ports,decls,(nameOcc i, Var ty (repName (unpack pN) i))))
+         else return (Just (ports,decls,(pId,(var,Var pId))))
 
 
 mkUniqueResult
-  :: Maybe (Maybe TopEntity)
+  :: Subst
+  -> Maybe (Maybe TopEntity)
   -> Id
-  -> NetlistMonad (Maybe ([(Identifier,HWType)],[Declaration],Id,(TmOccName,Term)))
-mkUniqueResult Nothing res = do
-  ([res'],[subst]) <- mkUnique [] [res]
+  -> NetlistMonad (Maybe ([(Identifier,HWType)],[Declaration],Id,Subst))
+mkUniqueResult subst0 Nothing res = do
+  ([res'],subst1) <- mkUnique subst0 [res]
   portM <- idToOutPort res'
   case portM of
-    Just port -> return (Just ([port],[],res',subst))
+    Just port -> return (Just ([port],[],res',subst1))
     _         -> return Nothing
 
-mkUniqueResult (Just teM) res = do
+mkUniqueResult subst0 (Just teM) res = do
   tcm       <- Lens.use tcCache
   typeTrans <- Lens.use typeTranslator
   reprs     <- Lens.use customReprs
   (_,sp)    <- Lens.use curCompNm
   let o    = varName res
-      o'   = id2identifier res
-      ty   = unembed (varType res)
+      o'   = nameOcc o
+      ty   = varType res
       hwty = unsafeCoreTypeToHWType sp $(curLoc) typeTrans reprs tcm True ty
       oPortSupply = fmap t_output teM
   when (containsBiSignalIn hwty)
@@ -583,8 +600,10 @@ mkUniqueResult (Just teM) res = do
   output <- mkOutput oPortSupply (o',hwty)
   case output of
     Just (ports, decls, pN) -> do
-      let pO = repName (unpack pN) o
-      return (Just (ports,decls,Id pO (embed ty),(nameOcc o, Var ty pO)))
+      let pO = repName pN o
+          pOId = mkId ty pO
+          subst1 = extendInScopeId (extendIdSubst subst0 res (Var pOId)) pOId
+      return (Just (ports,decls,pOId,subst1))
     _ -> return Nothing
 
 -- | Same as idToPort, but
@@ -620,43 +639,43 @@ idToPort var = do
   (_,sp) <- Lens.use curCompNm
   reprs <- Lens.use customReprs
   let i  = varName var
-      ty = unembed (varType var)
+      ty = varType var
       hwTy = unsafeCoreTypeToHWType sp $(curLoc) typeTrans reprs tcm False ty
   if isVoid hwTy
     then return Nothing
     else return . Just $
-      ( pack $ name2String i
+      ( nameOcc i
       , unsafeCoreTypeToHWType sp $(curLoc) typeTrans reprs tcm False ty
       )
 
 id2type :: Id -> Type
-id2type = unembed . varType
+id2type = varType
 
 id2identifier :: Id -> Identifier
-id2identifier = pack . name2String . varName
+id2identifier = nameOcc . varName
 
-repName :: String -> Name a -> Name a
-repName s (Name sort' _ loc) = Name sort' (Unbound.string2Name s) loc
+repName :: Text -> Name a -> Name a
+repName s (Name sort' _ i loc) = Name sort' s i loc
 
 -- | Make a set of IDs unique; also returns a substitution from old ID to new
 -- updated unique ID.
 mkUnique
-  :: [(TmOccName,Term)]
+  :: Subst
   -- ^ Existing substitution
   -> [Id]
   -- ^ IDs to make unique
-  -> NetlistMonad ([Id],[(TmOccName,Term)])
+  -> NetlistMonad ([Id],Subst)
   -- ^ (Unique IDs, update substitution)
 mkUnique = go []
   where
-    go :: [Id] -> [(TmOccName,Term)] -> [Id] -> NetlistMonad ([Id],[(TmOccName,Term)])
+    go :: [Id] -> Subst -> [Id] -> NetlistMonad ([Id],Subst)
     go processed subst []     = return (reverse processed,subst)
-    go processed subst (i:is) = do
+    go processed subst@(Subst isN _ _) (i:is) = do
       iN <- mkUniqueIdentifier Extended (id2identifier i)
-      let iN_unpacked = unpack iN
-          i'          = modifyVarName (repName iN_unpacked) i
+      let i' = uniqAway isN (modifyVarName (repName iN) i)
+          subst' = extendInScopeId (extendIdSubst subst i (Var i')) i'
       go (i':processed)
-         ((nameOcc . varName $ i,Var (unembed $ varType i') (varName i')):subst)
+         subst'
          is
 
 mkUniqueIdentifier
@@ -676,7 +695,7 @@ mkUniqueIdentifier typ nm = do
   where
     go :: Integer -> [Identifier] -> Identifier -> NetlistMonad Identifier
     go n s i = do
-      i' <- extendIdentifier typ i (pack ('_':show n))
+      i' <- extendIdentifier typ i (Text.pack ('_':show n))
       if i' `elem` s
          then go (n+1) s i
          else do
@@ -714,7 +733,7 @@ portName
   -> Identifier
   -> Identifier
 portName [] i = i
-portName x  _ = pack x
+portName x  _ = Text.pack x
 
 -- | Prefix given string before portnames /except/ when this string is empty.
 prefixParent :: String -> PortName -> PortName
@@ -729,7 +748,7 @@ appendIdentifier
   -> Int
   -> NetlistMonad (Identifier,HWType)
 appendIdentifier (nm,hwty) i =
-  (,hwty) <$> extendIdentifier Extended nm (pack ('_':show i))
+  (,hwty) <$> extendIdentifier Extended nm (Text.pack ('_':show i))
 
 uniquePortName
   :: String
@@ -737,7 +756,7 @@ uniquePortName
   -> NetlistMonad Identifier
 uniquePortName [] i = mkUniqueIdentifier Extended i
 uniquePortName x  _ = do
-  let x' = pack x
+  let x' = Text.pack x
   seenIds %= (x':)
   return x'
 
@@ -922,20 +941,20 @@ genComponentName
   :: [Identifier]
   -> (IdType -> Identifier -> Identifier)
   -> (Maybe Identifier,Maybe Identifier)
-  -> TmName
+  -> Id
   -> Identifier
-genComponentName seen mkId prefixM nm =
-  let nm' = Text.splitOn (Text.pack ".") (Text.pack (name2String nm))
-      fn  = mkId Basic (stripDollarPrefixes (last nm'))
+genComponentName seen mkIdFn prefixM nm =
+  let nm' = Text.splitOn (Text.pack ".") (nameOcc (varName nm))
+      fn  = mkIdFn Basic (stripDollarPrefixes (last nm'))
       fn' = if Text.null fn then Text.pack "Component" else fn
       prefix = maybe id (:) (snd prefixM) (init nm')
       nm2 = Text.concat (intersperse (Text.pack "_") (prefix ++ [fn']))
-      nm3 = mkId Basic nm2
+      nm3 = mkIdFn Basic nm2
   in  if nm3 `elem` seen then go 0 nm3 else nm3
   where
     go :: Integer -> Identifier -> Identifier
     go n i =
-      let i' = mkId Basic (i `Text.append` Text.pack ('_':show n))
+      let i' = mkIdFn Basic (i `Text.append` Text.pack ('_':show n))
       in  if i' `elem` seen
              then go (n+1) i
              else i'
@@ -944,14 +963,14 @@ genTopComponentName
   :: (IdType -> Identifier -> Identifier)
   -> (Maybe Identifier,Maybe Identifier)
   -> Maybe TopEntity
-  -> TmName
+  -> Id
   -> Identifier
-genTopComponentName _mkId prefixM (Just ann) _nm =
+genTopComponentName _mkIdFn prefixM (Just ann) _nm =
   case prefixM of
     (Just p,_) -> p `Text.append` Text.pack ('_':t_name ann)
     _          -> Text.pack (t_name ann)
-genTopComponentName mkId prefixM Nothing nm =
-  genComponentName [] mkId prefixM nm
+genTopComponentName mkIdFn prefixM Nothing nm =
+  genComponentName [] mkIdFn prefixM nm
 
 
 -- | Strips one or more layers of attributes from a HWType; stops at first
@@ -1086,7 +1105,7 @@ mkOutput' pM = case pM of
 
 -- | Instantiate a TopEntity, and add the proper type-conversions where needed
 mkTopUnWrapper
-  :: TmName
+  :: Id
   -- ^ Name of the TopEntity component
   -> Maybe TopEntity
   -- ^ (maybe) a corresponding @TopEntity@ annotation
@@ -1104,9 +1123,9 @@ mkTopUnWrapper topEntity annM man dstId args = do
       outNames = portOutNames man
 
   -- component name
-  mkId <- Lens.use mkIdentifierFn
+  mkIdFn <- Lens.use mkIdentifierFn
   prefixM <- Lens.use componentPrefix
-  let topName = genTopComponentName mkId prefixM annM topEntity
+  let topName = genTopComponentName mkIdFn prefixM annM topEntity
       topM    = fmap (const topName) annM
 
   -- inputs
@@ -1138,7 +1157,7 @@ mkTopUnWrapper topEntity annM man dstId args = do
   (iResult ++) <$> case topOutputM of
     Nothing -> return []
     Just (_, (oports, unwrappers, idsO)) -> do
-        instLabel <- extendIdentifier Basic topName ("_" `append` fst dstId)
+        instLabel <- extendIdentifier Basic topName ("_" `Text.append` fst dstId)
         let outpAssign = Assignment (fst dstId) (resBV topM idsO)
         let topCompDecl = InstDecl
                             Entity

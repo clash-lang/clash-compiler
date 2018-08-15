@@ -35,6 +35,7 @@ import           Data.Generics.Uniplate.DataOnly (transform)
 import           Data.List                       (foldl', lookup, nub)
 import           Data.Maybe                      (catMaybes, fromMaybe,
                                                   listToMaybe, mapMaybe)
+import qualified Data.Text                       as Text
 import           Data.Word                       (Word8)
 import           System.Exit                     (ExitCode (..))
 import           System.IO                       (hGetLine)
@@ -406,11 +407,11 @@ findTestBenchAnnotations bndrs = do
         "TestBench named: " ++ show tb ++ " not found"
     findTB _ = Panic.pgmError "Unexpected Synthesize"
 
-    eqNm thNm bndr = show thNm == qualNm
+    eqNm thNm bndr = Text.pack (show thNm) == qualNm
       where
         bndrNm  = Var.varName bndr
-        qualNm  = maybe occName (\modName -> modName ++ ('.':occName)) (modNameM bndrNm)
-        occName = OccName.occNameString (Name.nameOccName bndrNm)
+        qualNm  = maybe occName (\modName -> modName `Text.append` ('.' `Text.cons` occName)) (modNameM bndrNm)
+        occName = Text.pack (OccName.occNameString (Name.nameOccName bndrNm))
 
 findPrimitiveAnnotations
   :: GHC.GhcMonad m

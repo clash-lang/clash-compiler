@@ -18,11 +18,9 @@ import           Clash.Annotations.BitRepresentation.Internal
   (Type'(AppTy',ConstTy',LitTy'))
 import qualified Clash.Annotations.BitRepresentation.Util as BitRepresentation
 import qualified Clash.Core.Type                          as C
-import           Clash.Core.Name                          (name2String)
+import           Clash.Core.Name                          (nameOcc)
 import qualified Clash.Netlist.Types                      as Netlist
 import           Clash.Util                               (curLoc)
-import qualified Data.Text.Lazy                           as Text
-
 
 -- Convert Core type to BitRepresentation type
 coreToType'
@@ -36,7 +34,7 @@ coreToType'
 coreToType' (C.AppTy t1 t2) =
   AppTy' <$> coreToType' t1 <*> coreToType' t2
 coreToType' (C.ConstTy (C.TyCon name)) =
-   return $ ConstTy' (Text.pack $ name2String name)
+   return $ ConstTy' (nameOcc name)
 coreToType' (C.LitTy (C.NumTy n)) =
    return $ LitTy' n
 coreToType' e =

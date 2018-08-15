@@ -6,8 +6,7 @@
 
 module Clash.Core.TyCon where
 
-import Clash.Core.Name (Name, OccName)
+import Clash.Core.Name (Name)
 
 data TyCon
 type TyConName = Name TyCon
-type TyConOccName = OccName TyCon

@@ -18,7 +18,7 @@ import Clash.Netlist.BlackBox.Util
 import Clash.Netlist.Id
 import Clash.Netlist.Types
 import Clash.Backend
-import qualified Data.Text.Lazy as Text
+import qualified Data.Text as TextS
 
 altpllTF :: TemplateFunction
 altpllTF = TemplateFunction used valid altpllTemplate
@@ -51,7 +51,7 @@ alteraPllTemplate bbCtx = do
   traverse (mkUniqueIdentifier Basic)
            ["locked", "pllLock", "alteraPll","alteraPll_inst"]
  clocks <- traverse (mkUniqueIdentifier Extended)
-                    [Text.pack ("pllOut" ++ show n) | n <- [0..length tys - 1]]
+                    [TextS.pack ("pllOut" ++ show n) | n <- [0..length tys - 1]]
  getMon $ blockDecl alteraPll $ concat
   [[ NetDecl Nothing locked  rstTy
    , NetDecl Nothing pllLock Bool]
@@ -59,7 +59,7 @@ alteraPllTemplate bbCtx = do
   ,[ InstDecl Comp Nothing compName alteraPll_inst $ concat
       [[(Identifier "refclk" Nothing,In,clkTy,clk)
        ,(Identifier "rst" Nothing,In,rstTy,rst)]
-      ,[(Identifier (Text.pack ("outclk_" ++ show n)) Nothing,Out,ty,Identifier k Nothing)
+      ,[(Identifier (TextS.pack ("outclk_" ++ show n)) Nothing,Out,ty,Identifier k Nothing)
        |(k,ty,n) <- zip3 clocks tys [(0 :: Int)..]  ]
       ,[(Identifier "locked" Nothing,Out,rstTy,Identifier locked Nothing)]]
    , CondAssignment pllLock Bool (Identifier locked Nothing) rstTy
@@ -75,7 +75,7 @@ alteraPllTemplate bbCtx = do
   [_,(nm,_,_),(clk,clkTy,_),(rst,rstTy,_)] = bbInputs bbCtx
   (Identifier result Nothing,resTy@(Product _ (tail -> tys))) = bbResult bbCtx
   Just nm' = exprToString nm
-  compName = Text.pack nm'
+  compName = TextS.pack nm'
 
 altpllTemplate
   :: Backend s
@@ -106,5 +106,5 @@ altpllTemplate bbCtx = do
   [(nm,_,_),(clk,clkTy,_),(rst,rstTy,_)] = bbInputs bbCtx
   (Identifier result Nothing,resTy@(Product _ [clkOutTy,_])) = bbResult bbCtx
   Just nm' = exprToString nm
-  compName = Text.pack nm'
+  compName = TextS.pack nm'
 

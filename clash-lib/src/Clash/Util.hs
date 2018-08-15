@@ -9,6 +9,7 @@
 {-# LANGUAGE CPP                  #-}
 {-# LANGUAGE FlexibleInstances    #-}
 {-# LANGUAGE MagicHash            #-}
+{-# LANGUAGE OverloadedStrings    #-}
 {-# LANGUAGE Rank2Types           #-}
 {-# LANGUAGE TupleSections        #-}
 
@@ -18,32 +19,96 @@ module Clash.Util
   ( module Clash.Util
   , module X
   , makeLenses
+  , SrcSpan
+  , noSrcSpan
+  , HasCallStack
   )
 where
 
 import Control.Applicative            as X (Applicative,(<$>),(<*>),pure)
-import Control.Arrow                  as X ((***),first,second)
-import Control.DeepSeq
+import Control.Arrow                  as X ((***),(&&&),first,second)
+import qualified Control.Exception    as Exception
 import Control.Monad                  as X ((<=<),(>=>))
 import Control.Monad.State            (MonadState,State,StateT,runState)
 import qualified Control.Monad.State  as State
-import Control.Monad.Trans.Class      (MonadTrans,lift)
 import Data.Function                  as X (on)
 import Data.Hashable                  (Hashable)
 import Data.HashMap.Lazy              (HashMap)
 import qualified Data.HashMap.Lazy    as HashMapL
-import qualified Data.HashMap.Strict  as HashMapS
 import Data.Maybe                     (fromMaybe)
+import Data.Text.Prettyprint.Doc
+import Data.Text.Prettyprint.Doc.Render.String
 import Data.Version                   (Version)
 import Control.Lens
 import Debug.Trace                    (trace)
 import GHC.Base                       (Int(..),isTrue#,(==#),(+#))
 import GHC.Integer.Logarithms         (integerLogBase#)
+import GHC.Stack                      (HasCallStack, callStack, prettyCallStack)
 import qualified Language.Haskell.TH  as TH
+
+import SrcLoc                         (SrcSpan, noSrcSpan)
+import Clash.Unique
 
 #ifdef CABAL
 import qualified Paths_clash_lib      (version)
 #endif
+
+data ClashException = ClashException SrcSpan String (Maybe String)
+
+instance Show ClashException where
+  show (ClashException _ s eM) = s ++ "\n" ++ maybe "" id eM
+
+instance Exception.Exception ClashException
+
+assertPanic
+  :: String -> Int -> a
+assertPanic file ln = Exception.throw
+  (ClashException noSrcSpan ("ASSERT failed! file " ++ file ++ ", line " ++ show ln) Nothing)
+
+assertPprPanic
+  :: HasCallStack => String -> Int -> Doc ann -> a
+assertPprPanic _file _line msg = pprPanic "ASSERT failed!" doc
+ where
+  doc = sep [ msg, callStackDoc ]
+
+pprPanic
+  :: String -> Doc ann -> a
+pprPanic heading prettyMsg = Exception.throw
+  (ClashException noSrcSpan (renderString (layoutPretty defaultLayoutOptions doc)) Nothing)
+ where
+  doc = sep [pretty heading, nest 2 prettyMsg]
+
+callStackDoc
+  :: HasCallStack => Doc ann
+callStackDoc =
+  "Call stack:" <+> hang 4
+    (vcat (map pretty (lines (prettyCallStack callStack))))
+
+warnPprTrace
+  :: Bool -> String -> Int -> Doc ann -> a -> a
+warnPprTrace _     _ _ _ x | not debugIsOn = x
+warnPprTrace False _ _ _ x = x
+warnPprTrace True  file ln msg x =
+  pprDebugAndThen trace heading msg x
+ where
+  heading = hsep ["WARNING: file", pretty file <> comma, "line", pretty ln]
+
+pprTrace
+  :: String -> Doc ann -> a -> a
+pprTrace str = pprDebugAndThen trace (pretty str)
+
+pprTraceDebug
+  :: String -> Doc ann -> a -> a
+pprTraceDebug str doc x
+  | debugIsOn = pprDebugAndThen trace (pretty str) doc x
+  | otherwise = x
+
+pprDebugAndThen
+  :: (String -> a) -> Doc ann -> Doc ann -> a
+pprDebugAndThen cont heading prettyMsg =
+  cont (renderString (layoutPretty defaultLayoutOptions doc))
+ where
+  doc = sep [heading, nest 2 prettyMsg]
 
 -- | A class that can generate unique numbers
 class MonadUnique m where
@@ -78,41 +143,23 @@ makeCached key l create = do
       l %= HashMapL.insert key value
       return value
 
--- | Cache the result of a monadic action in a State 3 transformer layers down
-makeCachedT3 :: ( MonadTrans t2, MonadTrans t1, MonadTrans t
-                , Eq k, Hashable k
-                , MonadState s m
-                , Monad (t2 m), Monad (t1 (t2 m)), Monad (t (t1 (t2 m))))
-             => k -- ^ The key the action is associated with
-             -> Lens' s (HashMap k v) -- ^ The Lens to the HashMap that is the cache
-             -> (t (t1 (t2 m))) v -- ^ The action to cache
-             -> (t (t1 (t2 m))) v
-makeCachedT3 key l create = do
-  cache <- (lift . lift . lift) $ use l
-  case HashMapL.lookup key cache of
+-- | Cache the result of a monadic action using a 'UniqMap'
+makeCachedU
+  :: (MonadState s m, Uniquable k)
+  => k
+  -- ^ Key the action is associated with
+  -> Lens' s (UniqMap v)
+  -- ^ Lens to the cache
+  -> m v
+  -- ^ Action to cache
+  -> m v
+makeCachedU key l create = do
+  cache <- use l
+  case lookupUniqMap key cache of
     Just value -> return value
     Nothing -> do
       value <- create
-      (lift . lift . lift) $ l %= HashMapL.insert key value
-      return value
-
--- | Spine-strict cache variant of 'mkCachedT3'
-makeCachedT3S :: ( MonadTrans t2, MonadTrans t1, MonadTrans t
-                 , Eq k, Hashable k
-                 , MonadState s m
-                 , Monad (t2 m), Monad (t1 (t2 m)), Monad (t (t1 (t2 m)))
-                 , NFData v)
-              => k
-              -> Lens' s (HashMap k v)
-              -> (t (t1 (t2 m))) v
-              -> (t (t1 (t2 m))) v
-makeCachedT3S key l create = do
-  cache <- (lift . lift . lift) $ use l
-  case HashMapS.lookup key cache of
-    Just value -> return value
-    Nothing -> do
-      value <- create
-      value `deepseq` ((lift . lift . lift) $ l %= HashMapS.insert key value)
+      l %= extendUniqMap key value
       return value
 
 -- | Run a State-action using the State that is stored in a higher-layer Monad
@@ -175,10 +222,6 @@ mapAccumLM f acc (x:xs) = do
   (acc'',ys) <- mapAccumLM f acc' xs
   return (acc'',y:ys)
 
--- | Composition of a unary function with a binary function
-dot :: (c -> d) -> (a -> b -> c) -> a -> b -> d
-dot = (.) . (.)
-
 -- | if-then-else as a function on an argument
 ifThenElse :: (a -> Bool)
            -> (a -> b)
@@ -208,7 +251,7 @@ indexNote :: String
           -> [a]
           -> Int
           -> a
-indexNote note = fromMaybe (error note) `dot` indexMaybe
+indexNote note = \xs i -> fromMaybe (error note) (indexMaybe xs i)
 
 -- | Split the second list at the length of the first list
 splitAtList :: [b] -> [a] -> ([a], [a])
@@ -241,3 +284,39 @@ clogBase x y | x > 1 && y > 0 =
                 then Just (I# (z1 +# 1#))
                 else Just (I# z1)
 clogBase _ _ = Nothing
+
+-- | Determine whether two lists are of equal length
+equalLength
+  :: [a] -> [b] -> Bool
+equalLength [] [] = True
+equalLength (_:as) (_:bs) = equalLength as bs
+equalLength _ _ = False
+
+-- | Determine whether two lists are not of equal length
+neLength
+  :: [a] -> [b] -> Bool
+neLength [] [] = False
+neLength (_:as) (_:bs) = neLength as bs
+neLength _ _ = True
+
+-- | Zip two lists of equal length
+--
+-- NB Errors out for a DEBUG compiler when the two lists are not of equal length
+zipEqual
+  :: [a] -> [b] -> [(a,b)]
+#if !defined(DEBUG)
+zipEqual = zip
+#else
+zipEqual [] [] = []
+zipEqual (a:as) (b:bs) = (a,b) : zipEqual as bs
+zipEqual _ _ = error "zipEqual"
+#endif
+
+-- | Is this a DEBUG compiler?
+debugIsOn
+  :: Bool
+#if defined(DEBUG)
+debugIsOn = True
+#else
+debugIsOn = False
+#endif
