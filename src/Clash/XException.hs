@@ -456,6 +456,9 @@ instance (Undefined a, Undefined b, Undefined c, Undefined d, Undefined e
                  ,deepErrorX x,deepErrorX x,deepErrorX x,deepErrorX x
                  ,deepErrorX x,deepErrorX x,deepErrorX x)
 
+instance Undefined b => Undefined (a -> b) where
+  deepErrorX = pure . deepErrorX
+
 instance Undefined a => Undefined (Down a) where
   deepErrorX = Down . deepErrorX
 
