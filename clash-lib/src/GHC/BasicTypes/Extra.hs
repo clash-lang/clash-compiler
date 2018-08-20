@@ -13,7 +13,9 @@ module GHC.BasicTypes.Extra where
 
 import BasicTypes
 import Control.DeepSeq
+import Data.Binary
 import GHC.Generics
 
 deriving instance Generic InlineSpec
 instance NFData InlineSpec
+instance Binary InlineSpec

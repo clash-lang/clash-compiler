@@ -19,9 +19,11 @@ module Clash.Core.Name
 where
 
 import           Control.DeepSeq                        (NFData)
+import           Data.Binary                            (Binary)
 import           Data.Function                          (on)
 import           Data.Hashable                          (Hashable)
 import           Data.Typeable                          (Typeable)
+import           GHC.BasicTypes.Extra                   ()
 import           GHC.Generics                           (Generic)
 import           GHC.SrcLoc.Extra                       ()
 import           Unbound.Generics.LocallyNameless       hiding
@@ -38,7 +40,7 @@ data Name a
   , nameOcc  :: OccName a
   , nameLoc  :: !SrcSpan
   }
-  deriving (Show,Generic,NFData,Hashable)
+  deriving (Show,Generic,NFData,Hashable,Binary)
 
 instance Eq (Name a) where
   (==) = (==) `on` nameOcc
@@ -52,7 +54,7 @@ data NameSort
   = User
   | System
   | Internal
-  deriving (Eq,Ord,Show,Generic,NFData,Hashable)
+  deriving (Eq,Ord,Show,Generic,NFData,Hashable,Binary)
 
 instance Typeable a => Alpha (Name a) where
   aeq'      ctx (Name _ nm1 _) (Name _ nm2 _) = aeq'      ctx nm1 nm2

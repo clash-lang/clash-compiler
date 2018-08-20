@@ -30,6 +30,7 @@ where
 
 -- External Import
 import Control.DeepSeq
+import Data.Binary                            (Binary)
 import Data.HashMap.Lazy                      (HashMap)
 import GHC.Generics
 import Unbound.Generics.LocallyNameless       (Alpha(..))
@@ -72,7 +73,7 @@ data TyCon
   | SuperKindTyCon
   { tyConName :: !TyConName     -- ^ Name of the TyCon
   }
-  deriving (Generic,NFData)
+  deriving (Generic,NFData,Binary)
 
 instance Show TyCon where
   show (AlgTyCon       {tyConName = n}) = "AlgTyCon: " ++ show n
@@ -104,7 +105,7 @@ data AlgTyConRhs
                                  -- The TyName's are the type-variables from
                                  -- the corresponding TyCon.
   }
-  deriving (Show,Generic,NFData,Alpha)
+  deriving (Show,Generic,NFData,Alpha,Binary)
 
 instance Alpha TyCon where
   aeq' c tc1 tc2      = aeq' c (tyConName tc1) (tyConName tc2)

@@ -39,6 +39,7 @@ import           Control.Applicative          ((<|>))
 import           Control.DeepSeq              (NFData)
 import           Data.Aeson
   (FromJSON (..), Value (..), (.:), (.:?), (.!=))
+import           Data.Binary                  (Binary)
 import           Data.Char                    (isUpper, isLower, isAlphaNum)
 import           Data.Either                  (lefts)
 import           Data.HashMap.Lazy            (HashMap)
@@ -69,7 +70,7 @@ type PrimMap a = HashMap S.Text a
 -- guaranteed to have at least one module name which is not /Main/.
 data BlackBoxFunctionName =
   BlackBoxFunctionName [String] String
-    deriving (Eq, Generic, NFData)
+    deriving (Eq, Generic, NFData, Binary)
 
 instance Show BlackBoxFunctionName where
   show (BlackBoxFunctionName mods funcName) =
@@ -164,7 +165,7 @@ data Primitive a b c
   , primType :: !Text
     -- ^ Additional information
   }
-  deriving (Show, Generic, NFData)
+  deriving (Show, Generic, NFData, Binary)
 
 instance FromJSON UnresolvedPrimitive where
   parseJSON (Object v) =
