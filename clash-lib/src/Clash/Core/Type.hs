@@ -59,6 +59,7 @@ where
 
 -- External import
 import           Control.DeepSeq                         as DS
+import           Data.Binary                             (Binary)
 import           Data.Hashable                           (Hashable)
 import           Data.HashMap.Strict                     (HashMap)
 import qualified Data.HashMap.Strict                     as HashMap
@@ -104,7 +105,7 @@ data Type
   | AppTy    !Type !Type        -- ^ Type Application
   | LitTy    !LitTy             -- ^ Type literal
   | AnnType  [Attr'] !Type      -- ^ Annotated type, see Clash.Annotations.SynthesisAttributes
-  deriving (Show,Generic,NFData,Hashable)
+  deriving (Show,Generic,NFData,Hashable,Binary)
 
 -- | An easier view on types
 data TypeView
@@ -117,13 +118,13 @@ data TypeView
 data ConstTy
   = TyCon !TyConName -- ^ TyCon type
   | Arrow            -- ^ Function type
-  deriving (Show,Generic,NFData,Alpha,Hashable)
+  deriving (Show,Generic,NFData,Alpha,Hashable,Binary)
 
 -- | Literal Types
 data LitTy
   = NumTy !Integer
   | SymTy !String
-  deriving (Show,Generic,NFData,Alpha,Hashable)
+  deriving (Show,Generic,NFData,Alpha,Hashable,Binary)
 
 -- | The level above types
 type Kind       = Type

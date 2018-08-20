@@ -25,6 +25,7 @@ where
 
 -- External Modules
 import Control.DeepSeq
+import Data.Binary                             (Binary)
 import Data.Hashable                           (Hashable)
 import Data.Text                               (Text)
 import GHC.Generics
@@ -52,7 +53,7 @@ data Term
   | Case    !Term !Type [Alt]               -- ^ Case-expression: subject, type of
                                             -- alternatives, list of alternatives
   | Cast    !Term !Type !Type               -- ^ Cast a term from one type to another
-  deriving (Show,Generic,NFData,Hashable)
+  deriving (Show,Generic,NFData,Hashable,Binary)
 
 -- | Term reference
 type TmName     = Name Term
@@ -69,7 +70,7 @@ data Pat
   -- ^ Literal pattern
   | DefaultPat
   -- ^ Default pattern
-  deriving (Eq,Show,Generic,NFData,Alpha,Hashable)
+  deriving (Eq,Show,Generic,NFData,Alpha,Hashable,Binary)
 
 type Alt = Bind Pat Term
 

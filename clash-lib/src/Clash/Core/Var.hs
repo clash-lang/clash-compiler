@@ -23,6 +23,7 @@ where
 
 
 import Control.DeepSeq                  (NFData (..))
+import Data.Binary                      (Binary)
 import Data.Hashable                    (Hashable)
 import Data.Typeable                    (Typeable)
 import GHC.Generics                     (Generic)
@@ -41,7 +42,7 @@ data Attr'
   | IntegerAttr' String Integer
   | StringAttr' String String
   | Attr' String
-  deriving (Eq, Show, NFData, Generic, Hashable, Typeable, Alpha, Ord)
+  deriving (Eq, Show, NFData, Generic, Hashable, Typeable, Alpha, Ord, Binary)
 
 instance Subst Type Attr'
 instance Subst Term Attr'
@@ -64,7 +65,7 @@ data Var a
   { varName :: Name a
   , varType :: Embed Type
   }
-  deriving (Eq,Show,Generic,NFData,Hashable)
+  deriving (Eq,Show,Generic,NFData,Hashable,Binary)
 
 -- | Term variable
 type Id    = Var Term
