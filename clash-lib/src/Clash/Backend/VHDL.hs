@@ -1329,7 +1329,7 @@ toSLV (Clock {})    e = do
 toSLV (Reset {})    e = do
   nm <- Mon $ use modNm
   pretty (T.toLower $ T.pack nm) <> "_types.toSLV" <> parens (expr_ False e)
-toSLV (BitVector _) e = expr_ False e
+toSLV (BitVector _) e = expr_ True e
 toSLV (Signed _)   e = "std_logic_vector" <> parens (expr_ False e)
 toSLV (Unsigned _) e = "std_logic_vector" <> parens (expr_ False e)
 toSLV (Index _)    e = "std_logic_vector" <> parens (expr_ False e)
