@@ -792,7 +792,7 @@ __bundle__   :: 'Bundle' a => 'Unbundled' domain a -> 'Signal' domain a
 __unbundle__ :: 'Bundle' a => 'Signal' domain a -> 'Unbundled' domain a
 @
 
-'Unbundled' is an <http://www.haskell.org/ghc/docs/latest/html/users_guide/type-families.html#assoc-decl associated type family>
+'Unbundled' is an <https://downloads.haskell.org/~ghc/latest/docs/html/users_guide/glasgow_exts.html#associated-data-and-type-families associated type family>
 belonging to the 'Bundle' <http://en.wikipedia.org/wiki/Type_class type class>,
 which, together with 'bundle' and 'unbundle' defines the isomorphism between a
 product type of 'Signal's and a 'Signal' of a product type. That is, while
