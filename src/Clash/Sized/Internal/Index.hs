@@ -74,7 +74,7 @@ where
 
 import Control.DeepSeq            (NFData (..))
 import Data.Data                  (Data)
-import Data.Default               (Default (..))
+import Data.Default.Class         (Default (..))
 import Data.Proxy                 (Proxy (..))
 import Text.Read                  (Read (..), ReadPrec)
 import Language.Haskell.TH        (TypeQ, appT, conT, litT, numTyLit, sigE)

@@ -117,7 +117,7 @@ module Clash.Prelude
     -- *** Other
   , module Control.Applicative
   , module Data.Bits
-  , module Data.Default
+  , module Data.Default.Class
     -- ** Exceptions
   , module Clash.XException
   , undefined
@@ -133,7 +133,7 @@ where
 
 import           Control.Applicative
 import           Data.Bits
-import           Data.Default
+import           Data.Default.Class
 import           GHC.TypeLits
 import           GHC.TypeLits.Extra
 import           Language.Haskell.TH.Syntax  (Lift(..))

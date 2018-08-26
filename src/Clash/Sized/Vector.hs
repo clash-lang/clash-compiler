@@ -106,7 +106,7 @@ where
 
 import Control.DeepSeq            (NFData (..))
 import qualified Control.Lens     as Lens hiding (pattern (:>), pattern (:<))
-import Data.Default               (Default (..))
+import Data.Default.Class         (Default (..))
 import qualified Data.Foldable    as F
 import Data.Bifunctor.Flip        (Flip (..))
 import Data.Kind                  (Type)

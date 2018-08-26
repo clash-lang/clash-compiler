@@ -205,7 +205,7 @@ Library
                       constraints               >= 0.8     && < 1.0,
                       containers                >= 0.4.0   && < 0.7,
                       data-binary-ieee754       >= 0.4.4   && < 0.6,
-                      data-default              >= 0.5.3   && < 0.8,
+                      data-default-class        >= 0.1.2   && < 0.2,
                       integer-gmp               >= 0.5.1.0 && < 1.1,
                       deepseq                   >= 1.4.1.0 && < 1.5,
                       ghc-prim                  >= 0.3.1.0 && < 0.6,

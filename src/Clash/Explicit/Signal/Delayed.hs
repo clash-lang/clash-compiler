@@ -44,7 +44,7 @@ where
 
 import Control.DeepSeq            (NFData)
 import Data.Coerce                (coerce)
-import Data.Default               (Default(..))
+import Data.Default.Class         (Default(..))
 import GHC.TypeLits               (KnownNat, Nat, type (+))
 import Language.Haskell.TH.Syntax (Lift)
 import Prelude                    hiding (head, length, repeat)

@@ -83,7 +83,7 @@ import Data.Int
 import GHC.Prim
 import GHC.TypeLits
 import GHC.Word
-import Data.Default
+import Data.Default.Class
 
 {- $setup
 >>> :set -XTemplateHaskell -XDataKinds -XConstraintKinds -XTypeApplications

@@ -33,7 +33,7 @@ module Clash.Signal.Delayed
   )
 where
 
-import           Data.Default                  (Default)
+import           Data.Default.Class            (Default)
 import           GHC.TypeLits                  (KnownNat, type (+))
 
 import qualified Clash.Explicit.Signal.Delayed as E

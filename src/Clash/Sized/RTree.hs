@@ -61,7 +61,7 @@ where
 
 import Control.Applicative         (liftA2)
 import qualified Control.Lens      as Lens
-import Data.Default                (Default (..))
+import Data.Default.Class          (Default (..))
 import Data.Foldable               (toList)
 import Data.Kind                   (Type)
 import Data.Singletons.Prelude     (Apply, TyFun, type (@@))
