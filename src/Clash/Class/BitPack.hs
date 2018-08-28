@@ -233,9 +233,8 @@ instance (BitPack a, KnownNat (BitSize a)) => BitPack (Maybe a) where
   pack Nothing  = pack# low ++# undefined#
   pack (Just x) = pack# high ++# pack x
   unpack x = case split# x of
-    (c@(BV 0 _),rest) | unpack# c == low -> Nothing
-                      | otherwise        -> Just (unpack rest)
-    (_,_) -> undefError "Maybe.unpack" [x]
+    (c,rest) | checkUnpackUndef unpack# c == low -> Nothing
+             | otherwise                         -> Just (unpack rest)
 
 class GBitPack f where
   type GBitSize f :: Nat
