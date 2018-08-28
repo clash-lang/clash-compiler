@@ -1,20 +1,4 @@
 [ { "BlackBox" :
-    { "name"      : "Clash.Sized.Internal.BitVector.BV"
-    , "kind"      : "Expression"
-    , "type"      : "BV :: Integer -> Integer -> BitVector n"
-    , "comment"   : "THIS IS ONLY USED WHEN WW EXPOSES BITVECTOR INTERNALS"
-    , "template"  : "~ARG[1]"
-    }
-  }
-, { "BlackBox" :
-    { "name"      : "Clash.Sized.Internal.BitVector.Bit"
-    , "kind"      : "Expression"
-    , "type"      : "Bit :: Integer -> Integer -> BitVector n"
-    , "comment"   : "THIS IS ONLY USED WHEN WW EXPOSES BIT INTERNALS"
-    , "template"  : "~ARG[1]"
-    }
-  }
-, { "BlackBox" :
     { "name"      : "Clash.Sized.Internal.BitVector.undefined#"
     , "kind"      : "Expression"
     , "type"      : "undefined# :: forall n . KnownNat n => BitVector n"

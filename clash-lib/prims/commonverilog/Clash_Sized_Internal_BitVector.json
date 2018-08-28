@@ -1,4 +1,20 @@
 [ { "BlackBox" :
+    { "name"      : "Clash.Sized.Internal.BitVector.BV"
+    , "kind"      : "Expression"
+    , "type"      : "BV :: Integer -> Integer -> BitVector n"
+    , "comment"   : "THIS IS ONLY USED WHEN WW EXPOSES BITVECTOR INTERNALS"
+    , "template"  : "$unsigned(~VAR[i][1][(~SIZE[~TYPO]-1):0])"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "Clash.Sized.Internal.BitVector.Bit"
+    , "kind"      : "Expression"
+    , "type"      : "Bit :: Integer -> Integer -> BitVector n"
+    , "comment"   : "THIS IS ONLY USED WHEN WW EXPOSES BIT INTERNALS"
+    , "template"  : "~VAR[i][1][0]"
+    }
+  }
+, { "BlackBox" :
     { "name"      : "Clash.Sized.Internal.BitVector.high"
     , "kind"      : "Expression"
     , "type"      : "high :: Bit"
