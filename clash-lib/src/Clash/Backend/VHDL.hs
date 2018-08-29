@@ -56,7 +56,8 @@ import           Clash.Netlist.Id                     (IdType (..), mkBasicId')
 import           Clash.Netlist.Types                  hiding (_intWidth, intWidth)
 import           Clash.Netlist.Util                   hiding (mkIdentifier)
 import           Clash.Signal.Internal                (ClockKind (..))
-import           Clash.Util                           (clogBase, curLoc, first, makeCached, on, (<:>))
+import           Clash.Util
+  (clogBase, curLoc, first, makeCached, on, traceIf, (<:>))
 
 #ifdef CABAL
 import qualified Paths_clash_lib
@@ -1005,12 +1006,74 @@ expr_ _ (Identifier id_ (Just (DC (ty@(SP _ _),_)))) = pretty id_ <> parens (int
     start = typeSize ty - 1
     end   = typeSize ty - conSize ty
 
-expr_ _ (Identifier id_ (Just (Indexed ((Signed _ ),_,_))))  = do
+-- [Note] integer projection
+--
+-- The idea behind these expressions is to translate cases like:
+--
+-- > :: Int8 -> Int#
+-- > \case I8# i -> i
+--
+-- Which is fine, because no bits are lost. However, these expression might
+-- also be the result of the W/W transformation (or uses of unsafeToInteger)
+-- for:
+--
+-- > :: Signed 128 -> Integer
+-- > \case S i -> i
+--
+-- which is very bad because `Integer` is represented by 64 bits meaning we
+-- we lose the top 64 bits in the above translation.
+--
+-- Just as bad is that
+--
+-- > :: Word8 -> Word#
+-- > \case W8# w -> w
+--
+-- > :: Unsigned 8 -> Integer
+-- > \case U i -> i
+--
+-- result in the same expression... even though their resulting types are
+-- different. TODO: this needs  to be fixed!
+expr_ _ (Identifier id_ (Just (Indexed ((Signed w),_,_))))  = do
   iw <- Mon $ use intWidth
-  "resize" <> parens (pretty id_ <> "," <> int iw)
-expr_ _ (Identifier id_ (Just (Indexed ((Unsigned _),_,_)))) = do
+  traceIf (iw < w) ($(curLoc) ++ "WARNING: result smaller than argument") $
+    "resize" <> parens (pretty id_ <> "," <> int iw)
+expr_ _ (Identifier id_ (Just (Indexed ((Unsigned w),_,_)))) = do
   iw <- Mon $ use intWidth
-  "resize" <> parens (pretty id_ <> "," <> int iw)
+  traceIf (iw < w) ($(curLoc) ++ "WARNING: result smaller than argument") $
+    "resize" <> parens (pretty id_ <> "," <> int iw)
+
+-- [Note] mask projection
+--
+-- This covers the case of either:
+--
+-- `Clash.Sized.Internal.BitVector.unsafeToMask` or
+--
+-- > :: BitVector 8 -> Integer
+-- > \case BV m wild -> m
+--
+-- introduced by the W/W transformation. Both of which we prefer not to see
+-- but will allow. Since the mask is pretty much a simulation artifact we
+-- emit don't cares so stuff gets optimised away.
+expr_ _ (Identifier _ (Just (Indexed ((BitVector _),_,0)))) = do
+  iw <- Mon $ use intWidth
+  traceIf True ($(curLoc) ++ "WARNING: synthesizing bitvector mask to dontcare") $
+    vhdlTypeErrValue (Signed iw)
+
+-- [Note] bitvector projection
+--
+-- This covers the case of either:
+--
+-- `Clash.Sized.Internal.BitVector.unsafeToInteger` or
+--
+-- > :: BitVector 8 -> Integer
+-- > \case BV wild i -> i
+--
+-- introduced by the
+expr_ _ (Identifier id_ (Just (Indexed ((BitVector w),_,1)))) = do
+  iw <- Mon $ use intWidth
+  traceIf (iw < w) ($(curLoc) ++ "WARNING: result smaller than argument") $
+    "signed" <> parens ("std_logic_vector" <> parens ("resize" <>
+      parens ("unsigned" <> parens (pretty id_) <> "," <> int iw)))
 
 expr_ b (Identifier id_ (Just (Nested m1 m2))) = case nestM m1 m2 of
   Just m3 -> expr_ b (Identifier id_ (Just m3))

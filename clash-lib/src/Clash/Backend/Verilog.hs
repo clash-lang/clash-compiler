@@ -63,7 +63,8 @@ import           Clash.Netlist.Id                     (IdType (..), mkBasicId')
 import           Clash.Netlist.Types                  hiding (_intWidth, intWidth)
 import           Clash.Netlist.Util                   hiding (mkIdentifier, extendIdentifier)
 import           Clash.Signal.Internal                (ClockKind (..))
-import           Clash.Util                           (curLoc, (<:>),on,first)
+import           Clash.Util
+  (curLoc, first, on, traceIf, (<:>))
 
 
 
@@ -592,6 +593,30 @@ expr_ _ (Identifier id_ (Just (Indexed (CustomSP _id _dataRepr _size args,dcI,fI
       (ConstrRepr' _name _n _mask _value anns, _, _argTys) = args !! dcI
       ranges = map range' $ bitRanges (anns !! fI)
       range' (start, end) = string id_ <> brackets (int start <> ":" <> int end)
+
+-- See [Note] integer projection
+expr_ _ (Identifier id_ (Just (Indexed ((Signed w),_,_))))  = do
+  iw <- Mon $ use intWidth
+  traceIf (iw < w) ($(curLoc) ++ "WARNING: result smaller than argument") $
+    string id_
+
+-- See [Note] integer projection
+expr_ _ (Identifier id_ (Just (Indexed ((Unsigned w),_,_))))  = do
+  iw <- Mon $ use intWidth
+  traceIf (iw < w) ($(curLoc) ++ "WARNING: result smaller than argument") $
+    string id_
+
+-- See [Note] mask projection
+expr_ _ (Identifier _ (Just (Indexed ((BitVector _),_,0)))) = do
+  iw <- Mon $ use intWidth
+  traceIf True ($(curLoc) ++ "WARNING: synthesizing bitvector mask to dontcare") $
+    verilogTypeErrValue (Signed iw)
+
+-- See [Note] bitvector projection
+expr_ _ (Identifier id_ (Just (Indexed ((BitVector w),_,1)))) = do
+  iw <- Mon $ use intWidth
+  traceIf (iw < w) ($(curLoc) ++ "WARNING: result smaller than argument") $
+    string id_
 
 expr_ _ (Identifier id_ (Just m)) = case modifier 0 m of
   Nothing          -> string id_

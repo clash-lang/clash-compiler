@@ -59,7 +59,8 @@ import           Clash.Netlist.Id                     (IdType (..), mkBasicId')
 import           Clash.Netlist.Types                  hiding (_intWidth, intWidth)
 import           Clash.Netlist.Util                   hiding (mkIdentifier, extendIdentifier)
 import           Clash.Signal.Internal                (ClockKind (..))
-import           Clash.Util                           (curLoc, makeCached, (<:>), first, on)
+import           Clash.Util
+  (curLoc, makeCached, (<:>), first, on, traceIf)
 
 #ifdef CABAL
 import qualified Paths_clash_lib
@@ -921,7 +922,31 @@ expr_ b (Identifier id_ (Just (Nested m1 m2))) = case nestM m1 m2 of
     k <- expr_ b (Identifier id_ (Just m1))
     expr_ b (Identifier (renderOneLine k) (Just m2))
 
-expr_ _ (Identifier id_ (Just _))                      = string id_
+-- See [Note] integer projection
+expr_ _ (Identifier id_ (Just (Indexed ((Signed w),_,_))))  = do
+  iw <- Mon $ use intWidth
+  traceIf (iw < w) ($(curLoc) ++ "WARNING: result smaller than argument") $
+    string id_
+
+-- See [Note] integer projection
+expr_ _ (Identifier id_ (Just (Indexed ((Unsigned w),_,_))))  = do
+  iw <- Mon $ use intWidth
+  traceIf (iw < w) ($(curLoc) ++ "WARNING: result smaller than argument") $
+    string id_
+
+-- See [Note] mask projection
+expr_ _ (Identifier _ (Just (Indexed ((BitVector _),_,0)))) = do
+  iw <- Mon $ use intWidth
+  traceIf True ($(curLoc) ++ "WARNING: synthesizing bitvector mask to dontcare") $
+    verilogTypeErrValue (Signed iw)
+
+-- See [Note] bitvector projection
+expr_ _ (Identifier id_ (Just (Indexed ((BitVector w),_,1)))) = do
+  iw <- Mon $ use intWidth
+  traceIf (iw < w) ($(curLoc) ++ "WARNING: result smaller than argument") $
+    string id_
+
+expr_ _ (Identifier id_ (Just _)) = string id_
 
 expr_ b (DataCon _ (DC (Void {}, -1)) [e]) =  expr_ b e
 
