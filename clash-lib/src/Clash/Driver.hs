@@ -263,11 +263,14 @@ generateHDL reprs bindingsMap hdlState primMap tcm tupTcm typeTrans eval topEnti
 
 -- | Compiles blackbox functions and parses blackbox templates.
 compilePrimitive
-  :: ResolvedPrimitive
+  :: [FilePath]
+  -> FilePath
+  -> ResolvedPrimitive
   -> IO CompiledPrimitive
-compilePrimitive (BlackBoxHaskell bbName bbGenName source) = do
+compilePrimitive pkgDbs topDir (BlackBoxHaskell bbName bbGenName source) = do
+  let interpreterArgs = concatMap (("-package-db":) . (:[])) pkgDbs
   -- Compile a blackbox template function or fetch it from an already compiled file.
-  r <- Hint.runInterpreter (go source)
+  r <- Hint.unsafeRunInterpreterWithArgsLibdir interpreterArgs topDir (go source)
   processHintError (show bbGenName) bbName (BlackBoxHaskell bbName bbGenName) r
   where
     qualMod = intercalate "." modNames
@@ -308,13 +311,15 @@ compilePrimitive (BlackBoxHaskell bbName bbGenName source) = do
       Hint.setImports [ "Clash.Netlist.BlackBox.Types",  qualMod]
       Hint.unsafeInterpret funcName "BlackBoxFunction"
 
-compilePrimitive (BlackBox pNm tkind oReg libM imps incs templ) = do
+compilePrimitive pkgDbs topDir (BlackBox pNm tkind oReg libM imps incs templ) = do
   libM'  <- mapM parseTempl libM
   imps'  <- mapM parseTempl imps
   incs'  <- mapM (traverse parseBB) incs
   templ' <- parseBB templ
   return (BlackBox pNm tkind oReg libM' imps' incs' templ')
  where
+  interpreterArgs = concatMap (("-package-db":) . (:[])) pkgDbs
+
   parseTempl :: Applicative m => Text -> m BlackBoxTemplate
   parseTempl t = case runParse t of
     Failure errInfo
@@ -334,7 +339,7 @@ compilePrimitive (BlackBox pNm tkind oReg libM imps incs templ) = do
       let modDir = foldl (</>) tmpDir' (init modNames)
       Directory.createDirectoryIfMissing True modDir
       Text.writeFile (modDir </> last modNames <.>  "hs") source
-      Hint.runInterpreter $ do
+      Hint.unsafeRunInterpreterWithArgsLibdir interpreterArgs topDir $ do
         iPaths <- (tmpDir':) <$> Hint.get Hint.searchPath
         Hint.set [Hint.searchPath Hint.:= iPaths]
         Hint.loadModules [qualMod]
@@ -344,12 +349,12 @@ compilePrimitive (BlackBox pNm tkind oReg libM imps incs templ) = do
   parseBB ((THaskell,bbGenName),Nothing) = do
     let BlackBoxFunctionName modNames funcName = bbGenName
         qualMod = intercalate "." modNames
-    r <- Hint.runInterpreter $ do
+    r <- Hint.unsafeRunInterpreterWithArgsLibdir interpreterArgs topDir $ do
       Hint.setImports [ "Clash.Netlist.Types" , qualMod ]
       Hint.unsafeInterpret funcName "TemplateFunction"
     processHintError (show bbGenName) pNm BBFunction r
 
-compilePrimitive (Primitive pNm typ) =
+compilePrimitive _ _ (Primitive pNm typ) =
   return $ Primitive pNm typ
 
 processHintError

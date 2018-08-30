@@ -8,6 +8,7 @@ import Clash.Driver.Types
 import Clash.GHC.Evaluator
 import Clash.GHC.GenerateBindings
 import Clash.GHC.NetlistTypes
+import Clash.GHC.LoadModules (ghcLibDir)
 import Clash.Backend
 import Clash.Backend.SystemVerilog
 import Clash.Backend.VHDL
@@ -52,7 +53,8 @@ doHDL b src = do
 
   -- Parse primitives:
   startTime' <- Clock.getCurrentTime
-  primMap2   <- sequence $ HM.map compilePrimitive primMap
+  topDir     <- ghcLibDir
+  primMap2   <- sequence $ HM.map (compilePrimitive [] topDir) primMap
   prepTime'  <- startTime `deepseq` primMap2 `seq` Clock.getCurrentTime
   let prepStartDiff' = Clock.diffUTCTime prepTime' startTime'
   putStrLn $ "Parsing primitives took " ++ show prepStartDiff'
