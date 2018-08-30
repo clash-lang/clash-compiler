@@ -64,6 +64,13 @@
     }
   }
 , { "BlackBox" :
+    { "name"      : "Clash.Sized.Internal.BitVector.neq##"
+    , "kind"      : "Expression"
+    , "type"      : "neq## :: Bit -> Bit -> Bool"
+    , "template"  : "~ARG[0] /= ~ARG[1]"
+    }
+  }
+, { "BlackBox" :
     { "name"      : "Clash.Sized.Internal.BitVector.fromInteger##"
     , "kind"      : "Declaration"
     , "type"      : "fromInteger## :: Integer -> Integer -> Bit"
