@@ -62,12 +62,7 @@ import qualified TcRnMonad
 import qualified TcRnTypes
 import qualified TidyPgm
 import qualified Unique
-#if MIN_VERSION_ghc(8,2,0)
-import qualified UniqDFM
 import qualified UniqFM
-#else
-import qualified UniqFM
-#endif
 import qualified FamInst
 import qualified FamInstEnv
 import qualified GHC.LanguageExtensions          as LangExt
@@ -254,11 +249,8 @@ loadModules hdl modName dflagsM = do
     let (binders,modFamInstEnvs) = unzip tidiedMods
         bindersC                 = concat binders
         binderIds                = map fst (CoreSyn.flattenBinds bindersC)
-#if MIN_VERSION_ghc(8,2,0)
-        modFamInstEnvs'          = foldr UniqDFM.plusUDFM UniqDFM.emptyUDFM modFamInstEnvs
-#else
-        modFamInstEnvs'          = foldr UniqFM.plusUFM UniqFM.emptyUFM modFamInstEnvs
-#endif
+        plusFamInst f1 f2        = FamInstEnv.extendFamInstEnvList f1 (FamInstEnv.famInstEnvElts f2)
+        modFamInstEnvs'          = foldl' plusFamInst FamInstEnv.emptyFamInstEnv modFamInstEnvs
 
     (externalBndrs,clsOps,unlocatable,pFP,reprs) <-
       loadExternalExprs hdl (UniqSet.mkUniqSet binderIds) bindersC
