@@ -533,10 +533,10 @@ fromInteger_INLINE m i = sz `seq` BV (m `mod` sz) (i `mod` sz)
 
 instance (KnownNat m, KnownNat n) => ExtendingNum (BitVector m) (BitVector n) where
   type AResult (BitVector m) (BitVector n) = BitVector (Max m n + 1)
-  plus  = plus#
-  minus = minus#
+  add  = plus#
+  sub = minus#
   type MResult (BitVector m) (BitVector n) = BitVector (m + n)
-  times = times#
+  mul = times#
 
 {-# NOINLINE plus# #-}
 plus# :: (KnownNat m, KnownNat n) => BitVector m -> BitVector n -> BitVector (Max m n + 1)
@@ -836,33 +836,33 @@ decBitVector :: Integer -> TypeQ
 decBitVector n = appT (conT ''BitVector) (litT $ numTyLit n)
 
 instance KnownNat n => SaturatingNum (BitVector n) where
-  satPlus SatWrap a b = a +# b
-  satPlus SatZero a b =
+  satAdd SatWrap a b = a +# b
+  satAdd SatZero a b =
     let r = plus# a b
     in  if msb# r == low
            then resize# r
            else minBound#
-  satPlus _ a b =
+  satAdd _ a b =
     let r  = plus# a b
     in  if msb# r == low
            then resize# r
            else maxBound#
 
-  satMin SatWrap a b = a -# b
-  satMin _ a b =
+  satSub SatWrap a b = a -# b
+  satSub _ a b =
     let r = minus# a b
     in  if msb# r == low
            then resize# r
            else minBound#
 
-  satMult SatWrap a b = a *# b
-  satMult SatZero a b =
+  satMul SatWrap a b = a *# b
+  satMul SatZero a b =
     let r       = times# a b
         (rL,rR) = split# r
     in  case rL of
           0 -> rR
           _ -> minBound#
-  satMult _ a b =
+  satMul _ a b =
     let r       = times# a b
         (rL,rR) = split# r
     in  case rL of

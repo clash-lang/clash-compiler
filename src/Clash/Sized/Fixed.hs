@@ -89,8 +89,8 @@ import Test.QuickCheck            (Arbitrary, CoArbitrary)
 
 import Clash.Class.BitPack        (BitPack (..))
 import Clash.Class.Num            (ExtendingNum (..), SaturatingNum (..),
-                                   SaturationMode (..), boundedPlus, boundedMin,
-                                   boundedMult)
+                                   SaturationMode (..), boundedAdd, boundedSub,
+                                   boundedMul)
 import Clash.Class.Resize         (Resize (..))
 import Clash.Promoted.Nat         (SNat)
 import Clash.Prelude.BitIndex     (msb, split)
@@ -137,7 +137,7 @@ deriving instance CoArbitrary (rep (int + frac)) => CoArbitrary (Fixed rep int f
 deriving instance FiniteBits (rep (int + frac)) => FiniteBits (Fixed rep int frac)
 
 -- | Instance functions do not saturate.
--- Meaning that \"@`'shiftL'` 1 == 'satMult' 'SatWrap' 2'@\""
+-- Meaning that \"@`'shiftL'` 1 == 'satMul' 'SatWrap' 2'@\""
 deriving instance Bits (rep (int + frac)) => Bits (Fixed rep int frac)
 
 -- | Signed 'Fixed'-point number, with @int@ integer bits (including sign-bit)
@@ -163,11 +163,11 @@ deriving instance Bits (rep (int + frac)) => Bits (Fixed rep int frac)
 -- -4.0
 -- >>> 1.375 * (-0.8125) :: SFixed 3 4
 -- -1.125
--- >>> (1.375 :: SFixed 3 4) `times` (-0.8125 :: SFixed 3 4) :: SFixed 6 8
+-- >>> (1.375 :: SFixed 3 4) `mul` (-0.8125 :: SFixed 3 4) :: SFixed 6 8
 -- -1.1171875
--- >>> (2 :: SFixed 3 4) `plus` (3 :: SFixed 3 4) :: SFixed 4 4
+-- >>> (2 :: SFixed 3 4) `add` (3 :: SFixed 3 4) :: SFixed 4 4
 -- 5.0
--- >>> (-2 :: SFixed 3 4) `plus` (-3 :: SFixed 3 4) :: SFixed 4 4
+-- >>> (-2 :: SFixed 3 4) `add` (-3 :: SFixed 3 4) :: SFixed 4 4
 -- -5.0
 type SFixed = Fixed Signed
 
@@ -191,14 +191,14 @@ type SFixed = Fixed Signed
 -- 0.0
 -- >>> 1.375 * 0.8125 :: UFixed 3 4
 -- 1.0625
--- >>> (1.375 :: UFixed 3 4) `times` (0.8125 :: UFixed 3 4) :: UFixed 6 8
+-- >>> (1.375 :: UFixed 3 4) `mul` (0.8125 :: UFixed 3 4) :: UFixed 6 8
 -- 1.1171875
--- >>> (2 :: UFixed 3 4) `plus` (6 :: UFixed 3 4) :: UFixed 4 4
+-- >>> (2 :: UFixed 3 4) `add` (6 :: UFixed 3 4) :: UFixed 4 4
 -- 8.0
 --
--- However, 'minus' does not saturate to 'minBound' on underflow:
+-- However, 'sub' does not saturate to 'minBound' on underflow:
 --
--- >>> (1 :: UFixed 3 4) `minus` (3 :: UFixed 3 4) :: UFixed 4 4
+-- >>> (1 :: UFixed 3 4) `sub` (3 :: UFixed 3 4) :: UFixed 4 4
 -- 14.0
 type UFixed = Fixed Unsigned
 
@@ -339,7 +339,7 @@ mac2 :: ( 'GHC.TypeLits.KnownNat' frac1
      -> 'SFixed' int2 frac2
      -> 'SFixed' int3 frac3
      -> 'SFixed' (1 + Max (int1 + int2) int3) (Max (frac1 + frac2) frac3)
-mac2 x y s = (x \`times\` y) \`plus\` s
+mac2 x y s = (x \`mul\` y) \`add\` s
 @
 
 Which, with the proper constraint kinds can be reduced to:
@@ -352,7 +352,7 @@ mac3 :: ( 'ENumSFixedC' int1 frac1 int2 frac2
      -> 'SFixed' int2 frac2
      -> 'SFixed' int3 frac3
      -> 'SFixed' (1 + Max (int1 + int2) int3) (Max (frac1 + frac2) frac3)
-mac3 x y s = (x \`times\` y) \`plus\` s
+mac3 x y s = (x \`mul\` y) \`add\` s
 @
 -}
 
@@ -399,13 +399,13 @@ instance ENumFixedC rep int1 frac1 int2 frac2 =>
   ExtendingNum (Fixed rep int1 frac1) (Fixed rep int2 frac2) where
   type AResult (Fixed rep int1 frac1) (Fixed rep int2 frac2) =
                Fixed rep (1 + Max int1 int2) (Max frac1 frac2)
-  plus (Fixed f1) (Fixed f2) =
+  add (Fixed f1) (Fixed f2) =
     let sh1 = fromInteger (natVal (Proxy @(Max frac1 frac2)) - natVal (Proxy @frac1)) :: Int
         f1R = shiftL (resize f1) sh1 :: rep ((1 + Max int1 int2) + (Max frac1 frac2))
         sh2 = fromInteger (natVal (Proxy @(Max frac1 frac2)) - natVal (Proxy @frac2)) :: Int
         f2R = shiftL (resize f2) sh2 :: rep ((1 + Max int1 int2) + (Max frac1 frac2))
     in  Fixed (f1R + f2R)
-  minus (Fixed f1) (Fixed f2) =
+  sub (Fixed f1) (Fixed f2) =
     let sh1 = fromInteger (natVal (Proxy @(Max frac1 frac2)) - natVal (Proxy @frac1)) :: Int
         f1R = shiftL (resize f1) sh1 :: rep ((1 + Max int1 int2) + (Max frac1 frac2))
         sh2 = fromInteger (natVal (Proxy @(Max frac1 frac2)) - natVal (Proxy @frac2)) :: Int
@@ -413,7 +413,7 @@ instance ENumFixedC rep int1 frac1 int2 frac2 =>
     in  Fixed (f1R - f2R)
   type MResult (Fixed rep int1 frac1) (Fixed rep int2 frac2) =
                Fixed rep (int1 + int2) (frac1 + frac2)
-  times (Fixed fRep1) (Fixed fRep2) = Fixed (times fRep1 fRep2)
+  mul (Fixed fRep1) (Fixed fRep2) = Fixed (mul fRep1 fRep2)
 
 -- | Constraint for the 'Num' instance of 'Fixed'
 type NumFixedC rep int frac
@@ -459,9 +459,9 @@ type NumUFixedC int frac =
 -- * @'NumSFixedC' int frac@     for: @'SFixed' int frac@
 -- * @'NumUFixedC' int frac@     for: @'UFixed' int frac@
 instance (NumFixedC rep int frac) => Num (Fixed rep int frac) where
-  (+)              = boundedPlus
-  (*)              = boundedMult
-  (-)              = boundedMin
+  (+)              = boundedAdd
+  (*)              = boundedMul
+  (-)              = boundedSub
   negate (Fixed a) = Fixed (negate a)
   abs    (Fixed a) = Fixed (abs a)
   signum (Fixed a) = Fixed (signum a)
@@ -804,17 +804,17 @@ fLitR a = Fixed (fromInteger sat)
     shifted   = a * (2 ^ (natVal (Proxy @frac)))
 
 instance NumFixedC rep int frac => SaturatingNum (Fixed rep int frac) where
-  satPlus w (Fixed a) (Fixed b) = Fixed (satPlus w a b)
-  satMin  w (Fixed a) (Fixed b) = Fixed (satMin w a b)
+  satAdd w (Fixed a) (Fixed b) = Fixed (satAdd w a b)
+  satSub  w (Fixed a) (Fixed b) = Fixed (satSub w a b)
 
-  satMult SatWrap (Fixed a) (Fixed b) =
-    let res  = a `times` b
+  satMul SatWrap (Fixed a) (Fixed b) =
+    let res  = a `mul` b
         sh   = fromInteger (natVal (Proxy @frac))
         res' = shiftR res sh
     in  Fixed (resize res')
 
-  satMult SatBound (Fixed a) (Fixed b) =
-    let res     = a `times` b
+  satMul SatBound (Fixed a) (Fixed b) =
+    let res     = a `mul` b
         sh      = fromInteger (natVal (Proxy @frac))
         (rL,rR) = split res :: (BitVector int, BitVector (int + frac + frac))
     in  case isSigned a of
@@ -829,8 +829,8 @@ instance NumFixedC rep int frac => SaturatingNum (Fixed rep int frac) where
                      0 -> unpack (resize (shiftR rR sh))
                      _ -> maxBound
 
-  satMult SatZero (Fixed a) (Fixed b) =
-    let res     = a `times` b
+  satMul SatZero (Fixed a) (Fixed b) =
+    let res     = a `mul` b
         sh      = fromInteger (natVal (Proxy @frac))
         (rL,rR) = split res :: (BitVector int, BitVector (int + frac + frac))
     in  case isSigned a of
@@ -843,8 +843,8 @@ instance NumFixedC rep int frac => SaturatingNum (Fixed rep int frac) where
                      0 -> unpack (resize (shiftR rR sh))
                      _ -> 0
 
-  satMult SatSymmetric (Fixed a) (Fixed b) =
-    let res     = a `times` b
+  satMul SatSymmetric (Fixed a) (Fixed b) =
+    let res     = a `mul` b
         sh      = fromInteger (natVal (Proxy @frac))
         (rL,rR) = split res :: (BitVector int, BitVector (int + frac + frac))
     in  case isSigned a of

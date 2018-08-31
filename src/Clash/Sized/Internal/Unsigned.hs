@@ -125,13 +125,13 @@ import Clash.XException               (ShowX (..), Undefined, showsPrecXWith)
 -- 6
 -- >>> 2 * 4 :: Unsigned 3
 -- 0
--- >>> (2 :: Unsigned 3) `times` (4 :: Unsigned 3) :: Unsigned 6
+-- >>> (2 :: Unsigned 3) `mul` (4 :: Unsigned 3) :: Unsigned 6
 -- 8
--- >>> (2 :: Unsigned 3) `plus` (6 :: Unsigned 3) :: Unsigned 4
+-- >>> (2 :: Unsigned 3) `add` (6 :: Unsigned 3) :: Unsigned 4
 -- 8
--- >>> satPlus SatSymmetric 2 6 :: Unsigned 3
+-- >>> satAdd SatSymmetric 2 6 :: Unsigned 3
 -- 7
--- >>> satMin SatSymmetric 2 3 :: Unsigned 3
+-- >>> satSub SatSymmetric 2 3 :: Unsigned 3
 -- 0
 newtype Unsigned (n :: Nat) =
     -- | The constructor, 'U', and the field, 'unsafeToInteger', are not
@@ -282,10 +282,10 @@ fromInteger_INLINE i = U (i `mod` sz)
 
 instance (KnownNat m, KnownNat n) => ExtendingNum (Unsigned m) (Unsigned n) where
   type AResult (Unsigned m) (Unsigned n) = Unsigned (Max m n + 1)
-  plus  = plus#
-  minus = minus#
+  add  = plus#
+  sub = minus#
   type MResult (Unsigned m) (Unsigned n) = Unsigned (m + n)
-  times = times#
+  mul = times#
 
 {-# NOINLINE plus# #-}
 plus# :: Unsigned m -> Unsigned n -> Unsigned (Max m n + 1)
@@ -426,33 +426,33 @@ decUnsigned :: Integer -> TypeQ
 decUnsigned n = appT (conT ''Unsigned) (litT $ numTyLit n)
 
 instance KnownNat n => SaturatingNum (Unsigned n) where
-  satPlus SatWrap a b = a +# b
-  satPlus SatZero a b =
+  satAdd SatWrap a b = a +# b
+  satAdd SatZero a b =
     let r = plus# a b
     in  case msb r of
           0 -> resize# r
           _ -> minBound#
-  satPlus _ a b =
+  satAdd _ a b =
     let r  = plus# a b
     in  case msb r of
           0 -> resize# r
           _ -> maxBound#
 
-  satMin SatWrap a b = a -# b
-  satMin _ a b =
+  satSub SatWrap a b = a -# b
+  satSub _ a b =
     let r = minus# a b
     in  case msb r of
           0 -> resize# r
           _ -> minBound#
 
-  satMult SatWrap a b = a *# b
-  satMult SatZero a b =
+  satMul SatWrap a b = a *# b
+  satMul SatZero a b =
     let r       = times# a b
         (rL,rR) = split r
     in  case rL of
           0 -> unpack# rR
           _ -> minBound#
-  satMult _ a b =
+  satMul _ a b =
     let r       = times# a b
         (rL,rR) = split r
     in  case rL of

@@ -18,9 +18,9 @@ module Clash.Class.Num
     -- * Saturating arithmetic functions
   , SaturationMode (..)
   , SaturatingNum (..)
-  , boundedPlus
-  , boundedMin
-  , boundedMult
+  , boundedAdd
+  , boundedSub
+  , boundedMul
   )
 where
 
@@ -32,15 +32,15 @@ class ExtendingNum a b where
   type AResult a b
   -- | Add values of different (sub-)types, return a value of a (sub-)type
   -- that is potentially different from either argument.
-  plus  :: a -> b -> AResult a b
+  add  :: a -> b -> AResult a b
   -- | Subtract values of different (sub-)types, return a value of a (sub-)type
   -- that is potentially different from either argument.
-  minus :: a -> b -> AResult a b
+  sub :: a -> b -> AResult a b
   -- | Type of the result of the multiplication
   type MResult a b
   -- | Multiply values of different (sub-)types, return a value of a (sub-)type
   -- that is potentially different from either argument.
-  times :: a -> b -> MResult a b
+  mul :: a -> b -> MResult a b
 
 -- * Saturating arithmetic functions
 
@@ -59,25 +59,25 @@ data SaturationMode
 -- using 'SaturationMode'.
 class (Bounded a, Num a) => SaturatingNum a where
   -- | Addition with parametrisable over- and underflow behaviour
-  satPlus :: SaturationMode -> a -> a -> a
+  satAdd :: SaturationMode -> a -> a -> a
   -- | Subtraction with parametrisable over- and underflow behaviour
-  satMin  :: SaturationMode -> a -> a -> a
+  satSub  :: SaturationMode -> a -> a -> a
   -- | Multiplication with parametrisable over- and underflow behaviour
-  satMult :: SaturationMode -> a -> a -> a
+  satMul :: SaturationMode -> a -> a -> a
 
-{-# INLINE boundedPlus #-}
+{-# INLINE boundedAdd #-}
 -- | Addition that clips to 'maxBound' on overflow, and 'minBound' on underflow
-boundedPlus :: SaturatingNum a => a -> a -> a
-boundedPlus = satPlus SatBound
+boundedAdd :: SaturatingNum a => a -> a -> a
+boundedAdd = satAdd SatBound
 
-{-# INLINE boundedMin #-}
+{-# INLINE boundedSub #-}
 -- | Subtraction that clips to 'maxBound' on overflow, and 'minBound' on
 -- underflow
-boundedMin  :: SaturatingNum a => a -> a -> a
-boundedMin = satMin SatBound
+boundedSub  :: SaturatingNum a => a -> a -> a
+boundedSub = satSub SatBound
 
-{-# INLINE boundedMult #-}
+{-# INLINE boundedMul #-}
 -- | Multiplication that clips to 'maxBound' on overflow, and 'minBound' on
 -- underflow
-boundedMult :: SaturatingNum a => a -> a -> a
-boundedMult = satMult SatBound
+boundedMul :: SaturatingNum a => a -> a -> a
+boundedMul = satMul SatBound

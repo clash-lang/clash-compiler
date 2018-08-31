@@ -70,21 +70,21 @@ timesBench = env setup $ \m ->
   where
     setup = return (smallValue1,smallValue2)
 
-boundedPlusBench :: Benchmark
-boundedPlusBench = env setup $ \m ->
-  bench "boundedPlus WORD_SIZE_IN_BITS" $ nf (uncurry (boundedPlus)) m
+boundedAddBench :: Benchmark
+boundedAddBench = env setup $ \m ->
+  bench "boundedAdd WORD_SIZE_IN_BITS" $ nf (uncurry (boundedAdd)) m
   where
     setup = return (smallValue1,smallValue2)
 
-boundedMinBench :: Benchmark
-boundedMinBench = env setup $ \m ->
-  bench "boundedMin WORD_SIZE_IN_BITS" $ nf (uncurry (boundedMin)) m
+boundedSubBench :: Benchmark
+boundedSubBench = env setup $ \m ->
+  bench "boundedSub WORD_SIZE_IN_BITS" $ nf (uncurry (boundedSub)) m
   where
     setup = return (smallValue1,smallValue2)
 
-boundedMultBench :: Benchmark
-boundedMultBench = env setup $ \m ->
-  bench "boundedMult WORD_SIZE_IN_BITS" $ nf (uncurry (boundedMult)) m
+boundedMulBench :: Benchmark
+boundedMulBench = env setup $ \m ->
+  bench "boundedMul WORD_SIZE_IN_BITS" $ nf (uncurry (boundedMul)) m
   where
     setup = return (smallValue1,smallValue2)
 

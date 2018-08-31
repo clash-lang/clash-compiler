@@ -134,15 +134,15 @@ import Clash.XException               (ShowX (..), Undefined, showsPrecXWith)
 -- 6
 -- >>> 2 * 4 :: Signed 4
 -- -8
--- >>> (2 :: Signed 3) `times` (4 :: Signed 4) :: Signed 7
+-- >>> (2 :: Signed 3) `mul` (4 :: Signed 4) :: Signed 7
 -- 8
--- >>> (2 :: Signed 3) `plus` (3 :: Signed 3) :: Signed 4
+-- >>> (2 :: Signed 3) `add` (3 :: Signed 3) :: Signed 4
 -- 5
--- >>> (-2 :: Signed 3) `plus` (-3 :: Signed 3) :: Signed 4
+-- >>> (-2 :: Signed 3) `add` (-3 :: Signed 3) :: Signed 4
 -- -5
--- >>> satPlus SatSymmetric 2 3 :: Signed 3
+-- >>> satAdd SatSymmetric 2 3 :: Signed 3
 -- 3
--- >>> satPlus SatSymmetric (-2) (-3) :: Signed 3
+-- >>> satAdd SatSymmetric (-2) (-3) :: Signed 3
 -- -3
 newtype Signed (n :: Nat) =
     -- | The constructor, 'S', and the field, 'unsafeToInteger', are not
@@ -305,10 +305,10 @@ fromInteger_INLINE i = mask `seq` S res
 
 instance ExtendingNum (Signed m) (Signed n) where
   type AResult (Signed m) (Signed n) = Signed (Max m n + 1)
-  plus  = plus#
-  minus = minus#
+  add  = plus#
+  sub = minus#
   type MResult (Signed m) (Signed n) = Signed (m + n)
-  times = times#
+  mul = times#
 
 plus#, minus# :: Signed m -> Signed n -> Signed (Max m n + 1)
 {-# NOINLINE plus# #-}
@@ -453,8 +453,8 @@ decSigned :: Integer -> TypeQ
 decSigned n = appT (conT ''Signed) (litT $ numTyLit n)
 
 instance KnownNat n => SaturatingNum (Signed n) where
-  satPlus SatWrap  a b = a +# b
-  satPlus SatBound a b =
+  satAdd SatWrap  a b = a +# b
+  satAdd SatBound a b =
     let r      = plus# a b
         (_,r') = split r
     in  case msb r `xor` msb r' of
@@ -462,13 +462,13 @@ instance KnownNat n => SaturatingNum (Signed n) where
           _ -> case msb a .&. msb b of
             0 -> maxBound#
             _ -> minBound#
-  satPlus SatZero a b =
+  satAdd SatZero a b =
     let r      = plus# a b
         (_,r') = split r
     in  case msb r `xor` msb r' of
           0 -> unpack# r'
           _ -> fromInteger# 0
-  satPlus SatSymmetric a b =
+  satAdd SatSymmetric a b =
     let r      = plus# a b
         (_,r') = split r
     in  case msb r `xor` msb r' of
@@ -477,8 +477,8 @@ instance KnownNat n => SaturatingNum (Signed n) where
             0 -> maxBound#
             _ -> minBoundSym#
 
-  satMin SatWrap a b = a -# b
-  satMin SatBound a b =
+  satSub SatWrap a b = a -# b
+  satSub SatBound a b =
     let r      = minus# a b
         (_,r') = split r
     in  case msb r `xor` msb r' of
@@ -486,13 +486,13 @@ instance KnownNat n => SaturatingNum (Signed n) where
           _ -> case BV.pack# (msb a) ++# BV.pack# (msb b) of
             2 -> minBound#
             _ -> maxBound#
-  satMin SatZero a b =
+  satSub SatZero a b =
     let r      = minus# a b
         (_,r') = split r
     in  case msb r `xor` msb r' of
           0 -> unpack# r'
           _ -> fromInteger# 0
-  satMin SatSymmetric a b =
+  satSub SatSymmetric a b =
     let r      = minus# a b
         (_,r') = split r
     in  case msb r `xor` msb r' of
@@ -501,8 +501,8 @@ instance KnownNat n => SaturatingNum (Signed n) where
             2 -> minBoundSym#
             _ -> maxBound#
 
-  satMult SatWrap a b = a *# b
-  satMult SatBound a b =
+  satMul SatWrap a b = a *# b
+  satMul SatBound a b =
     let r        = times# a b
         (rL,rR)  = split r
         overflow = complement (reduceOr (BV.pack# (msb rR) ++# pack rL)) .|.
@@ -512,7 +512,7 @@ instance KnownNat n => SaturatingNum (Signed n) where
           _ -> case msb rL of
             0 -> maxBound#
             _ -> minBound#
-  satMult SatZero a b =
+  satMul SatZero a b =
     let r        = times# a b
         (rL,rR)  = split r
         overflow = complement (reduceOr (BV.pack# (msb rR) ++# pack rL)) .|.
@@ -520,7 +520,7 @@ instance KnownNat n => SaturatingNum (Signed n) where
     in  case overflow of
           1 -> unpack# rR
           _ -> fromInteger# 0
-  satMult SatSymmetric a b =
+  satMul SatSymmetric a b =
     let r        = times# a b
         (rL,rR)  = split r
         overflow = complement (reduceOr (BV.pack# (msb rR) ++# pack rL)) .|.

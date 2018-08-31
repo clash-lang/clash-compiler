@@ -50,6 +50,6 @@ multBench = env setup $ \m ->
 
 multBench_wrap :: Benchmark
 multBench_wrap = env setup $ \m ->
-  bench "satMult SatWrap" $ nf (uncurry (satMult SatWrap)) m
+  bench "satMult SatWrap" $ nf (uncurry (satMul SatWrap)) m
   where
     setup = return (smallValueU1,smallValueU2)

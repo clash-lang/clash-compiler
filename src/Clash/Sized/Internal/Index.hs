@@ -242,10 +242,10 @@ fromInteger_INLINE i = bound `seq` if i > (-1) && i < bound then I i else err
 
 instance ExtendingNum (Index m) (Index n) where
   type AResult (Index m) (Index n) = Index (m + n - 1)
-  plus  = plus#
-  minus = minus#
+  add  = plus#
+  sub = minus#
   type MResult (Index m) (Index n) = Index (((m - 1) * (n - 1)) + 1)
-  times = times#
+  mul = times#
 
 plus#, minus# :: Index m -> Index n -> Index (m + n - 1)
 {-# NOINLINE plus# #-}
@@ -264,21 +264,21 @@ times# :: Index m -> Index n -> Index (((m - 1) * (n - 1)) + 1)
 times# (I a) (I b) = I (a * b)
 
 instance (KnownNat n, 1 <= n) => SaturatingNum (Index n) where
-  satPlus SatWrap a b =
+  satAdd SatWrap a b =
     leToPlusKN @1 a $ \a' ->
     leToPlusKN @1 b $ \b' ->
       case plus# a' b' of
         z | let m = fromInteger# (natVal (Proxy @ n))
           , z >= m -> resize# (z - m)
         z -> resize# z
-  satPlus SatZero a b =
+  satAdd SatZero a b =
     leToPlusKN @1 a $ \a' ->
     leToPlusKN @1 b $ \b' ->
       case plus# a' b' of
         z | let m = fromInteger# (natVal (Proxy @ n))
           , z >= m -> fromInteger# 0
         z -> resize# z
-  satPlus _ a b =
+  satAdd _ a b =
     leToPlusKN @1 a $ \a' ->
     leToPlusKN @1 b $ \b' ->
       case plus# a' b' of
@@ -286,31 +286,31 @@ instance (KnownNat n, 1 <= n) => SaturatingNum (Index n) where
           , z >= m -> maxBound#
         z -> resize# z
 
-  satMin SatWrap a b =
+  satSub SatWrap a b =
     if lt# a b
        then maxBound -# (b -# a) +# 1
        else a -# b
 
-  satMin _ a b =
+  satSub _ a b =
     if lt# a b
        then fromInteger# 0
        else a -# b
 
-  satMult SatWrap a b =
+  satMul SatWrap a b =
     leToPlusKN @1 a $ \a' ->
     leToPlusKN @1 b $ \b' ->
       case times# a' b' of
         z | let m = fromInteger# (natVal (Proxy @ n))
           , z >= m -> resize# (z - m)
         z -> resize# z
-  satMult SatZero a b =
+  satMul SatZero a b =
     leToPlusKN @1 a $ \a' ->
     leToPlusKN @1 b $ \b' ->
       case times# a' b' of
         z | let m = fromInteger# (natVal (Proxy @ n))
           , z >= m -> fromInteger# 0
         z -> resize# z
-  satMult _ a b =
+  satMul _ a b =
     leToPlusKN @1 a $ \a' ->
     leToPlusKN @1 b $ \b' ->
       case times# a' b' of

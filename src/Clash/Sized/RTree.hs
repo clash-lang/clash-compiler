@@ -97,7 +97,7 @@ import Clash.XException
 let populationCount' :: (KnownNat k, KnownNat (2^k)) => BitVector (2^k) -> Index ((2^k)+1)
     populationCount' bv = tdfold (Proxy @IIndex)
                                  fromIntegral
-                                 (\_ x y -> plus x y)
+                                 (\_ x y -> add x y)
                                  (v2t (bv2v bv))
 :}
 -}
@@ -254,15 +254,15 @@ instance (KnownNat d, Undefined a) => Undefined (RTree d a) where
 -- 'Index' ((2^d)+1) -> 'Index' ((2^d)+1) -> 'Index' ((2^(d+1))+1)
 -- @
 --
--- We have such an adder in the form of the 'Clash.Class.Num.plus' function, as
+-- We have such an adder in the form of the 'Clash.Class.Num.add' function, as
 -- defined in the instance 'Clash.Class.Num.ExtendingNum' instance of 'Index'.
 -- However, we cannot simply use 'fold' to create a tree-structure of
--- 'Clash.Class.Num.plus'es:
+-- 'Clash.Class.Num.add'es:
 --
 -- >>> :{
 -- let populationCount' :: (KnownNat (2^d), KnownNat d, KnownNat (2^d+1))
 --                      => BitVector (2^d) -> Index (2^d+1)
---     populationCount' = tfold fromIntegral plus . v2t . bv2v
+--     populationCount' = tfold fromIntegral add . v2t . bv2v
 -- :}
 -- <BLANKLINE>
 -- <interactive>:...
@@ -273,9 +273,9 @@ instance (KnownNat d, Undefined a) => Undefined (RTree d a) where
 --         Actual type: Index ((2 ^ d) + 1)
 --                      -> Index ((2 ^ d) + 1)
 --                      -> AResult (Index ((2 ^ d) + 1)) (Index ((2 ^ d) + 1))
---     • In the second argument of ‘tfold’, namely ‘plus’
---       In the first argument of ‘(.)’, namely ‘tfold fromIntegral plus’
---       In the expression: tfold fromIntegral plus . v2t . bv2v
+--     • In the second argument of ‘tfold’, namely ‘add’
+--       In the first argument of ‘(.)’, namely ‘tfold fromIntegral add’
+--       In the expression: tfold fromIntegral add . v2t . bv2v
 --     • Relevant bindings include
 --         populationCount' :: BitVector (2 ^ d) -> Index ((2 ^ d) + 1)
 --           (bound at ...)
@@ -283,7 +283,7 @@ instance (KnownNat d, Undefined a) => Undefined (RTree d a) where
 -- because 'tfold' expects a function of type \"@b -> b -> b@\", i.e. a function
 -- where the arguments and result all have exactly the same type.
 --
--- In order to accommodate the type of our 'Clash.Class.Num.plus', where the
+-- In order to accommodate the type of our 'Clash.Class.Num.add', where the
 -- result is larger than the arguments, we must use a dependently typed fold in
 -- the form of 'dtfold':
 --
@@ -299,7 +299,7 @@ instance (KnownNat d, Undefined a) => Undefined (RTree d a) where
 --                  => BitVector (2^k) -> Index ((2^k)+1)
 -- populationCount' bv = 'tdfold' (Proxy @IIndex)
 --                              fromIntegral
---                              (\\_ x y -> 'Clash.Class.Num.plus' x y)
+--                              (\\_ x y -> 'Clash.Class.Num.add' x y)
 --                              ('v2t' ('Clash.Sized.Vector.bv2v' bv))
 -- @
 --
