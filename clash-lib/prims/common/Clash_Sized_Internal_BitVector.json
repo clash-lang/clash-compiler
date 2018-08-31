@@ -18,7 +18,7 @@
     , "template"  :
 "~INST 2
   ~OUTPUT <= ~RESULT~ ~TYPO~
-  ~INPUT  <= ~ARG[3]~ ~TYP[3]~
+  ~INPUT  <= ~VAR[bv][3]~ ~TYP[3]~
 ~INST"
     }
   }
