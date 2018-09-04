@@ -20,6 +20,8 @@ module Clash.Core.Literal
 where
 
 import Control.DeepSeq                        (NFData (..))
+import Data.Binary                            (Binary)
+import Data.Vector.Binary                     ()
 import Data.Hashable                          (Hashable)
 import Data.Vector.Primitive.Extra            (Vector)
 import Data.Word                              (Word8)
@@ -48,7 +50,7 @@ data Literal
   | CharLiteral     !Char
   | NaturalLiteral  !Integer
   | ByteArrayLiteral !(Vector Word8)
-  deriving (Eq,Ord,Show,Generic,NFData,Hashable)
+  deriving (Eq,Ord,Show,Generic,NFData,Hashable,Binary)
 
 instance Alpha Literal where
   fvAny' _ _ l = pure l

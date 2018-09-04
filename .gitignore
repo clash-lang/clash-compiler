@@ -26,6 +26,7 @@ cabal.config
 *.prof
 *.aux
 *.hp
+*.bin
 
 *~
 *.DS_Store

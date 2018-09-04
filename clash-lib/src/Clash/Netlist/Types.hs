@@ -30,6 +30,7 @@ import Control.DeepSeq
 import Control.Monad.State                  (State)
 import Control.Monad.State.Strict           (MonadIO, MonadState, StateT)
 import Data.Bits                            (testBit)
+import Data.Binary                          (Binary(..))
 import Data.Hashable
 import Data.HashMap.Lazy                    (HashMap)
 import Data.IntMap.Lazy                     (IntMap, empty)
@@ -310,6 +311,7 @@ data BlackBoxContext
 data BlackBox
   = BBTemplate BlackBoxTemplate
   | BBFunction TemplateFunction
+  deriving (Generic, NFData, Binary)
 
 data TemplateFunction where
   TemplateFunction
@@ -321,6 +323,15 @@ data TemplateFunction where
 instance Show BlackBox where
   show (BBTemplate t)  = show t
   show (BBFunction {}) = "TemplateFunction"
+
+instance NFData TemplateFunction where
+  rnf (TemplateFunction is f _) = rnf is `seq` f `seq` ()
+
+-- | __NB__: serialisation doesn't preserve the embedded function
+instance Binary TemplateFunction where
+  put (TemplateFunction is _ _ ) = put is
+  get = (\is -> TemplateFunction is err err) <$> get
+    where err = const $ error "TemplateFunction functions can't be preserved by serialisation"
 
 emptyBBContext :: BlackBoxContext
 emptyBBContext
