@@ -7,7 +7,7 @@ dotp :: SaturatingNum a
      => Vec (n + 1) a
      -> Vec (n + 1) a
      -> a
-dotp as bs = fold boundedPlus (zipWith boundedMult as bs)
+dotp as bs = fold boundedAdd (zipWith boundedMul as bs)
 
 fir
   :: (Default a, KnownNat n, SaturatingNum a, Undefined a, HiddenClockReset domain gated synchronous)

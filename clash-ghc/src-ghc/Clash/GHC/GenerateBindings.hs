@@ -13,7 +13,7 @@ module Clash.GHC.GenerateBindings
   (generateBindings)
 where
 
-import           Control.Lens            ((%~),(&),(^.),_1,_2)
+import           Control.Lens            ((%~),(&))
 import           Control.Monad.State     (State)
 import qualified Control.Monad.State     as State
 import           Data.Either             (lefts, rights)
@@ -21,9 +21,6 @@ import           Data.HashMap.Strict     (HashMap)
 import qualified Data.HashMap.Strict     as HashMap
 import           Data.IntMap.Strict      (IntMap)
 import qualified Data.IntMap.Strict      as IM
-import           Data.List               (foldl')
-import qualified Data.Set                as Set
-import qualified Data.Set.Lens           as Lens
 import           Unbound.Generics.LocallyNameless (bind,embed,rec,runFreshM,unembed)
 
 import qualified BasicTypes              as GHC
@@ -40,14 +37,12 @@ import           Clash.Annotations.BitRepresentation.Internal (DataRepr')
 import           Clash.Annotations.TopEntity (TopEntity)
 import           Clash.Annotations.Primitive (HDL)
 
-import           Clash.Core.FreeVars     (termFreeIds)
 import           Clash.Core.Name         (Name (..), string2SystemName)
 import           Clash.Core.Term         (Term (..), TmName, TmOccName)
 import           Clash.Core.Type         (Type (..), TypeView (..), mkFunTy, splitFunForallTy, tyView)
 import           Clash.Core.TyCon        (TyCon, TyConName, TyConOccName)
 import           Clash.Core.TysPrim      (tysPrimMap)
-import           Clash.Core.Subst        (substTms)
-import           Clash.Core.Util         (mkLams, mkTyLams, termType)
+import           Clash.Core.Util         (mkLams, mkTyLams)
 import           Clash.Core.Var          (Var (..))
 import           Clash.Driver.Types      (BindingMap)
 import           Clash.GHC.GHC2Core      (GHC2CoreState, tyConMap, coreToId, coreToName, coreToTerm,
@@ -92,49 +87,12 @@ generateBindings primDirs importDirs hdl modName dflagsM = do
           topEnt' <- coreToName GHC.varName GHC.varUnique qualfiedNameString topEnt
           benchM' <- traverse (coreToName GHC.varName GHC.varUnique qualfiedNameString) benchM
           return (topEnt',annM,benchM')) topEntities
-      retypedBindings               = retypeBindings allTcCache allBindings topEntities'
-      topEntities''                 = map (\(topEnt,annM,benchM) -> case HashMap.lookup (nameOcc topEnt) retypedBindings of
+      topEntities''                 = map (\(topEnt,annM,benchM) -> case HashMap.lookup (nameOcc topEnt) allBindings of
                                               Just (_,ty,_,_,_) -> (topEnt,ty,annM,benchM)
                                               Nothing       -> error "This shouldn't happen"
                                           ) topEntities'
 
-  return (retypedBindings, allTcCache, tupTcCache, topEntities'', primMap, reprs)
-
-retypeBindings
-  :: HashMap TyConOccName TyCon
-  -> BindingMap
-  -> [(TmName,Maybe TopEntity,Maybe TmName)]
-  -> BindingMap
-retypeBindings allTcCache = foldl' go
-  where
-    go allBindings (topEnt,_,benchM) = bBindings
-      where
-        topEntity = do e <- HashMap.lookup (nameOcc topEnt) allBindings
-                       return (nameOcc topEnt,e)
-        bench     = do t <- benchM
-                       e <- HashMap.lookup (nameOcc t) allBindings
-                       return (nameOcc t,e)
-
-        tBindings = maybe allBindings (retype' allBindings) topEntity
-        bBindings = maybe tBindings (retype' tBindings) bench
-        retype' d (t,_) = snd (retype allTcCache ([],d) t)
-
--- | clean up cast-removal mess
-retype
-  :: HashMap TyConOccName TyCon
-  -> ([TmOccName], BindingMap) -- (visited, bindings)
-  -> TmOccName                 -- top
-  -> ([TmOccName], BindingMap)
-retype tcm (visited,bindings) current = (visited', HashMap.insert current (nm,ty',sp,inl,tm') bindings')
-  where
-    (nm,_,sp,inl,tm)     = bindings HashMap.! current
-    used                 = Set.toList $ Lens.setOf termFreeIds tm
-    (visited',bindings') = foldl (retype tcm) (current:visited,bindings) (filter (`notElem` visited) used)
-    used'                = map ((^. _1) . (bindings' HashMap.!)) used
-    usedTys              = map ((^. _2) . (bindings' HashMap.!)) used
-    usedVars             = zipWith Var usedTys used'
-    tm'                  = substTms (zip used usedVars) tm
-    ty'                  = runFreshM (termType tcm tm')
+  return (allBindings, allTcCache, tupTcCache, topEntities'', primMap, reprs)
 
 mkBindings
   :: PrimMap (Primitive a b c)

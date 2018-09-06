@@ -45,6 +45,10 @@ ghcTypeToHWType
   -> Maybe (Either String HWType)
 ghcTypeToHWType iw floatSupport = go
   where
+    go reprs m keepVoid (AnnType attrs typ) = runExceptT $ do
+      typ' <- ExceptT $ return $ coreTypeToHWType go reprs m keepVoid typ
+      return $ Annotated attrs typ'
+
     go reprs m keepVoid ty@(tyView -> TyConApp tc args) = runExceptT $
       case name2String tc of
         "GHC.Int.Int8"                  -> return (Signed 8)

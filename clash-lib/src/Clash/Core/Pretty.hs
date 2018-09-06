@@ -255,6 +255,7 @@ ppr_type _ (VarTy _ tv)                 = ppr tv
 ppr_type _ (LitTy tyLit)                = ppr tyLit
 ppr_type p ty@(ForAllTy _)              = pprForAllType p ty
 ppr_type p (ConstTy (TyCon tc))         = pprTcApp p ppr_type tc []
+ppr_type p (AnnType _ann typ)           = ppr_type p typ
 ppr_type p (tyView -> TyConApp tc args) = pprTcApp p ppr_type tc args
 ppr_type p (tyView -> FunTy ty1 ty2)    = pprArrowChain p <$> ppr_type FunPrec ty1 <:> pprFunTail ty2
   where

@@ -1,7 +1,7 @@
 {-|
   Copyright   :  (C) 2012-2016, University of Twente,
                      2016-2017, Myrtle Software Ltd,
-                     2017     , Google Inc.
+                     2017-2018, Google Inc.
   License     :  BSD2 (see the file LICENSE)
   Maintainer  :  Christiaan Baaij <christiaan.baaij@gmail.com>
 
@@ -28,7 +28,8 @@ import           Data.Either                      (lefts,partitionEithers)
 import           Data.HashMap.Lazy                (HashMap)
 import qualified Data.HashMap.Lazy                as HashMap
 import           Data.List                        (elemIndex, sortOn)
-import           Data.Maybe                       (catMaybes, listToMaybe)
+import           Data.Maybe
+  (catMaybes, fromMaybe, listToMaybe)
 import           Data.Primitive.ByteArray         (ByteArray (..))
 import qualified Data.Text                        as StrictText
 import qualified Data.Text.Lazy                   as Text
@@ -37,7 +38,7 @@ import           GHC.Integer.GMP.Internals        (Integer (..), BigNat (..))
 import           System.FilePath                  ((</>), (<.>))
 import           Text.Read                        (readMaybe)
 import           Unbound.Generics.LocallyNameless
-  (Embed (..), runFreshMT, unbind, unembed, unrebind)
+  (Embed (..), runFreshMT, unbind, unembed, unrebind, embed)
 
 import           Outputable                       (ppr, showSDocUnsafe)
 import           SrcLoc                           (SrcSpan,isGoodSrcSpan,noSrcSpan)
@@ -55,7 +56,8 @@ import           Clash.Core.Pretty                (showDoc)
 import           Clash.Core.Term
   (Alt, Pat (..), Term (..), TmName, TmOccName)
 import qualified Clash.Core.Term                  as Core
-import           Clash.Core.Type                  (Type (..), splitFunTys, coreView)
+import           Clash.Core.Type
+  (Type (..), coreView, getFunResult, splitFunTys)
 import           Clash.Core.TyCon
   (TyCon, TyConOccName)
 import           Clash.Core.Util                  (collectArgs, termType)
@@ -194,12 +196,21 @@ genComponentT compName componentExpr = do
 
   tcm <- Lens.use tcCache
 
+  -- HACK: Determine resulttype of this function by looking at its definition
+  -- in topEntityAnns, instead of looking at its last binder (which obscure
+  -- any attributes [see: Clash.Annotations.SynthesisAttributes]).
+  topEntityType <- ((fst <$>) . HashMap.lookup compName) <$> Lens.use topEntityAnns
+
   seenIds .= []
   (compInps,argWrappers,compOutps,resUnwrappers,binders,resultM) <- do
     normalizedM <- splitNormalized tcm componentExpr
     case normalizedM of
-      Right normalized -> mkUniqueNormalized topEntMM normalized
-      Left err         -> throw (ClashException sp err Nothing)
+      Right (args, binds, res) -> do
+        let resultType = (\te -> fromMaybe te (getFunResult te)) <$> topEntityType
+            varType'   = maybe (varType res) embed resultType
+        mkUniqueNormalized topEntMM ((args, binds, res{varType=varType'}))
+      Left err ->
+        throw (ClashException sp err Nothing)
 
   netDecls <- fmap catMaybes . mapM mkNetDecl $ filter (maybe (const True) (/=) resultM . varName . fst) binders
   decls    <- concat <$> mapM (uncurry mkDeclarations . second unembed) binders

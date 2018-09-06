@@ -1,6 +1,6 @@
 {-|
   Copyright   :  (C) 2015-2016, University of Twente,
-                          2017, Google Inc.
+                     2017-2018, Google Inc.
   License     :  BSD2 (see the file LICENSE)
   Maintainer  :  Christiaan Baaij <christiaan.baaij@gmail.com>
 
@@ -34,7 +34,7 @@ import           Data.Maybe                           (catMaybes,fromMaybe,mapMa
 import           Data.Monoid                          hiding (Sum, Product)
 #endif
 import           Data.Semigroup.Monad
-import           Data.Text.Lazy                       (pack,unpack)
+import           Data.Text.Lazy                       (pack,unpack,intercalate)
 import qualified Data.Text.Lazy                       as Text
 import           Data.Text.Prettyprint.Doc.Extra
 #ifdef CABAL
@@ -49,6 +49,7 @@ import           Clash.Annotations.BitRepresentation.ClashLib
   (bitsToBits)
 import           Clash.Annotations.BitRepresentation.Util
   (BitOrigin(Lit, Field), bitOrigins, bitRanges)
+import           Clash.Core.Var                       (Attr'(..))
 import           Clash.Backend
 import           Clash.Backend.Verilog                (bits, bit_char, exprLit, include)
 import           Clash.Driver.Types                   (SrcSpan, noSrcSpan)
@@ -532,7 +533,8 @@ module_ c =
 
   -- map a port to its verilog type, port name, and any encoding notes
   sigPort (wr2ty -> portTy) (nm, hwTy)
-    = portTy <+> sigDecl (string nm) hwTy <+> encodingNote hwTy
+    = addAttrs (hwTypeAttrs hwTy)
+        (portTy <+> sigDecl (string nm) hwTy <+> encodingNote hwTy)
   -- slightly more readable than 'tupled', makes the output Haskell-y-er
   commafy v = (comma <> space) <> pure v
 
@@ -687,13 +689,33 @@ decls ds = do
 
 decl :: Declaration -> SystemVerilogM (Maybe Doc)
 decl (NetDecl' noteM _ id_ tyE) =
-  Just A.<$> maybe id addNote noteM (typ tyE)
+  Just A.<$> maybe id addNote noteM (addAttrs attrs (typ tyE))
   where
     typ (Left  ty) = string ty <+> string id_
     typ (Right ty) = sigDecl (string id_) ty
     addNote n = mappend ("//" <+> string n <> line)
+    attrs = fromMaybe [] (hwTypeAttrs A.<$> either (const Nothing) Just tyE)
 
 decl _ = return Nothing
+
+-- | Convert single attribute to systemverilog syntax
+renderAttr :: Attr' -> Text.Text
+renderAttr (StringAttr'  key value) = pack $ concat [key, " = ", show value]
+renderAttr (IntegerAttr' key value) = pack $ concat [key, " = ", show value]
+renderAttr (BoolAttr'    key True ) = pack $ concat [key, " = ", "1"]
+renderAttr (BoolAttr'    key False) = pack $ concat [key, " = ", "0"]
+renderAttr (Attr'        key      ) = pack $ key
+
+-- | Add attribute notation to given declaration
+addAttrs
+  :: [Attr']
+  -> SystemVerilogM Doc
+  -> SystemVerilogM Doc
+addAttrs []     t = t
+addAttrs attrs' t =
+  "(*" <+> attrs'' <+> "*)" <+> t
+    where
+      attrs'' = string $ intercalate ", " (map renderAttr attrs')
 
 insts :: [Declaration] -> SystemVerilogM Doc
 insts [] = emptyDoc

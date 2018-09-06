@@ -5,7 +5,7 @@ import Clash.Explicit.Prelude
 topEntity
   :: Vec 2 (Index 2)
   -> Vec 2 (Index 3)
-topEntity input = liftA2 plus (indices SNat) input
+topEntity input = liftA2 add (indices SNat) input
 {-# NOINLINE topEntity #-}
 
 testBench :: Signal System Bool

@@ -15,7 +15,7 @@ module Clash.Netlist.BlackBox.Types
  , TemplateKind (..)
  , Element(..)
  , Decl(..)
- , HdlSyn(Vivado, Other)
+ , HdlSyn(..)
  ) where
 
 import                Data.Text.Lazy             (Text)
@@ -126,5 +126,5 @@ data Element = C   !Text         -- ^ Constant
 data Decl = Decl !Int [(BlackBoxTemplate,BlackBoxTemplate)]
   deriving Show
 
-data HdlSyn = Vivado | Other
+data HdlSyn = Vivado | Quartus | Other
   deriving (Eq,Show,Read)

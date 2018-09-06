@@ -1,6 +1,7 @@
 {-|
   Copyright  :  (C) 2012-2016, University of Twente,
-                    2017     , Myrtle Software Ltd, Google Inc.
+                    2017     , Myrtle Software Ltd,
+                    2017-2018, Google Inc.
   License    :  BSD2 (see the file LICENSE)
   Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
 
@@ -48,6 +49,7 @@ import Clash.Backend                        (Backend)
 import Clash.Core.Term                      (TmOccName)
 import Clash.Core.Type                      (Type)
 import Clash.Core.TyCon                     (TyCon, TyConOccName)
+import Clash.Core.Var                       (Attr')
 import Clash.Driver.Types                   (BindingMap)
 import Clash.Netlist.BlackBox.Types         (BlackBoxTemplate)
 import Clash.Netlist.Id                     (IdType)
@@ -153,6 +155,8 @@ data HWType
   | CustomSum !Identifier !DataRepr' !Size [(ConstrRepr', Identifier)]
   -- ^ Same as Sum, but with a user specified bit representation. For more info,
   -- see: Clash.Annotations.BitRepresentations.
+  | Annotated [Attr'] !HWType
+  -- ^ Annotated
   deriving (Eq,Ord,Show,Generic)
 
 instance Hashable ClockKind
@@ -160,6 +164,12 @@ instance Hashable ResetKind
 
 instance Hashable HWType
 instance NFData HWType
+
+-- | Extract hardware attributes from Annotated. Returns an empty list if
+-- non-Annotated given or if Annotated has an empty list of attributes.
+hwTypeAttrs :: HWType -> [Attr']
+hwTypeAttrs (Annotated attrs _type) = attrs
+hwTypeAttrs _                       = []
 
 -- | Internals of a Component
 data Declaration
@@ -197,8 +207,12 @@ data Declaration
       -- Context in which tokens should be rendered:
       BlackBoxContext
   -- ^ Instantiation of blackbox declaration
-  | NetDecl' (Maybe Identifier) WireOrReg !Identifier (Either Identifier HWType)
-  -- ^ Signal declaration
+  | NetDecl'
+      (Maybe Identifier)         -- Note; will be inserted as a comment in target hdl
+      WireOrReg                  -- Wire or register
+      !Identifier                -- Name of signal
+      (Either Identifier HWType) -- Pointer to type of signal or type of signal
+      -- ^ Signal declaration
   deriving Show
 
 data EntityOrComponent = Entity | Comp
@@ -209,7 +223,14 @@ data WireOrReg = Wire | Reg
 
 instance NFData WireOrReg
 
-pattern NetDecl :: Maybe Identifier -> Identifier -> HWType -> Declaration
+pattern NetDecl
+  :: Maybe Identifier
+  -- ^ Note; will be inserted as a comment in target hdl
+  -> Identifier
+  -- ^ Name of signal
+  -> HWType
+  -- ^ Type of signal
+  -> Declaration
 pattern NetDecl note d ty <- NetDecl' note Wire d (Right ty)
   where
     NetDecl note d ty = NetDecl' note Wire d (Right ty)
