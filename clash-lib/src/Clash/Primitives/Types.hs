@@ -8,8 +8,10 @@
   Type and instance definitions for Primitive
 -}
 
+{-# LANGUAGE DeriveAnyClass    #-}
 {-# LANGUAGE DeriveFunctor     #-}
 {-# LANGUAGE DeriveFoldable    #-}
+{-# LANGUAGE DeriveGeneric     #-}
 {-# LANGUAGE DeriveTraversable #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE LambdaCase        #-}
@@ -34,8 +36,10 @@ import {-# SOURCE #-} Clash.Netlist.Types
 import           Clash.Netlist.BlackBox.Types
   (BlackBoxTemplate, BlackBoxFunction, TemplateKind (..))
 import           Control.Applicative          ((<|>))
+import           Control.DeepSeq              (NFData)
 import           Data.Aeson
   (FromJSON (..), Value (..), (.:), (.:?), (.!=))
+import           Data.Binary                  (Binary)
 import           Data.Char                    (isUpper, isLower, isAlphaNum)
 import           Data.Either                  (lefts)
 import           Data.HashMap.Lazy            (HashMap)
@@ -43,6 +47,7 @@ import qualified Data.HashMap.Strict          as H
 import           Data.List                    (intercalate)
 import qualified Data.Text                    as S
 import           Data.Text.Lazy               (Text)
+import           GHC.Generics                 (Generic)
 import           GHC.Stack                    (HasCallStack)
 
 -- | An unresolved primitive still contains pointers to files.
@@ -65,7 +70,7 @@ type PrimMap a = HashMap S.Text a
 -- guaranteed to have at least one module name which is not /Main/.
 data BlackBoxFunctionName =
   BlackBoxFunctionName [String] String
-    deriving (Eq)
+    deriving (Eq, Generic, NFData, Binary)
 
 instance Show BlackBoxFunctionName where
   show (BlackBoxFunctionName mods funcName) =
@@ -160,7 +165,7 @@ data Primitive a b c
   , primType :: !Text
     -- ^ Additional information
   }
-  deriving Show
+  deriving (Show, Generic, NFData, Binary)
 
 instance FromJSON UnresolvedPrimitive where
   parseJSON (Object v) =

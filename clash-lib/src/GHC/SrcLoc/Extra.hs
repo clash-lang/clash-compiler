@@ -13,12 +13,16 @@
 
 module GHC.SrcLoc.Extra where
 
+import Data.Binary
 import Data.Hashable                        (Hashable (..))
 import GHC.Generics
 import SrcLoc
-  (SrcSpan (..), RealSrcSpan, srcSpanFile, srcSpanStartLine, srcSpanEndLine,
-   srcSpanStartCol, srcSpanEndCol)
-import FastString                           (FastString (..))
+  (SrcSpan (..), RealSrcLoc, RealSrcSpan,
+   mkRealSrcLoc, mkRealSrcSpan,
+   realSrcSpanStart, realSrcSpanEnd,
+   srcLocFile, srcLocLine, srcLocCol,
+   srcSpanFile, srcSpanStartLine, srcSpanEndLine, srcSpanStartCol, srcSpanEndCol)
+import FastString                           (FastString (..), bytesFS, mkFastStringByteList)
 import Unbound.Generics.LocallyNameless     (Alpha (..))
 import Unbound.Generics.LocallyNameless.TH
 
@@ -35,3 +39,15 @@ instance Hashable RealSrcSpan where
 instance Hashable FastString where
   hashWithSalt salt fs = hashWithSalt salt (uniq fs)
 
+instance Binary SrcSpan
+instance Binary RealSrcSpan where
+  put r = put (realSrcSpanStart r, realSrcSpanEnd r)
+  get = uncurry mkRealSrcSpan <$> get
+
+instance Binary RealSrcLoc where
+  put r = put (srcLocFile r, srcLocLine r, srcLocCol r)
+  get = (\(file,line,col) -> mkRealSrcLoc file line col) <$> get
+
+instance Binary FastString where
+  put str = put $ bytesFS str
+  get = mkFastStringByteList <$> get

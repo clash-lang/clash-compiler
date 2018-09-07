@@ -1,0 +1,31 @@
+name:                clash-profiling
+version:             0.1.0
+synopsis:            A profilable run of the Clash normalization process
+-- description:
+homepage:            http://www.clash-lang.org/
+license:             BSD2
+author:              Leon Schoorl
+category:            Testing
+build-type:          Simple
+cabal-version:       >=1.10
+
+executable clash-profile-normalization-run
+  main-is:             profile-normalization-run.hs
+  default-language:    Haskell2010
+  ghc-options:         -O2 -Wall
+  build-depends:       base                 >= 4.8      && < 5,
+                       binary               >= 0.8.5    && < 0.11,
+                       bytestring           >= 0.10.0.2 && < 0.11,
+                       concurrent-supply    >= 0.1.7    && < 0.2,
+                       containers           >= 0.5.4.0  && < 0.6,
+                       deepseq              >= 1.4      && < 1.5,
+                       filepath             >= 1.4      && < 1.5,
+                       unordered-containers >= 0.2.3.3  && < 0.3,
+
+                       clash-benchmark,
+                       clash-ghc,
+                       clash-lib,
+                       clash-prelude,
+                       clash-profiling-prepare
+  -- automatically build ...-prepare tool
+  build-tool-depends:  clash-profiling-prepare:clash-profile-normalization-prepare

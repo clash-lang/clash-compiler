@@ -20,6 +20,7 @@ module Unbound.Generics.LocallyNameless.Extra where
 #if !MIN_VERSION_unbound_generics(0,2,0)
 import Control.DeepSeq
 #endif
+import Data.Binary
 import Data.Vector.Primitive
 import Data.Hashable                           (Hashable(..),hash)
 #if MIN_VERSION_unbound_generics(0,3,0)
@@ -113,3 +114,9 @@ instance Alpha Text where
 instance Subst b Text where
   subst  _ _ = id
   substs _   = id
+
+instance (Binary a, Binary b) => Binary (Bind a b)
+instance Binary a => Binary (Embed a)
+instance Binary (Name a)
+instance (Binary a, Binary b) => Binary (Rebind a b)
+instance Binary a => Binary (Rec a)

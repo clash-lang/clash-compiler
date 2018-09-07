@@ -12,6 +12,7 @@
 module Clash.Core.Type where
 
 import Control.DeepSeq                  (NFData)
+import Data.Binary                      (Binary)
 import Data.Hashable                    (Hashable)
 import GHC.Generics                     (Generic)
 import Unbound.Generics.LocallyNameless (Alpha,Subst)
@@ -36,5 +37,6 @@ instance Subst    Type Type
 instance Subst    Term Type
 instance NFData   Type
 instance Hashable Type
+instance Binary   Type
 
 mkTyConTy :: TyConName -> Type
