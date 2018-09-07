@@ -1,7 +1,12 @@
 -- there are no top level packages. any package can be checked out under the
 -- root directory (i.e. patched copies, or forks) and will automatically be
 -- preferred by the solver over other versions.
-packages: ./clash-ghc/*.cabal, ./clash-lib/*.cabal, ./clash-prelude/*.cabal, ./testsuite/*.cabal
+packages:
+  ./clash-ghc/*.cabal,
+  ./clash-lib/*.cabal,
+  ./clash-prelude/*.cabal,
+  ./testsuite/*.cabal,
+  ./benchmark/*.cabal
 
 allow-newer: *:Cabal, *:array, *:base, *:binary, *:^bytestring, *:containers,
   *:deepseq, *:directory, *:filepath, *:ghc, *:ghc-boot, *:ghc-boot-th,
