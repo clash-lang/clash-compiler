@@ -39,6 +39,7 @@ import Data.Int
 import Data.Word
 import Foreign.C.Types                (CUShort)
 import GHC.TypeLits                   (KnownNat, Nat, type (+))
+import GHC.TypeLits.Extra             (Max)
 import Numeric.Half                   (Half (..))
 import GHC.Generics
 import Prelude                        hiding (map)
@@ -49,7 +50,7 @@ import Clash.Sized.BitVector
   (Bit, BitVector, (++#), high, low)
 import Clash.Sized.Internal.BitVector
   (BitVector (BV), pack#, split#, checkUnpackUndef, undefError, undefined#,
-   unpack#, unsafeToInteger)
+   unpack#, unsafeToInteger, resize#, msb#)
 
 {- $setup
 >>> :set -XDataKinds
@@ -252,6 +253,21 @@ instance (KnownNat (GBitSize g), GBitPack f, GBitPack g) => GBitPack (f :*: g) w
   gunpack b               = gunpack front :*: gunpack back
     where
       (front, back) = split# b
+
+instance (KnownNat (GBitSize l), GBitPack l, 
+          KnownNat (GBitSize r), GBitPack r) =>
+     GBitPack (l :+: r) where
+   type GBitSize (l :+: r) = 1 + Max (GBitSize l) (GBitSize r)
+   gpack (L1 l)            = pack# low  ++# resize# (gpack l)
+   gpack (R1 r)            = pack# high ++# resize# (gpack r)
+   gunpack x               = if msb# x == low then l x else r x
+       where l = L1 . gunpack . resize#
+             r = R1 . gunpack . resize#
+
+instance GBitPack U1 where
+  type GBitSize U1 = 0
+  gpack _          = minBound
+  gunpack b        = U1
 
 instance (BitPack c) => GBitPack (K1 i c) where
   type GBitSize (K1 i c) = BitSize c
