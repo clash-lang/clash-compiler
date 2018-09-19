@@ -29,7 +29,7 @@
 , { "BlackBox" :
     { "name"      : "Control.Exception.Base.nonExhaustiveGuardsError"
     , "kind"      : "Expression"
-    , "type"      : nonExhaustiveGuardsError :: Addr# -> a"
+    , "type"      : "nonExhaustiveGuardsError :: Addr# -> a"
     , "template"  : "~ERRORO"
     }
   }
@@ -41,9 +41,9 @@
     }
   }
 , { "BlackBox" :
-    { "name"      : "Control.Exception.Base.noMethodBindingError
+    { "name"      : "Control.Exception.Base.noMethodBindingError"
     , "kind"      : "Expression"
-    , "type"      : noMethodBindingError :: Addr# -> a"
+    , "type"      : "noMethodBindingError :: Addr# -> a"
     , "template"  : "~ERRORO"
     }
   }
