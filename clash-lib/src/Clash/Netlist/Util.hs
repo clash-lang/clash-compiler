@@ -702,13 +702,6 @@ dcToLiteral _ i    = NumLit (toInteger i-1)
 extendPorts :: [PortName] -> [Maybe PortName]
 extendPorts ps = map Just ps ++ repeat Nothing
 
-appendNumber
-  :: (Identifier,HWType)
-  -> Int
-  -> (Identifier,HWType)
-appendNumber (nm,hwty) i =
-  (nm `append` "_" `append` pack (show i),hwty)
-
 portName
   :: String
   -> Identifier
