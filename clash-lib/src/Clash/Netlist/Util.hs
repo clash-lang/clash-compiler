@@ -10,6 +10,7 @@
 
 {-# LANGUAGE FlexibleContexts  #-}
 {-# LANGUAGE MultiWayIf        #-}
+{-# LANGUAGE NamedFieldPuns    #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TemplateHaskell   #-}
 {-# LANGUAGE TupleSections     #-}
@@ -21,7 +22,7 @@ import           Control.Error           (hush)
 import           Control.Exception       (throw)
 import           Control.Lens            ((.=),(%=))
 import qualified Control.Lens            as Lens
-import           Control.Monad           (unless, when, zipWithM)
+import           Control.Monad           (unless, when, zipWithM, join)
 import           Control.Monad.Trans.Except (runExcept)
 import           Data.Either             (partitionEithers)
 import           Data.HashMap.Strict     (HashMap)
@@ -30,6 +31,7 @@ import           Data.List               (intersperse, unzip4, sort)
 import           Data.Maybe              (catMaybes,fromMaybe)
 import           Data.Text.Lazy          (append,pack,unpack)
 import qualified Data.Text.Lazy          as Text
+import           Data.String             (fromString)
 import           Unbound.Generics.LocallyNameless
   (Embed, Fresh, embed, unbind, unembed, unrec)
 import qualified Unbound.Generics.LocallyNameless as Unbound
@@ -428,6 +430,26 @@ containsBiSignalIn (Vector _ ty)   = containsBiSignalIn ty
 containsBiSignalIn (RTree _ ty)    = containsBiSignalIn ty
 containsBiSignalIn _               = False
 
+-- | Helper function of @collectPortNames@, which operates on a @PortName@
+-- instead of a TopEntity.
+collectPortNames'
+  :: PortName
+  -> [Identifier]
+collectPortNames' (PortName nm)       = [fromString nm]
+collectPortNames' (PortProduct _ nms) = concatMap collectPortNames' nms
+
+-- | Recursively get all port names from top entity annotations. The result is
+-- a list of user defined port names, which should not be used by routines
+-- generating unique function names. Only completely qualified names are
+-- returned, as it does not (and cannot) account for any implicitly named ports
+-- under a PortProduct.
+collectPortNames
+  :: TopEntity
+  -> [Identifier]
+collectPortNames TestBench {} = []
+collectPortNames Synthesize { t_inputs, t_output } =
+  concatMap collectPortNames' t_inputs ++ collectPortNames' t_output
+
 -- | Uniquely rename all the variables and their references in a normalized
 -- term
 mkUniqueNormalized
@@ -444,6 +466,15 @@ mkUniqueNormalized
       ,[LetBinding]
       ,Maybe TmName)
 mkUniqueNormalized topMM (args,binds,res) = do
+  -- Add user define port names to list of seen ids to prevent name collisions.
+  let
+    portNames =
+      case join topMM of
+        Nothing  -> []
+        Just top -> collectPortNames top
+
+  seenIds %= (portNames++)
+
   -- Make arguments unique
   (iports,iwrappers,substArgs) <- mkUniqueArguments topMM args
 
