@@ -186,6 +186,10 @@ main = do
         , testGroup "Types"
             [ runTest ("tests" </> "shouldwork" </> "Types") defBuild [] "TypeFamilyReduction" ([""],"TypeFamilyReduction_topEntity",False)
             ]
+        , testGroup "TopEntity"
+            [ runTest ("tests" </> "shouldwork" </> "TopEntity") Verilog [] "PortNames" (["","PortNames_topEntity","PortNames_testBench"],"PortNames_testBench",True)
+            , outputTest ("tests" </> "shouldwork" </> "TopEntity") Verilog [] "PortNames" (["","PortNames_topEntity","PortNames_testBench"],"PortNames_testBench",False) "main"
+            ]
         , testGroup "Vector"
             [ runTest ("tests" </> "shouldwork" </> "Vector") defBuild [] "Concat"    (["","Concat_testBench"],"Concat_testBench",True)
             , runTest ("tests" </> "shouldwork" </> "Vector") defBuild [] "DFold"     (["","DFold_testBench"],"DFold_testBench",True)
