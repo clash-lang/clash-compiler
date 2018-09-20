@@ -1032,7 +1032,7 @@ mkOutput' pM = case pM of
                    in  return (concat ports,netdecl:assign:concat decls,pN)
             _   -> let hwty''  = filterVoid hwty'
                        netdecl = NetDecl Nothing pN hwty''
-                       assigns = zipWith (assignId pN hwty' 0) ids [0..]
+                       assigns = zipWith (assignId pN hwty'' 0) ids [0..]
                    in  if null attrs then
                          return (concat ports,netdecl:assigns ++ concat decls,pN)
                        else
