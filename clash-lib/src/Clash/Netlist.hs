@@ -29,7 +29,7 @@ import           Data.HashMap.Lazy                (HashMap)
 import qualified Data.HashMap.Lazy                as HashMap
 import           Data.List                        (elemIndex, sortOn)
 import           Data.Maybe
-  (catMaybes, fromMaybe, listToMaybe)
+  (catMaybes, listToMaybe)
 import           Data.Primitive.ByteArray         (ByteArray (..))
 import qualified Data.Text                        as StrictText
 import qualified Data.Text.Lazy                   as Text
@@ -57,7 +57,7 @@ import           Clash.Core.Term
   (Alt, Pat (..), Term (..), TmName, TmOccName)
 import qualified Clash.Core.Term                  as Core
 import           Clash.Core.Type
-  (Type (..), coreView, getFunResult, splitFunTys)
+  (Type (..), coreView, splitFunTys, splitCoreFunForallTy)
 import           Clash.Core.TyCon
   (TyCon, TyConOccName)
 import           Clash.Core.Util                  (collectArgs, termType)
@@ -199,15 +199,15 @@ genComponentT compName componentExpr = do
   -- HACK: Determine resulttype of this function by looking at its definition
   -- in topEntityAnns, instead of looking at its last binder (which obscure
   -- any attributes [see: Clash.Annotations.SynthesisAttributes]).
-  topEntityType <- ((fst <$>) . HashMap.lookup compName) <$> Lens.use topEntityAnns
+  topEntityTypeM     <- HashMap.lookup compName <$> Lens.use topEntityAnns
+  let topEntityTypeM' = snd . splitCoreFunForallTy tcm . fst <$> topEntityTypeM
 
   seenIds .= []
   (compInps,argWrappers,compOutps,resUnwrappers,binders,resultM) <- do
     normalizedM <- splitNormalized tcm componentExpr
     case normalizedM of
       Right (args, binds, res) -> do
-        let resultType = (\te -> fromMaybe te (getFunResult te)) <$> topEntityType
-            varType'   = maybe (varType res) embed resultType
+        let varType'   = maybe (varType res) embed topEntityTypeM'
         mkUniqueNormalized topEntMM ((args, binds, res{varType=varType'}))
       Left err ->
         throw (ClashException sp err Nothing)

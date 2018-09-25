@@ -52,7 +52,6 @@ module Clash.Core.Type
   , isIntegerTy
   , normalizeType
   , varAttrs
-  , getFunResult
   , typeAttrs
   )
 where
@@ -65,7 +64,7 @@ import           Data.HashMap.Strict                     (HashMap)
 import qualified Data.HashMap.Strict                     as HashMap
 import           Data.List                               (foldl',isPrefixOf)
 import           Data.Maybe                              (isJust, mapMaybe)
-import           GHC.Base                                (isTrue#,(==#),(<|>))
+import           GHC.Base                                (isTrue#,(==#))
 import           GHC.Generics                            (Generic(..))
 import           GHC.Integer                             (smallInteger)
 import           GHC.Integer.Logarithms                  (integerLogBase#)
@@ -325,19 +324,6 @@ isPolyFunCoreTy _ ty = case tyView ty of
   FunTy _ _ -> True
   OtherType (ForAllTy _) -> True
   _ -> False
-
--- | Extract rightmost type of types concatenated using an arrow (i.e., the
--- result of a function). Fails (returns Nothing) if this is not a function
--- type.
-getFunResult
-  :: Type
-  -> Maybe Type
-getFunResult typ =
-  case tyView typ of
-    FunTy _arg result ->
-      getFunResult result <|> Just result
-    _ ->
-      Nothing
 
 -- | Extract attributes from type. Will return an empty list if this is an
 -- AnnType with an empty list AND if this is not an AnnType at all.
