@@ -764,15 +764,15 @@ blockRam# clk content rd wen = case clockEnable clk of
        ena rd (ena .&&. wen)
   where
     -- no clock enable
-    go !ram o (r :- rs) (e :- en) (w :- wr) (d :- din) =
+    go !ram o rt@(~(r :- rs)) et@(~(e :- en)) wt@(~(w :- wr)) dt@(~(d :- din)) =
       let ram' = upd ram e (fromEnum w) d
           o'   = ram V.! r
-      in  o `seqX` o :- go ram' o' rs en wr din
+      in  o `seqX` o :- (rt `seq` et `seq` wt `seq` dt `seq` go ram' o' rs en wr din)
     -- clock enable
-    go' !ram o (re :- res) (r :- rs) (e :- en) (w :- wr) (d :- din) =
+    go' !ram o ret@(~(re :- res)) rt@(~(r :- rs)) et@(~(e :- en)) wt@(~(w :- wr)) dt@(~(d :- din)) =
       let ram' = upd ram e (fromEnum w) d
           o'   = if re then ram V.! r else o
-      in  o `seqX` o :- go' ram' o' res rs en wr din
+      in  o `seqX` o :- (ret `seq` rt `seq` et `seq` wt `seq` dt `seq` go' ram' o' res rs en wr din)
 
     upd ram we waddr d = case maybeX we of
       Nothing -> case maybeX waddr of
