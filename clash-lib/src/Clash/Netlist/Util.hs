@@ -27,8 +27,9 @@ import           Control.Monad.Trans.Except (runExcept)
 import           Data.Either             (partitionEithers)
 import           Data.HashMap.Strict     (HashMap)
 import qualified Data.HashMap.Strict     as HashMap
-import           Data.List               (intersperse, unzip4, sort)
+import           Data.List               (intersperse, unzip4, sort, intercalate)
 import           Data.Maybe              (catMaybes,fromMaybe)
+import           Data.Monoid             ((<>))
 import           Data.Text.Lazy          (append,pack,unpack)
 import qualified Data.Text.Lazy          as Text
 import           Data.String             (fromString)
@@ -433,10 +434,16 @@ containsBiSignalIn _               = False
 -- | Helper function of @collectPortNames@, which operates on a @PortName@
 -- instead of a TopEntity.
 collectPortNames'
-  :: PortName
+  :: [String]
+  -> PortName
   -> [Identifier]
-collectPortNames' (PortName nm)       = [fromString nm]
-collectPortNames' (PortProduct _ nms) = concatMap collectPortNames' nms
+collectPortNames' prefixes (PortName nm) =
+  let prefixes' = reverse (nm : prefixes) in
+  [fromString (intercalate "_" prefixes')]
+collectPortNames' prefixes (PortProduct "" nms) =
+  concatMap (collectPortNames' prefixes) nms
+collectPortNames' prefixes (PortProduct prefix nms) =
+  concatMap (collectPortNames' (prefix : prefixes)) nms
 
 -- | Recursively get all port names from top entity annotations. The result is
 -- a list of user defined port names, which should not be used by routines
@@ -448,7 +455,7 @@ collectPortNames
   -> [Identifier]
 collectPortNames TestBench {} = []
 collectPortNames Synthesize { t_inputs, t_output } =
-  concatMap collectPortNames' t_inputs ++ collectPortNames' t_output
+  concatMap (collectPortNames' []) t_inputs ++ (collectPortNames' []) t_output
 
 -- | Uniquely rename all the variables and their references in a normalized
 -- term
@@ -709,6 +716,14 @@ portName
 portName [] i = i
 portName x  _ = pack x
 
+-- | Prefix given string before portnames /except/ when this string is empty.
+prefixParent :: String -> PortName -> PortName
+prefixParent ""     p                   = p
+prefixParent parent (PortName p)        = PortName (parent <> "_" <> p)
+prefixParent parent (PortProduct "" ps) = PortProduct parent ps
+prefixParent parent (PortProduct p ps)  = PortProduct (parent <> "_" <> p) ps
+
+
 appendIdentifier
   :: (Identifier,HWType)
   -> Int
@@ -734,6 +749,7 @@ mkInput pM = case pM of
   Nothing -> go
   Just p  -> go' p
   where
+    -- No PortName given, infer names
     go (i,hwty) = do
       i' <- mkUniqueIdentifier Extended i
       let (attrs, hwty') = stripAttributes hwty
@@ -797,6 +813,7 @@ mkInput pM = case pM of
         _ -> return ([(i',hwty)],[],Identifier i' Nothing,i')
 
 
+    -- PortName specified by user
     go' (PortName p) (i,hwty) = do
       pN <- uniquePortName p i
       return ([(pN,hwty)],[],Identifier pN Nothing,pN)
@@ -807,7 +824,7 @@ mkInput pM = case pM of
       case hwty' of
         Vector sz hwty'' -> do
           arguments <- mapM (appendIdentifier (pN,hwty'')) [0..sz-1]
-          (ports,_,exprs,_) <- unzip4 <$> zipWithM mkInput (extendPorts ps) arguments
+          (ports,_,exprs,_) <- unzip4 <$> zipWithM mkInput (extendPorts $ map (prefixParent p) ps) arguments
           let hwty2    = filterVoid hwty''
               netdecl  = NetDecl Nothing pN (Vector sz hwty2)
               vecExpr  = mkVectorChain sz hwty2 exprs
@@ -819,7 +836,7 @@ mkInput pM = case pM of
 
         RTree d hwty'' -> do
           arguments <- mapM (appendIdentifier (pN,hwty'')) [0..2^d-1]
-          (ports,_,exprs,_) <- unzip4 <$> zipWithM mkInput (extendPorts ps) arguments
+          (ports,_,exprs,_) <- unzip4 <$> zipWithM mkInput (extendPorts $ map (prefixParent p) ps) arguments
           let hwty2    = filterVoid hwty''
               netdecl  = NetDecl Nothing pN (RTree d hwty2)
               trExpr   = mkRTreeChain d hwty2 exprs
@@ -831,7 +848,7 @@ mkInput pM = case pM of
 
         Product _ hwtys -> do
           arguments <- zipWithM appendIdentifier (map (pN,) hwtys) [0..]
-          let argumentsBundled   = zip hwtys (zip (extendPorts ps) arguments)
+          let argumentsBundled   = zip hwtys (zip (extendPorts $ map (prefixParent p) ps) arguments)
               argumentsFiltered  = filter (not . isVoid . fst) argumentsBundled
               argumentsFiltered' = unzip (map snd argumentsFiltered)
           (ports,_,exprs,_) <- unzip4 <$> uncurry (zipWithM mkInput) argumentsFiltered'
@@ -854,13 +871,13 @@ mkInput pM = case pM of
         Clock nm rt Gated -> do
           let hwtys = [Clock nm rt Source, Bool]
           arguments <- zipWithM appendIdentifier (map (pN,) hwtys) [0..]
-          (ports,_,exprs,_) <- unzip4 <$> zipWithM mkInput (extendPorts ps) arguments
+          (ports,_,exprs,_) <- unzip4 <$> zipWithM mkInput (extendPorts $ map (prefixParent p) ps) arguments
           let netdecl  = NetDecl Nothing pN hwty
               dcExpr   = DataCon hwty (DC (hwty,0)) exprs
               netassgn = Assignment pN dcExpr
           return (concat ports,[netdecl,netassgn],dcExpr,pN)
 
-        _ -> return ([(pN,hwty)],[],Identifier pN Nothing,pN)
+        _ ->  return ([(pN,hwty)],[],Identifier pN Nothing,pN)
 
 filterVoid
   :: HWType
@@ -1027,7 +1044,7 @@ mkOutput' pM = case pM of
           unless (null attrs)
             (throwAnnotatedSplitError $(curLoc) "Vector")
           results <- mapM (appendIdentifier (pN,hwty'')) [0..sz-1]
-          (ports,decls,ids) <- unzip3 <$> zipWithM mkOutput' (extendPorts ps) results
+          (ports,decls,ids) <- unzip3 <$> zipWithM mkOutput' (extendPorts $ map (prefixParent p) ps) results
           let hwty2   = Vector sz (filterVoid hwty'')
               netdecl = NetDecl Nothing pN hwty2
               assigns = zipWith (assignId pN hwty2 10) ids [0..]
@@ -1037,7 +1054,7 @@ mkOutput' pM = case pM of
           unless (null attrs)
             (throwAnnotatedSplitError $(curLoc) "RTree")
           results <- mapM (appendIdentifier (pN,hwty'')) [0..2^d-1]
-          (ports,decls,ids) <- unzip3 <$> zipWithM mkOutput' (extendPorts ps) results
+          (ports,decls,ids) <- unzip3 <$> zipWithM mkOutput' (extendPorts $ map (prefixParent p) ps) results
           let hwty2   = RTree d (filterVoid hwty'')
               netdecl = NetDecl Nothing pN hwty2
               assigns = zipWith (assignId pN hwty2 10) ids [0..]
@@ -1045,7 +1062,7 @@ mkOutput' pM = case pM of
 
         Product _ hwtys -> do
           results <- zipWithM appendIdentifier (map (pN,) hwtys) [0..]
-          let resultsBundled   = zip hwtys (zip (extendPorts ps) results)
+          let resultsBundled   = zip hwtys (zip (extendPorts $ map (prefixParent p) ps) results)
               resultsFiltered  = filter (not . isVoid . fst) resultsBundled
               resultsFiltered' = unzip (map snd resultsFiltered)
           (ports,decls,ids) <- unzip3 <$> uncurry (zipWithM mkOutput') resultsFiltered'
