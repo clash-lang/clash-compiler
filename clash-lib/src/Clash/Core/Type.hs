@@ -488,18 +488,18 @@ reduceTypeFamily tcm (tyView -> TyConApp tc tys)
     in  if i1 <= i2 then Just (mkTyConApp trueTc [] )
                     else Just (mkTyConApp falseTc [])
 
-  | name2String tc == "GHC.TypeLits.Extra.FLog"
+  | name2String tc `elem` ["GHC.TypeLits.Extra.FLog", "GHC.TypeNats.FLog"]
   , [i1, i2] <- mapMaybe (litView tcm) tys
   , i1 > 1
   , i2 > 0
   = Just (LitTy (NumTy (smallInteger (integerLogBase# i1 i2))))
 
-  | name2String tc == "GHC.TypeLits.Extra.CLog"
+  | name2String tc `elem` ["GHC.TypeLits.Extra.CLog", "GHC.TypeNats.CLog"]
   , [i1, i2] <- mapMaybe (litView tcm) tys
   , Just k <- clogBase i1 i2
   = Just (LitTy (NumTy (toInteger k)))
 
-  | name2String tc == "GHC.TypeLits.Extra.Log"
+  | name2String tc `elem` ["GHC.TypeLits.Extra.Log", "GHC.TypeNats.Log"]
   , [i1, i2] <- mapMaybe (litView tcm) tys
   , i1 > 1
   , i2 > 0
@@ -512,20 +512,20 @@ reduceTypeFamily tcm (tyView -> TyConApp tc tys)
                    else Just (LitTy (NumTy (smallInteger z1)))
 
 
-  | name2String tc == "GHC.TypeLits.Extra.GCD"
+  | name2String tc `elem` ["GHC.TypeLits.Extra.GCD", "GHC.TypeNats.GCD"]
   , [i1, i2] <- mapMaybe (litView tcm) tys
   = Just (LitTy (NumTy (i1 `gcd` i2)))
 
-  | name2String tc == "GHC.TypeLits.Extra.LCM"
+  | name2String tc `elem` ["GHC.TypeLits.Extra.LCM", "GHC.TypeNats.LCM"]
   , [i1, i2] <- mapMaybe (litView tcm) tys
   = Just (LitTy (NumTy (i1 `lcm` i2)))
 
-  | name2String tc == "GHC.TypeLits.Extra.Div"
+  | name2String tc `elem` ["GHC.TypeLits.Extra.Div", "GHC.TypeNats.Div"]
   , [i1, i2] <- mapMaybe (litView tcm) tys
   , i2 > 0
   = Just (LitTy (NumTy (i1 `div` i2)))
 
-  | name2String tc == "GHC.TypeLits.Extra.Mod"
+  | name2String tc `elem` ["GHC.TypeLits.Extra.Mod", "GHC.TypeNats.Mod"]
   , [i1, i2] <- mapMaybe (litView tcm) tys
   , i2 > 0
   = Just (LitTy (NumTy (i1 `mod` i2)))
