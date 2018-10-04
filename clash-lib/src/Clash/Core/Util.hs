@@ -464,4 +464,4 @@ tyNatSize :: HMS.HashMap TyConOccName TyCon
           -> Except String Integer
 tyNatSize m (coreView m -> Just ty) = tyNatSize m ty
 tyNatSize _ (LitTy (NumTy i))       = return i
-tyNatSize _ ty = throwE $ $(curLoc) ++ "Cannot reduce an integer: " ++ show ty
+tyNatSize _ ty = throwE $ $(curLoc) ++ "Cannot reduce to an integer:\n" ++ showDoc ty
