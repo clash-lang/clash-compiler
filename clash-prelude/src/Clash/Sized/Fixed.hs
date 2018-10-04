@@ -963,3 +963,11 @@ instance (NumFixedC rep int frac, Integral (rep (int + frac))) =>
      nF        = fracShift f
      denom     = 1 `shiftL` nF
      nom       = toInteger fRep
+
+instance (FracFixedC rep int frac, NumFixedC rep int frac, Integral (rep (int + frac))) =>
+         RealFrac (Fixed rep int frac) where
+  properFraction f@(Fixed fRep) = (fromIntegral whole, fract)
+    where
+      whole = (fRep `shiftR` fracShift f) + offset
+      fract = Fixed $ fRep - (whole `shiftL` fracShift f)
+      offset = if f < 0 then 1 else 0
