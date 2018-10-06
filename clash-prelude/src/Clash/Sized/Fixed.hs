@@ -429,6 +429,7 @@ type NumFixedC rep int frac
     , BitPack (rep (int + frac))
     , Enum    (rep (int + frac))
     , Bits    (rep (int + frac))
+    , Ord     (rep (int + frac))
     , Resize  rep
     , KnownNat int
     , KnownNat frac
@@ -464,7 +465,10 @@ instance (NumFixedC rep int frac) => Num (Fixed rep int frac) where
   (-)              = boundedSub
   negate (Fixed a) = Fixed (negate a)
   abs    (Fixed a) = Fixed (abs a)
-  signum (Fixed a) = Fixed (signum a)
+  signum (Fixed a)
+    | a == 0       = 0
+    | a <  0       = -1
+    | otherwise    = 1
   fromInteger i    = let fSH = fromInteger (natVal (Proxy @frac))
                          res = Fixed (fromInteger i `shiftL` fSH)
                      in  res
