@@ -60,6 +60,7 @@ module Clash.Sized.RTree
 where
 
 import Control.Applicative         (liftA2)
+import Control.DeepSeq             (NFData(..))
 import qualified Control.Lens      as Lens
 import Data.Default.Class          (Default (..))
 import Data.Foldable               (toList)
@@ -109,6 +110,10 @@ let populationCount' :: (KnownNat k, KnownNat (2^k)) => BitVector (2^k) -> Index
 data RTree :: Nat -> Type -> Type where
   LR_ :: a -> RTree 0 a
   BR_ :: RTree d a -> RTree d a -> RTree (d+1) a
+
+instance NFData a => NFData (RTree d a) where
+    rnf (LR_ x) = rnf x
+    rnf (BR_ l r ) = rnf l `seq` rnf r
 
 textract :: RTree 0 a -> a
 textract (LR_ x) = x
