@@ -13,10 +13,6 @@ cabal new-build -w ${HC} --disable-tests --disable-benchmarks all
 # Build with installed constraints for packages in global-db
 if $INSTALLED; then echo cabal new-build -w ${HC} --disable-tests --disable-benchmarks $(${HCPKG} list --global --simple-output --names-only | sed 's/\([a-zA-Z0-9-]\{1,\}\) */--constraint="\1 installed" /g') all | sh; else echo "Not building with installed constraints"; fi
 
-# build & run tests, build benchmarks
-cabal new-build -w ${HC} ${TEST} ${BENCH} all
-if [ "x$TEST" = "x--enable-tests" ]; then cabal new-run -w ${HC} -- clash-testsuite -j16; fi
-
 # cabal check
 (cd ${DISTDIR}/clash-lib-* && cabal check)
 (cd ${DISTDIR}/clash-ghc-* && cabal check)
@@ -24,3 +20,4 @@ if [ "x$TEST" = "x--enable-tests" ]; then cabal new-run -w ${HC} -- clash-testsu
 # haddock
 cd ${SRCDIR}
 if $HADDOCK; then cabal new-haddock -w ${HC} ${TEST} ${BENCH} all; else echo "Skipping haddock generation";fi
+set +x

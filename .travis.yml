@@ -6,6 +6,7 @@
 #
 stages:
   - precache
+  - build
   - test
 
 language: c
@@ -56,11 +57,26 @@ jobs:
       env: GHCHEAD=true
       addons: {apt: {packages: [ghc-ppa-tools,cabal-install-head,ghc-head,ghdl,gperf,g++-multilib], sources: [hvr-ghc,pgavin-ghdl]}}
 
+    - &build
+      stage: build
+      compiler: "ghc-8.2.2"
+      addons: {apt: {packages: [ghc-ppa-tools,cabal-install-head,ghc-8.2.2,ghdl,gperf,g++-multilib], sources: [hvr-ghc,pgavin-ghdl]}}
+      script: . ./.travis/script.sh
+
+    - <<: *build
+      compiler: "ghc-8.4.3"
+      addons: {apt: {packages: [ghc-ppa-tools,cabal-install-head,ghc-8.4.3,ghdl,gperf,g++-multilib], sources: [hvr-ghc,pgavin-ghdl]}}
+
+    - <<: *build
+      compiler: "ghc-head"
+      env: GHCHEAD=true
+      addons: {apt: {packages: [ghc-ppa-tools,cabal-install-head,ghc-head,ghdl,gperf,g++-multilib], sources: [hvr-ghc,pgavin-ghdl]}}
+
     - &test
       stage: test
       compiler: "ghc-8.2.2"
       addons: {apt: {packages: [ghc-ppa-tools,cabal-install-head,ghc-8.2.2,ghdl,gperf,g++-multilib], sources: [hvr-ghc,pgavin-ghdl]}}
-      script: . ./.travis/script.sh
+      script: . ./.travis/script_test.sh
 
     - <<: *test
       compiler: "ghc-8.4.3"
@@ -86,6 +102,7 @@ before_install:
   - ghdl --version
   - chmod +x ./.travis/install_iverilog.sh
   - chmod +x ./.travis/script.sh
+  - chmod +x ./.travis/script_test.sh
   - ./.travis/install_iverilog.sh
   - export PATH=$PATH:$HOME/iverilog/bin
   - vvp -V
