@@ -23,6 +23,7 @@ module Clash.Netlist.BlackBox.Types
 
 import                Control.DeepSeq            (NFData)
 import                Data.Binary                (Binary)
+import                Data.Hashable              (Hashable)
 import                Data.Text.Lazy             (Text)
 import qualified      Data.Text                  as S
 import                GHC.Generics               (Generic)
@@ -35,7 +36,7 @@ import {-# SOURCE #-} Clash.Netlist.Types        (BlackBox, Identifier)
 data TemplateKind
   = TDecl
   | TExpr
-  deriving (Show, Eq, Generic, NFData, Binary)
+  deriving (Show, Eq, Generic, NFData, Binary, Hashable)
 
 -- | See @Clash.Primitives.Types.BlackBox@ for documentation on this record's
 -- fields. (They are intentionally renamed to prevent name clashes.)
@@ -120,7 +121,7 @@ data Element = C   !Text         -- ^ Constant
              | Repeat [Element] [Element] -- ^ Repeat <hole> n times
              | DevNull [Element]          -- ^ Evaluate <hole> but swallow output
              | SigD [Element] !(Maybe Int)
-  deriving (Show, Generic, NFData, Binary)
+  deriving (Show, Generic, NFData, Binary, Hashable)
 
 -- | Component instantiation hole. First argument indicates which function argument
 -- to instantiate. Second argument corresponds to output and input assignments,
@@ -130,7 +131,7 @@ data Element = C   !Text         -- ^ Constant
 -- The LHS of the tuple is the name of the signal, while the RHS of the tuple
 -- is the type of the signal
 data Decl = Decl !Int [(BlackBoxTemplate,BlackBoxTemplate)]
-  deriving (Show, Generic, NFData, Binary)
+  deriving (Show, Generic, NFData, Binary, Hashable)
 
 data HdlSyn = Vivado | Quartus | Other
-  deriving (Eq, Show, Read, Generic, NFData, Binary)
+  deriving (Eq, Show, Read, Generic, NFData, Binary, Hashable)

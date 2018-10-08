@@ -329,9 +329,12 @@ data BlackBoxContext
   }
   deriving Show
 
+type BBName = String
+type BBHash = Int
+
 data BlackBox
   = BBTemplate BlackBoxTemplate
-  | BBFunction TemplateFunction
+  | BBFunction BBName BBHash TemplateFunction
   deriving (Generic, NFData, Binary)
 
 data TemplateFunction where
@@ -343,7 +346,8 @@ data TemplateFunction where
 
 instance Show BlackBox where
   show (BBTemplate t)  = show t
-  show (BBFunction {}) = "TemplateFunction"
+  show (BBFunction nm hsh _) =
+    "<TemplateFunction(nm=" ++ show nm ++ ", hash=" ++ show hsh ++ ")>"
 
 instance NFData TemplateFunction where
   rnf (TemplateFunction is f _) = rnf is `seq` f `seq` ()

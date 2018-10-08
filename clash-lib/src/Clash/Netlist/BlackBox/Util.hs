@@ -67,7 +67,7 @@ verifyBlackBoxContext
   -> N.BlackBox
   -- ^ Template to check against
   -> Bool
-verifyBlackBoxContext bbCtx (N.BBFunction (N.TemplateFunction _ f _)) = f bbCtx
+verifyBlackBoxContext bbCtx (N.BBFunction _ _ (N.TemplateFunction _ f _)) = f bbCtx
 verifyBlackBoxContext bbCtx (N.BBTemplate t) = all verify' t
   where
     verify' (I _ n)         = n < length (bbInputs bbCtx)
@@ -202,7 +202,7 @@ renderBlackBox libs imps includes bb bbCtx = do
     forM includes $ \((nm,_),inc) -> do
       let bbCtx' = bbCtx {bbQsysIncName = nms'}
       incForHash <- onBlackBox (renderTemplate bbCtx')
-                               (\(N.TemplateFunction _ _ f) -> do
+                               (\_name _hash (N.TemplateFunction _ _ f) -> do
                                   t <- f bbCtx'
                                   let t' = renderLazy (layoutPretty layout t)
                                   return (const t'))
@@ -221,12 +221,12 @@ renderBlackBox libs imps includes bb bbCtx = do
         N.BBTemplate bt   -> do
           t <- renderTemplate bbNamedCtx bt
           return (\col -> PP.nest (col-2) (PP.pretty (t (col + 2))))
-        N.BBFunction (N.TemplateFunction _ _ bf)  -> do
+        N.BBFunction _ _ (N.TemplateFunction _ _ bf)  -> do
           t <- bf bbNamedCtx
           return (\_ -> t)
 
   incs' <- mapM (onBlackBox (fmap (PP.pretty . ($ 0)) . renderTemplate bbNamedCtx)
-                            (\(N.TemplateFunction _ _ f) -> f bbNamedCtx))
+                            (\_name _hash (N.TemplateFunction _ _ f) -> f bbNamedCtx))
                 incs
   libs' <- mapM (fmap ($ 0) . renderTemplate bbNamedCtx) libs
   imps' <- mapM (fmap ($ 0) . renderTemplate bbNamedCtx) imps
@@ -730,7 +730,7 @@ prettyElem (Template bbname source) = do
 
 usedArguments :: N.BlackBox
               -> [Int]
-usedArguments (N.BBFunction (N.TemplateFunction k _ _)) = k
+usedArguments (N.BBFunction _nm _hsh (N.TemplateFunction k _ _)) = k
 usedArguments (N.BBTemplate t) = nub (concatMap go t)
   where
     go x = case x of
@@ -752,8 +752,8 @@ usedArguments (N.BBTemplate t) = nub (concatMap go t)
 
 onBlackBox
   :: (BlackBoxTemplate -> r)
-  -> (N.TemplateFunction -> r)
+  -> (N.BBName -> N.BBHash -> N.TemplateFunction -> r)
   -> N.BlackBox
   -> r
 onBlackBox f _ (N.BBTemplate t) = f t
-onBlackBox _ g (N.BBFunction t) = g t
+onBlackBox _ g (N.BBFunction n h t) = g n h t

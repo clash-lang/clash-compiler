@@ -42,6 +42,7 @@ import qualified Data.Time.Clock                  as Clock
 import qualified Language.Haskell.Interpreter     as Hint
 import qualified Language.Haskell.Interpreter.Unsafe as Hint
 import qualified System.Directory                 as Directory
+import           System.Environment               (getExecutablePath)
 import           System.FilePath                  ((</>), (<.>))
 import qualified System.FilePath                  as FilePath
 import qualified System.IO                        as IO
@@ -76,8 +77,12 @@ import           Clash.Normalize                  (checkNonRecursive, cleanupGra
                                                    normalize, runNormalization)
 import           Clash.Normalize.Util             (callGraph)
 import           Clash.Primitives.Types
+import           Clash.Primitives.Util            (hashCompiledPrimMap)
 import           Clash.Util                       (first)
 
+-- | Get modification data of current clash binary.
+getClashModificationDate :: IO Clock.UTCTime
+getClashModificationDate = Directory.getModificationTime =<< getExecutablePath
 
 -- | Create a set of target HDL files for a set of functions
 generateHDL
@@ -156,12 +161,34 @@ generateHDL reprs bindingsMap hdlState primMap tcm tupTcm typeTrans eval topEnti
 
   -- Calculate the hash over the callgraph and the topEntity annotation
   (sameTopHash,sameBenchHash,manifest) <- do
-    let topHash    = hash (annM,callGraphBindings bindingsMap (nameOcc topEntity))
-        benchHashM = fmap (hash . (annM,) . callGraphBindings bindingsMap . nameOcc) benchM
-        manifestI  = Manifest (topHash,benchHashM) [] [] [] [] []
-        manFile    = case annM of
-                       Nothing -> hdlDir </> topNmU <.> "manifest"
-                       _       -> hdlDir </> topNmU </> topNmU <.> "manifest"
+    clashModDate <- getClashModificationDate
+
+    let primMapHash = hashCompiledPrimMap primMap
+
+    let
+      topHash =
+        hash ( annM
+             , primMapHash
+             , show clashModDate
+             , callGraphBindings bindingsMap (nameOcc topEntity)
+             )
+
+    let
+      benchHashM =
+        case benchM of
+          Nothing -> Nothing
+          Just bench ->
+            let terms = callGraphBindings bindingsMap (nameOcc bench) in
+            Just (hash (annM, primMapHash, show clashModDate, terms))
+
+    let manifestI  = Manifest (topHash,benchHashM) [] [] [] [] []
+
+    let
+      manFile =
+        case annM of
+          Nothing -> hdlDir </> topNmU <.> "manifest"
+          _       -> hdlDir </> topNmU </> topNmU <.> "manifest"
+
     manM <- if not (opt_cachehdl opts)
             then return Nothing -- ignore manifest file because -fclash-nocache
             else (>>= readMaybe) . either (const Nothing) Just <$>
@@ -271,7 +298,11 @@ compilePrimitive pkgDbs topDir (BlackBoxHaskell bbName bbGenName source) = do
   let interpreterArgs = concatMap (("-package-db":) . (:[])) pkgDbs
   -- Compile a blackbox template function or fetch it from an already compiled file.
   r <- Hint.unsafeRunInterpreterWithArgsLibdir interpreterArgs topDir (go source)
-  processHintError (show bbGenName) bbName (BlackBoxHaskell bbName bbGenName) r
+  processHintError
+    (show bbGenName)
+    bbName
+    (\bbFunc -> BlackBoxHaskell bbName bbGenName (hash source, bbFunc))
+    r
   where
     qualMod = intercalate "." modNames
     BlackBoxFunctionName modNames funcName = bbGenName
@@ -345,14 +376,16 @@ compilePrimitive pkgDbs topDir (BlackBox pNm tkind oReg libM imps incs templ) = 
         Hint.loadModules [qualMod]
         Hint.setImports [ "Clash.Netlist.Types" , qualMod ]
         Hint.unsafeInterpret funcName "TemplateFunction"
-    processHintError (show bbGenName) pNm BBFunction r
+    let hsh = hash (qualMod, source)
+    processHintError (show bbGenName) pNm (BBFunction (Data.Text.unpack pNm) hsh) r
   parseBB ((THaskell,bbGenName),Nothing) = do
     let BlackBoxFunctionName modNames funcName = bbGenName
         qualMod = intercalate "." modNames
+        hsh     = hash qualMod
     r <- Hint.unsafeRunInterpreterWithArgsLibdir interpreterArgs topDir $ do
       Hint.setImports [ "Clash.Netlist.Types" , qualMod ]
       Hint.unsafeInterpret funcName "TemplateFunction"
-    processHintError (show bbGenName) pNm BBFunction r
+    processHintError (show bbGenName) pNm (BBFunction (Data.Text.unpack pNm) hsh) r
 
 compilePrimitive _ _ (Primitive pNm typ) =
   return $ Primitive pNm typ

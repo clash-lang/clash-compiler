@@ -34,7 +34,7 @@ module Clash.Primitives.Types
 
 import {-# SOURCE #-} Clash.Netlist.Types
 import           Clash.Netlist.BlackBox.Types
-  (BlackBoxTemplate, BlackBoxFunction, TemplateKind (..))
+  (BlackBoxFunction, BlackBoxTemplate, TemplateKind (..))
 import           Control.Applicative          ((<|>))
 import           Control.DeepSeq              (NFData)
 import           Data.Aeson
@@ -42,7 +42,7 @@ import           Data.Aeson
 import           Data.Binary                  (Binary)
 import           Data.Char                    (isUpper, isLower, isAlphaNum)
 import           Data.Either                  (lefts)
-import           Data.HashMap.Lazy            (HashMap)
+import           Data.Hashable                (Hashable)
 import qualified Data.HashMap.Strict          as H
 import           Data.List                    (intercalate)
 import qualified Data.Text                    as S
@@ -59,18 +59,19 @@ type ResolvedPrimitive = Primitive Text ((TemplateFormat,BlackBoxFunctionName),M
 type ResolvedPrimMap   = PrimMap ResolvedPrimitive
 
 -- | A compiled primitive has compiled all templates and functions from its
--- @ResolvedPrimitive@ counterpart.
-type CompiledPrimitive = Primitive BlackBoxTemplate BlackBox BlackBoxFunction
+-- @ResolvedPrimitive@ counterpart. The Int in the tuple is a hash of the
+-- (uncompiled) BlackBoxFunction.
+type CompiledPrimitive = Primitive BlackBoxTemplate BlackBox (Int, BlackBoxFunction)
 type CompiledPrimMap   = PrimMap CompiledPrimitive
 
 -- | A @PrimMap@ maps primitive names to a @Primitive@
-type PrimMap a = HashMap S.Text a
+type PrimMap a = H.HashMap S.Text a
 
 -- | A BBFN is a parsed version of a fully qualified function name. It is
 -- guaranteed to have at least one module name which is not /Main/.
 data BlackBoxFunctionName =
   BlackBoxFunctionName [String] String
-    deriving (Eq, Generic, NFData, Binary)
+    deriving (Eq, Generic, NFData, Binary, Hashable)
 
 instance Show BlackBoxFunctionName where
   show (BlackBoxFunctionName mods funcName) =
@@ -124,7 +125,7 @@ data TemplateSource
 data TemplateFormat
   = TTemplate
   | THaskell
-  deriving Show
+  deriving (Show, Generic, Hashable)
 
 -- | Externally defined primitive
 data Primitive a b c
@@ -165,7 +166,7 @@ data Primitive a b c
   , primType :: !Text
     -- ^ Additional information
   }
-  deriving (Show, Generic, NFData, Binary)
+  deriving (Show, Generic, NFData, Binary, Hashable, Functor)
 
 instance FromJSON UnresolvedPrimitive where
   parseJSON (Object v) =

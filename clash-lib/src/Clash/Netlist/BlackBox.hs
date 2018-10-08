@@ -103,14 +103,16 @@ prepareBlackBox
 prepareBlackBox pNm templ bbCtx =
   if verifyBlackBoxContext bbCtx templ
      then do
-        (t2,decls) <- onBlackBox (fmap (first BBTemplate) . setSym bbCtx)
-                                 (pure . (,[]) . BBFunction)
-                                 templ
+        (t2,decls) <-
+          onBlackBox
+            (fmap (first BBTemplate) . setSym bbCtx)
+            (\bbName bbHash bbFunc -> pure (BBFunction bbName bbHash bbFunc, []))
+            templ
         return (t2,decls)
      else do
        (_,sp) <- Lens.use curCompNm
        templ' <- onBlackBox (getMon . prettyBlackBox)
-                            (const (pure "TemplateFunction"))
+                            (\n h f -> return $ Text.pack $ show (BBFunction n h f))
                             templ
        let msg = $(curLoc) ++ "Can't match template for " ++ show pNm ++ " :\n\n" ++ Text.unpack templ' ++
                 "\n\nwith context:\n\n" ++ show bbCtx
@@ -178,22 +180,6 @@ mkPrimitive bbEParen bbEasD dst nm args ty = do
   where
     go =
       \case
-        Just (P.BlackBoxHaskell bbName funcName func) ->
-          case func bbEasD dst nm args ty of
-            Left err -> do
-              -- Blackbox template function returned an error:
-              let err' = unwords [ $(curLoc) ++ "Could not create blackbox"
-                                 , "template using", show funcName, "for"
-                                 , show bbName ++ ".", "Function reported: \n\n"
-                                 , err ]
-              (_,sp) <- Lens.use curCompNm
-              throw (ClashException sp err' Nothing)
-            Right ((BlackBoxMeta {..}), bbTemplate) ->
-              -- Blackbox template generation succesful. Rerun 'go', but this time
-              -- around with a 'normal' @BlackBox@
-              go (Just (P.BlackBox bbName bbKind bbOutputReg bbLibrary bbImports bbIncludes bbTemplate))
-              -- let bb = P.BlackBox bbName bbKind bbOutputReg bbLibrary bbImports bbIncludes in
-              -- go $ Just $ bb $ (const bbTemplate) <$> func
         Just p@(P.BlackBox {outputReg = wr}) -> do
           case kind p of
             TDecl -> do
@@ -383,22 +369,24 @@ mkFunInput resId e = do
             _ -> error $ $(curLoc) ++ "Cannot make function input for: " ++ showDoc e
   case templ of
     Left (TDecl,oreg,libs,imps,inc,_,templ') -> do
-      (l',templDecl)  <- onBlackBox (fmap (first BBTemplate) . setSym bbCtx)
-                                    (pure . (,[]) . BBFunction)
-                                    templ'
+      (l',templDecl)
+        <- onBlackBox
+            (fmap (first BBTemplate) . setSym bbCtx)
+            (\bbName bbHash bbFunc -> pure $ (BBFunction bbName bbHash bbFunc, []))
+            templ'
       return ((Left l',if oreg then Reg else Wire,libs,imps,inc,bbCtx),dcls ++ templDecl)
     Left (TExpr,_,libs,imps,inc,nm,templ') -> do
       onBlackBox
         (\t -> do t' <- getMon (prettyBlackBox t)
                   let assn = Assignment (pack "~RESULT") (Identifier t' Nothing)
                   return ((Right ("",[assn]),Wire,libs,imps,inc,bbCtx),dcls))
-        (\(TemplateFunction k g _) -> do
+        (\bbName bbHash (TemplateFunction k g _) -> do
           let f' bbCtx' = do
                 let assn = Assignment (pack "~RESULT")
                             (BlackBoxE nm libs imps inc templ' bbCtx' False)
                 p <- getMon (Backend.blockDecl "" [assn])
                 return p
-          return ((Left (BBFunction (TemplateFunction k g f'))
+          return ((Left (BBFunction bbName bbHash (TemplateFunction k g f'))
                   ,Wire
                   ,[]
                   ,[]

@@ -9,14 +9,17 @@
 -}
 
 {-# LANGUAGE RecordWildCards #-}
+{-# LANGUAGE NamedFieldPuns  #-}
 
-module Clash.Primitives.Util (generatePrimMap) where
+module Clash.Primitives.Util (generatePrimMap, hashCompiledPrimMap) where
 
 import           Data.Aeson.Extra       (decodeOrErr)
 import qualified Data.ByteString.Lazy   as LZ
 import qualified Data.HashMap.Lazy      as HashMap
+import qualified Data.HashMap.Strict    as HashMapStrict
 import           Data.Maybe             (fromMaybe)
-import           Data.List              (isSuffixOf)
+import           Data.Hashable          (hash)
+import           Data.List              (isSuffixOf, sort)
 import           Data.Text.Lazy         (Text)
 import qualified Data.Text.Lazy.IO      as T
 import           Data.Traversable       (mapM)
@@ -26,6 +29,27 @@ import qualified System.FilePath        as FilePath
 import           System.IO.Error        (tryIOError)
 
 import           Clash.Primitives.Types
+import           Clash.Netlist.Types    (BlackBox(..))
+
+hashCompiledPrimitive :: CompiledPrimitive -> Int
+hashCompiledPrimitive (Primitive {name, primType}) = hash (name, primType)
+hashCompiledPrimitive (BlackBoxHaskell {function}) = fst function
+hashCompiledPrimitive (BlackBox {name, kind, outputReg, libraries, imports, includes, template}) =
+  hash (name, kind, outputReg, libraries, imports, includes', hashBlackbox template)
+    where
+      includes' = map (\(nms, bb) -> (nms, hashBlackbox bb)) includes
+      hashBlackbox (BBTemplate bbTemplate) = hash bbTemplate
+      hashBlackbox (BBFunction bbName bbHash _bbFunc) = hash (bbName, bbHash)
+
+-- | Hash a compiled primitive map. It needs a separate function (as opposed to
+-- just 'hash') as it might contain (obviously unhashable) Haskell functions. This
+-- function takes the hash value stored with the function instead.
+hashCompiledPrimMap :: CompiledPrimMap -> Int
+hashCompiledPrimMap cpm = hash (map hashCompiledPrimitive orderedValues)
+  where
+    -- TODO: switch to 'normal' map instead of hashmap?
+    orderedKeys   = sort (HashMap.keys cpm)
+    orderedValues = map (cpm HashMapStrict.!) orderedKeys
 
 resolveTemplateSource
   :: HasCallStack
