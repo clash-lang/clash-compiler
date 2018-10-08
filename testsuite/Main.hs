@@ -174,7 +174,6 @@ main = do
             [ outputTest ("tests" </> "shouldwork" </> "SynthesisAttributes") defBuild [] "Simple"  ([""],"Simple_topEntity",False) "main"
             , outputTest ("tests" </> "shouldwork" </> "SynthesisAttributes") defBuild [] "Product" ([""],"Product_topEntity",False) "main"
             , runTest    ("tests" </> "shouldwork" </> "SynthesisAttributes") defBuild [] "Product" (["", "Product_testBench"],"Product_testBench",True)
-            , runTest    ("tests" </> "shouldwork" </> "SynthesisAttributes") defBuild [] "NewType" ([""],"NewType_topEntity",False)
             , testGroup "Failing" [
                 runFailingTest ("tests" </> "shouldfail" </> "SynthesisAttributes") defBuild [] "ProductInArgs"   (Just "Attempted to split Product into a number of HDL ports.")
               , runFailingTest ("tests" </> "shouldfail" </> "SynthesisAttributes") defBuild [] "ProductInResult" (Just "Attempted to split Product into a number of HDL ports.")
@@ -196,6 +195,7 @@ main = do
             , runTest ("tests" </> "shouldwork" </> "Vector") defBuild [] "FindIndex" (["","FindIndex_testBench"],"FindIndex_testBench",True)
             , runTest ("tests" </> "shouldwork" </> "Vector") defBuild [] "Fold"      (["","Fold_testBench"],"Fold_testBench",True)
             , runTest ("tests" </> "shouldwork" </> "Vector") defBuild [] "Foldr"     (["","Foldr_testBench"],"Foldr_testBench",True)
+            , runTest ("tests" </> "shouldwork" </> "Vector") defBuild [] "FoldrEmpty" (["","FoldrEmpty_testBench"],"FoldrEmpty_testBench",True)
             , runTest ("tests" </> "shouldwork" </> "Vector") defBuild [] "HOClock"   ([""],"HOClock_topEntity",False) -- Broken on GHC 8.0 due to: https://ghc.haskell.org/trac/ghc/ticket/115
             , runTest ("tests" </> "shouldwork" </> "Vector") defBuild [] "HOCon"     ([""],"HOCon_topEntity",False)
             , runTest ("tests" </> "shouldwork" </> "Vector") defBuild [] "HOPrim"    ([""],"HOPrim_topEntity",False)

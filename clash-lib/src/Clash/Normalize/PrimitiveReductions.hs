@@ -290,12 +290,19 @@ mkTravVec vecTc nilCon consCon pureTm apTm fmapTm bTy = go
 -- | Replace an application of the @Clash.Sized.Vector.foldr@ primitive on
 -- vectors of a known length @n@, by the fully unrolled recursive "definition"
 -- of @Clash.Sized.Vector.foldr@
-reduceFoldr :: Integer  -- ^ Length of the vector
-            -> Type -- ^ Element type of the argument vector
-            -> Term -- ^ The function to fold with
-            -> Term -- ^ The starting value
-            -> Term -- ^ The argument vector
-            -> NormalizeSession Term
+reduceFoldr
+  :: Integer
+  -- ^ Length of the vector
+  -> Type
+  -- ^ Element type of the argument vector
+  -> Term
+  -- ^ The function to fold with
+  -> Term
+  -- ^ The starting value
+  -> Term
+  -- ^ The argument vector
+  -> NormalizeSession Term
+reduceFoldr 0 _ _ start _ = changed start
 reduceFoldr n aTy fun start arg = do
     tcm <- Lens.view tcCache
     ty  <- termType tcm arg
@@ -315,11 +322,16 @@ reduceFoldr n aTy fun start arg = do
 -- | Replace an application of the @Clash.Sized.Vector.fold@ primitive on
 -- vectors of a known length @n@, by the fully unrolled recursive "definition"
 -- of @Clash.Sized.Vector.fold@
-reduceFold :: Integer  -- ^ Length of the vector
-           -> Type -- ^ Element type of the argument vector
-           -> Term -- ^ The function to fold with
-           -> Term -- ^ The argument vector
-           -> NormalizeSession Term
+reduceFold
+  :: Integer
+  -- ^ Length of the vector
+  -> Type
+  -- ^ Element type of the argument vector
+  -> Term
+  -- ^ The function to fold with
+  -> Term
+  -- ^ The argument vector
+  -> NormalizeSession Term
 reduceFold n aTy fun arg = do
     tcm <- Lens.view tcCache
     ty  <- termType tcm arg
@@ -345,12 +357,19 @@ reduceFold n aTy fun arg = do
 -- | Replace an application of the @Clash.Sized.Vector.dfold@ primitive on
 -- vectors of a known length @n@, by the fully unrolled recursive "definition"
 -- of @Clash.Sized.Vector.dfold@
-reduceDFold :: Integer  -- ^ Length of the vector
-            -> Type -- ^ Element type of the argument vector
-            -> Term -- ^ Function to fold with
-            -> Term -- ^ Starting value
-            -> Term -- ^ The vector to fold
-            -> NormalizeSession Term
+reduceDFold
+  :: Integer
+  -- ^ Length of the vector
+  -> Type
+  -- ^ Element type of the argument vector
+  -> Term
+  -- ^ Function to fold with
+  -> Term
+  -- ^ Starting value
+  -> Term
+  -- ^ The vector to fold
+  -> NormalizeSession Term
+reduceDFold 0 _ _ start _ = changed start
 reduceDFold n aTy fun start arg = do
     tcm <- Lens.view tcCache
     ty  <- termType tcm arg
