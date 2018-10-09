@@ -151,8 +151,11 @@ import           Clash.GHC.GenerateBindings
 import           Clash.GHC.NetlistTypes
 import           Clash.Netlist.BlackBox.Types (HdlSyn)
 import           Clash.Util (clashLibVersion)
+import qualified Data.HashMap.Strict as HM
 import qualified Data.Time.Clock as Clock
 import qualified Paths_clash_ghc
+
+import           Clash.Annotations.BitRepresentation.Internal (buildCustomReprs)
 
 -----------------------------------------------------------------------------
 
@@ -2012,7 +2015,7 @@ makeHDL backend optsRef srcs = do
                 -- Parsing / compiling primitives:
                 startTime' <- Clock.getCurrentTime
                 let dbs = reverse [p | PackageDB (PkgConfFile p) <- packageDBFlags dflags ]
-                primMap'   <- sequence $ HM.map (Clash.Driver.compilePrimitive dbs) primMap
+                primMap'   <- sequence $ HM.map (Clash.Driver.compilePrimitive dbs (topDir dflags)) primMap
                 prepTime'  <- startTime' `deepseq` primMap' `seq` Clock.getCurrentTime
                 let prepStartDiff' = Clock.diffUTCTime prepTime' startTime'
                 putStrLn $ "Parsing and compiling primitives took " ++ show prepStartDiff'

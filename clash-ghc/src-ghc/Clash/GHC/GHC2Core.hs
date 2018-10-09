@@ -30,6 +30,7 @@ where
 
 -- External Modules
 import           Control.Lens                ((^.), (%~), (&), (%=))
+import           Control.Monad.Fail
 import           Control.Monad.Trans.Class   (lift)
 import           Control.Monad.Trans.Reader  (ReaderT)
 import qualified Control.Monad.Trans.Reader  as Reader

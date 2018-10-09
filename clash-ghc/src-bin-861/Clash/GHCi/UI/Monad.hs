@@ -59,6 +59,7 @@ import Prelude hiding ((<>))
 
 import System.Console.Haskeline (CompletionFunc, InputT)
 import qualified System.Console.Haskeline as Haskeline
+import Control.Monad.Fail
 import Control.Monad.Trans.Class
 import Control.Monad.IO.Class
 import Data.Map.Strict (Map)
@@ -237,6 +238,9 @@ instance Applicative GHCi where
 
 instance Monad GHCi where
   (GHCi m) >>= k  =  GHCi $ \s -> m s >>= \a -> unGHCi (k a) s
+
+instance MonadFail GHCi where
+    fail err = error $ "fail(GHCi): "++err
 
 class HasGhciState m where
     getGHCiState    :: m GHCiState

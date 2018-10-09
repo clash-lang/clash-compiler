@@ -28,8 +28,9 @@ module Clash.Netlist.Types
 where
 
 import Control.DeepSeq
+import Control.Monad.Fail                   (MonadFail(fail))
 import Control.Monad.State                  (State)
-import Control.Monad.State.Strict           (MonadIO, MonadState, StateT)
+import Control.Monad.State.Strict           (MonadIO(liftIO), MonadState, StateT)
 import Data.Bits                            (testBit)
 import Data.Binary                          (Binary(..))
 import Data.Hashable
@@ -63,6 +64,10 @@ import Clash.Annotations.BitRepresentation.Internal
 newtype NetlistMonad a =
   NetlistMonad { runNetlist :: StateT NetlistState IO a }
   deriving newtype (Functor, Monad, Applicative, MonadState NetlistState, MonadIO)
+
+-- This can't be derived since FreshMT lacks an instance
+instance MonadFail NetlistMonad where
+  fail = liftIO . Control.Monad.Fail.fail
 
 -- | State of the NetlistMonad
 data NetlistState

@@ -18,6 +18,7 @@ module Clash.Rewrite.Types where
 import Control.Concurrent.Supply             (Supply, freshId)
 import Control.Lens                          (use, (.=))
 import Control.Monad
+import Control.Monad.Fail
 import Control.Monad.Fix                     (MonadFix (..), fix)
 import Control.Monad.Reader                  (MonadReader (..))
 import Control.Monad.State                   (MonadState (..))
@@ -124,6 +125,9 @@ instance Monad (RewriteMonad extra) where
                           (a,s',w) -> case runR (k a) r s' of
                                         (b,s'',w') -> let w'' = mappend w w'
                                                       in seq w'' (b,s'',w''))
+
+instance MonadFail (RewriteMonad extra) where
+  fail err = error $ "RewriteMonad.fail: "++err
 
 instance MonadState (RewriteState extra) (RewriteMonad extra) where
   get     = R (\_ s -> (s,s,mempty))

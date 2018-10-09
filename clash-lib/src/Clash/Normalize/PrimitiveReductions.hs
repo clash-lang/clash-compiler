@@ -33,6 +33,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TemplateHaskell   #-}
 {-# LANGUAGE ViewPatterns      #-}
+{-# LANGUAGE FlexibleContexts  #-}
 
 module Clash.Normalize.PrimitiveReductions where
 
