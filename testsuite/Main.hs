@@ -453,9 +453,9 @@ runTest'
   -> String
   -> ([String],String,Bool)
   -> [ExtraTestFunc]
-  -> TestTree
+  -> [TestTree]
 runTest' env VHDL extraArgs modName (subdirs, entName, doSim) extraTests =
-  withResource acquire tastyRelease (createTestTrees "VHDL" seqTests)
+  [withResource acquire tastyRelease (createTestTrees "VHDL" seqTests)]
     where
       cwDir   = Unsafe.unsafePerformIO $ Directory.getCurrentDirectory
       vhdlDir = "vhdl"
@@ -476,7 +476,7 @@ runTest' env VHDL extraArgs modName (subdirs, entName, doSim) extraTests =
           ++ [map (\f -> f (cwDir </> env) VHDL vhdlDir modDir modName entName) extraTests]
 
 runTest' env Verilog extraArgs modName (subdirs, entName, doSim) extraTests =
-  withResource acquire tastyRelease (createTestTrees "Verilog" seqTests)
+  [withResource acquire tastyRelease (createTestTrees "Verilog" seqTests)]
     where
       cwDir      = Unsafe.unsafePerformIO $ Directory.getCurrentDirectory
       verilogDir = "verilog"
@@ -490,7 +490,7 @@ runTest' env Verilog extraArgs modName (subdirs, entName, doSim) extraTests =
           ++ map (\f -> f (cwDir </> env) Verilog verilogDir modDir modName entName) extraTests
 
 runTest' env SystemVerilog extraArgs modName (subdirs,entName,doSim) extraTests =
-  withResource acquire tastyRelease (createTestTrees "SystemVerilog" seqTests)
+  [withResource acquire tastyRelease (createTestTrees "SystemVerilog" seqTests)]
     where
       cwDir   = Unsafe.unsafePerformIO $ Directory.getCurrentDirectory
       svDir   = "systemverilog"
@@ -504,12 +504,12 @@ runTest' env SystemVerilog extraArgs modName (subdirs,entName,doSim) extraTests 
           ] ++ [if doSim then [vsim modDir entName] else []]
             ++ [map (\f -> f (cwDir </> env) SystemVerilog svDir modDir modName entName) extraTests]
 
-runTest' env Both extraArgs modName entNameM extraTests = testGroup modName
+runTest' env Both extraArgs modName entNameM extraTests = concat
   [ runTest' env VHDL extraArgs modName entNameM extraTests
   , runTest' env Verilog extraArgs modName entNameM extraTests
   ]
 
-runTest' env All extraArgs modName entNameM extraTests = testGroup modName
+runTest' env All extraArgs modName entNameM extraTests = concat
   [ runTest' env VHDL extraArgs modName entNameM extraTests
   , runTest' env Verilog extraArgs modName entNameM extraTests
   , runTest' env SystemVerilog extraArgs modName entNameM extraTests
@@ -523,7 +523,7 @@ runTest
   -> ([String],String,Bool)
   -> TestTree
 runTest env target extraArgs modName (subdirs,entName,doSim) =
-  runTest' env target extraArgs modName (subdirs,entName,doSim) []
+  testGroup modName (runTest' env target extraArgs modName (subdirs,entName,doSim) [])
 
 runFailingTest'
   :: FilePath
@@ -632,4 +632,5 @@ outputTest
   -> String
   -> TestTree
 outputTest env target extraArgs modName entNameM funcName =
-  runTest' env target extraArgs modName entNameM [outputTest' funcName]
+  let testName = modName ++ " [output test]" in
+  testGroup testName (runTest' env target extraArgs modName entNameM [outputTest' funcName])
