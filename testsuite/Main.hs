@@ -187,8 +187,11 @@ main = do
             [ runTest ("tests" </> "shouldwork" </> "Types") defBuild [] "TypeFamilyReduction" ([""],"TypeFamilyReduction_topEntity",False)
             ]
         , testGroup "TopEntity"
+            -- VHDL tests disabled for now: I can't figure out how to generate a static name whilst retaining the ability to actually test..
             [ runTest ("tests" </> "shouldwork" </> "TopEntity") Verilog [] "PortNames" (["","PortNames_topEntity","PortNames_testBench"],"PortNames_testBench",True)
             , outputTest ("tests" </> "shouldwork" </> "TopEntity") Verilog [] "PortNames" (["","PortNames_topEntity","PortNames_testBench"],"PortNames_testBench",False) "main"
+            , runTest ("tests" </> "shouldwork" </> "TopEntity") Verilog [] "PortProducts" (["","PortProducts_topEntity","PortProducts_testBench"],"PortProducts_testBench",True)
+            , outputTest ("tests" </> "shouldwork" </> "TopEntity") Verilog [] "PortProducts" (["","PortProducts_topEntity","PortProducts_testBench"],"PortProducts_testBench",False) "main"
             ]
         , testGroup "Vector"
             [ runTest ("tests" </> "shouldwork" </> "Vector") defBuild [] "Concat"    (["","Concat_testBench"],"Concat_testBench",True)
