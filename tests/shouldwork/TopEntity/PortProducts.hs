@@ -1,4 +1,4 @@
-module PortNames where
+module PortProducts where
 
 import qualified Prelude as P
 import System.Environment (getArgs)
@@ -10,7 +10,7 @@ import Clash.Explicit.Testbench
 
 {-# ANN topEntity
   (Synthesize
-    { t_name     = "PortNames_topEntity"
+    { t_name     = "PortProducts_topEntity"
     , t_inputs   = [
         ]
     , t_output   = PortProduct "top" [
@@ -27,7 +27,7 @@ topEntity = (pure 0, (pure 1, pure 2))
 -- Simulation test
 {-# ANN testBench
   (Synthesize
-    { t_name     = "PortNames_testBench"
+    { t_name     = "PortProducts_testBench"
     , t_inputs   = [ ]
     , t_output   = PortName "result"
     }) #-}
@@ -49,7 +49,7 @@ assertIn needle haystack
 mainVerilog :: IO ()
 mainVerilog = do
   [modDir, topFile] <- getArgs
-  content <- readFile "verilog/PortNames/PortNames_topEntity/PortNames_topEntity.v"
+  content <- readFile "verilog/PortProducts/PortProducts_topEntity/PortProducts_topEntity.v"
 
   assertIn "top_zero" content
   assertIn "top_sub_one" content
