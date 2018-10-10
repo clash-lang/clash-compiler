@@ -1,4 +1,5 @@
 set -x
+set -e
 # test that source-distributions can be generated
 (cd "./clash-lib" && cabal sdist && cd "..")
 mv "."/clash-lib/dist/clash-lib-*.tar.gz ${DISTDIR}/
@@ -10,4 +11,5 @@ cat cabal.project
 # build & run tests, build benchmarks
 cabal new-build -w ${HC} all
 if [ "x$TEST" = "x--enable-tests" ]; then cabal new-run -w ${HC} -- clash-testsuite -j16; fi
+set +e
 set +x
