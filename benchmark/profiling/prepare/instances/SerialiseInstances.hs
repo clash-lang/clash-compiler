@@ -20,8 +20,6 @@ import qualified Data.HashMap.Strict                          as HM
 type CompiledPrimitive' = CL.Primitive CL.BlackBoxTemplate CL.BlackBox ()
 type CompiledPrimMap' = CL.PrimMap CompiledPrimitive'
 
-deriving instance Functor (CL.Primitive a b)
-
 -- Remove BlackBoxFunctions
 removeBBfunc :: CL.CompiledPrimitive -> CompiledPrimitive'
 removeBBfunc = fmap $ const ()
