@@ -227,7 +227,7 @@ end generate;~FI
 begin
   ~SYM[2](~LENGTH[~TYP[2]]) <= ~ARG[1];
 
-  foldr_loop : for ~GENSYM[i][3] in ~VAR[vec][2]'range generate~IF ~VIVADO ~THEN~IF~SIZE[~TYP[2]]~THEN
+  foldr_loop : for ~GENSYM[i][3] in 0 to (~LENGTH[~TYP[2]] - 1) generate~IF ~VIVADO ~THEN~IF~SIZE[~TYP[2]]~THEN
     signal ~GENSYM[foldr_in][4] : ~TYPEL[~TYP[2]];~ELSE ~FI
   begin~IF~SIZE[~TYP[2]]~THEN
     ~SYM[4] <= fromSLV(~VAR[vec][2](~SYM[3]));~ELSE ~FI

@@ -460,14 +460,21 @@ renderTag b (Err Nothing)   = fmap renderOneLine . getMon . hdlTypeErrValue . sn
 renderTag b (Err (Just n))  = let (_,ty,_) = bbInputs b !! n
                               in  renderOneLine <$> getMon (hdlTypeErrValue ty)
 renderTag b (Size e)        = return . Text.pack . show . typeSize $ lineToType b [e]
-renderTag b (Length e)      = return . Text.pack . show . vecLen $ lineToType b [e]
+
+renderTag b (Length e) = return . Text.pack . show . vecLen $ lineToType b [e]
   where
-    vecLen (Vector n _) = n
-    vecLen _            = error $ $(curLoc) ++ "vecLen of a non-vector type"
-renderTag b (Depth e)      = return . Text.pack . show . treeDepth $ lineToType b [e]
+    vecLen (Vector n _)               = n
+    vecLen (Void (Just (Vector n _))) = n
+    vecLen thing =
+      error $ $(curLoc) ++ "vecLen of a non-vector type: " ++ show thing
+
+renderTag b (Depth e) = return . Text.pack . show . treeDepth $ lineToType b [e]
   where
-    treeDepth (RTree n _) = n
-    treeDepth _           = error $ $(curLoc) ++ "treeDepth of a non-tree type"
+    treeDepth (RTree n _)               = n
+    treeDepth (Void (Just (RTree n _))) = n
+    treeDepth thing =
+      error $ $(curLoc) ++ "treeDepth of a non-tree type: " ++ show thing
+
 renderTag b e@(TypElem _)   = let ty = lineToType b [e]
                               in  renderOneLine <$> getMon (hdlType Internal ty)
 renderTag _ (Gen b)         = renderOneLine <$> genStmt b
