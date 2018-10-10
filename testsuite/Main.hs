@@ -215,6 +215,7 @@ main = do
             , runTest ("tests" </> "shouldwork" </> "Vector") defBuild [] "ToList"    (["","ToList_testBench"],"ToList_testBench",True)
             , runTest ("tests" </> "shouldwork" </> "Vector") defBuild [] "Unconcat"  (["","Unconcat_testBench"],"Unconcat_testBench",True)
             , runTest ("tests" </> "shouldwork" </> "Vector") defBuild [] "VACC"      ([""],"VACC_topEntity",False)
+            , runTest ("tests" </> "shouldwork" </> "Vector") defBuild [] "VEmpty"    (["", "VEmpty_testBench"],"VEmpty_testBench",True)
             , runTest ("tests" </> "shouldwork" </> "Vector") defBuild [] "VIndex"    ([""],"VIndex_topEntity",False)
             , runTest ("tests" </> "shouldwork" </> "Vector") defBuild [] "VFold"     (["","VFold_testBench"],"VFold_testBench",True)
             , runTest ("tests" </> "shouldwork" </> "Vector") defBuild [] "VMapAccum" ([""],"VMapAccum_topEntity",False)
