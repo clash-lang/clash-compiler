@@ -116,11 +116,13 @@ instance NFData a => NFData (RTree d a) where
     rnf (BR_ l r ) = rnf l `seq` rnf r
 
 textract :: RTree 0 a -> a
-textract (LR_ x) = x
+textract (LR_ x)   = x
+textract (BR_ _ _) = error $ "textract: nodes hold no values"
 {-# NOINLINE textract #-}
 
 tsplit :: RTree (d+1) a -> (RTree d a,RTree d a)
 tsplit (BR_ l r) = (l,r)
+tsplit (LR_ _)   = error $ "tsplit: leaf is atomic"
 {-# NOINLINE tsplit #-}
 
 -- | Leaf of a perfect depth tree

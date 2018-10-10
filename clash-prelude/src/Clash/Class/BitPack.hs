@@ -48,8 +48,7 @@ import Clash.Class.Resize             (zeroExtend)
 import Clash.Sized.BitVector
   (Bit, BitVector, (++#), high, low)
 import Clash.Sized.Internal.BitVector
-  (BitVector (BV), pack#, split#, checkUnpackUndef, undefError, undefined#,
-   unpack#, unsafeToInteger)
+  (pack#, split#, checkUnpackUndef, undefined#, unpack#, unsafeToInteger)
 
 {- $setup
 >>> :set -XDataKinds

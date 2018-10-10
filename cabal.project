@@ -7,8 +7,8 @@ packages:
   ./clash-prelude/*.cabal,
   ./testsuite/*.cabal,
   ./benchmark/*.cabal
-   ./benchmark/profiling/prepare/*.cabal
-   ./benchmark/profiling/run/*.cabal
+  ./benchmark/profiling/prepare/*.cabal
+  ./benchmark/profiling/run/*.cabal
 
 allow-newer: *:Cabal, *:array, *:base, *:binary, *:^bytestring, *:containers,
   *:deepseq, *:directory, *:filepath, *:ghc, *:ghc-boot, *:ghc-boot-th,

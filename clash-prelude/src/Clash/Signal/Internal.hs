@@ -224,9 +224,6 @@ of the second argument is evaluated as soon as the tail of the result is evaluat
 -- Is currently treated as 'id' by the Clash compiler.
 joinSignal# :: Signal domain (Signal domain a) -> Signal domain a
 joinSignal# ~(xs :- xss) = head# xs :- joinSignal# (mapSignal# tail# xss)
-  where
-    head# (x' :- _ )  = x'
-    tail# (_  :- xs') = xs'
 
 instance Num a => Num (Signal domain a) where
   (+)         = liftA2 (+)
