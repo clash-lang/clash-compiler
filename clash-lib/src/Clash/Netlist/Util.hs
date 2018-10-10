@@ -30,6 +30,7 @@ import           Data.List               (intersperse, unzip4, sort, intercalate
 import qualified Data.List               as List
 import           Data.Maybe              (catMaybes,fromMaybe)
 import           Text.Printf             (printf)
+import           Data.Semigroup          ((<>))
 import           Data.Text               (Text)
 import qualified Data.Text               as Text
 import           Data.Text.Prettyprint.Doc (Doc)
