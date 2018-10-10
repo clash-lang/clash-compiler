@@ -185,6 +185,8 @@ powUNat x (USucc y) = mulUNat x (powUNat x y)
 -- __NB__: Not synthesisable
 predUNat :: UNat (n+1) -> UNat n
 predUNat (USucc x) = x
+predUNat UZero     =
+  error "predUNat: impossible: 0 minus 1, -1 is not a natural number"
 
 -- | Subtract two unary-encoded natural numbers
 --
@@ -192,7 +194,7 @@ predUNat (USucc x) = x
 subUNat :: UNat (m+n) -> UNat n -> UNat m
 subUNat x         UZero     = x
 subUNat (USucc x) (USucc y) = subUNat x y
-subUNat UZero     _         = error "impossible: 0 + (n + 1) ~ 0"
+subUNat UZero     _         = error "subUNat: impossible: 0 + (n + 1) ~ 0"
 
 -- | Add two singleton natural numbers
 addSNat :: SNat a -> SNat b -> SNat (a+b)
@@ -393,22 +395,23 @@ predBNat (B0 x) = B1 (predBNat x)
 div2BNat :: BNat (2*n) -> BNat n
 div2BNat BT     = BT
 div2BNat (B0 x) = x
-div2BNat (B1 _) = error "impossible: 2*n ~ 2*n+1"
+div2BNat (B1 _) = error "div2BNat: impossible: 2*n ~ 2*n+1"
 
 -- | Subtract 1 and divide a base-2 encoded natural number by 2
 --
 -- __NB__: Not synthesisable
 div2Sub1BNat :: BNat (2*n+1) -> BNat n
 div2Sub1BNat (B1 x) = x
-div2Sub1BNat _      = error "impossible: 2*n+1 ~ 2*n"
+div2Sub1BNat _      = error "div2Sub1BNat: impossible: 2*n+1 ~ 2*n"
 
 -- | Get the log2 of a base-2 encoded natural number
 --
 -- __NB__: Not synthesisable
 log2BNat :: BNat (2^n) -> BNat n
+log2BNat BT = error "log2BNat: log2(0) not defined"
 log2BNat (B1 x) = case stripZeros x of
   BT -> BT
-  _  -> error "impossible: 2^n ~ 2x+1"
+  _  -> error "log2BNat: impossible: 2^n ~ 2x+1"
 log2BNat (B0 x) = succBNat (log2BNat x)
 
 -- | Strip non-contributing zero's from a base-2 encoded natural number
