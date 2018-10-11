@@ -57,7 +57,7 @@ end generate;
     , "type"      : "concat :: Vec n (Vec m a) -> Vec (n * m) a"
     , "template"  :
 "-- concat begin
-~GENSYM[concat][0] : for ~GENSYM[i][1] in ~VAR[vec][0]'range generate
+~GENSYM[concat][0] : for ~GENSYM[i][1] in 0 to (~LENGTH[~TYP[0]] - 1) generate
 begin~IF ~VIVADO ~THEN
 ~RESULT(~SYM[1] * ~LENGTH[~TYPEL[~TYP[0]]] to ((~SYM[1]+1) * ~LENGTH[~TYPEL[~TYP[0]]]) - 1) <= fromSLV(~VAR[vec][0](~SYM[1]));~ELSE
 ~RESULT(~SYM[1] * ~LENGTH[~TYPEL[~TYP[0]]] to ((~SYM[1]+1) * ~LENGTH[~TYPEL[~TYP[0]]]) - 1) <= ~VAR[vec][0](~SYM[1]);~FI
@@ -272,7 +272,7 @@ end block;~ELSE
   constant ~GENSYM[levels][5] : natural := natural (ceil (log2 (real (~LENGTH[~TYP[1]]))));
 begin
   -- put input array into the first half of the intermediate array~IF ~VIVADO ~THEN
-  ~SYM[6] : for ~SYM[7] in ~VAR[vec][1]'range generate
+  ~SYM[6] : for ~SYM[7] in 0 to (~LENGTH[~TYP[1]] - 1) generate
     ~SYM[3](~SYM[7]) <= fromSLV(~VAR[vec][1](~SYM[7]));
   end generate;~ELSE
   ~SYM[3](0 to ~LENGTH[~TYP[1]]-1) <= ~VAR[vec][1];~FI
@@ -370,9 +370,9 @@ end block;
     , "type"      : "transpose :: KnownNat n => Vec m (Vec n a) -> Vec n (Vec m a)"
     , "template"  :
 "-- transpose begin
-~GENSYM[transpose_outer][2] : for ~GENSYM[row_index][3] in ~VAR[matrix][1]'range generate
+~GENSYM[transpose_outer][2] : for ~GENSYM[row_index][3] in 0 to (~LENGTH[~TYP[1]] - 1) generate
   ~GENSYM[transpose_inner][4] : for ~GENSYM[col_index][5] in ~RESULT'range generate~IF ~VIVADO ~THEN
-    ~RESULT(~SYM[5])((~VAR[matrix][1]'length-~SYM[3])*~SIZE[~TYPEL[~TYPEL[~TYPO]]]-1 downto (~VAR[matrix][1]'length-~SYM[3]-1)*~SIZE[~TYPEL[~TYPEL[~TYPO]]]) <= ~VAR[vec][1](~SYM[3])((~RESULT'length-~SYM[5])*~SIZE[~TYPEL[~TYPEL[~TYPO]]]-1 downto (~RESULT'length-~SYM[5]-1)*~SIZE[~TYPEL[~TYPEL[~TYPO]]]);~ELSE
+    ~RESULT(~SYM[5])((~LENGTH[~TYP[1]]-~SYM[3])*~SIZE[~TYPEL[~TYPEL[~TYPO]]]-1 downto (~LENGTH[~TYP[1]]-~SYM[3]-1)*~SIZE[~TYPEL[~TYPEL[~TYPO]]]) <= ~VAR[vec][1](~SYM[3])((~RESULT'length-~SYM[5])*~SIZE[~TYPEL[~TYPEL[~TYPO]]]-1 downto (~RESULT'length-~SYM[5]-1)*~SIZE[~TYPEL[~TYPEL[~TYPO]]]);~ELSE
     ~RESULT(~SYM[5])(~SYM[3]) <= ~VAR[matrix][1](~SYM[3])(~SYM[5]);~FI
   end generate;
 end generate;
@@ -385,7 +385,7 @@ end generate;
     , "type"      : "reverse :: Vec n a -> Vec n a"
     , "template"  :
 "-- reverse begin
-~GENSYM[reverse_loop][2] : for ~GENSYM[i][3] in ~VAR[vec][0]'range generate
+~GENSYM[reverse_loop][2] : for ~GENSYM[i][3] in 0 to (~LENGTH[~TYP[0]] - 1) generate
   ~RESULT(~VAR[vec][0]'high - ~SYM[3]) <= ~VAR[vec][0](~SYM[3]);
 end generate;
 -- reverse end"
@@ -400,7 +400,7 @@ end generate;
                   -> BitVector (n * m)"
     , "template" :
 "-- concatBitVector begin
-~GENSYM[concatBitVectorIter_loop][2] : for ~GENSYM[i][3] in ~VAR[vec][2]'range generate
+~GENSYM[concatBitVectorIter_loop][2] : for ~GENSYM[i][3] in 0 to (~LENGTH[~TYP[2]] - 1) generate
   ~RESULT(((~SYM[3] * ~LIT[1]) + ~LIT[1] - 1) downto (~SYM[3] * ~LIT[1])) <= ~TYPMO'(~VAR[vec][2](~VAR[vec][2]'high - ~SYM[3]));
 end generate;
 -- concatBitVector end"
