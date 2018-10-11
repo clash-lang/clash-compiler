@@ -462,7 +462,7 @@ lookupIdSubst doc (Subst inScope tmS _) v
   | Just e <- lookupVarEnv v tmS = e
   -- Vital! See 'IdSubstEnv' Note [Extending the Subst]
   | Just v' <- lookupInScope inScope v = Var (coerce v')
-  | otherwise = WARN (True, "Subst.lookupIdSubst" <+> doc <+> ppr v)
+  | otherwise = WARN(True, "Subst.lookupIdSubst" <+> doc <+> ppr v)
                 Var v
 
 -- | Substitute an 'Id' for another one according to the 'Subst' given,
@@ -530,7 +530,7 @@ substTyWith
   -> Type
   -> Type
 substTyWith tvs tys =
-  ASSERT ( tvs `equalLength` tys )
+  ASSERT( tvs `equalLength` tys )
   substTy (zipTvSubst tvs tys)
 
 -- | Ensure that non of the binders in an expression shadow each-other, nor
