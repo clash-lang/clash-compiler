@@ -60,7 +60,7 @@ import           Clash.Core.Var                   (Id, Var (..))
 import           Clash.Core.VarEnv
   (InScopeSet, VarEnv, eltsVarEnv, emptyVarEnv, extendVarEnv, lookupVarEnv, lookupVarEnv',
     mkVarEnv)
-import           Clash.Driver.Types               (BindingMap)
+import           Clash.Driver.Types               (BindingMap, ClashOpts)
 import           Clash.Netlist.BlackBox
 import           Clash.Netlist.Id
 import           Clash.Netlist.Types              as HW
@@ -71,36 +71,40 @@ import           Clash.Util
 
 -- | Generate a hierarchical netlist out of a set of global binders with
 -- @topEntity@ at the top.
-genNetlist :: CustomReprs
-           -> BindingMap
-           -- ^ Global binders
-           -> InScopeSet
-           -- ^ Superset of global bindings
-           -> [(Id,Maybe TopEntity,Maybe Id)]
-           -- ^ All the TopEntities
-           -> CompiledPrimMap
-           -- ^ Primitive definitions
-           -> TyConMap
-           -- ^ TyCon cache
-           -> (CustomReprs -> TyConMap -> Bool -> Type -> Maybe (Either String HWType))
-           -- ^ Hardcoded Type -> HWType translator
-           -> Int
-           -- ^ Int/Word/Integer bit-width
-           -> (IdType -> Identifier -> Identifier)
-           -- ^ valid identifiers
-           -> (IdType -> Identifier -> Identifier -> Identifier)
-           -- ^ extend valid identifiers
-           -> [Identifier]
-           -- ^ Seen components
-           -> FilePath
-           -- ^ HDL dir
-           -> (Maybe Identifier,Maybe Identifier)
-           -- ^ Component name prefix
-           -> Id
-           -- ^ Name of the @topEntity@
-           -> IO ([(SrcSpan,[Identifier],Component)],[Identifier])
-genNetlist reprs globals is0 tops primMap tcm typeTrans iw mkId extId seen env prefixM topEntity = do
-  (_,s) <- runNetlistMonad reprs globals is0 (mkTopEntityMap tops) primMap tcm typeTrans
+genNetlist
+  :: ClashOpts
+  -- ^ Options Clash was called with
+  -> CustomReprs
+  -- ^ Custom bit representations for certain types
+  -> BindingMap
+  -- ^ Global binders
+  -> InScopeSet
+  -- ^ Superset of global bindings
+  -> [(Id,Maybe TopEntity,Maybe Id)]
+  -- ^ All the TopEntities
+  -> CompiledPrimMap
+  -- ^ Primitive definitions
+  -> TyConMap
+  -- ^ TyCon cache
+  -> (CustomReprs -> TyConMap -> Bool -> Type -> Maybe (Either String HWType))
+  -- ^ Hardcoded Type -> HWType translator
+  -> Int
+  -- ^ Int/Word/Integer bit-width
+  -> (IdType -> Identifier -> Identifier)
+  -- ^ valid identifiers
+  -> (IdType -> Identifier -> Identifier -> Identifier)
+  -- ^ extend valid identifiers
+  -> [Identifier]
+  -- ^ Seen components
+  -> FilePath
+  -- ^ HDL dir
+  -> (Maybe Identifier,Maybe Identifier)
+  -- ^ Component name prefix
+  -> Id
+  -- ^ Name of the @topEntity@
+  -> IO ([(SrcSpan,[Identifier],Component)],[Identifier])
+genNetlist opts reprs globals is0 tops primMap tcm typeTrans iw mkId extId seen env prefixM topEntity = do
+  (_,s) <- runNetlistMonad opts reprs globals is0 (mkTopEntityMap tops) primMap tcm typeTrans
              iw mkId extId seen env prefixM $ genComponent topEntity
   return ( eltsVarEnv $ _components s
          , _seenComps s
@@ -112,39 +116,47 @@ genNetlist reprs globals is0 tops primMap tcm typeTrans iw mkId extId seen env p
     mkTopEntityMap = mkVarEnv . map (\(a,b,_) -> (a,(varType a,b)))
 
 -- | Run a NetlistMonad action in a given environment
-runNetlistMonad :: CustomReprs
-                -> BindingMap
-                -- ^ Global binders
-                -> InScopeSet
-                -- ^ Superset of global bindings
-                -> VarEnv (Type, Maybe TopEntity)
-                -- ^ TopEntity annotations
-                -> CompiledPrimMap
-                -- ^ Primitive Definitions
-                -> TyConMap
-                -- ^ TyCon cache
-                -> (CustomReprs -> TyConMap -> Bool -> Type -> Maybe (Either String HWType))
-                -- ^ Hardcode Type -> HWType translator
-                -> Int
-                -- ^ Int/Word/Integer bit-width
-                -> (IdType -> Identifier -> Identifier)
-                -- ^ valid identifiers
-                -> (IdType -> Identifier -> Identifier -> Identifier)
-                -- ^ extend valid identifiers
-                -> [Identifier]
-                -- ^ Seen components
-                -> FilePath
-                -- ^ HDL dir
-                -> (Maybe Identifier,Maybe Identifier)
-                -- ^ Component name prefix
-                -> NetlistMonad a
-                -- ^ Action to run
-                -> IO (a, NetlistState)
-runNetlistMonad reprs s is0 tops p tcm typeTrans iw mkId extId seenIds_ env prefixM
+runNetlistMonad
+  :: ClashOpts
+  -- ^ Options Clash was called with
+  -> CustomReprs
+  -- ^ Custom bit representations for certain types
+  -> BindingMap
+  -- ^ Global binders
+  -> InScopeSet
+  -- ^ Superset of global bindings
+  -> VarEnv (Type, Maybe TopEntity)
+  -- ^ TopEntity annotations
+  -> CompiledPrimMap
+  -- ^ Primitive Definitions
+  -> TyConMap
+  -- ^ TyCon cache
+  -> (CustomReprs -> TyConMap -> Bool -> Type -> Maybe (Either String HWType))
+  -- ^ Hardcode Type -> HWType translator
+  -> Int
+  -- ^ Int/Word/Integer bit-width
+  -> (IdType -> Identifier -> Identifier)
+  -- ^ valid identifiers
+  -> (IdType -> Identifier -> Identifier -> Identifier)
+  -- ^ extend valid identifiers
+  -> [Identifier]
+  -- ^ Seen components
+  -> FilePath
+  -- ^ HDL dir
+  -> (Maybe Identifier,Maybe Identifier)
+  -- ^ Component name prefix
+  -> NetlistMonad a
+  -- ^ Action to run
+  -> IO (a, NetlistState)
+runNetlistMonad opts reprs s is0 tops p tcm typeTrans iw mkId extId seenIds_ env prefixM
   = flip runStateT s'
   . runNetlist
   where
-    s' = NetlistState s 0 emptyVarEnv p typeTrans tcm (StrictText.empty,noSrcSpan) iw mkId extId [] seenIds' names tops env 0 prefixM reprs is0
+    s' =
+      NetlistState
+        s 0 emptyVarEnv p typeTrans tcm (StrictText.empty,noSrcSpan) iw mkId
+        extId [] seenIds' names tops env 0 prefixM reprs is0 opts
+
     (seenIds',names) = genNames mkId prefixM seenIds_ emptyVarEnv s
 
 genNames :: (IdType -> Identifier -> Identifier)
