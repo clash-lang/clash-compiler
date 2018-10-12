@@ -18,7 +18,7 @@
 module Clash.Netlist.BlackBox where
 
 import           Control.Exception             (throw)
-import           Control.Lens                  ((<<%=))
+import           Control.Lens                  ((<<%=),(%=))
 import qualified Control.Lens                  as Lens
 import           Control.Monad.IO.Class        (liftIO)
 import           Data.Char                     (ord)
@@ -27,6 +27,7 @@ import qualified Data.HashMap.Lazy             as HashMap
 import qualified Data.IntMap                   as IntMap
 import           Data.Maybe                    (catMaybes)
 import           Data.Semigroup.Monad
+import qualified Data.Set                      as Set
 import           Data.Text.Lazy                (fromStrict)
 import qualified Data.Text.Lazy                as Text
 import           Data.Text                     (unpack)
@@ -189,11 +190,14 @@ mkPrimitive bbEParen bbEasD dst nm args ty = do
           -- Print blackbox warning if warning is set on this blackbox and
           -- printing warnings is enabled globally
           primWarn <- opt_primWarn <$> Lens.use clashOpts
-          case (wn, primWarn) of
-            (Just msg, True) ->
+          seen <- Set.member nm <$> Lens.use seenPrimitives
+          case (wn, primWarn, seen) of
+            (Just msg, True, False) ->
               liftIO $ putStrLn $ "Warning: " ++ unpack msg
             _ ->
               return ()
+
+          seenPrimitives %= (Set.insert nm)
 
           case kind p of
             TDecl -> do

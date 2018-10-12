@@ -29,6 +29,7 @@ import           Data.Either                      (lefts,partitionEithers)
 import qualified Data.HashMap.Lazy                as HashMap
 import           Data.List                        (elemIndex, sortOn)
 import           Data.Maybe                       (catMaybes, listToMaybe, fromMaybe)
+import qualified Data.Set                         as Set
 import           Data.Primitive.ByteArray         (ByteArray (..))
 import qualified Data.Text                        as StrictText
 import qualified Data.Vector.Primitive            as PV
@@ -155,7 +156,7 @@ runNetlistMonad opts reprs s is0 tops p tcm typeTrans iw mkId extId seenIds_ env
     s' =
       NetlistState
         s 0 emptyVarEnv p typeTrans tcm (StrictText.empty,noSrcSpan) iw mkId
-        extId [] seenIds' names tops env 0 prefixM reprs is0 opts
+        extId [] seenIds' Set.empty names tops env 0 prefixM reprs is0 opts
 
     (seenIds',names) = genNames mkId prefixM seenIds_ emptyVarEnv s
 
