@@ -52,6 +52,7 @@ import {-# SOURCE #-} Clash.Netlist
   (genComponent, mkDcApplication, mkDeclarations, mkExpr, mkNetDecl,
    mkProjection, mkSelection)
 import qualified Clash.Backend                 as Backend
+import           Clash.Driver.Types            (opt_primWarn)
 import           Clash.Netlist.BlackBox.Types  as B
 import           Clash.Netlist.BlackBox.Util   as B
 import           Clash.Netlist.Id              (IdType (..))
@@ -185,8 +186,14 @@ mkPrimitive bbEParen bbEasD dst nm args ty = do
     go =
       \case
         Just p@(P.BlackBox {outputReg = wr, warning = wn}) -> do
-          -- Print blackbox warning
-          maybe (pure ()) (liftIO . putStrLn . ("Warning: " ++) . unpack) wn
+          -- Print blackbox warning if warning is set on this blackbox and
+          -- printing warnings is enabled globally
+          primWarn <- opt_primWarn <$> Lens.use clashOpts
+          case (wn, primWarn) of
+            (Just msg, True) ->
+              liftIO $ putStrLn $ "Warning: " ++ unpack msg
+            _ ->
+              return ()
 
           case kind p of
             TDecl -> do

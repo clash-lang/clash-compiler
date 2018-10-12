@@ -25,7 +25,6 @@ import           Control.Monad                    (guard, when, unless, join, fo
 import           Control.Monad.State              (evalState, get)
 import           Data.Hashable                    (hash)
 import qualified Data.HashSet                     as HashSet
-import qualified Data.HashMap.Strict              as HashMap
 import           Data.IntMap                      (IntMap)
 import           Data.List                        (intercalate)
 import           Data.Maybe                       (fromMaybe)
@@ -89,18 +88,6 @@ import           Clash.Util                       (first)
 getClashModificationDate :: IO Clock.UTCTime
 getClashModificationDate = Directory.getModificationTime =<< getExecutablePath
 
--- Suppress primitive warnings when they are disabled
-handlePrimWarnings
-  :: ClashOpts
-  -> Primitive a b c
-  -> Primitive a b c
-handlePrimWarnings opts = \case
-  blackbox@(BlackBox {})
-    | not (opt_primWarn opts) -> blackbox { warning = Nothing }
-  prim -> prim
-
-  -- No more TopEntities to process
-
 -- | Create a set of target HDL files for a set of functions
 generateHDL
   :: forall backend . Backend backend
@@ -129,10 +116,8 @@ generateHDL
   -- ^ Debug information level for the normalization process
   -> (Clock.UTCTime,Clock.UTCTime)
   -> IO ()
-generateHDL reprs bindingsMap hdlState primMap' tcm tupTcm typeTrans eval
+generateHDL reprs bindingsMap hdlState primMap tcm tupTcm typeTrans eval
   topEntities opts (startTime,prepTime) = go prepTime [] topEntities where
-
-  primMap = HashMap.map (handlePrimWarnings opts) primMap'
 
   go prevTime _ [] = putStrLn $ "Total compilation took " ++
                               show (Clock.diffUTCTime prevTime startTime)
@@ -240,9 +225,9 @@ generateHDL reprs bindingsMap hdlState primMap' tcm tupTcm typeTrans eval
       putStrLn $ "Normalisation took " ++ show prepNormDiff
 
       -- 2. Generate netlist for topEntity
-      (netlist,seen') <- genNetlist reprs transformedBindings is0 topEntities primMap
-                                tcm typeTrans iw mkId extId seen
-                                hdlDir prefixM topEntity
+      (netlist,seen') <-
+        genNetlist opts reprs transformedBindings is0 topEntities primMap
+                   tcm typeTrans iw mkId extId seen hdlDir prefixM topEntity
 
       netlistTime <- netlist `deepseq` Clock.getCurrentTime
       let normNetDiff = Clock.diffUTCTime netlistTime normTime
@@ -276,9 +261,9 @@ generateHDL reprs bindingsMap hdlState primMap' tcm tupTcm typeTrans eval
       putStrLn $ "Testbench normalisation took " ++ show prepNormDiff
 
       -- 2. Generate netlist for topEntity
-      (netlist,seen'') <- genNetlist reprs transformedBindings is0 topEntities primMap
-                              tcm typeTrans iw mkId extId seen'
-                              hdlDir prefixM tb
+      (netlist,seen'') <-
+        genNetlist opts reprs transformedBindings is0 topEntities primMap
+                   tcm typeTrans iw mkId extId seen' hdlDir prefixM tb
 
       netlistTime <- netlist `deepseq` Clock.getCurrentTime
       let normNetDiff = Clock.diffUTCTime netlistTime normTime

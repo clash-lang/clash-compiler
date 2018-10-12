@@ -49,7 +49,7 @@ import Clash.Core.Type                      (Type)
 import Clash.Core.Var                       (Attr')
 import Clash.Core.TyCon                     (TyConMap)
 import Clash.Core.VarEnv                    (VarEnv, InScopeSet)
-import Clash.Driver.Types                   (BindingMap)
+import Clash.Driver.Types                   (BindingMap, ClashOpts)
 import Clash.Netlist.BlackBox.Types         (BlackBoxTemplate)
 import Clash.Netlist.Id                     (IdType)
 import Clash.Primitives.Types               (CompiledPrimMap)
@@ -68,13 +68,18 @@ newtype NetlistMonad a =
 -- | State of the NetlistMonad
 data NetlistState
   = NetlistState
-  { _bindings       :: BindingMap -- ^ Global binders
-  , _varCount       :: !Int -- ^ Number of signal declarations
-  , _components     :: VarEnv (SrcSpan,[Identifier],Component) -- ^ Cached components
-  , _primitives     :: CompiledPrimMap -- ^ Primitive Definitions
+  { _bindings       :: BindingMap
+  -- ^ Global binders
+  , _varCount       :: !Int
+  -- ^ Number of signal declarations
+  , _components     :: VarEnv (SrcSpan,[Identifier],Component)
+  -- ^ Cached components
+  , _primitives     :: CompiledPrimMap
+  -- ^ Primitive Definitions
   , _typeTranslator :: CustomReprs -> TyConMap -> Bool -> Type -> Maybe (Either String HWType)
   -- ^ Hardcoded Type -> HWType translator
-  , _tcCache        :: TyConMap-- ^ TyCon cache
+  , _tcCache        :: TyConMap
+  -- ^ TyCon cache
   , _curCompNm      :: !(Identifier,SrcSpan)
   , _intWidth       :: Int
   , _mkIdentifierFn :: IdType -> Identifier -> Identifier
@@ -90,6 +95,8 @@ data NetlistState
   -- ^ Prefix for top-level components, and prefix for all other components
   , _customReprs    :: CustomReprs
   , _globalInScope  :: InScopeSet
+  , _clashOpts      :: ClashOpts
+  -- ^ Settings Clash was called with
   }
 
 -- | Signal reference
