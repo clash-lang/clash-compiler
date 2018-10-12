@@ -35,6 +35,7 @@ import Data.Bits                            (testBit)
 import Data.Binary                          (Binary(..))
 import Data.Hashable
 import Data.IntMap                          (IntMap, empty)
+import qualified Data.Set                   as Set
 import Data.Text                            (Text, pack)
 import Data.Typeable                        (Typeable)
 import Data.Text.Prettyprint.Doc.Extra      (Doc)
@@ -86,6 +87,10 @@ data NetlistState
   , _extendIdentifierFn :: IdType -> Identifier -> Identifier -> Identifier
   , _seenIds        :: [Identifier]
   , _seenComps      :: [Identifier]
+  , _seenPrimitives :: Set.Set Text
+  -- ^ Keeps track of invocations of ´mkPrimitive´. It is currently used to
+  -- filter duplicate warning invocations for dubious blackbox instantiations,
+  -- see GitHub pull request #286.
   , _componentNames :: VarEnv Identifier
   , _topEntityAnns  :: VarEnv (Type, Maybe TopEntity)
   , _hdlDir         :: FilePath
