@@ -29,7 +29,7 @@ import           Data.List                       (nub)
 #if !MIN_VERSION_base(4,11,0)
 import           Data.Monoid
 #endif
-import           Data.Maybe                      (mapMaybe)
+import           Data.Maybe                      (mapMaybe, maybeToList)
 import           Data.Semigroup.Monad
 import qualified Data.Text
 import           Data.Text.Lazy                  (Text)
@@ -479,22 +479,14 @@ renderTag b e@(TypElem _)   = let ty = lineToType b [e]
                               in  renderOneLine <$> getMon (hdlType Internal ty)
 renderTag _ (Gen b)         = renderOneLine <$> genStmt b
 renderTag _ (GenSym [C t] _) = return t
-renderTag b (Vars n)        =
-  let (e,_,_) = bbInputs b !! n
 
-      go (Identifier i _) = [i]
-      go (DataCon _ _ es) = concatMap go es
-      go (DataTag _ e')   = [either id id e']
-      go (Literal {})     = []
-      go (ConvBV _ _ _ e') = go e'
-      go (BlackBoxE _ _ _ _ t b' _) =
-        let usedArgs = mapMaybe (indexMaybe (bbInputs b')) (usedArguments t)
-        in  concatMap (\(e',_,_) -> go e') usedArgs
+-- Determine variables used in argument /n/.
+renderTag b (Vars n) = return $ vars'
+  where
+    (e, _, _) = bbInputs b !! n
+    vars      = map Text.fromStrict (usedVariables e)
+    vars'     = Text.concat (map (Text.cons ',') vars)
 
-      vars    = go e
-  in  case vars of
-        [] -> return Text.empty
-        _  -> return (Text.concat $ map (Text.cons ',' . Text.fromStrict) vars)
 renderTag b (IndexType (L n)) =
   case bbInputs b !! n of
     (Literal _ (NumLit n'),_,_) ->
@@ -734,27 +726,62 @@ prettyElem (Template bbname source) = do
                                   <> brackets (string $ Text.concat bbname')
                                   <> brackets (string $ Text.concat source'))
 
-usedArguments :: N.BlackBox
-              -> [Int]
-usedArguments (N.BBFunction _nm _hsh (N.TemplateFunction k _ _)) = k
-usedArguments (N.BBTemplate t) = nub (concatMap go t)
+-- | Recursively walk @Element@, applying @f@ to each element in the tree.
+walkElement
+  :: (Element -> Maybe a)
+  -> Element
+  -> [a]
+walkElement f el = maybeToList (f el) ++ walked
   where
-    go x = case x of
-      D (Decl i args) -> i : concatMap (\(a,b) -> concatMap go a ++ concatMap go b) args
-      I _ i -> [i]
-      L i -> [i]
-      N i -> [i]
-      Var _ i -> [i]
-      IndexType e -> go e
-      FilePath e -> go e
-      Template bbname source -> concatMap go bbname ++ concatMap go source
-      IF b esT esF -> go b ++ concatMap go esT ++ concatMap go esF
-      SigD es _ -> concatMap go es
-      BV _ es _ -> concatMap go es
-      StrCmp _ i -> [i]
-      GenSym es _ -> concatMap go es
-      DevNull es -> concatMap go es
-      _ -> []
+    go     = walkElement f
+    walked =
+      case el of
+        D (Decl _ args) ->
+          concatMap (\(a,b) -> concatMap go a ++ concatMap go b) args
+        IndexType e -> go e
+        FilePath e -> go e
+        Template bbname source ->
+          concatMap go bbname ++ concatMap go source
+        IF b esT esF ->
+          go b ++ concatMap go esT ++ concatMap go esF
+        SigD es _ -> concatMap go es
+        BV _ es _ -> concatMap go es
+        GenSym es _ -> concatMap go es
+        DevNull es -> concatMap go es
+        _ -> []
+
+-- | Determine variables used in an expression. Used for VHDL sensitivity list.
+-- Also see: https://github.com/clash-lang/clash-compiler/issues/365
+usedVariables :: Expr -> [Identifier]
+usedVariables (Identifier i _)  = [i]
+usedVariables (DataCon _ _ es)  = concatMap usedVariables es
+usedVariables (DataTag _ e')    = [either id id e']
+usedVariables (Literal {})      = []
+usedVariables (ConvBV _ _ _ e') = usedVariables e'
+usedVariables (BlackBoxE _ _ _ _ t bb _) = nub (sList ++ sList')
+  where
+    matchI (I _ i) = Just i
+    matchI _       = Nothing
+
+    matchVar (Var [C v] _) = Just (Text.toStrict v)
+    matchVar _             = Nothing
+
+    t'     = onBlackBox id (\_ _ _ -> []) t
+    usedIs = mapMaybe (indexMaybe (bbInputs bb)) (concatMap (walkElement matchI) t')
+    sList  = concatMap (\(e,_,_) -> usedVariables e) usedIs
+    sList' = concatMap (walkElement matchVar) t'
+
+-- | Collect arguments (e.g., ~ARG, ~LIT) used in this blackbox
+usedArguments :: N.BlackBox -> [Int]
+usedArguments (N.BBFunction _nm _hsh (N.TemplateFunction k _ _)) = k
+usedArguments (N.BBTemplate t) = nub (concatMap (walkElement matchArg) t)
+  where
+    matchArg (D (Decl i _)) = Just i
+    matchArg (I _ i)        = Just i
+    matchArg (L i)          = Just i
+    matchArg (N i)          = Just i
+    matchArg (Var _ i)      = Just i
+    matchArg _              = Nothing
 
 onBlackBox
   :: (BlackBoxTemplate -> r)
