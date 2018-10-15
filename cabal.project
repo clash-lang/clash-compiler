@@ -29,7 +29,7 @@ repository head.hackage
 -- index state, to go along with the cabal.project.freeze file. update the index
 -- state by running `cabal update` twice and looking at the index state it
 -- displays to you (as the second update will be a no-op)
-index-state: 2018-07-03T07:02:43Z
+index-state: 2018-10-14T17:04:37Z
 
 package clash-ghc
   executable-dynamic: True
@@ -47,12 +47,12 @@ optional-packages: singletons/th-desugar/th-desugar.cabal
 source-repository-package
   type: git
   location: https://github.com/clash-lang/ghc-typelits-extra
-  tag: b9333c256151132eb97f72b262ddb23bd6a62446
+  tag: f1cba7cebf73e429dbdfa67c88161300bc5e318e
 
 source-repository-package
   type: git
   location: https://github.com/clash-lang/ghc-typelits-knownnat
-  tag: 9731ed3ae9c87a8930dd40eedced7c0128cb5e82
+  tag: 7c866bdefff3f8353a29eebb3d35264dacb2af28
 
 source-repository-package
   type: git
@@ -62,7 +62,7 @@ source-repository-package
 source-repository-package
   type: git
   location: https://github.com/clash-lang/ghc-tcplugins-extra
-  tag: 4f2defb334da089100a16c8e75ba462b06c9d465
+  tag: ac70960df5b04ec092ea189c8d34b28ab9b41695
 
 -- Build documentation for all dependencies so we can upload docs to hackage
 -- with proper links

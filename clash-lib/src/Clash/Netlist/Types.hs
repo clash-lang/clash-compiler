@@ -28,6 +28,7 @@ module Clash.Netlist.Types
 where
 
 import Control.DeepSeq
+import Control.Monad.Fail                   (MonadFail)
 import Control.Monad.State                  (State)
 import Control.Monad.State.Strict           (MonadIO, MonadState, StateT)
 import Data.Bits                            (testBit)
@@ -62,7 +63,7 @@ import Clash.Annotations.BitRepresentation.Internal
 -- of components that are being generated (WriterT)
 newtype NetlistMonad a =
   NetlistMonad { runNetlist :: StateT NetlistState IO a }
-  deriving newtype (Functor, Monad, Applicative, MonadState NetlistState, MonadIO)
+  deriving newtype (Functor, Monad, Applicative, MonadState NetlistState, MonadIO, MonadFail)
 
 -- | State of the NetlistMonad
 data NetlistState

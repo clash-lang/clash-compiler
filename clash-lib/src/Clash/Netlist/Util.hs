@@ -8,13 +8,14 @@
   Utilities for converting Core Type/Term to Netlist datatypes
 -}
 
-{-# LANGUAGE FlexibleContexts  #-}
-{-# LANGUAGE MultiWayIf        #-}
-{-# LANGUAGE NamedFieldPuns    #-}
-{-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE TemplateHaskell   #-}
-{-# LANGUAGE TupleSections     #-}
-{-# LANGUAGE ViewPatterns      #-}
+{-# LANGUAGE FlexibleContexts    #-}
+{-# LANGUAGE MonadFailDesugaring #-}
+{-# LANGUAGE MultiWayIf          #-}
+{-# LANGUAGE NamedFieldPuns      #-}
+{-# LANGUAGE OverloadedStrings   #-}
+{-# LANGUAGE TemplateHaskell     #-}
+{-# LANGUAGE TupleSections       #-}
+{-# LANGUAGE ViewPatterns        #-}
 
 module Clash.Netlist.Util where
 
@@ -1581,6 +1582,9 @@ nestM (Indexed (RTree d1 t1,1,n)) (Indexed (RTree d2 t2,1,m))
        | n == 0 && m == 0 -> let l = 0
                                  r = (2 ^ (d1-1)) `div` 2
                              in  Just (Indexed (RTree (-1) t1, l, r))
+       | n > 1 || n < 0   -> error $ "nestM: n should be 0 or 1, not:" ++ show n
+       | m > 1 || m < 0   -> error $ "nestM: m should be 0 or 1, not:" ++ show m
+       | otherwise        -> error $ "nestM: unexpected (n, m): " ++ show (n, m)
 nestM (Indexed (RTree (-1) t1,l,_)) (Indexed (RTree d t2,10,k))
   | t1 == t2
   , d  >= 0

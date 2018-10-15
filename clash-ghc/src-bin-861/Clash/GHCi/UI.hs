@@ -71,7 +71,6 @@ import Outputable hiding ( printForUser, printForUserPartWay )
 
 -- Other random utilities
 import BasicTypes hiding ( isTopLevel )
-import Config
 import Digraph
 import Encoding
 import FastString
@@ -151,8 +150,11 @@ import           Clash.GHC.GenerateBindings
 import           Clash.GHC.NetlistTypes
 import           Clash.Netlist.BlackBox.Types (HdlSyn)
 import           Clash.Util (clashLibVersion)
+import qualified Data.HashMap.Strict as HM
 import qualified Data.Time.Clock as Clock
 import qualified Paths_clash_ghc
+
+import           Clash.Annotations.BitRepresentation.Internal (buildCustomReprs)
 
 -----------------------------------------------------------------------------
 
@@ -915,7 +917,7 @@ installInteractivePrint :: Maybe String -> Bool -> GHCi ()
 installInteractivePrint Nothing _  = return ()
 installInteractivePrint (Just ipFun) exprmode = do
   ok <- trySuccess $ do
-                (name:_) <- GHC.parseName ipFun
+                name <- head <$> GHC.parseName ipFun
                 modifySession (\he -> let new_ic = setInteractivePrintName (hsc_IC he) name
                                       in he{hsc_IC = new_ic})
                 return Succeeded
@@ -2012,7 +2014,7 @@ makeHDL backend optsRef srcs = do
                 -- Parsing / compiling primitives:
                 startTime' <- Clock.getCurrentTime
                 let dbs = reverse [p | PackageDB (PkgConfFile p) <- packageDBFlags dflags ]
-                primMap'   <- sequence $ HM.map (Clash.Driver.compilePrimitive dbs) primMap
+                primMap'   <- sequence $ HM.map (Clash.Driver.compilePrimitive dbs (topDir dflags)) primMap
                 prepTime'  <- startTime' `deepseq` primMap' `seq` Clock.getCurrentTime
                 let prepStartDiff' = Clock.diffUTCTime prepTime' startTime'
                 putStrLn $ "Parsing and compiling primitives took " ++ show prepStartDiff'
@@ -3355,7 +3357,7 @@ stepLocalCmd arg = withSandboxOnly ":steplocal" $ step arg
       case mb_span of
         Nothing  -> stepCmd []
         Just loc -> do
-           Just md <- getCurrentBreakModule
+           md <- fromJust <$> getCurrentBreakModule
            current_toplevel_decl <- enclosingTickSpan md loc
            doContinue (`isSubspanOf` RealSrcSpan current_toplevel_decl) GHC.SingleStep
 
@@ -3846,7 +3848,7 @@ turnOffBreak loc = do
 
 getModBreak :: Module -> GHCi (ForeignRef BreakArray, Array Int SrcSpan)
 getModBreak m = do
-   Just mod_info <- GHC.getModuleInfo m
+   mod_info <- fromJust <$> GHC.getModuleInfo m
    let modBreaks  = GHC.modInfoModBreaks mod_info
    let arr        = GHC.modBreaks_flags modBreaks
    let ticks      = GHC.modBreaks_locs  modBreaks

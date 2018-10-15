@@ -13,6 +13,7 @@
 {-# LANGUAGE NondecreasingIndentation #-}
 {-# LANGUAGE OverloadedStrings        #-}
 {-# LANGUAGE Rank2Types               #-}
+{-# LANGUAGE FlexibleContexts         #-}
 {-# LANGUAGE TemplateHaskell          #-}
 {-# LANGUAGE ViewPatterns             #-}
 
@@ -24,6 +25,7 @@ import           Control.Lens
   (Lens', (%=), (+=), (^.), _3, _4, _Left)
 import qualified Control.Lens                as Lens
 import qualified Control.Monad               as Monad
+import           Control.Monad.Fail          (MonadFail)
 import qualified Control.Monad.State.Strict  as State
 import qualified Control.Monad.Writer        as Writer
 import           Data.Bifunctor              (bimap)
@@ -169,7 +171,7 @@ mkDerivedName (TransformContext _ ctx) sf = case closestLetBinder ctx of
 
 -- | Make a new binder and variable reference for a term
 mkTmBinderFor
-  :: (Monad m, MonadUnique m)
+  :: (Monad m, MonadUnique m, MonadFail m)
   => InScopeSet
   -> TyConMap -- ^ TyCon cache
   -> Name a -- ^ Name of the new binder
@@ -181,7 +183,7 @@ mkTmBinderFor is tcm name e = do
 
 -- | Make a new binder and variable reference for either a term or a type
 mkBinderFor
-  :: (Monad m, MonadUnique m)
+  :: (Monad m, MonadUnique m, MonadFail m)
   => InScopeSet
   -> TyConMap -- ^ TyCon cache
   -> Name a -- ^ Name of the new binder

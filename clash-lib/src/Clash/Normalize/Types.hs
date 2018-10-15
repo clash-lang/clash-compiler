@@ -7,7 +7,8 @@
   Types used in Normalize modules
 -}
 
-{-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE TemplateHaskell   #-}
+{-# LANGUAGE FlexibleInstances #-}
 
 module Clash.Normalize.Types where
 
@@ -60,6 +61,7 @@ data NormalizeState
   }
 
 makeLenses ''NormalizeState
+
 
 -- | State monad that stores specialisation and inlining information
 type NormalizeMonad = State NormalizeState

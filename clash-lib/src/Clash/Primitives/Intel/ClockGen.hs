@@ -11,13 +11,16 @@
 
 module Clash.Primitives.Intel.ClockGen where
 
-import Control.Monad.State
-import Data.Text.Prettyprint.Doc.Extra
-import Data.Semigroup.Monad
+import Clash.Backend
 import Clash.Netlist.BlackBox.Util
 import Clash.Netlist.Id
 import Clash.Netlist.Types
-import Clash.Backend
+
+import Control.Monad.State
+
+import Data.Semigroup.Monad
+import Data.Text.Prettyprint.Doc.Extra
+
 import qualified Data.Text as TextS
 
 altpllTF :: TemplateFunction
@@ -47,9 +50,12 @@ alteraPllTemplate
   => BlackBoxContext
   -> State s Doc
 alteraPllTemplate bbCtx = do
- [locked,pllLock,alteraPll,alteraPll_inst] <-
-  traverse (mkUniqueIdentifier Basic)
-           ["locked", "pllLock", "alteraPll","alteraPll_inst"]
+ let mkId = mkUniqueIdentifier Basic
+ locked <- mkId "locked"
+ pllLock <- mkId "pllLock"
+ alteraPll <- mkId "alteraPll"
+ alteraPll_inst <- mkId "alterPll_inst"
+
  clocks <- traverse (mkUniqueIdentifier Extended)
                     [TextS.pack ("pllOut" ++ show n) | n <- [0..length tys - 1]]
  getMon $ blockDecl alteraPll $ concat
@@ -82,9 +88,12 @@ altpllTemplate
   => BlackBoxContext
   -> State s Doc
 altpllTemplate bbCtx = do
- [pllOut,locked,pllLock,alteraPll,alteraPll_inst] <-
-  traverse (mkUniqueIdentifier Basic)
-           ["pllOut","locked", "pllLock", "altpll","altpll_inst"]
+ let mkId = mkUniqueIdentifier Basic
+ pllOut <- mkId "pllOut"
+ locked <- mkId "locked"
+ pllLock <- mkId "pllLock"
+ alteraPll <- mkId "altpll"
+ alteraPll_inst <- mkId "altpll_inst"
  getMon $ blockDecl alteraPll
   [ NetDecl Nothing locked  Bit
   , NetDecl Nothing pllLock Bool

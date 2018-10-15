@@ -53,6 +53,10 @@ jobs:
       addons: {apt: {packages: [ghc-ppa-tools,cabal-install-head,ghc-8.4.3,ghdl,gperf,g++-multilib], sources: [hvr-ghc,pgavin-ghdl]}}
 
     - <<: *precache
+      compiler: "ghc-8.6.2"
+      addons: {apt: {packages: [ghc-ppa-tools,cabal-install-head,ghc-8.6.2,ghdl,gperf,g++-multilib], sources: [hvr-ghc,pgavin-ghdl]}}
+
+    - <<: *precache
       compiler: "ghc-head"
       env: GHCHEAD=true
       addons: {apt: {packages: [ghc-ppa-tools,cabal-install-head,ghc-head,ghdl,gperf,g++-multilib], sources: [hvr-ghc,pgavin-ghdl]}}
@@ -68,6 +72,10 @@ jobs:
       addons: {apt: {packages: [ghc-ppa-tools,cabal-install-head,ghc-8.4.3,ghdl,gperf,g++-multilib], sources: [hvr-ghc,pgavin-ghdl]}}
 
     - <<: *build
+      compiler: "ghc-8.6.2"
+      addons: {apt: {packages: [ghc-ppa-tools,cabal-install-head,ghc-8.6.2,ghdl,gperf,g++-multilib], sources: [hvr-ghc,pgavin-ghdl]}}
+
+    - <<: *build
       compiler: "ghc-head"
       env: GHCHEAD=true
       addons: {apt: {packages: [ghc-ppa-tools,cabal-install-head,ghc-head,ghdl,gperf,g++-multilib], sources: [hvr-ghc,pgavin-ghdl]}}
@@ -81,6 +89,10 @@ jobs:
     - <<: *test
       compiler: "ghc-8.4.3"
       addons: {apt: {packages: [ghc-ppa-tools,cabal-install-head,ghc-8.4.3,ghdl,gperf,g++-multilib], sources: [hvr-ghc,pgavin-ghdl]}}
+
+    - <<: *test
+      compiler: "ghc-8.6.2"
+      addons: {apt: {packages: [ghc-ppa-tools,cabal-install-head,ghc-8.6.2,ghdl,gperf,g++-multilib], sources: [hvr-ghc,pgavin-ghdl]}}
 
     - <<: *test
       compiler: "ghc-head"
@@ -115,10 +127,9 @@ install:
   - HADDOCK=${HADDOCK-true}
   - INSTALLED=${INSTALLED-true}
   - GHCHEAD=${GHCHEAD-false}
-  - travis_retry cabal update -v
+  - travis_retry cabal new-update -v
   - "sed -i.bak 's/^jobs:/-- jobs:/' ${HOME}/.cabal/config"
-  - rm -fv cabal.project cabal.project.local
-  - "printf 'packages: \"./*/*.cabal\" \"./benchmark/profiling/*/*.cabal\"\\n' > cabal.project"
+  - "sed -i 's/flags: cosim/flags: travisci cosim/g' cabal.project"
   - cat cabal.project
   # Overlay Hackage Package Index for GHC HEAD: https://github.com/hvr/head.hackage
   - |
@@ -140,8 +151,8 @@ install:
       (cd "." && autoreconf -i);
     fi
   - rm -f cabal.project.freeze
-  - cabal new-build -w ${HC} ${TEST} ${BENCH} --project-file="cabal.project" --dep -j2 all
-  - cabal new-build -w ${HC} --disable-tests --disable-benchmarks --project-file="cabal.project" --dep -j2 all
+  - cabal new-build -w ${HC} ${TEST} ${BENCH} --project-file="cabal.project" --dep all
+  - cabal new-build -w ${HC} --disable-tests --disable-benchmarks --project-file="cabal.project" --dep all
   - rm -rf "."/.ghc.environment.* "."/dist
   - DISTDIR=$(mktemp -d /tmp/dist-test.XXXX)
   - SRCDIR=$PWD
