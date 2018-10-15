@@ -18,6 +18,7 @@ module Clash.Rewrite.Types where
 import Control.Concurrent.Supply             (Supply, freshId)
 import Control.Lens                          (use, (.=))
 import Control.Monad
+import Control.Monad.Fail                    (MonadFail(fail))
 import Control.Monad.Fix                     (MonadFix (..), fix)
 import Control.Monad.Reader                  (MonadReader (..))
 import Control.Monad.State                   (MonadState (..))
@@ -110,6 +111,9 @@ makeLenses ''RewriteEnv
 -- if a transformation/rewrite has been successfully applied.
 newtype RewriteMonad extra a = R
   { runR :: RewriteEnv -> RewriteState extra -> (a,RewriteState extra,Any) }
+
+instance MonadFail (RewriteMonad extra) where
+  fail err = error ("RewriteMonad.fail: " ++ err)
 
 instance Functor (RewriteMonad extra) where
   fmap f m = R (\r s -> case runR m r s of (a,s',w) -> (f a,s',w))

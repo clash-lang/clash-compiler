@@ -6,7 +6,7 @@ mv "."/clash-lib/dist/clash-lib-*.tar.gz ${DISTDIR}/
 (cd "./clash-ghc" && cabal sdist && cd "..")
 mv "."/clash-ghc/dist/clash-ghc-*.tar.gz ${DISTDIR}/
 find ${DISTDIR} -maxdepth 1 -name '*.tar.gz' -exec tar -xvf '{}' -C ${DISTDIR} \;
-printf 'packages: %b/clash-lib-*/*.cabal %b/clash-ghc-*/*.cabal clash-prelude/*.cabal clash-cosim/*.cabal testsuite/*.cabal benchmark/*.cabal benchmark/profiling/*/*.cabal\npackage clash-testsuite\n  flags: travisci cosim\n\npackage clash-ghc\n  executable-dynamic: True\n' ${DISTDIR} ${DISTDIR} > cabal.project
+sed -i 's/flags: cosim/flags: travisci cosim/g' cabal.project
 cat cabal.project
 # this builds all libraries and executables 
 cabal new-build -w ${HC} all

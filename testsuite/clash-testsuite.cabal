@@ -40,7 +40,7 @@ executable clash-testsuite
                        directory          >=1.2      && <1.4,
                        filepath           >=1.4      && <1.5,
                        process            >=1.2      && <1.7,
-                       tasty              >=0.10.1.2 && <2.0,
+                       tasty              >=1.1.0.2  && <2.0,
                        tasty-hunit,
                        neat-interpolation >=0.3      && <0.4,
                        concurrent-extra   >=0.7      && <0.8,

@@ -10,6 +10,7 @@
 
 {-# LANGUAGE BangPatterns      #-}
 {-# LANGUAGE CPP               #-}
+{-# LANGUAGE FlexibleContexts  #-}
 {-# LANGUAGE LambdaCase        #-}
 {-# LANGUAGE MagicHash         #-}
 {-# LANGUAGE OverloadedStrings #-}
@@ -749,7 +750,10 @@ splitCastWork ctx@(TransformContext is0 _) unchanged@(Letrec vs e') = do
   if hasChanged then changed (Letrec vs' e')
                 else return unchanged
   where
-    splitCastLetBinding :: InScopeSet -> LetBinding -> RewriteMonad extra [LetBinding]
+    splitCastLetBinding
+      :: InScopeSet
+      -> LetBinding
+      -> RewriteMonad extra [LetBinding]
     splitCastLetBinding isN x@(nm, e) = case e of
       Cast (Var {}) _ _  -> return [x]  -- already work-free
       Cast (Cast {}) _ _ -> return [x]  -- casts will be eliminated
