@@ -32,6 +32,7 @@ import           Data.Text.Lazy                (fromStrict)
 import qualified Data.Text.Lazy                as Text
 import           Data.Text                     (unpack)
 import qualified Data.Text                     as TextS
+import           System.IO                     (hPutStrLn, stderr)
 
 -- import           Clash.Backend                 as N
 import           Clash.Core.DataCon            as D (dcTag)
@@ -193,7 +194,10 @@ mkPrimitive bbEParen bbEasD dst nm args ty = do
           seen <- Set.member nm <$> Lens.use seenPrimitives
           case (wn, primWarn, seen) of
             (Just msg, True, False) ->
-              liftIO $ putStrLn $ "Warning: " ++ unpack msg
+              liftIO $ hPutStrLn stderr $ "Dubious primitive instantiation "
+                                       ++ "warning (disable with "
+                                       ++ "-fclash-no-prim-warn): "
+                                       ++ unpack msg
             _ ->
               return ()
 
