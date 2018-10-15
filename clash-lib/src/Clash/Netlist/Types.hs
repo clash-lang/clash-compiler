@@ -102,6 +102,8 @@ data NetlistState
   , _globalInScope  :: InScopeSet
   , _clashOpts      :: ClashOpts
   -- ^ Settings Clash was called with
+  , _isTestBench    :: Bool
+  -- ^ Whether we're compiling a testbench (suppresses some warnings)
   }
 
 -- | Signal reference

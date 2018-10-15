@@ -226,7 +226,7 @@ generateHDL reprs bindingsMap hdlState primMap tcm tupTcm typeTrans eval
 
       -- 2. Generate netlist for topEntity
       (netlist,seen') <-
-        genNetlist opts reprs transformedBindings is0 topEntities primMap
+        genNetlist False opts reprs transformedBindings is0 topEntities primMap
                    tcm typeTrans iw mkId extId seen hdlDir prefixM topEntity
 
       netlistTime <- netlist `deepseq` Clock.getCurrentTime
@@ -262,7 +262,7 @@ generateHDL reprs bindingsMap hdlState primMap tcm tupTcm typeTrans eval
 
       -- 2. Generate netlist for topEntity
       (netlist,seen'') <-
-        genNetlist opts reprs transformedBindings is0 topEntities primMap
+        genNetlist True opts reprs transformedBindings is0 topEntities primMap
                    tcm typeTrans iw mkId extId seen' hdlDir prefixM tb
 
       netlistTime <- netlist `deepseq` Clock.getCurrentTime

@@ -104,6 +104,7 @@ Library
                       ViewPatterns
 
   Build-depends:      aeson                   >= 0.6.2.0  && < 1.5,
+                      ansi-terminal           >= 0.8.0.0  && < 0.9,
                       ansi-wl-pprint          >= 0.6.8.2  && < 1.0,
                       attoparsec              >= 0.10.4.0 && < 0.14,
                       base                    >= 4.8      && < 5,
