@@ -73,7 +73,9 @@ import           Clash.Util
 -- | Generate a hierarchical netlist out of a set of global binders with
 -- @topEntity@ at the top.
 genNetlist
-  :: ClashOpts
+  :: Bool
+  -- ^ Whether this we're compiling a testbench (suppresses certain warnings)
+  -> ClashOpts
   -- ^ Options Clash was called with
   -> CustomReprs
   -- ^ Custom bit representations for certain types
@@ -104,9 +106,10 @@ genNetlist
   -> Id
   -- ^ Name of the @topEntity@
   -> IO ([(SrcSpan,[Identifier],Component)],[Identifier])
-genNetlist opts reprs globals is0 tops primMap tcm typeTrans iw mkId extId seen env prefixM topEntity = do
-  (_,s) <- runNetlistMonad opts reprs globals is0 (mkTopEntityMap tops) primMap tcm typeTrans
-             iw mkId extId seen env prefixM $ genComponent topEntity
+genNetlist isTb opts reprs globals is0 tops primMap tcm typeTrans iw mkId extId seen env prefixM topEntity = do
+  (_,s) <- runNetlistMonad isTb opts reprs globals is0 (mkTopEntityMap tops)
+             primMap tcm typeTrans iw mkId extId seen env prefixM $
+             genComponent topEntity
   return ( eltsVarEnv $ _components s
          , _seenComps s
          )
@@ -118,7 +121,9 @@ genNetlist opts reprs globals is0 tops primMap tcm typeTrans iw mkId extId seen 
 
 -- | Run a NetlistMonad action in a given environment
 runNetlistMonad
-  :: ClashOpts
+  :: Bool
+  -- ^ Whether this we're compiling a testbench (suppresses certain warnings)
+  -> ClashOpts
   -- ^ Options Clash was called with
   -> CustomReprs
   -- ^ Custom bit representations for certain types
@@ -149,14 +154,14 @@ runNetlistMonad
   -> NetlistMonad a
   -- ^ Action to run
   -> IO (a, NetlistState)
-runNetlistMonad opts reprs s is0 tops p tcm typeTrans iw mkId extId seenIds_ env prefixM
+runNetlistMonad isTb opts reprs s is0 tops p tcm typeTrans iw mkId extId seenIds_ env prefixM
   = flip runStateT s'
   . runNetlist
   where
     s' =
       NetlistState
         s 0 emptyVarEnv p typeTrans tcm (StrictText.empty,noSrcSpan) iw mkId
-        extId [] seenIds' Set.empty names tops env 0 prefixM reprs is0 opts
+        extId [] seenIds' Set.empty names tops env 0 prefixM reprs is0 opts isTb
 
     (seenIds',names) = genNames mkId prefixM seenIds_ emptyVarEnv s
 

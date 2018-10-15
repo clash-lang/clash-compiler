@@ -32,7 +32,11 @@ import           Data.Text.Lazy                (fromStrict)
 import qualified Data.Text.Lazy                as Text
 import           Data.Text                     (unpack)
 import qualified Data.Text                     as TextS
-import           System.IO                     (hPutStrLn, stderr)
+import qualified System.Console.ANSI           as ANSI
+import           System.Console.ANSI
+  ( hSetSGR, SGR(SetConsoleIntensity, SetColor), Color(Magenta)
+  , ConsoleIntensity(BoldIntensity), ConsoleLayer(Foreground), ColorIntensity(Vivid))
+import           System.IO                     (hPutStrLn, stderr, hFlush)
 
 -- import           Clash.Backend                 as N
 import           Clash.Core.DataCon            as D (dcTag)
@@ -190,14 +194,19 @@ mkPrimitive bbEParen bbEasD dst nm args ty = do
         Just p@(P.BlackBox {outputReg = wr, warning = wn}) -> do
           -- Print blackbox warning if warning is set on this blackbox and
           -- printing warnings is enabled globally
+          isTB <- Lens.use isTestBench
           primWarn <- opt_primWarn <$> Lens.use clashOpts
           seen <- Set.member nm <$> Lens.use seenPrimitives
-          case (wn, primWarn, seen) of
-            (Just msg, True, False) ->
+          case (wn, primWarn, seen, isTB) of
+            (Just msg, True, False, False) -> do
+              liftIO $ hSetSGR stderr [SetConsoleIntensity BoldIntensity]
+              liftIO $ hSetSGR stderr [SetColor Foreground Vivid Magenta]
               liftIO $ hPutStrLn stderr $ "Dubious primitive instantiation "
                                        ++ "warning (disable with "
                                        ++ "-fclash-no-prim-warn): "
                                        ++ unpack msg
+              liftIO $ hSetSGR stderr [ANSI.Reset]
+              liftIO $ hFlush stderr
             _ ->
               return ()
 
