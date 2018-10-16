@@ -9,8 +9,8 @@ import I2C.Types
 {-# ANN i2c
   (Synthesize
     { t_name     = "i2c"
-    , t_inputs   = [ PortName "arst"
-                   , PortName "clk"
+    , t_inputs   = [ PortName "clk"
+                   , PortName "arst"
                    , PortName "rst"
                    , PortName "ena"
                    , PortName "clkCnt"
