@@ -60,7 +60,7 @@ import Clash.Signal.Internal  (clockGate, register#)
 import Clash.Explicit.Signal  (Clock, Reset, Signal)
 import Clash.Sized.BitVector  (BitVector)
 import Clash.Sized.Vector
-import Clash.XException       (Undefined)
+import Clash.XException       (Undefined, errorX)
 
 {- | Dataflow circuit with bidirectional synchronisation channels.
 
@@ -216,7 +216,7 @@ fifoDF :: forall addrSize m n a domain gated synchronous .
 fifoDF clk rst _ iS = DF $ \i iV oR ->
   let initRdPtr      = 0
       initWrPtr      = fromIntegral (length iS)
-      initMem        = iS ++ repeat undefined :: Vec (m + n) a
+      initMem        = iS ++ repeat  (errorX "fifoDF: undefined") :: Vec (m + n) a
       initS          = (initMem,initRdPtr,initWrPtr)
       (o,empty,full) = mealyB clk rst fifoDF_mealy initS (i,iV,oR)
   in  (o,not <$> empty, not <$> full)
