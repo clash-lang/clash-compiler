@@ -44,6 +44,7 @@ module Clash.Unique
   , eltsUniqMap
   , keysUniqMap
   , listToUniqMap
+  , toListUniqMap
     -- *** UniqSet
   , uniqMapToUniqSet
     -- * UniqSet
@@ -243,6 +244,12 @@ listToUniqMap
   -> UniqMap b
 listToUniqMap xs =
   UniqMap (List.foldl' (\m (k, v) -> IntMap.insert (getUnique k) v m) IntMap.empty xs)
+
+-- | Convert a map to a list of key-value pairs
+toListUniqMap
+  :: UniqMap a
+  -> [(Unique,a)]
+toListUniqMap (UniqMap m) = IntMap.toList m
 
 -- | Extract the elements of a map into a list
 eltsUniqMap

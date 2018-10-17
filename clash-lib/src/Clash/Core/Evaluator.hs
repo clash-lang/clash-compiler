@@ -114,10 +114,10 @@ whnf'
   -> InScopeSet
   -> Bool
   -> Term
-  -> (GlobalHeap, Term)
+  -> (GlobalHeap, PureHeap, Term)
 whnf' eval gbl tcm gh ids is isSubj e
   = case whnf eval gbl tcm isSubj (Heap gh emptyVarEnv ids is,[],e) of
-      (Heap gh' _ _ _,_,e') -> (gh',e')
+      (Heap gh' ph' _ _,_,e') -> (gh',ph',e')
 
 -- | Evaluate to WHNF given an existing Heap and Stack
 whnf

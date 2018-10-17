@@ -140,7 +140,7 @@ collectGlobals inScope substitution seen e@(collectArgs -> (fun, args@(_:_)))
     ids <- Lens.use uniqSupply
     let (ids1,ids2) = splitSupply ids
     uniqSupply Lens..= ids2
-    let eval = snd . whnf' primEval bndrs tcm gh ids1 inScope False
+    let eval = (Lens.view Lens._3) . whnf' primEval bndrs tcm gh ids1 inScope False
         eTy  = termType tcm e
     untran <- isUntranslatableType False eTy
     case untran of
