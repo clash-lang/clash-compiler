@@ -202,7 +202,9 @@ main = do
             , runTest ("tests" </> "shouldwork" </> "Vector") defBuild [] "DTFold"    (["","DTFold_testBench"],"DTFold_testBench",True)
             , runTest ("tests" </> "shouldwork" </> "Vector") defBuild [] "EnumTypes" ([""],"EnumTypes_topEntity",False)
             , runTest ("tests" </> "shouldwork" </> "Vector") defBuild [] "FindIndex" (["","FindIndex_testBench"],"FindIndex_testBench",True)
+            , runTest ("tests" </> "shouldwork" </> "Vector") defBuild [] "FirOddSize" (["","FirOddSize_testBench"],"FirOddSize_testBench",True)
             , runTest ("tests" </> "shouldwork" </> "Vector") defBuild [] "Fold"      (["","Fold_testBench"],"Fold_testBench",True)
+            , runTest ("tests" </> "shouldwork" </> "Vector") defBuild [] "FoldlFuns" ([""],"FoldlFuns_topEntity",False)
             , runTest ("tests" </> "shouldwork" </> "Vector") defBuild [] "Foldr"     (["","Foldr_testBench"],"Foldr_testBench",True)
             , runTest ("tests" </> "shouldwork" </> "Vector") defBuild [] "FoldrEmpty" (["","FoldrEmpty_testBench"],"FoldrEmpty_testBench",True)
             , runTest ("tests" </> "shouldwork" </> "Vector") defBuild [] "HOClock"   ([""],"HOClock_topEntity",False) -- Broken on GHC 8.0 due to: https://ghc.haskell.org/trac/ghc/ticket/115
