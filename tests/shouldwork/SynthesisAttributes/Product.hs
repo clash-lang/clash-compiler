@@ -51,8 +51,8 @@ assertIn needle haystack
 -- VHDL test
 mainVHDL :: IO ()
 mainVHDL = do
-  [modDir, topFile] <- getArgs
-  content <- readFile (modDir </> topFile)
+  [topFile] <- getArgs
+  content <- readFile topFile
 
   assertIn "attribute top : string;" content
   assertIn " : signal is \"input1\"" content
@@ -63,8 +63,8 @@ mainVHDL = do
 -- Verilog test
 mainVerilog :: IO ()
 mainVerilog = do
-  [modDir, topFile] <- getArgs
-  content <- readFile (modDir </> topFile)
+  [topFile] <- getArgs
+  content <- readFile topFile
 
   assertIn "(* top = \"input1\" *) input" content
   assertIn "(* top = \"input2\" *) input" content
@@ -72,7 +72,16 @@ mainVerilog = do
   assertIn "(* top = \"output2\" *) output" content
 
 -- Verilog and SystemVerilog should share annotation syntax
-mainSystemVerilog = mainVerilog
+mainSystemVerilog :: IO ()
+mainSystemVerilog = do
+  [topFile] <- getArgs
+  content <- readFile topFile
+
+  assertIn "(* top = \"input1\" *) input" content
+  assertIn "(* top = \"input2\" *) input" content
+  assertIn "(* top = \"output1\" *) output" content
+  assertIn "(* top = \"output2\" *) output" content
+
 
 -- Simulation tests
 testBench :: Signal System Bool

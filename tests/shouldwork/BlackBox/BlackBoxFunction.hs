@@ -40,12 +40,9 @@ assertIn needle haystack
   | needle `isInfixOf` haystack = return ()
   | otherwise                   = P.error $ P.concat [ "Expected:\n\n  ", needle
                                                      , "\n\nIn:\n\n", haystack ]
+
 mainVHDL :: IO ()
 mainVHDL = do
-  [modDir, topFile] <- getArgs
-  content <- readFile (modDir </> topFile)
-
+  [topFile] <- getArgs
+  content <- readFile topFile
   assertIn "123456" content
-
-mainVerilog = mainVHDL
-mainSystemVerilog = mainVHDL

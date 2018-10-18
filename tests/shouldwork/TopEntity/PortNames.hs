@@ -3,7 +3,7 @@ module PortNames where
 import qualified Prelude as P
 import Data.List (isInfixOf)
 import System.Environment (getArgs)
-import System.FilePath ((</>))
+import System.FilePath ((</>), takeDirectory)
 
 import Clash.Prelude
 import Clash.Explicit.Testbench
@@ -48,8 +48,10 @@ assertIn needle haystack
 
 mainVerilog :: IO ()
 mainVerilog = do
-  [modDir, topFile] <- getArgs
-  content <- readFile "verilog/PortNames/PortNames_topEntity/PortNames_topEntity.v"
+  [topDir] <- getArgs
+  content <- readFile (takeDirectory topDir </> "PortNames_topEntity" </> "PortNames_topEntity.v")
+
+--  content <- readFile $ hdlDir </> "verilog/PortNames/PortNames_topEntity/PortNames_topEntity.v"
 
   assertIn "top_zero" content
   assertIn "top_sub_one" content

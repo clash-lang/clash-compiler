@@ -516,25 +516,26 @@ wantedLanguageExtensions df =
     foldl' DynFlags.xopt_unset
       (foldl' DynFlags.xopt_set df wanted) unwanted
   where
-    wanted = [ LangExt.TemplateHaskell
-             , LangExt.TemplateHaskellQuotes
-             , LangExt.DataKinds
-             , LangExt.MonoLocalBinds
-             , LangExt.TypeOperators
-             , LangExt.FlexibleContexts
+    -- Also update @Test.Tasty.Clash.outputTest'@ when updating this list!
+    wanted = [ LangExt.BinaryLiterals
              , LangExt.ConstraintKinds
-             , LangExt.TypeFamilies
-             , LangExt.BinaryLiterals
-             , LangExt.ExplicitNamespaces
-             , LangExt.KindSignatures
-             , LangExt.DeriveLift
-             , LangExt.TypeApplications
-             , LangExt.ScopedTypeVariables
-             , LangExt.MagicHash
-             , LangExt.ExplicitForAll
-             , LangExt.QuasiQuotes
-             , LangExt.DeriveGeneric
+             , LangExt.DataKinds
              , LangExt.DeriveAnyClass
+             , LangExt.DeriveGeneric
+             , LangExt.DeriveLift
+             , LangExt.ExplicitForAll
+             , LangExt.ExplicitNamespaces
+             , LangExt.FlexibleContexts
+             , LangExt.KindSignatures
+             , LangExt.MagicHash
+             , LangExt.MonoLocalBinds
+             , LangExt.QuasiQuotes
+             , LangExt.ScopedTypeVariables
+             , LangExt.TemplateHaskell
+             , LangExt.TemplateHaskellQuotes
+             , LangExt.TypeApplications
+             , LangExt.TypeFamilies
+             , LangExt.TypeOperators
              ]
     unwanted = [ LangExt.ImplicitPrelude
                , LangExt.MonomorphismRestriction
