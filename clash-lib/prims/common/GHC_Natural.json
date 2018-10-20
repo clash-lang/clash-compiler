@@ -10,4 +10,11 @@
     , "template"  : "~ERRORO"
     }
   }
+, { "BlackBox" :
+    { "name"      : "GHC.Natural.plusNatural"
+    , "kind"      : "Expression"
+    , "type"      : "plusNatural :: Natural -> Natural -> Natural"
+    , "template"  : "~ARG[0] + ~ARG[1]"
+    }
+  }
 ]
