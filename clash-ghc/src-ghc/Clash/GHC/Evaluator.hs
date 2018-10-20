@@ -972,6 +972,10 @@ reduceConstant isSubj gbl tcm h k nm ty tys args = case nm of
     , [i] <- intLiterals' [iV]
     -> let r = shiftLNatural (fromInteger n) (fromInteger i)
        in  reduce (Literal (NaturalLiteral (toInteger r)))
+
+  "GHC.Natural.plusNatural"
+    | Just (i,j) <- naturalLiterals args
+    -> reduce (integerToIntegerLiteral (i+j))
 #endif
 
   -- GHC.Real.^  -- XXX: Very fragile
@@ -3099,6 +3103,11 @@ integerLiterals' = typedLiterals' integerLiteral
       | dcTag dc == 3
       -> Just (Jn# (BN# ba))
     _ -> Nothing
+
+naturalLiterals :: [Value] -> Maybe (Integer,Integer)
+naturalLiterals args = case naturalLiterals' args of
+  [i,j] -> Just (i,j)
+  _ -> Nothing
 
 naturalLiterals' :: [Value] -> [Integer]
 naturalLiterals' = typedLiterals' naturalLiteral
