@@ -116,7 +116,6 @@ Library
                       deepseq                 >= 1.3.0.2  && < 1.5,
                       directory               >= 1.2.0.1  && < 1.4,
                       errors                  >= 1.4.2    && < 2.4,
-                      fgl                     >= 5.4.2.4  && < 5.7,
                       filepath                >= 1.3.0.1  && < 1.5,
                       ghc                     >= 8.0.2    && < 8.8,
                       hashable                >= 1.2.1.0  && < 1.3,
@@ -192,6 +191,7 @@ Library
 
                       Clash.Unique
                       Clash.Util
+                      Clash.Util.Graph
 
                       Data.Text.Prettyprint.Doc.Extra
 
