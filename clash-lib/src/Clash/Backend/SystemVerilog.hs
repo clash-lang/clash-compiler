@@ -23,7 +23,6 @@ import           Control.Lens                         hiding (Indexed)
 import           Control.Monad                        (forM,liftM,zipWithM)
 import           Control.Monad.State                  (State)
 import           Data.Bits                            (Bits, testBit)
-import           Data.Graph.Inductive                 (Gr, mkGraph, topsort')
 import           Data.HashMap.Lazy                    (HashMap)
 import qualified Data.HashMap.Lazy                    as HashMap
 import           Data.HashSet                         (HashSet)
@@ -61,6 +60,7 @@ import           Clash.Netlist.Util                   hiding (mkIdentifier, exte
 import           Clash.Signal.Internal                (ClockKind (..))
 import           Clash.Util
   (SrcSpan, noSrcSpan, curLoc, makeCached, (<:>), first, on, traceIf)
+import           Clash.Util.Graph                     (reverseTopSort)
 
 #ifdef CABAL
 import qualified Paths_clash_lib
@@ -304,17 +304,19 @@ topSortHWTys hwtys = sorted
     nodes  = zip [0..] hwtys
     nodesI = HashMap.fromList (zip hwtys [0..])
     edges  = concatMap edge hwtys
-    graph  = mkGraph nodes edges :: Gr HWType ()
-    sorted = reverse $ topsort' graph
+    sorted =
+      case reverseTopSort nodes edges of
+        Left err -> error ("[BUG IN CLASH] topSortHWTys: " ++ err)
+        Right ns -> ns
 
-    edge t@(Vector _ elTy) = maybe [] ((:[]) . (HashMap.lookupDefault (error $ $(curLoc) ++ "Vector") t nodesI,,()))
+    edge t@(Vector _ elTy) = maybe [] ((:[]) . (HashMap.lookupDefault (error $ $(curLoc) ++ "Vector") t nodesI,))
                                       (HashMap.lookup elTy nodesI)
-    edge t@(RTree _ elTy)  = maybe [] ((:[]) . (HashMap.lookupDefault (error $ $(curLoc) ++ "RTree") t nodesI,,()))
+    edge t@(RTree _ elTy)  = maybe [] ((:[]) . (HashMap.lookupDefault (error $ $(curLoc) ++ "RTree") t nodesI,))
                                       (HashMap.lookup elTy nodesI)
     edge t@(Product _ tys) = let ti = HashMap.lookupDefault (error $ $(curLoc) ++ "Product") t nodesI
-                             in mapMaybe (\ty -> liftM (ti,,()) (HashMap.lookup ty nodesI)) tys
+                             in mapMaybe (\ty -> liftM (ti,) (HashMap.lookup ty nodesI)) tys
     edge t@(SP _ ctys)     = let ti = HashMap.lookupDefault (error $ $(curLoc) ++ "SP") t nodesI
-                             in concatMap (\(_,tys) -> mapMaybe (\ty -> liftM (ti,,()) (HashMap.lookup ty nodesI)) tys) ctys
+                             in concatMap (\(_,tys) -> mapMaybe (\ty -> liftM (ti,) (HashMap.lookup ty nodesI)) tys) ctys
     edge _                 = []
 
 range :: Either Int Int -> SystemVerilogM Doc

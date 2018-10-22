@@ -24,7 +24,6 @@ import           Control.Lens                         hiding (Indexed)
 import           Control.Monad                        (forM,join,liftM,zipWithM)
 import           Control.Monad.State                  (State)
 import           Data.Bits                            (testBit, Bits)
-import           Data.Graph.Inductive                 (Gr, mkGraph, topsort')
 import           Data.Hashable                        (Hashable)
 import           Data.HashMap.Lazy                    (HashMap)
 import qualified Data.HashMap.Lazy                    as HashMap
@@ -61,6 +60,7 @@ import           Clash.Netlist.Util                   hiding (mkIdentifier)
 import           Clash.Signal.Internal                (ClockKind (..))
 import           Clash.Util
   (SrcSpan, noSrcSpan, clogBase, curLoc, first, makeCached, on, traceIf, (<:>))
+import           Clash.Util.Graph                     (reverseTopSort)
 
 #ifdef CABAL
 import qualified Paths_clash_lib
@@ -283,22 +283,25 @@ mkUsedTys p@(Product _ elTys) = p : concatMap mkUsedTys elTys
 mkUsedTys sp@(SP _ elTys)     = sp : concatMap mkUsedTys (concatMap snd elTys)
 mkUsedTys t                   = [t]
 
-topSortHWTys :: [HWType]
-             -> [HWType]
+topSortHWTys
+  :: [HWType]
+  -> [HWType]
 topSortHWTys hwtys = sorted
   where
     nodes  = zip [0..] hwtys
     nodesI = HashMap.fromList (zip hwtys [0..])
     edges  = concatMap edge hwtys
-    graph  = mkGraph nodes edges :: Gr HWType ()
-    sorted = reverse $ topsort' graph
+    sorted =
+      case reverseTopSort nodes edges of
+        Left err -> error ("[BUG IN CLASH] topSortHWTys: " ++ err)
+        Right ns -> ns
 
-    edge t@(Vector _ elTy) = maybe [] ((:[]) . (HashMap.lookupDefault (error $ $(curLoc) ++ "Vector") t nodesI,,()))
+    edge t@(Vector _ elTy) = maybe [] ((:[]) . (HashMap.lookupDefault (error $ $(curLoc) ++ "Vector") t nodesI,))
                                       (HashMap.lookup (mkVecZ elTy) nodesI)
-    edge t@(RTree _ elTy)  = maybe [] ((:[]) . (HashMap.lookupDefault (error $ $(curLoc) ++ "RTree") t nodesI,,()))
+    edge t@(RTree _ elTy)  = maybe [] ((:[]) . (HashMap.lookupDefault (error $ $(curLoc) ++ "RTree") t nodesI,))
                                       (HashMap.lookup (mkVecZ elTy) nodesI)
     edge t@(Product _ tys) = let ti = HashMap.lookupDefault (error $ $(curLoc) ++ "Product") t nodesI
-                             in mapMaybe (\ty -> liftM (ti,,()) (HashMap.lookup (mkVecZ ty) nodesI)) tys
+                             in mapMaybe (\ty -> liftM (ti,) (HashMap.lookup (mkVecZ ty) nodesI)) tys
     edge _                 = []
 
 normaliseType :: HWType -> VHDLM HWType
