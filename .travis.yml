@@ -28,6 +28,7 @@ cache:
     - $HOME/.cabal/packages
     - $HOME/.cabal/store
     - $HOME/iverilog
+    - dist-newstyle
 
 before_cache:
   - rm -fv $HOME/.cabal/packages/hackage.haskell.org/build-reports.log
