@@ -9,7 +9,7 @@ find ${DISTDIR} -maxdepth 1 -name '*.tar.gz' -exec tar -xvf '{}' -C ${DISTDIR} \
 sed -i 's/flags: cosim/flags: travisci cosim/g' cabal.project
 cat cabal.project
 # build & run tests, build benchmarks
-cabal new-build -w ${HC} all
-if [ "x$TEST" = "x--enable-tests" ]; then cabal new-run -w ${HC} -- clash-testsuite -j16; fi
+cabal new-build all
+if [ "x$TEST" = "x--enable-tests" ]; then cabal new-run -- clash-testsuite -j16; fi
 set +e
 set +x
