@@ -135,6 +135,10 @@ install:
   # Overlay Hackage Package Index for GHC HEAD: https://github.com/hvr/head.hackage
   - |
     if $GHCHEAD; then
+      echo "Disabling GHC HEAD for now. Singletons does not support it, causing unreasonable test times on Travis."
+      echo "Remove these lines if you believe singletons has support for GHC HEAD."
+      exit 1
+
       sed -i.bak 's/-- allow-newer:.*/allow-newer: *:base, *:template-haskell, *:ghc, *:Cabal/' ${HOME}/.cabal/config
 
       echo 'repository head.hackage'                                                        >> ${HOME}/.cabal/config
