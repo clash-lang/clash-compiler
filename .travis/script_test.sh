@@ -10,6 +10,6 @@ sed -i 's/flags: cosim/flags: travisci cosim/g' cabal.project
 cat cabal.project
 # build & run tests, build benchmarks
 cabal new-build all
-if [ "x$TEST" = "x--enable-tests" ]; then cabal new-run -- clash-testsuite -j16; fi
+if [ "x$TEST" = "x--enable-tests" ]; then cabal new-run -- clash-testsuite; fi
 set +e
 set +x
