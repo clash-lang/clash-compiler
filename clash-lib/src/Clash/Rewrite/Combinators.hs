@@ -43,8 +43,8 @@ allR trans (TransformContext is c) (Cast e ty1 ty2) =
   Cast <$> trans (TransformContext is (CastBody:c)) e <*> pure ty1 <*> pure ty2
 
 allR trans (TransformContext is c) (Letrec xes e) = do
-  e'   <- trans (TransformContext is' (LetBody bndrs:c)) e
   xes' <- traverse rewriteBind xes
+  e'   <- trans (TransformContext is' (LetBody bndrs:c)) e
   return (Letrec xes' e')
   -- Letrec <$> traverse rewriteBind xes <*> trans (TransformContext is' (LetBody bndrs:c)) e
  where
