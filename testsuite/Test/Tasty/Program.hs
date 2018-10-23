@@ -80,9 +80,6 @@ import Control.Concurrent.Lock ( Lock, acquire, release )
 
 import NeatInterpolation    ( text )
 
-import Text.Regex.PCRE ((=~))
-import Text.Regex.PCRE.Text ()
-
 import qualified Data.Text    as T
 import qualified Data.Text.IO as T
 
@@ -124,8 +121,8 @@ data TestFailingProgram =
     -- ^ Whether an empty stderr means test failure
     (Maybe Int)
     -- ^ Expected return code
-    (Maybe String)
-    -- ^ Expected string in stderr (regular expression)
+    (Maybe T.Text)
+    -- ^ Expected string in stderr
     (IO FilePath)
     -- ^ Work directory
     (IO (Maybe Lock, Maybe Lock))
@@ -193,8 +190,8 @@ testFailingProgram
   -> Maybe Int
   -- ^ Expected error code. Test will *only* succeed if program fails and the
   -- returned error code is equal to the given one.
-  -> (Maybe String)
-  -- ^ Expected string in stderr (regular expression)
+  -> (Maybe T.Text)
+  -- ^ Expected string in stderr
   -> IO FilePath
   -- ^ Optional working directory
   -> IO (Maybe Lock, Maybe Lock)
@@ -296,7 +293,7 @@ runFailingProgram
   -> Maybe Int
   -- ^ Expected error code. Test will *only* succeed if program fails and the
   -- returned error code is equal to the given one.
-  -> (Maybe String)
+  -> (Maybe T.Text)
   -- ^ Expected string in stderr (regular expression)
   -> FilePath
   -- ^ Optional working directory
@@ -319,7 +316,7 @@ runFailingProgram program args stdO errOnEmptyStderr expectedCode expectedStderr
           unexpectedEmptyStderr program code stdout
         else
           case expectedStderr of
-            Just r | not ((stderr =~ T.pack r) :: Bool) ->
+            Just r | not (r `T.isInfixOf` stderr) ->
               unexpectedStderr program code stderr stdout r
             _ ->
               case expectedCode of
@@ -355,10 +352,10 @@ unexpectedStderr
   -- ^ stderr
   -> T.Text
   -- ^ stdout
-  -> String
-  -- ^ Expected stderr (regular expression)
+  -> T.Text
+  -- ^ Expected stderr
   -> Result
-unexpectedStderr (T.pack -> file) (showT -> code) stderr stdout (T.pack -> expectedStderr) =
+unexpectedStderr (T.pack -> file) (showT -> code) stderr stdout expectedStderr =
   testFailed $ T.unpack $ [text|
     Program $file did not print expected output to stderr. We expected:
 
