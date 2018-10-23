@@ -383,10 +383,10 @@ caseCon ctx@(TransformContext is0 _) e@(Case subj ty alts)
     case whnf' primEval bndrs tcm gh ids1 is1 True subj of
       (gh',ph',v) -> do
         globalHeap Lens..= gh'
-        bindPureHeap tcm ph' $ case v of
-          Literal l -> caseCon ctx (Case (Literal l) ty alts)
+        bindPureHeap ctx tcm ph' $ \ctx' -> case v of
+          Literal l -> caseCon ctx' (Case (Literal l) ty alts)
           subj' -> case collectArgs subj' of
-            (Data _,_) -> caseCon ctx (Case subj' ty alts)
+            (Data _,_) -> caseCon ctx' (Case subj' ty alts)
 #if MIN_VERSION_ghc(8,2,2)
             (Prim nm ty',_:msgOrCallStack:_)
               | nm == "Control.Exception.Base.absentError" ->
@@ -415,7 +415,7 @@ caseCon ctx@(TransformContext is0 _) e@(Case subj ty alts)
               case coreTypeToHWType tran reprs tcm False subjTy of
                 Right (Void (Just hty))
                   | hty `elem` [BitVector 0, Unsigned 0, Signed 0, Index 1]
-                  -> caseCon ctx (Case (Literal (IntegerLiteral 0)) ty alts)
+                  -> caseCon ctx' (Case (Literal (IntegerLiteral 0)) ty alts)
                 _ -> traceIf (lvl > DebugNone && isConstant subj)
                        ("Irreducible constant as case subject: " ++ showPpr subj ++ "\nCan be reduced to: " ++ showPpr subj')
                        (caseOneAlt e)
@@ -437,14 +437,23 @@ caseCon _ e = return e
 -- | Binds variables on the PureHeap over the result of the rewrite
 --
 -- To prevent unnecessary rewrites only do this when rewrite changed something.
-bindPureHeap :: TyConMap -> PureHeap -> RewriteMonad extra Term -> RewriteMonad extra Term
-bindPureHeap tcm heap rw = do
-  (e, Monoid.getAny -> hasChanged) <- listen rw
+bindPureHeap
+  :: TransformContext
+  -> TyConMap
+  -> PureHeap
+  -> (TransformContext -> RewriteMonad extra Term)
+  -> RewriteMonad extra Term
+bindPureHeap (TransformContext is0 ctxs) tcm heap rw = do
+  (e, Monoid.getAny -> hasChanged) <- listen $ rw ctx'
   if hasChanged && not (null bndrs)
     then return $ Letrec bndrs e
     else return e
   where
     bndrs = map toLetBinding $ toListUniqMap heap
+    heapIds = map fst bndrs
+    is1 = extendInScopeSetList is0 heapIds
+    ctx' = TransformContext is1 (LetBody heapIds : ctxs)
+
     toLetBinding :: (Unique,Term) -> LetBinding
     toLetBinding (uniq,term) = (nm, term)
       where
@@ -1449,7 +1458,7 @@ reduceBinders is processed body ((id_,expr):binders) = case List.find ((== expr)
     Nothing -> reduceBinders is ((id_,expr):processed) body binders
 
 reduceConst :: NormRewrite
-reduceConst (TransformContext is0 _) e@(App _ _)
+reduceConst ctx@(TransformContext is0 _) e@(App _ _)
   | isConstant e
   , (conPrim, _) <- collectArgs e
   , isPrim conPrim
@@ -1465,7 +1474,7 @@ reduceConst (TransformContext is0 _) e@(App _ _)
     case whnf' primEval bndrs tcm gh ids1 is1 False e of
       (gh',ph',e') -> do
         globalHeap Lens..= gh'
-        bindPureHeap tcm ph' $ case e' of
+        bindPureHeap ctx tcm ph' $ \_ctx' -> case e' of
           (Literal _) -> changed e'
           (collectArgs -> (Prim nm _, _))
             | isFromInt nm
