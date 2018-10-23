@@ -43,8 +43,6 @@ executable clash-testsuite
                        tasty              >=0.10.1.2 && <2.0,
                        tasty-hunit,
                        neat-interpolation >=0.3      && <0.4,
-                       regex-pcre-builtin >=0.9      && <1,
-                       regex-pcre-text    >=0.9      && <1,
                        concurrent-extra   >=0.7      && <0.8,
                        temporary,
                        text,

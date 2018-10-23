@@ -11,6 +11,7 @@ import Test.Tasty.Program ( testProgram
 
 import           Data.Char        (toLower)
 import qualified Data.List        as List
+import qualified Data.Text        as Text
 import qualified System.Directory as Directory
 import           System.Process   (callProcess)
 import           System.FilePath  ((</>),(<.>))
@@ -535,8 +536,8 @@ runFailingTest'
   -- ^ Extra arguments
   -> String
   -- ^ Module name
-  -> Maybe String
-  -- ^ Expected stderr (regular expression)
+  -> Maybe Text.Text
+  -- ^ Expected stderr
   -> TestTree
 runFailingTest' _ All  _ _ _ = error "Unexpected test target: All"
 runFailingTest' _ Both _ _ _ = error "Unexpected test target: Both"
@@ -564,8 +565,8 @@ runFailingTest
   -- ^ Extra arguments
   -> String
   -- ^ Module name
-  -> Maybe String
-  -- ^ Expected stderr (regular expression)
+  -> Maybe Text.Text
+  -- ^ Expected stderr
   -> TestTree
 runFailingTest env Both extraArgs modName expectedStderr =
   testGroup modName

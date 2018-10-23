@@ -3,7 +3,7 @@ module PortProducts where
 import qualified Prelude as P
 import System.Environment (getArgs)
 import System.FilePath ((</>))
-import Text.Regex.PCRE ((=~))
+import Data.List (isInfixOf)
 
 import Clash.Prelude
 import Clash.Explicit.Testbench
@@ -42,9 +42,9 @@ testBench = done
 -- File content test
 assertIn :: String -> String -> IO ()
 assertIn needle haystack
-  | haystack =~ needle = return ()
-  | otherwise = P.error $ P.concat [ "Expected:\n\n  ", needle
-                                   , "\n\nIn:\n\n", haystack ]
+  | needle `isInfixOf` haystack = return ()
+  | otherwise                   = P.error $ P.concat [ "Expected:\n\n  ", needle
+                                                     , "\n\nIn:\n\n", haystack ]
 
 mainVerilog :: IO ()
 mainVerilog = do
