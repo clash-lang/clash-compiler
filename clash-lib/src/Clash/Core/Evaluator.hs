@@ -18,6 +18,7 @@ module Clash.Core.Evaluator where
 
 import           Control.Arrow                           (second)
 import           Control.Concurrent.Supply               (Supply, freshId)
+import           Data.Coerce                             (coerce)
 import           Data.Either                             (lefts,rights)
 import           Data.List
   (foldl',mapAccumL,uncons)
@@ -336,7 +337,7 @@ unwind eval gbl tcm h k v = do
   case kf of
     Update x                     -> return (update h k' x v)
     Apply x                      -> return (apply  h k' v x)
-    Instantiate ty               -> return (instantiate h k' v ty)
+    Instantiate ty               -> return (instantiate gbl h k' v ty)
     PrimApply nm ty tys vals tms -> primop eval gbl tcm h k' nm ty tys vals v tms
     Scrutinise _ alts            -> return (scrutinise h k' v alts)
 
@@ -371,12 +372,15 @@ apply h@(Heap _ _ _ is0) k (Lambda x' e) x = (h,k,substTm "Evaluator.apply" subs
 apply _ _ _ _ = error "not a lambda"
 
 -- | Instantiate a type-abstraction
-instantiate :: Heap -> Stack -> Value -> Type -> State
-instantiate h k (TyLambda x e) ty = (h,k,substTm "Evaluator.instantiate" subst e)
+instantiate :: BindingMap -> Heap -> Stack -> Value -> Type -> State
+instantiate gbl h k (TyLambda x e) ty = (h,k,substTm "Evaluator.instantiate" subst e)
  where
   subst  = extendTvSubst subst0 x ty
-  subst0 = mkSubst (mkInScopeSet (tyFVsOfTypes [ty]))
-instantiate _ _ _ _ = error "not a ty lambda"
+  subst0 = mkSubst is0
+  is0 = mkInScopeSet (gblVars `unionUniqSet` tyFVsOfTypes [ty])
+  gblVars :: VarSet
+  gblVars = uniqMapToUniqSet $ fmap ((\(nm,_,_,_) -> coerce nm)) gbl
+instantiate _ _ _ _ _ = error "not a ty lambda"
 
 -- | Evaluation of primitive operations
 primop
