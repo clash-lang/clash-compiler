@@ -542,12 +542,16 @@ deShadowTerm
 deShadowTerm is e = substTm "deShadowTerm" (mkSubst is) e
 
 -- | A much stronger variant of `deShadowTerm` that ensures that all bound
--- variables are unique
+-- variables are unique.
+--
+-- Also returns an extended 'InScopeSet' additionally containing the (renamed)
+-- unique bound variables of the term.
 freshenTm
   :: InScopeSet
+  -- ^ Current set of variables in scope
   -> Term
-  -> Term
-freshenTm is0 = snd . go (mkSubst is0) where
+  -> (InScopeSet, Term)
+freshenTm is0 = go (mkSubst is0) where
   go subst0 = \case
     Var v -> (substInScope subst0, lookupIdSubst "freshenTm" subst0 v)
     Lam v e -> case substIdBndr subst0 v of

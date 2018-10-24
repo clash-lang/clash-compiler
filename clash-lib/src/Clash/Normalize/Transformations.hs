@@ -98,12 +98,12 @@ import           Clash.Core.TyCon            (tyConDataCons)
 import           Clash.Core.Util
   (collectArgs, isClockOrReset, isCon, isFun, isLet, isPolyFun, isPrim,
    isSignalType, isVar, mkApps, mkLams, mkVec, piResultTy, termSize, termType,
-   tyNatSize, patIds, patVars)
+   tyNatSize, patVars)
 import           Clash.Core.Var              (Id, Var (..))
 import           Clash.Core.VarEnv
   (InScopeSet, VarEnv, VarSet, elemVarSet, emptyVarEnv, emptyVarSet, extendInScopeSet,
    extendInScopeSetList, lookupVarEnv, notElemVarSet, unionVarEnvWith, unionVarSet,
-   unionInScope, unitVarEnv, unitVarSet, mkVarSet, mkInScopeSet, uniqAway, emptyInScopeSet)
+   unionInScope, unitVarEnv, unitVarSet, mkVarSet, mkInScopeSet, uniqAway)
 import           Clash.Driver.Types          (DebugLevel (..))
 import           Clash.Netlist.BlackBox.Util (usedArguments)
 import           Clash.Netlist.Types         (HWType (..))
@@ -1062,7 +1062,7 @@ makeANF (TransformContext is0 ctx) (Lam bndr e) = do
 
 makeANF _ e@(TyLam {}) = return e
 
-makeANF ctx@(TransformContext is0 _) e
+makeANF ctx@(TransformContext is0 _) e0
   = do
     is1 <- unionInScope is0 <$> Lens.use globalInScope
     -- We need to freshen all binders in `e` because we're shuffling them around
@@ -1070,30 +1070,54 @@ makeANF ctx@(TransformContext is0 _) e
     -- don't have to be unique within an expression. And so lifting them all
     -- to a single let-binder will cause issues when they're not unique.
     --
-    -- TODO: Make freshening part of collectANF, so we don't traverse the
-    -- expression twice.
-    (e',(bndrs,_)) <- runStateT (bottomupR collectANF ctx (freshenTm is1 e)) ([],emptyInScopeSet)
+    -- We cannot make freshening part of collectANF, because when we generate
+    -- new binders, we need to make sure those names do not conflict with _any_
+    -- of the existing binders in the expression.
+    --
+    -- See also Note [ANF InScopeSet]
+    let (is2,e1) = freshenTm is1 e0
+    (e2,(bndrs,_)) <- runStateT (bottomupR collectANF ctx e1) ([],is2)
     case bndrs of
-      [] -> return e
-      _  -> changed (Letrec bndrs e')
+      [] -> return e0
+      _  -> changed (Letrec bndrs e2)
 
 -- | Note [ANF InScopeSet]
 --
 -- The InScopeSet contains:
 --
---    * All the global variables
+--    1. All the free variables of the expression we are traversing
 --
---    * The binders as we traverse down the expression (is0)
+--    2. All the bound variables of the expression we are traversing
 --
---    * The newly created let-bindings as we recurse back up the traversal
+--    3. The newly created let-bindings as we recurse back up the traversal
 --
 -- All of these are needed to created let-bindings that
 --
 --    * Do not shadow
 --    * Are not shadowed
---    * Nor conflict with eachother (i.e. have the same unique)
+--    * Nor conflict with each other (i.e. have the same unique)
+--
+-- Initially we start with the local InScopeSet and add the global variables:
+--
+-- @
+-- is1 <- unionInScope is0 <$> Lens.use globalInScope
+-- @
+--
+-- Which will gives us the (superset of) free variables of the expression. Then
+-- we call  'freshenTm'
+--
+-- @
+-- let (is2,e1) = freshenTm is1 e0
+-- @
+--
+-- Which extends the InScopeSet with all the bound variables in 'e1', the
+-- version of 'e0' where all binders are unique (not just deshadowed).
+--
+-- So we start out with an InScopeSet that satisfies points 1 and 2, now every
+-- time we create a new binder we must add it to the InScopeSet to satisfy
+-- point 3.
 collectANF :: NormRewriteW
-collectANF ctx@(TransformContext is0 _) e@(App appf arg)
+collectANF ctx e@(App appf arg)
   | (conVarPrim, _) <- collectArgs e
   , isCon conVarPrim || isPrim conVarPrim || isVar conVarPrim
   = do
@@ -1104,10 +1128,9 @@ collectANF ctx@(TransformContext is0 _) e@(App appf arg)
       (False,False,_) -> do
         tcm <- Lens.view tcCache
         -- See Note [ANF InScopeSet]
-        is1 <- unionInScope is0 <$>
-                  (unionInScope <$> Lens.use _2
-                                <*> lift (Lens.use globalInScope))
+        is1   <- Lens.use _2
         argId <- lift (mkTmBinderFor is1 tcm (mkDerivedName ctx "app_arg") arg)
+        -- See Note [ANF InScopeSet]
         tellBinders [(argId,arg)]
         return (App appf (Var argId))
       (True,False,Letrec binds body) -> do
@@ -1115,7 +1138,7 @@ collectANF ctx@(TransformContext is0 _) e@(App appf arg)
         return (App appf body)
       _ -> return e
 
-collectANF (TransformContext is0 _) (Letrec binds body) = do
+collectANF _ (Letrec binds body) = do
   tellBinders binds
   untranslatable <- lift (isUntranslatable False body)
   localVar       <- lift (isLocalVar body)
@@ -1124,10 +1147,9 @@ collectANF (TransformContext is0 _) (Letrec binds body) = do
     else do
       tcm <- Lens.view tcCache
       -- See Note [ANF InScopeSet]
-      is1 <- unionInScope is0 <$>
-                (unionInScope <$> Lens.use _2
-                              <*> lift (Lens.use globalInScope))
+      is1 <- Lens.use _2
       argId <- lift (mkTmBinderFor is1 tcm (mkUnsafeSystemName "result" 0) body)
+      -- See Note [ANF InScopeSet]
       tellBinders [(argId,body)]
       return (Var argId)
 
@@ -1150,55 +1172,78 @@ collectANF (TransformContext is0 _) (Letrec binds body) = do
 collectANF _ e@(Case _ _ [(DataPat dc _ _,_)])
   | nameOcc (dcName dc) == "Clash.Signal.Internal.:-" = return e
 
-collectANF ctx@(TransformContext is0 _) (Case subj ty alts) = do
-    localVar     <- lift (isLocalVar subj)
-    -- See Note [ANF InScopeSet]
-    is1 <- unionInScope is0 <$>
-              (unionInScope <$> Lens.use _2
-                            <*> lift (Lens.use globalInScope))
-    (bndr,subj') <- if localVar || isConstant subj
-      then return ([],subj)
-      else do tcm <- Lens.view tcCache
-              argId <- lift (mkTmBinderFor is1 tcm (mkDerivedName ctx "case_scrut") subj)
-              return ([(argId,subj)],Var argId)
+collectANF ctx (Case subj ty alts) = do
+    localVar <- lift (isLocalVar subj)
 
-    (binds,alts') <- fmap (first concat . unzip) $ mapM (lift . doAlt is1 subj') alts
+    subj' <- if localVar || isConstant subj
+      then return subj
+      else do
+        tcm <- Lens.view tcCache
+        -- See Note [ANF InScopeSet]
+        is1 <- Lens.use _2
+        argId <- lift (mkTmBinderFor is1 tcm (mkDerivedName ctx "case_scrut") subj)
+        -- See Note [ANF InScopeSet]
+        tellBinders [(argId,subj)]
+        return (Var argId)
 
-    tellBinders (bndr ++ binds)
+    alts' <- mapM (doAlt subj') alts
+
     case alts' of
       [(DataPat _ [] xs,altExpr)]
         | xs `idsDoNotOccurIn` altExpr
         -> return altExpr
       _ -> return (Case subj' ty alts')
   where
-    doAlt :: InScopeSet -> Term -> (Pat,Term) -> RewriteMonad NormalizeState ([LetBinding],(Pat,Term))
-    doAlt isN0 subj' alt@(DataPat dc [] xs,altExpr) = do
-      lv      <- isLocalVar altExpr
-      let isN1 = extendInScopeSetList isN0 xs
-      patSels <- Monad.zipWithM (doPatBndr isN1 subj' dc) xs [0..]
+    doAlt
+      :: Term -> (Pat,Term)
+      -> StateT ([LetBinding],InScopeSet) (RewriteMonad NormalizeState)
+                (Pat,Term)
+    doAlt subj' alt@(DataPat dc [] xs,altExpr) = do
+      lv  <- lift (isLocalVar altExpr)
+      patSels <- Monad.zipWithM (doPatBndr subj' dc) xs [0..]
       let usesXs (Var n) = any (== n) xs
           usesXs _       = False
       if (lv && not (usesXs altExpr)) || isConstant altExpr
-        then return (patSels,alt)
-        else do tcm <- Lens.view tcCache
-                altId <- mkTmBinderFor isN1 tcm (mkDerivedName ctx "case_alt") altExpr
-                return ((altId,altExpr):patSels,(DataPat dc [] xs,Var altId))
-    doAlt _ _ alt@(DataPat {}, _) = return ([],alt)
-    doAlt isN0 _ alt@(pat,altExpr) = do
-      lv <- isLocalVar altExpr
+        then do
+          -- See Note [ANF InScopeSet]
+          tellBinders patSels
+          return alt
+        else do
+          tcm <- Lens.view tcCache
+          -- See Note [ANF InScopeSet]
+          is1 <- Lens.use _2
+          altId <- lift (mkTmBinderFor is1 tcm (mkDerivedName ctx "case_alt") altExpr)
+          -- See Note [ANF InScopeSet]
+          tellBinders ((altId,altExpr):patSels)
+          return (DataPat dc [] xs,Var altId)
+    doAlt _ alt@(DataPat {}, _) = return alt
+    doAlt _ alt@(pat,altExpr) = do
+      lv <- lift (isLocalVar altExpr)
       if lv || isConstant altExpr
-        then return ([],alt)
-        else do tcm <- Lens.view tcCache
-                let (tvs,xs) = patIds pat
-                    isN1 = extendInScopeSetList (extendInScopeSetList isN0 tvs) xs
-                altId <- mkTmBinderFor isN1 tcm (mkDerivedName ctx "case_alt") altExpr
-                return ([(altId,altExpr)],(pat,Var altId))
+        then return alt
+        else do
+          tcm <- Lens.view tcCache
+          -- See Note [ANF InScopeSet]
+          is1 <- Lens.use _2
+          altId <- lift (mkTmBinderFor is1 tcm (mkDerivedName ctx "case_alt") altExpr)
+          tellBinders [(altId,altExpr)]
+          return (pat,Var altId)
 
-    doPatBndr :: InScopeSet -> Term -> DataCon -> Id -> Int -> RewriteMonad NormalizeState LetBinding
-    doPatBndr isN subj' dc pId i
-      = do tcm <- Lens.view tcCache
-           patExpr <- mkSelectorCase ($(curLoc) ++ "doPatBndr") isN tcm subj' (dcTag dc) i
-           return (pId,patExpr)
+    doPatBndr
+      :: Term -> DataCon -> Id -> Int
+      -> StateT ([LetBinding],InScopeSet) (RewriteMonad NormalizeState)
+                LetBinding
+    doPatBndr subj' dc pId i
+      = do
+        tcm <- Lens.view tcCache
+        -- See Note [ANF InScopeSet]
+        is1 <- Lens.use _2
+        patExpr <- lift (mkSelectorCase ($(curLoc) ++ "doPatBndr") is1 tcm subj' (dcTag dc) i)
+        -- No need to 'tellBinders' here because 'pId' is already in the ANF
+        -- InScopeSet.
+        --
+        -- See also Note [ANF InScopeSet]
+        return (pId,patExpr)
 
 collectANF _ e = return e
 
