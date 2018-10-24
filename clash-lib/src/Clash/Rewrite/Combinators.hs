@@ -46,7 +46,6 @@ allR trans (TransformContext is c) (Letrec xes e) = do
   xes' <- traverse rewriteBind xes
   e'   <- trans (TransformContext is' (LetBody bndrs:c)) e
   return (Letrec xes' e')
-  -- Letrec <$> traverse rewriteBind xes <*> trans (TransformContext is' (LetBody bndrs:c)) e
  where
   bndrs              = map fst xes
   is'                = extendInScopeSetList is (map fst xes)
