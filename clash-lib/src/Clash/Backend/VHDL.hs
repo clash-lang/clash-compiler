@@ -135,13 +135,15 @@ instance Backend VHDLState where
   hdlSyn          = use hdlsyn
   mkIdentifier    = return go
     where
-      go Basic    nm = filterReserved (TextS.toLower (mkBasicId' True nm))
+      go Basic nm = (stripTrailingUnderscore . filterReserved)
+                    (TextS.toLower (mkBasicId' True nm))
       go Extended (rmSlash -> nm) = case go Basic nm of
         nm' | nm /= nm' -> TextS.concat ["\\",nm,"\\"]
             |otherwise  -> nm'
   extendIdentifier = return go
     where
-      go Basic nm ext = filterReserved (TextS.toLower (mkBasicId' True (nm `TextS.append` ext)))
+      go Basic nm ext = (stripTrailingUnderscore . filterReserved)
+                        (TextS.toLower (mkBasicId' True (nm `TextS.append` ext)))
       go Extended ((rmSlash . escapeTemplate) -> nm) ext =
         let nmExt = nm `TextS.append` ext
         in  case go Basic nm ext of
@@ -211,6 +213,9 @@ filterReserved :: Identifier -> Identifier
 filterReserved s = if s `elem` reservedWords
   then s `TextS.append` "_r"
   else s
+
+stripTrailingUnderscore :: Identifier -> Identifier
+stripTrailingUnderscore = TextS.dropWhileEnd (== '_') -- TextS.takeWhile (/= '_')
 
 -- | Generate VHDL for a Netlist component
 genVHDL :: Identifier -> SrcSpan -> [Identifier] -> Component -> VHDLM ((String,Doc),[(String,Doc)])

@@ -137,13 +137,14 @@ instance Backend SystemVerilogState where
   hdlSyn          = use hdlsyn
   mkIdentifier    = return go
     where
-      go Basic    nm = filterReserved (mkBasicId' True nm)
+      go Basic    nm = (TextS.take 1024 . filterReserved) (mkBasicId' True nm)
       go Extended (rmSlash . escapeTemplate -> nm) = case go Basic nm of
         nm' | nm /= nm' -> TextS.concat ["\\",nm," "]
             |otherwise  -> nm'
   extendIdentifier = return go
     where
-      go Basic nm ext = filterReserved (mkBasicId' True (nm `TextS.append` ext))
+      go Basic nm ext = (TextS.take 1024 . filterReserved)
+                        (mkBasicId' True (nm `TextS.append` ext))
       go Extended (rmSlash -> nm) ext =
         let nmExt = nm `TextS.append` ext
         in  case go Basic nm ext of
