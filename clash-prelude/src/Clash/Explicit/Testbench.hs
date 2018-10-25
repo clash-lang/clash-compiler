@@ -28,6 +28,7 @@ import System.IO.Unsafe      (unsafeDupablePerformIO)
 
 import Clash.Explicit.Signal
   (Clock, Reset, Signal, fromList, register, unbundle)
+import Clash.Signal          (mux)
 import Clash.Sized.Index     (Index)
 import Clash.Sized.Internal.BitVector
   (BitVector, isLike)
@@ -192,7 +193,9 @@ outputVerifier
 outputVerifier clk rst samples i =
     let (s,o) = unbundle (genT <$> register clk rst 0 s)
         (e,f) = unbundle o
-    in  assert clk rst "outputVerifier" i e (register clk rst False f)
+        f'    = register clk rst False f
+        -- Only assert while not finished
+    in  mux f' f' $ assert clk rst "outputVerifier" i e f'
   where
     genT :: Index l -> (Index l,(a,Bool))
     genT s = (s',(samples !! s,finished))
@@ -220,7 +223,9 @@ outputVerifierBitVector
 outputVerifierBitVector clk rst samples i =
     let (s,o) = unbundle (genT <$> register clk rst 0 s)
         (e,f) = unbundle o
-    in  assertBitVector clk rst "outputVerifierBitVector" i e (register clk rst False f)
+        f'    = register clk rst False f
+        -- Only assert while not finished
+    in  mux f' f' $ assertBitVector clk rst "outputVerifierBitVector" i e f'
   where
     genT :: Index l -> (Index l,(BitVector n,Bool))
     genT s = (s',(samples !! s,finished))
