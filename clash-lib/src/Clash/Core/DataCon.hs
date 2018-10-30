@@ -22,10 +22,6 @@ module Clash.Core.DataCon
   )
 where
 
-#ifndef MIN_VERSION_unbound_generics
-#define MIN_VERSION_unbound_generics(x,y,z)(1)
-#endif
-
 import Control.DeepSeq                        (NFData(..))
 import Data.Binary                            (Binary)
 import Data.Hashable                          (Hashable)

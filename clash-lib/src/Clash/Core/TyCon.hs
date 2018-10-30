@@ -23,10 +23,6 @@ module Clash.Core.TyCon
   )
 where
 
-#ifndef MIN_VERSION_unbound_generics
-#define MIN_VERSION_unbound_generics(x,y,z)(1)
-#endif
-
 -- External Import
 import Control.DeepSeq
 import Data.Binary                            (Binary)
