@@ -98,7 +98,7 @@ import Clash.Prelude.BitReduction (reduceAnd, reduceOr)
 import Clash.Sized.BitVector      (BitVector, (++#))
 import Clash.Sized.Signed         (Signed)
 import Clash.Sized.Unsigned       (Unsigned)
-import Clash.XException           (ShowX (..), Undefined, showsPrecXWith)
+import Clash.XException           (ShowX (..), Undefined (..), errorX, showsPrecXWith)
 
 {- $setup
 >>> :set -XDataKinds
@@ -121,8 +121,6 @@ import Clash.XException           (ShowX (..), Undefined, showsPrecXWith)
 -- 'minBound' on underflow, and use truncation as the rounding method.
 newtype Fixed (rep :: Nat -> *) (int :: Nat) (frac :: Nat) =
   Fixed { unFixed :: rep (int + frac) }
-
-instance Undefined (Fixed rep int frac)
 
 deriving instance NFData (rep (int + frac)) => NFData (Fixed rep int frac)
 deriving instance (Typeable rep, Typeable int, Typeable frac
@@ -269,6 +267,8 @@ instance ( size ~ (int + frac), KnownNat frac, Integral (rep size)
 instance ( size ~ (int + frac), KnownNat frac, Integral (rep size)
          ) => ShowX (Fixed rep int frac) where
   showsPrecX = showsPrecXWith showsPrec
+
+instance Undefined (Fixed rep int frac) where deepErrorX = Fixed . errorX
 
 -- | None of the 'Read' class' methods are synthesisable.
 instance (size ~ (int + frac), KnownNat frac, Bounded (rep size), Integral (rep size))

@@ -93,7 +93,7 @@ import Clash.Class.Num            (ExtendingNum (..), SaturatingNum (..),
 import Clash.Class.Resize         (Resize (..))
 import {-# SOURCE #-} Clash.Sized.Internal.BitVector (BitVector (BV),undefError)
 import Clash.Promoted.Nat         (SNat, snatToNum, leToPlusKN)
-import Clash.XException           (ShowX (..), Undefined, showsPrecXWith)
+import Clash.XException           (ShowX (..), Undefined (..), errorX, showsPrecXWith)
 
 -- | Arbitrary-bounded unsigned integer represented by @ceil(log_2(n))@ bits.
 --
@@ -122,7 +122,7 @@ newtype Index (n :: Nat) =
     -- | The constructor, 'I', and the field, 'unsafeToInteger', are not
     -- synthesisable.
     I { unsafeToInteger :: Integer }
-  deriving (Data,Undefined)
+  deriving Data
 
 instance NFData (Index n) where
   rnf (I i) = rnf i `seq` ()
@@ -362,6 +362,8 @@ instance Show (Index n) where
 
 instance ShowX (Index n) where
   showsPrecX = showsPrecXWith showsPrec
+
+instance Undefined (Index n) where deepErrorX = errorX
 
 -- | None of the 'Read' class' methods are synthesisable.
 instance KnownNat n => Read (Index n) where

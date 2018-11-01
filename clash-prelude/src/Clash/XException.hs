@@ -375,86 +375,50 @@ instance GShowX UWord where
 class Undefined a where
   -- | Create a value where all the elements have an 'errorX', but the spine
   -- is defined.
-  deepErrorX :: HasCallStack => String -> a
-  deepErrorX = errorX
+  deepErrorX :: String -> a
+
+  default deepErrorX :: (Generic a, GUndefined (Rep a)) => String -> a
+  deepErrorX = to . gDeepErrorX
 
 instance Undefined ()
-instance (Undefined a, Undefined b) => Undefined (a,b) where
-  deepErrorX x = (deepErrorX x,deepErrorX x)
-instance (Undefined a, Undefined b, Undefined c) => Undefined (a,b,c) where
-  deepErrorX x = (deepErrorX x,deepErrorX x,deepErrorX x)
-instance (Undefined a, Undefined b, Undefined c, Undefined d) =>
-  Undefined (a,b,c,d) where
-  deepErrorX x = (deepErrorX x,deepErrorX x,deepErrorX x,deepErrorX x)
-instance (Undefined a, Undefined b, Undefined c, Undefined d, Undefined e) =>
-  Undefined (a,b,c,d,e) where
-  deepErrorX x = (deepErrorX x,deepErrorX x,deepErrorX x,deepErrorX x
-                 ,deepErrorX x)
-instance (Undefined a, Undefined b, Undefined c, Undefined d, Undefined e
-         ,Undefined f)
-  => Undefined (a,b,c,d,e,f) where
-  deepErrorX x = (deepErrorX x,deepErrorX x,deepErrorX x,deepErrorX x
-                 ,deepErrorX x,deepErrorX x)
+instance (Undefined a, Undefined b) => Undefined (a,b)
+instance (Undefined a, Undefined b, Undefined c) => Undefined (a,b,c)
+instance (Undefined a, Undefined b, Undefined c, Undefined d) => Undefined (a,b,c,d)
+instance (Undefined a, Undefined b, Undefined c, Undefined d, Undefined e) => Undefined (a,b,c,d,e)
+instance (Undefined a, Undefined b, Undefined c, Undefined d, Undefined e ,Undefined f)
+  => Undefined (a,b,c,d,e,f)
 instance (Undefined a, Undefined b, Undefined c, Undefined d, Undefined e
          ,Undefined f, Undefined g)
-  => Undefined (a,b,c,d,e,f,g) where
-  deepErrorX x = (deepErrorX x,deepErrorX x,deepErrorX x,deepErrorX x
-                 ,deepErrorX x,deepErrorX x,deepErrorX x)
+  => Undefined (a,b,c,d,e,f,g)
 instance (Undefined a, Undefined b, Undefined c, Undefined d, Undefined e
          ,Undefined f, Undefined g, Undefined h)
-  => Undefined (a,b,c,d,e,f,g,h) where
-  deepErrorX x = (deepErrorX x,deepErrorX x,deepErrorX x,deepErrorX x
-                 ,deepErrorX x,deepErrorX x,deepErrorX x,deepErrorX x)
+  => Undefined (a,b,c,d,e,f,g,h)
 instance (Undefined a, Undefined b, Undefined c, Undefined d, Undefined e
          ,Undefined f, Undefined g, Undefined h, Undefined i)
-  => Undefined (a,b,c,d,e,f,g,h,i) where
-  deepErrorX x = (deepErrorX x,deepErrorX x,deepErrorX x,deepErrorX x
-                 ,deepErrorX x,deepErrorX x,deepErrorX x,deepErrorX x
-                 ,deepErrorX x)
+  => Undefined (a,b,c,d,e,f,g,h,i)
 instance (Undefined a, Undefined b, Undefined c, Undefined d, Undefined e
          ,Undefined f, Undefined g, Undefined h, Undefined i, Undefined j)
-  => Undefined (a,b,c,d,e,f,g,h,i,j) where
-  deepErrorX x = (deepErrorX x,deepErrorX x,deepErrorX x,deepErrorX x
-                 ,deepErrorX x,deepErrorX x,deepErrorX x,deepErrorX x
-                 ,deepErrorX x,deepErrorX x)
+  => Undefined (a,b,c,d,e,f,g,h,i,j)
 instance (Undefined a, Undefined b, Undefined c, Undefined d, Undefined e
          ,Undefined f, Undefined g, Undefined h, Undefined i, Undefined j
          ,Undefined k)
-  => Undefined (a,b,c,d,e,f,g,h,i,j,k) where
-  deepErrorX x = (deepErrorX x,deepErrorX x,deepErrorX x,deepErrorX x
-                 ,deepErrorX x,deepErrorX x,deepErrorX x,deepErrorX x
-                 ,deepErrorX x,deepErrorX x,deepErrorX x)
+  => Undefined (a,b,c,d,e,f,g,h,i,j,k)
 instance (Undefined a, Undefined b, Undefined c, Undefined d, Undefined e
          ,Undefined f, Undefined g, Undefined h, Undefined i, Undefined j
          ,Undefined k, Undefined l)
-  => Undefined (a,b,c,d,e,f,g,h,i,j,k,l) where
-  deepErrorX x = (deepErrorX x,deepErrorX x,deepErrorX x,deepErrorX x
-                 ,deepErrorX x,deepErrorX x,deepErrorX x,deepErrorX x
-                 ,deepErrorX x,deepErrorX x,deepErrorX x,deepErrorX x)
+  => Undefined (a,b,c,d,e,f,g,h,i,j,k,l)
 instance (Undefined a, Undefined b, Undefined c, Undefined d, Undefined e
          ,Undefined f, Undefined g, Undefined h, Undefined i, Undefined j
          ,Undefined k, Undefined l, Undefined m)
-  => Undefined (a,b,c,d,e,f,g,h,i,j,k,l,m) where
-  deepErrorX x = (deepErrorX x,deepErrorX x,deepErrorX x,deepErrorX x
-                 ,deepErrorX x,deepErrorX x,deepErrorX x,deepErrorX x
-                 ,deepErrorX x,deepErrorX x,deepErrorX x,deepErrorX x
-                 ,deepErrorX x)
+  => Undefined (a,b,c,d,e,f,g,h,i,j,k,l,m)
 instance (Undefined a, Undefined b, Undefined c, Undefined d, Undefined e
          ,Undefined f, Undefined g, Undefined h, Undefined i, Undefined j
          ,Undefined k, Undefined l, Undefined m, Undefined n)
-  => Undefined (a,b,c,d,e,f,g,h,i,j,k,l,m,n) where
-  deepErrorX x = (deepErrorX x,deepErrorX x,deepErrorX x,deepErrorX x
-                 ,deepErrorX x,deepErrorX x,deepErrorX x,deepErrorX x
-                 ,deepErrorX x,deepErrorX x,deepErrorX x,deepErrorX x
-                 ,deepErrorX x,deepErrorX x)
+  => Undefined (a,b,c,d,e,f,g,h,i,j,k,l,m,n)
 instance (Undefined a, Undefined b, Undefined c, Undefined d, Undefined e
          ,Undefined f, Undefined g, Undefined h, Undefined i, Undefined j
          ,Undefined k, Undefined l, Undefined m, Undefined n, Undefined o)
-  => Undefined (a,b,c,d,e,f,g,h,i,j,k,l,m,n,o) where
-  deepErrorX x = (deepErrorX x,deepErrorX x,deepErrorX x,deepErrorX x
-                 ,deepErrorX x,deepErrorX x,deepErrorX x,deepErrorX x
-                 ,deepErrorX x,deepErrorX x,deepErrorX x,deepErrorX x
-                 ,deepErrorX x,deepErrorX x,deepErrorX x)
+  => Undefined (a,b,c,d,e,f,g,h,i,j,k,l,m,n,o)
 
 instance Undefined b => Undefined (a -> b) where
   deepErrorX = pure . deepErrorX
@@ -462,24 +426,46 @@ instance Undefined b => Undefined (a -> b) where
 instance Undefined a => Undefined (Down a) where
   deepErrorX = Down . deepErrorX
 
-instance Undefined [a]
-instance Undefined Char
 instance Undefined Bool
-instance Undefined Double
+instance Undefined [a]
 instance Undefined (Either a b)
-instance Undefined Float
-instance Undefined Int
-instance Undefined Int8
-instance Undefined Int16
-instance Undefined Int32
-instance Undefined Int64
-instance Undefined Integer
-instance Undefined (Seq a)
-instance Undefined Word
-instance Undefined Word8
-instance Undefined Word16
-instance Undefined Word32
-instance Undefined Word64
 instance Undefined (Maybe a)
-instance Undefined (Ratio a)
-instance Undefined (Complex a)
+
+instance Undefined Char where deepErrorX = errorX
+instance Undefined Double where deepErrorX = errorX
+instance Undefined Float where deepErrorX = errorX
+instance Undefined Int where deepErrorX = errorX
+instance Undefined Int8 where deepErrorX = errorX
+instance Undefined Int16 where deepErrorX = errorX
+instance Undefined Int32 where deepErrorX = errorX
+instance Undefined Int64 where deepErrorX = errorX
+instance Undefined Integer where deepErrorX = errorX
+instance Undefined Word where deepErrorX = errorX
+instance Undefined Word8 where deepErrorX = errorX
+instance Undefined Word16 where deepErrorX = errorX
+instance Undefined Word32 where deepErrorX = errorX
+instance Undefined Word64 where deepErrorX = errorX
+instance Undefined (Seq a) where deepErrorX = errorX
+instance Undefined (Ratio a) where deepErrorX = errorX
+instance Undefined (Complex a) where deepErrorX = errorX
+
+class GUndefined f where
+  gDeepErrorX :: String -> f a
+
+instance GUndefined V1 where
+  gDeepErrorX = errorX
+
+instance GUndefined U1 where
+  gDeepErrorX = const U1
+
+instance (GUndefined a) => GUndefined (M1 m d a) where
+  gDeepErrorX e = M1 (gDeepErrorX e)
+
+instance (GUndefined f, GUndefined g) => GUndefined (f :*: g) where
+  gDeepErrorX e = gDeepErrorX e :*: gDeepErrorX e
+
+instance Undefined c => GUndefined (K1 i c) where
+  gDeepErrorX e = K1 (deepErrorX e)
+
+instance GUndefined (f :+: g) where
+  gDeepErrorX = errorX

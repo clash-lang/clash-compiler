@@ -44,7 +44,7 @@ data Reg
   | RegC
   | RegD
   | RegE
-  deriving (Eq,Show,Enum,Undefined)
+  deriving (Eq,Show,Enum,Generic,Undefined)
 
 data Operator = Add | Sub | Incr | Imm | CmpGt
   deriving (Eq,Show)
@@ -372,7 +372,8 @@ import           Clash.XException        (Undefined)
 {- $setup
 >>> import Clash.Prelude as C
 >>> import qualified Data.List as L
->>> :set -XDataKinds -XRecordWildCards -XTupleSections -XTypeApplications -XFlexibleContexts -XDeriveAnyClass
+>>> :set -XDataKinds -XRecordWildCards -XTupleSections -XTypeApplications -XFlexibleContexts
+>>> :set -XDeriveAnyClass -XDeriveGeneric
 >>> type InstrAddr = Unsigned 8
 >>> type MemAddr = Unsigned 5
 >>> type Value = Signed 8
@@ -385,7 +386,7 @@ data Reg
   | RegC
   | RegD
   | RegE
-  deriving (Eq,Show,Enum,Undefined)
+  deriving (Eq,Show,Enum,C.Generic,Undefined)
 :}
 
 >>> :{
