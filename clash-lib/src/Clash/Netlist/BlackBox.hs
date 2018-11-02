@@ -20,6 +20,7 @@ module Clash.Netlist.BlackBox where
 import           Control.Exception             (throw)
 import           Control.Lens                  ((<<%=),(%=))
 import qualified Control.Lens                  as Lens
+import           Control.Monad                 (when)
 import           Control.Monad.IO.Class        (liftIO)
 import           Data.Char                     (ord)
 import           Data.Either                   (lefts)
@@ -58,7 +59,7 @@ import {-# SOURCE #-} Clash.Netlist
   (genComponent, mkDcApplication, mkDeclarations, mkExpr, mkNetDecl,
    mkProjection, mkSelection)
 import qualified Clash.Backend                 as Backend
-import           Clash.Driver.Types            (opt_primWarn)
+import           Clash.Driver.Types            (opt_primWarn, opt_color)
 import           Clash.Netlist.BlackBox.Types  as B
 import           Clash.Netlist.BlackBox.Util   as B
 import           Clash.Netlist.Id              (IdType (..))
@@ -196,11 +197,14 @@ mkPrimitive bbEParen bbEasD dst nm args ty = do
           -- printing warnings is enabled globally
           isTB <- Lens.use isTestBench
           primWarn <- opt_primWarn <$> Lens.use clashOpts
+          useColor <- opt_color <$> Lens.use clashOpts
           seen <- Set.member nm <$> Lens.use seenPrimitives
           case (wn, primWarn, seen, isTB) of
             (Just msg, True, False, False) -> do
+              -- TODO: Generalize
+              let setColor = SetColor Foreground Vivid Magenta
               liftIO $ hSetSGR stderr [SetConsoleIntensity BoldIntensity]
-              liftIO $ hSetSGR stderr [SetColor Foreground Vivid Magenta]
+              liftIO $ when useColor $ hSetSGR stderr [setColor]
               liftIO $ hPutStrLn stderr $ "Dubious primitive instantiation "
                                        ++ "warning (disable with "
                                        ++ "-fclash-no-prim-warn): "
