@@ -90,6 +90,9 @@ module Clash.Explicit.Prelude
   , module Clash.Sized.RTree
     -- ** Annotations
   , module Clash.Annotations.TopEntity
+    -- ** Generics type-classes
+  , Generic
+  , Generic1
     -- ** Type-level natural numbers
   , module GHC.TypeLits
   , module GHC.TypeLits.Extra
@@ -123,6 +126,7 @@ where
 import Control.Applicative
 import Data.Bits
 import Data.Default.Class
+import GHC.Generics (Generic, Generic1)
 import GHC.TypeLits
 import GHC.TypeLits.Extra
 import Language.Haskell.TH.Syntax  (Lift(..))
