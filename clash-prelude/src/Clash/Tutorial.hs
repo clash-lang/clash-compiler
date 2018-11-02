@@ -130,7 +130,7 @@ let testBench :: Signal System Bool
     testBench = done
       where
         testInput      = stimuliGenerator clk rst $(listToVecTH [(1,1) :: (Signed 9,Signed 9),(2,2),(3,3),(4,4)])
-        expectedOutput = outputVerifier clk rst $(listToVecTH [0 :: Signed 9,1,5,14])
+        expectedOutput = outputVerifier clk rst $(listToVecTH [0 :: Signed 9,1,5,14,14,14,14])
         done           = expectedOutput (topEntity clk rst testInput)
         clk            = tbSystemClockGen (not <$> done)
         rst            = systemResetGen
@@ -574,13 +574,12 @@ topEntity
   -> 'Signal' System ('Signed' 9, 'Signed' 9)
   -> 'Signal' System ('Signed' 9)
 topEntity = 'exposeClockReset' mac
-{\-\# NOINLINE topEntity \#-\}
 
 testBench :: 'Signal' System Bool
 testBench = done
   where
     testInput    = 'stimuliGenerator' clk rst $('listToVecTH' [(1,1) :: ('Signed' 9,'Signed' 9),(2,2),(3,3),(4,4)])
-    expectOutput = 'outputVerifier' clk rst $('listToVecTH' [0 :: 'Signed' 9,1,5,14])
+    expectOutput = 'outputVerifier' clk rst $('listToVecTH' [0 :: 'Signed' 9,1,5,14,14,14,14])
     done         = expectOutput (topEntity clk rst testInput)
     clk          = 'tbSystemClockGen' (not '<$>' done)
     rst          = 'systemResetGen'
@@ -595,13 +594,13 @@ simulate the behaviour of the /testBench/:
 [False,False,False,False
 cycle(system10000): 4, outputVerifier
 expected value: 14, not equal to actual value: 30
-,True
+,False
 cycle(system10000): 5, outputVerifier
 expected value: 14, not equal to actual value: 46
-,True
+,False
 cycle(system10000): 6, outputVerifier
 expected value: 14, not equal to actual value: 62
-,True]
+,False]
 
 We can see that for the first 4 samples, everything is working as expected,
 after which warnings are being reported. The reason is that 'stimuliGenerator'
