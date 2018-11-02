@@ -135,7 +135,7 @@ mkArgument bndr e = do
       Nothing
         | (Prim nm _,_) <- collectArgs e
         , nm == "Clash.Transformations.removedArg"
-        -> return ((Identifier (Text.fromStrict nm) Nothing, Void Nothing, False),[])
+        -> return ((Identifier nm Nothing, Void Nothing, False),[])
         | otherwise
         -> return ((error ($(curLoc) ++ "Forced to evaluate untranslatable type: " ++ eTyMsg), Void Nothing, False), [])
       Just hwTy -> case collectArgs e of
