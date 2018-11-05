@@ -82,12 +82,8 @@ floatPrimTyConName   = mkUnsafeSystemName "GHC.Prim.Float#"
                                 (getKey floatPrimTyConKey)
 doublePrimTyConName  = mkUnsafeSystemName "GHC.Prim.Double#"
                                 (getKey doublePrimTyConKey)
-#if MIN_VERSION_ghc(8,2,0)
 naturalPrimTyConName = mkUnsafeSystemName "GHC.Natural.Natural"
                                 (getKey naturalTyConKey)
-#else
-naturalPrimTyConName = string2SystemName "GHC.Natural.Natural"
-#endif
 byteArrayPrimTyConName = mkUnsafeSystemName "GHC.Prim.ByteArray#"
                           (getKey byteArrayPrimTyConKey)
 

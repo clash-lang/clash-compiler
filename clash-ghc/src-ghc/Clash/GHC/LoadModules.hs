@@ -175,20 +175,12 @@ loadModules hdl modName dflagsM = do
                     { DynFlags.optLevel = 2
                     , DynFlags.ghcMode  = GHC.CompManager
                     , DynFlags.ghcLink  = GHC.LinkInMemory
-#if MIN_VERSION_ghc(8,2,0)
                     , DynFlags.hscTarget
                         = if DynFlags.rtsIsProfiled
                              then DynFlags.HscNothing
                              else DynFlags.defaultObjectTarget
                                     (DynFlags.targetPlatform dflags)
-#else
-                    , DynFlags.hscTarget = DynFlags.HscNothing
-#endif
-#if __GLASGOW_HASKELL__ >= 711
                     , DynFlags.reductionDepth = 1000
-#else
-                    , DynFlags.ctxtStkDepth = 1000
-#endif
                     }
     let dflags2 = wantedOptimizationFlags dflags1
     let ghcDynamic = case lookup "GHC Dynamic" (DynFlags.compilerInfo dflags) of
@@ -451,11 +443,7 @@ disableOptimizationsFlags ms@(GHC.ModSummary {..})
   where
     dflags = wantedOptimizationFlags (ms_hspp_opts
               { DynFlags.optLevel = 2
-#if __GLASGOW_HASKELL__ >= 711
               , DynFlags.reductionDepth = 1000
-#else
-              , DynFlags.ctxtStkDepth = 1000
-#endif
               })
 
 wantedOptimizationFlags :: GHC.DynFlags -> GHC.DynFlags
