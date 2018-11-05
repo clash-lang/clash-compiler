@@ -148,9 +148,10 @@ main = do
             , runTest ("tests" </> "shouldwork" </> "Numbers") defBuild [] "Strict"  (["","Strict_testBench"],"Strict_testBench",True)
             ]
         , testGroup "Polymorphism"
-            [ runTest ("tests" </> "shouldwork" </> "Polymorphism") defBuild [] "ExistentialBoxed" ([""],"ExistentialBoxed_topEntity",False)
-            , runTest ("tests" </> "shouldwork" </> "Polymorphism") defBuild [] "GADTExistential"  ([""],"GADTExistential_topEntity",False)
-            , runTest ("tests" </> "shouldwork" </> "Polymorphism") defBuild [] "LocalPoly"        ([""],"LocalPoly_topEntity",False)
+            [ runTest ("tests" </> "shouldwork" </> "Polymorphism") defBuild [] "ExistentialBoxed"  ([""],"ExistentialBoxed_topEntity",False)
+            , runTest ("tests" </> "shouldwork" </> "Polymorphism") defBuild [] "FunctionInstances" (["","FunctionInstances_testBench"],"FunctionInstances_testBench",True)
+            , runTest ("tests" </> "shouldwork" </> "Polymorphism") defBuild [] "GADTExistential"   ([""],"GADTExistential_topEntity",False)
+            , runTest ("tests" </> "shouldwork" </> "Polymorphism") defBuild [] "LocalPoly"         ([""],"LocalPoly_topEntity",False)
             ]
         , testGroup "RTree"
             [ runTest ("tests" </> "shouldwork" </> "RTree") defBuild [] "TFold" ([""],"TFold_topEntity",False)
