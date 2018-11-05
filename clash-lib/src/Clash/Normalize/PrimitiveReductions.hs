@@ -754,9 +754,5 @@ buildSNat :: DataCon -> Integer -> Term
 buildSNat snatDc i =
   mkApps (Data snatDc)
          [Right (LitTy (NumTy i))
-#if MIN_VERSION_ghc(8,2,0)
          ,Left (Literal (NaturalLiteral (toInteger i)))
-#else
-         ,Left (Literal (IntegerLiteral (toInteger i)))
-#endif
          ]

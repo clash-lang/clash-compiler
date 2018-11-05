@@ -14,16 +14,7 @@ Synchronizer circuits for safe clock domain crossings
 {-# LANGUAGE TypeApplications      #-}
 {-# LANGUAGE TypeFamilies          #-}
 {-# LANGUAGE TypeOperators         #-}
-#if !MIN_VERSION_constraints(0,9,0)
-{-# LANGUAGE AllowAmbiguousTypes   #-}
-{-# LANGUAGE PolyKinds             #-}
-#endif
-
-#if MIN_VERSION_constraints(0,9,0)
-{-# LANGUAGE Safe #-}
-#else
-{-# LANGUAGE Trustworthy #-}
-#endif
+{-# LANGUAGE Safe                  #-}
 
 {-# OPTIONS_GHC -fplugin GHC.TypeLits.Normalise       #-}
 {-# OPTIONS_GHC -fplugin GHC.TypeLits.KnownNat.Solver #-}
@@ -41,11 +32,7 @@ where
 import Control.Applicative         (liftA2)
 import Data.Bits                   (complement, shiftR, xor)
 import Data.Constraint             ((:-)(..), Dict (..))
-#if MIN_VERSION_constraints(0,9,0)
 import Data.Constraint.Nat         (leTrans)
-#else
-import Unsafe.Coerce
-#endif
 import Data.Maybe                  (isJust)
 import GHC.TypeLits                (type (+), type (-), type (<=))
 
@@ -182,14 +169,3 @@ asyncFIFOSynchronizer addrSize@SNat wclk rclk wrst rrst rinc wdataM =
 
     (wfull,waddr,wptr)  = mealyB wclk wrst (ptrCompareT addrSize (isFull addrSize))
                                  (0,0,False) (s_rptr,isJust <$> wdataM)
-
-#if !MIN_VERSION_constraints(0,9,0)
-axiom :: forall a b . Dict (a ~ b)
-axiom = unsafeCoerce (Dict :: Dict (a ~ a))
-
-axiomLe :: forall a b. Dict (a <= b)
-axiomLe = axiom
-
-leTrans :: forall a b c. (b <= c, a <= b) :- (a <= c)
-leTrans = Sub (axiomLe @a @c)
-#endif

@@ -17,10 +17,6 @@ module Clash.Netlist.Id
   )
 where
 
-#ifndef MIN_VERSION_text
-#error MIN_VERSION_text undefined
-#endif
-
 import Data.Char (isAsciiLower,isAsciiUpper,isDigit)
 import Data.Text as Text
 
@@ -46,10 +42,6 @@ stripDollarPrefixes = stripWorkerPrefix . stripSpecPrefix . stripConPrefix
     stripDictFunPrefix t = case Text.stripPrefix "$f" t of
                              Just k  -> takeWhileEnd (/= '_') k
                              Nothing -> t
-
-#if !MIN_VERSION_text(1,2,2)
-    takeWhileEnd p = Text.reverse . Text.takeWhile p . Text.reverse
-#endif
 
     stripWorkerPrefix t = case Text.stripPrefix "$w" t of
                               Just k  -> k

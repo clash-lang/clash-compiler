@@ -85,18 +85,12 @@ import TyCon      (AlgTyConRhs (..), TyCon, tyConName,
                    tyConDataCons, tyConKind,
                    tyConName, tyConUnique)
 import Type       (mkTvSubstPrs, substTy, coreView)
-#if MIN_VERSION_ghc(8,2,0)
 import TyCoRep    (Coercion (..), TyLit (..), Type (..))
-#else
-import TyCoRep    (Coercion (..), TyBinder (..), TyLit (..), Type (..))
-#endif
 import Unique     (Uniquable (..), Unique, getKey, hasKey)
 import Var        (Id, TyVar, Var, idDetails,
                    isTyVar, varName, varType,
                    varUnique, idInfo)
-#if MIN_VERSION_ghc(8,2,0)
 import Var        (TyVarBndr (..))
-#endif
 import VarSet     (isEmptyVarSet)
 
 -- Local imports
@@ -238,12 +232,10 @@ makeAlgTyConRhs algTcRhs = case algTcRhs of
 #else
   DataTyCon dcs _ -> Just <$> C.DataTyCon <$> mapM coreToDataCon dcs
 #endif
-#if MIN_VERSION_ghc(8,2,0)
 #if MIN_VERSION_ghc(8,6,0)
   SumTyCon dcs _ -> Just <$> C.DataTyCon <$> mapM coreToDataCon dcs
 #else
   SumTyCon dcs -> Just <$> C.DataTyCon <$> mapM coreToDataCon dcs
-#endif
 #endif
   NewTyCon dc _ (rhsTvs,rhsEtad) _ -> Just <$> (C.NewTyCon <$> coreToDataCon dc
                                                            <*> ((,) <$> mapM coreToTyVar rhsTvs
@@ -675,13 +667,8 @@ coreToType' (TyConApp tc args)
                         tcName <- coreToName tyConName tyConUnique qualfiedNameString tc
                         tyConMap %= (C.extendUniqMap tcName tc)
                         C.mkTyConApp <$> (pure tcName) <*> mapM coreToType args
-#if MIN_VERSION_ghc(8,2,0)
 coreToType' (ForAllTy (TvBndr tv _) ty) = C.ForAllTy <$> coreToTyVar tv <*> coreToType ty
 coreToType' (FunTy ty1 ty2)             = C.mkFunTy <$> coreToType ty1 <*> coreToType ty2
-#else
-coreToType' (ForAllTy (Named tv _) ty) = C.ForAllTy <$> coreToTyVar tv <*> coreToType ty
-coreToType' (ForAllTy (Anon ty1) ty2)  = C.mkFunTy <$> coreToType ty1 <*> coreToType ty2
-#endif
 coreToType' (LitTy tyLit)    = return $ C.LitTy (coreToTyLit tyLit)
 coreToType' (AppTy ty1 ty2)  = C.AppTy <$> coreToType ty1 <*> coreToType' ty2
 coreToType' t@(CastTy _ _)   = error ("Cannot handle CastTy " ++ showPpr unsafeGlobalDynFlags t)
