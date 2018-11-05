@@ -379,6 +379,26 @@ funSubst tcm (Just s) = uncurry go
     go (tyView -> TyConApp tc argTys) (tyView -> TyConApp tc' argTys')
       | tc == tc'
       = foldl' (funSubst tcm) (Just s) (zip argTys argTys')
+    -- Whenever type classes have associated types whose instances 'map' to
+    -- functions, we try to find substitutions in the LHS and RHS of these
+    -- (type-level) functions. Because we use @funSubst@ recursively, we
+    -- implicitly check if these functions are of the same arity and match
+    -- in the first place. An example of such a construct:
+    --
+    --   class Example p where
+    --     type AB p
+    --
+    --   instance Example (a -> a) where
+    --     type AB (a -> a) = a
+    --
+    -- In the given example, we would find two substitutions. For example, when
+    -- matching against `Char -> Char` we'd find a duplicate `a -> Char`. We
+    -- can't think of any (type-checking) cases where these mappings would map
+    -- to different types, so this is OK for our purposes.
+    go (tyView -> FunTy a b) (tyView -> FunTy a' b') =
+      (++) <$> funSubst tcm (Just s) (a, a')
+           <*> funSubst tcm (Just s) (b, b')
+
     go _ _ = Nothing
 
 {- [Note: lazy type families]
