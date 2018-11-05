@@ -1,4 +1,4 @@
-{-# LANGUAGE RecordWildCards #-}
+{-# LANGUAGE RecordWildCards, DeriveAnyClass, DeriveGeneric #-}
 module I2C.BitMaster.BusCtrl where
 
 import Clash.Prelude
@@ -20,7 +20,7 @@ data BusStatusCtrl
   , _stopCondition  :: Bool        -- stop detected
   , _busy           :: Bool        -- internal busy signal
   , _cmdStop        :: Bool        -- STOP command
-  }
+  } deriving (Generic, Undefined)
 
 makeLenses ''BusStatusCtrl
 

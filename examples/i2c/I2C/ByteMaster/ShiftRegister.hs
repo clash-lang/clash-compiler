@@ -1,4 +1,4 @@
-{-# LANGUAGE RecordWildCards #-}
+{-# LANGUAGE RecordWildCards, DeriveAnyClass, DeriveGeneric #-}
 module I2C.ByteMaster.ShiftRegister where
 
 import Clash.Prelude
@@ -10,7 +10,7 @@ data ShiftRegister
   = ShiftRegister
   { _sr   :: Vec 8 Bit
   , _dcnt :: Index 8
-  }
+  } deriving (Generic, Undefined)
 
 makeLenses ''ShiftRegister
 
