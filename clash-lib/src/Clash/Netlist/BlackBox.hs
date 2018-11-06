@@ -88,7 +88,7 @@ warn opts msg = do
 
   hSetSGR stderr [SetConsoleIntensity BoldIntensity]
   when useColor $ hSetSGR stderr [SetColor Foreground Vivid Magenta]
-  hPutStrLn stderr msg
+  hPutStrLn stderr $ "[WARNING] " ++ msg
   hSetSGR stderr [ANSI.Reset]
   hFlush stderr
 
@@ -222,8 +222,9 @@ mkPrimitive bbEParen bbEasD dst nm args ty = do
           seen <- Set.member nm <$> Lens.use seenPrimitives
           case (wn, primWarn, seen, isTB) of
             (Just msg, True, False, False) -> do
-              liftIO $ warn opts $ "Dubious primitive instantiation warning (disable"
-                    ++ " with -fclash-no-prim-warn): " ++ unpack msg
+              liftIO $ warn opts $ "Dubious primitive instantiation: "
+                                ++ unpack msg
+                                ++ " (disable with -fclash-no-prim-warn)"
             _ ->
               return ()
 
