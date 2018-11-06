@@ -26,6 +26,8 @@ import Clash.Core.VarEnv (VarEnv)
 
 import Clash.Netlist.BlackBox.Types (HdlSyn (..))
 
+import Util (OverridingBool(..))
+
 -- | Global function binders
 --
 -- Global functions cannot be mutually recursive, only self-recursive
@@ -48,7 +50,7 @@ data ClashOpts = ClashOpts { opt_inlineLimit :: Int
                            , opt_cachehdl    :: Bool
                            , opt_cleanhdl    :: Bool
                            , opt_primWarn    :: Bool
-                           , opt_color       :: Bool
+                           , opt_color       :: OverridingBool
                            , opt_intWidth    :: Int
                            , opt_hdlDir      :: Maybe String
                            , opt_hdlSyn      :: HdlSyn
@@ -71,7 +73,7 @@ defClashOpts
   , opt_cachehdl            = True
   , opt_cleanhdl            = True
   , opt_primWarn            = True
-  , opt_color               = True
+  , opt_color               = Auto
   , opt_intWidth            = WORD_SIZE_IN_BITS
   , opt_hdlDir              = Nothing
   , opt_hdlSyn              = Other

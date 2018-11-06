@@ -36,6 +36,7 @@ import qualified Name                    as GHC hiding (varName)
 import qualified TyCon                   as GHC
 import qualified Type                    as GHC
 import qualified TysWiredIn              as GHC
+import qualified Util                    as GHC
 import qualified Var                     as GHC
 import qualified SrcLoc                  as GHC
 
@@ -63,7 +64,8 @@ import           Clash.Unique
 import           Clash.Util              ((***),first,traceIf)
 
 generateBindings
-  :: [FilePath]
+  :: GHC.OverridingBool
+  -> [FilePath]
   -- ^ primitives (blackbox) directories
   -> [FilePath]
   -- ^ import directories (-i flag)
@@ -81,8 +83,8 @@ generateBindings
         , ResolvedPrimMap  -- The primitives found in '.' and 'primDir'
         , [DataRepr']
         )
-generateBindings primDirs importDirs hdl modName dflagsM = do
-  (bindings,clsOps,unlocatable,fiEnvs,topEntities,pFP,reprs) <- loadModules hdl modName dflagsM
+generateBindings useColor primDirs importDirs hdl modName dflagsM = do
+  (bindings,clsOps,unlocatable,fiEnvs,topEntities,pFP,reprs) <- loadModules useColor hdl modName dflagsM
   primMap <- generatePrimMap $ concat [pFP, primDirs, importDirs]
   let ((bindingsMap,clsVMap),tcMap) = State.runState (mkBindings primMap bindings clsOps unlocatable) emptyGHC2CoreState
       (tcMap',tupTcCache)           = mkTupTyCons tcMap

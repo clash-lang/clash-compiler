@@ -73,6 +73,7 @@ import qualified OccName
 import           Outputable                      (ppr)
 import qualified Outputable
 import qualified UniqSet
+import           Util (OverridingBool)
 import qualified Var
 
 -- Internal Modules
@@ -109,9 +110,14 @@ getProcessOutput command =
      return (output, exitCode)
 
 loadModules
-  :: HDL
+  :: OverridingBool
+  -- ^ Use color
+  -> HDL
+  -- ^ HDL target
   -> String
+  -- ^ Module name
   -> Maybe (DynFlags.DynFlags)
+  -- ^ Flags to run GHC with
   -> IO ( [CoreSyn.CoreBind]                     -- Binders
         , [(CoreSyn.CoreBndr,Int)]               -- Class operations
         , [CoreSyn.CoreBndr]                     -- Unlocatable Expressions
@@ -122,7 +128,7 @@ loadModules
         , [FilePath]
         , [DataRepr']
         )
-loadModules hdl modName dflagsM = do
+loadModules useColor hdl modName dflagsM = do
   libDir <- MonadUtils.liftIO ghcLibDir
 
   GHC.runGhc (Just libDir) $ do
@@ -145,7 +151,8 @@ loadModules hdl modName dflagsM = do
                   let dfPlug = df1 { DynFlags.pluginModNames = nub $
                                           ghcTyLitNormPlugin : ghcTyLitExtrPlugin :
                                           ghcTyLitKNPlugin : DynFlags.pluginModNames df1
-                                   }
+                                     , DynFlags.useColor = useColor
+                                     }
                   return dfPlug
 
     let dflags1 = dflags

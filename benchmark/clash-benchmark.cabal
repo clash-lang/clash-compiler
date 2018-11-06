@@ -16,6 +16,7 @@ library
   Exposed-Modules:     BenchmarkCommon
   build-depends:       base                 >= 4.8      && < 5,
                        containers           >= 0.5.4.0  && < 0.6,
+                       ghc                  >= 8.2.0    && < 8.8,
                        unordered-containers >= 0.2.3.3  && < 0.3,
 
                        clash-ghc,

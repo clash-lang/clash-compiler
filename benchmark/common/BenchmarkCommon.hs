@@ -21,6 +21,8 @@ import Clash.Netlist.BlackBox.Types (HdlSyn(Other))
 import Clash.Netlist.Types          (HWType)
 import Clash.Primitives.Types
 
+import Util (OverridingBool(..))
+
 import Data.IntMap.Strict           (IntMap)
 
 defaultTests :: [FilePath]
@@ -35,7 +37,7 @@ typeTrans :: (CustomReprs -> TyConMap -> Bool -> Type -> Maybe (Either String HW
 typeTrans = ghcTypeToHWType WORD_SIZE_IN_BITS True
 
 opts :: ClashOpts
-opts = ClashOpts 20 20 15 0 DebugNone False True True True WORD_SIZE_IN_BITS Nothing HDLSYN True True ["."] Nothing
+opts = ClashOpts 20 20 15 0 DebugNone False True True Auto WORD_SIZE_IN_BITS Nothing HDLSYN True True ["."] Nothing
 
 backend :: VHDLState
 backend = initBackend WORD_SIZE_IN_BITS HDLSYN
@@ -53,7 +55,7 @@ runInputStage
         )
 runInputStage src = do
   pds <- primDirs backend
-  (bindingsMap,tcm,tupTcm,topEntities,primMap,reprs) <- generateBindings pds ["."] (hdlKind backend) src Nothing
+  (bindingsMap,tcm,tupTcm,topEntities,primMap,reprs) <- generateBindings Auto pds ["."] (hdlKind backend) src Nothing
   let topEntityNames = map (\(x,_,_) -> x) topEntities
       [(topEntity,_,_)] = topEntities
       tm = topEntity
