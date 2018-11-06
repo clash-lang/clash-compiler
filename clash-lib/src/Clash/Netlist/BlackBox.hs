@@ -37,7 +37,9 @@ import qualified System.Console.ANSI           as ANSI
 import           System.Console.ANSI
   ( hSetSGR, SGR(SetConsoleIntensity, SetColor), Color(Magenta)
   , ConsoleIntensity(BoldIntensity), ConsoleLayer(Foreground), ColorIntensity(Vivid))
-import           System.IO                     (hPutStrLn, stderr, hFlush)
+import           System.IO
+  (hPutStrLn, stderr, hFlush, hIsTerminalDevice)
+import           Util                          (OverridingBool(..))
 
 -- import           Clash.Backend                 as N
 import           Clash.Core.DataCon            as D (dcTag)
@@ -59,7 +61,8 @@ import {-# SOURCE #-} Clash.Netlist
   (genComponent, mkDcApplication, mkDeclarations, mkExpr, mkNetDecl,
    mkProjection, mkSelection)
 import qualified Clash.Backend                 as Backend
-import           Clash.Driver.Types            (opt_primWarn, opt_color)
+import           Clash.Driver.Types
+  (opt_primWarn, opt_color, ClashOpts)
 import           Clash.Netlist.BlackBox.Types  as B
 import           Clash.Netlist.BlackBox.Util   as B
 import           Clash.Netlist.Id              (IdType (..))
@@ -70,6 +73,24 @@ import           Clash.Primitives.Types        as P
 import           Clash.Unique                  (lookupUniqMap')
 import           Clash.Util
 
+-- | Emits (colorized) warning to stderr
+warn
+  :: ClashOpts
+  -> String
+  -> IO ()
+warn opts msg = do
+  -- TODO: Put in appropriate module
+  useColor <-
+    case opt_color opts of
+      Always -> return True
+      Never  -> return False
+      Auto   -> hIsTerminalDevice stderr
+
+  hSetSGR stderr [SetConsoleIntensity BoldIntensity]
+  when useColor $ hSetSGR stderr [SetColor Foreground Vivid Magenta]
+  hPutStrLn stderr msg
+  hSetSGR stderr [ANSI.Reset]
+  hFlush stderr
 
 -- | Generate the context for a BlackBox instantiation.
 mkBlackBoxContext
@@ -196,21 +217,13 @@ mkPrimitive bbEParen bbEasD dst nm args ty = do
           -- Print blackbox warning if warning is set on this blackbox and
           -- printing warnings is enabled globally
           isTB <- Lens.use isTestBench
+          opts <- Lens.use clashOpts
           primWarn <- opt_primWarn <$> Lens.use clashOpts
-          useColor <- opt_color <$> Lens.use clashOpts
           seen <- Set.member nm <$> Lens.use seenPrimitives
           case (wn, primWarn, seen, isTB) of
             (Just msg, True, False, False) -> do
-              -- TODO: Generalize
-              let setColor = SetColor Foreground Vivid Magenta
-              liftIO $ hSetSGR stderr [SetConsoleIntensity BoldIntensity]
-              liftIO $ when useColor $ hSetSGR stderr [setColor]
-              liftIO $ hPutStrLn stderr $ "Dubious primitive instantiation "
-                                       ++ "warning (disable with "
-                                       ++ "-fclash-no-prim-warn): "
-                                       ++ unpack msg
-              liftIO $ hSetSGR stderr [ANSI.Reset]
-              liftIO $ hFlush stderr
+              liftIO $ warn opts $ "Dubious primitive instantiation warning (disable"
+                    ++ " with -fclash-no-prim-warn): " ++ unpack msg
             _ ->
               return ()
 

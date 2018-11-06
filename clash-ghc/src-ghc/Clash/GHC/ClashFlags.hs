@@ -6,6 +6,7 @@
 -}
 
 {-# LANGUAGE CPP           #-}
+{-# LANGUAGE LambdaCase    #-}
 {-# LANGUAGE TupleSections #-}
 
 module Clash.GHC.ClashFlags
@@ -61,7 +62,6 @@ flagsClash r = [
   , defFlag "fclash-nocache"                 $ NoArg (liftEwM (setNoCache r))
   , defFlag "fclash-noclean"                 $ NoArg (liftEwM (setNoClean r))
   , defFlag "fclash-no-prim-warn"            $ NoArg (liftEwM (setNoPrimWarn r))
-  , defFlag "fclash-no-color"                $ NoArg (liftEwM (setNoColor r))
   , defFlag "fclash-spec-limit"              $ IntSuffix (liftEwM . setSpecLimit r)
   , defFlag "fclash-inline-limit"            $ IntSuffix (liftEwM . setInlineLimit r)
   , defFlag "fclash-inline-function-limit"   $ IntSuffix (liftEwM . setInlineFunctionLimit r)
@@ -110,9 +110,6 @@ setNoClean r = modifyIORef r (\c -> c {opt_cleanhdl = False})
 
 setNoPrimWarn :: IORef ClashOpts -> IO ()
 setNoPrimWarn r = modifyIORef r (\c -> c {opt_primWarn = False})
-
-setNoColor :: IORef ClashOpts -> IO ()
-setNoColor r = modifyIORef r (\c -> c {opt_color = False})
 
 setIntWidth :: IORef ClashOpts
             -> Int
