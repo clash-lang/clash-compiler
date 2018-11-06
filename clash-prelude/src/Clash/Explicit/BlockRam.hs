@@ -408,7 +408,7 @@ import Clash.XException       (Undefined, errorX, maybeX, seqX)
 {- $setup
 >>> import Clash.Explicit.Prelude as C
 >>> import qualified Data.List as L
->>> :set -XDataKinds -XRecordWildCards -XTupleSections -XDeriveAnyClass
+>>> :set -XDataKinds -XRecordWildCards -XTupleSections -XDeriveAnyClass -XDeriveGeneric
 >>> type InstrAddr = Unsigned 8
 >>> type MemAddr = Unsigned 5
 >>> type Value = Signed 8
@@ -421,7 +421,7 @@ data Reg
   | RegC
   | RegD
   | RegE
-  deriving (Eq,Show,Enum,Undefined)
+  deriving (Eq,Show,Enum,C.Generic,Undefined)
 :}
 
 >>> :{

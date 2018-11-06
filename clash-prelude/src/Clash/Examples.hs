@@ -6,7 +6,7 @@ Licence   : Creative Commons 4.0 (CC BY 4.0) (http://creativecommons.org/license
 
 {-# LANGUAGE NoImplicitPrelude, CPP, TemplateHaskell, DataKinds, BinaryLiterals,
              FlexibleContexts, GADTs, TypeOperators, TypeApplications,
-             RecordWildCards, DeriveAnyClass #-}
+             RecordWildCards, DeriveGeneric, DeriveAnyClass #-}
 {-# OPTIONS_GHC -fno-warn-unused-imports #-}
 {-# OPTIONS_GHC -fno-warn-unused-binds #-}
 {-# OPTIONS_GHC -fno-warn-type-defaults #-}
@@ -171,8 +171,7 @@ data RxReg
   , _rx_d1         :: Bit
   , _rx_d2         :: Bit
   , _rx_busy       :: Bool
-  }
-  deriving Undefined
+  } deriving (Generic, Undefined)
 
 makeLenses ''RxReg
 
@@ -184,7 +183,7 @@ data TxReg
   , _tx_out      :: Bit
   , _tx_cnt      :: Unsigned 4
   }
-  deriving Undefined
+  deriving (Generic, Undefined)
 
 makeLenses ''TxReg
 

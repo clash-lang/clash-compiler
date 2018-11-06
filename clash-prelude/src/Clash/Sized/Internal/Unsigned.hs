@@ -100,7 +100,7 @@ import Clash.Prelude.BitIndex         ((!), msb, replaceBit, split)
 import Clash.Prelude.BitReduction     (reduceOr)
 import Clash.Sized.Internal.BitVector (BitVector (BV), Bit, high, low, undefError)
 import qualified Clash.Sized.Internal.BitVector as BV
-import Clash.XException               (ShowX (..), Undefined, showsPrecXWith)
+import Clash.XException               (ShowX (..), Undefined (..), errorX, showsPrecXWith)
 
 -- | Arbitrary-width unsigned integer represented by @n@ bits
 --
@@ -137,7 +137,7 @@ newtype Unsigned (n :: Nat) =
     -- | The constructor, 'U', and the field, 'unsafeToInteger', are not
     -- synthesisable.
     U { unsafeToInteger :: Integer }
-  deriving (Data, Undefined)
+  deriving Data
 
 {-# NOINLINE size# #-}
 size# :: KnownNat n => Unsigned n -> Int
@@ -155,6 +155,8 @@ instance Show (Unsigned n) where
 
 instance ShowX (Unsigned n) where
   showsPrecX = showsPrecXWith showsPrec
+
+instance Undefined (Unsigned n) where deepErrorX = errorX
 
 -- | None of the 'Read' class' methods are synthesisable.
 instance KnownNat n => Read (Unsigned n) where

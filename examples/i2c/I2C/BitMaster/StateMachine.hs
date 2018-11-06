@@ -1,4 +1,4 @@
-{-# LANGUAGE RecordWildCards #-}
+{-# LANGUAGE RecordWildCards, DeriveAnyClass, DeriveGeneric #-}
 module I2C.BitMaster.StateMachine where
 
 import Clash.Prelude
@@ -13,7 +13,7 @@ data BitStateMachine
   | Stop  (Index 4)
   | Read  (Index 4)
   | Write (Index 4)
-  deriving Eq
+  deriving (Eq, Generic, Undefined)
 
 data StateMachine
   = StateMachine
@@ -22,7 +22,7 @@ data StateMachine
   , _sdaChk    :: Bool            -- check SDA status (multi-master arbiter)
   , _cmdAck    :: Bool            -- command completed
   , _bitStateM :: BitStateMachine -- State Machine
-  }
+  } deriving (Generic, Undefined)
 
 makeLenses ''StateMachine
 

@@ -1,4 +1,4 @@
-{-# LANGUAGE RecordWildCards, DeriveAnyClass #-}
+{-# LANGUAGE RecordWildCards, DeriveAnyClass, DeriveGeneric #-}
 module Reducer where
 
 import Clash.Prelude
@@ -50,7 +50,7 @@ equalDiscr _             _             = False
 data DiscrState = Discr { prevIndex :: ArrayIndex
                         , curDiscr  :: Unsigned DiscrSize
                         }
-                        deriving Undefined
+                        deriving (Generic, Undefined)
 
 type InputState = Vec (AdderDepth + 1) Cell
 
@@ -59,7 +59,7 @@ type FpState    = Vec AdderDepth Cell
 data ResState   = Res { cellMem  :: Vec DiscrRange Cell
                       , indexMem :: Vec DiscrRange ArrayIndex
                       }
-                      deriving Undefined
+                      deriving (Generic, Undefined)
 
 -- ===========================================================
 -- = Discrimintor: Hands out new discriminator to the system =

@@ -1,4 +1,4 @@
-{-# LANGUAGE RecordWildCards, DeriveAnyClass #-}
+{-# LANGUAGE RecordWildCards, DeriveAnyClass, DeriveGeneric #-}
 module I2C.ByteMaster (byteMaster) where
 
 import Clash.Prelude
@@ -12,7 +12,7 @@ import I2C.ByteMaster.ShiftRegister
 import I2C.Types
 
 data ByteStateMachine = Idle | Start | Read | Write | Ack | Stop
-  deriving Show
+  deriving (Show, Generic, Undefined)
 
 data ByteMasterS
   = ByteS
@@ -25,7 +25,7 @@ data ByteMasterS
   , _hostAck    :: Bool             -- host cmd acknowlegde register
   , _ackOut     :: Bool             -- slave ack register
   }
-  deriving Undefined
+  deriving (Generic, Undefined)
 
 makeLenses ''ByteMasterS
 

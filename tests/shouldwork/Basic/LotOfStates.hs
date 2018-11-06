@@ -1,4 +1,5 @@
 {-# LANGUAGE DeriveAnyClass #-}
+{-# LANGUAGE DeriveGeneric  #-}
 module LotOfStates where
 
 import Clash.Prelude
@@ -15,7 +16,7 @@ data States = S_0
             | S_8
             | S_9
             | S_10
-            deriving (Enum, Eq, Undefined)
+            deriving (Enum, Eq, Generic, Undefined)
 
 fsm :: States
     -> Unsigned 8

@@ -1,4 +1,4 @@
-{-# LANGUAGE RecordWildCards, DeriveAnyClass #-}
+{-# LANGUAGE RecordWildCards, DeriveAnyClass, DeriveGeneric #-}
 module I2C.BitMaster (bitMaster) where
 
 import Clash.Prelude
@@ -22,7 +22,7 @@ data BitMasterS
   , _slaveWait      :: Bool            -- clock generation signal
   , _cnt            :: Unsigned 16     -- clock divider counter (synthesis)
   }
-  deriving Undefined
+  deriving (Generic, Undefined)
 
 makeLenses ''BitMasterS
 
