@@ -1,4 +1,4 @@
-{-# LANGUAGE RecordWildCards, DeriveAnyClass, DeriveGeneric #-}
+{-# LANGUAGE RecordWildCards #-}
 module Reducer where
 
 import Clash.Prelude

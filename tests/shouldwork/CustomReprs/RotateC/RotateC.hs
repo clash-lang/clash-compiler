@@ -1,4 +1,3 @@
-{-# LANGUAGE DeriveGeneric, DeriveAnyClass #-}
 module RotateC where
 
 import Clash.Prelude.Testbench

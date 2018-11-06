@@ -62,8 +62,6 @@ class BitPack a where
   --
   -- Can be derived using `GHC.Generics`:
   --
-  -- > {-# LANGUAGE DeriveGeneric, DeriveAnyClass #-}
-  -- >
   -- > import Clash.Prelude
   -- > import GHC.Generics
   -- >

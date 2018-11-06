@@ -1,4 +1,3 @@
-{-# LANGUAGE DeriveGeneric, DeriveAnyClass #-}
 module RotateCScrambled
   ( topEntity
   , testBench

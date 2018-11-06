@@ -1,4 +1,4 @@
-{-# LANGUAGE RecordWildCards, DeriveAnyClass, DeriveGeneric #-}
+{-# LANGUAGE RecordWildCards #-}
 module I2C.BitMaster (bitMaster) where
 
 import Clash.Prelude

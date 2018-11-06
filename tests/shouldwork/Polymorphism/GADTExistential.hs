@@ -1,6 +1,3 @@
-{-# LANGUAGE DeriveGeneric    #-}
-{-# LANGUAGE TypeApplications #-}
-
 module GADTExistential where
 
 import           Clash.Prelude

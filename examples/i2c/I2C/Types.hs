@@ -1,4 +1,3 @@
-{-# LANGUAGE DeriveAnyClass, DeriveGeneric #-}
 module I2C.Types where
 
 import Clash.Prelude
