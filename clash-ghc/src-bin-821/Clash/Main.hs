@@ -85,7 +85,6 @@ import           Data.IORef (IORef, newIORef, readIORef)
 import qualified Data.Version (showVersion)
 import           Control.Exception (Exception(..),ErrorCall (..))
 
-import qualified GHC.LanguageExtensions as LangExt
 import           GHC.Exception ( SomeException )
 
 import qualified Clash.Backend
@@ -97,7 +96,7 @@ import           Clash.Driver.Types
 import           Clash.GHC.ClashFlags
 import           Clash.Netlist.BlackBox.Types (HdlSyn (..))
 import           Clash.Util (ClashException (..), clashLibVersion)
-import           Clash.GHC.LoadModules (ghcLibDir)
+import           Clash.GHC.LoadModules (ghcLibDir, wantedLanguageExtensions)
 
 -----------------------------------------------------------------------------
 -- ToDo:
@@ -161,51 +160,28 @@ defaultMain = flip withArgs $ do
             GHC.runGhc (Just libDir) $ do
 
             dflags <- GHC.getSessionDynFlags
-            let dflagsExtra = foldl DynFlags.xopt_set
-                                    dflags
-                                    [ LangExt.TemplateHaskell
-                                    , LangExt.TemplateHaskellQuotes
-                                    , LangExt.DataKinds
-                                    , LangExt.MonoLocalBinds
-                                    , LangExt.TypeOperators
-                                    , LangExt.FlexibleContexts
-                                    , LangExt.ConstraintKinds
-                                    , LangExt.TypeFamilies
-                                    , LangExt.BinaryLiterals
-                                    , LangExt.ExplicitNamespaces
-                                    , LangExt.KindSignatures
-                                    , LangExt.DeriveLift
-                                    , LangExt.TypeApplications
-                                    , LangExt.ScopedTypeVariables
-                                    , LangExt.MagicHash
-                                    , LangExt.ExplicitForAll
-                                    , LangExt.QuasiQuotes
-                                    ]
-                dflagsExtra1 = foldl DynFlags.xopt_unset dflagsExtra
-                                     [ LangExt.ImplicitPrelude
-                                     , LangExt.MonomorphismRestriction
-                                     ]
+            let dflagsExtra = wantedLanguageExtensions dflags
 
                 ghcTyLitNormPlugin = GHC.mkModuleName "GHC.TypeLits.Normalise"
                 ghcTyLitExtrPlugin = GHC.mkModuleName "GHC.TypeLits.Extra.Solver"
                 ghcTyLitKNPlugin   = GHC.mkModuleName "GHC.TypeLits.KnownNat.Solver"
-                dflagsExtra2 = dflagsExtra1
+                dflagsExtra1 = dflagsExtra
                                   { DynFlags.pluginModNames = nub $
                                       ghcTyLitNormPlugin : ghcTyLitExtrPlugin :
                                       ghcTyLitKNPlugin :
-                                      DynFlags.pluginModNames dflagsExtra1
+                                      DynFlags.pluginModNames dflagsExtra
                                   }
 
             case postStartupMode of
                 Left preLoadMode ->
                     liftIO $ do
                         case preLoadMode of
-                            ShowInfo               -> showInfo dflagsExtra2
-                            ShowGhcUsage           -> showGhcUsage  dflagsExtra2
-                            ShowGhciUsage          -> showGhciUsage dflagsExtra2
-                            PrintWithDynFlags f    -> putStrLn (f dflagsExtra2)
+                            ShowInfo               -> showInfo dflagsExtra1
+                            ShowGhcUsage           -> showGhcUsage  dflagsExtra1
+                            ShowGhciUsage          -> showGhciUsage dflagsExtra1
+                            PrintWithDynFlags f    -> putStrLn (f dflagsExtra1)
                 Right postLoadMode ->
-                    main' postLoadMode dflagsExtra2 argv3 flagWarnings r
+                    main' postLoadMode dflagsExtra1 argv3 flagWarnings r
 
 main' :: PostLoadMode -> DynFlags -> [Located String] -> [Located String]
       -> IORef ClashOpts
