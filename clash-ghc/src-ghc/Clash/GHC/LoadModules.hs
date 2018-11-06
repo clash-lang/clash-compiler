@@ -526,6 +526,8 @@ wantedLanguageExtensions df =
              , LangExt.MagicHash
              , LangExt.ExplicitForAll
              , LangExt.QuasiQuotes
+             , LangExt.DeriveGeneric
+             , LangExt.DeriveAnyClass
              ]
     unwanted = [ LangExt.ImplicitPrelude
                , LangExt.MonomorphismRestriction
