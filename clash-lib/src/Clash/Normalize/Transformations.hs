@@ -101,9 +101,10 @@ import           Clash.Core.Util
    tyNatSize, patVars)
 import           Clash.Core.Var              (Id, Var (..))
 import           Clash.Core.VarEnv
-  (InScopeSet, VarEnv, VarSet, elemVarSet, emptyVarEnv, emptyVarSet, extendInScopeSet,
-   extendInScopeSetList, lookupVarEnv, notElemVarSet, unionVarEnvWith, unionVarSet,
-   unionInScope, unitVarEnv, unitVarSet, mkVarSet, mkInScopeSet, uniqAway)
+  (InScopeSet, VarEnv, VarSet, elemInScopeSet, notElemInScopeSet, elemVarSet,
+   emptyVarEnv, emptyVarSet, extendInScopeSet, extendInScopeSetList, lookupVarEnv,
+   notElemVarSet, unionVarEnvWith, unionVarSet, unionInScope, unitVarEnv,
+   unitVarSet, mkVarSet, mkInScopeSet, uniqAway)
 import           Clash.Driver.Types          (DebugLevel (..))
 import           Clash.Netlist.BlackBox.Util (usedArguments)
 import           Clash.Netlist.Types         (HWType (..))
@@ -194,7 +195,7 @@ nonRepSpec ctx e@(App e1 e2)
   , null $ Lens.toListOf termFreeTyVars e2
   = do tcm <- Lens.view tcCache
        let e2Ty = termType tcm e2
-       localVar <- isLocalVar e2
+       localVar <- isNonGlobalVar e2
        nonRepE2 <- not <$> (representableType <$> Lens.view typeTranslator
                                               <*> Lens.view customReprs
                                               <*> pure False
@@ -257,8 +258,9 @@ caseCase _ e = return e
 -- | Inline function with a non-representable result if it's the subject
 -- of a Case-decomposition
 inlineNonRep :: NormRewrite
-inlineNonRep _ e@(Case scrut altsTy alts)
+inlineNonRep (TransformContext localScope _) e@(Case scrut altsTy alts)
   | (Var f, args) <- collectArgs scrut
+  , f `notElemInScopeSet` localScope
   = do
     (cf,_)    <- Lens.use curFun
     isInlined <- zoomExtra (alreadyInlined f cf)
@@ -555,7 +557,7 @@ topLet (TransformContext is0 ctx) e
 topLet (TransformContext is0 ctx) e@(Letrec binds body)
   | all isLambdaBodyCtx ctx
   = do
-    localVar       <- isLocalVar body
+    localVar       <- isNonGlobalVar body
     untranslatable <- isUntranslatable False body
     if localVar || untranslatable
       then return e
@@ -651,7 +653,7 @@ removeUnusedExpr _ e = return e
 bindConstantVar :: NormRewrite
 bindConstantVar = inlineBinders test
   where
-    test _ (_, e) = isLocalVar e >>= \case
+    test _ (_, e) = isNonGlobalVar e >>= \case
       True -> return True
       _    -> isConstantNotClockReset e >>= \case
         True -> Lens.use (extra.inlineConstantLimit) >>= \case
@@ -771,7 +773,7 @@ splitCastWork _ e = return e
 -- | Inline work-free functions, i.e. fully applied functions that evaluate to
 -- a constant
 inlineWorkFree :: NormRewrite
-inlineWorkFree _ e@(collectArgs -> (Var f,args))
+inlineWorkFree (TransformContext localScope _) e@(collectArgs -> (Var f,args))
   = do
     tcm <- Lens.view tcCache
     let eTy = termType tcm e
@@ -780,7 +782,8 @@ inlineWorkFree _ e@(collectArgs -> (Var f,args))
                                 args
     untranslatable <- isUntranslatableType True eTy
     let isSignal = isSignalType tcm eTy
-    if untranslatable || isSignal || argsHaveWork
+    let isLocalVar = f `elemInScopeSet` localScope
+    if untranslatable || isSignal || argsHaveWork || isLocalVar
       then return e
       else do
         bndrs <- Lens.use bindings
@@ -803,13 +806,14 @@ inlineWorkFree _ e@(collectArgs -> (Var f,args))
           isSignal = isSignalType tcm e'Ty
       return (not (null fvIds) || isSignal)
 
-inlineWorkFree _ e@(Var f) = do
+inlineWorkFree (TransformContext localScope _) e@(Var f) = do
   tcm <- Lens.view tcCache
   let fTy      = varType f
       closed   = not (isPolyFunCoreTy tcm fTy)
       isSignal = isSignalType tcm fTy
   untranslatable <- isUntranslatableType True fTy
-  if closed && not untranslatable && not isSignal
+  let isLocalVar = f `elemInScopeSet` localScope
+  if closed && not untranslatable && not isSignal && not isLocalVar
     then do
       bndrs <- Lens.use bindings
       case lookupVarEnv f bndrs of
@@ -826,10 +830,11 @@ inlineWorkFree _ e = return e
 
 -- | Inline small functions
 inlineSmall :: NormRewrite
-inlineSmall _ e@(collectArgs -> (Var f,args)) = do
+inlineSmall (TransformContext localScope _) e@(collectArgs -> (Var f,args)) = do
   untranslatable <- isUntranslatable True e
   topEnts <- Lens.view topEntities
-  if untranslatable || f `elemVarSet` topEnts
+  let isLocalVar = f `elemInScopeSet` localScope
+  if untranslatable || f `elemVarSet` topEnts || isLocalVar
     then return e
     else do
       bndrs <- Lens.use bindings
@@ -1122,7 +1127,7 @@ collectANF ctx e@(App appf arg)
   , isCon conVarPrim || isPrim conVarPrim || isVar conVarPrim
   = do
     untranslatable <- lift (isUntranslatable False arg)
-    localVar       <- lift (isLocalVar arg)
+    localVar       <- lift (isNonGlobalVar arg)
     constantNoCR   <- lift (isConstantNotClockReset arg)
     case (untranslatable,localVar || constantNoCR,arg) of
       (False,False,_) -> do
@@ -1141,7 +1146,7 @@ collectANF ctx e@(App appf arg)
 collectANF _ (Letrec binds body) = do
   tellBinders binds
   untranslatable <- lift (isUntranslatable False body)
-  localVar       <- lift (isLocalVar body)
+  localVar       <- lift (isNonGlobalVar body)
   if localVar || untranslatable
     then return body
     else do
@@ -1173,7 +1178,7 @@ collectANF _ e@(Case _ _ [(DataPat dc _ _,_)])
   | nameOcc (dcName dc) == "Clash.Signal.Internal.:-" = return e
 
 collectANF ctx (Case subj ty alts) = do
-    localVar <- lift (isLocalVar subj)
+    localVar <- lift (isNonGlobalVar subj)
 
     subj' <- if localVar || isConstant subj
       then return subj
@@ -1199,7 +1204,7 @@ collectANF ctx (Case subj ty alts) = do
       -> StateT ([LetBinding],InScopeSet) (RewriteMonad NormalizeState)
                 (Pat,Term)
     doAlt subj' alt@(DataPat dc [] xs,altExpr) = do
-      lv  <- lift (isLocalVar altExpr)
+      lv  <- lift (isNonGlobalVar altExpr)
       patSels <- Monad.zipWithM (doPatBndr subj' dc) xs [0..]
       let usesXs (Var n) = any (== n) xs
           usesXs _       = False
@@ -1218,7 +1223,7 @@ collectANF ctx (Case subj ty alts) = do
           return (DataPat dc [] xs,Var altId)
     doAlt _ alt@(DataPat {}, _) = return alt
     doAlt _ alt@(pat,altExpr) = do
-      lv <- lift (isLocalVar altExpr)
+      lv <- lift (isNonGlobalVar altExpr)
       if lv || isConstant altExpr
         then return alt
         else do
