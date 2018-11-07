@@ -112,7 +112,6 @@ Library
                       Clash.Explicit.Prelude.Safe
                       Clash.Explicit.Signal
                       Clash.Explicit.Signal.Delayed
-                      Clash.Explicit.Signal.Delayed.Bundle
                       Clash.Explicit.Synchronizer
                       Clash.Explicit.Testbench
 
@@ -147,6 +146,8 @@ Library
                       Clash.Signal.Bundle
                       Clash.Signal.BiSignal
                       Clash.Signal.Delayed
+                      Clash.Signal.Delayed.Internal
+                      Clash.Signal.Delayed.Bundle
                       Clash.Signal.Internal
                       Clash.Signal.Trace
 
