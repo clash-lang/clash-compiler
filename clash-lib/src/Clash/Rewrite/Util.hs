@@ -477,10 +477,10 @@ cloneName nm = do
   return nm {nameUniq = i}
 
 -- | Test whether a term is a variable reference to a local binder
-isLocalVar :: Term
+isNonGlobalVar :: Term
            -> RewriteMonad extra Bool
-isLocalVar (Var x) = notElemUniqMap (varName x) <$> Lens.use bindings
-isLocalVar _ = return False
+isNonGlobalVar (Var x) = notElemUniqMap (varName x) <$> Lens.use bindings
+isNonGlobalVar _ = return False
 
 {-# INLINE isUntranslatable #-}
 -- | Determine if a term cannot be represented in hardware
