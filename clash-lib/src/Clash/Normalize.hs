@@ -163,6 +163,9 @@ normalize' nm = do
                         -- global binder, sometimes causing the inliner to go
                         -- into a loop. Deshadowing freshens all the bindings
                         -- to avoid this.
+                        --
+                        -- TODO: See if we can remove this, now that the
+                        -- TODO: inlining functions account for global vars
                         is0 <- Lens.use globalInScope
                         let tm1 = deShadowTerm is0 tm
                         curFun .= (nm',sp)

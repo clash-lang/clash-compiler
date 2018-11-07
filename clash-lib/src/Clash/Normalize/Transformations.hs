@@ -1851,9 +1851,9 @@ inlineCleanup _ e = return e
 --
 -- NB: must only be called in the cleaning up phase.
 flattenLet :: NormRewrite
-flattenLet (TransformContext is0 _) (Letrec binds body) = do
-  let is1 = extendInScopeSetList is0 (map fst binds)
-  is2 <- unionInScope is1 <$> Lens.use globalInScope
+flattenLet (TransformContext is0 _) letrec@(Letrec _ _) = do
+  is1 <- unionInScope is0 <$> Lens.use globalInScope
+  let (is2, Letrec binds body) = freshenTm is1 letrec
   binds' <- concat <$> mapM (go is2) binds
   case binds' of
     -- inline binders into the body when there's only a single binder
