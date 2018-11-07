@@ -69,11 +69,10 @@ module Test.Tasty.Program (
  ) where
 
 import Control.Exception       ( finally )
-import Control.DeepSeq         ( deepseq                                  )
 import Data.Typeable           ( Typeable                                 )
 import System.Directory        ( findExecutable                           )
 import System.Exit             ( ExitCode(..)                             )
-import System.Process          ( runInteractiveProcess, waitForProcess    )
+import System.Process          ( cwd, readCreateProcessWithExitCode, proc )
 import Test.Tasty.Providers    ( IsTest (..), Result, TestName, TestTree,
                                  singleTest, testPassed, testFailed       )
 import Control.Concurrent.Lock ( Lock, acquire, release )
@@ -81,7 +80,6 @@ import Control.Concurrent.Lock ( Lock, acquire, release )
 import NeatInterpolation    ( text )
 
 import qualified Data.Text    as T
-import qualified Data.Text.IO as T
 
 
 data PrintOutput
@@ -263,19 +261,19 @@ runProgram
   -- ^ Optional working directory
   -> IO Result
 runProgram program args stdO stdF workDir = do
-  (_, stdoutH, stderrH, pid) <- runInteractiveProcess program args (Just workDir) Nothing
+  let cp = (proc program args) { cwd = Just workDir }
+  (exitCode, stdout, stderr) <- readCreateProcessWithExitCode cp ""
 
-  stderr <- T.hGetContents stderrH
-  stdout <- T.hGetContents stdoutH
-  ecode  <- stdout `deepseq` stderr `deepseq` waitForProcess pid
+  let stdoutT = T.pack stdout
+      stderrT = T.pack stderr
 
-  case ecode of
+  case exitCode of
     ExitSuccess ->
-      if stdF && not (T.null stdout)
-        then return (exitFailure program 1 stderr stdout)
-        else return (testPassed $ T.unpack $ testOutput stdO stderr stdout)
+      if stdF && not (null stdout)
+        then return (exitFailure program 1 stderrT stdoutT)
+        else return (testPassed $ T.unpack $ testOutput stdO stderrT stdoutT)
     ExitFailure code ->
-      return $ exitFailure program code stderr stdout
+      return $ exitFailure program code stderrT stdoutT
 
 -- | Run a program with given options and optional working directory.
 -- Return success if program exists with error code. Fails if program does
@@ -299,30 +297,30 @@ runFailingProgram
   -- ^ Optional working directory
   -> IO Result
 runFailingProgram program args stdO errOnEmptyStderr expectedCode expectedStderr workDir = do
-  (_, stdoutH, stderrH, pid) <- runInteractiveProcess program args (Just workDir) Nothing
+  let cp = (proc program args) { cwd = Just workDir }
+  (exitCode, stdout, stderr) <- readCreateProcessWithExitCode cp ""
 
-  stderr <- T.hGetContents stderrH
-  stdout <- T.hGetContents stdoutH
-  ecode  <- stdout `deepseq` stderr `deepseq` waitForProcess pid
+  let stdoutT = T.pack stdout
+      stderrT = T.pack stderr
 
-  let passed = testPassed (T.unpack $ testOutput stdO stderr stdout)
+      passed = testPassed (T.unpack $ testOutput stdO stderrT stdoutT)
 
-  return $ case ecode of
+  return $ case exitCode of
     ExitSuccess ->
-      unexpectedSuccess program stderr stdout
+      unexpectedSuccess program stderrT stdoutT
     ExitFailure code ->
-      if errOnEmptyStderr && T.null stderr
+      if errOnEmptyStderr && null stderr
         then
-          unexpectedEmptyStderr program code stdout
+          unexpectedEmptyStderr program code stdoutT
         else
           case expectedStderr of
-            Just r | not (r `T.isInfixOf` stderr) ->
-              unexpectedStderr program code stderr stdout r
+            Just r | not (r `T.isInfixOf` stderrT) ->
+              unexpectedStderr program code stderrT stdoutT r
             _ ->
               case expectedCode of
                 Nothing -> passed
                 Just n | n == code -> passed
-                       | otherwise -> unexpectedCode program code n stderr stdout
+                       | otherwise -> unexpectedCode program code n stderrT stdoutT
 
 
 -- | Indicates that program does not exist in the path
