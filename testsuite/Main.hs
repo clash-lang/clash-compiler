@@ -599,6 +599,8 @@ outputTest' funcName env target _hdlDir modDir modName entityName =
              , "-XBinaryLiterals"
              , "-XConstraintKinds"
              , "-XDataKinds"
+             , "-XDeriveAnyClass"
+             , "-XDeriveGeneric"
              , "-XDeriveLift"
              , "-XExplicitForAll"
              , "-XExplicitNamespaces"
