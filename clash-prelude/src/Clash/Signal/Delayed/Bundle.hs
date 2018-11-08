@@ -8,7 +8,7 @@
 {-# LANGUAGE TypeFamilyDependencies #-}
 {-# LANGUAGE TypeOperators          #-}
 
-module Clash.Explicit.Signal.Delayed.Bundle (
+module Clash.Signal.Delayed.Bundle (
   Bundle,
   Unbundled,
   bundle,
@@ -19,8 +19,7 @@ import           Control.Applicative           (liftA2)
 import           GHC.TypeLits                  (KnownNat)
 import           Prelude                       hiding (head, map, tail)
 
-import           Clash.Explicit.Signal.Delayed (DSignal, toSignal,
-                                                unsafeFromSignal)
+import           Clash.Signal.Delayed (DSignal, toSignal, unsafeFromSignal)
 import qualified Clash.Signal.Bundle           as B
 
 import           Clash.Signal.Internal         (Domain)

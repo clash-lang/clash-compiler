@@ -36,10 +36,10 @@ where
 import           Data.Default.Class            (Default)
 import           GHC.TypeLits                  (KnownNat, type (+))
 
+import Clash.Signal.Delayed.Internal
+  (DSignal, dfromList, dfromList_lazy, fromSignal, toSignal,
+   unsafeFromSignal, antiDelay, feedback)
 import qualified Clash.Explicit.Signal.Delayed as E
-import           Clash.Explicit.Signal.Delayed
-  (DSignal, dfromList, dfromList_lazy, feedback, fromSignal, toSignal,
-   unsafeFromSignal, antiDelay)
 import            Clash.Sized.Vector           (Vec)
 import            Clash.Signal
   (HiddenClockReset, hideClockReset)
