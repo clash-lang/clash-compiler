@@ -108,7 +108,6 @@ import Control.DeepSeq            (NFData (..))
 import qualified Control.Lens     as Lens hiding (pattern (:>), pattern (:<))
 import Data.Default.Class         (Default (..))
 import qualified Data.Foldable    as F
-import Data.Bifunctor.Flip        (Flip (..))
 import Data.Kind                  (Type)
 import Data.Proxy                 (Proxy (..))
 import Data.Singletons.Prelude    (TyFun,Apply,type (@@))
@@ -277,19 +276,19 @@ instance KnownNat n => Applicative (Vec n) where
   fs <*> xs = zipWith ($) fs xs
 
 instance (KnownNat n, 1 <= n) => F.Foldable (Vec n) where
-  fold a      = leToPlus @1 (Flip a) (fold mappend . runFlip)
-  foldMap f a = leToPlus @1 (Flip (map f a)) (fold mappend . runFlip)
-  foldr       = foldr
-  foldl       = foldl
-  foldr1 f a  = leToPlus @1 (Flip a) (foldr1 f . runFlip)
-  foldl1 f a  = leToPlus @1 (Flip a) (foldl1 f . runFlip)
-  toList      = toList
-  null _      = False
-  length      = length
-  maximum a   = leToPlus @1 (Flip a) (fold (\x y -> if x >= y then x else y) . runFlip)
-  minimum a   = leToPlus @1 (Flip a) (fold (\x y -> if x <= y then x else y) . runFlip)
-  sum a       = leToPlus @1 (Flip a) (fold (+) . runFlip)
-  product a   = leToPlus @1 (Flip a) (fold (*) . runFlip)
+  fold      = leToPlus @1 @n $ fold mappend
+  foldMap f = leToPlus @1 @n $ fold mappend . map f
+  foldr     = foldr
+  foldl     = foldl
+  foldr1 f  = leToPlus @1 @n $ foldr1 f
+  foldl1 f  = leToPlus @1 @n $ foldl1 f
+  toList    = toList
+  null _    = False
+  length    = length
+  maximum   = leToPlus @1 @n $ fold (\x y -> if x >= y then x else y)
+  minimum   = leToPlus @1 @n $ fold (\x y -> if x <= y then x else y)
+  sum       = leToPlus @1 @n $ fold (+)
+  product   = leToPlus @1 @n $ fold (*)
 
 instance Functor (Vec n) where
   fmap = map

@@ -461,26 +461,26 @@ stripZeros (B0 x)  = case stripZeros x of
 -- head' a = 'leToPlus' \@1 (Flip a) (head . runFlip)
 -- @
 leToPlus
-  :: forall (k :: Nat) (n :: Nat) f r
-   . (k <= n)
-  => f n
-  -- ^ Argument with the @(k <= n)@ constraint
-  -> (forall m . f (m + k) -> r)
-  -- ^ Function with the @(n + k)@ constraint
+  :: forall (k :: Nat) (n :: Nat) r
+   . ( k <= n
+     )
+  => (forall m . (n ~ (k + m)) => r)
+  -- ^ Context with the (k + m ~ n) constraint
   -> r
-leToPlus a f = f @ (n-k) a
+leToPlus r = r @(n - k)
 {-# INLINE leToPlus #-}
 
 -- | Same as 'leToPlus' with added 'KnownNat' constraints
 leToPlusKN
-  :: forall (k :: Nat) (n :: Nat) f r
-   . (k <= n, KnownNat n, KnownNat k)
-  => f n
-  -- ^ Argument with the @(k <= n)@ constraint
-  -> (forall m . KnownNat m => f (m + k) -> r)
-  -- ^ Function with the @(n + k)@ constraint
+  :: forall (k :: Nat) (n :: Nat) r
+   . ( k <= n
+     , KnownNat k
+     , KnownNat n
+     )
+  => (forall m . (n ~ (k + m), KnownNat m) => r)
+  -- ^ Context with the @(n ~ k + m)@ constraint
   -> r
-leToPlusKN a f = f @ (n-k) a
+leToPlusKN r = r @(n - k)
 {-# INLINE leToPlusKN #-}
 
 -- | Change a function that has an argument with an @(k <= n)@ constraint to a
@@ -495,19 +495,17 @@ leToPlusKN a f = f @ (n-k) a
 -- @
 -- f :: (1 '<=' n) => Index n -> Index n -> Bool
 --
--- g :: Index (n + 1) -> Index (n + 1) -> Bool
--- g a b = 'plusToLe' \@1 $ \\a' -> 'plusToLe' \@1 $ \\b' -> f a' b'
+-- g :: forall n . Index (n + 1) -> Index (n + 1) -> Bool
+-- g = 'plusToLe' \@1 \@n f
 -- @
 --
 -- Example 2
 --
 -- @
--- import Datal.Bifunctor.Flip
---
 -- fold :: (1 '<=' n) => (a -> a -> a) -> Vec n a -> a
 --
--- fold' :: (a -> a -> a) -> Vec (n+1) a -> a
--- fold' f a = 'plusToLe' \@1 (Flip a) (fold f . runFlip)
+-- fold' :: forall a n . (a -> a -> a) -> Vec (n+1) a -> a
+-- fold' f a = 'plusToLe' \@1 \@n $ fold f
 -- @
 plusToLe
   :: forall (k :: Nat) n f r
