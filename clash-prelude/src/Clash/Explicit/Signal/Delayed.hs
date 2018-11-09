@@ -24,9 +24,21 @@ Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
 {-# OPTIONS_HADDOCK show-extensions #-}
 
 module Clash.Explicit.Signal.Delayed
-  ( -- * Delay-annotated synchronous signals
-    delayed
+  ( DSignal
+    -- * Delay-annotated synchronous signals
+  , delayed
   , delayedI
+  , feedback
+    -- * Signal \<-\> DSignal conversion
+  , fromSignal
+  , toSignal
+    -- * List \<-\> DSignal conversion (not synthesisable)
+  , dfromList
+    -- ** lazy versions
+  , dfromList_lazy
+    -- * Experimental
+  , unsafeFromSignal
+  , antiDelay
   )
 where
 
@@ -37,7 +49,10 @@ import Prelude                    hiding (head, length, repeat)
 
 import Clash.Sized.Vector
   (Vec, head, length, repeat, shiftInAt0, singleton)
-import Clash.Signal.Delayed.Internal (DSignal(..))
+import Clash.Signal.Delayed.Internal
+  (DSignal(..), dfromList, dfromList_lazy, fromSignal, toSignal,
+   unsafeFromSignal, antiDelay, feedback)
+
 import Clash.Explicit.Signal
   (Clock, Reset, Signal, register,  bundle, unbundle)
 import Clash.XException           (Undefined)
@@ -46,7 +61,6 @@ import Clash.XException           (Undefined)
 >>> :set -XDataKinds
 >>> :set -XTypeOperators
 >>> import Clash.Explicit.Prelude
->>> import Clash.Signal.Delayed
 >>> let delay3 clk rst = delayed clk rst (0 :> 0 :> 0 :> Nil)
 >>> let delay2 clk rst = (delayedI clk rst :: DSignal System n Int -> DSignal System (n + 2) Int)
 >>> :{
