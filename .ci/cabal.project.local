@@ -1,0 +1,21 @@
+-- use latest packages from hackage
+index-state: HEAD
+
+-- don't generate haddock for all our deps
+package *
+  documentation: False
+
+package clash-lib
+  documentation: True
+  flags: +debug
+package clash-prelude
+  documentation: True
+  flags: +doctests
+  tests: True
+package clash-cosim
+  documentation: True
+  tests: True
+
+package clash-testsuite
+  -- enable cosim & disable systemverilog testing (needs modelsim)
+  flags: travisci cosim

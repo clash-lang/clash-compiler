@@ -1,3 +1,3 @@
 [submodule "clash-cosim"]
 	path = clash-cosim
-	url = ../clash-cosim.git
+	url = https://github.com/clash-lang/clash-cosim.git
