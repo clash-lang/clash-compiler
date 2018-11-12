@@ -1,0 +1,31 @@
+image: leonschoorl/clash-ci-image:trusty
+
+.tests:
+  variables:
+    GIT_SUBMODULE_STRATEGY: recursive
+  cache:
+    key: cabal-store-$CI_JOB_NAME
+    paths:
+      - cabal-store/
+  script:
+    - pwd
+    - lscpu
+    - export
+    - export GHC="$CI_JOB_NAME"
+    - .ci/setup.sh
+    - .ci/build.sh
+    - .ci/test.sh
+
+ghc-8.2.2:
+  extends: .tests
+ghc-8.4.4:
+  extends: .tests
+ghc-8.6.2:
+  extends: .tests
+
+ghc-head:
+  # extends: .tests
+  allow_failure: true
+  script:
+    - echo cabal head currently not working...
+    - exit 1
