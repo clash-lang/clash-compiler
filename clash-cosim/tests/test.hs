@@ -16,7 +16,7 @@ import Test.Tasty
 import Test.Tasty.HUnit
 import qualified Test.Tasty.QuickCheck as QC
 
-
+main :: IO ()
 main = defaultMain tests
 
 tests :: TestTree
@@ -41,9 +41,11 @@ bin f x y = L.head $ sample $ f
 
 
 -- | Test equalness of fibonacci sequences generated in verilog and haskell
+fibonacci :: TestTree
 fibonacci = testGroup "Fibonacci" $
     L.map fibonacci' [0, 10, 100, 1000, 10000]
 
+fibonacci' :: Int -> TestTree
 fibonacci' n =
     testCase ("n=" L.++ show n) $ fh @?= fv
         where
@@ -93,6 +95,7 @@ fibonacci_verilog = [verilogWithSettings|
 
 -- Test a very simple verilog multiplier. We hardcode some unit tests, then
 -- but we also use QuickCheck to generate a number of random numbers
+inlineMultiplication :: TestTree
 inlineMultiplication = testGroup "Multiplication"
   [ testCase "Small numbers"    $ 3 * 5         @?= (bin mult) 3 5
   , testCase "Zeroes"           $ 0 * 0         @?= (bin mult) 0 0
@@ -117,6 +120,7 @@ inlineMultiplication = testGroup "Multiplication"
 
 -- Test a very simple verilog multiplier. We hardcode some unit tests, then
 -- but we also use QuickCheck to generate a number of random numbers
+pointFree :: TestTree
 pointFree = testGroup "Point-free notation"
   [ testCase "Both"                $ 3 - 5 @?= (bin sub2) 3 5
   , testCase "Both (reversed)"     $ 5 - 3 @?= (bin sub2) 5 3

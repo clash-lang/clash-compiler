@@ -353,17 +353,18 @@ parseInput
     -> [SignalStream]
     -> t
     -> [SignalStream]
-parseInput doDup streams x = dup (toSignalStream x) : streams
+parseInput doDup streams t = dup (toSignalStream t) : streams
   where
     dup | doDup     = go
         | otherwise = id
     go (x:xs) = (x:x:go xs)
+    go _      = error "Unexpected empty SignalStream"
 
 parseClock
   :: [SignalStream]
   -> CS.Clock dom gated
   -> [SignalStream]
-parseClock streams clk = (cycle [[0],[1]]) : streams
+parseClock streams _clk = (cycle [[0],[1]]) : streams
 
 parseOutput
     :: CoSimType t
@@ -379,7 +380,7 @@ parseOutput doUndup f streams = res
               | doUndup   = go
               | otherwise = id
             go (x:_:xs) = x:go xs
-
+            go _        = error "Unexpected empty SignalStream"
 
 --------------------------------------
 ---- POLYVARIDIC ---------------------
@@ -421,4 +422,3 @@ class CoSimType t where
 instance (ClashType a, NFData a) => CoSimType (CP.Signal clk a) where
     toSignalStream   = map (wordPack . CP.pack) . CP.sample
     fromSignalStream = CP.fromList . map (CP.unpack . wordUnpack)
-

@@ -157,6 +157,7 @@ verilog_reg x = s
                              , resetFase = True
                              }-}
 
+main :: IO ()
 main =
     putStrLn $ show
              $ sampleN 5
@@ -164,4 +165,3 @@ main =
                   systemClockGen
                   systemResetGen
                   (testInput systemClockGen systemResetGen)
-

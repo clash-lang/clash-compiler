@@ -57,6 +57,7 @@ varNameParser = (:) <$> (lower <|> char '_') <*> many (alphaNum <|> char '_')
 varNumParser :: Parsec String st Int
 varNumParser = read <$> many1 digit
 
+clkParser :: Parsec String st CoSimDSLToken
 clkParser = try (string "#{") *> numOrName <*  (string "}")
     where
         numOrName = (ClkName <$> varNameParser)
