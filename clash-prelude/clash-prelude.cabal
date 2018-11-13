@@ -72,6 +72,12 @@ flag doctests
   default: True
   manual: True
 
+flag unittests
+  description:
+    You can disable testing with unittests using `-f-unittests`.
+  default: True
+  manual: True
+
 flag benchmarks
   description:
     You can disable testing with benchmarks using `-f-benchmarks`.
@@ -253,7 +259,7 @@ test-suite unittests
   ghc-options:      -Wall
   hs-source-dirs:   tests
 
-  if !flag(doctests)
+  if !flag(unittests)
     buildable: False
   else
     build-depends:
