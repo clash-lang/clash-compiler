@@ -3,6 +3,7 @@ image: leonschoorl/clash-ci-image:trusty
 .tests:
   variables:
     GIT_SUBMODULE_STRATEGY: recursive
+    TERM: xterm-color
   cache:
     key: cabal-store-$CI_JOB_NAME
     paths:
