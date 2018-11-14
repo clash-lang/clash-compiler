@@ -30,3 +30,4 @@ ghc-head:
   script:
     - echo cabal head currently not working...
     - exit 1
+
