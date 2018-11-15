@@ -909,18 +909,20 @@ vhdlRecSel ty i = tyName ty <> "_sel" <> int i
 decls :: [Declaration] -> VHDLM Doc
 decls [] = emptyDoc
 decls ds = do
-    rec (dsDoc,ls) <- fmap (unzip . catMaybes) $ mapM (decl (maximum ls)) ds
+    rec (dsDoc,ls,attrs) <- fmap (unzip3 . catMaybes) $ mapM (decl (maximum ls)) ds
     case dsDoc of
       [] -> emptyDoc
       _  -> punctuate' semi (pure dsDoc)
+            <> if null attrs then emptyDoc else line <> line <> renderAttrs (concat attrs)
 
-decl :: Int ->  Declaration -> VHDLM (Maybe (Doc,Int))
-decl l (NetDecl' noteM _ id_ ty) = Just <$> (,fromIntegral (TextS.length id_)) <$>
+decl :: Int ->  Declaration -> VHDLM (Maybe (Doc,Int,[(TextS.Text,Attr')]))
+decl l (NetDecl' noteM _ id_ ty) = Just <$> (,fromIntegral (TextS.length id_), (id_,) <$> attrs) <$>
   maybe id addNote noteM ("signal" <+> fill l (pretty id_) <+> colon <+> either pretty vhdlType ty)
   where
     addNote n = mappend ("--" <+> pretty n <> line)
+    attrs  = ty ^. _Right . to hwTypeAttrs
 
-decl _ (InstDecl Comp _ nm _ pms) = fmap (Just . (,0)) $ do
+decl _ (InstDecl Comp _ nm _ pms) = fmap (Just . (,0,[])) $ do
   { rec (p,ls) <- fmap unzip $ sequence [ (,formalLength i) <$> fill (maximum ls) (expr_ False i) <+> colon <+> portDir dir <+> vhdlType ty | (i,dir,ty,_) <- pms ]
   ; "component" <+> pretty nm <> line <>
       indent 2 ("port" <+> tupledSemi (pure p) <> semi) <> line <>
