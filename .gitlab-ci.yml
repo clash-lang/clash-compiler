@@ -13,6 +13,7 @@ image: leonschoorl/clash-ci-image:trusty
     - lscpu
     - export
     - export GHC="$CI_JOB_NAME"
+    - export THREADS=$(nproc)
     - .ci/setup.sh
     - .ci/build.sh
     - .ci/test.sh

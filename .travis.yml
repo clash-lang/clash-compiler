@@ -1,0 +1,75 @@
+sudo: required
+
+language: c
+
+services:
+  - docker
+
+stages:
+  - precache
+  - test
+
+git:
+  submodules: true
+
+cache:
+  directories:
+    - dist-newstyle
+    - cabal-store
+    - docker
+
+if: type = pull_request OR fork
+
+jobs:
+  include:
+    - &precache
+      stage: precache
+      compiler: "ghc-8.2.2"
+      script: true
+
+    - <<: *precache
+      compiler: "ghc-8.4.4"
+
+    - <<: *precache
+      compiler: "ghc-8.6.2"
+
+    - <<: *precache
+      compiler: "ghc-head"
+      env: GHCHEAD=true
+
+    - &test
+      stage: test
+      compiler: "ghc-8.2.2"
+      script: docker run -e THREADS=$THREADS -e GHC=$GHC -v $PWD:/root/build -it ${DOCKER_IMAGE} bash -c "cd /root/build && .ci/setup.sh && .ci/build.sh && .ci/test.sh"
+
+    - <<: *test
+      compiler: "ghc-8.4.4"
+
+    - <<: *test
+      compiler: "ghc-8.6.2"
+
+    - <<: *test
+      compiler: "ghc-head"
+      env: GHCHEAD=true
+
+  allow_failures:
+    - compiler: "ghc-head"
+
+before_cache:
+  # Save tagged docker images
+  - >
+    mkdir -p docker && docker images -a --filter='dangling=false' --format '{{.Repository}}:{{.Tag}} {{.ID}}'
+    | xargs -n 2 -t sh -c 'test -e docker/$1.tar.gz || docker save $0 | gzip -2 > docker/$1.tar.gz'
+
+before_install:
+  # Load cached docker images
+  - if [[ -d docker ]]; then ls docker/*.tar.gz | xargs -I {file} sh -c "zcat {file} | docker load"; fi
+
+  # Example: GHC=ghc-8.4.4
+  - export GHC=${CC}
+  - export THREADS=2
+  - export DOCKER_IMAGE=leonschoorl/clash-ci-image:trusty
+  - unset CC
+
+install:
+  - docker run -e THREADS=$THREADS -e GHC=$GHC -v $PWD:/root/build -it ${DOCKER_IMAGE} bash -c "cd /root/build && .ci/setup.sh && .ci/build.sh"
