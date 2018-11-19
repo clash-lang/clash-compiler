@@ -72,9 +72,9 @@
   }
 , { "BlackBox" :
     { "name"      : "Clash.Sized.Internal.BitVector.fromInteger##"
-    , "kind"      : "Declaration"
+    , "kind"      : "Expression"
     , "type"      : "fromInteger## :: Integer -> Integer -> Bit"
-    , "template"  : "~RESULT <= ~VAR[i][1](0) when '0' = ~VAR[i][0](0) else '-';"
+    , "template"  : "~IF~LIT[0]~THEN'U'~ELSE~VAR[i][1](0)~FI"
     }
   }
 , { "BlackBox" :
