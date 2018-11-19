@@ -42,7 +42,6 @@ import           Clash.Annotations.BitRepresentation.Internal
 import           Clash.Core.Evaluator             (PrimEvaluator)
 import           Clash.Core.FreeVars
   (termFreeIds, idDoesNotOccurIn, idOccursIn)
-import           Clash.Core.Name                  (Name (..), NameSort (..))
 import           Clash.Core.Pretty                (showPpr, ppr)
 import           Clash.Core.Subst                 (deShadowTerm, extendIdSubstList, mkSubst, substTm)
 import           Clash.Core.Term                  (Term (..))
@@ -52,8 +51,9 @@ import           Clash.Core.TyCon
 import           Clash.Core.Util                  (collectArgs, mkApps, termType)
 import           Clash.Core.Var                   (Id, varName, varType)
 import           Clash.Core.VarEnv
-  (VarEnv, eltsVarEnv, emptyInScopeSet, emptyVarEnv,
-   extendVarEnv, lookupVarEnv, mapVarEnv, mapMaybeVarEnv, mkInScopeSet, mkVarEnv, mkVarSet, notElemVarEnv, notElemVarSet, nullVarEnv, unionVarEnv)
+  (VarEnv, elemVarSet, eltsVarEnv, emptyInScopeSet, emptyVarEnv,
+   extendVarEnv, lookupVarEnv, mapVarEnv, mapMaybeVarEnv, mkInScopeSet,
+   mkVarEnv, mkVarSet, notElemVarEnv, notElemVarSet, nullVarEnv, unionVarEnv)
 import           Clash.Driver.Types
   (BindingMap, ClashOpts (..), DebugLevel (..))
 import           Clash.Netlist.Types              (HWType (..), FilteredHWType(..))
@@ -292,34 +292,35 @@ stripArgs _ _ _ = Nothing
 flattenNode
   :: CallTree
   -> NormalizeSession (Either CallTree ((Id,Term),[CallTree]))
-flattenNode (CLeaf (nm,(nameSort . varName -> Internal,_,_,e))) =
-  return (Right ((nm,e),[]))
+flattenNode c@(CLeaf (_,(_,_,NoInline,_))) = return (Left c)
 flattenNode c@(CLeaf (nm,(_,_,_,e))) = do
-  tcm  <- Lens.view tcCache
-  let norm = splitNormalized tcm e
-  case norm of
-    Right (ids,[(bId,bExpr)],_) -> do
-      let (fun,args) = collectArgs bExpr
-      case stripArgs ids (reverse ids) (reverse args) of
-        Just remainder | bId `idDoesNotOccurIn` bExpr ->
-          return (Right ((nm,mkApps fun (reverse remainder)),[]))
-        _ -> return (Right ((nm,e),[]))
-    _ | isCheapFunction e -> return (Right ((nm,e),[]))
-      | otherwise         -> return (Left c)
-flattenNode (CBranch (nm,(nameSort . varName -> Internal,_,_,e)) us) =
-  return (Right ((nm,e),us))
+  isTopEntity <- elemVarSet nm <$> Lens.view topEntities
+  if isTopEntity then return (Left c) else do
+    tcm  <- Lens.view tcCache
+    let norm = splitNormalized tcm e
+    case norm of
+      Right (ids,[(bId,bExpr)],_) -> do
+        let (fun,args) = collectArgs bExpr
+        case stripArgs ids (reverse ids) (reverse args) of
+          Just remainder | bId `idDoesNotOccurIn` bExpr ->
+               return (Right ((nm,mkApps fun (reverse remainder)),[]))
+          _ -> return (Right ((nm,e),[]))
+      _ -> return (Right ((nm,e),[]))
+flattenNode b@(CBranch (_,(_,_,NoInline,_)) _) =
+  return (Left b)
 flattenNode b@(CBranch (nm,(_,_,_,e)) us) = do
-  tcm  <- Lens.view tcCache
-  let norm = splitNormalized tcm e
-  case norm of
-    Right (ids,[(bId,bExpr)],_) -> do
-      let (fun,args) = collectArgs bExpr
-      case stripArgs ids (reverse ids) (reverse args) of
-        Just remainder | bId `idDoesNotOccurIn` bExpr -> do
-          return (Right ((nm,mkApps fun (reverse remainder)),us))
-        _ -> return (Right ((nm,e),us))
-    _ | isCheapFunction e -> return (Right ((nm,e),us))
-      | otherwise         -> return (Left b)
+  isTopEntity <- elemVarSet nm <$> Lens.view topEntities
+  if isTopEntity then return (Left b) else do
+    tcm  <- Lens.view tcCache
+    let norm = splitNormalized tcm e
+    case norm of
+      Right (ids,[(bId,bExpr)],_) -> do
+        let (fun,args) = collectArgs bExpr
+        case stripArgs ids (reverse ids) (reverse args) of
+          Just remainder | bId `idDoesNotOccurIn` bExpr ->
+               return (Right ((nm,mkApps fun (reverse remainder)),us))
+          _ -> return (Right ((nm,e),us))
+      _ -> return (Right ((nm,e),us))
 
 flattenCallTree
   :: CallTree
@@ -342,7 +343,7 @@ flattenCallTree (CBranch (nm,(nm',sp,inl,tm)) used) = do
   -- inline all components when the resulting expression after flattening
   -- is still considered "cheap". This happens often at the topEntity which
   -- wraps another functions and has some selectors and data-constructors.
-  if isCheapFunction newExpr
+  if inl /= NoInline && isCheapFunction newExpr
      then do
         let (toInline',allUsed') = unzip (map goCheap allUsed)
             subst' = extendIdSubstList (mkSubst is) toInline'
