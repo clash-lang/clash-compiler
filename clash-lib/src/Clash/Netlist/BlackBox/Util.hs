@@ -77,6 +77,9 @@ verifyBlackBoxContext bbCtx (N.BBTemplate t) = all verify' t
     verify' (L n)           = case indexMaybe (bbInputs bbCtx) n of
                                 Just (_,_,b) -> b
                                 _            -> False
+    verify' (LC n)          = case indexMaybe (bbInputs bbCtx) n of
+                                Just (_,_,b) -> b
+                                _            -> False
     verify' (Typ (Just n))  = n < length (bbInputs bbCtx)
     verify' (TypM (Just n)) = n < length (bbInputs bbCtx)
     verify' (Err (Just n))  = n < length (bbInputs bbCtx)
@@ -441,6 +444,10 @@ renderTag b (L n)           = let (e,_,_) = bbInputs b !! n
     mkLit (DataCon _ (DC (Void {}, _)) [Literal (Just (Unsigned _,_)) i]) = Literal Nothing i
     mkLit i                               = i
 
+renderTag b (LC n)
+  = let (e,_,_) = bbInputs b !! n
+    in  renderOneLine <$> getMon (expr False e)
+
 renderTag b e@(N _i) =
   case elementToText b e of
       Right s  -> return s
@@ -636,6 +643,7 @@ prettyElem (D (Decl i args)) = do
 prettyElem (O b) = if b then return "~ERESULT" else return "~RESULT"
 prettyElem (I b i) = renderOneLine <$> (if b then string "~EARG" else string "~ARG" <> brackets (int i))
 prettyElem (L i) = renderOneLine <$> (string "~LIT" <> brackets (int i))
+prettyElem (LC i) = renderOneLine <$> (string "~LITC" <> brackets (int i))
 prettyElem (N i) = renderOneLine <$> (string "~NAME" <> brackets (int i))
 prettyElem (Var es i) = do
   es' <- prettyBlackBox es
@@ -792,6 +800,7 @@ usedArguments (N.BBTemplate t) = nub (concatMap (walkElement matchArg) t)
     matchArg (D (Decl i _)) = Just i
     matchArg (I _ i)        = Just i
     matchArg (L i)          = Just i
+    matchArg (LC i)         = Just i
     matchArg (N i)          = Just i
     matchArg (Var _ i)      = Just i
     matchArg _              = Nothing

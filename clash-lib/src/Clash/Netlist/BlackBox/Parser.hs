@@ -72,6 +72,7 @@ pTagE =  O True            <$  string "~ERESULT"
      <|> I True            <$> (string "~EARG" *> brackets' natural')
      <|> Arg               <$> (string "~ARGN" *> brackets' natural') <*> brackets' natural'
      <|> I False           <$> (string "~ARG" *> brackets' natural')
+     <|> LC                <$> (string "~LITC" *> brackets' natural')
      <|> L                 <$> (string "~LIT" *> brackets' natural')
      <|> N                 <$> (string "~NAME" *> brackets' natural')
      <|> Var               <$> try (string "~VAR" *> brackets' pSigD) <*> brackets' natural'

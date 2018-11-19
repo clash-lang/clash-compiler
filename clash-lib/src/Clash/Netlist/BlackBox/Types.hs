@@ -83,6 +83,9 @@ data Element = C   !Text         -- ^ Constant
              -- ^ Generated input hole, first argument is the scoping level
              | N   !Int          -- ^ Name hole
              | L   !Int          -- ^ Literal hole
+             | LC  !Int
+             -- ^ Assert that argument is a literal, but treat it like a normal
+             -- argument otherwise
              | Var [Element] !Int    --
              | Sym !Text !Int    -- ^ Symbol hole
              | Typ !(Maybe Int)  -- ^ Type declaration hole

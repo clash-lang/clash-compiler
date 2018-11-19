@@ -37,14 +37,14 @@ end~FI
 "// register begin~IF ~ISGATED[2] ~THEN
 always @(posedge ~ARG[2][1]~IF ~ISSYNC[3] ~THEN ~ELSE or posedge ~ARG[3]~FI) begin : ~GENSYM[~COMPNAME_register][1]
   if (~ARG[3]) begin
-    ~RESULT <= ~ARG[4];
+    ~RESULT <= ~LITC[4];
   end else if (~ARG[2][0]) begin
     ~RESULT <= ~ARG[5];
   end
 end~ELSE
 always @(posedge ~ARG[2]~IF ~ISSYNC[3] ~THEN ~ELSE or posedge ~ARG[3]~FI) begin : ~SYM[1]
   if (~ARG[3]) begin
-    ~RESULT <= ~ARG[4];
+    ~RESULT <= ~LITC[4];
   end else begin
     ~RESULT <= ~ARG[5];
   end

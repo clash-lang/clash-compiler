@@ -62,7 +62,7 @@ begin
   begin
     if rising_edge(~SYM[1]) then
       if ~ARG[3] = '1' then
-        ~RESULT <= ~ARG[4]
+        ~RESULT <= ~LITC[4]
         -- pragma translate_off
         after 1 ps
         -- pragma translate_on
@@ -76,10 +76,10 @@ begin
       end if;
     end if;
   end process;~ELSE
-  ~SYM[3] : process(~SYM[1],~ARG[3]~VARS[4])
+  ~SYM[3] : process(~SYM[1],~ARG[3])
   begin
     if ~ARG[3] = '1' then
-      ~RESULT <= ~ARG[4];
+      ~RESULT <= ~LITC[4];
     elsif rising_edge(~SYM[1]) then
       if ~SYM[2] then
         ~RESULT <= ~ARG[5]
@@ -95,7 +95,7 @@ end block;~ELSE ~IF ~ISSYNC[3] ~THEN
 begin
   if rising_edge(~ARG[2]) then
     if ~ARG[3] = '1' then
-      ~RESULT <= ~ARG[4]
+      ~RESULT <= ~LITC[4]
       -- pragma translate_off
       after 1 ps
       -- pragma translate_on
@@ -109,10 +109,10 @@ begin
     end if;
   end if;
 end process;~ELSE
-~SYM[0] : process(~ARG[2],~ARG[3]~VARS[4])
+~SYM[0] : process(~ARG[2],~ARG[3])
 begin
   if ~ARG[3] = '1' then
-    ~RESULT <= ~ARG[4]
+    ~RESULT <= ~LITC[4]
     -- pragma translate_off
     after 1 ps
     -- pragma translate_on
