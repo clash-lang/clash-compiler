@@ -156,12 +156,18 @@ instance Backend VHDLState where
   setSrcSpan      = (srcSpan .=)
   getSrcSpan      = use srcSpan
   blockDecl nm ds = do
-    decs   <- decls ds
+    decs <- decls ds
+    let attrs = [ (id_, attr)
+                | NetDecl' _ _ id_ (Right hwtype) <- ds
+                , attr <- hwTypeAttrs hwtype]
     if isEmpty decs
        then insts ds
        else nest 2
               (pretty nm <+> colon <+> "block" <> line <>
-               pure decs) <> line <>
+               pure decs <>
+               if null attrs
+                then emptyDoc
+                else line <> line <> renderAttrs attrs) <> line <>
             nest 2
               ("begin" <> line <>
                 insts ds) <> line <>
