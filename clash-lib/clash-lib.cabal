@@ -117,6 +117,7 @@ Library
                       deepseq                 >= 1.3.0.2  && < 1.5,
                       directory               >= 1.2.0.1  && < 1.4,
                       errors                  >= 1.4.2    && < 2.4,
+                      exceptions              >= 0.10.0   && < 0.11.0,
                       filepath                >= 1.3.0.1  && < 1.5,
                       ghc                     >= 8.2.0    && < 8.8,
                       hashable                >= 1.2.1.0  && < 1.3,

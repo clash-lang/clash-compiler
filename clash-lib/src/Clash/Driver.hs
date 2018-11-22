@@ -21,7 +21,9 @@ import qualified Control.Concurrent.Supply        as Supply
 import           Control.DeepSeq
 import           Control.Exception                (tryJust, bracket)
 import           Control.Lens                     (use, view, (^.), _3, _4)
-import           Control.Monad                    (guard, when, unless, join, foldM)
+import           Control.Monad                    (guard, when, unless, foldM)
+import           Control.Monad.Catch              (MonadMask)
+import           Control.Monad.IO.Class           (MonadIO)
 import           Control.Monad.State              (evalState, get)
 import           Data.Hashable                    (hash)
 import qualified Data.HashSet                     as HashSet
@@ -291,6 +293,54 @@ generateHDL reprs bindingsMap hdlState primMap tcm tupTcm typeTrans eval
 
   go benchTime seen' topEntities'
 
+-- | Interpret a specific function from a specific module. This action tries
+-- two things:
+--
+--   1. Interpret without explicitly loading the module. This will succeed if
+--      the module was already loaded through a package database (set using
+--      'interpreterArgs').
+--
+--   2. If (1) fails, it does try to load it explicitly. If this also fails,
+--      an error is returned.
+--
+loadImportAndInterpret
+  :: (MonadIO m, MonadMask m)
+  => [String]
+  -- ^ Extra search path
+  -> [String]
+  -- ^ Interpreter args
+  -> String
+  -- ^ Top dir
+  -> Hint.ModuleName
+  -- ^ Module function lives in
+  -> String
+  -- ^ Function name
+  -> String
+  -- ^ Type name ("BlackBoxFunction" or "TemplateFunction")
+  -> m (Either Hint.InterpreterError a)
+loadImportAndInterpret iPaths0 interpreterArgs topDir qualMod funcName typ = do
+  -- Try to interpret function *without* loading module explicitly. If this
+  -- succeeds, the module was already in the global package database(s).
+  bbfE <- Hint.unsafeRunInterpreterWithArgsLibdir interpreterArgs topDir $ do
+    iPaths1 <- (++iPaths0) <$> Hint.get Hint.searchPath
+    Hint.set [Hint.searchPath Hint.:= iPaths1]
+    Hint.setImports [ "Clash.Netlist.Types", "Clash.Netlist.BlackBox.Types", qualMod]
+    Hint.unsafeInterpret funcName typ
+
+  case bbfE of
+    Left _ -> do
+      -- Try to interpret module as a local module, not yet present in the
+      -- global package database(s).
+      Hint.unsafeRunInterpreterWithArgsLibdir interpreterArgs topDir $ do
+        Hint.reset
+        iPaths1 <- (iPaths0++) <$> Hint.get Hint.searchPath
+        Hint.set [Hint.searchPath Hint.:= iPaths1]
+        Hint.loadModules [qualMod]
+        Hint.setImports [ "Clash.Netlist.BlackBox.Types", "Clash.Netlist.Types", qualMod]
+        Hint.unsafeInterpret funcName typ
+    Right _ -> do
+      return bbfE
+
 -- | Compiles blackbox functions and parses blackbox templates.
 compilePrimitive
   :: [FilePath]
@@ -300,7 +350,7 @@ compilePrimitive
 compilePrimitive pkgDbs topDir (BlackBoxHaskell bbName bbGenName source) = do
   let interpreterArgs = concatMap (("-package-db":) . (:[])) pkgDbs
   -- Compile a blackbox template function or fetch it from an already compiled file.
-  r <- Hint.unsafeRunInterpreterWithArgsLibdir interpreterArgs topDir (go source)
+  r <- go interpreterArgs source
   processHintError
     (show bbGenName)
     bbName
@@ -320,30 +370,22 @@ compilePrimitive pkgDbs topDir (BlackBoxHaskell bbName bbGenName source) = do
       let new = base </> sub in
       Directory.createDirectory new >> return new
 
-    -- |
     go
-      :: Maybe Text
-      -> Hint.Interpreter BlackBoxFunction
-    go (Just source') = do
+      :: [String]
+      -> Maybe Text
+      -> IO (Either Hint.InterpreterError BlackBoxFunction)
+    go args (Just source') = do
       -- Create a temporary directory with user module in it, add it to the
       -- list of import direcotries, and run as if it were a "normal" compiled
       -- module.
-      join $ Hint.liftIO $ do
-        tmpDir' <- getCanonicalTemporaryDirectory
-        withTempDirectory tmpDir' "clash-prim-compile" $ \tmpDir'' -> do
-          modDir <- foldM createDirectory' tmpDir'' (init modNames)
-          Text.writeFile (modDir </> (last modNames ++ ".hs")) source'
-          return $ do
-            -- Set import path for GHC interpreter and load module
-            iPaths <- (tmpDir'':) <$> Hint.get Hint.searchPath
-            Hint.set [Hint.searchPath Hint.:= iPaths]
-            Hint.loadModules [qualMod]
-            go Nothing
+      tmpDir0 <- getCanonicalTemporaryDirectory
+      withTempDirectory tmpDir0 "clash-prim-compile" $ \tmpDir1 -> do
+        modDir <- foldM createDirectory' tmpDir1 (init modNames)
+        Text.writeFile (modDir </> (last modNames ++ ".hs")) source'
+        loadImportAndInterpret [tmpDir1] args topDir qualMod funcName "BlackBoxFunction"
 
-    go Nothing = do
-      -- Either
-      Hint.setImports [ "Clash.Netlist.BlackBox.Types",  qualMod]
-      Hint.unsafeInterpret funcName "BlackBoxFunction"
+    go args Nothing = do
+      loadImportAndInterpret [] args topDir qualMod funcName "BlackBoxFunction"
 
 compilePrimitive pkgDbs topDir (BlackBox pNm tkind warnings oReg libM imps incs templ) = do
   libM'  <- mapM parseTempl libM
@@ -352,16 +394,21 @@ compilePrimitive pkgDbs topDir (BlackBox pNm tkind warnings oReg libM imps incs 
   templ' <- parseBB templ
   return (BlackBox pNm tkind warnings oReg libM' imps' incs' templ')
  where
-  interpreterArgs = concatMap (("-package-db":) . (:[])) pkgDbs
+  iArgs = concatMap (("-package-db":) . (:[])) pkgDbs
 
-  parseTempl :: Applicative m => Text -> m BlackBoxTemplate
+  parseTempl
+    :: Applicative m
+    => Text
+    -> m BlackBoxTemplate
   parseTempl t = case runParse t of
     Failure errInfo
       -> error (ANSI.displayS (ANSI.renderCompact (_errDoc errInfo)) "")
     Success t'
       -> pure t'
 
-  parseBB :: ((TemplateFormat,BlackBoxFunctionName),Maybe Text) -> IO BlackBox
+  parseBB
+    :: ((TemplateFormat,BlackBoxFunctionName), Maybe Text)
+    -> IO BlackBox
   parseBB ((TTemplate,_),Just t)     = BBTemplate <$> parseTempl t
   parseBB ((TTemplate,_),Nothing)    =
     error ("No template specified for blackbox: " ++ show pNm)
@@ -373,21 +420,14 @@ compilePrimitive pkgDbs topDir (BlackBox pNm tkind warnings oReg libM imps incs 
       let modDir = foldl (</>) tmpDir' (init modNames)
       Directory.createDirectoryIfMissing True modDir
       Text.writeFile (modDir </> last modNames <.>  "hs") source
-      Hint.unsafeRunInterpreterWithArgsLibdir interpreterArgs topDir $ do
-        iPaths <- (tmpDir':) <$> Hint.get Hint.searchPath
-        Hint.set [Hint.searchPath Hint.:= iPaths]
-        Hint.loadModules [qualMod]
-        Hint.setImports [ "Clash.Netlist.Types" , qualMod ]
-        Hint.unsafeInterpret funcName "TemplateFunction"
+      loadImportAndInterpret [tmpDir'] iArgs topDir qualMod funcName "TemplateFunction"
     let hsh = hash (qualMod, source)
     processHintError (show bbGenName) pNm (BBFunction (Data.Text.unpack pNm) hsh) r
   parseBB ((THaskell,bbGenName),Nothing) = do
     let BlackBoxFunctionName modNames funcName = bbGenName
         qualMod = intercalate "." modNames
         hsh     = hash qualMod
-    r <- Hint.unsafeRunInterpreterWithArgsLibdir interpreterArgs topDir $ do
-      Hint.setImports [ "Clash.Netlist.Types" , qualMod ]
-      Hint.unsafeInterpret funcName "TemplateFunction"
+    r <- loadImportAndInterpret [] iArgs topDir qualMod funcName "TemplateFunction"
     processHintError (show bbGenName) pNm (BBFunction (Data.Text.unpack pNm) hsh) r
 
 compilePrimitive _ _ (Primitive pNm typ) =
