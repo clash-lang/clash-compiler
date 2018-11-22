@@ -95,6 +95,10 @@ main = do
             , runTest ("tests" </> "shouldwork" </> "BitVector") defBuild [] "BoxGrow" (["","BoxGrow_testBench"],"BoxGrow_testBench",True)
             , runTest ("tests" </> "shouldwork" </> "BitVector") defBuild [] "RePack"  ([""],"RePack_topEntity",False)
             ]
+        , testGroup "BlackBox"
+            [ outputTest ("tests" </> "shouldwork" </> "BlackBox") VHDL [] "TemplateFunction" ([""],"TemplateFunction_topEntity",False) "main"
+            , outputTest ("tests" </> "shouldwork" </> "BlackBox") VHDL [] "BlackBoxFunction" ([""],"BlackBoxFunction_topEntity",False) "main"
+            ]
         , testGroup "BoxedFunctions"
             [ runTest ("tests" </> "shouldwork" </> "BoxedFunctions") defBuild [] "DeadRecursiveBoxed" ([""],"DeadRecursiveBoxed_topEntity",False)
             ]
