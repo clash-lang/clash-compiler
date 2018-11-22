@@ -264,6 +264,9 @@ runProgram program args stdO stdF workDir = do
   let cp = (proc program args) { cwd = Just workDir }
   (exitCode, stdout, stderr) <- readCreateProcessWithExitCode cp ""
 
+  -- For debugging: Uncomment this to print executable and and its arguments
+  --putStrLn $ show program ++ " " ++ concatMap (++ " ") args
+
   let stdoutT = T.pack stdout
       stderrT = T.pack stderr
 
@@ -299,6 +302,9 @@ runFailingProgram
 runFailingProgram program args stdO errOnEmptyStderr expectedCode expectedStderr workDir = do
   let cp = (proc program args) { cwd = Just workDir }
   (exitCode, stdout, stderr) <- readCreateProcessWithExitCode cp ""
+
+  -- For debugging: Uncomment this to print executable and and its arguments
+  --putStrLn $ show program ++ " " ++ concatMap (++ " ") args
 
   let stdoutT = T.pack stdout
       stderrT = T.pack stderr
