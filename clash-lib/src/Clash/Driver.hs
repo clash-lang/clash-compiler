@@ -344,10 +344,12 @@ loadImportAndInterpret iPaths0 interpreterArgs topDir qualMod funcName typ = do
 -- | Compiles blackbox functions and parses blackbox templates.
 compilePrimitive
   :: [FilePath]
+  -> [FilePath]
+  -- ^ import directories (-i flag)
   -> FilePath
   -> ResolvedPrimitive
   -> IO CompiledPrimitive
-compilePrimitive pkgDbs topDir (BlackBoxHaskell bbName bbGenName source) = do
+compilePrimitive idirs pkgDbs topDir (BlackBoxHaskell bbName bbGenName source) = do
   let interpreterArgs = concatMap (("-package-db":) . (:[])) pkgDbs
   -- Compile a blackbox template function or fetch it from an already compiled file.
   r <- go interpreterArgs source
@@ -382,12 +384,12 @@ compilePrimitive pkgDbs topDir (BlackBoxHaskell bbName bbGenName source) = do
       withTempDirectory tmpDir0 "clash-prim-compile" $ \tmpDir1 -> do
         modDir <- foldM createDirectory' tmpDir1 (init modNames)
         Text.writeFile (modDir </> (last modNames ++ ".hs")) source'
-        loadImportAndInterpret [tmpDir1] args topDir qualMod funcName "BlackBoxFunction"
+        loadImportAndInterpret (tmpDir1:idirs) args topDir qualMod funcName "BlackBoxFunction"
 
     go args Nothing = do
-      loadImportAndInterpret [] args topDir qualMod funcName "BlackBoxFunction"
+      loadImportAndInterpret idirs args topDir qualMod funcName "BlackBoxFunction"
 
-compilePrimitive pkgDbs topDir (BlackBox pNm tkind warnings oReg libM imps incs templ) = do
+compilePrimitive idirs pkgDbs topDir (BlackBox pNm tkind warnings oReg libM imps incs templ) = do
   libM'  <- mapM parseTempl libM
   imps'  <- mapM parseTempl imps
   incs'  <- mapM (traverse parseBB) incs
@@ -420,17 +422,17 @@ compilePrimitive pkgDbs topDir (BlackBox pNm tkind warnings oReg libM imps incs 
       let modDir = foldl (</>) tmpDir' (init modNames)
       Directory.createDirectoryIfMissing True modDir
       Text.writeFile (modDir </> last modNames <.>  "hs") source
-      loadImportAndInterpret [tmpDir'] iArgs topDir qualMod funcName "TemplateFunction"
+      loadImportAndInterpret (tmpDir':idirs) iArgs topDir qualMod funcName "TemplateFunction"
     let hsh = hash (qualMod, source)
     processHintError (show bbGenName) pNm (BBFunction (Data.Text.unpack pNm) hsh) r
   parseBB ((THaskell,bbGenName),Nothing) = do
     let BlackBoxFunctionName modNames funcName = bbGenName
         qualMod = intercalate "." modNames
         hsh     = hash qualMod
-    r <- loadImportAndInterpret [] iArgs topDir qualMod funcName "TemplateFunction"
+    r <- loadImportAndInterpret idirs iArgs topDir qualMod funcName "TemplateFunction"
     processHintError (show bbGenName) pNm (BBFunction (Data.Text.unpack pNm) hsh) r
 
-compilePrimitive _ _ (Primitive pNm typ) =
+compilePrimitive _ _ _ (Primitive pNm typ) =
   return $ Primitive pNm typ
 
 processHintError

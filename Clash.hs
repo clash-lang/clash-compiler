@@ -55,7 +55,7 @@ doHDL b src = do
   -- Parse primitives:
   startTime' <- Clock.getCurrentTime
   topDir     <- ghcLibDir
-  primMap2   <- sequence $ HM.map (compilePrimitive [] topDir) primMap
+  primMap2   <- sequence $ HM.map (compilePrimitive ["."] [] topDir) primMap
   prepTime'  <- startTime `deepseq` primMap2 `seq` Clock.getCurrentTime
   let prepStartDiff' = Clock.diffUTCTime prepTime' startTime'
   putStrLn $ "Parsing primitives took " ++ show prepStartDiff'

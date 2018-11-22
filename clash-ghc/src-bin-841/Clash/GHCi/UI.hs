@@ -1969,7 +1969,7 @@ makeHDL backend optsRef srcs = do
                 -- Parsing / compiling primitives:
                 startTime' <- Clock.getCurrentTime
                 let dbs = reverse [p | PackageDB (PkgConfFile p) <- packageDBFlags dflags]
-                primMap'   <- sequence $ HM.map (Clash.Driver.compilePrimitive dbs (topDir dflags)) primMap
+                primMap'   <- sequence $ HM.map (Clash.Driver.compilePrimitive idirs dbs (topDir dflags)) primMap
                 prepTime'  <- startTime' `deepseq` primMap' `seq` Clock.getCurrentTime
                 let prepStartDiff' = Clock.diffUTCTime prepTime' startTime'
                 putStrLn $ "Parsing and compiling primitives took " ++ show prepStartDiff'
