@@ -1016,6 +1016,7 @@ tyName' rec0 (filterTransparent -> t) = do
       let app = if rec0 then ["_", showt n] else [] in
       return $ TextS.concat $ "std_logic_vector" : app
     String        -> return "string"
+    Integer       -> return "integer"
     Bit           -> return "std_logic"
     Vector n elTy -> do
       elTy' <- tyName' True elTy

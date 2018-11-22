@@ -135,6 +135,8 @@ data HWType
   -- that vector.
   | String
   -- ^ String type
+  | Integer
+  -- ^ Integer type
   | Bool
   -- ^ Boolean type
   | Bit
