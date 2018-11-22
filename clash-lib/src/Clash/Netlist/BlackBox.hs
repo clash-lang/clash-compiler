@@ -211,8 +211,25 @@ mkPrimitive
 mkPrimitive bbEParen bbEasD dst nm args ty = do
   go =<< HashMap.lookup nm <$> Lens.use primitives
   where
+    go
+      :: Maybe CompiledPrimitive
+      -> NetlistMonad (Expr, [Declaration])
     go =
       \case
+        Just (P.BlackBoxHaskell bbName funcName (_fHash, func)) ->
+          case func bbEasD dst nm args ty of
+            Left err -> do
+              -- Blackbox template function returned an error:
+              let err' = unwords [ $(curLoc) ++ "Could not create blackbox"
+                                 , "template using", show funcName, "for"
+                                 , show bbName ++ ".", "Function reported: \n\n"
+                                 , err ]
+              (_,sp) <- Lens.use curCompNm
+              throw (ClashException sp err' Nothing)
+            Right ((BlackBoxMeta {..}), bbTemplate) ->
+              -- Blackbox template generation succesful. Rerun 'go', but this time
+              -- around with a 'normal' @BlackBox@
+              go (Just (P.BlackBox bbName bbKind Nothing bbOutputReg bbLibrary bbImports bbIncludes bbTemplate))
         Just p@(P.BlackBox {outputReg = wr, warning = wn}) -> do
           -- Print blackbox warning if warning is set on this blackbox and
           -- printing warnings is enabled globally
