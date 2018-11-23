@@ -60,5 +60,5 @@ runInputStage src = do
       [(topEntity,_,_)] = topEntities
       tm = topEntity
   topDir   <- ghcLibDir
-  primMap2 <- sequence $ fmap (compilePrimitive [] topDir) primMap
+  primMap2 <- sequence $ fmap (compilePrimitive [] [] topDir) primMap
   return (bindingsMap,tcm,tupTcm,topEntities, primMap2, buildCustomReprs reprs, topEntityNames,tm)

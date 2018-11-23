@@ -163,7 +163,9 @@ data Primitive a b c
   , function :: c
     -- ^ Used to indiciate type of template (declaration or expression).
   }
-  -- | A primitive that carries additional information
+  -- | A primitive that carries additional information. These are "real"
+  -- primitives, hardcoded in the compiler. For example: 'mapSignal' in
+  -- @GHC2Core.coreToTerm@.
   | Primitive
   { name     :: !S.Text
     -- ^ Name of the primitive
