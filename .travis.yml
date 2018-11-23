@@ -20,37 +20,18 @@ cache:
 
 if: type = pull_request OR fork
 
+env:
+  - THREADS=2 DOCKER_IMAGE=leonschoorl/clash-ci-image:trusty GHCHEAD=true
+
 jobs:
   include:
-    - &precache
-      stage: precache
-      compiler: "ghc-8.2.2"
-      script: true
-
-    - <<: *precache
-      compiler: "ghc-8.4.4"
-
-    - <<: *precache
-      compiler: "ghc-8.6.2"
-
-    - <<: *precache
+    - stage: precache
       compiler: "ghc-head"
-      env: GHCHEAD=true
+      script: docker run -e THREADS=$THREADS -e GHC=$GHC -v $PWD:/root/build -it ${DOCKER_IMAGE} bash -c "cd /root/build && .ci/setup.sh && .ci/build.sh"
 
-    - &test
-      stage: test
-      compiler: "ghc-8.2.2"
+    - stage: test
+      compiler: "ghc-head"
       script: docker run -e THREADS=$THREADS -e GHC=$GHC -v $PWD:/root/build -it ${DOCKER_IMAGE} bash -c "cd /root/build && .ci/setup.sh && .ci/build.sh && .ci/test.sh"
-
-    - <<: *test
-      compiler: "ghc-8.4.4"
-
-    - <<: *test
-      compiler: "ghc-8.6.2"
-
-    - <<: *test
-      compiler: "ghc-head"
-      env: GHCHEAD=true
 
   allow_failures:
     - compiler: "ghc-head"
@@ -67,9 +48,4 @@ before_install:
 
   # Example: GHC=ghc-8.4.4
   - export GHC=${CC}
-  - export THREADS=2
-  - export DOCKER_IMAGE=leonschoorl/clash-ci-image:trusty
   - unset CC
-
-install:
-  - docker run -e THREADS=$THREADS -e GHC=$GHC -v $PWD:/root/build -it ${DOCKER_IMAGE} bash -c "cd /root/build && .ci/setup.sh && .ci/build.sh"
