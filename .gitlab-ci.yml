@@ -27,5 +27,6 @@ ghc-head:
   # extends: .tests
   allow_failure: true
   script:
-    - echo cabal head currently not working...
+    # Awaiting issue: https://github.com/goldfirere/singletons/issues/357
+    - echo "GHC head currently disabled, because singletons doesn't build on ghc head"
     - exit 1
