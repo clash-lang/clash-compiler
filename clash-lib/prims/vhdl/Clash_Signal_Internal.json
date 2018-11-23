@@ -208,7 +208,7 @@ end process;
     , "template" :
 "-- pragma translate_off
 ~RESULT <= '1',
-           '0' after 2000 ps;
+           '0' after 3001 ps;
 -- pragma translate_on"
     }
   }

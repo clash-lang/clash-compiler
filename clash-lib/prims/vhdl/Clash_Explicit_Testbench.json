@@ -39,9 +39,9 @@ begin
   -- pragma translate_off
   ~SYM[2] <= ~ARG[5];
   ~SYM[3] <= ~ARG[6];
-  process(~IF ~ISGATED[2] ~THEN~SYM[4]~ELSE~ARG[2]~FI~IF ~ISSYNC[3] ~THEN ~ELSE,~ARG[3]~FI) is
+  process(~IF ~ISGATED[2] ~THEN~SYM[4]~ELSE~ARG[2]~FI) is
   begin
-    if (rising_edge(~IF ~ISGATED[2] ~THEN~SYM[4]~ELSE~ARG[2]~FI)~IF ~ISSYNC[3] ~THEN ~ELSE or falling_edge(~ARG[3])~FI) then
+    if (rising_edge(~IF ~ISGATED[2] ~THEN~SYM[4]~ELSE~ARG[2]~FI)) then
       assert (toSLV(~SYM[2]) = toSLV(~SYM[3])) report (~LIT[4] & \", expected: \" & ~SYM[1](toSLV(~SYM[3])) & \", actual: \" & ~SYM[1](toSLV(~SYM[2]))) severity error;
     end if;
   end process;

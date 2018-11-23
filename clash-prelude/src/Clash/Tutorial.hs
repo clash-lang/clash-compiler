@@ -405,7 +405,7 @@ examine the 'register' function by taking a look at the first 4 samples of the
 'register' functions applied to a constant signal with the value 8:
 
 >>> sampleN 4 (register 0 (pure 8))
-[0,8,8,8]
+[0,0,8,8]
 
 Where we see that the initial value of the signal is the specified 0 value,
 followed by 8's.
@@ -590,15 +590,15 @@ earlier for the simulation of the circuit, and creates an output verifier that
 compares against the results we got from our earlier simulation. We can even
 simulate the behaviour of the /testBench/:
 
->>> sampleN 7 testBench
-[False,False,False,False
-cycle(system10000): 4, outputVerifier
+>>> sampleN 8 testBench
+[False,False,False,False,False
+cycle(system10000): 5, outputVerifier
 expected value: 14, not equal to actual value: 30
 ,False
-cycle(system10000): 5, outputVerifier
+cycle(system10000): 6, outputVerifier
 expected value: 14, not equal to actual value: 46
 ,False
-cycle(system10000): 6, outputVerifier
+cycle(system10000): 7, outputVerifier
 expected value: 14, not equal to actual value: 62
 ,False]
 
@@ -1982,8 +1982,8 @@ Here is a list of Haskell features for which the CλaSH compiler has only
 
         To get the first 10 numbers, we do the following:
 
-        >>> sampleN @Source @Asynchronous 10 fibS
-        [0,1,1,2,3,5,8,13,21,34]
+        >>> sampleN @Source @Asynchronous 11 fibS
+        [0,0,1,1,2,3,5,8,13,21,34]
 
         Unlike the @fibR@ function, the above @fibS@ function /is/ synthesisable
         by the CλaSH compiler. Where the recursively defined (non-function)

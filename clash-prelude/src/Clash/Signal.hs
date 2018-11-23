@@ -482,8 +482,8 @@ delay = \i -> withFrozenCallStack (delay# #clk i)
 -- | 'register' @i s@ delays the values in 'Signal' @s@ for one cycle, and sets
 -- the value at time 0 to @i@
 --
--- >>> sampleN 3 (register 8 (fromList [1,2,3,4]))
--- [8,1,2]
+-- >>> sampleN 5 (register 8 (fromList [1,1,2,3,4]))
+-- [8,8,1,2,3]
 register
   :: (HasCallStack, Undefined a, HiddenClockReset domain gated synchronous)
   => a
@@ -514,10 +514,10 @@ infixr 3 `register`
 --
 -- We get:
 --
--- >>> sampleN 8 sometimes1
--- [Nothing,Just 1,Nothing,Just 1,Nothing,Just 1,Nothing,Just 1]
--- >>> sampleN 8 countSometimes
--- [0,0,1,1,2,2,3,3]
+-- >>> sampleN 9 sometimes1
+-- [Nothing,Nothing,Just 1,Nothing,Just 1,Nothing,Just 1,Nothing,Just 1]
+-- >>> sampleN 9 countSometimes
+-- [0,0,0,1,1,2,2,3,3]
 regMaybe
   :: (HasCallStack, Undefined a, HiddenClockReset domain gated synchronous)
   => a
@@ -542,10 +542,10 @@ infixr 3 `regMaybe`
 --
 -- We get:
 --
--- >>> sampleN 8 oscillate
--- [False,True,False,True,False,True,False,True]
--- >>> sampleN 8 count
--- [0,0,1,1,2,2,3,3]
+-- >>> sampleN 9 oscillate
+-- [False,False,True,False,True,False,True,False,True]
+-- >>> sampleN 9 count
+-- [0,0,0,1,1,2,2,3,3]
 regEn
   :: (HasCallStack, Undefined a, HiddenClockReset domain gated synchronous)
   => a
@@ -686,7 +686,7 @@ simulate f =
       rst = unsafeCoerce @(Reset System 'Asynchronous)
                          @(Reset domain synchronous)
                          (Async (True :- pure False))
-  in  S.simulate (exposeClockReset f clk rst)
+  in  tail . S.simulate (exposeClockReset f clk rst) . dup1
 
 -- | /Lazily/ simulate a (@'Signal' a -> 'Signal' b@) function given a list of
 -- samples of type /a/
@@ -711,7 +711,7 @@ simulate_lazy f =
       rst = unsafeCoerce @(Reset System 'Asynchronous)
                          @(Reset domain synchronous)
                          (Async (True :- pure False))
-  in  S.simulate_lazy (exposeClockReset f clk rst)
+  in  tail . S.simulate_lazy (exposeClockReset f clk rst) . dup1
 
 -- | Simulate a (@'Unbundled' a -> 'Unbundled' b@) function given a list of
 -- samples of type @a@
@@ -737,7 +737,7 @@ simulateB f =
       rst = unsafeCoerce @(Reset System 'Asynchronous)
                          @(Reset domain synchronous)
                          (Async (True :- pure False))
-  in  S.simulateB (exposeClockReset f clk rst)
+  in  tail . S.simulateB (exposeClockReset f clk rst) . dup1
 
 -- | /Lazily/ simulate a (@'Unbundled' a -> 'Unbundled' b@) function given a
 -- list of samples of type @a@
@@ -763,7 +763,11 @@ simulateB_lazy f =
       rst = unsafeCoerce @(Reset System 'Asynchronous)
                          @(Reset domain synchronous)
                          (Async (True :- pure False))
-  in  S.simulateB_lazy (exposeClockReset f clk rst)
+  in  tail . S.simulateB_lazy (exposeClockReset f clk rst) . dup1
+
+dup1 :: [a] -> [a]
+dup1 (x:xs) = x:x:xs
+dup1 _      = error "empty list"
 
 -- * QuickCheck combinators
 

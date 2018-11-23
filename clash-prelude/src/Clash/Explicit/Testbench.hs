@@ -121,8 +121,8 @@ assertBitVector clk _rst msg checked expected returned =
 -- testInput clk rst = 'stimuliGenerator' clk rst $('Clash.Sized.Vector.listToVecTH' [(1::Int),3..21])
 -- @
 --
--- >>> sampleN 13 (testInput systemClockGen systemResetGen)
--- [1,3,5,7,9,11,13,15,17,19,21,21,21]
+-- >>> sampleN 14 (testInput systemClockGen asyncResetGen)
+-- [1,1,3,5,7,9,11,13,15,17,19,21,21,21]
 stimuliGenerator
   :: forall l domain gated synchronous a
    . KnownNat l
@@ -159,26 +159,29 @@ stimuliGenerator clk rst samples =
 -- @
 --
 -- >>> import qualified Data.List as List
--- >>> sampleN 12 (expectedOutput systemClockGen systemResetGen (fromList ([0..10] List.++ [10,10,10])))
+-- >>> sampleN 12 (expectedOutput systemClockGen asyncResetGen (fromList (0:[0..10] List.++ [10,10,10])))
 -- <BLANKLINE>
 -- cycle(system10000): 0, outputVerifier
 -- expected value: 70, not equal to actual value: 0
 -- [False
 -- cycle(system10000): 1, outputVerifier
+-- expected value: 70, not equal to actual value: 0
+-- ,False
+-- cycle(system10000): 2, outputVerifier
 -- expected value: 99, not equal to actual value: 1
 -- ,False,False,False,False,False
--- cycle(system10000): 6, outputVerifier
+-- cycle(system10000): 7, outputVerifier
 -- expected value: 7, not equal to actual value: 6
 -- ,False
--- cycle(system10000): 7, outputVerifier
+-- cycle(system10000): 8, outputVerifier
 -- expected value: 8, not equal to actual value: 7
 -- ,False
--- cycle(system10000): 8, outputVerifier
+-- cycle(system10000): 9, outputVerifier
 -- expected value: 9, not equal to actual value: 8
 -- ,False
--- cycle(system10000): 9, outputVerifier
+-- cycle(system10000): 10, outputVerifier
 -- expected value: 10, not equal to actual value: 9
--- ,False,True,True]
+-- ,False,True]
 --
 -- If your working with 'BitVector's containing don't care bit you should use 'outputVerifierBitVector'.
 outputVerifier

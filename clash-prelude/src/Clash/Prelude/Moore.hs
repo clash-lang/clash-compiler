@@ -52,8 +52,8 @@ let macT s (x,y) = x * y + s
 -- mac = 'moore' mac id 0
 -- @
 --
--- >>> simulate mac [(1,1),(2,2),(3,3),(4,4)]
--- [0,1,5,14...
+-- >>> simulate mac [(0,0),(1,1),(2,2),(3,3),(4,4)]
+-- [0,0,1,5,14,30,...
 -- ...
 --
 -- Synchronous sequential functions can be composed just like their

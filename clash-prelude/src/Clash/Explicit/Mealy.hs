@@ -58,8 +58,8 @@ let macT s (x,y) = (s',s)
 -- mac clk rst = 'mealy' clk rst macT 0
 -- @
 --
--- >>> simulate (mac systemClockGen systemResetGen) [(1,1),(2,2),(3,3),(4,4)]
--- [0,1,5,14...
+-- >>> simulate (mac systemClockGen systemResetGen) [(0,0),(1,1),(2,2),(3,3),(4,4)]
+-- [0,0,1,5,14...
 -- ...
 --
 -- Synchronous sequential functions can be composed just like their
