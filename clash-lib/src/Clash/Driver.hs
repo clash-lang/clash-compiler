@@ -306,11 +306,12 @@ generateHDL reprs bindingsMap hdlState primMap tcm tupTcm typeTrans eval
 loadImportAndInterpret
   :: (MonadIO m, MonadMask m)
   => [String]
-  -- ^ Extra search path
+  -- ^ Extra search path (usually passed as -i)
   -> [String]
   -- ^ Interpreter args
   -> String
-  -- ^ Top dir
+  -- ^ The folder in which the GHC bootstrap libraries (base, containers, etc.)
+  -- can be found
   -> Hint.ModuleName
   -- ^ Module function lives in
   -> String
@@ -344,10 +345,14 @@ loadImportAndInterpret iPaths0 interpreterArgs topDir qualMod funcName typ = do
 -- | Compiles blackbox functions and parses blackbox templates.
 compilePrimitive
   :: [FilePath]
+  -- ^ Import directories (-i flag)
   -> [FilePath]
-  -- ^ import directories (-i flag)
+  -- ^ Package databases
   -> FilePath
+  -- ^ The folder in which the GHC bootstrap libraries (base, containers, etc.)
+  -- can be found
   -> ResolvedPrimitive
+  -- ^ Primitive to compile
   -> IO CompiledPrimitive
 compilePrimitive idirs pkgDbs topDir (BlackBoxHaskell bbName bbGenName source) = do
   let interpreterArgs = concatMap (("-package-db":) . (:[])) pkgDbs
