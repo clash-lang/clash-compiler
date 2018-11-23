@@ -14,9 +14,11 @@ git:
 
 cache:
   directories:
-    - dist-newstyle
     - cabal-store
     - docker
+
+    # Do NOT cache dist-newstyle. It seems to
+    #- dist-newstyle
 
 if: type = pull_request OR fork
 
