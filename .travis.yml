@@ -23,7 +23,7 @@ cache:
 if: type = pull_request OR fork
 
 env:
-  - THREADS=2 DOCKER_IMAGE=leonschoorl/clash-ci-image:trusty GHCHEAD=true
+  - THREADS=2 DOCKER_IMAGE=leonschoorl/clash-ci-image:trusty
 
 jobs:
   include:

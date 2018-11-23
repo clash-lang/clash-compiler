@@ -9,11 +9,9 @@ image: leonschoorl/clash-ci-image:trusty
     paths:
       - cabal-store/
   script:
-    - pwd
-    - lscpu
-    - export
     - export GHC="$CI_JOB_NAME"
     - export THREADS=$(nproc)
+    - export
     - .ci/setup.sh
     - .ci/build.sh
     - .ci/test.sh
