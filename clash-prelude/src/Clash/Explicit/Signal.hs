@@ -470,8 +470,8 @@ delay = \clk i -> withFrozenCallStack (delay# clk i)
 -- | \"@'register' clk rst i s@\" delays the values in 'Signal' /s/ for one
 -- cycle, and sets the value to @i@ the moment the reset becomes 'False'.
 --
--- >>> sampleN 3 (register systemClockGen systemResetGen 8 (fromList [1,2,3,4]))
--- [8,1,2]
+-- >>> sampleN 5 (register systemClockGen asyncResetGen 8 (fromList [1,1,2,3,4]))
+-- [8,8,1,2,3]
 register
   :: (HasCallStack, Undefined a)
   => Clock domain gated
@@ -504,10 +504,10 @@ register = \clk rst initial i -> withFrozenCallStack
 --
 -- We get:
 --
--- >>> sampleN 8 (sometimes1 systemClockGen systemResetGen)
--- [Nothing,Just 1,Nothing,Just 1,Nothing,Just 1,Nothing,Just 1]
--- >>> sampleN 8 (count systemClockGen systemResetGen)
--- [0,0,1,1,2,2,3,3]
+-- >>> sampleN 9 (sometimes1 systemClockGen asyncResetGen)
+-- [Nothing,Nothing,Just 1,Nothing,Just 1,Nothing,Just 1,Nothing,Just 1]
+-- >>> sampleN 9 (count systemClockGen asyncResetGen)
+-- [0,0,0,1,1,2,2,3,3]
 regMaybe
   :: (HasCallStack, Undefined a)
   => Clock domain gated
@@ -533,10 +533,10 @@ regMaybe = \clk rst initial iM -> withFrozenCallStack
 --
 -- We get:
 --
--- >>> sampleN 8 (oscillate systemClockGen systemResetGen)
--- [False,True,False,True,False,True,False,True]
--- >>> sampleN 8 (count systemClockGen systemResetGen)
--- [0,0,1,1,2,2,3,3]
+-- >>> sampleN 9 (oscillate systemClockGen asyncResetGen)
+-- [False,False,True,False,True,False,True,False,True]
+-- >>> sampleN 9 (count systemClockGen asyncResetGen)
+-- [0,0,0,1,1,2,2,3,3]
 regEn
   :: Undefined a
   => Clock domain clk
@@ -559,8 +559,8 @@ regEn = \clk rst initial en i -> withFrozenCallStack
 -- | Simulate a (@'Unbundled' a -> 'Unbundled' b@) function given a list of
 -- samples of type /a/
 --
--- >>> simulateB (unbundle . register systemClockGen systemResetGen (8,8) . bundle) [(1,1), (2,2), (3,3)] :: [(Int,Int)]
--- [(8,8),(1,1),(2,2),(3,3)...
+-- >>> simulateB (unbundle . register systemClockGen asyncResetGen (8,8) . bundle) [(1,1), (1,1), (2,2), (3,3)] :: [(Int,Int)]
+-- [(8,8),(8,8),(1,1),(2,2),(3,3)...
 -- ...
 --
 -- __NB__: This function is not synthesisable
@@ -576,8 +576,8 @@ simulateB f = simulate (bundle . f . unbundle)
 -- | /Lazily/ simulate a (@'Unbundled' a -> 'Unbundled' b@) function given a
 -- list of samples of type /a/
 --
--- >>> simulateB (unbundle . register systemClockGen systemResetGen (8,8) . bundle) [(1,1), (2,2), (3,3)] :: [(Int,Int)]
--- [(8,8),(1,1),(2,2),(3,3)...
+-- >>> simulateB (unbundle . register systemClockGen asyncResetGen (8,8) . bundle) [(1,1), (1,1), (2,2), (3,3)] :: [(Int,Int)]
+-- [(8,8),(8,8),(1,1),(2,2),(3,3)...
 -- ...
 --
 -- __NB__: This function is not synthesisable

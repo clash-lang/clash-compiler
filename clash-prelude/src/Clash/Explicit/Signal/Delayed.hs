@@ -87,8 +87,8 @@ let mac :: Clock System gated
 -- delay3 clk rst = 'delayed' clk rst (0 ':>' 0 ':>' 0 ':>' 'Nil')
 -- @
 --
--- >>> sampleN 6 (delay3 systemClockGen systemResetGen (dfromList [1..]))
--- [0,0,0,1,2,3]
+-- >>> sampleN 7 (delay3 systemClockGen asyncResetGen (dfromList [0..]))
+-- [0,0,0,0,1,2,3]
 delayed
   :: forall domain gated synchronous a n d
    . (KnownNat d, Undefined a)
@@ -115,8 +115,8 @@ delayed clk rst m ds = coerce (delaySignal (coerce ds))
 -- delay2 = 'delayI'
 -- @
 --
--- >>> sampleN 6 (delay2 systemClockGen systemResetGen (dfromList [1..]))
--- [0,0,1,2,3,4]
+-- >>> sampleN 7 (delay2 systemClockGen asyncResetGen (dfromList ([0..])))
+-- [0,0,0,1,2,3,4]
 delayedI
   :: (Default a, KnownNat d, Undefined a)
   => Clock domain gated

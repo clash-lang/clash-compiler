@@ -215,8 +215,8 @@ window clk rst x = res
 -- windowD3 = 'windowD'
 -- @
 --
--- >>> simulateB (windowD3 systemClockGen systemResetGen) [1::Int,2,3,4] :: [Vec 3 Int]
--- [<0,0,0>,<1,0,0>,<2,1,0>,<3,2,1>,<4,3,2>...
+-- >>> simulateB (windowD3 systemClockGen asyncResetGen) [1::Int,1,2,3,4] :: [Vec 3 Int]
+-- [<0,0,0>,<0,0,0>,<1,0,0>,<2,1,0>,<3,2,1>,<4,3,2>...
 -- ...
 windowD
   :: (KnownNat n, Default a, Undefined a)

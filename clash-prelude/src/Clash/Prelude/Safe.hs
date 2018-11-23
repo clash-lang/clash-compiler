@@ -217,9 +217,9 @@ isFalling = hideClockReset E.isFalling
 -- To be precise: the given signal will be @'False'@ for the next @n-1@ cycles,
 -- followed by a single @'True'@ value:
 --
--- >>> Prelude.last (sampleN 1024 (riseEvery d1024)) == True
+-- >>> Prelude.last (sampleN 1025 (riseEvery d1024)) == True
 -- True
--- >>> Prelude.or (sampleN 1023 (riseEvery d1024)) == False
+-- >>> Prelude.or (sampleN 1024 (riseEvery d1024)) == False
 -- True
 --
 -- For example, to update a counter once every 10 million cycles:
@@ -241,13 +241,13 @@ riseEvery = hideClockReset E.riseEvery
 --
 -- To oscillate on an interval of 5 cycles:
 --
--- >>> sampleN 10 (oscillate False d5)
--- [False,False,False,False,False,True,True,True,True,True]
+-- >>> sampleN 11 (oscillate False d5)
+-- [False,False,False,False,False,False,True,True,True,True,True]
 --
 -- To oscillate between @'True'@ and @'False'@:
 --
--- >>> sampleN 10 (oscillate False d1)
--- [False,True,False,True,False,True,False,True,False,True]
+-- >>> sampleN 11 (oscillate False d1)
+-- [False,False,True,False,True,False,True,False,True,False,True]
 --
 -- An alternative definition for the above could be:
 --

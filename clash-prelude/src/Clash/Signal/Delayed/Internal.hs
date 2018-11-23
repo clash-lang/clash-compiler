@@ -110,8 +110,8 @@ dfromList_lazy = coerce . fromList_lazy
 --                    in  (acc, 'delay' clk rst ('singleton' 0) acc')
 -- @
 --
--- >>> sampleN 6 (mac systemClockGen systemResetGen (dfromList [1..]) (dfromList [1..]))
--- [0,1,5,14,30,55]
+-- >>> sampleN 7 (mac systemClockGen systemResetGen (dfromList [0..]) (dfromList [0..]))
+-- [0,0,1,5,14,30,55]
 feedback
   :: (DSignal domain n a -> (DSignal domain n a,DSignal domain (n + m + 1) a))
   -> DSignal domain n a

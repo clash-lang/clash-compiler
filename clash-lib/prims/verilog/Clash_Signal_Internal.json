@@ -122,7 +122,7 @@ assign ~RESULT = ~SYM[0];
 reg ~TYPO ~GENSYM[rst][0];
 initial begin
   #1    ~SYM[0] = 1;
-  #1999 ~SYM[0] = 0;
+  #3001 ~SYM[0] = 0;
 end
 assign ~RESULT = ~SYM[0];
 // pragma translate_on"

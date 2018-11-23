@@ -446,8 +446,8 @@ syncResetGen = Sync (True :- pure False)
 -- >   -> Signal domain Int -> Signal domain Int
 -- > registerS = register
 --
--- >>> printX (sampleN 4 (registerS (clockGen @System) (syncResetGen @System) 0 (fromList [1,2,3])))
--- [X,0,2,3]
+-- >>> printX (sampleN 5 (registerS (clockGen @System) syncResetGen 0 (fromList [1,1,2,3])))
+-- [X,0,1,2,3]
 --
 -- === Asynchronous reset
 --
@@ -456,8 +456,8 @@ syncResetGen = Sync (True :- pure False)
 -- >   -> Signal domain Int -> Signal domain Int
 -- > registerA = register
 --
--- >>> sampleN 4 (registerA (clockGen @System) (asyncResetGen @System) 0 (fromList [1,2,3]))
--- [0,1,2,3]
+-- >>> sampleN 5 (registerA (clockGen @System) asyncResetGen 0 (fromList [1,1,2,3]))
+-- [0,0,1,2,3]
 data ResetKind
   = Synchronous
   -- ^ Components with a synchronous reset port produce the reset value when:
@@ -593,10 +593,11 @@ register# Clock {} (Sync rst) i =
 register# Clock {} (Async rst) i =
     go (withFrozenCallStack (deepErrorX "register: initial value undefined")) rst
   where
-    go o (r :- rs) as@(~(x :- xs)) =
-      let o' = if r then i else o
+    go o0 (r :- rs) as@(~(x :- xs)) =
+      let o1 = if r then i else o0
+          oN = if r then i else x
           -- [Note: register strictness annotations]
-      in  o' `seqX` o' :- (as `seq` go x rs xs)
+      in  o1 `seqX` o1 :- (as `seq` go oN rs xs)
 
 register# (GatedClock _ _ ena) (Sync rst)  i =
     go (withFrozenCallStack (deepErrorX "register: initial value undefined")) rst ena
@@ -612,7 +613,7 @@ register# (GatedClock _ _ ena) (Async rst) i =
   where
     go o (r :- rs) enas@(~(e :- es)) as@(~(x :- xs)) =
       let oR = if r then i else o
-          oE = if e then x else oR
+          oE = if r then i else (if e then x else o)
           -- [Note: register strictness annotations]
       in  oR `seqX` oR :- (as `seq` enas `seq` go oE rs es xs)
 {-# NOINLINE register# #-}
@@ -781,8 +782,8 @@ fromList = Prelude.foldr headStrictSignal (errorX "finite list")
 -- | Simulate a (@'Clash.Signal.Signal' a -> 'Clash.Signal.Signal' b@) function
 -- given a list of samples of type @a@
 --
--- >>> simulate (register systemClockGen systemResetGen 8) [1, 2, 3]
--- [8,1,2,3...
+-- >>> simulate (register systemClockGen asyncResetGen 8) [1, 1, 2, 3]
+-- [8,8,1,2,3...
 -- ...
 --
 -- __NB__: This function is not synthesisable
@@ -840,8 +841,8 @@ fromList_lazy = Prelude.foldr (:-) (error "finite list")
 -- | Simulate a (@'Clash.Signal.Signal' a -> 'Clash.Signal.Signal' b@) function
 -- given a list of samples of type @a@
 --
--- >>> simulate (register systemClockGen systemResetGen 8) [1, 2, 3]
--- [8,1,2,3...
+-- >>> simulate (register systemClockGen asyncResetGen 8) [1, 1, 2, 3]
+-- [8,8,1,2,3...
 -- ...
 --
 -- __NB__: This function is not synthesisable

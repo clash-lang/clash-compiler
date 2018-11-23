@@ -59,8 +59,8 @@ import            Clash.XException
 -- delay3 = 'delayed' (0 ':>' 0 ':>' 0 ':>' 'Nil')
 -- @
 --
--- >>> sampleN 6 (toSignal (delay3 (dfromList [1..])))
--- [0,0,0,1,2,3]
+-- >>> sampleN 7 (toSignal (delay3 (dfromList [0..])))
+-- [0,0,0,0,1,2,3]
 delayed
   :: (KnownNat d, Undefined a, HiddenClockReset domain gated synchronous)
   => Vec d a
@@ -75,8 +75,8 @@ delayed = hideClockReset E.delayed
 -- delay2 = 'delayedI'
 -- @
 --
--- >>> sampleN 6 (toSignal (delay2 (dfromList [1..])))
--- [0,0,1,2,3,4]
+-- >>> sampleN 7 (toSignal (delay2 (dfromList [0..])))
+-- [0,0,0,1,2,3,4]
 delayedI
   :: (Default a, KnownNat d, Undefined a, HiddenClockReset domain gated synchronous)
   => DSignal domain n a
