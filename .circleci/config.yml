@@ -1,0 +1,82 @@
+version: 2
+
+aliases:
+  - &env
+    DEBIAN_FRONTEND: noninteractive
+    TERM: xterm-color
+    THREADS: 2
+
+  - &submodules
+    run:
+      name: "Checkout submodules"
+      command: git submodule update --init --depth 1
+  - &setup
+    run:
+      name: Setup system
+      command: .ci/setup.sh
+  - &cache_restore
+    restore_cache:
+      keys:
+        - cabal-store-{{ .Environment.CIRCLE_JOB }}-{{ checksum ".circleci/config.yml" }}-{{ checksum "cabal.project" }}
+        - cabal-store-{{ .Environment.CIRCLE_JOB }}-
+  - &cache_save
+    save_cache:
+      key: cabal-store-{{ .Environment.CIRCLE_JOB }}-{{ checksum ".circleci/config.yml" }}-{{ checksum "cabal.project" }}
+      paths:
+        - cabal-store
+
+  - &build
+    run: .ci/build.sh
+
+  - &run-tests
+    run: .ci/test.sh
+
+  # When testing a pull request on CircleCI,
+  # fetch the result of merging it in.
+  - &merge_pullrequest
+    run:
+      name: Checkout pull request merge result
+      command: |
+        if [ -n "$CIRCLE_PR_NUMBER" ]; then
+          git fetch "$CIRCLE_REPOSITORY_URL" "pull/$CIRCLE_PR_NUMBER/merge:pull-$CIRCLE_PR_NUMBER-merged"
+          git rev-parse "pull-$CIRCLE_PR_NUMBER-merged"
+          git checkout "pull-$CIRCLE_PR_NUMBER-merged"
+        fi
+
+  - &build_default
+    docker:
+      - image: leonschoorl/clash-ci-image:trusty
+    steps:
+      - checkout
+      - *merge_pullrequest
+      - *submodules
+      - *setup
+      - *cache_restore
+      - *build
+      - *run-tests
+      - *cache_save
+
+workflows:
+  version: 2
+  build_and_test_clash:
+    jobs:
+      - ghc-8.2.2
+      - ghc-8.4.4
+      - ghc-8.6.2
+
+jobs:
+  ghc-8.2.2:
+    environment:
+      <<: *env
+      GHC: ghc-8.2.2
+    <<: *build_default
+  ghc-8.4.4:
+    environment:
+      <<: *env
+      GHC: ghc-8.4.4
+    <<: *build_default
+  ghc-8.6.2:
+    environment:
+      <<: *env
+      GHC: ghc-8.6.2
+    <<: *build_default
