@@ -8,18 +8,25 @@ delayer :: ( HiddenClockReset domain gated synchronous )
         => DSignal domain 0 Int -> DSignal domain 2 Int
 delayer = delayN d2
 
+zeroFirst2
+  :: (Num a, HiddenClockReset domain gated synchronous )
+  => Signal domain a -> Signal domain a
+zeroFirst2 a = mux en a 0
+  where
+    en = register False $ register False $ pure True
+
 topEntity
   :: Clock System Source
   -> Reset System Asynchronous
   -> Signal System Int
-  -> Signal System (Maybe Int)
-topEntity = exposeClockReset (fmap maybeX . toSignal . delayer . fromSignal)
+  -> Signal System Int
+topEntity = exposeClockReset (zeroFirst2 . toSignal . delayer . fromSignal)
 
 testBench :: Signal System Bool
 testBench = done
   where
     testInput      = stimuliGenerator clk rst $ 1 :> 2 :> 3 :> 10 :> Nil
-    expectedOutput = outputVerifier clk rst (Nothing:>Nothing:>Just 1:>Just 2:>Just 3:>Just 10:>Nil)
+    expectedOutput = outputVerifier clk rst (0:>0:>1:>2:>3:>10:>Nil)
     done           = expectedOutput (topEntity clk rst testInput)
     clk            = tbSystemClockGen (not <$> done)
     rst            = systemResetGen
