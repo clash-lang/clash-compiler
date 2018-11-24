@@ -1,4 +1,4 @@
-module DelayedFoled where
+module DelayedFold where
 
 import Clash.Prelude
 import qualified Clash.Signal.Delayed.Bundle as D
