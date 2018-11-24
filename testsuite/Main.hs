@@ -125,6 +125,11 @@ main = do
             , runTest ("tests" </> "shouldwork" </> "CustomReprs" </> "Deriving") defBuild [] "BitPackDerivation" (["", "BitPackDerivation_testBench"],"BitPackDerivation_testBench",True)
             , runTest ("tests" </> "shouldwork" </> "CustomReprs" </> "Indexed") defBuild [] "Indexed" (["", "Indexed_testBench"],"Indexed_testBench",True)
             ]
+        , testGroup "DSignal"
+            [ runTest ("tests" </> "shouldwork" </> "DSignal") defBuild [] "DelayedFold" (["","DelayedFold_testBench"],"DelayedFold_testBench",True)
+            , runTest ("tests" </> "shouldwork" </> "DSignal") defBuild [] "DelayI" (["","DelayI_testBench"],"DelayI_testBench",True)
+            , runTest ("tests" </> "shouldwork" </> "DSignal") defBuild [] "DelayN" (["","DelayN_testBench"],"DelayN_testBench",True)
+            ]
         , testGroup "Feedback"
             [ runTest ("tests" </> "shouldwork" </> "Feedback") defBuild [] "Fib" (["","Fib_testBench"],"Fib_testBench",True)
             ]
