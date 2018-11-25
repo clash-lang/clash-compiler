@@ -5,4 +5,19 @@
     , "template"  : "~ARG[1]"
     }
   }
+, { "Primitive" :
+    { "name"      : "Clash.Sized.Vector.dfold"
+    , "primType"  : "Function"
+    }
+  }
+, { "Primitive" :
+    { "name"      : "Clash.Sized.Vector.dtfold"
+    , "primType"  : "Function"
+    }
+  }
+, { "Primitive" :
+    { "name"      : "Clash.Sized.Vector.traverse#"
+    , "primType"  : "Function"
+    }
+  }
 ]

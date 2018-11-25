@@ -32,7 +32,6 @@ import           System.FilePath.Posix       ((<.>), (</>))
 -- GHC API
 import           Annotations (Annotation(..), getAnnTargetName_maybe)
 import qualified Annotations
-import qualified BasicTypes
 import qualified Class
 import qualified CoreFVs
 import qualified CoreSyn
@@ -264,14 +263,9 @@ loadExprFromTyThing bndr tyThing = case tyThing of
   GHC.AnId _id | Var.isId _id ->
     let _idInfo    = Var.idInfo _id
         unfolding  = IdInfo.unfoldingInfo _idInfo
-        inlineInfo = IdInfo.inlinePragInfo _idInfo
     in case unfolding of
       CoreSyn.CoreUnfolding {} ->
-        case (BasicTypes.inl_inline inlineInfo,BasicTypes.inl_act inlineInfo) of
-          (BasicTypes.NoInline,BasicTypes.AlwaysActive) -> Right bndr
-          (BasicTypes.NoInline,BasicTypes.NeverActive)  -> Right bndr
-          (BasicTypes.NoInline,_) -> Left (bndr, CoreSyn.unfoldingTemplate unfolding)
-          _ -> Left (bndr, CoreSyn.unfoldingTemplate unfolding)
+        Left (bndr, CoreSyn.unfoldingTemplate unfolding)
       (CoreSyn.DFunUnfolding dfbndrs dc es) ->
         let dcApp  = MkCore.mkCoreConApps dc es
             dfExpr = MkCore.mkCoreLams dfbndrs dcApp
