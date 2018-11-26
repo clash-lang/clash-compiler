@@ -41,8 +41,8 @@ assertIn needle haystack
 -- VHDL test
 mainVHDL :: IO ()
 mainVHDL = do
-  [modDir, topFile] <- getArgs
-  content <- readFile (modDir </> topFile)
+  [topFile] <- getArgs
+  content <- readFile topFile
 
   assertIn "attribute top : string;" content
   assertIn " : signal is \"input1\"" content
@@ -51,8 +51,8 @@ mainVHDL = do
 -- Verilog test
 mainVerilog :: IO ()
 mainVerilog = do
-  [modDir, topFile] <- getArgs
-  content <- readFile (modDir </> topFile)
+  topFile <- getArgs
+  content <- readFile topFile
 
   assertIn "(* top = \"input1\" *) input" content
   assertIn "(* top = \"input2\" *) input" content

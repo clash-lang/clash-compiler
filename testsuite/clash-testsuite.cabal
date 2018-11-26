@@ -30,8 +30,9 @@ flag cosim
 
 executable clash-testsuite
   main-is:             Main.hs
-  ghc-options:         -Wall
+  ghc-options:         -Wall -threaded -with-rtsopts=-N
   other-modules:       Test.Tasty.Program
+                       Test.Tasty.Clash
   default-extensions:  DeriveDataTypeable
                        OverloadedStrings
                        ViewPatterns
@@ -39,14 +40,23 @@ executable clash-testsuite
                        deepseq            >=1.4      && <1.5,
                        directory          >=1.2      && <1.4,
                        filepath           >=1.4      && <1.5,
+                       Glob               >=0.9      && <1.0,
                        process            >=1.2      && <1.7,
-                       tasty              >=1.1.0.2  && <2.0,
+                       tasty              >=1.1.0.3  && <2.0,
                        tasty-hunit,
                        neat-interpolation >=0.3      && <0.4,
                        concurrent-extra   >=0.7      && <0.8,
                        temporary,
                        text,
-                       generic-lens
+                       generic-lens,
+
+                       -- Strictly we don't need these dependencies for the
+                       -- testsuite to compile, but we do when running it.
+                       -- Leaving it out will cause the testsuite to compile
+                       -- it anyway so we're better of doing it beforehand.
+                       clash-ghc,
+                       clash-lib,
+                       clash-prelude
 
   -- hs-source-dirs:
   default-language:    Haskell2010

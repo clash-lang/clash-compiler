@@ -2,7 +2,7 @@ module PortProducts where
 
 import qualified Prelude as P
 import System.Environment (getArgs)
-import System.FilePath ((</>))
+import System.FilePath ((</>), takeDirectory)
 import Data.List (isInfixOf)
 
 import Clash.Prelude
@@ -48,8 +48,8 @@ assertIn needle haystack
 
 mainVerilog :: IO ()
 mainVerilog = do
-  [modDir, topFile] <- getArgs
-  content <- readFile "verilog/PortProducts/PortProducts_topEntity/PortProducts_topEntity.v"
+  [topDir] <- getArgs
+  content <- readFile (takeDirectory topDir </> "PortProducts_topEntity" </> "PortProducts_topEntity.v")
 
   assertIn "top_zero" content
   assertIn "top_sub_one" content

@@ -66,20 +66,28 @@ module Test.Tasty.Program (
    testProgram
  , testFailingProgram
  , PrintOutput(..)
+ , GlobArgs(..)
  ) where
 
-import Control.Exception       ( finally )
 import Data.Typeable           ( Typeable                                 )
-import System.Directory        ( findExecutable                           )
+import Data.Maybe              ( fromMaybe                                )
+import System.FilePath.Glob    ( globDir1, compile                        )
+import System.Directory        ( findExecutable, getCurrentDirectory      )
 import System.Exit             ( ExitCode(..)                             )
 import System.Process          ( cwd, readCreateProcessWithExitCode, proc )
 import Test.Tasty.Providers    ( IsTest (..), Result, TestName, TestTree,
                                  singleTest, testPassed, testFailed       )
-import Control.Concurrent.Lock ( Lock, acquire, release )
 
 import NeatInterpolation    ( text )
 
 import qualified Data.Text    as T
+
+
+data GlobArgs
+  = GlobStar
+  -- ^ Glob all argument with a star (*) in them
+  | NoGlob
+  -- ^ No globbing here, mister
 
 
 data PrintOutput
@@ -95,16 +103,14 @@ data TestProgram =
     -- ^ Executable
     [String]
     -- ^ Executable args
+    GlobArgs
+    -- ^ Whether to interpret glob patterns in arguments
     PrintOutput
     -- ^ What output to print on test success
     Bool
     -- ^ Whether an empty stderr means test failure
-    (IO FilePath)
+    (Maybe FilePath)
     -- ^ Work directory
-    (IO (Maybe Lock, Maybe Lock))
-    -- ^ Locks to wait for / release when ready. This is a poor man's
-    -- implementation of threaded tests, currently unsupported by
-    -- Tasty. See: <https://github.com/feuerbach/tasty/issues/48>.
       deriving (Typeable)
 
 data TestFailingProgram =
@@ -113,6 +119,8 @@ data TestFailingProgram =
     -- ^ Executable
     [String]
     -- ^ Executable args
+    GlobArgs
+    -- ^ Whether to interpret glob patterns in arguments
     PrintOutput
     -- ^ What output to print on test success
     Bool
@@ -121,12 +129,8 @@ data TestFailingProgram =
     -- ^ Expected return code
     (Maybe T.Text)
     -- ^ Expected string in stderr
-    (IO FilePath)
+    (Maybe FilePath)
     -- ^ Work directory
-    (IO (Maybe Lock, Maybe Lock))
-    -- ^ Locks to wait for / release when ready. This is a poor man's
-    -- implementation of threaded tests, currently unsupported by
-    -- Tasty. See: <https://github.com/feuerbach/tasty/issues/48>.
       deriving (Typeable)
 
 testOutput
@@ -148,6 +152,19 @@ testOutput PrintBoth     stderr  stdout = [text|
   $stdout
   |]
 
+globArgs
+  :: GlobArgs
+  -> Maybe FilePath
+  -> [String]
+  -> IO [String]
+globArgs NoGlob _dir args = return args
+globArgs GlobStar dir args = do
+  cwd0 <- getCurrentDirectory
+  concat <$> mapM (globArg' cwd0) args
+  where
+    globArg' cwd1 arg
+      | '*' `elem` arg = globDir1 (compile arg) (fromMaybe cwd1 dir)
+      | otherwise      = return [arg]
 
 -- | Create test that runs a program with given options. Test succeeds
 -- if program terminates successfully.
@@ -157,20 +174,18 @@ testProgram
   -> String
   -- ^ Program name
   -> [String]
-  -- ^ Program options
+  -- ^ Program arguments
+  -> GlobArgs
+  -- ^ Whether to interpret glob patterns in arguments
   -> PrintOutput
   -- ^ What output to print on test success
   -> Bool
   -- ^ Whether a non-empty stdout means failure
-  -> IO FilePath
+  -> Maybe FilePath
   -- ^ Optional working directory
-  -> IO (Maybe Lock, Maybe Lock)
-  -- ^ Locks to wait for / release when ready. This is a poor man's
-  -- implementation of threaded tests, currently unsupported by
-  -- Tasty. See: <https://github.com/feuerbach/tasty/issues/48>.
   -> TestTree
-testProgram testName program opts stdO stdF workDir locks =
-  singleTest testName (TestProgram program opts stdO stdF workDir locks)
+testProgram testName program opts glob stdO stdF workDir =
+  singleTest testName (TestProgram program opts glob stdO stdF workDir)
 
 -- | Create test that runs a program with given options. Test succeeds
 -- if program terminates with error
@@ -181,6 +196,8 @@ testFailingProgram
   -- ^ Program name
   -> [String]
   -- ^ Program options
+  -> GlobArgs
+  -- ^ Whether to interpret glob patterns in arguments
   -> PrintOutput
   -- ^ Whether to print stdout or stderr on success
   -> Bool
@@ -190,59 +207,35 @@ testFailingProgram
   -- returned error code is equal to the given one.
   -> (Maybe T.Text)
   -- ^ Expected string in stderr
-  -> IO FilePath
+  -> Maybe FilePath
   -- ^ Optional working directory
-  -> IO (Maybe Lock, Maybe Lock)
-  -- ^ Locks to wait for / release when ready. This is a poor man's
-  -- implementation of threaded tests, currently unsupported by
-  -- Tasty. See: <https://github.com/feuerbach/tasty/issues/48>.
   -> TestTree
-testFailingProgram testName program opts stdO stdF errCode expectedOutput workDir locks =
-  singleTest testName (TestFailingProgram program opts stdO stdF errCode expectedOutput workDir locks)
+testFailingProgram testName program opts glob stdO stdF errCode expectedOutput workDir =
+  singleTest testName (TestFailingProgram program opts glob stdO stdF errCode expectedOutput workDir)
 
 instance IsTest TestProgram where
-  run opts (TestProgram program args stdO stdF workDir locks) _ = do
-    (prevLock, nextLock) <- locks
-
+  run opts (TestProgram program args glob stdO stdF workDir) _ = do
     execFound <- findExecutable program
 
-    -- Wait for previous test to finish
-    maybe (return ()) acquire prevLock
+    args' <- globArgs glob workDir args
 
     -- Execute program
-    let result =
-          case execFound of
-            Nothing       -> return $ execNotFoundFailure program
-            Just progPath -> runProgram progPath args stdO stdF =<< workDir
-
-    finally
-      -- Calculate result
-      result
-      -- Release lock of next test (if applicable), even if error was thrown
-      (maybe (return ()) release nextLock)
+    case execFound of
+      Nothing       -> return $ execNotFoundFailure program
+      Just progPath -> runProgram progPath args' stdO stdF workDir
 
   testOptions = return []
 
 instance IsTest TestFailingProgram where
-  run _opts (TestFailingProgram program args stdO stdF errCode expectedOutput workDir locks) _ = do
-    (prevLock, nextLock) <- locks
-
+  run _opts (TestFailingProgram program args glob stdO stdF errCode expectedOutput workDir) _ = do
     execFound <- findExecutable program
 
-    -- Wait for previous test to finish
-    maybe (return ()) acquire prevLock
+    args' <- globArgs glob workDir args
 
     -- Execute program
-    let result =
-          case execFound of
-            Nothing       -> return $ execNotFoundFailure program
-            Just progPath -> runFailingProgram progPath args stdO stdF errCode expectedOutput =<< workDir
-
-    finally
-      -- Calculate result
-      result
-      -- Release lock of next test (if applicable), even if error was thrown
-      (maybe (return ()) release nextLock)
+    case execFound of
+      Nothing       -> return $ execNotFoundFailure program
+      Just progPath -> runFailingProgram progPath args stdO stdF errCode expectedOutput workDir
 
   testOptions = return []
 
@@ -257,11 +250,11 @@ runProgram
   -- ^ Whether to print stdout or stderr on success
   -> Bool
   -- ^ Whether a non-empty stdout means failure
-  -> FilePath
+  -> Maybe FilePath
   -- ^ Optional working directory
   -> IO Result
 runProgram program args stdO stdF workDir = do
-  let cp = (proc program args) { cwd = Just workDir }
+  let cp = (proc program args) { cwd = workDir }
   (exitCode, stdout, stderr) <- readCreateProcessWithExitCode cp ""
 
   -- For debugging: Uncomment this to print executable and and its arguments
@@ -294,13 +287,13 @@ runFailingProgram
   -> Maybe Int
   -- ^ Expected error code. Test will *only* succeed if program fails and the
   -- returned error code is equal to the given one.
-  -> (Maybe T.Text)
-  -- ^ Expected string in stderr (regular expression)
-  -> FilePath
+  -> Maybe T.Text
+  -- ^ Expected string in stderr
+  -> Maybe FilePath
   -- ^ Optional working directory
   -> IO Result
 runFailingProgram program args stdO errOnEmptyStderr expectedCode expectedStderr workDir = do
-  let cp = (proc program args) { cwd = Just workDir }
+  let cp = (proc program args) { cwd = workDir }
   (exitCode, stdout, stderr) <- readCreateProcessWithExitCode cp ""
 
   -- For debugging: Uncomment this to print executable and and its arguments

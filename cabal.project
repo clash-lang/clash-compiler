@@ -46,6 +46,12 @@ optional-packages: singletons/th-desugar/th-desugar.cabal
 
 source-repository-package
   type: git
+  location: https://github.com/feuerbach/tasty.git
+  tag: 6506befcd3bfc274aabeda5f10d36089fd6ff625
+  subdir: core
+
+source-repository-package
+  type: git
   location: https://github.com/clash-lang/ghc-typelits-extra
   tag: f1cba7cebf73e429dbdfa67c88161300bc5e318e
 
