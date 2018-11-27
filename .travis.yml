@@ -23,17 +23,22 @@ cache:
 if: type = pull_request OR fork
 
 env:
-  - THREADS=2 DOCKER_IMAGE=leonschoorl/clash-ci-image:trusty GHCHEAD=true
+  - THREADS=2 DOCKER_IMAGE=leonschoorl/clash-ci-image:trusty
 
 jobs:
   include:
     - stage: precache
       compiler: "ghc-head"
-      script: docker run -e THREADS=$THREADS -e GHC=$GHC -v $PWD:/root/build -it ${DOCKER_IMAGE} bash -c "cd /root/build && .ci/setup.sh && .ci/build.sh"
+      script:
+        # Awaiting issue: https://github.com/goldfirere/singletons/issues/357
+        - echo "GHC head currently disabled, because singletons doesn't build on ghc head" && exit 1
+        - docker run -e THREADS=$THREADS -e GHC=$GHC -v $PWD:/root/build -it ${DOCKER_IMAGE} bash -c "cd /root/build && .ci/setup.sh && .ci/build.sh"
 
     - stage: test
       compiler: "ghc-head"
-      script: docker run -e THREADS=$THREADS -e GHC=$GHC -v $PWD:/root/build -it ${DOCKER_IMAGE} bash -c "cd /root/build && .ci/setup.sh && .ci/build.sh && .ci/test.sh"
+      script:
+        - echo "GHC head currently disabled, because singletons doesn't build on ghc head" && exit 1
+        - docker run -e THREADS=$THREADS -e GHC=$GHC -v $PWD:/root/build -it ${DOCKER_IMAGE} bash -c "cd /root/build && .ci/setup.sh && .ci/build.sh && .ci/test.sh"
 
   allow_failures:
     - compiler: "ghc-head"

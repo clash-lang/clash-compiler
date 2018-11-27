@@ -2,7 +2,6 @@ version: 2
 
 aliases:
   - &env
-    DEBIAN_FRONTEND: noninteractive
     TERM: xterm-color
     THREADS: 2
 
@@ -28,7 +27,7 @@ aliases:
   - &build
     run: .ci/build.sh
 
-  - &run-tests
+  - &run_tests
     run: .ci/test.sh
 
   # When testing a pull request on CircleCI,
@@ -53,7 +52,7 @@ aliases:
       - *setup
       - *cache_restore
       - *build
-      - *run-tests
+      - *run_tests
       - *cache_save
 
 workflows:
