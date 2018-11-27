@@ -132,9 +132,21 @@ type TyName     = Name Type
 type KiName     = Name Kind
 
 -- | An easier view on types
+--
+-- Note [Arrow arguments]
+--
+-- Clash' Arrow type can either have 2 or 4 arguments, depending on who created it.
+-- By default it has two arguments: the argument type of a function, and the result
+-- type of a function.
+--
+-- So when do we have 4 arguments? When in Haskell/GHC land the arrow was
+-- unsaturated. This can happen in instance heads, or in the eta-reduced
+-- representation of newtypes. So what are those additional 2 arguments compared to
+-- the "normal" function type? They're the kinds of argument and result type.
 tyView :: Type -> TypeView
 tyView ty@(AppTy _ _) = case splitTyAppM ty of
   Just (ConstTy Arrow, [ty1,ty2]) -> FunTy ty1 ty2
+  Just (ConstTy Arrow, [_,_,ty1,ty2]) -> FunTy ty1 ty2 -- See Note [Arrow arguments]
   Just (ConstTy (TyCon tc), args) -> TyConApp tc args
   _ -> OtherType ty
 tyView (ConstTy (TyCon tc)) = TyConApp tc []
