@@ -92,20 +92,18 @@ where
 
 import Type.Reflection            (Typeable)
 import Control.Applicative        (liftA2, liftA3)
-import Control.DeepSeq            (NFData, force)
-import Control.Exception          (catch, evaluate, throw)
+import Control.DeepSeq            (NFData, rnf)
 import Data.Default.Class         (Default (..))
 import GHC.Generics               (Generic)
 import GHC.Stack                  (HasCallStack, withFrozenCallStack)
 import GHC.TypeLits               (KnownNat, KnownSymbol, Nat, Symbol)
 import Language.Haskell.TH.Syntax (Lift (..))
-import System.IO.Unsafe           (unsafeDupablePerformIO)
 import Test.QuickCheck            (Arbitrary (..), CoArbitrary(..), Property,
                                    property)
 
 import Clash.Promoted.Nat         (SNat (..), snatToInteger, snatToNum)
 import Clash.Promoted.Symbol      (SSymbol (..))
-import Clash.XException           (Undefined (..), XException, errorX, seqX)
+import Clash.XException           (Undefined (..), errorX, seqX)
 
 {- $setup
 >>> :set -XDataKinds
@@ -721,16 +719,6 @@ testFor n = property . and . take n . sample
 
 -- * List \<-\> Signal conversion (not synthesisable)
 
--- | A 'force' that lazily returns exceptions
-forceNoException :: NFData a => a -> IO a
-forceNoException x = catch (evaluate (force x)) (\(e :: XException) -> return (throw e))
-
-headStrictCons :: NFData a => a -> [a] -> [a]
-headStrictCons x xs = unsafeDupablePerformIO ((:) <$> forceNoException x <*> pure xs)
-
-headStrictSignal :: NFData a => a -> Signal domain a -> Signal domain a
-headStrictSignal x xs = unsafeDupablePerformIO ((:-) <$> forceNoException x <*> pure xs)
-
 -- | The above type is a generalisation for:
 --
 -- @
@@ -746,7 +734,7 @@ headStrictSignal x xs = unsafeDupablePerformIO ((:-) <$> forceNoException x <*> 
 --
 -- __NB__: This function is not synthesisable
 sample :: (Foldable f, NFData a) => f a -> [a]
-sample = foldr headStrictCons []
+sample = foldr (\a b -> rnf a `seqX` (a : b)) []
 
 -- | The above type is a generalisation for:
 --
@@ -775,7 +763,7 @@ sampleN n = take n . sample
 --
 -- __NB__: This function is not synthesisable
 fromList :: NFData a => [a] -> Signal domain a
-fromList = Prelude.foldr headStrictSignal (errorX "finite list")
+fromList = Prelude.foldr (\a b -> rnf a `seqX` (a :- b)) (errorX "finite list")
 
 -- * Simulation functions (not synthesisable)
 
