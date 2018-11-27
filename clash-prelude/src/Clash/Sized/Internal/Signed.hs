@@ -298,7 +298,7 @@ fromInteger# = fromInteger_INLINE
 
 {-# INLINE fromInteger_INLINE #-}
 fromInteger_INLINE :: forall n . KnownNat n => Integer -> Signed n
-fromInteger_INLINE i = mask `seq` S res
+fromInteger_INLINE i = if mask == 0 then S 0 else S res
   where
     mask = 1 `shiftL` fromInteger (natVal (Proxy @n) -1)
     res  = case divMod i mask of
