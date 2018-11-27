@@ -87,8 +87,7 @@ tastyRelease
   :: FilePath
   -> IO ()
 tastyRelease path = do
-  return ()
---  Directory.removeDirectoryRecursive path
+  Directory.removeDirectoryRecursive path
 
 -- | Set the stage for compilation
 createDirs
