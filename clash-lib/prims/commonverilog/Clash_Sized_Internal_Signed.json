@@ -116,21 +116,21 @@
     { "name"      : "Clash.Sized.Internal.Signed.plus#"
     , "kind"      : "Declaration"
     , "type"      : "plus# :: Signed m -> Signed n -> Signed (1 + Max m n)"
-    , "template"  : "assign ~RESULT = ~ARG[0] + ~ARG[1];"
+    , "template"  : "assign ~RESULT = ~IF~AND[~SIZE[~TYP[0]],~SIZE[~TYP[1]]]~THEN~ARG[0] + ~ARG[1]~ELSE~IF~SIZE[~TYP[0]]~THEN~ARG[0]~ELSE~ARG[1]~FI~FI;"
     }
   }
 , { "BlackBox" :
     { "name"      : "Clash.Sized.Internal.Signed.minus#"
     , "kind"      : "Declaration"
     , "type"      : "minus# :: Signed m -> Signed n -> Signed (1 + Max m n)"
-    , "template"  : "assign ~RESULT = ~ARG[0] - ~ARG[1];"
+    , "template"  : "assign ~RESULT = ~IF~AND[~SIZE[~TYP[0]],~SIZE[~TYP[1]]]~THEN ~ARG[0] - ~ARG[1]~ELSE~IF~SIZE[~TYP[0]]~THEN ~ARG[0]~ELSE - ~ARG[1] ~FI~FI;"
     }
   }
 , { "BlackBox" :
     { "name"      : "Clash.Sized.Internal.Signed.times#"
     , "kind"      : "Declaration"
     , "type"      : "times# :: Signed m -> Signed n -> Signed (m + n)"
-    , "template"  : "assign ~RESULT = ~ARG[0] * ~ARG[1];"
+    , "template"  : "assign ~RESULT = ~IF~AND[~SIZE[~TYP[0]],~SIZE[~TYP[1]]]~THEN~ARG[0] * ~ARG[1]~ELSE~SIZE[~TYPO]'d0~FI;"
     }
   }
 , { "BlackBox" :

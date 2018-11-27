@@ -46,21 +46,21 @@
     { "name"      : "Clash.Sized.Internal.BitVector.reduceAnd#"
     , "kind"      : "Expression"
     , "type"      : "reduceAnd# :: KnownNat n => BitVector n -> Bit"
-    , "template"  : "& (~ARG[1])"
+    , "template"  : "~IF~LIT[0]~THEN& (~ARG[1])~ELSE1'b1~FI"
     }
   }
 , { "BlackBox" :
     { "name"      : "Clash.Sized.Internal.BitVector.reduceOr#"
     , "kind"      : "Expression"
     , "type"      : "reduceOr# :: KnownNat n => BitVector n -> Bit"
-    , "template"  : "| (~ARG[1])"
+    , "template"  : "~IF~LIT[0]~THEN| (~ARG[1])~ELSE1'b0~FI"
     }
   }
 , { "BlackBox" :
     { "name"      : "Clash.Sized.Internal.BitVector.reduceXor#"
     , "kind"      : "Expression"
     , "type"      : "reduceXor# :: KnownNat n => BitVector n -> Bit"
-    , "template"  : "^ (~ARG[1])"
+    , "template"  : "~IF~LIT[0]~THEN^ (~ARG[1])~ELSE1'b0~FI"
     }
   }
 , { "BlackBox" :
@@ -179,7 +179,7 @@
     { "name"      : "Clash.Sized.Internal.BitVector.++#"
     , "kind"      : "Expression"
     , "type"      : "(++#) :: KnownNat m => BitVector n -> BitVector m -> BitVector (n + m)"
-    , "template"  : "{~ARG[1],~ARG[2]}"
+    , "template"  : "~IF~AND[~SIZE[~TYP[1]],~SIZE[~TYP[2]]]~THEN{~ARG[1],~ARG[2]}~ELSE~IF~SIZE[~TYP[1]]~THEN~ARG[1]~ELSE~ARG[2]~FI~FI"
     }
   }
 , { "BlackBox" :
@@ -276,21 +276,21 @@
     { "name"      : "Clash.Sized.Internal.BitVector.plus#"
     , "kind"      : "Declaration"
     , "type"      : "plus# :: (KnownNat m, KnownNat n) => BitVector m -> BitVector n -> BitVector (Max m n + 1)"
-    , "template"  : "assign ~RESULT = ~ARG[2] + ~ARG[3];"
+    , "template"  : "assign ~RESULT = ~IF~AND[~SIZE[~TYP[2]],~SIZE[~TYP[3]]]~THEN~ARG[2] + ~ARG[3]~ELSE~IF~SIZE[~TYP[2]]~THEN~ARG[2]~ELSE~ARG[3]~FI~FI;"
     }
   }
 , { "BlackBox" :
     { "name"      : "Clash.Sized.Internal.BitVector.minus#"
     , "kind"      : "Declaration"
     , "type"      : "minus# :: (KnownNat m, KnownNat n) => BitVector m -> BitVector n -> BitVector (Max m n + 1)"
-    , "template"  : "assign ~RESULT = ~ARG[2] - ~ARG[3];"
+    , "template"  : "assign ~RESULT = ~IF~AND[~SIZE[~TYP[2]],~SIZE[~TYP[3]]]~THEN~ARG[2] - ~ARG[3]~ELSE~IF~SIZE[~TYP[2]]~THEN~ARG[2]~ELSE-~ARG[3]~FI~FI;"
     }
   }
 , { "BlackBox" :
     { "name"      : "Clash.Sized.Internal.BitVector.times#"
     , "kind"      : "Declaration"
     , "type"      : "times# :: (KnownNat m, KnownNat n) => BitVector m -> BitVector n -> BitVector (m + n)"
-    , "template"  : "assign ~RESULT = ~ARG[2] * ~ARG[3];"
+    , "template"  : "assign ~RESULT = ~IF~AND[~SIZE[~TYP[2]],~SIZE[~TYP[3]]]~THEN~ARG[2] * ~ARG[3]~ELSE~SIZE[~TYPO]'d0~FI;"
     }
   }
 , { "BlackBox" :

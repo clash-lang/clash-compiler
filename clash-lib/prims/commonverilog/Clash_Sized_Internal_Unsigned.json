@@ -107,21 +107,21 @@
     { "name"      : "Clash.Sized.Internal.Unsigned.plus#"
     , "kind"      : "Declaration"
     , "type"      : "plus# :: Unsigned m -> Unsigned n -> Unsigned (1 + Max m n)"
-    , "template"  : "assign ~RESULT = ~ARG[0] + ~ARG[1];"
+    , "template"  : "assign ~RESULT = ~IF~AND[~SIZE[~TYP[0]],~SIZE[~TYP[1]]]~THEN~ARG[0] + ~ARG[1]~ELSE~IF~SIZE[~TYP[0]]~THEN~ARG[0]~ELSE~ARG[1]~FI~FI;"
     }
   }
 , { "BlackBox" :
     { "name"      : "Clash.Sized.Internal.Unsigned.minus#"
     , "kind"      : "Declaration"
     , "type"      : "minus# :: (KnownNat m, KnownNat n) => Unsigned m -> Unsigned n -> Unsigned (1 + Max m n)"
-    , "template"  : "assign ~RESULT = ~ARG[2] - ~ARG[3];"
+    , "template"  : "assign ~RESULT = ~IF~AND[~SIZE[~TYP[2]],~SIZE[~TYP[3]]]~THEN ~ARG[2] - ~ARG[3]~ELSE~IF~SIZE[~TYP[2]]~THEN ~ARG[2]~ELSE - ~ARG[3]~FI~FI;"
     }
   }
 , { "BlackBox" :
     { "name"      : "Clash.Sized.Internal.Unsigned.times#"
     , "kind"      : "Declaration"
     , "type"      : "times# :: Unsigned m -> Unsigned n -> Unsigned (m + n)"
-    , "template"  : "assign ~RESULT = ~ARG[0] * ~ARG[1];"
+    , "template"  : "assign ~RESULT = ~IF~AND[~SIZE[~TYP[0]],~SIZE[~TYP[1]]]~THEN~ARG[0] * ~ARG[1]~ELSE~SIZE[~TYPO]'d0~FI;"
     }
   }
 , { "BlackBox" :
