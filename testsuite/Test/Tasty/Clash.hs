@@ -256,6 +256,9 @@ ghdlMake path modName subdirs libs entName =
   (testName, test)
   where
     args = concat [ ["-m"]
+               -- TODO: Automatically detect GCC/linker version
+               -- Enable flags when running newer versions of the (GCC) linker.
+               -- , ["-Wl,-no-pie"]
                   , ["--workdir=work"]
                   , map (\l -> "-P" ++ emptyToDot (map toLower l)) libs
                   , ["-o", map toLower (noConflict entName subdirs) ]
