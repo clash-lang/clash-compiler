@@ -351,7 +351,7 @@ renderElem b (IF c t f) = do
                 | t1 == Text.pack t2 -> 1
                 | otherwise -> 0
               Nothing -> error $ $(curLoc) ++ "Expected a string literal: " ++ show e
-      (And es)   -> if all (==1) (map (check iw syn) es)
+      (And es)   -> if all (/=0) (map (check iw syn) es)
                        then 1
                        else 0
       _ -> error $ $(curLoc) ++ "IF: condition must be: SIZE, LENGTH, IW64, LIT, ISLIT, or ISARG"

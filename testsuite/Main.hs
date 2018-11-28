@@ -90,9 +90,13 @@ runClashTest =
         -- , runFailingTest ("tests" </> "shouldfail") defBuild [] "RecursivePoly" (Just "??")
         ]
       , clashTestGroup "BitVector"
-        [ runTest ("tests" </> "shouldwork" </> "BitVector") defBuild [] "Box"     (["","Box_testBench"],"Box_testBench",True)
-        , runTest ("tests" </> "shouldwork" </> "BitVector") defBuild [] "BoxGrow" (["","BoxGrow_testBench"],"BoxGrow_testBench",True)
-        , runTest ("tests" </> "shouldwork" </> "BitVector") defBuild [] "RePack"  ([""],"RePack_topEntity",False)
+        [ runTest ("tests" </> "shouldwork" </> "BitVector") defBuild [] "Box"              (["","Box_testBench"],"Box_testBench",True)
+        , runTest ("tests" </> "shouldwork" </> "BitVector") defBuild [] "BoxGrow"          (["","BoxGrow_testBench"],"BoxGrow_testBench",True)
+        , runTest ("tests" </> "shouldwork" </> "BitVector") defBuild [] "RePack"           ([""],"RePack_topEntity",False)
+        , runTest ("tests" </> "shouldwork" </> "BitVector") defBuild [] "ReduceZero"       (["","ReduceZero_testBench"],"ReduceZero_testBench",True)
+        , runTest ("tests" </> "shouldwork" </> "BitVector") defBuild [] "ReduceOne"        (["","ReduceOne_testBench"],"ReduceOne_testBench",True)
+        , runTest ("tests" </> "shouldwork" </> "BitVector") defBuild [] "ExtendingNumZero" (["","ExtendingNumZero_testBench"],"ExtendingNumZero_testBench",True)
+        , runTest ("tests" </> "shouldwork" </> "BitVector") defBuild [] "AppendZero"       (["","AppendZero_testBench"],"AppendZero_testBench",True)
         ]
       , clashTestGroup "BlackBox"
         [ outputTest ("tests" </> "shouldwork" </> "BlackBox") [VHDL]   "TemplateFunction" "main"
@@ -150,11 +154,13 @@ runClashTest =
         , runTest ("tests" </> "shouldwork" </> "HOPrim") defBuild [] "VecFun"    (["","VecFun_testBench"],"VecFun_testBench",True)
       ]
       , clashTestGroup "Numbers"
-        [ runTest ("tests" </> "shouldwork" </> "Numbers") defBuild [] "Bounds"  (["","Bounds_testBench"],"Bounds_testBench",True)
-        , runTest ("tests" </> "shouldwork" </> "Numbers") defBuild [] "Resize"  (["","Resize_testBench"],"Resize_testBench",True)
-        , runTest ("tests" </> "shouldwork" </> "Numbers") defBuild [] "Resize2" (["","Resize2_testBench"],"Resize2_testBench",True)
-        , runTest ("tests" </> "shouldwork" </> "Numbers") defBuild [] "SatMult" ([""],"SatMult_topEntity",False)
-        , runTest ("tests" </> "shouldwork" </> "Numbers") defBuild [] "Strict"  (["","Strict_testBench"],"Strict_testBench",True)
+        [ runTest ("tests" </> "shouldwork" </> "Numbers") defBuild [] "Bounds"       (["","Bounds_testBench"],"Bounds_testBench",True)
+        , runTest ("tests" </> "shouldwork" </> "Numbers") defBuild [] "Resize"       (["","Resize_testBench"],"Resize_testBench",True)
+        , runTest ("tests" </> "shouldwork" </> "Numbers") defBuild [] "Resize2"      (["","Resize2_testBench"],"Resize2_testBench",True)
+        , runTest ("tests" </> "shouldwork" </> "Numbers") defBuild [] "SatMult"      ([""],"SatMult_topEntity",False)
+        , runTest ("tests" </> "shouldwork" </> "Numbers") defBuild [] "Strict"       (["","Strict_testBench"],"Strict_testBench",True)
+        , runTest ("tests" </> "shouldwork" </> "Numbers") defBuild [] "UnsignedZero" (["","UnsignedZero_testBench"],"UnsignedZero_testBench",True)
+        , runTest ("tests" </> "shouldwork" </> "Numbers") defBuild [] "SignedZero"   (["","SignedZero_testBench"],"SignedZero_testBench",True)
         ]
       , clashTestGroup "Polymorphism"
         [ runTest ("tests" </> "shouldwork" </> "Polymorphism") defBuild [] "ExistentialBoxed"  ([""],"ExistentialBoxed_topEntity",False)

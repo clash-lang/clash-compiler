@@ -109,21 +109,21 @@
     { "name"      : "Clash.Sized.Internal.Signed.plus#"
     , "kind"      : "Expression"
     , "type"      : "plus# :: Signed m -> Signed n -> Signed (1 + Max m n)"
-    , "template"  : "resize(~ARG[0],~SIZE[~TYPO]) + resize(~ARG[1],~SIZE[~TYPO])"
+    , "template"  : "~IF~AND[~SIZE[~TYP[0]],~SIZE[~TYP[1]]]~THENresize(~ARG[0],~SIZE[~TYPO]) + resize(~ARG[1],~SIZE[~TYPO])~ELSE~IF~SIZE[~TYP[0]]~THENresize(~ARG[0],~SIZE[~TYPO])~ELSEresize(~ARG[1],~SIZE[~TYPO])~FI~FI"
     }
   }
 , { "BlackBox" :
     { "name"      : "Clash.Sized.Internal.Signed.minus#"
     , "kind"      : "Expression"
     , "type"      : "minus# :: Signed m -> Signed n -> Signed (1 + Max m n)"
-    , "template"  : "resize(~ARG[0],~SIZE[~TYPO]) - resize(~ARG[1],~SIZE[~TYPO])"
+    , "template"  : "~IF~AND[~SIZE[~TYP[0]],~SIZE[~TYP[1]]]~THENresize(~ARG[0],~SIZE[~TYPO]) - resize(~ARG[1],~SIZE[~TYPO])~ELSE~IF~SIZE[~TYP[0]]~THENresize(~ARG[0],~SIZE[~TYPO])~ELSEresize(- ~ARG[1],~SIZE[~TYPO])~FI~FI"
     }
   }
 , { "BlackBox" :
     { "name"      : "Clash.Sized.Internal.Signed.times#"
     , "kind"      : "Expression"
     , "type"      : "times# :: Signed m -> Signed n -> Signed (m + n)"
-    , "template"  : "~ARG[0] * ~ARG[1]"
+    , "template"  : "~IF~AND[~SIZE[~TYP[0]],~SIZE[~TYP[1]]]~THEN~ARG[0] * ~ARG[1]~ELSEsigned'(~SIZE[~TYPO]-1 downto 0 => '0')~FI"
     }
   }
 , { "BlackBox" :
