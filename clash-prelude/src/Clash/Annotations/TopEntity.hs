@@ -199,6 +199,7 @@ g = ...
 
 {-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE DeriveGeneric      #-}
+{-# LANGUAGE DeriveLift         #-}
 
 {-# LANGUAGE TemplateHaskellQuotes #-}
 
@@ -258,8 +259,8 @@ instance Lift TopEntity where
   lift (Synthesize name inputs output) =
     TH.appsE
       [ TH.conE 'Synthesize
-      , TH.stringE name
-      , TH.listE (map lift inputs)
+      , lift name
+      , lift inputs
       , lift output
       ]
   lift (TestBench _) = error "Cannot lift a TestBench"
@@ -354,17 +355,7 @@ data PortName
   -- 2. The prefix for any unnamed ports below the 'PortProduct'
   --
   -- You can use an empty String ,\"\" , in case you want an auto-generated name.
-  deriving (Data,Show,Generic)
-
-instance Lift PortName where
-  lift (PortName name) =
-    TH.appE (TH.conE 'PortName) (TH.stringE name)
-  lift (PortProduct name ports) =
-    TH.appsE
-      [ TH.conE 'PortProduct
-      , TH.stringE name
-      , TH.listE $ map lift ports
-      ]
+  deriving (Data,Show,Generic,Lift)
 
 -- | Default 'Synthesize' annotation which has no specified names for the input
 -- and output ports.
