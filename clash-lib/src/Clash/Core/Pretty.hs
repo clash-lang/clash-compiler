@@ -140,7 +140,7 @@ instance PrettyPrec (Var a) where
   pprPrec _ v@(Id {}) = do
     v'  <- pprM (varName v)
     ty' <- pprM (varType v)
-    return $ v' <+> dcolon <+> ty'
+    return $ v' <+> align (dcolon <+> ty')
 
 instance Pretty (Var a) where
   pretty = ppr
