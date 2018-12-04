@@ -64,7 +64,7 @@ import           Clash.Netlist.BlackBox.Util
 import           Clash.Netlist.Id                     (IdType (..), mkBasicId')
 import           Clash.Netlist.Types                  hiding (_intWidth, intWidth)
 import           Clash.Netlist.Util                   hiding (mkIdentifier, extendIdentifier)
-import           Clash.Signal.Internal                (ClockKind (..))
+import           Clash.Signal.Internal                (ClockKind (..), ResetKind (..))
 import           Clash.Util
   (SrcSpan, noSrcSpan, curLoc, traceIf, (<:>),on,first)
 
@@ -869,8 +869,9 @@ parenIf False = id
 punctuate' :: Monad m => Mon m Doc -> Mon m [Doc] -> Mon m Doc
 punctuate' s d = vcat (punctuate s d) <> s
 
-encodingNote :: HWType -> VerilogM Doc
-encodingNote (Clock _ _ Gated) = "// gated clock"
-encodingNote (Clock _ _ Source)= "// clock"
-encodingNote (Reset {})        = "// asynchronous reset: active high"
-encodingNote _                 = emptyDoc
+encodingNote :: Applicative m => HWType -> m Doc
+encodingNote (Clock _ _ Gated)        = string "// gated clock"
+encodingNote (Clock _ _ Source)       = string "// clock"
+encodingNote (Reset _ _ Asynchronous) = string "// asynchronous reset: active high"
+encodingNote (Reset _ _ Synchronous)  = string "// synchronous reset: active high"
+encodingNote _                        = emptyDoc

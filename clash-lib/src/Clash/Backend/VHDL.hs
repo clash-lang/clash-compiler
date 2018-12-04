@@ -62,7 +62,7 @@ import           Clash.Netlist.BlackBox.Util
 import           Clash.Netlist.Id                     (IdType (..), mkBasicId')
 import           Clash.Netlist.Types                  hiding (_intWidth, intWidth)
 import           Clash.Netlist.Util                   hiding (mkIdentifier)
-import           Clash.Signal.Internal                (ClockKind (..))
+import           Clash.Signal.Internal                (ClockKind (..), ResetKind (..))
 import           Clash.Util
   (SrcSpan, noSrcSpan, clogBase, curLoc, first, makeCached, on, traceIf, (<:>))
 import           Clash.Util.Graph                     (reverseTopSort)
@@ -1914,10 +1914,11 @@ punctuate' :: Monad m => Mon m Doc -> Mon m [Doc] -> Mon m Doc
 punctuate' s d = vcat (punctuate s d) <> s
 
 encodingNote :: HWType -> VHDLM Doc
-encodingNote (Clock _ _ Gated) = "-- gated clock" <> line
-encodingNote (Clock {})        = "-- clock" <> line
-encodingNote (Reset {})        = "-- asynchronous reset: active high" <> line
-encodingNote _                 = emptyDoc
+encodingNote (Clock _ _ Gated)        = "-- gated clock" <> line
+encodingNote (Clock _ _ Source)       = "-- clock" <> line
+encodingNote (Reset _ _ Asynchronous) = "-- asynchronous reset: active high"  <> line
+encodingNote (Reset _ _ Synchronous)  = "-- synchronous reset: active high" <> line
+encodingNote _                        = emptyDoc
 
 tupledSemi :: Applicative f => f [Doc] -> f Doc
 tupledSemi = align . encloseSep (flatAlt (lparen <+> emptyDoc) lparen)

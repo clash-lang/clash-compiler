@@ -50,7 +50,7 @@ import           Clash.Annotations.BitRepresentation.Util
   (BitOrigin(Lit, Field), bitOrigins, bitRanges)
 import           Clash.Core.Var                       (Attr'(..))
 import           Clash.Backend
-import           Clash.Backend.Verilog                (bits, bit_char, exprLit, include)
+import           Clash.Backend.Verilog                (bits, bit_char, encodingNote, exprLit, include)
 import           Clash.Netlist.BlackBox.Types         (HdlSyn (..))
 import           Clash.Netlist.BlackBox.Util
   (extractLiterals, renderBlackBox, renderFilePath)
@@ -1217,9 +1217,3 @@ parenIf False = id
 
 punctuate' :: Monad m => Mon m Doc -> Mon m [Doc] -> Mon m Doc
 punctuate' s d = vcat (punctuate s d) <> s
-
-encodingNote :: HWType -> SystemVerilogM Doc
-encodingNote (Clock _ _ Gated) = "// gated clock"
-encodingNote (Clock _ _ Source)= "// clock"
-encodingNote (Reset {})        = "// asynchronous reset: active high"
-encodingNote _                 = emptyDoc
