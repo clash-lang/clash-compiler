@@ -585,6 +585,7 @@ sample s =
                          @(Reset domain synchronous)
                          (Async (True :- pure False))
   in  S.sample (exposeClockReset s clk rst)
+{-# NOINLINE sample #-}
 
 -- | Get a list of /n/ samples from a 'Signal'
 --
@@ -611,6 +612,7 @@ sampleN n s =
                          @(Reset domain synchronous)
                          (Async (True :- pure False))
   in  S.sampleN n (exposeClockReset s clk rst)
+{-# NOINLINE sampleN #-}
 
 -- | /Lazily/ get an infinite list of samples from a 'Clash.Signal.Signal'
 --
@@ -634,7 +636,7 @@ sample_lazy s =
                          @(Reset domain synchronous)
                          (Async (True :- pure False))
   in  S.sample_lazy (exposeClockReset s clk rst)
-
+{-# NOINLINE sample_lazy #-}
 
 -- | Lazily get a list of /n/ samples from a 'Signal'
 --
@@ -659,6 +661,7 @@ sampleN_lazy n s =
                          @(Reset domain synchronous)
                          (Async (True :- pure False))
   in  S.sampleN_lazy n (exposeClockReset s clk rst)
+{-# NOINLINE sampleN_lazy #-}
 
 -- * Simulation functions
 
@@ -687,6 +690,7 @@ simulate f =
                          @(Reset domain synchronous)
                          (Async (True :- pure False))
   in  tail . S.simulate (exposeClockReset f clk rst) . dup1
+{-# NOINLINE simulate #-}
 
 -- | /Lazily/ simulate a (@'Signal' a -> 'Signal' b@) function given a list of
 -- samples of type /a/
@@ -712,6 +716,7 @@ simulate_lazy f =
                          @(Reset domain synchronous)
                          (Async (True :- pure False))
   in  tail . S.simulate_lazy (exposeClockReset f clk rst) . dup1
+{-# NOINLINE simulate_lazy #-}
 
 -- | Simulate a (@'Unbundled' a -> 'Unbundled' b@) function given a list of
 -- samples of type @a@
@@ -738,6 +743,7 @@ simulateB f =
                          @(Reset domain synchronous)
                          (Async (True :- pure False))
   in  tail . S.simulateB (exposeClockReset f clk rst) . dup1
+{-# NOINLINE simulateB #-}
 
 -- | /Lazily/ simulate a (@'Unbundled' a -> 'Unbundled' b@) function given a
 -- list of samples of type @a@
@@ -764,6 +770,7 @@ simulateB_lazy f =
                          @(Reset domain synchronous)
                          (Async (True :- pure False))
   in  tail . S.simulateB_lazy (exposeClockReset f clk rst) . dup1
+{-# NOINLINE simulateB_lazy #-}
 
 dup1 :: [a] -> [a]
 dup1 (x:xs) = x:x:xs
