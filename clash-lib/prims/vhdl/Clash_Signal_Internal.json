@@ -138,7 +138,13 @@ end process;~FI~FI
   -> Clcok domain 'Gated"
     , "template" :
 "-- clockGate begin~IF ~ISGATED[0] ~THEN
-~RESULT <= (~ARG[0].~TYPM[0]_sel0,~ARG[0].~TYPM[0]_sel1 and ~ARG[1]);~ELSE
+~GENSYM[clockgate][0]: block is
+  signal ~GENSYM[clk][1]: std_logic;
+  signal ~GENSYM[clkEn][2]: boolean;
+begin
+  (~SYM[1],~SYM[2]) <= ~ARG[0];
+  ~RESULT <= (~SYM[1], ~SYM[2] and ~ARG[1]);
+end block;~ELSE
 ~RESULT <= (~ARG[0],~ARG[1]);~FI
 -- clockGate end"
     }
