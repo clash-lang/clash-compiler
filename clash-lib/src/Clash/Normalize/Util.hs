@@ -6,10 +6,11 @@
   Utility functions used by the normalisation transformations
 -}
 
-{-# LANGUAGE BangPatterns    #-}
-{-# LANGUAGE LambdaCase      #-}
-{-# LANGUAGE RecordWildCards #-}
-{-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE BangPatterns      #-}
+{-# LANGUAGE LambdaCase        #-}
+{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE RecordWildCards   #-}
+{-# LANGUAGE TemplateHaskell   #-}
 
 module Clash.Normalize.Util where
 
@@ -78,7 +79,9 @@ isConstantNotClockReset e = do
   tcm <- Lens.view tcCache
   let eTy = termType tcm e
   if isClockOrReset tcm eTy
-     then return False
+     then case collectArgs e of
+        (Prim nm _,_) -> return (nm == "Clash.Transformations.removedArg")
+        _ -> return False
      else return (isConstant e)
 
 -- | Assert whether a name is a reference to a recursive binder.
