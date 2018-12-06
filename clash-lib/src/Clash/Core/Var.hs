@@ -38,9 +38,9 @@ import {-# SOURCE #-} Clash.Core.Type   (Kind, Type, TyName)
 import Clash.Unique
 
 
--- | Interal version of Clash.Annotation.SynthesisAttributes.Attr.
+-- | Interal version of Clash.Annotations.SynthesisAttributes.Attr.
 --
--- Needed because Clash.Annotation.SynthesisAttributes.Attr uses the Symbol
+-- Needed because Clash.Annotations.SynthesisAttributes.Attr uses the Symbol
 -- kind for names, which do not have a term-level representation
 data Attr'
   = BoolAttr' String Bool

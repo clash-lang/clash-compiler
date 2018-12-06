@@ -1390,7 +1390,7 @@ mkTopInput topM inps pM = case pM of
 -- | Consider the following type signature:
 --
 -- @
---   f :: Signal dom (Vec 6 A) `Annotate` ConstAttr "keep"
+--   f :: Signal dom (Vec 6 A) \`Annotate\` Attr "keep"
 --     -> Signal dom (Vec 6 B)
 -- @
 --

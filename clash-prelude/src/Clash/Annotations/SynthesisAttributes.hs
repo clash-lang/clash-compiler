@@ -6,7 +6,7 @@
   API for synthesis attributes (sometimes refered to as "synthesis directives",
   "pragmas", or "logic synthesis directives"). This is an experimental feature,
   please report any unexpected or broken behavior to Clash's GitHub page
-  (<github.com/clash-lang/clash-compiler/issues>).
+  (<https://github.com/clash-lang/clash-compiler/issues>).
 -}
 {-# LANGUAGE DeriveAnyClass #-}
 {-# LANGUAGE DeriveGeneric #-}
@@ -28,7 +28,7 @@ type Annotate a (attrs :: k) = a
 --
 -- @
 --   attribute chip_pin : string;
---   attribute chip_pin of sel : signal is "C4";
+--   attribute chip_pin of sel : signal is \"C4\";
 --   attribute chip_pin of data : signal is "D1, D2, D3, D4";
 -- @
 --
@@ -40,8 +40,8 @@ type Annotate a (attrs :: k) = a
 -- import Clash.Annotations.SynthesisAttributes (Attr (..), Annotate )
 --
 -- myFunc
---     :: (Signal System Bool `Annotate` StringAttr "chip_pin" "C4")
---     -> (Signal System Int4 `Annotate` StringAttr "chip_pin" "D1, D2, D3, D4")
+--     :: (Signal System Bool \`Annotate\` StringAttr "chip_pin" \"C4\")
+--     -> (Signal System Int4 \`Annotate\` StringAttr "chip_pin" "D1, D2, D3, D4")
 --     -> ...
 -- myFunc sel data = ...
 -- {-# NOINLINE myFunc #-}
@@ -54,8 +54,8 @@ type Annotate a (attrs :: k) = a
 -- For example:
 --
 -- @
--- Signal System Bool `Annotate`
---   [ StringAttr "chip_pin" "C4"
+-- Signal System Bool \`Annotate\`
+--   [ StringAttr "chip_pin" \"C4\"
 --   , BoolAttr "direct_enable" True
 --   , IntegerAttr "max_depth" 512
 --   , Attr "keep"
@@ -63,23 +63,23 @@ type Annotate a (attrs :: k) = a
 -- @
 --
 -- For Verilog see:
---     <http://quartushelp.altera.com/15.0/mergedProjects/hdl/vlog/vlog_file_dir.htm>
+--     <https://www.intel.com/content/www/us/en/programmable/quartushelp/current/index.htm#hdl/vlog/vlog_file_dir.htm>
 --
 -- For VHDL, see:
---     <http://quartushelp.altera.com/15.0/mergedProjects/hdl/vhdl/vhdl_file_dir.htm>
+--     <https://www.intel.com/content/www/us/en/programmable/quartushelp/current/index.htm#hdl/vhdl/vhdl_file_dir.htm>
 --
 -- Warning: This is an experimental feature, please report any unexpected or broken
--- behavior to Clash's GitHub page (<github.com/clash-lang/clash-compiler/issues>).
+-- behavior to Clash's GitHub page (<https://github.com/clash-lang/clash-compiler/issues>).
 data Attr
   = BoolAttr Symbol Bool
   -- ^ Attribute which argument is rendered as a bool. Example:
-  -- <http://quartushelp.altera.com/15.0/mergedProjects/hdl/vlog/vlog_file_dir_direct_enable.htm>
+  -- <https://www.intel.com/content/www/us/en/programmable/quartushelp/current/index.htm#hdl/vlog/vlog_file_dir_direct_enable.htm>
   | IntegerAttr Symbol Integer
   -- ^ Attribute which argument is rendered as a integer. Example:
-  -- <http://quartushelp.altera.com/15.0/mergedProjects/hdl/vlog/vlog_file_dir_max_depth.htm>
+  -- <https://www.intel.com/content/www/us/en/programmable/quartushelp/current/index.htm#hdl/vlog/vlog_file_dir_max_depth.htm>
   | StringAttr Symbol Symbol
   -- ^ Attribute which argument is rendered as a string. Example:
-  -- <http://quartushelp.altera.com/15.0/mergedProjects/hdl/vlog/vlog_file_dir_chip.htm>
+  -- <https://www.intel.com/content/www/us/en/programmable/quartushelp/current/index.htm#hdl/vlog/vlog_file_dir_chip.htm>
   | Attr Symbol
   -- ^ Attribute rendered as constant. Example:
-  -- <http://quartushelp.altera.com/15.0/mergedProjects/hdl/vlog/vlog_file_dir_keep.htm>
+  -- <https://www.intel.com/content/www/us/en/programmable/quartushelp/current/index.htm#hdl/vlog/vlog_file_dir_keep.htm>

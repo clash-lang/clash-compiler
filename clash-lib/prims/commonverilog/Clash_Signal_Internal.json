@@ -5,7 +5,7 @@
 "clockGate
   :: Clock domain gated -- ARG[0]
   -> Signal domain Bool -- ARG[1]
-  -> Clcok domain 'Gated"
+  -> Clock domain 'Gated"
     , "template" :
 "// clockGate begin~IF ~ISGATED[0] ~THEN
 assign ~RESULT = {~ARG[0][1],~ARG[0][0] & ~ARG[1]};~ELSE
