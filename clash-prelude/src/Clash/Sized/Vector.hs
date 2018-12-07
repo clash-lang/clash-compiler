@@ -117,12 +117,12 @@ import GHC.Base                   (Int(I#),Int#,isTrue#)
 import GHC.Prim                   ((==#),(<#),(-#))
 import Language.Haskell.TH        (ExpQ)
 import Language.Haskell.TH.Syntax (Lift(..))
-import Prelude                    hiding ((++), (!!), concat, drop, foldl,
-                                          foldl1, foldr, foldr1, head, init,
-                                          iterate, last, length, map, repeat,
-                                          replicate, reverse, scanl, scanr,
-                                          splitAt, tail, take, unzip, unzip3,
-                                          zip, zip3, zipWith, zipWith3)
+import Prelude                    hiding ((++), (!!), concat, concatMap, drop,
+                                          foldl, foldl1, foldr, foldr1, head,
+                                          init, iterate, last, length, map,
+                                          repeat, replicate, reverse, scanl,
+                                          scanr, splitAt, tail, take, unzip,
+                                          unzip3, zip, zip3, zipWith, zipWith3)
 import qualified Prelude          as P
 import Test.QuickCheck            (Arbitrary (..), CoArbitrary (..))
 import Unsafe.Coerce              (unsafeCoerce)
