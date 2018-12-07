@@ -8,6 +8,7 @@
 -}
 
 {-# LANGUAGE CPP                 #-}
+{-# LANGUAGE LambdaCase          #-}
 {-# LANGUAGE MultiWayIf          #-}
 {-# LANGUAGE OverloadedStrings   #-}
 {-# LANGUAGE RecursiveDo         #-}
@@ -21,15 +22,17 @@ module Clash.Backend.VHDL (VHDLState) where
 
 import           Control.Applicative                  (liftA2)
 import           Control.Lens                         hiding (Indexed)
-import           Control.Monad                        (forM,join,liftM,zipWithM)
-import           Control.Monad.State                  (State)
+import           Control.Monad                        (forM,join,zipWithM)
+import           Control.Monad.State                  (State, StateT)
 import           Data.Bits                            (testBit, Bits)
 import           Data.Hashable                        (Hashable)
 import           Data.HashMap.Lazy                    (HashMap)
 import qualified Data.HashMap.Lazy                    as HashMap
+import qualified Data.HashMap.Strict                  as HashMapS
 import           Data.HashSet                         (HashSet)
 import qualified Data.HashSet                         as HashSet
-import           Data.List                            (mapAccumL,nub,nubBy,intersperse)
+import           Data.List
+  (mapAccumL, nub, nubBy, intersperse, group, sort)
 import           Data.Maybe                           (catMaybes,fromMaybe,mapMaybe)
 #if !MIN_VERSION_base(4,11,0)
 import           Data.Monoid                          hiding (Sum, Product)
@@ -37,10 +40,12 @@ import           Data.Monoid                          hiding (Sum, Product)
 import           Data.Semigroup.Monad.Extra
 import qualified Data.Text.Lazy                       as T
 import qualified Data.Text                            as TextS
+import qualified Data.Text.Prettyprint.Doc            as PP
 import           Data.Text.Prettyprint.Doc.Extra
 import           GHC.Stack                            (HasCallStack)
 import qualified System.FilePath
 import           Text.Printf
+import           TextShow                             (showt)
 
 import           Clash.Annotations.Primitive          (HDL (..))
 import           Clash.Annotations.BitRepresentation.Internal
@@ -69,9 +74,13 @@ import qualified Paths_clash_lib
 -- | State for the 'Clash.Netlist.VHDL.VHDLM' monad:
 data VHDLState =
   VHDLState
-  { _tyCache   :: (HashSet HWType)     -- ^ Previously encountered HWTypes
-  , _tySeen    :: [Identifier]         -- ^ Generated product types
-  , _nameCache :: (HashMap HWType Doc) -- ^ Cache for previously generated product type names
+  { _tyCache   :: (HashSet HWType)
+  -- ^ Previously encountered HWTypes
+  , _tySeen    :: [Identifier]
+  -- ^ Generated product types
+  , _nameCache :: (HashMap (HWType, Bool) TextS.Text)
+  -- ^ Cache for type names. Bool indicates whether this name includes length
+  -- information in its first "part". See `tyName'` for more information.
   , _modNm     :: Identifier
   , _srcSpan   :: SrcSpan
   , _libraries :: [T.Text]
@@ -83,8 +92,10 @@ data VHDLState =
   -- ^ Files to be stored: (filename, contents). These files are generated
   -- during the execution of 'genNetlist'.
   , _idSeen    :: [Identifier]
-  , _intWidth  :: Int                  -- ^ Int/Word/Integer bit-width
-  , _hdlsyn    :: HdlSyn               -- ^ For which HDL synthesis tool are we generating VHDL
+  , _intWidth  :: Int
+  -- ^ Int/Word/Integer bit-width
+  , _hdlsyn    :: HdlSyn
+  -- ^ For which HDL synthesis tool are we generating VHDL
   }
 
 makeLenses ''VHDLState
@@ -112,14 +123,18 @@ instance Backend VHDLState where
 
   genHDL          = genVHDL
   mkTyPackage     = mkTyPackage_
-  hdlType Internal      ty = vhdlType ty
-  hdlType (External nm) ty = case ty of
-    Vector _ _  -> pretty nm <> dot <> vhdlType ty
-    RTree _ _   -> pretty nm <> dot <> vhdlType ty
-    Product _ _ -> pretty nm <> dot <> vhdlType ty
-    _           -> vhdlType ty
-  hdlTypeErrValue = vhdlTypeErrValue
-  hdlTypeMark     = vhdlTypeMark
+  hdlType Internal      (filterTransparent -> ty) = sizedQualTyName ty
+  hdlType (External nm) (filterTransparent -> ty) =
+    let sized = sizedQualTyName ty in
+    case ty of
+      Bit         -> sized
+      Bool        -> sized
+      Signed _    -> sized
+      Unsigned _  -> sized
+      BitVector _ -> sized
+      _           -> pretty nm <> dot <> sized
+  hdlTypeErrValue = sizedQualTyNameErrValue
+  hdlTypeMark     = qualTyName
   hdlRecSel       = vhdlRecSel
   hdlSig t ty     = sigDecl (pretty t) ty
   genStmt         = const emptyDoc
@@ -221,7 +236,82 @@ filterReserved s = if s `elem` reservedWords
   else s
 
 stripTrailingUnderscore :: Identifier -> Identifier
-stripTrailingUnderscore = TextS.dropWhileEnd (== '_') -- TextS.takeWhile (/= '_')
+stripTrailingUnderscore = TextS.dropWhileEnd (== '_')
+
+-- | Generate unique (partial) names for product fields. Example:
+--
+-- >>> productFieldNames [Unsigned 6, Unsigned 6, Bit, Bool]
+-- ["unsigned6_0", "unsigned6_1", "bit", "boolean"]
+productFieldNames
+  :: HasCallStack
+  => Maybe [TextS.Text]
+  -- ^ Label hints. From user records, for example.
+  -> [HWType]
+  -- ^ Field types
+  -> VHDLM [TextS.Text]
+productFieldNames labels0 fields = do
+  let labels1 = sequence labels0 ++ repeat Nothing
+  hFields <- zipWithM hName labels1 fields
+
+  let grouped = group $ sort $ hFields
+      counted = HashMapS.fromList (map (\(g:gs) -> (g, succ (length gs))) grouped)
+      names   = snd $ mapAccumL (name' counted) HashMapS.empty hFields
+
+  return names
+ where
+  hName
+    :: Maybe Identifier
+    -> HWType
+    -> VHDLM Identifier
+  hName Nothing field  =
+    tyName' False field
+  hName (Just label) _field = do
+    Mon (mkIdentifier <*> pure Basic <*> pure label)
+
+  name'
+    :: HashMap TextS.Text Int
+    -> HashMap TextS.Text Int
+    -> TextS.Text
+    -> (HashMap TextS.Text Int, TextS.Text)
+  name' counted countMap fieldName
+    | counted HashMapS.! fieldName > 1 =
+        -- Seen this fieldname more than once, so we need to add a number
+        -- as a postfix:
+        let succ' n = Just (maybe (0 :: Int) (+1) n) in
+        let countMap' = HashMapS.alter succ' fieldName countMap in
+        -- Each field will get a distinct number:
+        let count = countMap' HashMapS.! fieldName in
+        (countMap', TextS.concat [fieldName, "_", showt count])
+    | otherwise =
+        -- This fieldname has only been seen once, so we don't need to add
+        -- a number as a postfix:
+        (countMap, fieldName)
+
+productFieldName
+  :: HasCallStack
+  => Maybe [TextS.Text]
+  -- ^ Label hints. From user records, for example.
+  -> [HWType]
+  -- ^ Field types
+  -> Int
+  -- ^ Index of field
+  -> VHDLM Doc
+productFieldName labels fields fieldIndex = do
+  -- TODO: cache
+  names <- productFieldNames labels fields
+  return (PP.pretty (names !! fieldIndex))
+
+selectProductField
+  :: HasCallStack
+  => Maybe [TextS.Text]
+  -- ^ Label hints. From user records, for example.
+  -> [HWType]
+  -- ^ Field types
+  -> Int
+  -- ^ Index of field
+  -> VHDLM Doc
+selectProductField fieldLabels fieldTypes fieldIndex =
+  "_sel" <> int fieldIndex <> "_" <> productFieldName fieldLabels fieldTypes fieldIndex
 
 -- | Generate VHDL for a Netlist component
 genVHDL :: Identifier -> SrcSpan -> [Identifier] -> Component -> VHDLM ((String,Doc),[(String,Doc)])
@@ -248,14 +338,14 @@ genVHDL nm sp seen c = preserveSeen $ do
 mkTyPackage_ :: Identifier
              -> [HWType]
              -> VHDLM [(String,Doc)]
-mkTyPackage_ modName hwtys = do
+mkTyPackage_ modName (map filterTransparent -> hwtys) = do
     { syn <- Mon hdlSyn
     ; mkId <- Mon (mkIdentifier <*> pure Basic)
     ; let usedTys     = concatMap mkUsedTys hwtys
-    ; normTys <- nub <$> mapM (fmap mkVecZ . normaliseType) (hwtys ++ usedTys)
-    ; let sortedTys   = topSortHWTys normTys
-          packageDec  = vcat $ mapM tyDec sortedTys
-          (funDecs,funBodies) = unzip . mapMaybe (funDec syn) $ nubBy eqTypM sortedTys
+    ; let normTys0    = nub (map mkVecZ (hwtys ++ usedTys))
+    ; let sortedTys0  = topSortHWTys normTys0
+          packageDec  = vcat $ mapM tyDec (nubBy eqTypM sortedTys0)
+          (funDecs,funBodies) = unzip . mapMaybe (funDec syn) $ nubBy eqTypM (map normaliseType sortedTys0)
 
     ; (:[]) <$> (TextS.unpack $ mkId (modName `TextS.append` "_types"),) <$>
       "library IEEE;" <> line <>
@@ -283,16 +373,23 @@ mkTyPackage_ modName hwtys = do
     eqTypM (Signed _) (Signed _)         = True
     eqTypM (Unsigned _) (Unsigned _)     = True
     eqTypM (BitVector _) (BitVector _)   = True
-    eqTypM (Clock _ _ g) (Clock _ _ g')  = g == g'
-    eqTypM ty1 ty2 = ty1 == ty2
+    eqTypM ty1 ty2                       = ty1 == ty2
 
-mkUsedTys :: HWType
-        -> [HWType]
-mkUsedTys v@(Vector _ elTy)   = v : mkUsedTys elTy
-mkUsedTys v@(RTree _ elTy)    = v : mkUsedTys elTy
-mkUsedTys p@(Product _ elTys) = p : concatMap mkUsedTys elTys
-mkUsedTys sp@(SP _ elTys)     = sp : concatMap mkUsedTys (concatMap snd elTys)
-mkUsedTys t                   = [t]
+mkUsedTys :: HWType -> [HWType]
+mkUsedTys hwty = hwty : case hwty of
+  Vector _ elTy        -> mkUsedTys elTy
+  RTree _ elTy         -> mkUsedTys elTy
+  Product _ _ elTys    -> concatMap mkUsedTys elTys
+  SP _ elTys           -> concatMap mkUsedTys (concatMap snd elTys)
+  BiDirectional _ elTy -> mkUsedTys elTy
+  Annotated _ elTy     -> mkUsedTys elTy
+  CustomSP _ _ _ tys0 ->
+    let tys1 = concat [tys | (_repr, _id, tys) <- tys0] in
+    concatMap mkUsedTys tys1
+  Clock _ _ Gated ->
+    [normaliseType hwty]
+  _ ->
+    []
 
 topSortHWTys
   :: [HWType]
@@ -302,72 +399,128 @@ topSortHWTys hwtys = sorted
     nodes  = zip [0..] hwtys
     nodesI = HashMap.fromList (zip hwtys [0..])
     edges  = concatMap edge hwtys
+
     sorted =
       case reverseTopSort nodes edges of
-        Left err -> error ("[BUG IN CLASH] topSortHWTys: " ++ err)
+        Left err -> error $ $(curLoc) ++ "[BUG IN CLASH] topSortHWTys: " ++ err
         Right ns -> ns
 
-    edge t@(Vector _ elTy) = maybe [] ((:[]) . (HashMap.lookupDefault (error $ $(curLoc) ++ "Vector") t nodesI,))
-                                      (HashMap.lookup (mkVecZ elTy) nodesI)
-    edge t@(RTree _ elTy)  = maybe [] ((:[]) . (HashMap.lookupDefault (error $ $(curLoc) ++ "RTree") t nodesI,))
-                                      (HashMap.lookup (mkVecZ elTy) nodesI)
-    edge t@(Product _ tys) = let ti = HashMap.lookupDefault (error $ $(curLoc) ++ "Product") t nodesI
-                             in mapMaybe (\ty -> liftM (ti,) (HashMap.lookup (mkVecZ ty) nodesI)) tys
-    edge _                 = []
+    -- `elTy` needs to be rendered before `t`
+    edge t@(Vector _ elTy) =
+      case HashMap.lookup (mkVecZ elTy) nodesI of
+        Just node ->
+          [(nodesI HashMap.! t, node)]
+        Nothing ->
+          []
 
-normaliseType :: HWType -> VHDLM HWType
-normaliseType (Annotated _ ty) = normaliseType ty
-normaliseType (Vector n ty)    = Vector n <$> (normaliseType ty)
-normaliseType (RTree d ty)     = RTree d <$> (normaliseType ty)
-normaliseType (Product nm tys) = Product nm <$> (mapM normaliseType tys)
-normaliseType ty@(SP _ elTys)      = do
-  Mon $ mapM_ ((tyCache %=) . HashSet.insert) (concatMap snd elTys)
-  return (BitVector (typeSize ty))
-normaliseType (CustomSP _ _dataRepr size elTys) = do
-  Mon $ mapM_ ((tyCache %=) . HashSet.insert) [ty | (_, _, subTys) <- elTys, ty <- subTys]
-  return (BitVector size)
-normaliseType ty@(Index _) = return (Unsigned (typeSize ty))
-normaliseType ty@(Sum _ _) = return (BitVector (typeSize ty))
-normaliseType ty@(CustomSum _ _ _ _) = return (BitVector (typeSize ty))
-normaliseType (Clock _ _ Gated) =
-  return (Product "GatedClock" [Bit,Bool])
-normaliseType (Clock {}) = return Bit
-normaliseType (Reset {}) = return Bit
-normaliseType (BiDirectional _ ty) = normaliseType ty
-normaliseType ty = return ty
+    -- `elTy` needs to be rendered before `t`
+    edge t@(RTree _ elTy) =
+      let vecZ = mkVecZ elTy in
+      case HashMap.lookup vecZ nodesI of
+        Just node ->
+          [(nodesI HashMap.! t, node)] ++ edge elTy
+        Nothing ->
+          []
+
+    -- `tys` need to be rendered before `t`
+    edge t@(Product _ _ tys0) =
+      let tys1 = [HashMap.lookup (mkVecZ ty) nodesI | ty <- tys0] in
+      map (nodesI HashMap.! t,) (catMaybes tys1)
+
+    edge t@(SP _ tys0) =
+      let tys1 = concat (map snd tys0) in
+      let tys2 = [HashMap.lookup (mkVecZ ty) nodesI | ty <- tys1] in
+      map (nodesI HashMap.! t,) (catMaybes tys2)
+
+    edge t@(CustomSP _ _ _ tys0) =
+      let tys1 = concat [tys | (_repr, _id, tys) <- tys0] in
+      let tys2 = [HashMap.lookup (mkVecZ ty) nodesI | ty <- tys1] in
+      map (nodesI HashMap.! t,) (catMaybes tys2)
+
+    edge c@(Clock _ _ Gated) =
+      [(nodesI HashMap.! c, nodesI HashMap.! normaliseType c)]
+
+    edge _ = []
 
 mkVecZ :: HWType -> HWType
 mkVecZ (Vector _ elTy) = Vector 0 elTy
 mkVecZ (RTree _ elTy)  = RTree 0 elTy
 mkVecZ t               = t
 
-tyDec :: HWType -> VHDLM Doc
-tyDec (Vector _ elTy) = do
+typAliasDec :: HasCallStack => HWType -> VHDLM Doc
+typAliasDec hwty =
+  "subtype" <+> tyName hwty
+            <+> "is"
+            <+> sizedTyName (normaliseType hwty)
+            <> semi
+
+tyDec :: HasCallStack => HWType -> VHDLM Doc
+tyDec hwty = do
   syn <- Mon hdlSyn
-  case syn of
-    Vivado -> "type" <+> "array_of_" <> tyName elTy <+> "is array (integer range <>) of"
-              <+> "std_logic_vector" <> parens (int (typeSize elTy - 1) <+> "downto 0") <> semi
-    _ -> "type" <+> "array_of_" <> tyName elTy <+> "is array (integer range <>) of"
-         <+> vhdlType elTy <> semi
+  case hwty of
+    -- "Proper" custom types:
+    Vector _ elTy ->
+      case syn of
+        Vivado ->
+          "type" <+> tyName hwty
+                 <+> "is array (integer range <>) of std_logic_vector"
+                 <> parens (int (typeSize elTy - 1) <+> "downto 0")
+                 <> semi
 
-tyDec (RTree _ elTy) = do
-  syn <- Mon hdlSyn
-  case syn of
-    Vivado -> "type" <+> "tree_of_" <> tyName elTy <+> "is array (integer range <>) of"
-              <+> "std_logic_vector" <> parens (int (typeSize elTy - 1) <+> "downto 0") <> semi
-    _ ->  "type" <+> "tree_of_" <> tyName elTy <+> "is array (integer range <>) of" <+> vhdlType elTy <> semi
+        _ ->
+          "type" <+> tyName hwty
+                 <+> "is array (integer range <>) of"
+                 <+> sizedQualTyName elTy
+                 <> semi
 
-tyDec ty@(Product _ tys@(_:_:_)) = prodDec
-  where
-    prodDec = "type" <+> tName <+> "is record" <> line <>
-                indent 2 (vcat $ zipWithM (\x y -> x <+> colon <+> y <> semi) selNames selTys) <> line <>
-              "end record" <> semi
+    RTree _ elTy ->
+      case syn of
+        Vivado ->
+          "type" <+> tyName hwty
+                 <+> "is array (integer range <>) of"
+                 <+> "std_logic_vector"
+                 <> parens (int (typeSize elTy - 1) <+> "downto 0")
+                 <> semi
 
-    tName    = tyName ty
-    selNames = map (\i -> tName <> "_sel" <> int i) [0..]
-    selTys   = map vhdlType tys
+        _ ->
+          "type" <+> tyName hwty
+                 <+> "is array (integer range <>) of"
+                 <+> sizedQualTyName elTy
+                 <> semi
 
-tyDec _ = emptyDoc
+    Product _ labels tys@(_:_:_) ->
+      let selNames = map (\i -> tyName hwty <> selectProductField labels tys i) [0..] in
+      let selTys   = map sizedQualTyName tys in
+      "type" <+> tyName hwty <+> "is record" <> line  <>
+        indent 2 (vcat $ zipWithM (\x y -> x <+> colon <+> y <> semi) selNames selTys) <> line <>
+      "end record" <> semi
+
+    -- Type aliases:
+    Clock _ _ _       -> typAliasDec hwty
+    Reset _ _ _       -> typAliasDec hwty
+    Index _           -> typAliasDec hwty
+    CustomSP _ _ _ _  -> typAliasDec hwty
+    SP _ _            -> typAliasDec hwty
+    Sum _ _           -> typAliasDec hwty
+    CustomSum _ _ _ _ -> typAliasDec hwty
+
+    -- VHDL builtin types:
+    BitVector _ -> emptyDoc
+    Bool        -> emptyDoc
+    Bit         -> emptyDoc
+    Unsigned _  -> emptyDoc
+    Signed _    -> emptyDoc
+    String      -> emptyDoc
+
+    -- Transparent types:
+    BiDirectional _ ty -> tyDec ty
+    Annotated _ ty -> tyDec ty
+
+    Void {} -> error $ $(curLoc) ++ "[CLASH BUG] Void encountered in VHDL backend"
+
+    _ -> error $ $(curLoc) ++ show hwty
+
+
 
 
 funDec :: HdlSyn -> HWType -> Maybe (VHDLM Doc,VHDLM Doc)
@@ -414,14 +567,14 @@ funDec _ Bool = Just
     "end" <> semi
   )
 
-funDec _ Bit = Just
-  ( "function" <+> "toSLV" <+> parens ("sl" <+> colon <+> "in" <+> "std_logic") <+> "return" <+> "std_logic_vector" <> semi <> line <>
-    "function" <+> "fromSLV" <+> parens ("slv" <+> colon <+> "in" <+> "std_logic_vector") <+> "return" <+> "std_logic" <> semi
-  , "function" <+> "toSLV" <+> parens ("sl" <+> colon <+> "in" <+> "std_logic") <+> "return" <+> "std_logic_vector" <+> "is" <> line <>
+funDec _ bit@Bit = Just
+  ( "function" <+> "toSLV" <+> parens ("sl" <+> colon <+> "in" <+> tyName bit) <+> "return" <+> "std_logic_vector" <> semi <> line <>
+    "function" <+> "fromSLV" <+> parens ("slv" <+> colon <+> "in" <+> "std_logic_vector") <+> "return" <+> tyName bit <> semi
+  , "function" <+> "toSLV" <+> parens ("sl" <+> colon <+> "in" <+> tyName bit) <+> "return" <+> "std_logic_vector" <+> "is" <> line <>
     "begin" <> line <>
       indent 2 ("return" <+> "std_logic_vector'" <> parens (int 0 <+> rarrow <+> "sl") <> semi) <> line <>
     "end" <> semi <> line <>
-    "function" <+> "fromSLV" <+> parens ("slv" <+> colon <+> "in" <+> "std_logic_vector") <+> "return" <+> "std_logic" <+> "is" <> line <>
+    "function" <+> "fromSLV" <+> parens ("slv" <+> colon <+> "in" <+> "std_logic_vector") <+> "return" <+> tyName bit <+> "is" <> line <>
       indent 2
         ( "alias islv : std_logic_vector (0 to slv'length - 1) is slv;"
         ) <> line <>
@@ -457,14 +610,14 @@ funDec _ (Unsigned _) = Just
 
   )
 
-funDec _ t@(Product _ elTys) = Just
-  ( "function" <+> "toSLV" <+> parens ("p :" <+> vhdlType t) <+> "return std_logic_vector" <> semi <> line <>
-    "function" <+> "fromSLV" <+> parens ("slv" <+> colon <+> "in" <+> "std_logic_vector") <+> "return" <+> vhdlType t <> semi
-  , "function" <+> "toSLV" <+> parens ("p :" <+> vhdlType t) <+> "return std_logic_vector" <+> "is" <> line <>
+funDec _ t@(Product _ labels elTys) = Just
+  ( "function" <+> "toSLV" <+> parens ("p :" <+> sizedQualTyName t) <+> "return std_logic_vector" <> semi <> line <>
+    "function" <+> "fromSLV" <+> parens ("slv" <+> colon <+> "in" <+> "std_logic_vector") <+> "return" <+> sizedQualTyName t <> semi
+  , "function" <+> "toSLV" <+> parens ("p :" <+> sizedQualTyName t) <+> "return std_logic_vector" <+> "is" <> line <>
     "begin" <> line <>
     indent 2 ("return" <+> parens (hcat (punctuate " & " elTyToSLV)) <> semi) <> line <>
     "end" <> semi <> line <>
-    "function" <+> "fromSLV" <+> parens ("slv" <+> colon <+> "in" <+> "std_logic_vector") <+> "return" <+> vhdlType t <+> "is" <> line <>
+    "function" <+> "fromSLV" <+> parens ("slv" <+> colon <+> "in" <+> "std_logic_vector") <+> "return" <+> sizedQualTyName t <+> "is" <> line <>
       "alias islv : std_logic_vector(0 to slv'length - 1) is slv;" <> line <>
     "begin" <> line <>
     indent 2 ("return" <+> parens (hcat (punctuate "," elTyFromSLV)) <> semi) <> line <>
@@ -473,7 +626,7 @@ funDec _ t@(Product _ elTys) = Just
   where
     elTyToSLV = forM [0..(length elTys - 1)]
                      (\i -> "toSLV" <>
-                            parens ("p." <> tyName t <> "_sel" <> int i))
+                            parens ("p." <> tyName t <> selectProductField labels elTys i))
 
     argLengths = map typeSize elTys
     starts     = 0 : snd (mapAccumL ((join (,) .) . (+)) 0 argLengths)
@@ -484,11 +637,11 @@ funDec _ t@(Product _ elTys) = Just
                           parens ("islv" <> parens (int s <+> "to" <+> int e)))
 
 funDec syn t@(Vector _ elTy) = Just
-  ( "function" <+> "toSLV" <+> parens ("value : " <+> vhdlTypeMark t) <+> "return std_logic_vector" <> semi <> line <>
-    "function" <+> "fromSLV" <+> parens ("slv" <+> colon <+> "in" <+> "std_logic_vector") <+> "return" <+> vhdlTypeMark t <> semi
-  , "function" <+> "toSLV" <+> parens ("value : " <+> vhdlTypeMark t) <+> "return std_logic_vector" <+> "is" <> line <>
+  ( "function" <+> "toSLV" <+> parens ("value : " <+> qualTyName t) <+> "return std_logic_vector" <> semi <> line <>
+    "function" <+> "fromSLV" <+> parens ("slv" <+> colon <+> "in" <+> "std_logic_vector") <+> "return" <+> qualTyName t <> semi
+  , "function" <+> "toSLV" <+> parens ("value : " <+> qualTyName t) <+> "return std_logic_vector" <+> "is" <> line <>
       indent 2
-        ( "alias ivalue    :" <+> vhdlTypeMark t <> "(1 to value'length) is value;" <> line <>
+        ( "alias ivalue    :" <+> qualTyName t <> "(1 to value'length) is value;" <> line <>
           "variable result :" <+> "std_logic_vector" <> parens ("1 to value'length * " <> int (typeSize elTy)) <> semi
         ) <> line <>
     "begin" <> line <>
@@ -505,10 +658,10 @@ funDec syn t@(Vector _ elTy) = Just
          "return" <+> "result" <> semi
         ) <> line <>
     "end" <> semi <> line <>
-    "function" <+> "fromSLV" <+> parens ("slv" <+> colon <+> "in" <+> "std_logic_vector") <+> "return" <+> vhdlTypeMark t <+> "is" <> line <>
+    "function" <+> "fromSLV" <+> parens ("slv" <+> colon <+> "in" <+> "std_logic_vector") <+> "return" <+> qualTyName t <+> "is" <> line <>
       indent 2
         ( "alias islv      :" <+> "std_logic_vector" <> "(0 to slv'length - 1) is slv;" <> line <>
-          "variable result :" <+> vhdlTypeMark t <> parens ("0 to slv'length / " <> eSz <+> "- 1") <> semi
+          "variable result :" <+> qualTyName t <> parens ("0 to slv'length / " <> eSz <+> "- 1") <> semi
         ) <> line <>
     "begin" <> line <>
       indent 2
@@ -543,11 +696,11 @@ funDec _ (BitVector _) = Just
   )
 
 funDec syn t@(RTree _ elTy) = Just
-  ( "function" <+> "toSLV" <+> parens ("value : " <+> vhdlTypeMark t) <+> "return std_logic_vector" <> semi <> line <>
-    "function" <+> "fromSLV" <+> parens ("slv" <+> colon <+> "in" <+> "std_logic_vector") <+> "return" <+> vhdlTypeMark t <> semi
-  , "function" <+> "toSLV" <+> parens ("value : " <+> vhdlTypeMark t) <+> "return std_logic_vector" <+> "is" <> line <>
+  ( "function" <+> "toSLV" <+> parens ("value : " <+> qualTyName t) <+> "return std_logic_vector" <> semi <> line <>
+    "function" <+> "fromSLV" <+> parens ("slv" <+> colon <+> "in" <+> "std_logic_vector") <+> "return" <+> qualTyName t <> semi
+  , "function" <+> "toSLV" <+> parens ("value : " <+> qualTyName t) <+> "return std_logic_vector" <+> "is" <> line <>
       indent 2
-        ( "alias ivalue    :" <+> vhdlTypeMark t <> "(1 to value'length) is value;" <> line <>
+        ( "alias ivalue    :" <+> qualTyName t <> "(1 to value'length) is value;" <> line <>
           "variable result :" <+> "std_logic_vector" <> parens ("1 to value'length * " <> int (typeSize elTy)) <> semi
         ) <> line <>
     "begin" <> line <>
@@ -564,10 +717,10 @@ funDec syn t@(RTree _ elTy) = Just
          "return" <+> "result" <> semi
         ) <> line <>
     "end" <> semi <> line <>
-    "function" <+> "fromSLV" <+> parens ("slv" <+> colon <+> "in" <+> "std_logic_vector") <+> "return" <+> vhdlTypeMark t <+> "is" <> line <>
+    "function" <+> "fromSLV" <+> parens ("slv" <+> colon <+> "in" <+> "std_logic_vector") <+> "return" <+> qualTyName t <+> "is" <> line <>
       indent 2
         ( "alias islv      :" <+> "std_logic_vector" <> "(0 to slv'length - 1) is slv;" <> line <>
-          "variable result :" <+> vhdlTypeMark t <> parens ("0 to slv'length / " <> eSz <+> "- 1") <> semi
+          "variable result :" <+> qualTyName t <> parens ("0 to slv'length / " <> eSz <+> "- 1") <> semi
         ) <> line <>
     "begin" <> line <>
       indent 2
@@ -615,7 +768,7 @@ port :: Num t
      -> Int
      -> VHDLM (Doc, t)
 port elName hwType portDirection fillToN =
-  (,fromIntegral $ TextS.length elName) <$> (encodingNote hwType <> fill fillToN (pretty elName) <+> colon <+> direction <+> vhdlType hwType)
+  (,fromIntegral $ TextS.length elName) <$> (encodingNote hwType <> fill fillToN (pretty elName) <+> colon <+> direction <+> sizedQualTyName hwType)
  where
   direction | isBiSignalIn hwType = "inout"
             | otherwise           = portDirection
@@ -757,14 +910,15 @@ renderAttrs (attrMap -> attrs) =
     :: T.Text
     -> (TextS.Text, T.Text)
     -> VHDLM Doc
-  renderAttrDecl attrname (signalName, value) = "attribute"
-                                             <+> string attrname
-                                             <+> "of"
-                                             <+> stringS signalName
-                                             <+> colon
-                                             <+> "signal is"
-                                             <+> string value
-                                             <> semi
+  renderAttrDecl attrname (signalName, value) =
+        "attribute"
+    <+> string attrname
+    <+> "of"
+    <+> stringS signalName
+    <+> colon
+    <+> "signal is"
+    <+> string value
+    <> semi
 
 -- | Return all key/value pairs in the map in arbitrary key order.
 assocs :: Eq a => Hashable a => HashMap a b -> [(a,b)]
@@ -780,137 +934,259 @@ renderAttr (BoolAttr'    _key True ) = T.pack $ "true"
 renderAttr (BoolAttr'    _key False) = T.pack $ "false"
 renderAttr (Attr'        _key      ) = T.pack $ "true"
 
--- | Convert a Netlist HWType to a VHDL type
-vhdlType :: HWType -> VHDLM Doc
-vhdlType hwty = do
-    hwty' <- normaliseType hwty
-    Mon (tyCache %= HashSet.insert hwty')
-    go hwty'
-  where
-    go :: HWType -> VHDLM Doc
-    go Bool            = "boolean"
-    go Bit             = "std_logic"
-    go (Clock {})      = "std_logic"
-    go (Reset {})      = "std_logic"
-    go (BitVector n)   = case n of
-                           0 -> "std_logic_vector (0 downto 1)"
-                           _ -> "std_logic_vector" <> parens (int (n-1) <+> "downto 0")
-    go (Signed n)      = case n of
-                           0 -> "signed (0 downto 1)"
-                           _ -> "signed" <> parens (int (n-1) <+> "downto 0")
-    go (Unsigned n)    = case n of
-                           0 -> "unsigned (0 downto 1)"
-                           _ -> "unsigned" <> parens ( int (n-1) <+> "downto 0")
-    go (Vector n elTy) = do
-      nm <- Mon $ use modNm
-      pretty (TextS.toLower nm) <> "_types.array_of_" <> tyName elTy <> parens ("0 to " <> int (n-1))
-    go (RTree d elTy)  = do
-      nm <- Mon $ use modNm
-      pretty (TextS.toLower nm) <> "_types.tree_of_" <> tyName elTy <> parens ("0 to " <> int ((2^d)-1))
-    go t@(Product _ _) = do
-      nm <- Mon $ use modNm
-      pretty (TextS.toLower nm) <> "_types." <> tyName t
-    go (Void {})       = "std_logic_vector (0 downto 1)"
-    go String          = "string"
-    go ty              = error $ $(curLoc) ++ "vhdlType: type is not normalised: " ++ show ty
-
 sigDecl :: VHDLM Doc -> HWType -> VHDLM Doc
-sigDecl d t = d <+> colon <+> vhdlType t
+sigDecl d t = d <+> colon <+> sizedQualTyName t
 
--- | Convert a Netlist HWType to the root of a VHDL type
-vhdlTypeMark :: HWType -> VHDLM Doc
-vhdlTypeMark hwty = do
-  hwty' <- normaliseType hwty
-  Mon (tyCache %= HashSet.insert hwty')
-  go hwty'
+-- | Append size information to given type string
+appendSize :: VHDLM Doc -> HWType -> VHDLM Doc
+appendSize baseType sizedType = case sizedType of
+  BitVector n -> baseType <> parens (int (n-1) <+> "downto 0")
+  Signed n    -> baseType <> parens (int (n-1) <+> "downto 0")
+  Unsigned n  -> baseType <> parens (int (n-1) <+> "downto 0")
+  Vector n _  -> baseType <> parens ("0 to" <+> int (n-1))
+  RTree d _   -> baseType <> parens ("0 to" <+> int ((2^d)-1))
+  _           -> baseType
+
+-- | Same as @qualTyName@, but instantiate generic types with their size.
+sizedQualTyName :: HWType -> VHDLM Doc
+sizedQualTyName (filterTransparent -> hwty) = appendSize (qualTyName hwty) hwty
+
+-- | Same as @tyName@, but instantiate generic types with their size.
+sizedTyName :: HWType -> VHDLM Doc
+sizedTyName (filterTransparent -> hwty) = appendSize (tyName hwty) hwty
+
+-- | Same as @tyName@, but return fully qualified name (name, including module)
+qualTyName :: HWType -> VHDLM Doc
+qualTyName (filterTransparent -> hwty) = case hwty of
+  -- Builtin types:
+  Bit -> tyName hwty
+  Bool -> tyName hwty
+  Signed _ -> tyName hwty
+  Unsigned _ -> tyName hwty
+  BitVector _ -> tyName hwty
+
+  -- Transparent types:
+  BiDirectional _ elTy -> qualTyName elTy
+  Annotated _ elTy -> qualTyName elTy
+
+  -- Custom types:
+  _ -> do
+    modName <- Mon (use modNm)
+    pretty (TextS.toLower modName) <> "_types." <> tyName hwty
+
+-- | Generates a unique name for a given type. This action will cache its
+-- results, thus returning the same answer for the same @HWType@ argument.
+-- Some type names do not have specific names, but are instead basic types
+-- in VHDL.
+tyName
+  :: HWType
+  -- ^ Type to name
+  -> VHDLM Doc
+tyName t = do
+  nm <- tyName' False t
+  pretty nm
+
+-- | Generates a unique name for a given type. This action will cache its
+-- results, thus returning the same answer for the same @HWType@ argument.
+-- Some type names do not have specific names, but are instead basic types
+-- in VHDL.
+tyName'
+  :: Bool
+  -- ^ Include length information in first part of name. For example, say we
+  -- want to generate a name for a vector<signed>, where the vector is of length
+  -- 5, and signed has 64 bits. When given `True`, this function would
+  -- generate `array_of_5_signed_64`. When given `False` it would generate
+  -- `array_of_signed_64`. Note that parts other than the first part will always
+  -- have length information. This option is useful for generating names in
+  -- VHDL, where the `False` case is needed to create generic types.
+  -> HWType
+  -- ^ Type to name
+  -> VHDLM TextS.Text
+tyName' rec0 (filterTransparent -> t) = do
+  Mon (tyCache %= HashSet.insert t)
+  case t of
+    Void _        -> error $ $(curLoc) ++ "?"
+    Bool          -> return "boolean"
+    Signed n      ->
+      let app = if rec0 then ["_", showt n] else [] in
+      return $ TextS.concat $ "signed" : app
+    Unsigned n    ->
+      let app = if rec0 then ["_", showt n] else [] in
+      return $ TextS.concat $ "unsigned" : app
+    BitVector n   ->
+      let app = if rec0 then ["_", showt n] else [] in
+      return $ TextS.concat $ "std_logic_vector" : app
+    String        -> return "string"
+    Bit           -> return "std_logic"
+    Vector n elTy -> do
+      elTy' <- tyName' True elTy
+      let nm = TextS.concat [ "array_of_"
+                            , if rec0 then showt n `TextS.append` "_" else ""
+                            , elTy']
+      Mon $ makeCached (t, rec0) nameCache (return nm)
+    RTree n elTy  -> do
+      elTy' <- tyName' True elTy
+      let nm = TextS.concat [ "tree_of_"
+                            , if rec0 then showt n `TextS.append` "_" else ""
+                            , elTy']
+      Mon $ makeCached (t, rec0) nameCache (return nm)
+    -- TODO: nice formatting for Index. I.e., 2000 = 2e3, 1024 = 2pow10
+    Index n ->
+      return ("index_" `TextS.append` showt n)
+    Clock nm0 _ Gated ->
+      let nm1 = "clk_gated_" `TextS.append` nm0 in
+      Mon $ makeCached (t, False) nameCache (userTyName "clk_gated" nm1 t)
+    Clock nm0 _ Source ->
+      let nm1 = "clk_" `TextS.append` nm0 in
+      Mon $ makeCached (t, False) nameCache (userTyName "clk" nm1 t)
+    Reset nm0 _ _ ->
+      let nm1 = "rst_" `TextS.append` nm0 in
+      Mon $ makeCached (t, False) nameCache (userTyName "rst" nm1 t)
+    Sum nm _  ->
+      Mon $ makeCached (t, False) nameCache (userTyName "sum" nm t)
+    CustomSum nm _ _ _ ->
+      Mon $ makeCached (t, False) nameCache (userTyName "sum" nm t)
+    SP nm _ ->
+      Mon $ makeCached (t, False) nameCache (userTyName "sp" nm t)
+    CustomSP nm _ _ _ ->
+      Mon $ makeCached (t, False) nameCache (userTyName "sp" nm t)
+    Product nm _ _ ->
+      Mon $ makeCached (t, False) nameCache (userTyName "product" nm t)
+    Annotated _ hwTy ->
+      tyName' rec0 hwTy
+    BiDirectional _ hwTy ->
+      tyName' rec0 hwTy
+
+-- | Returns underlying type of given HWType. That is, the type by which it
+-- eventually will be represented in VHDL.
+normaliseType :: HWType -> HWType
+normaliseType hwty = case hwty of
+  Void {} -> error $ $(curLoc) ++ "[CLASH BUG] Void encountered in VHDL backend"
+
+  -- Base types:
+  Bool          -> hwty
+  Signed _      -> hwty
+  Unsigned _    -> hwty
+  BitVector _   -> hwty
+  String        -> hwty
+  Bit           -> hwty
+
+  -- Complex types, for which a user defined type is made in VHDL:
+  Vector _ _    -> hwty
+  RTree _ _     -> hwty
+  Product _ _ _ -> hwty
+
+  -- Special case for gated clock, which is converted to a tuple:
+  Clock nm _ Gated  ->
+    normaliseType (Product ("GatedClock_" `TextS.append` nm) (Just ["clk", "enable"]) [Bit, Bool])
+
+  -- Simple types, for which a subtype (without qualifiers) will be made in VHDL:
+  Clock _ _ Source  -> Bit
+  Reset _ _ _       -> Bit
+  Index _           -> Unsigned (typeSize hwty)
+  CustomSP _ _ _ _  -> BitVector (typeSize hwty)
+  SP _ _            -> BitVector (typeSize hwty)
+  Sum _ _           -> BitVector (typeSize hwty)
+  CustomSum _ _ _ _ -> BitVector (typeSize hwty)
+
+  -- Transparent types:
+  Annotated _ elTy -> normaliseType elTy
+  BiDirectional _ elTy -> normaliseType elTy
+
+-- | Recursively remove transparent types from given type
+filterTransparent :: HWType -> HWType
+filterTransparent hwty = case hwty of
+  Bool              -> hwty
+  Signed _          -> hwty
+  Unsigned _        -> hwty
+  BitVector _       -> hwty
+  String            -> hwty
+  Bit               -> hwty
+  Clock _ _ _       -> hwty
+  Reset _ _ _       -> hwty
+  Index _           -> hwty
+  Sum _ _           -> hwty
+  CustomSum _ _ _ _ -> hwty
+
+  Vector n elTy     -> Vector n (filterTransparent elTy)
+  RTree n elTy      -> RTree n (filterTransparent elTy)
+  Product nm labels elTys  ->
+    Product nm labels (map filterTransparent elTys)
+
+  SP nm0 constrs ->
+    SP nm0
+      (map (\(nm1, tys) -> (nm1, map filterTransparent tys)) constrs)
+
+  CustomSP nm0 drepr size constrs ->
+    CustomSP nm0 drepr size
+      (map (\(repr, nm1, tys) -> (repr, nm1, map filterTransparent tys)) constrs)
+
+  -- Transparent types:
+  Annotated _ elTy -> elTy
+  BiDirectional _ elTy -> elTy
+
+  Void {} -> error $ $(curLoc) ++ "[CLASH BUG] Void encountered in VHDL backend"
+
+-- | Create a unique type name for user defined types
+userTyName
+  :: Identifier
+  -- ^ Default name
+  -> Identifier
+  -- ^ Identifier stored in @hwTy@
+  -> HWType
+  -- ^ Type to give a (unique) name
+  -> StateT VHDLState Identity TextS.Text
+userTyName dflt nm0 hwTy = do
+  tyCache %= HashSet.insert hwTy
+  seen <- use tySeen
+  mkId <- mkIdentifier <*> pure Basic
+  let nm1 = (mkId . last . TextS.splitOn ".") nm0
+      nm2 = if TextS.null nm1 then dflt else nm1
+      nm3 = if nm2 `elem` seen then go mkId seen (0::Integer) nm2 else nm2
+  tySeen %= (nm3:)
+  return nm3
   where
-    go Bool            = "boolean"
-    go Bit             = "std_logic"
-    go (Clock {})      = "std_logic"
-    go (Reset {})      = "std_logic"
-    go (BitVector _)   = "std_logic_vector"
-    go (Signed _)      = "signed"
-    go (Unsigned _)    = "unsigned"
-    go (Vector _ elTy) = do
-      nm <- Mon $ use modNm
-      pretty (TextS.toLower nm) <> "_types.array_of_" <> tyName elTy
-    go (RTree _ elTy)  = do
-      nm <- Mon $ use modNm
-      pretty (TextS.toLower nm) <> "_types.tree_of_" <> tyName elTy
-    go t@(Product _ _) = do
-      nm <- Mon $ use modNm
-      pretty (TextS.toLower nm) <> "_types." <> tyName t
-    go t               = error $ $(curLoc) ++ "vhdlTypeMark: " ++ show t
+    go mkId seen count nm0' =
+      let nm1' = nm0' `TextS.append` TextS.pack ('_':show count) in
+      if nm1' `elem` seen then go mkId seen (count+1) nm0' else nm1'
 
-tyName :: HWType -> VHDLM Doc
-tyName Bool              = "boolean"
-tyName Bit               = "std_logic"
-tyName (Clock {})        = "std_logic"
-tyName (Reset {})        = "std_logic"
-tyName (Vector n elTy)   = "array_of_" <> int n <> "_" <> tyName elTy
-tyName (RTree n elTy)    = "tree_of_" <> int n <> "_" <> tyName elTy
-tyName (BitVector n)     = "std_logic_vector_" <> int n
-tyName t@(Index _)       = "unsigned_" <> int (typeSize t)
-tyName (Signed n)        = "signed_" <> int n
-tyName (Unsigned n)      = "unsigned_" <> int n
-tyName t@(Sum _ _)       = "std_logic_vector_" <> int (typeSize t)
-tyName t@(Product nm _)  = do
-    tN <- normaliseType t
-    Mon $ makeCached tN nameCache prodName
-  where
-    prodName = do
-      tyCache %= HashSet.insert t
-      seen <- use tySeen
-      mkId <- mkIdentifier <*> pure Basic
-      let nm'  = (mkId . last . TextS.splitOn ".") nm
-          nm'' = if TextS.null nm'
-                    then "product"
-                    else nm'
-          nm3  = if nm'' `elem` seen
-                    then go mkId seen (0::Integer) nm''
-                    else nm''
-      tySeen %= (nm3:)
-      pretty nm3
-
-    go mkId s i n =
-      let n' = n `TextS.append` TextS.pack ('_':show i)
-      in  if n' `elem` s
-             then go mkId s (i+1) n
-             else n'
-tyName t@(SP _ _)        = "std_logic_vector_" <> int (typeSize t)
-tyName e = error $ $(curLoc) ++ show e
 
 -- | Convert a Netlist HWType to an error VHDL value for that type
-vhdlTypeErrValue :: HWType -> VHDLM Doc
-vhdlTypeErrValue Bool                = "true"
-vhdlTypeErrValue Bit                 = "'-'"
-vhdlTypeErrValue t@(Vector n elTy)   = do
+sizedQualTyNameErrValue :: HWType -> VHDLM Doc
+sizedQualTyNameErrValue Bool                = "true"
+sizedQualTyNameErrValue Bit                 = "'-'"
+sizedQualTyNameErrValue t@(Vector n elTy)   = do
   syn <-Mon hdlSyn
   case syn of
-    Vivado -> vhdlTypeMark t <> "'" <> parens (int 0 <+> "to" <+> int (n-1) <+> rarrow <+>
+    Vivado -> qualTyName t <> "'" <> parens (int 0 <+> "to" <+> int (n-1) <+> rarrow <+>
                 "std_logic_vector'" <> parens (int 0 <+> "to" <+> int (typeSize elTy - 1) <+>
                  rarrow <+> "'-'"))
-    _ -> vhdlTypeMark t <> "'" <> parens (int 0 <+> "to" <+> int (n-1) <+> rarrow <+> vhdlTypeErrValue elTy)
-vhdlTypeErrValue t@(RTree n elTy)    = do
+    _ -> qualTyName t <> "'" <> parens (int 0 <+> "to" <+> int (n-1) <+> rarrow <+> sizedQualTyNameErrValue elTy)
+sizedQualTyNameErrValue t@(RTree n elTy)    = do
   syn <-Mon hdlSyn
   case syn of
-    Vivado -> vhdlTypeMark t <> "'" <>  parens (int 0 <+> "to" <+> int (2^n - 1) <+> rarrow <+>
+    Vivado -> qualTyName t <> "'" <>  parens (int 0 <+> "to" <+> int (2^n - 1) <+> rarrow <+>
                 "std_logic_vector'" <> parens (int 0 <+> "to" <+> int (typeSize elTy - 1) <+>
                  rarrow <+> "'-'"))
-    _ -> vhdlTypeMark t <> "'" <>  parens (int 0 <+> "to" <+> int (2^n - 1) <+> rarrow <+> vhdlTypeErrValue elTy)
-vhdlTypeErrValue t@(Product _ elTys) = vhdlTypeMark t <> "'" <> tupled (mapM vhdlTypeErrValue elTys)
-vhdlTypeErrValue (Reset {})          = "'-'"
-vhdlTypeErrValue (Clock _ _ Source)  = "'-'"
-vhdlTypeErrValue (Clock _ _ Gated)   = "('-',false)"
-vhdlTypeErrValue (Void {})           = "std_logic_vector'(0 downto 1 => '-')"
-vhdlTypeErrValue String              = "\"ERROR\""
-vhdlTypeErrValue t                   = vhdlTypeMark t <> "'" <> parens (int 0 <+> "to" <+> int (typeSize t - 1) <+> rarrow <+> "'-'")
+    _ -> qualTyName t <> "'" <>  parens (int 0 <+> "to" <+> int (2^n - 1) <+> rarrow <+> sizedQualTyNameErrValue elTy)
+sizedQualTyNameErrValue t@(Product _ _ elTys) =
+  qualTyName t <> "'" <> tupled (mapM sizedQualTyNameErrValue elTys)
+sizedQualTyNameErrValue (Reset {})          = "'-'"
+sizedQualTyNameErrValue (Clock _ _ Source)  = "'-'"
+sizedQualTyNameErrValue (Clock _ _ Gated)   = "('-',false)"
+sizedQualTyNameErrValue (Void {})           = "std_logic_vector'(0 downto 1 => '-')"
+sizedQualTyNameErrValue String              = "\"ERROR\""
+sizedQualTyNameErrValue t =
+  qualTyName t <> "'" <> parens (int 0 <+> "to" <+> int (typeSize t - 1) <+> rarrow <+> "'-'")
 
 vhdlRecSel
   :: HWType
   -> Int
   -> VHDLM Doc
-vhdlRecSel ty i = tyName ty <> "_sel" <> int i
+vhdlRecSel p@(Product _ labels tys) i =
+  tyName p <> selectProductField labels tys i
+vhdlRecSel ty i =
+  tyName ty <> "_sel" <> int i
 
 decls :: [Declaration] -> VHDLM Doc
 decls [] = emptyDoc
@@ -922,12 +1198,12 @@ decls ds = do
 
 decl :: Int ->  Declaration -> VHDLM (Maybe (Doc,Int))
 decl l (NetDecl' noteM _ id_ ty) = Just <$> (,fromIntegral (TextS.length id_)) <$>
-  maybe id addNote noteM ("signal" <+> fill l (pretty id_) <+> colon <+> either pretty vhdlType ty)
+  maybe id addNote noteM ("signal" <+> fill l (pretty id_) <+> colon <+> either pretty sizedQualTyName ty)
   where
     addNote n = mappend ("--" <+> pretty n <> line)
 
 decl _ (InstDecl Comp _ nm _ pms) = fmap (Just . (,0)) $ do
-  { rec (p,ls) <- fmap unzip $ sequence [ (,formalLength i) <$> fill (maximum ls) (expr_ False i) <+> colon <+> portDir dir <+> vhdlType ty | (i,dir,ty,_) <- pms ]
+  { rec (p,ls) <- fmap unzip $ sequence [ (,formalLength i) <$> fill (maximum ls) (expr_ False i) <+> colon <+> portDir dir <+> sizedQualTyName ty | (i,dir,ty,_) <- pms ]
   ; "component" <+> pretty nm <> line <>
       indent 2 ("port" <+> tupledSemi (pure p) <> semi) <> line <>
     "end component"
@@ -1072,7 +1348,7 @@ expr_ _ (Literal sizeM lit) = exprLit sizeM lit
 expr_ _ (Identifier id_ Nothing) = pretty id_
 expr_ _ (Identifier id_ (Just (Indexed (CustomSP _id _dataRepr _size args,dcI,fI)))) = do
   nm <- Mon $ use modNm
-  let cast = vhdlTypeMark resultType <> squote
+  let cast = qualTyName resultType <> squote
   let fSLV = stringS (TextS.toLower nm) <> "_types.fromSLV"
   cast <> parens (fSLV <> parens (hcat $ punctuate " & " $ ranges))
     where
@@ -1095,12 +1371,11 @@ expr_ _ (Identifier id_ (Just (Indexed (ty@(SP _ args),dcI,fI)))) =
       start    = typeSize ty - 1 - conSize ty - other
       end      = start - argSize + 1
 
-expr_ _ (Identifier id_ (Just (Indexed (ty@(Product _ _),_,fI)))) =
-  pretty id_ <> dot <> tyName ty <> "_sel" <> int fI
+expr_ _ (Identifier id_ (Just (Indexed (ty@(Product _ labels tys),_,fI)))) =
+  pretty id_ <> dot <> tyName ty <> selectProductField labels tys fI
 
-expr_ _ (Identifier id_ (Just (Indexed (ty@(Clock _ _ Gated),_,fI)))) = do
-  ty' <- normaliseType ty
-  pretty id_ <> dot <> tyName ty' <> "_sel" <> int fI
+expr_ p (Identifier id_ (Just (Indexed (ty@(Clock _ _ Gated),x,fI)))) = do
+  expr_ p (Identifier id_ (Just (Indexed (normaliseType ty,x,fI))))
 
 expr_ _ (Identifier id_ (Just (Indexed ((Vector _ elTy),1,0)))) = do
   syn <- Mon hdlSyn
@@ -1210,7 +1485,7 @@ expr_ _ (Identifier id_ (Just (Indexed ((Unsigned w),_,_)))) = do
 expr_ _ (Identifier _ (Just (Indexed ((BitVector _),_,0)))) = do
   iw <- Mon $ use intWidth
   traceIf True ($(curLoc) ++ "WARNING: synthesizing bitvector mask to dontcare") $
-    vhdlTypeErrValue (Signed iw)
+    sizedQualTyNameErrValue (Signed iw)
 
 -- [Note] bitvector projection
 --
@@ -1238,31 +1513,31 @@ expr_ _ (Identifier id_ (Just _)) = pretty id_
 
 expr_ b (DataCon _ (DC (Void {}, -1)) [e]) =  expr_ b e
 
-expr_ _ (DataCon ty@(Vector 0 _) _ _) = vhdlTypeErrValue ty
+expr_ _ (DataCon ty@(Vector 0 _) _ _) = sizedQualTyNameErrValue ty
 
 expr_ _ (DataCon ty@(Vector 1 elTy) _ [e])       = do
   syn <- Mon hdlSyn
   case syn of
-    Vivado -> vhdlTypeMark ty <> "'" <> parens (int 0 <+> rarrow <+> toSLV elTy e)
-    _ -> vhdlTypeMark ty <> "'" <> parens (int 0 <+> rarrow <+> expr_ False e)
+    Vivado -> qualTyName ty <> "'" <> parens (int 0 <+> rarrow <+> toSLV elTy e)
+    _ -> qualTyName ty <> "'" <> parens (int 0 <+> rarrow <+> expr_ False e)
 expr_ _ e@(DataCon ty@(Vector _ elTy) _ [e1,e2]) = do
   syn <- Mon hdlSyn
   case syn of
-    Vivado -> vhdlTypeMark ty <> "'" <> case vectorChain e of
+    Vivado -> qualTyName ty <> "'" <> case vectorChain e of
       Just es -> align (tupled (mapM (toSLV elTy) es))
       Nothing -> parens ("std_logic_vector'" <> parens (toSLV elTy e1) <+> "&" <+> expr_ False e2)
-    _ -> vhdlTypeMark ty <> "'" <> case vectorChain e of
+    _ -> qualTyName ty <> "'" <> case vectorChain e of
             Just es -> align (tupled (mapM (expr_ False) es))
-            Nothing -> parens (vhdlTypeMark elTy <> "'" <> parens (expr_ False e1) <+> "&" <+> expr_ False e2)
+            Nothing -> parens (qualTyName elTy <> "'" <> parens (expr_ False e1) <+> "&" <+> expr_ False e2)
 
 expr_ _ (DataCon ty@(RTree 0 elTy) _ [e]) = do
   syn <- Mon hdlSyn
   case syn of
-    Vivado -> vhdlTypeMark ty <> "'" <> parens (int 0 <+> rarrow <+> toSLV elTy e)
-    _ -> vhdlTypeMark ty <> "'" <> parens (int 0 <+> rarrow <+> expr_ False e)
-expr_ _ e@(DataCon ty@(RTree d elTy) _ [e1,e2]) = vhdlTypeMark ty <> "'" <> case rtreeChain e of
+    Vivado -> qualTyName ty <> "'" <> parens (int 0 <+> rarrow <+> toSLV elTy e)
+    _ -> qualTyName ty <> "'" <> parens (int 0 <+> rarrow <+> expr_ False e)
+expr_ _ e@(DataCon ty@(RTree d elTy) _ [e1,e2]) = qualTyName ty <> "'" <> case rtreeChain e of
   Just es -> tupled (mapM (expr_ False) es)
-  Nothing -> parens (vhdlTypeMark (RTree (d-1) elTy) <> "'" <> parens (expr_ False e1) <+>
+  Nothing -> parens (qualTyName (RTree (d-1) elTy) <> "'" <> parens (expr_ False e1) <+>
                      "&" <+> expr_ False e2)
 
 expr_ _ (DataCon ty@(SP _ args) (DC (_,i)) es) = assignExpr
@@ -1323,12 +1598,11 @@ expr_ _ (DataCon (CustomSP _ dataRepr size args) (DC (_,i)) es) =
                let resized = "resize" <> parens (rotated <> comma <> int fsize) in
                "std_logic_vector" <> parens resized
 
-expr_ _ (DataCon ty@(Product _ _) _ es) =
-    tupled $ zipWithM (\i e' -> tyName ty <> "_sel" <> int i <+> rarrow <+> expr_ False e') [0..] es
+expr_ _ (DataCon ty@(Product _ labels tys) _ es) =
+    tupled $ zipWithM (\i e' -> tyName ty <> selectProductField labels tys i <+> rarrow <+> expr_ False e') [0..] es
 
-expr_ _ (DataCon ty@(Clock _ _ Gated) _ es) = do
-    ty' <- normaliseType ty
-    tupled $ zipWithM (\i e' -> tyName ty' <> "_sel" <> int i <+> rarrow <+> expr_ False e') [0..] es
+expr_ p (DataCon ty@(Clock _ _ Gated) x es) = do
+  expr_ p (DataCon (normaliseType ty) x es)
 
 expr_ _ (BlackBoxE pNm _ _ _ _ bbCtx _)
   | pNm == "Clash.Sized.Internal.Signed.fromInteger#"
@@ -1393,7 +1667,7 @@ expr_ _ (DataTag (Sum _ _) (Right id_)) = do
   iw <- Mon $ use intWidth
   "signed" <> parens ("std_logic_vector" <> parens ("resize" <> parens ("unsigned" <> parens (pretty id_) <> "," <> int iw)))
 
-expr_ _ (DataTag (Product _ _) (Right _))  = do
+expr_ _ (DataTag (Product {}) (Right _))  = do
   iw <- Mon $ use intWidth
   "to_signed" <> parens (int 0 <> "," <> int iw)
 expr_ _ (DataTag hty@(SP _ _) (Right id_)) = do {
@@ -1424,7 +1698,7 @@ expr_ _ (ConvBV topM hwty True e) = do
   nm <- Mon $ use modNm
   case topM of
     Nothing -> pretty nm <> "_types" <> dot <> "toSLV" <>
-               parens (vhdlTypeMark hwty <> "'" <> parens (expr_ False e))
+               parens (qualTyName hwty <> "'" <> parens (expr_ False e))
     Just t  -> pretty t <> dot <> pretty t <> "_types" <> dot <> "toSLV" <> parens (expr_ False e)
 
 expr_ _ (ConvBV topM _ False e) = do
@@ -1554,16 +1828,16 @@ toSLV (CustomSum _ _dataRepr size reprs) (DataCon _ (DC (_,i)) _) =
   let (ConstrRepr' _ _ _ value _) = fst $ reprs !! i in
   let unsigned = "to_unsigned" <> parens (int (fromIntegral value) <> comma <> int size) in
   "std_logic_vector" <> parens unsigned
-toSLV t@(Product _ tys) (Identifier id_ Nothing) = do
+toSLV t@(Product _ labels tys) (Identifier id_ Nothing) = do
     selIds' <- sequence selIds
     encloseSep lparen rparen " & " (zipWithM toSLV tys selIds')
   where
     tName    = tyName t
-    selNames = map (fmap (T.toStrict . renderOneLine) ) [pretty id_ <> dot <> tName <> "_sel" <> int i | i <- [0..(length tys)-1]]
+    selNames = map (fmap (T.toStrict . renderOneLine) ) [pretty id_ <> dot <> tName <> selectProductField labels tys i | i <- [0..(length tys)-1]]
     selIds   = map (fmap (\n -> Identifier n Nothing)) selNames
-toSLV (Product _ tys) (DataCon _ _ es) = do
+toSLV (Product _ _ tys) (DataCon _ _ es) = do
   encloseSep lparen rparen " & " (zipWithM toSLV tys es)
-toSLV (Product _ _) e = do
+toSLV (Product _ _ _) e = do
   nm <- Mon $ use modNm
   pretty (TextS.toLower nm) <> "_types.toSLV" <> parens (expr_ False e)
 toSLV (SP _ _) e       = expr_ False e
@@ -1596,11 +1870,11 @@ fromSLV (Signed _)          id_ start end = "signed" <> parens (pretty id_ <> pa
 fromSLV (Unsigned _)        id_ start end = "unsigned" <> parens (pretty id_ <> parens (int start <+> "downto" <+> int end))
 fromSLV (Sum _ _)           id_ start end = pretty id_ <> parens (int start <+> "downto" <+> int end)
 fromSLV (CustomSum _ _ _ _) id_ start end = pretty id_ <> parens (int start <+> "downto" <+> int end)
-fromSLV t@(Product _ tys) id_ start _ = do
+fromSLV t@(Product _ labels tys) id_ start _ = do
     tupled $ zipWithM (\s e -> s <+> rarrow <+> e) selNames args
   where
     tName      = tyName t
-    selNames   = [tName <> "_sel" <> int i | i <- [0..]]
+    selNames   = [tName <> selectProductField labels tys i | i <- [0..]]
     argLengths = map typeSize tys
     starts     = start : snd (mapAccumL ((join (,) .) . (-)) start argLengths)
     ends       = map (+1) (tail starts)

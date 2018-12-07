@@ -317,8 +317,9 @@ mkADT builtInTranslation reprs m _tyString keepVoid tc args = case tyConDataCons
       (_:[],[[elemTy]]) ->
         return elemTy
 
-      (_:[],[elemTys@(_:_)]) ->
-        return $ Product tcName elemTys
+      ([dcFieldLabels -> labels],[elemTys@(_:_)]) ->
+        let labelsM = if null labels then Nothing else Just labels in
+        return (Product tcName labelsM elemTys)
 
       (_   ,concat -> [])
         | length dcs < 2 ->
@@ -364,14 +365,14 @@ representableType builtInTranslation reprs stringRepresentable m =
     either (const False) isRepresentable . coreTypeToHWType builtInTranslation reprs m False
   where
     isRepresentable hty = case hty of
-      String          -> stringRepresentable
-      Vector _ elTy   -> isRepresentable elTy
-      RTree  _ elTy   -> isRepresentable elTy
-      Product _ elTys -> all isRepresentable elTys
-      SP _ elTyss     -> all (all isRepresentable . snd) elTyss
+      String            -> stringRepresentable
+      Vector _ elTy     -> isRepresentable elTy
+      RTree  _ elTy     -> isRepresentable elTy
+      Product _ _ elTys -> all isRepresentable elTys
+      SP _ elTyss       -> all (all isRepresentable . snd) elTyss
       BiDirectional _ t -> isRepresentable t
-      Annotated _ ty  -> isRepresentable ty
-      _               -> True
+      Annotated _ ty    -> isRepresentable ty
+      _                 -> True
 
 -- | Determines the bitsize of a type
 typeSize :: HWType
@@ -393,7 +394,7 @@ typeSize (RTree d el) = (2^d) * typeSize el
 typeSize t@(SP _ cons) = conSize t +
   maximum (map (sum . map typeSize . snd) cons)
 typeSize (Sum _ dcs) = fromMaybe 0 . clogBase 2 . toInteger $ length dcs
-typeSize (Product _ tys) = sum $ map typeSize tys
+typeSize (Product _ _ tys) = sum $ map typeSize tys
 typeSize (BiDirectional In h) = typeSize h
 typeSize (BiDirectional Out _) = 0
 typeSize (CustomSP _ _ size _) = fromIntegral size
@@ -439,11 +440,11 @@ containsBiSignalIn
   :: HWType
   -> Bool
 containsBiSignalIn (BiDirectional In _) = True
-containsBiSignalIn (Product _ tys) = any containsBiSignalIn tys
-containsBiSignalIn (SP _ tyss)     = any (any containsBiSignalIn . snd) tyss
-containsBiSignalIn (Vector _ ty)   = containsBiSignalIn ty
-containsBiSignalIn (RTree _ ty)    = containsBiSignalIn ty
-containsBiSignalIn _               = False
+containsBiSignalIn (Product _ _ tys) = any containsBiSignalIn tys
+containsBiSignalIn (SP _ tyss)       = any (any containsBiSignalIn . snd) tyss
+containsBiSignalIn (Vector _ ty)     = containsBiSignalIn ty
+containsBiSignalIn (RTree _ ty)      = containsBiSignalIn ty
+containsBiSignalIn _                 = False
 
 -- | Helper function of @collectPortNames@, which operates on a @PortName@
 -- instead of a TopEntity.
@@ -799,7 +800,7 @@ mkInput pM = case pM of
           else
             throwAnnotatedSplitError $(curLoc) "RTree"
 
-        Product _ hwtys -> do
+        Product _ _ hwtys -> do
           arguments <- zipWithM appendIdentifier (map (i',) hwtys) [0..]
           let argumentsBundled   = zip hwtys arguments
               argumentsFiltered  = filter (not . isVoid . fst) argumentsBundled
@@ -867,7 +868,7 @@ mkInput pM = case pM of
           else
             throwAnnotatedSplitError $(curLoc) "RTree"
 
-        Product _ hwtys -> do
+        Product _ _ hwtys -> do
           arguments <- zipWithM appendIdentifier (map (pN,) hwtys) [0..]
           let argumentsBundled   = zip hwtys (zip (extendPorts $ map (prefixParent p) ps) arguments)
               argumentsFiltered  = filter (not . isVoid . fst) argumentsBundled
@@ -904,10 +905,10 @@ filterVoid
   :: HWType
   -> HWType
 filterVoid t = case t of
-  Product nm hwtys
+  Product nm labels hwtys
     | null hwtys'        -> Void Nothing
     | length hwtys' == 1 -> head hwtys'
-    | otherwise          -> Product nm hwtys'
+    | otherwise          -> Product nm labels hwtys'
     where
       hwtys' = filter (not . isVoid) (map filterVoid hwtys)
   _ -> t
@@ -1030,7 +1031,7 @@ mkOutput' pM = case pM of
               assigns = zipWith (assignId o' hwty2 10) ids [0..]
           return (concat ports,netdecl:assigns ++ concat decls,o')
 
-        Product _ hwtys -> do
+        Product _ _ hwtys -> do
           results <- zipWithM appendIdentifier (map (o,) hwtys) [0..]
           let resultsBundled   = zip hwtys results
               resultsFiltered  = filter (not . isVoid . fst) resultsBundled
@@ -1081,7 +1082,7 @@ mkOutput' pM = case pM of
               assigns = zipWith (assignId pN hwty2 10) ids [0..]
           return (concat ports,netdecl:assigns ++ concat decls,pN)
 
-        Product _ hwtys -> do
+        Product _ _ hwtys -> do
           results <- zipWithM appendIdentifier (map (pN,) hwtys) [0..]
           let resultsBundled   = zip hwtys (zip (extendPorts $ map (prefixParent p) ps) results)
               resultsFiltered  = filter (not . isVoid . fst) resultsBundled
@@ -1276,7 +1277,7 @@ mkTopInput topM inps pM = case pM of
           else
             throwAnnotatedSplitError $(curLoc) "RTree"
 
-        Product _ hwtys -> do
+        Product _ _ hwtys -> do
           arguments <- zipWithM appendIdentifier (map (i,) hwtys) [0..]
           (inps'',arguments1) <- mapAccumLM go inps' arguments
           let (ports,decls,ids) = unzip3 arguments1
@@ -1345,7 +1346,7 @@ mkTopInput topM inps pM = case pM of
           else
             throwAnnotatedSplitError $(curLoc) "RTree"
 
-        Product _ hwtys -> do
+        Product _ _ hwtys -> do
           arguments <- zipWithM appendIdentifier (map (pN',) hwtys) [0..]
           (inps'',arguments1) <-
             mapAccumLM (\acc (p',o') -> mkTopInput topM acc p' o') inps'
@@ -1466,7 +1467,7 @@ mkTopOutput' topM outps pM = case pM of
           else
             throwAnnotatedSplitError $(curLoc) "RTree"
 
-        Product _ hwtys -> do
+        Product _ _ hwtys -> do
           results <- zipWithM appendIdentifier (map (o',) hwtys) [0..]
           (outps'',results1) <- mapAccumLM go outps' results
           let (ports,decls,ids) = unzip3 results1
@@ -1522,7 +1523,7 @@ mkTopOutput' topM outps pM = case pM of
           else
             throwAnnotatedSplitError $(curLoc) "RTree"
 
-        Product _ hwtys -> do
+        Product _ _ hwtys -> do
           results <- zipWithM appendIdentifier (map (pN',) hwtys) [0..]
           (outps'',results1) <-
             mapAccumLM (\acc (p',o') -> mkTopOutput' topM acc p' o') outps'

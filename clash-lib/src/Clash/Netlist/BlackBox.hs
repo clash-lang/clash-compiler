@@ -399,7 +399,7 @@ mkFunInput resId e = do
                       dcApp    = DataCon resHTy (DC (resHTy,dcI)) dcInps
                       dcAss    = Assignment "~RESULT" dcApp
                   return (Right (("",[dcAss]),Wire))
-                Just resHTy@(Product _ dcArgs) -> do
+                Just resHTy@(Product _ _ dcArgs) -> do
                   let dcInps = [ Identifier (TextS.pack ("~ARG[" ++ show x ++ "]")) Nothing | x <- [(0::Int)..(length dcArgs - 1)]]
                       dcApp  = DataCon resHTy (DC (resHTy,0)) dcInps
                       dcAss  = Assignment "~RESULT" dcApp

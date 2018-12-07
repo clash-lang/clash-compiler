@@ -43,6 +43,7 @@ import qualified Data.HashMap.Strict         as HSM
 import           Data.Maybe                  (catMaybes,fromMaybe,listToMaybe)
 import           Data.Text                   (Text, isInfixOf,pack)
 import qualified Data.Text                   as Text
+import           Data.Text.Encoding          (decodeUtf8)
 import qualified Data.Traversable            as T
 
 -- GHC API
@@ -56,11 +57,12 @@ import CoreSyn
 import DataCon    (DataCon, dataConExTyVars,
                    dataConName, dataConRepArgTys,
                    dataConTag, dataConTyCon,
-                   dataConUnivTyVars, dataConWorkId)
+                   dataConUnivTyVars, dataConWorkId,
+                   dataConFieldLabels, flLabel)
 import DynFlags   (unsafeGlobalDynFlags)
 import FamInstEnv (FamInst (..), FamInstEnvs,
                    familyInstances)
-import FastString (unpackFS)
+import FastString (unpackFS, fastStringToByteString)
 import Id         (isDataConId_maybe)
 import IdInfo     (IdDetails (..), unfoldingInfo)
 import Literal    (Literal (..))
@@ -481,17 +483,21 @@ coreToDataCon dc = do
     mkDc dcTy repTys
   where
     mkDc dcTy repTys = do
+      let decLabel = decodeUtf8 . fastStringToByteString . flLabel
+      let fLabels  = map decLabel (dataConFieldLabels dc)
+
       nm   <- coreToName dataConName getUnique qualfiedNameString dc
       uTvs <- mapM coreToTyVar (dataConUnivTyVars dc)
       eTvs <- mapM coreToTyVar (dataConExTyVars dc)
       return $ C.MkData
-             { C.dcName       = nm
-             , C.dcUniq       = C.nameUniq nm
-             , C.dcTag        = dataConTag dc
-             , C.dcType       = dcTy
-             , C.dcArgTys     = repTys
-             , C.dcUnivTyVars = uTvs
-             , C.dcExtTyVars  = eTvs
+             { C.dcName        = nm
+             , C.dcUniq        = C.nameUniq nm
+             , C.dcTag         = dataConTag dc
+             , C.dcType        = dcTy
+             , C.dcArgTys      = repTys
+             , C.dcUnivTyVars  = uTvs
+             , C.dcExtTyVars   = eTvs
+             , C.dcFieldLabels = fLabels
              }
 
 typeConstructorToString

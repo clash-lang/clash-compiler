@@ -30,7 +30,7 @@ altpllTF = TemplateFunction used valid altpllTemplate
   valid bbCtx
     | [(nm,_,_),_,_] <- bbInputs bbCtx
     , Just _ <- exprToString nm
-    , (Identifier _ Nothing,Product _ _) <- bbResult bbCtx
+    , (Identifier _ Nothing,Product {}) <- bbResult bbCtx
     = True
   valid _ = False
 
@@ -41,7 +41,7 @@ alteraPllTF = TemplateFunction used valid alteraPllTemplate
   valid bbCtx
     | [_,(nm,_,_),_,_] <- bbInputs bbCtx
     , Just _ <- exprToString nm
-    , (Identifier _ Nothing,Product _ _) <- bbResult bbCtx
+    , (Identifier _ Nothing,Product {}) <- bbResult bbCtx
     = True
   valid _ = False
 
@@ -79,7 +79,7 @@ alteraPllTemplate bbCtx = do
   ]
  where
   [_,(nm,_,_),(clk,clkTy,_),(rst,rstTy,_)] = bbInputs bbCtx
-  (Identifier result Nothing,resTy@(Product _ (tail -> tys))) = bbResult bbCtx
+  (Identifier result Nothing,resTy@(Product _ _ (tail -> tys))) = bbResult bbCtx
   Just nm' = exprToString nm
   compName = TextS.pack nm'
 
@@ -113,7 +113,7 @@ altpllTemplate bbCtx = do
   ]
  where
   [(nm,_,_),(clk,clkTy,_),(rst,rstTy,_)] = bbInputs bbCtx
-  (Identifier result Nothing,resTy@(Product _ [clkOutTy,_])) = bbResult bbCtx
+  (Identifier result Nothing,resTy@(Product _ _ [clkOutTy,_])) = bbResult bbCtx
   Just nm' = exprToString nm
   compName = TextS.pack nm'
 

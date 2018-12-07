@@ -133,6 +133,7 @@ Library
                       template-haskell        >= 2.8.0.0  && < 2.15,
                       temporary               >= 1.2      && < 1.4,
                       text                    >= 1.2.2    && < 1.3,
+                      text-show               >= 3.7      && < 3.8,
                       time                    >= 1.4.0.1  && < 1.10,
                       transformers            >= 0.5.2.0  && < 0.6,
                       trifecta                >= 1.7.1.1  && < 2.0,

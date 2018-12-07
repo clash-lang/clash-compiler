@@ -328,7 +328,8 @@ verilogType' isDecl t =
          -> prefix <> renderVerilogTySize (sz-1)
 
 gatedClockType :: HWType -> HWType
-gatedClockType (Clock _ _ Gated) = Product "GatedClock" [Bit,Bool]
+gatedClockType (Clock _ _ Gated) =
+  Product "GatedClock" (Just ["clk", "enable"]) [Bit,Bool]
 gatedClockType ty = ty
 {-# INLINE gatedClockType #-}
 
@@ -528,7 +529,7 @@ modifier offset (Indexed (ty@(SP _ args),dcI,fI)) = Just (start+offset,end+offse
     start    = typeSize ty - 1 - conSize ty - other
     end      = start - argSize + 1
 
-modifier offset (Indexed (ty@(Product _ argTys),_,fI)) = Just (start+offset,end+offset)
+modifier offset (Indexed (ty@(Product _ _ argTys),_,fI)) = Just (start+offset,end+offset)
   where
     argTy   = argTys !! fI
     argSize = typeSize argTy
@@ -716,7 +717,7 @@ expr_ _ (DataCon (CustomSP name' dataRepr size args) (DC (_,constrNr)) es) =
       range' (Field n _start _end) =
         argExprs !! n
 
-expr_ _ (DataCon (Product _ _) _ es) = listBraces (mapM (expr_ False) es)
+expr_ _ (DataCon (Product {}) _ es) = listBraces (mapM (expr_ False) es)
 
 expr_ _ (DataCon (Clock _ _ Gated) _ es) = listBraces (mapM (expr_ False) es)
 
@@ -760,7 +761,7 @@ expr_ _ (DataTag Bool (Right id_))         = do
 expr_ _ (DataTag (Sum _ _) (Left id_))     = "$unsigned" <> parens (stringS id_)
 expr_ _ (DataTag (Sum _ _) (Right id_))    = "$unsigned" <> parens (stringS id_)
 
-expr_ _ (DataTag (Product _ _) (Right _))  = do
+expr_ _ (DataTag (Product {}) (Right _))  = do
   iw <- Mon (use intWidth)
   int iw <> "'sd0"
 

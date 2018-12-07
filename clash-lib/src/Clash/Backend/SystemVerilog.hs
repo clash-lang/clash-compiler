@@ -291,12 +291,12 @@ mkTyPackage_ modName hwtys =
 
 mkUsedTys :: HWType
         -> [HWType]
-mkUsedTys v@(Vector _ elTy)   = v : mkUsedTys elTy
-mkUsedTys t@(RTree _ elTy)    = t : mkUsedTys elTy
-mkUsedTys p@(Product _ elTys) = p : concatMap mkUsedTys elTys
-mkUsedTys sp@(SP _ elTys)     = sp : concatMap mkUsedTys (concatMap snd elTys)
-mkUsedTys c@(Clock _ _ Gated) = [c,Bit,Bool]
-mkUsedTys t                   = [t]
+mkUsedTys v@(Vector _ elTy)     = v : mkUsedTys elTy
+mkUsedTys t@(RTree _ elTy)      = t : mkUsedTys elTy
+mkUsedTys p@(Product _ _ elTys) = p : concatMap mkUsedTys elTys
+mkUsedTys sp@(SP _ elTys)       = sp : concatMap mkUsedTys (concatMap snd elTys)
+mkUsedTys c@(Clock _ _ Gated)   = [c,Bit,Bool]
+mkUsedTys t                     = [t]
 
 topSortHWTys :: [HWType]
              -> [HWType]
@@ -314,8 +314,8 @@ topSortHWTys hwtys = sorted
                                       (HashMap.lookup elTy nodesI)
     edge t@(RTree _ elTy)  = maybe [] ((:[]) . (HashMap.lookupDefault (error $ $(curLoc) ++ "RTree") t nodesI,))
                                       (HashMap.lookup elTy nodesI)
-    edge t@(Product _ tys) = let ti = HashMap.lookupDefault (error $ $(curLoc) ++ "Product") t nodesI
-                             in mapMaybe (\ty -> liftM (ti,) (HashMap.lookup ty nodesI)) tys
+    edge t@(Product _ _ tys) = let ti = HashMap.lookupDefault (error $ $(curLoc) ++ "Product") t nodesI
+                               in mapMaybe (\ty -> liftM (ti,) (HashMap.lookup ty nodesI)) tys
     edge t@(SP _ ctys)     = let ti = HashMap.lookupDefault (error $ $(curLoc) ++ "SP") t nodesI
                              in concatMap (\(_,tys) -> mapMaybe (\ty -> liftM (ti,) (HashMap.lookup ty nodesI)) tys) ctys
     edge _                 = []
@@ -355,7 +355,7 @@ tyDec ty@(RTree n elTy) | typeSize elTy > 0 = Just A.<$> do
         "typedef" <+> elTy' <+> hcat (mapM range ns) <+> tyName ty <+>
         brackets (int 0 <> colon <> int (n' - 1)) <> semi
       _ -> error $ $(curLoc) ++ "impossible"
-tyDec ty@(Product _ tys) | typeSize ty > 0 = Just A.<$> prodDec
+tyDec ty@(Product _ _ tys) | typeSize ty > 0 = Just A.<$> prodDec
   where
     prodDec = "typedef struct packed {" <> line <>
                 indent 2 (vcat $ fmap catMaybes $ zipWithM combineM selNames tys) <> line <>
@@ -372,7 +372,11 @@ tyDec ty@(Product _ tys) | typeSize ty > 0 = Just A.<$> prodDec
 tyDec _ = pure Nothing
 
 gatedClockType :: HWType -> HWType
-gatedClockType (Clock nm rt Gated) = Product ("GatedClock" `TextS.append` (TextS.pack (show (nm,rt)))) [Bit,Bool]
+gatedClockType (Clock nm rt Gated) =
+  Product
+    ("GatedClock" `TextS.append` (TextS.pack (show (nm,rt))))
+    (Just ["clk", "enable"])
+    [Bit,Bool]
 gatedClockType ty = ty
 {-# INLINE gatedClockType #-}
 
@@ -380,15 +384,15 @@ splitVecTy :: HWType -> Maybe ([Either Int Int],SystemVerilogM Doc)
 splitVecTy = fmap splitElemTy . go
   where
     splitElemTy (ns,t) = case t of
-      Product _ _ -> (ns, verilogType t)
-      Vector _ _  -> error $ $(curLoc) ++ "impossible"
-      Clock {}    -> (ns, verilogType t)
-      Reset {}    -> (ns, "logic")
-      Bool        -> (ns, "logic")
-      Bit         -> (ns, "logic")
-      String      -> (ns, "string")
-      Signed n    -> (ns ++ [Left n],"logic signed")
-      _           -> (ns ++ [Left (typeSize t)], "logic")
+      Product {} -> (ns, verilogType t)
+      Vector {}  -> error $ $(curLoc) ++ "impossible"
+      Clock {}   -> (ns, verilogType t)
+      Reset {}   -> (ns, "logic")
+      Bool       -> (ns, "logic")
+      Bit        -> (ns, "logic")
+      String     -> (ns, "string")
+      Signed n   -> (ns ++ [Left n],"logic signed")
+      _          -> (ns ++ [Left (typeSize t)], "logic")
 
     go (Vector n elTy) = case go elTy of
       Just (ns,elTy') -> Just (Right n:ns,elTy')
@@ -589,7 +593,7 @@ verilogType t = do
   let logicOrWire | isBiSignalIn t = "wire"
                   | otherwise      = "logic"
   case t of
-    Product _ _   -> do
+    Product {} -> do
       nm <- Mon $ use modNm
       stringS nm <> "_types::" <> tyName t
     Vector _ _ -> do
@@ -617,7 +621,7 @@ verilogTypeMark t = do
   nm <- Mon $ use modNm
   let m = tyName t
   case t of
-    Product _ _ -> stringS nm <> "_types::" <> m
+    Product {} -> stringS nm <> "_types::" <> m
     Vector _ _ -> stringS nm <> "_types::" <> m
     RTree _ _ -> stringS nm <> "_types::" <> m
     _ -> emptyDoc
@@ -634,7 +638,7 @@ tyName (Unsigned n)          = "logic_vector_" <> int n
 tyName t@(Sum _ _)           = "logic_vector_" <> int (typeSize t)
 tyName t@(CustomSum _ _ _ _) = "logic_vector_" <> int (typeSize t)
 tyName t@(CustomSP _ _ _ _)  = "logic_vector_" <> int (typeSize t)
-tyName t@(Product nm _)      = Mon (makeCached t nameCache prodName)
+tyName t@(Product nm _ _)    = Mon (makeCached t nameCache prodName)
   where
     prodName = do
       seen <- use tySeen
@@ -886,7 +890,7 @@ expr_ _ (Identifier id_ (Just (Indexed (ty@(SP _ args),dcI,fI)))) = fromSLV argT
     start    = typeSize ty - 1 - conSize ty - other
     end      = start - argSize + 1
 
-expr_ _ (Identifier id_ (Just (Indexed (ty@(Product _ tys),_,fI)))) = do
+expr_ _ (Identifier id_ (Just (Indexed (ty@(Product _ _ tys),_,fI)))) = do
   id'<- fmap (Text.toStrict . renderOneLine) (stringS id_ <> dot <> tyName ty <> "_sel" <> int fI)
   simpleFromSLV (tys !! fI) id'
 
@@ -1036,7 +1040,7 @@ expr_ _ (DataCon (CustomSP _ dataRepr size args) (DC (_,i)) es) =
                -- Select bits 'start' downto and including 'end'
                let rotated  = parens expr' <+> ">>" <+> int end in
                int fsize <> squote <> parens rotated
-expr_ _ (DataCon (Product _ tys) _ es) = listBraces (zipWithM toSLV tys es)
+expr_ _ (DataCon (Product _ _ tys) _ es) = listBraces (zipWithM toSLV tys es)
 expr_ _ (DataCon (Clock nm rt Gated) _ es) =
   listBraces (zipWithM toSLV [Clock nm rt Source,Bool] es)
 
@@ -1078,7 +1082,7 @@ expr_ _ (DataTag Bool (Right id_))         = do
 expr_ _ (DataTag (Sum _ _) (Left id_))     = "$unsigned" <> parens (stringS id_)
 expr_ _ (DataTag (Sum _ _) (Right id_))    = "$unsigned" <> parens (stringS id_)
 
-expr_ _ (DataTag (Product _ _) (Right _))  = do
+expr_ _ (DataTag (Product {}) (Right _))  = do
   iw <- Mon $ use intWidth
   int iw <> "'sd0"
 
