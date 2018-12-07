@@ -555,7 +555,7 @@ concat (x `Cons` xs) = x ++ concat xs
 
 -- | Map a function over all the elements of a vector and concatentate the resulting vectors.
 --
--- >>> concatMap (replicate 3) (1:>2:>3:>Nil)
+-- >>> concatMap (replicate d3) (1:>2:>3:>Nil)
 -- <1,1,1,2,2,2,3,3,3>
 concatMap :: (a -> Vec m b) -> Vec n a -> Vec (n * m) b
 concatMap f xs = concat (map f xs)
