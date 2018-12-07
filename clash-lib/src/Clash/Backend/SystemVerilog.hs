@@ -604,7 +604,7 @@ verilogType t = do
       stringS nm <> "_types::" <> tyName t
     Signed n      -> logicOrWire <+> "signed" <+> brackets (int (n-1) <> colon <> int 0)
     Clock _ _ Gated -> verilogType (gatedClockType t)
-    Clock {}      -> "logic"
+    Clock _ _ Source-> "logic"
     Reset {}      -> "logic"
     Bit           -> "logic"
     Bool          -> "logic"
@@ -660,7 +660,7 @@ tyName t@(Product nm _ _)    = Mon (makeCached t nameCache prodName)
              else n'
 tyName t@(SP _ _)  = "logic_vector_" <> int (typeSize t)
 tyName t@(Clock _ _ Gated) = tyName (gatedClockType t)
-tyName (Clock {})  = "logic"
+tyName (Clock _ _ Source)  = "logic"
 tyName (Reset {})  = "logic"
 tyName t =  error $ $(curLoc) ++ "tyName: " ++ show t
 
@@ -1193,6 +1193,6 @@ punctuate' s d = vcat (punctuate s d) <> s
 
 encodingNote :: HWType -> SystemVerilogM Doc
 encodingNote (Clock _ _ Gated) = "// gated clock"
-encodingNote (Clock {})        = "// clock"
+encodingNote (Clock _ _ Source)= "// clock"
 encodingNote (Reset {})        = "// asynchronous reset: active high"
 encodingNote _                 = emptyDoc
