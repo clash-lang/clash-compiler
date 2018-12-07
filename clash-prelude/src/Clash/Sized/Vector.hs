@@ -59,7 +59,7 @@ module Clash.Sized.Vector
     -- *** Initialisation from a list
   , listToVecTH
     -- ** Concatenation
-  , (++), (+>>), (<<+), concat
+  , (++), (+>>), (<<+), concat, concatMap
   , shiftInAt0, shiftInAtN , shiftOutFrom0, shiftOutFromN
   , merge
     -- * Modifying vectors
