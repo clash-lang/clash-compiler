@@ -553,6 +553,14 @@ concat Nil           = Nil
 concat (x `Cons` xs) = x ++ concat xs
 {-# NOINLINE concat #-}
 
+-- | Map a function over all the elements of a vector and concatentate the resulting vectors.
+--
+-- >>> concatMap (replicate 3) (1:>2:>3:>Nil)
+-- <1,1,1,2,2,2,3,3,3>
+concatMap :: (a -> Vec m b) -> Vec n a -> Vec (n * m) b
+concatMap f xs = concat (map f xs)
+{-# INLINE concatMap #-}
+
 -- | Split a vector of \(n * m)\ elements into a vector of \"vectors of length
 -- /m/\", where the length /m/ is given.
 --
