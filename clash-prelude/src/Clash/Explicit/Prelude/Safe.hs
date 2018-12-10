@@ -108,9 +108,9 @@ import GHC.Stack
 import GHC.TypeLits
 import GHC.TypeLits.Extra
 import Prelude hiding
-  ((++), (!!), concat, drop, foldl, foldl1, foldr, foldr1, head, init, iterate,
-   last, length, map, repeat, replicate, reverse, scanl, scanr, splitAt, tail,
-   take, unzip, unzip3, zip, zip3, zipWith, zipWith3, undefined)
+  ((++), (!!), concat, concatMap, drop, foldl, foldl1, foldr, foldr1, head, init,
+   iterate, last, length, map, repeat, replicate, reverse, scanl, scanr, splitAt,
+   tail, take, unzip, unzip3, zip, zip3, zipWith, zipWith3, undefined)
 
 import Clash.Annotations.TopEntity
 import Clash.Class.BitPack

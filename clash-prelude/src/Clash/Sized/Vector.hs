@@ -59,7 +59,7 @@ module Clash.Sized.Vector
     -- *** Initialisation from a list
   , listToVecTH
     -- ** Concatenation
-  , (++), (+>>), (<<+), concat
+  , (++), (+>>), (<<+), concat, concatMap
   , shiftInAt0, shiftInAtN , shiftOutFrom0, shiftOutFromN
   , merge
     -- * Modifying vectors
@@ -117,12 +117,12 @@ import GHC.Base                   (Int(I#),Int#,isTrue#)
 import GHC.Prim                   ((==#),(<#),(-#))
 import Language.Haskell.TH        (ExpQ)
 import Language.Haskell.TH.Syntax (Lift(..))
-import Prelude                    hiding ((++), (!!), concat, drop, foldl,
-                                          foldl1, foldr, foldr1, head, init,
-                                          iterate, last, length, map, repeat,
-                                          replicate, reverse, scanl, scanr,
-                                          splitAt, tail, take, unzip, unzip3,
-                                          zip, zip3, zipWith, zipWith3)
+import Prelude                    hiding ((++), (!!), concat, concatMap, drop,
+                                          foldl, foldl1, foldr, foldr1, head,
+                                          init, iterate, last, length, map,
+                                          repeat, replicate, reverse, scanl,
+                                          scanr, splitAt, tail, take, unzip,
+                                          unzip3, zip, zip3, zipWith, zipWith3)
 import qualified Prelude          as P
 import Test.QuickCheck            (Arbitrary (..), CoArbitrary (..))
 import Unsafe.Coerce              (unsafeCoerce)
@@ -552,6 +552,14 @@ concat :: Vec n (Vec m a) -> Vec (n * m) a
 concat Nil           = Nil
 concat (x `Cons` xs) = x ++ concat xs
 {-# NOINLINE concat #-}
+
+-- | Map a function over all the elements of a vector and concatentate the resulting vectors.
+--
+-- >>> concatMap (replicate d3) (1:>2:>3:>Nil)
+-- <1,1,1,2,2,2,3,3,3>
+concatMap :: (a -> Vec m b) -> Vec n a -> Vec (n * m) b
+concatMap f xs = concat (map f xs)
+{-# INLINE concatMap #-}
 
 -- | Split a vector of \(n * m)\ elements into a vector of \"vectors of length
 -- /m/\", where the length /m/ is given.
