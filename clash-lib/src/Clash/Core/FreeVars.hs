@@ -60,6 +60,24 @@ typeFreeVars = typeFreeVars' (const True) IntSet.empty
 -- @
 -- foldMapOf (typeFreeVars' (const True) IntSet.empty) unitVarSet ((a:* -> k) Int) = {a, k}
 -- @
+--
+-- Note [Closing over kind variables]
+--
+-- Consider the type
+--
+-- > forall k . b -> k
+--
+-- where
+--
+-- > b :: k -> Type
+--
+-- When we close over the free variables of @forall k . b -> k@, i.e. @b@, then
+-- the @k@ in @b :: k -> Type@ is most definitely /not/ the @k@ in
+-- @forall k . b -> k@. So when a type variable is free, i.e. not in the inScope
+-- set, its kind variables also aren´t; so in order to prevent collisions due to
+-- shadowing we close using an empty inScope set.
+--
+-- See also: https://git.haskell.org/ghc.git/commitdiff/503514b94f8dc7bd9eab5392206649aee45f140b
 typeFreeVars'
   :: (Contravariant f, Applicative f)
   => (forall b . Var b -> Bool)
@@ -75,7 +93,8 @@ typeFreeVars' interesting is f = go is where
       | interesting tv
       , varUniq tv `IntSet.notMember` inScope
       -> VarTy . coerce <$> f (coerce tv) <*
-         go inScope (varType tv)
+         go IntSet.empty -- See Note [Closing over kind variables]
+            (varType tv)
       | otherwise
       -> pure (VarTy tv)
     ForAllTy tv ty -> ForAllTy <$> goBndr inScope tv
@@ -150,6 +169,24 @@ termFreeVars = termFreeVars' (const True)
 -- @
 -- foldMapOf (termFreeVars' (const True)) unitVarSet (case (x : (a:* -> k) Int)) of {}) = {x, a, k}
 -- @
+--
+-- Note [Closing over type variables]
+--
+-- Consider the term
+--
+-- > /\(k :: Type) -> \(b :: k) -> a
+--
+-- where
+--
+-- > a :: k
+--
+-- When we close over the free variables of @/\k -> \(b :: k) -> (a :: k)@, i.e.
+-- @a@, then the @k@ in @a :: k@ is most definitely /not/ the @k@ in introduced
+-- by the @/\k ->@. So when a term variable is free, i.e. not in the inScope
+-- set, its type variables also aren´t; so in order to prevent collisions due to
+-- shadowing we close using an empty inScope set.
+--
+-- See also: https://git.haskell.org/ghc.git/commitdiff/503514b94f8dc7bd9eab5392206649aee45f140b
 termFreeVars'
   :: (Contravariant f, Applicative f)
   => (forall b . Var b -> Bool)
@@ -163,7 +200,10 @@ termFreeVars' interesting f = go IntSet.empty where
       | interesting v
       , varUniq v `IntSet.notMember` inScope
       -> Var . coerce <$> (f (coerce v)) <*
-         typeFreeVars' interesting inScope f (varType v)
+         typeFreeVars' interesting
+                       IntSet.empty -- See Note [Closing over type variables]
+                       f
+                       (varType v)
       | otherwise
       -> pure (Var v)
     Lam id_ tm -> Lam <$> goBndr inScope id_
