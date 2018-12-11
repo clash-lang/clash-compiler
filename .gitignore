@@ -1,5 +1,6 @@
-dist*
-.stack-work
+dist/
+dist-newstyle/
+.stack-work/
 cabal-dev
 /cabal.project.local
 .ghc.environment.*
