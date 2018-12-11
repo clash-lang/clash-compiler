@@ -36,7 +36,8 @@ import           SrcLoc                           (SrcSpan,noSrcSpan)
 import           Clash.Annotations.BitRepresentation.Internal
   (CustomReprs)
 import           Clash.Core.Evaluator             (PrimEvaluator)
-import           Clash.Core.FreeVars              (termFreeIds, idOccursIn)
+import           Clash.Core.FreeVars
+  (termFreeIds, idDoesNotOccurIn, idOccursIn)
 import           Clash.Core.Name                  (Name (..), NameSort (..))
 import           Clash.Core.Pretty                (showPpr, ppr)
 import           Clash.Core.Subst                 (deShadowTerm, extendIdSubstList, mkSubst, substTm)
@@ -304,11 +305,12 @@ flattenNode c@(CLeaf (nm,(_,_,_,e))) = do
   tcm  <- Lens.view tcCache
   let norm = splitNormalized tcm e
   case norm of
-    Right (ids,[(_,bExpr)],_) -> do
+    Right (ids,[(bId,bExpr)],_) -> do
       let (fun,args) = collectArgs bExpr
       case stripArgs ids (reverse ids) (reverse args) of
-        Just remainder -> return (Right ((nm,mkApps fun (reverse remainder)),[]))
-        Nothing        -> return (Right ((nm,e),[]))
+        Just remainder | bId `idDoesNotOccurIn` bExpr ->
+          return (Right ((nm,mkApps fun (reverse remainder)),[]))
+        _ -> return (Right ((nm,e),[]))
     _ | isCheapFunction e -> return (Right ((nm,e),[]))
       | otherwise         -> return (Left c)
 flattenNode (CBranch (nm,(nameSort . varName -> Internal,_,_,e)) us) =
@@ -317,11 +319,12 @@ flattenNode b@(CBranch (nm,(_,_,_,e)) us) = do
   tcm  <- Lens.view tcCache
   let norm = splitNormalized tcm e
   case norm of
-    Right (ids,[(_,bExpr)],_) -> do
+    Right (ids,[(bId,bExpr)],_) -> do
       let (fun,args) = collectArgs bExpr
       case stripArgs ids (reverse ids) (reverse args) of
-        Just remainder -> return (Right ((nm,mkApps fun (reverse remainder)),us))
-        Nothing        -> return (Right ((nm,e),us))
+        Just remainder | bId `idDoesNotOccurIn` bExpr -> do
+          return (Right ((nm,mkApps fun (reverse remainder)),us))
+        _ -> return (Right ((nm,e),us))
     _ | isCheapFunction e -> return (Right ((nm,e),us))
       | otherwise         -> return (Left b)
 
