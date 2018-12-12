@@ -29,7 +29,7 @@ repository head.hackage
 -- index state, to go along with the cabal.project.freeze file. update the index
 -- state by running `cabal update` twice and looking at the index state it
 -- displays to you (as the second update will be a no-op)
-index-state: 2018-10-14T17:04:37Z
+index-state: 2018-12-12T14:50:52Z
 
 package clash-ghc
   executable-dynamic: True
@@ -40,35 +40,7 @@ package clash-testsuite
 package clash-lib
   flags: debug
 
-optional-packages: singletons/th-desugar/th-desugar.cabal
-                   singletons/singletons.cabal
-                   clash-cosim/clash-cosim.cabal
-
-source-repository-package
-  type: git
-  location: https://github.com/feuerbach/tasty.git
-  tag: 6506befcd3bfc274aabeda5f10d36089fd6ff625
-  subdir: core
-
-source-repository-package
-  type: git
-  location: https://github.com/clash-lang/ghc-typelits-extra
-  tag: f1cba7cebf73e429dbdfa67c88161300bc5e318e
-
-source-repository-package
-  type: git
-  location: https://github.com/clash-lang/ghc-typelits-knownnat
-  tag: 7c866bdefff3f8353a29eebb3d35264dacb2af28
-
-source-repository-package
-  type: git
-  location: https://github.com/clash-lang/ghc-typelits-natnormalise
-  tag: b4951d4d9b7307154eac0984530bf2d70bca3358
-
-source-repository-package
-  type: git
-  location: https://github.com/clash-lang/ghc-tcplugins-extra
-  tag: ac70960df5b04ec092ea189c8d34b28ab9b41695
+optional-packages: clash-cosim/clash-cosim.cabal
 
 -- Build documentation for all dependencies so we can upload docs to hackage
 -- with proper links
