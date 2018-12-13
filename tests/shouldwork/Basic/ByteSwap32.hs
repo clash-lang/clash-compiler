@@ -13,8 +13,10 @@ topEntity = byteSwap32
 testBench :: Signal System Bool
 testBench = done
   where
-    testInput      = stimuliGenerator clk rst $(listToVecTH [1::Word32,3,8,50,0])
-    expectedOutput = outputVerifier clk rst $(listToVecTH ([16777216,50331648,134217728,838860800,0]::[Word32]))
+    unswapped      =       0x01 :>       0x03 :>       0x08 :>       0x32 :> 0 :> 0x12345678 :> Nil
+    swapped        = 0x01000000 :> 0x03000000 :> 0x08000000 :> 0x32000000 :> 0 :> 0x78563412 :> Nil
+    testInput      = stimuliGenerator clk rst $ unswapped ++ swapped
+    expectedOutput = outputVerifier clk rst $ swapped ++ unswapped
     done           = expectedOutput (topEntity <$> testInput)
     clk            = tbSystemClockGen (not <$> done)
     rst            = systemResetGen
