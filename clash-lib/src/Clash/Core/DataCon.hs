@@ -25,6 +25,7 @@ where
 import Control.DeepSeq                        (NFData(..))
 import Data.Binary                            (Binary)
 import Data.Hashable                          (Hashable)
+import qualified Data.Text                    as Text
 import GHC.Generics                           (Generic)
 
 import Clash.Core.Name                        (Name (..))
@@ -37,17 +38,23 @@ import Clash.Util
 -- | Data Constructor
 data DataCon
   = MkData
-  { dcName       :: !DcName  -- ^ Name of the DataCon
-  , dcUniq       :: {-# UNPACK #-} !Unique
-  , dcTag        :: !ConTag  -- ^ Syntactical position in the type definition
-  , dcType       :: !Type    -- ^ Type of the 'DataCon
-  , dcUnivTyVars :: [TyVar]  -- ^ Universally quantified type-variables,
-                             -- these type variables are also part of the
-                             -- result type of the DataCon
-  , dcExtTyVars  :: [TyVar]  -- ^ Existentially quantified type-variables,
-                             -- these type variables are not part of the result
-                             -- of the DataCon, but only of the arguments.
-  , dcArgTys     :: [Type]   -- ^ Argument types
+  { dcName :: !DcName
+  -- ^ Name of the DataCon
+  , dcUniq :: {-# UNPACK #-} !Unique
+  , dcTag :: !ConTag
+  -- ^ Syntactical position in the type definition
+  , dcType :: !Type
+  -- ^ Type of the 'DataCon
+  , dcUnivTyVars :: [TyVar]
+  -- ^ Universally quantified type-variables, these type variables are also part
+  -- of the result type of the DataCon
+  , dcExtTyVars :: [TyVar]
+  -- ^ Existentially quantified type-variables, these type variables are not
+  -- part of the result of the DataCon, but only of the arguments.
+  , dcArgTys :: [Type]
+  -- ^ Argument types
+  , dcFieldLabels :: [Text.Text]
+  -- ^ Names of fields. Used when data constructor is referring to a record type.
   } deriving (Generic,NFData,Hashable,Binary)
 
 instance Show DataCon where

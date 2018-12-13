@@ -153,8 +153,9 @@ data HWType
   -- ^ RTree type
   | Sum           !Identifier [Identifier]
   -- ^ Sum type: Name and Constructor names
-  | Product       !Identifier [HWType]
-  -- ^ Product type: Name and field types
+  | Product       !Identifier (Maybe [Text]) [HWType]
+  -- ^ Product type: Name, field names, and field types. Field names will be
+  -- populated when using records.
   | SP            !Identifier [(Identifier,[HWType])]
   -- ^ Sum-of-Product type: Name and Constructor names + field types
   | Clock         !Identifier !Integer !ClockKind

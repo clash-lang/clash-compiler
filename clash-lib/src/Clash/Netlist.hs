@@ -686,7 +686,7 @@ mkDcApplication dstHType bndr dc args = do
           EQ -> return (HW.DataCon dstHType (DC (dstHType,dcI)) argExprs)
           LT -> error $ $(curLoc) ++ "Over-applied constructor"
           GT -> error $ $(curLoc) ++ "Under-applied constructor"
-      Product _ dcArgs ->
+      Product _ _ dcArgs ->
         case compare (length dcArgs) (length argExprs) of
           EQ -> return (HW.DataCon dstHType (DC (dstHType,0)) argExprs)
           LT -> error $ $(curLoc) ++ "Over-applied constructor"
