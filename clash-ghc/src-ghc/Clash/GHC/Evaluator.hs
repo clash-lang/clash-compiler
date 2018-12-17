@@ -37,7 +37,8 @@ import qualified Data.Vector.Primitive as Vector
 import           Debug.Trace         (trace)
 import           GHC.Float
 import           GHC.Int
-import           GHC.Integer         (decodeDoubleInteger,encodeDoubleInteger)
+import           GHC.Integer
+  (decodeDoubleInteger,encodeDoubleInteger,compareInteger)
 import           GHC.Integer.GMP.Internals (Integer (..), BigNat (..))
 #if MIN_VERSION_base(4,12,0)
 import           GHC.Natural
@@ -941,6 +942,22 @@ reduceConstant isSubj gbl tcm h k nm ty tys args = case nm of
 
   "GHC.Integer.Type.leInteger#" | Just (i,j) <- integerLiterals args
     -> reduce (boolToIntLiteral (i <= j))
+
+  "GHC.Integer.Type.compareInteger" -- :: Integer -> Integer -> Ordering
+    | [i, j] <- integerLiterals' args
+    -> let -- Get the required result type (viewed as an applied type constructor name)
+           (_,tyView -> TyConApp tupTcNm []) = splitFunForallTy ty
+           -- Find the type constructor from the name
+           (Just tupTc) = lookupUniqMap tupTcNm tcm
+           -- Get the data constructors of that type
+           -- The type is 'Ordering', so they are: 'LT', 'EQ', 'GT'
+           [ltDc, eqDc, gtDc] = tyConDataCons tupTc
+           -- Do the actual compile-time evaluation
+           ord = compareInteger i j
+    in reduce $ case ord of
+        LT -> Data ltDc
+        EQ -> Data eqDc
+        GT -> Data gtDc
 
   "GHC.Integer.Type.shiftRInteger"
     | [iV, Lit (IntLiteral j)] <- args
