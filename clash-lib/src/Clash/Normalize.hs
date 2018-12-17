@@ -18,7 +18,6 @@ import           Control.Concurrent.Supply        (Supply)
 import           Control.Lens                     ((.=),(^.),_1,_4)
 import qualified Control.Lens                     as Lens
 import           Data.Either                      (partitionEithers)
-import           Data.Coerce                      (coerce)
 import qualified Data.IntMap                      as IntMap
 import           Data.IntMap.Strict               (IntMap)
 import           Data.List
@@ -48,7 +47,7 @@ import           Clash.Core.TyCon
 import           Clash.Core.Util                  (collectArgs, mkApps, termType)
 import           Clash.Core.Var                   (Id, varName, varType)
 import           Clash.Core.VarEnv
-  (InScopeSet, VarEnv, eltsVarEnv, emptyInScopeSet, emptyVarEnv,
+  (VarEnv, eltsVarEnv, emptyInScopeSet, emptyVarEnv,
    extendVarEnv, lookupVarEnv, mapVarEnv, mapMaybeVarEnv, mkInScopeSet, mkVarEnv, mkVarSet, notElemVarEnv, notElemVarSet, nullVarEnv, unionVarEnv)
 import           Clash.Driver.Types
   (BindingMap, ClashOpts (..), DebugLevel (..))
@@ -68,8 +67,7 @@ import           Clash.Rewrite.Types
 import           Clash.Rewrite.Util               (isUntranslatableType,
                                                    runRewrite,
                                                    runRewriteSession)
-import Clash.Signal.Internal                      (ResetKind (..))
-import           Clash.Unique                     (uniqMapToUniqSet)
+import           Clash.Signal.Internal            (ResetKind (..))
 import           Clash.Util
 
 -- | Run a NormalizeSession in a given environment
@@ -252,8 +250,7 @@ cleanupGraph
   -> NormalizeSession BindingMap
 cleanupGraph topEntity norm
   | Just ct <- mkCallTree [] norm topEntity
-  = do let inScope = mkInScopeSet (uniqMapToUniqSet (mapVarEnv (coerce . Lens.view _1) norm))
-       ctFlat <- flattenCallTree inScope ct
+  = do ctFlat <- flattenCallTree ct
        return (mkVarEnv $ snd $ callTreeToList [] ctFlat)
 cleanupGraph _ norm = return norm
 
@@ -329,12 +326,12 @@ flattenNode b@(CBranch (nm,(_,_,_,e)) us) = do
       | otherwise         -> return (Left b)
 
 flattenCallTree
-  :: InScopeSet
-  -> CallTree
+  :: CallTree
   -> NormalizeSession CallTree
-flattenCallTree _ c@(CLeaf _) = return c
-flattenCallTree is (CBranch (nm,(nm',sp,inl,tm)) used) = do
-  flattenedUsed   <- mapM (flattenCallTree is) used
+flattenCallTree c@(CLeaf _) = return c
+flattenCallTree (CBranch (nm,(nm',sp,inl,tm)) used) = do
+  is <- Lens.use globalInScope
+  flattenedUsed   <- mapM flattenCallTree used
   (newUsed,il_ct) <- partitionEithers <$> mapM flattenNode flattenedUsed
   let (toInline,il_used) = unzip il_ct
       subst = extendIdSubstList (mkSubst is) toInline

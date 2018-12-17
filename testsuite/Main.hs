@@ -176,6 +176,8 @@ runClashTest =
         [ runTest ("tests" </> "shouldwork" </> "Signal") defBuild [] "AlwaysHigh"      ([""],"AlwaysHigh_topEntity",False)
         , outputTest ("tests" </> "shouldwork" </> "Signal") defBuild "BlockRamLazy"    "main"
         , runTest ("tests" </> "shouldwork" </> "Signal") defBuild [] "BlockRamFile"    (["","BlockRamFile_testBench"],"BlockRamFile_testBench",True)
+        , runTest ("tests" </> "shouldwork" </> "Signal") defBuild ["-fclash-no-prim-warn"] "GatedClock" (["gated","source","testbench"],"testbench",True)
+        , runTest ("tests" </> "shouldwork" </> "Signal") defBuild [] "GatedClockWidth"                  (["","GatedClockWidth_testBench"],"GatedClockWidth_testBench",True)
         , runTest ("tests" </> "shouldwork" </> "Signal") defBuild [] "BlockRamTest"    ([""],"BlockRamTest_topEntity",False)
         , runTest ("tests" </> "shouldwork" </> "Signal") defBuild [] "DelayedReset"    (["","DelayedReset_testBench"],"DelayedReset_testBench",True)
         , runTest ("tests" </> "shouldwork" </> "Signal") defBuild [] "MAC"             ([""],"MAC_topEntity",False)
@@ -274,4 +276,3 @@ main = do
       putStrLn $ "Cleaning up " ++ temporaryDirectory
       removeDirectoryRecursive temporaryDirectory
     )
-

@@ -251,7 +251,14 @@ genVerilog _ sp seen c = preserveSeen $ do
 mkTyPackage_ :: Identifier
              -> [HWType]
              -> SystemVerilogM [(String,Doc)]
-mkTyPackage_ modName hwtys =
+mkTyPackage_ modName hwtys = do
+    normTys <- nub <$> mapM (normaliseType) (hwtys ++ usedTys)
+    let
+      needsDec    = nubBy eqReprTy $ normTys
+      hwTysSorted = topSortHWTys needsDec
+      packageDec  = vcat $ fmap catMaybes $ mapM tyDec hwTysSorted
+      funDecs     = vcat $ fmap catMaybes $ mapM funDec hwTysSorted
+
     (:[]) A.<$> (TextS.unpack modName ++ "_types",) A.<$>
        "package" <+> modNameD <> "_types" <> semi <> line <>
          indent 2 packageDec <> line <>
@@ -260,10 +267,6 @@ mkTyPackage_ modName hwtys =
   where
     modNameD    = stringS modName
     usedTys     = concatMap mkUsedTys hwtys
-    needsDec    = nubBy eqReprTy $ (hwtys ++ usedTys)
-    hwTysSorted = topSortHWTys needsDec
-    packageDec  = vcat $ fmap catMaybes $ mapM tyDec hwTysSorted
-    funDecs     = vcat $ fmap catMaybes $ mapM funDec hwTysSorted
 
     eqReprTy :: HWType -> HWType -> Bool
     eqReprTy (Vector n ty1) (Vector m ty2)
@@ -319,6 +322,28 @@ topSortHWTys hwtys = sorted
     edge t@(SP _ ctys)     = let ti = HashMap.lookupDefault (error $ $(curLoc) ++ "SP") t nodesI
                              in concatMap (\(_,tys) -> mapMaybe (\ty -> liftM (ti,) (HashMap.lookup ty nodesI)) tys) ctys
     edge _                 = []
+
+normaliseType :: HWType -> SystemVerilogM HWType
+normaliseType (Annotated _ ty) = normaliseType ty
+normaliseType (Vector n ty)    = Vector n <$> (normaliseType ty)
+normaliseType (RTree d ty)     = RTree d <$> (normaliseType ty)
+normaliseType (Product nm lbls tys) = Product nm lbls <$> (mapM normaliseType tys)
+normaliseType ty@(SP _ elTys)      = do
+  Mon $ mapM_ ((tyCache %=) . HashSet.insert) (concatMap snd elTys)
+  return (BitVector (typeSize ty))
+normaliseType (CustomSP _ _dataRepr size elTys) = do
+  Mon $ mapM_ ((tyCache %=) . HashSet.insert) [ty | (_, _, subTys) <- elTys, ty <- subTys]
+  return (BitVector size)
+normaliseType ty@(Index _) = return (Unsigned (typeSize ty))
+normaliseType ty@(Sum _ _) = return (BitVector (typeSize ty))
+normaliseType ty@(CustomSum _ _ _ _) = return (BitVector (typeSize ty))
+normaliseType ty@(Clock _ _ Gated) =
+  return (gatedClockType ty)
+normaliseType (Clock _ _ Source) = return Bit
+normaliseType (Reset {}) = return Bit
+normaliseType (BiDirectional dir ty) = BiDirectional dir <$> normaliseType ty
+normaliseType ty = return ty
+
 
 range :: Either Int Int -> SystemVerilogM Doc
 range (Left n)  = brackets (int (n-1) <> colon <> int 0)
@@ -588,7 +613,8 @@ mkUniqueId i = do
                     return i''
 
 verilogType :: HWType -> SystemVerilogM Doc
-verilogType t = do
+verilogType t_ = do
+  t <- normaliseType t_
   Mon (tyCache %= HashSet.insert t)
   let logicOrWire | isBiSignalIn t = "wire"
                   | otherwise      = "logic"
@@ -604,7 +630,7 @@ verilogType t = do
       stringS nm <> "_types::" <> tyName t
     Signed n      -> logicOrWire <+> "signed" <+> brackets (int (n-1) <> colon <> int 0)
     Clock _ _ Gated -> verilogType (gatedClockType t)
-    Clock {}      -> "logic"
+    Clock _ _ Source-> "logic"
     Reset {}      -> "logic"
     Bit           -> "logic"
     Bool          -> "logic"
@@ -616,7 +642,8 @@ sigDecl d t = verilogType t <+> d
 
 -- | Convert a Netlist HWType to the root of a Verilog type
 verilogTypeMark :: HWType -> SystemVerilogM Doc
-verilogTypeMark t = do
+verilogTypeMark t_ = do
+  t <- normaliseType t_
   Mon (tyCache %= HashSet.insert t)
   nm <- Mon $ use modNm
   let m = tyName t
@@ -638,7 +665,9 @@ tyName (Unsigned n)          = "logic_vector_" <> int n
 tyName t@(Sum _ _)           = "logic_vector_" <> int (typeSize t)
 tyName t@(CustomSum _ _ _ _) = "logic_vector_" <> int (typeSize t)
 tyName t@(CustomSP _ _ _ _)  = "logic_vector_" <> int (typeSize t)
-tyName t@(Product nm _ _)    = Mon (makeCached t nameCache prodName)
+tyName t@(Product nm _ _)      = do
+  tN <- normaliseType t
+  Mon (makeCached tN nameCache prodName)
   where
     prodName = do
       seen <- use tySeen
@@ -660,7 +689,7 @@ tyName t@(Product nm _ _)    = Mon (makeCached t nameCache prodName)
              else n'
 tyName t@(SP _ _)  = "logic_vector_" <> int (typeSize t)
 tyName t@(Clock _ _ Gated) = tyName (gatedClockType t)
-tyName (Clock {})  = "logic"
+tyName (Clock _ _ Source)  = "logic"
 tyName (Reset {})  = "logic"
 tyName t =  error $ $(curLoc) ++ "tyName: " ++ show t
 
@@ -895,10 +924,8 @@ expr_ _ (Identifier id_ (Just (Indexed (ty@(Product _ _ tys),_,fI)))) = do
   simpleFromSLV (tys !! fI) id'
 
 expr_ _ (Identifier id_ (Just (Indexed (ty@(Clock _ _ Gated),_,fI)))) = do
-  let tys = [Bit, Bool]
-      ty' = gatedClockType ty
-  id'<- fmap (Text.toStrict . renderOneLine) (stringS id_ <> dot <> tyName ty' <> "_sel" <> int fI)
-  simpleFromSLV (tys !! fI) id'
+  ty' <- normaliseType ty
+  stringS =<< fmap (Text.toStrict . renderOneLine) (stringS id_ <> dot <> tyName ty' <> "_sel" <> int fI)
 
 expr_ _ (Identifier id_ (Just (Indexed ((Vector _ elTy),1,0)))) = do
   id' <- fmap (Text.toStrict . renderOneLine) (stringS id_ <> brackets (int 0))
@@ -1193,6 +1220,6 @@ punctuate' s d = vcat (punctuate s d) <> s
 
 encodingNote :: HWType -> SystemVerilogM Doc
 encodingNote (Clock _ _ Gated) = "// gated clock"
-encodingNote (Clock {})        = "// clock"
+encodingNote (Clock _ _ Source)= "// clock"
 encodingNote (Reset {})        = "// asynchronous reset: active high"
 encodingNote _                 = emptyDoc

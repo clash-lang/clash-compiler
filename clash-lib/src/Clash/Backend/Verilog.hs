@@ -19,6 +19,7 @@
 module Clash.Backend.Verilog
   ( VerilogState
   , include
+  , encodingNote
   , exprLit
   , bits
   , bit_char
@@ -870,6 +871,6 @@ punctuate' s d = vcat (punctuate s d) <> s
 
 encodingNote :: HWType -> VerilogM Doc
 encodingNote (Clock _ _ Gated) = "// gated clock"
-encodingNote (Clock {})        = "// clock"
+encodingNote (Clock _ _ Source)= "// clock"
 encodingNote (Reset {})        = "// asynchronous reset: active high"
 encodingNote _                 = emptyDoc

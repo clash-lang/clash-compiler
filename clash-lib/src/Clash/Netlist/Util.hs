@@ -381,7 +381,8 @@ typeSize (Void {}) = 0
 typeSize String = 1
 typeSize Bool = 1
 typeSize Bit = 1
-typeSize (Clock {}) = 1
+typeSize (Clock _ _ Source) = 1
+typeSize (Clock _ _ Gated)  = 2
 typeSize (Reset {}) = 1
 typeSize (BitVector i) = i
 typeSize (Index 0) = 0
@@ -823,9 +824,8 @@ mkInput pM = case pM of
                   else
                     throwAnnotatedSplitError $(curLoc) "Product"
 
-        Clock nm rt Gated -> do
-          let hwtys = [Clock nm rt Source,Bool]
-          arguments <- zipWithM appendIdentifier (map (i',) hwtys) [0..]
+        Clock _ _ Gated -> do
+          arguments <- splitGatedClock i' hwty
           (ports,_,exprs,_) <- unzip4 <$> mapM (mkInput Nothing) arguments
           let netdecl  = NetDecl Nothing i' hwty
               dcExpr   = DataCon hwty (DC (hwty,0)) exprs
@@ -890,9 +890,8 @@ mkInput pM = case pM of
                      else
                        throwAnnotatedSplitError $(curLoc) "Product"
 
-        Clock nm rt Gated -> do
-          let hwtys = [Clock nm rt Source, Bool]
-          arguments <- zipWithM appendIdentifier (map (pN,) hwtys) [0..]
+        Clock _ _ Gated -> do
+          arguments <- splitGatedClock pN hwty
           (ports,_,exprs,_) <- unzip4 <$> zipWithM mkInput (extendPorts $ map (prefixParent p) ps) arguments
           let netdecl  = NetDecl Nothing pN hwty
               dcExpr   = DataCon hwty (DC (hwty,0)) exprs
@@ -1052,6 +1051,13 @@ mkOutput' pM = case pM of
                   else
                     throwAnnotatedSplitError $(curLoc) "Product"
 
+        Clock _ _ Gated -> do
+          results <- splitGatedClock o' hwty
+          (ports,decls,ids) <- unzip3 <$> mapM (mkOutput' Nothing) results
+          let netdecl = NetDecl Nothing o' hwty
+              assigns = zipWith (assignId o' hwty 0) ids [0..]
+          return (concat ports,netdecl:assigns ++ concat decls,o')
+
         _ -> return ([(o',hwty)],[],o')
 
     go' (PortName p) (o,hwty) = do
@@ -1100,6 +1106,14 @@ mkOutput' pM = case pM of
                          return (concat ports,netdecl:assigns ++ concat decls,pN)
                        else
                          throwAnnotatedSplitError $(curLoc) "Product"
+
+        Clock _ _ Gated -> do
+          results <- splitGatedClock pN hwty
+          let resultsBundled   = (extendPorts $ map (prefixParent p) ps, results)
+          (ports,decls,ids) <- unzip3 <$> uncurry (zipWithM mkOutput') resultsBundled
+          let netdecl = NetDecl Nothing pN hwty
+              assigns = zipWith (assignId pN hwty 0) ids [0..]
+          return (concat ports,netdecl:assigns ++ concat decls,pN)
 
         _ -> return ([(pN,hwty)],[],pN)
 
@@ -1289,9 +1303,8 @@ mkTopInput topM inps pM = case pM of
           else
             throwAnnotatedSplitError $(curLoc) "Product"
 
-        Clock nm rt Gated -> do
-          let hwtys = [Clock nm rt Source,Bool]
-          arguments <- zipWithM appendIdentifier (map (i,) hwtys) [0..]
+        Clock _ _ Gated -> do
+          arguments <- splitGatedClock i' hwty
           (inps'',arguments1) <- mapAccumLM go inps' arguments
           let (ports,decls,ids) = unzip3 arguments1
               assigns = zipWith (argBV topM) ids
@@ -1360,9 +1373,8 @@ mkTopInput topM inps pM = case pM of
           else
             throwAnnotatedSplitError $(curLoc) "Product"
 
-        Clock nm rt Gated -> do
-          let hwtys = [Clock nm rt Source,Bool]
-          arguments <- zipWithM appendIdentifier (map (pN',) hwtys) [0..]
+        Clock _ _ Gated -> do
+          arguments <- splitGatedClock pN' hwty
           (inps'',arguments1) <-
             mapAccumLM (\acc (p',o') -> mkTopInput topM acc p' o') inps'
                        (zip (extendPorts ps) arguments)
@@ -1478,6 +1490,17 @@ mkTopOutput' topM outps pM = case pM of
           else
             throwAnnotatedSplitError $(curLoc) "Product"
 
+        Clock _ _ Gated -> do
+          results <- splitGatedClock o' hwty
+          (outps'',results1) <- mapAccumLM go outps' results
+          let (ports,decls,ids) = unzip3 results1
+              ids' = map (resBV topM) ids
+              netassgn = Assignment o' (DataCon hwty (DC (hwty,0)) ids')
+          if null attrs then
+            return (outps'', (concat ports,oDecl:netassgn:concat decls,Left o'))
+          else
+            throwAnnotatedSplitError $(curLoc) $ show hwty
+
         _ -> return (rest,([(oN,o',hwty)],[oDecl],Left o'))
 
     go [] _ = error "This shouldn't happen"
@@ -1536,6 +1559,17 @@ mkTopOutput' topM outps pM = case pM of
           else
             throwAnnotatedSplitError $(curLoc) "Product"
 
+        Clock _ _ Gated -> do
+          results <- splitGatedClock pN hwty
+          (outps'',results1) <- mapAccumLM go outps' results
+          let (ports,decls,ids) = unzip3 results1
+              ids' = map (resBV topM) ids
+              netassgn = Assignment pN' (DataCon hwty (DC (hwty,0)) ids')
+          if null attrs then
+            return (outps'', (concat ports,pDecl:netassgn:concat decls,Left pN'))
+          else
+            throwAnnotatedSplitError $(curLoc) $ show hwty
+
         _ -> return (tail outps',([(pN,pN',hwty)],[pDecl],Left pN'))
 
 concatPortDecls3
@@ -1592,3 +1626,13 @@ nestM (Indexed (RTree (-1) t1,l,_)) (Indexed (RTree d t2,10,k))
   = Just (Indexed (RTree d t1,10,l+k))
 
 nestM _ _ = Nothing
+
+
+splitGatedClock :: Identifier -> HWType -> NetlistMonad [(Identifier,HWType)]
+splitGatedClock baseNm (Clock nm rt Gated) = do
+  hwnms <- mapM (extendIdentifier Basic baseNm) partNms
+  return $ zip hwnms hwtys
+  where
+    hwtys = [Clock nm rt Source,Bool]
+    partNms = ["_clk","_clken"]
+splitGatedClock _ ty = error $ $(curLoc) ++ "splitGatedClock can't split: " ++ show ty

@@ -386,8 +386,7 @@ mkUsedTys hwty = hwty : case hwty of
   CustomSP _ _ _ tys0 ->
     let tys1 = concat [tys | (_repr, _id, tys) <- tys0] in
     concatMap mkUsedTys tys1
-  Clock _ _ Gated ->
-    [normaliseType hwty]
+  Clock _ _ Gated      -> mkUsedTys (normaliseType hwty)
   _ ->
     []
 
