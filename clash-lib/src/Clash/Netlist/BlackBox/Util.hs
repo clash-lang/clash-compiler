@@ -665,9 +665,9 @@ prettyElem (IF b esT esF) = do
      string "~ELSE" <>
      string esF' <>
      string "~FI")
-prettyElem (And es) =
-  (renderLazy . layoutCompact) <$>
-  (brackets (tupled $ mapM (string <=< prettyElem) es))
+prettyElem (And es) = renderOneLine <$>
+  (string "~AND" <>
+  (brackets (hcat (punctuate comma (mapM (string <=< prettyElem) es)))))
 prettyElem IW64 = return "~IW64"
 prettyElem (HdlSyn s) = case s of
   Vivado -> return "~VIVADO"

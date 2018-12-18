@@ -251,6 +251,7 @@ runClashTest =
         , runTest ("tests" </> "shouldwork" </> "Vector") defBuild [] "VZip"       ([""],"VZip_topEntity",False)
         , runTest ("tests" </> "shouldwork" </> "Vector") defBuild [] "VecConst"   ([""],"VecConst_topEntity",False)
         , runTest ("tests" </> "shouldwork" </> "Vector") defBuild [] "VecOfSum"   ([""],"VecOfSum_topEntity",False)
+        , runTest ("tests" </> "shouldwork" </> "Vector") defBuild [] "T452"       ([""],"T452_topEntity",False)
         ]
       ]
     ]
