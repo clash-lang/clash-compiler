@@ -375,7 +375,7 @@ instance GShowX UWord where
 class Undefined a where
   -- | Create a value where all the elements have an 'errorX', but the spine
   -- is defined.
-  deepErrorX :: String -> a
+  deepErrorX :: HasCallStack => String -> a
 
   default deepErrorX :: (Generic a, GUndefined (Rep a)) => String -> a
   deepErrorX = to . gDeepErrorX
