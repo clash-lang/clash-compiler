@@ -4,6 +4,11 @@ image: leonschoorl/clash-ci-image:trusty
   variables:
     GIT_SUBMODULE_STRATEGY: recursive
     TERM: xterm-color
+  retry:
+    max: 2
+    when:
+      - runner_system_failure
+      - stuck_or_timeout_failure
   cache:
     key: cabal-store-$CI_JOB_NAME
     paths:

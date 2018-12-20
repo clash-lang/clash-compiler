@@ -2,6 +2,7 @@
 module Main (main) where
 
 import Control.Exception (finally)
+import Data.List (isSuffixOf)
 import System.Directory (createDirectoryIfMissing, removeDirectoryRecursive)
 import System.Process (readCreateProcessWithExitCode, proc)
 import GHC.Conc (numCapabilities)
@@ -11,6 +12,7 @@ import Test.Tasty.Clash
 
 import System.FilePath ((</>))
 import System.Environment (setEnv)
+import System.Exit (exitWith, ExitCode(ExitSuccess, ExitFailure))
 
 defBuild :: [BuildTarget]
 #ifdef TRAVISBUILD
@@ -256,24 +258,43 @@ runClashTest =
       ]
     ]
 
-
 main :: IO ()
 main = do
-  -- Make sure Clash is compiled before we run 'cabal new-run clash' in
-  -- sixteen different threads
-  putStrLn $ "Making sure Clash is compiled.."
-  let cp = proc "cabal" ["new-run", "clash"]
-  _ <- readCreateProcessWithExitCode cp ""
-
-  putStrLn $ "Default number of threads: " ++ show numCapabilities
-  setEnv "TASTY_NUM_THREADS" (show numCapabilities)
+  _ <- mapM (uncurry setEnv) [ ("clash_ghc_datadir", "./clash-ghc")
+                             , ("clash_lib_datadir", "./clash-lib")
+                             , ("clash_prelude_datadir", "./clash-prelude")
+                             , ("clash_testsuite_datadir", "./testsuite")
+                             ]
 
   putStrLn $ "Running in " ++ temporaryDirectory
   createDirectoryIfMissing True temporaryDirectory
 
-  finally
-    runClashTest
-    (do
-      putStrLn $ "Cleaning up " ++ temporaryDirectory
-      removeDirectoryRecursive temporaryDirectory
-    )
+  putStrLn $ "Making sure Clash is compiled.. "
+  let flag = "--help"
+  let cp = proc "cabal" ["--write-ghc-environment-files=always", "-v2", "new-run", "--", "clash", flag]
+  (exitCode, stdout, stderr) <- readCreateProcessWithExitCode cp ""
+
+  case exitCode of
+    ExitSuccess -> do
+      -- Execute test with found clash binary
+      let cmd0 = head $ filter (isSuffixOf ("clash " ++ flag)) $ lines stdout
+      let cmd1 = take (length cmd0 - (length flag + 1)) cmd0
+      setEnv "clash_bin" cmd1
+
+      putStrLn $ "Default number of threads: " ++ show numCapabilities
+      setEnv "TASTY_NUM_THREADS" (show numCapabilities)
+
+      finally
+        runClashTest
+        (do
+          putStrLn $ "Cleaning up " ++ temporaryDirectory
+          removeDirectoryRecursive temporaryDirectory
+        )
+    ExitFailure _ -> do
+      -- Building clash failed
+      putStrLn "'cabal new-run clash' failed"
+      putStrLn ">>> stdout:"
+      putStrLn stdout
+      putStrLn ">>> stderr:"
+      putStrLn stderr
+      exitWith exitCode
