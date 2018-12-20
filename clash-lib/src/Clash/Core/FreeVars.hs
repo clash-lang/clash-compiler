@@ -89,14 +89,20 @@ typeFreeVars'
   -> f Type
 typeFreeVars' interesting is f = go is where
   go inScope = \case
-    VarTy tv
-      | interesting tv
-      , varUniq tv `IntSet.notMember` inScope
-      -> VarTy . coerce <$> f (coerce tv) <*
-         go IntSet.empty -- See Note [Closing over kind variables]
-            (varType tv)
-      | otherwise
-      -> pure (VarTy tv)
+    VarTy tv -> tv1 <* go inScope1 (varType tv)
+      where
+        isInteresting = interesting tv
+        tvInScope     = varUniq tv `IntSet.member` inScope
+        inScope1
+          | tvInScope = inScope
+          | otherwise = IntSet.empty -- See Note [Closing over type variables]
+
+        tv1 | isInteresting
+            , not tvInScope
+            = VarTy . coerce <$> f (coerce tv)
+            | otherwise
+            = pure (VarTy tv)
+
     ForAllTy tv ty -> ForAllTy <$> goBndr inScope tv
                                <*> go (IntSet.insert (varUniq tv) inScope) ty
     AppTy l r -> AppTy <$> go inScope l <*> go inScope r
@@ -196,16 +202,20 @@ termFreeVars'
   -> f Term
 termFreeVars' interesting f = go IntSet.empty where
   go inScope = \case
-    Var v
-      | interesting v
-      , varUniq v `IntSet.notMember` inScope
-      -> Var . coerce <$> (f (coerce v)) <*
-         typeFreeVars' interesting
-                       IntSet.empty -- See Note [Closing over type variables]
-                       f
-                       (varType v)
-      | otherwise
-      -> pure (Var v)
+    Var v -> v1 <* typeFreeVars' interesting inScope1 f (varType v)
+      where
+        isInteresting = interesting v
+        vInScope      = varUniq v `IntSet.member` inScope
+        inScope1
+          | vInScope  = inScope
+          | otherwise = IntSet.empty -- See Note [Closing over type variables]
+
+        v1 | isInteresting
+           , not vInScope
+           = Var . coerce <$> f (coerce v)
+           | otherwise
+           = pure (Var v)
+
     Lam id_ tm -> Lam <$> goBndr inScope id_
                       <*> go (IntSet.insert (varUniq id_) inScope) tm
     TyLam tv tm -> TyLam <$> goBndr inScope tv
