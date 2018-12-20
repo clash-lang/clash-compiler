@@ -438,7 +438,9 @@ reduceTypeFamily tcm (tyView -> TyConApp tc tys)
 
   | nameUniq tc == getKey typeNatSubTyFamNameKey
   , [i1, i2] <- mapMaybe (litView tcm) tys
-  = Just (LitTy (NumTy (i1 - i2)))
+  , let z = i1 - i2
+  , z >= 0
+  = Just (LitTy (NumTy z))
 
   | nameUniq tc == getKey typeNatLeqTyFamNameKey
   , [i1, i2] <- mapMaybe (litView tcm) tys
