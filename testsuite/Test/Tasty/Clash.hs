@@ -5,6 +5,7 @@ import qualified Data.List                 as List
 import           Data.List                 (intercalate)
 import qualified Data.Text                 as T
 import qualified System.Directory          as Directory
+import           System.Environment        (getEnv)
 import           System.FilePath           ((</>),(<.>))
 import           System.IO.Unsafe          (unsafePerformIO)
 import           System.IO.Temp            (createTempDirectory)
@@ -34,6 +35,11 @@ temporaryDirectory = unsafePerformIO $ do
   tmpDir' <- createTempDirectory tmpDir "clash-test-"
   return tmpDir'
 {-# NOINLINE temporaryDirectory #-}
+
+-- | Directory to install Clash binary in
+clashBin :: String
+clashBin = unsafePerformIO (getEnv "clash_bin")
+{-# NOINLINE clashBin #-}
 
 -- | Given the module name of test, provide the test directory it is running in
 testDirectory
@@ -118,7 +124,7 @@ clashCmd
   -> (String, [String])
   -- ^ (command, arguments)
 clashCmd target sourceDir extraArgs modName oDir =
-  ("cabal", ["new-run", "clash", "--"] ++ args)
+  (clashBin, args)
     where
       args = concat [
           [target']
@@ -543,6 +549,7 @@ outputTest' env target modName funcName path =
     -- Also update @Clash.GHC.LoadModules.wantedLanguagesExtensions@ when
     -- updating this list!
       args = [ "new-exec"
+             , "--write-ghc-environment-files=never"
              , "--"
              , "runghc"
              , "-XBinaryLiterals"
