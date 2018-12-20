@@ -43,7 +43,7 @@ import           SrcLoc                      (SrcSpan)
 
 import           Clash.Core.DataCon          (dataConInstArgTys)
 import           Clash.Core.FreeVars
-  (idDoesNotOccurIn, idOccursIn, termFreeTyVars, typeFreeVars, termFreeVars')
+  (idDoesNotOccurIn, idOccursIn, typeFreeVars, termFreeVars')
 import           Clash.Core.Name
 import           Clash.Core.Pretty           (showPpr)
 import           Clash.Core.Subst
@@ -93,20 +93,18 @@ apply name rewrite ctx expr = do
   Monad.when (lvl > DebugNone && hasChanged) $ do
     tcm                  <- Lens.view tcCache
     let beforeTy         = termType tcm expr
-    let beforeFTV        = Lens.setOf termFreeTyVars expr
-    beforeFV             <- Lens.setOf <$> localFreeIds <*> pure expr
+    beforeFV             <- Lens.setOf <$> localFreeVars <*> pure expr
     let afterTy          = termType tcm expr'
-    let afterFTV         = Lens.setOf termFreeTyVars expr
-    afterFV              <- Lens.setOf <$> localFreeIds <*> pure expr'
-    let newFV = Set.size afterFTV > Set.size beforeFTV ||
-                Set.size afterFV > Set.size beforeFV
+    afterFV              <- Lens.setOf <$> localFreeVars <*> pure expr'
+    let newFV = not (afterFV `Set.isSubsetOf` beforeFV)
     Monad.when newFV $
             error ( concat [ $(curLoc)
                            , "Error when applying rewrite ", name
                            , " to:\n" , before
                            , "\nResult:\n" ++ after ++ "\n"
-                           , "Changes free variables from: ", show (beforeFTV,beforeFV)
-                           , "\nto: ", show (afterFTV,afterFV)
+                           , "It introduces free variables."
+                           , "\nBefore: " ++ showPpr (Set.toList beforeFV)
+                           , "\nAfter: " ++ showPpr (Set.toList afterFV)
                            ]
                   )
     traceIf (lvl >= DebugAll && (beforeTy `aeqType` afterTy))
@@ -315,8 +313,8 @@ substituteBinders inScope ((bndr,val):rest) others res =
          , map (second (substTm "substituteBindersOthers" subst)) others
          )
 
--- | Calculate the /local/ free variable of an expression: the free variables
--- that are not bound in the global environment.
+-- | Calculate the /local/ free identifiers of an expression: the free
+-- identifiers that are not bound in the global environment.
 localFreeIds :: (Applicative f, Lens.Contravariant f)
              => RewriteMonad extra ((Id -> f Id) -> Term -> f Term)
 localFreeIds = do
@@ -324,7 +322,18 @@ localFreeIds = do
   let f i@(Id {}) = i `notElemUniqMap` globalBndrs
       f _         = False
   return (termFreeVars' f)
-  -- return ((termFreeIds . Lens.filtered (not . (`HML.member` globalBndrs))))
+
+-- | Calculate the /local/ free variable of an expression: the free type
+-- variables and the free identifiers that are not bound in the global
+-- environment.
+localFreeVars
+  :: (Applicative f, Lens.Contravariant f)
+  => RewriteMonad extra (((Var a) -> f (Var a)) -> Term -> f Term)
+localFreeVars = do
+  globalBndrs <- Lens.use bindings
+  let f i@(Id {}) = i `notElemUniqMap` globalBndrs
+      f _         = True
+  return (termFreeVars' f)
 
 inlineOrLiftBinders
   :: (LetBinding -> RewriteMonad extra Bool)
