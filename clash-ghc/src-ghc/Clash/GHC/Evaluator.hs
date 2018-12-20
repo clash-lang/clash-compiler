@@ -953,8 +953,8 @@ reduceConstant isSubj gbl tcm h k nm ty tys args = case nm of
            -- The type is 'Ordering', so they are: 'LT', 'EQ', 'GT'
            [ltDc, eqDc, gtDc] = tyConDataCons tupTc
            -- Do the actual compile-time evaluation
-           ord = compareInteger i j
-    in reduce $ case ord of
+           ordVal = compareInteger i j
+    in reduce $ case ordVal of
         LT -> Data ltDc
         EQ -> Data eqDc
         GT -> Data gtDc
