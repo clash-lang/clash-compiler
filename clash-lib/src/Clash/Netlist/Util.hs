@@ -310,15 +310,27 @@ mkADT builtInTranslation reprs m _tyString keepVoid tc args = case tyConDataCons
     let tcName       = nameOcc tc
         substArgTyss = map substArgTys dcs
     argHTyss         <- mapM (mapM (coreTypeToHWType builtInTranslation reprs m keepVoid)) substArgTyss
+    let areNotVoids0 = map (\tys -> zip (map (not . isVoid) tys) tys) argHTyss
     let argHTyss1    = if keepVoid
                           then argHTyss
-                          else map (filter (not . isVoid)) argHTyss
+                          else map (map snd) (map (filter fst) areNotVoids0)
     case (dcs,argHTyss1) of
       (_:[],[[elemTy]]) ->
         return elemTy
 
-      ([dcFieldLabels -> labels],[elemTys@(_:_)]) ->
-        let labelsM = if null labels then Nothing else Just labels in
+      ([dcFieldLabels -> labels0],[elemTys@(_:_)]) -> do
+        labelsM <-
+          if null labels0 then
+            return Nothing
+          else if not keepVoid then
+            -- Filter out labels belonging to arguments filtered due to keepVoid
+            -- being true. See argHTyss1.
+            let areNotVoids1 = map fst (head areNotVoids0) in
+            let labels1      = filter fst (zip areNotVoids1 labels0) in
+            let labels2      = map snd labels1 in
+            return (Just labels2)
+          else
+            return (Just labels0)
         return (Product tcName labelsM elemTys)
 
       (_   ,concat -> [])
