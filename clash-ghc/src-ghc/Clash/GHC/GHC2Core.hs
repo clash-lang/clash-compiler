@@ -312,7 +312,8 @@ coreToTerm primMap unlocs srcsp coreExpr = Reader.runReaderT (term coreExpr) src
       e'   <- term e
       return (C.Letrec xes' e')
 
-    term' (Case _ _ ty [])  = C.Prim (pack "EmptyCase") <$> lift (coreToType ty)
+    term' (Case _ _ ty [])  = C.TyApp (C.Prim (pack "EmptyCase") C.undefinedTy)
+                                <$> lift (coreToType ty)
     term' (Case e b ty alts) = do
      let usesBndr = any ( not . isEmptyVarSet . exprSomeFreeVars (== b))
                   $ rhssOfAlts alts
