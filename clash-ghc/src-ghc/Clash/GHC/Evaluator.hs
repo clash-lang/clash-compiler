@@ -2280,7 +2280,8 @@ reduceConstant isSubj gbl tcm h k nm ty tys args = case nm of
     , Right m <- runExcept (tyNatSize tcm mTy)
     -> let _:nTy:aTy:_ = tys
            -- Get the tuple data-constructor
-           (_,tyView -> TyConApp tupTcNm tyArgs) = splitFunForallTy ty
+           ty1 = piResultTys tcm ty tys
+           (_,tyView -> TyConApp tupTcNm tyArgs) = splitFunForallTy ty1
            (Just tupTc)       = lookupUniqMap tupTcNm tcm
            [tupDc]            = tyConDataCons tupTc
            -- Get the vector data-constructors
@@ -2300,7 +2301,7 @@ reduceConstant isSubj gbl tcm h k nm ty tys args = case nm of
                    ]
            -- Projection either the first or second field of the recursive
            -- call to @splitAt@
-           splitAtSelR v = Case (splitAtRec v) (last tyArgs)
+           splitAtSelR v = Case (splitAtRec v)
            m1VecTy = mkTyConApp vecTcNm [LitTy (NumTy (m-1)),aTy]
            nVecTy  = mkTyConApp vecTcNm [nTy,aTy]
            -- Guaranteed no capture, so okay to use unsafe name generation
@@ -2325,8 +2326,8 @@ reduceConstant isSubj gbl tcm h k nm ty tys args = case nm of
             -> reduce $
                mkApps (Data tupDc) $ (map Right tyArgs) ++
                  [ Left (mkVecCons consCon aTy m' (Either.lefts vArgs !! 1)
-                           (splitAtSelR (Either.lefts vArgs !! 2) [lAlt]))
-                 , Left (splitAtSelR (Either.lefts vArgs !! 2) [rAlt])
+                           (splitAtSelR (Either.lefts vArgs !! 2) m1VecTy [lAlt]))
+                 , Left (splitAtSelR (Either.lefts vArgs !! 2) nVecTy [rAlt])
                  ]
          -- v doesn't reduce to a data-constructor
          _  -> Nothing
@@ -2770,7 +2771,8 @@ reduceConstant isSubj gbl tcm h k nm ty tys args = case nm of
     , mTy : nTy : aTy : _ <- tys
     , Right m <- runExcept (tyNatSize tcm mTy)
     -> let -- Get the tuple data-constructor
-           (_,tyView -> TyConApp tupTcNm tyArgs) = splitFunForallTy ty
+           ty1 = piResultTys tcm ty tys
+           (_,tyView -> TyConApp tupTcNm tyArgs) = splitFunForallTy ty1
            (Just tupTc)       = lookupUniqMap tupTcNm tcm
            [tupDc]            = tyConDataCons tupTc
            -- Get the vector data-constructors
@@ -2788,7 +2790,7 @@ reduceConstant isSubj gbl tcm h k nm ty tys args = case nm of
                    ]
            -- Projection either the first or second field of the recursive
            -- call to @splitAt@
-           splitAtSelR v = Case (splitAtRec v) (last tyArgs)
+           splitAtSelR v = Case (splitAtRec v)
            m1VecTy = mkTyConApp vecTcNm [LitTy (NumTy (m-1)),aTy]
            nVecTy  = mkTyConApp vecTcNm [nTy,aTy]
            -- Guaranteed no capture, so okay to use unsafe name generation
@@ -2812,8 +2814,8 @@ reduceConstant isSubj gbl tcm h k nm ty tys args = case nm of
             -> reduce $
                mkApps (Data tupDc) $ (map Right tyArgs) ++
                  [ Left (mkVecCons consCon aTy m' (Either.lefts vArgs !! 1)
-                           (splitAtSelR (Either.lefts vArgs !! 2) [lAlt]))
-                 , Left (splitAtSelR (Either.lefts vArgs !! 2) [rAlt])
+                           (splitAtSelR (Either.lefts vArgs !! 2) m1VecTy [lAlt]))
+                 , Left (splitAtSelR (Either.lefts vArgs !! 2) nVecTy [rAlt])
                  ]
          -- v doesn't reduce to a data-constructor
          _  -> Nothing
