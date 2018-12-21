@@ -515,7 +515,7 @@ tyDec hwty = do
     BiDirectional _ ty -> tyDec ty
     Annotated _ ty -> tyDec ty
 
-    Void {} -> error $ $(curLoc) ++ "[CLASH BUG] Void encountered in VHDL backend"
+    Void {} -> emptyDoc
 
     _ -> error $ $(curLoc) ++ show hwty
 
@@ -1004,7 +1004,8 @@ tyName'
 tyName' rec0 (filterTransparent -> t) = do
   Mon (tyCache %= HashSet.insert t)
   case t of
-    Void _        -> error $ $(curLoc) ++ "?"
+    Void _ ->
+      return (error ($(curLoc) ++ "[CLASH BUG] Forced to print Void tyName"))
     Bool          -> return "boolean"
     Signed n      ->
       let app = if rec0 then ["_", showt n] else [] in
@@ -1060,7 +1061,7 @@ tyName' rec0 (filterTransparent -> t) = do
 -- eventually will be represented in VHDL.
 normaliseType :: HWType -> HWType
 normaliseType hwty = case hwty of
-  Void {} -> error $ $(curLoc) ++ "[CLASH BUG] Void encountered in VHDL backend"
+  Void {} -> hwty
 
   -- Base types:
   Bool          -> hwty
@@ -1124,7 +1125,7 @@ filterTransparent hwty = case hwty of
   Annotated _ elTy -> elTy
   BiDirectional _ elTy -> elTy
 
-  Void {} -> error $ $(curLoc) ++ "[CLASH BUG] Void encountered in VHDL backend"
+  Void {} -> hwty
 
 -- | Create a unique type name for user defined types
 userTyName
@@ -1173,7 +1174,8 @@ sizedQualTyNameErrValue t@(Product _ _ elTys) =
 sizedQualTyNameErrValue (Reset {})          = "'-'"
 sizedQualTyNameErrValue (Clock _ _ Source)  = "'-'"
 sizedQualTyNameErrValue (Clock _ _ Gated)   = "('-',false)"
-sizedQualTyNameErrValue (Void {})           = "std_logic_vector'(0 downto 1 => '-')"
+sizedQualTyNameErrValue (Void {})           =
+  return (error ($(curLoc) ++ "[CLASH BUG] Forced to print Void error value"))
 sizedQualTyNameErrValue String              = "\"ERROR\""
 sizedQualTyNameErrValue t =
   qualTyName t <> "'" <> parens (int 0 <+> "to" <+> int (typeSize t - 1) <+> rarrow <+> "'-'")
