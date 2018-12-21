@@ -49,6 +49,7 @@ import           Data.Coerce                      (coerce)
 import qualified Data.Either                      as Either
 import qualified Data.Foldable                    as Foldable
 import qualified Data.IntMap.Strict               as IM
+import qualified Data.IntSet                      as IntSet
 import qualified Data.List                        as List
 import qualified Data.Map.Strict                  as Map
 import qualified Data.Maybe                       as Maybe
@@ -58,15 +59,14 @@ import           Data.Monoid                      (All (..))
 import Clash.Core.DataCon    (DataCon, dcTag)
 import Clash.Core.Evaluator  (whnf')
 import Clash.Core.FreeVars
-  (termFreeVars', noFreeVarsOfType, varsDoNotOccurIn)
+  (termFreeVars', typeFreeVars', varsDoNotOccurIn)
 import Clash.Core.Literal    (Literal (..))
 import Clash.Core.Term       (LetBinding, Pat (..), Term (..))
 import Clash.Core.TyCon      (tyConDataCons)
 import Clash.Core.Type       (Type, isPolyFunTy, mkTyConApp, splitFunForallTy)
 import Clash.Core.Util       (collectArgs, mkApps, patIds, termType)
-import Clash.Core.Var        (Var (..))
 import Clash.Core.VarEnv
-  (InScopeSet, VarSet, elemInScopeSet, notElemVarSet)
+  (InScopeSet, elemInScopeSet, notElemInScopeSet)
 import Clash.Normalize.Types (NormalizeState)
 import Clash.Normalize.Util  (isConstant)
 import Clash.Rewrite.Types
@@ -253,52 +253,53 @@ collectGlobalsLbs inScope substitution seen lbs = do
 
 -- | Given a case-tree corresponding to a disjoint interesting \"term-in-a-
 -- function-position\", return a let-expression: where the let-binding holds
--- a case-expression selecting between the uncommon arguments of the case-tree,
--- and the body is an application of the term applied to the common arguments of
--- the case tree, and projections of let-binding corresponding to the uncommon
+-- a case-expression selecting between the distinct arguments of the case-tree,
+-- and the body is an application of the term applied to the shared arguments of
+-- the case tree, and projections of let-binding corresponding to the distinct
 -- argument positions.
 mkDisjointGroup
   :: InScopeSet
-  -> VarSet -- ^ Current free variables.
+  -- ^ Variables in scope at the very top of the case-tree, i.e., the original
+  -- expression
   -> (Term,([Term],CaseTree [(Either Term Type)]))
-     -- ^ Case-tree of arguments belonging to the applied term.
+  -- ^ Case-tree of arguments belonging to the applied term.
   -> RewriteMonad NormalizeState (Term,[Term])
-mkDisjointGroup inScope fvs (fun,(seen,cs)) = do
+mkDisjointGroup inScope (fun,(seen,cs)) = do
     let argss    = Foldable.toList cs
         argssT   = zip [0..] (List.transpose argss)
-        (commonT,uncommonT) = List.partition (isCommon fvs . snd) argssT
-        common   = map (second head) commonT
-        uncommon = map (Either.lefts) (List.transpose (map snd uncommonT))
+        (sharedT,distinctT) = List.partition (areShared inScope . snd) argssT
+        shared   = map (second head) sharedT
+        distinct = map (Either.lefts) (List.transpose (map snd distinctT))
         cs'      = fmap (zip [0..]) cs
         cs''     = removeEmpty
                  $ fmap (Either.lefts . map snd)
-                        (if null common
+                        (if null shared
                            then cs'
-                           else fmap (filter (`notElem` common)) cs')
+                           else fmap (filter (`notElem` shared)) cs')
     tcm <- Lens.view tcCache
-    (uncommonCaseM,uncommonProjections) <- case uncommon of
-      -- only common arguments: do nothing.
+    (distinctCaseM,distinctProjections) <- case distinct of
+      -- only shared arguments: do nothing.
       [] -> return (Nothing,[])
       -- Create selectors and projections
       (uc:_) -> do
         let argTys = map (termType tcm) uc
         disJointSelProj inScope argTys cs''
-    let newArgs = mkDJArgs 0 common uncommonProjections
-    case uncommonCaseM of
+    let newArgs = mkDJArgs 0 shared distinctProjections
+    case distinctCaseM of
       Just lb -> return (Letrec [lb] (mkApps fun newArgs), seen)
       Nothing -> return (mkApps fun newArgs, seen)
 
--- | Create a single selector for all the representable uncommon arguments by
+-- | Create a single selector for all the representable distinct arguments by
 -- selecting between tuples. This selector is only ('Just') created when the
 -- number of representable uncommmon arguments is larger than one, otherwise it
 -- is not ('Nothing').
 --
 -- It also returns:
 --
--- * For all the non-representable uncommon arguments: a selector
--- * For all the representable uncommon arguments: a projection out of the tuple
+-- * For all the non-representable distinct arguments: a selector
+-- * For all the representable distinct arguments: a projection out of the tuple
 --   created by the larger selector. If this larger selector does not exist, a
---   single selector is created for the single representable uncommon argument.
+--   single selector is created for the single representable distinct argument.
 disJointSelProj
   :: InScopeSet
   -> [Type]
@@ -342,23 +343,27 @@ disJointSelProj inScope argTys cs = do
       | n == ut   = s : tranOrUnTran (n+1) uts          (p:projs)
       | otherwise = p : tranOrUnTran (n+1) ((ut,s):uts) projs
 
-
-isCommon :: VarSet -> [Either Term Type] -> Bool
-isCommon _   []             = True
-isCommon _   (Right ty:tys) =
-  noFreeVarsOfType ty && allEqual (Right ty:tys)
-isCommon fvs (Left tm:tms) =
-  getAll (Lens.foldMapOf (termFreeVars' isFreeId) (const (All False)) tm) &&
-  allEqual (Left tm:tms)
+-- | Arguments are shared between invocations if:
+--
+-- * They contain _no_ references to locally-bound variables
+-- * Are all equal
+areShared :: InScopeSet -> [Either Term Type] -> Bool
+areShared _       []       = True
+areShared inScope xs@(x:_) = noFV1 && allEqual xs
  where
-  isFreeId i@Id {} = i `notElemVarSet` fvs
-  isFreeId _       = False
+  noFV1 = case x of
+    Right ty -> getAll (Lens.foldMapOf (typeFreeVars' isLocallyBound IntSet.empty)
+                                       (const (All False)) ty)
+    Left tm  -> getAll (Lens.foldMapOf (termFreeVars' isLocallyBound)
+                                       (const (All False)) tm)
+
+  isLocallyBound v = v `notElemInScopeSet` inScope
 
 -- | Create a list of arguments given a map of positions to common arguments,
 -- and a list of arguments
 mkDJArgs :: Int -- ^ Current position
          -> [(Int,Either Term Type)] -- ^ map from position to common argument
-         -> [Term] -- ^ (projections for) uncommon arguments
+         -> [Term] -- ^ (projections for) distinct arguments
          -> [Either Term Type]
 mkDJArgs _ cms []   = map snd cms
 mkDJArgs _ [] uncms = map Left uncms
@@ -366,7 +371,7 @@ mkDJArgs n ((m,x):cms) (y:uncms)
   | n == m    = x       : mkDJArgs (n+1) cms (y:uncms)
   | otherwise = Left y  : mkDJArgs (n+1) ((m,x):cms) uncms
 
--- | Create a case-expression that selects between the uncommon arguments given
+-- | Create a case-expression that selects between the distinct arguments given
 -- a case-tree
 genCase :: Type -- ^ Type of the alternatives
         -> Maybe DataCon -- ^ DataCon to pack multiple arguments

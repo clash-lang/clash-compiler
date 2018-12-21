@@ -1767,8 +1767,7 @@ disjointExpressionConsolidation ctx@(TransformContext is0 _) e@(Case _scrut _ty 
     if null disJoint
        then return e
        else do
-         let eFreeIds = Lens.foldMapOf termFreeIds unitVarSet e
-         exprs <- mapM (mkDisjointGroup is1 eFreeIds) disJoint
+         exprs <- mapM (mkDisjointGroup is1) disJoint
          tcm   <- Lens.view tcCache
          lids  <- Monad.zipWithM (mkFunOut is1 tcm) disJoint exprs
          let substitution = zip (map fst disJoint) (map Var lids)
