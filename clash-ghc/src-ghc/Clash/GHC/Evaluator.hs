@@ -2115,7 +2115,7 @@ reduceConstant isSubj gbl tcm h k nm ty tys args = case nm of
 ---------
 -- Vector
 ---------
-  "Clash.Sized.Vector.length"
+  "Clash.Sized.Vector.length" -- :: KnownNat n => Vec n a -> Int
     | isSubj
     , [nTy, _] <- tys
     , Right n <-runExcept (tyNatSize tcm nTy)
@@ -2134,7 +2134,7 @@ reduceConstant isSubj gbl tcm h k nm ty tys args = case nm of
        in  reduce (mkApps (Data intCon) [Left (Literal (IntLiteral (toInteger (n - 1))))])
 
 -- Indexing
-  "Clash.Sized.Vector.index_int"
+  "Clash.Sized.Vector.index_int" -- :: KnownNat n => Vec n a -> Int
     | isSubj
     , nTy : aTy : _  <- tys
     , _ : xs : i : _ <- args
@@ -2158,11 +2158,11 @@ reduceConstant isSubj gbl tcm h k nm ty tys args = case nm of
                                      ]
                     _ -> Nothing
                  _ -> Nothing
-  "Clash.Sized.Vector.head"
+  "Clash.Sized.Vector.head" -- :: Vec (n+1) a -> a
     | isSubj
     , [DC _ vArgs] <- args
     -> reduceWHNF (Either.lefts vArgs !! 1)
-  "Clash.Sized.Vector.last"
+  "Clash.Sized.Vector.last" -- :: Vec (n+1) a -> a
     | isSubj
     , [DC _ vArgs] <- args
     , (Right _ : Right aTy : Right nTy : _) <- vArgs
@@ -2175,11 +2175,11 @@ reduceConstant isSubj gbl tcm h k nm ty tys args = case nm of
                                      ,Left (Either.lefts vArgs !! 2)
                                      ])
 -- - Sub-vectors
-  "Clash.Sized.Vector.tail"
+  "Clash.Sized.Vector.tail" -- :: Vec (n+1) a -> Vec n a
     | isSubj
     , [DC _ vArgs] <- args
     -> reduceWHNF (Either.lefts vArgs !! 2)
-  "Clash.Sized.Vector.init"
+  "Clash.Sized.Vector.init" -- :: Vec (n+1) a -> Vec n a
     | isSubj
     , [DC consCon vArgs] <- args
     , (Right _ : Right aTy : Right nTy : _) <- vArgs
@@ -2192,7 +2192,7 @@ reduceConstant isSubj gbl tcm h k nm ty tys args = case nm of
                   (mkApps (Prim nm ty) [Right (LitTy (NumTy (n-1)))
                                        ,Right aTy
                                        ,Left (Either.lefts vArgs !! 2)])
-  "Clash.Sized.Vector.select"
+  "Clash.Sized.Vector.select" -- :: (CmpNat (i+s) (s*n) ~ GT) => SNat f -> SNat s -> SNat n -> Vec (f + i) a -> Vec n a
     | isSubj
     , iTy : sTy : nTy : fTy : aTy : _ <- tys
     , eq : f : s : n : xs : _ <- args
@@ -2274,7 +2274,7 @@ reduceConstant isSubj gbl tcm h k nm ty tys args = case nm of
       (Just tupTc)       = lookupUniqMap tupTcNm tcm
       [tupDc]            = tyConDataCons tupTc
 -- - Splitting
-  "Clash.Sized.Vector.splitAt"
+  "Clash.Sized.Vector.splitAt" -- :: SNat m -> Vec (m + n) a -> (Vec m a, Vec n a)
     | isSubj
     , DC snatDc (Right mTy:_) <- head args
     , Right m <- runExcept (tyNatSize tcm mTy)
@@ -2332,7 +2332,7 @@ reduceConstant isSubj gbl tcm h k nm ty tys args = case nm of
          -- v doesn't reduce to a data-constructor
          _  -> Nothing
 
-  "Clash.Sized.Vector.unconcat"
+  "Clash.Sized.Vector.unconcat" -- :: KnownNat n => SNamt m -> Vec (n * m) a -> Vec n (Vec m a)
     | isSubj
     , kn : snat : v : _  <- args
     , nTy : mTy : aTy :_ <- tys
@@ -2381,7 +2381,7 @@ reduceConstant isSubj gbl tcm h k nm ty tys args = case nm of
                     ,Left (Case splitAtCall n1mVecTy [bsAlt])])
 -- Construction
 -- - initialisation
-  "Clash.Sized.Vector.replicate"
+  "Clash.Sized.Vector.replicate" -- :: SNat n -> a -> Vec n a
     | isSubj
     , let ty' = piResultTys tcm ty tys
     , let (_,resTy) = splitFunForallTy ty'
@@ -2393,7 +2393,7 @@ reduceConstant isSubj gbl tcm h k nm ty tys args = case nm of
            mkVec nilCon consCon argTy len
                  (replicate (fromInteger len) (valToTerm (last args)))
 -- - Concatenation
-  "Clash.Sized.Vector.++"
+  "Clash.Sized.Vector.++" -- :: Vec n a -> Vec m a -> Vec (n + m) a
     | isSubj
     , DC dc vArgs <- head args
     , Right nTy : Right aTy : _ <- vArgs
@@ -2412,7 +2412,7 @@ reduceConstant isSubj gbl tcm h k nm ty tys args = case nm of
                                       ,Left (valToTerm (last args))
                                       ])
          _ -> Nothing
-  "Clash.Sized.Vector.concat"
+  "Clash.Sized.Vector.concat" -- :: Vec n (Vec m a) -> Vec (n * m) a
     | isSubj
     , (nTy : mTy : aTy : _)  <- tys
     , (xs : _)               <- args
@@ -2439,7 +2439,7 @@ reduceConstant isSubj gbl tcm h k nm ty tys args = case nm of
         _ -> Nothing
 
 -- Modifying vectors
-  "Clash.Sized.Vector.replace_int"
+  "Clash.Sized.Vector.replace_int" -- :: KnownNat n => Vec n a -> Int -> a -> Vec n a
     | isSubj
     , nTy : aTy : _  <- tys
     , _ : xs : i : a : _ <- args
@@ -2467,7 +2467,7 @@ reduceConstant isSubj gbl tcm h k nm ty tys args = case nm of
                  _ -> Nothing
 
 -- - specialised permutations
-  "Clash.Sized.Vector.reverse"
+  "Clash.Sized.Vector.reverse" -- :: Vec n a -> Vec n a
     | isSubj
     , nTy : aTy : _  <- tys
     , [DC vecDc vArgs] <- args
@@ -2529,7 +2529,7 @@ reduceConstant isSubj gbl tcm h k nm ty tys args = case nm of
                                        , Left  (Either.lefts vArgs !! 2)
                                        ])
                        ]
-  "Clash.Sized.Vector.rotateLeftS"
+  "Clash.Sized.Vector.rotateLeftS" -- :: KnownNat n => Vec n a -> SNat d -> Vec n a
     | isSubj
     , nTy : aTy : _ : _ <- tys
     , kn : xs : d : _ <- args
@@ -2561,7 +2561,7 @@ reduceConstant isSubj gbl tcm h k nm ty tys args = case nm of
                                                 ,Left  (Literal (NaturalLiteral (d3-1)))])
                                   ]
          _  -> Nothing
-  "Clash.Sized.Vector.rotateRightS"
+  "Clash.Sized.Vector.rotateRightS" -- :: KnownNat n => Vec n a -> SNat d -> Vec n a
     | isSubj
     , nTy : aTy : _ : _ <- tys
     , kn : xs : d : _ <- args
@@ -2596,7 +2596,7 @@ reduceConstant isSubj gbl tcm h k nm ty tys args = case nm of
          _  -> Nothing
 -- Element-wise operations
 -- - mapping
-  "Clash.Sized.Vector.map"
+  "Clash.Sized.Vector.map" -- :: (a -> b) -> Vec n a -> Vec n b
     | isSubj
     , DC dc vArgs <- args !! 1
     , aTy : bTy : nTy : _ <- tys
@@ -2611,7 +2611,7 @@ reduceConstant isSubj gbl tcm h k nm ty tys args = case nm of
                                       ,Right (LitTy (NumTy (n' - 1)))
                                       ,Left (valToTerm (args !! 0))
                                       ,Left (Either.lefts vArgs !! 2)])
-  "Clash.Sized.Vector.imap"
+  "Clash.Sized.Vector.imap" -- :: forall n a b . KnownNat n => (Index n -> a -> b) -> Vec n a -> Vec n b
     | isSubj
     , nTy : aTy : bTy : _ <- tys
     , (tyArgs,tyView -> TyConApp vecTcNm _) <- splitFunForallTy ty
@@ -2660,7 +2660,7 @@ reduceConstant isSubj gbl tcm h k nm ty tys args = case nm of
                          ])
 
 -- - Zipping
-  "Clash.Sized.Vector.zipWith"
+  "Clash.Sized.Vector.zipWith" -- :: (a -> b -> c) -> Vec n a -> Vec n b -> Vec n c
     | isSubj
     , aTy : bTy : cTy : nTy : _ <- tys
     , f : xs : ys : _   <- args
@@ -2691,7 +2691,7 @@ reduceConstant isSubj gbl tcm h k nm ty tys args = case nm of
                                                     ])])
 
 -- Folding
-  "Clash.Sized.Vector.foldr"
+  "Clash.Sized.Vector.foldr" -- :: (a -> b -> b) -> b -> Vec n a -> b
     | isSubj
     , aTy : bTy : nTy : _ <- tys
     , f : z : xs : _ <- args
@@ -2711,7 +2711,7 @@ reduceConstant isSubj gbl tcm h k nm ty tys args = case nm of
                                    ,Left  (Either.lefts vArgs !! 2)
                                    ])
                      ]
-  "Clash.Sized.Vector.fold"
+  "Clash.Sized.Vector.fold" -- :: (a -> a -> a) -> Vec (n + 1) a -> a
     | isSubj
     , aTy : nTy : _ <- tys
     , f : vs : _ <- args
@@ -2766,7 +2766,7 @@ reduceConstant isSubj gbl tcm h k nm ty tys args = case nm of
                          ]
 
 
-  "Clash.Sized.Vector.fold_split"
+  "Clash.Sized.Vector.fold_split" -- :: Natural -> Vec (m + n) a -> (Vec m a, Vec n a)
     | isSubj
     , mTy : nTy : aTy : _ <- tys
     , Right m <- runExcept (tyNatSize tcm mTy)
