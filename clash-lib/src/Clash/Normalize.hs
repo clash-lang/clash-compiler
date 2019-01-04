@@ -51,9 +51,9 @@ import           Clash.Core.VarEnv
    extendVarEnv, lookupVarEnv, mapVarEnv, mapMaybeVarEnv, mkInScopeSet, mkVarEnv, mkVarSet, notElemVarEnv, notElemVarSet, nullVarEnv, unionVarEnv)
 import           Clash.Driver.Types
   (BindingMap, ClashOpts (..), DebugLevel (..))
-import           Clash.Netlist.Types              (HWType (..))
+import           Clash.Netlist.Types              (HWType (..), FilteredHWType(..))
 import           Clash.Netlist.Util
-  (splitNormalized, unsafeCoreTypeToHWType)
+  (splitNormalized, unsafeCoreTypeToHWType, stripFiltered)
 import           Clash.Normalize.Strategy
 import           Clash.Normalize.Transformations
   (appProp, bindConstantVar, caseCon, flattenLet, reduceConst, topLet)
@@ -78,7 +78,7 @@ runNormalization
   -- ^ UniqueSupply
   -> BindingMap
   -- ^ Global Binders
-  -> (CustomReprs -> TyConMap -> Bool -> Type -> Maybe (Either String HWType))
+  -> (CustomReprs -> TyConMap -> Type -> Maybe (Either String FilteredHWType))
   -- ^ Hardcoded Type -> HWType translator
   -> CustomReprs
   -> TyConMap
@@ -389,7 +389,7 @@ callTreeToList visited (CBranch (nm,bndr) used)
 clockResetErrors
   :: SrcSpan
   -> CustomReprs
-  -> (CustomReprs -> TyConMap -> Bool -> Type -> Maybe (Either String HWType))
+  -> (CustomReprs -> TyConMap -> Type -> Maybe (Either String FilteredHWType))
   -> TyConMap
   -> Type
   -> [String]
@@ -398,7 +398,7 @@ clockResetErrors sp reprs tyTran tcm ty =
   where
     (args,_)  = splitCoreFunForallTy tcm ty
     (_,args') = partitionEithers args
-    hwArgs    = zip (map (unsafeCoreTypeToHWType sp $(curLoc) tyTran reprs tcm False) args') args'
+    hwArgs    = zip (map (stripFiltered . unsafeCoreTypeToHWType sp $(curLoc) tyTran reprs tcm) args') args'
     clks      = groupBy ((==) `on` fst) . sortBy (compare `on` fst)
               $ [ ((nm,i),ty') | (Clock nm i _,ty') <- hwArgs]
     rsts      = groupBy ((==) `on` (fst.fst)) . sortBy (compare `on` (fst.fst))

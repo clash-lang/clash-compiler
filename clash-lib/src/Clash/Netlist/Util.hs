@@ -68,9 +68,22 @@ import           Clash.Signal.Internal   (ClockKind (..))
 import           Clash.Unique
 import           Clash.Util
 
+-- | Throw away information indicating which constructor fields were filtered
+-- due to being void.
+stripFiltered :: FilteredHWType -> HWType
+stripFiltered (FilteredHWType hwty _filtered) = hwty
+
+flattenFiltered :: FilteredHWType -> [[Bool]]
+flattenFiltered (FilteredHWType _hwty filtered) = map (map fst) filtered
+
+-- | Determines if type is a zero-width construct ("void")
 isVoid :: HWType -> Bool
 isVoid Void {} = True
 isVoid _       = False
+
+-- | Same as @isVoid@, but on @FilteredHWType@ instead of @HWType@
+isFilteredVoid :: FilteredHWType -> Bool
+isFilteredVoid = isVoid . stripFiltered
 
 isBiSignalOut :: HWType -> Bool
 isBiSignalOut (Void (Just (BiDirectional Out _))) = True
@@ -112,22 +125,22 @@ splitNormalized tcm expr = case collectBndrs expr of
 -- builtin types. Errors if the Core type is not translatable.
 unsafeCoreTypeToHWType
   :: SrcSpan
+  -- ^ Approximate location in original source file
   -> String
-  -> (CustomReprs -> TyConMap -> Bool -> Type -> Maybe (Either String HWType))
+  -> (CustomReprs -> TyConMap -> Type -> Maybe (Either String FilteredHWType))
   -> CustomReprs
   -> TyConMap
-  -> Bool
   -> Type
-  -> HWType
-unsafeCoreTypeToHWType sp loc builtInTranslation reprs m keepVoid =
-  either (\msg -> throw (ClashException sp (loc ++ msg) Nothing)) id .
-  coreTypeToHWType builtInTranslation reprs m keepVoid
+  -> FilteredHWType
+unsafeCoreTypeToHWType sp loc builtInTranslation reprs m ty =
+  either (\msg -> throw (ClashException sp (loc ++ msg) Nothing)) id $
+  coreTypeToHWType builtInTranslation reprs m ty
 
 -- | Converts a Core type to a HWType within the NetlistMonad; errors on failure
 unsafeCoreTypeToHWTypeM
   :: String
   -> Type
-  -> NetlistMonad HWType
+  -> NetlistMonad FilteredHWType
 unsafeCoreTypeToHWTypeM loc ty =
   unsafeCoreTypeToHWType
     <$> (snd <$> Lens.use curCompNm)
@@ -135,18 +148,18 @@ unsafeCoreTypeToHWTypeM loc ty =
     <*> Lens.use typeTranslator
     <*> Lens.use customReprs
     <*> Lens.use tcCache
-    <*> pure False
     <*> pure ty
 
 -- | Converts a Core type to a HWType within the NetlistMonad; 'Nothing' on failure
 coreTypeToHWTypeM
   :: Type
-  -> NetlistMonad (Maybe HWType)
-coreTypeToHWTypeM ty = hush <$> (coreTypeToHWType <$> Lens.use typeTranslator
-                                                  <*> Lens.use customReprs
-                                                  <*> Lens.use tcCache
-                                                  <*> pure False
-                                                  <*> pure ty)
+  -- ^ Type to convert to HWType
+  -> NetlistMonad (Maybe FilteredHWType)
+coreTypeToHWTypeM ty =
+  hush <$> (coreTypeToHWType <$> Lens.use typeTranslator
+                             <*> Lens.use customReprs
+                             <*> Lens.use tcCache
+                             <*> pure ty)
 
 -- | Returns the name and period of the clock corresponding to a type
 synchronizedClk
@@ -261,88 +274,136 @@ fixCustomRepr _ _ typ = typ
 -- builtin types. Returns a string containing the error message when the Core
 -- type is not translatable.
 coreTypeToHWType
-  :: (CustomReprs -> TyConMap -> Bool -> Type -> Maybe (Either String HWType))
+  :: (CustomReprs -> TyConMap -> Type -> Maybe (Either String FilteredHWType))
   -> CustomReprs
   -> TyConMap
-  -> Bool
   -> Type
-  -> Either String HWType
-coreTypeToHWType builtInTranslation reprs m keepVoid ty = go' ty
+  -- ^ Type to convert to HWType
+  -> Either String FilteredHWType
+coreTypeToHWType builtInTranslation reprs m ty = go' ty
   where
     -- Try builtin translation; for now this is hardcoded to be the one in ghcTypeToHWType
-    go' :: Type -> Either String HWType
-    go' (builtInTranslation reprs m keepVoid -> Just hty) =
-      fixCustomRepr reprs ty <$> hty
+    go' :: Type -> Either String FilteredHWType
+    go' (builtInTranslation reprs m -> Just hwtyE) =
+      (\(FilteredHWType hwty filtered) ->
+        (FilteredHWType (fixCustomRepr reprs ty hwty) filtered)) <$> hwtyE
     -- Strip transparant types:
     go' (coreView m -> Just ty') =
-      coreTypeToHWType builtInTranslation reprs m keepVoid ty'
+      coreTypeToHWType builtInTranslation reprs m ty'
     -- Try to create hwtype based on AST:
     go' (tyView -> TyConApp tc args) = do
-      hwty <- mkADT builtInTranslation reprs m (showPpr ty) keepVoid tc args
-      return $ fixCustomRepr reprs ty hwty
+      FilteredHWType hwty filtered <- mkADT builtInTranslation reprs m (showPpr ty) tc args
+      return (FilteredHWType (fixCustomRepr reprs ty hwty) filtered)
     -- All methods failed:
     go' _ = Left $ "Can't translate non-tycon type: " ++ showPpr ty
 
+-- | Generates original indices in list before filtering, given a list of
+-- removed indices.
+--
+-- >>> originalIndices [False, False, True, False]
+-- [0,1,3]
+originalIndices
+  :: [Bool]
+  -- ^ Were voids. Length must be less than or equal to n.
+  -> [Int]
+  -- ^ Original indices
+originalIndices wereVoids =
+  [i | (i, void) <- zip [0..] wereVoids, not void]
 
 -- | Converts an algebraic Core type (split into a TyCon and its argument) to a HWType.
 mkADT
-  :: (CustomReprs -> TyConMap -> Bool -> Type -> Maybe (Either String HWType))
+  :: (CustomReprs -> TyConMap -> Type -> Maybe (Either String FilteredHWType))
   -- ^ Hardcoded Type -> HWType translator
   -> CustomReprs
   -> TyConMap
   -- ^ TyCon cache
   -> String
   -- ^ String representation of the Core type for error messages
-  -> Bool
-  -- ^ Keep Void
   -> TyConName
   -- ^ The TyCon
   -> [Type]
   -- ^ Its applied arguments
-  -> Either String HWType
-mkADT _ _ m tyString _ tc _
+  -> Either String FilteredHWType
+  -- ^ An error string or a tuple with the type and possibly a list of
+  -- removed arguments.
+mkADT _ _ m tyString tc _
   | isRecursiveTy m tc
   = Left $ $(curLoc) ++ "Can't translate recursive type: " ++ tyString
 
-mkADT builtInTranslation reprs m _tyString keepVoid tc args = case tyConDataCons (m `lookupUniqMap'` tc) of
-  []  -> return (Void Nothing)
+mkADT builtInTranslation reprs m _tyString tc args = case tyConDataCons (m `lookupUniqMap'` tc) of
+  []  -> return (FilteredHWType (Void Nothing) [])
   dcs -> do
-    let tcName       = nameOcc tc
-        substArgTyss = map substArgTys dcs
-    argHTyss         <- mapM (mapM (coreTypeToHWType builtInTranslation reprs m keepVoid)) substArgTyss
-    let areNotVoids0 = map (\tys -> zip (map (not . isVoid) tys) tys) argHTyss
-    let argHTyss1    = if keepVoid
-                          then argHTyss
-                          else map (map snd) (map (filter fst) areNotVoids0)
-    case (dcs,argHTyss1) of
-      (_:[],[[elemTy]]) ->
-        return elemTy
+    let tcName           = nameOcc tc
+        substArgTyss     = map substArgTys dcs
+    argHTyss0           <- mapM (mapM (coreTypeToHWType builtInTranslation reprs m)) substArgTyss
+    let argHTyss1        = map (\tys -> zip (map isFilteredVoid tys) tys) argHTyss0
+    let areVoids         = map (map fst) argHTyss1
+    let filteredArgHTyss = map (map snd . filter (not . fst)) argHTyss1
 
+    -- Every alternative is annotated with some examples. Be sure to read them.
+    case (dcs, filteredArgHTyss) of
+      -- Type has one constructor and that constructor has a single field,
+      -- modulo empty fields if keepVoid is False. Examples of such fields
+      -- are:
+      --
+      -- >>> data ABC = ABC Int
+      -- >>> data DEF = DEF Int ()
+      --
+      -- Notice that @DEF@'s constructor has an "empty" second argument. The
+      -- second field of FilteredHWType would then look like:
+      --
+      -- >>> [[False, True]]
+      (_:[],[[elemTy]]) ->
+        return (FilteredHWType (stripFiltered elemTy) argHTyss1)
+
+      -- Type has one constructor, but multiple fields modulo empty fields
+      -- (see previous case for more thorough explanation). Examples:
+      --
+      -- >>> data GHI = GHI Int Int
+      -- >>> data JKL = JKL Int () Int
+      --
+      -- In the second case the second field of FilteredHWType would be
+      -- [[False, True, False]]
       ([dcFieldLabels -> labels0],[elemTys@(_:_)]) -> do
         labelsM <-
           if null labels0 then
             return Nothing
-          else if not keepVoid then
-            -- Filter out labels belonging to arguments filtered due to keepVoid
-            -- being true. See argHTyss1.
-            let areNotVoids1 = map fst (head areNotVoids0) in
-            let labels1      = filter fst (zip areNotVoids1 labels0) in
-            let labels2      = map snd labels1 in
-            return (Just labels2)
           else
-            return (Just labels0)
-        return (Product tcName labelsM elemTys)
+            -- Filter out labels belonging to arguments filtered due to being
+            -- void. See argHTyss1.
+            let areNotVoids = map not (head areVoids) in
+            let labels1     = filter fst (zip areNotVoids labels0) in
+            let labels2     = map snd labels1 in
+            return (Just labels2)
+        let hwty = Product tcName labelsM (map stripFiltered elemTys)
+        return (FilteredHWType hwty argHTyss1)
 
-      (_   ,concat -> [])
-        | length dcs < 2 ->
-          return (Void Nothing)
+      -- Either none of the constructors have fields, or they have been filtered
+      -- due to them being empty. Examples:
+      --
+      -- >>> data MNO = M    | N | O
+      -- >>> data PQR = P () | Q | R ()
+      -- >>> data STU = STU
+      -- >>> data VWX
+      (_, concat -> [])
+        -- If none of the dataconstructors have fields, and there are 1 or less
+        -- of them, this type only has one inhabitant. It can therefore be
+        -- represented by zero bits, and is therefore empty:
+        | length dcs <= 1 ->
+          return (FilteredHWType (Void Nothing) argHTyss1)
+        -- None of the dataconstructors have fields. This type is therefore a
+        -- simple Sum type.
         | otherwise ->
-          return $ Sum tcName $ map (nameOcc . dcName) dcs
+          return (FilteredHWType (Sum tcName $ map (nameOcc . dcName) dcs) argHTyss1)
 
-      (_   ,elemHTys) ->
-        return $ SP tcName $ zipWith
+      -- A sum of product, due to multiple constructors, where at least one
+      -- of the constructor has one or more fields modulo empty fields. Example:
+      --
+      -- >>> data YZA = Y Int | Z () | A
+      (_,elemHTys) ->
+        return $ FilteredHWType (SP tcName $ zipWith
           (\dc tys ->  ( nameOcc (dcName dc), tys))
-          dcs elemHTys
+          dcs (map stripFiltered <$> elemHTys)) argHTyss1
  where
   argsFVs = List.foldl' unionVarSet emptyVarSet
                 (map (Lens.foldMapOf typeFreeVars unitVarSet) args)
@@ -366,7 +427,7 @@ isRecursiveTy m tc = case tyConDataCons (m `lookupUniqMap'` tc) of
 -- | Determines if a Core type is translatable to a HWType given a function that
 -- translates certain builtin types.
 representableType
-  :: (CustomReprs -> TyConMap -> Bool -> Type -> Maybe (Either String HWType))
+  :: (CustomReprs -> TyConMap -> Type -> Maybe (Either String FilteredHWType))
   -> CustomReprs
   -> Bool
   -- ^ String considered representable
@@ -374,7 +435,7 @@ representableType
   -> Type
   -> Bool
 representableType builtInTranslation reprs stringRepresentable m =
-    either (const False) isRepresentable . coreTypeToHWType builtInTranslation reprs m False
+    either (const False) isRepresentable . fmap stripFiltered . coreTypeToHWType builtInTranslation reprs m
   where
     isRepresentable hty = case hty of
       String            -> stringRepresentable
@@ -434,12 +495,14 @@ termHWType :: String
 termHWType loc e = do
   m <- Lens.use tcCache
   let ty = termType m e
-  unsafeCoreTypeToHWTypeM loc ty
+  stripFiltered <$> unsafeCoreTypeToHWTypeM loc ty
 
 -- | Gives the HWType corresponding to a term. Returns 'Nothing' if the term has
 -- a Core type that is not translatable to a HWType.
-termHWTypeM :: Term
-            -> NetlistMonad (Maybe HWType)
+termHWTypeM
+  :: Term
+  -- ^ Term to convert to HWType
+  -> NetlistMonad (Maybe FilteredHWType)
 termHWTypeM e = do
   m  <- Lens.use tcCache
   let ty = termType m e
@@ -485,10 +548,28 @@ collectPortNames TestBench {} = []
 collectPortNames Synthesize { t_inputs, t_output } =
   concatMap (collectPortNames' []) t_inputs ++ (collectPortNames' []) t_output
 
+-- | Remove ports having a void-type from user supplied PortName annotation
+filterVoidPorts
+  :: FilteredHWType
+  -> PortName
+  -> PortName
+filterVoidPorts _hwty (PortName s) =
+  PortName s
+filterVoidPorts (FilteredHWType _hwty [filtered]) (PortProduct s ps) =
+  PortProduct s [filterVoidPorts f p | (p, (void, f)) <- zip ps filtered, not void]
+filterVoidPorts _filtered (PortProduct _s _ps) =
+  -- TODO: Prettify errors
+  error $ $(curLoc) ++ "Ports were annotated as product, but type wasn't one."
+
 -- | Uniquely rename all the variables and their references in a normalized
 -- term
 mkUniqueNormalized
   :: Maybe (Maybe TopEntity)
+  -- ^ Top entity annotation where:
+  --
+  --     * Nothing: term is not a top entity
+  --     * Just Nothing: term is a top entity, but has no explicit annotation
+  --     * Just (Just ..): term is a top entity, and has an explicit annotation
   -> ( [Id]
      , [LetBinding]
      , Id
@@ -554,6 +635,11 @@ mkUniqueNormalized topMM (args,binds,res) = do
 mkUniqueArguments
   :: Subst
   -> Maybe (Maybe TopEntity)
+  -- ^ Top entity annotation where:
+  --
+  --     * Nothing: term is not a top entity
+  --     * Just Nothing: term is a top entity, but has no explicit annotation
+  --     * Just (Just ..): term is a top entity, and has an explicit annotation
   -> [Id]
   -> NetlistMonad
        ([(Identifier,HWType)]
@@ -578,11 +664,12 @@ mkUniqueArguments subst0 (Just teM) args = do
       typeTrans <- Lens.use typeTranslator
       reprs     <- Lens.use customReprs
       (_,sp)    <- Lens.use curCompNm
-      let i    = varName var
-          i'   = nameOcc i
-          ty   = varType var
-          hwty = unsafeCoreTypeToHWType sp $(curLoc) typeTrans reprs tcm True ty
-      (ports,decls,_,pN) <- mkInput pM (i',hwty)
+      let i     = varName var
+          i'    = nameOcc i
+          ty    = varType var
+          fHwty = unsafeCoreTypeToHWType sp $(curLoc) typeTrans reprs tcm ty
+          FilteredHWType hwty _ = fHwty
+      (ports,decls,_,pN) <- mkInput (filterVoidPorts fHwty <$> pM) (i',hwty)
       let pId  = mkId ty (repName pN i)
       if isVoid hwty
          then return Nothing
@@ -592,6 +679,11 @@ mkUniqueArguments subst0 (Just teM) args = do
 mkUniqueResult
   :: Subst
   -> Maybe (Maybe TopEntity)
+  -- ^ Top entity annotation where:
+  --
+  --     * Nothing: term is not a top entity
+  --     * Just Nothing: term is a top entity, but has no explicit annotation
+  --     * Just (Just ..): term is a top entity, and has an explicit annotation
   -> Id
   -> NetlistMonad (Maybe ([(Identifier,HWType)],[Declaration],Id,Subst))
 mkUniqueResult subst0 Nothing res = do
@@ -606,14 +698,15 @@ mkUniqueResult subst0 (Just teM) res = do
   typeTrans <- Lens.use typeTranslator
   reprs     <- Lens.use customReprs
   (_,sp)    <- Lens.use curCompNm
-  let o    = varName res
-      o'   = nameOcc o
-      ty   = varType res
-      hwty = unsafeCoreTypeToHWType sp $(curLoc) typeTrans reprs tcm True ty
+  let o     = varName res
+      o'    = nameOcc o
+      ty    = varType res
+      fHwty = unsafeCoreTypeToHWType sp $(curLoc) typeTrans reprs tcm ty
+      FilteredHWType hwty _ = fHwty
       oPortSupply = fmap t_output teM
   when (containsBiSignalIn hwty)
     (throw (ClashException sp ($(curLoc) ++ "BiSignalIn cannot be part of a function's result. Use 'readFromBiSignal'.") Nothing))
-  output <- mkOutput oPortSupply (o',hwty)
+  output <- mkOutput (filterVoidPorts fHwty <$> oPortSupply) (o',hwty)
   case output of
     Just (ports, decls, pN) -> do
       let pO = repName pN o
@@ -656,13 +749,10 @@ idToPort var = do
   reprs <- Lens.use customReprs
   let i  = varName var
       ty = varType var
-      hwTy = unsafeCoreTypeToHWType sp $(curLoc) typeTrans reprs tcm False ty
+      hwTy = stripFiltered $ unsafeCoreTypeToHWType sp $(curLoc) typeTrans reprs tcm ty
   if isVoid hwTy
     then return Nothing
-    else return . Just $
-      ( nameOcc i
-      , unsafeCoreTypeToHWType sp $(curLoc) typeTrans reprs tcm False ty
-      )
+    else return (Just (nameOcc i, hwTy))
 
 id2type :: Id -> Type
 id2type = varType
@@ -792,9 +882,8 @@ mkInput pM = case pM of
         Vector sz hwty'' -> do
           arguments <- mapM (appendIdentifier (i',hwty'')) [0..sz-1]
           (ports,_,exprs,_) <- unzip4 <$> mapM (mkInput Nothing) arguments
-          let hwty2    = filterVoid hwty''
-              netdecl  = NetDecl Nothing i' (Vector sz hwty2)
-              vecExpr  = mkVectorChain sz hwty2 exprs
+          let netdecl  = NetDecl Nothing i' (Vector sz hwty'')
+              vecExpr  = mkVectorChain sz hwty'' exprs
               netassgn = Assignment i' vecExpr
           if null attrs then
             return (concat ports,[netdecl,netassgn],vecExpr,i')
@@ -804,9 +893,8 @@ mkInput pM = case pM of
         RTree d hwty'' -> do
           arguments <- mapM (appendIdentifier (i',hwty'')) [0..2^d-1]
           (ports,_,exprs,_) <- unzip4 <$> mapM (mkInput Nothing) arguments
-          let hwty2    = filterVoid hwty''
-              netdecl  = NetDecl Nothing i' (RTree d hwty2)
-              trExpr   = mkRTreeChain d hwty2 exprs
+          let netdecl  = NetDecl Nothing i' (RTree d hwty'')
+              trExpr   = mkRTreeChain d hwty'' exprs
               netassgn = Assignment i' trExpr
           if null attrs then
             return (concat ports,[netdecl,netassgn],trExpr,i')
@@ -815,21 +903,16 @@ mkInput pM = case pM of
 
         Product _ _ hwtys -> do
           arguments <- zipWithM appendIdentifier (map (i',) hwtys) [0..]
-          let argumentsBundled   = zip hwtys arguments
-              argumentsFiltered  = filter (not . isVoid . fst) argumentsBundled
-              argumentsFiltered' = map snd argumentsFiltered
-          (ports,_,exprs,_) <- unzip4 <$> mapM (mkInput Nothing) argumentsFiltered'
+          (ports,_,exprs,_) <- unzip4 <$> mapM (mkInput Nothing) arguments
           case exprs of
             [expr] ->
-              let hwty''   = filterVoid hwty
-                  netdecl  = NetDecl Nothing i' hwty''
+              let netdecl  = NetDecl Nothing i' hwty
                   dcExpr   = expr
                   netassgn = Assignment i' expr
               in  return (concat ports,[netdecl,netassgn],dcExpr,i')
             _ ->
-              let hwty''   = filterVoid hwty
-                  netdecl  = NetDecl Nothing i' hwty''
-                  dcExpr   = DataCon hwty'' (DC (hwty'',0)) exprs
+              let netdecl  = NetDecl Nothing i' hwty
+                  dcExpr   = DataCon hwty (DC (hwty,0)) exprs
                   netassgn = Assignment i' dcExpr
               in  if null attrs then
                     return (concat ports,[netdecl,netassgn],dcExpr,i')
@@ -859,9 +942,8 @@ mkInput pM = case pM of
         Vector sz hwty'' -> do
           arguments <- mapM (appendIdentifier (pN,hwty'')) [0..sz-1]
           (ports,_,exprs,_) <- unzip4 <$> zipWithM mkInput (extendPorts $ map (prefixParent p) ps) arguments
-          let hwty2    = filterVoid hwty''
-              netdecl  = NetDecl Nothing pN (Vector sz hwty2)
-              vecExpr  = mkVectorChain sz hwty2 exprs
+          let netdecl  = NetDecl Nothing pN (Vector sz hwty'')
+              vecExpr  = mkVectorChain sz hwty'' exprs
               netassgn = Assignment pN vecExpr
           if null attrs then
             return (concat ports,[netdecl,netassgn],vecExpr,pN)
@@ -871,9 +953,8 @@ mkInput pM = case pM of
         RTree d hwty'' -> do
           arguments <- mapM (appendIdentifier (pN,hwty'')) [0..2^d-1]
           (ports,_,exprs,_) <- unzip4 <$> zipWithM mkInput (extendPorts $ map (prefixParent p) ps) arguments
-          let hwty2    = filterVoid hwty''
-              netdecl  = NetDecl Nothing pN (RTree d hwty2)
-              trExpr   = mkRTreeChain d hwty2 exprs
+          let netdecl  = NetDecl Nothing pN (RTree d hwty'')
+              trExpr   = mkRTreeChain d hwty'' exprs
               netassgn = Assignment pN trExpr
           if null attrs then
             return (concat ports,[netdecl,netassgn],trExpr,pN)
@@ -882,20 +963,16 @@ mkInput pM = case pM of
 
         Product _ _ hwtys -> do
           arguments <- zipWithM appendIdentifier (map (pN,) hwtys) [0..]
-          let argumentsBundled   = zip hwtys (zip (extendPorts $ map (prefixParent p) ps) arguments)
-              argumentsFiltered  = filter (not . isVoid . fst) argumentsBundled
-              argumentsFiltered' = unzip (map snd argumentsFiltered)
-          (ports,_,exprs,_) <- unzip4 <$> uncurry (zipWithM mkInput) argumentsFiltered'
+          let ps'            = extendPorts $ map (prefixParent p) ps
+          (ports,_,exprs,_) <- unzip4 <$> uncurry (zipWithM mkInput) (ps', arguments)
           case exprs of
             [expr] ->
-                 let hwty''   = filterVoid hwty'
-                     netdecl  = NetDecl Nothing pN hwty''
+                 let netdecl  = NetDecl Nothing pN hwty'
                      dcExpr   = expr
                      netassgn = Assignment pN expr
                  in  return (concat ports,[netdecl,netassgn],dcExpr,pN)
-            _ -> let hwty''   = filterVoid hwty'
-                     netdecl  = NetDecl Nothing pN hwty''
-                     dcExpr   = DataCon hwty'' (DC (hwty'',0)) exprs
+            _ -> let netdecl  = NetDecl Nothing pN hwty'
+                     dcExpr   = DataCon hwty' (DC (hwty',0)) exprs
                      netassgn = Assignment pN dcExpr
                  in  if null attrs then
                        return (concat ports,[netdecl,netassgn],dcExpr,pN)
@@ -911,18 +988,6 @@ mkInput pM = case pM of
           return (concat ports,[netdecl,netassgn],dcExpr,pN)
 
         _ ->  return ([(pN,hwty)],[],Identifier pN Nothing,pN)
-
-filterVoid
-  :: HWType
-  -> HWType
-filterVoid t = case t of
-  Product nm labels hwtys
-    | null hwtys'        -> Void Nothing
-    | length hwtys' == 1 -> head hwtys'
-    | otherwise          -> Product nm labels hwtys'
-    where
-      hwtys' = filter (not . isVoid) (map filterVoid hwtys)
-  _ -> t
 
 -- | Create a Vector chain for a list of 'Identifier's
 mkVectorChain :: Int
@@ -1027,9 +1092,8 @@ mkOutput' pM = case pM of
             (throwAnnotatedSplitError $(curLoc) "Vector")
           results <- mapM (appendIdentifier (o',hwty'')) [0..sz-1]
           (ports,decls,ids) <- unzip3 <$> mapM (mkOutput' Nothing) results
-          let hwty2   = Vector sz (filterVoid hwty'')
-              netdecl = NetDecl Nothing o' hwty2
-              assigns = zipWith (assignId o' hwty2 10) ids [0..]
+          let netdecl = NetDecl Nothing o' hwty'
+              assigns = zipWith (assignId o' hwty' 10) ids [0..]
           return (concat ports,netdecl:assigns ++ concat decls,o')
 
         RTree d hwty'' -> do
@@ -1037,27 +1101,21 @@ mkOutput' pM = case pM of
             (throwAnnotatedSplitError $(curLoc) "RTree")
           results <- mapM (appendIdentifier (o',hwty'')) [0..2^d-1]
           (ports,decls,ids) <- unzip3 <$> mapM (mkOutput' Nothing) results
-          let hwty2   = RTree d (filterVoid hwty'')
-              netdecl = NetDecl Nothing o' hwty2
-              assigns = zipWith (assignId o' hwty2 10) ids [0..]
+          let netdecl = NetDecl Nothing o' hwty'
+              assigns = zipWith (assignId o' hwty' 10) ids [0..]
           return (concat ports,netdecl:assigns ++ concat decls,o')
 
         Product _ _ hwtys -> do
           results <- zipWithM appendIdentifier (map (o,) hwtys) [0..]
-          let resultsBundled   = zip hwtys results
-              resultsFiltered  = filter (not . isVoid . fst) resultsBundled
-              resultsFiltered' = map snd resultsFiltered
-          (ports,decls,ids) <- unzip3 <$> mapM (mkOutput' Nothing) resultsFiltered'
+          (ports,decls,ids) <- unzip3 <$> mapM (mkOutput' Nothing) results
           case ids of
             [i] ->
-              let hwty''  = filterVoid hwty
-                  netdecl = NetDecl Nothing o' hwty''
+              let netdecl = NetDecl Nothing o' hwty
                   assign  = Assignment i (Identifier o' Nothing)
               in  return (concat ports,netdecl:assign:concat decls,o')
             _   ->
-              let hwty''  = filterVoid hwty
-                  netdecl = NetDecl Nothing o' hwty''
-                  assigns = zipWith (assignId o' hwty'' 0) ids [0..]
+              let netdecl = NetDecl Nothing o' hwty
+                  assigns = zipWith (assignId o' hwty 0) ids [0..]
               in  if null attrs then
                      return (concat ports,netdecl:assigns ++ concat decls,o')
                   else
@@ -1085,9 +1143,8 @@ mkOutput' pM = case pM of
             (throwAnnotatedSplitError $(curLoc) "Vector")
           results <- mapM (appendIdentifier (pN,hwty'')) [0..sz-1]
           (ports,decls,ids) <- unzip3 <$> zipWithM mkOutput' (extendPorts $ map (prefixParent p) ps) results
-          let hwty2   = Vector sz (filterVoid hwty'')
-              netdecl = NetDecl Nothing pN hwty2
-              assigns = zipWith (assignId pN hwty2 10) ids [0..]
+          let netdecl = NetDecl Nothing pN hwty'
+              assigns = zipWith (assignId pN hwty' 10) ids [0..]
           return (concat ports,netdecl:assigns ++ concat decls,pN)
 
         RTree d hwty'' -> do
@@ -1095,25 +1152,20 @@ mkOutput' pM = case pM of
             (throwAnnotatedSplitError $(curLoc) "RTree")
           results <- mapM (appendIdentifier (pN,hwty'')) [0..2^d-1]
           (ports,decls,ids) <- unzip3 <$> zipWithM mkOutput' (extendPorts $ map (prefixParent p) ps) results
-          let hwty2   = RTree d (filterVoid hwty'')
-              netdecl = NetDecl Nothing pN hwty2
-              assigns = zipWith (assignId pN hwty2 10) ids [0..]
+          let netdecl = NetDecl Nothing pN hwty'
+              assigns = zipWith (assignId pN hwty' 10) ids [0..]
           return (concat ports,netdecl:assigns ++ concat decls,pN)
 
         Product _ _ hwtys -> do
           results <- zipWithM appendIdentifier (map (pN,) hwtys) [0..]
-          let resultsBundled   = zip hwtys (zip (extendPorts $ map (prefixParent p) ps) results)
-              resultsFiltered  = filter (not . isVoid . fst) resultsBundled
-              resultsFiltered' = unzip (map snd resultsFiltered)
-          (ports,decls,ids) <- unzip3 <$> uncurry (zipWithM mkOutput') resultsFiltered'
+          let ps'            = extendPorts $ map (prefixParent p) ps
+          (ports,decls,ids) <- unzip3 <$> uncurry (zipWithM mkOutput') (ps', results)
           case ids of
-            [i] -> let hwty''  = filterVoid hwty'
-                       netdecl = NetDecl Nothing pN hwty''
+            [i] -> let netdecl = NetDecl Nothing pN hwty'
                        assign  = Assignment i (Identifier pN Nothing)
                    in  return (concat ports,netdecl:assign:concat decls,pN)
-            _   -> let hwty''  = filterVoid hwty'
-                       netdecl = NetDecl Nothing pN hwty''
-                       assigns = zipWith (assignId pN hwty'' 0) ids [0..]
+            _   -> let netdecl = NetDecl Nothing pN hwty'
+                       assigns = zipWith (assignId pN hwty' 0) ids [0..]
                    in  if null attrs then
                          return (concat ports,netdecl:assigns ++ concat decls,pN)
                        else

@@ -215,6 +215,16 @@ runClashTest =
         , outputTest ("tests" </> "shouldwork" </> "TopEntity") [Verilog] "PortNames" "main"
         , runTest ("tests" </> "shouldwork" </> "TopEntity") [Verilog] [] "PortProducts" (["","PortProducts_topEntity","PortProducts_testBench"],"PortProducts_testBench",True)
         , outputTest ("tests" </> "shouldwork" </> "TopEntity") [Verilog] "PortProducts" "main"
+        , runTest ("tests" </> "shouldwork" </> "TopEntity") [Verilog] [] "PortNamesWithUnit" (["","PortNamesWithUnit_topEntity","PortNamesWithUnit_testBench"],"PortNamesWithUnit_testBench",True)
+        , outputTest ("tests" </> "shouldwork" </> "TopEntity") [Verilog] "PortNamesWithUnit" "main"
+        ]
+      , clashTestGroup "Void"
+        [ runTest ("tests" </> "shouldwork" </> "Unit") defBuild [] "ZipWithUnitVector"            (["","ZipWithUnitVector_testBench"],"ZipWithUnitVector_testBench",True)
+        , runTest ("tests" </> "shouldwork" </> "Unit") defBuild [] "ZipWithTupleWithUnitLeft"     (["","ZipWithTupleWithUnitLeft_testBench"],"ZipWithTupleWithUnitLeft_testBench",True)
+        , runTest ("tests" </> "shouldwork" </> "Unit") defBuild [] "ZipWithTupleWithUnitRight"    (["","ZipWithTupleWithUnitRight_testBench"],"ZipWithTupleWithUnitRight_testBench",True)
+        , runTest ("tests" </> "shouldwork" </> "Unit") defBuild [] "ZipWithTripleWithUnitMiddle"  (["","ZipWithTripleWithUnitMiddle_testBench"],"ZipWithTripleWithUnitMiddle_testBench",True)
+        , runTest ("tests" </> "shouldwork" </> "Unit") defBuild [] "ZipWithUnitSP"                (["","ZipWithUnitSP_testBench"],"ZipWithUnitSP_testBench",True)
+        , runTest ("tests" </> "shouldwork" </> "Unit") defBuild [] "ZipWithUnitSP2"               (["","ZipWithUnitSP2_testBench"],"ZipWithUnitSP2_testBench",True)
         ]
       , clashTestGroup "Vector"
         [ runTest ("tests" </> "shouldwork" </> "Vector") defBuild [] "Concat"     (["","Concat_testBench"],"Concat_testBench",True)

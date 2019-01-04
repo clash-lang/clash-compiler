@@ -26,19 +26,22 @@ import           Data.Char                     (ord)
 import           Data.Either                   (lefts)
 import qualified Data.HashMap.Lazy             as HashMap
 import qualified Data.IntMap                   as IntMap
-import           Data.Maybe                    (catMaybes)
+import           Data.List                     (elemIndex)
+import           Data.Maybe                    (catMaybes, fromJust)
 import           Data.Semigroup.Monad
 import qualified Data.Set                      as Set
 import           Data.Text.Lazy                (fromStrict)
 import qualified Data.Text.Lazy                as Text
 import           Data.Text                     (unpack)
 import qualified Data.Text                     as TextS
+import           GHC.Stack                     (HasCallStack)
 import qualified System.Console.ANSI           as ANSI
 import           System.Console.ANSI
   ( hSetSGR, SGR(SetConsoleIntensity, SetColor), Color(Magenta)
   , ConsoleIntensity(BoldIntensity), ConsoleLayer(Foreground), ColorIntensity(Vivid))
 import           System.IO
   (hPutStrLn, stderr, hFlush, hIsTerminalDevice)
+import           TextShow                      (showt)
 import           Util                          (OverridingBool(..))
 
 -- import           Clash.Backend                 as N
@@ -108,7 +111,7 @@ mkBlackBoxContext resId args = do
 
     -- Make context result
     let res = Identifier resNm Nothing
-    resTy <- unsafeCoreTypeToHWTypeM $(curLoc) (V.varType resId)
+    resTy <- stripFiltered <$> unsafeCoreTypeToHWTypeM $(curLoc) (V.varType resId)
 
     lvl <- Lens.use curBBlvl
     (nm,_) <- Lens.use curCompNm
@@ -159,7 +162,7 @@ mkArgument bndr e = do
     tcm   <- Lens.use tcCache
     let ty = termType tcm e
     iw    <- Lens.use intWidth
-    hwTyM <- N.termHWTypeM e
+    hwTyM <- fmap stripFiltered <$> N.termHWTypeM e
     let eTyMsg = "(" ++ showPpr e ++ " :: " ++ showPpr ty ++ ")"
     ((e',t,l),d) <- case hwTyM of
       Nothing
@@ -287,7 +290,7 @@ mkPrimitive bbEParen bbEasD dst nm args ty = do
                     Nothing -> return (Identifier "__VOID__" Nothing,[])
         Just (P.Primitive pNm _)
           | pNm == "GHC.Prim.tagToEnum#" -> do
-              hwTy <- N.unsafeCoreTypeToHWTypeM $(curLoc) ty
+              hwTy <- stripFiltered <$> N.unsafeCoreTypeToHWTypeM $(curLoc) ty
               case args of
                 [Right (ConstTy (TyCon tcN)), Left (C.Literal (IntLiteral i))] -> do
                   tcm <- Lens.use tcCache
@@ -302,7 +305,7 @@ mkPrimitive bbEParen bbEasD dst nm args ty = do
                   case scrutExpr of
                     Identifier id_ Nothing -> return (DataTag hwTy (Left id_),scrutDecls)
                     _ -> do
-                      scrutHTy <- unsafeCoreTypeToHWTypeM $(curLoc) scrutTy
+                      scrutHTy <- stripFiltered <$> unsafeCoreTypeToHWTypeM $(curLoc) scrutTy
                       tmpRhs <- mkUniqueIdentifier Extended "#tte_rhs"
                       let netDeclRhs   = NetDecl Nothing tmpRhs scrutHTy
                           netAssignRhs = Assignment tmpRhs scrutExpr
@@ -315,7 +318,7 @@ mkPrimitive bbEParen bbEasD dst nm args ty = do
               [Right _,Left scrut] -> do
                 tcm      <- Lens.use tcCache
                 let scrutTy = termType tcm scrut
-                scrutHTy <- unsafeCoreTypeToHWTypeM $(curLoc) scrutTy
+                scrutHTy <- stripFiltered <$> unsafeCoreTypeToHWTypeM $(curLoc) scrutTy
                 (scrutExpr,scrutDecls) <- mkExpr False (Left "#dtt_rhs") scrutTy scrut
                 case scrutExpr of
                   Identifier id_ Nothing -> return (DataTag scrutHTy (Right id_),scrutDecls)
@@ -351,7 +354,7 @@ mkPrimitive bbEParen bbEasD dst nm args ty = do
           nm'' <- mkUniqueIdentifier Extended nm'
           -- TODO: check that it's okay to use `mkUnsafeInternalName`
           let nm3 = mkUnsafeSystemName nm'' 0
-          hwTy <- N.unsafeCoreTypeToHWTypeM $(curLoc) ty
+          hwTy <- stripFiltered <$> N.unsafeCoreTypeToHWTypeM $(curLoc) ty
           let id_    = mkId ty nm3
               idDecl = NetDecl' Nothing wr nm'' (Right hwTy)
           case hwTy of
@@ -363,7 +366,8 @@ mkPrimitive bbEParen bbEasD dst nm args ty = do
 -- argument term, given that the term is a function. Errors if the term is not
 -- a function
 mkFunInput
-  :: Id
+  :: HasCallStack
+  => Id
   -- ^ Identifier binding the encompassing primitive/blackbox application
   -> Term
   -- ^ The function argument term
@@ -376,6 +380,8 @@ mkFunInput
        ,BlackBoxContext)
       ,[Declaration])
 mkFunInput resId e = do
+  -- TODO: Rewrite this function to use blackbox functions. Right now it
+  -- TODO: generates strings that are later parsed/interpreted again. Silly!
   let (appE,args) = collectArgs e
   (bbCtx,dcls) <- mkBlackBoxContext resId (lefts args)
   templ <- case appE of
@@ -390,36 +396,62 @@ mkFunInput resId e = do
               tcm <- Lens.use tcCache
               let eTy = termType tcm e
                   (_,resTy) = splitFunTys tcm eTy
-              resHTyM <- coreTypeToHWTypeM resTy
-              case resHTyM of
-                Just resHTy@(SP _ dcArgPairs) -> do
-                  let dcI      = dcTag dc - 1
-                      dcArgs   = snd $ indexNote ($(curLoc) ++ "No DC with tag: " ++ show dcI) dcArgPairs dcI
-                      dcInps   = [ Identifier (TextS.pack ("~ARG[" ++ show x ++ "]")) Nothing | x <- [(0::Int)..(length dcArgs - 1)]]
-                      dcApp    = DataCon resHTy (DC (resHTy,dcI)) dcInps
-                      dcAss    = Assignment "~RESULT" dcApp
+
+              resHTyM0 <- coreTypeToHWTypeM resTy
+              let resHTyM1 = (\fHwty -> (stripFiltered fHwty, flattenFiltered fHwty)) <$> resHTyM0
+
+              -- TODO: Handle CustomSP / CustomSum
+              case resHTyM1 of
+                -- Special case where coreTypeToHWTypeM determined a type to
+                -- be completely transparent.
+                Just (_resHTy, areVoids@[countEq False -> 1]) -> do
+                  let nonVoidArgI = fromJust (elemIndex False (head areVoids))
+                  let arg = TextS.concat ["~ARG[", showt nonVoidArgI, "]"]
+                  let assign = Assignment "~RESULT" (Identifier arg Nothing)
+                  return (Right (("", [assign]), Wire))
+
+                -- Because we filter void constructs, the argument indices and
+                -- the field indices don't necessarily correspond anymore. We
+                -- use the result of coreTypeToHWTypeM to figure out what the
+                -- original indices are. Please see the documentation in
+                -- Clash.Netlist.Util.mkADT for more information.
+                Just (resHTy@(SP _ _), areVoids0) -> do
+                  let
+                      dcI       = dcTag dc - 1
+                      areVoids1 = indexNote ($(curLoc) ++ "No areVoids with index: " ++ show dcI) areVoids0 dcI
+                      dcInps    = [Identifier (TextS.pack ("~ARG[" ++ show x ++ "]")) Nothing | x <- originalIndices areVoids1]
+                      dcApp     = DataCon resHTy (DC (resHTy,dcI)) dcInps
+                      dcAss     = Assignment "~RESULT" dcApp
                   return (Right (("",[dcAss]),Wire))
-                Just resHTy@(Product _ _ dcArgs) -> do
-                  let dcInps = [ Identifier (TextS.pack ("~ARG[" ++ show x ++ "]")) Nothing | x <- [(0::Int)..(length dcArgs - 1)]]
-                      dcApp  = DataCon resHTy (DC (resHTy,0)) dcInps
-                      dcAss  = Assignment "~RESULT" dcApp
+
+                -- Like SP, we have to retrieve the index BEFORE filtering voids
+                Just (resHTy@(Product _ _ _), areVoids0) -> do
+                  let areVoids1 = head areVoids0
+                      dcInps    = [ Identifier (TextS.pack ("~ARG[" ++ show x ++ "]")) Nothing | x <- originalIndices areVoids1]
+                      dcApp     = DataCon resHTy (DC (resHTy,0)) dcInps
+                      dcAss     = Assignment "~RESULT" dcApp
                   return (Right (("",[dcAss]),Wire))
-                Just resHTy@(Vector _ _) -> do
+
+                -- Vectors never have defined areVoids (or all set to False), as
+                -- it would be converted to Void otherwise. We can therefore
+                -- safely ignore it:
+                Just (resHTy@(Vector _ _), _areVoids) -> do
                   let dcInps = [ Identifier (TextS.pack ("~ARG[" ++ show x ++ "]")) Nothing | x <- [(1::Int)..2] ]
                       dcApp  = DataCon resHTy (DC (resHTy,1)) dcInps
                       dcAss  = Assignment "~RESULT" dcApp
                   return (Right (("",[dcAss]),Wire))
-                -- The following happens for things like `Maybe ()`
-                Just resHTy@(Sum _ _) -> do
+
+                -- Sum types OR a Sum type after filtering empty types:
+                Just (resHTy@(Sum _ _), _areVoids) -> do
                   let dcI   = dcTag dc - 1
                       dcApp = DataCon resHTy (DC (resHTy,dcI)) []
                       dcAss = Assignment "~RESULT" dcApp
                   return (Right (("",[dcAss]),Wire))
-                -- The following happens for things like `(1,())`
-                Just _ -> do
-                  let inp   = Identifier "~ARG[0]" Nothing
-                      assgn = Assignment "~RESULT" inp
-                  return (Right (("",[assgn]),Wire))
+
+                Just (Void {}, _areVoids) ->
+                  return (error $ $(curLoc) ++ "Encountered Void in mkFunInput."
+                                            ++ " This is a bug in Clash.")
+
                 _ -> error $ $(curLoc) ++ "Cannot make function input for: " ++ showPpr e
             C.Var fun -> do
               normalized <- Lens.use bindings

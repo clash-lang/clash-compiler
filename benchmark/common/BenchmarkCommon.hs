@@ -18,7 +18,7 @@ import Clash.GHC.GenerateBindings
 import Clash.GHC.LoadModules (ghcLibDir)
 import Clash.GHC.NetlistTypes
 import Clash.Netlist.BlackBox.Types (HdlSyn(Other))
-import Clash.Netlist.Types          (HWType)
+import Clash.Netlist.Types          (FilteredHWType)
 import Clash.Primitives.Types
 
 import Util (OverridingBool(..))
@@ -33,7 +33,7 @@ defaultTests =
   , "benchmark/tests/PipelinesViaFolds.hs"
   ]
 
-typeTrans :: (CustomReprs -> TyConMap -> Bool -> Type -> Maybe (Either String HWType))
+typeTrans :: (CustomReprs -> TyConMap -> Type -> Maybe (Either String FilteredHWType))
 typeTrans = ghcTypeToHWType WORD_SIZE_IN_BITS True
 
 opts :: ClashOpts

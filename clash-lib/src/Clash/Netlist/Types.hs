@@ -77,7 +77,7 @@ data NetlistState
   -- ^ Cached components
   , _primitives     :: CompiledPrimMap
   -- ^ Primitive Definitions
-  , _typeTranslator :: CustomReprs -> TyConMap -> Bool -> Type -> Maybe (Either String HWType)
+  , _typeTranslator :: CustomReprs -> TyConMap -> Type -> Maybe (Either String FilteredHWType)
   -- ^ Hardcoded Type -> HWType translator
   , _tcCache        :: TyConMap
   -- ^ TyCon cache
@@ -126,6 +126,15 @@ instance NFData Component where
 
 -- | Size indication of a type (e.g. bit-size or number of elements)
 type Size = Int
+
+type IsVoid = Bool
+
+-- | Tree structure indicating which constructor fields were filtered from
+-- a type due to them being void. We need this information to generate stable
+-- and/or user-defined port mappings.
+data FilteredHWType =
+  FilteredHWType HWType [[(IsVoid, FilteredHWType)]]
+    deriving (Eq, Show)
 
 -- | Representable hardware types
 data HWType
