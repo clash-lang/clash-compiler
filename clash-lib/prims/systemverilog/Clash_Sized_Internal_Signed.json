@@ -37,8 +37,8 @@ assign ~RESULT = (~VAR[dividend][0][~SIZE[~TYPO]-1] == ~VAR[divider][1][~SIZE[~T
     , "template"  :
 "// rotateL begin
 logic [2*~LIT[0]-1:0] ~GENSYM[s][0];
-assign ~SYM[0] = {~ARG[1],~ARG[1]} << ~ARG[2];
-assign ~RESULT = $signed(~SYM[0][~LIT[0]-1 : 0]);
+assign ~SYM[0] = {~ARG[1],~ARG[1]} << (~ARG[2] % ~LIT[0]);
+assign ~RESULT = $signed(~SYM[0][2*~LIT[0]-1 : ~LIT[0]]);
 // rotateL end"
     }
   }
@@ -49,7 +49,7 @@ assign ~RESULT = $signed(~SYM[0][~LIT[0]-1 : 0]);
     , "template"  :
 "// rotateR begin
 logic [2*~LIT[0]-1:0] ~GENSYM[s][0];
-assign ~SYM[0] = {~ARG[1],~ARG[1]} >> ~ARG[2];
+assign ~SYM[0] = {~ARG[1],~ARG[1]} >> (~ARG[2] % ~LIT[0]);
 assign ~RESULT = $signed(~SYM[0][~LIT[0]-1 : 0]);
 // rotateR end"
     }

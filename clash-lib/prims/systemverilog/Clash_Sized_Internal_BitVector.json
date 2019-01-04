@@ -56,7 +56,7 @@ assign ~RESULT = { ~VAR[bv][1][$high(~VAR[bv][1]) : ~LIT[0]]
     , "template"  :
 "// rotateL begin
 logic [2*~LIT[0]-1:0] ~GENSYM[bv][0];
-assign ~SYM[0] = {~ARG[1],~ARG[1]} << ~ARG[2];
+assign ~SYM[0] = {~ARG[1],~ARG[1]} << (~ARG[2] % ~LIT[0]);
 assign ~RESULT = ~SYM[0][2*~LIT[0]-1 : ~LIT[0]];
 // rotateL end"
     }
@@ -68,7 +68,7 @@ assign ~RESULT = ~SYM[0][2*~LIT[0]-1 : ~LIT[0]];
     , "template"  :
 "// rotateR begin
 logic [2*~LIT[0]-1:0] ~GENSYM[bv][0];
-assign ~SYM[0] = {~ARG[1],~ARG[1]} >> ~ARG[2];
+assign ~SYM[0] = {~ARG[1],~ARG[1]} >> (~ARG[2] % ~LIT[0]);
 assign ~RESULT = ~SYM[0][~LIT[0]-1 : 0];
 // rotateR end"
     }
