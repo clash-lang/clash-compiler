@@ -107,7 +107,7 @@ import           Clash.Core.VarEnv
    unitVarSet, mkVarSet, mkInScopeSet, uniqAway)
 import           Clash.Driver.Types          (DebugLevel (..))
 import           Clash.Netlist.BlackBox.Util (usedArguments)
-import           Clash.Netlist.Types         (HWType (..))
+import           Clash.Netlist.Types         (HWType (..), FilteredHWType(..))
 import           Clash.Netlist.Util
   (coreTypeToHWType, representableType, splitNormalized)
 import           Clash.Normalize.DEC
@@ -414,8 +414,8 @@ caseCon ctx@(TransformContext is0 _) e@(Case subj ty alts)
             _ -> do
               let subjTy = termType tcm subj
               tran <- Lens.view typeTranslator
-              case coreTypeToHWType tran reprs tcm False subjTy of
-                Right (Void (Just hty))
+              case coreTypeToHWType tran reprs tcm subjTy of
+                Right (FilteredHWType (Void (Just hty)) _areVoids)
                   | hty `elem` [BitVector 0, Unsigned 0, Signed 0, Index 1]
                   -> caseCon ctx' (Case (Literal (IntegerLiteral 0)) ty alts)
                 _ -> traceIf (lvl > DebugNone && isConstant subj)
@@ -427,8 +427,8 @@ caseCon ctx e@(Case subj ty alts) = do
   tcm <- Lens.view tcCache
   let subjTy = termType tcm subj
   tran <- Lens.view typeTranslator
-  case coreTypeToHWType tran reprs tcm False subjTy of
-    Right (Void (Just hty))
+  case coreTypeToHWType tran reprs tcm subjTy of
+    Right (FilteredHWType (Void (Just hty)) _areVoids)
       | hty `elem` [BitVector 0, Unsigned 0, Signed 0, Index 1]
       -> caseCon ctx (Case (Literal (IntegerLiteral 0)) ty alts)
     _ -> caseOneAlt e

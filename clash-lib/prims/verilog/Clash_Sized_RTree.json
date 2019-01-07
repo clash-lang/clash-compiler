@@ -2,7 +2,7 @@
     { "name"      : "Clash.Sized.RTree.treplicate"
     , "kind"      : "Expression"
     , "type"      : "replicate :: SNat d -> a -> RTree d a"
-    , "template"  : "'{(2**~LIT[0]) {~ARG[1]}}"
+    , "template"  : "{(2**~LIT[0]) {~ARG[1]}}"
     }
   }
 , { "BlackBox" :

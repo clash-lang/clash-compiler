@@ -89,7 +89,7 @@ genNetlist
   -- ^ Primitive definitions
   -> TyConMap
   -- ^ TyCon cache
-  -> (CustomReprs -> TyConMap -> Bool -> Type -> Maybe (Either String HWType))
+  -> (CustomReprs -> TyConMap -> Type -> Maybe (Either String FilteredHWType))
   -- ^ Hardcoded Type -> HWType translator
   -> Int
   -- ^ Int/Word/Integer bit-width
@@ -137,7 +137,7 @@ runNetlistMonad
   -- ^ Primitive Definitions
   -> TyConMap
   -- ^ TyCon cache
-  -> (CustomReprs -> TyConMap -> Bool -> Type -> Maybe (Either String HWType))
+  -> (CustomReprs -> TyConMap -> Type -> Maybe (Either String FilteredHWType))
   -- ^ Hardcode Type -> HWType translator
   -> Int
   -- ^ Int/Word/Integer bit-width
@@ -257,7 +257,7 @@ genComponentT compName componentExpr = do
 mkNetDecl :: (Id, Term) -> NetlistMonad (Maybe Declaration)
 mkNetDecl (id_,tm) = do
   let typ             = varType id_
-  hwTy <- unsafeCoreTypeToHWTypeM $(curLoc) typ
+  hwTy <- unsafeCoreTypeToHWTypeM' $(curLoc) typ
   wr   <- termToWireOrReg tm
   if isVoid hwTy
      then return Nothing
@@ -297,7 +297,7 @@ mkDeclarations
   -- ^ RHS of the let-binder
   -> NetlistMonad [Declaration]
 mkDeclarations bndr e = do
-  hty <- unsafeCoreTypeToHWTypeM $(curLoc) (varType bndr)
+  hty <- unsafeCoreTypeToHWTypeM' $(curLoc) (varType bndr)
   if isVoid hty && not (isBiSignalOut hty)
      then return []
      else mkDeclarations' bndr e
@@ -341,7 +341,7 @@ mkDeclarations' bndr app =
     -- _ | isBiSignalOut (id2type bndr) && (not $ isWriteToBiSignalPrimitive app) ->
     --     return []
     _ -> do
-      hwTy <- unsafeCoreTypeToHWTypeM $(curLoc) (id2type bndr)
+      hwTy <- unsafeCoreTypeToHWTypeM' $(curLoc) (id2type bndr)
       if isBiSignalOut hwTy && not (isWriteToBiSignalPrimitive app)
          then return []
          else do
@@ -366,8 +366,8 @@ mkSelection bndr scrut altTy alts = do
   let scrutTy            = termType tcm scrut
       alts'              = (reorderDefault . reorderCustom tcm reprs scrutTy)
                            alts
-  scrutHTy               <- unsafeCoreTypeToHWTypeM $(curLoc) scrutTy
-  altHTy                 <- unsafeCoreTypeToHWTypeM $(curLoc) altTy
+  scrutHTy               <- unsafeCoreTypeToHWTypeM' $(curLoc) scrutTy
+  altHTy                 <- unsafeCoreTypeToHWTypeM' $(curLoc) altTy
   scrutId                <- extendIdentifier Extended
                                (id2identifier bndr)
                                "_selection"
@@ -463,7 +463,7 @@ mkFunApp dst fun args = do
       , length fArgTys == length args
       -> do
         let dstId = id2identifier dst
-        argHWTys <- mapM (unsafeCoreTypeToHWTypeM $(curLoc)) fArgTys
+        argHWTys <- mapM (unsafeCoreTypeToHWTypeM' $(curLoc)) fArgTys
         -- Filter out the arguments of hwtype `Void` and only translate them
         -- to the intermediate HDL afterwards
         let argsBundled   = zip argHWTys (zip args fArgTys)
@@ -473,7 +473,7 @@ mkFunApp dst fun args = do
         (argExprs,argDecls) <- second concat . unzip <$>
                                  mapM (\(e,t) -> mkExpr False (Left dstId) t e)
                                  argsFiltered'
-        dstHWty  <- unsafeCoreTypeToHWTypeM $(curLoc) fResTy
+        dstHWty  <- unsafeCoreTypeToHWTypeM' $(curLoc) fResTy
         env  <- Lens.use hdlDir
         mkId <- Lens.use mkIdentifierFn
         prefixM <- Lens.use componentPrefix
@@ -493,7 +493,7 @@ mkFunApp dst fun args = do
         Just _ -> do
           (_,_,Component compName compInps co _) <- preserveVarEnv $ genComponent fun
           let argTys = map (termType tcm) args
-          argHWTys <- mapM coreTypeToHWTypeM argTys
+          argHWTys <- mapM coreTypeToHWTypeM' argTys
           -- Filter out the arguments of hwtype `Void` and only translate
           -- them to the intermediate HDL afterwards
           let argsBundled   = zip argHWTys (zip args argTys)
@@ -529,7 +529,7 @@ toSimpleVar dst (e,ty) = do
              (id2identifier dst)
              "_fun_arg"
   argNm' <- mkUniqueIdentifier Extended argNm
-  hTy <- unsafeCoreTypeToHWTypeM $(curLoc) ty
+  hTy <- unsafeCoreTypeToHWTypeM' $(curLoc) ty
   let argDecl         = NetDecl Nothing argNm' hTy
       argAssn         = Assignment argNm' e
   return (Identifier argNm' Nothing,[argDecl,argAssn])
@@ -562,7 +562,7 @@ mkExpr _ _ _ (Core.Literal l) = do
 mkExpr bbEasD bndr ty app = do
   let (appF,args) = collectArgs app
       tmArgs      = lefts args
-  hwTy    <- unsafeCoreTypeToHWTypeM $(curLoc) ty
+  hwTy    <- unsafeCoreTypeToHWTypeM' $(curLoc) ty
   (_,sp) <- Lens.use curCompNm
   case appF of
     Data dc -> mkDcApplication hwTy bndr dc tmArgs
@@ -599,8 +599,8 @@ mkProjection mkDec bndr scrut altTy alt@(pat,v) = do
     _ -> throw (ClashException sp ($(curLoc) ++
                 "Not in normal form: RHS of case-projection is not a variable:\n\n"
                  ++ showPpr e) Nothing)
-  sHwTy <- unsafeCoreTypeToHWTypeM $(curLoc) scrutTy
-  vHwTy <- unsafeCoreTypeToHWTypeM $(curLoc) altTy
+  sHwTy <- unsafeCoreTypeToHWTypeM' $(curLoc) scrutTy
+  vHwTy <- unsafeCoreTypeToHWTypeM' $(curLoc) altTy
   (selId,modM,decls) <- do
     scrutNm <- either return
                  (\b -> extendIdentifier Extended
@@ -624,7 +624,7 @@ mkProjection mkDec bndr scrut altTy alt@(pat,v) = do
               tms'       = if any (`elem` tmsFVs) exts
                               then throw (ClashException sp ($(curLoc) ++ "Not in normal form: Pattern binds existential variables:\n\n" ++ showPpr e) Nothing)
                               else tms
-          argHWTys <- mapM coreTypeToHWTypeM tmsTys
+          argHWTys <- mapM coreTypeToHWTypeM' tmsTys
           let tmsBundled   = zip argHWTys tms'
               tmsFiltered  = filter (maybe False (not . isVoid) . fst) tmsBundled
               tmsFiltered' = map snd tmsFiltered
@@ -667,7 +667,7 @@ mkDcApplication dstHType bndr dc args = do
   tcm                 <- Lens.use tcCache
   let argTys          = map (termType tcm) args
   argNm <- either return (\b -> extendIdentifier Extended (nameOcc (varName b)) "_dc_arg") bndr
-  argHWTys            <- mapM coreTypeToHWTypeM argTys
+  argHWTys            <- mapM coreTypeToHWTypeM' argTys
   -- Filter out the arguments of hwtype `Void` and only translate
   -- them to the intermediate HDL afterwards
   let argsBundled   = zip argHWTys (zip args argTys)

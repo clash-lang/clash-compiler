@@ -172,8 +172,9 @@ runClashTest =
         , runTest ("tests" </> "shouldwork" </> "Polymorphism") defBuild [] "LocalPoly"         ([""],"LocalPoly_topEntity",False)
         ]
       , clashTestGroup "RTree"
-        [ runTest ("tests" </> "shouldwork" </> "RTree") defBuild [] "TFold" ([""],"TFold_topEntity",False)
-        , runTest ("tests" </> "shouldwork" </> "RTree") defBuild [] "TZip"  ([""],"TZip_topEntity",False)
+        [ runTest ("tests" </> "shouldwork" </> "RTree") defBuild [] "TFold"       ([""],"TFold_topEntity",False)
+        , runTest ("tests" </> "shouldwork" </> "RTree") defBuild [] "TRepeat"  ([""],"TRepeat_topEntity",False)
+        , runTest ("tests" </> "shouldwork" </> "RTree") defBuild [] "TZip"        ([""],"TZip_topEntity",False)
       ]
       , clashTestGroup "Signal"
         [ runTest ("tests" </> "shouldwork" </> "Signal") defBuild [] "AlwaysHigh"      ([""],"AlwaysHigh_topEntity",False)
@@ -212,10 +213,24 @@ runClashTest =
         ]
       , clashTestGroup "TopEntity"
         -- VHDL tests disabled for now: I can't figure out how to generate a static name whilst retaining the ability to actually test..
-        [ runTest ("tests" </> "shouldwork" </> "TopEntity") [Verilog] [] "PortNames" (["","PortNames_topEntity","PortNames_testBench"],"PortNames_testBench",True)
+        [ runTest ("tests" </> "shouldwork" </> "TopEntity")    [Verilog] [] "PortNames" (["","PortNames_topEntity","PortNames_testBench"],"PortNames_testBench",True)
         , outputTest ("tests" </> "shouldwork" </> "TopEntity") [Verilog] "PortNames" "main"
-        , runTest ("tests" </> "shouldwork" </> "TopEntity") [Verilog] [] "PortProducts" (["","PortProducts_topEntity","PortProducts_testBench"],"PortProducts_testBench",True)
+        , runTest ("tests" </> "shouldwork" </> "TopEntity")    [Verilog] [] "PortProducts" (["","PortProducts_topEntity","PortProducts_testBench"],"PortProducts_testBench",True)
         , outputTest ("tests" </> "shouldwork" </> "TopEntity") [Verilog] "PortProducts" "main"
+        , runTest ("tests" </> "shouldwork" </> "TopEntity")    [Verilog] [] "PortNamesWithUnit" (["","PortNamesWithUnit_topEntity","PortNamesWithUnit_testBench"],"PortNamesWithUnit_testBench",True)
+        , outputTest ("tests" </> "shouldwork" </> "TopEntity") [Verilog] "PortNamesWithUnit" "main"
+        , runTest ("tests" </> "shouldwork" </> "TopEntity")    [Verilog] [] "PortNamesWithVector" (["","PortNamesWithVector_topEntity","PortNamesWithVector_testBench"],"PortNamesWithVector_testBench",True)
+        , outputTest ("tests" </> "shouldwork" </> "TopEntity") [Verilog] "PortNamesWithVector" "main"
+        , runTest ("tests" </> "shouldwork" </> "TopEntity")    [Verilog] [] "PortNamesWithRTree" (["","PortNamesWithRTree_topEntity","PortNamesWithRTree_testBench"],"PortNamesWithRTree_testBench",True)
+        , outputTest ("tests" </> "shouldwork" </> "TopEntity") [Verilog] "PortNamesWithRTree" "main"
+        ]
+      , clashTestGroup "Void"
+        [ runTest ("tests" </> "shouldwork" </> "Unit") defBuild [] "ZipWithUnitVector"            (["","ZipWithUnitVector_testBench"],"ZipWithUnitVector_testBench",True)
+        , runTest ("tests" </> "shouldwork" </> "Unit") defBuild [] "ZipWithTupleWithUnitLeft"     (["","ZipWithTupleWithUnitLeft_testBench"],"ZipWithTupleWithUnitLeft_testBench",True)
+        , runTest ("tests" </> "shouldwork" </> "Unit") defBuild [] "ZipWithTupleWithUnitRight"    (["","ZipWithTupleWithUnitRight_testBench"],"ZipWithTupleWithUnitRight_testBench",True)
+        , runTest ("tests" </> "shouldwork" </> "Unit") defBuild [] "ZipWithTripleWithUnitMiddle"  (["","ZipWithTripleWithUnitMiddle_testBench"],"ZipWithTripleWithUnitMiddle_testBench",True)
+        , runTest ("tests" </> "shouldwork" </> "Unit") defBuild [] "ZipWithUnitSP"                (["","ZipWithUnitSP_testBench"],"ZipWithUnitSP_testBench",True)
+        , runTest ("tests" </> "shouldwork" </> "Unit") defBuild [] "ZipWithUnitSP2"               (["","ZipWithUnitSP2_testBench"],"ZipWithUnitSP2_testBench",True)
         ]
       , clashTestGroup "Vector"
         [ runTest ("tests" </> "shouldwork" </> "Vector") defBuild [] "Concat"     (["","Concat_testBench"],"Concat_testBench",True)
@@ -243,6 +258,7 @@ runClashTest =
         , runTest ("tests" </> "shouldwork" </> "Vector") defBuild [] "VACC"       ([""],"VACC_topEntity",False)
         , runTest ("tests" </> "shouldwork" </> "Vector") defBuild [] "VEmpty"     (["", "VEmpty_testBench"],"VEmpty_testBench",True)
         , runTest ("tests" </> "shouldwork" </> "Vector") defBuild [] "VIndex"     ([""],"VIndex_topEntity",False)
+        , runTest ("tests" </> "shouldwork" </> "Vector") defBuild [] "VIndicesI"  (["","VIndicesI_testBench"],"VIndicesI_testBench",True)
         , runTest ("tests" </> "shouldwork" </> "Vector") defBuild [] "VFold"      (["","VFold_testBench"],"VFold_testBench",True)
         , runTest ("tests" </> "shouldwork" </> "Vector") defBuild [] "VMapAccum"  ([""],"VMapAccum_topEntity",False)
         , runTest ("tests" </> "shouldwork" </> "Vector") defBuild [] "VMerge"     (["","VMerge_testBench"],"VMerge_testBench",True)

@@ -141,7 +141,7 @@ genvar ~GENSYM[n][1];
 ~GENERATE
 for (~SYM[1]=0; ~SYM[1] < $size(~RESULT); ~SYM[1] = ~SYM[1] + 1) begin : ~GENSYM[imap][2]
   ~INDEXTYPE[~LIT[0]] ~GENSYM[i][3];
-  assign ~SYM[3] = ~LENGTH[~TYPO] - 1 - ~SYM[1];~IF~SIZE[~TYP[2]]~THEN
+  assign ~SYM[3] = ~SYM[1];~IF~SIZE[~TYP[2]]~THEN
   ~TYPEL[~TYP[2]] ~GENSYM[imap_in][4];
   assign ~SYM[4] = ~FROMBV[~VAR[vec][2][\\~SYM[1]\\]][~TYPEL[~TYP[2]]];~ELSE ~FI
   ~TYPEL[~TYPO] ~GENSYM[imap_out][5];
@@ -166,7 +166,7 @@ genvar ~GENSYM[n][1];
 ~GENERATE
 for (~SYM[1]=0; ~SYM[1] < $size(~RESULT); ~SYM[1] = ~SYM[1] + 1) begin : ~GENSYM[imap][2]
   ~TYP[0] ~GENSYM[i][3];
-  assign ~SYM[3] = ~LENGTH[~TYPO] - 1 - ~SYM[1] + ~ARG[0];~IF~SIZE[~TYP[2]]~THEN
+  assign ~SYM[3] = ~SYM[1] + ~ARG[0];~IF~SIZE[~TYP[2]]~THEN
   ~TYPEL[~TYP[2]] ~GENSYM[imap_in][4];
   assign ~SYM[4] = ~FROMBV[~VAR[vec][2][\\~SYM[1]\\]][~TYPEL[~TYP[2]]];~ELSE ~FI
   ~TYPEL[~TYPO] ~GENSYM[imap_out][5];

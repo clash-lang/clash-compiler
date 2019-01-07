@@ -76,7 +76,7 @@ import           Clash.Netlist.Util               (genComponentName, genTopCompo
 import           Clash.Netlist.BlackBox.Parser    (runParse)
 import           Clash.Netlist.BlackBox.Types     (BlackBoxTemplate, BlackBoxFunction)
 import           Clash.Netlist.Types
-  (BlackBox (..), Component (..), HWType, Identifier)
+  (BlackBox (..), Component (..), Identifier, FilteredHWType)
 import           Clash.Normalize                  (checkNonRecursive, cleanupGraph,
                                                    normalize, runNormalization)
 import           Clash.Normalize.Util             (callGraph)
@@ -103,7 +103,7 @@ generateHDL
   -- ^ TyCon cache
   -> IntMap TyConName
   -- ^ Tuple TyCon cache
-  -> (CustomReprs -> TyConMap -> Bool -> Type -> Maybe (Either String HWType))
+  -> (CustomReprs -> TyConMap -> Type -> Maybe (Either String FilteredHWType))
   -- ^ Hardcoded 'Type' -> 'HWType' translator
   -> PrimEvaluator
   -- ^ Hardcoded evaluator (delta-reduction)
@@ -607,7 +607,7 @@ normalizeEntity
   -- ^ TyCon cache
   -> IntMap TyConName
   -- ^ Tuple TyCon cache
-  -> (CustomReprs -> TyConMap -> Bool -> Type -> Maybe (Either String HWType))
+  -> (CustomReprs -> TyConMap -> Type -> Maybe (Either String FilteredHWType))
   -- ^ Hardcoded 'Type' -> 'HWType' translator
   -> PrimEvaluator
   -- ^ Hardcoded evaluator (delta-reduction)

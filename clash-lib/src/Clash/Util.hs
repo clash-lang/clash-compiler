@@ -268,6 +268,17 @@ clashLibVersion = Paths_clash_lib.version
 clashLibVersion = error "development version"
 #endif
 
+-- | Return number of occurrences of an item in a list
+countEq
+  :: Eq a
+  => a
+  --  ^ Needle
+  -> [a]
+  -- ^ Haystack
+  -> Int
+  -- ^ Times needle was found in haystack
+countEq a as = length (filter (== a) as)
+
 -- | \x y -> floor (logBase x y), x > 1 && y > 0
 flogBase :: Integer -> Integer -> Maybe Int
 flogBase x y | x > 1 && y > 0 = Just (I# (integerLogBase# x y))

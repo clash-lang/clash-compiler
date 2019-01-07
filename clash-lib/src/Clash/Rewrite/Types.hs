@@ -35,7 +35,7 @@ import Clash.Core.TyCon          (TyConName, TyConMap)
 import Clash.Core.Var            (Id, TyVar)
 import Clash.Core.VarEnv         (InScopeSet, VarSet)
 import Clash.Driver.Types        (BindingMap, DebugLevel)
-import Clash.Netlist.Types       (HWType)
+import Clash.Netlist.Types       (FilteredHWType)
 import Clash.Util
 
 import Clash.Annotations.BitRepresentation.Internal (CustomReprs)
@@ -89,10 +89,9 @@ data RewriteEnv
   -- ^ Lvl at which we print debugging messages
   , _typeTranslator :: CustomReprs
                     -> TyConMap
-                    -> Bool
                     -> Type
-                    -> Maybe (Either String HWType)
-  -- ^ Hardcode Type -> HWType translator
+                    -> Maybe (Either String FilteredHWType)
+  -- ^ Hardcode Type -> FilteredHWType translator
   , _tcCache        :: TyConMap
   -- ^ TyCon cache
   , _tupleTcCache   :: IntMap TyConName
