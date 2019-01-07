@@ -888,12 +888,12 @@ inst_ (CondAssignment id_ ty scrut scrutTy es) = fmap Just $ do
     conds i ((Just c ,e):es') = (exprLit (Just (scrutTy,conSize scrutTy)) c <+> colon <+> stringS i <+> equals <+> expr_ False e) <:> conds i es'
 
 inst_ (InstDecl' _ _ nm lbl ps pms) = fmap Just $
-    nest 2 (stringS nm <+> stringS lbl <> params <> line <> pms' <> semi)
+    nest 2 (stringS nm <> params <> stringS lbl <> line <> pms' <> semi)
   where
     pms' = tupled $ sequence [dot <> expr_ False i <+> parens (expr_ False e) | (i,_,_,e) <- pms]
     params
       | null ps   = emptyDoc
-      | otherwise = line <> "#" <> tupled (sequence [dot <> expr_ False i <+> parens (expr_ False e) | (i,_,e) <- ps])
+      | otherwise = line <> "#" <> tupled (sequence [dot <> expr_ False i <+> parens (expr_ False e) | (i,_,e) <- ps]) <> line
 
 inst_ (BlackBoxD _ libs imps inc bs bbCtx) =
   fmap Just (Mon (column (renderBlackBox libs imps inc bs bbCtx)))
