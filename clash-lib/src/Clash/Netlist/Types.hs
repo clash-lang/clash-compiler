@@ -22,7 +22,7 @@
 {-# OPTIONS_GHC -Wno-orphans #-}
 
 module Clash.Netlist.Types
-  ( Declaration (..,NetDecl, InstDecl)
+  ( Declaration (..,NetDecl)
   , module Clash.Netlist.Types
   )
 where
@@ -208,7 +208,7 @@ data Declaration
   -- * Type of the scrutinee
   --
   -- * List of: (Maybe expression scrutinized expression is compared with,RHS of alternative)
-  | InstDecl' EntityOrComponent (Maybe Identifier) !Identifier !Identifier [(Expr,HWType,Expr)] [(Expr,PortDirection,HWType,Expr)]
+  | InstDecl EntityOrComponent (Maybe Identifier) !Identifier !Identifier [(Expr,HWType,Expr)] [(Expr,PortDirection,HWType,Expr)]
   -- ^ Instantiation of another component:
   --
   -- * Whether it's an entity or a component
@@ -251,15 +251,6 @@ data WireOrReg = Wire | Reg
   deriving (Show,Generic)
 
 instance NFData WireOrReg
-
-pattern InstDecl
-  :: EntityOrComponent
-  -> Maybe Identifier
-  -> Identifier
-  -> Identifier
-  -> [(Expr,PortDirection,HWType,Expr)]
-  -> Declaration
-pattern InstDecl eoc mi i2 i3 as = InstDecl' eoc mi i2 i3 [] as
 
 pattern NetDecl
   :: Maybe Identifier

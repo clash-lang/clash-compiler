@@ -1205,7 +1205,7 @@ decl l (NetDecl' noteM _ id_ ty) = Just <$> (,fromIntegral (TextS.length id_)) <
   where
     addNote n = mappend ("--" <+> pretty n <> line)
 
-decl _ (InstDecl' Comp _ nm _ gens pms) = fmap (Just . (,0)) $ do
+decl _ (InstDecl Comp _ nm _ gens pms) = fmap (Just . (,0)) $ do
   { rec (p,ls) <- fmap unzip $ sequence [ (,formalLength i) <$> fill (maximum ls) (expr_ False i) <+> colon <+> portDir dir <+> sizedQualTyName ty | (i,dir,ty,_) <- pms ]
   ; rec (g,lsg) <- fmap unzip $ sequence [ (,formalLength i) <$> fill (maximum lsg) (expr_ False i) <+> colon <+> sizedQualTyName ty | (i,ty,_) <- gens]
   ; "component" <+> pretty nm <> line <>
@@ -1329,7 +1329,7 @@ inst_ (CondAssignment id_ _sig scrut scrutTy es) = fmap Just $
     conds ((Nothing,e):_)   = expr_ False e <+> "when" <+> "others" <:> return []
     conds ((Just c ,e):es') = expr_ False e <+> "when" <+> patLit scrutTy c <:> conds es'
 
-inst_ (InstDecl' entOrComp libM nm lbl gens pms) = do
+inst_ (InstDecl entOrComp libM nm lbl gens pms) = do
     maybe (return ()) (\lib -> Mon (libraries %= (T.fromStrict lib:))) libM
     fmap Just $
       nest 2 $ pretty lbl <+> colon <+> entOrComp'
