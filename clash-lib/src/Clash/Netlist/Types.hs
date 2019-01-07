@@ -136,7 +136,7 @@ data HWType
   | String
   -- ^ String type
   | Integer
-  -- ^ Integer type
+  -- ^ Integer type (for parameters only)
   | Bool
   -- ^ Boolean type
   | Bit
