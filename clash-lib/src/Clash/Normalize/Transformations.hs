@@ -408,7 +408,7 @@ caseCon ctx@(TransformContext is0 _) e@(Case subj ty alts)
               | nm `elem` ["Clash.Transformations.undefined"] ->
                 let e' = mkApps (Prim nm ty') [Right ty]
                 in changed e'
-            (Prim nm _,[])
+            (Prim nm _,[_])
               | nm `elem` ["EmptyCase"] ->
                 changed (Prim nm ty)
             _ -> do

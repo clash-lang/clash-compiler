@@ -48,6 +48,7 @@ runClashTest =
       , runTest "examples"               [VHDL]   []                                        "Blinker"      (["blinker"],"blinker",False)
       , runTest "examples"               defBuild []                                        "BlockRamTest" ([""],"BlockRamTest_topEntity",False)
       , runTest "examples"               defBuild []                                        "Calculator"   (["","Calculator_testBench"],"Calculator_testBench",True )
+      , runTest "examples"               defBuild []                                        "CHIP8"        ([""],"CHIP8_topEntity", False)
       , runTest "examples"               defBuild []                                        "CochleaPlus"  ([""],"CochleaPlus_topEntity",False)
       , runTest "examples"               defBuild ["-fclash-component-prefix","test"]       "FIR"          (["","test_FIR_testBench"],"test_FIR_testBench",True )
       , runTest "examples"               defBuild []                                        "Fifo"         ([""],"Fifo_topEntity",False)
