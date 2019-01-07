@@ -557,9 +557,11 @@ filterVoidPorts _hwty (PortName s) =
   PortName s
 filterVoidPorts (FilteredHWType _hwty [filtered]) (PortProduct s ps) =
   PortProduct s [filterVoidPorts f p | (p, (void, f)) <- zip ps filtered, not void]
-filterVoidPorts _filtered (PortProduct _s _ps) =
+filterVoidPorts filtered pp@(PortProduct _s _ps) =
   -- TODO: Prettify errors
-  error $ $(curLoc) ++ "Ports were annotated as product, but type wasn't one."
+  error $ $(curLoc) ++ "Ports were annotated as product, but type wasn't one: \n\n"
+                    ++ "   Filtered was: " ++ show filtered ++ "\n\n"
+                    ++ "   Ports was: " ++ show pp
 
 -- | Uniquely rename all the variables and their references in a normalized
 -- term

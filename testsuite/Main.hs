@@ -171,8 +171,9 @@ runClashTest =
         , runTest ("tests" </> "shouldwork" </> "Polymorphism") defBuild [] "LocalPoly"         ([""],"LocalPoly_topEntity",False)
         ]
       , clashTestGroup "RTree"
-        [ runTest ("tests" </> "shouldwork" </> "RTree") defBuild [] "TFold" ([""],"TFold_topEntity",False)
-        , runTest ("tests" </> "shouldwork" </> "RTree") defBuild [] "TZip"  ([""],"TZip_topEntity",False)
+        [ runTest ("tests" </> "shouldwork" </> "RTree") defBuild [] "TFold"       ([""],"TFold_topEntity",False)
+        , runTest ("tests" </> "shouldwork" </> "RTree") defBuild [] "TRepeat"  ([""],"TRepeat_topEntity",False)
+        , runTest ("tests" </> "shouldwork" </> "RTree") defBuild [] "TZip"        ([""],"TZip_topEntity",False)
       ]
       , clashTestGroup "Signal"
         [ runTest ("tests" </> "shouldwork" </> "Signal") defBuild [] "AlwaysHigh"      ([""],"AlwaysHigh_topEntity",False)
@@ -211,12 +212,16 @@ runClashTest =
         ]
       , clashTestGroup "TopEntity"
         -- VHDL tests disabled for now: I can't figure out how to generate a static name whilst retaining the ability to actually test..
-        [ runTest ("tests" </> "shouldwork" </> "TopEntity") [Verilog] [] "PortNames" (["","PortNames_topEntity","PortNames_testBench"],"PortNames_testBench",True)
+        [ runTest ("tests" </> "shouldwork" </> "TopEntity")    [Verilog] [] "PortNames" (["","PortNames_topEntity","PortNames_testBench"],"PortNames_testBench",True)
         , outputTest ("tests" </> "shouldwork" </> "TopEntity") [Verilog] "PortNames" "main"
-        , runTest ("tests" </> "shouldwork" </> "TopEntity") [Verilog] [] "PortProducts" (["","PortProducts_topEntity","PortProducts_testBench"],"PortProducts_testBench",True)
+        , runTest ("tests" </> "shouldwork" </> "TopEntity")    [Verilog] [] "PortProducts" (["","PortProducts_topEntity","PortProducts_testBench"],"PortProducts_testBench",True)
         , outputTest ("tests" </> "shouldwork" </> "TopEntity") [Verilog] "PortProducts" "main"
-        , runTest ("tests" </> "shouldwork" </> "TopEntity") [Verilog] [] "PortNamesWithUnit" (["","PortNamesWithUnit_topEntity","PortNamesWithUnit_testBench"],"PortNamesWithUnit_testBench",True)
+        , runTest ("tests" </> "shouldwork" </> "TopEntity")    [Verilog] [] "PortNamesWithUnit" (["","PortNamesWithUnit_topEntity","PortNamesWithUnit_testBench"],"PortNamesWithUnit_testBench",True)
         , outputTest ("tests" </> "shouldwork" </> "TopEntity") [Verilog] "PortNamesWithUnit" "main"
+        , runTest ("tests" </> "shouldwork" </> "TopEntity")    [Verilog] [] "PortNamesWithVector" (["","PortNamesWithVector_topEntity","PortNamesWithVector_testBench"],"PortNamesWithVector_testBench",True)
+        , outputTest ("tests" </> "shouldwork" </> "TopEntity") [Verilog] "PortNamesWithVector" "main"
+        , runTest ("tests" </> "shouldwork" </> "TopEntity")    [Verilog] [] "PortNamesWithRTree" (["","PortNamesWithRTree_topEntity","PortNamesWithRTree_testBench"],"PortNamesWithRTree_testBench",True)
+        , outputTest ("tests" </> "shouldwork" </> "TopEntity") [Verilog] "PortNamesWithRTree" "main"
         ]
       , clashTestGroup "Void"
         [ runTest ("tests" </> "shouldwork" </> "Unit") defBuild [] "ZipWithUnitVector"            (["","ZipWithUnitVector_testBench"],"ZipWithUnitVector_testBench",True)

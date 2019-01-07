@@ -168,20 +168,42 @@ ghcTypeToHWType iw floatSupport = go
 
         "Clash.Sized.Vector.Vec" -> do
           let [szTy,elTy] = args
-          sz     <- mapExceptT (Just . coerce) (tyNatSize m szTy)
-          elHWTy <- ExceptT $ return $ stripFiltered <$> coreTypeToHWType go reprs m elTy
-          case elHWTy of
-            Void {}     -> returnN (Void (Just (Vector (fromInteger sz) elHWTy)))
-            _ | sz == 0 -> returnN (Void (Just (Vector (fromInteger sz) elHWTy)))
-            _           -> returnN $ Vector (fromInteger sz) elHWTy
+          sz0     <- mapExceptT (Just . coerce) (tyNatSize m szTy)
+          fElHWTy <- ExceptT $ return $ coreTypeToHWType go reprs m elTy
+
+          -- Treat Vec as a product type with a single constructor and N
+          -- constructor fields.
+          let sz1    = fromInteger sz0 :: Int
+              elHWTy = stripFiltered fElHWTy
+
+          let
+            (isVoid, vecHWTy) =
+              case elHWTy of
+                Void {}      -> (True, Void (Just (Vector sz1 elHWTy)))
+                _ | sz1 == 0 -> (True, Void (Just (Vector sz1 elHWTy)))
+                _            -> (False, Vector sz1 elHWTy)
+
+          let filtered = [replicate sz1 (isVoid, fElHWTy)]
+          return (FilteredHWType vecHWTy filtered)
 
         "Clash.Sized.RTree.RTree" -> do
           let [szTy,elTy] = args
-          sz     <- mapExceptT (Just . coerce) (tyNatSize m szTy)
-          elHWTy <- ExceptT $ return $ stripFiltered <$> coreTypeToHWType go reprs m elTy
-          case elHWTy of
-            Void {} -> returnN (Void (Just (RTree (fromInteger sz) elHWTy)))
-            _       -> returnN $ RTree (fromInteger sz) elHWTy
+          sz0     <- mapExceptT (Just . coerce) (tyNatSize m szTy)
+          fElHWTy <- ExceptT $ return $ coreTypeToHWType go reprs m elTy
+
+          -- Treat RTree as a product type with a single constructor and 2^N
+          -- constructor fields.
+          let sz1    = fromInteger sz0 :: Int
+              elHWTy = stripFiltered fElHWTy
+
+          let
+            (isVoid, vecHWTy) =
+              case elHWTy of
+                Void {} -> (True, Void (Just (RTree sz1 elHWTy)))
+                _       -> (False, RTree sz1 elHWTy)
+
+          let filtered = [replicate (2^sz1) (isVoid, fElHWTy)]
+          return (FilteredHWType vecHWTy filtered)
 
         "String" -> returnN String
         "GHC.Types.[]" -> case tyView (head args) of
