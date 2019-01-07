@@ -111,7 +111,7 @@ mkBlackBoxContext resId args = do
 
     -- Make context result
     let res = Identifier resNm Nothing
-    resTy <- stripFiltered <$> unsafeCoreTypeToHWTypeM $(curLoc) (V.varType resId)
+    resTy <- unsafeCoreTypeToHWTypeM' $(curLoc) (V.varType resId)
 
     lvl <- Lens.use curBBlvl
     (nm,_) <- Lens.use curCompNm
@@ -290,7 +290,7 @@ mkPrimitive bbEParen bbEasD dst nm args ty = do
                     Nothing -> return (Identifier "__VOID__" Nothing,[])
         Just (P.Primitive pNm _)
           | pNm == "GHC.Prim.tagToEnum#" -> do
-              hwTy <- stripFiltered <$> N.unsafeCoreTypeToHWTypeM $(curLoc) ty
+              hwTy <- N.unsafeCoreTypeToHWTypeM' $(curLoc) ty
               case args of
                 [Right (ConstTy (TyCon tcN)), Left (C.Literal (IntLiteral i))] -> do
                   tcm <- Lens.use tcCache
@@ -305,7 +305,7 @@ mkPrimitive bbEParen bbEasD dst nm args ty = do
                   case scrutExpr of
                     Identifier id_ Nothing -> return (DataTag hwTy (Left id_),scrutDecls)
                     _ -> do
-                      scrutHTy <- stripFiltered <$> unsafeCoreTypeToHWTypeM $(curLoc) scrutTy
+                      scrutHTy <- unsafeCoreTypeToHWTypeM' $(curLoc) scrutTy
                       tmpRhs <- mkUniqueIdentifier Extended "#tte_rhs"
                       let netDeclRhs   = NetDecl Nothing tmpRhs scrutHTy
                           netAssignRhs = Assignment tmpRhs scrutExpr
@@ -318,7 +318,7 @@ mkPrimitive bbEParen bbEasD dst nm args ty = do
               [Right _,Left scrut] -> do
                 tcm      <- Lens.use tcCache
                 let scrutTy = termType tcm scrut
-                scrutHTy <- stripFiltered <$> unsafeCoreTypeToHWTypeM $(curLoc) scrutTy
+                scrutHTy <- unsafeCoreTypeToHWTypeM' $(curLoc) scrutTy
                 (scrutExpr,scrutDecls) <- mkExpr False (Left "#dtt_rhs") scrutTy scrut
                 case scrutExpr of
                   Identifier id_ Nothing -> return (DataTag scrutHTy (Right id_),scrutDecls)
@@ -354,7 +354,7 @@ mkPrimitive bbEParen bbEasD dst nm args ty = do
           nm'' <- mkUniqueIdentifier Extended nm'
           -- TODO: check that it's okay to use `mkUnsafeInternalName`
           let nm3 = mkUnsafeSystemName nm'' 0
-          hwTy <- stripFiltered <$> N.unsafeCoreTypeToHWTypeM $(curLoc) ty
+          hwTy <- N.unsafeCoreTypeToHWTypeM' $(curLoc) ty
           let id_    = mkId ty nm3
               idDecl = NetDecl' Nothing wr nm'' (Right hwTy)
           case hwTy of

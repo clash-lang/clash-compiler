@@ -53,7 +53,7 @@ import           Clash.Driver.Types
   (BindingMap, ClashOpts (..), DebugLevel (..))
 import           Clash.Netlist.Types              (HWType (..), FilteredHWType(..))
 import           Clash.Netlist.Util
-  (splitNormalized, unsafeCoreTypeToHWType, stripFiltered)
+  (splitNormalized, unsafeCoreTypeToHWType')
 import           Clash.Normalize.Strategy
 import           Clash.Normalize.Transformations
   (appProp, bindConstantVar, caseCon, flattenLet, reduceConst, topLet)
@@ -398,7 +398,7 @@ clockResetErrors sp reprs tyTran tcm ty =
   where
     (args,_)  = splitCoreFunForallTy tcm ty
     (_,args') = partitionEithers args
-    hwArgs    = zip (map (stripFiltered . unsafeCoreTypeToHWType sp $(curLoc) tyTran reprs tcm) args') args'
+    hwArgs    = zip (map (unsafeCoreTypeToHWType' sp $(curLoc) tyTran reprs tcm) args') args'
     clks      = groupBy ((==) `on` fst) . sortBy (compare `on` fst)
               $ [ ((nm,i),ty') | (Clock nm i _,ty') <- hwArgs]
     rsts      = groupBy ((==) `on` (fst.fst)) . sortBy (compare `on` (fst.fst))

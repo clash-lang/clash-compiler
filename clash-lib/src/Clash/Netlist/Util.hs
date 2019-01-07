@@ -121,6 +121,19 @@ splitNormalized tcm expr = case collectBndrs expr of
  where
   ty = termType tcm expr
 
+-- | Same as @unsafeCoreTypeToHWType@, but discards void filter information
+unsafeCoreTypeToHWType'
+  :: SrcSpan
+  -- ^ Approximate location in original source file
+  -> String
+  -> (CustomReprs -> TyConMap -> Type -> Maybe (Either String FilteredHWType))
+  -> CustomReprs
+  -> TyConMap
+  -> Type
+  -> HWType
+unsafeCoreTypeToHWType' sp loc builtInTranslation reprs m ty =
+  stripFiltered (unsafeCoreTypeToHWType sp loc builtInTranslation reprs m ty)
+
 -- | Converts a Core type to a HWType given a function that translates certain
 -- builtin types. Errors if the Core type is not translatable.
 unsafeCoreTypeToHWType
@@ -136,6 +149,14 @@ unsafeCoreTypeToHWType sp loc builtInTranslation reprs m ty =
   either (\msg -> throw (ClashException sp (loc ++ msg) Nothing)) id $
   coreTypeToHWType builtInTranslation reprs m ty
 
+-- | Same as @unsafeCoreTypeToHWTypeM@, but discards void filter information
+unsafeCoreTypeToHWTypeM'
+  :: String
+  -> Type
+  -> NetlistMonad HWType
+unsafeCoreTypeToHWTypeM' loc ty =
+  stripFiltered <$> unsafeCoreTypeToHWTypeM loc ty
+
 -- | Converts a Core type to a HWType within the NetlistMonad; errors on failure
 unsafeCoreTypeToHWTypeM
   :: String
@@ -149,6 +170,15 @@ unsafeCoreTypeToHWTypeM loc ty =
     <*> Lens.use customReprs
     <*> Lens.use tcCache
     <*> pure ty
+
+-- | Same as @coreTypeToHWTypeM@, but discards void filter information
+coreTypeToHWTypeM'
+  :: Type
+  -- ^ Type to convert to HWType
+  -> NetlistMonad (Maybe HWType)
+coreTypeToHWTypeM' ty =
+  fmap stripFiltered <$> coreTypeToHWTypeM ty
+
 
 -- | Converts a Core type to a HWType within the NetlistMonad; 'Nothing' on failure
 coreTypeToHWTypeM
@@ -269,6 +299,18 @@ fixCustomRepr reprs (coreToType' -> Right tyName) sp@(SP name subtys) =
       sp
 
 fixCustomRepr _ _ typ = typ
+
+-- | Same as @coreTypeToHWType@, but discards void filter information
+coreTypeToHWType'
+  :: (CustomReprs -> TyConMap -> Type -> Maybe (Either String FilteredHWType))
+  -> CustomReprs
+  -> TyConMap
+  -> Type
+  -- ^ Type to convert to HWType
+  -> Either String HWType
+coreTypeToHWType' builtInTranslation reprs m ty =
+  stripFiltered <$> coreTypeToHWType builtInTranslation reprs m ty
+
 
 -- | Converts a Core type to a HWType given a function that translates certain
 -- builtin types. Returns a string containing the error message when the Core
@@ -435,7 +477,7 @@ representableType
   -> Type
   -> Bool
 representableType builtInTranslation reprs stringRepresentable m =
-    either (const False) isRepresentable . fmap stripFiltered . coreTypeToHWType builtInTranslation reprs m
+    either (const False) isRepresentable . coreTypeToHWType' builtInTranslation reprs m
   where
     isRepresentable hty = case hty of
       String            -> stringRepresentable
@@ -751,7 +793,7 @@ idToPort var = do
   reprs <- Lens.use customReprs
   let i  = varName var
       ty = varType var
-      hwTy = stripFiltered $ unsafeCoreTypeToHWType sp $(curLoc) typeTrans reprs tcm ty
+      hwTy = unsafeCoreTypeToHWType' sp $(curLoc) typeTrans reprs tcm ty
   if isVoid hwTy
     then return Nothing
     else return (Just (nameOcc i, hwTy))
