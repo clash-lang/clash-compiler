@@ -209,7 +209,19 @@ data Declaration
   --
   -- * List of: (Maybe expression scrutinized expression is compared with,RHS of alternative)
   | InstDecl' EntityOrComponent (Maybe Identifier) !Identifier !Identifier [(Expr,HWType,Expr)] [(Expr,PortDirection,HWType,Expr)]
-  -- ^ Instantiation of another component
+  -- ^ Instantiation of another component:
+  --
+  -- * Whether it's an entity or a component
+  --
+  -- * Comment to add to the generated code
+  --
+  -- * The component's (or entity's) name
+  --
+  -- * Instance label
+  --
+  -- * List of parameters for this component (param name, param type, param value)
+  --
+  -- * Ports (port name, port direction, type, assignment)
   | BlackBoxD
       -- Primitive name:
       !Text
