@@ -479,7 +479,7 @@ mkFunInput resId e = do
                       outpAssign    = (Identifier (fst compOutp) Nothing,Out,snd compOutp,Identifier "~RESULT" Nothing)
                   i <- varCount <<%= (+1)
                   let instLabel     = TextS.concat [compName,TextS.pack ("_" ++ show i)]
-                      instDecl      = InstDecl Entity Nothing compName instLabel (outpAssign:inpAssigns)
+                      instDecl      = InstDecl Entity Nothing compName instLabel [] (outpAssign:inpAssigns)
                   return (Right (("",[instDecl]),Wire))
                 Nothing -> error $ $(curLoc) ++ "Cannot make function input for: " ++ showPpr e
             C.Lam {} -> do

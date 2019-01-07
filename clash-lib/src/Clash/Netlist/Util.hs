@@ -489,11 +489,13 @@ representableType builtInTranslation reprs stringRepresentable m =
       Annotated _ ty    -> isRepresentable ty
       _                 -> True
 
--- | Determines the bitsize of a type
+-- | Determines the bitsize of a type. For types that don't get turned
+-- into real values in hardware (string, integer) the size is 0.
 typeSize :: HWType
          -> Int
 typeSize (Void {}) = 0
-typeSize String = 1
+typeSize String = 0
+typeSize Integer = 0
 typeSize Bool = 1
 typeSize Bit = 1
 typeSize (Clock _ _ Source) = 1
@@ -1289,6 +1291,7 @@ mkTopUnWrapper topEntity annM man dstId args = do
                             (Just topName)
                             topName
                             instLabel
+                            []
                             ( map (\(p,i,t) -> (Identifier p Nothing,In, t,Identifier i Nothing)) (concat iports) ++
                               map (\(p,o,t) -> (Identifier p Nothing,Out,t,Identifier o Nothing)) oports)
 
