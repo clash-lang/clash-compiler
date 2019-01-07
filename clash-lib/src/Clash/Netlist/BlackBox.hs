@@ -400,7 +400,6 @@ mkFunInput resId e = do
               resHTyM0 <- coreTypeToHWTypeM resTy
               let resHTyM1 = (\fHwty -> (stripFiltered fHwty, flattenFiltered fHwty)) <$> resHTyM0
 
-              -- TODO: Handle CustomSP / CustomSum
               case resHTyM1 of
                 -- Special case where coreTypeToHWTypeM determined a type to
                 -- be completely transparent.
@@ -416,6 +415,17 @@ mkFunInput resId e = do
                 -- original indices are. Please see the documentation in
                 -- Clash.Netlist.Util.mkADT for more information.
                 Just (resHTy@(SP _ _), areVoids0) -> do
+                  let
+                      dcI       = dcTag dc - 1
+                      areVoids1 = indexNote ($(curLoc) ++ "No areVoids with index: " ++ show dcI) areVoids0 dcI
+                      dcInps    = [Identifier (TextS.pack ("~ARG[" ++ show x ++ "]")) Nothing | x <- originalIndices areVoids1]
+                      dcApp     = DataCon resHTy (DC (resHTy,dcI)) dcInps
+                      dcAss     = Assignment "~RESULT" dcApp
+                  return (Right (("",[dcAss]),Wire))
+
+                -- CustomSP the same as SP, but with a user-defined bit
+                -- level representation
+                Just (resHTy@(CustomSP {}), areVoids0) -> do
                   let
                       dcI       = dcTag dc - 1
                       areVoids1 = indexNote ($(curLoc) ++ "No areVoids with index: " ++ show dcI) areVoids0 dcI
@@ -443,6 +453,13 @@ mkFunInput resId e = do
 
                 -- Sum types OR a Sum type after filtering empty types:
                 Just (resHTy@(Sum _ _), _areVoids) -> do
+                  let dcI   = dcTag dc - 1
+                      dcApp = DataCon resHTy (DC (resHTy,dcI)) []
+                      dcAss = Assignment "~RESULT" dcApp
+                  return (Right (("",[dcAss]),Wire))
+
+                -- Same as Sum, but with user defined bit level representation
+                Just (resHTy@(CustomSum {}), _areVoids) -> do
                   let dcI   = dcTag dc - 1
                       dcApp = DataCon resHTy (DC (resHTy,dcI)) []
                       dcAss = Assignment "~RESULT" dcApp
