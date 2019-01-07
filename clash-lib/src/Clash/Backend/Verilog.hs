@@ -509,7 +509,7 @@ inst_ (InstDecl _ _ nm lbl ps pms) = fmap Just $
   where
     pms' = tupled $ sequence [dot <> expr_ False i <+> parens (expr_ False e) | (i,_,_,e) <- pms]
     params
-      | null ps   = emptyDoc
+      | null ps   = space
       | otherwise = line <> "#" <> tupled (sequence [dot <> expr_ False i <+> parens (expr_ False e) | (i,_,e) <- ps]) <> line
 
 inst_ (BlackBoxD _ libs imps inc bs bbCtx) =
