@@ -1,2 +1,2 @@
 #!/bin/sh
-ghci -fobject-code -iclash-lib/src -iclash-ghc/src-ghc -Wall -Werror -DTOOL_VERSION_ghc=\"$(ghc --numeric-version)\" Clash.hs
+ghci -fobject-code -iclash-lib/src -iclash-ghc/src-ghc -Wall -DTOOL_VERSION_ghc=\"$(ghc --numeric-version)\" Clash.hs
