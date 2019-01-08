@@ -16,9 +16,9 @@ build-type:          Simple
 -- extra-source-files:
 cabal-version:       >=1.10
 
-flag travisci
+flag disable-sv-tests
    description:
-     The tests are run on TravisCI
+     Don't run systemverilog tests
    default: False
    manual: True
 
@@ -61,7 +61,7 @@ executable clash-testsuite
 
   -- hs-source-dirs:
   default-language:    Haskell2010
-  if flag(travisci)
-    ghc-options:       -DTRAVISBUILD
+  if flag(disable-sv-tests)
+    cpp-options:       -DDISABLE_SV_TESTS
   if flag(cosim)
-    ghc-options:       -DCOSIM
+    cpp-options:       -DCOSIM

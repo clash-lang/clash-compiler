@@ -15,7 +15,7 @@ import System.Environment (setEnv)
 import System.Exit (exitWith, ExitCode(ExitSuccess, ExitFailure))
 
 defBuild :: [BuildTarget]
-#ifdef TRAVISBUILD
+#ifdef DISABLE_SV_TESTS
 defBuild = [VHDL, Verilog]
 #else
 defBuild = [VHDL, Verilog, SystemVerilog]
