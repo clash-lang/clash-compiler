@@ -1209,7 +1209,7 @@ decl l (NetDecl' noteM _ id_ ty) = Just <$> (,fromIntegral (TextS.length id_)) <
 
 decl _ (InstDecl Comp _ nm _ gens pms) = fmap (Just . (,0)) $ do
   { rec (p,ls) <- fmap unzip $ sequence [ (,formalLength i) <$> fill (maximum ls) (expr_ False i) <+> colon <+> portDir dir <+> sizedQualTyName ty | (i,dir,ty,_) <- pms ]
-  ; rec (g,lsg) <- fmap unzip $ sequence [ (,formalLength i) <$> fill (maximum lsg) (expr_ False i) <+> colon <+> sizedQualTyName ty | (i,ty,_) <- gens]
+  ; rec (g,lsg) <- fmap unzip $ sequence [ (,formalLength i) <$> fill (maximum lsg) (expr_ False i) <+> colon <+> tyName ty | (i,ty,_) <- gens]
   ; "component" <+> pretty nm <> line <>
     ( if null g then emptyDoc
         else indent 2 ("generic" <> line <> tupledSemi (pure g) <> semi) <> line
