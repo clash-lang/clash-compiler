@@ -49,6 +49,7 @@ executable clash-testsuite
                        temporary,
                        text,
                        generic-lens,
+                       interpolate,
 
                        -- Strictly we don't need these dependencies for the
                        -- testsuite to compile, but we do when running it.
