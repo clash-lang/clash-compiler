@@ -53,7 +53,7 @@ import           Clash.Core.Term
 import           Clash.Core.TyCon
   (TyConMap, tyConDataCons)
 import           Clash.Core.Type             (KindOrType, Type (..),
-                                              TypeView (..), coreView,
+                                              TypeView (..), coreView1,
                                               normalizeType,
                                               typeKind, tyView)
 import           Clash.Core.Util
@@ -546,7 +546,7 @@ mkSelectorCase
   -> m Term
 mkSelectorCase caller inScope tcm scrut dcI fieldI = go (termType tcm scrut)
   where
-    go (coreView tcm -> Just ty')   = go ty'
+    go (coreView1 tcm -> Just ty')   = go ty'
     go scrutTy@(tyView -> TyConApp tc args) =
       case tyConDataCons (lookupUniqMap' tcm tc) of
         [] -> cantCreate $(curLoc) ("TyCon has no DataCons: " ++ show tc ++ " " ++ showPpr tc) scrutTy

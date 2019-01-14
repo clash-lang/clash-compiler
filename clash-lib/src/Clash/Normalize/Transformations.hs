@@ -1199,8 +1199,8 @@ collectANF _ (Letrec binds body) = do
 -- type by the Clash compiler, so observing its constructor leads to all kinds
 -- of problems. In this case that "Clash.Rewrite.Util.mkSelectorCase" will
 -- try to project the LHS and RHS of the ':-' constructor, however,
--- 'mkSelectorCase' uses 'coreView' to find the "real" data-constructor.
--- 'coreView' however looks through the 'Signal' type, and hence 'mkSelector'
+-- 'mkSelectorCase' uses 'coreView1' to find the "real" data-constructor.
+-- 'coreView1' however looks through the 'Signal' type, and hence 'mkSelector'
 -- finds the data constructors for the element type of Signal. This resulted in
 -- error #24 (https://github.com/christiaanb/clash2/issues/24), where we
 -- try to get the first field out of the 'Vec's 'Nil' constructor.

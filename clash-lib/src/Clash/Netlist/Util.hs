@@ -56,7 +56,7 @@ import           Clash.Core.Term         (LetBinding, Term (..))
 import           Clash.Core.TyCon
   (TyConName, TyConMap, tyConDataCons)
 import           Clash.Core.Type         (Type (..), TypeView (..), LitTy (..),
-                                          coreView, splitTyConAppM, tyView)
+                                          coreView1, splitTyConAppM, tyView)
 import           Clash.Core.Util         (collectBndrs, termType, tyNatSize)
 import           Clash.Core.Var          (Id, Var (..), mkId, modifyVarName, Attr')
 import           Clash.Core.VarEnv
@@ -330,7 +330,7 @@ coreTypeToHWType builtInTranslation reprs m ty = go' ty
       (\(FilteredHWType hwty filtered) ->
         (FilteredHWType (fixCustomRepr reprs ty hwty) filtered)) <$> hwtyE
     -- Strip transparant types:
-    go' (coreView m -> Just ty') =
+    go' (coreView1 m -> Just ty') =
       coreTypeToHWType builtInTranslation reprs m ty'
     -- Try to create hwtype based on AST:
     go' (tyView -> TyConApp tc args) = do

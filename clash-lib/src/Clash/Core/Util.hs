@@ -141,7 +141,7 @@ piResultTyMaybe
   -> Type
   -> Maybe Type
 piResultTyMaybe m ty arg
-  | Just ty' <- coreView m ty
+  | Just ty' <- coreView1 m ty
   = piResultTyMaybe m ty' arg
   | FunTy _ res <- tyView ty
   = Just res
@@ -181,7 +181,7 @@ piResultTys
   -> Type
 piResultTys _ ty [] = ty
 piResultTys m ty origArgs@(arg:args)
-  | Just ty' <- coreView m ty
+  | Just ty' <- coreView1 m ty
   = piResultTys m ty' origArgs
   | FunTy _ res <- tyView ty
   = piResultTys m res args
@@ -194,7 +194,7 @@ piResultTys m ty origArgs@(arg:args)
 
   go env ty' [] = substTy (mkTvSubst inScope env) ty'
   go env ty' allArgs@(arg':args')
-    | Just ty'' <- coreView m ty'
+    | Just ty'' <- coreView1 m ty'
     = go env ty'' allArgs
     | FunTy _ res <- tyView ty'
     = go env res args'
@@ -581,7 +581,7 @@ isClockOrReset
   :: TyConMap
   -> Type
   -> Bool
-isClockOrReset m (coreView m -> Just ty) = isClockOrReset m ty
+isClockOrReset m (coreView1 m -> Just ty) = isClockOrReset m ty
 isClockOrReset _ (tyView -> TyConApp tcNm _) = case nameOcc tcNm of
   "Clash.Signal.Internal.Clock" -> True
   "Clash.Signal.Internal.Reset" -> True
@@ -591,7 +591,7 @@ isClockOrReset _ _ = False
 tyNatSize :: TyConMap
           -> Type
           -> Except String Integer
-tyNatSize m (coreView m -> Just ty) = tyNatSize m ty
+tyNatSize m (coreView1 m -> Just ty) = tyNatSize m ty
 tyNatSize _ (LitTy (NumTy i))       = return i
 tyNatSize _ ty = throwE $ $(curLoc) ++ "Cannot reduce to an integer:\n" ++ showDoc (ppr ty)
 

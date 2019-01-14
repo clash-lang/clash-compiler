@@ -54,7 +54,7 @@ import           Clash.Core.Term
   (Alt, Pat (..), Term (..))
 import qualified Clash.Core.Term                  as Core
 import           Clash.Core.Type
-  (Type (..), coreView, splitFunTys, splitCoreFunForallTy)
+  (Type (..), coreView1, splitFunTys, splitCoreFunForallTy)
 import           Clash.Core.TyCon                 (TyConMap)
 import           Clash.Core.Util                  (collectArgs, termType)
 import           Clash.Core.Var                   (Id, Var (..))
@@ -420,7 +420,7 @@ reorderCustom
   -> Type
   -> [(Pat, Term)]
   -> [(Pat, Term)]
-reorderCustom tcm reprs (coreView tcm -> Just ty) alts =
+reorderCustom tcm reprs (coreView1 tcm -> Just ty) alts =
   reorderCustom tcm reprs ty alts
 reorderCustom _tcm reprs (coreToType' -> Right typeName) alts =
   case getDataRepr typeName reprs of
