@@ -415,9 +415,6 @@ instance {-# OVERLAPPING #-} (CoSimType t, CoSim r) => CoSim (t -> r) where
     coSim b s streams = coSim b s . parseInput b streams
 
 class CoSimType t where
-    -- | Return the number of bits in the type of the argument. The actual value of
-    -- the argument is ignored. Errors for types that do not have a fixed bitsize,
-    -- like Integer. This function will not evaluate its argument.
     toSignalStream   :: t -> SignalStream
     fromSignalStream :: SignalStream -> t
 
