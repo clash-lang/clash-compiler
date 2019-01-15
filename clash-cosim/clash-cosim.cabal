@@ -5,7 +5,7 @@ License:        BSD2
 License-File:   LICENSE
 Author:         John Verheij <https://github.com/jgjverheij>
 Maintainer:     Martijn Bastiaan <martijn@qbaylogic.com>
-Homepage:       https://github.com/jgjverheij/clash-cosim/
+Homepage:       https://github.com/clash-lang/clash-cosim
 Category:       Hardware
 Synopsis:       Co-simulation in Clash
 Description:    clash-cosim implements Verilog cosimulation in Haskell and
@@ -52,7 +52,7 @@ custom-setup
 
 source-repository head
   type: git
-  location: https://github.com/jgjverheij/clash-cosim/
+  location: https://github.com/clash-lang/clash-cosim.git
 
 Library
   default-language: Haskell2010
