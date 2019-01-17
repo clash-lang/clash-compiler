@@ -56,7 +56,7 @@ import           Clash.Core.Term         (LetBinding, Term (..))
 import           Clash.Core.TyCon
   (TyConName, TyConMap, tyConDataCons)
 import           Clash.Core.Type         (Type (..), TypeView (..), LitTy (..),
-                                          coreView1, splitTyConAppM, tyView)
+                                          coreView1, splitTyConAppM, tyView, TyVar)
 import           Clash.Core.Util         (collectBndrs, termType, tyNatSize)
 import           Clash.Core.Var          (Id, Var (..), mkId, modifyVarName, Attr')
 import           Clash.Core.VarEnv
@@ -1747,3 +1747,14 @@ splitGatedClock baseNm (Clock nm rt Gated) = do
     hwtys = [Clock nm rt Source,Bool]
     partNms = ["_clk","_clken"]
 splitGatedClock _ ty = error $ $(curLoc) ++ "splitGatedClock can't split: " ++ show ty
+
+-- | Determines if any type variables (exts) are bound in any of the given
+-- type or term variables (tms). It's currently only used to detect bound
+-- existentials, hence the name.
+bindsExistentials
+  :: [TyVar]
+  -> [Var a]
+  -> Bool
+bindsExistentials exts tms = any (`elem` freeVars) exts
+ where
+  freeVars = concatMap (Lens.toListOf typeFreeVars) (map varType tms)

@@ -259,7 +259,7 @@ isPolyTy _                       = False
 splitFunTy :: TyConMap
            -> Type
            -> Maybe (Type, Type)
-splitFunTy m (coreView1 m -> Just ty)   = splitFunTy m ty
+splitFunTy m (coreView1 m -> Just ty)  = splitFunTy m ty
 splitFunTy _ (tyView -> FunTy arg res) = Just (arg,res)
 splitFunTy _ _ = Nothing
 
@@ -268,7 +268,7 @@ splitFunTys :: TyConMap
             -> ([Type],Type)
 splitFunTys m ty = go [] ty ty
   where
-    go args orig_ty (coreView1 m -> Just ty')  = go args orig_ty ty'
+    go args orig_ty (coreView1 m -> Just ty') = go args orig_ty ty'
     go args _       (tyView -> FunTy arg res) = go (arg:args) res res
     go args orig_ty _                         = (reverse args, orig_ty)
 
@@ -290,9 +290,9 @@ splitCoreFunForallTy :: TyConMap
 splitCoreFunForallTy tcm ty = go [] ty ty
   where
     go args orig_ty (coreView1 tcm -> Just ty') = go args orig_ty ty'
-    go args _       (ForAllTy tv res)          = go (Left tv:args) res res
-    go args _       (tyView -> FunTy arg res)  = go (Right arg:args) res res
-    go args orig_ty _                          = (reverse args,orig_ty)
+    go args _       (ForAllTy tv res)           = go (Left tv:args) res res
+    go args _       (tyView -> FunTy arg res)   = go (Right arg:args) res res
+    go args orig_ty _                           = (reverse args,orig_ty)
 
 -- | Is a type a polymorphic or function type?
 isPolyFunTy :: Type
@@ -329,7 +329,7 @@ applyFunTy :: TyConMap
            -> Type
            -> Type
 applyFunTy m (coreView1 m -> Just ty)   arg = applyFunTy m ty arg
-applyFunTy _ (tyView -> FunTy _ resTy) _   = resTy
+applyFunTy _ (tyView -> FunTy _ resTy) _    = resTy
 applyFunTy _ _ _ = error $ $(curLoc) ++ "Report as bug: not a FunTy"
 
 -- | Split a type application in the applied type and the argument types

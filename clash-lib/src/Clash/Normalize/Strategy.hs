@@ -50,11 +50,13 @@ constantPropgation = propagate >-> repeatR inlineAndPropagate >->
 
     transPropagate :: [(String,NormRewrite)]
     transPropagate =
-      [ ("applicationPropagation", appProp        )
-      , ("bindConstantVar"       , bindConstantVar)
-      , ("caseLet"               , caseLet        )
-      , ("caseCase"              , caseCase       )
-      , ("caseCon"               , caseCon        )
+      [ ("applicationPropagation", appProp              )
+      , ("bindConstantVar"       , bindConstantVar      )
+      , ("caseLet"               , caseLet              )
+      , ("caseCase"              , caseCase             )
+      , ("caseCon"               , caseCon              )
+      , ("caseElemNonReachable"  , caseElemNonReachable )
+      , ("elemExistentials"      , elemExistentials     )
       ]
 
     -- These transformations can safely be applied in a top-down traversal as

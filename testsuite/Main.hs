@@ -151,6 +151,14 @@ runClashTest =
         [ runTest ("tests" </> "shouldwork" </> "Floating") defBuild ["-fclash-float-support"] "FloatPack" ([""],"FloatPack_topEntity",False)
         , runTest ("tests" </> "shouldwork" </> "Floating") defBuild ["-fclash-float-support"] "FloatConstFolding" (["","FloatConstFolding_testBench"],"FloatConstFolding_testBench",True)
         ]
+      , clashTestGroup "GADTs"
+        [ runTest ("tests" </> "shouldwork" </> "GADTs") defBuild [] "MonomorphicTopEntity" (["", "MonomorphicTopEntity_testBench"],"MonomorphicTopEntity_testBench",True)
+        , runTest ("tests" </> "shouldwork" </> "GADTs") defBuild [] "Head"                 (["", "Head_testBench"],"Head_testBench",True)
+        , runTest ("tests" </> "shouldwork" </> "GADTs") defBuild [] "HeadM"                (["", "HeadM_testBench"],"HeadM_testBench",True)
+        , runTest ("tests" </> "shouldwork" </> "GADTs") defBuild [] "Tail"                 (["", "Tail_testBench"],"Tail_testBench",True)
+        , runTest ("tests" </> "shouldwork" </> "GADTs") defBuild [] "TailM"                (["", "TailM_testBench"],"TailM_testBench",True)
+        , runTest ("tests" </> "shouldwork" </> "GADTs") defBuild [] "TailOfTail"           (["", "TailOfTail_testBench"],"TailOfTail_testBench",True)
+        ]
       , clashTestGroup "HOPrim"
         [ runTest ("tests" </> "shouldwork" </> "HOPrim") defBuild [] "HOImap"    (["","HOImap_testBench"],"HOImap_testBench",True)
         , runTest ("tests" </> "shouldwork" </> "HOPrim") defBuild [] "TestMap"   (["","TestMap_testBench"],"TestMap_testBench",True)

@@ -46,7 +46,6 @@ import           Clash.Annotations.BitRepresentation.Internal
   (CustomReprs, DataRepr'(..), ConstrRepr'(..), getDataRepr, getConstrRepr)
 import           Clash.Annotations.TopEntity      (TopEntity (..))
 import           Clash.Core.DataCon               (DataCon (..))
-import           Clash.Core.FreeVars              (typeFreeVars)
 import           Clash.Core.Literal               (Literal (..))
 import           Clash.Core.Name                  (Name(..))
 import           Clash.Core.Pretty                (showPpr)
@@ -619,12 +618,10 @@ mkProjection mkDec bndr scrut altTy alt@(pat,v) = do
   let altVarId = nameOcc (varName varTm)
   modifier <- case pat of
         DataPat dc exts tms -> do
-          let tmsTys     = map varType tms
-              tmsFVs     = concatMap (Lens.toListOf typeFreeVars) tmsTys
-              tms'       = if any (`elem` tmsFVs) exts
-                              then throw (ClashException sp ($(curLoc) ++ "Not in normal form: Pattern binds existential variables:\n\n" ++ showPpr e) Nothing)
-                              else tms
-          argHWTys <- mapM coreTypeToHWTypeM' tmsTys
+          let tms' = if bindsExistentials exts tms
+                       then throw (ClashException sp ($(curLoc) ++ "Not in normal form: Pattern binds existential variables:\n\n" ++ showPpr e) Nothing)
+                       else tms
+          argHWTys <- mapM coreTypeToHWTypeM' (map varType tms)
           let tmsBundled   = zip argHWTys tms'
               tmsFiltered  = filter (maybe False (not . isVoid) . fst) tmsBundled
               tmsFiltered' = map snd tmsFiltered

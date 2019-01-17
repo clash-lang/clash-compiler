@@ -42,7 +42,7 @@ import           BasicTypes                  (InlineSpec (..))
 import           SrcLoc                      (SrcSpan)
 import           GHC.Stack                   (HasCallStack)
 
-import           Clash.Core.DataCon          (dataConInstArgTys)
+import           Clash.Core.DataCon          (dcExtTyVars)
 import           Clash.Core.FreeVars
   (idDoesNotOccurIn, idOccursIn, typeFreeVars, termFreeVars')
 import           Clash.Core.Name
@@ -59,7 +59,7 @@ import           Clash.Core.Type             (KindOrType, Type (..),
                                               typeKind, tyView)
 import           Clash.Core.Util
   (collectArgs, isPolyFun, mkAbstraction, mkApps, mkLams,
-   mkTmApps, mkTyApps, mkTyLams, termType)
+   mkTmApps, mkTyApps, mkTyLams, termType, dataConInstArgTysE)
 import           Clash.Core.Var
   (Id, TyVar, Var (..), mkId, mkTyVar)
 import           Clash.Core.VarEnv
@@ -548,14 +548,14 @@ mkSelectorCase
   -> m Term
 mkSelectorCase caller inScope tcm scrut dcI fieldI = go (termType tcm scrut)
   where
-    go (coreView1 tcm -> Just ty')   = go ty'
+    go (coreView1 tcm -> Just ty') = go ty'
     go scrutTy@(tyView -> TyConApp tc args) =
       case tyConDataCons (lookupUniqMap' tcm tc) of
         [] -> cantCreate $(curLoc) ("TyCon has no DataCons: " ++ show tc ++ " " ++ showPpr tc) scrutTy
         dcs | dcI > length dcs -> cantCreate $(curLoc) "DC index exceeds max" scrutTy
             | otherwise -> do
           let dc = indexNote ($(curLoc) ++ "No DC with tag: " ++ show (dcI-1)) dcs (dcI-1)
-          let (Just fieldTys) = dataConInstArgTys dc args
+          let (Just fieldTys) = dataConInstArgTysE inScope tcm dc args
           if fieldI >= length fieldTys
             then cantCreate $(curLoc) "Field index exceed max" scrutTy
             else do
@@ -563,7 +563,7 @@ mkSelectorCase caller inScope tcm scrut dcI fieldI = go (termType tcm scrut)
               let ty = indexNote ($(curLoc) ++ "No DC field#: " ++ show fieldI) fieldTys fieldI
               selBndr <- mkInternalVar inScope "sel" ty
               let bndrs  = take fieldI wildBndrs ++ [selBndr] ++ drop (fieldI+1) wildBndrs
-                  pat    = DataPat dc [] bndrs
+                  pat    = DataPat dc (dcExtTyVars dc) bndrs
                   retVal = Case scrut ty [ (pat, Var selBndr) ]
               return retVal
     go scrutTy = cantCreate $(curLoc) ("Type of subject is not a datatype: " ++ showPpr scrutTy) scrutTy

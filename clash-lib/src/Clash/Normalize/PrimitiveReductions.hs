@@ -40,7 +40,7 @@ import qualified Control.Lens                     as Lens
 import           Data.List                        (mapAccumR)
 import qualified Data.Maybe                       as Maybe
 
-import           Clash.Core.DataCon               (DataCon, dataConInstArgTys)
+import           Clash.Core.DataCon               (DataCon)
 import           Clash.Core.Literal               (Literal (..))
 import           Clash.Core.Pretty                (showPpr)
 import           Clash.Core.Term                  (Term (..), Pat (..))
@@ -53,7 +53,7 @@ import           Clash.Core.TyCon                 (TyConName, tyConDataCons)
 import           Clash.Core.TysPrim               (integerPrimTy, typeNatKind)
 import           Clash.Core.Util
   (appendToVec, extractElems, extractTElems, idToVar, mkApps, mkRTree,
-   mkUniqInternalId, mkUniqSystemTyVar, mkVec, termType)
+   mkUniqInternalId, mkUniqSystemTyVar, mkVec, termType, dataConInstArgTys)
 import           Clash.Core.Var                   (Var (..))
 import           Clash.Core.VarEnv
   (InScopeSet, extendInScopeSetList)

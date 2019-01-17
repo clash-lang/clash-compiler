@@ -36,7 +36,7 @@ Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
 
 module Clash.Sized.Vector
   ( -- * 'Vec'tor data type
-    Vec(Nil,(:>),(:<))
+    Vec(Nil,(:>),(:<),Cons)
     -- * Accessors
     -- ** Length information
   , length, lengthS

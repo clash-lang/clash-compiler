@@ -27,6 +27,7 @@ module Clash.Core.Subst
     -- ** Applying substitutions
   , substTy
   , substTyWith
+  , substTyInVar
     -- * Substitution into terms
     -- ** Substitution environments
   , Subst (..)
@@ -279,11 +280,11 @@ extendInScopeId
   :: Subst
   -> Id
   -> Subst
-extendInScopeId (Subst inScope env tenv) ids =
+extendInScopeId (Subst inScope env tenv) id' =
   Subst inScope' env' tenv
  where
-  inScope' = extendInScopeSet inScope ids
-  env'     = delVarEnv env ids
+  inScope' = extendInScopeSet inScope id'
+  env'     = delVarEnv env id'
 
 -- | Add 'Id's to the in-scope set. See also 'extendInScopeId'
 extendInScopeIdList
@@ -312,6 +313,15 @@ substTy (Subst inScope _ tvS) ty
   = checkValidSubst s' [ty] (substTy' s' ty)
  where
   s' = TvSubst inScope tvS
+
+-- | Substitute within a 'TyVar'. See 'substTy'.
+substTyInVar
+  :: HasCallStack
+  => Subst
+  -> Var a
+  -> Var a
+substTyInVar subst tyVar =
+  tyVar { varType = (substTy subst (varType tyVar)) }
 
 -- | Like 'substTy', but skips the checks for the invariants described in
 -- 'TvSubts' Note [The substitution environment]. Should be used inside this
