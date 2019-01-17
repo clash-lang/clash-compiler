@@ -19,6 +19,7 @@ executable clash-profile-normalization-run
                        concurrent-supply    >= 0.1.7    && < 0.2,
                        containers           >= 0.5.4.0  && < 0.6,
                        deepseq              >= 1.4      && < 1.5,
+                       directory            >= 1.3.0.0  && < 1.4,
                        filepath             >= 1.4      && < 1.5,
                        unordered-containers >= 0.2.3.3  && < 0.3,
 

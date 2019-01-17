@@ -34,8 +34,7 @@ import           Control.Exception               (throwIO)
 import           Control.Monad.IO.Class          (liftIO)
 import           Data.Generics.Uniplate.DataOnly (transform)
 import           Data.List                       (foldl', lookup, nub)
-import           Data.Maybe                      (catMaybes, fromMaybe,
-                                                  listToMaybe, mapMaybe)
+import           Data.Maybe                      (catMaybes, listToMaybe, mapMaybe)
 import qualified Data.Text                       as Text
 import           Data.Word                       (Word8)
 import           System.Exit                     (ExitCode (..))
@@ -110,7 +109,9 @@ getProcessOutput command =
      return (output, exitCode)
 
 loadModules
-  :: OverridingBool
+  :: FilePath
+  -- ^ Temporary directory
+  -> OverridingBool
   -- ^ Use color
   -> HDL
   -- ^ HDL target
@@ -128,7 +129,7 @@ loadModules
         , [FilePath]
         , [DataRepr']
         )
-loadModules useColor hdl modName dflagsM = do
+loadModules tmpDir useColor hdl modName dflagsM = do
   libDir <- MonadUtils.liftIO ghcLibDir
 
   GHC.runGhc (Just libDir) $ do
@@ -230,10 +231,10 @@ loadModules useColor hdl modName dflagsM = do
         modFamInstEnvs'          = foldl' plusFamInst FamInstEnv.emptyFamInstEnv modFamInstEnvs
 
     (externalBndrs,clsOps,unlocatable,pFP,reprs) <-
-      loadExternalExprs hdl (UniqSet.mkUniqSet binderIds) bindersC
+      loadExternalExprs tmpDir hdl (UniqSet.mkUniqSet binderIds) bindersC
 
     -- Find local primitive annotations
-    pFP' <- findPrimitiveAnnotations hdl binderIds
+    pFP' <- findPrimitiveAnnotations hdl tmpDir binderIds
 
     hscEnv <- GHC.getSession
 #if MIN_VERSION_ghc(8,6,0)
@@ -392,13 +393,11 @@ findTestBenchAnnotations bndrs = do
 findPrimitiveAnnotations
   :: GHC.GhcMonad m
   => HDL
+  -> FilePath
   -> [CoreSyn.CoreBndr]
   -> m [FilePath]
-findPrimitiveAnnotations hdl bndrs = do
-  dflags <- GHC.getSessionDynFlags
-
+findPrimitiveAnnotations hdl tmpDir bndrs = do
   let -- Using the stub directory as the output directory for inline primitives
-      outDir = fromMaybe "." $ GHC.stubDir dflags
       deserializer = GhcPlugins.deserializeWithData :: ([Word8] -> Primitive)
       targets =
         concatMap
@@ -410,7 +409,7 @@ findPrimitiveAnnotations hdl bndrs = do
 
   anns <- mapM (GHC.findGlobalAnns deserializer) targets
   sequence $
-    mapMaybe (primitiveFilePath hdl outDir)
+    mapMaybe (primitiveFilePath hdl tmpDir)
     (concat $ zipWith (\t -> map ((,) t)) targets anns)
 
 parseModule :: GHC.GhcMonad m => GHC.ModSummary -> m GHC.ParsedModule

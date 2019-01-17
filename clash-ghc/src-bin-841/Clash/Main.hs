@@ -83,7 +83,8 @@ import           Clash.GHCi.UI (makeHDL)
 import           Exception (gcatch)
 import           Data.IORef (IORef, newIORef, readIORef)
 import qualified Data.Version (showVersion)
-import           Control.Exception (Exception(..),ErrorCall (..))
+import           Control.Exception (Exception(..),ErrorCall (..),finally)
+import           System.Directory (removeDirectoryRecursive)
 
 import           GHC.Exception ( SomeException )
 
@@ -91,8 +92,8 @@ import qualified Clash.Backend
 import           Clash.Backend.SystemVerilog (SystemVerilogState)
 import           Clash.Backend.VHDL    (VHDLState)
 import           Clash.Backend.Verilog (VerilogState)
-import           Clash.Driver.Types
-  (ClashOpts (..), defClashOpts)
+import           Clash.Driver (createTemporaryClashDirectory)
+import           Clash.Driver.Types (ClashOpts (..), defClashOpts)
 import           Clash.GHC.ClashFlags
 import           Clash.Netlist.BlackBox.Types (HdlSyn (..))
 import           Clash.Util (ClashException (..), clashLibVersion)
@@ -140,56 +141,62 @@ defaultMain = flip withArgs $ do
     libDir <- ghcLibDir
 
     let argv1 = map (mkGeneralLocated "on the commandline") argv0
-    r <- newIORef defClashOpts
-    (argv2, clashFlagWarnings) <- parseClashFlags r argv1
+    tmpDir <- createTemporaryClashDirectory
+    finally (do
+      r <- newIORef (defClashOpts tmpDir)
 
-    -- 2. Parse the "mode" flags (--make, --interactive etc.)
-    -- (mode, argv3, flagWarnings) <- parseModeFlags argv2
-    (mode, argv3, modeFlagWarnings) <- parseModeFlags argv2
-    let flagWarnings = modeFlagWarnings ++ clashFlagWarnings
+      (argv2, clashFlagWarnings) <- parseClashFlags r argv1
 
-    -- If all we want to do is something like showing the version number
-    -- then do it now, before we start a GHC session etc. This makes
-    -- getting basic information much more resilient.
+      -- 2. Parse the "mode" flags (--make, --interactive etc.)
+      -- (mode, argv3, flagWarnings) <- parseModeFlags argv2
+      (mode, argv3, modeFlagWarnings) <- parseModeFlags argv2
+      let flagWarnings = modeFlagWarnings ++ clashFlagWarnings
 
-    -- In particular, if we wait until later before giving the version
-    -- number then bootstrapping gets confused, as it tries to find out
-    -- what version of GHC it's using before package.conf exists, so
-    -- starting the session fails.
-    case mode of
-        Left preStartupMode ->
-            do case preStartupMode of
-                   ShowSupportedExtensions   -> showSupportedExtensions
-                   ShowVersion               -> showVersion
-                   ShowNumVersion            -> putStrLn cProjectVersion
-                   ShowOptions isInteractive -> showOptions isInteractive
-        Right postStartupMode ->
-            -- start our GHC session
-            GHC.runGhc (Just libDir) $ do
+      -- If all we want to do is something like showing the version number
+      -- then do it now, before we start a GHC session etc. This makes
+      -- getting basic information much more resilient.
 
-            dflags <- GHC.getSessionDynFlags
-            let dflagsExtra = wantedLanguageExtensions dflags
+      -- In particular, if we wait until later before giving the version
+      -- number then bootstrapping gets confused, as it tries to find out
+      -- what version of GHC it's using before package.conf exists, so
+      -- starting the session fails.
+      case mode of
+          Left preStartupMode ->
+              do case preStartupMode of
+                     ShowSupportedExtensions   -> showSupportedExtensions
+                     ShowVersion               -> showVersion
+                     ShowNumVersion            -> putStrLn cProjectVersion
+                     ShowOptions isInteractive -> showOptions isInteractive
+          Right postStartupMode ->
+              -- start our GHC session
+              GHC.runGhc (Just libDir) $ do
 
-                ghcTyLitNormPlugin = GHC.mkModuleName "GHC.TypeLits.Normalise"
-                ghcTyLitExtrPlugin = GHC.mkModuleName "GHC.TypeLits.Extra.Solver"
-                ghcTyLitKNPlugin   = GHC.mkModuleName "GHC.TypeLits.KnownNat.Solver"
-                dflagsExtra1 = dflagsExtra
-                                  { DynFlags.pluginModNames = nub $
-                                      ghcTyLitNormPlugin : ghcTyLitExtrPlugin :
-                                      ghcTyLitKNPlugin :
-                                      DynFlags.pluginModNames dflagsExtra
-                                  }
+              dflags <- GHC.getSessionDynFlags
+              let dflagsExtra = wantedLanguageExtensions dflags
 
-            case postStartupMode of
-                Left preLoadMode ->
-                    liftIO $ do
-                        case preLoadMode of
-                            ShowInfo               -> showInfo dflagsExtra1
-                            ShowGhcUsage           -> showGhcUsage  dflagsExtra1
-                            ShowGhciUsage          -> showGhciUsage dflagsExtra1
-                            PrintWithDynFlags f    -> putStrLn (f dflagsExtra1)
-                Right postLoadMode ->
-                    main' postLoadMode dflagsExtra1 argv3 flagWarnings r
+                  ghcTyLitNormPlugin = GHC.mkModuleName "GHC.TypeLits.Normalise"
+                  ghcTyLitExtrPlugin = GHC.mkModuleName "GHC.TypeLits.Extra.Solver"
+                  ghcTyLitKNPlugin   = GHC.mkModuleName "GHC.TypeLits.KnownNat.Solver"
+                  dflagsExtra1 = dflagsExtra
+                                    { DynFlags.pluginModNames = nub $
+                                        ghcTyLitNormPlugin : ghcTyLitExtrPlugin :
+                                        ghcTyLitKNPlugin :
+                                        DynFlags.pluginModNames dflagsExtra
+                                    }
+
+              case postStartupMode of
+                  Left preLoadMode ->
+                      liftIO $ do
+                          case preLoadMode of
+                              ShowInfo               -> showInfo dflagsExtra1
+                              ShowGhcUsage           -> showGhcUsage  dflagsExtra1
+                              ShowGhciUsage          -> showGhciUsage dflagsExtra1
+                              PrintWithDynFlags f    -> putStrLn (f dflagsExtra1)
+                  Right postLoadMode ->
+                      main' postLoadMode dflagsExtra1 argv3 flagWarnings r
+      ) (
+       removeDirectoryRecursive tmpDir
+      )
 
 main' :: PostLoadMode -> DynFlags -> [Located String] -> [Warn]
       -> IORef ClashOpts
