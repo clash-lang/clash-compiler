@@ -138,7 +138,7 @@ import           Clash.Backend.SystemVerilog (SystemVerilogState)
 import           Clash.Backend.VHDL (VHDLState)
 import           Clash.Backend.Verilog (VerilogState)
 import qualified Clash.Driver
-import           Clash.Driver.Types (ClashOpts(..))
+import           Clash.Driver.Types (ClashOpts (..))
 import           Clash.GHC.Evaluator
 import           Clash.GHC.GenerateBindings
 import           Clash.GHC.NetlistTypes
@@ -1890,12 +1890,13 @@ makeHDL backend optsRef srcs = do
   dflags <- GHC.getSessionDynFlags
   liftIO $ do startTime <- Clock.getCurrentTime
               opts0  <- readIORef optsRef
-              let opts1 = opts0 { opt_color = useColor dflags }
-              let iw    = opt_intWidth opts1
-                  fp    = opt_floatSupport opts1
-                  syn   = opt_hdlSyn opts1
-                  color = opt_color opts1
-                  hdl   = Clash.Backend.hdlKind backend'
+              let opts1  = opts0 { opt_color = useColor dflags }
+              let iw     = opt_intWidth opts1
+                  fp     = opt_floatSupport opts1
+                  syn    = opt_hdlSyn opts1
+                  color  = opt_color opts1
+                  tmpDir = opt_tmpDir opts1
+                  hdl    = Clash.Backend.hdlKind backend'
                   -- determine whether `-outputdir` was used
                   outputDir = do odir <- objectDir dflags
                                  hidir <- hiDir dflags
@@ -1914,7 +1915,7 @@ makeHDL backend optsRef srcs = do
               forM_ srcs $ \src -> do
                 -- Generate bindings:
                 (bindingsMap,tcm,tupTcm,topEntities,primMap,reprs) <-
-                  generateBindings color primDirs idirs hdl src (Just dflags)
+                  generateBindings tmpDir color primDirs idirs hdl src (Just dflags)
                 prepTime <- startTime `deepseq` bindingsMap `deepseq` tcm `deepseq` Clock.getCurrentTime
                 let prepStartDiff = Clock.diffUTCTime prepTime startTime
                 putStrLn $ "Loading dependencies took " ++ show prepStartDiff

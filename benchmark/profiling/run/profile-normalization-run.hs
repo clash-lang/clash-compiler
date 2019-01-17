@@ -8,8 +8,10 @@ import           Clash.GHC.Evaluator          (reduceConstant)
 
 import qualified Control.Concurrent.Supply    as Supply
 import           Control.DeepSeq              (deepseq)
+import           Control.Exception            (finally)
 import           Data.Binary                  (decode)
 import           Data.IntMap.Strict           (IntMap)
+import           System.Directory             (removeDirectoryRecursive)
 import           System.Environment           (getArgs)
 import           System.FilePath              (FilePath)
 
@@ -23,11 +25,18 @@ main = do
   args <- getArgs
   let tests | null args = defaultTests
             | otherwise = args
-  res <- mapM benchFile tests
-  deepseq res $ return ()
 
-benchFile :: FilePath -> IO ()
-benchFile src = do
+  tmpDir <- createTemporaryClashDirectory
+
+  finally (do
+    res <- mapM (benchFile tmpDir) tests
+    deepseq res $ return ()
+   ) (
+    removeDirectoryRecursive tmpDir
+   )
+
+benchFile :: FilePath -> FilePath -> IO ()
+benchFile tmpDir src = do
   supplyN <- Supply.newSupply
   env <- setupEnv src
   putStrLn $ "Doing normalization of " ++ src
@@ -35,7 +44,7 @@ benchFile src = do
       primMap' = fmap unremoveBBfunc primMap
       res :: BindingMap
       res = fst $ normalizeEntity reprs bindingsMap primMap' tcm tupTcm typeTrans reduceConstant
-                   topEntityNames opts supplyN topEntity
+                   topEntityNames (opts tmpDir) supplyN topEntity
   res `deepseq` putStrLn ".. done\n"
 
 setupEnv :: FilePath -> IO (BindingMap,TyConMap,IntMap TyConName

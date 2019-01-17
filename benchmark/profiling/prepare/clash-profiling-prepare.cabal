@@ -30,8 +30,10 @@ executable clash-profile-normalization-prepare
   build-depends:       base                  >= 4.8      && < 5,
                        binary                >= 0.8.5    && < 0.11,
                        bytestring            >= 0.10.0.2 && < 0.11,
+                       directory             >= 1.3.0.0  && < 1.4,
                        filepath              >= 1.4      && < 1.5,
                        ghc                   >= 8.2.0    && < 8.6,
 
+                       clash-lib,
                        clash-benchmark,
                        clash-profiling-prepare

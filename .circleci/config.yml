@@ -8,7 +8,7 @@ aliases:
   - &submodules
     run:
       name: "Checkout submodules"
-      command: git submodule update --init --depth 1
+      command: git submodule update --init
   - &setup
     run:
       name: Setup system
