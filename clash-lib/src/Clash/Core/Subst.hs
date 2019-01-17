@@ -301,7 +301,8 @@ extendInScopeIdList (Subst inScope env tenv) ids =
 -- The substitution has to satisfy the invariant described in
 -- 'TvSubst's Note [The substitution environment]
 substTy
-  :: Subst
+  :: HasCallStack
+  => Subst
   -> Type
   -> Type
 substTy (Subst inScope _ tvS) ty
@@ -316,7 +317,8 @@ substTy (Subst inScope _ tvS) ty
 -- 'TvSubts' Note [The substitution environment]. Should be used inside this
 -- module only.
 substTyUnchecked
-  :: TvSubst
+  :: HasCallStack
+  => TvSubst
   -> Type
   -> Type
 substTyUnchecked subst@(TvSubst _ tvS) ty
@@ -328,7 +330,8 @@ substTyUnchecked subst@(TvSubst _ tvS) ty
 -- | This checks if the substitution satisfies the invariant from 'TvSbust's
 -- Note [The substitution invariant].
 checkValidSubst
-  :: TvSubst
+  :: HasCallStack
+  => TvSubst
   -> [Type]
   -> a
   -> a
@@ -364,7 +367,8 @@ isValidSubst (TvSubst inScope tenv) = tenvFVs `varSetInScope` inScope
 
 -- | The work-horse of 'substTy'
 substTy'
-  :: TvSubst
+  :: HasCallStack
+  => TvSubst
   -> Type
   -> Type
 substTy' subst = go where
@@ -427,7 +431,8 @@ substTyVarBndr subst@(TvSubst inScope tenv) oldVar =
 
 -- | Substitute within a 'Type'
 substTm
-  :: Doc ()
+  :: HasCallStack
+  => Doc ()
   -> Subst
   -> Term
   -> Term
@@ -454,7 +459,8 @@ substTm doc subst = go where
 
 -- | Find the substitution for an 'Id' in the 'Subst'
 lookupIdSubst
-  :: Doc ann
+  :: HasCallStack
+  => Doc ann
   -> Subst
   -> Id
   -> Term
@@ -469,7 +475,8 @@ lookupIdSubst doc (Subst inScope tmS _) v
 -- returning the result and an update 'Subst' that should be used in subsequent
 -- substitutions.
 substIdBndr
-  :: Subst
+  :: HasCallStack
+  => Subst
   -> Id
   -> (Subst,Id)
 substIdBndr subst@(Subst inScope env tenv) oldId =
@@ -499,7 +506,8 @@ substIdBndr subst@(Subst inScope env tenv) oldId =
 
 -- | Like 'substTyVarBndr' but takes a 'Subst' instead of a 'TvSubst'
 substTyVarBndr'
-  :: Subst
+  :: HasCallStack
+  => Subst
   -> TyVar
   -> (Subst,TyVar)
 substTyVarBndr' (Subst inScope tmS tyS) tv =
@@ -509,7 +517,8 @@ substTyVarBndr' (Subst inScope tmS tyS) tv =
 -- | Apply a substitution to an entire set of let-bindings, additionally
 -- returning an updated 'Subst' that should be used by subsequent substitutions.
 substBind
-  :: Doc ()
+  :: HasCallStack
+  => Doc ()
   -> Subst
   -> [LetBinding]
   -> (Subst,[LetBinding])
@@ -525,7 +534,8 @@ substBind doc subst xs =
 -- Works only if the domain of the substitution is superset of the type being
 -- substituted into
 substTyWith
-  :: [TyVar]
+  :: HasCallStack
+  => [TyVar]
   -> [Type]
   -> Type
   -> Type

@@ -40,6 +40,7 @@ import qualified Data.Text                   as Text
 
 import           BasicTypes                  (InlineSpec (..))
 import           SrcLoc                      (SrcSpan)
+import           GHC.Stack                   (HasCallStack)
 
 import           Clash.Core.DataCon          (dataConInstArgTys)
 import           Clash.Core.FreeVars
@@ -536,7 +537,8 @@ mkWildValBinder is = mkInternalVar is "wild"
 
 -- | Make a case-decomposition that extracts a field out of a (Sum-of-)Product type
 mkSelectorCase
-  :: (Functor m, Monad m, MonadUnique m)
+  :: HasCallStack
+  => (Functor m, Monad m, MonadUnique m)
   => String -- ^ Name of the caller of this function
   -> InScopeSet
   -> TyConMap -- ^ TyCon cache
