@@ -19,6 +19,8 @@ module Clash.Core.Pretty
   , ppr
   , showDoc
   , showPpr
+  , tracePprId
+  , tracePpr
   )
 where
 
@@ -28,6 +30,7 @@ import Control.Monad.Identity
 import qualified Data.Text              as T
 import Data.Text.Prettyprint.Doc
 import Data.Text.Prettyprint.Doc.Render.String
+import Debug.Trace                      (trace)
 import GHC.Show                         (showMultiLineString)
 import Numeric                          (fromRat)
 
@@ -68,6 +71,12 @@ showDoc = renderString . layoutPretty (LayoutOptions (AvailablePerLine 80 0.6))
 
 showPpr :: PrettyPrec p => p -> String
 showPpr = showDoc . ppr
+
+tracePprId :: PrettyPrec p => p -> p
+tracePprId p = trace (showPpr p) p
+
+tracePpr :: PrettyPrec p => p -> a -> a
+tracePpr p a = trace (showPpr p) a
 
 prettyParen :: Bool -> Doc ann -> Doc ann
 prettyParen False = id
