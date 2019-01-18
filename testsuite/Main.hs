@@ -169,6 +169,7 @@ runClashTest =
       ]
       , clashTestGroup "Numbers"
         [ runTest ("tests" </> "shouldwork" </> "Numbers") defBuild [] "Bounds"       (["","Bounds_testBench"],"Bounds_testBench",True)
+        , runTest ("tests" </> "shouldwork" </> "Numbers") defBuild [] "NegativeLits" (["","NegativeLits_testBench"],"NegativeLits_testBench",True)
         , runTest ("tests" </> "shouldwork" </> "Numbers") defBuild [] "Resize"       (["","Resize_testBench"],"Resize_testBench",True)
         , runTest ("tests" </> "shouldwork" </> "Numbers") defBuild [] "Resize2"      (["","Resize2_testBench"],"Resize2_testBench",True)
         , runTest ("tests" </> "shouldwork" </> "Numbers") defBuild [] "SatMult"      ([""],"SatMult_topEntity",False)
