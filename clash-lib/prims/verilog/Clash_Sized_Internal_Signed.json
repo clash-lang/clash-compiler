@@ -36,9 +36,9 @@ assign ~RESULT = (~VAR[dividend][0][~SIZE[~TYPO]-1] == ~VAR[divider][1][~SIZE[~T
     , "type"      : "rotateL# :: KnownNat n => Signed n -> Int -> Signed n"
     , "template"  :
 "// rotateL begin
-wire [2*~LIT[0]-1:0] ~SYM[0];
-assign ~SYM[0] = {~ARG[1],~ARG[1]} << ~ARG[2];
-assign ~RESULT = $signed(~SYM[0][~LIT[0]-1 : 0]);
+wire [2*~SIZE[~TYPO]-1:0] ~GENSYM[s][0];
+assign ~SYM[0] = {~ARG[1],~ARG[1]} << (~ARG[2] % ~SIZE[~TYPO]);
+assign ~RESULT = $signed(~SYM[0][2*~SIZE[~TYPO]-1 : ~SIZE[~TYPO]]);
 // rotateL end"
     }
   }
@@ -48,9 +48,9 @@ assign ~RESULT = $signed(~SYM[0][~LIT[0]-1 : 0]);
     , "type"      : "rotateR# :: KnownNat n => Signed n -> Int -> Signed n"
     , "template"  :
 "// rotateR begin
-wire [2*~LIT[0]-1:0] ~GENSYM[s][0];
-assign ~SYM[0] = {~ARG[1],~ARG[1]} >> ~ARG[2];
-assign ~RESULT = $signed(~SYM[0][~LIT[0]-1 : 0]);
+wire [2*~SIZE[~TYPO]-1:0] ~GENSYM[s][0];
+assign ~SYM[0] = {~ARG[1],~ARG[1]} >> (~ARG[2] % ~SIZE[~TYPO]);
+assign ~RESULT = $signed(~SYM[0][~SIZE[~TYPO]-1 : 0]);
 // rotateR end"
     }
   }

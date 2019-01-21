@@ -52,9 +52,9 @@ end
     , "type"      : "rotateL# :: KnownNat n => BitVector n -> Int -> BitVector n"
     , "template"  :
 "// rotateL begin
-wire [2*~LIT[0]-1:0] ~SYM[0];
-assign ~SYM[0] = {~ARG[1],~ARG[1]} << ~ARG[2];
-assign ~RESULT = ~SYM[0][2*~LIT[0]-1 : ~LIT[0]];
+wire [2*~SIZE[~TYPO]-1:0] ~GENSYM[bv][0];
+assign ~SYM[0] = {~ARG[1],~ARG[1]} << (~ARG[2] % ~SIZE[~TYPO]);
+assign ~RESULT = ~SYM[0][2*~SIZE[~TYPO]-1 : ~SIZE[~TYPO]];
 // rotateL end"
     }
   }
@@ -64,9 +64,9 @@ assign ~RESULT = ~SYM[0][2*~LIT[0]-1 : ~LIT[0]];
     , "type"      : "rotateR# :: KnownNat n => BitVector n -> Int -> BitVector n"
     , "template"  :
 "// rotateR begin
-wire [2*~LIT[0]-1:0] ~GENSYM[bv][0];
-assign ~SYM[0] = {~ARG[1],~ARG[1]} >> ~ARG[2];
-assign ~RESULT = ~SYM[0][~LIT[0]-1 : 0];
+wire [2*~SIZE[~TYPO]-1:0] ~GENSYM[bv][0];
+assign ~SYM[0] = {~ARG[1],~ARG[1]} >> (~ARG[2] % ~SIZE[~TYPO]);
+assign ~RESULT = ~SYM[0][~SIZE[~TYPO]-1 : 0];
 // rotateR end"
     }
   }

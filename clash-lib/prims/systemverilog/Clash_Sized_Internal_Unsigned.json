@@ -4,9 +4,9 @@
     , "type"      : "rotateL# :: KnownNat n => Unsigned n -> Int -> Unsigned n"
     , "template"  :
 "// rotateL begin
-logic [2*~LIT[0]-1:0] ~GENSYM[u][0];
-assign ~SYM[0] = {~ARG[1],~ARG[1]} << ~ARG[2];
-assign ~RESULT = ~SYM[0][~LIT[0]-1 : 0];
+logic [2*~SIZE[~TYPO]-1:0] ~GENSYM[u][0];
+assign ~SYM[0] = {~ARG[1],~ARG[1]} << (~ARG[2] % ~SIZE[~TYPO]);
+assign ~RESULT = ~SYM[0][2*~SIZE[~TYPO]-1 : ~SIZE[~TYPO]];
 // rotateL end"
     }
   }
@@ -16,9 +16,9 @@ assign ~RESULT = ~SYM[0][~LIT[0]-1 : 0];
     , "type"      : "rotateR# :: KnownNat n => Unsigned n -> Int -> Unsigned n"
     , "template"  :
 "// rotateR begin
-logic [2*~LIT[0]-1:0] ~GENSYM[u][0];
-assign ~SYM[0] = {~ARG[1],~ARG[1]} >> ~ARG[2];
-assign ~RESULT = ~SYM[0][~LIT[0]-1 : 0];
+logic [2*~SIZE[~TYPO]-1:0] ~GENSYM[u][0];
+assign ~SYM[0] = {~ARG[1],~ARG[1]} >> (~ARG[2] % ~SIZE[~TYPO]);
+assign ~RESULT = ~SYM[0][~SIZE[~TYPO]-1 : 0];
 // rotateR end"
     }
   }
