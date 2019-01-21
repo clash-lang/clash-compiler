@@ -103,9 +103,16 @@ delayed = hideClockReset E.delayed
 --
 -- >>> sampleN 7 (toSignal (delay2 (-1) (dfromList [0..])))
 -- [-1,-1,-1,1,2,3,4]
+--
+-- Or @d@ can be specified using type application:
+--
+-- >>> :t delayedI @3
+-- delayedI @3
+--   :: (...) =>
+--      a -> DSignal domain n a -> DSignal domain (n + 3) a
 delayedI
-  :: HiddenClockReset domain gated synchronous
-  => KnownNat d
+  :: KnownNat d
+  => HiddenClockReset domain gated synchronous
   => a
   -- ^ Default value
   -> DSignal domain n a
@@ -152,8 +159,12 @@ delayN d dflt = coerce . go (snatToInteger d) . coerce @_ @(Signal domain a)
 --
 -- >>> sampleN 6 (toSignal (delayI2 (-1) (dfromList [1..])))
 -- [-1,-1,1,2,3,4]
+--
+-- You can also use type application to do the same:
+-- >>> sampleN 6 (toSignal (delayI @2 (-1) (dfromList [1..])))
+-- [-1,-1,1,2,3,4]
 delayI
-  :: forall domain gated synchronous d n a
+  :: forall d n a domain gated synchronous
    . HiddenClockReset domain gated synchronous
   => KnownNat d
   => a

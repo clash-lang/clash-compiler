@@ -119,6 +119,16 @@ delayed clk rst m ds = coerce (delaySignal (coerce ds))
 --
 -- >>> sampleN 7 (delay2 systemClockGen asyncResetGen (-1) (dfromList ([0..])))
 -- [-1,-1,-1,1,2,3,4]
+--
+-- @d@ can also be specified using type application:
+--
+-- >>> :t delayedI @3
+-- delayedI @3
+--   :: Clock domain gated
+--      -> Reset domain synchronous
+--      -> a
+--      -> DSignal domain n a
+--      -> DSignal domain (n + 3) a
 delayedI
   :: KnownNat d
   => Clock domain gated
