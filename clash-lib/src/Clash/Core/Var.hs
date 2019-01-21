@@ -21,6 +21,7 @@ module Clash.Core.Var
   , mkId
   , mkTyVar
   , setVarUnique
+  , setVarType
   , modifyVarName
   , attrName
   )
@@ -117,3 +118,9 @@ setVarUnique
   -> Unique
   -> Var a
 setVarUnique v u = v { varUniq = u, varName = (varName v) {nameUniq = u} }
+
+setVarType
+  :: Var a
+  -> Type
+  -> Var a
+setVarType v t = v { varType = t }

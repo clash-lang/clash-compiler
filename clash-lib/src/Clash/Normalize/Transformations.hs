@@ -22,6 +22,8 @@ module Clash.Normalize.Transformations
   , caseLet
   , caseCon
   , caseCase
+  , caseElemNonReachable
+  , elemExistentials
   , inlineNonRep
   , inlineOrLiftNonRep
   , typeSpec
@@ -87,7 +89,8 @@ import           Clash.Core.FreeVars
 import           Clash.Core.Literal          (Literal (..))
 import           Clash.Core.Pretty           (showPpr)
 import           Clash.Core.Subst
-  (substTm, mkSubst, extendIdSubst, extendIdSubstList, extendTvSubst, extendTvSubstList, freshenTm)
+  (substTm, mkSubst, extendIdSubst, extendIdSubstList, extendTvSubst,
+   extendTvSubstList, freshenTm, substTyInVar)
 import           Clash.Core.Term             (LetBinding, Pat (..), Term (..))
 import           Clash.Core.Type             (TypeView (..), applyFunTy,
                                               isPolyFunCoreTy,
@@ -98,7 +101,8 @@ import           Clash.Core.TyCon            (TyConMap, tyConDataCons)
 import           Clash.Core.Util
   (collectArgs, isClockOrReset, isCon, isFun, isLet, isPolyFun, isPrim,
    isSignalType, isVar, mkApps, mkLams, mkVec, piResultTy, termSize, termType,
-   tyNatSize, patVars)
+   tyNatSize, patVars, isAbsurdAlt, altEqs, substInExistentials,
+   solveFirstNonAbsurd)
 import           Clash.Core.Var              (Id, Var (..), mkId)
 import           Clash.Core.VarEnv
   (InScopeSet, VarEnv, VarSet, elemInScopeSet, notElemInScopeSet, elemVarSet,
@@ -109,7 +113,7 @@ import           Clash.Driver.Types          (DebugLevel (..))
 import           Clash.Netlist.BlackBox.Util (usedArguments)
 import           Clash.Netlist.Types         (HWType (..), FilteredHWType(..))
 import           Clash.Netlist.Util
-  (coreTypeToHWType, representableType, splitNormalized)
+  (coreTypeToHWType, representableType, splitNormalized, bindsExistentials)
 import           Clash.Normalize.DEC
 import           Clash.Normalize.PrimitiveReductions
 import           Clash.Normalize.Types
@@ -239,6 +243,94 @@ caseLet _ (Case (Letrec xes e) ty alts) =
   changed (Letrec xes (Case e ty alts))
 
 caseLet _ e = return e
+
+-- | Remove non-reachable alternatives. For example, consider:
+--
+--    data STy ty where
+--      SInt :: Int -> STy Int
+--      SBool :: Bool -> STy Bool
+--
+--    f :: STy ty -> ty
+--    f (SInt b) = b + 1
+--    f (SBool True) = False
+--    f (SBool False) = True
+--    {-# NOINLINE f #-}
+--
+--    g :: STy Int -> Int
+--    g = f
+--
+-- @f@ is always specialized on @STy Int@. The SBool alternatives are therefore
+-- unreachable. Additional information can be found at:
+-- https://github.com/clash-lang/clash-compiler/pull/465
+caseElemNonReachable :: NormRewrite
+caseElemNonReachable _ case0@(Case scrut altsTy alts0) = do
+  tcm <- Lens.view tcCache
+
+  let (altsAbsurd, altsOther) = List.partition (isAbsurdAlt tcm) alts0
+  case altsAbsurd of
+    [] -> return case0
+    _  -> changed =<< caseOneAlt (Case scrut altsTy altsOther)
+
+caseElemNonReachable _ e = return e
+
+-- | Tries to eliminate existentials by using heuristics to determine what the
+-- existential should be. For example, consider Vec:
+--
+--    data Vec :: Nat -> Type -> Type where
+--      Nil       :: Vec 0 a
+--      Cons x xs :: a -> Vec n a -> Vec (n + 1) a
+--
+-- Thus, 'null' (annotated with existentials) could look like:
+--
+--    null :: forall n . Vec n Bool -> Bool
+--    null v =
+--      case v of
+--        Nil  {n ~ 0}                                     -> True
+--        Cons {n1:Nat} {n~n1+1} (x :: a) (xs :: Vec n1 a) -> False
+--
+-- When it's applied to a vector of length 5, this becomes:
+--
+--    null :: Vec 5 Bool -> Bool
+--    null v =
+--      case v of
+--        Nil  {5 ~ 0}                                     -> True
+--        Cons {n1:Nat} {5~n1+1} (x :: a) (xs :: Vec n1 a) -> False
+--
+-- This function solves 'n1' and replaces every occurrence with its solution. A
+-- very limited number of solutions are currently recognized: only adds (such
+-- as in the example) will be solved.
+elemExistentials :: NormRewrite
+elemExistentials (TransformContext is0 _) (Case scrut altsTy alts0) = do
+  tcm <- Lens.view tcCache
+  is1 <- unionInScope is0 <$> Lens.use globalInScope
+
+  alts1 <- mapM (go is1 tcm) alts0
+  caseOneAlt (Case scrut altsTy alts1)
+
+ where
+    -- Eliminate free type variables if possible
+    go :: InScopeSet -> TyConMap -> (Pat, Term) -> NormalizeSession (Pat, Term)
+    go is2 tcm alt@(DataPat dc exts0 xs0, term0) =
+      case solveFirstNonAbsurd (altEqs tcm alt) of
+        -- No equations solved:
+        Nothing -> return alt
+        -- One or more equations solved:
+        Just (tyVar, solution) ->
+          changed =<< go is2 tcm (DataPat dc exts1 xs1, term1)
+          where
+            -- Substitute solution in existentials and applied types
+            is3   = extendInScopeSetList is2 exts0
+            xs1   = map (substTyInVar (extendTvSubst (mkSubst is3) tyVar solution)) xs0
+            exts1 = substInExistentials is2 exts0 (tyVar, solution)
+
+            -- Substitute solution in term.
+            is4       = extendInScopeSetList is3 xs1
+            subst     = extendTvSubst (mkSubst is4) tyVar solution
+            term1     = substTm "Replacing tyVar due to solved eq" subst term0
+
+    go _ _ alt = return alt
+
+elemExistentials _ e = return e
 
 -- | Move a Case-decomposition from the subject of a Case-decomposition to the alternatives
 caseCase :: NormRewrite
@@ -1199,8 +1291,8 @@ collectANF _ (Letrec binds body) = do
 -- type by the Clash compiler, so observing its constructor leads to all kinds
 -- of problems. In this case that "Clash.Rewrite.Util.mkSelectorCase" will
 -- try to project the LHS and RHS of the ':-' constructor, however,
--- 'mkSelectorCase' uses 'coreView' to find the "real" data-constructor.
--- 'coreView' however looks through the 'Signal' type, and hence 'mkSelector'
+-- 'mkSelectorCase' uses 'coreView1' to find the "real" data-constructor.
+-- 'coreView1' however looks through the 'Signal' type, and hence 'mkSelector'
 -- finds the data constructors for the element type of Signal. This resulted in
 -- error #24 (https://github.com/christiaanb/clash2/issues/24), where we
 -- try to get the first field out of the 'Vec's 'Nil' constructor.
@@ -1239,7 +1331,7 @@ collectANF ctx (Case subj ty alts) = do
       :: Term -> (Pat,Term)
       -> StateT ([LetBinding],InScopeSet) (RewriteMonad NormalizeState)
                 (Pat,Term)
-    doAlt subj' alt@(DataPat dc [] xs,altExpr) = do
+    doAlt subj' alt@(DataPat dc exts xs,altExpr) | not (bindsExistentials exts xs) = do
       lv  <- lift (isNonGlobalVar altExpr)
       patSels <- Monad.zipWithM (doPatBndr subj' dc) xs [0..]
       let usesXs (Var n) = any (== n) xs
@@ -1256,7 +1348,7 @@ collectANF ctx (Case subj ty alts) = do
           altId <- lift (mkTmBinderFor is1 tcm (mkDerivedName ctx "case_alt") altExpr)
           -- See Note [ANF InScopeSet]
           tellBinders ((altId,altExpr):patSels)
-          return (DataPat dc [] xs,Var altId)
+          return (DataPat dc exts xs,Var altId)
     doAlt _ alt@(DataPat {}, _) = return alt
     doAlt _ alt@(pat,altExpr) = do
       lv <- lift (isNonGlobalVar altExpr)

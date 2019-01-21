@@ -60,7 +60,7 @@ import           TysWiredIn          (tupleTyCon)
 import           Unique              (getKey)
 
 import           Clash.Class.BitPack (pack,unpack)
-import           Clash.Core.DataCon  (DataCon (..), dataConInstArgTys)
+import           Clash.Core.DataCon  (DataCon (..))
 import           Clash.Core.Evaluator
   (Heap (..), PrimEvaluator, Value (..), valToTerm, whnf)
 import           Clash.Core.Literal  (Literal (..))
@@ -73,7 +73,8 @@ import           Clash.Core.Type
 import           Clash.Core.TyCon
   (TyConMap, TyConName, tyConDataCons)
 import           Clash.Core.TysPrim
-import           Clash.Core.Util     (mkApps,mkRTree,mkVec,piResultTys,tyNatSize)
+import           Clash.Core.Util
+  (mkApps,mkRTree,mkVec,piResultTys,tyNatSize,dataConInstArgTys)
 import           Clash.Core.Var      (mkId, mkTyVar)
 import           Clash.GHC.GHC2Core  (modNameM)
 import           Clash.Rewrite.Util  (mkSelectorCase)

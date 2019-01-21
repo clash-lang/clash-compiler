@@ -18,7 +18,6 @@ module Clash.Core.DataCon
   ( DataCon (..)
   , DcName
   , ConTag
-  , dataConInstArgTys
   )
 where
 
@@ -29,7 +28,6 @@ import qualified Data.Text                    as Text
 import GHC.Generics                           (Generic)
 
 import Clash.Core.Name                        (Name (..))
-import {-# SOURCE #-} Clash.Core.Subst        (substTyWith)
 import {-# SOURCE #-} Clash.Core.Type         (Type)
 import Clash.Core.Var                         (TyVar)
 import Clash.Unique
@@ -74,23 +72,3 @@ instance Uniquable DataCon where
 type ConTag = Int
 -- | DataCon reference
 type DcName = Name DataCon
-
--- | Given a DataCon and a list of types, the type variables of the DataCon
--- type are substituted for the list of types. The argument types are returned.
---
--- The list of types should be equal to the number of type variables, otherwise
--- @Nothing@ is returned.
-dataConInstArgTys :: DataCon -> [Type] -> Maybe [Type]
-dataConInstArgTys (MkData { dcArgTys     = arg_tys
-                          , dcUnivTyVars = univ_tvs
-                          , dcExtTyVars  = ex_tvs
-                          })
-                  inst_tys
-  | length tyvars == length inst_tys
-  = Just (map (substTyWith tyvars inst_tys) arg_tys)
-
-  | otherwise
-  = Nothing
-
-  where
-    tyvars = univ_tvs ++ ex_tvs

@@ -40,12 +40,12 @@ import qualified Control.Lens                     as Lens
 import           Data.List                        (mapAccumR)
 import qualified Data.Maybe                       as Maybe
 
-import           Clash.Core.DataCon               (DataCon, dataConInstArgTys)
+import           Clash.Core.DataCon               (DataCon)
 import           Clash.Core.Literal               (Literal (..))
 import           Clash.Core.Pretty                (showPpr)
 import           Clash.Core.Term                  (Term (..), Pat (..))
 import           Clash.Core.Type                  (LitTy (..), Type (..),
-                                                   TypeView (..), coreView,
+                                                   TypeView (..), coreView1,
                                                    mkFunTy, mkTyConApp,
                                                    splitFunForallTy, tyView,
                                                    undefinedTy)
@@ -53,7 +53,7 @@ import           Clash.Core.TyCon                 (TyConName, tyConDataCons)
 import           Clash.Core.TysPrim               (integerPrimTy, typeNatKind)
 import           Clash.Core.Util
   (appendToVec, extractElems, extractTElems, idToVar, mkApps, mkRTree,
-   mkUniqInternalId, mkUniqSystemTyVar, mkVec, termType)
+   mkUniqInternalId, mkUniqSystemTyVar, mkVec, termType, dataConInstArgTys)
 import           Clash.Core.Var                   (Var (..))
 import           Clash.Core.VarEnv
   (InScopeSet, extendInScopeSetList)
@@ -82,7 +82,7 @@ reduceZipWith inScope0 n lhsElTy rhsElTy resElTy fun lhsArg rhsArg = do
     let ty = termType tcm lhsArg
     go tcm ty
   where
-    go tcm (coreView tcm -> Just ty') = go tcm ty'
+    go tcm (coreView1 tcm -> Just ty') = go tcm ty'
     go tcm (tyView -> TyConApp vecTcNm _)
       | (Just vecTc) <- lookupUniqMap vecTcNm tcm
       , [nilCon,consCon] <- tyConDataCons vecTc
@@ -116,7 +116,7 @@ reduceMap inScope n argElTy resElTy fun arg = do
     let ty = termType tcm arg
     go tcm ty
   where
-    go tcm (coreView tcm -> Just ty') = go tcm ty'
+    go tcm (coreView1 tcm -> Just ty') = go tcm ty'
     go tcm (tyView -> TyConApp vecTcNm _)
       | (Just vecTc)     <- lookupUniqMap vecTcNm tcm
       , [nilCon,consCon] <- tyConDataCons vecTc
@@ -147,7 +147,7 @@ reduceImap inScope n argElTy resElTy fun arg = do
     let ty = termType tcm arg
     go tcm ty
   where
-    go tcm (coreView tcm -> Just ty') = go tcm ty'
+    go tcm (coreView1 tcm -> Just ty') = go tcm ty'
     go tcm (tyView -> TyConApp vecTcNm _)
       | (Just vecTc)     <- lookupUniqMap vecTcNm tcm
       , [nilCon,consCon] <- tyConDataCons vecTc
@@ -196,7 +196,7 @@ reduceTraverse inScope n aTy fTy bTy dict fun arg = do
         ty = termType tcm arg
     go tcm apDictTcNm ty
   where
-    go tcm apDictTcNm (coreView tcm -> Just ty') = go tcm apDictTcNm ty'
+    go tcm apDictTcNm (coreView1 tcm -> Just ty') = go tcm apDictTcNm ty'
     go tcm apDictTcNm (tyView -> TyConApp vecTcNm _)
       | (Just vecTc) <- lookupUniqMap vecTcNm tcm
       , [nilCon,consCon] <- tyConDataCons vecTc
@@ -327,7 +327,7 @@ reduceFoldr inScope n aTy fun start arg = do
     let ty = termType tcm arg
     go tcm ty
   where
-    go tcm (coreView tcm -> Just ty') = go tcm ty'
+    go tcm (coreView1 tcm -> Just ty') = go tcm ty'
     go tcm (tyView -> TyConApp vecTcNm _)
       | (Just vecTc) <- lookupUniqMap vecTcNm tcm
       , [_,consCon] <- tyConDataCons vecTc
@@ -360,7 +360,7 @@ reduceFold inScope n aTy fun arg = do
     let ty = termType tcm arg
     go tcm ty
   where
-    go tcm (coreView tcm -> Just ty') = go tcm ty'
+    go tcm (coreView1 tcm -> Just ty') = go tcm ty'
     go tcm (tyView -> TyConApp vecTcNm _)
       | (Just vecTc) <- lookupUniqMap vecTcNm tcm
       , [_,consCon]  <- tyConDataCons vecTc
@@ -402,7 +402,7 @@ reduceDFold inScope n aTy fun start arg = do
     let ty = termType tcm arg
     go tcm ty
   where
-    go tcm (coreView tcm -> Just ty') = go tcm ty'
+    go tcm (coreView1 tcm -> Just ty') = go tcm ty'
     go tcm (tyView -> TyConApp vecTcNm _)
       | (Just vecTc) <- lookupUniqMap vecTcNm tcm
       , [_,consCon]  <- tyConDataCons vecTc
@@ -442,7 +442,7 @@ reduceHead inScope n aTy vArg = do
     let ty = termType tcm vArg
     go tcm ty
   where
-    go tcm (coreView tcm -> Just ty') = go tcm ty'
+    go tcm (coreView1 tcm -> Just ty') = go tcm ty'
     go tcm (tyView -> TyConApp vecTcNm _)
       | (Just vecTc) <- lookupUniqMap vecTcNm tcm
       , [_,consCon]  <- tyConDataCons vecTc
@@ -469,7 +469,7 @@ reduceTail inScope n aTy vArg = do
     let ty = termType tcm vArg
     go tcm ty
   where
-    go tcm (coreView tcm -> Just ty') = go tcm ty'
+    go tcm (coreView1 tcm -> Just ty') = go tcm ty'
     go tcm (tyView -> TyConApp vecTcNm _)
       | (Just vecTc) <- lookupUniqMap vecTcNm tcm
       , [_,consCon]  <- tyConDataCons vecTc
@@ -497,7 +497,7 @@ reduceLast inScope n aTy vArg = do
     let ty = termType tcm vArg
     go tcm ty
   where
-    go tcm (coreView tcm -> Just ty') = go tcm ty'
+    go tcm (coreView1 tcm -> Just ty') = go tcm ty'
     go tcm (tyView -> TyConApp vecTcNm _)
       | (Just vecTc) <- lookupUniqMap vecTcNm tcm
       , [_,consCon]  <- tyConDataCons vecTc
@@ -526,7 +526,7 @@ reduceInit inScope n aTy vArg = do
     let ty = termType tcm vArg
     go tcm ty
   where
-    go tcm (coreView tcm -> Just ty') = go tcm ty'
+    go tcm (coreView1 tcm -> Just ty') = go tcm ty'
     go tcm (tyView -> TyConApp vecTcNm _)
       | (Just vecTc) <- lookupUniqMap vecTcNm tcm
       , [nilCon,consCon]  <- tyConDataCons vecTc
@@ -561,7 +561,7 @@ reduceAppend inScope n m aTy lArg rArg = do
     let ty = termType tcm lArg
     go tcm ty
   where
-    go tcm (coreView tcm -> Just ty') = go tcm ty'
+    go tcm (coreView1 tcm -> Just ty') = go tcm ty'
     go tcm (tyView -> TyConApp vecTcNm _)
       | (Just vecTc) <- lookupUniqMap vecTcNm tcm
       , [_,consCon]  <- tyConDataCons vecTc
@@ -588,7 +588,7 @@ reduceUnconcat n 0 aTy arg = do
     let ty = termType tcm arg
     go tcm ty
   where
-    go tcm (coreView tcm -> Just ty') = go tcm ty'
+    go tcm (coreView1 tcm -> Just ty') = go tcm ty'
     go tcm (tyView -> TyConApp vecTcNm _)
       | (Just vecTc)     <- lookupUniqMap vecTcNm tcm
       , [nilCon,consCon] <- tyConDataCons vecTc
@@ -613,7 +613,7 @@ reduceTranspose n 0 aTy arg = do
     let ty = termType tcm arg
     go tcm ty
   where
-    go tcm (coreView tcm -> Just ty') = go tcm ty'
+    go tcm (coreView1 tcm -> Just ty') = go tcm ty'
     go tcm (tyView -> TyConApp vecTcNm _)
       | (Just vecTc)     <- lookupUniqMap vecTcNm tcm
       , [nilCon,consCon] <- tyConDataCons vecTc
@@ -634,7 +634,7 @@ reduceReplicate n aTy eTy arg = do
     tcm <- Lens.view tcCache
     go tcm eTy
   where
-    go tcm (coreView tcm -> Just ty') = go tcm ty'
+    go tcm (coreView1 tcm -> Just ty') = go tcm ty'
     go tcm (tyView -> TyConApp vecTcNm _)
       | (Just vecTc)     <- lookupUniqMap vecTcNm tcm
       , [nilCon,consCon] <- tyConDataCons vecTc
@@ -658,7 +658,7 @@ reduceDTFold inScope n aTy lrFun brFun arg = do
     let ty = termType tcm arg
     go tcm ty
   where
-    go tcm (coreView tcm -> Just ty') = go tcm ty'
+    go tcm (coreView1 tcm -> Just ty') = go tcm ty'
     go tcm (tyView -> TyConApp vecTcNm _)
       | (Just vecTc) <- lookupUniqMap vecTcNm tcm
       , [_,consCon]  <- tyConDataCons vecTc
@@ -705,7 +705,7 @@ reduceTFold inScope n aTy lrFun brFun arg = do
     let ty = termType tcm arg
     go tcm ty
   where
-    go tcm (coreView tcm -> Just ty') = go tcm ty'
+    go tcm (coreView1 tcm -> Just ty') = go tcm ty'
     go tcm (tyView -> TyConApp treeTcNm _)
       | (Just treeTc) <- lookupUniqMap treeTcNm tcm
       , [lrCon,brCon] <- tyConDataCons treeTc
@@ -742,7 +742,7 @@ reduceTReplicate n aTy eTy arg = do
     tcm <- Lens.view tcCache
     go tcm eTy
   where
-    go tcm (coreView tcm -> Just ty') = go tcm ty'
+    go tcm (coreView1 tcm -> Just ty') = go tcm ty'
     go tcm (tyView -> TyConApp treeTcNm _)
       | (Just treeTc) <- lookupUniqMap treeTcNm tcm
       , [lrCon,brCon] <- tyConDataCons treeTc

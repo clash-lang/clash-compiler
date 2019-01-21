@@ -25,7 +25,7 @@ import Clash.Core.Name                  (Name (..))
 import Clash.Core.Pretty                (showPpr)
 import Clash.Core.TyCon                 (TyConMap, tyConDataCons)
 import Clash.Core.Type
-  (LitTy (..), Type (..), TypeView (..), coreView, tyView)
+  (LitTy (..), Type (..), TypeView (..), coreView1, tyView)
 import Clash.Core.Util                  (tyNatSize)
 import Clash.Netlist.Util               (coreTypeToHWType, stripFiltered)
 import Clash.Netlist.Types
@@ -218,7 +218,7 @@ domain
   :: TyConMap
   -> Type
   -> ExceptT String Maybe (String,Integer)
-domain m (coreView m -> Just ty') = domain m ty'
+domain m (coreView1 m -> Just ty') = domain m ty'
 domain m (tyView -> TyConApp tcNm [LitTy (SymTy nm),rateTy])
   | nameOcc tcNm == "Clash.Signal.Internal.Dom"
   = do rate <- mapExceptT (Just . coerce) (tyNatSize m rateTy)
@@ -229,7 +229,7 @@ clockKind
   :: TyConMap
   -> Type
   -> ExceptT String Maybe ClockKind
-clockKind m (coreView m -> Just ty') = clockKind m ty'
+clockKind m (coreView1 m -> Just ty') = clockKind m ty'
 clockKind _ (tyView -> TyConApp tcNm [])
   | nameOcc tcNm == "Clash.Signal.Internal.Source"
   = return Source
@@ -241,7 +241,7 @@ resetKind
   :: TyConMap
   -> Type
   -> ExceptT String Maybe ResetKind
-resetKind m (coreView m -> Just ty') = resetKind m ty'
+resetKind m (coreView1 m -> Just ty') = resetKind m ty'
 resetKind _ (tyView -> TyConApp tcNm [])
   | nameOcc tcNm == "Clash.Signal.Internal.Synchronous"
   = return Synchronous

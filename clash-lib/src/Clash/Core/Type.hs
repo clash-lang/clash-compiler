@@ -30,6 +30,7 @@ module Clash.Core.Type
   , TyVar
   , tyView
   , coreView
+  , coreView1
   , typeKind
   , mkTyConTy
   , mkFunTy
@@ -155,9 +156,19 @@ tyView t = OtherType t
 -- | A view on types in which newtypes are transparent, the Signal type is
 -- transparent, and type functions are evaluated to WHNF (when possible).
 --
+-- Strips away ALL layers. If no layers are found it returns the given type.
+coreView :: TyConMap -> Type -> Type
+coreView tcm ty =
+  case coreView1 tcm ty of
+    Nothing  -> ty
+    Just ty' -> coreView tcm ty'
+
+-- | A view on types in which newtypes are transparent, the Signal type is
+-- transparent, and type functions are evaluated to WHNF (when possible).
+--
 -- Only strips away one "layer".
-coreView :: TyConMap -> Type -> Maybe Type
-coreView tcMap ty = case tyView ty of
+coreView1 :: TyConMap -> Type -> Maybe Type
+coreView1 tcMap ty = case tyView ty of
   TyConApp tcNm args
     | nameOcc tcNm == "Clash.Signal.BiSignal.BiSignalIn"
     , [_,_,_,elTy] <- args
@@ -248,7 +259,7 @@ isPolyTy _                       = False
 splitFunTy :: TyConMap
            -> Type
            -> Maybe (Type, Type)
-splitFunTy m (coreView m -> Just ty)   = splitFunTy m ty
+splitFunTy m (coreView1 m -> Just ty)  = splitFunTy m ty
 splitFunTy _ (tyView -> FunTy arg res) = Just (arg,res)
 splitFunTy _ _ = Nothing
 
@@ -257,7 +268,7 @@ splitFunTys :: TyConMap
             -> ([Type],Type)
 splitFunTys m ty = go [] ty ty
   where
-    go args orig_ty (coreView m -> Just ty')  = go args orig_ty ty'
+    go args orig_ty (coreView1 m -> Just ty') = go args orig_ty ty'
     go args _       (tyView -> FunTy arg res) = go (arg:args) res res
     go args orig_ty _                         = (reverse args, orig_ty)
 
@@ -278,21 +289,21 @@ splitCoreFunForallTy :: TyConMap
                      -> ([Either TyVar Type], Type)
 splitCoreFunForallTy tcm ty = go [] ty ty
   where
-    go args orig_ty (coreView tcm -> Just ty') = go args orig_ty ty'
-    go args _       (ForAllTy tv res)          = go (Left tv:args) res res
-    go args _       (tyView -> FunTy arg res)  = go (Right arg:args) res res
-    go args orig_ty _                          = (reverse args,orig_ty)
+    go args orig_ty (coreView1 tcm -> Just ty') = go args orig_ty ty'
+    go args _       (ForAllTy tv res)           = go (Left tv:args) res res
+    go args _       (tyView -> FunTy arg res)   = go (Right arg:args) res res
+    go args orig_ty _                           = (reverse args,orig_ty)
 
 -- | Is a type a polymorphic or function type?
 isPolyFunTy :: Type
             -> Bool
 isPolyFunTy = not . null . fst . splitFunForallTy
 
--- | Is a type a polymorphic or function type under 'coreView'?
+-- | Is a type a polymorphic or function type under 'coreView1'?
 isPolyFunCoreTy :: TyConMap
                 -> Type
                 -> Bool
-isPolyFunCoreTy m (coreView m -> Just ty) = isPolyFunCoreTy m ty
+isPolyFunCoreTy m (coreView1 m -> Just ty) = isPolyFunCoreTy m ty
 isPolyFunCoreTy _ ty = case tyView ty of
   FunTy _ _ -> True
   OtherType (ForAllTy _ _) -> True
@@ -317,8 +328,8 @@ applyFunTy :: TyConMap
            -> Type
            -> Type
            -> Type
-applyFunTy m (coreView m -> Just ty)   arg = applyFunTy m ty arg
-applyFunTy _ (tyView -> FunTy _ resTy) _   = resTy
+applyFunTy m (coreView1 m -> Just ty)   arg = applyFunTy m ty arg
+applyFunTy _ (tyView -> FunTy _ resTy) _    = resTy
 applyFunTy _ _ _ = error $ $(curLoc) ++ "Report as bug: not a FunTy"
 
 -- | Split a type application in the applied type and the argument types

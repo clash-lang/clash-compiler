@@ -85,13 +85,25 @@ callStackDoc =
     (vcat (map pretty (lines (prettyCallStack callStack))))
 
 warnPprTrace
-  :: Bool -> String -> Int -> Doc ann -> a -> a
+  :: HasCallStack
+  => Bool
+  -- ^ Trigger warning?
+  -> String
+  -- ^ File name
+  -> Int
+  -- ^ Line number
+  -> Doc ann
+  -- ^ Message
+  -> a
+  -- ^ Pass value (like trace)
+  -> a
 warnPprTrace _     _ _ _ x | not debugIsOn = x
 warnPprTrace False _ _ _ x = x
 warnPprTrace True  file ln msg x =
-  pprDebugAndThen trace heading msg x
+  pprDebugAndThen trace (vcat [heading0, heading1]) msg x
  where
-  heading = hsep ["WARNING: file", pretty file <> comma, "line", pretty ln]
+  heading0 = hsep ["WARNING: file", pretty file <> comma, "line", pretty ln]
+  heading1 = "WARNING CALLSTACK:" <> line <> pretty (prettyCallStack callStack)
 
 pprTrace
   :: String -> Doc ann -> a -> a

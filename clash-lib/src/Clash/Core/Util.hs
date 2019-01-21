@@ -7,6 +7,7 @@
 -}
 
 {-# LANGUAGE CPP               #-}
+{-# LANGUAGE NamedFieldPuns    #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TemplateHaskell   #-}
 {-# LANGUAGE ViewPatterns      #-}
@@ -19,8 +20,9 @@ import Control.Monad.Trans.Except              (Except, throwE)
 import           Data.Coerce                   (coerce)
 import qualified Data.IntSet                   as IntSet
 import qualified Data.HashSet                  as HashSet
-import Data.List                               (foldl', mapAccumR)
-import Data.Maybe                              (fromJust, mapMaybe)
+import Data.List
+  (foldl', mapAccumR, elemIndices)
+import Data.Maybe                              (fromJust, mapMaybe, catMaybes)
 import qualified Data.Text                     as T
 import           Data.Text.Prettyprint.Doc     (line)
 #if !MIN_VERSION_base(4,11,0)
@@ -28,19 +30,20 @@ import           Data.Semigroup
 #endif
 
 import Clash.Core.DataCon
-  (DataCon, dcType, dataConInstArgTys)
+  (DataCon (MkData), dcType, dcUnivTyVars, dcExtTyVars, dcArgTys)
 import Clash.Core.FreeVars                     (termFreeVars, tyFVsOfTypes)
 import Clash.Core.Literal                      (literalType)
 import Clash.Core.Name
   (Name (..), OccName, mkUnsafeInternalName, mkUnsafeSystemName)
 import Clash.Core.Pretty                       (ppr, showDoc)
 import Clash.Core.Subst
-  (extendTvSubst, mkSubst, mkTvSubst, substTy)
+  (extendTvSubst, mkSubst, mkTvSubst, substTy, substTyWith,
+   substTyInVar, extendTvSubstList)
 import Clash.Core.Term
-  (LetBinding, Pat (..), Term (..))
+  (LetBinding, Pat (..), Term (..), Alt)
 import Clash.Core.Type
   (Kind, LitTy (..), Type (..), TypeView (..),
-   coreView, isFunTy, isPolyFunCoreTy, mkFunTy, splitFunTy, tyView)
+   coreView, coreView1, isFunTy, isPolyFunCoreTy, mkFunTy, splitFunTy, tyView)
 import Clash.Core.TyCon
   (TyConMap, tyConDataCons)
 import Clash.Core.TysPrim                      (typeNatKind)
@@ -48,7 +51,7 @@ import Clash.Core.Var
   (Id, TyVar, Var (..), mkId, mkTyVar)
 import Clash.Core.VarEnv
   (InScopeSet, VarEnv, emptyVarEnv, extendInScopeSet, extendVarEnv,
-   lookupVarEnv, mkInScopeSet, uniqAway)
+   lookupVarEnv, mkInScopeSet, uniqAway, extendInScopeSetList, unionInScope)
 import Clash.Unique
 import Clash.Util
 
@@ -56,6 +59,159 @@ import Clash.Util
 type Gamma = VarEnv Type
 -- | Kind environment/context
 type Delta = VarEnv Kind
+
+-- | Given the left and right side of an equation, normalize it such that
+-- equations of the following forms:
+--
+--     * 5     ~ n + 2
+--     * 5     ~ 2 + n
+--     * n + 2 ~ 5
+--     * 2 + n ~ 5
+--
+-- are returned as (5, 2, n)
+normalizeAdd
+  :: (Type, Type)
+  -> Maybe (Integer, Integer, Type)
+normalizeAdd (a, b) = do
+  (n, rhs) <- lhsLit a b
+  case tyView rhs of
+    TyConApp (nameOcc -> "GHC.TypeNats.+") [left, right] -> do
+      (m, o) <- lhsLit left right
+      return (n, m, o)
+    _ ->
+      Nothing
+ where
+  lhsLit x                 (LitTy (NumTy n)) = Just (n, x)
+  lhsLit (LitTy (NumTy n)) y                 = Just (n, y)
+  lhsLit _                 _                 = Nothing
+
+-- | Data type that indicates what kind of solution (if any) was found
+data AddSolution
+  = Solution (TyVar, Type)
+  -- ^ Solution was found. Variable equals some integer.
+  | AbsurdSolution
+  -- ^ A solution was found, but it involved negative naturals.
+  | NoSolution
+  -- ^ Given type wasn't an equation, or it was unsolvable.
+    deriving (Show)
+
+-- | Solve given equations and return the first non-absurd solution (if any)
+solveFirstNonAbsurd
+  :: [(Type, Type)]
+  -> Maybe (TyVar, Type)
+solveFirstNonAbsurd [] = Nothing
+solveFirstNonAbsurd (eq:eqs) =
+  case solveAdd eq of
+    Solution s ->
+      Just s
+    _  ->
+      solveFirstNonAbsurd eqs
+
+-- | Solve equations supported by @normalizeAdd@. See documentation of
+-- @AddSolution@ to understand the return value.
+solveAdd
+  :: (Type, Type)
+  -> AddSolution
+solveAdd ab =
+  case normalizeAdd ab of
+    Just (n, m, VarTy tyVar) ->
+      if n >= 0 && m >= 0 && n - m >= 0 then
+        Solution (tyVar, (LitTy (NumTy (n - m))))
+      else
+        AbsurdSolution
+    _ ->
+      NoSolution
+
+-- | If type is an equation, return LHS and RHS.
+typeEq
+  :: TyConMap
+  -> Type
+  -> Maybe (Type, Type)
+typeEq tcm ty =
+ case tyView (coreView tcm ty) of
+  TyConApp (nameOcc -> "GHC.Prim.~#") [_, _, left, right] ->
+    Just (coreView tcm left, coreView tcm right)
+  _ ->
+    Nothing
+
+-- | Get constraint equations
+altEqs
+  :: TyConMap
+  -> Alt
+  -> [(Type, Type)]
+altEqs tcm (pat, _term) =
+ catMaybes (map (typeEq tcm . varType) (snd (patIds pat)))
+
+-- | Tests for unreachable alternative due to types being "absurd". See
+-- @isAbsurdEq@ for more info.
+isAbsurdAlt
+  :: TyConMap
+  -> Alt
+  -> Bool
+isAbsurdAlt tcm alt =
+  any (isAbsurdEq tcm) (altEqs tcm alt)
+
+-- | Determines if an "equation" obtained through @altEqs@ or @typeEq@ is
+-- absurd. That is, it tests if two types that are definitely not equal are
+-- asserted to be equal OR if the computation of the types yield some absurd
+-- (intermediate) result such as -1.
+isAbsurdEq
+  :: TyConMap
+  -> (Type, Type)
+  -> Bool
+isAbsurdEq tcm ((left0, right0)) =
+  case (coreView tcm left0, coreView tcm right0) of
+    (ConstTy {}, ConstTy {}) ->
+      left0 /= right0
+    (LitTy {}, LitTy {}) ->
+      left0 /= right0
+    (left1, right1) ->
+      case solveAdd (left1, right1) of
+        AbsurdSolution -> True
+        _              -> False
+
+-- Safely substitute global type variables in a list of potentially
+-- shadowing type variables.
+substGlobalsInExistentials
+  :: HasCallStack
+  => InScopeSet
+  -- ^ Variables in scope
+  -> [TyVar]
+  -- ^ List of existentials to apply the substitution for
+  -> [(TyVar, Type)]
+  -- ^ Substitutions
+  -> [TyVar]
+substGlobalsInExistentials is exts substs0 = result
+  -- TODO: Is is actually possible that existentials shadow each other? If they
+  -- TODO: can't, we can remove this function
+  where
+    iss     = scanl extendInScopeSet is exts
+    substs1 = map (\is_ -> extendTvSubstList (mkSubst is_) substs0) iss
+    result  = zipWith substTyInVar substs1 exts
+
+-- | Safely substitute a type variable in a list of existentials. This function
+-- will account for cases where existentials shadow each other.
+substInExistentials
+  :: HasCallStack
+  => InScopeSet
+  -- ^ Variables in scope
+  -> [TyVar]
+  -- ^ List of existentials to apply the substitution for
+  -> (TyVar, Type)
+  -- ^ Substitution
+  -> [TyVar]
+substInExistentials is exts subst@(typeVar, _type) =
+  -- TODO: Is is actually possible that existentials shadow each other? If they
+  -- TODO: can't, we can remove this function
+  case elemIndices typeVar exts of
+    [] ->
+      -- We're not replacing any of the existentials, but a global variable
+      substGlobalsInExistentials is exts [subst]
+    (last -> i) ->
+      -- We're replacing an existential. That means we're not touching any
+      -- variables that were introduced before it. For all variables after it,
+      -- it is as we would replace global variables in them.
+      take (i+1) exts ++ substGlobalsInExistentials is (drop (i+1) exts) [subst]
 
 -- | Determine the type of a term
 termType
@@ -141,7 +297,7 @@ piResultTyMaybe
   -> Type
   -> Maybe Type
 piResultTyMaybe m ty arg
-  | Just ty' <- coreView m ty
+  | Just ty' <- coreView1 m ty
   = piResultTyMaybe m ty' arg
   | FunTy _ res <- tyView ty
   = Just res
@@ -181,7 +337,7 @@ piResultTys
   -> Type
 piResultTys _ ty [] = ty
 piResultTys m ty origArgs@(arg:args)
-  | Just ty' <- coreView m ty
+  | Just ty' <- coreView1 m ty
   = piResultTys m ty' origArgs
   | FunTy _ res <- tyView ty
   = piResultTys m res args
@@ -194,7 +350,7 @@ piResultTys m ty origArgs@(arg:args)
 
   go env ty' [] = substTy (mkTvSubst inScope env) ty'
   go env ty' allArgs@(arg':args')
-    | Just ty'' <- coreView m ty'
+    | Just ty'' <- coreView1 m ty'
     = go env ty'' allArgs
     | FunTy _ res <- tyView ty'
     = go env res args'
@@ -581,7 +737,7 @@ isClockOrReset
   :: TyConMap
   -> Type
   -> Bool
-isClockOrReset m (coreView m -> Just ty) = isClockOrReset m ty
+isClockOrReset m (coreView1 m -> Just ty)    = isClockOrReset m ty
 isClockOrReset _ (tyView -> TyConApp tcNm _) = case nameOcc tcNm of
   "Clash.Signal.Internal.Clock" -> True
   "Clash.Signal.Internal.Reset" -> True
@@ -591,8 +747,8 @@ isClockOrReset _ _ = False
 tyNatSize :: TyConMap
           -> Type
           -> Except String Integer
-tyNatSize m (coreView m -> Just ty) = tyNatSize m ty
-tyNatSize _ (LitTy (NumTy i))       = return i
+tyNatSize m (coreView1 m -> Just ty) = tyNatSize m ty
+tyNatSize _ (LitTy (NumTy i))        = return i
 tyNatSize _ ty = throwE $ $(curLoc) ++ "Cannot reduce to an integer:\n" ++ showDoc (ppr ty)
 
 
@@ -628,3 +784,61 @@ mkUniqInternalId (supply,inScope) (nm, ty) =
   (u,supply') = freshId supply
   v           = mkId ty (mkUnsafeInternalName nm u)
   v'          = uniqAway inScope v
+
+
+-- | Same as @dataConInstArgTys@, but it tries to compute existentials too,
+-- hence the extra argument @TyConMap@. WARNING: It will return the types
+-- of non-existentials only
+dataConInstArgTysE
+  :: HasCallStack
+  => InScopeSet
+  -> TyConMap
+  -> DataCon
+  -> [Type]
+  -> Maybe [Type]
+dataConInstArgTysE is0 tcm (MkData { dcArgTys, dcExtTyVars, dcUnivTyVars }) inst_tys = do
+  -- TODO: Check if all existentials were solved (they should be, or the wouldn't have
+  -- TODO: been solved in the caseElemExistentials transformation)
+  let is1   = extendInScopeSetList is0 dcExtTyVars
+      is2   = unionInScope is1 (mkInScopeSet (tyFVsOfTypes inst_tys))
+      subst = extendTvSubstList (mkSubst is2) (zip dcUnivTyVars inst_tys)
+  go
+    (substGlobalsInExistentials is0 dcExtTyVars (zip dcUnivTyVars inst_tys))
+    (map (substTy subst) dcArgTys)
+
+ where
+  go
+    :: [TyVar]
+    -- ^ Existentials
+    -> [Type]
+    -- ^ Type arguments
+    -> Maybe [Type]
+    -- ^ Maybe ([type of non-existential])
+  go exts0 args0 =
+    let eqs = catMaybes (map (typeEq tcm) args0) in
+    case solveFirstNonAbsurd eqs of
+      Just (tyVar, solution1) ->
+        go exts1 args1
+        where
+          exts1 = substInExistentials is0 exts0 (tyVar, solution1)
+          is2   = extendInScopeSetList is0 exts1
+          subst = extendTvSubst (mkSubst is2) tyVar solution1
+          args1 = map (substTy subst) args0
+      Nothing ->
+        Just args0
+
+
+-- | Given a DataCon and a list of types, the type variables of the DataCon
+-- type are substituted for the list of types. The argument types are returned.
+--
+-- The list of types should be equal to the number of type variables, otherwise
+-- @Nothing@ is returned.
+dataConInstArgTys :: DataCon -> [Type] -> Maybe [Type]
+dataConInstArgTys (MkData { dcArgTys, dcUnivTyVars, dcExtTyVars }) inst_tys =
+  -- TODO: Check if inst_tys do not contain any free variables on call sites. If
+  -- TODO: they do, this function is unsafe to use.
+  let tyvars = dcUnivTyVars ++ dcExtTyVars in
+  if length tyvars == length inst_tys then
+    Just (map (substTyWith tyvars inst_tys) dcArgTys)
+  else
+    Nothing
