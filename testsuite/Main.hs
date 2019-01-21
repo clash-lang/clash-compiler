@@ -153,9 +153,10 @@ runClashTest =
         ]
       , clashTestGroup "GADTs"
         [ runTest ("tests" </> "shouldwork" </> "GADTs") defBuild [] "Constrained"          (["", "Constrained_testBench"],"Constrained_testBench",True)
-        , runTest ("tests" </> "shouldwork" </> "GADTs") defBuild [] "MonomorphicTopEntity" (["", "MonomorphicTopEntity_testBench"],"MonomorphicTopEntity_testBench",True)
         , runTest ("tests" </> "shouldwork" </> "GADTs") defBuild [] "Head"                 (["", "Head_testBench"],"Head_testBench",True)
         , runTest ("tests" </> "shouldwork" </> "GADTs") defBuild [] "HeadM"                (["", "HeadM_testBench"],"HeadM_testBench",True)
+        , runTest ("tests" </> "shouldwork" </> "GADTs") defBuild [] "MonomorphicTopEntity" (["", "MonomorphicTopEntity_testBench"],"MonomorphicTopEntity_testBench",True)
+        , runTest ("tests" </> "shouldwork" </> "GADTs") defBuild [] "Record"               (["", "Record_testBench"],"Record_testBench",True)
         , runTest ("tests" </> "shouldwork" </> "GADTs") defBuild [] "Tail"                 (["", "Tail_testBench"],"Tail_testBench",True)
         , runTest ("tests" </> "shouldwork" </> "GADTs") defBuild [] "TailM"                (["", "TailM_testBench"],"TailM_testBench",True)
         , runTest ("tests" </> "shouldwork" </> "GADTs") defBuild [] "TailOfTail"           (["", "TailOfTail_testBench"],"TailOfTail_testBench",True)
