@@ -152,7 +152,8 @@ runClashTest =
         , runTest ("tests" </> "shouldwork" </> "Floating") defBuild ["-fclash-float-support"] "FloatConstFolding" (["","FloatConstFolding_testBench"],"FloatConstFolding_testBench",True)
         ]
       , clashTestGroup "GADTs"
-        [ runTest ("tests" </> "shouldwork" </> "GADTs") defBuild [] "MonomorphicTopEntity" (["", "MonomorphicTopEntity_testBench"],"MonomorphicTopEntity_testBench",True)
+        [ runTest ("tests" </> "shouldwork" </> "GADTs") defBuild [] "Constrained"          (["", "Constrained_testBench"],"Constrained_testBench",True)
+        , runTest ("tests" </> "shouldwork" </> "GADTs") defBuild [] "MonomorphicTopEntity" (["", "MonomorphicTopEntity_testBench"],"MonomorphicTopEntity_testBench",True)
         , runTest ("tests" </> "shouldwork" </> "GADTs") defBuild [] "Head"                 (["", "Head_testBench"],"Head_testBench",True)
         , runTest ("tests" </> "shouldwork" </> "GADTs") defBuild [] "HeadM"                (["", "HeadM_testBench"],"HeadM_testBench",True)
         , runTest ("tests" </> "shouldwork" </> "GADTs") defBuild [] "Tail"                 (["", "Tail_testBench"],"Tail_testBench",True)
