@@ -1022,11 +1022,13 @@ for the SystemVerilog primitives) if you want to know which functions are define
 as \"regular\" primitives. The compiler looks for primitives in four locations:
 
 * The official install location: e.g.
-  * @$CABAL_DIR\/share\/\<GHC_VERSION\>\/clash-lib\-<VERSION\>\/prims\/common@
-  * @$CABAL_DIR\/share\/\<GHC_VERSION\>\/clash-lib\-<VERSION\>\/prims\/commonverilog@
-  * @$CABAL_DIR\/share\/\<GHC_VERSION\>\/clash-lib\-<VERSION\>\/prims\/systemverilog@
-  * @$CABAL_DIR\/share\/\<GHC_VERSION\>\/clash-lib\-<VERSION\>\/prims\/verilog@
-  * @$CABAL_DIR\/share\/\<GHC_VERSION\>\/clash-lib\-<VERSION\>\/prims\/vhdl@
+
+    * @$CABAL_DIR\/share\/\<GHC_VERSION\>\/clash-lib\-<VERSION\>\/prims\/common@
+    * @$CABAL_DIR\/share\/\<GHC_VERSION\>\/clash-lib\-<VERSION\>\/prims\/commonverilog@
+    * @$CABAL_DIR\/share\/\<GHC_VERSION\>\/clash-lib\-<VERSION\>\/prims\/systemverilog@
+    * @$CABAL_DIR\/share\/\<GHC_VERSION\>\/clash-lib\-<VERSION\>\/prims\/verilog@
+    * @$CABAL_DIR\/share\/\<GHC_VERSION\>\/clash-lib\-<VERSION\>\/prims\/vhdl@
+
 * Directories indicated by a 'Clash.Annotations.Primitive.Primitive' annotation
 * The current directory (the location given by @pwd@)
 * The include directories specified on the command-line: @-i\<DIR\>@
@@ -1280,7 +1282,7 @@ a general listing of the available template holes:
   string literal.
 * @~DEVNULL[\<HOLE\>]@: Render all dependencies of @\<HOLE\>@, but disregard direct output
 * @~REPEAT[\<HOLE\>][N]@: Repeat literal value of @\<HOLE\>@ a total of @N@ times.
-* @~TEMPLATE[\<HOLE1\>][\<HOLE2\>]@: Render a file <HOLE1> with contents <HOLE2>.
+* @~TEMPLATE[\<HOLE1\>][\<HOLE2\>]@: Render a file @\<HOLE1\>@ with contents @\<HOLE2\>@.
 
 
 Some final remarks to end this section: VHDL primitives are there to instruct the

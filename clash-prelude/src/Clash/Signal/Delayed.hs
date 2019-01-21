@@ -90,7 +90,7 @@ delayed
   -> DSignal domain (n + d) a
 delayed = hideClockReset E.delayed
 
--- | Delay a 'DSignal' for @m@ periods, where @m@ is derived from the context.
+-- | Delay a 'DSignal' for @d@ periods, where @d@ is derived from the context.
 --
 -- @
 -- delay2

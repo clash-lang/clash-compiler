@@ -104,7 +104,7 @@ delayed clk rst m ds = coerce (delaySignal (coerce ds))
                r      = register clk rst m (bundle r')
            in  head o
 
--- | Delay a 'DSignal' for @m@ periods, where @m@ is derived from the
+-- | Delay a 'DSignal' for @d@ periods, where @d@ is derived from the
 -- context.
 --
 -- @
@@ -114,7 +114,7 @@ delayed clk rst m ds = coerce (delaySignal (coerce ds))
 --   -> Int
 --   -> 'DSignal' domain n Int
 --   -> 'DSignal' domain (n + 2) Int
--- delay2 = 'delayI'
+-- delay2 = 'delayedI'
 -- @
 --
 -- >>> sampleN 7 (delay2 systemClockGen asyncResetGen (-1) (dfromList ([0..])))

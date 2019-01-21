@@ -55,7 +55,7 @@ module Clash.Sized.Fixed
   , fLitR
     -- * 'Fixed' point wrapper
   , Fixed (..), resizeF, fracShift
-    -- * Constraint synonyms
+    -- * Constraint synonyms #constraintsynonyms#
     -- $constraintsynonyms
 
     -- ** Constraint synonyms for 'SFixed'
@@ -135,7 +135,7 @@ deriving instance CoArbitrary (rep (int + frac)) => CoArbitrary (Fixed rep int f
 deriving instance FiniteBits (rep (int + frac)) => FiniteBits (Fixed rep int frac)
 
 -- | Instance functions do not saturate.
--- Meaning that \"@`'shiftL'` 1 == 'satMul' 'SatWrap' 2'@\""
+-- Meaning that \"@\`shiftL\` 1 == 'satMul' 'SatWrap' 2'@\"
 deriving instance Bits (rep (int + frac)) => Bits (Fixed rep int frac)
 
 -- | Signed 'Fixed'-point number, with @int@ integer bits (including sign-bit)
@@ -275,7 +275,7 @@ instance (size ~ (int + frac), KnownNat frac, Bounded (rep size), Integral (rep 
       => Read (Fixed rep int frac) where
   readPrec = fLitR <$> readPrec
 
-{- $constraintsynonyms #constraintsynonyms#
+{- $constraintsynonyms
 Writing polymorphic functions over fixed point numbers can be a potentially
 verbose due to the many class constraints induced by the functions and operators
 of this module.
