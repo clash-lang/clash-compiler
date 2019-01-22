@@ -296,10 +296,10 @@ assign ~RESULT = ~SYM[0][(2*~LENGTH[~TYP[1]])-2];
 , { "BlackBox" :
     { "name"      : "Clash.Sized.Vector.index_int"
     , "kind"      : "Declaration"
-    , "type"      : "index_integer :: KnownNat n => Vec n a -> Int -> a"
+    , "type"      : "index_int :: KnownNat n => Vec n a -> Int -> a"
     , "template"  :
-"// indexVec begin
-wire ~TYPO ~GENSYM[vec][0] [0:~LIT[0]-1];
+"// index begin
+~IF~SIZE[~TYP[1]]~THENwire ~TYPO ~GENSYM[vec][0] [0:~LIT[0]-1];
 
 genvar ~GENSYM[i][2];
 ~GENERATE
@@ -308,8 +308,8 @@ for (~SYM[2]=0; ~SYM[2] < ~LIT[0]; ~SYM[2]=~SYM[2]+1) begin : ~GENSYM[mk_array][
 end
 ~ENDGENERATE
 
-assign ~RESULT = ~SYM[0][~ARG[2]];
-// indexVec end"
+assign ~RESULT = ~SYM[0][~ARG[2]];~ELSEassign ~RESULT = ~ERRORO;~FI
+// index end"
     }
   }
 , { "BlackBox" :

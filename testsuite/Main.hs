@@ -248,6 +248,7 @@ runClashTest =
         , runTest ("tests" </> "shouldwork" </> "Vector") defBuild [] "HOClock"    ([""],"HOClock_topEntity",False)
         , runTest ("tests" </> "shouldwork" </> "Vector") defBuild [] "HOCon"      ([""],"HOCon_topEntity",False)
         , runTest ("tests" </> "shouldwork" </> "Vector") defBuild [] "HOPrim"     ([""],"HOPrim_topEntity",False)
+        , runTest ("tests" </> "shouldwork" </> "Vector") defBuild [] "IndexInt"   (["","IndexInt_testBench"],"IndexInt_testBench",True)
         , runTest ("tests" </> "shouldwork" </> "Vector") defBuild [] "Indices"    (["","Indices_testBench"],"Indices_testBench",True)
         , runTest ("tests" </> "shouldwork" </> "Vector") defBuild [] "Minimum"    (["","Minimum_testBench"],"Minimum_testBench",True)
         , runTest ("tests" </> "shouldwork" </> "Vector") defBuild [] "MovingAvg"  ([""],"MovingAvg_topEntity", False)

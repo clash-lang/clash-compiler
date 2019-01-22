@@ -288,8 +288,8 @@ assign ~RESULT = ~SYM[0][(2*~LENGTH[~TYP[1]])-2];
 , { "BlackBox" :
     { "name"      : "Clash.Sized.Vector.index_int"
     , "kind"      : "Expression"
-    , "type"      : "index_integer :: KnownNat n => Vec n a -> Int -> a"
-    , "template"  : "~FROMBV[~VAR[vec][1][\\~ARG[2]\\]][~TYPO]"
+    , "type"      : "index_int :: KnownNat n => Vec n a -> Int -> a"
+    , "template"  : "~IF~SIZE[~TYP[1]]~THEN~FROMBV[~VAR[vec][1][\\~ARG[2]\\]][~TYPO]~ELSE~ERRORO~FI"
     }
   }
 , { "BlackBox" :
