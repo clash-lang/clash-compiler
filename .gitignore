@@ -31,3 +31,15 @@ cabal.config
 
 *~
 *.DS_Store
+
+# IntelliJ
+/.idea
+*.iml
+
+# HDL directories often created during development cycle
+/vhdl
+/verilog
+/systemverilog
+
+# Temporary directory for Clash testsuite
+/.clash-test-tmp
