@@ -18,14 +18,14 @@
     { "name"      : "Clash.Sized.Internal.BitVector.size#"
     , "kind"      : "Expression"
     , "type"      : "size# :: KnownNat n => BitVector n -> Int"
-    , "template"  : "to_signed(~LIT[0],~SIZE[~TYPO])"
+    , "template"  : "to_signed(~SIZE[~TYP[1]],~SIZE[~TYPO])"
     }
   }
 , { "BlackBox" :
     { "name"      : "Clash.Sized.Internal.BitVector.maxIndex#"
     , "kind"      : "Expression"
     , "type"      : "maxIndex# :: KnownNat n => BitVector n -> Int"
-    , "template"  : "to_signed(~LIT[0] - 1,~SIZE[~TYPO])"
+    , "template"  : "to_signed(~SIZE[~TYP[1]] - 1,~SIZE[~TYPO])"
     }
   }
 , { "BlackBox" :
@@ -229,22 +229,22 @@ end block;~ELSE
     , "template" :
 "-- indexBitVector begin ~IF~SIZE[~TYP[1]]~THEN~IF ~ISVAR[1] ~THEN
 ~GENSYM[indexBitVector][0] : block
-  signal ~GENSYM[vec_index][1] : integer range 0 to ~LIT[0]-1;
+  signal ~GENSYM[vec_index][1] : integer range 0 to ~SIZE[~TYP[1]]-1;
 begin
   ~SYM[1] <= to_integer(~ARG[2])
   -- pragma translate_off
-               mod ~LIT[0]
+               mod ~SIZE[~TYP[1]]
   -- pragma translate_on
                ;
 
   ~RESULT <= ~ARG[1](~SYM[1]);
 end block;~ELSE
 ~SYM[0] : block
-  signal ~SYM[1] : integer range 0 to ~LIT[0]-1;
+  signal ~SYM[1] : integer range 0 to ~SIZE[~TYP[1]]-1;
 begin
   ~SYM[1] <= to_integer(~ARG[2])
   -- pragma translate_off
-               mod ~LIT[0]
+               mod ~SIZE[~TYP[1]]
   -- pragma translate_on
                ;
 
@@ -266,11 +266,11 @@ end block;~FI~ELSE
     , "template" :
 "-- replaceBit begin ~IF~SIZE[~TYP[1]]~THEN
 ~GENSYM[replaceBit][0] : block
-  signal ~GENSYM[vec_index][1] : integer range 0 to ~LIT[0]-1;
+  signal ~GENSYM[vec_index][1] : integer range 0 to ~SIZE[~TYP[1]]-1;
 begin
   ~SYM[1] <= to_integer(~ARG[2])
   -- pragma translate_off
-               mod ~LIT[0]
+               mod ~SIZE[~TYP[1]]
   -- pragma translate_on
                ;
 
@@ -335,7 +335,7 @@ end process;
 "msb# :: KnownNat n  -- ARG[0]
       => BitVector n -- ARG[1]
       -> Bit"
-    , "template" : "~IF ~LIT[0] ~THEN ~VAR[bv][1](~VAR[bv][1]'high) ~ELSE \"0\" ~FI"
+    , "template" : "~IF ~SIZE[~TYP[1]] ~THEN ~VAR[bv][1](~VAR[bv][1]'high) ~ELSE \"0\" ~FI"
     }
   }
 , { "BlackBox" :
@@ -421,7 +421,7 @@ end process;
     { "name"      : "Clash.Sized.Internal.BitVector.*#"
     , "kind"      : "Expression"
     , "type"      : "(*#) :: KnownNat n => BitVector n -> BitVector n -> BitVector n"
-    , "template"  : "std_logic_vector(resize(unsigned(~ARG[1]) * unsigned(~ARG[2]), ~LIT[0]))"
+    , "template"  : "std_logic_vector(resize(unsigned(~ARG[1]) * unsigned(~ARG[2]), ~SIZE[~TYP[1]]))"
     }
   }
 , { "BlackBox" :
@@ -435,7 +435,7 @@ end process;
     { "name"      : "Clash.Sized.Internal.BitVector.fromInteger#"
     , "kind"      : "Expression"
     , "type"      : "fromInteger# :: KnownNat n => Integer -> Integer -> BitVector n"
-    , "template"  : "std_logic_vector(resize(unsigned(std_logic_vector(~ARG[2])),~LIT[0]))"
+    , "template"  : "std_logic_vector(resize(unsigned(std_logic_vector(~ARG[2])),~SIZE[~TYPO]))"
     }
   }
 , { "BlackBox" :
@@ -540,7 +540,7 @@ end process;
     { "name"      : "Clash.Sized.Internal.BitVector.resize#"
     , "kind"      : "Expression"
     , "type"      : "resize# :: KnownNat m => BitVector n -> BitVector m"
-    , "template"  : "~IF~SIZE[~TYP[1]]~THENstd_logic_vector(resize(unsigned(~ARG[1]),~LIT[0]))~ELSEstd_logic_vector'(~SIZE[~TYPO]-1 downto 0 => '0')~FI"
+    , "template"  : "~IF~SIZE[~TYP[1]]~THENstd_logic_vector(resize(unsigned(~ARG[1]),~SIZE[~TYPO]))~ELSEstd_logic_vector'(~SIZE[~TYPO]-1 downto 0 => '0')~FI"
     }
   }
 ]
