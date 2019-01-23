@@ -67,7 +67,8 @@ import           Clash.Core.Name
 import           Clash.Core.Term     (Pat (..), Term (..))
 import           Clash.Core.Type
   (Type (..), ConstTy (..), LitTy (..), TypeView (..), mkFunTy, mkTyConApp,
-   splitFunForallTy, tyView, undefinedTy)
+   splitFunForallTy, tyView)
+import           Clash.Core.Type     (undefinedTy)
 import           Clash.Core.TyCon
   (TyConMap, TyConName, tyConDataCons)
 import           Clash.Core.TysPrim

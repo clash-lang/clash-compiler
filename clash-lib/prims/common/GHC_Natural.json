@@ -1,13 +1,32 @@
-[ { "Primitive" :
-    { "name"      : "GHC.Natural.NatS#"
-    , "primType"  : "Constructor"
+[
+  {
+    "Primitive": {
+      "name": "GHC.Natural.NatS#",
+      "primType": "Constructor"
     }
-  }
-, { "BlackBox" :
-    { "name"      : "GHC.Natural.underflowError"
-    , "kind"      : "Expression"
-    , "type"      : "underflowError :: a"
-    , "template"  : "~ERRORO"
+  },
+  {
+    "BlackBox": {
+      "name": "GHC.Natural.underflowError",
+      "kind": "Expression",
+      "type": "underflowError :: a",
+      "template": "~ERRORO"
+    }
+  },
+  {
+    "BlackBox": {
+      "name": "GHC.Natural.plusNatural",
+      "kind": "Expression",
+      "type": "plusNatural :: Natural -> Natural -> Natural",
+      "template": "~ARG[0] + ~ARG[1]"
+    }
+  },
+  {
+    "BlackBox": {
+      "name": "GHC.Natural.minusNatural",
+      "kind": "Expression",
+      "type": "minusNatural :: Natural -> Natural -> Natural",
+      "template": "~ARG[0] - ~ARG[1]"
     }
   }
 ]

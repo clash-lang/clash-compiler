@@ -1,0 +1,26 @@
+[
+  {
+    "BlackBox": {
+      "name": "GHC.Natural.naturalFromInteger",
+      "kind": "Expression",
+      "type": "naturalFromInteger :: Integer -> Natural",
+      "template": "resize(unsigned(std_logic_vector(~ARG[0])),~SIZE[~TYPO])"
+    }
+  },
+  {
+    "BlackBox": {
+      "name": "GHC.Natural.timesNatural",
+      "kind": "Expression",
+      "type": "timesNatural :: Natural -> Natural -> Natural",
+      "template": "resize(~ARG[0] * ~ARG[1],~SIZE[~TYPO])"
+    }
+  },
+  {
+    "BlackBox": {
+      "name": "GHC.Natural.wordToNatural#",
+      "kind": "Expression",
+      "type": "wordToNatural# :: Word# -> Natural",
+      "template": "unsigned(std_logic_vector(~ARG[0]))"
+    }
+  }
+]

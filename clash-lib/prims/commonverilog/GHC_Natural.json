@@ -1,0 +1,26 @@
+[
+  {
+    "BlackBox": {
+      "name": "GHC.Natural.naturalFromInteger",
+      "kind": "Expression",
+      "type": "naturalFromInteger :: Integer -> Natural",
+      "template": "$unsigned(~ARG[0][(~SIZE[~TYPO]-1):0])"
+    }
+  },
+  {
+    "BlackBox": {
+      "name": "GHC.Natural.timesNatural",
+      "kind": "Expression",
+      "type": "timesNatural :: Natural -> Natural -> Natural",
+      "template": "~ARG[0] * ~ARG[1]"
+    }
+  },
+  {
+    "BlackBox": {
+      "name": "GHC.Natural.wordToNatural#",
+      "kind": "Declaration",
+      "type": "wordToNatural# :: Word# -> Natural",
+      "template": "assign ~RESULT = $unsigned(~ARG[0]);"
+    }
+  }
+]
