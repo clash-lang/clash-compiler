@@ -814,7 +814,9 @@ exprLit :: (Applicative m, Monoid (m Doc) ) => Maybe (HWType,Size) -> Literal ->
 exprLit Nothing (NumLit i) = integer i
 
 exprLit (Just (hty,sz)) (NumLit i) = case hty of
-  Unsigned _ -> int sz <> string "'d" <> integer i
+  Unsigned _
+   | i < 0     -> string "-" <> int sz <> string "'d" <> integer (abs i)
+   | otherwise -> int sz <> string "'d" <> integer i
   Index _ -> int (typeSize hty) <> string "'d" <> integer i
   Signed _
    | i < 0     -> string "-" <> int sz <> string "'sd" <> integer (abs i)
