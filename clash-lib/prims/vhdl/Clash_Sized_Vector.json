@@ -302,7 +302,7 @@ end block;
     , "type"      : "index_int :: KnownNat n => Vec n a -> Int -> a"
     , "template"  :
 "-- index begin
-~GENSYM[indexVec][0] : block
+~IF~SIZE[~TYP[1]]~THEN~GENSYM[indexVec][0] : block
   signal ~GENSYM[vec_index][1] : integer range 0 to ~LIT[0]-1;
 begin
   ~SYM[1] <= to_integer(~ARG[2])
@@ -312,7 +312,7 @@ begin
                ;~IF ~VIVADO ~THEN
   ~RESULT <= fromSLV(~VAR[vec][1](~SYM[1]));~ELSE
   ~RESULT <= ~VAR[vec][1](~SYM[1]);~FI
-end block;
+end block;~ELSE~RESULT <= ~ERRORO;~FI
 -- index end"
     }
   }
