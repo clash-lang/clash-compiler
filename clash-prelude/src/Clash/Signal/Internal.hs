@@ -103,7 +103,7 @@ import Test.QuickCheck            (Arbitrary (..), CoArbitrary(..), Property,
 
 import Clash.Promoted.Nat         (SNat (..), snatToInteger, snatToNum)
 import Clash.Promoted.Symbol      (SSymbol (..))
-import Clash.XException           (Undefined (..), errorX, seqX)
+import Clash.XException           (Undefined (..), errorX, maybeX, seqX)
 
 {- $setup
 >>> :set -XDataKinds
@@ -569,8 +569,12 @@ delay# (GatedClock _ _ en) =
     go (withFrozenCallStack (deepErrorX "delay: initial value undefined")) en
   where
     go o (e :- es) as@(~(x :- xs)) =
+      let o' = case maybeX e of
+                 Just True  -> x
+                 Just False -> o
+                 Nothing    -> deepErrorX "delay: undefined clock enable"
       -- See [Note: register strictness annotations]
-      o `seqX` o :- (as `seq` if e then go x es xs else go o es xs)
+      in  o `seqX` o :- (as `seq` go o' es xs)
 {-# NOINLINE delay# #-}
 
 register#
@@ -601,7 +605,10 @@ register# (GatedClock _ _ ena) (Sync rst)  i =
     go (withFrozenCallStack (deepErrorX "register: initial value undefined")) rst ena
   where
     go o rt@(~(r :- rs)) enas@(~(e :- es)) as@(~(x :- xs)) =
-      let oE = if e then x else o
+      let oE = case maybeX e of
+                 Just True  -> x
+                 Just False -> o
+                 Nothing    -> deepErrorX "register: undefined clock enable"
           oR = if r then i else oE
           -- [Note: register strictness annotations]
       in  o `seqX` o :- (rt `seq` enas `seq` as `seq` go oR rs es xs)
@@ -611,7 +618,10 @@ register# (GatedClock _ _ ena) (Async rst) i =
   where
     go o (r :- rs) enas@(~(e :- es)) as@(~(x :- xs)) =
       let oR = if r then i else o
-          oE = if r then i else (if e then x else o)
+          oE = if r then i else case maybeX e of
+                 Just True  -> x
+                 Just False -> o
+                 Nothing    -> deepErrorX "register: undefined clock enable"
           -- [Note: register strictness annotations]
       in  oR `seqX` oR :- (as `seq` enas `seq` go oE rs es xs)
 {-# NOINLINE register# #-}
