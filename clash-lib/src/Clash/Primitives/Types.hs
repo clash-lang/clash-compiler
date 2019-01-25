@@ -186,7 +186,7 @@ instance FromJSON UnresolvedPrimitive where
                  <|> (Just . TFile   <$> conVal .: "file")
                  <|> (pure Nothing)
 
-            let fName' = either error id (parseBBFN fName)
+            fName' <- either fail return (parseBBFN fName)
 
             return (BlackBoxHaskell name' fName' templ)
           "BlackBox"  ->
@@ -202,8 +202,8 @@ instance FromJSON UnresolvedPrimitive where
             Primitive <$> conVal .: "name"
                       <*> conVal .: "primType"
 
-          e -> error $ "[1] Expected: BlackBox or Primitive object, got: " ++ show e
-      e -> error $ "[2] Expected: BlackBox or Primitive object, got: " ++ show e
+          e -> fail $ "[1] Expected: BlackBox or Primitive object, got: " ++ show e
+      e -> fail $ "[2] Expected: BlackBox or Primitive object, got: " ++ show e
     where
       parseTemplate c =
         (,) <$> ((,) <$> (c .:? "format" >>= traverse parseTemplateFormat) .!= TTemplate
@@ -218,15 +218,15 @@ instance FromJSON UnresolvedPrimitive where
 
       parseTemplateKind (String "Declaration") = pure TDecl
       parseTemplateKind (String "Expression")  = pure TExpr
-      parseTemplateKind c = error ("[4] Expected: Declaration or Expression, got " ++ show c)
+      parseTemplateKind c = fail ("[4] Expected: Declaration or Expression, got " ++ show c)
 
       parseTemplateFormat (String "Template") = pure TTemplate
       parseTemplateFormat (String "Haskell")  = pure THaskell
-      parseTemplateFormat c = error ("[5] unexpected format: " ++ show c)
+      parseTemplateFormat c = fail ("[5] unexpected format: " ++ show c)
 
-      parseBBFN' = either error return . parseBBFN
+      parseBBFN' = either fail return . parseBBFN
 
       defTemplateFunction = BlackBoxFunctionName ["Template"] "template"
 
   parseJSON unexpected =
-    error $ "[3] Expected: BlackBox or Primitive object, got: " ++ show unexpected
+    fail $ "[3] Expected: BlackBox or Primitive object, got: " ++ show unexpected

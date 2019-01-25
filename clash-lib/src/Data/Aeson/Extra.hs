@@ -6,6 +6,7 @@
 
 module Data.Aeson.Extra where
 
+import           Control.Exception    (throw)
 import qualified Data.Ix              as Ix
 import qualified Data.Text            as T
 import           Data.Text            (Text,pack,unpack)
@@ -14,6 +15,10 @@ import           Data.Aeson           (FromJSON, Result (..), fromJSON, json)
 import           Data.Attoparsec.Lazy (Result (..), parse)
 import           Data.ByteString.Lazy (ByteString)
 import           System.FilePath      ()
+
+import           Clash.Util           (ClashException(..))
+import           SrcLoc               (mkGeneralSrcSpan)
+import           FastString           (mkFastString)
 
 -- Quick and dirty way of replacing fake escapes in naively converted bytestring
 replaceCommonEscapes :: Text -> Text
@@ -48,10 +53,10 @@ decodeOrErr path contents =
   case parse json contents of
     Done _ v -> case fromJSON v of
                     Success a -> Just a
-                    Error msg -> error ("Could not deduce valid scheme for '" ++ show path ++ "'. Error was: \n\n" ++ msg)
+                    Error msg -> clashError ("Could not deduce valid scheme for " ++ show path ++ ". Error was: \n\n" ++ msg)
 
     -- JSON parse error:
-    Fail bytes cntxs msg -> error ( "Could not read or parse " ++ show path ++ ". "
+    Fail bytes cntxs msg -> clashError ("Could not read or parse " ++ show path ++ ". "
                                  ++ (if null cntxs then "" else "Context was:\n  " ++ intercalate "\n  " cntxs)
                                  ++ "\n\nError reported by Attoparsec was:\n  "
                                  ++ msg
@@ -59,3 +64,6 @@ decodeOrErr path contents =
                                  -- HACK: Replace with proper parser/fail logic in future. Or don't. It's not important.
                                  ++ (unpack $ genLineErr contents bytes)
                                  )
+  where
+    loc = mkGeneralSrcSpan $ mkFastString path
+    clashError msg = throw $ ClashException loc msg Nothing
