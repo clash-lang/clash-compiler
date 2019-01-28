@@ -90,6 +90,7 @@ runClashTest =
         , clashTestGroup "ShouldFail" [
           runFailingTest ("tests" </> "shouldfail") defBuild [] "RecursiveBoxed" (Just "Callgraph after normalisation contains following recursive components")
         , runFailingTest ("tests" </> "shouldfail") defBuild [] "RecursiveDatatype" (Just "Not in normal form: no Letrec")
+        , runFailingTest ("tests" </> "shouldfail" </> "InvalidPrimitive") defBuild ["-itests/shouldfail/InvalidPrimitive"] "InvalidPrimitive" (Just "InvalidPrimitive.json")
         -- Disabled, due to it eating gigabytes of memory:
         -- , runFailingTest ("tests" </> "shouldfail") defBuild [] "RecursivePoly" (Just "??")
         ]
