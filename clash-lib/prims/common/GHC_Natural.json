@@ -18,7 +18,8 @@
       "name": "GHC.Natural.plusNatural",
       "kind": "Expression",
       "type": "plusNatural :: Natural -> Natural -> Natural",
-      "template": "~ARG[0] + ~ARG[1]"
+      "template": "~ARG[0] + ~ARG[1]",
+      "warning": "GHC.Natural.plusNatural: Naturals are dynamically sized in simulation, but fixed-length after synthesization. Use carefully."
     }
   },
   {
@@ -26,7 +27,8 @@
       "name": "GHC.Natural.minusNatural",
       "kind": "Expression",
       "type": "minusNatural :: Natural -> Natural -> Natural",
-      "template": "~ARG[0] - ~ARG[1]"
+      "template": "~ARG[0] - ~ARG[1]",
+      "warning": "GHC.Natural.minusNatural: Naturals are dynamically sized in simulation, but fixed-length after synthesization. Use carefully."
     }
   }
 ]
