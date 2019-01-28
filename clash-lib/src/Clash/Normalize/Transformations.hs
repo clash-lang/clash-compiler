@@ -497,12 +497,11 @@ caseCon ctx@(TransformContext is0 _) e@(Case subj ty alts)
                 let e' = mkApps (Prim nm ty') [repTy,Right ty,msgOrCallStack]
                 in  changed e'
             (Prim nm ty',[_])
-              | nm `elem` ["Clash.Transformations.undefined"] ->
+              | nm `elem` [ "Clash.Transformations.undefined"
+                          , "Clash.GHC.Evaluator.undefined"
+                          , "EmptyCase"] ->
                 let e' = mkApps (Prim nm ty') [Right ty]
                 in changed e'
-            (Prim nm _,[_])
-              | nm `elem` ["EmptyCase"] ->
-                changed (Prim nm ty)
             _ -> do
               let subjTy = termType tcm subj
               tran <- Lens.view typeTranslator

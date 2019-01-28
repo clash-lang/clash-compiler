@@ -40,9 +40,7 @@ import           GHC.Int
 import           GHC.Integer
   (decodeDoubleInteger,encodeDoubleInteger,compareInteger)
 import           GHC.Integer.GMP.Internals (Integer (..), BigNat (..))
-#if MIN_VERSION_base(4,12,0)
 import           GHC.Natural
-#endif
 import           GHC.Prim
 import           GHC.Real            (Ratio (..))
 import           GHC.TypeLits        (KnownNat)
@@ -70,6 +68,7 @@ import           Clash.Core.Term     (Pat (..), Term (..))
 import           Clash.Core.Type
   (Type (..), ConstTy (..), LitTy (..), TypeView (..), mkFunTy, mkTyConApp,
    splitFunForallTy, tyView)
+import           Clash.Core.Type     (undefinedTy)
 import           Clash.Core.TyCon
   (TyConMap, TyConName, tyConDataCons)
 import           Clash.Core.TysPrim
@@ -978,19 +977,51 @@ reduceConstant isSubj gbl tcm h k nm ty tys args = case nm of
     | [Lit (WordLiteral w)] <- args
     -> reduce (Literal (NaturalLiteral w))
 
-#if MIN_VERSION_base(4,12,0)
   "GHC.Natural.naturalToInteger"
     | [i] <- naturalLiterals' args
-    -> reduce (Literal (IntegerLiteral i))
+    -> reduce (Literal (IntegerLiteral (toInteger i)))
+
+  "GHC.Natural.naturalFromInteger"
+    | [i] <- integerLiterals' args
+    ->
+     let nTy = snd (splitFunForallTy ty) in
+     reduce (checkNaturalRange1 nTy i id)
 
   -- GHC.shiftLNatural --- XXX: Fragile worker of GHC.shiflLNatural
   "GHC.Natural.$wshiftLNatural"
     | [nV,iV] <- args
     , [n] <- naturalLiterals' [nV]
-    , [i] <- intLiterals' [iV]
-    -> let r = shiftLNatural (fromInteger n) (fromInteger i)
-       in  reduce (Literal (NaturalLiteral (toInteger r)))
-#endif
+    , [i] <- fromInteger <$> intLiterals' [iV]
+    ->
+     let nTy = snd (splitFunForallTy ty) in
+     reduce (checkNaturalRange1 nTy n ((flip shiftL) i))
+
+  "GHC.Natural.plusNatural"
+    | Just (i,j) <- naturalLiterals args
+    ->
+     let nTy = snd (splitFunForallTy ty) in
+     reduce (checkNaturalRange2 nTy i j (+))
+
+  "GHC.Natural.timesNatural"
+    | Just (i,j) <- naturalLiterals args
+    ->
+     let nTy = snd (splitFunForallTy ty) in
+     reduce (checkNaturalRange2 nTy i j (*))
+
+  "GHC.Natural.minusNatural"
+    | Just (i,j) <- naturalLiterals args
+    ->
+     let nTy = snd (splitFunForallTy ty) in
+     reduce (checkNaturalRange nTy [i, j] (\[i', j'] ->
+                case minusNaturalMaybe i' j' of
+                  Nothing -> checkNaturalRange1 nTy (-1) id
+                  Just n -> naturalToNaturalLiteral n))
+
+  "GHC.Natural.wordToNatural#"
+    | [Lit (WordLiteral w)] <- args
+    ->
+     let nTy = snd (splitFunForallTy ty) in
+     reduce (checkNaturalRange1 nTy w id)
 
   -- GHC.Real.^  -- XXX: Very fragile
   --   ^_f, $wf, $wf1 are specialisations of the internal function f in the implementation of (^) in GHC.Real
@@ -3075,6 +3106,31 @@ reduceConstant isSubj gbl tcm h k nm ty tys args = case nm of
          _ -> Nothing
   _ -> Nothing
   where
+    evalUndefined nTy =
+      mkApps (Prim "Clash.GHC.Evaluator.undefined" undefinedTy) [Right nTy]
+
+    checkNaturalRange1 nTy i f =
+      checkNaturalRange nTy [i]
+        (\[i'] -> naturalToNaturalLiteral (f i'))
+
+    checkNaturalRange2 nTy i j f =
+      checkNaturalRange nTy [i, j]
+        (\[i', j'] -> naturalToNaturalLiteral (f i' j'))
+
+    -- Check given integer's range. If any of them are less than zero, give up
+    -- and return an undefined type.
+    checkNaturalRange
+      :: Type
+      -- Type of GHC.Natural.Natural ^
+      -> [Integer]
+      -> ([Natural] -> Term)
+      -> Term
+    checkNaturalRange nTy natsAsInts f =
+      if any (<0) natsAsInts then
+        evalUndefined nTy
+      else
+        f (map fromInteger natsAsInts)
+
     reduce e = case isX e of
       Left msg -> trace (unlines ["Warning: Not evaluating constant expression:", show nm, "Because doing so generates an XException:", msg]) Nothing
       Right e' -> Just (h,k,e')
@@ -3100,9 +3156,14 @@ floatLiterals' = typedLiterals' floatLiteral
       Lit (FloatLiteral i) -> Just i
       _ -> Nothing
 
-integerLiterals :: [Value] -> Maybe (Integer,Integer)
+integerLiterals :: [Value] -> Maybe (Integer, Integer)
 integerLiterals args = case integerLiterals' args of
   [i,j] -> Just (i,j)
+  _ -> Nothing
+
+naturalLiterals :: [Value] -> Maybe (Integer, Integer)
+naturalLiterals args = case naturalLiterals' args of
+  [i,j] -> Just (i, j)
   _ -> Nothing
 
 integerLiterals' :: [Value] -> [Integer]
@@ -3470,6 +3531,9 @@ integerToWordLiteral = Literal . WordLiteral . toInteger . (fromInteger :: Integ
 
 integerToIntegerLiteral :: Integer -> Term
 integerToIntegerLiteral = Literal . IntegerLiteral
+
+naturalToNaturalLiteral :: Natural -> Term
+naturalToNaturalLiteral = Literal . NaturalLiteral . toInteger
 
 bConPrim :: Type -> Term
 bConPrim (tyView -> TyConApp bTcNm _)

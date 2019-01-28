@@ -50,6 +50,7 @@ import Data.Sequence     (Seq)
 import Data.Word         (Word8,Word16,Word32,Word64)
 import GHC.Exts          (Char (C#), Double (D#), Float (F#), Int (I#), Word (W#))
 import GHC.Generics
+import GHC.Natural       (Natural)
 import GHC.Show          (appPrec)
 import GHC.Stack         (HasCallStack, callStack, prettyCallStack)
 import System.IO.Unsafe  (unsafeDupablePerformIO)
@@ -262,6 +263,9 @@ instance ShowX Int64 where
 instance ShowX Integer where
   showsPrecX = showsPrecXWith showsPrec
 
+instance ShowX Natural where
+  showsPrecX = showsPrecXWith showsPrec
+
 instance ShowX a => ShowX (Seq a) where
   showsPrecX _ = showListX . toList
 
@@ -440,6 +444,7 @@ instance Undefined Int16 where deepErrorX = errorX
 instance Undefined Int32 where deepErrorX = errorX
 instance Undefined Int64 where deepErrorX = errorX
 instance Undefined Integer where deepErrorX = errorX
+instance Undefined Natural where deepErrorX = errorX
 instance Undefined Word where deepErrorX = errorX
 instance Undefined Word8 where deepErrorX = errorX
 instance Undefined Word16 where deepErrorX = errorX

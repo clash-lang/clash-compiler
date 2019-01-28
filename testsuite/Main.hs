@@ -171,6 +171,10 @@ runClashTest =
       ]
       , clashTestGroup "Numbers"
         [ runTest ("tests" </> "shouldwork" </> "Numbers") defBuild [] "Bounds"       (["","Bounds_testBench"],"Bounds_testBench",True)
+#if MIN_VERSION_base(4,12,0)
+        -- Naturals are broken on GHC <= 8.4. See https://github.com/clash-lang/clash-compiler/pull/473
+        , runTest ("tests" </> "shouldwork" </> "Numbers") defBuild [] "Naturals"     (["","Naturals_testBench"],"Naturals_testBench",True)
+#endif
         , runTest ("tests" </> "shouldwork" </> "Numbers") defBuild [] "NegativeLits" (["","NegativeLits_testBench"],"NegativeLits_testBench",True)
         , runTest ("tests" </> "shouldwork" </> "Numbers") defBuild [] "Resize"       (["","Resize_testBench"],"Resize_testBench",True)
         , runTest ("tests" </> "shouldwork" </> "Numbers") defBuild [] "Resize2"      (["","Resize2_testBench"],"Resize2_testBench",True)
