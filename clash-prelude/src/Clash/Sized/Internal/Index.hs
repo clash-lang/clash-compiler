@@ -108,15 +108,15 @@ import Clash.XException           (ShowX (..), Undefined (..), errorX, showsPrec
 -- >>> 1 + 2 :: Index 8
 -- 3
 -- >>> 2 + 6 :: Index 8
--- *** Exception: Clash.Sized.Index: result 8 is out of bounds: [0..7]
+-- *** Exception: X: Clash.Sized.Index: result 8 is out of bounds: [0..7]
 -- ...
 -- >>> 1 - 3 :: Index 8
--- *** Exception: Clash.Sized.Index: result -2 is out of bounds: [0..7]
+-- *** Exception: X: Clash.Sized.Index: result -2 is out of bounds: [0..7]
 -- ...
 -- >>> 2 * 3 :: Index 8
 -- 6
 -- >>> 2 * 4 :: Index 8
--- *** Exception: Clash.Sized.Index: result 8 is out of bounds: [0..7]
+-- *** Exception: X: Clash.Sized.Index: result 8 is out of bounds: [0..7]
 -- ...
 newtype Index (n :: Nat) =
     -- | The constructor, 'I', and the field, 'unsafeToInteger', are not
@@ -237,7 +237,7 @@ fromInteger_INLINE :: forall n . KnownNat n => Integer -> Index n
 fromInteger_INLINE i = bound `seq` if i > (-1) && i < bound then I i else err
   where
     bound = natVal (Proxy @n)
-    err   = error ("Clash.Sized.Index: result " ++ show i ++
+    err   = errorX ("Clash.Sized.Index: result " ++ show i ++
                    " is out of bounds: [0.." ++ show (bound - 1) ++ "]")
 
 instance ExtendingNum (Index m) (Index n) where
