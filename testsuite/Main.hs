@@ -73,6 +73,7 @@ runClashTest =
         , runTest ("tests" </> "shouldwork" </> "Basic") defBuild [] "IrrefError"          ([""],"IrrefError_topEntity",False)
         , runTest ("tests" </> "shouldwork" </> "Basic") defBuild [] "LambdaDrop"          ([""],"LambdaDrop_topEntity",False)
         , runTest ("tests" </> "shouldwork" </> "Basic") defBuild [] "LotOfStates"         (["","LotOfStates_testBench"],"LotOfStates_testBench",True)
+        , runTest ("tests" </> "shouldwork" </> "Basic") defBuild [] "NameOverlap"         (["nameoverlap"],"nameoverlap",False)
         , runTest ("tests" </> "shouldwork" </> "Basic") defBuild [] "NestedPrimitives"    ([""],"NestedPrimitives_topEntity",False)
         , runTest ("tests" </> "shouldwork" </> "Basic") defBuild [] "NestedPrimitives2"   ([""],"NestedPrimitives2_topEntity",False)
         , runTest ("tests" </> "shouldwork" </> "Basic") defBuild [] "NORX"                (["","NORX_testBench"],"NORX_testBench",True)
