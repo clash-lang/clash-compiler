@@ -253,18 +253,8 @@ instance ShowX a => ShowX (Vec n a) where
           punc (x `Cons` xs)  = \s -> showsX x (',':punc xs s)
 
 instance (KnownNat n, Eq a) => Eq (Vec n a) where
-  (==) v1 v2
-    | length v1 == 0 = True
-    | otherwise      = fold @Bool @n (&&) (unsafeCoerce (zipWith (==) v1 v2))
-  -- FIXME: the `unsafeCoerce` is a hack because the Clash compiler cannot deal
-  -- with the existential length of the 'xs' in "Cons x xs".
-  --
-  -- Ideally we would write:
-  --
-  -- (==) Nil           _  = True
-  -- (==) v1@(Cons _ _) v2 = fold (&&) (zipWith (==) v1 v2)
-  --
-  -- But the Clash compiler currently fails on that definition.
+  (==) Nil _            = True
+  (==) v1@(Cons _ _) v2 = fold (&&) (zipWith (==) v1 v2)
 
 instance (KnownNat n, Ord a) => Ord (Vec n a) where
   compare x y = foldr f EQ $ zipWith compare x y
