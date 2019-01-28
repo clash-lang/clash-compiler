@@ -269,7 +269,7 @@
     { "name"      : "Clash.Sized.Internal.BitVector.fromInteger#"
     , "kind"      : "Expression"
     , "type"      : "fromInteger# :: KnownNat n => Integer -> Integer -> BitVector n"
-    , "template"  : "$unsigned(~ARG[2][(~SIZE[~TYPO]-1):0])"
+    , "template"  : "$unsigned(~VAR[n][2][(~SIZE[~TYPO]-1):0])"
     }
   }
 , { "BlackBox" :

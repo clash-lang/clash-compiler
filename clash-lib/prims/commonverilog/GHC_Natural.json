@@ -4,7 +4,7 @@
       "name": "GHC.Natural.naturalFromInteger",
       "kind": "Expression",
       "type": "naturalFromInteger :: Integer -> Natural",
-      "template": "$unsigned(~ARG[0][(~SIZE[~TYPO]-1):0])"
+      "template": "$unsigned(~VAR[n][0][(~SIZE[~TYPO]-1):0])"
     }
   },
   {
