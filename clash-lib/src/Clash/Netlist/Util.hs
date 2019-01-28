@@ -902,15 +902,22 @@ appendIdentifier
 appendIdentifier (nm,hwty) i =
   (,hwty) <$> extendIdentifier Extended nm (Text.pack ('_':show i))
 
+-- | In addition to the original port name (where the user should assert that
+-- it's a valid identifier), we also add the version of the port name that has
+-- gone through the 'mkIdentifier Basic' process. Why? so that the provided port
+-- name is copied verbatim into the generated HDL, but that in e.g.
+-- case-insensitive HDLs, a case-variant of the port name is not used as one
+-- of the signal names.
 uniquePortName
   :: String
   -> Identifier
   -> NetlistMonad Identifier
 uniquePortName [] i = mkUniqueIdentifier Extended i
 uniquePortName x  _ = do
-  let x' = Text.pack x
-  seenIds %= (x':)
-  return x'
+  let xT = Text.pack x
+  xTB <- mkIdentifier Basic xT
+  seenIds %= ([xT,xTB] ++)
+  return xT
 
 mkInput
   :: Maybe PortName
