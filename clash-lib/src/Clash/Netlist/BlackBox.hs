@@ -138,7 +138,7 @@ prepareBlackBox pNm templ bbCtx =
      then do
         (t2,decls) <-
           onBlackBox
-            (fmap (first BBTemplate) . setSym bbCtx)
+            (fmap (first BBTemplate) . setSym mkUniqueIdentifier bbCtx)
             (\bbName bbHash bbFunc -> pure (BBFunction bbName bbHash bbFunc, []))
             templ
         return (t2,decls)
@@ -475,7 +475,7 @@ mkFunInput resId e = do
               case lookupVarEnv fun normalized of
                 Just _ -> do
                   (_,_,Component compName compInps [snd -> compOutp] _) <- preserveVarEnv $ genComponent fun
-                  let inpAssigns    = zipWith (\(i,t) e' -> (Identifier i Nothing,In,t,e')) compInps [ Identifier (TextS.pack ("~ARG[" ++ show x ++ "]")) Nothing | x <- [(0::Int)..] ]
+                  let inpAssigns    = zipWith (\(i,t) e' -> (Identifier i Nothing,In,t,e')) compInps [ Identifier (TextS.pack ("~VAR[arg" ++ show x ++ "][" ++ show x ++ "]")) Nothing | x <- [(0::Int)..] ]
                       outpAssign    = (Identifier (fst compOutp) Nothing,Out,snd compOutp,Identifier "~RESULT" Nothing)
                   i <- varCount <<%= (+1)
                   let instLabel     = TextS.concat [compName,TextS.pack ("_" ++ show i)]
@@ -490,7 +490,7 @@ mkFunInput resId e = do
     Left (TDecl,oreg,libs,imps,inc,_,templ') -> do
       (l',templDecl)
         <- onBlackBox
-            (fmap (first BBTemplate) . setSym bbCtx)
+            (fmap (first BBTemplate) . setSym mkUniqueIdentifier bbCtx)
             (\bbName bbHash bbFunc -> pure $ (BBFunction bbName bbHash bbFunc, []))
             templ'
       return ((Left l',if oreg then Reg else Wire,libs,imps,inc,bbCtx),dcls ++ templDecl)

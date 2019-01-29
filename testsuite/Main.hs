@@ -165,6 +165,7 @@ runClashTest =
         ]
       , clashTestGroup "HOPrim"
         [ runTest ("tests" </> "shouldwork" </> "HOPrim") defBuild [] "HOImap"    (["","HOImap_testBench"],"HOImap_testBench",True)
+        , runTest ("tests" </> "shouldwork" </> "HOPrim") defBuild [] "Map"       (["","Map_testBench"],"Map_testBench",True)
         , runTest ("tests" </> "shouldwork" </> "HOPrim") defBuild [] "TestMap"   (["","TestMap_testBench"],"TestMap_testBench",True)
         , runTest ("tests" </> "shouldwork" </> "HOPrim") defBuild [] "Transpose" (["","Transpose_testBench"],"Transpose_testBench",True)
         , runTest ("tests" </> "shouldwork" </> "HOPrim") defBuild [] "VecFun"    (["","VecFun_testBench"],"VecFun_testBench",True)
