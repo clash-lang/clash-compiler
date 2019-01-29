@@ -20,7 +20,7 @@ normalization = rmDeadcode >-> constantPropgation >-> etaTL >-> rmUnusedExpr >-!
                 bindConst >-> letTL >-> evalConst >-!-> cse >-!-> cleanup >-> recLetRec
   where
     etaTL      = apply "etaTL" etaExpansionTL !-> innerMost (apply "applicationPropagation" appProp)
-    anf        = topdownR (apply "nonRepANF" nonRepANF) >-> apply "ANF" makeANF
+    anf        = topdownR (apply "nonRepANF" nonRepANF) >-> apply "ANF" makeANF >-> topdownR (apply "caseCon" caseCon)
     letTL      = topdownSucR (apply "topLet" topLet)
     recLetRec  = apply "recToLetRec" recToLetRec
     rmUnusedExpr = bottomupR (apply "removeUnusedExpr" removeUnusedExpr)
