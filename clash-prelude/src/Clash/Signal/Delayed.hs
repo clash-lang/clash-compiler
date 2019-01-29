@@ -47,8 +47,9 @@ where
 import           Data.Default.Class            (Default)
 import           Data.Coerce                   (coerce)
 import           Data.Kind                     (Type)
+import           Data.Proxy                    (Proxy(..))
 import           GHC.TypeLits                  (KnownNat, type (^), type (+), type (*), Nat)
-import           Data.Singletons.Prelude hiding (PNum (..), SNum (..), Undefined)
+import           Data.Singletons.Prelude       (Apply, TyFun, type (@@))
 
 import Clash.Signal.Delayed.Internal
   (DSignal(..), dfromList, dfromList_lazy, fromSignal, toSignal,

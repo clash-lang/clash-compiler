@@ -99,7 +99,9 @@ setDebugLevel :: IORef ClashOpts
               -> String
               -> EwM IO ()
 setDebugLevel r s = case readMaybe s of
-  Just dbgLvl -> liftEwM $ modifyIORef r (\c -> c {opt_dbgLevel = dbgLvl})
+  Just dbgLvl -> liftEwM $ do
+                   modifyIORef r (\c -> c {opt_dbgLevel = dbgLvl})
+                   when (dbgLvl > DebugNone) $ setNoCache r -- when debugging disable cache
   Nothing     -> addWarn (s ++ " is an invalid debug level")
 
 setNoCache :: IORef ClashOpts -> IO ()
