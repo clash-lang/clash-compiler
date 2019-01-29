@@ -1335,7 +1335,7 @@ collectANF ctx (Case subj ty alts) = do
       patSels <- Monad.zipWithM (doPatBndr subj' dc) xs [0..]
       let usesXs (Var n) = any (== n) xs
           usesXs _       = False
-      if (lv && not (usesXs altExpr)) || isConstant altExpr
+      if (lv && (not (usesXs altExpr) || length alts == 1)) || isConstant altExpr
         then do
           -- See Note [ANF InScopeSet]
           tellBinders patSels
@@ -1939,11 +1939,13 @@ inlineCleanup (TransformContext is0 _) (Letrec binds body) = do
           _ -> False
       | id_ `notElemVarSet` bodyFVs
       = case tm of
-          -- Inlines WW projection that exposes internals of the BitVector types
           Case _ _ [(DataPat dcE _ _,_)]
             -> let nm = (nameOcc (dcName dcE))
-               in nm == "Clash.Sized.Internal.BitVector.BV"  ||
-                  nm == "Clash.Sized.Internal.BitVector.Bit"
+               in -- Inlines WW projection that exposes internals of the BitVector types
+                  nm == "Clash.Sized.Internal.BitVector.BV"  ||
+                  nm == "Clash.Sized.Internal.BitVector.Bit" ||
+                  -- Inlines projections out of constraint-tuples (e.g. HiddenClockReset)
+                  "GHC.Classes" `Text.isPrefixOf` nm
           _ -> False
 
     isInteresting _ _ _ _ = False
