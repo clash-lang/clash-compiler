@@ -8,11 +8,13 @@
   in templates
 -}
 
-{-# LANGUAGE CPP               #-}
-{-# LANGUAGE FlexibleContexts  #-}
-{-# LANGUAGE LambdaCase        #-}
-{-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE TemplateHaskell   #-}
+{-# LANGUAGE CPP                 #-}
+{-# LANGUAGE FlexibleContexts    #-}
+{-# LANGUAGE LambdaCase          #-}
+{-# LANGUAGE OverloadedStrings   #-}
+{-# LANGUAGE RankNTypes          #-}
+{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TemplateHaskell     #-}
 
 module Clash.Netlist.BlackBox.Util where
 
@@ -44,15 +46,17 @@ import           Text.Read                       (readEither)
 import           Text.Trifecta.Result            hiding (Err)
 
 import           Clash.Backend                   (Backend (..), Usage (..))
+import qualified Clash.Backend                   as Backend
 import           Clash.Netlist.BlackBox.Parser
 import           Clash.Netlist.BlackBox.Types
 import           Clash.Netlist.Id                (IdType (..))
 import           Clash.Netlist.Types             (BlackBoxContext (..),
                                                   Expr (..), HWType (..),
                                                   Identifier, Literal (..),
-                                                  Modifier (..), NetlistMonad)
+                                                  Modifier (..),
+                                                  Declaration(BlackBoxD))
 import qualified Clash.Netlist.Types             as N
-import           Clash.Netlist.Util              (mkUniqueIdentifier, typeSize)
+import           Clash.Netlist.Util              (typeSize)
 import           Clash.Signal.Internal           (ClockKind (Gated),
                                                   ResetKind (Synchronous))
 import           Clash.Util
@@ -91,26 +95,32 @@ extractLiterals = map (\case (e,_,_) -> e)
 -- | Update all the symbol references in a template, and increment the symbol
 -- counter for every newly encountered symbol.
 setSym
-  :: BlackBoxContext
+  :: forall m
+   . Monad m
+  => (IdType -> Identifier -> m Identifier)
+  -> BlackBoxContext
   -> BlackBoxTemplate
-  -> NetlistMonad (BlackBoxTemplate,[N.Declaration])
-setSym bbCtx l = do
+  -> m (BlackBoxTemplate,[N.Declaration])
+setSym mkUniqueIdentifierM bbCtx l = do
     (a,(_,decls)) <- runStateT (mapM setSym' l) (IntMap.empty,IntMap.empty)
     return (a,concatMap snd (IntMap.elems decls))
   where
-    setSym' :: Element
-            -> StateT ( IntMap.IntMap Identifier
-                      , IntMap.IntMap (Identifier,[N.Declaration]))
-                      NetlistMonad
-                      Element
+    setSym'
+      :: Element
+      -> StateT ( IntMap.IntMap Identifier
+                , IntMap.IntMap (Identifier,[N.Declaration]))
+                m
+                Element
     setSym' e = case e of
       Var nm i | i < length (bbInputs bbCtx) -> case bbInputs bbCtx !! i of
-        (Identifier nm' Nothing,_,_) -> return (Var [C (Text.fromStrict nm')] i)
+        (Identifier nm' Nothing,_,_) ->
+          return (Var [C (Text.fromStrict nm')] i)
+
         (e',hwTy,_) -> do
           varM <- IntMap.lookup i <$> use _2
           case varM of
             Nothing -> do
-              nm' <- lift (mkUniqueIdentifier Extended (Text.toStrict (concatT (C "#":nm))))
+              nm' <- lift (mkUniqueIdentifierM Extended (Text.toStrict (concatT (C "#":nm))))
               let decls = case typeSize hwTy of
                     0 -> []
                     _ -> [N.NetDecl Nothing nm' hwTy
@@ -123,7 +133,7 @@ setSym bbCtx l = do
         symM <- IntMap.lookup i <$> use _1
         case symM of
           Nothing -> do
-            t <- lift (mkUniqueIdentifier Extended "#n")
+            t <- lift (mkUniqueIdentifierM Extended "#n")
             _1 %= (IntMap.insert i t)
             return (Sym (Text.fromStrict t) i)
           Just t -> return (Sym (Text.fromStrict t) i)
@@ -131,7 +141,7 @@ setSym bbCtx l = do
         symM <- IntMap.lookup i <$> use _1
         case symM of
           Nothing -> do
-            t' <- lift (mkUniqueIdentifier Basic (Text.toStrict (concatT t)))
+            t' <- lift (mkUniqueIdentifierM Basic (Text.toStrict (concatT t)))
             _1 %= (IntMap.insert i t')
             return (GenSym [C (Text.fromStrict t')] i)
           Just _ -> error ("Symbol #" ++ show (t,i) ++ " is already defined")
@@ -234,32 +244,6 @@ renderBlackBox libs imps includes bb bbCtx = do
   addImports imps'
   return bb'
 
--- | Assign @Var@ holes in the context of a primitive HDL template that is
--- passed as an argument of a higher-order HDL template. For the general case,
--- use 'setSym'
---
--- This functions errors when the @Var@ hole cannot be filled with a variable,
--- as it is (currently) impossible to create unique names this late in the
--- pipeline.
-setSimpleVar
-  :: BlackBoxContext
-  -> BlackBoxTemplate
-  -> BlackBoxTemplate
-setSimpleVar bbCtx = map go
-  where
-    go e = case e of
-      Var _ i
-        | i < length (bbInputs bbCtx)
-        , (Identifier nm' Nothing,_,_) <- bbInputs bbCtx !! i
-        -> Var [C (Text.fromStrict nm')] i
-        | otherwise
-        -> error $ $(curLoc) ++ "You can only pass variables to function arguments in a higher-order primitive"
-      D (Decl n l') -> D (Decl n (map (map go *** map go) l'))
-      IF c t f      -> IF c (map go t) (map go f)
-      SigD e' m     -> SigD (map go e') m
-      BV t e' m     -> BV t (map go e') m
-      _             -> e
-
 -- | Render a single template element
 renderElem :: Backend backend
            => BlackBoxContext
@@ -268,20 +252,49 @@ renderElem :: Backend backend
 renderElem b (D (Decl n (l:ls))) = do
   (o,oTy,_) <- idToExpr <$> combineM (lineToIdentifier b) (return . lineToType b) l
   is <- mapM (fmap idToExpr . combineM (lineToIdentifier b) (return . lineToType b)) ls
-  let Just (templ,_,libs,imps,inc,pCtx)  = IntMap.lookup n (bbFunctions b)
+  let Just (templ0,_,libs,imps,inc,pCtx)  = IntMap.lookup n (bbFunctions b)
       b' = pCtx { bbResult = (o,oTy), bbInputs = bbInputs pCtx ++ is }
-  templ' <- case templ of
-              Left t        -> return t
-              Right (nm,ds) -> do block <- getMon $ blockDecl nm ds
-                                  return . N.BBTemplate . parseFail . renderLazy $ (layoutPretty (LayoutOptions (AvailablePerLine 120 0.4)) block)
-  let t2 = onBlackBox (N.BBTemplate . setSimpleVar b') N.BBFunction templ'
-  if verifyBlackBoxContext b' t2
+      layoutOptions = LayoutOptions (AvailablePerLine 120 0.4)
+
+  templ1 <-
+    case templ0 of
+      Left t ->
+        return t
+      Right (nm,ds) -> do
+        block <- getMon (blockDecl nm ds)
+        return $ N.BBTemplate
+               $ parseFail
+               $ renderLazy
+               $ layoutPretty layoutOptions block
+
+  templ4 <-
+    case templ1 of
+      N.BBFunction {} ->
+        return templ1
+      N.BBTemplate templ2 -> do
+        (templ3, templDecls) <- setSym Backend.mkUniqueIdentifier b' templ2
+        case templDecls of
+          [] ->
+            return (N.BBTemplate templ3)
+          _ -> do
+            nm1 <- Backend.mkUniqueIdentifier Basic "bb"
+            nm2 <- Backend.mkUniqueIdentifier Basic "bb"
+            let bbD = BlackBoxD nm1 libs imps inc (N.BBTemplate templ3) b'
+            block <- getMon (blockDecl nm2 (templDecls ++ [bbD]))
+            return $ N.BBTemplate
+                   $ parseFail
+                   $ renderLazy
+                   $ layoutPretty layoutOptions block
+
+  if verifyBlackBoxContext b' templ4
     then do
-      bb <- renderBlackBox libs imps inc t2 b'
-      return (renderLazy . layoutPretty (LayoutOptions (AvailablePerLine 120 0.4)) . bb)
+      bb <- renderBlackBox libs imps inc templ4 b'
+      return (renderLazy . layoutPretty layoutOptions . bb)
     else do
       sp <- getSrcSpan
-      throw (ClashException sp ($(curLoc) ++ "\nCan't match context:\n" ++ show b' ++ "\nwith template:\n" ++ show templ) Nothing)
+      throw (ClashException sp ($(curLoc) ++ "\nCan't match context:\n"
+                                          ++ show b' ++ "\nwith template:\n"
+                                          ++ show templ0) Nothing)
 
 renderElem b (SigD e m) = do
   e' <- Text.concat <$> mapM (fmap ($ 0) . renderElem b) e
