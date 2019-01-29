@@ -519,6 +519,16 @@ mkFunInput resId e = do
     Right (decl,wr) ->
       return ((Right decl,wr,[],[],[],bbCtx),dcls)
   where
+    goExpr e' = do
+      tcm <- Lens.use tcCache
+      let eType = termType tcm e'
+      (appExpr,appDecls) <- mkExpr False (Left "#bb_res") eType e'
+      let assn = Assignment "~RESULT" appExpr
+      nm <- if null appDecls
+               then return ""
+               else mkUniqueIdentifier Basic "block"
+      return (Right ((nm,appDecls ++ [assn]),Wire))
+
     go is0 n (Lam id_ e') = do
       lvl <- Lens.use curBBlvl
       let nm    = TextS.concat
@@ -548,16 +558,6 @@ mkFunInput resId e = do
       nm <- mkUniqueIdentifier Basic "selection"
       return (Right ((nm,selectionDecls),Reg))
 
-    go _ _ e'@(App _ _) = do
-      tcm <- Lens.use tcCache
-      let eType = termType tcm e'
-      (appExpr,appDecls) <- mkExpr False (Left "#bb_res") eType e'
-      let assn = Assignment "~RESULT" appExpr
-      nm <- if null appDecls
-               then return ""
-               else mkUniqueIdentifier Basic "block"
-      return (Right ((nm,appDecls ++ [assn]),Wire))
-
     go is0 _ e'@(Letrec {}) = do
       tcm <- Lens.use tcCache
       let normE = splitNormalized tcm e'
@@ -583,4 +583,15 @@ mkFunInput resId e = do
         goR r id_ | id_ == r  = id_ {varName = mkUnsafeSystemName "~RESULT" 0}
                   | otherwise = id_
 
-    go _ _ e' = error $ $(curLoc) ++ "Cannot make function input for: " ++ showPpr e'
+    go _ _ e'@(App {}) = goExpr e'
+    go _ _ e'@(C.Data {}) = goExpr e'
+    go _ _ e'@(C.Literal {}) = goExpr e'
+    go _ _ e'@(Cast {}) = goExpr e'
+    go _ _ e'@(Prim {}) = goExpr e'
+    go _ _ e'@(TyApp {}) = goExpr e'
+
+    go _ _ e'@(Case _ _ []) =
+      error $ $(curLoc) ++ "Cannot make function input for case without alternatives: " ++ show e'
+
+    go _ _ e'@(TyLam {}) =
+      error $ $(curLoc) ++ "Cannot make function input for TyLam: " ++ show e'
