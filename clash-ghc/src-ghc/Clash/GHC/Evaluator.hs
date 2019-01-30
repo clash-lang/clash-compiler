@@ -973,6 +973,10 @@ reduceConstant isSubj gbl tcm h k nm ty tys args = case nm of
     | [Lit (WordLiteral w)] <- args
     -> reduce (Literal (IntegerLiteral w))
 
+  "GHC.Integer.Type.integerToWord"
+    | [i] <- integerLiterals' args
+    -> reduce (integerToWordLiteral i)
+
   "GHC.Natural.NatS#"
     | [Lit (WordLiteral w)] <- args
     -> reduce (Literal (NaturalLiteral w))
