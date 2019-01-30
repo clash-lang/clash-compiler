@@ -31,6 +31,7 @@ import qualified Control.Monad.Writer        as Writer
 import           Data.Bifunctor              (bimap)
 import           Data.Coerce                 (coerce)
 import           Data.Functor.Const          (Const (..))
+import           Data.List                   (group, sort)
 import qualified Data.Map                    as Map
 import           Data.Maybe                  (catMaybes,isJust,mapMaybe)
 import qualified Data.Monoid                 as Monoid
@@ -78,10 +79,51 @@ zoomExtra :: State.State extra a
 zoomExtra m = R (\_ s -> case State.runState m (s ^. extra) of
                            (a,s') -> (a,s {_extra = s'},mempty))
 
--- | Record if a transformation is succesfully applied
-apply :: String -- ^ Name of the transformation
-      -> Rewrite extra -- ^ Transformation to be applied
-      -> Rewrite extra
+-- | Some transformations might erroneously introduce shadowing. For example,
+-- a transformation might result in:
+--
+--   let a = ...
+--       b = ...
+--       a = ...
+--
+-- where the last 'a', shadows the first, while Clash assumes that this can't
+-- happen. This function finds those constructs and a list of found duplicates.
+--
+findAccidentialShadows :: Term -> [[Id]]
+findAccidentialShadows =
+  \case
+    Var {}      -> []
+    Data {}     -> []
+    Literal {}  -> []
+    Prim {}     -> []
+    Lam _ t     -> findAccidentialShadows t
+    TyLam _ t   -> findAccidentialShadows t
+    App t1 t2   -> concatMap findAccidentialShadows [t1, t2]
+    TyApp t _   -> findAccidentialShadows t
+    Cast t _ _  -> findAccidentialShadows t
+    Case t _ as ->
+      concatMap (findInPat . fst) as ++
+        concatMap findAccidentialShadows (t : map snd as)
+    Letrec bs t ->
+      findDups (map fst bs) ++ findAccidentialShadows t
+
+ where
+  findInPat :: Pat -> [[Id]]
+  findInPat (LitPat _)        = []
+  findInPat (DefaultPat)      = []
+  findInPat (DataPat _ _ ids) = findDups ids
+
+  findDups :: [Id] -> [[Id]]
+  findDups ids = filter ((1 <) . length) (group (sort ids))
+
+
+-- | Record if a transformation is successfully applied
+apply
+  :: String
+  -- ^ Name of the transformation
+  -> Rewrite extra
+  -- ^ Transformation to be applied
+  -> Rewrite extra
 apply name rewrite ctx expr = do
   lvl <- Lens.view dbgLevel
   let before = showPpr expr
@@ -93,11 +135,13 @@ apply name rewrite ctx expr = do
 
   Monad.when (lvl > DebugNone && hasChanged) $ do
     tcm                  <- Lens.view tcCache
-    let beforeTy         = termType tcm expr
+    let beforeTy          = termType tcm expr
     beforeFV             <- Lens.setOf <$> localFreeVars <*> pure expr
-    let afterTy          = termType tcm expr'
+    let afterTy           = termType tcm expr'
     afterFV              <- Lens.setOf <$> localFreeVars <*> pure expr'
-    let newFV = not (afterFV `Set.isSubsetOf` beforeFV)
+    let newFV             = not (afterFV `Set.isSubsetOf` beforeFV)
+    let accidentalShadows = findAccidentialShadows expr'
+
     Monad.when newFV $
             error ( concat [ $(curLoc)
                            , "Error when applying rewrite ", name
@@ -108,6 +152,18 @@ apply name rewrite ctx expr = do
                            , "\nAfter: " ++ showPpr (Set.toList afterFV)
                            ]
                   )
+    Monad.when (not (null accidentalShadows)) $
+      error ( concat [ $(curLoc)
+                     , "Error when applying rewrite ", name
+                     , " to:\n" , before
+                     , "\nResult:\n" ++ after ++ "\n"
+                     , "It accidentally creates shadowing let/case-bindings:\n"
+                     , " ", showPpr accidentalShadows, "\n"
+                     , "This usually means that a transformation did not extend "
+                     , "or incorrectly extended its InScopeSet before applying a "
+                     , "substitution."
+                     ])
+
     traceIf (lvl >= DebugAll && (beforeTy `aeqType` afterTy))
             ( concat [ $(curLoc)
                      , "Error when applying rewrite ", name
@@ -128,10 +184,13 @@ apply name rewrite ctx expr = do
 
 -- | Perform a transformation on a Term
 runRewrite
-  :: String -- ^ Name of the transformation
+  :: String
+  -- ^ Name of the transformation
   -> InScopeSet
-  -> Rewrite extra -- ^ Transformation to perform
-  -> Term  -- ^ Term to transform
+  -> Rewrite extra
+  -- ^ Transformation to perform
+  -> Term
+  -- ^ Term to transform
   -> RewriteMonad extra Term
 runRewrite name is rewrite expr = apply name rewrite (TransformContext is []) expr
 
