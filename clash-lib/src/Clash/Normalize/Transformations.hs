@@ -688,10 +688,12 @@ topLet (TransformContext is0 ctx) e@(Letrec binds body)
     untranslatable <- isUntranslatable False body
     if localVar || untranslatable
       then return e
-      else do tcm <- Lens.view tcCache
-              is1 <- unionInScope is0 <$> Lens.use globalInScope
-              argId <- mkTmBinderFor is1 tcm (mkUnsafeSystemName "result" 0) body
-              changed (Letrec (binds ++ [(argId,body)]) (Var argId))
+      else do
+        tcm <- Lens.view tcCache
+        is1 <- unionInScope is0 <$> Lens.use globalInScope
+        let is2 = extendInScopeSetList is1 (map fst binds)
+        argId <- mkTmBinderFor is2 tcm (mkUnsafeSystemName "result" 0) body
+        changed (Letrec (binds ++ [(argId,body)]) (Var argId))
 
 topLet _ e = return e
 
