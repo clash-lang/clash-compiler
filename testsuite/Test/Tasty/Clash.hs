@@ -487,12 +487,13 @@ runFailingTest'
   -- one closest to the test.
   -> TestTree
 runFailingTest' env target extraArgs modName expectedStderr path =
-  let (cmd, args) = clashCmd target (sourceDirectory </> env) ("-fclash-nocache" : extraArgs) modName (testDirectory path) in
+  let args0 = "-fclash-debug" : "DebugSilent" : "-fclash-nocache" : extraArgs in
+  let (cmd, args1) = clashCmd target (sourceDirectory </> env) args0 modName (testDirectory path) in
   let testName    = "clash" in
   testFailingProgram
     testName
     cmd
-    args
+    args1
     NoGlob
     PrintNeither
     False

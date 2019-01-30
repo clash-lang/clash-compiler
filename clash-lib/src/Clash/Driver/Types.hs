@@ -35,11 +35,18 @@ type BindingMap = VarEnv (Id,SrcSpan,InlineSpec,Term)
 
 -- | Debug Message Verbosity
 data DebugLevel
-  = DebugNone    -- ^ Don't show debug messages
-  | DebugFinal   -- ^ Show completely normalized expressions
-  | DebugName    -- ^ Names of applied transformations
-  | DebugApplied -- ^ Show sub-expressions after a successful rewrite
-  | DebugAll     -- ^ Show all sub-expressions on which a rewrite is attempted
+  = DebugNone
+  -- ^ Don't show debug messages
+  | DebugSilent
+  -- ^ Run invariant checks and err if violated (enabled by any debug flag)
+  | DebugFinal
+  -- ^ Show completely normalized expressions
+  | DebugName
+  -- ^ Names of applied transformations
+  | DebugApplied
+  -- ^ Show sub-expressions after a successful rewrite
+  | DebugAll
+  -- ^ Show all sub-expressions on which a rewrite is attempted
   deriving (Eq,Ord,Read)
 
 data ClashOpts = ClashOpts { opt_inlineLimit :: Int
