@@ -8,7 +8,7 @@ import Data.List (isInfixOf)
 import System.Environment (getArgs)
 import System.FilePath ((</>))
 
-import Clash.Prelude
+import Clash.Prelude hiding (Text)
 import Clash.Netlist.Types
 import Clash.Netlist.BlackBox.Types
 import Clash.Annotations.Primitive (Primitive(..), HDL(..))
@@ -16,7 +16,7 @@ import Clash.Annotations.Primitive (Primitive(..), HDL(..))
 myMultiplyTF :: BlackBoxFunction
 myMultiplyTF isD resId primName args ty =
   Right ( emptyBlackBoxMeta
-        , BBTemplate [C "123456 * ", Arg 0 0, C " * ", Arg 0 1]
+        , BBTemplate [Text "123456 * ", ArgGen 0 0, Text " * ", ArgGen 0 1]
         )
 
 {-# ANN myMultiply (InlinePrimitive VHDL "[ { \"BlackBoxHaskell\" : { \"name\" : \"BlackBoxFunction.myMultiply\", \"templateFunction\" : \"BlackBoxFunction.myMultiplyTF\"}} ]") #-}
