@@ -37,8 +37,8 @@ pBlackBoxD = some pElement
 -- | Parse a single Template Element
 pElement :: Parser Element
 pElement  =  pTagD
-         <|> C <$> pText
-         <|> C <$> (pack <$> string "~ ")
+         <|> Text <$> pText
+         <|> Text <$> (pack <$> string "~ ")
 
 -- | Parse the Text part of a Template
 pText :: Parser Text
@@ -49,7 +49,7 @@ pTagD :: Parser Element
 pTagD =  IF <$> (symbol "~IF" *> pTagE)
             <*> (spaces *> (string "~THEN" *> pBlackBoxD))
             <*> (string "~ELSE" *> pBlackBoxD <* string "~FI")
-     <|> D <$> pDecl
+     <|> Component <$> pDecl
      <|> pTagE
 
 -- | Parse a Declaration
@@ -67,13 +67,13 @@ pInput = symbol "~INPUT" *> symbol "<=" *> ((,) <$> (pBlackBoxE <* symbol "~") <
 
 -- | Parse an Expression element
 pTagE :: Parser Element
-pTagE =  O True            <$  string "~ERESULT"
-     <|> O False           <$  string "~RESULT"
-     <|> I True            <$> (string "~EARG" *> brackets' natural')
-     <|> Arg               <$> (string "~ARGN" *> brackets' natural') <*> brackets' natural'
-     <|> I False           <$> (string "~ARG" *> brackets' natural')
-     <|> L                 <$> (string "~LIT" *> brackets' natural')
-     <|> N                 <$> (string "~NAME" *> brackets' natural')
+pTagE =  Result True       <$  string "~ERESULT"
+     <|> Result False      <$  string "~RESULT"
+     <|> ArgGen            <$> (string "~ARGN" *> brackets' natural') <*> brackets' natural'
+     <|> Arg True          <$> (string "~EARG" *> brackets' natural')
+     <|> Arg False         <$> (string "~ARG" *> brackets' natural')
+     <|> Lit               <$> (string "~LIT" *> brackets' natural')
+     <|> Name              <$> (string "~NAME" *> brackets' natural')
      <|> Var               <$> try (string "~VAR" *> brackets' pSigD) <*> brackets' natural'
      <|> (Sym Text.empty)  <$> (string "~SYM" *> brackets' natural')
      <|> Typ Nothing       <$  string "~TYPO"
@@ -127,11 +127,11 @@ pBlackBoxE = some pElemE
 -- | Parse an Expression or Text
 pElemE :: Parser Element
 pElemE = pTagE
-      <|> C <$> pText
+      <|> Text <$> pText
 
 -- | Parse SigD
 pSigD :: Parser [Element]
-pSigD = some (pTagE <|> (C (pack "[") <$ (pack <$> string "[\\"))
-                    <|> (C (pack "]") <$ (pack <$> string "\\]"))
-                    <|> (C <$> (pack <$> some (satisfyRange '\000' '\90')))
-                    <|> (C <$> (pack <$> some (satisfyRange '\94' '\125'))))
+pSigD = some (pTagE <|> (Text (pack "[") <$ (pack <$> string "[\\"))
+                    <|> (Text (pack "]") <$ (pack <$> string "\\]"))
+                    <|> (Text <$> (pack <$> some (satisfyRange '\000' '\90')))
+                    <|> (Text <$> (pack <$> some (satisfyRange '\94' '\125'))))

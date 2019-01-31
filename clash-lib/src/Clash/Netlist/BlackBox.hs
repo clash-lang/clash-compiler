@@ -330,7 +330,7 @@ mkPrimitive bbEParen bbEasD dst nm args ty = do
               _ -> error $ $(curLoc) ++ "dataToTag: " ++ show (map (either showPpr showPpr) args)
           | otherwise ->
               return (BlackBoxE "" [] [] []
-                        (BBTemplate [C $ mconcat ["NO_TRANSLATION_FOR:",fromStrict pNm]])
+                        (BBTemplate [Text $ mconcat ["NO_TRANSLATION_FOR:",fromStrict pNm]])
                         emptyBBContext False,[])
         _ -> do
           (_,sp) <- Lens.use curCompNm
@@ -474,7 +474,7 @@ mkFunInput resId e = do
               normalized <- Lens.use bindings
               case lookupVarEnv fun normalized of
                 Just _ -> do
-                  (_,_,Component compName compInps [snd -> compOutp] _) <- preserveVarEnv $ genComponent fun
+                  (_,_,N.Component compName compInps [snd -> compOutp] _) <- preserveVarEnv $ genComponent fun
                   let inpAssigns    = zipWith (\(i,t) e' -> (Identifier i Nothing,In,t,e')) compInps [ Identifier (TextS.pack ("~VAR[arg" ++ show x ++ "][" ++ show x ++ "]")) Nothing | x <- [(0::Int)..] ]
                       outpAssign    = (Identifier (fst compOutp) Nothing,Out,snd compOutp,Identifier "~RESULT" Nothing)
                   i <- varCount <<%= (+1)
