@@ -64,9 +64,8 @@ import           Clash.Rewrite.Combinators        ((>->),(!->))
 import           Clash.Rewrite.Types
   (RewriteEnv (..), RewriteState (..), bindings, curFun, dbgLevel, extra,
    tcCache, topEntities, typeTranslator, customReprs, globalInScope)
-import           Clash.Rewrite.Util               (isUntranslatableType,
-                                                   runRewrite,
-                                                   runRewriteSession)
+import           Clash.Rewrite.Util
+  (apply, isUntranslatableType, runRewrite, runRewriteSession)
 import           Clash.Signal.Internal            (ResetKind (..))
 import           Clash.Util
 
@@ -351,8 +350,12 @@ flattenCallTree (CBranch (nm,(nm',sp,inl,tm)) used) = do
      else return (CBranch (nm,(nm',sp,inl,newExpr)) allUsed)
   where
     flatten =
-      innerMost (appProp >-> bindConstantVar >-> caseCon >-> reduceConst >-> flattenLet) !->
-      topdownSucR topLet
+      innerMost (apply "appProp" appProp >->
+                 apply "bindConstantVar" bindConstantVar >->
+                 apply "caseCon" caseCon >->
+                 apply "reduceConst" reduceConst >->
+                 apply "flattenLet" flattenLet) !->
+      topdownSucR (apply "topLet" topLet)
 
     goCheap (CLeaf   (nm2,(_,_,_,e)))    = ((nm2,e),[])
     goCheap (CBranch (nm2,(_,_,_,e)) us) = ((nm2,e),us)
