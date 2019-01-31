@@ -1238,10 +1238,6 @@ type NormRewriteW = Transform (StateT ([LetBinding],InScopeSet) (RewriteMonad No
 tellBinders :: Monad m => [LetBinding] -> StateT ([LetBinding],InScopeSet) m ()
 tellBinders bs = modify ((bs ++) *** (`extendInScopeSetList` (map fst bs)))
 
--- NOTE [unsafeUnbind]: Use unsafeUnbind (which doesn't freshen pattern
--- variables). Reason: previously collected expression still reference
--- the 'old' variable names created by the traversal!
-
 -- | Turn an expression into a modified ANF-form. As opposed to standard ANF,
 -- constants do not become let-bound.
 makeANF :: NormRewrite
