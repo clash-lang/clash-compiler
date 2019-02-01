@@ -54,12 +54,6 @@ pprM = pprPrec 0
 ppr :: PrettyPrec p => p -> Doc ann
 ppr = runIdentity . pprM
 
-lunbind
-  :: (a,b)
-  -> ((a,b) -> r)
-  -> r
-lunbind a f = f a
-
 noPrec, opPrec, appPrec :: Num a => a
 noPrec = 0
 opPrec = 1
@@ -128,12 +122,12 @@ instance PrettyPrec Term where
     Data dc      -> pprPrec prec dc
     Literal l    -> pprPrec prec l
     Prim nm _    -> return $ pretty nm
-    Lam  v e1    -> lunbind (v,e1) $ \(v1,e2)  -> pprPrecLam prec [v1] e2
-    TyLam v e1   -> lunbind (v,e1) $ \(tv,e2) -> pprPrecTyLam prec [tv] e2
+    Lam  v e1    -> pprPrecLam prec [v] e1
+    TyLam tv e1  -> pprPrecTyLam prec [tv] e1
     App fun arg  -> pprPrecApp prec fun arg
     TyApp e' ty  -> pprPrecTyApp prec e' ty
-    Letrec xes e1  -> lunbind (xes,e1) $ \(xes1,e2) -> pprPrecLetrec prec xes1 e2
-    Case e' _ alts -> pprPrecCase prec e' =<< mapM (`lunbind` return) alts
+    Letrec xes e1  -> pprPrecLetrec prec xes e1
+    Case e' _ alts -> pprPrecCase prec e' alts
     Cast e' ty1 ty2-> pprPrecCast prec e' ty1 ty2
 
 instance Pretty Term where
@@ -300,8 +294,7 @@ pprSigmaType showForalls ty = do
                       , pprType rho
                       ]
   where
-    split1 tvs (ForAllTy tv resTy) =
-      lunbind (tv,resTy) $ \(tv',resTy') -> split1 (tv':tvs) resTy'
+    split1 tvs (ForAllTy tv resTy) = split1 (tv:tvs) resTy
     split1 tvs resTy = return (reverse tvs,resTy)
 
 pprForAll :: Monad m => [TyVar] -> m (Doc ann)
