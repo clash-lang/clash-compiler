@@ -130,6 +130,7 @@ runNormalization opts supply globals typeTrans reprs tcm tupTcm eval primMap rcs
                   (opt_inlineConstantLimit opts)
                   primMap
                   rcsMap
+                  (opt_newInlineStrat opts)
 
 
 normalize
@@ -323,7 +324,11 @@ flattenNode b@(CBranch (nm,(_,_,_,e)) us) = do
           Just remainder | bId `idDoesNotOccurIn` bExpr ->
                return (Right ((nm,mkApps fun (reverse remainder)),us))
           _ -> return (Right ((nm,e),us))
-      _ -> return (Right ((nm,e),us))
+      _ -> do
+        newInlineStrat <- Lens.use (extra.newInlineStrategy)
+        if newInlineStrat || isCheapFunction e
+           then return (Right ((nm,e),us))
+           else return (Left b)
 
 flattenCallTree
   :: CallTree
