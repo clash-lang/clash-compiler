@@ -1216,8 +1216,11 @@ a general listing of the available template holes:
 * @~RESULT@: Signal to which the result of a primitive must be assigned
   to. NB: Only used in a /declaration/ primitive.
 * @~ARG[N]@: @(N+1)@'th argument to the function.
-* @~LIT[N]@: @(N+1)@'th argument to the function An extra condition that must
+* @~LIT[N]@: @(N+1)@'th argument to the function. An extra condition that must
   hold is that this @(N+1)@'th argument is an (integer) literal.
+* @~CONST[N]@: @(N+1)@'th argument to the function. Clash will try to reduce
+* this to a literal, even if it would otherwise consider it too expensive. As
+* opposed to ~LIT, ~CONST will render a valid HDL expression.
 * @~TYP[N]@: VHDL type of the @(N+1)@'th argument.
 * @~TYPO@: VHDL type of the result.
 * @~TYPM[N]@: VHDL type/name/ of the @(N+1)@'th argument; used in /type/

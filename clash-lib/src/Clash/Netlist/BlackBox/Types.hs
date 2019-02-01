@@ -72,7 +72,17 @@ type BlackBoxFunction
 -- | A BlackBox Template is a List of Elements
 type BlackBoxTemplate = [Element]
 
--- | Elements of a blackbox context
+-- | Elements of a blackbox context. If you extend this list, make sure to
+-- update the following functions:
+--
+--  - Clash.Netlist.BlackBox.Types.prettyElem
+--  - Clash.Netlist.BlackBox.Types.renderElem
+--  - Clash.Netlist.BlackBox.Types.renderTag
+--  - Clash.Netlist.BlackBox.Types.setSym
+--  - Clash.Netlist.BlackBox.Types.usedArguments
+--  - Clash.Netlist.BlackBox.Types.usedVariables
+--  - Clash.Netlist.BlackBox.Types.verifyBlackBoxContext
+--  - Clash.Netlist.BlackBox.Types.walkElement
 data Element
   = Text !Text
   -- ^ Dumps given text without processing in HDL
@@ -85,6 +95,8 @@ data Element
   | ArgGen !Int !Int
   -- ^ Like Arg, but its first argument is the scoping level. For use in
   -- in generated code only.
+  | Const !Int
+  -- ^ Like Arg, but input hole must be a constant.
   | Lit !Int
   -- ^ Like Arg, but input hole must be a literal
   | Name !Int

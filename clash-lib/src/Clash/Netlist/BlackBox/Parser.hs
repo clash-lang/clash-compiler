@@ -13,7 +13,7 @@ module Clash.Netlist.BlackBox.Parser
   (runParse)
 where
 
-import           Control.Applicative
+import           Control.Applicative          ((<|>))
 import           Data.Text.Lazy               (Text, pack, unpack)
 import qualified Data.Text.Lazy               as Text
 import           Text.Parser.Combinators
@@ -72,6 +72,7 @@ pTagE =  Result True       <$  string "~ERESULT"
      <|> ArgGen            <$> (string "~ARGN" *> brackets' natural') <*> brackets' natural'
      <|> Arg True          <$> (string "~EARG" *> brackets' natural')
      <|> Arg False         <$> (string "~ARG" *> brackets' natural')
+     <|> Const             <$> (string "~CONST" *> brackets' natural')
      <|> Lit               <$> (string "~LIT" *> brackets' natural')
      <|> Name              <$> (string "~NAME" *> brackets' natural')
      <|> Var               <$> try (string "~VAR" *> brackets' pSigD) <*> brackets' natural'
