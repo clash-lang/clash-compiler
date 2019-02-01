@@ -11,11 +11,21 @@
   -> Signal domain a          -- Expected value (ARG[6])
   -> Signal domain b          -- Return valued  (ARG[7])
   -> Signal domain b"
-    , "template" :
-"-- assert begin
-~GENSYM[assert][0] : block
-  -- pragma translate_off
-  function ~GENSYM[slv2string][1] (slv : std_logic_vector) return STRING is
+    , "imports": ["~INCLUDENAME[0].all"]
+    , "includes" :
+      [ { "name" : "slv2string"
+        , "extension" : "vhdl"
+        , "template" :
+"-- helper function of Clash.Explicit.Testbench.assert
+library IEEE;
+use IEEE.STD_LOGIC_1164.ALL;
+
+package ~INCLUDENAME[0] is
+  function slv2string (slv : std_logic_vector) return STRING;
+end;
+
+package body ~INCLUDENAME[0] is
+  function slv2string (slv : std_logic_vector) return STRING is
      variable result : string (1 to slv'length);
      variable res_l : string (1 to 3);
      variable r : integer;
@@ -27,7 +37,14 @@
         r := r + 1;
      end loop;
      return result;
-  end;
+  end slv2string;
+end;"
+        }
+      ]
+    , "template" :
+"-- assert begin
+~GENSYM[assert][0] : block
+  -- pragma translate_off
   signal ~GENSYM[actual][2] : ~TYP[5];
   signal ~GENSYM[expected][3] : ~TYP[6];
 ~IF ~ISGATED[2] ~THEN
@@ -42,7 +59,7 @@ begin
   process(~IF ~ISGATED[2] ~THEN~SYM[4]~ELSE~ARG[2]~FI) is
   begin
     if (rising_edge(~IF ~ISGATED[2] ~THEN~SYM[4]~ELSE~ARG[2]~FI)) then
-      assert (toSLV(~SYM[2]) = toSLV(~SYM[3])) report (~LIT[4] & \", expected: \" & ~SYM[1](toSLV(~SYM[3])) & \", actual: \" & ~SYM[1](toSLV(~SYM[2]))) severity error;
+      assert (toSLV(~SYM[2]) = toSLV(~SYM[3])) report (~LIT[4] & \", expected: \" & ~INCLUDENAME[0].slv2string(toSLV(~SYM[3])) & \", actual: \" & ~INCLUDENAME[0].slv2string(toSLV(~SYM[2]))) severity error;
     end if;
   end process;
   -- pragma translate_on
@@ -69,15 +86,16 @@ end block;
   -> Signal domain b"
     , "imports" : ["~INCLUDENAME[0].all"]
     , "includes" :
-      [{ "name" : "non_std_match"
+      [{ "name" : "assertBitVector"
       , "extension" : "vhdl"
       , "template" :
-"
+"-- helper functions of Clash.Explicit.Testbench.assertBitVector
 library IEEE;
 use IEEE.STD_LOGIC_1164.ALL;
 
 package ~INCLUDENAME[0] is
   function non_std_match (l, r : std_logic_vector) return boolean;
+  function slv2string (slv : std_logic_vector) return STRING;
 end;
 
 package body ~INCLUDENAME[0] is
@@ -101,14 +119,8 @@ package body ~INCLUDENAME[0] is
     end loop;
     return true;
   end non_std_match;
-end;
-"
-      }]
-    , "template" :
-"-- assertBitVector begin
-~GENSYM[assert][0] : block
-  -- pragma translate_off
-  function ~GENSYM[slv2string][1] (slv : std_logic_vector) return STRING is
+
+  function slv2string (slv : std_logic_vector) return STRING is
      variable result : string (1 to slv'length);
      variable res_l : string (1 to 3);
      variable r : integer;
@@ -120,7 +132,15 @@ end;
         r := r + 1;
      end loop;
      return result;
-  end;
+  end slv2string;
+
+end;
+"
+      }]
+    , "template" :
+"-- assertBitVector begin
+~GENSYM[assert][0] : block
+  -- pragma translate_off
   signal ~GENSYM[actual][2] : ~TYP[4];
   signal ~GENSYM[expected][3] : ~TYP[5];
 ~IF ~ISGATED[1] ~THEN
@@ -135,7 +155,7 @@ begin
   process(~IF ~ISGATED[1] ~THEN~SYM[4]~ELSE~ARG[1]~FI~IF ~ISSYNC[2] ~THEN ~ELSE,~ARG[2]~FI) is
   begin
     if (rising_edge(~IF ~ISGATED[1] ~THEN~SYM[4]~ELSE~ARG[1]~FI)~IF ~ISSYNC[2] ~THEN ~ELSE or falling_edge(~ARG[2])~FI) then
-      assert (non_std_match(toSLV(~SYM[2]),toSLV(~SYM[3]))) report (~LIT[3] & \", expected: \" & ~SYM[1](toSLV(~SYM[3])) & \", actual: \" & ~SYM[1](toSLV(~SYM[2]))) severity error;
+      assert (~INCLUDENAME[0].non_std_match(toSLV(~SYM[2]),toSLV(~SYM[3]))) report (~LIT[3] & \", expected: \" & ~INCLUDENAME[0].slv2string(toSLV(~SYM[3])) & \", actual: \" & ~INCLUDENAME[0].slv2string(toSLV(~SYM[2]))) severity error;
     end if;
   end process;
   -- pragma translate_on
