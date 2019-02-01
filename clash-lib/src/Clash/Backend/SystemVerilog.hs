@@ -74,7 +74,7 @@ data SystemVerilogState =
     , _nameCache :: HashMap HWType Doc -- ^ Cache for previously generated product type names
     , _genDepth  :: Int -- ^ Depth of current generative block
     , _modNm     :: Identifier
-    , _idSeen    :: [Identifier]
+    , _idSeen    :: HashSet Identifier
     , _oports    :: [Identifier]
     , _srcSpan   :: SrcSpan
     , _includes  :: [(String,Doc)]
@@ -101,7 +101,7 @@ primsRoot = return ("clash-lib" System.FilePath.</> "prims")
 #endif
 
 instance Backend SystemVerilogState where
-  initBackend     = SystemVerilogState HashSet.empty [] HashMap.empty 0 "" [] [] noSrcSpan [] [] [] []
+  initBackend     = SystemVerilogState HashSet.empty [] HashMap.empty 0 "" HashSet.empty [] noSrcSpan [] [] [] []
   hdlKind         = const SystemVerilog
   primDirs        = const $ do root <- primsRoot
                                return [ root System.FilePath.</> "common"
@@ -226,7 +226,7 @@ filterReserved s = if s `elem` reservedWords
   else s
 
 -- | Generate SystemVerilog for a Netlist component
-genVerilog :: Identifier -> SrcSpan -> [Identifier] -> Component -> SystemVerilogM ((String,Doc),[(String,Doc)])
+genVerilog :: Identifier -> SrcSpan -> HashSet Identifier -> Component -> SystemVerilogM ((String,Doc),[(String,Doc)])
 genVerilog _ sp seen c = preserveSeen $ do
     Mon $ idSeen .= seen
     Mon $ setSrcSpan sp
@@ -590,7 +590,7 @@ addSeen c = do
   let iport = map fst (inputs c)
       oport = map (fst.snd) $ outputs c
       nets  = mapMaybe (\case {NetDecl' _ _ i _ -> Just i; _ -> Nothing}) $ declarations c
-  Mon (idSeen .= concat [iport,oport,nets])
+  Mon (idSeen %= (HashSet.union (HashSet.fromList (concat [iport,oport,nets]))))
   Mon (oports .= oport)
 
 mkUniqueId :: Identifier -> SystemVerilogM Identifier
@@ -600,16 +600,16 @@ mkUniqueId i = do
   let i' = mkId i
   case i `elem` seen of
     True  -> go mkId seen i' 0
-    False -> do Mon (idSeen %= (i':))
+    False -> do Mon (idSeen %= (HashSet.insert i'))
                 return i'
   where
-    go :: (Identifier -> Identifier) -> [Identifier] -> Identifier
+    go :: (Identifier -> Identifier) -> HashSet Identifier -> Identifier
        -> Int -> SystemVerilogM Identifier
     go mkId seen i' n = do
       let i'' = mkId (TextS.append i' (TextS.pack ('_':show n)))
       case i'' `elem` seen of
         True  -> go mkId seen i' (n+1)
-        False -> do Mon (idSeen %= (i'':))
+        False -> do Mon (idSeen %= (HashSet.insert i''))
                     return i''
 
 verilogType :: HWType -> SystemVerilogM Doc
