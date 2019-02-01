@@ -8,12 +8,13 @@
 -}
 
 {-# LANGUAGE TemplateHaskell   #-}
-{-# LANGUAGE FlexibleInstances #-}
 
 module Clash.Normalize.Types where
 
 import Control.Monad.State.Strict (State)
-import Data.Map            (Map)
+import Data.Map                   (Map)
+import Data.Set                   (Set)
+import Data.Text                  (Text)
 
 import Clash.Core.Term        (Term)
 import Clash.Core.Type        (Type)
@@ -52,7 +53,10 @@ data NormalizeState
   -- recursive
   , _inlineConstantLimit :: !Word
   -- ^ Size of a constant below which it is always inlined; 0 = no limit
-  , _primitives :: CompiledPrimMap -- ^ Primitive Definitions
+  , _primitives :: CompiledPrimMap
+  -- ^ Primitive Definitions
+  , _primitiveArgs :: Map Text (Set Int)
+  -- ^ Cache for looking up constantness of blackbox arguments
   , _recursiveComponents :: VarEnv Bool
   -- ^ Map telling whether a components is recursively defined.
   --

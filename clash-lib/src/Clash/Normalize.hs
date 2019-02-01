@@ -134,6 +134,7 @@ runNormalization opts supply globals typeTrans reprs tcm tupTcm eval primMap rcs
                   (opt_inlineFunctionLimit opts)
                   (opt_inlineConstantLimit opts)
                   primMap
+                  Map.empty
                   rcsMap
                   (opt_newInlineStrat opts)
 

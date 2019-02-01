@@ -1674,9 +1674,10 @@ reduceConst _ e = return e
 -- * Clash.Sized.Vector.replicate
 -- * Clash.Sized.Vector.dtfold
 reduceNonRepPrim :: NormRewrite
-reduceNonRepPrim (TransformContext is0 _) e@(App _ _) | (Prim f _, args) <- collectArgs e = do
+reduceNonRepPrim (TransformContext is0 ctx) e@(App _ _) | (Prim nm _, args) <- collectArgs e = do
   tcm <- Lens.view tcCache
   is1 <- unionInScope is0 <$> Lens.use globalInScope
+  shouldReduce1 <- shouldReduce ctx
   let eTy = termType tcm e
   case tyView eTy of
     (TyConApp vecTcNm@(nameOcc -> "Clash.Sized.Vector.Vec")
@@ -1685,13 +1686,13 @@ reduceNonRepPrim (TransformContext is0 _) e@(App _ _) | (Prim f _, args) <- coll
           [nilCon,consCon] = tyConDataCons vecTc
           nilE = mkVec nilCon consCon aTy 0 []
       changed nilE
-    tv -> case f of
+    tv -> case nm of
       "Clash.Sized.Vector.zipWith" | length args == 7 -> do
         let [lhsElTy,rhsElty,resElTy,nTy] = Either.rights args
         case runExcept (tyNatSize tcm nTy) of
           Right n -> do
             untranslatableTys <- mapM isUntranslatableType_not_poly [lhsElTy,rhsElty,resElTy]
-            if or untranslatableTys
+            if or untranslatableTys || shouldReduce1
                then let [fun,lhsArg,rhsArg] = Either.lefts args
                     in  reduceZipWith is1 n lhsElTy rhsElty resElTy fun lhsArg rhsArg
                else return e
@@ -1701,7 +1702,7 @@ reduceNonRepPrim (TransformContext is0 _) e@(App _ _) | (Prim f _, args) <- coll
         case runExcept (tyNatSize tcm nTy) of
           Right n -> do
             untranslatableTys <- mapM isUntranslatableType_not_poly [argElTy,resElTy]
-            if or untranslatableTys
+            if or untranslatableTys || shouldReduce1
                then let [fun,arg] = Either.lefts args
                     in  reduceMap is1 n argElTy resElTy fun arg
                else return e
@@ -1718,7 +1719,7 @@ reduceNonRepPrim (TransformContext is0 _) e@(App _ _) | (Prim f _, args) <- coll
             isPow2 x  = x /= 0 && (x .&. (complement x + 1)) == x
         untranslatableTy <- isUntranslatableType_not_poly aTy
         case runExcept (tyNatSize tcm nTy) of
-          Right n | not (isPow2 (n + 1)) || untranslatableTy ->
+          Right n | not (isPow2 (n + 1)) || untranslatableTy || shouldReduce1 ->
             let [fun,arg] = Either.lefts args
             in  reduceFold is1 (n + 1) aTy fun arg
           _ -> return e
@@ -1727,7 +1728,7 @@ reduceNonRepPrim (TransformContext is0 _) e@(App _ _) | (Prim f _, args) <- coll
         in  case runExcept (tyNatSize tcm nTy) of
           Right n -> do
             untranslatableTys <- mapM isUntranslatableType_not_poly [aTy,bTy]
-            if or untranslatableTys
+            if or untranslatableTys || shouldReduce1
               then let [fun,start,arg] = Either.lefts args
                    in  reduceFoldr is1 n aTy fun start arg
               else return e
@@ -1746,7 +1747,7 @@ reduceNonRepPrim (TransformContext is0 _) e@(App _ _) | (Prim f _, args) <- coll
                 | m == 0 -> changed lArg
                 | otherwise -> do
                     untranslatableTy <- isUntranslatableType_not_poly aTy
-                    if untranslatableTy
+                    if untranslatableTy || shouldReduce1
                        then reduceAppend is1 n m aTy lArg rArg
                        else return e
               _ -> return e
@@ -1756,7 +1757,7 @@ reduceNonRepPrim (TransformContext is0 _) e@(App _ _) | (Prim f _, args) <- coll
         case runExcept (tyNatSize tcm nTy) of
           Right n -> do
             untranslatableTy <- isUntranslatableType_not_poly aTy
-            if untranslatableTy
+            if untranslatableTy || shouldReduce1
                then reduceHead is1 n aTy vArg
                else return e
           _ -> return e
@@ -1766,7 +1767,7 @@ reduceNonRepPrim (TransformContext is0 _) e@(App _ _) | (Prim f _, args) <- coll
         case runExcept (tyNatSize tcm nTy) of
           Right n -> do
             untranslatableTy <- isUntranslatableType_not_poly aTy
-            if untranslatableTy
+            if untranslatableTy || shouldReduce1
                then reduceTail is1 n aTy vArg
                else return e
           _ -> return e
@@ -1776,7 +1777,7 @@ reduceNonRepPrim (TransformContext is0 _) e@(App _ _) | (Prim f _, args) <- coll
         case runExcept (tyNatSize tcm nTy) of
           Right n -> do
             untranslatableTy <- isUntranslatableType_not_poly aTy
-            if untranslatableTy
+            if untranslatableTy || shouldReduce1
                then reduceLast is1 n aTy vArg
                else return e
           _ -> return e
@@ -1786,7 +1787,7 @@ reduceNonRepPrim (TransformContext is0 _) e@(App _ _) | (Prim f _, args) <- coll
         case runExcept (tyNatSize tcm nTy) of
           Right n -> do
             untranslatableTy <- isUntranslatableType_not_poly aTy
-            if untranslatableTy
+            if untranslatableTy || shouldReduce1
                then reduceInit is1 n aTy vArg
                else return e
           _ -> return e
@@ -1805,7 +1806,7 @@ reduceNonRepPrim (TransformContext is0 _) e@(App _ _) | (Prim f _, args) <- coll
         case runExcept (tyNatSize tcm nTy) of
           Right n -> do
             untranslatableTy <- isUntranslatableType_not_poly aTy
-            if untranslatableTy
+            if untranslatableTy || shouldReduce1
                then reduceReplicate n aTy eTy vArg
                else return e
           _ -> return e
@@ -1814,7 +1815,7 @@ reduceNonRepPrim (TransformContext is0 _) e@(App _ _) | (Prim f _, args) <- coll
         case runExcept (tyNatSize tcm nTy) of
           Right n -> do
             untranslatableTys <- mapM isUntranslatableType_not_poly [argElTy,resElTy]
-            if or untranslatableTys
+            if or untranslatableTys || shouldReduce1
                then let [_,fun,arg] = Either.lefts args
                     in  reduceImap is1 n argElTy resElTy fun arg
                else return e
@@ -1834,7 +1835,7 @@ reduceNonRepPrim (TransformContext is0 _) e@(App _ _) | (Prim f _, args) <- coll
         case runExcept (tyNatSize tcm nTy) of
           Right n -> do
             untranslatableTy <- isUntranslatableType False aTy
-            if untranslatableTy
+            if untranslatableTy || shouldReduce1
                then reduceReplicate n aTy eTy vArg
                else return e
           _ -> return e

@@ -61,6 +61,17 @@ import           Clash.Signal.Internal           (ClockKind (Gated),
                                                   ResetKind (Synchronous))
 import           Clash.Util
 
+inputHole :: Element -> Maybe Int
+inputHole = \case
+  Arg _ n       -> pure n
+  Lit n         -> pure n
+  Const n       -> pure n
+  Name n        -> pure n
+  Typ (Just n)  -> pure n
+  TypM (Just n) -> pure n
+  Err (Just n)  -> pure n
+  _             -> Nothing
+
 -- | Determine if the number of normal/literal/function inputs of a blackbox
 -- context at least matches the number of argument that is expected by the
 -- template.
@@ -74,18 +85,14 @@ verifyBlackBoxContext bbCtx (N.BBFunction _ _ (N.TemplateFunction _ f _)) = f bb
 verifyBlackBoxContext bbCtx (N.BBTemplate t) = all verify' t
   where
     verify' = \case
-      Arg _ n ->
-        n < length (bbInputs bbCtx)
       Lit n ->
         case indexMaybe (bbInputs bbCtx) n of
           Just (_, _, b) -> b
           _              -> False
-      Typ (Just n) ->
-        n < length (bbInputs bbCtx)
-      TypM (Just n) ->
-        n < length (bbInputs bbCtx)
-      Err (Just n) ->
-        n < length (bbInputs bbCtx)
+      Const n ->
+        case indexMaybe (bbInputs bbCtx) n of
+          Just (_, _, b) -> b
+          _              -> False
       Component (Decl n l') ->
         case IntMap.lookup n (bbFunctions bbCtx) of
           Just _ ->
@@ -94,8 +101,12 @@ verifyBlackBoxContext bbCtx (N.BBTemplate t) = all verify' t
                        verifyBlackBoxContext bbCtx (N.BBTemplate y)) l'
           Nothing ->
             False
-      _ ->
-        True
+      e ->
+        case inputHole e of
+          Nothing ->
+            True
+          Just n ->
+            n < length (bbInputs bbCtx)
 
 extractLiterals :: BlackBoxContext
                 -> [Expr]
@@ -437,6 +448,10 @@ renderTag b (Arg esc n)  = do
   escape <- if esc then unextend else pure id
   (Text.fromStrict . escape . Text.toStrict . renderOneLine) <$> getMon (expr False e)
 
+renderTag b (Const n)  = do
+  let (e,_,_) = bbInputs b !! n
+  renderOneLine <$> getMon (expr False e)
+
 renderTag b t@(ArgGen k n)
   | k == bbLevel b
   , let (e,_,_) = bbInputs b !! n
@@ -444,14 +459,16 @@ renderTag b t@(ArgGen k n)
   | otherwise
   = getMon (prettyElem t)
 
-renderTag b (Lit n)      = let (e,_,_) = bbInputs b !! n
-                              in  renderOneLine <$> getMon (expr False (mkLit e))
-  where
-    mkLit (Literal (Just (Signed _,_)) i)   = Literal Nothing i
-    mkLit (Literal (Just (Unsigned _,_)) i) = Literal Nothing i
-    mkLit (DataCon _ (DC (Void {}, _)) [Literal (Just (Signed _,_)) i]) = Literal Nothing i
-    mkLit (DataCon _ (DC (Void {}, _)) [Literal (Just (Unsigned _,_)) i]) = Literal Nothing i
-    mkLit i                               = i
+renderTag b (Lit n) =
+  renderOneLine <$> getMon (expr False (mkLit e))
+ where
+  (e,_,_) = bbInputs b !! n
+
+  mkLit (Literal (Just (Signed _,_)) i)                                 = Literal Nothing i
+  mkLit (Literal (Just (Unsigned _,_)) i)                               = Literal Nothing i
+  mkLit (DataCon _ (DC (Void {}, _)) [Literal (Just (Signed _,_)) i])   = Literal Nothing i
+  mkLit (DataCon _ (DC (Void {}, _)) [Literal (Just (Unsigned _,_)) i]) = Literal Nothing i
+  mkLit i                                                               = i
 
 renderTag b e@(Name _i) =
   case elementToText b e of
@@ -648,6 +665,7 @@ prettyElem (Component (Decl i args)) = do
 prettyElem (Result b) = if b then return "~ERESULT" else return "~RESULT"
 prettyElem (Arg b i) = renderOneLine <$> (if b then string "~EARG" else string "~ARG" <> brackets (int i))
 prettyElem (Lit i) = renderOneLine <$> (string "~LIT" <> brackets (int i))
+prettyElem (Const i) = renderOneLine <$> (string "~CONST" <> brackets (int i))
 prettyElem (Name i) = renderOneLine <$> (string "~NAME" <> brackets (int i))
 prettyElem (Var es i) = do
   es' <- prettyBlackBox es
@@ -760,6 +778,10 @@ walkElement f el = maybeToList (f el) ++ walked
   where
     go     = walkElement f
     walked =
+      -- TODO: alternatives are purposely explicitly listed in case @Element@
+      -- TODO: gets extended. This way, GHC will complain about missing
+      -- TODO: alternatives. It would probably be better to replace it by Lens
+      -- TODO: logic?
       case el of
         Component (Decl _ args) ->
           concatMap (\(a,b) -> concatMap go a ++ concatMap go b) args
@@ -773,7 +795,38 @@ walkElement f el = maybeToList (f el) ++ walked
         BV _ es _ -> concatMap go es
         GenSym es _ -> concatMap go es
         DevNull es -> concatMap go es
-        _ -> []
+        Text _ -> []
+        Result _ -> []
+        Arg _ _ -> []
+        ArgGen _ _ -> []
+        Const _ -> []
+        Lit _ -> []
+        Name _ -> []
+        Var es _ -> concatMap go es
+        Sym _ _ -> []
+        Typ _ -> []
+        TypM _ -> []
+        Err _ -> []
+        TypElem e -> go e
+        CompName -> []
+        IncludeName _ -> []
+        Size e -> go e
+        Length e -> go e
+        Depth e -> go e
+        Gen _ -> []
+        And es -> concatMap go es
+        IW64 -> []
+        HdlSyn _ -> []
+        Sel e _ -> go e
+        IsLit _ -> []
+        IsVar _ -> []
+        IsGated _ -> []
+        IsSync _ -> []
+        StrCmp es _ -> concatMap go es
+        OutputWireReg _ -> []
+        Vars _ -> []
+        Repeat es1 es2 ->
+          concatMap go es1 ++ concatMap go es2
 
 -- | Determine variables used in an expression. Used for VHDL sensitivity list.
 -- Also see: https://github.com/clash-lang/clash-compiler/issues/365
@@ -806,6 +859,7 @@ usedArguments (N.BBTemplate t) = nub (concatMap (walkElement matchArg) t)
     matchArg (Lit i)        = Just i
     matchArg (Name i)       = Just i
     matchArg (Var _ i)      = Just i
+    matchArg (Const i)      = Just i
     matchArg _              = Nothing
 
 onBlackBox
