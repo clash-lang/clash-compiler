@@ -211,9 +211,6 @@ data HDL
 -- nicer multiline strings.
 --
 -- @
--- {\-\# LANGUAGE DataKinds   \#-\}
--- {\-\# LANGUAGE QuasiQuotes \#-\}
---
 -- module InlinePrimitive where
 --
 -- import           Clash.Annotations.Primitive
@@ -224,7 +221,8 @@ data HDL
 -- {\-\# ANN example (InlinePrimitive VHDL $ unindent [i|
 --   [ { \"BlackBox\" :
 --       { "name" : "InlinePrimitive.example"
---       , "templateD" :
+--       , "kind": "Declaration"
+--       , "template" :
 --   "-- begin InlinePrimitive example:
 --   ~GENSYM[example][0] : block
 --   ~RESULT <= 1 + ~ARG[0];

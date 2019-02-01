@@ -1053,15 +1053,16 @@ For which the VHDL /expression/ primitive is:
 
 @
 { \"BlackBox\" :
-  { "name"      : "Clash.Sized.Internal.Signed.*#"
-  , "templateE" : "resize(~ARG[1] * ~ARG[2], ~LIT[0])"
+  { "name"     : "Clash.Sized.Internal.Signed.*#"
+  , "kind"     : "Expression"
+  , "template" : "resize(~ARG[1] * ~ARG[2], ~LIT[0])"
   }
 }
 @
 
 The @name@ of the primitive is the /fully qualified/ name of the function you
 are creating the primitive for. Because we are creating an /expression/
-primitive we define a @template__E__@ field. As the name suggest, it is a VHDL
+primitive the kind must be set to @Expression@. As the name suggest, it is a VHDL
 /template/, meaning that the compiler must fill in the holes heralded by the
 tilde (~). Here:
 
@@ -1150,7 +1151,8 @@ And for which the /declaration/ primitive is:
   -> Signal dom Int  -- wr,   ARG[5]
   -> Signal dom a    -- din,  ARG[6]
   -> Signal dom a"
-    , "templateD" :
+    , "kind" : "Declaration"
+    , "template" :
 "-- blockRam begin
 ~GENSYM[~COMPNAME_blockRam][0] : block
   signal ~GENSYM[RAM][1] : ~TYP[2] := ~LIT[2];~IF ~VIVADO ~THEN
@@ -1210,7 +1212,7 @@ end block;
 
 Again, the @name@ of the primitive is the fully qualified name of the function
 you are creating the primitive for. Because we are creating a /declaration/
-primitive we define a @template__D__@ field. Instead of discussing what the
+primitive the /kind/ must be set to @Declaration@. Instead of discussing what the
 individual template holes mean in the above context, we will instead just give
 a general listing of the available template holes:
 
@@ -1304,8 +1306,9 @@ For those who are interested, the equivalent Verilog primitives are:
 
 @
 { \"BlackBox\" :
-  { "name"      : "Clash.Sized.Internal.Signed.*#"
-  , "templateE" : "~ARG[1] * ~ARG[2]"
+  { "name"     : "Clash.Sized.Internal.Signed.*#"
+  , "kind"     : "Expression"
+  , "template" : "~ARG[1] * ~ARG[2]"
   }
 }
 @
@@ -1325,7 +1328,8 @@ and
   -> Signal dom Int  -- wr,   ARG[5]
   -> Signal dom a    -- din,  ARG[6]
   -> Signal dom a"
-    , "templateD" :
+    , "kind" : "Declaration"
+    , "template" :
 "// blockRam begin
 reg ~TYPO ~GENSYM[RAM][0] [0:~LENGTH[~TYP[2]]-1];
 reg ~TYPO ~GENSYM[~RESULT_q][1];
@@ -1371,8 +1375,9 @@ And the equivalent SystemVerilog primitives are:
 
 @
 { \"BlackBox\" :
-  { "name"      : "Clash.Sized.Internal.Signed.*#"
-  , "templateE" : "~ARG[1] * ~ARG[2]"
+  { "name"     : "Clash.Sized.Internal.Signed.*#"
+  , "kind"     : "Expression"
+  , "template" : "~ARG[1] * ~ARG[2]"
   }
 }
 @
@@ -1392,7 +1397,8 @@ and
   -> Signal dom Int  -- wr,   ARG[5]
   -> Signal dom a    -- din,  ARG[6]
   -> Signal dom a"
-    , "templateD" :
+    , "kind" : "Declaration"
+    , "template" :
 "// blockRam begin
 ~SIGD[~GENSYM[RAM][0]][2];
 logic [~SIZE[~TYP[6]]-1:0] ~GENSYM[~RESULT_q][1];
