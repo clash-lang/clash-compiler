@@ -90,7 +90,7 @@ import           Clash.Core.Literal          (Literal (..))
 import           Clash.Core.Pretty           (showPpr)
 import           Clash.Core.Subst
   (substTm, mkSubst, extendIdSubst, extendIdSubstList, extendTvSubst,
-   extendTvSubstList, freshenTm, substTyInVar)
+   extendTvSubstList, freshenTm, substTyInVar, deShadowTerm)
 import           Clash.Core.Term             (LetBinding, Pat (..), Term (..))
 import           Clash.Core.Type             (TypeView (..), applyFunTy,
                                               isPolyFunCoreTy,
@@ -194,7 +194,7 @@ typeSpec _ e = return e
 
 -- | Specialize functions on their non-representable argument
 nonRepSpec :: NormRewrite
-nonRepSpec ctx e@(App e1 e2)
+nonRepSpec ctx@(TransformContext is0 _) e@(App e1 e2)
   | (Var {}, args) <- collectArgs e1
   , (_, [])     <- Either.partitionEithers args
   , null $ Lens.toListOf termFreeTyVars e2
@@ -231,7 +231,9 @@ nonRepSpec ctx e@(App e1 e2)
             | nameSort (varName fNm) == Internal
             -> do
               tm' <- censor (const mempty) (bottomupR appProp ctx (mkApps tm fArgs))
-              return tm'
+              -- See Note [AppProp no-shadow invariant]
+              is1 <- unionInScope is0 <$> Lens.use globalInScope
+              return (deShadowTerm is1 tm')
           _ -> return app
       | otherwise = return app
 
@@ -383,9 +385,12 @@ inlineNonRep (TransformContext localScope _) e@(Case scrut altsTy alts)
                                                   <*> Lens.view tcCache
                                                   <*> pure scrutTy)
         case (nonRepScrut, bodyMaybe) of
-          (True,Just (_,_,_,scrutBody)) -> do
+          (True,Just (_,_,_,scrutBody0)) -> do
             Monad.when noException (zoomExtra (addNewInline f cf))
-            changed $ Case (mkApps scrutBody args) altsTy alts
+            -- See Note [AppProp no-shadow invariant]
+            allInScope <- unionInScope localScope <$> Lens.use globalInScope
+            let scrutBody1 = deShadowTerm allInScope scrutBody0
+            changed $ Case (mkApps scrutBody1 args) altsTy alts
           _ -> return e
   where
     exception tcm ((tyView . typeKind tcm) -> TyConApp (nameOcc -> "GHC.Types.Constraint") _) = True
@@ -922,7 +927,10 @@ inlineWorkFree (TransformContext localScope _) e@(collectArgs -> (Var f,args))
             isRecBndr <- isRecursiveBndr f
             if isRecBndr
                then return e
-               else changed (mkApps body args)
+               else do
+                 -- See Note [AppProp no-shadow invariant]
+                 allInScope <- unionInScope localScope <$> Lens.use globalInScope
+                 changed (mkApps (deShadowTerm allInScope body) args)
           _ -> return e
   where
     -- an expression is has work when it contains free local variables,
@@ -951,7 +959,10 @@ inlineWorkFree (TransformContext localScope _) e@(Var f) = do
           isRecBndr <- isRecursiveBndr f
           if isRecBndr
              then return e
-             else changed body
+             else do
+              -- See Note [AppProp no-shadow invariant]
+              allInScope <- unionInScope localScope <$> Lens.use globalInScope
+              changed (deShadowTerm allInScope body)
         _ -> return e
     else return e
 
@@ -973,7 +984,10 @@ inlineSmall (TransformContext localScope _) e@(collectArgs -> (Var f,args)) = do
         Just (_,_,inl,body) -> do
           isRecBndr <- isRecursiveBndr f
           if not isRecBndr && inl /= NoInline && termSize body < sizeLimit
-             then changed (mkApps body args)
+             then do
+               -- See Note [AppProp no-shadow invariant]
+               allInScope <- unionInScope localScope <$> Lens.use globalInScope
+               changed (mkApps (deShadowTerm allInScope body) args)
              else return e
         _ -> return e
 
@@ -1029,6 +1043,49 @@ constantSpec _ e = return e
 -- in  case x of
 --       D a b -> h a b1
 -- @
+--
+-- Note [AppProp no-shadow invariant]
+--
+-- Imagine
+--
+-- @
+-- (\x -> e) u
+-- @
+--
+-- where @u@ has a free variable named @x@, rewriting this to:
+--
+-- @
+-- let x = u
+-- in  e
+-- @
+--
+-- would be very bad, because the let-binding suddenly captures the free
+-- variable in @u@. The same for:
+--
+-- @
+-- (let x = w in e) u
+-- @
+--
+-- where @u@ again has a free variable @x@, rewriting this to:
+--
+-- @
+-- let x = w in (e u)
+-- @
+--
+-- would be bad because the let-binding now captures the free variable in @u@.
+--
+-- To prevent this from happening, we can either:
+--
+-- 1. Rename the bindings, so that they cannot capture
+-- 2. Ensure that @AppProp@ is only called in a context where there is no
+--    shadowing, i.e. the bindings can never never collide with the current
+--    inScopeSet.
+--
+-- We have gone for option 2 so that AppProp requires less computation and
+-- because AppProp is such a commonly applied transformation. This
+-- means that when normalisation starts we deshadow the expression, and when
+-- we inline global binders, we ensure that inlined expression is deshadowed
+-- taking the InScopeSet of the context into account.
 appProp :: NormRewrite
 appProp (TransformContext is0 _) (App (Lam v e) arg) = do
   if isConstant arg || isVar arg
@@ -1491,7 +1548,7 @@ recToLetRec _ e = return e
 
 -- | Inline a function with functional arguments
 inlineHO :: NormRewrite
-inlineHO _ e@(App _ _)
+inlineHO (TransformContext is0 _) e@(App _ _)
   | (Var f, args) <- collectArgs e
   = do
     tcm <- Lens.view tcCache
@@ -1509,7 +1566,9 @@ inlineHO _ e@(App _ _)
                   case bodyMaybe of
                     Just (_,_,_,body) -> do
                       zoomExtra (addNewInline f cf)
-                      changed (mkApps body args)
+                      -- See Note [AppProp no-shadow invariant]
+                      is1 <- unionInScope is0 <$> Lens.use globalInScope
+                      changed (mkApps (deShadowTerm is1 body) args)
                     _ -> return e
       else return e
 

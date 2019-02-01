@@ -64,9 +64,8 @@ import           Clash.Rewrite.Combinators        ((>->),(!->))
 import           Clash.Rewrite.Types
   (RewriteEnv (..), RewriteState (..), bindings, curFun, dbgLevel, extra,
    tcCache, topEntities, typeTranslator, customReprs, globalInScope)
-import           Clash.Rewrite.Util               (isUntranslatableType,
-                                                   runRewrite,
-                                                   runRewriteSession)
+import           Clash.Rewrite.Util
+  (apply, isUntranslatableType, runRewrite, runRewriteSession)
 import           Clash.Signal.Internal            (ResetKind (..))
 import           Clash.Util
 
@@ -163,8 +162,8 @@ normalize' nm = do
                         -- into a loop. Deshadowing freshens all the bindings
                         -- to avoid this.
                         --
-                        -- TODO: See if we can remove this, now that the
-                        -- TODO: inlining functions account for global vars
+                        -- Additionally, it allows for a much cheaper `appProp`
+                        -- transformation, see Note [AppProp no-shadow invariant]
                         is0 <- Lens.use globalInScope
                         let tm1 = deShadowTerm is0 tm
                         curFun .= (nm',sp)
@@ -337,7 +336,11 @@ flattenCallTree (CBranch (nm,(nm',sp,inl,tm)) used) = do
       subst = extendIdSubstList (mkSubst is) toInline
   newExpr <- case toInline of
                [] -> return tm
-               _  -> rewriteExpr ("flattenExpr",flatten) (showPpr nm, substTm "flattenCallTree.flattenExpr" subst tm)
+               _  -> do is0 <- Lens.use globalInScope
+                        -- To have a cheap `appProp` transformation we need to
+                        -- deshadow, see also Note [AppProp no-shadow invariant]
+                        let tm1 = deShadowTerm is0 (substTm "flattenCallTree.flattenExpr" subst tm)
+                        rewriteExpr ("flattenExpr",flatten) (showPpr nm, tm1)
   let allUsed = newUsed ++ concat il_used
   -- inline all components when the resulting expression after flattening
   -- is still considered "cheap". This happens often at the topEntity which
@@ -346,13 +349,21 @@ flattenCallTree (CBranch (nm,(nm',sp,inl,tm)) used) = do
      then do
         let (toInline',allUsed') = unzip (map goCheap allUsed)
             subst' = extendIdSubstList (mkSubst is) toInline'
-        newExpr' <- rewriteExpr ("flattenCheap",flatten) (showPpr nm, substTm "flattenCallTree.flattenCheap" subst' newExpr)
+        is0 <- Lens.use globalInScope
+        -- To have a cheap `appProp` transformation we need to
+        -- deshadow, see also Note [AppProp no-shadow invariant]
+        let tm1 = deShadowTerm is0 (substTm "flattenCallTree.flattenCheap" subst' newExpr)
+        newExpr' <- rewriteExpr ("flattenCheap",flatten) (showPpr nm, tm1)
         return (CBranch (nm,(nm',sp,inl,newExpr')) (concat allUsed'))
      else return (CBranch (nm,(nm',sp,inl,newExpr)) allUsed)
   where
     flatten =
-      innerMost (appProp >-> bindConstantVar >-> caseCon >-> reduceConst >-> flattenLet) !->
-      topdownSucR topLet
+      innerMost (apply "appProp" appProp >->
+                 apply "bindConstantVar" bindConstantVar >->
+                 apply "caseCon" caseCon >->
+                 apply "reduceConst" reduceConst >->
+                 apply "flattenLet" flattenLet) !->
+      topdownSucR (apply "topLet" topLet)
 
     goCheap (CLeaf   (nm2,(_,_,_,e)))    = ((nm2,e),[])
     goCheap (CBranch (nm2,(_,_,_,e)) us) = ((nm2,e),us)
