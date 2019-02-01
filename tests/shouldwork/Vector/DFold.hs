@@ -9,8 +9,9 @@ import Data.Singletons.Prelude hiding (type (+))
 import Data.Singletons.Prelude
 #endif
 import Data.Proxy
+import Data.Kind (Type)
 
-data Append (m :: Nat) (a :: *) (f :: TyFun Nat *) :: *
+data Append (m :: Nat) (a :: Type) (f :: TyFun Nat Type) :: Type
 type instance Apply (Append m a) l = Vec (l + m) a
 
 append' xs ys = dfold (Proxy :: Proxy (Append m a)) (const (:>)) ys xs

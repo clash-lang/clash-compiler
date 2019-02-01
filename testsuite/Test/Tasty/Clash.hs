@@ -1,3 +1,4 @@
+{-# LANGUAGE CPP #-}
 module Test.Tasty.Clash where
 
 import           Data.Char                 (toLower)
@@ -597,6 +598,9 @@ outputTest' env target extraArgs modName funcName path =
              , "-XMonoLocalBinds"
              , "-XNoImplicitPrelude"
              , "-XNoMonomorphismRestriction"
+#if __GLASGOW_HASKELL__ >= 806
+             , "-XNoStarIsType"
+#endif
              , "-XNoStrict"
              , "-XNoStrictData"
              , "-XQuasiQuotes"

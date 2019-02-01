@@ -6,16 +6,17 @@ module Record where
 
 import Clash.Prelude
 import Clash.Explicit.Testbench
+import Data.Kind (Type)
 
 -- Real-world example of a GADT stolen from:
 --   https://stackoverflow.com/questions/21505975/write-gadt-record-with-constrained-type
-class HasData (a :: *) where
-    type Data a :: *
+class HasData (a :: Type) where
+    type Data a :: Type
 
 instance HasData Int where
     type Data Int = Maybe Int
 
-data Foo :: * -> * where
+data Foo :: Type -> Type where
     Foo :: HasData a => {
         getChar :: Char,
         getData :: Data a,

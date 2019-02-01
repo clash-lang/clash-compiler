@@ -6,8 +6,9 @@ import Clash.Prelude
 import Clash.Explicit.Testbench
 
 import Data.Bits (complement)
+import Data.Kind (Type)
 
-data Bus n :: * where
+data Bus n :: Type where
   Bus :: forall n
        . n <= 10
       => BitVector n
