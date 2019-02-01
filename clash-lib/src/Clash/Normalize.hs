@@ -9,10 +9,15 @@
 -}
 
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE TupleSections #-}
 {-# LANGUAGE TemplateHaskell   #-}
 {-# LANGUAGE ViewPatterns      #-}
 
+{-# OPTIONS_GHC -Wno-unused-imports #-}
+
 module Clash.Normalize where
+
+import Data.Either
 
 import           Control.Concurrent.Supply        (Supply)
 import           Control.Lens                     ((.=),(^.),_1,_4)
@@ -53,7 +58,7 @@ import           Clash.Driver.Types
   (BindingMap, ClashOpts (..), DebugLevel (..))
 import           Clash.Netlist.Types              (HWType (..), FilteredHWType(..))
 import           Clash.Netlist.Util
-  (splitNormalized, unsafeCoreTypeToHWType')
+  (splitNormalized, coreTypeToHWType')
 import           Clash.Normalize.Strategy
 import           Clash.Normalize.Transformations
   (appProp, bindConstantVar, caseCon, flattenLet, reduceConst, topLet)
@@ -404,12 +409,16 @@ clockResetErrors
   -> TyConMap
   -> Type
   -> [String]
-clockResetErrors sp reprs tyTran tcm ty =
+clockResetErrors _sp reprs tyTran tcm ty =
    (Maybe.mapMaybe reportClock clks ++ Maybe.mapMaybe reportResets rsts)
   where
     (args,_)  = splitCoreFunForallTy tcm ty
     (_,args') = partitionEithers args
-    hwArgs    = zip (map (unsafeCoreTypeToHWType' sp $(curLoc) tyTran reprs tcm) args') args'
+    hwArgs    = rights $
+                  zipWith
+                    (\ a b -> (,b) <$> a)
+                    (map (coreTypeToHWType' tyTran reprs tcm) args')
+                    args'
     clks      = groupBy ((==) `on` fst) . sortBy (compare `on` fst)
               $ [ ((nm,i),ty') | (Clock nm i _,ty') <- hwArgs]
     rsts      = groupBy ((==) `on` (fst.fst)) . sortBy (compare `on` (fst.fst))
