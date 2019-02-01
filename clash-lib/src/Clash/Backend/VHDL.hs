@@ -91,7 +91,7 @@ data VHDLState =
   , _memoryDataFiles:: [(String,String)]
   -- ^ Files to be stored: (filename, contents). These files are generated
   -- during the execution of 'genNetlist'.
-  , _idSeen    :: [Identifier]
+  , _idSeen    :: HashSet Identifier
   , _intWidth  :: Int
   -- ^ Int/Word/Integer bit-width
   , _hdlsyn    :: HdlSyn
@@ -111,7 +111,7 @@ primsRoot = return ("clash-lib" System.FilePath.</> "prims")
 #endif
 
 instance Backend VHDLState where
-  initBackend     = VHDLState HashSet.empty [] HashMap.empty "" noSrcSpan [] [] [] [] [] []
+  initBackend     = VHDLState HashSet.empty [] HashMap.empty "" noSrcSpan [] [] [] [] [] HashSet.empty
   hdlKind         = const VHDL
   primDirs        = const $ do root <- primsRoot
                                return [ root System.FilePath.</> "common"
@@ -314,7 +314,7 @@ selectProductField fieldLabels fieldTypes fieldIndex =
   "_sel" <> int fieldIndex <> "_" <> productFieldName fieldLabels fieldTypes fieldIndex
 
 -- | Generate VHDL for a Netlist component
-genVHDL :: Identifier -> SrcSpan -> [Identifier] -> Component -> VHDLM ((String,Doc),[(String,Doc)])
+genVHDL :: Identifier -> SrcSpan -> HashSet Identifier -> Component -> VHDLM ((String,Doc),[(String,Doc)])
 genVHDL nm sp seen c = preserveSeen $ do
     Mon $ idSeen .= seen
     Mon $ setSrcSpan sp

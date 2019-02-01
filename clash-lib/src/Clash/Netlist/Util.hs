@@ -26,6 +26,8 @@ import qualified Control.Lens            as Lens
 import           Control.Monad           (unless, when, zipWithM, join)
 import           Control.Monad.Trans.Except (runExcept)
 import           Data.Either             (partitionEithers)
+import           Data.HashSet            (HashSet)
+import qualified Data.HashSet            as HashSet
 import           Data.String             (fromString)
 import           Data.List               (intersperse, unzip4, sort, intercalate)
 import qualified Data.List               as List
@@ -635,7 +637,7 @@ mkUniqueNormalized topMM (args,binds,res) = do
         Nothing  -> []
         Just top -> collectPortNames top
 
-  seenIds %= (portNames++)
+  seenIds %= (HashSet.fromList portNames `HashSet.union`)
 
   let (bndrs,exprs) = unzip binds
 
@@ -838,20 +840,20 @@ mkUniqueIdentifier typ nm = do
   seen  <- Lens.use seenIds
   seenC <- Lens.use seenComps
   i     <- mkIdentifier typ nm
-  let s = seenC ++ seen
-  if i `elem` s
+  let s = seenC `HashSet.union` seen
+  if i `HashSet.member` s
      then go 0 s i
      else do
-      seenIds %= (i:)
+      seenIds %= (HashSet.insert i)
       return i
   where
-    go :: Integer -> [Identifier] -> Identifier -> NetlistMonad Identifier
+    go :: Integer -> HashSet Identifier -> Identifier -> NetlistMonad Identifier
     go n s i = do
       i' <- extendIdentifier typ i (Text.pack ('_':show n))
       if i' `elem` s
          then go (n+1) s i
          else do
-          seenIds %= (i':)
+          seenIds %= (HashSet.insert i')
           return i'
 
 -- | Preserve the Netlist '_varEnv' and '_varCount' when executing a monadic action
@@ -916,7 +918,7 @@ uniquePortName [] i = mkUniqueIdentifier Extended i
 uniquePortName x  _ = do
   let xT = Text.pack x
   xTB <- mkIdentifier Basic xT
-  seenIds %= ([xT,xTB] ++)
+  seenIds %= (\s -> List.foldl' (flip HashSet.insert) s [xT,xTB])
   return xT
 
 mkInput
@@ -1070,7 +1072,7 @@ mkRTreeChain d elTy es =
         ]
 
 genComponentName
-  :: [Identifier]
+  :: HashSet Identifier
   -> (IdType -> Identifier -> Identifier)
   -> (Maybe Identifier,Maybe Identifier)
   -> Id
@@ -1102,7 +1104,7 @@ genTopComponentName _mkIdFn prefixM (Just ann) _nm =
     (Just p,_) -> p `Text.append` Text.pack ('_':t_name ann)
     _          -> Text.pack (t_name ann)
 genTopComponentName mkIdFn prefixM Nothing nm =
-  genComponentName [] mkIdFn prefixM nm
+  genComponentName HashSet.empty mkIdFn prefixM nm
 
 
 -- | Strips one or more layers of attributes from a HWType; stops at first

@@ -32,6 +32,7 @@ import           Control.Lens                         ((+=),(-=),(.=),(%=), make
 import           Control.Monad                        (forM)
 import           Control.Monad.State                  (State)
 import           Data.Bits                            (Bits, testBit)
+import           Data.HashSet                         (HashSet)
 import qualified Data.HashSet                         as HashSet
 import           Data.Maybe                           (catMaybes,fromMaybe,mapMaybe)
 import           Data.List                            (nub, nubBy)
@@ -79,7 +80,7 @@ import qualified Paths_clash_lib
 data VerilogState =
   VerilogState
     { _genDepth  :: Int -- ^ Depth of current generative block
-    , _idSeen    :: [Identifier]
+    , _idSeen    :: HashSet Identifier
     , _srcSpan   :: SrcSpan
     , _includes  :: [(String,Doc)]
     , _imports   :: [Text.Text]
@@ -105,7 +106,7 @@ primsRoot = return ("clash-lib" System.FilePath.</> "prims")
 #endif
 
 instance Backend VerilogState where
-  initBackend     = VerilogState 0 [] noSrcSpan [] [] [] []
+  initBackend     = VerilogState 0 HashSet.empty noSrcSpan [] [] [] []
   hdlKind         = const Verilog
   primDirs        = const $ do root <- primsRoot
                                return [ root System.FilePath.</> "common"
@@ -213,7 +214,7 @@ filterReserved s = if s `elem` reservedWords
   else s
 
 -- | Generate VHDL for a Netlist component
-genVerilog :: SrcSpan -> [Identifier] -> Component -> VerilogM ((String,Doc),[(String,Doc)])
+genVerilog :: SrcSpan -> HashSet Identifier -> Component -> VerilogM ((String,Doc),[(String,Doc)])
 genVerilog sp seen c = preserveSeen $ do
     Mon (idSeen .= seen)
     Mon (setSrcSpan sp)
@@ -295,7 +296,7 @@ addSeen c = do
   let iport = [iName | (iName, _) <- inputs c]
       oport = [oName | (_, (oName, _)) <- outputs c]
       nets  = mapMaybe (\case {NetDecl' _ _ i _ -> Just i; _ -> Nothing}) $ declarations c
-  Mon $ idSeen .= concat [iport,oport,nets]
+  Mon $ idSeen %= (HashSet.union (HashSet.fromList (concat [iport,oport,nets])))
 
 -- render a type; by default, removing zero-sizes is an aesthetic operation
 -- and is only valid for decls (e.g. when rendering module ports), so don't
