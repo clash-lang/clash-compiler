@@ -120,7 +120,7 @@ instance PrettyPrec TyCon where
 
 instance PrettyPrec LitTy where
   pprPrec _ (NumTy i) = return $ pretty i
-  pprPrec _ (SymTy s) = return $ pretty s
+  pprPrec _ (SymTy s) = return $ dquotes $ pretty s
 
 instance PrettyPrec Term where
   pprPrec prec e = case e of
