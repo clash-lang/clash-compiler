@@ -58,6 +58,8 @@ data NormalizeState
   --
   -- NB: there are only no mutually-recursive component, only self-recursive
   -- ones.
+  , _newInlineStrategy :: Bool
+  -- ^ Flattening stage should use the new (no-)inlining strategy
   }
 
 makeLenses ''NormalizeState

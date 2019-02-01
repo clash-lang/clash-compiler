@@ -68,6 +68,7 @@ data ClashOpts = ClashOpts { opt_inlineLimit :: Int
                            , opt_floatSupport :: Bool
                            , opt_importPaths :: [FilePath]
                            , opt_componentPrefix :: Maybe String
+                           , opt_newInlineStrat :: Bool
                            }
 
 
@@ -94,6 +95,7 @@ defClashOpts tmpDir
   , opt_floatSupport        = False
   , opt_importPaths         = []
   , opt_componentPrefix     = Nothing
+  , opt_newInlineStrat      = True
   }
 
 -- | Information about the generated HDL between (sub)runs of the compiler

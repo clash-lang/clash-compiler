@@ -73,6 +73,7 @@ flagsClash r = [
   , defFlag "fclash-float-support"           $ NoArg (liftEwM (setFloatSupport r))
   , defFlag "fclash-allow-zero-width"        $ NoArg (setAllowZeroWidth r)
   , defFlag "fclash-component-prefix"        $ SepArg (liftEwM . setComponentPrefix r)
+  , defFlag "fclash-old-inline-strategy"     $ NoArg (liftEwM (setOldInlineStrategy r))
   ]
 
 -- | Print deprecated flag warning
@@ -172,3 +173,6 @@ setComponentPrefix
   -> String
   -> IO ()
 setComponentPrefix r s = modifyIORef r (\c -> c {opt_componentPrefix = Just s})
+
+setOldInlineStrategy :: IORef ClashOpts -> IO ()
+setOldInlineStrategy r = modifyIORef r (\c -> c {opt_newInlineStrat = False})
