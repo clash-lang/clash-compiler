@@ -80,6 +80,7 @@ import Text.Read                  (Read (..), ReadPrec)
 import Language.Haskell.TH        (TypeQ, appT, conT, litT, numTyLit, sigE)
 import Language.Haskell.TH.Syntax (Lift(..))
 import Numeric.Natural            (Natural)
+import GHC.Stack                  (HasCallStack)
 import GHC.TypeLits               (CmpNat, KnownNat, Nat, type (+), type (-),
                                    type (*), type (<=), natVal)
 import GHC.TypeLits.Extra         (CLog)
@@ -233,7 +234,7 @@ fromInteger# :: KnownNat n => Integer -> Index n
 {-# NOINLINE fromInteger# #-}
 fromInteger# = fromInteger_INLINE
 {-# INLINE fromInteger_INLINE #-}
-fromInteger_INLINE :: forall n . KnownNat n => Integer -> Index n
+fromInteger_INLINE :: forall n . (HasCallStack, KnownNat n) => Integer -> Index n
 fromInteger_INLINE i = bound `seq` if i > (-1) && i < bound then I i else err
   where
     bound = natVal (Proxy @n)
