@@ -24,6 +24,7 @@ where
 
 import Clash.Explicit.Signal (Bundle (..), Clock, Reset, Signal, register)
 import Clash.XException      (Undefined)
+import GHC.Stack             (HasCallStack)
 
 {- $setup
 >>> :set -XDataKinds -XTypeApplications
@@ -70,7 +71,7 @@ import Clash.XException      (Undefined)
 --     s2 = 'moore' clk rst mac id 0 ('bundle' (b,y))
 -- @
 moore
-  :: Undefined s
+  :: (HasCallStack, Undefined s)
   => Clock domain gated       -- ^ 'Clock' to synchronize to
   -> Reset domain synchronous
   -> (s -> i -> s)         -- ^ Transfer function in moore machine form:
@@ -90,7 +91,7 @@ moore clk rst ft fo iS =
 -- | Create a synchronous function from a combinational function describing
 -- a moore machine without any output logic
 medvedev
-  :: Undefined s
+  :: (HasCallStack, Undefined s)
   => Clock domain gated
   -> Reset domain synchronous
   -> (s -> i -> s)
@@ -127,7 +128,7 @@ medvedev clk rst tr st = moore clk rst tr id st
 --     (i2,b2) = 'mooreB' clk rst t o 3 (i1,c)
 -- @
 mooreB
-  :: (Bundle i, Bundle o, Undefined s)
+  :: (HasCallStack, Bundle i, Bundle o, Undefined s)
   => Clock domain gated
   -> Reset domain synchronous
   -> (s -> i -> s) -- ^ Transfer function in moore machine form:
