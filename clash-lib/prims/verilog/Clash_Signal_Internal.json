@@ -29,26 +29,28 @@ end~FI
   :: (HasCallStack, Undefined a) -- (ARG[0], ARG[1])
   => Clock domain gated       -- ARG[2]
   -> Reset domain synchronous -- ARG[3]
-  -> a                        -- ARG[4]
-  -> Signal clk a             -- ARG[5]
+  -> a                        -- ARG[4] (powerup value)
+  -> a                        -- ARG[5] (reset value)
+  -> Signal clk a             -- ARG[6]
   -> Signal clk a"
-    , "outputReg" : true
     , "template" :
-"// register begin~IF ~ISGATED[2] ~THEN
+"// register begin
+reg ~TYPO ~GENSYM[reg][0] = ~CONST[4]; ~IF ~ISGATED[2] ~THEN
 always @(posedge ~ARG[2][1]~IF ~ISSYNC[3] ~THEN ~ELSE or posedge ~ARG[3]~FI) begin : ~GENSYM[~COMPNAME_register][1]
   if (~ARG[3]) begin
-    ~RESULT <= ~CONST[4];
+    ~SYM[0] <= ~CONST[5];
   end else if (~ARG[2][0]) begin
-    ~RESULT <= ~ARG[5];
+    ~SYM[0] <= ~ARG[6];
   end
 end~ELSE
 always @(posedge ~ARG[2]~IF ~ISSYNC[3] ~THEN ~ELSE or posedge ~ARG[3]~FI) begin : ~SYM[1]
   if (~ARG[3]) begin
-    ~RESULT <= ~CONST[4];
+    ~SYM[0] <= ~CONST[5];
   end else begin
-    ~RESULT <= ~ARG[5];
+    ~SYM[0] <= ~ARG[6];
   end
 end~FI
+assign ~RESULT = ~SYM[0];
 // register end"
     }
   }

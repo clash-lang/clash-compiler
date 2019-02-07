@@ -208,6 +208,8 @@ runClashTest =
         , runTest ("tests" </> "shouldwork" </> "Signal") defBuild [] "MAC"             ([""],"MAC_topEntity",False)
         , runTest ("tests" </> "shouldwork" </> "Signal") defBuild [] "NoCPR"           (["example"],"example",False)
         , runTest ("tests" </> "shouldwork" </> "Signal") defBuild [] "Ram"             (["","Ram_testBench"],"Ram_testBench",True)
+        , runTest ("tests" </> "shouldwork" </> "Signal") defBuild [] "RegisterAS"      (["","RegisterAS_testBench"],"RegisterAS_testBench",True)
+        , runTest ("tests" </> "shouldwork" </> "Signal") defBuild [] "RegisterSS"      (["","RegisterSS_testBench"],"RegisterSS_testBench",True)
         , runTest ("tests" </> "shouldwork" </> "Signal") defBuild [] "Rom"             (["","Rom_testBench"],"Rom_testBench",True)
         , runTest ("tests" </> "shouldwork" </> "Signal") defBuild [] "RomFile"         (["","RomFile_testBench"],"RomFile_testBench",True)
         , runTest ("tests" </> "shouldwork" </> "Signal") defBuild [] "SigP"            ([""],"SigP_topEntity",False)
