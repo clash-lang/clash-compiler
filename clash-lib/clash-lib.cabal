@@ -186,6 +186,7 @@ Library
                       Clash.Primitives.Types
                       Clash.Primitives.Util
 
+                      Clash.Primitives.GHC.Word
                       Clash.Primitives.Intel.ClockGen
 
                       Clash.Rewrite.Combinators
