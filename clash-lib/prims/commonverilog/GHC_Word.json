@@ -1,29 +1,26 @@
-[ { "BlackBox" :
-    { "name"      : "GHC.Word.W8#"
-    , "kind"      : "Declaration"
-    , "type"      : "W8# :: Word# -> Word8"
-    , "template"  : "assign ~RESULT = $unsigned(~ARG[0]);"
+[
+  {
+    "BlackBoxHaskell": {
+      "name": "GHC.Word.W8#",
+      "templateFunction": "Clash.Primitives.GHC.Word.wordTF"
     }
-  }
-, { "BlackBox" :
-    { "name"      : "GHC.Word.W16#"
-    , "kind"      : "Declaration"
-    , "type"      : "W16# :: Word# -> Word16"
-    , "template"  : "assign ~RESULT = $unsigned(~ARG[0]);"
+  },
+  {
+    "BlackBoxHaskell": {
+      "name": "GHC.Word.W16#",
+      "templateFunction": "Clash.Primitives.GHC.Word.wordTF"
     }
-  }
-, { "BlackBox" :
-    { "name"      : "GHC.Word.W32#"
-    , "kind"      : "Declaration"
-    , "type"      : "W32# :: Word# -> Word32"
-    , "template"  : "assign ~RESULT = $unsigned(~ARG[0]);"
+  },
+  {
+    "BlackBoxHaskell": {
+      "name": "GHC.Word.W32#",
+      "templateFunction": "Clash.Primitives.GHC.Word.wordTF"
     }
-  }
-, { "BlackBox" :
-    { "name"      : "GHC.Word.W64#"
-    , "kind"      : "Declaration"
-    , "type"      : "W64# :: Word# -> Word64"
-    , "template"  : "assign ~RESULT = $unsigned(~ARG[0]);"
+  },
+  {
+    "BlackBoxHaskell": {
+      "name": "GHC.Word.W64#",
+      "templateFunction": "Clash.Primitives.GHC.Word.wordTF"
     }
   }
 ]
