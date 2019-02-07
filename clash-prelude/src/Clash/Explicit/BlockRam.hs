@@ -398,8 +398,9 @@ import GHC.Stack              (HasCallStack, withFrozenCallStack)
 import GHC.TypeLits           (KnownNat, type (^))
 import Prelude                hiding (length)
 
+import Clash.Explicit.Signal  (register)
 import Clash.Signal.Internal
-  (Clock, Reset, Signal (..), (.&&.), clockEnable, mux, register#)
+  (Clock, Reset, Signal (..), (.&&.), clockEnable, mux)
 import Clash.Signal.Bundle    (unbundle)
 import Clash.Sized.Unsigned   (Unsigned)
 import Clash.Sized.Vector     (Vec, toList)
@@ -802,5 +803,5 @@ readNew rst clk ram rdAddr wrM = mux wasSame wasWritten $ ram rdAddr wrM
         readNewT _  Nothing             = (False   , undefined)
 
         (wasSame,wasWritten) =
-          unbundle (register# clk rst (False,undefined)
-                              (readNewT <$> rdAddr <*> wrM))
+          unbundle (register clk rst (False, undefined)
+                             (readNewT <$> rdAddr <*> wrM))

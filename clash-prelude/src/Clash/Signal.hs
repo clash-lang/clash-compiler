@@ -145,6 +145,7 @@ import           Prelude
 import           Test.QuickCheck       (Property, property)
 import           Unsafe.Coerce         (unsafeCoerce)
 
+import qualified Clash.Explicit.Signal as E
 import           Clash.Explicit.Signal
   (System, resetSynchronizer, systemClockGen, systemResetGen, tbSystemClockGen)
 import qualified Clash.Explicit.Signal as S
@@ -493,7 +494,7 @@ register
   -- reset value when the reset value becomes 'True'
   -> Signal domain a
   -> Signal domain a
-register = \i s -> withFrozenCallStack (register# #clk #rst i s)
+register = \i s -> withFrozenCallStack (E.register #clk #rst i s)
 {-# INLINE register #-}
 infixr 3 `register`
 
@@ -528,7 +529,7 @@ regMaybe
   -> Signal domain (Maybe a)
   -> Signal domain a
 regMaybe = \initial iM -> withFrozenCallStack
-  (register# (clockGate #clk (fmap isJust iM)) #rst initial (fmap fromJust iM))
+  (E.register (clockGate #clk (fmap isJust iM)) #rst initial (fmap fromJust iM))
 {-# INLINE regMaybe #-}
 infixr 3 `regMaybe`
 
@@ -557,7 +558,7 @@ regEn
   -> Signal domain a
   -> Signal domain a
 regEn = \initial en i -> withFrozenCallStack
-  (register# (clockGate #clk en) #rst initial i)
+  (E.register (clockGate #clk en) #rst initial i)
 {-# INLINE regEn #-}
 
 -- * Signal -> List conversion

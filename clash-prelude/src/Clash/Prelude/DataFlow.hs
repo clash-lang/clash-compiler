@@ -56,8 +56,8 @@ import Clash.Explicit.Mealy   (mealyB)
 import Clash.Promoted.Nat     (SNat)
 import Clash.Signal           ((.&&.), unbundle)
 import Clash.Signal.Bundle    (Bundle (..))
-import Clash.Signal.Internal  (clockGate, register#)
-import Clash.Explicit.Signal  (Clock, Reset, Signal)
+import Clash.Signal.Internal  (clockGate)
+import Clash.Explicit.Signal  (Clock, Reset, Signal, register)
 import Clash.Sized.BitVector  (BitVector)
 import Clash.Sized.Vector
 import Clash.XException       (Undefined, errorX)
@@ -158,7 +158,7 @@ mealyDF :: Undefined s
 mealyDF clk rst f iS =
   DF (\i iV oR -> let en     = iV .&&. oR
                       (s',o) = unbundle (f <$> s <*> i)
-                      s      = register# (clockGate clk en) rst iS s'
+                      s      = register (clockGate clk en) rst iS s'
                   in  (o,iV,oR))
 
 -- | Create a 'DataFlow' circuit from a Moore machine description as those of
@@ -173,7 +173,7 @@ mooreDF :: Undefined s
 mooreDF clk rst ft fo iS =
   DF (\i iV oR -> let en  = iV .&&. oR
                       s'  = ft <$> s <*> i
-                      s   = register# (clockGate clk en) rst iS s'
+                      s   = register (clockGate clk en) rst iS s'
                       o   = fo <$> s
                   in  (o,iV,oR))
 

@@ -484,7 +484,7 @@ register
   -> Signal domain a
   -> Signal domain a
 register = \clk rst initial i -> withFrozenCallStack
-  (register# clk rst initial i)
+  (register# clk rst initial initial i)
 {-# INLINE register #-}
 
 -- | Version of 'register' that only updates its content when its fourth
@@ -520,7 +520,7 @@ regMaybe
   -> Signal domain (Maybe a)
   -> Signal domain a
 regMaybe = \clk rst initial iM -> withFrozenCallStack
-  (register# (clockGate clk (fmap isJust iM)) rst initial (fmap fromJust iM))
+  (register (clockGate clk (fmap isJust iM)) rst initial (fmap fromJust iM))
 {-# INLINE regMaybe #-}
 
 -- | Version of 'register' that only updates its content when its fourth
@@ -551,7 +551,7 @@ regEn
   -> Signal domain a
   -> Signal domain a
 regEn = \clk rst initial en i -> withFrozenCallStack
-  (register# (clockGate clk en) rst initial i)
+  (register (clockGate clk en) rst initial i)
 {-# INLINE regEn #-}
 
 -- * Product/Signal isomorphism

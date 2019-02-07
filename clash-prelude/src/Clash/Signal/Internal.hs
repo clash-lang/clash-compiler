@@ -114,9 +114,9 @@ import Clash.XException           (Undefined (..), errorX, maybeX, seqX)
 >>> type System = Dom "System" 10000
 >>> let systemClockGen = clockGen @System
 >>> let systemResetGen = asyncResetGen @System
->>> let register = register#
->>> let registerS = register#
->>> let registerA = register#
+>>> import Clash.Explicit.Signal (register)
+>>> let registerS = register
+>>> let registerA = register
 -}
 
 -- * Signal
@@ -438,24 +438,35 @@ syncResetGen = Sync (True :- pure False)
 -- synchronous reset and an asynchronous reset:
 --
 -- === Synchronous reset
+-- >>> let inputList = [1,2,3,4,5,6,7]
+-- >>> let resetList = [False, False, True, True, False, False, False]
 --
 -- > registerS
--- >   :: Clock domain gated -> Reset domain Synchronous
--- >   -> Signal domain Int -> Signal domain Int
+-- >   :: Clock domain gated
+-- >   -> Reset domain Synchronous
+-- >   -> Signal domain Int
+-- >   -> Signal domain Int
 -- > registerS = register
 --
--- >>> printX (sampleN 5 (registerS (clockGen @System) syncResetGen 0 (fromList [1,1,2,3])))
--- [X,0,1,2,3]
+-- >>> let syncReset = unsafeToSyncReset (fromList resetList)
+-- >>> sampleN 7 (registerS (clockGen @System) syncReset 0 (fromList inputList))
+-- [0,1,2,0,0,5,6]
 --
 -- === Asynchronous reset
 --
 -- > registerA
--- >   :: Clock domain gated -> Reset domain Asynchronous
--- >   -> Signal domain Int -> Signal domain Int
+-- >   :: Clock domain gated
+-- >   -> Reset domain Asynchronous
+-- >   -> Signal domain Int
+-- >   -> Signal domain Int
 -- > registerA = register
 --
--- >>> sampleN 5 (registerA (clockGen @System) asyncResetGen 0 (fromList [1,1,2,3]))
--- [0,0,1,2,3]
+-- >>> let asyncReset = unsafeToAsyncReset (fromList resetList)
+-- >>> sampleN 7 (registerA (clockGen @System) asyncReset 0 (fromList inputList))
+-- [0,1,0,0,0,5,6]
+--
+-- Notice that the very first value we sample is the power-up value of the
+-- register.
 data ResetKind
   = Synchronous
   -- ^ Components with a synchronous reset port produce the reset value when:
@@ -577,48 +588,62 @@ delay# (GatedClock _ _ en) =
       in  o `seqX` o :- (as `seq` go o' es xs)
 {-# NOINLINE delay# #-}
 
+-- | A register with a power up and reset value. Power up values are not
+-- supported on all platforms, please consult the manual of your target platform
+-- and check the notes below.
+--
+-- Xilinx: power up values and reset values MUST be the same. If they are not,
+-- the Xilinx tooling __will ignore the reset value__ and use the power up value
+-- instead.
+--
+-- Intel: power up values and reset values MUST be the same. If they are not,
+-- the Intel tooling __will ignore the power up value__ and use the reset value
+-- instead.
 register#
   :: (HasCallStack, Undefined a)
   => Clock domain gated
   -> Reset domain synchronous
   -> a
+  -- ^ Power up value
+  -> a
+  -- ^ Reset value
   -> Signal domain a
   -> Signal domain a
-register# Clock {} (Sync rst) i =
-    go (withFrozenCallStack (deepErrorX "register: initial value undefined")) rst
+register# Clock {} (Sync rst) powerUpVal resetVal =
+    go powerUpVal rst
   where
     go o rt@(~(r :- rs)) as@(~(x :- xs)) =
-      let o' = if r then i else x
+      let o' = if r then resetVal else x
           -- [Note: register strictness annotations]
       in  o `seqX` o :- (rt `seq` as `seq` go o' rs xs)
 
-register# Clock {} (Async rst) i =
-    go (withFrozenCallStack (deepErrorX "register: initial value undefined")) rst
+register# Clock {} (Async rst) powerUpVal resetVal =
+    go powerUpVal rst
   where
     go o0 (r :- rs) as@(~(x :- xs)) =
-      let o1 = if r then i else o0
-          oN = if r then i else x
+      let o1 = if r then resetVal else o0
+          oN = if r then resetVal else x
           -- [Note: register strictness annotations]
       in  o1 `seqX` o1 :- (as `seq` go oN rs xs)
 
-register# (GatedClock _ _ ena) (Sync rst)  i =
-    go (withFrozenCallStack (deepErrorX "register: initial value undefined")) rst ena
+register# (GatedClock _ _ ena) (Sync rst) powerUpVal resetVal =
+    go powerUpVal rst ena
   where
     go o rt@(~(r :- rs)) enas@(~(e :- es)) as@(~(x :- xs)) =
       let oE = case maybeX e of
                  Just True  -> x
                  Just False -> o
                  Nothing    -> deepErrorX "register: undefined clock enable"
-          oR = if r then i else oE
+          oR = if r then resetVal else oE
           -- [Note: register strictness annotations]
       in  o `seqX` o :- (rt `seq` enas `seq` as `seq` go oR rs es xs)
 
-register# (GatedClock _ _ ena) (Async rst) i =
-    go (withFrozenCallStack (deepErrorX "register: initial value undefined")) rst ena
+register# (GatedClock _ _ ena) (Async rst) powerUpVal resetVal =
+    go powerUpVal rst ena
   where
     go o (r :- rs) enas@(~(e :- es)) as@(~(x :- xs)) =
-      let oR = if r then i else o
-          oE = if r then i else case maybeX e of
+      let oR = if r then resetVal else o
+          oE = if r then resetVal else case maybeX e of
                  Just True  -> x
                  Just False -> o
                  Nothing    -> deepErrorX "register: undefined clock enable"
@@ -626,7 +651,6 @@ register# (GatedClock _ _ ena) (Async rst) i =
       in  oR `seqX` oR :- (as `seq` enas `seq` go oE rs es xs)
 {-# NOINLINE register# #-}
 
-{-# INLINE mux #-}
 -- | The above type is a generalisation for:
 --
 -- @
@@ -637,6 +661,7 @@ register# (GatedClock _ _ ena) (Async rst) i =
 -- when @b@ is 'False'.
 mux :: Applicative f => f Bool -> f a -> f a -> f a
 mux = liftA3 (\b t f -> if b then t else f)
+{-# INLINE mux #-}
 
 infix 4 .==.
 -- | The above type is a generalisation for:
