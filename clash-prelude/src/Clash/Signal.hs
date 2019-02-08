@@ -470,14 +470,16 @@ withClockReset = \clk rst f -> expose @"rst" (expose @"clk" f clk) rst
 -- | 'delay' @s@ delays the values in 'Signal' @s@ for once cycle, the value
 -- at time 0 is undefined.
 --
--- >>> printX (sampleN 3 (delay (fromList [1,2,3,4])))
--- [X,1,2]
+-- >>> printX (sampleN 3 (delay 0 (fromList [1,2,3,4])))
+-- [0,1,2]
 delay
-  :: (HasCallStack, Undefined a, HiddenClock domain gated)
-  => Signal domain a
+  :: (HasCallStack, HiddenClock domain gated)
+  => a
+  -- ^ Default value
+  -> Signal domain a
   -- ^ Signal to delay
   -> Signal domain a
-delay = \i -> withFrozenCallStack (delay# #clk i)
+delay = \dflt i -> withFrozenCallStack (delay# #clk dflt i)
 {-# INLINE delay #-}
 
 -- | 'register' @i s@ delays the values in 'Signal' @s@ for one cycle, and sets

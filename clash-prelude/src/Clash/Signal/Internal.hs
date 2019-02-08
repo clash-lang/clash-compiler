@@ -95,7 +95,7 @@ import Control.Applicative        (liftA2, liftA3)
 import Control.DeepSeq            (NFData, rnf)
 import Data.Default.Class         (Default (..))
 import GHC.Generics               (Generic)
-import GHC.Stack                  (HasCallStack, withFrozenCallStack)
+import GHC.Stack                  (HasCallStack)
 import GHC.TypeLits               (KnownNat, KnownSymbol, Nat, Symbol)
 import Language.Haskell.TH.Syntax (Lift (..))
 import Test.QuickCheck            (Arbitrary (..), CoArbitrary(..), Property,
@@ -103,7 +103,7 @@ import Test.QuickCheck            (Arbitrary (..), CoArbitrary(..), Property,
 
 import Clash.Promoted.Nat         (SNat (..), snatToInteger, snatToNum)
 import Clash.Promoted.Symbol      (SSymbol (..))
-import Clash.XException           (Undefined (..), errorX, maybeX, seqX)
+import Clash.XException           (errorX, seqX)
 
 {- $setup
 >>> :set -XDataKinds
@@ -569,21 +569,19 @@ infixr 3 .&&.
 -- need to 'seq' it explicitly.
 
 delay#
-  :: (HasCallStack, Undefined a)
+  :: HasCallStack
   => Clock  domain gated
+  -> a
   -> Signal domain a
   -> Signal domain a
-delay# Clock {} =
-  \s -> withFrozenCallStack (deepErrorX "delay: initial value undefined") :- s
+delay# Clock {} dflt =
+  \s -> dflt :- s
 
-delay# (GatedClock _ _ en) =
-    go (withFrozenCallStack (deepErrorX "delay: initial value undefined")) en
+delay# (GatedClock _ _ en) dflt =
+    go dflt en
   where
     go o (e :- es) as@(~(x :- xs)) =
-      let o' = case maybeX e of
-                 Just True  -> x
-                 Just False -> o
-                 Nothing    -> deepErrorX "delay: undefined clock enable"
+      let o' = if e then x else o
       -- See [Note: register strictness annotations]
       in  o `seqX` o :- (as `seq` go o' es xs)
 {-# NOINLINE delay# #-}

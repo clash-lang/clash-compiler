@@ -6,7 +6,6 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE MultiParamTypeClasses      #-}
 {-# LANGUAGE KindSignatures             #-}
-{-# LANGUAGE MagicHash                  #-}
 {-# LANGUAGE ScopedTypeVariables        #-}
 {-# LANGUAGE TypeFamilies               #-}
 {-# LANGUAGE TypeOperators              #-}
@@ -46,8 +45,6 @@ import Clash.Explicit.Signal
 >>> :set -XDataKinds
 >>> :set -XTypeOperators
 >>> import Clash.Explicit.Prelude
->>> let delay3 clk rst = delayed clk rst (0 :> 0 :> 0 :> Nil)
->>> let delay2 clk rst = (delayedI clk rst :: DSignal System n Int -> DSignal System (n + 2) Int)
 >>> :{
 let mac :: Clock System gated
         -> Reset System synchronous

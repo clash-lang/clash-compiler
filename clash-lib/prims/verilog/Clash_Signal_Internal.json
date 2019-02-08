@@ -3,21 +3,23 @@
     , "kind" : "Declaration"
     , "type" :
 "delay#
-  :: (HasCallStack,Undefined a) -- (ARG[0],ARG[1])
-  => Clock domain gated       -- ARG[2]
+  :: HasCallStack             -- ARG[0]
+  => Clock domain gated       -- ARG[1]
+  -> a                        -- ARG[2]
   -> Signal clk a             -- ARG[3]
   -> Signal clk a"
-    , "outputReg" : true
     , "template" :
-"// delay begin~IF ~ISGATED[2] ~THEN
-always @(posedge ~ARG[2][1]) begin : ~GENSYM[~COMPNAME_delay][1]
-  if (~ARG[2][0]) begin
-    ~RESULT <= ~ARG[3];
+"// delay begin,
+reg ~TYPO ~GENSYM[reg][0] = ~CONST[2];~IF ~ISGATED[1] ~THEN
+always @(posedge ~ARG[1][1]) begin : ~GENSYM[~COMPNAME_delay][1]
+  if (~ARG[1][0]) begin
+    ~SYM[0] <= ~ARG[3];
   end
 end~ELSE
-always @(posedge ~ARG[2]) begin : ~SYM[1]
-  ~RESULT <= ~ARG[3];
+always @(posedge ~ARG[1]) begin : ~SYM[1]
+  ~SYM[0] <= ~ARG[3];
 end~FI
+assign ~RESULT = ~SYM[0];
 // delay end"
     }
   }
