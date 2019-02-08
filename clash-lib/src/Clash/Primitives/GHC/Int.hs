@@ -16,7 +16,7 @@ import           Clash.Core.Literal
 import           Clash.Core.Term              (Term(Literal))
 import           Clash.Core.Type              (Type)
 import           Clash.Primitives.GHC.Literal
-  (literalTF, signed, literal, assign)
+  (literalTF, signed, signedLiteral, assign)
 import           Clash.Netlist.Types          (BlackBox(BBTemplate))
 import           Clash.Netlist.BlackBox.Types
   (BlackBoxFunction, Element(Arg, Result), emptyBlackBoxMeta
@@ -47,12 +47,12 @@ intTF'
 intTF' False [Left (Literal (getIntLit -> Just n))] intSize =
   -- Literal as expression:
   ( emptyBlackBoxMeta
-  , BBTemplate (signed (literal intSize n)))
+  , BBTemplate [signedLiteral intSize n])
 
 intTF' True [Left (Literal (getIntLit -> Just n))] intSize =
   -- Literal as declaration:
   ( emptyBlackBoxMeta
-  , BBTemplate (assign (Result False) (signed (literal intSize n))))
+  , BBTemplate (assign (Result False) [signedLiteral intSize n]))
 
 intTF' _isDecl _args _intSize =
   -- Not a literal. We need an assignment as Verilog does not support truncating
