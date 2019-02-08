@@ -9,9 +9,10 @@
 
 module Clash.Primitives.GHC.Literal
  ( assign
- , literal
  , signed
+ , signedLiteral
  , unsigned
+ , unsignedLiteral
  , literalTF
  )
  where
@@ -37,9 +38,21 @@ signed el = [Text "$signed(", el, Text ")"]
 assign :: Element -> [Element] -> [Element]
 assign lhs rhs = Text "assign " : lhs : Text " = " : rhs ++ [Text ";"]
 
-literal :: Int -> Integer -> Element
-literal wordSize wordVal =
-  Text (LT.concat [showtl wordSize, "'d", showtl wordVal])
+signedLiteral :: Int -> Integer -> Element
+signedLiteral wordSize wordVal =
+  Text (LT.concat [ if wordVal < 0 then "-" else ""
+                  , showtl wordSize
+                  , "'sd"
+                  , showtl (abs wordVal)
+                  ])
+
+unsignedLiteral :: Int -> Integer -> Element
+unsignedLiteral wordSize wordVal =
+  Text (LT.concat [ if wordVal < 0 then "-" else ""
+                  , showtl wordSize
+                  , "'d"
+                  , showtl (abs wordVal)
+                  ])
 
 -- | Parse integer in strings of the form "GHC.Word.WordX#" where
 -- "GHC.Word.Word" is the prefix given.
