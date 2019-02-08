@@ -404,7 +404,7 @@ import Clash.Signal.Internal
 import Clash.Signal.Bundle    (unbundle)
 import Clash.Sized.Unsigned   (Unsigned)
 import Clash.Sized.Vector     (Vec, toList)
-import Clash.XException       (Undefined, errorX, maybeX, seqX)
+import Clash.XException       (errorX, maybeX, seqX)
 
 {- $setup
 >>> import Clash.Explicit.Prelude as C
@@ -787,7 +787,7 @@ blockRam# clk content rd wen = case clockEnable clk of
 
 -- | Create read-after-write blockRAM from a read-before-write one
 readNew
-  :: (Eq addr, Undefined a)
+  :: Eq addr
   => Reset domain synchronous
   -> Clock domain gated
   -> (Signal domain addr -> Signal domain (Maybe (addr, a)) -> Signal domain a)

@@ -25,7 +25,6 @@ where
 
 import qualified Clash.Explicit.Mealy as E
 import           Clash.Signal
-import           Clash.XException
 import           GHC.Stack            (HasCallStack)
 
 {- $setup
@@ -74,13 +73,16 @@ let macT s (x,y) = (s',s)
 --     s1 = 'mealy' mac 0 ('Clash.Signal.bundle' (a,x))
 --     s2 = 'mealy' mac 0 ('Clash.Signal.bundle' (b,y))
 -- @
-mealy :: (HasCallStack, Undefined s, HiddenClockReset domain gated synchronous)
-      => (s -> i -> (s,o)) -- ^ Transfer function in mealy machine form:
-                           -- @state -> input -> (newstate,output)@
-      -> s                 -- ^ Initial state
-      -> (Signal domain i -> Signal domain o)
-      -- ^ Synchronous sequential function with input and output matching that
-      -- of the mealy machine
+mealy
+  :: HasCallStack
+  => HiddenClockReset domain gated synchronous
+  => (s -> i -> (s,o))
+  -- ^ Transfer function in mealy machine form: @state -> input -> (newstate,output)@
+  -> s
+  -- ^ Initial state
+  -> (Signal domain i -> Signal domain o)
+  -- ^ Synchronous sequential function with input and output matching that
+  -- of the mealy machine
 mealy = hideClockReset E.mealy
 {-# INLINE mealy #-}
 
@@ -110,23 +112,33 @@ mealy = hideClockReset E.mealy
 --     (i1,b1) = 'mealyB' f 0 (a,b)
 --     (i2,b2) = 'mealyB' f 3 (i1,c)
 -- @
-mealyB :: (HasCallStack, Bundle i, Bundle o, Undefined s, HiddenClockReset domain gated synchronous)
-       => (s -> i -> (s,o)) -- ^ Transfer function in mealy machine form:
-                            -- @state -> input -> (newstate,output)@
-       -> s                 -- ^ Initial state
-       -> (Unbundled domain i -> Unbundled domain o)
-       -- ^ Synchronous sequential function with input and output matching that
-       -- of the mealy machine
+mealyB
+  :: HasCallStack
+  => HiddenClockReset domain gated synchronous
+  => Bundle i
+  => Bundle o
+  => (s -> i -> (s,o))
+  -- ^ Transfer function in mealy machine form: @state -> input -> (newstate,output)@
+  -> s
+  -- ^ Initial state
+  -> (Unbundled domain i -> Unbundled domain o)
+  -- ^ Synchronous sequential function with input and output matching that
+  -- of the mealy machine
 mealyB = hideClockReset E.mealyB
 {-# INLINE mealyB #-}
 
 -- | Infix version of 'mealyB'
-(<^>) :: (HasCallStack, Bundle i, Bundle o, Undefined s, HiddenClockReset domain gated synchronous)
-      => (s -> i -> (s,o)) -- ^ Transfer function in mealy machine form:
-                           -- @state -> input -> (newstate,output)@
-      -> s                 -- ^ Initial state
-      -> (Unbundled domain i -> Unbundled domain o)
-      -- ^ Synchronous sequential function with input and output matching that
-      -- of the mealy machine
+(<^>)
+  :: HasCallStack
+  => HiddenClockReset domain gated synchronous
+  => Bundle i
+  => Bundle o
+  => (s -> i -> (s,o))
+  -- ^ Transfer function in mealy machine form: @state -> input -> (newstate,output)@
+  -> s
+  -- ^ Initial state
+ -> (Unbundled domain i -> Unbundled domain o)
+ -- ^ Synchronous sequential function with input and output matching that
+ -- of the mealy machine
 (<^>) = mealyB
 {-# INLINE (<^>) #-}

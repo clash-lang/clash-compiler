@@ -339,11 +339,9 @@ This concludes the short introduction to using 'blockRam'.
 
 -}
 
-{-# LANGUAGE BangPatterns        #-}
 {-# LANGUAGE DataKinds           #-}
 {-# LANGUAGE FlexibleContexts    #-}
 {-# LANGUAGE GADTs               #-}
-{-# LANGUAGE MagicHash           #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeOperators       #-}
 
@@ -367,7 +365,6 @@ import qualified Clash.Explicit.BlockRam as E
 import           Clash.Signal
 import           Clash.Sized.Unsigned    (Unsigned)
 import           Clash.Sized.Vector      (Vec)
-import           Clash.XException        (Undefined)
 
 {- $setup
 >>> import Clash.Prelude as C
@@ -700,7 +697,7 @@ blockRamPow2 = \cnt rd wrM -> withFrozenCallStack
 --      ... =>
 --      Signal domain addr
 --      -> Signal domain (Maybe (addr, a)) -> Signal domain a
-readNew :: (Eq addr, Undefined a, HiddenClockReset domain gated synchronous)
+readNew :: (Eq addr, HiddenClockReset domain gated synchronous)
         => (Signal domain addr -> Signal domain (Maybe (addr, a)) -> Signal domain a)
         -- ^ The @ram@ component
         -> Signal domain addr              -- ^ Read address @r@

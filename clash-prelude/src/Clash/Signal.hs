@@ -486,7 +486,7 @@ delay = \i -> withFrozenCallStack (delay# #clk i)
 -- >>> sampleN 5 (register 8 (fromList [1,1,2,3,4]))
 -- [8,8,1,2,3]
 register
-  :: (HasCallStack, Undefined a, HiddenClockReset domain gated synchronous)
+  :: (HasCallStack, HiddenClockReset domain gated synchronous)
   => a
   -- ^ Reset value
   --
@@ -520,7 +520,7 @@ infixr 3 `register`
 -- >>> sampleN 9 countSometimes
 -- [0,0,0,1,1,2,2,3,3]
 regMaybe
-  :: (HasCallStack, Undefined a, HiddenClockReset domain gated synchronous)
+  :: (HasCallStack, HiddenClockReset domain gated synchronous)
   => a
   -- ^ Reset value
   --
@@ -548,7 +548,7 @@ infixr 3 `regMaybe`
 -- >>> sampleN 9 count
 -- [0,0,0,1,1,2,2,3,3]
 regEn
-  :: (HasCallStack, Undefined a, HiddenClockReset domain gated synchronous)
+  :: (HasCallStack, HiddenClockReset domain gated synchronous)
   => a
   -- ^ Reset value
   --
