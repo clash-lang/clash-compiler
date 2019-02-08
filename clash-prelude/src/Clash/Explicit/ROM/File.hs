@@ -97,6 +97,7 @@ import Clash.Promoted.Nat           (SNat (..), pow2SNat, snatToNum)
 import Clash.Sized.BitVector        (BitVector)
 import Clash.Explicit.Signal        (Clock, Signal, delay)
 import Clash.Sized.Unsigned         (Unsigned)
+import Clash.XException             (Undefined(deepErrorX))
 
 
 -- | A ROM with a synchronous read port, with space for 2^@n@ elements
@@ -185,9 +186,10 @@ romFile#
   -- ^ Read address @rd@
   -> Signal domain (BitVector m)
   -- ^ The value of the ROM at address @rd@ from the previous clock cycle
-romFile# clk sz file rd = delay clk ((content !) <$> rd)
-  where
-    mem     = unsafePerformIO (initMem file)
-    content = listArray (0,szI-1) mem
-    szI     = snatToNum sz
+romFile# clk sz file rd =
+  delay clk (deepErrorX "First value of romFile is undefined") ((content !) <$> rd)
+ where
+  mem     = unsafePerformIO (initMem file)
+  content = listArray (0,szI-1) mem
+  szI     = snatToNum sz
 {-# NOINLINE romFile# #-}
