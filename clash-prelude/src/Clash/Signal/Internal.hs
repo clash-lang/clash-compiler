@@ -600,7 +600,7 @@ delay# (GatedClock _ _ en) =
 -- the Intel tooling __will ignore the power up value__ and use the reset value
 -- instead.
 register#
-  :: (HasCallStack, Undefined a)
+  :: HasCallStack
   => Clock domain gated
   -> Reset domain synchronous
   -> a
@@ -630,10 +630,7 @@ register# (GatedClock _ _ ena) (Sync rst) powerUpVal resetVal =
     go powerUpVal rst ena
   where
     go o rt@(~(r :- rs)) enas@(~(e :- es)) as@(~(x :- xs)) =
-      let oE = case maybeX e of
-                 Just True  -> x
-                 Just False -> o
-                 Nothing    -> deepErrorX "register: undefined clock enable"
+      let oE = if e then x else o
           oR = if r then resetVal else oE
           -- [Note: register strictness annotations]
       in  o `seqX` o :- (rt `seq` enas `seq` as `seq` go oR rs es xs)
@@ -643,10 +640,7 @@ register# (GatedClock _ _ ena) (Async rst) powerUpVal resetVal =
   where
     go o (r :- rs) enas@(~(e :- es)) as@(~(x :- xs)) =
       let oR = if r then resetVal else o
-          oE = if r then resetVal else case maybeX e of
-                 Just True  -> x
-                 Just False -> o
-                 Nothing    -> deepErrorX "register: undefined clock enable"
+          oE = if r then resetVal else (if e then x else o)
           -- [Note: register strictness annotations]
       in  oR `seqX` oR :- (as `seq` enas `seq` go oE rs es xs)
 {-# NOINLINE register# #-}

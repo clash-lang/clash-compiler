@@ -23,7 +23,7 @@ topEntity = exposeClockReset output
     cpuOut = mealyState (runCPU defaultOut cpu) initState cpuIn
     output = boolToBit . (== 0x00) . cpuOutMemAddr <$> cpuOut
 
-mealyState :: (HiddenClockReset domain gated synchronous, Undefined s)
+mealyState :: (HiddenClockReset domain gated synchronous)
            => (i -> State s o) -> s -> (Signal domain i -> Signal domain o)
 mealyState f = mealy $ \s x -> let (y, s') = runState (f x) s in (s', y)
 

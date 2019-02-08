@@ -473,7 +473,7 @@ delay = \clk i -> withFrozenCallStack (delay# clk i)
 -- >>> sampleN 5 (register systemClockGen asyncResetGen 8 (fromList [1,1,2,3,4]))
 -- [8,8,1,2,3]
 register
-  :: (HasCallStack, Undefined a)
+  :: HasCallStack
   => Clock domain gated
   -- ^ clock
   -> Reset domain synchronous
@@ -509,7 +509,7 @@ register = \clk rst initial i -> withFrozenCallStack
 -- >>> sampleN 9 (count systemClockGen asyncResetGen)
 -- [0,0,0,1,1,2,2,3,3]
 regMaybe
-  :: (HasCallStack, Undefined a)
+  :: HasCallStack
   => Clock domain gated
   -- ^ Clock
   -> Reset domain synchronous
@@ -538,8 +538,7 @@ regMaybe = \clk rst initial iM -> withFrozenCallStack
 -- >>> sampleN 9 (count systemClockGen asyncResetGen)
 -- [0,0,0,1,1,2,2,3,3]
 regEn
-  :: Undefined a
-  => Clock domain clk
+  :: Clock domain clk
   -- ^ Clock
   -> Reset domain synchronous
   -- ^ Reset (active-high), 'regEn' outputs the reset value when the

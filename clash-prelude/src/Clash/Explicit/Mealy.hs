@@ -21,7 +21,6 @@ module Clash.Explicit.Mealy
 where
 
 import Clash.Explicit.Signal (Bundle (..), Clock, Reset, Signal, register)
-import Clash.XException      (Undefined)
 import GHC.Stack             (HasCallStack)
 
 {- $setup
@@ -77,15 +76,18 @@ let macT s (x,y) = (s',s)
 --     s1 = 'mealy' clk rst mac 0 ('bundle' (a,x))
 --     s2 = 'mealy' clk rst mac 0 ('bundle' (b,y))
 -- @
-mealy :: (HasCallStack, Undefined s)
-      => Clock dom gated   -- ^ 'Clock' to synchronize to
-      -> Reset dom synchronous
-      -> (s -> i -> (s,o)) -- ^ Transfer function in mealy machine form:
-                           -- @state -> input -> (newstate,output)@
-      -> s                 -- ^ Initial state
-      -> (Signal dom i -> Signal dom o)
-      -- ^ Synchronous sequential function with input and output matching that
-      -- of the mealy machine
+mealy
+  :: HasCallStack
+  => Clock dom gated
+  -- ^ 'Clock' to synchronize to
+  -> Reset dom synchronous
+  -> (s -> i -> (s,o))
+  -- ^ Transfer function in mealy machine form: @state -> input -> (newstate,output)@
+  -> s
+  -- ^ Initial state
+  -> (Signal dom i -> Signal dom o)
+  -- ^ Synchronous sequential function with input and output matching that
+  -- of the mealy machine
 mealy clk rst f iS =
   \i -> let (s',o) = unbundle $ f <$> s <*> i
             s      = register clk rst iS s'
@@ -118,14 +120,18 @@ mealy clk rst f iS =
 --     (i1,b1) = 'mealyB' clk rst f 0 (a,b)
 --     (i2,b2) = 'mealyB' clk rst f 3 (i1,c)
 -- @
-mealyB :: (HasCallStack, Bundle i, Bundle o, Undefined s)
-       => Clock dom gated
-       -> Reset dom synchronous
-       -> (s -> i -> (s,o)) -- ^ Transfer function in mealy machine form:
-                    -- @state -> input -> (newstate,output)@
-       -> s                 -- ^ Initial state
-       -> (Unbundled dom i -> Unbundled dom o)
-       -- ^ Synchronous sequential function with input and output matching that
-       -- of the mealy machine
+mealyB
+  :: HasCallStack
+  => Bundle i
+  => Bundle o
+  => Clock dom gated
+  -> Reset dom synchronous
+  -> (s -> i -> (s,o))
+  -- ^ Transfer function in mealy machine form: @state -> input -> (newstate,output)@
+  -> s
+  -- ^ Initial state
+  -> (Unbundled dom i -> Unbundled dom o)
+ -- ^ Synchronous sequential function with input and output matching that
+ -- of the mealy machine
 mealyB clk rst f iS i = unbundle (mealy clk rst f iS (bundle i))
 {-# INLINE mealyB #-}
