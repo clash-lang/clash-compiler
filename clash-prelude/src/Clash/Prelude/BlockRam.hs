@@ -365,6 +365,7 @@ import qualified Clash.Explicit.BlockRam as E
 import           Clash.Signal
 import           Clash.Sized.Unsigned    (Unsigned)
 import           Clash.Sized.Vector      (Vec)
+import           Clash.XException        (Undefined)
 
 {- $setup
 >>> import Clash.Prelude as C
@@ -638,7 +639,10 @@ prog2 = -- 0 := 4
 -- Block RAM.
 -- * Use the adapter 'readNew' for obtaining write-before-read semantics like this: @readNew (blockRam inits) rd wrM@.
 blockRam
-  :: (Enum addr, HiddenClock domain gated, HasCallStack)
+  :: HasCallStack
+  => HiddenClock domain gated
+  => Undefined a
+  => Enum addr
   => Vec n a     -- ^ Initial content of the BRAM, also
                  -- determines the size, @n@, of the BRAM.
                  --
@@ -673,7 +677,10 @@ blockRam = \cnt rd wrM -> withFrozenCallStack
 -- Block RAM.
 -- * Use the adapter 'readNew' for obtaining write-before-read semantics like this: @readNew (blockRamPow2 inits) rd wrM@.
 blockRamPow2
-  :: (KnownNat n, HiddenClock domain gated, HasCallStack)
+  :: HasCallStack
+  => HiddenClock domain gated
+  => Undefined a
+  => KnownNat n
   => Vec (2^n) a         -- ^ Initial content of the BRAM, also
                          -- determines the size, @2^n@, of the BRAM.
                          --
