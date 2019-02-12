@@ -60,7 +60,7 @@ logic [~SYM[2]:0] ~GENSYM[intermediate][3] [0:(2*~SYM[0])-2];
 genvar ~GENSYM[i][4];
 ~GENERATE
 for (~SYM[4] = 0; ~SYM[4] < ~SYM[0]; ~SYM[4]=~SYM[4]+1) begin : ~GENSYM[mk_array][11]
-  assign ~SYM[3][~SYM[4]] = $unsigned(~ARG[0][~SYM[4]]);
+  assign ~SYM[3][~SYM[4]] = $unsigned(~VAR[input][0][~SYM[4]]);
 end
 ~ENDGENERATE
 
@@ -116,7 +116,7 @@ logic [~SYM[2]:0] ~GENSYM[intermediate][3] [0:(2*~SYM[0])-2];
 genvar ~GENSYM[i][4];
 ~GENERATE
 for (~SYM[4] = 0; ~SYM[4] < ~SYM[0]; ~SYM[4]=~SYM[4]+1) begin : ~GENSYM[mk_array][11]
-  assign ~SYM[3][~SYM[4]] = $unsigned(~ARG[0][~SYM[4]]);
+  assign ~SYM[3][~SYM[4]] = $unsigned(~VAR[input][0][~SYM[4]]);
 end
 ~ENDGENERATE
 
@@ -172,7 +172,7 @@ logic [~SYM[2]:0] ~GENSYM[intermediate][3] [0:(2*~SYM[0])-2];
 genvar ~GENSYM[i][4];
 ~GENERATE
 for (~SYM[4] = 0; ~SYM[4] < ~SYM[0]; ~SYM[4]=~SYM[4]+1) begin : ~GENSYM[mk_array][11]
-  assign ~SYM[3][~SYM[4]] = $unsigned(~ARG[0][~SYM[4]]);
+  assign ~SYM[3][~SYM[4]] = $unsigned(~VAR[input][0][~SYM[4]]);
 end
 ~ENDGENERATE
 
@@ -228,7 +228,7 @@ logic [~SYM[2]:0] ~GENSYM[intermediate][3] [0:(2*~SYM[0])-2];
 genvar ~GENSYM[i][4];
 ~GENERATE
 for (~SYM[4] = 0; ~SYM[4] < ~SYM[0]; ~SYM[4]=~SYM[4]+1) begin : ~GENSYM[mk_array][11]
-  assign ~SYM[3][~SYM[4]] = $unsigned(~ARG[0][~SYM[4]]);
+  assign ~SYM[3][~SYM[4]] = $unsigned(~VAR[input][0][~SYM[4]]);
 end
 ~ENDGENERATE
 
@@ -255,7 +255,7 @@ assign ~RESULT = $unsigned(~SYM[3][(2*~SYM[0])-2]);
 , { "BlackBox" :
     { "name"      : "GHC.Prim.popCnt#"
     , "kind"      : "Declaration"
-    , "type"      : "popCnt8# :: Word# -> Word#"
+    , "type"      : "popCnt# :: Word# -> Word#"
     , "imports"   : ["~INCLUDENAME[0].inc"]
     , "includes" :
       [ { "name" : "depth2Index"
@@ -284,7 +284,7 @@ logic [~SYM[2]:0] ~GENSYM[intermediate][3] [0:(2*~SYM[0])-2];
 genvar ~GENSYM[i][4];
 ~GENERATE
 for (~SYM[4] = 0; ~SYM[4] < ~SYM[0]; ~SYM[4]=~SYM[4]+1) begin : ~GENSYM[mk_array][11]
-  assign ~SYM[3][~SYM[4]] = $unsigned(~ARG[0][~SYM[4]]);
+  assign ~SYM[3][~SYM[4]] = $unsigned(~VAR[input][0][~SYM[4]]);
 end
 ~ENDGENERATE
 

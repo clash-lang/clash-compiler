@@ -313,7 +313,7 @@
 begin
   -- put input into the first half of the intermediate array
   ~GENSYM[make_array][6]: for ~GENSYM[i][7] in 0 to (~SYM[2] - 1) generate
-    ~SYM[5](i) <= resize(~ARG[0](~SYM[7] downto ~SYM[7]),~SYM[3]+1);
+    ~SYM[5](~SYM[7]) <= resize(~VAR[input][0](~SYM[7] downto ~SYM[7]),~SYM[3]+1);
   end generate;
 
   -- Create the tree of adders
@@ -354,7 +354,7 @@ end block;
 begin
   -- put input into the first half of the intermediate array
   ~GENSYM[make_array][6]: for ~GENSYM[i][7] in 0 to (~SYM[2] - 1) generate
-    ~SYM[5](i) <= resize(~ARG[0](~SYM[7] downto ~SYM[7]),~SYM[3]+1);
+    ~SYM[5](~SYM[7]) <= resize(~VAR[input][0](~SYM[7] downto ~SYM[7]),~SYM[3]+1);
   end generate;
 
   -- Create the tree of adders
@@ -377,7 +377,7 @@ end block;
 , { "BlackBox" :
     { "name"      : "GHC.Prim.popCnt32#"
     , "kind"      : "Declaration"
-    , "type"      : "popCnt16 :: Word# -> Word#"
+    , "type"      : "popCnt32 :: Word# -> Word#"
     , "template"  :
 "-- popCnt32 begin
 ~GENSYM[popCnt32][0] : block
@@ -395,7 +395,7 @@ end block;
 begin
   -- put input into the first half of the intermediate array
   ~GENSYM[make_array][6]: for ~GENSYM[i][7] in 0 to (~SYM[2] - 1) generate
-    ~SYM[5](i) <= resize(~ARG[0](~SYM[7] downto ~SYM[7]),~SYM[3]+1);
+    ~SYM[5](~SYM[7]) <= resize(~VAR[input][0](~SYM[7] downto ~SYM[7]),~SYM[3]+1);
   end generate;
 
   -- Create the tree of adders
@@ -418,7 +418,7 @@ end block;
 , { "BlackBox" :
     { "name"      : "GHC.Prim.popCnt64#"
     , "kind"      : "Declaration"
-    , "type"      : "popCnt16 :: Word# -> Word#"
+    , "type"      : "popCnt64 :: Word# -> Word#"
     , "template"  :
 "-- popCnt64 begin
 ~GENSYM[popCnt64][0] : block
@@ -436,7 +436,7 @@ end block;
 begin
   -- put input into the first half of the intermediate array
   ~GENSYM[make_array][6]: for ~GENSYM[i][7] in 0 to (~SYM[2] - 1) generate
-    ~SYM[5](i) <= resize(~ARG[0](~SYM[7] downto ~SYM[7]),~SYM[3]+1);
+    ~SYM[5](~SYM[7]) <= resize(~VAR[input][0](~SYM[7] downto ~SYM[7]),~SYM[3]+1);
   end generate;
 
   -- Create the tree of adders
@@ -477,7 +477,7 @@ end block;
 begin
   -- put input into the first half of the intermediate array
   ~GENSYM[make_array][6]: for ~GENSYM[i][7] in 0 to (~SYM[2] - 1) generate
-    ~SYM[5](i) <= resize(~ARG[0](~SYM[7] downto ~SYM[7]),~SYM[3]+1);
+    ~SYM[5](~SYM[7]) <= resize(~VAR[input][0](~SYM[7] downto ~SYM[7]),~SYM[3]+1);
   end generate;
 
   -- Create the tree of adders
