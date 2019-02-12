@@ -59,8 +59,10 @@ flagsClash r = [
     defFlag "fclash-debug"                   $ SepArg (setDebugLevel r)
   , defFlag "fclash-hdldir"                  $ SepArg (setHdlDir r)
   , defFlag "fclash-hdlsyn"                  $ SepArg (setHdlSyn r)
-  , defFlag "fclash-nocache"                 $ NoArg (liftEwM (setNoCache r))
-  , defFlag "fclash-noclean"                 $ NoArg (liftEwM (setNoClean r))
+  , defFlag "fclash-nocache"                 $ NoArg (deprecated "nocache" "no-cache" setNoCache r)
+  , defFlag "fclash-no-cache"                $ NoArg (liftEwM (setNoCache r))
+  , defFlag "fclash-noclean"                 $ NoArg (deprecated "noclean" "no-clean" setNoClean r)
+  , defFlag "fclash-no-clean"                $ NoArg (liftEwM (setNoClean r))
   , defFlag "fclash-no-prim-warn"            $ NoArg (liftEwM (setNoPrimWarn r))
   , defFlag "fclash-spec-limit"              $ IntSuffix (liftEwM . setSpecLimit r)
   , defFlag "fclash-inline-limit"            $ IntSuffix (liftEwM . setInlineLimit r)
@@ -72,6 +74,22 @@ flagsClash r = [
   , defFlag "fclash-allow-zero-width"        $ NoArg (setAllowZeroWidth r)
   , defFlag "fclash-component-prefix"        $ SepArg (liftEwM . setComponentPrefix r)
   ]
+
+-- | Print deprecated flag warning
+deprecated
+  :: String
+  -- ^ Deprecated flag
+  -> String
+  -- ^ Use X instead
+  -> (a -> IO ())
+  -> a
+  -> EwM IO ()
+deprecated wrong right f a = do
+  addWarn ("Using '-fclash-" ++ wrong
+                             ++ "' is deprecated. Use '-fclash-"
+                             ++ right
+                             ++ "' instead.")
+  liftEwM (f a)
 
 setInlineLimit :: IORef ClashOpts
                -> Int
