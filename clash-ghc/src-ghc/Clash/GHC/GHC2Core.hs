@@ -283,6 +283,9 @@ coreToTerm primMap unlocs srcsp coreExpr = Reader.runReaderT (term coreExpr) src
         go "GHC.Base.$"                        args
           | length args == 5
           = term (App (args!!3) (args!!4))
+        go "GHC.Magic.noinline"                args   -- noinline :: forall a. a -> a
+          | [_ty, x] <- args
+          = term x
         -- Remove most CallStack logic
         go "GHC.Stack.Types.PushCallStack"     args = term (last args)
         go "GHC.Stack.Types.FreezeCallStack"   args = term (last args)
@@ -366,6 +369,7 @@ coreToTerm primMap unlocs srcsp coreExpr = Reader.runReaderT (term coreExpr) src
               | f == pack "Clash.Signal.Bundle.vecBundle#"   -> return (vecUnwrapTerm xType)
               | f == pack "GHC.Base.$"                       -> return (dollarTerm xType)
               | f == pack "GHC.Stack.withFrozenCallStack"    -> return (withFrozenCallStackTerm xType)
+              | f == pack "GHC.Magic.noinline"               -> return (idTerm xType)
               | f == pack "GHC.Magic.lazy"                   -> return (idTerm xType)
               | f == pack "GHC.Magic.runRW#"                 -> return (runRWTerm xType)
               | otherwise                                    -> return (C.Prim xNameS xType)

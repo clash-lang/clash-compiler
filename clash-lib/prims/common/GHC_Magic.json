@@ -4,6 +4,12 @@
     }
   }
 , { "Primitive" :
+    { "name"      : "GHC.Magic.noinline"
+    , "type"      : "forall a. a -> a"
+    , "primType"  : "Function"
+    }
+  }
+, { "Primitive" :
     { "name"      : "GHC.Magic.runRW#"
     , "primType"  : "Function"
     }
