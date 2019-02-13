@@ -23,7 +23,6 @@ module Clash.Explicit.Moore
 where
 
 import Clash.Explicit.Signal (Bundle (..), Clock, Reset, Signal, register)
-import GHC.Stack             (HasCallStack)
 
 {- $setup
 >>> :set -XDataKinds -XTypeApplications
@@ -70,8 +69,7 @@ import GHC.Stack             (HasCallStack)
 --     s2 = 'moore' clk rst mac id 0 ('bundle' (b,y))
 -- @
 moore
-  :: HasCallStack
-  => Clock domain gated
+  :: Clock domain gated
   -- ^ 'Clock' to synchronize to
   -> Reset domain synchronous
   -> (s -> i -> s)
@@ -92,8 +90,7 @@ moore clk rst ft fo iS =
 -- | Create a synchronous function from a combinational function describing
 -- a moore machine without any output logic
 medvedev
-  :: HasCallStack
-  => Clock domain gated
+  :: Clock domain gated
   -> Reset domain synchronous
   -> (s -> i -> s)
   -> s
@@ -129,8 +126,7 @@ medvedev clk rst tr st = moore clk rst tr id st
 --     (i2,b2) = 'mooreB' clk rst t o 3 (i1,c)
 -- @
 mooreB
-  :: HasCallStack
-  => Bundle i
+  :: Bundle i
   => Bundle o
   => Clock domain gated
   -> Reset domain synchronous
@@ -147,8 +143,7 @@ mooreB clk rst ft fo iS i = unbundle (moore clk rst ft fo iS (bundle i))
 
 -- | A version of 'medvedev' that does automatic 'Bundle'ing
 medvedevB
-  :: HasCallStack
-  => Bundle i
+  :: Bundle i
   => Bundle s
   => Clock domain gated
   -> Reset domain synchronous
