@@ -10,13 +10,13 @@
   -> Signal clk a"
     , "template" :
 "-- delay begin~IF ~ISGATED[1] ~THEN
-~GENSYM[~COMPNAME_delay][0] : block
+~GENSYM[~RESULT_delay][0] : block
   signal ~GENSYM[clk][1] : std_logic;
   signal ~GENSYM[ce][2]  : boolean;
-  signal ~GENSYM[s][3]   : ~TYPO := ~CONST[2];
+  signal ~GENSYM[~RESULT_reg][3]   : ~TYPO := ~CONST[2];
 begin
   (~SYM[1],~SYM[2]) <= ~ARG[1];
-  ~GENSYM[~COMPNAME_dly][4] : process(~SYM[1])
+  ~GENSYM[~RESULT_dly][4] : process(~SYM[1])
   begin
     if rising_edge(~SYM[1]) then
       if ~SYM[2] then
@@ -29,14 +29,14 @@ begin
     end if;
   end process;
 end block;~ELSE
-~GENSYM[~COMPNAME_delay][5] : block
-  signal ~GENSYM[s][6] : ~TYPO := ~CONST[2];
+~SYM[0] : block
+  signal ~SYM[3] : ~TYPO := ~CONST[2];
 begin
-  ~RESULT <= ~SYM[6];
-  ~SYM[0] : process(~ARG[1])
+  ~RESULT <= ~SYM[3];
+  ~SYM[4] : process(~ARG[1])
   begin
     if rising_edge(~ARG[1]) then
-      ~SYM[6] <= ~ARG[3]
+      ~SYM[3] <= ~ARG[3]
       -- pragma translate_off
       after 1 ps
       -- pragma translate_on
@@ -64,11 +64,11 @@ end block;~FI
 ~GENSYM[~COMPNAME_register][0] : block
   signal ~GENSYM[clk][1] : std_logic;
   signal ~GENSYM[ce][2] : boolean;
-  signal ~GENSYM[s][3] : ~TYPO := ~CONST[3];
+  signal ~GENSYM[~RESULT_reg][3] : ~TYPO := ~CONST[3];
 begin
   (~SYM[1],~SYM[2]) <= ~ARG[1];
   ~RESULT <= ~SYM[3]; ~IF ~ISSYNC[2] ~THEN
-  ~GENSYM[~COMPNAME_reg][4] : process(~SYM[1])
+  ~GENSYM[~RESULT_r][4] : process(~SYM[1])
   begin
     if rising_edge(~SYM[1]) then
       if ~ARG[2] = '1' then
@@ -101,21 +101,21 @@ begin
     end if;
   end process;~FI
 end block;~ELSE
-~GENSYM[~COMPNAME_register][5] : block
-  signal ~GENSYM[s][6] : ~TYPO := ~CONST[3];
+~SYM[0] : block
+  signal ~SYM[3] : ~TYPO := ~CONST[3];
 begin
-  ~RESULT <= ~SYM[6]; ~IF ~ISSYNC[2] ~THEN
-  ~SYM[0] : process(~ARG[1])
+  ~RESULT <= ~SYM[3]; ~IF ~ISSYNC[2] ~THEN
+  ~SYM[4] : process(~ARG[1])
   begin
     if rising_edge(~ARG[1]) then
       if ~ARG[2] = '1' then
-        ~SYM[6] <= ~CONST[3]
+        ~SYM[3] <= ~CONST[3]
         -- pragma translate_off
         after 1 ps
         -- pragma translate_on
         ;
       else
-        ~SYM[6] <= ~ARG[5]
+        ~SYM[3] <= ~ARG[5]
         -- pragma translate_off
         after 1 ps
         -- pragma translate_on
@@ -123,16 +123,16 @@ begin
       end if;
     end if;
   end process;~ELSE
-  ~SYM[0] : process(~ARG[1],~ARG[2]~VARS[3])
+  ~SYM[4] : process(~ARG[1],~ARG[2]~VARS[3])
   begin
     if ~ARG[2] = '1' then
-      ~SYM[6] <= ~CONST[3]
+      ~SYM[3] <= ~CONST[3]
       -- pragma translate_off
       after 1 ps
       -- pragma translate_on
       ;
     elsif rising_edge(~ARG[1]) then
-      ~SYM[6] <= ~ARG[5]
+      ~SYM[3] <= ~ARG[5]
       -- pragma translate_off
       after 1 ps
       -- pragma translate_on
