@@ -105,9 +105,9 @@ runClashTest =
         , runTest ("tests" </> "shouldwork" </> "BitVector") defBuild [] "AppendZero"       (["","AppendZero_testBench"],"AppendZero_testBench",True)
         ]
       , clashTestGroup "BlackBox"
-        [ outputTest ("tests" </> "shouldwork" </> "BlackBox") [VHDL]   "TemplateFunction" "main"
-        , outputTest ("tests" </> "shouldwork" </> "BlackBox") [VHDL]   "BlackBoxFunction" "main"
-        , outputTest ("tests" </> "shouldwork" </> "Signal")   defBuild "BlockRamLazy"     "main"
+        [ outputTest ("tests" </> "shouldwork" </> "BlackBox") [VHDL]   [] "TemplateFunction" "main"
+        , outputTest ("tests" </> "shouldwork" </> "BlackBox") [VHDL]   [] "BlackBoxFunction" "main"
+        , outputTest ("tests" </> "shouldwork" </> "Signal")   defBuild [] "BlockRamLazy"     "main"
         ]
       , clashTestGroup "BoxedFunctions"
         [ runTest ("tests" </> "shouldwork" </> "BoxedFunctions") defBuild [] "DeadRecursiveBoxed" ([""],"DeadRecursiveBoxed_topEntity",False)
@@ -203,7 +203,7 @@ runClashTest =
       ]
       , clashTestGroup "Signal"
         [ runTest ("tests" </> "shouldwork" </> "Signal") defBuild [] "AlwaysHigh"      ([""],"AlwaysHigh_topEntity",False)
-        , outputTest ("tests" </> "shouldwork" </> "Signal") defBuild "BlockRamLazy"    "main"
+        , outputTest ("tests" </> "shouldwork" </> "Signal") defBuild [] "BlockRamLazy"    "main"
         , runTest ("tests" </> "shouldwork" </> "Signal") defBuild [] "BlockRamFile"    (["","BlockRamFile_testBench"],"BlockRamFile_testBench",True)
         , runTest ("tests" </> "shouldwork" </> "Signal") defBuild ["-fclash-no-prim-warn"] "GatedClock" (["gated","source","testbench"],"testbench",True)
         , runTest ("tests" </> "shouldwork" </> "Signal") defBuild [] "GatedClockWidth"                  (["","GatedClockWidth_testBench"],"GatedClockWidth_testBench",True)
@@ -224,8 +224,8 @@ runClashTest =
         , runFailingTest ("tests" </> "shouldfail" </> "Signal") defBuild [] "MAC" (Just "Can't match template for \"Clash.Signal.Internal.register#\"")
         ]
       , clashTestGroup "SynthesisAttributes"
-        [ outputTest ("tests" </> "shouldwork" </> "SynthesisAttributes") defBuild "Simple"  "main"
-        , outputTest ("tests" </> "shouldwork" </> "SynthesisAttributes") defBuild "Product" "main"
+        [ outputTest ("tests" </> "shouldwork" </> "SynthesisAttributes") defBuild [] "Simple"  "main"
+        , outputTest ("tests" </> "shouldwork" </> "SynthesisAttributes") defBuild []  "Product" "main"
         , runTest ("tests" </> "shouldwork" </> "SynthesisAttributes") defBuild [] "Product" (["", "Product_testBench"],"Product_testBench",True)
         , clashTestGroup "ShouldFail" [
             runFailingTest ("tests" </> "shouldfail" </> "SynthesisAttributes") defBuild [] "ProductInArgs"   (Just "Attempted to split Product into a number of HDL ports.")
@@ -242,16 +242,17 @@ runClashTest =
       , clashTestGroup "TopEntity"
         -- VHDL tests disabled for now: I can't figure out how to generate a static name whilst retaining the ability to actually test..
         [ runTest ("tests" </> "shouldwork" </> "TopEntity")    [Verilog] [] "PortNames" (["","PortNames_topEntity","PortNames_testBench"],"PortNames_testBench",True)
-        , outputTest ("tests" </> "shouldwork" </> "TopEntity") [Verilog] "PortNames" "main"
+        , outputTest ("tests" </> "shouldwork" </> "TopEntity") [Verilog] [] "PortNames" "main"
         , runTest ("tests" </> "shouldwork" </> "TopEntity")    [Verilog] [] "PortProducts" (["","PortProducts_topEntity","PortProducts_testBench"],"PortProducts_testBench",True)
-        , outputTest ("tests" </> "shouldwork" </> "TopEntity") [Verilog] "PortProducts" "main"
+        , outputTest ("tests" </> "shouldwork" </> "TopEntity") [Verilog] [] "PortProducts" "main"
         , runTest ("tests" </> "shouldwork" </> "TopEntity")    [Verilog] [] "PortNamesWithUnit" (["","PortNamesWithUnit_topEntity","PortNamesWithUnit_testBench"],"PortNamesWithUnit_testBench",True)
-        , outputTest ("tests" </> "shouldwork" </> "TopEntity") [Verilog] "PortNamesWithUnit" "main"
+        , outputTest ("tests" </> "shouldwork" </> "TopEntity") [Verilog] [] "PortNamesWithUnit" "main"
         , runTest ("tests" </> "shouldwork" </> "TopEntity")    [Verilog] [] "PortNamesWithVector" (["","PortNamesWithVector_topEntity","PortNamesWithVector_testBench"],"PortNamesWithVector_testBench",True)
-        , outputTest ("tests" </> "shouldwork" </> "TopEntity") [Verilog] "PortNamesWithVector" "main"
+        , outputTest ("tests" </> "shouldwork" </> "TopEntity") [Verilog] [] "PortNamesWithVector" "main"
         , runTest ("tests" </> "shouldwork" </> "TopEntity")    [Verilog] [] "PortNamesWithRTree" (["","PortNamesWithRTree_topEntity","PortNamesWithRTree_testBench"],"PortNamesWithRTree_testBench",True)
-        , outputTest ("tests" </> "shouldwork" </> "TopEntity") [Verilog] "PortNamesWithRTree" "main"
+        , outputTest ("tests" </> "shouldwork" </> "TopEntity") [Verilog] [] "PortNamesWithRTree" "main"
         , runTest ("tests" </> "shouldwork" </> "TopEntity")    defBuild [] "TopEntHOArg" (["f","g"],"f",False)
+        , outputTest ("tests" </> "shouldwork" </> "TopEntity") [Verilog] [] "PortNamesWithRTree" "main"
         ]
       , clashTestGroup "Void"
         [ runTest ("tests" </> "shouldwork" </> "Unit") defBuild [] "Imap"                         (["","Imap_testBench"],"Imap_testBench",True)
