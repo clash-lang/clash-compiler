@@ -82,31 +82,33 @@ verifyBlackBoxContext
   -- ^ Template to check against
   -> Bool
 verifyBlackBoxContext bbCtx (N.BBFunction _ _ (N.TemplateFunction _ f _)) = f bbCtx
-verifyBlackBoxContext bbCtx (N.BBTemplate t) = all verify' t
+verifyBlackBoxContext bbCtx (N.BBTemplate t) = and (concatMap (walkElement verify') t)
   where
-    verify' = \case
-      Lit n ->
-        case indexMaybe (bbInputs bbCtx) n of
-          Just (_, _, b) -> b
-          _              -> False
-      Const n ->
-        case indexMaybe (bbInputs bbCtx) n of
-          Just (_, _, b) -> b
-          _              -> False
-      Component (Decl n l') ->
-        case IntMap.lookup n (bbFunctions bbCtx) of
-          Just _ ->
-            all (\(x,y) ->
-                    verifyBlackBoxContext bbCtx (N.BBTemplate x) &&
-                       verifyBlackBoxContext bbCtx (N.BBTemplate y)) l'
-          Nothing ->
-            False
-      e ->
-        case inputHole e of
-          Nothing ->
-            True
-          Just n ->
-            n < length (bbInputs bbCtx)
+    verify' e =
+      Just $
+      case e of
+        Lit n ->
+          case indexMaybe (bbInputs bbCtx) n of
+            Just (_, _, b) -> b
+            _              -> False
+        Const n ->
+          case indexMaybe (bbInputs bbCtx) n of
+            Just (_, _, b) -> b
+            _              -> False
+        Component (Decl n l') ->
+          case IntMap.lookup n (bbFunctions bbCtx) of
+            Just _ ->
+              all (\(x,y) ->
+                      verifyBlackBoxContext bbCtx (N.BBTemplate x) &&
+                         verifyBlackBoxContext bbCtx (N.BBTemplate y)) l'
+            Nothing ->
+              False
+        _ ->
+          case inputHole e of
+            Nothing ->
+              True
+            Just n ->
+              n < length (bbInputs bbCtx)
 
 extractLiterals :: BlackBoxContext
                 -> [Expr]
