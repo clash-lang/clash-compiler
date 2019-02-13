@@ -15,7 +15,7 @@
     , "outputReg" : true
     , "template" :
 "// blockRam begin
-reg ~TYPO ~GENSYM[RAM][0] [0:~LENGTH[~TYP[3]]-1];
+reg ~TYPO ~GENSYM[~RESULT_RAM][0] [0:~LENGTH[~TYP[3]]-1];
 
 reg ~TYP[3] ~GENSYM[ram_init][2];
 integer ~GENSYM[i][3];
@@ -26,7 +26,7 @@ initial begin
   end
 end
 ~IF ~ISGATED[2] ~THEN
-always @(posedge ~ARG[2][1]) begin : ~GENSYM[~COMPNAME_blockRam][4]~IF ~VIVADO ~THEN
+always @(posedge ~ARG[2][1]) begin : ~GENSYM[~RESULT_blockRam][4]~IF ~VIVADO ~THEN
   if (~ARG[2][0]) begin
     if (~ARG[5]) begin
       ~SYM[0][~ARG[6]] <= ~ARG[7];

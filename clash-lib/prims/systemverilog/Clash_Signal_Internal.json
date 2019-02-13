@@ -10,8 +10,8 @@
   -> Signal clk a"
     , "template" :
 "// delay begin,
-~TYPO ~GENSYM[reg][0] = ~CONST[2]; ~IF ~ISGATED[1] ~THEN
-always_ff @(posedge ~ARG[1][1]) begin : ~GENSYM[~COMPNAME_delay][1]
+~TYPO ~GENSYM[~RESULT_reg][0] = ~CONST[2]; ~IF ~ISGATED[1] ~THEN
+always_ff @(posedge ~ARG[1][1]) begin : ~GENSYM[~RESULT_delay][1]
   if (~ARG[1][0]) begin
     ~SYM[0] <= ~ARG[3];
   end
@@ -37,8 +37,8 @@ assign ~RESULT = ~SYM[0];
   -> Signal clk a"
     , "template" :
 "// register begin
-~TYPO ~GENSYM[reg][0] = ~CONST[3]; ~IF ~ISGATED[1] ~THEN
-always_ff @(posedge ~ARG[1][1]~IF ~ISSYNC[2] ~THEN ~ELSE or posedge ~ARG[2]~FI) begin : ~GENSYM[~COMPNAME_register][1]
+~TYPO ~GENSYM[~RESULT_reg][0] = ~CONST[3]; ~IF ~ISGATED[1] ~THEN
+always_ff @(posedge ~ARG[1][1]~IF ~ISSYNC[2] ~THEN ~ELSE or posedge ~ARG[2]~FI) begin : ~GENSYM[~RESULT_register][1]
   if (~ARG[2]) begin
     ~SYM[0] <= ~CONST[4];
   end else if (~ARG[1][0]) begin

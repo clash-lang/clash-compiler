@@ -14,8 +14,8 @@
   -> Signal dom a"
     , "template" :
 "-- blockRam begin
-~GENSYM[~COMPNAME_blockRam][0] : block
-  signal ~GENSYM[RAM][1] : ~TYP[3] := ~CONST[3];
+~GENSYM[~RESULT_blockRam][0] : block
+  signal ~GENSYM[~RESULT_RAM][1] : ~TYP[3] := ~CONST[3];
   signal ~GENSYM[rd][3]  : integer range 0 to ~LENGTH[~TYP[3]] - 1;
   signal ~GENSYM[wr][4]  : integer range 0 to ~LENGTH[~TYP[3]] - 1;~IF ~ISGATED[2] ~THEN
   signal ~GENSYM[clk][5] : std_logic;
