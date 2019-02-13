@@ -196,7 +196,6 @@ where
 
 import Control.DeepSeq       (NFData)
 import Data.Maybe            (isJust, fromJust)
-import GHC.Stack             (HasCallStack, withFrozenCallStack)
 
 import Clash.Signal.Internal
 import Clash.Signal.Bundle   (Bundle (..))
@@ -464,14 +463,13 @@ repSchedule high low = take low $ repSchedule' low high 1
 -- >>> printX (sampleN 3 (delay systemClockGen 0 (fromList [1,2,3,4])))
 -- [0,1,2]
 delay
-  :: HasCallStack
-  => Clock domain gated
+  :: Clock domain gated
   -- ^ Clock
   -> a
   -- ^ Default value
   -> Signal domain a
   -> Signal domain a
-delay = \clk dflt i -> withFrozenCallStack (delay# clk dflt i)
+delay = delay#
 {-# INLINE delay #-}
 
 -- | \"@'register' clk rst i s@\" delays the values in 'Signal' /s/ for one
@@ -480,8 +478,7 @@ delay = \clk dflt i -> withFrozenCallStack (delay# clk dflt i)
 -- >>> sampleN 5 (register systemClockGen asyncResetGen 8 (fromList [1,1,2,3,4]))
 -- [8,8,1,2,3]
 register
-  :: HasCallStack
-  => Clock domain gated
+  :: Clock domain gated
   -- ^ clock
   -> Reset domain synchronous
   -- ^ Reset (active-high), 'register' outputs the reset value when the
@@ -490,8 +487,8 @@ register
   -- ^ Reset value
   -> Signal domain a
   -> Signal domain a
-register = \clk rst initial i -> withFrozenCallStack
-  (register# clk rst initial initial i)
+register clk rst initial i =
+  register# clk rst initial initial i
 {-# INLINE register #-}
 
 -- | Version of 'register' that only updates its content when its fourth
@@ -516,8 +513,7 @@ register = \clk rst initial i -> withFrozenCallStack
 -- >>> sampleN 9 (count systemClockGen asyncResetGen)
 -- [0,0,0,1,1,2,2,3,3]
 regMaybe
-  :: HasCallStack
-  => Clock domain gated
+  :: Clock domain gated
   -- ^ Clock
   -> Reset domain synchronous
   -- ^ Reset (active-high), 'regMaybe' outputs the reset value when the
@@ -526,8 +522,8 @@ regMaybe
   -- ^ Reset value
   -> Signal domain (Maybe a)
   -> Signal domain a
-regMaybe = \clk rst initial iM -> withFrozenCallStack
-  (register (clockGate clk (fmap isJust iM)) rst initial (fmap fromJust iM))
+regMaybe clk rst initial iM =
+  register (clockGate clk (fmap isJust iM)) rst initial (fmap fromJust iM)
 {-# INLINE regMaybe #-}
 
 -- | Version of 'register' that only updates its content when its fourth
@@ -556,8 +552,8 @@ regEn
   -- ^ Enable signal
   -> Signal domain a
   -> Signal domain a
-regEn = \clk rst initial en i -> withFrozenCallStack
-  (register (clockGate clk en) rst initial i)
+regEn clk rst initial en i =
+  register (clockGate clk en) rst initial i
 {-# INLINE regEn #-}
 
 -- * Product/Signal isomorphism

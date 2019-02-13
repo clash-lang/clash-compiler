@@ -21,7 +21,6 @@ module Clash.Explicit.Mealy
 where
 
 import Clash.Explicit.Signal (Bundle (..), Clock, Reset, Signal, register)
-import GHC.Stack             (HasCallStack)
 
 {- $setup
 >>> :set -XDataKinds -XTypeApplications
@@ -77,8 +76,7 @@ let macT s (x,y) = (s',s)
 --     s2 = 'mealy' clk rst mac 0 ('bundle' (b,y))
 -- @
 mealy
-  :: HasCallStack
-  => Clock dom gated
+  :: Clock dom gated
   -- ^ 'Clock' to synchronize to
   -> Reset dom synchronous
   -> (s -> i -> (s,o))
@@ -121,8 +119,7 @@ mealy clk rst f iS =
 --     (i2,b2) = 'mealyB' clk rst f 3 (i1,c)
 -- @
 mealyB
-  :: HasCallStack
-  => Bundle i
+  :: Bundle i
   => Bundle o
   => Clock dom gated
   -> Reset dom synchronous

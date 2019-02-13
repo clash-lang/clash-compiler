@@ -95,7 +95,6 @@ import Control.Applicative        (liftA2, liftA3)
 import Control.DeepSeq            (NFData, rnf)
 import Data.Default.Class         (Default (..))
 import GHC.Generics               (Generic)
-import GHC.Stack                  (HasCallStack)
 import GHC.TypeLits               (KnownNat, KnownSymbol, Nat, Symbol)
 import Language.Haskell.TH.Syntax (Lift (..))
 import Test.QuickCheck            (Arbitrary (..), CoArbitrary(..), Property,
@@ -569,8 +568,7 @@ infixr 3 .&&.
 -- need to 'seq' it explicitly.
 
 delay#
-  :: HasCallStack
-  => Clock  domain gated
+  :: Clock  domain gated
   -> a
   -> Signal domain a
   -> Signal domain a
@@ -598,8 +596,7 @@ delay# (GatedClock _ _ en) dflt =
 -- the Intel tooling __will ignore the power up value__ and use the reset value
 -- instead.
 register#
-  :: HasCallStack
-  => Clock domain gated
+  :: Clock domain gated
   -> Reset domain synchronous
   -> a
   -- ^ Power up value

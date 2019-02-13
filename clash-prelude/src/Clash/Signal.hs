@@ -137,7 +137,6 @@ module Clash.Signal
 where
 
 import           Control.DeepSeq       (NFData)
-import           GHC.Stack             (HasCallStack, withFrozenCallStack)
 import           GHC.TypeLits          (KnownNat, KnownSymbol)
 import           Data.Bits             (Bits) -- Haddock only
 import           Data.Maybe            (isJust, fromJust)
@@ -473,13 +472,14 @@ withClockReset = \clk rst f -> expose @"rst" (expose @"clk" f clk) rst
 -- >>> printX (sampleN 3 (delay 0 (fromList [1,2,3,4])))
 -- [0,1,2]
 delay
-  :: (HasCallStack, HiddenClock domain gated)
+  :: HiddenClock domain gated
   => a
   -- ^ Default value
   -> Signal domain a
   -- ^ Signal to delay
   -> Signal domain a
-delay = \dflt i -> withFrozenCallStack (delay# #clk dflt i)
+delay dflt i =
+  delay# #clk dflt i
 {-# INLINE delay #-}
 
 -- | 'register' @i s@ delays the values in 'Signal' @s@ for one cycle, and sets
@@ -488,7 +488,7 @@ delay = \dflt i -> withFrozenCallStack (delay# #clk dflt i)
 -- >>> sampleN 5 (register 8 (fromList [1,1,2,3,4]))
 -- [8,8,1,2,3]
 register
-  :: (HasCallStack, HiddenClockReset domain gated synchronous)
+  :: HiddenClockReset domain gated synchronous
   => a
   -- ^ Reset value
   --
@@ -496,7 +496,8 @@ register
   -- reset value when the reset value becomes 'True'
   -> Signal domain a
   -> Signal domain a
-register = \i s -> withFrozenCallStack (E.register #clk #rst i s)
+register i s =
+  E.register #clk #rst i s
 {-# INLINE register #-}
 infixr 3 `register`
 
@@ -522,7 +523,7 @@ infixr 3 `register`
 -- >>> sampleN 9 countSometimes
 -- [0,0,0,1,1,2,2,3,3]
 regMaybe
-  :: (HasCallStack, HiddenClockReset domain gated synchronous)
+  :: HiddenClockReset domain gated synchronous
   => a
   -- ^ Reset value
   --
@@ -530,8 +531,8 @@ regMaybe
   -- reset value when the reset value becomes 'True'
   -> Signal domain (Maybe a)
   -> Signal domain a
-regMaybe = \initial iM -> withFrozenCallStack
-  (E.register (clockGate #clk (fmap isJust iM)) #rst initial (fmap fromJust iM))
+regMaybe initial iM =
+  E.register (clockGate #clk (fmap isJust iM)) #rst initial (fmap fromJust iM)
 {-# INLINE regMaybe #-}
 infixr 3 `regMaybe`
 
@@ -550,7 +551,7 @@ infixr 3 `regMaybe`
 -- >>> sampleN 9 count
 -- [0,0,0,1,1,2,2,3,3]
 regEn
-  :: (HasCallStack, HiddenClockReset domain gated synchronous)
+  :: HiddenClockReset domain gated synchronous
   => a
   -- ^ Reset value
   --
@@ -559,8 +560,8 @@ regEn
   -> Signal domain Bool
   -> Signal domain a
   -> Signal domain a
-regEn = \initial en i -> withFrozenCallStack
-  (E.register (clockGate #clk en) #rst initial i)
+regEn initial en i =
+  E.register (clockGate #clk en) #rst initial i
 {-# INLINE regEn #-}
 
 -- * Signal -> List conversion
