@@ -205,9 +205,6 @@ runClashTest =
         , runTest ("tests" </> "shouldwork" </> "Signal") defBuild [] "GatedClockWidth"                  (["","GatedClockWidth_testBench"],"GatedClockWidth_testBench",True)
         , runTest ("tests" </> "shouldwork" </> "Signal") defBuild [] "BlockRamTest"    ([""],"BlockRamTest_topEntity",False)
         , runTest ("tests" </> "shouldwork" </> "Signal") defBuild [] "DelayedReset"    (["","DelayedReset_testBench"],"DelayedReset_testBench",True)
-        -- Test disabled in https://github.com/clash-lang/clash-compiler/pull/494.
-        -- After this PR we don't support undefined power up values anymore.
-        -- , runTest ("tests" </> "shouldwork" </> "Signal") defBuild [] "MAC"             ([""],"MAC_topEntity",False)
         , runTest ("tests" </> "shouldwork" </> "Signal") defBuild [] "NoCPR"           (["example"],"example",False)
         , runTest ("tests" </> "shouldwork" </> "Signal") defBuild [] "Ram"             (["","Ram_testBench"],"Ram_testBench",True)
         , runTest ("tests" </> "shouldwork" </> "Signal") defBuild [] "RegisterAS"      (["","RegisterAS_testBench"],"RegisterAS_testBench",True)
@@ -219,6 +216,8 @@ runClashTest =
         , runTest ("tests" </> "shouldwork" </> "Signal" </> "BiSignal") defBuild [] "Counter" (["","Counter_testBench"],"Counter_testBench",True)
         , runTest ("tests" </> "shouldwork" </> "Signal" </> "BiSignal") defBuild [] "CounterHalfTuple" (["","CounterHalfTuple_testBench"],"CounterHalfTuple_testBench",True)
         , runTest ("tests" </> "shouldwork" </> "Signal" </> "BiSignal") defBuild [] "CounterHalfTupleRev" (["","CounterHalfTupleRev_testBench"],"CounterHalfTupleRev_testBench",True)
+
+        , runFailingTest ("tests" </> "shouldfail" </> "Signal") defBuild [] "MAC" (Just "Can't match template for \"Clash.Signal.Internal.register#\"")
         ]
       , clashTestGroup "SynthesisAttributes"
         [ outputTest ("tests" </> "shouldwork" </> "SynthesisAttributes") defBuild "Simple"  "main"
