@@ -514,9 +514,13 @@ caseCon ctx@(TransformContext is0 _) e@(Case subj ty alts)
                 Right (FilteredHWType (Void (Just hty)) _areVoids)
                   | hty `elem` [BitVector 0, Unsigned 0, Signed 0, Index 1]
                   -> caseCon ctx' (Case (Literal (IntegerLiteral 0)) ty alts)
-                _ -> traceIf (lvl > DebugNone && isConstant subj)
-                       ("Irreducible constant as case subject: " ++ showPpr subj ++ "\nCan be reduced to: " ++ showPpr subj')
-                       (caseOneAlt e)
+                _ -> do
+                  let ret = caseOneAlt e
+                  if lvl > DebugNone then do
+                    subjIsConst <- isConstant subj
+                    traceIf (lvl > DebugNone && subjIsConst) ("Irreducible constant as case subject: " ++ showPpr subj ++ "\nCan be reduced to: " ++ showPpr subj') ret
+                  else
+                    ret
 
 caseCon ctx e@(Case subj ty alts) = do
   reprs <- Lens.view customReprs
@@ -1000,13 +1004,16 @@ constantSpec ctx e@(App e1 e2)
   | (Var {}, args) <- collectArgs e1
   , (_, []) <- Either.partitionEithers args
   , null $ Lens.toListOf termFreeTyVars e2
-  , isConstant e2
-  = do tcm <- Lens.view tcCache
-       let e2Ty = termType tcm e2
-       -- Don't specialise on clock or reset generators
-       case isClockOrReset tcm e2Ty of
-          False -> specializeNorm ctx e
-          _ -> return e
+  = do e2Isconstant <- isConstant e2
+       if e2Isconstant then do
+         tcm <- Lens.view tcCache
+         let e2Ty = termType tcm e2
+         -- Don't specialise on clock or reset generators
+         case isClockOrReset tcm e2Ty of
+            False -> specializeNorm ctx e
+            _ -> return e
+       else
+        return e
 
 constantSpec _ e = return e
 
@@ -1088,7 +1095,8 @@ constantSpec _ e = return e
 -- taking the InScopeSet of the context into account.
 appProp :: NormRewrite
 appProp (TransformContext is0 _) (App (Lam v e) arg) = do
-  if isConstant arg || isVar arg
+  argIsConstant <- isConstant arg
+  if argIsConstant || isVar arg
     then do
       is1 <- unionInScope is0 <$> Lens.use globalInScope
       let subst = extendIdSubst (mkSubst is1) v arg
@@ -1099,10 +1107,11 @@ appProp _ (App (Letrec v e) arg) = do
   changed (Letrec v (App e arg))
 
 appProp ctx@(TransformContext is0 _) (App (Case scrut ty alts) arg) = do
+  argIsConstant <- isConstant arg
   tcm <- Lens.view tcCache
   let argTy = termType tcm arg
       ty' = applyFunTy tcm ty argTy
-  if isConstant arg || isVar arg
+  if argIsConstant || isVar arg
     then do
       let alts' = map (second (`App` arg)) alts
       changed $ Case scrut ty' alts'
@@ -1361,8 +1370,9 @@ collectANF _ e@(Case _ _ [(DataPat dc _ _,_)])
 
 collectANF ctx (Case subj ty alts) = do
     localVar <- lift (isNonGlobalVar subj)
+    isConstantSubj <- lift (isConstant subj)
 
-    subj' <- if localVar || isConstant subj
+    subj' <- if localVar || isConstantSubj
       then return subj
       else do
         tcm <- Lens.view tcCache
@@ -1388,9 +1398,10 @@ collectANF ctx (Case subj ty alts) = do
     doAlt subj' alt@(DataPat dc exts xs,altExpr) | not (bindsExistentials exts xs) = do
       lv  <- lift (isNonGlobalVar altExpr)
       patSels <- Monad.zipWithM (doPatBndr subj' dc) xs [0..]
+      altExprIsConstant <- lift (isConstant altExpr)
       let usesXs (Var n) = any (== n) xs
           usesXs _       = False
-      if (lv && (not (usesXs altExpr) || length alts == 1)) || isConstant altExpr
+      if (lv && (not (usesXs altExpr) || length alts == 1)) || altExprIsConstant
         then do
           -- See Note [ANF InScopeSet]
           tellBinders patSels
@@ -1406,7 +1417,8 @@ collectANF ctx (Case subj ty alts) = do
     doAlt _ alt@(DataPat {}, _) = return alt
     doAlt _ alt@(pat,altExpr) = do
       lv <- lift (isNonGlobalVar altExpr)
-      if lv || isConstant altExpr
+      altExprIsConstant <- lift (isConstant altExpr)
+      if lv || altExprIsConstant
         then return alt
         else do
           tcm <- Lens.view tcCache
@@ -1612,29 +1624,32 @@ reduceBinders is processed body ((id_,expr):binders) = case List.find ((== expr)
 
 reduceConst :: NormRewrite
 reduceConst ctx@(TransformContext is0 _) e@(App _ _)
-  | isConstant e
-  , (conPrim, _) <- collectArgs e
+  | (conPrim, _) <- collectArgs e
   , isPrim conPrim
   = do
-    tcm <- Lens.view tcCache
-    bndrs <- Lens.use bindings
-    primEval <- Lens.view evaluator
-    ids <- Lens.use uniqSupply
-    let (ids1,ids2) = splitSupply ids
-    uniqSupply Lens..= ids2
-    gh <- Lens.use globalHeap
-    is1 <- unionInScope is0 <$> Lens.use globalInScope
-    case whnf' primEval bndrs tcm gh ids1 is1 False e of
-      (gh',ph',e') -> do
-        globalHeap Lens..= gh'
-        bindPureHeap ctx tcm ph' $ \_ctx' -> case e' of
-          (Literal _) -> changed e'
-          (collectArgs -> (Prim nm _, _))
-            | isFromInt nm
-            , e /= e'
-            -> changed e'
-          (collectArgs -> (Data _,_)) -> changed e'
-          _                           -> return e
+    eIsConstant <- isConstant e
+    if eIsConstant then do
+      tcm <- Lens.view tcCache
+      bndrs <- Lens.use bindings
+      primEval <- Lens.view evaluator
+      ids <- Lens.use uniqSupply
+      let (ids1,ids2) = splitSupply ids
+      uniqSupply Lens..= ids2
+      gh <- Lens.use globalHeap
+      is1 <- unionInScope is0 <$> Lens.use globalInScope
+      case whnf' primEval bndrs tcm gh ids1 is1 False e of
+        (gh',ph',e') -> do
+          globalHeap Lens..= gh'
+          bindPureHeap ctx tcm ph' $ \_ctx' -> case e' of
+            (Literal _) -> changed e'
+            (collectArgs -> (Prim nm _, _))
+              | isFromInt nm
+              , e /= e'
+              -> changed e'
+            (collectArgs -> (Data _,_)) -> changed e'
+            _                           -> return e
+    else
+      return e
 
 reduceConst _ e = return e
 

@@ -60,7 +60,7 @@ import           Clash.Core.Type             (KindOrType, Type (..),
                                               typeKind, tyView)
 import           Clash.Core.Util
   (collectArgs, isPolyFun, mkAbstraction, mkApps, mkLams,
-   mkTmApps, mkTyApps, mkTyLams, termType, dataConInstArgTysE)
+   mkTmApps, mkTyApps, mkTyLams, termType, dataConInstArgTysE, isClockOrReset)
 import           Clash.Core.Var
   (Id, TyVar, Var (..), mkId, mkTyVar)
 import           Clash.Core.VarEnv
@@ -388,12 +388,39 @@ localFreeIds = do
 -- environment.
 localFreeVars
   :: (Applicative f, Lens.Contravariant f)
-  => RewriteMonad extra (((Var a) -> f (Var a)) -> Term -> f Term)
+  => RewriteMonad extra ((Var a -> f (Var a)) -> Term -> f Term)
 localFreeVars = do
   globalBndrs <- Lens.use bindings
   let f i@(Id {}) = i `notElemUniqMap` globalBndrs
       f _         = True
   return (termFreeVars' f)
+
+-- | Determines if term has any locally free variables. That is, the free type
+-- variables and the free identifiers that are not bound in the global
+-- scope.
+hasLocalFreeVars :: RewriteMonad extra (Term -> Bool)
+hasLocalFreeVars = Lens.notNullOf <$> localFreeVars
+
+-- | Determine if a term represents a constant
+isConstant :: Term -> RewriteMonad extra Bool
+isConstant e = case collectArgs e of
+  (Data _, args)   -> and <$> mapM (either isConstant (const (pure True))) args
+  (Prim _ _, args) -> and <$> mapM (either isConstant (const (pure True))) args
+  (Lam _ _, _)     -> not <$> (hasLocalFreeVars <*> pure e)
+  (Literal _,_)    -> pure True
+  _                -> pure False
+
+isConstantNotClockReset
+  :: Term
+  -> RewriteMonad extra Bool
+isConstantNotClockReset e = do
+  tcm <- Lens.view tcCache
+  let eTy = termType tcm e
+  if isClockOrReset tcm eTy
+     then case collectArgs e of
+        (Prim nm _,_) -> return (nm == "Clash.Transformations.removedArg")
+        _ -> return False
+     else isConstant e
 
 inlineOrLiftBinders
   :: (LetBinding -> RewriteMonad extra Bool)

@@ -71,7 +71,6 @@ import           Clash.Netlist.BlackBox.Util   as B
 import           Clash.Netlist.Id              (IdType (..))
 import           Clash.Netlist.Types           as N
 import           Clash.Netlist.Util            as N
-import           Clash.Normalize.Util          (isConstant)
 import           Clash.Primitives.Types        as P
 import           Clash.Unique                  (lookupUniqMap')
 import           Clash.Util
@@ -151,6 +150,14 @@ prepareBlackBox pNm templ bbCtx =
                 "\n\nwith context:\n\n" ++ show bbCtx
        throw (ClashException sp msg Nothing)
 
+-- | Determine if a term represents a literal
+isLiteral :: Term -> Bool
+isLiteral e = case collectArgs e of
+  (Data _, args)   -> all (either isLiteral (const True)) args
+  (Prim _ _, args) -> all (either isLiteral (const True)) args
+  (C.Literal _,_)  -> True
+  _                -> False
+
 mkArgument
   :: Identifier
   -- ^ LHS of the original let-binder
@@ -185,10 +192,10 @@ mkArgument bndr e = do
           (e',d) <- mkPrimitive True False (Left bndr) f args ty
           case e' of
             (Identifier _ _) -> return ((e',hwTy,False), d)
-            _                -> return ((e',hwTy,isConstant e), d)
+            _                -> return ((e',hwTy,isLiteral e), d)
         (Data dc, args) -> do
           (exprN,dcDecls) <- mkDcApplication hwTy (Left bndr) dc (lefts args)
-          return ((exprN,hwTy,isConstant e),dcDecls)
+          return ((exprN,hwTy,isLiteral e),dcDecls)
         (Case scrut ty' [alt],[]) -> do
           (projection,decls) <- mkProjection False (Left bndr) scrut ty' alt
           return ((projection,hwTy,False),decls)
