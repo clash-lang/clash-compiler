@@ -84,7 +84,7 @@ begin
       end if;
     end if;
   end process;~ELSE
-  ~SYM[4] : process(~SYM[1],~ARG[1]~VARS[2])
+  ~SYM[4] : process(~SYM[1],~ARG[1])
   begin
     if ~ARG[1] = '1' then
       ~SYM[3] <= ~CONST[3];
@@ -121,7 +121,7 @@ begin
       end if;
     end if;
   end process;~ELSE
-  ~SYM[4] : process(~ARG[0],~ARG[1]~VARS[2])
+  ~SYM[4] : process(~ARG[0],~ARG[1])
   begin
     if ~ARG[1] = '1' then
       ~SYM[3] <= ~CONST[3]
