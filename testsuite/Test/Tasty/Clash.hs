@@ -488,7 +488,7 @@ runFailingTest'
   -- one closest to the test.
   -> TestTree
 runFailingTest' env target extraArgs modName expectedStderr path =
-  let args0 = "-fclash-nocache" : extraArgs in
+  let args0 = "-fclash-no-cache" : extraArgs in
   let (cmd, args1) = clashCmd target (sourceDirectory </> env) args0 modName (testDirectory path) in
   let testName    = "clash" in
   testFailingProgram
