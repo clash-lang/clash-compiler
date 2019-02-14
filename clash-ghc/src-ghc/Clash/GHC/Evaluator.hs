@@ -977,6 +977,10 @@ reduceConstant isSubj gbl tcm h k nm ty tys args = case nm of
     | [i] <- integerLiterals' args
     -> reduce (integerToWordLiteral i)
 
+  "GHC.Integer.Type.testBitInteger" -- :: Integer -> Int# -> Bool
+    | [Lit (IntegerLiteral i), Lit (IntLiteral j)] <- args
+    -> reduce (boolToBoolLiteral tcm ty (testBit i (fromInteger j)))
+
   "GHC.Natural.NatS#"
     | [Lit (WordLiteral w)] <- args
     -> reduce (Literal (NaturalLiteral w))
