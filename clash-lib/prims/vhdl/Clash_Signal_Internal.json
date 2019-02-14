@@ -70,7 +70,7 @@ begin
   begin
     if rising_edge(~SYM[1]) then
       if ~ARG[1] = '1' then
-        ~SYM[3] <= ~CONST[2]
+        ~SYM[3] <= ~CONST[3]
         -- pragma translate_off
         after 1 ps
         -- pragma translate_on
@@ -87,7 +87,7 @@ begin
   ~SYM[4] : process(~SYM[1],~ARG[1]~VARS[2])
   begin
     if ~ARG[1] = '1' then
-      ~SYM[3] <= ~CONST[2];
+      ~SYM[3] <= ~CONST[3];
     elsif rising_edge(~SYM[1]) then
       if ~SYM[2] then
         ~SYM[3] <= ~ARG[4]
@@ -107,7 +107,7 @@ begin
   begin
     if rising_edge(~ARG[0]) then
       if ~ARG[1] = '1' then
-        ~SYM[3] <= ~CONST[2]
+        ~SYM[3] <= ~CONST[3]
         -- pragma translate_off
         after 1 ps
         -- pragma translate_on
@@ -124,7 +124,7 @@ begin
   ~SYM[4] : process(~ARG[0],~ARG[1]~VARS[2])
   begin
     if ~ARG[1] = '1' then
-      ~SYM[3] <= ~CONST[2]
+      ~SYM[3] <= ~CONST[3]
       -- pragma translate_off
       after 1 ps
       -- pragma translate_on
