@@ -1,4 +1,4 @@
-module Constants where
+module Lambda where
 
 -- Test if Clash will try to reduce "myConstant" to a constant even though it
 -- is marked NOINLINE and even though it is a "complex" expression. Register
@@ -24,6 +24,7 @@ topEntity
   => Signal System (Vec VecSize Int)
   -> Signal System (Vec VecSize Int)
 topEntity = register (myConstant True)
+{-# NOINLINE topEntity #-}
 
 testBench :: Signal System Bool
 testBench = done

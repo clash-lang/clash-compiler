@@ -68,7 +68,6 @@ runClashTest =
         , runTest ("tests" </> "shouldwork" </> "Basic") defBuild [] "ByteSwap32"          (["","ByteSwap32_testBench"],"ByteSwap32_testBench",True)
         , runTest ("tests" </> "shouldwork" </> "Basic") defBuild [] "CharTest"            (["","CharTest_testBench"],"CharTest_testBench",True)
         , runTest ("tests" </> "shouldwork" </> "Basic") defBuild [] "ClassOps"            (["","ClassOps_testBench"],"ClassOps_testBench",True)
-        , runTest ("tests" </> "shouldwork" </> "Basic") defBuild [] "Constants"            (["","Constants_testBench"],"Constants_testBench",True)
         , runTest ("tests" </> "shouldwork" </> "Basic") defBuild [] "CountTrailingZeros"  (["","CountTrailingZeros_testBench"],"CountTrailingZeros_testBench",True)
         , runTest ("tests" </> "shouldwork" </> "Basic") defBuild [] "DivMod"              ([""],"DivMod_topEntity",False)
         , runTest ("tests" </> "shouldwork" </> "Basic") defBuild [] "IrrefError"          ([""],"IrrefError_topEntity",False)
@@ -192,6 +191,10 @@ runClashTest =
         , runTest ("tests" </> "shouldwork" </> "Polymorphism") defBuild [] "FunctionInstances" (["","FunctionInstances_testBench"],"FunctionInstances_testBench",True)
         , runTest ("tests" </> "shouldwork" </> "Polymorphism") defBuild [] "GADTExistential"   ([""],"GADTExistential_topEntity",False)
         , runTest ("tests" </> "shouldwork" </> "Polymorphism") defBuild [] "LocalPoly"         ([""],"LocalPoly_topEntity",False)
+        ]
+      , clashTestGroup "PrimitiveReductions"
+        [ runTest ("tests" </> "shouldwork" </> "PrimitiveReductions") defBuild [] "Lambda"     (["","Lambda_testBench"],"Lambda_testBench",True)
+        , runTest ("tests" </> "shouldwork" </> "PrimitiveReductions") defBuild [] "ReplaceInt" (["","ReplaceInt_testBench"],"ReplaceInt_testBench",True)
         ]
       , clashTestGroup "RTree"
         [ runTest ("tests" </> "shouldwork" </> "RTree") defBuild [] "TFold"       ([""],"TFold_topEntity",False)

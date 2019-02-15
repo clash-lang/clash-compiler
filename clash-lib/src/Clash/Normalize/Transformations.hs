@@ -1825,6 +1825,18 @@ reduceNonRepPrim (TransformContext is0 ctx) e@(App _ _) | (Prim nm _, args) <- c
                then reduceReplicate n aTy eTy vArg
                else return e
           _ -> return e
+       -- replace_int :: KnownNat n => Vec n a -> Int -> a -> Vec n a
+      "Clash.Sized.Vector.replace_int" | length args == 6 -> do
+        let ([_knArg,vArg,iArg,aArg],[nTy,aTy]) = Either.partitionEithers args
+        case runExcept (tyNatSize tcm nTy) of
+          Right n -> do
+            untranslatableTy <- isUntranslatableType_not_poly aTy
+            if untranslatableTy || shouldReduce1
+               then reduceReplace_int is1 n aTy eTy vArg iArg aArg
+               else return e
+          _ -> return e
+
+
       "Clash.Sized.Vector.imap" | length args == 6 -> do
         let [nTy,argElTy,resElTy] = Either.rights args
         case runExcept (tyNatSize tcm nTy) of
