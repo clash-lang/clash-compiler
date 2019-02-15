@@ -1367,7 +1367,7 @@ reduceConstant isSubj gbl tcm h k nm ty tys args = case nm of
     , [ _
       , PrimVal bvNm _ _ [_, Lit (IntegerLiteral mskBv), Lit (IntegerLiteral bv)]
       , valArgs -> Just [Literal (IntLiteral i)]
-      , PrimVal bNm  _ _ [_, Lit (IntegerLiteral mskB), Lit (IntegerLiteral b)]
+      , PrimVal bNm  _ _ [Lit (IntegerLiteral mskB), Lit (IntegerLiteral b)]
       ] <- args
     , bvNm == "Clash.Sized.Internal.BitVector.fromInteger#"
     , bNm  == "Clash.Sized.Internal.BitVector.fromInteger##"
