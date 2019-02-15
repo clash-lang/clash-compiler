@@ -23,8 +23,6 @@ module Clash.Explicit.Moore
 where
 
 import Clash.Explicit.Signal (Bundle (..), Clock, Reset, Signal, register)
-import Clash.XException      (Undefined)
-import GHC.Stack             (HasCallStack)
 
 {- $setup
 >>> :set -XDataKinds -XTypeApplications
@@ -71,14 +69,15 @@ import GHC.Stack             (HasCallStack)
 --     s2 = 'moore' clk rst mac id 0 ('bundle' (b,y))
 -- @
 moore
-  :: (HasCallStack, Undefined s)
-  => Clock domain gated       -- ^ 'Clock' to synchronize to
+  :: Clock domain gated
+  -- ^ 'Clock' to synchronize to
   -> Reset domain synchronous
-  -> (s -> i -> s)         -- ^ Transfer function in moore machine form:
-                           -- @state -> input -> newstate@
-  -> (s -> o)              -- ^ Output function in moore machine form:
-                           -- @state -> output@
-  -> s                     -- ^ Initial state
+  -> (s -> i -> s)
+  -- ^ Transfer function in moore machine form: @state -> input -> newstate@
+  -> (s -> o)
+  -- ^ Output function in moore machine form: @state -> output@
+  -> s
+  -- ^ Initial state
   -> (Signal domain i -> Signal domain o)
   -- ^ Synchronous sequential function with input and output matching that
   -- of the moore machine
@@ -91,8 +90,7 @@ moore clk rst ft fo iS =
 -- | Create a synchronous function from a combinational function describing
 -- a moore machine without any output logic
 medvedev
-  :: (HasCallStack, Undefined s)
-  => Clock domain gated
+  :: Clock domain gated
   -> Reset domain synchronous
   -> (s -> i -> s)
   -> s
@@ -128,7 +126,8 @@ medvedev clk rst tr st = moore clk rst tr id st
 --     (i2,b2) = 'mooreB' clk rst t o 3 (i1,c)
 -- @
 mooreB
-  :: (HasCallStack, Bundle i, Bundle o, Undefined s)
+  :: Bundle i
+  => Bundle o
   => Clock domain gated
   -> Reset domain synchronous
   -> (s -> i -> s) -- ^ Transfer function in moore machine form:
@@ -144,7 +143,8 @@ mooreB clk rst ft fo iS i = unbundle (moore clk rst ft fo iS (bundle i))
 
 -- | A version of 'medvedev' that does automatic 'Bundle'ing
 medvedevB
-  :: (Bundle i, Bundle s, Undefined s)
+  :: Bundle i
+  => Bundle s
   => Clock domain gated
   -> Reset domain synchronous
   -> (s -> i -> s)

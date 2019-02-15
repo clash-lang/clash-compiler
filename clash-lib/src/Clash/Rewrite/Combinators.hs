@@ -8,33 +8,67 @@
 
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TupleSections       #-}
+{-# LANGUAGE ViewPatterns        #-}
 
-module Clash.Rewrite.Combinators where
+module Clash.Rewrite.Combinators
+  ( allR
+  , (!->)
+  , (>-!)
+  , (>-!->)
+  , (>->)
+  , bottomupR
+  , repeatR
+  , topdownR
+
+  , whenR
+  , bottomupWhenR
+  )
+ where
 
 import           Control.DeepSeq             (deepseq)
 import           Control.Monad               ((>=>))
 import qualified Control.Monad.Writer        as Writer
 import qualified Data.Monoid                 as Monoid
+import           Data.Text                   (Text)
+import           Data.Either                 (lefts, rights)
 
 import           Clash.Core.Term             (Term (..))
-import           Clash.Core.Util             (patIds)
+import           Clash.Core.Util             (patIds, collectArgs)
 import           Clash.Core.VarEnv
   (extendInScopeSet, extendInScopeSetList)
 import           Clash.Rewrite.Types
 
+-- | Given a function application, find the primitive it's applied. Yields
+-- Nothing if given term is not an application or if it is not a primitive.
+primArg
+  :: Term
+  -- ^ Function application
+  -> Maybe (Text, Int, Int)
+  -- ^ If @Term@ was a primitive: (name of primitive, #type args, #term args)
+primArg (collectArgs -> t) =
+  case t of
+    (Prim nm _, args) ->
+      Just (nm, length (rights args), length (lefts args))
+    _ ->
+      Nothing
+
 -- | Apply a transformation on the subtrees of an term
-allR :: forall m . Monad m
-     => Transform m -- ^ The transformation to apply to the subtrees
-     -> Transform m
+allR
+  :: forall m
+   . Monad m
+  => Transform m
+  -- ^ The transformation to apply to the subtrees
+  -> Transform m
 allR trans (TransformContext is c) (Lam v e) =
   Lam v <$> trans (TransformContext (extendInScopeSet is v) (LamBody v:c)) e
 
 allR trans (TransformContext is c) (TyLam tv e) =
   TyLam tv <$> trans (TransformContext (extendInScopeSet is tv) (TyLamBody tv:c)) e
 
-allR trans (TransformContext is c) (App e1 e2) =
-  App <$> trans (TransformContext is (AppFun:c)) e1
-      <*> trans (TransformContext is (AppArg:c)) e2
+allR trans (TransformContext is c) (App e1 e2) = do
+  e1' <- trans (TransformContext is (AppFun:c)) e1
+  e2' <- trans (TransformContext is (AppArg (primArg e1') : c)) e2
+  pure (App e1' e2')
 
 allR trans (TransformContext is c) (TyApp e ty) =
   TyApp <$> trans (TransformContext is (TyAppC:c)) e <*> pure ty

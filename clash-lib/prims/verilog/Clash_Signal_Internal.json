@@ -3,21 +3,22 @@
     , "kind" : "Declaration"
     , "type" :
 "delay#
-  :: (HasCallStack,Undefined a) -- (ARG[0],ARG[1])
-  => Clock domain gated       -- ARG[2]
-  -> Signal clk a             -- ARG[3]
+  :: Clock domain gated       -- ARG[0]
+  -> a                        -- ARG[1]
+  -> Signal clk a             -- ARG[2]
   -> Signal clk a"
-    , "outputReg" : true
     , "template" :
-"// delay begin~IF ~ISGATED[2] ~THEN
-always @(posedge ~ARG[2][1]) begin : ~GENSYM[~COMPNAME_delay][1]
-  if (~ARG[2][0]) begin
-    ~RESULT <= ~ARG[3];
+"// delay begin,
+reg ~TYPO ~GENSYM[~RESULT_reg][0] = ~CONST[1];~IF ~ISGATED[0] ~THEN
+always @(posedge ~ARG[0][1]) begin : ~GENSYM[~RESULT_delay][1]
+  if (~ARG[0][0]) begin
+    ~SYM[0] <= ~ARG[2];
   end
 end~ELSE
-always @(posedge ~ARG[2]) begin : ~SYM[1]
-  ~RESULT <= ~ARG[3];
+always @(posedge ~ARG[0]) begin : ~SYM[1]
+  ~SYM[0] <= ~ARG[2];
 end~FI
+assign ~RESULT = ~SYM[0];
 // delay end"
     }
   }
@@ -26,29 +27,30 @@ end~FI
     , "kind" : "Declaration"
     , "type" :
 "register#
-  :: (HasCallStack, Undefined a) -- (ARG[0], ARG[1])
-  => Clock domain gated       -- ARG[2]
-  -> Reset domain synchronous -- ARG[3]
-  -> a                        -- ARG[4]
-  -> Signal clk a             -- ARG[5]
+  :: Clock domain gated       -- ARG[0]
+  -> Reset domain synchronous -- ARG[1]
+  -> a                        -- ARG[2] (powerup value)
+  -> a                        -- ARG[3] (reset value)
+  -> Signal clk a             -- ARG[4]
   -> Signal clk a"
-    , "outputReg" : true
     , "template" :
-"// register begin~IF ~ISGATED[2] ~THEN
-always @(posedge ~ARG[2][1]~IF ~ISSYNC[3] ~THEN ~ELSE or posedge ~ARG[3]~FI) begin : ~GENSYM[~COMPNAME_register][1]
-  if (~ARG[3]) begin
-    ~RESULT <= ~ARG[4];
-  end else if (~ARG[2][0]) begin
-    ~RESULT <= ~ARG[5];
+"// register begin
+reg ~TYPO ~GENSYM[~RESULT_reg][0] = ~CONST[2]; ~IF ~ISGATED[0] ~THEN
+always @(posedge ~ARG[0][1]~IF ~ISSYNC[1] ~THEN ~ELSE or posedge ~ARG[1]~FI) begin : ~GENSYM[~RESULT_register][1]
+  if (~ARG[1]) begin
+    ~SYM[0] <= ~CONST[3];
+  end else if (~ARG[0][0]) begin
+    ~SYM[0] <= ~ARG[4];
   end
 end~ELSE
-always @(posedge ~ARG[2]~IF ~ISSYNC[3] ~THEN ~ELSE or posedge ~ARG[3]~FI) begin : ~SYM[1]
-  if (~ARG[3]) begin
-    ~RESULT <= ~ARG[4];
+always @(posedge ~ARG[0]~IF ~ISSYNC[1] ~THEN ~ELSE or posedge ~ARG[1]~FI) begin : ~SYM[1]
+  if (~ARG[1]) begin
+    ~SYM[0] <= ~CONST[3];
   end else begin
-    ~RESULT <= ~ARG[5];
+    ~SYM[0] <= ~ARG[4];
   end
 end~FI
+assign ~RESULT = ~SYM[0];
 // register end"
     }
   }

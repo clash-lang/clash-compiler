@@ -20,6 +20,7 @@ fifo
 
 which can subsequently be inspected in the interactive environment:
 
+>>> import Clash.Explicit.Prelude
 >>> :t fifo @System
 fifo @System
   :: Clock System gated

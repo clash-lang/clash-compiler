@@ -161,7 +161,7 @@ data Primitive a b c
     -- ^ Name of the primitive
   , functionName :: BlackBoxFunctionName
   , function :: c
-    -- ^ Used to indiciate type of template (declaration or expression).
+    -- ^ Used to indicate type of template (declaration or expression).
   }
   -- | A primitive that carries additional information. These are "real"
   -- primitives, hardcoded in the compiler. For example: 'mapSignal' in

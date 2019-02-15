@@ -1,29 +1,26 @@
-[ { "BlackBox" :
-    { "name"      : "GHC.Int.I8#"
-    , "kind"      : "Declaration"
-    , "type"      : "I8# :: Int# -> Int8"
-    , "template"  : "assign ~RESULT = $signed(~ARG[0]);"
+[
+  {
+    "BlackBoxHaskell": {
+      "name": "GHC.Int.I8#",
+      "templateFunction": "Clash.Primitives.GHC.Int.intTF"
     }
-  }
-, { "BlackBox" :
-    { "name"      : "GHC.Int.I16#"
-    , "kind"      : "Declaration"
-    , "type"      : "I16# :: Int# -> Int16"
-    , "template"  : "assign ~RESULT = $signed(~ARG[0]);"
+  },
+  {
+    "BlackBoxHaskell": {
+      "name": "GHC.Int.I16#",
+      "templateFunction": "Clash.Primitives.GHC.Int.intTF"
     }
-  }
-, { "BlackBox" :
-    { "name"      : "GHC.Int.I32#"
-    , "kind"      : "Declaration"
-    , "type"      : "I32# :: Int# -> Int32"
-    , "template"  : "assign ~RESULT = $signed(~ARG[0]);"
+  },
+  {
+    "BlackBoxHaskell": {
+      "name": "GHC.Int.I32#",
+      "templateFunction": "Clash.Primitives.GHC.Int.intTF"
     }
-  }
-, { "BlackBox" :
-    { "name"      : "GHC.Int.I64#"
-    , "kind"      : "Declaration"
-    , "type"      : "I64# :: Int# -> Int64"
-    , "template"  : "assign ~RESULT = $signed(~ARG[0]);"
+  },
+  {
+    "BlackBoxHaskell": {
+      "name": "GHC.Int.I64#",
+      "templateFunction": "Clash.Primitives.GHC.Int.intTF"
     }
   }
 ]

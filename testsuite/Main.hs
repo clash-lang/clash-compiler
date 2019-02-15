@@ -192,6 +192,10 @@ runClashTest =
         , runTest ("tests" </> "shouldwork" </> "Polymorphism") defBuild [] "GADTExistential"   ([""],"GADTExistential_topEntity",False)
         , runTest ("tests" </> "shouldwork" </> "Polymorphism") defBuild [] "LocalPoly"         ([""],"LocalPoly_topEntity",False)
         ]
+      , clashTestGroup "PrimitiveReductions"
+        [ runTest ("tests" </> "shouldwork" </> "PrimitiveReductions") defBuild [] "Lambda"     (["","Lambda_testBench"],"Lambda_testBench",True)
+        , runTest ("tests" </> "shouldwork" </> "PrimitiveReductions") defBuild [] "ReplaceInt" (["","ReplaceInt_testBench"],"ReplaceInt_testBench",True)
+        ]
       , clashTestGroup "RTree"
         [ runTest ("tests" </> "shouldwork" </> "RTree") defBuild [] "TFold"       ([""],"TFold_topEntity",False)
         , runTest ("tests" </> "shouldwork" </> "RTree") defBuild [] "TRepeat"  ([""],"TRepeat_topEntity",False)
@@ -205,9 +209,10 @@ runClashTest =
         , runTest ("tests" </> "shouldwork" </> "Signal") defBuild [] "GatedClockWidth"                  (["","GatedClockWidth_testBench"],"GatedClockWidth_testBench",True)
         , runTest ("tests" </> "shouldwork" </> "Signal") defBuild [] "BlockRamTest"    ([""],"BlockRamTest_topEntity",False)
         , runTest ("tests" </> "shouldwork" </> "Signal") defBuild [] "DelayedReset"    (["","DelayedReset_testBench"],"DelayedReset_testBench",True)
-        , runTest ("tests" </> "shouldwork" </> "Signal") defBuild [] "MAC"             ([""],"MAC_topEntity",False)
         , runTest ("tests" </> "shouldwork" </> "Signal") defBuild [] "NoCPR"           (["example"],"example",False)
         , runTest ("tests" </> "shouldwork" </> "Signal") defBuild [] "Ram"             (["","Ram_testBench"],"Ram_testBench",True)
+        , runTest ("tests" </> "shouldwork" </> "Signal") defBuild [] "RegisterAS"      (["","RegisterAS_testBench"],"RegisterAS_testBench",True)
+        , runTest ("tests" </> "shouldwork" </> "Signal") defBuild [] "RegisterSS"      (["","RegisterSS_testBench"],"RegisterSS_testBench",True)
         , runTest ("tests" </> "shouldwork" </> "Signal") defBuild [] "Rom"             (["","Rom_testBench"],"Rom_testBench",True)
         , runTest ("tests" </> "shouldwork" </> "Signal") defBuild [] "RomFile"         (["","RomFile_testBench"],"RomFile_testBench",True)
         , runTest ("tests" </> "shouldwork" </> "Signal") defBuild [] "SigP"            ([""],"SigP_topEntity",False)
@@ -215,6 +220,8 @@ runClashTest =
         , runTest ("tests" </> "shouldwork" </> "Signal" </> "BiSignal") defBuild [] "Counter" (["","Counter_testBench"],"Counter_testBench",True)
         , runTest ("tests" </> "shouldwork" </> "Signal" </> "BiSignal") defBuild [] "CounterHalfTuple" (["","CounterHalfTuple_testBench"],"CounterHalfTuple_testBench",True)
         , runTest ("tests" </> "shouldwork" </> "Signal" </> "BiSignal") defBuild [] "CounterHalfTupleRev" (["","CounterHalfTupleRev_testBench"],"CounterHalfTupleRev_testBench",True)
+
+        , runFailingTest ("tests" </> "shouldfail" </> "Signal") defBuild [] "MAC" (Just "Can't match template for \"Clash.Signal.Internal.register#\"")
         ]
       , clashTestGroup "SynthesisAttributes"
         [ outputTest ("tests" </> "shouldwork" </> "SynthesisAttributes") defBuild "Simple"  "main"

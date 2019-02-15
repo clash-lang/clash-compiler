@@ -68,11 +68,10 @@ import Clash.Core.Util       (collectArgs, mkApps, patIds, termType)
 import Clash.Core.VarEnv
   (InScopeSet, elemInScopeSet, notElemInScopeSet)
 import Clash.Normalize.Types (NormalizeState)
-import Clash.Normalize.Util  (isConstant)
 import Clash.Rewrite.Types
   (RewriteMonad, bindings, evaluator, globalHeap, tcCache, tupleTcCache, uniqSupply)
 import Clash.Rewrite.Util    (mkInternalVar, mkSelectorCase,
-                              isUntranslatableType)
+                              isUntranslatableType, isConstant)
 import Clash.Unique          (lookupUniqMap)
 import Clash.Util
 
@@ -116,23 +115,29 @@ allEqual (x:xs) = all (== x) xs
 -- | Collect 'CaseTree's for (potentially) disjoint applications of globals out
 -- of an expression. Also substitute truly disjoint applications of globals by a
 -- reference to a lifted out application.
-collectGlobals ::
-     InScopeSet
-  -> [(Term,Term)] -- ^ Substitution of (applications of) a global
-                   -- binder by a reference to a lifted term.
-  -> [Term] -- ^ List of already seen global binders
-  -> Term -- ^ The expression
-  -> RewriteMonad NormalizeState
-                  (Term,[(Term,([Term],CaseTree [(Either Term Type)]))])
-collectGlobals inScope substitution seen (Case scrut ty alts) = do
+collectGlobals'
+  :: InScopeSet
+  -> [(Term,Term)]
+  -- ^ Substitution of (applications of) a global binder by a reference to a
+  -- lifted term.
+  -> [Term]
+  -- ^ List of already seen global binders
+  -> Term
+  -- ^ The expression
+  -> Bool
+  -- ^ Whether expression is constant
+  -> RewriteMonad
+      NormalizeState
+      (Term, [(Term, ([Term], CaseTree [Either Term Type]))])
+collectGlobals' inScope substitution seen (Case scrut ty alts) _eIsConstant = do
   rec (alts' ,collected)  <- collectGlobalsAlts inScope substitution seen scrut'
                                                 alts
       (scrut',collected') <- collectGlobals inScope substitution
                                             (map fst collected ++ seen) scrut
   return (Case scrut' ty alts',collected ++ collected')
 
-collectGlobals inScope substitution seen e@(collectArgs -> (fun, args@(_:_)))
-  | not (isConstant e) = do
+collectGlobals' inScope substitution seen e@(collectArgs -> (fun, args@(_:_))) eIsconstant
+  | not eIsconstant = do
     tcm <- Lens.view tcCache
     bndrs <- Lens.use bindings
     primEval <- Lens.view evaluator
@@ -146,26 +151,28 @@ collectGlobals inScope substitution seen e@(collectArgs -> (fun, args@(_:_)))
     case untran of
       -- Don't lift out non-representable values, because they cannot be let-bound
       -- in our desired normal form.
-      False -> case interestingToLift inScope eval fun args of
-        Just fun' | fun' `notElem` seen -> do
-          (args',collected) <- collectGlobalsArgs inScope substitution
-                                                  (fun':seen) args
-          let e' = Maybe.fromMaybe (mkApps fun' args') (List.lookup fun' substitution)
-          -- This function is lifted out an environment with the currently 'seen'
-          -- binders. When we later apply substitution, we need to start with this
-          -- environment, otherwise we perform incorrect substitutions in the
-          -- arguments.
-          return (e',(fun',(seen,Leaf args')):collected)
-        _ -> do (args',collected) <- collectGlobalsArgs inScope substitution
-                                                        seen args
-                return (mkApps fun args',collected)
+      False -> do
+        isInteresting <- interestingToLift inScope eval fun args
+        case isInteresting of
+          Just fun' | fun' `notElem` seen -> do
+            (args',collected) <- collectGlobalsArgs inScope substitution
+                                                    (fun':seen) args
+            let e' = Maybe.fromMaybe (mkApps fun' args') (List.lookup fun' substitution)
+            -- This function is lifted out an environment with the currently 'seen'
+            -- binders. When we later apply substitution, we need to start with this
+            -- environment, otherwise we perform incorrect substitutions in the
+            -- arguments.
+            return (e',(fun',(seen,Leaf args')):collected)
+          _ -> do (args',collected) <- collectGlobalsArgs inScope substitution
+                                                          seen args
+                  return (mkApps fun args',collected)
       _ -> return (e,[])
 
 -- FIXME: This duplicates A LOT of let-bindings, where I just pray that after
 -- the ANF, CSE, and DeadCodeRemoval pass all duplicates are removed.
 --
 -- I think we should be able to do better, but perhaps we cannot fix it here.
-collectGlobals inScope substitution seen (Letrec lbs body) = do
+collectGlobals' inScope substitution seen (Letrec lbs body) _eIsConstant = do
   (body',collected)   <- collectGlobals    inScope substitution seen body
   (lbs',collected')   <- collectGlobalsLbs inScope substitution
                                            (map fst collected ++ seen)
@@ -174,7 +181,25 @@ collectGlobals inScope substitution seen (Letrec lbs body) = do
          ,map (second (second (LB lbs'))) (collected ++ collected')
          )
 
-collectGlobals _ _ _ e = return (e,[])
+collectGlobals' _ _ _ e _ = return (e,[])
+
+-- | Collect 'CaseTree's for (potentially) disjoint applications of globals out
+-- of an expression. Also substitute truly disjoint applications of globals by a
+-- reference to a lifted out application.
+collectGlobals
+  :: InScopeSet
+  -> [(Term,Term)]
+  -- ^ Substitution of (applications of) a global binder by a reference to
+  -- a lifted term.
+  -> [Term]
+  -- ^ List of already seen global binders
+  -> Term
+  -- ^ The expression
+  -> RewriteMonad
+      NormalizeState
+      (Term, [(Term, ([Term], CaseTree [Either Term Type]))])
+collectGlobals inScope substitution seen e =
+  collectGlobals' inScope substitution seen e =<< isConstant e
 
 -- | Collect 'CaseTree's for (potentially) disjoint applications of globals out
 -- of a list of application arguments. Also substitute truly disjoint
@@ -415,22 +440,22 @@ interestingToLift
   -- ^ Term in function position
   -> [Either Term Type]
   -- ^ Arguments
-  -> Maybe Term
+  -> RewriteMonad extra (Maybe Term)
 interestingToLift inScope _ e@(Var v) _ =
   if v `elemInScopeSet` inScope
-     then Just e
-     else Nothing
-interestingToLift inScope eval e@(Prim nm pty) args =
-    case List.lookup nm interestingPrims of
-      Just t | t || not (all isConstant lArgs) -> Just e
-      _ -> if isHOTy pty
-              then if not . null . Maybe.catMaybes $
-                      map (uncurry (interestingToLift inScope eval) .
-                           collectArgs
-                          ) lArgs
-                      then Just e
-                      else Nothing
-              else Nothing
+     then pure (Just e)
+     else pure Nothing
+interestingToLift inScope eval e@(Prim nm pty) args = do
+  anyArgNotConstant <- anyM (fmap not . isConstant) lArgs
+  case List.lookup nm interestingPrims of
+    Just t | t || anyArgNotConstant -> pure (Just e)
+    _ -> do
+      let isInteresting = uncurry (interestingToLift inScope eval) . collectArgs
+      if isHOTy pty then do
+        anyInteresting <- anyM (fmap Maybe.isJust . isInteresting) lArgs
+        if anyInteresting then pure (Just e) else pure Nothing
+      else
+        pure Nothing
 
   where
     interestingPrims =
@@ -500,4 +525,4 @@ interestingToLift inScope eval e@(Prim nm pty) args =
     isHOTy t = case splitFunForallTy t of
       (args',_) -> any isPolyFunTy (Either.rights args')
 
-interestingToLift _ _ _ _ = Nothing
+interestingToLift _ _ _ _ = pure Nothing

@@ -25,6 +25,7 @@ import Control.Monad.State                   (MonadState (..))
 import Control.Monad.Writer                  (MonadWriter (..))
 import Data.IntMap.Strict                    (IntMap)
 import Data.Monoid                           (Any)
+import Data.Text                             (Text)
 
 import SrcLoc (SrcSpan)
 
@@ -42,19 +43,29 @@ import Clash.Annotations.BitRepresentation.Internal (CustomReprs)
 
 -- | Context in which a term appears
 data CoreContext
-  = AppFun           -- ^ Function position of an application
-  | AppArg           -- ^ Argument position of an application
-  | TyAppC           -- ^ Function position of a type application
-  | LetBinding Id [Id] -- ^ RHS of a Let-binder with the sibling LHS'
-  | LetBody    [Id]  -- ^ Body of a Let-binding with the bound LHS'
-  | LamBody    Id    -- ^ Body of a lambda-term with the abstracted variable
-  | TyLamBody  TyVar -- ^ Body of a TyLambda-term with the abstracted
-                     -- type-variable
+  = AppFun
+  -- ^ Function position of an application
+  | AppArg (Maybe (Text, Int, Int))
+  -- ^ Argument position of an application. If this is an argument applied to
+  -- a primitive, a tuple is defined containing (name of the primitive, #type
+  -- args, #term args)
+  | TyAppC
+  -- ^ Function position of a type application
+  | LetBinding Id [Id]
+  -- ^ RHS of a Let-binder with the sibling LHS'
+  | LetBody [Id]
+  -- ^ Body of a Let-binding with the bound LHS'
+  | LamBody Id
+  -- ^ Body of a lambda-term with the abstracted variable
+  | TyLamBody TyVar
+  -- ^ Body of a TyLambda-term with the abstracted type-variable
   | CaseAlt [TyVar] [Id]
   -- ^ RHS of a case-alternative with the variables bound by
   -- the pattern on the LHS
-  | CaseScrut        -- ^ Subject of a case-decomposition
-  | CastBody         -- ^ Body of a Cast
+  | CaseScrut
+  -- ^ Subject of a case-decomposition
+  | CastBody
+  -- ^ Body of a Cast
   deriving (Eq,Show)
 
 -- | State of a rewriting session
@@ -101,6 +112,7 @@ data RewriteEnv
   , _topEntities    :: VarSet
   -- ^ Functions that are considered TopEntities
   , _customReprs    :: CustomReprs
+  -- ^ Custom bit representations
   }
 
 makeLenses ''RewriteEnv

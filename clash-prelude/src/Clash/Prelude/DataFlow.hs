@@ -56,11 +56,11 @@ import Clash.Explicit.Mealy   (mealyB)
 import Clash.Promoted.Nat     (SNat)
 import Clash.Signal           ((.&&.), unbundle)
 import Clash.Signal.Bundle    (Bundle (..))
-import Clash.Signal.Internal  (clockGate, register#)
-import Clash.Explicit.Signal  (Clock, Reset, Signal)
+import Clash.Signal.Internal  (clockGate)
+import Clash.Explicit.Signal  (Clock, Reset, Signal, register)
 import Clash.Sized.BitVector  (BitVector)
 import Clash.Sized.Vector
-import Clash.XException       (Undefined, errorX)
+import Clash.XException       (errorX)
 
 {- | Dataflow circuit with bidirectional synchronisation channels.
 
@@ -149,8 +149,7 @@ pureDF f = DF (\i iV oR -> (fmap f i,iV,oR))
 
 -- | Create a 'DataFlow' circuit from a Mealy machine description as those of
 -- "Clash.Prelude.Mealy"
-mealyDF :: Undefined s
-        => Clock domain gated
+mealyDF :: Clock domain gated
         -> Reset domain synchronous
         -> (s -> i -> (s,o))
         -> s
@@ -158,13 +157,12 @@ mealyDF :: Undefined s
 mealyDF clk rst f iS =
   DF (\i iV oR -> let en     = iV .&&. oR
                       (s',o) = unbundle (f <$> s <*> i)
-                      s      = register# (clockGate clk en) rst iS s'
+                      s      = register (clockGate clk en) rst iS s'
                   in  (o,iV,oR))
 
 -- | Create a 'DataFlow' circuit from a Moore machine description as those of
 -- "Clash.Prelude.Moore"
-mooreDF :: Undefined s
-        => Clock domain gated
+mooreDF :: Clock domain gated
         -> Reset domain synchronous
         -> (s -> i -> s)
         -> (s -> o)
@@ -173,7 +171,7 @@ mooreDF :: Undefined s
 mooreDF clk rst ft fo iS =
   DF (\i iV oR -> let en  = iV .&&. oR
                       s'  = ft <$> s <*> i
-                      s   = register# (clockGate clk en) rst iS s'
+                      s   = register (clockGate clk en) rst iS s'
                       o   = fo <$> s
                   in  (o,iV,oR))
 
@@ -206,7 +204,7 @@ fifoDF_mealy (mem,rptr,wptr) (wdata,winc,rinc) =
 -- fifo4 = 'fifoDF' d4 (2 :> 3 :> Nil)
 -- @
 fifoDF :: forall addrSize m n a domain gated synchronous .
-     (KnownNat addrSize, KnownNat n, KnownNat m, (m + n) ~ (2 ^ addrSize), Undefined a)
+     (KnownNat addrSize, KnownNat n, KnownNat m, (m + n) ~ (2 ^ addrSize))
   => Clock domain gated
   -> Reset domain synchronous
   -> SNat (m + n) -- ^ Depth of the FIFO buffer. Must be a power of two.
@@ -337,7 +335,7 @@ parNDF fs =
 -- @
 --
 -- <<doc/loopDF_sync.svg>>
-loopDF :: (KnownNat m, KnownNat n, KnownNat addrSize, (m+n) ~ (2^addrSize), Undefined d)
+loopDF :: (KnownNat m, KnownNat n, KnownNat addrSize, (m+n) ~ (2^addrSize))
        => Clock dom gated
        -> Reset dom synchronous
        -> SNat (m + n) -- ^ Depth of the FIFO buffer. Must be a power of two

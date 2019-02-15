@@ -26,8 +26,6 @@ where
 
 import qualified Clash.Explicit.Moore as E
 import           Clash.Signal
-import           Clash.XException
-import           GHC.Stack            (HasCallStack)
 
 {- $setup
 >>> :set -XDataKinds -XTypeApplications
@@ -72,7 +70,7 @@ let macT s (x,y) = x * y + s
 --     s2 = 'moore' mac id 0 ('Clash.Signal.bundle' (b,y))
 -- @
 moore
-  :: (HasCallStack, Undefined s, HiddenClockReset domain gated synchronous)
+  :: HiddenClockReset domain gated synchronous
   => (s -> i -> s) -- ^ Transfer function in moore machine form:
                    -- @state -> input -> newstate@
   -> (s -> o)      -- ^ Output function in moore machine form:
@@ -88,7 +86,7 @@ moore = hideClockReset E.moore
 -- | Create a synchronous function from a combinational function describing
 -- a moore machine without any output logic
 medvedev
-  :: (HasCallStack, Undefined s, HiddenClockReset domain gated synchronous)
+  :: HiddenClockReset domain gated synchronous
   => (s -> i -> s)
   -> s
   -> (Signal domain i -> Signal domain s)
@@ -123,7 +121,9 @@ medvedev tr st = moore tr id st
 --     (i2,b2) = 'mooreB' t o 3 (i1,c)
 -- @
 mooreB
-  :: (HasCallStack, Bundle i, Bundle o, Undefined s, HiddenClockReset domain gated synchronous)
+  :: HiddenClockReset domain gated synchronous
+  => Bundle i
+  => Bundle o
   => (s -> i -> s) -- ^ Transfer function in moore machine form:
                    -- @state -> input -> newstate@
   -> (s -> o)      -- ^ Output function in moore machine form:
@@ -137,7 +137,9 @@ mooreB = hideClockReset E.mooreB
 
 -- | A version of 'medvedev' that does automatic 'Bundle'ing
 medvedevB
-  :: (HasCallStack, Bundle i, Bundle s, Undefined s, HiddenClockReset domain gated synchronous)
+  :: HiddenClockReset domain gated synchronous
+  => Bundle i
+  => Bundle s
   => (s -> i -> s)
   -> s
   -> (Unbundled domain i -> Unbundled domain s)

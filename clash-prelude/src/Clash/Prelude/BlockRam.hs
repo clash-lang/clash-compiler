@@ -339,11 +339,9 @@ This concludes the short introduction to using 'blockRam'.
 
 -}
 
-{-# LANGUAGE BangPatterns        #-}
 {-# LANGUAGE DataKinds           #-}
 {-# LANGUAGE FlexibleContexts    #-}
 {-# LANGUAGE GADTs               #-}
-{-# LANGUAGE MagicHash           #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeOperators       #-}
 
@@ -641,7 +639,10 @@ prog2 = -- 0 := 4
 -- Block RAM.
 -- * Use the adapter 'readNew' for obtaining write-before-read semantics like this: @readNew (blockRam inits) rd wrM@.
 blockRam
-  :: (Enum addr, HiddenClock domain gated, HasCallStack)
+  :: HasCallStack
+  => HiddenClock domain gated
+  => Undefined a
+  => Enum addr
   => Vec n a     -- ^ Initial content of the BRAM, also
                  -- determines the size, @n@, of the BRAM.
                  --
@@ -676,7 +677,10 @@ blockRam = \cnt rd wrM -> withFrozenCallStack
 -- Block RAM.
 -- * Use the adapter 'readNew' for obtaining write-before-read semantics like this: @readNew (blockRamPow2 inits) rd wrM@.
 blockRamPow2
-  :: (KnownNat n, HiddenClock domain gated, HasCallStack)
+  :: HasCallStack
+  => HiddenClock domain gated
+  => Undefined a
+  => KnownNat n
   => Vec (2^n) a         -- ^ Initial content of the BRAM, also
                          -- determines the size, @2^n@, of the BRAM.
                          --
@@ -700,7 +704,7 @@ blockRamPow2 = \cnt rd wrM -> withFrozenCallStack
 --      ... =>
 --      Signal domain addr
 --      -> Signal domain (Maybe (addr, a)) -> Signal domain a
-readNew :: (Eq addr, Undefined a, HiddenClockReset domain gated synchronous)
+readNew :: (Eq addr, HiddenClockReset domain gated synchronous)
         => (Signal domain addr -> Signal domain (Maybe (addr, a)) -> Signal domain a)
         -- ^ The @ram@ component
         -> Signal domain addr              -- ^ Read address @r@

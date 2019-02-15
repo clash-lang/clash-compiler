@@ -36,6 +36,7 @@
 
 module Clash.Normalize.PrimitiveReductions where
 
+import           Control.Concurrent.Supply        (Supply)
 import qualified Control.Lens                     as Lens
 import           Data.List                        (mapAccumR)
 import qualified Data.Maybe                       as Maybe
@@ -641,6 +642,96 @@ reduceReplicate n aTy eTy arg = do
       = let retVec = mkVec nilCon consCon aTy n (replicate (fromInteger n) arg)
         in  changed retVec
     go _ ty = error $ $(curLoc) ++ "reduceReplicate: argument does not have a vector type: " ++ showPpr ty
+
+-- TODO: Take a shortcut when given index is a literal. Right now, this function
+-- TODO: simply creates a case statement for every element in the vector, which
+-- TODO: Clash will eliminate one-by-one if the index turned out to be literal.
+-- TODO: It would of course be best to not create the cases in the first place!
+reduceReplace_int
+  :: InScopeSet
+  -> Integer
+  -- ^ Size of vector
+  -> Type
+  -- ^ Type of vector element
+  -> Type
+  -- ^ Type of vector
+  -> Term
+  -- ^ Vector
+  -> Term
+  -- ^ Index
+  -> Term
+  -- ^ Element
+  -> NormalizeSession Term
+reduceReplace_int is0 n aTy vTy v i newA = do
+  tcm <- Lens.view tcCache
+  go tcm vTy
+ where
+  -- Basically creates:
+  --
+  -- case i0 of
+  --   I# i1 ->
+  --     case i1 of
+  --       curI -> newA
+  --       _    -> oldA
+  --
+  -- where:
+  --
+  --   - curI is the index of the current element, which we statically know
+  --   - i0 is the index given to replace_int, and i1 is its primitive sibling
+  --   - newA is the element given to replace_int as a replacement for..
+  --   - oldA; an element at index curI
+  --
+  replace_intElement
+    :: Supply
+    -- ^ Unique supply
+    -> DataCon
+    -- Int datacon
+    -> Type
+    -- Int type
+    -> Term
+    -- ^ Element in vector
+    -> Integer
+    -- ^
+    -> Term
+  replace_intElement uniqs0 iDc iTy oldA elIndex = case0
+   where
+    (_, iId) = mkUniqInternalId (uniqs0, is0) ("i", iTy)
+    case0    = Case i aTy [(DataPat iDc [] [iId], case1)]
+    case1    = Case (Var iId) aTy [ (DefaultPat, oldA)
+                                  , (LitPat (IntLiteral elIndex), newA) ]
+
+  go tcm (coreView1 tcm -> Just ty') = go tcm ty'
+  go tcm (tyView -> TyConApp vecTcNm _)
+    | (Just vecTc)     <- lookupUniqMap vecTcNm tcm
+    , [nilCon,consCon] <- tyConDataCons vecTc
+    = do
+      -- Get data constructors of 'Int'
+      uniqs0                   <- Lens.use uniqSupply
+      let iTy                   = termType tcm i
+          (TyConApp iTcNm _)    = tyView iTy
+          (Just iTc)            = lookupUniqMap iTcNm tcm
+          [iDc]                 = tyConDataCons iTc
+
+      -- Get elements from vector
+          (uniqs1,(vars,elems)) = second (second concat . unzip)
+                                $ extractElems
+                                    uniqs0
+                                    is0
+                                    consCon
+                                    aTy
+                                    'I'
+                                    n
+                                    v
+
+      -- Replace every element with (if i == elIndex then newA else oldA)
+      let replacedEls = zipWith (replace_intElement uniqs1 iDc iTy) vars [0..]
+          lbody       = mkVec nilCon consCon aTy n replacedEls
+          lb          = Letrec (init elems) lbody
+      uniqSupply Lens..= uniqs1
+      changed lb
+  go _ ty = error $ $(curLoc) ++ "reduceReplace_int: argument does not have "
+                                ++ "a vector type: " ++ showPpr ty
+
 
 -- | Replace an application of the @Clash.Sized.Vector.dtfold@ primitive on
 -- vectors of a known length @n@, by the fully unrolled recursive "definition"

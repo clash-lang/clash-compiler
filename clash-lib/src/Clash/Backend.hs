@@ -12,6 +12,7 @@ module Clash.Backend where
 import Control.Lens                         (Lens')
 import qualified  Control.Lens              as Lens
 import Data.HashSet                         (HashSet)
+import qualified Data.HashSet               as HashSet
 import Data.Maybe                           (fromMaybe)
 import Data.Semigroup.Monad                 (Mon (..))
 import qualified Data.Text                  as T
@@ -58,7 +59,7 @@ class Backend state where
   extractTypes     :: state -> HashSet HWType
 
   -- | Generate HDL for a Netlist component
-  genHDL           :: Identifier -> SrcSpan -> [Identifier] -> Component -> Mon (State state) ((String, Doc),[(String,Doc)])
+  genHDL           :: Identifier -> SrcSpan -> HashSet Identifier -> Component -> Mon (State state) ((String, Doc),[(String,Doc)])
   -- | Generate a HDL package containing type definitions for the given HWTypes
   mkTyPackage      :: Identifier -> [HWType] -> Mon (State state) [(String, Doc)]
   -- | Convert a Netlist HWType to a target HDL type
@@ -106,7 +107,7 @@ class Backend state where
   getDataFiles     :: State state [(String,FilePath)]
   addMemoryDataFile  :: (String,String) -> State state ()
   getMemoryDataFiles :: State state [(String,String)]
-  seenIdentifiers  :: Lens' state [Identifier]
+  seenIdentifiers  :: Lens' state (HashSet Identifier)
 
 -- | Replace a normal HDL template placeholder with an unescaped/unextended
 -- template placeholder.
@@ -133,14 +134,14 @@ mkUniqueIdentifier typ nm = do
   let i = mkId typ nm
   if i `elem` seen
      then go extendId (0::Int) seen i
-     else do seenIdentifiers Lens.%= (i:)
+     else do seenIdentifiers Lens.%= (HashSet.insert i)
              return i
  where
   go extendId n seen i = do
     let i' = extendId typ i (T.pack ('_':show n))
     if i' `elem` seen
        then go extendId (n+1) seen i
-       else do seenIdentifiers Lens.%= (i':)
+       else do seenIdentifiers Lens.%= (HashSet.insert i')
                return i'
 
 preserveSeen

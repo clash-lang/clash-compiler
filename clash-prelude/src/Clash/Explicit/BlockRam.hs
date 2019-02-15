@@ -398,12 +398,13 @@ import GHC.Stack              (HasCallStack, withFrozenCallStack)
 import GHC.TypeLits           (KnownNat, type (^))
 import Prelude                hiding (length)
 
+import Clash.Explicit.Signal  (register)
 import Clash.Signal.Internal
-  (Clock, Reset, Signal (..), (.&&.), clockEnable, mux, register#)
+  (Clock, Reset, Signal (..), (.&&.), clockEnable, mux)
 import Clash.Signal.Bundle    (unbundle)
 import Clash.Sized.Unsigned   (Unsigned)
 import Clash.Sized.Vector     (Vec, toList)
-import Clash.XException       (Undefined, errorX, maybeX, seqX)
+import Clash.XException       (maybeX, seqX, Undefined, deepErrorX)
 
 {- $setup
 >>> import Clash.Explicit.Prelude as C
@@ -683,6 +684,7 @@ prog2 = -- 0 := 4
 -- * Use the adapter 'readNew' for obtaining write-before-read semantics like this: @'readNew' clk rst ('blockRam' clk inits) rd wrM@.
 blockRam
   :: HasCallStack
+  => Undefined a
   => Enum addr
   => Clock dom gated
   -- ^ 'Clock' to synchronize to
@@ -721,7 +723,9 @@ blockRam = \clk content rd wrM ->
 -- Block RAM.
 -- * Use the adapter 'readNew' for obtaining write-before-read semantics like this: @'readNew' clk rst ('blockRamPow2' clk inits) rd wrM@.
 blockRamPow2
-  :: (KnownNat n, HasCallStack)
+  :: HasCallStack
+  => Undefined a
+  => KnownNat n
   => Clock dom gated          -- ^ 'Clock' to synchronize to
   -> Vec (2^n) a              -- ^ Initial content of the BRAM, also
                               -- determines the size, @2^n@, of
@@ -741,6 +745,7 @@ blockRamPow2 = \clk cnt rd wrM -> withFrozenCallStack
 -- | blockRAM primitive
 blockRam#
   :: HasCallStack
+  => Undefined a
   => Clock dom gated -- ^ 'Clock' to synchronize to
   -> Vec n a         -- ^ Initial content of the BRAM, also
                      -- determines the size, @n@, of the BRAM.
@@ -756,11 +761,11 @@ blockRam#
 blockRam# clk content rd wen = case clockEnable clk of
   Nothing ->
     go (V.fromList (toList content))
-       (withFrozenCallStack (errorX "blockRam: intial value undefined"))
+       (withFrozenCallStack (deepErrorX "blockRam: intial value undefined"))
        rd wen
   Just ena ->
     go' (V.fromList (toList content))
-       (withFrozenCallStack (errorX "blockRam: intial value undefined"))
+       (withFrozenCallStack (deepErrorX "blockRam: intial value undefined"))
        ena rd (ena .&&. wen)
   where
     -- no clock enable
@@ -786,7 +791,7 @@ blockRam# clk content rd wen = case clockEnable clk of
 
 -- | Create read-after-write blockRAM from a read-before-write one
 readNew
-  :: (Eq addr, Undefined a)
+  :: Eq addr
   => Reset domain synchronous
   -> Clock domain gated
   -> (Signal domain addr -> Signal domain (Maybe (addr, a)) -> Signal domain a)
@@ -802,5 +807,5 @@ readNew rst clk ram rdAddr wrM = mux wasSame wasWritten $ ram rdAddr wrM
         readNewT _  Nothing             = (False   , undefined)
 
         (wasSame,wasWritten) =
-          unbundle (register# clk rst (False,undefined)
-                              (readNewT <$> rdAddr <*> wrM))
+          unbundle (register clk rst (False, undefined)
+                             (readNewT <$> rdAddr <*> wrM))

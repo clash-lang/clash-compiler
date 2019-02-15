@@ -7,13 +7,8 @@ Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
 
 {-# LANGUAGE CPP                        #-}
 {-# LANGUAGE DataKinds                  #-}
-{-# LANGUAGE DeriveLift                 #-}
-{-# LANGUAGE DeriveTraversable          #-}
 {-# LANGUAGE GADTs                      #-}
-{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE MultiParamTypeClasses      #-}
-{-# LANGUAGE KindSignatures             #-}
-{-# LANGUAGE MagicHash                  #-}
 {-# LANGUAGE ScopedTypeVariables        #-}
 {-# LANGUAGE TypeFamilies               #-}
 {-# LANGUAGE TypeOperators              #-}
@@ -43,7 +38,6 @@ module Clash.Explicit.Signal.Delayed
 where
 
 import Data.Coerce                (coerce)
-import Data.Default.Class         (Default(..))
 import GHC.TypeLits               (KnownNat, type (+))
 import Prelude                    hiding (head, length, repeat)
 
@@ -55,14 +49,13 @@ import Clash.Signal.Delayed.Internal
 
 import Clash.Explicit.Signal
   (Clock, Reset, Signal, register,  bundle, unbundle)
-import Clash.XException           (Undefined)
 
 {- $setup
 >>> :set -XDataKinds
 >>> :set -XTypeOperators
 >>> import Clash.Explicit.Prelude
->>> let delay3 clk rst = delayed clk rst (0 :> 0 :> 0 :> Nil)
->>> let delay2 clk rst = (delayedI clk rst :: DSignal System n Int -> DSignal System (n + 2) Int)
+>>> let delay3 clk rst = delayed clk rst (-1 :> -1 :> -1 :> Nil)
+>>> let delay2 clk rst = (delayedI clk rst :: Int -> DSignal System n Int -> DSignal System (n + 2) Int)
 >>> :{
 let mac :: Clock System gated
         -> Reset System synchronous
@@ -79,22 +72,27 @@ let mac :: Clock System gated
 
 -}
 
+-- TODO: Reimplement with dtfold
 -- | Delay a 'DSignal' for @d@ periods.
 --
 -- @
--- delay3 :: Clock domain gated -> Reset domain synchronous
---        -> 'DSignal' domain n Int -> 'DSignal' domain (n + 3) Int
--- delay3 clk rst = 'delayed' clk rst (0 ':>' 0 ':>' 0 ':>' 'Nil')
+-- delay3
+--   :: Clock domain gated
+--   -> Reset domain synchronous
+--   -> 'DSignal' domain n Int
+--   -> 'DSignal' domain (n + 3) Int
+-- delay3 clk rst = 'delayed' clk rst (-1 ':>' -1 ':>' -1 ':>' 'Nil')
 -- @
 --
 -- >>> sampleN 7 (delay3 systemClockGen asyncResetGen (dfromList [0..]))
--- [0,0,0,0,1,2,3]
+-- [-1,-1,-1,-1,1,2,3]
 delayed
   :: forall domain gated synchronous a n d
-   . (KnownNat d, Undefined a)
+   . KnownNat d
   => Clock domain gated
   -> Reset domain synchronous
   -> Vec d a
+  -- ^ Default values
   -> DSignal domain n a
   -> DSignal domain (n + d) a
 delayed clk rst m ds = coerce (delaySignal (coerce ds))
@@ -110,17 +108,23 @@ delayed clk rst m ds = coerce (delaySignal (coerce ds))
 -- context.
 --
 -- @
--- delay2 :: Clock domain gated -> Reset domain synchronous
---        -> 'DSignal' domain n Int -> 'DSignal' domain (n + 2) Int
+-- delay2
+--   :: Clock domain gated
+--   -> Reset domain synchronous
+--   -> Int
+--   -> 'DSignal' domain n Int
+--   -> 'DSignal' domain (n + 2) Int
 -- delay2 = 'delayI'
 -- @
 --
--- >>> sampleN 7 (delay2 systemClockGen asyncResetGen (dfromList ([0..])))
--- [0,0,0,1,2,3,4]
+-- >>> sampleN 7 (delay2 systemClockGen asyncResetGen (-1) (dfromList ([0..])))
+-- [-1,-1,-1,1,2,3,4]
 delayedI
-  :: (Default a, KnownNat d, Undefined a)
+  :: KnownNat d
   => Clock domain gated
   -> Reset domain synchronous
+  -> a
+  -- ^ Default value
   -> DSignal domain n a
   -> DSignal domain (n + d) a
-delayedI clk rst = delayed clk rst (repeat def)
+delayedI clk rst dflt = delayed clk rst (repeat dflt)

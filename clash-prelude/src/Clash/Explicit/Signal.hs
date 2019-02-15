@@ -196,12 +196,9 @@ where
 
 import Control.DeepSeq       (NFData)
 import Data.Maybe            (isJust, fromJust)
-import GHC.Stack             (HasCallStack, withFrozenCallStack)
 
 import Clash.Signal.Internal
 import Clash.Signal.Bundle   (Bundle (..))
-
-import Clash.XException      (Undefined)
 
 {- $setup
 >>> :set -XDataKinds -XTypeApplications
@@ -211,8 +208,8 @@ import Clash.XException      (Undefined)
 >>> type Dom7 = Dom "dom" 7
 >>> let clk2 = clockGen @Dom2
 >>> let clk7 = clockGen @Dom7
->>> let oversampling clkA clkB = delay clkB . unsafeSynchronizer clkA clkB . delay clkA
->>> let almostId clkA clkB = delay clkB . unsafeSynchronizer clkA clkB . delay clkA . unsafeSynchronizer clkB clkA . delay clkB
+>>> let oversampling clkA clkB dflt = delay clkB dflt . unsafeSynchronizer clkA clkB . delay clkA dflt
+>>> let almostId clkA clkB dflt = delay clkB dflt . unsafeSynchronizer clkA clkB . delay clkA dflt . unsafeSynchronizer clkB clkA . delay clkB dflt
 >>> let oscillate clk rst = let s = register clk rst False (not <$> s) in s
 >>> let count clk rst = let s = regEn clk rst 0 (oscillate clk rst) (s + 1) in s
 >>> :{
@@ -351,10 +348,14 @@ freqCalc freq = ceiling ((1.0 / freq) / 1.0e-12)
 -- flip-flop synchronizer:
 --
 -- @
--- dualFlipFlop :: Clock domA gatedA -> Clock domB gatedB
---              -> Signal domA Bit -> Signal domB Bit
--- dualFlipFlop clkA clkB = 'delay' clkB . 'delay' clkB
---                        . 'unsafeSynchronizer' clkA clkB
+-- dualFlipFlop
+--   :: Clock domA gatedA
+--   -> Clock domB gatedB
+--   -> Bit
+--   -> Signal domA Bit
+--   -> Signal domB Bit
+-- dualFlipFlop clkA clkB dflt = 'delay' clkB dflt . 'delay' clkB dflt
+--                             . 'unsafeSynchronizer' clkA clkB
 -- @
 --
 -- The 'unsafeSynchronizer' works in such a way that, given 2 clocks:
@@ -379,31 +380,34 @@ freqCalc freq = ceiling ((1.0 / freq) / 1.0e-12)
 -- values:
 --
 -- @
--- 'delay' clkB $
+-- 'delay' clkB dflt $
 -- 'unsafeSynchronizer' clkA clkB $
--- 'delay' clkA $
+-- 'delay' clkA dflt $
 -- 'unsafeSynchronizer' clkB clkA $
 -- 'delay' clkB s
 --
 -- ==
 --
--- X :- X :- s
+-- dflt :- dflt :- s
 -- @
 --
 -- Something we can easily observe:
 --
 -- @
--- oversampling clkA clkB = 'delay' clkB . 'unsafeSynchronizer' clkA clkB
---                        . 'delay' clkA
--- almostId clkA clkB = 'delay' clkB . 'unsafeSynchronizer' clkA clkB
---                    . 'delay' clkA . 'unsafeSynchronizer' clkB clkA
---                    . 'delay' clkB
+-- oversampling clkA clkB dflt = 'delay' clkB dflt
+--                             . 'unsafeSynchronizer' clkA clkB
+--                             . 'delay' clkA dflt
+-- almostId clkA clkB dflt = 'delay' clkB dflt
+--                         . 'unsafeSynchronizer' clkA clkB
+--                         . 'delay' clkA dflt
+--                         . 'unsafeSynchronizer' clkB clkA
+--                         . 'delay' clkB dflt
 -- @
 --
--- >>> printX (sampleN 37 (oversampling clk7 clk2 (fromList [(1::Int)..10])))
--- [X,X,1,1,1,2,2,2,2,3,3,3,4,4,4,4,5,5,5,6,6,6,6,7,7,7,8,8,8,8,9,9,9,10,10,10,10]
--- >>> printX (sampleN 12 (almostId clk2 clk7 (fromList [(1::Int)..10])))
--- [X,X,1,2,3,4,5,6,7,8,9,10]
+-- >>> sampleN 37 (oversampling clk7 clk2 0 (fromList [(1::Int)..10]))
+-- [0,0,1,1,1,2,2,2,2,3,3,3,4,4,4,4,5,5,5,6,6,6,6,7,7,7,8,8,8,8,9,9,9,10,10,10,10]
+-- >>> sampleN 12 (almostId clk2 clk7 0 (fromList [(1::Int)..10]))
+-- [0,0,1,2,3,4,5,6,7,8,9,10]
 unsafeSynchronizer
   :: Clock  domain1 gated1 -- ^ 'Clock' of the incoming signal
   -> Clock  domain2 gated2 -- ^ 'Clock' of the outgoing signal
@@ -456,15 +460,16 @@ repSchedule high low = take low $ repSchedule' low high 1
 -- | \"@'delay' clk s@\" delays the values in 'Signal' /s/ for once cycle, the
 -- value at time 0 is /undefined/.
 --
--- >>> printX (sampleN 3 (delay systemClockGen (fromList [1,2,3,4])))
--- [X,1,2]
+-- >>> printX (sampleN 3 (delay systemClockGen 0 (fromList [1,2,3,4])))
+-- [0,1,2]
 delay
-  :: (HasCallStack, Undefined a)
-  => Clock domain gated
+  :: Clock domain gated
   -- ^ Clock
+  -> a
+  -- ^ Default value
   -> Signal domain a
   -> Signal domain a
-delay = \clk i -> withFrozenCallStack (delay# clk i)
+delay = delay#
 {-# INLINE delay #-}
 
 -- | \"@'register' clk rst i s@\" delays the values in 'Signal' /s/ for one
@@ -473,8 +478,7 @@ delay = \clk i -> withFrozenCallStack (delay# clk i)
 -- >>> sampleN 5 (register systemClockGen asyncResetGen 8 (fromList [1,1,2,3,4]))
 -- [8,8,1,2,3]
 register
-  :: (HasCallStack, Undefined a)
-  => Clock domain gated
+  :: Clock domain gated
   -- ^ clock
   -> Reset domain synchronous
   -- ^ Reset (active-high), 'register' outputs the reset value when the
@@ -483,8 +487,8 @@ register
   -- ^ Reset value
   -> Signal domain a
   -> Signal domain a
-register = \clk rst initial i -> withFrozenCallStack
-  (register# clk rst initial i)
+register clk rst initial i =
+  register# clk rst initial initial i
 {-# INLINE register #-}
 
 -- | Version of 'register' that only updates its content when its fourth
@@ -509,8 +513,7 @@ register = \clk rst initial i -> withFrozenCallStack
 -- >>> sampleN 9 (count systemClockGen asyncResetGen)
 -- [0,0,0,1,1,2,2,3,3]
 regMaybe
-  :: (HasCallStack, Undefined a)
-  => Clock domain gated
+  :: Clock domain gated
   -- ^ Clock
   -> Reset domain synchronous
   -- ^ Reset (active-high), 'regMaybe' outputs the reset value when the
@@ -519,8 +522,8 @@ regMaybe
   -- ^ Reset value
   -> Signal domain (Maybe a)
   -> Signal domain a
-regMaybe = \clk rst initial iM -> withFrozenCallStack
-  (register# (clockGate clk (fmap isJust iM)) rst initial (fmap fromJust iM))
+regMaybe clk rst initial iM =
+  register (clockGate clk (fmap isJust iM)) rst initial (fmap fromJust iM)
 {-# INLINE regMaybe #-}
 
 -- | Version of 'register' that only updates its content when its fourth
@@ -538,8 +541,7 @@ regMaybe = \clk rst initial iM -> withFrozenCallStack
 -- >>> sampleN 9 (count systemClockGen asyncResetGen)
 -- [0,0,0,1,1,2,2,3,3]
 regEn
-  :: Undefined a
-  => Clock domain clk
+  :: Clock domain clk
   -- ^ Clock
   -> Reset domain synchronous
   -- ^ Reset (active-high), 'regEn' outputs the reset value when the
@@ -550,8 +552,8 @@ regEn
   -- ^ Enable signal
   -> Signal domain a
   -> Signal domain a
-regEn = \clk rst initial en i -> withFrozenCallStack
-  (register# (clockGate clk en) rst initial i)
+regEn clk rst initial en i =
+  register (clockGate clk en) rst initial i
 {-# INLINE regEn #-}
 
 -- * Product/Signal isomorphism

@@ -11,13 +11,18 @@
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE NamedFieldPuns  #-}
 
-module Clash.Primitives.Util (generatePrimMap, hashCompiledPrimMap) where
+module Clash.Primitives.Util
+  ( generatePrimMap
+  , hashCompiledPrimMap
+  , constantArgs
+  ) where
 
 import           Data.Aeson.Extra       (decodeOrErr)
 import qualified Data.ByteString.Lazy   as LZ
 import qualified Data.HashMap.Lazy      as HashMap
 import qualified Data.HashMap.Strict    as HashMapStrict
 import           Data.Maybe             (fromMaybe)
+import qualified Data.Set               as Set
 import           Data.Hashable          (hash)
 import           Data.List              (isSuffixOf, sort)
 import           Data.Text.Lazy         (Text)
@@ -29,7 +34,14 @@ import qualified System.FilePath        as FilePath
 import           System.IO.Error        (tryIOError)
 
 import           Clash.Primitives.Types
+  ( Primitive(BlackBox), CompiledPrimitive, ResolvedPrimitive, ResolvedPrimMap
+  , includes, template, TemplateSource(TFile, TInline), Primitive(..)
+  , UnresolvedPrimitive, CompiledPrimMap)
 import           Clash.Netlist.Types    (BlackBox(..))
+import           Clash.Netlist.BlackBox.Util
+  (walkElement)
+import           Clash.Netlist.BlackBox.Types
+  (Element(Const, Lit))
 
 hashCompiledPrimitive :: CompiledPrimitive -> Int
 hashCompiledPrimitive (Primitive {name, primType}) = hash (name, primType)
@@ -109,3 +121,13 @@ generatePrimMap filePaths = do
 
   primitives <- fmap concat $ mapM resolvePrimitive primitiveFiles
   return $ HashMap.fromList $ zip (map name primitives) primitives
+
+-- | Determine what argument should be constant / literal
+constantArgs :: CompiledPrimitive -> Set.Set Int
+constantArgs BlackBox {template = BBTemplate template} =
+  Set.fromList (concatMap (walkElement getConstant) template)
+ where
+  getConstant (Lit i)      = Just i
+  getConstant (Const i)    = Just i
+  getConstant _            = Nothing
+constantArgs _ = Set.empty

@@ -132,7 +132,6 @@ ddrIn# (GatedClock _ _ ena) (Async rst) i0 i1 i2 =
 --
 -- Produces a DDR output signal from a normal signal of pairs of input.
 ddrOut :: ( HasCallStack
-          , Undefined a
           , fast ~ 'Dom n pFast
           , slow ~ 'Dom n (2*pFast))
        => Clock slow gated            -- ^ clock
@@ -144,7 +143,6 @@ ddrOut clk rst i0 = uncurry (withFrozenCallStack $ ddrOut# clk rst i0) . unbundl
 
 
 ddrOut# :: ( HasCallStack
-           , Undefined a
            , fast ~ 'Dom n pFast
            , slow ~ 'Dom n (2*pFast))
         => Clock slow gated

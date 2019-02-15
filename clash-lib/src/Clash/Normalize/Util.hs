@@ -7,16 +7,29 @@
 -}
 
 {-# LANGUAGE BangPatterns      #-}
-{-# LANGUAGE LambdaCase        #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecordWildCards   #-}
-{-# LANGUAGE TemplateHaskell   #-}
 
-module Clash.Normalize.Util where
+module Clash.Normalize.Util
+ ( isConstantArg
+ , shouldReduce
+ , alreadyInlined
+ , addNewInline
+ , specializeNorm
+ , isRecursiveBndr
+ , isClosed
+ , callGraph
+ , classifyFunction
+ , isCheapFunction
+ )
+ where
 
 import           Control.Lens            ((&),(+~),(%=),(^.),_4)
 import qualified Control.Lens            as Lens
 import qualified Data.List               as List
+import qualified Data.Map                as Map
+import qualified Data.HashMap.Strict     as HashMapS
+import           Data.Text               (Text)
 
 import           Clash.Core.FreeVars     (idOccursIn, termFreeIds)
 import           Clash.Core.Term         (Term (..))
@@ -24,12 +37,56 @@ import           Clash.Core.TyCon        (TyConMap)
 import           Clash.Core.Var          (Id, Var (..))
 import           Clash.Core.VarEnv
 import           Clash.Core.Util
-  (collectArgs, isClockOrReset, isPolyFun, termType)
+  (collectArgs, isPolyFun)
 import           Clash.Driver.Types      (BindingMap)
 import           Clash.Normalize.Types
-import           Clash.Rewrite.Types     (bindings,extra,tcCache)
+import           Clash.Primitives.Util   (constantArgs)
+import           Clash.Rewrite.Types
+  (bindings,extra,RewriteMonad,CoreContext(AppArg))
 import           Clash.Rewrite.Util      (specialise)
 import           Clash.Unique
+import           Clash.Util              (anyM)
+
+-- | Determine if argument should reduce to a constant given a primitive and
+-- an argument number. Caches results.
+isConstantArg
+  :: Text
+  -- ^ Primitive name
+  -> Int
+  -- ^ Argument number
+  -> RewriteMonad NormalizeState Bool
+  -- ^ Yields @DontCare@ for if given primitive name is not found, if the
+  -- argument does not exist, or if the argument was not mentioned by the
+  -- blackbox.
+isConstantArg nm i = do
+  argMap <- Lens.use (extra.primitiveArgs)
+  case Map.lookup nm argMap of
+    Nothing -> do
+      -- Constant args not yet calculated, or primitive does not exist
+      prims <- Lens.use (extra.primitives)
+      case HashMapS.lookup nm prims of
+        Nothing ->
+          -- Primitive does not exist:
+          pure False
+        Just p -> do
+          -- Calculate constant arguments:
+          let m = constantArgs p
+          (extra.primitiveArgs) Lens.%= Map.insert nm m
+          pure (i `elem` m)
+    Just m ->
+      -- Cached version found
+      pure (i `elem` m)
+
+-- | Given a list of transformation contexts, determine if any of the contexts
+-- indicates that the current arg is to be reduced to a constant / literal.
+shouldReduce
+  :: [CoreContext]
+  -- ^ ..in the current transformcontext
+  -> RewriteMonad NormalizeState Bool
+shouldReduce = anyM isConstantArg'
+  where
+    isConstantArg' (AppArg (Just (nm, _, i))) = isConstantArg nm i
+    isConstantArg' _ = pure False
 
 -- | Determine if a function is already inlined in the context of the 'NetlistMonad'
 alreadyInlined
@@ -65,24 +122,6 @@ isClosed :: TyConMap
          -> Term
          -> Bool
 isClosed tcm = not . isPolyFun tcm
-
--- | Determine if a term represents a constant
-isConstant :: Term -> Bool
-isConstant e = case collectArgs e of
-  (Data _, args)   -> all (either isConstant (const True)) args
-  (Prim _ _, args) -> all (either isConstant (const True)) args
-  (Literal _,_)    -> True
-  _                -> False
-
-isConstantNotClockReset :: Term -> NormalizeSession Bool
-isConstantNotClockReset e = do
-  tcm <- Lens.view tcCache
-  let eTy = termType tcm e
-  if isClockOrReset tcm eTy
-     then case collectArgs e of
-        (Prim nm _,_) -> return (nm == "Clash.Transformations.removedArg")
-        _ -> return False
-     else return (isConstant e)
 
 -- | Assert whether a name is a reference to a recursive binder.
 isRecursiveBndr
