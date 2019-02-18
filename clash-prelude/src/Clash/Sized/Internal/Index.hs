@@ -297,9 +297,8 @@ instance (KnownNat n, 1 <= n) => SaturatingNum (Index n) where
   satMul SatWrap a b =
     leToPlusKN @1 @n $
       case times# a b of
-        z | let m = fromInteger# (natVal (Proxy @ n))
-          , z >= m -> resize# (z - m)
-        z -> resize# z
+        z -> let m = fromInteger# (natVal (Proxy @ n))
+             in resize# (z `mod` m)
   satMul SatZero a b =
     leToPlusKN @1 @n $
       case times# a b of
