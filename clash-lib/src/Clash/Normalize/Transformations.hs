@@ -367,11 +367,10 @@ inlineNonRep (TransformContext localScope _) e@(Case scrut altsTy alts)
         noException = not (exception tcm scrutTy)
     if noException && (Maybe.fromMaybe 0 isInlined) > limit
       then do
-        let ty = termType tcm scrut
         traceIf True (concat [$(curLoc) ++ "InlineNonRep: " ++ showPpr (varName f)
                              ," already inlined " ++ show limit ++ " times in:"
                              , showPpr (varName cf)
-                             , "\nType of the subject is: " ++ showPpr ty
+                             , "\nType of the subject is: " ++ showPpr scrutTy
                              , "\nFunction " ++ showPpr (varName cf)
                              , " will not reach a normal form, and compilation"
                              , " might fail."
