@@ -1610,7 +1610,7 @@ reduceConstant isSubj gbl tcm h k nm ty tys args = case nm of
   "Clash.Sized.Internal.Index.unpack#"
     | Just (nTy,kn) <- extractKnownNat tcm tys
     , [(0,i)] <- bitVectorLiterals' args
-    -> (h,k,) <$> mkIndexLit ty nTy kn i
+    -> reduce (mkIndexLit ty nTy kn i)
 
 -- Eq
   "Clash.Sized.Internal.Index.eq#" | Just (i,j) <- indexLiterals args
@@ -1635,21 +1635,21 @@ reduceConstant isSubj gbl tcm h k nm ty tys args = case nm of
 -- Bounded
   "Clash.Sized.Internal.Index.maxBound#"
     | Just (nTy,mb) <- extractKnownNat tcm tys
-    -> (h,k,) <$> mkIndexLit ty nTy mb (mb - 1)
+    -> reduce (mkIndexLit ty nTy mb (mb - 1))
 
 -- Num
   "Clash.Sized.Internal.Index.+#"
     | Just (nTy,kn) <- extractKnownNat tcm tys
     , [i,j] <- indexLiterals' args
-    -> (h,k,) <$> mkIndexLit ty nTy kn (i + j)
+    -> reduce (mkIndexLit ty nTy kn (i + j))
   "Clash.Sized.Internal.Index.-#"
     | Just (nTy,kn) <- extractKnownNat tcm tys
     , [i,j] <- indexLiterals' args
-    -> (h,k,) <$> mkIndexLit ty nTy kn (i - j)
+    -> reduce (mkIndexLit ty nTy kn (i - j))
   "Clash.Sized.Internal.Index.*#"
     | Just (nTy,kn) <- extractKnownNat tcm tys
     , [i,j] <- indexLiterals' args
-    -> (h,k,) <$> mkIndexLit ty nTy kn (i * j)
+    -> reduce (mkIndexLit ty nTy kn (i * j))
 
 -- ExtendingNum
   "Clash.Sized.Internal.Index.plus#"
@@ -1658,31 +1658,31 @@ reduceConstant isSubj gbl tcm h k nm ty tys args = case nm of
     , Right _ <- runExcept (tyNatSize tcm nTy)
     , Just (i,j) <- indexLiterals args
     -> let resTyInfo = extractTySizeInfo tcm ty tys
-       in  (h,k,) <$> mkIndexLit' resTyInfo (i + j)
+       in  reduce (mkIndexLit' resTyInfo (i + j))
   "Clash.Sized.Internal.Index.minus#"
     | mTy : nTy : _ <- tys
     , Right _ <- runExcept (tyNatSize tcm mTy)
     , Right _ <- runExcept (tyNatSize tcm nTy)
     , Just (i,j) <- indexLiterals args
     -> let resTyInfo = extractTySizeInfo tcm ty tys
-       in  (h,k,) <$> mkIndexLit' resTyInfo (i - j)
+       in  reduce (mkIndexLit' resTyInfo (i - j))
   "Clash.Sized.Internal.Index.times#"
     | mTy : nTy : _ <- tys
     , Right _ <- runExcept (tyNatSize tcm mTy)
     , Right _ <- runExcept (tyNatSize tcm nTy)
     , Just (i,j) <- indexLiterals args
     -> let resTyInfo = extractTySizeInfo tcm ty tys
-       in  (h,k,) <$> mkIndexLit' resTyInfo (i * j)
+       in  reduce (mkIndexLit' resTyInfo (i * j))
 
 -- Integral
   "Clash.Sized.Internal.Index.quot#"
     | Just (nTy,kn) <- extractKnownNat tcm tys
     , Just (i,j) <- indexLiterals args
-    -> (h,k,) <$> mkIndexLit ty nTy kn (i `quot` j)
+    -> reduce (mkIndexLit ty nTy kn (i `quot` j))
   "Clash.Sized.Internal.Index.rem#"
     | Just (nTy,kn) <- extractKnownNat tcm tys
     , Just (i,j) <- indexLiterals args
-    -> (h,k,) <$> mkIndexLit ty nTy kn (i `rem` j)
+    -> reduce (mkIndexLit ty nTy kn (i `rem` j))
   "Clash.Sized.Internal.Index.toInteger#"
     | [PrimVal nm' _ _ [_, Lit (IntegerLiteral i)]] <- args
     , nm' == "Clash.Sized.Internal.Index.fromInteger#"
@@ -1692,7 +1692,7 @@ reduceConstant isSubj gbl tcm h k nm ty tys args = case nm of
   "Clash.Sized.Internal.Index.resize#"
     | Just (mTy,m) <- extractKnownNat tcm tys
     , [i] <- indexLiterals' args
-    -> (h,k,) <$> mkIndexLit ty mTy m i
+    -> reduce (mkIndexLit ty mTy m i)
 
 ---------
 -- Signed
@@ -2650,7 +2650,7 @@ reduceConstant isSubj gbl tcm h k nm ty tys args = case nm of
     , let (tyArgs',_) = splitFunForallTy (Either.rights tyArgs !! 1)
     , TyConApp indexTcNm _ <- tyView (Either.rights tyArgs' !! 0)
     , Right n <- runExcept (tyNatSize tcm nTy)
-    , Just iLit <- mkIndexLit (Either.rights tyArgs' !! 0) nTy n 0
+    , let iLit = mkIndexLit (Either.rights tyArgs' !! 0) nTy n 0
     -> reduceWHNF $
        mkApps (Prim "Clash.Sized.Vector.imap_go" (vecImapGoTy vecTcNm indexTcNm))
               [Right nTy
@@ -2673,7 +2673,7 @@ reduceConstant isSubj gbl tcm h k nm ty tys args = case nm of
          0  -> reduce (mkVecNil dc bTy)
          m' -> let (tyArgs,_) = splitFunForallTy ty
                    TyConApp indexTcNm _ = tyView (Either.rights tyArgs !! 0)
-                   Just iLit = mkIndexLit (Either.rights tyArgs !! 0) nTy n' 1
+                   iLit = mkIndexLit (Either.rights tyArgs !! 0) nTy n' 1
                in reduce $ mkVecCons dc bTy m'
                  (mkApps (valToTerm f) [Left (valToTerm n),Left (Either.lefts vArgs !! 1)])
                  (mkApps (Prim nm ty)
@@ -3413,13 +3413,16 @@ mkIndexLit
   -> Type    -- forall n.
   -> Integer -- KnownNat n
   -> Integer -- value
-  -> Maybe Term
+  -> Term
 mkIndexLit rTy nTy kn val
   | val >= 0
   , val < kn
-  = Just (mkSizedLit indexConPrim rTy nTy kn val)
+  = mkSizedLit indexConPrim rTy nTy kn val
   | otherwise
-  = Nothing
+  = TyApp (Prim "Clash.GHC.Evaluator.undefined" undefinedTy)
+          (mkTyConApp indexTcNm [nTy])
+  where
+    TyConApp indexTcNm _ = tyView (snd (splitFunForallTy rTy))
 
 -- Construct a constant term of a sized type
 mkSizedLit'
@@ -3464,13 +3467,17 @@ mkIndexLit'
      ,Type     -- forall n.
      ,Integer) -- KnownNat n
   -> Integer -- value
-  -> Maybe Term
-mkIndexLit' res@(_,_,kn) val
+  -> Term
+mkIndexLit' res@(rTy,nTy,kn) val
   | val >= 0
   , val < kn
-  = Just (mkSizedLit' indexConPrim res val)
+  = mkSizedLit' indexConPrim res val
   | otherwise
-  = Nothing
+  = TyApp (Prim "Clash.GHC.Evaluator.undefined" undefinedTy)
+          (mkTyConApp indexTcNm [nTy])
+  where
+    TyConApp indexTcNm _ = tyView (snd (splitFunForallTy rTy))
+
 
 
 -- | Create a vector of supplied elements
