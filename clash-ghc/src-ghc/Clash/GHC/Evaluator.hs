@@ -60,7 +60,7 @@ import           Unique              (getKey)
 import           Clash.Class.BitPack (pack,unpack)
 import           Clash.Core.DataCon  (DataCon (..))
 import           Clash.Core.Evaluator
-  (Heap (..), PrimEvaluator, Value (..), valToTerm, whnf)
+  (Heap (..), PrimEvaluator, Stack, Value (..), valToTerm, whnf)
 import           Clash.Core.Literal  (Literal (..))
 import           Clash.Core.Name
   (Name (..), NameSort (..), mkUnsafeSystemName)
@@ -3162,6 +3162,7 @@ reduceConstant isSubj gbl tcm h k nm ty tys args = case nm of
       else
         f (map fromInteger natsAsInts)
 
+    reduce :: Term -> Maybe (Heap, Stack, Term)
     reduce e = case isX e of
       Left msg -> trace (unlines ["Warning: Not evaluating constant expression:", show nm, "Because doing so generates an XException:", msg]) Nothing
       Right e' -> Just (h,k,e')
