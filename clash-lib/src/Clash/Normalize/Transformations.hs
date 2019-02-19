@@ -612,6 +612,11 @@ matchLiteralContructor c (IntegerLiteral l) alts = go (reverse alts)
       in changed e'
     | otherwise
     = go alts'
+  go ((LitPat l', e):alts')
+    | IntegerLiteral l == l'
+    = changed e
+    | otherwise
+    = go alts'
   go _ = error $ $(curLoc) ++ "Report as bug: caseCon error: " ++ showPpr c
 
 matchLiteralContructor c (NaturalLiteral l) alts = go (reverse alts)
@@ -639,6 +644,11 @@ matchLiteralContructor c (NaturalLiteral l) alts = go (reverse alts)
                  [] -> e
                  _  -> Letrec binds e
       in changed e'
+    | otherwise
+    = go alts'
+  go ((LitPat l', e):alts')
+    | NaturalLiteral l == l'
+    = changed e
     | otherwise
     = go alts'
   go _ = error $ $(curLoc) ++ "Report as bug: caseCon error: " ++ showPpr c
