@@ -173,6 +173,8 @@ runClashTest =
       ]
       , clashTestGroup "Numbers"
         [ runTest ("tests" </> "shouldwork" </> "Numbers") defBuild [] "Bounds"       (["","Bounds_testBench"],"Bounds_testBench",True)
+        , runTest ("tests" </> "shouldwork" </> "Numbers") defBuild ["-itests/shouldwork/Numbers","-fclash-inline-limit=300"] "NumConstantFoldingTB"       (["","NumConstantFoldingTB_testBench"],"NumConstantFoldingTB_testBench",True)
+        , outputTest ("tests" </> "shouldwork" </> "Numbers") defBuild ["-fclash-inline-limit=300"] "NumConstantFolding"  "main"
 #if MIN_VERSION_base(4,12,0)
         -- Naturals are broken on GHC <= 8.4. See https://github.com/clash-lang/clash-compiler/pull/473
         , runTest ("tests" </> "shouldwork" </> "Numbers") defBuild [] "Naturals"     (["","Naturals_testBench"],"Naturals_testBench",True)
@@ -252,7 +254,6 @@ runClashTest =
         , runTest ("tests" </> "shouldwork" </> "TopEntity")    [Verilog] [] "PortNamesWithRTree" (["","PortNamesWithRTree_topEntity","PortNamesWithRTree_testBench"],"PortNamesWithRTree_testBench",True)
         , outputTest ("tests" </> "shouldwork" </> "TopEntity") [Verilog] [] "PortNamesWithRTree" "main"
         , runTest ("tests" </> "shouldwork" </> "TopEntity")    defBuild [] "TopEntHOArg" (["f","g"],"f",False)
-        , outputTest ("tests" </> "shouldwork" </> "TopEntity") [Verilog] [] "PortNamesWithRTree" "main"
         ]
       , clashTestGroup "Void"
         [ runTest ("tests" </> "shouldwork" </> "Unit") defBuild [] "Imap"                         (["","Imap_testBench"],"Imap_testBench",True)
