@@ -3282,8 +3282,9 @@ sizedLiteral szCon val = case val of
 bitLiterals
   :: [Value]
   -> [(Integer,Integer)]
-bitLiterals = typedLiterals' go
+bitLiterals = map normalizeBit . typedLiterals' go
  where
+  normalizeBit (msk,v) = (msk .&. 1, v .&. 1)
   go val = case val of
     PrimVal nm _ _ [Lit (IntegerLiteral m), Lit (IntegerLiteral i)]
       | nm == "Clash.Sized.Internal.BitVector.fromInteger##"
@@ -3405,7 +3406,8 @@ mkBitLit
   -- ^ Value
   -> Term
 mkBitLit ty msk val =
-  mkApps (bConPrim sTy) [Left (Literal (IntegerLiteral msk)), Left (Literal (IntegerLiteral val))]
+  mkApps (bConPrim sTy) [ Left (Literal (IntegerLiteral (msk .&. 1)))
+                        , Left (Literal (IntegerLiteral (val .&. 1)))]
   where
     (_,sTy) = splitFunForallTy ty
 
