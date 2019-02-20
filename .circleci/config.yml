@@ -3,7 +3,7 @@ version: 2
 aliases:
   - &env
     TERM: xterm-color
-    THREADS: 2
+    THREADS: 1
 
   - &submodules
     run:
