@@ -134,14 +134,15 @@ mkBindings primMap bindings clsOps unlocatable = do
                           GHC.Rec bs -> do
                             tms <- mapM (\(v,e) -> do
                                           let sp = GHC.getSrcSpan v
+                                              inl = GHC.inlinePragmaSpec . GHC.inlinePragInfo $ GHC.idInfo v
                                           tm <- coreToTerm primMap unlocatable sp e
                                           v' <- coreToId v
                                           checkPrimitive primMap v
-                                          return (v',sp,tm)
+                                          return (v',sp,inl,tm)
                                         ) bs
                             case tms of
-                              [(v,sp,tm)] -> return [(v, (v, sp, GHC.NoInline, tm))]
-                              _ -> return $ map (\(v,sp,e) -> (v,(v,sp,GHC.NoInline, Letrec (map (\(x,_,y) -> (x,y)) tms) e))) tms
+                              [(v,sp,inl,tm)] -> return [(v, (v, sp, inl, tm))]
+                              _ -> return $ map (\(v,sp,inl,e) -> (v,(v,sp,inl, Letrec (map (\(x,_,_,y) -> (x,y)) tms) e))) tms
                        ) bindings
   clsOpList    <- mapM (\(v,i) -> do
                           v' <- coreToId v
