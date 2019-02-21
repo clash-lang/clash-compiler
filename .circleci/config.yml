@@ -4,6 +4,7 @@ aliases:
   - &env
     TERM: xterm-color
     THREADS: 1
+    CABAL_JOBS: 1
 
   - &submodules
     run:
