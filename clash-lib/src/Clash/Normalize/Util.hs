@@ -70,7 +70,7 @@ isConstantArg nm i = do
           pure False
         Just p -> do
           -- Calculate constant arguments:
-          let m = constantArgs p
+          let m = constantArgs nm p
           (extra.primitiveArgs) Lens.%= Map.insert nm m
           pure (i `elem` m)
     Just m ->

@@ -81,7 +81,7 @@
     { "name"      : "Clash.Sized.Internal.BitVector.fromInteger##"
     , "kind"      : "Expression"
     , "type"      : "fromInteger## :: Integer -> Integer -> Bit"
-    , "template"  : "~VAR[i][0][0] ? 1'bx : ~VAR[i][1][0]"
+    , "template"  : "~ARG[0][0] ? 1'bx : ~ARG[1][0]"
     }
   }
 , { "BlackBox" :
@@ -269,7 +269,7 @@
     { "name"      : "Clash.Sized.Internal.BitVector.fromInteger#"
     , "kind"      : "Expression"
     , "type"      : "fromInteger# :: KnownNat n => Integer -> Integer -> BitVector n"
-    , "template"  : "$unsigned(~VAR[n][2][(~SIZE[~TYPO]-1):0])"
+    , "template"  : "$unsigned(~ARG[2][(~SIZE[~TYPO]-1):0])"
     }
   }
 , { "BlackBox" :
