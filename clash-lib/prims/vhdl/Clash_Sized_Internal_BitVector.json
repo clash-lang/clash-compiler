@@ -74,7 +74,7 @@
     { "name"      : "Clash.Sized.Internal.BitVector.fromInteger##"
     , "kind"      : "Expression"
     , "type"      : "fromInteger## :: Integer -> Integer -> Bit"
-    , "template"  : "~IF~LIT[0]~THEN'U'~ELSE~VAR[i][1](0)~FI"
+    , "template"  : "~IF~LIT[0]~THEN'U'~ELSE~ARG[1](0)~FI"
     }
   }
 , { "BlackBox" :

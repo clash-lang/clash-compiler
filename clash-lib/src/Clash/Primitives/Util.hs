@@ -8,8 +8,9 @@
   Utility functions to generate Primitives
 -}
 
-{-# LANGUAGE RecordWildCards #-}
-{-# LANGUAGE NamedFieldPuns  #-}
+{-# LANGUAGE RecordWildCards   #-}
+{-# LANGUAGE NamedFieldPuns    #-}
+{-# LANGUAGE OverloadedStrings #-}
 
 module Clash.Primitives.Util
   ( generatePrimMap
@@ -25,6 +26,7 @@ import           Data.Maybe             (fromMaybe)
 import qualified Data.Set               as Set
 import           Data.Hashable          (hash)
 import           Data.List              (isSuffixOf, sort)
+import qualified Data.Text              as TS
 import           Data.Text.Lazy         (Text)
 import qualified Data.Text.Lazy.IO      as T
 import           Data.Traversable       (mapM)
@@ -123,11 +125,24 @@ generatePrimMap filePaths = do
   return $ HashMap.fromList $ zip (map name primitives) primitives
 
 -- | Determine what argument should be constant / literal
-constantArgs :: CompiledPrimitive -> Set.Set Int
-constantArgs BlackBox {template = BBTemplate template} =
-  Set.fromList (concatMap (walkElement getConstant) template)
+constantArgs :: TS.Text -> CompiledPrimitive -> Set.Set Int
+constantArgs nm BlackBox {template = BBTemplate template} =
+  Set.fromList (fromIntForce ++ concatMap (walkElement getConstant) template)
  where
   getConstant (Lit i)      = Just i
   getConstant (Const i)    = Just i
   getConstant _            = Nothing
-constantArgs _ = Set.empty
+
+  -- Ensure that if the "Integer" arguments are constants, that they are reduced
+  -- to literals, so that the buildin rules can properly fire.
+  --
+  -- Only in the the case that "Integer" arguments are truly variables should
+  -- the blackbox rules fire.
+  fromIntForce
+    | nm == "Clash.Sized.Internal.BitVector.fromInteger#"  = [2]
+    | nm == "Clash.Sized.Internal.BitVector.fromInteger##" = [0,1]
+    | nm == "Clash.Sized.Internal.Index.fromInteger#"      = [1]
+    | nm == "Clash.Sized.Internal.Signed.fromInteger#"     = [1]
+    | nm == "Clash.Sized.Internal.Unsigned.fromInteger#"   = [1]
+    | otherwise = []
+constantArgs _ _ = Set.empty
