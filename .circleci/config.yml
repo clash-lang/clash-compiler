@@ -3,7 +3,7 @@ version: 2
 aliases:
   - &env
     TERM: xterm-color
-    THREADS: 1
+    THREADS: 2
     CABAL_JOBS: 1
 
   - &submodules
