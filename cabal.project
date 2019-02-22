@@ -34,6 +34,10 @@ index-state: 2018-12-12T14:50:52Z
 package clash-ghc
   executable-dynamic: True
 
+package clash-prelude
+  -- workaround for plugins not loading in Haddock with GHC-8.6
+  haddock-options: --optghc=-fdefer-type-errors
+
 package clash-testsuite
   flags: cosim
 

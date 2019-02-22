@@ -15,8 +15,7 @@ cp .ci/cabal.project.local .
 
 case "$GHC" in
   ghc-8.6* )
-    # see https://github.com/haskell/haddock/issues/900
-    echo "Haddock and doctests are broken on GHC 8.6, disabling"
+    echo "doctests are broken on GHC 8.6, disabling"
     cp .ci/cabal.project.local-8.6 cabal.project.local
     ;;
 esac
