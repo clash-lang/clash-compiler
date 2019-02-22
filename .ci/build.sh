@@ -9,6 +9,7 @@ until cabal new-update || [ $NEXT_WAIT_TIME -eq 5 ]; do
 done
 
 sed -i "s/-- ghc-options:/ghc-options: -j$THREADS/g" ${HOME}/.cabal/config
+sed -i "s/^[- ]*jobs:.*/jobs: $CABAL_JOBS/g" ${HOME}/.cabal/config
 echo "store-dir: ${PWD}/cabal-store" >> ${HOME}/.cabal/config
 
 cabal new-build all
