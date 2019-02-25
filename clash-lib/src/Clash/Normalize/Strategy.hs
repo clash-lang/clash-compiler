@@ -57,6 +57,7 @@ constantPropgation = propagate >-> repeatR inlineAndPropagate >->
       , ("caseCon"               , caseCon              )
       , ("caseElemNonReachable"  , caseElemNonReachable )
       , ("elemExistentials"      , elemExistentials     )
+      , ("removeUnusedExpr"      , removeUnusedExpr     )
       ]
 
     -- These transformations can safely be applied in a top-down traversal as

@@ -99,7 +99,7 @@ import           Clash.Core.Type             (TypeView (..), applyFunTy,
                                               tyView, undefinedTy)
 import           Clash.Core.TyCon            (TyConMap, tyConDataCons)
 import           Clash.Core.Util
-  (collectArgs, isClockOrReset, isCon, isFun, isLet, isPolyFun, isPrim,
+  (collectArgs, isCon, isFun, isLet, isPolyFun, isPrim,
    isSignalType, isVar, mkApps, mkLams, mkVec, piResultTy, termSize, termType,
    tyNatSize, patVars, isAbsurdAlt, altEqs, substInExistentials,
    solveFirstNonAbsurd)
@@ -1008,23 +1008,14 @@ inlineSmall (TransformContext localScope _) e@(collectArgs -> (Var f,args)) = do
 inlineSmall _ e = return e
 
 -- | Specialise functions on arguments which are constant, except when they
--- are clock or reset generators
-constantSpec :: NormRewrite
-constantSpec ctx e@(App e1 e2)
+-- are clock, reset generators.
+constantSpec :: HasCallStack => NormRewrite
+constantSpec ctx@(TransformContext is0 _) e@(App e1 e2)
   | (Var {}, args) <- collectArgs e1
   , (_, []) <- Either.partitionEithers args
   , null $ Lens.toListOf termFreeTyVars e2
-  = do e2Isconstant <- isConstant e2
-       if e2Isconstant then do
-         tcm <- Lens.view tcCache
-         let e2Ty = termType tcm e2
-         -- Don't specialise on clock or reset generators
-         case isClockOrReset tcm e2Ty of
-            False -> specializeNorm ctx e
-            _ -> return e
-       else
-        return e
-
+  = do e2Speccable <- canConstantSpec is0 e2
+       if e2Speccable then specializeNorm ctx e else return e
 constantSpec _ e = return e
 
 
