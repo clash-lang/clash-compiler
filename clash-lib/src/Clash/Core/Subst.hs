@@ -556,7 +556,8 @@ substTyWith tvs tys =
 -- | Ensure that non of the binders in an expression shadow each-other, nor
 -- conflict with he in-scope set
 deShadowTerm
-  :: InScopeSet
+  :: HasCallStack
+  => InScopeSet
   -> Term
   -> Term
 deShadowTerm is e = substTm "deShadowTerm" (mkSubst is) e
