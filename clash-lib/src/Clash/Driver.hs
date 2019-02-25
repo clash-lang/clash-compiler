@@ -8,19 +8,15 @@
   Module that connects all the parts of the Clash compiler library
 -}
 
-{-# LANGUAGE LambdaCase               #-}
 {-# LANGUAGE NondecreasingIndentation #-}
 {-# LANGUAGE ScopedTypeVariables      #-}
-{-# LANGUAGE TemplateHaskell          #-}
-{-# LANGUAGE TupleSections            #-}
-{-# LANGUAGE ViewPatterns             #-}
 
 module Clash.Driver where
 
 import qualified Control.Concurrent.Supply        as Supply
 import           Control.DeepSeq
 import           Control.Exception                (tryJust, bracket)
-import           Control.Lens                     (use, view, (^.), _3, _4)
+import           Control.Lens                     (use, view, (^.), _4)
 import           Control.Monad                    (guard, when, unless, foldM)
 import           Control.Monad.Catch              (MonadMask)
 import           Control.Monad.IO.Class           (MonadIO)
@@ -243,7 +239,7 @@ generateHDL reprs bindingsMap hdlState primMap tcm tupTcm typeTrans eval
       putStrLn $ "Netlist generation took " ++ show normNetDiff
 
       -- 3. Generate topEntity wrapper
-      let topComponent = view _3 . head $ filter (Data.Text.isSuffixOf topNm . componentName . view _3) netlist
+      let topComponent = view _4 . head $ filter (Data.Text.isSuffixOf topNm . componentName . view _4) netlist
           (hdlDocs,manifest',dfiles,mfiles)  = createHDL hdlState' (Data.Text.pack modName) seen' netlist topComponent
                                    (topNm, Right manifest)
           dir = hdlDir </> maybe "" (const modName) annM
@@ -480,7 +476,7 @@ createHDL
   -- ^ Module hierarchy root
   -> HashSet Identifier
   -- ^ Component names
-  -> [(SrcSpan,HashSet Identifier,Component)]
+  -> [([Bool],SrcSpan,HashSet Identifier,Component)]
   -- ^ List of components
   -> Component
   -- ^ Top component
@@ -494,7 +490,7 @@ createHDL
   -- + The update manifest file
   -- + The data files that need to be copied
 createHDL backend modName seen components top (topName,manifestE) = flip evalState backend $ getMon $ do
-  (hdlNmDocs,incs) <- unzip <$> mapM (\(sp,ids,comp) -> genHDL modName sp (seen `HashSet.union` ids) comp) components
+  (hdlNmDocs,incs) <- unzip <$> mapM (\(_wereVoids,sp,ids,comp) -> genHDL modName sp (seen `HashSet.union` ids) comp) components
   hwtys <- HashSet.toList <$> extractTypes <$> Mon get
   typesPkg <- mkTyPackage modName hwtys
   dataFiles <- Mon getDataFiles
@@ -509,7 +505,7 @@ createHDL backend modName seen components top (topName,manifestE) = flip evalSta
       let topOutNames = map (fst . snd) (outputs top)
       topOutTypes <- mapM (fmap (Text.toStrict . renderOneLine) .
                            hdlType (External topName) . snd . snd) (outputs top)
-      let compNames = map (componentName . view _3) components
+      let compNames = map (componentName . view _4) components
       return (m { portInNames    = topInNames
                 , portInTypes    = topInTypes
                 , portOutNames   = topOutNames

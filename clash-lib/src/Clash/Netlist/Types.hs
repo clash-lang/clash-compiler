@@ -74,7 +74,7 @@ data NetlistState
   -- ^ Global binders
   , _varCount       :: !Int
   -- ^ Number of signal declarations
-  , _components     :: VarEnv (SrcSpan,HashSet Identifier,Component)
+  , _components     :: VarEnv ([Bool],SrcSpan,HashSet Identifier,Component)
   -- ^ Cached components
   , _primitives     :: CompiledPrimMap
   -- ^ Primitive Definitions
