@@ -479,8 +479,10 @@ mkFunApp dst fun args = do
         mkId <- Lens.use mkIdentifierFn
         prefixM <- Lens.use componentPrefix
         let topName = StrictText.unpack (genTopComponentName mkId prefixM annM fun)
+            modName = takeWhile (/= '.')
+                                (StrictText.unpack (nameOcc (varName fun)))
         manFile <- case annM of
-          Just _  -> return (env </> topName </> topName <.> "manifest")
+          Just _  -> return (env </> ".." </> modName </> topName </> topName <.> "manifest")
           Nothing -> return (env </> topName <.> "manifest")
         Just man <- readMaybe <$> liftIO (readFile manFile)
         instDecls <- mkTopUnWrapper fun annM man (dstId,dstHWty)
