@@ -25,7 +25,7 @@ where
 #endif
 
 -- External Modules
-import           Clash.Annotations.Primitive     (HDL, Primitive (..))
+import           Clash.Annotations.Primitive     (HDL)
 import           Clash.Annotations.TopEntity     (TopEntity (..))
 import           Control.Arrow                   (second)
 #if MIN_VERSION_ghc(8,6,0)
@@ -33,10 +33,11 @@ import           Control.Exception               (throwIO)
 #endif
 import           Control.Monad.IO.Class          (liftIO)
 import           Data.Generics.Uniplate.DataOnly (transform)
+import           Data.Data                       (Data)
+import           Data.Typeable                   (Typeable)
 import           Data.List                       (foldl', lookup, nub)
 import           Data.Maybe                      (catMaybes, listToMaybe, mapMaybe)
 import qualified Data.Text                       as Text
-import           Data.Word                       (Word8)
 import           System.Exit                     (ExitCode (..))
 import           System.IO                       (hGetLine)
 import           System.IO.Error                 (tryIOError)
@@ -76,7 +77,6 @@ import           Util (OverridingBool)
 import qualified Var
 
 -- Internal Modules
-import           Clash.Annotations.BitRepresentation          (DataReprAnn)
 import           Clash.GHC.GHC2Core                           (modNameM)
 import           Clash.GHC.LoadInterfaceFiles                 (loadExternalExprs, primitiveFilePath)
 import           Clash.Util                                   (curLoc)
@@ -325,28 +325,54 @@ makeRecursiveGroups
     makeBind (Digraph.AcyclicSCC (b,e)) = CoreSyn.NonRec b e
     makeBind (Digraph.CyclicSCC bs)     = CoreSyn.Rec bs
 
+-- | Find annotations by given targets
+findAnnotationsByTargets
+  :: GHC.GhcMonad m
+  => Typeable a
+  => Data a
+  => [Annotations.AnnTarget Name.Name]
+  -> m [[a]]
+findAnnotationsByTargets targets =
+  mapM (GHC.findGlobalAnns GhcPlugins.deserializeWithData) targets
+
+-- | Find all annotations of a certain type in all modules seen so far.
+findAllModuleAnnotations
+  :: GHC.GhcMonad m
+  => Data a
+  => Typeable a
+  => m [a]
+findAllModuleAnnotations = do
+  hsc_env <- GHC.getSession
+  ann_env <- liftIO $ HscTypes.prepareAnnotations hsc_env Nothing
+  return $ concat
+         $ UniqFM.nonDetEltsUFM
+         $ Annotations.deserializeAnns GhcPlugins.deserializeWithData ann_env
+
+-- | Find all annotations belonging to all binders seen so far.
+findNamedAnnotations
+  :: GHC.GhcMonad m
+  => Data a
+  => Typeable a
+  => [CoreSyn.CoreBndr]
+  -> m [[a]]
+findNamedAnnotations bndrs =
+  findAnnotationsByTargets (map (Annotations.NamedTarget . Var.varName) bndrs)
+
+-- | Find annotations of type @DataReprAnn@ and convert them to @DataRepr'@
 findCustomReprAnnotations
   :: GHC.GhcMonad m
   => m [DataRepr']
-findCustomReprAnnotations = do
-  hsc_env <- GHC.getSession
-  ann_env <- liftIO $ HscTypes.prepareAnnotations hsc_env Nothing
+findCustomReprAnnotations =
+  map dataReprAnnToDataRepr' <$> findAllModuleAnnotations
 
-  let deserializer = GhcPlugins.deserializeWithData :: [Word8] -> DataReprAnn
-  let deserialized = Annotations.deserializeAnns deserializer ann_env
-  let reprs        = concat $ UniqFM.nonDetEltsUFM deserialized
-
-  return $ map dataReprAnnToDataRepr' reprs
-
+-- | Find synthesize annotations and make sure each binder has no more than
+-- a single annotation.
 findSynthesizeAnnotations
   :: GHC.GhcMonad m
   => [CoreSyn.CoreBndr]
   -> m [(CoreSyn.CoreBndr,Maybe TopEntity)]
 findSynthesizeAnnotations bndrs = do
-  let deserializer = GhcPlugins.deserializeWithData :: ([Word8] -> TopEntity)
-      targets      = map (Annotations.NamedTarget . Var.varName) bndrs
-
-  anns <- mapM (GHC.findGlobalAnns deserializer) targets
+  anns <- findNamedAnnotations bndrs
   let isSyn (Synthesize {}) = True
       isSyn _               = False
       anns'    = map (filter isSyn) anns
@@ -357,15 +383,14 @@ findSynthesizeAnnotations bndrs = do
             "The following functions have multiple 'Synthesize' annotations: " ++
             Outputable.showSDocUnsafe (ppr (map fst as))
 
+-- | Find testbench annotations and make sure that each binder has no more than
+-- a single annotation.
 findTestBenchAnnotations
   :: GHC.GhcMonad m
   => [CoreSyn.CoreBndr]
   -> m [(CoreSyn.CoreBndr,CoreSyn.CoreBndr)]
 findTestBenchAnnotations bndrs = do
-  let deserializer = GhcPlugins.deserializeWithData :: ([Word8] -> TopEntity)
-      targets      = map (Annotations.NamedTarget . Var.varName) bndrs
-
-  anns <- mapM (GHC.findGlobalAnns deserializer) targets
+  anns <- findNamedAnnotations bndrs
   let isTB (TestBench {}) = True
       isTB _              = False
       anns'     = map (filter isTB) anns
@@ -390,6 +415,8 @@ findTestBenchAnnotations bndrs = do
         qualNm  = maybe occName (\modName -> modName `Text.append` ('.' `Text.cons` occName)) (modNameM bndrNm)
         occName = Text.pack (OccName.occNameString (Name.nameOccName bndrNm))
 
+-- | Find primitive annotations bound to given binders, or annotations made
+-- in modules of those binders.
 findPrimitiveAnnotations
   :: GHC.GhcMonad m
   => HDL
@@ -397,17 +424,19 @@ findPrimitiveAnnotations
   -> [CoreSyn.CoreBndr]
   -> m [FilePath]
 findPrimitiveAnnotations hdl tmpDir bndrs = do
-  let -- Using the stub directory as the output directory for inline primitives
-      deserializer = GhcPlugins.deserializeWithData :: ([Word8] -> Primitive)
-      targets =
-        concatMap
-          ( (\v -> catMaybes
-            [ Just $ Annotations.NamedTarget v
-            , Annotations.ModuleTarget <$> Name.nameModule_maybe v
-            ]) . Var.varName
-          ) bndrs
+  let
+    annTargets =
+     map
+       (fmap Annotations.ModuleTarget . Name.nameModule_maybe)
+       (map Var.varName bndrs)
 
-  anns <- mapM (GHC.findGlobalAnns deserializer) targets
+  let
+    targets =
+      (catMaybes annTargets) ++
+        (map (Annotations.NamedTarget . Var.varName) bndrs)
+
+  anns <- findAnnotationsByTargets targets
+
   sequence $
     mapMaybe (primitiveFilePath hdl tmpDir)
     (concat $ zipWith (\t -> map ((,) t)) targets anns)
