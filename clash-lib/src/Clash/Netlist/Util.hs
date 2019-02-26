@@ -31,7 +31,7 @@ import qualified Data.HashSet            as HashSet
 import           Data.String             (fromString)
 import           Data.List               (intersperse, unzip4, sort, intercalate)
 import qualified Data.List               as List
-import           Data.Maybe              (catMaybes,fromMaybe)
+import           Data.Maybe              (catMaybes,fromMaybe,isNothing)
 import           Text.Printf             (printf)
 import           Data.Semigroup          ((<>))
 import           Data.Text               (Text)
@@ -623,7 +623,8 @@ mkUniqueNormalized
      , Id
      )
   -> NetlistMonad
-      ([(Identifier,HWType)]
+      ([Bool]
+      ,[(Identifier,HWType)]
       ,[Declaration]
       ,[(Identifier,HWType)]
       ,[Declaration]
@@ -643,7 +644,7 @@ mkUniqueNormalized topMM (args,binds,res) = do
 
   -- Make arguments unique
   is0 <- (`extendInScopeSetList` (args ++ bndrs)) <$> Lens.use globalInScope
-  (iports,iwrappers,substArgs) <- mkUniqueArguments (mkSubst is0) topMM args
+  (wereVoids, iports,iwrappers,substArgs) <- mkUniqueArguments (mkSubst is0) topMM args
 
   -- Make result unique. This might yield 'Nothing' in which case the result
   -- was a single BiSignalOut. This is superfluous in the HDL, as the argument
@@ -675,10 +676,10 @@ mkUniqueNormalized topMM (args,binds,res) = do
       -- Replace old IDs by updated unique IDs in the RHSs of the let-binders
       let exprs' = map (substTm ("mkUniqueNormalized1" :: Doc ()) substR) exprs
       -- Return the uniquely named arguments, let-binders, and result
-      return (iports,iwrappers,oports,owrappers,zip (bndrsL' ++ r:bndrsR') exprs' ++ extraBndr,Just res1)
+      return (wereVoids,iports,iwrappers,oports,owrappers,zip (bndrsL' ++ r:bndrsR') exprs' ++ extraBndr,Just res1)
     Nothing -> do
       (bndrs', substArgs') <- mkUnique substArgs bndrs
-      return (iports,iwrappers,[],[],zip bndrs' (map (substTm ("mkUniqueNormalized2" :: Doc ()) substArgs') exprs),Nothing)
+      return (wereVoids,iports,iwrappers,[],[],zip bndrs' (map (substTm ("mkUniqueNormalized2" :: Doc ()) substArgs') exprs),Nothing)
 
 mkUniqueArguments
   :: Subst
@@ -690,20 +691,23 @@ mkUniqueArguments
   --     * Just (Just ..): term is a top entity, and has an explicit annotation
   -> [Id]
   -> NetlistMonad
-       ([(Identifier,HWType)]
-       ,[Declaration]
-       ,Subst
+       ( [Bool]                 -- Were voids
+       , [(Identifier,HWType)]  -- Arguments and their types
+       , [Declaration]          -- Extra declarations
+       , Subst                  -- Substitution with new vars in scope
        )
 mkUniqueArguments subst0 Nothing args = do
   (args',subst1) <- mkUnique subst0 args
   ports <- mapM idToInPort args'
-  return (catMaybes ports,[],subst1)
+  return (map isNothing ports, catMaybes ports, [], subst1)
 
 mkUniqueArguments subst0 (Just teM) args = do
   let iPortSupply = maybe (repeat Nothing) (extendPorts . t_inputs) teM
-  (ports,decls,subst) <- unzip3 . catMaybes <$> zipWithM go iPortSupply args
-  let ports' = concat ports
-  return ( ports', concat decls
+  ports0 <- zipWithM go iPortSupply args
+  let (ports1, decls, subst) = unzip3 (catMaybes ports0)
+  return ( map isNothing ports0
+         , concat ports1
+         , concat decls
          , extendInScopeIdList (extendIdSubstList subst0 (map snd subst))
                                (map fst subst))
   where

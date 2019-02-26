@@ -25,7 +25,7 @@ import SrcLoc               (SrcSpan)
 
 
 genComponent :: Id
-             -> NetlistMonad (SrcSpan,HashSet Identifier,Component)
+             -> NetlistMonad ([Bool],SrcSpan,HashSet Identifier,Component)
 
 mkExpr :: Bool
        -> Either Identifier Id

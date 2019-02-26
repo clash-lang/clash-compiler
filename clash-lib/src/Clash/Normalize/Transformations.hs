@@ -99,7 +99,7 @@ import           Clash.Core.Type             (TypeView (..), applyFunTy,
                                               tyView, undefinedTy)
 import           Clash.Core.TyCon            (TyConMap, tyConDataCons)
 import           Clash.Core.Util
-  (collectArgs, isClockOrReset, isCon, isFun, isLet, isPolyFun, isPrim,
+  (collectArgs, isCon, isFun, isLet, isPolyFun, isPrim,
    isSignalType, isVar, mkApps, mkLams, mkVec, piResultTy, termSize, termType,
    tyNatSize, patVars, isAbsurdAlt, altEqs, substInExistentials,
    solveFirstNonAbsurd)
@@ -127,7 +127,7 @@ import           Clash.Unique
   (Unique, lookupUniqMap, toListUniqMap)
 import           Clash.Util
 
-inlineOrLiftNonRep :: NormRewrite
+inlineOrLiftNonRep :: HasCallStack => NormRewrite
 inlineOrLiftNonRep = inlineOrLiftBinders nonRepTest inlineTest
   where
     nonRepTest :: (Id, Term) -> RewriteMonad extra Bool
@@ -183,7 +183,7 @@ as they'd need to be.
 -}
 
 -- | Specialize functions on their type
-typeSpec :: NormRewrite
+typeSpec :: HasCallStack => NormRewrite
 typeSpec ctx e@(TyApp e1 ty)
   | (Var {},  args) <- collectArgs e1
   , null $ Lens.toListOf typeFreeVars ty
@@ -193,7 +193,7 @@ typeSpec ctx e@(TyApp e1 ty)
 typeSpec _ e = return e
 
 -- | Specialize functions on their non-representable argument
-nonRepSpec :: NormRewrite
+nonRepSpec :: HasCallStack => NormRewrite
 nonRepSpec ctx@(TransformContext is0 _) e@(App e1 e2)
   | (Var {}, args) <- collectArgs e1
   , (_, [])     <- Either.partitionEithers args
@@ -240,7 +240,7 @@ nonRepSpec ctx@(TransformContext is0 _) e@(App e1 e2)
 nonRepSpec _ e = return e
 
 -- | Lift the let-bindings out of the subject of a Case-decomposition
-caseLet :: NormRewrite
+caseLet :: HasCallStack => NormRewrite
 caseLet _ (Case (Letrec xes e) ty alts) =
   changed (Letrec xes (Case e ty alts))
 
@@ -264,7 +264,7 @@ caseLet _ e = return e
 -- @f@ is always specialized on @STy Int@. The SBool alternatives are therefore
 -- unreachable. Additional information can be found at:
 -- https://github.com/clash-lang/clash-compiler/pull/465
-caseElemNonReachable :: NormRewrite
+caseElemNonReachable :: HasCallStack => NormRewrite
 caseElemNonReachable _ case0@(Case scrut altsTy alts0) = do
   tcm <- Lens.view tcCache
 
@@ -301,7 +301,7 @@ caseElemNonReachable _ e = return e
 -- This function solves 'n1' and replaces every occurrence with its solution. A
 -- very limited number of solutions are currently recognized: only adds (such
 -- as in the example) will be solved.
-elemExistentials :: NormRewrite
+elemExistentials :: HasCallStack => NormRewrite
 elemExistentials (TransformContext is0 _) (Case scrut altsTy alts0) = do
   tcm <- Lens.view tcCache
   is1 <- unionInScope is0 <$> Lens.use globalInScope
@@ -335,7 +335,7 @@ elemExistentials (TransformContext is0 _) (Case scrut altsTy alts0) = do
 elemExistentials _ e = return e
 
 -- | Move a Case-decomposition from the subject of a Case-decomposition to the alternatives
-caseCase :: NormRewrite
+caseCase :: HasCallStack => NormRewrite
 caseCase _ e@(Case (Case scrut alts1Ty alts1) alts2Ty alts2)
   = do
     ty1Rep <- representableType <$> Lens.view typeTranslator
@@ -352,7 +352,7 @@ caseCase _ e = return e
 
 -- | Inline function with a non-representable result if it's the subject
 -- of a Case-decomposition
-inlineNonRep :: NormRewrite
+inlineNonRep :: HasCallStack => NormRewrite
 inlineNonRep (TransformContext localScope _) e@(Case scrut altsTy alts)
   | (Var f, args) <- collectArgs scrut
   , f `notElemInScopeSet` localScope
@@ -427,7 +427,7 @@ inlineNonRep _ e = return e
 -- let a1 = f a b
 -- in  h a1
 -- @
-caseCon :: NormRewrite
+caseCon :: HasCallStack => NormRewrite
 caseCon (TransformContext is0 _) (Case scrut ty alts)
   | (Data dc, args) <- collectArgs scrut
   = case List.find (equalCon dc . fst) alts of
@@ -671,7 +671,7 @@ caseOneAlt e = return e
 
 -- | Bring an application of a DataCon or Primitive in ANF, when the argument is
 -- is considered non-representable
-nonRepANF :: NormRewrite
+nonRepANF :: HasCallStack => NormRewrite
 nonRepANF ctx e@(App appConPrim arg)
   | (conPrim, _) <- collectArgs e
   , isCon conPrim || isPrim conPrim
@@ -688,7 +688,7 @@ nonRepANF _ e = return e
 
 -- | Ensure that top-level lambda's eventually bind a let-expression of which
 -- the body is a variable-reference.
-topLet :: NormRewrite
+topLet :: HasCallStack => NormRewrite
 topLet (TransformContext is0 ctx) e
   | all isLambdaBodyCtx ctx && not (isLet e)
   = do
@@ -719,7 +719,7 @@ topLet _ e = return e
 -- Misc rewrites
 
 -- | Remove unused let-bindings
-deadCode :: NormRewrite
+deadCode :: HasCallStack => NormRewrite
 deadCode _ e@(Letrec xes body) = do
     let bodyFVs = Lens.foldMapOf termFreeIds unitVarSet body
         (xesUsed,xesOther) = List.partition((`elemVarSet` bodyFVs) . fst) xes
@@ -743,7 +743,7 @@ deadCode _ e@(Letrec xes body) = do
 
 deadCode _ e = return e
 
-removeUnusedExpr :: NormRewrite
+removeUnusedExpr :: HasCallStack => NormRewrite
 removeUnusedExpr _ e@(collectArgs -> (p@(Prim nm _),args)) = do
   bbM <- HashMap.lookup nm <$> Lens.use (extra.primitives)
   case bbM of
@@ -798,7 +798,7 @@ removeUnusedExpr _ e = return e
 
 -- | Inline let-bindings when the RHS is either a local variable reference or
 -- is constant (except clock or reset generators)
-bindConstantVar :: NormRewrite
+bindConstantVar :: HasCallStack => NormRewrite
 bindConstantVar = inlineBinders test
   where
     test _ (_, e) = isNonGlobalVar e >>= \case
@@ -811,14 +811,14 @@ bindConstantVar = inlineBinders test
     -- test _ _ = return False
 
 -- | Push a cast over a case into it's alternatives.
-caseCast :: NormRewrite
+caseCast :: HasCallStack => NormRewrite
 caseCast _ (Cast (Case subj ty alts) ty1 ty2) = do
   let alts' = map (\(p,e) -> (p, Cast e ty1 ty2)) alts
   changed (Case subj ty alts')
 caseCast _ e = return e
 
 -- | Push a cast over a Letrec into it's body
-letCast :: NormRewrite
+letCast :: HasCallStack => NormRewrite
 letCast _ (Cast (Letrec binds body) ty1 ty2) =
   changed $ Letrec binds (Cast body ty1 ty2)
 letCast _ e = return e
@@ -837,7 +837,7 @@ letCast _ e = return e
 --   y = f' a
 --     where f' x' = (\x -> g x) (cast x')
 -- @
-argCastSpec :: NormRewrite
+argCastSpec :: HasCallStack => NormRewrite
 argCastSpec ctx e@(App _ (Cast e' _ _)) = case e' of
   Var {} -> go
   Cast (Var {}) _ _ -> go
@@ -855,7 +855,7 @@ argCastSpec _ e = return e
 
 -- | Only inline casts that just contain a 'Var', because these are guaranteed work-free.
 -- These are the result of the 'splitCastWork' transformation.
-inlineCast :: NormRewrite
+inlineCast :: HasCallStack => NormRewrite
 inlineCast = inlineBinders test
   where
     test _ (_, (Cast (Var {}) _ _)) = return True
@@ -866,7 +866,7 @@ inlineCast = inlineBinders test
 -- @
 --   (cast :: b -> a) $ (cast :: a -> b) x   ==> x
 -- @
-eliminateCastCast :: NormRewrite
+eliminateCastCast :: HasCallStack => NormRewrite
 eliminateCastCast _ c@(Cast (Cast e tyA tyB) tyB' tyC) = do
   tcm <- Lens.view tcCache
   let ntyA  = normalizeType tcm tyA
@@ -892,7 +892,7 @@ eliminateCastCast _ e = return e
 -- let x  = cast x'
 --     x' = f a b
 -- @
-splitCastWork :: NormRewrite
+splitCastWork :: HasCallStack => NormRewrite
 splitCastWork ctx@(TransformContext is0 _) unchanged@(Letrec vs e') = do
   is1 <- unionInScope is0 <$> Lens.use globalInScope
   (vss', Monoid.getAny -> hasChanged) <- listen (mapM (splitCastLetBinding is1) vs)
@@ -920,7 +920,7 @@ splitCastWork _ e = return e
 
 -- | Inline work-free functions, i.e. fully applied functions that evaluate to
 -- a constant
-inlineWorkFree :: NormRewrite
+inlineWorkFree :: HasCallStack => NormRewrite
 inlineWorkFree (TransformContext localScope _) e@(collectArgs -> (Var f,args))
   = do
     tcm <- Lens.view tcCache
@@ -983,7 +983,7 @@ inlineWorkFree (TransformContext localScope _) e@(Var f) = do
 inlineWorkFree _ e = return e
 
 -- | Inline small functions
-inlineSmall :: NormRewrite
+inlineSmall :: HasCallStack => NormRewrite
 inlineSmall (TransformContext localScope _) e@(collectArgs -> (Var f,args)) = do
   untranslatable <- isUntranslatable True e
   topEnts <- Lens.view topEntities
@@ -1008,23 +1008,14 @@ inlineSmall (TransformContext localScope _) e@(collectArgs -> (Var f,args)) = do
 inlineSmall _ e = return e
 
 -- | Specialise functions on arguments which are constant, except when they
--- are clock or reset generators
-constantSpec :: NormRewrite
-constantSpec ctx e@(App e1 e2)
+-- are clock, reset generators.
+constantSpec :: HasCallStack => NormRewrite
+constantSpec ctx@(TransformContext is0 _) e@(App e1 e2)
   | (Var {}, args) <- collectArgs e1
   , (_, []) <- Either.partitionEithers args
   , null $ Lens.toListOf termFreeTyVars e2
-  = do e2Isconstant <- isConstant e2
-       if e2Isconstant then do
-         tcm <- Lens.view tcCache
-         let e2Ty = termType tcm e2
-         -- Don't specialise on clock or reset generators
-         case isClockOrReset tcm e2Ty of
-            False -> specializeNorm ctx e
-            _ -> return e
-       else
-        return e
-
+  = do e2Speccable <- canConstantSpec is0 e2
+       if e2Speccable then specializeNorm ctx e else return e
 constantSpec _ e = return e
 
 
@@ -1103,7 +1094,7 @@ constantSpec _ e = return e
 -- means that when normalisation starts we deshadow the expression, and when
 -- we inline global binders, we ensure that inlined expression is deshadowed
 -- taking the InScopeSet of the context into account.
-appProp :: NormRewrite
+appProp :: HasCallStack => NormRewrite
 appProp (TransformContext is0 _) (App (Lam v e) arg) = do
   argIsConstant <- isConstant arg
   if argIsConstant || isVar arg
@@ -1189,7 +1180,7 @@ appProp _ e = return e
 --        2 -> fromInteger 1
 --        3 -> fromInteger 0
 -- @
-caseFlat :: NormRewrite
+caseFlat :: HasCallStack => NormRewrite
 caseFlat _ e@(Case (collectEqArgs -> Just (scrut',_)) ty _)
   = do
        case collectFlat scrut' e of
@@ -1259,7 +1250,7 @@ tellBinders bs = modify ((bs ++) *** (`extendInScopeSetList` (map fst bs)))
 
 -- | Turn an expression into a modified ANF-form. As opposed to standard ANF,
 -- constants do not become let-bound.
-makeANF :: NormRewrite
+makeANF :: HasCallStack => NormRewrite
 makeANF (TransformContext is0 ctx) (Lam bndr e) = do
   e' <- makeANF (TransformContext (extendInScopeSet is0 bndr)
                                   (LamBody bndr:ctx))
@@ -1322,7 +1313,7 @@ makeANF ctx@(TransformContext is0 _) e0
 -- So we start out with an InScopeSet that satisfies points 1 and 2, now every
 -- time we create a new binder we must add it to the InScopeSet to satisfy
 -- point 3.
-collectANF :: NormRewriteW
+collectANF :: HasCallStack => NormRewriteW
 collectANF ctx e@(App appf arg)
   | (conVarPrim, _) <- collectArgs e
   , isCon conVarPrim || isPrim conVarPrim || isVar conVarPrim
@@ -1457,12 +1448,12 @@ collectANF ctx (Case subj ty alts) = do
 collectANF _ e = return e
 
 -- | Eta-expand top-level lambda's (DON'T use in a traversal!)
-etaExpansionTL :: NormRewrite
+etaExpansionTL :: HasCallStack => NormRewrite
 etaExpansionTL (TransformContext is0 ctx) e = do
   is1 <- unionInScope is0 <$> Lens.use globalInScope
   etaExpansionTL' (TransformContext is1 ctx) e
 
-etaExpansionTL' :: NormRewrite
+etaExpansionTL' :: HasCallStack => NormRewrite
 etaExpansionTL' (TransformContext is0 ctx) (Lam bndr e) = do
   e' <- etaExpansionTL'
           (TransformContext (extendInScopeSet is0 bndr) (LamBody bndr:ctx))
@@ -1508,7 +1499,7 @@ etaExpansionTL' (TransformContext is0 ctx) e
 -- along the unchanged original arguments, into let-recursive function. This
 -- means that all recursive calls are replaced by the same variable reference as
 -- found in the body of the top-level let-expression.
-recToLetRec :: NormRewrite
+recToLetRec :: HasCallStack => NormRewrite
 recToLetRec (TransformContext is0 []) e = do
   (fn,_) <- Lens.use curFun
   tcm    <- Lens.view tcCache
@@ -1565,7 +1556,7 @@ recToLetRec (TransformContext is0 []) e = do
 recToLetRec _ e = return e
 
 -- | Inline a function with functional arguments
-inlineHO :: NormRewrite
+inlineHO :: HasCallStack => NormRewrite
 inlineHO (TransformContext is0 _) e@(App _ _)
   | (Var f, args) <- collectArgs e
   = do
@@ -1593,7 +1584,7 @@ inlineHO (TransformContext is0 _) e@(App _ _)
 inlineHO _ e = return e
 
 -- | Simplified CSE, only works on let-bindings, works from top to bottom
-simpleCSE :: NormRewrite
+simpleCSE :: HasCallStack => NormRewrite
 simpleCSE (TransformContext is0 _) e@(Letrec binders body) = do
   let is1 = extendInScopeSetList is0 (map fst binders)
   is2 <- unionInScope is1 <$> Lens.use globalInScope
@@ -1632,7 +1623,7 @@ reduceBinders is processed body ((id_,expr):binders) = case List.find ((== expr)
       in  reduceBinders is processed' body' binders'
     Nothing -> reduceBinders is ((id_,expr):processed) body binders
 
-reduceConst :: NormRewrite
+reduceConst :: HasCallStack => NormRewrite
 reduceConst ctx@(TransformContext is0 _) e@(App _ _)
   | (conPrim, _) <- collectArgs e
   , isPrim conPrim
@@ -1698,7 +1689,7 @@ reduceConst _ e = return e
 -- * Clash.Sized.Vector.transpose
 -- * Clash.Sized.Vector.replicate
 -- * Clash.Sized.Vector.dtfold
-reduceNonRepPrim :: NormRewrite
+reduceNonRepPrim :: HasCallStack => NormRewrite
 reduceNonRepPrim (TransformContext is0 ctx) e@(App _ _) | (Prim nm _, args) <- collectArgs e = do
   tcm <- Lens.view tcCache
   is1 <- unionInScope is0 <$> Lens.use globalInScope
@@ -1945,7 +1936,7 @@ reduceNonRepPrim _ e = return e
 --       B -> f_out
 --       C -> h x
 -- @
-disjointExpressionConsolidation :: NormRewrite
+disjointExpressionConsolidation :: HasCallStack => NormRewrite
 disjointExpressionConsolidation ctx@(TransformContext is0 _) e@(Case _scrut _ty _alts@(_:_:_)) = do
     is1 <- unionInScope is0 <$> Lens.use globalInScope
     (_,collected) <- collectGlobals is1 [] [] e
@@ -1991,7 +1982,7 @@ disjointExpressionConsolidation _ e = return e
 --     a HDL declaration)
 --   * a projection case-expression (1 alternative)
 --   * a data constructor
-inlineCleanup :: NormRewrite
+inlineCleanup :: HasCallStack => NormRewrite
 inlineCleanup (TransformContext is0 _) (Letrec binds body) = do
   prims <- Lens.use (extra.primitives)
       -- For all let-bindings, count the number of times they are referenced.
@@ -2073,7 +2064,7 @@ inlineCleanup _ e = return e
 -- flattens those nested let-bindings again.
 --
 -- NB: must only be called in the cleaning up phase.
-flattenLet :: NormRewrite
+flattenLet :: HasCallStack => NormRewrite
 flattenLet (TransformContext is0 _) letrec@(Letrec _ _) = do
   is1 <- unionInScope is0 <$> Lens.use globalInScope
   let (is2, Letrec binds body) = freshenTm is1 letrec

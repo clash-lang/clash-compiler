@@ -481,9 +481,17 @@ mkFunInput resId e = do
               normalized <- Lens.use bindings
               case lookupVarEnv fun normalized of
                 Just _ -> do
-                  (_,_,N.Component compName compInps [snd -> compOutp] _) <- preserveVarEnv $ genComponent fun
-                  let inpAssigns    = zipWith (\(i,t) e' -> (Identifier i Nothing,In,t,e')) compInps [ Identifier (TextS.pack ("~VAR[arg" ++ show x ++ "][" ++ show x ++ "]")) Nothing | x <- [(0::Int)..] ]
-                      outpAssign    = (Identifier (fst compOutp) Nothing,Out,snd compOutp,Identifier "~RESULT" Nothing)
+                  (wereVoids,_,_,N.Component compName compInps [snd -> compOutp] _) <-
+                    preserveVarEnv $ genComponent fun
+
+                  let inpAssign (i, t) e' = (Identifier i Nothing, In, t, e')
+                      inpVar i            = TextS.pack ("~VAR[arg" ++ show i ++ "][" ++ show i ++ "]")
+                      inpVars             = [Identifier (inpVar i)  Nothing | i <- originalIndices wereVoids]
+                      inpAssigns          = zipWith inpAssign compInps inpVars
+                      outpAssign          = ( Identifier (fst compOutp) Nothing
+                                            , Out
+                                            , snd compOutp
+                                            , Identifier "~RESULT" Nothing )
                   i <- varCount <<%= (+1)
                   let instLabel     = TextS.concat [compName,TextS.pack ("_" ++ show i)]
                       instDecl      = InstDecl Entity Nothing compName instLabel [] (outpAssign:inpAssigns)
@@ -568,7 +576,7 @@ mkFunInput resId e = do
     go is0 _ e'@(Letrec {}) = do
       tcm <- Lens.use tcCache
       let normE = splitNormalized tcm e'
-      ([],[],_,[],binders,resultM) <- case normE of
+      (_,[],[],_,[],binders,resultM) <- case normE of
         Right norm -> do
           isCur <- Lens.use globalInScope
           globalInScope Lens..= is0 `unionInScope` isCur

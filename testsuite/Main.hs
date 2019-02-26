@@ -253,7 +253,8 @@ runClashTest =
         , outputTest ("tests" </> "shouldwork" </> "TopEntity") [Verilog] "PortNamesWithRTree" "main"
         ]
       , clashTestGroup "Void"
-        [ runTest ("tests" </> "shouldwork" </> "Unit") defBuild [] "ZipWithUnitVector"            (["","ZipWithUnitVector_testBench"],"ZipWithUnitVector_testBench",True)
+        [ runTest ("tests" </> "shouldwork" </> "Unit") defBuild [] "Imap"                         (["","Imap_testBench"],"Imap_testBench",True)
+        , runTest ("tests" </> "shouldwork" </> "Unit") defBuild [] "ZipWithUnitVector"            (["","ZipWithUnitVector_testBench"],"ZipWithUnitVector_testBench",True)
         , runTest ("tests" </> "shouldwork" </> "Unit") defBuild [] "ZipWithTupleWithUnitLeft"     (["","ZipWithTupleWithUnitLeft_testBench"],"ZipWithTupleWithUnitLeft_testBench",True)
         , runTest ("tests" </> "shouldwork" </> "Unit") defBuild [] "ZipWithTupleWithUnitRight"    (["","ZipWithTupleWithUnitRight_testBench"],"ZipWithTupleWithUnitRight_testBench",True)
         , runTest ("tests" </> "shouldwork" </> "Unit") defBuild [] "ZipWithTripleWithUnitMiddle"  (["","ZipWithTripleWithUnitMiddle_testBench"],"ZipWithTripleWithUnitMiddle_testBench",True)

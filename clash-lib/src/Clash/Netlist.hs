@@ -106,7 +106,7 @@ genNetlist
   -- ^ Component name prefix
   -> Id
   -- ^ Name of the @topEntity@
-  -> IO ([(SrcSpan,HashSet Identifier,Component)],HashSet Identifier)
+  -> IO ([([Bool],SrcSpan,HashSet Identifier,Component)],HashSet Identifier)
 genNetlist isTb opts reprs globals is0 tops primMap tcm typeTrans iw mkId extId seen env prefixM topEntity = do
   (_,s) <- runNetlistMonad isTb opts reprs globals is0 (mkTopEntityMap tops)
              primMap tcm typeTrans iw mkId extId seen env prefixM $
@@ -184,7 +184,7 @@ genNames mkId prefixM s0 m0 = foldl go (s0,m0)
 genComponent
   :: Id
   -- ^ Name of the function
-  -> NetlistMonad (SrcSpan,HashSet Identifier,Component)
+  -> NetlistMonad ([Bool],SrcSpan,HashSet Identifier,Component)
 genComponent compName = do
   compExprM <- lookupVarEnv compName <$> Lens.use bindings
   case compExprM of
@@ -200,7 +200,7 @@ genComponentT
   -- ^ Name of the function
   -> Term
   -- ^ Corresponding term
-  -> NetlistMonad (SrcSpan,HashSet Identifier,Component)
+  -> NetlistMonad ([Bool],SrcSpan,HashSet Identifier,Component)
 genComponentT compName componentExpr = do
   varCount .= 0
   componentName1 <- (`lookupVarEnv'` compName) <$> Lens.use componentNames
@@ -222,7 +222,7 @@ genComponentT compName componentExpr = do
   let topEntityTypeM' = snd . splitCoreFunForallTy tcm . fst <$> topEntityTypeM
 
   seenIds .= HashSet.empty
-  (compInps,argWrappers,compOutps,resUnwrappers,binders,resultM) <-
+  (wereVoids,compInps,argWrappers,compOutps,resUnwrappers,binders,resultM) <-
     case splitNormalized tcm componentExpr of
       Right (args, binds, res) -> do
         let varType'   = fromMaybe (varType res) topEntityTypeM'
@@ -246,14 +246,14 @@ genComponentT compName componentExpr = do
           component      = Component componentName2 compInps compOutps'
                              (netDecls ++ argWrappers ++ decls ++ resUnwrappers')
       ids <- Lens.use seenIds
-      return (sp, ids, component)
+      return (wereVoids, sp, ids, component)
     -- No result declaration means that the result is empty, this only happens
     -- when the TopEntity has an empty result. We just create an empty component
     -- in this case.
     Nothing -> do
       let component = Component componentName2 compInps [] (netDecls ++ argWrappers ++ decls)
       ids <- Lens.use seenIds
-      return (sp, ids, component)
+      return (wereVoids, sp, ids, component)
 
 mkNetDecl :: (Id, Term) -> NetlistMonad (Maybe Declaration)
 mkNetDecl (id_,tm) = do
@@ -492,7 +492,7 @@ mkFunApp dst fun args = do
       normalized <- Lens.use bindings
       case lookupVarEnv fun normalized of
         Just _ -> do
-          (_,_,Component compName compInps co _) <- preserveVarEnv $ genComponent fun
+          (_,_,_,Component compName compInps co _) <- preserveVarEnv $ genComponent fun
           let argTys = map (termType tcm) args
           argHWTys <- mapM coreTypeToHWTypeM' argTys
           -- Filter out the arguments of hwtype `Void` and only translate
