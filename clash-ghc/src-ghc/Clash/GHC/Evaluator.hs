@@ -1308,6 +1308,30 @@ reduceConstant isSubj gbl tcm h k nm ty tys args = case nm of
     | [(0,i)] <- bitLiterals args
     -> reduce (mkBitLit ty 0 (complement i))
 
+  "Clash.Sized.Internal.BitVector.countLeadingZerosBV#"
+    | [_, bv0] <- args
+    , Just (_, bvSize) <- extractKnownNat tcm tys
+    -- TODO: Check if we can safely handle non-zero bitmasks
+    , [(0, i)] <- bitVectorLiterals' [bv0]
+    -> let res = reifyNat bvSize (op (toBV (0, i))) in
+       let resTyInfo = extractTySizeInfo tcm ty tys in
+       reduce (mkIndexLit' resTyInfo (toInteger res))
+    where
+      op :: KnownNat n => BitVector n -> Proxy n -> Int
+      op u _ = countLeadingZeros u
+
+  "Clash.Sized.Internal.BitVector.countTrailingZerosBV#"
+    | [_, bv0] <- args
+    , Just (_, bvSize) <- extractKnownNat tcm tys
+    -- TODO: Check if we can safely handle non-zero bitmasks
+    , [(0, i)] <- bitVectorLiterals' [bv0]
+    -> let res = reifyNat bvSize (op (toBV (0, i))) in
+       let resTyInfo = extractTySizeInfo tcm ty tys in
+       reduce (mkIndexLit' resTyInfo (toInteger res))
+    where
+      op :: KnownNat n => BitVector n -> Proxy n -> Int
+      op u _ = countTrailingZeros u
+
 -- Pack
   "Clash.Sized.Internal.BitVector.pack#"
     | [(msk,i)] <- bitLiterals args

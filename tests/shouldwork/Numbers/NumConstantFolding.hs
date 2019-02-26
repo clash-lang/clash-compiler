@@ -114,8 +114,6 @@ cFiniteBits = (r1,r2,r3)
     r1 = finiteBitSize      @n 22190
     r2 = countLeadingZeros  @n 22191
     r3 = countTrailingZeros @n 22192
-    -- TODO countLeadingZeros and countTrailingZeros for all clash types
-    -- are implemented with folds and bv2v both of which don't constantfold
 
 
 cExtendingNum :: forall a b. (Num a, Num b, ExtendingNum a b) => _
@@ -191,7 +189,7 @@ tUnsigned16
     , cOrd            @(Unsigned 16)
     , cIntegral       @(Unsigned 16)
     , cBits           @(Unsigned 16)
-    -- , cFiniteBits  @(Unsigned 16) -- broken
+    , cFiniteBits     @(Unsigned 16)
     , csClashSpecific @(Unsigned 16)
     , cResize         @(Unsigned 16)
     )
@@ -202,7 +200,7 @@ tSigned16
     , cOrd            @(Signed 16)
     , cIntegral       @(Signed 16)
     , cBits           @(Signed 16)
-    -- , cFiniteBits  @(Signed 16) -- broken
+    , cFiniteBits     @(Signed 16)
     , csClashSpecific @(Signed 16)
     , cResize         @(Signed 16)
     )
@@ -213,7 +211,7 @@ tBitVector16
     , cOrd            @(BitVector 16)
     , cIntegral       @(BitVector 16)
     , cBits           @(BitVector 16)
-    -- , cFiniteBits  @(BitVector 16) -- broken
+    , cFiniteBits     @(BitVector 16)
     , csClashSpecific @(BitVector 16)
     , cResize         @(BitVector 16)
     )
@@ -233,7 +231,7 @@ tSFixed
     , cOrd            @(SFixed 16 0)
     -- no Integral
     , cBits           @(SFixed 16 0)
-    -- , cFiniteBits     @(SFixed 16 0) -- broken
+    , cFiniteBits     @(SFixed 16 0)
     , csClashSpecific @(SFixed 16 0)
     )
 tUFixed
@@ -242,7 +240,7 @@ tUFixed
     , cOrd            @(UFixed 16 0)
     -- no Integral
     , cBits           @(UFixed 16 0)
-    -- , cFiniteBits     @(UFixed 16 0) -- broken
+    , cFiniteBits     @(UFixed 16 0)
     , csClashSpecific @(UFixed 16 0)
     )
 

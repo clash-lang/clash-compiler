@@ -50,4 +50,14 @@
     , "template"  : "~ARG[0] <= ~ARG[1]"
     }
   }
+, { "Primitive" :
+    { "name"      : "Clash.Sized.Internal.BitVector.countLeadingZerosBV#"
+    , "primType"  : "Function"
+    }
+  }
+, { "Primitive" :
+    { "name"      : "Clash.Sized.Internal.BitVector.countTrailingZerosBV#"
+    , "primType"  : "Function"
+    }
+  }
 ]

@@ -114,8 +114,8 @@ module Clash.Sized.Internal.BitVector
   , rotateR#
   , popCountBV
     -- *** FiniteBits
-  , countLeadingZerosBV
-  , countTrailingZerosBV
+  , countLeadingZerosBV#
+  , countTrailingZerosBV#
     -- *** Resize
   , truncateB#
     -- *** QuickCheck
@@ -610,16 +610,16 @@ instance KnownNat n => Bits (BitVector n) where
 
 instance KnownNat n => FiniteBits (BitVector n) where
   finiteBitSize       = size#
-  countLeadingZeros   = fromInteger . I.toInteger# . countLeadingZerosBV
-  countTrailingZeros  = fromInteger . I.toInteger# . countTrailingZerosBV
+  countLeadingZeros   = fromInteger . I.toInteger# . countLeadingZerosBV#
+  countTrailingZeros  = fromInteger . I.toInteger# . countTrailingZerosBV#
 
-countLeadingZerosBV :: KnownNat n => BitVector n -> I.Index (n+1)
-countLeadingZerosBV = V.foldr (\l r -> if eq## l low then 1 + r else 0) 0 . V.bv2v
-{-# INLINE countLeadingZerosBV #-}
+countLeadingZerosBV# :: KnownNat n => BitVector n -> I.Index (n+1)
+countLeadingZerosBV# = V.foldr (\l r -> if eq## l low then 1 + r else 0) 0 . V.bv2v
+{-# NOINLINE countLeadingZerosBV# #-}
 
-countTrailingZerosBV :: KnownNat n => BitVector n -> I.Index (n+1)
-countTrailingZerosBV = V.foldl (\l r -> if eq## r low then 1 + l else 0) 0 . V.bv2v
-{-# INLINE countTrailingZerosBV #-}
+countTrailingZerosBV# :: KnownNat n => BitVector n -> I.Index (n+1)
+countTrailingZerosBV# = V.foldl (\l r -> if eq## r low then 1 + l else 0) 0 . V.bv2v
+{-# NOINLINE countTrailingZerosBV# #-}
 
 {-# NOINLINE reduceAnd# #-}
 reduceAnd# :: KnownNat n => BitVector n -> Bit
