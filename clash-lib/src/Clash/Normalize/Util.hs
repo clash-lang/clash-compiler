@@ -9,6 +9,7 @@
 {-# LANGUAGE BangPatterns      #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecordWildCards   #-}
+{-# LANGUAGE ViewPatterns      #-}
 
 module Clash.Normalize.Util
  ( isConstantArg
@@ -21,6 +22,8 @@ module Clash.Normalize.Util
  , callGraph
  , classifyFunction
  , isCheapFunction
+ , isNonRecursiveGlobalVar
+ , canConstantSpec
  )
  where
 
@@ -37,13 +40,13 @@ import           Clash.Core.TyCon        (TyConMap)
 import           Clash.Core.Var          (Id, Var (..))
 import           Clash.Core.VarEnv
 import           Clash.Core.Util
-  (collectArgs, isPolyFun)
+  (collectArgs, isPolyFun, termType, isClockOrReset)
 import           Clash.Driver.Types      (BindingMap)
 import           Clash.Normalize.Types
 import           Clash.Primitives.Util   (constantArgs)
 import           Clash.Rewrite.Types
-  (bindings,extra,RewriteMonad,CoreContext(AppArg))
-import           Clash.Rewrite.Util      (specialise)
+  (bindings,extra,RewriteMonad,CoreContext(AppArg), tcCache, curFun)
+import           Clash.Rewrite.Util      (specialise, hasLocalFreeVars)
 import           Clash.Unique
 import           Clash.Util              (anyM)
 
@@ -123,6 +126,30 @@ isClosed :: TyConMap
          -> Bool
 isClosed tcm = not . isPolyFun tcm
 
+-- | Test whether binder is a non-shadowed global variable
+isGlobalBndr
+  :: InScopeSet
+  -- ^ Local scope
+  -> Id
+  -- ^ Term to check for global variness
+  -> RewriteMonad extra Bool
+isGlobalBndr localScope x = do
+  bndrs <- Lens.use bindings
+  let inLocalScope = x `elemInScopeSet` localScope
+  let inGlobalScope = elemUniqMap (varName x) bndrs
+  return (not inLocalScope && inGlobalScope)
+
+-- | Test whether a given term represents a non-recursive global variable
+isNonRecursiveGlobalVar
+  :: InScopeSet
+  -> Term
+  -> NormalizeSession Bool
+isNonRecursiveGlobalVar is (collectArgs -> (Var i, _args)) = do
+  eIsGlobal <- isGlobalBndr is i
+  eIsRec    <- isRecursiveBndr i
+  return (eIsGlobal && not eIsRec)
+isNonRecursiveGlobalVar _ _ = return False
+
 -- | Assert whether a name is a reference to a recursive binder.
 isRecursiveBndr
   :: Id
@@ -142,6 +169,38 @@ isRecursiveBndr f = do
           let isR = f `idOccursIn` fBody
           (extra.recursiveComponents) %= extendVarEnv f isR
           return isR
+
+-- | Test if we can constant specialize current term in current function. The
+-- rules are, we can constant fold if:
+--
+--   * Term does not carry a clock or reset
+--   * Term is constant is @isConstant@ sense, and additionally when term is a
+--     global, non-recursive variable
+--
+canConstantSpec
+  :: InScopeSet
+  -> Term
+  -> RewriteMonad NormalizeState Bool
+canConstantSpec is0 e = do
+  tcm <- Lens.view tcCache
+  if isClockOrReset tcm (termType tcm e) then
+    case collectArgs e of
+      (Prim nm _, _) -> return (nm == "Clash.Transformations.removedArg")
+      _              -> return False
+  else
+    case collectArgs e of
+      (Data _, args)   -> and <$> mapM (either (canConstantSpec is0) (const (pure True))) args
+      (Prim _ _, args) -> and <$> mapM (either (canConstantSpec is0) (const (pure True))) args
+      (Lam _ _, _)     -> not <$> (hasLocalFreeVars <*> pure e)
+      (Var f, args)    -> do
+        (curF, _) <- Lens.use curFun
+
+        argsConst <- and <$> mapM (either (canConstantSpec is0) (const (pure True))) args
+        isNonRecGlobVar <- isNonRecursiveGlobalVar is0 e
+        return (argsConst && isNonRecGlobVar && f /= curF)
+
+      (Literal _,_)    -> pure True
+      _                -> pure False
 
 -- | A call graph counts the number of occurrences that a functions 'g' is used
 -- in 'f'.
