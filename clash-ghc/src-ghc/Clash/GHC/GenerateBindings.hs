@@ -54,7 +54,7 @@ import           Clash.Core.VarEnv
   (InScopeSet, VarEnv, extendInScopeSet, mkInScopeSet, mkVarEnv, unionVarEnv)
 import           Clash.Driver.Types      (BindingMap)
 import           Clash.GHC.GHC2Core      (GHC2CoreState, tyConMap, coreToId, coreToName, coreToTerm,
-                                          makeAllTyCons, qualfiedNameString, emptyGHC2CoreState)
+                                          makeAllTyCons, qualifiedNameString, emptyGHC2CoreState)
 import           Clash.GHC.LoadModules   (loadModules)
 import           Clash.Primitives.Types  (PrimMap, ResolvedPrimMap, Primitive)
 import           Clash.Primitives.Util   (generatePrimMap)
@@ -100,7 +100,7 @@ generateBindings tmpDir useColor primDirs importDirs hdl modName dflagsM = do
       allBindings                   = bindingsMap `unionVarEnv` clsMap
       topEntities'                  =
         flip State.evalState tcMap' $ mapM (\(topEnt,annM,benchM) -> do
-          topEnt' <- coreToName GHC.varName GHC.varUnique qualfiedNameString topEnt
+          topEnt' <- coreToName GHC.varName GHC.varUnique qualifiedNameString topEnt
           benchM' <- traverse coreToId benchM
           return (topEnt',annM,benchM')) topEntities
       topEntities''                 = map (\(topEnt,annM,benchM) -> case lookupUniqMap topEnt allBindings of
@@ -160,7 +160,7 @@ mkBindings primMap bindings clsOps unlocatable = do
 --   * isn't using all its arguments
 checkPrimitive :: PrimMap a -> GHC.CoreBndr -> State GHC2CoreState ()
 checkPrimitive primMap v = do
-  name' <- qualfiedNameString (GHC.varName v)
+  name' <- qualifiedNameString (GHC.varName v)
   when (name' `HashMap.member` primMap) $ do
     let
       info = GHC.idInfo v
@@ -174,7 +174,7 @@ checkPrimitive primMap v = do
               GHC.UnhelpfulLoc _ -> ""
               GHC.RealSrcLoc l   -> showPpr l ++ ": "
       warnIf cond msg = traceIf cond ("\n"++loc++"Warning: "++msg) return ()
-    qName <- Text.unpack <$> qualfiedNameString (GHC.varName v)
+    qName <- Text.unpack <$> qualifiedNameString (GHC.varName v)
     let primStr = "primitive " ++ qName ++ " "
     unless (qName == "Clash.XException.errorX" || "GHC." `isPrefixOf` qName) $ do
       warnIf (inline /= GHC.NoInline)
@@ -225,7 +225,7 @@ mkTupTyCons tcMap = (tcMap'',tupTcCache)
   where
     tupTyCons        = GHC.promotedTrueDataCon : GHC.promotedFalseDataCon
                      : map (GHC.tupleTyCon GHC.Boxed) [2..62]
-    (tcNames,tcMap') = State.runState (mapM (\tc -> coreToName GHC.tyConName GHC.tyConUnique qualfiedNameString tc) tupTyCons) tcMap
+    (tcNames,tcMap') = State.runState (mapM (\tc -> coreToName GHC.tyConName GHC.tyConUnique qualifiedNameString tc) tupTyCons) tcMap
     tupTcCache       = IMS.fromList (zip [2..62] (drop 2 tcNames))
     tupHM            = listToUniqMap (zip tcNames tupTyCons)
     tcMap''          = tcMap' & tyConMap %~ (`unionUniqMap` tupHM)

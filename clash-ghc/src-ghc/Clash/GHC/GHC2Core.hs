@@ -22,7 +22,7 @@ module Clash.GHC.GHC2Core
   , coreToId
   , coreToName
   , modNameM
-  , qualfiedNameString
+  , qualifiedNameString
   , makeAllTyCons
   , emptyGHC2CoreState
   )
@@ -150,7 +150,7 @@ makeTyCon fiEnvs tc = tycon
         tcArity = tyConArity tc
 
         mkAlgTyCon = do
-          tcName <- coreToName tyConName tyConUnique qualfiedNameString tc
+          tcName <- coreToName tyConName tyConUnique qualifiedNameString tc
           tcKind <- coreToType (tyConKind tc)
           tcRhsM <- makeAlgTyConRhs $ algTyConRhs tc
           case tcRhsM of
@@ -166,7 +166,7 @@ makeTyCon fiEnvs tc = tycon
             Nothing -> return (C.PrimTyCon (C.nameUniq tcName) tcName tcKind tcArity)
 
         mkFunTyCon = do
-          tcName <- coreToName tyConName tyConUnique qualfiedNameString tc
+          tcName <- coreToName tyConName tyConUnique qualifiedNameString tc
           tcKind <- coreToType (tyConKind tc)
           substs <- case isClosedSynFamilyTyConWithAxiom_maybe tc of
             Nothing -> let instances = familyInstances fiEnvs tc
@@ -185,7 +185,7 @@ makeTyCon fiEnvs tc = tycon
             }
 
         mkTupleTyCon = do
-          tcName <- coreToName tyConName tyConUnique qualfiedNameString tc
+          tcName <- coreToName tyConName tyConUnique qualifiedNameString tc
           tcKind <- coreToType (tyConKind tc)
           tcDc   <- fmap (C.DataTyCon . (:[])) . coreToDataCon . head . tyConDataCons $ tc
           return
@@ -198,7 +198,7 @@ makeTyCon fiEnvs tc = tycon
             }
 
         mkPrimTyCon = do
-          tcName <- coreToName tyConName tyConUnique qualfiedNameString tc
+          tcName <- coreToName tyConName tyConUnique qualifiedNameString tc
           tcKind <- coreToType (tyConKind tc)
           return
             C.PrimTyCon
@@ -209,14 +209,14 @@ makeTyCon fiEnvs tc = tycon
             }
 
         mkSuperKindTyCon = do
-          tcName <- coreToName tyConName tyConUnique qualfiedNameString tc
+          tcName <- coreToName tyConName tyConUnique qualifiedNameString tc
           return C.SuperKindTyCon
                    { C.tyConUniq = C.nameUniq tcName
                    , C.tyConName = tcName
                    }
 
         mkVoidTyCon = do
-          tcName <- coreToName tyConName tyConUnique qualfiedNameString tc
+          tcName <- coreToName tyConName tyConUnique qualifiedNameString tc
           tcKind <- coreToType (tyConKind tc)
           return (C.PrimTyCon (C.nameUniq tcName) tcName tcKind tcArity)
 
@@ -258,7 +258,7 @@ coreToTerm primMap unlocs srcsp coreExpr = Reader.runReaderT (term coreExpr) src
     term :: CoreExpr -> ReaderT SrcSpan (State GHC2CoreState) C.Term
     term e
       | (Var x,args) <- collectArgs e
-      , let nm = State.evalState (qualfiedNameString (varName x)) emptyGHC2CoreState
+      , let nm = State.evalState (qualifiedNameString (varName x)) emptyGHC2CoreState
       = go nm args
       | otherwise
       = term' e
@@ -418,7 +418,7 @@ addUsefull x = Reader.local (\r -> if isGoodSrcSpan x then x else r)
 
 isIntegerTy :: Type -> State GHC2CoreState Bool
 isIntegerTy (TyConApp tc []) = do
-  tcNm <- qualfiedNameString (tyConName tc)
+  tcNm <- qualifiedNameString (tyConName tc)
   return (tcNm == "GHC.Integer.Type.Integer")
 isIntegerTy _ = return False
 
@@ -444,7 +444,7 @@ hasPrimCo co@(AxiomInstCo _ _ coers) = do
          return (listToMaybe tcs)
   where
     isPrimTc (TyConApp tc _) = do
-      tcNm <- qualfiedNameString (tyConName tc)
+      tcNm <- qualifiedNameString (tyConName tc)
       return (tcNm `elem` ["Clash.Sized.Internal.BitVector.Bit"
                           ,"Clash.Sized.Internal.BitVector.BitVector"
                           ,"Clash.Sized.Internal.Index.Index"
@@ -487,7 +487,7 @@ coreToDataCon dc = do
       let decLabel = decodeUtf8 . fastStringToByteString . flLabel
       let fLabels  = map decLabel (dataConFieldLabels dc)
 
-      nm   <- coreToName dataConName getUnique qualfiedNameString dc
+      nm   <- coreToName dataConName getUnique qualifiedNameString dc
       uTvs <- mapM coreToTyVar (dataConUnivTyVars dc)
       eTvs <- mapM coreToTyVar (dataConExTyVars dc)
       return $ C.MkData
@@ -505,7 +505,7 @@ typeConstructorToString
   :: TyCon
   -> State GHC2CoreState String
 typeConstructorToString constructor =
-   Text.unpack . C.nameOcc <$> coreToName tyConName tyConUnique qualfiedNameString constructor
+   Text.unpack . C.nameOcc <$> coreToName tyConName tyConUnique qualifiedNameString constructor
 
 _ATTR_NAME :: String
 _ATTR_NAME = "Clash.Annotations.SynthesisAttributes.Attr"
@@ -671,7 +671,7 @@ coreToType' (TyConApp tc args)
                             synTy'  = substTy substs' synTy
                         foldl C.AppTy <$> coreToType synTy' <*> mapM coreToType remArgs
                       _ -> do
-                        tcName <- coreToName tyConName tyConUnique qualfiedNameString tc
+                        tcName <- coreToName tyConName tyConUnique qualifiedNameString tc
                         tyConMap %= (C.extendUniqMap tcName tc)
                         C.mkTyConApp <$> (pure tcName) <*> mapM coreToType args
 coreToType' (ForAllTy (TvBndr tv _) ty) = C.ForAllTy <$> coreToTyVar tv <*> coreToType ty
@@ -698,11 +698,11 @@ coreToId i =
 
 coreToVar :: Var
           -> State GHC2CoreState (C.Name a)
-coreToVar = coreToName varName varUnique qualfiedNameStringM
+coreToVar = coreToName varName varUnique qualifiedNameStringM
 
 coreToPrimVar :: Var
               -> State GHC2CoreState (C.Name C.Term)
-coreToPrimVar = coreToName varName varUnique qualfiedNameString
+coreToPrimVar = coreToName varName varUnique qualifiedNameString
 
 coreToName
   :: (b -> Name)
@@ -716,19 +716,19 @@ coreToName toName toUnique toString v = do
       loc = getSrcSpan (toName v)
   return (C.Name C.User ns key loc)
 
-qualfiedNameString
+qualifiedNameString
   :: Name
   -> State GHC2CoreState Text
-qualfiedNameString n =
+qualifiedNameString n =
   makeCached n nameMap $
   return (fromMaybe "_INTERNAL_" (modNameM n) `Text.append` ('.' `Text.cons` occName))
  where
   occName = pack (occNameString (nameOccName n))
 
-qualfiedNameStringM
+qualifiedNameStringM
   :: Name
   -> State GHC2CoreState Text
-qualfiedNameStringM n =
+qualifiedNameStringM n =
   makeCached n nameMap $
   return (maybe occName (\modName -> modName `Text.append` ('.' `Text.cons` occName)) (modNameM n))
  where
