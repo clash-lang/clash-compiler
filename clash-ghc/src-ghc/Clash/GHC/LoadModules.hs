@@ -25,9 +25,9 @@ where
 #endif
 
 -- External Modules
-import           Clash.Annotations.Primitive     (HDL)
+import           Clash.Annotations.Primitive     (HDL, PrimitiveGuard)
 import           Clash.Annotations.TopEntity     (TopEntity (..))
-import           Control.Arrow                   (second)
+import           Control.Arrow                   (first, second)
 #if MIN_VERSION_ghc(8,6,0)
 import           Control.Exception               (throwIO)
 #endif
@@ -77,7 +77,7 @@ import           Util (OverridingBool)
 import qualified Var
 
 -- Internal Modules
-import           Clash.GHC.GHC2Core                           (modNameM)
+import           Clash.GHC.GHC2Core                           (modNameM, qualifiedNameString')
 import           Clash.GHC.LoadInterfaceFiles                 (loadExternalExprs, primitiveFilePath)
 import           Clash.Util                                   (curLoc)
 import           Clash.Annotations.BitRepresentation.Internal
@@ -128,6 +128,7 @@ loadModules
            , Maybe CoreSyn.CoreBndr)]            -- (maybe) testBench bndr
         , [FilePath]
         , [DataRepr']
+        , [(Text.Text, PrimitiveGuard ())]
         )
 loadModules tmpDir useColor hdl modName dflagsM = do
   libDir <- MonadUtils.liftIO ghcLibDir
@@ -255,10 +256,11 @@ loadModules tmpDir useColor hdl modName dflagsM = do
     -- Because tidiedMods is in topological order, binders is also, and hence
     -- allSyn is in topological order. This means that the "root" 'topEntity'
     -- will be compiled last.
-    allSyn   <- findSynthesizeAnnotations binderIds
-    benchAnn <- findTestBenchAnnotations binderIds
-    topSyn   <- findSynthesizeAnnotations rootIds
-    reprs'   <- findCustomReprAnnotations
+    allSyn     <- map (second Just) <$> findSynthesizeAnnotations binderIds
+    topSyn     <- map (second Just) <$> findSynthesizeAnnotations rootIds
+    benchAnn   <- findTestBenchAnnotations binderIds
+    reprs'     <- findCustomReprAnnotations
+    primGuards <- findPrimitiveGuardAnnotations binderIds
     let varNameString = OccName.occNameString . Name.nameOccName . Var.varName
         topEntities = filter ((== "topEntity") . varNameString) rootIds
         benches     = filter ((== "testBench") . varNameString) rootIds
@@ -285,7 +287,16 @@ loadModules tmpDir useColor hdl modName dflagsM = do
         (_, _) ->
           Panic.pgmError $ $(curLoc) ++ "Multiple 'topEntities' found."
 
-    return (bindersC ++ makeRecursiveGroups externalBndrs,clsOps,unlocatable,(fst famInstEnvs,modFamInstEnvs'),topEntities',nub $ pFP ++ pFP',reprs++reprs')
+
+    return ( bindersC ++ makeRecursiveGroups externalBndrs
+           , clsOps
+           , unlocatable
+           , (fst famInstEnvs, modFamInstEnvs')
+           , topEntities'
+           , nub $ pFP ++ pFP'
+           , reprs ++ reprs'
+           , primGuards
+           )
 
 -- | Given a set of bindings, make explicit non-recursive bindings and
 -- recursive binding groups.
@@ -325,6 +336,28 @@ makeRecursiveGroups
     makeBind (Digraph.AcyclicSCC (b,e)) = CoreSyn.NonRec b e
     makeBind (Digraph.CyclicSCC bs)     = CoreSyn.Rec bs
 
+errOnDuplicateAnnotations
+  :: String
+  -- ^ Name of annotation
+  -> [CoreSyn.CoreBndr]
+  -- ^ Binders searched for
+  -> [[a]]
+  -- ^ Parsed annotations
+  -> [(CoreSyn.CoreBndr, a)]
+errOnDuplicateAnnotations nm bndrs anns =
+  go (zip bndrs anns)
+ where
+  go
+    :: [(CoreSyn.CoreBndr, [a])]
+    -> [(CoreSyn.CoreBndr, a)]
+  go []             = []
+  go ((_, []):ps)   = go ps
+  go ((b, [p]):ps)  = (b, p) : (go ps)
+  go ((b, _):_)  =
+    Panic.pgmError $ "The following value has multiple "
+                  ++ "'" ++ nm ++ "' annotations: "
+                  ++ Outputable.showSDocUnsafe (ppr b)
+
 -- | Find annotations by given targets
 findAnnotationsByTargets
   :: GHC.GhcMonad m
@@ -358,6 +391,15 @@ findNamedAnnotations
 findNamedAnnotations bndrs =
   findAnnotationsByTargets (map (Annotations.NamedTarget . Var.varName) bndrs)
 
+findPrimitiveGuardAnnotations
+  :: GHC.GhcMonad m
+  => [CoreSyn.CoreBndr]
+  -> m [(Text.Text, (PrimitiveGuard ()))]
+findPrimitiveGuardAnnotations bndrs = do
+  anns0 <- findNamedAnnotations bndrs
+  let anns1 = errOnDuplicateAnnotations "PrimitiveGuard" bndrs anns0
+  pure (map (first (qualifiedNameString' . Var.varName)) anns1)
+
 -- | Find annotations of type @DataReprAnn@ and convert them to @DataRepr'@
 findCustomReprAnnotations
   :: GHC.GhcMonad m
@@ -370,18 +412,13 @@ findCustomReprAnnotations =
 findSynthesizeAnnotations
   :: GHC.GhcMonad m
   => [CoreSyn.CoreBndr]
-  -> m [(CoreSyn.CoreBndr,Maybe TopEntity)]
+  -> m [(CoreSyn.CoreBndr, TopEntity)]
 findSynthesizeAnnotations bndrs = do
   anns <- findNamedAnnotations bndrs
-  let isSyn (Synthesize {}) = True
-      isSyn _               = False
-      anns'    = map (filter isSyn) anns
-      annBndrs = filter (not . null . snd) (zip bndrs anns')
-  case filter ((> 1) . length . snd) annBndrs of
-    [] -> return $ map (second listToMaybe) annBndrs
-    as -> Panic.pgmError $
-            "The following functions have multiple 'Synthesize' annotations: " ++
-            Outputable.showSDocUnsafe (ppr (map fst as))
+  pure (errOnDuplicateAnnotations "Synthesize" bndrs (map (filter isSyn) anns))
+ where
+  isSyn (Synthesize {}) = True
+  isSyn _               = False
 
 -- | Find testbench annotations and make sure that each binder has no more than
 -- a single annotation.
@@ -390,18 +427,14 @@ findTestBenchAnnotations
   => [CoreSyn.CoreBndr]
   -> m [(CoreSyn.CoreBndr,CoreSyn.CoreBndr)]
 findTestBenchAnnotations bndrs = do
-  anns <- findNamedAnnotations bndrs
-  let isTB (TestBench {}) = True
-      isTB _              = False
-      anns'     = map (filter isTB) anns
-      annBndrs  = filter (not . null . snd) (zip bndrs anns')
-      annBndrs' = case filter ((> 1) . length . snd) annBndrs of
-        [] -> map (second head) annBndrs
-        as -> Panic.pgmError $
-          "The following functions have multiple 'TestBench' annotations: " ++
-          Outputable.showSDocUnsafe (ppr (map fst as))
-  return (map (second findTB) annBndrs')
+  anns0 <- findNamedAnnotations bndrs
+  let anns1 = map (filter isTB) anns0
+      anns2 = errOnDuplicateAnnotations "TestBench" bndrs anns1
+  return (map (second findTB) anns2)
   where
+    isTB (TestBench {}) = True
+    isTB _              = False
+
     findTB :: TopEntity -> CoreSyn.CoreBndr
     findTB (TestBench tb) = case listToMaybe (filter (eqNm tb) bndrs) of
       Just tb' -> tb'

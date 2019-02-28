@@ -7,8 +7,6 @@
 
 {-# LANGUAGE LambdaCase        #-}
 {-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE TemplateHaskell   #-}
-{-# LANGUAGE ViewPatterns      #-}
 
 module Clash.GHC.GenerateBindings
   (generateBindings)
@@ -56,7 +54,7 @@ import           Clash.Driver.Types      (BindingMap)
 import           Clash.GHC.GHC2Core      (GHC2CoreState, tyConMap, coreToId, coreToName, coreToTerm,
                                           makeAllTyCons, qualifiedNameString, emptyGHC2CoreState)
 import           Clash.GHC.LoadModules   (loadModules)
-import           Clash.Primitives.Types  (PrimMap, ResolvedPrimMap, Primitive)
+import           Clash.Primitives.Types  (PrimMap, ResolvedPrimMap)
 import           Clash.Primitives.Util   (generatePrimMap)
 import           Clash.Rewrite.Util      (mkInternalVar, mkSelectorCase)
 import           Clash.Unique
@@ -75,7 +73,7 @@ generateBindings
   -> HDL
   -- ^ HDL target
   -> String
-  -> Maybe  (GHC.DynFlags)
+  -> Maybe GHC.DynFlags
   -> IO ( BindingMap
         , TyConMap
         , IntMap TyConName
@@ -87,8 +85,16 @@ generateBindings
         , [DataRepr']
         )
 generateBindings tmpDir useColor primDirs importDirs hdl modName dflagsM = do
-  (bindings,clsOps,unlocatable,fiEnvs,topEntities,pFP,reprs) <- loadModules tmpDir useColor hdl modName dflagsM
-  primMap <- generatePrimMap $ concat [pFP, primDirs, importDirs]
+  (  bindings
+   , clsOps
+   , unlocatable
+   , fiEnvs
+   , topEntities
+   , pFP
+   , customBitRepresentations
+   , primGuards ) <- loadModules tmpDir useColor hdl modName dflagsM
+
+  primMap <- generatePrimMap primGuards (concat [pFP, primDirs, importDirs])
   let ((bindingsMap,clsVMap),tcMap) = State.runState (mkBindings primMap bindings clsOps unlocatable) emptyGHC2CoreState
       (tcMap',tupTcCache)           = mkTupTyCons tcMap
       tcCache                       = makeAllTyCons tcMap' fiEnvs
@@ -108,10 +114,16 @@ generateBindings tmpDir useColor primDirs importDirs hdl modName dflagsM = do
                                               Nothing        -> error "This shouldn't happen"
                                           ) topEntities'
 
-  return (allBindings, allTcCache, tupTcCache, topEntities'', primMap, reprs)
+  return ( allBindings
+         , allTcCache
+         , tupTcCache
+         , topEntities''
+         , primMap
+         , customBitRepresentations
+         )
 
 mkBindings
-  :: PrimMap (Primitive a b c)
+  :: ResolvedPrimMap
   -> [GHC.CoreBind]
   -- Binders
   -> [(GHC.CoreBndr,Int)]

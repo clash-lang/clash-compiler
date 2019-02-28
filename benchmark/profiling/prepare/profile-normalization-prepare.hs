@@ -33,7 +33,7 @@ prepareFile tmpDir fIn = do
   let fOut = fIn ++ ".bin"
   inp <- runInputStage tmpDir fIn
   let (bindingsMap,tcm,tupTcm,_topEntities,primMap,reprs,topEntityNames,topEntity) = inp
-      inp' = (bindingsMap,tcm,tupTcm,_topEntities, fmap removeBBfunc primMap, reprs,topEntityNames,topEntity)
+      inp' = (bindingsMap,tcm,tupTcm,_topEntities, fmap (fmap removeBBfunc) primMap, reprs,topEntityNames,topEntity)
   putStrLn $ "Serialising to : " ++ fOut
   B.writeFile fOut $ encode inp'
   putStrLn "Done"

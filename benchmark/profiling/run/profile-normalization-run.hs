@@ -41,7 +41,7 @@ benchFile tmpDir src = do
   env <- setupEnv src
   putStrLn $ "Doing normalization of " ++ src
   let (bindingsMap,tcm,tupTcm,_topEntities,primMap,reprs,topEntityNames,topEntity) = env
-      primMap' = fmap unremoveBBfunc primMap
+      primMap' = fmap (fmap unremoveBBfunc) primMap
       res :: BindingMap
       res = fst $ normalizeEntity reprs bindingsMap primMap' tcm tupTcm typeTrans reduceConstant
                    topEntityNames (opts tmpDir) supplyN topEntity

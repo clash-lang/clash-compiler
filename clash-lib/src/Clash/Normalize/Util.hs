@@ -34,6 +34,7 @@ import qualified Data.Map                as Map
 import qualified Data.HashMap.Strict     as HashMapS
 import           Data.Text               (Text)
 
+import           Clash.Annotations.Primitive (extractPrim)
 import           Clash.Core.FreeVars     (idOccursIn, termFreeIds)
 import           Clash.Core.Term         (Term (..))
 import           Clash.Core.TyCon        (TyConMap)
@@ -67,7 +68,7 @@ isConstantArg nm i = do
     Nothing -> do
       -- Constant args not yet calculated, or primitive does not exist
       prims <- Lens.use (extra.primitives)
-      case HashMapS.lookup nm prims of
+      case extractPrim =<< HashMapS.lookup nm prims of
         Nothing ->
           -- Primitive does not exist:
           pure False

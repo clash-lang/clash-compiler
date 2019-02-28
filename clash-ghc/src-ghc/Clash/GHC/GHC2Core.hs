@@ -23,6 +23,7 @@ module Clash.GHC.GHC2Core
   , coreToName
   , modNameM
   , qualifiedNameString
+  , qualifiedNameString'
   , makeAllTyCons
   , emptyGHC2CoreState
   )
@@ -96,6 +97,7 @@ import Var        (TyVarBndr (..))
 import VarSet     (isEmptyVarSet)
 
 -- Local imports
+import           Clash.Annotations.Primitive (extractPrim)
 import qualified Clash.Core.DataCon          as C
 import qualified Clash.Core.Literal          as C
 import qualified Clash.Core.Name             as C
@@ -248,7 +250,7 @@ makeAlgTyConRhs algTcRhs = case algTcRhs of
   TupleTyCon {}    -> error "Cannot handle tuple tycons"
 
 coreToTerm
-  :: PrimMap (Primitive a b c)
+  :: ResolvedPrimMap
   -> [Var]
   -> SrcSpan
   -> CoreExpr
@@ -341,12 +343,15 @@ coreToTerm primMap unlocs srcsp coreExpr = Reader.runReaderT (term coreExpr) src
     term' (Type t)          = C.Prim (pack "_TY_") <$> lift (coreToType t)
     term' (Coercion co)     = C.Prim (pack "_CO_") <$> lift (coreToType (coercionType co))
 
+    lookupPrim :: Text -> Maybe (Maybe ResolvedPrimitive)
+    lookupPrim nm = extractPrim <$> HashMap.lookup nm primMap
+
     var srcsp' x = do
         xPrim  <- coreToPrimVar x
         let xNameS = C.nameOcc xPrim
         xType  <- coreToType (varType x)
         case isDataConId_maybe x of
-          Just dc -> case HashMap.lookup xNameS primMap of
+          Just dc -> case lookupPrim xNameS of
             Just _  -> return $ C.Prim xNameS xType
             Nothing -> if isDataConWrapId x && not (isNewTyCon (dataConTyCon dc))
               then let xInfo = idInfo x
@@ -356,8 +361,8 @@ coreToTerm primMap unlocs srcsp coreExpr = Reader.runReaderT (term coreExpr) src
                           NoUnfolding -> error ("No unfolding for DC wrapper: " ++ showPpr unsafeGlobalDynFlags x)
                           _ -> error ("Unexpected unfolding for DC wrapper: " ++ showPpr unsafeGlobalDynFlags x)
               else C.Data <$> coreToDataCon dc
-          Nothing -> case HashMap.lookup xNameS primMap of
-            Just (Primitive f _)
+          Nothing -> case lookupPrim xNameS of
+            Just (Just (Primitive f _))
               | f == pack "Clash.Signal.Internal.mapSignal#" -> return (mapSignalTerm xType)
               | f == pack "Clash.Signal.Internal.signal#"    -> return (signalTerm xType)
               | f == pack "Clash.Signal.Internal.appSignal#" -> return (appSignalTerm xType)
@@ -369,9 +374,13 @@ coreToTerm primMap unlocs srcsp coreExpr = Reader.runReaderT (term coreExpr) src
               | f == pack "GHC.Magic.lazy"                   -> return (idTerm xType)
               | f == pack "GHC.Magic.runRW#"                 -> return (runRWTerm xType)
               | otherwise                                    -> return (C.Prim xNameS xType)
-            Just (BlackBox {}) ->
+            Just (Just (BlackBox {})) ->
               return $ C.Prim xNameS xType
-            Just (BlackBoxHaskell {}) ->
+            Just (Just (BlackBoxHaskell {})) ->
+              return $ C.Prim xNameS xType
+            Just Nothing ->
+              -- Was guarded by "DontTranslate". We don't know yet if Clash will
+              -- actually use it later on, so we don't err here.
               return $ C.Prim xNameS xType
             Nothing
               | x `elem` unlocs -> return (C.Prim xNameS xType)
@@ -715,6 +724,14 @@ coreToName toName toUnique toString v = do
   let key = getKey (toUnique v)
       loc = getSrcSpan (toName v)
   return (C.Name C.User ns key loc)
+
+qualifiedNameString'
+  :: Name
+  -> Text
+qualifiedNameString' n =
+  fromMaybe "_INTERNAL_" (modNameM n) `Text.append` ('.' `Text.cons` occName)
+ where
+  occName = pack (occNameString (nameOccName n))
 
 qualifiedNameString
   :: Name

@@ -472,7 +472,9 @@ runTest env targets extraArgs modName (subdirs, entName, doSim) path =
         runTest' env target extraArgs modName subdirs entName doSim (modName:path)
 
 runFailingTest'
-  :: FilePath
+  :: Bool
+  -- ^ Test exit code?
+  -> FilePath
   -- ^ Work directory
   -> BuildTarget
   -- ^ Build target
@@ -487,11 +489,12 @@ runFailingTest'
   -- item in the list will be the root node, while the first one will be the
   -- one closest to the test.
   -> TestTree
-runFailingTest' env target extraArgs modName expectedStderr path =
+runFailingTest' testExitCode env target extraArgs modName expectedStderr path =
   let args0 = "-fclash-no-cache" : extraArgs in
   let (cmd, args1) = clashCmd target (sourceDirectory </> env) args0 modName (testDirectory path) in
   let testName    = "clash" in
   testFailingProgram
+    testExitCode
     testName
     cmd
     args1
@@ -524,7 +527,31 @@ runFailingTest env targets extraArgs modName expectedStderr path =
     rft target path' =
       testGroup (show target) $
         return $
-          runFailingTest' env target extraArgs modName expectedStderr (show target : path')
+          runFailingTest' True env target extraArgs modName expectedStderr (show target : path')
+
+runWarningTest
+  :: FilePath
+  -- ^ Work directory
+  -> [BuildTarget]
+  -- ^ Build targets
+  -> [String]
+  -- ^ Extra arguments
+  -> String
+  -- ^ Module name
+  -> Maybe T.Text
+  -- ^ Expected stderr
+  -> [TestName]
+  -- ^ Parent test names in order of distance to the test. That is, the last
+  -- item in the list will be the root node, while the first one will be the
+  -- one closest to the test.
+  -> TestTree
+runWarningTest env targets extraArgs modName expectedStderr path =
+  testGroup modName [ rft target (modName : path) | target <- targets ]
+  where
+    rft target path' =
+      testGroup (show target) $
+        return $
+          runFailingTest' False env target extraArgs modName expectedStderr (show target : path')
 
 outputTest'
   :: FilePath

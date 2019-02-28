@@ -42,6 +42,7 @@ import           Text.Read                        (readMaybe)
 import           Outputable                       (ppr, showSDocUnsafe)
 import           SrcLoc                           (SrcSpan,isGoodSrcSpan,noSrcSpan)
 
+import           Clash.Annotations.Primitive      (extractPrim)
 import           Clash.Annotations.BitRepresentation.ClashLib
   (coreToType')
 import           Clash.Annotations.BitRepresentation.Internal
@@ -275,7 +276,7 @@ mkNetDecl (id_,tm) = do
     termToWireOrReg (collectArgs -> (Prim nm' _,_)) = do
       bbM <- HashMap.lookup nm' <$> Lens.use primitives
       case bbM of
-        Just (BlackBox {..}) | outputReg -> return Reg
+        Just (extractPrim -> Just BlackBox {..}) | outputReg -> return Reg
         _ -> return Wire
     termToWireOrReg _ = return Wire
 

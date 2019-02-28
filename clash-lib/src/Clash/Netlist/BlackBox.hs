@@ -44,7 +44,8 @@ import           System.IO
 import           TextShow                      (showt)
 import           Util                          (OverridingBool(..))
 
--- import           Clash.Backend                 as N
+import           Clash.Annotations.Primitive
+  (PrimitiveGuard(HasBlackBox, WarnNonSynthesizable, WarnAlways, DontTranslate))
 import           Clash.Core.DataCon            as D (dcTag)
 import           Clash.Core.FreeVars           (termFreeIds)
 import           Clash.Core.Literal            as L (Literal (..))
@@ -204,12 +205,67 @@ mkArgument bndr e = do
                   ,hwTy,False),[])
     return ((e',t,l),d)
 
+-- | Extract a compiled primitive from a gaurded primtive. Emit a warning if
+-- the guard wants to, or fail entirely.
+extractPrimWarnOrFail
+  :: TextS.Text
+  -- ^ Name of primitive
+  -> NetlistMonad CompiledPrimitive
+extractPrimWarnOrFail nm = do
+  prim <- HashMap.lookup nm <$> Lens.use primitives
+  case prim of
+    Just guardedPrim ->
+      -- See if we need to warn the user, or error because we encountered
+      -- a primitive the user explicitly requested not to translate
+      go guardedPrim
+    Nothing -> do
+      -- Blackbox requested, but no blackbox found at all!
+      (_,sp) <- Lens.use curCompNm
+      let msg = $(curLoc) ++ "No blackbox found for: " ++ unpack nm
+             ++ ". Did you forget to include directories containing "
+             ++ "primitives? You can use '-i/my/prim/dir' to achieve this."
+      throw (ClashException sp msg Nothing)
+ where
+  go
+    :: GuardedCompiledPrimitive
+    -> NetlistMonad CompiledPrimitive
+  go (HasBlackBox cp) =
+    return cp
+
+  go DontTranslate = do
+    (_,sp) <- Lens.use curCompNm
+    let msg = $(curLoc) ++ "Clash was forced to translate '" ++ unpack nm
+           ++ "', but this value was marked with DontTranslate. Did you forget"
+           ++ " to include a blackbox for one of the constructs using this?"
+    throw (ClashException sp msg Nothing)
+
+  go (WarnAlways warning cp) = do
+    primWarn <- opt_primWarn <$> Lens.use clashOpts
+    seen <- Set.member nm <$> Lens.use seenPrimitives
+    opts <- Lens.use clashOpts
+
+    when (primWarn && not seen)
+      $ liftIO
+      $ warn opts
+      $ "Dubious primitive instantiation: "
+     ++ warning
+     ++ " (disable with -fclash-no-prim-warn)"
+
+    seenPrimitives %= Set.insert nm
+
+    return cp
+
+  go (WarnNonSynthesizable warning cp) = do
+    isTB <- Lens.use isTestBench
+    if isTB then return cp else go (WarnAlways warning cp)
+
+
 mkPrimitive
   :: Bool
   -- ^ Put BlackBox expression in parenthesis
   -> Bool
   -- ^ Treat BlackBox expression as declaration
-  -> (Either Identifier Id)
+  -> Either Identifier Id
   -- ^ Id to assign the result to
   -> TextS.Text
   -- ^ Name of primitive
@@ -218,15 +274,15 @@ mkPrimitive
   -> Type
   -- ^ Result type
   -> NetlistMonad (Expr,[Declaration])
-mkPrimitive bbEParen bbEasD dst nm args ty = do
-  go =<< HashMap.lookup nm <$> Lens.use primitives
+mkPrimitive bbEParen bbEasD dst nm args ty =
+  go =<< extractPrimWarnOrFail nm
   where
     go
-      :: Maybe CompiledPrimitive
+      :: CompiledPrimitive
       -> NetlistMonad (Expr, [Declaration])
     go =
       \case
-        Just (P.BlackBoxHaskell bbName funcName (_fHash, func)) ->
+        P.BlackBoxHaskell bbName funcName (_fHash, func) ->
           case func bbEasD dst nm args ty of
             Left err -> do
               -- Blackbox template function returned an error:
@@ -236,27 +292,11 @@ mkPrimitive bbEParen bbEasD dst nm args ty = do
                                  , err ]
               (_,sp) <- Lens.use curCompNm
               throw (ClashException sp err' Nothing)
-            Right ((BlackBoxMeta {..}), bbTemplate) ->
+            Right (BlackBoxMeta {..}, bbTemplate) ->
               -- Blackbox template generation succesful. Rerun 'go', but this time
               -- around with a 'normal' @BlackBox@
-              go (Just (P.BlackBox bbName bbKind Nothing bbOutputReg bbLibrary bbImports bbIncludes bbTemplate))
-        Just p@(P.BlackBox {outputReg = wr, warning = wn}) -> do
-          -- Print blackbox warning if warning is set on this blackbox and
-          -- printing warnings is enabled globally
-          isTB <- Lens.use isTestBench
-          opts <- Lens.use clashOpts
-          primWarn <- opt_primWarn <$> Lens.use clashOpts
-          seen <- Set.member nm <$> Lens.use seenPrimitives
-          case (wn, primWarn, seen, isTB) of
-            (Just msg, True, False, False) -> do
-              liftIO $ warn opts $ "Dubious primitive instantiation: "
-                                ++ unpack msg
-                                ++ " (disable with -fclash-no-prim-warn)"
-            _ ->
-              return ()
-
-          seenPrimitives %= (Set.insert nm)
-
+              go (P.BlackBox bbName bbKind () bbOutputReg bbLibrary bbImports bbIncludes bbTemplate)
+        p@P.BlackBox {outputReg = wr} ->
           case kind p of
             TDecl -> do
               let tempD = template p
@@ -295,7 +335,7 @@ mkPrimitive bbEParen bbEasD dst nm args ty = do
                       (bbTempl,templDecl) <- prepareBlackBox pNm tempE bbCtx
                       return (BlackBoxE pNm (libraries p) (imports p) (includes p) bbTempl bbCtx bbEParen,ctxDcls ++ templDecl)
                     Nothing -> return (Identifier "__VOID__" Nothing,[])
-        Just (P.Primitive pNm _)
+        P.Primitive pNm _
           | pNm == "GHC.Prim.tagToEnum#" -> do
               hwTy <- N.unsafeCoreTypeToHWTypeM' $(curLoc) ty
               case args of
@@ -339,9 +379,6 @@ mkPrimitive bbEParen bbEasD dst nm args ty = do
               return (BlackBoxE "" [] [] []
                         (BBTemplate [Text $ mconcat ["NO_TRANSLATION_FOR:",fromStrict pNm]])
                         emptyBBContext False,[])
-        _ -> do
-          (_,sp) <- Lens.use curCompNm
-          throw (ClashException sp ($(curLoc) ++ "No blackbox found for: " ++ unpack nm) Nothing)
 
     resBndr
       :: Bool
@@ -393,11 +430,20 @@ mkFunInput resId e = do
   (bbCtx,dcls) <- mkBlackBoxContext resId (lefts args)
   templ <- case appE of
             Prim nm _ -> do
-              bbM <- fmap (HashMap.lookup nm) $ Lens.use primitives
-              (_,sp) <- Lens.use curCompNm
-              let templ = case bbM of
-                            Just (P.BlackBox {..}) -> Left (kind,outputReg,libraries,imports,includes,nm,template)
-                            _ -> throw (ClashException sp ($(curLoc) ++ "No blackbox found for: " ++ unpack nm) Nothing)
+              bb  <- extractPrimWarnOrFail nm
+              let
+                templ =
+                  case bb of
+                    P.BlackBox {..} ->
+                      Left (kind,outputReg,libraries,imports,includes,nm,template)
+                    P.Primitive pn pt ->
+                      error $ $(curLoc) ++ "Unexpected blackbox type: "
+                                        ++ "Primitive " ++ show pn
+                                        ++ " " ++ show pt
+                    P.BlackBoxHaskell pnm fn _ ->
+                      error $ $(curLoc) ++ "Unexpected blackbox type: "
+                                        ++ "BlackBoxHaskell" ++ show pnm
+                                        ++ " " ++ show fn ++ " <func>"
               return templ
             Data dc -> do
               tcm <- Lens.use tcCache
