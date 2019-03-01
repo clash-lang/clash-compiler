@@ -46,7 +46,7 @@ import           Clash.Annotations.Primitive (HDL)
 
 import           Clash.Core.Term         (Term (..))
 import           Clash.Core.Type         (Type (..), TypeView (..), mkFunTy, splitFunForallTy, tyView)
-import           Clash.Core.TyCon        (TyConMap, TyConName)
+import           Clash.Core.TyCon        (TyConMap, TyConName, isNewTypeTc)
 import           Clash.Core.TysPrim      (tysPrimMap)
 import           Clash.Core.Util         (mkLams, mkTyLams)
 import           Clash.Core.Var          (Var (..), Id)
@@ -205,7 +205,10 @@ mkClassSelector inScope0 tcm ty sel = newExpr
                                                       _      -> False))
                        $ splitFunForallTy ty
     newExpr = case tyView dictTy of
-      (TyConApp _ _) -> flip State.evalState (0 :: Int) $ do
+      (TyConApp tcNm _)
+        | Just tc <- lookupUniqMap tcNm tcm
+        , not (isNewTypeTc tc)
+        -> flip State.evalState (0 :: Int) $ do
                           dcId <- mkInternalVar inScope0 "dict" dictTy
                           let inScope1 = extendInScopeSet inScope0 dcId
                           selE <- mkSelectorCase "mkClassSelector" inScope1 tcm (Var dcId) 1 sel
@@ -213,8 +216,8 @@ mkClassSelector inScope0 tcm ty sel = newExpr
       (FunTy arg res) -> flip State.evalState (0 :: Int) $ do
                            dcId <- mkInternalVar inScope0 "dict" (mkFunTy arg res)
                            return (mkTyLams (mkLams (Var dcId) [dcId]) tvs)
-      (OtherType oTy) -> flip State.evalState (0 :: Int) $ do
-                           dcId <- mkInternalVar inScope0 "dict" oTy
+      _ -> flip State.evalState (0 :: Int) $ do
+                           dcId <- mkInternalVar inScope0 "dict" dictTy
                            return (mkTyLams (mkLams (Var dcId) [dcId]) tvs)
 
 mkTupTyCons :: GHC2CoreState -> (GHC2CoreState,IntMap TyConName)

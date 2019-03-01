@@ -19,6 +19,7 @@ module Clash.Core.TyCon
   , AlgTyConRhs (..)
   , mkKindTyCon
   , isTupleTyConLike
+  , isNewTypeTc
   , tyConDataCons
   )
 where
@@ -123,3 +124,9 @@ tyConDataCons :: TyCon -> [DataCon]
 tyConDataCons (AlgTyCon {algTcRhs = DataTyCon { dataCons = cons}}) = cons
 tyConDataCons (AlgTyCon {algTcRhs = NewTyCon  { dataCon  = con }}) = [con]
 tyConDataCons _                                                    = []
+
+isNewTypeTc
+  :: TyCon
+  -> Bool
+isNewTypeTc (AlgTyCon {algTcRhs = NewTyCon {}}) = True
+isNewTypeTc _ = False
