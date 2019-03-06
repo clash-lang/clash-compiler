@@ -10,6 +10,7 @@
 {-# LANGUAGE DeriveGeneric         #-}
 {-# LANGUAGE FlexibleInstances     #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE OverloadedStrings     #-}
 {-# LANGUAGE TemplateHaskell       #-}
 
 module Clash.Core.Name
@@ -22,7 +23,7 @@ import           Control.DeepSeq                        (NFData)
 import           Data.Binary                            (Binary)
 import           Data.Function                          (on)
 import           Data.Hashable                          (Hashable (..))
-import           Data.Text                              (Text, append, cons)
+import           Data.Text                              (Text, append)
 import           GHC.BasicTypes.Extra                   ()
 import           GHC.Generics                           (Generic)
 import           GHC.SrcLoc.Extra                       ()
@@ -70,10 +71,10 @@ mkUnsafeInternalName
   :: Text
   -> Unique
   -> Name a
-mkUnsafeInternalName s i = Name Internal ('#' `cons` s) i noSrcSpan
+mkUnsafeInternalName s i = Name Internal ("c$" `append` s) i noSrcSpan
 
 appendToName :: Name a -> Text -> Name a
 appendToName (Name sort nm uniq loc) s = Name Internal nm2 uniq loc
   where
-    nm1 = case sort of {Internal -> nm; _ -> '#' `cons` nm}
+    nm1 = case sort of {Internal -> nm; _ -> "c$" `append` nm}
     nm2 = nm1 `append` s

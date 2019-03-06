@@ -40,7 +40,7 @@ data Usage
 
 class Backend state where
   -- | Initial state for state monad
-  initBackend :: Int -> HdlSyn -> state
+  initBackend :: Int -> HdlSyn -> Bool -> state
 
   -- | What HDL is the backend generating
   hdlKind :: state -> HDL

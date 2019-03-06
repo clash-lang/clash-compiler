@@ -17,23 +17,29 @@ module Clash.Netlist.Id
   )
 where
 
+import Clash.Annotations.Primitive (HDL (..))
 import Data.Char (isAsciiLower,isAsciiUpper,isDigit)
 import Data.Text as Text
 
 data IdType = Basic | Extended
 
-mkBasicId' :: Bool
-           -> Text
-           -> Text
-mkBasicId' tupEncode = stripMultiscore . stripLeading . zEncode tupEncode
+mkBasicId'
+  :: HDL
+  -> Bool
+  -> Text
+  -> Text
+mkBasicId' hdl tupEncode = stripMultiscore hdl . stripLeading hdl . zEncode hdl tupEncode
   where
-    stripLeading    = Text.dropWhile (`elem` ('_':['0'..'9']))
-    stripMultiscore = Text.concat
-                    . Prelude.map (\cs -> case Text.head cs of
-                                            '_' -> "_"
-                                            _   -> cs
-                                  )
-                    . Text.group
+    stripLeading VHDL = Text.dropWhile (`elem` ('_':['0'..'9']))
+    stripLeading _    = Text.dropWhile (`elem` ('$':['0'..'9']))
+    stripMultiscore VHDL
+      = Text.concat
+      . Prelude.map (\cs -> case Text.head cs of
+                              '_' -> "_"
+                              _   -> cs
+                    )
+      . Text.group
+    stripMultiscore _ = id
 
 stripDollarPrefixes :: Text -> Text
 stripDollarPrefixes = stripWorkerPrefix . stripSpecPrefix . stripConPrefix
@@ -59,38 +65,40 @@ stripDollarPrefixes = stripWorkerPrefix . stripSpecPrefix . stripConPrefix
 type UserString    = Text -- As the user typed it
 type EncodedString = Text -- Encoded form
 
-zEncode :: Bool -> UserString -> EncodedString
-zEncode False cs = go (uncons cs)
+zEncode :: HDL -> Bool -> UserString -> EncodedString
+zEncode hdl False cs = go (uncons cs)
   where
     go Nothing         = empty
-    go (Just (c,cs'))  = append (encodeDigitCh c) (go' $ uncons cs')
+    go (Just (c,cs'))  = append (encodeDigitCh hdl c) (go' $ uncons cs')
     go' Nothing        = empty
-    go' (Just (c,cs')) = append (encodeCh c) (go' $ uncons cs')
+    go' (Just (c,cs')) = append (encodeCh hdl c) (go' $ uncons cs')
 
-zEncode True cs = case maybeTuple cs of
+zEncode hdl True cs = case maybeTuple cs of
                     Just (n,cs') -> append n (go' (uncons cs'))
                     Nothing      -> go (uncons cs)
   where
     go Nothing         = empty
-    go (Just (c,cs'))  = append (encodeDigitCh c) (go' $ uncons cs')
+    go (Just (c,cs'))  = append (encodeDigitCh hdl c) (go' $ uncons cs')
     go' Nothing        = empty
     go' (Just (c,cs')) = case maybeTuple (cons c cs') of
                            Just (n,cs2) -> append n (go' $ uncons cs2)
-                           Nothing      -> append (encodeCh c) (go' $ uncons cs')
+                           Nothing      -> append (encodeCh hdl c) (go' $ uncons cs')
 
-encodeDigitCh :: Char -> EncodedString
-encodeDigitCh c | isDigit c = Text.empty -- encodeAsUnicodeChar c
-encodeDigitCh c             = encodeCh c
+encodeDigitCh :: HDL -> Char -> EncodedString
+encodeDigitCh _   c | isDigit c = Text.empty -- encodeAsUnicodeChar c
+encodeDigitCh hdl c             = encodeCh hdl c
 
-encodeCh :: Char -> EncodedString
-encodeCh c | unencodedChar c = singleton c     -- Common case first
-           | otherwise       = Text.empty
+encodeCh :: HDL -> Char -> EncodedString
+encodeCh hdl c | unencodedChar hdl c = singleton c     -- Common case first
+               | otherwise           = Text.empty
 
-unencodedChar :: Char -> Bool   -- True for chars that don't need encoding
-unencodedChar c  = or [ isAsciiLower c
-                      , isAsciiUpper c
-                      , isDigit c
-                      , c == '_']
+unencodedChar :: HDL -> Char -> Bool   -- True for chars that don't need encoding
+unencodedChar hdl c  =
+  or [ isAsciiLower c
+     , isAsciiUpper c
+     , isDigit c
+     , if hdl == VHDL then c == '_' else c `elem` ['_','$']
+     ]
 
 maybeTuple :: UserString -> Maybe (EncodedString,UserString)
 maybeTuple "(# #)" = Just ("Unit",empty)

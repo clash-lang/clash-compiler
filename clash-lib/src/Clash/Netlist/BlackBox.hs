@@ -308,12 +308,12 @@ mkPrimitive bbEParen bbEasD dst nm args ty = do
                 [Right _, Left scrut] -> do
                   tcm     <- Lens.use tcCache
                   let scrutTy = termType tcm scrut
-                  (scrutExpr,scrutDecls) <- mkExpr False (Left "#tte_rhs") scrutTy scrut
+                  (scrutExpr,scrutDecls) <- mkExpr False (Left "c$tte_rhs") scrutTy scrut
                   case scrutExpr of
                     Identifier id_ Nothing -> return (DataTag hwTy (Left id_),scrutDecls)
                     _ -> do
                       scrutHTy <- unsafeCoreTypeToHWTypeM' $(curLoc) scrutTy
-                      tmpRhs <- mkUniqueIdentifier Extended "#tte_rhs"
+                      tmpRhs <- mkUniqueIdentifier Extended "c$tte_rhs"
                       let netDeclRhs   = NetDecl Nothing tmpRhs scrutHTy
                           netAssignRhs = Assignment tmpRhs scrutExpr
                       return (DataTag hwTy (Left tmpRhs),[netDeclRhs,netAssignRhs] ++ scrutDecls)
@@ -326,11 +326,11 @@ mkPrimitive bbEParen bbEasD dst nm args ty = do
                 tcm      <- Lens.use tcCache
                 let scrutTy = termType tcm scrut
                 scrutHTy <- unsafeCoreTypeToHWTypeM' $(curLoc) scrutTy
-                (scrutExpr,scrutDecls) <- mkExpr False (Left "#dtt_rhs") scrutTy scrut
+                (scrutExpr,scrutDecls) <- mkExpr False (Left "c$dtt_rhs") scrutTy scrut
                 case scrutExpr of
                   Identifier id_ Nothing -> return (DataTag scrutHTy (Right id_),scrutDecls)
                   _ -> do
-                    tmpRhs  <- mkUniqueIdentifier Extended "#dtt_rhs"
+                    tmpRhs  <- mkUniqueIdentifier Extended "c$dtt_rhs"
                     let netDeclRhs   = NetDecl Nothing tmpRhs scrutHTy
                         netAssignRhs = Assignment tmpRhs scrutExpr
                     return (DataTag scrutHTy (Right tmpRhs),[netDeclRhs,netAssignRhs] ++ scrutDecls)
@@ -537,7 +537,7 @@ mkFunInput resId e = do
     goExpr e' = do
       tcm <- Lens.use tcCache
       let eType = termType tcm e'
-      (appExpr,appDecls) <- mkExpr False (Left "#bb_res") eType e'
+      (appExpr,appDecls) <- mkExpr False (Left "c$bb_res") eType e'
       let assn = Assignment "~RESULT" appExpr
       nm <- if null appDecls
                then return ""
@@ -559,7 +559,7 @@ mkFunInput resId e = do
       return (Right (("",[assn]),Wire))
 
     go _ _ (Case scrut ty [alt]) = do
-      (projection,decls) <- mkProjection False (Left "#bb_res") scrut ty alt
+      (projection,decls) <- mkProjection False (Left "c$bb_res") scrut ty alt
       let assn = Assignment "~RESULT" projection
       nm <- if null decls
                then return ""

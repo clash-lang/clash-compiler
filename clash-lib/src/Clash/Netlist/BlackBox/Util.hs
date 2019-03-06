@@ -144,7 +144,7 @@ setSym mkUniqueIdentifierM bbCtx l = do
           varM <- IntMap.lookup i <$> use _2
           case varM of
             Nothing -> do
-              nm' <- lift (mkUniqueIdentifierM Extended (Text.toStrict (concatT (Text "#":nm))))
+              nm' <- lift (mkUniqueIdentifierM Extended (Text.toStrict (concatT (Text "c$":nm))))
               let decls = case typeSize hwTy of
                     0 -> []
                     _ -> [N.NetDecl Nothing nm' hwTy
@@ -157,7 +157,7 @@ setSym mkUniqueIdentifierM bbCtx l = do
         symM <- IntMap.lookup i <$> use _1
         case symM of
           Nothing -> do
-            t <- lift (mkUniqueIdentifierM Extended "#n")
+            t <- lift (mkUniqueIdentifierM Extended "c$n")
             _1 %= (IntMap.insert i t)
             return (Sym (Text.fromStrict t) i)
           Just t -> return (Sym (Text.fromStrict t) i)

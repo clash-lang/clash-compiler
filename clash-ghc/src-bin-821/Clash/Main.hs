@@ -998,18 +998,18 @@ abiHash strs = do
 -----------------------------------------------------------------------------
 -- VHDL Generation
 
-makeHDL' :: Clash.Backend.Backend backend => (Int -> HdlSyn -> backend) ->  IORef ClashOpts -> [(String,Maybe Phase)] -> Ghc ()
+makeHDL' :: Clash.Backend.Backend backend => (Int -> HdlSyn -> Bool -> backend) ->  IORef ClashOpts -> [(String,Maybe Phase)] -> Ghc ()
 makeHDL' _       _ []   = throwGhcException (CmdLineError "No input files")
 makeHDL' backend r srcs = makeHDL backend r $ fmap fst srcs
 
 makeVHDL :: IORef ClashOpts -> [(String, Maybe Phase)] -> Ghc ()
-makeVHDL = makeHDL' (Clash.Backend.initBackend :: Int -> HdlSyn -> VHDLState)
+makeVHDL = makeHDL' (Clash.Backend.initBackend :: Int -> HdlSyn -> Bool -> VHDLState)
 
 makeVerilog ::  IORef ClashOpts -> [(String, Maybe Phase)] -> Ghc ()
-makeVerilog = makeHDL' (Clash.Backend.initBackend :: Int -> HdlSyn -> VerilogState)
+makeVerilog = makeHDL' (Clash.Backend.initBackend :: Int -> HdlSyn -> Bool -> VerilogState)
 
 makeSystemVerilog ::  IORef ClashOpts -> [(String, Maybe Phase)] -> Ghc ()
-makeSystemVerilog = makeHDL' (Clash.Backend.initBackend :: Int -> HdlSyn -> SystemVerilogState)
+makeSystemVerilog = makeHDL' (Clash.Backend.initBackend :: Int -> HdlSyn -> Bool -> SystemVerilogState)
 
 -- -----------------------------------------------------------------------------
 -- Util
