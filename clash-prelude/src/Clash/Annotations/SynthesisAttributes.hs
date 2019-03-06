@@ -20,8 +20,9 @@ module Clash.Annotations.SynthesisAttributes
   ) where
 
 import GHC.TypeLits (Symbol)
+import Data.Kind (Type)
 
-type Annotate a (attrs :: k) = a
+type Annotate (a :: Type) (attrs :: k) = a
 
 -- | Synthesis attributes are directives passed to sythesis tools, such as
 -- Quartus. An example of such an attribute in VHDL:
