@@ -137,20 +137,20 @@ instance Backend SystemVerilogState where
   hdlSyn          = use hdlsyn
   mkIdentifier    = return go
     where
-      go Basic    nm = (TextS.take 1024 . filterReserved) (mkBasicId' True nm)
+      go Basic    nm = (TextS.take 1024 . filterReserved) (mkBasicId' SystemVerilog True nm)
       go Extended (rmSlash . escapeTemplate -> nm) = case go Basic nm of
         nm' | nm /= nm' -> TextS.concat ["\\",nm," "]
             |otherwise  -> nm'
   extendIdentifier = return go
     where
       go Basic nm ext = (TextS.take 1024 . filterReserved)
-                        (mkBasicId' True (nm `TextS.append` ext))
+                        (mkBasicId' SystemVerilog True (nm `TextS.append` ext))
       go Extended (rmSlash -> nm) ext =
         let nmExt = nm `TextS.append` ext
         in  case go Basic nm ext of
-              nm' | nm' /= nmExt -> case TextS.head nmExt of
-                      '#' -> TextS.concat ["\\",nmExt," "]
-                      _   -> TextS.concat ["\\#",nmExt," "]
+              nm' | nm' /= nmExt -> case TextS.isPrefixOf "c$" nmExt of
+                      True -> TextS.concat ["\\",nmExt," "]
+                      _    -> TextS.concat ["\\c$",nmExt," "]
                   | otherwise    -> nm'
 
   setModName nm s = s {_modNm = nm}
