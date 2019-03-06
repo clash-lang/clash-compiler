@@ -40,8 +40,8 @@ type Annotate a (attrs :: k) = a
 -- import Clash.Annotations.SynthesisAttributes (Attr (..), Annotate )
 --
 -- myFunc
---     :: (Signal System Bool \`Annotate\` StringAttr "chip_pin" \"C4\")
---     -> (Signal System Int4 \`Annotate\` StringAttr "chip_pin" "D1, D2, D3, D4")
+--     :: (Signal System Bool \`Annotate\` 'StringAttr "chip_pin" \"C4\")
+--     -> (Signal System Int4 \`Annotate\` 'StringAttr "chip_pin" "D1, D2, D3, D4")
 --     -> ...
 -- myFunc sel data = ...
 -- {-# NOINLINE myFunc #-}
@@ -55,10 +55,10 @@ type Annotate a (attrs :: k) = a
 --
 -- @
 -- Signal System Bool \`Annotate\`
---   [ StringAttr "chip_pin" \"C4\"
---   , BoolAttr "direct_enable" True
---   , IntegerAttr "max_depth" 512
---   , Attr "keep"
+--   [ 'StringAttr "chip_pin" \"C4\"
+--   , 'BoolAttr "direct_enable" 'True
+--   , 'IntegerAttr "max_depth" 512
+--   , 'Attr "keep"
 --   ]
 -- @
 --
