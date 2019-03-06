@@ -2,12 +2,12 @@ Name:                 clash-ghc
 Version:              0.99
 Synopsis:             CAES Language for Synchronous Hardware
 Description:
-  CλaSH (pronounced ‘clash’) is a functional hardware description language that
-  borrows both its syntax and semantics from the functional programming language
-  Haskell. The CλaSH compiler transforms these high-level descriptions to
-  low-level synthesizable VHDL, Verilog, or SystemVerilog.
+  Clash is a functional hardware description language that borrows both its
+  syntax and semantics from the functional programming language Haskell. The
+  Clash compiler transforms these high-level descriptions to low-level
+  synthesizable VHDL, Verilog, or SystemVerilog.
   .
-  Features of CλaSH:
+  Features of Clash:
   .
   * Strongly typed, but with a very high degree of type inference, enabling both
     safe and fast prototyping using concise descriptions.
@@ -26,7 +26,7 @@ Description:
   .
   This package provides:
   .
-  * CλaSH Compiler binary using GHC/Haskell as a frontend
+  * Clash Compiler binary using GHC/Haskell as a frontend
   .
   .
   Prelude library: <http://hackage.haskell.org/package/clash-prelude>

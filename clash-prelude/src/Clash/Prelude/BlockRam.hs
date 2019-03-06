@@ -12,7 +12,7 @@ BlockRAM primitives
 We will show a rather elaborate example on how you can, and why you might want
 to use 'blockRam's. We will build a \"small\" CPU+Memory+Program ROM where we
 will slowly evolve to using blockRams. Note that the code is /not/ meant as a
-de-facto standard on how to do CPU design in CλaSH.
+de-facto standard on how to do CPU design in Clash.
 
 We start with the definition of the Instructions, Register names and machine
 codes:

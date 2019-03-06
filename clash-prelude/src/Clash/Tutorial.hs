@@ -62,10 +62,10 @@ module Clash.Tutorial (
   -- * Troubleshooting
   -- $errorsandsolutions
 
-  -- * Limitations of CλaSH
+  -- * Limitations of Clash
   -- $limitations
 
-  -- * CλaSH vs Lava
+  -- * Clash vs Lava
   -- $vslava
 
   -- * Migration guide from Clash 0.7
@@ -152,14 +152,13 @@ let fibS :: SystemClockReset => Signal System (Unsigned 64)
 -}
 
 {- $introduction
-CλaSH (pronounced ‘clash’) is a functional hardware description language that
-borrows both its syntax and semantics from the functional programming language
-Haskell. It provides a familiar structural design approach to both combination
-and synchronous sequential circuits. The CλaSH compiler transforms these
-high-level descriptions to low-level synthesizable VHDL, Verilog, or
-SystemVerilog.
+Clash is a functional hardware description language that borrows both its syntax
+and semantics from the functional programming language Haskell. It provides a
+familiar structural design approach to both combination and synchronous
+sequential circuits. The Clash compiler transforms these high-level descriptions
+to low-level synthesizable VHDL, Verilog, or SystemVerilog.
 
-Features of CλaSH:
+Features of Clash:
 
   * Strongly typed, but with a very high degree of type inference, enabling
     both safe and fast prototyping using concise descriptions.
@@ -173,15 +172,15 @@ Features of CλaSH:
   * Multiple clock domains, with type safe clock domain crossing.
   * Template language for introducing new VHDL/(System)Verilog primitives.
 
-Although we say that CλaSH borrows the semantics of Haskell, that statement
-should be taken with a grain of salt. What we mean to say is that the CλaSH
+Although we say that Clash borrows the semantics of Haskell, that statement
+should be taken with a grain of salt. What we mean to say is that the Clash
 compiler views a circuit description as /structural/ description. This means,
 in an academic handwavy way, that every function denotes a component and every
 function application denotes an instantiation of said component. Now, this has
 consequences on how we view /recursively/ defined functions: structurally, a
 recursively defined function would denote an /infinitely/ deep / structured
 component, something that cannot be turned into an actual circuit
-(See also <#limitations Limitations of CλaSH>).
+(See also <#limitations Limitations of Clash>).
 
 On the other hand, Haskell's by-default non-strict evaluation works very well
 for the simulation of the feedback loops, which are ubiquitous in digital
@@ -195,7 +194,7 @@ counter = s
 @
 
 The above definition, which uses value-recursion, /can/ be synthesized to a
-circuit by the CλaSH compiler.
+circuit by the Clash compiler.
 
 Over time, you will get a better feeling for the consequences of taking a
 /structural/ view on circuit descriptions. What is always important to
@@ -203,12 +202,12 @@ remember is that every applied functions results in an instantiated component,
 and also that the compiler will /never/ infer / invent more logic than what is
 specified in the circuit description.
 
-With that out of the way, let us continue with installing CλaSH and building
+With that out of the way, let us continue with installing Clash and building
 our first circuit.
 -}
 
 {- $installation
-The CλaSH compiler and Prelude library for circuit design only work with the
+The Clash compiler and Prelude library for circuit design only work with the
 <http://haskell.org/ghc GHC> Haskell compiler version 8.2.1 or higher.
 
   (1) Install __GHC 8.2.1 or higher__
@@ -265,7 +264,7 @@ The CλaSH compiler and Prelude library for circuit design only work with the
 
       * Run @cabal update@
 
-  (2) Install __CλaSH__
+  (2) Install __Clash__
 
       * Run:
 
@@ -289,9 +288,9 @@ The CλaSH compiler and Prelude library for circuit design only work with the
 -}
 
 {- $working
-This tutorial can be followed best whilst having the CλaSH interpreter running
+This tutorial can be followed best whilst having the Clash interpreter running
 at the same time. If you followed the installation instructions, you already
-know how to start the CλaSH compiler in interpretive mode:
+know how to start the Clash compiler in interpretive mode:
 
 @
 clashi
@@ -318,7 +317,7 @@ choice in editor, the following @edit-load-run@ cycle probably work best for you
         the interpreter
 
 You are of course free to deviate from these suggestions as you see fit :-) It
-is just recommended that you have the CλaSH interpreter open during this
+is just recommended that you have the Clash interpreter open during this
 tutorial.
 -}
 
@@ -343,7 +342,7 @@ file we will be working on and input some preliminaries:
     Module names must always start with a __C__apital letter. Also make sure that
     the file name corresponds to the module name.
 
-* Add the import statement for the CλaSH prelude library:
+* Add the import statement for the Clash prelude library:
 
     @
     import Clash.Prelude
@@ -392,7 +391,7 @@ is an (infinite) list of samples, where the samples correspond to the values
 of the 'Signal' at discrete, consecutive, ticks of the /clock/. All (sequential)
 components in the circuit are synchronized to this global /clock/. For the
 rest of this tutorial, and probably at any moment where you will be working with
-CλaSH, you should probably not actively think about 'Signal's as infinite lists
+Clash, you should probably not actively think about 'Signal's as infinite lists
 of samples, but just as values that are manipulated by sequential circuits. To
 make this even easier, it actually not possible to manipulate the underlying
 representation directly: you can only modify 'Signal' values through a set of
@@ -419,7 +418,7 @@ only show one of many ways to specify a sequential circuit, at the section we
 will show a couple more.
 
 A principled way to describe a sequential circuit is to use one of the classic
-machine models, within the CλaSH prelude library offer standard function to
+machine models, within the Clash prelude library offer standard function to
 support the <http://en.wikipedia.org/wiki/Mealy_machine Mealy machine>.
 To improve sharing, we will combine the transition function and output function
 into one. This gives rise to the following Mealy specification of the MAC
@@ -526,9 +525,9 @@ topEntity
 topEntity = 'exposeClockReset' mac
 @
 
-The 'topEntity' function is the starting point for the CλaSH compiler to
+The 'topEntity' function is the starting point for the Clash compiler to
 transform your circuit description into a VHDL netlist. It must meet the
-following restrictions in order for the CλaSH compiler to work:
+following restrictions in order for the Clash compiler to work:
 
   * It must be completely monomorphic
   * It must be completely first-order
@@ -552,11 +551,11 @@ There are multiple reasons as to why might you want to create a so-called
   * You want to compare post-synthesis / post-place&route behaviour to that of
     the behaviour of the original generated HDL.
   * Need representative stimuli for your dynamic power calculations
-  * Verify that the HDL output of the CλaSH compiler has the same behaviour as
-    the Haskell / CλaSH specification.
+  * Verify that the HDL output of the Clash compiler has the same behaviour as
+    the Haskell / Clash specification.
 
-For these purposes, you can have CλaSH compiler generate a /test bench/. In
-order for the CλaSH compiler to do this you need to do one of the following:
+For these purposes, you can have Clash compiler generate a /test bench/. In
+order for the Clash compiler to do this you need to do one of the following:
 
   * Create a function called /testBench/ in the root module.
   * Annotate your /topEntity/ function (or function with a
@@ -625,7 +624,7 @@ generator(s) by actual clock sources, such as an onboard PLL.
 -}
 
 {- $mac5
-Aside from being to generate VHDL, the CλaSH compiler can also generate Verilog
+Aside from being to generate VHDL, the Clash compiler can also generate Verilog
 and SystemVerilog. You can repeat the previous two parts of the tutorial, but
 instead of executing the @:vhdl@ command, you execute the @:verilog@ or
 @:sytemverilog@ command in the interpreter. This will create a directory called
@@ -732,7 +731,7 @@ topEntity
 topEntity = exposeClockReset (fir (0 ':>' 1 ':>' 2 ':>' 3 ':>' 'Nil'))
 @
 
-Here we can see that, although the CλaSH compiler handles recursive function
+Here we can see that, although the Clash compiler handles recursive function
 definitions poorly, many of the regular patterns that we often encounter in
 circuit design are already captured by the higher-order functions that are
 present for the 'Vec'tor type.
@@ -854,7 +853,7 @@ or construction of product types, then use 'mealyB'.
 
 {- $annotations #annotations#
 'Synthesize' annotations allow us to control hierarchy and naming aspects of the
-CλaSH compiler, specifically, they allow us to:
+Clash compiler, specifically, they allow us to:
 
     * Assign names to entities (VHDL) \/ modules ((System)Verilog), and their
       ports.
@@ -877,7 +876,7 @@ restrictions:
 
 Also take the following into account when using 'Synthesize' annotations.
 
-    * The CλaSH compiler is based on the GHC Haskell compiler, and the GHC
+    * The Clash compiler is based on the GHC Haskell compiler, and the GHC
       machinery does not understand 'Synthesize' annotations and it might
       subsequently decide to inline those functions. You should therefor also
       add a @{\-\# NOINLINE f \#-\}@ pragma to the functions which you give
@@ -886,7 +885,7 @@ Also take the following into account when using 'Synthesize' annotations.
       on constants.
 
 Finally, the root module, the module which you pass as an argument to the
-CλaSH compiler must either have:
+Clash compiler must either have:
 
     * A function with a 'Synthesize' annotation.
     * A function called /topEntity/.
@@ -937,7 +936,7 @@ blinkerT (leds,mode,cntr) key1R = ((leds',mode',cntr'),leds)
           | otherwise = leds
 @
 
-The CλaSH compiler will normally generate the following @blinker_topEntity.vhdl@ file:
+The Clash compiler will normally generate the following @blinker_topEntity.vhdl@ file:
 
 @
 -- Automatically generated VHDL-93
@@ -974,7 +973,7 @@ However, if we add the following 'Synthesize' annotation in the file:
     }) \#-\}
 @
 
-The CλaSH compiler will generate the following @blinker.vhdl@ file instead:
+The Clash compiler will generate the following @blinker.vhdl@ file instead:
 
 @
 -- Automatically generated VHDL-93
@@ -1013,9 +1012,9 @@ There are times when you already have an existing piece of IP, or there are
 times where you need the VHDL to have a specific shape so that the VHDL
 synthesis tool can infer a specific component. In these specific cases you can
 resort to defining your own VHDL primitives. Actually, most of the primitives
-in CλaSH are specified in the same way as you will read about in this section.
+in Clash are specified in the same way as you will read about in this section.
 There are perhaps 10 (at most) functions which are truly hard-coded into the
-CλaSH compiler. You can take a look at the files in
+Clash compiler. You can take a look at the files in
 <https://github.com/clash-lang/clash-compiler/tree/master/clash-lib/prims/vhdl>
 (or <https://github.com/clash-lang/clash-compiler/tree/master/clash-lib/prims/verilog>
 for the Verilog primitives or <https://github.com/clash-lang/clash-compiler/tree/master/clash-lib/prims/systemverilog>
@@ -1036,7 +1035,7 @@ Where redefined primitives in the current directory or include directories will
 overwrite those in the official install location. For now, files containing
 primitive definitions must have an @.json@ file-extension.
 
-CλaSH differentiates between two types of primitives, /expression/ primitives
+Clash differentiates between two types of primitives, /expression/ primitives
 and /declaration/ primitives, corresponding to whether the primitive is a VHDL
 /expression/ or a VHDL /declaration/. We will first explore /expression/
 primitives, using 'Signed' multiplication ('*') as an example. The
@@ -1082,7 +1081,7 @@ corresponding to the methods of the type class. In the above case, 'KnownNat'
 is actually just like a @newtype@ wrapper for 'Integer'.
 
 The second kind of primitive that we will explore is the /declaration/ primitive.
-We will use 'blockRam#' as an example, for which the Haskell/CλaSH code is:
+We will use 'blockRam#' as an example, for which the Haskell/Clash code is:
 
 @
 import qualified Data.Vector           as V
@@ -1249,7 +1248,7 @@ a general listing of the available template holes:
   other cases. Valid @\<CONDITION\>@s are @~LENGTH[\<HOLE\>]@, @~SIZE[\<HOLE\>]@,
   @~DEPTH[\<HOLE\>]@, @~VIVADO@, @~IW64@, @~ISLIT[N]@, @~ISVAR[N], @~ISGATED[N]@,
   @~ISSYNC[N]@, and @~AND[\<HOLE1\>,\<HOLE2\>,..]@.
-* @~VIVADO@: /1/ when CλaSH compiler is invoked with the @-fclash-xilinx@ or
+* @~VIVADO@: /1/ when Clash compiler is invoked with the @-fclash-xilinx@ or
   @-fclash-vivado@ flag. To be used with in an @~IF .. ~THEN .. ~ElSE .. ~FI@
   statement.
 * @~TOBV[\<HOLE\>][\<TYPE\>]@: create conversion code that so that the
@@ -1285,9 +1284,9 @@ a general listing of the available template holes:
 
 
 Some final remarks to end this section: VHDL primitives are there to instruct the
-CλaSH compiler to use the given VHDL template, instead of trying to do normal
+Clash compiler to use the given VHDL template, instead of trying to do normal
 synthesis. As a consequence you can use constructs inside the Haskell
-definitions that are normally not synthesizable by the CλaSH compiler. However,
+definitions that are normally not synthesizable by the Clash compiler. However,
 VHDL primitives do not give us /co-simulation/: where you would be able to
 simulate VHDL and Haskell in a /single/ environment. If you still want to
 simulate your design in Haskell, you will have to describe, in a cycle- and
@@ -1427,7 +1426,7 @@ assign ~RESULT = ~FROMBV[~SYM[1]][~TYP[6]];
 -}
 
 {- $multiclock #multiclock#
-CλaSH supports designs multiple /clock/ (and /reset/) domains, though perhaps in
+Clash supports designs multiple /clock/ (and /reset/) domains, though perhaps in
 a slightly limited form. What is possible is:
 
 * Create clock primitives, such as PPLs, which have an accompanying HDL primitive
@@ -1479,7 +1478,7 @@ What is /not/ possible is:
   And then create a HDL primitive, as described in later on in
   this <#primitives tutorial>, to implement the desired behaviour in HDL.
 
-What this means is that when CλaSH converts your design to VHDL/(System)Verilog,
+What this means is that when Clash converts your design to VHDL/(System)Verilog,
 you end up with a top-level module/entity with multiple clock and reset ports
 for the different clock domains. If you're targeting an FPGA, you can use e.g. a
 <https://www.altera.com/literature/ug/ug_altpll.pdf PPL> or
@@ -1516,7 +1515,7 @@ import Data.Constraint.Nat    (leTrans)
 Then we'll start with the /heart/ of the FIFO synchroniser, an asynchronous RAM
 in the form of 'asyncRam''. It's called an asynchronous RAM because the read
 port is not synchronised to any clock (though the write port is). Note that in
-CλaSH we don't really have asynchronous logic, there is only combinational and
+Clash we don't really have asynchronous logic, there is only combinational and
 synchronous logic. As a consequence, we see in the type signature of
 'Clash.Explicit.Prelude.asyncRam':
 
@@ -1538,7 +1537,7 @@ __asyncRam__
 @
 
 that the signal containing the read address __r__ is synchronised to a different
-clock. That is, there is __no__ such thing as an @AsyncSignal@ in CλaSH.
+clock. That is, there is __no__ such thing as an @AsyncSignal@ in Clash.
 
 We continue by instantiating the 'Clash.Explicit.Prelude.asyncRam':
 
@@ -1615,7 +1614,7 @@ It uses the 'unsafeSynchroniser' primitive, which is needed to go from one clock
 domain to the other. All synchronizers are specified in terms of
 'unsafeSynchronizer' (see for example the <src/Clash-Prelude-RAM.html#line-103 source of asyncRam>).
 The 'unsafeSynchronizer' primitive is turned into a (bundle of) wire(s) by the
-CλaSH compiler, so developers must ensure that it is only used as part of a
+Clash compiler, so developers must ensure that it is only used as part of a
 proper synchronizer.
 
 Finally we combine all the component in:
@@ -1784,7 +1783,7 @@ adcToFFT = asyncFIFOSynchronizer d8
 For now, this is the end of this tutorial. We will be adding updates over time,
 so check back from time to time. For now, we recommend that you continue with
 exploring the "Clash.Prelude" module, and get a better understanding of the
-capabilities of CλaSH in the process.
+capabilities of Clash in the process.
 -}
 
 {- $errorsandsolutions
@@ -1925,7 +1924,7 @@ A list of often encountered errors and their solutions:
 -}
 
 {- $limitations #limitations#
-Here is a list of Haskell features for which the CλaSH compiler has only
+Here is a list of Haskell features for which the Clash compiler has only
 /limited/ support (for now):
 
 * __Recursively defined functions__
@@ -1933,7 +1932,7 @@ Here is a list of Haskell features for which the CλaSH compiler has only
     At first hand, it seems rather bad that a compiler for a functional language
     cannot synthesize recursively defined functions to circuits. However, when
     viewing your functions as a /structural/ specification of a circuit, this
-    /feature/ of the CλaSH compiler makes sense. Also, only certain types of
+    /feature/ of the Clash compiler makes sense. Also, only certain types of
     recursion are considered non-synthesisable; recursively defined values are
     for example synthesisable: they are (often) synthesized to feedback loops.
 
@@ -1956,15 +1955,15 @@ Here is a list of Haskell features for which the CλaSH compiler has only
         >>> L.map fibR [0..9]
         [0,1,1,2,3,5,8,13,21,34]
 
-        The @fibR@ function is not synthesizable by the CλaSH compiler, because,
+        The @fibR@ function is not synthesizable by the Clash compiler, because,
         when we take a /structural/ view, @fibR@ describes an infinitely deep
         structure.
 
         In principal, descriptions like the above could be synthesized to a
         circuit, but it would have to be a /sequential/ circuit. Where the most
         general synthesis would then require a stack. Such a synthesis approach
-        is also known as /behavioural/ synthesis, something which the CλaSH
-        compiler simply does not do. One reason that CλaSH does not do this is
+        is also known as /behavioural/ synthesis, something which the Clash
+        compiler simply does not do. One reason that Clash does not do this is
         because it does not fit the paradigm that only functions working on
         values of type 'Signal' result in sequential circuits, and all other
         (non higher-order) functions result in combinational circuits. This
@@ -1989,7 +1988,7 @@ Here is a list of Haskell features for which the CλaSH compiler has only
         [0,0,1,1,2,3,5,8,13,21,34]
 
         Unlike the @fibR@ function, the above @fibS@ function /is/ synthesisable
-        by the CλaSH compiler. Where the recursively defined (non-function)
+        by the Clash compiler. Where the recursively defined (non-function)
         value /r/ is synthesized to a feedback loop containing three registers
         and one adder.
 
@@ -2031,24 +2030,24 @@ Here is a list of Haskell features for which the CλaSH compiler has only
         Where one can imagine that a compiler can unroll the definition of
         @mapV@ four times, knowing that the @topEntity@ function applies @mapV@
         to a 'Vec' of length 4. Sadly, the compile-time evaluation mechanisms in
-        the CλaSH compiler are very poor, and a user-defined function such as
+        the Clash compiler are very poor, and a user-defined function such as
         the @mapV@ function defined above, is /currently/ not synthesisable.
         We /do/ plan to add support for this in the future. In the mean time,
         this poor support for user-defined recursive functions is amortized by
-        the fact that the CλaSH compiler has built-in support for the
+        the fact that the Clash compiler has built-in support for the
         higher-order functions defined in "Clash.Sized.Vector". Most regular
         design patterns often encountered in circuit design are captured by the
         higher-order functions in "Clash.Sized.Vector".
 
 * __Recursive datatypes__
 
-    The CλaSH compiler needs to be able to determine a bit-size for any value
+    The Clash compiler needs to be able to determine a bit-size for any value
     that will be represented in the eventual circuit. More specifically, we need
     to know the maximum number of bits needed to represent a value. While this
     is trivial for values of the elementary types, sum types, and product types,
     putting a fixed upper bound on recursive types is not (always) feasible.
     This means that the ubiquitous list type is unsupported! The only recursive
-    type that is currently supported by the CλaSH compiler is the 'Vec'tor type,
+    type that is currently supported by the Clash compiler is the 'Vec'tor type,
     for which the compiler has hard-coded knowledge.
 
     For \"easy\" 'Vec'tor literals you should use Template Haskell splices and
@@ -2107,13 +2106,13 @@ Here is a list of Haskell features for which the CλaSH compiler has only
     There are several aspects of which you should take note:
 
         *   'Int' and 'Word' are represented by the same number of bits as is
-            native for the architecture of the computer on which the CλaSH
+            native for the architecture of the computer on which the Clash
             compiler is executed. This means that if you are working on a 64-bit
             machine, 'Int' and 'Word' will be 64-bit. This might be problematic
             when you are working in a team, and one designer has a 32-bit
             machine, and the other has a 64-bit machine. In general, you should
             be avoiding 'Int' in such cases, but as a band-aid solution, you can
-            force the CλaSH compiler to use a specific bit-width for `Int` and
+            force the Clash compiler to use a specific bit-width for `Int` and
             `Word` using the @-fclash-intwidth=N@ flag, where /N/ must either be
             /32/ or /64/.
 
@@ -2124,11 +2123,11 @@ Here is a list of Haskell features for which the CλaSH compiler has only
 
         *   The translation of 'Integer' is not meaning-preserving. 'Integer' in
             Haskell is an arbitrary precision integer, something that cannot
-            be represented in a statically known number of bits. In the CλaSH
+            be represented in a statically known number of bits. In the Clash
             compiler, we chose to represent 'Integer' by the same number of bits
             as we do for 'Int' and 'Word'. As you have read in a previous
             bullet point, this number of bits is either 32 or 64, depending on
-            the architecture of the machine the CλaSH compiler is running on, or
+            the architecture of the machine the Clash compiler is running on, or
             the setting of the @-fclash-intwidth@ flag.
 
             Consequently, you should use `Integer` with due diligence; be
@@ -2161,16 +2160,16 @@ Lava family of languages:
 * <http://hackage.haskell.org/package/york-lava York Lava>
 * <http://hackage.haskell.org/package/kansas-lava Kansas Lava>
 
-The big difference between CλaSH and Lava is that CλaSH uses a \"standard\"
+The big difference between Clash and Lava is that Clash uses a \"standard\"
 compiler (static analysis) approach towards synthesis, where Lava is an
 embedded domain specific language. One downside of static analysis vs. the
 embedded language approach is already clearly visible: synthesis of recursive
-descriptions does not come for \"free\". This will be implemented in CλaSH in
+descriptions does not come for \"free\". This will be implemented in Clash in
 due time, but that doesn't help the circuit designer right now. As already
 mentioned earlier, the poor support for recursive functions is amortized by
 the built-in support for the higher-order in "Clash.Sized.Vector".
 
-The big upside of CλaSH and its static analysis approach is that CλaSH can
+The big upside of Clash and its static analysis approach is that Clash can
 do synthesis of \"normal\" functions: there is no forced encasing datatype (often
 called /Signal/ in Lava) on all the arguments and results of a synthesizable
 function. This enables the following features not available to Lava:

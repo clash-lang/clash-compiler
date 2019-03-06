@@ -5,7 +5,7 @@ License    :  BSD2 (see the file LICENSE)
 Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
 
 'TopEntity' annotations allow us to control hierarchy and naming aspects of the
-CλaSH compiler. We have the 'Synthesize' and 'TestBench' annotation.
+Clash compiler. We have the 'Synthesize' and 'TestBench' annotation.
 
 === 'Synthesize' annotation
 
@@ -32,7 +32,7 @@ restrictions:
 
 Also take the following into account when using 'Synthesize' annotations.
 
-    * The CλaSH compiler is based on the GHC Haskell compiler, and the GHC
+    * The Clash compiler is based on the GHC Haskell compiler, and the GHC
       machinery does not understand 'Synthesize' annotations and it might
       subsequently decide to inline those functions. You should therefor also
       add a @{\-\# NOINLINE f \#-\}@ pragma to the functions which you give
@@ -41,7 +41,7 @@ Also take the following into account when using 'Synthesize' annotations.
       on constants.
 
 Finally, the root module, the module which you pass as an argument to the
-CλaSH compiler must either have:
+Clash compiler must either have:
 
     * A function with a 'Synthesize' annotation.
     * A function called /topEntity/.
@@ -93,7 +93,7 @@ blinkerT (leds,mode,cntr) key1R = ((leds',mode',cntr'),leds)
           | otherwise = leds
 @
 
-The CλaSH compiler would normally generate the following
+The Clash compiler would normally generate the following
 @blinker_topentity.vhdl@ file:
 
 @
@@ -139,7 +139,7 @@ However, if we add the following 'Synthesize' annotation in the file:
     }) \#-\}
 @
 
-The CλaSH compiler will generate the following @blinker.vhdl@ file instead:
+The Clash compiler will generate the following @blinker.vhdl@ file instead:
 
 @
 -- Automatically generated VHDL-93
