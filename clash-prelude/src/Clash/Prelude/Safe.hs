@@ -6,12 +6,12 @@
 
   __This is the <https://downloads.haskell.org/~ghc/latest/docs/html/users_guide/safe_haskell.html Safe> API only of "Clash.Prelude"__
 
-  CλaSH (pronounced ‘clash’) is a functional hardware description language that
-  borrows both its syntax and semantics from the functional programming language
-  Haskell. The merits of using a functional language to describe hardware comes
-  from the fact that combinational circuits can be directly modeled as
-  mathematical functions and that functional languages lend themselves very well
-  at describing and (de-)composing mathematical functions.
+  Clash is a functional hardware description language that borrows both its
+  syntax and semantics from the functional programming language Haskell. The
+  merits of using a functional language to describe hardware comes from the fact
+  that combinational circuits can be directly modeled as mathematical functions
+  and that functional languages lend themselves very well at describing and
+  (de-)composing mathematical functions.
 
   This package provides:
 

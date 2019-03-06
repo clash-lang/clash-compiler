@@ -125,7 +125,7 @@ data Domain = Dom { domainName :: Symbol, clkPeriod :: Nat }
   deriving (Typeable)
 
 infixr 5 :-
-{- | CλaSH has synchronous 'Signal's in the form of:
+{- | Clash has synchronous 'Signal's in the form of:
 
 @
 'Signal' (domain :: 'Domain') a

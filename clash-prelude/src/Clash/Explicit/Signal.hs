@@ -5,7 +5,7 @@ Copyright  :  (C) 2013-2016, University of Twente,
 License    :  BSD2 (see the file LICENSE)
 Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
 
-CλaSH has synchronous 'Signal's in the form of:
+Clash has synchronous 'Signal's in the form of:
 
 @
 'Signal' (domain :: 'Domain') a
