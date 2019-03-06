@@ -239,7 +239,7 @@ sigPort :: Maybe WireOrReg
         -> VerilogM Doc
 sigPort wor pName hwType =
     addAttrs (hwTypeAttrs hwType)
-      (portType <+> verilogType' True hwType <+> stringS pName <+> encodingNote hwType)
+      (portType <+> verilogType' True hwType <+> stringS pName <> encodingNote hwType)
   where
     portType = case wor of
                  Nothing   -> if isBiSignalIn hwType then "inout" else "input"
@@ -876,8 +876,8 @@ punctuate' :: Monad m => Mon m Doc -> Mon m [Doc] -> Mon m Doc
 punctuate' s d = vcat (punctuate s d) <> s
 
 encodingNote :: Applicative m => HWType -> m Doc
-encodingNote (Clock _ _ Gated)        = string "// gated clock"
-encodingNote (Clock _ _ Source)       = string "// clock"
-encodingNote (Reset _ _ Asynchronous) = string "// asynchronous reset: active high"
-encodingNote (Reset _ _ Synchronous)  = string "// synchronous reset: active high"
+encodingNote (Clock _ _ Gated)        = string " // gated clock"
+encodingNote (Clock _ _ Source)       = string " // clock"
+encodingNote (Reset _ _ Asynchronous) = string " // asynchronous reset: active high"
+encodingNote (Reset _ _ Synchronous)  = string " // synchronous reset: active high"
 encodingNote _                        = emptyDoc
