@@ -24,6 +24,7 @@ import           Control.Lens
 import           Control.Monad                   (forM)
 import           Control.Monad.State             (State, StateT (..), lift)
 import           Data.Bool                       (bool)
+import qualified Data.DList                      as DList
 import           Data.Foldable                   (foldrM)
 import           Data.Hashable                   (Hashable (..))
 import qualified Data.IntMap                     as IntMap
@@ -286,7 +287,7 @@ renderElem b (Component (Decl n (l:ls))) = do
       Left t ->
         return t
       Right (nm,ds) -> do
-        block <- getMon (blockDecl nm ds)
+        block <- getMon (blockDecl nm (DList.toList ds))
         return $ N.BBTemplate
                $ parseFail
                $ renderLazy

@@ -24,6 +24,8 @@ import           Control.Monad                    (join)
 import           Control.Monad.IO.Class           (liftIO)
 import           Control.Monad.State.Strict       (runStateT)
 import           Data.Binary.IEEE754              (floatToWord, doubleToWord)
+import           Data.DList                       (DList)
+import qualified Data.DList                       as DList
 import           Data.Char                        (ord)
 import           Data.Either                      (lefts,partitionEithers)
 import qualified Data.HashMap.Lazy                as HashMap
@@ -231,8 +233,7 @@ genComponentT compName componentExpr = do
         throw (ClashException sp err Nothing)
 
   netDecls <- fmap catMaybes . mapM mkNetDecl $ filter (maybe (const True) (/=) resultM . fst) binders
-  decls    <- concat <$> mapM (uncurry mkDeclarations) binders
-
+  decls    <- DList.concat <$> mapM (uncurry mkDeclarations) binders
   case resultM of
     Just result -> do
       Just (NetDecl' _ rw _ _) <- mkNetDecl . head $ filter ((==result) . fst) binders
@@ -244,14 +245,19 @@ genComponentT compName componentExpr = do
                            ,NetDecl' n rw res (Right resTy):tail resUnwrappers
                            )
           component      = Component componentName2 compInps compOutps'
-                             (netDecls ++ argWrappers ++ decls ++ resUnwrappers')
+                             (DList.toList
+                              (DList.fromList netDecls `DList.append`
+                              DList.fromList argWrappers `DList.append`
+                              decls `DList.append`
+                              DList.fromList resUnwrappers'))
       ids <- Lens.use seenIds
       return (wereVoids, sp, ids, component)
     -- No result declaration means that the result is empty, this only happens
     -- when the TopEntity has an empty result. We just create an empty component
     -- in this case.
     Nothing -> do
-      let component = Component componentName2 compInps [] (netDecls ++ argWrappers ++ decls)
+      let component = Component componentName2 compInps []
+                        (DList.toList (DList.fromList netDecls `DList.append` DList.fromList argWrappers `DList.append` decls))
       ids <- Lens.use seenIds
       return (wereVoids, sp, ids, component)
 
@@ -296,11 +302,11 @@ mkDeclarations
   -- ^ LHS of the let-binder
   -> Term
   -- ^ RHS of the let-binder
-  -> NetlistMonad [Declaration]
+  -> NetlistMonad (DList Declaration)
 mkDeclarations bndr e = do
   hty <- unsafeCoreTypeToHWTypeM' $(curLoc) (varType bndr)
   if isVoid hty && not (isBiSignalOut hty)
-     then return []
+     then return DList.empty
      else mkDeclarations' bndr e
 
 -- | Generate a list of Declarations for a let-binder
@@ -309,7 +315,7 @@ mkDeclarations'
   -- ^ LHS of the let-binder
   -> Term
   -- ^ RHS of the let-binder
-  -> NetlistMonad [Declaration]
+  -> NetlistMonad (DList Declaration)
 mkDeclarations' bndr (Var v) = mkFunApp bndr v []
 
 mkDeclarations' _ e@(Case _ _ []) = do
@@ -344,14 +350,14 @@ mkDeclarations' bndr app =
     _ -> do
       hwTy <- unsafeCoreTypeToHWTypeM' $(curLoc) (id2type bndr)
       if isBiSignalOut hwTy && not (isWriteToBiSignalPrimitive app)
-         then return []
+         then return DList.empty
          else do
           (exprApp,declsApp) <- mkExpr False (Right bndr) (varType bndr) app
           let dstId = id2identifier bndr
-              assn  = case exprApp of
-                        Identifier _ Nothing -> []
-                        _ -> [Assignment dstId exprApp]
-          return (declsApp ++ assn)
+              decls =case exprApp of
+                Identifier _ Nothing -> declsApp
+                _ -> declsApp `DList.snoc` Assignment dstId exprApp
+          return decls
 
 -- | Generate a declaration that selects an alternative based on the value of
 -- the scrutinee
@@ -360,7 +366,7 @@ mkSelection
   -> Term
   -> Type
   -> [Alt]
-  -> NetlistMonad [Declaration]
+  -> NetlistMonad (DList Declaration)
 mkSelection bndr scrut altTy alts = do
   tcm                    <- Lens.use tcCache
   reprs                  <- Lens.use customReprs
@@ -374,12 +380,12 @@ mkSelection bndr scrut altTy alts = do
                                "_selection"
   (_,sp)                 <- Lens.use curCompNm
   (scrutExpr,scrutDecls) <- first (mkScrutExpr sp scrutHTy (fst (head alts'))) <$> mkExpr True (Left scrutId) scrutTy scrut
-  (exprs,altsDecls)      <- (second concat . unzip) <$> mapM (mkCondExpr scrutHTy) alts'
+  (exprs,altsDecls)      <- (second DList.concat . unzip) <$> mapM (mkCondExpr scrutHTy) alts'
 
   let dstId = id2identifier bndr
-  return $! scrutDecls ++ altsDecls ++ [CondAssignment dstId altHTy scrutExpr scrutHTy exprs]
+  return $! scrutDecls `DList.append` altsDecls `DList.snoc` (CondAssignment dstId altHTy scrutExpr scrutHTy exprs)
   where
-    mkCondExpr :: HWType -> (Pat,Term) -> NetlistMonad ((Maybe HW.Literal,Expr),[Declaration])
+    mkCondExpr :: HWType -> (Pat,Term) -> NetlistMonad ((Maybe HW.Literal,Expr),DList Declaration)
     mkCondExpr scrutHTy (pat,alt) = do
       altId <- extendIdentifier Extended
                  (id2identifier bndr)
@@ -454,7 +460,7 @@ mkFunApp
   :: Id -- ^ LHS of the let-binder
   -> Id -- ^ Name of the applied function
   -> [Term] -- ^ Function arguments
-  -> NetlistMonad [Declaration]
+  -> NetlistMonad (DList Declaration)
 mkFunApp dst fun args = do
   topAnns <- Lens.use topEntityAnns
   tcm     <- Lens.use tcCache
@@ -471,7 +477,7 @@ mkFunApp dst fun args = do
             argsFiltered  = filter (not . isVoid . fst) argsBundled
             argsFiltered' = map snd argsFiltered
             hWTysFiltered = filter (not . isVoid) argHWTys
-        (argExprs,argDecls) <- second concat . unzip <$>
+        (argExprs,argDecls) <- second DList.concat . unzip <$>
                                  mapM (\(e,t) -> mkExpr False (Left dstId) t e)
                                  argsFiltered'
         dstHWty  <- unsafeCoreTypeToHWTypeM' $(curLoc) fResTy
@@ -487,7 +493,7 @@ mkFunApp dst fun args = do
         Just man <- readMaybe <$> liftIO (readFile manFile)
         instDecls <- mkTopUnWrapper fun annM man (dstId,dstHWty)
                        (zip argExprs hWTysFiltered)
-        return (argDecls ++ instDecls)
+        return (argDecls `DList.append` instDecls)
 
       | otherwise -> error $ $(curLoc) ++ "under-applied TopEntity"
     _ -> do
@@ -507,26 +513,26 @@ mkFunApp dst fun args = do
           if length tysFiltered == length compInps
             then do
               let dstId = nameOcc $ varName dst
-              (argExprs,argDecls)   <- fmap (second concat . unzip) $! mapM (\(e,t) -> mkExpr False (Left dstId) t e) argsFiltered'
-              (argExprs',argDecls') <- (second concat . unzip) <$> mapM (toSimpleVar dst) (zip argExprs tysFiltered)
+              (argExprs,argDecls)   <- fmap (second DList.concat . unzip) $! mapM (\(e,t) -> mkExpr False (Left dstId) t e) argsFiltered'
+              (argExprs',argDecls') <- (second DList.concat . unzip) <$> mapM (toSimpleVar dst) (zip argExprs tysFiltered)
               let inpAssigns    = zipWith (\(i,t) e -> (Identifier i Nothing,In,t,e)) compInps argExprs'
                   outpAssign    = case compOutp of
                     Nothing -> []
                     Just (id_,hwtype) -> [(Identifier id_ Nothing,Out,hwtype,Identifier dstId Nothing)]
               instLabel <- extendIdentifier Basic compName (StrictText.pack "_" `StrictText.append` dstId)
               let instDecl      = InstDecl Entity Nothing compName instLabel [] (outpAssign ++ inpAssigns)
-              return (argDecls ++ argDecls' ++ [instDecl])
+              return (argDecls `DList.append` argDecls' `DList.snoc` instDecl)
             else error $ $(curLoc) ++ "under-applied normalized function"
         Nothing -> case args of
           [] -> do
             let dstId = id2identifier dst
-            return [Assignment dstId (Identifier (nameOcc $ varName fun) Nothing)]
+            return (DList.singleton $ Assignment dstId (Identifier (nameOcc $ varName fun) Nothing))
           _ -> error $ $(curLoc) ++ "Unknown function: " ++ showPpr fun
 
 toSimpleVar :: Id
             -> (Expr,Type)
-            -> NetlistMonad (Expr,[Declaration])
-toSimpleVar _ (e@(Identifier _ _),_) = return (e,[])
+            -> NetlistMonad (Expr,DList Declaration)
+toSimpleVar _ (e@(Identifier _ _),_) = return (e,DList.empty)
 toSimpleVar dst (e,ty) = do
   argNm <- extendIdentifier Extended
              (id2identifier dst)
@@ -535,31 +541,31 @@ toSimpleVar dst (e,ty) = do
   hTy <- unsafeCoreTypeToHWTypeM' $(curLoc) ty
   let argDecl         = NetDecl Nothing argNm' hTy
       argAssn         = Assignment argNm' e
-  return (Identifier argNm' Nothing,[argDecl,argAssn])
+  return (Identifier argNm' Nothing,DList.fromList [argDecl,argAssn])
 
 -- | Generate an expression for a term occurring on the RHS of a let-binder
 mkExpr :: Bool -- ^ Treat BlackBox expression as declaration
        -> (Either Identifier Id) -- ^ Id to assign the result to
        -> Type -- ^ Type of the LHS of the let-binder
        -> Term -- ^ Term to convert to an expression
-       -> NetlistMonad (Expr,[Declaration]) -- ^ Returned expression and a list of generate BlackBox declarations
+       -> NetlistMonad (Expr,DList Declaration) -- ^ Returned expression and a list of generate BlackBox declarations
 mkExpr _ _ _ (Core.Literal l) = do
   iw <- Lens.use intWidth
   case l of
-    IntegerLiteral i -> return (HW.Literal (Just (Signed iw,iw)) $ NumLit i, [])
-    IntLiteral i     -> return (HW.Literal (Just (Signed iw,iw)) $ NumLit i, [])
-    WordLiteral w    -> return (HW.Literal (Just (Unsigned iw,iw)) $ NumLit w, [])
-    Int64Literal i   -> return (HW.Literal (Just (Signed 64,64)) $ NumLit i, [])
-    Word64Literal w  -> return (HW.Literal (Just (Unsigned 64,64)) $ NumLit w, [])
-    CharLiteral c    -> return (HW.Literal (Just (Unsigned 21,21)) . NumLit . toInteger $ ord c, [])
+    IntegerLiteral i -> return (HW.Literal (Just (Signed iw,iw)) $ NumLit i, DList.empty)
+    IntLiteral i     -> return (HW.Literal (Just (Signed iw,iw)) $ NumLit i, DList.empty)
+    WordLiteral w    -> return (HW.Literal (Just (Unsigned iw,iw)) $ NumLit w, DList.empty)
+    Int64Literal i   -> return (HW.Literal (Just (Signed 64,64)) $ NumLit i, DList.empty)
+    Word64Literal w  -> return (HW.Literal (Just (Unsigned 64,64)) $ NumLit w, DList.empty)
+    CharLiteral c    -> return (HW.Literal (Just (Unsigned 21,21)) . NumLit . toInteger $ ord c, DList.empty)
     FloatLiteral r   -> let f = fromRational r :: Float
                             i = toInteger (floatToWord f)
-                        in  return (HW.Literal (Just (BitVector 32,32)) (NumLit i), [])
+                        in  return (HW.Literal (Just (BitVector 32,32)) (NumLit i), DList.empty)
     DoubleLiteral r  -> let d = fromRational r :: Double
                             i = toInteger (doubleToWord d)
-                        in  return (HW.Literal (Just (BitVector 64,64)) (NumLit i), [])
-    NaturalLiteral n -> return (HW.Literal (Just (Unsigned iw,iw)) $ NumLit n, [])
-    ByteArrayLiteral (PV.Vector _ _ (ByteArray ba)) -> return (HW.Literal Nothing (NumLit (Jp# (BN# ba))),[])
+                        in  return (HW.Literal (Just (BitVector 64,64)) (NumLit i), DList.empty)
+    NaturalLiteral n -> return (HW.Literal (Just (Unsigned iw,iw)) $ NumLit n, DList.empty)
+    ByteArrayLiteral (PV.Vector _ _ (ByteArray ba)) -> return (HW.Literal Nothing (NumLit (Jp# (BN# ba))),DList.empty)
     _ -> error $ $(curLoc) ++ "not an integer or char literal"
 
 mkExpr bbEasD bndr ty app = do
@@ -571,7 +577,7 @@ mkExpr bbEasD bndr ty app = do
     Data dc -> mkDcApplication hwTy bndr dc tmArgs
     Prim nm _ -> mkPrimitive False bbEasD bndr nm args ty
     Var f
-      | null tmArgs -> return (Identifier (nameOcc $ varName f) Nothing,[])
+      | null tmArgs -> return (Identifier (nameOcc $ varName f) Nothing,DList.empty)
       | otherwise ->
         throw (ClashException sp ($(curLoc) ++ "Not in normal form: top-level binder in argument position:\n\n" ++ showPpr app) Nothing)
     Case scrut ty' [alt] -> mkProjection bbEasD bndr scrut ty' alt
@@ -591,7 +597,7 @@ mkProjection
   -- ^ The type of the result
   -> Alt
   -- ^ The field to be projected
-  -> NetlistMonad (Expr, [Declaration])
+  -> NetlistMonad (Expr, DList Declaration)
 mkProjection mkDec bndr scrut altTy alt@(pat,v) = do
   tcm <- Lens.use tcCache
   let scrutTy = termType tcm scrut
@@ -617,7 +623,7 @@ mkProjection mkDec bndr scrut altTy alt@(pat,v) = do
         scrutNm' <- mkUniqueIdentifier Extended scrutNm
         let scrutDecl = NetDecl Nothing scrutNm' sHwTy
             scrutAssn = Assignment scrutNm' scrutExpr
-        return (scrutNm',Nothing,newDecls ++ [scrutDecl,scrutAssn])
+        return (scrutNm',Nothing,newDecls `DList.snoc` scrutDecl `DList.snoc` scrutAssn)
 
   let altVarId = nameOcc (varName varTm)
   modifier <- case pat of
@@ -643,7 +649,7 @@ mkProjection mkDec bndr scrut altTy alt@(pat,v) = do
       scrutNm' <- mkUniqueIdentifier Extended scrutNm
       let scrutDecl = NetDecl Nothing scrutNm' vHwTy
           scrutAssn = Assignment scrutNm' extractExpr
-      return (Identifier scrutNm' Nothing,scrutDecl:scrutAssn:decls)
+      return (Identifier scrutNm' Nothing,scrutDecl `DList.cons` scrutAssn `DList.cons` decls)
     _ -> return (extractExpr,decls)
   where
     nestModifier Nothing  m          = m
@@ -661,7 +667,7 @@ mkDcApplication
     -- ^ Applied DataCon
     -> [Term]
     -- ^ DataCon Arguments
-    -> NetlistMonad (Expr,[Declaration])
+    -> NetlistMonad (Expr,DList Declaration)
     -- ^ Returned expression and a list of generate BlackBox declarations
 mkDcApplication dstHType bndr dc args = do
   let dcNm = nameOcc (dcName dc)
@@ -674,7 +680,7 @@ mkDcApplication dstHType bndr dc args = do
   let argsBundled   = zip argHWTys (zip args argTys)
       (hWTysFiltered,argsFiltered) = unzip
         (filter (maybe True (not . isVoid) . fst) argsBundled)
-  (argExprs,argDecls) <- fmap (second concat . unzip) $! mapM (\(e,t) -> mkExpr False (Left argNm) t e) argsFiltered
+  (argExprs,argDecls) <- fmap (second DList.concat . unzip) $! mapM (\(e,t) -> mkExpr False (Left argNm) t e) argsFiltered
   fmap (,argDecls) $! case (hWTysFiltered,argExprs) of
     -- Is the DC just a newtype wrapper?
     ([Just argHwTy],[argExpr]) | argHwTy == dstHType ->

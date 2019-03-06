@@ -23,6 +23,8 @@ import qualified Control.Lens                  as Lens
 import           Control.Monad                 (when)
 import           Control.Monad.IO.Class        (liftIO)
 import           Data.Char                     (ord)
+import           Data.DList                    (DList)
+import qualified Data.DList                    as DList
 import           Data.Either                   (lefts)
 import qualified Data.HashMap.Lazy             as HashMap
 import qualified Data.IntMap                   as IntMap
@@ -100,7 +102,7 @@ mkBlackBoxContext
   -- ^ Identifier binding the primitive/blackbox application
   -> [Term]
   -- ^ Arguments of the primitive/blackbox application
-  -> NetlistMonad (BlackBoxContext,[Declaration])
+  -> NetlistMonad (BlackBoxContext,DList Declaration)
 mkBlackBoxContext resId args = do
     -- Make context inputs
     tcm             <- Lens.use tcCache
@@ -116,7 +118,7 @@ mkBlackBoxContext resId args = do
     (nm,_) <- Lens.use curCompNm
 
     return ( Context (res,resTy) imps funs [] lvl nm
-           , concat impDecls ++ concat funDecls
+           , DList.concat impDecls `DList.append` DList.concat funDecls
            )
   where
     addFunction tcm im (arg,i) = if isFun tcm arg
@@ -125,13 +127,13 @@ mkBlackBoxContext resId args = do
               curBBlvl Lens.-= 1
               let im' = IntMap.insert i f im
               return (im',d)
-      else return (im,[])
+      else return (im,DList.empty)
 
 prepareBlackBox
   :: TextS.Text
   -> BlackBox
   -> BlackBoxContext
-  -> NetlistMonad (BlackBox,[Declaration])
+  -> NetlistMonad (BlackBox,DList Declaration)
 prepareBlackBox pNm templ bbCtx =
   if verifyBlackBoxContext bbCtx templ
      then do
@@ -140,7 +142,7 @@ prepareBlackBox pNm templ bbCtx =
             (fmap (first BBTemplate) . setSym mkUniqueIdentifier bbCtx)
             (\bbName bbHash bbFunc -> pure (BBFunction bbName bbHash bbFunc, []))
             templ
-        return (t2,decls)
+        return (t2,DList.fromList decls)
      else do
        (_,sp) <- Lens.use curCompNm
        templ' <- onBlackBox (getMon . prettyBlackBox)
@@ -163,7 +165,7 @@ mkArgument
   -- ^ LHS of the original let-binder
   -> Term
   -> NetlistMonad ( (Expr,HWType,Bool)
-                  , [Declaration]
+                  , DList Declaration
                   )
 mkArgument bndr e = do
     tcm   <- Lens.use tcCache
@@ -175,19 +177,19 @@ mkArgument bndr e = do
       Nothing
         | (Prim nm _,_) <- collectArgs e
         , nm == "Clash.Transformations.removedArg"
-        -> return ((Identifier nm Nothing, Void Nothing, False),[])
+        -> return ((Identifier nm Nothing, Void Nothing, False),DList.empty)
         | otherwise
-        -> return ((error ($(curLoc) ++ "Forced to evaluate untranslatable type: " ++ eTyMsg), Void Nothing, False), [])
+        -> return ((error ($(curLoc) ++ "Forced to evaluate untranslatable type: " ++ eTyMsg), Void Nothing, False), DList.empty)
       Just hwTy -> case collectArgs e of
-        (C.Var v,[]) -> return ((Identifier (nameOcc (varName v)) Nothing,hwTy,False),[])
-        (C.Literal (IntegerLiteral i),[]) -> return ((N.Literal (Just (Signed iw,iw)) (N.NumLit i),hwTy,True),[])
-        (C.Literal (IntLiteral i), []) -> return ((N.Literal (Just (Signed iw,iw)) (N.NumLit i),hwTy,True),[])
-        (C.Literal (WordLiteral w), []) -> return ((N.Literal (Just (Unsigned iw,iw)) (N.NumLit w),hwTy,True),[])
-        (C.Literal (CharLiteral c), []) -> return ((N.Literal (Just (Unsigned 21,21)) (N.NumLit . toInteger $ ord c),hwTy,True),[])
-        (C.Literal (StringLiteral s),[]) -> return ((N.Literal Nothing (N.StringLit s),hwTy,True),[])
-        (C.Literal (Int64Literal i), []) -> return ((N.Literal (Just (Signed 64,64)) (N.NumLit i),hwTy,True),[])
-        (C.Literal (Word64Literal i), []) -> return ((N.Literal (Just (Unsigned 64,64)) (N.NumLit i),hwTy,True),[])
-        (C.Literal (NaturalLiteral n), []) -> return ((N.Literal (Just (Unsigned iw,iw)) (N.NumLit n),hwTy,True),[])
+        (C.Var v,[]) -> return ((Identifier (nameOcc (varName v)) Nothing,hwTy,False),DList.empty)
+        (C.Literal (IntegerLiteral i),[]) -> return ((N.Literal (Just (Signed iw,iw)) (N.NumLit i),hwTy,True),DList.empty)
+        (C.Literal (IntLiteral i), []) -> return ((N.Literal (Just (Signed iw,iw)) (N.NumLit i),hwTy,True),DList.empty)
+        (C.Literal (WordLiteral w), []) -> return ((N.Literal (Just (Unsigned iw,iw)) (N.NumLit w),hwTy,True),DList.empty)
+        (C.Literal (CharLiteral c), []) -> return ((N.Literal (Just (Unsigned 21,21)) (N.NumLit . toInteger $ ord c),hwTy,True),DList.empty)
+        (C.Literal (StringLiteral s),[]) -> return ((N.Literal Nothing (N.StringLit s),hwTy,True),DList.empty)
+        (C.Literal (Int64Literal i), []) -> return ((N.Literal (Just (Signed 64,64)) (N.NumLit i),hwTy,True),DList.empty)
+        (C.Literal (Word64Literal i), []) -> return ((N.Literal (Just (Unsigned 64,64)) (N.NumLit i),hwTy,True),DList.empty)
+        (C.Literal (NaturalLiteral n), []) -> return ((N.Literal (Just (Unsigned iw,iw)) (N.NumLit n),hwTy,True),DList.empty)
         (Prim f _,args) -> do
           (e',d) <- mkPrimitive True False (Left bndr) f args ty
           case e' of
@@ -201,7 +203,7 @@ mkArgument bndr e = do
           return ((projection,hwTy,False),decls)
         _ ->
           return ((Identifier (error ($(curLoc) ++ "Forced to evaluate unexpected function argument: " ++ eTyMsg)) Nothing
-                  ,hwTy,False),[])
+                  ,hwTy,False),DList.empty)
     return ((e',t,l),d)
 
 mkPrimitive
@@ -217,13 +219,13 @@ mkPrimitive
   -- ^ Arguments
   -> Type
   -- ^ Result type
-  -> NetlistMonad (Expr,[Declaration])
+  -> NetlistMonad (Expr,DList Declaration)
 mkPrimitive bbEParen bbEasD dst nm args ty = do
   go =<< HashMap.lookup nm <$> Lens.use primitives
   where
     go
       :: Maybe CompiledPrimitive
-      -> NetlistMonad (Expr, [Declaration])
+      -> NetlistMonad (Expr, DList Declaration)
     go =
       \case
         Just (P.BlackBoxHaskell bbName funcName (_fHash, func)) ->
@@ -269,8 +271,8 @@ mkPrimitive bbEParen bbEasD dst nm args ty = do
                   (templ,templDecl) <- prepareBlackBox pNm tempD bbCtx
                   let bbDecl = N.BlackBoxD pNm (libraries p) (imports p)
                                            (includes p) templ bbCtx
-                  return (Identifier dstNm Nothing,dstDecl ++ ctxDcls ++ templDecl ++ [bbDecl])
-                Nothing -> return (Identifier "__VOID__" Nothing,[])
+                  return (Identifier dstNm Nothing,dstDecl `DList.append` ctxDcls `DList.append` templDecl `DList.snoc` bbDecl)
+                Nothing -> return (Identifier "__VOID__" Nothing,DList.empty)
             TExpr -> do
               let tempE = template p
                   pNm = name p
@@ -285,16 +287,16 @@ mkPrimitive bbEParen bbEasD dst nm args ty = do
                                         (BlackBoxE pNm (libraries p) (imports p)
                                                    (includes p) bbTempl bbCtx
                                                    bbEParen)
-                      return (Identifier dstNm Nothing, dstDecl ++ ctxDcls ++ templDecl ++ [tmpAssgn])
-                    Nothing -> return (Identifier "__VOID__" Nothing,[])
+                      return (Identifier dstNm Nothing, dstDecl `DList.append` ctxDcls `DList.append` templDecl `DList.snoc` tmpAssgn)
+                    Nothing -> return (Identifier "__VOID__" Nothing,DList.empty)
                 else do
                   resM <- resBndr False Wire dst
                   case resM of
                     Just (dst',_,_) -> do
                       (bbCtx,ctxDcls)     <- mkBlackBoxContext dst' (lefts args)
                       (bbTempl,templDecl) <- prepareBlackBox pNm tempE bbCtx
-                      return (BlackBoxE pNm (libraries p) (imports p) (includes p) bbTempl bbCtx bbEParen,ctxDcls ++ templDecl)
-                    Nothing -> return (Identifier "__VOID__" Nothing,[])
+                      return (BlackBoxE pNm (libraries p) (imports p) (includes p) bbTempl bbCtx bbEParen,ctxDcls `DList.append` templDecl)
+                    Nothing -> return (Identifier "__VOID__" Nothing,DList.empty)
         Just (P.Primitive pNm _)
           | pNm == "GHC.Prim.tagToEnum#" -> do
               hwTy <- N.unsafeCoreTypeToHWTypeM' $(curLoc) ty
@@ -316,12 +318,12 @@ mkPrimitive bbEParen bbEasD dst nm args ty = do
                       tmpRhs <- mkUniqueIdentifier Extended "#tte_rhs"
                       let netDeclRhs   = NetDecl Nothing tmpRhs scrutHTy
                           netAssignRhs = Assignment tmpRhs scrutExpr
-                      return (DataTag hwTy (Left tmpRhs),[netDeclRhs,netAssignRhs] ++ scrutDecls)
+                      return (DataTag hwTy (Left tmpRhs),netDeclRhs `DList.cons` netAssignRhs `DList.cons` scrutDecls)
                 _ -> error $ $(curLoc) ++ "tagToEnum: " ++ show (map (either showPpr showPpr) args)
           | pNm == "GHC.Prim.dataToTag#" -> case args of
               [Right _,Left (Data dc)] -> do
                 iw <- Lens.use intWidth
-                return (N.Literal (Just (Signed iw,iw)) (NumLit $ toInteger $ dcTag dc - 1),[])
+                return (N.Literal (Just (Signed iw,iw)) (NumLit $ toInteger $ dcTag dc - 1),DList.empty)
               [Right _,Left scrut] -> do
                 tcm      <- Lens.use tcCache
                 let scrutTy = termType tcm scrut
@@ -333,12 +335,12 @@ mkPrimitive bbEParen bbEasD dst nm args ty = do
                     tmpRhs  <- mkUniqueIdentifier Extended "#dtt_rhs"
                     let netDeclRhs   = NetDecl Nothing tmpRhs scrutHTy
                         netAssignRhs = Assignment tmpRhs scrutExpr
-                    return (DataTag scrutHTy (Right tmpRhs),[netDeclRhs,netAssignRhs] ++ scrutDecls)
+                    return (DataTag scrutHTy (Right tmpRhs),netDeclRhs `DList.cons` netAssignRhs `DList.cons` scrutDecls)
               _ -> error $ $(curLoc) ++ "dataToTag: " ++ show (map (either showPpr showPpr) args)
           | otherwise ->
               return (BlackBoxE "" [] [] []
                         (BBTemplate [Text $ mconcat ["NO_TRANSLATION_FOR:",fromStrict pNm]])
-                        emptyBBContext False,[])
+                        emptyBBContext False,DList.empty)
         _ -> do
           (_,sp) <- Lens.use curCompNm
           throw (ClashException sp ($(curLoc) ++ "No blackbox found for: " ++ unpack nm) Nothing)
@@ -347,7 +349,7 @@ mkPrimitive bbEParen bbEasD dst nm args ty = do
       :: Bool
       -> WireOrReg
       -> (Either Identifier Id)
-      -> NetlistMonad (Maybe (Id,Identifier,[Declaration]))
+      -> NetlistMonad (Maybe (Id,Identifier,DList Declaration))
       -- Nothing when the binder would have type `Void`
     resBndr mkDec wr dst' = case dst' of
       Left dstL -> case mkDec of
@@ -355,7 +357,7 @@ mkPrimitive bbEParen bbEasD dst nm args ty = do
           -- TODO: check that it's okay to use `mkUnsafeSystemName`
           let nm' = mkUnsafeSystemName dstL 0
               id_ = mkId ty nm'
-          return (Just (id_,dstL,[]))
+          return (Just (id_,dstL,DList.empty))
         True -> do
           nm'  <- extendIdentifier Extended dstL "_res"
           nm'' <- mkUniqueIdentifier Extended nm'
@@ -366,8 +368,8 @@ mkPrimitive bbEParen bbEasD dst nm args ty = do
               idDecl = NetDecl' Nothing wr nm'' (Right hwTy)
           case hwTy of
             Void {} -> return Nothing
-            _       -> return (Just (id_,nm'',[idDecl]))
-      Right dstR -> return (Just (dstR,nameOcc . varName $ dstR,[]))
+            _       -> return (Just (id_,nm'',DList.singleton idDecl))
+      Right dstR -> return (Just (dstR,nameOcc . varName $ dstR,DList.empty))
 
 -- | Create an template instantiation text and a partial blackbox content for an
 -- argument term, given that the term is a function. Errors if the term is not
@@ -379,13 +381,13 @@ mkFunInput
   -> Term
   -- ^ The function argument term
   -> NetlistMonad
-      ((Either BlackBox (Identifier,[Declaration])
+      ((Either BlackBox (Identifier,DList Declaration)
        ,WireOrReg
        ,[BlackBoxTemplate]
        ,[BlackBoxTemplate]
        ,[((TextS.Text,TextS.Text),BlackBox)]
        ,BlackBoxContext)
-      ,[Declaration])
+      ,DList Declaration)
 mkFunInput resId e = do
   -- TODO: Rewrite this function to use blackbox functions. Right now it
   -- TODO: generates strings that are later parsed/interpreted again. Silly!
@@ -414,7 +416,7 @@ mkFunInput resId e = do
                   let nonVoidArgI = fromJust (elemIndex False (head areVoids))
                   let arg = TextS.concat ["~ARG[", showt nonVoidArgI, "]"]
                   let assign = Assignment "~RESULT" (Identifier arg Nothing)
-                  return (Right (("", [assign]), Wire))
+                  return (Right (("", DList.singleton assign), Wire))
 
                 -- Because we filter void constructs, the argument indices and
                 -- the field indices don't necessarily correspond anymore. We
@@ -428,7 +430,7 @@ mkFunInput resId e = do
                       dcInps    = [Identifier (TextS.pack ("~ARG[" ++ show x ++ "]")) Nothing | x <- originalIndices areVoids1]
                       dcApp     = DataCon resHTy (DC (resHTy,dcI)) dcInps
                       dcAss     = Assignment "~RESULT" dcApp
-                  return (Right (("",[dcAss]),Wire))
+                  return (Right (("",DList.singleton dcAss),Wire))
 
                 -- CustomSP the same as SP, but with a user-defined bit
                 -- level representation
@@ -439,7 +441,7 @@ mkFunInput resId e = do
                       dcInps    = [Identifier (TextS.pack ("~ARG[" ++ show x ++ "]")) Nothing | x <- originalIndices areVoids1]
                       dcApp     = DataCon resHTy (DC (resHTy,dcI)) dcInps
                       dcAss     = Assignment "~RESULT" dcApp
-                  return (Right (("",[dcAss]),Wire))
+                  return (Right (("",DList.singleton dcAss),Wire))
 
                 -- Like SP, we have to retrieve the index BEFORE filtering voids
                 Just (resHTy@(Product _ _ _), areVoids0) -> do
@@ -447,7 +449,7 @@ mkFunInput resId e = do
                       dcInps    = [ Identifier (TextS.pack ("~ARG[" ++ show x ++ "]")) Nothing | x <- originalIndices areVoids1]
                       dcApp     = DataCon resHTy (DC (resHTy,0)) dcInps
                       dcAss     = Assignment "~RESULT" dcApp
-                  return (Right (("",[dcAss]),Wire))
+                  return (Right (("",DList.singleton dcAss),Wire))
 
                 -- Vectors never have defined areVoids (or all set to False), as
                 -- it would be converted to Void otherwise. We can therefore
@@ -456,21 +458,21 @@ mkFunInput resId e = do
                   let dcInps = [ Identifier (TextS.pack ("~ARG[" ++ show x ++ "]")) Nothing | x <- [(1::Int)..2] ]
                       dcApp  = DataCon resHTy (DC (resHTy,1)) dcInps
                       dcAss  = Assignment "~RESULT" dcApp
-                  return (Right (("",[dcAss]),Wire))
+                  return (Right (("",DList.singleton dcAss),Wire))
 
                 -- Sum types OR a Sum type after filtering empty types:
                 Just (resHTy@(Sum _ _), _areVoids) -> do
                   let dcI   = dcTag dc - 1
                       dcApp = DataCon resHTy (DC (resHTy,dcI)) []
                       dcAss = Assignment "~RESULT" dcApp
-                  return (Right (("",[dcAss]),Wire))
+                  return (Right (("",DList.singleton dcAss),Wire))
 
                 -- Same as Sum, but with user defined bit level representation
                 Just (resHTy@(CustomSum {}), _areVoids) -> do
                   let dcI   = dcTag dc - 1
                       dcApp = DataCon resHTy (DC (resHTy,dcI)) []
                       dcAss = Assignment "~RESULT" dcApp
-                  return (Right (("",[dcAss]),Wire))
+                  return (Right (("",DList.singleton dcAss),Wire))
 
                 Just (Void {}, _areVoids) ->
                   return (error $ $(curLoc) ++ "Encountered Void in mkFunInput."
@@ -495,7 +497,7 @@ mkFunInput resId e = do
                   i <- varCount <<%= (+1)
                   let instLabel     = TextS.concat [compName,TextS.pack ("_" ++ show i)]
                       instDecl      = InstDecl Entity Nothing compName instLabel [] (outpAssign:inpAssigns)
-                  return (Right (("",[instDecl]),Wire))
+                  return (Right (("",DList.singleton instDecl),Wire))
                 Nothing -> error $ $(curLoc) ++ "Cannot make function input for: " ++ showPpr e
             C.Lam {} -> do
               let is0 = mkInScopeSet (Lens.foldMapOf termFreeIds unitVarSet appE)
@@ -508,12 +510,12 @@ mkFunInput resId e = do
             (fmap (first BBTemplate) . setSym mkUniqueIdentifier bbCtx)
             (\bbName bbHash bbFunc -> pure $ (BBFunction bbName bbHash bbFunc, []))
             templ'
-      return ((Left l',if oreg then Reg else Wire,libs,imps,inc,bbCtx),dcls ++ templDecl)
+      return ((Left l',if oreg then Reg else Wire,libs,imps,inc,bbCtx),dcls `DList.append` DList.fromList templDecl)
     Left (TExpr,_,libs,imps,inc,nm,templ') -> do
       onBlackBox
         (\t -> do t' <- getMon (prettyBlackBox t)
                   let assn = Assignment "~RESULT" (Identifier (Text.toStrict t') Nothing)
-                  return ((Right ("",[assn]),Wire,libs,imps,inc,bbCtx),dcls))
+                  return ((Right ("",DList.singleton assn),Wire,libs,imps,inc,bbCtx),dcls))
         (\bbName bbHash (TemplateFunction k g _) -> do
           let f' bbCtx' = do
                 let assn = Assignment "~RESULT"
@@ -542,7 +544,7 @@ mkFunInput resId e = do
       nm <- if null appDecls
                then return ""
                else mkUniqueIdentifier Basic "block"
-      return (Right ((nm,appDecls ++ [assn]),Wire))
+      return (Right ((nm,appDecls `DList.snoc` assn),Wire))
 
     go is0 n (Lam id_ e') = do
       lvl <- Lens.use curBBlvl
@@ -556,7 +558,7 @@ mkFunInput resId e = do
 
     go _ _ (C.Var v) = do
       let assn = Assignment "~RESULT" (Identifier (nameOcc (varName v)) Nothing)
-      return (Right (("",[assn]),Wire))
+      return (Right (("",DList.singleton assn),Wire))
 
     go _ _ (Case scrut ty [alt]) = do
       (projection,decls) <- mkProjection False (Left "#bb_res") scrut ty alt
@@ -564,7 +566,7 @@ mkFunInput resId e = do
       nm <- if null decls
                then return ""
                else mkUniqueIdentifier Basic "projection"
-      return (Right ((nm,decls ++ [assn]),Wire))
+      return (Right ((nm,decls `DList.snoc` assn),Wire))
 
     go _ _ (Case scrut ty alts@(_:_:_)) = do
       -- TODO: check that it's okay to use `mkUnsafeSystemName`
@@ -588,11 +590,11 @@ mkFunInput resId e = do
         Just result -> do
           let binders' = map (\(id_,tm) -> (goR result id_,tm)) binders
           netDecls <- fmap catMaybes . mapM mkNetDecl $ filter ((/= result) . fst) binders
-          decls    <- concat <$> mapM (uncurry mkDeclarations) binders'
+          decls    <- DList.concat <$> mapM (uncurry mkDeclarations) binders'
           Just (NetDecl' _ rw _ _) <- mkNetDecl . head $ filter ((==result) . fst) binders
           nm <- mkUniqueIdentifier Basic "fun"
-          return (Right ((nm,netDecls ++ decls),rw))
-        Nothing -> return (Right (("",[]),Wire))
+          return (Right ((nm,DList.fromList netDecls `DList.append` decls),rw))
+        Nothing -> return (Right (("",DList.empty),Wire))
       where
         -- TODO: check that it's okay to use `mkUnsafeSystemName`
         goR r id_ | id_ == r  = id_ {varName = mkUnsafeSystemName "~RESULT" 0}

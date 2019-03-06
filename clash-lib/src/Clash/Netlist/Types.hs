@@ -33,6 +33,7 @@ import Control.Monad.State                  (State)
 import Control.Monad.State.Strict           (MonadIO, MonadState, StateT)
 import Data.Bits                            (testBit)
 import Data.Binary                          (Binary(..))
+import Data.DList                           (DList)
 import Data.Hashable
 import Data.HashSet                         (HashSet)
 import Data.IntMap                          (IntMap, empty)
@@ -345,7 +346,7 @@ data BlackBoxContext
   = Context
   { bbResult    :: (Expr,HWType) -- ^ Result name and type
   , bbInputs    :: [(Expr,HWType,Bool)] -- ^ Argument names, types, and whether it is a literal
-  , bbFunctions :: IntMap (Either BlackBox (Identifier,[Declaration])
+  , bbFunctions :: IntMap (Either BlackBox (Identifier,DList Declaration)
                           ,WireOrReg
                           ,[BlackBoxTemplate]
                           ,[BlackBoxTemplate]

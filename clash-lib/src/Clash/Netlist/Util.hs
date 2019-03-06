@@ -25,6 +25,8 @@ import           Control.Lens            ((.=),(%=))
 import qualified Control.Lens            as Lens
 import           Control.Monad           (unless, when, zipWithM, join)
 import           Control.Monad.Trans.Except (runExcept)
+import           Data.DList              (DList)
+import qualified Data.DList              as DList
 import           Data.Either             (partitionEithers)
 import           Data.HashSet            (HashSet)
 import qualified Data.HashSet            as HashSet
@@ -1255,7 +1257,7 @@ mkTopUnWrapper
   -- ^ The name and type of the signal to which to assign the result
   -> [(Expr,HWType)]
   -- ^ The arguments
-  -> NetlistMonad [Declaration]
+  -> NetlistMonad (DList Declaration)
 mkTopUnWrapper topEntity annM man dstId args = do
   let inTys    = portInTypes man
       outTys   = portOutTypes man
@@ -1294,8 +1296,8 @@ mkTopUnWrapper topEntity annM man dstId args = do
                   (head oPortSupply)
                   result
 
-  (iResult ++) <$> case topOutputM of
-    Nothing -> return []
+  (DList.append (DList.fromList iResult)) <$> case topOutputM of
+    Nothing -> return DList.empty
     Just (_, (oports, unwrappers, idsO)) -> do
         instLabel <- extendIdentifier Basic topName ("_" `Text.append` fst dstId)
         let outpAssign = Assignment (fst dstId) (resBV topM idsO)
@@ -1308,7 +1310,7 @@ mkTopUnWrapper topEntity annM man dstId args = do
                             ( map (\(p,i,t) -> (Identifier p Nothing,In, t,Identifier i Nothing)) (concat iports) ++
                               map (\(p,o,t) -> (Identifier p Nothing,Out,t,Identifier o Nothing)) oports)
 
-        return $ (topCompDecl:unwrappers) ++ [outpAssign]
+        return $ (topCompDecl `DList.cons` DList.fromList unwrappers) `DList.snoc` outpAssign
 
 -- | Convert between BitVector for an argument
 argBV

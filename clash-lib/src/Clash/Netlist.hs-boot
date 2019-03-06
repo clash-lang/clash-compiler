@@ -14,6 +14,7 @@ module Clash.Netlist
   ,mkSelection
   ) where
 
+import Data.DList           (DList)
 import Data.HashSet         (HashSet)
 import Clash.Core.DataCon   (DataCon)
 import Clash.Core.Term      (Alt,LetBinding,Term)
@@ -31,13 +32,13 @@ mkExpr :: Bool
        -> Either Identifier Id
        -> Type
        -> Term
-       -> NetlistMonad (Expr,[Declaration])
+       -> NetlistMonad (Expr,DList Declaration)
 
 mkDcApplication :: HWType
                 -> Either Identifier Id
                 -> DataCon
                 -> [Term]
-                -> NetlistMonad (Expr,[Declaration])
+                -> NetlistMonad (Expr,DList Declaration)
 
 mkProjection
   :: Bool
@@ -45,15 +46,15 @@ mkProjection
   -> Term
   -> Type
   -> Alt
-  -> NetlistMonad (Expr, [Declaration])
+  -> NetlistMonad (Expr, DList Declaration)
 
 mkSelection
   :: Id
   -> Term
   -> Type
   -> [Alt]
-  -> NetlistMonad [Declaration]
+  -> NetlistMonad (DList Declaration)
 
 mkNetDecl :: LetBinding -> NetlistMonad (Maybe Declaration)
 
-mkDeclarations :: Id -> Term -> NetlistMonad [Declaration]
+mkDeclarations :: Id -> Term -> NetlistMonad (DList Declaration)
