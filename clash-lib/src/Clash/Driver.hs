@@ -155,8 +155,9 @@ generateHDL reprs bindingsMap hdlState primMap tcm tupTcm typeTrans eval
           _ -> (modName1, (Nothing,Nothing))
       iw        = opt_intWidth opts
       hdlsyn    = opt_hdlSyn opts
+      escpIds   = opt_escapedIds opts
       hdlState' = setModName (Data.Text.pack modName)
-                $ fromMaybe (initBackend iw hdlsyn :: backend) hdlState
+                $ fromMaybe (initBackend iw hdlsyn escpIds :: backend) hdlState
       hdlDir    = fromMaybe "." (opt_hdlDir opts) </>
                         Clash.Backend.name hdlState' </>
                         takeWhile (/= '.') topEntityS
