@@ -17,7 +17,8 @@ allow-newer: *:Cabal, *:array, *:base, *:binary, *:^bytestring, *:containers,
   *:integer-gmp, *:libiserv, *:mtl, *:parsec, *:pretty, *:process, *:stm,
   *:template-haskell, *:terminfo, *:text, *:time, *:transformers, *:unix,
   *:xhtml, *:ghc-tcplugins-extra, *:ghc-typelits-natnormalise,
-  *:ghc-typelits-knownnat, *:ghc-typelits-extra
+  *:ghc-typelits-knownnat, *:ghc-typelits-extra,
+  *:aeson, *:th-abstraction, *:microlens
 
 repository head.hackage
   url: http://head.hackage.haskell.org/

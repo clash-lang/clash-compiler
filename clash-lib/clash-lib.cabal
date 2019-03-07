@@ -130,7 +130,7 @@ Library
                       hint                    >= 0.7      && < 0.10,
                       integer-gmp             >= 1.0      && < 1.1,
                       interpolate             >= 0.2.0    && < 1.0,
-                      lens                    >= 3.9.2    && < 4.18,
+                      lens                    >= 3.9.2    && < 4.19,
                       mtl                     >= 2.1.2    && < 2.3,
                       parsers                 >= 0.12.8   && < 1.0,
                       prettyprinter           >= 1.2.0.1  && < 2.0,
@@ -143,7 +143,7 @@ Library
                       text-show               >= 3.7      && < 3.9,
                       time                    >= 1.4.0.1  && < 1.10,
                       transformers            >= 0.5.2.0  && < 0.6,
-                      trifecta                >= 1.7.1.1  && < 2.0,
+                      trifecta                >= 1.7.1.1  && < 2.1,
                       vector                  >= 0.11     && < 1.0,
                       vector-binary-instances >= 0.2.3.5  && < 0.3,
                       unordered-containers    >= 0.2.3.3  && < 0.3
