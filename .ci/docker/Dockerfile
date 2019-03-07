@@ -39,7 +39,7 @@ RUN apt-get remove -y $DEPS_IVERILOG_BUILD && \
 RUN rm /etc/apt/apt.conf.d/docker-clean
 
 # Prefetch some packages for speedy installation
-ARG PREFETCH="cabal-install-2.4 ghc-8.2.2 ghc-8.4.4 ghc-8.6.5"
+ARG PREFETCH="cabal-install-2.4 ghc-8.2.2 ghc-8.4.4 ghc-8.6.5 ghc-8.8.1"
 
 ARG GHC_FETCH_DATE="unknown"
 RUN apt-get update && apt-get install -y --download-only $PREFETCH
