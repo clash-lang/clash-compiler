@@ -1,5 +1,5 @@
 {-# LANGUAGE RecordWildCards, LambdaCase #-}
-module GHCi.Leak
+module Clash.GHCi.Leak
   ( LeakIndicators
   , getLeakIndicators
   , checkLeakIndicators
@@ -11,7 +11,7 @@ import DynFlags ( sTargetPlatform )
 import Foreign.Ptr (ptrToIntPtr, intPtrToPtr)
 import GHC
 import GHC.Ptr (Ptr (..))
-import GHCi.Util
+import Clash.GHCi.Util
 import HscTypes
 import Outputable
 import Platform (target32Bit)

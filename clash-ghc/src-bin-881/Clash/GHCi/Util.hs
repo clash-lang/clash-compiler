@@ -1,7 +1,7 @@
 {-# LANGUAGE MagicHash, UnboxedTuples #-}
 
 -- | Utilities for GHCi.
-module GHCi.Util where
+module Clash.GHCi.Util where
 
 -- NOTE: Avoid importing GHC modules here, because the primary purpose
 -- of this module is to not use UnboxedTuples in a module that imports
