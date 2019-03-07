@@ -56,7 +56,12 @@ import CoreFVs    (exprSomeFreeVars)
 import CoreSyn
   (AltCon (..), Bind (..), CoreExpr, Expr (..), Unfolding (..), Tickish (..),
    collectArgs, rhssOfAlts, unfoldingTemplate)
-import DataCon    (DataCon, dataConExTyVars,
+import DataCon    (DataCon,
+#if MIN_VERSION_ghc(8,8,0)
+                   dataConExTyCoVars,
+#else
+                   dataConExTyVars,
+#endif
                    dataConName, dataConRepArgTys,
                    dataConTag, dataConTyCon,
                    dataConUnivTyVars, dataConWorkId,
@@ -94,7 +99,11 @@ import Unique     (Uniquable (..), Unique, getKey, hasKey)
 import Var        (Id, TyVar, Var, idDetails,
                    isTyVar, varName, varType,
                    varUnique, idInfo, isGlobalId)
+#if MIN_VERSION_ghc(8,8,0)
+import Var        (VarBndr (..))
+#else
 import Var        (TyVarBndr (..))
+#endif
 import VarSet     (isEmptyVarSet)
 
 -- Local imports
@@ -468,8 +477,14 @@ coreToTerm primMap unlocs = term
     coreToLiteral :: Literal
                   -> C.Literal
     coreToLiteral l = case l of
+#if MIN_VERSION_ghc(8,8,0)
+      LitString  fs  -> C.StringLiteral (Char8.unpack fs)
+      LitChar    c   -> C.CharLiteral c
+      LitRubbish     -> C.StringLiteral [] -- unused literal
+#else
       MachStr    fs  -> C.StringLiteral (Char8.unpack fs)
       MachChar   c   -> C.CharLiteral c
+#endif
 #if MIN_VERSION_ghc(8,6,0)
       LitNumber lt i _ -> case lt of
         LitNumInteger -> C.IntegerLiteral i
@@ -485,10 +500,17 @@ coreToTerm primMap unlocs = term
       MachWord64 i   -> C.WordLiteral i
       LitInteger i _ -> C.IntegerLiteral i
 #endif
+#if MIN_VERSION_ghc(8,8,0)
+      LitFloat r    -> C.FloatLiteral r
+      LitDouble r   -> C.DoubleLiteral r
+      LitNullAddr   -> C.StringLiteral []
+      LitLabel fs _ _ -> C.StringLiteral (unpackFS fs)
+#else
       MachFloat r    -> C.FloatLiteral r
       MachDouble r   -> C.DoubleLiteral r
       MachNullAddr   -> C.StringLiteral []
       MachLabel fs _ _ -> C.StringLiteral (unpackFS fs)
+#endif
 
 addUsefull :: SrcSpan
            -> C2C a
@@ -581,7 +603,11 @@ coreToDataCon dc = do
 
       nm   <- coreToName dataConName getUnique qualifiedNameString dc
       uTvs <- mapM coreToTyVar (dataConUnivTyVars dc)
+#if MIN_VERSION_ghc(8,8,0)
+      eTvs <- mapM coreToTyVar (dataConExTyCoVars dc)
+#else
       eTvs <- mapM coreToTyVar (dataConExTyVars dc)
+#endif
       return $ C.MkData
              { C.dcName        = nm
              , C.dcUniq        = C.nameUniq nm
@@ -766,7 +792,11 @@ coreToType' (TyConApp tc args)
                         tcName <- coreToName tyConName tyConUnique qualifiedNameString tc
                         tyConMap %= (C.extendUniqMap tcName tc)
                         C.mkTyConApp <$> (pure tcName) <*> mapM coreToType args
+#if MIN_VERSION_ghc(8,8,0)
+coreToType' (ForAllTy (Bndr tv _) ty)   = C.ForAllTy <$> coreToTyVar tv <*> coreToType ty
+#else
 coreToType' (ForAllTy (TvBndr tv _) ty) = C.ForAllTy <$> coreToTyVar tv <*> coreToType ty
+#endif
 coreToType' (FunTy ty1 ty2)             = C.mkFunTy <$> coreToType ty1 <*> coreToType ty2
 coreToType' (LitTy tyLit)    = return $ C.LitTy (coreToTyLit tyLit)
 coreToType' (AppTy ty1 ty2)  = C.AppTy <$> coreToType ty1 <*> coreToType' ty2
