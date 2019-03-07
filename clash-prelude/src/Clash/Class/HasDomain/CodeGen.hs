@@ -13,6 +13,8 @@ module Clash.Class.HasDomain.CodeGen
 
 import           Language.Haskell.TH.Syntax
 import           Clash.CPP                    (maxTupleSize)
+import           Language.Haskell.TH.Compat   (mkTySynInstD)
+
 
 mkTup :: [Type] -> Type
 mkTup names@(length -> n) =
@@ -25,7 +27,7 @@ mkTup names@(length -> n) =
 -- With /n/ number of variables on the LHS.
 mkTryDomainTupleInstance :: Name -> Name -> Int -> Dec
 mkTryDomainTupleInstance tryDomainName mergeName n =
-  TySynInstD tryDomainName (TySynEqn [t, tupPat] tupBody)
+  mkTySynInstD tryDomainName [t, tupPat] tupBody
  where
   bcde = map (VarT . mkName . ("a"++) . show) [1..n-1]
   a    = VarT (mkName "a0")
@@ -50,7 +52,7 @@ mkTryDomainTuples tryDomainName mergeName =
 -- With /n/ number of variables on the LHS.
 mkHasDomainTupleInstance :: Name -> Name -> Int -> Dec
 mkHasDomainTupleInstance hasDomainName mergeName n =
-  TySynInstD hasDomainName (TySynEqn [dom, tupPat] merge)
+  mkTySynInstD hasDomainName [dom, tupPat] merge
  where
   bcde = map (VarT . mkName . ("a"++) . show) [1..n-1]
   a    = VarT (mkName "a0")

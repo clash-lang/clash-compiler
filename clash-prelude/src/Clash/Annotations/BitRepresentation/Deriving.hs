@@ -13,6 +13,7 @@ This module contains:
     e.g. one-hot, for a data type.
 
 -}
+{-# LANGUAGE CPP                #-}
 {-# LANGUAGE DataKinds          #-}
 {-# LANGUAGE DeriveAnyClass     #-}
 {-# LANGUAGE DeriveDataTypeable #-}
@@ -67,6 +68,7 @@ import qualified Clash.Annotations.BitRepresentation.Util
 import           Clash.Class.BitPack
   (BitPack, BitSize, pack, packXWith, unpack)
 import           Clash.Class.Resize         (resize)
+import           Language.Haskell.TH.Compat (mkTySynInstD)
 import           Clash.Sized.BitVector      (BitVector, low, (++#))
 import           Clash.Sized.Internal.BitVector (undefined#)
 import           Control.DeepSeq            (NFData)
@@ -202,7 +204,11 @@ typeSize typ = do
       error $ unwords [
           "Could not find custom bit representation nor BitSize instance"
         , "for", show typ ++ "." ]
+#if MIN_VERSION_template_haskell(2,15,0)
+    [TySynInstD (TySynEqn _ _ (LitT (NumTyLit n)))] ->
+#else
     [TySynInstD _ (TySynEqn _ (LitT (NumTyLit n)))] ->
+#endif
       [| n |]
     [_impl] ->
       [| fromIntegral $ natVal (Proxy :: Proxy (BitSize $(return typ))) |]
@@ -903,11 +909,7 @@ deriveBitPack typQ = do
 
   let (DataReprAnn _name dataSize _constrs) = ann
 
-  let bitSizeInst = TySynInstD
-                      ''BitSize
-                      (TySynEqn
-                        [typ]
-                        (LitT (NumTyLit $ toInteger dataSize)))
+  let bitSizeInst = mkTySynInstD ''BitSize [typ] (LitT (NumTyLit $ toInteger dataSize))
 
   let bpInst = [ InstanceD
                    (Just Overlapping)

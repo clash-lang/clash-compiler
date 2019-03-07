@@ -156,6 +156,7 @@ import GHC.Generics               (Generic)
 import GHC.Stack                  (HasCallStack)
 import GHC.TypeLits               (KnownSymbol, Nat, Symbol, type (<=))
 import Language.Haskell.TH.Syntax -- (Lift (..), Q, Dec)
+import Language.Haskell.TH.Compat (mkTySynInstD)
 import Numeric.Natural            (Natural)
 import Test.QuickCheck            (Arbitrary (..), CoArbitrary(..), Property,
                                    property)
@@ -549,7 +550,7 @@ createDomain (VDomainConfiguration name period edge reset init_ polarity) =
 
     let vTagImpl = AppE (VarE 'vDomain) (AppTypeE (VarE 'knownDomain) (LitT (StrTyLit name)))
         kdImpl = FunD 'knownDomain [Clause [] (NormalB sDom) []]
-        kcImpl = TySynInstD ''KnownConf (TySynEqn [LitT (StrTyLit name)] kcType)
+        kcImpl = mkTySynInstD ''KnownConf [LitT (StrTyLit name)] kcType
         vName = mkName ('v':name)
 
     pure  [ -- KnownDomain instance (ex: instance KnownDomain "System" where ...)

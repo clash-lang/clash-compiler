@@ -9,6 +9,7 @@ Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
 module Clash.Class.BitPack.Internal (deriveBitPackTuples) where
 
 import           Clash.CPP             (maxTupleSize)
+import           Language.Haskell.TH.Compat (mkTySynInstD)
 import           Control.Monad         (replicateM)
 import           Data.List             (foldl')
 import           GHC.TypeLits          (KnownNat)
@@ -52,12 +53,10 @@ deriveBitPackTuples bitPackName bitSizeName packName unpackName = do
         instTy = AppT bitPack $ tuple (v:vs)
 
         -- Associated type BitSize
-        bitSizeTypeEq =
-          TySynEqn
-            [ tuple (v:vs) ]
+        bitSizeType =
+          mkTySynInstD bitSizeName [tuple (v:vs)]
             $ plus `AppT` (bitSize `AppT` v) `AppT`
               (bitSize `AppT` foldl AppT (TupleT $ tupleNum - 1) vs)
-        bitSizeType = TySynInstD bitSizeName bitSizeTypeEq
 
         pack =
           FunD
