@@ -42,6 +42,8 @@ module Clash.Promoted.Nat
   , subSNat, divSNat, modSNat, flogBaseSNat, clogBaseSNat, logBaseSNat
     -- *** Specialised
   , pow2SNat
+    -- *** Comparison
+  , SNatLE (..), compareSNat
     -- * Unary/Peano-encoded natural numbers
     -- ** Data type
   , UNat (..)
@@ -262,6 +264,18 @@ logBaseSNat SNat SNat = SNat
 pow2SNat :: SNat a -> SNat (2^a)
 pow2SNat SNat = SNat
 {-# INLINE pow2SNat #-}
+
+-- | Ordering relation between two Nats
+data SNatLE a b where
+  SNatLE :: forall a b . a <= b => SNatLE a b
+  SNatGT :: forall a b . (b+1) <= a => SNatLE a b
+
+-- | Get an ordering relation between two SNats
+compareSNat :: forall a b . SNat a -> SNat b -> SNatLE a b
+compareSNat a b =
+  if snatToInteger a <= snatToInteger b
+     then unsafeCoerce (SNatLE @0 @0)
+     else unsafeCoerce (SNatGT @1 @0)
 
 -- | Base-2 encoded natural number
 --

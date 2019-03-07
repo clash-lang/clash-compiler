@@ -117,7 +117,7 @@ module Clash.Sized.Internal.BitVector
   , countLeadingZerosBV
   , countTrailingZerosBV
     -- *** Resize
-  , resize#
+  , truncateB#
     -- *** QuickCheck
   , shrinkSizedUnsigned
   -- ** Other
@@ -147,7 +147,8 @@ import Test.QuickCheck.Arbitrary  (Arbitrary (..), CoArbitrary (..),
 import Clash.Class.Num            (ExtendingNum (..), SaturatingNum (..),
                                    SaturationMode (..))
 import Clash.Class.Resize         (Resize (..))
-import Clash.Promoted.Nat         (SNat, snatToInteger, snatToNum)
+import Clash.Promoted.Nat
+  (SNat (..), SNatLE (..), compareSNat, snatToInteger, snatToNum)
 import Clash.XException
   (ShowX (..), Undefined (..), errorX, showsPrecXWith)
 
@@ -495,7 +496,7 @@ instance KnownNat n => Num (BitVector n) where
   (*)         = (*#)
   negate      = negate#
   abs         = id
-  signum bv   = resize# (pack# (reduceOr# bv))
+  signum bv   = resizeBV (pack# (reduceOr# bv))
   fromInteger = fromInteger# 0
 
 (+#),(-#),(*#) :: forall n . KnownNat n => BitVector n -> BitVector n -> BitVector n
@@ -821,16 +822,20 @@ popCountBV bv =
 {-# INLINE popCountBV #-}
 
 instance Resize BitVector where
-  resize     = resize#
-  zeroExtend = extend
+  resize     = resizeBV
+  zeroExtend = (0 ++#)
   signExtend = \bv -> (if msb# bv == low then id else complement) 0 ++# bv
-  truncateB  = resize#
+  truncateB  = truncateB#
 
-{-# NOINLINE resize# #-}
-resize# :: forall n m . KnownNat m => BitVector n -> BitVector m
-resize# (BV msk i) =
-  let m = 1 `shiftL` fromInteger (natVal (Proxy @m))
-  in  if i >= m then fromInteger_INLINE msk i else BV msk i
+resizeBV :: forall n m . (KnownNat n, KnownNat m) => BitVector n -> BitVector m
+resizeBV = case compareSNat @n @m (SNat @n) (SNat @m) of
+  SNatLE -> (++#) @n @(m-n) 0
+  SNatGT -> truncateB# @m @(n - m)
+{-# INLINE resizeBV #-}
+
+truncateB# :: forall a b . KnownNat a => BitVector (a + b) -> BitVector a
+truncateB# (BV msk i) = fromInteger_INLINE msk i
+{-# NOINLINE truncateB# #-}
 
 instance KnownNat n => Lift (BitVector n) where
   lift bv@(BV m i) = sigE [| fromInteger# m i |] (decBitVector (natVal bv))
@@ -844,19 +849,19 @@ instance KnownNat n => SaturatingNum (BitVector n) where
   satAdd SatZero a b =
     let r = plus# a b
     in  if msb# r == low
-           then resize# r
+           then truncateB# r
            else minBound#
   satAdd _ a b =
     let r  = plus# a b
     in  if msb# r == low
-           then resize# r
+           then truncateB# r
            else maxBound#
 
   satSub SatWrap a b = a -# b
   satSub _ a b =
     let r = minus# a b
     in  if msb# r == low
-           then resize# r
+           then truncateB# r
            else minBound#
 
   satMul SatWrap a b = a *# b

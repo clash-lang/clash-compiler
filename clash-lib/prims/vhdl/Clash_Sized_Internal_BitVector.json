@@ -537,10 +537,10 @@ end process;
     }
   }
 , { "BlackBox" :
-    { "name"      : "Clash.Sized.Internal.BitVector.resize#"
+    { "name"      : "Clash.Sized.Internal.BitVector.truncateB#"
     , "kind"      : "Expression"
-    , "type"      : "resize# :: KnownNat m => BitVector n -> BitVector m"
-    , "template"  : "~IF~SIZE[~TYP[1]]~THENstd_logic_vector(resize(unsigned(~ARG[1]),~SIZE[~TYPO]))~ELSEstd_logic_vector'(~SIZE[~TYPO]-1 downto 0 => '0')~FI"
+    , "type"      : "truncateB# :: forall a b . KnownNat a => BitVector (a + b) -> BitVector a"
+    , "template"  : "std_logic_vector(resize(unsigned(~ARG[1]),~SIZE[~TYPO]))"
     }
   }
 ]

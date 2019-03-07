@@ -1605,15 +1605,15 @@ reduceConstant isSubj gbl tcm h k nm ty tys args = case nm of
         op :: KnownNat n => BitVector n -> Int -> Proxy n -> (Integer,Integer)
         op u i _ = splitBV (BitVector.rotateR# u i)
 
--- Resize
-  "Clash.Sized.Internal.BitVector.resize#" -- forall n m . KnownNat m => BitVector n -> BitVector m
-    | _ : mTy : _ <- tys
-    , Right km <- runExcept (tyNatSize tcm mTy)
+-- truncateB
+  "Clash.Sized.Internal.BitVector.truncateB#" -- forall a b . KnownNat a => BitVector (a + b) -> BitVector a
+    | aTy  : _ <- tys
+    , Right ka <- runExcept (tyNatSize tcm aTy)
     , [(mski,i)] <- bitVectorLiterals' args
-    -> let bitsKeep = (bit (fromInteger km)) - 1
+    -> let bitsKeep = (bit (fromInteger ka)) - 1
            val = i .&. bitsKeep
            msk = mski .&. bitsKeep
-    in reduce (mkBitVectorLit ty mTy km msk val)
+    in reduce (mkBitVectorLit ty aTy ka msk val)
 
 --------
 -- Index
