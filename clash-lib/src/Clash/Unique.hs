@@ -83,6 +83,7 @@ import Data.Text.Prettyprint.Doc.Render.String
 #if !MIN_VERSION_base(4,11,0)
 import           Data.Semigroup
 #endif
+import           GHC.Stack
 
 type Unique = Int
 
@@ -168,11 +169,15 @@ lookupUniqMap k (UniqMap m) = IntMap.lookup (getUnique k) m
 
 -- | Like 'lookupUniqMap'', but errors out when the key is not present
 lookupUniqMap'
-  :: Uniquable a
+  :: (HasCallStack, Uniquable a)
   => UniqMap b
   -> a
   -> b
-lookupUniqMap' (UniqMap m) k = m IntMap.! getUnique k
+lookupUniqMap' (UniqMap m) k =
+  IntMap.findWithDefault d k' m
+ where
+  k' = getUnique k
+  d  = error ("lookupUniqMap': key " ++ show k' ++ " is not an element of the map")
 
 -- | Check whether a key is in the map
 elemUniqMap

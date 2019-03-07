@@ -1429,11 +1429,17 @@ reduceConstant isSubj gbl tcm h k nm ty tys args = case nm of
 -- Eq
   -- eq#, neq# :: KnownNat n => BitVector n -> BitVector n -> Bool
   "Clash.Sized.Internal.BitVector.eq#"
+    | nTy : _ <- tys
+    , Right 0 <- runExcept (tyNatSize tcm nTy)
+    -> reduce (boolToBoolLiteral tcm ty True)
     | Just (_, kn) <- extractKnownNat tcm tys
     , Just val <- reifyNat kn (liftBitVector2Bool BitVector.eq# ty tcm args)
     -> reduce val
 
   "Clash.Sized.Internal.BitVector.neq#"
+    | nTy : _ <- tys
+    , Right 0 <- runExcept (tyNatSize tcm nTy)
+    -> reduce (boolToBoolLiteral tcm ty False)
     | Just (_, kn) <- extractKnownNat tcm tys
     , Just val <- reifyNat kn (liftBitVector2Bool BitVector.neq# ty tcm args)
     -> reduce val
@@ -1441,18 +1447,30 @@ reduceConstant isSubj gbl tcm h k nm ty tys args = case nm of
 -- Ord
   -- lt#,ge#,gt#,le# :: KnownNat n => BitVector n -> BitVector n -> Bool
   "Clash.Sized.Internal.BitVector.lt#"
+    | nTy : _ <- tys
+    , Right 0 <- runExcept (tyNatSize tcm nTy)
+    -> reduce (boolToBoolLiteral tcm ty False)
     | Just (_, kn) <- extractKnownNat tcm tys
     , Just val <- reifyNat kn (liftBitVector2Bool BitVector.lt# ty tcm args)
     -> reduce val
   "Clash.Sized.Internal.BitVector.ge#"
+    | nTy : _ <- tys
+    , Right 0 <- runExcept (tyNatSize tcm nTy)
+    -> reduce (boolToBoolLiteral tcm ty True)
     | Just (_, kn) <- extractKnownNat tcm tys
     , Just val <- reifyNat kn (liftBitVector2Bool BitVector.ge# ty tcm args)
     -> reduce val
   "Clash.Sized.Internal.BitVector.gt#"
+    | nTy : _ <- tys
+    , Right 0 <- runExcept (tyNatSize tcm nTy)
+    -> reduce (boolToBoolLiteral tcm ty False)
     | Just (_, kn) <- extractKnownNat tcm tys
     , Just val <- reifyNat kn (liftBitVector2Bool BitVector.gt# ty tcm args)
     -> reduce val
   "Clash.Sized.Internal.BitVector.le#"
+    | nTy : _ <- tys
+    , Right 0 <- runExcept (tyNatSize tcm nTy)
+    -> reduce (boolToBoolLiteral tcm ty True)
     | Just (_, kn) <- extractKnownNat tcm tys
     , Just val <- reifyNat kn (liftBitVector2Bool BitVector.le# ty tcm args)
     -> reduce val
@@ -1587,15 +1605,15 @@ reduceConstant isSubj gbl tcm h k nm ty tys args = case nm of
         op :: KnownNat n => BitVector n -> Int -> Proxy n -> (Integer,Integer)
         op u i _ = splitBV (BitVector.rotateR# u i)
 
--- Resize
-  "Clash.Sized.Internal.BitVector.resize#" -- forall n m . KnownNat m => BitVector n -> BitVector m
-    | _ : mTy : _ <- tys
-    , Right km <- runExcept (tyNatSize tcm mTy)
+-- truncateB
+  "Clash.Sized.Internal.BitVector.truncateB#" -- forall a b . KnownNat a => BitVector (a + b) -> BitVector a
+    | aTy  : _ <- tys
+    , Right ka <- runExcept (tyNatSize tcm aTy)
     , [(mski,i)] <- bitVectorLiterals' args
-    -> let bitsKeep = (bit (fromInteger km)) - 1
+    -> let bitsKeep = (bit (fromInteger ka)) - 1
            val = i .&. bitsKeep
            msk = mski .&. bitsKeep
-    in reduce (mkBitVectorLit ty mTy km msk val)
+    in reduce (mkBitVectorLit ty aTy ka msk val)
 
 --------
 -- Index

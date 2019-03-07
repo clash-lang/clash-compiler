@@ -350,10 +350,10 @@
     }
   }
 , { "BlackBox" :
-    { "name"      : "Clash.Sized.Internal.BitVector.resize#"
-    , "kind"      : "Declaration"
-    , "type"      : "resize# :: KnownNat m => BitVector n -> BitVector m"
-    , "template"  : "assign ~RESULT = ~IF~SIZE[~TYP[1]]~THEN$unsigned(~ARG[1])~ELSE~SIZE[~TYPO]'d0~FI;"
+    { "name"      : "Clash.Sized.Internal.BitVector.truncateB#"
+    , "kind"      : "Expression"
+    , "type"      : "truncateB# :: forall a b . KnownNat a => BitVector (a + b) -> BitVector a"
+    , "template"  : "~VAR[bv][1][0+:~SIZE[~TYPO]]"
     }
   }
 ]
