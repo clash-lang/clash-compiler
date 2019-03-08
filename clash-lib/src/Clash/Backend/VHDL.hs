@@ -153,8 +153,10 @@ instance Backend VHDLState where
       allowExtended <- use extendedIds
       return (go allowExtended)
     where
-      go _ Basic nm = (stripTrailingUnderscore . filterReserved)
-                    (TextS.toLower (mkBasicId' VHDL True nm))
+      go _ Basic nm =
+        case (stripTrailingUnderscore . filterReserved) (TextS.toLower (mkBasicId' VHDL True nm)) of
+          nm' | TextS.null nm' -> "clash_internal"
+              | otherwise -> nm'
       go esc Extended (rmSlash -> nm) = case go esc Basic nm of
         nm' | esc && nm /= nm' -> TextS.concat ["\\",nm,"\\"]
             | otherwise -> nm'
@@ -162,8 +164,10 @@ instance Backend VHDLState where
       allowExtended <- use extendedIds
       return (go allowExtended)
     where
-      go _ Basic nm ext = (stripTrailingUnderscore . filterReserved)
-                        (TextS.toLower (mkBasicId' VHDL True (nm `TextS.append` ext)))
+      go _ Basic nm ext =
+        case (stripTrailingUnderscore . filterReserved) (TextS.toLower (mkBasicId' VHDL True (nm `TextS.append` ext))) of
+          nm' | TextS.null nm' -> "clash_internal"
+              | otherwise -> nm'
       go esc Extended ((rmSlash . escapeTemplate) -> nm) ext =
         let nmExt = nm `TextS.append` ext
         in  case go esc Basic nm ext of

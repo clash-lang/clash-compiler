@@ -145,7 +145,9 @@ instance Backend VerilogState where
       allowEscaped <- use escapedIds
       return (go allowEscaped)
     where
-      go _ Basic    nm = (TextS.take 1024 . filterReserved) (mkBasicId' Verilog True nm)
+      go _ Basic nm = case (TextS.take 1024 . filterReserved) (mkBasicId' Verilog True nm) of
+        nm' | TextS.null nm' -> "_clash_internal"
+            | otherwise      -> nm'
       go esc Extended (rmSlash -> nm) = case go esc Basic nm of
         nm' | esc && nm /= nm' -> TextS.concat ["\\",nm," "]
             | otherwise -> nm'
@@ -153,8 +155,10 @@ instance Backend VerilogState where
       allowEscaped <- use escapedIds
       return (go allowEscaped)
     where
-      go _ Basic nm ext = (TextS.take 1024 . filterReserved)
-                        (mkBasicId' Verilog True (nm `TextS.append` ext))
+      go _ Basic nm ext =
+        case (TextS.take 1024 . filterReserved) (mkBasicId' Verilog True (nm `TextS.append` ext)) of
+          nm' | TextS.null nm' -> "_clash_internal"
+              | otherwise      -> nm'
       go esc Extended (rmSlash . escapeTemplate -> nm) ext =
         let nmExt = nm `TextS.append` ext
         in  case go esc Basic nm ext of
