@@ -119,6 +119,8 @@ loadModules
   -- ^ Module name
   -> Maybe (DynFlags.DynFlags)
   -- ^ Flags to run GHC with
+  -> [FilePath]
+  -- ^ Import dirs to use when no DynFlags are provided
   -> IO ( [CoreSyn.CoreBind]                     -- Binders
         , [(CoreSyn.CoreBndr,Int)]               -- Class operations
         , [CoreSyn.CoreBndr]                     -- Unlocatable Expressions
@@ -130,7 +132,7 @@ loadModules
         , [DataRepr']
         , [(Text.Text, PrimitiveGuard ())]
         )
-loadModules tmpDir useColor hdl modName dflagsM = do
+loadModules tmpDir useColor hdl modName dflagsM idirs = do
   libDir <- MonadUtils.liftIO ghcLibDir
 
   GHC.runGhc (Just libDir) $ do
@@ -154,6 +156,7 @@ loadModules tmpDir useColor hdl modName dflagsM = do
                                           ghcTyLitNormPlugin : ghcTyLitExtrPlugin :
                                           ghcTyLitKNPlugin : DynFlags.pluginModNames df1
                                      , DynFlags.useColor = useColor
+                                     , DynFlags.importPaths = idirs
                                      }
                   return dfPlug
 

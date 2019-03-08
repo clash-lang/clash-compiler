@@ -36,8 +36,8 @@ defaultTests =
 typeTrans :: (CustomReprs -> TyConMap -> Type -> Maybe (Either String FilteredHWType))
 typeTrans = ghcTypeToHWType WORD_SIZE_IN_BITS True
 
-opts :: FilePath -> ClashOpts
-opts tmpDir = ClashOpts 20 20 15 0 DebugNone False True True Auto WORD_SIZE_IN_BITS Nothing tmpDir HDLSYN True True ["."] Nothing True True
+opts :: FilePath -> [FilePath] -> ClashOpts
+opts tmpDir idirs = ClashOpts 20 20 15 0 DebugNone False True True Auto WORD_SIZE_IN_BITS Nothing tmpDir HDLSYN True True idirs Nothing True True
 
 backend :: VHDLState
 backend = initBackend WORD_SIZE_IN_BITS HDLSYN True
@@ -45,6 +45,8 @@ backend = initBackend WORD_SIZE_IN_BITS HDLSYN True
 runInputStage
   :: FilePath
   -- ^ Temporary directory
+  -> [FilePath]
+  -- ^ Import dirs
   -> FilePath
   -> IO (BindingMap
         ,TyConMap
@@ -55,9 +57,9 @@ runInputStage
         ,[Id]
         ,Id
         )
-runInputStage tmpDir src = do
+runInputStage tmpDir idirs src = do
   pds <- primDirs backend
-  (bindingsMap,tcm,tupTcm,topEntities,primMap,reprs) <- generateBindings tmpDir Auto pds ["."] (hdlKind backend) src Nothing
+  (bindingsMap,tcm,tupTcm,topEntities,primMap,reprs) <- generateBindings tmpDir Auto pds idirs (hdlKind backend) src Nothing
   let topEntityNames = map (\(x,_,_) -> x) topEntities
       [(topEntity,_,_)] = topEntities
       tm = topEntity
