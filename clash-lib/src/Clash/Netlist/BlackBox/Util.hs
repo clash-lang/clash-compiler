@@ -392,6 +392,9 @@ renderElem b (IF c t f) = do
       (And es)   -> if all (/=0) (map (check iw syn) es)
                        then 1
                        else 0
+      CmpLE e1 e2 -> if check iw syn e1 <= check iw syn e2
+                        then 1
+                        else 0
       _ -> error $ $(curLoc) ++ "IF: condition must be: SIZE, LENGTH, IW64, LIT, ISLIT, or ISARG"
 
 renderElem b e = fmap const (renderTag b e)
@@ -713,6 +716,11 @@ prettyElem (IF b esT esF) = do
 prettyElem (And es) = renderOneLine <$>
   (string "~AND" <>
   (brackets (hcat (punctuate comma (mapM (string <=< prettyElem) es)))))
+prettyElem (CmpLE e1 e2) = do
+  e1' <- prettyElem e1
+  e2' <- prettyElem e2
+  renderOneLine <$> (string "~CMPLE" <> brackets (string e1')
+                                     <> brackets (string e2'))
 prettyElem IW64 = return "~IW64"
 prettyElem (HdlSyn s) = case s of
   Vivado -> return "~VIVADO"
@@ -817,6 +825,7 @@ walkElement f el = maybeToList (f el) ++ walked
         Depth e -> go e
         Gen _ -> []
         And es -> concatMap go es
+        CmpLE e1 e2 -> go e1 ++ go e2
         IW64 -> []
         HdlSyn _ -> []
         Sel e _ -> go e

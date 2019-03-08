@@ -96,6 +96,7 @@ pTagE =  Result True       <$  string "~ERESULT"
      <|> (`SigD` Nothing)  <$> (string "~SIGDO" *> brackets' pSigD)
      <|> SigD              <$> (string "~SIGD" *> brackets' pSigD) <*> (Just <$> (brackets' natural'))
      <|> IW64              <$  string "~IW64"
+     <|> CmpLE             <$> try (string "~CMPLE" *> brackets' pTagE) <*> brackets' pTagE
      <|> (HdlSyn Vivado)   <$  string "~VIVADO"
      <|> (HdlSyn Other)    <$  string "~OTHERSYN"
      <|> (BV True)         <$> (string "~TOBV" *> brackets' pSigD) <*> brackets' pTagE

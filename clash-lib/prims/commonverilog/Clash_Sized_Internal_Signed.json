@@ -42,9 +42,9 @@
   }
 , { "BlackBox" :
     { "name"      : "Clash.Sized.Internal.Signed.toInteger#"
-    , "kind"      : "Declaration"
+    , "kind"      : "Expression"
     , "type"      : "toInteger# :: Signed n -> Integer"
-    , "template"  : "assign ~RESULT = ~IF~SIZE[~TYP[0]]~THEN$unsigned(~ARG[0])~ELSE64'sd0~FI;"
+    , "template"  : "~IF~SIZE[~TYP[0]]~THEN~IF~CMPLE[~SIZE[~TYPO]][~SIZE[~TYP[0]]]~THEN$signed(~VAR[i][0][0+:~SIZE[~TYPO]])~ELSE$signed({{(~SIZE[~TYPO]-~SIZE[~TYP[0]]) {1'b0}},~VAR[i][0]})~FI~ELSE~SIZE[~TYPO]'sd0~FI"
     }
   }
 , { "BlackBox" :
@@ -109,7 +109,7 @@
     { "name"      : "Clash.Sized.Internal.Signed.fromInteger#"
     , "kind"      : "Expression"
     , "type"      : "fromInteger# :: KnownNat n => Integer -> Signed (n :: Nat)"
-    , "template"  : "$signed(~ARG[1][(~LIT[0]-1):0])"
+    , "template"  : "~IF~CMPLE[~SIZE[~TYPO]][~SIZE[~TYP[1]]]~THEN$signed(~VAR[i][1][0+:~SIZE[~TYPO]])~ELSE$signed({{(~SIZE[~TYPO]-~SIZE[~TYP[1]]) {1'b0}},~VAR[i][1]})~FI"
     }
   }
 , { "BlackBox" :
@@ -184,29 +184,16 @@
   }
 , { "BlackBox" :
     { "name"      : "Clash.Sized.Internal.Signed.truncateB#"
-    , "kind"      : "Declaration"
+    , "kind"      : "Expression"
     , "type"      : "truncateB# :: KnownNat m => Signed (n + m) -> Signed m"
-    , "template"  : "assign ~RESULT = $signed(~ARG[1]);"
+    , "template"  : "$signed(~VAR[s][1][0+:~SIZE[~TYPO]])"
     }
   }
 , { "BlackBox" :
     { "name"      : "Clash.Sized.Internal.Signed.resize#"
-    , "kind"      : "Declaration"
+    , "kind"      : "Expression"
     , "type"      : "resize# :: (KnownNat n, KnownNat m) => Signed n -> Signed m"
-    , "comment"   : "Back-end should only use this code when the result is smaller than the argument"
-    , "template"  :
-"// resize begin~IF~SIZE[~TYP[2]]~THEN
-~GENERATE
-  if (~LIT[1] < ~LIT[0]) begin
-    // truncate, sign preserving
-    assign ~RESULT = $signed({~VAR[s][2][~LIT[0]-1],~VAR[s][2][(~LIT[1]-2):0]});
-  end else begin
-    // sign-extend
-    assign ~RESULT = $signed(~VAR[s][2]);
-  end
-~ENDGENERATE~ELSE
-assign ~RESULT = ~SIZE[~TYPO]'d0;~FI
-// resize end"
+    , "template"  : "~IF~SIZE[~TYP[2]]~THEN~IF~CMPLE[~SIZE[~TYPO]][~SIZE[~TYP[2]]]~THEN$signed({~VAR[s][2][~LIT[0]-1],~VAR[s][2][0+:(~SIZE[~TYPO]-1)]})~ELSE$signed({{(~SIZE[~TYPO]-~SIZE[~TYP[2]]) {~VAR[s][2][~LIT[0]-1]}},~VAR[s][2]})~FI~ELSE~SIZE[~TYPO]'sd0~FI"
     }
   }
 ]
