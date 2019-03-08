@@ -53,6 +53,7 @@ module Clash.Normalize.Transformations
   , letCast
   , eliminateCastCast
   , argCastSpec
+  , etaExpandSyn
   )
 where
 
@@ -1494,6 +1495,25 @@ etaExpansionTL' (TransformContext is0 ctx) e
                              (App e (Var newId))
         changed (Lam newId e')
       else return e
+
+-- | Eta-expand functions with a Synthesize annotation, needed to allow such
+-- functions to appear as arguments to higher-order primitives.
+etaExpandSyn :: HasCallStack => NormRewrite
+etaExpandSyn (TransformContext is0 ctx) e@(collectArgs -> (Var f, _)) = do
+  topEnts <- Lens.view topEntities
+  tcm <- Lens.view tcCache
+  let isTopEnt = f `elemVarSet` topEnts
+      appFunCtx = case ctx of
+                    (AppFun:_) -> True
+                    _ -> False
+      argTyM = fmap fst (splitFunTy tcm (termType tcm e))
+  case argTyM of
+    Just argTy | isTopEnt && not appFunCtx -> do
+      newId <- mkInternalVar is0 "arg" argTy
+      changed (Lam newId (App e (Var newId)))
+    _ -> return e
+
+etaExpandSyn _ e = return e
 
 -- | Turn a  normalized recursive function, where the recursive calls only pass
 -- along the unchanged original arguments, into let-recursive function. This

@@ -12,6 +12,7 @@ module Clash.Netlist
   ,mkNetDecl
   ,mkProjection
   ,mkSelection
+  ,mkFunApp
   ) where
 
 import Data.HashSet         (HashSet)
@@ -57,3 +58,9 @@ mkSelection
 mkNetDecl :: LetBinding -> NetlistMonad (Maybe Declaration)
 
 mkDeclarations :: Id -> Term -> NetlistMonad [Declaration]
+
+mkFunApp
+  :: Identifier -- ^ LHS of the let-binder
+  -> Id -- ^ Name of the applied function
+  -> [Term] -- ^ Function arguments
+  -> NetlistMonad [Declaration]

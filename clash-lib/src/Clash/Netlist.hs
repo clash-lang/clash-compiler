@@ -310,7 +310,7 @@ mkDeclarations'
   -> Term
   -- ^ RHS of the let-binder
   -> NetlistMonad [Declaration]
-mkDeclarations' bndr (Var v) = mkFunApp bndr v []
+mkDeclarations' bndr (Var v) = mkFunApp (id2identifier bndr) v []
 
 mkDeclarations' _ e@(Case _ _ []) = do
   (_,sp) <- Lens.use curCompNm
@@ -330,7 +330,7 @@ mkDeclarations' bndr app =
   let (appF,(args,tyArgs)) = second partitionEithers $ collectArgs app
   in case appF of
     Var f
-      | null tyArgs -> mkFunApp bndr f args
+      | null tyArgs -> mkFunApp (id2identifier bndr) f args
       | otherwise   -> do
         (_,sp) <- Lens.use curCompNm
         throw (ClashException sp ($(curLoc) ++ "Not in normal form: Var-application with Type arguments:\n\n" ++ showPpr app) Nothing)
@@ -451,11 +451,11 @@ patPos reprs pat@(DataPat dataCon _ _) =
 
 -- | Generate a list of Declarations for a let-binder where the RHS is a function application
 mkFunApp
-  :: Id -- ^ LHS of the let-binder
+  :: Identifier -- ^ LHS of the let-binder
   -> Id -- ^ Name of the applied function
   -> [Term] -- ^ Function arguments
   -> NetlistMonad [Declaration]
-mkFunApp dst fun args = do
+mkFunApp dstId fun args = do
   topAnns <- Lens.use topEntityAnns
   tcm     <- Lens.use tcCache
   case lookupVarEnv fun topAnns of
@@ -463,7 +463,6 @@ mkFunApp dst fun args = do
       | let (fArgTys,fResTy) = splitFunTys tcm ty
       , length fArgTys == length args
       -> do
-        let dstId = id2identifier dst
         argHWTys <- mapM (unsafeCoreTypeToHWTypeM' $(curLoc)) fArgTys
         -- Filter out the arguments of hwtype `Void` and only translate them
         -- to the intermediate HDL afterwards
@@ -506,9 +505,8 @@ mkFunApp dst fun args = do
               compOutp      = snd <$> listToMaybe co
           if length tysFiltered == length compInps
             then do
-              let dstId = nameOcc $ varName dst
               (argExprs,argDecls)   <- fmap (second concat . unzip) $! mapM (\(e,t) -> mkExpr False (Left dstId) t e) argsFiltered'
-              (argExprs',argDecls') <- (second concat . unzip) <$> mapM (toSimpleVar dst) (zip argExprs tysFiltered)
+              (argExprs',argDecls') <- (second concat . unzip) <$> mapM (toSimpleVar dstId) (zip argExprs tysFiltered)
               let inpAssigns    = zipWith (\(i,t) e -> (Identifier i Nothing,In,t,e)) compInps argExprs'
                   outpAssign    = case compOutp of
                     Nothing -> []
@@ -518,18 +516,16 @@ mkFunApp dst fun args = do
               return (argDecls ++ argDecls' ++ [instDecl])
             else error $ $(curLoc) ++ "under-applied normalized function"
         Nothing -> case args of
-          [] -> do
-            let dstId = id2identifier dst
-            return [Assignment dstId (Identifier (nameOcc $ varName fun) Nothing)]
+          [] -> return [Assignment dstId (Identifier (nameOcc $ varName fun) Nothing)]
           _ -> error $ $(curLoc) ++ "Unknown function: " ++ showPpr fun
 
-toSimpleVar :: Id
+toSimpleVar :: Identifier
             -> (Expr,Type)
             -> NetlistMonad (Expr,[Declaration])
 toSimpleVar _ (e@(Identifier _ _),_) = return (e,[])
-toSimpleVar dst (e,ty) = do
+toSimpleVar dstId (e,ty) = do
   argNm <- extendIdentifier Extended
-             (id2identifier dst)
+             dstId
              "_fun_arg"
   argNm' <- mkUniqueIdentifier Extended argNm
   hTy <- unsafeCoreTypeToHWTypeM' $(curLoc) ty

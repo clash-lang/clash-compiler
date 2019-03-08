@@ -251,6 +251,7 @@ runClashTest =
         , outputTest ("tests" </> "shouldwork" </> "TopEntity") [Verilog] "PortNamesWithVector" "main"
         , runTest ("tests" </> "shouldwork" </> "TopEntity")    [Verilog] [] "PortNamesWithRTree" (["","PortNamesWithRTree_topEntity","PortNamesWithRTree_testBench"],"PortNamesWithRTree_testBench",True)
         , outputTest ("tests" </> "shouldwork" </> "TopEntity") [Verilog] "PortNamesWithRTree" "main"
+        , runTest ("tests" </> "shouldwork" </> "TopEntity")    defBuild [] "TopEntHOArg" (["f","g"],"f",False)
         ]
       , clashTestGroup "Void"
         [ runTest ("tests" </> "shouldwork" </> "Unit") defBuild [] "Imap"                         (["","Imap_testBench"],"Imap_testBench",True)

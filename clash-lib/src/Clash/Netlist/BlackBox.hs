@@ -23,7 +23,7 @@ import qualified Control.Lens                  as Lens
 import           Control.Monad                 (when)
 import           Control.Monad.IO.Class        (liftIO)
 import           Data.Char                     (ord)
-import           Data.Either                   (lefts)
+import           Data.Either                   (lefts, partitionEithers)
 import qualified Data.HashMap.Lazy             as HashMap
 import qualified Data.IntMap                   as IntMap
 import           Data.List                     (elemIndex)
@@ -62,7 +62,7 @@ import           Clash.Core.VarEnv
   (extendInScopeSet, mkInScopeSet, lookupVarEnv, unionInScope, uniqAway, unitVarSet)
 import {-# SOURCE #-} Clash.Netlist
   (genComponent, mkDcApplication, mkDeclarations, mkExpr, mkNetDecl,
-   mkProjection, mkSelection)
+   mkProjection, mkSelection, mkFunApp)
 import qualified Clash.Backend                 as Backend
 import           Clash.Driver.Types
   (opt_primWarn, opt_color, ClashOpts)
@@ -478,25 +478,30 @@ mkFunInput resId e = do
 
                 _ -> error $ $(curLoc) ++ "Cannot make function input for: " ++ showPpr e
             C.Var fun -> do
-              normalized <- Lens.use bindings
-              case lookupVarEnv fun normalized of
-                Just _ -> do
-                  (wereVoids,_,_,N.Component compName compInps [snd -> compOutp] _) <-
-                    preserveVarEnv $ genComponent fun
+              topAnns <- Lens.use topEntityAnns
+              case lookupVarEnv fun topAnns of
+                Just _ ->
+                  error $ $(curLoc) ++ "Cannot make function input for partially applied Synthesize-annotated: " ++ showPpr e
+                _ -> do
+                  normalized <- Lens.use bindings
+                  case lookupVarEnv fun normalized of
+                    Just _ -> do
+                      (wereVoids,_,_,N.Component compName compInps [snd -> compOutp] _) <-
+                        preserveVarEnv $ genComponent fun
 
-                  let inpAssign (i, t) e' = (Identifier i Nothing, In, t, e')
-                      inpVar i            = TextS.pack ("~VAR[arg" ++ show i ++ "][" ++ show i ++ "]")
-                      inpVars             = [Identifier (inpVar i)  Nothing | i <- originalIndices wereVoids]
-                      inpAssigns          = zipWith inpAssign compInps inpVars
-                      outpAssign          = ( Identifier (fst compOutp) Nothing
-                                            , Out
-                                            , snd compOutp
-                                            , Identifier "~RESULT" Nothing )
-                  i <- varCount <<%= (+1)
-                  let instLabel     = TextS.concat [compName,TextS.pack ("_" ++ show i)]
-                      instDecl      = InstDecl Entity Nothing compName instLabel [] (outpAssign:inpAssigns)
-                  return (Right (("",[instDecl]),Wire))
-                Nothing -> error $ $(curLoc) ++ "Cannot make function input for: " ++ showPpr e
+                      let inpAssign (i, t) e' = (Identifier i Nothing, In, t, e')
+                          inpVar i            = TextS.pack ("~VAR[arg" ++ show i ++ "][" ++ show i ++ "]")
+                          inpVars             = [Identifier (inpVar i)  Nothing | i <- originalIndices wereVoids]
+                          inpAssigns          = zipWith inpAssign compInps inpVars
+                          outpAssign          = ( Identifier (fst compOutp) Nothing
+                                                , Out
+                                                , snd compOutp
+                                                , Identifier "~RESULT" Nothing )
+                      i <- varCount <<%= (+1)
+                      let instLabel     = TextS.concat [compName,TextS.pack ("_" ++ show i)]
+                          instDecl      = InstDecl Entity Nothing compName instLabel [] (outpAssign:inpAssigns)
+                      return (Right (("",[instDecl]),Wire))
+                    Nothing -> error $ $(curLoc) ++ "Cannot make function input for: " ++ showPpr e
             C.Lam {} -> do
               let is0 = mkInScopeSet (Lens.foldMapOf termFreeIds unitVarSet appE)
               go is0 0 appE
@@ -534,6 +539,16 @@ mkFunInput resId e = do
     Right (decl,wr) ->
       return ((Right decl,wr,[],[],[],bbCtx),dcls)
   where
+    goExpr app@(collectArgs -> (C.Var fun,args@(_:_))) = do
+      let (tmArgs,tyArgs) = partitionEithers args
+      if null tyArgs
+        then do
+          appDecls <- mkFunApp "~RESULT" fun tmArgs
+          nm <- mkUniqueIdentifier Basic "block"
+          return (Right ((nm,appDecls),Wire))
+        else do
+          (_,sp) <- Lens.use curCompNm
+          throw (ClashException sp ($(curLoc) ++ "Not in normal form: Var-application with Type arguments:\n\n" ++ showPpr app) Nothing)
     goExpr e' = do
       tcm <- Lens.use tcCache
       let eType = termType tcm e'
