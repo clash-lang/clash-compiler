@@ -531,6 +531,8 @@ outputTest'
   -- ^ Work directory
   -> BuildTarget
   -- ^ Build target
+  -> [String]
+  -- ^ Extra clash arguments
   -> String
   -- ^ Module name
   -> String
@@ -540,7 +542,7 @@ outputTest'
   -- item in the list will be the root node, while the first one will be the
   -- one closest to the test.
   -> TestTree
-outputTest' env target modName funcName path =
+outputTest' env target extraArgs modName funcName path =
   withResource acquire tastyRelease (const seqTests)
     where
       path' = show target:path
@@ -595,7 +597,7 @@ outputTest' env target modName funcName path =
       workDir = testDirectory path'
 
       seqTests = testGroup (show target) $ sequenceTests path' $
-        [ clashHDL target (sourceDirectory </> env) [] modName workDir
+        [ clashHDL target (sourceDirectory </> env) extraArgs modName workDir
         , ("runghc", testProgram "runghc" "cabal" args NoGlob PrintStdErr False Nothing)
         ]
 
@@ -604,6 +606,8 @@ outputTest
   -- ^ Work directory
   -> [BuildTarget]
   -- ^ Build targets
+  -> [String]
+  -- ^ Extra clash arguments
   -> String
   -- ^ Module name
   -> String
@@ -613,8 +617,8 @@ outputTest
   -- item in the list will be the root node, while the first one will be the
   -- one closest to the test.
   -> TestTree
-outputTest env targets modName funcName path =
+outputTest env targets extraArgs modName funcName path =
   let testName = modName ++ " [output test]" in
   let path' = testName : path in
   testGroup testName
-    [outputTest' env target modName funcName path' | target <- targets]
+    [outputTest' env target extraArgs modName funcName path' | target <- targets]

@@ -111,6 +111,13 @@
     }
   }
 , { "BlackBox" :
+    { "name"      : "GHC.Integer.Type.testBitInteger"
+    , "kind"      : "Expression"
+    , "type"      : "testBitInteger :: Integer -> Int# -> Bool"
+    , "template"  : "~VAR[input][0][~ARG[1]] == 1'b1"
+    }
+  }
+, { "BlackBox" :
     { "name"      : "GHC.Integer.Type.wordToInteger"
     , "kind"      : "Declaration"
     , "type"      : "wordToInteger :: Word# -> Integer"

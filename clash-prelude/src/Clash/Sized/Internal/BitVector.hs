@@ -205,9 +205,9 @@ instance NFData Bit where
 
 instance Show Bit where
   show (Bit 0 b) =
-    case b of
-      0 -> "0"
-      _ -> "1"
+    case testBit b 0 of
+      True  -> "1"
+      False -> "0"
   show (Bit _ _) = "."
 
 instance ShowX Bit where
@@ -290,8 +290,8 @@ instance Bits Bit where
   complement        = complement##
   zeroBits          = low
   bit i             = if i == 0 then high else low
-  setBit _ i        = if i == 0 then high else low
-  clearBit _ i      = if i == 0 then low  else high
+  setBit b i        = if i == 0 then high else b
+  clearBit b i      = if i == 0 then low  else b
   complementBit b i = if i == 0 then complement## b else b
   testBit b i       = if i == 0 then eq## b high else False
   bitSizeMaybe _    = Just 1
@@ -713,7 +713,7 @@ slice# (BV msk i) m n = BV (shiftR (msk .&. mask) n')
 replaceBit# :: KnownNat n => BitVector n -> Int -> Bit -> BitVector n
 replaceBit# bv@(BV m v) i (Bit mb b)
     | i >= 0 && i < sz = BV (clearBit m i  .|. (mb `shiftL` i))
-                            (if b == 1 && mb == 0 then setBit v i else clearBit v i)
+                            (if testBit b 0 && mb == 0 then setBit v i else clearBit v i)
     | otherwise        = err
   where
     sz   = fromInteger (natVal bv)

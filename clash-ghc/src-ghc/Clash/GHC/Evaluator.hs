@@ -973,6 +973,14 @@ reduceConstant isSubj gbl tcm h k nm ty tys args = case nm of
     | [Lit (WordLiteral w)] <- args
     -> reduce (Literal (IntegerLiteral w))
 
+  "GHC.Integer.Type.integerToWord"
+    | [i] <- integerLiterals' args
+    -> reduce (integerToWordLiteral i)
+
+  "GHC.Integer.Type.testBitInteger" -- :: Integer -> Int# -> Bool
+    | [Lit (IntegerLiteral i), Lit (IntLiteral j)] <- args
+    -> reduce (boolToBoolLiteral tcm ty (testBit i (fromInteger j)))
+
   "GHC.Natural.NatS#"
     | [Lit (WordLiteral w)] <- args
     -> reduce (Literal (NaturalLiteral w))
@@ -1359,7 +1367,7 @@ reduceConstant isSubj gbl tcm h k nm ty tys args = case nm of
     , [ _
       , PrimVal bvNm _ _ [_, Lit (IntegerLiteral mskBv), Lit (IntegerLiteral bv)]
       , valArgs -> Just [Literal (IntLiteral i)]
-      , PrimVal bNm  _ _ [_, Lit (IntegerLiteral mskB), Lit (IntegerLiteral b)]
+      , PrimVal bNm  _ _ [Lit (IntegerLiteral mskB), Lit (IntegerLiteral b)]
       ] <- args
     , bvNm == "Clash.Sized.Internal.BitVector.fromInteger#"
     , bNm  == "Clash.Sized.Internal.BitVector.fromInteger##"
@@ -3274,8 +3282,9 @@ sizedLiteral szCon val = case val of
 bitLiterals
   :: [Value]
   -> [(Integer,Integer)]
-bitLiterals = typedLiterals' go
+bitLiterals = map normalizeBit . typedLiterals' go
  where
+  normalizeBit (msk,v) = (msk .&. 1, v .&. 1)
   go val = case val of
     PrimVal nm _ _ [Lit (IntegerLiteral m), Lit (IntegerLiteral i)]
       | nm == "Clash.Sized.Internal.BitVector.fromInteger##"
@@ -3397,7 +3406,8 @@ mkBitLit
   -- ^ Value
   -> Term
 mkBitLit ty msk val =
-  mkApps (bConPrim sTy) [Left (Literal (IntegerLiteral msk)), Left (Literal (IntegerLiteral val))]
+  mkApps (bConPrim sTy) [ Left (Literal (IntegerLiteral (msk .&. 1)))
+                        , Left (Literal (IntegerLiteral (val .&. 1)))]
   where
     (_,sTy) = splitFunForallTy ty
 

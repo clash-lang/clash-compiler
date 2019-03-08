@@ -134,6 +134,13 @@ end block;
     }
   }
 , { "BlackBox" :
+    { "name"      : "GHC.Integer.Type.testBitInteger"
+    , "kind"      : "Expression"
+    , "type"      : "testBitInteger :: Integer -> Int# -> Bool"
+    , "template"  : "~VAR[input][0](to_integer(~ARG[1])) = '1'"
+    }
+  }
+, { "BlackBox" :
     { "name"      : "GHC.Integer.Type.wordToInteger"
     , "kind"      : "Expression"
     , "type"      : "wordToInteger :: Word# -> Integer"
