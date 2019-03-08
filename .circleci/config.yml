@@ -13,7 +13,11 @@ aliases:
   - &setup
     run:
       name: Setup system
-      command: .ci/setup.sh
+      command: |
+        # Only test on external pull requests
+        if [ -n "$CIRCLE_PR_NUMBER" ]; then
+          .ci/setup.sh
+        fi
   - &cache_restore
     restore_cache:
       keys:
@@ -26,10 +30,22 @@ aliases:
         - cabal-store
 
   - &build
-    run: .ci/build.sh
-
+    run:
+      name: Build dependencies and Clash itself
+      command: |
+        # Only test on external pull requests
+        if [ -n "$CIRCLE_PR_NUMBER" ]; then
+          .ci/build.sh
+        fi
+            
   - &run_tests
-    run: .ci/test.sh
+    run: 
+      name: Run tests
+      command: |
+        # Only test on external pull requests
+        if [ -n "$CIRCLE_PR_NUMBER" ]; then
+          .ci/test.sh
+        fi
 
   # When testing a pull request on CircleCI,
   # fetch the result of merging it in.
