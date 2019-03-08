@@ -42,9 +42,9 @@
   }
 , { "BlackBox" :
     { "name"      : "GHC.Prim.ord#"
-    , "kind"      : "Declaration"
+    , "kind"      : "Expression"
     , "type"      : "ord :: Char# -> Int#"
-    , "template"  : "assign ~RESULT = $unsigned(~ARG[0]);"
+    , "template"  : "$signed({{(~SIZE[~TYPO]-~SIZE[~TYP[0]]) {1'b0}},~VAR[c][0]})"
     }
   }
 , { "BlackBox" :
@@ -140,9 +140,9 @@
   }
 , { "BlackBox" :
     { "name"      : "GHC.Prim.chr#"
-    , "kind"      : "Declaration"
+    , "kind"      : "Expression"
     , "type"      : "ord :: Int# -> Char#"
-    , "template"  : "assign ~RESULT = $unsigned(~ARG[0]);"
+    , "template"  : "$unsigned(~VAR[i][0][0+:~SIZE[~TYPO]])"
     }
   }
 , { "BlackBox" :

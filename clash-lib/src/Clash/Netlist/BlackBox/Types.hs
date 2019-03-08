@@ -135,6 +135,8 @@ data Element
   | And [Element]
   | IW64
   -- ^ Hole indicating whether Int/Word/Integer are 64-Bit
+  | CmpLE !Element !Element
+  -- ^ Compare less-or-equal
   | HdlSyn HdlSyn
   -- ^ Hole indicating which synthesis tool we're generating HDL for
   | BV !Bool [Element] !Element
