@@ -194,6 +194,12 @@ runClashTest =
         , runTest ("tests" </> "shouldwork" </> "Polymorphism") defBuild [] "GADTExistential"   ([""],"GADTExistential_topEntity",False)
         , runTest ("tests" </> "shouldwork" </> "Polymorphism") defBuild [] "LocalPoly"         ([""],"LocalPoly_topEntity",False)
         ]
+      , clashTestGroup "PrimitiveGuards"
+        [ runFailingTest ("tests" </> "shouldfail" </> "PrimitiveGuards") defBuild [] "HasBlackBox" (Just "No BlackBox definition for 'HasBlackBox.primitive' even though this value was annotated with 'HasBlackBox'.")
+        , runFailingTest ("tests" </> "shouldfail" </> "PrimitiveGuards") defBuild [] "DontTranslate" (Just "Clash was forced to translate 'DontTranslate.primitive', but this value was marked with DontTranslate. Did you forget to include a blackbox for one of the constructs using this?")
+        , runWarningTest ("tests" </> "shouldwork" </> "PrimitiveGuards") [VHDL] [] "WarnAlways" (Just "You shouldn't use 'primitive'!")
+        ]
+
       , clashTestGroup "PrimitiveReductions"
         [ runTest ("tests" </> "shouldwork" </> "PrimitiveReductions") defBuild [] "Lambda"     (["","Lambda_testBench"],"Lambda_testBench",True)
         , runTest ("tests" </> "shouldwork" </> "PrimitiveReductions") defBuild [] "ReplaceInt" (["","ReplaceInt_testBench"],"ReplaceInt_testBench",True)

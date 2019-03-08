@@ -24,6 +24,8 @@ module Clash.Primitives.Types
   , TemplateFormat(..)
   , BlackBoxFunctionName(..)
   , Primitive(..)
+  , GuardedCompiledPrimitive
+  , GuardedResolvedPrimitive
   , PrimMap
   , UnresolvedPrimitive
   , ResolvedPrimitive
@@ -33,6 +35,7 @@ module Clash.Primitives.Types
   ) where
 
 import {-# SOURCE #-} Clash.Netlist.Types
+import           Clash.Annotations.Primitive  (PrimitiveGuard)
 import           Clash.Netlist.BlackBox.Types
   (BlackBoxFunction, BlackBoxTemplate, TemplateKind (..))
 import           Control.Applicative          ((<|>))
@@ -51,18 +54,20 @@ import           GHC.Generics                 (Generic)
 import           GHC.Stack                    (HasCallStack)
 
 -- | An unresolved primitive still contains pointers to files.
-type UnresolvedPrimitive = Primitive Text ((TemplateFormat,BlackBoxFunctionName),Maybe TemplateSource) (Maybe TemplateSource)
+type UnresolvedPrimitive = Primitive Text ((TemplateFormat,BlackBoxFunctionName),Maybe TemplateSource) (Maybe S.Text) (Maybe TemplateSource)
 
 -- | A parsed primitive does not contain pointers to filesystem files anymore,
 -- but holds uncompiled @BlackBoxTemplate@s and @BlackBoxFunction@s.
-type ResolvedPrimitive = Primitive Text ((TemplateFormat,BlackBoxFunctionName),Maybe Text) (Maybe Text)
-type ResolvedPrimMap   = PrimMap ResolvedPrimitive
+type ResolvedPrimitive        = Primitive Text ((TemplateFormat,BlackBoxFunctionName),Maybe Text) () (Maybe Text)
+type GuardedResolvedPrimitive = PrimitiveGuard ResolvedPrimitive
+type ResolvedPrimMap          = PrimMap GuardedResolvedPrimitive
 
 -- | A compiled primitive has compiled all templates and functions from its
 -- @ResolvedPrimitive@ counterpart. The Int in the tuple is a hash of the
 -- (uncompiled) BlackBoxFunction.
-type CompiledPrimitive = Primitive BlackBoxTemplate BlackBox (Int, BlackBoxFunction)
-type CompiledPrimMap   = PrimMap CompiledPrimitive
+type CompiledPrimitive        = Primitive BlackBoxTemplate BlackBox () (Int, BlackBoxFunction)
+type GuardedCompiledPrimitive = PrimitiveGuard CompiledPrimitive
+type CompiledPrimMap          = PrimMap GuardedCompiledPrimitive
 
 -- | A @PrimMap@ maps primitive names to a @Primitive@
 type PrimMap a = H.HashMap S.Text a
@@ -125,17 +130,17 @@ data TemplateSource
 data TemplateFormat
   = TTemplate
   | THaskell
-  deriving (Show, Generic, Hashable)
+  deriving (Show, Generic, Hashable, NFData)
 
 -- | Externally defined primitive
-data Primitive a b c
+data Primitive a b c d
   -- | Primitive template written in a Clash specific templating language
   = BlackBox
   { name      :: !S.Text
     -- ^ Name of the primitive
   , kind      :: TemplateKind
     -- ^ Whether this results in an expression or a declaration
-  , warning  :: Maybe S.Text
+  , warning  :: c
     -- ^ A warning to be outputted when the primitive is instantiated.
     -- This is intended to be used as a warning for primitives that are not
     -- synthesizable, but may also be used for other purposes.
@@ -160,7 +165,7 @@ data Primitive a b c
   { name :: !S.Text
     -- ^ Name of the primitive
   , functionName :: BlackBoxFunctionName
-  , function :: c
+  , function :: d
     -- ^ Used to indicate type of template (declaration or expression).
   }
   -- | A primitive that carries additional information. These are "real"

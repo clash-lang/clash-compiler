@@ -115,6 +115,8 @@ data TestProgram =
 
 data TestFailingProgram =
   TestFailingProgram
+    Bool
+    -- ^ Test exit code
     String
     -- ^ Executable
     [String]
@@ -190,7 +192,9 @@ testProgram testName program opts glob stdO stdF workDir =
 -- | Create test that runs a program with given options. Test succeeds
 -- if program terminates with error
 testFailingProgram
-  :: TestName
+  :: Bool
+  -- ^ Test exit code?
+  -> TestName
   -- ^ Test name
   -> String
   -- ^ Program name
@@ -210,8 +214,8 @@ testFailingProgram
   -> Maybe FilePath
   -- ^ Optional working directory
   -> TestTree
-testFailingProgram testName program opts glob stdO stdF errCode expectedOutput workDir =
-  singleTest testName (TestFailingProgram program opts glob stdO stdF errCode expectedOutput workDir)
+testFailingProgram testExitCode testName program opts glob stdO stdF errCode expectedOutput workDir =
+  singleTest testName (TestFailingProgram testExitCode program opts glob stdO stdF errCode expectedOutput workDir)
 
 instance IsTest TestProgram where
   run opts (TestProgram program args glob stdO stdF workDir) _ = do
@@ -227,7 +231,7 @@ instance IsTest TestProgram where
   testOptions = return []
 
 instance IsTest TestFailingProgram where
-  run _opts (TestFailingProgram program args glob stdO stdF errCode expectedOutput workDir) _ = do
+  run _opts (TestFailingProgram testExitCode program args glob stdO stdF errCode expectedOutput workDir) _ = do
     execFound <- findExecutable program
 
     args' <- globArgs glob workDir args
@@ -235,7 +239,7 @@ instance IsTest TestFailingProgram where
     -- Execute program
     case execFound of
       Nothing       -> return $ execNotFoundFailure program
-      Just progPath -> runFailingProgram progPath args stdO stdF errCode expectedOutput workDir
+      Just progPath -> runFailingProgram testExitCode progPath args stdO stdF errCode expectedOutput workDir
 
   testOptions = return []
 
@@ -276,7 +280,9 @@ runProgram program args stdO stdF workDir = do
 -- not return (an expected) error code or if the program fails to execute at
 -- all.
 runFailingProgram
-  :: String
+  :: Bool
+  -- ^ Test exit code?
+  -> String
   -- ^ Program name
   -> [String]
   -- ^ Program options
@@ -292,9 +298,9 @@ runFailingProgram
   -> Maybe FilePath
   -- ^ Optional working directory
   -> IO Result
-runFailingProgram program args stdO errOnEmptyStderr expectedCode expectedStderr workDir = do
+runFailingProgram testExitCode program args stdO errOnEmptyStderr expectedCode expectedStderr workDir = do
   let cp = (proc program args) { cwd = workDir }
-  (exitCode, stdout, stderr) <- readCreateProcessWithExitCode cp ""
+  (exitCode0, stdout, stderr) <- readCreateProcessWithExitCode cp ""
 
   -- For debugging: Uncomment this to print executable and and its arguments
   --putStrLn $ show program ++ " " ++ concatMap (++ " ") args
@@ -304,22 +310,33 @@ runFailingProgram program args stdO errOnEmptyStderr expectedCode expectedStderr
 
       passed = testPassed (T.unpack $ testOutput stdO stderrT stdoutT)
 
-  return $ case exitCode of
-    ExitSuccess ->
-      unexpectedSuccess program stderrT stdoutT
-    ExitFailure code ->
-      if errOnEmptyStderr && null stderr
-        then
-          unexpectedEmptyStderr program code stdoutT
+  return (go (stdoutT, stderrT, stdout, stderr, passed) exitCode0)
+
+ where
+  -- TODO: Clean up this code..
+  go e@(stdoutT, stderrT, _stdout, stderr, passed) exitCode1 =
+    case exitCode1 of
+      ExitSuccess ->
+        if testExitCode then
+          unexpectedSuccess program stderrT stdoutT
         else
-          case expectedStderr of
-            Just r | not (r `T.isInfixOf` stderrT) ->
-              unexpectedStderr program code stderrT stdoutT r
-            _ ->
-              case expectedCode of
-                Nothing -> passed
-                Just n | n == code -> passed
-                       | otherwise -> unexpectedCode program code n stderrT stdoutT
+          go e (ExitFailure 0)
+      ExitFailure code ->
+        if errOnEmptyStderr && null stderr
+          then
+            unexpectedEmptyStderr program code stdoutT
+          else
+            case expectedStderr of
+              Just r | not (r `T.isInfixOf` stderrT) ->
+                unexpectedStderr program code stderrT stdoutT r
+              _ ->
+                if testExitCode then
+                  passed
+                else
+                  case expectedCode of
+                    Nothing -> passed
+                    Just n | n == code -> passed
+                           | otherwise -> unexpectedCode program code n stderrT stdoutT
 
 
 -- | Indicates that program does not exist in the path

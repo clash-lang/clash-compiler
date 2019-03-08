@@ -54,7 +54,8 @@ import           Text.Read                        (readMaybe)
 import           SrcLoc                           (SrcSpan)
 import           GHC.BasicTypes.Extra             ()
 
-import           Clash.Annotations.Primitive      (HDL (..))
+import           Clash.Annotations.Primitive
+  (HDL (..))
 import           Clash.Annotations.BitRepresentation.Internal
   (CustomReprs)
 import           Clash.Annotations.TopEntity      (TopEntity (..))
@@ -398,12 +399,12 @@ compilePrimitive idirs pkgDbs topDir (BlackBoxHaskell bbName bbGenName source) =
     go args Nothing = do
       loadImportAndInterpret idirs args topDir qualMod funcName "BlackBoxFunction"
 
-compilePrimitive idirs pkgDbs topDir (BlackBox pNm tkind warnings oReg libM imps incs templ) = do
+compilePrimitive idirs pkgDbs topDir (BlackBox pNm tkind () oReg libM imps incs templ) = do
   libM'  <- mapM parseTempl libM
   imps'  <- mapM parseTempl imps
   incs'  <- mapM (traverse parseBB) incs
   templ' <- parseBB templ
-  return (BlackBox pNm tkind warnings oReg libM' imps' incs' templ')
+  return (BlackBox pNm tkind () oReg libM' imps' incs' templ')
  where
   iArgs = concatMap (("-package-db":) . (:[])) pkgDbs
 
@@ -442,7 +443,7 @@ compilePrimitive idirs pkgDbs topDir (BlackBox pNm tkind warnings oReg libM imps
     processHintError (show bbGenName) pNm (BBFunction (Data.Text.unpack pNm) hsh) r
 
 compilePrimitive _ _ _ (Primitive pNm typ) =
-  return $ Primitive pNm typ
+  return (Primitive pNm typ)
 
 processHintError
   :: Monad m

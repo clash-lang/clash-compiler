@@ -81,6 +81,7 @@ import           GHC.Integer.GMP.Internals   (Integer (..), BigNat (..))
 
 import           BasicTypes                  (InlineSpec (..))
 
+import           Clash.Annotations.Primitive (extractPrim)
 import           Clash.Core.DataCon          (DataCon (..))
 import           Clash.Core.Evaluator        (PureHeap, whnf')
 import           Clash.Core.Name
@@ -120,7 +121,7 @@ import           Clash.Normalize.PrimitiveReductions
 import           Clash.Normalize.Types
 import           Clash.Normalize.Util
 import           Clash.Primitives.Types
-  (Primitive(..), PrimMap, TemplateKind(TExpr))
+  (Primitive(..), TemplateKind(TExpr), CompiledPrimMap)
 import           Clash.Rewrite.Combinators
 import           Clash.Rewrite.Types
 import           Clash.Rewrite.Util
@@ -748,7 +749,7 @@ removeUnusedExpr :: HasCallStack => NormRewrite
 removeUnusedExpr _ e@(collectArgs -> (p@(Prim nm _),args)) = do
   bbM <- HashMap.lookup nm <$> Lens.use (extra.primitives)
   case bbM of
-    Just (BlackBox pNm _ _ _ _ _ inc templ) -> do
+    Just (extractPrim ->  Just (BlackBox pNm _ _ _ _ _ inc templ)) -> do
       let usedArgs = if isFromInt pNm
                         then [0,1,2]
                         else usedArguments templ ++
@@ -2026,7 +2027,7 @@ inlineCleanup (TransformContext is0 _) (Letrec binds body) = do
     -- Determine whether a let-binding is interesting to inline
     isInteresting
       :: VarEnv Int
-      -> PrimMap (Primitive a b c)
+      -> CompiledPrimMap
       -> VarSet
       -> (Id, Term)
       -> Bool
@@ -2035,7 +2036,7 @@ inlineCleanup (TransformContext is0 _) (Letrec binds body) = do
       , id_ `notElemVarSet` bodyFVs
       = case tm of
           Prim nm _
-            | Just p@(BlackBox {}) <- HashMap.lookup nm prims
+            | Just (extractPrim -> Just p@(BlackBox {})) <- HashMap.lookup nm prims
             , TExpr <- kind p
             , Just occ <- lookupVarEnv id_ allOccs
             , occ < 2

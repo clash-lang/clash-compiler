@@ -7,6 +7,7 @@ import Data.Binary
 
 import Data.Hashable (Hashable)
 
+import           Clash.Annotations.Primitive                  (PrimitiveGuard)
 import qualified Clash.Annotations.BitRepresentation.Internal as CP
 
 import qualified Clash.Primitives.Types                       as CL
@@ -17,8 +18,8 @@ import qualified Data.HashMap.Strict                          as HM
 
 
 -- | Like C.CompiledPrimitive but without the functions BlackBoxFunction so we can serialise it
-type CompiledPrimitive' = CL.Primitive CL.BlackBoxTemplate CL.BlackBox ()
-type CompiledPrimMap' = CL.PrimMap CompiledPrimitive'
+type CompiledPrimitive' = CL.Primitive CL.BlackBoxTemplate CL.BlackBox () ()
+type CompiledPrimMap' = CL.PrimMap (PrimitiveGuard CompiledPrimitive')
 
 -- Remove BlackBoxFunctions
 removeBBfunc :: CL.CompiledPrimitive -> CompiledPrimitive'
