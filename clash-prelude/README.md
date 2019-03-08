@@ -1,4 +1,4 @@
-# CλaSH - A functional hardware description language
+# Clash - A functional hardware description language
 
 [![Build Status](https://travis-ci.org/clash-lang/clash-prelude.svg?branch=master)](https://travis-ci.org/clash-lang/clash-prelude)
 [![Hackage](https://img.shields.io/hackage/v/clash-prelude.svg)](https://hackage.haskell.org/package/clash-prelude)
@@ -12,12 +12,12 @@ Only works with GHC-8.2+
  [GHC 8.4.2](https://www.haskell.org/ghc/download_ghc_8_4_2),
  [GHC 8.4.3](https://www.haskell.org/ghc/download_ghc_8_4_3))!
 
-CλaSH (pronounced ‘clash’) is a functional hardware description language that
-borrows both its syntax and semantics from the functional programming language
-Haskell. The CλaSH compiler transforms these high-level descriptions to
+Clash is a functional hardware description language that borrows both
+its syntax and semantics from the functional programming language
+Haskell. The Clash compiler transforms these high-level descriptions to
 low-level synthesizable VHDL, Verilog, or SystemVerilog.
 
-Features of CλaSH:
+Features of Clash:
 
   * Strongly typed, yet with a very high degree of type inference, enabling both
     safe and fast prototyping using concise descriptions.
