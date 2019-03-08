@@ -155,6 +155,8 @@ module Clash.Explicit.Signal
   , resetSynchronizer
     -- * Basic circuit functions
   , delay
+  , delayMaybe
+  , delayEn
   , register
   , regMaybe
   , regEn
@@ -458,9 +460,9 @@ repSchedule high low = take low $ repSchedule' low high 1
 -- * Basic circuit functions
 
 -- | \"@'delay' clk s@\" delays the values in 'Signal' /s/ for once cycle, the
--- value at time 0 is /undefined/.
+-- value at time 0 is /dflt/.
 --
--- >>> printX (sampleN 3 (delay systemClockGen 0 (fromList [1,2,3,4])))
+-- >>> sampleN 3 (delay systemClockGen 0 (fromList [1,2,3,4]))
 -- [0,1,2]
 delay
   :: Clock domain gated
@@ -471,6 +473,42 @@ delay
   -> Signal domain a
 delay = delay#
 {-# INLINE delay #-}
+
+-- | Version of 'delay' that only updates when its third argument is a 'Just'
+-- value.
+--
+-- >>> let input = fromList [Just 1, Just 2, Nothing, Nothing, Just 5, Just 6, Just (7::Int)]
+-- >>> sampleN 7 (delayMaybe systemClockGen 0 input)
+-- [0,1,2,2,2,5,6]
+delayMaybe
+  :: Clock domain gated
+  -- ^ Clock
+  -> a
+  -- ^ Initial value
+  -> Signal domain (Maybe a)
+  -> Signal domain a
+delayMaybe clk dflt i =
+  delayEn clk dflt (isJust <$> i) (fromJust <$> i)
+{-# INLINE delayMaybe #-}
+
+-- | Version of 'delay' that only updates when its third argument is asserted.
+--
+-- >>> let input = fromList [1,2,3,4,5,6,7::Int]
+-- >>> let enable = fromList [True,True,False,False,True,True,True]
+-- >>> sampleN 7 (delayEn systemClockGen 0 enable input)
+-- [0,1,2,2,2,5,6]
+delayEn
+  :: Clock domain gated
+  -- ^ Clock
+  -> a
+  -- ^ Initial value
+  -> Signal domain Bool
+  -- ^ Enable
+  -> Signal domain a
+  -> Signal domain a
+delayEn clk dflt en i =
+  delay (clockGate clk en) dflt i
+{-# INLINE delayEn #-}
 
 -- | \"@'register' clk rst i s@\" delays the values in 'Signal' /s/ for one
 -- cycle, and sets the value to @i@ the moment the reset becomes 'False'.
