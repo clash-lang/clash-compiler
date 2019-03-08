@@ -1,14 +1,14 @@
-# `clash-lib` - CλaSH compiler, as a library
+# `clash-lib` - Clash compiler, as a library
 
   * See the LICENSE file for license and copyright details
 
-# CλaSH - A functional hardware description language
-CλaSH (pronounced ‘clash’) is a functional hardware description language that
-borrows both its syntax and semantics from the functional programming language
-Haskell. The CλaSH compiler transforms these high-level descriptions to
+# Clash - A functional hardware description language
+Clash is a functional hardware description language that borrows both
+its syntax and semantics from the functional programming language
+Haskell. The Clash compiler transforms these high-level descriptions to
 low-level synthesizable VHDL, Verilog, or SystemVerilog.
 
-Features of CλaSH:
+Features of Clash:
 
   * Strongly typed (like VHDL), yet with a very high degree of type inference,
     enabling both safe and fast prototying using consise descriptions (like
