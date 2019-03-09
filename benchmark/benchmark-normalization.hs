@@ -18,7 +18,7 @@ import qualified Control.Concurrent.Supply    as Supply
 import           Control.DeepSeq              (NFData(rnf),rwhnf)
 import           Control.Exception            (finally)
 import           Data.IntMap.Strict           (IntMap)
-import           Data.List                    (break, isPrefixOf)
+import           Data.List                    (break, isPrefixOf, partition)
 import           System.Directory             (removeDirectoryRecursive)
 import           System.Environment           (getArgs, withArgs)
 import           System.FilePath              (FilePath)
@@ -34,29 +34,32 @@ import BenchmarkCommon
 main :: IO ()
 main = do
   args <- getArgs
-  let (fileArgs,optionArgs) = break (isPrefixOf "-") args
+  let (idirs0,rest)         = partition ((== "-i") . take 2) args
+      idirs1                = ".":map (drop 2) idirs0
+      (fileArgs,optionArgs) = break (isPrefixOf "-") rest
       tests | null fileArgs = defaultTests
             | otherwise     = fileArgs
 
   tmpDir <- createTemporaryClashDirectory
 
   finally (do
-    withArgs optionArgs (defaultMain $ fmap (benchFile tmpDir) tests)
+    withArgs optionArgs (defaultMain $ fmap (benchFile tmpDir idirs1) tests)
    ) (
     removeDirectoryRecursive tmpDir
    )
 
-benchFile :: FilePath -> FilePath -> Benchmark
-benchFile tmpDir src =
-  env (setupEnv tmpDir src) $
+benchFile :: FilePath -> [FilePath] -> FilePath -> Benchmark
+benchFile tmpDir idirs src =
+  env (setupEnv tmpDir idirs src) $
     \ ~((bindingsMap,tcm,tupTcm,_topEntities,primMap,reprs,topEntityNames,topEntity),supplyN) -> do
       bench ("normalization of " ++ src)
             (nf (fst . normalizeEntity reprs bindingsMap primMap tcm tupTcm typeTrans
                                  reduceConstant topEntityNames
-                                 (opts tmpDir) supplyN :: _ -> BindingMap) topEntity)
+                                 (opts tmpDir idirs) supplyN :: _ -> BindingMap) topEntity)
 
 setupEnv
   :: FilePath
+  -> [FilePath]
   -> FilePath
   -> IO ((BindingMap, TyConMap, IntMap TyConName
          ,[(Id, Maybe TopEntity, Maybe Id)]
@@ -64,8 +67,8 @@ setupEnv
          )
         ,Supply.Supply
         )
-setupEnv tmpDir src = do
-  inp <- runInputStage tmpDir src
+setupEnv tmpDir idirs src = do
+  inp <- runInputStage tmpDir idirs src
   supplyN <- Supply.newSupply
   return (inp,supplyN)
 
