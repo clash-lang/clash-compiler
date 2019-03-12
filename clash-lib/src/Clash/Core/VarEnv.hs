@@ -1,3 +1,5 @@
+{-# LANGUAGE DeriveAnyClass             #-}
+{-# LANGUAGE DeriveGeneric              #-}
 {-# LANGUAGE FlexibleInstances          #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE OverloadedStrings          #-}
@@ -86,11 +88,13 @@ module Clash.Core.VarEnv
   )
 where
 
+import Data.Binary                         (Binary)
 import           Data.Coerce               (coerce)
 import qualified Data.List                 as List
 import           Data.Maybe                (fromMaybe)
 import           Data.Text.Prettyprint.Doc
 import           GHC.Exts                  (Any)
+import           GHC.Generics
 
 import           Clash.Core.Pretty
 import           Clash.Core.Var
@@ -317,6 +321,7 @@ mkVarSet xs = mkUniqSet (coerce xs)
 -- See "Secrets of the Glasgow Haskell Compiler inliner" Section 3.2 for the
 -- motivation
 data InScopeSet = InScopeSet VarSet {-# UNPACK #-} !Int
+  deriving (Generic, Binary)
 
 instance Pretty InScopeSet where
   pretty (InScopeSet s _) = pretty s

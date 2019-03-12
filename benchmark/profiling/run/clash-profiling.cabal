@@ -21,6 +21,8 @@ executable clash-profile-normalization-run
                        deepseq              >= 1.4      && < 1.5,
                        directory            >= 1.3.0.0  && < 1.4,
                        filepath             >= 1.4      && < 1.5,
+                       mtl                     >= 2.1.2    && < 2.3,
+                       text                    >= 1.2.2    && < 1.3,
                        unordered-containers >= 0.2.3.3  && < 0.3,
 
                        clash-benchmark,
@@ -30,3 +32,27 @@ executable clash-profile-normalization-run
                        clash-profiling-prepare
   -- automatically build ...-prepare tool
   build-tool-depends:  clash-profiling-prepare:clash-profile-normalization-prepare
+
+executable clash-profile-netlist-run
+  main-is:             profile-netlist-run.hs
+  default-language:    Haskell2010
+  ghc-options:         -O2 -Wall
+  build-depends:       base                 >= 4.8      && < 5,
+                       binary               >= 0.8.5    && < 0.11,
+                       bytestring           >= 0.10.0.2 && < 0.11,
+                       concurrent-supply    >= 0.1.7    && < 0.2,
+                       containers           >= 0.5.4.0  && < 0.6,
+                       deepseq              >= 1.4      && < 1.5,
+                       directory            >= 1.3.0.0  && < 1.4,
+                       filepath             >= 1.4      && < 1.5,
+                       mtl                     >= 2.1.2    && < 2.3,
+                       text                    >= 1.2.2    && < 1.3,
+                       unordered-containers >= 0.2.3.3  && < 0.3,
+
+                       clash-benchmark,
+                       clash-ghc,
+                       clash-lib,
+                       clash-prelude,
+                       clash-profiling-prepare
+  -- automatically build ...-prepare tool
+  build-tool-depends:  clash-profiling-prepare:clash-profile-netlist-prepare
