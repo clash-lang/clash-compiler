@@ -173,8 +173,7 @@ normalize' nm = do
                         -- transformation, see Note [AppProp no-shadow invariant]
                         is0 <- Lens.use globalInScope
                         let tm1 = deShadowTerm is0 tm
-                        curFun .= (nm',sp)
-                        tm2 <- rewriteExpr ("normalization",normalization) (nmS,tm1)
+                        tm2 <- rewriteExpr ("normalization",normalization) (nmS,tm1) (nm',sp)
                         let ty' = termType tcm tm2
                         return (nm' {varType = ty'},sp,inl,tm2)
             let usedBndrs = Lens.toListOf termFreeIds (tmNorm ^. _4)
@@ -206,9 +205,11 @@ normalize' nm = do
 
 -- | Rewrite a term according to the provided transformation
 rewriteExpr :: (String,NormRewrite) -- ^ Transformation to apply
-            -> (String,Term) -- ^ Term to transform
+            -> (String,Term)        -- ^ Term to transform
+            -> (Id, SrcSpan)        -- ^ Renew current function being rewritten
             -> NormalizeSession Term
-rewriteExpr (nrwS,nrw) (bndrS,expr) = do
+rewriteExpr (nrwS,nrw) (bndrS,expr) (nm, sp) = do
+  curFun .= (nm, sp)
   lvl <- Lens.view dbgLevel
   let before = showPpr expr
   let expr' = traceIf (lvl >= DebugFinal)
@@ -345,7 +346,7 @@ flattenCallTree (CBranch (nm,(nm',sp,inl,tm)) used) = do
                         -- To have a cheap `appProp` transformation we need to
                         -- deshadow, see also Note [AppProp no-shadow invariant]
                         let tm1 = deShadowTerm is0 (substTm "flattenCallTree.flattenExpr" subst tm)
-                        rewriteExpr ("flattenExpr",flatten) (showPpr nm, tm1)
+                        rewriteExpr ("flattenExpr",flatten) (showPpr nm, tm1) (nm', sp)
   let allUsed = newUsed ++ concat il_used
   -- inline all components when the resulting expression after flattening
   -- is still considered "cheap". This happens often at the topEntity which
@@ -358,7 +359,7 @@ flattenCallTree (CBranch (nm,(nm',sp,inl,tm)) used) = do
         -- To have a cheap `appProp` transformation we need to
         -- deshadow, see also Note [AppProp no-shadow invariant]
         let tm1 = deShadowTerm is0 (substTm "flattenCallTree.flattenCheap" subst' newExpr)
-        newExpr' <- rewriteExpr ("flattenCheap",flatten) (showPpr nm, tm1)
+        newExpr' <- rewriteExpr ("flattenCheap",flatten) (showPpr nm, tm1) (nm', sp)
         return (CBranch (nm,(nm',sp,inl,newExpr')) (concat allUsed'))
      else return (CBranch (nm,(nm',sp,inl,newExpr)) allUsed)
   where
