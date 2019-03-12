@@ -295,7 +295,7 @@ foldrWithUnique f s (UniqMap m) = IntMap.foldrWithKey f s m
 --
 -- Invariant: they keys in the map are the uniques of the values
 newtype UniqSet a = UniqSet (IntMap a)
-  deriving (Foldable, Semigroup, Monoid)
+  deriving (Foldable, Semigroup, Monoid, Binary)
 
 instance Pretty a => Pretty (UniqSet a) where
   pretty (UniqSet env) =
