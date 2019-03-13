@@ -844,18 +844,18 @@ mkUniqueIdentifier typ nm = do
   seen  <- Lens.use seenIds
   seenC <- Lens.use seenComps
   i     <- mkIdentifier typ nm
-  let s = seenC `HashSet.union` seen
-  if i `HashSet.member` s
-     then go 0 s i
+  let memberSeen k = k `HashSet.member` seen || k `HashSet.member` seenC
+  if memberSeen i
+     then go 0 memberSeen i
      else do
       seenIds %= (HashSet.insert i)
       return i
   where
-    go :: Integer -> HashSet Identifier -> Identifier -> NetlistMonad Identifier
-    go n s i = do
+    go :: Integer -> (Identifier -> Bool) -> Identifier -> NetlistMonad Identifier
+    go n g i = do
       i' <- extendIdentifier typ i (Text.pack ('_':show n))
-      if i' `elem` s
-         then go (n+1) s i
+      if g i'
+         then go (n+1) g i
          else do
           seenIds %= (HashSet.insert i')
           return i'
