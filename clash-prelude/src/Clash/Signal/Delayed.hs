@@ -65,7 +65,7 @@ import Clash.Promoted.Nat         (SNat (..), snatToInteger)
 >>> import Clash.Prelude
 >>> let delay3 = delayed (-1 :> -1 :> -1 :> Nil)
 >>> let delay2 = delayedI :: HiddenClockReset domain gated synchronous => Int -> DSignal domain n Int -> DSignal domain (n + 2) Int
->>> let delayN2 = delayN (SNat :: SNat 2)
+>>> let delayN2 = delayN d2
 >>> let delayI2 = delayI :: HiddenClockReset domain gated synchronous => Int -> DSignal domain n Int -> DSignal domain (n + 2) Int
 >>> let countingSignals = Clash.Prelude.repeat (dfromList [0..]) :: Vec 4 (DSignal domain 0 Int)
 -}
@@ -127,7 +127,7 @@ delayedI = hideClockReset E.delayedI
 --   => Int
 --   -> 'DSignal' domain n Int
 --   -> 'DSignal' domain (n + 2) Int
--- delay2 = 'delayN' (SNat :: SNat 2)
+-- delay2 = 'delayN' d2
 -- @
 --
 -- >>> printX $ sampleN 6 (toSignal (delayN2 (-1) (dfromList [1..])))

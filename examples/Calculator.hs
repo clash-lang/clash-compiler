@@ -42,7 +42,7 @@ topEntity = exposeClockReset go where
   go i = val where
     (addr,val) = (pu alu <^> (0,0,0 :: Unsigned 3)) (mem,i)
     mem        = (datamem <^> initMem) (addr,val)
-    initMem    = replicate (SNat :: SNat 8) 0
+    initMem    = replicate d8 0
 {-# NOINLINE topEntity #-}
 
 testBench :: Signal System Bool
