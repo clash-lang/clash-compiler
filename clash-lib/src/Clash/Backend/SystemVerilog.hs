@@ -25,6 +25,7 @@ import           Control.Monad.State                  (State)
 import           Data.Bits                            (Bits, testBit)
 import           Data.HashMap.Lazy                    (HashMap)
 import qualified Data.HashMap.Lazy                    as HashMap
+import qualified Data.HashMap.Strict                  as HashMapS
 import           Data.HashSet                         (HashSet)
 import qualified Data.HashSet                         as HashSet
 import           Data.List                            (nub, nubBy)
@@ -74,7 +75,7 @@ data SystemVerilogState =
     , _nameCache :: HashMap HWType Doc -- ^ Cache for previously generated product type names
     , _genDepth  :: Int -- ^ Depth of current generative block
     , _modNm     :: Identifier
-    , _idSeen    :: HashSet Identifier
+    , _idSeen    :: HashMapS.HashMap Identifier Word
     , _oports    :: [Identifier]
     , _srcSpan   :: SrcSpan
     , _includes  :: [(String,Doc)]
@@ -102,7 +103,7 @@ primsRoot = return ("clash-lib" System.FilePath.</> "prims")
 #endif
 
 instance Backend SystemVerilogState where
-  initBackend     = SystemVerilogState HashSet.empty [] HashMap.empty 0 "" HashSet.empty [] noSrcSpan [] [] [] []
+  initBackend     = SystemVerilogState HashSet.empty [] HashMap.empty 0 "" HashMapS.empty [] noSrcSpan [] [] [] []
   hdlKind         = const SystemVerilog
   primDirs        = const $ do root <- primsRoot
                                return [ root System.FilePath.</> "common"
@@ -235,7 +236,7 @@ filterReserved s = if s `elem` reservedWords
   else s
 
 -- | Generate SystemVerilog for a Netlist component
-genVerilog :: Identifier -> SrcSpan -> HashSet Identifier -> Component -> SystemVerilogM ((String,Doc),[(String,Doc)])
+genVerilog :: Identifier -> SrcSpan -> HashMapS.HashMap Identifier Word -> Component -> SystemVerilogM ((String,Doc),[(String,Doc)])
 genVerilog _ sp seen c = preserveSeen $ do
     Mon $ idSeen .= seen
     Mon $ setSrcSpan sp
@@ -599,7 +600,7 @@ addSeen c = do
   let iport = map fst (inputs c)
       oport = map (fst.snd) $ outputs c
       nets  = mapMaybe (\case {NetDecl' _ _ i _ -> Just i; _ -> Nothing}) $ declarations c
-  Mon (idSeen %= (HashSet.union (HashSet.fromList (concat [iport,oport,nets]))))
+  Mon (idSeen %= (HashMapS.unionWith max (HashMapS.fromList (concatMap (map (,0)) [iport,oport,nets]))))
   Mon (oports .= oport)
 
 mkUniqueId :: Identifier -> SystemVerilogM Identifier
@@ -607,19 +608,19 @@ mkUniqueId i = do
   mkId <- Mon (mkIdentifier <*> pure Extended)
   seen <- Mon $ use idSeen
   let i' = mkId i
-  case i `elem` seen of
-    True  -> go mkId seen i' 0
-    False -> do Mon (idSeen %= (HashSet.insert i'))
-                return i'
+  case HashMapS.lookup i seen of
+    Just n -> go mkId seen i' n
+    Nothing -> do Mon (idSeen %= (HashMapS.insert i' 0))
+                  return i'
   where
-    go :: (Identifier -> Identifier) -> HashSet Identifier -> Identifier
-       -> Int -> SystemVerilogM Identifier
+    go :: (Identifier -> Identifier) -> HashMapS.HashMap Identifier Word -> Identifier
+       -> Word -> SystemVerilogM Identifier
     go mkId seen i' n = do
       let i'' = mkId (TextS.append i' (TextS.pack ('_':show n)))
-      case i'' `elem` seen of
-        True  -> go mkId seen i' (n+1)
-        False -> do Mon (idSeen %= (HashSet.insert i''))
-                    return i''
+      case HashMapS.lookup i'' seen of
+        Just _  -> go mkId seen i' (n+1)
+        Nothing -> do Mon (idSeen %= (HashMapS.insert i'' (n+1)))
+                      return i''
 
 verilogType :: HWType -> SystemVerilogM Doc
 verilogType t_ = do

@@ -34,7 +34,7 @@ import Control.Monad.State.Strict           (MonadIO, MonadState, StateT)
 import Data.Bits                            (testBit)
 import Data.Binary                          (Binary(..))
 import Data.Hashable
-import Data.HashSet                         (HashSet)
+import Data.HashMap.Strict                  (HashMap)
 import Data.IntMap                          (IntMap, empty)
 import qualified Data.Set                   as Set
 import Data.Text                            (Text, pack)
@@ -74,7 +74,7 @@ data NetlistState
   -- ^ Global binders
   , _varCount       :: !Int
   -- ^ Number of signal declarations
-  , _components     :: VarEnv ([Bool],SrcSpan,HashSet Identifier,Component)
+  , _components     :: VarEnv ([Bool],SrcSpan,HashMap Identifier Word,Component)
   -- ^ Cached components
   , _primitives     :: CompiledPrimMap
   -- ^ Primitive Definitions
@@ -86,8 +86,8 @@ data NetlistState
   , _intWidth       :: Int
   , _mkIdentifierFn :: IdType -> Identifier -> Identifier
   , _extendIdentifierFn :: IdType -> Identifier -> Identifier -> Identifier
-  , _seenIds        :: HashSet Identifier
-  , _seenComps      :: HashSet Identifier
+  , _seenIds        :: HashMap Identifier Word
+  , _seenComps      :: HashMap Identifier Word
   , _seenPrimitives :: Set.Set Text
   -- ^ Keeps track of invocations of ´mkPrimitive´. It is currently used to
   -- filter duplicate warning invocations for dubious blackbox instantiations,

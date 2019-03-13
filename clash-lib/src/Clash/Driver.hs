@@ -10,6 +10,7 @@
 
 {-# LANGUAGE NondecreasingIndentation #-}
 {-# LANGUAGE ScopedTypeVariables      #-}
+{-# LANGUAGE TupleSections            #-}
 
 module Clash.Driver where
 
@@ -22,7 +23,8 @@ import           Control.Monad.Catch              (MonadMask)
 import           Control.Monad.IO.Class           (MonadIO)
 import           Control.Monad.State              (evalState, get)
 import           Data.Hashable                    (hash)
-import           Data.HashSet                     (HashSet)
+import           Data.HashMap.Strict              (HashMap)
+import qualified Data.HashMap.Strict              as HashMap
 import qualified Data.HashSet                     as HashSet
 import           Data.IntMap                      (IntMap)
 import           Data.List                        (intercalate)
@@ -123,7 +125,7 @@ generateHDL
   -> (Clock.UTCTime,Clock.UTCTime)
   -> IO ()
 generateHDL reprs bindingsMap hdlState primMap tcm tupTcm typeTrans eval
-  topEntities opts (startTime,prepTime) = go prepTime HashSet.empty topEntities where
+  topEntities opts (startTime,prepTime) = go prepTime HashMap.empty topEntities where
 
   go prevTime _ [] = putStrLn $ "Total compilation took " ++
                               show (Clock.diffUTCTime prevTime startTime)
@@ -220,7 +222,7 @@ generateHDL reprs bindingsMap hdlState primMap tcm tupTcm typeTrans eval
     then do
       putStrLn ("Using cached result for: " ++ Data.Text.unpack (nameOcc (varName topEntity)))
       topTime <- Clock.getCurrentTime
-      return (topTime,manifest,HashSet.fromList (componentNames manifest) `HashSet.union` seen)
+      return (topTime,manifest,HashMap.unionWith max (HashMap.fromList (map (,0) (componentNames manifest))) seen)
     else do
       -- 1. Normalise topEntity
       let (transformedBindings,is0) = normalizeEntity reprs bindingsMap primMap tcm tupTcm
@@ -257,7 +259,7 @@ generateHDL reprs bindingsMap hdlState primMap tcm tupTcm typeTrans eval
     Just tb | not sameBenchHash -> do
       putStrLn $ "Compiling: " ++ Data.Text.unpack (nameOcc (varName tb))
 
-      let modName'  = genComponentName HashSet.empty mkId prefixM tb
+      let modName'  = genComponentName HashMap.empty mkId prefixM tb
           hdlState2 = setModName modName' hdlState'
 
       -- 1. Normalise testBench
@@ -476,9 +478,9 @@ createHDL
   -- ^ Backend
   -> Identifier
   -- ^ Module hierarchy root
-  -> HashSet Identifier
+  -> HashMap Identifier Word
   -- ^ Component names
-  -> [([Bool],SrcSpan,HashSet Identifier,Component)]
+  -> [([Bool],SrcSpan,HashMap Identifier Word,Component)]
   -- ^ List of components
   -> Component
   -- ^ Top component
@@ -492,7 +494,7 @@ createHDL
   -- + The update manifest file
   -- + The data files that need to be copied
 createHDL backend modName seen components top (topName,manifestE) = flip evalState backend $ getMon $ do
-  (hdlNmDocs,incs) <- unzip <$> mapM (\(_wereVoids,sp,ids,comp) -> genHDL modName sp (seen `HashSet.union` ids) comp) components
+  (hdlNmDocs,incs) <- unzip <$> mapM (\(_wereVoids,sp,ids,comp) -> genHDL modName sp (HashMap.unionWith max seen ids) comp) components
   hwtys <- HashSet.toList <$> extractTypes <$> Mon get
   typesPkg <- mkTyPackage modName hwtys
   dataFiles <- Mon getDataFiles

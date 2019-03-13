@@ -11,8 +11,9 @@ module Clash.Backend where
 
 import Control.Lens                         (Lens')
 import qualified  Control.Lens              as Lens
+import Data.HashMap.Strict                  (HashMap)
+import qualified Data.HashMap.Strict        as HashMap
 import Data.HashSet                         (HashSet)
-import qualified Data.HashSet               as HashSet
 import Data.Maybe                           (fromMaybe)
 import Data.Semigroup.Monad                 (Mon (..))
 import qualified Data.Text                  as T
@@ -59,7 +60,7 @@ class Backend state where
   extractTypes     :: state -> HashSet HWType
 
   -- | Generate HDL for a Netlist component
-  genHDL           :: Identifier -> SrcSpan -> HashSet Identifier -> Component -> Mon (State state) ((String, Doc),[(String,Doc)])
+  genHDL           :: Identifier -> SrcSpan -> HashMap Identifier Word -> Component -> Mon (State state) ((String, Doc),[(String,Doc)])
   -- | Generate a HDL package containing type definitions for the given HWTypes
   mkTyPackage      :: Identifier -> [HWType] -> Mon (State state) [(String, Doc)]
   -- | Convert a Netlist HWType to a target HDL type
@@ -107,7 +108,7 @@ class Backend state where
   getDataFiles     :: State state [(String,FilePath)]
   addMemoryDataFile  :: (String,String) -> State state ()
   getMemoryDataFiles :: State state [(String,String)]
-  seenIdentifiers  :: Lens' state (HashSet Identifier)
+  seenIdentifiers  :: Lens' state (HashMap Identifier Word)
 
 -- | Replace a normal HDL template placeholder with an unescaped/unextended
 -- template placeholder.
@@ -132,17 +133,19 @@ mkUniqueIdentifier typ nm = do
   extendId <- extendIdentifier
   seen     <- Lens.use seenIdentifiers
   let i = mkId typ nm
-  if i `elem` seen
-     then go extendId (0::Int) seen i
-     else do seenIdentifiers Lens.%= (HashSet.insert i)
-             return i
+  case HashMap.lookup i seen of
+    Just n -> go extendId n seen i
+    Nothing -> do
+     seenIdentifiers Lens.%= (HashMap.insert i 0)
+     return i
  where
   go extendId n seen i = do
     let i' = extendId typ i (T.pack ('_':show n))
-    if i' `elem` seen
-       then go extendId (n+1) seen i
-       else do seenIdentifiers Lens.%= (HashSet.insert i')
-               return i'
+    case HashMap.lookup i' seen of
+       Just _ -> go extendId (n+1) seen i
+       Nothing -> do
+        seenIdentifiers Lens.%= (HashMap.insert i' (n+1))
+        return i'
 
 preserveSeen
   :: Backend s

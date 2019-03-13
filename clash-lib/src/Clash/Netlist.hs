@@ -26,9 +26,9 @@ import           Control.Monad.State.Strict       (runStateT)
 import           Data.Binary.IEEE754              (floatToWord, doubleToWord)
 import           Data.Char                        (ord)
 import           Data.Either                      (lefts,partitionEithers)
+import           Data.HashMap.Strict              (HashMap)
+import qualified Data.HashMap.Strict              as HashMapS
 import qualified Data.HashMap.Lazy                as HashMap
-import           Data.HashSet                     (HashSet)
-import qualified Data.HashSet                     as HashSet
 import           Data.List                        (elemIndex, sortOn)
 import           Data.Maybe                       (catMaybes, listToMaybe, fromMaybe)
 import qualified Data.Set                         as Set
@@ -99,7 +99,7 @@ genNetlist
   -- ^ valid identifiers
   -> (IdType -> Identifier -> Identifier -> Identifier)
   -- ^ extend valid identifiers
-  -> HashSet Identifier
+  -> HashMap Identifier Word
   -- ^ Seen components
   -> FilePath
   -- ^ HDL dir
@@ -107,7 +107,7 @@ genNetlist
   -- ^ Component name prefix
   -> Id
   -- ^ Name of the @topEntity@
-  -> IO ([([Bool],SrcSpan,HashSet Identifier,Component)],HashSet Identifier)
+  -> IO ([([Bool],SrcSpan,HashMap Identifier Word,Component)],HashMap Identifier Word)
 genNetlist isTb opts reprs globals is0 tops primMap tcm typeTrans iw mkId extId seen env prefixM topEntity = do
   (_,s) <- runNetlistMonad isTb opts reprs globals is0 (mkTopEntityMap tops)
              primMap tcm typeTrans iw mkId extId seen env prefixM $
@@ -147,7 +147,7 @@ runNetlistMonad
   -- ^ valid identifiers
   -> (IdType -> Identifier -> Identifier -> Identifier)
   -- ^ extend valid identifiers
-  -> HashSet Identifier
+  -> HashMap Identifier Word
   -- ^ Seen components
   -> FilePath
   -- ^ HDL dir
@@ -163,21 +163,21 @@ runNetlistMonad isTb opts reprs s is0 tops p tcm typeTrans iw mkId extId seenIds
     s' =
       NetlistState
         s 0 emptyVarEnv p typeTrans tcm (StrictText.empty,noSrcSpan) iw mkId
-        extId HashSet.empty seenIds' Set.empty names tops env 0 prefixM reprs is0 opts isTb
+        extId HashMapS.empty seenIds' Set.empty names tops env 0 prefixM reprs is0 opts isTb
 
     (seenIds',names) = genNames mkId prefixM seenIds_ emptyVarEnv s
 
 genNames :: (IdType -> Identifier -> Identifier)
          -> (Maybe Identifier,Maybe Identifier)
-         -> HashSet Identifier
+         -> HashMap Identifier Word
          -> VarEnv Identifier
          -> BindingMap
-         -> (HashSet Identifier, VarEnv Identifier)
+         -> (HashMap Identifier Word, VarEnv Identifier)
 genNames mkId prefixM s0 m0 = foldl go (s0,m0)
   where
     go (s,m) (v,_,_,_) =
       let nm' = genComponentName s mkId prefixM v
-          s'  = HashSet.insert nm' s
+          s'  = HashMapS.insert nm' 0 s
           m'  = extendVarEnv v nm' m
       in (s', m')
 
@@ -185,7 +185,7 @@ genNames mkId prefixM s0 m0 = foldl go (s0,m0)
 genComponent
   :: Id
   -- ^ Name of the function
-  -> NetlistMonad ([Bool],SrcSpan,HashSet Identifier,Component)
+  -> NetlistMonad ([Bool],SrcSpan,HashMap Identifier Word,Component)
 genComponent compName = do
   compExprM <- lookupVarEnv compName <$> Lens.use bindings
   case compExprM of
@@ -201,7 +201,7 @@ genComponentT
   -- ^ Name of the function
   -> Term
   -- ^ Corresponding term
-  -> NetlistMonad ([Bool],SrcSpan,HashSet Identifier,Component)
+  -> NetlistMonad ([Bool],SrcSpan,HashMap Identifier Word,Component)
 genComponentT compName componentExpr = do
   varCount .= 0
   componentName1 <- (`lookupVarEnv'` compName) <$> Lens.use componentNames
@@ -222,7 +222,7 @@ genComponentT compName componentExpr = do
   topEntityTypeM     <- lookupVarEnv compName <$> Lens.use topEntityAnns
   let topEntityTypeM' = snd . splitCoreFunForallTy tcm . fst <$> topEntityTypeM
 
-  seenIds .= HashSet.empty
+  seenIds .= HashMapS.empty
   (wereVoids,compInps,argWrappers,compOutps,resUnwrappers,binders,resultM) <-
     case splitNormalized tcm componentExpr of
       Right (args, binds, res) -> do
