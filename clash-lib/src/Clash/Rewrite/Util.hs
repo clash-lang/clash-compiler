@@ -199,7 +199,7 @@ runRewriteSession :: RewriteEnv
                   -> RewriteState extra
                   -> RewriteMonad extra a
                   -> a
-runRewriteSession r s m = traceIf True ("Applied " ++
+runRewriteSession r s m = traceIf True ("Clash: Applied " ++
                                         show (s' ^. transformCounter) ++
                                         " transformations")
                                   a

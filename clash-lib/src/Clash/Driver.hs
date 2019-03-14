@@ -127,13 +127,13 @@ generateHDL
 generateHDL reprs bindingsMap hdlState primMap tcm tupTcm typeTrans eval
   topEntities opts (startTime,prepTime) = go prepTime HashMap.empty topEntities where
 
-  go prevTime _ [] = putStrLn $ "Total compilation took " ++
+  go prevTime _ [] = putStrLn $ "Clash: Total compilation took " ++
                               show (Clock.diffUTCTime prevTime startTime)
 
   -- Process the next TopEntity
   go prevTime seen ((topEntity,annM,benchM):topEntities') = do
   let topEntityS = Data.Text.unpack (nameOcc (varName topEntity))
-  putStrLn $ "Compiling: " ++ topEntityS
+  putStrLn $ "Clash: Compiling " ++ topEntityS
 
   -- Some initial setup
   let modName1 = takeWhile (/= '.') topEntityS
@@ -169,7 +169,7 @@ generateHDL reprs bindingsMap hdlState primMap tcm tupTcm typeTrans eval
       topNm     = genTopComponentName mkId prefixM annM topEntity
       topNmU    = Data.Text.unpack topNm
 
-  unless (opt_cachehdl opts) $ putStrLn "Ignoring .manifest files"
+  unless (opt_cachehdl opts) $ putStrLn "Clash: Ignoring .manifest files"
 
   -- Calculate the hash over the callgraph and the topEntity annotation
   (sameTopHash,sameBenchHash,manifest) <- do
@@ -220,7 +220,7 @@ generateHDL reprs bindingsMap hdlState primMap tcm tupTcm typeTrans eval
 
   (topTime,manifest',seen') <- if sameTopHash
     then do
-      putStrLn ("Using cached result for: " ++ Data.Text.unpack (nameOcc (varName topEntity)))
+      putStrLn ("Clash: Using cached result for: " ++ Data.Text.unpack (nameOcc (varName topEntity)))
       topTime <- Clock.getCurrentTime
       return (topTime,manifest,HashMap.unionWith max (HashMap.fromList (map (,0) (componentNames manifest))) seen)
     else do
@@ -231,7 +231,7 @@ generateHDL reprs bindingsMap hdlState primMap tcm tupTcm typeTrans eval
 
       normTime <- transformedBindings `deepseq` Clock.getCurrentTime
       let prepNormDiff = Clock.diffUTCTime normTime prevTime
-      putStrLn $ "Normalisation took " ++ show prepNormDiff
+      putStrLn $ "Clash: Normalisation took " ++ show prepNormDiff
 
       -- 2. Generate netlist for topEntity
       (netlist,seen') <-
@@ -240,7 +240,7 @@ generateHDL reprs bindingsMap hdlState primMap tcm tupTcm typeTrans eval
 
       netlistTime <- netlist `deepseq` Clock.getCurrentTime
       let normNetDiff = Clock.diffUTCTime netlistTime normTime
-      putStrLn $ "Netlist generation took " ++ show normNetDiff
+      putStrLn $ "Clash: Netlist generation took " ++ show normNetDiff
 
       -- 3. Generate topEntity wrapper
       let topComponent = view _4 . head $ filter (Data.Text.isSuffixOf topNm . componentName . view _4) netlist
@@ -257,7 +257,7 @@ generateHDL reprs bindingsMap hdlState primMap tcm tupTcm typeTrans eval
 
   benchTime <- case benchM of
     Just tb | not sameBenchHash -> do
-      putStrLn $ "Compiling: " ++ Data.Text.unpack (nameOcc (varName tb))
+      putStrLn $ "Clash: Compiling " ++ Data.Text.unpack (nameOcc (varName tb))
 
       let modName'  = genComponentName HashMap.empty mkId prefixM tb
           hdlState2 = setModName modName' hdlState'
@@ -267,7 +267,7 @@ generateHDL reprs bindingsMap hdlState primMap tcm tupTcm typeTrans eval
                                   typeTrans eval topEntityNames opts supplyTB tb
       normTime <- transformedBindings `deepseq` Clock.getCurrentTime
       let prepNormDiff = Clock.diffUTCTime normTime topTime
-      putStrLn $ "Testbench normalisation took " ++ show prepNormDiff
+      putStrLn $ "Clash: Testbench normalisation took " ++ show prepNormDiff
 
       -- 2. Generate netlist for topEntity
       (netlist,seen'') <-
@@ -276,7 +276,7 @@ generateHDL reprs bindingsMap hdlState primMap tcm tupTcm typeTrans eval
 
       netlistTime <- netlist `deepseq` Clock.getCurrentTime
       let normNetDiff = Clock.diffUTCTime netlistTime normTime
-      putStrLn $ "Testbench netlist generation took " ++ show normNetDiff
+      putStrLn $ "Clash: Testbench netlist generation took " ++ show normNetDiff
 
       -- 3. Write HDL
       let (hdlDocs,_,dfiles,mfiles) = createHDL hdlState2 modName' seen'' netlist undefined
@@ -292,8 +292,8 @@ generateHDL reprs bindingsMap hdlState primMap tcm tupTcm typeTrans eval
 
     Just tb -> do
       let tb' = Data.Text.unpack (nameOcc (varName tb))
-      putStrLn ("Compiling: " ++ tb')
-      putStrLn ("Using cached result for: " ++ tb')
+      putStrLn ("Clash: Compiling: " ++ tb')
+      putStrLn ("Clash: Using cached result for: " ++ tb')
       return topTime
 
     Nothing -> return topTime
