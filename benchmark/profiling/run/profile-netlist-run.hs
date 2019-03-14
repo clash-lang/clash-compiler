@@ -13,7 +13,7 @@ import           Control.DeepSeq              (deepseq)
 import           Control.Exception            (finally)
 import           Control.Monad.State          (evalState)
 import           Data.Binary                  (decode)
-import qualified Data.HashSet                 as HashSet
+import qualified Data.HashMap.Strict          as HashMap
 import           Data.List                    (partition)
 import           Data.Maybe                   (fromMaybe)
 import qualified Data.Text                    as Text
@@ -57,7 +57,7 @@ benchFile tmpDir idirs src = do
       mkId1      = evalState mkIdentifier hdlState'
       extId      = evalState extendIdentifier hdlState'
       prefixM    = (Nothing,Nothing)
-      seen       = HashSet.empty
+      seen       = HashMap.empty
       hdlDir     = fromMaybe "." (opt_hdlDir opts1) </>
                          Clash.Backend.name hdlState' </>
                          takeWhile (/= '.') topEntityS

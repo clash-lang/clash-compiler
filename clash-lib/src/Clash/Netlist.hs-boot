@@ -15,7 +15,7 @@ module Clash.Netlist
   ,mkFunApp
   ) where
 
-import Data.HashSet         (HashSet)
+import Data.HashMap.Strict  (HashMap)
 import Clash.Core.DataCon   (DataCon)
 import Clash.Core.Term      (Alt,LetBinding,Term)
 import Clash.Core.Type      (Type)
@@ -26,7 +26,7 @@ import SrcLoc               (SrcSpan)
 
 
 genComponent :: Id
-             -> NetlistMonad ([Bool],SrcSpan,HashSet Identifier,Component)
+             -> NetlistMonad ([Bool],SrcSpan,HashMap Identifier Word,Component)
 
 mkExpr :: Bool
        -> Either Identifier Id

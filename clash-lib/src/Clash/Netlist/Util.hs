@@ -26,12 +26,13 @@ import qualified Control.Lens            as Lens
 import           Control.Monad           (unless, when, zipWithM, join)
 import           Control.Monad.Trans.Except (runExcept)
 import           Data.Either             (partitionEithers)
-import           Data.HashSet            (HashSet)
-import qualified Data.HashSet            as HashSet
+import           Data.HashMap.Strict     (HashMap)
+import qualified Data.HashMap.Strict     as HashMap
 import           Data.String             (fromString)
 import           Data.List               (intersperse, unzip4, sort, intercalate)
 import qualified Data.List               as List
 import           Data.Maybe              (catMaybes,fromMaybe,isNothing)
+import           Data.Monoid             (First (..))
 import           Text.Printf             (printf)
 import           Data.Semigroup          ((<>))
 import           Data.Text               (Text)
@@ -638,7 +639,7 @@ mkUniqueNormalized topMM (args,binds,res) = do
         Nothing  -> []
         Just top -> collectPortNames top
 
-  seenIds %= (HashSet.fromList portNames `HashSet.union`)
+  seenIds %= (HashMap.unionWith max (HashMap.fromList (map (,0) portNames)))
 
   let (bndrs,exprs) = unzip binds
 
@@ -844,21 +845,21 @@ mkUniqueIdentifier typ nm = do
   seen  <- Lens.use seenIds
   seenC <- Lens.use seenComps
   i     <- mkIdentifier typ nm
-  let memberSeen k = k `HashSet.member` seen || k `HashSet.member` seenC
-  if memberSeen i
-     then go 0 memberSeen i
-     else do
-      seenIds %= (HashSet.insert i)
+  let getCopyIter k = getFirst (First (HashMap.lookup k seen) <> First (HashMap.lookup k seenC))
+  case getCopyIter i of
+    Just n -> go n getCopyIter i
+    Nothing -> do
+      seenIds %= HashMap.insert i 0
       return i
-  where
-    go :: Integer -> (Identifier -> Bool) -> Identifier -> NetlistMonad Identifier
-    go n g i = do
-      i' <- extendIdentifier typ i (Text.pack ('_':show n))
-      if g i'
-         then go (n+1) g i
-         else do
-          seenIds %= (HashSet.insert i')
-          return i'
+ where
+  go :: Word -> (Identifier -> Maybe Word) -> Identifier -> NetlistMonad Identifier
+  go n g i = do
+    i'  <- extendIdentifier typ i (Text.pack ('_':show n))
+    case g i' of
+      Just _  -> go (n+1) g i
+      Nothing -> do
+        seenIds %= HashMap.insert i (n+1)
+        return i'
 
 -- | Preserve the Netlist '_varEnv' and '_varCount' when executing a monadic action
 preserveVarEnv :: NetlistMonad a
@@ -922,7 +923,7 @@ uniquePortName [] i = mkUniqueIdentifier Extended i
 uniquePortName x  _ = do
   let xT = Text.pack x
   xTB <- mkIdentifier Basic xT
-  seenIds %= (\s -> List.foldl' (flip HashSet.insert) s [xT,xTB])
+  seenIds %= (\s -> List.foldl' (\m k -> HashMap.insert k 0 m) s [xT,xTB])
   return xT
 
 mkInput
@@ -1076,7 +1077,7 @@ mkRTreeChain d elTy es =
         ]
 
 genComponentName
-  :: HashSet Identifier
+  :: HashMap Identifier Word
   -> (IdType -> Identifier -> Identifier)
   -> (Maybe Identifier,Maybe Identifier)
   -> Id
@@ -1088,14 +1089,16 @@ genComponentName seen mkIdFn prefixM nm =
       prefix = maybe id (:) (snd prefixM) (init nm')
       nm2 = Text.concat (intersperse (Text.pack "_") (prefix ++ [fn']))
       nm3 = mkIdFn Basic nm2
-  in  if nm3 `elem` seen then go 0 nm3 else nm3
+  in  case HashMap.lookup nm3 seen of
+        Just n  -> go n nm3
+        Nothing -> nm3
   where
-    go :: Integer -> Identifier -> Identifier
+    go :: Word -> Identifier -> Identifier
     go n i =
       let i' = mkIdFn Basic (i `Text.append` Text.pack ('_':show n))
-      in  if i' `elem` seen
-             then go (n+1) i
-             else i'
+      in  case HashMap.lookup i' seen of
+             Just _  -> go (n+1) i
+             Nothing -> i'
 
 genTopComponentName
   :: (IdType -> Identifier -> Identifier)
@@ -1108,7 +1111,7 @@ genTopComponentName _mkIdFn prefixM (Just ann) _nm =
     (Just p,_) -> p `Text.append` Text.pack ('_':t_name ann)
     _          -> Text.pack (t_name ann)
 genTopComponentName mkIdFn prefixM Nothing nm =
-  genComponentName HashSet.empty mkIdFn prefixM nm
+  genComponentName HashMap.empty mkIdFn prefixM nm
 
 
 -- | Strips one or more layers of attributes from a HWType; stops at first
