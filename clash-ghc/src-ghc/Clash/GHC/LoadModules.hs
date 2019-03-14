@@ -28,6 +28,7 @@ where
 import           Clash.Annotations.Primitive     (HDL, PrimitiveGuard)
 import           Clash.Annotations.TopEntity     (TopEntity (..))
 import           Control.Arrow                   (first, second)
+import           Control.DeepSeq                 (deepseq)
 #if MIN_VERSION_ghc(8,6,0)
 import           Control.Exception               (throwIO)
 #endif
@@ -38,6 +39,7 @@ import           Data.Typeable                   (Typeable)
 import           Data.List                       (foldl', lookup, nub)
 import           Data.Maybe                      (catMaybes, listToMaybe, mapMaybe)
 import qualified Data.Text                       as Text
+import qualified Data.Time.Clock                 as Clock
 import           System.Exit                     (ExitCode (..))
 import           System.IO                       (hGetLine)
 import           System.IO.Error                 (tryIOError)
@@ -134,7 +136,7 @@ loadModules
         )
 loadModules tmpDir useColor hdl modName dflagsM idirs = do
   libDir <- MonadUtils.liftIO ghcLibDir
-
+  startTime <- Clock.getCurrentTime
   GHC.runGhc (Just libDir) $ do
     dflags <- case dflagsM of
                 Just df -> return df
@@ -234,8 +236,16 @@ loadModules tmpDir useColor hdl modName dflagsM idirs = do
         plusFamInst f1 f2        = FamInstEnv.extendFamInstEnvList f1 (FamInstEnv.famInstEnvElts f2)
         modFamInstEnvs'          = foldl' plusFamInst FamInstEnv.emptyFamInstEnv modFamInstEnvs
 
+    modTime <- startTime `deepseq` length binderIds `deepseq` MonadUtils.liftIO Clock.getCurrentTime
+    let modStartDiff = Clock.diffUTCTime modTime startTime
+    MonadUtils.liftIO $ putStrLn $ "GHC: Parsing and optimising modules took: " ++ show modStartDiff
+
     (externalBndrs,clsOps,unlocatable,pFP,reprs) <-
       loadExternalExprs tmpDir hdl (UniqSet.mkUniqSet binderIds) bindersC
+
+    extTime <- modTime `deepseq` length unlocatable `deepseq` MonadUtils.liftIO Clock.getCurrentTime
+    let extModDiff = Clock.diffUTCTime extTime modTime
+    MonadUtils.liftIO $ putStrLn $ "GHC: Loading external modules from interface files took: " ++ show extModDiff
 
     -- Find local primitive annotations
     pFP' <- findPrimitiveAnnotations hdl tmpDir binderIds
@@ -290,14 +300,21 @@ loadModules tmpDir useColor hdl modName dflagsM idirs = do
         (_, _) ->
           Panic.pgmError $ $(curLoc) ++ "Multiple 'topEntities' found."
 
+    let pFP1   = nub $ pFP ++ pFP'
+        reprs1 = reprs ++ reprs'
+
+    annTime <- extTime `deepseq` length topEntities' `deepseq` pFP1 `deepseq`
+               reprs1 `deepseq` primGuards `deepseq` MonadUtils.liftIO Clock.getCurrentTime
+    let annExtDiff = Clock.diffUTCTime annTime extTime
+    MonadUtils.liftIO $ putStrLn $ "GHC: Parsing annotations took: " ++ show annExtDiff
 
     return ( bindersC ++ makeRecursiveGroups externalBndrs
            , clsOps
            , unlocatable
            , (fst famInstEnvs, modFamInstEnvs')
            , topEntities'
-           , nub $ pFP ++ pFP'
-           , reprs ++ reprs'
+           , pFP1
+           , reprs1
            , primGuards
            )
 

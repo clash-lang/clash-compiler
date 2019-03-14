@@ -2013,7 +2013,7 @@ makeHDL backend optsRef srcs = do
                   generateBindings tmpDir color primDirs idirs hdl src (Just dflags)
                 prepTime <- startTime `deepseq` bindingsMap `deepseq` tcm `deepseq` Clock.getCurrentTime
                 let prepStartDiff = Clock.diffUTCTime prepTime startTime
-                putStrLn $ "Loading dependencies took " ++ show prepStartDiff
+                putStrLn $ "GHC+Clash: Loading modules cumulatively took " ++ show prepStartDiff
 
                 -- Parsing / compiling primitives:
                 startTime' <- Clock.getCurrentTime
@@ -2021,7 +2021,7 @@ makeHDL backend optsRef srcs = do
                 primMap'   <- sequence $ HM.map (sequence . fmap (Clash.Driver.compilePrimitive idirs dbs (topDir dflags))) primMap
                 prepTime'  <- startTime' `deepseq` primMap' `seq` Clock.getCurrentTime
                 let prepStartDiff' = Clock.diffUTCTime prepTime' startTime'
-                putStrLn $ "Parsing and compiling primitives took " ++ show prepStartDiff'
+                putStrLn $ "Clash: Parsing and compiling primitives took " ++ show prepStartDiff'
 
                 -- Generate HDL:
                 Clash.Driver.generateHDL
