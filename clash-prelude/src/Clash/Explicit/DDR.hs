@@ -48,6 +48,7 @@ import Clash.Signal.Internal
 -- of values.
 ddrIn
   :: ( HasCallStack
+     , Undefined a
      , fast ~ 'Dom n pFast
      , slow ~ 'Dom n (2*pFast))
   => Clock slow gated
@@ -68,6 +69,7 @@ ddrIn clk rst (i0,i1,i2) = withFrozenCallStack $ ddrIn# clk rst i0 i1 i2
 ddrIn#
   :: forall a slow fast n pFast gated synchronous
    . ( HasCallStack
+     , Undefined a
      , fast ~ 'Dom n pFast
      , slow ~ 'Dom n (2*pFast))
   => Clock slow gated
@@ -78,9 +80,9 @@ ddrIn#
   -> Signal fast a
   -> Signal slow (a,a)
 ddrIn# (Clock {}) (Sync rst) i0 i1 i2 =
-  go ((errorX "ddrIn: initial value 0 undefined")
-     ,(errorX "ddrIn: initial value 1 undefined")
-     ,(errorX "ddrIn: initial value 2 undefined"))
+  go ((deepErrorX "ddrIn: initial value 0 undefined")
+     ,(deepErrorX "ddrIn: initial value 1 undefined")
+     ,(deepErrorX "ddrIn: initial value 2 undefined"))
      rst
   where
     go :: (a,a,a) -> Signal slow Bool -> Signal fast a -> Signal slow (a,a)
@@ -89,9 +91,9 @@ ddrIn# (Clock {}) (Sync rst) i0 i1 i2 =
       in o0 `seqX` o1 `seqX` (o0,o1) :- (rt `seq` as `seq` go (o0',o1',o2') rs xs)
 
 ddrIn# (Clock {}) (Async rst) i0 i1 i2 =
-  go ((errorX "ddrIn: initial value 0 undefined")
-     ,(errorX "ddrIn: initial value 1 undefined")
-     ,(errorX "ddrIn: initial value 2 undefined"))
+  go ((deepErrorX "ddrIn: initial value 0 undefined")
+     ,(deepErrorX "ddrIn: initial value 1 undefined")
+     ,(deepErrorX "ddrIn: initial value 2 undefined"))
      rst
   where
     go :: (a,a,a) -> Signal slow Bool -> Signal fast a -> Signal slow (a,a)
@@ -100,9 +102,9 @@ ddrIn# (Clock {}) (Async rst) i0 i1 i2 =
       in o0' `seqX` o1' `seqX`(o0',o1') :- (as `seq` go (o2',x0,x1) rs xs)
 
 ddrIn# (GatedClock _ _ ena) (Sync rst) i0 i1 i2 =
-  go ((errorX "ddrIn: initial value 0 undefined")
-     ,(errorX "ddrIn: initial value 1 undefined")
-     ,(errorX "ddrIn: initial value 2 undefined"))
+  go ((deepErrorX "ddrIn: initial value 0 undefined")
+     ,(deepErrorX "ddrIn: initial value 1 undefined")
+     ,(deepErrorX "ddrIn: initial value 2 undefined"))
      rst
      ena
   where
@@ -114,9 +116,9 @@ ddrIn# (GatedClock _ _ ena) (Sync rst) i0 i1 i2 =
                                       else go (o0 ,o1 ,o2)    rs es xs)
 
 ddrIn# (GatedClock _ _ ena) (Async rst) i0 i1 i2 =
-  go ((errorX "ddrIn: initial value 0 undefined")
-     ,(errorX "ddrIn: initial value 1 undefined")
-     ,(errorX "ddrIn: initial value 2 undefined"))
+  go ((deepErrorX "ddrIn: initial value 0 undefined")
+     ,(deepErrorX "ddrIn: initial value 1 undefined")
+     ,(deepErrorX "ddrIn: initial value 2 undefined"))
      rst
      ena
   where
