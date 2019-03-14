@@ -331,9 +331,21 @@ mkPrimitive bbEParen bbEasD dst nm args ty =
                   resM <- resBndr False Wire dst
                   case resM of
                     Just (dst',_,_) -> do
-                      (bbCtx,ctxDcls)     <- mkBlackBoxContext dst' (lefts args)
-                      (bbTempl,templDecl) <- prepareBlackBox pNm tempE bbCtx
-                      return (BlackBoxE pNm (libraries p) (imports p) (includes p) bbTempl bbCtx bbEParen,ctxDcls ++ templDecl)
+                      (bbCtx,ctxDcls)      <- mkBlackBoxContext dst' (lefts args)
+                      (bbTempl,templDecl0) <- prepareBlackBox pNm tempE bbCtx
+                      let templDecl1 = case nm of
+                            "Clash.Sized.Internal.BitVector.fromInteger#"
+                              | [N.Literal _ (NumLit _), N.Literal _ _, N.Literal _ _] <- extractLiterals bbCtx -> []
+                            "Clash.Sized.Internal.BitVector.fromInteger##"
+                              | [N.Literal _ _, N.Literal _ _] <- extractLiterals bbCtx -> []
+                            "Clash.Sized.Internal.Index.fromInteger#"
+                              | [N.Literal _ (NumLit _), N.Literal _ _] <- extractLiterals bbCtx -> []
+                            "Clash.Sized.Internal.Signed.fromInteger#"
+                              | [N.Literal _ (NumLit _), N.Literal _ _] <- extractLiterals bbCtx -> []
+                            "Clash.Sized.Internal.Unsigned.fromInteger#"
+                              | [N.Literal _ (NumLit _), N.Literal _ _] <- extractLiterals bbCtx -> []
+                            _ -> templDecl0
+                      return (BlackBoxE pNm (libraries p) (imports p) (includes p) bbTempl bbCtx bbEParen,ctxDcls ++ templDecl1)
                     Nothing -> return (Identifier "__VOID__" Nothing,[])
         P.Primitive pNm _
           | pNm == "GHC.Prim.tagToEnum#" -> do
