@@ -29,7 +29,7 @@ CallStack (from HasCallStack):
 
 module Clash.XException
   ( -- * 'X': An exception for uninitialized values
-    XException, errorX, isX, maybeX
+    XException (..), errorX, isX, maybeX
     -- * Printing 'X' exceptions as \"X\"
   , ShowX (..), showsX, printX, showsPrecXWith
     -- * Strict evaluation
