@@ -269,7 +269,10 @@ step eval gbl tcm (h, k, e) = case e of
     | nm `elem` ["GHC.Prim.realWorld#"]
     -> unwind eval gbl tcm h k (PrimVal nm ty' [] [])
     | otherwise
-    -> eval (isScrut k) gbl tcm h k nm ty' [] []
+    -> case fst (splitFunForallTy ty')  of
+        []  -> eval (isScrut k) gbl tcm h k nm ty' [] []
+        tys -> let (h2,e') = mkAbstr (h,e) tys
+               in  step eval gbl tcm (h2,k,e')
   (App e1 e2)  -> let (h2,id_) = newLetBinding tcm h e2
                   in  Just (h2,Apply id_:k,e1)
   (TyApp e1 ty) -> Just (h,Instantiate ty:k,e1)
