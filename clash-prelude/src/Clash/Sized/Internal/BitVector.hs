@@ -170,8 +170,8 @@ import                qualified Data.List                  as L
 data BitVector (n :: Nat) =
     -- | The constructor, 'BV', and  the field, 'unsafeToInteger', are not
     -- synthesisable.
-    BV { unsafeMask      :: Integer
-       , unsafeToInteger :: Integer
+    BV { unsafeMask      :: !Integer
+       , unsafeToInteger :: !Integer
        }
   deriving Data
 
@@ -181,8 +181,8 @@ data BitVector (n :: Nat) =
 data Bit =
   -- | The constructor, 'Bit', and  the field, 'unsafeToInteger#', are not
   -- synthesisable.
-  Bit { unsafeMask#      :: Integer
-      , unsafeToInteger# :: Integer
+  Bit { unsafeMask#      :: !Integer
+      , unsafeToInteger# :: !Integer
       }
   deriving Data
 
