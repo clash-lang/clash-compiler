@@ -94,7 +94,8 @@ import Clash.Class.Num            (ExtendingNum (..), SaturatingNum (..),
 import Clash.Class.Resize         (Resize (..))
 import {-# SOURCE #-} Clash.Sized.Internal.BitVector (BitVector (BV),undefError)
 import Clash.Promoted.Nat         (SNat, snatToNum, leToPlusKN)
-import Clash.XException           (ShowX (..), Undefined (..), errorX, showsPrecXWith)
+import Clash.XException
+  (ShowX (..), Undefined (..), errorX, showsPrecXWith, rwhnfX)
 
 -- | Arbitrary-bounded unsigned integer represented by @ceil(log_2(n))@ bits.
 --
@@ -357,7 +358,9 @@ instance Show (Index n) where
 instance ShowX (Index n) where
   showsPrecX = showsPrecXWith showsPrec
 
-instance Undefined (Index n) where deepErrorX = errorX
+instance Undefined (Index n) where
+  deepErrorX = errorX
+  rnfX = rwhnfX
 
 -- | None of the 'Read' class' methods are synthesisable.
 instance KnownNat n => Read (Index n) where

@@ -273,6 +273,7 @@ test-suite unittests
 
   Other-Modules: Clash.Tests.DerivingDataRepr
                  Clash.Tests.DerivingDataReprTypes
+                 Clash.Tests.Undefined
 
 
 benchmark benchmark-clash-prelude

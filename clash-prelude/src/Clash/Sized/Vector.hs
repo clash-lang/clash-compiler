@@ -107,6 +107,7 @@ where
 import Control.DeepSeq            (NFData (..))
 import qualified Control.Lens     as Lens hiding (pattern (:>), pattern (:<))
 import Data.Default.Class         (Default (..))
+import Data.Either                (isLeft)
 import qualified Data.Foldable    as F
 import Data.Kind                  (Type)
 import Data.Proxy                 (Proxy (..))
@@ -134,8 +135,9 @@ import Clash.Promoted.Nat.Literals (d1)
 import Clash.Sized.Internal.BitVector (Bit, BitVector, (++#), split#)
 import Clash.Sized.Index          (Index)
 
-import Clash.Class.BitPack (BitPack (..), packXWith)
-import Clash.XException    (ShowX (..), Undefined (..), showsX, showsPrecXWith)
+import Clash.Class.BitPack        (packXWith, BitPack (..))
+import Clash.XException
+  (ShowX (..), Undefined (..), isX, showsX, showsPrecXWith, seqX)
 
 {- $setup
 >>> :set -XDataKinds
@@ -296,6 +298,13 @@ instance (Default a, KnownNat n) => Default (Vec n a) where
 
 instance (Undefined a, KnownNat n) => Undefined (Vec n a) where
   deepErrorX x = repeat (deepErrorX x)
+
+  rnfX v = if isLeft (isX v) then () else go v
+   where
+    go :: Vec n a -> ()
+    go Nil         = ()
+    go (Cons x xs) = rnfX x `seqX` rnfX xs
+
 
 {-# INLINE singleton #-}
 -- | Create a vector of one element

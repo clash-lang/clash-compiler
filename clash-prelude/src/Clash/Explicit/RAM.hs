@@ -43,7 +43,7 @@ import Clash.Explicit.Signal ((.&&.), unbundle, unsafeSynchronizer)
 import Clash.Promoted.Nat    (SNat (..), snatToNum, pow2SNat)
 import Clash.Signal.Internal (Clock (..), Signal (..), clockEnable)
 import Clash.Sized.Unsigned  (Unsigned)
-import Clash.XException      (errorX, maybeX)
+import Clash.XException      (errorX, maybeIsX)
 
 -- | Create a RAM with space for 2^@n@ elements
 --
@@ -132,11 +132,11 @@ asyncRam# wclk rclk sz rd en wr din =
           o    = ram V.! r
       in  o :- go ram' rs es ws ds
 
-    upd ram we waddr d = case maybeX we of
-      Nothing -> case maybeX waddr of
+    upd ram we waddr d = case maybeIsX we of
+      Nothing -> case maybeIsX waddr of
         Nothing -> V.map (const (seq waddr d)) ram
         Just wa -> ram V.// [(wa,d)]
-      Just True -> case maybeX waddr of
+      Just True -> case maybeIsX waddr of
         Nothing -> V.map (const (seq waddr d)) ram
         Just wa -> ram V.// [(wa,d)]
       _ -> ram
