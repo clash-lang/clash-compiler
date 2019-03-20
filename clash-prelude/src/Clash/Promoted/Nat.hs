@@ -448,7 +448,7 @@ stripZeros (B0 x)  = case stripZeros x of
   BT -> BT
   k  -> B0 k
 
--- | Change a function that has an argument with an @(n + k)@ constraint to a
+-- | Change a function that has an argument with an @(n ~ (k + m))@ constraint to a
 -- function with an argument that has an @(k <= n)@ constraint.
 --
 -- __NB__ It is the dual to 'plusToLe'
@@ -460,26 +460,24 @@ stripZeros (B0 x)  = case stripZeros x of
 -- @
 -- f :: Index (n+1) -> Index (n + 1) -> Bool
 --
--- g :: (1 '<=' n) => Index n -> Index n -> Bool
--- g a b = 'leToPlus' \@1 $ \\a' -> 'leToPlus' \@1 $ \\b' -> f a' b'
+-- g :: forall n. (1 '<=' n) => Index n -> Index n -> Bool
+-- g a b = 'leToPlus' \@1 \@n (f a b)
 -- @
 --
 -- Example 2
 --
 -- @
--- import Data.Bifunctor.Flip
---
 -- head :: Vec (n + 1) a -> a
 --
--- head' :: (1 '<=' n) => Vec n a -> a
--- head' a = 'leToPlus' \@1 (Flip a) (head . runFlip)
+-- head' :: forall n a. (1 '<=' n) => Vec n a -> a
+-- head' = 'leToPlus' @1 @n head
 -- @
 leToPlus
   :: forall (k :: Nat) (n :: Nat) r
    . ( k <= n
      )
   => (forall m . (n ~ (k + m)) => r)
-  -- ^ Context with the (k + m ~ n) constraint
+  -- ^ Context with the @(n ~ (k + m))@ constraint
   -> r
 leToPlus r = r @(n - k)
 {-# INLINE leToPlus #-}
@@ -492,7 +490,7 @@ leToPlusKN
      , KnownNat n
      )
   => (forall m . (n ~ (k + m), KnownNat m) => r)
-  -- ^ Context with the @(n ~ k + m)@ constraint
+  -- ^ Context with the @(n ~ (k + m))@ constraint
   -> r
 leToPlusKN r = r @(n - k)
 {-# INLINE leToPlusKN #-}
