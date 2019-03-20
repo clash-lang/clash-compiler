@@ -140,6 +140,12 @@ runClashTest =
         , runTest ("tests" </> "shouldwork" </> "CustomReprs" </> "Deriving")      defBuild [] "BitPackDerivation"      (["", "BitPackDerivation_testBench"],"BitPackDerivation_testBench",True)
         , runTest ("tests" </> "shouldwork" </> "CustomReprs" </> "Indexed")       defBuild [] "Indexed"                (["", "Indexed_testBench"],"Indexed_testBench",True)
         ]
+      , clashTestGroup "DDR"
+        [ runTest ("tests" </> "shouldwork" </> "DDR") defBuild [] "DDRinGA" (["","DDRinGA_testBench"],"DDRinGA_testBench",True)
+        , runTest ("tests" </> "shouldwork" </> "DDR") defBuild [] "DDRinGS" (["","DDRinGS_testBench"],"DDRinGS_testBench",True)
+        , runTest ("tests" </> "shouldwork" </> "DDR") defBuild [] "DDRinUA" (["","DDRinUA_testBench"],"DDRinUA_testBench",True)
+        , runTest ("tests" </> "shouldwork" </> "DDR") defBuild [] "DDRinUS" (["","DDRinUS_testBench"],"DDRinUS_testBench",True)
+        ]
       , clashTestGroup "DSignal"
         [ runTest ("tests" </> "shouldwork" </> "DSignal") defBuild [] "DelayedFold" (["","DelayedFold_testBench"],"DelayedFold_testBench",True)
         , runTest ("tests" </> "shouldwork" </> "DSignal") defBuild [] "DelayI"      (["","DelayI_testBench"],"DelayI_testBench",True)
