@@ -196,7 +196,7 @@ begin
   -------------
   ~GENSYM[~COMPNAME_ddrOut_pos][5] : process(~SYM[3])
   begin
-    if rising_edge(~SYM[4]) then
+    if rising_edge(~SYM[3]) then
       if ~ARG[5] = '1' then
         ~SYM[1] <= ~ARG[6];
       elsif ~SYM[4] then

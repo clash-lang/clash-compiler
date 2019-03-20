@@ -85,8 +85,8 @@ assign ~RESULT = {~SYM[3], ~SYM[1]};
          -> Signal fast a"
     , "template" :
 "// ddrOut begin
-~SIGD[~GENSYM[data_Pos][1]][5];
-~SIGD[~GENSYM[data_Neg][2]][5];
+~SIGD[~GENSYM[data_Pos][1]][6];
+~SIGD[~GENSYM[data_Neg][2]][6];
 ~IF ~ISGATED[4] ~THEN
 always @(posedge ~ARG[4][1]~IF ~ISSYNC[5] ~THEN ~ELSE or posedge ~ARG[5]~FI) begin : ~GENSYM[~COMPNAME_ddrOut_pos][5]
   if (~ARG[5]) begin
