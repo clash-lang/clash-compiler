@@ -2,28 +2,29 @@
     { "name" : "Clash.Explicit.ROM.rom#"
     , "kind" : "Declaration"
     , "type" :
-"rom# :: KnownNat n      -- ARG[0]
-      => Clock dom gated -- clk,  ARG[1]
-      -> Vec n a         -- init, ARG[2]
-      -> Signal dom Int  -- rd,   ARG[3]
+"rom# :: ( KnownNat n    --       ARG[0]
+         , Undefined a ) --       ARG[1]
+      => Clock dom gated -- clk,  ARG[2]
+      -> Vec n a         -- init, ARG[3]
+      -> Signal dom Int  -- rd,   ARG[4]
       -> Signal dom a"
     , "template" :
 "-- rom begin
 ~GENSYM[~COMPNAME_rom][0] : block
-  signal ~GENSYM[ROM][1] : ~TYP[2];
-  signal ~GENSYM[rd][2]  : integer range 0 to ~LIT[0]-1;~IF ~ISGATED[1] ~THEN
+  signal ~GENSYM[ROM][1] : ~TYP[3];
+  signal ~GENSYM[rd][2]  : integer range 0 to ~LIT[0]-1;~IF ~ISGATED[2] ~THEN
   signal ~GENSYM[clk][3] : std_logic;
   signal ~GENSYM[ce][4]  : boolean;~ELSE ~FI
 begin
-  ~SYM[1] <= ~LIT[2];
+  ~SYM[1] <= ~LIT[3];
 
-  ~SYM[2] <= to_integer(~ARG[3])
+  ~SYM[2] <= to_integer(~ARG[4])
   -- pragma translate_off
                 mod ~LIT[0]
   -- pragma translate_on
                 ;
-  ~IF ~ISGATED[1] ~THEN
-  (~SYM[3],~SYM[4]) <= ~ARG[1];
+  ~IF ~ISGATED[2] ~THEN
+  (~SYM[3],~SYM[4]) <= ~ARG[2];
   ~GENSYM[romSync][5] : process (~SYM[3])
   begin
     if (rising_edge(~SYM[3])) then
@@ -41,9 +42,9 @@ begin
       end if;
     end if;
   end process;~ELSE
-  ~SYM[5] : process (~ARG[1])
+  ~SYM[5] : process (~ARG[2])
   begin
-    if (rising_edge(~ARG[1])) then~IF ~VIVADO ~THEN
+    if (rising_edge(~ARG[2])) then~IF ~VIVADO ~THEN
       ~RESULT <= ~FROMBV[~SYM[1](~SYM[2])][~TYPO]
       -- pragma translate_off
       after 1 ps
