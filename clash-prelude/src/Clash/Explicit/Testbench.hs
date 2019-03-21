@@ -5,29 +5,37 @@ License    :  BSD2 (see the file LICENSE)
 Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
 -}
 
+{-# LANGUAGE DataKinds           #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TypeOperators       #-}
 
 {-# LANGUAGE Unsafe #-}
 
 {-# OPTIONS_HADDOCK show-extensions #-}
 
+{-# OPTIONS_GHC -fplugin=GHC.TypeLits.Normalise #-}
+{-# OPTIONS_GHC -fplugin=GHC.TypeLits.KnownNat.Solver #-}
+
 module Clash.Explicit.Testbench
   ( -- * Testbench functions for circuits
     assert
-  , stimuliGenerator
+  , ignoreFor
   , outputVerifier
   , outputVerifierBitVector
+  , stimuliGenerator
   )
 where
 
 import Control.Exception     (catch, evaluate)
 import Debug.Trace           (trace)
-import GHC.TypeLits          (KnownNat)
+import GHC.TypeLits          (KnownNat, type (+))
 import Prelude               hiding ((!!), length)
 import System.IO.Unsafe      (unsafeDupablePerformIO)
 
+import Clash.Class.Num       (satAdd, SaturationMode(SatBound))
 import Clash.Explicit.Signal
   (Clock, Reset, Signal, fromList, register, unbundle)
+import Clash.Promoted.Nat    (SNat(..))
 import Clash.Signal          (mux)
 import Clash.Sized.Index     (Index)
 import Clash.Sized.Internal.BitVector
@@ -241,3 +249,23 @@ outputVerifierBitVector clk rst samples i =
 
         finished = s == maxI
 {-# INLINABLE outputVerifierBitVector #-}
+
+-- | Ignore signal for a number of cycles, while outputting a static value.
+ignoreFor
+  :: forall dom gated sync n a
+   . Clock dom gated
+  -> Reset dom sync
+  -> SNat n
+  -- ^ Number of cycles to ignore incoming signal
+  -> a
+  -- ^ Value function produces when ignoring signal
+  -> Signal dom a
+  -- ^ Incoming signal
+  -> Signal dom a
+  -- ^ Either a passthrough of the incoming signal, or the static value
+  -- provided as the second argument.
+ignoreFor clk rst SNat a i =
+  mux ((==) <$> counter <*> (pure maxBound)) i (pure a)
+ where
+  counter :: Signal dom (Index (n+1))
+  counter = register clk rst 0 (satAdd SatBound 1 <$> counter)
