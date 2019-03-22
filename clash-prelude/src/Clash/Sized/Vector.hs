@@ -94,7 +94,7 @@ module Clash.Sized.Vector
   , bv2v
   , v2bv
     -- * Misc
-  , lazyV, VCons, asNatProxy
+  , lazyV, VCons, asNatProxy, seqV, forceV, seqVX, forceVX
     -- * Primitives
     -- ** 'Traversable' instance
   , traverse#
@@ -2125,6 +2125,49 @@ bv2v = unpack
 -- 0001_0010
 v2bv :: KnownNat n => Vec n Bit -> BitVector n
 v2bv = pack
+
+-- | Evaluate all elements of a vector to WHNF, returning the second argument
+seqV
+  :: KnownNat n
+  => Vec n a
+  -> b
+  -> b
+seqV v b =
+  let s () e = seq e () in
+  foldl s () v `seq` b
+{-# NOINLINE seqV #-}
+infixr 0 `seqV`
+
+-- | Evaluate all elements of a vector to WHNF
+forceV
+  :: KnownNat n
+  => Vec n a
+  -> Vec n a
+forceV v =
+  v `seqV` v
+{-# INLINE forceV #-}
+
+-- | Evaluate all elements of a vector to WHNF, returning the second argument.
+-- Does not propagate 'XException's.
+seqVX
+  :: KnownNat n
+  => Vec n a
+  -> b
+  -> b
+seqVX v b =
+  let s () e = seqX e () in
+  foldl s () v `seqX` b
+{-# NOINLINE seqVX #-}
+infixr 0 `seqVX`
+
+-- | Evaluate all elements of a vector to WHNF. Does not propagate 'XException's.
+forceVX
+  :: KnownNat n
+  => Vec n a
+  -> Vec n a
+forceVX v =
+  v `seqVX` v
+{-# INLINE forceVX #-}
 
 instance Lift a => Lift (Vec n a) where
   lift Nil           = [| Nil |]
