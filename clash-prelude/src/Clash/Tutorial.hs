@@ -905,25 +905,25 @@ module Blinker where
 import Clash.Prelude
 import Clash.Intel.ClockGen
 
+type DomInput = Dom \"Input\" 20000
 type Dom50 = Dom \"System\" 20000
 
 topEntity
-  :: Clock Dom50 Source
-  -> Reset Dom50 Asynchronous
+  :: Clock DomInput Source
+  -> Signal DomInput Bool
   -> Signal Dom50 Bit
   -> Signal Dom50 (BitVector 8)
-topEntity clk rst = 'Clash.Signal.exposeClockReset' (\\key1 ->
-    let key1R = 'Clash.Prelude.isRising' 1 key1
-    in  'Clash.Prelude.mealy' blinkerT (1,False,0) key1R) pllOut rstSync
+topEntity clk rst =
+    exposeClockReset (mealy blinkerT (1,False,0) . 'Clash.Prelude.isRising' 1) pllOut rstSync
   where
-    (pllOut,pllStable) = 'Clash.Intel.ClockGen.altpll' @@Dom50 (SSymbol @@"altpll50") clk rst
-    rstSync            = 'Clash.Signal.resetSynchronizer' pllOut ('Clash.Signal.unsafeToAsyncReset' pllStable)
+    (pllOut,pllStable) = 'Clash.Intel.ClockGen.altpll' @@Dom50 (SSymbol @@"altpll50") clk ('Clash.Signal.unsafeToAsyncReset' (not \<$\> rst))
+    rstSync            = 'Clash.Signal.resetSynchronizer' pllOut ('Clash.Signal.unsafeToAsyncReset' (not \<$\> pllStable))
 
 blinkerT (leds,mode,cntr) key1R = ((leds',mode',cntr'),leds)
   where
     -- clock frequency = 50e6  (50 MHz)
     -- led update rate = 333e-3 (every 333ms)
-    cnt_max = 16650000 -- 50e6 * 333e-3
+    cnt_max = 16650000 :: (Index 16650001) -- 50e6 * 333e-3
 
     cntr' | cntr == cnt_max = 0
           | otherwise       = cntr + 1
@@ -950,11 +950,10 @@ use work.blinker_types.all;
 
 entity blinker_topentity is
   port(-- clock
-       clk    : in std_logic;
-       -- asynchronous reset: active high
-       rst    : in std_logic;
-       x      : in std_logic;
-       result : out std_logic_vector(7 downto 0));
+       clk  : in blinker_types.clk_input;
+       rst  : in boolean;
+       x    : in std_logic;
+       leds : out std_logic_vector(7 downto 0));
 end;
 
 architecture structural of blinker_topentity is
@@ -987,9 +986,8 @@ use work.blinker_types.all;
 
 entity blinker is
   port(-- clock
-       CLOCK_50 : in std_logic;
-       -- asynchronous reset: active high
-       KEY0     : in std_logic;
+       CLOCK_50 : in blinker_types.clk_input;
+       KEY0     : in boolean;
        KEY1     : in std_logic;
        LED      : out std_logic_vector(7 downto 0));
 end;

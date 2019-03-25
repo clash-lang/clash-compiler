@@ -1,10 +1,9 @@
-{-# LANGUAGE NoMonoLocalBinds #-}
 module Blinker where
 
 import Clash.Prelude
-import Clash.Promoted.Symbol
 import Clash.Intel.ClockGen
 
+type DomInput = Dom "Input" 20000
 type Dom50 = Dom "System" 20000
 
 {-# ANN topEntity
@@ -17,15 +16,15 @@ type Dom50 = Dom "System" 20000
     , t_output = PortName "LED"
     }) #-}
 topEntity
-  :: Clock Dom50 Source
-  -> Reset Dom50 Asynchronous
+  :: Clock DomInput Source
+  -> Signal DomInput Bool
   -> Signal Dom50 Bit
   -> Signal Dom50 (BitVector 8)
 topEntity clk rst =
     exposeClockReset (mealy blinkerT (1,False,0) . isRising 1) pllOut rstSync
   where
-    (pllOut,pllStable) = altpll @Dom50 (SSymbol @ "altpll50") clk rst
-    rstSync            = resetSynchronizer pllOut (unsafeToAsyncReset pllStable)
+    (pllOut,pllStable) = altpll @Dom50 (SSymbol @"altpll50") clk (unsafeToAsyncReset (not <$> rst))
+    rstSync            = resetSynchronizer pllOut (unsafeToAsyncReset (not <$> pllStable))
 
 blinkerT (leds,mode,cntr) key1R = ((leds',mode',cntr'),leds)
   where
