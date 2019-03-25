@@ -6,11 +6,9 @@
 
 __WARNING__
 Only works with GHC-8.2+
-([GHC 8.2.1](https://www.haskell.org/ghc/download_ghc_8_2_1),
- [GHC 8.2.2](https://www.haskell.org/ghc/download_ghc_8_2_2),
- [GHC 8.4.1](https://www.haskell.org/ghc/download_ghc_8_4_1),
- [GHC 8.4.2](https://www.haskell.org/ghc/download_ghc_8_4_2),
- [GHC 8.4.3](https://www.haskell.org/ghc/download_ghc_8_4_3))!
+([GHC 8.2](https://www.haskell.org/ghc/download_ghc_8_2_2),
+ [GHC 8.4](https://www.haskell.org/ghc/download_ghc_8_4_4),
+ [GHC 8.6](https://www.haskell.org/ghc/download_ghc_8_6_4))!
 
 Clash is a functional hardware description language that borrows both
 its syntax and semantics from the functional programming language
