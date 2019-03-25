@@ -836,8 +836,11 @@ buildUnpack (DataReprAnn _name _size constrs) = do
   argNameIn   <- newName "toBeUnpackedIn"
   argName     <- newName "toBeUnpacked"
   matches     <- mapM (buildUnpackIfE argName) constrs
-  err         <- [| error $ "Could not match constructor for: " ++ show $(varE argName) |]
-  let unpackBody    = MultiIfE $ matches ++ [(NormalG (ConE 'True), err)]
+  let fallThroughLast []      = []
+      fallThroughLast [(_,e)] = [(NormalG (ConE 'True), e)]
+      fallThroughLast (x:xs)  = x:fallThroughLast xs
+
+  let unpackBody    = MultiIfE (fallThroughLast matches)
   let unpackLambda  = LamE [VarP argName] unpackBody
   let unpackApplied = (VarE 'dontApplyInHDL) `AppE` unpackLambda `AppE` (VarE argNameIn)
   let func          = FunD 'unpack [Clause [VarP argNameIn] (NormalB unpackApplied) []]
