@@ -294,6 +294,12 @@ coreToTerm primMap unlocs srcsp coreExpr = Reader.runReaderT (term coreExpr) src
         go "GHC.Stack.withFrozenCallStack"     args
           | length args == 3
           = term (App (args!!2) (args!!1))
+        go "Clash.Class.BitPack.packXWith" args
+          | [_nTy,_aTy,_kn,f] <- args
+          = term f
+        go "Clash.Sized.BitVector.Internal.checkUnpackUndef" args
+          | [_nTy,_aTy,_kn,_typ,f] <- args
+          = term f
         go _ _ = term' e
     term' (Var x)                 = do
       srcsp' <- Reader.ask
@@ -377,6 +383,8 @@ coreToTerm primMap unlocs srcsp coreExpr = Reader.runReaderT (term coreExpr) src
               | f == pack "GHC.Magic.noinline"               -> return (idTerm xType)
               | f == pack "GHC.Magic.lazy"                   -> return (idTerm xType)
               | f == pack "GHC.Magic.runRW#"                 -> return (runRWTerm xType)
+              | f == pack "Clash.Class.BitPack.packXWith"    -> return (packXWithTerm xType)
+              | f == pack "Clash.Sized.Internal.BitVector.checkUnpackUndef" -> return (checkUnpackUndefTerm xType)
               | otherwise                                    -> return (C.Prim xNameS xType)
             Just (Just (BlackBox {})) ->
               return $ C.Prim xNameS xType
@@ -1022,6 +1030,62 @@ runRWTerm (C.ForAllTy rTV (C.ForAllTy oTV funTy)) =
     rwNm             = pack "GHC.Prim.realWorld#"
 
 runRWTerm ty = error $ $(curLoc) ++ show ty
+
+-- | Given type type:
+--
+-- @forall (n :: Nat) (a :: Type) .Knownnat n => (a -> BitVector n) -> a -> BitVector n@
+--
+-- Genereate the term:
+--
+-- @/\(n:Nat)./\(a:TYPE r).\(kn:KnownNat n).\(f:a -> BitVector n).f@
+packXWithTerm
+  :: C.Type
+  -> C.Term
+packXWithTerm (C.ForAllTy nTV (C.ForAllTy aTV funTy)) =
+  C.TyLam nTV (
+  C.TyLam aTV (
+  C.Lam knId (
+  C.Lam fId (
+  C.Var fId))))
+  where
+    C.FunTy knTy rTy = C.tyView funTy
+    C.FunTy fTy _    = C.tyView rTy
+    knName           = C.mkUnsafeSystemName "kn" 0
+    fName            = C.mkUnsafeSystemName "f" 1
+    knId             = C.mkId knTy knName
+    fId              = C.mkId fTy fName
+
+packXWithTerm ty = error $ $(curLoc) ++ show ty
+
+-- | Given type type:
+--
+-- @forall (n :: Nat) (a :: Type) .Knownnat n => Typeable a => (BitVector n -> a) -> BitVector n -> a@
+--
+-- Genereate the term:
+--
+-- @/\(n:Nat)./\(a:TYPE r).\(kn:KnownNat n).\(f:a -> BitVector n).f@
+checkUnpackUndefTerm
+  :: C.Type
+  -> C.Term
+checkUnpackUndefTerm (C.ForAllTy nTV (C.ForAllTy aTV funTy)) =
+  C.TyLam nTV (
+  C.TyLam aTV (
+  C.Lam knId (
+  C.Lam tpId (
+  C.Lam fId (
+  C.Var fId)))))
+  where
+    C.FunTy knTy r0Ty = C.tyView funTy
+    C.FunTy tpTy r1Ty = C.tyView r0Ty
+    C.FunTy fTy _     = C.tyView r1Ty
+    knName            = C.mkUnsafeSystemName "kn" 0
+    tpName            = C.mkUnsafeSystemName "tp" 1
+    fName             = C.mkUnsafeSystemName "f" 2
+    knId              = C.mkId knTy knName
+    tpId              = C.mkId tpTy tpName
+    fId               = C.mkId fTy fName
+
+checkUnpackUndefTerm ty = error $ $(curLoc) ++ show ty
 
 isDataConWrapId :: Id -> Bool
 isDataConWrapId v = case idDetails v of

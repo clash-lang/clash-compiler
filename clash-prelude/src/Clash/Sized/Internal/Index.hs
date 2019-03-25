@@ -88,7 +88,7 @@ import Test.QuickCheck.Arbitrary  (Arbitrary (..), CoArbitrary (..),
                                    arbitraryBoundedIntegral,
                                    coarbitraryIntegral, shrinkIntegral)
 
-import Clash.Class.BitPack        (BitPack (..))
+import Clash.Class.BitPack        (BitPack (..), packXWith)
 import Clash.Class.Num            (ExtendingNum (..), SaturatingNum (..),
                                    SaturationMode (..))
 import Clash.Class.Resize         (Resize (..))
@@ -133,7 +133,7 @@ instance NFData (Index n) where
 
 instance (KnownNat n, 1 <= n) => BitPack (Index n) where
   type BitSize (Index n) = CLog 2 n
-  pack   = pack#
+  pack   = packXWith pack#
   unpack = unpack#
 
 -- | Safely convert an `SNat` value to an `Index`

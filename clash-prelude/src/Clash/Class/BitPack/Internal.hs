@@ -17,18 +17,18 @@ deriveBitPackTuples
   -- ^ pack
   -> Name
   -- ^ unpack
-  -> Name
-  -- ^ append (++#)
   -> DecsQ
-deriveBitPackTuples bitPackName bitSizeName packName unpackName appendName = do
+deriveBitPackTuples bitPackName bitSizeName packName unpackName = do
   let bitPack  = ConT bitPackName
       bitSize  = ConT bitSizeName
       knownNat = ConT ''KnownNat
       plus     = ConT $ mkName "+"
 
   allNames <- replicateM 62 (newName "a")
+  retupName <- newName "retup"
   x <- newName "x"
   y <- newName "y"
+  tup <- newName "tup"
 
   pure $ flip map [3..62] $ \tupleNum ->
     let names  = take tupleNum allNames
@@ -56,13 +56,18 @@ deriveBitPackTuples bitPackName bitSizeName packName unpackName appendName = do
           FunD
             packName
             [ Clause
-                [ TupP $ map VarP names ]
-                ( let (e:es) = map VarE names
-                  in NormalB $ AppE
-                    (VarE appendName `AppE` (VarE packName `AppE` e))
-                    (VarE packName `AppE` TupE es)
-                )
-                []
+                [VarP tup]
+                (NormalB (AppE (VarE packName) (AppE (VarE retupName) (VarE tup))))
+                [FunD
+                    retupName
+                    [ Clause
+                        [ TupP $ map VarP names ]
+                        ( let (e:es) = map VarE names
+                          in NormalB (TupE [e,TupE es])
+                        )
+                        []
+                    ]
+                ]
             ]
 
         unpack =

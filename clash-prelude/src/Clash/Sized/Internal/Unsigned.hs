@@ -92,7 +92,7 @@ import Test.QuickCheck.Arbitrary      (Arbitrary (..), CoArbitrary (..),
                                        arbitraryBoundedIntegral,
                                        coarbitraryIntegral)
 
-import Clash.Class.BitPack            (BitPack (..))
+import Clash.Class.BitPack            (BitPack (..), packXWith)
 import Clash.Class.Num                (ExtendingNum (..), SaturatingNum (..),
                                        SaturationMode (..))
 import Clash.Class.Resize             (Resize (..))
@@ -164,7 +164,7 @@ instance KnownNat n => Read (Unsigned n) where
 
 instance KnownNat n => BitPack (Unsigned n) where
   type BitSize (Unsigned n) = n
-  pack   = pack#
+  pack   = packXWith pack#
   unpack = unpack#
 
 {-# NOINLINE pack# #-}
