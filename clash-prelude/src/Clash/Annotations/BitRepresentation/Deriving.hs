@@ -62,7 +62,8 @@ import Clash.Annotations.BitRepresentation.Util
 import qualified Clash.Annotations.BitRepresentation.Util
   as Util
 
-import           Clash.Class.BitPack        (BitPack, BitSize, pack, unpack)
+import           Clash.Class.BitPack
+  (BitPack, BitSize, pack, packXWith, unpack)
 import           Clash.Class.Resize         (resize)
 import           Clash.Sized.BitVector      (BitVector, low, (++#))
 import           Clash.Sized.Internal.BitVector (undefined#)
@@ -796,7 +797,7 @@ buildPack dataRepr@(DataReprAnn _name _size constrs) = do
   constrs'     <- mapM (buildPackMatch dataRepr) constrs
   let packBody    = CaseE (VarE argName) constrs'
   let packLambda  = LamE [VarP argName] packBody
-  let packApplied = (VarE 'dontApplyInHDL) `AppE` packLambda `AppE` (VarE argNameIn)
+  let packApplied = (VarE 'dontApplyInHDL) `AppE` (VarE 'packXWith `AppE` packLambda) `AppE` (VarE argNameIn)
   let func        = FunD 'pack [Clause [VarP argNameIn] (NormalB packApplied) []]
   return [func]
 
