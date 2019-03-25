@@ -46,6 +46,9 @@ import Clash.Signal.Internal
 --
 -- Consumes a DDR input signal and produces a regular signal containing a pair
 -- of values.
+--
+-- >>> printX $ sampleN 5 $ ddrIn systemClockGen syncResetGen (-1,-2,-3) (fromList [0..10])
+-- [(X,X),((-1),(-2)),((-3),2),(3,4),(5,6)]
 ddrIn
   :: ( HasCallStack
      , Undefined a
@@ -133,6 +136,9 @@ ddrIn# (GatedClock _ _ ena) (Async rst) i0 i1 i2 =
 -- | DDR output primitive
 --
 -- Produces a DDR output signal from a normal signal of pairs of input.
+--
+-- >>> sampleN 7 $ ddrOut systemClockGen asyncResetGen (-1) (fromList [(0,1),(2,3),(4,5)])
+-- [-1,-1,-1,2,3,4,5]
 ddrOut
   :: ( HasCallStack
      , Undefined a

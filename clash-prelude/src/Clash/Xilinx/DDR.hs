@@ -8,9 +8,10 @@ DDR primitives for Xilinx FPGAs
 For general information about DDR primitives see "Clash.Explicit.DDR".
 
 For more information about the Xilinx DDR primitives see:
-    * Vivado Design Suite 7 Series FPGA and Zynq-7000 All Programmable SoC
-      Libraries Guide, UG953 (v2017.2) June 7, 2016, p294-296,p404-406,
-      https://www.xilinx.com/support/documentation/sw_manuals/xilinx2017_2/ug953-vivado-7series-libraries.pdf
+
+* Vivado Design Suite 7 Series FPGA and Zynq-7000 All Programmable SoC
+  Libraries Guide, UG953 (v2018.3) December 5, 2018, p371-373,p481-483,
+  <https://www.xilinx.com/support/documentation/sw_manuals/xilinx2018_3/ug953-vivado-7series-libraries.pdf>
 -}
 
 {-# LANGUAGE CPP              #-}
@@ -35,7 +36,7 @@ import Clash.Explicit.Prelude
 import Clash.Explicit.DDR
 
 -- | Xilinx specific variant of 'ddrIn' implemented using the Xilinx IDDR
--- primitive.
+-- primitive in @SAME_EDGE@ mode.
 --
 -- Reset values are @0@
 iddr
@@ -55,7 +56,7 @@ iddr clk rst = withFrozenCallStack ddrIn# clk rst 0 0 0
 {-# NOINLINE iddr #-}
 
 -- | Xilinx specific variant of 'ddrOut' implemented using the Xilinx ODDR
--- primitive.
+-- primitive in @SAME_EDGE@ mode.
 --
 -- Reset value is @0@
 oddr
