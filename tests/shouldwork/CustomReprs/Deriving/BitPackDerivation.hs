@@ -18,7 +18,7 @@ data Train
   | Maintenance
   | Toy
 
-deriveAnnotation (simpleDerivator OneHot Overlap) [t| Train |]
+deriveAnnotation (simpleDerivator OneHot OverlapL) [t| Train |]
 deriveBitPack [t| Train |]
 
 topEntity

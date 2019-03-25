@@ -20,7 +20,7 @@ import Data.Maybe (Maybe(..))
 ------------ DERIVING SIMPLE REPRESENTATIONS ------------
 ---------------------------------------------------------
 oneHotOverlapRepr :: DataReprAnn
-oneHotOverlapRepr = $( (simpleDerivator OneHot Overlap) =<< [t| Train |] )
+oneHotOverlapRepr = $( (simpleDerivator OneHot OverlapL) =<< [t| Train |] )
 
 oneHotOverlapRepr' :: DataReprAnn
 oneHotOverlapRepr' =
@@ -48,7 +48,7 @@ oneHotWideRepr' =
     ]
 
 countOverlapRepr :: DataReprAnn
-countOverlapRepr = $( (simpleDerivator Binary Overlap) =<< [t| Train |] )
+countOverlapRepr = $( (simpleDerivator Binary OverlapL) =<< [t| Train |] )
 
 countOverlapRepr' :: DataReprAnn
 countOverlapRepr' =

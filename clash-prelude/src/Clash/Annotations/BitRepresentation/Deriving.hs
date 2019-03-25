@@ -38,8 +38,10 @@ module Clash.Annotations.BitRepresentation.Deriving
   , deriveDefaultAnnotation
   , derivePackedAnnotation
   , derivePackedMaybeAnnotation
+  , deriveBlueSpecAnnotation
   -- * Derivators
   , defaultDerivator
+  , blueSpecDerivator
   , packedDerivator
   , packedMaybeDerivator
   , simpleDerivator
@@ -118,11 +120,20 @@ data ConstructorType
 
 -- | Indicates how to pack (constructor) fields for simpleDerivator
 data FieldsType
-  = Overlap
+  = OverlapL
   -- ^ Store fields of different constructors at (possibly) overlapping bit
   -- positions. That is, a data type with two constructors with each two fields
   -- of each one bit will take /two/ bits for its whole representation (plus
-  -- constructor bits). This is the default behaviour of Clash.
+  -- constructor bits). Overlap is left-biased, i.e. don't care bits are padded
+  -- to the right.
+  --
+  -- This is the default behaviour of Clash.
+  | OverlapR
+  -- ^ Store fields of different constructors at (possibly) overlapping bit
+  -- positions. That is, a data type with two constructors with each two fields
+  -- of each one bit will take /two/ bits for its whole representation (plus
+  -- constructor bits). Overlap is right biased, i.e. don't care bits are padded
+  -- between between the constructor bits and the field bits.
   | Wide
   -- ^ Store fields of different constructs at non-overlapping positions. That
   -- is, a data type with two constructors with each two fields of each one bit
@@ -284,8 +295,8 @@ oneHotConstructor ns = zip values values
   where
     values = [shiftL 1 n | n <- ns]
 
-overlapFieldAnns :: [[Q Exp]] -> [[Q Exp]]
-overlapFieldAnns fieldSizess = map go fieldSizess
+overlapFieldAnnsL :: [[Q Exp]] -> [[Q Exp]]
+overlapFieldAnnsL fieldSizess = map go fieldSizess
   where
     fieldSizess'  = listE $ map listE fieldSizess
     constructorSizes = [| map sum $fieldSizess' |]
@@ -294,6 +305,18 @@ overlapFieldAnns fieldSizess = map go fieldSizess
       mapAccumL
         (\start size -> ([| $start - $size |], [| bitmask $start $size |]))
         [| maximum $constructorSizes - 1 |]
+        fieldSizes
+
+overlapFieldAnnsR :: [[Q Exp]] -> [[Q Exp]]
+overlapFieldAnnsR fieldSizess = map go fieldSizess
+  where
+    fieldSizess'  = listE $ map listE fieldSizess
+    constructorSizes = [| map sum $fieldSizess' |]
+    go fieldSizes =
+      snd $
+      mapAccumL
+        (\start size -> ([| $start - $size |], [| bitmask $start $size |]))
+        [| maximum $constructorSizes - (maximum $constructorSizes - sum $(listE fieldSizes)) - 1 |]
         fieldSizes
 
 wideFieldAnns :: [[Q Exp]] -> [[Q Exp]]
@@ -380,18 +403,30 @@ simpleDerivator ctype ftype = deriveDataRepr constrDerivator fieldsDerivator
 
     fieldsDerivator =
       case ftype of
-        Overlap -> overlapFieldAnns
+        OverlapL -> overlapFieldAnnsL
+        OverlapR -> overlapFieldAnnsR
         Wide -> wideFieldAnns
 
 -- | Derives bit representation corresponding to the default manner in which
 -- Clash stores types.
 defaultDerivator :: Derivator
-defaultDerivator = simpleDerivator Binary Overlap
+defaultDerivator = simpleDerivator Binary OverlapL
+
+-- | Derives bit representation corresponding to the default manner in which
+-- BlueSpec stores types.
+blueSpecDerivator :: Derivator
+blueSpecDerivator = simpleDerivator Binary OverlapR
 
 -- | Derives bit representation corresponding to the default manner in which
 -- Clash stores types.
 deriveDefaultAnnotation :: Q Type -> Q [Dec]
 deriveDefaultAnnotation = deriveAnnotation defaultDerivator
+
+
+-- | Derives bit representation corresponding to the default manner in which
+-- BlueSpec stores types.
+deriveBlueSpecAnnotation :: Q Type -> Q [Dec]
+deriveBlueSpecAnnotation = deriveAnnotation blueSpecDerivator
 
 ---------------------------------------------------------------
 ------------ DERIVING PACKED MAYBE REPRESENTATIONS ------------
