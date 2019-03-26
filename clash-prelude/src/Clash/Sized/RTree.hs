@@ -73,7 +73,7 @@ import qualified Prelude           as P
 import Prelude                     hiding ((++), (!!))
 import Test.QuickCheck             (Arbitrary (..), CoArbitrary (..))
 
-import Clash.Class.BitPack         (BitPack (..))
+import Clash.Class.BitPack         (BitPack (..), packXWith)
 import Clash.Promoted.Nat          (SNat (..), UNat (..), pow2SNat, snatToNum,
                                     subSNat, toUNat)
 import Clash.Promoted.Nat.Literals (d1)
@@ -204,7 +204,7 @@ instance KnownNat d => Traversable (RTree d) where
 instance (KnownNat d, KnownNat (BitSize a), BitPack a) =>
   BitPack (RTree d a) where
   type BitSize (RTree d a) = (2^d) * (BitSize a)
-  pack   = pack . t2v
+  pack   = packXWith (pack . t2v)
   unpack = v2t . unpack
 
 type instance Lens.Index   (RTree d a) = Int
