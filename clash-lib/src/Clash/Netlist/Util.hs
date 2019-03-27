@@ -604,6 +604,10 @@ filterVoidPorts _hwty (PortName s) =
   PortName s
 filterVoidPorts (FilteredHWType _hwty [filtered]) (PortProduct s ps) =
   PortProduct s [filterVoidPorts f p | (p, (void, f)) <- zip ps filtered, not void]
+filterVoidPorts (FilteredHWType _hwty fs) (PortProduct s ps)
+  | length (filter (not.fst) (concat fs)) == 1
+  , length ps == 2
+  = PortProduct s ps
 filterVoidPorts filtered pp@(PortProduct _s _ps) =
   -- TODO: Prettify errors
   error $ $(curLoc) ++ "Ports were annotated as product, but type wasn't one: \n\n"
@@ -1039,6 +1043,20 @@ mkInput pM = case pM of
                      else
                        throwAnnotatedSplitError $(curLoc) "Product"
 
+        SP _ ((concat . map snd) -> [elTy]) -> do
+          let hwtys = [BitVector (conSize hwty'),elTy]
+          arguments <- zipWithM appendIdentifier (map (pN,) hwtys) [0..]
+          let ps'            = extendPorts $ map (prefixParent p) ps
+          (ports,_,exprs,_) <- unzip4 <$> uncurry (zipWithM mkInput) (ps', arguments)
+          case exprs of
+            [conExpr,elExpr] -> do
+              let netdecl  = NetDecl Nothing pN hwty'
+                  dcExpr   = DataCon hwty' (DC (BitVector (typeSize hwty'),0))
+                              [conExpr,ConvBV Nothing elTy True elExpr]
+                  netassgn = Assignment pN dcExpr
+              return (concat ports,[netdecl,netassgn],dcExpr,pN)
+            _ -> error "Unexpected error for PortProduct"
+
         Clock _ _ Gated -> do
           arguments <- splitGatedClock pN hwty
           (ports,_,exprs,_) <- unzip4 <$> zipWithM mkInput (extendPorts $ map (prefixParent p) ps) arguments
@@ -1232,6 +1250,29 @@ mkOutput' pM = case pM of
                          return (concat ports,netdecl:assigns ++ concat decls,pN)
                        else
                          throwAnnotatedSplitError $(curLoc) "Product"
+
+        SP _ ((concat . map snd) -> [elTy]) -> do
+          let hwtys = [BitVector (conSize hwty'),elTy]
+          results <- zipWithM appendIdentifier (map (pN,) hwtys) [0..]
+          let ps'            = extendPorts $ map (prefixParent p) ps
+          (ports,decls,ids) <- unzip3 <$> uncurry (zipWithM mkOutput') (ps', results)
+          case ids of
+            [conId,elId] ->
+              let netdecl = NetDecl Nothing pN hwty'
+                  conIx   = Sliced (BitVector (typeSize hwty')
+                                    ,typeSize hwty' - 1
+                                    ,typeSize elTy
+                                    )
+                  elIx    = Sliced (BitVector (typeSize hwty')
+                                    ,typeSize elTy - 1
+                                    ,0
+                                    )
+                  assigns = [Assignment conId (Identifier pN (Just conIx))
+                            ,Assignment elId  (ConvBV Nothing elTy False
+                                                (Identifier pN (Just elIx)))
+                            ]
+              in  return (concat ports,netdecl:assigns ++ concat decls,pN)
+            _ -> error "Unexpected error for PortProduct"
 
         Clock _ _ Gated -> do
           results <- splitGatedClock pN hwty
@@ -1500,6 +1541,30 @@ mkTopInput topM inps pM = case pM of
           else
             throwAnnotatedSplitError $(curLoc) "Product"
 
+        SP _ ((concat . map snd) -> [elTy]) -> do
+          let hwtys = [BitVector (conSize hwty'),elTy]
+          arguments <- zipWithM appendIdentifier (map (pN',) hwtys) [0..]
+          (inps'',arguments1) <-
+            mapAccumLM (\acc (p',o') -> mkTopInput topM acc p' o') inps'
+                       (zip (extendPorts ps) arguments)
+          let (ports,decls,ids) = unzip3 arguments1
+          case ids of
+            [conId,elId] -> do
+              let conIx   = Sliced (BitVector (typeSize hwty')
+                                    ,typeSize hwty' - 1
+                                    ,typeSize elTy
+                                    )
+                  elIx    = Sliced (BitVector (typeSize hwty')
+                                    ,typeSize elTy - 1
+                                    ,0
+                                    )
+                  assigns = [argBV topM conId (Identifier pN (Just conIx))
+                            ,argBV topM elId  (ConvBV Nothing elTy False
+                                                (Identifier pN (Just elIx)))
+                            ]
+              return (inps'',(concat ports,pDecl:assigns ++ concat decls,Left pN'))
+            _ -> error "Unexpected error for PortProduct"
+
         Clock _ _ Gated -> do
           arguments <- splitGatedClock pN' hwty
           (inps'',arguments1) <-
@@ -1685,6 +1750,21 @@ mkTopOutput' topM outps pM = case pM of
             return (outps'',(concat ports,pDecl:netassgn:concat decls,Left pN'))
           else
             throwAnnotatedSplitError $(curLoc) "Product"
+
+
+        SP _ ((concat . map snd) -> [elTy]) -> do
+          let hwtys = [BitVector (conSize elTy),elTy]
+          results <- zipWithM appendIdentifier (map (pN',) hwtys) [0..]
+          (outps'',results1) <-
+            mapAccumLM (\acc (p',o') -> mkTopOutput' topM acc p' o') outps'
+                       (zip (extendPorts ps) results)
+          let (ports,decls,ids) = unzip3 results1
+              ids1 = map (resBV topM) ids
+              ids2 = case ids1 of
+                      [conId,elId] -> [conId,ConvBV Nothing elTy True elId]
+                      _ -> error "Unexpected error for PortProduct"
+              netassgn = Assignment pN' (DataCon hwty (DC (BitVector (typeSize hwty),0)) ids2)
+          return (outps'',(concat ports,pDecl:netassgn:concat decls,Left pN'))
 
         Clock _ _ Gated -> do
           results <- splitGatedClock pN hwty

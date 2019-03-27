@@ -1014,6 +1014,9 @@ expr_ _ (Identifier id_ (Just (Indexed ((BitVector w),_,1)))) = do
   traceIf (iw < w) ($(curLoc) ++ "WARNING: result smaller than argument") $
     stringS id_
 
+expr_ _ (Identifier id_ (Just (Sliced ((BitVector _,start,end))))) =
+  stringS id_ <> brackets (int start <> ":" <> int end)
+
 expr_ _ (Identifier id_ (Just _)) = stringS id_
 
 expr_ b (DataCon _ (DC (Void {}, -1)) [e]) =  expr_ b e
@@ -1031,6 +1034,11 @@ expr_ _ (DataCon (RTree 0 elTy) _ [e]) = "'" <> braces (toSLV elTy e)
 expr_ _ e@(DataCon ty@(RTree _ elTy) _ [e1,e2]) = case rtreeChain e of
   Just es -> "'" <> listBraces (mapM (toSLV elTy) es)
   Nothing -> verilogTypeMark ty <> "_br" <> parens (expr_ False e1 <> comma <+> expr_ False e2)
+
+expr_ _ (DataCon (SP {}) (DC (BitVector _,_)) es) = assignExpr
+  where
+    argExprs   = map (expr_ False) es
+    assignExpr = braces (hcat $ punctuate comma $ sequence argExprs)
 
 expr_ _ (DataCon ty@(SP _ args) (DC (_,i)) es) = assignExpr
   where

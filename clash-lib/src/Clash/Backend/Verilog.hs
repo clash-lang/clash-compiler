@@ -535,6 +535,8 @@ modifier
   -- ^ Offset, only used when we have nested modifiers
   -> Modifier
   -> Maybe (Int,Int)
+modifier offset (Sliced (BitVector _,start,end)) = Just (start+offset,end+offset)
+
 modifier offset (Indexed (ty@(SP _ args),dcI,fI)) = Just (start+offset,end+offset)
   where
     argTys   = snd $ args !! dcI
@@ -677,6 +679,11 @@ expr_ _ e@(DataCon (RTree _ _) _ es@[_,_]) =
   case rtreeChain e of
     Just es' -> listBraces (mapM (expr_ False) es')
     Nothing  -> listBraces (mapM (expr_ False) es)
+
+expr_ _ (DataCon (SP {}) (DC (BitVector _,_)) es) = assignExpr
+  where
+    argExprs   = map (expr_ False) es
+    assignExpr = braces (hcat $ punctuate comma $ sequence argExprs)
 
 expr_ _ (DataCon ty@(SP _ args) (DC (_,i)) es) = assignExpr
   where
