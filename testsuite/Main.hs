@@ -254,6 +254,8 @@ runClashTest =
         , outputTest ("tests" </> "shouldwork" </> "TopEntity") [Verilog] [] "PortNames" "main"
         , runTest ("tests" </> "shouldwork" </> "TopEntity")    [Verilog] [] "PortProducts" (["","PortProducts_topEntity","PortProducts_testBench"],"PortProducts_testBench",True)
         , outputTest ("tests" </> "shouldwork" </> "TopEntity") [Verilog] [] "PortProducts" "main"
+        , runTest ("tests" </> "shouldwork" </> "TopEntity")    [Verilog] [] "PortProductsSum" (["","PortProductsSum_topEntity","PortProductsSum_testBench"],"PortProductsSum_testBench",True)
+        , outputTest ("tests" </> "shouldwork" </> "TopEntity") [Verilog] [] "PortProductsSum" "main"
         , runTest ("tests" </> "shouldwork" </> "TopEntity")    [Verilog] [] "PortNamesWithUnit" (["","PortNamesWithUnit_topEntity","PortNamesWithUnit_testBench"],"PortNamesWithUnit_testBench",True)
         , outputTest ("tests" </> "shouldwork" </> "TopEntity") [Verilog] [] "PortNamesWithUnit" "main"
         , runTest ("tests" </> "shouldwork" </> "TopEntity")    [Verilog] [] "PortNamesWithVector" (["","PortNamesWithVector_topEntity","PortNamesWithVector_testBench"],"PortNamesWithVector_testBench",True)

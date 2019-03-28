@@ -1525,6 +1525,9 @@ expr_ _ (Identifier id_ (Just (Indexed ((BitVector w),_,1)))) = do
     "signed" <> parens ("std_logic_vector" <> parens ("resize" <>
       parens ("unsigned" <> parens (pretty id_) <> "," <> int iw)))
 
+expr_ _ (Identifier id_ (Just (Sliced (BitVector _,start,end)))) =
+  pretty id_ <> parens (int start <+> "downto" <+> int end)
+
 expr_ b (Identifier id_ (Just (Nested m1 m2))) = case nestM m1 m2 of
   Just m3 -> expr_ b (Identifier id_ (Just m3))
   _ -> do
@@ -1561,6 +1564,11 @@ expr_ _ e@(DataCon ty@(RTree d elTy) _ [e1,e2]) = qualTyName ty <> "'" <> case r
   Just es -> tupled (mapM (expr_ False) es)
   Nothing -> parens (qualTyName (RTree (d-1) elTy) <> "'" <> parens (expr_ False e1) <+>
                      "&" <+> expr_ False e2)
+
+expr_ _ (DataCon (SP {}) (DC (BitVector _,_)) es) = assignExpr
+  where
+    argExprs   = map (parens . expr_ False) es
+    assignExpr = "std_logic_vector'" <> parens (hcat $ punctuate " & " $ sequence argExprs)
 
 expr_ _ (DataCon ty@(SP _ args) (DC (_,i)) es) = assignExpr
   where

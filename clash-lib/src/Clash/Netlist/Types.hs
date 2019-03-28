@@ -286,6 +286,8 @@ data Modifier
   | DC (HWType,Int) -- ^ See expression in a DataCon context: (Type of the expression, DataCon tag)
   | VecAppend -- ^ See the expression in the context of a Vector append operation
   | RTreeAppend -- ^ See the expression in the context of a Tree append operation
+  | Sliced (HWType,Int,Int)
+  -- ^ Slice the identifier of the given type from start to end
   | Nested Modifier Modifier
   deriving Show
 
