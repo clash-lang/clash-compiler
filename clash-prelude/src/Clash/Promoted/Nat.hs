@@ -143,12 +143,12 @@ instance KnownNat n => ShowX (UNat n) where
 -- | Convert a singleton natural number to its unary representation
 --
 -- __NB__: Not synthesisable
-toUNat :: SNat n -> UNat n
-toUNat p@SNat = fromI (natVal p)
+toUNat :: forall n . SNat n -> UNat n
+toUNat p@SNat = fromI @n (natVal p)
   where
-    fromI :: Integer -> UNat m
-    fromI 0 = unsafeCoerce UZero
-    fromI n = unsafeCoerce (USucc (fromI (n - 1)))
+    fromI :: forall m . Integer -> UNat m
+    fromI 0 = unsafeCoerce @(UNat 0) @(UNat m) UZero
+    fromI n = unsafeCoerce @(UNat ((m-1)+1)) @(UNat m) (USucc (fromI @(m-1) (n - 1)))
 
 -- | Convert a unary-encoded natural number to its singleton representation
 --
