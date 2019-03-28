@@ -349,8 +349,10 @@ coreToTerm primMap unlocs srcsp coreExpr = Reader.runReaderT (term coreExpr) src
           -> C.Cast <$> term e <*> lift (coreToType ty1) <*> lift (coreToType ty2)
         _ -> term e
     term' (Tick _ e)        = term e
-    term' (Type t)          = C.Prim (pack "_TY_") <$> lift (coreToType t)
-    term' (Coercion co)     = C.Prim (pack "_CO_") <$> lift (coreToType (coercionType co))
+    term' (Type t)          = C.TyApp (C.Prim (pack "_TY_") C.undefinedTy) <$>
+                                lift (coreToType t)
+    term' (Coercion co)     = C.TyApp (C.Prim (pack "_CO_") C.undefinedTy) <$>
+                                lift (coreToType (coercionType co))
 
     lookupPrim :: Text -> Maybe (Maybe ResolvedPrimitive)
     lookupPrim nm = extractPrim <$> HashMap.lookup nm primMap
