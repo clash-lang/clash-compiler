@@ -66,9 +66,7 @@ assert msg actual expected ret =
 --  hideReset (hideClock E.assert) {-msg actual expected ret-}
 {-# INLINE assert #-}
 
--- | To be used as one of the functions to create the \"magical\" 'testInput'
--- value, which the Clash compiler looks for to create the stimulus generator
--- for the generated VHDL testbench.
+-- | 
 --
 -- Example:
 --
@@ -92,9 +90,7 @@ stimuliGenerator
 stimuliGenerator = hideReset (hideClock E.stimuliGenerator)
 {-# INLINE stimuliGenerator #-}
 
--- | To be used as one of the functions to generate the \"magical\" 'expectedOutput'
--- function, which the Clash compiler looks for to create the signal verifier
--- for the generated VHDL testbench.
+-- |
 --
 -- Example:
 --

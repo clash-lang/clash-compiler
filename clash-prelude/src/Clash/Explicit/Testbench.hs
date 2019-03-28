@@ -128,9 +128,7 @@ assertBitVector clk (Reset _) msg checked expected returned =
 
 
 
--- | To be used as one of the functions to create the \"magical\" 'testInput'
--- value, which the Clash compiler looks for to create the stimulus generator
--- for the generated VHDL testbench.
+-- |
 --
 -- Example:
 --
@@ -170,9 +168,7 @@ stimuliGenerator clk rst samples =
                 else s
 {-# INLINABLE stimuliGenerator #-}
 
--- | To be used as one of the functions to generate the \"magical\" 'expectedOutput'
--- function, which the Clash compiler looks for to create the signal verifier
--- for the generated VHDL testbench.
+-- | 
 --
 -- Example:
 --
