@@ -62,10 +62,10 @@ begin
       assert (toSLV(~SYM[2]) = toSLV(~SYM[3])) report (~LIT[4] & \", expected: \" & ~INCLUDENAME[0].slv2string(toSLV(~SYM[3])) & \", actual: \" & ~INCLUDENAME[0].slv2string(toSLV(~SYM[2]))) severity error;
     end if;
   end process;
-  -- pragma translate_on
 ~IF ~ISGATED[2] ~THEN
   (~SYM[4],~SYM[5]) <= ~ARG[2];
 ~ELSE ~FI
+  -- pragma translate_on
   ~RESULT <= ~ARG[7];
 end block;
 -- assert end"
@@ -158,10 +158,10 @@ begin
       assert (~INCLUDENAME[0].non_std_match(toSLV(~SYM[2]),toSLV(~SYM[3]))) report (~LIT[3] & \", expected: \" & ~INCLUDENAME[0].slv2string(toSLV(~SYM[3])) & \", actual: \" & ~INCLUDENAME[0].slv2string(toSLV(~SYM[2]))) severity error;
     end if;
   end process;
-  -- pragma translate_on
 ~IF ~ISGATED[1] ~THEN
   (~SYM[4],~SYM[5]) <= ~ARG[1];
 ~ELSE ~FI
+  -- pragma translate_on
   ~RESULT <= ~ARG[6];
 end block;
 -- assertBitVector end"
