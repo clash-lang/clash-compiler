@@ -22,6 +22,7 @@
     * Clash.Sized.Vector.imap
     * Clash.Sized.Vector.dtfold
     * Clash.Sized.RTree.tfold
+    * Clash.Sized.Vector.reverse
 
   Partially handles:
 
@@ -64,6 +65,37 @@ import           Clash.Rewrite.Types
 import           Clash.Rewrite.Util
 import           Clash.Unique
 import           Clash.Util
+
+-- | Replace an application of the @Clash.Sized.Vector.reverse@ primitive on
+-- vectors of a known length @n@, by the fully unrolled recursive "definition"
+-- of @Clash.Sized.Vector.reverse@
+reduceReverse
+  :: InScopeSet
+  -> Integer
+  -- ^ Length of the vector
+  -> Type
+  -- ^ Element of type of the vector
+  -> Term
+  -- ^ The vector to reverse
+  -> NormalizeSession Term
+reduceReverse inScope0 n elTy vArg = do
+  tcm <- Lens.view tcCache
+  let ty = termType tcm vArg
+  go tcm ty
+ where
+  go tcm (coreView1 tcm -> Just ty') = go tcm ty'
+  go tcm (tyView -> TyConApp vecTcNm _)
+    | Just vecTc <- lookupUniqMap vecTcNm tcm
+    , [nilCon, consCon] <- tyConDataCons vecTc
+    = do
+      uniqs0 <- Lens.use uniqSupply
+      let (uniqs1,(vars,elems)) = second (second concat . unzip)
+                                $ extractElems uniqs0 inScope0 consCon elTy 'V' n vArg
+          lbody = mkVec nilCon consCon elTy n (reverse vars)
+          lb    = Letrec (init elems) lbody
+      uniqSupply Lens..= uniqs1
+      changed lb
+  go _ ty = error $ $(curLoc) ++ "reduceReverse: argument does not have a vector type: " ++ showPpr ty
 
 -- | Replace an application of the @Clash.Sized.Vector.zipWith@ primitive on
 -- vectors of a known length @n@, by the fully unrolled recursive "definition"

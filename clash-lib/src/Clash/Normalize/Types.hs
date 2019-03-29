@@ -64,6 +64,10 @@ data NormalizeState
   -- ones.
   , _newInlineStrategy :: Bool
   -- ^ Flattening stage should use the new (no-)inlining strategy
+  , _normalizeUltra :: Bool
+  -- ^ High-effort normalization session, trading performance improvement for
+  -- potentially much longer compile times. Follows the 'Clash.Driver.opt_ultra'
+  -- flag.
   }
 
 makeLenses ''NormalizeState

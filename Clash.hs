@@ -66,7 +66,7 @@ doHDL b src = do
     putStrLn $ "Parsing primitives took " ++ show prepStartDiff'
 
     generateHDL (buildCustomReprs reprs) bindingsMap (Just b) primMap2 tcm tupTcm (ghcTypeToHWType WORD_SIZE_IN_BITS True) reduceConstant topEntities
-      (ClashOpts 20 20 15 0 DebugNone False True True Auto WORD_SIZE_IN_BITS Nothing tmpDir HDLSYN True True ["."] Nothing True True) (startTime,prepTime)
+      (ClashOpts 20 20 15 0 DebugNone False True True Auto WORD_SIZE_IN_BITS Nothing tmpDir HDLSYN True True ["."] Nothing True True False) (startTime,prepTime)
    ) (do
     removeDirectoryRecursive tmpDir
    )
