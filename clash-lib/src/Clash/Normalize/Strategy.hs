@@ -31,7 +31,7 @@ normalization :: NormRewrite
 normalization = rmDeadcode >-> constantPropgation >-> etaTL >-> rmUnusedExpr >-!-> anf >-!-> rmDeadcode >->
                 bindConst >-> letTL >-> evalConst >-!-> cse >-!-> cleanup >-> recLetRec
   where
-    etaTL      = apply "etaTL" etaExpansionTL !-> innerMost (apply "applicationPropagation" appProp)
+    etaTL      = apply "etaTL" etaExpansionTL !-> topdownR (apply "applicationPropagation" appPropFast)
     anf        = topdownR (apply "nonRepANF" nonRepANF) >-> apply "ANF" makeANF >-> topdownR (apply "caseCon" caseCon)
     letTL      = topdownSucR (apply "topLet" topLet)
     recLetRec  = apply "recToLetRec" recToLetRec
@@ -54,7 +54,7 @@ constantPropgation = propagate >-> repeatR inlineAndPropagate >->
                      caseFlattening >-> dec >-> spec >-> dec >->
                      conSpec
   where
-    propagate          = innerMost (applyMany transPropagate)
+    propagate          = topdownRR (applyMany transPropagate)
     inlineAndPropagate = (topdownR (applyMany transInlineSafe) >-> inlineNR)
                          !-> propagate
     spec               = bottomupR (applyMany specTransformations)
@@ -64,7 +64,7 @@ constantPropgation = propagate >-> repeatR inlineAndPropagate >->
 
     transPropagate :: [(String,NormRewrite)]
     transPropagate =
-      [ ("applicationPropagation", appProp              )
+      [ ("applicationPropagation", appPropFast          )
       , ("bindConstantVar"       , bindConstantVar      )
       , ("caseLet"               , caseLet              )
       , ("caseCase"              , caseCase             )
@@ -240,6 +240,9 @@ liftNonRep.
 -- | Topdown traversal, stops upon first success
 topdownSucR :: Rewrite extra -> Rewrite extra
 topdownSucR r = r >-! (allR (topdownSucR r))
+
+topdownRR :: Rewrite extra -> Rewrite extra
+topdownRR r = repeatR (topdownR r)
 
 innerMost :: Rewrite extra -> Rewrite extra
 innerMost r = bottomupR (r !-> innerMost r)
