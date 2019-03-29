@@ -138,6 +138,7 @@ runNormalization opts supply globals typeTrans reprs tcm tupTcm eval primMap rcs
                   Map.empty
                   rcsMap
                   (opt_newInlineStrat opts)
+                  (opt_ultra opts)
 
 
 normalize

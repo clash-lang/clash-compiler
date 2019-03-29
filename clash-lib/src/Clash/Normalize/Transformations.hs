@@ -1714,6 +1714,7 @@ reduceNonRepPrim (TransformContext is0 ctx) e@(App _ _) | (Prim nm _, args) <- c
   tcm <- Lens.view tcCache
   is1 <- unionInScope is0 <$> Lens.use globalInScope
   shouldReduce1 <- shouldReduce ctx
+  ultra <- Lens.use (extra.normalizeUltra)
   let eTy = termType tcm e
   case tyView eTy of
     (TyConApp vecTcNm@(nameOcc -> "Clash.Sized.Vector.Vec")
@@ -1728,7 +1729,7 @@ reduceNonRepPrim (TransformContext is0 ctx) e@(App _ _) | (Prim nm _, args) <- c
         case runExcept (tyNatSize tcm nTy) of
           Right n -> do
             untranslatableTys <- mapM isUntranslatableType_not_poly [lhsElTy,rhsElty,resElTy]
-            if or untranslatableTys || shouldReduce1
+            if or untranslatableTys || shouldReduce1 || ultra
                then let [fun,lhsArg,rhsArg] = Either.lefts args
                     in  reduceZipWith is1 n lhsElTy rhsElty resElTy fun lhsArg rhsArg
                else return e
@@ -1738,7 +1739,7 @@ reduceNonRepPrim (TransformContext is0 ctx) e@(App _ _) | (Prim nm _, args) <- c
         case runExcept (tyNatSize tcm nTy) of
           Right n -> do
             untranslatableTys <- mapM isUntranslatableType_not_poly [argElTy,resElTy]
-            if or untranslatableTys || shouldReduce1
+            if or untranslatableTys || shouldReduce1 || ultra
                then let [fun,arg] = Either.lefts args
                     in  reduceMap is1 n argElTy resElTy fun arg
                else return e
@@ -1755,7 +1756,7 @@ reduceNonRepPrim (TransformContext is0 ctx) e@(App _ _) | (Prim nm _, args) <- c
             isPow2 x  = x /= 0 && (x .&. (complement x + 1)) == x
         untranslatableTy <- isUntranslatableType_not_poly aTy
         case runExcept (tyNatSize tcm nTy) of
-          Right n | not (isPow2 (n + 1)) || untranslatableTy || shouldReduce1 ->
+          Right n | not (isPow2 (n + 1)) || untranslatableTy || shouldReduce1 || ultra ->
             let [fun,arg] = Either.lefts args
             in  reduceFold is1 (n + 1) aTy fun arg
           _ -> return e
@@ -1764,7 +1765,7 @@ reduceNonRepPrim (TransformContext is0 ctx) e@(App _ _) | (Prim nm _, args) <- c
         in  case runExcept (tyNatSize tcm nTy) of
           Right n -> do
             untranslatableTys <- mapM isUntranslatableType_not_poly [aTy,bTy]
-            if or untranslatableTys || shouldReduce1
+            if or untranslatableTys || shouldReduce1 || ultra
               then let [fun,start,arg] = Either.lefts args
                    in  reduceFoldr is1 n aTy fun start arg
               else return e
@@ -1852,7 +1853,7 @@ reduceNonRepPrim (TransformContext is0 ctx) e@(App _ _) | (Prim nm _, args) <- c
         case runExcept (tyNatSize tcm nTy) of
           Right n -> do
             untranslatableTy <- isUntranslatableType_not_poly aTy
-            if untranslatableTy || shouldReduce1
+            if untranslatableTy || shouldReduce1 || ultra
                then reduceReplace_int is1 n aTy eTy vArg iArg aArg
                else return e
           _ -> return e
@@ -1863,7 +1864,7 @@ reduceNonRepPrim (TransformContext is0 ctx) e@(App _ _) | (Prim nm _, args) <- c
         case runExcept (tyNatSize tcm nTy) of
           Right n -> do
             untranslatableTys <- mapM isUntranslatableType_not_poly [argElTy,resElTy]
-            if or untranslatableTys || shouldReduce1
+            if or untranslatableTys || shouldReduce1 || ultra
                then let [_,fun,arg] = Either.lefts args
                     in  reduceImap is1 n argElTy resElTy fun arg
                else return e
@@ -1873,6 +1874,13 @@ reduceNonRepPrim (TransformContext is0 ctx) e@(App _ _) | (Prim nm _, args) <- c
         in  case runExcept (tyNatSize tcm nTy) of
           Right n -> reduceDTFold is1 n aTy lrFun brFun arg
           _ -> return e
+
+      "Clash.Sized.Vector.reverse"
+        | ultra
+        , ([vArg],[nTy,aTy]) <- Either.partitionEithers args
+        , Right n <- runExcept (tyNatSize tcm nTy)
+        -> reduceReverse is1 n aTy vArg
+
       "Clash.Sized.RTree.tdfold" | length args == 8 ->
         let ([_kn,_motive,lrFun,brFun,arg],[_mTy,nTy,aTy]) = Either.partitionEithers args
         in  case runExcept (tyNatSize tcm nTy) of

@@ -75,6 +75,7 @@ flagsClash r = [
   , defFlag "fclash-component-prefix"        $ SepArg (liftEwM . setComponentPrefix r)
   , defFlag "fclash-old-inline-strategy"     $ NoArg (liftEwM (setOldInlineStrategy r))
   , defFlag "fclash-no-escaped-identifiers"  $ NoArg (liftEwM (setNoEscapedIds r))
+  , defFlag "fclash-compile-ultra"           $ NoArg (liftEwM (setUltra r))
   ]
 
 -- | Print deprecated flag warning
@@ -180,3 +181,6 @@ setOldInlineStrategy r = modifyIORef r (\c -> c {opt_newInlineStrat = False})
 
 setNoEscapedIds :: IORef ClashOpts -> IO ()
 setNoEscapedIds r = modifyIORef r (\c -> c {opt_escapedIds = False})
+
+setUltra :: IORef ClashOpts -> IO ()
+setUltra r = modifyIORef r (\c -> c {opt_ultra = True})

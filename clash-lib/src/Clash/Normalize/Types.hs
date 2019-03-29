@@ -64,6 +64,8 @@ data NormalizeState
   -- ones.
   , _newInlineStrategy :: Bool
   -- ^ Flattening stage should use the new (no-)inlining strategy
+  , _normalizeUltra :: Bool
+  -- ^ Put the normalizer to work
   }
 
 makeLenses ''NormalizeState
