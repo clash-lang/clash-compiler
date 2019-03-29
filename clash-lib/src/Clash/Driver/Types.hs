@@ -70,6 +70,13 @@ data ClashOpts = ClashOpts { opt_inlineLimit :: Int
                            , opt_componentPrefix :: Maybe String
                            , opt_newInlineStrat :: Bool
                            , opt_escapedIds :: Bool
+                           , opt_ultra :: Bool
+                           -- ^ Perform a high-effort compile, trading improved
+                           -- performance for potentially much longer compile
+                           -- times.
+                           --
+                           -- Name inspired by Design Compiler's /compile_ultra/
+                           -- flag.
                            }
 
 
@@ -98,6 +105,7 @@ defClashOpts tmpDir
   , opt_componentPrefix     = Nothing
   , opt_newInlineStrat      = True
   , opt_escapedIds          = True
+  , opt_ultra               = False
   }
 
 -- | Information about the generated HDL between (sub)runs of the compiler
