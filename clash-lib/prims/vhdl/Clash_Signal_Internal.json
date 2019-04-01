@@ -175,7 +175,8 @@ end block;~ELSE
      ,KnownNat period)       -- ARG[2]
   => Clock domain Source"
     , "template" :
-"-- pragma translate_off
+"-- clockGen begin
+-- pragma translate_off
 ~GENSYM[clkGen][0] : process is
   constant ~GENSYM[half_period][1] : time := ~LIT[2]0 ps / 2;
 begin
@@ -204,7 +205,8 @@ end process;
   => Signal domain Bool      -- ARG[3]
   -> Clock domain Source"
     , "template" :
-"-- pragma translate_off
+"-- tbClockGen begin
+-- pragma translate_off
 ~GENSYM[clkGen][0] : process is
   constant ~GENSYM[half_period][1] : time := ~LIT[2]0 ps / 2;
 begin
@@ -218,7 +220,8 @@ begin
   end loop;
   wait;
 end process;
--- pragma translate_on"
+-- pragma translate_on
+-- tbClockGen end"
     }
   }
 , { "BlackBox" :
@@ -227,10 +230,12 @@ end process;
     , "type" :
 "asyncResetGen :: Reset domain 'Asynchronous"
     , "template" :
-"-- pragma translate_off
+"-- asyncResetGen begin
+-- pragma translate_off
 ~RESULT <= '1',
            '0' after 3001 ps;
--- pragma translate_on"
+-- pragma translate_on
+-- asyncResetGen end"
     }
   }
 , { "BlackBox" :
@@ -241,10 +246,12 @@ end process;
                  , KnownNat clkPeriod )
               => Reset domain 'Synchronous"
     , "template" :
-"-- pragma translate_off
+"-- syncResetGen begin
+-- pragma translate_off
 ~RESULT <= '1',
            '0' after (2999 ps + ~LIT[1]0 ps);
--- pragma translate_on"
+-- pragma translate_on
+-- syncResetGen end"
     }
   }
 , { "BlackBox" :

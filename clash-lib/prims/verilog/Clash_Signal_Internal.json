@@ -67,7 +67,8 @@ assign ~RESULT = ~SYM[0];
      ,KnownNat period)       -- ARG[2]
   => Clock domain Source"
     , "template" :
-"// pragma translate_off
+"// clockGen begin
+// pragma translate_off
 reg ~TYPO ~GENSYM[clk][0];
 // 1 = 0.1ps
 localparam ~GENSYM[half_period][1] = (~LIT[2]0 / 2);
@@ -81,7 +82,8 @@ always begin
   end
 end
 assign ~RESULT = ~SYM[0];
-// pragma translate_on"
+// pragma translate_on
+// clockGen end"
     }
   }
 , { "BlackBox" :
@@ -96,7 +98,8 @@ assign ~RESULT = ~SYM[0];
   => Signal domain Bool      -- ARG[3]
   -> Clock domain Source"
     , "template" :
-"// pragma translate_off
+"// tbClockGen begin
+// pragma translate_off
 reg ~TYPO ~GENSYM[clk][0];
 // 1 = 0.1ps
 localparam ~GENSYM[half_period][1] = (~LIT[2]0 / 2);
@@ -113,7 +116,8 @@ always begin
   end
 end
 assign ~RESULT = ~SYM[0];
-// pragma translate_on"
+// pragma translate_on
+// tbClockGen end"
     }
   }
 , { "BlackBox" :
@@ -122,23 +126,29 @@ assign ~RESULT = ~SYM[0];
     , "type" :
 "asyncResetGen :: Reset domain 'Asynchronous"
     , "template" :
-"// pragma translate_off
+"// asyncResetGen begin
+// pragma translate_off
 reg ~TYPO ~GENSYM[rst][0];
 initial begin
   #1    ~SYM[0] = 1;
   #3001 ~SYM[0] = 0;
 end
 assign ~RESULT = ~SYM[0];
-// pragma translate_on"
+// pragma translate_on
+// asyncResetGen end"
     }
   }
 , { "BlackBox" :
     { "name"      : "Clash.Signal.Internal.syncResetGen"
     , "kind" : "Declaration"
     , "type" :
-"asyncResetGen :: Reset domain 'Synchronous"
+"syncResetGen
+  :: ( domain ~ 'Dom n clkPeriod
+     , KnownNat clkPeriod )
+  => Reset domain 'Synchronous"
     , "template" :
-"// pragma translate_off
+"// syncResetGen begin
+// pragma translate_off
 reg ~TYPO ~GENSYM[rst][0];
 localparam ~GENSYM[reset_period][1] = 2998 + ~LIT[1]0;
 initial begin
@@ -146,7 +156,8 @@ initial begin
   #~SYM[1] ~SYM[0] = 0;
 end
 assign ~RESULT = ~SYM[0];
-// pragma translate_on"
+// pragma translate_on
+// syncResetGen end"
     }
   }
 ]
