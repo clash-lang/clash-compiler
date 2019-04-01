@@ -163,20 +163,7 @@ normalize' nm = do
       resTyRep <- not <$> isUntranslatableType False resTy
       if resTyRep
          then do
-            tmNorm <- makeCachedU nm (extra.normalized) $ do
-                        -- We deshadow the term because sometimes GHC gives us
-                        -- code where a local binder has the same unique as a
-                        -- global binder, sometimes causing the inliner to go
-                        -- into a loop. Deshadowing freshens all the bindings
-                        -- to avoid this.
-                        --
-                        -- Additionally, it allows for a much cheaper `appProp`
-                        -- transformation, see Note [AppProp no-shadow invariant]
-                        is0 <- Lens.use globalInScope
-                        let tm1 = deShadowTerm is0 tm
-                        tm2 <- rewriteExpr ("normalization",normalization) (nmS,tm1) (nm',sp)
-                        let ty' = termType tcm tm2
-                        return (nm' {varType = ty'},sp,inl,tm2)
+            tmNorm <- normalizeTopLvlBndr nm (nm',sp,inl,tm)
             let usedBndrs = Lens.toListOf termFreeIds (tmNorm ^. _4)
             traceIf (nm `elem` usedBndrs)
                     (concat [ $(curLoc),"Expr belonging to bndr: ",nmS ," (:: "
@@ -203,24 +190,6 @@ normalize' nm = do
                             , " Not normalising:\n", showPpr tm] )
                     (return (toNormalize,(nm,(nm',sp,inl,tm))))
     Nothing -> error $ $(curLoc) ++ "Expr belonging to bndr: " ++ nmS ++ " not found"
-
--- | Rewrite a term according to the provided transformation
-rewriteExpr :: (String,NormRewrite) -- ^ Transformation to apply
-            -> (String,Term)        -- ^ Term to transform
-            -> (Id, SrcSpan)        -- ^ Renew current function being rewritten
-            -> NormalizeSession Term
-rewriteExpr (nrwS,nrw) (bndrS,expr) (nm, sp) = do
-  curFun .= (nm, sp)
-  lvl <- Lens.view dbgLevel
-  let before = showPpr expr
-  let expr' = traceIf (lvl >= DebugFinal)
-                (bndrS ++ " before " ++ nrwS ++ ":\n\n" ++ before ++ "\n")
-                expr
-  rewritten <- runRewrite nrwS emptyInScopeSet nrw expr'
-  let after = showPpr rewritten
-  traceIf (lvl >= DebugFinal)
-    (bndrS ++ " after " ++ nrwS ++ ":\n\n" ++ after ++ "\n") $
-    return rewritten
 
 -- | Check whether the normalized bindings are non-recursive. Errors when one
 -- of the components is recursive.

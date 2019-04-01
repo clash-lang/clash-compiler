@@ -924,7 +924,7 @@ splitCastWork _ e = return e
 -- | Inline work-free functions, i.e. fully applied functions that evaluate to
 -- a constant
 inlineWorkFree :: HasCallStack => NormRewrite
-inlineWorkFree (TransformContext localScope _) e@(collectArgs -> (Var f,args))
+inlineWorkFree (TransformContext localScope _) e@(collectArgs -> (Var f,args@(_:_)))
   = do
     tcm <- Lens.view tcCache
     let eTy = termType tcm e
@@ -972,11 +972,12 @@ inlineWorkFree (TransformContext localScope _) e@(Var f) = do
       bndrs <- Lens.use bindings
       case lookupVarEnv f bndrs of
         -- Don't inline recursive expressions
-        Just (_,_,_,body) -> do
+        Just top -> do
           isRecBndr <- isRecursiveBndr f
           if isRecBndr
              then return e
              else do
+              (_,_,_,body) <- normalizeTopLvlBndr f top
               -- See Note [AppProp no-shadow invariant]
               allInScope <- unionInScope localScope <$> Lens.use globalInScope
               changed (deShadowTerm allInScope body)

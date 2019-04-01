@@ -24,32 +24,41 @@ module Clash.Normalize.Util
  , isCheapFunction
  , isNonRecursiveGlobalVar
  , canConstantSpec
+ , normalizeTopLvlBndr
+ , rewriteExpr
  )
  where
 
-import           Control.Lens            ((&),(+~),(%=),(^.),_4)
+import           Control.Lens            ((&),(+~),(%=),(^.),_4,(.=))
 import qualified Control.Lens            as Lens
 import qualified Data.List               as List
 import qualified Data.Map                as Map
 import qualified Data.HashMap.Strict     as HashMapS
 import           Data.Text               (Text)
 
+import           BasicTypes              (InlineSpec)
+
 import           Clash.Annotations.Primitive (extractPrim)
 import           Clash.Core.FreeVars     (idOccursIn, termFreeIds)
+import           Clash.Core.Pretty       (showPpr)
+import           Clash.Core.Subst        (deShadowTerm)
 import           Clash.Core.Term         (Term (..))
 import           Clash.Core.TyCon        (TyConMap)
 import           Clash.Core.Var          (Id, Var (..))
 import           Clash.Core.VarEnv
 import           Clash.Core.Util
   (collectArgs, isPolyFun, termType, isClockOrReset)
-import           Clash.Driver.Types      (BindingMap)
+import           Clash.Driver.Types      (BindingMap, DebugLevel (..))
+import {-# SOURCE #-} Clash.Normalize.Strategy (normalization)
 import           Clash.Normalize.Types
 import           Clash.Primitives.Util   (constantArgs)
 import           Clash.Rewrite.Types
-  (bindings,extra,RewriteMonad,CoreContext(AppArg), tcCache, curFun)
-import           Clash.Rewrite.Util      (specialise, hasLocalFreeVars)
+  (bindings,extra,RewriteMonad,CoreContext(AppArg), tcCache, curFun,
+   globalInScope, dbgLevel)
+import           Clash.Rewrite.Util
+  (specialise, hasLocalFreeVars, runRewrite)
 import           Clash.Unique
-import           Clash.Util              (anyM)
+import           Clash.Util              (SrcSpan, anyM, makeCachedU, traceIf)
 
 -- | Determine if argument should reduce to a constant given a primitive and
 -- an argument number. Caches results.
@@ -257,3 +266,44 @@ isCheapFunction tm = case classifyFunction tm of
     | _primitive <= 1 -> _function  <= 0 && _selection <= 0
     | _selection <= 1 -> _function  <= 0 && _primitive <= 0
     | otherwise       -> False
+
+normalizeTopLvlBndr
+  :: Id
+  -> (Id, SrcSpan, InlineSpec, Term)
+  -> NormalizeSession (Id, SrcSpan, InlineSpec, Term)
+normalizeTopLvlBndr nm (nm',sp,inl,tm) = makeCachedU nm (extra.normalized) $ do
+  tcm <- Lens.view tcCache
+  let nmS = showPpr (varName nm)
+  -- We deshadow the term because sometimes GHC gives us
+  -- code where a local binder has the same unique as a
+  -- global binder, sometimes causing the inliner to go
+  -- into a loop. Deshadowing freshens all the bindings
+  -- to avoid this.
+  --
+  -- Additionally, it allows for a much cheaper `appProp`
+  -- transformation, see Note [AppProp no-shadow invariant]
+  is0 <- Lens.use globalInScope
+  let tm1 = deShadowTerm is0 tm
+  old <- Lens.use curFun
+  tm2 <- rewriteExpr ("normalization",normalization) (nmS,tm1) (nm',sp)
+  curFun .= old
+  let ty' = termType tcm tm2
+  return (nm' {varType = ty'},sp,inl,tm2)
+
+-- | Rewrite a term according to the provided transformation
+rewriteExpr :: (String,NormRewrite) -- ^ Transformation to apply
+            -> (String,Term)        -- ^ Term to transform
+            -> (Id, SrcSpan)        -- ^ Renew current function being rewritten
+            -> NormalizeSession Term
+rewriteExpr (nrwS,nrw) (bndrS,expr) (nm, sp) = do
+  curFun .= (nm, sp)
+  lvl <- Lens.view dbgLevel
+  let before = showPpr expr
+  let expr' = traceIf (lvl >= DebugFinal)
+                (bndrS ++ " before " ++ nrwS ++ ":\n\n" ++ before ++ "\n")
+                expr
+  rewritten <- runRewrite nrwS emptyInScopeSet nrw expr'
+  let after = showPpr rewritten
+  traceIf (lvl >= DebugFinal)
+    (bndrS ++ " after " ++ nrwS ++ ":\n\n" ++ after ++ "\n") $
+    return rewritten
