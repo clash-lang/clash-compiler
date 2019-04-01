@@ -87,7 +87,6 @@ assign ~RESULT = {~SYM[3], ~SYM[1]};
 "// ddrOut begin
 reg ~SIGD[~GENSYM[data_Pos][1]][6];
 reg ~SIGD[~GENSYM[data_Neg][2]][6];
-reg ~SIGD[~GENSYM[data_Out][3]][6];
 ~IF ~ISGATED[4] ~THEN
 always @(posedge ~ARG[4][1]~IF ~ISSYNC[5] ~THEN ~ELSE or posedge ~ARG[5]~FI) begin : ~GENSYM[~COMPNAME_ddrOut_pos][5]
   if (~ARG[5]) begin
@@ -119,16 +118,8 @@ always @(posedge ~ARG[4]~IF ~ISSYNC[5] ~THEN ~ELSE or posedge ~ARG[5]~FI) begin 
   end
 end~FI
 
-always @(*) begin ~IF ~ISGATED[4] ~THEN
-  if (~ARG[4][1]) begin~ELSE
-  if (~ARG[4]) begin~FI
-    ~SYM[3] = ~SYM[1];
-  end else begin
-    ~SYM[3] = ~SYM[2];
-  end
-end
+assign ~RESULT = ~ARG[4]~IF ~ISGATED[4] ~THEN[1]~ELSE ~FI ? ~SYM[1] : ~SYM[2];
 
-assign ~RESULT = ~SYM[3];
 // ddrOut end"
     }
   }
