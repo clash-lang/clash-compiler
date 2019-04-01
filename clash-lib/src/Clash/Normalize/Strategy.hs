@@ -37,20 +37,18 @@ normalization = rmDeadcode >-> constantPropgation >-> etaTL >-> rmUnusedExpr >-!
 
 
 constantPropgation :: NormRewrite
-constantPropgation = propagate >-> repeatR inlineAndPropagate >->
+constantPropgation = inlineAndPropagate >->
                      caseFlattening >-> dec >-> spec >-> dec >->
                      conSpec
   where
-    propagate          = topdownRR (applyMany transPropagate)
-    inlineAndPropagate = (topdownR (applyMany transInlineSafe) >-> inlineNR)
-                         !-> propagate
+    inlineAndPropagate = repeatR (topdownR (applyMany transPropagateAndInline) >-> inlineNR)
     spec               = bottomupR (applyMany specTransformations)
     caseFlattening     = repeatR (topdownR (apply "caseFlat" caseFlat))
     dec                = repeatR (topdownR (apply "DEC" disjointExpressionConsolidation))
     conSpec            = bottomupR (apply "constantSpec" constantSpec)
 
-    transPropagate :: [(String,NormRewrite)]
-    transPropagate =
+    transPropagateAndInline :: [(String,NormRewrite)]
+    transPropagateAndInline =
       [ ("applicationPropagation", appPropFast          )
       , ("bindConstantVar"       , bindConstantVar      )
       , ("caseLet"               , caseLet              )
@@ -59,26 +57,22 @@ constantPropgation = propagate >-> repeatR inlineAndPropagate >->
       , ("caseElemNonReachable"  , caseElemNonReachable )
       , ("elemExistentials"      , elemExistentials     )
       , ("removeUnusedExpr"      , removeUnusedExpr     )
+      -- These transformations can safely be applied in a top-down traversal as
+      -- they themselves check whether the to-be-inlined binder is recursive or not.
+      , ("inlineWorkFree"  , inlineWorkFree)
+      , ("inlineSmall"     , inlineSmall)
+      , ("bindOrLiftNonRep", inlineOrLiftNonRep) -- See: [Note] bindNonRep before liftNonRep
+                                                 -- See: [Note] bottom-up traversal for liftNonRep
+      , ("reduceNonRepPrim", reduceNonRepPrim)
+
+
+      , ("caseCast"        , caseCast)
+      , ("letCast"         , letCast)
+      , ("splitCastWork"   , splitCastWork)
+      , ("argCastSpec"     , argCastSpec)
+      , ("inlineCast"      , inlineCast)
+      , ("eliminateCastCast",eliminateCastCast)
       ]
-
-    -- These transformations can safely be applied in a top-down traversal as
-    -- they themselves check whether the to-be-inlined binder is recursive or not.
-    transInlineSafe :: [(String,NormRewrite)]
-    transInlineSafe =
-       [ ("inlineWorkFree"  , inlineWorkFree)
-       , ("inlineSmall"     , inlineSmall)
-       , ("bindOrLiftNonRep", inlineOrLiftNonRep) -- See: [Note] bindNonRep before liftNonRep
-                                                  -- See: [Note] bottom-up traversal for liftNonRep
-       , ("reduceNonRepPrim", reduceNonRepPrim)
-
-
-       , ("caseCast"        , caseCast)
-       , ("letCast"         , letCast)
-       , ("splitCastWork"   , splitCastWork)
-       , ("argCastSpec"     , argCastSpec)
-       , ("inlineCast"      , inlineCast)
-       , ("eliminateCastCast",eliminateCastCast)
-       ]
 
     -- InlineNonRep cannot be applied in a top-down traversal, as the non-representable
     -- binder might be recursive. The idea is, is that if the recursive
