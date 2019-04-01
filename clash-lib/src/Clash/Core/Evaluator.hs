@@ -10,6 +10,9 @@
 
 -}
 
+{-# LANGUAGE BangPatterns      #-}
+{-# LANGUAGE LambdaCase        #-}
+{-# LANGUAGE MagicHash         #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TemplateHaskell   #-}
 {-# LANGUAGE ViewPatterns      #-}
@@ -23,9 +26,13 @@ import           Data.Either                             (lefts,rights)
 import           Data.List
   (foldl',mapAccumL,uncons)
 import           Data.IntMap                             (IntMap)
+import qualified Data.Primitive.ByteArray                as BA
+import qualified Data.Vector.Primitive                   as PV
 import           Data.Text                               (Text)
 import           Data.Text.Prettyprint.Doc
 import           Debug.Trace                             (trace)
+import           GHC.Integer.GMP.Internals
+  (Integer (..), BigNat (..))
 import           Clash.Core.DataCon
 import           Clash.Core.FreeVars
 import           Clash.Core.Literal
@@ -423,17 +430,6 @@ primop _ _ _ h k nm ty tys vs v (e:es) =
 
 -- | Evaluate a case-expression
 scrutinise :: Heap -> Stack -> Value -> [Alt] -> State
-scrutinise h k (Lit l) alts
-  | altE:_ <-
-    [altE | (LitPat altL,altE) <- alts, altL == l ] ++
-    [altE | (DataPat altDc _ _,altE) <- alts, matchLit altDc l ] ++
-    [altE | (DefaultPat,altE) <- alts ]
-  = (h,k,altE)
-scrutinise h k (DC dc xs) alts
-  | altE:_ <- [substAlt altDc tvs pxs xs altE
-              | (DataPat altDc tvs pxs,altE) <- alts, altDc == dc ] ++
-              [altE | (DefaultPat,altE) <- alts ]
-  = (h,k,altE)
 scrutinise h k v [] = (h,k,valToTerm v)
 -- [Note: empty case expressions]
 --
@@ -441,16 +437,78 @@ scrutinise h k v [] = (h,k,valToTerm v)
 -- are used to indicate that the `whnf` function was called the context of a
 -- case-expression, which means certain special primitives must be forced.
 -- See also [Note: forcing special primitives]
-scrutinise _ _ _ _  = error "scrutinise"
+scrutinise h k (Lit l) alts = case alts of
+  (DefaultPat,altE):alts1 -> (h,k,go altE alts1)
+  _ -> (h,k,go (error ("scrutinise: no match " ++
+          showPpr (Case (valToTerm (Lit l)) (ConstTy Arrow) alts))) alts)
+ where
+  go def [] = def
+  go _ ((LitPat l1,altE):_) | l1 == l = altE
+  go _ ((DataPat dc [] [x],altE):_)
+    | IntegerLiteral l1 <- l
+    , Just patE <- case dcTag dc of
+       1 | l1 >= ((-2)^(63::Int)) &&  l1 < 2^(63::Int) ->
+          Just (IntLiteral l1)
+       2 | l1 >= (2^(63::Int)) ->
+          let !(Jp# !(BN# ba0)) = l1
+              ba1 = BA.ByteArray ba0
+              bv = PV.Vector 0 (BA.sizeofByteArray ba1) ba1
+          in  Just (ByteArrayLiteral bv)
+       3 | l1 < ((-2)^(63::Int)) ->
+          let !(Jn# !(BN# ba0)) = l1
+              ba1 = BA.ByteArray ba0
+              bv = PV.Vector 0 (BA.sizeofByteArray ba1) ba1
+          in  Just (ByteArrayLiteral bv)
+       _ -> Nothing
+    = let inScope = fVsOfTerms [altE]
+          subst0  = mkSubst (mkInScopeSet inScope)
+          subst1  = extendIdSubst subst0 x (Literal patE)
+      in  substTm "Evaluator.scrutinise" subst1 altE
+    | NaturalLiteral l1  <- l
+    , Just patE <- case dcTag dc of
+       1 | l1 >= 0 &&  l1 < 2^(64::Int) ->
+          Just (IntLiteral l1)
+       2 | l1 >= (2^(64::Int)) ->
+          let !(Jp# !(BN# ba0)) = l1
+              ba1 = BA.ByteArray ba0
+              bv = PV.Vector 0 (BA.sizeofByteArray ba1) ba1
+          in  Just (ByteArrayLiteral bv)
+       _ -> Nothing
+    = let inScope = fVsOfTerms [altE]
+          subst0  = mkSubst (mkInScopeSet inScope)
+          subst1  = extendIdSubst subst0 x (Literal patE)
+      in  substTm "Evaluator.scrutinise" subst1 altE
+  go def (_:alts1) = go def alts1
 
-matchLit :: DataCon -> Literal -> Bool
-matchLit dc (IntegerLiteral l)
-  | dcTag dc == 1
-  = l < 2^(63::Int)
-matchLit dc (NaturalLiteral l)
-  | dcTag dc == 1
-  = l < 2^(64::Int)
-matchLit _ _ = False
+scrutinise h k (DC dc xs) alts
+  | altE:_ <- [substAlt altDc tvs pxs xs altE
+              | (DataPat altDc tvs pxs,altE) <- alts, altDc == dc ] ++
+              [altE | (DefaultPat,altE) <- alts ]
+  = (h,k,altE)
+
+scrutinise h k v@(PrimVal nm _ _ vs) alts
+  | any (\case {(LitPat {},_) -> True; _ -> False}) alts
+  = case alts of
+      ((DefaultPat,altE):alts1) -> (h,k,go altE alts1)
+      _ -> (h,k,go (error ("scrutinise: no match " ++
+                showPpr (Case (valToTerm v) (ConstTy Arrow) alts))) alts)
+ where
+  go def [] = def
+  go _   ((LitPat l1,altE):_) | l1 == l = altE
+  go def (_:alts1) = go def alts1
+
+  l = case nm of
+        "Clash.Sized.Internal.BitVector.fromInteger#"
+          | [_,Lit (IntegerLiteral 0),Lit l0] <- vs -> l0
+        "Clash.Sized.Internal.Index.fromInteger#"
+          | [_,Lit l0] <- vs -> l0
+        "Clash.Sized.Internal.Signed.fromInteger#"
+          | [_,Lit l0] <- vs -> l0
+        "Clash.Sized.Internal.Unsigned.fromInteger#"
+          | [_,Lit l0] <- vs -> l0
+        _ -> error ("scrutinise: " ++ showPpr (Case (valToTerm v) (ConstTy Arrow) alts))
+
+scrutinise _ _ v alts = error ("scrutinise: " ++ showPpr (Case (valToTerm v) (ConstTy Arrow) alts))
 
 substAlt :: DataCon -> [TyVar] -> [Id] -> [Either Term Type] -> Term -> Term
 substAlt dc tvs xs args e = substTm "Evaluator.substAlt" subst e
