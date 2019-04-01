@@ -46,13 +46,15 @@ topEntityGS :: Clock DomReal Gated
           -> Signal DomDDR (Unsigned 8)
 topEntityGS = topEntityGeneric
 
+input = ((0,1):>(2,3):>(4,5):>(6,7):>((8,9)::(Unsigned 8,Unsigned 8)) :> Nil)
+expected = (0:>0:> 0:>1:>2:>3:>4:>5:>6:>7:>8:>(9 :: Unsigned 8) :> Nil)
 
 testBenchUS :: Signal DomDDR Bool
 testBenchUS = done
   where
-    testInput      = stimuliGenerator clkReal rstReal ((0,1):>(2,3):>(4,5):>(6,7):>((8,9)::(Unsigned 8,Unsigned 8)) :> Nil)
+    testInput      = stimuliGenerator clkReal rstReal input
     actualOutput   = ignoreFor clkDDR rstDDR d1 0 (topEntityUS clkReal rstReal testInput)
-    expectedOutput = outputVerifier clkDDR rstDDR (0:>0:> 0:>1:>2:>3:>4:>5:>6:>7:>8:>(9 :: Unsigned 8) :> Nil)
+    expectedOutput = outputVerifier clkDDR rstDDR expected
     done           = expectedOutput actualOutput
     done'          = not <$> done
     clkDDR         = tbClockGen @DomDDR done'
@@ -63,9 +65,9 @@ testBenchUS = done
 testBenchUA :: Signal DomDDR Bool
 testBenchUA = done
   where
-    testInput      = stimuliGenerator clkReal rstReal ((0,1):>(2,3):>(4,5):>(6,7):>((8,9)::(Unsigned 8,Unsigned 8)) :> Nil)
+    testInput      = stimuliGenerator clkReal rstReal input
     actualOutput   = ignoreFor clkDDR rstDDR d1 0 (topEntityUA clkReal rstReal testInput)
-    expectedOutput = outputVerifier clkDDR rstDDR (0:>0:> 0:>1:>2:>3:>4:>5:>6:>7:>8:>(9 :: Unsigned 8) :> Nil)
+    expectedOutput = outputVerifier clkDDR rstDDR expected
     done           = expectedOutput actualOutput
     done'          = not <$> done
     clkDDR         = tbClockGen @DomDDR done'
@@ -76,9 +78,9 @@ testBenchUA = done
 testBenchGA :: Signal DomDDR Bool
 testBenchGA = done
   where
-    testInput      = stimuliGenerator clkReal rstReal ((0,1):>(2,3):>(4,5):>(6,7):>((8,9)::(Unsigned 8,Unsigned 8)) :> Nil)
+    testInput      = stimuliGenerator clkReal rstReal input
     actualOutput   = ignoreFor clkDDR rstDDR d1 0 (topEntityGA clkReal rstReal testInput)
-    expectedOutput = outputVerifier clkDDR rstDDR (0:>0:> 0:>1:>2:>3:>4:>5:>6:>7:>8:>(9 :: Unsigned 8) :> Nil)
+    expectedOutput = outputVerifier clkDDR rstDDR expected
     done           = expectedOutput actualOutput
     done'          = not <$> done
     clkDDR         = let c = tbClockGen @DomDDR done' in clockGate c (pure True)
@@ -89,9 +91,9 @@ testBenchGA = done
 testBenchGS :: Signal DomDDR Bool
 testBenchGS = done
   where
-    testInput      = stimuliGenerator clkReal rstReal ((0,1):>(2,3):>(4,5):>(6,7):>((8,9)::(Unsigned 8,Unsigned 8)) :> Nil)
+    testInput      = stimuliGenerator clkReal rstReal input
     actualOutput   = ignoreFor clkDDR rstDDR d1 0 (topEntityGS clkReal rstReal testInput)
-    expectedOutput = outputVerifier clkDDR rstDDR (0:>0:> 0:>1:>2:>3:>4:>5:>6:>7:>8:>(9 :: Unsigned 8) :> Nil)
+    expectedOutput = outputVerifier clkDDR rstDDR expected
     done           = expectedOutput actualOutput
     done'          = not <$> done
     clkDDR         = let c = tbClockGen @DomDDR done' in clockGate c (pure True)
