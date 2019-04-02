@@ -155,6 +155,9 @@ dquotes = fmap PP.dquotes
 align :: Functor f => f Doc -> f Doc
 align = fmap PP.align
 
+hsep :: Functor f => f [Doc] -> f Doc
+hsep = fmap PP.hsep
+
 vsep :: Functor f => f [Doc] -> f Doc
 vsep = fmap PP.vsep
 

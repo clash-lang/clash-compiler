@@ -51,7 +51,7 @@ import           Clash.Annotations.BitRepresentation.Util
   (BitOrigin(Lit, Field), bitOrigins, bitRanges)
 import           Clash.Core.Var                       (Attr'(..))
 import           Clash.Backend
-import           Clash.Backend.Verilog                (bits, bit_char, encodingNote, exprLit, include)
+import           Clash.Backend.Verilog                (bits, bit_char, encodingNote, exprLit, include, uselibs)
 import           Clash.Netlist.BlackBox.Types         (HdlSyn (..))
 import           Clash.Netlist.BlackBox.Util
   (extractLiterals, renderBlackBox, renderFilePath)
@@ -80,6 +80,7 @@ data SystemVerilogState =
     , _srcSpan   :: SrcSpan
     , _includes  :: [(String,Doc)]
     , _imports   :: [Text.Text]
+    , _libraries :: [Text.Text]
     , _dataFiles      :: [(String,FilePath)]
     -- ^ Files to be copied: (filename, old path)
     , _memoryDataFiles:: [(String,String)]
@@ -104,7 +105,7 @@ primsRoot = return ("clash-lib" System.FilePath.</> "prims")
 #endif
 
 instance Backend SystemVerilogState where
-  initBackend     = SystemVerilogState HashSet.empty [] HashMap.empty 0 "" HashMapS.empty [] noSrcSpan [] [] [] []
+  initBackend     = SystemVerilogState HashSet.empty [] HashMap.empty 0 "" HashMapS.empty [] noSrcSpan [] [] [] [] []
   hdlKind         = const SystemVerilog
   primDirs        = const $ do root <- primsRoot
                                return [ root System.FilePath.</> "common"
@@ -176,7 +177,7 @@ instance Backend SystemVerilogState where
         insts ds
   unextend = return rmSlash
   addIncludes inc = includes %= (inc++)
-  addLibraries _ = return ()
+  addLibraries libs = libraries %= (libs ++)
   addImports inps = imports %= (inps ++)
   addAndSetData f = do
     fs <- use dataFiles
@@ -558,7 +559,8 @@ module_ c =
   modVerilog = do
     body <- modBody
     imps <- Mon $ use imports
-    modHeader <> line <> modPorts <> line <> include (nub imps) <> pure body <> line <> modEnding
+    libs <- Mon $ use libraries
+    modHeader <> line <> modPorts <> line <> include (nub imps) <> uselibs (nub libs) <> pure body <> line <> modEnding
 
   modHeader  = "module" <+> stringS (componentName c)
   modPorts   = indent 4 (tupleInputs inPorts <> line <> tupleOutputs outPorts <> semi)
