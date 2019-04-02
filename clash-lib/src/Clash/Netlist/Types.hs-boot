@@ -4,6 +4,8 @@
   Maintainer  :  Christiaan Baaij <christiaan.baaij@gmail.com>
 -}
 
+{-# LANGUAGE RoleAnnotations #-}
+
 module Clash.Netlist.Types where
 
 import Data.Text (Text)
@@ -15,3 +17,6 @@ data Declaration
 data Component
 data Expr
 data BlackBox
+
+type role NetlistMonad nominal
+data NetlistMonad a
