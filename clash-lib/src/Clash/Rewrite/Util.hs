@@ -8,6 +8,7 @@
   Utilities for rewriting: e.g. inlining, specialisation, etc.
 -}
 
+{-# LANGUAGE BangPatterns             #-}
 {-# LANGUAGE CPP                      #-}
 {-# LANGUAGE LambdaCase               #-}
 {-# LANGUAGE NondecreasingIndentation #-}
@@ -124,23 +125,39 @@ apply
   -> Rewrite extra
   -- ^ Transformation to be applied
   -> Rewrite extra
-apply name rewrite ctx expr = do
+apply = \s rewrite ctx expr0 -> do
   lvl <- Lens.view dbgLevel
-  let before = showPpr expr
-  (expr', anyChanged) <- traceIf (lvl >= DebugAll) ("Trying: " ++ name ++ " on:\n" ++ before) $ Writer.listen $ rewrite ctx expr
+  (expr1,anyChanged) <- Writer.listen (rewrite ctx expr0)
   let hasChanged = Monoid.getAny anyChanged
-  Monad.when hasChanged $ transformCounter += 1
-  let after  = showPpr expr'
-  let expr'' = if hasChanged then expr' else expr
+      !expr2     = if hasChanged then expr1 else expr0
+  Monad.when hasChanged (transformCounter += 1)
+  if lvl == DebugNone
+    then return expr2
+    else applyDebug lvl s expr0 hasChanged expr2
+{-# INLINE apply #-}
 
+applyDebug
+  :: DebugLevel
+  -- ^ The current debugging level
+  -> String
+  -- ^ Name of the transformation
+  -> Term
+  -- ^ Original expression
+  -> Bool
+  -- ^ Whether the rewrite indicated change
+  -> Term
+  -- ^ New expression
+  -> RewriteMonad extra Term
+applyDebug lvl name exprOld hasChanged exprNew =
+ traceIf (lvl >= DebugAll) ("Trying: " ++ name ++ " on:\n" ++ before) $ do
   Monad.when (lvl > DebugNone && hasChanged) $ do
     tcm                  <- Lens.view tcCache
-    let beforeTy          = termType tcm expr
-    beforeFV             <- Lens.setOf <$> localFreeVars <*> pure expr
-    let afterTy           = termType tcm expr'
-    afterFV              <- Lens.setOf <$> localFreeVars <*> pure expr'
+    let beforeTy          = termType tcm exprOld
+    beforeFV             <- Lens.setOf <$> localFreeVars <*> pure exprOld
+    let afterTy           = termType tcm exprNew
+    afterFV              <- Lens.setOf <$> localFreeVars <*> pure exprNew
     let newFV             = not (afterFV `Set.isSubsetOf` beforeFV)
-    let accidentalShadows = findAccidentialShadows expr'
+    let accidentalShadows = findAccidentialShadows exprNew
 
     Monad.when newFV $
             error ( concat [ $(curLoc)
@@ -174,13 +191,19 @@ apply name rewrite ctx expr = do
                      ]
             ) (return ())
 
-  Monad.when (lvl >= DebugApplied && not hasChanged && not (expr `aeqTerm` expr')) $
-    error $ $(curLoc) ++ "Expression changed without notice(" ++ name ++  "): before" ++ before ++ "\nafter:\n" ++ after
+  Monad.when (lvl >= DebugApplied && not hasChanged && not (exprOld `aeqTerm` exprNew)) $
+    error $ $(curLoc) ++ "Expression changed without notice(" ++ name ++  "): before"
+                      ++ before ++ "\nafter:\n" ++ after
 
   traceIf (lvl >= DebugName && hasChanged) name $
-    traceIf (lvl >= DebugApplied && hasChanged) ("Changes when applying rewrite to:\n" ++ before ++ "\nResult:\n" ++ after ++ "\n") $
-      traceIf (lvl >= DebugAll && not hasChanged) ("No changes when applying rewrite " ++ name ++ " to:\n" ++ after ++ "\n") $
-        return expr''
+    traceIf (lvl >= DebugApplied && hasChanged) ("Changes when applying rewrite to:\n"
+                      ++ before ++ "\nResult:\n" ++ after ++ "\n") $
+      traceIf (lvl >= DebugAll && not hasChanged) ("No changes when applying rewrite "
+                        ++ name ++ " to:\n" ++ after ++ "\n") $
+        return exprNew
+ where
+  before = showPpr exprOld
+  after  = showPpr exprNew
 
 -- | Perform a transformation on a Term
 runRewrite

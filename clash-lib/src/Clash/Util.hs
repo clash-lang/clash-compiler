@@ -210,6 +210,7 @@ combineM f g (x,y) = (,) <$> f x <*> g y
 traceIf :: Bool -> String -> a -> a
 traceIf True  msg = trace msg
 traceIf False _   = id
+{-# INLINE traceIf #-}
 
 -- | Monadic version of 'Data.List.partition'
 partitionM :: Monad m
