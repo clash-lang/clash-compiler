@@ -735,9 +735,13 @@ coreToName
   -> State GHC2CoreState (C.Name a)
 coreToName toName toUnique toString v = do
   ns <- toString (toName v)
-  let key = getKey (toUnique v)
-      loc = getSrcSpan (toName v)
-  return (C.Name C.User ns key loc)
+  let key  = getKey (toUnique v)
+      loc  = getSrcSpan (toName v)
+      sort | ns == "ds" || Text.isPrefixOf "$" ns
+           = C.System
+           | otherwise
+           = C.User
+  return (C.Name sort ns key loc)
 
 qualifiedNameString'
   :: Name
