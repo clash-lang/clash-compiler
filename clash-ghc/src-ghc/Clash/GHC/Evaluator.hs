@@ -2198,8 +2198,7 @@ reduceConstant isSubj gbl tcm h k nm ty tys args = case nm of
 
 -- Indexing
   "Clash.Sized.Vector.index_int" -- :: KnownNat n => Vec n a -> Int
-    | isSubj
-    , nTy : aTy : _  <- tys
+    | nTy : aTy : _  <- tys
     , _ : xs : i : _ <- args
     , DC intDc [Left (Literal (IntLiteral i'))] <- i
     -> if i' < 0

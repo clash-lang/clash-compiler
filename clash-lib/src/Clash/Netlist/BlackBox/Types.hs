@@ -31,7 +31,8 @@ import                GHC.Generics               (Generic)
 import                Clash.Core.Term            (Term)
 import                Clash.Core.Type            (Type)
 import                Clash.Core.Var             (Id)
-import {-# SOURCE #-} Clash.Netlist.Types        (BlackBox, Identifier)
+import {-# SOURCE #-} Clash.Netlist.Types
+  (BlackBox, Identifier, NetlistMonad)
 
 data TemplateKind
   = TDecl
@@ -67,7 +68,7 @@ type BlackBoxFunction
   -- ^ Arguments
   -> Type
   -- ^ Result type
-  -> Either String (BlackBoxMeta, BlackBox)
+  -> NetlistMonad (Either String (BlackBoxMeta, BlackBox))
 
 -- | A BlackBox Template is a List of Elements
 type BlackBoxTemplate = [Element]

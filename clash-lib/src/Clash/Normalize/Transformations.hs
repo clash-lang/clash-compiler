@@ -1744,13 +1744,18 @@ reduceConst ctx@(TransformContext is0 _) e@(App _ _)
           bindPureHeap ctx tcm ph' $ \_ctx' -> case e' of
             (Literal _) -> changed e'
             (collectArgs -> (Prim nm _, _))
-              | isFromInt nm
+              | isFromInt nm || isLitDC nm
               , e /= e'
               -> changed e'
             (collectArgs -> (Data _,_)) -> changed e'
             _                           -> return e
     else
       return e
+ where
+  isLitDC nm = nm `elem` ["GHC.Types.I#", "GHC.Types.W#"
+                         ,"GHC.Int.I8#", "GHC.Int.I16#", "GHC.Int.I32#", "GHC.Int.I64#"
+                         ,"GHC.Word.W8#","GHC.Word.W16#","GHC.Word.W32#","GHC.Word.W64#"
+                         ]
 
 reduceConst _ e = return e
 

@@ -282,8 +282,9 @@ mkPrimitive bbEParen bbEasD dst nm args ty =
       -> NetlistMonad (Expr, [Declaration])
     go =
       \case
-        P.BlackBoxHaskell bbName funcName (_fHash, func) ->
-          case func bbEasD dst nm args ty of
+        P.BlackBoxHaskell bbName funcName (_fHash, func) -> do
+          bbFunRes <- func bbEasD dst nm args ty
+          case bbFunRes of
             Left err -> do
               -- Blackbox template function returned an error:
               let err' = unwords [ $(curLoc) ++ "Could not create blackbox"
