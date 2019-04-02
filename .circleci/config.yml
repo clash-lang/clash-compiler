@@ -78,7 +78,7 @@ workflows:
     jobs:
       - ghc-8.2.2
       - ghc-8.4.4
-      - ghc-8.6.2
+      - ghc-8.6.4
 
 jobs:
   ghc-8.2.2:
@@ -91,8 +91,8 @@ jobs:
       <<: *env
       GHC: ghc-8.4.4
     <<: *build_default
-  ghc-8.6.2:
+  ghc-8.6.4:
     environment:
       <<: *env
-      GHC: ghc-8.6.2
+      GHC: ghc-8.6.4
     <<: *build_default
