@@ -14,7 +14,7 @@ import Clash.Netlist.BlackBox.Types
 import Clash.Annotations.Primitive (Primitive(..), HDL(..))
 
 myMultiplyTF :: BlackBoxFunction
-myMultiplyTF isD resId primName args ty =
+myMultiplyTF isD resId primName args ty = pure $
   Right ( emptyBlackBoxMeta
         , BBTemplate [Text "123456 * ", ArgGen 0 0, Text " * ", ArgGen 0 1]
         )

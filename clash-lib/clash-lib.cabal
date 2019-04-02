@@ -123,6 +123,7 @@ Library
                       hashable                >= 1.2.1.0  && < 1.3,
                       hint                    >= 0.7      && < 0.10,
                       integer-gmp             >= 1.0      && < 1.1,
+                      interpolate             >= 0.2.0    && < 1.0,
                       lens                    >= 3.9.2    && < 4.18,
                       mtl                     >= 2.1.2    && < 2.3,
                       parsers                 >= 0.12.8   && < 1.0,
@@ -190,6 +191,7 @@ Library
                       Clash.Primitives.GHC.Literal
                       Clash.Primitives.GHC.Word
                       Clash.Primitives.Intel.ClockGen
+                      Clash.Primitives.Sized.Vector
 
                       Clash.Rewrite.Combinators
                       Clash.Rewrite.Types

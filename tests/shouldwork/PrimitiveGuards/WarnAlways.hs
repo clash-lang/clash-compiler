@@ -10,7 +10,7 @@ import Clash.Netlist.BlackBox.Types (BlackBoxFunction, emptyBlackBoxMeta, Elemen
 import Clash.Annotations.Primitive (Primitive(InlinePrimitive), HDL(VHDL))
 
 primitiveTF :: BlackBoxFunction
-primitiveTF isD resId primName args ty =
+primitiveTF isD resId primName args ty = pure $
   Right ( emptyBlackBoxMeta, BBTemplate [Text "5 + ", ArgGen 0 0])
 
 primitive

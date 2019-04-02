@@ -186,5 +186,17 @@ constantArgs nm BlackBox {template = BBTemplate template} =
     | nm == "Clash.Sized.Internal.Index.fromInteger#"      = [1]
     | nm == "Clash.Sized.Internal.Signed.fromInteger#"     = [1]
     | nm == "Clash.Sized.Internal.Unsigned.fromInteger#"   = [1]
+    -- There is a special code-path for `index_int` in the Verilog backend in
+    -- case the index is a variable. But this code path only works when the
+    -- vector is (a projection of) a variable. By forcing the arguments of
+    -- index_int we can be sure that arguments are either:
+    --
+    -- Constant Variable
+    -- Variable Constant
+    -- Variable Variable
+    --
+    -- As all other cases would be reduced by the evaluator, and even expensive
+    -- primitives under index_int are fully unrolled.
+    | nm == "Clash.Sized.Vector.index_int"                 = [1,2]
     | otherwise = []
 constantArgs _ _ = Set.empty
