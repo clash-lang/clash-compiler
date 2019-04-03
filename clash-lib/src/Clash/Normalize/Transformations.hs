@@ -1814,7 +1814,7 @@ reduceNonRepPrim (TransformContext is0 ctx) e@(App _ _) | (Prim nm _, args) <- c
         case runExcept (tyNatSize tcm nTy) of
           Right n -> do
             untranslatableTys <- mapM isUntranslatableType_not_poly [lhsElTy,rhsElty,resElTy]
-            if or untranslatableTys || shouldReduce1 || ultra
+            if or untranslatableTys || shouldReduce1 || ultra || n < 2
                then let [fun,lhsArg,rhsArg] = Either.lefts args
                     in  reduceZipWith is1 n lhsElTy rhsElty resElTy fun lhsArg rhsArg
                else return e
@@ -1824,7 +1824,7 @@ reduceNonRepPrim (TransformContext is0 ctx) e@(App _ _) | (Prim nm _, args) <- c
         case runExcept (tyNatSize tcm nTy) of
           Right n -> do
             untranslatableTys <- mapM isUntranslatableType_not_poly [argElTy,resElTy]
-            if or untranslatableTys || shouldReduce1 || ultra
+            if or untranslatableTys || shouldReduce1 || ultra || n < 2
                then let [fun,arg] = Either.lefts args
                     in  reduceMap is1 n argElTy resElTy fun arg
                else return e
@@ -1841,7 +1841,7 @@ reduceNonRepPrim (TransformContext is0 ctx) e@(App _ _) | (Prim nm _, args) <- c
             isPow2 x  = x /= 0 && (x .&. (complement x + 1)) == x
         untranslatableTy <- isUntranslatableType_not_poly aTy
         case runExcept (tyNatSize tcm nTy) of
-          Right n | not (isPow2 (n + 1)) || untranslatableTy || shouldReduce1 || ultra ->
+          Right n | not (isPow2 (n + 1)) || untranslatableTy || shouldReduce1 || ultra || n == 0 ->
             let [fun,arg] = Either.lefts args
             in  reduceFold is1 (n + 1) aTy fun arg
           _ -> return e
@@ -1949,7 +1949,7 @@ reduceNonRepPrim (TransformContext is0 ctx) e@(App _ _) | (Prim nm _, args) <- c
         case runExcept (tyNatSize tcm nTy) of
           Right n -> do
             untranslatableTys <- mapM isUntranslatableType_not_poly [argElTy,resElTy]
-            if or untranslatableTys || shouldReduce1 || ultra
+            if or untranslatableTys || shouldReduce1 || ultra || n < 2
                then let [_,fun,arg] = Either.lefts args
                     in  reduceImap is1 n argElTy resElTy fun arg
                else return e
