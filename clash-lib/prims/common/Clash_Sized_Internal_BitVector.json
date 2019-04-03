@@ -5,21 +5,9 @@
     , "template"  : "~ERRORO"
     }
   }
-, { "BlackBox" :
+, { "Primitive" :
     { "name"      : "Clash.Sized.Internal.BitVector.checkUnpackUndef"
-    , "kind"      : "Declaration"
-    , "type"      :
-"checkUnpackUndef
-  :: ( KnownNat n        -- ARG[0]
-     , Typeable a)       -- ARG[1]
-  => (BitVector n -> a)  -- ARG[2]
-  -> BitVector n         -- ARG[3]
-  -> a"
-    , "template"  :
-"~INST 2
-  ~OUTPUT <= ~RESULT~ ~TYPO~
-  ~INPUT  <= ~VAR[bv][3]~ ~TYP[3]~
-~INST"
+    , "primType"  : "Function"
     }
   }
 , { "BlackBox" :
