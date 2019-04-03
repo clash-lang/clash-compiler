@@ -2,7 +2,7 @@
 module Main (main) where
 
 import Control.Exception (finally)
-import Data.List (isSuffixOf)
+import Data.List (isSuffixOf, (\\))
 import System.Directory (createDirectoryIfMissing, removeDirectoryRecursive)
 import System.Process (readCreateProcessWithExitCode, proc)
 import GHC.Conc (numCapabilities)
@@ -63,7 +63,9 @@ runClashTest =
       ]
     , clashTestGroup "Unit"
       [ clashTestGroup "Basic"
-        [ runTest ("tests" </> "shouldwork" </> "Basic") defBuild [] "BangData"            ([""],"BangData_topEntity",False)
+        [ -- TODO: Enable AES test on SystemVerilog. See issue #569.
+          runTest ("tests" </> "shouldwork" </> "Basic") (defBuild \\ [SystemVerilog]) [] "AES"                 ([""],"AES_topEntity",False)
+        , runTest ("tests" </> "shouldwork" </> "Basic") defBuild [] "BangData"            ([""],"BangData_topEntity",False)
         , runTest ("tests" </> "shouldwork" </> "Basic") defBuild [] "Trace"               ([""],"Trace_topEntity",False)
         , runTest ("tests" </> "shouldwork" </> "Basic") defBuild [] "ByteSwap32"          (["","ByteSwap32_testBench"],"ByteSwap32_testBench",True)
         , runTest ("tests" </> "shouldwork" </> "Basic") defBuild [] "CharTest"            (["","CharTest_testBench"],"CharTest_testBench",True)
