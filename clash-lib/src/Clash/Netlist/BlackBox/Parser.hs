@@ -90,6 +90,7 @@ pTagE =  Result True       <$  string "~ERESULT"
      <|> Size              <$> (string "~SIZE" *> brackets' pTagE)
      <|> Length            <$> (string "~LENGTH" *> brackets' pTagE)
      <|> Depth             <$> (string "~DEPTH" *> brackets' pTagE)
+     <|> MaxIndex          <$> (string "~MAXINDEX" *> brackets' pTagE)
      <|> FilePath          <$> (string "~FILE" *> brackets' pTagE)
      <|> Gen               <$> (True <$ string "~GENERATE")
      <|> Gen               <$> (False <$ string "~ENDGENERATE")

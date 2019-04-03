@@ -522,6 +522,12 @@ renderTag b (Depth e) = return . Text.pack . show . treeDepth $ lineToType b [e]
     treeDepth thing =
       error $ $(curLoc) ++ "treeDepth of a non-tree type: " ++ show thing
 
+renderTag b (MaxIndex e) = return . Text.pack . show . vecLen $ lineToType b [e]
+  where
+    vecLen (Vector n _) = n-1
+    vecLen thing =
+      error $ $(curLoc) ++ "vecLen of a non-vector type: " ++ show thing
+
 renderTag b e@(TypElem _)   = let ty = lineToType b [e]
                               in  renderOneLine <$> getMon (hdlType Internal ty)
 renderTag _ (Gen b)         = renderOneLine <$> genStmt b
@@ -699,6 +705,9 @@ prettyElem (Length e) = do
 prettyElem (Depth e) = do
   e' <- prettyElem e
   renderOneLine <$> (string "~DEPTH" <> brackets (string e'))
+prettyElem (MaxIndex e) = do
+  e' <- prettyElem e
+  renderOneLine <$> (string "~MAXINDEX" <> brackets (string e'))
 prettyElem (FilePath e) = do
   e' <- prettyElem e
   renderOneLine <$> (string "~FILE" <> brackets (string e'))
@@ -823,6 +832,7 @@ walkElement f el = maybeToList (f el) ++ walked
         Size e -> go e
         Length e -> go e
         Depth e -> go e
+        MaxIndex e -> go e
         Gen _ -> []
         And es -> concatMap go es
         CmpLE e1 e2 -> go e1 ++ go e2
