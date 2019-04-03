@@ -126,6 +126,8 @@ data Element
   -- ^ Length of a vector hole
   | Depth !Element
   -- ^ Depth of a tree hole
+  | MaxIndex !Element
+  -- ^ Max index into a vector
   | FilePath !Element
   -- ^ Hole containing a filepath for a data file
   | Template [Element] [Element]
