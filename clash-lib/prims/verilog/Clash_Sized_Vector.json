@@ -303,23 +303,14 @@ assign ~RESULT = ~SYM[0][(2*~LENGTH[~TYP[1]])-2];
     , "kind"      : "Declaration"
     , "type"      : "replace_int :: KnownNat n => Vec n a -> Int -> a -> Vec n a"
     , "template"  :
-"// replaceVec start
-reg ~TYP[3] ~GENSYM[vec][1] [0:~LIT[0]-1];
-integer ~GENSYM[i][2];
-always @(*) begin
-  for (~SYM[2]=0;~SYM[2]<~LIT[0];~SYM[2]=~SYM[2]+1) begin
-    ~SYM[1][~LIT[0]-1-~SYM[2]] = ~VAR[vecflat][1][~SYM[2]*~SIZE[~TYP[3]]+:~SIZE[~TYP[3]]];
-  end
-  ~SYM[1][~ARG[2]] = ~ARG[3];
-end
-
-genvar ~GENSYM[i][3];
+"// vector replace begin
+genvar ~GENSYM[i][0];
 ~GENERATE
-for (~SYM[3]=0;~SYM[3]<~LIT[0];~SYM[3]=~SYM[3]+1) begin : ~GENSYM[mk_vec][4]
-  assign ~RESULT[~SYM[3]*~SIZE[~TYP[3]]+:~SIZE[~TYP[3]]] = ~SYM[1][(~LIT[0]-1)-~SYM[3]];
+for (~SYM[0]=0;~SYM[0]<~LENGTH[~TYPO];~SYM[0]=~SYM[0]+1) begin : ~GENSYM[vector_replace][1]
+  assign ~RESULT[(~MAXINDEX[~TYPO]-~SYM[0])*~SIZE[~TYP[3]]+:~SIZE[~TYP[3]]] = ~ARG[2] == ~SYM[0] ? ~ARG[3] : ~VAR[vec][1][(~MAXINDEX[~TYPO]-~SYM[0])*~SIZE[~TYP[3]]+:~SIZE[~TYP[3]]];
 end
 ~ENDGENERATE
-// replaceVec end"
+// vector replace end"
     }
   }
 , { "BlackBox" :
