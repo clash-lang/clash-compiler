@@ -104,6 +104,7 @@ runClashTest =
         , runTest ("tests" </> "shouldwork" </> "BitVector") defBuild [] "ReduceZero"       (["","ReduceZero_testBench"],"ReduceZero_testBench",True)
         , runTest ("tests" </> "shouldwork" </> "BitVector") defBuild [] "ReduceOne"        (["","ReduceOne_testBench"],"ReduceOne_testBench",True)
         , runTest ("tests" </> "shouldwork" </> "BitVector") defBuild [] "ExtendingNumZero" (["","ExtendingNumZero_testBench"],"ExtendingNumZero_testBench",True)
+        , runTest ("tests" </> "shouldwork" </> "BitVector") defBuild ["-fconstraint-solver-iterations=15"] "GenericBitPack"   (["","GenericBitPack_testBench"],"GenericBitPack_testBench",True)
         , runTest ("tests" </> "shouldwork" </> "BitVector") defBuild [] "AppendZero"       (["","AppendZero_testBench"],"AppendZero_testBench",True)
         ]
       , clashTestGroup "BlackBox"

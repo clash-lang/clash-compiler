@@ -12,6 +12,7 @@ Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
 {-# LANGUAGE MagicHash            #-}
 {-# LANGUAGE ScopedTypeVariables  #-}
 {-# LANGUAGE TemplateHaskell      #-}
+{-# LANGUAGE TypeApplications     #-}
 {-# LANGUAGE TypeFamilies         #-}
 {-# LANGUAGE TypeOperators        #-}
 {-# LANGUAGE UndecidableInstances #-}
@@ -19,7 +20,9 @@ Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
 
 {-# LANGUAGE Trustworthy #-}
 
-{-# OPTIONS_GHC -fplugin GHC.TypeLits.KnownNat.Solver #-}
+{-# OPTIONS_GHC -fplugin=GHC.TypeLits.Extra.Solver #-}
+{-# OPTIONS_GHC -fplugin=GHC.TypeLits.Normalise #-}
+{-# OPTIONS_GHC -fplugin=GHC.TypeLits.KnownNat.Solver #-}
 {-# OPTIONS_HADDOCK show-extensions #-}
 
 #include "MachDeps.h"
@@ -40,14 +43,16 @@ import Data.Binary.IEEE754            (doubleToWord, floatToWord, wordToDouble,
 import Data.Int
 import Data.Word
 import Foreign.C.Types                (CUShort)
-import GHC.TypeLits                   (KnownNat, Nat, type (+))
+import GHC.TypeLits                   (KnownNat, Nat, type (+), type (-))
 import Numeric.Half                   (Half (..))
 import GHC.Generics
+import GHC.TypeLits.Extra             (CLog, Max)
 import Prelude                        hiding (map)
 import System.IO.Unsafe               (unsafeDupablePerformIO)
 
+import Clash.Promoted.Nat             (SNat(..), snatToNum)
 import Clash.Class.BitPack.Internal   (deriveBitPackTuples)
-import Clash.Class.Resize             (zeroExtend)
+import Clash.Class.Resize             (zeroExtend, resize)
 import Clash.Sized.BitVector
   (Bit, BitVector, (++#), high, low)
 import Clash.Sized.Internal.BitVector
@@ -72,16 +77,27 @@ class BitPack a where
   -- > data MyProductType = MyProductType { a :: Int, b :: Bool }
   -- >   deriving (Generic, BitPack)
   type BitSize a :: Nat
-  type BitSize a = GBitSize (Rep a)
+  type BitSize a = (CLog 2 (GConstructorCount (Rep a))) + (GFieldSize (Rep a))
   -- | Convert element of type @a@ to a 'BitVector'
   --
   -- >>> pack (-5 :: Signed 6)
   -- 11_1011
   pack   :: a -> BitVector (BitSize a)
   default pack
-    :: (Generic a, GBitPack (Rep a), GBitSize (Rep a) ~ BitSize a)
+    :: ( Generic a
+       , GBitPack (Rep a)
+       , KnownNat constrSize
+       , KnownNat fieldSize
+       , constrSize ~ CLog 2 (GConstructorCount (Rep a))
+       , fieldSize ~ GFieldSize (Rep a)
+       , (constrSize + fieldSize) ~ BitSize a
+       )
     => a -> BitVector (BitSize a)
-  pack = gpack . from
+  pack a =
+    resize (pack sc) ++# packedFields
+   where
+    (sc, packedFields) = gPackFields 0 (from a)
+
   -- | Convert a 'BitVector' to an element of type @a@
   --
   -- >>> pack (-5 :: Signed 6)
@@ -93,9 +109,19 @@ class BitPack a where
   -- 11_1011
   unpack :: BitVector (BitSize a) -> a
   default unpack
-    :: (Generic a, GBitPack (Rep a), GBitSize (Rep a) ~ BitSize a)
+    :: ( Generic a
+       , GBitPack (Rep a)
+       , KnownNat constrSize
+       , KnownNat fieldSize
+       , constrSize ~ CLog 2 (GConstructorCount (Rep a))
+       , fieldSize ~ GFieldSize (Rep a)
+       , (constrSize + fieldSize) ~ BitSize a
+       )
     => BitVector (BitSize a) -> a
-  unpack = to . gunpack
+  unpack b =
+    to (gUnpack sc 0 bFields)
+   where
+    (unpack . resize -> sc, bFields) = split# b
 
 packXWith
   :: KnownNat n
@@ -247,26 +273,103 @@ instance (BitPack a, KnownNat (BitSize a)) => BitPack (Maybe a) where
              | otherwise                         -> Just (unpack rest)
 
 class GBitPack f where
-  type GBitSize f :: Nat
-  gpack :: f a -> BitVector (GBitSize f)
-  gunpack :: BitVector (GBitSize f) -> f a
+  -- | Size of fields. If multiple constructors exist, this is the maximum of
+  -- the sum of each of the constructors fields.
+  type GFieldSize f :: Nat
 
-instance (GBitPack a) => GBitPack (M1 m d a) where
-  type GBitSize (M1 m d a) = GBitSize a
-  gpack (M1 m1)            = gpack m1
-  gunpack b                = M1 (gunpack b)
+  -- | Number of constructors this type has. Indirectly indicates how many bits
+  -- are needed to represent the constructor.
+  type GConstructorCount f :: Nat
 
-instance (KnownNat (GBitSize g), KnownNat (GBitSize f), GBitPack f, GBitPack g) => GBitPack (f :*: g) where
-  type GBitSize (f :*: g) = GBitSize f + GBitSize g
-  gpack = let go (m :*: ms) = gpack m ++# gpack ms in packXWith go
-  gunpack b               = gunpack front :*: gunpack back
-    where
-      (front, back) = split# b
+  -- | Pack fields of a type. Caller should pack and prepend the constructor bits.
+  gPackFields
+    :: Int
+    -- ^ Current constructor
+    -> f a
+    -- ^ Data to pack
+    -> (Int, BitVector (GFieldSize f))
+    -- ^ (Constructor number, Packed fields)
 
-instance (BitPack c) => GBitPack (K1 i c) where
-  type GBitSize (K1 i c) = BitSize c
-  gpack (K1 i)           = pack i
-  gunpack b              = K1 (unpack b)
+  -- | Unpack whole type.
+  gUnpack
+    :: Int
+    -- ^ Construct with constructor /n/
+    -> Int
+    -- ^ Current constructor
+    -> BitVector (GFieldSize f)
+    -- ^ BitVector containing fields
+    -> f a
+    -- ^ Unpacked result
+
+instance GBitPack a => GBitPack (M1 m d a) where
+  type GFieldSize (M1 m d a) = GFieldSize a
+  type GConstructorCount (M1 m d a) = GConstructorCount a
+
+  gPackFields cc (M1 m1) = gPackFields cc m1
+  gUnpack c cc b = M1 (gUnpack c cc b)
+
+instance ( KnownNat (GFieldSize g)
+         , KnownNat (GFieldSize f)
+         , KnownNat (GConstructorCount f)
+         , GBitPack f
+         , GBitPack g
+         ) => GBitPack (f :+: g) where
+  type GFieldSize (f :+: g) = Max (GFieldSize f) (GFieldSize g)
+  type GConstructorCount (f :+: g) = GConstructorCount f + GConstructorCount g
+
+  gPackFields cc (L1 l) =
+    let (sc, packed) = gPackFields cc l in
+    let padding = undefined# :: BitVector (Max (GFieldSize f) (GFieldSize g) - GFieldSize f) in
+    (sc, packed ++# padding)
+  gPackFields cc (R1 r) =
+    let cLeft = snatToNum (SNat @(GConstructorCount f)) in
+    let (sc, packed) = gPackFields (cc + cLeft) r in
+    let padding = undefined# :: BitVector (Max (GFieldSize f) (GFieldSize g) - GFieldSize g) in
+    (sc, packed ++# padding)
+
+  gUnpack c cc b =
+    if c <= cc then
+      L1 (gUnpack c cc f)
+    else
+      let cLeft = snatToNum (SNat @(GConstructorCount f)) in
+      R1 (gUnpack c (cc + cLeft) g)
+
+   where
+    -- It's a thing of beauty, if I may say so myself!
+    (f, _ :: BitVector (Max (GFieldSize f) (GFieldSize g) - GFieldSize f)) = split# b
+    (g, _ :: BitVector (Max (GFieldSize f) (GFieldSize g) - GFieldSize g)) = split# b
+
+
+instance (KnownNat (GFieldSize g), KnownNat (GFieldSize f), GBitPack f, GBitPack g) => GBitPack (f :*: g) where
+  type GFieldSize (f :*: g) = GFieldSize f + GFieldSize g
+  type GConstructorCount (f :*: g) = 1
+
+  gPackFields cc fg =
+    (cc, packXWith go fg)
+   where
+    go (l0 :*: r0) =
+      let (_, l1) = gPackFields cc l0 in
+      let (_, r1) = gPackFields cc r0 in
+      l1 ++# r1
+
+  gUnpack c cc b =
+    gUnpack c cc front :*: gUnpack c cc back
+   where
+    (front, back) = split# b
+
+instance BitPack c => GBitPack (K1 i c) where
+  type GFieldSize (K1 i c) = BitSize c
+  type GConstructorCount (K1 i c)  = 1
+
+  gPackFields cc (K1 i) = (cc, pack i)
+  gUnpack _c _cc b      = K1 (unpack b)
+
+instance GBitPack U1 where
+  type GFieldSize U1 = 0
+  type GConstructorCount U1 = 1
+
+  gPackFields cc U1 = (cc, 0)
+  gUnpack _c _cc _b = U1
 
 -- | Zero-extend a 'Bool'ean value to a 'BitVector' of the appropriate size.
 --
