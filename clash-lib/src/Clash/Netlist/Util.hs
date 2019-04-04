@@ -863,6 +863,10 @@ mkUniqueIdentifier typ nm = do
       Just _  -> go (n+1) g i
       Nothing -> do
         seenIds %= HashMap.insert i (n+1)
+        -- Don't forget to add the extended ID to the list of seen identifiers,
+        -- in case we want to create a new identifier based on the extended ID
+        -- we return in this function
+        seenIds %= HashMap.insert i' 0
         return i'
 
 -- | Preserve the Netlist '_varEnv' and '_varCount' when executing a monadic action
