@@ -1725,37 +1725,22 @@ reduceBinders is processed body ((id_,expr):binders) = case List.find ((== expr)
 
 reduceConst :: HasCallStack => NormRewrite
 reduceConst ctx@(TransformContext is0 _) e@(App _ _)
-  | (conPrim, _) <- collectArgs e
-  , isPrim conPrim
+  | (Prim nm0 _, _) <- collectArgs e
   = do
-    eIsConstant <- isConstant e
-    if eIsConstant then do
-      tcm <- Lens.view tcCache
-      bndrs <- Lens.use bindings
-      primEval <- Lens.view evaluator
-      ids <- Lens.use uniqSupply
-      let (ids1,ids2) = splitSupply ids
-      uniqSupply Lens..= ids2
-      gh <- Lens.use globalHeap
-      is1 <- unionInScope is0 <$> Lens.use globalInScope
-      case whnf' primEval bndrs tcm gh ids1 is1 False e of
-        (gh',ph',e') -> do
-          globalHeap Lens..= gh'
-          bindPureHeap ctx tcm ph' $ \_ctx' -> case e' of
-            (Literal _) -> changed e'
-            (collectArgs -> (Prim nm _, _))
-              | isFromInt nm || isLitDC nm
-              , e /= e'
-              -> changed e'
-            (collectArgs -> (Data _,_)) -> changed e'
-            _                           -> return e
-    else
-      return e
- where
-  isLitDC nm = nm `elem` ["GHC.Types.I#", "GHC.Types.W#"
-                         ,"GHC.Int.I8#", "GHC.Int.I16#", "GHC.Int.I32#", "GHC.Int.I64#"
-                         ,"GHC.Word.W8#","GHC.Word.W16#","GHC.Word.W32#","GHC.Word.W64#"
-                         ]
+    tcm <- Lens.view tcCache
+    bndrs <- Lens.use bindings
+    primEval <- Lens.view evaluator
+    ids <- Lens.use uniqSupply
+    let (ids1,ids2) = splitSupply ids
+    uniqSupply Lens..= ids2
+    gh <- Lens.use globalHeap
+    is1 <- unionInScope is0 <$> Lens.use globalInScope
+    case whnf' primEval bndrs tcm gh ids1 is1 False e of
+      (gh',ph',e') -> do
+        globalHeap Lens..= gh'
+        bindPureHeap ctx tcm ph' $ \_ctx' -> case e' of
+          (collectArgs -> (Prim nm1 _, _)) | nm0 == nm1 -> return e
+          _ -> changed e'
 
 reduceConst _ e = return e
 
