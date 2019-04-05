@@ -54,3 +54,10 @@ package *
 -- The fail package is empty for GHC 8+, and haddock errors out on it
 package fail
   documentation: False
+
+-- | We need: a <=? Max a b ~ True
+source-repository-package
+  type: git
+  location: https://github.com/clash-lang/ghc-typelits-extra
+  tag: a8de0b68b8216411cb862195354f251cd41bae50
+
