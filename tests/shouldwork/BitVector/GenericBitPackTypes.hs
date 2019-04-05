@@ -84,3 +84,6 @@ iT = FooSP2_A 2
 
 jT :: FooSP2 U1 U2
 jT = FooSP2_B 1
+
+kT :: (U1, U2)
+kT = (1, 2)

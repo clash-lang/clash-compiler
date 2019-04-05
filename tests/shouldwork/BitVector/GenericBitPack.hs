@@ -19,9 +19,10 @@ topEntity
      , FooSP2 U1 U2
      , FooSP2 U1 U2
      , FooSP2 U1 U2
+     , (U1, U2)
      )
-  -> BitVector 136
-topEntity (a, b, c, d, e, f, g, h, i, j) =
+  -> BitVector 152
+topEntity (a, b, c, d, e, f, g, h, i, j, k) =
   packed ++# packed
  where
   packed =
@@ -36,6 +37,7 @@ topEntity (a, b, c, d, e, f, g, h, i, j) =
       , pack h
       , pack i
       , pack j
+      , pack k
       )
 {-# NOINLINE topEntity #-}
 
@@ -56,6 +58,7 @@ testBench = done
           , hT
           , iT
           , jT
+          , kT
           ) :> Nil)
 
     expectedOutput =
@@ -72,6 +75,7 @@ testBench = done
               , $(lift (pack hT))
               , $(lift (pack iT))
               , $(lift (pack jT))
+              , $(lift (pack kT))
 
               , $$(bLit "00100010")  :: BitVector 8
               , $$(bLit "000")       :: BitVector 3
@@ -83,6 +87,7 @@ testBench = done
               , $$(bLit "0001000001") :: BitVector 10
               , $$(bLit "01010.....") :: BitVector 10
               , $$(bLit "1000001...") :: BitVector 10
+              , $$(bLit "00100010")  :: BitVector 8
 
               ) :> Nil)
 
