@@ -83,10 +83,8 @@ import           Clash.GHCi.UI (makeHDL)
 import           Exception (gcatch)
 import           Data.IORef (IORef, newIORef, readIORef)
 import qualified Data.Version (showVersion)
-import           Control.Exception (Exception(..),ErrorCall (..),finally)
+import           Control.Exception (finally)
 import           System.Directory (removeDirectoryRecursive)
-
-import           GHC.Exception ( SomeException )
 
 import qualified Clash.Backend
 import           Clash.Backend.SystemVerilog (SystemVerilogState)
@@ -96,8 +94,9 @@ import           Clash.Driver (createTemporaryClashDirectory)
 import           Clash.Driver.Types (ClashOpts (..), defClashOpts)
 import           Clash.GHC.ClashFlags
 import           Clash.Netlist.BlackBox.Types (HdlSyn (..))
-import           Clash.Util (ClashException (..), clashLibVersion)
+import           Clash.Util (clashLibVersion)
 import           Clash.GHC.LoadModules (ghcLibDir, wantedLanguageExtensions)
+import           Clash.GHC.Util (handleClashException)
 
 -----------------------------------------------------------------------------
 -- ToDo:
@@ -307,37 +306,6 @@ main' postLoadMode dflags0 args flagWarnings clashOpts = do
        DoBackpack             -> doBackpack (map fst srcs)
 
   liftIO $ dumpFinalStats dflags6
-
-handleClashException
-  :: GhcMonad m
-  => DynFlags
-  -> ClashOpts
-  -> SomeException
-  -> m a
-handleClashException df opts e = case fromException e of
-  Just (ClashException sp s eM) ->
-    throwOneError (mkPlainErrMsg df sp (text s $$ blankLine $$ srcInfo $$ showExtra (opt_errorExtra opts) eM))
-  _ -> case fromException e of
-    Just (ErrorCall msg) ->
-      throwOneError (mkPlainErrMsg df noSrcSpan (text "Clash error call:" $$ text msg))
-    _ -> case fromException e of
-      Just (e' :: SourceError) -> do
-        GHC.printException e'
-        liftIO $ exitWith (ExitFailure 1)
-      _ -> throwOneError (mkPlainErrMsg df noSrcSpan (text "Other error:" $$ text (displayException e)))
-  where
-    srcInfo = text "NB: The source location of the error is not exact, only indicative, as it is acquired after optimisations." $$
-              text "The actual location of the error can be in a function that is inlined." $$
-              text "To prevent inlining of those functions, annotate them with a NOINLINE pragma."
-
-    showExtra False (Just _)   =
-      blankLine $$
-      text "This error contains additional information, rerun with '-fclash-error-extra' to show this information."
-    showExtra True  (Just msg) =
-      blankLine $$
-      text "Additional information:" $$ blankLine $$
-      text msg
-    showExtra _ _ = empty
 
 ghciUI :: IORef ClashOpts -> [(FilePath, Maybe Phase)] -> Maybe [String] -> Ghc ()
 #if !defined(GHCI)
