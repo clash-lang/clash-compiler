@@ -91,6 +91,7 @@ class BitPack a where
   default pack
     :: ( Generic a
        , GBitPack (Rep a)
+       , KnownNat (BitSize a)
        , KnownNat constrSize
        , KnownNat fieldSize
        , constrSize ~ CLog 2 (GConstructorCount (Rep a))
@@ -98,10 +99,11 @@ class BitPack a where
        , (constrSize + fieldSize) ~ BitSize a
        )
     => a -> BitVector (BitSize a)
-  pack a =
-    resize (pack sc) ++# packedFields
+  pack = packXWith go
    where
-    (sc, packedFields) = gPackFields 0 (from a)
+    go a = resize (pack sc) ++# packedFields
+     where
+      (sc, packedFields) = gPackFields 0 (from a)
 
   -- | Convert a 'BitVector' to an element of type @a@
   --
@@ -126,7 +128,7 @@ class BitPack a where
   unpack b =
     to (gUnpack sc 0 bFields)
    where
-    (unpack . resize -> sc, bFields) = split# b
+    (checkUnpackUndef unpack . resize -> sc, bFields) = split# b
 
 packXWith
   :: KnownNat n
