@@ -56,3 +56,31 @@ instance ( BitPack a
          , KnownNat (BitSize a)
          , KnownNat (BitSize b)
          ) => BitPack (FooSP2 a b)
+
+-- Testsuite data (in separate module to circumvent TH stage restrictions):
+type U1 = Unsigned 3
+type U2 = Unsigned 5
+
+aT :: FooProduct U1 U2
+aT = FooProduct 1 2
+
+bT = FooSumA
+cT = FooSumB
+dT = FooSumC
+eT = FooSumG
+
+fT :: FooSP1 U1 U2
+fT = FooSP1_AB 1 2
+
+gT :: FooSP1 U1 U2
+gT = FooSP1_BA 1 2
+
+hT :: FooSP2 U1 U2
+hT = FooSP2_AB 2 1
+
+iT :: FooSP2 U1 U2
+iT = FooSP2_A 2
+
+
+jT :: FooSP2 U1 U2
+jT = FooSP2_B 1

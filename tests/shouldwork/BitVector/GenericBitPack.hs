@@ -9,30 +9,34 @@ import Clash.Prelude
 import Clash.Explicit.Testbench
 
 topEntity
-  :: ( FooProduct (Unsigned 2) (Unsigned 2)
+  :: ( FooProduct U1 U2
      , FooSum
      , FooSum
      , FooSum
      , FooSum
-     , FooSP1 (Unsigned 3) (Unsigned 5)
-     , FooSP1 (Unsigned 3) (Unsigned 5)
-     , FooSP2 (Unsigned 3) (Unsigned 5)
-     , FooSP2 (Unsigned 3) (Unsigned 5)
-     , FooSP2 (Unsigned 3) (Unsigned 5)
+     , FooSP1 U1 U2
+     , FooSP1 U1 U2
+     , FooSP2 U1 U2
+     , FooSP2 U1 U2
+     , FooSP2 U1 U2
      )
-  -> BitVector 64
-topEntity (a, b, c, d, e, f, g, h, i, j) = pack $
-  ( pack a
-  , pack b
-  , pack c
-  , pack d
-  , pack e
-  , pack f
-  , pack g
-  , pack h
-  , pack i
-  , pack j
-  )
+  -> BitVector 136
+topEntity (a, b, c, d, e, f, g, h, i, j) =
+  packed ++# packed
+ where
+  packed =
+    pack $
+      ( pack a
+      , pack b
+      , pack c
+      , pack d
+      , pack e
+      , pack f
+      , pack g
+      , pack h
+      , pack i
+      , pack j
+      )
 {-# NOINLINE topEntity #-}
 
 testBench :: Signal System Bool
@@ -42,33 +46,46 @@ testBench = done
       stimuliGenerator
         clk
         rst
-        (( FooProduct (1 :: Unsigned 2) (2 :: Unsigned 2)
-         , FooSumA
-         , FooSumB
-         , FooSumC
-         , FooSumG
-         , FooSP1_AB (1 :: Unsigned 3) (2 :: Unsigned 5)
-         , FooSP1_BA (2 :: Unsigned 5) (1 :: Unsigned 3)
-         , FooSP2_AB (2 :: Unsigned 3) (1 :: Unsigned 5)
-         , FooSP2_A (2 :: Unsigned 3)
-         , FooSP2_B (1 :: Unsigned 5)
-         ) :> Nil)
+        ( ( aT
+          , bT
+          , cT
+          , dT
+          , eT
+          , fT
+          , gT
+          , hT
+          , iT
+          , jT
+          ) :> Nil)
+
     expectedOutput =
       outputVerifierBitVector
         clk
         rst
-        (pack ( $(lift (pack (FooProduct (1 :: Unsigned 2) (2 :: Unsigned 2))))
-              , $(lift (pack FooSumA))
-              , $(lift (pack FooSumB))
-              , $(lift (pack FooSumC))
-              , $(lift (pack FooSumG))
-              , $(lift (pack (FooSP1_AB (1 :: Unsigned 3) (2 :: Unsigned 5))))
-              , $(lift (pack (FooSP1_BA (2 :: Unsigned 5) (1 :: Unsigned 3))))
+        (pack ( $(lift (pack aT))
+              , $(lift (pack bT))
+              , $(lift (pack cT))
+              , $(lift (pack dT))
+              , $(lift (pack eT))
+              , $(lift (pack fT))
+              , $(lift (pack gT))
+              , $(lift (pack hT))
+              , $(lift (pack iT))
+              , $(lift (pack jT))
 
-              , $(lift (pack (FooSP2_AB (2 :: Unsigned 3) (1 :: Unsigned 5))))
-              , $(lift (pack (FooSP2_A (2 :: Unsigned 3) :: FooSP2 (Unsigned 3) (Unsigned 5))))
-              , $(lift (pack (FooSP2_B (1 :: Unsigned 5) :: FooSP2 (Unsigned 3) (Unsigned 5))))
+              , $$(bLit "00100010")  :: BitVector 8
+              , $$(bLit "000")       :: BitVector 3
+              , $$(bLit "001")       :: BitVector 3
+              , $$(bLit "010")       :: BitVector 3
+              , $$(bLit "110")       :: BitVector 3
+              , $$(bLit "000100010") :: BitVector 9
+              , $$(bLit "100001010") :: BitVector 9
+              , $$(bLit "0001000001") :: BitVector 10
+              , $$(bLit "01010.....") :: BitVector 10
+              , $$(bLit "1000001...") :: BitVector 10
+
               ) :> Nil)
+
     done           = expectedOutput (topEntity <$> testInput)
     clk            = tbSystemClockGen (not <$> done)
     rst            = systemResetGen
