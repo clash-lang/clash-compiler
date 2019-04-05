@@ -16,9 +16,10 @@
 
 module Clash.Core.Pretty
   ( PrettyPrec (..)
-  , ppr
+  , PrettyOptions (..), defPrettyOptions
+  , ppr, ppr'
   , showDoc
-  , showPpr
+  , showPpr, showPpr'
   , tracePprId
   , tracePpr
   )
@@ -46,13 +47,25 @@ import Clash.Util
 
 -- | PrettyPrec printing Show-like typeclass
 class PrettyPrec p where
-  pprPrec :: Monad m => Rational -> p -> m (Doc ann)
+  pprPrec :: Monad m => PrettyOptions -> Rational -> p -> m (Doc ann)
 
-pprM :: (Monad m, PrettyPrec p) => p -> m (Doc ann)
-pprM = pprPrec 0
+data PrettyOptions = PrettyOptions
+  { displayUniques    :: Bool
+  , displayTypes      :: Bool
+  , displayQualifiers :: Bool
+  }
+
+defPrettyOptions :: PrettyOptions
+defPrettyOptions = PrettyOptions True True True
+
+pprM :: (Monad m, PrettyPrec p) => PrettyOptions -> p -> m (Doc ann)
+pprM opts = pprPrec opts 0
 
 ppr :: PrettyPrec p => p -> Doc ann
-ppr = runIdentity . pprM
+ppr = runIdentity . pprM defPrettyOptions
+
+ppr' :: PrettyPrec p => PrettyOptions -> p -> Doc ann
+ppr' opts = runIdentity . pprM opts
 
 noPrec, opPrec, appPrec :: Num a => a
 noPrec = 0
@@ -66,6 +79,9 @@ showDoc = renderString . layoutPretty (LayoutOptions (AvailablePerLine 80 0.6))
 showPpr :: PrettyPrec p => p -> String
 showPpr = showDoc . ppr
 
+showPpr' :: PrettyPrec p => PrettyOptions -> p -> String
+showPpr' opts = showDoc . ppr' opts
+
 tracePprId :: PrettyPrec p => p -> p
 tracePprId p = trace (showPpr p) p
 
@@ -76,22 +92,33 @@ prettyParen :: Bool -> Doc ann -> Doc ann
 prettyParen False = id
 prettyParen True  = parens
 
+removeQualifiers :: PrettyOptions -> Text -> Text
+removeQualifiers opts | displayQualifiers opts = id
+                      | otherwise              = snd . T.breakOnEnd "."
+
+nameOcc' :: PrettyOptions -> Name a -> Text
+nameOcc' opts = removeQualifiers opts . nameOcc
+
 instance PrettyPrec (Name a) where
-  pprPrec p n = pprPrec p (nameOcc n `T.append` T.pack (show (nameUniq n)))
+  pprPrec opts p n
+    | displayUniques opts
+    = pprPrec opts p (nameOcc' opts n `T.append` T.pack (show (nameUniq n)))
+    | otherwise
+    = pprPrec opts p (nameOcc' opts n)
 
 instance PrettyPrec a => PrettyPrec [a] where
-  pprPrec prec xs = do
-    xs' <- mapM (pprPrec prec) xs
+  pprPrec opts prec xs = do
+    xs' <- mapM (pprPrec opts prec) xs
     return $ vcat xs'
 
 instance PrettyPrec (Id, Term) where
-  pprPrec _ = pprTopLevelBndr
+  pprPrec opts _ = pprTopLevelBndr opts
 
-pprTopLevelBndr :: Monad m => (Id,Term) -> m (Doc ann)
-pprTopLevelBndr (bndr,expr) = do
-  bndr' <- pprM bndr
-  bndrName <- pprM (varName bndr)
-  expr' <- pprM expr
+pprTopLevelBndr :: Monad m => PrettyOptions -> (Id,Term) -> m (Doc ann)
+pprTopLevelBndr opts (bndr,expr) = do
+  bndr' <- pprM opts bndr
+  bndrName <- pprM opts (varName bndr)
+  expr' <- pprM opts expr
   return $ bndr' <> line <> hang 2 (sep [(bndrName <+> equals), expr']) <> line
 
 dcolon :: (Doc ann)
@@ -101,34 +128,35 @@ rarrow :: (Doc ann)
 rarrow = "->"
 
 instance PrettyPrec Text where
-  pprPrec _ = pure . pretty
+  pprPrec opts _ = pure . pretty . removeQualifiers opts
 
 instance PrettyPrec Type where
-  pprPrec _ = pprType
+  pprPrec opts _ t | displayTypes opts = pprType opts t
+                   | otherwise         = pure emptyDoc
 
 instance Pretty Type where
   pretty = ppr
 
 instance PrettyPrec TyCon where
-  pprPrec _ tc = pprM $ tyConName tc
+  pprPrec opts _ tc = pprM opts $ tyConName tc
 
 instance PrettyPrec LitTy where
-  pprPrec _ (NumTy i) = return $ pretty i
-  pprPrec _ (SymTy s) = return $ dquotes $ pretty s
+  pprPrec _ _ (NumTy i) = return $ pretty i
+  pprPrec _ _ (SymTy s) = return $ dquotes $ pretty s
 
 instance PrettyPrec Term where
-  pprPrec prec e = case e of
-    Var x        -> pprPrec prec (varName x)
-    Data dc      -> pprPrec prec dc
-    Literal l    -> pprPrec prec l
-    Prim nm _    -> return $ pretty nm
-    Lam  v e1    -> pprPrecLam prec [v] e1
-    TyLam tv e1  -> pprPrecTyLam prec [tv] e1
-    App fun arg  -> pprPrecApp prec fun arg
-    TyApp e' ty  -> pprPrecTyApp prec e' ty
-    Letrec xes e1  -> pprPrecLetrec prec xes e1
-    Case e' _ alts -> pprPrecCase prec e' alts
-    Cast e' ty1 ty2-> pprPrecCast prec e' ty1 ty2
+  pprPrec opts prec e = case e of
+    Var x           -> pprPrec opts prec (varName x)
+    Data dc         -> pprPrec opts prec dc
+    Literal l       -> pprPrec opts prec l
+    Prim nm _       -> pprPrec opts prec nm
+    Lam v e1        -> pprPrecLam opts prec [v] e1
+    TyLam tv e1     -> pprPrecTyLam opts prec [tv] e1
+    App fun arg     -> pprPrecApp opts prec fun arg
+    TyApp e' ty     -> pprPrecTyApp opts prec e' ty
+    Letrec xes e1   -> pprPrecLetrec opts prec xes e1
+    Case e' _ alts  -> pprPrecCase opts prec e' alts
+    Cast e' ty1 ty2 -> pprPrecCast opts prec e' ty1 ty2
 
 instance Pretty Term where
   pretty = ppr
@@ -139,20 +167,23 @@ data BindingSite
   | LetBind
 
 instance PrettyPrec (Var a) where
-  pprPrec _ v@(TyVar {}) = pprM $ varName v
-  pprPrec _ v@(Id {}) = do
-    v'  <- pprM (varName v)
-    ty' <- pprM (varType v)
-    return $ v' <+> align (dcolon <+> ty')
+  pprPrec opts _ v@(TyVar {}) = pprM opts $ varName v
+  pprPrec opts _ v@(Id {})
+    | displayTypes opts
+    = do v'  <- pprM opts (varName v)
+         ty' <- pprM opts (varType v)
+         return $ v' <+> align (dcolon <+> ty')
+    | otherwise
+    = pprM opts (varName v)
 
 instance Pretty (Var a) where
   pretty = ppr
 
 instance PrettyPrec DataCon where
-  pprPrec _ dc = pprM $ dcName dc
+  pprPrec opts _ dc = pprM opts $ dcName dc
 
 instance PrettyPrec Literal where
-  pprPrec _ l = case l of
+  pprPrec _ _ l = case l of
     IntegerLiteral i
       | i < 0         -> return $ parens (pretty i)
       | otherwise     -> return $ pretty i
@@ -172,59 +203,68 @@ instance PrettyPrec Literal where
     ByteArrayLiteral s -> return $ pretty $ show s
 
 instance PrettyPrec Pat where
-  pprPrec prec pat = case pat of
+  pprPrec opts prec pat = case pat of
     DataPat dc txs xs -> do
-      dc'  <- pprM  dc
-      txs' <- mapM (pprBndr LetBind) txs
-      xs'  <- mapM (pprBndr CaseBind) xs
+      dc'  <- pprM opts dc
+      txs' <- mapM (pprBndr opts LetBind) txs
+      xs'  <- mapM (pprBndr opts CaseBind) xs
       return $ prettyParen (prec >= appPrec) $ dc' <+> hsep txs' <> softline <> (nest 2 (vcat xs'))
-    LitPat l   -> pprM l
+    LitPat l   -> pprM opts l
     DefaultPat -> return $ pretty '_'
 
-pprPrecLam :: Monad m => Rational -> [Id] -> Term -> m (Doc ann)
-pprPrecLam prec xs e = do
-  xs' <- mapM (pprBndr LambdaBind) xs
-  e'  <- pprPrec noPrec e
+pprPrecLam :: Monad m => PrettyOptions -> Rational -> [Id] -> Term -> m (Doc ann)
+pprPrecLam opts prec xs e = do
+  xs' <- mapM (pprBndr opts LambdaBind) xs
+  e'  <- pprPrec opts noPrec e
   return $ prettyParen (prec > noPrec) $
     pretty 'λ' <> hsep xs' <+> rarrow <> line <> e'
 
-pprPrecTyLam :: Monad m => Rational -> [TyVar] -> Term -> m (Doc ann)
-pprPrecTyLam prec tvs e = do
-  tvs' <- mapM pprM tvs
-  e'   <- pprPrec noPrec e
-  return $ prettyParen (prec > noPrec) $
-    pretty 'Λ' <> hsep tvs' <+> rarrow <> line <> e'
+pprPrecTyLam :: Monad m => PrettyOptions -> Rational -> [TyVar] -> Term -> m (Doc ann)
+pprPrecTyLam opts prec tvs e
+  | displayTypes opts
+  = do tvs' <- mapM (pprM opts) tvs
+       e'   <- pprPrec opts noPrec e
+       return $ prettyParen (prec > noPrec) $
+         pretty 'Λ' <> hsep tvs' <+> rarrow <> line <> e'
+  | otherwise
+  = pprPrec opts prec e
 
-pprPrecApp :: Monad m => Rational -> Term -> Term -> m (Doc ann)
-pprPrecApp prec e1 e2 = do
-  e1' <- pprPrec opPrec e1
-  e2' <- pprPrec appPrec e2
+pprPrecApp :: Monad m => PrettyOptions -> Rational -> Term -> Term -> m (Doc ann)
+pprPrecApp opts prec e1 e2 = do
+  e1' <- pprPrec opts opPrec e1
+  e2' <- pprPrec opts appPrec e2
   return $ prettyParen (prec >= appPrec) $
     hang 2 (vsep [e1',e2'])
 
-pprPrecTyApp :: Monad m => Rational -> Term -> Type -> m (Doc ann)
-pprPrecTyApp prec e ty = do
-  e' <- pprPrec opPrec e
-  ty' <- pprParendType ty
-  return $ prettyParen (prec >= appPrec) $
-    hang 2 (sep [e', (pretty '@' <> ty')])
+pprPrecTyApp :: Monad m => PrettyOptions -> Rational -> Term -> Type -> m (Doc ann)
+pprPrecTyApp opts prec e ty
+  | displayTypes opts
+  = do e' <- pprPrec opts opPrec e
+       ty' <- pprParendType opts ty
+       return $ prettyParen (prec >= appPrec) $
+         hang 2 (sep [e', (pretty '@' <> ty')])
+  | otherwise
+  = pprPrec opts prec e
 
 -- TODO use more conventional cast operator (|> or ▷) ?
-pprPrecCast :: Monad m => Rational -> Term -> Type -> Type -> m (Doc ann)
-pprPrecCast prec e ty1 ty2 = do
-  e' <- pprPrec appPrec e
-  ty1' <- pprType ty1
-  ty2' <- pprType ty2
-  return $ prettyParen (prec >= appPrec) $
-    parens ("cast" <> softline <> nest 5 (vcat [dcolon <+> ty1', rarrow <+> ty2']))
-      <> softline <> nest 2 e'
+pprPrecCast :: Monad m => PrettyOptions -> Rational -> Term -> Type -> Type -> m (Doc ann)
+pprPrecCast opts prec e ty1 ty2
+  | displayTypes opts
+  = do e' <- pprPrec opts appPrec e
+       ty1' <- pprType opts ty1
+       ty2' <- pprType opts ty2
+       return $ prettyParen (prec >= appPrec) $
+         parens ("cast" <> softline <> nest 5 (vcat [dcolon <+> ty1', rarrow <+> ty2']))
+           <> softline <> nest 2 e'
+  | otherwise
+  = pprPrec opts prec e
 
-pprPrecLetrec :: Monad m => Rational -> [(Id, Term)] -> Term -> m (Doc ann)
-pprPrecLetrec prec xes body = do
-  body' <- pprPrec noPrec body
+pprPrecLetrec :: Monad m => PrettyOptions -> Rational -> [(Id, Term)] -> Term -> m (Doc ann)
+pprPrecLetrec opts prec xes body = do
+  body' <- pprPrec opts noPrec body
   xes'  <- mapM (\(x,e) -> do
-                  x' <- pprBndr LetBind x
-                  e' <- pprPrec noPrec e
+                  x' <- pprBndr opts LetBind x
+                  e' <- pprPrec opts noPrec e
                   return $ x' <> line <> equals <+> e'
                 ) xes
   let xes'' = case xes' of
@@ -233,24 +273,24 @@ pprPrecLetrec prec xes body = do
   return $ prettyParen (prec > noPrec) $
     hang 2 (vcat ("letrec":xes'')) <> line <> "in" <+> body'
 
-pprPrecCase :: Monad m => Rational -> Term -> [(Pat,Term)] -> m (Doc ann)
-pprPrecCase prec e alts = do
-  e' <- pprPrec prec e
-  alts' <- mapM (pprPrecAlt noPrec) alts
+pprPrecCase :: Monad m => PrettyOptions -> Rational -> Term -> [(Pat,Term)] -> m (Doc ann)
+pprPrecCase opts prec e alts = do
+  e' <- pprPrec opts prec e
+  alts' <- mapM (pprPrecAlt opts noPrec) alts
   return $ prettyParen (prec > noPrec) $
     hang 2 (vcat (("case" <+> e' <+> "of"):alts'))
 
-pprPrecAlt :: Monad m => Rational -> (Pat,Term) -> m (Doc ann)
-pprPrecAlt _ (altPat, altE) = do
-  altPat' <- pprPrec noPrec altPat
-  altE'   <- pprPrec noPrec altE
+pprPrecAlt :: Monad m => PrettyOptions -> Rational -> (Pat,Term) -> m (Doc ann)
+pprPrecAlt opts _ (altPat, altE) = do
+  altPat' <- pprPrec opts noPrec altPat
+  altE'   <- pprPrec opts noPrec altE
   return $ hang 2 (vcat [(altPat' <+> rarrow), altE'])
 
-pprBndr :: (Monad m, PrettyPrec a) => BindingSite -> a -> m (Doc ann)
-pprBndr bs x = prettyParen needsParen <$> pprM x
+pprBndr :: (Monad m, PrettyPrec a) => PrettyOptions -> BindingSite -> a -> m (Doc ann)
+pprBndr opts bs x = prettyParen needsParen <$> pprM opts x
   where
     needsParen = case bs of
-      LambdaBind -> True
+      LambdaBind -> displayTypes opts
       CaseBind   -> True
       LetBind    -> False
 
@@ -263,90 +303,93 @@ data TypePrec
 maybeParen :: TypePrec -> TypePrec -> (Doc ann) -> (Doc ann)
 maybeParen ctxt_prec inner_prec = prettyParen (ctxt_prec >= inner_prec)
 
-pprType :: Monad m => Type -> m (Doc ann)
-pprType = ppr_type TopPrec
+pprType :: Monad m => PrettyOptions -> Type -> m (Doc ann)
+pprType opts = ppr_type opts TopPrec
 
-pprParendType :: Monad m => Type -> m (Doc ann)
-pprParendType = ppr_type TyConPrec
+pprParendType :: Monad m => PrettyOptions -> Type -> m (Doc ann)
+pprParendType opts = ppr_type opts TyConPrec
 
-ppr_type :: Monad m => TypePrec -> Type -> m (Doc ann)
-ppr_type _ (VarTy tv)                   = pprM tv
-ppr_type _ (LitTy tyLit)                = pprM tyLit
-ppr_type p ty@(ForAllTy {})             = pprForAllType p ty
-ppr_type p (ConstTy (TyCon tc))         = pprTcApp p ppr_type tc []
-ppr_type p (AnnType _ann typ)           = ppr_type p typ
-ppr_type p (tyView -> TyConApp tc args) = pprTcApp p ppr_type tc args
-ppr_type p (tyView -> FunTy ty1 ty2)    = pprArrowChain p <$> ppr_type FunPrec ty1 <:> pprFunTail ty2
+ppr_type :: Monad m => PrettyOptions -> TypePrec -> Type -> m (Doc ann)
+ppr_type opts _ (VarTy tv)                   = pprM opts tv
+ppr_type opts _ (LitTy tyLit)                = pprM opts tyLit
+ppr_type opts p ty@(ForAllTy {})             = pprForAllType opts p ty
+ppr_type opts p (ConstTy (TyCon tc))         = pprTcApp opts p (ppr_type opts) tc []
+ppr_type opts p (AnnType _ann typ)           = ppr_type opts p typ
+ppr_type opts p (tyView -> TyConApp tc args) = pprTcApp opts p (ppr_type opts) tc args
+ppr_type opts p (tyView -> FunTy ty1 ty2)    = pprArrowChain p <$> ppr_type opts FunPrec ty1 <:> pprFunTail ty2
   where
-    pprFunTail (tyView -> FunTy ty1' ty2') = ppr_type FunPrec ty1' <:> pprFunTail ty2'
-    pprFunTail otherTy                     = ppr_type TopPrec otherTy <:> pure []
+    pprFunTail (tyView -> FunTy ty1' ty2') = ppr_type opts FunPrec ty1' <:> pprFunTail ty2'
+    pprFunTail otherTy                     = ppr_type opts TopPrec otherTy <:> pure []
 
-ppr_type p (AppTy ty1 ty2) = maybeParen p TyConPrec <$> ((<+>) <$> pprType ty1 <*> ppr_type TyConPrec ty2)
-ppr_type _ (ConstTy Arrow) = return (parens rarrow)
+ppr_type opts p (AppTy ty1 ty2) = maybeParen p TyConPrec <$> ((<+>) <$> pprType opts ty1
+                                                                    <*> ppr_type opts TyConPrec ty2)
+ppr_type _    _ (ConstTy Arrow) = return (parens rarrow)
 
-pprForAllType :: Monad m => TypePrec -> Type -> m (Doc ann)
-pprForAllType p ty = maybeParen p FunPrec <$> pprSigmaType True ty
+pprForAllType :: Monad m => PrettyOptions -> TypePrec -> Type -> m (Doc ann)
+pprForAllType opts p ty = maybeParen p FunPrec <$> pprSigmaType opts True ty
 
-pprSigmaType :: Monad m => Bool -> Type -> m (Doc ann)
-pprSigmaType showForalls ty = do
+pprSigmaType :: Monad m => PrettyOptions -> Bool -> Type -> m (Doc ann)
+pprSigmaType opts showForalls ty = do
     (tvs, rho)     <- split1 [] ty
-    sep <$> sequenceA [ if showForalls then pprForAll tvs else pure emptyDoc
-                      , pprType rho
+    sep <$> sequenceA [ if showForalls then pprForAll opts tvs else pure emptyDoc
+                      , pprType opts rho
                       ]
   where
     split1 tvs (ForAllTy tv resTy) = split1 (tv:tvs) resTy
-    split1 tvs resTy = return (reverse tvs,resTy)
+    split1 tvs resTy               = return (reverse tvs,resTy)
 
-pprForAll :: Monad m => [TyVar] -> m (Doc ann)
-pprForAll [] = return emptyDoc
-pprForAll tvs = do
-  tvs' <- mapM pprTvBndr tvs
+pprForAll :: Monad m => PrettyOptions -> [TyVar] -> m (Doc ann)
+pprForAll _    []  = return emptyDoc
+pprForAll opts tvs = do
+  tvs' <- mapM (pprTvBndr opts) tvs
   return $ pretty '∀' <+> sep tvs' <> dot
 
-pprTvBndr :: Monad m => TyVar -> m (Doc ann)
-pprTvBndr tv
-  = do
-      tv'   <- pprM tv
-      kind' <- pprKind (varType tv)
-      return $ parens (tv' <+> dcolon <+> kind')
+pprTvBndr :: Monad m => PrettyOptions -> TyVar -> m (Doc ann)
+pprTvBndr opts tv
+  | displayTypes opts
+  = do tv'   <- pprM opts tv
+       kind' <- pprKind opts (varType tv)
+       return $ parens (tv' <+> dcolon <+> kind')
+  | otherwise
+  = pprM opts tv
 
-pprKind :: Monad m => Kind -> m (Doc ann)
-pprKind = pprType
+pprKind :: Monad m => PrettyOptions -> Kind -> m (Doc ann)
+pprKind opts = pprType opts
 
-pprTcApp :: Monad m => TypePrec -> (TypePrec -> Type -> m (Doc ann))
+pprTcApp :: Monad m => PrettyOptions -> TypePrec -> (TypePrec -> Type -> m (Doc ann))
   -> TyConName -> [Type] -> m (Doc ann)
-pprTcApp _ _  tc []
-  = return . pretty $ nameOcc tc
+pprTcApp opts _ _  tc []
+  = return . pretty $ nameOcc' opts tc
 
-pprTcApp p pp tc tys
+pprTcApp opts p pp tc tys
   | isTupleTyConLike tc
   = do
     tys' <- mapM (pp TopPrec) tys
     return $ parens $ sep $ punctuate comma tys'
 
   | otherwise
-  = pprTypeNameApp p pp tc tys
+  = pprTypeNameApp opts p pp tc tys
 
-pprTypeNameApp :: Monad m => TypePrec -> (TypePrec -> Type -> m (Doc ann))
+pprTypeNameApp :: Monad m => PrettyOptions -> TypePrec -> (TypePrec -> Type -> m (Doc ann))
   -> Name a -> [Type] -> m (Doc ann)
-pprTypeNameApp p pp name tys
+pprTypeNameApp opts p pp name tys
   | isSym
   , [ty1,ty2] <- tys
-  = pprInfixApp p pp name ty1 ty2
+  = pprInfixApp opts p pp name ty1 ty2
   | otherwise
   = do
     tys' <- mapM (pp TyConPrec) tys
-    let name' = pretty $ nameOcc name
+    let name' = pretty $ nameOcc' opts name
     return $ pprPrefixApp p (pprPrefixVar isSym name') tys'
   where
     isSym = isSymName name
 
-pprInfixApp :: Monad m => TypePrec -> (TypePrec -> Type -> m (Doc ann))
+pprInfixApp :: Monad m => PrettyOptions -> TypePrec -> (TypePrec -> Type -> m (Doc ann))
   -> Name a -> Type -> Type -> m (Doc ann)
-pprInfixApp p pp name ty1 ty2 = do
+pprInfixApp opts p pp name ty1 ty2 = do
   ty1'  <- pp FunPrec ty1
   ty2'  <- pp FunPrec ty2
-  let name' = pretty $ nameOcc name
+  let name' = pretty $ nameOcc' opts name
   return $ maybeParen p FunPrec $ sep [ty1', pprInfixVar True name' <+> ty2']
 
 pprPrefixApp :: TypePrec -> (Doc ann) -> [(Doc ann)] -> (Doc ann)
