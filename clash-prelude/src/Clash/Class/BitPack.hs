@@ -40,6 +40,12 @@ where
 import Control.Exception              (catch, evaluate)
 import Data.Binary.IEEE754            (doubleToWord, floatToWord, wordToDouble,
                                        wordToFloat)
+
+#if MIN_VERSION_base(4,12,0)
+import Data.Complex                   (Complex)
+import Data.Ord                       (Down)
+#endif
+
 import Data.Int
 import Data.Word
 import Foreign.C.Types                (CUShort)
@@ -53,8 +59,7 @@ import System.IO.Unsafe               (unsafeDupablePerformIO)
 import Clash.Promoted.Nat             (SNat(..), snatToNum)
 import Clash.Class.BitPack.Internal   (deriveBitPackTuples)
 import Clash.Class.Resize             (zeroExtend, resize)
-import Clash.Sized.BitVector
-  (Bit, BitVector, (++#), high, low)
+import Clash.Sized.BitVector          (Bit, BitVector, (++#))
 import Clash.Sized.Internal.BitVector
   (pack#, split#, checkUnpackUndef, undefined#, unpack#, unsafeToInteger)
 import Clash.XException
@@ -263,15 +268,6 @@ instance (KnownNat (BitSize a), KnownNat (BitSize b), BitPack a, BitPack b) =>
   pack = let go (a,b) = pack a ++# pack b in packXWith go
   unpack ab  = let (a,b) = split# ab in (unpack a, unpack b)
 
-instance (BitPack a, KnownNat (BitSize a)) => BitPack (Maybe a) where
-  type BitSize (Maybe a) = 1 + BitSize a
-  pack = let go Nothing  = pack# low ++# undefined#
-             go (Just x) = pack# high ++# pack x
-         in  packXWith go
-  unpack x = case split# x of
-    (c,rest) | checkUnpackUndef unpack# c == low -> Nothing
-             | otherwise                         -> Just (unpack rest)
-
 class GBitPack f where
   -- | Size of fields. If multiple constructors exist, this is the maximum of
   -- the sum of each of the constructors fields.
@@ -370,6 +366,27 @@ instance GBitPack U1 where
 
   gPackFields cc U1 = (cc, 0)
   gUnpack _c _cc _b = U1
+
+-- Instances derived using Generic
+instance ( BitPack a
+         , KnownNat (BitSize a)
+         , BitPack b
+         , KnownNat (BitSize b)
+         ) => BitPack (Either a b)
+
+instance ( BitPack a
+         , KnownNat (BitSize a)
+         ) => BitPack (Maybe a)
+
+#if MIN_VERSION_base(4,12,0)
+instance ( BitPack a
+         , KnownNat (BitSize a)
+         ) => BitPack (Complex a)
+
+instance ( BitPack a
+         , KnownNat (BitSize a)
+         ) => BitPack (Down a)
+#endif
 
 -- | Zero-extend a 'Bool'ean value to a 'BitVector' of the appropriate size.
 --

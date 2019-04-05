@@ -1,6 +1,11 @@
+{-|
+Copyright  :  (C) 2019, QBayLogic B.V.
+License    :  BSD2 (see the file LICENSE)
+Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
+-}
 {-# LANGUAGE TemplateHaskell #-}
 
-module Clash.Class.BitPack.Internal where
+module Clash.Class.BitPack.Internal (deriveBitPackTuples) where
 
 import           Control.Monad         (replicateM)
 import           Data.List             (foldl')
