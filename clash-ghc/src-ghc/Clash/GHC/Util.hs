@@ -3,7 +3,7 @@ module Clash.GHC.Util where
 
 import ErrUtils           (mkPlainErrMsg)
 import GHC                (GhcMonad(..), printException)
-import GhcPlugins         (DynFlags, SourceError, ($$), blankLine, empty, liftIO, noSrcSpan, text, throwOneError)
+import GhcPlugins         (DynFlags, SourceError, ($$), blankLine, empty, isGoodSrcSpan, liftIO, noSrcSpan, text, throwOneError)
 
 import Control.Exception  (Exception(..), ErrorCall(..))
 import GHC.Exception      (SomeException)
@@ -19,8 +19,10 @@ handleClashException
   -> SomeException
   -> m a
 handleClashException df opts e = case fromException e of
-  Just (ClashException sp s eM) ->
-    throwOneError (mkPlainErrMsg df sp (text s $$ blankLine $$ srcInfo $$ showExtra (opt_errorExtra opts) eM))
+  Just (ClashException sp s eM) -> do
+    let srcInfo' | isGoodSrcSpan sp = srcInfo
+                 | otherwise = empty
+    throwOneError (mkPlainErrMsg df sp (text s $$ srcInfo' $$ showExtra (opt_errorExtra opts) eM))
   _ -> case fromException e of
     Just (ErrorCall msg) ->
       throwOneError (mkPlainErrMsg df noSrcSpan (text "Clash error call:" $$ text msg))
