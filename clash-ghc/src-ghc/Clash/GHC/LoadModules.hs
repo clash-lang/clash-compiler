@@ -27,12 +27,15 @@ where
 -- External Modules
 import           Clash.Annotations.Primitive     (HDL, PrimitiveGuard)
 import           Clash.Annotations.TopEntity     (TopEntity (..))
+import           Clash.Util                      (ClashException(..), pkgIdFromTypeable)
 import           Control.Arrow                   (first, second)
 import           Control.DeepSeq                 (deepseq)
+import           Control.Exception               (throw)
 #if MIN_VERSION_ghc(8,6,0)
 import           Control.Exception               (throwIO)
 #endif
 import           Control.Monad.IO.Class          (liftIO)
+import           Data.Char                       (isDigit)
 import           Data.Generics.Uniplate.DataOnly (transform)
 import           Data.Data                       (Data)
 import           Data.Typeable                   (Typeable)
@@ -40,6 +43,7 @@ import           Data.List                       (foldl', lookup, nub)
 import           Data.Maybe                      (catMaybes, listToMaybe, mapMaybe)
 import qualified Data.Text                       as Text
 import qualified Data.Time.Clock                 as Clock
+import           Language.Haskell.TH.Syntax      (lift)
 import           System.Exit                     (ExitCode (..))
 import           System.IO                       (hGetLine)
 import           System.IO.Error                 (tryIOError)
@@ -61,7 +65,7 @@ import qualified HscMain
 import qualified HscTypes
 import qualified MonadUtils
 import qualified Panic
-import qualified GhcPlugins                      (deserializeWithData)
+import qualified GhcPlugins                      (deserializeWithData, installedUnitIdString)
 import qualified TcRnMonad
 import qualified TcRnTypes
 import qualified TidyPgm
@@ -81,7 +85,7 @@ import qualified Var
 -- Internal Modules
 import           Clash.GHC.GHC2Core                           (modNameM, qualifiedNameString')
 import           Clash.GHC.LoadInterfaceFiles                 (loadExternalExprs, primitiveFilePath)
-import           Clash.Util                                   (curLoc)
+import           Clash.Util                                   (curLoc, noSrcSpan)
 import           Clash.Annotations.BitRepresentation.Internal
   (DataRepr', dataReprAnnToDataRepr')
 
@@ -223,6 +227,7 @@ loadModules tmpDir useColor hdl modName dflagsM idirs = do
 #else
                                  ; simpl_guts <- MonadUtils.liftIO $ HscMain.hscSimplify hsc_env dsMod
 #endif
+                                 ; checkForInvalidPrelude simpl_guts
                                  ; (tidy_guts,_) <- MonadUtils.liftIO $ TidyPgm.tidyProgram hsc_env simpl_guts
                                  ; let pgm        = HscTypes.cg_binds tidy_guts
                                  ; let modFamInstEnv = TcRnTypes.tcg_fam_inst_env $ fst $ GHC.tm_internals_ tcMod
@@ -702,3 +707,28 @@ removeStrictnessAnnotations pm =
 
     -- rmConDeclF :: GHC.DataId name => GHC.ConDeclField name -> GHC.ConDeclField name
     rmConDeclF cdf = cdf {GHC.cd_fld_type = rmHsType (GHC.cd_fld_type cdf)}
+
+-- | The package id of the clash-prelude we were built with
+preludePkgId :: String
+preludePkgId = $(lift $ pkgIdFromTypeable (undefined :: TopEntity))
+
+-- | Check that we're using the same clash-prelude as we were built with
+--
+-- Because if they differ clash won't be able to recognize any ANNotations.
+checkForInvalidPrelude :: Monad m => HscTypes.ModGuts -> m ()
+checkForInvalidPrelude guts =
+  case filter isWrongPrelude pkgIds of
+    []    -> return ()
+    (x:_) -> throw (ClashException noSrcSpan (msgWrongPrelude x) Nothing)
+  where
+    pkgs = HscTypes.dep_pkgs . HscTypes.mg_deps $ guts
+    pkgIds = map (GhcPlugins.installedUnitIdString . fst) pkgs
+    prelude = "clash-prelude-"
+    isPrelude pkg = case splitAt (length prelude) pkg of
+      (x,y:_) | x == prelude && isDigit y -> True     -- check for a digit so we don't match clash-prelude-extras
+      _ -> False
+    isWrongPrelude pkg = isPrelude pkg && pkg /= preludePkgId
+    msgWrongPrelude pkg = unlines ["Clash only works with the exact clash-prelude it was built with."
+                                  ,"Clash was built with: " ++ preludePkgId
+                                  ,"So can't run with:    " ++ pkg
+                                  ]

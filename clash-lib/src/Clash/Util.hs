@@ -31,6 +31,7 @@ import qualified Control.Exception    as Exception
 import Control.Monad                  as X ((<=<),(>=>))
 import Control.Monad.State            (MonadState,State,StateT,runState)
 import qualified Control.Monad.State  as State
+import Data.Typeable                  (Typeable)
 import Data.Function                  as X (on)
 import Data.Hashable                  (Hashable)
 import Data.HashMap.Lazy              (HashMap)
@@ -44,6 +45,7 @@ import Debug.Trace                    (trace)
 import GHC.Base                       (Int(..),isTrue#,(==#),(+#))
 import GHC.Integer.Logarithms         (integerLogBase#)
 import GHC.Stack                      (HasCallStack, callStack, prettyCallStack)
+import Type.Reflection                (tyConPackage, typeRepTyCon, typeOf)
 import qualified Language.Haskell.TH  as TH
 
 import SrcLoc                         (SrcSpan, noSrcSpan)
@@ -357,3 +359,9 @@ anyM p (x:xs) = do
     return True
   else
     anyM p xs
+
+-- | Get the package id of the type of a value
+-- >>> pkgIdFromTypeable (undefined :: TopEntity)
+-- "clash-prelude-0.99.3-64904d90747cb49e17166bbc86fec8678918e4ead3847193a395b258e680373c"
+pkgIdFromTypeable :: Typeable a => a -> String
+pkgIdFromTypeable = tyConPackage . typeRepTyCon . typeOf
