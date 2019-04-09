@@ -8,3 +8,6 @@ packages:
 
 extra-deps:
 - ./clash-cosim
+
+- git: https://github.com/clash-lang/ghc-typelits-extra
+  commit: a8de0b68b8216411cb862195354f251cd41bae50
