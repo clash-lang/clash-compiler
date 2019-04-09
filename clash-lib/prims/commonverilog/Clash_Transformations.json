@@ -1,0 +1,8 @@
+[ { "BlackBox" :
+    { "name"      : "Clash.Transformations.eqInt"
+    , "kind"      : "Expression"
+    , "type"      : "eqInt :: Int -> Int -> Bool"
+    , "template"  : "~ARG[0] == ~ARG[1]"
+    }
+  }
+]
