@@ -198,5 +198,6 @@ constantArgs nm BlackBox {template = BBTemplate template} =
     -- As all other cases would be reduced by the evaluator, and even expensive
     -- primitives under index_int are fully unrolled.
     | nm == "Clash.Sized.Vector.index_int"                 = [1,2]
+    | nm == "Clash.Sized.Vector.replace_int"               = [1,2]
     | otherwise = []
 constantArgs _ _ = Set.empty

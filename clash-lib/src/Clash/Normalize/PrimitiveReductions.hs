@@ -37,10 +37,12 @@
 
 module Clash.Normalize.PrimitiveReductions where
 
-import           Control.Concurrent.Supply        (Supply)
 import qualified Control.Lens                     as Lens
 import           Data.List                        (mapAccumR)
 import qualified Data.Maybe                       as Maybe
+
+import           PrelNames                        (boolTyConKey)
+import           Unique                           (getKey)
 
 import           Clash.Core.DataCon               (DataCon)
 import           Clash.Core.Literal               (Literal (..))
@@ -51,7 +53,8 @@ import           Clash.Core.Type                  (LitTy (..), Type (..),
                                                    mkFunTy, mkTyConApp,
                                                    splitFunForallTy, tyView,
                                                    undefinedTy)
-import           Clash.Core.TyCon                 (TyConName, tyConDataCons)
+import           Clash.Core.TyCon
+  (TyConMap, TyConName, tyConDataCons, tyConName)
 import           Clash.Core.TysPrim               (integerPrimTy, typeNatKind)
 import           Clash.Core.Util
   (appendToVec, extractElems, extractTElems, idToVar, mkApps, mkRTree,
@@ -697,22 +700,20 @@ reduceReplace_int is0 n aTy vTy v i newA = do
  where
   -- Basically creates:
   --
-  -- case i0 of
-  --   I# i1 ->
-  --     case i1 of
-  --       curI -> newA
-  --       _    -> oldA
+  -- case eqInt i0 curI  of
+  --   True -> newA
+  --   _    -> oldA
   --
   -- where:
   --
   --   - curI is the index of the current element, which we statically know
-  --   - i0 is the index given to replace_int, and i1 is its primitive sibling
+  --   - i0 is the index given to replace_int
   --   - newA is the element given to replace_int as a replacement for..
   --   - oldA; an element at index curI
   --
   replace_intElement
-    :: Supply
-    -- ^ Unique supply
+    :: TyConMap
+    -- ^ TyCon map
     -> DataCon
     -- Int datacon
     -> Type
@@ -722,12 +723,27 @@ reduceReplace_int is0 n aTy vTy v i newA = do
     -> Integer
     -- ^
     -> Term
-  replace_intElement uniqs0 iDc iTy oldA elIndex = case0
+  replace_intElement tcm iDc iTy oldA elIndex = case0
    where
-    (_, iId) = mkUniqInternalId (uniqs0, is0) ("i", iTy)
-    case0    = Case i aTy [(DataPat iDc [] [iId], case1)]
-    case1    = Case (Var iId) aTy [ (DefaultPat, oldA)
-                                  , (LitPat (IntLiteral elIndex), newA) ]
+    (Just boolTc) = lookupUniqMap (getKey boolTyConKey) tcm
+    [_,trueDc]    = tyConDataCons boolTc
+    eqInt         = eqIntPrim iTy (mkTyConApp (tyConName boolTc) [])
+    case0         = Case (mkApps eqInt [Left i
+                                       ,Left (mkApps (Data iDc)
+                                             [Left (Literal (IntLiteral elIndex))])
+                                       ])
+                         aTy
+                         [(DefaultPat, oldA)
+                         ,(DataPat trueDc [] [], newA)
+                         ]
+
+  -- Equality on lifted Int that returns a Bool
+  eqIntPrim
+    :: Type
+    -> Type
+    -> Term
+  eqIntPrim intTy boolTy =
+    Prim "Clash.Transformations.eqInt" (mkFunTy intTy (mkFunTy intTy boolTy))
 
   go tcm (coreView1 tcm -> Just ty') = go tcm ty'
   go tcm (tyView -> TyConApp vecTcNm _)
@@ -753,7 +769,7 @@ reduceReplace_int is0 n aTy vTy v i newA = do
                                     v
 
       -- Replace every element with (if i == elIndex then newA else oldA)
-      let replacedEls = zipWith (replace_intElement uniqs1 iDc iTy) vars [0..]
+      let replacedEls = zipWith (replace_intElement tcm iDc iTy) vars [0..]
           lbody       = mkVec nilCon consCon aTy n replacedEls
           lb          = Letrec (init elems) lbody
       uniqSupply Lens..= uniqs1

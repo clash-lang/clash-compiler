@@ -2507,8 +2507,7 @@ reduceConstant isSubj gbl tcm h k nm ty tys args = case nm of
 
 -- Modifying vectors
   "Clash.Sized.Vector.replace_int" -- :: KnownNat n => Vec n a -> Int -> a -> Vec n a
-    | isSubj
-    , nTy : aTy : _  <- tys
+    | nTy : aTy : _  <- tys
     , _ : xs : i : a : _ <- args
     , DC intDc [Left (Literal (IntLiteral i'))] <- i
     -> if i' < 0
@@ -2532,6 +2531,12 @@ reduceConstant isSubj gbl tcm h k nm ty tys args = case nm of
                                         ])
                     _ -> Nothing
                  _ -> Nothing
+
+  "Clash.Transformations.eqInt"
+    | [ DC _ [Left (Literal (IntLiteral i))]
+      , DC _ [Left (Literal (IntLiteral j))]
+      ] <- args
+    -> reduce (boolToBoolLiteral tcm ty (i == j))
 
 -- - specialised permutations
   "Clash.Sized.Vector.reverse" -- :: Vec n a -> Vec n a
