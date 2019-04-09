@@ -16,7 +16,7 @@ import Clash.Rewrite.Util
 
 -- | Normalisation transformation
 normalization :: NormRewrite
-normalization = rmDeadcode >-> constantPropgation >-> etaTL >-> rmUnusedExpr >-!-> anf >-!-> rmDeadcode >->
+normalization = rmDeadcode >-> constantPropagation >-> etaTL >-> rmUnusedExpr >-!-> anf >-!-> rmDeadcode >->
                 bindConst >-> letTL >-> evalConst >-!-> cse >-!-> cleanup >-> recLetRec
   where
     etaTL      = apply "etaTL" etaExpansionTL !-> topdownR (apply "applicationPropagation" appPropFast)
@@ -36,8 +36,8 @@ normalization = rmDeadcode >-> constantPropgation >-> etaTL >-> rmUnusedExpr >-!
                  >-> rmDeadcode >-> letTL
 
 
-constantPropgation :: NormRewrite
-constantPropgation = inlineAndPropagate >->
+constantPropagation :: NormRewrite
+constantPropagation = inlineAndPropagate >->
                      caseFlattening >-> dec >-> spec >-> dec >->
                      conSpec
   where
