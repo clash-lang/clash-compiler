@@ -61,8 +61,8 @@ import           Clash.Core.Util
    mkUniqInternalId, mkUniqSystemTyVar, mkVec, termType, dataConInstArgTys)
 import           Clash.Core.Var                   (Var (..))
 import           Clash.Core.VarEnv
-  (InScopeSet, extendInScopeSetList)
-
+  (InScopeSet, extendInScopeSetList, unionInScope)
+import {-# SOURCE #-} Clash.Normalize.Strategy
 import           Clash.Normalize.Types
 import           Clash.Rewrite.Types
 import           Clash.Rewrite.Util
@@ -104,7 +104,7 @@ reduceReverse inScope0 n elTy vArg = do
 -- vectors of a known length @n@, by the fully unrolled recursive "definition"
 -- of @Clash.Sized.Vector.zipWith@
 reduceZipWith
-  :: InScopeSet
+  :: TransformContext
   -> Integer  -- ^ Length of the vector(s)
   -> Type -- ^ Type of the lhs of the function
   -> Type -- ^ Type of the rhs of the function
@@ -113,7 +113,7 @@ reduceZipWith
   -> Term -- ^ The 1st vector argument
   -> Term -- ^ The 2nd vector argument
   -> NormalizeSession Term
-reduceZipWith inScope0 n lhsElTy rhsElTy resElTy fun lhsArg rhsArg = do
+reduceZipWith (TransformContext is0 ctx) n lhsElTy rhsElTy resElTy fun lhsArg rhsArg = do
     tcm <- Lens.view tcCache
     let ty = termType tcm lhsArg
     go tcm ty
@@ -124,12 +124,14 @@ reduceZipWith inScope0 n lhsElTy rhsElTy resElTy fun lhsArg rhsArg = do
       , [nilCon,consCon] <- tyConDataCons vecTc
       = do
         uniqs0 <- Lens.use uniqSupply
+        fun1   <- constantPropagation (TransformContext is0 (AppArg Nothing:ctx)) fun
+        is1    <- unionInScope is0 <$> Lens.use globalInScope
         let (uniqs1,(varsL,elemsL)) = second (second concat . unzip)
-                                    $ extractElems uniqs0 inScope0 consCon lhsElTy 'L' n lhsArg
-            inScope1 = extendInScopeSetList inScope0 (map fst elemsL)
+                                    $ extractElems uniqs0 is1 consCon lhsElTy 'L' n lhsArg
+            is2 = extendInScopeSetList is1 (map fst elemsL)
             (uniqs2,(varsR,elemsR)) = second (second concat . unzip)
-                                    $ extractElems uniqs1 inScope1 consCon rhsElTy 'R' n rhsArg
-            funApps          = zipWith (\l r -> mkApps fun [Left l,Left r]) varsL varsR
+                                    $ extractElems uniqs1 is2 consCon rhsElTy 'R' n rhsArg
+            funApps          = zipWith (\l r -> mkApps fun1 [Left l,Left r]) varsL varsR
             lbody            = mkVec nilCon consCon resElTy n funApps
             lb               = Letrec (init elemsL ++ init elemsR) lbody
         uniqSupply Lens..= uniqs2
@@ -140,14 +142,14 @@ reduceZipWith inScope0 n lhsElTy rhsElTy resElTy fun lhsArg rhsArg = do
 -- of a known length @n@, by the fully unrolled recursive "definition" of
 -- @Clash.Sized.Vector.map@
 reduceMap
-  :: InScopeSet
+  :: TransformContext
   -> Integer  -- ^ Length of the vector
   -> Type -- ^ Argument type of the function
   -> Type -- ^ Result type of the function
   -> Term -- ^ The map'd function
   -> Term -- ^ The map'd over vector
   -> NormalizeSession Term
-reduceMap inScope n argElTy resElTy fun arg = do
+reduceMap (TransformContext is0 ctx) n argElTy resElTy fun arg = do
     tcm <- Lens.view tcCache
     let ty = termType tcm arg
     go tcm ty
@@ -158,9 +160,11 @@ reduceMap inScope n argElTy resElTy fun arg = do
       , [nilCon,consCon] <- tyConDataCons vecTc
       = do
         uniqs0 <- Lens.use uniqSupply
+        fun1 <- constantPropagation (TransformContext is0 (AppArg Nothing:ctx)) fun
+        is1 <- unionInScope is0 <$> Lens.use globalInScope
         let (uniqs1,(vars,elems)) = second (second concat . unzip)
-                                  $ extractElems uniqs0 inScope consCon argElTy 'A' n arg
-            funApps          = map (fun `App`) vars
+                                  $ extractElems uniqs0 is1 consCon argElTy 'A' n arg
+            funApps          = map (fun1 `App`) vars
             lbody            = mkVec nilCon consCon resElTy n funApps
             lb               = Letrec (init elems) lbody
         uniqSupply Lens..= uniqs1
@@ -171,14 +175,14 @@ reduceMap inScope n argElTy resElTy fun arg = do
 -- of a known length @n@, by the fully unrolled recursive "definition" of
 -- @Clash.Sized.Vector.imap@
 reduceImap
-  :: InScopeSet
+  :: TransformContext
   -> Integer  -- ^ Length of the vector
   -> Type -- ^ Argument type of the function
   -> Type -- ^ Result type of the function
   -> Term -- ^ The imap'd function
   -> Term -- ^ The imap'd over vector
   -> NormalizeSession Term
-reduceImap inScope n argElTy resElTy fun arg = do
+reduceImap (TransformContext is0 ctx) n argElTy resElTy fun arg = do
     tcm <- Lens.view tcCache
     let ty = termType tcm arg
     go tcm ty
@@ -189,7 +193,9 @@ reduceImap inScope n argElTy resElTy fun arg = do
       , [nilCon,consCon] <- tyConDataCons vecTc
       = do
         uniqs0 <- Lens.use uniqSupply
-        let (uniqs1,nTv)     = mkUniqSystemTyVar (uniqs0,inScope) ("n",typeNatKind)
+        fun1 <- constantPropagation (TransformContext is0 (AppArg Nothing:ctx)) fun
+        is1 <- unionInScope is0 <$> Lens.use globalInScope
+        let (uniqs1,nTv)     = mkUniqSystemTyVar (uniqs0,is1) ("n",typeNatKind)
             (uniqs2,(vars,elems)) = second (second concat . unzip)
                                   $ uncurry extractElems uniqs1 consCon argElTy 'I' n arg
             (Right idxTy:_,_) = splitFunForallTy (termType tcm fun)
@@ -205,8 +211,7 @@ reduceImap inScope n argElTy resElTy fun arg = do
             idxs             = map (App (App (TyApp idxFromInteger (LitTy (NumTy n)))
                                              (Literal (IntegerLiteral (toInteger n))))
                                    . Literal . IntegerLiteral . toInteger) [0..(n-1)]
-
-            funApps          = zipWith (\i v -> App (App fun i) v) idxs vars
+            funApps          = zipWith (\i v -> App (App fun1 i) v) idxs vars
             lbody            = mkVec nilCon consCon resElTy n funApps
             lb               = Letrec (init elems) lbody
         uniqSupply Lens..= uniqs2
@@ -217,7 +222,7 @@ reduceImap inScope n argElTy resElTy fun arg = do
 -- vectors of a known length @n@, by the fully unrolled recursive "definition"
 -- of @Clash.Sized.Vector.traverse#@
 reduceTraverse
-  :: InScopeSet
+  :: TransformContext
   -> Integer  -- ^ Length of the vector
   -> Type -- ^ Element type of the argument vector
   -> Type -- ^ The type of the applicative
@@ -226,7 +231,7 @@ reduceTraverse
   -> Term -- ^ The function to traverse with
   -> Term -- ^ The argument vector
   -> NormalizeSession Term
-reduceTraverse inScope n aTy fTy bTy dict fun arg = do
+reduceTraverse (TransformContext is0 ctx) n aTy fTy bTy dict fun arg = do
     tcm <- Lens.view tcCache
     let (TyConApp apDictTcNm _) = tyView (termType tcm dict)
         ty = termType tcm arg
@@ -238,11 +243,13 @@ reduceTraverse inScope n aTy fTy bTy dict fun arg = do
       , [nilCon,consCon] <- tyConDataCons vecTc
       = do
         uniqs0 <- Lens.use uniqSupply
+        fun1 <- constantPropagation (TransformContext is0 (AppArg Nothing:ctx)) fun
+        is1 <- unionInScope is0 <$> Lens.use globalInScope
         let (Just apDictTc)    = lookupUniqMap apDictTcNm tcm
             [apDictCon]        = tyConDataCons apDictTc
             (Just apDictIdTys) = dataConInstArgTys apDictCon [fTy]
             (uniqs1,apDictIds@[functorDictId,pureId,apId,_,_]) =
-              mapAccumR mkUniqInternalId (uniqs0,inScope)
+              mapAccumR mkUniqInternalId (uniqs0,is1)
                 (zip ["functorDict","pure","ap","apConstL","apConstR"]
                      apDictIdTys)
 
@@ -278,7 +285,7 @@ reduceTraverse inScope n aTy fTy bTy dict fun arg = do
             (uniqs3,(vars,elems)) = second (second concat . unzip)
                                   $ uncurry extractElems uniqs2 consCon aTy 'T' n arg
 
-            funApps = map (fun `App`) vars
+            funApps = map (fun1 `App`) vars
 
             lbody   = mkTravVec vecTcNm nilCon consCon (Var (apDictIds!!1))
                                                        (Var (apDictIds!!2))
@@ -345,7 +352,7 @@ mkTravVec vecTc nilCon consCon pureTm apTm fmapTm bTy = go
 -- vectors of a known length @n@, by the fully unrolled recursive "definition"
 -- of @Clash.Sized.Vector.foldr@
 reduceFoldr
-  :: InScopeSet
+  :: TransformContext
   -> Integer
   -- ^ Length of the vector
   -> Type
@@ -358,7 +365,7 @@ reduceFoldr
   -- ^ The argument vector
   -> NormalizeSession Term
 reduceFoldr _ 0 _ _ start _ = changed start
-reduceFoldr inScope n aTy fun start arg = do
+reduceFoldr (TransformContext is0 ctx) n aTy fun start arg = do
     tcm <- Lens.view tcCache
     let ty = termType tcm arg
     go tcm ty
@@ -369,9 +376,11 @@ reduceFoldr inScope n aTy fun start arg = do
       , [_,consCon] <- tyConDataCons vecTc
       = do
         uniqs0 <- Lens.use uniqSupply
+        fun1 <- constantPropagation (TransformContext is0 (AppArg Nothing:ctx)) fun
+        is1 <- unionInScope is0 <$> Lens.use globalInScope
         let (uniqs1,(vars,elems)) = second (second concat . unzip)
-                                  $ extractElems uniqs0 inScope consCon aTy 'G' n arg
-            lbody            = foldr (\l r -> mkApps fun [Left l,Left r]) start vars
+                                  $ extractElems uniqs0 is1 consCon aTy 'G' n arg
+            lbody            = foldr (\l r -> mkApps fun1 [Left l,Left r]) start vars
             lb               = Letrec (init elems) lbody
         uniqSupply Lens..= uniqs1
         changed lb
@@ -381,7 +390,7 @@ reduceFoldr inScope n aTy fun start arg = do
 -- vectors of a known length @n@, by the fully unrolled recursive "definition"
 -- of @Clash.Sized.Vector.fold@
 reduceFold
-  :: InScopeSet
+  :: TransformContext
   -> Integer
   -- ^ Length of the vector
   -> Type
@@ -391,7 +400,7 @@ reduceFold
   -> Term
   -- ^ The argument vector
   -> NormalizeSession Term
-reduceFold inScope n aTy fun arg = do
+reduceFold (TransformContext is0 ctx) n aTy fun arg = do
     tcm <- Lens.view tcCache
     let ty = termType tcm arg
     go tcm ty
@@ -402,19 +411,21 @@ reduceFold inScope n aTy fun arg = do
       , [_,consCon]  <- tyConDataCons vecTc
       = do
         uniqs0 <- Lens.use uniqSupply
+        fun1 <- constantPropagation (TransformContext is0 (AppArg Nothing:ctx)) fun
+        is1 <- unionInScope is0 <$> Lens.use globalInScope
         let (uniqs1,(vars,elems)) = second (second concat . unzip)
-                                  $ extractElems uniqs0 inScope consCon aTy 'F' n arg
-            lbody            = foldV vars
+                                  $ extractElems uniqs0 is1 consCon aTy 'F' n arg
+            lbody            = foldV fun1 vars
             lb               = Letrec (init elems) lbody
         uniqSupply Lens..= uniqs1
         changed lb
     go _ ty = error $ $(curLoc) ++ "reduceFold: argument does not have a vector type: " ++ showPpr ty
 
-    foldV [a] = a
-    foldV as  = let (l,r) = splitAt (length as `div` 2) as
-                    lF    = foldV l
-                    rF    = foldV r
-                in  mkApps fun [Left lF, Left rF]
+    foldV _ [a] = a
+    foldV f as  = let (l,r) = splitAt (length as `div` 2) as
+                      lF    = foldV f l
+                      rF    = foldV f r
+                  in  mkApps f [Left lF, Left rF]
 
 -- | Replace an application of the @Clash.Sized.Vector.dfold@ primitive on
 -- vectors of a known length @n@, by the fully unrolled recursive "definition"
