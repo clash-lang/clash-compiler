@@ -751,10 +751,13 @@ removeUnusedExpr _ e@(collectArgs -> (p@(Prim nm _),args)) = do
   bbM <- HashMap.lookup nm <$> Lens.use (extra.primitives)
   case bbM of
     Just (extractPrim ->  Just (BlackBox pNm _ _ _ _ _ inc templ)) -> do
-      let usedArgs = if isFromInt pNm
-                        then [0,1,2]
-                        else usedArguments templ ++
-                             concatMap (usedArguments . snd) inc
+      let usedArgs | isFromInt pNm
+                   = [0,1,2]
+                   | nm `elem` ["Clash.Annotations.BitRepresentation.Deriving.dontApplyInHDL"
+                               ]
+                   = [0,1]
+                   | otherwise
+                   = usedArguments templ ++ concatMap (usedArguments . snd) inc
       tcm <- Lens.view tcCache
       args' <- go tcm 0 usedArgs args
       if args == args'

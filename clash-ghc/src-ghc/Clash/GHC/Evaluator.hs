@@ -2100,6 +2100,11 @@ reduceConstant isSubj gbl tcm h k nm ty tys args = case nm of
            val = i .&. bitsKeep
     in reduce (mkUnsignedLit ty mTy km val)
 
+  "Clash.Annotations.BitRepresentation.Deriving.dontApplyInHDL"
+    | isSubj
+    , f : a : _ <- args
+    -> reduceWHNF (mkApps (valToTerm f) [Left (valToTerm a)])
+
 --------
 -- RTree
 --------
