@@ -28,6 +28,7 @@ aliases:
       key: cabal-store-{{ .Environment.CIRCLE_JOB }}-{{ checksum ".circleci/config.yml" }}-{{ checksum "cabal.project" }}
       paths:
         - cabal-store
+        - ~/.stack
 
   - &build
     run:
@@ -37,7 +38,12 @@ aliases:
         if [ -n "$CIRCLE_PR_NUMBER" ]; then
           .ci/build.sh
         fi
-            
+
+  - &stack_build
+    run:
+      name: Build dependencies and Clash itself with Stack
+      command: .ci/stack_build.sh
+
   - &run_tests
     run: 
       name: Run tests
@@ -71,6 +77,17 @@ aliases:
       - *build
       - *run_tests
       - *cache_save
+  - &build_with_stack
+    docker:
+      - image: leonschoorl/clash-ci-image:trusty
+    steps:
+      - checkout
+      - *merge_pullrequest
+      - *submodules
+      - *setup
+      - *cache_restore
+      - *stack_build
+      - *cache_save
 
 workflows:
   version: 2
@@ -79,6 +96,7 @@ workflows:
       - ghc-8.2.2
       - ghc-8.4.4
       - ghc-8.6.4
+      - ghc-stack
 
 jobs:
   ghc-8.2.2:
@@ -96,3 +114,9 @@ jobs:
       <<: *env
       GHC: ghc-8.6.4
     <<: *build_default
+  ghc-stack:
+    environment:
+      <<: *env
+      GHC: ghc-8.6.4
+    <<: *build_with_stack
+
