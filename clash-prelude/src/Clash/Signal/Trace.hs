@@ -1,5 +1,6 @@
 {-|
 Copyright  :  (C) 2018, Google Inc.
+                  2019, Myrtle Software Tld
 License    :  BSD2 (see the file LICENSE)
 Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
 
@@ -44,6 +45,7 @@ main = do
 @
 -}
 {-# LANGUAGE CPP                 #-}
+{-# LANGUAGE BangPatterns        #-}
 {-# LANGUAGE DataKinds           #-}
 {-# LANGUAGE FlexibleContexts    #-}
 {-# LANGUAGE MagicHash           #-}
@@ -95,6 +97,8 @@ import           Clash.Class.BitPack   (BitPack, BitSize, pack)
 import           Clash.Promoted.Nat    (snatToNum, SNat(..))
 import           Clash.Signal.Internal (sample)
 import           Clash.XException      (deepseqX, Undefined)
+import           Clash.Sized.Internal.BitVector
+  (BitVector(BV))
 
 -- Haskell / GHC:
 import           Control.Monad         (foldM)
@@ -119,7 +123,7 @@ import qualified Paths_clash_prelude
 
 type Period   = Int
 type Changed  = Bool
-type Value    = Integer
+type Value    = (Integer, Integer) -- (Mask, Value)
 type Width    = Int
 type TraceMap = Map.Map String (Period, Width, [Value])
 
@@ -135,7 +139,9 @@ mkTrace
   => Undefined a
   => Signal domain a
   -> [Value]
-mkTrace signal = map (toInteger . pack) (sample signal)
+mkTrace signal = sample (unsafeToTup . pack <$> signal)
+ where
+  unsafeToTup (BV mask value) = (mask, value)
 
 -- | Trace a single signal. Will emit an error if a signal with the same name
 -- was previously registered.
@@ -377,12 +383,25 @@ dumpVCD## (offset, cycles) traceMap now
   headerWire w l n = map Text.pack ["$var wire", show w, [l], n, "$end"]
   initValues       = map Text.pack $ zipWith ($) formatters inits
 
+  -- Guard against (partially) undefined bitvectors:
+  toIntegers :: Int -> [[Value]] -> [[Integer]]
+  toIntegers _ [] = []
+  toIntegers !cyclen (xs:xss) =
+    zipWith vToInteger traceNames xs : toIntegers (cyclen + 1) xss
+   where
+    vToInteger _traceName (0, v) = v
+    vToInteger traceName (mask, v) =
+      error $ "dumpVCD can't handle (partially) undefined values yet, but "
+           ++ "encountered one at cycle " ++ show cyclen ++ " of traced signal "
+           ++ "labeled " ++ show traceName ++ ". Mask was " ++ show mask
+           ++ ", value was " ++ show v ++ "."
+
   formatters = zipWith format widths labels
-  inits = map head valuess'
-  tails = map changed valuess'
+  inits = map head (toIntegers 0 valuess')
+  tails = map changed (toIntegers 0 valuess')
 
   -- | Format single value according to VCD spec
-  format :: Width -> Char -> Value -> String
+  format :: Width -> Char -> Integer -> String
   format 1 label 0   = ['0', label, '\n']
   format 1 label 1   = ['1', label, '\n']
   format 1 label val =
@@ -393,7 +412,7 @@ dumpVCD## (offset, cycles) traceMap now
 
   -- | Given a list of values, return a list of list of bools indicating
   -- if a value changed. The first value is *not* included in the result.
-  changed :: [Value] -> [(Changed, Value)]
+  changed :: [Integer] -> [(Changed, Integer)]
   changed (s:ss) = zip (zipWith (/=) (s:ss) ss) ss
   changed []     = []
 
@@ -405,7 +424,7 @@ dumpVCD## (offset, cycles) traceMap now
         let pre = Text.concat ["#", n, "\n"] in
         fmap (Text.append pre) t
 
-  bodyPart :: [(Changed, Value)] -> Maybe Text.Text
+  bodyPart :: [(Changed, Integer)] -> Maybe Text.Text
   bodyPart values =
     let formatted  = [(c, f v) | (f, (c,v)) <- zip formatters values]
         formatted' = map (Text.pack . snd) $ filter fst $ formatted in
