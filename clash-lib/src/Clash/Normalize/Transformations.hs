@@ -75,7 +75,6 @@ import qualified Data.List                   as List
 import qualified Data.Maybe                  as Maybe
 import qualified Data.Monoid                 as Monoid
 import qualified Data.Primitive.ByteArray    as BA
-import           Data.Text                   (Text)
 import qualified Data.Text                   as Text
 import qualified Data.Vector.Primitive       as PV
 import           Debug.Trace                 (trace)
@@ -1302,14 +1301,6 @@ collectEqArgs (collectArgs -> (Prim nm _, args))
       in Just (scrut,val)
 collectEqArgs _ = Nothing
 
-
-isFromInt :: Text -> Bool
-isFromInt nm = nm == "Clash.Sized.Internal.BitVector.fromInteger##" ||
-               nm == "Clash.Sized.Internal.BitVector.fromInteger#" ||
-               nm == "Clash.Sized.Internal.Index.fromInteger#" ||
-               nm == "Clash.Sized.Internal.Signed.fromInteger#" ||
-               nm == "Clash.Sized.Internal.Unsigned.fromInteger#"
-
 type NormRewriteW = Transform (StateT ([LetBinding],InScopeSet) (RewriteMonad NormalizeState))
 
 -- | See Note [ANF InScopeSet]
@@ -2138,10 +2129,15 @@ inlineCleanup _ e = return e
 flattenLet :: HasCallStack => NormRewrite
 flattenLet (TransformContext is0 _) letrec@(Letrec _ _) = do
   let (is2, Letrec binds body) = freshenTm is0 letrec
+      bodyOccs = Lens.foldMapByOf
+                   freeLocalIds (unionVarEnvWith (+))
+                   emptyVarEnv (`unitVarEnv` (1 :: Int))
+                   body
   binds' <- concat <$> mapM (go is2) binds
   case binds' of
-    -- inline binders into the body when there's only a single binder
-    [(id',e')] ->
+    -- inline binders into the body when there's only a single binder, and only
+    -- if that binder doesn't perform any work or is only used once in the body
+    [(id',e')] | Just occ <- lookupVarEnv id' bodyOccs, isWorkFree e' || occ < 2 ->
       if id' `localIdOccursIn` e'
          -- Except when the binder is recursive!
          then return (Letrec binds' body)
@@ -2150,15 +2146,22 @@ flattenLet (TransformContext is0 _) letrec@(Letrec _ _) = do
     _ -> return (Letrec binds' body)
   where
     go :: InScopeSet -> LetBinding -> NormalizeSession [LetBinding]
-    go isN (id_,Letrec binds' body') = case binds' of
-       -- inline binders into the body when there's only a single binder
-      [(id',e')] ->
-        if id' `localIdOccursIn` e'
-           -- Except when the binder is recursive!
-           then changed [(id',e'),(id_, body')]
-           else let subst = extendIdSubst (mkSubst isN) id' e'
-                in  changed [(id_, (substTm "flattenLetGo" subst body'))]
-      bs -> changed (bs ++ [(id_, body')])
+    go isN (id_,Letrec binds' body') = do
+      let bodyOccs = Lens.foldMapByOf
+                       freeLocalIds (unionVarEnvWith (+))
+                       emptyVarEnv (`unitVarEnv` (1 :: Int))
+                       body'
+      case binds' of
+        -- inline binders into the body when there's only a single binder, and
+        -- only if that binder doesn't perform any work or is only used once in
+        -- the body
+        [(id',e')] | Just occ <- lookupVarEnv id' bodyOccs, isWorkFree e' || occ < 2 ->
+          if id' `localIdOccursIn` e'
+             -- Except when the binder is recursive!
+             then changed [(id',e'),(id_, body')]
+             else let subst = extendIdSubst (mkSubst isN) id' e'
+                  in  changed [(id_, (substTm "flattenLetGo" subst body'))]
+        bs -> changed (bs ++ [(id_, body')])
     go _ b = return [b]
 
 flattenLet _ e = return e
