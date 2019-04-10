@@ -606,6 +606,13 @@ modifier offset (Indexed (ty@(RTree _ argTy),10,fI)) = Just (start+offset,end+of
     start   = typeSize ty - (fI * argSize) - 1
     end     = start - argSize + 1
 
+modifier offset (Indexed (CustomSP _id _dataRepr _size args,dcI,fI)) =
+  case bitRanges (anns !! fI) of
+    [(start,end)] -> Just (start+offset,end+offset)
+    _ -> error ($(curLoc) ++ "Cannot handle projection out of a non-contiguously encoded field")
+ where
+  (ConstrRepr' _name _n _mask _value anns, _, _argTys) = args !! dcI
+
 modifier offset (DC (ty@(SP _ _),_)) = Just (start+offset,end+offset)
   where
     start = typeSize ty - 1

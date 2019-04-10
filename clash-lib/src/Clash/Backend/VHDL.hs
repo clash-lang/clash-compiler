@@ -1384,15 +1384,22 @@ expr_ _ (Identifier id_ (Just (Indexed (CustomSP _id _dataRepr _size args,dcI,fI
       range (start, end) =
         pretty id_ <> parens (int start <+> "downto" <+> int end)
 
-expr_ _ (Identifier id_ (Just (Indexed (ty@(SP _ args),dcI,fI)))) =
-  fromSLV argTy id_ start end
-    where
-      argTys   = snd $ args !! dcI
-      argTy    = argTys !! fI
-      argSize  = typeSize argTy
-      other    = otherSize argTys (fI-1)
-      start    = typeSize ty - 1 - conSize ty - other
-      end      = start - argSize + 1
+expr_ b (Identifier id_ (Just (Indexed (ty@(SP _ args),dcI,fI)))) = do
+  nm <- Mon $ use modNm
+  case b of
+    True ->
+      (case normaliseType argTy of
+        BitVector {} -> id
+        _ -> (\x -> pretty (TextS.toLower nm) <> "_types.fromSLV" <> parens x))
+      (pretty id_ <> parens (int start <+> "downto" <+> int end))
+    _ -> fromSLV argTy id_ start end
+ where
+   argTys   = snd $ args !! dcI
+   argTy    = argTys !! fI
+   argSize  = typeSize argTy
+   other    = otherSize argTys (fI-1)
+   start    = typeSize ty - 1 - conSize ty - other
+   end      = start - argSize + 1
 
 expr_ _ (Identifier id_ (Just (Indexed (ty@(Product _ labels tys),_,fI)))) =
   pretty id_ <> dot <> tyName ty <> selectProductField labels tys fI
@@ -1529,10 +1536,35 @@ expr_ _ (Identifier id_ (Just (Indexed ((BitVector w),_,1)))) = do
 expr_ _ (Identifier id_ (Just (Sliced (BitVector _,start,end)))) =
   pretty id_ <> parens (int start <+> "downto" <+> int end)
 
+expr_ b (Identifier id_ (Just (Nested (Indexed ((Vector n elTy),1,1)) m0))) = go 1 m0
+ where
+  go s (Nested (Indexed ((Vector {}),1,1)) m1) = go (s+1) m1
+  go s (Indexed (Vector {},1,1)) = pretty id_ <> parens (int (s+1) <+> "to" <+> int (n-1))
+  go s (Indexed (Vector {},1,0)) = do
+    syn <- Mon hdlSyn
+    case syn of
+      Vivado -> do
+        id' <- fmap (T.toStrict . renderOneLine) (pretty id_ <> parens (int s))
+        fromSLV elTy id' (typeSize elTy - 1) 0
+      _ -> pretty id_ <> parens (int s)
+  -- This is a HACK for Clash.Driver.TopWrapper.mkOutput
+-- Vector's don't have a 10'th constructor, this is just so that we can
+-- recognize the particular case
+  go s (Indexed (Vector {},10,fI)) = do
+    syn <- Mon hdlSyn
+    case syn of
+      Vivado -> do
+        id' <- fmap (T.toStrict . renderOneLine) (pretty id_ <> parens (int (s+fI)))
+        fromSLV elTy id' (typeSize elTy - 1) 0
+      _ -> pretty id_ <> parens (int (s+fI))
+  go s m1 = do
+    k <- pretty id_ <> parens (int s <+> "to" <+> int (n-1))
+    expr b (Identifier (T.toStrict $ renderOneLine k) (Just m1))
+
 expr_ b (Identifier id_ (Just (Nested m1 m2))) = case nestM m1 m2 of
   Just m3 -> expr_ b (Identifier id_ (Just m3))
   _ -> do
-    k <- expr_ b (Identifier id_ (Just m1))
+    k <- expr_ True (Identifier id_ (Just m1))
     expr_ b (Identifier (T.toStrict $ renderOneLine k) (Just m2))
 
 expr_ _ (Identifier id_ (Just _)) = pretty id_
