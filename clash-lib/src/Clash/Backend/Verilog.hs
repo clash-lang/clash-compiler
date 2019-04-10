@@ -191,6 +191,7 @@ instance Backend VerilogState where
   addMemoryDataFile f = memoryDataFiles %= (f:)
   getMemoryDataFiles = use memoryDataFiles
   seenIdentifiers = idSeen
+  ifThenElseExpr _ = True
 
 rmSlash :: Identifier -> Identifier
 rmSlash nm = fromMaybe nm $ do
@@ -809,6 +810,9 @@ expr_ _ (DataTag (RTree _ _) (Right _)) = do
   int iw <> "'sd1"
 
 expr_ b (ConvBV _ _ _ e) = expr_ b e
+
+expr_ b (IfThenElse c t e) =
+  parenIf b (expr_ True c <+> "?" <+> expr_ True t <+> ":" <+> expr_ True e)
 
 expr_ _ e = error $ $(curLoc) ++ (show e) -- empty
 

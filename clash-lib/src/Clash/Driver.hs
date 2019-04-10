@@ -166,6 +166,7 @@ generateHDL reprs bindingsMap hdlState primMap tcm tupTcm typeTrans eval
                         takeWhile (/= '.') topEntityS
       mkId      = evalState mkIdentifier hdlState'
       extId     = evalState extendIdentifier hdlState'
+      ite       = ifThenElseExpr hdlState'
       topNm     = genTopComponentName mkId prefixM annM topEntity
       topNmU    = Data.Text.unpack topNm
 
@@ -236,7 +237,7 @@ generateHDL reprs bindingsMap hdlState primMap tcm tupTcm typeTrans eval
       -- 2. Generate netlist for topEntity
       (netlist,seen') <-
         genNetlist False opts reprs transformedBindings is0 topEntities primMap
-                   tcm typeTrans iw mkId extId seen hdlDir prefixM topEntity
+                   tcm typeTrans iw mkId extId ite seen hdlDir prefixM topEntity
 
       netlistTime <- netlist `deepseq` Clock.getCurrentTime
       let normNetDiff = Clock.diffUTCTime netlistTime normTime
@@ -272,7 +273,7 @@ generateHDL reprs bindingsMap hdlState primMap tcm tupTcm typeTrans eval
       -- 2. Generate netlist for topEntity
       (netlist,seen'') <-
         genNetlist True opts reprs transformedBindings is0 topEntities primMap
-                   tcm typeTrans iw mkId extId seen' hdlDir prefixM tb
+                   tcm typeTrans iw mkId extId ite seen' hdlDir prefixM tb
 
       netlistTime <- netlist `deepseq` Clock.getCurrentTime
       let normNetDiff = Clock.diffUTCTime netlistTime normTime

@@ -99,6 +99,8 @@ genNetlist
   -- ^ valid identifiers
   -> (IdType -> Identifier -> Identifier -> Identifier)
   -- ^ extend valid identifiers
+  -> Bool
+  -- ^ Whether the backend supports ifThenElse expressions
   -> HashMap Identifier Word
   -- ^ Seen components
   -> FilePath
@@ -108,9 +110,9 @@ genNetlist
   -> Id
   -- ^ Name of the @topEntity@
   -> IO ([([Bool],SrcSpan,HashMap Identifier Word,Component)],HashMap Identifier Word)
-genNetlist isTb opts reprs globals is0 tops primMap tcm typeTrans iw mkId extId seen env prefixM topEntity = do
+genNetlist isTb opts reprs globals is0 tops primMap tcm typeTrans iw mkId extId ite seen env prefixM topEntity = do
   (_,s) <- runNetlistMonad isTb opts reprs globals is0 (mkTopEntityMap tops)
-             primMap tcm typeTrans iw mkId extId seen env prefixM $
+             primMap tcm typeTrans iw mkId extId ite seen env prefixM $
              genComponent topEntity
   return ( eltsVarEnv $ _components s
          , _seenComps s
@@ -147,6 +149,8 @@ runNetlistMonad
   -- ^ valid identifiers
   -> (IdType -> Identifier -> Identifier -> Identifier)
   -- ^ extend valid identifiers
+  -> Bool
+  -- ^ Whether the backend supports ifThenElse expressions
   -> HashMap Identifier Word
   -- ^ Seen components
   -> FilePath
@@ -156,14 +160,14 @@ runNetlistMonad
   -> NetlistMonad a
   -- ^ Action to run
   -> IO (a, NetlistState)
-runNetlistMonad isTb opts reprs s is0 tops p tcm typeTrans iw mkId extId seenIds_ env prefixM
+runNetlistMonad isTb opts reprs s is0 tops p tcm typeTrans iw mkId extId ite seenIds_ env prefixM
   = flip runStateT s'
   . runNetlist
   where
     s' =
       NetlistState
         s 0 emptyVarEnv p typeTrans tcm (StrictText.empty,noSrcSpan) iw mkId
-        extId HashMapS.empty seenIds' Set.empty names tops env 0 prefixM reprs is0 opts isTb
+        extId HashMapS.empty seenIds' Set.empty names tops env 0 prefixM reprs is0 opts isTb ite
 
     (seenIds',names) = genNames mkId prefixM seenIds_ emptyVarEnv s
 
@@ -272,7 +276,14 @@ mkNetDecl (id_,tm) = do
     nm = varName id_
 
     termToWireOrReg :: Term -> NetlistMonad WireOrReg
-    termToWireOrReg (Case _ _ (_:_:_)) = return Reg
+    termToWireOrReg (Case scrut _ alts0@(_:_:_)) = do
+      tcm <- Lens.use tcCache
+      let scrutTy = termType tcm scrut
+      scrutHTy <- unsafeCoreTypeToHWTypeM' $(curLoc) scrutTy
+      ite <- Lens.use backEndITE
+      case iteAlts scrutHTy alts0 of
+        Just _ | ite -> return Wire
+        _ -> return Reg
     termToWireOrReg (collectArgs -> (Prim nm' _,_)) = do
       bbM <- HashMap.lookup nm' <$> Lens.use primitives
       case bbM of
@@ -362,51 +373,64 @@ mkSelection
   -> Type
   -> [Alt]
   -> NetlistMonad [Declaration]
-mkSelection bndr scrut altTy alts = do
-  tcm                    <- Lens.use tcCache
-  reprs                  <- Lens.use customReprs
-  let scrutTy            = termType tcm scrut
-      alts'              = (reorderDefault . reorderCustom tcm reprs scrutTy)
-                           alts
-  scrutHTy               <- unsafeCoreTypeToHWTypeM' $(curLoc) scrutTy
-  altHTy                 <- unsafeCoreTypeToHWTypeM' $(curLoc) altTy
-  scrutId                <- extendIdentifier Extended
-                               (id2identifier bndr)
-                               "_selection"
-  (_,sp)                 <- Lens.use curCompNm
-  (scrutExpr,scrutDecls) <- first (mkScrutExpr sp scrutHTy (fst (head alts'))) <$> mkExpr True (Left scrutId) scrutTy scrut
-  (exprs,altsDecls)      <- (second concat . unzip) <$> mapM (mkCondExpr scrutHTy) alts'
-
+mkSelection bndr scrut altTy alts0 = do
   let dstId = id2identifier bndr
-  return $! scrutDecls ++ altsDecls ++ [CondAssignment dstId altHTy scrutExpr scrutHTy exprs]
-  where
-    mkCondExpr :: HWType -> (Pat,Term) -> NetlistMonad ((Maybe HW.Literal,Expr),[Declaration])
-    mkCondExpr scrutHTy (pat,alt) = do
-      altId <- extendIdentifier Extended
-                 (id2identifier bndr)
-                 "_sel_alt"
-      (altExpr,altDecls) <- mkExpr False (Left altId) altTy alt
-      (,altDecls) <$> case pat of
-        DefaultPat           -> return (Nothing,altExpr)
-        DataPat dc _ _ -> return (Just (dcToLiteral scrutHTy (dcTag dc)),altExpr)
-        LitPat  (IntegerLiteral i) -> return (Just (NumLit i),altExpr)
-        LitPat  (IntLiteral i) -> return (Just (NumLit i), altExpr)
-        LitPat  (WordLiteral w) -> return (Just (NumLit w), altExpr)
-        LitPat  (CharLiteral c) -> return (Just (NumLit . toInteger $ ord c), altExpr)
-        LitPat  (Int64Literal i) -> return (Just (NumLit i), altExpr)
-        LitPat  (Word64Literal w) -> return (Just (NumLit w), altExpr)
-        LitPat  (NaturalLiteral n) -> return (Just (NumLit n), altExpr)
-        _  -> do
-          (_,sp) <- Lens.use curCompNm
-          throw (ClashException sp ($(curLoc) ++ "Not an integer literal in LitPat:\n\n" ++ showPpr pat) Nothing)
+  tcm <- Lens.use tcCache
+  let scrutTy = termType tcm scrut
+  scrutHTy <- unsafeCoreTypeToHWTypeM' $(curLoc) scrutTy
+  scrutId  <- extendIdentifier Extended (id2identifier bndr) "_selection"
+  (_,sp) <- Lens.use curCompNm
+  ite <- Lens.use backEndITE
+  case iteAlts scrutHTy alts0 of
+    Just (altT,altF)
+      | ite
+      -> do
+      (scrutExpr,scrutDecls) <- case scrutHTy of
+        SP {} -> first (mkScrutExpr sp scrutHTy (fst (last alts0))) <$>
+                   mkExpr True (Left scrutId) scrutTy scrut
+        _ -> mkExpr False (Left scrutId) scrutTy scrut
+      altTId <- extendIdentifier Extended (id2identifier bndr) "_sel_alt_t"
+      altFId <- extendIdentifier Extended (id2identifier bndr) "_sel_alt_f"
+      (altTExpr,altTDecls) <- mkExpr False (Left altTId) altTy altT
+      (altFExpr,altFDecls) <- mkExpr False (Left altFId) altTy altF
+      return $! scrutDecls ++ altTDecls ++ altFDecls ++
+                [Assignment dstId (IfThenElse scrutExpr altTExpr altFExpr)]
+    _ -> do
+      reprs <- Lens.use customReprs
+      let alts1 = (reorderDefault . reorderCustom tcm reprs scrutTy) alts0
+      altHTy                 <- unsafeCoreTypeToHWTypeM' $(curLoc) altTy
+      (scrutExpr,scrutDecls) <- first (mkScrutExpr sp scrutHTy (fst (head alts1))) <$>
+                                  mkExpr True (Left scrutId) scrutTy scrut
+      (exprs,altsDecls)      <- (second concat . unzip) <$> mapM (mkCondExpr scrutHTy) alts1
+      return $! scrutDecls ++ altsDecls ++ [CondAssignment dstId altHTy scrutExpr scrutHTy exprs]
+ where
+  mkCondExpr :: HWType -> (Pat,Term) -> NetlistMonad ((Maybe HW.Literal,Expr),[Declaration])
+  mkCondExpr scrutHTy (pat,alt) = do
+    altId <- extendIdentifier Extended
+               (id2identifier bndr)
+               "_sel_alt"
+    (altExpr,altDecls) <- mkExpr False (Left altId) altTy alt
+    (,altDecls) <$> case pat of
+      DefaultPat           -> return (Nothing,altExpr)
+      DataPat dc _ _ -> return (Just (dcToLiteral scrutHTy (dcTag dc)),altExpr)
+      LitPat  (IntegerLiteral i) -> return (Just (NumLit i),altExpr)
+      LitPat  (IntLiteral i) -> return (Just (NumLit i), altExpr)
+      LitPat  (WordLiteral w) -> return (Just (NumLit w), altExpr)
+      LitPat  (CharLiteral c) -> return (Just (NumLit . toInteger $ ord c), altExpr)
+      LitPat  (Int64Literal i) -> return (Just (NumLit i), altExpr)
+      LitPat  (Word64Literal w) -> return (Just (NumLit w), altExpr)
+      LitPat  (NaturalLiteral n) -> return (Just (NumLit n), altExpr)
+      _  -> do
+        (_,sp) <- Lens.use curCompNm
+        throw (ClashException sp ($(curLoc) ++ "Not an integer literal in LitPat:\n\n" ++ showPpr pat) Nothing)
 
-    mkScrutExpr :: SrcSpan -> HWType -> Pat -> Expr -> Expr
-    mkScrutExpr sp scrutHTy pat scrutE = case pat of
-      DataPat dc _ _ -> let modifier = Just (DC (scrutHTy,dcTag dc - 1))
-                        in case scrutE of
-                            Identifier scrutId Nothing -> Identifier scrutId modifier
-                            _ -> throw (ClashException sp ($(curLoc) ++ "Not in normal form: Not a variable reference or primitive as subject of a case-statement:\n\n" ++ show scrutE) Nothing)
-      _ -> scrutE
+  mkScrutExpr :: SrcSpan -> HWType -> Pat -> Expr -> Expr
+  mkScrutExpr sp scrutHTy pat scrutE = case pat of
+    DataPat dc _ _ -> let modifier = Just (DC (scrutHTy,dcTag dc - 1))
+                      in case scrutE of
+                          Identifier scrutId Nothing -> Identifier scrutId modifier
+                          _ -> throw (ClashException sp ($(curLoc) ++ "Not in normal form: Not a variable reference or primitive as subject of a case-statement:\n\n" ++ show scrutE) Nothing)
+    _ -> scrutE
 
 -- GHC puts default patterns in the first position, we want them in the
 -- last position.
