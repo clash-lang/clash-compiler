@@ -105,6 +105,8 @@ data NetlistState
   -- ^ Settings Clash was called with
   , _isTestBench    :: Bool
   -- ^ Whether we're compiling a testbench (suppresses some warnings)
+  , _backEndITE :: Bool
+  -- ^ Whether the backend supports ifThenElse expressions
   }
 
 -- | Signal reference
@@ -314,6 +316,7 @@ data Expr
       !Bool
   -- ^ Instantiation of a BlackBox expression
   | ConvBV     (Maybe Identifier) HWType Bool Expr
+  | IfThenElse Expr Expr Expr
   deriving Show
 
 -- | Literals used in an expression

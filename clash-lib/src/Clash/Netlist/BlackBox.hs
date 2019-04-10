@@ -645,7 +645,14 @@ mkFunInput resId e = do
       let resId'  = resId {varName = mkUnsafeSystemName "~RESULT" 0}
       selectionDecls <- mkSelection resId' scrut ty alts
       nm <- mkUniqueIdentifier Basic "selection"
-      return (Right ((nm,selectionDecls),Reg))
+      tcm <- Lens.use tcCache
+      let scrutTy = termType tcm scrut
+      scrutHTy <- unsafeCoreTypeToHWTypeM' $(curLoc) scrutTy
+      ite <- Lens.use backEndITE
+      let wr = case iteAlts scrutHTy alts of
+                 Just _ | ite -> Wire
+                 _ -> Reg
+      return (Right ((nm,selectionDecls),wr))
 
     go is0 _ e'@(Letrec {}) = do
       tcm <- Lens.use tcCache

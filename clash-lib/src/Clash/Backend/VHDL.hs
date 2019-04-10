@@ -209,6 +209,7 @@ instance Backend VHDLState where
   addMemoryDataFile f = memoryDataFiles %= (f:)
   getMemoryDataFiles = use memoryDataFiles
   seenIdentifiers = idSeen
+  ifThenElseExpr _ = False
 
 rmSlash :: Identifier -> Identifier
 rmSlash nm = fromMaybe nm $ do

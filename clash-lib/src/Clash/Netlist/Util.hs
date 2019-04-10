@@ -49,13 +49,14 @@ import           Clash.Annotations.TopEntity (PortName (..), TopEntity (..))
 import           Clash.Driver.Types      (Manifest (..))
 import           Clash.Core.DataCon      (DataCon (..))
 import           Clash.Core.FreeVars     (termFreeIds, typeFreeVars)
+import qualified Clash.Core.Literal      as C
 import           Clash.Core.Name
   (Name (..), appendToName, nameOcc)
 import           Clash.Core.Pretty       (showPpr)
 import           Clash.Core.Subst
   (Subst (..), extendIdSubst, extendIdSubstList, extendInScopeId,
    extendInScopeIdList, extendTvSubstList, mkSubst, substTm, substTy, substTyWith)
-import           Clash.Core.Term         (LetBinding, Term (..))
+import           Clash.Core.Term         (Alt, LetBinding, Pat (..), Term (..))
 import           Clash.Core.TyCon
   (TyConName, TyConMap, tyConDataCons)
 import           Clash.Core.Type         (Type (..), TypeView (..), LitTy (..),
@@ -1858,3 +1859,31 @@ bindsExistentials
 bindsExistentials exts tms = any (`elem` freeVars) exts
  where
   freeVars = concatMap (Lens.toListOf typeFreeVars) (map varType tms)
+
+iteAlts :: HWType -> [Alt] -> Maybe (Term,Term)
+iteAlts sHTy [(pat0,alt0),(pat1,alt1)] | validIteSTy sHTy = case pat0 of
+  DataPat dc _ _ -> case dcTag dc of
+    2 -> Just (alt0,alt1)
+    _ -> Just (alt1,alt0)
+  LitPat (C.IntegerLiteral l) -> case l of
+    1 -> Just (alt0,alt1)
+    _ -> Just (alt1,alt0)
+  DefaultPat -> case pat1 of
+    DataPat dc _ _ -> case dcTag dc of
+      2 -> Just (alt1,alt0)
+      _ -> Just (alt0,alt1)
+    LitPat (C.IntegerLiteral l) -> case l of
+      1 -> Just (alt1,alt0)
+      _ -> Just (alt0,alt1)
+    _ -> Nothing
+  _ -> Nothing
+ where
+  validIteSTy Bool          = True
+  validIteSTy Bit           = True
+  validIteSTy (Sum _ [_,_]) = True
+  validIteSTy (SP _ [_,_])  = True
+  validIteSTy (Unsigned 1)  = True
+  validIteSTy (Index 2)     = True
+  validIteSTy _             = False
+
+iteAlts _ _ = Nothing
