@@ -7,6 +7,7 @@
 -}
 
 {-# LANGUAGE BangPatterns      #-}
+{-# LANGUAGE LambdaCase        #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecordWildCards   #-}
 {-# LANGUAGE ViewPatterns      #-}
@@ -26,6 +27,8 @@ module Clash.Normalize.Util
  , canConstantSpec
  , normalizeTopLvlBndr
  , rewriteExpr
+ , isWorkFree
+ , isFromInt
  )
  where
 
@@ -47,7 +50,7 @@ import           Clash.Core.Term
   (Context, CoreContext(AppArg), Term (..), collectArgs)
 import           Clash.Core.TyCon        (TyConMap)
 import           Clash.Core.Util         (isClockOrReset, isPolyFun, termType)
-import           Clash.Core.Var          (Id, Var (..), isGlobalId)
+import           Clash.Core.Var          (Id, Var (..), isGlobalId, isLocalId)
 import           Clash.Core.VarEnv
   (VarEnv, emptyInScopeSet, emptyVarEnv, extendVarEnv, extendVarEnvWith,
    lookupVarEnv, unionVarEnvWith, unitVarEnv)
@@ -292,3 +295,25 @@ rewriteExpr (nrwS,nrw) (bndrS,expr) (nm, sp) = do
   traceIf (lvl >= DebugFinal)
     (bndrS ++ " after " ++ nrwS ++ ":\n\n" ++ after ++ "\n") $
     return rewritten
+
+isWorkFree
+  :: Term
+  -> Bool
+isWorkFree = \case
+  Var i -> isLocalId i
+  Data {} -> True
+  Literal {} -> True
+  Prim nm _ -> isFromInt nm -- TODO: There are more work-free primitives
+  App f a -> isWorkFree a && isWorkFree f
+  TyApp e _ -> isWorkFree e
+  Letrec bs e -> isWorkFree e && all (isWorkFree . snd) bs
+  Case s _ [(_,a)] -> isWorkFree s && isWorkFree a
+  Cast e _ _ -> isWorkFree e
+  _ -> False
+
+isFromInt :: Text -> Bool
+isFromInt nm = nm == "Clash.Sized.Internal.BitVector.fromInteger##" ||
+               nm == "Clash.Sized.Internal.BitVector.fromInteger#" ||
+               nm == "Clash.Sized.Internal.Index.fromInteger#" ||
+               nm == "Clash.Sized.Internal.Signed.fromInteger#" ||
+               nm == "Clash.Sized.Internal.Unsigned.fromInteger#"
