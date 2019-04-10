@@ -57,13 +57,14 @@ benchFile tmpDir idirs src = do
       mkId1      = evalState mkIdentifier hdlState'
       extId      = evalState extendIdentifier hdlState'
       prefixM    = (Nothing,Nothing)
+      ite        = ifThenElseExpr hdlState'
       seen       = HashMap.empty
       hdlDir     = fromMaybe "." (opt_hdlDir opts1) </>
                          Clash.Backend.name hdlState' </>
                          takeWhile (/= '.') topEntityS
   (netlist,_) <-
     genNetlist False opts1 reprs transformedBindings is0 topEntities primMap'
-               tcm typeTrans iw mkId1 extId seen hdlDir prefixM topEntity
+               tcm typeTrans iw mkId1 extId ite seen hdlDir prefixM topEntity
   netlist `deepseq` putStrLn ".. done\n"
 
 setupEnv

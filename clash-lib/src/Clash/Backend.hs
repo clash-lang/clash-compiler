@@ -109,6 +109,7 @@ class Backend state where
   addMemoryDataFile  :: (String,String) -> State state ()
   getMemoryDataFiles :: State state [(String,String)]
   seenIdentifiers  :: Lens' state (HashMap Identifier Word)
+  ifThenElseExpr :: state -> Bool
 
 -- | Replace a normal HDL template placeholder with an unescaped/unextended
 -- template placeholder.
