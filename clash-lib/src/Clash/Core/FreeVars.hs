@@ -13,18 +13,23 @@
 module Clash.Core.FreeVars
   (-- * Free variable calculation
     typeFreeVars
-  , termFreeVars
-  , termFreeIds
+  , termFreeVarsX
+  , freeIds
+  , freeLocalVars
+  , freeLocalIds
+  , globalIds
   , termFreeTyVars
   , tyFVsOfTypes
-  , fVsOfTerms
+  , localFVsOfTerms
+  , hasLocalFreeVars
   -- * Fast
   , noFreeVarsOfType
   -- * occurrence check
-  , idOccursIn
-  , idDoesNotOccurIn
-  , idsDoNotOccurIn
-  , varsDoNotOccurIn
+  , localIdOccursIn
+  , globalIdOccursIn
+  , localIdDoesNotOccurIn
+  , localIdsDoNotOccurIn
+  , localVarsDoNotOccurIn
   -- * Internal
   , typeFreeVars'
   , termFreeVars'
@@ -40,7 +45,7 @@ import Data.Monoid                      (All (..), Any (..))
 
 import Clash.Core.Term                  (Pat (..), Term (..))
 import Clash.Core.Type                  (Type (..))
-import Clash.Core.Var                   (Id,TyVar,Var (..))
+import Clash.Core.Var                   (Id, IdScope (..), TyVar, Var (..))
 import Clash.Core.VarEnv                (VarSet, unitVarSet)
 
 -- | Gives the free type-variables in a Type, implemented as a 'Fold'
@@ -111,40 +116,75 @@ typeFreeVars' interesting is f = go is where
   goBndr inScope tv = (\t -> tv {varType = t}) <$> go inScope (varType tv)
 
 -- | Check whether an identifier does not occur free in a term
-idDoesNotOccurIn
+localIdDoesNotOccurIn
   :: Id
   -> Term
   -> Bool
-idDoesNotOccurIn v e = getAll (Lens.foldMapOf termFreeIds (All . (/= v)) e)
+localIdDoesNotOccurIn v e = getAll (Lens.foldMapOf freeLocalIds (All . (/= v)) e)
 
 -- | Check whether a set of identifiers does not occur free in a term
-idsDoNotOccurIn
+localIdsDoNotOccurIn
   :: [Id]
   -> Term
   -> Bool
-idsDoNotOccurIn vs e =
-  getAll (Lens.foldMapOf termFreeIds (All . (`notElem` vs)) e)
+localIdsDoNotOccurIn vs e =
+  getAll (Lens.foldMapOf freeLocalIds (All . (`notElem` vs)) e)
 
 -- | Check whether a set of variables does not occur free in a term
-varsDoNotOccurIn
+localVarsDoNotOccurIn
   :: [Var a]
   -> Term
   -> Bool
-varsDoNotOccurIn vs e =
-  getAll (Lens.foldMapOf termFreeVars (All . (`notElem` vs)) e)
+localVarsDoNotOccurIn vs e =
+  getAll (Lens.foldMapOf freeLocalVars (All . (`notElem` vs)) e)
 
--- | Check whether an identifier occurs free in a term
-idOccursIn
+-- | Check whether a local identifier occurs free in a term
+localIdOccursIn
   :: Id
   -> Term
   -> Bool
-idOccursIn v e = getAny (Lens.foldMapOf termFreeIds (Any . (== v)) e)
+localIdOccursIn v e = getAny (Lens.foldMapOf freeLocalIds (Any . (== v)) e)
+
+-- | Check whether a local identifier occurs free in a term
+globalIdOccursIn
+  :: Id
+  -> Term
+  -> Bool
+globalIdOccursIn v e = getAny (Lens.foldMapOf globalIds (Any . (== v)) e)
+
+-- | Calculate the /local/ free variable of an expression: the free type
+-- variables and the free identifiers that are not bound in the global
+-- environment.
+freeLocalVars :: Fold Term (Var a)
+freeLocalVars = termFreeVars' isLocalVar where
+  isLocalVar (Id {idScope = GlobalId}) = False
+  isLocalVar _ = True
 
 -- | Gives the free identifiers of a Term, implemented as a 'Fold'
-termFreeIds :: Fold Term Id
-termFreeIds = termFreeVars' isId where
+freeIds :: Fold Term Id
+freeIds = termFreeVars' isId where
   isId (Id {}) = True
   isId _       = False
+
+-- | Calculate the /local/ free identifiers of an expression: the free
+-- identifiers that are not bound in the global environment.
+freeLocalIds :: Fold Term Id
+freeLocalIds = termFreeVars' isLocalId where
+  isLocalId (Id {idScope = LocalId}) = True
+  isLocalId _ = False
+
+-- | Calculate the /global/ free identifiers of an expression: the free
+-- identifiers that are bound in the global environment.
+globalIds :: Fold Term Id
+globalIds = termFreeVars' isGlobalId where
+  isGlobalId (Id {idScope = GlobalId}) = True
+  isGlobalId _ = False
+
+-- | Determines if term has any locally free variables. That is, the free type
+-- variables and the free identifiers that are not bound in the global
+-- scope.
+hasLocalFreeVars :: Term -> Bool
+hasLocalFreeVars = Lens.notNullOf freeLocalVars
 
 -- | Gives the free type-variables of a Term, implemented as a 'Fold'
 --
@@ -165,8 +205,11 @@ termFreeTyVars = termFreeVars' isTV where
 -- @
 -- foldMapOf termFreeVars unitVarSet (case (x : (a:* -> k) Int)) of {}) = {x, a, k}
 -- @
-termFreeVars :: Fold Term (Var a)
-termFreeVars = termFreeVars' (const True)
+--
+-- __NB__ this collects both global and local IDs, and you almost __NEVER__ want
+-- to use this. Use one of the other FV calculations instead
+termFreeVarsX :: Fold Term (Var a)
+termFreeVarsX = termFreeVars' (const True)
 
 -- | Gives the "interesting" free variables in a Term, implemented as a 'Fold'
 --
@@ -269,10 +312,10 @@ tyFVsOfTypes = foldMap go
   go = Lens.foldMapOf typeFreeVars unitVarSet
 
 -- | Collect the free variables of a collection of terms into a set
-fVsOfTerms
+localFVsOfTerms
   :: Foldable f
   => f Term
   -> VarSet
-fVsOfTerms = foldMap go
+localFVsOfTerms = foldMap go
  where
-  go = Lens.foldMapOf termFreeVars unitVarSet
+  go = Lens.foldMapOf freeLocalVars unitVarSet

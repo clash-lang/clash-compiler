@@ -74,7 +74,7 @@ import           Clash.Core.TyCon
 import           Clash.Core.TysPrim
 import           Clash.Core.Util
   (mkApps,mkRTree,mkVec,piResultTys,tyNatSize,dataConInstArgTys)
-import           Clash.Core.Var      (mkId, mkTyVar)
+import           Clash.Core.Var      (mkLocalId, mkTyVar)
 import           Clash.GHC.GHC2Core  (modNameM)
 import           Clash.Rewrite.Util  (mkSelectorCase)
 import           Clash.Unique        (lookupUniqMap)
@@ -2284,8 +2284,8 @@ reduceConstant isSubj gbl tcm h k nm ty tys args = case nm of
                    -- Guaranteed no capture, so okay to use unsafe name generation
                    fNm    = mkUnsafeSystemName "fxs" 0
                    iNm    = mkUnsafeSystemName "ixs" 1
-                   fId    = mkId fVecTy fNm
-                   iId    = mkId iVecTy iNm
+                   fId    = mkLocalId fVecTy fNm
+                   iId    = mkLocalId iVecTy iNm
                    tupPat = DataPat tupDc [] [fId,iId]
                    iAlt   = (tupPat, (Var iId))
                in  reduce $
@@ -2315,8 +2315,8 @@ reduceConstant isSubj gbl tcm h k nm ty tys args = case nm of
                    -- Guaranteed no capture, so okay to use unsafe name generation
                    fNm    = mkUnsafeSystemName "fxs" 0
                    iNm    = mkUnsafeSystemName "ixs" 1
-                   fId    = mkId fVecTy fNm
-                   iId    = mkId iVecTy iNm
+                   fId    = mkLocalId fVecTy fNm
+                   iId    = mkLocalId iVecTy iNm
                    tupPat = DataPat tupDc [] [fId,iId]
                    iAlt   = (tupPat, (Var iId))
                in  reduceWHNF $
@@ -2374,8 +2374,8 @@ reduceConstant isSubj gbl tcm h k nm ty tys args = case nm of
            -- Guaranteed no capture, so okay to use unsafe name generation
            lNm     = mkUnsafeSystemName "l" 0
            rNm     = mkUnsafeSystemName "r" 1
-           lId     = mkId m1VecTy lNm
-           rId     = mkId nVecTy rNm
+           lId     = mkLocalId m1VecTy lNm
+           rId     = mkLocalId nVecTy rNm
            tupPat  = DataPat tupDc [] [lId,rId]
            lAlt    = (tupPat, (Var lId))
            rAlt    = (tupPat, (Var rId))
@@ -2428,8 +2428,8 @@ reduceConstant isSubj gbl tcm h k nm ty tys args = case nm of
            -- Guaranteed no capture, so okay to use unsafe name generation
            asNm     = mkUnsafeSystemName "as" 0
            bsNm     = mkUnsafeSystemName "bs" 1
-           asId     = mkId mVecTy asNm
-           bsId     = mkId n1mVecTy bsNm
+           asId     = mkLocalId mVecTy asNm
+           bsId     = mkLocalId n1mVecTy bsNm
            tupPat   = DataPat tupDc [] [asId,bsId]
            asAlt    = (tupPat, (Var asId))
            bsAlt    = (tupPat, (Var bsId))
@@ -2816,8 +2816,8 @@ reduceConstant isSubj gbl tcm h k nm ty tys args = case nm of
                   -- Guaranteed no capture, so okay to use unsafe name generation
                   asNm     = mkUnsafeSystemName "as" 0
                   bsNm     = mkUnsafeSystemName "bs" 1
-                  asId     = mkId mVecTy asNm
-                  bsId     = mkId n1mVecTy bsNm
+                  asId     = mkLocalId mVecTy asNm
+                  bsId     = mkLocalId n1mVecTy bsNm
                   tupPat   = DataPat tupDc [] [asId,bsId]
                   asAlt    = (tupPat, (Var asId))
                   bsAlt    = (tupPat, (Var bsId))
@@ -2868,8 +2868,8 @@ reduceConstant isSubj gbl tcm h k nm ty tys args = case nm of
            -- Guaranteed no capture, so okay to use unsafe name generation
            lNm     = mkUnsafeSystemName "l" 0
            rNm     = mkUnsafeSystemName "r" 1
-           lId     = mkId m1VecTy lNm
-           rId     = mkId nVecTy rNm
+           lId     = mkLocalId m1VecTy lNm
+           rId     = mkLocalId nVecTy rNm
            tupPat  = DataPat tupDc [] [lId,rId]
            lAlt    = (tupPat, (Var lId))
            rAlt    = (tupPat, (Var rId))
@@ -2957,8 +2957,8 @@ reduceConstant isSubj gbl tcm h k nm ty tys args = case nm of
                   -- Guaranteed no capture, so okay to use unsafe name generation
                   xsLNm    = mkUnsafeSystemName "xsL" 0
                   xsRNm    = mkUnsafeSystemName "xsR" 1
-                  xsLId    = mkId k2ty xsLNm
-                  xsRId    = mkId k2ty xsRNm
+                  xsLId    = mkLocalId k2ty xsLNm
+                  xsRId    = mkLocalId k2ty xsRNm
                   tupPat   = DataPat tupDc [] [xsLId,xsRId]
                   asAlt    = (tupPat, (Var xsLId))
                   bsAlt    = (tupPat, (Var xsRId))
@@ -3128,8 +3128,8 @@ reduceConstant isSubj gbl tcm h k nm ty tys args = case nm of
               -- Guaranteed no capture, so okay to use unsafe name generation
               xNm         = mkUnsafeSystemName "x" 0
               bvNm        = mkUnsafeSystemName "bv'" 1
-              xId         = mkId mBVTy xNm
-              bvId        = mkId n1BVTy bvNm
+              xId         = mkLocalId mBVTy xNm
+              bvId        = mkLocalId n1BVTy bvNm
               tupPat      = DataPat tupDc [] [xId,bvId]
               xAlt        = (tupPat, (Var xId))
               bvAlt       = (tupPat, (Var bvId))

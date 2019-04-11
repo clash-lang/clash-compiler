@@ -83,8 +83,6 @@ data RewriteState extra
   -- ^ Used for 'Fresh'
   , _globalHeap       :: GlobalHeap
   -- ^ Used as a heap for compile-time evaluation of primitives that live in I/O
-  , _globalInScope    :: !InScopeSet
-  -- ^ Superset of global binders
   , _extra            :: !extra
   -- ^ Additional state
   }

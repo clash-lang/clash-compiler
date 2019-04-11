@@ -89,7 +89,7 @@ import           Clash.Core.Evaluator        (PureHeap, whnf')
 import           Clash.Core.Name
   (Name (..), NameSort (..), mkUnsafeSystemName)
 import           Clash.Core.FreeVars
-  (idOccursIn, idsDoNotOccurIn, termFreeIds, termFreeTyVars, typeFreeVars, varsDoNotOccurIn)
+  (localIdOccursIn, localIdsDoNotOccurIn, freeLocalIds, termFreeTyVars, typeFreeVars, localVarsDoNotOccurIn)
 import           Clash.Core.Literal          (Literal (..))
 import           Clash.Core.Pretty           (showPpr)
 import           Clash.Core.Subst
@@ -106,10 +106,11 @@ import           Clash.Core.Util
   (collectArgs, isCon, isFun, isLet, isPolyFun, isPrim,
    isSignalType, isVar, mkApps, mkLams, mkVec, piResultTy, termSize, termType,
    tyNatSize, patVars, isAbsurdAlt, altEqs, substInExistentials,
-   solveFirstNonAbsurd, patIds)
-import           Clash.Core.Var              (Id, Var (..), mkId)
+   solveFirstNonAbsurd, patIds, isLocalVar)
+import           Clash.Core.Var
+  (Id, Var (..), isGlobalId, isLocalId, mkLocalId)
 import           Clash.Core.VarEnv
-  (InScopeSet, VarEnv, VarSet, elemInScopeSet, notElemInScopeSet, elemVarSet,
+  (InScopeSet, VarEnv, VarSet, elemVarSet,
    emptyVarEnv, emptyVarSet, extendInScopeSet, extendInScopeSetList, lookupVarEnv,
    notElemVarSet, unionVarEnvWith, unionVarSet, unionInScope, unitVarEnv,
    unitVarSet, mkVarSet, mkInScopeSet, uniqAway)
@@ -147,26 +148,26 @@ inlineOrLiftNonRep = inlineOrLiftBinders nonRepTest inlineTest
     inlineTest e (id_, e')
       = not . or <$> sequence -- We do __NOT__ inline:
               [ -- 1. recursive let-binders
-                pure (id_ `idOccursIn` e')
+                pure (id_ `localIdOccursIn` e')
                 -- 2. join points (which are not void-wrappers)
               , pure (isJoinPointIn id_ e && not (isVoidWrapper e'))
                 -- 3. binders that are used more than once in the body, because
                 --    it makes CSE a whole lot more difficult.
-              , (>1) <$> freeOccurances
+              , pure (freeOccurances > 1)
               ]
       where
         -- The number of free occurrences of the binder in the entire
         -- let-expression
-        freeOccurances :: RewriteMonad extra Int
+        freeOccurances :: Int
         freeOccurances = case e of
           Letrec _ res -> do
-            Monoid.getSum <$>
-              (Lens.foldMapOf <$> localFreeIds
-                              <*> pure (\i -> if i == id_
-                                                 then Monoid.Sum 1
-                                                 else Monoid.Sum 0)
-                              <*> pure res)
-          _ -> return 0
+            Monoid.getSum
+              (Lens.foldMapOf freeLocalIds
+                              (\i -> if i == id_
+                                        then Monoid.Sum 1
+                                        else Monoid.Sum 0)
+                              res)
+          _ -> 0
 
 {- [Note] join points and void wrappers
 Join points are functions that only occur in tail-call positions within an
@@ -204,7 +205,7 @@ nonRepSpec ctx@(TransformContext is0 _) e@(App e1 e2)
   , null $ Lens.toListOf termFreeTyVars e2
   = do tcm <- Lens.view tcCache
        let e2Ty = termType tcm e2
-       localVar <- isNonGlobalVar e2
+       let localVar = isLocalVar e2
        nonRepE2 <- not <$> (representableType <$> Lens.view typeTranslator
                                               <*> Lens.view customReprs
                                               <*> pure False
@@ -236,8 +237,7 @@ nonRepSpec ctx@(TransformContext is0 _) e@(App e1 e2)
             -> do
               tm' <- censor (const mempty) (bottomupR appProp ctx (mkApps tm fArgs))
               -- See Note [AppProp no-shadow invariant]
-              is1 <- unionInScope is0 <$> Lens.use globalInScope
-              return (deShadowTerm is1 tm')
+              return (deShadowTerm is0 tm')
           _ -> return app
       | otherwise = return app
 
@@ -308,9 +308,8 @@ caseElemNonReachable _ e = return e
 elemExistentials :: HasCallStack => NormRewrite
 elemExistentials (TransformContext is0 _) (Case scrut altsTy alts0) = do
   tcm <- Lens.view tcCache
-  is1 <- unionInScope is0 <$> Lens.use globalInScope
 
-  alts1 <- mapM (go is1 tcm) alts0
+  alts1 <- mapM (go is0 tcm) alts0
   caseOneAlt (Case scrut altsTy alts1)
 
  where
@@ -359,7 +358,7 @@ caseCase _ e = return e
 inlineNonRep :: HasCallStack => NormRewrite
 inlineNonRep (TransformContext localScope _) e@(Case scrut altsTy alts)
   | (Var f, args) <- collectArgs scrut
-  , f `notElemInScopeSet` localScope
+  , isGlobalId f
   = do
     (cf,_)    <- Lens.use curFun
     isInlined <- zoomExtra (alreadyInlined f cf)
@@ -391,8 +390,7 @@ inlineNonRep (TransformContext localScope _) e@(Case scrut altsTy alts)
           (True,Just (_,_,_,scrutBody0)) -> do
             Monad.when noException (zoomExtra (addNewInline f cf))
             -- See Note [AppProp no-shadow invariant]
-            allInScope <- unionInScope localScope <$> Lens.use globalInScope
-            let scrutBody1 = deShadowTerm allInScope scrutBody0
+            let scrutBody1 = deShadowTerm localScope scrutBody0
             changed $ Case (mkApps scrutBody1 args) altsTy alts
           _ -> return e
   where
@@ -436,8 +434,7 @@ caseCon (TransformContext is0 _) (Case scrut ty alts)
   = case List.find (equalCon dc . fst) alts of
       Just (DataPat _ tvs xs, e) -> do
         let is1 = extendInScopeSetList (extendInScopeSetList is0 tvs) xs
-        is2 <- unionInScope is1 <$> Lens.use globalInScope
-        let fvs = Lens.foldMapOf termFreeIds unitVarSet e
+        let fvs = Lens.foldMapOf freeLocalIds unitVarSet e
             (binds,_) = List.partition ((`elemVarSet` fvs) . fst)
                       $ zip xs (Either.lefts args)
             e' = case binds of
@@ -445,10 +442,10 @@ caseCon (TransformContext is0 _) (Case scrut ty alts)
                   _  ->
                     -- See Note [CaseCon deshadow]
                     let ((is3,substIds),binds') = List.mapAccumL newBinder
-                                                    (is2,[]) binds
+                                                    (is1,[]) binds
                         subst = extendIdSubstList (mkSubst is3) substIds
                     in  Letrec binds' (substTm "caseCon0" subst e)
-        let subst = extendTvSubstList (mkSubst is2)
+        let subst = extendTvSubstList (mkSubst is1)
                   $ zip tvs (drop (length (dcUnivTyVars dc)) (Either.rights args))
         changed (substTm "caseCon1" subst e')
       _ -> case alts of
@@ -481,8 +478,7 @@ caseCon ctx@(TransformContext is0 _) e@(Case subj ty alts)
     uniqSupply Lens..= ids2
     gh <- Lens.use globalHeap
     lvl <- Lens.view dbgLevel
-    is1 <- unionInScope is0 <$> Lens.use globalInScope
-    case whnf' primEval bndrs tcm gh ids1 is1 True subj of
+    case whnf' primEval bndrs tcm gh ids1 is0 True subj of
       (gh',ph',v) -> do
         globalHeap Lens..= gh'
         bindPureHeap ctx tcm ph' $ \ctx' -> case v of
@@ -520,7 +516,7 @@ caseCon ctx@(TransformContext is0 _) e@(Case subj ty alts)
                 _ -> do
                   let ret = caseOneAlt e
                   if lvl > DebugNone then do
-                    subjIsConst <- isConstant subj
+                    let subjIsConst = isConstant subj
                     traceIf (lvl > DebugNone && subjIsConst) ("Irreducible constant as case subject: " ++ showPpr subj ++ "\nCan be reduced to: " ++ showPpr subj') ret
                   else
                     ret
@@ -563,7 +559,7 @@ bindPureHeap (TransformContext is0 ctxs) tcm heap rw = do
     toLetBinding (uniq,term) = (nm, term)
       where
         ty = termType tcm term
-        nm = mkId ty (mkUnsafeSystemName "x" uniq) -- See [Note: Name re-creation]
+        nm = mkLocalId ty (mkUnsafeSystemName "x" uniq) -- See [Note: Name re-creation]
 
 {- [Note: Name re-creation]
 The names of heap bound variables are safely generate with mkUniqSystemId in Clash.Core.Evaluator.newLetBinding.
@@ -582,7 +578,7 @@ matchLiteralContructor c (IntegerLiteral l) alts = go (reverse alts)
   go ((DataPat dc [] xs,e):alts')
     | dcTag dc == 1
     , l >= ((-2)^(63::Int)) &&  l < 2^(63::Int)
-    = let fvs       = Lens.foldMapOf termFreeIds unitVarSet e
+    = let fvs       = Lens.foldMapOf freeLocalIds unitVarSet e
           (binds,_) = List.partition ((`elemVarSet` fvs) . fst)
                     $ zip xs [Literal (IntLiteral l)]
           e' = case binds of
@@ -594,7 +590,7 @@ matchLiteralContructor c (IntegerLiteral l) alts = go (reverse alts)
     = let !(Jp# !(BN# ba)) = l
           ba'       = BA.ByteArray ba
           bv        = PV.Vector 0 (BA.sizeofByteArray ba') ba'
-          fvs       = Lens.foldMapOf termFreeIds unitVarSet e
+          fvs       = Lens.foldMapOf freeLocalIds unitVarSet e
           (binds,_) = List.partition ((`elemVarSet` fvs) . fst)
                     $ zip xs [Literal (ByteArrayLiteral bv)]
           e' = case binds of
@@ -606,7 +602,7 @@ matchLiteralContructor c (IntegerLiteral l) alts = go (reverse alts)
     = let !(Jn# !(BN# ba)) = l
           ba'       = BA.ByteArray ba
           bv        = PV.Vector 0 (BA.sizeofByteArray ba') ba'
-          fvs       = Lens.foldMapOf termFreeIds unitVarSet e
+          fvs       = Lens.foldMapOf freeLocalIds unitVarSet e
           (binds,_) = List.partition ((`elemVarSet` fvs) . fst)
                     $ zip xs [Literal (ByteArrayLiteral bv)]
           e' = case binds of
@@ -628,7 +624,7 @@ matchLiteralContructor c (NaturalLiteral l) alts = go (reverse alts)
   go ((DataPat dc [] xs,e):alts')
     | dcTag dc == 1
     , l >= 0 && l < 2^(64::Int)
-    = let fvs       = Lens.foldMapOf termFreeIds unitVarSet e
+    = let fvs       = Lens.foldMapOf freeLocalIds unitVarSet e
           (binds,_) = List.partition ((`elemVarSet` fvs) . fst)
                     $ zip xs [Literal (WordLiteral l)]
           e' = case binds of
@@ -640,7 +636,7 @@ matchLiteralContructor c (NaturalLiteral l) alts = go (reverse alts)
     = let !(Jp# !(BN# ba)) = l
           ba'       = BA.ByteArray ba
           bv        = PV.Vector 0 (BA.sizeofByteArray ba') ba'
-          fvs       = Lens.foldMapOf termFreeIds unitVarSet e
+          fvs       = Lens.foldMapOf freeLocalIds unitVarSet e
           (binds,_) = List.partition ((`elemVarSet` fvs) . fst)
                     $ zip xs [Literal (ByteArrayLiteral bv)]
           e' = case binds of
@@ -665,7 +661,7 @@ caseOneAlt e@(Case _ _ [(pat,altE)]) = case pat of
   DefaultPat -> changed altE
   LitPat _ -> changed altE
   DataPat _ tvs xs
-    | (coerce tvs ++ coerce xs) `varsDoNotOccurIn` altE
+    | (coerce tvs ++ coerce xs) `localVarsDoNotOccurIn` altE
     -> changed altE
     | otherwise
     -> return e
@@ -699,21 +695,19 @@ topLet (TransformContext is0 ctx) e
   if untranslatable
     then return e
     else do tcm <- Lens.view tcCache
-            is1 <- unionInScope is0 <$> Lens.use globalInScope
-            argId <- mkTmBinderFor is1 tcm (mkUnsafeSystemName "result" 0) e
+            argId <- mkTmBinderFor is0 tcm (mkUnsafeSystemName "result" 0) e
             changed (Letrec [(argId, e)] (Var argId))
 
 topLet (TransformContext is0 ctx) e@(Letrec binds body)
   | all isLambdaBodyCtx ctx
   = do
-    localVar       <- isNonGlobalVar body
+    let localVar = isLocalVar body
     untranslatable <- isUntranslatable False body
     if localVar || untranslatable
       then return e
       else do
         tcm <- Lens.view tcCache
-        is1 <- unionInScope is0 <$> Lens.use globalInScope
-        let is2 = extendInScopeSetList is1 (map fst binds)
+        let is2 = extendInScopeSetList is0 (map fst binds)
         argId <- mkTmBinderFor is2 tcm (mkUnsafeSystemName "result" 0) body
         changed (Letrec (binds ++ [(argId,body)]) (Var argId))
 
@@ -724,7 +718,7 @@ topLet _ e = return e
 -- | Remove unused let-bindings
 deadCode :: HasCallStack => NormRewrite
 deadCode _ e@(Letrec xes body) = do
-    let bodyFVs = Lens.foldMapOf termFreeIds unitVarSet body
+    let bodyFVs = Lens.foldMapOf freeLocalIds unitVarSet body
         (xesUsed,xesOther) = List.partition((`elemVarSet` bodyFVs) . fst) xes
         xesUsed' = findUsedBndrs [] xesUsed xesOther
     if length xesUsed' /= length xes
@@ -739,7 +733,7 @@ deadCode _ e@(Letrec xes body) = do
     findUsedBndrs used explore other =
       let fvsUsed = List.foldl' unionVarSet
                                 emptyVarSet
-                                (map (Lens.foldMapOf termFreeIds unitVarSet . snd) explore)
+                                (map (Lens.foldMapOf freeLocalIds unitVarSet . snd) explore)
           (explore',other') = List.partition
                                 ((`elemVarSet` fvsUsed) . fst) other
       in findUsedBndrs (used ++ explore) explore' other'
@@ -778,7 +772,7 @@ removeUnusedExpr _ e@(collectArgs -> (p@(Prim nm _),args)) = do
          else return (Left p' : args'')
 
 removeUnusedExpr _ e@(Case _ _ [(DataPat _ [] xs,altExpr)]) =
-  if xs `idsDoNotOccurIn` altExpr
+  if xs `localIdsDoNotOccurIn` altExpr
      then changed altExpr
      else return e
 
@@ -807,7 +801,7 @@ removeUnusedExpr _ e = return e
 bindConstantVar :: HasCallStack => NormRewrite
 bindConstantVar = inlineBinders test
   where
-    test _ (_, e) = isNonGlobalVar e >>= \case
+    test _ (_, e) = case isLocalVar e of
       True -> return True
       _    -> isConstantNotClockReset e >>= \case
         True -> Lens.use (extra.inlineConstantLimit) >>= \case
@@ -900,8 +894,7 @@ eliminateCastCast _ e = return e
 -- @
 splitCastWork :: HasCallStack => NormRewrite
 splitCastWork ctx@(TransformContext is0 _) unchanged@(Letrec vs e') = do
-  is1 <- unionInScope is0 <$> Lens.use globalInScope
-  (vss', Monoid.getAny -> hasChanged) <- listen (mapM (splitCastLetBinding is1) vs)
+  (vss', Monoid.getAny -> hasChanged) <- listen (mapM (splitCastLetBinding is0) vs)
   let vs' = concat vss'
   if hasChanged then changed (Letrec vs' e')
                 else return unchanged
@@ -936,8 +929,8 @@ inlineWorkFree (TransformContext localScope _) e@(collectArgs -> (Var f,args@(_:
                                 args
     untranslatable <- isUntranslatableType True eTy
     let isSignal = isSignalType tcm eTy
-    let isLocalVar = f `elemInScopeSet` localScope
-    if untranslatable || isSignal || argsHaveWork || isLocalVar
+    let lv = isLocalId f
+    if untranslatable || isSignal || argsHaveWork || lv
       then return e
       else do
         bndrs <- Lens.use bindings
@@ -949,15 +942,14 @@ inlineWorkFree (TransformContext localScope _) e@(collectArgs -> (Var f,args@(_:
                then return e
                else do
                  -- See Note [AppProp no-shadow invariant]
-                 allInScope <- unionInScope localScope <$> Lens.use globalInScope
-                 changed (mkApps (deShadowTerm allInScope body) args)
+                 changed (mkApps (deShadowTerm localScope body) args)
           _ -> return e
   where
     -- an expression is has work when it contains free local variables,
     -- or has a Signal type, i.e. it does not evaluate to a work-free
     -- constant.
     expressionHasWork e' = do
-      fvIds <- Lens.toListOf <$> localFreeIds <*> pure e'
+      let fvIds = Lens.toListOf freeLocalIds e'
       tcm   <- Lens.view tcCache
       let e'Ty     = termType tcm e'
           isSignal = isSignalType tcm e'Ty
@@ -969,8 +961,8 @@ inlineWorkFree (TransformContext localScope _) e@(Var f) = do
       closed   = not (isPolyFunCoreTy tcm fTy)
       isSignal = isSignalType tcm fTy
   untranslatable <- isUntranslatableType True fTy
-  let isLocalVar = f `elemInScopeSet` localScope
-  if closed && not untranslatable && not isSignal && not isLocalVar
+  let gv = isGlobalId f
+  if closed && not untranslatable && not isSignal && gv
     then do
       bndrs <- Lens.use bindings
       case lookupVarEnv f bndrs of
@@ -982,8 +974,7 @@ inlineWorkFree (TransformContext localScope _) e@(Var f) = do
              else do
               (_,_,_,body) <- normalizeTopLvlBndr f top
               -- See Note [AppProp no-shadow invariant]
-              allInScope <- unionInScope localScope <$> Lens.use globalInScope
-              changed (deShadowTerm allInScope body)
+              changed (deShadowTerm localScope body)
         _ -> return e
     else return e
 
@@ -994,8 +985,8 @@ inlineSmall :: HasCallStack => NormRewrite
 inlineSmall (TransformContext localScope _) e@(collectArgs -> (Var f,args)) = do
   untranslatable <- isUntranslatable True e
   topEnts <- Lens.view topEntities
-  let isLocalVar = f `elemInScopeSet` localScope
-  if untranslatable || f `elemVarSet` topEnts || isLocalVar
+  let lv = isLocalId f
+  if untranslatable || f `elemVarSet` topEnts || lv
     then return e
     else do
       bndrs <- Lens.use bindings
@@ -1007,8 +998,7 @@ inlineSmall (TransformContext localScope _) e@(collectArgs -> (Var f,args)) = do
           if not isRecBndr && inl /= NoInline && termSize body < sizeLimit
              then do
                -- See Note [AppProp no-shadow invariant]
-               allInScope <- unionInScope localScope <$> Lens.use globalInScope
-               changed (mkApps (deShadowTerm allInScope body) args)
+               changed (mkApps (deShadowTerm localScope body) args)
              else return e
         _ -> return e
 
@@ -1017,11 +1007,11 @@ inlineSmall _ e = return e
 -- | Specialise functions on arguments which are constant, except when they
 -- are clock, reset generators.
 constantSpec :: HasCallStack => NormRewrite
-constantSpec ctx@(TransformContext is0 _) e@(App e1 e2)
+constantSpec ctx e@(App e1 e2)
   | (Var {}, args) <- collectArgs e1
   , (_, []) <- Either.partitionEithers args
   , null $ Lens.toListOf termFreeTyVars e2
-  = do e2Speccable <- canConstantSpec is0 e2
+  = do e2Speccable <- canConstantSpec e2
        if e2Speccable then specializeNorm ctx e else return e
 constantSpec _ e = return e
 
@@ -1103,11 +1093,10 @@ constantSpec _ e = return e
 -- taking the InScopeSet of the context into account.
 appProp :: HasCallStack => NormRewrite
 appProp (TransformContext is0 _) (App (Lam v e) arg) = do
-  argIsConstant <- isConstant arg
+  let argIsConstant = isConstant arg
   if argIsConstant || isVar arg
     then do
-      is1 <- unionInScope is0 <$> Lens.use globalInScope
-      let subst = extendIdSubst (mkSubst is1) v arg
+      let subst = extendIdSubst (mkSubst is0) v arg
       changed $ substTm "appProp.AppLam" subst e
     else changed $ Letrec [(v, arg)] e
 
@@ -1115,7 +1104,7 @@ appProp _ (App (Letrec v e) arg) = do
   changed (Letrec v (App e arg))
 
 appProp ctx@(TransformContext is0 _) (App (Case scrut ty alts) arg) = do
-  argIsConstant <- isConstant arg
+  let argIsConstant = isConstant arg
   tcm <- Lens.view tcCache
   let argTy = termType tcm arg
       ty' = applyFunTy tcm ty argTy
@@ -1125,15 +1114,13 @@ appProp ctx@(TransformContext is0 _) (App (Case scrut ty alts) arg) = do
       changed $ Case scrut ty' alts'
     else do
       -- See Note [AppProp deshadow]
-      is1 <- unionInScope is0 <$> Lens.use globalInScope
-      let is2 = unionInScope is1 ((mkInScopeSet . mkVarSet . concatMap (patVars . fst)) alts)
+      let is2 = unionInScope is0 ((mkInScopeSet . mkVarSet . concatMap (patVars . fst)) alts)
       boundArg <- mkTmBinderFor is2 tcm (mkDerivedName ctx "app_arg") arg
       let alts' = map (second (`App` (Var boundArg))) alts
       changed (Letrec [(boundArg, arg)] (Case scrut ty' alts'))
 
 appProp (TransformContext is0 _) (TyApp (TyLam tv e) t) = do
-  is1 <- unionInScope is0 <$> Lens.use globalInScope
-  let subst = extendTvSubst (mkSubst is1) tv t
+  let subst = extendTvSubst (mkSubst is0) tv t
   changed $ substTm "appProp.TyAppTyLam" subst e
 
 appProp _ (TyApp (Letrec v e) t) = do
@@ -1158,11 +1145,10 @@ appPropFast ctx@(TransformContext is _) = \case
 
   go is0 (Lam v e) (Left arg:args) = do
     setChanged
-    argIsConstant <- isConstant arg
+    let argIsConstant = isConstant arg
     if argIsConstant || isVar arg
       then do
-        is1 <- unionInScope is0 <$> Lens.use globalInScope
-        let subst = extendIdSubst (mkSubst is1) v arg
+        let subst = extendIdSubst (mkSubst is0) v arg
         go is0 (substTm "appPropFast.AppLam" subst e) args
       else do
         let is1 = extendInScopeSet is0 v
@@ -1176,15 +1162,13 @@ appPropFast ctx@(TransformContext is _) = \case
 
   go is0 (TyLam tv e) (Right t:args) = do
     setChanged
-    is1 <- unionInScope is0 <$> Lens.use globalInScope
-    let subst = extendTvSubst (mkSubst is1) tv t
+    let subst = extendTvSubst (mkSubst is0) tv t
     go is0 (substTm "appPropFast.TyAppTyLam" subst e) args
 
   go is0 (Case scrut ty0 alts) args0@(_:_) = do
     setChanged
-    isA0 <- unionInScope is0 <$> Lens.use globalInScope
     let isA1 = unionInScope
-                 isA0
+                 is0
                  ((mkInScopeSet . mkVarSet . concatMap (patVars . fst)) alts)
     (ty1,vs,args1) <- goCaseArg isA1 ty0 [] args0
     case vs of
@@ -1208,7 +1192,7 @@ appPropFast ctx@(TransformContext is _) = \case
     return (ty2,ls1,Right t:args1)
 
   goCaseArg isA0 ty0 ls0 (Left arg:args0) = do
-    argIsConstant <- isConstant arg
+    let argIsConstant = isConstant arg
     tcm <- Lens.view tcCache
     let argTy = termType tcm arg
         ty1   = applyFunTy tcm ty0 argTy
@@ -1345,7 +1329,6 @@ makeANF _ e@(TyLam {}) = return e
 
 makeANF ctx@(TransformContext is0 _) e0
   = do
-    is1 <- unionInScope is0 <$> Lens.use globalInScope
     -- We need to freshen all binders in `e` because we're shuffling them around
     -- into a single let-binder, because even when binders don't shadow, they
     -- don't have to be unique within an expression. And so lifting them all
@@ -1356,7 +1339,7 @@ makeANF ctx@(TransformContext is0 _) e0
     -- of the existing binders in the expression.
     --
     -- See also Note [ANF InScopeSet]
-    let (is2,e1) = freshenTm is1 e0
+    let (is2,e1) = freshenTm is0 e0
     (e2,(bndrs,_)) <- runStateT (bottomupR collectANF ctx e1) ([],is2)
     case bndrs of
       [] -> return e0
@@ -1403,7 +1386,7 @@ collectANF ctx e@(App appf arg)
   , isCon conVarPrim || isPrim conVarPrim || isVar conVarPrim
   = do
     untranslatable <- lift (isUntranslatable False arg)
-    localVar       <- lift (isNonGlobalVar arg)
+    let localVar   = isLocalVar arg
     constantNoCR   <- lift (isConstantNotClockReset arg)
     case (untranslatable,localVar || constantNoCR,arg) of
       (False,False,_) -> do
@@ -1422,7 +1405,7 @@ collectANF ctx e@(App appf arg)
 collectANF _ (Letrec binds body) = do
   tellBinders binds
   untranslatable <- lift (isUntranslatable False body)
-  localVar       <- lift (isNonGlobalVar body)
+  let localVar = isLocalVar body
   if localVar || untranslatable
     then return body
     else do
@@ -1454,8 +1437,8 @@ collectANF _ e@(Case _ _ [(DataPat dc _ _,_)])
   | nameOcc (dcName dc) == "Clash.Signal.Internal.:-" = return e
 
 collectANF ctx (Case subj ty alts) = do
-    localVar <- lift (isNonGlobalVar subj)
-    isConstantSubj <- lift (isConstant subj)
+    let localVar = isLocalVar subj
+    let isConstantSubj = isConstant subj
 
     subj' <- if localVar || isConstantSubj
       then return subj
@@ -1472,7 +1455,7 @@ collectANF ctx (Case subj ty alts) = do
 
     case alts' of
       [(DataPat _ [] xs,altExpr)]
-        | xs `idsDoNotOccurIn` altExpr
+        | xs `localIdsDoNotOccurIn` altExpr
         -> return altExpr
       _ -> return (Case subj' ty alts')
   where
@@ -1481,9 +1464,9 @@ collectANF ctx (Case subj ty alts) = do
       -> StateT ([LetBinding],InScopeSet) (RewriteMonad NormalizeState)
                 (Pat,Term)
     doAlt subj' alt@(DataPat dc exts xs,altExpr) | not (bindsExistentials exts xs) = do
-      lv  <- lift (isNonGlobalVar altExpr)
+      let lv = isLocalVar altExpr
       patSels <- Monad.zipWithM (doPatBndr subj' dc) xs [0..]
-      altExprIsConstant <- lift (isConstant altExpr)
+      let altExprIsConstant = isConstant altExpr
       let usesXs (Var n) = any (== n) xs
           usesXs _       = False
       if (lv && (not (usesXs altExpr) || length alts == 1)) || altExprIsConstant
@@ -1501,8 +1484,8 @@ collectANF ctx (Case subj ty alts) = do
           return (DataPat dc exts xs,Var altId)
     doAlt _ alt@(DataPat {}, _) = return alt
     doAlt _ alt@(pat,altExpr) = do
-      lv <- lift (isNonGlobalVar altExpr)
-      altExprIsConstant <- lift (isConstant altExpr)
+      let lv = isLocalVar altExpr
+      let altExprIsConstant = isConstant altExpr
       if lv || altExprIsConstant
         then return alt
         else do
@@ -1533,20 +1516,15 @@ collectANF _ e = return e
 
 -- | Eta-expand top-level lambda's (DON'T use in a traversal!)
 etaExpansionTL :: HasCallStack => NormRewrite
-etaExpansionTL (TransformContext is0 ctx) e = do
-  is1 <- unionInScope is0 <$> Lens.use globalInScope
-  etaExpansionTL' (TransformContext is1 ctx) e
-
-etaExpansionTL' :: HasCallStack => NormRewrite
-etaExpansionTL' (TransformContext is0 ctx) (Lam bndr e) = do
-  e' <- etaExpansionTL'
+etaExpansionTL (TransformContext is0 ctx) (Lam bndr e) = do
+  e' <- etaExpansionTL
           (TransformContext (extendInScopeSet is0 bndr) (LamBody bndr:ctx))
           e
   return $ Lam bndr e'
 
-etaExpansionTL' (TransformContext is0 ctx) (Letrec xes e) = do
+etaExpansionTL (TransformContext is0 ctx) (Letrec xes e) = do
   let bndrs = map fst xes
-  e' <- etaExpansionTL'
+  e' <- etaExpansionTL
           (TransformContext (extendInScopeSetList is0 bndrs)
                             (LetBody bndrs:ctx))
           e
@@ -1562,7 +1540,7 @@ etaExpansionTL' (TransformContext is0 ctx) (Letrec xes e) = do
       in  (bndr:bndrs,e1)
     stripLambda e' = ([],e')
 
-etaExpansionTL' (TransformContext is0 ctx) e
+etaExpansionTL (TransformContext is0 ctx) e
   = do
     tcm <- Lens.view tcCache
     if isFun tcm e
@@ -1573,7 +1551,7 @@ etaExpansionTL' (TransformContext is0 ctx) e
                     . termType tcm
                     ) e
         newId <- mkInternalVar is0 "arg" argTy
-        e' <- etaExpansionTL' (TransformContext (extendInScopeSet is0 newId)
+        e' <- etaExpansionTL (TransformContext (extendInScopeSet is0 newId)
                                                (LamBody newId:ctx))
                              (App e (Var newId))
         changed (Lam newId e')
@@ -1608,15 +1586,13 @@ recToLetRec (TransformContext is0 []) e = do
   tcm    <- Lens.view tcCache
   case splitNormalized tcm e of
     Right (args,bndrs,res) -> do
-      let v                 = Var fn
-          args'             = map Var args
-          (toInline,others) = List.partition (eqApp tcm v args' . snd) bndrs
+      let args'             = map Var args
+          (toInline,others) = List.partition (eqApp tcm fn args' . snd) bndrs
           resV              = Var res
       case (toInline,others) of
         (_:_,_:_) -> do
           let is1          = extendInScopeSetList is0 (args ++ map fst bndrs)
-          is2 <- unionInScope is1 <$> Lens.use globalInScope
-          let substsInline = extendIdSubstList (mkSubst is2)
+          let substsInline = extendIdSubstList (mkSubst is1)
                            $ map (second (const resV)) toInline
               others'      = map (second (substTm "recToLetRec" substsInline))
                                  others
@@ -1631,13 +1607,13 @@ recToLetRec (TransformContext is0 []) e = do
     -- xs == (fst xs, snd xs)
     --
     -- TODO: this is far from complete
-    eqApp tcm v args (collectArgs -> (v',args'))
-      | v == v'
+    eqApp tcm v args (collectArgs -> (Var v',args'))
+      | isGlobalId v'
+      , v == v'
       , let args2 = Either.lefts args'
       , length args == length args2
       = and (zipWith (eqArg tcm) args args2)
-      | otherwise
-      = False
+    eqApp _ _ _ _ = False
 
     eqArg _ v1 v2@(Var {})
       = v1 == v2
@@ -1679,8 +1655,7 @@ inlineHO (TransformContext is0 _) e@(App _ _)
                     Just (_,_,_,body) -> do
                       zoomExtra (addNewInline f cf)
                       -- See Note [AppProp no-shadow invariant]
-                      is1 <- unionInScope is0 <$> Lens.use globalInScope
-                      changed (mkApps (deShadowTerm is1 body) args)
+                      changed (mkApps (deShadowTerm is0 body) args)
                     _ -> return e
       else return e
 
@@ -1690,8 +1665,7 @@ inlineHO _ e = return e
 simpleCSE :: HasCallStack => NormRewrite
 simpleCSE (TransformContext is0 _) e@(Letrec binders body) = do
   let is1 = extendInScopeSetList is0 (map fst binders)
-  is2 <- unionInScope is1 <$> Lens.use globalInScope
-  let (reducedBindings,body') = reduceBindersFix is2 binders body
+  let (reducedBindings,body') = reduceBindersFix is1 binders body
   if length binders /= length reducedBindings
      then changed (Letrec reducedBindings body')
      else return e
@@ -1737,8 +1711,7 @@ reduceConst ctx@(TransformContext is0 _) e@(App _ _)
     let (ids1,ids2) = splitSupply ids
     uniqSupply Lens..= ids2
     gh <- Lens.use globalHeap
-    is1 <- unionInScope is0 <$> Lens.use globalInScope
-    case whnf' primEval bndrs tcm gh ids1 is1 False e of
+    case whnf' primEval bndrs tcm gh ids1 is0 False e of
       (gh',ph',e') -> do
         globalHeap Lens..= gh'
         bindPureHeap ctx tcm ph' $ \_ctx' -> case e' of
@@ -1785,7 +1758,6 @@ reduceConst _ e = return e
 reduceNonRepPrim :: HasCallStack => NormRewrite
 reduceNonRepPrim c@(TransformContext is0 ctx) e@(App _ _) | (Prim nm _, args) <- collectArgs e = do
   tcm <- Lens.view tcCache
-  is1 <- unionInScope is0 <$> Lens.use globalInScope
   shouldReduce1 <- shouldReduce ctx
   ultra <- Lens.use (extra.normalizeUltra)
   let eTy = termType tcm e
@@ -1846,7 +1818,7 @@ reduceNonRepPrim c@(TransformContext is0 ctx) e@(App _ _) | (Prim nm _, args) <-
       "Clash.Sized.Vector.dfold" | length args == 8 ->
         let ([_kn,_motive,fun,start,arg],[_mTy,nTy,aTy]) = Either.partitionEithers args
         in  case runExcept (tyNatSize tcm nTy) of
-          Right n -> reduceDFold is1 n aTy fun start arg
+          Right n -> reduceDFold is0 n aTy fun start arg
           _ -> return e
       "Clash.Sized.Vector.++" | length args == 5 ->
         let [nTy,aTy,mTy] = Either.rights args
@@ -1858,7 +1830,7 @@ reduceNonRepPrim c@(TransformContext is0 ctx) e@(App _ _) | (Prim nm _, args) <-
                 | otherwise -> do
                     untranslatableTy <- isUntranslatableType_not_poly aTy
                     if untranslatableTy || shouldReduce1
-                       then reduceAppend is1 n m aTy lArg rArg
+                       then reduceAppend is0 n m aTy lArg rArg
                        else return e
               _ -> return e
       "Clash.Sized.Vector.head" | length args == 3 -> do
@@ -1868,7 +1840,7 @@ reduceNonRepPrim c@(TransformContext is0 ctx) e@(App _ _) | (Prim nm _, args) <-
           Right n -> do
             untranslatableTy <- isUntranslatableType_not_poly aTy
             if untranslatableTy || shouldReduce1
-               then reduceHead is1 n aTy vArg
+               then reduceHead is0 n aTy vArg
                else return e
           _ -> return e
       "Clash.Sized.Vector.tail" | length args == 3 -> do
@@ -1878,7 +1850,7 @@ reduceNonRepPrim c@(TransformContext is0 ctx) e@(App _ _) | (Prim nm _, args) <-
           Right n -> do
             untranslatableTy <- isUntranslatableType_not_poly aTy
             if untranslatableTy || shouldReduce1
-               then reduceTail is1 n aTy vArg
+               then reduceTail is0 n aTy vArg
                else return e
           _ -> return e
       "Clash.Sized.Vector.last" | length args == 3 -> do
@@ -1888,7 +1860,7 @@ reduceNonRepPrim c@(TransformContext is0 ctx) e@(App _ _) | (Prim nm _, args) <-
           Right n -> do
             untranslatableTy <- isUntranslatableType_not_poly aTy
             if untranslatableTy || shouldReduce1
-               then reduceLast is1 n aTy vArg
+               then reduceLast is0 n aTy vArg
                else return e
           _ -> return e
       "Clash.Sized.Vector.init" | length args == 3 -> do
@@ -1898,7 +1870,7 @@ reduceNonRepPrim c@(TransformContext is0 ctx) e@(App _ _) | (Prim nm _, args) <-
           Right n -> do
             untranslatableTy <- isUntranslatableType_not_poly aTy
             if untranslatableTy || shouldReduce1
-               then reduceInit is1 n aTy vArg
+               then reduceInit is0 n aTy vArg
                else return e
           _ -> return e
       "Clash.Sized.Vector.unconcat" | length args == 6 -> do
@@ -1927,7 +1899,7 @@ reduceNonRepPrim c@(TransformContext is0 ctx) e@(App _ _) | (Prim nm _, args) <-
           Right n -> do
             untranslatableTy <- isUntranslatableType_not_poly aTy
             if untranslatableTy || shouldReduce1 || ultra
-               then reduceReplace_int is1 n aTy eTy vArg iArg aArg
+               then reduceReplace_int is0 n aTy eTy vArg iArg aArg
                else return e
           _ -> return e
 
@@ -1945,19 +1917,19 @@ reduceNonRepPrim c@(TransformContext is0 ctx) e@(App _ _) | (Prim nm _, args) <-
       "Clash.Sized.Vector.dtfold" | length args == 8 ->
         let ([_kn,_motive,lrFun,brFun,arg],[_mTy,nTy,aTy]) = Either.partitionEithers args
         in  case runExcept (tyNatSize tcm nTy) of
-          Right n -> reduceDTFold is1 n aTy lrFun brFun arg
+          Right n -> reduceDTFold is0 n aTy lrFun brFun arg
           _ -> return e
 
       "Clash.Sized.Vector.reverse"
         | ultra
         , ([vArg],[nTy,aTy]) <- Either.partitionEithers args
         , Right n <- runExcept (tyNatSize tcm nTy)
-        -> reduceReverse is1 n aTy vArg
+        -> reduceReverse is0 n aTy vArg
 
       "Clash.Sized.RTree.tdfold" | length args == 8 ->
         let ([_kn,_motive,lrFun,brFun,arg],[_mTy,nTy,aTy]) = Either.partitionEithers args
         in  case runExcept (tyNatSize tcm nTy) of
-          Right n -> reduceTFold is1 n aTy lrFun brFun arg
+          Right n -> reduceTFold is0 n aTy lrFun brFun arg
           _ -> return e
       "Clash.Sized.RTree.treplicate" | length args == 4 -> do
         let ([_sArg,vArg],[nTy,aTy]) = Either.partitionEithers args
@@ -2039,22 +2011,21 @@ reduceNonRepPrim _ e = return e
 -- @
 disjointExpressionConsolidation :: HasCallStack => NormRewrite
 disjointExpressionConsolidation ctx@(TransformContext is0 _) e@(Case _scrut _ty _alts@(_:_:_)) = do
-    is1 <- unionInScope is0 <$> Lens.use globalInScope
-    (_,collected) <- collectGlobals is1 [] [] e
+    (_,collected) <- collectGlobals is0 [] [] e
     let disJoint = filter (isDisjoint . snd . snd) collected
     if null disJoint
        then return e
        else do
-         exprs <- mapM (mkDisjointGroup is1) disJoint
+         exprs <- mapM (mkDisjointGroup is0) disJoint
          tcm   <- Lens.view tcCache
-         lids  <- Monad.zipWithM (mkFunOut is1 tcm) disJoint exprs
+         lids  <- Monad.zipWithM (mkFunOut is0 tcm) disJoint exprs
          let substitution = zip (map fst disJoint) (map Var lids)
              subsMatrix   = l2m substitution
          (exprs',_) <- unzip <$> Monad.zipWithM
-                        (\s (e',seen) -> collectGlobals is1 s seen e')
+                        (\s (e',seen) -> collectGlobals is0 s seen e')
                         subsMatrix
                         exprs
-         (e',_) <- collectGlobals is1 substitution [] e
+         (e',_) <- collectGlobals is0 substitution [] e
          let lb = Letrec (zip lids exprs') e'
          lb' <- bottomupR deadCode ctx lb
          changed lb'
@@ -2093,14 +2064,13 @@ inlineCleanup (TransformContext is0 _) (Letrec binds body) = do
   --                   $ map ( List.foldl' countOcc HashMap.empty
   --                         . Lens.toListOf termFreeIds . unembed . snd) binds
   let is1 = extendInScopeSetList is0 (map fst binds)
-  is2 <- unionInScope is1 <$> Lens.use globalInScope
   let allOccs       = List.foldl' (unionVarEnvWith (+)) emptyVarEnv
-                    $ map (Lens.foldMapByOf termFreeIds (unionVarEnvWith (+))
+                    $ map (Lens.foldMapByOf freeLocalIds (unionVarEnvWith (+))
                             emptyVarEnv (`unitVarEnv` 1) . snd)
                           binds
-      bodyFVs       = Lens.foldMapOf termFreeIds unitVarSet body
+      bodyFVs       = Lens.foldMapOf freeLocalIds unitVarSet body
       (il,keep)     = List.partition (isInteresting allOccs prims bodyFVs) binds
-      keep'         = inlineBndrs is2 keep il
+      keep'         = inlineBndrs is1 keep il
   if null il then return  (Letrec binds body)
              else changed (Letrec keep' body)
   where
@@ -2167,13 +2137,12 @@ inlineCleanup _ e = return e
 -- NB: must only be called in the cleaning up phase.
 flattenLet :: HasCallStack => NormRewrite
 flattenLet (TransformContext is0 _) letrec@(Letrec _ _) = do
-  is1 <- unionInScope is0 <$> Lens.use globalInScope
-  let (is2, Letrec binds body) = freshenTm is1 letrec
+  let (is2, Letrec binds body) = freshenTm is0 letrec
   binds' <- concat <$> mapM (go is2) binds
   case binds' of
     -- inline binders into the body when there's only a single binder
     [(id',e')] ->
-      if id' `idOccursIn` e'
+      if id' `localIdOccursIn` e'
          -- Except when the binder is recursive!
          then return (Letrec binds' body)
          else let subst = extendIdSubst (mkSubst is2) id' e'
@@ -2184,7 +2153,7 @@ flattenLet (TransformContext is0 _) letrec@(Letrec _ _) = do
     go isN (id_,Letrec binds' body') = case binds' of
        -- inline binders into the body when there's only a single binder
       [(id',e')] ->
-        if id' `idOccursIn` e'
+        if id' `localIdOccursIn` e'
            -- Except when the binder is recursive!
            then changed [(id',e'),(id_, body')]
            else let subst = extendIdSubst (mkSubst isN) id' e'

@@ -59,12 +59,13 @@ import           Data.Monoid                      (All (..))
 import Clash.Core.DataCon    (DataCon, dcTag)
 import Clash.Core.Evaluator  (whnf')
 import Clash.Core.FreeVars
-  (termFreeVars', typeFreeVars', varsDoNotOccurIn)
+  (termFreeVars', typeFreeVars', localVarsDoNotOccurIn)
 import Clash.Core.Literal    (Literal (..))
 import Clash.Core.Term       (LetBinding, Pat (..), Term (..))
 import Clash.Core.TyCon      (tyConDataCons)
 import Clash.Core.Type       (Type, isPolyFunTy, mkTyConApp, splitFunForallTy)
 import Clash.Core.Util       (collectArgs, mkApps, patIds, termType)
+import Clash.Core.Var        (isGlobalId)
 import Clash.Core.VarEnv
   (InScopeSet, elemInScopeSet, notElemInScopeSet)
 import Clash.Normalize.Types (NormalizeState)
@@ -199,7 +200,7 @@ collectGlobals
       NormalizeState
       (Term, [(Term, ([Term], CaseTree [Either Term Type]))])
 collectGlobals inScope substitution seen e =
-  collectGlobals' inScope substitution seen e =<< isConstant e
+  collectGlobals' inScope substitution seen e (isConstant e)
 
 -- | Collect 'CaseTree's for (potentially) disjoint applications of globals out
 -- of a list of application arguments. Also substitute truly disjoint
@@ -416,7 +417,7 @@ genCase ty dcM argTys = go
     go (Branch scrut [(p,ct)]) =
       let ct' = go ct
           (ptvs,pids) = patIds p
-      in  if (coerce ptvs ++ coerce pids) `varsDoNotOccurIn` ct'
+      in  if (coerce ptvs ++ coerce pids) `localVarsDoNotOccurIn` ct'
              then ct'
              else Case scrut ty [(p,ct')]
 
@@ -442,11 +443,11 @@ interestingToLift
   -- ^ Arguments
   -> RewriteMonad extra (Maybe Term)
 interestingToLift inScope _ e@(Var v) _ =
-  if v `elemInScopeSet` inScope
+  if isGlobalId v ||  v `elemInScopeSet` inScope
      then pure (Just e)
      else pure Nothing
 interestingToLift inScope eval e@(Prim nm pty) args = do
-  anyArgNotConstant <- anyM (fmap not . isConstant) lArgs
+  let anyArgNotConstant = any (not . isConstant) lArgs
   case List.lookup nm interestingPrims of
     Just t | t || anyArgNotConstant -> pure (Just e)
     _ -> do

@@ -46,7 +46,7 @@ benchFile tmpDir idirs src = do
   let (bindingsMap,tcm,tupTcm,_topEntities,primMap,reprs,topEntityNames,topEntity) = env
       primMap' = fmap (fmap unremoveBBfunc) primMap
       res :: BindingMap
-      res = fst $ normalizeEntity reprs bindingsMap primMap' tcm tupTcm typeTrans reduceConstant
+      res = normalizeEntity reprs bindingsMap primMap' tcm tupTcm typeTrans reduceConstant
                    topEntityNames (opts tmpDir idirs) supplyN topEntity
   res `deepseq` putStrLn ".. done\n"
 

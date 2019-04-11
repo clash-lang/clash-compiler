@@ -16,13 +16,19 @@
 module Clash.Core.Var
   ( Attr' (..)
   , Var (..)
+  , IdScope (..)
   , Id
   , TyVar
   , mkId
+  , mkLocalId
+  , mkGlobalId
   , mkTyVar
   , setVarUnique
   , setVarType
+  , setIdScope
   , modifyVarName
+  , isGlobalId
+  , isLocalId
   , attrName
   )
 where
@@ -69,6 +75,7 @@ data Var a
   { varName :: !(Name a)
   , varUniq :: {-# UNPACK #-} !Unique
   , varType :: Type
+  , idScope :: IdScope
   }
   deriving (Show,Generic,NFData,Hashable,Binary)
 
@@ -81,6 +88,9 @@ instance Ord (Var a) where
 
 instance Uniquable (Var a) where
   getUnique = varUniq
+
+data IdScope = GlobalId | LocalId
+  deriving (Show,Generic,NFData,Hashable,Binary)
 
 -- | Term variable
 type Id    = Var Term
@@ -95,9 +105,9 @@ modifyVarName ::
 modifyVarName f (TyVar n _ k) =
   let n' = f n
   in  TyVar n' (nameUniq n') k
-modifyVarName f (Id n _ t) =
+modifyVarName f (Id n _ t s) =
   let n' = f n
-  in  Id n' (nameUniq n') t
+  in  Id n' (nameUniq n') t s
 
 -- | Make a type variable
 mkTyVar
@@ -109,9 +119,22 @@ mkTyVar tyKind tyName = TyVar tyName (nameUniq tyName) tyKind
 -- | Make a term variable
 mkId
   :: Type
+  -> IdScope
   -> TmName
   -> Id
-mkId tmType tmName = Id tmName (nameUniq tmName) tmType
+mkId tmType scope tmName = Id tmName (nameUniq tmName) tmType scope
+
+mkLocalId
+  :: Type
+  -> TmName
+  -> Id
+mkLocalId tmType tmName = Id tmName (nameUniq tmName) tmType LocalId
+
+mkGlobalId
+  :: Type
+  -> TmName
+  -> Id
+mkGlobalId tmType tmName = Id tmName (nameUniq tmName) tmType GlobalId
 
 setVarUnique
   :: Var a
@@ -124,3 +147,22 @@ setVarType
   -> Type
   -> Var a
 setVarType v t = v { varType = t }
+
+isGlobalId
+  :: Var a
+  -> Bool
+isGlobalId (Id {idScope = GlobalId}) = True
+isGlobalId _ = False
+
+isLocalId
+  :: Var a
+  -> Bool
+isLocalId (Id {idScope = LocalId}) = True
+isLocalId _  = False
+
+setIdScope
+  :: IdScope
+  -> Var a
+  -> Var a
+setIdScope s (Id nm u t _) = Id nm u t s
+setIdScope _ v = v

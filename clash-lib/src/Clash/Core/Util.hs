@@ -31,7 +31,7 @@ import           Data.Semigroup
 
 import Clash.Core.DataCon
   (DataCon (MkData), dcType, dcUnivTyVars, dcExtTyVars, dcArgTys)
-import Clash.Core.FreeVars                     (termFreeVars, tyFVsOfTypes)
+import Clash.Core.FreeVars                     (termFreeVarsX, tyFVsOfTypes)
 import Clash.Core.Literal                      (literalType)
 import Clash.Core.Name
   (Name (..), OccName, mkUnsafeInternalName, mkUnsafeSystemName)
@@ -48,7 +48,7 @@ import Clash.Core.TyCon
   (TyConMap, tyConDataCons)
 import Clash.Core.TysPrim                      (typeNatKind)
 import Clash.Core.Var
-  (Id, TyVar, Var (..), mkId, mkTyVar)
+  (Id, TyVar, Var (..), isLocalId, mkLocalId, mkTyVar)
 import Clash.Core.VarEnv
   (InScopeSet, VarEnv, emptyVarEnv, extendInScopeSet, extendVarEnv,
    lookupVarEnv, mkInScopeSet, uniqAway, extendInScopeSetList, unionInScope)
@@ -438,6 +438,12 @@ isVar :: Term
 isVar (Var {}) = True
 isVar _        = False
 
+isLocalVar
+  :: Term
+  -> Bool
+isLocalVar (Var v) = isLocalId v
+isLocalVar _ = False
+
 -- | Is a term a datatype constructor?
 isCon :: Term
       -> Bool
@@ -538,7 +544,7 @@ availableUniques
   -> [Unique]
 availableUniques t = [ n | n <- [0..] , n `IntSet.notMember` avoid ]
  where
-  avoid = Lens.foldMapOf termFreeVars (\a i -> IntSet.insert (varUniq a) i) t
+  avoid = Lens.foldMapOf termFreeVarsX (\a i -> IntSet.insert (varUniq a) i) t
             IntSet.empty
 
 -- | Create let-bindings with case-statements that select elements out of a
@@ -771,7 +777,7 @@ mkUniqSystemId (supply,inScope) (nm, ty) =
   ((supply',extendInScopeSet inScope v'), v')
  where
   (u,supply') = freshId supply
-  v           = mkId ty (mkUnsafeSystemName nm u)
+  v           = mkLocalId ty (mkUnsafeSystemName nm u)
   v'          = uniqAway inScope v
 
 mkUniqInternalId
@@ -782,7 +788,7 @@ mkUniqInternalId (supply,inScope) (nm, ty) =
   ((supply',extendInScopeSet inScope v'), v')
  where
   (u,supply') = freshId supply
-  v           = mkId ty (mkUnsafeInternalName nm u)
+  v           = mkLocalId ty (mkUnsafeInternalName nm u)
   v'          = uniqAway inScope v
 
 

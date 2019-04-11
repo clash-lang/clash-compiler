@@ -47,7 +47,7 @@ import           Util                          (OverridingBool(..))
 import           Clash.Annotations.Primitive
   (PrimitiveGuard(HasBlackBox, WarnNonSynthesizable, WarnAlways, DontTranslate))
 import           Clash.Core.DataCon            as D (dcTag)
-import           Clash.Core.FreeVars           (termFreeIds)
+import           Clash.Core.FreeVars           (freeIds)
 import           Clash.Core.Literal            as L (Literal (..))
 import           Clash.Core.Name
   (Name (..), mkUnsafeSystemName)
@@ -58,9 +58,10 @@ import           Clash.Core.Type               as C (Type (..), ConstTy (..),
                                                 splitFunTys)
 import           Clash.Core.TyCon              as C (tyConDataCons)
 import           Clash.Core.Util               (collectArgs, isFun, termType)
-import           Clash.Core.Var                as V (Id, Var (..), mkId, modifyVarName)
+import           Clash.Core.Var                as V
+  (Id, Var (..), mkLocalId, modifyVarName)
 import           Clash.Core.VarEnv
-  (extendInScopeSet, mkInScopeSet, lookupVarEnv, unionInScope, uniqAway, unitVarSet)
+  (extendInScopeSet, mkInScopeSet, lookupVarEnv, uniqAway, unitVarSet)
 import {-# SOURCE #-} Clash.Netlist
   (genComponent, mkDcApplication, mkDeclarations, mkExpr, mkNetDecl,
    mkProjection, mkSelection, mkFunApp)
@@ -404,7 +405,7 @@ mkPrimitive bbEParen bbEasD dst nm args ty =
         False -> do
           -- TODO: check that it's okay to use `mkUnsafeSystemName`
           let nm' = mkUnsafeSystemName dstL 0
-              id_ = mkId ty nm'
+              id_ = mkLocalId ty nm'
           return (Just (id_,dstL,[]))
         True -> do
           nm'  <- extendIdentifier Extended dstL "_res"
@@ -412,7 +413,7 @@ mkPrimitive bbEParen bbEasD dst nm args ty =
           -- TODO: check that it's okay to use `mkUnsafeInternalName`
           let nm3 = mkUnsafeSystemName nm'' 0
           hwTy <- N.unsafeCoreTypeToHWTypeM' $(curLoc) ty
-          let id_    = mkId ty nm3
+          let id_    = mkLocalId ty nm3
               idDecl = NetDecl' Nothing wr nm'' (Right hwTy)
           case hwTy of
             Void {} -> return Nothing
@@ -562,7 +563,7 @@ mkFunInput resId e = do
                       return (Right (("",[instDecl]),Wire))
                     Nothing -> error $ $(curLoc) ++ "Cannot make function input for: " ++ showPpr e
             C.Lam {} -> do
-              let is0 = mkInScopeSet (Lens.foldMapOf termFreeIds unitVarSet appE)
+              let is0 = mkInScopeSet (Lens.foldMapOf freeIds unitVarSet appE)
               go is0 0 appE
             _ -> error $ $(curLoc) ++ "Cannot make function input for: " ++ showPpr e
   case templ of
@@ -658,12 +659,7 @@ mkFunInput resId e = do
       tcm <- Lens.use tcCache
       let normE = splitNormalized tcm e'
       (_,[],[],_,[],binders,resultM) <- case normE of
-        Right norm -> do
-          isCur <- Lens.use globalInScope
-          globalInScope Lens..= is0 `unionInScope` isCur
-          norm' <- mkUniqueNormalized Nothing norm
-          globalInScope Lens..= isCur
-          return norm'
+        Right norm -> mkUniqueNormalized is0 Nothing norm
         Left err -> error err
       case resultM of
         Just result -> do

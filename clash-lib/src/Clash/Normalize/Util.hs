@@ -39,12 +39,13 @@ import           Data.Text               (Text)
 import           BasicTypes              (InlineSpec)
 
 import           Clash.Annotations.Primitive (extractPrim)
-import           Clash.Core.FreeVars     (idOccursIn, termFreeIds)
+import           Clash.Core.FreeVars
+  (globalIds, hasLocalFreeVars, globalIdOccursIn)
 import           Clash.Core.Pretty       (showPpr)
 import           Clash.Core.Subst        (deShadowTerm)
 import           Clash.Core.Term         (Term (..))
 import           Clash.Core.TyCon        (TyConMap)
-import           Clash.Core.Var          (Id, Var (..))
+import           Clash.Core.Var          (Id, Var (..), isGlobalId)
 import           Clash.Core.VarEnv
 import           Clash.Core.Util
   (collectArgs, isPolyFun, termType, isClockOrReset)
@@ -53,10 +54,9 @@ import {-# SOURCE #-} Clash.Normalize.Strategy (normalization)
 import           Clash.Normalize.Types
 import           Clash.Primitives.Util   (constantArgs)
 import           Clash.Rewrite.Types
-  (bindings,extra,RewriteMonad,CoreContext(AppArg), tcCache, curFun,
-   globalInScope, dbgLevel)
+  (bindings,extra,RewriteMonad,CoreContext(AppArg), tcCache, curFun, dbgLevel)
 import           Clash.Rewrite.Util
-  (specialise, hasLocalFreeVars, runRewrite)
+  (specialise, runRewrite)
 import           Clash.Unique
 import           Clash.Util              (SrcSpan, anyM, makeCachedU, traceIf)
 
@@ -136,29 +136,15 @@ isClosed :: TyConMap
          -> Bool
 isClosed tcm = not . isPolyFun tcm
 
--- | Test whether binder is a non-shadowed global variable
-isGlobalBndr
-  :: InScopeSet
-  -- ^ Local scope
-  -> Id
-  -- ^ Term to check for global variness
-  -> RewriteMonad extra Bool
-isGlobalBndr localScope x = do
-  bndrs <- Lens.use bindings
-  let inLocalScope = x `elemInScopeSet` localScope
-  let inGlobalScope = elemUniqMap (varName x) bndrs
-  return (not inLocalScope && inGlobalScope)
-
 -- | Test whether a given term represents a non-recursive global variable
 isNonRecursiveGlobalVar
-  :: InScopeSet
-  -> Term
+  :: Term
   -> NormalizeSession Bool
-isNonRecursiveGlobalVar is (collectArgs -> (Var i, _args)) = do
-  eIsGlobal <- isGlobalBndr is i
+isNonRecursiveGlobalVar (collectArgs -> (Var i, _args)) = do
+  let eIsGlobal = isGlobalId i
   eIsRec    <- isRecursiveBndr i
   return (eIsGlobal && not eIsRec)
-isNonRecursiveGlobalVar _ _ = return False
+isNonRecursiveGlobalVar _ = return False
 
 -- | Assert whether a name is a reference to a recursive binder.
 isRecursiveBndr
@@ -176,7 +162,7 @@ isRecursiveBndr f = do
           -- There are no global mutually-recursive functions, only self-recursive
           -- ones, so checking whether 'f' is part of the free variables of the
           -- body of 'f' is sufficient.
-          let isR = f `idOccursIn` fBody
+          let isR = f `globalIdOccursIn` fBody
           (extra.recursiveComponents) %= extendVarEnv f isR
           return isR
 
@@ -188,10 +174,9 @@ isRecursiveBndr f = do
 --     global, non-recursive variable
 --
 canConstantSpec
-  :: InScopeSet
-  -> Term
+  :: Term
   -> RewriteMonad NormalizeState Bool
-canConstantSpec is0 e = do
+canConstantSpec e = do
   tcm <- Lens.view tcCache
   if isClockOrReset tcm (termType tcm e) then
     case collectArgs e of
@@ -199,14 +184,14 @@ canConstantSpec is0 e = do
       _              -> return False
   else
     case collectArgs e of
-      (Data _, args)   -> and <$> mapM (either (canConstantSpec is0) (const (pure True))) args
-      (Prim _ _, args) -> and <$> mapM (either (canConstantSpec is0) (const (pure True))) args
-      (Lam _ _, _)     -> not <$> (hasLocalFreeVars <*> pure e)
+      (Data _, args)   -> and <$> mapM (either canConstantSpec (const (pure True))) args
+      (Prim _ _, args) -> and <$> mapM (either canConstantSpec (const (pure True))) args
+      (Lam _ _, _)     -> pure (not (hasLocalFreeVars e))
       (Var f, args)    -> do
         (curF, _) <- Lens.use curFun
 
-        argsConst <- and <$> mapM (either (canConstantSpec is0) (const (pure True))) args
-        isNonRecGlobVar <- isNonRecursiveGlobalVar is0 e
+        argsConst <- and <$> mapM (either canConstantSpec (const (pure True))) args
+        isNonRecGlobVar <- isNonRecursiveGlobalVar e
         return (argsConst && isNonRecGlobVar && f /= curF)
 
       (Literal _,_)    -> pure True
@@ -226,7 +211,7 @@ callGraph bndrs rt = go emptyVarEnv (varUniq rt)
     go cg root
       | Nothing     <- lookupUniqMap root cg
       , Just rootTm <- lookupUniqMap root bndrs =
-      let used = Lens.foldMapByOf termFreeIds (unionVarEnvWith (+))
+      let used = Lens.foldMapByOf globalIds (unionVarEnvWith (+))
                   emptyVarEnv (`unitUniqMap` 1) (rootTm ^. _4)
           cg'  = extendUniqMap root used cg
       in  List.foldl' go cg' (keysUniqMap used)
@@ -282,8 +267,7 @@ normalizeTopLvlBndr nm (nm',sp,inl,tm) = makeCachedU nm (extra.normalized) $ do
   --
   -- Additionally, it allows for a much cheaper `appProp`
   -- transformation, see Note [AppProp no-shadow invariant]
-  is0 <- Lens.use globalInScope
-  let tm1 = deShadowTerm is0 tm
+  let tm1 = deShadowTerm emptyInScopeSet tm
   old <- Lens.use curFun
   tm2 <- rewriteExpr ("normalization",normalization) (nmS,tm1) (nm',sp)
   curFun .= old

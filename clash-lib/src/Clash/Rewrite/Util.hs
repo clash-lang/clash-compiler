@@ -46,7 +46,8 @@ import           GHC.Stack                   (HasCallStack)
 
 import           Clash.Core.DataCon          (dcExtTyVars)
 import           Clash.Core.FreeVars
-  (idDoesNotOccurIn, idOccursIn, typeFreeVars, termFreeVars')
+  (freeLocalVars, hasLocalFreeVars, localIdDoesNotOccurIn, localIdOccursIn,
+   typeFreeVars, termFreeVars')
 import           Clash.Core.Name
 import           Clash.Core.Pretty           (showPpr)
 import           Clash.Core.Subst
@@ -63,10 +64,10 @@ import           Clash.Core.Util
   (collectArgs, isPolyFun, mkAbstraction, mkApps, mkLams,
    mkTmApps, mkTyApps, mkTyLams, termType, dataConInstArgTysE, isClockOrReset)
 import           Clash.Core.Var
-  (Id, TyVar, Var (..), mkId, mkTyVar)
+  (Id, IdScope (..), TyVar, Var (..), mkGlobalId, mkLocalId, mkTyVar)
 import           Clash.Core.VarEnv
-  (InScopeSet, VarEnv, elemVarSet, extendInScopeSet,
-   extendInScopeSetList, mkInScopeSet, notElemVarEnv, unionInScope, uniqAway)
+  (InScopeSet, VarEnv, elemVarSet, extendInScopeSetList, mkInScopeSet,
+   notElemVarEnv, uniqAway)
 import           Clash.Driver.Types
   (DebugLevel (..))
 import           Clash.Netlist.Util          (representableType)
@@ -153,11 +154,11 @@ applyDebug lvl name exprOld hasChanged exprNew =
   Monad.when (lvl > DebugNone && hasChanged) $ do
     tcm                  <- Lens.view tcCache
     let beforeTy          = termType tcm exprOld
-    beforeFV             <- Lens.setOf <$> localFreeVars <*> pure exprOld
-    let afterTy           = termType tcm exprNew
-    afterFV              <- Lens.setOf <$> localFreeVars <*> pure exprNew
-    let newFV             = not (afterFV `Set.isSubsetOf` beforeFV)
-    let accidentalShadows = findAccidentialShadows exprNew
+        beforeFV          = Lens.setOf freeLocalVars exprOld
+        afterTy           = termType tcm exprNew
+        afterFV           = Lens.setOf freeLocalVars exprNew
+        newFV             = not (afterFV `Set.isSubsetOf` beforeFV)
+        accidentalShadows = findAccidentialShadows exprNew
 
     Monad.when newFV $
             error ( concat [ $(curLoc)
@@ -273,7 +274,7 @@ mkBinderFor
 mkBinderFor is tcm name (Left term) = do
   name' <- cloneName name
   let ty = termType tcm term
-  return (Left (uniqAway is (mkId ty (coerce name'))))
+  return (Left (uniqAway is (mkLocalId ty (coerce name'))))
 
 mkBinderFor is tcm name (Right ty) = do
   name' <- cloneName name
@@ -291,7 +292,7 @@ mkInternalVar
 mkInternalVar inScope name ty = do
   i <- getUniqueM
   let nm = mkUnsafeInternalName name i
-  return (uniqAway inScope (mkId ty nm))
+  return (uniqAway inScope (mkLocalId ty nm))
 
 -- | Inline the binders in a let-binding that have a certain property
 inlineBinders
@@ -304,8 +305,7 @@ inlineBinders condition (TransformContext inScope0 _) expr@(Letrec xes res) = do
     [] -> return expr
     _  -> do
       let inScope1 = extendInScopeSetList inScope0 (map fst xes)
-      inScope2 <- unionInScope inScope1 <$> Lens.use globalInScope
-      let (others',res') = substituteBinders inScope2 replace others res
+          (others',res') = substituteBinders inScope1 replace others res
           newExpr = case others' of
                           [] -> res'
                           _  -> Letrec others' res'
@@ -368,7 +368,8 @@ tailCalls id_ = \case
 -- i.e. is a wrapper around a (partially) applied function 'f', where the
 -- introduced argument 'w' is not used by 'f'
 isVoidWrapper :: Term -> Bool
-isVoidWrapper (Lam bndr e@(collectArgs -> (Var _,_))) = bndr `idDoesNotOccurIn` e
+isVoidWrapper (Lam bndr e@(collectArgs -> (Var _,_))) =
+  bndr `localIdDoesNotOccurIn` e
 isVoidWrapper _ = False
 
 -- | Substitute the RHS of the first set of Let-binders for references to the
@@ -388,7 +389,7 @@ substituteBinders inScope ((bndr,val):rest) others res =
   substituteBinders inScope rest' others' res'
  where
   subst    = extendIdSubst (mkSubst inScope) bndr val
-  selfRef  = bndr `idOccursIn` val
+  selfRef  = bndr `localIdOccursIn` val
   (res',rest',others') = if selfRef
     then (res,rest,(bndr,val):others)
     else ( substTm "substituteBindersRes" subst res
@@ -396,42 +397,14 @@ substituteBinders inScope ((bndr,val):rest) others res =
          , map (second (substTm "substituteBindersOthers" subst)) others
          )
 
--- | Calculate the /local/ free identifiers of an expression: the free
--- identifiers that are not bound in the global environment.
-localFreeIds :: (Applicative f, Lens.Contravariant f)
-             => RewriteMonad extra ((Id -> f Id) -> Term -> f Term)
-localFreeIds = do
-  globalBndrs <- Lens.use bindings
-  let f i@(Id {}) = i `notElemUniqMap` globalBndrs
-      f _         = False
-  return (termFreeVars' f)
-
--- | Calculate the /local/ free variable of an expression: the free type
--- variables and the free identifiers that are not bound in the global
--- environment.
-localFreeVars
-  :: (Applicative f, Lens.Contravariant f)
-  => RewriteMonad extra ((Var a -> f (Var a)) -> Term -> f Term)
-localFreeVars = do
-  globalBndrs <- Lens.use bindings
-  let f i@(Id {}) = i `notElemUniqMap` globalBndrs
-      f _         = True
-  return (termFreeVars' f)
-
--- | Determines if term has any locally free variables. That is, the free type
--- variables and the free identifiers that are not bound in the global
--- scope.
-hasLocalFreeVars :: RewriteMonad extra (Term -> Bool)
-hasLocalFreeVars = Lens.notNullOf <$> localFreeVars
-
 -- | Determine if a term represents a constant
-isConstant :: Term -> RewriteMonad extra Bool
+isConstant :: Term -> Bool
 isConstant e = case collectArgs e of
-  (Data _, args)   -> and <$> mapM (either isConstant (const (pure True))) args
-  (Prim _ _, args) -> and <$> mapM (either isConstant (const (pure True))) args
-  (Lam _ _, _)     -> not <$> (hasLocalFreeVars <*> pure e)
-  (Literal _,_)    -> pure True
-  _                -> pure False
+  (Data _, args)   -> all (either isConstant (const True)) args
+  (Prim _ _, args) -> all (either isConstant (const True)) args
+  (Lam _ _, _)     -> not (hasLocalFreeVars e)
+  (Literal _,_)    -> True
+  _                -> False
 
 isConstantNotClockReset
   :: Term
@@ -443,7 +416,7 @@ isConstantNotClockReset e = do
      then case collectArgs e of
         (Prim nm _,_) -> return (nm == "Clash.Transformations.removedArg")
         _ -> return False
-     else isConstant e
+     else pure (isConstant e)
 
 inlineOrLiftBinders
   :: (LetBinding -> RewriteMonad extra Bool)
@@ -460,17 +433,14 @@ inlineOrLiftBinders condition inlineOrLift (TransformContext inScope0 _) expr@(L
     [] -> return expr
     _  -> do
       let inScope1 = extendInScopeSetList inScope0 (map fst xes)
-      inScope2 <- unionInScope inScope1 <$> Lens.use globalInScope
       (doInline,doLift) <- partitionM (inlineOrLift expr) replace
       -- We first substitute the binders that we can inline both the binders
       -- that we intend to lift, the other binders, and the body
-      let (others',res')     = substituteBinders inScope2 doInline (doLift ++ others) res
+      let (others',res')     = substituteBinders inScope1 doInline (doLift ++ others) res
           (doLift',others'') = splitAt (length doLift) others'
       doLift'' <- mapM liftBinding doLift'
-      -- Add the new lifted binders to the inscope set
-      inScope3 <- unionInScope inScope1 <$> Lens.use globalInScope
       -- We then substitute the lifted binders in the other binders and the body
-      let (others3,res'') = substituteBinders inScope3 doLift'' others'' res'
+      let (others3,res'') = substituteBinders inScope1 doLift'' others'' res'
           newExpr = case others3 of
                       [] -> res''
                       _  -> Letrec others3 res''
@@ -484,15 +454,15 @@ inlineOrLiftBinders _ _ _ e = return e
 liftBinding :: LetBinding
             -> RewriteMonad extra LetBinding
 liftBinding (var@Id {varName = idName} ,e) = do
-  globalBndrs <- Lens.use bindings
   -- Get all local FVs, excluding the 'idName' from the let-binding
   let unitFV :: Var a -> Const (UniqSet TyVar,UniqSet Id) (Var a)
       unitFV v@(Id {})    = Const (emptyUniqSet,unitUniqSet (coerce v))
       unitFV v@(TyVar {}) = Const (unitUniqSet (coerce v),emptyUniqSet)
 
       interesting :: Var a -> Bool
-      interesting v@(Id {}) = v `notElemVarEnv` globalBndrs && varUniq v /= varUniq var
-      interesting _         = True
+      interesting Id {idScope = GlobalId} = False
+      interesting v@(Id {idScope = LocalId}) = varUniq v /= varUniq var
+      interesting _ = True
 
       (boundFTVsSet,boundFVsSet) =
         getConst (Lens.foldMapOf (termFreeVars' interesting) unitFV e)
@@ -504,7 +474,7 @@ liftBinding (var@Id {varName = idName} ,e) = do
   let newBodyTy = termType tcm $ mkTyLams (mkLams e boundFVs) boundFTVs
   (cf,sp)   <- Lens.use curFun
   newBodyNm <- cloneName (appendToName (varName cf) ("_" `Text.append` nameOcc idName))
-  let newBodyId = mkId newBodyTy newBodyNm {nameSort = Internal}
+  let newBodyId = mkGlobalId newBodyTy newBodyNm {nameSort = Internal}
 
   -- Make a new expression, consisting of the the lifted function applied to
   -- its free variables
@@ -514,8 +484,7 @@ liftBinding (var@Id {varName = idName} ,e) = do
                   (map Var boundFVs)
       inScope0 = mkInScopeSet (coerce boundFVsSet)
       inScope1 = extendInScopeSetList inScope0 [var,newBodyId]
-  inScope2 <- unionInScope inScope1 <$> Lens.use globalInScope
-  let subst    = extendIdSubst (mkSubst inScope2) var newExpr
+  let subst    = extendIdSubst (mkSubst inScope1) var newExpr
       -- Substitute the recursive calls by the new expression
       e' = substTm "liftBinding" subst e
       -- Create a new body that abstracts over the free variables
@@ -526,7 +495,6 @@ liftBinding (var@Id {varName = idName} ,e) = do
   case aeqExisting of
     -- If it doesn't, create a new binder
     [] -> do -- Add the created function to the list of global bindings
-             globalInScope %= (`extendInScopeSet` newBodyId)
              bindings %= extendUniqMap newBodyNm
                                     -- We mark this function as internal so that
                                     -- it can be inlined at the very end of
@@ -571,7 +539,7 @@ mkFunction bndrNm sp inl body = do
   let bodyTy = termType tcm body
   bodyNm <- cloneName bndrNm
   addGlobalBind bodyNm bodyTy sp inl body
-  return (mkId bodyTy bodyNm)
+  return (mkGlobalId bodyTy bodyNm)
 
 -- | Add a function to the set of global binders
 addGlobalBind
@@ -582,8 +550,7 @@ addGlobalBind
   -> Term
   -> RewriteMonad extra ()
 addGlobalBind vNm ty sp inl body = do
-  let vId = mkId ty vNm
-  globalInScope %= (`extendInScopeSet` vId)
+  let vId = mkGlobalId ty vNm
   (ty,body) `deepseq` bindings %= extendUniqMap vNm (vId,sp,inl,body)
 
 -- | Create a new name out of the given name, but with another unique
@@ -594,12 +561,6 @@ cloneName
 cloneName nm = do
   i <- getUniqueM
   return nm {nameUniq = i}
-
--- | Test whether a term is a variable reference to a local binder
-isNonGlobalVar :: Term
-           -> RewriteMonad extra Bool
-isNonGlobalVar (Var x) = notElemUniqMap (varName x) <$> Lens.use bindings
-isNonGlobalVar _ = return False
 
 {-# INLINE isUntranslatable #-}
 -- | Determine if a term cannot be represented in hardware
@@ -751,11 +712,10 @@ specialise' specMapLbl specHistLbl specLimitLbl (TransformContext is0 _) e (Var 
                   newNames      = [ mkUnsafeInternalName ("pTS" `Text.append` Text.pack (show n)) n
                                   | n <- [(0::Int)..]
                                   ]
-              is1 <- unionInScope is0 <$> Lens.use globalInScope
               -- Make new binders for existing arguments
               (boundArgs,argVars) <- fmap (unzip . map (either (Left &&& Left . Var) (Right &&& Right . VarTy))) $
                                      Monad.zipWithM
-                                       (mkBinderFor is1 tcm)
+                                       (mkBinderFor is0 tcm)
                                        (existingNames ++ newNames)
                                        args
               -- Determine name the resulting specialised function, and the
