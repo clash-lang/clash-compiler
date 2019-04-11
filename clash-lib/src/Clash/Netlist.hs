@@ -332,7 +332,7 @@ mkDeclarations' _ e@(Case _ _ []) = do
           Nothing
 
 mkDeclarations' bndr (Case scrut altTy alts@(_:_:_)) =
-  mkSelection bndr scrut altTy alts
+  mkSelection (Right bndr) scrut altTy alts
 
 mkDeclarations' bndr app =
   let (appF,(args,tyArgs)) = second partitionEithers $ collectArgs app
@@ -364,17 +364,17 @@ mkDeclarations' bndr app =
 -- | Generate a declaration that selects an alternative based on the value of
 -- the scrutinee
 mkSelection
-  :: Id
+  :: (Either Identifier Id)
   -> Term
   -> Type
   -> [Alt]
   -> NetlistMonad [Declaration]
 mkSelection bndr scrut altTy alts0 = do
-  let dstId = id2identifier bndr
+  let dstId = either id id2identifier bndr
   tcm <- Lens.use tcCache
   let scrutTy = termType tcm scrut
   scrutHTy <- unsafeCoreTypeToHWTypeM' $(curLoc) scrutTy
-  scrutId  <- extendIdentifier Extended (id2identifier bndr) "_selection"
+  scrutId  <- extendIdentifier Extended dstId "_selection"
   (_,sp) <- Lens.use curCompNm
   ite <- Lens.use backEndITE
   case iteAlts scrutHTy alts0 of
@@ -385,8 +385,8 @@ mkSelection bndr scrut altTy alts0 = do
         SP {} -> first (mkScrutExpr sp scrutHTy (fst (last alts0))) <$>
                    mkExpr True (Left scrutId) scrutTy scrut
         _ -> mkExpr False (Left scrutId) scrutTy scrut
-      altTId <- extendIdentifier Extended (id2identifier bndr) "_sel_alt_t"
-      altFId <- extendIdentifier Extended (id2identifier bndr) "_sel_alt_f"
+      altTId <- extendIdentifier Extended dstId "_sel_alt_t"
+      altFId <- extendIdentifier Extended dstId "_sel_alt_f"
       (altTExpr,altTDecls) <- mkExpr False (Left altTId) altTy altT
       (altFExpr,altFDecls) <- mkExpr False (Left altFId) altTy altF
       return $! scrutDecls ++ altTDecls ++ altFDecls ++
@@ -403,7 +403,7 @@ mkSelection bndr scrut altTy alts0 = do
   mkCondExpr :: HWType -> (Pat,Term) -> NetlistMonad ((Maybe HW.Literal,Expr),[Declaration])
   mkCondExpr scrutHTy (pat,alt) = do
     altId <- extendIdentifier Extended
-               (id2identifier bndr)
+               (either id id2identifier bndr)
                "_sel_alt"
     (altExpr,altDecls) <- mkExpr False (Left altId) altTy alt
     (,altDecls) <$> case pat of
@@ -592,6 +592,19 @@ mkExpr bbEasD bndr ty app = do
       | otherwise ->
         throw (ClashException sp ($(curLoc) ++ "Not in normal form: top-level binder in argument position:\n\n" ++ showPpr app) Nothing)
     Case scrut ty' [alt] -> mkProjection bbEasD bndr scrut ty' alt
+    Case scrut tyA alts -> do
+      tcm <- Lens.use tcCache
+      let scrutTy = termType tcm scrut
+      scrutHTy <- unsafeCoreTypeToHWTypeM' $(curLoc) scrutTy
+      ite <- Lens.use backEndITE
+      let wr = case iteAlts scrutHTy alts of
+                 Just _ | ite -> Wire
+                 _ -> Reg
+      argNm0 <- extendIdentifier Extended (either id id2identifier bndr) "_sel_arg"
+      argNm1 <- mkUniqueIdentifier Extended argNm0
+      hwTyA  <- unsafeCoreTypeToHWTypeM' $(curLoc) tyA
+      decls  <- mkSelection (Left argNm1) scrut tyA alts
+      return (Identifier argNm1 Nothing, NetDecl' Nothing wr argNm1 (Right hwTyA):decls)
     _ -> throw (ClashException sp ($(curLoc) ++ "Not in normal form: application of a Let/Lam/Case:\n\n" ++ showPpr app) Nothing)
 
 -- | Generate an expression that projects a field out of a data-constructor.

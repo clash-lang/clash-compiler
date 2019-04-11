@@ -49,7 +49,7 @@ mkProjection
   -> NetlistMonad (Expr, [Declaration])
 
 mkSelection
-  :: Id
+  :: Either Identifier Id
   -> Term
   -> Type
   -> [Alt]
