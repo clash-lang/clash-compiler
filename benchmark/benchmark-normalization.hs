@@ -53,7 +53,7 @@ benchFile tmpDir idirs src =
   env (setupEnv tmpDir idirs src) $
     \ ~((bindingsMap,tcm,tupTcm,_topEntities,primMap,reprs,topEntityNames,topEntity),supplyN) -> do
       bench ("normalization of " ++ src)
-            (nf (fst . normalizeEntity reprs bindingsMap primMap tcm tupTcm typeTrans
+            (nf (normalizeEntity reprs bindingsMap primMap tcm tupTcm typeTrans
                                  reduceConstant topEntityNames
                                  (opts tmpDir idirs) supplyN :: _ -> BindingMap) topEntity)
 

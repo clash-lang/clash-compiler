@@ -41,9 +41,10 @@ import           Clash.Annotations.BitRepresentation.Internal
   (CustomReprs)
 import           Clash.Core.Evaluator             (PrimEvaluator)
 import           Clash.Core.FreeVars
-  (termFreeIds, idDoesNotOccurIn, idOccursIn)
+  (freeLocalIds, globalIds, globalIdOccursIn, localIdDoesNotOccurIn)
 import           Clash.Core.Pretty                (showPpr, ppr)
-import           Clash.Core.Subst                 (deShadowTerm, extendIdSubstList, mkSubst, substTm)
+import           Clash.Core.Subst
+  (deShadowTerm, extendGblSubstList, mkSubst, substTm)
 import           Clash.Core.Term                  (Term (..), collectArgs)
 import           Clash.Core.Type                  (Type, splitCoreFunForallTy)
 import           Clash.Core.TyCon
@@ -69,7 +70,7 @@ import           Clash.Primitives.Types           (CompiledPrimMap)
 import           Clash.Rewrite.Combinators        ((>->),(!->))
 import           Clash.Rewrite.Types
   (RewriteEnv (..), RewriteState (..), bindings, curFun, dbgLevel, extra,
-   tcCache, topEntities, typeTranslator, customReprs, globalInScope)
+   tcCache, topEntities, typeTranslator, customReprs)
 import           Clash.Rewrite.Util
   (apply, isUntranslatableType, runRewrite, runRewriteSession)
 import           Clash.Signal.Internal            (ResetKind (..))
@@ -104,8 +105,6 @@ runNormalization
 runNormalization opts supply globals typeTrans reprs tcm tupTcm eval primMap rcsMap topEnts
   = runRewriteSession rwEnv rwState
   where
-    globalsInScope = mkInScopeSet . mkVarSet . map (Lens.view _1) $ eltsVarEnv globals
-
     rwEnv     = RewriteEnv
                   (opt_dbgLevel opts)
                   typeTrans
@@ -122,7 +121,6 @@ runNormalization opts supply globals typeTrans reprs tcm tupTcm eval primMap rcs
                   (error $ $(curLoc) ++ "Report as bug: no curFun",noSrcSpan)
                   0
                   (IntMap.empty, 0)
-                  globalsInScope
                   normState
 
     normState = NormalizeState
@@ -164,7 +162,7 @@ normalize' nm = do
       if resTyRep
          then do
             tmNorm <- normalizeTopLvlBndr nm (nm',sp,inl,tm)
-            let usedBndrs = Lens.toListOf termFreeIds (tmNorm ^. _4)
+            let usedBndrs = Lens.toListOf globalIds (tmNorm ^. _4)
             traceIf (nm `elem` usedBndrs)
                     (concat [ $(curLoc),"Expr belonging to bndr: ",nmS ," (:: "
                             , showPpr (varType (tmNorm ^. _1))
@@ -177,7 +175,7 @@ normalize' nm = do
                             $ filter (`notElemVarEnv` (extendVarEnv nm nm prevNorm)) usedBndrs
             return (toNormalize,(nm,tmNorm))
          else do
-            let usedBndrs = Lens.toListOf termFreeIds tm
+            let usedBndrs = Lens.toListOf globalIds tm
             prevNorm <- mapVarEnv (Lens.view _1) <$> Lens.use (extra.normalized)
             topEnts  <- Lens.view topEntities
             let toNormalize = filter (`notElemVarSet` topEnts)
@@ -205,7 +203,7 @@ checkNonRecursive norm = case mapMaybeVarEnv go norm of
                                  ])
  where
   go (nm,_,_,tm) =
-    if nm `idOccursIn` tm
+    if nm `globalIdOccursIn` tm
        then Just (nm,tm)
        else Nothing
 
@@ -237,7 +235,7 @@ mkCallTree
   -> Maybe CallTree
 mkCallTree visited bindingMap root
   | Just rootTm <- lookupVarEnv root bindingMap
-  = let used   = Set.toList $ Lens.setOf termFreeIds $ (rootTm ^. _4)
+  = let used   = Set.toList $ Lens.setOf globalIds $ (rootTm ^. _4)
         other  = Maybe.mapMaybe (mkCallTree (root:visited) bindingMap) (filter (`notElem` visited) used)
     in  case used of
           [] -> Just (CLeaf   (root,rootTm))
@@ -254,7 +252,7 @@ stripArgs allIds []    args = if any mentionsId args
                                 then Nothing
                                 else Just args
   where
-    mentionsId t = not $ null (either (Lens.toListOf termFreeIds) (const []) t
+    mentionsId t = not $ null (either (Lens.toListOf freeLocalIds) (const []) t
                               `intersect`
                               allIds)
 
@@ -276,7 +274,7 @@ flattenNode c@(CLeaf (nm,(_,_,_,e))) = do
       Right (ids,[(bId,bExpr)],_) -> do
         let (fun,args) = collectArgs bExpr
         case stripArgs ids (reverse ids) (reverse args) of
-          Just remainder | bId `idDoesNotOccurIn` bExpr ->
+          Just remainder | bId `localIdDoesNotOccurIn` bExpr ->
                return (Right ((nm,mkApps fun (reverse remainder)),[]))
           _ -> return (Right ((nm,e),[]))
       _ -> return (Right ((nm,e),[]))
@@ -291,7 +289,7 @@ flattenNode b@(CBranch (nm,(_,_,_,e)) us) = do
       Right (ids,[(bId,bExpr)],_) -> do
         let (fun,args) = collectArgs bExpr
         case stripArgs ids (reverse ids) (reverse args) of
-          Just remainder | bId `idDoesNotOccurIn` bExpr ->
+          Just remainder | bId `localIdDoesNotOccurIn` bExpr ->
                return (Right ((nm,mkApps fun (reverse remainder)),us))
           _ -> return (Right ((nm,e),us))
       _ -> do
@@ -305,17 +303,15 @@ flattenCallTree
   -> NormalizeSession CallTree
 flattenCallTree c@(CLeaf _) = return c
 flattenCallTree (CBranch (nm,(nm',sp,inl,tm)) used) = do
-  is <- Lens.use globalInScope
   flattenedUsed   <- mapM flattenCallTree used
   (newUsed,il_ct) <- partitionEithers <$> mapM flattenNode flattenedUsed
   let (toInline,il_used) = unzip il_ct
-      subst = extendIdSubstList (mkSubst is) toInline
+      subst = extendGblSubstList (mkSubst emptyInScopeSet) toInline
   newExpr <- case toInline of
                [] -> return tm
-               _  -> do is0 <- Lens.use globalInScope
-                        -- To have a cheap `appProp` transformation we need to
+               _  -> do -- To have a cheap `appProp` transformation we need to
                         -- deshadow, see also Note [AppProp no-shadow invariant]
-                        let tm1 = deShadowTerm is0 (substTm "flattenCallTree.flattenExpr" subst tm)
+                        let tm1 = deShadowTerm emptyInScopeSet (substTm "flattenCallTree.flattenExpr" subst tm)
                         rewriteExpr ("flattenExpr",flatten) (showPpr nm, tm1) (nm', sp)
   let allUsed = newUsed ++ concat il_used
   -- inline all components when the resulting expression after flattening
@@ -324,11 +320,10 @@ flattenCallTree (CBranch (nm,(nm',sp,inl,tm)) used) = do
   if inl /= NoInline && isCheapFunction newExpr
      then do
         let (toInline',allUsed') = unzip (map goCheap allUsed)
-            subst' = extendIdSubstList (mkSubst is) toInline'
-        is0 <- Lens.use globalInScope
+            subst' = extendGblSubstList (mkSubst emptyInScopeSet) toInline'
         -- To have a cheap `appProp` transformation we need to
         -- deshadow, see also Note [AppProp no-shadow invariant]
-        let tm1 = deShadowTerm is0 (substTm "flattenCallTree.flattenCheap" subst' newExpr)
+        let tm1 = deShadowTerm emptyInScopeSet (substTm "flattenCallTree.flattenCheap" subst' newExpr)
         newExpr' <- rewriteExpr ("flattenCheap",flatten) (showPpr nm, tm1) (nm', sp)
         return (CBranch (nm,(nm',sp,inl,newExpr')) (concat allUsed'))
      else return (CBranch (nm,(nm',sp,inl,newExpr)) allUsed)

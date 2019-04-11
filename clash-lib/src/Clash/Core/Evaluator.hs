@@ -21,7 +21,6 @@ module Clash.Core.Evaluator where
 
 import           Control.Arrow                           (second)
 import           Control.Concurrent.Supply               (Supply, freshId)
-import           Data.Coerce                             (coerce)
 import           Data.Either                             (lefts,rights)
 import           Data.List
   (foldl',mapAccumL,uncons)
@@ -332,8 +331,8 @@ mkAbstr = foldr go
 force :: BindingMap -> Heap -> Stack -> Id -> Maybe State
 force gbl (Heap gh h ids is) k x' = case lookupVarEnv x' h of
     Nothing -> case lookupUniqMap x' gbl of
-      Nothing        -> Nothing
-      Just (_,_,_,e) -> Just (Heap  gh h ids is,k,e)
+      Just (_,_,_,e) | isGlobalId x' -> Just (Heap gh h ids is,k,e)
+      _ -> Nothing
     Just e -> Just (Heap gh (delVarEnv h x') ids is,Update x':k,e)
     -- Removing the heap-bound value on a force ensures we do not get stuck on
     -- expressions such as: "let x = x in x"
@@ -349,7 +348,7 @@ unwind eval gbl tcm h k v = do
   case kf of
     Update x                     -> return (update h k' x v)
     Apply x                      -> return (apply  h k' v x)
-    Instantiate ty               -> return (instantiate gbl h k' v ty)
+    Instantiate ty               -> return (instantiate h k' v ty)
     PrimApply nm ty tys vals tms -> primop eval gbl tcm h k' nm ty tys vals v tms
     Scrutinise _ alts            -> return (scrutinise h k' v alts)
 
@@ -384,15 +383,13 @@ apply h@(Heap _ _ _ is0) k (Lambda x' e) x = (h,k,substTm "Evaluator.apply" subs
 apply _ _ _ _ = error "not a lambda"
 
 -- | Instantiate a type-abstraction
-instantiate :: BindingMap -> Heap -> Stack -> Value -> Type -> State
-instantiate gbl h k (TyLambda x e) ty = (h,k,substTm "Evaluator.instantiate" subst e)
+instantiate :: Heap -> Stack -> Value -> Type -> State
+instantiate h k (TyLambda x e) ty = (h,k,substTm "Evaluator.instantiate" subst e)
  where
   subst  = extendTvSubst subst0 x ty
   subst0 = mkSubst is0
-  is0 = mkInScopeSet (gblVars `unionUniqSet` tyFVsOfTypes [ty])
-  gblVars :: VarSet
-  gblVars = uniqMapToUniqSet $ fmap ((\(nm,_,_,_) -> coerce nm)) gbl
-instantiate _ _ _ _ _ = error "not a ty lambda"
+  is0    = mkInScopeSet (localFVsOfTerms [e] `unionUniqSet` tyFVsOfTypes [ty])
+instantiate _ _ _ _ = error "not a ty lambda"
 
 -- | Evaluation of primitive operations
 primop
@@ -462,7 +459,7 @@ scrutinise h k (Lit l) alts = case alts of
               bv = PV.Vector 0 (BA.sizeofByteArray ba1) ba1
           in  Just (ByteArrayLiteral bv)
        _ -> Nothing
-    = let inScope = fVsOfTerms [altE]
+    = let inScope = localFVsOfTerms [altE]
           subst0  = mkSubst (mkInScopeSet inScope)
           subst1  = extendIdSubst subst0 x (Literal patE)
       in  substTm "Evaluator.scrutinise" subst1 altE
@@ -476,7 +473,7 @@ scrutinise h k (Lit l) alts = case alts of
               bv = PV.Vector 0 (BA.sizeofByteArray ba1) ba1
           in  Just (ByteArrayLiteral bv)
        _ -> Nothing
-    = let inScope = fVsOfTerms [altE]
+    = let inScope = localFVsOfTerms [altE]
           subst0  = mkSubst (mkInScopeSet inScope)
           subst1  = extendIdSubst subst0 x (Literal patE)
       in  substTm "Evaluator.scrutinise" subst1 altE
@@ -519,7 +516,7 @@ substAlt dc tvs xs args e = substTm "Evaluator.substAlt" subst e
   tms        = lefts args
   substTyMap = zip tvs (drop (length (dcUnivTyVars dc)) tys)
   substTmMap = zip xs tms
-  inScope    = tyFVsOfTypes tys `unionVarSet` fVsOfTerms (e:tms)
+  inScope    = tyFVsOfTypes tys `unionVarSet` localFVsOfTerms (e:tms)
   subst      = extendTvSubstList (extendIdSubstList subst0 substTmMap) substTyMap
   subst0     = mkSubst (mkInScopeSet inScope)
 

@@ -48,7 +48,7 @@ import           Clash.Annotations.BitRepresentation.Internal
 import           Clash.Annotations.TopEntity (PortName (..), TopEntity (..))
 import           Clash.Driver.Types      (Manifest (..))
 import           Clash.Core.DataCon      (DataCon (..))
-import           Clash.Core.FreeVars     (termFreeIds, typeFreeVars)
+import           Clash.Core.FreeVars     (freeLocalIds, typeFreeVars)
 import qualified Clash.Core.Literal      as C
 import           Clash.Core.Name
   (Name (..), appendToName, nameOcc)
@@ -62,10 +62,11 @@ import           Clash.Core.TyCon
 import           Clash.Core.Type         (Type (..), TypeView (..), LitTy (..),
                                           coreView1, splitTyConAppM, tyView, TyVar)
 import           Clash.Core.Util         (collectBndrs, termType, tyNatSize)
-import           Clash.Core.Var          (Id, Var (..), mkId, modifyVarName, Attr')
+import           Clash.Core.Var
+  (Id, Var (..), mkLocalId, modifyVarName, Attr')
 import           Clash.Core.VarEnv
-  (emptyVarSet, extendInScopeSetList, mkInScopeSet, unionVarSet, uniqAway,
-   unitVarSet, mkVarSet)
+  (InScopeSet, emptyVarSet, extendInScopeSetList, mkInScopeSet, mkVarSet,
+   unionVarSet, uniqAway, unitVarSet)
 import           Clash.Netlist.Id        (IdType (..), stripDollarPrefixes)
 import           Clash.Netlist.Types     as HW
 import           Clash.Signal.Internal   (ClockKind (..))
@@ -618,7 +619,8 @@ filterVoidPorts filtered pp@(PortProduct _s _ps) =
 -- | Uniquely rename all the variables and their references in a normalized
 -- term
 mkUniqueNormalized
-  :: Maybe (Maybe TopEntity)
+  :: InScopeSet
+  -> Maybe (Maybe TopEntity)
   -- ^ Top entity annotation where:
   --
   --     * Nothing: term is not a top entity
@@ -636,7 +638,7 @@ mkUniqueNormalized
       ,[Declaration]
       ,[LetBinding]
       ,Maybe Id)
-mkUniqueNormalized topMM (args,binds,res) = do
+mkUniqueNormalized is0 topMM (args,binds,res) = do
   -- Add user define port names to list of seen ids to prevent name collisions.
   let
     portNames =
@@ -649,8 +651,8 @@ mkUniqueNormalized topMM (args,binds,res) = do
   let (bndrs,exprs) = unzip binds
 
   -- Make arguments unique
-  is0 <- (`extendInScopeSetList` (args ++ bndrs)) <$> Lens.use globalInScope
-  (wereVoids, iports,iwrappers,substArgs) <- mkUniqueArguments (mkSubst is0) topMM args
+  let is1 = is0 `extendInScopeSetList` (args ++ bndrs)
+  (wereVoids, iports,iwrappers,substArgs) <- mkUniqueArguments (mkSubst is1) topMM args
 
   -- Make result unique. This might yield 'Nothing' in which case the result
   -- was a single BiSignalOut. This is superfluous in the HDL, as the argument
@@ -659,7 +661,7 @@ mkUniqueNormalized topMM (args,binds,res) = do
   case resM of
     Just (oports,owrappers,res1,substRes) -> do
       let usesOutput = concatMap (filter ( == res)
-                                         . Lens.toListOf termFreeIds
+                                         . Lens.toListOf freeLocalIds
                                          ) exprs
       -- If the let-binder carrying the result is used in a feedback loop
       -- rename the let-binder to "<X>_rec", and assign the "<X>_rec" to
@@ -728,7 +730,7 @@ mkUniqueArguments subst0 (Just teM) args = do
           fHwty = unsafeCoreTypeToHWType sp $(curLoc) typeTrans reprs tcm ty
           FilteredHWType hwty _ = fHwty
       (ports,decls,_,pN) <- mkInput (filterVoidPorts fHwty <$> pM) (i',hwty)
-      let pId  = mkId ty (repName pN i)
+      let pId  = mkLocalId ty (repName pN i)
       if isVoid hwty
          then return Nothing
          else return (Just (ports,decls,(pId,(var,Var pId))))
@@ -768,7 +770,7 @@ mkUniqueResult subst0 (Just teM) res = do
   case output of
     Just (ports, decls, pN) -> do
       let pO = repName pN o
-          pOId = mkId ty pO
+          pOId = mkLocalId ty pO
           subst1 = extendInScopeId (extendIdSubst subst0 res (Var pOId)) pOId
       return (Just (ports,decls,pOId,subst1))
     _ -> return Nothing
@@ -834,7 +836,7 @@ mkUnique = go []
   where
     go :: [Id] -> Subst -> [Id] -> NetlistMonad ([Id],Subst)
     go processed subst []     = return (reverse processed,subst)
-    go processed subst@(Subst isN _ _) (i:is) = do
+    go processed subst@(Subst isN _ _ _) (i:is) = do
       iN <- mkUniqueIdentifier Extended (id2identifier i)
       let i' = uniqAway isN (modifyVarName (repName iN) i)
           subst' = extendInScopeId (extendIdSubst subst i (Var i')) i'

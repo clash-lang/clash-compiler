@@ -61,8 +61,8 @@ import           Clash.Core.TyCon                 (TyConMap)
 import           Clash.Core.Util                  (termType)
 import           Clash.Core.Var                   (Id, Var (..))
 import           Clash.Core.VarEnv
-  (InScopeSet, VarEnv, eltsVarEnv, emptyVarEnv, extendVarEnv, lookupVarEnv, lookupVarEnv',
-    mkVarEnv)
+  (VarEnv, eltsVarEnv, emptyInScopeSet, emptyVarEnv, extendVarEnv, lookupVarEnv,
+   lookupVarEnv', mkVarEnv)
 import           Clash.Driver.Types               (BindingMap, ClashOpts)
 import           Clash.Netlist.BlackBox
 import           Clash.Netlist.Id
@@ -83,8 +83,6 @@ genNetlist
   -- ^ Custom bit representations for certain types
   -> BindingMap
   -- ^ Global binders
-  -> InScopeSet
-  -- ^ Superset of global bindings
   -> [(Id,Maybe TopEntity,Maybe Id)]
   -- ^ All the TopEntities
   -> CompiledPrimMap
@@ -110,8 +108,8 @@ genNetlist
   -> Id
   -- ^ Name of the @topEntity@
   -> IO ([([Bool],SrcSpan,HashMap Identifier Word,Component)],HashMap Identifier Word)
-genNetlist isTb opts reprs globals is0 tops primMap tcm typeTrans iw mkId extId ite seen env prefixM topEntity = do
-  (_,s) <- runNetlistMonad isTb opts reprs globals is0 (mkTopEntityMap tops)
+genNetlist isTb opts reprs globals tops primMap tcm typeTrans iw mkId extId ite seen env prefixM topEntity = do
+  (_,s) <- runNetlistMonad isTb opts reprs globals (mkTopEntityMap tops)
              primMap tcm typeTrans iw mkId extId ite seen env prefixM $
              genComponent topEntity
   return ( eltsVarEnv $ _components s
@@ -133,8 +131,6 @@ runNetlistMonad
   -- ^ Custom bit representations for certain types
   -> BindingMap
   -- ^ Global binders
-  -> InScopeSet
-  -- ^ Superset of global bindings
   -> VarEnv (Type, Maybe TopEntity)
   -- ^ TopEntity annotations
   -> CompiledPrimMap
@@ -160,14 +156,14 @@ runNetlistMonad
   -> NetlistMonad a
   -- ^ Action to run
   -> IO (a, NetlistState)
-runNetlistMonad isTb opts reprs s is0 tops p tcm typeTrans iw mkId extId ite seenIds_ env prefixM
+runNetlistMonad isTb opts reprs s tops p tcm typeTrans iw mkId extId ite seenIds_ env prefixM
   = flip runStateT s'
   . runNetlist
   where
     s' =
       NetlistState
         s 0 emptyVarEnv p typeTrans tcm (StrictText.empty,noSrcSpan) iw mkId
-        extId HashMapS.empty seenIds' Set.empty names tops env 0 prefixM reprs is0 opts isTb ite
+        extId HashMapS.empty seenIds' Set.empty names tops env 0 prefixM reprs opts isTb ite
 
     (seenIds',names) = genNames mkId prefixM seenIds_ emptyVarEnv s
 
@@ -231,7 +227,7 @@ genComponentT compName componentExpr = do
     case splitNormalized tcm componentExpr of
       Right (args, binds, res) -> do
         let varType'   = fromMaybe (varType res) topEntityTypeM'
-        mkUniqueNormalized topEntMM ((args, binds, res{varType=varType'}))
+        mkUniqueNormalized emptyInScopeSet topEntMM ((args, binds, res{varType=varType'}))
       Left err ->
         throw (ClashException sp err Nothing)
 

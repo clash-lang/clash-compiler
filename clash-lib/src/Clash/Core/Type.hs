@@ -87,7 +87,7 @@ varAttrs :: Var a -> [Attr']
 varAttrs t@(TyVar {}) =
   error $ $(curLoc) ++ "Unexpected argument: " ++ show t
 
-varAttrs (Id _ _ ty) =
+varAttrs (Id _ _ ty _) =
   case ty of
     AnnType attrs _typ -> attrs
     _                  -> []
