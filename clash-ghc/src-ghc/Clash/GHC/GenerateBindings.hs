@@ -42,14 +42,15 @@ import           Clash.Annotations.BitRepresentation.Internal (DataRepr')
 import           Clash.Annotations.TopEntity (TopEntity)
 import           Clash.Annotations.Primitive (HDL)
 
+import           Clash.Core.Subst        (extendGblSubstList, mkSubst, substTm)
 import           Clash.Core.Term         (Term (..))
 import           Clash.Core.Type         (Type (..), TypeView (..), mkFunTy, splitFunForallTy, tyView)
 import           Clash.Core.TyCon        (TyConMap, TyConName, isNewTypeTc)
 import           Clash.Core.TysPrim      (tysPrimMap)
 import           Clash.Core.Util         (mkLams, mkTyLams)
-import           Clash.Core.Var          (Var (..), Id)
+import           Clash.Core.Var          (Var (..), Id, IdScope (..), setIdScope)
 import           Clash.Core.VarEnv
-  (InScopeSet, VarEnv, extendInScopeSet, mkInScopeSet, mkVarEnv, unionVarEnv)
+  (InScopeSet, VarEnv, emptyInScopeSet, extendInScopeSet, mkInScopeSet, mkVarEnv, unionVarEnv)
 import           Clash.Driver.Types      (BindingMap)
 import           Clash.GHC.GHC2Core      (GHC2CoreState, tyConMap, coreToId, coreToName, coreToTerm,
                                           makeAllTyCons, qualifiedNameString, emptyGHC2CoreState)
@@ -135,26 +136,31 @@ mkBindings
            )
 mkBindings primMap bindings clsOps unlocatable = do
   bindingsList <- mapM (\case
-                          GHC.NonRec v e -> do
-                            let sp = GHC.getSrcSpan v
-                                inl = GHC.inlinePragmaSpec . GHC.inlinePragInfo $ GHC.idInfo v
-                            tm <- coreToTerm primMap unlocatable sp e
-                            v' <- coreToId v
-                            checkPrimitive primMap v
-                            return [(v', (v', sp, inl, tm))]
-                          GHC.Rec bs -> do
-                            tms <- mapM (\(v,e) -> do
-                                          let sp = GHC.getSrcSpan v
-                                              inl = GHC.inlinePragmaSpec . GHC.inlinePragInfo $ GHC.idInfo v
-                                          tm <- coreToTerm primMap unlocatable sp e
-                                          v' <- coreToId v
-                                          checkPrimitive primMap v
-                                          return (v',sp,inl,tm)
-                                        ) bs
-                            case tms of
-                              [(v,sp,inl,tm)] -> return [(v, (v, sp, inl, tm))]
-                              _ -> return $ map (\(v,sp,inl,e) -> (v,(v,sp,inl, Letrec (map (\(x,_,_,y) -> (x,y)) tms) e))) tms
-                       ) bindings
+    GHC.NonRec v e -> do
+      let sp = GHC.getSrcSpan v
+          inl = GHC.inlinePragmaSpec . GHC.inlinePragInfo $ GHC.idInfo v
+      tm <- coreToTerm primMap unlocatable sp e
+      v' <- coreToId v
+      checkPrimitive primMap v
+      return [(v', (v', sp, inl, tm))]
+    GHC.Rec bs -> do
+      tms <- mapM (\(v,e) -> do
+                    let sp = GHC.getSrcSpan v
+                        inl = GHC.inlinePragmaSpec . GHC.inlinePragInfo $ GHC.idInfo v
+                    tm <- coreToTerm primMap unlocatable sp e
+                    v' <- coreToId v
+                    checkPrimitive primMap v
+                    return (v',sp,inl,tm)
+                  ) bs
+      case tms of
+        [(v,sp,inl,tm)] -> return [(v, (v, sp, inl, tm))]
+        _ -> let vsL   = map (setIdScope LocalId . view _1) tms
+                 vsV   = map Var vsL
+                 subst = extendGblSubstList (mkSubst emptyInScopeSet) (zip vsL vsV)
+                 lbs   = zipWith (\(_,_,_,e) vL -> (vL,substTm "mkBindings" subst e)) tms vsL
+                 tms1  = zipWith (\(v,sp,inl,_) (_,e) -> (v,(v,sp,inl,Letrec lbs e))) tms lbs
+             in  return tms1
+    ) bindings
   clsOpList    <- mapM (\(v,i) -> do
                           v' <- coreToId v
                           return (v', (v',i))

@@ -92,7 +92,7 @@ import TyCoRep    (Coercion (..), TyLit (..), Type (..))
 import Unique     (Uniquable (..), Unique, getKey, hasKey)
 import Var        (Id, TyVar, Var, idDetails,
                    isTyVar, varName, varType,
-                   varUnique, idInfo)
+                   varUnique, idInfo, isGlobalId)
 import Var        (TyVarBndr (..))
 import VarSet     (isEmptyVarSet)
 
@@ -717,7 +717,9 @@ coreToTyVar tv =
 coreToId :: Id
          -> State GHC2CoreState C.Id
 coreToId i =
-  C.mkId <$> coreToType (varType i) <*> coreToVar i
+  C.mkId <$> coreToType (varType i) <*> pure scope <*> coreToVar i
+ where
+  scope = if isGlobalId i then C.GlobalId else C.LocalId
 
 coreToVar :: Var
           -> State GHC2CoreState (C.Name a)
@@ -801,8 +803,8 @@ mapSignalTerm (C.ForAllTy aTV (C.ForAllTy bTV (C.ForAllTy clkTV funTy))) =
     fName = C.mkUnsafeSystemName "f" 0
     xName = C.mkUnsafeSystemName "x" 1
     fTy   = C.mkFunTy aTy bTy
-    fId   = C.mkId fTy fName
-    xId   = C.mkId aTy xName
+    fId   = C.mkLocalId fTy fName
+    xId   = C.mkLocalId aTy xName
 
 mapSignalTerm ty = error $ $(curLoc) ++ show ty
 
@@ -823,7 +825,7 @@ signalTerm (C.ForAllTy aTV (C.ForAllTy clkTV funTy)) =
   where
     (C.FunTy _ aTy) = C.tyView funTy
     xName = C.mkUnsafeSystemName "x" 0
-    xId   = C.mkId aTy xName
+    xId   = C.mkLocalId aTy xName
 
 signalTerm ty = error $ $(curLoc) ++ show ty
 
@@ -855,8 +857,8 @@ appSignalTerm (C.ForAllTy clkTV (C.ForAllTy aTV (C.ForAllTy bTV funTy))) =
     fName = C.mkUnsafeSystemName "f" 0
     xName = C.mkUnsafeSystemName "x" 1
     fTy   = C.mkFunTy aTy bTy
-    fId   = C.mkId fTy fName
-    xId   = C.mkId aTy xName
+    fId   = C.mkLocalId fTy fName
+    xId   = C.mkLocalId aTy xName
 
 appSignalTerm ty = error $ $(curLoc) ++ show ty
 
@@ -883,7 +885,7 @@ vecUnwrapTerm (C.ForAllTy tTV (C.ForAllTy nTV (C.ForAllTy aTV funTy))) =
   where
     (C.FunTy _ vsTy) = C.tyView funTy
     vsName           = C.mkUnsafeSystemName "vs" 0
-    vsId             = C.mkId vsTy vsName
+    vsId             = C.mkLocalId vsTy vsName
 
 vecUnwrapTerm ty = error $ $(curLoc) ++ show ty
 
@@ -918,9 +920,9 @@ traverseTerm (C.ForAllTy fTV (C.ForAllTy aTV (C.ForAllTy bTV (C.ForAllTy clkTV f
     dictName = C.mkUnsafeSystemName "dict" 0
     gName    = C.mkUnsafeSystemName "g" 1
     xName    = C.mkUnsafeSystemName "x" 2
-    dictId   = C.mkId dictTy dictName
-    gId      = C.mkId gTy gName
-    xId      = C.mkId xTy xName
+    dictId   = C.mkLocalId dictTy dictName
+    gId      = C.mkLocalId gTy gName
+    xId      = C.mkLocalId xTy xName
 
 traverseTerm ty = error $ $(curLoc) ++ show ty
 
@@ -951,8 +953,8 @@ dollarTerm (C.ForAllTy rTV (C.ForAllTy aTV (C.ForAllTy bTV funTy))) =
     (C.FunTy aTy _)       = C.tyView funTy''
     fName = C.mkUnsafeSystemName "f" 0
     xName = C.mkUnsafeSystemName "x" 1
-    fId   = C.mkId fTy fName
-    xId   = C.mkId aTy xName
+    fId   = C.mkLocalId fTy fName
+    xId   = C.mkLocalId aTy xName
 
 dollarTerm ty = error $ $(curLoc) ++ show ty
 
@@ -987,8 +989,8 @@ withFrozenCallStackTerm (C.ForAllTy aTV funTy) =
     (C.FunTy callStackTy fTy) = C.tyView funTy
     callStackName = C.mkUnsafeSystemName "callStack" 0
     fName         = C.mkUnsafeSystemName "f" 1
-    callStackId   = C.mkId callStackTy callStackName
-    fId           = C.mkId fTy fName
+    callStackId   = C.mkLocalId callStackTy callStackName
+    fId           = C.mkLocalId fTy fName
 
 withFrozenCallStackTerm ty = error $ $(curLoc) ++ show ty
 
@@ -1009,7 +1011,7 @@ idTerm (C.ForAllTy aTV funTy) =
   where
     (C.FunTy xTy _) = C.tyView funTy
     xName           = C.mkUnsafeSystemName "x" 0
-    xId             = C.mkId xTy xName
+    xId             = C.mkLocalId xTy xName
 
 idTerm ty = error $ $(curLoc) ++ show ty
 
@@ -1032,7 +1034,7 @@ runRWTerm (C.ForAllTy rTV (C.ForAllTy oTV funTy)) =
     (C.FunTy fTy _)  = C.tyView funTy
     (C.FunTy rwTy _) = C.tyView fTy
     fName            = C.mkUnsafeSystemName "f" 0
-    fId              = C.mkId fTy fName
+    fId              = C.mkLocalId fTy fName
     rwNm             = pack "GHC.Prim.realWorld#"
 
 runRWTerm ty = error $ $(curLoc) ++ show ty
@@ -1058,8 +1060,8 @@ packXWithTerm (C.ForAllTy nTV (C.ForAllTy aTV funTy)) =
     C.FunTy fTy _    = C.tyView rTy
     knName           = C.mkUnsafeSystemName "kn" 0
     fName            = C.mkUnsafeSystemName "f" 1
-    knId             = C.mkId knTy knName
-    fId              = C.mkId fTy fName
+    knId             = C.mkLocalId knTy knName
+    fId              = C.mkLocalId fTy fName
 
 packXWithTerm ty = error $ $(curLoc) ++ show ty
 
@@ -1087,9 +1089,9 @@ checkUnpackUndefTerm (C.ForAllTy nTV (C.ForAllTy aTV funTy)) =
     knName            = C.mkUnsafeSystemName "kn" 0
     tpName            = C.mkUnsafeSystemName "tp" 1
     fName             = C.mkUnsafeSystemName "f" 2
-    knId              = C.mkId knTy knName
-    tpId              = C.mkId tpTy tpName
-    fId               = C.mkId fTy fName
+    knId              = C.mkLocalId knTy knName
+    tpId              = C.mkLocalId tpTy tpName
+    fId               = C.mkLocalId fTy fName
 
 checkUnpackUndefTerm ty = error $ $(curLoc) ++ show ty
 

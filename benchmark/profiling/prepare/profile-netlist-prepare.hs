@@ -35,8 +35,8 @@ prepareFile tmpDir idirs fIn = do
   putStrLn $ "Preparing: " ++ fIn
   let fOut = fIn ++ ".bin"
   inp <- runNormalisationStage tmpDir idirs fIn
-  let (transformedBindings,is0,topEntities,primMap,tcm,reprs,topEntity) = inp
-      inp' = (transformedBindings,is0,topEntities,fmap (fmap removeBBfunc) primMap,tcm,reprs,topEntity)
+  let (transformedBindings,topEntities,primMap,tcm,reprs,topEntity) = inp
+      inp' = (transformedBindings,topEntities,fmap (fmap removeBBfunc) primMap,tcm,reprs,topEntity)
   putStrLn $ "Serialising to : " ++ fOut
   B.writeFile fOut $ encode inp'
   putStrLn "Done"

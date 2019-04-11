@@ -12,7 +12,6 @@ import Clash.Backend.VHDL
 import Clash.Core.TyCon
 import Clash.Core.Type
 import Clash.Core.Var
-import Clash.Core.VarEnv
 import Clash.Driver
 import Clash.Driver.Types
 import Clash.GHC.Evaluator (reduceConstant)
@@ -75,7 +74,6 @@ runNormalisationStage
   -> [FilePath]
   -> String
   -> IO (BindingMap
-        ,InScopeSet
         ,[(Id, Maybe TopEntity, Maybe Id)]
         ,CompiledPrimMap
         ,TyConMap
@@ -87,7 +85,7 @@ runNormalisationStage tmpDir idirs src = do
   (bindingsMap,tcm,tupTcm,topEntities,primMap,reprs,topEntityNames,topEntity) <-
     runInputStage tmpDir idirs src
   let opts1 = opts tmpDir idirs
-      (transformedBindings,is0) =
+      transformedBindings =
         normalizeEntity reprs bindingsMap primMap tcm tupTcm typeTrans reduceConstant
           topEntityNames opts1 supplyN topEntity
-  return (transformedBindings,is0,topEntities,primMap,tcm,reprs,topEntity)
+  return (transformedBindings,topEntities,primMap,tcm,reprs,topEntity)

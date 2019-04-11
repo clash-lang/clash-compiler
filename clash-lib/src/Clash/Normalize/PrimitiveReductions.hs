@@ -47,7 +47,8 @@ import           Unique                           (getKey)
 import           Clash.Core.DataCon               (DataCon)
 import           Clash.Core.Literal               (Literal (..))
 import           Clash.Core.Pretty                (showPpr)
-import           Clash.Core.Term                  (Term (..), Pat (..))
+import           Clash.Core.Term
+  (CoreContext (..), Term (..), Pat (..))
 import           Clash.Core.Type                  (LitTy (..), Type (..),
                                                    TypeView (..), coreView1,
                                                    mkFunTy, mkTyConApp,
@@ -61,7 +62,7 @@ import           Clash.Core.Util
    mkUniqInternalId, mkUniqSystemTyVar, mkVec, termType, dataConInstArgTys)
 import           Clash.Core.Var                   (Var (..))
 import           Clash.Core.VarEnv
-  (InScopeSet, extendInScopeSetList, unionInScope)
+  (InScopeSet, extendInScopeSetList)
 import {-# SOURCE #-} Clash.Normalize.Strategy
 import           Clash.Normalize.Types
 import           Clash.Rewrite.Types
@@ -125,10 +126,9 @@ reduceZipWith (TransformContext is0 ctx) n lhsElTy rhsElTy resElTy fun lhsArg rh
       = do
         uniqs0 <- Lens.use uniqSupply
         fun1   <- constantPropagation (TransformContext is0 (AppArg Nothing:ctx)) fun
-        is1    <- unionInScope is0 <$> Lens.use globalInScope
         let (uniqs1,(varsL,elemsL)) = second (second concat . unzip)
-                                    $ extractElems uniqs0 is1 consCon lhsElTy 'L' n lhsArg
-            is2 = extendInScopeSetList is1 (map fst elemsL)
+                                    $ extractElems uniqs0 is0 consCon lhsElTy 'L' n lhsArg
+            is2 = extendInScopeSetList is0 (map fst elemsL)
             (uniqs2,(varsR,elemsR)) = second (second concat . unzip)
                                     $ extractElems uniqs1 is2 consCon rhsElTy 'R' n rhsArg
             funApps          = zipWith (\l r -> mkApps fun1 [Left l,Left r]) varsL varsR
@@ -161,9 +161,8 @@ reduceMap (TransformContext is0 ctx) n argElTy resElTy fun arg = do
       = do
         uniqs0 <- Lens.use uniqSupply
         fun1 <- constantPropagation (TransformContext is0 (AppArg Nothing:ctx)) fun
-        is1 <- unionInScope is0 <$> Lens.use globalInScope
         let (uniqs1,(vars,elems)) = second (second concat . unzip)
-                                  $ extractElems uniqs0 is1 consCon argElTy 'A' n arg
+                                  $ extractElems uniqs0 is0 consCon argElTy 'A' n arg
             funApps          = map (fun1 `App`) vars
             lbody            = mkVec nilCon consCon resElTy n funApps
             lb               = Letrec (init elems) lbody
@@ -194,8 +193,7 @@ reduceImap (TransformContext is0 ctx) n argElTy resElTy fun arg = do
       = do
         uniqs0 <- Lens.use uniqSupply
         fun1 <- constantPropagation (TransformContext is0 (AppArg Nothing:ctx)) fun
-        is1 <- unionInScope is0 <$> Lens.use globalInScope
-        let (uniqs1,nTv)     = mkUniqSystemTyVar (uniqs0,is1) ("n",typeNatKind)
+        let (uniqs1,nTv)     = mkUniqSystemTyVar (uniqs0,is0) ("n",typeNatKind)
             (uniqs2,(vars,elems)) = second (second concat . unzip)
                                   $ uncurry extractElems uniqs1 consCon argElTy 'I' n arg
             (Right idxTy:_,_) = splitFunForallTy (termType tcm fun)
@@ -244,12 +242,11 @@ reduceTraverse (TransformContext is0 ctx) n aTy fTy bTy dict fun arg = do
       = do
         uniqs0 <- Lens.use uniqSupply
         fun1 <- constantPropagation (TransformContext is0 (AppArg Nothing:ctx)) fun
-        is1 <- unionInScope is0 <$> Lens.use globalInScope
         let (Just apDictTc)    = lookupUniqMap apDictTcNm tcm
             [apDictCon]        = tyConDataCons apDictTc
             (Just apDictIdTys) = dataConInstArgTys apDictCon [fTy]
             (uniqs1,apDictIds@[functorDictId,pureId,apId,_,_]) =
-              mapAccumR mkUniqInternalId (uniqs0,is1)
+              mapAccumR mkUniqInternalId (uniqs0,is0)
                 (zip ["functorDict","pure","ap","apConstL","apConstR"]
                      apDictIdTys)
 
@@ -377,9 +374,8 @@ reduceFoldr (TransformContext is0 ctx) n aTy fun start arg = do
       = do
         uniqs0 <- Lens.use uniqSupply
         fun1 <- constantPropagation (TransformContext is0 (AppArg Nothing:ctx)) fun
-        is1 <- unionInScope is0 <$> Lens.use globalInScope
         let (uniqs1,(vars,elems)) = second (second concat . unzip)
-                                  $ extractElems uniqs0 is1 consCon aTy 'G' n arg
+                                  $ extractElems uniqs0 is0 consCon aTy 'G' n arg
             lbody            = foldr (\l r -> mkApps fun1 [Left l,Left r]) start vars
             lb               = Letrec (init elems) lbody
         uniqSupply Lens..= uniqs1
@@ -412,9 +408,8 @@ reduceFold (TransformContext is0 ctx) n aTy fun arg = do
       = do
         uniqs0 <- Lens.use uniqSupply
         fun1 <- constantPropagation (TransformContext is0 (AppArg Nothing:ctx)) fun
-        is1 <- unionInScope is0 <$> Lens.use globalInScope
         let (uniqs1,(vars,elems)) = second (second concat . unzip)
-                                  $ extractElems uniqs0 is1 consCon aTy 'F' n arg
+                                  $ extractElems uniqs0 is0 consCon aTy 'F' n arg
             lbody            = foldV fun1 vars
             lb               = Letrec (init elems) lbody
         uniqSupply Lens..= uniqs1

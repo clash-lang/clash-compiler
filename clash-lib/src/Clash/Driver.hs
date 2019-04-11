@@ -17,7 +17,7 @@ module Clash.Driver where
 import qualified Control.Concurrent.Supply        as Supply
 import           Control.DeepSeq
 import           Control.Exception                (tryJust, bracket)
-import           Control.Lens                     (use, view, (^.), _4)
+import           Control.Lens                     (view, (^.), _4)
 import           Control.Monad                    (guard, when, unless, foldM)
 import           Control.Monad.Catch              (MonadMask)
 import           Control.Monad.IO.Class           (MonadIO)
@@ -69,7 +69,7 @@ import           Clash.Core.Term                  (Term)
 import           Clash.Core.Type                  (Type)
 import           Clash.Core.TyCon                 (TyConMap, TyConName)
 import           Clash.Core.Var                   (Id, varName)
-import           Clash.Core.VarEnv                (InScopeSet, emptyVarEnv)
+import           Clash.Core.VarEnv                (emptyVarEnv)
 import           Clash.Driver.Types
 import           Clash.Netlist                    (genNetlist)
 import           Clash.Netlist.Util               (genComponentName, genTopComponentName)
@@ -80,7 +80,6 @@ import           Clash.Netlist.Types
 import           Clash.Normalize                  (checkNonRecursive, cleanupGraph,
                                                    normalize, runNormalization)
 import           Clash.Normalize.Util             (callGraph)
-import           Clash.Rewrite.Types              (globalInScope)
 import           Clash.Primitives.Types
 import           Clash.Primitives.Util            (hashCompiledPrimMap)
 import           Clash.Unique                     (keysUniqMap, lookupUniqMap')
@@ -226,7 +225,7 @@ generateHDL reprs bindingsMap hdlState primMap tcm tupTcm typeTrans eval
       return (topTime,manifest,HashMap.unionWith max (HashMap.fromList (map (,0) (componentNames manifest))) seen)
     else do
       -- 1. Normalise topEntity
-      let (transformedBindings,is0) = normalizeEntity reprs bindingsMap primMap tcm tupTcm
+      let transformedBindings = normalizeEntity reprs bindingsMap primMap tcm tupTcm
                                   typeTrans eval topEntityNames opts supplyN
                                   topEntity
 
@@ -236,7 +235,7 @@ generateHDL reprs bindingsMap hdlState primMap tcm tupTcm typeTrans eval
 
       -- 2. Generate netlist for topEntity
       (netlist,seen') <-
-        genNetlist False opts reprs transformedBindings is0 topEntities primMap
+        genNetlist False opts reprs transformedBindings topEntities primMap
                    tcm typeTrans iw mkId extId ite seen hdlDir prefixM topEntity
 
       netlistTime <- netlist `deepseq` Clock.getCurrentTime
@@ -264,7 +263,7 @@ generateHDL reprs bindingsMap hdlState primMap tcm tupTcm typeTrans eval
           hdlState2 = setModName modName' hdlState'
 
       -- 1. Normalise testBench
-      let (transformedBindings,is0) = normalizeEntity reprs bindingsMap primMap tcm tupTcm
+      let transformedBindings = normalizeEntity reprs bindingsMap primMap tcm tupTcm
                                   typeTrans eval topEntityNames opts supplyTB tb
       normTime <- transformedBindings `deepseq` Clock.getCurrentTime
       let prepNormDiff = Clock.diffUTCTime normTime topTime
@@ -272,7 +271,7 @@ generateHDL reprs bindingsMap hdlState primMap tcm tupTcm typeTrans eval
 
       -- 2. Generate netlist for topEntity
       (netlist,seen'') <-
-        genNetlist True opts reprs transformedBindings is0 topEntities primMap
+        genNetlist True opts reprs transformedBindings topEntities primMap
                    tcm typeTrans iw mkId extId ite seen' hdlDir prefixM tb
 
       netlistTime <- netlist `deepseq` Clock.getCurrentTime
@@ -627,15 +626,14 @@ normalizeEntity
   -- ^ Unique supply
   -> Id
   -- ^ root of the hierarchy
-  -> (BindingMap, InScopeSet)
+  -> BindingMap
 normalizeEntity reprs bindingsMap primMap tcm tupTcm typeTrans eval topEntities
   opts supply tm = transformedBindings
   where
     doNorm = do norm <- normalize [tm]
                 let normChecked = checkNonRecursive norm
                 cleaned <- cleanupGraph tm normChecked
-                is0 <- use globalInScope
-                return (cleaned,is0)
+                return cleaned
     transformedBindings = runNormalization opts supply bindingsMap
                             typeTrans reprs tcm tupTcm eval primMap emptyVarEnv
                             topEntities doNorm

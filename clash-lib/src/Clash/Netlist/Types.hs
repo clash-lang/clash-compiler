@@ -50,7 +50,7 @@ import Clash.Backend                        (Backend)
 import Clash.Core.Type                      (Type)
 import Clash.Core.Var                       (Attr')
 import Clash.Core.TyCon                     (TyConMap)
-import Clash.Core.VarEnv                    (VarEnv, InScopeSet)
+import Clash.Core.VarEnv                    (VarEnv)
 import Clash.Driver.Types                   (BindingMap, ClashOpts)
 import Clash.Netlist.BlackBox.Types         (BlackBoxTemplate)
 import Clash.Netlist.Id                     (IdType)
@@ -100,7 +100,6 @@ data NetlistState
   , _componentPrefix :: (Maybe Identifier,Maybe Identifier)
   -- ^ Prefix for top-level components, and prefix for all other components
   , _customReprs    :: CustomReprs
-  , _globalInScope  :: InScopeSet
   , _clashOpts      :: ClashOpts
   -- ^ Settings Clash was called with
   , _isTestBench    :: Bool
