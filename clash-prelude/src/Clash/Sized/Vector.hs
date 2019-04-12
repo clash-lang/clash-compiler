@@ -107,7 +107,6 @@ where
 import Control.DeepSeq            (NFData (..))
 import qualified Control.Lens     as Lens hiding (pattern (:>), pattern (:<))
 import Data.Default.Class         (Default (..))
-import Data.Either                (isLeft)
 import qualified Data.Foldable    as F
 import Data.Kind                  (Type)
 import Data.Proxy                 (Proxy (..))
@@ -137,7 +136,7 @@ import Clash.Sized.Index          (Index)
 
 import Clash.Class.BitPack        (packXWith, BitPack (..))
 import Clash.XException
-  (ShowX (..), Undefined (..), isX, showsX, showsPrecXWith, seqX)
+  (ShowX (..), Undefined (..), showsX, showsPrecXWith, seqX)
 
 {- $setup
 >>> :set -XDataKinds
@@ -203,8 +202,7 @@ data Vec :: Nat -> Type -> Type where
   Cons :: a -> Vec n a -> Vec (n + 1) a
 
 instance NFData a => NFData (Vec n a) where
-  rnf Nil         = ()
-  rnf (Cons x xs) = rnf x `seq` rnf xs
+  rnf = foldl (\() -> rnf) ()
 
 -- | Add an element to the head of a vector.
 --
@@ -299,11 +297,11 @@ instance (Default a, KnownNat n) => Default (Vec n a) where
 instance (Undefined a, KnownNat n) => Undefined (Vec n a) where
   deepErrorX x = repeat (deepErrorX x)
 
-  rnfX v = if isLeft (isX v) then () else go v
-   where
-    go :: Vec n a -> ()
-    go Nil         = ()
-    go (Cons x xs) = rnfX x `seqX` rnfX xs
+  rnfX v =
+    -- foldl will fail if the spine of the vector is undefined, so we need to
+    -- seqX the result of it. We need to use foldl so Clash won't treat it as
+    -- a recursive function.
+    seqX (foldl (\() -> rnfX) () v) ()
 
 
 {-# INLINE singleton #-}
