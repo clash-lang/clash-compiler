@@ -10,7 +10,7 @@
     { "name"      : "Clash.XException.errorX"
     , "workInfo"  : "Constant"
     , "kind"      : "Expression"
-    , "type"      : "errorX :: HasCallStack -> String -> a"
+    , "type"      : "errorX :: HasCallStack => String -> a"
     , "template"  : "~ERRORO"
     }
   }
