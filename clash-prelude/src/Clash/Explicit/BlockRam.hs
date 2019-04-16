@@ -392,7 +392,7 @@ module Clash.Explicit.BlockRam
   )
 where
 
-import Data.Maybe             (fromJust, isJust)
+import Data.Maybe             (isJust)
 import qualified Data.Vector  as V
 import GHC.Stack              (HasCallStack, withFrozenCallStack)
 import GHC.TypeLits           (KnownNat, type (^))
@@ -404,7 +404,8 @@ import Clash.Signal.Internal
 import Clash.Signal.Bundle    (unbundle)
 import Clash.Sized.Unsigned   (Unsigned)
 import Clash.Sized.Vector     (Vec, toList)
-import Clash.XException       (maybeIsX, seqX, Undefined, deepErrorX)
+import Clash.XException
+  (maybeIsX, seqX, Undefined, deepErrorX, defaultSeqX, errorX)
 
 {- $setup
 >>> import Clash.Explicit.Prelude as C
@@ -700,9 +701,12 @@ blockRam
   -- ^ Value of the @blockRAM@ at address @r@ from the previous clock cycle
 blockRam = \clk content rd wrM ->
   let en       = isJust <$> wrM
-      (wr,din) = unbundle (fromJust <$> wrM)
+      (wr,din) = unbundle (fromJustX <$> wrM)
   in  withFrozenCallStack
       (blockRam# clk content (fromEnum <$> rd) en (fromEnum <$> wr) din)
+ where
+  fromJustX Nothing  = errorX "fromJustX"
+  fromJustX (Just x) = x
 {-# INLINE blockRam #-}
 
 -- | Create a blockRAM with space for 2^@n@ elements
@@ -770,12 +774,12 @@ blockRam# clk content rd wen = case clockEnable clk of
   where
     -- no clock enable
     go !ram o rt@(~(r :- rs)) et@(~(e :- en)) wt@(~(w :- wr)) dt@(~(d :- din)) =
-      let ram' = upd ram e (fromEnum w) d
+      let ram' = d `defaultSeqX` upd ram e (fromEnum w) d
           o'   = ram V.! r
       in  o `seqX` o :- (rt `seq` et `seq` wt `seq` dt `seq` go ram' o' rs en wr din)
     -- clock enable
     go' !ram o ret@(~(re :- res)) rt@(~(r :- rs)) et@(~(e :- en)) wt@(~(w :- wr)) dt@(~(d :- din)) =
-      let ram' = upd ram e (fromEnum w) d
+      let ram' = d `defaultSeqX` upd ram e (fromEnum w) d
           o'   = if re then ram V.! r else o
       in  o `seqX` o :- (ret `seq` rt `seq` et `seq` wt `seq` dt `seq` go' ram' o' res rs en wr din)
 
