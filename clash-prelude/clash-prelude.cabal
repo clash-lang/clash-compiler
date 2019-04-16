@@ -66,6 +66,15 @@ source-repository head
   type: git
   location: https://github.com/clash-lang/clash-prelude.git
 
+flag super-strict
+  description:
+    Use `deepseqX` (instead of `seqX`) in register-like constructs. This can
+    help to eliminate space leaks when using lazy data structures in
+    registers-like constructs. This potentially slows down Clash hardware
+    simulation.
+  default: False
+  manual: True
+
 flag doctests
   description:
     You can disable testing with doctests using `-f-doctests`.
@@ -90,6 +99,9 @@ Library
   default-language:   Haskell2010
   ghc-options:        -Wall -fexpose-all-unfoldings -fno-worker-wrapper
   CPP-Options:        -DCABAL
+
+  if flag(super-strict)
+    CPP-Options: -DCLASH_SUPER_STRICT
 
   Exposed-modules:    Clash.Annotations.TopEntity
                       Clash.Annotations.Primitive

@@ -1091,7 +1091,7 @@ import           GHC.Stack             (HasCallStack, withFrozenCallStack)
 import Clash.Signal.Internal
   (Clock, Signal (..), (.&&.), clockEnable)
 import Clash.Sized.Vector     (Vec, toList)
-import Clash.XException       (errorX, seqX)
+import Clash.XException       (errorX, defaultSeqX)
 
 -- | blockRAM primitive
 blockRam#
@@ -1122,12 +1122,12 @@ blockRam# clk content rd wen = case 'Clash.Signal.Internal.clockEnable' clk of
     go !ram o (r :- rs) (e :- en) (w :- wr) (d :- din) =
       let ram' = upd ram e w d
           o'   = ram V.! r
-      in  o ``seqX`` o :- go ram' o' rs en wr din
+      in  o ``defaultSeqX`` o :- go ram' o' rs en wr din
     -- clock enable
     go' !ram o (re :- res) (r :- rs) (e :- en) (w :- wr) (d :- din) =
       let ram' = upd ram e w d
           o'   = if re then ram V.! r else o
-      in  o ``seqX`` o :- go' ram' o' res rs en wr din
+      in  o ``defaultSeqX`` o :- go' ram' o' res rs en wr din
 
     upd ram True  addr d = ram V.// [(addr,d)]
     upd ram False _    _ = ram
