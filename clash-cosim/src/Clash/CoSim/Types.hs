@@ -12,9 +12,9 @@ be housed in Simulator.hs, but FFI code crashes Template Haskell.
 module Clash.CoSim.Types where
 
 import Data.Data (Data, Typeable)
-import Control.DeepSeq (NFData)
 
 import Clash.Prelude (BitPack, BitSize, KnownNat)
+import Clash.XException (Undefined)
 
 -- | Settings passed to the simulator. Does not affect synthetization.
 data CoSimSettings = CoSimSettings
@@ -45,7 +45,7 @@ defaultSettings = CoSimSettings
 -- can be simultated.
 type ClashType a = ( BitPack a
                    , KnownNat (BitSize a)
-                   , NFData a
+                   , Undefined a
                    )
 
 -- | Supported simulators

@@ -18,8 +18,15 @@ repository head.hackage
 
 source-repository-package
   type: git
-  location: https://github.com/clash-lang/clash-prelude
-  tag: bd0c50b7e8051fcfb9318cc70971f48daa8b56da
+  location: https://github.com/clash-lang/clash-compiler
+  tag: 3c7f92ad2357a577467ec84df61fffa36843cb50
+  subdir: clash-prelude
+
+-- | We need: a <=? Max a b ~ True
+source-repository-package
+  type: git
+  location: https://github.com/clash-lang/ghc-typelits-extra
+  tag: a8de0b68b8216411cb862195354f251cd41bae50
 
 -- Build documentation for all dependencies so we can upload docs to hackage
 -- with proper links
@@ -28,4 +35,7 @@ package *
 
 -- The fail package is empty for GHC 8+, and haddock errors out on it
 package fail
+  documentation: False
+
+package clash-prelude
   documentation: False
