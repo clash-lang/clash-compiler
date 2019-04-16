@@ -94,7 +94,7 @@ module Clash.Sized.Vector
   , bv2v
   , v2bv
     -- * Misc
-  , lazyV, VCons, asNatProxy
+  , lazyV, VCons, asNatProxy, seqV, forceV, seqVX, forceVX
     -- * Primitives
     -- ** 'Traversable' instance
   , traverse#
@@ -134,8 +134,9 @@ import Clash.Promoted.Nat.Literals (d1)
 import Clash.Sized.Internal.BitVector (Bit, BitVector, (++#), split#)
 import Clash.Sized.Index          (Index)
 
-import Clash.Class.BitPack (BitPack (..), packXWith)
-import Clash.XException    (ShowX (..), Undefined (..), showsX, showsPrecXWith)
+import Clash.Class.BitPack        (packXWith, BitPack (..))
+import Clash.XException
+  (ShowX (..), Undefined (..), showsX, showsPrecXWith, seqX)
 
 {- $setup
 >>> :set -XDataKinds
@@ -201,8 +202,7 @@ data Vec :: Nat -> Type -> Type where
   Cons :: a -> Vec n a -> Vec (n + 1) a
 
 instance NFData a => NFData (Vec n a) where
-  rnf Nil         = ()
-  rnf (Cons x xs) = rnf x `seq` rnf xs
+  rnf = foldl (\() -> rnf) ()
 
 -- | Add an element to the head of a vector.
 --
@@ -296,6 +296,13 @@ instance (Default a, KnownNat n) => Default (Vec n a) where
 
 instance (Undefined a, KnownNat n) => Undefined (Vec n a) where
   deepErrorX x = repeat (deepErrorX x)
+
+  rnfX v =
+    -- foldl will fail if the spine of the vector is undefined, so we need to
+    -- seqX the result of it. We need to use foldl so Clash won't treat it as
+    -- a recursive function.
+    seqX (foldl (\() -> rnfX) () v) ()
+
 
 {-# INLINE singleton #-}
 -- | Create a vector of one element
@@ -2116,6 +2123,49 @@ bv2v = unpack
 -- 0001_0010
 v2bv :: KnownNat n => Vec n Bit -> BitVector n
 v2bv = pack
+
+-- | Evaluate all elements of a vector to WHNF, returning the second argument
+seqV
+  :: KnownNat n
+  => Vec n a
+  -> b
+  -> b
+seqV v b =
+  let s () e = seq e () in
+  foldl s () v `seq` b
+{-# NOINLINE seqV #-}
+infixr 0 `seqV`
+
+-- | Evaluate all elements of a vector to WHNF
+forceV
+  :: KnownNat n
+  => Vec n a
+  -> Vec n a
+forceV v =
+  v `seqV` v
+{-# INLINE forceV #-}
+
+-- | Evaluate all elements of a vector to WHNF, returning the second argument.
+-- Does not propagate 'XException's.
+seqVX
+  :: KnownNat n
+  => Vec n a
+  -> b
+  -> b
+seqVX v b =
+  let s () e = seqX e () in
+  foldl s () v `seqX` b
+{-# NOINLINE seqVX #-}
+infixr 0 `seqVX`
+
+-- | Evaluate all elements of a vector to WHNF. Does not propagate 'XException's.
+forceVX
+  :: KnownNat n
+  => Vec n a
+  -> Vec n a
+forceVX v =
+  v `seqVX` v
+{-# INLINE forceVX #-}
 
 instance Lift a => Lift (Vec n a) where
   lift Nil           = [| Nil |]

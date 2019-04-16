@@ -94,9 +94,9 @@ import qualified Clash.Sized.Vector    as Vector
 import           Clash.Class.BitPack   (BitPack, BitSize, pack)
 import           Clash.Promoted.Nat    (snatToNum, SNat(..))
 import           Clash.Signal.Internal (sample)
+import           Clash.XException      (deepseqX, Undefined)
 
 -- Haskell / GHC:
-import           Control.DeepSeq       (NFData, deepseq)
 import           Control.Monad         (foldM)
 import           Data.Bits             (testBit)
 import           Data.Char             (ord, chr)
@@ -132,7 +132,7 @@ mkTrace
   :: HasCallStack
   => KnownNat (BitSize a)
   => BitPack a
-  => NFData a
+  => Undefined a
   => Signal domain a
   -> [Value]
 mkTrace signal = map (toInteger . pack) (sample signal)
@@ -143,7 +143,7 @@ traceSignal#
   :: forall domain a
    . ( KnownNat (BitSize a)
      , BitPack a
-     , NFData a )
+     , Undefined a )
   => IORef TraceMap
   -- ^ Map to store the trace
   -> Int
@@ -171,7 +171,7 @@ traceVecSignal#
    . ( KnownNat (BitSize a)
      , KnownNat n
      , BitPack a
-     , NFData a )
+     , Undefined a )
   => IORef TraceMap
   -- ^ Map to store the traces
   -> Int
@@ -201,7 +201,7 @@ traceSignal
      , KnownNat period
      , KnownNat (BitSize a)
      , BitPack a
-     , NFData a )
+     , Undefined a )
   => String
   -- ^ Name of signal in the VCD output
   -> Signal domain a
@@ -222,7 +222,7 @@ traceSignal traceName signal =
 traceSignal1
   :: ( KnownNat (BitSize a)
      , BitPack a
-     , NFData a )
+     , Undefined a )
   => String
   -- ^ Name of signal in the VCD output
   -> Signal domain a
@@ -246,7 +246,7 @@ traceVecSignal
      , KnownNat period
      , KnownNat n
      , BitPack a
-     , NFData a )
+     , Undefined a )
   => String
   -- ^ Name of signal in debugging output. Will be appended by _0, _1, ..., _n.
   -> Signal domain (Vec (n+1) a)
@@ -269,7 +269,7 @@ traceVecSignal1
   :: ( KnownNat (BitSize a)
      , KnownNat n
      , BitPack a
-     , NFData a )
+     , Undefined a )
   => String
   -- ^ Name of signal in debugging output. Will be appended by _0, _1, ..., _n.
   -> Signal domain (Vec (n+1) a)
@@ -413,7 +413,7 @@ dumpVCD## (offset, cycles) traceMap now
 
 -- | Same as @dumpVCD@, but supplied with a custom tracemap
 dumpVCD#
-  :: NFData a
+  :: Undefined a
   => IORef TraceMap
   -- ^ Map with collected traces
   -> (Int, Int)
@@ -445,7 +445,7 @@ dumpVCD# traceMap slice signal traceNames = do
 -- Evaluates /cntrOut/ long enough in order for to guarantee that the @main@,
 -- and @sub@ traces end up in the generated VCD file.
 dumpVCD
-  :: NFData a
+  :: Undefined a
   => (Int, Int)
   -- ^ (offset, number of samples)
   -> Signal domain a
@@ -457,7 +457,7 @@ dumpVCD = dumpVCD# traceMap#
 
 -- | Keep evaluating given signal until all trace names are present.
 waitForTraces#
-  :: NFData a
+  :: Undefined a
   => IORef TraceMap
   -- ^ Map with collected traces
   -> Signal dom a
@@ -468,13 +468,13 @@ waitForTraces#
 waitForTraces# traceMap signal traceNames = do
   atomicWriteIORef traceMap Map.empty
   rest <- foldM go (sample signal) traceNames
-  return $ deepseq (head rest) ()
+  return $ deepseqX (head rest) ()
  where
   go s nm = do
     m <- readIORef traceMap
     if Map.member nm m then
       return s
     else
-      deepseq
+      deepseqX
         (head s)
         (go (tail s) nm)

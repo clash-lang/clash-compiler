@@ -92,7 +92,7 @@ where
 
 import Type.Reflection            (Typeable)
 import Control.Applicative        (liftA2, liftA3)
-import Control.DeepSeq            (NFData, rnf)
+import Control.DeepSeq            (NFData)
 import Data.Default.Class         (Default (..))
 import GHC.Generics               (Generic)
 import GHC.TypeLits               (KnownNat, KnownSymbol, Nat, Symbol)
@@ -102,7 +102,7 @@ import Test.QuickCheck            (Arbitrary (..), CoArbitrary(..), Property,
 
 import Clash.Promoted.Nat         (SNat (..), snatToInteger, snatToNum)
 import Clash.Promoted.Symbol      (SSymbol (..))
-import Clash.XException           (errorX, seqX)
+import Clash.XException           (Undefined, errorX, seqX, deepseqX)
 
 {- $setup
 >>> :set -XDataKinds
@@ -757,8 +757,8 @@ testFor n = property . and . take n . sample
 -- > sample s == [s0, s1, s2, s3, ...
 --
 -- __NB__: This function is not synthesisable
-sample :: (Foldable f, NFData a) => f a -> [a]
-sample = foldr (\a b -> rnf a `seqX` (a : b)) []
+sample :: (Foldable f, Undefined a) => f a -> [a]
+sample = foldr (\a b -> deepseqX a (a : b)) []
 
 -- | The above type is a generalisation for:
 --
@@ -774,7 +774,7 @@ sample = foldr (\a b -> rnf a `seqX` (a : b)) []
 -- > sampleN 3 s == [s0, s1, s2]
 --
 -- __NB__: This function is not synthesisable
-sampleN :: (Foldable f, NFData a) => Int -> f a -> [a]
+sampleN :: (Foldable f, Undefined a) => Int -> f a -> [a]
 sampleN n = take n . sample
 
 -- | Create a 'Clash.Signal.Signal' from a list
@@ -786,8 +786,8 @@ sampleN n = take n . sample
 -- [1,2]
 --
 -- __NB__: This function is not synthesisable
-fromList :: NFData a => [a] -> Signal domain a
-fromList = Prelude.foldr (\a b -> rnf a `seqX` (a :- b)) (errorX "finite list")
+fromList :: Undefined a => [a] -> Signal domain a
+fromList = Prelude.foldr (\a b -> deepseqX a (a :- b)) (errorX "finite list")
 
 -- * Simulation functions (not synthesisable)
 
@@ -799,7 +799,7 @@ fromList = Prelude.foldr (\a b -> rnf a `seqX` (a :- b)) (errorX "finite list")
 -- ...
 --
 -- __NB__: This function is not synthesisable
-simulate :: (NFData a, NFData b) => (Signal domain1 a -> Signal domain2 b) -> [a] -> [b]
+simulate :: (Undefined a, Undefined b) => (Signal domain1 a -> Signal domain2 b) -> [a] -> [b]
 simulate f = sample . f . fromList
 
 -- | The above type is a generalisation for:

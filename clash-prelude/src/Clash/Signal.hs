@@ -138,7 +138,6 @@ module Clash.Signal
   )
 where
 
-import           Control.DeepSeq       (NFData)
 import           GHC.TypeLits          (KnownNat, KnownSymbol)
 import           Data.Bits             (Bits) -- Haddock only
 import           Data.Maybe            (isJust, fromJust)
@@ -612,7 +611,7 @@ regEn initial en i =
 -- __NB__: This function is not synthesisable
 sample
   :: forall gated synchronous domain a
-   . NFData a
+   . Undefined a
   => (HiddenClockReset domain gated synchronous => Signal domain a)
   -- ^ 'Signal' we want to sample, whose source potentially has a hidden clock
   -- (and reset)
@@ -637,7 +636,7 @@ sample s =
 -- __NB__: This function is not synthesisable
 sampleN
   :: forall gated synchronous domain a
-   . NFData a
+   . Undefined a
   => Int
   -- ^ The number of samples we want to see
   -> (HiddenClockReset domain gated synchronous => Signal domain a)
@@ -715,7 +714,7 @@ sampleN_lazy n s =
 -- __NB__: This function is not synthesisable
 simulate
   :: forall gated synchronous domain a b
-   . (NFData a, NFData b)
+   . (Undefined a, Undefined b)
   => (HiddenClockReset domain gated synchronous =>
       Signal domain a -> Signal domain b)
   -- ^ 'Signal' we want to sample, whose source potentially has a hidden clock
@@ -768,7 +767,7 @@ simulate_lazy f =
 -- __NB__: This function is not synthesisable
 simulateB
   :: forall gated synchronous domain a b
-   . (Bundle a, Bundle b, NFData a, NFData b)
+   . (Bundle a, Bundle b, Undefined a, Undefined b)
   => (HiddenClockReset domain gated synchronous =>
       Unbundled domain a -> Unbundled domain b)
   -- ^ Function we want to simulate, whose components potentially have a hidden

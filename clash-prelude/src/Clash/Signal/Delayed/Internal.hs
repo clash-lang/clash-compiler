@@ -30,7 +30,6 @@ module Clash.Signal.Delayed.Internal
   )
 where
 
-import Control.DeepSeq            (NFData)
 import Data.Coerce                (coerce)
 import Data.Default.Class         (Default(..))
 import GHC.TypeLits               (Nat, type (+))
@@ -40,6 +39,7 @@ import Test.QuickCheck            (Arbitrary, CoArbitrary)
 import Clash.Promoted.Nat         (SNat)
 import Clash.Explicit.Signal
   (Domain, Signal, fromList, fromList_lazy)
+import Clash.XException           (Undefined)
 
 {- $setup
 >>> :set -XDataKinds
@@ -79,7 +79,7 @@ newtype DSignal (domain :: Domain) (delay :: Nat) a =
 -- [1,2]
 --
 -- __NB__: This function is not synthesisable
-dfromList :: NFData a => [a] -> DSignal domain 0 a
+dfromList :: Undefined a => [a] -> DSignal domain 0 a
 dfromList = coerce . fromList
 
 -- | Create a 'DSignal' from a list

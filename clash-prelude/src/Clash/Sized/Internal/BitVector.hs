@@ -150,7 +150,7 @@ import Clash.Class.Resize         (Resize (..))
 import Clash.Promoted.Nat
   (SNat (..), SNatLE (..), compareSNat, snatToInteger, snatToNum)
 import Clash.XException
-  (ShowX (..), Undefined (..), errorX, showsPrecXWith)
+  (ShowX (..), Undefined (..), errorX, showsPrecXWith, rwhnfX)
 
 import {-# SOURCE #-} qualified Clash.Sized.Vector         as V
 import {-# SOURCE #-} qualified Clash.Sized.Internal.Index as I
@@ -170,8 +170,8 @@ import                qualified Data.List                  as L
 data BitVector (n :: Nat) =
     -- | The constructor, 'BV', and  the field, 'unsafeToInteger', are not
     -- synthesisable.
-    BV { unsafeMask      :: Integer
-       , unsafeToInteger :: Integer
+    BV { unsafeMask      :: !Integer
+       , unsafeToInteger :: !Integer
        }
   deriving Data
 
@@ -181,8 +181,8 @@ data BitVector (n :: Nat) =
 data Bit =
   -- | The constructor, 'Bit', and  the field, 'unsafeToInteger#', are not
   -- synthesisable.
-  Bit { unsafeMask#      :: Integer
-      , unsafeToInteger# :: Integer
+  Bit { unsafeMask#      :: !Integer
+      , unsafeToInteger# :: !Integer
       }
   deriving Data
 
@@ -213,7 +213,9 @@ instance Show Bit where
 instance ShowX Bit where
   showsPrecX = showsPrecXWith showsPrec
 
-instance Undefined Bit where deepErrorX = errorX
+instance Undefined Bit where
+  deepErrorX = errorX
+  rnfX = rwhnfX
 
 instance Lift Bit where
   lift (Bit m i) = [| fromInteger## m i |]
@@ -357,7 +359,9 @@ instance KnownNat n => Show (BitVector n) where
 instance KnownNat n => ShowX (BitVector n) where
   showsPrecX = showsPrecXWith showsPrec
 
-instance Undefined (BitVector n) where deepErrorX = errorX
+instance Undefined (BitVector n) where
+  deepErrorX = errorX
+  rnfX = rwhnfX
 
 -- | Create a binary literal
 --

@@ -196,11 +196,11 @@ module Clash.Explicit.Signal
   )
 where
 
-import Control.DeepSeq       (NFData)
 import Data.Maybe            (isJust, fromJust)
 
 import Clash.Signal.Internal
 import Clash.Signal.Bundle   (Bundle (..))
+import Clash.XException      (Undefined)
 
 {- $setup
 >>> :set -XDataKinds -XTypeApplications
@@ -605,7 +605,7 @@ regEn clk rst initial en i =
 --
 -- __NB__: This function is not synthesisable
 simulateB
-  :: (Bundle a, Bundle b, NFData a, NFData b)
+  :: (Bundle a, Bundle b, Undefined a, Undefined b)
   => (Unbundled domain1 a -> Unbundled domain2 b)
   -- ^ The function we want to simulate
   -> [a]

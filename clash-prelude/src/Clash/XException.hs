@@ -1,6 +1,7 @@
 {-|
-Copyright  :  (C) 2016, University of Twente,
-                  2017, Myrtle Software Ltd, QBayLogic, Google Inc.
+Copyright  :  (C) 2016,      University of Twente,
+                  2017,      QBayLogic, Google Inc.
+                  2017-2019, Myrtle Software Ltd
 License    :  BSD2 (see the file LICENSE)
 Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
 
@@ -14,14 +15,17 @@ CallStack (from HasCallStack):
 "(X,4)"
 -}
 
-{-# LANGUAGE DefaultSignatures   #-}
-{-# LANGUAGE DeriveGeneric       #-}
-{-# LANGUAGE FlexibleContexts    #-}
-{-# LANGUAGE FlexibleInstances   #-}
-{-# LANGUAGE MagicHash           #-}
-{-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE StandaloneDeriving  #-}
-{-# LANGUAGE TypeOperators       #-}
+{-# LANGUAGE DefaultSignatures     #-}
+{-# LANGUAGE DeriveGeneric         #-}
+{-# LANGUAGE EmptyCase             #-}
+{-# LANGUAGE FlexibleContexts      #-}
+{-# LANGUAGE FlexibleInstances     #-}
+{-# LANGUAGE GADTs                 #-}
+{-# LANGUAGE MagicHash             #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE ScopedTypeVariables   #-}
+{-# LANGUAGE StandaloneDeriving    #-}
+{-# LANGUAGE TypeOperators         #-}
 
 {-# LANGUAGE Trustworthy #-}
 
@@ -29,24 +33,26 @@ CallStack (from HasCallStack):
 
 module Clash.XException
   ( -- * 'X': An exception for uninitialized values
-    XException (..), errorX, isX, maybeX
+    XException(..), errorX, isX, hasX, maybeIsX, maybeHasX
     -- * Printing 'X' exceptions as \"X\"
   , ShowX (..), showsX, printX, showsPrecXWith
     -- * Strict evaluation
-  , seqX
+  , seqX, forceX, deepseqX, rwhnfX
     -- * Structured undefined
-  , Undefined (..)
+  , Undefined (rnfX, deepErrorX)
   )
 where
 
 import Control.Exception (Exception, catch, evaluate, throw)
 import Control.DeepSeq   (NFData, rnf)
 import Data.Complex      (Complex)
+import Data.Either       (isLeft)
 import Data.Foldable     (toList)
 import Data.Int          (Int8,Int16,Int32,Int64)
 import Data.Ord          (Down (Down))
-import Data.Ratio        (Ratio)
-import Data.Sequence     (Seq)
+import Data.Ratio        (Ratio, numerator, denominator)
+import qualified Data.Semigroup as SG
+import Data.Sequence     (Seq(Empty, (:<|)))
 import Data.Word         (Word8,Word16,Word32,Word64)
 import GHC.Exts          (Char (C#), Double (D#), Float (F#), Int (I#), Word (W#))
 import GHC.Generics
@@ -84,22 +90,76 @@ seqX a b = unsafeDupablePerformIO
 {-# NOINLINE seqX #-}
 infixr 0 `seqX`
 
--- | Fully evaluate a value, returning 'Nothing' if is throws 'XException'.
+-- | Evaluate a value with given function, returning 'Nothing' if it throws
+-- 'XException'.
 --
--- > maybeX 42               = Just 42
--- > maybeX (XException msg) = Nothing
--- > maybeX _|_              = _|_
-maybeX :: NFData a => a -> Maybe a
-maybeX = either (const Nothing) Just . isX
+-- > maybeX hasX 42                  = Just 42
+-- > maybeX hasX (XException msg)    = Nothing
+-- > maybeX hasX (3, XException msg) = Nothing
+-- > maybeX hasX (3, _|_)            = _|_
+-- > maybeX hasX _|_                 = _|_
+-- >
+-- > maybeX isX 42                  = Just 42
+-- > maybeX isX (XException msg)    = Nothing
+-- > maybeX isX (3, XException msg) = Just (3, XException msg)
+-- > maybeX isX (3, _|_)            = Just (3, _|_)
+-- > maybeX isX _|_                 = _|_
+--
+maybeX :: NFData a => (a -> Either String a) -> a -> Maybe a
+maybeX f a = either (const Nothing) Just (f a)
 
--- | Fully evaluate a value, returning @'Left' msg@ if is throws 'XException'.
+-- | Fully evaluate a value, returning 'Nothing' if it throws 'XException'.
 --
--- > isX 42               = Right 42
--- > isX (XException msg) = Left msg
--- > isX _|_              = _|_
-isX :: NFData a => a -> Either String a
-isX a = unsafeDupablePerformIO
-  (catch (evaluate (rnf a) >> return (Right a)) (\(XException msg) -> return (Left msg)))
+-- > maybeX 42                  = Just 42
+-- > maybeX (XException msg)    = Nothing
+-- > maybeX (3, XException msg) = Nothing
+-- > maybeX (3, _|_)            = _|_
+-- > maybeX _|_                 = _|_
+--
+maybeHasX :: NFData a => a -> Maybe a
+maybeHasX = maybeX hasX
+
+-- | Evaluate a value to WHNF, returning 'Nothing' if it throws 'XException'.
+--
+-- > maybeIsX 42                  = Just 42
+-- > maybeIsX (XException msg)    = Nothing
+-- > maybeIsX (3, XException msg) = Just (3, XException msg)
+-- > maybeIsX (3, _|_)            = Just (3, _|_)
+-- > maybeIsX _|_                 = _|_
+maybeIsX :: NFData a => a -> Maybe a
+maybeIsX = maybeX isX
+
+-- | Fully evaluate a value, returning @'Left' msg@ if it throws 'XException'.
+--
+-- > hasX 42                  = Right 42
+-- > hasX (XException msg)    = Left msg
+-- > hasX (3, XException msg) = Left msg
+-- > hasX (3, _|_)            = _|_
+-- > hasX _|_                 = _|_
+--
+-- If a data structure contains multiple 'XException's, the "first" message is
+-- picked according to the implementation of 'rnf'.
+hasX :: NFData a => a -> Either String a
+hasX a =
+  unsafeDupablePerformIO
+    (catch
+      (evaluate (rnf a) >> return (Right a))
+      (\(XException msg) -> return (Left msg)))
+{-# NOINLINE hasX #-}
+
+-- | Evaluate a value to WHNF, returning @'Left' msg@ if is a 'XException'.
+--
+-- > isX 42                  = Right 42
+-- > isX (XException msg)    = Left msg
+-- > isX (3, XException msg) = Right (3, XException msg)
+-- > isX (3, _|_)            = (3, _|_)
+-- > isX _|_                 = _|_
+isX :: a -> Either String a
+isX a =
+  unsafeDupablePerformIO
+    (catch
+      (evaluate a >> return (Right a))
+      (\(XException msg) -> return (Left msg)))
 {-# NOINLINE isX #-}
 
 showXWith :: (a -> ShowS) -> a -> ShowS
@@ -374,8 +434,101 @@ instance GShowX UInt where
 instance GShowX UWord where
   gshowsPrecX _ _ (UWord w)   = showsPrec 0 (W# w) . showString "##"
 
--- | Create a value where all the elements have an 'errorX', but the spine
--- is defined.
+-- | a variant of 'deepseqX' that is useful in some circumstances:
+--
+-- > forceX x = x `deepseqX` x
+forceX :: Undefined a => a -> a
+forceX x = x `deepseqX` x
+{-# INLINE forceX #-}
+
+-- | 'deepseqX': fully evaluates the first argument, before returning the
+-- second. Does not propagate 'XException's.
+deepseqX :: Undefined a => a -> b -> b
+deepseqX a b = rnfX a `seq` b
+{-# NOINLINE deepseqX #-}
+
+-- | Reduce to weak head normal form
+--
+-- Equivalent to @\\x -> 'seqX' x ()@.
+--
+-- Useful for defining 'Undefined.rnfX' for types for which NF=WHNF holds.
+rwhnfX :: a -> ()
+rwhnfX = (`seqX` ())
+{-# INLINE rwhnfX #-}
+
+-- | Hidden internal type-class. Adds a generic implementation for the "NFDataX"
+-- part of 'Undefined'
+class GNFDataX arity f where
+  grnfX :: RnfArgs arity a -> f a -> ()
+
+instance GNFDataX arity V1 where
+  grnfX _ x = case x of {}
+
+data Zero
+data One
+
+data RnfArgs arity a where
+  RnfArgs0 :: RnfArgs Zero a
+  RnfArgs1  :: (a -> ()) -> RnfArgs One a
+
+instance GNFDataX arity U1 where
+  grnfX _ u = if isLeft (isX u) then () else case u of U1 -> ()
+
+instance Undefined a => GNFDataX arity (K1 i a) where
+  grnfX _ = rnfX . unK1
+  {-# INLINEABLE grnfX #-}
+
+instance GNFDataX arity a => GNFDataX arity (M1 i c a) where
+  grnfX args a =
+    -- Check for X needed to handle edge-case "data Void"
+    if isLeft (isX a) then
+      ()
+    else
+      grnfX args (unM1 a)
+  {-# INLINEABLE grnfX #-}
+
+instance (GNFDataX arity a, GNFDataX arity b) => GNFDataX arity (a :*: b) where
+  grnfX args xy@(~(x :*: y)) =
+    if isLeft (isX xy) then
+      ()
+    else
+      grnfX args x `seq` grnfX args y
+  {-# INLINEABLE grnfX #-}
+
+instance (GNFDataX arity a, GNFDataX arity b) => GNFDataX arity (a :+: b) where
+  grnfX args lrx =
+    if isLeft (isX lrx) then
+      ()
+    else
+      case lrx of
+        L1 x -> grnfX args x
+        R1 x -> grnfX args x
+  {-# INLINEABLE grnfX #-}
+
+instance GNFDataX One Par1 where
+  grnfX (RnfArgs1 r) = r . unPar1
+
+instance NFDataX1 f => GNFDataX One (Rec1 f) where
+  grnfX (RnfArgs1 r) = liftRnfX r . unRec1
+
+instance (NFDataX1 f, GNFDataX One g) => GNFDataX One (f :.: g) where
+  grnfX args = liftRnfX (grnfX args) . unComp1
+
+-- | A class of functors that can be fully evaluated, according to semantics
+-- of NFDataX.
+class NFDataX1 f where
+  -- | 'liftRnfX' should reduce its argument to normal form (that is, fully
+  -- evaluate all sub-components), given an argument to reduce @a@ arguments,
+  -- and then return '()'.
+  --
+  -- See 'rnfX' for the generic deriving.
+  liftRnfX :: (a -> ()) -> f a -> ()
+
+  default liftRnfX :: (Generic1 f, GNFDataX One (Rep1 f)) => (a -> ()) -> f a -> ()
+  liftRnfX r = grnfX (RnfArgs1 r) . from1
+
+-- | Create a value where all the elements have an 'errorX' but the spine
+-- is defined, and fully evaluate a value with 'errorX's in it.
 class Undefined a where
   -- | Create a value where all the elements have an 'errorX', but the spine
   -- is defined.
@@ -383,6 +536,13 @@ class Undefined a where
 
   default deepErrorX :: (HasCallStack, Generic a, GUndefined (Rep a)) => String -> a
   deepErrorX = withFrozenCallStack $ to . gDeepErrorX
+
+  -- | Evaluate a value to NF. As opposed to 'NFData's 'rnf', it does not bubble
+  -- up 'XException's.
+  rnfX :: a -> ()
+
+  default rnfX :: (Generic a, GNFDataX Zero (Rep a)) => a -> ()
+  rnfX = grnfX RnfArgs0 . from
 
 instance Undefined ()
 instance (Undefined a, Undefined b) => Undefined (a,b)
@@ -426,33 +586,104 @@ instance (Undefined a, Undefined b, Undefined c, Undefined d, Undefined e
 
 instance Undefined b => Undefined (a -> b) where
   deepErrorX = pure . deepErrorX
+  rnfX = rwhnfX
 
 instance Undefined a => Undefined (Down a) where
   deepErrorX = Down . deepErrorX
+  rnfX d@(~(Down x))= if isLeft (isX d) then rnfX x else ()
 
 instance Undefined Bool
-instance Undefined [a]
-instance Undefined (Either a b)
-instance Undefined (Maybe a)
+instance Undefined a => Undefined [a]
+instance (Undefined a, Undefined b) => Undefined (Either a b)
+instance Undefined a => Undefined (Maybe a)
 
-instance Undefined Char where deepErrorX = errorX
-instance Undefined Double where deepErrorX = errorX
-instance Undefined Float where deepErrorX = errorX
-instance Undefined Int where deepErrorX = errorX
-instance Undefined Int8 where deepErrorX = errorX
-instance Undefined Int16 where deepErrorX = errorX
-instance Undefined Int32 where deepErrorX = errorX
-instance Undefined Int64 where deepErrorX = errorX
-instance Undefined Integer where deepErrorX = errorX
-instance Undefined Natural where deepErrorX = errorX
-instance Undefined Word where deepErrorX = errorX
-instance Undefined Word8 where deepErrorX = errorX
-instance Undefined Word16 where deepErrorX = errorX
-instance Undefined Word32 where deepErrorX = errorX
-instance Undefined Word64 where deepErrorX = errorX
-instance Undefined (Seq a) where deepErrorX = errorX
-instance Undefined (Ratio a) where deepErrorX = errorX
-instance Undefined (Complex a) where deepErrorX = errorX
+instance Undefined Char where
+  deepErrorX = errorX
+  rnfX = rwhnfX
+
+instance Undefined Double where
+  deepErrorX = errorX
+  rnfX = rwhnfX
+
+instance Undefined Float where
+  deepErrorX = errorX
+  rnfX = rwhnfX
+
+instance Undefined Int where
+  deepErrorX = errorX
+  rnfX = rwhnfX
+
+instance Undefined Int8 where
+  deepErrorX = errorX
+  rnfX = rwhnfX
+
+instance Undefined Int16 where
+  deepErrorX = errorX
+  rnfX = rwhnfX
+
+instance Undefined Int32 where
+  deepErrorX = errorX
+  rnfX = rwhnfX
+
+instance Undefined Int64 where
+  deepErrorX = errorX
+  rnfX = rwhnfX
+
+instance Undefined Integer where
+  deepErrorX = errorX
+  rnfX = rwhnfX
+
+instance Undefined Natural where
+  deepErrorX = errorX
+  rnfX = rwhnfX
+
+instance Undefined Word where
+  deepErrorX = errorX
+  rnfX = rwhnfX
+
+instance Undefined Word8 where
+  deepErrorX = errorX
+  rnfX = rwhnfX
+
+instance Undefined Word16 where
+  deepErrorX = errorX
+  rnfX = rwhnfX
+
+instance Undefined Word32 where
+  deepErrorX = errorX
+  rnfX = rwhnfX
+
+instance Undefined Word64 where
+  deepErrorX = errorX
+  rnfX = rwhnfX
+
+instance Undefined a => Undefined (Seq a) where
+  deepErrorX = errorX
+  rnfX s =
+    if isLeft (isX s) then () else go s
+   where
+    go Empty = ()
+    go (x :<| xs) = rnfX x `seq` go xs
+
+instance Undefined a => Undefined (Ratio a) where
+  deepErrorX = errorX
+  rnfX r = rnfX (numerator r) `seq` rnfX (denominator r)
+
+instance Undefined a => Undefined (Complex a) where
+  deepErrorX = errorX
+
+instance (Undefined a, Undefined b) => Undefined (SG.Arg a b)
+instance Undefined (SG.All)
+instance Undefined (SG.Any)
+instance Undefined a => Undefined (SG.Dual a)
+instance Undefined a => Undefined (SG.Endo a)
+instance Undefined a => Undefined (SG.First a)
+instance Undefined a => Undefined (SG.Last a)
+instance Undefined a => Undefined (SG.Max a)
+instance Undefined a => Undefined (SG.Min a)
+instance Undefined a => Undefined (SG.Option a)
+instance Undefined a => Undefined (SG.Product a)
+instance Undefined a => Undefined (SG.Sum a)
 
 class GUndefined f where
   gDeepErrorX :: HasCallStack => String -> f a

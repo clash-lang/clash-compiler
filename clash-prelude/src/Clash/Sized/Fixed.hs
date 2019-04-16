@@ -74,6 +74,7 @@ import Control.Arrow              ((***), second)
 import Data.Bits                  (Bits (..), FiniteBits)
 import Data.Data                  (Data)
 import Data.Default.Class         (Default (..))
+import Data.Either                (isLeft)
 import Text.Read                  (Read(..))
 import Data.List                  (find)
 import Data.Maybe                 (fromJust)
@@ -98,7 +99,8 @@ import Clash.Prelude.BitReduction (reduceAnd, reduceOr)
 import Clash.Sized.BitVector      (BitVector, (++#))
 import Clash.Sized.Signed         (Signed)
 import Clash.Sized.Unsigned       (Unsigned)
-import Clash.XException           (ShowX (..), Undefined (..), errorX, showsPrecXWith)
+import Clash.XException
+  (ShowX (..), Undefined (..), isX, errorX, showsPrecXWith)
 
 {- $setup
 >>> :set -XDataKinds
@@ -268,7 +270,9 @@ instance ( size ~ (int + frac), KnownNat frac, Integral (rep size)
          ) => ShowX (Fixed rep int frac) where
   showsPrecX = showsPrecXWith showsPrec
 
-instance Undefined (Fixed rep int frac) where deepErrorX = Fixed . errorX
+instance Undefined (rep (int + frac)) => Undefined (Fixed rep int frac) where
+  deepErrorX = Fixed . errorX
+  rnfX f@(~(Fixed x)) = if isLeft (isX f) then () else rnfX x
 
 -- | None of the 'Read' class' methods are synthesisable.
 instance (size ~ (int + frac), KnownNat frac, Bounded (rep size), Integral (rep size))
