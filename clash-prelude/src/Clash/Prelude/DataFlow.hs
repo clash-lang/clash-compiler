@@ -60,7 +60,7 @@ import Clash.Signal.Internal  (clockGate)
 import Clash.Explicit.Signal  (Clock, Reset, Signal, register)
 import Clash.Sized.BitVector  (BitVector)
 import Clash.Sized.Vector
-import Clash.XException       (errorX)
+import Clash.XException       (errorX, Undefined)
 
 {- | Dataflow circuit with bidirectional synchronisation channels.
 
@@ -136,24 +136,30 @@ newtype DataFlow domain iEn oEn i o
 --
 --  * Not consume data when validity is deasserted.
 --  * Only update its output when readiness is asserted.
-liftDF :: (Signal dom i -> Signal dom Bool -> Signal dom Bool
-                        -> (Signal dom o, Signal dom Bool, Signal dom Bool))
-       -> DataFlow dom Bool Bool i o
+liftDF
+  :: ( Signal dom i
+    -> Signal dom Bool
+    -> Signal dom Bool
+    -> (Signal dom o, Signal dom Bool, Signal dom Bool))
+  -> DataFlow dom Bool Bool i o
 liftDF = DF
 
 -- | Create a 'DataFlow' circuit where the given function @f@ operates on the
 -- data, and the synchronisation channels are passed unaltered.
-pureDF :: (i -> o)
-       -> DataFlow dom Bool Bool i o
+pureDF
+  :: (i -> o)
+  -> DataFlow dom Bool Bool i o
 pureDF f = DF (\i iV oR -> (fmap f i,iV,oR))
 
 -- | Create a 'DataFlow' circuit from a Mealy machine description as those of
 -- "Clash.Prelude.Mealy"
-mealyDF :: Clock domain gated
-        -> Reset domain synchronous
-        -> (s -> i -> (s,o))
-        -> s
-        -> DataFlow domain Bool Bool i o
+mealyDF
+  :: Undefined s
+  => Clock domain gated
+  -> Reset domain synchronous
+  -> (s -> i -> (s,o))
+  -> s
+  -> DataFlow domain Bool Bool i o
 mealyDF clk rst f iS =
   DF (\i iV oR -> let en     = iV .&&. oR
                       (s',o) = unbundle (f <$> s <*> i)
@@ -162,12 +168,14 @@ mealyDF clk rst f iS =
 
 -- | Create a 'DataFlow' circuit from a Moore machine description as those of
 -- "Clash.Prelude.Moore"
-mooreDF :: Clock domain gated
-        -> Reset domain synchronous
-        -> (s -> i -> s)
-        -> (s -> o)
-        -> s
-        -> DataFlow domain Bool Bool i o
+mooreDF
+  :: Undefined s
+  => Clock domain gated
+  -> Reset domain synchronous
+  -> (s -> i -> s)
+  -> (s -> o)
+  -> s
+  -> DataFlow domain Bool Bool i o
 mooreDF clk rst ft fo iS =
   DF (\i iV oR -> let en  = iV .&&. oR
                       s'  = ft <$> s <*> i
@@ -203,8 +211,13 @@ fifoDF_mealy (mem,rptr,wptr) (wdata,winc,rinc) =
 -- @
 -- fifo4 = 'fifoDF' d4 (2 :> 3 :> Nil)
 -- @
-fifoDF :: forall addrSize m n a domain gated synchronous .
-     (KnownNat addrSize, KnownNat n, KnownNat m, (m + n) ~ (2 ^ addrSize))
+fifoDF
+  :: forall addrSize m n a domain gated synchronous
+   . ( Undefined a
+     , KnownNat addrSize
+     , KnownNat n
+     , KnownNat m
+     , (m + n) ~ (2 ^ addrSize) )
   => Clock domain gated
   -> Reset domain synchronous
   -> SNat (m + n) -- ^ Depth of the FIFO buffer. Must be a power of two.
@@ -335,15 +348,21 @@ parNDF fs =
 -- @
 --
 -- <<doc/loopDF_sync.svg>>
-loopDF :: (KnownNat m, KnownNat n, KnownNat addrSize, (m+n) ~ (2^addrSize))
-       => Clock dom gated
-       -> Reset dom synchronous
-       -> SNat (m + n) -- ^ Depth of the FIFO buffer. Must be a power of two
-       -> Vec m d -- ^ Initial content of the FIFO buffer. Can be smaller than
-                  -- the size of the FIFO. Empty spaces are initialised with
-                  -- 'undefined'.
-       -> DataFlow dom (Bool,Bool) (Bool,Bool) (a,d) (b,d)
-       -> DataFlow dom Bool Bool   a           b
+loopDF
+  :: ( Undefined d
+     , KnownNat m
+     , KnownNat n
+     , KnownNat addrSize
+     , (m+n) ~ (2^addrSize) )
+  => Clock dom gated
+  -> Reset dom synchronous
+  -> SNat (m + n)
+  -- ^ Depth of the FIFO buffer. Must be a power of two
+  -> Vec m d
+  -- ^ Initial content of the FIFO buffer. Can be smaller than the size of the
+  -- FIFO. Empty spaces are initialised with 'undefined'.
+  -> DataFlow dom (Bool,Bool) (Bool,Bool) (a,d) (b,d)
+  -> DataFlow dom Bool Bool   a           b
 loopDF clk rst sz is (DF f) =
   DF (\a aV bR -> let (bd,bdV,adR) = f ad adV bdR
                       (b,d)        = unbundle bd

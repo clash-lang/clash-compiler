@@ -568,7 +568,8 @@ infixr 3 .&&.
 -- need to 'seq' it explicitly.
 
 delay#
-  :: Clock  domain gated
+  :: Undefined a
+  => Clock  domain gated
   -> a
   -> Signal domain a
   -> Signal domain a
@@ -596,7 +597,8 @@ delay# (GatedClock _ _ en) dflt =
 -- the Intel tooling __will ignore the power up value__ and use the reset value
 -- instead.
 register#
-  :: Clock domain gated
+  :: Undefined a
+  => Clock domain gated
   -> Reset domain synchronous
   -> a
   -- ^ Power up value

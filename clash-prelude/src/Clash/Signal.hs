@@ -473,7 +473,8 @@ withClockReset = \clk rst f -> expose @"rst" (expose @"clk" f clk) rst
 -- >>> sampleN 3 (delay 0 (fromList [1,2,3,4]))
 -- [0,1,2]
 delay
-  :: HiddenClock domain gated
+  :: ( Undefined a
+     , HiddenClock domain gated )
   => a
   -- ^ Default value
   -> Signal domain a
@@ -490,7 +491,8 @@ delay dflt i =
 -- >>> sampleN 7 (delayMaybe 0 input)
 -- [0,1,2,2,2,5,6]
 delayMaybe
-  :: HiddenClock domain gated
+  :: ( Undefined a
+     , HiddenClock domain gated )
   => a
   -- ^ Initial value
   -> Signal domain (Maybe a)
@@ -506,7 +508,8 @@ delayMaybe dflt i =
 -- >>> sampleN 7 (delayEn 0 enable input)
 -- [0,1,2,2,2,5,6]
 delayEn
-  :: HiddenClock domain gated
+  :: ( Undefined a
+     , HiddenClock domain gated )
   => a
   -- ^ Initial value
   -> Signal domain Bool
@@ -523,7 +526,8 @@ delayEn dflt en i =
 -- >>> sampleN 5 (register 8 (fromList [1,1,2,3,4]))
 -- [8,8,1,2,3]
 register
-  :: HiddenClockReset domain gated synchronous
+  :: ( Undefined a
+     , HiddenClockReset domain gated synchronous )
   => a
   -- ^ Reset value
   --
@@ -558,7 +562,8 @@ infixr 3 `register`
 -- >>> sampleN 9 countSometimes
 -- [0,0,0,1,1,2,2,3,3]
 regMaybe
-  :: HiddenClockReset domain gated synchronous
+  :: ( Undefined a
+     , HiddenClockReset domain gated synchronous )
   => a
   -- ^ Reset value
   --
@@ -586,7 +591,8 @@ infixr 3 `regMaybe`
 -- >>> sampleN 9 count
 -- [0,0,0,1,1,2,2,3,3]
 regEn
-  :: HiddenClockReset domain gated synchronous
+  :: ( Undefined a
+     , HiddenClockReset domain gated synchronous )
   => a
   -- ^ Reset value
   --

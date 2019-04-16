@@ -54,11 +54,12 @@ import Clash.Signal.Delayed.Internal
   (DSignal(..), dfromList, dfromList_lazy, fromSignal, toSignal,
    unsafeFromSignal, antiDelay, feedback)
 import qualified Clash.Explicit.Signal.Delayed as E
-import            Clash.Sized.Vector           (Vec, dtfold)
-import            Clash.Signal
+import           Clash.Sized.Vector            (Vec, dtfold)
+import           Clash.Signal
   (HiddenClockReset, hideClockReset, Signal, delay, Domain(..))
 
-import Clash.Promoted.Nat         (SNat (..), snatToInteger)
+import           Clash.Promoted.Nat            (SNat (..), snatToInteger)
+import           Clash.XException              (Undefined)
 
 {- $setup
 >>> :set -XDataKinds -XTypeOperators -XTypeApplications -XFlexibleContexts
@@ -83,8 +84,10 @@ import Clash.Promoted.Nat         (SNat (..), snatToInteger)
 -- >>> sampleN 7 (toSignal (delay3 (dfromList [0..])))
 -- [-1,-1,-1,-1,1,2,3]
 delayed
-  :: HiddenClockReset domain gated synchronous
-  => KnownNat d
+  :: ( KnownNat d
+     , HiddenClockReset domain gated synchronous
+     , Undefined a
+     )
   => Vec d a
   -> DSignal domain n a
   -> DSignal domain (n + d) a
@@ -108,11 +111,13 @@ delayed = hideClockReset E.delayed
 --
 -- >>> :t delayedI @3
 -- delayedI @3
---   :: (...) =>
+--   :: (...
+--       ...) =>
 --      a -> DSignal domain n a -> DSignal domain (n + 3) a
 delayedI
-  :: KnownNat d
-  => HiddenClockReset domain gated synchronous
+  :: ( KnownNat d
+     , Undefined a
+     , HiddenClockReset domain gated synchronous )
   => a
   -- ^ Default value
   -> DSignal domain n a
@@ -134,7 +139,8 @@ delayedI = hideClockReset E.delayedI
 -- [-1,-1,1,2,3,4]
 delayN
   :: forall domain gated synchronous a d n
-   . HiddenClockReset domain gated synchronous
+   . ( HiddenClockReset domain gated synchronous
+     , Undefined a )
   => SNat d
   -> a
   -- ^ Default value
@@ -165,8 +171,9 @@ delayN d dflt = coerce . go (snatToInteger d) . coerce @_ @(Signal domain a)
 -- [-1,-1,1,2,3,4]
 delayI
   :: forall d n a domain gated synchronous
-   . HiddenClockReset domain gated synchronous
-  => KnownNat d
+   . ( HiddenClockReset domain gated synchronous
+     , Undefined a
+     , KnownNat d )
   => a
   -- ^ Default value
   -> DSignal domain n a
@@ -192,9 +199,10 @@ type instance Apply (DelayedFold domain n delay a) k = DSignal domain (n + (dela
 -- [-1,-1,1,1,0,1,16,81]
 delayedFold
   :: forall domain gated synchronous n delay k a
-   . HiddenClockReset domain gated synchronous
-  => KnownNat delay
-  => KnownNat k
+   . ( HiddenClockReset domain gated synchronous
+     , Undefined a
+     , KnownNat delay
+     , KnownNat k )
   => SNat delay
   -- ^ Delay applied after each step
   -> a

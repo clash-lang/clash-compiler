@@ -131,26 +131,30 @@ ddrIn# (GatedClock _ _ ena) (Async rst) i0 i1 i2 =
 -- | DDR output primitive
 --
 -- Produces a DDR output signal from a normal signal of pairs of input.
-ddrOut :: ( HasCallStack
-          , fast ~ 'Dom n pFast
-          , slow ~ 'Dom n (2*pFast))
-       => Clock slow gated            -- ^ clock
-       -> Reset slow synchronous      -- ^ reset
-       -> a                           -- ^ reset value
-       -> Signal slow (a,a)           -- ^ normal speed input pairs
-       -> Signal fast a               -- ^ DDR output signal
+ddrOut
+  :: ( HasCallStack
+     , Undefined a
+     , fast ~ 'Dom n pFast
+     , slow ~ 'Dom n (2*pFast))
+  => Clock slow gated            -- ^ clock
+  -> Reset slow synchronous      -- ^ reset
+  -> a                           -- ^ reset value
+  -> Signal slow (a,a)           -- ^ normal speed input pairs
+  -> Signal fast a               -- ^ DDR output signal
 ddrOut clk rst i0 = uncurry (withFrozenCallStack $ ddrOut# clk rst i0) . unbundle
 
 
-ddrOut# :: ( HasCallStack
-           , fast ~ 'Dom n pFast
-           , slow ~ 'Dom n (2*pFast))
-        => Clock slow gated
-        -> Reset slow synchronous
-        -> a
-        -> Signal slow a
-        -> Signal slow a
-        -> Signal fast a
+ddrOut#
+  :: ( HasCallStack
+     , Undefined a
+     , fast ~ 'Dom n pFast
+     , slow ~ 'Dom n (2*pFast))
+  => Clock slow gated
+  -> Reset slow synchronous
+  -> a
+  -> Signal slow a
+  -> Signal slow a
+  -> Signal fast a
 ddrOut# clk rst i0 xs ys =
     -- We only observe one reset value, because when the mux switches on the
     -- next clock level, the second register will already be outputting its

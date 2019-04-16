@@ -791,7 +791,7 @@ blockRam# clk content rd wen = case clockEnable clk of
 
 -- | Create read-after-write blockRAM from a read-before-write one
 readNew
-  :: Eq addr
+  :: (Undefined a, Eq addr)
   => Reset domain synchronous
   -> Clock domain gated
   -> (Signal domain addr -> Signal domain (Maybe (addr, a)) -> Signal domain a)

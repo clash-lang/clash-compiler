@@ -25,6 +25,7 @@ where
 
 import qualified Clash.Explicit.Mealy as E
 import           Clash.Signal
+import           Clash.XException           (Undefined)
 
 {- $setup
 >>> :set -XDataKinds -XTypeApplications
@@ -73,7 +74,8 @@ let macT s (x,y) = (s',s)
 --     s2 = 'mealy' mac 0 ('Clash.Signal.bundle' (b,y))
 -- @
 mealy
-  :: HiddenClockReset domain gated synchronous
+  :: ( HiddenClockReset domain gated synchronous
+     , Undefined s )
   => (s -> i -> (s,o))
   -- ^ Transfer function in mealy machine form: @state -> input -> (newstate,output)@
   -> s
@@ -111,9 +113,8 @@ mealy = hideClockReset E.mealy
 --     (i2,b2) = 'mealyB' f 3 (i1,c)
 -- @
 mealyB
-  :: HiddenClockReset domain gated synchronous
-  => Bundle i
-  => Bundle o
+  :: ( HiddenClockReset domain gated synchronous
+     , Undefined s, Bundle i, Bundle o )
   => (s -> i -> (s,o))
   -- ^ Transfer function in mealy machine form: @state -> input -> (newstate,output)@
   -> s
@@ -126,9 +127,8 @@ mealyB = hideClockReset E.mealyB
 
 -- | Infix version of 'mealyB'
 (<^>)
-  :: HiddenClockReset domain gated synchronous
-  => Bundle i
-  => Bundle o
+  :: ( HiddenClockReset domain gated synchronous
+     , Undefined s, Bundle i, Bundle o )
   => (s -> i -> (s,o))
   -- ^ Transfer function in mealy machine form: @state -> input -> (newstate,output)@
   -> s

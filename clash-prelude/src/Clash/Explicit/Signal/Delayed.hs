@@ -50,6 +50,8 @@ import Clash.Signal.Delayed.Internal
 import Clash.Explicit.Signal
   (Clock, Reset, Signal, register,  bundle, unbundle)
 
+import Clash.XException (Undefined)
+
 {- $setup
 >>> :set -XDataKinds
 >>> :set -XTypeOperators
@@ -89,6 +91,7 @@ let mac :: Clock System gated
 delayed
   :: forall domain gated synchronous a n d
    . KnownNat d
+  => Undefined a
   => Clock domain gated
   -> Reset domain synchronous
   -> Vec d a
@@ -124,13 +127,15 @@ delayed clk rst m ds = coerce (delaySignal (coerce ds))
 --
 -- >>> :t delayedI @3
 -- delayedI @3
---   :: Clock domain gated
+--   :: Undefined a =>
+--      Clock domain gated
 --      -> Reset domain synchronous
 --      -> a
 --      -> DSignal domain n a
 --      -> DSignal domain (n + 3) a
 delayedI
   :: KnownNat d
+  => Undefined a
   => Clock domain gated
   -> Reset domain synchronous
   -> a
