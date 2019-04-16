@@ -19,7 +19,7 @@ repository head.hackage
 source-repository-package
   type: git
   location: https://github.com/clash-lang/clash-compiler
-  tag: 1111111111111111111111111111111111111111
+  tag: 3c7f92ad2357a577467ec84df61fffa36843cb50
   subdir: clash-prelude
 
 -- | We need: a <=? Max a b ~ True

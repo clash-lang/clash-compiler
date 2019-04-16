@@ -102,7 +102,7 @@ install:
     echo 'source-repository-package'                                    >> cabal.project
     echo '  type: git'                                                  >> cabal.project
     echo '  location: https://github.com/clash-lang/clash-compiler'     >> cabal.project
-    echo '  tag: 1111111111111111111111111111111111111111'              >> cabal.project
+    echo '  tag: 3c7f92ad2357a577467ec84df61fffa36843cb50'              >> cabal.project
     echo '  subdir: clash-prelude'                                      >> cabal.project
     echo ''                                                             >> cabal.project
     echo 'source-repository-package'                                    >> cabal.project
@@ -138,7 +138,7 @@ script:
     echo 'source-repository-package'                                    >> cabal.project
     echo '  type: git'                                                  >> cabal.project
     echo '  location: https://github.com/clash-lang/clash-compiler'     >> cabal.project
-    echo '  tag: 1111111111111111111111111111111111111111'              >> cabal.project
+    echo '  tag: 3c7f92ad2357a577467ec84df61fffa36843cb50'              >> cabal.project
     echo '  subdir: clash-prelude'                                      >> cabal.project
     echo ''                                                             >> cabal.project
     echo 'source-repository-package'                                    >> cabal.project
