@@ -43,7 +43,6 @@ import Foreign
 import Foreign.C
 
 -- GC / IO / Monad
-import Control.DeepSeq (NFData)
 import Control.Monad
 import System.IO.Unsafe
 import System.Mem
@@ -419,6 +418,6 @@ class CoSimType t where
     toSignalStream   :: t -> SignalStream
     fromSignalStream :: SignalStream -> t
 
-instance (ClashType a, NFData a) => CoSimType (CP.Signal clk a) where
+instance (ClashType a, CP.Undefined a) => CoSimType (CP.Signal clk a) where
     toSignalStream   = map (wordPack . CP.pack) . CP.sample
     fromSignalStream = CP.fromList . map (CP.unpack . wordUnpack)

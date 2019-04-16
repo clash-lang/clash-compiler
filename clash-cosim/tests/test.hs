@@ -4,10 +4,9 @@
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE RankNTypes #-}
 
-import Control.DeepSeq (NFData)
-
 import Clash.Prelude
 import Clash.Prelude.Testbench
+import Clash.XException (Undefined)
 import Clash.CoSim (verilog, verilogWithSettings, period, defaultSettings)
 
 import Data.List as L
@@ -30,7 +29,7 @@ tests = testGroup "Inline verilog"
 -- "normal" Haskell types.
 bin
     :: forall t a
-     . (t ~ Signal System a, NFData a)
+     . (t ~ Signal System a, Undefined a)
     => (t -> t -> t)
     -> a
     -> a
