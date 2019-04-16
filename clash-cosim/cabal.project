@@ -29,3 +29,6 @@ package *
 -- The fail package is empty for GHC 8+, and haddock errors out on it
 package fail
   documentation: False
+
+package clash-prelude
+  documentation: False

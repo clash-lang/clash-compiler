@@ -104,8 +104,8 @@ install:
       (cd "." && autoreconf -i);
     fi
   - rm -f cabal.project.freeze
-  - cabal new-build -w ${HC} ${TEST} ${BENCH} --project-file="cabal.project" --dep -j2 all
-  - cabal new-build -w ${HC} --disable-tests --disable-benchmarks --project-file="cabal.project" --dep -j2 all
+  - cabal new-build --write-ghc-environment-files=always -w ${HC} ${TEST} ${BENCH} --project-file="cabal.project" --dep -j2 all
+  - cabal new-build --write-ghc-environment-files=always -w ${HC} --disable-tests --disable-benchmarks --project-file="cabal.project" --dep -j2 all
   - rm -rf .ghc.environment.* "."/dist
   - DISTDIR=$(mktemp -d /tmp/dist-test.XXXX)
 
@@ -113,7 +113,7 @@ install:
 # any command which exits with a non-zero exit code causes the build to fail.
 script:
   # test that source-distributions can be generated
-  - cabal new-build -w ${HC} --disable-tests --disable-benchmarks all
+  - cabal new-build --write-ghc-environment-files=always -w ${HC} --disable-tests --disable-benchmarks all
   - (cd "." && cabal new-sdist)
   - mv "."/dist-newstyle/sdist/clash-cosim-*.tar.gz ${DISTDIR}/
   - cd ${DISTDIR} || false
@@ -124,10 +124,10 @@ script:
   - cat cabal.project || true
   - cat cabal.project.local || true
   # this builds all libraries and executables (without tests/benchmarks)
-  - cabal new-build -w ${HC} --disable-tests --disable-benchmarks all
+  - cabal new-build --write-ghc-environment-files=always -w ${HC} --disable-tests --disable-benchmarks all
 
   # build & run tests, build benchmarks
-  - cabal new-build -w ${HC} ${TEST} ${BENCH} all
+  - cabal new-build --write-ghc-environment-files=always -w ${HC} ${TEST} ${BENCH} all
   - if [ "x$TEST" = "x--enable-tests" ]; then cabal new-test -w ${HC} ${TEST} ${BENCH} all; fi
 
   # cabal check
@@ -138,7 +138,7 @@ script:
   - if $HADDOCK; then cabal new-haddock -w ${HC} ${TEST} ${BENCH} all; else echo "Skipping haddock generation";fi
 
   # Build without installed constraints for packages in global-db
-  - if $UNCONSTRAINED; then rm -f cabal.project.local; echo cabal new-build -w ${HC} --disable-tests --disable-benchmarks all; else echo "Not building without installed constraints"; fi
+  - if $UNCONSTRAINED; then rm -f cabal.project.local; echo cabal new-build --write-ghc-environment-files=always -w ${HC} --disable-tests --disable-benchmarks all; else echo "Not building without installed constraints"; fi
 
 # REGENDATA ["--irc-channel","irc.freenode.org#clash-lang","./clash-cosim.cabal"]
 # EOF
