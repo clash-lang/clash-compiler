@@ -1833,7 +1833,7 @@ reduceNonRepPrim c@(TransformContext is0 ctx) e@(App _ _) | (Prim nm _, args) <-
           Right n -> do
             untranslatableTy <- isUntranslatableType_not_poly aTy
             if untranslatableTy || shouldReduce1
-               then reduceHead is0 n aTy vArg
+               then reduceHead is0 (n+1) aTy vArg
                else return e
           _ -> return e
       "Clash.Sized.Vector.tail" | length args == 3 -> do
@@ -1843,7 +1843,7 @@ reduceNonRepPrim c@(TransformContext is0 ctx) e@(App _ _) | (Prim nm _, args) <-
           Right n -> do
             untranslatableTy <- isUntranslatableType_not_poly aTy
             if untranslatableTy || shouldReduce1
-               then reduceTail is0 n aTy vArg
+               then reduceTail is0 (n+1) aTy vArg
                else return e
           _ -> return e
       "Clash.Sized.Vector.last" | length args == 3 -> do
@@ -1853,7 +1853,7 @@ reduceNonRepPrim c@(TransformContext is0 ctx) e@(App _ _) | (Prim nm _, args) <-
           Right n -> do
             untranslatableTy <- isUntranslatableType_not_poly aTy
             if untranslatableTy || shouldReduce1
-               then reduceLast is0 n aTy vArg
+               then reduceLast is0 (n+1) aTy vArg
                else return e
           _ -> return e
       "Clash.Sized.Vector.init" | length args == 3 -> do
@@ -1863,7 +1863,7 @@ reduceNonRepPrim c@(TransformContext is0 ctx) e@(App _ _) | (Prim nm _, args) <-
           Right n -> do
             untranslatableTy <- isUntranslatableType_not_poly aTy
             if untranslatableTy || shouldReduce1
-               then reduceInit is0 n aTy vArg
+               then reduceInit is0 (n+1) aTy vArg
                else return e
           _ -> return e
       "Clash.Sized.Vector.unconcat" | length args == 6 -> do
