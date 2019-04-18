@@ -99,7 +99,7 @@ import           Clash.Core.Term
    collectArgs)
 import           Clash.Core.Type             (TypeView (..), applyFunTy,
                                               isPolyFunCoreTy,
-                                              normalizeType,
+                                              normalizeType, splitFunForallTy,
                                               splitFunTy, typeKind,
                                               tyView, undefinedTy)
 import           Clash.Core.TyCon            (TyConMap, tyConDataCons)
@@ -742,7 +742,7 @@ deadCode _ e@(Letrec xes body) = do
 deadCode _ e = return e
 
 removeUnusedExpr :: HasCallStack => NormRewrite
-removeUnusedExpr _ e@(collectArgs -> (p@(Prim nm _),args)) = do
+removeUnusedExpr _ e@(collectArgs -> (p@(Prim nm pty),args)) = do
   bbM <- HashMap.lookup nm <$> Lens.use (extra.primitives)
   case bbM of
     Just (extractPrim ->  Just (BlackBox pNm _ _ _ _ _ inc templ)) -> do
@@ -760,6 +760,8 @@ removeUnusedExpr _ e@(collectArgs -> (p@(Prim nm _),args)) = do
          else changed (mkApps p args')
     _ -> return e
   where
+    arity = length . Either.lefts . fst $ splitFunForallTy pty
+
     go _ _ _ [] = return []
     go tcm n used (Right ty:args') = do
       args'' <- go tcm n used args'
@@ -768,9 +770,9 @@ removeUnusedExpr _ e@(collectArgs -> (p@(Prim nm _),args)) = do
       args'' <- go tcm (n+1) used args'
       let ty = termType tcm tm
           p' = mkApps (Prim "Clash.Transformations.removedArg" undefinedTy) [Right ty]
-      if n `elem` used
-         then return (Left tm : args'')
-         else return (Left p' : args'')
+      if n < arity && n `notElem` used
+         then return (Left p' : args'')
+         else return (Left tm : args'')
 
 removeUnusedExpr _ e@(Case _ _ [(DataPat _ [] xs,altExpr)]) =
   if xs `localIdsDoNotOccurIn` altExpr
