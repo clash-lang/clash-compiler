@@ -21,6 +21,7 @@ module Clash.Core.Evaluator where
 
 import           Control.Arrow                           (second)
 import           Control.Concurrent.Supply               (Supply, freshId)
+import           Control.Lens                            (view, _4)
 import           Data.Either                             (lefts,rights)
 import           Data.List
   (foldl',mapAccumL,uncons)
@@ -50,9 +51,10 @@ import           Clash.Unique
 import           Clash.Util                              (curLoc)
 
 -- | The heap
-data Heap = Heap GlobalHeap PureHeap Supply InScopeSet
+data Heap = Heap GlobalHeap GPureHeap PureHeap Supply InScopeSet
 
 type PureHeap = VarEnv Term
+newtype GPureHeap = GPureHeap { unGPureHeap :: PureHeap }
 
 -- | Global heap
 type GlobalHeap = (IntMap Term, Int)
@@ -62,6 +64,7 @@ type Stack = [StackFrame]
 
 data StackFrame
   = Update Id
+  | GUpdate Id
   | Apply  Id
   | Instantiate Type
   | PrimApply  Text Type [Type] [Value] [Term]
@@ -70,6 +73,7 @@ data StackFrame
 
 instance Pretty StackFrame where
   pretty (Update i) = hsep ["Update", ppr i]
+  pretty (GUpdate i) = hsep ["GUpdate", ppr i]
   pretty (Apply i) = hsep ["Apply", ppr i]
   pretty (Instantiate t) = hsep ["Instantiate", ppr t]
   pretty (PrimApply a b c d e) = do
@@ -101,7 +105,6 @@ type State = (Heap, Stack, Term)
 -- | Function that can evaluator primitives, i.e., perform delta-reduction
 type PrimEvaluator =
   Bool -> -- Force special primitives? See [Note: forcing special primitives]
-  BindingMap -> -- Global binders
   TyConMap -> -- Type constructors
   Heap ->
   Stack ->
@@ -122,26 +125,27 @@ whnf'
   -> Bool
   -> Term
   -> (GlobalHeap, PureHeap, Term)
-whnf' eval gbl tcm gh ids is isSubj e
-  = case whnf eval gbl tcm isSubj (Heap gh emptyVarEnv ids is,[],e) of
-      (Heap gh' ph' _ _,_,e') -> (gh',ph',e')
+whnf' eval gbl0 tcm gh ids is isSubj e
+  = case whnf eval tcm isSubj (Heap gh gbl1 emptyVarEnv ids is,[],e) of
+      (Heap gh' _ ph' _ _,_,e') -> (gh',ph',e')
+ where
+  gbl1 = GPureHeap (mapVarEnv (view _4) gbl0)
 
 -- | Evaluate to WHNF given an existing Heap and Stack
 whnf
   :: PrimEvaluator
-  -> BindingMap
   -> TyConMap
   -> Bool
   -> State
   -> State
-whnf eval gbl tcm isSubj (h,k,e) =
+whnf eval tcm isSubj (h,k,e) =
     if isSubj
        then go (h,Scrutinise ty []:k,e) -- See [Note: empty case expressions]
        else go (h,k,e)
   where
     ty = termType tcm e
 
-    go s = case step eval gbl tcm s of
+    go s = case step eval tcm s of
       Just s' -> go s'
       Nothing
         | Just e' <- unwindStack s
@@ -160,7 +164,7 @@ isScrut _ = False
 -- | Completely unwind the stack to get back the complete term
 unwindStack :: State -> Maybe State
 unwindStack s@(_,[],_) = Just s
-unwindStack (h@(Heap _ h' _ _),(kf:k'),e) = case kf of
+unwindStack (h@(Heap _ _ h' _ _),(kf:k'),e) = case kf of
   PrimApply nm ty tys vs tms ->
     unwindStack
       (h,k'
@@ -189,6 +193,8 @@ unwindStack (h@(Heap _ h' _ _),(kf:k'),e) = case kf of
   Scrutinise ty alts ->
     unwindStack (h,k',Case e ty alts)
   Update _ ->
+    unwindStack (h,k',e)
+  GUpdate _ ->
     unwindStack (h,k',e)
 
 {- [Note: forcing special primitives]
@@ -219,23 +225,22 @@ evaluate these special primitives.
 -- | Small-step operational semantics.
 step
   :: PrimEvaluator
-  -> BindingMap
   -> TyConMap
   -> State
   -> Maybe State
-step eval gbl tcm (h, k, e) = case e of
-  Var v        -> force gbl h k v
-  (Lam x e')   -> unwind eval gbl tcm h k (Lambda x e')
-  (TyLam x e') -> unwind eval gbl tcm h k (TyLambda x e')
-  (Literal l)  -> unwind eval gbl tcm h k (Lit l)
+step eval tcm (h, k, e) = case e of
+  Var v        -> force h k v
+  (Lam x e')   -> unwind eval tcm h k (Lambda x e')
+  (TyLam x e') -> unwind eval tcm h k (TyLambda x e')
+  (Literal l)  -> unwind eval tcm h k (Lit l)
   (App e1 e2)
     | (Data dc,args) <- collectArgs e
     , (tys,_) <- splitFunForallTy (dcType dc)
     -> case compare (length args) (length tys) of
-         EQ -> unwind eval gbl tcm h k (DC dc args)
+         EQ -> unwind eval tcm h k (DC dc args)
          LT -> let (tys',_) = splitFunForallTy (termType tcm e)
                    (h2,e')  = mkAbstr (h,e) tys'
-               in  step eval gbl tcm (h2,k,e')
+               in  step eval tcm (h2,k,e')
          GT -> error "Overapplied DC"
     | (Prim nm ty,args) <- collectArgs e
     , (tys,_) <- splitFunForallTy ty
@@ -244,17 +249,17 @@ step eval gbl tcm (h, k, e) = case e of
                in  Just (h,PrimApply nm ty (rights args) [] es:k,e')
          LT -> let (tys',_) = splitFunForallTy (termType tcm e)
                    (h2,e') = mkAbstr (h,e) tys'
-               in  step eval gbl tcm (h2,k,e')
+               in  step eval tcm (h2,k,e')
          GT -> let (h2,id_) = newLetBinding tcm h e2
                in  Just (h2,Apply id_:k,e1)
   (TyApp e1 ty)
     | (Data dc,args) <- collectArgs e
     , (tys,_) <- splitFunForallTy (dcType dc)
     -> case compare (length args) (length tys) of
-         EQ -> unwind eval gbl tcm h k (DC dc args)
+         EQ -> unwind eval tcm h k (DC dc args)
          LT -> let (tys',_) = splitFunForallTy (termType tcm e)
                    (h2,e') = mkAbstr (h,e) tys'
-               in  step eval gbl tcm (h2,k,e')
+               in  step eval tcm (h2,k,e')
          GT -> error "Overapplied DC"
     | (Prim nm ty',args) <- collectArgs e
     , (tys,_) <- splitFunForallTy ty'
@@ -262,23 +267,23 @@ step eval gbl tcm (h, k, e) = case e of
          EQ -> case lefts args of
               [] | nm `elem` ["Clash.Transformations.removedArg"]
                  -- The above primitives are actually values, and not operations.
-                 -> unwind eval gbl tcm h k (PrimVal nm ty' (rights args) [])
+                 -> unwind eval tcm h k (PrimVal nm ty' (rights args) [])
                  | otherwise
-                 -> eval (isScrut k) gbl tcm h k nm ty' (rights args) []
+                 -> eval (isScrut k) tcm h k nm ty' (rights args) []
               (e':es) -> Just (h,PrimApply nm ty' (rights args) [] es:k,e')
          LT -> let (tys',_) = splitFunForallTy (termType tcm e)
                    (h2,e') = mkAbstr (h,e) tys'
-               in  step eval gbl tcm (h2,k,e')
+               in  step eval tcm (h2,k,e')
          GT -> Just (h,Instantiate ty:k,e1)
-  (Data dc) -> unwind eval gbl tcm h k (DC dc [])
+  (Data dc) -> unwind eval tcm h k (DC dc [])
   (Prim nm ty')
     | nm `elem` ["GHC.Prim.realWorld#"]
-    -> unwind eval gbl tcm h k (PrimVal nm ty' [] [])
+    -> unwind eval tcm h k (PrimVal nm ty' [] [])
     | otherwise
     -> case fst (splitFunForallTy ty')  of
-        []  -> eval (isScrut k) gbl tcm h k nm ty' [] []
+        []  -> eval (isScrut k) tcm h k nm ty' [] []
         tys -> let (h2,e') = mkAbstr (h,e) tys
-               in  step eval gbl tcm (h2,k,e')
+               in  step eval tcm (h2,k,e')
   (App e1 e2)  -> let (h2,id_) = newLetBinding tcm h e2
                   in  Just (h2,Apply id_:k,e1)
   (TyApp e1 ty) -> Just (h,Instantiate ty:k,e1)
@@ -292,12 +297,12 @@ newLetBinding
   -> Heap
   -> Term
   -> (Heap,Id)
-newLetBinding tcm h@(Heap gh h' ids is0) e
+newLetBinding tcm h@(Heap gh gbl h' ids is0) e
   | Var v <- e
   , Just _ <- lookupVarEnv v h'
   = (h, v)
   | otherwise
-  = (Heap gh (extendVarEnv id_ e h') ids' is1,id_)
+  = (Heap gh gbl (extendVarEnv id_ e h') ids' is1,id_)
   where
     ty = termType tcm e
     ((ids',is1),id_) = mkUniqSystemId (ids,is0) ("x",ty)
@@ -321,40 +326,48 @@ mkAbstr = foldr go
   where
     go (Left tv)  (h,e)          =
       (h,TyLam tv (TyApp e (VarTy tv)))
-    go (Right ty) (Heap gh h ids is,e) =
+    go (Right ty) (Heap gh gbl h ids is,e) =
       let ((ids',_),id_) = mkUniqSystemId (ids,is) ("x",ty)
-      in  (Heap gh h ids' is,Lam id_ (App e (Var id_)))
+      in  (Heap gh gbl h ids' is,Lam id_ (App e (Var id_)))
 
 -- | Force the evaluation of a variable.
-force :: BindingMap -> Heap -> Stack -> Id -> Maybe State
-force gbl (Heap gh h ids is) k x' = case lookupVarEnv x' h of
-    Nothing -> case lookupUniqMap x' gbl of
-      Just (_,_,_,e) | isGlobalId x' -> Just (Heap gh h ids is,k,e)
+force :: Heap -> Stack -> Id -> Maybe State
+force (Heap gh g@(GPureHeap gbl) h ids is) k x' = case lookupVarEnv x' h of
+    Nothing -> case lookupVarEnv x' gbl of
+      Just e | isGlobalId x'
+        -> Just (Heap gh (GPureHeap (delVarEnv gbl x')) h ids is,GUpdate x':k,e)
       _ -> Nothing
-    Just e -> Just (Heap gh (delVarEnv h x') ids is,Update x':k,e)
+    Just e -> Just (Heap gh g (delVarEnv h x') ids is,Update x':k,e)
     -- Removing the heap-bound value on a force ensures we do not get stuck on
     -- expressions such as: "let x = x in x"
 
 -- | Unwind the stack by 1
 unwind
   :: PrimEvaluator
-  -> BindingMap
   -> TyConMap
   -> Heap -> Stack -> Value -> Maybe State
-unwind eval gbl tcm h k v = do
+unwind eval tcm h k v = do
   (kf,k') <- uncons k
   case kf of
     Update x                     -> return (update h k' x v)
+    GUpdate x                    -> return (gupdate h k' x v)
     Apply x                      -> return (apply  h k' v x)
     Instantiate ty               -> return (instantiate h k' v ty)
-    PrimApply nm ty tys vals tms -> primop eval gbl tcm h k' nm ty tys vals v tms
+    PrimApply nm ty tys vals tms -> primop eval tcm h k' nm ty tys vals v tms
     Scrutinise _ alts            -> return (scrutinise h k' v alts)
 
 -- | Update the Heap with the evaluated term
 update :: Heap -> Stack -> Id -> Value -> State
-update (Heap gh h ids is) k x v = (Heap gh (extendVarEnv x v' h) ids is,k,v')
+update (Heap gh gbl h ids is) k x v = (Heap gh gbl (extendVarEnv x v' h) ids is,k,v')
   where
     v' = valToTerm v
+
+-- | Update the Globals with the evaluated term
+gupdate :: Heap -> Stack -> Id -> Value -> State
+gupdate (Heap gh (GPureHeap gbl) h ids is) k x v =
+  (Heap gh (GPureHeap (extendVarEnv x v' gbl)) h ids is,k,v')
+ where
+  v' = valToTerm v
 
 valToTerm :: Value -> Term
 valToTerm v = case v of
@@ -374,7 +387,7 @@ toType x = VarTy x
 
 -- | Apply a value to a function
 apply :: Heap -> Stack -> Value -> Id -> State
-apply h@(Heap _ _ _ is0) k (Lambda x' e) x = (h,k,substTm "Evaluator.apply" subst e)
+apply h@(Heap _ _ _ _ is0) k (Lambda x' e) x = (h,k,substTm "Evaluator.apply" subst e)
  where
   subst  = extendIdSubst subst0 x' (Var x)
   subst0 = mkSubst (extendInScopeSet is0 x)
@@ -392,7 +405,6 @@ instantiate _ _ _ _ = error "not a ty lambda"
 -- | Evaluation of primitive operations
 primop
   :: PrimEvaluator
-  -> BindingMap
   -> TyConMap
   -> Heap
   -> Stack
@@ -409,7 +421,7 @@ primop
   -> [Term]
   -- ^ The remaining terms which must be evaluated to a value
   -> Maybe State
-primop eval gbl tcm h k nm ty tys vs v []
+primop eval tcm h k nm ty tys vs v []
   | nm `elem` ["Clash.Sized.Internal.BitVector.fromInteger#"
               ,"Clash.Sized.Internal.BitVector.fromInteger##"
               ,"Clash.Sized.Internal.Index.fromInteger#"
@@ -420,9 +432,9 @@ primop eval gbl tcm h k nm ty tys vs v []
               ,"GHC.Prim.MutableByteArray#"
               ]
               -- The above primitives are actually values, and not operations.
-  = unwind eval gbl tcm h k (PrimVal nm ty tys (vs ++ [v]))
-  | otherwise = eval (isScrut k) gbl tcm h k nm ty tys (vs ++ [v])
-primop _ _ _ h k nm ty tys vs v (e:es) =
+  = unwind eval tcm h k (PrimVal nm ty tys (vs ++ [v]))
+  | otherwise = eval (isScrut k) tcm h k nm ty tys (vs ++ [v])
+primop _ _ h k nm ty tys vs v (e:es) =
   Just (h,PrimApply nm ty tys (vs ++ [v]) es:k,e)
 
 -- | Evaluate a case-expression
@@ -520,8 +532,8 @@ substAlt dc tvs xs args e = substTm "Evaluator.substAlt" subst e
 
 -- | Allocate let-bindings on the heap
 allocate :: Heap -> Stack -> [LetBinding] -> Term -> State
-allocate (Heap gh h ids is0) k xes e =
-  (Heap gh (h `extendVarEnvList` xes') ids' isN,k,e')
+allocate (Heap gh gbl h ids is0) k xes e =
+  (Heap gh gbl (h `extendVarEnvList` xes') ids' isN,k,e')
  where
   xNms     = map fst xes
   is1      = extendInScopeSetList is0 xNms
