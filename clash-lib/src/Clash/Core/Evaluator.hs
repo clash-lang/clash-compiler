@@ -97,6 +97,8 @@ data Value
   | PrimVal  Text Type [Type] [Value]
   -- ^ Clash's number types are represented by their "fromInteger#" primitive
   -- function. So some primitives are values.
+  | Suspend Term
+  -- ^ Used by lazy primitives
   deriving Show
 
 -- | State of the evaluator
@@ -378,6 +380,7 @@ valToTerm v = case v of
   Lit l                -> Literal l
   PrimVal nm ty tys vs -> foldl' App (foldl' TyApp (Prim nm ty) tys)
                                  (map valToTerm vs)
+  Suspend e            -> e
 
 toVar :: Id -> Term
 toVar x = Var x
@@ -434,6 +437,10 @@ primop eval tcm h k nm ty tys vs v []
               -- The above primitives are actually values, and not operations.
   = unwind eval tcm h k (PrimVal nm ty tys (vs ++ [v]))
   | otherwise = eval (isScrut k) tcm h k nm ty tys (vs ++ [v])
+primop eval tcm h0 k nm ty tys [] v [e]
+  | nm == "Clash.Sized.Vector.lazyV"
+  = let (h1,i) = newLetBinding tcm h0 e
+    in  eval (isScrut k) tcm h1 k nm ty tys [v,Suspend (Var i)]
 primop _ _ h k nm ty tys vs v (e:es) =
   Just (h,PrimApply nm ty tys (vs ++ [v]) es:k,e)
 
