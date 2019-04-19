@@ -83,7 +83,7 @@ import           Clash.Normalize.Util             (callGraph)
 import           Clash.Primitives.Types
 import           Clash.Primitives.Util            (hashCompiledPrimMap)
 import           Clash.Unique                     (keysUniqMap, lookupUniqMap')
-import           Clash.Util                       (first)
+import           Clash.Util                       (first, reportTimeDiff)
 
 -- | Get modification data of current clash binary.
 getClashModificationDate :: IO Clock.UTCTime
@@ -127,7 +127,7 @@ generateHDL reprs bindingsMap hdlState primMap tcm tupTcm typeTrans eval
   topEntities opts (startTime,prepTime) = go prepTime HashMap.empty topEntities where
 
   go prevTime _ [] = putStrLn $ "Clash: Total compilation took " ++
-                              show (Clock.diffUTCTime prevTime startTime)
+                                reportTimeDiff prevTime startTime
 
   -- Process the next TopEntity
   go prevTime seen ((topEntity,annM,benchM):topEntities') = do
@@ -230,8 +230,8 @@ generateHDL reprs bindingsMap hdlState primMap tcm tupTcm typeTrans eval
                                   topEntity
 
       normTime <- transformedBindings `deepseq` Clock.getCurrentTime
-      let prepNormDiff = Clock.diffUTCTime normTime prevTime
-      putStrLn $ "Clash: Normalisation took " ++ show prepNormDiff
+      let prepNormDiff = reportTimeDiff normTime prevTime
+      putStrLn $ "Clash: Normalisation took " ++ prepNormDiff
 
       -- 2. Generate netlist for topEntity
       (netlist,seen') <-
@@ -239,8 +239,8 @@ generateHDL reprs bindingsMap hdlState primMap tcm tupTcm typeTrans eval
                    tcm typeTrans iw mkId extId ite seen hdlDir prefixM topEntity
 
       netlistTime <- netlist `deepseq` Clock.getCurrentTime
-      let normNetDiff = Clock.diffUTCTime netlistTime normTime
-      putStrLn $ "Clash: Netlist generation took " ++ show normNetDiff
+      let normNetDiff = reportTimeDiff netlistTime normTime
+      putStrLn $ "Clash: Netlist generation took " ++ normNetDiff
 
       -- 3. Generate topEntity wrapper
       let topComponent = view _4 . head $ filter (Data.Text.isSuffixOf topNm . componentName . view _4) netlist
@@ -266,8 +266,8 @@ generateHDL reprs bindingsMap hdlState primMap tcm tupTcm typeTrans eval
       let transformedBindings = normalizeEntity reprs bindingsMap primMap tcm tupTcm
                                   typeTrans eval topEntityNames opts supplyTB tb
       normTime <- transformedBindings `deepseq` Clock.getCurrentTime
-      let prepNormDiff = Clock.diffUTCTime normTime topTime
-      putStrLn $ "Clash: Testbench normalisation took " ++ show prepNormDiff
+      let prepNormDiff = reportTimeDiff normTime topTime
+      putStrLn $ "Clash: Testbench normalisation took " ++ prepNormDiff
 
       -- 2. Generate netlist for topEntity
       (netlist,seen'') <-
@@ -275,8 +275,8 @@ generateHDL reprs bindingsMap hdlState primMap tcm tupTcm typeTrans eval
                    tcm typeTrans iw mkId extId ite seen' hdlDir prefixM tb
 
       netlistTime <- netlist `deepseq` Clock.getCurrentTime
-      let normNetDiff = Clock.diffUTCTime netlistTime normTime
-      putStrLn $ "Clash: Testbench netlist generation took " ++ show normNetDiff
+      let normNetDiff = reportTimeDiff netlistTime normTime
+      putStrLn $ "Clash: Testbench netlist generation took " ++ normNetDiff
 
       -- 3. Write HDL
       let (hdlDocs,_,dfiles,mfiles) = createHDL hdlState2 modName' seen'' netlist undefined

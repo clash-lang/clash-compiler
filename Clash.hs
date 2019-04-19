@@ -15,6 +15,7 @@ import Clash.Backend.VHDL
 import Clash.Backend.Verilog
 import Clash.Netlist.BlackBox.Types
 import Clash.Annotations.BitRepresentation.Internal (buildCustomReprs)
+import Clash.Util
 
 import Control.DeepSeq
 import Control.Exception (finally)
@@ -54,16 +55,16 @@ doHDL b src = do
     pd      <- primDirs b
     (bindingsMap,tcm,tupTcm,topEntities,primMap,reprs) <- generateBindings tmpDir Auto pd ["."] (hdlKind b) src Nothing
     prepTime <- startTime `deepseq` bindingsMap `deepseq` tcm `deepseq` reprs `deepseq` Clock.getCurrentTime
-    let prepStartDiff = Clock.diffUTCTime prepTime startTime
-    putStrLn $ "Loading dependencies took " ++ show prepStartDiff
+    let prepStartDiff = reportTimeDiff prepTime startTime
+    putStrLn $ "Loading dependencies took " ++ prepStartDiff
 
     -- Parse primitives:
     startTime' <- Clock.getCurrentTime
     topDir     <- ghcLibDir
     primMap2   <- sequence $ HM.map (sequence . fmap (compilePrimitive ["."] [] topDir)) primMap
     prepTime'  <- startTime `deepseq` primMap2 `seq` Clock.getCurrentTime
-    let prepStartDiff' = Clock.diffUTCTime prepTime' startTime'
-    putStrLn $ "Parsing primitives took " ++ show prepStartDiff'
+    let prepStartDiff' = reportTimeDiff prepTime' startTime'
+    putStrLn $ "Parsing primitives took " ++ prepStartDiff'
 
     generateHDL (buildCustomReprs reprs) bindingsMap (Just b) primMap2 tcm tupTcm (ghcTypeToHWType WORD_SIZE_IN_BITS True) reduceConstant topEntities
       (ClashOpts 20 20 15 0 DebugNone False True True Auto WORD_SIZE_IN_BITS Nothing tmpDir HDLSYN True True ["."] Nothing True True False) (startTime,prepTime)

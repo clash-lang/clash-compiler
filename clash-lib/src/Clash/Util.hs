@@ -39,6 +39,9 @@ import Data.Maybe                     (fromMaybe)
 import Data.Text.Prettyprint.Doc
 import Data.Text.Prettyprint.Doc.Render.String
 import Data.Version                   (Version)
+import qualified Data.Time.Format     as Clock
+import qualified Data.Time.Clock      as Clock
+import Data.Time.Clock                (UTCTime)
 import Control.Lens
 import Debug.Trace                    (trace)
 import GHC.Base                       (Int(..),isTrue#,(==#),(+#))
@@ -358,3 +361,16 @@ anyM p (x:xs) = do
     return True
   else
     anyM p xs
+
+reportTimeDiff :: UTCTime -> UTCTime -> String
+reportTimeDiff start end =
+  Clock.formatTime Clock.defaultTimeLocale fmt
+    (Clock.UTCTime (toEnum 0) (fromRational (toRational diff)))
+ where
+  diff = Clock.diffUTCTime start end
+  fmt  | diff >= 3600
+       = "%-Hh%-Mm%-S%03Qs"
+       | diff >= 60
+       = "%-Mm%-S%03Qs"
+       | otherwise
+       = "%-S%03Qs"
