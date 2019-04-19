@@ -145,7 +145,7 @@ import           Clash.GHC.Evaluator
 import           Clash.GHC.GenerateBindings
 import           Clash.GHC.NetlistTypes
 import           Clash.Netlist.BlackBox.Types (HdlSyn)
-import           Clash.Util (clashLibVersion)
+import           Clash.Util (clashLibVersion, reportTimeDiff)
 import qualified Data.HashMap.Strict as HM
 import qualified Data.Time.Clock as Clock
 import qualified Paths_clash_ghc
@@ -1965,16 +1965,16 @@ makeHDL backend optsRef srcs = do
                 (bindingsMap,tcm,tupTcm,topEntities,primMap,reprs) <-
                   generateBindings tmpDir color primDirs idirs hdl src (Just dflags)
                 prepTime <- startTime `deepseq` bindingsMap `deepseq` tcm `deepseq` Clock.getCurrentTime
-                let prepStartDiff = Clock.diffUTCTime prepTime startTime
-                putStrLn $ "GHC+Clash: Loading modules cumulatively took " ++ show prepStartDiff
+                let prepStartDiff = reportTimeDiff prepTime startTime
+                putStrLn $ "GHC+Clash: Loading modules cumulatively took " ++ prepStartDiff
 
                 -- Parsing / compiling primitives:
                 startTime' <- Clock.getCurrentTime
                 let dbs = reverse [p | PackageDB (PkgConfFile p) <- packageDBFlags dflags]
                 primMap'   <- sequence $ HM.map (sequence . fmap (Clash.Driver.compilePrimitive idirs dbs (topDir dflags))) primMap
                 prepTime'  <- startTime' `deepseq` primMap' `seq` Clock.getCurrentTime
-                let prepStartDiff' = Clock.diffUTCTime prepTime' startTime'
-                putStrLn $ "Clash: Parsing and compiling primitives took " ++ show prepStartDiff'
+                let prepStartDiff' = reportTimeDiff prepTime' startTime'
+                putStrLn $ "Clash: Parsing and compiling primitives took " ++ prepStartDiff'
 
                 -- Generate HDL:
                 Clash.Driver.generateHDL

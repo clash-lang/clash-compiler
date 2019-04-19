@@ -85,7 +85,7 @@ import qualified Var
 -- Internal Modules
 import           Clash.GHC.GHC2Core                           (modNameM, qualifiedNameString')
 import           Clash.GHC.LoadInterfaceFiles                 (loadExternalExprs, primitiveFilePath)
-import           Clash.Util                                   (curLoc, noSrcSpan)
+import           Clash.Util                                   (curLoc, noSrcSpan, reportTimeDiff)
 import           Clash.Annotations.BitRepresentation.Internal
   (DataRepr', dataReprAnnToDataRepr')
 
@@ -242,8 +242,8 @@ loadModules tmpDir useColor hdl modName dflagsM idirs = do
         modFamInstEnvs'          = foldl' plusFamInst FamInstEnv.emptyFamInstEnv modFamInstEnvs
 
     modTime <- startTime `deepseq` length binderIds `deepseq` MonadUtils.liftIO Clock.getCurrentTime
-    let modStartDiff = Clock.diffUTCTime modTime startTime
-    MonadUtils.liftIO $ putStrLn $ "GHC: Parsing and optimising modules took: " ++ show modStartDiff
+    let modStartDiff = reportTimeDiff modTime startTime
+    MonadUtils.liftIO $ putStrLn $ "GHC: Parsing and optimising modules took: " ++ modStartDiff
 
     (externalBndrs,clsOps,unlocatable,pFP,reprs) <-
       loadExternalExprs tmpDir hdl (UniqSet.mkUniqSet binderIds) bindersC
@@ -252,8 +252,8 @@ loadModules tmpDir useColor hdl modName dflagsM idirs = do
     let allBinderIds = externalBndrIds ++ binderIds
 
     extTime <- modTime `deepseq` length unlocatable `deepseq` MonadUtils.liftIO Clock.getCurrentTime
-    let extModDiff = Clock.diffUTCTime extTime modTime
-    MonadUtils.liftIO $ putStrLn $ "GHC: Loading external modules from interface files took: " ++ show extModDiff
+    let extModDiff = reportTimeDiff extTime modTime
+    MonadUtils.liftIO $ putStrLn $ "GHC: Loading external modules from interface files took: " ++ extModDiff
 
     -- Find local primitive annotations
     pFP' <- findPrimitiveAnnotations hdl tmpDir binderIds
@@ -313,8 +313,8 @@ loadModules tmpDir useColor hdl modName dflagsM idirs = do
 
     annTime <- extTime `deepseq` length topEntities' `deepseq` pFP1 `deepseq`
                reprs1 `deepseq` primGuards `deepseq` MonadUtils.liftIO Clock.getCurrentTime
-    let annExtDiff = Clock.diffUTCTime annTime extTime
-    MonadUtils.liftIO $ putStrLn $ "GHC: Parsing annotations took: " ++ show annExtDiff
+    let annExtDiff = reportTimeDiff annTime extTime
+    MonadUtils.liftIO $ putStrLn $ "GHC: Parsing annotations took: " ++ annExtDiff
 
     return ( bindersC ++ makeRecursiveGroups externalBndrs
            , clsOps
