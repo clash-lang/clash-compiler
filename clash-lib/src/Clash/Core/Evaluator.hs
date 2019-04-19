@@ -166,7 +166,7 @@ isScrut _ = False
 -- | Completely unwind the stack to get back the complete term
 unwindStack :: State -> Maybe State
 unwindStack s@(_,[],_) = Just s
-unwindStack (h@(Heap _ _ h' _ _),(kf:k'),e) = case kf of
+unwindStack (h@(Heap gh gbl h' ids is),(kf:k'),e) = case kf of
   PrimApply nm ty tys vs tms ->
     unwindStack
       (h,k'
@@ -194,8 +194,8 @@ unwindStack (h@(Heap _ _ h' _ _),(kf:k'),e) = case kf of
     unwindStack (h,k',e)
   Scrutinise ty alts ->
     unwindStack (h,k',Case e ty alts)
-  Update _ ->
-    unwindStack (h,k',e)
+  Update x ->
+    unwindStack (Heap gh gbl (extendVarEnv x e h') ids is,k',e)
   GUpdate _ ->
     unwindStack (h,k',e)
 
