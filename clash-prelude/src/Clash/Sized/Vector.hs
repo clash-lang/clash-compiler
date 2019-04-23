@@ -8,6 +8,7 @@ Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
 {-# LANGUAGE BangPatterns         #-}
 {-# LANGUAGE CPP                  #-}
 {-# LANGUAGE DataKinds            #-}
+{-# LANGUAGE FlexibleInstances    #-}
 {-# LANGUAGE GADTs                #-}
 {-# LANGUAGE KindSignatures       #-}
 {-# LANGUAGE MagicHash            #-}
@@ -106,6 +107,10 @@ where
 
 import Control.DeepSeq            (NFData (..))
 import qualified Control.Lens     as Lens hiding (pattern (:>), pattern (:<))
+import Data.Constraint            ((:-)(..), Dict (..))
+import Data.Constraint.Nat        (leZero)
+import Data.Data
+  (Data (..), Constr, DataType, Fixity (..), Typeable, mkConstr, mkDataType)
 import Data.Default.Class         (Default (..))
 import qualified Data.Foldable    as F
 import Data.Kind                  (Type)
@@ -114,6 +119,7 @@ import Data.Singletons.Prelude    (TyFun,Apply,type (@@))
 import GHC.TypeLits               (CmpNat, KnownNat, Nat, type (+), type (-), type (*),
                                    type (^), type (<=), natVal)
 import GHC.Base                   (Int(I#),Int#,isTrue#)
+import GHC.Generics               hiding (Fixity (..))
 import GHC.Prim                   ((==#),(<#),(-#))
 import Language.Haskell.TH        (ExpQ)
 import Language.Haskell.TH.Syntax (Lift(..))
@@ -128,8 +134,8 @@ import Test.QuickCheck            (Arbitrary (..), CoArbitrary (..))
 import Unsafe.Coerce              (unsafeCoerce)
 
 import Clash.Promoted.Nat
-  (SNat (..), UNat (..), leToPlus, pow2SNat, snatProxy, snatToInteger, subSNat,
-   withSNat, toUNat)
+  (SNat (..), SNatLE (..), UNat (..), compareSNat, leToPlus, pow2SNat,
+   snatProxy, snatToInteger, subSNat, withSNat, toUNat)
 import Clash.Promoted.Nat.Literals (d1)
 import Clash.Sized.Internal.BitVector (Bit, BitVector, (++#), split#)
 import Clash.Sized.Index          (Index)
@@ -200,6 +206,54 @@ infixr 5 `Cons`
 data Vec :: Nat -> Type -> Type where
   Nil  :: Vec 0 a
   Cons :: a -> Vec n a -> Vec (n + 1) a
+
+-- | In many cases, this Generic instance only allows generic
+-- functions/instances over vectors of at least size 1, due to the
+-- /n-1/ in the /Rep (Vec n a)/ definition.
+--
+-- We'll have to wait for things like
+-- https://ryanglscott.github.io/2018/02/11/how-to-derive-generic-for-some-gadts/
+-- before we can work around this limitation
+instance KnownNat n => Generic (Vec n a) where
+  type Rep (Vec n a) =
+    D1 ('MetaData "Vec" "Clash.Data.Vector" "clash-prelude" 'False)
+      (C1 ('MetaCons "Nil" 'PrefixI 'False) U1 :+:
+       C1 ('MetaCons "Cons" 'PrefixI 'False)
+        (S1 ('MetaSel 'Nothing
+                'NoSourceUnpackedness
+                'NoSourceStrictness
+                'DecidedLazy)
+            (Rec0 a) :*:
+         S1 ('MetaSel 'Nothing
+                'NoSourceUnpackedness
+                'NoSourceStrictness
+                'DecidedLazy)
+            (Rec0 (Vec (n-1) a))))
+  from Nil         = M1 (L1 (M1 U1))
+  from (Cons x xs) = M1 (R1 (M1 (M1 (K1 x) :*: M1 (K1 xs))))
+  to (M1 g) = case compareSNat (SNat @n) (SNat @0) of
+    SNatLE -> case leZero @n of
+      Sub Dict -> Nil
+    SNatGT -> case g of
+      R1 (M1 (M1 (K1 p) :*: M1 (K1 q))) -> Cons p q
+
+instance (KnownNat n, Typeable a, Data a) => Data (Vec n a) where
+  gunfold k z _ = case compareSNat (SNat @n) (SNat @0) of
+    SNatLE -> case leZero @n of
+      Sub Dict -> z Nil
+    SNatGT -> k (k (z @(a -> Vec (n-1) a -> Vec n a) Cons))
+  toConstr Nil        = cNil
+  toConstr (Cons _ _) = cCons
+  dataTypeOf _        = tVec
+
+tVec :: DataType
+tVec = mkDataType "Vec" [cNil, cCons]
+
+cNil :: Constr
+cNil = mkConstr tVec "Nil" [] Prefix
+
+cCons :: Constr
+cCons = mkConstr tVec "Cons" [] Prefix
 
 instance NFData a => NFData (Vec n a) where
   rnf = foldl (\() -> rnf) ()
