@@ -15,6 +15,7 @@ CallStack (from HasCallStack):
 "(X,4)"
 -}
 
+{-# LANGUAGE CPP                   #-}
 {-# LANGUAGE DefaultSignatures     #-}
 {-# LANGUAGE DeriveGeneric         #-}
 {-# LANGUAGE EmptyCase             #-}
@@ -37,8 +38,8 @@ module Clash.XException
     -- * Printing 'X' exceptions as \"X\"
   , ShowX (..), showsX, printX, showsPrecXWith
     -- * Strict evaluation
-  , seqX, forceX, deepseqX, rwhnfX
-    -- * Structured undefined
+  , seqX, forceX, deepseqX, rwhnfX, defaultSeqX
+    -- * Structured undefined / deep evaluation with undefined values
   , Undefined (rnfX, deepErrorX)
   )
 where
@@ -68,6 +69,17 @@ instance Show XException where
   show (XException s) = s
 
 instance Exception XException
+
+-- | Either 'seqX' or 'deepSeqX' depending on the value of the cabal flag
+-- '-fsuper-strict'. If enabled, 'defaultSeqX' will be 'deepseqX', otherwise
+-- 'seqX'. Flag defaults to /false/ and thus 'seqX'.
+defaultSeqX :: Undefined a => a -> b -> b
+#ifdef CLASH_SUPER_STRICT
+defaultSeqX = deepseqX
+#else
+defaultSeqX = seqX
+#endif
+{-# INLINE defaultSeqX #-}
 
 -- | Like 'error', but throwing an 'XException' instead of an 'ErrorCall'
 --

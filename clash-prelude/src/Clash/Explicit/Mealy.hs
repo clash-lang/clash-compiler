@@ -20,7 +20,9 @@ module Clash.Explicit.Mealy
   )
 where
 
-import Clash.Explicit.Signal (Bundle (..), Clock, Reset, Signal, register)
+import           Clash.Explicit.Signal
+  (Bundle (..), Clock, Reset, Signal, register)
+import           Clash.XException      (Undefined)
 
 {- $setup
 >>> :set -XDataKinds -XTypeApplications
@@ -76,7 +78,8 @@ let macT s (x,y) = (s',s)
 --     s2 = 'mealy' clk rst mac 0 ('bundle' (b,y))
 -- @
 mealy
-  :: Clock dom gated
+  :: Undefined s
+  => Clock dom gated
   -- ^ 'Clock' to synchronize to
   -> Reset dom synchronous
   -> (s -> i -> (s,o))
@@ -119,8 +122,9 @@ mealy clk rst f iS =
 --     (i2,b2) = 'mealyB' clk rst f 3 (i1,c)
 -- @
 mealyB
-  :: Bundle i
-  => Bundle o
+  :: ( Undefined s
+     , Bundle i
+     , Bundle o )
   => Clock dom gated
   -> Reset dom synchronous
   -> (s -> i -> (s,o))

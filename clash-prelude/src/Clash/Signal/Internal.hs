@@ -102,7 +102,7 @@ import Test.QuickCheck            (Arbitrary (..), CoArbitrary(..), Property,
 
 import Clash.Promoted.Nat         (SNat (..), snatToInteger, snatToNum)
 import Clash.Promoted.Symbol      (SSymbol (..))
-import Clash.XException           (Undefined, errorX, seqX, deepseqX)
+import Clash.XException           (Undefined, errorX, deepseqX, defaultSeqX)
 
 {- $setup
 >>> :set -XDataKinds
@@ -568,7 +568,8 @@ infixr 3 .&&.
 -- need to 'seq' it explicitly.
 
 delay#
-  :: Clock  domain gated
+  :: Undefined a
+  => Clock  domain gated
   -> a
   -> Signal domain a
   -> Signal domain a
@@ -581,7 +582,7 @@ delay# (GatedClock _ _ en) dflt =
     go o (e :- es) as@(~(x :- xs)) =
       let o' = if e then x else o
       -- See [Note: register strictness annotations]
-      in  o `seqX` o :- (as `seq` go o' es xs)
+      in  o `defaultSeqX` o :- (as `seq` go o' es xs)
 {-# NOINLINE delay# #-}
 
 -- | A register with a power up and reset value. Power up values are not
@@ -596,7 +597,8 @@ delay# (GatedClock _ _ en) dflt =
 -- the Intel tooling __will ignore the power up value__ and use the reset value
 -- instead.
 register#
-  :: Clock domain gated
+  :: Undefined a
+  => Clock domain gated
   -> Reset domain synchronous
   -> a
   -- ^ Power up value
@@ -610,7 +612,7 @@ register# Clock {} (Sync rst) powerUpVal resetVal =
     go o rt@(~(r :- rs)) as@(~(x :- xs)) =
       let o' = if r then resetVal else x
           -- [Note: register strictness annotations]
-      in  o `seqX` o :- (rt `seq` as `seq` go o' rs xs)
+      in  o `defaultSeqX` o :- (rt `seq` as `seq` go o' rs xs)
 
 register# Clock {} (Async rst) powerUpVal resetVal =
     go powerUpVal rst
@@ -619,7 +621,7 @@ register# Clock {} (Async rst) powerUpVal resetVal =
       let o1 = if r then resetVal else o0
           oN = if r then resetVal else x
           -- [Note: register strictness annotations]
-      in  o1 `seqX` o1 :- (as `seq` go oN rs xs)
+      in  o1 `defaultSeqX` o1 :- (as `seq` go oN rs xs)
 
 register# (GatedClock _ _ ena) (Sync rst) powerUpVal resetVal =
     go powerUpVal rst ena
@@ -628,7 +630,7 @@ register# (GatedClock _ _ ena) (Sync rst) powerUpVal resetVal =
       let oE = if e then x else o
           oR = if r then resetVal else oE
           -- [Note: register strictness annotations]
-      in  o `seqX` o :- (rt `seq` enas `seq` as `seq` go oR rs es xs)
+      in  o `defaultSeqX` o :- (rt `seq` enas `seq` as `seq` go oR rs es xs)
 
 register# (GatedClock _ _ ena) (Async rst) powerUpVal resetVal =
     go powerUpVal rst ena
@@ -637,7 +639,7 @@ register# (GatedClock _ _ ena) (Async rst) powerUpVal resetVal =
       let oR = if r then resetVal else o
           oE = if r then resetVal else (if e then x else o)
           -- [Note: register strictness annotations]
-      in  oR `seqX` oR :- (as `seq` enas `seq` go oE rs es xs)
+      in  oR `defaultSeqX` oR :- (as `seq` enas `seq` go oE rs es xs)
 {-# NOINLINE register# #-}
 
 -- | The above type is a generalisation for:

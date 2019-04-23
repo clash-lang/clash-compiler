@@ -465,7 +465,8 @@ repSchedule high low = take low $ repSchedule' low high 1
 -- >>> sampleN 3 (delay systemClockGen 0 (fromList [1,2,3,4]))
 -- [0,1,2]
 delay
-  :: Clock domain gated
+  :: Undefined a
+  => Clock domain gated
   -- ^ Clock
   -> a
   -- ^ Default value
@@ -481,7 +482,8 @@ delay = delay#
 -- >>> sampleN 7 (delayMaybe systemClockGen 0 input)
 -- [0,1,2,2,2,5,6]
 delayMaybe
-  :: Clock domain gated
+  :: Undefined a
+  => Clock domain gated
   -- ^ Clock
   -> a
   -- ^ Initial value
@@ -498,7 +500,8 @@ delayMaybe clk dflt i =
 -- >>> sampleN 7 (delayEn systemClockGen 0 enable input)
 -- [0,1,2,2,2,5,6]
 delayEn
-  :: Clock domain gated
+  :: Undefined a
+  => Clock domain gated
   -- ^ Clock
   -> a
   -- ^ Initial value
@@ -516,7 +519,8 @@ delayEn clk dflt en i =
 -- >>> sampleN 5 (register systemClockGen asyncResetGen 8 (fromList [1,1,2,3,4]))
 -- [8,8,1,2,3]
 register
-  :: Clock domain gated
+  :: Undefined a
+  => Clock domain gated
   -- ^ clock
   -> Reset domain synchronous
   -- ^ Reset (active-high), 'register' outputs the reset value when the
@@ -551,7 +555,8 @@ register clk rst initial i =
 -- >>> sampleN 9 (count systemClockGen asyncResetGen)
 -- [0,0,0,1,1,2,2,3,3]
 regMaybe
-  :: Clock domain gated
+  :: Undefined a
+  => Clock domain gated
   -- ^ Clock
   -> Reset domain synchronous
   -- ^ Reset (active-high), 'regMaybe' outputs the reset value when the
@@ -579,7 +584,8 @@ regMaybe clk rst initial iM =
 -- >>> sampleN 9 (count systemClockGen asyncResetGen)
 -- [0,0,0,1,1,2,2,3,3]
 regEn
-  :: Clock domain clk
+  :: Undefined a
+  => Clock domain clk
   -- ^ Clock
   -> Reset domain synchronous
   -- ^ Reset (active-high), 'regEn' outputs the reset value when the

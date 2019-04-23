@@ -704,13 +704,17 @@ blockRamPow2 = \cnt rd wrM -> withFrozenCallStack
 --      ... =>
 --      Signal domain addr
 --      -> Signal domain (Maybe (addr, a)) -> Signal domain a
-readNew :: (Eq addr, HiddenClockReset domain gated synchronous)
-        => (Signal domain addr -> Signal domain (Maybe (addr, a)) -> Signal domain a)
-        -- ^ The @ram@ component
-        -> Signal domain addr              -- ^ Read address @r@
-        -> Signal domain (Maybe (addr, a)) -- ^ (Write address @w@, value to write)
-        -> Signal domain a
-        -- ^ Value of the @ram@ at address @r@ from the previous clock
-        -- cycle
+readNew
+  :: ( HiddenClockReset domain gated synchronous
+     , Undefined a
+     , Eq addr )
+  => (Signal domain addr -> Signal domain (Maybe (addr, a)) -> Signal domain a)
+  -- ^ The @ram@ component
+  -> Signal domain addr
+  -- ^ Read address @r@
+  -> Signal domain (Maybe (addr, a))
+  -- ^ (Write address @w@, value to write)
+  -> Signal domain a
+  -- ^ Value of the @ram@ at address @r@ from the previous clock cycle
 readNew = hideClockReset (\clk rst -> E.readNew rst clk)
 {-# INLINE readNew #-}

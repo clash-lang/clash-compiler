@@ -165,7 +165,7 @@ import Clash.XException
 -- [(8,8),(8,8),(1,1),(2,2),(3,3)...
 -- ...
 registerB
-  :: Bundle a
+  :: (Undefined a, Bundle a)
   => Clock domain gated
   -> Reset domain synchronous
   -> a
@@ -176,7 +176,7 @@ registerB clk rst i = unbundle Prelude.. register clk rst i Prelude.. bundle
 
 -- | Give a pulse when the 'Signal' goes from 'minBound' to 'maxBound'
 isRising
-  :: (Bounded a, Eq a)
+  :: (Undefined a, Bounded a, Eq a)
   => Clock domain gated
   -> Reset domain synchronous
   -> a -- ^ Starting value
@@ -190,7 +190,7 @@ isRising clk rst is s = liftA2 edgeDetect prev s
 
 -- | Give a pulse when the 'Signal' goes from 'maxBound' to 'minBound'
 isFalling
-  :: (Bounded a, Eq a)
+  :: (Undefined a, Bounded a, Eq a)
   => Clock domain gated
   -> Reset domain synchronous
   -> a -- ^ Starting value

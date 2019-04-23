@@ -73,52 +73,53 @@ assign ~RESULT = {~SYM[3], ~SYM[1]};
     , "kind" : "Declaration"
     , "type" :
 "ddrOut# :: ( HasCallStack               -- ARG[0]
-            , fast ~ Dom n pFast         -- ARG[1]
-            , slow ~ Dom n (2*pFast))    -- ARG[2]
-         => Clock slow gated             -- ARG[3]
-         -> Reset slow synchronous       -- ARG[4]
-         -> a                            -- ARG[5]
-         -> Signal slow a                -- ARG[6]
+            , Undefined a                -- ARG[1]
+            , fast ~ Dom n pFast         -- ARG[2]
+            , slow ~ Dom n (2*pFast))    -- ARG[3]
+         => Clock slow gated             -- ARG[4]
+         -> Reset slow synchronous       -- ARG[5]
+         -> a                            -- ARG[6]
          -> Signal slow a                -- ARG[7]
+         -> Signal slow a                -- ARG[8]
          -> Signal fast a"
     , "template" :
 "// ddrOut begin
 ~SIGD[~GENSYM[data_Pos][1]][5];
 ~SIGD[~GENSYM[data_Neg][2]][5];
-~IF ~ISGATED[3] ~THEN
-always @(posedge ~ARG[3][1]~IF ~ISSYNC[4] ~THEN ~ELSE or posedge ~ARG[4]~FI) begin : ~GENSYM[~COMPNAME_ddrOut_pos][5]
-  if (~ARG[4]) begin
-    ~SYM[1] <= ~ARG[5];
-  end else if (~ARG[3][0]) begin
+~IF ~ISGATED[4] ~THEN
+always @(posedge ~ARG[4][1]~IF ~ISSYNC[5] ~THEN ~ELSE or posedge ~ARG[5]~FI) begin : ~GENSYM[~COMPNAME_ddrOut_pos][5]
+  if (~ARG[5]) begin
     ~SYM[1] <= ~ARG[6];
+  end else if (~ARG[4][0]) begin
+    ~SYM[1] <= ~ARG[7];
   end
 end~ELSE
-always @(posedge ~ARG[3]~IF ~ISSYNC[4] ~THEN ~ELSE or posedge ~ARG[4]~FI) begin : ~SYM[5]
-  if (~ARG[4]) begin
-    ~SYM[1] <= ~ARG[5];
-  end else begin
+always @(posedge ~ARG[4]~IF ~ISSYNC[5] ~THEN ~ELSE or posedge ~ARG[5]~FI) begin : ~SYM[5]
+  if (~ARG[5]) begin
     ~SYM[1] <= ~ARG[6];
+  end else begin
+    ~SYM[1] <= ~ARG[7];
   end
 end~FI
-~IF ~ISGATED[3] ~THEN
-always @(posedge ~ARG[3][1]~IF ~ISSYNC[4] ~THEN ~ELSE or posedge ~ARG[4]~FI) begin : ~GENSYM[~COMPNAME_ddrOut_neg][6]
-  if (~ARG[4]) begin
-    ~SYM[2] <= ~ARG[5];
-  end else if (~ARG[3][0]) begin
-    ~SYM[2] <= ~ARG[7];
+~IF ~ISGATED[4] ~THEN
+always @(posedge ~ARG[4][1]~IF ~ISSYNC[5] ~THEN ~ELSE or posedge ~ARG[5]~FI) begin : ~GENSYM[~COMPNAME_ddrOut_neg][6]
+  if (~ARG[5]) begin
+    ~SYM[2] <= ~ARG[6];
+  end else if (~ARG[4][0]) begin
+    ~SYM[2] <= ~ARG[8];
   end
 end~ELSE
-always @(posedge ~ARG[3]~IF ~ISSYNC[4] ~THEN ~ELSE or posedge ~ARG[4]~FI) begin : ~SYM[6]
-  if (~ARG[4]) begin
-    ~SYM[2] <= ~ARG[5];
+always @(posedge ~ARG[4]~IF ~ISSYNC[5] ~THEN ~ELSE or posedge ~ARG[5]~FI) begin : ~SYM[6]
+  if (~ARG[5]) begin
+    ~SYM[2] <= ~ARG[6];
   end else begin
-    ~SYM[2] <= ~ARG[7];
+    ~SYM[2] <= ~ARG[8];
   end
 end~FI
 
-always @(*) begin ~IF ~ISGATED[3] ~THEN
-  if (~ARG[3][1]) begin~ELSE
-  if (~ARG[3]) begin~FI
+always @(*) begin ~IF ~ISGATED[4] ~THEN
+  if (~ARG[4][1]) begin~ELSE
+  if (~ARG[4]) begin~FI
     ~RESULT = ~SYM[1];
   end else begin
     ~RESULT = ~SYM[2];
