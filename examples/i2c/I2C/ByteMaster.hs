@@ -1,3 +1,4 @@
+{-# LANGUAGE DeriveAnyClass  #-}
 {-# LANGUAGE RecordWildCards #-}
 module I2C.ByteMaster (byteMaster) where
 

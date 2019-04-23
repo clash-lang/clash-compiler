@@ -1,3 +1,4 @@
+{-# LANGUAGE DeriveAnyClass #-}
 module RotateCNested where
 
 import Clash.Prelude.Testbench

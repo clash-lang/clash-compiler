@@ -1,3 +1,4 @@
+{-# LANGUAGE DeriveAnyClass #-}
 module TRepeat where
 
 import qualified Prelude as P

@@ -1,3 +1,4 @@
+{-# LANGUAGE DeriveAnyClass #-}
 module PortNamesWithVector where
 
 import qualified Prelude as P

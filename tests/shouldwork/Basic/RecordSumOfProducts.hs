@@ -1,4 +1,5 @@
 {-# LANGUAGE DataKinds #-}
+{-# LANGUAGE DeriveAnyClass #-}
 {-# LANGUAGE TemplateHaskell #-}
 
 module RecordSumOfProducts where

@@ -1,3 +1,4 @@
+{-# LANGUAGE DeriveAnyClass #-}
 module ZipWithUnitSP where
 
 import Clash.Prelude

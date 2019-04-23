@@ -1,3 +1,4 @@
+{-# LANGUAGE DeriveAnyClass  #-}
 {-# LANGUAGE RecordWildCards #-}
 module Reducer where
 

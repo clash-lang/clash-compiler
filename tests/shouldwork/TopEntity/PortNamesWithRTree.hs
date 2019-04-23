@@ -1,3 +1,4 @@
+{-# LANGUAGE DeriveAnyClass #-}
 module PortNamesWithRTree where
 
 import qualified Prelude as P

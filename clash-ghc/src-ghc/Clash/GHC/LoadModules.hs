@@ -601,7 +601,6 @@ wantedLanguageExtensions df =
     wanted = [ LangExt.BinaryLiterals
              , LangExt.ConstraintKinds
              , LangExt.DataKinds
-             , LangExt.DeriveAnyClass
              , LangExt.DeriveGeneric
              , LangExt.DeriveLift
              , LangExt.ExplicitForAll

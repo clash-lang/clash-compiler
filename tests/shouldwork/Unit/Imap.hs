@@ -1,5 +1,5 @@
 -- See: https://github.com/clash-lang/clash-compiler/issues/507
-
+{-# LANGUAGE DeriveAnyClass #-}
 module Imap where
 
 import Clash.Prelude

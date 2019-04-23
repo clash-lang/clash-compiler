@@ -1,3 +1,4 @@
+{-# LANGUAGE DeriveAnyClass #-}
 module LotOfStates where
 
 import Clash.Prelude
