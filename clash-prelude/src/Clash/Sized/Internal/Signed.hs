@@ -7,6 +7,7 @@ Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
 
 {-# LANGUAGE DataKinds                  #-}
 {-# LANGUAGE DeriveAnyClass             #-}
+{-# LANGUAGE DeriveGeneric              #-}
 {-# LANGUAGE DeriveDataTypeable         #-}
 {-# LANGUAGE KindSignatures             #-}
 {-# LANGUAGE MagicHash                  #-}
@@ -91,6 +92,7 @@ import Data.Data                      (Data)
 import Data.Default.Class             (Default (..))
 import Data.Proxy                     (Proxy (..))
 import Text.Read                      (Read (..), ReadPrec)
+import GHC.Generics                   (Generic)
 import GHC.TypeLits                   (KnownNat, Nat, type (+), natVal)
 import GHC.TypeLits.Extra             (Max)
 import Language.Haskell.TH            (TypeQ, appT, conT, litT, numTyLit, sigE)
@@ -149,7 +151,7 @@ newtype Signed (n :: Nat) =
     -- | The constructor, 'S', and the field, 'unsafeToInteger', are not
     -- synthesisable.
     S { unsafeToInteger :: Integer}
-  deriving Data
+  deriving (Data, Generic)
 
 instance Undefined (Signed n) where
   deepErrorX = errorX

@@ -7,6 +7,7 @@ Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
 
 {-# LANGUAGE DataKinds                  #-}
 {-# LANGUAGE DeriveDataTypeable         #-}
+{-# LANGUAGE DeriveGeneric              #-}
 {-# LANGUAGE DeriveAnyClass             #-}
 {-# LANGUAGE KindSignatures             #-}
 {-# LANGUAGE MagicHash                  #-}
@@ -133,6 +134,7 @@ import Data.Data                  (Data)
 import Data.Default.Class         (Default (..))
 import Data.Proxy                 (Proxy (..))
 import Data.Typeable              (Typeable, typeOf)
+import GHC.Generics               (Generic)
 import GHC.Integer                (smallInteger)
 import GHC.Prim                   (dataToTag#)
 import GHC.Stack                  (HasCallStack, withFrozenCallStack)
@@ -173,7 +175,7 @@ data BitVector (n :: Nat) =
     BV { unsafeMask      :: !Integer
        , unsafeToInteger :: !Integer
        }
-  deriving Data
+  deriving (Data, Generic)
 
 -- * Bit
 
@@ -184,7 +186,7 @@ data Bit =
   Bit { unsafeMask#      :: !Integer
       , unsafeToInteger# :: !Integer
       }
-  deriving Data
+  deriving (Data, Generic)
 
 -- * Constructions
 -- ** Initialisation

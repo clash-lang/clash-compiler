@@ -9,6 +9,7 @@ Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
 {-# LANGUAGE DataKinds             #-}
 {-# LANGUAGE DeriveAnyClass        #-}
 {-# LANGUAGE DeriveDataTypeable    #-}
+{-# LANGUAGE DeriveGeneric         #-}
 {-# LANGUAGE FlexibleContexts      #-}
 {-# LANGUAGE KindSignatures        #-}
 {-# LANGUAGE MagicHash             #-}
@@ -80,6 +81,7 @@ import Text.Read                  (Read (..), ReadPrec)
 import Language.Haskell.TH        (TypeQ, appT, conT, litT, numTyLit, sigE)
 import Language.Haskell.TH.Syntax (Lift(..))
 import Numeric.Natural            (Natural)
+import GHC.Generics               (Generic)
 import GHC.Stack                  (HasCallStack)
 import GHC.TypeLits               (CmpNat, KnownNat, Nat, type (+), type (-),
                                    type (*), type (<=), natVal)
@@ -124,7 +126,7 @@ newtype Index (n :: Nat) =
     -- | The constructor, 'I', and the field, 'unsafeToInteger', are not
     -- synthesisable.
     I { unsafeToInteger :: Integer }
-  deriving Data
+  deriving (Data, Generic)
 
 instance NFData (Index n) where
   rnf (I i) = rnf i `seq` ()
