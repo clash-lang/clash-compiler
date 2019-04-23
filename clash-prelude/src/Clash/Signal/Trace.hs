@@ -1,5 +1,6 @@
 {-|
 Copyright  :  (C) 2018, Google Inc.
+                  2019, Myrtle Software Tld
 License    :  BSD2 (see the file LICENSE)
 Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
 
@@ -44,6 +45,7 @@ main = do
 @
 -}
 {-# LANGUAGE CPP                 #-}
+{-# LANGUAGE BangPatterns        #-}
 {-# LANGUAGE DataKinds           #-}
 {-# LANGUAGE FlexibleContexts    #-}
 {-# LANGUAGE MagicHash           #-}
@@ -70,6 +72,10 @@ module Clash.Signal.Trace
   -- * VCD dump functions
   , dumpVCD
 
+  -- * Replay functions
+  , dumpReplayable
+  , replay
+
   -- * Internal
   -- ** Types
   , Period
@@ -87,18 +93,23 @@ module Clash.Signal.Trace
   ) where
 
 -- Clash:
-import           Clash.Signal.Internal (Domain (..))
+import           Clash.Signal.Internal (Domain (..), fromList)
 import           Clash.Signal          (Signal, bundle, unbundle)
 import           Clash.Sized.Vector    (Vec, iterateI)
 import qualified Clash.Sized.Vector    as Vector
-import           Clash.Class.BitPack   (BitPack, BitSize, pack)
+import           Clash.Class.BitPack   (BitPack, BitSize, pack, unpack)
 import           Clash.Promoted.Nat    (snatToNum, SNat(..))
 import           Clash.Signal.Internal (sample)
 import           Clash.XException      (deepseqX, Undefined)
+import           Clash.Sized.Internal.BitVector
+  (BitVector(BV))
 
 -- Haskell / GHC:
 import           Control.Monad         (foldM)
 import           Data.Bits             (testBit)
+import           Data.Binary           (encode, decodeOrFail)
+import           Data.ByteString.Lazy  (ByteString)
+import qualified Data.ByteString.Lazy  as ByteStringLazy
 import           Data.Char             (ord, chr)
 import           Data.IORef
   (IORef, atomicModifyIORef', atomicWriteIORef, newIORef, readIORef)
@@ -111,6 +122,7 @@ import           Data.Time.Format      (formatTime, defaultTimeLocale)
 import           GHC.Stack             (HasCallStack)
 import           GHC.TypeLits          (KnownNat, type (+))
 import           System.IO.Unsafe      (unsafePerformIO)
+import           Type.Reflection       (Typeable, TypeRep, typeRep)
 
 #ifdef CABAL
 import qualified Data.Version
@@ -119,9 +131,13 @@ import qualified Paths_clash_prelude
 
 type Period   = Int
 type Changed  = Bool
-type Value    = Integer
+type Value    = (Integer, Integer) -- (Mask, Value)
 type Width    = Int
-type TraceMap = Map.Map String (Period, Width, [Value])
+
+-- | Serialized TypeRep we need to store for dumpReplayable / replay
+type TypeRepBS = ByteString
+
+type TraceMap  = Map.Map String (TypeRepBS, Period, Width, [Value])
 
 -- | Map of traces used by the non-internal trace and dumpvcd functions.
 traceMap# :: IORef TraceMap
@@ -135,7 +151,9 @@ mkTrace
   => Undefined a
   => Signal domain a
   -> [Value]
-mkTrace signal = map (toInteger . pack) (sample signal)
+mkTrace signal = sample (unsafeToTup . pack <$> signal)
+ where
+  unsafeToTup (BV mask value) = (mask, value)
 
 -- | Trace a single signal. Will emit an error if a signal with the same name
 -- was previously registered.
@@ -143,7 +161,8 @@ traceSignal#
   :: forall domain a
    . ( KnownNat (BitSize a)
      , BitPack a
-     , Undefined a )
+     , Undefined a
+     , Typeable a )
   => IORef TraceMap
   -- ^ Map to store the trace
   -> Int
@@ -158,7 +177,14 @@ traceSignal# traceMap period traceName signal =
     if Map.member traceName m then
       error $ "Already tracing a signal with the name: '" ++ traceName ++ "'."
     else
-      (Map.insert traceName (period, width, mkTrace signal) m, signal)
+      ( Map.insert
+          traceName
+          ( encode (typeRep @a)
+          , period
+          , width
+          , mkTrace signal)
+          m
+      , signal)
  where
   width = snatToNum (SNat @ (BitSize a))
 {-# NOINLINE traceSignal# #-}
@@ -171,7 +197,8 @@ traceVecSignal#
    . ( KnownNat (BitSize a)
      , KnownNat n
      , BitPack a
-     , Undefined a )
+     , Undefined a
+     , Typeable a )
   => IORef TraceMap
   -- ^ Map to store the traces
   -> Int
@@ -201,7 +228,8 @@ traceSignal
      , KnownNat period
      , KnownNat (BitSize a)
      , BitPack a
-     , Undefined a )
+     , Undefined a
+     , Typeable a )
   => String
   -- ^ Name of signal in the VCD output
   -> Signal domain a
@@ -222,7 +250,8 @@ traceSignal traceName signal =
 traceSignal1
   :: ( KnownNat (BitSize a)
      , BitPack a
-     , Undefined a )
+     , Undefined a
+     , Typeable a )
   => String
   -- ^ Name of signal in the VCD output
   -> Signal domain a
@@ -246,7 +275,8 @@ traceVecSignal
      , KnownNat period
      , KnownNat n
      , BitPack a
-     , Undefined a )
+     , Undefined a
+     , Typeable a )
   => String
   -- ^ Name of signal in debugging output. Will be appended by _0, _1, ..., _n.
   -> Signal domain (Vec (n+1) a)
@@ -269,7 +299,8 @@ traceVecSignal1
   :: ( KnownNat (BitSize a)
      , KnownNat n
      , BitPack a
-     , Undefined a )
+     , Undefined a
+     , Typeable a )
   => String
   -- ^ Name of signal in debugging output. Will be appended by _0, _1, ..., _n.
   -> Signal domain (Vec (n+1) a)
@@ -285,7 +316,7 @@ iso8601Format = formatTime defaultTimeLocale "%Y-%m-%dT%H:%M:%S"
 toPeriodMap :: TraceMap -> Map.Map Period [(String, Width, [Value])]
 toPeriodMap m = foldl' go Map.empty (Map.assocs m)
   where
-    go periodMap (traceName, (period, width, values)) =
+    go periodMap (traceName, (_rep, period, width, values)) =
       Map.alter (Just . go') period periodMap
         where
           go' = ((traceName, width, values):) . (fromMaybe [])
@@ -377,12 +408,25 @@ dumpVCD## (offset, cycles) traceMap now
   headerWire w l n = map Text.pack ["$var wire", show w, [l], n, "$end"]
   initValues       = map Text.pack $ zipWith ($) formatters inits
 
+  -- Guard against (partially) undefined bitvectors:
+  toIntegers :: Int -> [[Value]] -> [[Integer]]
+  toIntegers _ [] = []
+  toIntegers !cyclen (xs:xss) =
+    zipWith vToInteger traceNames xs : toIntegers (cyclen + 1) xss
+   where
+    vToInteger _traceName (0, v) = v
+    vToInteger traceName (mask, v) =
+      error $ "dumpVCD can't handle (partially) undefined values yet, but "
+           ++ "encountered one at cycle " ++ show cyclen ++ " of traced signal "
+           ++ "labeled " ++ show traceName ++ ". Mask was " ++ show mask
+           ++ ", value was " ++ show v ++ "."
+
   formatters = zipWith format widths labels
-  inits = map head valuess'
-  tails = map changed valuess'
+  inits = map head (toIntegers 0 valuess')
+  tails = map changed (toIntegers 0 valuess')
 
   -- | Format single value according to VCD spec
-  format :: Width -> Char -> Value -> String
+  format :: Width -> Char -> Integer -> String
   format 1 label 0   = ['0', label, '\n']
   format 1 label 1   = ['1', label, '\n']
   format 1 label val =
@@ -393,7 +437,7 @@ dumpVCD## (offset, cycles) traceMap now
 
   -- | Given a list of values, return a list of list of bools indicating
   -- if a value changed. The first value is *not* included in the result.
-  changed :: [Value] -> [(Changed, Value)]
+  changed :: [Integer] -> [(Changed, Integer)]
   changed (s:ss) = zip (zipWith (/=) (s:ss) ss) ss
   changed []     = []
 
@@ -405,7 +449,7 @@ dumpVCD## (offset, cycles) traceMap now
         let pre = Text.concat ["#", n, "\n"] in
         fmap (Text.append pre) t
 
-  bodyPart :: [(Changed, Value)] -> Maybe Text.Text
+  bodyPart :: [(Changed, Integer)] -> Maybe Text.Text
   bodyPart values =
     let formatted  = [(c, f v) | (f, (c,v)) <- zip formatters values]
         formatted' = map (Text.pack . snd) $ filter fst $ formatted in
@@ -449,11 +493,69 @@ dumpVCD
   => (Int, Int)
   -- ^ (offset, number of samples)
   -> Signal domain a
-  -- ^ (One of) the output the circuit containing the traces
+  -- ^ (One of) the outputs of the circuit containing the traces
   -> [String]
   -- ^ The names of the traces you definitely want to be dumped in the VCD file
   -> IO (Either String Text.Text)
 dumpVCD = dumpVCD# traceMap#
+
+-- | Dump a number of samples to a replayable bytestring.
+dumpReplayable
+  :: forall a domain
+   . Undefined a
+  => Int
+  -- ^ Number of samples
+  -> Signal domain a
+  -- ^ (One of) the outputs of the circuit containing the traces
+  -> String
+  -- ^ Name of trace to dump
+  -> IO ByteString
+dumpReplayable n oSignal traceName = do
+  waitForTraces# traceMap# oSignal [traceName]
+  replaySignal <- (Map.! traceName) <$> readIORef traceMap#
+  let (tRep, _period, _width, samples) = replaySignal
+  pure (ByteStringLazy.concat (tRep : map encode (take n samples)))
+
+-- | Take a serialized signal (dumped with @dumpReplayable@) and convert it
+-- back into a signal. Will error if dumped type does not match requested
+-- type. The first value in the signal that fails to decode will stop the
+-- decoding process and yield an error. Not that this always happens if you
+-- evaluate more values than were originally dumped.
+replay
+  :: forall a domain n
+   . ( Typeable a
+     , Undefined a
+     , BitPack a
+     , KnownNat n 
+     , n ~ BitSize a )
+  => ByteString
+  -> Either String (Signal domain a)
+replay bytes0 = samples1
+ where
+  samples1 =
+    case decodeOrFail bytes0 of
+      Left (_, _, err) ->
+        Left ("Failed to decode typeRep. Parser reported:\n\n" ++ err)
+      Right (bytes1, _, _ :: TypeRep a) ->
+        let samples0 = decodeSamples bytes1 in
+        let err = "Failed to decode value in signal. Parser reported:\n\n " in
+        Right (fromList (map (either (error . (err ++)) id) samples0))
+
+-- | Helper function of 'replay'. Decodes ByteString to some type with
+-- BitVector as an intermediate type.
+decodeSamples
+  :: forall a n
+   . ( BitPack a
+     , KnownNat n
+     , n ~ BitSize a )
+  => ByteString
+  -> [Either String a]
+decodeSamples bytes0 =
+  case decodeOrFail bytes0 of
+    Left (_, _, err) ->
+      [Left err]
+    Right (bytes1, _, (m, v)) ->
+      (Right (unpack (BV m v))) : decodeSamples bytes1
 
 -- | Keep evaluating given signal until all trace names are present.
 waitForTraces#
