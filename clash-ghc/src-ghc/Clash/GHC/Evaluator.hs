@@ -3399,7 +3399,7 @@ mkSizedLit
   -> Integer -- value
   -> Term
 mkSizedLit conPrim ty nTy kn val
-  = mkApps (conPrim sTy) [Right nTy,Left (Literal (NaturalLiteral kn)),Left (Literal (IntegerLiteral ( val)))]
+  = mkApps (conPrim sTy) [Right nTy,Left (Literal (NaturalLiteral kn)),Left (Literal (IntegerLiteral val))]
   where
     (_,sTy) = splitFunForallTy ty
 
@@ -3466,10 +3466,7 @@ mkSizedLit'
      ,Integer) -- KnownNat n
   -> Integer -- value
   -> Term
-mkSizedLit' conPrim (ty,nTy,kn) val
-  = mkApps (conPrim sTy) [Right nTy,Left (Literal (NaturalLiteral kn)),Left (Literal (IntegerLiteral ( val)))]
-  where
-    (_,sTy) = splitFunForallTy ty
+mkSizedLit' conPrim (ty,nTy,kn) = mkSizedLit conPrim ty nTy kn
 
 mkSignedLit', mkUnsignedLit'
   :: (Type     -- result type
@@ -3487,14 +3484,7 @@ mkBitVectorLit'
   -> Integer -- Mask
   -> Integer -- value
   -> Term
-mkBitVectorLit' (ty,nTy,kn) mask val
-  = mkApps (bvConPrim sTy)
-           [Right nTy
-           ,Left (Literal (NaturalLiteral kn))
-           ,Left (Literal (IntegerLiteral mask))
-           ,Left (Literal (IntegerLiteral val))]
-  where
-    (_,sTy) = splitFunForallTy ty
+mkBitVectorLit' (ty,nTy,kn) = mkBitVectorLit ty nTy kn
 
 mkIndexLit'
   :: (Type     -- result type
@@ -3502,17 +3492,7 @@ mkIndexLit'
      ,Integer) -- KnownNat n
   -> Integer -- value
   -> Term
-mkIndexLit' res@(rTy,nTy,kn) val
-  | val >= 0
-  , val < kn
-  = mkSizedLit' indexConPrim res val
-  | otherwise
-  = TyApp (Prim "Clash.GHC.Evaluator.undefined" undefinedTy)
-          (mkTyConApp indexTcNm [nTy])
-  where
-    TyConApp indexTcNm _ = tyView (snd (splitFunForallTy rTy))
-
-
+mkIndexLit' (rTy,nTy,kn) = mkIndexLit rTy nTy kn
 
 -- | Create a vector of supplied elements
 mkVecCons
