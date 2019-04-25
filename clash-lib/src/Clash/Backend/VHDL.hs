@@ -97,6 +97,7 @@ data VHDLState =
   , _hdlsyn    :: HdlSyn
   -- ^ For which HDL synthesis tool are we generating VHDL
   , _extendedIds :: Bool
+  , _undefValue :: Maybe (Maybe Int)
   }
 
 makeLenses ''VHDLState
@@ -1168,31 +1169,39 @@ userTyName dflt nm0 hwTy = do
 -- | Convert a Netlist HWType to an error VHDL value for that type
 sizedQualTyNameErrValue :: HWType -> VHDLM Doc
 sizedQualTyNameErrValue Bool                = "true"
-sizedQualTyNameErrValue Bit                 = "'-'"
+sizedQualTyNameErrValue Bit                 = singularErrValue
 sizedQualTyNameErrValue t@(Vector n elTy)   = do
   syn <-Mon hdlSyn
   case syn of
     Vivado -> qualTyName t <> "'" <> parens (int 0 <+> "to" <+> int (n-1) <+> rarrow <+>
                 "std_logic_vector'" <> parens (int 0 <+> "to" <+> int (typeSize elTy - 1) <+>
-                 rarrow <+> "'-'"))
+                 rarrow <+> singularErrValue))
     _ -> qualTyName t <> "'" <> parens (int 0 <+> "to" <+> int (n-1) <+> rarrow <+> sizedQualTyNameErrValue elTy)
 sizedQualTyNameErrValue t@(RTree n elTy)    = do
   syn <-Mon hdlSyn
   case syn of
     Vivado -> qualTyName t <> "'" <>  parens (int 0 <+> "to" <+> int (2^n - 1) <+> rarrow <+>
                 "std_logic_vector'" <> parens (int 0 <+> "to" <+> int (typeSize elTy - 1) <+>
-                 rarrow <+> "'-'"))
+                 rarrow <+> singularErrValue))
     _ -> qualTyName t <> "'" <>  parens (int 0 <+> "to" <+> int (2^n - 1) <+> rarrow <+> sizedQualTyNameErrValue elTy)
 sizedQualTyNameErrValue t@(Product _ _ elTys) =
   qualTyName t <> "'" <> tupled (mapM sizedQualTyNameErrValue elTys)
-sizedQualTyNameErrValue (Reset {})          = "'-'"
-sizedQualTyNameErrValue (Clock _ _ Source)  = "'-'"
-sizedQualTyNameErrValue (Clock _ _ Gated)   = "('-',false)"
+sizedQualTyNameErrValue (Reset {})          = singularErrValue
+sizedQualTyNameErrValue (Clock _ _ Source)  = singularErrValue
+sizedQualTyNameErrValue (Clock _ _ Gated)   = tupled (sequence [singularErrValue,"false"])
 sizedQualTyNameErrValue (Void {})           =
   return (error ($(curLoc) ++ "[CLASH BUG] Forced to print Void error value"))
 sizedQualTyNameErrValue String              = "\"ERROR\""
 sizedQualTyNameErrValue t =
-  qualTyName t <> "'" <> parens (int 0 <+> "to" <+> int (typeSize t - 1) <+> rarrow <+> "'-'")
+  qualTyName t <> "'" <> parens (int 0 <+> "to" <+> int (typeSize t - 1) <+> rarrow <+> singularErrValue)
+
+singularErrValue :: VHDLM Doc
+singularErrValue = do
+  udf <- Mon (use undefValue)
+  case udf of
+    Nothing       -> "'-'"
+    Just Nothing  -> "'0'"
+    Just (Just x) -> "'" <> int x <> "'"
 
 vhdlRecSel
   :: HWType
@@ -1868,7 +1877,12 @@ hex s = char 'x' <> dquotes (pretty (T.pack s))
 bit_char :: Bit -> VHDLM Doc
 bit_char H = char '1'
 bit_char L = char '0'
-bit_char U = char '-'
+bit_char U = do
+  udf <- Mon (use undefValue)
+  case udf of
+    Nothing -> char '-'
+    Just Nothing -> char '0'
+    Just (Just i) -> "'" <> int i <> "'"
 bit_char Z = char 'Z'
 
 toSLV :: HWType -> Expr -> VHDLM Doc

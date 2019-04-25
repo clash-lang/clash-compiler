@@ -29,17 +29,17 @@ import Util (OverridingBool(..))
 genSystemVerilog
   :: String
   -> IO ()
-genSystemVerilog = doHDL (initBackend WORD_SIZE_IN_BITS HDLSYN True :: SystemVerilogState)
+genSystemVerilog = doHDL (initBackend WORD_SIZE_IN_BITS HDLSYN True Nothing :: SystemVerilogState)
 
 genVHDL
   :: String
   -> IO ()
-genVHDL = doHDL (initBackend WORD_SIZE_IN_BITS HDLSYN True :: VHDLState)
+genVHDL = doHDL (initBackend WORD_SIZE_IN_BITS HDLSYN True Nothing :: VHDLState)
 
 genVerilog
   :: String
   -> IO ()
-genVerilog = doHDL (initBackend WORD_SIZE_IN_BITS HDLSYN True :: VerilogState)
+genVerilog = doHDL (initBackend WORD_SIZE_IN_BITS HDLSYN True Nothing :: VerilogState)
 
 doHDL
   :: HasCallStack
@@ -66,8 +66,11 @@ doHDL b src = do
     let prepStartDiff' = reportTimeDiff prepTime' startTime'
     putStrLn $ "Parsing primitives took " ++ prepStartDiff'
 
-    generateHDL (buildCustomReprs reprs) bindingsMap (Just b) primMap2 tcm tupTcm (ghcTypeToHWType WORD_SIZE_IN_BITS True) reduceConstant topEntities
-      (ClashOpts 20 20 15 0 DebugNone False True True Auto WORD_SIZE_IN_BITS Nothing tmpDir HDLSYN True True ["."] Nothing True True False) (startTime,prepTime)
+    generateHDL (buildCustomReprs reprs) bindingsMap (Just b) primMap2 tcm tupTcm
+      (ghcTypeToHWType WORD_SIZE_IN_BITS True) reduceConstant topEntities
+      (ClashOpts 20 20 15 0 DebugNone False True True Auto WORD_SIZE_IN_BITS
+        Nothing tmpDir HDLSYN True True ["."] Nothing True True False Nothing)
+      (startTime,prepTime)
    ) (do
     removeDirectoryRecursive tmpDir
    )

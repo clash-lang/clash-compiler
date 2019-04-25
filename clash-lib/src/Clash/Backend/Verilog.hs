@@ -11,6 +11,7 @@
 {-# LANGUAGE LambdaCase        #-}
 {-# LANGUAGE MultiWayIf        #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE RankNTypes        #-}
 {-# LANGUAGE RecursiveDo       #-}
 {-# LANGUAGE TemplateHaskell   #-}
 {-# LANGUAGE TupleSections     #-}
@@ -28,7 +29,7 @@ where
 
 import           Control.Applicative                  ((<*), (*>))
 import qualified Control.Applicative                  as A
-import           Control.Lens                         ((+=),(-=),(.=),(%=), makeLenses, use)
+import           Control.Lens                         (Lens',(+=),(-=),(.=),(%=), makeLenses, use)
 import           Control.Monad                        (forM)
 import           Control.Monad.State                  (State)
 import           Data.Bits                            (Bits, testBit)
@@ -93,6 +94,7 @@ data VerilogState =
     , _intWidth  :: Int -- ^ Int/Word/Integer bit-width
     , _hdlsyn    :: HdlSyn
     , _escapedIds :: Bool
+    , _undefValue :: Maybe (Maybe Int)
     }
 
 makeLenses ''VerilogState
@@ -355,7 +357,12 @@ verilogTypeMark = const emptyDoc
 
 -- | Convert a Netlist HWType to an error Verilog value for that type
 verilogTypeErrValue :: HWType -> VerilogM Doc
-verilogTypeErrValue ty = braces (int (typeSize ty) <+> braces "1'bx")
+verilogTypeErrValue ty = do
+  udf <- Mon (use undefValue)
+  case udf of
+    Nothing       -> braces (int (typeSize ty) <+> braces "1'bx")
+    Just Nothing  -> int (typeSize ty) <> "'d0 /* undefined */"
+    Just (Just x) -> braces (int (typeSize ty) <+> braces ("1'b" <> int x)) <+> "/* undefined */"
 
 verilogRecSel
   :: HWType
@@ -514,7 +521,7 @@ inst_ (CondAssignment id_ _ scrut scrutTy es) = fmap Just $
     conds _ []                = return []
     conds i [(_,e)]           = ("default" <+> colon <+> stringS i <+> equals <+> expr_ False e) <:> return []
     conds i ((Nothing,e):_)   = ("default" <+> colon <+> stringS i <+> equals <+> expr_ False e) <:> return []
-    conds i ((Just c ,e):es') = (exprLit (Just (scrutTy,conSize scrutTy)) c <+> colon <+> stringS i <+> equals <+> expr_ False e) <:> conds i es'
+    conds i ((Just c ,e):es') = (exprLitV (Just (scrutTy,conSize scrutTy)) c <+> colon <+> stringS i <+> equals <+> expr_ False e) <:> conds i es'
 
 inst_ (InstDecl _ _ nm lbl ps pms) = fmap Just $
     nest 2 (stringS nm <> params <> stringS lbl <> line <> pms' <> semi)
@@ -633,7 +640,7 @@ modifier _ _ = Nothing
 expr_ :: Bool -- ^ Enclose in parenthesis?
       -> Expr -- ^ Expr to convert
       -> VerilogM Doc
-expr_ _ (Literal sizeM lit) = exprLit sizeM lit
+expr_ _ (Literal sizeM lit) = exprLitV sizeM lit
 
 expr_ _ (Identifier id_ Nothing) = stringS id_
 
@@ -701,7 +708,7 @@ expr_ _ (DataCon ty@(SP _ args) (DC (_,i)) es) = assignExpr
     argExprs   = map (expr_ False) es
     extraArg   = case typeSize ty - dcSize of
                    0 -> []
-                   n -> [int n <> "'b" <> bits (replicate n U)]
+                   n -> [int n <> "'b" <> bits undefValue (replicate n U)]
     assignExpr = braces (hcat $ punctuate comma $ sequence (dcExpr:argExprs ++ extraArg))
 
 expr_ _ (DataCon ty@(Sum _ _) (DC (_,i)) []) = int (typeSize ty) <> "'d" <> int i
@@ -743,7 +750,7 @@ expr_ _ (DataCon (CustomSP name' dataRepr size args) (DC (_,constrNr)) es) =
         :: BitOrigin
         -> VerilogM Doc
       range' (Lit (bitsToBits -> ns)) =
-        int (length ns) <> squote <> "b" <> hcat (mapM bit_char ns)
+        int (length ns) <> squote <> "b" <> hcat (mapM (bit_char undefValue) ns)
       range' (Field n _start _end) =
         argExprs !! n
 
@@ -754,31 +761,31 @@ expr_ _ (DataCon (Clock _ _ Gated) _ es) = listBraces (mapM (expr_ False) es)
 expr_ _ (BlackBoxE pNm _ _ _ _ bbCtx _)
   | pNm == "Clash.Sized.Internal.Signed.fromInteger#"
   , [Literal _ (NumLit n), Literal _ i] <- extractLiterals bbCtx
-  = exprLit (Just (Signed (fromInteger n),fromInteger n)) i
+  = exprLitV (Just (Signed (fromInteger n),fromInteger n)) i
 
 expr_ _ (BlackBoxE pNm _ _ _ _ bbCtx _)
   | pNm == "Clash.Sized.Internal.Unsigned.fromInteger#"
   , [Literal _ (NumLit n), Literal _ i] <- extractLiterals bbCtx
-  = exprLit (Just (Unsigned (fromInteger n),fromInteger n)) i
+  = exprLitV (Just (Unsigned (fromInteger n),fromInteger n)) i
 
 expr_ _ (BlackBoxE pNm _ _ _ _ bbCtx _)
   | pNm == "Clash.Sized.Internal.BitVector.fromInteger#"
   , [Literal _ (NumLit n), Literal _ m, Literal _ i] <- extractLiterals bbCtx
   = let NumLit m' = m
         NumLit i' = i
-    in exprLit (Just (BitVector (fromInteger n),fromInteger n)) (BitVecLit m' i')
+    in exprLitV (Just (BitVector (fromInteger n),fromInteger n)) (BitVecLit m' i')
 
 expr_ _ (BlackBoxE pNm _ _ _ _ bbCtx _)
   | pNm == "Clash.Sized.Internal.BitVector.fromInteger##"
   , [Literal _ m, Literal _ i] <- extractLiterals bbCtx
   = let NumLit m' = m
         NumLit i' = i
-    in exprLit (Just (Bit,1)) (BitLit $ toBit m' i')
+    in exprLitV (Just (Bit,1)) (BitLit $ toBit m' i')
 
 expr_ _ (BlackBoxE pNm _ _ _ _ bbCtx _)
   | pNm == "Clash.Sized.Internal.Index.fromInteger#"
   , [Literal _ (NumLit n), Literal _ i] <- extractLiterals bbCtx
-  = exprLit (Just (Index (fromInteger n),fromInteger n)) i
+  = exprLit undefValue (Just (Index (fromInteger n),fromInteger n)) i
 
 expr_ b (BlackBoxE _ libs imps inc bs bbCtx b') = do
   parenIf (b || b') (Mon (renderBlackBox libs imps inc bs bbCtx <*> pure 0))
@@ -839,10 +846,13 @@ rtreeChain (DataCon (RTree 0 _) _ [e])     = Just [e]
 rtreeChain (DataCon (RTree _ _) _ [e1,e2]) = Just e1 <:> rtreeChain e2
 rtreeChain _                               = Nothing
 
-exprLit :: (Applicative m, Monoid (m Doc) ) => Maybe (HWType,Size) -> Literal -> m Doc
-exprLit Nothing (NumLit i) = integer i
+exprLitV :: Maybe (HWType,Size) -> Literal -> VerilogM Doc
+exprLitV = exprLit undefValue
 
-exprLit (Just (hty,sz)) (NumLit i) = case hty of
+exprLit :: Lens' s (Maybe (Maybe Int)) -> Maybe (HWType,Size) -> Literal -> Mon (State s) Doc
+exprLit _ Nothing (NumLit i) = integer i
+
+exprLit k (Just (hty,sz)) (NumLit i) = case hty of
   Unsigned _
    | i < 0     -> string "-" <> int sz <> string "'d" <> integer (abs i)
    | otherwise -> int sz <> string "'d" <> integer i
@@ -852,15 +862,15 @@ exprLit (Just (hty,sz)) (NumLit i) = case hty of
    | otherwise -> int sz <> string "'sd" <> integer i
   _ -> int sz <> string "'b" <> blit
   where
-    blit = bits (toBits sz i)
-exprLit (Just (_,sz)) (BitVecLit m i) = int sz <> string "'b" <> bvlit
+    blit = bits k (toBits sz i)
+exprLit k (Just (_,sz)) (BitVecLit m i) = int sz <> string "'b" <> bvlit
   where
-    bvlit = bits (toBits' sz m i)
+    bvlit = bits k (toBits' sz m i)
 
-exprLit _             (BoolLit t)   = string $ if t then "1'b1" else "1'b0"
-exprLit _             (BitLit b)    = string "1'b" <> bit_char b
-exprLit _             (StringLit s) = string . pack $ show s
-exprLit _             l             = error $ $(curLoc) ++ "exprLit: " ++ show l
+exprLit _ _             (BoolLit t)   = string $ if t then "1'b1" else "1'b0"
+exprLit k _             (BitLit b)    = string "1'b" <> bit_char k b
+exprLit _ _             (StringLit s) = string . pack $ show s
+exprLit _ _             l             = error $ $(curLoc) ++ "exprLit: " ++ show l
 
 toBits :: Integral a => Int -> a -> [Bit]
 toBits size val = map (\x -> if odd x then H else L)
@@ -878,8 +888,8 @@ toBits' size msk val = map (\(m,i) -> if odd m then U else (if odd i then H else
                   ( map (`mod` 2) $ iterate (`div` 2) val)
 
 
-bits :: Applicative m => [Bit] -> m Doc
-bits = hcat . traverse bit_char
+bits :: Lens' s (Maybe (Maybe Int)) -> [Bit] -> Mon (State s) Doc
+bits k = hcat . traverse (bit_char k)
 
 bit_char' :: Bit -> Char
 bit_char' H = '1'
@@ -887,8 +897,14 @@ bit_char' L = '0'
 bit_char' U = 'x'
 bit_char' Z = 'z'
 
-bit_char :: Applicative m => Bit -> m Doc
-bit_char = char . bit_char'
+bit_char :: Lens' s (Maybe (Maybe Int)) -> Bit -> Mon (State s) Doc
+bit_char k b = do
+  udf <- Mon (use k)
+  case (udf,b) of
+    (Just Nothing,U)  -> char '0'
+    (Just (Just i),U) -> "'" <> int i <> "'"
+    _                 -> char (bit_char' b)
+
 
 dcToExpr :: HWType -> Int -> Expr
 dcToExpr ty i = Literal (Just (ty,conSize ty)) (NumLit (toInteger i))

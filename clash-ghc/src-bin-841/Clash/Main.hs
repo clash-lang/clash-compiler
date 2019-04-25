@@ -1011,18 +1011,19 @@ abiHash strs = do
 -----------------------------------------------------------------------------
 -- VHDL Generation
 
-makeHDL' :: Clash.Backend.Backend backend => (Int -> HdlSyn -> Bool -> backend) ->  IORef ClashOpts -> [(String,Maybe Phase)] -> Ghc ()
+makeHDL' :: Clash.Backend.Backend backend => (Int -> HdlSyn -> Bool -> Maybe (Maybe Int) ->  backend)
+         -> IORef ClashOpts -> [(String,Maybe Phase)] -> Ghc ()
 makeHDL' _       _ []   = throwGhcException (CmdLineError "No input files")
 makeHDL' backend r srcs = makeHDL backend r $ fmap fst srcs
 
 makeVHDL :: IORef ClashOpts -> [(String, Maybe Phase)] -> Ghc ()
-makeVHDL = makeHDL' (Clash.Backend.initBackend :: Int -> HdlSyn -> Bool -> VHDLState)
+makeVHDL = makeHDL' (Clash.Backend.initBackend :: Int -> HdlSyn -> Bool -> Maybe (Maybe Int) ->  VHDLState)
 
 makeVerilog ::  IORef ClashOpts -> [(String, Maybe Phase)] -> Ghc ()
-makeVerilog = makeHDL' (Clash.Backend.initBackend :: Int -> HdlSyn -> Bool -> VerilogState)
+makeVerilog = makeHDL' (Clash.Backend.initBackend :: Int -> HdlSyn -> Bool -> Maybe (Maybe Int) ->  VerilogState)
 
 makeSystemVerilog ::  IORef ClashOpts -> [(String, Maybe Phase)] -> Ghc ()
-makeSystemVerilog = makeHDL' (Clash.Backend.initBackend :: Int -> HdlSyn -> Bool -> SystemVerilogState)
+makeSystemVerilog = makeHDL' (Clash.Backend.initBackend :: Int -> HdlSyn -> Bool -> Maybe (Maybe Int) -> SystemVerilogState)
 
 -- -----------------------------------------------------------------------------
 -- Util

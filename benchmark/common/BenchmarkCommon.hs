@@ -39,10 +39,12 @@ typeTrans :: (CustomReprs -> TyConMap -> Type -> Maybe (Either String FilteredHW
 typeTrans = ghcTypeToHWType WORD_SIZE_IN_BITS True
 
 opts :: FilePath -> [FilePath] -> ClashOpts
-opts tmpDir idirs = ClashOpts 20 20 15 0 DebugNone False True True Auto WORD_SIZE_IN_BITS Nothing tmpDir HDLSYN True True idirs Nothing True True False
+opts tmpDir idirs =
+  ClashOpts 20 20 15 0 DebugNone False True True Auto WORD_SIZE_IN_BITS Nothing
+    tmpDir HDLSYN True True idirs Nothing True True False Nothing
 
 backend :: VHDLState
-backend = initBackend WORD_SIZE_IN_BITS HDLSYN True
+backend = initBackend WORD_SIZE_IN_BITS HDLSYN True Nothing
 
 runInputStage
   :: FilePath
