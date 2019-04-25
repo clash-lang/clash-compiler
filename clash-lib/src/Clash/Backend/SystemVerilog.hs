@@ -88,6 +88,7 @@ data SystemVerilogState =
     , _intWidth  :: Int -- ^ Int/Word/Integer bit-width
     , _hdlsyn    :: HdlSyn
     , _escapedIds :: Bool
+    , _undefValue :: Maybe (Maybe Int)
     }
 
 makeLenses ''SystemVerilogState
@@ -709,15 +710,23 @@ verilogTypeErrValue :: HWType -> SystemVerilogM Doc
 verilogTypeErrValue (Vector n elTy) = do
   syn <- Mon hdlSyn
   case syn of
-    Vivado -> char '\'' <> braces (int n <+> braces (braces (int (typeSize elTy) <+> braces "1'bx")))
+    Vivado -> char '\'' <> braces (int n <+> braces (singularErrValue elTy))
     _ -> char '\'' <> braces (int n <+> braces (verilogTypeErrValue elTy))
 verilogTypeErrValue (RTree n elTy) = do
   syn <- Mon hdlSyn
   case syn of
-    Vivado -> char '\'' <> braces (int (2^n) <+> braces (braces (int (typeSize elTy) <+> braces "1'bx")))
+    Vivado -> char '\'' <> braces (int (2^n) <+> braces (singularErrValue elTy))
     _ -> char '\'' <> braces (int (2^n) <+> braces (verilogTypeErrValue elTy))
 verilogTypeErrValue String = "\"ERROR\""
-verilogTypeErrValue ty  = braces (int (typeSize ty) <+> braces "1'bx")
+verilogTypeErrValue ty = singularErrValue ty
+
+singularErrValue :: HWType -> SystemVerilogM Doc
+singularErrValue ty = do
+  udf <- Mon (use undefValue)
+  case udf of
+    Nothing       -> braces (int (typeSize ty) <+> braces "1'bx")
+    Just Nothing  -> int (typeSize ty) <> "'d0 /* undefined */"
+    Just (Just x) -> braces (int (typeSize ty) <+> braces ("1'b" <> int x)) <+> "/* undefined */"
 
 verilogRecSel
   :: HWType
@@ -896,7 +905,7 @@ inst_ (CondAssignment id_ ty scrut scrutTy es) = fmap Just $ do
     conds _ []                = return []
     conds i [(_,e)]           = ("default" <+> colon <+> stringS i <+> equals <+> expr_ False e) <:> return []
     conds i ((Nothing,e):_)   = ("default" <+> colon <+> stringS i <+> equals <+> expr_ False e) <:> return []
-    conds i ((Just c ,e):es') = (exprLit (Just (scrutTy,conSize scrutTy)) c <+> colon <+> stringS i <+> equals <+> expr_ False e) <:> conds i es'
+    conds i ((Just c ,e):es') = (exprLitSV (Just (scrutTy,conSize scrutTy)) c <+> colon <+> stringS i <+> equals <+> expr_ False e) <:> conds i es'
 
 inst_ (InstDecl _ _ nm lbl ps pms) = fmap Just $
     nest 2 (stringS nm <> params <> stringS lbl <> line <> pms' <> semi)
@@ -915,7 +924,7 @@ inst_ (NetDecl' _ _ _ _) = return Nothing
 expr_ :: Bool -- ^ Enclose in parenthesis?
       -> Expr -- ^ Expr to convert
       -> SystemVerilogM Doc
-expr_ _ (Literal sizeM lit)                           = exprLit sizeM lit
+expr_ _ (Literal sizeM lit)                           = exprLitSV sizeM lit
 expr_ _ (Identifier id_ Nothing)                      = stringS id_
 expr_ _ (Identifier id_ (Just (Indexed (CustomSP _id _dataRepr _size args,dcI,fI)))) =
   expFromSLV resultType (braces $ hcat $ punctuate ", " $ sequence ranges)
@@ -1049,7 +1058,7 @@ expr_ _ (DataCon ty@(SP _ args) (DC (_,i)) es) = assignExpr
     argExprs   = zipWith toSLV argTys es
     extraArg   = case typeSize ty - dcSize of
                    0 -> []
-                   n -> [int n <> "'b" <> bits (replicate n U)]
+                   n -> [int n <> "'b" <> bits undefValue (replicate n U)]
     assignExpr = braces (hcat $ punctuate comma $ sequence (dcExpr:argExprs ++ extraArg))
 
 expr_ _ (DataCon ty@(Sum _ _) (DC (_,i)) []) = int (typeSize ty) <> "'d" <> int i
@@ -1071,7 +1080,7 @@ expr_ _ (DataCon (CustomSP _ dataRepr size args) (DC (_,i)) es) =
         :: BitOrigin
         -> SystemVerilogM Doc
       range' (Lit (bitsToBits -> ns)) =
-        int (length ns) <> squote <> "b" <> hcat (mapM bit_char ns)
+        int (length ns) <> squote <> "b" <> hcat (mapM (bit_char undefValue) ns)
       range' (Field n start end) =
         -- We want to select the bits starting from 'start' downto and including
         -- 'end'. We cannot use slice notation in Verilog, as the preceding
@@ -1096,29 +1105,29 @@ expr_ _ (DataCon (Clock nm rt Gated) _ es) =
 expr_ _ (BlackBoxE pNm _ _ _ _ bbCtx _)
   | pNm == "Clash.Sized.Internal.Signed.fromInteger#"
   , [Literal _ (NumLit n), Literal _ i] <- extractLiterals bbCtx
-  = exprLit (Just (Signed (fromInteger n),fromInteger n)) i
+  = exprLitSV (Just (Signed (fromInteger n),fromInteger n)) i
 
 expr_ _ (BlackBoxE pNm _ _ _ _ bbCtx _)
   | pNm == "Clash.Sized.Internal.Unsigned.fromInteger#"
   , [Literal _ (NumLit n), Literal _ i] <- extractLiterals bbCtx
-  = exprLit (Just (Unsigned (fromInteger n),fromInteger n)) i
+  = exprLitSV (Just (Unsigned (fromInteger n),fromInteger n)) i
 
 expr_ _ (BlackBoxE pNm _ _ _ _ bbCtx _)
   | pNm == "Clash.Sized.Internal.BitVector.fromInteger#"
   , [Literal _ (NumLit n), Literal _ (NumLit m), Literal _ (NumLit i)] <- extractLiterals bbCtx
-  = exprLit (Just (BitVector (fromInteger n),fromInteger n)) (BitVecLit m i)
+  = exprLitSV (Just (BitVector (fromInteger n),fromInteger n)) (BitVecLit m i)
 
 expr_ _ (BlackBoxE pNm _ _ _ _ bbCtx _)
   | pNm == "Clash.Sized.Internal.BitVector.fromInteger##"
   , [Literal _ m, Literal _ i] <- extractLiterals bbCtx
   = let NumLit m' = m
         NumLit i' = i
-    in exprLit (Just (Bit,1)) (BitLit $ toBit m' i')
+    in exprLitSV (Just (Bit,1)) (BitLit $ toBit m' i')
 
 expr_ _ (BlackBoxE pNm _ _ _ _ bbCtx _)
   | pNm == "Clash.Sized.Internal.Index.fromInteger#"
   , [Literal _ (NumLit n), Literal _ i] <- extractLiterals bbCtx
-  = exprLit (Just (Index (fromInteger n),fromInteger n)) i
+  = exprLitSV (Just (Index (fromInteger n),fromInteger n)) i
 
 expr_ b (BlackBoxE _ libs imps inc bs bbCtx b') =
   parenIf (b || b') (Mon (renderBlackBox libs imps inc bs bbCtx <*> pure 0))
@@ -1188,6 +1197,9 @@ expr_ b (IfThenElse c t e) =
   parenIf b (expr_ True c <+> "?" <+> expr_ True t <+> ":" <+> expr_ True e)
 
 expr_ _ e = error $ $(curLoc) ++ (show e) -- empty
+
+exprLitSV :: Maybe (HWType,Size) -> Literal -> SystemVerilogM Doc
+exprLitSV = exprLit undefValue
 
 otherSize :: [HWType] -> Int -> Int
 otherSize _ n | n < 0 = 0
