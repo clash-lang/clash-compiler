@@ -515,7 +515,7 @@ litView _ (LitTy (NumTy i))                = Just i
 litView m (reduceTypeFamily m -> Just ty') = litView m ty'
 litView _ _ = Nothing
 
--- | The type of GHC.Err.undefined :: forall a . a
+-- | The type @forall a . a@
 undefinedTy ::Type
 undefinedTy =
   let aNm = mkUnsafeSystemName "a" 0
