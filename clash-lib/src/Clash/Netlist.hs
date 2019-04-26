@@ -25,7 +25,7 @@ import           Control.Monad.IO.Class           (liftIO)
 import           Control.Monad.State.Strict       (runStateT)
 import           Data.Binary.IEEE754              (floatToWord, doubleToWord)
 import           Data.Char                        (ord)
-import           Data.Either                      (lefts,partitionEithers)
+import           Data.Either                      (partitionEithers)
 import           Data.HashMap.Strict              (HashMap)
 import qualified Data.HashMap.Strict              as HashMapS
 import qualified Data.HashMap.Lazy                as HashMap
@@ -58,7 +58,7 @@ import qualified Clash.Core.Term                  as Core
 import           Clash.Core.Type
   (Type (..), coreView1, splitFunTys, splitCoreFunForallTy)
 import           Clash.Core.TyCon                 (TyConMap)
-import           Clash.Core.Util                  (collectArgs, termType)
+import           Clash.Core.Util                  (collectArgs, mkApps, termType)
 import           Clash.Core.Var                   (Id, Var (..))
 import           Clash.Core.VarEnv
   (VarEnv, eltsVarEnv, emptyInScopeSet, emptyVarEnv, extendVarEnv, lookupVarEnv,
@@ -581,7 +581,7 @@ mkExpr _ _ _ (Core.Literal l) = do
 
 mkExpr bbEasD bndr ty app = do
   let (appF,args) = collectArgs app
-      tmArgs      = lefts args
+      (tmArgs,tyArgs) = partitionEithers args
   hwTy    <- unsafeCoreTypeToHWTypeM' $(curLoc) ty
   (_,sp) <- Lens.use curCompNm
   case appF of
@@ -589,8 +589,14 @@ mkExpr bbEasD bndr ty app = do
     Prim nm _ -> mkPrimitive False bbEasD bndr nm args ty
     Var f
       | null tmArgs -> return (Identifier (nameOcc $ varName f) Nothing,[])
-      | otherwise ->
-        throw (ClashException sp ($(curLoc) ++ "Not in normal form: top-level binder in argument position:\n\n" ++ showPpr app) Nothing)
+      | not (null tyArgs) ->
+          throw (ClashException sp ($(curLoc) ++ "Not in normal form: Var-application with Type arguments:\n\n" ++ showPpr app) Nothing)
+      | otherwise -> do
+          argNm0 <- extendIdentifier Extended (either id id2identifier bndr) "_fun_arg"
+          argNm1 <- mkUniqueIdentifier Extended argNm0
+          hwTyA  <- unsafeCoreTypeToHWTypeM' $(curLoc) ty
+          decls  <- mkFunApp argNm1 f tmArgs
+          return (Identifier argNm1 Nothing, NetDecl' Nothing Wire argNm1 (Right hwTyA):decls)
     Case scrut ty' [alt] -> mkProjection bbEasD bndr scrut ty' alt
     Case scrut tyA alts -> do
       tcm <- Lens.use tcCache
@@ -605,7 +611,12 @@ mkExpr bbEasD bndr ty app = do
       hwTyA  <- unsafeCoreTypeToHWTypeM' $(curLoc) tyA
       decls  <- mkSelection (Left argNm1) scrut tyA alts
       return (Identifier argNm1 Nothing, NetDecl' Nothing wr argNm1 (Right hwTyA):decls)
-    _ -> throw (ClashException sp ($(curLoc) ++ "Not in normal form: application of a Let/Lam/Case:\n\n" ++ showPpr app) Nothing)
+    Letrec binders body -> do
+      netDecls <- fmap catMaybes $ mapM mkNetDecl binders
+      decls    <- concat <$> mapM (uncurry mkDeclarations) binders
+      (bodyE,bodyDecls) <- mkExpr bbEasD bndr ty (mkApps body args)
+      return (bodyE,netDecls ++ decls ++ bodyDecls)
+    _ -> throw (ClashException sp ($(curLoc) ++ "Not in normal form: application of a Lambda-expression\n\n" ++ showPpr app) Nothing)
 
 -- | Generate an expression that projects a field out of a data-constructor.
 --
