@@ -159,6 +159,15 @@ end block;
     }
   }
 , { "BlackBox" :
+    { "name"      : "GHC.Integer.Type.integerToWord64"
+    , "workInfo"  : "Never"
+    , "kind"      : "Expression"
+    , "type"      : "integerToWord :: Integer -> Word64#"
+    , "comment"   : "only used by 32 bit GHC"
+    , "template"  : "unsigned(std_logic_vector(~ARG[0]))"
+    }
+  }
+, { "BlackBox" :
     { "name"      : "GHC.Integer.Type.bitInteger"
     , "kind"      : "Expression"
     , "type"      : "bitInteger :: Int -> Integer"
