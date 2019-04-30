@@ -131,4 +131,46 @@
     , "template"  : "assign ~RESULT = $unsigned(~ARG[0]);"
     }
   }
+, { "BlackBox" :
+    { "name"      : "GHC.Integer.Type.bitInteger"
+    , "kind"      : "Expression"
+    , "type"      : "bitInteger :: Int -> Integer"
+    , "template"  : "1 << ~ARG[0]"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "GHC.Integer.Type.complementInteger"
+    , "kind"      : "Expression"
+    , "type"      : "complementInteger :: Integer -> Integer"
+    , "template"  : "~ ~ARG[0]"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "GHC.Integer.Type.xorInteger"
+    , "kind"      : "Expression"
+    , "type"      : "xorInteger :: Integer -> Integer -> Integer"
+    , "template"  : "~ARG[0] ^ ~ARG[1]"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "GHC.Integer.Type.orInteger"
+    , "kind"      : "Expression"
+    , "type"      : "orInteger :: Integer -> Integer -> Integer"
+    , "template"  : "~ARG[0] | ~ARG[1]"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "GHC.Integer.Type.andInteger"
+    , "kind"      : "Expression"
+    , "type"      : "andInteger :: Integer -> Integer -> Integer"
+    , "template"  : "~ARG[0] & ~ARG[1]"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "GHC.Integer.Type.$wsignumInteger"
+    , "kind"      : "Expression"
+    , "type"      : "$wsignumInteger :: Integer -> Integer"
+    , "template"  : "(~ARG[0] < ~SIZE[~TYPO]'sd0) ? -~SIZE[~TYPO]'sd1 : ((~ARG[0] == ~SIZE[~TYPO]'sd0) ? ~SIZE[~TYPO]'sd0 : ~SIZE[~TYPO]'sd1)"
+    }
+  }
 ]

@@ -18,6 +18,7 @@
 
 module Clash.GHC.Evaluator where
 
+import           Control.Applicative (liftA2)
 import           Control.Concurrent.Supply  (Supply,freshId)
 import           Control.Monad              (ap)
 import           Control.Monad.Trans.Except (runExcept)
@@ -26,7 +27,7 @@ import           Data.Char           (chr,ord)
 import qualified Data.Either         as Either
 import qualified Data.IntMap         as IntMap
 import           Data.Maybe
-  (fromMaybe, mapMaybe)
+  (fromMaybe, mapMaybe, catMaybes)
 import qualified Data.List           as List
 import qualified Data.Primitive.ByteArray as ByteArray
 import           Data.Proxy          (Proxy)
@@ -35,10 +36,12 @@ import           Data.Text           (Text)
 import qualified Data.Text           as Text
 import qualified Data.Vector.Primitive as Vector
 import           Debug.Trace         (trace)
+import           GHC.Stack           (HasCallStack)
 import           GHC.Float
 import           GHC.Int
 import           GHC.Integer
-  (decodeDoubleInteger,encodeDoubleInteger,compareInteger)
+  (decodeDoubleInteger,encodeDoubleInteger,compareInteger,orInteger,andInteger,
+   xorInteger,complementInteger,absInteger,signumInteger)
 import           GHC.Integer.GMP.Internals (Integer (..), BigNat (..))
 import           GHC.Natural
 import           GHC.Prim
@@ -823,6 +826,16 @@ reduceConstant isSubj gbl tcm h k nm ty tys args = case nm of
   "GHC.Classes.divInt#" | Just (i,j) <- intLiterals args
     -> reduce (integerToIntLiteral (i `div` j))
 
+  -- modInt# :: Int# -> Int# -> Int#
+  "GHC.Classes.modInt#"
+    | [dividend, divisor] <- intLiterals' args
+    ->
+      if divisor == 0 then
+        let iTy = snd (splitFunForallTy ty) in
+        reduce (evalUndefined iTy)
+      else
+        reduce (Literal (IntLiteral (dividend `mod` divisor)))
+
   "GHC.Classes.not"
     | [DC bCon _] <- args
     -> reduce (boolToBoolLiteral tcm ty (nameOcc (dcName bCon) == "GHC.Types.False"))
@@ -1164,6 +1177,39 @@ reduceConstant isSubj gbl tcm h k nm ty tys args = case nm of
             | matDigs' == floatDigits (undefined :: Double)
             -> reduce (Literal (DoubleLiteral (toRational (fromRational (n :% d) :: Double))))
           _ -> error $ $(curLoc) ++ "GHC.Float.$w$sfromRat'': Not a Float or Double"
+
+  "GHC.Integer.Type.$wsignumInteger" -- XXX: Not super-fragile, but still..
+    | [i] <- integerLiterals' args
+    -> reduce (Literal (IntLiteral (signum i)))
+
+
+  "GHC.Integer.Type.signumInteger"
+    | [i] <- integerLiterals' args
+    -> reduce (Literal (IntegerLiteral (signumInteger i)))
+
+  "GHC.Integer.Type.absInteger"
+    | [i] <- integerLiterals' args
+    -> reduce (Literal (IntegerLiteral (absInteger i)))
+
+  "GHC.Integer.Type.bitInteger"
+    | [i] <- intLiterals' args
+    -> reduce (Literal (IntegerLiteral (bit (fromInteger i))))
+
+  "GHC.Integer.Type.complementInteger"
+    | [i] <- integerLiterals' args
+    -> reduce (Literal (IntegerLiteral (complementInteger i)))
+
+  "GHC.Integer.Type.orInteger"
+    | [i, j] <- integerLiterals' args
+    -> reduce (Literal (IntegerLiteral (orInteger i j)))
+
+  "GHC.Integer.Type.xorInteger"
+    | [i, j] <- integerLiterals' args
+    -> reduce (Literal (IntegerLiteral (xorInteger i j)))
+
+  "GHC.Integer.Type.andInteger"
+    | [i, j] <- integerLiterals' args
+    -> reduce (Literal (IntegerLiteral (andInteger i j)))
 
   "GHC.Integer.Type.doubleFromInteger"
     | [i] <- integerLiterals' args
@@ -3246,12 +3292,29 @@ intLiterals' = typedLiterals' intLiteral
       Lit (IntLiteral i) -> Just i
       _ -> Nothing
 
-intCLiterals :: [Value] -> Maybe (Integer,Integer)
-intCLiterals args = case args of
-  ([DC _ [Left (Literal (IntLiteral i))]
-   ,DC _ [Left (Literal (IntLiteral j))]])
-    -> Just (i,j)
-  _ -> Nothing
+intCLiteral :: Value -> Maybe Integer
+intCLiteral (DC _ [Left (Literal (IntLiteral i))]) = Just i
+intCLiteral _                                      = Nothing
+
+intCLiterals :: [Value] -> Maybe (Integer, Integer)
+intCLiterals (a1:a2:_) = liftA2 (,) (intCLiteral a1) (intCLiteral a2)
+intCLiterals _         = Nothing
+
+intCLiterals' :: [Value] -> [Integer]
+intCLiterals' = catMaybes . map intCLiteral
+
+mkIntCLiteral
+  :: HasCallStack
+  => Value
+  -- ^ Some existing intC literal. To construct a new intC literal, this
+  -- function needs the dataconstructor.
+  -> Integer
+  -- ^ New value of intC literal
+  -> Term
+mkIntCLiteral (DC dc [Left (Literal (IntLiteral _))]) i =
+  App (Data dc) (Literal (IntLiteral i))
+mkIntCLiteral v _i =
+  error $ "Report as bug: mkIntCLiteral was called with wrong value: " ++ show v
 
 wordLiterals :: [Value] -> Maybe (Integer,Integer)
 wordLiterals args = case args of

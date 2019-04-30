@@ -176,9 +176,10 @@ runClashTest =
         , runTest ("tests" </> "shouldwork" </> "HOPrim") defBuild [] "VecFun"    (["","VecFun_testBench"],"VecFun_testBench",True)
       ]
       , clashTestGroup "Numbers"
-        [ runTest ("tests" </> "shouldwork" </> "Numbers") defBuild [] "Bounds"       (["","Bounds_testBench"],"Bounds_testBench",True)
+        [ runTest ("tests" </> "shouldwork" </> "Numbers") defBuild [] "BitInteger"   (["","BitInteger_testBench"],"BitInteger_testBench",True)
+        , runTest ("tests" </> "shouldwork" </> "Numbers") defBuild [] "Bounds"       (["","Bounds_testBench"],"Bounds_testBench",True)
         -- TODO: re-enable for Verilog
-        , runTest ("tests" </> "shouldwork" </> "Numbers") [VHDL] ["-itests/shouldwork/Numbers","-fclash-inline-limit=300"] "NumConstantFoldingTB"       (["","NumConstantFoldingTB_testBench"],"NumConstantFoldingTB_testBench",True)
+        , runTest ("tests" </> "shouldwork" </> "Numbers") (defBuild \\ [Verilog]) ["-itests/shouldwork/Numbers","-fclash-inline-limit=300"] "NumConstantFoldingTB"       (["","NumConstantFoldingTB_testBench"],"NumConstantFoldingTB_testBench",True)
         , outputTest ("tests" </> "shouldwork" </> "Numbers") defBuild ["-fclash-inline-limit=300"] "NumConstantFolding"  "main"
 #if MIN_VERSION_base(4,12,0)
         -- Naturals are broken on GHC <= 8.4. See https://github.com/clash-lang/clash-compiler/pull/473
@@ -190,9 +191,10 @@ runClashTest =
         , runTest ("tests" </> "shouldwork" </> "Numbers") defBuild [] "Resize3"      (["","Resize3_testBench"],"Resize3_testBench",True)
         , runTest ("tests" </> "shouldwork" </> "Numbers") defBuild [] "SatMult"      ([""],"SatMult_topEntity",False)
         , runTest ("tests" </> "shouldwork" </> "Numbers") defBuild ["-itests/shouldwork/Numbers"] "ShiftRotate"         (["","ShiftRotate_testBench"],"ShiftRotate_testBench",True)
+        , runTest ("tests" </> "shouldwork" </> "Numbers") defBuild [] "SignedZero"   (["","SignedZero_testBench"],"SignedZero_testBench",True)
+        , runTest ("tests" </> "shouldwork" </> "Numbers") defBuild [] "Signum"   (["","Signum_testBench"],"Signum_testBench",True)
         , runTest ("tests" </> "shouldwork" </> "Numbers") defBuild [] "Strict"       (["","Strict_testBench"],"Strict_testBench",True)
         , runTest ("tests" </> "shouldwork" </> "Numbers") defBuild [] "UnsignedZero" (["","UnsignedZero_testBench"],"UnsignedZero_testBench",True)
-        , runTest ("tests" </> "shouldwork" </> "Numbers") defBuild [] "SignedZero"   (["","SignedZero_testBench"],"SignedZero_testBench",True)
         ]
       , clashTestGroup "Polymorphism"
         [ runTest ("tests" </> "shouldwork" </> "Polymorphism") defBuild [] "ExistentialBoxed"  ([""],"ExistentialBoxed_topEntity",False)
