@@ -9,12 +9,14 @@
 {-# LANGUAGE BangPatterns      #-}
 {-# LANGUAGE CPP               #-}
 {-# LANGUAGE DataKinds         #-}
-{-# LANGUAGE ViewPatterns      #-}
+{-# LANGUAGE KindSignatures    #-}
 {-# LANGUAGE MagicHash         #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE RankNTypes        #-}
 {-# LANGUAGE TemplateHaskell   #-}
 {-# LANGUAGE TupleSections     #-}
 {-# LANGUAGE UnboxedTuples     #-}
+{-# LANGUAGE ViewPatterns      #-}
 
 module Clash.GHC.Evaluator where
 
@@ -36,7 +38,6 @@ import           Data.Text           (Text)
 import qualified Data.Text           as Text
 import qualified Data.Vector.Primitive as Vector
 import           Debug.Trace         (trace)
-import           GHC.Stack           (HasCallStack)
 import           GHC.Float
 import           GHC.Int
 import           GHC.Integer
@@ -46,6 +47,7 @@ import           GHC.Integer.GMP.Internals (Integer (..), BigNat (..))
 import           GHC.Natural
 import           GHC.Prim
 import           GHC.Real            (Ratio (..))
+import           GHC.Stack           (HasCallStack)
 import           GHC.TypeLits        (KnownNat)
 import           GHC.Types           (IO (..))
 import           GHC.Word
@@ -1243,6 +1245,35 @@ reduceConstant isSubj gbl tcm h k nm ty tys args = case nm of
     | [i] <- bitVectorLiterals' args
     -> reduce (Literal (DoubleLiteral (toRational $ (unpack :: BitVector 64 -> Double) (toBV i))))
 
+  -- expIndex#
+  --   :: KnownNat m
+  --   => Index m
+  --   -> SNat n
+  --   -> Index (n^m)
+  "Clash.Class.Exp.expIndex#"
+    | [b] <- indexLiterals' args
+    , [(_mTy, km), (_, e)] <- extractKnownNats tcm tys
+    -> reduce (mkIndexLit ty (LitTy (NumTy (km^e))) (km^e) (b^e))
+
+  -- expSigned#
+  --   :: KnownNat m
+  --   => Signed m
+  --   -> SNat n
+  --   -> Signed (n*m)
+  "Clash.Class.Exp.expSigned#"
+    | [b] <- signedLiterals' args
+    , [(_mTy, km), (_, e)] <- extractKnownNats tcm tys
+    -> reduce (mkSignedLit ty (LitTy (NumTy (km*e))) (km*e) (b^e))
+
+  -- expUnsigned#
+  --   :: KnownNat m
+  --   => Unsigned m
+  --   -> SNat n
+  --   -> Unsigned m
+  "Clash.Class.Exp.expUnsigned#"
+    | [b] <- unsignedLiterals' args
+    , [(_mTy, km), (_, e)] <- extractKnownNats tcm tys
+    -> reduce (mkUnsignedLit ty (LitTy (NumTy (km*e))) (km*e) (b^e))
 
   "Clash.Promoted.Nat.powSNat"
     | [Right a, Right b] <- map (runExcept . tyNatSize tcm) tys
@@ -3461,17 +3492,41 @@ extractKnownNat tcm tys = case tys of
     -> Just (nTy, nInt)
   _ -> Nothing
 
+extractKnownNatVal :: TyConMap -> [Type] -> Maybe Integer
+extractKnownNatVal tcm tys = fmap snd (extractKnownNat tcm tys)
+
+-- From an argument list to function of type
+--   forall n m o .. . (KnownNat n, KnownNat m, KnownNat o, ..) => ...
+-- extract [(nTy,nInt), (mTy,mInt), (oTy,oInt)]
+-- where nTy is the Type of n
+-- and   nInt is its value as an Integer
+extractKnownNats :: TyConMap -> [Type] -> [(Type, Integer)]
+extractKnownNats tcm tys =
+  catMaybes (map (extractKnownNat tcm . pure)  tys)
+
+extractKnownNatVals :: TyConMap -> [Type] -> [Integer]
+extractKnownNatVals tcm tys = map snd (extractKnownNats tcm tys)
+
 -- Construct a constant term of a sized type
 mkSizedLit
-  :: (Type -> Term)    -- type constructor?
-  -> Type    -- result type
-  -> Type    -- forall n.
-  -> Integer -- KnownNat n
-  -> Integer -- value
+  :: (Type -> Term)
+  -- ^ Type constructor?
+  -> Type
+  -- ^ Result type
+  -> Type
+  -- ^ forall n.
+  -> Integer
+  -- ^ KnownNat n
+  -> Integer
+  -- ^ Value to construct
   -> Term
-mkSizedLit conPrim ty nTy kn val
-  = mkApps (conPrim sTy) [Right nTy,Left (Literal (NaturalLiteral kn)),Left (Literal (IntegerLiteral val))]
-  where
+mkSizedLit conPrim ty nTy kn val =
+  mkApps
+    (conPrim sTy)
+    [ Right nTy
+    , Left (Literal (NaturalLiteral kn))
+    , Left (Literal (IntegerLiteral val)) ]
+ where
     (_,sTy) = splitFunForallTy ty
 
 mkBitLit
@@ -3489,20 +3544,29 @@ mkBitLit ty msk val =
     (_,sTy) = splitFunForallTy ty
 
 mkSignedLit, mkUnsignedLit
-  :: Type    -- result type
-  -> Type    -- forall n.
-  -> Integer -- KnownNat n
-  -> Integer -- value
+  :: Type
+  -- Result type
+  -> Type
+  -- forall n.
+  -> Integer
+  -- KnownNat n
+  -> Integer
+  -- Value
   -> Term
 mkSignedLit    = mkSizedLit signedConPrim
 mkUnsignedLit  = mkSizedLit unsignedConPrim
 
 mkBitVectorLit
-  :: Type    -- result type
-  -> Type    -- forall n.
-  -> Integer -- KnownNat n
-  -> Integer -- mask
-  -> Integer -- value
+  :: Type
+  -- ^ Result type
+  -> Type
+  -- ^ forall n.
+  -> Integer
+  -- ^ KnownNat n
+  -> Integer
+  -- ^ mask
+  -> Integer
+  -- ^ Value to construct
   -> Term
 mkBitVectorLit ty nTy kn mask val
   = mkApps (bvConPrim sTy)
@@ -3513,65 +3577,93 @@ mkBitVectorLit ty nTy kn mask val
   where
     (_,sTy) = splitFunForallTy ty
 
-mkIndexLit
-  :: Type    -- result type
-  -> Type    -- forall n.
-  -> Integer -- KnownNat n
-  -> Integer -- value
-  -> Term
-mkIndexLit rTy nTy kn val
+mkIndexLitE
+  :: Type
+  -- ^ Result type
+  -> Type
+  -- ^ forall n.
+  -> Integer
+  -- ^ KnownNat n
+  -> Integer
+  -- ^ Value to construct
+  -> Either Term Term
+  -- ^ Either undefined (if given value is out of bounds of given type) or term
+  -- representing literal
+mkIndexLitE rTy nTy kn val
   | val >= 0
   , val < kn
-  = mkSizedLit indexConPrim rTy nTy kn val
+  = Right (mkSizedLit indexConPrim rTy nTy kn val)
   | otherwise
-  = TyApp (Prim "Clash.GHC.Evaluator.undefined" undefinedTy)
-          (mkTyConApp indexTcNm [nTy])
+  = Left
+      ( TyApp
+          (Prim "Clash.GHC.Evaluator.undefined" undefinedTy)
+          (mkTyConApp indexTcNm [nTy]) )
   where
     TyConApp indexTcNm _ = tyView (snd (splitFunForallTy rTy))
 
--- Construct a constant term of a sized type
+mkIndexLit
+  :: Type
+  -- ^ Result type
+  -> Type
+  -- ^ forall n.
+  -> Integer
+  -- ^ KnownNat n
+  -> Integer
+  -- ^ Value to construct
+  -> Term
+mkIndexLit rTy nTy kn val =
+  either id id (mkIndexLitE rTy nTy kn val)
+
+-- | Construct a constant term of a sized type
 mkSizedLit'
-  :: (Type -> Term)    -- type constructor?
-  -> (Type     -- result type
-     ,Type     -- forall n.
-     ,Integer) -- KnownNat n
-  -> Integer -- value
+  :: (Type -> Term)
+  -- ^ Type constructor?
+  -> (Type, Type, Integer)
+  -- ^ (result type, forall n., KnownNat n)
+  -> Integer
+  -- ^ Value to construct
   -> Term
 mkSizedLit' conPrim (ty,nTy,kn) = mkSizedLit conPrim ty nTy kn
 
 mkSignedLit', mkUnsignedLit'
-  :: (Type     -- result type
-     ,Type     -- forall n.
-     ,Integer) -- KnownNat n
-  -> Integer -- value
+  :: (Type, Type, Integer)
+  -- ^ (result type, forall n., KnownNat n)
+  -> Integer
+  -- ^ Value to construct
   -> Term
 mkSignedLit'    = mkSizedLit' signedConPrim
 mkUnsignedLit'  = mkSizedLit' unsignedConPrim
 
 mkBitVectorLit'
-  :: (Type     -- result type
-     ,Type     -- forall n.
-     ,Integer) -- KnownNat n
-  -> Integer -- Mask
-  -> Integer -- value
+  :: (Type, Type, Integer)
+  -- ^ (result type, forall n., KnownNat n)
+  -> Integer
+  -- ^ Mask
+  -> Integer
+  -- ^ Value
   -> Term
 mkBitVectorLit' (ty,nTy,kn) = mkBitVectorLit ty nTy kn
 
 mkIndexLit'
-  :: (Type     -- result type
-     ,Type     -- forall n.
-     ,Integer) -- KnownNat n
-  -> Integer -- value
+  :: (Type, Type, Integer)
+  -- ^ (result type, forall n., KnownNat n)
+  -> Integer
+  -- ^ value
   -> Term
 mkIndexLit' (rTy,nTy,kn) = mkIndexLit rTy nTy kn
 
 -- | Create a vector of supplied elements
 mkVecCons
-  :: DataCon -- ^ The Cons (:>) constructor
-  -> Type    -- ^ Element type
-  -> Integer -- ^ Length of the vector
-  -> Term    -- ^ head of the vector
-  -> Term    -- ^ tail of the vector
+  :: DataCon
+  -- ^ The Cons (:>) constructor
+  -> Type
+  -- ^ Element type
+  -> Integer
+  -- ^ Length of the vector
+  -> Term
+  -- ^ head of the vector
+  -> Term
+  -- ^ tail of the vector
   -> Term
 mkVecCons consCon resTy n h t =
   mkApps (Data consCon) [Right (LitTy (NumTy n))
@@ -3746,9 +3838,12 @@ liftSized2 extractLitArgs mkLit f ty tcm tys args p
 -- The resulting function must be executed with reifyNat
 runSizedF
   :: (KnownNat n, Integral (sized n))
-  => (sized n -> sized n -> sized n)   -- ^ function to run
-  -> Integer                           -- ^ first  argument
-  -> Integer                           -- ^ second argument
+  => (sized n -> sized n -> sized n)
+  -- ^ function to run
+  -> Integer
+  -- ^ first  argument
+  -> Integer
+  -- ^ second argument
   -> (Proxy n -> Integer)
 runSizedF f i j _ = toInteger $ f (fromInteger i) (fromInteger j)
 

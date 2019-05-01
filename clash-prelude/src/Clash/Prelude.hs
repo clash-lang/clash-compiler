@@ -124,6 +124,7 @@ module Clash.Prelude
     -- ** Type classes
     -- *** Clash
   , module Clash.Class.BitPack
+  , module Clash.Class.Exp
   , module Clash.Class.Num
   , module Clash.Class.Resize
     -- *** Other
@@ -153,10 +154,11 @@ import           Language.Haskell.TH.Syntax  (Lift(..))
 import           Prelude hiding
   ((++), (!!), concat, concatMap, drop, foldl, foldl1, foldr, foldr1, head, init,
    iterate, last, length, map, repeat, replicate, reverse, scanl, scanr, splitAt,
-   tail, take, unzip, unzip3, zip, zip3, zipWith, zipWith3, undefined)
+   tail, take, unzip, unzip3, zip, zip3, zipWith, zipWith3, undefined, (^))
 
 import           Clash.Annotations.TopEntity
 import           Clash.Class.BitPack
+import           Clash.Class.Exp
 import           Clash.Class.Num
 import           Clash.Class.Resize
 import qualified Clash.Explicit.Prelude      as E

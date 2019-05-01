@@ -247,7 +247,9 @@ extractPrimWarnOrFail nm = do
     when (primWarn && not seen)
       $ liftIO
       $ warn opts
-      $ "Dubious primitive instantiation: "
+      $ "Dubious primitive instantiation for "
+     ++ unpack nm
+     ++ ": "
      ++ warning
      ++ " (disable with -fclash-no-prim-warn)"
 
