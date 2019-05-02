@@ -53,12 +53,12 @@ import           Clash.Core.Literal               (Literal (..))
 import           Clash.Core.Name                  (Name(..))
 import           Clash.Core.Pretty                (showPpr)
 import           Clash.Core.Term
-  (Alt, Pat (..), Term (..))
+  (Alt, Pat (..), Term (..), collectArgs)
 import qualified Clash.Core.Term                  as Core
 import           Clash.Core.Type
   (Type (..), coreView1, splitFunTys, splitCoreFunForallTy)
 import           Clash.Core.TyCon                 (TyConMap)
-import           Clash.Core.Util                  (collectArgs, termType)
+import           Clash.Core.Util                  (termType)
 import           Clash.Core.Var                   (Id, Var (..))
 import           Clash.Core.VarEnv
   (InScopeSet, VarEnv, eltsVarEnv, emptyVarEnv, extendVarEnv, lookupVarEnv, lookupVarEnv',

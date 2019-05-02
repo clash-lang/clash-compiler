@@ -12,6 +12,7 @@
 {-# LANGUAGE FlexibleInstances     #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE TemplateHaskell       #-}
+{-# LANGUAGE ViewPatterns          #-}
 
 module Clash.Core.Term
   ( Term (..)
@@ -19,12 +20,15 @@ module Clash.Core.Term
   , LetBinding
   , Pat (..)
   , Alt
+  , CoreContext (..), Context, isLambdaBodyCtx
+  , collectArgs, primArg
   )
 where
 
 -- External Modules
 import Control.DeepSeq
 import Data.Binary                             (Binary)
+import Data.Either                             (lefts, rights)
 import Data.Hashable                           (Hashable)
 import Data.Text                               (Text)
 import GHC.Generics
@@ -70,3 +74,85 @@ data Pat
 
 type Alt = (Pat,Term)
 
+-- | Context in which a term appears
+data CoreContext
+  = AppFun
+  -- ^ Function position of an application
+  | AppArg (Maybe (Text, Int, Int))
+  -- ^ Argument position of an application. If this is an argument applied to
+  -- a primitive, a tuple is defined containing (name of the primitive, #type
+  -- args, #term args)
+  | TyAppC
+  -- ^ Function position of a type application
+  | LetBinding Id [Id]
+  -- ^ RHS of a Let-binder with the sibling LHS'
+  | LetBody [Id]
+  -- ^ Body of a Let-binding with the bound LHS'
+  | LamBody Id
+  -- ^ Body of a lambda-term with the abstracted variable
+  | TyLamBody TyVar
+  -- ^ Body of a TyLambda-term with the abstracted type-variable
+  | CaseAlt Pat
+  -- ^ RHS of a case-alternative with the bound pattern on the LHS
+  | CaseScrut
+  -- ^ Subject of a case-decomposition
+  | CastBody
+  -- ^ Body of a Cast
+  deriving (Show, Generic, NFData, Hashable, Binary)
+
+-- | A list of @CoreContext@ describes the complete navigation path from the
+-- top-level to a specific sub-expression.
+type Context = [CoreContext]
+
+-- [Note] Custom @Eq@ instance for @CoreContext@
+--
+-- We need a manual equality instance here, due to the argument of `AppArg`.
+-- Specifically, it is the only piece of information kept in `CoreContext`,
+-- which references information about its children, breaking the invariant
+-- that contexts represent a navigation to a specific sub-expression.
+--
+-- One would expect equal contexts to navigate to the same place, but if
+-- these navigate to an argument position that contains different children,
+-- we will get inequality from the derived `Eq`.
+instance Eq CoreContext where
+  c == c' = case (c, c') of
+    (AppFun,          AppFun)            -> True
+    (AppArg _,        AppArg _)          -> True
+    -- NB: we do not see inside the argument here
+    (TyAppC,          TyAppC)            -> True
+    (LetBinding i is, LetBinding i' is') -> i == i' && is == is'
+    (LetBody is,      LetBody is')       -> is == is'
+    (LamBody i,       LamBody i')        -> i == i'
+    (TyLamBody tv,    TyLamBody tv')     -> tv == tv'
+    (CaseAlt p,       CaseAlt p')        -> p == p'
+    (CaseScrut,       CaseScrut)         -> True
+    (CastBody,        CastBody)          -> True
+    (_,               _)                 -> False
+
+-- | Is the Context a Lambda/Term-abstraction context?
+isLambdaBodyCtx :: CoreContext -> Bool
+isLambdaBodyCtx (LamBody _) = True
+isLambdaBodyCtx _           = False
+
+-- | Split a (Type)Application in the applied term and it arguments
+collectArgs :: Term
+            -> (Term, [Either Term Type])
+collectArgs = go []
+  where
+    go args (App e1 e2) = go (Left e2:args) e1
+    go args (TyApp e t) = go (Right t:args) e
+    go args e           = (e, args)
+
+-- | Given a function application, find the primitive it's applied. Yields
+-- Nothing if given term is not an application or if it is not a primitive.
+primArg
+  :: Term
+  -- ^ Function application
+  -> Maybe (Text, Int, Int)
+  -- ^ If @Term@ was a primitive: (name of primitive, #type args, #term args)
+primArg (collectArgs -> t) =
+  case t of
+    (Prim nm _, args) ->
+      Just (nm, length (rights args), length (lefts args))
+    _ ->
+      Nothing

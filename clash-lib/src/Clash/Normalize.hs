@@ -44,11 +44,11 @@ import           Clash.Core.FreeVars
   (termFreeIds, idDoesNotOccurIn, idOccursIn)
 import           Clash.Core.Pretty                (showPpr, ppr)
 import           Clash.Core.Subst                 (deShadowTerm, extendIdSubstList, mkSubst, substTm)
-import           Clash.Core.Term                  (Term (..))
+import           Clash.Core.Term                  (Term (..), collectArgs)
 import           Clash.Core.Type                  (Type, splitCoreFunForallTy)
 import           Clash.Core.TyCon
   (TyConMap, TyConName)
-import           Clash.Core.Util                  (collectArgs, mkApps, termType)
+import           Clash.Core.Util                  (mkApps, termType)
 import           Clash.Core.Var                   (Id, varName, varType)
 import           Clash.Core.VarEnv
   (VarEnv, elemVarSet, eltsVarEnv, emptyInScopeSet, emptyVarEnv,

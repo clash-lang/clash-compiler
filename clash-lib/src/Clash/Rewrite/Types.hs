@@ -25,48 +25,20 @@ import Control.Monad.State                   (MonadState (..))
 import Control.Monad.Writer                  (MonadWriter (..))
 import Data.IntMap.Strict                    (IntMap)
 import Data.Monoid                           (Any)
-import Data.Text                             (Text)
 
 import SrcLoc (SrcSpan)
 
 import Clash.Core.Evaluator      (GlobalHeap, PrimEvaluator)
-import Clash.Core.Term           (Term)
+import Clash.Core.Term           (Term, Context)
 import Clash.Core.Type           (Type)
 import Clash.Core.TyCon          (TyConName, TyConMap)
-import Clash.Core.Var            (Id, TyVar)
+import Clash.Core.Var            (Id)
 import Clash.Core.VarEnv         (InScopeSet, VarSet)
 import Clash.Driver.Types        (BindingMap, DebugLevel)
 import Clash.Netlist.Types       (FilteredHWType)
 import Clash.Util
 
 import Clash.Annotations.BitRepresentation.Internal (CustomReprs)
-
--- | Context in which a term appears
-data CoreContext
-  = AppFun
-  -- ^ Function position of an application
-  | AppArg (Maybe (Text, Int, Int))
-  -- ^ Argument position of an application. If this is an argument applied to
-  -- a primitive, a tuple is defined containing (name of the primitive, #type
-  -- args, #term args)
-  | TyAppC
-  -- ^ Function position of a type application
-  | LetBinding Id [Id]
-  -- ^ RHS of a Let-binder with the sibling LHS'
-  | LetBody [Id]
-  -- ^ Body of a Let-binding with the bound LHS'
-  | LamBody Id
-  -- ^ Body of a lambda-term with the abstracted variable
-  | TyLamBody TyVar
-  -- ^ Body of a TyLambda-term with the abstracted type-variable
-  | CaseAlt [TyVar] [Id]
-  -- ^ RHS of a case-alternative with the variables bound by
-  -- the pattern on the LHS
-  | CaseScrut
-  -- ^ Subject of a case-decomposition
-  | CastBody
-  -- ^ Body of a Cast
-  deriving (Eq,Show)
 
 -- | State of a rewriting session
 data RewriteState extra
@@ -90,8 +62,6 @@ data RewriteState extra
   }
 
 makeLenses ''RewriteState
-
-
 
 -- | Read-only environment of a rewriting session
 data RewriteEnv
@@ -168,8 +138,8 @@ instance MonadFix (RewriteMonad extra) where
 
 data TransformContext
   = TransformContext
-  { tfInScope     :: !InScopeSet
-  , tfCoreContext :: [CoreContext]
+  { tfInScope :: !InScopeSet
+  , tfContext :: Context
   }
 
 -- | Monadic action that transforms a term given a certain context

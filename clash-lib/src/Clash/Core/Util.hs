@@ -35,12 +35,12 @@ import Clash.Core.FreeVars                     (termFreeVars, tyFVsOfTypes)
 import Clash.Core.Literal                      (literalType)
 import Clash.Core.Name
   (Name (..), OccName, mkUnsafeInternalName, mkUnsafeSystemName)
-import Clash.Core.Pretty                       (ppr, showDoc)
+import Clash.Core.Pretty                       (ppr, showPpr)
 import Clash.Core.Subst
   (extendTvSubst, mkSubst, mkTvSubst, substTy, substTyWith,
    substTyInVar, extendTvSubstList)
 import Clash.Core.Term
-  (LetBinding, Pat (..), Term (..), Alt)
+  (LetBinding, Pat (..), Term (..), Alt, collectArgs)
 import Clash.Core.Type
   (Kind, LitTy (..), Type (..), TypeView (..),
    coreView, coreView1, isFunTy, isPolyFunCoreTy, mkFunTy, splitFunTy, tyView)
@@ -233,15 +233,6 @@ termType m e = case e of
   Case _ ty _    -> ty
   Cast _ _ ty2   -> ty2
 
--- | Split a (Type)Application in the applied term and it arguments
-collectArgs :: Term
-            -> (Term, [Either Term Type])
-collectArgs = go []
-  where
-    go args (App e1 e2) = go (Left e2:args) e1
-    go args (TyApp e t) = go (Right t:args) e
-    go args e           = (e, args)
-
 -- | Split a (Type)Abstraction in the bound variables and the abstracted term
 collectBndrs :: Term
              -> ([Either Id TyVar], Term)
@@ -265,9 +256,9 @@ applyTypeToArgs e m opTy args = go opTy args
   go opTy' (Left _:args')   = case splitFunTy m opTy' of
     Just (_,resTy) -> go resTy args'
     _ -> error $ unlines ["applyTypeToArgs:"
-                         ,"Expression: " ++ showDoc (ppr e)
-                         ,"Type: " ++ showDoc (ppr opTy)
-                         ,"Args: " ++ unlines (map (either (showDoc.ppr) (showDoc.ppr)) args)
+                         ,"Expression: " ++ showPpr e
+                         ,"Type: " ++ showPpr opTy
+                         ,"Args: " ++ unlines (map (either showPpr showPpr) args)
                          ]
 
   goTyArgs opTy' revTys (Right ty:args') = goTyArgs opTy' (ty:revTys) args'
@@ -454,13 +445,13 @@ isPrim _         = False
 idToVar :: Id
         -> Term
 idToVar i@(Id {}) = Var i
-idToVar tv        = error $ $(curLoc) ++ "idToVar: tyVar: " ++ showDoc (ppr tv)
+idToVar tv        = error $ $(curLoc) ++ "idToVar: tyVar: " ++ showPpr tv
 
 -- | Make a term variable out of a variable reference
 varToId :: Term
         -> Id
 varToId (Var i) = i
-varToId e       = error $ $(curLoc) ++ "varToId: not a var: " ++ showDoc (ppr e)
+varToId e       = error $ $(curLoc) ++ "varToId: not a var: " ++ showPpr e
 
 termSize :: Term
          -> Word
@@ -749,7 +740,7 @@ tyNatSize :: TyConMap
           -> Except String Integer
 tyNatSize m (coreView1 m -> Just ty) = tyNatSize m ty
 tyNatSize _ (LitTy (NumTy i))        = return i
-tyNatSize _ ty = throwE $ $(curLoc) ++ "Cannot reduce to an integer:\n" ++ showDoc (ppr ty)
+tyNatSize _ ty = throwE $ $(curLoc) ++ "Cannot reduce to an integer:\n" ++ showPpr ty
 
 
 mkUniqSystemTyVar

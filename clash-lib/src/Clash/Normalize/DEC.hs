@@ -61,10 +61,10 @@ import Clash.Core.Evaluator  (whnf')
 import Clash.Core.FreeVars
   (termFreeVars', typeFreeVars', varsDoNotOccurIn)
 import Clash.Core.Literal    (Literal (..))
-import Clash.Core.Term       (LetBinding, Pat (..), Term (..))
+import Clash.Core.Term       (LetBinding, Pat (..), Term (..), collectArgs)
 import Clash.Core.TyCon      (tyConDataCons)
 import Clash.Core.Type       (Type, isPolyFunTy, mkTyConApp, splitFunForallTy)
-import Clash.Core.Util       (collectArgs, mkApps, patIds, termType)
+import Clash.Core.Util       (mkApps, patIds, termType)
 import Clash.Core.VarEnv
   (InScopeSet, elemInScopeSet, notElemInScopeSet)
 import Clash.Normalize.Types (NormalizeState)

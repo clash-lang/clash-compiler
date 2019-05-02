@@ -198,6 +198,7 @@ Library
                       Clash.Unique
                       Clash.Util
                       Clash.Util.Graph
+                      Clash.Pretty
 
                       Data.Text.Prettyprint.Doc.Extra
 

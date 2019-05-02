@@ -79,11 +79,12 @@ import           Data.IntMap (IntMap)
 import qualified Data.IntMap as IntMap
 import qualified Data.List   as List
 import           Data.Text.Prettyprint.Doc
-import Data.Text.Prettyprint.Doc.Render.String
 #if !MIN_VERSION_base(4,11,0)
 import           Data.Semigroup
 #endif
 import           GHC.Stack
+
+import           Clash.Pretty
 
 type Unique = Int
 
@@ -97,15 +98,15 @@ instance Uniquable Int where
 newtype UniqMap a = UniqMap (IntMap a)
   deriving (Functor, Foldable, Traversable, Semigroup, Monoid, NFData, Binary)
 
-instance Pretty a => Pretty (UniqMap a) where
-  pretty (UniqMap env) =
+instance ClashPretty a => ClashPretty (UniqMap a) where
+  clashPretty (UniqMap env) =
     brackets $ fillSep $ punctuate comma $
-      [ pretty uq <+> ":->" <+> pretty elt
+      [ fromPretty uq <+> ":->" <+> clashPretty elt
       | (uq,elt) <- IntMap.toList env
       ]
 
-instance Pretty a => Show (UniqMap a) where
-  show = renderString . layoutPretty (LayoutOptions (AvailablePerLine 80 0.6)) . pretty
+instance ClashPretty a => Show (UniqMap a) where
+  show = showDoc . clashPretty
 
 -- | The empty map
 emptyUniqMap
@@ -297,9 +298,9 @@ foldrWithUnique f s (UniqMap m) = IntMap.foldrWithKey f s m
 newtype UniqSet a = UniqSet (IntMap a)
   deriving (Foldable, Semigroup, Monoid, Binary)
 
-instance Pretty a => Pretty (UniqSet a) where
-  pretty (UniqSet env) =
-    braces (fillSep (map pretty (IntMap.elems env)))
+instance ClashPretty a => ClashPretty (UniqSet a) where
+  clashPretty (UniqSet env) =
+    braces (fillSep (map clashPretty (IntMap.elems env)))
 
 -- | The empty set
 emptyUniqSet
