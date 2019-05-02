@@ -70,7 +70,6 @@ import Data.Singletons.Prelude     (Apply, TyFun, type (@@))
 import Data.Proxy                  (Proxy (..))
 import GHC.TypeLits                (KnownNat, Nat, type (+), type (^), type (*))
 import Language.Haskell.TH.Syntax  (Lift(..))
-import qualified Prelude           as P
 import Prelude                     hiding ((++), (!!))
 import Test.QuickCheck             (Arbitrary (..), CoArbitrary (..))
 

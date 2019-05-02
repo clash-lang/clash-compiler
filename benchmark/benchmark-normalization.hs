@@ -17,9 +17,8 @@ import           Criterion.Main
 import qualified Control.Concurrent.Supply    as Supply
 import           Control.DeepSeq              (NFData(rnf),rwhnf)
 import           Data.IntMap.Strict           (IntMap)
-import           Data.List                    (break, isPrefixOf, partition)
+import           Data.List                    (isPrefixOf, partition)
 import           System.Environment           (getArgs, withArgs)
-import           System.FilePath              (FilePath)
 
 import BenchmarkCommon
 

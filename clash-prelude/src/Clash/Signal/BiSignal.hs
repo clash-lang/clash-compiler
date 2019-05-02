@@ -116,7 +116,7 @@ module Clash.Signal.BiSignal (
 
 import           Data.Kind                  (Type)
 import           Data.List                  (intercalate)
-import           Data.Maybe                 (Maybe,fromMaybe,fromJust,isJust)
+import           Data.Maybe                 (fromMaybe,fromJust,isJust)
 
 import           Clash.Class.BitPack        (BitPack (..))
 import           Clash.Sized.BitVector      (BitVector)

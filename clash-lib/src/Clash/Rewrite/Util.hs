@@ -28,7 +28,9 @@ import           Control.Lens
   (Lens', (%=), (+=), (^.), _3, _4, _Left)
 import qualified Control.Lens                as Lens
 import qualified Control.Monad               as Monad
+#if !MIN_VERSION_base(4,13,0)
 import           Control.Monad.Fail          (MonadFail)
+#endif
 import qualified Control.Monad.State.Strict  as State
 import qualified Control.Monad.Writer        as Writer
 import           Data.Bifunctor              (bimap)
@@ -51,8 +53,6 @@ import           System.IO.Unsafe            (unsafePerformIO)
 #endif
 
 import           BasicTypes                  (InlineSpec (..))
-import           SrcLoc                      (SrcSpan)
-import           GHC.Stack                   (HasCallStack)
 
 import           Clash.Core.DataCon          (dcExtTyVars)
 import           Clash.Core.FreeVars

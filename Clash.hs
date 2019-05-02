@@ -21,7 +21,6 @@ import Clash.Util
 import Control.DeepSeq
 import qualified Data.Time.Clock as Clock
 
-import GHC.Stack (HasCallStack)
 import Util (OverridingBool(..))
 
 genSystemVerilog

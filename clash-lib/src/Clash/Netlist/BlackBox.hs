@@ -34,7 +34,6 @@ import           Data.Text.Lazy                (fromStrict)
 import qualified Data.Text.Lazy                as Text
 import           Data.Text                     (unpack)
 import qualified Data.Text                     as TextS
-import           GHC.Stack                     (HasCallStack)
 import qualified System.Console.ANSI           as ANSI
 import           System.Console.ANSI
   ( hSetSGR, SGR(SetConsoleIntensity, SetColor), Color(Magenta)
