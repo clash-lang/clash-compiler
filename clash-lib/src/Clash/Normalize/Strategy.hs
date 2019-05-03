@@ -14,6 +14,18 @@ import Clash.Rewrite.Combinators
 import Clash.Rewrite.Types
 import Clash.Rewrite.Util
 
+-- [Note: bottomup traversal evalConst]
+--
+-- 2-May-2019: There is a bug in the evaluator where all data constructors are
+-- considered lazy, even though their declaration says they have strict fields.
+-- This causes some reductions to fail because the term under the constructor is
+-- not in WHNF, which is what some of the evaluation rules for certain primitive
+-- operations expect. Using a bottom-up traversal works around this bug by
+-- ensuring that the values under the constructor are in WHNF.
+--
+-- Using a bottomup traversal ensures that constants are reduced to NF, even if
+-- constructors are lazy, thus ensuring more sensible/smaller generated HDL.
+
 -- | Normalisation transformation
 normalization :: NormRewrite
 normalization = rmDeadcode >-> constantPropgation >-> etaTL >-> rmUnusedExpr >-!-> anf >-!-> rmDeadcode >->
@@ -26,7 +38,8 @@ normalization = rmDeadcode >-> constantPropgation >-> etaTL >-> rmUnusedExpr >-!
     rmUnusedExpr = bottomupR (apply "removeUnusedExpr" removeUnusedExpr)
     rmDeadcode = bottomupR (apply "deadcode" deadCode)
     bindConst  = topdownR (apply "bindConstantVar" bindConstantVar)
-    evalConst  = topdownR (apply "evalConst" reduceConst)
+    -- See [Note] bottomup traversal evalConst:
+    evalConst  = bottomupR (apply "evalConst" reduceConst)
     cse        = topdownR (apply "CSE" simpleCSE)
     cleanup    = topdownR (apply "etaExpandSyn" etaExpandSyn) >->
                  topdownSucR (apply "inlineCleanup" inlineCleanup) !->

@@ -112,6 +112,7 @@ Library
                       Clash.Annotations.SynthesisAttributes
 
                       Clash.Class.BitPack
+                      Clash.Class.Exp
                       Clash.Class.Num
                       Clash.Class.Resize
 

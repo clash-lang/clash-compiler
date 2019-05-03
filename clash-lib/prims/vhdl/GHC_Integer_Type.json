@@ -154,4 +154,52 @@ end block;
     , "template"  : "unsigned(std_logic_vector(~ARG[0]))"
     }
   }
+, { "BlackBox" :
+    { "name"      : "GHC.Integer.Type.bitInteger"
+    , "kind"      : "Expression"
+    , "type"      : "bitInteger :: Int -> Integer"
+    , "template"  : "shift_left(to_signed(1, ~SIZE[~TYPO]),to_integer(~ARG[0]))"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "GHC.Integer.Type.complementInteger"
+    , "kind"      : "Expression"
+    , "type"      : "complementInteger :: Integer -> Integer"
+    , "template"  : "not ~ARG[0]"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "GHC.Integer.Type.xorInteger"
+    , "kind"      : "Expression"
+    , "type"      : "xorInteger :: Integer -> Integer -> Integer"
+    , "template"  : "~ARG[0] xor ~ARG[1]"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "GHC.Integer.Type.orInteger"
+    , "kind"      : "Expression"
+    , "type"      : "orInteger :: Integer -> Integer -> Integer"
+    , "template"  : "~ARG[0] or ~ARG[1]"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "GHC.Integer.Type.andInteger"
+    , "kind"      : "Expression"
+    , "type"      : "andInteger :: Integer -> Integer -> Integer"
+    , "template"  : "~ARG[0] and ~ARG[1]"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "GHC.Integer.Type.$wsignumInteger"
+    , "kind"      : "Declaration"
+    , "type"      : "$wsignumInteger :: Integer -> Integer"
+    , "template"  : "
+-- begin signumInteger
+~RESULT <= to_signed(-1, ~SIZE[~TYPO]) when ~ARG[0] < 0
+  else to_signed(0, ~SIZE[~TYPO])  when ~ARG[0] = 0
+  else to_signed(1, ~SIZE[~TYPO]);
+-- end signumInteger
+"
+    }
+  }
 ]
