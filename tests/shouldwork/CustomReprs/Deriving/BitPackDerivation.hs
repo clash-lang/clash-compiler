@@ -11,9 +11,9 @@ data Train
       SmallInt
       -- ^ Number of wagons
   | Freight
-      SmallInt
+      ( SmallInt
       -- ^ Number of wagons
-      SmallInt
+      , SmallInt )
       -- ^ Max weight
   | Maintenance
   | Toy
@@ -34,7 +34,7 @@ testBench = done'
   where
     testInput = stimuliGenerator $ Toy
                                 :> Maintenance
-                                :> Freight 2 3
+                                :> Freight (2, 3)
                                 :> Passenger 1
                                 :> Nil
 
