@@ -93,7 +93,9 @@ import           Clash.Core.Pretty           (showPpr)
 import           Clash.Core.Subst
   (substTm, mkSubst, extendIdSubst, extendIdSubstList, extendTvSubst,
    extendTvSubstList, freshenTm, substTyInVar, deShadowTerm)
-import           Clash.Core.Term             (LetBinding, Pat (..), Term (..))
+import           Clash.Core.Term
+  (LetBinding, Pat (..), Term (..), CoreContext (..), isLambdaBodyCtx,
+   collectArgs)
 import           Clash.Core.Type             (TypeView (..), applyFunTy,
                                               isPolyFunCoreTy,
                                               normalizeType,
@@ -101,7 +103,7 @@ import           Clash.Core.Type             (TypeView (..), applyFunTy,
                                               tyView, undefinedTy)
 import           Clash.Core.TyCon            (TyConMap, tyConDataCons)
 import           Clash.Core.Util
-  (collectArgs, isCon, isFun, isLet, isPolyFun, isPrim,
+  (isCon, isFun, isLet, isPolyFun, isPrim,
    isSignalType, isVar, mkApps, mkLams, mkVec, piResultTy, termSize, termType,
    tyNatSize, patVars, isAbsurdAlt, altEqs, substInExistentials,
    solveFirstNonAbsurd)

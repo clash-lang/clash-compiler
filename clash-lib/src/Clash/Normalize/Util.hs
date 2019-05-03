@@ -36,17 +36,18 @@ import           Data.Text               (Text)
 
 import           Clash.Annotations.Primitive (extractPrim)
 import           Clash.Core.FreeVars     (idOccursIn, termFreeIds)
-import           Clash.Core.Term         (Term (..))
+import           Clash.Core.Term
+  (Term (..), Context, CoreContext(AppArg), collectArgs)
 import           Clash.Core.TyCon        (TyConMap)
 import           Clash.Core.Var          (Id, Var (..))
 import           Clash.Core.VarEnv
 import           Clash.Core.Util
-  (collectArgs, isPolyFun, termType, isClockOrReset)
+  (isPolyFun, termType, isClockOrReset)
 import           Clash.Driver.Types      (BindingMap)
 import           Clash.Normalize.Types
 import           Clash.Primitives.Util   (constantArgs)
 import           Clash.Rewrite.Types
-  (bindings,extra,RewriteMonad,CoreContext(AppArg), tcCache, curFun)
+  (bindings,extra,RewriteMonad, tcCache, curFun)
 import           Clash.Rewrite.Util      (specialise, hasLocalFreeVars)
 import           Clash.Unique
 import           Clash.Util              (anyM)
@@ -84,7 +85,7 @@ isConstantArg nm i = do
 -- | Given a list of transformation contexts, determine if any of the contexts
 -- indicates that the current arg is to be reduced to a constant / literal.
 shouldReduce
-  :: [CoreContext]
+  :: Context
   -- ^ ..in the current transformcontext
   -> RewriteMonad NormalizeState Bool
 shouldReduce = anyM isConstantArg'

@@ -96,10 +96,11 @@ import           Data.Text.Prettyprint.Doc
 import           GHC.Exts                  (Any)
 import           GHC.Generics
 
-import           Clash.Core.Pretty
+import           Clash.Core.Pretty         ()
 import           Clash.Core.Var
 import           Clash.Unique
 import           Clash.Util
+import           Clash.Pretty
 
 -- * VarEnv
 
@@ -323,8 +324,8 @@ mkVarSet xs = mkUniqSet (coerce xs)
 data InScopeSet = InScopeSet VarSet {-# UNPACK #-} !Int
   deriving (Generic, Binary)
 
-instance Pretty InScopeSet where
-  pretty (InScopeSet s _) = pretty s
+instance ClashPretty InScopeSet where
+  clashPretty (InScopeSet s _) = clashPretty s
 
 -- | The empty set
 extendInScopeSet
@@ -418,7 +419,7 @@ uniqAway' (InScopeSet set n) var = try 1 where
     | otherwise
     = setVarUnique var uniq
     where
-      msg  = pretty k <+> "tries" <+> ppr (varName var) <+> pretty n
+      msg  = fromPretty k <+> "tries" <+> clashPretty (varName var) <+> fromPretty n
       uniq = deriveUnique origUniq (n * k)
 
 deriveUnique

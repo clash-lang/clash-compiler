@@ -53,11 +53,11 @@ import           Clash.Core.Name
   (Name (..), mkUnsafeSystemName)
 import           Clash.Core.Pretty             (showPpr)
 import           Clash.Core.Subst              (extendIdSubst, mkSubst, substTm)
-import           Clash.Core.Term               as C (Term (..))
+import           Clash.Core.Term               as C (Term (..), collectArgs)
 import           Clash.Core.Type               as C (Type (..), ConstTy (..),
                                                 splitFunTys)
 import           Clash.Core.TyCon              as C (tyConDataCons)
-import           Clash.Core.Util               (collectArgs, isFun, termType)
+import           Clash.Core.Util               (isFun, termType)
 import           Clash.Core.Var                as V (Id, Var (..), mkId, modifyVarName)
 import           Clash.Core.VarEnv
   (extendInScopeSet, mkInScopeSet, lookupVarEnv, unionInScope, uniqAway, unitVarSet)

@@ -51,7 +51,8 @@ import           Clash.Core.Pretty           (showPpr)
 import           Clash.Core.Subst
   (aeqTerm, aeqType, extendIdSubst, mkSubst, substTm)
 import           Clash.Core.Term
-  (LetBinding, Pat (..), Term (..), TmName)
+  (LetBinding, Pat (..), Term (..), CoreContext (..), Context, TmName,
+   collectArgs)
 import           Clash.Core.TyCon
   (TyConMap, tyConDataCons)
 import           Clash.Core.Type             (KindOrType, Type (..),
@@ -59,7 +60,7 @@ import           Clash.Core.Type             (KindOrType, Type (..),
                                               normalizeType,
                                               typeKind, tyView)
 import           Clash.Core.Util
-  (collectArgs, isPolyFun, mkAbstraction, mkApps, mkLams,
+  (isPolyFun, mkAbstraction, mkApps, mkLams,
    mkTmApps, mkTyApps, mkTyLams, termType, dataConInstArgTysE, isClockOrReset)
 import           Clash.Core.Var
   (Id, TyVar, Var (..), mkId, mkTyVar)
@@ -217,7 +218,7 @@ changed val = do
   Writer.tell (Monoid.Any True)
   return val
 
-closestLetBinder :: [CoreContext] -> Maybe Id
+closestLetBinder :: Context -> Maybe Id
 closestLetBinder [] = Nothing
 closestLetBinder (LetBinding id_ _:_) = Just id_
 closestLetBinder (_:ctx)              = closestLetBinder ctx
@@ -606,12 +607,6 @@ isUntranslatableType stringRepresentable ty =
                              <*> pure stringRepresentable
                              <*> Lens.view tcCache
                              <*> pure ty)
-
--- | Is the Context a Lambda/Term-abstraction context?
-isLambdaBodyCtx :: CoreContext
-                -> Bool
-isLambdaBodyCtx (LamBody _) = True
-isLambdaBodyCtx _           = False
 
 -- | Make a binder that should not be referenced
 mkWildValBinder

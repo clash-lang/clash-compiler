@@ -54,13 +54,14 @@ import qualified Data.List                 as List
 
 import           Clash.Core.FreeVars
   (noFreeVarsOfType, fVsOfTerms, tyFVsOfTypes)
-import           Clash.Core.Pretty         (ppr)
+import           Clash.Core.Pretty         (ppr, fromPpr)
 import           Clash.Core.Term           (LetBinding, Pat (..), Term (..))
 import           Clash.Core.Type           (Type (..))
 import           Clash.Core.VarEnv
 import           Clash.Core.Var            (Id, Var (..), TyVar)
 import           Clash.Unique
 import           Clash.Util
+import           Clash.Pretty
 
 -- * Subst
 
@@ -124,11 +125,11 @@ data TvSubst
   = TvSubst InScopeSet -- Variable in scope /after/ substitution
             TvSubstEnv -- Substitution for types
 
-instance Pretty TvSubst where
-  pretty (TvSubst ins tenv) =
+instance ClashPretty TvSubst where
+  clashPretty (TvSubst ins tenv) =
     brackets $ sep [ "TvSubst"
-                   , nest 2 ("In scope:" <+> pretty ins)
-                   , nest 2 ("Type env:" <+> pretty tenv)]
+                   , nest 2 ("In scope:" <+> clashPretty ins)
+                   , nest 2 ("Type env:" <+> clashPretty tenv)]
 
 -- | A substitution  of 'Term's for 'Id's
 --
@@ -347,15 +348,15 @@ checkValidSubst
   -> a
 checkValidSubst subst@(TvSubst inScope tenv) tys a =
   WARN( not (isValidSubst subst),
-        "inScope" <+> pretty inScope <> line <>
-        "tenv" <+> pretty tenv <> line <>
-        "tenvFVs" <+> pretty (tyFVsOfTypes tenv) <> line <>
-        "tys" <+> ppr tys)
+        "inScope" <+> clashPretty inScope <> line <>
+        "tenv" <+> clashPretty tenv <> line <>
+        "tenvFVs" <+> clashPretty (tyFVsOfTypes tenv) <> line <>
+        "tys" <+> fromPpr tys)
   WARN( not tysFVsInSope,
-       "inScope" <+> pretty inScope <> line <>
-       "tenv" <+> pretty tenv <> line <>
-       "tys" <+> ppr tys <> line <>
-       "needsInScope" <+> pretty needsInScope)
+       "inScope" <+> clashPretty inScope <> line <>
+       "tenv" <+> clashPretty tenv <> line <>
+       "tys" <+> fromPpr tys <> line <>
+       "needsInScope" <+> clashPretty needsInScope)
   a
  where
   needsInScope = foldrWithUnique (\k _ s -> delVarSetByKey k s)
@@ -409,7 +410,9 @@ substTyVarBndr
   -> TyVar
   -> (TvSubst, TyVar)
 substTyVarBndr subst@(TvSubst inScope tenv) oldVar =
-  ASSERT2( no_capture, ppr oldVar <> line <> ppr newVar <> line <> pretty subst)
+  ASSERT2( no_capture, clashPretty oldVar <> line
+                    <> clashPretty newVar <> line
+                    <> clashPretty subst )
   (TvSubst (inScope `extendInScopeSet` newVar) newEnv, newVar)
  where
   newEnv | noChange  = delVarEnv tenv oldVar
@@ -470,7 +473,7 @@ substTm doc subst = go where
 -- | Find the substitution for an 'Id' in the 'Subst'
 lookupIdSubst
   :: HasCallStack
-  => Doc ann
+  => Doc ()
   -> Subst
   -> Id
   -> Term
@@ -478,7 +481,7 @@ lookupIdSubst doc (Subst inScope tmS _) v
   | Just e <- lookupVarEnv v tmS = e
   -- Vital! See 'IdSubstEnv' Note [Extending the Subst]
   | Just v' <- lookupInScope inScope v = Var (coerce v')
-  | otherwise = WARN(True, "Subst.lookupIdSubst" <+> doc <+> ppr v)
+  | otherwise = WARN(True, "Subst.lookupIdSubst" <+> doc <+> fromPpr v)
                 Var v
 
 -- | Substitute an 'Id' for another one according to the 'Subst' given,

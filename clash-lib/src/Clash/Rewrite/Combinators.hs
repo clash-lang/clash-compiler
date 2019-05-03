@@ -29,28 +29,12 @@ import           Control.DeepSeq             (deepseq)
 import           Control.Monad               ((>=>))
 import qualified Control.Monad.Writer        as Writer
 import qualified Data.Monoid                 as Monoid
-import           Data.Text                   (Text)
-import           Data.Either                 (lefts, rights)
 
-import           Clash.Core.Term             (Term (..))
-import           Clash.Core.Util             (patIds, collectArgs)
+import           Clash.Core.Term             (Term (..), CoreContext (..), primArg)
+import           Clash.Core.Util             (patIds)
 import           Clash.Core.VarEnv
   (extendInScopeSet, extendInScopeSetList)
 import           Clash.Rewrite.Types
-
--- | Given a function application, find the primitive it's applied. Yields
--- Nothing if given term is not an application or if it is not a primitive.
-primArg
-  :: Term
-  -- ^ Function application
-  -> Maybe (Text, Int, Int)
-  -- ^ If @Term@ was a primitive: (name of primitive, #type args, #term args)
-primArg (collectArgs -> t) =
-  case t of
-    (Prim nm _, args) ->
-      Just (nm, length (rights args), length (lefts args))
-    _ ->
-      Nothing
 
 -- | Apply a transformation on the subtrees of an term
 allR
@@ -93,7 +77,7 @@ allR trans (TransformContext is c) (Case scrut ty alts) =
   rewriteAlt (p,e) =
     let (tvs,ids) = patIds p
         is'       = extendInScopeSetList (extendInScopeSetList is tvs) ids
-    in  (p,) <$> trans (TransformContext is' (CaseAlt tvs ids:c)) e
+    in  (p,) <$> trans (TransformContext is' (CaseAlt p : c)) e
 
 allR _ _ tm = pure tm
 

@@ -42,6 +42,7 @@ import           Clash.Driver.Types                      (BindingMap)
 import           Prelude                                 hiding (lookup)
 import           Clash.Unique
 import           Clash.Util                              (curLoc)
+import           Clash.Pretty
 
 -- | The heap
 data Heap = Heap GlobalHeap PureHeap Supply InScopeSet
@@ -62,17 +63,18 @@ data StackFrame
   | Scrutinise Type [Alt]
   deriving Show
 
-instance Pretty StackFrame where
-  pretty (Update i) = hsep ["Update", ppr i]
-  pretty (Apply i) = hsep ["Apply", ppr i]
-  pretty (Instantiate t) = hsep ["Instantiate", ppr t]
-  pretty (PrimApply a b c d e) = do
-    hsep ["PrimApply", pretty a, "::", ppr b,
-          "; type args=", ppr c,
-          "; val args=", ppr (map valToTerm d),
-          "term args=", ppr e]
-  pretty (Scrutinise a b) =
-    hsep ["Scrutinise ", ppr a, ppr (Case (Literal (CharLiteral '_')) a b)]
+instance ClashPretty StackFrame where
+  clashPretty (Update i) = hsep ["Update", fromPpr i]
+  clashPretty (Apply i) = hsep ["Apply", fromPpr i]
+  clashPretty (Instantiate t) = hsep ["Instantiate", fromPpr t]
+  clashPretty (PrimApply a b c d e) = do
+    hsep ["PrimApply", fromPretty a, "::", fromPpr b,
+          "; type args=", fromPpr c,
+          "; val args=", fromPpr (map valToTerm d),
+          "term args=", fromPpr e]
+  clashPretty (Scrutinise a b) =
+    hsep ["Scrutinise ", fromPpr a,
+          fromPpr (Case (Literal (CharLiteral '_')) a b)]
 
 -- Values
 data Value
@@ -170,13 +172,13 @@ unwindStack (h@(Heap _ h' _ _),(kf:k'),e) = case kf of
                        $ [ "Clash.Core.Evaluator.unwindStack:"
                          , "Stack:"
                          ] ++
-                         [ "  "++ showDoc (pretty frame) | frame <- kf:k'] ++
+                         [ "  "++ showDoc (clashPretty frame) | frame <- kf:k'] ++
                          [ ""
                          , "Expression:"
-                         , showDoc $ ppr e
+                         , showPpr e
                          , ""
                          , "Heap:"
-                         , showDoc (pretty h')
+                         , showDoc (clashPretty h')
                          ]
   Scrutinise _ [] ->
     unwindStack (h,k',e)
