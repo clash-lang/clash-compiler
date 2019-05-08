@@ -34,9 +34,9 @@ coreToType'
 coreToType' (C.AppTy t1 t2) =
   AppTy' <$> coreToType' t1 <*> coreToType' t2
 coreToType' (C.ConstTy (C.TyCon name)) =
-   return $ ConstTy' (nameOcc name)
+  return $ ConstTy' (nameOcc name)
 coreToType' (C.LitTy (C.NumTy n)) =
-   return $ LitTy' n
+  return $ LitTy' n
 coreToType' e =
   Left $ $(curLoc) ++ "Unexpected type: " ++ show e
 
