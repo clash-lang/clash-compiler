@@ -624,7 +624,7 @@ generator(s) by actual clock sources, such as an onboard PLL.
 -}
 
 {- $mac5
-Aside from being to generate VHDL, the Clash compiler can also generate Verilog
+Aside from being able to generate VHDL, the Clash compiler can also generate Verilog
 and SystemVerilog. You can repeat the previous two parts of the tutorial, but
 instead of executing the @:vhdl@ command, you execute the @:verilog@ or
 @:sytemverilog@ command in the interpreter. This will create a directory called
