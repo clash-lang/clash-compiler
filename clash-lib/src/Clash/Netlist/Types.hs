@@ -111,6 +111,8 @@ data NetlistState
 -- | Signal reference
 type Identifier = Text
 
+type Comment = Text
+
 -- | Component: base unit of a Netlist
 data Component
   = Component
@@ -215,7 +217,7 @@ data Declaration
   -- * Type of the scrutinee
   --
   -- * List of: (Maybe expression scrutinized expression is compared with,RHS of alternative)
-  | InstDecl EntityOrComponent (Maybe Identifier) !Identifier !Identifier [(Expr,HWType,Expr)] [(Expr,PortDirection,HWType,Expr)]
+  | InstDecl EntityOrComponent (Maybe Comment) !Identifier !Identifier [(Expr,HWType,Expr)] [(Expr,PortDirection,HWType,Expr)]
   -- ^ Instantiation of another component:
   --
   -- * Whether it's an entity or a component
@@ -244,7 +246,7 @@ data Declaration
       BlackBoxContext
   -- ^ Instantiation of blackbox declaration
   | NetDecl'
-      (Maybe Identifier)         -- Note; will be inserted as a comment in target hdl
+      (Maybe Comment)            -- Note; will be inserted as a comment in target hdl
       WireOrReg                  -- Wire or register
       !Identifier                -- Name of signal
       (Either Identifier HWType) -- Pointer to type of signal or type of signal
@@ -260,7 +262,7 @@ data WireOrReg = Wire | Reg
 instance NFData WireOrReg
 
 pattern NetDecl
-  :: Maybe Identifier
+  :: Maybe Comment
   -- ^ Note; will be inserted as a comment in target hdl
   -> Identifier
   -- ^ Name of signal
