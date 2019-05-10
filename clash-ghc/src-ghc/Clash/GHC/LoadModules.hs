@@ -248,6 +248,9 @@ loadModules tmpDir useColor hdl modName dflagsM idirs = do
     (externalBndrs,clsOps,unlocatable,pFP,reprs) <-
       loadExternalExprs tmpDir hdl (UniqSet.mkUniqSet binderIds) bindersC
 
+    let externalBndrIds = map fst externalBndrs
+    let allBinderIds = externalBndrIds ++ binderIds
+
     extTime <- modTime `deepseq` length unlocatable `deepseq` MonadUtils.liftIO Clock.getCurrentTime
     let extModDiff = Clock.diffUTCTime extTime modTime
     MonadUtils.liftIO $ putStrLn $ "GHC: Loading external modules from interface files took: " ++ show extModDiff
@@ -278,7 +281,7 @@ loadModules tmpDir useColor hdl modName dflagsM idirs = do
     topSyn     <- map (second Just) <$> findSynthesizeAnnotations rootIds
     benchAnn   <- findTestBenchAnnotations binderIds
     reprs'     <- findCustomReprAnnotations
-    primGuards <- findPrimitiveGuardAnnotations binderIds
+    primGuards <- findPrimitiveGuardAnnotations allBinderIds
     let varNameString = OccName.occNameString . Name.nameOccName . Var.varName
         topEntities = filter ((== "topEntity") . varNameString) rootIds
         benches     = filter ((== "testBench") . varNameString) rootIds
