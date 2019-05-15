@@ -612,6 +612,7 @@ wantedLanguageExtensions df =
              , LangExt.DeriveAnyClass
              , LangExt.DeriveGeneric
              , LangExt.DeriveLift
+             , LangExt.DerivingStrategies
              , LangExt.ExplicitForAll
              , LangExt.ExplicitNamespaces
              , LangExt.FlexibleContexts
