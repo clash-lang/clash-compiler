@@ -996,9 +996,38 @@ expr_ _ (Identifier id_ (Just (DC (ty@(SP _ _),_)))) = stringS id_ <> brackets (
 
 expr_ b (Identifier id_ (Just (Nested m1 m2))) = case nestM m1 m2 of
   Just m3 -> expr_ b (Identifier id_ (Just m3))
-  _ -> do
-    k <- expr_ b (Identifier id_ (Just m1))
-    expr_ b (Identifier (Text.toStrict (renderOneLine k)) (Just m2))
+  _ -> case nestSP 0 m1 m2 of
+    Just (argTy,start,end) -> fromSLV argTy id_ start end
+    _ -> do
+      k <- expr_ b (Identifier id_ (Just m1))
+      expr_ b (Identifier (Text.toStrict (renderOneLine k)) (Just m2))
+ where
+  nestSP offset k1 k2 = case goSP offset k1 of
+    Just (_,_,e) -> goSP e k2
+    _ -> Nothing
+
+  goSP offset (Indexed (ty@(SP _ args),dcI,fI)) = Just (argTy,start+offset,end+offset)
+   where
+    argTys   = snd $ args !! dcI
+    argTy    = argTys !! fI
+    argSize  = typeSize argTy
+    other    = otherSize argTys (fI-1)
+    start    = typeSize ty - 1 - conSize ty - other
+    end      = start - argSize + 1
+
+
+  goSP offset (Indexed (CustomSP _id _dataRepr _size args,dcI,fI)) =
+    case bitRanges (anns !! fI) of
+      [(start,end)] -> Just (argTy,start+offset,end+offset)
+      _ -> Nothing
+
+   where
+    (ConstrRepr' _name _n _mask _value anns, _, argTys) = args !! dcI
+    argTy = argTys !! fI
+
+  goSP offset (Nested k1 k2) = nestSP offset k1 k2
+
+  goSP _ _ = Nothing
 
 -- See [Note] integer projection
 expr_ _ (Identifier id_ (Just (Indexed ((Signed w),_,_))))  = do
