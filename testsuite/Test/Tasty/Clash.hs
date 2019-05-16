@@ -591,6 +591,7 @@ outputTest' env target extraClashArgs extraGhcArgs modName funcName path =
              , "-XDataKinds"
              , "-XDeriveAnyClass"
              , "-XDeriveGeneric"
+             , "-XDerivingStrategies"
              , "-XDeriveLift"
              , "-XExplicitForAll"
              , "-XExplicitNamespaces"
