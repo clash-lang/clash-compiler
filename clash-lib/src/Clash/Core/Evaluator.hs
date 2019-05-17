@@ -485,7 +485,7 @@ scrutinise h k (Lit l) alts = case alts of
     | NaturalLiteral l1  <- l
     , Just patE <- case dcTag dc of
        1 | l1 >= 0 &&  l1 < 2^(64::Int) ->
-          Just (IntLiteral l1)
+          Just (WordLiteral l1)
        2 | l1 >= (2^(64::Int)) ->
           let !(Jp# !(BN# ba0)) = l1
               ba1 = BA.ByteArray ba0
