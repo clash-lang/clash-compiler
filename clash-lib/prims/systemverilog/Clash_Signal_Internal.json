@@ -73,7 +73,7 @@ assign ~RESULT = ~SYM[0];
 localparam ~GENSYM[half_period][0] = (~LIT[2]0 / 2);
 always begin
   ~RESULT = 0;
-  #3000 forever begin
+  #30000 forever begin
     ~RESULT = ~ ~RESULT;
     #~SYM[0];
     ~RESULT = ~ ~RESULT;
@@ -102,7 +102,7 @@ end
 localparam ~GENSYM[half_period][0] = (~LIT[2]0 / 2);
 always begin
   ~RESULT = 0;
-  #3000 forever begin
+  #30000 forever begin
     if (~ ~ARG[3]) begin
       $finish;
     end
@@ -125,7 +125,7 @@ end
 // pragma translate_off
 initial begin
   #1    ~RESULT = 1;
-  #3001 ~RESULT = 0;
+  #30001 ~RESULT = 0;
 end
 // pragma translate_on
 // asyncResetGen end"
@@ -142,7 +142,7 @@ end
     , "template" :
 "// syncResetGen begin
 // pragma translate_off
-localparam ~GENSYM[reset_period][1] = 2998 + ~LIT[1]0;
+localparam ~GENSYM[reset_period][1] = 29998 + ~LIT[1]0;
 initial begin
   #1 ~RESULT = 1;
   #~SYM[1] ~RESULT = 0;

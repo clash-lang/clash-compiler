@@ -74,7 +74,7 @@ reg ~TYPO ~GENSYM[clk][0];
 localparam ~GENSYM[half_period][1] = (~LIT[2]0 / 2);
 always begin
   ~SYM[0] = 0;
-  #3000 forever begin
+  #30000 forever begin
     ~SYM[0] = ~ ~SYM[0];
     #~SYM[1];
     ~SYM[0] = ~ ~SYM[0];
@@ -105,7 +105,7 @@ reg ~TYPO ~GENSYM[clk][0];
 localparam ~GENSYM[half_period][1] = (~LIT[2]0 / 2);
 always begin
   ~SYM[0] = 0;
-  #3000 forever begin
+  #30000 forever begin
     if (~ ~ARG[3]) begin
       $finish;
     end
@@ -131,7 +131,7 @@ assign ~RESULT = ~SYM[0];
 reg ~TYPO ~GENSYM[rst][0];
 initial begin
   #1    ~SYM[0] = 1;
-  #3001 ~SYM[0] = 0;
+  #30001 ~SYM[0] = 0;
 end
 assign ~RESULT = ~SYM[0];
 // pragma translate_on
@@ -150,7 +150,7 @@ assign ~RESULT = ~SYM[0];
 "// syncResetGen begin
 // pragma translate_off
 reg ~TYPO ~GENSYM[rst][0];
-localparam ~GENSYM[reset_period][1] = 2998 + ~LIT[1]0;
+localparam ~GENSYM[reset_period][1] = 29998 + ~LIT[1]0;
 initial begin
   #1 ~SYM[0] = 1;
   #~SYM[1] ~SYM[0] = 0;
