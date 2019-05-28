@@ -89,6 +89,7 @@ runClashTest =
         , runTest ("tests" </> "shouldwork" </> "Basic") defBuild [] "SimpleConstructor"   ([""],"SimpleConstructor_topEntity",False)
         , runTest ("tests" </> "shouldwork" </> "Basic") defBuild [] "TagToEnum"           ([""],"TagToEnum_topEntity",False)
         , runTest ("tests" </> "shouldwork" </> "Basic") defBuild [] "TestIndex"           ([""],"TestIndex_topEntity",False)
+        , runTest ("tests" </> "shouldwork" </> "Basic") defBuild [] "Time"                (["","Time_testBench"],"Time_testBench",True)
         , runTest ("tests" </> "shouldwork" </> "Basic") defBuild [] "TwoFunctions"        ([""],"TwoFunctions_topEntity",False)
         ]
         , clashTestGroup "ShouldFail"
