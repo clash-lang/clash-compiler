@@ -760,7 +760,7 @@ removeUnusedExpr _ e@(collectArgs -> (p@(Prim nm pty),args)) = do
          else changed (mkApps p args')
     _ -> return e
   where
-    arity = length . Either.lefts . fst $ splitFunForallTy pty
+    arity = length . Either.rights . fst $ splitFunForallTy pty
 
     go _ _ _ [] = return []
     go tcm n used (Right ty:args') = do
