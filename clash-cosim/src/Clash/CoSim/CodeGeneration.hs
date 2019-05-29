@@ -24,7 +24,7 @@ import Clash.CoSim.Paths_clash_cosim
 
 import Clash.Annotations.Primitive (Primitive(..), HDL(..))
 import Clash.CoSim.Types
-import Clash.Prelude (Clock, ClockKind (..), Signal)
+import Clash.Prelude (Clock, Signal, KnownDomain)
 import System.Environment (getEnv)
 import Language.Haskell.TH
 import Control.Monad (replicateM)
@@ -111,20 +111,21 @@ coSimTypeGen clks args = do
     let domName = mkName "dom"
     let dom     = return $ VarT domName
 
+    let confName = mkName "conf"
+    let conf     = return (VarT confName)
+
     -- Generate contraints:
     argConstraints <- sequence $ map (\name -> [t| ClashType $name |]) argTypeNames
     resConstraint  <- [t| ClashType $result |]
-    let constraints = resConstraint : argConstraints
+    kdConstraint   <- [t| KnownDomain $dom $conf |]
+    let constraints = kdConstraint : resConstraint : argConstraints
 
     -- Generate type:
     fixedArgs      <- sequence [[t| String |], [t| String |], [t| CoSimSettings |]]
-    clkSignalTypes <- sequence (replicate clks [t|Clock $dom 'Source|])
+    clkSignalTypes <- sequence (replicate clks [t|Clock $dom |])
     argSignalTypes <- sequence $ map (\name -> [t| Signal $dom $name |]) argTypeNames
     resSignalType  <- [t| Signal $dom $result |]
 
     let ctx = (fixedArgs ++ clkSignalTypes ++ argSignalTypes) `arrowsR` resSignalType
-    let varNames = resultName : domName : argNames
+    let varNames = resultName : domName : confName : argNames
     return $ ForallT (map PlainTV varNames) constraints ctx
-
-
-

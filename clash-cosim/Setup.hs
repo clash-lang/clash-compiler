@@ -210,7 +210,8 @@ blackboxJson'
 blackboxJson' clks args = blackboxObject bbname "" templateD
     where
       -- Offset where 'real' arguments start, instead of constraints
-      argsOffset = 1 -- result constraint
+      argsOffset = 1    -- result constraint
+                 + 1    -- knowndomain constraint
                  + args -- argument constraints
 
       -- Offset where signal arguments start
