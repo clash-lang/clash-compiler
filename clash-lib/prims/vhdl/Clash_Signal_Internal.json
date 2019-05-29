@@ -174,10 +174,15 @@ end block;~ELSE
      ,KnownSymbol nm         -- ARG[1]
      ,KnownNat period)       -- ARG[2]
   => Clock domain Source"
+    , "comment" :
+        "ModelSim and Vivado seem to round time values to an integer number of picoseconds.
+         Use two half periods to prevent rounding errors from affecting the full period."
     , "template" :
-"-- pragma translate_off
+"-- clockGen begin
+-- pragma translate_off
 ~GENSYM[clkGen][0] : process is
-  constant ~GENSYM[half_period][1] : time := ~LIT[2]0 ps / 2;
+  constant ~GENSYM[half_periodH][1] : time := ~LIT[2]000 fs / 2;
+  constant ~GENSYM[half_periodL][2] : time := ~LIT[2]000 fs - ~SYM[1];
 begin
   ~RESULT <= '0';
   wait for 3000 ps;
@@ -185,7 +190,7 @@ begin
     ~RESULT <= not ~RESULT;
     wait for ~SYM[1];
     ~RESULT <= not ~RESULT;
-    wait for ~SYM[1];
+    wait for ~SYM[2];
   end loop;
   wait;
 end process;
@@ -204,9 +209,11 @@ end process;
   => Signal domain Bool      -- ARG[3]
   -> Clock domain Source"
     , "template" :
-"-- pragma translate_off
+"-- tbClockGen begin
+-- pragma translate_off
 ~GENSYM[clkGen][0] : process is
-  constant ~GENSYM[half_period][1] : time := ~LIT[2]0 ps / 2;
+  constant ~GENSYM[half_periodH][1] : time := ~LIT[2]000 fs / 2;
+  constant ~GENSYM[half_periodL][2] : time := ~LIT[2]000 fs - ~SYM[1];
 begin
   ~RESULT <= '0';
   wait for 3000 ps;
@@ -214,11 +221,12 @@ begin
     ~RESULT <= not ~RESULT;
     wait for ~SYM[1];
     ~RESULT <= not ~RESULT;
-    wait for ~SYM[1];
+    wait for ~SYM[2];
   end loop;
   wait;
 end process;
--- pragma translate_on"
+-- pragma translate_on
+-- tbClockGen end"
     }
   }
 , { "BlackBox" :
@@ -227,10 +235,12 @@ end process;
     , "type" :
 "asyncResetGen :: Reset domain 'Asynchronous"
     , "template" :
-"-- pragma translate_off
+"-- asyncResetGen begin
+-- pragma translate_off
 ~RESULT <= '1',
            '0' after 3001 ps;
--- pragma translate_on"
+-- pragma translate_on
+-- asyncResetGen end"
     }
   }
 , { "BlackBox" :
@@ -241,10 +251,12 @@ end process;
                  , KnownNat clkPeriod )
               => Reset domain 'Synchronous"
     , "template" :
-"-- pragma translate_off
+"-- syncResetGen begin
+-- pragma translate_off
 ~RESULT <= '1',
-           '0' after (2999 ps + ~LIT[1]0 ps);
--- pragma translate_on"
+           '0' after (2999 ps + ~LIT[1] ps);
+-- pragma translate_on
+-- syncResetGen end"
     }
   }
 , { "BlackBox" :
