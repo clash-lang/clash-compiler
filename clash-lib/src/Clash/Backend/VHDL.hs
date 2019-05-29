@@ -219,6 +219,11 @@ rmSlash nm = fromMaybe nm $ do
 
 type VHDLM a = Mon (State VHDLState) a
 
+-- | Time units: are added to 'reservedWords' as simulators trip over signals
+-- named after them.
+timeUnits :: [Identifier]
+timeUnits = ["fs", "ps", "ns", "us", "ms", "sec", "min"]
+
 -- List of reserved VHDL-2008 keywords
 -- + used internal names: toslv, fromslv, tagtoenum, datatotag
 -- + used IEEE library names: integer, boolean, std_logic, std_logic_vector,
@@ -239,7 +244,7 @@ reservedWords = ["abs","access","after","alias","all","and","architecture"
   ,"unaffected","units","until","use","variable","vmode","vprop","vunit","wait"
   ,"when","while","with","xnor","xor","toslv","fromslv","tagtoenum","datatotag"
   ,"integer", "boolean", "std_logic", "std_logic_vector", "signed", "unsigned"
-  ,"to_integer", "to_signed", "to_unsigned", "string"]
+  ,"to_integer", "to_signed", "to_unsigned", "string"] ++ timeUnits
 
 filterReserved :: Identifier -> Identifier
 filterReserved s = if s `elem` reservedWords
