@@ -222,7 +222,7 @@ type VHDLM a = Mon (State VHDLState) a
 -- | Time units: are added to 'reservedWords' as simulators trip over signals
 -- named after them.
 timeUnits :: [Identifier]
-timeUnits = ["fs", "ps", "ns", "us", "ms", "sec", "min"]
+timeUnits = ["fs", "ps", "ns", "us", "ms", "sec", "min", "hr"]
 
 -- List of reserved VHDL-2008 keywords
 -- + used internal names: toslv, fromslv, tagtoenum, datatotag
