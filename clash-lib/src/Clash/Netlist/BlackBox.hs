@@ -285,7 +285,7 @@ mkPrimitive bbEParen bbEasD dst nm args ty =
       -> NetlistMonad (Expr, [Declaration])
     go =
       \case
-        P.BlackBoxHaskell bbName funcName (_fHash, func) -> do
+        P.BlackBoxHaskell bbName wf funcName (_fHash, func) -> do
           bbFunRes <- func bbEasD dst nm args ty
           case bbFunRes of
             Left err -> do
@@ -299,7 +299,7 @@ mkPrimitive bbEParen bbEasD dst nm args ty =
             Right (BlackBoxMeta {..}, bbTemplate) ->
               -- Blackbox template generation succesful. Rerun 'go', but this time
               -- around with a 'normal' @BlackBox@
-              go (P.BlackBox bbName bbKind () bbOutputReg bbLibrary bbImports bbIncludes bbTemplate)
+              go (P.BlackBox bbName wf bbKind () bbOutputReg bbLibrary bbImports bbIncludes bbTemplate)
         p@P.BlackBox {outputReg = wr} ->
           case kind p of
             TDecl -> do
@@ -351,7 +351,7 @@ mkPrimitive bbEParen bbEasD dst nm args ty =
                             _ -> templDecl0
                       return (BlackBoxE pNm (libraries p) (imports p) (includes p) bbTempl bbCtx bbEParen,ctxDcls ++ templDecl1)
                     Nothing -> return (Identifier "__VOID__" Nothing,[])
-        P.Primitive pNm _
+        P.Primitive pNm _ _
           | pNm == "GHC.Prim.tagToEnum#" -> do
               hwTy <- N.unsafeCoreTypeToHWTypeM' $(curLoc) ty
               case args of
@@ -452,11 +452,11 @@ mkFunInput resId e = do
                   case bb of
                     P.BlackBox {..} ->
                       Left (kind,outputReg,libraries,imports,includes,nm,template)
-                    P.Primitive pn pt ->
+                    P.Primitive pn _ pt ->
                       error $ $(curLoc) ++ "Unexpected blackbox type: "
                                         ++ "Primitive " ++ show pn
                                         ++ " " ++ show pt
-                    P.BlackBoxHaskell pnm fn _ ->
+                    P.BlackBoxHaskell pnm _ fn _ ->
                       error $ $(curLoc) ++ "Unexpected blackbox type: "
                                         ++ "BlackBoxHaskell" ++ show pnm
                                         ++ " " ++ show fn ++ " <func>"

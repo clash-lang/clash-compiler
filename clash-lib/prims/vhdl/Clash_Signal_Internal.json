@@ -145,6 +145,7 @@ end block;~FI
   }
 , { "BlackBox" :
     { "name" : "Clash.Signal.Internal.clockGate"
+    , "workInfo" : "Always"
     , "kind" : "Declaration"
     , "type" :
 "clockGate
@@ -166,6 +167,7 @@ end block;~ELSE
   }
 , { "BlackBox" :
     { "name"      : "Clash.Signal.Internal.clockGen"
+    , "workInfo"  : "Always"
     , "kind" : "Declaration"
     , "warning" : "Clash.Signal.Internal.clockGen is not synthesizable!"
     , "type" :
@@ -199,6 +201,7 @@ end process;
   }
 , { "BlackBox" :
     { "name"      : "Clash.Signal.Internal.tbClockGen"
+    , "workInfo"  : "Always"
     , "kind" : "Declaration"
     , "warning" : "Clash.Signal.Internal.tbClockGen is not synthesizable!"
     , "type" :
@@ -231,6 +234,7 @@ end process;
   }
 , { "BlackBox" :
     { "name"      : "Clash.Signal.Internal.asyncResetGen"
+    , "workInfo"  : "Always"
     , "kind" : "Declaration"
     , "type" :
 "asyncResetGen :: Reset domain 'Asynchronous"
@@ -245,6 +249,7 @@ end process;
   }
 , { "BlackBox" :
     { "name"      : "Clash.Signal.Internal.syncResetGen"
+    , "workInfo"  : "Always"
     , "kind" : "Declaration"
     , "type" :
 "syncResetGen :: ( domain ~ 'Dom n clkPeriod
@@ -261,6 +266,7 @@ end process;
   }
 , { "BlackBox" :
     { "name"      : "Clash.Signal.Internal.unsafeFromAsyncReset"
+    , "workInfo"  : "Never"
     , "kind" : "Declaration"
     , "type" :
 "unsafeFromAsyncReset :: Reset domain Asynchronous -> Signal domain Bool"
@@ -269,6 +275,7 @@ end process;
   }
 , { "BlackBox" :
     { "name"      : "Clash.Signal.Internal.unsafeToAsyncReset"
+    , "workInfo"  : "Never"
     , "kind" : "Declaration"
     , "type" :
 "unsafeToAsyncReset :: Signal domain Bool -> Reset domain Asynchronous"
@@ -277,6 +284,7 @@ end process;
   }
 , { "BlackBox" :
     { "name"      : "Clash.Signal.Internal.fromSyncReset"
+    , "workInfo"  : "Never"
     , "kind" : "Declaration"
     , "type" :
 "fromSyncReset :: Reset domain Synchronous -> Signal domain Bool"
@@ -285,6 +293,7 @@ end process;
   }
 , { "BlackBox" :
     { "name"      : "Clash.Signal.Internal.unsafeToSyncReset"
+    , "workInfo"  : "Never"
     , "kind" : "Declaration"
     , "type" :
 "unsafeToSyncReset :: Signal domain Bool -> Reset domain Synchronous"

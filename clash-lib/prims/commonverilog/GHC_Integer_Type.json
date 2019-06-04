@@ -1,5 +1,6 @@
 [ { "BlackBox" :
     { "name"      : "GHC.Integer.Type.smallInteger"
+    , "workInfo"  : "Never"
     , "kind"      : "Declaration"
     , "type"      : "smallInteger :: Int# -> Integer"
     , "template"  : "assign ~RESULT = $signed(~ARG[0]);"
@@ -7,6 +8,7 @@
   }
 , { "BlackBox" :
     { "name"      : "GHC.Integer.Type.integerToInt"
+    , "workInfo"  : "Never"
     , "kind"      : "Declaration"
     , "type"      : "integerToInt :: Integer -> Int#"
     , "template"  : "assign ~RESULT = $signed(~ARG[0]);"
@@ -119,6 +121,7 @@
   }
 , { "BlackBox" :
     { "name"      : "GHC.Integer.Type.wordToInteger"
+    , "workInfo"  : "Never"
     , "kind"      : "Declaration"
     , "type"      : "wordToInteger :: Word# -> Integer"
     , "template"  : "assign ~RESULT = $signed(~ARG[0]);"
@@ -126,6 +129,7 @@
   }
 , { "BlackBox" :
     { "name"      : "GHC.Integer.Type.integerToWord"
+    , "workInfo"  : "Never"
     , "kind"      : "Declaration"
     , "type"      : "integerToWord :: Integer -> Word#"
     , "template"  : "assign ~RESULT = $unsigned(~ARG[0]);"

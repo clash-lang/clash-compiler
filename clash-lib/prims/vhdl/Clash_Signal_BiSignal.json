@@ -17,6 +17,7 @@
   }
 , { "BlackBox" :
     { "name" : "Clash.Signal.BiSignal.readFromBiSignal#"
+    , "workInfo" : "Never"
     , "kind" : "Declaration"
     , "type" :
 "readFromBiSignal#

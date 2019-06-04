@@ -1,5 +1,6 @@
 [ { "BlackBox" :
     { "name" : "Clash.Signal.BiSignal.veryUnsafeToBiSignalIn"
+    , "workInfo" : "Never"
     , "kind" : "Declaration"
     , "type" :
 "veryUnsafeToBiSignalIn
@@ -14,6 +15,7 @@
   }
 , { "BlackBox" :
     { "name" : "Clash.Signal.BiSignal.mergeBiSignalOuts"
+    , "workInfo" : "Never"
     , "kind" : "Expression"
     , "type" :
 "mergeBiSignalOuts

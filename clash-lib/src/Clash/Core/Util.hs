@@ -40,10 +40,11 @@ import Clash.Core.Subst
   (extendTvSubst, mkSubst, mkTvSubst, substTy, substTyWith,
    substTyInVar, extendTvSubstList)
 import Clash.Core.Term
-  (LetBinding, Pat (..), Term (..), Alt, collectArgs)
+  (LetBinding, Pat (..), PrimInfo (..), Term (..), Alt, WorkInfo (..), collectArgs)
 import Clash.Core.Type
   (Kind, LitTy (..), Type (..), TypeView (..),
-   coreView, coreView1, isFunTy, isPolyFunCoreTy, mkFunTy, splitFunTy, tyView)
+   coreView, coreView1, isFunTy, isPolyFunCoreTy, mkFunTy, splitFunTy, tyView,
+   undefinedTy)
 import Clash.Core.TyCon
   (TyConMap, tyConDataCons)
 import Clash.Core.TysPrim                      (typeNatKind)
@@ -222,7 +223,7 @@ termType m e = case e of
   Var t          -> varType t
   Data dc        -> dcType dc
   Literal l      -> literalType l
-  Prim _ t       -> t
+  Prim _ t       -> primType t
   Lam v e'       -> mkFunTy (varType v) (termType m e')
   TyLam tv e'    -> ForAllTy tv (termType m e')
   App _ _        -> case collectArgs e of
@@ -490,13 +491,13 @@ mkVec nilCon consCon resTy = go
   where
     go _ [] = mkApps (Data nilCon) [Right (LitTy (NumTy 0))
                                    ,Right resTy
-                                   ,Left  (Prim "_CO_" nilCoTy)
+                                   ,Left  (primCo nilCoTy)
                                    ]
 
     go n (x:xs) = mkApps (Data consCon) [Right (LitTy (NumTy n))
                                         ,Right resTy
                                         ,Right (LitTy (NumTy (n-1)))
-                                        ,Left (Prim "_CO_" (consCoTy n))
+                                        ,Left (primCo (consCoTy n))
                                         ,Left x
                                         ,Left (go (n-1) xs)]
 
@@ -520,7 +521,7 @@ appendToVec consCon resTy vec = go
     go n (x:xs) = mkApps (Data consCon) [Right (LitTy (NumTy n))
                                         ,Right resTy
                                         ,Right (LitTy (NumTy (n-1)))
-                                        ,Left (Prim "_CO_" (consCoTy n))
+                                        ,Left (primCo (consCoTy n))
                                         ,Left x
                                         ,Left (go (n-1) xs)]
 
@@ -676,7 +677,7 @@ mkRTree lrCon brCon resTy = go
   where
     go _ [x] = mkApps (Data lrCon) [Right (LitTy (NumTy 0))
                                     ,Right resTy
-                                    ,Left  (Prim "_CO_" lrCoTy)
+                                    ,Left  (primCo lrCoTy)
                                     ,Left  x
                                     ]
 
@@ -685,7 +686,7 @@ mkRTree lrCon brCon resTy = go
       in  mkApps (Data brCon) [Right (LitTy (NumTy n))
                               ,Right resTy
                               ,Right (LitTy (NumTy (n-1)))
-                              ,Left (Prim "_CO_" (brCoTy n))
+                              ,Left (primCo (brCoTy n))
                               ,Left (go (n-1) xsL)
                               ,Left (go (n-1) xsR)]
 
@@ -839,3 +840,15 @@ dataConInstArgTys (MkData { dcArgTys, dcUnivTyVars, dcExtTyVars }) inst_tys =
     Just (map (substTyWith tyvars inst_tys) dcArgTys)
   else
     Nothing
+
+-- | Make a coercion
+primCo
+  :: Type
+  -> Term
+primCo ty = Prim "_CO_" (PrimInfo ty WorkNever)
+
+-- | Make an undefined term
+undefinedTm
+  :: Type
+  -> Term
+undefinedTm = TyApp (Prim "Clash.Transformation." (PrimInfo undefinedTy WorkNever))

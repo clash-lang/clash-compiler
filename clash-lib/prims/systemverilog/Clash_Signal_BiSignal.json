@@ -17,6 +17,7 @@ assign ~ARG[1] = (~ARG[3] == 1'b1) ? ~ARG[4] : {~SIZE[~TYP[1]] {1'bz}};
   }
 , { "BlackBox" :
     { "name" : "Clash.Signal.BiSignal.readFromBiSignal#"
+    , "workInfo" : "Never"
     , "kind" : "Declaration"
     , "type" :
 "readFromBiSignal#

@@ -362,14 +362,14 @@ compilePrimitive
   -> ResolvedPrimitive
   -- ^ Primitive to compile
   -> IO CompiledPrimitive
-compilePrimitive idirs pkgDbs topDir (BlackBoxHaskell bbName bbGenName source) = do
+compilePrimitive idirs pkgDbs topDir (BlackBoxHaskell bbName wf bbGenName source) = do
   let interpreterArgs = concatMap (("-package-db":) . (:[])) pkgDbs
   -- Compile a blackbox template function or fetch it from an already compiled file.
   r <- go interpreterArgs source
   processHintError
     (show bbGenName)
     bbName
-    (\bbFunc -> BlackBoxHaskell bbName bbGenName (hash source, bbFunc))
+    (\bbFunc -> BlackBoxHaskell bbName wf bbGenName (hash source, bbFunc))
     r
   where
     qualMod = intercalate "." modNames
@@ -402,12 +402,12 @@ compilePrimitive idirs pkgDbs topDir (BlackBoxHaskell bbName bbGenName source) =
     go args Nothing = do
       loadImportAndInterpret idirs args topDir qualMod funcName "BlackBoxFunction"
 
-compilePrimitive idirs pkgDbs topDir (BlackBox pNm tkind () oReg libM imps incs templ) = do
+compilePrimitive idirs pkgDbs topDir (BlackBox pNm wf tkind () oReg libM imps incs templ) = do
   libM'  <- mapM parseTempl libM
   imps'  <- mapM parseTempl imps
   incs'  <- mapM (traverse parseBB) incs
   templ' <- parseBB templ
-  return (BlackBox pNm tkind () oReg libM' imps' incs' templ')
+  return (BlackBox pNm wf tkind () oReg libM' imps' incs' templ')
  where
   iArgs = concatMap (("-package-db":) . (:[])) pkgDbs
 
@@ -445,8 +445,8 @@ compilePrimitive idirs pkgDbs topDir (BlackBox pNm tkind () oReg libM imps incs 
     r <- loadImportAndInterpret idirs iArgs topDir qualMod funcName "TemplateFunction"
     processHintError (show bbGenName) pNm (BBFunction (Data.Text.unpack pNm) hsh) r
 
-compilePrimitive _ _ _ (Primitive pNm typ) =
-  return (Primitive pNm typ)
+compilePrimitive _ _ _ (Primitive pNm wf typ) =
+  return (Primitive pNm wf typ)
 
 processHintError
   :: Monad m

@@ -1,5 +1,6 @@
 [ { "BlackBox" :
     { "name"      : "Clash.Intel.ClockGen.altpll"
+    , "workInfo"  : "Always"
     , "kind"      : "Declaration"
     , "format"    : "Haskell"
     , "templateFunction" : "Clash.Primitives.Intel.ClockGen.altpllTF"
@@ -7,6 +8,7 @@
   }
 , { "BlackBox" :
     { "name"      : "Clash.Intel.ClockGen.alteraPll"
+    , "workInfo"  : "Always"
     , "kind"      : "Declaration"
     , "format"    : "Haskell"
     , "templateFunction" : "Clash.Primitives.Intel.ClockGen.alteraPllTF"

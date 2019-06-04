@@ -2,12 +2,14 @@
   {
     "Primitive": {
       "name": "GHC.Natural.NatS#",
+      "workInfo" : "Never",
       "primType": "Constructor"
     }
   },
   {
     "BlackBox": {
       "name": "GHC.Natural.underflowError",
+      "workInfo" : "Constant",
       "kind": "Expression",
       "type": "underflowError :: a",
       "template": "~ERRORO"

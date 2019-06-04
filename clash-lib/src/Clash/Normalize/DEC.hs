@@ -61,7 +61,8 @@ import Clash.Core.Evaluator  (whnf')
 import Clash.Core.FreeVars
   (termFreeVars', typeFreeVars', localVarsDoNotOccurIn)
 import Clash.Core.Literal    (Literal (..))
-import Clash.Core.Term       (LetBinding, Pat (..), Term (..), collectArgs)
+import Clash.Core.Term
+  (LetBinding, Pat (..), PrimInfo (..), Term (..), collectArgs)
 import Clash.Core.TyCon      (tyConDataCons)
 import Clash.Core.Type       (Type, isPolyFunTy, mkTyConApp, splitFunForallTy)
 import Clash.Core.Util       (mkApps, patIds, termType)
@@ -446,13 +447,13 @@ interestingToLift inScope _ e@(Var v) _ =
   if isGlobalId v ||  v `elemInScopeSet` inScope
      then pure (Just e)
      else pure Nothing
-interestingToLift inScope eval e@(Prim nm pty) args = do
+interestingToLift inScope eval e@(Prim nm pInfo) args = do
   let anyArgNotConstant = any (not . isConstant) lArgs
   case List.lookup nm interestingPrims of
     Just t | t || anyArgNotConstant -> pure (Just e)
     _ -> do
       let isInteresting = uncurry (interestingToLift inScope eval) . collectArgs
-      if isHOTy pty then do
+      if isHOTy (primType pInfo) then do
         anyInteresting <- anyM (fmap Maybe.isJust . isInteresting) lArgs
         if anyInteresting then pure (Just e) else pure Nothing
       else

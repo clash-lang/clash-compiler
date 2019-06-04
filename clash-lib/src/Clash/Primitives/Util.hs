@@ -52,7 +52,7 @@ import           Clash.Netlist.BlackBox.Types
   (Element(Const, Lit))
 
 hashCompiledPrimitive :: CompiledPrimitive -> Int
-hashCompiledPrimitive (Primitive {name, primType}) = hash (name, primType)
+hashCompiledPrimitive (Primitive {name, primSort}) = hash (name, primSort)
 hashCompiledPrimitive (BlackBoxHaskell {function}) = fst function
 hashCompiledPrimitive (BlackBox {name, kind, outputReg, libraries, imports, includes, template}) =
   hash (name, kind, outputReg, libraries, imports, includes', hashBlackbox template)
@@ -88,17 +88,17 @@ resolvePrimitive'
   => FilePath
   -> UnresolvedPrimitive
   -> IO (TS.Text, GuardedResolvedPrimitive)
-resolvePrimitive' _metaPath (Primitive name primType) =
-  return (name, HasBlackBox (Primitive name primType))
+resolvePrimitive' _metaPath (Primitive name wf primType) =
+  return (name, HasBlackBox (Primitive name wf primType))
 resolvePrimitive' metaPath BlackBox{template=t, includes=i, ..} = do
   let resolvedIncludes = mapM (traverse (traverse (traverse (resolveTemplateSource metaPath)))) i
       resolved         = traverse (traverse (resolveTemplateSource metaPath)) t
-  bb <- BlackBox name kind () outputReg libraries imports <$> resolvedIncludes <*> resolved
+  bb <- BlackBox name workInfo kind () outputReg libraries imports <$> resolvedIncludes <*> resolved
   case warning of
     Just w  -> pure (name, WarnNonSynthesizable (TS.unpack w) bb)
     Nothing -> pure (name, HasBlackBox bb)
-resolvePrimitive' metaPath (BlackBoxHaskell bbName funcName t) =
-  (bbName,) . HasBlackBox . BlackBoxHaskell bbName funcName <$> (mapM (resolveTemplateSource metaPath) t)
+resolvePrimitive' metaPath (BlackBoxHaskell bbName wf funcName t) =
+  (bbName,) . HasBlackBox . BlackBoxHaskell bbName wf funcName <$> (mapM (resolveTemplateSource metaPath) t)
 
 -- | Interprets contents of json file as list of @Primitive@s.
 resolvePrimitive

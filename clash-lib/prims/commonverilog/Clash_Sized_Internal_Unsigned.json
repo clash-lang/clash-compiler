@@ -42,6 +42,7 @@
   }
 , { "BlackBox" :
     { "name"      : "Clash.Sized.Internal.Unsigned.toInteger#"
+    , "workInfo"  : "Never"
     , "kind"      : "Expression"
     , "type"      : "toInteger# :: Unsigned n -> Integer"
     , "template"  : "~IF~SIZE[~TYP[0]]~THEN~IF~CMPLE[~SIZE[~TYPO]][~SIZE[~TYP[0]]]~THEN$signed(~VAR[i][0][0+:~SIZE[~TYPO]])~ELSE$signed({{(~SIZE[~TYPO]-~SIZE[~TYP[0]]) {1'b0}},~VAR[i][0]})~FI~ELSE~SIZE[~TYPO]'sd0~FI"
@@ -49,6 +50,7 @@
   }
 , { "BlackBox" :
     { "name"      : "Clash.Sized.Internal.Unsigned.size#"
+    , "workInfo"  : "Constant"
     , "kind"      : "Expression"
     , "type"      : "size# :: KnownNat n => Unsigned n -> Int"
     , "template"  : "~SIZE[~TYPO]'sd~LIT[0]"
@@ -56,6 +58,7 @@
   }
 , { "BlackBox" :
     { "name"      : "Clash.Sized.Internal.Unsigned.pack#"
+    , "workInfo"  : "Never"
     , "kind"      : "Expression"
     , "type"      : "pack# :: Unsigned n -> BitVector n"
     , "template"  : "~ARG[0]"
@@ -63,6 +66,7 @@
   }
 , { "BlackBox" :
     { "name"      : "Clash.Sized.Internal.Unsigned.unpack#"
+    , "workInfo"  : "Never"
     , "kind"      : "Expression"
     , "type"      : "unpack# :: KnownNat n => BitVector n -> Unsigned n"
     , "template"  : "~ARG[1]"
@@ -70,6 +74,7 @@
   }
 , { "BlackBox" :
     { "name"      : "Clash.Sized.Internal.Unsigned.minBound#"
+    , "workInfo"  : "Constant"
     , "kind"      : "Expression"
     , "type"      : "minBound# :: Unsigned n"
     , "template"  : "~SIZE[~TYPO]'d0"
@@ -77,6 +82,7 @@
   }
 , { "BlackBox" :
     { "name"      : "Clash.Sized.Internal.Unsigned.maxBound#"
+    , "workInfo"  : "Constant"
     , "kind"      : "Expression"
     , "type"      : "maxBound# :: KnownNat n => Unsigned n"
     , "template"  : "{~LIT[0] {1'b1}}"
@@ -98,6 +104,7 @@
   }
 , { "BlackBox" :
     { "name"      : "Clash.Sized.Internal.Unsigned.fromInteger#"
+    , "workInfo"  : "Never"
     , "kind"      : "Expression"
     , "type"      : "fromInteger# :: KnownNat n => Integer -> Unsigned n"
     , "template"  : "~IF~CMPLE[~SIZE[~TYPO]][~SIZE[~TYP[1]]]~THEN$unsigned(~VAR[i][1][0+:~SIZE[~TYPO]])~ELSE$unsigned({{(~SIZE[~TYPO]-~SIZE[~TYP[1]]) {1'b0}},~VAR[i][1]})~FI"
@@ -175,6 +182,7 @@
   }
 , { "BlackBox" :
     { "name"      : "Clash.Sized.Internal.Unsigned.resize#"
+    , "workInfo"  : "Never"
     , "kind"      : "Expression"
     , "type"      : "resize# :: KnownNat m => Unsigned n -> Unsigned m"
     , "template"  : "~IF~SIZE[~TYP[1]]~THEN~IF~CMPLE[~SIZE[~TYPO]][~SIZE[~TYP[1]]]~THEN~VAR[bv][1][0+:~SIZE[~TYPO]]~ELSE{{(~SIZE[~TYPO]-~SIZE[~TYP[1]]) {1'b0}},~ARG[1]}~FI~ELSE~SIZE[~TYPO]'d0~FI"

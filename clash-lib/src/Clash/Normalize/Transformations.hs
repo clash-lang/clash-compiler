@@ -95,19 +95,19 @@ import           Clash.Core.Subst
   (substTm, mkSubst, extendIdSubst, extendIdSubstList, extendTvSubst,
    extendTvSubstList, freshenTm, substTyInVar, deShadowTerm)
 import           Clash.Core.Term
-  (LetBinding, Pat (..), Term (..), CoreContext (..), isLambdaBodyCtx,
-   collectArgs)
+  (LetBinding, Pat (..), Term (..), CoreContext (..), PrimInfo (..),
+   isLambdaBodyCtx, collectArgs)
 import           Clash.Core.Type             (TypeView (..), applyFunTy,
                                               isPolyFunCoreTy,
                                               normalizeType, splitFunForallTy,
                                               splitFunTy, typeKind,
-                                              tyView, undefinedTy)
+                                              tyView)
 import           Clash.Core.TyCon            (TyConMap, tyConDataCons)
 import           Clash.Core.Util
   (isCon, isFun, isLet, isPolyFun, isPrim,
    isSignalType, isVar, mkApps, mkLams, mkVec, piResultTy, termSize, termType,
    tyNatSize, patVars, isAbsurdAlt, altEqs, substInExistentials,
-   solveFirstNonAbsurd, patIds, isLocalVar)
+   solveFirstNonAbsurd, patIds, isLocalVar, undefinedTm)
 import           Clash.Core.Var
   (Id, Var (..), isGlobalId, isLocalId, mkLocalId)
 import           Clash.Core.VarEnv
@@ -451,7 +451,7 @@ caseCon (TransformContext is0 _) (Case scrut ty alts)
         changed (substTm "caseCon1" subst e')
       _ -> case alts of
              ((DefaultPat,e):_) -> changed e
-             _ -> changed (mkApps (Prim "Clash.Transformations.undefined" undefinedTy) [Right ty])
+             _ -> changed (undefinedTm ty)
   where
     equalCon dc (DataPat dc' _ _) = dcTag dc == dcTag dc'
     equalCon _  _                 = False
@@ -742,10 +742,10 @@ deadCode _ e@(Letrec xes body) = do
 deadCode _ e = return e
 
 removeUnusedExpr :: HasCallStack => NormRewrite
-removeUnusedExpr _ e@(collectArgs -> (p@(Prim nm pty),args)) = do
+removeUnusedExpr _ e@(collectArgs -> (p@(Prim nm pInfo),args)) = do
   bbM <- HashMap.lookup nm <$> Lens.use (extra.primitives)
   case bbM of
-    Just (extractPrim ->  Just (BlackBox pNm _ _ _ _ _ inc templ)) -> do
+    Just (extractPrim ->  Just (BlackBox pNm _ _ _ _ _ _ inc templ)) -> do
       let usedArgs | isFromInt pNm
                    = [0,1,2]
                    | nm `elem` ["Clash.Annotations.BitRepresentation.Deriving.dontApplyInHDL"
@@ -760,7 +760,7 @@ removeUnusedExpr _ e@(collectArgs -> (p@(Prim nm pty),args)) = do
          else changed (mkApps p args')
     _ -> return e
   where
-    arity = length . Either.rights . fst $ splitFunForallTy pty
+    arity = length . Either.rights . fst $ splitFunForallTy (primType pInfo)
 
     go _ _ _ [] = return []
     go tcm n used (Right ty:args') = do
@@ -769,7 +769,7 @@ removeUnusedExpr _ e@(collectArgs -> (p@(Prim nm pty),args)) = do
     go tcm n used (Left tm : args') = do
       args'' <- go tcm (n+1) used args'
       let ty = termType tcm tm
-          p' = mkApps (Prim "Clash.Transformations.removedArg" undefinedTy) [Right ty]
+          p' = removedTm ty
       if n < arity && n `notElem` used
          then return (Left p' : args'')
          else return (Left tm : args'')
@@ -1095,9 +1095,8 @@ constantSpec _ e = return e
 -- we inline global binders, we ensure that inlined expression is deshadowed
 -- taking the InScopeSet of the context into account.
 appProp :: HasCallStack => NormRewrite
-appProp (TransformContext is0 _) (App (Lam v e) arg) = do
-  let argIsConstant = isConstant arg
-  if argIsConstant || isVar arg
+appProp (TransformContext is0 _) (App (Lam v e) arg) =
+  if isWorkFree arg || isVar arg
     then do
       let subst = extendIdSubst (mkSubst is0) v arg
       changed $ substTm "appProp.AppLam" subst e
@@ -1107,11 +1106,10 @@ appProp _ (App (Letrec v e) arg) = do
   changed (Letrec v (App e arg))
 
 appProp ctx@(TransformContext is0 _) (App (Case scrut ty alts) arg) = do
-  let argIsConstant = isConstant arg
   tcm <- Lens.view tcCache
   let argTy = termType tcm arg
       ty' = applyFunTy tcm ty argTy
-  if argIsConstant || isVar arg
+  if isWorkFree arg || isVar arg
     then do
       let alts' = map (second (`App` arg)) alts
       changed $ Case scrut ty' alts'
@@ -1158,8 +1156,7 @@ appPropFast ctx@(TransformContext is _) = \case
 
   go is0 (Lam v e) (Left arg:args) = do
     setChanged
-    let argIsConstant = isConstant arg
-    if argIsConstant || isVar arg
+    if isWorkFree arg || isVar arg
       then do
         let subst = extendIdSubst (mkSubst is0) v arg
         go is0 (substTm "appPropFast.AppLam" subst e) args
@@ -1205,11 +1202,10 @@ appPropFast ctx@(TransformContext is _) = \case
     return (ty2,ls1,Right t:args1)
 
   goCaseArg isA0 ty0 ls0 (Left arg:args0) = do
-    let argIsConstant = isConstant arg
     tcm <- Lens.view tcCache
     let argTy = termType tcm arg
         ty1   = applyFunTy tcm ty0 argTy
-    case argIsConstant || isVar arg of
+    case isWorkFree arg || isVar arg of
       True -> do
         (ty2,ls1,args1) <- goCaseArg isA0 ty1 ls0 args0
         return (ty2,ls1,Left arg:args1)
@@ -1956,8 +1952,7 @@ reduceNonRepPrim c@(TransformContext is0 ctx) e@(App _ _) | (Prim nm _, args) <-
                                     [Right lTy
                                     ,Right rTy
                                     ,Left  bvArg
-                                    ,Left  (mkApps (Prim "Clash.Transformations.removedArg" undefinedTy)
-                                                   [Right rTy])
+                                    ,Left  (removedTm rTy)
                                     ]
 
               changed tup
@@ -1967,8 +1962,7 @@ reduceNonRepPrim c@(TransformContext is0 ctx) e@(App _ _) | (Prim nm _, args) <-
                   tup          = mkApps (Data tupDc)
                                     [Right lTy
                                     ,Right rTy
-                                    ,Left  (mkApps (Prim "Clash.Transformations.removedArg" undefinedTy)
-                                                   [Right lTy])
+                                    ,Left  (removedTm lTy)
                                     ,Left  bvArg
                                     ]
 

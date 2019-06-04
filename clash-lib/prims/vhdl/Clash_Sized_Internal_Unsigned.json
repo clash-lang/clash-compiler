@@ -1,5 +1,6 @@
 [ { "BlackBox" :
     { "name"      : "Clash.Sized.Internal.Unsigned.size#"
+    , "workInfo"  : "Constant"
     , "kind"      : "Expression"
     , "type"      : "size# :: KnownNat n => Unsigned n -> Int"
     , "template"  : "to_signed(~LIT[0],~SIZE[~TYPO])"
@@ -7,6 +8,7 @@
   }
 , { "BlackBox" :
     { "name"      : "Clash.Sized.Internal.Unsigned.pack#"
+    , "workInfo"  : "Never"
     , "kind"      : "Expression"
     , "type"      : "pack# :: Unsigned n -> BitVector n"
     , "template"  : "std_logic_vector(~ARG[0])"
@@ -14,6 +16,7 @@
   }
 , { "BlackBox" :
     { "name"      : "Clash.Sized.Internal.Unsigned.unpack#"
+    , "workInfo"  : "Never"
     , "kind"      : "Expression"
     , "type"      : "unpack# :: KnownNat n => BitVector n -> Unsigned n"
     , "template"  : "unsigned(~ARG[1])"
@@ -63,6 +66,7 @@
   }
 , { "BlackBox" :
     { "name"      : "Clash.Sized.Internal.Unsigned.minBound#"
+    , "workInfo"  : "Constant"
     , "kind"      : "Expression"
     , "type"      : "minBound# :: Unsigned n"
     , "template"  : "~IF~SIZE[~TYPO]~THENunsigned'(~SIZE[~TYPO]-1 downto 0 => '0')~ELSEunsigned'(0 downto 1 => '0')~FI"
@@ -70,6 +74,7 @@
   }
 , { "BlackBox" :
     { "name"      : "Clash.Sized.Internal.Unsigned.maxBound#"
+    , "workInfo"  : "Constant"
     , "kind"      : "Expression"
     , "type"      : "maxBound# :: KnownNat n => Unsigned n"
     , "template"  : "~IF~SIZE[~TYPO]~THENunsigned'(~LIT[0]-1 downto 0 => '1')~ELSEunsigned'(0 downto 1 => '1')~FI"
@@ -91,6 +96,7 @@
   }
 , { "BlackBox" :
     { "name"      : "Clash.Sized.Internal.Unsigned.fromInteger#"
+    , "workInfo"  : "Never"
     , "kind"      : "Expression"
     , "type"      : "fromInteger# :: KnownNat n => Integer -> Unsigned n"
     , "template"  : "resize(unsigned(std_logic_vector(~ARG[1])),~LIT[0])"
@@ -126,6 +132,7 @@
   }
 , { "BlackBox" :
     { "name"      : "Clash.Sized.Internal.Unsigned.toInteger#"
+    , "workInfo"  : "Never"
     , "kind"      : "Expression"
     , "type"      : "toInteger# :: Unsigned n -> Integer"
     , "template"  : "~IF~SIZE[~TYP[0]]~THENsigned(std_logic_vector(resize(~ARG[0],~SIZE[~TYPO])))~ELSEto_signed(0,64)~FI"
@@ -189,6 +196,7 @@
   }
 , { "BlackBox" :
     { "name"      : "Clash.Sized.Internal.Unsigned.resize#"
+    , "workInfo"  : "Never"
     , "kind"      : "Expression"
     , "type"      : "resize# :: KnownNat m => Unsigned n -> Unsigned m"
     , "template"  : "~IF~SIZE[~TYP[1]]~THENresize(~ARG[1],~LIT[0])~ELSEunsigned'(~SIZE[~TYPO]-1 downto 0 => '0')~FI"

@@ -48,18 +48,18 @@ import           Clash.Core.DataCon               (DataCon)
 import           Clash.Core.Literal               (Literal (..))
 import           Clash.Core.Pretty                (showPpr)
 import           Clash.Core.Term
-  (CoreContext (..), Term (..), Pat (..))
+  (CoreContext (..), PrimInfo (..), Term (..), WorkInfo (..), Pat (..))
 import           Clash.Core.Type                  (LitTy (..), Type (..),
                                                    TypeView (..), coreView1,
                                                    mkFunTy, mkTyConApp,
-                                                   splitFunForallTy, tyView,
-                                                   undefinedTy)
+                                                   splitFunForallTy, tyView)
 import           Clash.Core.TyCon
   (TyConMap, TyConName, tyConDataCons, tyConName)
 import           Clash.Core.TysPrim               (integerPrimTy, typeNatKind)
 import           Clash.Core.Util
   (appendToVec, extractElems, extractTElems, idToVar, mkApps, mkRTree,
-   mkUniqInternalId, mkUniqSystemTyVar, mkVec, termType, dataConInstArgTys)
+   mkUniqInternalId, mkUniqSystemTyVar, mkVec, termType, dataConInstArgTys,
+   primCo, undefinedTm)
 import           Clash.Core.Var                   (Var (..))
 import           Clash.Core.VarEnv
   (InScopeSet, extendInScopeSetList)
@@ -205,7 +205,7 @@ reduceImap (TransformContext is0 ctx) n argElTy resElTy fun arg = do
                                                            [VarTy nTv])
                                                [integerPrimTy,integerPrimTy])
             idxFromInteger   = Prim "Clash.Sized.Internal.Index.fromInteger#"
-                                    idxFromIntegerTy
+                                    (PrimInfo idxFromIntegerTy WorkNever)
             idxs             = map (App (App (TyApp idxFromInteger (LitTy (NumTy n)))
                                              (Literal (IntegerLiteral (toInteger n))))
                                    . Literal . IntegerLiteral . toInteger) [0..(n-1)]
@@ -320,7 +320,7 @@ mkTravVec vecTc nilCon consCon pureTm apTm fmapTm bTy = go
                             ,Left  (mkApps (Data nilCon)
                                            [Right (LitTy (NumTy 0))
                                            ,Right bTy
-                                           ,Left  (Prim "_CO_" nilCoTy)])]
+                                           ,Left  (primCo nilCoTy)])]
 
     go n (x:xs) = mkApps apTm
       [Right (mkTyConApp vecTc [LitTy (NumTy (n-1)),bTy])
@@ -332,7 +332,7 @@ mkTravVec vecTc nilCon consCon pureTm apTm fmapTm bTy = go
                                           [Right (LitTy (NumTy n))
                                           ,Right bTy
                                           ,Right (LitTy (NumTy (n-1)))
-                                          ,Left  (Prim "_CO_" (consCoTy n))
+                                          ,Left  (primCo (consCoTy n))
                                           ])
                            ,Left  x])
       ,Left (go (n-1) xs)]
@@ -550,7 +550,7 @@ reduceLast inScope n aTy vArg = do
             (tB,_)       = head (last elems)
         uniqSupply Lens..= uniqs1
         case n of
-         0 -> changed (mkApps (Prim "Clash.Transformations.undefined" undefinedTy) [Right aTy])
+         0 -> changed (undefinedTm aTy)
          _ -> changed (Letrec (init (concat elems)) (Var tB))
     go _ ty = error $ $(curLoc) ++ "reduceLast: argument does not have a vector type: " ++ showPpr ty
 
@@ -578,7 +578,7 @@ reduceInit inScope n aTy vArg = do
                                $ extractElems uniqs0 inScope consCon aTy 'L' n vArg
         uniqSupply Lens..= uniqs1
         case n of
-         0 -> changed (mkApps (Prim "Clash.Transformations.undefined" undefinedTy) [Right aTy])
+         0 -> changed (undefinedTm aTy)
          1 -> changed (mkVec nilCon consCon aTy 0 [])
          _ -> let el = init elems
                   iv = mkVec nilCon consCon aTy (n-1) (map (idToVar . fst . head) el)
@@ -752,7 +752,8 @@ reduceReplace_int is0 n aTy vTy v i newA = do
     -> Type
     -> Term
   eqIntPrim intTy boolTy =
-    Prim "Clash.Transformations.eqInt" (mkFunTy intTy (mkFunTy intTy boolTy))
+    Prim "Clash.Transformations.eqInt"
+         (PrimInfo (mkFunTy intTy (mkFunTy intTy boolTy)) WorkVariable)
 
   go tcm (coreView1 tcm -> Just ty') = go tcm ty'
   go tcm (tyView -> TyConApp vecTcNm _)

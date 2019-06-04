@@ -1,5 +1,6 @@
 [ { "BlackBox" :
     { "name"      : "Clash.Sized.Vector.head"
+    , "workInfo"  : "Never"
     , "kind"      : "Expression"
     , "type"      : "head :: Vec (n + 1) a -> a"
     , "template"  : "~IF ~VIVADO ~THEN ~TYPMO'(fromSLV(~VAR[vec][0](0))) ~ELSE ~VAR[vec][0](0) ~FI"
@@ -7,6 +8,7 @@
   }
 , { "BlackBox" :
     { "name"      : "Clash.Sized.Vector.tail"
+    , "workInfo"  : "Never"
     , "kind"      : "Expression"
     , "type"      : "tail :: Vec (n + 1) a -> Vec n a"
     , "template"  : "~VAR[vec][0](1 to ~VAR[vec][0]'high)"
@@ -14,6 +16,7 @@
   }
 , { "BlackBox" :
     { "name"      : "Clash.Sized.Vector.last"
+    , "workInfo"  : "Never"
     , "kind"      : "Expression"
     , "type"      : "Vec (n + 1) a -> a"
     , "template"  : "~IF ~VIVADO ~THEN ~TYPMO'(fromSLV(~VAR[vec][0](~VAR[vec][0]'high))) ~ELSE ~VAR[vec][0](~VAR[vec][0]'high) ~FI"
@@ -21,6 +24,7 @@
   }
 , { "BlackBox" :
     { "name"      : "Clash.Sized.Vector.init"
+    , "workInfo"  : "Never"
     , "kind"      : "Expression"
     , "type"      : "Vec (n + 1) a -> Vec n a"
     , "template"  : "~VAR[vec][0](0 to ~VAR[vec][0]'high - 1)"
@@ -28,6 +32,7 @@
   }
 , { "BlackBox" :
     { "name" : "Clash.Sized.Vector.select"
+    , "workInfo"  : "Never"
     , "kind" : "Declaration"
     , "type" :
 "select :: (CmpNat (i + s) (s * n) ~ GT) -- ARG[0]
@@ -46,6 +51,7 @@ end generate;
   }
 , { "BlackBox" :
     { "name"      : "Clash.Sized.Vector.++"
+    , "workInfo"  : "Never"
     , "kind"      : "Expression"
     , "type"      : "(++) :: Vec n a -> Vec m a -> Vec (n + m) a"
     , "template"  : "~TYPMO'(~TYPM[0]'(~ARG[0]) & ~TYPM[1]'(~ARG[1]))"
@@ -53,6 +59,7 @@ end generate;
   }
 , { "BlackBox" :
     { "name"      : "Clash.Sized.Vector.concat"
+    , "workInfo"  : "Never"
     , "kind"      : "Declaration"
     , "type"      : "concat :: Vec n (Vec m a) -> Vec (n * m) a"
     , "template"  :
@@ -67,6 +74,7 @@ end generate;
   }
 , { "BlackBox" :
     { "name"      : "Clash.Sized.Vector.splitAt"
+    , "workInfo"  : "Never"
     , "kind"      : "Expression"
     , "type"      : "splitAt :: SNat m -> Vec (m + n) a -> (Vec m a, Vec n a)"
     , "template"  : "~IF~LENGTH[~TYPO]~THEN~ARG[1]~ELSE(~VAR[vec][1](0 to ~LIT[0]-1),~VAR[vec][1](~LIT[0] to ~VAR[vec][1]'high))~FI"
@@ -74,6 +82,7 @@ end generate;
   }
 , { "BlackBox" :
     { "name" : "Clash.Sized.Vector.unconcat"
+    , "workInfo" : "Never"
     , "kind" : "Declaration"
     , "type" :
 "unconcat :: KnownNat n     -- ARG[0]
@@ -92,6 +101,7 @@ end generate;
   }
 , { "BlackBox" :
     { "name"      : "Clash.Sized.Vector.map"
+    , "workInfo"  : "Never"
     , "kind"      : "Declaration"
     , "type"      : "map :: (a -> b) -> Vec n a -> Vec n b"
     , "template"  :
@@ -118,6 +128,7 @@ end generate;~FI
   }
 , { "BlackBox" :
     { "name"      : "Clash.Sized.Vector.imap"
+    , "workInfo"  : "Never"
     , "kind"      : "Declaration"
     , "type"      : "imap :: KnownNat n => (Index n -> a -> b) -> Vec n a -> Vec n b"
     , "template"  :
@@ -155,6 +166,7 @@ end block;
   }
 , { "BlackBox" :
     { "name"      : "Clash.Sized.Vector.imap_go"
+    , "workInfo"  : "Never"
     , "kind"      : "Declaration"
     , "type"      : "imap_go :: Index n -> (Index n -> a -> b) -> Vec m a -> Vec m b"
     , "template"  :
@@ -187,6 +199,7 @@ end generate;~FI
   }
 , { "BlackBox" :
     { "name"      : "Clash.Sized.Vector.zipWith"
+    , "workInfo"  : "Never"
     , "kind"      : "Declaration"
     , "type"      : "zipWith :: (a -> b -> c) -> Vec n a -> Vec n b -> Vec n c"
     , "template"  :
@@ -217,6 +230,7 @@ end generate;~FI
   }
 , { "BlackBox" :
     { "name"      : "Clash.Sized.Vector.foldr"
+    , "workInfo"  : "Never"
     , "kind"      : "Declaration"
     , "type"      : "foldr :: (a -> b -> b) -> b -> Vec n a -> b"
     , "template"  :
@@ -253,6 +267,7 @@ end block;~ELSE
   }
 , { "BlackBox" :
     { "name"      : "Clash.Sized.Vector.fold"
+    , "workInfo"  : "Never"
     , "kind"      : "Declaration"
     , "type"      : "fold :: (a -> a -> a) -> Vec (n+1) a -> a"
     , "comment"   : "THIS ONLY WORKS FOR POWER OF TWO LENGTH VECTORS"
@@ -345,6 +360,7 @@ end block;
   }
 , { "BlackBox" :
     { "name"      : "Clash.Sized.Vector.maxIndex"
+    , "workInfo"  : "Constant"
     , "kind"      : "Expression"
     , "type"      : "maxIndex :: KnownNat n => Vec n a -> Int"
     , "template"  : "to_signed(~LIT[0] - 1,~SIZE[~TYPO])"
@@ -352,6 +368,7 @@ end block;
   }
 , { "BlackBox" :
     { "name"      : "Clash.Sized.Vector.length"
+    , "workInfo"  : "Constant"
     , "kind"      : "Expression"
     , "type"      : "length :: KnownNat n => Vec n a -> Int"
     , "template"  : "to_signed(~LIT[0],~SIZE[~TYPO])"
@@ -359,6 +376,7 @@ end block;
   }
 , { "BlackBox" :
     { "name"      : "Clash.Sized.Vector.replicate"
+    , "workInfo"  : "Never"
     , "kind"      : "Expression"
     , "type"      : "replicate :: SNat n -> a -> Vec n a"
     , "template"  : "~TYPMO'(0 to ~LIT[0]-1 => ~IF ~VIVADO ~THEN ~TOBV[~TYPM[1]'(~ARG[1])][~TYP[1]] ~ELSE ~ARG[1] ~FI)"
@@ -366,6 +384,7 @@ end block;
   }
 , { "BlackBox" :
     { "name"      : "Clash.Sized.Vector.transpose"
+    , "workInfo"  : "Never"
     , "kind"      : "Declaration"
     , "type"      : "transpose :: KnownNat n => Vec m (Vec n a) -> Vec n (Vec m a)"
     , "template"  :
@@ -381,6 +400,7 @@ end generate;
   }
 , { "BlackBox" :
     { "name"      : "Clash.Sized.Vector.reverse"
+    , "workInfo"  : "Never"
     , "kind"      : "Declaration"
     , "type"      : "reverse :: Vec n a -> Vec n a"
     , "template"  :
@@ -393,6 +413,7 @@ end generate;
   }
 , { "BlackBox" :
     { "name" : "Clash.Sized.Vector.concatBitVector#"
+    , "workInfo" : "Never"
     , "kind" : "Declaration"
     , "type" :
 "concatBitVector# :: (KnownNat n,KnownNat m) -- (ARG[0],ARG[1])
@@ -408,6 +429,7 @@ end generate;
   }
 , { "BlackBox" :
     { "name" : "Clash.Sized.Vector.unconcatBitVector#"
+    , "workInfo" : "Never"
     , "kind" : "Declaration"
     , "type" :
 "unconcatBitVector# :: (KnownNat n, KnownNat m) -- (ARG[0],ARG[1])
@@ -423,6 +445,7 @@ end generate;
   }
 , { "BlackBox" :
     { "name"      : "Clash.Sized.Vector.rotateLeftS"
+    , "workInfo"  : "Never"
     , "kind"      : "Declaration"
     , "type"      : "rotateLeftS :: KnownNat n => Vec n a -> SNat d -> Vec n a"
     , "template"  :
@@ -444,6 +467,7 @@ end block;
   }
 , { "BlackBox" :
     { "name"      : "Clash.Sized.Vector.rotateRightS"
+    , "workInfo"  : "Never"
     , "kind"      : "Declaration"
     , "type"      : "rotateRightS :: KnownNat n => Vec n a -> SNat d -> Vec n a"
     , "template"  :

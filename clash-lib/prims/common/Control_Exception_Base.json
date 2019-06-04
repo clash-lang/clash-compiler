@@ -1,5 +1,6 @@
 [ { "BlackBox" :
     { "name"      : "Control.Exception.Base.recSelError"
+    , "workInfo"  : "Constant"
     , "kind"      : "Expression"
     , "type"      : "recSelError :: Addr# -> a"
     , "template"  : "~ERRORO"
@@ -7,6 +8,7 @@
   }
 , { "BlackBox" :
    { "name"      : "Control.Exception.Base.recConError"
+    , "workInfo"  : "Constant"
     , "kind"      : "Expression"
     , "type"      : "recConError :: Addr# -> a"
     , "template"  : "~ERRORO"
@@ -14,6 +16,7 @@
   }
 , { "BlackBox" :
     { "name"      : "Control.Exception.Base.irrefutPatError"
+    , "workInfo"  : "Constant"
     , "kind"      : "Expression"
     , "type"      : "irrefutPatError :: Addr# -> a"
     , "template"  : "~ERRORO"
@@ -21,6 +24,7 @@
   }
 , { "BlackBox" :
     { "name"      : "Control.Exception.Base.runtimeError"
+    , "workInfo"  : "Constant"
     , "kind"      : "Expression"
     , "type"      : "runtimeError :: Addr# -> a"
     , "template"  : "~ERRORO"
@@ -28,6 +32,7 @@
   }
 , { "BlackBox" :
     { "name"      : "Control.Exception.Base.nonExhaustiveGuardsError"
+    , "workInfo"  : "Constant"
     , "kind"      : "Expression"
     , "type"      : "nonExhaustiveGuardsError :: Addr# -> a"
     , "template"  : "~ERRORO"
@@ -35,6 +40,7 @@
   }
 , { "BlackBox" :
    { "name"      : "Control.Exception.Base.patError"
+    , "workInfo"  : "Constant"
     , "kind"      : "Expression"
     , "type"      : "patError :: Addr# -> a"
     , "template"  : "~ERRORO"
@@ -42,6 +48,7 @@
   }
 , { "BlackBox" :
     { "name"      : "Control.Exception.Base.noMethodBindingError"
+    , "workInfo"  : "Constant"
     , "kind"      : "Expression"
     , "type"      : "noMethodBindingError :: Addr# -> a"
     , "template"  : "~ERRORO"
@@ -49,6 +56,7 @@
   }
 , { "BlackBox" :
     { "name"      : "Control.Exception.Base.absentError"
+    , "workInfo"  : "Constant"
     , "kind"      : "Expression"
     , "type"      : "absentError :: Addr# -> a"
     , "template"  : "~ERRORO"
@@ -56,6 +64,7 @@
   }
 , { "BlackBox" :
     { "name"      : "Control.Exception.Base.typeError"
+    , "workInfo"  : "Constant"
     , "kind"      : "Expression"
     , "type"      : "typeError :: Addr# -> a"
     , "template"  : "~ERRORO"

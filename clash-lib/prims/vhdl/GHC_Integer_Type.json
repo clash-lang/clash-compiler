@@ -1,5 +1,6 @@
 [ { "BlackBox" :
     { "name"      : "GHC.Integer.Type.smallInteger"
+    , "workInfo"  : "Never"
     , "kind"      : "Expression"
     , "type"      : "smallInteger :: Int# -> Integer"
     , "template"  : "~ARG[0]"
@@ -7,6 +8,7 @@
   }
 , { "BlackBox" :
     { "name"      : "GHC.Integer.Type.integerToInt"
+    , "workInfo"  : "Never"
     , "kind"      : "Expression"
     , "type"      : "integerToInt :: Integer -> Int#"
     , "template"  : "~ARG[0]"
@@ -142,6 +144,7 @@ end block;
   }
 , { "BlackBox" :
     { "name"      : "GHC.Integer.Type.wordToInteger"
+    , "workInfo"  : "Never"
     , "kind"      : "Expression"
     , "type"      : "wordToInteger :: Word# -> Integer"
     , "template"  : "signed(std_logic_vector(~ARG[0]))"
@@ -149,6 +152,7 @@ end block;
   }
 , { "BlackBox" :
     { "name"      : "GHC.Integer.Type.integerToWord"
+    , "workInfo"  : "Never"
     , "kind"      : "Expression"
     , "type"      : "integerToWord :: Integer -> Word#"
     , "template"  : "unsigned(std_logic_vector(~ARG[0]))"

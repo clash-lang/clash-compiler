@@ -1,5 +1,6 @@
 [ { "BlackBox" :
     { "name"      : "Clash.Class.BitPack.packFloat#"
+    , "workInfo"  : "Never"
     , "kind"      : "Expression"
     , "type" :
 "packFloat# :: Float -> BitVector 32"
@@ -8,6 +9,7 @@
   }
 , { "BlackBox" :
     { "name"      : "Clash.Class.BitPack.unpackFloat#"
+    , "workInfo"  : "Never"
     , "kind"      : "Expression"
     , "type" :
 "packFloat# :: BitVector 32 -> Float"
@@ -16,6 +18,7 @@
   }
 , { "BlackBox" :
     { "name"      : "Clash.Class.BitPack.packDouble#"
+    , "workInfo"  : "Never"
     , "kind"      : "Expression"
     , "type" :
 "packFloat# :: Double -> BitVector 64"
@@ -24,6 +27,7 @@
   }
 , { "BlackBox" :
     { "name"      : "Clash.Class.BitPack.unpackDouble#"
+    , "workInfo"  : "Never"
     , "kind"      : "Expression"
     , "type" :
 "packFloat# :: BitVector 64 -> Double"

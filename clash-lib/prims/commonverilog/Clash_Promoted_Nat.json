@@ -1,5 +1,6 @@
 [ { "BlackBox" :
     { "name"      : "Clash.Promoted.Nat.flogBaseSNat"
+    , "workInfo"  : "Never"
     , "kind"      : "Expression"
     , "type"      : "Clash.Promoted.Nat.flogBaseSNat :: (2 <= base, 1 <= x)
                                                      => SNat base -- ARG[2]
@@ -25,6 +26,7 @@ endfunction"
   }
 , { "BlackBox" :
     { "name"      : "Clash.Promoted.Nat.clogBaseSNat"
+    , "workInfo"  : "Never"
     , "kind"      : "Expression"
     , "type"      : "Clash.Promoted.Nat.clogBaseSNat :: (2 <= base, 1 <= x)
                                                      => SNat base -- ARG[2]
@@ -49,6 +51,7 @@ endfunction"
   }
 , { "BlackBox" :
     { "name"      : "Clash.Promoted.Nat.logBaseSNat"
+    , "workInfo"  : "Never"
     , "kind"      : "Expression"
     , "type"      : "Clash.Promoted.Nat.logBaseSNat :: (FLog base x ~ CLog base x)
                                                     => SNat base -- ARG[1]

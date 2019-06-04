@@ -1,5 +1,6 @@
 [ { "BlackBox" :
     { "name"      : "Clash.Sized.Internal.BitVector.BV"
+    , "workInfo"  : "Never"
     , "kind"      : "Expression"
     , "type"      : "BV :: Integer -> Integer -> BitVector n"
     , "comment"   : "THIS IS ONLY USED WHEN WW EXPOSES BITVECTOR INTERNALS"
@@ -8,6 +9,7 @@
   }
 , { "BlackBox" :
     { "name"      : "Clash.Sized.Internal.BitVector.Bit"
+    , "workInfo"  : "Never"
     , "kind"      : "Expression"
     , "type"      : "Bit :: Integer -> Integer -> BitVector n"
     , "comment"   : "THIS IS ONLY USED WHEN WW EXPOSES BIT INTERNALS"
@@ -16,6 +18,7 @@
   }
 , { "BlackBox" :
     { "name"      : "Clash.Sized.Internal.BitVector.high"
+    , "workInfo"  : "Never"
     , "kind"      : "Expression"
     , "type"      : "high :: Bit"
     , "template"  : "1'b1"
@@ -23,6 +26,7 @@
   }
 , { "BlackBox" :
     { "name"      : "Clash.Sized.Internal.BitVector.low"
+    , "workInfo"  : "Never"
     , "kind"      : "Expression"
     , "type"      : "low :: Bit"
     , "template"  : "1'b0"
@@ -30,6 +34,7 @@
   }
 , { "BlackBox" :
     { "name"      : "Clash.Sized.Internal.BitVector.pack#"
+    , "workInfo"  : "Never"
     , "kind"      : "Expression"
     , "type"      : "pack# :: Bit -> BitVector 1"
     , "template"  : "~ARG[0]"
@@ -37,6 +42,7 @@
   }
 , { "BlackBox" :
     { "name"      : "Clash.Sized.Internal.BitVector.unpack#"
+    , "workInfo"  : "Never"
     , "kind"      : "Expression"
     , "type"      : "unpack# :: BitVector 1 -> Bit"
     , "template"  : "~ARG[0]"
@@ -79,6 +85,7 @@
   }
 , { "BlackBox" :
     { "name"      : "Clash.Sized.Internal.BitVector.fromInteger##"
+    , "workInfo"  : "Never"
     , "kind"      : "Expression"
     , "type"      : "fromInteger## :: Integer -> Integer -> Bit"
     , "template"  : "~ARG[0][0] ? 1'bx : ~ARG[1][0]"
@@ -156,6 +163,7 @@
   }
 , { "BlackBox" :
     { "name"      : "Clash.Sized.Internal.BitVector.toInteger#"
+    , "workInfo"  : "Never"
     , "kind"      : "Expression"
     , "type"      : "toInteger# :: KnownNat n => BitVector n -> Integer"
     , "template"  : "~IF~SIZE[~TYP[1]]~THEN~IF~CMPLE[~SIZE[~TYPO]][~SIZE[~TYP[1]]]~THEN$signed(~VAR[bv][1][0+:~SIZE[~TYPO]])~ELSE$signed({{(~SIZE[~TYPO]-~SIZE[~TYP[1]]) {1'b0}},~VAR[bv][1]})~FI~ELSE~SIZE[~TYPO]'sd0~FI"
@@ -163,6 +171,7 @@
   }
 , { "BlackBox" :
     { "name"      : "Clash.Sized.Internal.BitVector.size#"
+    , "workInfo"  : "Constant"
     , "kind"      : "Expression"
     , "type"      : "size# :: KnownNat n => BitVector n -> Int"
     , "template"  : "~SIZE[~TYPO]'sd~SIZE[~TYP[1]]"
@@ -170,6 +179,7 @@
   }
 , { "BlackBox" :
     { "name"      : "Clash.Sized.Internal.BitVector.maxIndex#"
+    , "workInfo"  : "Constant"
     , "kind"      : "Expression"
     , "type"      : "maxIndex# :: KnownNat n => BitVector n -> Int"
     , "template"  : "~SIZE[~TYPO]'sd~SIZE[~TYP[1]] - ~SIZE[~TYPO]'sd1"
@@ -177,6 +187,7 @@
   }
 , { "BlackBox" :
     { "name"      : "Clash.Sized.Internal.BitVector.++#"
+    , "workInfo"  : "Never"
     , "kind"      : "Expression"
     , "type"      : "(++#) :: KnownNat m => BitVector n -> BitVector m -> BitVector (n + m)"
     , "template"  : "~IF~AND[~SIZE[~TYP[1]],~SIZE[~TYP[2]]]~THEN{~ARG[1],~ARG[2]}~ELSE~IF~SIZE[~TYP[1]]~THEN~ARG[1]~ELSE~ARG[2]~FI~FI"
@@ -195,6 +206,7 @@
   }
 , { "BlackBox" :
     { "name" : "Clash.Sized.Internal.BitVector.slice#"
+    , "workInfo" : "Never"
     , "kind" : "Expression"
     , "type" :
 "slice# :: BitVector (m + 1 + i) -- ARG[0]
@@ -206,6 +218,7 @@
   }
 , { "BlackBox" :
     { "name" : "Clash.Sized.Internal.BitVector.msb#"
+    , "workInfo" : "Never"
     , "kind" : "Expression"
     , "type" :
 "msb# :: KnownNat n  -- ARG[0]
@@ -216,6 +229,7 @@
   }
 , { "BlackBox" :
     { "name" : "Clash.Sized.Internal.BitVector.lsb#"
+    , "workInfo" : "Never"
     , "kind" : "Expression"
     , "type" :
 "lsb# :: BitVector n -- ARG[0]
@@ -225,6 +239,7 @@
   }
 , { "BlackBox" :
     { "name"      : "Clash.Sized.Internal.BitVector.minBound#"
+    , "workInfo"  : "Constant"
     , "kind"      : "Expression"
     , "type"      : "minBound# :: BitVector n"
     , "template"  : "~SIZE[~TYPO]'d0"
@@ -232,6 +247,7 @@
   }
 , { "BlackBox" :
     { "name"      : "Clash.Sized.Internal.BitVector.maxBound#"
+    , "workInfo"  : "Constant"
     , "kind"      : "Expression"
     , "type"      : "maxBound# :: KnownNat n => BitVector n"
     , "template"  : "{~SIZE[~TYPO] {1'b1}}"
@@ -267,6 +283,7 @@
   }
 , { "BlackBox" :
     { "name"      : "Clash.Sized.Internal.BitVector.fromInteger#"
+    , "workInfo"  : "Never"
     , "kind"      : "Expression"
     , "type"      : "fromInteger# :: KnownNat n => Integer -> Integer -> BitVector n"
     , "template"  : "~IF~CMPLE[~SIZE[~TYPO]][~SIZE[~TYP[2]]]~THEN$unsigned(~VAR[i][2][0+:~SIZE[~TYPO]])~ELSE$unsigned({{(~SIZE[~TYPO]-~SIZE[~TYP[2]]) {1'b0}},~VAR[i][2]})~FI"
@@ -351,6 +368,7 @@
   }
 , { "BlackBox" :
     { "name"      : "Clash.Sized.Internal.BitVector.truncateB#"
+    , "workInfo"  : "Never"
     , "kind"      : "Expression"
     , "type"      : "truncateB# :: forall a b . KnownNat a => BitVector (a + b) -> BitVector a"
     , "template"  : "~VAR[bv][1][0+:~SIZE[~TYPO]]"

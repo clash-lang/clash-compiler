@@ -323,7 +323,7 @@ coreToTerm primMap unlocs srcsp coreExpr = Reader.runReaderT (term coreExpr) src
       e'   <- term e
       return (C.Letrec xes' e')
 
-    term' (Case _ _ ty [])  = C.TyApp (C.Prim (pack "EmptyCase") C.undefinedTy)
+    term' (Case _ _ ty [])  = C.TyApp (C.Prim (pack "EmptyCase") (C.PrimInfo C.undefinedTy C.WorkNever))
                                 <$> lift (coreToType ty)
     term' (Case e b ty alts) = do
      let usesBndr = any ( not . isEmptyVarSet . exprSomeFreeVars (== b))
@@ -349,9 +349,9 @@ coreToTerm primMap unlocs srcsp coreExpr = Reader.runReaderT (term coreExpr) src
           -> C.Cast <$> term e <*> lift (coreToType ty1) <*> lift (coreToType ty2)
         _ -> term e
     term' (Tick _ e)        = term e
-    term' (Type t)          = C.TyApp (C.Prim (pack "_TY_") C.undefinedTy) <$>
+    term' (Type t)          = C.TyApp (C.Prim (pack "_TY_") (C.PrimInfo C.undefinedTy C.WorkNever)) <$>
                                 lift (coreToType t)
-    term' (Coercion co)     = C.TyApp (C.Prim (pack "_CO_") C.undefinedTy) <$>
+    term' (Coercion co)     = C.TyApp (C.Prim (pack "_CO_") (C.PrimInfo C.undefinedTy C.WorkNever)) <$>
                                 lift (coreToType (coercionType co))
 
     lookupPrim :: Text -> Maybe (Maybe ResolvedPrimitive)
@@ -363,7 +363,7 @@ coreToTerm primMap unlocs srcsp coreExpr = Reader.runReaderT (term coreExpr) src
         xType  <- coreToType (varType x)
         case isDataConId_maybe x of
           Just dc -> case lookupPrim xNameS of
-            Just _  -> return $ C.Prim xNameS xType
+            Just p  -> return $ C.Prim xNameS (C.PrimInfo xType (maybe C.WorkVariable workInfo p))
             Nothing -> if isDataConWrapId x && not (isNewTyCon (dataConTyCon dc))
               then let xInfo = idInfo x
                        unfolding = unfoldingInfo xInfo
@@ -373,7 +373,7 @@ coreToTerm primMap unlocs srcsp coreExpr = Reader.runReaderT (term coreExpr) src
                           _ -> error ("Unexpected unfolding for DC wrapper: " ++ showPpr unsafeGlobalDynFlags x)
               else C.Data <$> coreToDataCon dc
           Nothing -> case lookupPrim xNameS of
-            Just (Just (Primitive f _))
+            Just (Just (Primitive f wi _))
               | f == pack "Clash.Signal.Internal.mapSignal#" -> return (mapSignalTerm xType)
               | f == pack "Clash.Signal.Internal.signal#"    -> return (signalTerm xType)
               | f == pack "Clash.Signal.Internal.appSignal#" -> return (appSignalTerm xType)
@@ -387,19 +387,22 @@ coreToTerm primMap unlocs srcsp coreExpr = Reader.runReaderT (term coreExpr) src
               | f == pack "GHC.Magic.runRW#"                 -> return (runRWTerm xType)
               | f == pack "Clash.Class.BitPack.packXWith"    -> return (packXWithTerm xType)
               | f == pack "Clash.Sized.Internal.BitVector.checkUnpackUndef" -> return (checkUnpackUndefTerm xType)
-              | otherwise                                    -> return (C.Prim xNameS xType)
-            Just (Just (BlackBox {})) ->
-              return $ C.Prim xNameS xType
-            Just (Just (BlackBoxHaskell {})) ->
-              return $ C.Prim xNameS xType
+              | otherwise                                    -> return (C.Prim xNameS (C.PrimInfo xType wi))
+            Just (Just (BlackBox {workInfo = wi})) ->
+              return $ C.Prim xNameS (C.PrimInfo xType wi)
+            Just (Just (BlackBoxHaskell {workInfo = wi})) ->
+              return $ C.Prim xNameS (C.PrimInfo xType wi)
             Just Nothing ->
               -- Was guarded by "DontTranslate". We don't know yet if Clash will
               -- actually use it later on, so we don't err here.
-              return $ C.Prim xNameS xType
+              return $ C.Prim xNameS (C.PrimInfo xType C.WorkAlways)
             Nothing
-              | x `elem` unlocs -> return (C.Prim xNameS xType)
-              | pack "$cshow" `isInfixOf` xNameS -> return (C.Prim xNameS xType)
-              | otherwise       -> C.Var <$> coreToId x
+              | x `elem` unlocs
+              -> return (C.Prim xNameS (C.PrimInfo xType C.WorkAlways))
+              | pack "$cshow" `isInfixOf` xNameS
+              -> return (C.Prim xNameS (C.PrimInfo xType C.WorkAlways))
+              | otherwise
+              -> C.Var <$> coreToId x
 
     alt (DEFAULT   , _ , e) = (C.DefaultPat,) <$> term e
     alt (LitAlt l  , _ , e) = (C.LitPat (coreToLiteral l),) <$> term e
@@ -1029,7 +1032,7 @@ runRWTerm (C.ForAllTy rTV (C.ForAllTy oTV funTy)) =
   C.TyLam rTV (
   C.TyLam oTV (
   C.Lam   fId (
-  (C.App (C.Var fId) (C.Prim rwNm rwTy)))))
+  (C.App (C.Var fId) (C.Prim rwNm (C.PrimInfo rwTy C.WorkNever))))))
   where
     (C.FunTy fTy _)  = C.tyView funTy
     (C.FunTy rwTy _) = C.tyView fTy
