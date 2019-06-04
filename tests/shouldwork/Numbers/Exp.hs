@@ -12,7 +12,7 @@
 module Exp (testInput, topEntity, expectedOutputs, packedExpectedOutputs) where
 
 import Clash.Prelude
-import NumConstantFolding (lit)
+import ConstantFoldingUtil (lit)
 
 
 testInput :: Vec _ Integer

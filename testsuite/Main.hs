@@ -196,7 +196,7 @@ runClashTest =
         , outputTest ("tests" </> "shouldwork" </> "Numbers") defBuild ["-itests/shouldwork/Numbers"] ["-itests/shouldwork/Numbers"] "ExpWithClashCF"  "main"
         -- TODO: re-enable for Verilog
         , runTest ("tests" </> "shouldwork" </> "Numbers") (defBuild \\ [Verilog]) ["-itests/shouldwork/Numbers","-fclash-inline-limit=300"] "NumConstantFoldingTB"       (["","NumConstantFoldingTB_testBench"],"NumConstantFoldingTB_testBench",True)
-        , outputTest ("tests" </> "shouldwork" </> "Numbers") defBuild ["-fclash-inline-limit=300", "-fconstraint-solver-iterations=15"] [] "NumConstantFolding"  "main"
+        , outputTest ("tests" </> "shouldwork" </> "Numbers") defBuild ["-fclash-inline-limit=300", "-fconstraint-solver-iterations=15"] ["-itests/shouldwork/Numbers"] "NumConstantFolding"  "main"
 #if MIN_VERSION_base(4,12,0)
         -- Naturals are broken on GHC <= 8.4. See https://github.com/clash-lang/clash-compiler/pull/473
         , runTest ("tests" </> "shouldwork" </> "Numbers") defBuild [] "Naturals"     (["","Naturals_testBench"],"Naturals_testBench",True)

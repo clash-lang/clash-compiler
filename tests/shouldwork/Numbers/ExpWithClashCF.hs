@@ -4,7 +4,7 @@ import Clash.Prelude
 import Clash.Explicit.Testbench
 
 import qualified Exp
-import qualified NumConstantFolding as NCF
+import qualified ConstantFoldingUtil as CFU
 
 
 -- Constant folded topEntity (GHC/TemplateHaskell)
@@ -22,6 +22,6 @@ testBench = done
     rst            = systemResetGen
 
 
-mainVHDL = NCF.checkForUnfolded NCF.vhdlNr
-mainVerilog = NCF.checkForUnfolded NCF.verilogNr
-mainSystemVerilog = NCF.checkForUnfolded NCF.verilogNr
+mainVHDL = CFU.mainVHDL
+mainVerilog = CFU.mainVHDL
+mainSystemVerilog = CFU.mainVHDL
