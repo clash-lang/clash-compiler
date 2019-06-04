@@ -13,6 +13,7 @@
 {-# LANGUAGE FlexibleContexts  #-}
 {-# LANGUAGE LambdaCase        #-}
 {-# LANGUAGE MagicHash         #-}
+{-# LANGUAGE MultiWayIf        #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TemplateHaskell   #-}
 {-# LANGUAGE TupleSections     #-}
@@ -97,7 +98,7 @@ import           Clash.Core.Subst
 import           Clash.Core.Term
   (LetBinding, Pat (..), Term (..), CoreContext (..), PrimInfo (..),
    isLambdaBodyCtx, collectArgs)
-import           Clash.Core.Type             (TypeView (..), applyFunTy,
+import           Clash.Core.Type             (Type, TypeView (..), applyFunTy,
                                               isPolyFunCoreTy,
                                               normalizeType, splitFunForallTy,
                                               splitFunTy, typeKind,
@@ -1577,6 +1578,20 @@ etaExpandSyn (TransformContext is0 ctx) e@(collectArgs -> (Var f, _)) = do
 
 etaExpandSyn _ e = return e
 
+isClassConstraint :: Type -> Bool
+isClassConstraint (tyView -> TyConApp nm0 _) =
+  if -- Constraint tuple:
+     | "GHC.Classes.(%" `Text.isInfixOf` nm1 -> True
+     -- Constraint class:
+     | "C:" `Text.isInfixOf` nm2 -> True
+     | otherwise -> False
+ where
+  nm1 = nameOcc nm0
+  nm2 = snd (Text.breakOnEnd "." nm1)
+
+isClassConstraint _ = False
+
+
 -- | Turn a  normalized recursive function, where the recursive calls only pass
 -- along the unchanged original arguments, into let-recursive function. This
 -- means that all recursive calls are replaced by the same variable reference as
@@ -1601,13 +1616,22 @@ recToLetRec (TransformContext is0 []) e = do
         _ -> return e
     _ -> return e
   where
-    -- This checks whether things are semantically equal
+    -- This checks whether things are semantically equal. For example, say we
+    -- have:
     --
-    -- i.e. that
+    --   x :: (a, (b, c))
     --
-    -- xs == (fst xs, snd xs)
+    -- and
     --
-    -- TODO: this is far from complete
+    --   y :: (a, (b, c))
+    --
+    -- If we can determine that 'y' is constructed solely using the
+    -- corresponding fields in 'x', then we can say they are semantically
+    -- equal. The algorithm below keeps track of what (sub)field it is
+    -- constructing, and checks if the field-expression projects the
+    -- corresponding (sub)field from the target variable.
+    --
+    -- TODO: See [Note: Breaks on constants and predetermined equality]
     eqApp tcm v args (collectArgs -> (Var v',args'))
       | isGlobalId v'
       , v == v'
@@ -1618,20 +1642,64 @@ recToLetRec (TransformContext is0 []) e = do
 
     eqArg _ v1 v2@(Var {})
       = v1 == v2
-    eqArg tcm v1 v2@(collectArgs -> (Data _,args'))
-      | termType tcm v1 == termType tcm v2
-      = and (zipWith (isNthProjection v1) [0..] (Either.lefts args'))
+    eqArg tcm v1 v2@(collectArgs -> (Data _, args'))
+      | let t1 = termType tcm v1
+      , let t2 = termType tcm v2
+      , t1 == t2
+      = if isClassConstraint t1 then
+          -- Class constraints are equal if their types are equal, so we can
+          -- take a shortcut here.
+          True
+        else
+          -- Check whether all arguments to the data constructor are projections
+          --
+          and (zipWith (eqDat v1) (map pure [0..]) (Either.lefts args'))
     eqArg _ _ _
       = False
 
-    -- `isNthProjection s n c` checks that `c` is the `n`th projection
-    -- of `s`.
-    isNthProjection :: Term -> Int -> Term -> Bool
-    isNthProjection v n (Case v' _ [(DataPat _ _ xs, Var s)])
-      | v == v'
-      , Just n' <- List.elemIndex s xs
-      = n == n'
-    isNthProjection _ _ _ = False
+    -- Recursively check whether a term /e/ is semantically equal to some variable /v/.
+    -- Currently it can only assert equality when /e/ is  syntactically equal
+    -- to /v/, or is constructed out of projections of /v/, importantly:
+    --
+    -- [Note: Breaks on constants and predetermined equality]
+    -- This function currently breaks if:
+    --
+    --   * One or more subfields are constants. Constants might have been
+    --     inlined for the construction, instead of being a projection of the
+    --     target variable.
+    --
+    --   * One or more subfields are determined to be equal and one is simply
+    --     swapped / replaced by the other. For example, say we have
+    --     `x :: (a, a)`. If GHC determines that both elements of the tuple will
+    --     always be the same, it might replace the (semantically equal to 'x')
+    --     construction of `y` with `(fst x, fst x)`.
+    --
+    eqDat :: Term -> [Int] -> Term -> Bool
+    eqDat v fTrace (collectArgs -> (Data _, args)) =
+      and (zipWith (eqDat v) (map (:fTrace) [0..]) (Either.lefts args))
+    eqDat v1 fTrace v2 =
+      case stripProjection (reverse fTrace) v1 v2 of
+        Just [] -> True
+        _ -> False
+
+    stripProjection :: [Int] -> Term -> Term -> Maybe [Int]
+    stripProjection fTrace0 vTarget0 (Case v _ [(DataPat _ _ xs, r)]) = do
+      -- Get projection made in subject of case:
+      fTrace1 <- stripProjection fTrace0 vTarget0 v
+
+      -- Extract projection of this case statement. Subsequent calls to
+      -- 'stripProjection' will check if new target is actually used.
+      n <- headMaybe fTrace1
+      vTarget1 <- indexMaybe xs n
+      fTrace2 <- tailMaybe fTrace1
+
+      stripProjection fTrace2 (Var vTarget1) r
+
+    stripProjection fTrace (Var sTarget) (Var s) =
+      if sTarget == s then Just fTrace else Nothing
+
+    stripProjection _fTrace _vTarget _v =
+      Nothing
 
 recToLetRec _ e = return e
 

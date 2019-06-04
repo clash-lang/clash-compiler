@@ -271,6 +271,16 @@ indexNote :: String
           -> a
 indexNote note = \xs i -> fromMaybe (error note) (indexMaybe xs i)
 
+-- | Safe version of 'head'
+headMaybe :: [a] -> Maybe a
+headMaybe (a:_) = Just a
+headMaybe _ = Nothing
+
+-- | Safe version of 'tail'
+tailMaybe :: [a] -> Maybe [a]
+tailMaybe (_:as) = Just as
+tailMaybe _ = Nothing
+
 -- | Split the second list at the length of the first list
 splitAtList :: [b] -> [a] -> ([a], [a])
 splitAtList [] xs         = ([], xs)
