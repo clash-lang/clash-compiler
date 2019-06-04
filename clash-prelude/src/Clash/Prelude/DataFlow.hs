@@ -4,7 +4,7 @@ Copyright  :  (C) 2013-2016, University of Twente,
 License    :  BSD2 (see the file LICENSE)
 Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
 
-Self-synchronising circuits based on data-flow principles.
+Self-synchronizing circuits based on data-flow principles.
 -}
 
 {-# LANGUAGE DataKinds             #-}
@@ -62,7 +62,7 @@ import Clash.Sized.BitVector  (BitVector)
 import Clash.Sized.Vector
 import Clash.XException       (errorX, Undefined)
 
-{- | Dataflow circuit with bidirectional synchronisation channels.
+{- | Dataflow circuit with bidirectional synchronization channels.
 
 In the /forward/ direction we assert /validity/ of the data. In the /backward/
 direction we assert that the circuit is /ready/ to receive new data. A circuit
@@ -102,7 +102,7 @@ We define several composition operators for our 'DataFlow' circuits:
  * 'lockStep' proceed in lock-step.
 
 When you look at the types of the above operators it becomes clear why we
-parametrise in the types of the synchronisation channels.
+parametrize in the types of the synchronization channels.
 -}
 newtype DataFlow domain iEn oEn i o
   = DF
@@ -145,7 +145,7 @@ liftDF
 liftDF = DF
 
 -- | Create a 'DataFlow' circuit where the given function @f@ operates on the
--- data, and the synchronisation channels are passed unaltered.
+-- data, and the synchronization channels are passed unaltered.
 pureDF
   :: (i -> o)
   -> DataFlow dom Bool Bool i o
@@ -309,13 +309,13 @@ parNDF fs =
 -- | Feed back the second halve of the communication channel. The feedback loop
 -- is buffered by a 'fifoDF' circuit.
 --
--- So given a circuit /h/ with two synchronisation channels:
+-- So given a circuit /h/ with two synchronization channels:
 --
 -- @
 -- __h__ :: 'DataFlow' (Bool,Bool) (Bool,Bool) (a,d) (b,d)
 -- @
 --
--- Feeding back the /d/ part (including its synchronisation channels) results
+-- Feeding back the /d/ part (including its synchronization channels) results
 -- in:
 --
 -- @
@@ -324,7 +324,7 @@ parNDF fs =
 --
 -- <<doc/loopDF.svg>>
 --
--- When you have a circuit @h'@, with only a single synchronisation channel:
+-- When you have a circuit @h'@, with only a single synchronization channel:
 --
 -- @
 -- __h'__ :: 'DataFlow' Bool Bool (a,d) (b,d)
@@ -337,7 +337,7 @@ parNDF fs =
 -- @
 --
 -- The circuits @f@, @h@, and @g@, must operate in /lock-step/ because the /h'/
--- circuit only has a single synchronisation channel. Consequently, there
+-- circuit only has a single synchronization channel. Consequently, there
 -- should only be progress when all three circuits are producing /valid/ data
 -- and all three circuits are /ready/ to receive new data. We need to compose
 -- /h'/ with the 'lockStep' and 'stepLock' functions to achieve the /lock-step/
@@ -390,9 +390,9 @@ loopDF_nobuf (DF f) = DF (\a aV bR -> let (bd,bdV,adR) = f ad adV bdR
                                       in  (b,bV,aR)
                          )
 
--- | Reduce or extend the synchronisation granularity of parallel compositions.
+-- | Reduce or extend the synchronization granularity of parallel compositions.
 class LockStep a b where
-  -- | Reduce the synchronisation granularity to a single 'Bool'ean value.
+  -- | Reduce the synchronization granularity to a single 'Bool'ean value.
   --
   -- Given:
   --
@@ -409,7 +409,7 @@ class LockStep a b where
   -- @
   --
   -- because, @f \`parDF\` g@, has type, @'DataFlow' (Bool,Bool) (Bool,Bool) (a,c) (b,d)@,
-  -- which does not match the expected synchronisation granularity of @h@. We
+  -- which does not match the expected synchronization granularity of @h@. We
   -- need a circuit in between that has the type:
   --
   -- @
@@ -425,7 +425,7 @@ class LockStep a b where
   -- ready port is only asserted when @h@ is ready and @g@ is producing valid
   -- data. @f@ and @g@ will hence be proceeding in /lock-step/.
   --
-  -- The 'lockStep' function ensures that all synchronisation signals are
+  -- The 'lockStep' function ensures that all synchronization signals are
   -- properly connected:
   --
   -- @
@@ -434,7 +434,7 @@ class LockStep a b where
   --
   -- <<doc/lockStep.svg>>
   --
-  -- __Note 1__: ensure that the components that you are synchronising have
+  -- __Note 1__: ensure that the components that you are synchronizing have
   -- buffered/delayed @ready@ and @valid@ signals, or 'lockStep' has the
   -- potential to introduce combinational loops. You can do this by placing
   -- 'fifoDF's on the parallel channels. Extending the above example, you would
@@ -458,7 +458,7 @@ class LockStep a b where
   -- Does the right thing.
   lockStep :: DataFlow dom a Bool b b
 
-  -- | Extend the synchronisation granularity from a single 'Bool'ean value.
+  -- | Extend the synchronization granularity from a single 'Bool'ean value.
   --
   -- Given:
   --
@@ -475,7 +475,7 @@ class LockStep a b where
   -- @
   --
   -- because, @f \`parDF\` g@, has type, @'DataFlow' (Bool,Bool) (Bool,Bool) (a,c) (b,d)@,
-  -- which does not match the expected synchronisation granularity of @h@. We
+  -- which does not match the expected synchronization granularity of @h@. We
   -- need a circuit in between that has the type:
   --
   -- @
@@ -491,7 +491,7 @@ class LockStep a b where
   -- only asserted when @h@ is valid and @f@ is ready to receive new values.
   -- @f@ and @g@ will hence be proceeding in /lock-step/.
   --
-  -- The 'stepLock' function ensures that all synchronisation signals are
+  -- The 'stepLock' function ensures that all synchronization signals are
   -- properly connected:
   --
   -- @
@@ -500,7 +500,7 @@ class LockStep a b where
   --
   -- <<doc/stepLock.svg>>
   --
-  -- __Note 1__: ensure that the components that you are synchronising have
+  -- __Note 1__: ensure that the components that you are synchronizing have
   -- buffered/delayed @ready@ and @valid@ signals, or 'stepLock' has the
   -- potential to introduce combinational loops. You can do this by placing
   -- 'fifoDF's on the parallel channels. Extending the above example, you would

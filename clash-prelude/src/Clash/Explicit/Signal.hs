@@ -144,7 +144,7 @@ module Clash.Explicit.Signal
     -- * Clock
   , Clock, ClockKind (..)
   , freqCalc
-    -- ** Synchronisation primitive
+    -- ** Synchronization primitive
   , unsafeSynchronizer
     -- ** Clock gating
   , clockGate
@@ -343,12 +343,12 @@ resetSynchronizer clk rst  =
 freqCalc :: Double -> Integer
 freqCalc freq = ceiling ((1.0 / freq) / 1.0e-12)
 
--- ** Synchronisation primitive
 {-# NOINLINE unsafeSynchronizer #-}
+-- ** Synchronization primitive
 -- | The 'unsafeSynchronizer' function is a primitive that must be used to
--- connect one clock domain to the other, and will be synthesised to a (bundle
+-- connect one clock domain to the other, and will be synthesized to a (bundle
 -- of) wire(s) in the eventual circuit. This function should only be used as
--- part of a proper synchronisation component, such as the following dual
+-- part of a proper synchronization component, such as the following dual
 -- flip-flop synchronizer:
 --
 -- @
