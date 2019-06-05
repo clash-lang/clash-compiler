@@ -13,6 +13,7 @@
   -> Signal slow (BitVector m)  -- ARG[7]
   -> Signal slow (BitVector m)  -- ARG[8]
   -> Signal fast (BitVector m)"
+    , "libraries" : ["altera_mf"]
     , "template" :
 "// altddioOut begin
 altddio_out

@@ -12,6 +12,7 @@
   -> Reset slow synchronous       -- ARG[6]
   -> Signal fast (BitVector m)    -- ARG[7]
   -> Signal slow (BitVector m,BitVector m)"
+    , "libraries" : ["altera_mf"]
     , "template" :
 "// altddioIn begin
 wire ~SIGD[~GENSYM[dataout_l][1]][7];
