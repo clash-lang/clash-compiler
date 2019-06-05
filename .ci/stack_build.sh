@@ -3,5 +3,6 @@ set -xeo pipefail
 
 apt update
 apt install wget -y
-wget -qO- https://get.haskellstack.org/ | sh
+wget -q https://get.haskellstack.org/ -O stack_install.sh
+sh stack_install.sh
 stack build
