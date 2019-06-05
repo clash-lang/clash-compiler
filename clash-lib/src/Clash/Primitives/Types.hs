@@ -36,6 +36,7 @@ module Clash.Primitives.Types
 
 import {-# SOURCE #-} Clash.Netlist.Types
 import           Clash.Annotations.Primitive  (PrimitiveGuard)
+import           Clash.Core.Term (WorkInfo (..))
 import           Clash.Netlist.BlackBox.Types
   (BlackBoxFunction, BlackBoxTemplate, TemplateKind (..))
 import           Control.Applicative          ((<|>))
@@ -138,6 +139,8 @@ data Primitive a b c d
   = BlackBox
   { name      :: !S.Text
     -- ^ Name of the primitive
+  , workInfo  :: WorkInfo
+    -- ^ Whether the primitive does any work, i.e. takes chip area
   , kind      :: TemplateKind
     -- ^ Whether this results in an expression or a declaration
   , warning  :: c
@@ -164,6 +167,8 @@ data Primitive a b c d
   | BlackBoxHaskell
   { name :: !S.Text
     -- ^ Name of the primitive
+  , workInfo  :: WorkInfo
+    -- ^ Whether the primitive does any work, i.e. takes chip area
   , functionName :: BlackBoxFunctionName
   , function :: d
     -- ^ Used to indicate type of template (declaration or expression).
@@ -174,7 +179,9 @@ data Primitive a b c d
   | Primitive
   { name     :: !S.Text
     -- ^ Name of the primitive
-  , primType :: !Text
+  , workInfo  :: WorkInfo
+    -- ^ Whether the primitive does any work, i.e. takes chip area
+  , primSort :: !Text
     -- ^ Additional information
   }
   deriving (Show, Generic, NFData, Binary, Hashable, Functor)
@@ -186,6 +193,7 @@ instance FromJSON UnresolvedPrimitive where
         case conKey of
           "BlackBoxHaskell"  -> do
             name' <- conVal .: "name"
+            wf    <- ((conVal .:? "workInfo" >>= maybe (pure Nothing) parseWorkInfo) .!= WorkVariable)
             fName <- conVal .: "templateFunction"
             templ <- (Just . TInline <$> conVal .: "template")
                  <|> (Just . TFile   <$> conVal .: "file")
@@ -193,9 +201,10 @@ instance FromJSON UnresolvedPrimitive where
 
             fName' <- either fail return (parseBBFN fName)
 
-            return (BlackBoxHaskell name' fName' templ)
+            return (BlackBoxHaskell name' wf fName' templ)
           "BlackBox"  ->
             BlackBox <$> conVal .: "name"
+                     <*> (conVal .:? "workInfo" >>= maybe (pure Nothing) parseWorkInfo) .!= WorkVariable
                      <*> (conVal .: "kind" >>= parseTemplateKind)
                      <*> conVal .:? "warning"
                      <*> conVal .:? "outputReg" .!= False
@@ -205,6 +214,7 @@ instance FromJSON UnresolvedPrimitive where
                      <*> parseTemplate conVal
           "Primitive" ->
             Primitive <$> conVal .: "name"
+                      <*> (conVal .:? "workInfo" >>= maybe (pure Nothing) parseWorkInfo) .!= WorkVariable
                       <*> conVal .: "primType"
 
           e -> fail $ "[1] Expected: BlackBox or Primitive object, got: " ++ show e
@@ -228,6 +238,12 @@ instance FromJSON UnresolvedPrimitive where
       parseTemplateFormat (String "Template") = pure TTemplate
       parseTemplateFormat (String "Haskell")  = pure THaskell
       parseTemplateFormat c = fail ("[5] unexpected format: " ++ show c)
+
+      parseWorkInfo (String "Constant") = pure (Just WorkConstant)
+      parseWorkInfo (String "Never")    = pure (Just WorkNever)
+      parseWorkInfo (String "Variable") = pure (Just WorkVariable)
+      parseWorkInfo (String "Always")   = pure (Just WorkAlways)
+      parseWorkInfo c = fail ("[6] unexpected workInfo: " ++ show c)
 
       parseBBFN' = either fail return . parseBBFN
 

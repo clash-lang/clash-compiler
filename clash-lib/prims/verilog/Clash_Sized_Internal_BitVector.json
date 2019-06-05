@@ -19,6 +19,7 @@ end
   }
 , { "BlackBox" :
     { "name" : "Clash.Sized.Internal.BitVector.setSlice#"
+    , "workInfo" : "Never"
     , "kind" : "Declaration"
     , "type" :
 "setSlice# :: BitVector (m + 1 + i) -- ARG[0]

@@ -1,5 +1,6 @@
 [ { "BlackBox" :
     { "name"      : "Clash.Sized.Internal.BitVector.undefined#"
+    , "workInfo"  : "Constant"
     , "kind"      : "Expression"
     , "type"      : "undefined# :: forall n . KnownNat n => BitVector n"
     , "template"  : "~ERRORO"
@@ -7,6 +8,7 @@
   }
 , { "Primitive" :
     { "name"      : "Clash.Sized.Internal.BitVector.checkUnpackUndef"
+    , "workInfo"  : "Never"
     , "primType"  : "Function"
     }
   }

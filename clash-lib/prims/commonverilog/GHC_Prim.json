@@ -147,6 +147,7 @@
   }
 , { "BlackBox" :
     { "name"      : "GHC.Prim.int2Word#"
+    , "workInfo"  : "Never"
     , "kind"      : "Expression"
     , "type"      : "int2Word# :: Int# -> Word#"
     , "template"  : "$unsigned(~ARG[0])"
@@ -231,6 +232,7 @@
   }
 , { "BlackBox" :
     { "name"      : "GHC.Prim.word2Int#"
+    , "workInfo"  : "Never"
     , "kind"      : "Expression"
     , "type"      : "int2Word# :: Word# -> Int#"
     , "template"  : "$signed(~ARG[0])"
@@ -280,6 +282,7 @@
   }
 , { "BlackBox" :
     { "name"      : "GHC.Prim.byteSwap16#"
+    , "workInfo"  : "Never"
     , "kind"      : "Declaration"
     , "type"      : "byteSwap16# :: Word# -> Word#"
     , "template"  :
@@ -291,6 +294,7 @@ assign ~RESULT = {~VAR[w][0][31:16],~VAR[w][0][7:0],~VAR[w][0][15:8]};~FI
   }
 , { "BlackBox" :
     { "name"      : "GHC.Prim.byteSwap32#"
+    , "workInfo"  : "Never"
     , "kind"      : "Declaration"
     , "type"      : "byteSwap32# :: Word# -> Word#"
     , "template"  :
@@ -302,6 +306,7 @@ assign ~RESULT = {~VAR[w][0][7:0],~VAR[w][0][15:8],~VAR[w][0][23:16],~VAR[w][0][
   }
 , { "BlackBox" :
     { "name"      : "GHC.Prim.byteSwap64#"
+    , "workInfo"  : "Never"
     , "kind"      : "Declaration"
     , "type"      : "byteSwap64# :: Word# -> Word#"
     , "template"  :
@@ -313,6 +318,7 @@ assign ~RESULT = {~VAR[w][0][7:0],~VAR[w][0][15:8],~VAR[w][0][23:16],~VAR[w][0][
   }
 , { "BlackBox" :
     { "name"      : "GHC.Prim.byteSwap#"
+    , "workInfo"  : "Never"
     , "kind"      : "Declaration"
     , "type"      : "byteSwap# :: Word# -> Word#"
     , "template"  :
@@ -325,6 +331,7 @@ assign ~RESULT = {~VAR[w][0][7:0],~VAR[w][0][15:8],~VAR[w][0][23:16],~VAR[w][0][
   }
 , { "BlackBox" :
     { "name"      : "GHC.Prim.narrow8Int#"
+    , "workInfo"  : "Never"
     , "kind"      : "Declaration"
     , "type"      : "narrow8Int# :: Int# -> Int#"
     , "template"  :
@@ -335,6 +342,7 @@ assign ~RESULT = $signed(~VAR[i][0][7:0]);
   }
 , { "BlackBox" :
     { "name"      : "GHC.Prim.narrow16Int#"
+    , "workInfo"  : "Never"
     , "kind"      : "Declaration"
     , "type"      : "narrow16Int# :: Int# -> Int#"
     , "template"  :
@@ -345,6 +353,7 @@ assign ~RESULT = $signed(~VAR[i][0][15:0]);
   }
 , { "BlackBox" :
     { "name"      : "GHC.Prim.narrow32Int#"
+    , "workInfo"  : "Never"
     , "kind"      : "Declaration"
     , "type"      : "narrow32Int# :: Int# -> Int#"
     , "template"  :
@@ -355,6 +364,7 @@ assign ~RESULT = $signed(~VAR[i][0][31:0]);
   }
 , { "BlackBox" :
     { "name"      : "GHC.Prim.narrow8Word#"
+    , "workInfo"  : "Never"
     , "kind"      : "Declaration"
     , "type"      : "narrow8Int# :: Word# -> Word#"
     , "template"  :
@@ -365,6 +375,7 @@ assign ~RESULT = $unsigned(~VAR[w][0][7:0]);
   }
 , { "BlackBox" :
     { "name"      : "GHC.Prim.narrow16Word#"
+    , "workInfo"  : "Never"
     , "kind"      : "Declaration"
     , "type"      : "narrow16Word# :: Word# -> Word#"
     , "template"  :
@@ -375,6 +386,7 @@ assign ~RESULT = $unsigned(~VAR[w][0][15:0]);
   }
 , { "BlackBox" :
     { "name"      : "GHC.Prim.narrow32Word#"
+    , "workInfo"  : "Never"
     , "kind"      : "Declaration"
     , "type"      : "narrow32Int# :: Word# -> Word#"
     , "template"  :

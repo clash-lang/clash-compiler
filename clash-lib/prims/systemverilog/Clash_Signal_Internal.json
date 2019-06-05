@@ -58,6 +58,7 @@ assign ~RESULT = ~SYM[0];
   }
 , { "BlackBox" :
     { "name" : "Clash.Signal.Internal.clockGen"
+    , "workInfo" : "Always"
     , "kind" : "Declaration"
     , "warning" : "Clash.Signal.Internal.clockGen is not synthesizable!"
     , "type" :
@@ -86,6 +87,7 @@ end
   }
 , { "BlackBox" :
     { "name" : "Clash.Signal.Internal.tbClockGen"
+    , "workInfo" : "Always"
     , "kind" : "Declaration"
     , "warning" : "Clash.Signal.Internal.tbClockGen is not synthesizable!"
     , "type" :
@@ -118,6 +120,7 @@ end
   }
 , { "BlackBox" :
     { "name" : "Clash.Signal.Internal.asyncResetGen"
+    , "workInfo" : "Always"
     , "kind" : "Declaration"
     , "type" : "asyncResetGen :: Reset domain Asynchronous"
     , "template" :
@@ -133,6 +136,7 @@ end
   }
 , { "BlackBox" :
     { "name" : "Clash.Signal.Internal.syncResetGen"
+    , "workInfo" : "Always"
     , "kind" : "Declaration"
     , "type" :
 "syncResetGen

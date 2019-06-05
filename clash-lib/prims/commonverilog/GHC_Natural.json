@@ -2,6 +2,7 @@
   {
     "BlackBox": {
       "name": "GHC.Natural.naturalFromInteger",
+      "workInfo" : "Never",
       "kind": "Expression",
       "type": "naturalFromInteger :: Integer -> Natural",
       "template": "$unsigned(~VAR[n][0][(~SIZE[~TYPO]-1):0])",
@@ -20,6 +21,7 @@
   {
     "BlackBox": {
       "name": "GHC.Natural.wordToNatural#",
+      "workInfo" : "Never",
       "kind": "Declaration",
       "type": "wordToNatural# :: Word# -> Natural",
       "template": "assign ~RESULT = $unsigned(~ARG[0]);",

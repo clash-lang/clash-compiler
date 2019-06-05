@@ -1,5 +1,6 @@
 [ { "BlackBox" :
     { "name"      : "Clash.Xilinx.ClockGen.clockWizard"
+    , "workInfo"  : "Always"
     , "kind"      : "Declaration"
     , "type"      :
 "clockWizard
@@ -19,6 +20,7 @@
   }
 , { "BlackBox" :
     { "name"      : "Clash.Xilinx.ClockGen.clockWizardDifferential"
+    , "workInfo"  : "Always"
     , "kind"      : "Declaration"
     , "type"      :
 "clockWizardDifferential

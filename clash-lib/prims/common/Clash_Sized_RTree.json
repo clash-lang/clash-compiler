@@ -1,5 +1,6 @@
 [ { "Primitive" :
     { "name"      : "Clash.Sized.RTree.tdfold"
+    , "workInfo"  : "Never"
     , "primType"  : "Function"
     }
   }

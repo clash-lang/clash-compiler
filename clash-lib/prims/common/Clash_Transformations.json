@@ -1,5 +1,6 @@
 [ { "BlackBox" :
     { "name"      : "Clash.Transformations.removedArg"
+    , "workInfo"  : "Constant"
     , "kind"      : "Expression"
     , "type"      : "removedArg :: a"
     , "template"  : "~ERRORO"

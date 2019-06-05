@@ -15,6 +15,7 @@ assign ~RESULT = {~ARG[0],~ARG[1]};~FI
   }
 , { "BlackBox" :
     { "name"      : "Clash.Signal.Internal.unsafeFromAsyncReset"
+    , "workInfo"  : "Never"
     , "kind" : "Expression"
     , "type" :
 "unsafeFromAsyncReset :: Reset domain Asynchronous -> Signal domain Bool"
@@ -23,6 +24,7 @@ assign ~RESULT = {~ARG[0],~ARG[1]};~FI
   }
 , { "BlackBox" :
     { "name"      : "Clash.Signal.Internal.unsafeToAsyncReset"
+    , "workInfo"  : "Never"
     , "kind" : "Expression"
     , "type" :
 "unsafeToAsyncReset :: Signal domain Bool -> Reset domain Asynchronous"
@@ -31,6 +33,7 @@ assign ~RESULT = {~ARG[0],~ARG[1]};~FI
   }
 , { "BlackBox" :
     { "name"      : "Clash.Signal.Internal.fromSyncReset"
+    , "workInfo"  : "Never"
     , "kind" : "Expression"
     , "type" :
 "fromSyncReset :: Reset domain Synchronous -> Signal domain Bool"
@@ -39,6 +42,7 @@ assign ~RESULT = {~ARG[0],~ARG[1]};~FI
   }
 , { "BlackBox" :
     { "name"      : "Clash.Signal.Internal.unsafeToSyncReset"
+    , "workInfo"  : "Never"
     , "kind" : "Expression"
     , "type" :
 "unsafeToSyncReset :: Signal domain Bool -> Reset domain Synchronous"

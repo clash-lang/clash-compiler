@@ -1,5 +1,6 @@
 [ { "BlackBox" :
     { "name"      : "Clash.Sized.Internal.Index.pack#"
+    , "workInfo"  : "Never"
     , "kind"      : "Expression"
     , "type"      : "pack# :: Index n -> BitVector (CLog 2 n)"
     , "template"  : "std_logic_vector(~ARG[0])"
@@ -7,6 +8,7 @@
   }
 , { "BlackBox" :
     { "name"      : "Clash.Sized.Internal.Index.unpack#"
+    , "workInfo"  : "Never"
     , "kind"      : "Expression"
     , "type"      : "unpack# :: (KnownNat n, 1 <= n) => BitVector (CLog 2 n) -> Index n"
     , "template"  : "unsigned(~ARG[2])"
@@ -56,6 +58,7 @@
   }
 , { "BlackBox" :
     { "name"      : "Clash.Sized.Internal.Index.maxBound#"
+    , "workInfo"  : "Constant"
     , "kind"      : "Expression"
     , "type"      : "maxBound# :: KnownNat n => Index n"
     , "template"  : "to_unsigned(~LIT[0]-1,~SIZE[~TYPO])"
@@ -84,6 +87,7 @@
   }
 , { "BlackBox" :
     { "name"      : "Clash.Sized.Internal.Index.fromInteger#"
+    , "workInfo"  : "Never"
     , "kind"      : "Expression"
     , "type"      : "fromInteger# :: KnownNat n => Integer -> Index n"
     , "template"  : "resize(unsigned(std_logic_vector(~ARG[1])),~SIZE[~TYPO])"
@@ -119,6 +123,7 @@
   }
 , { "BlackBox" :
     { "name"      : "Clash.Sized.Internal.Index.toInteger#"
+    , "workInfo"  : "Never"
     , "kind"      : "Expression"
     , "type"      : "toInteger# :: Index n -> Integer"
     , "template"  : "~IF~SIZE[~TYP[0]]~THENsigned(std_logic_vector(resize(~ARG[0],~SIZE[~TYPO])))~ELSEto_signed(0,64)~FI"
@@ -126,6 +131,7 @@
   }
 , { "BlackBox" :
     { "name"      : "Clash.Sized.Internal.Index.resize#"
+    , "workInfo"  : "Never"
     , "kind"      : "Expression"
     , "type"      : "resize# :: KnownNat m => Index n -> Index m"
     , "template"  : "~IF~SIZE[~TYP[1]]~THENresize(~ARG[1],~SIZE[~TYPO])~ELSEunsigned'(~SIZE[~TYPO]-1 downto 0 => '0')~FI"

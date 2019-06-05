@@ -1,5 +1,6 @@
 [ { "BlackBox" :
     { "name"      : "Clash.Sized.Internal.Signed.size#"
+    , "workInfo"  : "Constant"
     , "kind"      : "Expression"
     , "type"      : "size# :: KnownNat n => Signed n -> Int"
     , "template"   : "to_signed(~LIT[0],~SIZE[~TYPO])"
@@ -7,6 +8,7 @@
   }
 , { "BlackBox" :
     { "name"      : "Clash.Sized.Internal.Signed.pack#"
+    , "workInfo"  : "Never"
     , "kind"      : "Expression"
     , "type"      : "pack# :: KnownNat n => Signed n -> BitVector n"
     , "template"  : "std_logic_vector(~ARG[1])"
@@ -14,6 +16,7 @@
   }
 , { "BlackBox" :
     { "name"      : "Clash.Sized.Internal.Signed.unpack#"
+    , "workInfo"  : "Never"
     , "kind"      : "Expression"
     , "type"      : "unpack# :: KnownNat n => BitVector n -> Signed n"
     , "template"  : "signed(~ARG[1])"
@@ -63,6 +66,7 @@
   }
 , { "BlackBox" :
     { "name"      : "Clash.Sized.Internal.Signed.minBound#"
+    , "workInfo"  : "Constant"
     , "kind"      : "Expression"
     , "type"      : "minBound# :: KnownNat n => Signed n"
     , "comment"   : "the quantification with signed gives the array an ascending index"
@@ -71,6 +75,7 @@
   }
 , { "BlackBox" :
     { "name"      : "Clash.Sized.Internal.Signed.maxBound#"
+    , "workInfo"  : "Constant"
     , "kind"      : "Expression"
     , "type"      : "maxBound# :: KnownNat n => Signed n"
     , "comment"   : "the quantification with signed gives the array an ascending index"
@@ -100,6 +105,7 @@
   }
 , { "BlackBox" :
     { "name"      : "Clash.Sized.Internal.Signed.fromInteger#"
+    , "workInfo"  : "Never"
     , "kind"      : "Expression"
     , "type"      : "fromInteger# :: KnownNat n => Integer -> Signed (n :: Nat)"
     , "template"  : "resize(~ARG[1],~LIT[0])"
@@ -158,6 +164,7 @@ end block;
   }
 , { "BlackBox" :
     { "name"      : "Clash.Sized.Internal.Signed.toInteger#"
+    , "workInfo"  : "Never"
     , "kind"      : "Expression"
     , "type"      : "toInteger# :: Signed n -> Integer"
     , "template"  : "~IF~SIZE[~TYP[0]]~THENresize(~ARG[0],~SIZE[~TYPO])~ELSEto_signed(0,64)~FI"
@@ -221,6 +228,7 @@ end block;
   }
 , { "BlackBox" :
     { "name"      : "Clash.Sized.Internal.Signed.resize#"
+    , "workInfo"  : "Never"
     , "kind"      : "Expression"
     , "type"      : "resize# :: (KnownNat n, KnownNat m) => Signed n -> Signed m"
     , "template"  : "~IF~SIZE[~TYP[2]]~THENresize(~ARG[2],~LIT[1])~ELSEsigned'(~SIZE[~TYPO]-1 downto 0 => '0')~FI"
@@ -228,6 +236,7 @@ end block;
   }
 , { "BlackBox" :
     { "name"      : "Clash.Sized.Internal.Signed.truncateB#"
+    , "workInfo"  : "Never"
     , "kind"      : "Expression"
     , "type"      : "truncateB# :: KnownNat m => Signed (n + m) -> Signed m"
     , "template"  : "~IF~SIZE[~TYPO]~THEN~VAR[s][1](~LIT[0]-1 downto 0)~ELSEsigned'(0 downto 1 => '0')~FI"

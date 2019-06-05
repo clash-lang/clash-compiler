@@ -20,6 +20,8 @@ module Clash.Core.Term
   , LetBinding
   , Pat (..)
   , Alt
+  , PrimInfo (..)
+  , WorkInfo (..)
   , CoreContext (..), Context, isLambdaBodyCtx
   , collectArgs, primArg
   )
@@ -45,7 +47,7 @@ data Term
   = Var     !Id                             -- ^ Variable reference
   | Data    !DataCon                        -- ^ Datatype constructor
   | Literal !Literal                        -- ^ Literal
-  | Prim    !Text !Type                     -- ^ Primitive
+  | Prim    !Text !PrimInfo                 -- ^ Primitive
   | Lam     !Id Term                        -- ^ Term-abstraction
   | TyLam   !TyVar Term                     -- ^ Type-abstraction
   | App     !Term !Term                     -- ^ Application
@@ -54,6 +56,25 @@ data Term
   | Case    !Term !Type [Alt]               -- ^ Case-expression: subject, type of
                                             -- alternatives, list of alternatives
   | Cast    !Term !Type !Type               -- ^ Cast a term from one type to another
+  deriving (Show,Generic,NFData,Hashable,Binary)
+
+data PrimInfo
+  = PrimInfo
+  { primType     :: !Type
+  , primWorkInfo :: !WorkInfo
+  }
+  deriving (Show,Generic,NFData,Hashable,Binary)
+
+data WorkInfo
+  = WorkConstant
+  -- ^ Ignores its arguments, and outputs a constant
+  | WorkNever
+  -- ^ Never adds any work
+  | WorkVariable
+  -- ^ Does work when the arguments are variable
+  | WorkAlways
+  -- ^ Performs work regardless of whether the variables are constant or
+  -- variable; these are things like clock or reset generators
   deriving (Show,Generic,NFData,Hashable,Binary)
 
 -- | Term reference

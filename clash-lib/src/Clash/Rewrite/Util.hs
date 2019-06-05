@@ -38,6 +38,7 @@ import           Data.Maybe                  (catMaybes,isJust,mapMaybe)
 import qualified Data.Monoid                 as Monoid
 import qualified Data.Set                    as Set
 import qualified Data.Set.Lens               as Lens
+import           Data.Text                   (Text)
 import qualified Data.Text                   as Text
 
 import           BasicTypes                  (InlineSpec (..))
@@ -53,19 +54,19 @@ import           Clash.Core.Pretty           (showPpr)
 import           Clash.Core.Subst
   (aeqTerm, aeqType, extendIdSubst, mkSubst, substTm)
 import           Clash.Core.Term
-  (LetBinding, Pat (..), Term (..), CoreContext (..), Context, TmName,
-   collectArgs)
+  (LetBinding, Pat (..), Term (..), CoreContext (..), Context, PrimInfo (..),
+   TmName, WorkInfo (..), collectArgs)
 import           Clash.Core.TyCon
   (TyConMap, tyConDataCons)
 import           Clash.Core.Type             (KindOrType, Type (..),
                                               TypeView (..), coreView1,
                                               normalizeType,
-                                              typeKind, tyView)
+                                              typeKind, tyView, isPolyFunTy)
 import           Clash.Core.Util
   (isPolyFun, mkAbstraction, mkApps, mkLams,
    mkTmApps, mkTyApps, mkTyLams, termType, dataConInstArgTysE, isClockOrReset)
 import           Clash.Core.Var
-  (Id, IdScope (..), TyVar, Var (..), mkGlobalId, mkLocalId, mkTyVar)
+  (Id, IdScope (..), TyVar, Var (..), isLocalId, mkGlobalId, mkLocalId, mkTyVar)
 import           Clash.Core.VarEnv
   (InScopeSet, VarEnv, elemVarSet, extendInScopeSetList, mkInScopeSet,
    notElemVarEnv, uniqAway)
@@ -397,6 +398,40 @@ substituteBinders inScope ((bndr,val):rest) others res =
          , map (second (substTm "substituteBindersRest" subst)) rest
          , map (second (substTm "substituteBindersOthers" subst)) others
          )
+
+-- | Determine whether a term does any work, i.e. adds to the size of the circuit
+isWorkFree
+  :: Term
+  -> Bool
+isWorkFree (collectArgs -> (fun,args)) = case fun of
+  Var i            -> isLocalId i && not (isPolyFunTy (varType i))
+  Data {}          -> all isWorkFreeArg args
+  Literal {}       -> True
+  Prim _ pInfo -> case primWorkInfo pInfo of
+    WorkConstant   -> True -- We can ignore the arguments, because this
+                           -- primitive outputs a constant regardless of its
+                           -- arguments
+    WorkNever      -> all isWorkFreeArg args
+    WorkVariable   -> all isConstantArg args
+    WorkAlways     -> False -- Things like clock or reset generator always
+                            -- perform work
+  Lam _ e          -> isWorkFree e && all isWorkFreeArg args
+  TyLam _ e        -> isWorkFree e && all isWorkFreeArg args
+  Letrec bs e ->
+    isWorkFree e && all (isWorkFree . snd) bs && all isWorkFreeArg args
+  Case s _ [(_,a)] -> isWorkFree s && isWorkFree a && all isWorkFreeArg args
+  Cast e _ _       -> isWorkFree e && all isWorkFreeArg args
+  _                -> False
+ where
+  isWorkFreeArg = either isWorkFree (const True)
+  isConstantArg = either isConstant (const True)
+
+isFromInt :: Text -> Bool
+isFromInt nm = nm == "Clash.Sized.Internal.BitVector.fromInteger##" ||
+               nm == "Clash.Sized.Internal.BitVector.fromInteger#" ||
+               nm == "Clash.Sized.Internal.Index.fromInteger#" ||
+               nm == "Clash.Sized.Internal.Signed.fromInteger#" ||
+               nm == "Clash.Sized.Internal.Unsigned.fromInteger#"
 
 -- | Determine if a term represents a constant
 isConstant :: Term -> Bool

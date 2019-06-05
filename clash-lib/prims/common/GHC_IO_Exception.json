@@ -1,5 +1,6 @@
 [ { "BlackBox" :
     { "name"      : "GHC.IO.Exception.assertError"
+    , "workInfo"  : "Never"
     , "kind"      : "Expression"
     , "type"      : "assertError :: HasCallStack => Bool -> a -> a"
     , "comment"   : "It would be nice if we could use a HDL assertion, however,

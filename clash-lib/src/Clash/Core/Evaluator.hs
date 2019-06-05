@@ -68,7 +68,7 @@ data StackFrame
   | GUpdate Id
   | Apply  Id
   | Instantiate Type
-  | PrimApply  Text Type [Type] [Value] [Term]
+  | PrimApply  Text PrimInfo [Type] [Value] [Term]
   | Scrutinise Type [Alt]
   deriving Show
 
@@ -78,7 +78,7 @@ instance ClashPretty StackFrame where
   clashPretty (Apply i) = hsep ["Apply", fromPpr i]
   clashPretty (Instantiate t) = hsep ["Instantiate", fromPpr t]
   clashPretty (PrimApply a b c d e) = do
-    hsep ["PrimApply", fromPretty a, "::", fromPpr b,
+    hsep ["PrimApply", fromPretty a, "::", fromPpr (primType b),
           "; type args=", fromPpr c,
           "; val args=", fromPpr (map valToTerm d),
           "term args=", fromPpr e]
@@ -96,7 +96,7 @@ data Value
   -- ^ Data constructors
   | Lit Literal
   -- ^ Literals
-  | PrimVal  Text Type [Type] [Value]
+  | PrimVal  Text PrimInfo [Type] [Value]
   -- ^ Clash's number types are represented by their "fromInteger#" primitive
   -- function. So some primitives are values.
   | Suspend Term
@@ -113,7 +113,7 @@ type PrimEvaluator =
   Heap ->
   Stack ->
   Text -> -- Name of the primitive
-  Type -> -- Type of the primitive
+  PrimInfo -> -- Type of the primitive
   [Type] -> -- Type arguments of the primitive
   [Value] -> -- Value arguments of the primitive
   Maybe State -- Delta-reduction can get stuck, so Nothing is an option
@@ -246,11 +246,12 @@ step eval tcm (h, k, e) = case e of
                    (h2,e')  = mkAbstr (h,e) tys'
                in  step eval tcm (h2,k,e')
          GT -> error "Overapplied DC"
-    | (Prim nm ty,args) <- collectArgs e
+    | (Prim nm pInfo,args) <- collectArgs e
+    , let ty = primType pInfo
     , (tys,_) <- splitFunForallTy ty
     -> case compare (length args) (length tys) of
          EQ -> let (e':es) = lefts args
-               in  Just (h,PrimApply nm ty (rights args) [] es:k,e')
+               in  Just (h,PrimApply nm pInfo (rights args) [] es:k,e')
          LT -> let (tys',_) = splitFunForallTy (termType tcm e)
                    (h2,e') = mkAbstr (h,e) tys'
                in  step eval tcm (h2,k,e')
@@ -265,27 +266,29 @@ step eval tcm (h, k, e) = case e of
                    (h2,e') = mkAbstr (h,e) tys'
                in  step eval tcm (h2,k,e')
          GT -> error "Overapplied DC"
-    | (Prim nm ty',args) <- collectArgs e
+    | (Prim nm pInfo,args) <- collectArgs e
+    , let ty' = primType pInfo
     , (tys,_) <- splitFunForallTy ty'
     -> case compare (length args) (length tys) of
          EQ -> case lefts args of
               [] | nm `elem` ["Clash.Transformations.removedArg"]
                  -- The above primitives are actually values, and not operations.
-                 -> unwind eval tcm h k (PrimVal nm ty' (rights args) [])
+                 -> unwind eval tcm h k (PrimVal nm pInfo (rights args) [])
                  | otherwise
-                 -> eval (isScrut k) tcm h k nm ty' (rights args) []
-              (e':es) -> Just (h,PrimApply nm ty' (rights args) [] es:k,e')
+                 -> eval (isScrut k) tcm h k nm pInfo (rights args) []
+              (e':es) -> Just (h,PrimApply nm pInfo (rights args) [] es:k,e')
          LT -> let (tys',_) = splitFunForallTy (termType tcm e)
                    (h2,e') = mkAbstr (h,e) tys'
                in  step eval tcm (h2,k,e')
          GT -> Just (h,Instantiate ty:k,e1)
   (Data dc) -> unwind eval tcm h k (DC dc [])
-  (Prim nm ty')
+  (Prim nm pInfo)
     | nm `elem` ["GHC.Prim.realWorld#"]
-    -> unwind eval tcm h k (PrimVal nm ty' [] [])
+    -> unwind eval tcm h k (PrimVal nm pInfo [] [])
     | otherwise
+    , let ty' = primType pInfo
     -> case fst (splitFunForallTy ty')  of
-        []  -> eval (isScrut k) tcm h k nm ty' [] []
+        []  -> eval (isScrut k) tcm h k nm pInfo [] []
         tys -> let (h2,e') = mkAbstr (h,e) tys
                in  step eval tcm (h2,k,e')
   (App e1 e2)  -> let (h2,id_) = newLetBinding tcm h e2
@@ -415,7 +418,7 @@ primop
   -> Stack
   -> Text
   -- ^ Name of the primitive
-  -> Type
+  -> PrimInfo
   -- ^ Type of the primitive
   -> [Type]
   -- ^ Applied types
