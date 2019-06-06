@@ -106,8 +106,8 @@ import           Clash.Core.TyCon            (TyConMap, tyConDataCons)
 import           Clash.Core.Util
   (isCon, isFun, isLet, isPolyFun, isPrim,
    isSignalType, isVar, mkApps, mkLams, mkVec, piResultTy, termSize, termType,
-   tyNatSize, patVars, isAbsurdAlt, altEqs, substInExistentials,
-   solveFirstNonAbsurd, patIds, isLocalVar, undefinedTm)
+   tyNatSize, patVars, isAbsurdAlt, altEqs, substInExistentialsList,
+   solveNonAbsurds, patIds, isLocalVar, undefinedTm)
 import           Clash.Core.Var
   (Id, Var (..), isGlobalId, isLocalId, mkLocalId)
 import           Clash.Core.VarEnv
@@ -317,21 +317,21 @@ elemExistentials (TransformContext is0 _) (Case scrut altsTy alts0) = do
     -- Eliminate free type variables if possible
     go :: InScopeSet -> TyConMap -> (Pat, Term) -> NormalizeSession (Pat, Term)
     go is2 tcm alt@(DataPat dc exts0 xs0, term0) =
-      case solveFirstNonAbsurd (altEqs tcm alt) of
+      case solveNonAbsurds (altEqs tcm alt) of
         -- No equations solved:
-        Nothing -> return alt
+        [] -> return alt
         -- One or more equations solved:
-        Just (tyVar, solution) ->
+        sols ->
           changed =<< go is2 tcm (DataPat dc exts1 xs1, term1)
           where
             -- Substitute solution in existentials and applied types
             is3   = extendInScopeSetList is2 exts0
-            xs1   = map (substTyInVar (extendTvSubst (mkSubst is3) tyVar solution)) xs0
-            exts1 = substInExistentials is2 exts0 (tyVar, solution)
+            xs1   = map (substTyInVar (extendTvSubstList (mkSubst is3) sols)) xs0
+            exts1 = substInExistentialsList is2 exts0 sols
 
             -- Substitute solution in term.
             is4       = extendInScopeSetList is3 xs1
-            subst     = extendTvSubst (mkSubst is4) tyVar solution
+            subst     = extendTvSubstList (mkSubst is4) sols
             term1     = substTm "Replacing tyVar due to solved eq" subst term0
 
     go _ _ alt = return alt
