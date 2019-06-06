@@ -26,7 +26,7 @@ RAM primitives with a combinational read port.
 {-# OPTIONS_HADDOCK show-extensions #-}
 
 module Clash.Explicit.RAM
-  ( -- * RAM synchronised to an arbitrary clock
+  ( -- * RAM synchronized to an arbitrary clock
     asyncRam
   , asyncRamPow2
     -- * Internal
@@ -59,7 +59,7 @@ asyncRamPow2
   => Clock wdom wgated
   -- ^ 'Clock' to which to synchronise the write port of the RAM
   -> Clock rdom rgated
-  -- ^ 'Clock' to which the read address signal, @r@, is synchronised
+  -- ^ 'Clock' to which the read address signal, @r@, is synchronized
   -> Signal rdom (Unsigned n)
   -- ^ Read address @r@
   -> Signal wdom (Maybe (Unsigned n, a))
@@ -84,7 +84,7 @@ asyncRam
   => Clock wdom wgated
    -- ^ 'Clock' to which to synchronise the write port of the RAM
   -> Clock rdom rgated
-   -- ^ 'Clock' to which the read address signal, @r@, is synchronised
+   -- ^ 'Clock' to which the read address signal, @r@, is synchronized
   -> SNat n
   -- ^ Size @n@ of the RAM
   -> Signal rdom addr
@@ -106,7 +106,7 @@ asyncRam#
   => Clock wdom wgated
   -- ^ 'Clock' to which to synchronise the write port of the RAM
   -> Clock rdom rgated
-  -- ^ 'Clock' to which the read address signal, @r@, is synchronised
+  -- ^ 'Clock' to which the read address signal, @r@, is synchronized
   -> SNat n            -- ^ Size @n@ of the RAM
   -> Signal rdom Int  -- ^ Read address @r@
   -> Signal wdom Bool -- ^ Write enable

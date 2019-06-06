@@ -109,13 +109,13 @@ module Clash.Signal
   , (.&&.), (.||.)
     -- * Product/Signal isomorphism
   , Bundle(..)
-    -- * Simulation functions (not synthesisable)
+    -- * Simulation functions (not synthesizable)
   , simulate
   , simulateB
     -- ** lazy versions
   , simulate_lazy
   , simulateB_lazy
-    -- * List \<-\> Signal conversion (not synthesisable)
+    -- * List \<-\> Signal conversion (not synthesizable)
   , sample
   , sampleN
   , fromList
@@ -614,7 +614,7 @@ regEn initial en i =
 --
 -- > sample s == [s0, s1, s2, s3, ...
 --
--- __NB__: This function is not synthesisable
+-- __NB__: This function is not synthesizable
 sample
   :: forall gated synchronous domain a
    . Undefined a
@@ -639,7 +639,7 @@ sample s =
 --
 -- > sampleN 3 s == [s0, s1, s2]
 --
--- __NB__: This function is not synthesisable
+-- __NB__: This function is not synthesizable
 sampleN
   :: forall gated synchronous domain a
    . Undefined a
@@ -666,7 +666,7 @@ sampleN n s =
 --
 -- > sample s == [s0, s1, s2, s3, ...
 --
--- __NB__: This function is not synthesisable
+-- __NB__: This function is not synthesizable
 sample_lazy
   :: forall gated synchronous domain a
    . (HiddenClockReset domain gated synchronous => Signal domain a)
@@ -690,7 +690,7 @@ sample_lazy s =
 --
 -- > sampleN 3 s == [s0, s1, s2]
 --
--- __NB__: This function is not synthesisable
+-- __NB__: This function is not synthesizable
 sampleN_lazy
   :: forall gated synchronous domain a
    . Int
@@ -717,7 +717,7 @@ sampleN_lazy n s =
 -- [8,1,2,3...
 -- ...
 --
--- __NB__: This function is not synthesisable
+-- __NB__: This function is not synthesizable
 simulate
   :: forall gated synchronous domain a b
    . (Undefined a, Undefined b)
@@ -744,7 +744,7 @@ simulate f =
 -- [8,1,2,3...
 -- ...
 --
--- __NB__: This function is not synthesisable
+-- __NB__: This function is not synthesizable
 simulate_lazy
   :: forall gated synchronous domain a b
    . (HiddenClockReset domain gated synchronous =>
@@ -770,7 +770,7 @@ simulate_lazy f =
 -- [(8,8),(1,1),(2,2),(3,3)...
 -- ...
 --
--- __NB__: This function is not synthesisable
+-- __NB__: This function is not synthesizable
 simulateB
   :: forall gated synchronous domain a b
    . (Bundle a, Bundle b, Undefined a, Undefined b)
@@ -797,7 +797,7 @@ simulateB f =
 -- [(8,8),(1,1),(2,2),(3,3)...
 -- ...
 --
--- __NB__: This function is not synthesisable
+-- __NB__: This function is not synthesizable
 simulateB_lazy
   :: forall gated synchronous domain a b
    . (Bundle a, Bundle b)

@@ -128,7 +128,7 @@ data FieldsType
   -- constructor bits). Overlap is left-biased, i.e. don't care bits are padded
   -- to the right.
   --
-  -- This is the default behaviour of Clash.
+  -- This is the default behavior of Clash.
   | OverlapR
   -- ^ Store fields of different constructors at (possibly) overlapping bit
   -- positions. That is, a data type with two constructors with each two fields

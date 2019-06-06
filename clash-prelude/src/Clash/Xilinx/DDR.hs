@@ -34,7 +34,7 @@ import GHC.Stack (HasCallStack, withFrozenCallStack)
 import Clash.Explicit.Prelude
 import Clash.Explicit.DDR
 
--- | Xilinx specific variant of 'ddrIn' implementend using the Xilinx IDDR
+-- | Xilinx specific variant of 'ddrIn' implemented using the Xilinx IDDR
 -- primitive.
 --
 -- Reset values are @0@
@@ -54,7 +54,7 @@ iddr
 iddr clk rst = withFrozenCallStack ddrIn# clk rst 0 0 0
 {-# NOINLINE iddr #-}
 
--- | Xilinx specific variant of 'ddrOut' implementend using the Xilinx ODDR
+-- | Xilinx specific variant of 'ddrOut' implemented using the Xilinx ODDR
 -- primitive.
 --
 -- Reset value is @0@

@@ -242,7 +242,7 @@ especially as the memories we need for our application get bigger. The
 'blockRam' function will be translated to such a /Block RAM/.
 
 One important aspect of Block RAMs have a /synchronous/ read port, meaning that,
-unlike the behaviour of 'Clash.Prelude.RAM.asyncRam', given a read address @r@
+unlike the behavior of 'Clash.Prelude.RAM.asyncRam', given a read address @r@
 at time @t@, the value @v@ in the RAM at address @r@ is only available at time
 @t+1@.
 
@@ -382,7 +382,7 @@ This concludes the short introduction to using 'blockRam'.
 {-# OPTIONS_GHC -fno-cpr-anal #-}
 
 module Clash.Explicit.BlockRam
-  ( -- * BlockRAM synchronised to the system clock
+  ( -- * BlockRAM synchronized to the system clock
     blockRam
   , blockRamPow2
     -- * Read/Write conflict resolution

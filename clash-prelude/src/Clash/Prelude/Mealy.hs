@@ -16,7 +16,7 @@
 {-# LANGUAGE Safe #-}
 
 module Clash.Prelude.Mealy
-  ( -- * Mealy machine synchronised to the system clock
+  ( -- * Mealy machine synchronized to the system clock
     mealy
   , mealyB
   , (<^>)

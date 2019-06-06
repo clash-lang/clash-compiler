@@ -21,7 +21,7 @@ module Clash.Prelude.ROM
   ( -- * Asynchronous ROM
     asyncRom
   , asyncRomPow2
-    -- * Synchronous ROM synchronised to an arbitrary clock
+    -- * Synchronous ROM synchronized to an arbitrary clock
   , rom
   , romPow2
     -- * Internal

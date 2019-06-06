@@ -48,7 +48,7 @@ module Clash.Sized.Internal.Index
   , ge#
   , gt#
   , le#
-    -- ** Enum (not synthesisable)
+    -- ** Enum (not synthesizable)
   , enumFrom#
   , enumFromThen#
   , enumFromTo#
@@ -124,7 +124,7 @@ import Clash.XException
 -- ...
 newtype Index (n :: Nat) =
     -- | The constructor, 'I', and the field, 'unsafeToInteger', are not
-    -- synthesisable.
+    -- synthesizable.
     I { unsafeToInteger :: Integer }
   deriving (Data, Generic)
 
@@ -181,7 +181,7 @@ gt# (I n) (I m) = n > m
 le# (I n) (I m) = n <= m
 
 -- | The functions: 'enumFrom', 'enumFromThen', 'enumFromTo', and
--- 'enumFromThenTo', are not synthesisable.
+-- 'enumFromThenTo', are not synthesizable.
 instance KnownNat n => Enum (Index n) where
   succ           = (+# fromInteger# 1)
   pred           = (-# fromInteger# 1)
@@ -364,7 +364,7 @@ instance Undefined (Index n) where
   deepErrorX = errorX
   rnfX = rwhnfX
 
--- | None of the 'Read' class' methods are synthesisable.
+-- | None of the 'Read' class' methods are synthesizable.
 instance KnownNat n => Read (Index n) where
   readPrec = fromIntegral <$> (readPrec :: ReadPrec Natural)
 

@@ -88,7 +88,7 @@ newtype DataFlow' dom iEn oEn i o
 
 where:
 
- * @dom@ is the clock to which the circuit is synchronised.
+ * @dom@ is the clock to which the circuit is synchronized.
  * @iEn@ is the type of the bidirectional incoming synchronisation channel.
  * @oEn@ is the type of the bidirectional outgoing synchronisation channel.
  * @i@ is the incoming data type.
@@ -116,7 +116,7 @@ newtype DataFlow domain iEn oEn i o
           )
   }
 
--- | Dataflow circuit synchronised to the 'systemClockGen'.
+-- | Dataflow circuit synchronized to the 'systemClockGen'.
 -- type DataFlow iEn oEn i o = DataFlow' systemClockGen iEn oEn i o
 
 -- | Create a 'DataFlow' circuit from a circuit description with the appropriate
@@ -222,7 +222,7 @@ fifoDF
   -> Reset domain synchronous
   -> SNat (m + n) -- ^ Depth of the FIFO buffer. Must be a power of two.
   -> Vec m a      -- ^ Initial content. Can be smaller than the size of the
-                  -- FIFO. Empty spaces are initialised with 'undefined'.
+                  -- FIFO. Empty spaces are initialized with 'undefined'.
   -> DataFlow domain Bool Bool a a
 fifoDF clk rst _ iS = DF $ \i iV oR ->
   let initRdPtr      = 0
@@ -360,7 +360,7 @@ loopDF
   -- ^ Depth of the FIFO buffer. Must be a power of two
   -> Vec m d
   -- ^ Initial content of the FIFO buffer. Can be smaller than the size of the
-  -- FIFO. Empty spaces are initialised with 'undefined'.
+  -- FIFO. Empty spaces are initialized with 'undefined'.
   -> DataFlow dom (Bool,Bool) (Bool,Bool) (a,d) (b,d)
   -> DataFlow dom Bool Bool   a           b
 loopDF clk rst sz is (DF f) =

@@ -51,7 +51,7 @@ module Clash.Sized.Fixed
   , divide
     -- * Compile-time 'Double' conversion
   , fLit
-    -- * Run-time 'Double' conversion (not synthesisable)
+    -- * Run-time 'Double' conversion (not synthesizable)
   , fLitR
     -- * 'Fixed' point wrapper
   , Fixed (..), resizeF, fracShift
@@ -274,7 +274,7 @@ instance Undefined (rep (int + frac)) => Undefined (Fixed rep int frac) where
   deepErrorX = Fixed . errorX
   rnfX f@(~(Fixed x)) = if isLeft (isX f) then () else rnfX x
 
--- | None of the 'Read' class' methods are synthesisable.
+-- | None of the 'Read' class' methods are synthesizable.
 instance (size ~ (int + frac), KnownNat frac, Bounded (rep size), Integral (rep size))
       => Read (Fixed rep int frac) where
   readPrec = fLitR <$> readPrec
@@ -648,13 +648,13 @@ fLit a = [|| Fixed (fromInteger sat) ||]
 
 -- | Convert, at run-time, a 'Double' to a 'Fixed'-point.
 --
--- __NB__: this functions is /not/ synthesisable
+-- __NB__: this functions is /not/ synthesizable
 --
 -- = Creating data-files #creatingdatafiles#
 --
 -- An example usage of this function is for example to convert a data file
 -- containing 'Double's to a data file with ASCI-encoded binary numbers to be
--- used by a synthesisable function like 'Clash.Prelude.ROM.File.asyncRomFile'.
+-- used by a synthesizable function like 'Clash.Prelude.ROM.File.asyncRomFile'.
 -- For example, given a file @Data.txt@ containing:
 --
 -- @

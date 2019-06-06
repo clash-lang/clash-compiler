@@ -55,14 +55,14 @@ data SaturationMode
                  -- numbers.
   deriving Eq
 
--- | 'Num' operators in which overflow and underflow behaviour can be specified
+-- | 'Num' operators in which overflow and underflow behavior can be specified
 -- using 'SaturationMode'.
 class (Bounded a, Num a) => SaturatingNum a where
-  -- | Addition with parametrisable over- and underflow behaviour
+  -- | Addition with parametrizable over- and underflow behavior
   satAdd :: SaturationMode -> a -> a -> a
-  -- | Subtraction with parametrisable over- and underflow behaviour
+  -- | Subtraction with parametrizable over- and underflow behavior
   satSub  :: SaturationMode -> a -> a -> a
-  -- | Multiplication with parametrisable over- and underflow behaviour
+  -- | Multiplication with parametrizable over- and underflow behavior
   satMul :: SaturationMode -> a -> a -> a
 
 {-# INLINE boundedAdd #-}

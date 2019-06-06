@@ -224,7 +224,7 @@ nonRepSpec ctx@(TransformContext is0 _) e@(App e1 e2)
     --
     -- We need to do this because otherwise the specialisation history won't
     -- recognize the new specialisation argument as something the function has
-    -- already been specialised on
+    -- already been specialized on
     inlineInternalSpecialisationArgument
       :: Term
       -> NormalizeSession Term

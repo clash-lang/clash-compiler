@@ -31,11 +31,11 @@ data NormalizeState
   { _normalized          :: BindingMap
   -- ^ Global binders
   , _specialisationCache :: Map (Id,Int,Either Term Type) Id
-  -- ^ Cache of previously specialised functions:
+  -- ^ Cache of previously specialized functions:
   --
-  -- * Key: (name of the original function, argument position, specialised term/type)
+  -- * Key: (name of the original function, argument position, specialized term/type)
   --
-  -- * Elem: (name of specialised function,type of specialised function)
+  -- * Elem: (name of specialized function,type of specialized function)
   , _specialisationHistory :: VarEnv Int
   -- ^ Cache of how many times a function was specialized
   , _specialisationLimit :: !Int

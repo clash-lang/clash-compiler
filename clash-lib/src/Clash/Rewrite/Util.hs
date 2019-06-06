@@ -748,14 +748,14 @@ specialise' specMapLbl specHistLbl specLimitLbl (TransformContext is0 _) e (Var 
                                        (mkBinderFor is0 tcm)
                                        (existingNames ++ newNames)
                                        args
-              -- Determine name the resulting specialised function, and the
-              -- form of the specialised-on argument
+              -- Determine name the resulting specialized function, and the
+              -- form of the specialized-on argument
               (fId,inl',specArg') <- case specArg of
                 Left a@(collectArgs -> (Var g,gArgs)) -> if isPolyFun tcm a
                     then do
                       -- In case we are specialising on an argument that is a
                       -- global function then we use that function's name as the
-                      -- name of the specialised higher-order function.
+                      -- name of the specialized higher-order function.
                       -- Additionally, we will return the body of the global
                       -- function, instead of a variable reference to the
                       -- global function.
@@ -798,7 +798,7 @@ specialise' _ _ _ _ctx _ (appE,args) (Left specArg) = do
   -- Create specialized function
   let newBody = mkAbstraction specArg specBndrs
   -- See if there's an existing binder that's alpha-equivalent to the
-  -- specialised function
+  -- specialized function
   existing <- filterUniqMap ((`aeqTerm` newBody) . (^. _4)) <$> Lens.use bindings
   -- Create a new function if an alpha-equivalent binder doesn't exist
   newf <- case eltsUniqMap existing of

@@ -57,11 +57,11 @@ module Clash.Signal.Internal
   , syncResetGen
     -- * Boolean connectives
   , (.&&.), (.||.)
-    -- * Simulation functions (not synthesisable)
+    -- * Simulation functions (not synthesizable)
   , simulate
     -- ** lazy version
   , simulate_lazy
-    -- * List \<-\> Signal conversion (not synthesisable)
+    -- * List \<-\> Signal conversion (not synthesizable)
   , sample
   , sampleN
   , fromList
@@ -155,7 +155,7 @@ never create a clock that goes any faster!
 because some VHDL simulators don't support fractions of picoseconds.
 -}
 data Signal (domain :: Domain) a
-  -- | The constructor, @(':-')@, is __not__ synthesisable.
+  -- | The constructor, @(':-')@, is __not__ synthesizable.
   = a :- Signal domain a
 
 head# :: Signal dom a -> a
@@ -233,7 +233,7 @@ instance Num a => Num (Signal domain a) where
   signum      = fmap signum
   fromInteger = signal# . fromInteger
 
--- | __NB__: Not synthesisable
+-- | __NB__: Not synthesizable
 --
 -- __NB__: In \"@'foldr' f z s@\":
 --
@@ -243,7 +243,7 @@ instance Foldable (Signal domain) where
   foldr = foldr#
 
 {-# NOINLINE foldr# #-}
--- | __NB__: Not synthesisable
+-- | __NB__: Not synthesizable
 --
 -- __NB__: In \"@'foldr#' f z s@\":
 --
@@ -530,7 +530,7 @@ unsafeToSyncReset r = Sync r
 {-# NOINLINE unsafeToSyncReset #-}
 
 infixr 2 .||.
--- | The above type is a generalisation for:
+-- | The above type is a generalization for:
 --
 -- @
 -- __(.||.)__ :: 'Clash.Signal.Signal' 'Bool' -> 'Clash.Signal.Signal' 'Bool' -> 'Clash.Signal.Signal' 'Bool'
@@ -541,7 +541,7 @@ infixr 2 .||.
 (.||.) = liftA2 (||)
 
 infixr 3 .&&.
--- | The above type is a generalisation for:
+-- | The above type is a generalization for:
 --
 -- @
 -- __(.&&.)__ :: 'Clash.Signal.Signal' 'Bool' -> 'Clash.Signal.Signal' 'Bool' -> 'Clash.Signal.Signal' 'Bool'
@@ -644,7 +644,7 @@ register# (GatedClock _ _ ena) (Async rst) powerUpVal resetVal =
       in  oR `defaultSeqX` oR :- (as `seq` enas `seq` go oE rs es xs)
 {-# NOINLINE register# #-}
 
--- | The above type is a generalisation for:
+-- | The above type is a generalization for:
 --
 -- @
 -- __mux__ :: 'Clash.Signal.Signal' 'Bool' -> 'Clash.Signal.Signal' a -> 'Clash.Signal.Signal' a -> 'Clash.Signal.Signal' a
@@ -657,7 +657,7 @@ mux = liftA3 (\b t f -> if b then t else f)
 {-# INLINE mux #-}
 
 infix 4 .==.
--- | The above type is a generalisation for:
+-- | The above type is a generalization for:
 --
 -- @
 -- __(.==.)__ :: 'Eq' a => 'Clash.Signal.Signal' a -> 'Clash.Signal.Signal' a -> 'Clash.Signal.Signal' 'Bool'
@@ -668,7 +668,7 @@ infix 4 .==.
 (.==.) = liftA2 (==)
 
 infix 4 ./=.
--- | The above type is a generalisation for:
+-- | The above type is a generalization for:
 --
 -- @
 -- __(./=.)__ :: 'Eq' a => 'Clash.Signal.Signal' a -> 'Clash.Signal.Signal' a -> 'Clash.Signal.Signal' 'Bool'
@@ -679,7 +679,7 @@ infix 4 ./=.
 (./=.) = liftA2 (/=)
 
 infix 4 .<.
--- | The above type is a generalisation for:
+-- | The above type is a generalization for:
 --
 -- @
 -- __(.<.)__ :: 'Ord' a => 'Clash.Signal.Signal' a -> 'Clash.Signal.Signal' a -> 'Clash.Signal.Signal' 'Bool'
@@ -690,7 +690,7 @@ infix 4 .<.
 (.<.) = liftA2 (<)
 
 infix 4 .<=.
--- | The above type is a generalisation for:
+-- | The above type is a generalization for:
 --
 -- @
 -- __(.<=.)__ :: 'Ord' a => 'Clash.Signal.Signal' a -> 'Clash.Signal.Signal' a -> 'Clash.Signal.Signal' 'Bool'
@@ -701,7 +701,7 @@ infix 4 .<=.
 (.<=.) = liftA2 (<=)
 
 infix 4 .>.
--- | The above type is a generalisation for:
+-- | The above type is a generalization for:
 --
 -- @
 -- __(.>.)__ :: 'Ord' a => 'Clash.Signal.Signal' a -> 'Clash.Signal.Signal' a -> 'Clash.Signal.Signal' 'Bool'
@@ -712,7 +712,7 @@ infix 4 .>.
 (.>.) = liftA2 (>)
 
 infix 4 .>=.
--- | The above type is a generalisation for:
+-- | The above type is a generalization for:
 --
 -- @
 -- __(.>=.)__ :: 'Ord' a => 'Clash.Signal.Signal' a -> 'Clash.Signal.Signal' a -> 'Clash.Signal.Signal' 'Bool'
@@ -735,7 +735,7 @@ instance CoArbitrary a => CoArbitrary (Signal domain a) where
     n <- arbitrary
     coarbitrary (take (abs n) (sample_lazy xs)) gen
 
--- | The above type is a generalisation for:
+-- | The above type is a generalization for:
 --
 -- @
 -- __testFor__ :: 'Int' -> 'Clash.Signal.Signal' Bool -> 'Property'
@@ -745,9 +745,9 @@ instance CoArbitrary a => CoArbitrary (Signal domain a) where
 testFor :: Foldable f => Int -> f Bool -> Property
 testFor n = property . and . take n . sample
 
--- * List \<-\> Signal conversion (not synthesisable)
+-- * List \<-\> Signal conversion (not synthesizable)
 
--- | The above type is a generalisation for:
+-- | The above type is a generalization for:
 --
 -- @
 -- __sample__ :: 'Clash.Signal.Signal' a -> [a]
@@ -760,11 +760,11 @@ testFor n = property . and . take n . sample
 --
 -- > sample s == [s0, s1, s2, s3, ...
 --
--- __NB__: This function is not synthesisable
+-- __NB__: This function is not synthesizable
 sample :: (Foldable f, Undefined a) => f a -> [a]
 sample = foldr (\a b -> deepseqX a (a : b)) []
 
--- | The above type is a generalisation for:
+-- | The above type is a generalization for:
 --
 -- @
 -- __sampleN__ :: Int -> 'Clash.Signal.Signal' a -> [a]
@@ -777,7 +777,7 @@ sample = foldr (\a b -> deepseqX a (a : b)) []
 --
 -- > sampleN 3 s == [s0, s1, s2]
 --
--- __NB__: This function is not synthesisable
+-- __NB__: This function is not synthesizable
 sampleN :: (Foldable f, Undefined a) => Int -> f a -> [a]
 sampleN n = take n . sample
 
@@ -789,11 +789,11 @@ sampleN n = take n . sample
 -- >>> sampleN 2 (fromList [1,2,3,4,5])
 -- [1,2]
 --
--- __NB__: This function is not synthesisable
+-- __NB__: This function is not synthesizable
 fromList :: Undefined a => [a] -> Signal domain a
 fromList = Prelude.foldr (\a b -> deepseqX a (a :- b)) (errorX "finite list")
 
--- * Simulation functions (not synthesisable)
+-- * Simulation functions (not synthesizable)
 
 -- | Simulate a (@'Clash.Signal.Signal' a -> 'Clash.Signal.Signal' b@) function
 -- given a list of samples of type @a@
@@ -802,11 +802,11 @@ fromList = Prelude.foldr (\a b -> deepseqX a (a :- b)) (errorX "finite list")
 -- [8,8,1,2,3...
 -- ...
 --
--- __NB__: This function is not synthesisable
+-- __NB__: This function is not synthesizable
 simulate :: (Undefined a, Undefined b) => (Signal domain1 a -> Signal domain2 b) -> [a] -> [b]
 simulate f = sample . f . fromList
 
--- | The above type is a generalisation for:
+-- | The above type is a generalization for:
 --
 -- @
 -- __sample__ :: 'Clash.Signal.Signal' a -> [a]
@@ -819,11 +819,11 @@ simulate f = sample . f . fromList
 --
 -- > sample s == [s0, s1, s2, s3, ...
 --
--- __NB__: This function is not synthesisable
+-- __NB__: This function is not synthesizable
 sample_lazy :: Foldable f => f a -> [a]
 sample_lazy = foldr (:) []
 
--- | The above type is a generalisation for:
+-- | The above type is a generalization for:
 --
 -- @
 -- __sampleN__ :: Int -> 'Clash.Signal.Signal' a -> [a]
@@ -836,7 +836,7 @@ sample_lazy = foldr (:) []
 --
 -- > sampleN 3 s == [s0, s1, s2]
 --
--- __NB__: This function is not synthesisable
+-- __NB__: This function is not synthesizable
 sampleN_lazy :: Foldable f => Int -> f a -> [a]
 sampleN_lazy n = take n . sample_lazy
 
@@ -848,11 +848,11 @@ sampleN_lazy n = take n . sample_lazy
 -- >>> sampleN 2 (fromList [1,2,3,4,5])
 -- [1,2]
 --
--- __NB__: This function is not synthesisable
+-- __NB__: This function is not synthesizable
 fromList_lazy :: [a] -> Signal domain a
 fromList_lazy = Prelude.foldr (:-) (error "finite list")
 
--- * Simulation functions (not synthesisable)
+-- * Simulation functions (not synthesizable)
 
 -- | Simulate a (@'Clash.Signal.Signal' a -> 'Clash.Signal.Signal' b@) function
 -- given a list of samples of type @a@
@@ -861,6 +861,6 @@ fromList_lazy = Prelude.foldr (:-) (error "finite list")
 -- [8,8,1,2,3...
 -- ...
 --
--- __NB__: This function is not synthesisable
+-- __NB__: This function is not synthesizable
 simulate_lazy :: (Signal domain1 a -> Signal domain2 b) -> [a] -> [b]
 simulate_lazy f = sample_lazy . f . fromList_lazy

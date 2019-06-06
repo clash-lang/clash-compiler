@@ -4,9 +4,9 @@ Copyright  :  (C) 2015-2016, University of Twente,
 License    :  BSD2 (see the file LICENSE)
 Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
 
-= Initialising a BlockRAM with a data file #usingramfiles#
+= Initializing a BlockRAM with a data file #usingramfiles#
 
-BlockRAM primitives that can be initialised with a data file. The BNF grammar
+BlockRAM primitives that can be initialized with a data file. The BNF grammar
 for this data file is simple:
 
 @
@@ -78,7 +78,7 @@ __>>> L.tail $ sampleN 4 $ g (fromList [3..5])__
 {-# OPTIONS_HADDOCK show-extensions #-}
 
 module Clash.Prelude.BlockRam.File
-  ( -- * BlockRAM synchronised to an arbitrary clock
+  ( -- * BlockRAM synchronized to an arbitrary clock
     blockRamFile
   , blockRamFilePow2
   )

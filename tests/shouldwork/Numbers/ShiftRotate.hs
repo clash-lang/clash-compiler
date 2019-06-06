@@ -2,7 +2,7 @@
 This tests the HDL implementations of shiftL,shiftR,rotateL and rotateR
 by checking their results against compile-time evaluated calls to the same functions.
 
-So it checks that the HDL implementations have the same behaviour as the Haskell implementations.
+So it checks that the HDL implementations have the same behavior as the Haskell implementations.
 (And it assumes that the Haskell implementations are correct.)
 -}
 {-# LANGUAGE PartialTypeSignatures #-}

@@ -18,7 +18,7 @@ ROMs
 {-# OPTIONS_HADDOCK show-extensions #-}
 
 module Clash.Explicit.ROM
-  ( -- * Synchronous ROM synchronised to an arbitrary clock
+  ( -- * Synchronous ROM synchronized to an arbitrary clock
     rom
   , romPow2
     -- * Internal

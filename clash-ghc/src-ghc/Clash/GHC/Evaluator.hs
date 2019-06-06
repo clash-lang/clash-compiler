@@ -216,7 +216,7 @@ reduceConstant isSubj tcm h k nm pInfo tys args = case nm of
 
   "GHC.Prim.int2Word#"
     | [Lit (IntLiteral i)] <- args
-    -> reduce . Literal . WordLiteral . toInteger $ (fromInteger :: Integer -> Word) i -- for overflow behaviour
+    -> reduce . Literal . WordLiteral . toInteger $ (fromInteger :: Integer -> Word) i -- for overflow behavior
 
   "GHC.Prim.int2Float#"
     | [Lit (IntLiteral i)] <- args
@@ -343,7 +343,7 @@ reduceConstant isSubj tcm h k nm pInfo tys args = case nm of
 
   "GHC.Prim.word2Int#"
     | [Lit (WordLiteral i)] <- args
-    -> reduce . Literal . IntLiteral . toInteger $ (fromInteger :: Integer -> Int) i -- for overflow behaviour
+    -> reduce . Literal . IntLiteral . toInteger $ (fromInteger :: Integer -> Int) i -- for overflow behavior
 
   "GHC.Prim.gtWord#" | Just (i,j) <- wordLiterals args
     -> reduce (boolToIntLiteral (i > j))
@@ -2628,7 +2628,7 @@ reduceConstant isSubj tcm h k nm pInfo tys args = case nm of
       ] <- args
     -> reduce (boolToBoolLiteral tcm ty (i == j))
 
--- - specialised permutations
+-- - specialized permutations
   "Clash.Sized.Vector.reverse" -- :: Vec n a -> Vec n a
     | isSubj
     , nTy : aTy : _  <- tys
@@ -3721,10 +3721,10 @@ charToCharLiteral :: Char -> Term
 charToCharLiteral = Literal . CharLiteral
 
 integerToIntLiteral :: Integer -> Term
-integerToIntLiteral = Literal . IntLiteral . toInteger . (fromInteger :: Integer -> Int) -- for overflow behaviour
+integerToIntLiteral = Literal . IntLiteral . toInteger . (fromInteger :: Integer -> Int) -- for overflow behavior
 
 integerToWordLiteral :: Integer -> Term
-integerToWordLiteral = Literal . WordLiteral . toInteger . (fromInteger :: Integer -> Word) -- for overflow behaviour
+integerToWordLiteral = Literal . WordLiteral . toInteger . (fromInteger :: Integer -> Word) -- for overflow behavior
 
 integerToIntegerLiteral :: Integer -> Term
 integerToIntegerLiteral = Literal . IntegerLiteral

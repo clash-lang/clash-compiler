@@ -34,7 +34,7 @@ module Clash.Signal.Delayed
     -- * Signal \<-\> DSignal conversion
   , fromSignal
   , toSignal
-    -- * List \<-\> DSignal conversion (not synthesisable)
+    -- * List \<-\> DSignal conversion (not synthesizable)
   , dfromList
     -- ** lazy versions
   , dfromList_lazy
