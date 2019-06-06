@@ -183,7 +183,8 @@ genNames mkId prefixM s0 m0 = foldl go (s0,m0)
 
 -- | Generate a component for a given function (caching)
 genComponent
-  :: Id
+  :: HasCallStack
+  => Id
   -- ^ Name of the function
   -> NetlistMonad ([Bool],SrcSpan,HashMap Identifier Word,Component)
 genComponent compName = do
@@ -197,7 +198,8 @@ genComponent compName = do
 
 -- | Generate a component for a given function
 genComponentT
-  :: Id
+  :: HasCallStack
+  => Id
   -- ^ Name of the function
   -> Term
   -- ^ Corresponding term
@@ -300,7 +302,8 @@ isWriteToBiSignalPrimitive e = case collectArgs e of
 -- | Generate a list of Declarations for a let-binder, return an empty list
 -- if the bound expression is represented by 0 bits
 mkDeclarations
-  :: Id
+  :: HasCallStack
+  => Id
   -- ^ LHS of the let-binder
   -> Term
   -- ^ RHS of the let-binder
@@ -313,7 +316,8 @@ mkDeclarations bndr e = do
 
 -- | Generate a list of Declarations for a let-binder
 mkDeclarations'
-  :: Id
+  :: HasCallStack
+  => Id
   -- ^ LHS of the let-binder
   -> Term
   -- ^ RHS of the let-binder
@@ -472,7 +476,8 @@ patPos reprs pat@(DataPat dataCon _ _) =
 
 -- | Generate a list of Declarations for a let-binder where the RHS is a function application
 mkFunApp
-  :: Identifier -- ^ LHS of the let-binder
+  :: HasCallStack
+  => Identifier -- ^ LHS of the let-binder
   -> Id -- ^ Name of the applied function
   -> [Term] -- ^ Function arguments
   -> NetlistMonad [Declaration]
@@ -555,7 +560,8 @@ toSimpleVar dstId (e,ty) = do
   return (Identifier argNm' Nothing,[argDecl,argAssn])
 
 -- | Generate an expression for a term occurring on the RHS of a let-binder
-mkExpr :: Bool -- ^ Treat BlackBox expression as declaration
+mkExpr :: HasCallStack
+       => Bool -- ^ Treat BlackBox expression as declaration
        -> (Either Identifier Id) -- ^ Id to assign the result to
        -> Type -- ^ Type of the LHS of the let-binder
        -> Term -- ^ Term to convert to an expression
@@ -694,7 +700,8 @@ mkProjection mkDec bndr scrut altTy alt@(pat,v) = do
 
 -- | Generate an expression for a DataCon application occurring on the RHS of a let-binder
 mkDcApplication
-    :: HWType
+    :: HasCallStack
+    => HWType
     -- ^ HWType of the LHS of the let-binder
     -> (Either Identifier Id)
     -- ^ Id to assign the result to
