@@ -94,7 +94,7 @@ data TypeEqSolution
   -- ^ A solution was found, but it involved negative naturals.
   | NoSolution
   -- ^ Given type wasn't an equation, or it was unsolvable.
-    deriving (Show)
+    deriving (Show, Eq)
 
 catSolutions :: [TypeEqSolution] -> [(TyVar, Type)]
 catSolutions = mapMaybe getSol
@@ -108,7 +108,7 @@ solveNonAbsurds [] = []
 solveNonAbsurds (eq:eqs) =
   solved ++ solveNonAbsurds eqs
  where
-  solvers = [pure . solveAdd, map Solution . solveEq]
+  solvers = [pure . solveAdd, solveEq]
   solved = catSolutions (concat [s eq | s <- solvers])
 
 -- | Solve simple equalities such as:
@@ -119,15 +119,21 @@ solveNonAbsurds (eq:eqs) =
 --   * SomeType 3 5 ~ SomeType a b
 --   * SomeType a 5 ~ SomeType 3 b
 --
-solveEq :: (Type, Type) -> [(TyVar, Type)]
+solveEq :: (Type, Type) -> [TypeEqSolution]
 solveEq (left, right) =
   case (left, right) of
     (VarTy tyVar, ConstTy {}) ->
       -- a ~ 3
-      [(tyVar, right)]
+      [Solution (tyVar, right)]
     (ConstTy {}, VarTy tyVar) ->
       -- 3 ~ a
-      [(tyVar, left)]
+      [Solution (tyVar, left)]
+    (ConstTy {}, ConstTy {}) ->
+      -- Int /= Char
+      if left /= right then [AbsurdSolution] else []
+    (LitTy {}, LitTy {}) ->
+      -- 3 /= 5
+      if left /= right then [AbsurdSolution] else []
     _ ->
       case (tyView left, tyView right) of
         (TyConApp leftNm leftTys, TyConApp rightNm rightTys) ->
@@ -193,14 +199,8 @@ isAbsurdEq
   -> Bool
 isAbsurdEq tcm ((left0, right0)) =
   case (coreView tcm left0, coreView tcm right0) of
-    (ConstTy {}, ConstTy {}) ->
-      left0 /= right0
-    (LitTy {}, LitTy {}) ->
-      left0 /= right0
-    (left1, right1) ->
-      case solveAdd (left1, right1) of
-        AbsurdSolution -> True
-        _              -> False
+    (solveAdd -> AbsurdSolution) -> True
+    lr -> any (==AbsurdSolution) (solveEq lr)
 
 -- Safely substitute global type variables in a list of potentially
 -- shadowing type variables.
