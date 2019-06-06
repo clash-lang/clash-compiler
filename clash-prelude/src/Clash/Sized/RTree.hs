@@ -456,7 +456,7 @@ replaceTree i a = v2t . replace i a . t2v
 data ZipWithTree (b :: Type) (c :: Type) (f :: TyFun Nat Type) :: Type
 type instance Apply (ZipWithTree b c) d = RTree d b -> RTree d c
 
--- | 'tzipWith' generalises 'tzip' by zipping with the function given as the
+-- | 'tzipWith' generalizes 'tzip' by zipping with the function given as the
 -- first argument, instead of a tupling function. For example, "tzipWith (+)"
 -- applied to two trees produces the tree of corresponding sums.
 --

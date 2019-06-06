@@ -780,7 +780,7 @@ elemIndex :: (KnownNat n, Eq a) => a -> Vec n a -> Maybe (Index n)
 elemIndex x = findIndex (x ==)
 {-# INLINE elemIndex #-}
 
--- | 'zipWith' generalises 'zip' by zipping with the function given
+-- | 'zipWith' generalizes 'zip' by zipping with the function given
 -- as the first argument, instead of a tupling function.
 -- For example, \"'zipWith' @(+)@\" applied to two vectors produces the
 -- vector of corresponding sums.
@@ -799,7 +799,7 @@ zipWith _ Nil           _  = Nil
 zipWith f (x `Cons` xs) ys = f x (head ys) `Cons` zipWith f xs (tail ys)
 {-# NOINLINE zipWith #-}
 
--- | 'zipWith3' generalises 'zip3' by zipping with the function given
+-- | 'zipWith3' generalizes 'zip3' by zipping with the function given
 -- as the first argument, instead of a tupling function.
 --
 -- > zipWith3 f (x1 :> x2 :> ... xn :> Nil) (y1 :> y2 :> ... :> yn :> Nil) (z1 :> z2 :> ... :> zn :> Nil) == (f x1 y1 z1 :> f x2 y2 z2 :> ... :> f xn yn zn :> Nil)
@@ -1603,7 +1603,7 @@ windows2d stY stX xss = map (transpose . (map (windows1d stX))) (windows1d stY x
 {-# INLINE windows2d #-}
 
 -- | Forward permutation specified by an index mapping, /ix/. The result vector
--- is initialised by the given defaults, /def/, and an further values that are
+-- is initialized by the given defaults, /def/, and an further values that are
 -- permuted into the result are added to the current value using the given
 -- combination function, /f/.
 --

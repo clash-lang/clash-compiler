@@ -62,7 +62,7 @@ import GHC.Show          (appPrec)
 import GHC.Stack         (HasCallStack, callStack, prettyCallStack, withFrozenCallStack)
 import System.IO.Unsafe  (unsafeDupablePerformIO)
 
--- | An exception representing an \"uninitialised\" value.
+-- | An exception representing an \"uninitialized\" value.
 newtype XException = XException String
 
 instance Show XException where

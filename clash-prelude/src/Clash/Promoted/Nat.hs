@@ -129,7 +129,7 @@ snatToNum p@SNat = fromInteger (natVal p)
 
 -- | Unary representation of a type-level natural
 --
--- __NB__: Not synthesisable
+-- __NB__: Not synthesizable
 data UNat :: Nat -> Type where
   UZero :: UNat 0
   USucc :: UNat n -> UNat (n + 1)
@@ -142,7 +142,7 @@ instance KnownNat n => ShowX (UNat n) where
 
 -- | Convert a singleton natural number to its unary representation
 --
--- __NB__: Not synthesisable
+-- __NB__: Not synthesizable
 toUNat :: forall n . SNat n -> UNat n
 toUNat p@SNat = fromI @n (natVal p)
   where
@@ -152,14 +152,14 @@ toUNat p@SNat = fromI @n (natVal p)
 
 -- | Convert a unary-encoded natural number to its singleton representation
 --
--- __NB__: Not synthesisable
+-- __NB__: Not synthesizable
 fromUNat :: UNat n -> SNat n
 fromUNat UZero     = SNat :: SNat 0
 fromUNat (USucc x) = addSNat (fromUNat x) (SNat :: SNat 1)
 
 -- | Add two unary-encoded natural numbers
 --
--- __NB__: Not synthesisable
+-- __NB__: Not synthesizable
 addUNat :: UNat n -> UNat m -> UNat (n + m)
 addUNat UZero     y     = y
 addUNat x         UZero = x
@@ -167,7 +167,7 @@ addUNat (USucc x) y     = USucc (addUNat x y)
 
 -- | Multiply two unary-encoded natural numbers
 --
--- __NB__: Not synthesisable
+-- __NB__: Not synthesizable
 mulUNat :: UNat n -> UNat m -> UNat (n * m)
 mulUNat UZero      _     = UZero
 mulUNat _          UZero = UZero
@@ -175,14 +175,14 @@ mulUNat (USucc x) y      = addUNat y (mulUNat x y)
 
 -- | Power of two unary-encoded natural numbers
 --
--- __NB__: Not synthesisable
+-- __NB__: Not synthesizable
 powUNat :: UNat n -> UNat m -> UNat (n ^ m)
 powUNat _ UZero     = USucc UZero
 powUNat x (USucc y) = mulUNat x (powUNat x y)
 
 -- | Predecessor of a unary-encoded natural number
 --
--- __NB__: Not synthesisable
+-- __NB__: Not synthesizable
 predUNat :: UNat (n+1) -> UNat n
 predUNat (USucc x) = x
 predUNat UZero     =
@@ -190,7 +190,7 @@ predUNat UZero     =
 
 -- | Subtract two unary-encoded natural numbers
 --
--- __NB__: Not synthesisable
+-- __NB__: Not synthesizable
 subUNat :: UNat (m+n) -> UNat n -> UNat m
 subUNat x         UZero     = x
 subUNat (USucc x) (USucc y) = subUNat x y
@@ -278,7 +278,7 @@ compareSNat a b =
 -- | Base-2 encoded natural number
 --
 --    * __NB__: The LSB is the left/outer-most constructor:
---    * __NB__: Not synthesisable
+--    * __NB__: Not synthesizable
 --
 -- >>> B0 (B1 (B1 BT))
 -- b6
@@ -335,7 +335,7 @@ showBNat = go []
 
 -- | Convert a singleton natural number to its base-2 representation
 --
--- __NB__: Not synthesisable
+-- __NB__: Not synthesizable
 toBNat :: SNat n -> BNat n
 toBNat s@SNat = toBNat' (natVal s)
   where
@@ -347,7 +347,7 @@ toBNat s@SNat = toBNat' (natVal s)
 
 -- | Convert a base-2 encoded natural number to its singleton representation
 --
--- __NB__: Not synthesisable
+-- __NB__: Not synthesizable
 fromBNat :: BNat n -> SNat n
 fromBNat BT     = SNat :: SNat 0
 fromBNat (B0 x) = mulSNat (SNat :: SNat 2) (fromBNat x)
@@ -356,7 +356,7 @@ fromBNat (B1 x) = addSNat (mulSNat (SNat :: SNat 2) (fromBNat x))
 
 -- | Add two base-2 encoded natural numbers
 --
--- __NB__: Not synthesisable
+-- __NB__: Not synthesizable
 addBNat :: BNat n -> BNat m -> BNat (n+m)
 addBNat (B0 a) (B0 b) = B0 (addBNat a b)
 addBNat (B0 a) (B1 b) = B1 (addBNat a b)
@@ -367,7 +367,7 @@ addBNat a      BT     = a
 
 -- | Multiply two base-2 encoded natural numbers
 --
--- __NB__: Not synthesisable
+-- __NB__: Not synthesizable
 mulBNat :: BNat n -> BNat m -> BNat (n*m)
 mulBNat BT      _  = BT
 mulBNat _       BT = BT
@@ -376,7 +376,7 @@ mulBNat (B1 a)  b  = addBNat (B0 (mulBNat a b)) b
 
 -- | Power of two base-2 encoded natural numbers
 --
--- __NB__: Not synthesisable
+-- __NB__: Not synthesizable
 powBNat :: BNat n -> BNat m -> BNat (n^m)
 powBNat _  BT      = B1 BT
 powBNat a  (B0 b)  = let z = powBNat a b
@@ -386,7 +386,7 @@ powBNat a  (B1 b)  = let z = powBNat a b
 
 -- | Successor of a base-2 encoded natural number
 --
--- __NB__: Not synthesisable
+-- __NB__: Not synthesizable
 succBNat :: BNat n -> BNat (n+1)
 succBNat BT     = B1 BT
 succBNat (B0 a) = B1 a
@@ -394,7 +394,7 @@ succBNat (B1 a) = B0 (succBNat a)
 
 -- | Predecessor of a base-2 encoded natural number
 --
--- __NB__: Not synthesisable
+-- __NB__: Not synthesizable
 predBNat :: (1 <= n) => BNat n -> BNat (n-1)
 predBNat (B1 a) = case stripZeros a of
   BT -> BT
@@ -403,7 +403,7 @@ predBNat (B0 x) = B1 (predBNat x)
 
 -- | Divide a base-2 encoded natural number by 2
 --
--- __NB__: Not synthesisable
+-- __NB__: Not synthesizable
 div2BNat :: BNat (2*n) -> BNat n
 div2BNat BT     = BT
 div2BNat (B0 x) = x
@@ -411,14 +411,14 @@ div2BNat (B1 _) = error "div2BNat: impossible: 2*n ~ 2*n+1"
 
 -- | Subtract 1 and divide a base-2 encoded natural number by 2
 --
--- __NB__: Not synthesisable
+-- __NB__: Not synthesizable
 div2Sub1BNat :: BNat (2*n+1) -> BNat n
 div2Sub1BNat (B1 x) = x
 div2Sub1BNat _      = error "div2Sub1BNat: impossible: 2*n+1 ~ 2*n"
 
 -- | Get the log2 of a base-2 encoded natural number
 --
--- __NB__: Not synthesisable
+-- __NB__: Not synthesizable
 log2BNat :: BNat (2^n) -> BNat n
 log2BNat BT = error "log2BNat: log2(0) not defined"
 log2BNat (B1 x) = case stripZeros x of
@@ -437,7 +437,7 @@ log2BNat (B0 x) = succBNat (log2BNat x)
 -- >>> stripZeros (B1 (B0 (B0 (B0 BT))))
 -- b1
 --
--- __NB__: Not synthesisable
+-- __NB__: Not synthesizable
 stripZeros :: BNat n -> BNat n
 stripZeros BT      = BT
 stripZeros (B1 x)  = B1 (stripZeros x)

@@ -224,7 +224,7 @@ especially as the memories we need for our application get bigger. The
 'blockRam' function will be translated to such a /Block RAM/.
 
 One important aspect of Block RAMs have a /synchronous/ read port, meaning that,
-unlike the behaviour of 'Clash.Prelude.RAM.asyncRam', given a read address @r@
+unlike the behavior of 'Clash.Prelude.RAM.asyncRam', given a read address @r@
 at time @t@, the value @v@ in the RAM at address @r@ is only available at time
 @t+1@.
 
@@ -350,7 +350,7 @@ This concludes the short introduction to using 'blockRam'.
 {-# OPTIONS_HADDOCK show-extensions #-}
 
 module Clash.Prelude.BlockRam
-  ( -- * BlockRAM synchronised to the system clock
+  ( -- * BlockRAM synchronized to the system clock
     blockRam
   , blockRamPow2
     -- * Read/Write conflict resolution
@@ -695,7 +695,7 @@ blockRamPow2 = \cnt rd wrM -> withFrozenCallStack
   (hideClock E.blockRamPow2 cnt rd wrM)
 {-# INLINE blockRamPow2 #-}
 
--- | Create read-after-write blockRAM from a read-before-write one (synchronised to system clock)
+-- | Create read-after-write blockRAM from a read-before-write one (synchronized to system clock)
 --
 -- >>> import Clash.Prelude
 -- >>> :t readNew (blockRam (0 :> 1 :> Nil))

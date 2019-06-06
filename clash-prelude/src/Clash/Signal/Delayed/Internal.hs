@@ -20,7 +20,7 @@ module Clash.Signal.Delayed.Internal
     DSignal(..)
   , feedback
   , fromSignal
-    -- * List \<-\> DSignal conversion (not synthesisable)
+    -- * List \<-\> DSignal conversion (not synthesizable)
   , dfromList
     -- ** lazy versions
   , dfromList_lazy
@@ -78,7 +78,7 @@ newtype DSignal (domain :: Domain) (delay :: Nat) a =
 -- >>> sampleN 2 (dfromList [1,2,3,4,5])
 -- [1,2]
 --
--- __NB__: This function is not synthesisable
+-- __NB__: This function is not synthesizable
 dfromList :: Undefined a => [a] -> DSignal domain 0 a
 dfromList = coerce . fromList
 
@@ -90,7 +90,7 @@ dfromList = coerce . fromList
 -- >>> sampleN 2 (dfromList [1,2,3,4,5])
 -- [1,2]
 --
--- __NB__: This function is not synthesisable
+-- __NB__: This function is not synthesizable
 dfromList_lazy :: [a] -> DSignal domain 0 a
 dfromList_lazy = coerce . fromList_lazy
 

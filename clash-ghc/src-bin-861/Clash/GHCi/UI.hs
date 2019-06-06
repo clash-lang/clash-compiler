@@ -1452,7 +1452,7 @@ changeDirectory dir = do
   liftIO $ setCurrentDirectory dir'
   dflags <- getDynFlags
   -- With -fexternal-interpreter, we have to change the directory of the subprocess too.
-  -- (this gives consistent behaviour with and without -fexternal-interpreter)
+  -- (this gives consistent behavior with and without -fexternal-interpreter)
   when (gopt Opt_ExternalInterpreter dflags) $
     lift $ enqueueCommands ["System.Directory.setCurrentDirectory " ++ show dir']
 

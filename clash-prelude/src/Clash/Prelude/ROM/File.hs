@@ -4,9 +4,9 @@ Copyright  :  (C) 2015-2016, University of Twente,
 License    :  BSD2 (see the file LICENSE)
 Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
 
-= Initialising a ROM with a data file #usingromfiles#
+= Initializing a ROM with a data file #usingromfiles#
 
-ROMs initialised with a data file. The BNF grammar for this data file is simple:
+ROMs initialized with a data file. The BNF grammar for this data file is simple:
 
 @
 FILE = LINE+
@@ -77,7 +77,7 @@ module Clash.Prelude.ROM.File
   ( -- * Asynchronous ROM
     asyncRomFile
   , asyncRomFilePow2
-    -- * Synchronous ROM synchronised to an arbitrary clock
+    -- * Synchronous ROM synchronized to an arbitrary clock
   , romFile
   , romFilePow2
     -- * Internal

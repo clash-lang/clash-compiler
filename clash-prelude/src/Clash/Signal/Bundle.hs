@@ -136,7 +136,7 @@ deriveBundleTuples ''Bundle ''Unbundled 'bundle 'unbundle
 
 instance KnownNat n => Bundle (Vec n a) where
   type Unbundled t (Vec n a) = Vec n (Signal t a)
-  -- The 'Traversable' instance of 'Vec' is not synthesisable, so we must
+  -- The 'Traversable' instance of 'Vec' is not synthesizable, so we must
   -- define 'bundle' as a primitive.
   bundle   = vecBundle#
   unbundle = sequenceA . fmap lazyV

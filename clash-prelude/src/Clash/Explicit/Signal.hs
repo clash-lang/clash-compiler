@@ -174,13 +174,13 @@ module Clash.Explicit.Signal
   , (.&&.), (.||.)
     -- * Product/Signal isomorphism
   , Bundle(..)
-    -- * Simulation functions (not synthesisable)
+    -- * Simulation functions (not synthesizable)
   , simulate
   , simulateB
     -- ** lazy versions
   , simulate_lazy
   , simulateB_lazy
-    -- * List \<-\> Signal conversion (not synthesisable)
+    -- * List \<-\> Signal conversion (not synthesizable)
   , sample
   , sampleN
   , fromList
@@ -339,7 +339,7 @@ resetSynchronizer clk rst  =
 -- >>> freqCalc 240e6
 -- 4167
 --
--- __NB__: This function is /not/ synthesisable
+-- __NB__: This function is /not/ synthesizable
 freqCalc :: Double -> Integer
 freqCalc freq = ceiling ((1.0 / freq) / 1.0e-12)
 
@@ -611,7 +611,7 @@ regEn clk rst initial en i =
 -- [(8,8),(8,8),(1,1),(2,2),(3,3)...
 -- ...
 --
--- __NB__: This function is not synthesisable
+-- __NB__: This function is not synthesizable
 simulateB
   :: (Bundle a, Bundle b, Undefined a, Undefined b)
   => (Unbundled domain1 a -> Unbundled domain2 b)
@@ -628,7 +628,7 @@ simulateB f = simulate (bundle . f . unbundle)
 -- [(8,8),(8,8),(1,1),(2,2),(3,3)...
 -- ...
 --
--- __NB__: This function is not synthesisable
+-- __NB__: This function is not synthesizable
 simulateB_lazy
   :: (Bundle a, Bundle b)
   => (Unbundled domain1 a -> Unbundled domain2 b)

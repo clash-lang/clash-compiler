@@ -51,7 +51,7 @@ import Clash.XException            (Undefined)
 
 -- * Dual flip-flop synchronizer
 
--- | Synchroniser based on two sequentially connected flip-flops.
+-- | Synchronizer based on two sequentially connected flip-flops.
 --
 --  * __NB__: This synchroniser can be used for __bit__-synchronization.
 --
@@ -76,15 +76,15 @@ import Clash.XException            (Undefined)
 dualFlipFlopSynchronizer
   :: Undefined a
   => Clock domain1 gated1
-  -- ^ 'Clock' to which the incoming  data is synchronised
+  -- ^ 'Clock' to which the incoming  data is synchronized
   -> Clock domain2 gated2
-  -- ^ 'Clock' to which the outgoing data is synchronised
+  -- ^ 'Clock' to which the outgoing data is synchronized
   -> Reset domain2 synchronous
   -- ^ 'Reset' for registers on the outgoing domain
   -> a
   -- ^ Initial value of the two synchronisation registers
   -> Signal domain1 a -- ^ Incoming data
-  -> Signal domain2 a -- ^ Outgoing, synchronised, data
+  -> Signal domain2 a -- ^ Outgoing, synchronized, data
 dualFlipFlopSynchronizer clk1 clk2 rst i =
   register clk2 rst i . register clk2 rst i . unsafeSynchronizer clk1 clk2
 
@@ -133,7 +133,7 @@ isFull addrSize@SNat ptr s_ptr = case leTrans @1 @2 @addrSize of
         a2 = SNat @(addrSize - 2)
     in  ptr == (complement (slice addrSize a1 s_ptr) ++# slice a2 d0 s_ptr)
 
--- | Synchroniser implemented as a FIFO around an asynchronous RAM. Based on the
+-- | Synchronizer implemented as a FIFO around an asynchronous RAM. Based on the
 -- design described in "Clash.Tutorial#multiclock", which is itself based on the
 -- design described in <http://www.sunburst-design.com/papers/CummingsSNUG2002SJ_FIFO1.pdf>.
 --
@@ -144,9 +144,9 @@ asyncFIFOSynchronizer
   -- ^ Size of the internally used addresses, the  FIFO contains @2^addrSize@
   -- elements.
   -> Clock wdomain wgated
-  -- ^ 'Clock' to which the write port is synchronised
+  -- ^ 'Clock' to which the write port is synchronized
   -> Clock rdomain rgated
-  -- ^ 'Clock' to which the read port is synchronised
+  -- ^ 'Clock' to which the read port is synchronized
   -> Reset wdomain synchronous
   -> Reset rdomain synchronous
   -> Signal rdomain Bool

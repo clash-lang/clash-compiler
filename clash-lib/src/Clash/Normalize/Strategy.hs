@@ -218,7 +218,7 @@ bindNonRep will now lead to:
 > f    = \a x -> (a x) && (f a x)
 > f'   = \x -> (not x) && (f not x)
 
-Because `f` has already been specialised on the alpha-equivalent-to-itself `not`
+Because `f` has already been specialized on the alpha-equivalent-to-itself `not`
 function, liftNonRep leads to:
 
 > main = f'

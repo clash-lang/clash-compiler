@@ -41,7 +41,7 @@ module Clash.Sized.Internal.Unsigned
   , ge#
   , gt#
   , le#
-    -- ** Enum (not synthesisable)
+    -- ** Enum (not synthesizable)
   , enumFrom#
   , enumFromThen#
   , enumFromTo#
@@ -138,7 +138,7 @@ import Clash.XException
 -- 0
 newtype Unsigned (n :: Nat) =
     -- | The constructor, 'U', and the field, 'unsafeToInteger', are not
-    -- synthesisable.
+    -- synthesizable.
     U { unsafeToInteger :: Integer }
   deriving (Data, Generic)
 
@@ -163,7 +163,7 @@ instance Undefined (Unsigned n) where
   deepErrorX = errorX
   rnfX = rwhnfX
 
--- | None of the 'Read' class' methods are synthesisable.
+-- | None of the 'Read' class' methods are synthesizable.
 instance KnownNat n => Read (Unsigned n) where
   readPrec = fromIntegral <$> (readPrec :: ReadPrec Natural)
 
@@ -210,7 +210,7 @@ gt# (U n) (U m) = n > m
 le# (U n) (U m) = n <= m
 
 -- | The functions: 'enumFrom', 'enumFromThen', 'enumFromTo', and
--- 'enumFromThenTo', are not synthesisable.
+-- 'enumFromThenTo', are not synthesizable.
 instance KnownNat n => Enum (Unsigned n) where
   succ           = (+# fromInteger# 1)
   pred           = (-# fromInteger# 1)

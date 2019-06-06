@@ -53,7 +53,7 @@ module Clash.Prelude
   , asyncRomPow2
   , rom
   , romPow2
-    -- ** ROMs initialised with a data file
+    -- ** ROMs initialized with a data file
   , asyncRomFile
   , asyncRomFilePow2
   , romFile
@@ -64,7 +64,7 @@ module Clash.Prelude
     -- * BlockRAM primitives
   , blockRam
   , blockRamPow2
-    -- ** BlockRAM primitives initialised with a data file
+    -- ** BlockRAM primitives initialized with a data file
   , blockRamFile
   , blockRamFilePow2
     -- ** BlockRAM read/write conflict resolution

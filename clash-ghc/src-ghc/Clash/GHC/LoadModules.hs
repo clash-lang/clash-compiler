@@ -569,7 +569,7 @@ wantedOptimizationFlags df =
                ]
 
     -- Coercions between Integer and Clash' numeric primitives cause Clash to
-    -- fail. As strictness only affects simulation behaviour, removing them
+    -- fail. As strictness only affects simulation behavior, removing them
     -- is perfectly safe.
     unwantedLang = [ LangExt.Strict
                    , LangExt.StrictData
@@ -650,7 +650,7 @@ wantedLanguageExtensions df =
 -- we could lose bits when the original numeric type had more bits than 64.
 --
 -- Removing these strictness annotations is perfectly safe, as they only
--- affect simulation behaviour.
+-- affect simulation behavior.
 removeStrictnessAnnotations ::
      GHC.ParsedModule
   -> GHC.ParsedModule
