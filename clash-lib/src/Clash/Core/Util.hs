@@ -87,7 +87,7 @@ normalizeAdd (a, b) = do
   lhsLit _                 _                 = Nothing
 
 -- | Data type that indicates what kind of solution (if any) was found
-data AddSolution
+data TypeEqSolution
   = Solution (TyVar, Type)
   -- ^ Solution was found. Variable equals some integer.
   | AbsurdSolution
@@ -96,23 +96,54 @@ data AddSolution
   -- ^ Given type wasn't an equation, or it was unsolvable.
     deriving (Show)
 
--- | Solve given equations and return the first non-absurd solution (if any)
-solveFirstNonAbsurd
-  :: [(Type, Type)]
-  -> Maybe (TyVar, Type)
-solveFirstNonAbsurd [] = Nothing
-solveFirstNonAbsurd (eq:eqs) =
-  case solveAdd eq of
-    Solution s ->
-      Just s
-    _  ->
-      solveFirstNonAbsurd eqs
+catSolutions :: [TypeEqSolution] -> [(TyVar, Type)]
+catSolutions = mapMaybe getSol
+ where
+  getSol (Solution s) = Just s
+  getSol _ = Nothing
+
+-- | Solve given equations and return all non-absurd solutions
+solveNonAbsurds :: [(Type, Type)] -> [(TyVar, Type)]
+solveNonAbsurds [] = []
+solveNonAbsurds (eq:eqs) =
+  solved ++ solveNonAbsurds eqs
+ where
+  solvers = [pure . solveAdd, map Solution . solveEq]
+  solved = catSolutions (concat [s eq | s <- solvers])
+
+-- | Solve simple equalities such as:
+--
+--   * a ~ 3
+--   * 3 ~ a
+--   * SomeType a b ~ SomeType 3 5
+--   * SomeType 3 5 ~ SomeType a b
+--   * SomeType a 5 ~ SomeType 3 b
+--
+solveEq :: (Type, Type) -> [(TyVar, Type)]
+solveEq (left, right) =
+  case (left, right) of
+    (VarTy tyVar, ConstTy {}) ->
+      -- a ~ 3
+      [(tyVar, right)]
+    (ConstTy {}, VarTy tyVar) ->
+      -- 3 ~ a
+      [(tyVar, left)]
+    _ ->
+      case (tyView left, tyView right) of
+        (TyConApp leftNm leftTys, TyConApp rightNm rightTys) ->
+          -- SomeType a b ~ SomeType 3 5 (or other way around)
+          if leftNm == rightNm then
+            concat (map solveEq (zip leftTys rightTys))
+          else
+            [AbsurdSolution]
+        _ ->
+          []
 
 -- | Solve equations supported by @normalizeAdd@. See documentation of
--- @AddSolution@ to understand the return value.
+-- @TypeEqSolution@ to understand the return value.
 solveAdd
   :: (Type, Type)
-  -> AddSolution
+  -> TypeEqSolution
 solveAdd ab =
   case normalizeAdd ab of
     Just (n, m, VarTy tyVar) ->
@@ -189,6 +220,20 @@ substGlobalsInExistentials is exts substs0 = result
     iss     = scanl extendInScopeSet is exts
     substs1 = map (\is_ -> extendTvSubstList (mkSubst is_) substs0) iss
     result  = zipWith substTyInVar substs1 exts
+
+-- | Safely substitute type variables in a list of existentials. This function
+-- will account for cases where existentials shadow each other.
+substInExistentialsList
+  :: HasCallStack
+  => InScopeSet
+  -- ^ Variables in scope
+  -> [TyVar]
+  -- ^ List of existentials to apply the substitution for
+  -> [(TyVar, Type)]
+  -- ^ Substitutions
+  -> [TyVar]
+substInExistentialsList is exts substs =
+  foldl (substInExistentials is) exts substs
 
 -- | Safely substitute a type variable in a list of existentials. This function
 -- will account for cases where existentials shadow each other.
@@ -814,16 +859,16 @@ dataConInstArgTysE is0 tcm (MkData { dcArgTys, dcExtTyVars, dcUnivTyVars }) inst
     -- ^ Maybe ([type of non-existential])
   go exts0 args0 =
     let eqs = catMaybes (map (typeEq tcm) args0) in
-    case solveFirstNonAbsurd eqs of
-      Just (tyVar, solution1) ->
+    case solveNonAbsurds eqs of
+      [] ->
+        Just args0
+      sols ->
         go exts1 args1
         where
-          exts1 = substInExistentials is0 exts0 (tyVar, solution1)
+          exts1 = substInExistentialsList is0 exts0 sols
           is2   = extendInScopeSetList is0 exts1
-          subst = extendTvSubst (mkSubst is2) tyVar solution1
+          subst = extendTvSubstList (mkSubst is2) sols
           args1 = map (substTy subst) args0
-      Nothing ->
-        Just args0
 
 
 -- | Given a DataCon and a list of types, the type variables of the DataCon
