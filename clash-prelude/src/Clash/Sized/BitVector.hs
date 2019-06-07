@@ -27,6 +27,8 @@ module Clash.Sized.BitVector
   , bLit
     -- ** Concatenation
   , (++#)
+    -- ** Pattern matching
+  , bitPattern
   )
 where
 
