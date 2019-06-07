@@ -591,14 +591,17 @@ simulate the behavior of the /testBench/:
 
 >>> sampleN 8 testBench
 [False,False,False,False,False
-cycle(system10000): 5, outputVerifier
-expected value: 14, not equal to actual value: 30
+On cycle 5 of clock 'system10000', outputVerifier encountered an unexpected value:
+  Expected: 14
+  Actual:   30
 ,False
-cycle(system10000): 6, outputVerifier
-expected value: 14, not equal to actual value: 46
+On cycle 6 of clock 'system10000', outputVerifier encountered an unexpected value:
+  Expected: 14
+  Actual:   46
 ,False
-cycle(system10000): 7, outputVerifier
-expected value: 14, not equal to actual value: 62
+On cycle 7 of clock 'system10000', outputVerifier encountered an unexpected value:
+  Expected: 14
+  Actual:   62
 ,False]
 
 We can see that for the first 4 samples, everything is working as expected,

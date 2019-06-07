@@ -62,14 +62,10 @@ assert clk _rst msg checked expected returned =
   (\c e cnt r ->
       if eqX c e
          then r
-         else trace (concat [ "\ncycle(" ++ show clk ++ "): "
-                            , show cnt
-                            , ", "
-                            , msg
-                            , "\nexpected value: "
-                            , showX e
-                            , ", not equal to actual value: "
-                            , showX c
+         else trace (concat [ "\nOn cycle ", show cnt, " of clock '", show clk
+                            , "', ", msg, " encountered an unexpected value:\n"
+                            , "  Expected: ", showX e, "\n"
+                            , "  Actual:   ", showX c
                             ]) r)
   <$> checked <*> expected <*> fromList [(0::Integer)..] <*> returned
   where
@@ -91,14 +87,10 @@ assertBitVector clk _rst msg checked expected returned =
   (\c e cnt r ->
       if eqX c e
          then r
-         else trace (concat [ "\ncycle(" ++ show clk ++ "): "
-                            , show cnt
-                            , ", "
-                            , msg
-                            , "\nexpected value: "
-                            , showX e
-                            , ", not equal to actual value: "
-                            , showX c
+         else trace (concat [ "\nOn cycle ", show cnt, " of ", show clk, ", "
+                            , msg, " encountered an unexpected value:\n"
+                            , "  Expected: ", showX e, "\n"
+                            , "  Actual:   ", showX c
                             ]) r)
   <$> checked <*> expected <*> fromList [(0::Integer)..] <*> returned
   where
@@ -161,26 +153,33 @@ stimuliGenerator clk rst samples =
 -- >>> import qualified Data.List as List
 -- >>> sampleN 12 (expectedOutput systemClockGen asyncResetGen (fromList (0:[0..10] List.++ [10,10,10])))
 -- <BLANKLINE>
--- cycle(system10000): 0, outputVerifier
--- expected value: 70, not equal to actual value: 0
+-- On cycle 0 of clock 'system10000', outputVerifier encountered an unexpected value:
+--   Expected: 70
+--   Actual:   0
 -- [False
--- cycle(system10000): 1, outputVerifier
--- expected value: 70, not equal to actual value: 0
+-- On cycle 1 of clock 'system10000', outputVerifier encountered an unexpected value:
+--   Expected: 70
+--   Actual:   0
 -- ,False
--- cycle(system10000): 2, outputVerifier
--- expected value: 99, not equal to actual value: 1
+-- On cycle 2 of clock 'system10000', outputVerifier encountered an unexpected value:
+--   Expected: 99
+--   Actual:   1
 -- ,False,False,False,False,False
--- cycle(system10000): 7, outputVerifier
--- expected value: 7, not equal to actual value: 6
+-- On cycle 7 of clock 'system10000', outputVerifier encountered an unexpected value:
+--   Expected: 7
+--   Actual:   6
 -- ,False
--- cycle(system10000): 8, outputVerifier
--- expected value: 8, not equal to actual value: 7
+-- On cycle 8 of clock 'system10000', outputVerifier encountered an unexpected value:
+--   Expected: 8
+--   Actual:   7
 -- ,False
--- cycle(system10000): 9, outputVerifier
--- expected value: 9, not equal to actual value: 8
+-- On cycle 9 of clock 'system10000', outputVerifier encountered an unexpected value:
+--   Expected: 9
+--   Actual:   8
 -- ,False
--- cycle(system10000): 10, outputVerifier
--- expected value: 10, not equal to actual value: 9
+-- On cycle 10 of clock 'system10000', outputVerifier encountered an unexpected value:
+--   Expected: 10
+--   Actual:   9
 -- ,False,True]
 --
 -- If your working with 'BitVector's containing don't care bit you should use 'outputVerifierBitVector'.
