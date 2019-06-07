@@ -14,7 +14,7 @@
     , "template" :
 "// assert begin
 // pragma translate_off
-always @(posedge ~IF ~ISGATED[2] ~THEN ~ARG[2][1] ~ELSE ~ARG[2] ~FI~IF ~ISSYNC[3] ~THEN ~ELSE or negedge ~ARG[3]~FI) begin
+always @(posedge ~IF ~ISGATED[2] ~THEN ~ARG[2][1] ~ELSE ~ARG[2] ~FI) begin
   if (~ARG[5] !== ~ARG[6]) begin
     $display(\"@%0tns: %s, expected: %b, actual: %b\", $time, ~LIT[4], ~ARG[6], ~ARG[5]);
     $finish;
@@ -45,7 +45,7 @@ wire ~TYP[5] ~GENSYM[maskXor][0]  = ~ARG[5] ^ ~ARG[5];
 wire ~TYP[5] ~GENSYM[checked][1]  = ~ARG[4] ^ ~SYM[0];
 wire ~TYP[5] ~GENSYM[expected][2] = ~ARG[5] ^ ~SYM[0];
 
-always @(posedge ~IF ~ISGATED[1] ~THEN ~ARG[1][1] ~ELSE ~ARG[1] ~FI~IF ~ISSYNC[2] ~THEN ~ELSE or negedge ~ARG[2]~FI) begin
+always @(posedge ~IF ~ISGATED[1] ~THEN ~ARG[1][1] ~ELSE ~ARG[1] ~FI) begin
   if (~SYM[1] !== ~SYM[2]) begin
     $display(\"@%0tns: %s, expected: %b, actual: %b\", $time, ~LIT[3], ~ARG[5], ~ARG[4]);
     $finish;

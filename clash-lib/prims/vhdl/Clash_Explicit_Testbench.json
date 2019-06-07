@@ -152,9 +152,9 @@ begin
   -- pragma translate_off
   ~SYM[2] <= ~ARG[4];
   ~SYM[3] <= ~ARG[5];
-  process(~IF ~ISGATED[1] ~THEN~SYM[4]~ELSE~ARG[1]~FI~IF ~ISSYNC[2] ~THEN ~ELSE,~ARG[2]~FI) is
+  process(~IF ~ISGATED[1] ~THEN~SYM[4]~ELSE~ARG[1]~FI) is
   begin
-    if (rising_edge(~IF ~ISGATED[1] ~THEN~SYM[4]~ELSE~ARG[1]~FI)~IF ~ISSYNC[2] ~THEN ~ELSE or falling_edge(~ARG[2])~FI) then
+    if (rising_edge(~IF ~ISGATED[1] ~THEN~SYM[4]~ELSE~ARG[1]~FI)) then
       assert (~INCLUDENAME[0].non_std_match(toSLV(~SYM[2]),toSLV(~SYM[3]))) report (~LIT[3] & \", expected: \" & ~INCLUDENAME[0].slv2string(toSLV(~SYM[3])) & \", actual: \" & ~INCLUDENAME[0].slv2string(toSLV(~SYM[2]))) severity error;
     end if;
   end process;
