@@ -545,16 +545,16 @@ containing the top level entity.
 -}
 
 {- $mac4
-There are multiple reasons as to why might you want to create a so-called
+There are multiple reasons as to why you might want to create a so-called
 /test bench/ for the generated HDL:
 
   * You want to compare post-synthesis / post-place&route behavior to that of
     the behavior of the original generated HDL.
-  * Need representative stimuli for your dynamic power calculations
+  * Need representative stimuli for your dynamic power calculations.
   * Verify that the HDL output of the Clash compiler has the same behavior as
     the Haskell / Clash specification.
 
-For these purposes, you can have Clash compiler generate a /test bench/. In
+For these purposes, you can have the Clash compiler generate a /test bench/. In
 order for the Clash compiler to do this you need to do one of the following:
 
   * Create a function called /testBench/ in the root module.
@@ -610,7 +610,7 @@ show, as the global clock will be stopped after 4 ticks.
 You should now again run @:vhdl@ in the interpreter; this time the compiler
 will take a bit longer to generate all the circuits. Inside the @.\/vhdl\/MAC@
 directory you will now also find a /mac_testbench/ subdirectory containing all
-the @vhdl@ files for the /test bench/
+the @vhdl@ files for the /test bench/.
 
 
 After compilation is finished you  load all the files in your favourite VHDL
@@ -672,8 +672,8 @@ structure.
 
     We can also implement the original @macT@ function as a
     @'Control.Monad.State.Lazy.State'@
-    monadic computation. First we must an extra import statement, right after
-    the import of "Clash.Prelude":
+    monadic computation. First we must add an extra import statement, right
+    after the import of "Clash.Prelude":
 
     @
     import Control.Monad.State
@@ -751,7 +751,7 @@ write:
 g a b c = (b1,b2,i2)
   where
     (i1,b1) = 'unbundle' ('mealy' f 0 ('bundle' (a,b)))
-    (i2,b2) = 'unbundle' ('mealy' f 3 ('bundle' (i1,c)))
+    (i2,b2) = 'unbundle' ('mealy' f 3 ('bundle' (c,i1)))
 @
 
 Why do we need these 'bundle', and 'unbundle' functions you might ask? When we
@@ -844,7 +844,7 @@ Using 'mealyB' we can define @g@ as:
 g a b c = (b1,b2,i2)
   where
     (i1,b1) = 'mealyB' f 0 (a,b)
-    (i2,b2) = 'mealyB' f 3 (i1,c)
+    (i2,b2) = 'mealyB' f 3 (c,i1)
 @
 
 The general rule of thumb is: always use 'mealy', unless you do pattern matching
@@ -864,7 +864,7 @@ Clash compiler, specifically, they allow us to:
       means deleting the cache; changing this file will result in /undefined/
       behavior.
 
-Functions with a 'Synthesize' annotation do must adhere to the following
+Functions with a 'Synthesize' annotation must adhere to the following
 restrictions:
 
     * Although functions with a 'Synthesize' annotation can of course depend
@@ -1436,7 +1436,7 @@ Clash supports designs multiple /clock/ (and /reset/) domains, though perhaps in
 a slightly limited form. What is possible is:
 
 * Create clock primitives, such as PPLs, which have an accompanying HDL primitive
-  (described in later on in this <#primitives tutorial>)
+  (described <#primitives later on> in this tutorial).
 * Explicitly assign clocks to memory primitives.
 * Synchronize between differently-clocked parts of your design in a type-safe
   way.
@@ -1573,7 +1573,6 @@ ptrCompareT addrSize\@SNat flagGen (bin,ptr,flag) (s_ptr,inc) =
     bin' = bin + 'boolToBV' (inc && not flag)
     ptr' = (bin' \`shiftR\` 1) \`xor\` bin'
     addr = 'truncateB' bin
-
     flag' = flagGen ptr' s_ptr
 @
 
@@ -1668,9 +1667,9 @@ Ultimately, the whole file containing our FIFO design will look like this:
 @
 module MultiClockFifo where
 
-import Clash.Prelude
 import Clash.Explicit.Prelude
 import Data.Maybe             (isJust)
+import Data.Constraint.Nat    (leTrans)
 
 fifoMem wclk rclk addrSize wfull raddr wdataM =
   'Clash.Explicit.Prelude.asyncRam' wclk rclk
@@ -1686,7 +1685,6 @@ ptrCompareT addrSize\@SNat flagGen (bin,ptr,flag) (s_ptr,inc) =
     bin' = bin + 'boolToBV' (inc && not flag)
     ptr' = (bin' \`shiftR\` 1) \`xor\` bin'
     addr = 'truncateB' bin
-
     flag' = flagGen ptr' s_ptr
 
 -- FIFO empty: when next pntr == synchronized wptr or on reset
