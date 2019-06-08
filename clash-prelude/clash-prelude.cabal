@@ -285,7 +285,8 @@ test-suite unittests
       tasty         >= 1.2      && < 1.3,
       tasty-hunit
 
-  Other-Modules: Clash.Tests.DerivingDataRepr
+  Other-Modules: Clash.Tests.BitVector
+                 Clash.Tests.DerivingDataRepr
                  Clash.Tests.DerivingDataReprTypes
                  Clash.Tests.Undefined
 

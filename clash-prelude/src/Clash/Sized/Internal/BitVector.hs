@@ -1,6 +1,7 @@
 {-|
 Copyright  :  (C) 2013-2016, University of Twente,
                   2016     , Myrtle Software Ltd
+                  2019     , Gergő Érdi
 License    :  BSD2 (see the file LICENSE)
 Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
 -}
@@ -18,6 +19,7 @@ Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
 {-# LANGUAGE TypeFamilies               #-}
 {-# LANGUAGE TypeOperators              #-}
 {-# LANGUAGE UndecidableInstances       #-}
+{-# LANGUAGE ViewPatterns               #-}
 
 {-# LANGUAGE Unsafe #-}
 
@@ -124,6 +126,7 @@ module Clash.Sized.Internal.BitVector
   -- ** Other
   , undefError
   , checkUnpackUndef
+  , bitPattern
   )
 where
 
@@ -135,12 +138,13 @@ import Data.Default.Class         (Default (..))
 import Data.Proxy                 (Proxy (..))
 import Data.Typeable              (Typeable, typeOf)
 import GHC.Generics               (Generic)
+import Data.Maybe                 (fromMaybe)
 import GHC.Integer                (smallInteger)
 import GHC.Prim                   (dataToTag#)
 import GHC.Stack                  (HasCallStack, withFrozenCallStack)
 import GHC.TypeLits               (KnownNat, Nat, type (+), type (-), natVal)
 import GHC.TypeLits.Extra         (Max)
-import Language.Haskell.TH        (Q, TExp, TypeQ, appT, conT, litT, numTyLit, sigE)
+import Language.Haskell.TH        (Q, TExp, TypeQ, appT, conT, litT, numTyLit, sigE, Lit(..), litE, Pat, litP)
 import Language.Haskell.TH.Syntax (Lift(..))
 import Test.QuickCheck.Arbitrary  (Arbitrary (..), CoArbitrary (..),
                                    arbitraryBoundedIntegral,
@@ -985,3 +989,39 @@ isLike (BV cMask c) (BV eMask e) = e' == c' && e' == c''
     -- | checked with undefined bits set to 1
     c'' = (c .|. cMask) .&. complement eMask
 {-# NOINLINE isLike #-}
+
+fromBits :: [Bit] -> Integer
+fromBits = L.foldl (\v b -> v `shiftL` 1 .|. fromIntegral b) 0
+
+-- | Template Haskell macro for generating a pattern matching on some
+-- bits of a value.
+--
+-- This macro compiles to an efficient view pattern that matches the
+-- bits of a given value against the bits specified in the
+-- pattern. The scrutinee can be any type that is an instance of the
+-- 'Num', 'Bits' and 'Eq' typeclasses.
+--
+-- The bit pattern is specified by a string which contains @\'0\'@ or
+-- @\'1\'@ for matching a bit, or @\'.\'@ for bits which are not matched.
+--
+-- The following example matches a byte against two bit patterns where
+-- some bits are relevant and others are not:
+--
+-- @
+--   decode :: Unsigned 8 -> Maybe Bool
+--   decode $(bitPattern "00...110") = Just True
+--   decode $(bitPattern "10..0001") = Just False
+--   decode _ = Nothing
+-- @
+bitPattern :: String -> Q Pat
+bitPattern s = [p| (($mask .&.) -> $target) |]
+  where
+    bs = parse <$> s
+
+    mask = litE . IntegerL . fromBits $ maybe 0 (const 1) <$> bs
+    target = litP . IntegerL . fromBits $ fromMaybe 0 <$> bs
+
+    parse '.' = Nothing
+    parse '0' = Just 0
+    parse '1' = Just 1
+    parse c = error $ "Invalid bit pattern: " ++ show c
