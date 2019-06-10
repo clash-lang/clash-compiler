@@ -20,8 +20,10 @@ module Clash.GHC.LoadModules
   )
 where
 
+#ifndef USE_GHC_PATHS
 #ifndef TOOL_VERSION_ghc
 #error TOOL_VERSION_ghc undefined
+#endif
 #endif
 
 -- External Modules
@@ -44,11 +46,16 @@ import           Data.Maybe                      (catMaybes, listToMaybe, mapMay
 import qualified Data.Text                       as Text
 import qualified Data.Time.Clock                 as Clock
 import           Language.Haskell.TH.Syntax      (lift)
+
+#ifdef USE_GHC_PATHS
+import           GHC.Paths                       (libdir)
+#else
 import           System.Exit                     (ExitCode (..))
 import           System.IO                       (hGetLine)
 import           System.IO.Error                 (tryIOError)
 import           System.Process                  (runInteractiveCommand,
                                                   waitForProcess)
+#endif
 
 -- GHC API
 import qualified Annotations
@@ -90,6 +97,9 @@ import           Clash.Annotations.BitRepresentation.Internal
   (DataRepr', dataReprAnnToDataRepr')
 
 ghcLibDir :: IO FilePath
+#ifdef USE_GHC_PATHS
+ghcLibDir = return libdir
+#else
 ghcLibDir = do
   (libDirM,exitCode) <- getProcessOutput $ "ghc-" ++ TOOL_VERSION_ghc ++ " --print-libdir"
   case exitCode of
@@ -113,6 +123,7 @@ getProcessOutput command =
      output   <- either (const Nothing) Just <$> tryIOError (hGetLine pOut)
      -- return both the output and the exit code.
      return (output, exitCode)
+#endif
 
 loadModules
   :: FilePath
