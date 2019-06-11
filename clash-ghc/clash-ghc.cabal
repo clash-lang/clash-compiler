@@ -61,6 +61,12 @@ flag dynamic
   default: False
   manual: True
 
+flag use-ghc-paths
+  description:
+    Locate the GHC core libraries using the `ghc-paths` package.  Note: this flag may make binaries less relocatable, by hard-coding an absolute path to the core libraries.
+  default: False
+  manual: True
+
 executable clash
   Main-Is:            src-ghc/Batch.hs
   Build-Depends:      base, clash-ghc
@@ -144,6 +150,9 @@ library
                       primitive                 >= 0.5.0.1  && < 1.0,
                       template-haskell          >= 2.8.0.0  && < 2.15,
                       vector                    >= 0.11     && < 1.0
+  if flag(use-ghc-paths)
+    Build-Depends:    ghc-paths
+    CPP-Options:      -DUSE_GHC_PATHS=1
 
   if os(windows)
     Build-Depends:    Win32                     >= 2.3.1    && < 2.9
