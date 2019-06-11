@@ -370,7 +370,7 @@ verilogRecSel
   -> Int
   -> VerilogM Doc
 verilogRecSel ty i = case modifier 0 (Indexed (ty,0,i)) of
-  Just (start,end) -> brackets (int start <> colon <> int end)
+  Just (start,end,_resTy) -> brackets (int start <> colon <> int end)
   _ -> error "Can't make a record selector"
 
 decls :: [Declaration] -> VerilogM Doc
@@ -539,14 +539,15 @@ inst_ (NetDecl' _ _ _ _) = return Nothing
 
 -- | Calculate the beginning and end index into a variable, to get the
 -- desired field.
+-- Also returns the HWType of the result.
 modifier
   :: Int
   -- ^ Offset, only used when we have nested modifiers
   -> Modifier
-  -> Maybe (Int,Int)
-modifier offset (Sliced (BitVector _,start,end)) = Just (start+offset,end+offset)
+  -> Maybe (Int,Int,HWType)
+modifier offset (Sliced (BitVector _,start,end)) = Just (start+offset,end+offset, BitVector (start-end+1))
 
-modifier offset (Indexed (ty@(SP _ args),dcI,fI)) = Just (start+offset,end+offset)
+modifier offset (Indexed (ty@(SP _ args),dcI,fI)) = Just (start+offset,end+offset, argTy)
   where
     argTys   = snd $ args !! dcI
     argTy    = argTys !! fI
@@ -555,7 +556,7 @@ modifier offset (Indexed (ty@(SP _ args),dcI,fI)) = Just (start+offset,end+offse
     start    = typeSize ty - 1 - conSize ty - other
     end      = start - argSize + 1
 
-modifier offset (Indexed (ty@(Product _ _ argTys),_,fI)) = Just (start+offset,end+offset)
+modifier offset (Indexed (ty@(Product _ _ argTys),_,fI)) = Just (start+offset,end+offset, argTy)
   where
     argTy   = argTys !! fI
     argSize = typeSize argTy
@@ -563,7 +564,7 @@ modifier offset (Indexed (ty@(Product _ _ argTys),_,fI)) = Just (start+offset,en
     start   = typeSize ty - 1 - otherSz
     end     = start - argSize + 1
 
-modifier offset (Indexed (ty@(Clock _ _ Gated),_,fI)) = Just (start+offset,end+offset)
+modifier offset (Indexed (ty@(Clock _ _ Gated),_,fI)) = Just (start+offset,end+offset, argTy)
   where
     argTys  = [Bit, Bool]
     argTy   = argTys !! fI
@@ -572,34 +573,34 @@ modifier offset (Indexed (ty@(Clock _ _ Gated),_,fI)) = Just (start+offset,end+o
     start   = typeSize ty - 1 - otherSz
     end     = start - argSize + 1
 
-modifier offset (Indexed (ty@(Vector _ argTy),1,0)) = Just (start+offset,end+offset)
+modifier offset (Indexed (ty@(Vector _ argTy),1,0)) = Just (start+offset,end+offset, argTy)
   where
     argSize = typeSize argTy
     start   = typeSize ty - 1
     end     = start - argSize + 1
 
-modifier offset (Indexed (ty@(Vector _ argTy),1,1)) = Just (start+offset,offset)
+modifier offset (Indexed (ty@(Vector _ argTy),1,1)) = Just (start+offset,offset, argTy)
   where
     argSize = typeSize argTy
     start   = typeSize ty - argSize - 1
 
-modifier offset (Indexed (ty@(RTree 0 _),0,0)) = Just (start+offset,offset)
+modifier offset (Indexed (ty@(RTree 0 argTy),0,0)) = Just (start+offset,offset, argTy)
   where
     start   = typeSize ty - 1
 
-modifier offset (Indexed (ty@(RTree _ _),1,0)) = Just (start+offset,end+offset)
+modifier offset (Indexed (ty@(RTree _ argTy),1,0)) = Just (start+offset,end+offset, argTy)
   where
     start   = typeSize ty - 1
     end     = typeSize ty `div` 2
 
-modifier offset (Indexed (ty@(RTree _ _),1,1)) = Just (start+offset,offset)
+modifier offset (Indexed (ty@(RTree _ argTy),1,1)) = Just (start+offset,offset, argTy)
   where
     start   = (typeSize ty `div` 2) - 1
 
 -- This is a HACK for Clash.Driver.TopWrapper.mkOutput
 -- Vector's don't have a 10'th constructor, this is just so that we can
 -- recognize the particular case
-modifier offset (Indexed (ty@(Vector _ argTy),10,fI)) = Just (start+offset,end+offset)
+modifier offset (Indexed (ty@(Vector _ argTy),10,fI)) = Just (start+offset,end+offset, argTy)
   where
     argSize = typeSize argTy
     start   = typeSize ty - (fI * argSize) - 1
@@ -608,7 +609,7 @@ modifier offset (Indexed (ty@(Vector _ argTy),10,fI)) = Just (start+offset,end+o
 -- This is a HACK for Clash.Driver.TopWrapper.mkOutput
 -- RTree's don't have a 10'th constructor, this is just so that we can
 -- recognize the particular case
-modifier offset (Indexed (ty@(RTree _ argTy),10,fI)) = Just (start+offset,end+offset)
+modifier offset (Indexed (ty@(RTree _ argTy),10,fI)) = Just (start+offset,end+offset, argTy)
   where
     argSize = typeSize argTy
     start   = typeSize ty - (fI * argSize) - 1
@@ -616,12 +617,13 @@ modifier offset (Indexed (ty@(RTree _ argTy),10,fI)) = Just (start+offset,end+of
 
 modifier offset (Indexed (CustomSP _id _dataRepr _size args,dcI,fI)) =
   case bitRanges (anns !! fI) of
-    [(start,end)] -> Just (start+offset,end+offset)
+    [(start,end)] -> Just (start+offset,end+offset, argTy)
     _ -> error ($(curLoc) ++ "Cannot handle projection out of a non-contiguously encoded field")
  where
-  (ConstrRepr' _name _n _mask _value anns, _, _argTys) = args !! dcI
+  (ConstrRepr' _name _n _mask _value anns, _, argTys) = args !! dcI
+  argTy = argTys !! fI
 
-modifier offset (DC (ty@(SP _ _),_)) = Just (start+offset,end+offset)
+modifier offset (DC (ty@(SP _ _),_)) = Just (start+offset,end+offset, ty)
   where
     start = typeSize ty - 1
     end   = typeSize ty - conSize ty
@@ -629,10 +631,10 @@ modifier offset (DC (ty@(SP _ _),_)) = Just (start+offset,end+offset)
 modifier offset (Nested m1 m2) = do
   case modifier offset m1 of
     Nothing    -> modifier offset m2
-    Just (s,e) -> case modifier e m2 of
+    Just (s,e,argTy) -> case modifier e m2 of
       -- In case the second modifier is `Nothing` that means we want the entire
       -- thing calculated by the first modifier
-      Nothing -> Just (s,e)
+      Nothing -> Just (s,e,argTy)
       m       -> m
 
 modifier _ _ = Nothing
@@ -678,7 +680,9 @@ expr_ _ (Identifier id_ (Just (Indexed ((BitVector w),_,1)))) = do
 
 expr_ _ (Identifier id_ (Just m)) = case modifier 0 m of
   Nothing          -> stringS id_
-  Just (start,end) -> stringS id_ <> brackets (int start <> colon <> int end)
+  Just (start,end,resTy) -> case resTy of
+    Signed _ -> "$signed" <> parens (stringS id_ <> brackets (int start <> colon <> int end))
+    _        ->                      stringS id_ <> brackets (int start <> colon <> int end)
 
 expr_ b (DataCon _ (DC (Void {}, -1)) [e]) = expr_ b e
 

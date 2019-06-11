@@ -195,6 +195,7 @@ runClashTest =
         , runTest ("tests" </> "shouldwork" </> "Numbers") defBuild [] "Resize3"      (["","Resize3_testBench"],"Resize3_testBench",True)
         , runTest ("tests" </> "shouldwork" </> "Numbers") defBuild [] "SatMult"      ([""],"SatMult_topEntity",False)
         , runTest ("tests" </> "shouldwork" </> "Numbers") defBuild ["-itests/shouldwork/Numbers"] "ShiftRotate"         (["","ShiftRotate_testBench"],"ShiftRotate_testBench",True)
+        , runTest ("tests" </> "shouldwork" </> "Numbers") defBuild [] "SignedProjectionTB"   (["","SignedProjectionTB_testBench"],"SignedProjectionTB_testBench",True)
         , runTest ("tests" </> "shouldwork" </> "Numbers") defBuild [] "SignedZero"   (["","SignedZero_testBench"],"SignedZero_testBench",True)
         , runTest ("tests" </> "shouldwork" </> "Numbers") defBuild [] "Signum"   (["","Signum_testBench"],"Signum_testBench",True)
         , runTest ("tests" </> "shouldwork" </> "Numbers") defBuild [] "Strict"       (["","Strict_testBench"],"Strict_testBench",True)
