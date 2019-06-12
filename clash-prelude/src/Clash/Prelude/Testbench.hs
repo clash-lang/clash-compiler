@@ -15,9 +15,10 @@ Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
 module Clash.Prelude.Testbench
   ( -- * Testbench functions for circuits
     assert
-  , stimuliGenerator
+  , ignoreFor
   , outputVerifier
   , outputVerifierBitVector
+  , stimuliGenerator
   )
 where
 
@@ -26,6 +27,7 @@ import GHC.TypeLits                       (KnownNat)
 import qualified Clash.Explicit.Testbench as E
 import           Clash.Signal
   (HiddenClockReset, Signal, hideClockReset)
+import Clash.Promoted.Nat                 (SNat)
 import Clash.Sized.BitVector              (BitVector)
 import Clash.Sized.Vector                 (Vec)
 import Clash.XException                   (ShowX)
@@ -130,3 +132,18 @@ outputVerifierBitVector
   -> Signal domain Bool -- ^ Indicator that all samples are verified
 outputVerifierBitVector = hideClockReset E.outputVerifierBitVector
 {-# INLINE outputVerifierBitVector #-}
+
+-- | Ignore signal for a number of cycles, while outputting a static value.
+ignoreFor
+  :: HiddenClockReset domain gated synchronous
+  => SNat n
+  -- ^ Number of cycles to ignore incoming signal
+  -> a
+  -- ^ Value function produces when ignoring signal
+  -> Signal domain a
+  -- ^ Incoming signal
+  -> Signal domain a
+  -- ^ Either a passthrough of the incoming signal, or the static value
+  -- provided as the second argument.
+ignoreFor = hideClockReset E.ignoreFor
+{-# INLINE ignoreFor #-}

@@ -46,8 +46,12 @@ import Clash.Signal.Internal
 --
 -- Consumes a DDR input signal and produces a regular signal containing a pair
 -- of values.
+--
+-- >>> printX $ sampleN 5 $ ddrIn systemClockGen syncResetGen (-1,-2,-3) (fromList [0..10])
+-- [(X,X),((-1),(-2)),((-3),2),(3,4),(5,6)]
 ddrIn
   :: ( HasCallStack
+     , Undefined a
      , fast ~ 'Dom n pFast
      , slow ~ 'Dom n (2*pFast))
   => Clock slow gated
@@ -68,6 +72,7 @@ ddrIn clk rst (i0,i1,i2) = withFrozenCallStack $ ddrIn# clk rst i0 i1 i2
 ddrIn#
   :: forall a slow fast n pFast gated synchronous
    . ( HasCallStack
+     , Undefined a
      , fast ~ 'Dom n pFast
      , slow ~ 'Dom n (2*pFast))
   => Clock slow gated
@@ -78,9 +83,9 @@ ddrIn#
   -> Signal fast a
   -> Signal slow (a,a)
 ddrIn# (Clock {}) (Sync rst) i0 i1 i2 =
-  go ((errorX "ddrIn: initial value 0 undefined")
-     ,(errorX "ddrIn: initial value 1 undefined")
-     ,(errorX "ddrIn: initial value 2 undefined"))
+  go ((deepErrorX "ddrIn: initial value 0 undefined")
+     ,(deepErrorX "ddrIn: initial value 1 undefined")
+     ,(deepErrorX "ddrIn: initial value 2 undefined"))
      rst
   where
     go :: (a,a,a) -> Signal slow Bool -> Signal fast a -> Signal slow (a,a)
@@ -89,20 +94,20 @@ ddrIn# (Clock {}) (Sync rst) i0 i1 i2 =
       in o0 `seqX` o1 `seqX` (o0,o1) :- (rt `seq` as `seq` go (o0',o1',o2') rs xs)
 
 ddrIn# (Clock {}) (Async rst) i0 i1 i2 =
-  go ((errorX "ddrIn: initial value 0 undefined")
-     ,(errorX "ddrIn: initial value 1 undefined")
-     ,(errorX "ddrIn: initial value 2 undefined"))
+  go ((deepErrorX "ddrIn: initial value 0 undefined")
+     ,(deepErrorX "ddrIn: initial value 1 undefined")
+     ,(deepErrorX "ddrIn: initial value 2 undefined"))
      rst
   where
     go :: (a,a,a) -> Signal slow Bool -> Signal fast a -> Signal slow (a,a)
     go (o0,o1,o2) ~(r :- rs) as@(~(x0 :- x1 :- xs)) =
-      let (o0',o1',o2') = if r then (i0,i1,i2) else (o0,o1,o2)
-      in o0' `seqX` o1' `seqX`(o0',o1') :- (as `seq` go (o2',x0,x1) rs xs)
+      let (o0',o1',o2',o3',o4') = if r then (i0,i1,i0,i1,i2) else (o0,o1,o2,x0,x1)
+      in o0' `seqX` o1' `seqX`(o0',o1') :- (as `seq` go (o2',o3',o4') rs xs)
 
 ddrIn# (GatedClock _ _ ena) (Sync rst) i0 i1 i2 =
-  go ((errorX "ddrIn: initial value 0 undefined")
-     ,(errorX "ddrIn: initial value 1 undefined")
-     ,(errorX "ddrIn: initial value 2 undefined"))
+  go ((deepErrorX "ddrIn: initial value 0 undefined")
+     ,(deepErrorX "ddrIn: initial value 1 undefined")
+     ,(deepErrorX "ddrIn: initial value 2 undefined"))
      rst
      ena
   where
@@ -111,26 +116,29 @@ ddrIn# (GatedClock _ _ ena) (Sync rst) i0 i1 i2 =
       let (o0',o1',o2') = if r then (i0,i1,i2) else (o2,x0,x1)
       in o0 `seqX` o1 `seqX` (o0,o1)
            :- (rt `seq` as `seq` if e then go (o0',o1',o2') rs es xs
-                                      else go (o0 ,o1 ,o2)    rs es xs)
+                                      else go (o0 ,o1 ,o2)  rs es xs)
 
 ddrIn# (GatedClock _ _ ena) (Async rst) i0 i1 i2 =
-  go ((errorX "ddrIn: initial value 0 undefined")
-     ,(errorX "ddrIn: initial value 1 undefined")
-     ,(errorX "ddrIn: initial value 2 undefined"))
+  go ((deepErrorX "ddrIn: initial value 0 undefined")
+     ,(deepErrorX "ddrIn: initial value 1 undefined")
+     ,(deepErrorX "ddrIn: initial value 2 undefined"))
      rst
      ena
   where
     go :: (a,a,a) -> Signal slow Bool -> Signal slow Bool -> Signal fast a -> Signal slow (a,a)
     go (o0,o1,o2) ~(r :- rs) ~(e :- es) as@(~(x0 :- x1 :- xs)) =
-      let (o0',o1',o2') = if r then (i0,i1,i2) else (o0,o1,o2)
+      let (o0',o1',o2',o3',o4') = if r then (i0,i1,i0,i1,i2) else (o0,o1,o2,x0,x1)
       in o0' `seqX` o1' `seqX` (o0',o1')
-           :- (as `seq` if e then go (o2',x0 ,x1)   rs es xs
+           :- (as `seq` if e then go (o2',o3',o4') rs es xs
                              else go (o0',o1',o2') rs es xs)
 {-# NOINLINE ddrIn# #-}
 
 -- | DDR output primitive
 --
 -- Produces a DDR output signal from a normal signal of pairs of input.
+--
+-- >>> sampleN 7 $ ddrOut systemClockGen asyncResetGen (-1) (fromList [(0,1),(2,3),(4,5)])
+-- [-1,-1,-1,2,3,4,5]
 ddrOut
   :: ( HasCallStack
      , Undefined a
@@ -163,7 +171,7 @@ ddrOut# clk rst i0 xs ys =
     -- That is why we drop the first value of the stream.
     let (_ :- out) = zipSig xs' ys' in out
   where
-    xs' = register clk rst i0 xs
-    ys' = register clk rst i0 ys
+    xs' = register# clk rst (error "ddrOut: unreachable error") i0 xs
+    ys' = register# clk rst (deepErrorX "ddrOut: initial value undefined") i0 ys
     zipSig (a :- as) (b :- bs) = a :- b :- zipSig as bs
 {-# NOINLINE ddrOut# #-}

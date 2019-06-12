@@ -9,7 +9,7 @@ For general information about DDR primitives see "Clash.Explicit.DDR".
 
 Note that a synchronous reset is only available on certain devices,
 see ALTDDIO userguide for the specifics:
-https://www.altera.com/content/dam/altera-www/global/en_US/pdfs/literature/ug/ug_altddio.pdf
+<https://www.altera.com/content/dam/altera-www/global/en_US/pdfs/literature/ug/ug_altddio.pdf>
 -}
 
 {-# LANGUAGE CPP              #-}

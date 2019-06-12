@@ -38,6 +38,8 @@ import           Clash.Signal
 import           Clash.Sized.Unsigned (Unsigned)
 import           Clash.Sized.Vector   (Vec, length, toList)
 
+import           Clash.XException     (Undefined)
+
 -- | An asynchronous/combinational ROM with space for @n@ elements
 --
 -- Additional helpful information:
@@ -91,7 +93,7 @@ asyncRom# content rd = arr ! rd
 -- * See "Clash.Sized.Fixed#creatingdatafiles" and "Clash.Prelude.BlockRam#usingrams"
 -- for ideas on how to use ROMs and RAMs
 rom
-  :: (KnownNat n, KnownNat m, HiddenClock domain gated)
+  :: (Undefined a, KnownNat n, KnownNat m, HiddenClock domain gated)
   => Vec n a               -- ^ ROM content
                            --
                            -- __NB:__ must be a constant
@@ -110,7 +112,7 @@ rom = hideClock E.rom
 -- * See "Clash.Sized.Fixed#creatingdatafiles" and "Clash.Prelude.BlockRam#usingrams"
 -- for ideas on how to use ROMs and RAMs
 romPow2
-  :: (KnownNat n, HiddenClock domain gated)
+  :: (Undefined a, KnownNat n, HiddenClock domain gated)
   => Vec (2^n) a         -- ^ ROM content
                          --
                          -- __NB:__ must be a constant
