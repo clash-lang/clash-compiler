@@ -3,30 +3,28 @@
     , "kind" : "Declaration"
     , "type" :
 "asyncRam#
-  :: HasCallStack      -- ARG[0]
-  => Clock wdom wgated -- ^ wclk, ARG[1]
-  -> Clock rdom rgated -- ^ rclk, ARG[2]
-  -> SNat n            -- ^ sz,   ARG[3]
-  -> Signal rdom Int   -- ^ rd,   ARG[4]
-  -> Signal wdom Bool  -- ^ en,   ARG[5]
-  -> Signal wdom Int   -- ^ wr,   ARG[6]
-  -> Signal wdom a     -- ^ din,  ARG[7]
+  :: ( HasCallStack              -- ARG[0]
+     , KnownDomain wdom wconf    -- ARG[1]
+     , KnownDomain rdom rconf )  -- ARG[2]
+  => Clock wdom                  -- ^ wclk, ARG[3]
+  -> Clock rdom                  -- ^ rclk, ARG[4]
+  -> Enable wdom                 -- ^ wen,  ARG[5]
+  -> SNat n                      -- ^ sz,   ARG[6]
+  -> Signal rdom Int             -- ^ rd,   ARG[7]
+  -> Signal wdom Bool            -- ^ en,   ARG[8]
+  -> Signal wdom Int             -- ^ wr,   ARG[9]
+  -> Signal wdom a               -- ^ din,  ARG[10]
   -> Signal rdom a"
     , "template" :
 "// asyncRam begin
-logic [~SIZE[~TYP[7]]-1:0] ~GENSYM[RAM][0] [0:~LIT[3]-1];~IF ~ISGATED[1] ~THEN
-always @(posedge ~ARG[1][1]) begin : ~GENSYM[~COMPNAME_Ram][1]
-  if (~ARG[5] & ~ARG[1][0]) begin
-    ~SYM[0][~ARG[6]] <= ~TOBV[~ARG[7]][~TYP[7]];
+logic [~SIZE[~TYP[10]]-1:0] ~GENSYM[RAM][0] [0:~LIT[6]-1];
+always @(posedge ~ARG[3]) begin : ~GENSYM[~COMPNAME_Ram][1]
+  if (~IF ~ISENABLED[5] ~THEN ~ARG[5] & ~ELSE ~FI ~ARG[8]) begin
+    ~SYM[0][~ARG[9]] <= ~TOBV[~ARG[10]][~TYP[10]];
   end
-end~ELSE
-always @(posedge ~ARG[1]) begin : ~SYM[1]
-  if (~ARG[5]) begin
-    ~SYM[0][~ARG[6]] <= ~TOBV[~ARG[7]][~TYP[7]];
-  end
-end~FI
+end
 
-assign ~RESULT = ~FROMBV[~SYM[0][\\~ARG[4]\\]][~TYPO];
+assign ~RESULT = ~FROMBV[~SYM[0][\\~ARG[7]\\]][~TYPO];
 // asyncRam end"
     }
   }

@@ -1,52 +1,42 @@
 [ { "BlackBox" :
-    { "name" : "Clash.Signal.Internal.clockGate"
+    { "name" : "Clash.Signal.Internal.toEnabledClock"
     , "kind" : "Declaration"
     , "type" :
-"clockGate
-  :: Clock domain gated -- ARG[0]
-  -> Signal domain Bool -- ARG[1]
-  -> Clock domain 'Gated"
+"toEnabledClock
+  :: Clock dom -- ARG[0]
+  -> Signal dom Bool -- ARG[1]
+  -> Clock dom"
     , "template" :
-"// clockGate begin~IF ~ISGATED[0] ~THEN
+"// toEnabledClock begin~IF ~ISENABLED[0] ~THEN
 assign ~RESULT = {~ARG[0][1],~ARG[0][0] & ~ARG[1]};~ELSE
 assign ~RESULT = {~ARG[0],~ARG[1]};~FI
-// clockGate end"
+// toEnabledClock end"
     }
   }
 , { "BlackBox" :
-    { "name"      : "Clash.Signal.Internal.unsafeFromAsyncReset"
+    { "name"      : "Clash.Signal.Internal.unsafeFromReset"
     , "workInfo"  : "Never"
     , "kind" : "Expression"
     , "type" :
-"unsafeFromAsyncReset :: Reset domain Asynchronous -> Signal domain Bool"
+"unsafeFromReset :: Reset dom -> Signal dom Bool"
     , "template" : "~ARG[0]"
     }
   }
 , { "BlackBox" :
-    { "name"      : "Clash.Signal.Internal.unsafeToAsyncReset"
-    , "workInfo"  : "Never"
+    { "name"      : "Clash.Signal.Internal.unsafeToReset"
     , "kind" : "Expression"
+    , "workInfo"  : "Never"
     , "type" :
-"unsafeToAsyncReset :: Signal domain Bool -> Reset domain Asynchronous"
-    , "template" : "~ARG[0]"
+"unsafeToReset :: KnownDomain dom conf => Signal dom Bool -> Reset dom"
+    , "template" : "~ARG[1]"
     }
   }
 , { "BlackBox" :
-    { "name"      : "Clash.Signal.Internal.fromSyncReset"
-    , "workInfo"  : "Never"
-    , "kind" : "Expression"
-    , "type" :
-"fromSyncReset :: Reset domain Synchronous -> Signal domain Bool"
-    , "template" : "~ARG[0]"
-    }
-  }
-, { "BlackBox" :
-    { "name"      : "Clash.Signal.Internal.unsafeToSyncReset"
-    , "workInfo"  : "Never"
-    , "kind" : "Expression"
-    , "type" :
-"unsafeToSyncReset :: Signal domain Bool -> Reset domain Synchronous"
-    , "template" : "~ARG[0]"
+    { "name" : "Clash.Signal.Internal.tbEnableGen"
+    , "workInfo" : "Always"
+    , "kind" : "Declaration"
+    , "type" : "tbEnableGen :: Enable dom"
+    , "template" : "assign ~RESULT = 1'b1;"
     }
   }
 ]

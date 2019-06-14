@@ -4,11 +4,13 @@
     , "kind"      : "Expression"
     , "type" :
 "unsafeSynchronizer
-  :: Clock dom1 g1
-  -> Clock dom2 g2
-  -> Signal dom1 a -- ARG[2]
+  :: ( KnownDomain dom1 conf1    -- ARG[0]
+     , KnownDomain dom2 conf2 )  -- ARG[1]
+  => Clock dom1                  -- ARG[2]
+  -> Clock dom2                  -- ARG[3]
+  -> Signal dom1 a               -- ARG[4]
   -> Signal dom2 a"
-    , "template"  : "~ARG[2]"
+    , "template"  : "~ARG[4]"
     }
   }
 ]

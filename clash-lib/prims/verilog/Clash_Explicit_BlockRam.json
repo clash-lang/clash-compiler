@@ -3,48 +3,49 @@
     , "kind" : "Declaration"
     , "type" :
 "blockRam#
-  :: HasCallStack    --       ARG[0]
-  => Undefined a     --       ARG[1]
-  => Clock dom gated -- clk,  ARG[2]
-  -> Vec n a         -- init, ARG[3]
-  -> Signal dom Int  -- rd,   ARG[4]
-  -> Signal dom Bool -- wren, ARG[5]
-  -> Signal dom Int  -- wr,   ARG[6]
-  -> Signal dom a    -- din,  ARG[7]
+  :: ( HasCallStack  --       ARG[0]
+     , Undefined a ) --       ARG[1]
+  => Clock dom       -- clk,  ARG[2]
+  => Enable dom      -- en,   ARG[3]
+  -> Vec n a         -- init, ARG[4]
+  -> Signal dom Int  -- rd,   ARG[5]
+  -> Signal dom Bool -- wren, ARG[6]
+  -> Signal dom Int  -- wr,   ARG[7]
+  -> Signal dom a    -- din,  ARG[8]
   -> Signal dom a"
     , "outputReg" : true
     , "template" :
 "// blockRam begin
-reg ~TYPO ~GENSYM[~RESULT_RAM][0] [0:~LENGTH[~TYP[3]]-1];
+reg ~TYPO ~GENSYM[~RESULT_RAM][0] [0:~LENGTH[~TYP[4]]-1];
 
-reg ~TYP[3] ~GENSYM[ram_init][2];
+reg ~TYP[4] ~GENSYM[ram_init][2];
 integer ~GENSYM[i][3];
 initial begin
-  ~SYM[2] = ~CONST[3];
-  for (~SYM[3]=0; ~SYM[3] < ~LENGTH[~TYP[3]]; ~SYM[3] = ~SYM[3] + 1) begin
-    ~SYM[0][~LENGTH[~TYP[3]]-1-~SYM[3]] = ~SYM[2][~SYM[3]*~SIZE[~TYPO]+:~SIZE[~TYPO]];
+  ~SYM[2] = ~CONST[4];
+  for (~SYM[3]=0; ~SYM[3] < ~LENGTH[~TYP[4]]; ~SYM[3] = ~SYM[3] + 1) begin
+    ~SYM[0][~LENGTH[~TYP[4]]-1-~SYM[3]] = ~SYM[2][~SYM[3]*~SIZE[~TYPO]+:~SIZE[~TYPO]];
   end
 end
-~IF ~ISGATED[2] ~THEN
-always @(posedge ~ARG[2][1]) begin : ~GENSYM[~RESULT_blockRam][4]~IF ~VIVADO ~THEN
-  if (~ARG[2][0]) begin
-    if (~ARG[5]) begin
-      ~SYM[0][~ARG[6]] <= ~ARG[7];
+~IF ~ISENABLED[3] ~THEN
+always @(posedge ~ARG[2]) begin : ~GENSYM[~RESULT_blockRam][4]~IF ~VIVADO ~THEN
+  if (~ARG[3]) begin
+    if (~ARG[6]) begin
+      ~SYM[0][~ARG[7]] <= ~ARG[8];
     end
-    ~RESULT <= ~SYM[0][~ARG[4]];
+    ~RESULT <= ~SYM[0][~ARG[5]];
   end~ELSE
-  if (~ARG[5] & ~ARG[2][0]) begin
-    ~SYM[0][~ARG[6]] <= ~ARG[7];
+  if (~ARG[6] & ~ARG[3]) begin
+    ~SYM[0][~ARG[7]] <= ~ARG[8];
   end
-  if (~ARG[2][0]) begin
-    ~RESULT <= ~SYM[0][~ARG[4]];
+  if (~ARG[3]) begin
+    ~RESULT <= ~SYM[0][~ARG[5]];
   end~FI
 end~ELSE
 always @(posedge ~ARG[2]) begin : ~SYM[4]
-  if (~ARG[5]) begin
-    ~SYM[0][~ARG[6]] <= ~ARG[7];
+  if (~ARG[6]) begin
+    ~SYM[0][~ARG[7]] <= ~ARG[8];
   end
-  ~RESULT <= ~SYM[0][~ARG[4]];
+  ~RESULT <= ~SYM[0][~ARG[5]];
 end~FI
 // blockRam end"
     }

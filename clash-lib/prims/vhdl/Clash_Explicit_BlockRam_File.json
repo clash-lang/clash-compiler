@@ -3,14 +3,16 @@
     , "kind" : "Declaration"
     , "type" :
 "blockRamFile#
-  :: (KnownNat m, HasCallStack)-- (ARG[0],ARG]1)
-  => Clock dom gated          -- clk,  ARG[2]
-  -> SNat n                   -- sz,   ARG[3]
-  -> FilePath                 -- file, ARG[4]
-  -> Signal dom Int           -- rd,   ARG[5]
-  -> Signal dom Bool          -- wren, ARG[6]
-  -> Signal dom Int           -- wr,   ARG[7]
-  -> Signal dom (BitVector m) -- din,  ARG[8]
+  :: ( KnownNat m             -- ARG[0]
+     , HasCallStack )         -- ARG[1]
+  => Clock dom                -- clk,  ARG[2]
+  => Enable dom               -- en,   ARG[3]
+  -> SNat n                   -- sz,   ARG[4]
+  -> FilePath                 -- file, ARG[5]
+  -> Signal dom Int           -- rd,   ARG[6]
+  -> Signal dom Bool          -- wren, ARG[7]
+  -> Signal dom Int           -- wr,   ARG[8]
+  -> Signal dom (BitVector m) -- din,  ARG[9]
   -> Signal dom (BitVector m)"
     , "template" :
 "-- blockRamFile begin
@@ -20,7 +22,7 @@
   impure function ~GENSYM[InitRamFromFile][1] (RamFileName : in string) return ~SYM[6] is
     FILE RamFile : text open read_mode is RamFileName;
     variable RamFileLine : line;
-    variable RAM : ~SYM[6](0 to ~LIT[3]-1);
+    variable RAM : ~SYM[6](0 to ~LIT[4]-1);
   begin
     for i in RAM'range loop
       readline(RamFile,RamFileLine);
@@ -29,31 +31,28 @@
     return RAM;
   end function;
 
-  signal ~GENSYM[RAM][2] : ~SYM[6](0 to ~LIT[3]-1) := ~SYM[1](~FILE[~LIT[4]]);
-  signal ~GENSYM[rd][4]  : integer range 0 to ~LIT[3]-1;
-  signal ~GENSYM[wr][5]  : integer range 0 to ~LIT[3]-1;~IF ~ISGATED[2] ~THEN
-  signal ~GENSYM[clk][7] : std_logic;
-  signal ~GENSYM[ce][8]  : boolean;~ELSE ~FI
+  signal ~GENSYM[RAM][2] : ~SYM[6](0 to ~LIT[4]-1) := ~SYM[1](~FILE[~LIT[5]]);
+  signal ~GENSYM[rd][4]  : integer range 0 to ~LIT[4]-1;
+  signal ~GENSYM[wr][5]  : integer range 0 to ~LIT[4]-1;
 begin
-  ~SYM[4] <= to_integer(~ARG[5])
+  ~SYM[4] <= to_integer(~ARG[6])
   -- pragma translate_off
-                mod ~LIT[3]
+                mod ~LIT[4]
   -- pragma translate_on
                 ;
 
-  ~SYM[5] <= to_integer(~ARG[7])
+  ~SYM[5] <= to_integer(~ARG[8])
   -- pragma translate_off
-                mod ~LIT[3]
+                mod ~LIT[4]
   -- pragma translate_on
                 ;
-  ~IF ~VIVADO ~THEN ~IF ~ISGATED[2] ~THEN
-  (~SYM[7],~SYM[8]) <= ~ARG[2];
-  ~GENSYM[blockRamFile_sync][9] : process(~SYM[7])
+  ~IF ~VIVADO ~THEN ~IF ~ISENABLED[3] ~THEN
+  ~GENSYM[blockRamFile_sync][9] : process(~ARG[2])
   begin
-    if rising_edge(~SYM[7]) then
-      if ~SYM[8] then
-        if ~ARG[6] then
-          ~SYM[2](~SYM[5]) <= to_bitvector(~ARG[8]);
+    if rising_edge(~ARG[2]) then
+      if ~ARG[3] then
+        if ~ARG[7] then
+          ~SYM[2](~SYM[5]) <= to_bitvector(~ARG[9]);
         end if;
         ~RESULT <= to_stdlogicvector(~SYM[2](~SYM[4]))
         -- pragma translate_off
@@ -66,8 +65,8 @@ begin
   ~SYM[9] : process(~ARG[2])
   begin
     if rising_edge(~ARG[2]) then
-      if ~ARG[6] then
-        ~SYM[2](~SYM[5]) <= to_bitvector(~ARG[8]);
+      if ~ARG[7] then
+        ~SYM[2](~SYM[5]) <= to_bitvector(~ARG[9]);
       end if;
       ~RESULT <= to_stdlogicvector(~SYM[2](~SYM[4]))
       -- pragma translate_off
@@ -75,15 +74,14 @@ begin
       -- pragma translate_on
       ;
     end if;
-  end process;~FI ~ELSE ~IF ~ISGATED[2] ~THEN
-  (~SYM[7],~SYM[8]) <= ~ARG[2];
-  ~SYM[9] : process(~SYM[7])
+  end process;~FI ~ELSE ~IF ~ISENABLED[3] ~THEN
+  ~SYM[9] : process(~ARG[2])
   begin
-    if rising_edge(~SYM[7]) then
-      if ~ARG[6] and ~SYM[8] then
-        ~SYM[2](~SYM[5]) <= to_bitvector(~ARG[8]);
+    if rising_edge(~ARG[2]) then
+      if ~ARG[7] and ~ARG[3] then
+        ~SYM[2](~SYM[5]) <= to_bitvector(~ARG[9]);
       end if;
-      if ~SYM[8] then
+      if ~ARG[3] then
         ~RESULT <= to_stdlogicvector(~SYM[2](~SYM[4]))
         -- pragma translate_off
         after 1 ps
@@ -95,8 +93,8 @@ begin
   ~SYM[9] : process(~ARG[2])
   begin
     if rising_edge(~ARG[2]) then
-      if ~ARG[6] then
-        ~SYM[2](~SYM[5]) <= to_bitvector(~ARG[8]);
+      if ~ARG[7] then
+        ~SYM[2](~SYM[5]) <= to_bitvector(~ARG[9]);
       end if;
       ~RESULT <= to_stdlogicvector(~SYM[2](~SYM[4]))
       -- pragma translate_off

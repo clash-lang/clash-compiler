@@ -3,59 +3,49 @@
     , "kind" : "Declaration"
     , "type" :
 "asyncRam#
-  :: HasCallStack      -- ARG[0]
-  => Clock wdom wgated -- ^ wclk, ARG[1]
-  -> Clock rdom rgated -- ^ rclk, ARG[2]
-  -> SNat n            -- ^ sz,   ARG[3]
-  -> Signal rdom Int   -- ^ rd,   ARG[4]
-  -> Signal wdom Bool  -- ^ en,   ARG[5]
-  -> Signal wdom Int   -- ^ wr,   ARG[6]
-  -> Signal wdom a     -- ^ din,  ARG[7]
+  :: ( HasCallStack              -- ARG[0]
+     , KnownDomain wdom wconf    -- ARG[1]
+     , KnownDomain rdom rconf )  -- ARG[2]
+  => Clock wdom                  -- ^ wclk, ARG[3]
+  -> Clock rdom                  -- ^ rclk, ARG[4]
+  -> Enable wdom                 -- ^ wen,  ARG[5]
+  -> SNat n                      -- ^ sz,   ARG[6]
+  -> Signal rdom Int             -- ^ rd,   ARG[7]
+  -> Signal wdom Bool            -- ^ en,   ARG[8]
+  -> Signal wdom Int             -- ^ wr,   ARG[9]
+  -> Signal wdom a               -- ^ din,  ARG[10]
   -> Signal rdom a"
     , "template" :
 "-- asyncRam begin
 ~GENSYM[~COMPNAME_asyncRam][0] : block~IF ~VIVADO ~THEN
-  type ~GENSYM[RamType][4] is array(natural range <>) of std_logic_vector(~SIZE[~TYP[7]]-1 downto 0);~ELSE
-  type ~SYM[4] is array(natural range <>) of ~TYP[7];~FI
-  signal ~GENSYM[RAM][1] : ~SYM[4](0 to ~LIT[3]-1);
-  signal ~GENSYM[rd][2] : integer range 0 to ~LIT[3] - 1;
-  signal ~GENSYM[wr][3] : integer range 0 to ~LIT[3] - 1;~IF ~ISGATED[1] ~THEN
-  signal ~GENSYM[clk][5] : std_logic;
-  signal ~GENSYM[ce][6] : boolean;~ELSE ~FI
+  type ~GENSYM[RamType][4] is array(natural range <>) of std_logic_vector(~SIZE[~TYP[10]]-1 downto 0);~ELSE
+  type ~SYM[4] is array(natural range <>) of ~TYP[10];~FI
+  signal ~GENSYM[RAM][1] : ~SYM[4](0 to ~LIT[6]-1);
+  signal ~GENSYM[rd][2] : integer range 0 to ~LIT[6] - 1;
+  signal ~GENSYM[wr][3] : integer range 0 to ~LIT[6] - 1;
 begin
-  ~SYM[2] <= to_integer(~ARG[4])
+  ~SYM[2] <= to_integer(~ARG[7])
   -- pragma translate_off
-                mod ~LIT[3]
+                mod ~LIT[6]
   -- pragma translate_on
                 ;
 
-  ~SYM[3] <= to_integer(~ARG[6])
+  ~SYM[3] <= to_integer(~ARG[9])
   -- pragma translate_off
-                mod ~LIT[3]
+                mod ~LIT[6]
   -- pragma translate_on
                 ;
-  ~IF ~ISGATED[1] ~THEN
-  (~SYM[5],~SYM[6]) <= ~ARG[1];
-  ~GENSYM[asyncRam_sync][7] : process(~SYM[5])
+  ~GENSYM[asyncRam_sync][7] : process(~ARG[3])
   begin
-    if rising_edge(~SYM[5]) then
-      if (~ARG[5] and ~SYM[6]) then~IF ~VIVADO ~THEN
-        ~SYM[1](~SYM[3]) <= ~TOBV[~ARG[7]][~TYP[7]];~ELSE
-        ~SYM[1](~SYM[3]) <= ~ARG[7];~FI
+    if rising_edge(~ARG[3]) then
+      if (~ARG[8] ~IF ~ISENABLED[5] ~THEN and ~ARG[5] ~ELSE ~FI) then~IF ~VIVADO ~THEN
+        ~SYM[1](~SYM[3]) <= ~TOBV[~ARG[10]][~TYP[10]];~ELSE
+        ~SYM[1](~SYM[3]) <= ~ARG[10];~FI
       end if;
     end if;
-  end process;~ELSE
-  ~SYM[7] : process(~ARG[1])
-  begin
-    if rising_edge(~ARG[1]) then
-      if ~ARG[5] then~IF ~VIVADO ~THEN
-        ~SYM[1](~SYM[3]) <= ~TOBV[~ARG[7]][~TYP[7]];~ELSE
-        ~SYM[1](~SYM[3]) <= ~ARG[7];~FI
-      end if;
-    end if;
-  end process;~FI
+  end process;
   ~IF ~VIVADO ~THEN
-  ~RESULT <= ~FROMBV[~SYM[1](~SYM[2])][~TYP[7]];~ELSE
+  ~RESULT <= ~FROMBV[~SYM[1](~SYM[2])][~TYP[10]];~ELSE
   ~RESULT <= ~SYM[1](~SYM[2]);~FI
 end block;
 -- asyncRam end"

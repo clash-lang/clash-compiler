@@ -3,43 +3,45 @@
     , "kind" : "Declaration"
     , "type" :
 "blockRamFile#
-  :: (KnownNat m, HasCallStack)-- (ARG[0],ARG[1])
-  => Clock dom gated           -- clk,  ARG[2]
-  -> SNat n                    -- sz,   ARG[3]
-  -> FilePath                  -- file, ARG[4]
-  -> Signal dom Int            -- rd,   ARG[5]
-  -> Signal dom Bool           -- wren, ARG[6]
-  -> Signal dom Int            -- wr,   ARG[7]
-  -> Signal dom (BitVector m)  -- din,  ARG[8]
+  :: ( KnownNat m              --       ARG[0]
+     , HasCallStack )          --       ARG[1]
+  => Clock dom                 -- clk,  ARG[2]
+  => Enable dom                -- en,   ARG[3]
+  -> SNat n                    -- sz,   ARG[4]
+  -> FilePath                  -- file, ARG[5]
+  -> Signal dom Int            -- rd,   ARG[6]
+  -> Signal dom Bool           -- wren, ARG[7]
+  -> Signal dom Int            -- wr,   ARG[8]
+  -> Signal dom (BitVector m)  -- din,  ARG[9]
   -> Signal dom (BitVector m)"
     , "outputReg" : true
     , "template" :
 "// blockRamFile begin
-reg ~TYPO ~GENSYM[RAM][0] [0:~LIT[3]-1];
+reg ~TYPO ~GENSYM[RAM][0] [0:~LIT[4]-1];
 
 initial begin
-  $readmemb(~FILE[~LIT[4]],~SYM[0]);
+  $readmemb(~FILE[~LIT[5]],~SYM[0]);
 end
-~IF ~ISGATED[2] ~THEN
-always @(posedge ~ARG[2][1]) begin : ~GENSYM[~COMPNAME_blockRamFile][2]~IF ~VIVADO ~THEN
-  if (~ARG[2][0]) begin
-    if (~ARG[6]) begin
-      ~SYM[0][~ARG[7]] <= ~ARG[8];
+~IF ~ISENABLED[3] ~THEN
+always @(posedge ~ARG[2]) begin : ~GENSYM[~COMPNAME_blockRamFile][2]~IF ~VIVADO ~THEN
+  if (~ARG[3]) begin
+    if (~ARG[7]) begin
+      ~SYM[0][~ARG[8]] <= ~ARG[9];
     end
-    ~RESULT <= ~SYM[0][~ARG[5]];
+    ~RESULT <= ~SYM[0][~ARG[6]];
   end~ELSE
-  if (~ARG[6] & ~ARG[2][0]) begin
-    ~SYM[0][~ARG[7]] <= ~ARG[8];
+  if (~ARG[7] & ~ARG[3]) begin
+    ~SYM[0][~ARG[8]] <= ~ARG[9];
   end
-  if (~ARG[2][0]) begin
-    ~RESULT <= ~SYM[0][~ARG[5]];
+  if (~ARG[3]) begin
+    ~RESULT <= ~SYM[0][~ARG[6]];
   end~FI
 end~ELSE
 always @(posedge ~ARG[2]) begin : ~SYM[2]
-  if (~ARG[6]) begin
-    ~SYM[0][~ARG[7]] <= ~ARG[8];
+  if (~ARG[7]) begin
+    ~SYM[0][~ARG[8]] <= ~ARG[9];
   end
-  ~RESULT <= ~SYM[0][~ARG[5]];
+  ~RESULT <= ~SYM[0][~ARG[6]];
 end~FI
 // blockRamFile end"
     }

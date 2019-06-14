@@ -4,23 +4,24 @@
     , "type" :
 "rom# :: ( KnownNat n    --       ARG[0]
          , Undefined a ) --       ARG[1]
-      => Clock dom gated -- clk,  ARG[2]
-      -> Vec n a         -- init, ARG[3]
-      -> Signal dom Int  -- rd,   ARG[4]
+      => Clock dom       -- clk,  ARG[2]
+      => Enable dom      -- en,   ARG[3]
+      -> Vec n a         -- init, ARG[4]
+      -> Signal dom Int  -- rd,   ARG[5]
       -> Signal dom a"
     , "template" :
 "// rom begin
-~SIGD[~GENSYM[ROM][0]][3];
-assign ~SYM[0] = ~LIT[3];
+~SIGD[~GENSYM[ROM][0]][4];
+assign ~SYM[0] = ~LIT[4];
 
-logic [~SIZE[~TYPO]-1:0] ~GENSYM[~RESULT_q][1];~IF ~ISGATED[2] ~THEN
-always @(posedge ~ARG[2][1]) begin : ~GENSYM[~COMPNAME_rom][2]
-  if (~ARG[2][0]) begin
-    ~SYM[1] <= ~SYM[0][~ARG[4]];
+logic [~SIZE[~TYPO]-1:0] ~GENSYM[~RESULT_q][1];~IF ~ISENABLED[3] ~THEN
+always @(posedge ~ARG[2]) begin : ~GENSYM[~COMPNAME_rom][2]
+  if (~ARG[3]) begin
+    ~SYM[1] <= ~SYM[0][~ARG[5]];
   end
 end~ELSE
 always @(posedge ~ARG[2]) begin : ~SYM[2]
-  ~SYM[1] <= ~SYM[0][~ARG[4]];
+  ~SYM[1] <= ~SYM[0][~ARG[5]];
 end~FI
 
 assign ~RESULT = ~FROMBV[~SYM[1]][~TYPO];

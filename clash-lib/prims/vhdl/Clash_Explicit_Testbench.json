@@ -3,14 +3,14 @@
     , "kind" : "Declaration"
     , "type" :
 "assert
-  :: (Eq a,ShowX a)           -- (ARG[0],ARG[1])
-  => Clock domain gated       -- ARG[2]
-  -> Reset domain synchronous -- ARG[3]
-  -> String                   -- ARG[4]
-  -> Signal domain a          -- Checked value  (ARG[5])
-  -> Signal domain a          -- Expected value (ARG[6])
-  -> Signal domain b          -- Return valued  (ARG[7])
-  -> Signal domain b"
+  :: (KnownDomain dom conf, Eq a, ShowX a)-- (ARG[0],ARG[1],ARG[2])
+  => Clock dom                             -- ARG[3]
+  -> Reset dom                             -- ARG[4]
+  -> String                                -- ARG[5]
+  -> Signal dom a                          -- Checked value  (ARG[6])
+  -> Signal dom a                          -- Expected value (ARG[7])
+  -> Signal dom b                          -- Return valued  (ARG[8])
+  -> Signal dom b"
     , "imports": ["~INCLUDENAME[0].all"]
     , "includes" :
       [ { "name" : "slv2string"
@@ -45,28 +45,21 @@ end;"
 "-- assert begin
 ~GENSYM[assert][0] : block
   -- pragma translate_off
-  signal ~GENSYM[actual][2] : ~TYP[5];
-  signal ~GENSYM[expected][3] : ~TYP[6];
-~IF ~ISGATED[2] ~THEN
-  signal ~GENSYM[clk][4] : std_logic;
-  signal ~GENSYM[ce][5]  : boolean;
-~ELSE ~FI
+  signal ~GENSYM[actual][2] : ~TYP[6];
+  signal ~GENSYM[expected][3] : ~TYP[7];
   -- pragma translate_on
 begin
   -- pragma translate_off
-  ~SYM[2] <= ~ARG[5];
-  ~SYM[3] <= ~ARG[6];
-  process(~IF ~ISGATED[2] ~THEN~SYM[4]~ELSE~ARG[2]~FI) is
+  ~SYM[2] <= ~ARG[6];
+  ~SYM[3] <= ~ARG[7];
+  process(~ARG[3]) is
   begin
-    if (rising_edge(~IF ~ISGATED[2] ~THEN~SYM[4]~ELSE~ARG[2]~FI)) then
-      assert (toSLV(~SYM[2]) = toSLV(~SYM[3])) report (~LIT[4] & \", expected: \" & ~INCLUDENAME[0].slv2string(toSLV(~SYM[3])) & \", actual: \" & ~INCLUDENAME[0].slv2string(toSLV(~SYM[2]))) severity error;
+    if (rising_edge(~ARG[3])) then
+      assert (toSLV(~SYM[2]) = toSLV(~SYM[3])) report (~LIT[5] & \", expected: \" & ~INCLUDENAME[0].slv2string(toSLV(~SYM[3])) & \", actual: \" & ~INCLUDENAME[0].slv2string(toSLV(~SYM[2]))) severity error;
     end if;
   end process;
-~IF ~ISGATED[2] ~THEN
-  (~SYM[4],~SYM[5]) <= ~ARG[2];
-~ELSE ~FI
   -- pragma translate_on
-  ~RESULT <= ~ARG[7];
+  ~RESULT <= ~ARG[8];
 end block;
 -- assert end"
     }
@@ -76,14 +69,15 @@ end block;
     , "kind" : "Declaration"
     , "type" :
 "assertBitVector
-  :: KnownNat n                  --                 ARG[0]
-  => Clock domain gated          --                 ARG[1]
-  -> Reset domain synchronous    --                 ARG[2]
-  -> String                      --                 ARG[3]
-  -> Signal domain (BitVector n) -- Checked value  (ARG[4])
-  -> Signal domain (BitVector n) -- Expected value (ARG[5])
-  -> Signal domain b             -- Return valued  (ARG[6])
-  -> Signal domain b"
+  :: ( KnownDomain dom conf   --                 ARG[0]
+     , KnownNat n )           --                 ARG[1]
+  => Clock dom                --                 ARG[2]
+  -> Reset dom                --                 ARG[3]
+  -> String                   --                 ARG[4]
+  -> Signal dom (BitVector n) -- Checked value  (ARG[5])
+  -> Signal dom (BitVector n) -- Expected value (ARG[6])
+  -> Signal dom b             -- Return valued  (ARG[7])
+  -> Signal dom b"
     , "imports" : ["~INCLUDENAME[0].all"]
     , "includes" :
       [{ "name" : "assertBitVector"
@@ -141,28 +135,21 @@ end;
 "-- assertBitVector begin
 ~GENSYM[assert][0] : block
   -- pragma translate_off
-  signal ~GENSYM[actual][2] : ~TYP[4];
-  signal ~GENSYM[expected][3] : ~TYP[5];
-~IF ~ISGATED[1] ~THEN
-  signal ~GENSYM[clk][4] : std_logic;
-  signal ~GENSYM[ce][5]  : boolean;
-~ELSE ~FI
+  signal ~GENSYM[actual][2] : ~TYP[5];
+  signal ~GENSYM[expected][3] : ~TYP[6];
   -- pragma translate_on
 begin
   -- pragma translate_off
-  ~SYM[2] <= ~ARG[4];
-  ~SYM[3] <= ~ARG[5];
-  process(~IF ~ISGATED[1] ~THEN~SYM[4]~ELSE~ARG[1]~FI) is
+  ~SYM[2] <= ~ARG[5];
+  ~SYM[3] <= ~ARG[6];
+  process(~ARG[2]) is
   begin
-    if (rising_edge(~IF ~ISGATED[1] ~THEN~SYM[4]~ELSE~ARG[1]~FI)) then
-      assert (~INCLUDENAME[0].non_std_match(toSLV(~SYM[2]),toSLV(~SYM[3]))) report (~LIT[3] & \", expected: \" & ~INCLUDENAME[0].slv2string(toSLV(~SYM[3])) & \", actual: \" & ~INCLUDENAME[0].slv2string(toSLV(~SYM[2]))) severity error;
+    if (rising_edge(~ARG[2])) then
+      assert (~INCLUDENAME[0].non_std_match(toSLV(~SYM[2]),toSLV(~SYM[3]))) report (~LIT[4] & \", expected: \" & ~INCLUDENAME[0].slv2string(toSLV(~SYM[3])) & \", actual: \" & ~INCLUDENAME[0].slv2string(toSLV(~SYM[2]))) severity error;
     end if;
   end process;
-~IF ~ISGATED[1] ~THEN
-  (~SYM[4],~SYM[5]) <= ~ARG[1];
-~ELSE ~FI
   -- pragma translate_on
-  ~RESULT <= ~ARG[6];
+  ~RESULT <= ~ARG[7];
 end block;
 -- assertBitVector end"
     }

@@ -2,28 +2,30 @@
     { "name" : "Clash.Explicit.ROM.File.romFile#"
     , "kind" : "Declaration"
     , "type" :
-"romFile# :: KnownNat m      -- ARG[0]
-          => Clock clk gated -- clk,  ARG[1]
-          -> SNat n          -- sz,   ARG[2]
-          -> FilePath        -- file, ARG[3]
-          -> Signal dom Int  -- rd,   ARG[4]
+"romFile# :: ( KnownNat m             --       ARG[0]
+             , KnownDomain dom conf )--       ARG[1]
+          => Clock dom                -- clk,  ARG[2]
+          -> Enable dom               -- en,   ARG[3]
+          -> SNat n                   -- sz,   ARG[4]
+          -> FilePath                 -- file, ARG[5]
+          -> Signal dom Int           -- rd,   ARG[6]
           -> Signal dom (BitVector m)"
     , "template" :
 "// romFile begin
-~SIGDO[~GENSYM[ROM][0]] [0:~LIT[2]-1];
+~SIGDO[~GENSYM[ROM][0]] [0:~LIT[4]-1];
 
 initial begin
-  $readmemb(~FILE[~LIT[3]],~SYM[0]);
+  $readmemb(~FILE[~LIT[5]],~SYM[0]);
 end
 
-~SIGDO[~GENSYM[~RESULT_q][1]];~IF ~ISGATED[1] ~THEN
-always @(posedge ~ARG[1][1]) begin : ~GENSYM[~COMPNAME_romFile][2]
-  if (~ARG[1][0]) begin
-    ~SYM[1] <= ~SYM[0][~ARG[4]];
+~SIGDO[~GENSYM[~RESULT_q][1]];~IF ~ISENABLED[3] ~THEN
+always @(posedge ~ARG[2]) begin : ~GENSYM[~COMPNAME_romFile][2]
+  if (~ARG[3]) begin
+    ~SYM[1] <= ~SYM[0][~ARG[6]];
   end
 end~ELSE
 always @(posedge ~ARG[1]) begin : ~SYM[2]
-  ~SYM[1] <= ~SYM[0][~ARG[4]];
+  ~SYM[1] <= ~SYM[0][~ARG[6]];
 end~FI
 
 assign ~RESULT = ~SYM[1];

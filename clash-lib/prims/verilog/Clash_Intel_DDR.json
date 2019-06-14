@@ -4,19 +4,20 @@
     , "type" :
 "altddioIn
   :: ( HasCallStack               -- ARG[0]
-     , fast ~ Dom n pFast         -- ARG[1]
-     , slow ~ Dom n (2*pFast)     -- ARG[2]
+     , KnownDomain fast domf      -- ARG[1]
+     , KnownDomain slow doms      -- ARG[2]
      , KnownNat m )               -- ARG[3]
   => SSymbol deviceFamily         -- ARG[4]
-  -> Clock slow gated             -- ARG[5]
-  -> Reset slow synchronous       -- ARG[6]
-  -> Signal fast (BitVector m)    -- ARG[7]
+  -> Clock slow                   -- ARG[5]
+  -> Reset slow                   -- ARG[6]
+  -> Enable slow                  -- ARG[7]
+  -> Signal fast (BitVector m)    -- ARG[8]
   -> Signal slow (BitVector m,BitVector m)"
     , "libraries" : ["altera_mf"]
     , "template" :
 "// altddioIn begin
-wire ~SIGD[~GENSYM[dataout_l][1]][7];
-wire ~SIGD[~GENSYM[dataout_h][2]][7];
+wire ~SIGD[~GENSYM[dataout_l][1]][8];
+wire ~SIGD[~GENSYM[dataout_h][2]][8];
 
 altddio_in
   #(
@@ -27,16 +28,14 @@ altddio_in
     .power_up_high (\"OFF\"),
     .width (~SIZE[~TYP[7]])
   )
-  ~GENSYM[~COMPNAME_ALTDDIO_IN][7] (~IF ~ISSYNC[6] ~THEN
+  ~GENSYM[~COMPNAME_ALTDDIO_IN][7] (~IF ~ISSYNC[2] ~THEN
     .sclr (~ARG[6]),
     .aclr (1'b0),~ELSE
     .aclr (~ARG[6]),
     .sclr (1'b0),~FI
-    .datain (~ARG[7]),~IF ~ISGATED[5] ~THEN
-    .inclock (~ARG[5][1]),
-    .inclocken (~ARG[5][0]),~ELSE
+    .datain (~ARG[8]),~
     .inclock (~ARG[5]),
-    .inclocken (1'b1),~FI
+    .inclocken (~IF ~ISENABLED[7] ~THEN ~ARG[7] ~ELSE 1'b1 ~FI),
     .dataout_h (~SYM[2]),
     .dataout_l (~SYM[1]),
     .aset (1'b0),

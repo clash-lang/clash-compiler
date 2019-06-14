@@ -2,11 +2,13 @@
     { "name" : "Clash.Explicit.ROM.File.romFile#"
     , "kind" : "Declaration"
     , "type" :
-"romFile# :: KnownNat m      -- ARG[0]
-          => Clock dom gated -- clk,  ARG[1]
-          -> SNat n          -- sz,   ARG[2]
-          -> FilePath        -- file, ARG[3]
-          -> Signal dom Int  -- rd,   ARG[4]
+"romFile# :: ( KnownNat m           --       ARG[0]
+             , KnownDomain dom conf--       ARG[1]
+          => Clock dom              -- clk,  ARG[2]
+          -> Enable dom             -- en,   ARG[3]
+          -> SNat n                 -- sz,   ARG[4]
+          -> FilePath               -- file, ARG[5]
+          -> Signal dom Int         -- rd,   ARG[6]
           -> Signal dom (BitVector m)"
     , "template" :
 "-- romFile begin
@@ -16,7 +18,7 @@
   impure function ~GENSYM[InitRomFromFile][1] (RomFileName : in string) return ~SYM[4] is
     FILE RomFile : text open read_mode is RomFileName;
     variable RomFileLine : line;
-    variable ROM : ~SYM[4](0 to ~LIT[2]-1);
+    variable ROM : ~SYM[4](0 to ~LIT[4]-1);
   begin
     for i in ROM'range loop
       readline(RomFile,RomFileLine);
@@ -25,22 +27,19 @@
     return ROM;
   end function;
 
-  signal ~GENSYM[ROM][2] : ~SYM[4](0 to ~LIT[2]-1) := ~SYM[1](~FILE[~LIT[3]]);
-  signal ~GENSYM[rd][3] : integer range 0 to ~LIT[2]-1;~IF ~ISGATED[1] ~THEN
-  signal ~GENSYM[clk][5] : std_logic;
-  signal ~GENSYM[ce][6] : boolean; ~ELSE ~FI
+  signal ~GENSYM[ROM][2] : ~SYM[4](0 to ~LIT[4]-1) := ~SYM[1](~FILE[~LIT[5]]);
+  signal ~GENSYM[rd][3] : integer range 0 to ~LIT[4]-1;
 begin
-  ~SYM[3] <= to_integer(~ARG[4])
+  ~SYM[3] <= to_integer(~ARG[6])
   -- pragma translate_off
-                mod ~LIT[2]
+                mod ~LIT[4]
   -- pragma translate_on
                 ;
-  ~IF ~ISGATED[1] ~THEN
-  (~SYM[5],~SYM[6]) <= ~ARG[1];
-  ~GENSYM[romFileSync][7] : process (~SYM[5])
+  ~IF ~ISENABLED[3] ~THEN
+  ~GENSYM[romFileSync][7] : process (~ARG[2])
   begin
-    if (rising_edge(~SYM[5])) then
-      if ~SYM[6] then
+    if (rising_edge(~ARG[2])) then
+      if ~ARG[3] then
         ~RESULT <= to_stdlogicvector(~SYM[2](~SYM[3]))
         -- pragma translate_off
         after 1 ps
@@ -49,9 +48,9 @@ begin
       end if;
     end if;
   end process;~ELSE
-  ~SYM[7] : process (~ARG[1])
+  ~SYM[7] : process (~ARG[2])
   begin
-    if (rising_edge(~ARG[1])) then
+    if (rising_edge(~ARG[2])) then
       ~RESULT <= to_stdlogicvector(~SYM[2](~SYM[3]))
       -- pragma translate_off
       after 1 ps

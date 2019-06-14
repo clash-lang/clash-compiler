@@ -4,47 +4,27 @@
     , "type" :
 "rom# :: ( KnownNat n    --       ARG[0]
          , Undefined a ) --       ARG[1]
-      => Clock dom gated -- clk,  ARG[2]
-      -> Vec n a         -- init, ARG[3]
-      -> Signal dom Int  -- rd,   ARG[4]
+      => Clock dom       -- clk,  ARG[2]
+      -> Enable dom      -- en,   ARG[3]
+      -> Vec n a         -- init, ARG[4]
+      -> Signal dom Int  -- rd,   ARG[5]
       -> Signal dom a"
     , "template" :
 "-- rom begin
 ~GENSYM[~COMPNAME_rom][0] : block
-  signal ~GENSYM[ROM][1] : ~TYP[3];
-  signal ~GENSYM[rd][2]  : integer range 0 to ~LIT[0]-1;~IF ~ISGATED[2] ~THEN
-  signal ~GENSYM[clk][3] : std_logic;
-  signal ~GENSYM[ce][4]  : boolean;~ELSE ~FI
+  signal ~GENSYM[ROM][1] : ~TYP[4];
+  signal ~GENSYM[rd][2]  : integer range 0 to ~LIT[0]-1;
 begin
-  ~SYM[1] <= ~LIT[3];
+  ~SYM[1] <= ~LIT[4];
 
-  ~SYM[2] <= to_integer(~ARG[4])
+  ~SYM[2] <= to_integer(~ARG[5])
   -- pragma translate_off
                 mod ~LIT[0]
   -- pragma translate_on
                 ;
-  ~IF ~ISGATED[2] ~THEN
-  (~SYM[3],~SYM[4]) <= ~ARG[2];
-  ~GENSYM[romSync][5] : process (~SYM[3])
+  ~GENSYM[romSync][5] : process (~ARG[2])
   begin
-    if (rising_edge(~SYM[3])) then
-      if ~SYM[4] then~IF ~VIVADO ~THEN
-        ~RESULT <= ~FROMBV[~SYM[1](~SYM[2])][~TYPO]
-        -- pragma translate_off
-        after 1 ps
-        -- pragma translate_on
-        ;~ELSE
-        ~RESULT <= ~SYM[1](~SYM[2])
-        -- pragma translate_off
-        after 1 ps
-        -- pragma translate_on
-        ;~FI
-      end if;
-    end if;
-  end process;~ELSE
-  ~SYM[5] : process (~ARG[2])
-  begin
-    if (rising_edge(~ARG[2])) then~IF ~VIVADO ~THEN
+    if (rising_edge(~ARG[2])~IF ~ISENABLED[3] ~THEN and ~ARG[3] ~ELSE ~FI) then~IF ~VIVADO ~THEN
       ~RESULT <= ~FROMBV[~SYM[1](~SYM[2])][~TYPO]
       -- pragma translate_off
       after 1 ps
@@ -56,7 +36,7 @@ begin
       -- pragma translate_on
       ;~FI
     end if;
-  end process;~FI
+  end process;
 end block;
 -- rom end"
     }

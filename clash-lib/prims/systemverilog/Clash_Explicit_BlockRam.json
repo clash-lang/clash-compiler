@@ -3,43 +3,44 @@
     , "kind" : "Declaration"
     , "type" :
 "blockRam#
-  :: HasCallStack    --       ARG[0]
-  => Undefined a     --       ARG[1]
-  => Clock dom gated -- clk,  ARG[2]
-  -> Vec n a         -- init, ARG[3]
-  -> Signal dom Int  -- rd,   ARG[4]
-  -> Signal dom Bool -- wren, ARG[5]
-  -> Signal dom Int  -- wr,   ARG[6]
-  -> Signal dom a    -- din,  ARG[7]
+  :: ( HasCallStack  --       ARG[0]
+     , Undefined a ) --       ARG[1]
+  => Clock dom       -- clk,  ARG[2]
+  -> Enable dom      -- en,   ARG[3]
+  -> Vec n a         -- init, ARG[4]
+  -> Signal dom Int  -- rd,   ARG[5]
+  -> Signal dom Bool -- wren, ARG[6]
+  -> Signal dom Int  -- wr,   ARG[7]
+  -> Signal dom a    -- din,  ARG[8]
   -> Signal dom a"
     , "template" :
 "// blockRam begin
-~SIGD[~GENSYM[RAM][0]][3];
-logic [~SIZE[~TYP[7]]-1:0] ~GENSYM[~RESULT_q][1];
+~SIGD[~GENSYM[RAM][0]][4];
+logic [~SIZE[~TYP[8]]-1:0] ~GENSYM[~RESULT_q][1];
 initial begin
-  ~SYM[0] = ~CONST[3];
-end~IF ~ISGATED[2] ~THEN
-always @(posedge ~ARG[2][1]) begin : ~GENSYM[~COMPNAME_blockRam][2]~IF ~VIVADO ~THEN
-  if (~ARG[2][0]) begin
-    if (~ARG[5]) begin
-      ~SYM[0][~ARG[6]] <= ~TOBV[~ARG[7]][~TYP[7]];
+  ~SYM[0] = ~CONST[4];
+end~IF ~ISENABLED[3] ~THEN
+always @(posedge ~ARG[2]) begin : ~GENSYM[~COMPNAME_blockRam][2]~IF ~VIVADO ~THEN
+  if (~ARG[3]) begin
+    if (~ARG[6]) begin
+      ~SYM[0][~ARG[7]] <= ~TOBV[~ARG[8]][~TYP[8]];
     end
-    ~SYM[1] <= ~SYM[0][~ARG[4]];
+    ~SYM[1] <= ~SYM[0][~ARG[5]];
   end~ELSE
-  if (~ARG[5] & ~ARG[2][0]) begin
-    ~SYM[0][~ARG[6]] <= ~TOBV[~ARG[7]][~TYP[7]];
+  if (~ARG[6] & ~ARG[3]) begin
+    ~SYM[0][~ARG[7]] <= ~TOBV[~ARG[8]][~TYP[8]];
   end
-  if (~ARG[2][0]) begin
-    ~SYM[1] <= ~SYM[0][~ARG[4]];
+  if (~ARG[3]) begin
+    ~SYM[1] <= ~SYM[0][~ARG[5]];
   end~FI
 end~ELSE
 always @(posedge ~ARG[2]) begin : ~SYM[2]
-  if (~ARG[5]) begin
-    ~SYM[0][~ARG[6]] <= ~TOBV[~ARG[7]][~TYP[7]];
+  if (~ARG[6]) begin
+    ~SYM[0][~ARG[7]] <= ~TOBV[~ARG[8]][~TYP[8]];
   end
-  ~SYM[1] <= ~SYM[0][~ARG[4]];
+  ~SYM[1] <= ~SYM[0][~ARG[5]];
 end~FI
-assign ~RESULT = ~FROMBV[~SYM[1]][~TYP[7]];
+assign ~RESULT = ~FROMBV[~SYM[1]][~TYP[8]];
 // blockRam end"
     }
   }

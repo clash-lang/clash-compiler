@@ -4,31 +4,32 @@
     , "type" :
 "rom# :: ( KnownNat n    --       ARG[0]
          , Undefined a ) --       ARG[1]
-      => Clock dom gated -- clk,  ARG[2]
-      -> Vec n a         -- init, ARG[3]
-      -> Signal dom Int  -- rd,   ARG[4]
+      => Clock dom       -- clk,  ARG[2]
+      -> Enable dom      -- en,   ARG[3]
+      -> Vec n a         -- init, ARG[4]
+      -> Signal dom Int  -- rd,   ARG[5]
       -> Signal dom a"
     , "outputReg" : true
     , "template" :
 "// rom begin
 reg ~TYPO ~GENSYM[ROM][0] [0:~LIT[0]-1];
 
-reg ~TYP[3] ~GENSYM[rom_init][2];
+reg ~TYP[4] ~GENSYM[rom_init][2];
 integer ~GENSYM[i][3];
 initial begin
-  ~SYM[2] = ~LIT[3];
+  ~SYM[2] = ~LIT[4];
   for (~SYM[3]=0; ~SYM[3] < ~LIT[0]; ~SYM[3] = ~SYM[3] + 1) begin
     ~SYM[0][~LIT[0]-1-~SYM[3]] = ~SYM[2][~SYM[3]*~SIZE[~TYPO]+:~SIZE[~TYPO]];
   end
 end
-~IF ~ISGATED[2] ~THEN
-always @(posedge ~ARG[2][1]) begin : ~GENSYM[~COMPNAME_rom][4]
-  if (~ARG[2][0]) begin
-    ~RESULT <= ~SYM[0][~ARG[4]];
+~IF ~ISENABLED[3] ~THEN
+always @(posedge ~ARG[2]) begin : ~GENSYM[~COMPNAME_rom][4]
+  if (~ARG[3]) begin
+    ~RESULT <= ~SYM[0][~ARG[5]];
   end
 end~ELSE
 always @(posedge ~ARG[2]) begin : ~SYM[4]
-  ~RESULT <= ~SYM[0][~ARG[4]];
+  ~RESULT <= ~SYM[0][~ARG[5]];
 end~FI
 // rom end"
     }
