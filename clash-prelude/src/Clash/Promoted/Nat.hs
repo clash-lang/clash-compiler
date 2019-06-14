@@ -35,7 +35,7 @@ module Clash.Promoted.Nat
   , snatProxy
   , withSNat
     -- ** Conversion
-  , snatToInteger, snatToNum
+  , snatToInteger, snatToNatural, snatToNum
     -- ** Arithmetic
   , addSNat, mulSNat, powSNat
     -- *** Partial
@@ -80,8 +80,10 @@ import Data.Kind          (Type)
 import GHC.TypeLits       (KnownNat, Nat, type (+), type (-), type (*),
                            type (^), type (<=), natVal)
 import GHC.TypeLits.Extra (CLog, FLog, Div, Log, Mod)
+import GHC.Natural        (naturalFromInteger)
 import Language.Haskell.TH (appT, conT, litT, numTyLit, sigE)
 import Language.Haskell.TH.Syntax (Lift (..))
+import Numeric.Natural    (Natural)
 import Unsafe.Coerce      (unsafeCoerce)
 import Clash.XException   (ShowX (..), showsPrecXWith)
 
@@ -107,7 +109,7 @@ snatProxy :: KnownNat n => proxy n -> SNat n
 snatProxy _ = SNat
 
 instance Show (SNat n) where
-  show p@SNat = 'd' : show (natVal p)
+  show p@SNat = 'd' : show (snatToInteger p)
 
 instance ShowX (SNat n) where
   showsPrecX = showsPrecXWith showsPrec
@@ -117,14 +119,19 @@ instance ShowX (SNat n) where
 withSNat :: KnownNat n => (SNat n -> a) -> a
 withSNat f = f SNat
 
-{-# INLINE snatToInteger #-}
 -- | Reify the type-level 'Nat' @n@ to it's term-level 'Integer' representation.
 snatToInteger :: SNat n -> Integer
 snatToInteger p@SNat = natVal p
+{-# INLINE snatToInteger #-}
+
+snatToNatural :: SNat n -> Natural
+snatToNatural = naturalFromInteger . snatToInteger
+{-# INLINE snatToNatural #-}
+
 
 -- | Reify the type-level 'Nat' @n@ to it's term-level 'Num'ber.
 snatToNum :: Num a => SNat n -> a
-snatToNum p@SNat = fromInteger (natVal p)
+snatToNum p@SNat = fromInteger (snatToInteger p)
 {-# INLINE snatToNum #-}
 
 -- | Unary representation of a type-level natural
@@ -144,7 +151,7 @@ instance KnownNat n => ShowX (UNat n) where
 --
 -- __NB__: Not synthesizable
 toUNat :: forall n . SNat n -> UNat n
-toUNat p@SNat = fromI @n (natVal p)
+toUNat p@SNat = fromI @n (snatToInteger p)
   where
     fromI :: forall m . Integer -> UNat m
     fromI 0 = unsafeCoerce @(UNat 0) @(UNat m) UZero
@@ -337,7 +344,7 @@ showBNat = go []
 --
 -- __NB__: Not synthesizable
 toBNat :: SNat n -> BNat n
-toBNat s@SNat = toBNat' (natVal s)
+toBNat s@SNat = toBNat' (snatToInteger s)
   where
     toBNat' :: Integer -> BNat m
     toBNat' 0 = unsafeCoerce BT
