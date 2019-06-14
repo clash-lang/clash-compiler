@@ -53,10 +53,10 @@ import Clash.XException            (Undefined)
 
 -- | Synchronizer based on two sequentially connected flip-flops.
 --
---  * __NB__: This synchroniser can be used for __bit__-synchronization.
+--  * __NB__: This synchronizer can be used for __bit__-synchronization.
 --
---  * __NB__: Although this synchroniser does reduce metastability, it does
---  not guarantee the proper synchronisation of a whole __word__. For
+--  * __NB__: Although this synchronizer does reduce metastability, it does
+--  not guarantee the proper synchronization of a whole __word__. For
 --  example, given that the output is sampled twice as fast as the input is
 --  running, and we have two samples in the input stream that look like:
 --
@@ -71,7 +71,7 @@ import Clash.XException            (Undefined)
 --      Where the level-change of the __msb__ was not captured, but the level
 --      change of the __lsb__s were.
 --
---      If you want to have /safe/ __word__-synchronisation use
+--      If you want to have /safe/ __word__-synchronization use
 --      'asyncFIFOSynchronizer'.
 dualFlipFlopSynchronizer
   :: Undefined a
@@ -137,7 +137,7 @@ isFull addrSize@SNat ptr s_ptr = case leTrans @1 @2 @addrSize of
 -- design described in "Clash.Tutorial#multiclock", which is itself based on the
 -- design described in <http://www.sunburst-design.com/papers/CummingsSNUG2002SJ_FIFO1.pdf>.
 --
--- __NB__: This synchroniser can be used for __word__-synchronization.
+-- __NB__: This synchronizer can be used for __word__-synchronization.
 asyncFIFOSynchronizer
   :: (2 <= addrSize)
   => SNat addrSize

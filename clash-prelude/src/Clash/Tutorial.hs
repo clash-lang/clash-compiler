@@ -1491,18 +1491,18 @@ for the different clock domains. If you're targeting an FPGA, you can use e.g. a
 <http://www.xilinx.com/support/documentation/user_guides/ug472_7Series_Clocking.pdf MMCM>
 to provide the clock signals.
 
-== Building a FIFO synchroniser
+== Building a FIFO synchronizer
 
 This part of the tutorial assumes you know what <https://en.wikipedia.org/wiki/Metastability_in_electronics metastability>
 is, and how it can never truly be avoided in any asynchronous circuit. Also
 it assumes that you are familiar with the design of synchronizer circuits, and
-why a dual flip-flop synchroniser only works for bit-synchronisation and not
-word-synchronisation.
+why a dual flip-flop synchronizer only works for bit-synchronization and not
+word-synchronization.
 The explicitly clocked versions of all synchronous functions and primitives can
 be found in "Clash.Explicit.Prelude", which also re-exports the functions in
 "Clash.Signal.Explicit". We will use those functions to create a FIFO where
 the read and write port are synchronized to different clocks. Below you can find
-the code to build the FIFO synchroniser based on the design described in:
+the code to build the FIFO synchronizer based on the design described in:
 <http://www.sunburst-design.com/papers/CummingsSNUG2002SJ_FIFO1.pdf>
 
 We start with enable a few options that will make writing the type-signatures for
@@ -1518,7 +1518,7 @@ import Data.Maybe             (isJust)
 import Data.Constraint.Nat    (leTrans)
 @
 
-Then we'll start with the /heart/ of the FIFO synchroniser, an asynchronous RAM
+Then we'll start with the /heart/ of the FIFO synchronizer, an asynchronous RAM
 in the form of 'asyncRam''. It's called an asynchronous RAM because the read
 port is not synchronized to any clock (though the write port is). Note that in
 Clash we don't really have asynchronous logic, there is only combinational and
@@ -1576,7 +1576,7 @@ ptrCompareT addrSize\@SNat flagGen (bin,ptr,flag) (s_ptr,inc) =
     flag' = flagGen ptr' s_ptr
 @
 
-It is parametrised in both address size, @addrSize@, and status flag generator,
+It is parametrized in both address size, @addrSize@, and status flag generator,
 @flagGen@. It has two inputs, @s_ptr@, the synchronized pointer from the other
 clock domain, and @inc@, which indicates we want to perform a write or read of
 the FIFO. It creates three outputs: @flag@, the full or empty flag, @addr@, the
@@ -1607,7 +1607,7 @@ isFull addrSize@SNat ptr s_ptr = case leTrans @1 @2 @addrSize of
 wptrFullInit        = (0,0,False)
 @
 
-We create a dual flip-flop synchroniser to be used to synchronise the
+We create a dual flip-flop synchronizer to be used to synchronize the
 Gray-encoded pointers between the two clock domains:
 
 @
@@ -1658,7 +1658,7 @@ asyncFIFOSynchronizer addrSize\@SNat wclk rclk wrst rrst rinc wdataM =
                                  wptrFullInit (s_rptr,isJust \<$\> wdataM)
 @
 
-where we first specify the synchronisation of the read and the write pointers,
+where we first specify the synchronization of the read and the write pointers,
 instantiate the asynchronous RAM, and instantiate the read address \/ pointer \/
 flag generator and write address \/ pointer \/ flag generator.
 
@@ -1706,11 +1706,11 @@ isFull addrSize@SNat ptr s_ptr = case leTrans @1 @2 @addrSize of
 
 wptrFullInit        = (0,0,False)
 
--- Dual flip-flop synchroniser
+-- Dual flip-flop synchronizer
 ptrSync clk1 clk2 rst2 =
   'Clash.Explicit.Signal.register' clk2 rst2 0 . 'Clash.Explicit.Signal.register' clk2 rst2 0 . 'Clash.Explicit.Signal.unsafeSynchronizer' clk1 clk2
 
--- Async FIFO synchroniser
+-- Async FIFO synchronizer
 asyncFIFOSynchronizer
   :: (2 <= addrSize)
   => SNat addrSize
@@ -1744,9 +1744,9 @@ asyncFIFOSynchronizer addrSize\@SNat wclk rclk wrst rrst rinc wdataM =
                                  wptrFullInit (s_rptr,isJust \<$\> wdataM)
 @
 
-== Instantiating a FIFO synchroniser
+== Instantiating a FIFO synchronizer
 
-Having finished our FIFO synchroniser it's time to instantiate with concrete
+Having finished our FIFO synchronizer it's time to instantiate with concrete
 clock domains. Let us assume we have part of our system connected to an ADC
 which runs at 20 MHz, and we have created an FFT component running at only 9
 MHz. We want to connect part of our design connected to the ADC, and running
@@ -1766,7 +1766,7 @@ type DomADC = 'Dom \"ADC\" 50000
 type DomFFT = 'Dom \"FFT\" 111112
 @
 
-and subsequently a 256-space FIFO synchroniser that safely bridges the ADC clock
+and subsequently a 256-space FIFO synchronizer that safely bridges the ADC clock
 domain and to the FFT clock domain:
 
 @

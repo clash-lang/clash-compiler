@@ -58,11 +58,11 @@ data SaturationMode
 -- | 'Num' operators in which overflow and underflow behavior can be specified
 -- using 'SaturationMode'.
 class (Bounded a, Num a) => SaturatingNum a where
-  -- | Addition with parametrizable over- and underflow behavior
+  -- | Addition with parameterizable over- and underflow behavior
   satAdd :: SaturationMode -> a -> a -> a
-  -- | Subtraction with parametrizable over- and underflow behavior
+  -- | Subtraction with parameterizable over- and underflow behavior
   satSub  :: SaturationMode -> a -> a -> a
-  -- | Multiplication with parametrizable over- and underflow behavior
+  -- | Multiplication with parameterizable over- and underflow behavior
   satMul :: SaturationMode -> a -> a -> a
 
 {-# INLINE boundedAdd #-}
