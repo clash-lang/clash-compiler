@@ -19,18 +19,21 @@ import Data.Functor.Identity            (Identity (..))
 import Data.Text                        (pack)
 import Control.Monad.Trans.Except
   (ExceptT (..), mapExceptT, runExceptT, throwE)
+import Language.Haskell.TH.Syntax       (showName)
 
 import Clash.Core.DataCon               (DataCon (..))
 import Clash.Core.Name                  (Name (..))
 import Clash.Core.Pretty                (showPpr)
 import Clash.Core.TyCon                 (TyConMap, tyConDataCons)
 import Clash.Core.Type
-  (LitTy (..), Type (..), TypeView (..), coreView1, tyView)
+  (LitTy (..), Type (..), TypeView (..), coreView, tyView)
 import Clash.Core.Util                  (tyNatSize)
 import Clash.Netlist.Util               (coreTypeToHWType, stripFiltered)
 import Clash.Netlist.Types
   (HWType(..), FilteredHWType(..), PortDirection (..))
-import Clash.Signal.Internal            (ClockKind (..), ResetKind (..))
+import Clash.Signal.Internal
+  (ResetPolarity(..), ActiveEdge(..), ResetKind(..)
+  ,InitBehavior(..))
 import Clash.Unique                     (lookupUniqMap')
 import Clash.Util                       (curLoc)
 
@@ -128,17 +131,34 @@ ghcTypeToHWType iw floatSupport = go
           (fType . Void . Just . BiDirectional Out . BitVector . fromInteger) <$>
             mapExceptT (Just .coerce) (tyNatSize m szTy)
 
+        "Clash.Signal.Internal.KnownDomain"
+          | [_tag, dom] <- args
+          ->
+            case tyView dom of
+              TyConApp _ [tag0, period0, edge0, rstKind0, init0, polarity0] -> do
+                tag1      <- domTag tag0
+                period1   <- domPeriod period0
+                edge1     <- domEdge m edge0
+                rstKind1  <- domResetKind m rstKind0
+                init1     <- domInitBehavior m init0
+                polarity1 <- domResetPolarity m polarity0
+
+                let kd = KnownDomain (pack tag1) period1 edge1 rstKind1 init1 polarity1
+                returnN (Void (Just kd))
+              _ ->
+                ExceptT Nothing
+
         "Clash.Signal.Internal.Clock"
-          | [dom,clkKind] <- args
-          -> do (nm,rate) <- domain m dom
-                gated     <- clockKind m clkKind
-                returnN (Clock (pack nm) rate gated)
+          | [tag0] <- args
+          -> do
+            tag1 <- domTag tag0
+            returnN (Clock (pack tag1))
 
         "Clash.Signal.Internal.Reset"
-          | [dom,rstKind] <- args
-          -> do (nm,rate)   <- domain m dom
-                synchronous <- resetKind m rstKind
-                returnN (Reset (pack nm) rate synchronous)
+          | [tag0] <- args
+          -> do
+            tag1 <- domTag tag0
+            returnN (Reset (pack tag1))
 
         "Clash.Sized.Internal.BitVector.Bit" -> returnN Bit
 
@@ -214,37 +234,76 @@ ghcTypeToHWType iw floatSupport = go
 
     go _ _ _ = Nothing
 
-domain
+domTag :: Type -> ExceptT String Maybe String
+domTag (LitTy (SymTy tag)) = pure tag
+domTag ty = throwE $ "Can't translate domain tag" ++ showPpr ty
+
+domPeriod :: Type -> ExceptT String Maybe Integer
+domPeriod (LitTy (NumTy period)) = pure period
+domPeriod ty = throwE $ "Can't translate domain period" ++ showPpr ty
+
+
+fromType
+  :: String
+  -- ^ Name of type (for error reporting)
+  -> [(String, a)]
+  -- ^ [(Fully qualified constructor name, constructor value)
+  -> TyConMap
+  -- ^ Constructor map (used to look through newtypes)
+  -> Type
+  -- ^ Type representing some constructor
+  -> ExceptT String Maybe a
+fromType tyNm constrs m ty =
+  case tyView (coreView m ty) of
+    TyConApp tcNm [] ->
+      go constrs (nameOcc tcNm)
+    _ ->
+      throwE $ "Can't translate " ++ tyNm ++ showPpr ty
+ where
+  go ((cName,c):cs) tcNm =
+    if pack cName == tcNm then
+      pure c
+    else
+      go cs tcNm
+  go [] _ =
+    throwE $ "Can't translate " ++ tyNm ++ showPpr ty
+
+domEdge
   :: TyConMap
   -> Type
-  -> ExceptT String Maybe (String,Integer)
-domain m (coreView1 m -> Just ty') = domain m ty'
-domain m (tyView -> TyConApp tcNm [LitTy (SymTy nm),rateTy])
-  | nameOcc tcNm == "Clash.Signal.Internal.Dom"
-  = do rate <- mapExceptT (Just . coerce) (tyNatSize m rateTy)
-       return (nm,rate)
-domain _ ty = throwE $ "Can't translate domain: " ++ showPpr ty
+  -> ExceptT String Maybe ActiveEdge
+domEdge =
+  fromType
+    (showName ''ActiveEdge)
+    [ (showName 'Rising, Rising)
+    , (showName 'Falling, Falling) ]
 
-clockKind
-  :: TyConMap
-  -> Type
-  -> ExceptT String Maybe ClockKind
-clockKind m (coreView1 m -> Just ty') = clockKind m ty'
-clockKind _ (tyView -> TyConApp tcNm [])
-  | nameOcc tcNm == "Clash.Signal.Internal.Source"
-  = return Source
-  | nameOcc tcNm == "Clash.Signal.Internal.Gated"
-  = return Gated
-clockKind _ ty = throwE $ "Can't translate ClockKind" ++ showPpr ty
-
-resetKind
+domResetKind
   :: TyConMap
   -> Type
   -> ExceptT String Maybe ResetKind
-resetKind m (coreView1 m -> Just ty') = resetKind m ty'
-resetKind _ (tyView -> TyConApp tcNm [])
-  | nameOcc tcNm == "Clash.Signal.Internal.Synchronous"
-  = return Synchronous
-  | nameOcc tcNm == "Clash.Signal.Internal.Asynchronous"
-  = return Asynchronous
-resetKind _ ty = throwE $ "Can't translate ResetKind" ++ showPpr ty
+domResetKind =
+  fromType
+    (showName ''ResetKind)
+    [ (showName 'Synchronous, Synchronous)
+    , (showName 'Asynchronous, Asynchronous) ]
+
+domInitBehavior
+  :: TyConMap
+  -> Type
+  -> ExceptT String Maybe InitBehavior
+domInitBehavior =
+  fromType
+    (showName ''InitBehavior)
+    [ (showName 'Defined, Defined)
+    , (showName 'Undefined, Undefined) ]
+
+domResetPolarity
+  :: TyConMap
+  -> Type
+  -> ExceptT String Maybe ResetPolarity
+domResetPolarity =
+  fromType
+    (showName ''ResetPolarity)
+    [ (showName 'ActiveHigh, ActiveHigh)
+    , (showName 'ActiveLow, ActiveLow) ]

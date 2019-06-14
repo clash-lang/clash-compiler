@@ -71,6 +71,7 @@ type BlackBoxFunction
   -> NetlistMonad (Either String (BlackBoxMeta, BlackBox))
 
 -- | A BlackBox Template is a List of Elements
+-- TODO: Add name of function for better error messages
 type BlackBoxTemplate = [Element]
 
 -- | Elements of a blackbox context. If you extend this list, make sure to
@@ -148,8 +149,20 @@ data Element
   -- ^ Record selector of a type
   | IsLit !Int
   | IsVar !Int
-  | IsGated !Int
+  | IsActiveHigh !Int
+  -- ^ Whether a domain's reset lines are synchronous.
+  | Tag !Int
+  -- ^ Tag of a domain.
+  | Period !Int
+  -- ^ Period of a domain.
+  | IsRisingEdge !Int
+  -- ^ Which clock edge memory elements are sensitive to.
   | IsSync !Int
+  -- ^ Whether a domain's reset lines are synchronous. Errors if not applied to
+  -- a KnownDomain.
+  | IsInitDefined !Int
+  | IsEnabled !Int
+  -- ^ Whether reset line is constantly enabled
   | StrCmp [Element] !Int
   | OutputWireReg !Int
   | Vars !Int

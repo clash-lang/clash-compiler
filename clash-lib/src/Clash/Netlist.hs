@@ -794,4 +794,17 @@ mkDcApplication dstHType bndr dc args = do
         -> pure (head argExprs)
         | dcNm == "GHC.Natural.NatJ#"
         -> pure (head argExprs)
-      _ -> error $ $(curLoc) ++ "mkDcApplication undefined for: " ++ show (dstHType,dc,args,argHWTys)
+--      KnownDomain {} ->
+--        return (Identifier "__KNOWNDOMAIN__" Nothing)
+--        pure $
+--        error $ $(curLoc) ++ "mkDcApplication undefined for KnownDomain. "
+--                          ++ "Did a blackbox definition try to render it? "
+--                          ++ "Context: \n\n"
+--                          ++ "dstHType: " ++ show dstHType ++ "\n\n"
+--                          ++ "dc: " ++ show dc ++ "\n\n"
+--                          ++ "args: " ++ show args ++ "\n\n"
+--                          ++ "argHWTys: " ++ show argHWTys ++ "\n\n"
+--                          ++ "Callstack: "
+--                          ++ prettyCallStack callStack
+      _ ->
+        error $ $(curLoc) ++ "mkDcApplication undefined for: " ++ show (dstHType,dc,args,argHWTys)

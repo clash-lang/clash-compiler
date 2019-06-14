@@ -24,7 +24,6 @@ import           Control.Exception       (throw)
 import           Control.Lens            ((.=),(%=))
 import qualified Control.Lens            as Lens
 import           Control.Monad           (unless, when, zipWithM, join)
-import           Control.Monad.Trans.Except (runExcept)
 import           Data.Either             (partitionEithers)
 import           Data.HashMap.Strict     (HashMap)
 import qualified Data.HashMap.Strict     as HashMap
@@ -55,13 +54,13 @@ import           Clash.Core.Name
 import           Clash.Core.Pretty       (showPpr)
 import           Clash.Core.Subst
   (Subst (..), extendIdSubst, extendIdSubstList, extendInScopeId,
-   extendInScopeIdList, extendTvSubstList, mkSubst, substTm, substTy, substTyWith)
+   extendInScopeIdList, extendTvSubstList, mkSubst, substTm, substTy)
 import           Clash.Core.Term         (Alt, LetBinding, Pat (..), Term (..))
 import           Clash.Core.TyCon
   (TyConName, TyConMap, tyConDataCons)
-import           Clash.Core.Type         (Type (..), TypeView (..), LitTy (..),
+import           Clash.Core.Type         (Type (..), TypeView (..),
                                           coreView1, splitTyConAppM, tyView, TyVar)
-import           Clash.Core.Util         (collectBndrs, termType, tyNatSize)
+import           Clash.Core.Util         (collectBndrs, termType)
 import           Clash.Core.Var
   (Id, Var (..), mkLocalId, modifyVarName, Attr')
 import           Clash.Core.VarEnv
@@ -69,7 +68,6 @@ import           Clash.Core.VarEnv
    unionVarSet, uniqAway, unitVarSet)
 import           Clash.Netlist.Id        (IdType (..), stripDollarPrefixes)
 import           Clash.Netlist.Types     as HW
-import           Clash.Signal.Internal   (ClockKind (..))
 import           Clash.Unique
 import           Clash.Util
 
@@ -195,37 +193,6 @@ coreTypeToHWTypeM ty =
                              <*> Lens.use customReprs
                              <*> Lens.use tcCache
                              <*> pure ty)
-
--- | Returns the name and period of the clock corresponding to a type
-synchronizedClk
-  :: TyConMap
-  -- ^ TyCon cache
-  -> Type
-  -> Maybe (Identifier,Integer)
-synchronizedClk tcm ty
-  | not . null . Lens.toListOf typeFreeVars $ ty = Nothing
-  | Just (tcNm,args) <- splitTyConAppM ty
-  = case nameOcc tcNm of
-      "Clash.Sized.Vector.Vec"       -> synchronizedClk tcm (args!!1)
-      "Clash.Signal.Internal.SClock" -> case splitTyConAppM (head args) of
-        Just (_,[LitTy (SymTy s),litTy])
-          | Right i <- runExcept (tyNatSize tcm litTy) -> Just (Text.pack s,i)
-        _ -> error $ $(curLoc) ++ "Clock period not a simple literal: " ++ showPpr ty
-      "Clash.Signal.Internal.Signal" -> case splitTyConAppM (head args) of
-        Just (_,[LitTy (SymTy s),litTy])
-          | Right i <- runExcept (tyNatSize tcm litTy) -> Just (Text.pack s,i)
-        _ -> error $ $(curLoc) ++ "Clock period not a simple literal: " ++ showPpr ty
-      _ -> case tyConDataCons (tcm `lookupUniqMap'` tcNm) of
-             [dc] -> let argTys   = dcArgTys dc
-                         argTVs   = dcUnivTyVars dc
-                         -- argSubts = zip argTVs args
-                         args'    = map (substTyWith argTVs args) argTys
-                     in case args' of
-                        (arg:_) -> synchronizedClk tcm arg
-                        _ -> Nothing
-             _    -> Nothing
-  | otherwise
-  = Nothing
 
 packSP
   :: CustomReprs
@@ -501,10 +468,10 @@ typeSize :: HWType
 typeSize (Void {}) = 0
 typeSize String = 0
 typeSize Integer = 0
+typeSize (KnownDomain {}) = 0
 typeSize Bool = 1
 typeSize Bit = 1
-typeSize (Clock _ _ Source) = 1
-typeSize (Clock _ _ Gated)  = 2
+typeSize (Clock _) = 1
 typeSize (Reset {}) = 1
 typeSize (BitVector i) = i
 typeSize (Index 0) = 0
@@ -990,14 +957,6 @@ mkInput pM = case pM of
                   else
                     throwAnnotatedSplitError $(curLoc) "Product"
 
-        Clock _ _ Gated -> do
-          arguments <- splitGatedClock i' hwty
-          (ports,_,exprs,_) <- unzip4 <$> mapM (mkInput Nothing) arguments
-          let netdecl  = NetDecl Nothing i' hwty
-              dcExpr   = DataCon hwty (DC (hwty,0)) exprs
-              netassgn = Assignment i' dcExpr
-          return (concat ports,[netdecl,netassgn],dcExpr,i')
-
         _ -> return ([(i',hwty)],[],Identifier i' Nothing,i')
 
 
@@ -1063,14 +1022,6 @@ mkInput pM = case pM of
                   netassgn = Assignment pN dcExpr
               return (concat ports,[netdecl,netassgn],dcExpr,pN)
             _ -> error "Unexpected error for PortProduct"
-
-        Clock _ _ Gated -> do
-          arguments <- splitGatedClock pN hwty
-          (ports,_,exprs,_) <- unzip4 <$> zipWithM mkInput (extendPorts $ map (prefixParent p) ps) arguments
-          let netdecl  = NetDecl Nothing pN hwty
-              dcExpr   = DataCon hwty (DC (hwty,0)) exprs
-              netassgn = Assignment pN dcExpr
-          return (concat ports,[netdecl,netassgn],dcExpr,pN)
 
         _ ->  return ([(pN,hwty)],[],Identifier pN Nothing,pN)
 
@@ -1208,13 +1159,6 @@ mkOutput' pM = case pM of
                   else
                     throwAnnotatedSplitError $(curLoc) "Product"
 
-        Clock _ _ Gated -> do
-          results <- splitGatedClock o' hwty
-          (ports,decls,ids) <- unzip3 <$> mapM (mkOutput' Nothing) results
-          let netdecl = NetDecl Nothing o' hwty
-              assigns = zipWith (assignId o' hwty 0) ids [0..]
-          return (concat ports,netdecl:assigns ++ concat decls,o')
-
         _ -> return ([(o',hwty)],[],o')
 
     go' (PortName p) (o,hwty) = do
@@ -1280,14 +1224,6 @@ mkOutput' pM = case pM of
                             ]
               in  return (concat ports,netdecl:assigns ++ concat decls,pN)
             _ -> error "Unexpected error for PortProduct"
-
-        Clock _ _ Gated -> do
-          results <- splitGatedClock pN hwty
-          let resultsBundled   = (extendPorts $ map (prefixParent p) ps, results)
-          (ports,decls,ids) <- unzip3 <$> uncurry (zipWithM mkOutput') resultsBundled
-          let netdecl = NetDecl Nothing pN hwty
-              assigns = zipWith (assignId pN hwty 0) ids [0..]
-          return (concat ports,netdecl:assigns ++ concat decls,pN)
 
         _ -> return ([(pN,hwty)],[],pN)
 
@@ -1416,7 +1352,6 @@ doConv hwty (Just topM) b e = case hwty of
   Vector  {} -> ConvBV topM hwty b e
   RTree   {} -> ConvBV topM hwty b e
   Product {} -> ConvBV topM hwty b e
-  Clock _ _ Gated -> ConvBV topM hwty b e
   _          -> e
 
 -- | Generate input port mappings for the TopEntity
@@ -1477,15 +1412,6 @@ mkTopInput topM inps pM = case pM of
             return (inps'',(concat ports,iDecl:assigns++concat decls,Left i'))
           else
             throwAnnotatedSplitError $(curLoc) "Product"
-
-        Clock _ _ Gated -> do
-          arguments <- splitGatedClock i' hwty
-          (inps'',arguments1) <- mapAccumLM go inps' arguments
-          let (ports,decls,ids) = unzip3 arguments1
-              assigns = zipWith (argBV topM) ids
-                          [ Identifier i' (Just (Indexed (hwty,0,n)))
-                          | n <- [0..]]
-          return (inps'',(concat ports,iDecl:assigns++concat decls,Left i'))
 
         _ -> return (rest,([(iN,i',hwty)],[iDecl],Left i'))
 
@@ -1571,17 +1497,6 @@ mkTopInput topM inps pM = case pM of
                             ]
               return (inps'',(concat ports,pDecl:assigns ++ concat decls,Left pN'))
             _ -> error "Unexpected error for PortProduct"
-
-        Clock _ _ Gated -> do
-          arguments <- splitGatedClock pN' hwty
-          (inps'',arguments1) <-
-            mapAccumLM (\acc (p',o') -> mkTopInput topM acc p' o') inps'
-                       (zip (extendPorts ps) arguments)
-          let (ports,decls,ids) = unzip3 arguments1
-              assigns = zipWith (argBV topM) ids
-                          [ Identifier pN' (Just (Indexed (hwty,0,n)))
-                          | n <- [0..]]
-          return (inps'',(concat ports,pDecl:assigns ++ concat decls,Left pN'))
 
         _ -> return (tail inps',([(pN,pN',hwty)],[pDecl],Left pN'))
 
@@ -1689,17 +1604,6 @@ mkTopOutput' topM outps pM = case pM of
           else
             throwAnnotatedSplitError $(curLoc) "Product"
 
-        Clock _ _ Gated -> do
-          results <- splitGatedClock o' hwty
-          (outps'',results1) <- mapAccumLM go outps' results
-          let (ports,decls,ids) = unzip3 results1
-              ids' = map (resBV topM) ids
-              netassgn = Assignment o' (DataCon hwty (DC (hwty,0)) ids')
-          if null attrs then
-            return (outps'', (concat ports,oDecl:netassgn:concat decls,Left o'))
-          else
-            throwAnnotatedSplitError $(curLoc) $ show hwty
-
         _ -> return (rest,([(oN,o',hwty)],[oDecl],Left o'))
 
     go [] _ = error "This shouldn't happen"
@@ -1773,17 +1677,6 @@ mkTopOutput' topM outps pM = case pM of
               netassgn = Assignment pN' (DataCon hwty (DC (BitVector (typeSize hwty),0)) ids2)
           return (outps'',(concat ports,pDecl:netassgn:concat decls,Left pN'))
 
-        Clock _ _ Gated -> do
-          results <- splitGatedClock pN hwty
-          (outps'',results1) <- mapAccumLM go outps' results
-          let (ports,decls,ids) = unzip3 results1
-              ids' = map (resBV topM) ids
-              netassgn = Assignment pN' (DataCon hwty (DC (hwty,0)) ids')
-          if null attrs then
-            return (outps'', (concat ports,pDecl:netassgn:concat decls,Left pN'))
-          else
-            throwAnnotatedSplitError $(curLoc) $ show hwty
-
         _ -> return (tail outps',([(pN,pN',hwty)],[pDecl],Left pN'))
 
 concatPortDecls3
@@ -1841,15 +1734,6 @@ nestM (Indexed (RTree (-1) t1,l,_)) (Indexed (RTree d t2,10,k))
 
 nestM _ _ = Nothing
 
-
-splitGatedClock :: Identifier -> HWType -> NetlistMonad [(Identifier,HWType)]
-splitGatedClock baseNm (Clock nm rt Gated) = do
-  hwnms <- mapM (extendIdentifier Basic baseNm) partNms
-  return $ zip hwnms hwtys
-  where
-    hwtys = [Clock nm rt Source,Bool]
-    partNms = ["_clk","_clken"]
-splitGatedClock _ ty = error $ $(curLoc) ++ "splitGatedClock can't split: " ++ show ty
 
 -- | Determines if any type variables (exts) are bound in any of the given
 -- type or term variables (tms). It's currently only used to detect bound
