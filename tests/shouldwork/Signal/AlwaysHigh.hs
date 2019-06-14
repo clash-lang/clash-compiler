@@ -3,7 +3,8 @@ module AlwaysHigh where
 import Clash.Prelude
 
 topEntity
-  :: Clock System Source
-  -> Reset System Asynchronous
+  :: Clock System
+  -> Reset System
+  -> Enable System
   -> Signal System Bit
-topEntity = exposeClockReset (register high (pure high))
+topEntity = exposeClockResetEnable (register high (pure high))

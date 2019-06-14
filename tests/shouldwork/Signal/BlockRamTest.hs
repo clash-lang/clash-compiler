@@ -4,8 +4,10 @@ module BlockRamTest where
 import Clash.Prelude
 
 topEntity
-  :: Clock System Source
+  :: Clock System
+  -> Enable System
   -> Signal System (Unsigned 7)
   -> Signal System (Maybe (Unsigned 7, Vec 4 Bit))
   -> Signal System (Vec 4 Bit)
-topEntity = exposeClock (blockRam (replicate d128 (repeat high)))
+topEntity clk en =
+  exposeEnable (exposeClock (blockRam (replicate d128 (repeat high))) clk) en

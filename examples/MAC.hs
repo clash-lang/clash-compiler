@@ -11,19 +11,20 @@ macT acc (x,y) = (acc',o)
     o    = acc
 
 mac
-  :: HiddenClockReset System Source Asynchronous
+  :: SystemClockResetEnable
   => Signal System (Signed 9, Signed 9)
   -> Signal System (Signed 9)
 mac = macT `mealy` 0
 
 topEntity
-  :: Clock System Source
-  -> Reset System Asynchronous
+  :: Clock System
+  -> Reset System
+  -> Enable System
   -> Signal System (Signed 9,Signed 9)
   -> Signal System (Signed 9)
 topEntity clk rst xy = r
   where
-    r = exposeClockReset mac clk rst xy
+    r = exposeClockResetEnable mac clk rst xy
 {-# NOINLINE topEntity #-}
 
 testBench :: Signal System Bool
@@ -31,6 +32,6 @@ testBench = done
   where
     testInput      = stimuliGenerator clk rst $(listToVecTH [(1,1) :: (Signed 9,Signed 9),(2,2),(3,3),(4,4)])
     expectedOutput = outputVerifier clk rst $(listToVecTH [0 :: Signed 9,1,5,14])
-    done           = expectedOutput (topEntity clk rst testInput)
+    done           = expectedOutput (topEntity clk rst (enableGen) testInput)
     clk            = tbSystemClockGen (not <$> done)
     rst            = systemResetGen

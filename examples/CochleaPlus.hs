@@ -53,11 +53,12 @@ c_frm (ws,ts,hist) vs = ((ws',ts',hist'),y)
     y   = hist'
 
 topEntity
-  :: Clock  System Source
-  -> Reset  System Asynchronous
+  :: Clock  System
+  -> Reset  System
+  -> Enable System
   -> Signal System (Vec 6 Integer)
   -> Signal System (Vec 12 Integer)
-topEntity = exposeClockReset (c_frm `mealy` (c_ws0,c_ts0,c_hist0))
+topEntity = exposeClockResetEnable (c_frm `mealy` (c_ws0,c_ts0,c_hist0))
 
 -- Haskell
 sim f s [] = []
@@ -65,7 +66,7 @@ sim f s (x:xs) = y : sim f s' xs
   where
     (s',y) = f s x
 -- Clash
-c_sim f i = L.take (L.length i) $ simulate (f clockGen systemResetGen) c_vss
+c_sim f i = L.take (L.length i) $ simulate (f clockGen systemResetGen (enableGen)) c_vss
 
 c_outp = c_sim topEntity c_vss
 

@@ -10,7 +10,8 @@ func
 func d c = 0
 
 mod'
-    :: forall dom gated sync. HiddenClockReset dom gated sync
+    :: forall dom conf
+     . HiddenClockResetEnable dom conf
     => Signal dom (BitVector 32)
 mod' = o
     where
@@ -27,4 +28,4 @@ mod' = o
     o :: Signal dom (BitVector 32)
     o = f (pure 0)
 
-topEntity clk rst = withClockReset @System @Source @Synchronous clk rst mod'
+topEntity clk rst en = withClockResetEnable @System clk rst en (mod' @System)

@@ -3,20 +3,21 @@ module MovingAvg where
 import Clash.Prelude
 
 windowN
-  :: HiddenClockReset domain gated synchronous
+  :: HiddenClockResetEnable dom conf
   => Default a
   => KnownNat n
   => Undefined a
   => SNat (n+1)
-  -> Signal domain a
-  -> Vec (n + 1) (Signal domain a)
+  -> Signal dom a
+  -> Vec (n + 1) (Signal dom a)
 windowN size = window
 
 movingAvarageNaive size signal =  fold (+) <$> bundle (windowN size signal)
 
 topEntity
-  :: Clock System Source
-  -> Reset System Asynchronous
+  :: Clock System
+  -> Reset System
+  -> Enable System
   -> Signal System (Signed 9)
   -> Signal System (Signed 9)
-topEntity = exposeClockReset (movingAvarageNaive d5)
+topEntity = exposeClockResetEnable (movingAvarageNaive d5)

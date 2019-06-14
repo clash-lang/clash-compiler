@@ -4,7 +4,7 @@ import Clash.Prelude
 import Clash.Explicit.Testbench
 
 go
-  :: SystemClockReset
+  :: SystemClockResetEnable
   => ()
   -> Signal System Bool
   -> Signal System Bool
@@ -16,7 +16,7 @@ go _ = mealy update initialState
     update (c, index) i = ((c, index), c `xor` i)
 
 topEntity
-  :: SystemClockReset
+  :: SystemClockResetEnable
   => Signal System (Vec 4 Bool)
   -> Signal System (Vec 4 Bool)
 topEntity =
@@ -24,7 +24,7 @@ topEntity =
 {-# NOINLINE topEntity #-}
 
 
-testBench :: SystemClockReset => Signal System Bool
+testBench :: SystemClockResetEnable => Signal System Bool
 testBench = done
   where
     testInput      = stimuliGenerator clk rst ((True :> True :> False :> False :> Nil) :> Nil)

@@ -15,7 +15,7 @@ replace_int v i a = replace i a v
 
 
 topEntity
-  :: HiddenClockReset System Source Asynchronous
+  :: SystemClockResetEnable
   => Signal System Int
   -> Signal System (Vec 5 Char)
 topEntity i = a
@@ -35,7 +35,7 @@ testBench = done
                                            :> ('a' :> 'x' :> 'x' :> 'c' :> 'a' :> Nil)
                                            :> ('a' :> 'x' :> 'x' :> 'x' :> 'a' :> Nil)
                                            :> Nil)
-    done           = expectedOutput (exposeClockReset topEntity clk rst testInput)
+    done           = expectedOutput (exposeClockResetEnable topEntity clk rst enableGen testInput)
     clk            = tbSystemClockGen (not <$> done)
-    rst            = asyncResetGen @System
+    rst            = systemResetGen
 {-# NOINLINE testBench #-}

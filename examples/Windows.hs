@@ -61,11 +61,12 @@ hfk1d xs = x2 + multwc (x1 - 2 * x2 + x3)
     x3 = xs !! 2
 
 topEntity
-  :: Clock  System Source
-  -> Reset  System Asynchronous
+  :: Clock  System
+  -> Reset  System
+  -> Enable System
   -> Signal System (Vec 2 Temp)
   -> Signal System (Vec 2 Temp)
-topEntity = exposeClockReset ((swarch1d hfk1d) `mealy` (repeat 0))
+topEntity = exposeClockResetEnable ((swarch1d hfk1d) `mealy` (repeat 0))
 
 res :: [Vec 2 Temp]
-res = simulate (topEntity clockGen systemResetGen) $ L.repeat (repeat 45)
+res = simulate (topEntity clockGen systemResetGen (enableGen)) $ L.repeat (repeat 45)

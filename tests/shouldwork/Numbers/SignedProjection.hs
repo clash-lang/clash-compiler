@@ -19,7 +19,7 @@ imagPart :: Complex a -> a
 imagPart (_ :+ y) = y
 
 top
-  :: SystemClockReset
+  :: SystemClockResetEnable
   => Signal System (Complex (Signed 3))
   -> Signal System (Signed 4)
 top = minimal

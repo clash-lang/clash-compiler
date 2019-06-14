@@ -20,7 +20,7 @@ myConstant b = g b (map (+1) (repeat 3))
 {-# NOINLINE myConstant #-}
 
 topEntity
-  :: HiddenClockReset System Source Asynchronous
+  :: SystemClockResetEnable
   => Signal System (Vec VecSize Int)
   -> Signal System (Vec VecSize Int)
 topEntity = register (myConstant True)
@@ -31,7 +31,7 @@ testBench = done
   where
     testInput      = stimuliGenerator clk rst (repeat 8 :> repeat 9 :> Nil)
     expectedOutput = outputVerifier clk rst ((5 :> repeat 4) :> repeat 8 :> repeat 9 :> Nil)
-    done           = expectedOutput (exposeClockReset topEntity clk rst testInput)
+    done           = expectedOutput (exposeClockResetEnable topEntity clk rst enableGen testInput)
     clk            = tbSystemClockGen (not <$> done)
-    rst            = asyncResetGen @System
+    rst            = systemResetGen
 {-# NOINLINE testBench #-}

@@ -4,11 +4,12 @@ import Clash.Prelude
 
 topEntity
   :: Integer
-  -> Clock System Source
-  -> Reset System Asynchronous
+  -> Clock System
+  -> Reset System
+  -> Enable System
   -> (Signal System Integer, Signal System Integer)
   -> Signal System Integer
-topEntity i = exposeClockReset (macT <^> i)
+topEntity i = exposeClockResetEnable (macT <^> i)
 
 macT s (x,y) = (s',o)
   where

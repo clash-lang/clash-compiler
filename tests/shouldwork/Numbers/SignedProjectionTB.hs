@@ -10,14 +10,15 @@ import qualified Data.List as L
 
 
 expected :: Vec _ (Signed 4)
-expected = $(listToVecTH $ L.take (length input) $ simulate minimal $ toList input)
+expected = $(listToVecTH $ L.take (length input) $ simulate @System minimal $ toList input)
 
 topEntity
-  :: Clock System 'Source
-  -> Reset System 'Asynchronous
+  :: Clock System
+  -> Reset System
+  -> Enable System
   -> Signal System (Complex (Signed 3))
   -> Signal System (Signed 4)
-topEntity clk rst = withClockReset clk rst top
+topEntity clk rst en = withClockResetEnable clk rst en top
 {-# NOINLINE topEntity #-}
 
 testBench :: Signal System Bool
@@ -25,6 +26,6 @@ testBench = done
   where
     testInput      = stimuliGenerator clk rst input
     expectedOutput = outputVerifier clk rst expected
-    done           = expectedOutput (topEntity clk rst testInput)
+    done           = expectedOutput (topEntity clk rst enableGen testInput)
     clk            = tbSystemClockGen (not <$> done)
     rst            = systemResetGen

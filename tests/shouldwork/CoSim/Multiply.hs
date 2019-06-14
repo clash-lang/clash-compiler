@@ -4,7 +4,8 @@ import Clash.CoSim
 import Clash.Explicit.Prelude
 
 verilog_mult
-  :: Signal d (Signed 64)
+  :: KnownDomain d dom
+  => Signal d (Signed 64)
   -> Signal d (Signed 64)
   -> Signal d (Signed 64)
 verilog_mult x y = [verilog|

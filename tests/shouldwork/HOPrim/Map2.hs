@@ -16,7 +16,7 @@ topEntity =
 {-# NOINLINE topEntity #-}
 
 
-testBench :: SystemClockReset => Signal System Bool
+testBench :: SystemClockResetEnable => Signal System Bool
 testBench = done
   where
     testInput      = stimuliGenerator clk rst ((repeat ()) :> Nil)

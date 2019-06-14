@@ -62,7 +62,7 @@ rotateColor c =
     Blue  -> Red
 
 topEntity
-  :: SystemClockReset
+  :: SystemClockResetEnable
   => Signal System (Maybe Color)
   -> Signal System Color
 topEntity = fmap f
@@ -90,4 +90,9 @@ testBench = done'
                                    :> Nil
 
     done  = expectedOutput (topEntity testInput)
-    done' = withClockReset (tbSystemClockGen (not <$> done')) systemResetGen done
+    done' =
+      withClockResetEnable
+        (tbSystemClockGen (not <$> done'))
+        systemResetGen
+        enableGen
+        done

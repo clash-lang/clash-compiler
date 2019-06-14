@@ -4,7 +4,7 @@ import Clash.Prelude
 import Clash.Explicit.Testbench
 
 topEntity
-  :: HiddenClockReset System 'Source 'Asynchronous
+  :: SystemClockResetEnable
   => Signal System Int
   -> Signal System Int
 topEntity x =
@@ -20,6 +20,8 @@ testBench = done
   where
     testInput      = stimuliGenerator clk rst (2 :> 3 :> 4 :> 5 :> Nil)
     expectedOutput = outputVerifier clk rst (2 :> 3 :> 4 :> 5 :> Nil)
-    done           = expectedOutput (withClockReset clk rst topEntity testInput)
     clk            = tbSystemClockGen (not <$> done)
     rst            = systemResetGen
+    done =
+      expectedOutput
+        (withClockResetEnable clk rst enableGen topEntity testInput)

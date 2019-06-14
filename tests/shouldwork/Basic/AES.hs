@@ -69,8 +69,8 @@ roundLast :: Vec 4 (BitVector 32) -> AESState -> AESState
 roundLast roundKey = addRoundKey roundKey . shiftRows . subBytes
 
 keyExpander
-    :: forall dom gated sync
-    .  HiddenClockReset dom gated sync
+    :: forall dom conf
+    .  HiddenClockResetEnable dom conf
     => Signal dom Bool
     -> Signal dom (BitVector 128)
     -> Signal dom (Vec 4 (BitVector 32))
@@ -83,8 +83,8 @@ keyExpander start key = keyState
     rc =  register (unpack 1) $ mux start (pure $ unpack 1) (gfDouble <$> rc)
 
 aes
-    :: forall dom gated sync
-    .  HiddenClockReset dom gated sync
+    :: forall dom conf
+    .  HiddenClockResetEnable dom conf
     => Signal dom Bool
     -> Signal dom (BitVector 128)
     -> Signal dom (BitVector 128)
@@ -107,4 +107,5 @@ aes start key block = bundle (cnt, roundKey, pack <$> roundState, cnt .==. 11)
             preRoundKey   = bool (mixColumns preMixColumns) preMixColumns (cnt == 10)
             preMixColumns = shiftRows $ subBytes roundState
 
-topEntity clk rst = withClockReset @System @Source @Synchronous clk rst aes
+topEntity clk rst en =
+  withClockResetEnable @System clk rst en (aes @System)

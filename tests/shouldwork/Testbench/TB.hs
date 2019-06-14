@@ -7,10 +7,11 @@ type Inp   = (Signed 4,Outp)
 type Outp  = (Maybe (Signed 8,Bool),Bit)
 
 topEntity
-  :: Clock System Source
-  -> Reset System Asynchronous
+  :: Clock System
+  -> Reset System
+  -> Enable System
   -> Signal System Inp -> Signal System Outp
-topEntity = exposeClockReset (transfer `mealy` initS)
+topEntity = exposeClockResetEnable (transfer `mealy` initS)
 {-# NOINLINE topEntity #-}
 
 transfer s i = (i,o)
@@ -30,6 +31,6 @@ testBench = done
                       $(listToVecTH ([(Nothing,0)
                                      ,(Just (4,True), 0)
                                      ]::[(Maybe (Signed 8,Bool),Bit)]))
-    done           = expectedOutput (topEntity clk rst testInput)
+    done           = expectedOutput (topEntity clk rst enableGen testInput)
     clk            = tbSystemClockGen (not <$> done)
     rst            = systemResetGen

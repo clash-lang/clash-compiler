@@ -8,7 +8,7 @@ import Clash.Explicit.Testbench
 import Data.Word
 
 topEntity
-  :: HiddenClockReset System Source Asynchronous
+  :: SystemClockResetEnable
   => Signal System Word8
 topEntity = fmap head r
   where
@@ -22,7 +22,7 @@ testBench :: Signal System Bool
 testBench = done
   where
     expectedOutput = outputVerifier clk rst (0 :> 1 :> 2 :> 3 :> Nil)
-    done           = expectedOutput (exposeClockReset topEntity clk rst)
+    done           = expectedOutput (exposeClockResetEnable topEntity clk rst enableGen)
     clk            = tbSystemClockGen (not <$> done)
-    rst            = asyncResetGen @System
+    rst            = systemResetGen
 {-# NOINLINE testBench #-}

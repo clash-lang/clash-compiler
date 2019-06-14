@@ -4,8 +4,8 @@ import Clash.Prelude
 import Clash.Explicit.Testbench
 
 topEntity
-  :: Clock  System Source
-  -> Reset  System Asynchronous
+  :: Clock  System
+  -> Reset  System
   -> Signal System (Signed 16)
   -> Signal System ( Signed 17
                    , Signed 17

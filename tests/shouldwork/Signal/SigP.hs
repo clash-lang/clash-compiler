@@ -3,8 +3,9 @@ module SigP where
 import Clash.Prelude
 
 topEntity
-  :: Clock System Source
-  -> Reset System Asynchronous
+  :: Clock System
+  -> Reset System
+  -> Enable System
   -> Signal System (Bool, Bool)
   -> (Signal System Bool, Signal System Bool)
-topEntity = exposeClockReset (unbundle . register (False,False))
+topEntity = exposeClockResetEnable (unbundle . register (False,False))

@@ -5,7 +5,7 @@ module PipelinesViaFolds where
 import Clash.Prelude
 import Data.Word
 
-topEntity :: SystemClockReset => Signal System Word32 -> Signal System Word32
+topEntity :: SystemClockResetEnable => Signal System Word32 -> Signal System Word32
 topEntity = pipeline
   where
     pipeline :: Signal System Word32 -> Signal System Word32

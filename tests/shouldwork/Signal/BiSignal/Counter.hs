@@ -26,29 +26,31 @@ counter (write, prevread) i = ((write', prevread'), output)
     write' = not write
 
 -- | Write on odd cyles
-odd :: Clock System Source
-  -> Reset System Asynchronous
-  -> BiSignalIn  'Undefined System (BitSize Int)
-  -> BiSignalOut 'Undefined System (BitSize Int)
-odd clk rst s = writeToBiSignal s (mealy clk rst counter (False, 0) (readFromBiSignal s))
+odd :: Clock System
+  -> Reset System
+  -> Enable System
+  -> BiSignalIn  'Floating System (BitSize Int)
+  -> BiSignalOut 'Floating System (BitSize Int)
+odd clk rst en s = writeToBiSignal s (mealy clk rst en counter (False, 0) (readFromBiSignal s))
 
 -- | Write on even cyles
-even :: Clock System Source
-  -> Reset System Asynchronous
-  -> BiSignalIn  'Undefined System (BitSize Int)
-  -> BiSignalOut 'Undefined System (BitSize Int)
-even clk rst s = writeToBiSignal s (mealy clk rst counter (True, 0) (readFromBiSignal s))
+even :: Clock System
+  -> Reset System
+  -> Enable System
+  -> BiSignalIn  'Floating System (BitSize Int)
+  -> BiSignalOut 'Floating System (BitSize Int)
+even clk rst en s = writeToBiSignal s (mealy clk rst en counter (True, 0) (readFromBiSignal s))
 
 
 {-# NOINLINE topEntity #-}
-topEntity :: Clock System Source
-          -> Reset System Asynchronous
-          -> Signal System Int
-topEntity clk rst = readFromBiSignal bus'
+topEntity :: Clock System
+  -> Reset System
+  -> Enable System
+  -> Signal System Int
+topEntity clk rst en = readFromBiSignal bus'
   where
-    bus  = mergeBiSignalOuts $ odd clk rst bus' :> even clk rst bus' :> Nil
+    bus  = mergeBiSignalOuts $ odd clk rst en bus' :> even clk rst en bus' :> Nil
     bus' = veryUnsafeToBiSignalIn bus
-
 
 main :: IO()
 main = do
@@ -60,5 +62,5 @@ testBench :: Signal System Bool
 testBench = done
   where
     clock          = tbSystemClockGen (not <$> done)
-    done           = expectedOutput (topEntity clock systemResetGen)
+    done           = expectedOutput (topEntity clock systemResetGen enableGen)
     expectedOutput = outputVerifier clock systemResetGen (1 :> 2 :> 3 :> 4 :> 5 :> 6 :> 7 :> Nil)

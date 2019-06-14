@@ -11,7 +11,7 @@ topEntity = pure 0
 -- Actual bug test
 bug = blockRamPow2 (repeat (0 :: Unsigned 1)) bug (pure Nothing)
 
-main = mapM printX $ sampleN 4 bug
+main = mapM printX $ sampleN @System 4 bug
 mainSystemVerilog = main
 mainVerilog = main
 mainVHDL = main
