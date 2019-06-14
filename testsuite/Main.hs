@@ -76,6 +76,8 @@ runClashTest =
         , runTest ("tests" </> "shouldwork" </> "Basic") defBuild [] "IrrefError"          ([""],"IrrefError_topEntity",False)
         , runTest ("tests" </> "shouldwork" </> "Basic") defBuild [] "LambdaDrop"          ([""],"LambdaDrop_topEntity",False)
         , runTest ("tests" </> "shouldwork" </> "Basic") defBuild [] "LotOfStates"         (["","LotOfStates_testBench"],"LotOfStates_testBench",True)
+        -- TODO: Fix for VHDL. ModelSim / GHDL simulate _extremely_ slowly
+        , runTest ("tests" </> "shouldwork" </> "Basic") (defBuild \\ [VHDL]) [] "MultipleHidden"      (["","MultipleHidden_testBench"],"MultipleHidden_testBench",True)
         , runTest ("tests" </> "shouldwork" </> "Basic") defBuild [] "NameOverlap"         (["nameoverlap"],"nameoverlap",False)
         , runTest ("tests" </> "shouldwork" </> "Basic") defBuild [] "NestedPrimitives"    ([""],"NestedPrimitives_topEntity",False)
         , runTest ("tests" </> "shouldwork" </> "Basic") defBuild [] "NestedPrimitives2"   ([""],"NestedPrimitives2_topEntity",False)
