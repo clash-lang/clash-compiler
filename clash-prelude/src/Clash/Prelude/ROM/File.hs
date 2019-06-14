@@ -1,6 +1,7 @@
 {-|
 Copyright  :  (C) 2015-2016, University of Twente,
                   2017     , Google Inc.
+                  2019     , Myrtle Software Ltd
 License    :  BSD2 (see the file LICENSE)
 Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
 
@@ -33,7 +34,7 @@ We can instantiate a synchronous ROM using the content of the above file like
 so:
 
 @
-f :: HiddenClock domain => Signal domain (Unsigned 3) -> Signal domain (Unsigned 9)
+f :: HiddenClock dom conf => Signal dom (Unsigned 3) -> Signal dom (Unsigned 9)
 f rd = 'Clash.Class.BitPack.unpack' '<$>' 'romFile' d7 \"memory.bin\" rd
 @
 
@@ -49,7 +50,7 @@ However, we can also interpret the same data as a tuple of a 6-bit unsigned
 number, and a 3-bit signed number:
 
 @
-g :: HiddenClock domain => Signal domain (Unsigned 3) -> Signal domain (Unsigned 6,Signed 3)
+g :: HiddenClock dom conf => Signal dom (Unsigned 3) -> Signal dom (Unsigned 6,Signed 3)
 g rd = 'Clash.Class.BitPack.unpack' '<$>' 'romFile' d7 \"memory.bin\" rd
 @
 
@@ -140,10 +141,14 @@ import           Clash.Sized.Unsigned         (Unsigned)
 --     @
 asyncRomFile
   :: (KnownNat m, Enum addr)
-  => SNat n      -- ^ Size of the ROM
-  -> FilePath    -- ^ File describing the content of the ROM
-  -> addr        -- ^ Read address @rd@
-  -> BitVector m -- ^ The value of the ROM at address @rd@
+  => SNat n
+  -- ^ Size of the ROM
+  -> FilePath
+  -- ^ File describing the content of the ROM
+  -> addr
+  -- ^ Read address @rd@
+  -> BitVector m
+  -- ^ The value of the ROM at address @rd@
 asyncRomFile sz file = asyncRomFile# sz file . fromEnum
 -- Leave 'asyncRom' eta-reduced, see Note [Eta-reduction and unsafePerformIO initMem]
 {-# INLINE asyncRomFile #-}
@@ -214,19 +219,26 @@ asyncRomFile sz file = asyncRomFile# sz file . fromEnum
 asyncRomFilePow2
   :: forall n m
    . (KnownNat m, KnownNat n)
-  => FilePath    -- ^ File describing the content of the ROM
-  -> Unsigned n  -- ^ Read address @rd@
-  -> BitVector m -- ^ The value of the ROM at address @rd@
+  => FilePath
+  -- ^ File describing the content of the ROM
+  -> Unsigned n
+  -- ^ Read address @rd@
+  -> BitVector m
+  -- ^ The value of the ROM at address @rd@
 asyncRomFilePow2 = asyncRomFile (pow2SNat (SNat @ n))
 {-# INLINE asyncRomFilePow2 #-}
 
 -- | asyncROMFile primitive
 asyncRomFile#
   :: KnownNat m
-  => SNat n       -- ^ Size of the ROM
-  -> FilePath     -- ^ File describing the content of the ROM
-  -> Int          -- ^ Read address @rd@
-  -> BitVector m  -- ^ The value of the ROM at address @rd@
+  => SNat n
+  -- ^ Size of the ROM
+  -> FilePath
+  -- ^ File describing the content of the ROM
+  -> Int
+  -- ^ Read address @rd@
+  -> BitVector m
+  -- ^ The value of the ROM at address @rd@
 asyncRomFile# sz file = (content !) -- Leave "(content !)" eta-reduced, see
   where                             -- Note [Eta-reduction and unsafePerformIO initMem]
     mem     = unsafePerformIO (initMem file)
@@ -258,13 +270,20 @@ asyncRomFile# sz file = (content !) -- Leave "(content !)" eta-reduced, see
 -- * See "Clash.Sized.Fixed#creatingdatafiles" for ideas on how to create your
 -- own data files.
 romFile
-  :: (KnownNat m, KnownNat n, HiddenClock domain gated)
-  => SNat n               -- ^ Size of the ROM
-  -> FilePath             -- ^ File describing the content of the ROM
-  -> Signal domain (Unsigned n)  -- ^ Read address @rd@
-  -> Signal domain (BitVector m)
+  :: ( KnownNat m
+     , KnownNat n
+     , HiddenClock dom conf
+     , HiddenEnable dom conf
+     )
+  => SNat n
+  -- ^ Size of the ROM
+  -> FilePath
+  -- ^ File describing the content of the ROM
+  -> Signal dom (Unsigned n)
+  -- ^ Read address @rd@
+  -> Signal dom (BitVector m)
   -- ^ The value of the ROM at address @rd@ from the previous clock cycle
-romFile = hideClock E.romFile
+romFile = hideEnable (hideClock E.romFile)
 {-# INLINE romFile #-}
 
 -- | A ROM with a synchronous read port, with space for 2^@n@ elements
@@ -291,11 +310,17 @@ romFile = hideClock E.romFile
 -- * See "Clash.Sized.Fixed#creatingdatafiles" for ideas on how to create your
 -- own data files.
 romFilePow2
-  :: forall n m domain gated
-   . (KnownNat m, KnownNat n, HiddenClock domain gated)
-  => FilePath                    -- ^ File describing the content of the ROM
-  -> Signal domain (Unsigned n)  -- ^ Read address @rd@
-  -> Signal domain (BitVector m)
+  :: forall n m dom conf
+   . ( KnownNat m
+     , KnownNat n
+     , HiddenClock dom conf
+     , HiddenEnable dom conf
+     )
+  => FilePath
+  -- ^ File describing the content of the ROM
+  -> Signal dom (Unsigned n)
+  -- ^ Read address @rd@
+  -> Signal dom (BitVector m)
   -- ^ The value of the ROM at address @rd@ from the previous clock cycle
-romFilePow2 = hideClock E.romFilePow2
+romFilePow2 = hideEnable (hideClock E.romFilePow2)
 {-# INLINE romFilePow2 #-}

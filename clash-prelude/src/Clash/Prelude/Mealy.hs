@@ -1,6 +1,7 @@
 {-|
   Copyright  :  (C) 2013-2016, University of Twente,
                     2017     , Google Inc.
+                    2019     , Myrtle Software Ltd
   License    :  BSD2 (see the file LICENSE)
   Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
 
@@ -51,11 +52,11 @@ let macT s (x,y) = (s',s)
 --   where
 --     s' = x * y + s
 --
--- mac :: HiddenClockReset domain gated synchronous => 'Signal' domain (Int, Int) -> 'Signal' domain Int
+-- mac :: HiddenClockResetEnable dom conf => 'Signal' dom (Int, Int) -> 'Signal' dom Int
 -- mac = 'mealy' macT 0
 -- @
 --
--- >>> simulate mac [(0,0),(1,1),(2,2),(3,3),(4,4)]
+-- >>> simulate @System mac [(0,0),(1,1),(2,2),(3,3),(4,4)]
 -- [0,0,1,5,14...
 -- ...
 --
@@ -64,26 +65,26 @@ let macT s (x,y) = (s',s)
 --
 -- @
 -- dualMac
---   :: HiddenClockReset domain gated synchronous
---   => ('Signal' domain Int, 'Signal' domain Int)
---   -> ('Signal' domain Int, 'Signal' domain Int)
---   -> 'Signal' domain Int
+--   :: HiddenClockResetEnable dom conf
+--   => ('Signal' dom Int, 'Signal' dom Int)
+--   -> ('Signal' dom Int, 'Signal' dom Int)
+--   -> 'Signal' dom Int
 -- dualMac (a,b) (x,y) = s1 + s2
 --   where
 --     s1 = 'mealy' mac 0 ('Clash.Signal.bundle' (a,x))
 --     s2 = 'mealy' mac 0 ('Clash.Signal.bundle' (b,y))
 -- @
 mealy
-  :: ( HiddenClockReset domain gated synchronous
+  :: ( HiddenClockResetEnable dom conf
      , Undefined s )
   => (s -> i -> (s,o))
   -- ^ Transfer function in mealy machine form: @state -> input -> (newstate,output)@
   -> s
   -- ^ Initial state
-  -> (Signal domain i -> Signal domain o)
+  -> (Signal dom i -> Signal dom o)
   -- ^ Synchronous sequential function with input and output matching that
   -- of the mealy machine
-mealy = hideClockReset E.mealy
+mealy = hideClockResetEnable E.mealy
 {-# INLINE mealy #-}
 
 -- | A version of 'mealy' that does automatic 'Bundle'ing
@@ -113,27 +114,31 @@ mealy = hideClockReset E.mealy
 --     (i2,b2) = 'mealyB' f 3 (i1,c)
 -- @
 mealyB
-  :: ( HiddenClockReset domain gated synchronous
-     , Undefined s, Bundle i, Bundle o )
+  :: ( HiddenClockResetEnable dom conf
+     , Undefined s
+     , Bundle i
+     , Bundle o )
   => (s -> i -> (s,o))
   -- ^ Transfer function in mealy machine form: @state -> input -> (newstate,output)@
   -> s
   -- ^ Initial state
-  -> (Unbundled domain i -> Unbundled domain o)
+  -> (Unbundled dom i -> Unbundled dom o)
   -- ^ Synchronous sequential function with input and output matching that
   -- of the mealy machine
-mealyB = hideClockReset E.mealyB
+mealyB = hideClockResetEnable E.mealyB
 {-# INLINE mealyB #-}
 
 -- | Infix version of 'mealyB'
 (<^>)
-  :: ( HiddenClockReset domain gated synchronous
-     , Undefined s, Bundle i, Bundle o )
+  :: ( HiddenClockResetEnable dom conf
+     , Undefined s
+     , Bundle i
+     , Bundle o )
   => (s -> i -> (s,o))
   -- ^ Transfer function in mealy machine form: @state -> input -> (newstate,output)@
   -> s
   -- ^ Initial state
- -> (Unbundled domain i -> Unbundled domain o)
+ -> (Unbundled dom i -> Unbundled dom o)
  -- ^ Synchronous sequential function with input and output matching that
  -- of the mealy machine
 (<^>) = mealyB

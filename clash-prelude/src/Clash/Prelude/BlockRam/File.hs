@@ -1,6 +1,7 @@
 {-|
 Copyright  :  (C) 2015-2016, University of Twente,
-                  2017     , Myrtle Software Ltd, Google Inc.
+                  2019     , Myrtle Software Ltd
+                  2017     , Google Inc.
 License    :  BSD2 (see the file LICENSE)
 Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
 
@@ -33,7 +34,7 @@ For example, a data file @memory.bin@ containing the 9-bit unsigned number
 We can instantiate a BlockRAM using the content of the above file like so:
 
 @
-f :: HiddenClock domain -> Signal domain (Unsigned 3) -> Signal domain (Unsigned 9)
+f :: HiddenClock dom conf -> Signal dom (Unsigned 3) -> Signal dom (Unsigned 9)
 f rd = 'Clash.Class.BitPack.unpack' '<$>' exposeClock 'blockRamFile' clk d7 \"memory.bin\" rd (signal Nothing)
 @
 
@@ -50,7 +51,7 @@ However, we can also interpret the same data as a tuple of a 6-bit unsigned
 number, and a 3-bit signed number:
 
 @
-g :: HiddenClock domain -> Signal domain (Unsigned 3) -> Signal domain (Unsigned 6,Signed 3)
+g :: HiddenClock dom conf -> Signal dom (Unsigned 3) -> Signal dom (Unsigned 6,Signed 3)
 g clk rd = 'Clash.Class.BitPack.unpack' '<$>' exposeClock 'blockRamFile' clk d7 \"memory.bin\" rd (signal Nothing)
 @
 
@@ -90,7 +91,8 @@ import GHC.Stack                              (HasCallStack, withFrozenCallStack
 
 import qualified Clash.Explicit.BlockRam.File as E
 import           Clash.Promoted.Nat           (SNat)
-import           Clash.Signal                 (HiddenClock, Signal, hideClock)
+import           Clash.Signal
+  (HiddenClock, HiddenEnable, Signal, hideClock, hideEnable)
 import           Clash.Sized.BitVector        (BitVector)
 import           Clash.Sized.Unsigned         (Unsigned)
 
@@ -121,19 +123,23 @@ import           Clash.Sized.Unsigned         (Unsigned)
 -- * See "Clash.Sized.Fixed#creatingdatafiles" for ideas on how to create your
 -- own data files.
 blockRamFilePow2
-  :: forall domain gated n m
-   . (KnownNat m, KnownNat n, HiddenClock domain gated, HasCallStack)
+  :: forall dom conf n m
+   . ( KnownNat m
+     , KnownNat n
+     , HiddenClock dom conf
+     , HiddenEnable dom conf
+     , HasCallStack )
   => FilePath
   -- ^ File describing the initial content of the blockRAM
-  -> Signal domain (Unsigned n)
+  -> Signal dom (Unsigned n)
   -- ^ Read address @r@
-  -> Signal domain (Maybe (Unsigned n, BitVector m))
+  -> Signal dom (Maybe (Unsigned n, BitVector m))
   -- ^ (write address @w@, value to write)
-  -> Signal domain (BitVector m)
+  -> Signal dom (BitVector m)
   -- ^ Value of the @blockRAM@ at address @r@ from the previous
   -- clock cycle
 blockRamFilePow2 = \fp rd wrM -> withFrozenCallStack
-  (hideClock E.blockRamFilePow2 fp rd wrM)
+  (hideEnable (hideClock E.blockRamFilePow2) fp rd wrM)
 {-# INLINE blockRamFilePow2 #-}
 
 -- | Create a blockRAM with space for @n@ elements
@@ -163,18 +169,22 @@ blockRamFilePow2 = \fp rd wrM -> withFrozenCallStack
 -- * See "Clash.Sized.Fixed#creatingdatafiles" for ideas on how to create your
 -- own data files.
 blockRamFile
-  :: (KnownNat m, Enum addr, HiddenClock domain gated, HasCallStack)
+  :: ( KnownNat m
+     , Enum addr
+     , HiddenClock dom conf
+     , HiddenEnable dom conf
+     , HasCallStack )
   => SNat n
   -- ^ Size of the blockRAM
   -> FilePath
   -- ^ File describing the initial content of the blockRAM
-  -> Signal domain addr
+  -> Signal dom addr
   -- ^ Read address @r@
-  -> Signal domain (Maybe (addr, BitVector m))
+  -> Signal dom (Maybe (addr, BitVector m))
   -- ^ (write address @w@, value to write)
-  -> Signal domain (BitVector m)
+  -> Signal dom (BitVector m)
   -- ^ Value of the @blockRAM@ at address @r@ from the previous
   -- clock cycle
 blockRamFile = \sz fp rd wrM -> withFrozenCallStack
-  (hideClock E.blockRamFile sz fp rd wrM)
+  (hideEnable (hideClock E.blockRamFile) sz fp rd wrM)
 {-# INLINE blockRamFile #-}

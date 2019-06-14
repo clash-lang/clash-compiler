@@ -1,14 +1,14 @@
 {-|
 Copyright  :  (C) 2013-2016, University of Twente,
-                  2017     , Myrtle Software Ltd, Google Inc.
+                  2017     , Google Inc.
+                  2019     , Myrtle Software Ltd
 License    :  BSD2 (see the file LICENSE)
 Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
 
 __This is the <https://downloads.haskell.org/~ghc/latest/docs/html/users_guide/safe_haskell.html Safe> API only of "Clash.Explicit.Prelude"__
 
 This module defines the explicitly clocked counterparts of the functions
-defined in "Clash.Prelude". Take a look at "Clash.Signal.Explicit" to see how
-you can make multi-clock designs.
+defined in "Clash.Prelude".
 -}
 
 {-# LANGUAGE DataKinds           #-}
@@ -147,7 +147,7 @@ import Clash.XException
 {- $setup
 >>> :set -XDataKinds
 >>> import Clash.Explicit.Prelude
->>> let rP clk rst = registerB clk rst (8::Int,8::Int)
+>>> let rP clk rst en = registerB clk rst en (8::Int,8::Int)
 -}
 
 
@@ -155,50 +155,62 @@ import Clash.XException
 -- @('Signal' a, 'Signal' b)@)
 --
 -- @
--- rP :: Clock domain gated -> Reset domain synchronous
---    -> ('Signal' domain Int, 'Signal' domain Int)
---    -> ('Signal' domain Int, 'Signal' domain Int)
--- rP clk rst = 'registerB' clk rst (8,8)
+-- rP :: Clock dom -> Reset dom -> Enable dom
+--    -> ('Signal' dom Int, 'Signal' dom Int)
+--    -> ('Signal' dom Int, 'Signal' dom Int)
+-- rP clk rst en = 'registerB' clk rst en (8,8)
 -- @
 --
--- >>> simulateB (rP systemClockGen systemResetGen) [(1,1),(1,1),(2,2),(3,3)] :: [(Int,Int)]
+-- >>> simulateB (rP systemClockGen systemResetGen enableGen) [(1,1),(1,1),(2,2),(3,3)] :: [(Int,Int)]
 -- [(8,8),(8,8),(1,1),(2,2),(3,3)...
 -- ...
 registerB
-  :: (Undefined a, Bundle a)
-  => Clock domain gated
-  -> Reset domain synchronous
+  :: ( KnownDomain dom conf
+     , Undefined a
+     , Bundle a )
+  => Clock dom
+  -> Reset dom
+  -> Enable dom
   -> a
-  -> Unbundled domain a
-  -> Unbundled domain a
-registerB clk rst i = unbundle Prelude.. register clk rst i Prelude.. bundle
+  -> Unbundled dom a
+  -> Unbundled dom a
+registerB clk rst en i =
+  unbundle Prelude.. register clk rst en i Prelude.. bundle
 {-# INLINE registerB #-}
 
 -- | Give a pulse when the 'Signal' goes from 'minBound' to 'maxBound'
 isRising
-  :: (Undefined a, Bounded a, Eq a)
-  => Clock domain gated
-  -> Reset domain synchronous
+  :: ( KnownDomain dom conf
+     , Undefined a
+     , Bounded a
+     , Eq a )
+  => Clock dom
+  -> Reset dom
+  -> Enable dom
   -> a -- ^ Starting value
-  -> Signal domain a
-  -> Signal domain Bool
-isRising clk rst is s = liftA2 edgeDetect prev s
+  -> Signal dom a
+  -> Signal dom Bool
+isRising clk rst en is s = liftA2 edgeDetect prev s
   where
-    prev = register clk rst is s
+    prev = register clk rst en is s
     edgeDetect old new = old == minBound && new == maxBound
 {-# INLINABLE isRising #-}
 
 -- | Give a pulse when the 'Signal' goes from 'maxBound' to 'minBound'
 isFalling
-  :: (Undefined a, Bounded a, Eq a)
-  => Clock domain gated
-  -> Reset domain synchronous
+  :: ( KnownDomain dom conf
+     , Undefined a
+     , Bounded a
+     , Eq a )
+  => Clock dom
+  -> Reset dom
+  -> Enable dom
   -> a -- ^ Starting value
-  -> Signal domain a
-  -> Signal domain Bool
-isFalling clk rst is s = liftA2 edgeDetect prev s
+  -> Signal dom a
+  -> Signal dom Bool
+isFalling clk rst en is s = liftA2 edgeDetect prev s
   where
-    prev = register clk rst is s
+    prev = register clk rst en is s
     edgeDetect old new = old == maxBound && new == minBound
 {-# INLINABLE isFalling #-}
 
@@ -206,12 +218,14 @@ isFalling clk rst is s = liftA2 edgeDetect prev s
 -- combined with functions like @'Clash.Explicit.Signal.regEn'@ or
 -- @'Clash.Explicit.Signal.mux'@, in order to delay a register by a known amount.
 riseEvery
-  :: forall domain gated synchronous n
-   . Clock domain gated
-  -> Reset domain synchronous
+  :: forall dom conf n
+   . KnownDomain dom conf
+  => Clock dom
+  -> Reset dom
+  -> Enable dom
   -> SNat n
-  -> Signal domain Bool
-riseEvery clk rst SNat = moore clk rst transfer output 0 (pure ())
+  -> Signal dom Bool
+riseEvery clk rst en SNat = moore clk rst en transfer output 0 (pure ())
   where
     output :: Index n -> Bool
     output = (== maxBound)
@@ -222,19 +236,22 @@ riseEvery clk rst SNat = moore clk rst transfer output 0 (pure ())
 
 -- | Oscillate a @'Bool'@ for a given number of cycles, given the starting state.
 oscillate
-  :: forall domain gated synchronous n
-   . Clock domain gated
-  -> Reset domain synchronous
+  :: forall dom conf n
+   . KnownDomain dom conf
+  => Clock dom
+  -> Reset dom
+  -> Enable dom
   -> Bool
   -> SNat n
-  -> Signal domain Bool
-oscillate clk rst begin SNat = moore clk rst transfer snd (0, begin) (pure ())
-  where
-    transfer :: (Index n, Bool) -> () -> (Index n, Bool)
-    transfer (s, i) _ =
-      if s == maxBound
-        then (0,   not i) -- reset state and oscillate output
-        else (s+1, i)     -- hold current output
+  -> Signal dom Bool
+oscillate clk rst en begin SNat =
+  moore clk rst en transfer snd (0, begin) (pure ())
+ where
+  transfer :: (Index n, Bool) -> () -> (Index n, Bool)
+  transfer (s, i) _ =
+    if s == maxBound
+      then (0,   not i) -- reset state and oscillate output
+      else (s+1, i)     -- hold current output
 {-# INLINEABLE oscillate #-}
 
 undefined :: HasCallStack => a

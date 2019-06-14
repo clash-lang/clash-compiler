@@ -1,6 +1,6 @@
 {-|
 Copyright  :  (C) 2018, Google Inc.
-                  2019, Myrtle Software Tld
+                  2019, Myrtle Software Ltd
 License    :  BSD2 (see the file LICENSE)
 Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
 
@@ -11,7 +11,7 @@ import Clash.Prelude hiding (writeFile)
 import Data.Text.IO  (writeFile)
 
 -- | Count and wrap around
-subCounter :: SystemClockReset => Signal System (Index 3)
+subCounter :: SystemClockResetEnable => Signal System (Index 3)
 subCounter = traceSignal1 "sub" counter
   where
     counter =
@@ -22,7 +22,7 @@ subCounter = traceSignal1 "sub" counter
       | otherwise     = c + 1
 
 -- | Count, but only when my subcounter is wrapping around
-mainCounter :: SystemClockReset => Signal System (Signed 64)
+mainCounter :: SystemClockResetEnable => Signal System (Signed 64)
 mainCounter = traceSignal1 "main" counter
   where
     counter =
@@ -33,9 +33,9 @@ mainCounter = traceSignal1 "main" counter
       | otherwise      = c
 
 -- | Collect traces, and dump them to a VCD file.
-main :: SystemClockReset => IO ()
+main :: SystemClockResetEnable => IO ()
 main = do
-  let cntrOut = exposeClockReset mainCounter systemClockGen systemResetGen
+  let cntrOut = exposeClockResetEnable mainCounter systemClockGen systemResetGen
   vcd <- dumpVCD (0, 100) cntrOut ["main", "sub"]
   case vcd of
     Left msg ->
@@ -93,8 +93,9 @@ module Clash.Signal.Trace
   ) where
 
 -- Clash:
-import           Clash.Signal.Internal (Domain (..), fromList)
-import           Clash.Signal          (Signal, bundle, unbundle)
+import           Clash.Signal.Internal (fromList)
+import           Clash.Signal
+  (KnownDomain(..), SDomainConfiguration(..), Signal, bundle, unbundle)
 import           Clash.Sized.Vector    (Vec, iterateI)
 import qualified Clash.Sized.Vector    as Vector
 import           Clash.Class.BitPack   (BitPack, BitSize, pack, unpack)
@@ -149,7 +150,7 @@ mkTrace
   => KnownNat (BitSize a)
   => BitPack a
   => Undefined a
-  => Signal domain a
+  => Signal dom a
   -> [Value]
 mkTrace signal = sample (unsafeToTup . pack <$> signal)
  where
@@ -158,7 +159,7 @@ mkTrace signal = sample (unsafeToTup . pack <$> signal)
 -- | Trace a single signal. Will emit an error if a signal with the same name
 -- was previously registered.
 traceSignal#
-  :: forall domain a
+  :: forall dom a
    . ( KnownNat (BitSize a)
      , BitPack a
      , Undefined a
@@ -169,9 +170,9 @@ traceSignal#
   -- ^ The associated clock period for the trace
   -> String
   -- ^ Name of signal in the VCD output
-  -> Signal domain a
+  -> Signal dom a
   -- ^ Signal to trace
-  -> IO (Signal domain a)
+  -> IO (Signal dom a)
 traceSignal# traceMap period traceName signal =
   atomicModifyIORef' traceMap $ \m ->
     if Map.member traceName m then
@@ -193,7 +194,7 @@ traceSignal# traceMap period traceName signal =
 -- a different trace. If the trace name already exists, this function will emit
 -- an error.
 traceVecSignal#
-  :: forall domain n a
+  :: forall dom n a
    . ( KnownNat (BitSize a)
      , KnownNat n
      , BitPack a
@@ -205,9 +206,9 @@ traceVecSignal#
   -- ^ Associated clock period for the trace
   -> String
   -- ^ Name of signal in the VCD output. Will be appended by _0, _1, ..., _n.
-  -> Signal domain (Vec (n+1) a)
+  -> Signal dom (Vec (n+1) a)
   -- ^ Signal to trace
-  -> IO (Signal domain (Vec (n+1) a))
+  -> IO (Signal dom (Vec (n+1) a))
 traceVecSignal# traceMap period vecTraceName (unbundle -> vecSignal) =
   fmap bundle . sequenceA $
     Vector.zipWith trace' (iterateI succ (0 :: Int)) vecSignal
@@ -220,24 +221,25 @@ traceVecSignal# traceMap period vecTraceName (unbundle -> vecSignal) =
 -- was previously registered.
 --
 -- __NB__ Works correctly when creating VCD files from traced signal in
--- multi-clock circuits. However 'traceSignal1' might be more convinient to
+-- multi-clock circuits. However 'traceSignal1' might be more convenient to
 -- use when the domain of your circuit is polymorphic.
 traceSignal
-  :: forall domain a name period
-   . ( domain ~ 'Dom name period
-     , KnownNat period
+  :: forall dom conf a
+   . ( KnownDomain dom conf
      , KnownNat (BitSize a)
      , BitPack a
      , Undefined a
      , Typeable a )
   => String
   -- ^ Name of signal in the VCD output
-  -> Signal domain a
+  -> Signal dom a
   -- ^ Signal to trace
-  -> Signal domain a
+  -> Signal dom a
 traceSignal traceName signal =
-  unsafePerformIO $ traceSignal# traceMap# (snatToNum (SNat @ period))
-                      traceName signal
+  case knownDomain @dom of
+    SDomainConfiguration _dom period _edge _reset _init _polarity ->
+      unsafePerformIO $
+        traceSignal# traceMap# (snatToNum period) traceName signal
 {-# NOINLINE traceSignal #-}
 
 -- | Trace a single signal. Will emit an error if a signal with the same name
@@ -254,9 +256,9 @@ traceSignal1
      , Typeable a )
   => String
   -- ^ Name of signal in the VCD output
-  -> Signal domain a
+  -> Signal dom a
   -- ^ Signal to trace
-  -> Signal domain a
+  -> Signal dom a
 traceSignal1 traceName signal =
   unsafePerformIO (traceSignal# traceMap# 1 traceName signal)
 {-# NOINLINE traceSignal1 #-}
@@ -269,22 +271,23 @@ traceSignal1 traceName signal =
 -- multi-clock circuits. However 'traceSignal1' might be more convinient to
 -- use when the domain of your circuit is polymorphic.
 traceVecSignal
-  :: forall domain a name period n
-   . ( domain ~ 'Dom name period
+  :: forall dom a conf n
+   . ( KnownDomain dom conf
      , KnownNat (BitSize a)
-     , KnownNat period
      , KnownNat n
      , BitPack a
      , Undefined a
      , Typeable a )
   => String
   -- ^ Name of signal in debugging output. Will be appended by _0, _1, ..., _n.
-  -> Signal domain (Vec (n+1) a)
+  -> Signal dom (Vec (n+1) a)
   -- ^ Signal to trace
-  -> Signal domain (Vec (n+1) a)
+  -> Signal dom (Vec (n+1) a)
 traceVecSignal traceName signal =
-  unsafePerformIO $ traceVecSignal# traceMap# (snatToNum (SNat @ period))
-                      traceName signal
+  case knownDomain @dom of
+    SDomainConfiguration _dom period _edge _reset _init _polarity ->
+      unsafePerformIO $
+        traceVecSignal# traceMap# (snatToNum period) traceName signal
 {-# NOINLINE traceVecSignal #-}
 
 -- | Trace a single vector signal: each element in the vector will show up as
@@ -303,9 +306,9 @@ traceVecSignal1
      , Typeable a )
   => String
   -- ^ Name of signal in debugging output. Will be appended by _0, _1, ..., _n.
-  -> Signal domain (Vec (n+1) a)
+  -> Signal dom (Vec (n+1) a)
   -- ^ Signal to trace
-  -> Signal domain (Vec (n+1) a)
+  -> Signal dom (Vec (n+1) a)
 traceVecSignal1 traceName signal =
   unsafePerformIO $ traceVecSignal# traceMap# 1 traceName signal
 {-# NOINLINE traceVecSignal1 #-}
@@ -462,7 +465,7 @@ dumpVCD#
   -- ^ Map with collected traces
   -> (Int, Int)
   -- ^ (offset, number of samples)
-  -> Signal domain a
+  -> Signal dom a
   -- ^ (One of) the output(s) the circuit containing the traces
   -> [String]
   -- ^ The names of the traces you definitely want to be dumped to the VCD file
@@ -492,7 +495,7 @@ dumpVCD
   :: Undefined a
   => (Int, Int)
   -- ^ (offset, number of samples)
-  -> Signal domain a
+  -> Signal dom a
   -- ^ (One of) the outputs of the circuit containing the traces
   -> [String]
   -- ^ The names of the traces you definitely want to be dumped in the VCD file
@@ -501,11 +504,11 @@ dumpVCD = dumpVCD# traceMap#
 
 -- | Dump a number of samples to a replayable bytestring.
 dumpReplayable
-  :: forall a domain
+  :: forall a dom
    . Undefined a
   => Int
   -- ^ Number of samples
-  -> Signal domain a
+  -> Signal dom a
   -- ^ (One of) the outputs of the circuit containing the traces
   -> String
   -- ^ Name of trace to dump
@@ -522,14 +525,14 @@ dumpReplayable n oSignal traceName = do
 -- decoding process and yield an error. Not that this always happens if you
 -- evaluate more values than were originally dumped.
 replay
-  :: forall a domain n
+  :: forall a dom n
    . ( Typeable a
      , Undefined a
      , BitPack a
-     , KnownNat n 
+     , KnownNat n
      , n ~ BitSize a )
   => ByteString
-  -> Either String (Signal domain a)
+  -> Either String (Signal dom a)
 replay bytes0 = samples1
  where
   samples1 =

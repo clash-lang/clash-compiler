@@ -6,11 +6,13 @@ Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
 PLL and other clock-related components for Xilinx FPGAs
 -}
 
-{-# LANGUAGE DataKinds      #-}
-{-# LANGUAGE ExplicitForAll #-}
-{-# LANGUAGE GADTs          #-}
+{-# LANGUAGE DataKinds        #-}
+{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE ExplicitForAll   #-}
+{-# LANGUAGE GADTs            #-}
 module Clash.Xilinx.ClockGen where
 
+import Clash.Annotations.Primitive    (hasBlackBox)
 import Clash.Promoted.Symbol
 import Clash.Signal.Internal
 import Unsafe.Coerce
@@ -35,23 +37,26 @@ import Unsafe.Coerce
 -- clockWizard @@Dom100MHz (SSymbol @@"clkWizard50to100") clk50 rst
 -- @
 clockWizard
-  :: forall pllOut pllIn name
-   . SSymbol name
+  :: forall domIn domOut periodIn periodOut edge init polarity name
+   . ( KnownDomain domIn ('DomainConfiguration domIn periodIn edge 'Asynchronous init polarity)
+     , KnownDomain domOut ('DomainConfiguration domOut periodOut edge 'Asynchronous init polarity) )
+  => SSymbol name
   -- ^ Name of the component, must correspond to the name entered in the
   -- \"Clock Wizard\" dialog.
   --
   -- For example, when you entered \"clockWizard50\", instantiate as follows:
   --
   -- > SSymbol @ "clockWizard50"
-  -> Clock  pllIn 'Source
+  -> Clock domIn
   -- ^ Free running clock (i.e. a clock pin connected to a crystal)
-  -> Reset  pllIn 'Asynchronous
+  -> Reset domIn
   -- ^ Reset for the PLL
-  -> (Clock pllOut 'Source, Signal pllOut Bool)
+  -> (Clock domOut, Enable domOut)
   -- ^ (Stable PLL clock, PLL lock)
-clockWizard _ clk (Async rst) =
-  (unsafeCoerce (clockGate clk rst), unsafeCoerce rst)
+clockWizard _ clk rst =
+  (unsafeCoerce clk, unsafeCoerce (toEnable (unsafeToHighPolarity rst)))
 {-# NOINLINE clockWizard #-}
+{-# ANN clockWizard hasBlackBox #-}
 
 -- | A clock source that corresponds to the Xilinx PLL/MMCM component created
 -- with the \"Clock Wizard\", with settings to provide a stable 'Clock'
@@ -73,22 +78,25 @@ clockWizard _ clk (Async rst) =
 -- clockWizardDifferential @@Dom100MHz (SSymbol @@"clkWizardD50to100") clk50N clk50P rst
 -- @
 clockWizardDifferential
-  :: forall pllOut pllIn name
-   . SSymbol name
+  :: forall domIn domOut periodIn periodOut edge init polarity name
+   . ( KnownDomain domIn ('DomainConfiguration domIn periodIn edge 'Asynchronous init polarity)
+     , KnownDomain domOut ('DomainConfiguration domOut periodOut edge 'Asynchronous init polarity) )
+  => SSymbol name
   -- ^ Name of the component, must correspond to the name entered in the
   -- \"Clock Wizard\" dialog.
   --
   -- For example, when you entered \"clockWizardD50\", instantiate as follows:
   --
   -- > SSymbol @ "clockWizardD50"
-  -> Clock pllIn 'Source
+  -> Clock domIn
   -- ^ Free running clock, negative phase
-  -> Clock pllIn 'Source
+  -> Clock domIn
   -- ^ Free running clock, positive phase
-  -> Reset pllIn 'Asynchronous
+  -> Reset domIn
   -- ^ Reset for the PLL
-  -> (Clock pllOut 'Source, Signal pllOut Bool)
+  -> (Clock domOut, Enable domOut)
   -- ^ (Stable PLL clock, PLL lock)
-clockWizardDifferential _name clkP _clkN (Async rst) =
-  (unsafeCoerce (clockGate clkP rst), unsafeCoerce rst)
+clockWizardDifferential _name (Clock _) (Clock _) rst =
+  (Clock SSymbol, unsafeCoerce (toEnable (unsafeToHighPolarity rst)))
 {-# NOINLINE clockWizardDifferential #-}
+{-# ANN clockWizardDifferential hasBlackBox #-}

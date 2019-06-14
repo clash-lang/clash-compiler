@@ -4,9 +4,10 @@ License    :  BSD2 (see the file LICENSE)
 Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
 -}
 
-{-# LANGUAGE DataKinds      #-}
-{-# LANGUAGE GADTs          #-}
-{-# LANGUAGE KindSignatures #-}
+{-# LANGUAGE DataKinds             #-}
+{-# LANGUAGE GADTs                 #-}
+{-# LANGUAGE KindSignatures        #-}
+{-# LANGUAGE TemplateHaskellQuotes #-}
 
 {-# LANGUAGE Safe #-}
 
@@ -16,11 +17,19 @@ module Clash.Promoted.Symbol
   (SSymbol (..), ssymbolProxy, ssymbolToString)
 where
 
+import Language.Haskell.TH.Syntax
 import GHC.TypeLits (KnownSymbol, Symbol, symbolVal)
 
 -- | Singleton value for a type-level string @s@
 data SSymbol (s :: Symbol) where
   SSymbol :: KnownSymbol s => SSymbol s
+
+instance KnownSymbol s => Lift (SSymbol (s :: Symbol)) where
+--  lift :: t -> Q Exp
+  lift t = pure (AppTypeE (ConE 'SSymbol) tt)
+    where
+      tt = LitT (StrTyLit (ssymbolToString t))
+
 
 instance Show (SSymbol s) where
   show s@SSymbol = symbolVal s

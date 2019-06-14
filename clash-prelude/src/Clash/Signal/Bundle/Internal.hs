@@ -71,7 +71,7 @@ deriveBundleTuples bundleTyName unbundledTyName bundleName unbundleName = do
             [ Clause
                 [ VarP tup ]
                 ( NormalB . TupE $
-                    map 
+                    map
                       (\n -> VarE 'fmap `AppE` unbundleLambda n `AppE` VarE tup)
                       [0..tupleNum-1]
                 )

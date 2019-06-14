@@ -1,3 +1,10 @@
+{-|
+  Copyright   :  (C) 2019     , Myrtle Software Ltd.
+                     2018     , @blaxill
+                     2018-2019, QBayLogic B.V.
+  License     :  BSD2 (see the file LICENSE)
+  Maintainer  :  Christiaan Baaij <christiaan.baaij@gmail.com>
+-}
 {-# LANGUAGE CPP                        #-}
 {-# LANGUAGE DataKinds                  #-}
 {-# LANGUAGE DeriveLift                 #-}
@@ -32,13 +39,13 @@ where
 
 import Data.Coerce                (coerce)
 import Data.Default.Class         (Default(..))
-import GHC.TypeLits               (Nat, type (+))
+import GHC.TypeLits               (Nat, type (+), Symbol)
 import Language.Haskell.TH.Syntax (Lift)
 import Test.QuickCheck            (Arbitrary, CoArbitrary)
 
 import Clash.Promoted.Nat         (SNat)
 import Clash.Explicit.Signal
-  (Domain, Signal, fromList, fromList_lazy)
+  (Signal, fromList, fromList_lazy)
 import Clash.XException           (Undefined)
 
 {- $setup
@@ -46,29 +53,30 @@ import Clash.XException           (Undefined)
 >>> :set -XTypeOperators
 >>> import Clash.Explicit.Prelude
 >>> :{
-let mac :: Clock System gated
-        -> Reset System synchronous
+let mac :: Clock System
+        -> Reset System
+        -> Enable System
         -> DSignal System 0 Int -> DSignal System 0 Int
         -> DSignal System 0 Int
-    mac clk rst x y = feedback (mac' x y)
+    mac clk rst en x y = feedback (mac' x y)
       where
         mac' :: DSignal System 0 Int -> DSignal System 0 Int
              -> DSignal System 0 Int
              -> (DSignal System 0 Int, DSignal System 1 Int)
         mac' a b acc = let acc' = a * b + acc
-                       in  (acc, delayed clk rst (singleton 0) acc')
+                       in  (acc, delayed clk rst en (singleton 0) acc')
 :}
 
 -}
 
 -- | A synchronized signal with samples of type @a@, synchronized to clock
 -- @clk@, that has accumulated @delay@ amount of samples delay along its path.
-newtype DSignal (domain :: Domain) (delay :: Nat) a =
-    DSignal { -- | Strip a 'DSignal' from its delay information.
-              toSignal :: Signal domain a
+newtype DSignal (dom :: Symbol) (delay :: Nat) a =
+    DSignal { toSignal :: Signal dom a
+              -- ^ Strip a 'DSignal' from its delay information.
             }
-  deriving (Show,Default,Functor,Applicative,Num,Fractional,
-            Foldable,Traversable,Arbitrary,CoArbitrary,Lift)
+  deriving ( Show, Default, Functor, Applicative, Num, Fractional
+           , Foldable, Traversable, Arbitrary, CoArbitrary, Lift )
 
 -- | Create a 'DSignal' from a list
 --
@@ -79,7 +87,7 @@ newtype DSignal (domain :: Domain) (delay :: Nat) a =
 -- [1,2]
 --
 -- __NB__: This function is not synthesizable
-dfromList :: Undefined a => [a] -> DSignal domain 0 a
+dfromList :: Undefined a => [a] -> DSignal dom 0 a
 dfromList = coerce . fromList
 
 -- | Create a 'DSignal' from a list
@@ -91,33 +99,33 @@ dfromList = coerce . fromList
 -- [1,2]
 --
 -- __NB__: This function is not synthesizable
-dfromList_lazy :: [a] -> DSignal domain 0 a
+dfromList_lazy :: [a] -> DSignal dom 0 a
 dfromList_lazy = coerce . fromList_lazy
 
 -- | Feed the delayed result of a function back to its input:
 --
 -- @
--- mac :: Clock domain gated -> Reset domain synchronous
---     -> 'DSignal' domain 0 Int -> 'DSignal' domain 0 Int -> 'DSignal' domain 0 Int
--- mac clk rst x y = 'feedback' (mac' x y)
+-- mac :: Clock dom -> Reset dom -> Enable dom
+--     -> 'DSignal' dom 0 Int -> 'DSignal' dom 0 Int -> 'DSignal' dom 0 Int
+-- mac clk rst en x y = 'feedback' (mac' x y)
 --   where
---     mac' :: 'DSignal' domain 0 Int -> 'DSignal' domain 0 Int -> 'DSignal' domain 0 Int
---          -> ('DSignal' domain 0 Int, 'DSignal' domain 1 Int)
+--     mac' :: 'DSignal' dom 0 Int -> 'DSignal' dom 0 Int -> 'DSignal' dom 0 Int
+--          -> ('DSignal' dom 0 Int, 'DSignal' dom 1 Int)
 --     mac' a b acc = let acc' = a * b + acc
---                    in  (acc, 'delay' clk rst ('singleton' 0) acc')
+--                    in  (acc, 'delay' clk rst en ('singleton' 0) acc')
 -- @
 --
--- >>> sampleN 7 (mac systemClockGen systemResetGen (dfromList [0..]) (dfromList [0..]))
+-- >>> sampleN 7 (mac systemClockGen systemResetGen enableGen (dfromList [0..]) (dfromList [0..]))
 -- [0,0,1,5,14,30,55]
 feedback
-  :: (DSignal domain n a -> (DSignal domain n a,DSignal domain (n + m + 1) a))
-  -> DSignal domain n a
+  :: (DSignal dom n a -> (DSignal dom n a,DSignal dom (n + m + 1) a))
+  -> DSignal dom n a
 feedback f = let (o,r) = f (coerce r) in o
 
 -- | 'Signal's are not delayed
 --
 -- > sample s == dsample (fromSignal s)
-fromSignal :: Signal domain a -> DSignal domain 0 a
+fromSignal :: Signal dom a -> DSignal dom 0 a
 fromSignal = coerce
 
 -- | __EXPERIMENTAL__
@@ -126,7 +134,7 @@ fromSignal = coerce
 --
 -- __NB__: Should only be used to interface with functions specified in terms of
 -- 'Signal'.
-unsafeFromSignal :: Signal domain a -> DSignal domain n a
+unsafeFromSignal :: Signal dom a -> DSignal dom n a
 unsafeFromSignal = DSignal
 
 -- | __EXPERIMENTAL__
@@ -134,12 +142,12 @@ unsafeFromSignal = DSignal
 -- Access a /delayed/ signal in the present.
 --
 -- @
--- mac :: Clock domain gated -> Reset domain synchronous
---     -> 'DSignal' domain 0 Int -> 'DSignal' domain 0 Int -> 'DSignal' domain 0 Int
--- mac clk rst x y = acc'
+-- mac :: Clock dom -> Reset dom -> Enable dom
+--     -> 'DSignal' dom 0 Int -> 'DSignal' dom 0 Int -> 'DSignal' dom 0 Int
+-- mac clk rst en x y = acc'
 --   where
 --     acc' = (x * y) + 'antiDelay' d1 acc
---     acc  = 'delay' clk rst ('singleton' 0) acc'
+--     acc  = 'delay' clk rst en ('singleton' 0) acc'
 -- @
-antiDelay :: SNat d -> DSignal domain (n + d) a -> DSignal domain n a
+antiDelay :: SNat d -> DSignal dom (n + d) a -> DSignal dom n a
 antiDelay _ = coerce

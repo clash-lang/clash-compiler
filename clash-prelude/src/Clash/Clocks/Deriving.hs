@@ -1,5 +1,6 @@
 {-|
 Copyright  :  (C) 2018, Google Inc
+                  2019, Myrtle Software Ltd
 License    :  BSD2 (see the file LICENSE)
 Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
 -}
@@ -19,7 +20,7 @@ import Unsafe.Coerce               (unsafeCoerce)
 -- Derive instance for /n/ clocks
 derive' :: Int -> Q Dec
 derive' n = do
-  -- (Clock d0 'Source, Clock d1 Source', )
+  -- (Clock d0, Clock d1, )
   instType  <- foldM (\a n' -> AppT a <$> clkType n') (TupleT $ n + 1) [1..n]
   instType' <- (AppT (ConT $ mkName "Clocks") . AppT instType) <$> lockType
 
@@ -29,27 +30,25 @@ derive' n = do
 
   -- Implementation of 'clocks'
   let noInline  = PragmaD $ InlineP (mkName "clocks") NoInline FunLike AllPhases
-  let clkImpls  = replicate n (clkImpl clk rst)
+  let clkImpls  = replicate n (clkImpl clk)
   let instTuple = TupE $ clkImpls ++ [AppE (VarE 'unsafeCoerce) (VarE rst)]
   let funcBody  = NormalB instTuple
-  let rstPat    = ConP 'Async [VarP rst]
-  let instFunc  = FunD (mkName "clocks") [Clause [VarP clk, rstPat] funcBody []]
+  let instFunc  = FunD (mkName "clocks") [Clause [VarP clk, VarP rst] funcBody []]
 
   return $ InstanceD Nothing [] instType' [instFunc, noInline]
 
   where
-    -- | Generate type @Clock dom 'Source@ with fresh @dom@ variable
+    -- | Generate type @Clock dom@ with fresh @dom@ variable
     clkType n' =
       let c = varT $ mkName ("c" ++ show n') in
-      [t| Clock $c 'Source |]
+      [t| Clock $c |]
 
     -- | Generate type @Signal dom 'Bool@ with fresh @dom@ variable
     lockType =
       let c = varT $ mkName "pllLock" in
       [t| Signal $c Bool |]
 
-    clkImpl (VarE -> clk) (VarE -> rst) =
-      AppE (VarE 'unsafeCoerce) (AppE (AppE (VarE 'clockGate) clk) rst)
+    clkImpl clk = AppE (VarE 'unsafeCoerce) (VarE clk)
 
 -- Derive instances for up to and including to /n/ clocks
 deriveClocksInstances :: Int -> Q [Dec]
