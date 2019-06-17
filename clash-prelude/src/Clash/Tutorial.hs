@@ -440,12 +440,13 @@ examine the 'register' function by taking a look at the first 4 samples of the
 
 Where we see that the initial value of the signal is the specified 0 value,
 followed by 8's. You might be surprised to see /two/ zeros instead of just a
-single zero. What happens is that Clash emulates what happens /before/ the
-clock becomes active. In other words, Clash emulates the powerup values of
-registers too. Whether this is a defined or unknown value depends on your
-hardware target, and can be configured by using a different synthesis
-@'Domain'@. The default synthesis domain, @'System', assumes that registers do
-have a powerup value - as is true for most FPGA platforms in most contexts.
+single zero. What happens is that in Clash you get to see the output of the
+circuit /before/ the clock becomes actives. In other words, in Clash you get to
+describe the powerup values of registers too. Whether this is a defined or
+unknown value depends on your hardware target, and can be configured by using a
+different synthesis @'Domain'@. The default synthesis domain, @'System', assumes
+that registers do have a powerup value - as is true for most FPGA platforms in
+most contexts.
 -}
 
 {- $mac2
@@ -544,7 +545,7 @@ definition, our complete @MAC.hs@ should now have the following content:
 @
 module MAC where
 
-import 'Clash.Prelude'
+import "Clash.Prelude"
 
 ma acc (x,y) = acc + x * y
 
@@ -603,7 +604,7 @@ order for the Clash compiler to do this you need to do one of the following:
 For example, you can test the earlier defined /topEntity/ by:
 
 @
-import Clash.Explicit.Testbench
+import "Clash.Explicit.Testbench"
 
 topEntity
   :: 'Clock' System 'Source'
