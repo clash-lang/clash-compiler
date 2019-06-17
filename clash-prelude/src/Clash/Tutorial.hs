@@ -358,13 +358,13 @@ ma acc (x, y) = acc + x * y
 @
 
 The circuit we just wrote is a combinational circuit: no registers are inserted
-(all registers are inserted explicitly in Clash, as we'll later see). We usually
+(you describe explicitly where Clash will insert registers, as we'll later see). We usually
 refer to circuits as /functions/, similar to programming languages such as C,
 Python, or Haskell. In this case, the function we just defined is called @ma@.
 Its first argument is @acc@, its second is @(x, y)@ - a composite type called a
 tuple. This component is "unpacked", and its first element is called @x@, its
 second @y@. Everything to the right of the equals symbol is @ma@'s
-implementation.
+result.
 If you followed the instructions of running the interpreter side-by-side, you
 can already test this function:
 
@@ -394,7 +394,7 @@ You should read this as follows:
 Note that @ma@ therefore works on multiple types! The only condition we
 imposed is that @a@ should be a @'Num'@ber type. In Clash this means it should
 support the operations @'Prelude.+'@, @'Prelude.-'@, @'Prelude.*'@, and some
-others. Indeed, this is why Clash added the constraint in the first place: the
+others. Indeed, this is why Clash adds the constraint in the first place: the
 definition of @ma@ uses @+@ and @*@. Whenever a function works over multiple
 types, we call it /polymorphic/ ("poly" meaning "many", "morphic" meaning
 "forms"). While powerful, its not clear how Clash should synthesize this as
@@ -442,8 +442,8 @@ Where we see that the initial value of the signal is the specified 0 value,
 followed by 8's. You might be surprised to see /two/ zeros instead of just a
 single zero. What happens is that Clash emulates what happens /before/ the
 clock becomes active. In other words, Clash emulates the powerup values of
-registers too. Whether this is a defined or undefined value depends on your
-synthesis target, and can be configured by using a different synthesis
+registers too. Whether this is a defined or unknown value depends on your
+hardware target, and can be configured by using a different synthesis
 @'Domain'@. The default synthesis domain, @'System', assumes that registers do
 have a powerup value - as is true for most FPGA platforms in most contexts.
 -}
