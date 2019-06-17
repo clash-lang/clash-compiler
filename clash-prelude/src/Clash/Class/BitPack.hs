@@ -326,10 +326,10 @@ instance ( KnownNat (GFieldSize g)
     (sc, packed ++# padding)
 
   gUnpack c cc b =
-    if c <= cc then
+    let cLeft = snatToNum (SNat @(GConstructorCount f)) in
+    if c < cc + cLeft then
       L1 (gUnpack c cc f)
     else
-      let cLeft = snatToNum (SNat @(GConstructorCount f)) in
       R1 (gUnpack c (cc + cLeft) g)
 
    where
