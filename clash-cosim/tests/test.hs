@@ -6,7 +6,6 @@
 
 import Clash.Prelude
 import Clash.Prelude.Testbench
-import Clash.XException (Undefined)
 import Clash.CoSim (verilog, verilogWithSettings, period, defaultSettings)
 
 import Data.List as L
