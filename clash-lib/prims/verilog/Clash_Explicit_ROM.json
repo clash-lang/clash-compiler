@@ -2,34 +2,35 @@
     { "name" : "Clash.Explicit.ROM.rom#"
     , "kind" : "Declaration"
     , "type" :
-"rom# :: ( KnownNat n    --       ARG[0]
-         , Undefined a ) --       ARG[1]
-      => Clock dom       -- clk,  ARG[2]
-      -> Enable dom      -- en,   ARG[3]
-      -> Vec n a         -- init, ARG[4]
-      -> Signal dom Int  -- rd,   ARG[5]
+"rom# :: ( KnownDomain dom conf   ARG[0]
+         , KnownNat n    --       ARG[1]
+         , Undefined a ) --       ARG[2]
+      => Clock dom       -- clk,  ARG[3]
+      -> Enable dom      -- en,   ARG[4]
+      -> Vec n a         -- init, ARG[5]
+      -> Signal dom Int  -- rd,   ARG[6]
       -> Signal dom a"
     , "outputReg" : true
     , "template" :
 "// rom begin
-reg ~TYPO ~GENSYM[ROM][0] [0:~LIT[0]-1];
+reg ~TYPO ~GENSYM[ROM][1] [0:~LIT[1]-1];
 
-reg ~TYP[4] ~GENSYM[rom_init][2];
-integer ~GENSYM[i][3];
+reg ~TYP[5] ~GENSYM[rom_init][3];
+integer ~GENSYM[i][4];
 initial begin
-  ~SYM[2] = ~LIT[4];
-  for (~SYM[3]=0; ~SYM[3] < ~LIT[0]; ~SYM[3] = ~SYM[3] + 1) begin
-    ~SYM[0][~LIT[0]-1-~SYM[3]] = ~SYM[2][~SYM[3]*~SIZE[~TYPO]+:~SIZE[~TYPO]];
+  ~SYM[3] = ~LIT[5];
+  for (~SYM[4]=0; ~SYM[4] < ~LIT[1]; ~SYM[4] = ~SYM[4] + 1) begin
+    ~SYM[1][~LIT[1]-1-~SYM[4]] = ~SYM[3][~SYM[4]*~SIZE[~TYPO]+:~SIZE[~TYPO]];
   end
 end
-~IF ~ISENABLED[3] ~THEN
-always @(posedge ~ARG[2]) begin : ~GENSYM[~COMPNAME_rom][4]
-  if (~ARG[3]) begin
-    ~RESULT <= ~SYM[0][~ARG[5]];
+~IF ~ISENABLED[4] ~THEN
+always @(~IF~ISRISINGEDGE[0]~THENposedge~ELSEnegedge~FI ~ARG[3]) begin : ~GENSYM[~COMPNAME_rom][5]
+  if (~ARG[4]) begin
+    ~RESULT <= ~SYM[1][~ARG[6]];
   end
 end~ELSE
-always @(posedge ~ARG[2]) begin : ~SYM[4]
-  ~RESULT <= ~SYM[0][~ARG[5]];
+always @(~IF~ISRISINGEDGE[0]~THENposedge~ELSEnegedge~FI ~ARG[3]) begin : ~SYM[5]
+  ~RESULT <= ~SYM[1][~ARG[6]];
 end~FI
 // rom end"
     }

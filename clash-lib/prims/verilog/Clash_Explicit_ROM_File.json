@@ -19,12 +19,12 @@ initial begin
   $readmemb(~FILE[~LIT[5]],~SYM[0]);
 end
 ~IF ~ISENABLED[3] ~THEN
-always @(posedge ~ARG[2]) begin : ~GENSYM[~COMPNAME_romFile][2]
+always @(~IF~ISRISINGEDGE[1]~THENposedge~ELSEnegedge~FI ~ARG[2]) begin : ~GENSYM[~COMPNAME_romFile][2]
   if (~ARG[3]) begin
     ~RESULT <= ~SYM[0][~ARG[6]];
   end
 end~ELSE
-always @(posedge ~ARG[2]) begin : ~SYM[2]
+always @(~IF~ISRISINGEDGE[1]~THENposedge~ELSEnegedge~FI ~ARG[2]) begin : ~SYM[2]
   ~RESULT <= ~SYM[0][~ARG[6]];
 end~FI
 // romFile end"

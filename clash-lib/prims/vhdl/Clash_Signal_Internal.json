@@ -18,7 +18,7 @@ begin
   ~GENSYM[~RESULT_dly][4] : process(~ARG[2])
   begin
     ~RESULT <= ~SYM[1];
-    if rising_edge(~ARG[2]) then
+    if ~IF~ISRISINGEDGE[0]~THENrising_edge~ELSEfalling_edge~FI(~ARG[2]) then
       if ~ARG[3] then
         ~SYM[1] <= ~ARG[5]
         -- pragma translate_off
@@ -35,7 +35,7 @@ begin
   ~RESULT <= ~SYM[1];
   ~SYM[4] : process(~ARG[2])
   begin
-    if rising_edge(~ARG[2]) then
+    if ~IF~ISRISINGEDGE[0]~THENrising_edge~ELSEfalling_edge~FI(~ARG[2]) then
       ~SYM[1] <= ~ARG[5]
       -- pragma translate_off
       after 1 ps
@@ -69,7 +69,7 @@ begin
   ~RESULT <= ~SYM[1]; ~IF ~ISSYNC[0] ~THEN
   ~GENSYM[~RESULT_r][2] : process(~ARG[2])
   begin
-    if rising_edge(~ARG[2]) then
+    if ~IF~ISRISINGEDGE[0]~THENrising_edge~ELSEfalling_edge~FI(~ARG[2]) then
       if ~ARG[3] = ~IF ~ISACTIVEHIGH[0] ~THEN '1' ~ELSE '0' ~FI then
         ~SYM[1] <= ~CONST[6]
         -- pragma translate_off
@@ -89,7 +89,7 @@ begin
   begin
     if ~ARG[3] = ~IF ~ISACTIVEHIGH[0] ~THEN '1' ~ELSE '0' ~FI then
       ~SYM[1] <= ~CONST[6];
-    elsif rising_edge(~ARG[2]) then
+    elsif ~IF~ISRISINGEDGE[0]~THENrising_edge~ELSEfalling_edge~FI(~ARG[2]) then
       if ~ARG[4] then
         ~SYM[1] <= ~ARG[7]
         -- pragma translate_off
@@ -106,7 +106,7 @@ begin
   ~RESULT <= ~SYM[1]; ~IF ~ISSYNC[0] ~THEN
   ~SYM[2] : process(~ARG[2])
   begin
-    if rising_edge(~ARG[2]) then
+    if ~IF~ISRISINGEDGE[0]~THENrising_edge~ELSEfalling_edge~FI(~ARG[2]) then
       if ~ARG[3] = ~IF ~ISACTIVEHIGH[0] ~THEN '1' ~ELSE '0' ~FI then
         ~SYM[1] <= ~CONST[6]
         -- pragma translate_off
@@ -130,7 +130,7 @@ begin
       after 1 ps
       -- pragma translate_on
       ;
-    elsif rising_edge(~ARG[2]) then
+    elsif ~IF~ISRISINGEDGE[0]~THENrising_edge~ELSEfalling_edge~FI(~ARG[2]) then
       ~SYM[1] <= ~ARG[7]
       -- pragma translate_off
       after 1 ps
@@ -161,7 +161,7 @@ end block;~FI
   constant ~GENSYM[half_periodH][1] : time := ~PERIOD[0]000 fs / 2;
   constant ~GENSYM[half_periodL][2] : time := ~PERIOD[0]000 fs - ~SYM[1];
 begin
-  ~RESULT <= '0';
+  ~RESULT <= ~IF~ISRISINGEDGE[0]~THEN'0'~ELSE'1'~FI;
   wait for 3000 ps;
   loop
     ~RESULT <= not ~RESULT;
@@ -192,7 +192,7 @@ end process;
   constant ~GENSYM[half_periodH][1] : time := ~PERIOD[0]000 fs / 2;
   constant ~GENSYM[half_periodL][2] : time := ~PERIOD[0]000 fs - ~SYM[1];
 begin
-  ~RESULT <= '0';
+  ~RESULT <= ~IF~ISRISINGEDGE[0]~THEN'0'~ELSE'1'~FI;
   wait for 3000 ps;
   while ~ARG[1] loop
     ~RESULT <= not ~RESULT;

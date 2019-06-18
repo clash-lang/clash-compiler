@@ -2,35 +2,36 @@
     { "name" : "Clash.Explicit.ROM.rom#"
     , "kind" : "Declaration"
     , "type" :
-"rom# :: ( KnownNat n    --       ARG[0]
-         , Undefined a ) --       ARG[1]
-      => Clock dom       -- clk,  ARG[2]
-      -> Enable dom      -- en,   ARG[3]
-      -> Vec n a         -- init, ARG[4]
-      -> Signal dom Int  -- rd,   ARG[5]
+"rom# :: ( KnownDomain dom conf   ARG[0]
+         , KnownNat n    --       ARG[1]
+         , Undefined a ) --       ARG[2]
+      => Clock dom       -- clk,  ARG[3]
+      -> Enable dom      -- en,   ARG[4]
+      -> Vec n a         -- init, ARG[5]
+      -> Signal dom Int  -- rd,   ARG[6]
       -> Signal dom a"
     , "template" :
 "-- rom begin
-~GENSYM[~COMPNAME_rom][0] : block
-  signal ~GENSYM[ROM][1] : ~TYP[4];
-  signal ~GENSYM[rd][2]  : integer range 0 to ~LIT[0]-1;
+~GENSYM[~COMPNAME_rom][1] : block
+  signal ~GENSYM[ROM][2] : ~TYP[5];
+  signal ~GENSYM[rd][3]  : integer range 0 to ~LIT[1]-1;
 begin
-  ~SYM[1] <= ~LIT[4];
+  ~SYM[2] <= ~LIT[5];
 
-  ~SYM[2] <= to_integer(~ARG[5])
+  ~SYM[3] <= to_integer(~ARG[6])
   -- pragma translate_off
-                mod ~LIT[0]
+                mod ~LIT[1]
   -- pragma translate_on
                 ;
-  ~GENSYM[romSync][5] : process (~ARG[2])
+  ~GENSYM[romSync][6] : process (~ARG[3])
   begin
-    if (rising_edge(~ARG[2])~IF ~ISENABLED[3] ~THEN and ~ARG[3] ~ELSE ~FI) then~IF ~VIVADO ~THEN
-      ~RESULT <= ~FROMBV[~SYM[1](~SYM[2])][~TYPO]
+    if (~IF~ISRISINGEDGE[0]~THENrising_edge~ELSEfalling_edge~FI(~ARG[3])~IF ~ISENABLED[4] ~THEN and ~ARG[4] ~ELSE ~FI) then~IF ~VIVADO ~THEN
+      ~RESULT <= ~FROMBV[~SYM[2](~SYM[3])][~TYPO]
       -- pragma translate_off
       after 1 ps
       -- pragma translate_on
       ;~ELSE
-      ~RESULT <= ~SYM[1](~SYM[2])
+      ~RESULT <= ~SYM[2](~SYM[3])
       -- pragma translate_off
       after 1 ps
       -- pragma translate_on

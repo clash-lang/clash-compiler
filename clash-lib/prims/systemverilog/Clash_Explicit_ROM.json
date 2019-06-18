@@ -2,29 +2,30 @@
     { "name" : "Clash.Explicit.ROM.rom#"
     , "kind" : "Declaration"
     , "type" :
-"rom# :: ( KnownNat n    --       ARG[0]
-         , Undefined a ) --       ARG[1]
-      => Clock dom       -- clk,  ARG[2]
-      => Enable dom      -- en,   ARG[3]
-      -> Vec n a         -- init, ARG[4]
-      -> Signal dom Int  -- rd,   ARG[5]
+"rom# :: ( KnownDomain dom conf   ARG[0]
+         , KnownNat n    --       ARG[1]
+         , Undefined a ) --       ARG[2]
+      => Clock dom       -- clk,  ARG[3]
+      => Enable dom      -- en,   ARG[4]
+      -> Vec n a         -- init, ARG[5]
+      -> Signal dom Int  -- rd,   ARG[6]
       -> Signal dom a"
     , "template" :
 "// rom begin
-~SIGD[~GENSYM[ROM][0]][4];
-assign ~SYM[0] = ~LIT[4];
+~SIGD[~GENSYM[ROM][1]][5];
+assign ~SYM[1] = ~LIT[5];
 
-logic [~SIZE[~TYPO]-1:0] ~GENSYM[~RESULT_q][1];~IF ~ISENABLED[3] ~THEN
-always @(posedge ~ARG[2]) begin : ~GENSYM[~COMPNAME_rom][2]
-  if (~ARG[3]) begin
-    ~SYM[1] <= ~SYM[0][~ARG[5]];
+logic [~SIZE[~TYPO]-1:0] ~GENSYM[~RESULT_q][2];~IF ~ISENABLED[4] ~THEN
+always @(~IF~ISRISINGEDGE[0]~THENposedge~ELSEnegedge~FI ~ARG[3]) begin : ~GENSYM[~COMPNAME_rom][3]
+  if (~ARG[4]) begin
+    ~SYM[2] <= ~SYM[1][~ARG[6]];
   end
 end~ELSE
-always @(posedge ~ARG[2]) begin : ~SYM[2]
-  ~SYM[1] <= ~SYM[0][~ARG[5]];
+always @(~IF~ISRISINGEDGE[0]~THENposedge~ELSEnegedge~FI ~ARG[3]) begin : ~SYM[3]
+  ~SYM[2] <= ~SYM[1][~ARG[6]];
 end~FI
 
-assign ~RESULT = ~FROMBV[~SYM[1]][~TYPO];
+assign ~RESULT = ~FROMBV[~SYM[2]][~TYPO];
 // rom end"
     }
   }

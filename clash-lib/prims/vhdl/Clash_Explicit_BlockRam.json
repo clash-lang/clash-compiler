@@ -3,55 +3,56 @@
     , "kind" : "Declaration"
     , "type" :
 "blockRam#
-  :: ( HasCallStack  --       ARG[0]
-     , Undefined a ) --       ARG[1]
-  => Clock dom       -- clk,  ARG[2]
-  -> Enable dom      -- en,   ARG[3]
-  -> Vec n a         -- init, ARG[4]
-  -> Signal dom Int  -- rd,   ARG[5]
-  -> Signal dom Bool -- wren, ARG[6]
-  -> Signal dom Int  -- wr,   ARG[7]
-  -> Signal dom a    -- din,  ARG[8]
+  :: ( KnownDomain dom conf   ARG[0]
+     , HasCallStack  --       ARG[1]
+     , Undefined a ) --       ARG[2]
+  => Clock dom       -- clk,  ARG[3]
+  -> Enable dom      -- en,   ARG[4]
+  -> Vec n a         -- init, ARG[5]
+  -> Signal dom Int  -- rd,   ARG[6]
+  -> Signal dom Bool -- wren, ARG[7]
+  -> Signal dom Int  -- wr,   ARG[8]
+  -> Signal dom a    -- din,  ARG[9]
   -> Signal dom a"
     , "template" :
 "-- blockRam begin
-~GENSYM[~RESULT_blockRam][0] : block
-  signal ~GENSYM[~RESULT_RAM][1] : ~TYP[4] := ~CONST[4];
-  signal ~GENSYM[rd][3]  : integer range 0 to ~LENGTH[~TYP[4]] - 1;
-  signal ~GENSYM[wr][4]  : integer range 0 to ~LENGTH[~TYP[4]] - 1;
+~GENSYM[~RESULT_blockRam][1] : block
+  signal ~GENSYM[~RESULT_RAM][2] : ~TYP[5] := ~CONST[5];
+  signal ~GENSYM[rd][4]  : integer range 0 to ~LENGTH[~TYP[5]] - 1;
+  signal ~GENSYM[wr][5]  : integer range 0 to ~LENGTH[~TYP[5]] - 1;
 begin
-  ~SYM[3] <= to_integer(~ARG[5])
+  ~SYM[4] <= to_integer(~ARG[6])
   -- pragma translate_off
-                mod ~LENGTH[~TYP[4]]
+                mod ~LENGTH[~TYP[5]]
   -- pragma translate_on
                 ;
 
-  ~SYM[4] <= to_integer(~ARG[7])
+  ~SYM[5] <= to_integer(~ARG[8])
   -- pragma translate_off
-                mod ~LENGTH[~TYP[4]]
+                mod ~LENGTH[~TYP[5]]
   -- pragma translate_on
                 ;
 ~IF ~VIVADO ~THEN
-  ~SYM[5] : process(~ARG[2])
+  ~SYM[6] : process(~ARG[3])
   begin
-    if rising_edge(~ARG[2]) then
-      if ~ARG[6] ~IF ~ISENABLED[3] ~THEN and ~ARG[3] ~ELSE ~FI then
-        ~SYM[1](~SYM[4]) <= ~TOBV[~ARG[8]][~TYP[8]];
+    if ~IF~ISRISINGEDGE[0]~THENrising_edge~ELSEfalling_edge~FI(~ARG[3]) then
+      if ~ARG[7] ~IF ~ISENABLED[4] ~THEN and ~ARG[4] ~ELSE ~FI then
+        ~SYM[2](~SYM[5]) <= ~TOBV[~ARG[9]][~TYP[9]];
       end if;
-      ~RESULT <= fromSLV(~SYM[1](~SYM[3]))
+      ~RESULT <= fromSLV(~SYM[2](~SYM[4]))
       -- pragma translate_off
       after 1 ps
       -- pragma translate_on
       ;
     end if;
   end process; ~ELSE
-  ~SYM[5] : process(~ARG[2])
+  ~SYM[6] : process(~ARG[3])
   begin
-    if rising_edge(~ARG[2]) then
-      if ~ARG[6] ~IF ~ISENABLED[3] ~THEN and ~ARG[3] ~ELSE ~FI then
-        ~SYM[1](~SYM[4]) <= ~ARG[8];
+    if ~IF~ISRISINGEDGE[0]~THENrising_edge~ELSEfalling_edge~FI(~ARG[3]) then
+      if ~ARG[7] ~IF ~ISENABLED[4] ~THEN and ~ARG[4] ~ELSE ~FI then
+        ~SYM[2](~SYM[5]) <= ~ARG[9];
       end if;
-      ~RESULT <= ~SYM[1](~SYM[3])
+      ~RESULT <= ~SYM[2](~SYM[4])
       -- pragma translate_off
       after 1 ps
       -- pragma translate_on

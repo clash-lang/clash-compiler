@@ -34,7 +34,8 @@ import GHC.Stack              (withFrozenCallStack)
 import GHC.TypeLits           (KnownNat, type (^))
 import Prelude hiding         (length)
 
-import Clash.Signal.Internal  (Clock (..), Signal (..), Enable, fromEnable)
+import Clash.Signal.Internal
+  (Clock (..), KnownDomain, Signal (..), Enable, fromEnable)
 import Clash.Sized.Unsigned   (Unsigned)
 import Clash.Sized.Vector     (Vec, length, toList)
 import Clash.XException       (deepErrorX, seqX, Undefined)
@@ -49,7 +50,7 @@ import Clash.XException       (deepErrorX, seqX, Undefined)
 -- * See "Clash.Sized.Fixed#creatingdatafiles" and "Clash.Explicit.BlockRam#usingrams"
 -- for ideas on how to use ROMs and RAMs
 romPow2
-  :: (KnownNat n, Undefined a)
+  :: (KnownDomain dom conf, KnownNat n, Undefined a)
   => Clock dom
   -- ^ 'Clock' to synchronize to
   -> Enable dom
@@ -75,7 +76,7 @@ romPow2 = rom
 -- * See "Clash.Sized.Fixed#creatingdatafiles" and "Clash.Explicit.BlockRam#usingrams"
 -- for ideas on how to use ROMs and RAMs
 rom
-  :: (KnownNat n, Undefined a, Enum addr)
+  :: (KnownDomain dom conf, KnownNat n, Undefined a, Enum addr)
   => Clock dom
   -- ^ 'Clock' to synchronize to
   -> Enable dom
@@ -93,8 +94,8 @@ rom = \clk en content rd -> rom# clk en content (fromEnum <$> rd)
 
 -- | ROM primitive
 rom#
-  :: forall dom n a
-   . (KnownNat n, Undefined a)
+  :: forall dom n a conf
+   . (KnownDomain dom conf, KnownNat n, Undefined a)
   => Clock dom
   -- ^ 'Clock' to synchronize to
   -> Enable dom

@@ -702,7 +702,8 @@ prog2 = -- 0 := 4
 -- Block RAM.
 -- * Use the adapter 'readNew' for obtaining write-before-read semantics like this: @'readNew' clk rst ('blockRam' clk inits) rd wrM@.
 blockRam
-  :: ( HasCallStack
+  :: ( KnownDomain dom conf
+     , HasCallStack
      , Undefined a
      , Enum addr )
   => Clock dom
@@ -750,7 +751,8 @@ blockRam = \clk gen content rd wrM ->
 -- Block RAM.
 -- * Use the adapter 'readNew' for obtaining write-before-read semantics like this: @'readNew' clk rst ('blockRamPow2' clk inits) rd wrM@.
 blockRamPow2
-  :: ( HasCallStack
+  :: ( KnownDomain dom conf
+     , HasCallStack
      , Undefined a
      , KnownNat n )
   => Clock dom
@@ -776,7 +778,8 @@ blockRamPow2 = \clk en cnt rd wrM -> withFrozenCallStack
 
 -- | blockRAM primitive
 blockRam#
-  :: ( HasCallStack
+  :: ( KnownDomain dom conf
+     , HasCallStack
      , Undefined a )
   => Clock dom
   -- ^ 'Clock' to synchronize to

@@ -18,7 +18,7 @@
     , "template" :
 "// asyncRam begin
 reg ~TYPO ~GENSYM[RAM][0] [0:~LIT[6]-1];
-always @(posedge ~ARG[3]) begin : ~GENSYM[~COMPNAME_Ram][1]
+always @(~IF~ISRISINGEDGE[1]~THENposedge~ELSEnegedge~FI ~ARG[3]) begin : ~GENSYM[~COMPNAME_Ram][1]
   if (~ARG[8] ~IF ~ISENABLED[5] ~THEN & ~ARG[5] ~ELSE ~FI) begin
     ~SYM[0][~ARG[9]] <= ~ARG[10];
   end

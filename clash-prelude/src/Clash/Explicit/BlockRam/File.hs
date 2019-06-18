@@ -109,7 +109,7 @@ import System.IO.Unsafe      (unsafePerformIO)
 import Clash.Promoted.Nat    (SNat (..), pow2SNat)
 import Clash.Sized.BitVector (BitVector)
 import Clash.Signal.Internal
-  (Clock(..), Signal (..), Enable, fromEnable, (.&&.))
+  (Clock(..), Signal (..), Enable, KnownDomain, fromEnable, (.&&.))
 import Clash.Signal.Bundle   (unbundle)
 import Clash.Sized.Unsigned  (Unsigned)
 import Clash.XException      (errorX, maybeIsX, seqX)
@@ -142,8 +142,8 @@ import Clash.XException      (errorX, maybeIsX, seqX)
 -- * See "Clash.Explicit.Fixed#creatingdatafiles" for ideas on how to create your
 -- own data files.
 blockRamFilePow2
-  :: forall dom n m
-   . (KnownNat m, KnownNat n, HasCallStack)
+  :: forall dom n m conf
+   . (KnownDomain dom conf, KnownNat m, KnownNat n, HasCallStack)
   => Clock dom
   -- ^ 'Clock' to synchronize to
   -> Enable dom
@@ -187,7 +187,7 @@ blockRamFilePow2 = \clk en file rd wrM -> withFrozenCallStack
 -- * See "Clash.Sized.Fixed#creatingdatafiles" for ideas on how to create your
 -- own data files.
 blockRamFile
-  :: (KnownNat m, Enum addr, HasCallStack)
+  :: (KnownDomain dom conf, KnownNat m, Enum addr, HasCallStack)
   => Clock dom
   -- ^ 'Clock' to synchronize to
   -> Enable dom
@@ -212,8 +212,8 @@ blockRamFile = \clk gen sz file rd wrM ->
 
 -- | blockRamFile primitive
 blockRamFile#
-  :: forall m dom n
-   . (KnownNat m, HasCallStack)
+  :: forall m dom n conf
+   . (KnownDomain dom conf, KnownNat m, HasCallStack)
   => Clock dom
   -- ^ 'Clock' to synchronize to
   -> Enable dom
