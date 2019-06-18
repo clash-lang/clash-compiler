@@ -231,22 +231,22 @@ instance Show (SResetPolarity polarity) where
   show SActiveLow = "SActiveLow"
 
 data InitBehavior
-  = Undefined
-  -- ^ Power up value of memory elements is /undefined/.
+  = Unknown
+  -- ^ Power up value of memory elements is /unknown/.
   | Defined
   -- ^ If applicable, power up value of a memory element is defined. Applies to
   -- 'register's for example, but not to 'blockRam'.
   deriving (Show, Eq, Ord, Generic, NFData, Data, Hashable)
 
 data SInitBehavior (init :: InitBehavior) where
-  SUndefined :: SInitBehavior 'Undefined
-  -- See: 'Undefined' ^
+  SUnknown :: SInitBehavior 'Unknown
+  -- See: 'Unknown' ^
 
   SDefined :: SInitBehavior 'Defined
   -- See: 'Defined' ^
 
 instance Show (SInitBehavior init) where
-  show SUndefined = "SUndefined"
+  show SUnknown = "SUnknown"
   show SDefined = "SDefined"
 
 -- | A domain with a name (@Symbol@). Configures the behavior of various aspects
@@ -346,7 +346,7 @@ hasDefinedInitialValues
 hasDefinedInitialValues =
   case knownDomain @dom of
     SDomainConfiguration _dom _period _edge _sync SDefined _polarity -> True
-    SDomainConfiguration _dom _period _edge _sync SUndefined _polarity -> False
+    SDomainConfiguration _dom _period _edge _sync SUnknown _polarity -> False
 {-# INLINE hasDefinedInitialValues #-}
 
 -- | Whether resets are active high
@@ -482,7 +482,7 @@ vDomain (SDomainConfiguration dom period edge reset init_ polarity) =
     (snatToNatural period)
     (case edge of {SRising -> Rising; SFalling -> Falling})
     (case reset of {SAsynchronous -> Asynchronous; SSynchronous -> Synchronous})
-    (case init_ of {SDefined -> Defined; SUndefined -> Undefined})
+    (case init_ of {SDefined -> Defined; SUnknown -> Unknown})
     (case polarity of {SActiveHigh -> ActiveHigh; SActiveLow -> ActiveLow})
 
 -- TODO: Function might reject valid type names. Figure out what's allowed.
@@ -540,7 +540,7 @@ createDomain (VDomainConfiguration name period edge reset init_ polarity) =
   initE =
     pure $
     case init_ of
-      Undefined -> ConE 'SUndefined
+      Unknown -> ConE 'SUnknown
       Defined -> ConE 'SDefined
 
   polarityE =
@@ -567,7 +567,7 @@ createDomain (VDomainConfiguration name period edge reset init_ polarity) =
   initT =
     pure $
     case init_ of
-      Undefined -> PromotedT 'Undefined
+      Unknown -> PromotedT 'Unknown
       Defined -> PromotedT 'Defined
 
   polarityT =
@@ -1063,7 +1063,7 @@ register# (Clock dom) rst (fromEnable -> ena) powerUpVal0 resetVal =
     case knownDomainByName dom of
       SDomainConfiguration _dom _period _edge _sync SDefined _polarity ->
         powerUpVal0
-      SDomainConfiguration _dom _period _edge _sync SUndefined _polarity ->
+      SDomainConfiguration _dom _period _edge _sync SUnknown _polarity ->
         deepErrorX ("First value of register undefined on domain " ++ show dom)
 
   goSync

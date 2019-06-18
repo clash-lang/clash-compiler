@@ -296,7 +296,7 @@ domInitBehavior =
   fromType
     (showName ''InitBehavior)
     [ (showName 'Defined, Defined)
-    , (showName 'Undefined, Undefined) ]
+    , (showName 'Unknown, Unknown) ]
 
 domResetPolarity
   :: TyConMap

@@ -430,7 +430,7 @@ renderElem b (IF c t f) = do
         let (_, ty, _) = bbInputs b !! n in
         case stripVoid ty of
           KnownDomain _ _ _ _ Defined _ -> 1
-          KnownDomain _ _ _ _ Undefined _ -> 0
+          KnownDomain _ _ _ _ Unknown _ -> 0
           _ -> error $ $(curLoc) ++ "IsInitDefined: Expected KnownDomain, not: " ++ show ty
 
       (IsActiveHigh n) ->
