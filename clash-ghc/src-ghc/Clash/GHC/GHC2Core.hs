@@ -480,7 +480,9 @@ coreToTerm primMap unlocs = term
 #if MIN_VERSION_ghc(8,8,0)
       LitString  fs  -> C.StringLiteral (Char8.unpack fs)
       LitChar    c   -> C.CharLiteral c
-      LitRubbish     -> C.StringLiteral [] -- unused literal
+      LitRubbish     ->
+        error $ "coreToTerm: Encountered LibRubbish. This is a bug in Clash. "
+             ++ "Report on https://github.com/clash-lang/clash-compiler/issues."
 #else
       MachStr    fs  -> C.StringLiteral (Char8.unpack fs)
       MachChar   c   -> C.CharLiteral c
