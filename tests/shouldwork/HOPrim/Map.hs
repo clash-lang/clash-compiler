@@ -24,11 +24,11 @@ topEntity =
 {-# NOINLINE topEntity #-}
 
 
-testBench :: SystemClockResetEnable => Signal System Bool
+testBench :: Signal System Bool
 testBench = done
   where
     testInput      = stimuliGenerator clk rst ((True :> True :> False :> False :> Nil) :> Nil)
     expectedOutput = outputVerifier clk rst ((True :> True :> False :> False :>Nil):>Nil)
-    done           = expectedOutput (topEntity testInput)
+    done           = expectedOutput (exposeClockResetEnable topEntity clk rst enableGen testInput)
     clk            = tbSystemClockGen (not <$> done)
     rst            = systemResetGen
