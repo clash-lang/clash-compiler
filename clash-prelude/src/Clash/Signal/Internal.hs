@@ -1017,9 +1017,17 @@ delay#
   -> a
   -> Signal dom a
   -> Signal dom a
-delay# (Clock _dom) (fromEnable -> en) dflt =
-    go dflt en
+delay# (Clock dom) (fromEnable -> en) powerUpVal0 =
+    go powerUpVal1 en
   where
+    powerUpVal1 :: a
+    powerUpVal1 =
+      case knownDomainByName dom of
+        SDomainConfiguration _dom _period _edge _sync SDefined _polarity ->
+          powerUpVal0
+        SDomainConfiguration _dom _period _edge _sync SUnknown _polarity ->
+          deepErrorX ("First value of `delay` unknown on domain " ++ show dom)
+
     go o (e :- es) as@(~(x :- xs)) =
       let o' = if e then x else o
       -- See [Note: register strictness annotations]

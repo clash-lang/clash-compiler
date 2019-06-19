@@ -4,11 +4,19 @@ import Clash.Prelude
 import qualified Clash.Signal.Delayed.Bundle as D
 import Clash.Explicit.Testbench
 
+zeroAt0
+  :: HiddenClockResetEnable dom conf
+  => DSignal dom n Int
+  -> DSignal dom n Int
+zeroAt0 a = unsafeFromSignal (mux en (toSignal a) 0)
+  where
+    en = register False (pure True)
+
 delayer
   :: HiddenClockResetEnable dom conf
   => DSignal dom 0 Int
   -> DSignal dom 2 Int
-delayer = delayN d2 0
+delayer = zeroAt0 . delayN d2 0
 
 topEntity
   :: Clock System

@@ -9,6 +9,17 @@ createDomain vSystem{vTag="Dom2", vPeriod=2}
 createDomain vSystem{vTag="Dom7", vPeriod=7}
 createDomain vSystem{vTag="Dom9", vPeriod=9}
 
+zeroAt0
+  :: forall dom a conf
+   . (KnownDomain dom conf, Num a)
+  => Clock dom
+  -> Reset dom
+  -> Signal dom a
+  -> Signal dom a
+zeroAt0 clk rst a = mux en a 0
+  where
+    en = register clk rst (enableGen @dom) False (pure True)
+
 topEntity
   :: Clock Dom2
   -> Clock Dom7
@@ -40,7 +51,7 @@ testBench = done
     testInput      = stimuliGenerator clk7 rst7 $(listToVecTH [(1::Integer)..20])
     expectedOutput = outputVerifier   clk9 rst9
                         (0 :> 1 :>  $(listToVecTH ([2,3,4,6,7,8,9,11,12,13,15,16]::[Integer])))
-    done           = expectedOutput (topEntity clk2 clk7 clk9 testInput)
+    done           = expectedOutput (zeroAt0 clk9 rst9 (topEntity clk2 clk7 clk9 testInput))
     done'          = not <$> done
     clk2           = tbClockGen @Dom2 (unsafeSynchronizer clk9 clk2 done')
     clk7           = tbClockGen @Dom7 (unsafeSynchronizer clk9 clk7 done')
