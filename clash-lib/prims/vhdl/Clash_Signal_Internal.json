@@ -15,9 +15,9 @@
 ~GENSYM[~RESULT_delay][0] : block
   signal ~GENSYM[~RESULT_reg][1]   : ~TYPO ~IF ~ISINITDEFINED[0] ~THEN := ~CONST[4] ~ELSE ~FI;
 begin
+  ~RESULT <= ~SYM[1];
   ~GENSYM[~RESULT_dly][4] : process(~ARG[2])
   begin
-    ~RESULT <= ~SYM[1];
     if ~IF~ISRISINGEDGE[0]~THENrising_edge~ELSEfalling_edge~FI(~ARG[2]) then
       if ~ARG[3] then
         ~SYM[1] <= ~ARG[5]
