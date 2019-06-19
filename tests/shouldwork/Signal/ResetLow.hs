@@ -38,7 +38,12 @@ topEntity1 clk rst = topEntity clk arst enableGen
 testBench :: Signal SystemLow Bool
 testBench = done
   where
-    expectedOutput = outputVerifier clk rst (1 :> 1 :> 2 :> 3 :> 1 :> 1 :> 2 :> 3 :> 4 :> 5 :> 6 :> Nil)
+    expectedOutput = outputVerifier clk rst (1 :> 1 :> 2 :> 3
+                                               :> (if isAsynchronous @SystemLow
+                                                   then 1
+                                                   else 4)
+                                               :> 1 :> 2 :> 3 :> 4
+                                               :> 5 :> 6 :> Nil)
     done           = expectedOutput (topEntity1 clk rst)
     clk            = tbClockGen (not <$> done)
     rst            = resetGen

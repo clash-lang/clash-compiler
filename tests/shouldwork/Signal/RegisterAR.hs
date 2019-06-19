@@ -37,7 +37,10 @@ topEntityAR clk rst = topEntity clk arst
 testBench :: Signal System Bool
 testBench = done
   where
-    expectedOutput = outputVerifier clk rst (1 :> 1 :> 2 :> 1 :> 1 :> 1 :> 2 :> 3 :> Nil)
+    expectedOutput = outputVerifier clk rst (1 :> 1 :> 2 :>
+                                             (if isAsynchronous @System
+                                              then 1
+                                              else 3) :> 1 :> 1 :> 2 :> 3 :> Nil)
     done           = expectedOutput (topEntityAR clk rst)
     clk            = tbSystemClockGen (not <$> done)
     rst            = systemResetGen

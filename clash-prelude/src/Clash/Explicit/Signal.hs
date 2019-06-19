@@ -166,6 +166,8 @@ module Clash.Explicit.Signal
   , vDomain
   , createDomain
   , knownVDomain
+  , isAsynchronous
+  , isActiveHigh
     -- ** Enabling
   , Enable(..)
   , toEnable
