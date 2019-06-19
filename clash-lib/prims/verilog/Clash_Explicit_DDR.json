@@ -20,22 +20,22 @@
 reg ~SIGD[~GENSYM[data_Pos][1]][9];
 reg ~SIGD[~GENSYM[data_Neg][2]][9];
 reg ~SIGD[~GENSYM[data_Neg_Latch][3]][9];
-always @(~IF~ISRISINGEDGE[2]~THENposedge~ELSEnegedge~FI ~ARG[4]~IF ~ISSYNC[3] ~THEN ~ELSE or posedge ~ARG[5]~FI) begin : ~GENSYM[~COMPNAME_ddrIn_pos][6]
-  if (~ARG[5]) begin
+always @(~IF~ISRISINGEDGE[2]~THENposedge~ELSEnegedge~FI ~ARG[4]~IF~ISSYNC[3]~THEN)~ELSE or ~IF~ISACTIVEHIGH[2]~THENposedge~ELSEnegedge~FI ~ARG[5])~FI begin : ~GENSYM[~COMPNAME_ddrIn_pos][6]
+  if (~IF~ISACTIVEHIGH[2]~THEN~ARG[5]~ELSE! ~ARG[5]~FI) begin
     ~SYM[1] <= ~ARG[8];
   end else ~IF ~ISENABLED[6] ~THEN if (~ARG[6]) ~ELSE ~FI begin
     ~SYM[1] <= ~ARG[10];
   end
 end
-always @(~IF~ISRISINGEDGE[2]~THENnegedge~ELSEposedge~FI ~ARG[4]~IF ~ISSYNC[3] ~THEN ~ELSE or posedge ~ARG[5]~FI) begin : ~GENSYM[~COMPNAME_ddrIn_neg][7]
-  if (~ARG[5]) begin
+always @(~IF~ISRISINGEDGE[2]~THENnegedge~ELSEposedge~FI ~ARG[4]~IF~ISSYNC[3]~THEN)~ELSE or ~IF~ISACTIVEHIGH[2]~THENposedge~ELSEnegedge~FI ~ARG[5])~FI begin : ~GENSYM[~COMPNAME_ddrIn_neg][7]
+  if (~IF~ISACTIVEHIGH[2]~THEN~ARG[5]~ELSE! ~ARG[5]~FI) begin
     ~SYM[2] <= ~ARG[9];
   end else ~IF ~ISENABLED[6] ~THEN if (~ARG[6]) ~ELSE ~FI begin
     ~SYM[2] <= ~ARG[10];
   end
 end
-always @(~IF~ISRISINGEDGE[2]~THENposedge~ELSEnegedge~FI ~ARG[4]~IF ~ISSYNC[3] ~THEN ~ELSE or posedge ~ARG[5]~FI) begin : ~GENSYM[~COMPNAME_ddrIn_neg_latch][8]
-  if (~ARG[5]) begin
+always @(~IF~ISRISINGEDGE[2]~THENposedge~ELSEnegedge~FI ~ARG[4]~IF~ISSYNC[3]~THEN)~ELSE or ~IF~ISACTIVEHIGH[2]~THENposedge~ELSEnegedge~FI ~ARG[5])~FI begin : ~GENSYM[~COMPNAME_ddrIn_neg_latch][8]
+  if (~IF~ISACTIVEHIGH[2]~THEN~ARG[5]~ELSE! ~ARG[5]~FI) begin
     ~SYM[3] <= ~ARG[7];
   end else ~IF ~ISENABLED[6] ~THEN if (~ARG[6]) ~ELSE ~FI begin
     ~SYM[3] <= ~SYM[2];
@@ -65,15 +65,15 @@ assign ~RESULT = {~SYM[3], ~SYM[1]};
 "// ddrOut begin
 reg ~SIGD[~GENSYM[data_Pos][1]][7];
 reg ~SIGD[~GENSYM[data_Neg][2]][7];
-always @(~IF~ISRISINGEDGE[2]~THENposedge~ELSEnegedge~FI ~ARG[4]~IF ~ISSYNC[3] ~THEN ~ELSE or posedge ~ARG[5]~FI) begin : ~GENSYM[~COMPNAME_ddrOut_pos][5]
-  if (~ARG[5]) begin
+always @(~IF~ISRISINGEDGE[2]~THENposedge~ELSEnegedge~FI ~ARG[4]~IF~ISSYNC[3]~THEN)~ELSE or ~IF~ISACTIVEHIGH[2]~THENposedge~ELSEnegedge~FI ~ARG[5])~FI begin : ~GENSYM[~COMPNAME_ddrOut_pos][5]
+  if (~IF~ISACTIVEHIGH[2]~THEN~ARG[5]~ELSE! ~ARG[5]~FI) begin
     ~SYM[1] <= ~ARG[7];
   end else ~IF ~ISENABLED[6] ~THEN if (~ARG[6]) ~ELSE ~FI begin
     ~SYM[1] <= ~ARG[8];
   end
 end
-always @(~IF~ISRISINGEDGE[2]~THENposedge~ELSEnegedge~FI ~ARG[4]~IF ~ISSYNC[3] ~THEN ~ELSE or posedge ~ARG[5]~FI) begin : ~GENSYM[~COMPNAME_ddrOut_neg][6]
-  if (~ARG[5]) begin
+always @(~IF~ISRISINGEDGE[2]~THENposedge~ELSEnegedge~FI ~ARG[4]~IF~ISSYNC[3]~THEN)~ELSE or ~IF~ISACTIVEHIGH[2]~THENposedge~ELSEnegedge~FI ~ARG[5])~FI begin : ~GENSYM[~COMPNAME_ddrOut_neg][6]
+  if (~IF~ISACTIVEHIGH[2]~THEN~ARG[5]~ELSE! ~ARG[5]~FI) begin
     ~SYM[2] <= ~ARG[7];
   end else ~IF ~ISENABLED[6] ~THEN if (~ARG[6]) ~ELSE ~FI begin
     ~SYM[2] <= ~ARG[9];
