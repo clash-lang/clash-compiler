@@ -52,11 +52,11 @@ import           Clash.Core.FreeVars
 import           Clash.Core.Pretty                (showPpr, ppr)
 import           Clash.Core.Subst
   (deShadowTerm, extendGblSubstList, mkSubst, substTm)
-import           Clash.Core.Term                  (Term (..), collectArgs)
+import           Clash.Core.Term                  (Term (..), collectArgsTicks)
 import           Clash.Core.Type                  (Type, splitCoreFunForallTy)
 import           Clash.Core.TyCon
   (TyConMap, TyConName)
-import           Clash.Core.Util                  (mkApps, termType)
+import           Clash.Core.Util                  (mkApps, mkTicks, termType)
 import           Clash.Core.Var                   (Id, varName, varType)
 import           Clash.Core.VarEnv
   (VarEnv, elemVarSet, eltsVarEnv, emptyInScopeSet, emptyVarEnv,
@@ -281,10 +281,10 @@ flattenNode c@(CLeaf (nm,(_,_,_,e))) = do
     let norm = splitNormalized tcm e
     case norm of
       Right (ids,[(bId,bExpr)],_) -> do
-        let (fun,args) = collectArgs bExpr
+        let (fun,args,ticks) = collectArgsTicks bExpr
         case stripArgs ids (reverse ids) (reverse args) of
           Just remainder | bId `localIdDoesNotOccurIn` bExpr ->
-               return (Right ((nm,mkApps fun (reverse remainder)),[]))
+               return (Right ((nm,mkApps (mkTicks fun ticks) (reverse remainder)),[]))
           _ -> return (Right ((nm,e),[]))
       _ -> return (Right ((nm,e),[]))
 flattenNode b@(CBranch (_,(_,_,NoInline,_)) _) =
@@ -296,10 +296,10 @@ flattenNode b@(CBranch (nm,(_,_,_,e)) us) = do
     let norm = splitNormalized tcm e
     case norm of
       Right (ids,[(bId,bExpr)],_) -> do
-        let (fun,args) = collectArgs bExpr
+        let (fun,args,ticks) = collectArgsTicks bExpr
         case stripArgs ids (reverse ids) (reverse args) of
           Just remainder | bId `localIdDoesNotOccurIn` bExpr ->
-               return (Right ((nm,mkApps fun (reverse remainder)),us))
+               return (Right ((nm,mkApps (mkTicks fun ticks) (reverse remainder)),us))
           _ -> return (Right ((nm,e),us))
       _ -> do
         newInlineStrat <- Lens.use (extra.newInlineStrategy)

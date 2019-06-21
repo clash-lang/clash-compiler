@@ -64,7 +64,7 @@ import           Clash.Core.Subst
   (aeqTerm, aeqType, extendIdSubst, mkSubst, substTm)
 import           Clash.Core.Term
   (LetBinding, Pat (..), Term (..), CoreContext (..), Context, PrimInfo (..),
-   TmName, WorkInfo (..), collectArgs)
+   TmName, WorkInfo (..), collectArgs, collectArgsTicks)
 import           Clash.Core.TyCon
   (TyConMap, tyConDataCons)
 import           Clash.Core.Type             (KindOrType, Type (..),
@@ -72,7 +72,7 @@ import           Clash.Core.Type             (KindOrType, Type (..),
                                               normalizeType,
                                               typeKind, tyView, isPolyFunTy)
 import           Clash.Core.Util
-  (isPolyFun, mkAbstraction, mkApps, mkLams,
+  (isPolyFun, mkAbstraction, mkApps, mkLams, mkTicks,
    mkTmApps, mkTyApps, mkTyLams, termType, dataConInstArgTysE, isClockOrReset)
 import           Clash.Core.Var
   (Id, IdScope (..), TyVar, Var (..), isLocalId, mkGlobalId, mkLocalId, mkTyVar)
@@ -114,6 +114,7 @@ findAccidentialShadows =
     App t1 t2   -> concatMap findAccidentialShadows [t1, t2]
     TyApp t _   -> findAccidentialShadows t
     Cast t _ _  -> findAccidentialShadows t
+    Tick _ t    -> findAccidentialShadows t
     Case t _ as ->
       concatMap (findInPat . fst) as ++
         concatMap findAccidentialShadows (t : map snd as)
@@ -701,8 +702,8 @@ specialise :: Lens' extra (Map.Map (Id, Int, Either Term Type) Id) -- ^ Lens int
            -> Lens' extra Int -- ^ Lens into the specialisation limit
            -> Rewrite extra
 specialise specMapLbl specHistLbl specLimitLbl ctx e = case e of
-  (TyApp e1 ty) -> specialise' specMapLbl specHistLbl specLimitLbl ctx e (collectArgs e1) (Right ty)
-  (App e1 e2)   -> specialise' specMapLbl specHistLbl specLimitLbl ctx e (collectArgs e1) (Left  e2)
+  (TyApp e1 ty) -> specialise' specMapLbl specHistLbl specLimitLbl ctx e (collectArgsTicks e1) (Right ty)
+  (App e1 e2)   -> specialise' specMapLbl specHistLbl specLimitLbl ctx e (collectArgsTicks e1) (Left  e2)
   _             -> return e
 
 -- | Specialise an application on its argument
@@ -711,10 +712,10 @@ specialise' :: Lens' extra (Map.Map (Id, Int, Either Term Type) Id) -- ^ Lens in
             -> Lens' extra Int -- ^ Lens into the specialisation limit
             -> TransformContext -- Transformation context
             -> Term -- ^ Original term
-            -> (Term, [Either Term Type]) -- ^ Function part of the term, split into root and applied arguments
+            -> (Term, [Either Term Type], [SrcSpan]) -- ^ Function part of the term, split into root and applied arguments
             -> Either Term Type -- ^ Argument to specialize on
             -> RewriteMonad extra Term
-specialise' specMapLbl specHistLbl specLimitLbl (TransformContext is0 _) e (Var f, args) specArgIn = do
+specialise' specMapLbl specHistLbl specLimitLbl (TransformContext is0 _) e (Var f, args, ticks) specArgIn = do
   lvl <- Lens.view dbgLevel
 
   -- Don't specialise TopEntities
@@ -742,7 +743,7 @@ specialise' specMapLbl specHistLbl specLimitLbl (TransformContext is0 _) e (Var 
       traceIf (lvl >= DebugApplied)
         ("Using previous specialization of " ++ showPpr (varName f) ++ " on " ++
           (either showPpr showPpr) specAbs ++ ": " ++ showPpr (varName f')) $
-        changed $ mkApps (Var f') (args ++ specVars)
+        changed $ mkApps (mkTicks (Var f') ticks) (args ++ specVars)
     -- Create new specialized function
     Nothing -> do
       -- Determine if we can specialize f
@@ -776,7 +777,7 @@ specialise' specMapLbl specHistLbl specLimitLbl (TransformContext is0 _) e (Var 
               -- Determine name the resulting specialized function, and the
               -- form of the specialized-on argument
               (fId,inl',specArg') <- case specArg of
-                Left a@(collectArgs -> (Var g,gArgs)) -> if isPolyFun tcm a
+                Left a@(collectArgsTicks -> (Var g,gArgs,_gTicks)) -> if isPolyFun tcm a
                     then do
                       -- In case we are specialising on an argument that is a
                       -- global function then we use that function's name as the
@@ -800,7 +801,7 @@ specialise' specMapLbl specHistLbl specLimitLbl (TransformContext is0 _) e (Var 
               (extra.specHistLbl) %= extendUniqMapWith f 1 (+)
               (extra.specMapLbl)  %= Map.insert (f,argLen,specAbs) newf
               -- use specialized function
-              let newExpr = mkApps (Var newf) (args ++ specVars)
+              let newExpr = mkApps (mkTicks (Var newf) ticks) (args ++ specVars)
               newf `deepseq` changed newExpr
         Nothing -> return e
   where
@@ -817,7 +818,7 @@ specialise' specMapLbl specHistLbl specLimitLbl (TransformContext is0 _) e (Var 
           bs' -> init bs' ++ bs
         go bs _ = bs
 
-specialise' _ _ _ _ctx _ (appE,args) (Left specArg) = do
+specialise' _ _ _ _ctx _ (appE,args,ticks) (Left specArg) = do
   -- Create binders and variable references for free variables in 'specArg'
   (specBndrs,specVars) <- specArgBndrsAndVars (Left specArg)
   -- Create specialized function
@@ -840,7 +841,7 @@ specialise' _ _ _ _ctx _ (appE,args) (Left specArg) = do
   -- Create specialized argument
   let newArg  = Left $ mkApps (Var newf) specVars
   -- Use specialized argument
-  let newExpr = mkApps appE (args ++ [newArg])
+  let newExpr = mkApps (mkTicks appE ticks) (args ++ [newArg])
   changed newExpr
 
 specialise' _ _ _ _ e _ _ = return e

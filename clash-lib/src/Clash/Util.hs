@@ -393,3 +393,11 @@ reportTimeDiff start end =
        = "%-Mm%-S%03Qs"
        | otherwise
        = "%-S%03Qs"
+
+-- | Converts a curried function to a function on a triple
+uncurry3
+  :: (a -> b -> c -> d)
+  -> (a,b,c)
+  -> d
+uncurry3 = \f (a,b,c) -> f a b c
+{-# INLINE uncurry3 #-}

@@ -274,6 +274,7 @@ termFreeVars' interesting f = go IntSet.empty where
     Cast tm t1 t2 -> Cast <$> go inScope tm
                           <*> typeFreeVars' interesting inScope f t1
                           <*> typeFreeVars' interesting inScope f t2
+    Tick sp tm -> Tick sp <$> go inScope tm
     tm -> pure tm
 
   goBndr inScope v =

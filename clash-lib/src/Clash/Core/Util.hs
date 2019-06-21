@@ -21,7 +21,7 @@ import           Data.Coerce                   (coerce)
 import qualified Data.IntSet                   as IntSet
 import qualified Data.HashSet                  as HashSet
 import Data.List
-  (foldl', mapAccumR, elemIndices)
+  (foldl', mapAccumR, elemIndices, nub)
 import Data.Maybe                              (fromJust, mapMaybe, catMaybes)
 import qualified Data.Text                     as T
 import           Data.Text.Prettyprint.Doc     (line)
@@ -280,6 +280,7 @@ termType m e = case e of
   Letrec _ e'    -> termType m e'
   Case _ ty _    -> ty
   Cast _ _ ty2   -> ty2
+  Tick _ e'      -> termType m e'
 
 -- | Split a (Type)Abstraction in the bound variables and the abstracted term
 collectBndrs :: Term
@@ -447,6 +448,12 @@ mkTyApps :: Term
          -> Term
 mkTyApps = foldl' TyApp
 
+mkTicks
+  :: Term
+  -> [SrcSpan]
+  -> Term
+mkTicks tm ticks = foldl' (\e s -> Tick s e) tm (nub ticks)
+
 -- | Does a term have a function type?
 isFun :: TyConMap
       -> Term
@@ -518,6 +525,7 @@ termSize (TyLam _ e)  = termSize e
 termSize (App e1 e2)  = termSize e1 + termSize e2
 termSize (TyApp e _)  = termSize e
 termSize (Cast e _ _) = termSize e
+termSize (Tick _ e)   = termSize e
 termSize (Letrec bndrs e) = sum (bodySz:bndrSzs)
  where
   bndrSzs = map (termSize . snd) bndrs
@@ -913,3 +921,7 @@ substArgTys dc args =
       -- See Note [The substitution invariant]
       subst   = extendTvSubstList (mkSubst is) (univTVs `zipEqual` args)
   in  map (substTy subst) (dcArgTys dc)
+
+stripTicks :: Term -> Term
+stripTicks (Tick _ e) = stripTicks e
+stripTicks e = e

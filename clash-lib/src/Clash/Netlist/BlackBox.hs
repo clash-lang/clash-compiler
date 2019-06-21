@@ -53,7 +53,8 @@ import           Clash.Core.Name
   (Name (..), mkUnsafeSystemName)
 import           Clash.Core.Pretty             (showPpr)
 import           Clash.Core.Subst              (extendIdSubst, mkSubst, substTm)
-import           Clash.Core.Term               as C (Term (..), collectArgs)
+import           Clash.Core.Term               as C
+  (Term (..), collectArgs, collectArgsTicks)
 import           Clash.Core.Type               as C (Type (..), ConstTy (..),
                                                 splitFunTys)
 import           Clash.Core.TyCon              as C (tyConDataCons)
@@ -182,25 +183,34 @@ mkArgument bndr e = do
         -> return ((Identifier nm Nothing, Void Nothing, False),[])
         | otherwise
         -> return ((error ($(curLoc) ++ "Forced to evaluate untranslatable type: " ++ eTyMsg), Void Nothing, False), [])
-      Just hwTy -> case collectArgs e of
-        (C.Var v,[]) -> return ((Identifier (nameOcc (varName v)) Nothing,hwTy,False),[])
-        (C.Literal (IntegerLiteral i),[]) -> return ((N.Literal (Just (Signed iw,iw)) (N.NumLit i),hwTy,True),[])
-        (C.Literal (IntLiteral i), []) -> return ((N.Literal (Just (Signed iw,iw)) (N.NumLit i),hwTy,True),[])
-        (C.Literal (WordLiteral w), []) -> return ((N.Literal (Just (Unsigned iw,iw)) (N.NumLit w),hwTy,True),[])
-        (C.Literal (CharLiteral c), []) -> return ((N.Literal (Just (Unsigned 21,21)) (N.NumLit . toInteger $ ord c),hwTy,True),[])
-        (C.Literal (StringLiteral s),[]) -> return ((N.Literal Nothing (N.StringLit s),hwTy,True),[])
-        (C.Literal (Int64Literal i), []) -> return ((N.Literal (Just (Signed 64,64)) (N.NumLit i),hwTy,True),[])
-        (C.Literal (Word64Literal i), []) -> return ((N.Literal (Just (Unsigned 64,64)) (N.NumLit i),hwTy,True),[])
-        (C.Literal (NaturalLiteral n), []) -> return ((N.Literal (Just (Unsigned iw,iw)) (N.NumLit n),hwTy,True),[])
-        (Prim f _,args) -> do
-          (e',d) <- mkPrimitive True False (Left bndr) f args ty
+      Just hwTy -> case collectArgsTicks e of
+        (C.Var v,[],_) -> return ((Identifier (nameOcc (varName v)) Nothing,hwTy,False),[])
+        (C.Literal (IntegerLiteral i),[],_) ->
+          return ((N.Literal (Just (Signed iw,iw)) (N.NumLit i),hwTy,True),[])
+        (C.Literal (IntLiteral i), [],_) ->
+          return ((N.Literal (Just (Signed iw,iw)) (N.NumLit i),hwTy,True),[])
+        (C.Literal (WordLiteral w), [],_) ->
+          return ((N.Literal (Just (Unsigned iw,iw)) (N.NumLit w),hwTy,True),[])
+        (C.Literal (CharLiteral c), [],_) ->
+          return ((N.Literal (Just (Unsigned 21,21)) (N.NumLit . toInteger $ ord c),hwTy,True),[])
+        (C.Literal (StringLiteral s),[],_) ->
+          return ((N.Literal Nothing (N.StringLit s),hwTy,True),[])
+        (C.Literal (Int64Literal i), [],_) ->
+          return ((N.Literal (Just (Signed 64,64)) (N.NumLit i),hwTy,True),[])
+        (C.Literal (Word64Literal i), [],_) ->
+          return ((N.Literal (Just (Unsigned 64,64)) (N.NumLit i),hwTy,True),[])
+        (C.Literal (NaturalLiteral n), [],_) ->
+          return ((N.Literal (Just (Unsigned iw,iw)) (N.NumLit n),hwTy,True),[])
+        (Prim f _,args,ticks) -> do
+          let tickDecls = ticksToDecls ticks
+          (e',d) <- mkPrimitive True False (Left bndr) f args ty tickDecls
           case e' of
             (Identifier _ _) -> return ((e',hwTy,False), d)
             _                -> return ((e',hwTy,isLiteral e), d)
-        (Data dc, args) -> do
+        (Data dc, args,_) -> do
           (exprN,dcDecls) <- mkDcApplication hwTy (Left bndr) dc (lefts args)
           return ((exprN,hwTy,isLiteral e),dcDecls)
-        (Case scrut ty' [alt],[]) -> do
+        (Case scrut ty' [alt],[],_) -> do
           (projection,decls) <- mkProjection False (Left bndr) scrut ty' alt
           return ((projection,hwTy,False),decls)
         _ ->
@@ -278,8 +288,10 @@ mkPrimitive
   -- ^ Arguments
   -> Type
   -- ^ Result type
+  -> [Declaration]
+  -- ^ Tick declarations
   -> NetlistMonad (Expr,[Declaration])
-mkPrimitive bbEParen bbEasD dst nm args ty =
+mkPrimitive bbEParen bbEasD dst nm args ty tickDecls =
   go =<< extractPrimWarnOrFail nm
   where
     go
@@ -315,7 +327,7 @@ mkPrimitive bbEParen bbEasD dst nm args ty =
                   (templ,templDecl) <- prepareBlackBox pNm tempD bbCtx
                   let bbDecl = N.BlackBoxD pNm (libraries p) (imports p)
                                            (includes p) templ bbCtx
-                  return (Identifier dstNm Nothing,dstDecl ++ ctxDcls ++ templDecl ++ [bbDecl])
+                  return (Identifier dstNm Nothing,dstDecl ++ ctxDcls ++ templDecl ++ tickDecls ++ [bbDecl])
                 Nothing -> return (Identifier "__VOID__" Nothing,[])
             TExpr -> do
               let tempE = template p
@@ -444,7 +456,8 @@ mkFunInput
 mkFunInput resId e = do
   -- TODO: Rewrite this function to use blackbox functions. Right now it
   -- TODO: generates strings that are later parsed/interpreted again. Silly!
-  let (appE,args) = collectArgs e
+  let (appE,args,ticks) = collectArgsTicks e
+      tickDecls = ticksToDecls ticks
   (bbCtx,dcls) <- mkBlackBoxContext "__INTERNAL__" resId (lefts args)
   templ <- case appE of
             Prim nm _ -> do
@@ -478,7 +491,7 @@ mkFunInput resId e = do
                   let nonVoidArgI = fromJust (elemIndex False (head areVoids))
                   let arg = TextS.concat ["~ARG[", showt nonVoidArgI, "]"]
                   let assign = Assignment "~RESULT" (Identifier arg Nothing)
-                  return (Right (("", [assign]), Wire))
+                  return (Right (("", tickDecls ++ [assign]), Wire))
 
                 -- Because we filter void constructs, the argument indices and
                 -- the field indices don't necessarily correspond anymore. We
@@ -492,7 +505,7 @@ mkFunInput resId e = do
                       dcInps    = [Identifier (TextS.pack ("~ARG[" ++ show x ++ "]")) Nothing | x <- originalIndices areVoids1]
                       dcApp     = DataCon resHTy (DC (resHTy,dcI)) dcInps
                       dcAss     = Assignment "~RESULT" dcApp
-                  return (Right (("",[dcAss]),Wire))
+                  return (Right (("",tickDecls ++ [dcAss]),Wire))
 
                 -- CustomSP the same as SP, but with a user-defined bit
                 -- level representation
@@ -503,7 +516,7 @@ mkFunInput resId e = do
                       dcInps    = [Identifier (TextS.pack ("~ARG[" ++ show x ++ "]")) Nothing | x <- originalIndices areVoids1]
                       dcApp     = DataCon resHTy (DC (resHTy,dcI)) dcInps
                       dcAss     = Assignment "~RESULT" dcApp
-                  return (Right (("",[dcAss]),Wire))
+                  return (Right (("",tickDecls ++ [dcAss]),Wire))
 
                 -- Like SP, we have to retrieve the index BEFORE filtering voids
                 Just (resHTy@(Product _ _ _), areVoids0) -> do
@@ -511,7 +524,7 @@ mkFunInput resId e = do
                       dcInps    = [ Identifier (TextS.pack ("~ARG[" ++ show x ++ "]")) Nothing | x <- originalIndices areVoids1]
                       dcApp     = DataCon resHTy (DC (resHTy,0)) dcInps
                       dcAss     = Assignment "~RESULT" dcApp
-                  return (Right (("",[dcAss]),Wire))
+                  return (Right (("",tickDecls ++ [dcAss]),Wire))
 
                 -- Vectors never have defined areVoids (or all set to False), as
                 -- it would be converted to Void otherwise. We can therefore
@@ -520,21 +533,21 @@ mkFunInput resId e = do
                   let dcInps = [ Identifier (TextS.pack ("~ARG[" ++ show x ++ "]")) Nothing | x <- [(1::Int)..2] ]
                       dcApp  = DataCon resHTy (DC (resHTy,1)) dcInps
                       dcAss  = Assignment "~RESULT" dcApp
-                  return (Right (("",[dcAss]),Wire))
+                  return (Right (("",tickDecls ++ [dcAss]),Wire))
 
                 -- Sum types OR a Sum type after filtering empty types:
                 Just (resHTy@(Sum _ _), _areVoids) -> do
                   let dcI   = dcTag dc - 1
                       dcApp = DataCon resHTy (DC (resHTy,dcI)) []
                       dcAss = Assignment "~RESULT" dcApp
-                  return (Right (("",[dcAss]),Wire))
+                  return (Right (("",tickDecls ++ [dcAss]),Wire))
 
                 -- Same as Sum, but with user defined bit level representation
                 Just (resHTy@(CustomSum {}), _areVoids) -> do
                   let dcI   = dcTag dc - 1
                       dcApp = DataCon resHTy (DC (resHTy,dcI)) []
                       dcAss = Assignment "~RESULT" dcApp
-                  return (Right (("",[dcAss]),Wire))
+                  return (Right (("",tickDecls ++ [dcAss]),Wire))
 
                 Just (Void {}, _areVoids) ->
                   return (error $ $(curLoc) ++ "Encountered Void in mkFunInput."
@@ -564,11 +577,11 @@ mkFunInput resId e = do
                       i <- varCount <<%= (+1)
                       let instLabel     = TextS.concat [compName,TextS.pack ("_" ++ show i)]
                           instDecl      = InstDecl Entity Nothing compName instLabel [] (outpAssign:inpAssigns)
-                      return (Right (("",[instDecl]),Wire))
+                      return (Right (("",tickDecls ++ [instDecl]),Wire))
                     Nothing -> error $ $(curLoc) ++ "Cannot make function input for: " ++ showPpr e
             C.Lam {} -> do
               let is0 = mkInScopeSet (Lens.foldMapOf freeIds unitVarSet appE)
-              go is0 0 appE
+              either Left (Right . first (second (tickDecls ++))) <$> go is0 0 appE
             _ -> error $ $(curLoc) ++ "Cannot make function input for: " ++ showPpr e
   case templ of
     Left (TDecl,oreg,libs,imps,inc,_,templ') -> do
@@ -603,11 +616,12 @@ mkFunInput resId e = do
     Right (decl,wr) ->
       return ((Right decl,wr,[],[],[],bbCtx),dcls)
   where
-    goExpr app@(collectArgs -> (C.Var fun,args@(_:_))) = do
+    goExpr app@(collectArgsTicks -> (C.Var fun,args@(_:_),ticks)) = do
       let (tmArgs,tyArgs) = partitionEithers args
       if null tyArgs
         then do
-          appDecls <- mkFunApp "~RESULT" fun tmArgs
+          let tickDecls = ticksToDecls ticks
+          appDecls <- mkFunApp "~RESULT" fun tmArgs tickDecls
           nm <- mkUniqueIdentifier Basic "block"
           return (Right ((nm,appDecls),Wire))
         else do
@@ -648,7 +662,7 @@ mkFunInput resId e = do
     go _ _ (Case scrut ty alts@(_:_:_)) = do
       -- TODO: check that it's okay to use `mkUnsafeSystemName`
       let resId'  = resId {varName = mkUnsafeSystemName "~RESULT" 0}
-      selectionDecls <- mkSelection (Right resId') scrut ty alts
+      selectionDecls <- mkSelection (Right resId') scrut ty alts []
       nm <- mkUniqueIdentifier Basic "selection"
       tcm <- Lens.use tcCache
       let scrutTy = termType tcm scrut
@@ -678,6 +692,8 @@ mkFunInput resId e = do
         -- TODO: check that it's okay to use `mkUnsafeSystemName`
         goR r id_ | id_ == r  = id_ {varName = mkUnsafeSystemName "~RESULT" 0}
                   | otherwise = id_
+
+    go is0 n (Tick _ e') = go is0 n e'
 
     go _ _ e'@(App {}) = goExpr e'
     go _ _ e'@(C.Data {}) = goExpr e'

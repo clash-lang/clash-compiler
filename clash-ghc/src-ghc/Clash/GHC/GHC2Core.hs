@@ -374,7 +374,8 @@ coreToTerm primMap unlocs = term
         Just _ | ty1_I || ty2_I
           -> C.Cast <$> term e <*> coreToType ty1 <*> coreToType ty2
         _ -> term e
-    term' (Tick (SourceNote rsp _) e) = addUsefull (RealSrcSpan rsp) (term e)
+    term' (Tick (SourceNote rsp _) e) =
+      C.Tick (RealSrcSpan rsp) <$> addUsefull (RealSrcSpan rsp) (term e)
     term' (Tick _ e)        = term e
     term' (Type t)          = C.TyApp (C.Prim (pack "_TY_") (C.PrimInfo C.undefinedTy C.WorkNever)) <$>
                                 coreToType t

@@ -38,6 +38,7 @@ import Data.Text.Prettyprint.Doc.Internal
 import Debug.Trace                      (trace)
 import GHC.Show                         (showMultiLineString)
 import Numeric                          (fromRat)
+import qualified Outputable             as GHC
 
 import Clash.Core.DataCon               (DataCon (..))
 import Clash.Core.Literal               (Literal (..))
@@ -218,6 +219,13 @@ instance PrettyPrec Term where
     Letrec xes e1   -> pprPrecLetrec prec xes e1
     Case e' _ alts  -> pprPrecCase prec e' alts
     Cast e' ty1 ty2 -> pprPrecCast prec e' ty1 ty2
+    Tick t e'       -> do
+      tDoc <- pprPrec prec t
+      eDoc <- pprPrec prec e'
+      return (tDoc <> line' <> eDoc)
+
+instance PrettyPrec SrcSpan where
+  pprPrec _ sp = return ("<src>"<>pretty (GHC.showSDocUnsafe (GHC.ppr sp)))
 
 instance ClashPretty Term where
   clashPretty = fromPpr

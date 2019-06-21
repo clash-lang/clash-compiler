@@ -57,6 +57,7 @@ mkSelection
   -> Term
   -> Type
   -> [Alt]
+  -> [Declaration]
   -> NetlistMonad [Declaration]
 
 mkNetDecl :: LetBinding -> NetlistMonad (Maybe Declaration)
@@ -68,4 +69,5 @@ mkFunApp
   => Identifier -- ^ LHS of the let-binder
   -> Id -- ^ Name of the applied function
   -> [Term] -- ^ Function arguments
+  -> [Declaration] -- ^ Tick declarations
   -> NetlistMonad [Declaration]
