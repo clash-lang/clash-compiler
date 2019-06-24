@@ -892,7 +892,7 @@ sample s =
   case knownDomain @dom of
     SDomainConfiguration dom _ _ _ _ _ ->
       let clk = Clock dom in
-      let rst = Reset dom (True :- pure False) in
+      let rst = Reset (True :- pure False) in
       let en = S.enableGen in
       S.sample (exposeClockResetEnable s clk rst en)
 {-# NOINLINE sample #-}
@@ -919,7 +919,7 @@ sampleN n s =
   case knownDomain @dom of
     SDomainConfiguration dom _ _ _ _ _ ->
       let clk = Clock dom in
-      let rst = Reset dom (True :- pure False) in
+      let rst = Reset (True :- pure False) in
       let en = S.enableGen in
       S.sampleN n (exposeClockResetEnable s clk rst en)
 {-# NOINLINE sampleN #-}
@@ -943,7 +943,7 @@ sample_lazy s =
   case knownDomain @dom of
     SDomainConfiguration dom _ _ _ _ _ ->
       let clk = Clock dom in
-      let rst = Reset dom (True :- pure False) in
+      let rst = Reset (True :- pure False) in
       let en = S.enableGen in
       S.sample_lazy (exposeClockResetEnable s clk rst en)
 {-# NOINLINE sample_lazy #-}
@@ -968,7 +968,7 @@ sampleN_lazy n s =
   case knownDomain @dom of
     SDomainConfiguration dom _ _ _ _ _ ->
       let clk = Clock dom in
-      let rst = Reset dom (True :- pure False) in
+      let rst = Reset (True :- pure False) in
       let en = S.enableGen in
       S.sampleN_lazy n (exposeClockResetEnable s clk rst en)
 {-# NOINLINE sampleN_lazy #-}
@@ -1000,7 +1000,7 @@ simulate f =
   case knownDomain @dom of
     SDomainConfiguration dom _ _ _ _ _ ->
       let clk = Clock dom in
-      let rst = Reset dom (True :- pure False) in
+      let rst = Reset (True :- pure False) in
       let en = S.enableGen in
       -- TODO: Explain why we skip the the first value here
       tail . S.simulate (exposeClockResetEnable f clk rst en) . dup1
@@ -1027,7 +1027,7 @@ simulate_lazy f =
   case knownDomain @dom of
     SDomainConfiguration dom _ _ _ _ _ ->
       let clk = Clock dom in
-      let rst = Reset dom (True :- pure False) in
+      let rst = Reset (True :- pure False) in
       let en = S.enableGen in
       tail . S.simulate_lazy (exposeClockResetEnable f clk rst en) . dup1
 {-# NOINLINE simulate_lazy #-}
@@ -1057,7 +1057,7 @@ simulateB f =
   case knownDomain @dom of
     SDomainConfiguration dom _ _ _ _ _ ->
       let clk = Clock dom in
-      let rst = Reset dom (True :- pure False) in
+      let rst = Reset (True :- pure False) in
       let en = S.enableGen in
       tail . S.simulateB (exposeClockResetEnable f clk rst en) . dup1
 {-# NOINLINE simulateB #-}
@@ -1085,7 +1085,7 @@ simulateB_lazy f =
   case knownDomain @dom of
     SDomainConfiguration dom _ _ _ _ _ ->
       let clk = Clock dom in
-      let rst = Reset dom (True :- pure False) in
+      let rst = Reset (True :- pure False) in
       let en = S.enableGen in
       tail . S.simulateB_lazy (exposeClockResetEnable f clk rst en) . dup1
 {-# NOINLINE simulateB_lazy #-}

@@ -72,7 +72,7 @@ assert
   -> Signal dom b
   -- ^ Return value
   -> Signal dom b
-assert clk (Reset _ _) msg checked expected returned =
+assert clk (Reset _) msg checked expected returned =
   (\c e cnt r ->
       if eqX c e
          then r
@@ -106,7 +106,7 @@ assertBitVector
   -> Signal dom b
   -- ^ Return value
   -> Signal dom b
-assertBitVector clk (Reset _ _) msg checked expected returned =
+assertBitVector clk (Reset _) msg checked expected returned =
   (\c e cnt r ->
       if eqX c e
          then r

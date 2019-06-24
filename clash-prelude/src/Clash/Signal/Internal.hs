@@ -861,16 +861,16 @@ resetGen
   => Reset dom
 resetGen =
   if isActiveHigh @dom then
-    Reset SSymbol (True :- pure False)
+    Reset (True :- pure False)
   else
-    Reset SSymbol (False :- pure True)
+    Reset (False :- pure True)
 {-# NOINLINE resetGen #-}
 {-# ANN resetGen hasBlackBox #-}
 
 -- | A reset signal belonging to a domain called /dom/.
 --
 -- The underlying representation of resets is 'Bool'.
-data Reset (dom :: Domain) = Reset (SSymbol dom) (Signal dom Bool)
+data Reset (dom :: Domain) = Reset (Signal dom Bool)
 
 -- | Convert a reset to an active high reset. Has no effect if reset is already
 -- an active high reset. Is unsafe because it can introduce:
@@ -922,7 +922,7 @@ unsafeToLowPolarity (unsafeFromReset -> r) =
 unsafeFromReset
   :: Reset dom
   -> Signal dom Bool
-unsafeFromReset (Reset _dom r) = r
+unsafeFromReset (Reset r) = r
 {-# NOINLINE unsafeFromReset #-}
 {-# ANN unsafeFromReset hasBlackBox #-}
 
@@ -937,7 +937,7 @@ unsafeToReset
   :: KnownDomain dom conf
   => Signal dom Bool
   -> Reset dom
-unsafeToReset r = Reset SSymbol r
+unsafeToReset r = Reset r
 {-# NOINLINE unsafeToReset #-}
 {-# ANN unsafeToReset hasBlackBox #-}
 
