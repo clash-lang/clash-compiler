@@ -1070,7 +1070,7 @@ For which the VHDL /expression/ primitive is:
 @
 { \"BlackBox\" :
   { "name"     : "Clash.Sized.Internal.Signed.*#"
-  , "kind"     : "Expression"
+  , "kind"     : \"Expression\"
   , "template" : "resize(~ARG[1] * ~ARG[2], ~LIT[0])"
   }
 }
@@ -1161,7 +1161,7 @@ And for which the /declaration/ primitive is:
 @
 { \"BlackBox\" :
   { "name" : "Clash.Explicit.BlockRam.blockRam#"
-  , "kind" : "Declaration"
+  , "kind" : \"Declaration\"
   , "type" :
 "blockRam#
   :: ( HasCallStack  --       ARG[0]
@@ -1330,7 +1330,7 @@ For those who are interested, the equivalent Verilog primitives are:
 @
 { \"BlackBox\" :
   { "name"     : "Clash.Sized.Internal.Signed.*#"
-  , "kind"     : "Expression"
+  , "kind"     : \"Expression\"
   , "template" : "~ARG[1] * ~ARG[2]"
   }
 }
@@ -1339,9 +1339,9 @@ For those who are interested, the equivalent Verilog primitives are:
 and
 
 @
-{ "BlackBox" :
+{ \"BlackBox\" :
   { "name" : "Clash.Explicit.BlockRam.blockRam#"
-  , "kind" : "Declaration"
+  , "kind" : \"Declaration\"
   , "type" :
 "blockRam#
   :: ( HasCallStack  --       ARG[0]
@@ -1401,7 +1401,7 @@ And the equivalent SystemVerilog primitives are:
 @
 { \"BlackBox\" :
   { "name"     : "Clash.Sized.Internal.Signed.*#"
-  , "kind"     : "Expression"
+  , "kind"     : \"Expression\"
   , "template" : "~ARG[1] * ~ARG[2]"
   }
 }
@@ -1410,9 +1410,9 @@ And the equivalent SystemVerilog primitives are:
 and
 
 @
-{ "BlackBox" :
+{ \"BlackBox\" :
   { "name" : "Clash.Explicit.BlockRam.blockRam#"
-  , "kind" : "Declaration"
+  , "kind" : \"Declaration\"
   , "type" :
 "blockRam#
   :: ( HasCallStack  --       ARG[0]
