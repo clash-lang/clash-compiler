@@ -8,21 +8,21 @@ Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
 Clash has synchronous 'Signal's in the form of:
 
 @
-'Signal' (dom :: 'Symbol') a
+'Signal' (dom :: 'Domain') a
 @
 
 Where /a/ is the type of the value of the 'Signal', for example /Int/ or /Bool/,
 and /dom/ is the /clock-/ (and /reset-/) domain to which the memory elements
 manipulating these 'Signal's belong.
 
-The type-parameter, /dom/, is of the kind 'Symbol' - a simple string. That
+The type-parameter, /dom/, is of the kind 'Domain' - a simple string. That
 string refers to a single /synthesis domain/. A synthesis domain describes the
 behavior of certain aspects of memory elements in it. More specifically, a
 domain looks like:
 
 @
 'DomainConfiguration'
-  { _name :: 'Symbol'
+  { _name :: 'Domain'
   -- ^ Domain name
   , _period :: 'Nat'
   -- ^ Clock period in /ps/
@@ -86,6 +86,7 @@ module Clash.Signal
   , BiSignalOut
   , BiSignalDefault(..)
     -- * Domain
+  , Domain
   , KnownDomain(..)
   , ActiveEdge(..)
   , SActiveEdge(..)

@@ -14,13 +14,13 @@ To cleanly map to functions (and thus support software simulation using Haskell)
 a /BiSignal/ comes in two parts; the __in__ part:
 
 @
-'BiSignalIn' (ds :: 'BiSignalDefault') (dom :: 'Symbol') (n :: Nat)
+'BiSignalIn' (ds :: 'BiSignalDefault') (dom :: 'Domain') (n :: Nat)
 @
 
 and the __out__ part:
 
 @
-'BiSignalOut' (ds :: 'BiSignalDefault') (dom :: 'Symbol') (n :: Nat)
+'BiSignalOut' (ds :: 'BiSignalDefault') (dom :: 'Domain') (n :: Nat)
 @
 
 Where:
@@ -83,19 +83,22 @@ topEntity clk rst = readFromBiSignal bus'
 @
 -}
 
-{-# LANGUAGE CPP #-}
-{-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE MagicHash #-}
-{-# LANGUAGE TypeOperators #-}
-{-# LANGUAGE KindSignatures #-}
-{-# LANGUAGE DataKinds #-}
-{-# LANGUAGE TypeFamilies #-}
-{-# LANGUAGE FlexibleInstances #-}
-{-# LANGUAGE InstanceSigs #-}
-{-# LANGUAGE GADTs #-}
-{-# LANGUAGE RankNTypes #-}
-{-# LANGUAGE MultiParamTypeClasses #-}
-{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE CPP                    #-}
+{-# LANGUAGE DataKinds              #-}
+{-# LANGUAGE FlexibleContexts       #-}
+{-# LANGUAGE FlexibleInstances      #-}
+{-# LANGUAGE GADTs                  #-}
+{-# LANGUAGE InstanceSigs           #-}
+{-# LANGUAGE KindSignatures         #-}
+{-# LANGUAGE MagicHash              #-}
+{-# LANGUAGE MultiParamTypeClasses  #-}
+{-# LANGUAGE RankNTypes             #-}
+{-# LANGUAGE ScopedTypeVariables    #-}
+{-# LANGUAGE TypeFamilies           #-}
+{-# LANGUAGE TypeOperators          #-}
+#if __GLASGOW_HASKELL__ < 806
+{-# LANGUAGE TypeInType #-}
+#endif
 
 {-# OPTIONS_GHC -fplugin=GHC.TypeLits.Extra.Solver #-}
 {-# OPTIONS_GHC -fplugin=GHC.TypeLits.Normalise #-}
@@ -111,17 +114,18 @@ module Clash.Signal.BiSignal (
   , veryUnsafeToBiSignalIn
   ) where
 
-import           Data.Maybe                 (Maybe,fromMaybe,fromJust,isJust)
+import           Data.Kind                  (Type)
 import           Data.List                  (intercalate)
+import           Data.Maybe                 (Maybe,fromMaybe,fromJust,isJust)
 
 import           Clash.Class.BitPack        (BitPack (..))
 import           Clash.Sized.BitVector      (BitVector)
 import qualified Clash.Sized.Vector         as V
 import           Clash.Sized.Vector         (Vec)
-import           Clash.Signal.Internal      (Signal(..), head#, tail#)
+import           Clash.Signal.Internal      (Signal(..), Domain, head#, tail#)
 import           Clash.XException           (errorX)
 
-import           GHC.TypeLits               (KnownNat, Nat, Symbol)
+import           GHC.TypeLits               (KnownNat, Nat)
 import           GHC.Stack                  (HasCallStack)
 import           Data.Reflection            (Given (..))
 
@@ -138,7 +142,7 @@ data BiSignalDefault
   deriving (Show)
 
 -- | Singleton versions of 'BiSignalDefault'
-data SBiSignalDefault :: BiSignalDefault -> * where
+data SBiSignalDefault :: BiSignalDefault -> Type where
   SPullUp   :: SBiSignalDefault 'PullUp
   SPullDown :: SBiSignalDefault 'PullDown
   SFloating :: SBiSignalDefault 'Floating
@@ -153,14 +157,14 @@ instance Given (SBiSignalDefault 'Floating) where
   given = SFloating
 
 -- | The /in/ part of an __inout__ port
-data BiSignalIn (ds :: BiSignalDefault) (dom :: Symbol) (n :: Nat)
+data BiSignalIn (ds :: BiSignalDefault) (dom :: Domain) (n :: Nat)
   = BiSignalIn (SBiSignalDefault ds) (Signal dom (Maybe (BitVector n)))
 
 -- | The /out/ part of an __inout__ port
 --
 -- Wraps (multiple) writing signals. The semantics are such that only one of
 -- the signals may write at a single time step.
-newtype BiSignalOut (ds :: BiSignalDefault) (dom :: Symbol) (n :: Nat)
+newtype BiSignalOut (ds :: BiSignalDefault) (dom :: Domain) (n :: Nat)
   = BiSignalOut [Signal dom (Maybe (BitVector n))]
 
 #if MIN_VERSION_base(4,11,0)

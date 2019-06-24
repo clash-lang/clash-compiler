@@ -25,6 +25,9 @@ Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
 {-# LANGUAGE TypeApplications       #-}
 {-# LANGUAGE TypeFamilies           #-}
 {-# LANGUAGE ViewPatterns           #-}
+#if __GLASGOW_HASKELL__ < 806
+{-# LANGUAGE TypeInType #-}
+#endif
 
 {-# LANGUAGE Unsafe #-}
 
@@ -40,6 +43,7 @@ module Clash.Signal.Internal
   , head#
   , tail#
     -- * Domains
+  , Domain
   , KnownDomain(..)
   , knownDomainByName
   , ActiveEdge(..)
@@ -249,7 +253,7 @@ instance Show (SInitBehavior init) where
   show SUnknown = "SUnknown"
   show SDefined = "SDefined"
 
--- | A domain with a name (@Symbol@). Configures the behavior of various aspects
+-- | A domain with a name (@Domain@). Configures the behavior of various aspects
 -- of a circuits. See the documentation of this record's field types for more
 -- information on the options.
 --
@@ -257,7 +261,7 @@ instance Show (SInitBehavior init) where
 -- how to create custom synthesis domains.
 data DomainConfiguration
   = DomainConfiguration
-  { _name :: Symbol
+  { _name :: Domain
   -- ^ Domain name
   , _period :: Nat
   -- ^ Period of clock in /ps/
@@ -275,7 +279,7 @@ data DomainConfiguration
   deriving (Typeable)
 
 -- | Singleton version of 'DomainConfiguration'
-data SDomainConfiguration (dom :: Symbol) (conf :: DomainConfiguration) where
+data SDomainConfiguration (dom :: Domain) (conf :: DomainConfiguration) where
   SDomainConfiguration
     :: SSymbol dom
     -- Domain name ^
@@ -307,7 +311,7 @@ instance Show (SDomainConfiguration dom conf) where
 
 -- | A 'KnownDomain' constraint indicates that a circuit's behavior depends on
 -- some properties of a domain. See 'DomainConfiguration' for more information.
-class KnownSymbol dom => KnownDomain (dom :: Symbol) (conf :: DomainConfiguration) | dom -> conf where
+class KnownSymbol dom => KnownDomain (dom :: Domain) (conf :: DomainConfiguration) | dom -> conf where
   -- | Returns 'SDomainConfiguration' corresponding to an instance's 'DomainConfiguration'.
   --
   -- Example usage:
@@ -400,7 +404,7 @@ vSystem = vDomain (knownDomain @System)
 --
 -- See module documentation of "Clash.Explicit.Signal" for more information on
 -- how to create custom synthesis domains.
-type System = "System"
+type System = ("System" :: Domain)
 
 
 -- | Convenience value to allow easy "subclassing" of IntelSystem domain. Should
@@ -418,7 +422,7 @@ vIntelSystem = vDomain (knownDomain @IntelSystem)
 --
 -- See module documentation of "Clash.Explicit.Signal" for more information on
 -- how to create custom synthesis domains.
-type IntelSystem = "IntelSystem"
+type IntelSystem = ("IntelSystem" :: Domain)
 
 -- | Convenience value to allow easy "subclassing" of XilinxSystem domain. Should
 -- be used in combination with 'createDomain'. For example, if you just want to
@@ -435,7 +439,7 @@ vXilinxSystem = vDomain (knownDomain @XilinxSystem)
 --
 -- See module documentation of "Clash.Explicit.Signal" for more information on
 -- how to create custom synthesis domains.
-type XilinxSystem = "XilinxSystem"
+type XilinxSystem = ("XilinxSystem" :: Domain)
 
 -- | Same as SDomainConfiguration but allows for easy updates through record update syntax.
 -- Should be used in combination with 'vDomain' and 'createDomain'. Example:
@@ -518,7 +522,7 @@ createDomain (VDomainConfiguration name period edge reset init_ polarity) =
     let vTagImpl = AppTypeE (VarE 'knownVDomain) (LitT (StrTyLit name))
     let kdImpl = FunD 'knownDomain [Clause [] (NormalB sDom) []]
     pure  [ InstanceD Nothing [] kdType [kdImpl]
-          , TySynD (mkName name) [] (LitT (StrTyLit name))
+          , TySynD (mkName name) [] (LitT (StrTyLit name)  `SigT`  ConT ''Domain)
           , FunD (mkName ('v':name)) [Clause [] (NormalB vTagImpl) []]
           ]
   else
@@ -549,7 +553,7 @@ createDomain (VDomainConfiguration name period edge reset init_ polarity) =
       ActiveHigh -> ConE 'SActiveHigh
       ActiveLow -> ConE 'SActiveLow
 
-  nameT    = pure (LitT (StrTyLit name))
+  nameT   = pure (LitT (StrTyLit name))
   periodT = pure (LitT (NumTyLit (toInteger period)))
 
   edgeT =
@@ -577,18 +581,20 @@ createDomain (VDomainConfiguration name period edge reset init_ polarity) =
       ActiveLow -> PromotedT 'ActiveLow
 
 
+type Domain = Symbol
+
 infixr 5 :-
 {- | Clash has synchronous 'Signal's in the form of:
 
 @
-'Signal' (dom :: 'Symbol') a
+'Signal' (dom :: 'Domain') a
 @
 
 Where /a/ is the type of the value of the 'Signal', for example /Int/ or /Bool/,
 and /dom/ is the /clock-/ (and /reset-/) domain to which the memory elements
 manipulating these 'Signal's belong.
 
-The type-parameter, /dom/, is of the kind 'Symbol' - a simple string. That
+The type-parameter, /dom/, is of the kind 'Domain' - a simple string. That
 string refers to a single /synthesis domain/. A synthesis domain describes the
 behavior of certain aspects of memory elements in it.
 
@@ -604,7 +610,7 @@ Check out 'IntelSystem' and 'XilinxSystem' too!
 See the module documentation of "Clash.Signal" for more information about
 domains.
 -}
-data Signal (dom :: Symbol) a
+data Signal (dom :: Domain) a
   -- | The constructor, @(':-')@, is __not__ synthesizable.
   = a :- Signal dom a
 
@@ -738,7 +744,7 @@ enableGen :: Enable dom
 enableGen = toEnable (pure True)
 
 -- | A clock signal belonging to a domain named /dom/.
-data Clock (dom :: Symbol) = Clock (SSymbol dom)
+data Clock (dom :: Domain) = Clock (SSymbol dom)
 
 instance Show (Clock dom) where
   show (Clock dom) = "<Clock: " ++ show dom ++ ">"
@@ -864,7 +870,7 @@ resetGen =
 -- | A reset signal belonging to a domain called /dom/.
 --
 -- The underlying representation of resets is 'Bool'.
-data Reset dom = Reset (SSymbol dom) (Signal dom Bool)
+data Reset (dom :: Domain) = Reset (SSymbol dom) (Signal dom Bool)
 
 -- | Convert a reset to an active high reset. Has no effect if reset is already
 -- an active high reset. Is unsafe because it can introduce:

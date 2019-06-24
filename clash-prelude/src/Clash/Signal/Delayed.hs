@@ -11,12 +11,15 @@ Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
 {-# LANGUAGE FlexibleContexts     #-}
 {-# LANGUAGE KindSignatures       #-}
 {-# LANGUAGE ScopedTypeVariables  #-}
-{-# LANGUAGE TypeOperators        #-}
 {-# LANGUAGE TypeApplications     #-}
 {-# LANGUAGE TypeFamilies         #-}
+{-# LANGUAGE TypeOperators        #-}
 {-# LANGUAGE UndecidableInstances #-}
 #if __GLASGOW_HASKELL__ >= 806
 {-# LANGUAGE NoStarIsType #-}
+#endif
+#if __GLASGOW_HASKELL__ < 806
+{-# LANGUAGE TypeInType #-}
 #endif
 
 {-# LANGUAGE Trustworthy #-}
@@ -49,9 +52,10 @@ import           Data.Coerce                   (coerce)
 import           Data.Kind                     (Type)
 import           Data.Proxy                    (Proxy(..))
 import           GHC.TypeLits
-  (KnownNat, Symbol, type (^), type (+), type (*), Nat)
+  (KnownNat, type (^), type (+), type (*), Nat)
 import           Data.Singletons.Prelude       (Apply, TyFun, type (@@))
 
+import           Clash.Signal.Internal         (Domain)
 import Clash.Signal.Delayed.Internal
   (DSignal(..), dfromList, dfromList_lazy, fromSignal, toSignal,
    unsafeFromSignal, antiDelay, feedback)
@@ -184,7 +188,7 @@ delayI
   -> DSignal dom (n+d) a
 delayI dflt = delayN (SNat :: SNat d) dflt
 
-data DelayedFold (dom :: Symbol) (n :: Nat) (delay :: Nat) (a :: Type) (f :: TyFun Nat Type) :: Type
+data DelayedFold (dom :: Domain) (n :: Nat) (delay :: Nat) (a :: Type) (f :: TyFun Nat Type) :: Type
 type instance Apply (DelayedFold dom n delay a) k = DSignal dom (n + (delay*k)) a
 
 -- | Tree fold over a 'Vec' of 'DSignal's with a combinatorial function,

@@ -639,6 +639,9 @@ wantedLanguageExtensions df =
              , LangExt.TypeApplications
              , LangExt.TypeFamilies
              , LangExt.TypeOperators
+#if __GLASGOW_HASKELL__ < 806
+             , LangExt.TypeInType
+#endif
              ]
     unwanted = [ LangExt.ImplicitPrelude
                , LangExt.MonomorphismRestriction

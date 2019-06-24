@@ -15,7 +15,7 @@ Where /a/ is the type of the value of the 'Signal', for example /Int/ or /Bool/,
 and /dom/ is the /clock-/ (and /reset-/) domain to which the memory elements
 manipulating these 'Signal's belong.
 
-The type-parameter, /dom/, is of the kind 'Symbol' - a simple string. That
+The type-parameter, /dom/, is of the kind 'Domain' - a simple string. That
 string refers to a single /synthesis domain/. A synthesis domain describes the
 behavior of certain aspects of memory elements in it. More specifically, a
 domain looks like:
@@ -143,6 +143,7 @@ module Clash.Explicit.Signal
   ( -- * Synchronous signal
     Signal
     -- * Domain
+  , Domain
   , KnownDomain(..)
   , ActiveEdge(..)
   , SActiveEdge(..)

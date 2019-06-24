@@ -7,6 +7,7 @@ Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
 The Product/Signal isomorphism
 -}
 
+{-# LANGUAGE CPP                    #-}
 {-# LANGUAGE DataKinds              #-}
 {-# LANGUAGE DefaultSignatures      #-}
 {-# LANGUAGE KindSignatures         #-}
@@ -15,6 +16,9 @@ The Product/Signal isomorphism
 {-# LANGUAGE TypeFamilies           #-}
 {-# LANGUAGE TypeFamilyDependencies #-}
 {-# LANGUAGE TypeOperators          #-}
+#if __GLASGOW_HASKELL__ < 806
+{-# LANGUAGE TypeInType #-}
+#endif
 
 {-# LANGUAGE Trustworthy #-}
 
@@ -25,12 +29,12 @@ module Clash.Signal.Bundle
   )
 where
 
-import GHC.TypeLits                 (KnownNat, Symbol)
+import GHC.TypeLits                 (KnownNat)
 import Prelude                      hiding (head, map, tail)
 
 import Clash.NamedTypes             ((:::))
 import Clash.Signal.Bundle.Internal (deriveBundleTuples)
-import Clash.Signal.Internal        (Signal (..))
+import Clash.Signal.Internal        (Signal (..), Domain)
 import Clash.Sized.BitVector        (Bit, BitVector)
 import Clash.Sized.Fixed            (Fixed)
 import Clash.Sized.Index            (Index)
@@ -70,7 +74,7 @@ import Clash.Sized.RTree            (RTree, lazyT)
 -- @
 --
 class Bundle a where
-  type Unbundled (dom :: Symbol) a = res | res -> dom a
+  type Unbundled (dom :: Domain) a = res | res -> dom a
   type Unbundled dom a = Signal dom a
   -- | Example:
   --

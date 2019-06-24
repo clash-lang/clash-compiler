@@ -2304,7 +2304,7 @@ and / or easy to use as the standard Haskell features.
   only 'Signal' which has a /dom/ and /value/ type variable.
 
     @
-    data Signal (dom :: Symbol) a
+    data Signal (dom :: Domain) a
     @
 
   The /dom/ refers to a synthesis domain. See "Clash.Explicit.Signal" for more

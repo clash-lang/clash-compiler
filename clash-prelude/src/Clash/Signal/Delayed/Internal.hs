@@ -11,11 +11,14 @@
 {-# LANGUAGE DeriveTraversable          #-}
 {-# LANGUAGE GADTs                      #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
-{-# LANGUAGE MultiParamTypeClasses      #-}
 {-# LANGUAGE KindSignatures             #-}
+{-# LANGUAGE MultiParamTypeClasses      #-}
 {-# LANGUAGE ScopedTypeVariables        #-}
 {-# LANGUAGE TypeFamilies               #-}
 {-# LANGUAGE TypeOperators              #-}
+#if __GLASGOW_HASKELL__ < 806
+{-# LANGUAGE TypeInType #-}
+#endif
 
 {-# LANGUAGE Trustworthy #-}
 
@@ -39,11 +42,12 @@ where
 
 import Data.Coerce                (coerce)
 import Data.Default.Class         (Default(..))
-import GHC.TypeLits               (Nat, type (+), Symbol)
+import GHC.TypeLits               (Nat, type (+))
 import Language.Haskell.TH.Syntax (Lift)
 import Test.QuickCheck            (Arbitrary, CoArbitrary)
 
 import Clash.Promoted.Nat         (SNat)
+import Clash.Signal.Internal      (Domain)
 import Clash.Explicit.Signal
   (Signal, fromList, fromList_lazy)
 import Clash.XException           (Undefined)
@@ -71,7 +75,7 @@ let mac :: Clock System
 
 -- | A synchronized signal with samples of type @a@, synchronized to clock
 -- @clk@, that has accumulated @delay@ amount of samples delay along its path.
-newtype DSignal (dom :: Symbol) (delay :: Nat) a =
+newtype DSignal (dom :: Domain) (delay :: Nat) a =
     DSignal { toSignal :: Signal dom a
               -- ^ Strip a 'DSignal' from its delay information.
             }

@@ -5,6 +5,7 @@
   License     :  BSD2 (see the file LICENSE)
   Maintainer  :  Christiaan Baaij <christiaan.baaij@gmail.com>
 -}
+{-# LANGUAGE CPP                    #-}
 {-# LANGUAGE DataKinds              #-}
 {-# LANGUAGE DefaultSignatures      #-}
 {-# LANGUAGE FlexibleContexts       #-}
@@ -14,6 +15,9 @@
 {-# LANGUAGE TypeFamilies           #-}
 {-# LANGUAGE TypeFamilyDependencies #-}
 {-# LANGUAGE TypeOperators          #-}
+#if __GLASGOW_HASKELL__ < 806
+{-# LANGUAGE TypeInType #-}
+#endif
 
 module Clash.Signal.Delayed.Bundle (
   Bundle,
@@ -23,9 +27,10 @@ module Clash.Signal.Delayed.Bundle (
   ) where
 
 import           Control.Applicative           (liftA2)
-import           GHC.TypeLits                  (KnownNat, Symbol)
+import           GHC.TypeLits                  (KnownNat)
 import           Prelude                       hiding (head, map, tail)
 
+import           Clash.Signal.Internal         (Domain)
 import           Clash.Signal.Delayed (DSignal, toSignal, unsafeFromSignal)
 import qualified Clash.Signal.Bundle           as B
 
@@ -70,7 +75,7 @@ import           GHC.TypeLits                  (Nat)
 -- @
 --
 class Bundle a where
-  type Unbundled (dom :: Symbol) (d :: Nat) a = res | res -> dom d a
+  type Unbundled (dom :: Domain) (d :: Nat) a = res | res -> dom d a
   type Unbundled dom d a = DSignal dom d a
 
   -- | Example:
