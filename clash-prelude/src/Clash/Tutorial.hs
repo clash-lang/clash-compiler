@@ -2395,7 +2395,7 @@ fir
   => Vec (n + 1) a -> Signal dom a -> Signal dom a
 fir coeffs x_t = y_t
   where
-    y_t = dotp coeffs <$> bundle xs
+    y_t = dotp coeffs \<$\> bundle xs
     xs  = window x_t
 
 topEntity
@@ -2412,8 +2412,8 @@ testBench = done
   where
     testInput      = stimuliGenerator clk rst (2:>3:>(-2):>8:>Nil)
     expectedOutput = outputVerifier clk rst (4:>12:>1:>20:>Nil)
-    done           = expectedOutput (topEntity clk rst (enableGen) testInput)
-    clk            = tbSystemClockGen (not <$> done)
+    done           = expectedOutput (topEntity clk rst enableGen testInput)
+    clk            = tbSystemClockGen (not \<$\> done)
     rst            = systemResetGen
 @
 

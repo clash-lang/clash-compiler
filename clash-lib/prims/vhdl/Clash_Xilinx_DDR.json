@@ -20,8 +20,6 @@
   signal ~GENSYM[dataout_l][1] : ~TYP[7];
   signal ~GENSYM[dataout_h][2] : ~TYP[7];
   signal ~GENSYM[d][3]         : ~TYP[7];~IF ~ISENABLED[4] ~THEN
-//  signal ~GENSYM[clk][4]     : std_logic;
-//  signal ~GENSYM[ce][5]      : boolean;
   signal ~GENSYM[ce_logic][4]: std_logic;~ELSE ~FI
 begin~IF ~ISENABLED[4] ~THEN
   ~SYM[4] <= '1' when (~ARG[6]) else '0';~ELSE ~FI
