@@ -376,6 +376,7 @@ This concludes the short introduction to using 'blockRam'.
 {-# LANGUAGE BangPatterns        #-}
 {-# LANGUAGE DataKinds           #-}
 {-# LANGUAGE GADTs               #-}
+{-# LANGUAGE KindSignatures      #-}
 {-# LANGUAGE MagicHash           #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeOperators       #-}
@@ -393,6 +394,8 @@ module Clash.Explicit.BlockRam
   ( -- * BlockRAM synchronized to the system clock
     blockRam
   , blockRamPow2
+  , blockRam1
+  , ResetStrategy(..)
     -- * Read/Write conflict resolution
   , readNew
     -- * Internal
@@ -400,18 +403,23 @@ module Clash.Explicit.BlockRam
   )
 where
 
+import Control.Applicative    (liftA2)
 import Data.Maybe             (isJust)
 import qualified Data.Vector  as V
 import GHC.Stack              (HasCallStack, withFrozenCallStack)
-import GHC.TypeLits           (KnownNat, type (^))
-import Prelude                hiding (length)
+import GHC.TypeLits           (KnownNat, type (^), type (<=))
+import Prelude                hiding (length, replicate)
 
+import Clash.Annotations.Primitive (hasBlackBox)
+import Clash.Class.Num        (SaturationMode(SatBound), satAdd)
 import Clash.Explicit.Signal  (KnownDomain, Enable, register, fromEnable)
 import Clash.Signal.Internal
-  (Clock(..), Reset, Signal (..), (.&&.), mux)
+  (Clock(..), Reset, Signal (..), invertReset, (.&&.), mux)
+import Clash.Promoted.Nat     (SNat(..))
 import Clash.Signal.Bundle    (unbundle)
 import Clash.Sized.Unsigned   (Unsigned)
-import Clash.Sized.Vector     (Vec, toList)
+import Clash.Sized.Index      (Index)
+import Clash.Sized.Vector     (Vec, replicate, toList)
 import Clash.XException
   (maybeIsX, seqX, Undefined, deepErrorX, defaultSeqX, errorX)
 
@@ -681,6 +689,10 @@ prog2 = -- 0 := 4
 
 -}
 
+fromJustX :: HasCallStack => Maybe a -> a
+fromJustX Nothing  = errorX "fromJustX: Nothing"
+fromJustX (Just x) = x
+
 -- | Create a blockRAM with space for @n@ elements
 --
 -- * __NB__: Read value is delayed by 1 cycle
@@ -725,9 +737,6 @@ blockRam = \clk gen content rd wrM ->
       (wr,din) = unbundle (fromJustX <$> wrM)
   in  withFrozenCallStack
       (blockRam# clk gen content (fromEnum <$> rd) en (fromEnum <$> wr) din)
- where
-  fromJustX Nothing  = errorX "fromJustX"
-  fromJustX (Just x) = x
 {-# INLINE blockRam #-}
 
 -- | Create a blockRAM with space for 2^@n@ elements
@@ -776,6 +785,98 @@ blockRamPow2 = \clk en cnt rd wrM -> withFrozenCallStack
   (blockRam clk en cnt rd wrM)
 {-# INLINE blockRamPow2 #-}
 
+data ResetStrategy (r :: Bool) where
+  ClearOnReset :: ResetStrategy 'True
+  NoClearOnReset :: ResetStrategy 'False
+
+-- | Version of blockram that is initialized with the same value on all
+-- memory positions.
+blockRam1
+   :: forall n dom a r addr conf
+   . ( KnownDomain dom conf
+     , HasCallStack
+     , Undefined a
+     , Enum addr
+     , 1 <= n )
+  => Clock dom
+  -- ^ 'Clock' to synchronize to
+  -> Reset dom
+  -- ^ 'Reset' line to listen to. Needs to be held at least /n/ cycles in order
+  -- for the BRAM to be reset to its initial state.
+  -> Enable dom
+  -- ^ Global enable
+  -> ResetStrategy r
+  -- ^ Whether to clear BRAM on asserted reset ('ClearOnReset') or
+  -- not ('NoClearOnReset'). Reset needs to be asserted at least /n/ cycles to
+  -- clear the BRAM.
+  -> SNat n
+  -- ^ Number of elements in BRAM
+  -> a
+  -- ^ Initial content of the BRAM (replicated /n/ times)
+  -> Signal dom addr
+  -- ^ Read address @r@
+  -> Signal dom (Maybe (addr, a))
+  -- ^ (write address @w@, value to write)
+  -> Signal dom a
+  -- ^ Value of the @blockRAM@ at address @r@ from the previous clock cycle
+blockRam1 clk rst0 en rstStrategy n@SNat a rd0 mw0 =
+  case rstStrategy of
+    ClearOnReset ->
+      -- Use reset infrastructure
+      blockRam1# clk en n a rd1 we1 wa1 w1
+    NoClearOnReset ->
+      -- Ignore reset infrastructure, pass values unchanged
+      blockRam1# clk en n a
+        (fromEnum <$> rd0)
+        we0
+        (fromEnum <$> wa0)
+        w0
+ where
+  rstBool = register clk rst0 en True (pure False)
+  rstInv = invertReset rst0
+
+  waCounter :: Signal dom (Index n)
+  waCounter = register clk rstInv en 0 (liftA2 (satAdd SatBound) (pure 1) waCounter)
+
+  wa0 = fst . fromJustX <$> mw0
+  w0  = snd . fromJustX <$> mw0
+  we0 = isJust <$> mw0
+
+  rd1 = mux rstBool 0 (fromEnum <$> rd0)
+  we1 = mux rstBool (pure True) we0
+  wa1 = mux rstBool (fromInteger . toInteger <$> waCounter) (fromEnum <$> wa0)
+  w1  = mux rstBool (pure a) w0
+
+-- | blockRAM1 primitive
+blockRam1#
+  :: forall n dom a conf
+   . ( KnownDomain dom conf
+     , HasCallStack
+     , Undefined a )
+  => Clock dom
+  -- ^ 'Clock' to synchronize to
+  -> Enable dom
+  -- ^ Global Enable
+  -> SNat n
+  -- ^ Number of elements in BRAM
+  -> a
+  -- ^ Initial content of the BRAM (replicated /n/ times)
+  -> Signal dom Int
+  -- ^ Read address @r@
+  -> Signal dom Bool
+  -- ^ Write enable
+  -> Signal dom Int
+  -- ^ Write address @w@
+  -> Signal dom a
+  -- ^ Value to write (at address @w@)
+  -> Signal dom a
+  -- ^ Value of the @blockRAM@ at address @r@ from the previous clock cycle
+blockRam1# clk en n a =
+  -- TODO: Generalize to single BRAM primitive taking an initialization function
+  blockRam# clk en (replicate n a)
+{-# NOINLINE blockRam1# #-}
+{-# ANN blockRam1# hasBlackBox #-}
+
 -- | blockRAM primitive
 blockRam#
   :: ( KnownDomain dom conf
@@ -821,6 +922,7 @@ blockRam# (Clock _) gen content rd wen =
       Nothing -> V.map (const (seq waddr d)) ram
       Just wa -> ram V.// [(wa,d)]
     _ -> ram
+{-# ANN blockRam# hasBlackBox #-}
 {-# NOINLINE blockRam# #-}
 
 -- | Create read-after-write blockRAM from a read-before-write one

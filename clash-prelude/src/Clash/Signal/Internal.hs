@@ -89,6 +89,7 @@ module Clash.Signal.Internal
   , unsafeToLowPolarity
   , unsafeFromHighPolarity
   , unsafeFromLowPolarity
+  , invertReset
     -- * Basic circuits
   , delay#
   , register#
@@ -973,6 +974,10 @@ unsafeFromLowPolarity
   -> Reset dom
 unsafeFromLowPolarity r =
   unsafeToReset (if isActiveHigh @dom then not <$> r else r)
+
+-- | Invert reset signal
+invertReset :: KnownDomain dom conf => Reset dom -> Reset dom
+invertReset = unsafeToReset . fmap not . unsafeFromReset
 
 
 infixr 2 .||.
