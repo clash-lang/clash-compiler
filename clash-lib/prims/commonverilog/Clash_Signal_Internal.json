@@ -1,19 +1,4 @@
 [ { "BlackBox" :
-    { "name" : "Clash.Signal.Internal.toEnabledClock"
-    , "kind" : "Declaration"
-    , "type" :
-"toEnabledClock
-  :: Clock dom -- ARG[0]
-  -> Signal dom Bool -- ARG[1]
-  -> Clock dom"
-    , "template" :
-"// toEnabledClock begin~IF ~ISENABLED[0] ~THEN
-assign ~RESULT = {~ARG[0][1],~ARG[0][0] & ~ARG[1]};~ELSE
-assign ~RESULT = {~ARG[0],~ARG[1]};~FI
-// toEnabledClock end"
-    }
-  }
-, { "BlackBox" :
     { "name"      : "Clash.Signal.Internal.unsafeFromReset"
     , "workInfo"  : "Never"
     , "kind" : "Expression"
