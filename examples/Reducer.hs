@@ -158,7 +158,7 @@ controller (inp1, inp2, pipe, fromResMem) = (arg1, arg2, shift, toResMem)
 -- =============================================
 -- = Reducer: Wrap up all the above components =
 -- =============================================
-reducer :: SystemClockReset => (Signal System DataInt, Signal System ArrayIndex) -> Signal System OutputSignal
+reducer :: SystemClockResetEnable => (Signal System DataInt, Signal System ArrayIndex) -> Signal System OutputSignal
 reducer (dataIn,index) = redOut
   where
     (newDiscrVal,newDiscr)     = mealyB discriminator initDiscrState index
@@ -168,11 +168,12 @@ reducer (dataIn,index) = redOut
     (arg1,arg2,shift,toResMem) = fmapB controller (inp1, inp2, pipe, fromResMem)
 
 topEntity
-  :: Clock System Source
-  -> Reset System Asynchronous
+  :: Clock System
+  -> Reset System
+  -> Enable System
   -> (Signal System DataInt, Signal System ArrayIndex)
   -> Signal System OutputSignal
-topEntity = exposeClockReset reducer
+topEntity = exposeClockResetEnable reducer
 
 fmapB f = unbundle . fmap f . bundle
 

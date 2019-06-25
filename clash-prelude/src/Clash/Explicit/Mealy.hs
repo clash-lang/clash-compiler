@@ -1,6 +1,7 @@
 {-|
   Copyright  :  (C) 2013-2016, University of Twente,
                     2017     , Google Inc.
+                    2019     , Myrtle Software Ltd
   License    :  BSD2 (see the file LICENSE)
   Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
 
@@ -21,7 +22,7 @@ module Clash.Explicit.Mealy
 where
 
 import           Clash.Explicit.Signal
-  (Bundle (..), Clock, Reset, Signal, register)
+  (KnownDomain, Bundle (..), Clock, Reset, Signal, Enable, register)
 import           Clash.XException      (Undefined)
 
 {- $setup
@@ -34,7 +35,7 @@ let macT s (x,y) = (s',s)
         s' = x * y + s
 :}
 
->>> let mac clk rst = mealy clk rst macT 0
+>>> let mac clk rst en = mealy clk rst en macT 0
 -}
 
 -- | Create a synchronous function from a combinational function describing
@@ -52,14 +53,16 @@ let macT s (x,y) = (s',s)
 --     s' = x * y + s
 --
 -- mac
---   :: 'Clock' domain Source
---   -> 'Reset' domain Asynchronous
---   -> 'Signal' domain (Int, Int)
---   -> 'Signal' domain Int
--- mac clk rst = 'mealy' clk rst macT 0
+--   :: 'KnownDomain' dom conf
+--   => 'Clock' dom
+--   -> 'Reset' dom
+--   -> 'Enable' dom
+--   -> 'Signal' dom (Int, Int)
+--   -> 'Signal' dom Int
+-- mac clk rst en = 'mealy' clk rst en macT 0
 -- @
 --
--- >>> simulate (mac systemClockGen systemResetGen) [(0,0),(1,1),(2,2),(3,3),(4,4)]
+-- >>> simulate (mac systemClockGen systemResetGen enableGen) [(0,0),(1,1),(2,2),(3,3),(4,4)]
 -- [0,0,1,5,14...
 -- ...
 --
@@ -68,20 +71,26 @@ let macT s (x,y) = (s',s)
 --
 -- @
 -- dualMac
---   :: 'Clock' domain gated -> 'Reset' domain synchronous
---   -> ('Signal' domain Int, 'Signal' domain Int)
---   -> ('Signal' domain Int, 'Signal' domain Int)
---   -> 'Signal' domain Int
--- dualMac clk rst (a,b) (x,y) = s1 + s2
+--   :: 'KnownDomain' dom conf
+--   => 'Clock' dom
+--   -> 'Reset' dom
+--   -> 'Enable' dom
+--   -> ('Signal' dom Int, 'Signal' dom Int)
+--   -> ('Signal' dom Int, 'Signal' dom Int)
+--   -> 'Signal' dom Int
+-- dualMac clk rst en (a,b) (x,y) = s1 + s2
 --   where
---     s1 = 'mealy' clk rst mac 0 ('bundle' (a,x))
---     s2 = 'mealy' clk rst mac 0 ('bundle' (b,y))
+--     s1 = 'mealy' clk rst en mac 0 ('bundle' (a,x))
+--     s2 = 'mealy' clk rst en mac 0 ('bundle' (b,y))
 -- @
 mealy
-  :: Undefined s
-  => Clock dom gated
+  :: ( KnownDomain dom conf
+     , Undefined s )
+  => Clock dom
   -- ^ 'Clock' to synchronize to
-  -> Reset dom synchronous
+  -> Reset dom
+  -> Enable dom
+  -- ^ Global enable
   -> (s -> i -> (s,o))
   -- ^ Transfer function in mealy machine form: @state -> input -> (newstate,output)@
   -> s
@@ -89,9 +98,9 @@ mealy
   -> (Signal dom i -> Signal dom o)
   -- ^ Synchronous sequential function with input and output matching that
   -- of the mealy machine
-mealy clk rst f iS =
+mealy clk rst en f iS =
   \i -> let (s',o) = unbundle $ f <$> s <*> i
-            s      = register clk rst iS s'
+            s      = register clk rst en iS s'
         in  o
 {-# INLINABLE mealy #-}
 
@@ -107,26 +116,28 @@ mealy clk rst f iS =
 -- write:
 --
 -- @
--- g clk rst a b c = (b1,b2,i2)
+-- g clk rst en a b c = (b1,b2,i2)
 --   where
---     (i1,b1) = 'unbundle' (mealy clk rst f 0 ('bundle' (a,b)))
---     (i2,b2) = 'unbundle' (mealy clk rst f 3 ('bundle' (i1,c)))
+--     (i1,b1) = 'unbundle' (mealy clk rst en f 0 ('bundle' (a,b)))
+--     (i2,b2) = 'unbundle' (mealy clk rst en f 3 ('bundle' (i1,c)))
 -- @
 --
 -- Using 'mealyB'' however we can write:
 --
 -- @
--- g clk rst a b c = (b1,b2,i2)
+-- g clk rst en a b c = (b1,b2,i2)
 --   where
---     (i1,b1) = 'mealyB' clk rst f 0 (a,b)
---     (i2,b2) = 'mealyB' clk rst f 3 (i1,c)
+--     (i1,b1) = 'mealyB' clk rst en f 0 (a,b)
+--     (i2,b2) = 'mealyB' clk rst en f 3 (i1,c)
 -- @
 mealyB
-  :: ( Undefined s
+  :: ( KnownDomain dom conf
+     , Undefined s
      , Bundle i
      , Bundle o )
-  => Clock dom gated
-  -> Reset dom synchronous
+  => Clock dom
+  -> Reset dom
+  -> Enable dom
   -> (s -> i -> (s,o))
   -- ^ Transfer function in mealy machine form: @state -> input -> (newstate,output)@
   -> s
@@ -134,5 +145,5 @@ mealyB
   -> (Unbundled dom i -> Unbundled dom o)
  -- ^ Synchronous sequential function with input and output matching that
  -- of the mealy machine
-mealyB clk rst f iS i = unbundle (mealy clk rst f iS (bundle i))
+mealyB clk rst en f iS i = unbundle (mealy clk rst en f iS (bundle i))
 {-# INLINE mealyB #-}

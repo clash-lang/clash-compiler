@@ -34,6 +34,7 @@ type BitMasterO = (BitRespSig,Bool,I2COut)
     { t_name     = "bitmaster"
     , t_inputs   = [ PortName "clk"
                    , PortName "arst"
+                   , PortName "gen"
                    , PortProduct ""
                       [ PortName "rst"
                       , PortName "ena"
@@ -53,11 +54,12 @@ type BitMasterO = (BitRespSig,Bool,I2COut)
                      ]
     }) #-}
 bitMaster
-  :: Clock System Source
-  -> Reset System Asynchronous
+  :: Clock System
+  -> Reset System
+  -> Enable System
   -> Unbundled System BitMasterI
   -> Unbundled System BitMasterO
-bitMaster = exposeClockReset (mealyB bitMasterT bitMasterInit)
+bitMaster = exposeClockResetEnable (mealyB bitMasterT bitMasterInit)
 {-# NOINLINE bitMaster #-}
 
 bitMasterInit = BitS { _stateMachine   = stateMachineStart

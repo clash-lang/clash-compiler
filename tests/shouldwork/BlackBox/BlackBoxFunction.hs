@@ -29,7 +29,7 @@ myMultiply a b =
 {-# NOINLINE myMultiply #-}
 
 topEntity
-  :: HiddenClockReset System Source Asynchronous
+  :: SystemClockResetEnable
   => Signal System Int
   -> Signal System Int
 topEntity a = myMultiply a a

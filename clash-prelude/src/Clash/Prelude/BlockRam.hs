@@ -1,6 +1,6 @@
 {-|
 Copyright  :  (C) 2013-2016, University of Twente,
-                  2016-2017, Myrtle Software Ltd,
+                  2016-2019, Myrtle Software Ltd,
                   2017     , Google Inc.
 License    :  BSD2 (see the file LICENSE)
 Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
@@ -18,7 +18,7 @@ We start with the definition of the Instructions, Register names and machine
 codes:
 
 @
-{\-\# LANGUAGE RecordWildCards, TupleSections, DeriveAnyClass \#-\}
+{\-\# LANGUAGE RecordWildCards, TupleSections, DeriveAnyClass, TypeApplications \#-\}
 module CPU where
 
 import Clash.Prelude
@@ -34,7 +34,7 @@ data Instruction
   | Load MemAddr Reg
   | Store Reg MemAddr
   | Nop
-  deriving (Eq,Show)
+  deriving (Eq, Show)
 
 data Reg
   = Zero
@@ -44,10 +44,10 @@ data Reg
   | RegC
   | RegD
   | RegE
-  deriving (Eq,Show,Enum,Generic,Undefined)
+  deriving (Eq, Show, Enum, Generic, Undefined)
 
 data Operator = Add | Sub | Incr | Imm | CmpGt
-  deriving (Eq,Show)
+  deriving (Eq, Show)
 
 data MachCode
   = MachCode
@@ -61,10 +61,17 @@ data MachCode
   , jmpM    :: Maybe Value
   }
 
-nullCode = MachCode { inputX = Zero, inputY = Zero, result = Zero, aluCode = Imm
-                    , ldReg = Zero, rdAddr = 0, wrAddrM = Nothing
-                    , jmpM = Nothing
-                    }
+nullCode =
+  MachCode
+    { inputX = Zero
+    , inputY = Zero
+    , result = Zero
+    , aluCode = Imm
+    , ldReg = Zero
+    , rdAddr = 0
+    , wrAddrM = Nothing
+    , jmpM = Nothing
+    }
 @
 
 Next we define the CPU and its ALU:
@@ -75,36 +82,38 @@ cpu :: Vec 7 Value          -- ^ Register bank
     -> ( Vec 7 Value
        , (MemAddr, Maybe (MemAddr,Value), InstrAddr)
        )
-cpu regbank (memOut,instr) = (regbank',(rdAddr,(,aluOut) '<$>' wrAddrM,fromIntegral ipntr))
-  where
-    -- Current instruction pointer
-    ipntr = regbank '!!' PC
+cpu regbank (memOut, instr) =
+  (regbank', (rdAddr, (,aluOut) '<$>' wrAddrM, fromIntegral ipntr))
+ where
+  -- Current instruction pointer
+  ipntr = regbank '!!' PC
 
-    -- Decoder
-    (MachCode {..}) = case instr of
-      Compute op rx ry res -> nullCode {inputX=rx,inputY=ry,result=res,aluCode=op}
-      Branch cr a          -> nullCode {inputX=cr,jmpM=Just a}
-      Jump a               -> nullCode {aluCode=Incr,jmpM=Just a}
-      Load a r             -> nullCode {ldReg=r,rdAddr=a}
-      Store r a            -> nullCode {inputX=r,wrAddrM=Just a}
-      Nop                  -> nullCode
+  -- Decoder
+  (MachCode {..}) = case instr of
+    Compute op rx ry res -> nullCode {inputX=rx,inputY=ry,result=res,aluCode=op}
+    Branch cr a          -> nullCode {inputX=cr,jmpM=Just a}
+    Jump a               -> nullCode {aluCode=Incr,jmpM=Just a}
+    Load a r             -> nullCode {ldReg=r,rdAddr=a}
+    Store r a            -> nullCode {inputX=r,wrAddrM=Just a}
+    Nop                  -> nullCode
 
-    -- ALU
-    regX   = regbank '!!' inputX
-    regY   = regbank '!!' inputY
-    aluOut = alu aluCode regX regY
+  -- ALU
+  regX   = regbank '!!' inputX
+  regY   = regbank '!!' inputY
+  aluOut = alu aluCode regX regY
 
-    -- next instruction
-    nextPC = case jmpM of
-               Just a | aluOut /= 0 -> ipntr + a
-               _                    -> ipntr + 1
+  -- next instruction
+  nextPC =
+    case jmpM of
+      Just a | aluOut /= 0 -> ipntr + a
+      _                    -> ipntr + 1
 
-    -- update registers
-    regbank' = 'replace' Zero   0
-             $ 'replace' PC     nextPC
-             $ 'replace' result aluOut
-             $ 'replace' ldReg  memOut
-             $ regbank
+  -- update registers
+  regbank' = 'replace' Zero   0
+           $ 'replace' PC     nextPC
+           $ 'replace' result aluOut
+           $ 'replace' ldReg  memOut
+           $ regbank
 
 alu Add   x y = x + y
 alu Sub   x y = x - y
@@ -116,28 +125,39 @@ alu CmpGt x y = if x > y then 1 else 0
 We initially create a memory out of simple registers:
 
 @
-dataMem :: HiddenClockReset domain gated synchronous
-        => Signal domain MemAddr                 -- ^ Read address
-        -> Signal domain (Maybe (MemAddr,Value)) -- ^ (write address, data in)
-        -> Signal domain Value                   -- ^ data out
-dataMem rd wrM = 'Clash.Prelude.Mealy.mealy' dataMemT ('replicate' d32 0) (bundle (rd,wrM))
-  where
-    dataMemT mem (rd,wrM) = (mem',dout)
-      where
-        dout = mem '!!' rd
-        mem' = case wrM of
-                 Just (wr,din) -> 'replace' wr din mem
-                 _ -> mem
+dataMem
+  :: HiddenClockResetEnable dom conf
+  => Signal dom MemAddr
+  -- ^ Read address
+  -> Signal dom (Maybe (MemAddr,Value))
+  -- ^ (write address, data in)
+  -> Signal dom Value
+  -- ^ data out
+dataMem rd wrM =
+  'Clash.Prelude.Mealy.mealy' dataMemT ('replicate' d32 0) (bundle (rd,wrM))
+ where
+  dataMemT mem (rd,wrM) = (mem',dout)
+    where
+      dout = mem '!!' rd
+      mem' =
+        case wrM of
+          Just (wr,din) -> 'replace' wr din mem
+          _             -> mem
 @
 
 And then connect everything:
 
 @
-system :: (KnownNat n, HiddenClockReset domain gated synchronous) => Vec n Instruction -> Signal domain Value
+system
+  :: ( KnownNat n
+     , HiddenClockResetEnable dom conf
+     )
+  => Vec n Instruction
+  -> Signal dom Value
 system instrs = memOut
   where
     memOut = dataMem rdAddr dout
-    (rdAddr,dout,ipntr) = 'Clash.Prelude.Mealy.mealyB' cpu ('replicate' d7 0) (memOut,instr)
+    (rdAddr, dout, ipntr) = 'Clash.Prelude.Mealy.mealyB' cpu ('replicate' d7 0) (memOut,instr)
     instr  = 'Clash.Prelude.ROM.asyncRom' instrs '<$>' ipntr
 @
 
@@ -178,7 +198,7 @@ prog = -- 0 := 4
 And test our system:
 
 @
->>> sampleN 32 (system prog)
+>>> sampleN @System 32 (system prog)
 [0,0,0,0,0,0,4,4,4,4,4,4,4,4,6,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,2]
 
 @
@@ -195,7 +215,11 @@ Instead it is preferable to use the 'Clash.Prelude.RAM.asyncRam' function which
 has the potential to be translated to a more efficient structure:
 
 @
-system2 :: (KnownNat n, HiddenClockReset domain gated synchronous) => Vec n Instruction -> Signal domain Value
+system2
+  :: ( KnownNat n
+     , HiddenClockResetEnable dom conf )
+  => Vec n Instruction
+  -> Signal dom Value
 system2 instrs = memOut
   where
     memOut = 'Clash.Prelude.RAM.asyncRam' d32 rdAddr dout
@@ -210,7 +234,7 @@ output samples are also 'undefined'. We use the utility function 'printX' to con
 filter out the undefinedness and replace it with the string "X" in the few leading outputs.
 
 @
->>> printX $ sampleN 32 (system2 prog)
+>>> printX $ sampleN @System 32 (system2 prog)
 [X,X,X,X,X,X,4,4,4,4,4,4,4,4,6,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,2]
 
 @
@@ -236,48 +260,57 @@ We hence need to also delay the register address to which the memory address
 is loaded:
 
 @
-cpu2 :: (Vec 7 Value,Reg)    -- ^ (Register bank, Load reg addr)
-     -> (Value,Instruction)  -- ^ (Memory output, Current instruction)
-     -> ( (Vec 7 Value,Reg)
-        , (MemAddr, Maybe (MemAddr,Value), InstrAddr)
-        )
-cpu2 (regbank,ldRegD) (memOut,instr) = ((regbank',ldRegD'),(rdAddr,(,aluOut) '<$>' wrAddrM,fromIntegral ipntr))
-  where
-    -- Current instruction pointer
-    ipntr = regbank '!!' PC
+cpu2
+  :: (Vec 7 Value,Reg)
+  -- ^ (Register bank, Load reg addr)
+  -> (Value, Instruction)
+  -- ^ (Memory output, Current instruction)
+  -> ( (Vec 7 Value,Reg)
+     , (MemAddr, Maybe (MemAddr, Value), InstrAddr)
+     )
+cpu2 (regbank,ldRegD) (memOut,instr) =
+  ((regbank', ldRegD'), (rdAddr, (,aluOut) '<$>' wrAddrM, fromIntegral ipntr))
+ where
+  -- Current instruction pointer
+  ipntr = regbank '!!' PC
 
-    -- Decoder
-    (MachCode {..}) = case instr of
-      Compute op rx ry res -> nullCode {inputX=rx,inputY=ry,result=res,aluCode=op}
-      Branch cr a          -> nullCode {inputX=cr,jmpM=Just a}
-      Jump a               -> nullCode {aluCode=Incr,jmpM=Just a}
-      Load a r             -> nullCode {ldReg=r,rdAddr=a}
-      Store r a            -> nullCode {inputX=r,wrAddrM=Just a}
-      Nop                  -> nullCode
+  -- Decoder
+  (MachCode {..}) = case instr of
+    Compute op rx ry res -> nullCode {inputX=rx,inputY=ry,result=res,aluCode=op}
+    Branch cr a          -> nullCode {inputX=cr,jmpM=Just a}
+    Jump a               -> nullCode {aluCode=Incr,jmpM=Just a}
+    Load a r             -> nullCode {ldReg=r,rdAddr=a}
+    Store r a            -> nullCode {inputX=r,wrAddrM=Just a}
+    Nop                  -> nullCode
 
-    -- ALU
-    regX   = regbank '!!' inputX
-    regY   = regbank '!!' inputY
-    aluOut = alu aluCode regX regY
+  -- ALU
+  regX   = regbank '!!' inputX
+  regY   = regbank '!!' inputY
+  aluOut = alu aluCode regX regY
 
-    -- next instruction
-    nextPC = case jmpM of
-               Just a | aluOut /= 0 -> ipntr + a
-               _                    -> ipntr + 1
+  -- next instruction
+  nextPC =
+    case jmpM of
+      Just a | aluOut /= 0 -> ipntr + a
+      _                    -> ipntr + 1
 
-    -- update registers
-    ldRegD'  = ldReg -- Delay the ldReg by 1 cycle
-    regbank' = 'replace' Zero   0
-             $ 'replace' PC     nextPC
-             $ 'replace' result aluOut
-             $ 'replace' ldRegD memOut
-             $ regbank
+  -- update registers
+  ldRegD'  = ldReg  -- Delay the ldReg by 1 cycle
+  regbank' = 'replace' Zero   0
+           $ 'replace' PC     nextPC
+           $ 'replace' result aluOut
+           $ 'replace' ldRegD memOut
+           $ regbank
 @
 
 We can now finally instantiate our system with a 'blockRam':
 
 @
-system3 :: (KnownNat n, HiddenClockReset domain gated synchronous) => Vec n Instruction -> Signal domain Value
+system3
+  :: (KnownNat n
+     , HiddenClockResetEnable dom conf )
+  => Vec n Instruction
+  -> Signal dom Value
 system3 instrs = memOut
   where
     memOut = 'blockRam' (replicate d32 0) rdAddr dout
@@ -330,7 +363,7 @@ we need to disregard the first sample, because the initial output of a
 filter out the undefinedness and replace it with the string "X".
 
 @
->>> printX $ sampleN 34 (system3 prog2)
+>>> printX $ sampleN @System 34 (system3 prog2)
 [X,0,0,0,0,0,0,4,4,4,4,4,4,4,4,6,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,2]
 
 @
@@ -468,10 +501,10 @@ cpu regbank (memOut,instr) = (regbank',(rdAddr,(,aluOut) <$> wrAddrM,fromIntegra
 
 >>> :{
 dataMem
-  :: HiddenClockReset domain gated synchronous
-  => Signal domain MemAddr
-  -> Signal domain (Maybe (MemAddr,Value))
-  -> Signal domain Value
+  :: HiddenClockResetEnable dom conf
+  => Signal dom MemAddr
+  -> Signal dom (Maybe (MemAddr,Value))
+  -> Signal dom Value
 dataMem rd wrM = mealy dataMemT (C.replicate d32 0) (bundle (rd,wrM))
   where
     dataMemT mem (rd,wrM) = (mem',dout)
@@ -484,9 +517,9 @@ dataMem rd wrM = mealy dataMemT (C.replicate d32 0) (bundle (rd,wrM))
 
 >>> :{
 system
-  :: (KnownNat n, HiddenClockReset domain gated synchronous)
+  :: (KnownNat n, HiddenClockResetEnable dom conf)
   => Vec n Instruction
-  -> Signal domain Value
+  -> Signal dom Value
 system instrs = memOut
   where
     memOut = dataMem rdAddr dout
@@ -528,9 +561,10 @@ prog = -- 0 := 4
 
 >>> :{
 system2
-  :: (KnownNat n, HiddenClockReset domain gated synchronous)
+  :: ( KnownNat n
+     , HiddenClockResetEnable dom conf )
   => Vec n Instruction
-  -> Signal domain Value
+  -> Signal dom Value
 system2 instrs = memOut
   where
     memOut = asyncRam d32 rdAddr dout
@@ -539,45 +573,51 @@ system2 instrs = memOut
 :}
 
 >>> :{
-cpu2 :: (Vec 7 Value,Reg)    -- ^ (Register bank, Load reg addr)
-     -> (Value,Instruction)  -- ^ (Memory output, Current instruction)
-     -> ( (Vec 7 Value,Reg)
-        , (MemAddr,Maybe (MemAddr,Value),InstrAddr)
-        )
-cpu2 (regbank,ldRegD) (memOut,instr) = ((regbank',ldRegD'),(rdAddr,(,aluOut) <$> wrAddrM,fromIntegral ipntr))
-  where
-    -- Current instruction pointer
-    ipntr = regbank C.!! PC
-    -- Decoder
-    (MachCode {..}) = case instr of
-      Compute op rx ry res -> nullCode {inputX=rx,inputY=ry,result=res,aluCode=op}
-      Branch cr a          -> nullCode {inputX=cr,jmpM=Just a}
-      Jump a               -> nullCode {aluCode=Incr,jmpM=Just a}
-      Load a r             -> nullCode {ldReg=r,rdAddr=a}
-      Store r a            -> nullCode {inputX=r,wrAddrM=Just a}
-      Nop                  -> nullCode
-    -- ALU
-    regX   = regbank C.!! inputX
-    regY   = regbank C.!! inputY
-    aluOut = alu aluCode regX regY
-    -- next instruction
-    nextPC = case jmpM of
-               Just a | aluOut /= 0 -> ipntr + a
-               _                    -> ipntr + 1
-    -- update registers
-    ldRegD'  = ldReg -- Delay the ldReg by 1 cycle
-    regbank' = replace Zero   0
-             $ replace PC     nextPC
-             $ replace result aluOut
-             $ replace ldRegD memOut
-             $ regbank
+cpu2
+  :: (Vec 7 Value,Reg)
+  -- ^ (Register bank, Load reg addr)
+  -> (Value,Instruction)
+  -- ^ (Memory output, Current instruction)
+  -> ( (Vec 7 Value,Reg)
+     , (MemAddr, Maybe (MemAddr, Value), InstrAddr)
+     )
+cpu2 (regbank,ldRegD) (memOut,instr) =
+  ((regbank', ldRegD'), (rdAddr, (,aluOut) <$> wrAddrM, fromIntegral ipntr))
+ where
+  -- Current instruction pointer
+  ipntr = regbank C.!! PC
+  -- Decoder
+  (MachCode {..}) = case instr of
+    Compute op rx ry res -> nullCode {inputX=rx,inputY=ry,result=res,aluCode=op}
+    Branch cr a          -> nullCode {inputX=cr,jmpM=Just a}
+    Jump a               -> nullCode {aluCode=Incr,jmpM=Just a}
+    Load a r             -> nullCode {ldReg=r,rdAddr=a}
+    Store r a            -> nullCode {inputX=r,wrAddrM=Just a}
+    Nop                  -> nullCode
+  -- ALU
+  regX   = regbank C.!! inputX
+  regY   = regbank C.!! inputY
+  aluOut = alu aluCode regX regY
+  -- next instruction
+  nextPC =
+    case jmpM of
+      Just a | aluOut /= 0 -> ipntr + a
+      _                    -> ipntr + 1
+  -- update registers
+  ldRegD'  = ldReg -- Delay the ldReg by 1 cycle
+  regbank' = replace Zero   0
+           $ replace PC     nextPC
+           $ replace result aluOut
+           $ replace ldRegD memOut
+           $ regbank
 :}
 
 >>> :{
 system3
-  :: (KnownNat n, HiddenClockReset domain gated synchronous)
+  :: ( KnownNat n
+     , HiddenClockResetEnable dom conf )
   => Vec n Instruction
-  -> Signal domain Value
+  -> Signal dom Value
 system3 instrs = memOut
   where
     memOut = blockRam (C.replicate d32 0) rdAddr dout
@@ -626,10 +666,10 @@ prog2 = -- 0 := 4
 --
 -- @
 -- bram40
---   :: 'HiddenClock' domain
---   => 'Signal' domain ('Unsigned' 6)
---   -> 'Signal' domain (Maybe ('Unsigned' 6, 'Clash.Sized.BitVector.Bit'))
---   -> 'Signal' domain 'Clash.Sized.BitVector.Bit'
+--   :: 'HiddenClock' dom
+--   => 'Signal' dom ('Unsigned' 6)
+--   -> 'Signal' dom (Maybe ('Unsigned' 6, 'Clash.Sized.BitVector.Bit'))
+--   -> 'Signal' dom 'Clash.Sized.BitVector.Bit'
 -- bram40 = 'blockRam' ('Clash.Sized.Vector.replicate' d40 1)
 -- @
 --
@@ -639,22 +679,25 @@ prog2 = -- 0 := 4
 -- Block RAM.
 -- * Use the adapter 'readNew' for obtaining write-before-read semantics like this: @readNew (blockRam inits) rd wrM@.
 blockRam
-  :: HasCallStack
-  => HiddenClock domain gated
-  => Undefined a
-  => Enum addr
-  => Vec n a     -- ^ Initial content of the BRAM, also
-                 -- determines the size, @n@, of the BRAM.
-                 --
-                 -- __NB__: __MUST__ be a constant.
-  -> Signal domain addr -- ^ Read address @r@
-  -> Signal domain (Maybe (addr, a))
+  :: ( HasCallStack
+     , HiddenClock dom conf
+     , HiddenEnable dom conf
+     , Undefined a
+     , Enum addr
+     )
+  => Vec n a
+  -- ^ Initial content of the BRAM, also determines the size, @n@, of the BRAM.
+  --
+  -- __NB__: __MUST__ be a constant.
+  -> Signal dom addr
+  -- ^ Read address @r@
+  -> Signal dom (Maybe (addr, a))
    -- ^ (write address @w@, value to write)
-  -> Signal domain a
+  -> Signal dom a
   -- ^ Value of the @blockRAM@ at address @r@ from the previous clock
   -- cycle
 blockRam = \cnt rd wrM -> withFrozenCallStack
-  (hideClock E.blockRam cnt rd wrM)
+  (hideEnable (hideClock E.blockRam) cnt rd wrM)
 {-# INLINE blockRam #-}
 
 -- | Create a blockRAM with space for 2^@n@ elements
@@ -664,10 +707,10 @@ blockRam = \cnt rd wrM -> withFrozenCallStack
 --
 -- @
 -- bram32
---   :: 'HiddenClock' domain
---   => 'Signal' domain ('Unsigned' 5)
---   -> 'Signal' domain (Maybe ('Unsigned' 5, 'Clash.Sized.BitVector.Bit'))
---   -> 'Signal' domain 'Clash.Sized.BitVector.Bit'
+--   :: 'HiddenClock' dom
+--   => 'Signal' dom ('Unsigned' 5)
+--   -> 'Signal' dom (Maybe ('Unsigned' 5, 'Clash.Sized.BitVector.Bit'))
+--   -> 'Signal' dom 'Clash.Sized.BitVector.Bit'
 -- bram32 = 'blockRamPow2' ('Clash.Sized.Vector.replicate' d32 1)
 -- @
 --
@@ -677,22 +720,25 @@ blockRam = \cnt rd wrM -> withFrozenCallStack
 -- Block RAM.
 -- * Use the adapter 'readNew' for obtaining write-before-read semantics like this: @readNew (blockRamPow2 inits) rd wrM@.
 blockRamPow2
-  :: HasCallStack
-  => HiddenClock domain gated
-  => Undefined a
-  => KnownNat n
-  => Vec (2^n) a         -- ^ Initial content of the BRAM, also
-                         -- determines the size, @2^n@, of the BRAM.
-                         --
-                         -- __NB__: __MUST__ be a constant.
-  -> Signal domain (Unsigned n) -- ^ Read address @r@
-  -> Signal domain (Maybe (Unsigned n, a))
+  :: ( HasCallStack
+     , HiddenClock dom conf
+     , HiddenEnable dom conf
+     , Undefined a
+     , KnownNat n
+     )
+  => Vec (2^n) a
+  -- ^ Initial content of the BRAM, also determines the size, @2^n@, of the BRAM.
+  --
+  -- __NB__: __MUST__ be a constant.
+  -> Signal dom (Unsigned n)
+  -- ^ Read address @r@
+  -> Signal dom (Maybe (Unsigned n, a))
   -- ^ (write address @w@, value to write)
-  -> Signal domain a
+  -> Signal dom a
   -- ^ Value of the @blockRAM@ at address @r@ from the previous clock
   -- cycle
 blockRamPow2 = \cnt rd wrM -> withFrozenCallStack
-  (hideClock E.blockRamPow2 cnt rd wrM)
+  (hideEnable (hideClock E.blockRamPow2) cnt rd wrM)
 {-# INLINE blockRamPow2 #-}
 
 -- | Create read-after-write blockRAM from a read-before-write one (synchronized to system clock)
@@ -701,20 +747,22 @@ blockRamPow2 = \cnt rd wrM -> withFrozenCallStack
 -- >>> :t readNew (blockRam (0 :> 1 :> Nil))
 -- readNew (blockRam (0 :> 1 :> Nil))
 --   :: ...
+--      ...
+--      ...
+--      ...
 --      ... =>
---      Signal domain addr
---      -> Signal domain (Maybe (addr, a)) -> Signal domain a
+--      Signal dom addr -> Signal dom (Maybe (addr, a)) -> Signal dom a
 readNew
-  :: ( HiddenClockReset domain gated synchronous
+  :: ( HiddenClockResetEnable dom conf
      , Undefined a
      , Eq addr )
-  => (Signal domain addr -> Signal domain (Maybe (addr, a)) -> Signal domain a)
+  => (Signal dom addr -> Signal dom (Maybe (addr, a)) -> Signal dom a)
   -- ^ The @ram@ component
-  -> Signal domain addr
+  -> Signal dom addr
   -- ^ Read address @r@
-  -> Signal domain (Maybe (addr, a))
+  -> Signal dom (Maybe (addr, a))
   -- ^ (Write address @w@, value to write)
-  -> Signal domain a
+  -> Signal dom a
   -- ^ Value of the @ram@ at address @r@ from the previous clock cycle
-readNew = hideClockReset (\clk rst -> E.readNew rst clk)
+readNew = hideClockResetEnable (\clk rst -> E.readNew rst clk)
 {-# INLINE readNew #-}

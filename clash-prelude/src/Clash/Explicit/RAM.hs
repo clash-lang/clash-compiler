@@ -1,6 +1,7 @@
 {-|
 Copyright  :  (C) 2015-2016, University of Twente,
-                  2017     , Myrtle Software Ltd, Google Inc.
+                  2017     , Google Inc.
+                  2019     , Myrtle Software Ltd
 License    :  BSD2 (see the file LICENSE)
 Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
 
@@ -39,9 +40,10 @@ import GHC.Stack             (HasCallStack, withFrozenCallStack)
 import GHC.TypeLits          (KnownNat)
 import qualified Data.Vector as V
 
-import Clash.Explicit.Signal ((.&&.), unbundle, unsafeSynchronizer)
+import Clash.Explicit.Signal
+  (unbundle, unsafeSynchronizer, KnownDomain, enable)
 import Clash.Promoted.Nat    (SNat (..), snatToNum, pow2SNat)
-import Clash.Signal.Internal (Clock (..), Signal (..), clockEnable)
+import Clash.Signal.Internal (Clock (..), Signal (..), Enable, fromEnable)
 import Clash.Sized.Unsigned  (Unsigned)
 import Clash.XException      (errorX, maybeIsX)
 
@@ -54,20 +56,26 @@ import Clash.XException      (errorX, maybeIsX)
 -- * See "Clash.Prelude.BlockRam#usingrams" for more information on how to use a
 -- RAM.
 asyncRamPow2
-  :: forall wdom rdom wgated rgated n a
-   . (KnownNat n, HasCallStack)
-  => Clock wdom wgated
-  -- ^ 'Clock' to which to synchronise the write port of the RAM
-  -> Clock rdom rgated
+  :: forall wdom rdom wconf rconf n a
+   . ( KnownNat n
+     , HasCallStack
+     , KnownDomain wdom wconf
+     , KnownDomain rdom rconf
+     )
+  => Clock wdom
+  -- ^ 'Clock' to which to synchronize the write port of the RAM
+  -> Clock rdom
   -- ^ 'Clock' to which the read address signal, @r@, is synchronized
+  -> Enable wdom
+  -- ^ Global enable
   -> Signal rdom (Unsigned n)
   -- ^ Read address @r@
   -> Signal wdom (Maybe (Unsigned n, a))
   -- ^ (write address @w@, value to write)
   -> Signal rdom a
   -- ^ Value of the @RAM@ at address @r@
-asyncRamPow2 = \wclk rclk rd wrM -> withFrozenCallStack
-  (asyncRam wclk rclk (pow2SNat (SNat @ n)) rd wrM)
+asyncRamPow2 = \wclk rclk en rd wrM -> withFrozenCallStack
+  (asyncRam wclk rclk en (pow2SNat (SNat @n)) rd wrM)
 {-# INLINE asyncRamPow2 #-}
 
 
@@ -80,11 +88,17 @@ asyncRamPow2 = \wclk rclk rd wrM -> withFrozenCallStack
 -- * See "Clash.Explicit.BlockRam#usingrams" for more information on how to use a
 -- RAM.
 asyncRam
-  :: (Enum addr, HasCallStack)
-  => Clock wdom wgated
-   -- ^ 'Clock' to which to synchronise the write port of the RAM
-  -> Clock rdom rgated
-   -- ^ 'Clock' to which the read address signal, @r@, is synchronized
+  :: ( Enum addr
+     , HasCallStack
+     , KnownDomain wdom wconf
+     , KnownDomain rdom rconf
+     )
+  => Clock wdom
+   -- ^ 'Clock' to which to synchronize the write port of the RAM
+  -> Clock rdom
+   -- ^ 'Clock' to which the read address signal, @r@, is synchronized to
+  -> Enable wdom
+  -- ^ Global enable
   -> SNat n
   -- ^ Size @n@ of the RAM
   -> Signal rdom addr
@@ -93,36 +107,44 @@ asyncRam
   -- ^ (write address @w@, value to write)
   -> Signal rdom a
    -- ^ Value of the @RAM@ at address @r@
-asyncRam = \wclk rclk sz rd wrM ->
+asyncRam = \wclk rclk gen sz rd wrM ->
   let en       = isJust <$> wrM
       (wr,din) = unbundle (fromJust <$> wrM)
   in  withFrozenCallStack
-      (asyncRam# wclk rclk sz (fromEnum <$> rd) en (fromEnum <$> wr) din)
+      (asyncRam# wclk rclk gen sz (fromEnum <$> rd) en (fromEnum <$> wr) din)
 {-# INLINE asyncRam #-}
 
 -- | RAM primitive
 asyncRam#
-  :: HasCallStack
-  => Clock wdom wgated
-  -- ^ 'Clock' to which to synchronise the write port of the RAM
-  -> Clock rdom rgated
+  :: ( HasCallStack
+     , KnownDomain wdom wconf
+     , KnownDomain rdom rconf )
+  => Clock wdom
+  -- ^ 'Clock' to which to synchronize the write port of the RAM
+  -> Clock rdom
   -- ^ 'Clock' to which the read address signal, @r@, is synchronized
-  -> SNat n            -- ^ Size @n@ of the RAM
-  -> Signal rdom Int  -- ^ Read address @r@
-  -> Signal wdom Bool -- ^ Write enable
-  -> Signal wdom Int  -- ^ Write address @w@
-  -> Signal wdom a    -- ^ Value to write (at address @w@)
-  -> Signal rdom a    -- ^ Value of the @RAM@ at address @r@
-asyncRam# wclk rclk sz rd en wr din =
+  -> Enable wdom
+  -- ^ Global enable
+  -> SNat n
+  -- ^ Size @n@ of the RAM
+  -> Signal rdom Int
+  -- ^ Read address @r@
+  -> Signal wdom Bool
+  -- ^ Write enable
+  -> Signal wdom Int
+  -- ^ Write address @w@
+  -> Signal wdom a
+  -- ^ Value to write (at address @w@)
+  -> Signal rdom a
+  -- ^ Value of the @RAM@ at address @r@
+asyncRam# wclk rclk en sz rd we wr din =
     unsafeSynchronizer wclk rclk dout
   where
     rd'  = unsafeSynchronizer rclk wclk rd
     ramI = V.replicate
               (snatToNum sz)
               (withFrozenCallStack (errorX "asyncRam#: initial value undefined"))
-    en'  = case clockEnable wclk of
-             Nothing  -> en
-             Just wgt -> wgt .&&. en
+    en' = fromEnable (enable en we)
     dout = go ramI rd' en' wr din
 
     go :: V.Vector a -> Signal wdom Int -> Signal wdom Bool
@@ -132,7 +154,7 @@ asyncRam# wclk rclk sz rd en wr din =
           o    = ram V.! r
       in  o :- go ram' rs es ws ds
 
-    upd ram we waddr d = case maybeIsX we of
+    upd ram we' waddr d = case maybeIsX we' of
       Nothing -> case maybeIsX waddr of
         Nothing -> V.map (const (seq waddr d)) ram
         Just wa -> ram V.// [(wa,d)]

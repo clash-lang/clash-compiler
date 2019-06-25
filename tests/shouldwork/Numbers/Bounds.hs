@@ -19,10 +19,11 @@ actual
     :> Nil
 
 topEntity
-  :: Clock System Source
-  -> Reset System Asynchronous
+  :: Clock System
+  -> Reset System
+  -> Enable System
   -> Signal System () -> Signal System Integer
-topEntity = exposeClockReset (mealy loop actual)
+topEntity = exposeClockResetEnable (mealy loop actual)
 {-# NOINLINE topEntity #-}
 
 loop :: Vec (n+2) a -> () -> (Vec (n+2) a, a)
@@ -34,6 +35,6 @@ testBench = done
   where
     testInput      = pure ()
     expectedOutput = outputVerifier clk rst expected
-    done           = expectedOutput (topEntity clk rst testInput)
+    done           = expectedOutput (topEntity clk rst enableGen testInput)
     clk            = tbSystemClockGen (not <$> done)
     rst            = systemResetGen

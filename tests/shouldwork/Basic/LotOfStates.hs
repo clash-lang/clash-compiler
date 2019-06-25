@@ -34,11 +34,12 @@ fsm s i
   | otherwise            = (s,     0)
 
 topEntity
-  :: Clock System Source
-  -> Reset System Asynchronous
+  :: Clock System
+  -> Reset System
+  -> Enable System
   -> Signal System (Unsigned 8)
   -> Signal System (Unsigned 8)
-topEntity = exposeClockReset (mealy fsm S_0)
+topEntity = exposeClockResetEnable (mealy fsm S_0)
 {-# NOINLINE topEntity #-}
 
 testBench :: Signal System Bool
@@ -48,6 +49,6 @@ testBench = done
         [0 :: (Unsigned 8), 1, 1, 2, 2, 3, 3, 4, 4, 5, 5, 5, 6, 6, 6, 7, 7, 7, 8, 8, 9, 9, 10, 10, 11, 11, 1, 1])
     expectedOutput = outputVerifier clk rst $(listToVecTH
         [0 :: (Unsigned 8), 1, 0, 2, 0, 3, 0, 4, 0, 5, 0, 0, 6, 0, 0, 7, 0, 0, 8, 0, 9, 0, 10,  0, 11,  0, 1, 0])
-    done           = expectedOutput (topEntity clk rst testInput)
+    done           = expectedOutput (topEntity clk rst enableGen testInput)
     clk            = tbSystemClockGen (not <$> done)
     rst            = systemResetGen

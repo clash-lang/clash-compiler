@@ -37,6 +37,7 @@ type ByteMasterO = (Bool,Bool,BitVector 8,BitCtrlSig)
     { t_name     = "bytemaster"
     , t_inputs   = [ PortName "clk"
                    , PortName "arst"
+                   , PortName "gen"
                    , PortProduct ""
                       [ PortName "rst"
                       , PortName "start"
@@ -55,11 +56,12 @@ type ByteMasterO = (Bool,Bool,BitVector 8,BitCtrlSig)
                      ]
     }) #-}
 byteMaster
-  :: Clock System Source
-  -> Reset System Asynchronous
+  :: Clock System
+  -> Reset System
+  -> Enable System
   -> Unbundled System ByteMasterI
   -> Unbundled System ByteMasterO
-byteMaster = exposeClockReset (mealyB byteMasterT byteMasterInit)
+byteMaster = exposeClockResetEnable (mealyB byteMasterT byteMasterInit)
 {-# NOINLINE byteMaster #-}
 
 {-# INLINE byteMasterInit #-}

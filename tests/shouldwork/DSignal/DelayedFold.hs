@@ -4,25 +4,35 @@ import Clash.Prelude
 import qualified Clash.Signal.Delayed.Bundle as D
 import Clash.Explicit.Testbench
 
+zeroAt0
+  :: HiddenClockResetEnable dom conf
+  => DSignal dom n Int
+  -> DSignal dom n Int
+zeroAt0 a = unsafeFromSignal (mux en (toSignal a) 0)
+  where
+    en = register False (pure True)
+
 folder
-  :: HiddenClockReset domain gated synchronous
-  => DSignal domain 0 (Vec 4 Int)
-  -> DSignal domain 2 Int
-folder = delayedFold d1 0 (+) . D.unbundle
+  :: HiddenClockResetEnable dom conf
+  => DSignal dom 0 (Vec 4 Int)
+  -> DSignal dom 2 Int
+folder = zeroAt0 . delayedFold d1 0 (+) . D.unbundle
+--{-# NOINLINE folder #-}
 
 topEntity
-  :: Clock System Source
-  -> Reset System Asynchronous
+  :: Clock System
+  -> Reset System
+  -> Enable System
   -> Signal System (Vec 4 Int)
   -> Signal System Int
-topEntity = exposeClockReset (toSignal . folder . fromSignal)
+topEntity = exposeClockResetEnable (toSignal . folder . fromSignal)
 
 testBench :: Signal System Bool
 testBench = done
   where
     testInput      = stimuliGenerator clk rst $ repeat 1 :> repeat 2 :> (1:>2:>3:>4:>Nil) :> Nil
     expectedOutput = outputVerifier clk rst (0:>4:>4:>8:>10:>Nil)
-    done           = expectedOutput (topEntity clk rst testInput)
+    done           = expectedOutput (topEntity clk rst enableGen testInput)
     clk            = tbSystemClockGen (not <$> done)
     rst            = systemResetGen
 

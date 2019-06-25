@@ -27,39 +27,40 @@ counter (write, prevread) i = ((write', prevread'), output)
 {-# NOINLINE counter #-}
 
 -- | Write on odd cyles
-f :: Clock System Source
-  -> Reset System Asynchronous
-  -> BiSignalIn 'Undefined System (BitSize Int)
+f :: Clock System
+  -> Reset System
+  -> Enable System
+  -> BiSignalIn 'Floating System (BitSize Int)
   -> ( Signal System Int
-     , BiSignalOut 'Undefined System (BitSize Int)
+     , BiSignalOut 'Floating System (BitSize Int)
      )
-f clk rst s = (6, writeToBiSignal s (mealy clk rst counter (False, 0) (readFromBiSignal s)))
+f clk rst en s = (6, writeToBiSignal s (mealy clk rst en counter (False, 0) (readFromBiSignal s)))
 {-# NOINLINE f #-}
 
 -- | Write on even cyles
-g :: Clock System Source
-  -> Reset System Asynchronous
-  -> BiSignalIn 'Undefined System (BitSize Int)
+g :: Clock System
+  -> Reset System
+  -> Enable System
+  -> BiSignalIn 'Floating System (BitSize Int)
   -> ( Signal System Int
-     , BiSignalOut 'Undefined System (BitSize Int)
+     , BiSignalOut 'Floating System (BitSize Int)
      )
-g clk rst s = (7, writeToBiSignal s (mealy clk rst counter (True, 0) (readFromBiSignal s)))
+g clk rst en s = (7, writeToBiSignal s (mealy clk rst en counter (True, 0) (readFromBiSignal s)))
 {-# NOINLINE g #-}
 
 
-topEntity :: Clock System Source
-          -> Reset System Asynchronous
+topEntity :: Clock System
+          -> Reset System
+          -> Enable System
           -> ( Signal System Int
              , Signal System Int
              , Signal System Int
              )
-topEntity clk rst = ( readFromBiSignal bus'
-                    , fInt
-                    , gInt
-                    )
+topEntity clk rst en =
+  (readFromBiSignal bus', fInt, gInt)
   where
-    (fInt, fBus) = f clk rst bus'
-    (gInt, gBus) = g clk rst bus'
+    (fInt, fBus) = f clk rst en bus'
+    (gInt, gBus) = g clk rst en bus'
 
     bus  = mergeBiSignalOuts (fBus :> gBus :> Nil)
     bus' = veryUnsafeToBiSignalIn bus
@@ -77,6 +78,6 @@ testBench :: Signal System Bool
 testBench = done
   where
     clock          = tbSystemClockGen (not <$> done)
-    (a, _b, _c)    = topEntity clock systemResetGen
+    (a, _b, _c)    = topEntity clock systemResetGen enableGen
     done           = expectedOutput a
     expectedOutput = outputVerifier clock systemResetGen (1 :> 2 :> 3 :> 4 :> 5 :> 6 :> 7 :> Nil)

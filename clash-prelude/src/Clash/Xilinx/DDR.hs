@@ -32,6 +32,7 @@ where
 
 import GHC.Stack (HasCallStack, withFrozenCallStack)
 
+import Clash.Annotations.Primitive (hasBlackBox)
 import Clash.Explicit.Prelude
 import Clash.Explicit.DDR
 
@@ -41,45 +42,53 @@ import Clash.Explicit.DDR
 -- Reset values are @0@
 iddr
   :: ( HasCallStack
-     , fast ~ 'Dom n pFast
-     , slow ~ 'Dom n (2*pFast)
+     , KnownDomain fast ('DomainConfiguration fast fPeriod edge reset init polarity)
+     , KnownDomain slow ('DomainConfiguration slow (2*fPeriod) edge reset init polarity)
      , KnownNat m )
-  => Clock slow gated
+  => Clock slow
   -- ^ clock
-  -> Reset slow synchronous
+  -> Reset slow
   -- ^ reset
+  -> Enable slow
+  -- ^ global enable
   -> Signal fast (BitVector m)
   -- ^ DDR input signal
   -> Signal slow ((BitVector m),(BitVector m))
   -- ^ normal speed output pairs
-iddr clk rst = withFrozenCallStack ddrIn# clk rst 0 0 0
+iddr clk rst en = withFrozenCallStack ddrIn# clk rst en 0 0 0
 {-# NOINLINE iddr #-}
+{-# ANN iddr hasBlackBox #-}
 
 -- | Xilinx specific variant of 'ddrOut' implemented using the Xilinx ODDR
 -- primitive in @SAME_EDGE@ mode.
 --
 -- Reset value is @0@
 oddr
-  :: ( slow ~ 'Dom n (2*pFast)
-     , fast ~ 'Dom n pFast
+  :: ( KnownDomain fast ('DomainConfiguration fast fPeriod edge reset init polarity)
+     , KnownDomain slow ('DomainConfiguration slow (2*fPeriod) edge reset init polarity)
      , KnownNat m )
-  => Clock slow gated
+  => Clock slow
   -- ^ clock
-  -> Reset slow synchronous
+  -> Reset slow
   -- ^ reset
-  -> Signal slow (BitVector m,BitVector m)
+  -> Enable slow
+  -- ^ global enable
+  -> Signal slow (BitVector m, BitVector m)
   -- ^ normal speed input pairs
   -> Signal fast (BitVector m)
   -- ^ DDR output signal
-oddr clk rst = uncurry (withFrozenCallStack oddr# clk rst) . unbundle
+oddr clk rst en = uncurry (withFrozenCallStack oddr# clk rst en) . unbundle
 
-oddr# :: ( slow ~ 'Dom n (2*pFast)
-         , fast ~ 'Dom n pFast
-         , KnownNat m )
-      => Clock slow gated
-      -> Reset slow synchronous
-      -> Signal slow (BitVector m)
-      -> Signal slow (BitVector m)
-      -> Signal fast (BitVector m)
-oddr# clk rst = ddrOut# clk rst 0
+oddr#
+  :: ( KnownDomain fast ('DomainConfiguration fast fPeriod edge reset init polarity)
+     , KnownDomain slow ('DomainConfiguration slow (2*fPeriod) edge reset init polarity)
+     , KnownNat m )
+  => Clock slow
+  -> Reset slow
+  -> Enable slow
+  -> Signal slow (BitVector m)
+  -> Signal slow (BitVector m)
+  -> Signal fast (BitVector m)
+oddr# clk rst en = ddrOut# clk rst en 0
 {-# NOINLINE oddr# #-}
+{-# ANN oddr# hasBlackBox #-}

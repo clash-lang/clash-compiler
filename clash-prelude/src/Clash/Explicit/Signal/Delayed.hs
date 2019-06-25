@@ -1,6 +1,7 @@
 {-|
 Copyright  :  (C) 2013-2016, University of Twente,
                   2017     , Google Inc.
+                  2019     , Myrtle Software Ltd
 License    :  BSD2 (see the file LICENSE)
 Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
 -}
@@ -48,28 +49,29 @@ import Clash.Signal.Delayed.Internal
    unsafeFromSignal, antiDelay, feedback)
 
 import Clash.Explicit.Signal
-  (Clock, Reset, Signal, register,  bundle, unbundle)
+  (KnownDomain, Clock, Reset, Signal, Enable, register,  bundle, unbundle)
 
-import Clash.XException (Undefined)
+import Clash.XException           (Undefined)
 
 {- $setup
 >>> :set -XDataKinds
 >>> :set -XTypeOperators
 >>> import Clash.Explicit.Prelude
->>> let delay3 clk rst = delayed clk rst (-1 :> -1 :> -1 :> Nil)
->>> let delay2 clk rst = (delayedI clk rst :: Int -> DSignal System n Int -> DSignal System (n + 2) Int)
+>>> let delay3 clk rst en = delayed clk rst en (-1 :> -1 :> -1 :> Nil)
+>>> let delay2 clk rst en = (delayedI clk rst en :: Int -> DSignal System n Int -> DSignal System (n + 2) Int)
 >>> :{
-let mac :: Clock System gated
-        -> Reset System synchronous
+let mac :: Clock System
+        -> Reset System
+        -> Enable System
         -> DSignal System 0 Int -> DSignal System 0 Int
         -> DSignal System 0 Int
-    mac clk rst x y = feedback (mac' x y)
+    mac clk rst en x y = feedback (mac' x y)
       where
         mac' :: DSignal System 0 Int -> DSignal System 0 Int
              -> DSignal System 0 Int
              -> (DSignal System 0 Int, DSignal System 1 Int)
         mac' a b acc = let acc' = a * b + acc
-                       in  (acc, delayed clk rst (singleton 0) acc')
+                       in  (acc, delayed clk rst en (singleton 0) acc')
 :}
 
 -}
@@ -79,32 +81,35 @@ let mac :: Clock System gated
 --
 -- @
 -- delay3
---   :: Clock domain gated
---   -> Reset domain synchronous
---   -> 'DSignal' domain n Int
---   -> 'DSignal' domain (n + 3) Int
--- delay3 clk rst = 'delayed' clk rst (-1 ':>' -1 ':>' -1 ':>' 'Nil')
+--   :: Clock dom
+--   -> Reset dom
+--   -> Enable dom
+--   -> 'DSignal' dom n Int
+--   -> 'DSignal' dom (n + 3) Int
+-- delay3 clk rst en = 'delayed' clk rst en (-1 ':>' -1 ':>' -1 ':>' 'Nil')
 -- @
 --
--- >>> sampleN 7 (delay3 systemClockGen asyncResetGen (dfromList [0..]))
+-- >>> sampleN 7 (delay3 systemClockGen resetGen enableGen (dfromList [0..]))
 -- [-1,-1,-1,-1,1,2,3]
 delayed
-  :: forall domain gated synchronous a n d
-   . KnownNat d
-  => Undefined a
-  => Clock domain gated
-  -> Reset domain synchronous
+  :: forall dom conf a n d
+   . ( KnownDomain dom conf
+     , KnownNat d
+     , Undefined a )
+  => Clock dom
+  -> Reset dom
+  -> Enable dom
   -> Vec d a
-  -- ^ Default values
-  -> DSignal domain n a
-  -> DSignal domain (n + d) a
-delayed clk rst m ds = coerce (delaySignal (coerce ds))
+  -- ^ Initial values
+  -> DSignal dom n a
+  -> DSignal dom (n + d) a
+delayed clk rst en m ds = coerce (delaySignal (coerce ds))
   where
-    delaySignal :: Signal domain a -> Signal domain a
+    delaySignal :: Signal dom a -> Signal dom a
     delaySignal s = case length m of
       0 -> s
       _ -> let (r',o) = shiftInAt0 (unbundle r) (singleton s)
-               r      = register clk rst m (bundle r')
+               r      = register clk rst en m (bundle r')
            in  head o
 
 -- | Delay a 'DSignal' for @d@ periods, where @d@ is derived from the
@@ -112,34 +117,38 @@ delayed clk rst m ds = coerce (delaySignal (coerce ds))
 --
 -- @
 -- delay2
---   :: Clock domain gated
---   -> Reset domain synchronous
+--   :: Clock dom
+--   -> Reset dom
+--   -> Enable dom
 --   -> Int
---   -> 'DSignal' domain n Int
---   -> 'DSignal' domain (n + 2) Int
+--   -> 'DSignal' dom n Int
+--   -> 'DSignal' dom (n + 2) Int
 -- delay2 = 'delayedI'
 -- @
 --
--- >>> sampleN 7 (delay2 systemClockGen asyncResetGen (-1) (dfromList ([0..])))
+-- >>> sampleN 7 (delay2 systemClockGen resetGen enableGen (-1) (dfromList ([0..])))
 -- [-1,-1,-1,1,2,3,4]
 --
 -- @d@ can also be specified using type application:
 --
 -- >>> :t delayedI @3
 -- delayedI @3
---   :: Undefined a =>
---      Clock domain gated
---      -> Reset domain synchronous
+--   :: ... =>
+--      Clock dom
+--      -> Reset dom
+--      -> Enable dom
 --      -> a
---      -> DSignal domain n a
---      -> DSignal domain (n + 3) a
+--      -> DSignal dom n a
+--      -> DSignal dom (n + 3) a
 delayedI
-  :: KnownNat d
-  => Undefined a
-  => Clock domain gated
-  -> Reset domain synchronous
+  :: ( KnownNat d
+     , KnownDomain dom conf
+     , Undefined a )
+  => Clock dom
+  -> Reset dom
+  -> Enable dom
   -> a
-  -- ^ Default value
-  -> DSignal domain n a
-  -> DSignal domain (n + d) a
-delayedI clk rst dflt = delayed clk rst (repeat dflt)
+  -- ^ Initial value
+  -> DSignal dom n a
+  -> DSignal dom (n + d) a
+delayedI clk rst en dflt = delayed clk rst en (repeat dflt)

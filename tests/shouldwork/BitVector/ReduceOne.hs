@@ -4,11 +4,12 @@ import Clash.Prelude
 import Clash.Explicit.Testbench
 
 topEntity
-  :: Clock  System Source
-  -> Reset  System Asynchronous
+  :: Clock  System
+  -> Reset  System
+  -> Enable System
   -> Signal System (Signed 1)
   -> Signal System (Bit, Bit, Bit)
-topEntity clk rst =
+topEntity clk rst en =
   fmap (\a -> (reduceAnd a, reduceOr a, reduceXor a))
 {-# NOINLINE topEntity #-}
 
@@ -17,6 +18,6 @@ testBench = done
   where
     testInput      = stimuliGenerator clk rst ((1 :: Signed 1) :> 0 :> Nil)
     expectedOutput = outputVerifier clk rst ((high, high, high) :> (low, low, low) :> Nil)
-    done           = expectedOutput (topEntity clk rst testInput)
+    done           = expectedOutput (topEntity clk rst enableGen testInput)
     clk            = tbSystemClockGen (not <$> done)
     rst            = systemResetGen

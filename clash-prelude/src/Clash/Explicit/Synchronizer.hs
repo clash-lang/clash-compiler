@@ -1,6 +1,6 @@
 {-|
 Copyright   :  (C) 2015-2016, University of Twente,
-                   2016-2017, Myrtle Software Ltd,
+                   2016-2019, Myrtle Software Ltd,
                    2017     , Google Inc.
 License     :  BSD2 (see the file LICENSE)
 Maintainer  :  Christiaan Baaij <christiaan.baaij@gmail.com>
@@ -42,10 +42,10 @@ import Clash.Prelude.BitIndex      (slice)
 import Clash.Explicit.Mealy        (mealyB)
 import Clash.Explicit.RAM          (asyncRam)
 import Clash.Explicit.Signal
-  (Clock, Reset, Signal, register, unsafeSynchronizer)
+  (Clock, Reset, Signal, Enable, register, unsafeSynchronizer)
 import Clash.Promoted.Nat          (SNat (..), pow2SNat)
 import Clash.Promoted.Nat.Literals (d0)
-import Clash.Signal                (mux)
+import Clash.Signal                (mux, KnownDomain)
 import Clash.Sized.BitVector       (BitVector, (++#))
 import Clash.XException            (Undefined)
 
@@ -74,64 +74,88 @@ import Clash.XException            (Undefined)
 --      If you want to have /safe/ __word__-synchronization use
 --      'asyncFIFOSynchronizer'.
 dualFlipFlopSynchronizer
-  :: Undefined a
-  => Clock domain1 gated1
+  :: ( Undefined a
+     , KnownDomain dom1 conf1
+     , KnownDomain dom2 conf2 )
+  => Clock dom1
   -- ^ 'Clock' to which the incoming  data is synchronized
-  -> Clock domain2 gated2
+  -> Clock dom2
   -- ^ 'Clock' to which the outgoing data is synchronized
-  -> Reset domain2 synchronous
+  -> Reset dom2
   -- ^ 'Reset' for registers on the outgoing domain
+  -> Enable dom2
+  -- ^ 'Enable' for registers on the outgoing domain
   -> a
-  -- ^ Initial value of the two synchronisation registers
-  -> Signal domain1 a -- ^ Incoming data
-  -> Signal domain2 a -- ^ Outgoing, synchronized, data
-dualFlipFlopSynchronizer clk1 clk2 rst i =
-  register clk2 rst i . register clk2 rst i . unsafeSynchronizer clk1 clk2
+  -- ^ Initial value of the two synchronization registers
+  -> Signal dom1 a
+  -- ^ Incoming data
+  -> Signal dom2 a
+  -- ^ Outgoing, synchronized, data
+dualFlipFlopSynchronizer clk1 clk2 rst en i =
+  register clk2 rst en i
+    . register clk2 rst en i
+    . unsafeSynchronizer clk1 clk2
 
 -- * Asynchronous FIFO synchronizer
 
 fifoMem
-  :: Clock wdomain wgated
-  -> Clock rdomain rgated
+  :: ( KnownDomain wdom conf1
+     , KnownDomain rdom conf2 )
+  => Clock wdom
+  -> Clock rdom
+  -> Enable wdom
   -> SNat addrSize
-  -> Signal wdomain Bool
-  -> Signal rdomain (BitVector addrSize)
-  -> Signal wdomain (Maybe (BitVector addrSize, a))
-  -> Signal rdomain a
-fifoMem wclk rclk addrSize@SNat full raddr writeM =
-  asyncRam wclk rclk
-           (pow2SNat addrSize)
-           raddr
-           (mux full (pure Nothing) writeM)
+  -> Signal wdom Bool
+  -> Signal rdom (BitVector addrSize)
+  -> Signal wdom (Maybe (BitVector addrSize, a))
+  -> Signal rdom a
+fifoMem wclk rclk en addrSize@SNat full raddr writeM =
+  asyncRam
+    wclk rclk en
+    (pow2SNat addrSize)
+    raddr
+    (mux full (pure Nothing) writeM)
 
-ptrCompareT :: SNat addrSize
-            -> (BitVector (addrSize + 1) -> BitVector (addrSize + 1) -> Bool)
-            -> (BitVector (addrSize + 1), BitVector (addrSize + 1), Bool)
-            -> (BitVector (addrSize + 1), Bool)
-            -> ((BitVector (addrSize + 1), BitVector (addrSize + 1), Bool)
-               ,(Bool, BitVector addrSize, BitVector (addrSize + 1)))
-ptrCompareT SNat flagGen (bin,ptr,flag) (s_ptr,inc) = ((bin',ptr',flag')
-                                                      ,(flag,addr,ptr))
-  where
-    -- GRAYSTYLE2 pointer
-    bin' = bin + boolToBV (inc && not flag)
-    ptr' = (bin' `shiftR` 1) `xor` bin'
-    addr = truncateB bin
+ptrCompareT
+  :: SNat addrSize
+  -> (BitVector (addrSize + 1) -> BitVector (addrSize + 1) -> Bool)
+  -> ( BitVector (addrSize + 1)
+     , BitVector (addrSize + 1)
+     , Bool )
+  -> ( BitVector (addrSize + 1)
+     , Bool )
+  -> ( ( BitVector (addrSize + 1)
+       , BitVector (addrSize + 1)
+       , Bool )
+     , ( Bool
+       , BitVector addrSize
+       , BitVector (addrSize + 1)
+       )
+     )
+ptrCompareT SNat flagGen (bin, ptr, flag) (s_ptr, inc) =
+  ((bin', ptr', flag'), (flag, addr, ptr))
+ where
+  -- GRAYSTYLE2 pointer
+  bin' = bin + boolToBV (inc && not flag)
+  ptr' = (bin' `shiftR` 1) `xor` bin'
+  addr = truncateB bin
 
-    flag' = flagGen ptr' s_ptr
+  flag' = flagGen ptr' s_ptr
 
 -- FIFO full: when next pntr == synchonized {~wptr[addrSize:addrSize-1],wptr[addrSize-1:0]}
-isFull :: forall addrSize .
-          (2 <= addrSize)
-       => SNat addrSize
-       -> BitVector (addrSize + 1)
-       -> BitVector (addrSize + 1)
-       -> Bool
-isFull addrSize@SNat ptr s_ptr = case leTrans @1 @2 @addrSize of
-  Sub Dict ->
-    let a1 = SNat @(addrSize - 1)
-        a2 = SNat @(addrSize - 2)
-    in  ptr == (complement (slice addrSize a1 s_ptr) ++# slice a2 d0 s_ptr)
+isFull
+  :: forall addrSize
+   . (2 <= addrSize)
+  => SNat addrSize
+  -> BitVector (addrSize + 1)
+  -> BitVector (addrSize + 1)
+  -> Bool
+isFull addrSize@SNat ptr s_ptr =
+  case leTrans @1 @2 @addrSize of
+    Sub Dict ->
+      let a1 = SNat @(addrSize - 1)
+          a2 = SNat @(addrSize - 2)
+      in  ptr == (complement (slice addrSize a1 s_ptr) ++# slice a2 d0 s_ptr)
 
 -- | Synchronizer implemented as a FIFO around an asynchronous RAM. Based on the
 -- design described in "Clash.Tutorial#multiclock", which is itself based on the
@@ -139,33 +163,48 @@ isFull addrSize@SNat ptr s_ptr = case leTrans @1 @2 @addrSize of
 --
 -- __NB__: This synchronizer can be used for __word__-synchronization.
 asyncFIFOSynchronizer
-  :: (2 <= addrSize)
+  :: ( KnownDomain wdom wconf
+     , KnownDomain rdom rconf
+     , 2 <= addrSize )
   => SNat addrSize
   -- ^ Size of the internally used addresses, the  FIFO contains @2^addrSize@
   -- elements.
-  -> Clock wdomain wgated
+  -> Clock wdom
   -- ^ 'Clock' to which the write port is synchronized
-  -> Clock rdomain rgated
+  -> Clock rdom
   -- ^ 'Clock' to which the read port is synchronized
-  -> Reset wdomain synchronous
-  -> Reset rdomain synchronous
-  -> Signal rdomain Bool
+  -> Reset wdom
+  -> Reset rdom
+  -> Enable wdom
+  -> Enable rdom
+  -> Signal rdom Bool
   -- ^ Read request
-  -> Signal wdomain (Maybe a)
+  -> Signal wdom (Maybe a)
   -- ^ Element to insert
-  -> (Signal rdomain a, Signal rdomain Bool, Signal wdomain Bool)
+  -> (Signal rdom a, Signal rdom Bool, Signal wdom Bool)
   -- ^ (Oldest element in the FIFO, @empty@ flag, @full@ flag)
-asyncFIFOSynchronizer addrSize@SNat wclk rclk wrst rrst rinc wdataM =
-    (rdata,rempty,wfull)
-  where
-    s_rptr = dualFlipFlopSynchronizer rclk wclk wrst 0 rptr
-    s_wptr = dualFlipFlopSynchronizer wclk rclk rrst 0 wptr
+asyncFIFOSynchronizer addrSize@SNat wclk rclk wrst rrst wen ren rinc wdataM =
+  (rdata, rempty, wfull)
+ where
+  s_rptr = dualFlipFlopSynchronizer rclk wclk wrst wen 0 rptr
+  s_wptr = dualFlipFlopSynchronizer wclk rclk rrst ren 0 wptr
 
-    rdata = fifoMem wclk rclk addrSize wfull raddr
-              (liftA2 (,) <$> (pure <$> waddr) <*> wdataM)
+  rdata =
+    fifoMem
+      wclk rclk wen
+      addrSize wfull raddr
+      (liftA2 (,) <$> (pure <$> waddr) <*> wdataM)
 
-    (rempty,raddr,rptr) = mealyB rclk rrst (ptrCompareT addrSize (==)) (0,0,True)
-                                 (s_wptr,rinc)
+  (rempty, raddr, rptr) =
+    mealyB
+      rclk rrst ren
+      (ptrCompareT addrSize (==))
+      (0, 0, True)
+      (s_wptr, rinc)
 
-    (wfull,waddr,wptr)  = mealyB wclk wrst (ptrCompareT addrSize (isFull addrSize))
-                                 (0,0,False) (s_rptr,isJust <$> wdataM)
+  (wfull, waddr, wptr) =
+    mealyB
+      wclk wrst wen
+      (ptrCompareT addrSize (isFull addrSize))
+      (0, 0, False)
+      (s_rptr, isJust <$> wdataM)

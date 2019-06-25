@@ -1,6 +1,7 @@
 {-|
 Copyright  :  (C) 2015-2016, University of Twente,
                   2017     , Google Inc.
+                  2019     , Myrtle Software Ltd
 License    :  BSD2 (see the file LICENSE)
 Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
 
@@ -10,6 +11,7 @@ ROMs
 {-# LANGUAGE DataKinds        #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE MagicHash        #-}
+{-# LANGUAGE RankNTypes       #-}
 {-# LANGUAGE TypeOperators    #-}
 
 {-# LANGUAGE Safe #-}
@@ -46,12 +48,16 @@ import           Clash.XException     (Undefined)
 --
 -- * See "Clash.Sized.Fixed#creatingdatafiles" and "Clash.Prelude.BlockRam#usingrams"
 -- for ideas on how to use ROMs and RAMs
-asyncRom :: (KnownNat n, Enum addr)
-         => Vec n a -- ^ ROM content
-                    --
-                    -- __NB:__ must be a constant
-         -> addr    -- ^ Read address @rd@
-         -> a       -- ^ The value of the ROM at address @rd@
+asyncRom
+  :: (KnownNat n, Enum addr)
+  => Vec n a
+  -- ^ ROM content
+  --
+  -- __NB:__ must be a constant
+  -> addr
+  -- ^ Read address @rd@
+  -> a
+  -- ^ The value of the ROM at address @rd@
 asyncRom = \content rd -> asyncRom# content (fromEnum rd)
 {-# INLINE asyncRom #-}
 
@@ -61,22 +67,30 @@ asyncRom = \content rd -> asyncRom# content (fromEnum rd)
 --
 -- * See "Clash.Sized.Fixed#creatingdatafiles" and "Clash.Prelude.BlockRam#usingrams"
 -- for ideas on how to use ROMs and RAMs
-asyncRomPow2 :: KnownNat n
-             => Vec (2^n) a -- ^ ROM content
-                            --
-                            -- __NB:__ must be a constant
-             -> Unsigned n  -- ^ Read address @rd@
-             -> a           -- ^ The value of the ROM at address @rd@
+asyncRomPow2
+  :: KnownNat n
+  => Vec (2^n) a
+  -- ^ ROM content
+  --
+  -- __NB:__ must be a constant
+  -> Unsigned n
+  -- ^ Read address @rd@
+  -> a
+  -- ^ The value of the ROM at address @rd@
 asyncRomPow2 = asyncRom
 {-# INLINE asyncRomPow2 #-}
 
 -- | asyncROM primitive
-asyncRom# :: KnownNat n
-          => Vec n a  -- ^ ROM content
-                      --
-                      -- __NB:__ must be a constant
-          -> Int      -- ^ Read address @rd@
-          -> a        -- ^ The value of the ROM at address @rd@
+asyncRom#
+  :: KnownNat n
+  => Vec n a
+  -- ^ ROM content
+  --
+  -- __NB:__ must be a constant
+  -> Int
+  -- ^ Read address @rd@
+  -> a
+  -- ^ The value of the ROM at address @rd@
 asyncRom# content rd = arr ! rd
   where
     szI = length content
@@ -93,13 +107,21 @@ asyncRom# content rd = arr ! rd
 -- * See "Clash.Sized.Fixed#creatingdatafiles" and "Clash.Prelude.BlockRam#usingrams"
 -- for ideas on how to use ROMs and RAMs
 rom
-  :: (Undefined a, KnownNat n, KnownNat m, HiddenClock domain gated)
-  => Vec n a               -- ^ ROM content
-                           --
-                           -- __NB:__ must be a constant
-  -> Signal domain (Unsigned m)   -- ^ Read address @rd@
-  -> Signal domain a              -- ^ The value of the ROM at address @rd@
-rom = hideClock E.rom
+  :: forall dom n m a conf
+   . ( Undefined a
+     , KnownNat n
+     , KnownNat m
+     , HiddenClock dom conf
+     , HiddenEnable dom conf )
+  => Vec n a
+  -- ^ ROM content
+  --
+  -- __NB:__ must be a constant
+  -> Signal dom (Unsigned m)
+  -- ^ Read address @rd@
+  -> Signal dom a
+  -- ^ The value of the ROM at address @rd@
+rom = hideEnable (hideClock E.rom)
 {-# INLINE rom #-}
 
 -- | A ROM with a synchronous read port, with space for 2^@n@ elements
@@ -112,11 +134,18 @@ rom = hideClock E.rom
 -- * See "Clash.Sized.Fixed#creatingdatafiles" and "Clash.Prelude.BlockRam#usingrams"
 -- for ideas on how to use ROMs and RAMs
 romPow2
-  :: (Undefined a, KnownNat n, HiddenClock domain gated)
-  => Vec (2^n) a         -- ^ ROM content
-                         --
-                         -- __NB:__ must be a constant
-  -> Signal domain (Unsigned n) -- ^ Read address @rd@
-  -> Signal domain a            -- ^ The value of the ROM at address @rd@
-romPow2 = hideClock E.romPow2
+  :: forall dom n a conf
+   . ( KnownNat n
+     , Undefined a
+     , HiddenClock dom conf
+     , HiddenEnable dom conf )
+  => Vec (2^n) a
+  -- ^ ROM content
+  --
+  -- __NB:__ must be a constant
+  -> Signal dom (Unsigned n)
+  -- ^ Read address @rd@
+  -> Signal dom a
+  -- ^ The value of the ROM at address @rd@
+romPow2 = hideEnable (hideClock E.romPow2)
 {-# INLINE romPow2 #-}

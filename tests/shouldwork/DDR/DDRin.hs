@@ -6,47 +6,57 @@ import Clash.Explicit.Testbench (ignoreFor)
 import Clash.Intel.DDR
 import Clash.Xilinx.DDR
 
-type DomReal = Dom "A" 2000 -- real clock domain
-type DomDDR  = Dom "A" 1000 -- fake doublespeed domain, used to model a ddr signal
+createDomain vSystem{vTag="AsyncReal", vPeriod=2000, vReset=Asynchronous}  -- real clock domain
+createDomain vSystem{vTag="AsyncDDR", vPeriod=1000, vReset=Asynchronous}  -- fake ddr domain
+createDomain vSystem{vTag="SyncReal", vPeriod=2000, vReset=Synchronous}  -- real clock domain
+createDomain vSystem{vTag="SyncDDR", vPeriod=1000, vReset=Synchronous}  -- fake ddr domain
 
 {-
 The four variants defined here are all the combinations of
-  clock: Gated  or Ungated
+  clock: Enabled  or Regular
   reset: Asynch or Sync
 -}
 
-topEntityGeneric :: Clock DomReal gated
-          -> Reset DomReal synchronous
-          -> Signal DomDDR (BitVector 8)
-          -> Signal DomReal (BitVector 8, BitVector 8)
-topEntityGeneric clk rst = ddrIn clk rst (dummy,dummy,dummy)
--- topEntityGeneric clk rst = iddr clk rst
--- topEntityGeneric clk rst = altddioIn (SSymbol @"Cyclone IV GX") clk rst
+topEntityGeneric
+  :: ( KnownDomain fast ('DomainConfiguration fast fPeriod edge reset init polarity)
+     , KnownDomain slow ('DomainConfiguration slow (2*fPeriod) edge reset init polarity) )
+  => Clock slow
+  -> Reset slow
+  -> Enable slow
+  -> Signal fast (BitVector 8)
+  -> Signal slow (BitVector 8, BitVector 8)
+topEntityGeneric clk rst en = ddrIn clk rst en (dummy,dummy,dummy)
+-- topEntityGeneric clk rst en = iddr clk rst en
+-- topEntityGeneric clk rst en = altddioIn (SSymbol @"Cyclone IV GX") clk rst en
 
 
-topEntityUA :: Clock DomReal Source
-          -> Reset DomReal Asynchronous
-          -> Signal DomDDR (BitVector 8)
-          -> Signal DomReal (BitVector 8, BitVector 8)
-topEntityUA = topEntityGeneric
+topEntityUA
+  :: Clock AsyncReal
+  -> Reset AsyncReal
+  -> Signal AsyncDDR (BitVector 8)
+  -> Signal AsyncReal (BitVector 8, BitVector 8)
+topEntityUA clk rst = topEntityGeneric clk rst enableGen
 
-topEntityUS :: Clock DomReal Source
-          -> Reset DomReal Synchronous
-          -> Signal DomDDR (BitVector 8)
-          -> Signal DomReal (BitVector 8, BitVector 8)
-topEntityUS = topEntityGeneric
+topEntityUS
+  :: Clock SyncReal
+  -> Reset SyncReal
+  -> Signal SyncDDR (BitVector 8)
+  -> Signal SyncReal (BitVector 8, BitVector 8)
+topEntityUS clk rst = topEntityGeneric clk rst enableGen
 
-topEntityGA :: Clock DomReal Gated
-          -> Reset DomReal Asynchronous
-          -> Signal DomDDR (BitVector 8)
-          -> Signal DomReal (BitVector 8, BitVector 8)
-topEntityGA = topEntityGeneric
+topEntityGA
+  :: Clock AsyncReal
+  -> Reset AsyncReal
+  -> Signal AsyncDDR (BitVector 8)
+  -> Signal AsyncReal (BitVector 8, BitVector 8)
+topEntityGA clk rst = topEntityGeneric clk rst tbEnableGen
 
-topEntityGS :: Clock DomReal Gated
-          -> Reset DomReal Synchronous
-          -> Signal DomDDR (BitVector 8)
-          -> Signal DomReal (BitVector 8, BitVector 8)
-topEntityGS = topEntityGeneric
+topEntityGS
+  :: Clock SyncReal
+  -> Reset SyncReal
+  -> Signal SyncDDR (BitVector 8)
+  -> Signal SyncReal (BitVector 8, BitVector 8)
+topEntityGS clk rst = topEntityGeneric clk rst tbEnableGen
 
 
 testinput = $(listToVecTH [1..17::BitVector 8])
@@ -58,58 +68,58 @@ testoutputSync =  (dummy, dummy):>(dummy,2) :> (3,4):>(5,6):>(7,8):>(9,10):>(11,
 
 
 
-testBenchUS :: Signal DomReal Bool
+testBenchUS :: Signal SyncReal Bool
 testBenchUS = done
   where
     testInput      = stimuliGenerator clkDDR rstDDR testinput
     expectedOutput = outputVerifier   clkReal rstReal testoutputSync
-    actualOutput   = ignoreFor clkReal rstReal d1 (dummy, dummy) (topEntityUS clkReal rstReal testInput)
+    actualOutput   = ignoreFor clkReal rstReal enableGen d1 (dummy, dummy) (topEntityUS clkReal rstReal testInput)
     done           = expectedOutput actualOutput
     done'          = not <$> done
 
-    clkDDR         = tbClockGen @DomDDR (unsafeSynchronizer clkReal clkDDR done')
-    clkReal        = tbClockGen @DomReal done'
-    rstDDR         = syncResetGen @DomDDR
-    rstReal        = syncResetGen @DomReal
+    clkDDR         = tbClockGen @SyncDDR (unsafeSynchronizer clkReal clkDDR done')
+    clkReal        = tbClockGen @SyncReal done'
+    rstDDR         = resetGen @SyncDDR
+    rstReal        = resetGen @SyncReal
 
-testBenchUA :: Signal DomReal Bool
+testBenchUA :: Signal AsyncReal Bool
 testBenchUA = done
   where
     testInput      = stimuliGenerator clkDDR rstDDR testinput
     expectedOutput = outputVerifier   clkReal rstReal testoutputAsync
-    actualOutput   = ignoreFor clkReal rstReal d1 (dummy, dummy) (topEntityUA clkReal rstReal testInput)
+    actualOutput   = ignoreFor clkReal rstReal enableGen d1 (dummy, dummy) (topEntityUA clkReal rstReal testInput)
     done           = expectedOutput actualOutput
     done'          = not <$> done
 
-    clkDDR         = tbClockGen @DomDDR (unsafeSynchronizer clkReal clkDDR done')
-    clkReal        = tbClockGen @DomReal done'
-    rstDDR         = asyncResetGen @DomDDR
-    rstReal        = asyncResetGen @DomReal
+    clkDDR         = tbClockGen @AsyncDDR (unsafeSynchronizer clkReal clkDDR done')
+    clkReal        = tbClockGen @AsyncReal done'
+    rstDDR         = resetGen @AsyncDDR
+    rstReal        = resetGen @AsyncReal
 
-testBenchGS :: Signal DomReal Bool
+testBenchGS :: Signal SyncReal Bool
 testBenchGS = done
   where
     testInput      = stimuliGenerator clkDDR rstDDR testinput
     expectedOutput = outputVerifier   clkReal rstReal testoutputSync
-    actualOutput   = ignoreFor clkReal rstReal d1 (dummy, dummy) (topEntityGS clkReal rstReal testInput)
+    actualOutput   = ignoreFor clkReal rstReal enableGen d1 (dummy, dummy) (topEntityGS clkReal rstReal testInput)
     done           = expectedOutput actualOutput
     done'          = not <$> done
 
-    clkDDR         = let c = tbClockGen @DomDDR (unsafeSynchronizer clkReal clkDDR done') in clockGate c $ pure True
-    clkReal        = let c = tbClockGen @DomReal done' in clockGate c $ pure True
-    rstDDR         = syncResetGen @DomDDR
-    rstReal        = syncResetGen @DomReal
+    clkDDR         = tbClockGen @SyncDDR (unsafeSynchronizer clkReal clkDDR done')
+    clkReal        = tbClockGen @SyncReal done'
+    rstDDR         = resetGen @SyncDDR
+    rstReal        = resetGen @SyncReal
 
-testBenchGA :: Signal DomReal Bool
+testBenchGA :: Signal AsyncReal Bool
 testBenchGA = done
   where
     testInput      = stimuliGenerator clkDDR rstDDR testinput
     expectedOutput = outputVerifier   clkReal rstReal testoutputAsync
-    actualOutput   = ignoreFor clkReal rstReal d1 (dummy, dummy) (topEntityGA clkReal rstReal testInput)
+    actualOutput   = ignoreFor clkReal rstReal enableGen d1 (dummy, dummy) (topEntityGA clkReal rstReal testInput)
     done           = expectedOutput actualOutput
     done'          = not <$> done
 
-    clkDDR         = let c = tbClockGen @DomDDR (unsafeSynchronizer clkReal clkDDR done') in clockGate c $ pure True
-    clkReal        = let c = tbClockGen @DomReal done' in clockGate c $ pure True
-    rstDDR         = asyncResetGen @DomDDR
-    rstReal        = asyncResetGen @DomReal
+    clkDDR         = tbClockGen @AsyncDDR (unsafeSynchronizer clkReal clkDDR done')
+    clkReal        = tbClockGen @AsyncReal done'
+    rstDDR         = resetGen @AsyncDDR
+    rstReal        = resetGen @AsyncReal

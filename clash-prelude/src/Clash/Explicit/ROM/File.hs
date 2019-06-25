@@ -1,6 +1,7 @@
 {-|
 Copyright  :  (C) 2015-2016, University of Twente,
                   2017     , Google Inc.
+                  2019     , Myrtle Software Ltd.
 License    :  BSD2 (see the file LICENSE)
 Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
 
@@ -34,9 +35,9 @@ so:
 
 @
 f
-  :: Clock  domain gated
-  -> Signal domain (Unsigned 3)
-  -> Signal domain (Unsigned 9)
+  :: Clock  dom
+  -> Signal dom (Unsigned 3)
+  -> Signal dom (Unsigned 9)
 f clk rd = 'Clash.Class.BitPack.unpack' '<$>' 'romFile' clk d7 \"memory.bin\" rd
 @
 
@@ -53,9 +54,9 @@ number, and a 3-bit signed number:
 
 @
 g
-  :: Clock  domain Source
-  -> Signal domain (Unsigned 3)
-  -> Signal domain (Unsigned 6,Signed 3)
+  :: Clock  dom Regular
+  -> Signal dom (Unsigned 3)
+  -> Signal dom (Unsigned 6,Signed 3)
 g clk rd = 'Clash.Class.BitPack.unpack' '<$>' 'romFile' clk d7 \"memory.bin\" rd
 @
 
@@ -95,7 +96,7 @@ import System.IO.Unsafe             (unsafePerformIO)
 import Clash.Explicit.BlockRam.File (initMem)
 import Clash.Promoted.Nat           (SNat (..), pow2SNat, snatToNum)
 import Clash.Sized.BitVector        (BitVector)
-import Clash.Explicit.Signal        (Clock, Signal, delay)
+import Clash.Explicit.Signal        (Clock, Enable, Signal, KnownDomain, delay)
 import Clash.Sized.Unsigned         (Unsigned)
 import Clash.XException             (Undefined(deepErrorX))
 
@@ -124,15 +125,20 @@ import Clash.XException             (Undefined(deepErrorX))
 -- * See "Clash.Sized.Fixed#creatingdatafiles" for ideas on how to create your
 -- own data files.
 romFilePow2
-  :: forall domain gated n m
-   . (KnownNat m, KnownNat n)
-  => Clock domain gated        -- ^ 'Clock' to synchronize to
-  -> FilePath                  -- ^ File describing the content of
-                               -- the ROM
-  -> Signal domain (Unsigned n)  -- ^ Read address @rd@
-  -> Signal domain (BitVector m)
+  :: forall dom conf n m
+   . (KnownNat m, KnownNat n, KnownDomain dom conf)
+  => Clock dom
+  -- ^ 'Clock' to synchronize to
+  -> Enable dom
+  -- ^ Global enable
+  -> FilePath
+  -- ^ File describing the content of
+  -- the ROM
+  -> Signal dom (Unsigned n)
+  -- ^ Read address @rd@
+  -> Signal dom (BitVector m)
   -- ^ The value of the ROM at address @rd@ from the previous clock cycle
-romFilePow2 = \clk -> romFile clk (pow2SNat (SNat @ n))
+romFilePow2 = \clk en -> romFile clk en (pow2SNat (SNat @ n))
 {-# INLINE romFilePow2 #-}
 
 -- | A ROM with a synchronous read port, with space for @n@ elements
@@ -159,35 +165,39 @@ romFilePow2 = \clk -> romFile clk (pow2SNat (SNat @ n))
 -- * See "Clash.Sized.Fixed#creatingdatafiles" for ideas on how to create your
 -- own data files.
 romFile
-  :: (KnownNat m, Enum addr)
-  => Clock domain gated
+  :: (KnownNat m, Enum addr, KnownDomain dom conf)
+  => Clock dom
   -- ^ 'Clock' to synchronize to
+  -> Enable dom
+  -- ^ Global enable
   -> SNat n
   -- ^ Size of the ROM
   -> FilePath
   -- ^ File describing the content of the ROM
-  -> Signal domain addr
+  -> Signal dom addr
   -- ^ Read address @rd@
-  -> Signal domain (BitVector m)
+  -> Signal dom (BitVector m)
   -- ^ The value of the ROM at address @rd@ from the previous clock cycle
-romFile = \clk sz file rd -> romFile# clk sz file (fromEnum <$> rd)
+romFile = \clk en sz file rd -> romFile# clk en sz file (fromEnum <$> rd)
 {-# INLINE romFile #-}
 
 -- | romFile primitive
 romFile#
-  :: KnownNat m
-  => Clock domain gated
+  :: (KnownNat m, KnownDomain dom conf)
+  => Clock dom
   -- ^ 'Clock' to synchronize to
+  -> Enable dom
+  -- ^ Global enable
   -> SNat n
   -- ^ Size of the ROM
   -> FilePath
   -- ^ File describing the content of the ROM
-  -> Signal domain Int
+  -> Signal dom Int
   -- ^ Read address @rd@
-  -> Signal domain (BitVector m)
+  -> Signal dom (BitVector m)
   -- ^ The value of the ROM at address @rd@ from the previous clock cycle
-romFile# clk sz file rd =
-  delay clk (deepErrorX "First value of romFile is undefined") ((content !) <$> rd)
+romFile# clk en sz file rd =
+  delay clk en (deepErrorX "First value of romFile is undefined") ((content !) <$> rd)
  where
   mem     = unsafePerformIO (initMem file)
   content = listArray (0,szI-1) mem

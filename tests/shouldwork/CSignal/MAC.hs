@@ -2,14 +2,15 @@ module MAC where
 
 import Clash.Explicit.Prelude
 
-type DomA101 = Dom "A" 101
+createDomain vSystem{vTag="DomA101", vPeriod=101}
 
 topEntity
-  :: Clock DomA101 Source
-  -> Reset DomA101 Asynchronous
+  :: Clock DomA101
+  -> Reset DomA101
+  -> Enable DomA101
   -> (Signal DomA101 Integer, Signal DomA101 Integer)
   -> Signal DomA101 Integer
-topEntity clk rst = mealyB clk rst macT 0
+topEntity clk rst en = mealyB clk rst en macT 0
 
 macT s (x,y) = (s', o)
   where

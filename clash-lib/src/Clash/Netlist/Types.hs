@@ -19,7 +19,6 @@
 {-# LANGUAGE TemplateHaskell            #-}
 {-# LANGUAGE DeriveDataTypeable         #-}
 
-{-# OPTIONS_GHC -Wno-orphans #-}
 
 module Clash.Netlist.Types
   ( Declaration (..,NetDecl)
@@ -33,7 +32,7 @@ import Control.Monad.State                  (State)
 import Control.Monad.State.Strict           (MonadIO, MonadState, StateT)
 import Data.Bits                            (testBit)
 import Data.Binary                          (Binary(..))
-import Data.Hashable
+import Data.Hashable                        (Hashable)
 import Data.HashMap.Strict                  (HashMap)
 import Data.IntMap                          (IntMap, empty)
 import qualified Data.Set                   as Set
@@ -55,7 +54,8 @@ import Clash.Driver.Types                   (BindingMap, ClashOpts)
 import Clash.Netlist.BlackBox.Types         (BlackBoxTemplate)
 import Clash.Netlist.Id                     (IdType)
 import Clash.Primitives.Types               (CompiledPrimMap)
-import Clash.Signal.Internal                (ClockKind, ResetKind)
+import Clash.Signal.Internal
+  (ResetPolarity, ActiveEdge, ResetKind, InitBehavior)
 import Clash.Util                           (makeLenses)
 
 import Clash.Annotations.BitRepresentation.Internal
@@ -152,29 +152,29 @@ data HWType
   -- ^ Boolean type
   | Bit
   -- ^ Bit type
-  | BitVector     !Size
+  | BitVector !Size
   -- ^ BitVector of a specified size
-  | Index         !Integer
+  | Index !Integer
   -- ^ Unsigned integer with specified (exclusive) upper bounder
-  | Signed        !Size
+  | Signed !Size
   -- ^ Signed integer of a specified size
-  | Unsigned      !Size
+  | Unsigned !Size
   -- ^ Unsigned integer of a specified size
-  | Vector        !Size       !HWType
+  | Vector !Size !HWType
   -- ^ Vector type
-  | RTree         !Size       !HWType
+  | RTree !Size !HWType
   -- ^ RTree type
-  | Sum           !Identifier [Identifier]
+  | Sum !Identifier [Identifier]
   -- ^ Sum type: Name and Constructor names
-  | Product       !Identifier (Maybe [Text]) [HWType]
+  | Product !Identifier (Maybe [Text]) [HWType]
   -- ^ Product type: Name, field names, and field types. Field names will be
   -- populated when using records.
-  | SP            !Identifier [(Identifier,[HWType])]
+  | SP !Identifier [(Identifier,[HWType])]
   -- ^ Sum-of-Product type: Name and Constructor names + field types
-  | Clock         !Identifier !Integer !ClockKind
-  -- ^ Clock type with specified name and period
-  | Reset         !Identifier !Integer !ResetKind
-  -- ^ Reset type corresponding to clock with a specified name and period
+  | Clock !Identifier
+  -- ^ Clock type corresponding to domain /Identifier/
+  | Reset !Identifier
+  -- ^ Reset type corresponding to domain /Identifier/
   | BiDirectional !PortDirection !HWType
   -- ^ Tagging type indicating a bidirectional (inout) port
   | CustomSP !Identifier !DataRepr' !Size [(ConstrRepr', Identifier, [HWType])]
@@ -184,14 +184,10 @@ data HWType
   -- ^ Same as Sum, but with a user specified bit representation. For more info,
   -- see: Clash.Annotations.BitRepresentations.
   | Annotated [Attr'] !HWType
-  -- ^ Annotated
-  deriving (Eq,Ord,Show,Generic)
-
-instance Hashable ClockKind
-instance Hashable ResetKind
-
-instance Hashable HWType
-instance NFData HWType
+  -- ^ Annotated with HDL attributes
+  | KnownDomain !Identifier !Integer !ActiveEdge !ResetKind !InitBehavior !ResetPolarity
+  -- ^ Domain name, period, active edge, reset kind, initial value behavior
+  deriving (Eq, Ord, Show, Generic, NFData, Hashable)
 
 -- | Extract hardware attributes from Annotated. Returns an empty list if
 -- non-Annotated given or if Annotated has an empty list of attributes.
@@ -347,7 +343,8 @@ toBit m i = if testBit m 0
 -- | Context used to fill in the holes of a BlackBox template
 data BlackBoxContext
   = Context
-  { bbResult    :: (Expr,HWType) -- ^ Result name and type
+  { bbName      :: Text -- ^ Blackbox function name (for error reporting)
+  , bbResult    :: (Expr,HWType) -- ^ Result name and type
   , bbInputs    :: [(Expr,HWType,Bool)] -- ^ Argument names, types, and whether it is a literal
   , bbFunctions :: IntMap (Either BlackBox (Identifier,[Declaration])
                           ,WireOrReg
@@ -400,10 +397,11 @@ instance Binary TemplateFunction where
   get = (\is -> TemplateFunction is err err) <$> get
     where err = const $ error "TemplateFunction functions can't be preserved by serialisation"
 
-emptyBBContext :: BlackBoxContext
-emptyBBContext
+emptyBBContext :: Text -> BlackBoxContext
+emptyBBContext n
   = Context
-  { bbResult      = (Identifier (pack "__EMPTY__") Nothing, Void Nothing)
+  { bbName        = n
+  , bbResult      = (Identifier (pack "__EMPTY__") Nothing, Void Nothing)
   , bbInputs      = []
   , bbFunctions   = empty
   , bbQsysIncName = []

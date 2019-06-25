@@ -23,7 +23,7 @@ mac xy = mealy macT 0 xy
         o    = acc
 
 topEntity
-  :: SystemClockReset
+  :: SystemClockResetEnable
   => (Signal System (Signed 9) `Annotate` 'StringAttr "top" "input1") `Annotate` 'StringAttr "top" "input2"
   -> Signal System (Signed 9)
   -> Signal System (Signed 9)

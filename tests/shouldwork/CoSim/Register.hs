@@ -5,11 +5,12 @@ import Clash.CoSim
 import Clash.Explicit.Prelude
 
 verilog_register
-  :: Clock  d 'Source
-  -> Reset  d 'Asynchronous
+  :: KnownDomain d dom
+  => Clock  d
+  -> Reset d
   -> Signal d (Signed 64)
   -> Signal d (Signed 64)
-verilog_register clk (unsafeFromAsyncReset -> arst) x = [verilog|
+verilog_register clk (unsafeToHighPolarity -> arst) x = [verilog|
   parameter data_width = 64;
 
   input  #{clk};
@@ -28,11 +29,11 @@ verilog_register clk (unsafeFromAsyncReset -> arst) x = [verilog|
 {-# NOINLINE verilog_register #-}
 
 topEntity
-  :: Clock System 'Source
-  -> Reset System 'Asynchronous
+  :: Clock System
+  -> Reset System
   -> Signal System (Signed 64)
 topEntity clk arst = let s  = verilog_register clk arst (s' + 1)
-                         s' = register clk arst 0 s
+                         s' = register clk arst enableGen 0 s
                      in  s'
 
 testBench :: Signal System Bool

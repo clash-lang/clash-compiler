@@ -596,11 +596,16 @@ outputTest' env target extraClashArgs extraGhcArgs modName funcName path =
              , "-XExplicitForAll"
              , "-XExplicitNamespaces"
              , "-XFlexibleContexts"
+             , "-XFlexibleInstances"
              , "-XKindSignatures"
              , "-XMagicHash"
              , "-XMonoLocalBinds"
+             , "-XMultiParamTypeClasses"
              , "-XNoImplicitPrelude"
              , "-XNoMonomorphismRestriction"
+#if __GLASGOW_HASKELL__ < 806
+             , "-XTypeInType"
+#endif
 #if __GLASGOW_HASKELL__ >= 806
              , "-XNoStarIsType"
 #endif

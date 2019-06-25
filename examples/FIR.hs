@@ -10,23 +10,24 @@ dotp :: SaturatingNum a
 dotp as bs = fold boundedAdd (zipWith boundedMul as bs)
 
 fir
-  :: ( HiddenClockReset domain gated synchronous
+  :: ( HiddenClockResetEnable tag dom
      , Default a
      , KnownNat n
      , SaturatingNum a
      , Undefined a )
-  => Vec (n + 1) a -> Signal domain a -> Signal domain a
+  => Vec (n + 1) a -> Signal tag a -> Signal tag a
 fir coeffs x_t = y_t
   where
     y_t = dotp coeffs <$> bundle xs
     xs  = window x_t
 
 topEntity
-  :: Clock  System Source
-  -> Reset  System Asynchronous
+  :: Clock  System
+  -> Reset  System
+  -> Enable System
   -> Signal System (Signed 16)
   -> Signal System (Signed 16)
-topEntity = exposeClockReset (fir (2:>3:>(-2):>8:>Nil))
+topEntity = exposeClockResetEnable (fir (2:>3:>(-2):>8:>Nil))
 {-# NOINLINE topEntity #-}
 
 testBench :: Signal System Bool
@@ -34,6 +35,6 @@ testBench = done
   where
     testInput      = stimuliGenerator clk rst (2:>3:>(-2):>8:>Nil)
     expectedOutput = outputVerifier clk rst (4:>12:>1:>20:>Nil)
-    done           = expectedOutput (topEntity clk rst testInput)
+    done           = expectedOutput (topEntity clk rst (enableGen) testInput)
     clk            = tbSystemClockGen (not <$> done)
     rst            = systemResetGen

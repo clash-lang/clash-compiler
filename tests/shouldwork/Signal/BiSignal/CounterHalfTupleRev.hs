@@ -27,42 +27,43 @@ counter (write, prevread) i = ((write', prevread'), output)
 {-# NOINLINE counter #-}
 
 -- | Write on odd cyles
-f :: Clock System Source
-  -> Reset System Asynchronous
-  -> BiSignalIn 'Undefined System (BitSize Int)
-  -> ( BiSignalOut 'Undefined System (BitSize Int)
+f :: Clock System
+  -> Reset System
+  -> Enable System
+  -> BiSignalIn 'Floating System (BitSize Int)
+  -> ( BiSignalOut 'Floating System (BitSize Int)
      , Signal System Int
      )
-f clk rst s = (writeToBiSignal s (mealy clk rst counter (False, 0) (readFromBiSignal s)), 6)
+f clk rst en s = (writeToBiSignal s (mealy clk rst en counter (False, 0) (readFromBiSignal s)), 6)
 {-# NOINLINE f #-}
 
 -- | Write on even cyles
-g :: Clock System Source
-  -> Reset System Asynchronous
-  -> BiSignalIn 'Undefined System (BitSize Int)
-  -> ( BiSignalOut 'Undefined System (BitSize Int)
+g :: Clock System
+  -> Reset System
+  -> Enable System
+  -> BiSignalIn 'Floating System (BitSize Int)
+  -> ( BiSignalOut 'Floating System (BitSize Int)
      , Signal System Int
      )
-g clk rst s = (writeToBiSignal s (mealy clk rst counter (True, 0) (readFromBiSignal s)), 7)
+g clk rst en s = (writeToBiSignal s (mealy clk rst en counter (True, 0) (readFromBiSignal s)), 7)
 {-# NOINLINE g #-}
 
 
-topEntity :: Clock System Source
-          -> Reset System Asynchronous
-          -> ( Signal System Int
-             , Signal System Int
-             , Signal System Int
-             )
-topEntity clk rst = ( readFromBiSignal bus'
-                    , fInt
-                    , gInt
-                    )
-  where
-    (fBus, fInt) = f clk rst bus'
-    (gBus, gInt) = g clk rst bus'
+topEntity
+  :: Clock System
+  -> Reset System
+  -> Enable System
+  -> ( Signal System Int
+     , Signal System Int
+     , Signal System Int )
+topEntity clk rst en =
+  (readFromBiSignal bus', fInt, gInt)
+ where
+  (fBus, fInt) = f clk rst en bus'
+  (gBus, gInt) = g clk rst en bus'
 
-    bus  = mergeBiSignalOuts (fBus :> gBus :> Nil)
-    bus' = veryUnsafeToBiSignalIn bus
+  bus  = mergeBiSignalOuts (fBus :> gBus :> Nil)
+  bus' = veryUnsafeToBiSignalIn bus
 {-# NOINLINE topEntity #-}
 
 
@@ -77,6 +78,6 @@ testBench :: Signal System Bool
 testBench = done
   where
     clock          = tbSystemClockGen (not <$> done)
-    (a, _b, _c)    = topEntity clock systemResetGen
+    (a, _b, _c)    = topEntity clock systemResetGen enableGen
     done           = expectedOutput a
     expectedOutput = outputVerifier clock systemResetGen (1 :> 2 :> 3 :> 4 :> 5 :> 6 :> 7 :> Nil)

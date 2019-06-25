@@ -34,11 +34,12 @@ datamem mem (addr,Nothing)  = (mem                 ,mem !! addr)
 datamem mem (addr,Just val) = (replace addr val mem,mem !! addr)
 
 topEntity
-  :: Clock  System Source
-  -> Reset  System Asynchronous
+  :: Clock  System
+  -> Reset  System
+  -> Enable System
   -> Signal System (OPC Word)
   -> Signal System (Maybe Word)
-topEntity = exposeClockReset go where
+topEntity = exposeClockResetEnable go where
   go i = val where
     (addr,val) = (pu alu <^> (0,0,0 :: Unsigned 3)) (mem,i)
     mem        = (datamem <^> initMem) (addr,val)
@@ -50,6 +51,6 @@ testBench = done
   where
     testInput      = stimuliGenerator clk rst $(listToVecTH [Imm 1::OPC Word,Push,Imm 2,Push,Pop,Pop,Pop,ADD])
     expectedOutput = outputVerifier clk rst $(listToVecTH [Just 1 :: Maybe Word,Nothing,Just 2,Nothing,Nothing,Nothing,Nothing,Just 3])
-    done           = expectedOutput (topEntity clk rst testInput)
+    done           = expectedOutput (topEntity clk rst (enableGen) testInput)
     clk            = tbSystemClockGen (not <$> done)
     rst            = systemResetGen

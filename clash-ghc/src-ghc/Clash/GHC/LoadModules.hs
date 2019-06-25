@@ -627,8 +627,10 @@ wantedLanguageExtensions df =
              , LangExt.ExplicitForAll
              , LangExt.ExplicitNamespaces
              , LangExt.FlexibleContexts
+             , LangExt.FlexibleInstances
              , LangExt.KindSignatures
              , LangExt.MagicHash
+             , LangExt.MultiParamTypeClasses
              , LangExt.MonoLocalBinds
              , LangExt.QuasiQuotes
              , LangExt.ScopedTypeVariables
@@ -637,6 +639,9 @@ wantedLanguageExtensions df =
              , LangExt.TypeApplications
              , LangExt.TypeFamilies
              , LangExt.TypeOperators
+#if __GLASGOW_HASKELL__ < 806
+             , LangExt.TypeInType
+#endif
              ]
     unwanted = [ LangExt.ImplicitPrelude
                , LangExt.MonomorphismRestriction

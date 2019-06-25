@@ -22,7 +22,7 @@ deriveAnnotation (simpleDerivator OneHot OverlapL) [t| Train |]
 deriveBitPack [t| Train |]
 
 topEntity
-  :: SystemClockReset
+  :: SystemClockResetEnable
   => Signal System Train
   -> Signal System (BitVector 8)
 topEntity trains = pack <$> trains
@@ -38,7 +38,7 @@ testBench = done'
                                 :> Passenger 1
                                 :> Nil
 
-    expectedOutput :: SystemClockReset
+    expectedOutput :: SystemClockResetEnable
                    => Signal System (BitVector 8) -> Signal System Bool
     expectedOutput = outputVerifierBitVector $ ($$(bLit "1000....") :: BitVector 8)
                                             :> ($$(bLit "0100....") :: BitVector 8)
@@ -46,4 +46,9 @@ testBench = done'
                                             :> ($$(bLit "000101..") :: BitVector 8)
                                             :> Nil
     done  = expectedOutput (topEntity testInput)
-    done' = withClockReset (tbSystemClockGen (not <$> done')) systemResetGen done
+    done' =
+      withClockResetEnable
+        (tbSystemClockGen (not <$> done'))
+        systemResetGen
+        enableGen
+        done

@@ -539,8 +539,8 @@ class NFDataX1 f where
   default liftRnfX :: (Generic1 f, GNFDataX One (Rep1 f)) => (a -> ()) -> f a -> ()
   liftRnfX r = grnfX (RnfArgs1 r) . from1
 
--- | Create a value where all the elements have an 'errorX' but the spine
--- is defined, and fully evaluate a value with 'errorX's in it.
+-- | Class that houses functions dealing with /undefined/ values in Clash. See
+-- 'deepErrorX' and 'rnfX'.
 class Undefined a where
   -- | Create a value where all the elements have an 'errorX', but the spine
   -- is defined.

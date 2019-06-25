@@ -29,5 +29,10 @@ mbfilter (dout,ind) din = ((dout',ind'), low)
 
                   (dout',ind') = foldl f (dout0,ind0) din
 
-topEntity :: Clock System Source -> Reset System Asynchronous -> Signal System Din -> Signal System Bit
-topEntity = exposeClockReset (mbfilter `mealy` (dout0, ind0))
+topEntity
+  :: Clock System
+  -> Reset System
+  -> Enable System
+  -> Signal System Din
+  -> Signal System Bit
+topEntity = exposeClockResetEnable (mbfilter `mealy` (dout0, ind0))

@@ -34,6 +34,8 @@ import                Clash.Core.Var             (Id)
 import {-# SOURCE #-} Clash.Netlist.Types
   (BlackBox, Identifier, NetlistMonad)
 
+import qualified      Clash.Signal.Internal      as Signal
+
 data TemplateKind
   = TDecl
   | TExpr
@@ -71,6 +73,7 @@ type BlackBoxFunction
   -> NetlistMonad (Either String (BlackBoxMeta, BlackBox))
 
 -- | A BlackBox Template is a List of Elements
+-- TODO: Add name of function for better error messages
 type BlackBoxTemplate = [Element]
 
 -- | Elements of a blackbox context. If you extend this list, make sure to
@@ -148,8 +151,20 @@ data Element
   -- ^ Record selector of a type
   | IsLit !Int
   | IsVar !Int
-  | IsGated !Int
+  | IsActiveHigh !Int
+  -- ^ Whether a domain's reset lines are synchronous.
+  | Tag !Int
+  -- ^ Tag of a domain.
+  | Period !Int
+  -- ^ Period of a domain.
+  | ActiveEdge !Signal.ActiveEdge !Int
+  -- ^ Test active edge of memory elements in a certain domain
   | IsSync !Int
+  -- ^ Whether a domain's reset lines are synchronous. Errors if not applied to
+  -- a KnownDomain.
+  | IsInitDefined !Int
+  | IsAlwaysEnabled !Int
+  -- ^ Whether reset line is constantly enabled
   | StrCmp [Element] !Int
   | OutputWireReg !Int
   | Vars !Int

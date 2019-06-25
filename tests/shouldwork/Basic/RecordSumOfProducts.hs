@@ -15,10 +15,12 @@ data DbS = DbS { dbS :: DbState }
 
 
 topEntity
-  :: Clock System Source
-  -> Reset System Asynchronous
-  -> Signal System Bit -> Signal System Bit
-topEntity = exposeClockReset (walkState <^> DbS (DbInitDisp 0))
+  :: Clock System
+  -> Reset System
+  -> Enable System
+  -> Signal System Bit
+  -> Signal System Bit
+topEntity = exposeClockResetEnable (walkState <^> DbS (DbInitDisp 0))
 
 walkState :: DbS
           -> Bit

@@ -17,7 +17,7 @@ import qualified Data.Text.IO as T
 
 --------------- Logic -------------------
 mac
-  :: SystemClockReset
+  :: SystemClockResetEnable
   => Signal System (Signed 9, Signed 9)
   -> Signal System (Signed 9)
 mac xy = mealy macT 0 xy
@@ -28,7 +28,7 @@ mac xy = mealy macT 0 xy
         o    = acc
 
 topEntity
-  :: SystemClockReset
+  :: SystemClockResetEnable
   => Signal System ( Signed 9 `Annotate` 'StringAttr "top" "input1"
                    , Signed 9 `Annotate` 'StringAttr "top" "input2"
                    )
@@ -100,4 +100,4 @@ testBench = done'
                                                   ])
 
     done           = expectedOutput (topEntity testInput)
-    done'          = withClockReset (tbSystemClockGen (not <$> done')) systemResetGen done
+    done'          = withClockResetEnable (tbSystemClockGen (not <$> done')) systemResetGen enableGen done

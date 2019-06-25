@@ -1,5 +1,6 @@
 {-|
 Copyright  :  (C) 2017, Google Inc.
+                  2019, Myrtle Software Ltd
 License    :  BSD2 (see the file LICENSE)
 Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
 
@@ -26,7 +27,7 @@ Where:
 
   * The internal representation is a 'BitVector'
   * /n/ indicates the number of bits in the 'BitVector'
-  * /domain/ is the /clock-/ (and /reset-/) domain to which the memory elements
+  * /dom/ is the /clock-/ (and /reset-/) domain to which the memory elements
     manipulating these BiSignals belong.
   * Lastly, /ds/ indicates the default behavior for the BiSignal if nothing is
     being written (pull-down, pull-up, or undefined).
@@ -43,11 +44,12 @@ cycle.
 
 @
 -- | Alternatively read / increment+write
-counter :: (Bool, Int)
-        -- ^ Internal flip + previous read
-        -> Int
-        -- ^ Int from inout
-        -> ((Bool, Int), Maybe Int)
+counter
+  :: (Bool, Int)
+  -- ^ Internal flip + previous read
+  -> Int
+  -- ^ Int from inout
+  -> ((Bool, Int), Maybe Int)
 counter (write, prevread) i = ((write', prevread'), output)
   where
     output    = if write then Just (succ prevread) else Nothing
@@ -55,24 +57,25 @@ counter (write, prevread) i = ((write', prevread'), output)
     write' = not write
 
 -- | Write on odd cyles
-f :: Clock System Source
-  -> Reset System Asynchronous
-  -> BiSignalIn  Undefined System (BitSize Int)
-  -> BiSignalOut Undefined System (BitSize Int)
+f :: Clock System
+  -> Reset System
+  -> BiSignalIn  Floating System (BitSize Int)
+  -> BiSignalOut Floating System (BitSize Int)
 f clk rst s = writeToBiSignal s (mealy clk rst counter (False, 0) (readFromBiSignal s))
 
 -- | Write on even cyles
-g :: Clock System Source
-  -> Reset System Asynchronous
-  -> BiSignalIn  Undefined System (BitSize Int)
-  -> BiSignalOut Undefined System (BitSize Int)
+g :: Clock System
+  -> Reset System
+  -> BiSignalIn  Floating System (BitSize Int)
+  -> BiSignalOut Floating System (BitSize Int)
 g clk rst s = writeToBiSignal s (mealy clk rst counter (True, 0) (readFromBiSignal s))
 
 
 -- | Connect the /f/ and /g/ circuits to the same bus
-topEntity :: Clock System Source
-          -> Reset System Asynchronous
-          -> Signal System Int
+topEntity
+  :: Clock System
+  -> Reset System
+  -> Signal System Int
 topEntity clk rst = readFromBiSignal bus'
   where
     bus  = mergeBiSignalOuts $ f clk rst bus' :> g clk rst bus' :> Nil
@@ -80,19 +83,22 @@ topEntity clk rst = readFromBiSignal bus'
 @
 -}
 
-{-# LANGUAGE CPP #-}
-{-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE MagicHash #-}
-{-# LANGUAGE TypeOperators #-}
-{-# LANGUAGE KindSignatures #-}
-{-# LANGUAGE DataKinds #-}
-{-# LANGUAGE TypeFamilies #-}
-{-# LANGUAGE FlexibleInstances #-}
-{-# LANGUAGE InstanceSigs #-}
-{-# LANGUAGE GADTs #-}
-{-# LANGUAGE RankNTypes #-}
-{-# LANGUAGE MultiParamTypeClasses #-}
-{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE CPP                    #-}
+{-# LANGUAGE DataKinds              #-}
+{-# LANGUAGE FlexibleContexts       #-}
+{-# LANGUAGE FlexibleInstances      #-}
+{-# LANGUAGE GADTs                  #-}
+{-# LANGUAGE InstanceSigs           #-}
+{-# LANGUAGE KindSignatures         #-}
+{-# LANGUAGE MagicHash              #-}
+{-# LANGUAGE MultiParamTypeClasses  #-}
+{-# LANGUAGE RankNTypes             #-}
+{-# LANGUAGE ScopedTypeVariables    #-}
+{-# LANGUAGE TypeFamilies           #-}
+{-# LANGUAGE TypeOperators          #-}
+#if __GLASGOW_HASKELL__ < 806
+{-# LANGUAGE TypeInType #-}
+#endif
 
 {-# OPTIONS_GHC -fplugin=GHC.TypeLits.Extra.Solver #-}
 {-# OPTIONS_GHC -fplugin=GHC.TypeLits.Normalise #-}
@@ -108,8 +114,9 @@ module Clash.Signal.BiSignal (
   , veryUnsafeToBiSignalIn
   ) where
 
-import           Data.Maybe                 (Maybe,fromMaybe,fromJust,isJust)
+import           Data.Kind                  (Type)
 import           Data.List                  (intercalate)
+import           Data.Maybe                 (Maybe,fromMaybe,fromJust,isJust)
 
 import           Clash.Class.BitPack        (BitPack (..))
 import           Clash.Sized.BitVector      (BitVector)
@@ -129,16 +136,16 @@ data BiSignalDefault
   -- ^ __inout__ port behaves as if connected to a pull-up resistor
   | PullDown
   -- ^ __inout__ port behaves as if connected to a pull-down resistor
-  | Undefined
+  | Floating
   -- ^ __inout__ port behaves as if is /floating/. Reading a /floating/
   -- 'BiSignal' value in simulation will yield an errorX (undefined value).
   deriving (Show)
 
 -- | Singleton versions of 'BiSignalDefault'
-data SBiSignalDefault :: BiSignalDefault -> * where
-  SPullUp    :: SBiSignalDefault 'PullUp
-  SPullDown  :: SBiSignalDefault 'PullDown
-  SUndefined :: SBiSignalDefault 'Undefined
+data SBiSignalDefault :: BiSignalDefault -> Type where
+  SPullUp   :: SBiSignalDefault 'PullUp
+  SPullDown :: SBiSignalDefault 'PullDown
+  SFloating :: SBiSignalDefault 'Floating
 
 instance Given (SBiSignalDefault 'PullUp) where
   given = SPullUp
@@ -146,8 +153,8 @@ instance Given (SBiSignalDefault 'PullUp) where
 instance Given (SBiSignalDefault 'PullDown) where
   given = SPullDown
 
-instance Given (SBiSignalDefault 'Undefined) where
-  given = SUndefined
+instance Given (SBiSignalDefault 'Floating) where
+  given = SFloating
 
 -- | The /in/ part of an __inout__ port
 data BiSignalIn (ds :: BiSignalDefault) (dom :: Domain) (n :: Nat)
@@ -192,7 +199,7 @@ readFromBiSignal#
   -> Signal d (BitVector n)
 readFromBiSignal# (BiSignalIn ds s) =
   case ds of
-    SUndefined -> fromMaybe (errorX " undefined value on BiSignalIn") <$> s
+    SFloating -> fromMaybe (errorX " undefined value on BiSignalIn") <$> s
     SPullDown  -> fromMaybe minBound <$> s
     SPullUp    -> fromMaybe maxBound <$> s
 {-# NOINLINE readFromBiSignal# #-}

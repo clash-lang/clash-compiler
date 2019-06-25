@@ -68,7 +68,6 @@ import           Clash.Netlist.BlackBox.Util
 import           Clash.Netlist.Id                     (IdType (..), mkBasicId')
 import           Clash.Netlist.Types                  hiding (_intWidth, intWidth)
 import           Clash.Netlist.Util                   hiding (mkIdentifier, extendIdentifier)
-import           Clash.Signal.Internal                (ClockKind (..), ResetKind (..))
 import           Clash.Util
   (SrcSpan, noSrcSpan, curLoc, traceIf, (<:>),on,first)
 
@@ -343,7 +342,6 @@ verilogType' isDecl t =
 
   in case t of
        -- special case: Bit, Bool, clocks and resets
-       Clock _ _ Gated -> verilogType' isDecl (gatedClockType t)
        Clock {} -> emptyDoc
        Reset {} -> emptyDoc
        Bit      -> emptyDoc
@@ -352,12 +350,6 @@ verilogType' isDecl t =
        -- otherwise, print the type and prefix
        ty | (prefix, sz) <- getVerilogTy ty
          -> prefix <> renderVerilogTySize (sz-1)
-
-gatedClockType :: HWType -> HWType
-gatedClockType (Clock _ _ Gated) =
-  Product "GatedClock" (Just ["clk", "enable"]) [Bit,Bool]
-gatedClockType ty = ty
-{-# INLINE gatedClockType #-}
 
 sigDecl :: VerilogM Doc -> HWType -> VerilogM Doc
 sigDecl d t = verilogType t <+> d
@@ -574,15 +566,6 @@ modifier offset (Indexed (ty@(Product _ _ argTys),_,fI)) = Just (start+offset,en
     start   = typeSize ty - 1 - otherSz
     end     = start - argSize + 1
 
-modifier offset (Indexed (ty@(Clock _ _ Gated),_,fI)) = Just (start+offset,end+offset, argTy)
-  where
-    argTys  = [Bit, Bool]
-    argTy   = argTys !! fI
-    argSize = typeSize argTy
-    otherSz = otherSize argTys (fI - 1)
-    start   = typeSize ty - 1 - otherSz
-    end     = start - argSize + 1
-
 modifier offset (Indexed (ty@(Vector _ argTy),1,0)) = Just (start+offset,end+offset, argTy)
   where
     argSize = typeSize argTy
@@ -771,8 +754,6 @@ expr_ _ (DataCon (CustomSP name' dataRepr size args) (DC (_,constrNr)) es) =
 
 expr_ _ (DataCon (Product {}) _ es) = listBraces (mapM (expr_ False) es)
 
-expr_ _ (DataCon (Clock _ _ Gated) _ es) = listBraces (mapM (expr_ False) es)
-
 expr_ _ (BlackBoxE pNm _ _ _ _ bbCtx _)
   | pNm == "Clash.Sized.Internal.Signed.fromInteger#"
   , [Literal _ (NumLit n), Literal _ i] <- extractLiterals bbCtx
@@ -935,8 +916,6 @@ punctuate' :: Monad m => Mon m Doc -> Mon m [Doc] -> Mon m Doc
 punctuate' s d = vcat (punctuate s d) <> s
 
 encodingNote :: Applicative m => HWType -> m Doc
-encodingNote (Clock _ _ Gated)        = string " // gated clock"
-encodingNote (Clock _ _ Source)       = string " // clock"
-encodingNote (Reset _ _ Asynchronous) = string " // asynchronous reset: active high"
-encodingNote (Reset _ _ Synchronous)  = string " // synchronous reset: active high"
-encodingNote _                        = emptyDoc
+encodingNote (Clock _) = string " // clock"
+encodingNote (Reset _) = string " // reset"
+encodingNote _         = emptyDoc

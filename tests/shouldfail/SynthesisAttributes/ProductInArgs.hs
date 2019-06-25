@@ -12,7 +12,7 @@ mac xy = mealy macT 0 xy
         o    = acc
 
 topEntity
-  :: SystemClockReset
+  :: SystemClockResetEnable
   => Signal System (Signed 9, Signed 9) `Annotate` 'StringAttr "args" "product"
   -> Signal System (Signed 9)
 topEntity xy = mac xy

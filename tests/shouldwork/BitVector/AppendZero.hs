@@ -5,8 +5,8 @@ import Clash.Explicit.Testbench
 import Clash.Sized.BitVector ((++#))
 
 topEntity
-  :: Clock  System Source
-  -> Reset  System Asynchronous
+  :: Clock  System
+  -> Reset  System
   -> Signal System ( BitVector 16
                    , BitVector 16
                    , BitVector 32

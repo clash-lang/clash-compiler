@@ -35,17 +35,18 @@ fifo (rpntr, wpntr, elms) (datain,wrt,rd) = ((rpntr',wpntr',elms'),(full,empty,d
     dataout = elms !! rind
 
 fifoL
-  :: SystemClockReset
+  :: SystemClockResetEnable
   => Signal System (Elm,Bool,Bool)
   -> Signal System (Bool,Bool,Elm)
 fifoL = fifo `mealy` (0,0,replicate d4 0)
 
 topEntity
-  :: Clock System Source
-  -> Reset System Asynchronous
+  :: Clock System
+  -> Reset System
+  -> Enable System
   -> Signal System (Elm,Bool,Bool)
   -> Signal System (Bool,Bool,Elm)
-topEntity = exposeClockReset fifoL
+topEntity = exposeClockResetEnable fifoL
 
 testdatas :: [[(Elm,Bool,Bool)]]
 testdatas = [
