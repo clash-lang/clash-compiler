@@ -65,6 +65,8 @@ module Clash.Prelude
     -- * BlockRAM primitives
   , blockRam
   , blockRamPow2
+  , blockRam1
+  , E.ResetStrategy(..)
     -- ** BlockRAM primitives initialized with a data file
   , blockRamFile
   , blockRamFilePow2
@@ -167,6 +169,7 @@ import           Clash.Hidden
 import           Clash.NamedTypes
 import           Clash.Prelude.BitIndex
 import           Clash.Prelude.BitReduction
+import           Clash.Prelude.BlockRam
 import           Clash.Prelude.BlockRam.File
 import           Clash.Prelude.DataFlow
 import           Clash.Prelude.ROM.File
