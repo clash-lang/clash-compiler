@@ -90,7 +90,7 @@ end generate;
           -> Vec (n * m) a  -- ARG[2]
           -> Vec n (Vec m a)"
     , "template" :
-"-- unconcat begin
+"-- unconcat begin~DEVNULL[~ARG[0]]
 ~GENSYM[unconcat][0] : for ~GENSYM[i][2] in ~RESULT'range generate
 begin~IF ~VIVADO ~THEN
   ~RESULT(~SYM[2]) <= ~TOBV[~VAR[vec][2]((~SYM[2] * ~LIT[1]) to ((~SYM[2] * ~LIT[1]) + ~LIT[1] - 1))][~TYPEL[~TYPO]];~ELSE
