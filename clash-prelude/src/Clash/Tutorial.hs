@@ -1289,7 +1289,7 @@ a general listing of the available template holes:
 * @~ISVAR[N]@: Is the @(N+1)@'th argument to the function explicitly not a
   literal
 * @~TAG[N]@: Name of given domain. Errors when called on an argument which is not
-  a 'KnownDomain'.
+  a 'KnownDomain', 'Reset', or 'Clock'.
 * @~PERIOD[N]@: Clock period of given domain. Errors when called on an argument
   which is not a 'KnownDomain'.
 * @~ISALWAYSENABLED[N]@: Is the @(N+1)@'th argument a an Enable line set to a constant

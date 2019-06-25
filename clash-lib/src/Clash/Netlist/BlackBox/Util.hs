@@ -349,6 +349,10 @@ renderElem b (Tag n) = do
   case stripVoid ty of
     KnownDomain dom _ _ _ _ _ ->
       return (const (Text.pack (Data.Text.unpack dom)))
+    Reset dom ->
+      return (const (Text.pack (Data.Text.unpack dom)))
+    Clock dom ->
+      return (const (Text.pack (Data.Text.unpack dom)))
     _ ->
       error $ $(curLoc) ++ "Tag: Expected KnownDomain, not: " ++ show ty
 
