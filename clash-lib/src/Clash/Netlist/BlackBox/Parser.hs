@@ -20,6 +20,7 @@ import           Text.Parser.Combinators
 import           Text.Trifecta                hiding (Err)
 import           Text.Trifecta.Delta
 
+import qualified Clash.Signal.Internal        as Signal
 import           Clash.Netlist.BlackBox.Types
 
 -- | Parse a text as a BlackBoxTemplate, returns a list of errors in case
@@ -43,6 +44,12 @@ pElement  =  pTagD
 -- | Parse the Text part of a Template
 pText :: Parser Text
 pText = pack <$> some (satisfyRange '\000' '\125')
+
+pEdge :: Parser Signal.ActiveEdge
+pEdge =
+  (pure Signal.Rising <* symbol "Rising") <|>
+  (pure Signal.Falling <* symbol "Falling")
+
 
 -- | Parse a Declaration or Expression element
 pTagD :: Parser Element
@@ -119,7 +126,7 @@ pTagE =  Result True       <$  string "~ERESULT"
      -- Domain attributes:
      <|> Tag               <$> (string "~TAG" *> brackets' natural')
      <|> Period            <$> (string "~PERIOD" *> brackets' natural')
-     <|> IsRisingEdge      <$> (string "~ISRISINGEDGE" *> brackets' natural')
+     <|> ActiveEdge        <$> (string "~ACTIVEEDGE" *> brackets pEdge) <*> brackets' natural'
      <|> IsSync            <$> (string "~ISSYNC" *> brackets' natural')
      <|> IsInitDefined     <$> (string "~ISINITDEFINED" *> brackets' natural')
 

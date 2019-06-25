@@ -24,12 +24,12 @@ initial begin
   end
 end
 ~IF ~ISALWAYSENABLED[4] ~THEN
-always @(~IF~ISRISINGEDGE[0]~THENposedge~ELSEnegedge~FI ~ARG[3]) begin : ~GENSYM[~COMPNAME_rom][5]
+always @(~IF~ACTIVEEDGE[Rising][0]~THENposedge~ELSEnegedge~FI ~ARG[3]) begin : ~GENSYM[~COMPNAME_rom][5]
   if (~ARG[4]) begin
     ~RESULT <= ~SYM[1][~ARG[6]];
   end
 end~ELSE
-always @(~IF~ISRISINGEDGE[0]~THENposedge~ELSEnegedge~FI ~ARG[3]) begin : ~SYM[5]
+always @(~IF~ACTIVEEDGE[Rising][0]~THENposedge~ELSEnegedge~FI ~ARG[3]) begin : ~SYM[5]
   ~RESULT <= ~SYM[1][~ARG[6]];
 end~FI
 // rom end"

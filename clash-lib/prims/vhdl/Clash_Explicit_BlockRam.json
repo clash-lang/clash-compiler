@@ -35,7 +35,7 @@ begin
 ~IF ~VIVADO ~THEN
   ~SYM[6] : process(~ARG[3])
   begin
-    if ~IF~ISRISINGEDGE[0]~THENrising_edge~ELSEfalling_edge~FI(~ARG[3]) then
+    if ~IF~ACTIVEEDGE[Rising][0]~THENrising_edge~ELSEfalling_edge~FI(~ARG[3]) then
       if ~ARG[7] ~IF ~ISALWAYSENABLED[4] ~THEN and ~ARG[4] ~ELSE ~FI then
         ~SYM[2](~SYM[5]) <= ~TOBV[~ARG[9]][~TYP[9]];
       end if;
@@ -48,7 +48,7 @@ begin
   end process; ~ELSE
   ~SYM[6] : process(~ARG[3])
   begin
-    if ~IF~ISRISINGEDGE[0]~THENrising_edge~ELSEfalling_edge~FI(~ARG[3]) then
+    if ~IF~ACTIVEEDGE[Rising][0]~THENrising_edge~ELSEfalling_edge~FI(~ARG[3]) then
       if ~ARG[7] ~IF ~ISALWAYSENABLED[4] ~THEN and ~ARG[4] ~ELSE ~FI then
         ~SYM[2](~SYM[5]) <= ~ARG[9];
       end if;

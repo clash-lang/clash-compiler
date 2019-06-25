@@ -50,7 +50,7 @@ begin
   ~IF ~VIVADO ~THEN ~IF ~ISALWAYSENABLED[4] ~THEN
   ~GENSYM[blockRamFile_sync][10] : process(~ARG[3])
   begin
-    if ~IF~ISRISINGEDGE[0]~THENrising_edge~ELSEfalling_edge~FI(~ARG[3]) then
+    if ~IF~ACTIVEEDGE[Rising][0]~THENrising_edge~ELSEfalling_edge~FI(~ARG[3]) then
       if ~ARG[4] then
         if ~ARG[8] then
           ~SYM[3](~SYM[6]) <= to_bitvector(~ARG[10]);
@@ -65,7 +65,7 @@ begin
   end process;~ELSE
   ~SYM[10] : process(~ARG[3])
   begin
-    if ~IF~ISRISINGEDGE[0]~THENrising_edge~ELSEfalling_edge~FI(~ARG[3]) then
+    if ~IF~ACTIVEEDGE[Rising][0]~THENrising_edge~ELSEfalling_edge~FI(~ARG[3]) then
       if ~ARG[8] then
         ~SYM[3](~SYM[6]) <= to_bitvector(~ARG[10]);
       end if;
@@ -78,7 +78,7 @@ begin
   end process;~FI ~ELSE ~IF ~ISALWAYSENABLED[4] ~THEN
   ~SYM[10] : process(~ARG[3])
   begin
-    if ~IF~ISRISINGEDGE[0]~THENrising_edge~ELSEfalling_edge~FI(~ARG[3]) then
+    if ~IF~ACTIVEEDGE[Rising][0]~THENrising_edge~ELSEfalling_edge~FI(~ARG[3]) then
       if ~ARG[8] and ~ARG[4] then
         ~SYM[3](~SYM[6]) <= to_bitvector(~ARG[10]);
       end if;
@@ -93,7 +93,7 @@ begin
   end process;~ELSE
   ~SYM[10] : process(~ARG[3])
   begin
-    if ~IF~ISRISINGEDGE[0]~THENrising_edge~ELSEfalling_edge~FI(~ARG[3]) then
+    if ~IF~ACTIVEEDGE[Rising][0]~THENrising_edge~ELSEfalling_edge~FI(~ARG[3]) then
       if ~ARG[8] then
         ~SYM[3](~SYM[6]) <= to_bitvector(~ARG[10]);
       end if;

@@ -34,6 +34,8 @@ import                Clash.Core.Var             (Id)
 import {-# SOURCE #-} Clash.Netlist.Types
   (BlackBox, Identifier, NetlistMonad)
 
+import qualified      Clash.Signal.Internal      as Signal
+
 data TemplateKind
   = TDecl
   | TExpr
@@ -155,8 +157,8 @@ data Element
   -- ^ Tag of a domain.
   | Period !Int
   -- ^ Period of a domain.
-  | IsRisingEdge !Int
-  -- ^ Which clock edge memory elements are sensitive to.
+  | ActiveEdge !Signal.ActiveEdge !Int
+  -- ^ Test active edge of memory elements in a certain domain
   | IsSync !Int
   -- ^ Whether a domain's reset lines are synchronous. Errors if not applied to
   -- a KnownDomain.

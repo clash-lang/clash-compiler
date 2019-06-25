@@ -38,7 +38,7 @@ begin
   ~IF ~ISALWAYSENABLED[3] ~THEN
   ~GENSYM[romFileSync][7] : process (~ARG[2])
   begin
-    if (~IF~ISRISINGEDGE[1]~THENrising_edge~ELSEfalling_edge~FI(~ARG[2])) then
+    if (~IF~ACTIVEEDGE[Rising][1]~THENrising_edge~ELSEfalling_edge~FI(~ARG[2])) then
       if ~ARG[3] then
         ~RESULT <= to_stdlogicvector(~SYM[2](~SYM[3]))
         -- pragma translate_off
@@ -50,7 +50,7 @@ begin
   end process;~ELSE
   ~SYM[7] : process (~ARG[2])
   begin
-    if (~IF~ISRISINGEDGE[1]~THENrising_edge~ELSEfalling_edge~FI(~ARG[2])) then
+    if (~IF~ACTIVEEDGE[Rising][1]~THENrising_edge~ELSEfalling_edge~FI(~ARG[2])) then
       ~RESULT <= to_stdlogicvector(~SYM[2](~SYM[3]))
       -- pragma translate_off
       after 1 ps

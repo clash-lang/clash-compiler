@@ -54,7 +54,7 @@ begin
   ~SYM[3] <= ~ARG[7];
   process(~ARG[3]) is
   begin
-    if (~IF~ISRISINGEDGE[0]~THENrising_edge~ELSEfalling_edge~FI(~ARG[3])) then
+    if (~IF~ACTIVEEDGE[Rising][0]~THENrising_edge~ELSEfalling_edge~FI(~ARG[3])) then
       assert (toSLV(~SYM[2]) = toSLV(~SYM[3])) report (~LIT[5] & \", expected: \" & ~INCLUDENAME[0].slv2string(toSLV(~SYM[3])) & \", actual: \" & ~INCLUDENAME[0].slv2string(toSLV(~SYM[2]))) severity error;
     end if;
   end process;
@@ -144,7 +144,7 @@ begin
   ~SYM[3] <= ~ARG[6];
   process(~ARG[2]) is
   begin
-    if (~IF~ISRISINGEDGE[0]~THENrising_edge~ELSEfalling_edge~FI(~ARG[2])) then
+    if (~IF~ACTIVEEDGE[Rising][0]~THENrising_edge~ELSEfalling_edge~FI(~ARG[2])) then
       assert (~INCLUDENAME[0].non_std_match(toSLV(~SYM[2]),toSLV(~SYM[3]))) report (~LIT[4] & \", expected: \" & ~INCLUDENAME[0].slv2string(toSLV(~SYM[3])) & \", actual: \" & ~INCLUDENAME[0].slv2string(toSLV(~SYM[2]))) severity error;
     end if;
   end process;

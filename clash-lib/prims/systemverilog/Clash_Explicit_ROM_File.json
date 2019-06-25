@@ -19,12 +19,12 @@ initial begin
 end
 
 ~SIGDO[~GENSYM[~RESULT_q][1]];~IF ~ISALWAYSENABLED[3] ~THEN
-always @(~IF~ISRISINGEDGE[1]~THENposedge~ELSEnegedge~FI ~ARG[2]) begin : ~GENSYM[~COMPNAME_romFile][2]
+always @(~IF~ACTIVEEDGE[Rising][1]~THENposedge~ELSEnegedge~FI ~ARG[2]) begin : ~GENSYM[~COMPNAME_romFile][2]
   if (~ARG[3]) begin
     ~SYM[1] <= ~SYM[0][~ARG[6]];
   end
 end~ELSE
-always @(~IF~ISRISINGEDGE[1]~THENposedge~ELSEnegedge~FI ~ARG[2]) begin : ~SYM[2]
+always @(~IF~ACTIVEEDGE[Rising][1]~THENposedge~ELSEnegedge~FI ~ARG[2]) begin : ~SYM[2]
   ~SYM[1] <= ~SYM[0][~ARG[6]];
 end~FI
 

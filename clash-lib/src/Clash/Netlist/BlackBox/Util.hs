@@ -58,7 +58,7 @@ import           Clash.Netlist.Types             (BlackBoxContext (..),
 import qualified Clash.Netlist.Types             as N
 import           Clash.Netlist.Util              (typeSize)
 import           Clash.Signal.Internal
-  (ResetKind(..), ResetPolarity(..), ActiveEdge(..), InitBehavior(..))
+  (ResetKind(..), ResetPolarity(..), InitBehavior(..))
 import           Clash.Util
 
 -- | Strip as many "Void" layers as possible. Might still return a Void if the
@@ -412,12 +412,13 @@ renderElem b (IF c t f) = do
 
 --        error $ show (e, ty, isLit, bbName b)
 
-      (IsRisingEdge n) ->
+      (ActiveEdge edgeRequested n) ->
         let (_, ty, _) = bbInputs b !! n in
         case stripVoid ty of
-          KnownDomain _ _ Rising _ _ _ -> 1
-          KnownDomain _ _ Falling _ _ _ -> 0
-          _ -> error $ $(curLoc) ++ "IsRisingEdge: Expected KnownDomain, not: " ++ show ty
+          KnownDomain _ _ edgeActual _ _ _ ->
+            if edgeRequested == edgeActual then 1 else 0
+          _ ->
+            error $ $(curLoc) ++ "ActiveEdge: Expected KnownDomain, not: " ++ show ty
 
       (IsSync n) ->
         let (_, ty, _) = bbInputs b !! n in
@@ -810,7 +811,7 @@ prettyElem (IsAlwaysEnabled i) = renderOneLine <$> (string "~ISALWAYSENABLED" <>
 -- Domain attributes:
 prettyElem (Tag i) = renderOneLine <$> (string "~TAG" <> brackets (int i))
 prettyElem (Period i) = renderOneLine <$> (string "~PERIOD" <> brackets (int i))
-prettyElem (IsRisingEdge i) = renderOneLine <$> (string "~ISRISINGEDGE" <> brackets (int i))
+prettyElem (ActiveEdge e i) = renderOneLine <$> (string "~ACTIVEEDGE" <> brackets (string (Text.pack (show e))) <> brackets (int i))
 prettyElem (IsSync i) = renderOneLine <$> (string "~ISSYNC" <> brackets (int i))
 prettyElem (IsInitDefined i) = renderOneLine <$> (string "~ISINITDEFINED" <> brackets (int i))
 
@@ -909,7 +910,7 @@ walkElement f el = maybeToList (f el) ++ walked
         IsVar _ -> []
         Tag _ -> []
         Period _ -> []
-        IsRisingEdge _ -> []
+        ActiveEdge _ _ -> []
         IsSync _ -> []
         IsInitDefined _ -> []
         IsActiveHigh _ -> []
@@ -960,7 +961,7 @@ usedArguments (N.BBTemplate t) = nub (concatMap (walkElement matchArg) t)
 
         -- Domain properties (only need type):
         IsInitDefined _ -> Nothing
-        IsRisingEdge _ -> Nothing
+        ActiveEdge _ _ -> Nothing
         IsSync _ -> Nothing
         Period _ -> Nothing
         Tag _ -> Nothing

@@ -137,6 +137,7 @@ import Type.Reflection            (Typeable)
 import Control.Applicative        (liftA2, liftA3)
 import Control.DeepSeq            (NFData)
 import Clash.Annotations.Primitive (hasBlackBox)
+import Data.Binary                (Binary)
 import Data.Char                  (isAsciiUpper, isAlphaNum, isAscii)
 import Data.Coerce                (coerce)
 import Data.Data                  (Data)
@@ -179,7 +180,7 @@ data ActiveEdge
   -- ^ Elements are sensitive to the rising edge (low-to-high) of the clock.
   | Falling
   -- ^ Elements are sensitive to the falling edge (high-to-low) of the clock.
-  deriving (Show, Eq, Ord, Generic, NFData, Data, Hashable)
+  deriving (Show, Eq, Ord, Generic, NFData, Data, Hashable, Binary)
 
 data SActiveEdge (edge :: ActiveEdge) where
   SRising  :: SActiveEdge 'Rising

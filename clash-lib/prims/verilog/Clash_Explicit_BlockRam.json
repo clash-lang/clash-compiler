@@ -28,7 +28,7 @@ initial begin
   end
 end
 ~IF ~ISALWAYSENABLED[4] ~THEN
-always @(~IF~ISRISINGEDGE[0]~THENposedge~ELSEnegedge~FI ~ARG[3]) begin : ~GENSYM[~RESULT_blockRam][5]~IF ~VIVADO ~THEN
+always @(~IF~ACTIVEEDGE[Rising][0]~THENposedge~ELSEnegedge~FI ~ARG[3]) begin : ~GENSYM[~RESULT_blockRam][5]~IF ~VIVADO ~THEN
   if (~ARG[4]) begin
     if (~ARG[7]) begin
       ~SYM[1][~ARG[8]] <= ~ARG[9];
@@ -42,7 +42,7 @@ always @(~IF~ISRISINGEDGE[0]~THENposedge~ELSEnegedge~FI ~ARG[3]) begin : ~GENSYM
     ~RESULT <= ~SYM[1][~ARG[6]];
   end~FI
 end~ELSE
-always @(~IF~ISRISINGEDGE[0]~THENposedge~ELSEnegedge~FI ~ARG[3]) begin : ~SYM[5]
+always @(~IF~ACTIVEEDGE[Rising][0]~THENposedge~ELSEnegedge~FI ~ARG[3]) begin : ~SYM[5]
   if (~ARG[7]) begin
     ~SYM[1][~ARG[8]] <= ~ARG[9];
   end

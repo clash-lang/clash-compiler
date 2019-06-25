@@ -1298,8 +1298,9 @@ a general listing of the available template holes:
   when called on an argument which is not a 'KnownDomain'.
 * @~ISINITDEFINED[N]@: Does synthesis domain at the @(N+1)@'th argument have defined initial
   values. Errors when called on an argument which is not a 'KnownDomain'.
-* @~ISRISINGEDGE[N]@: Does synthesis domain of the @(N+1)@'th respond to rising
-  edges. Errors when called on an argument which is not a 'KnownDomain'.
+* @~ACTIVEEDGE[edge][N]@: Does synthesis domain at the @(N+1)@'th argument respond to
+  /edge/. /edge/ must be one of 'Falling' or 'Rising'. Errors when called on an
+  argument which is not a 'KnownDomain'.
 * @~AND[\<HOLE1\>,\<HOLE2\>,..]@: Logically /and/ the conditions in the @\<HOLE\>@'s
 * @~VARS[N]@: VHDL: Return the variables at the @(N+1)@'th argument argument.
 * @~NAME[N]@: Render the @(N+1)@'th string literal argument as an identifier
