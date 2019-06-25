@@ -18,7 +18,7 @@ reg ~TYPO ~GENSYM[ROM][0] [0:~LIT[4]-1];
 initial begin
   $readmemb(~FILE[~LIT[5]],~SYM[0]);
 end
-~IF ~ISENABLED[3] ~THEN
+~IF ~ISALWAYSENABLED[3] ~THEN
 always @(~IF~ISRISINGEDGE[1]~THENposedge~ELSEnegedge~FI ~ARG[2]) begin : ~GENSYM[~COMPNAME_romFile][2]
   if (~ARG[3]) begin
     ~RESULT <= ~SYM[0][~ARG[6]];

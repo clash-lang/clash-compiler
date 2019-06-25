@@ -1196,7 +1196,7 @@ begin
   ~SYM[5] : process(~ARG[2])
   begin
     if rising_edge(~ARG[2]) then
-      if ~ARG[6] ~IF ~ISENABLED[3] ~THEN and ~ARG[3] ~ELSE ~FI then
+      if ~ARG[6] ~IF ~ISALWAYSENABLED[3] ~THEN and ~ARG[3] ~ELSE ~FI then
         ~SYM[1](~SYM[4]) <= ~TOBV[~ARG[8]][~TYP[8]];
       end if;
       ~RESULT <= fromSLV(~SYM[1](~SYM[3]))
@@ -1209,7 +1209,7 @@ begin
   ~SYM[5] : process(~ARG[2])
   begin
     if rising_edge(~ARG[2]) then
-      if ~ARG[6] ~IF ~ISENABLED[3] ~THEN and ~ARG[3] ~ELSE ~FI then
+      if ~ARG[6] ~IF ~ISALWAYSENABLED[3] ~THEN and ~ARG[3] ~ELSE ~FI then
         ~SYM[1](~SYM[4]) <= ~ARG[8];
       end if;
       ~RESULT <= ~SYM[1](~SYM[3])
@@ -1265,7 +1265,7 @@ a general listing of the available template holes:
 * @~IF \<CONDITION\> ~THEN \<THEN\> ~ELSE \<ELSE\> ~FI@: renders the \<ELSE\>
   part when \<CONDITION\> evaluates to /0/, and renders the \<THEN\> in all
   other cases. Valid @\<CONDITION\>@s are @~LENGTH[\<HOLE\>]@, @~SIZE[\<HOLE\>]@,
-  @~DEPTH[\<HOLE\>]@, @~VIVADO@, @~IW64@, @~ISLIT[N]@, @~ISVAR[N], @~ISENABLED[N]@,
+  @~DEPTH[\<HOLE\>]@, @~VIVADO@, @~IW64@, @~ISLIT[N]@, @~ISVAR[N], @~ISALWAYSENABLED[N]@,
   @~ISSYNC[N]@, and @~AND[\<HOLE1\>,\<HOLE2\>,..]@.
 * @~VIVADO@: /1/ when Clash compiler is invoked with the @-fclash-xilinx@ or
   @-fclash-vivado@ flag. To be used with in an @~IF .. ~THEN .. ~ElSE .. ~FI@
@@ -1292,7 +1292,7 @@ a general listing of the available template holes:
   a 'KnownDomain'.
 * @~PERIOD[N]@: Clock period of given domain. Errors when called on an argument
   which is not a 'KnownDomain'.
-* @~ISENABLED[N]@: Is the @(N+1)@'th argument a an Enable line set to a constant
+* @~ISALWAYSENABLED[N]@: Is the @(N+1)@'th argument a an Enable line set to a constant
   True. Errors when called on an argument which is not an 'Enable'.
 * @~ISSYNC[N]@: Does synthesis domain of the @(N+1)@'th have synchronous resets. Errors
   when called on an argument which is not a 'KnownDomain'.
@@ -1367,7 +1367,7 @@ initial begin
     ~SYM[0][~LENGTH[~TYP[4]]-1-~SYM[3]] = ~SYM[2][~SYM[3]*~SIZE[~TYPO]+:~SIZE[~TYPO]];
   end
 end
-~IF ~ISENABLED[3] ~THEN
+~IF ~ISALWAYSENABLED[3] ~THEN
 always @(posedge ~ARG[2]) begin : ~GENSYM[~RESULT_blockRam][4]~IF ~VIVADO ~THEN
   if (~ARG[3]) begin
     if (~ARG[6]) begin
@@ -1431,7 +1431,7 @@ and
 logic [~SIZE[~TYP[8]]-1:0] ~GENSYM[~RESULT_q][1];
 initial begin
   ~SYM[0] = ~CONST[4];
-end~IF ~ISENABLED[3] ~THEN
+end~IF ~ISALWAYSENABLED[3] ~THEN
 always @(posedge ~ARG[2]) begin : ~GENSYM[~COMPNAME_blockRam][2]~IF ~VIVADO ~THEN
   if (~ARG[3]) begin
     if (~ARG[6]) begin

@@ -19,9 +19,9 @@
 "-- altddioIn begin
 ~GENSYM[~COMPNAME_ALTDDIO_IN][0] : block
   signal ~GENSYM[dataout_l][1] : ~TYP[8];
-  signal ~GENSYM[dataout_h][2] : ~TYP[8];~IF ~ISENABLED[7] ~THEN
+  signal ~GENSYM[dataout_h][2] : ~TYP[8];~IF ~ISALWAYSENABLED[7] ~THEN
   signal ~GENSYM[ce_logic][4]: std_logic;~ELSE ~FI
-begin~IF ~ISENABLED[5] ~THEN
+begin~IF ~ISALWAYSENABLED[5] ~THEN
   ~SYM[4] <= '1' when (~ARG[7]) else '0';~ELSE ~FI
   ~GENSYM[~COMPNAME_ALTDDIO_IN][7] : ALTDDIO_IN
   GENERIC MAP (
@@ -35,7 +35,7 @@ begin~IF ~ISENABLED[5] ~THEN
   PORT MAP (~IF ~ISSYNC[6] ~THEN
     sclr      => ~ARG[6],~ELSE
     aclr      => ~ARG[6],~FI
-    datain    => ~ARG[8],~IF ~ISENABLED[5] ~THEN
+    datain    => ~ARG[8],~IF ~ISALWAYSENABLED[5] ~THEN
     inclocken => ~SYM[4],~ELSE ~FI
     inclock   => ~ARG[5],
     dataout_h => ~SYM[2],
@@ -66,9 +66,9 @@ end block;
     , "imports" : ["altera_mf.altera_mf_components.all"]
     , "template" :
 "-- altddioOut begin
-~GENSYM[~COMPNAME_ALTDDIO_OUT][0] : block ~IF ~ISENABLED[7] ~THEN
+~GENSYM[~COMPNAME_ALTDDIO_OUT][0] : block ~IF ~ISALWAYSENABLED[7] ~THEN
   signal ~GENSYM[ce_logic][1] : std_logic; ~ELSE ~FI
-begin~IF ~ISENABLED[7] ~THEN
+begin~IF ~ISALWAYSENABLED[7] ~THEN
   ~SYM[3] <= '1' when (~ARG[7]) else '0'; ~ELSE ~FI
   ~GENSYM[~COMPNAME_ALTDDIO_OUT][7] : ALTDDIO_OUT
     GENERIC MAP (
@@ -83,7 +83,7 @@ begin~IF ~ISENABLED[7] ~THEN
     )
     PORT MAP (~IF ~ISSYNC[2] ~THEN
       sclr       => ~ARG[6],~ELSE
-      aclr       => ~ARG[6],~FI ~IF ~ISENABLED[7] ~THEN
+      aclr       => ~ARG[6],~FI ~IF ~ISALWAYSENABLED[7] ~THEN
       outclocken => ~SYM[1],~ELSE ~FI
       outclock   => ~ARG[5],
       datain_h   => ~ARG[7],

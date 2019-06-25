@@ -20,7 +20,7 @@
 logic [~SIZE[~TYP[9]]-1:0] ~GENSYM[~RESULT_q][2];
 initial begin
   ~SYM[1] = ~CONST[5];
-end~IF ~ISENABLED[4] ~THEN
+end~IF ~ISALWAYSENABLED[4] ~THEN
 always @(~IF~ISRISINGEDGE[0]~THENposedge~ELSEnegedge~FI ~ARG[3]) begin : ~GENSYM[~COMPNAME_blockRam][3]~IF ~VIVADO ~THEN
   if (~ARG[4]) begin
     if (~ARG[7]) begin

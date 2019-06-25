@@ -161,7 +161,7 @@ data Element
   -- ^ Whether a domain's reset lines are synchronous. Errors if not applied to
   -- a KnownDomain.
   | IsInitDefined !Int
-  | IsEnabled !Int
+  | IsAlwaysEnabled !Int
   -- ^ Whether reset line is constantly enabled
   | StrCmp [Element] !Int
   | OutputWireReg !Int

@@ -23,7 +23,7 @@
 initial begin
   $readmemb(~FILE[~LIT[6]],~SYM[1]);
 end
-~IF ~ISENABLED[4] ~THEN
+~IF ~ISALWAYSENABLED[4] ~THEN
 always @(~IF~ISRISINGEDGE[0]~THENposedge~ELSEnegedge~FI ~ARG[3]) begin : ~GENSYM[~COMPNAME_blockRamFile][3]~IF ~VIVADO ~THEN
   if (~ARG[4]) begin
     if (~ARG[8]) begin

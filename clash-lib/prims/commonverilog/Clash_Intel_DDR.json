@@ -36,7 +36,7 @@ altddio_out
     .datain_h (~ARG[8]),
     .datain_l (~ARG[9]),
     .outclock (~ARG[5]),
-    .outclocken (~IF ~ISENABLED[7] ~THEN ~ARG[7] ~ELSE 1'b1 ~FI),
+    .outclocken (~IF ~ISALWAYSENABLED[7] ~THEN ~ARG[7] ~ELSE 1'b1 ~FI),
     .dataout (~RESULT),
     .aset (1'b0),
     .sset (1'b0),

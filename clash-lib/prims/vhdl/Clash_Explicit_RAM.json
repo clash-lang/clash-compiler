@@ -38,7 +38,7 @@ begin
   ~GENSYM[asyncRam_sync][7] : process(~ARG[3])
   begin
     if ~IF~ISRISINGEDGE[1]~THENrising_edge~ELSEfalling_edge~FI(~ARG[3]) then
-      if (~ARG[8] ~IF ~ISENABLED[5] ~THEN and ~ARG[5] ~ELSE ~FI) then~IF ~VIVADO ~THEN
+      if (~ARG[8] ~IF ~ISALWAYSENABLED[5] ~THEN and ~ARG[5] ~ELSE ~FI) then~IF ~VIVADO ~THEN
         ~SYM[1](~SYM[3]) <= ~TOBV[~ARG[10]][~TYP[10]];~ELSE
         ~SYM[1](~SYM[3]) <= ~ARG[10];~FI
       end if;

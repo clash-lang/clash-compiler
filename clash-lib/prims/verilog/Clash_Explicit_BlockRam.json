@@ -27,7 +27,7 @@ initial begin
     ~SYM[1][~LENGTH[~TYP[5]]-1-~SYM[4]] = ~SYM[3][~SYM[4]*~SIZE[~TYPO]+:~SIZE[~TYPO]];
   end
 end
-~IF ~ISENABLED[4] ~THEN
+~IF ~ISALWAYSENABLED[4] ~THEN
 always @(~IF~ISRISINGEDGE[0]~THENposedge~ELSEnegedge~FI ~ARG[3]) begin : ~GENSYM[~RESULT_blockRam][5]~IF ~VIVADO ~THEN
   if (~ARG[4]) begin
     if (~ARG[7]) begin
