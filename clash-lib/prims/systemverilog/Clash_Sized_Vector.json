@@ -108,7 +108,7 @@ assign ~SYM[0] = ~TOBV[~ARG[1]][~TYP[1]];
            -> Vec (n * m) a  -- ARG[2]
            -> Vec n (Vec m a)"
     , "template" :
-"// unconcat begin
+"// unconcat begin~DEVNULL[~ARG[0]]
 genvar ~GENSYM[n][1];
 ~GENERATE
   for (~SYM[1] = 0; ~SYM[1] < $size(~RESULT); ~SYM[1] = ~SYM[1] + 1) begin : ~GENSYM[unconcat][2]

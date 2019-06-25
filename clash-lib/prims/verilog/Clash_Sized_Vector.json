@@ -93,7 +93,7 @@ end
            => SNat m         -- ARG[1]
            -> Vec (n * m) a  -- ARG[2]
            -> Vec n (Vec m a)"
-    , "template" : "~ARG[2]"
+    , "template" : "~ARG[2]~DEVNULL[~ARG[0]]~DEVNULL[~ARG[1]]"
     }
   }
 , { "BlackBox" :
