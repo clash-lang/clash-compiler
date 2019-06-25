@@ -1294,14 +1294,14 @@ a general listing of the available template holes:
   which is not a 'KnownDomain'.
 * @~ISALWAYSENABLED[N]@: Is the @(N+1)@'th argument a an Enable line set to a constant
   True. Errors when called on an argument which is not an 'Enable'.
-* @~ISSYNC[N]@: Does synthesis domain of the @(N+1)@'th have synchronous resets. Errors
+* @~ISSYNC[N]@: Does synthesis domain at the @(N+1)@'th argument have synchronous resets. Errors
   when called on an argument which is not a 'KnownDomain'.
-* @~ISINITDEFINED[N]@: Does synthesis domain of the @(N+1)@'th have defined initial
+* @~ISINITDEFINED[N]@: Does synthesis domain at the @(N+1)@'th argument have defined initial
   values. Errors when called on an argument which is not a 'KnownDomain'.
 * @~ISRISINGEDGE[N]@: Does synthesis domain of the @(N+1)@'th respond to rising
   edges. Errors when called on an argument which is not a 'KnownDomain'.
 * @~AND[\<HOLE1\>,\<HOLE2\>,..]@: Logically /and/ the conditions in the @\<HOLE\>@'s
-* @~VARS[N]@: VHDL: Return the variables of the @(N+1)@'th argument.
+* @~VARS[N]@: VHDL: Return the variables at the @(N+1)@'th argument argument.
 * @~NAME[N]@: Render the @(N+1)@'th string literal argument as an identifier
   instead of a string literal. Fails when the @(N+1)@'th argument is not a
   string literal.
