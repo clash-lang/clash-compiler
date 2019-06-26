@@ -145,6 +145,7 @@ module Clash.Explicit.Signal
     -- * Domain
   , Domain
   , KnownDomain(..)
+  , KnownConfiguration
   , ActiveEdge(..)
   , SActiveEdge(..)
   , InitBehavior(..)
@@ -241,16 +242,18 @@ import Clash.Signal.Internal
 import Clash.XException               (Undefined, deepErrorX)
 
 {- $setup
->>> :set -XDataKinds -XTypeApplications -XFlexibleInstances -XMultiParamTypeClasses
+>>> :set -XDataKinds -XTypeApplications -XFlexibleInstances -XMultiParamTypeClasses -XTypeFamilies
 >>> import Clash.Explicit.Prelude
 >>> import qualified Data.List as L
 >>> :{
-instance KnownDomain "Dom2" ('DomainConfiguration "Dom2" 2 'Rising 'Asynchronous 'Defined 'ActiveHigh) where
+instance KnownDomain "Dom2" where
+  type KnownConf "Dom2" = 'DomainConfiguration "Dom2" 2 'Rising 'Asynchronous 'Defined 'ActiveHigh
   knownDomain = SDomainConfiguration SSymbol SNat SRising SAsynchronous SDefined SActiveHigh
 :}
 
 >>> :{
-instance KnownDomain "Dom7" ('DomainConfiguration "Dom7" 7 'Rising 'Asynchronous 'Defined 'ActiveHigh) where
+instance KnownDomain "Dom7" where
+  type KnownConf "Dom7" = 'DomainConfiguration "Dom7" 7 'Rising 'Asynchronous 'Defined 'ActiveHigh
   knownDomain = SDomainConfiguration SSymbol SNat SRising SAsynchronous SDefined SActiveHigh
 :}
 
@@ -365,8 +368,8 @@ systemResetGen = resetGen
 --     leds   = mealy blinkerT (1, False, 0) key1R
 -- @
 resetSynchronizer
-  :: forall dom conf
-   . KnownDomain dom conf
+  :: forall dom
+   . KnownDomain dom
   => Clock dom
   -> Reset dom
   -> Enable dom
@@ -470,9 +473,9 @@ freqCalc freq = ceiling ((1.0 / freq) / 1.0e-12)
 -- >>> sampleN 12 (almostId clk2 clk7 en2 en7 0 (fromList [(1::Int)..10]))
 -- [0,0,1,2,3,4,5,6,7,8,9,10]
 unsafeSynchronizer
-  :: forall dom1 dom2 conf1 conf2 a
-   . ( KnownDomain dom1 conf1
-     , KnownDomain dom2 conf2 )
+  :: forall dom1 dom2 a
+   . ( KnownDomain dom1
+     , KnownDomain dom2 )
   => Clock dom1
   -- ^ 'Clock' of the incoming signal
   -> Clock dom2
@@ -536,7 +539,7 @@ enable e0 e1 =
 -- | Special version of 'delay' that doesn't take enable signals of any kind.
 -- Initial value will be undefined.
 dflipflop
-  :: ( KnownDomain dom conf
+  :: ( KnownDomain dom
      , Undefined a )
   => Clock dom
   -> Signal dom a
@@ -555,7 +558,7 @@ dflipflop clk i =
 -- >>> sampleN 3 (delay systemClockGen enableGen 0 (fromList [1,2,3,4]))
 -- [0,1,2]
 delay
-  :: ( KnownDomain dom conf
+  :: ( KnownDomain dom
      , Undefined a )
   => Clock dom
   -- ^ Clock
@@ -575,7 +578,7 @@ delay = delay#
 -- >>> sampleN 7 (delayMaybe systemClockGen enableGen 0 input)
 -- [0,1,2,2,2,5,6]
 delayMaybe
-  :: ( KnownDomain dom conf
+  :: ( KnownDomain dom
      , Undefined a )
   => Clock dom
   -- ^ Clock
@@ -596,7 +599,7 @@ delayMaybe clk gen dflt i =
 -- >>> sampleN 7 (delayEn systemClockGen enableGen 0 enable input)
 -- [0,1,2,2,2,5,6]
 delayEn
-  :: ( KnownDomain dom conf
+  :: ( KnownDomain dom
      , Undefined a )
   => Clock dom
   -- ^ Clock
@@ -618,7 +621,7 @@ delayEn clk gen dflt en i =
 -- >>> sampleN 5 (register systemClockGen resetGen enableGen 8 (fromList [1,1,2,3,4]))
 -- [8,8,1,2,3]
 register
-  :: ( KnownDomain dom conf
+  :: ( KnownDomain dom
      , Undefined a )
   => Clock dom
   -- ^ clock
@@ -657,7 +660,7 @@ register clk rst gen initial i =
 -- >>> sampleN 9 (count systemClockGen resetGen enableGen)
 -- [0,0,0,1,1,2,2,3,3]
 regMaybe
-  :: ( KnownDomain dom conf
+  :: ( KnownDomain dom
      , Undefined a )
   => Clock dom
   -- ^ Clock
@@ -689,7 +692,7 @@ regMaybe clk rst en initial iM =
 -- >>> sampleN 9 (count systemClockGen resetGen enableGen)
 -- [0,0,0,1,1,2,2,3,3]
 regEn
-  :: ( KnownDomain dom conf
+  :: ( KnownDomain dom
      , Undefined a
      )
   => Clock dom

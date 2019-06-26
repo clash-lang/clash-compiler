@@ -120,7 +120,7 @@ We initially create a memory out of simple registers:
 
 @
 dataMem
-  :: KnownDomain dom conf
+  :: KnownDomain dom
   => Clock dom
   -> Reset dom
   -> Enable dom
@@ -144,7 +144,7 @@ And then connect everything:
 
 @
 system
-  :: ( KnownDomain dom conf
+  :: ( KnownDomain dom
      , KnownNat n )
   => Vec n Instruction
   -> Clock dom
@@ -213,7 +213,7 @@ has the potential to be translated to a more efficient structure:
 
 @
 system2
-  :: ( KnownDomain dom conf
+  :: ( KnownDomain dom
      , KnownNat n )
   => Vec n Instruction
   -> Clock dom
@@ -305,7 +305,7 @@ We can now finally instantiate our system with a 'blockRam':
 
 @
 system3
-  :: ( KnownDomain dom conf
+  :: ( KnownDomain dom
      , KnownNat n )
   => Vec n Instruction
   -> Clock dom
@@ -523,7 +523,7 @@ cpu regbank (memOut,instr) = (regbank',(rdAddr,(,aluOut) <$> wrAddrM,fromIntegra
 
 >>> :{
 dataMem
-  :: KnownDomain dom conf
+  :: KnownDomain dom
   => Clock  dom
   -> Reset  dom
   -> Enable dom
@@ -542,7 +542,7 @@ dataMem clk rst en rd wrM = mealy clk rst en dataMemT (C.replicate d32 0) (bundl
 
 >>> :{
 system
-  :: ( KnownDomain dom conf
+  :: ( KnownDomain dom
      , KnownNat n )
   => Vec n Instruction
   -> Clock dom
@@ -590,7 +590,7 @@ prog = -- 0 := 4
 
 >>> :{
 system2
-  :: ( KnownDomain dom conf
+  :: ( KnownDomain dom
      , KnownNat n )
   => Vec n Instruction
   -> Clock dom
@@ -641,7 +641,7 @@ cpu2 (regbank,ldRegD) (memOut,instr) = ((regbank',ldRegD'),(rdAddr,(,aluOut) <$>
 
 >>> :{
 system3
-  :: ( KnownDomain dom conf
+  :: ( KnownDomain dom
      , KnownNat n )
   => Vec n Instruction
   -> Clock dom
@@ -714,7 +714,7 @@ fromJustX (Just x) = x
 -- Block RAM.
 -- * Use the adapter 'readNew' for obtaining write-before-read semantics like this: @'readNew' clk rst ('blockRam' clk inits) rd wrM@.
 blockRam
-  :: ( KnownDomain dom conf
+  :: ( KnownDomain dom
      , HasCallStack
      , Undefined a
      , Enum addr )
@@ -760,7 +760,7 @@ blockRam = \clk gen content rd wrM ->
 -- Block RAM.
 -- * Use the adapter 'readNew' for obtaining write-before-read semantics like this: @'readNew' clk rst ('blockRamPow2' clk inits) rd wrM@.
 blockRamPow2
-  :: ( KnownDomain dom conf
+  :: ( KnownDomain dom
      , HasCallStack
      , Undefined a
      , KnownNat n )
@@ -792,8 +792,8 @@ data ResetStrategy (r :: Bool) where
 -- | Version of blockram that is initialized with the same value on all
 -- memory positions.
 blockRam1
-   :: forall n dom a r addr conf
-   . ( KnownDomain dom conf
+   :: forall n dom a r addr
+   . ( KnownDomain dom
      , HasCallStack
      , Undefined a
      , Enum addr
@@ -849,8 +849,8 @@ blockRam1 clk rst0 en rstStrategy n@SNat a rd0 mw0 =
 
 -- | blockRAM1 primitive
 blockRam1#
-  :: forall n dom a conf
-   . ( KnownDomain dom conf
+  :: forall n dom a
+   . ( KnownDomain dom
      , HasCallStack
      , Undefined a )
   => Clock dom
@@ -879,7 +879,7 @@ blockRam1# clk en n a =
 
 -- | blockRAM primitive
 blockRam#
-  :: ( KnownDomain dom conf
+  :: ( KnownDomain dom
      , HasCallStack
      , Undefined a )
   => Clock dom
@@ -927,7 +927,7 @@ blockRam# (Clock _) gen content rd wen =
 
 -- | Create read-after-write blockRAM from a read-before-write one
 readNew
-  :: ( KnownDomain dom conf
+  :: ( KnownDomain dom
      , Undefined a
      , Eq addr )
   => Reset dom

@@ -49,7 +49,7 @@ import Clash.XException                   (ShowX)
 --
 -- __NB__: This function /can/ be used in synthesizable designs.
 assert
-  :: (Eq a, ShowX a, HiddenClock dom conf, HiddenReset dom conf)
+  :: (Eq a, ShowX a, HiddenClock dom , HiddenReset dom )
   => String
   -- ^ Additional message
   -> Signal dom a
@@ -74,7 +74,7 @@ assert msg actual expected ret =
 --
 -- @
 -- testInput
---   :: HiddenClockResetEnable dom conf
+--   :: HiddenClockResetEnable dom
 --   => 'Signal' dom Int
 -- testInput = 'stimuliGenerator' $('Clash.Sized.Vector.listToVecTH' [(1::Int),3..21])
 -- @
@@ -83,8 +83,8 @@ assert msg actual expected ret =
 -- [1,3,5,7,9,11,13,15,17,19,21,21,21]
 stimuliGenerator
   :: ( KnownNat l
-     , HiddenClock dom conf
-     , HiddenReset dom conf )
+     , HiddenClock dom
+     , HiddenReset dom  )
   => Vec l a
   -- ^ Samples to generate
   -> Signal dom a
@@ -100,7 +100,7 @@ stimuliGenerator = hideReset (hideClock E.stimuliGenerator)
 --
 -- @
 -- expectedOutput
---   :: HiddenClockResetEnable dom conf
+--   :: HiddenClockResetEnable dom
 --   -> 'Signal' dom Int -> 'Signal' dom Bool
 -- expectedOutput = 'outputVerifier' $('Clash.Sized.Vector.listToVecTH' ([70,99,2,3,4,5,7,8,9,10]::[Int]))
 -- @
@@ -132,8 +132,8 @@ outputVerifier
   :: ( KnownNat l
      , Eq a
      , ShowX a
-     , HiddenClock dom conf
-     , HiddenReset dom conf )
+     , HiddenClock dom
+     , HiddenReset dom  )
   => Vec l a
   -- ^ Samples to compare with
   -> Signal dom a
@@ -149,8 +149,8 @@ outputVerifier = hideReset (hideClock E.outputVerifier)
 outputVerifierBitVector
   :: ( KnownNat l
      , KnownNat n
-     , HiddenClock dom conf
-     , HiddenReset dom conf )
+     , HiddenClock dom
+     , HiddenReset dom  )
   => Vec l (BitVector n)
   -- ^ Samples to compare with
   -> Signal dom (BitVector n)
@@ -162,7 +162,7 @@ outputVerifierBitVector = hideReset (hideClock E.outputVerifierBitVector)
 
 -- | Ignore signal for a number of cycles, while outputting a static value.
 ignoreFor
-  :: HiddenClockResetEnable dom conf
+  :: HiddenClockResetEnable dom
   => SNat n
   -- ^ Number of cycles to ignore incoming signal
   -> a

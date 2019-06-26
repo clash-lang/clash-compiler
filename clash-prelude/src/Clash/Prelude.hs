@@ -192,8 +192,8 @@ import           Clash.XException
 
 {- $setup
 >>> :set -XDataKinds -XFlexibleContexts -XTypeApplications
->>> let window4  = window  :: HiddenClockResetEnable dom conf => Signal dom Int -> Vec 4 (Signal dom Int)
->>> let windowD3 = windowD :: HiddenClockResetEnable dom conf => Signal dom Int -> Vec 3 (Signal dom Int)
+>>> let window4  = window  :: HiddenClockResetEnable dom  => Signal dom Int -> Vec 4 (Signal dom Int)
+>>> let windowD3 = windowD :: HiddenClockResetEnable dom  => Signal dom Int -> Vec 3 (Signal dom Int)
 -}
 
 {- $hiding
@@ -209,7 +209,7 @@ It instead exports the identically named functions defined in terms of
 
 -- | Give a window over a 'Signal'
 --
--- > window4 :: HiddenClockResetEnable dom conf
+-- > window4 :: HiddenClockResetEnable dom
 -- >         => Signal dom Int -> Vec 4 (Signal dom Int)
 -- > window4 = window
 --
@@ -217,7 +217,7 @@ It instead exports the identically named functions defined in terms of
 -- [<1,0,0,0>,<2,1,0,0>,<3,2,1,0>,<4,3,2,1>,<5,4,3,2>...
 -- ...
 window
-  :: ( HiddenClockResetEnable dom conf
+  :: ( HiddenClockResetEnable dom
      , KnownNat n
      , Default a
      , Undefined a )
@@ -231,7 +231,7 @@ window = hideClockResetEnable E.window
 -- | Give a delayed window over a 'Signal'
 --
 -- > windowD3
--- >   :: HiddenClockResetEnable dom conf
+-- >   :: HiddenClockResetEnable dom
 -- >   => Signal dom Int
 -- >   -> Vec 3 (Signal dom Int)
 -- > windowD3 = windowD
@@ -240,7 +240,7 @@ window = hideClockResetEnable E.window
 -- [<0,0,0>,<1,0,0>,<2,1,0>,<3,2,1>,<4,3,2>...
 -- ...
 windowD
-  :: ( HiddenClockResetEnable dom conf
+  :: ( HiddenClockResetEnable dom
      , KnownNat n
      , Default a
      , Undefined a )

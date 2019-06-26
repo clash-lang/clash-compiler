@@ -60,7 +60,7 @@ import Clash.XException      (ShowX (..), XException)
 --
 -- __NB__: This function /can/ be used in synthesizable designs.
 assert
-  :: (KnownDomain dom conf, Eq a, ShowX a)
+  :: (KnownDomain dom, Eq a, ShowX a)
   => Clock dom
   -> Reset dom
   -> String
@@ -94,7 +94,7 @@ assert clk (Reset _) msg checked expected returned =
 
 -- | The same as 'assert', but can handle don't care bits in it's expected value.
 assertBitVector
-  :: (KnownDomain dom conf, KnownNat n)
+  :: (KnownDomain dom, KnownNat n)
   => Clock dom
   -> Reset dom
   -> String
@@ -136,7 +136,7 @@ assertBitVector clk (Reset _) msg checked expected returned =
 --
 -- @
 -- testInput
---   :: KnownDomain dom conf
+--   :: KnownDomain dom
 --   => Clock dom
 --   -> Reset dom
 --   -> 'Signal' dom Int
@@ -146,9 +146,9 @@ assertBitVector clk (Reset _) msg checked expected returned =
 -- >>> sampleN 14 (testInput systemClockGen resetGen)
 -- [1,1,3,5,7,9,11,13,15,17,19,21,21,21]
 stimuliGenerator
-  :: forall l dom conf  a
+  :: forall l dom   a
    . ( KnownNat l
-     , KnownDomain dom conf )
+     , KnownDomain dom )
   => Clock dom
   -- ^ Clock to which to synchronize the output signal
   -> Reset dom
@@ -210,9 +210,9 @@ stimuliGenerator clk rst samples =
 --
 -- If your working with 'BitVector's containing don't care bit you should use 'outputVerifierBitVector'.
 outputVerifier
-  :: forall l dom conf  a
+  :: forall l dom   a
    . ( KnownNat l
-     , KnownDomain dom conf
+     , KnownDomain dom
      , Eq a
      , ShowX a )
   => Clock dom
@@ -247,10 +247,10 @@ outputVerifier clk rst samples i =
 -- | Same as 'outputVerifier', but can handle don't care bits in it's expected
 -- values.
 outputVerifierBitVector
-  :: forall l n dom conf
+  :: forall l n dom
    . ( KnownNat l
      , KnownNat n
-     , KnownDomain dom conf
+     , KnownDomain dom
      )
   => Clock dom
   -- ^ Clock to which the input signal is synchronized to
@@ -283,8 +283,8 @@ outputVerifierBitVector clk rst samples i =
 
 -- | Ignore signal for a number of cycles, while outputting a static value.
 ignoreFor
-  :: forall dom conf n a
-   . KnownDomain dom conf
+  :: forall dom  n a
+   . KnownDomain dom
   => Clock dom
   -> Reset dom
   -> Enable dom

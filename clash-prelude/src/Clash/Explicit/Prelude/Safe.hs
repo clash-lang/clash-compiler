@@ -165,7 +165,7 @@ import Clash.XException
 -- [(8,8),(8,8),(1,1),(2,2),(3,3)...
 -- ...
 registerB
-  :: ( KnownDomain dom conf
+  :: ( KnownDomain dom
      , Undefined a
      , Bundle a )
   => Clock dom
@@ -180,7 +180,7 @@ registerB clk rst en i =
 
 -- | Give a pulse when the 'Signal' goes from 'minBound' to 'maxBound'
 isRising
-  :: ( KnownDomain dom conf
+  :: ( KnownDomain dom
      , Undefined a
      , Bounded a
      , Eq a )
@@ -198,7 +198,7 @@ isRising clk rst en is s = liftA2 edgeDetect prev s
 
 -- | Give a pulse when the 'Signal' goes from 'maxBound' to 'minBound'
 isFalling
-  :: ( KnownDomain dom conf
+  :: ( KnownDomain dom
      , Undefined a
      , Bounded a
      , Eq a )
@@ -218,8 +218,8 @@ isFalling clk rst en is s = liftA2 edgeDetect prev s
 -- combined with functions like @'Clash.Explicit.Signal.regEn'@ or
 -- @'Clash.Explicit.Signal.mux'@, in order to delay a register by a known amount.
 riseEvery
-  :: forall dom conf n
-   . KnownDomain dom conf
+  :: forall dom  n
+   . KnownDomain dom
   => Clock dom
   -> Reset dom
   -> Enable dom
@@ -236,8 +236,8 @@ riseEvery clk rst en SNat = moore clk rst en transfer output 0 (pure ())
 
 -- | Oscillate a @'Bool'@ for a given number of cycles, given the starting state.
 oscillate
-  :: forall dom conf n
-   . KnownDomain dom conf
+  :: forall dom  n
+   . KnownDomain dom
   => Clock dom
   -> Reset dom
   -> Enable dom

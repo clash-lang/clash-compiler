@@ -107,12 +107,12 @@ asyncRom# content rd = arr ! rd
 -- * See "Clash.Sized.Fixed#creatingdatafiles" and "Clash.Prelude.BlockRam#usingrams"
 -- for ideas on how to use ROMs and RAMs
 rom
-  :: forall dom n m a conf
+  :: forall dom n m a
    . ( Undefined a
      , KnownNat n
      , KnownNat m
-     , HiddenClock dom conf
-     , HiddenEnable dom conf )
+     , HiddenClock dom
+     , HiddenEnable dom  )
   => Vec n a
   -- ^ ROM content
   --
@@ -134,11 +134,11 @@ rom = hideEnable (hideClock E.rom)
 -- * See "Clash.Sized.Fixed#creatingdatafiles" and "Clash.Prelude.BlockRam#usingrams"
 -- for ideas on how to use ROMs and RAMs
 romPow2
-  :: forall dom n a conf
+  :: forall dom n a
    . ( KnownNat n
      , Undefined a
-     , HiddenClock dom conf
-     , HiddenEnable dom conf )
+     , HiddenClock dom
+     , HiddenEnable dom  )
   => Vec (2^n) a
   -- ^ ROM content
   --

@@ -40,8 +40,8 @@ import Clash.Explicit.DDR
 -- Reset values are @0@
 altddioIn
   :: ( HasCallStack
-     , KnownDomain fast ('DomainConfiguration fast fPeriod edge reset init polarity)
-     , KnownDomain slow ('DomainConfiguration slow (2*fPeriod) edge reset init polarity)
+     , KnownConfiguration fast ('DomainConfiguration fast fPeriod edge reset init polarity)
+     , KnownConfiguration slow ('DomainConfiguration slow (2*fPeriod) edge reset init polarity)
      , KnownNat m )
   => SSymbol deviceFamily
   -- ^ The FPGA family
@@ -68,8 +68,8 @@ altddioIn _devFam clk rst en = withFrozenCallStack ddrIn# clk rst en 0 0 0
 -- Reset value is @0@
 altddioOut
   :: ( HasCallStack
-     , KnownDomain fast ('DomainConfiguration fast fPeriod edge reset init polarity)
-     , KnownDomain slow ('DomainConfiguration slow (2*fPeriod) edge reset init polarity)
+     , KnownConfiguration fast ('DomainConfiguration fast fPeriod edge reset init polarity)
+     , KnownConfiguration slow ('DomainConfiguration slow (2*fPeriod) edge reset init polarity)
      , KnownNat m )
   => SSymbol deviceFamily
   -- ^ The FPGA family
@@ -92,8 +92,8 @@ altddioOut devFam clk rst en =
 
 altddioOut#
   :: ( HasCallStack
-     , KnownDomain fast ('DomainConfiguration fast fPeriod edge reset init polarity)
-     , KnownDomain slow ('DomainConfiguration slow (2*fPeriod) edge reset init polarity)
+     , KnownConfiguration fast ('DomainConfiguration fast fPeriod edge reset init polarity)
+     , KnownConfiguration slow ('DomainConfiguration slow (2*fPeriod) edge reset init polarity)
      , KnownNat m )
   => SSymbol deviceFamily
   -> Clock slow

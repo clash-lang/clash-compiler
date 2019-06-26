@@ -6,7 +6,7 @@ import Clash.Explicit.Testbench
 import qualified Data.List as L
 
 zeroAt0
-  :: HiddenClockResetEnable dom conf
+  :: HiddenClockResetEnable dom
   => Signal dom (Unsigned 8,Unsigned 8)
   -> Signal dom (Unsigned 8,Unsigned 8)
 zeroAt0 a = mux en a (bundle (0,0))

@@ -295,7 +295,7 @@ g = 'hideClockReset' f
 Or, alternatively, by:
 
 @
--- h :: HiddenClockResetEnable dom conf => Signal dom a -> ...
+-- h :: HiddenClockResetEnable dom  => Signal dom a -> ...
 h = f 'hasClock' 'hasReset'
 @
 
@@ -304,7 +304,7 @@ h = f 'hasClock' 'hasReset'
 Given a component:
 
 @
-f :: HiddenClockResetEnable dom conf
+f :: HiddenClockResetEnable dom
   => Signal dom Int
   -> Signal dom Int
 @
@@ -366,32 +366,32 @@ type HiddenEnableName dom = AppendSymbol dom "_en"
 -- | A /constraint/ that indicates the component has a hidden 'Clock'
 --
 -- <Clash-Signal.html#hiddenclockandreset Click here to read more about hidden clocks, resets, and enables>
-type HiddenClock dom conf =
+type HiddenClock dom =
   ( Hidden (HiddenClockName dom) (Clock dom)
-  , KnownDomain dom conf )
+  , KnownDomain dom )
 
 -- | A /constraint/ that indicates the component needs a 'Reset'
 --
 -- <Clash-Signal.html#hiddenclockandreset Click here to read more about hidden clocks, resets, and enables>
-type HiddenReset dom conf =
+type HiddenReset dom =
   ( Hidden (HiddenResetName dom) (Reset dom)
-  , KnownDomain dom conf )
+  , KnownDomain dom )
 
 -- | A /constraint/ that indicates the component needs a 'Enable'
 --
 -- <Clash-Signal.html#hiddenclockandreset Click here to read more about hidden clocks, resets, and enables>
-type HiddenEnable dom conf =
+type HiddenEnable dom =
   ( Hidden (HiddenEnableName dom) (Enable dom)
-  , KnownDomain dom conf )
+  , KnownDomain dom )
 
 -- | A /constraint/ that indicates the component needs a 'Clock', a 'Reset',
 -- and an 'Enable' belonging to the same dom.
 --
 -- <Clash-Signal.html#hiddenclockandreset Click here to read more about hidden clocks, resets, and enables>
-type HiddenClockResetEnable dom conf =
-  ( HiddenClock dom conf
-  , HiddenReset dom conf
-  , HiddenEnable dom conf
+type HiddenClockResetEnable dom  =
+  ( HiddenClock dom
+  , HiddenReset dom
+  , HiddenEnable dom
   )
 
 -- | A /constraint/ that indicates the component needs a 'Clock', a 'Reset',
@@ -409,10 +409,10 @@ type SystemClockResetEnable =
 --
 -- <Clash-Signal.html#hiddenclockandreset Click here to read more about hidden clocks, resets, and enables>
 exposeClock
-  :: forall dom conf  r
-   . (HiddenClock dom conf => r)
+  :: forall dom  r
+   . (HiddenClock dom  => r)
   -- ^ The component with a hidden clock
-  -> (KnownDomain dom conf => Clock dom -> r)
+  -> (KnownDomain dom => Clock dom -> r)
   -- ^ The component with its clock argument exposed
 exposeClock = \f clk -> expose @(HiddenClockName dom) f clk
 {-# INLINE exposeClock #-}
@@ -421,8 +421,8 @@ exposeClock = \f clk -> expose @(HiddenClockName dom) f clk
 --
 -- <Clash-Signal.html#hiddenclockandreset Click here to read more about hidden clocks, resets, and enables>
 hideClock
-  :: forall dom conf  r
-   . HiddenClock dom conf
+  :: forall dom r
+   . HiddenClock dom
   => (Clock dom -> r)
   -- ^ Function whose clock argument you want to hide
   -> r
@@ -435,11 +435,11 @@ hideClock = \f -> f (fromLabel @(HiddenClockName dom))
 -- withClock = 'flip' exposeClock
 -- @
 withClock
-  :: forall dom conf  r
-   . KnownDomain dom conf
+  :: forall dom r
+   . KnownDomain dom
   => Clock dom
   -- ^ The 'Clock' we want to connect
-  -> (HiddenClock dom conf => r)
+  -> (HiddenClock dom  => r)
   -- ^ The function with a hidden 'Clock' argument
   -> r
 withClock = \clk f -> expose @(HiddenClockName dom) f clk
@@ -450,8 +450,8 @@ withClock = \clk f -> expose @(HiddenClockName dom) f clk
 --
 -- <Clash-Signal.html#hiddenclockandreset Click here to read more about hidden clocks, resets, and enables>
 hasClock
-  :: forall dom conf
-   . HiddenClock dom conf
+  :: forall dom
+   . HiddenClock dom
   => Clock dom
 hasClock = fromLabel @(HiddenClockName dom)
 {-# INLINE hasClock #-}
@@ -461,10 +461,10 @@ hasClock = fromLabel @(HiddenClockName dom)
 --
 -- <Clash-Signal.html#hiddenclockandreset Click here to read more about hidden clocks, resets, and enables>
 exposeReset
-  :: forall dom conf r
-   . (HiddenReset dom conf => r)
+  :: forall dom r
+   . (HiddenReset dom  => r)
   -- ^ The component with a hidden reset
-  -> (KnownDomain dom conf => Reset dom -> r)
+  -> (KnownDomain dom => Reset dom -> r)
   -- ^ The component with its reset argument exposed
 exposeReset = \f rst -> expose @(HiddenResetName dom) f rst
 {-# INLINE exposeReset #-}
@@ -473,8 +473,8 @@ exposeReset = \f rst -> expose @(HiddenResetName dom) f rst
 --
 -- <Clash-Signal.html#hiddenclockandreset Click here to read more about hidden clocks, resets, and enables>
 hideReset
-  :: forall dom conf r
-   . HiddenReset dom conf
+  :: forall dom r
+   . HiddenReset dom
   => (Reset dom -> r)
   -- ^ Component whose reset argument you want to hide
   -> r
@@ -489,11 +489,11 @@ hideReset = \f -> f (fromLabel @(HiddenResetName dom))
 --
 -- <Clash-Signal.html#hiddenclockandreset Click here to read more about hidden clocks, resets, and enables>
 withReset
-  :: forall dom conf r
-   . KnownDomain dom conf
+  :: forall dom r
+   . KnownDomain dom
   => Reset dom
   -- ^ The 'Reset' we want to connect
-  -> (HiddenReset dom conf => r)
+  -> (HiddenReset dom  => r)
   -- ^ The function with a hidden 'Reset' argument
   -> r
 withReset = \rst f -> expose @(HiddenResetName dom) f rst
@@ -504,8 +504,8 @@ withReset = \rst f -> expose @(HiddenResetName dom) f rst
 --
 -- <Clash-Signal.html#hiddenclockandreset Click here to read more about hidden clocks, resets, and enables>
 hasReset
-  :: forall dom conf
-   . HiddenReset dom conf
+  :: forall dom
+   . HiddenReset dom
   => Reset dom
 hasReset = fromLabel @(HiddenResetName dom)
 {-# INLINE hasReset #-}
@@ -515,10 +515,10 @@ hasReset = fromLabel @(HiddenResetName dom)
 --
 -- <Clash-Signal.html#hiddenclockandreset Click here to read more about hidden clocks, resets, and enables>
 exposeEnable
-  :: forall dom conf r
-   . (HiddenEnable dom conf => r)
+  :: forall dom  r
+   . (HiddenEnable dom => r)
   -- ^ The component with a hidden reset
-  -> (KnownDomain dom conf => Enable dom -> r)
+  -> (KnownDomain dom => Enable dom -> r)
   -- ^ The component with its reset argument exposed
 exposeEnable = \f rst -> expose @(HiddenEnableName dom) f rst
 {-# INLINE exposeEnable #-}
@@ -527,8 +527,8 @@ exposeEnable = \f rst -> expose @(HiddenEnableName dom) f rst
 --
 -- <Clash-Signal.html#hiddenclockandreset Click here to read more about hidden clocks, resets, and enables>
 hideEnable
-  :: forall dom conf r
-   . HiddenEnable dom conf
+  :: forall dom r
+   . HiddenEnable dom
   => (Enable dom -> r)
   -- ^ Component whose reset argument you want to hide
   -> r
@@ -543,11 +543,11 @@ hideEnable = \f -> f (fromLabel @(HiddenEnableName dom))
 --
 -- <Clash-Signal.html#hiddenclockandreset Click here to read more about hidden clocks, resets, and enables>
 withEnable
-  :: forall dom conf r
-   . KnownDomain dom conf
+  :: forall dom r
+   . KnownDomain dom
   => Enable dom
   -- ^ The 'Enable' we want to connect
-  -> (HiddenEnable dom conf => r)
+  -> (HiddenEnable dom  => r)
   -- ^ The function with a hidden 'Enable' argument
   -> r
 withEnable = \rst f -> expose @(HiddenEnableName dom) f rst
@@ -558,8 +558,8 @@ withEnable = \rst f -> expose @(HiddenEnableName dom) f rst
 --
 -- <Clash-Signal.html#hiddenclockandreset Click here to read more about hidden clocks, resets, and enables>
 hasEnable
-  :: forall dom conf
-   . HiddenEnable dom conf
+  :: forall dom
+   . HiddenEnable dom
   => Enable dom
 hasEnable = fromLabel @(HiddenEnableName dom)
 {-# INLINE hasEnable #-}
@@ -586,10 +586,10 @@ hasEnable = fromLabel @(HiddenEnableName dom)
 --     rst            = systemResetGen
 -- @
 exposeClockResetEnable
-  :: forall dom conf r
-   . (HiddenClockResetEnable dom conf => r)
+  :: forall dom  r
+   . (HiddenClockResetEnable dom => r)
   -- ^ The component with hidden clock, reset, and enable arguments
-  -> (KnownDomain dom conf => Clock dom -> Reset dom -> Enable dom -> r)
+  -> (KnownDomain dom => Clock dom -> Reset dom -> Enable dom -> r)
   -- ^ The component with its clock, reset, and enable arguments exposed
 exposeClockResetEnable =
   \f clk rst en ->
@@ -611,9 +611,9 @@ exposeClockResetEnable =
 --
 -- <Clash-Signal.html#hiddenclockandreset Click here to read more about hidden clocks, resets, and enables>
 hideClockResetEnable
-  :: forall dom conf r
-   . HiddenClockResetEnable dom conf
-  => (KnownDomain dom conf => Clock dom -> Reset dom -> Enable dom -> r)
+  :: forall dom r
+   . HiddenClockResetEnable dom
+  => (KnownDomain dom => Clock dom -> Reset dom -> Enable dom -> r)
   -- ^ Component whose clock, reset, and enable argument you want to hide
   -> r
 hideClockResetEnable =
@@ -659,15 +659,15 @@ hideClockResetEnable =
 --
 -- <Clash-Signal.html#hiddenclockandreset Click here to read more about hidden clocks, resets, and enables>
 withClockResetEnable
-  :: forall dom r conf
-   . KnownDomain dom conf
+  :: forall dom r
+   . KnownDomain dom
   => Clock dom
   -- ^ The 'Clock' we want to connect
   -> Reset dom
   -- ^ The 'Reset' we want to connect
   -> Enable dom
   -- ^ The 'Enable' we want to connect
-  -> (HiddenClockResetEnable dom conf => r)
+  -> (HiddenClockResetEnable dom => r)
   -- ^ The function with a hidden 'Clock', hidden 'Reset', and hidden
   -- 'Enable' argument
   -> r
@@ -690,8 +690,8 @@ withClockResetEnable =
 -- | Special version of 'delay' that doesn't take enable signals of any kind.
 -- Initial value will be undefined.
 dflipflop
-  :: forall dom conf a
-   . ( HiddenClock dom conf
+  :: forall dom a
+   . ( HiddenClock dom
      , Undefined a )
   => Signal dom a
   -> Signal dom a
@@ -705,10 +705,10 @@ dflipflop =
 -- >>> sampleN @System 3 (delay 0 (fromList [1,2,3,4]))
 -- [0,1,2]
 delay
-  :: forall dom conf  a
+  :: forall dom a
    . ( Undefined a
-     , HiddenClock dom conf
-     , HiddenEnable dom conf )
+     , HiddenClock dom
+     , HiddenEnable dom  )
   => a
   -- ^ Initial value
   -> Signal dom a
@@ -729,10 +729,10 @@ delay dflt i =
 -- >>> sampleN @System 7 (delayMaybe 0 input)
 -- [0,1,2,2,2,5,6]
 delayMaybe
-  :: forall dom conf  a
+  :: forall dom a
    . ( Undefined a
-     , HiddenClock dom conf
-     , HiddenEnable dom conf )
+     , HiddenClock dom
+     , HiddenEnable dom  )
   => a
   -- ^ Initial value
   -> Signal dom (Maybe a)
@@ -752,10 +752,10 @@ delayMaybe dflt i =
 -- >>> sampleN @System 7 (delayEn 0 enable input)
 -- [0,1,2,2,2,5,6]
 delayEn
-  :: forall dom conf  a
+  :: forall dom a
    . ( Undefined a
-     , HiddenClock dom conf
-     , HiddenEnable dom conf )
+     , HiddenClock dom
+     , HiddenEnable dom  )
   => a
   -- ^ Initial value
   -> Signal dom Bool
@@ -777,8 +777,8 @@ delayEn dflt en i =
 -- >>> sampleN @System 5 (register 8 (fromList [1,1,2,3,4]))
 -- [8,8,1,2,3]
 register
-  :: forall dom conf a
-   . ( HiddenClockResetEnable dom conf
+  :: forall dom a
+   . ( HiddenClockResetEnable dom
      , Undefined a )
   => a
   -- ^ Reset value
@@ -818,8 +818,8 @@ infixr 3 `register`
 -- >>> sampleN @System 9 countSometimes
 -- [0,0,0,1,1,2,2,3,3]
 regMaybe
-  :: forall dom conf a
-   . ( HiddenClockResetEnable dom conf
+  :: forall dom a
+   . ( HiddenClockResetEnable dom
      , Undefined a )
   => a
   -- ^ Reset value. 'regMaybe' outputs the reset value when the reset is active.
@@ -850,8 +850,8 @@ infixr 3 `regMaybe`
 -- >>> sampleN @System 9 count
 -- [0,0,0,1,1,2,2,3,3]
 regEn
-  :: forall dom conf a
-   . ( HiddenClockResetEnable dom conf
+  :: forall dom a
+   . ( HiddenClockResetEnable dom
      , Undefined a )
   => a
   -- ^ Reset value
@@ -881,10 +881,10 @@ regEn initial en i =
 --
 -- __NB__: This function is not synthesizable
 sample
-  :: forall dom conf a
-   . ( KnownDomain dom conf
+  :: forall dom a
+   . ( KnownDomain dom
      , Undefined a )
-  => (HiddenClockResetEnable dom conf => Signal dom a)
+  => (HiddenClockResetEnable dom  => Signal dom a)
   -- ^ 'Signal' we want to sample, whose source potentially has a hidden clock
   -- (and reset)
   -> [a]
@@ -906,12 +906,12 @@ sample s =
 --
 -- __NB__: This function is not synthesizable
 sampleN
-  :: forall dom conf a
-   . ( KnownDomain dom conf
+  :: forall dom a
+   . ( KnownDomain dom
      , Undefined a )
   => Int
   -- ^ The number of samples we want to see
-  -> (HiddenClockResetEnable dom conf => Signal dom a)
+  -> (HiddenClockResetEnable dom  => Signal dom a)
   -- ^ 'Signal' we want to sample, whose source potentially has a hidden clock
   -- (and reset)
   -> [a]
@@ -933,9 +933,9 @@ sampleN n s =
 --
 -- __NB__: This function is not synthesizable
 sample_lazy
-  :: forall dom conf a
-   . KnownDomain dom conf
-  => (HiddenClockResetEnable dom conf => Signal dom a)
+  :: forall dom a
+   . KnownDomain dom
+  => (HiddenClockResetEnable dom  => Signal dom a)
   -- ^ 'Signal' we want to sample, whose source potentially has a hidden clock
   -- (and reset)
   -> [a]
@@ -957,10 +957,10 @@ sample_lazy s =
 --
 -- __NB__: This function is not synthesizable
 sampleN_lazy
-  :: forall dom conf a
-   . KnownDomain dom conf
+  :: forall dom a
+   . KnownDomain dom
   => Int
-  -> (HiddenClockResetEnable dom conf => Signal dom a)
+  -> (HiddenClockResetEnable dom  => Signal dom a)
   -- ^ 'Signal' we want to sample, whose source potentially has a hidden clock
   -- (and reset)
   -> [a]
@@ -986,11 +986,11 @@ sampleN_lazy n s =
 --
 -- __NB__: This function is not synthesizable
 simulate
-  :: forall dom conf a b
-   . ( KnownDomain dom conf
+  :: forall dom a b
+   . ( KnownDomain dom
      , Undefined a
      , Undefined b )
-  => (HiddenClockResetEnable dom conf =>
+  => (HiddenClockResetEnable dom  =>
       Signal dom a -> Signal dom b)
   -- ^ 'Signal' we want to sample, whose source potentially has a hidden clock
   -- (and reset)
@@ -1015,9 +1015,9 @@ simulate f =
 --
 -- __NB__: This function is not synthesizable
 simulate_lazy
-  :: forall dom conf a b
-   . KnownDomain dom conf
-  => (HiddenClockResetEnable dom conf =>
+  :: forall dom a b
+   . KnownDomain dom
+  => (HiddenClockResetEnable dom  =>
       Signal dom a -> Signal dom b)
   -- ^ Function we want to simulate, whose components potentially have a hidden
   -- clock (and reset)
@@ -1041,13 +1041,13 @@ simulate_lazy f =
 --
 -- __NB__: This function is not synthesizable
 simulateB
-  :: forall dom conf a b
-   . ( KnownDomain dom conf
+  :: forall dom a b
+   . ( KnownDomain dom
      , Bundle a
      , Bundle b
      , Undefined a
      , Undefined b )
-  => (HiddenClockResetEnable dom conf =>
+  => (HiddenClockResetEnable dom  =>
       Unbundled dom a -> Unbundled dom b)
   -- ^ Function we want to simulate, whose components potentially have a hidden
   -- clock (and reset)
@@ -1071,11 +1071,11 @@ simulateB f =
 --
 -- __NB__: This function is not synthesizable
 simulateB_lazy
-  :: forall dom conf a b
-   . ( KnownDomain dom conf
+  :: forall dom a b
+   . ( KnownDomain dom
      , Bundle a
      , Bundle b )
-  => (HiddenClockResetEnable dom conf =>
+  => (HiddenClockResetEnable dom  =>
       Unbundled dom a -> Unbundled dom b)
   -- ^ Function we want to simulate, whose components potentially have a hidden
   -- clock (and reset)
@@ -1098,10 +1098,10 @@ dup1 _      = error "empty list"
 
 -- |  @testFor n s@ tests the signal /s/ for /n/ cycles.
 testFor
-  :: KnownDomain dom conf
+  :: KnownDomain dom
   => Int
   -- ^ The number of cycles we want to test for
-  -> (HiddenClockResetEnable dom conf => Signal dom Bool)
+  -> (HiddenClockResetEnable dom  => Signal dom Bool)
   -- ^ 'Signal' we want to evaluate, whose source potentially has a hidden clock
   -- (and reset)
   -> Property
@@ -1110,9 +1110,9 @@ testFor n s = property (and (Clash.Signal.sampleN n s))
 -- ** Synchronization primitive
 -- | Implicit version of 'Clash.Explicit.Signal.unsafeSynchronizer'.
 unsafeSynchronizer
-  :: forall dom1 dom2 conf1 conf2 a
-   . ( HiddenClock dom1 conf1
-     , HiddenClock dom2 conf2 )
+  :: forall dom1 dom2 a
+   . ( HiddenClock dom1
+     , HiddenClock dom2 )
   => Signal dom1 a
   -> Signal dom2 a
 unsafeSynchronizer =

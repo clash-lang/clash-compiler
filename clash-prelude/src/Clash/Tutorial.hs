@@ -2427,7 +2427,7 @@ dotp :: SaturatingNum a
 dotp as bs = fold boundedAdd (zipWith boundedMul as bs)
 
 fir
-  :: ( HiddenClockResetEnable dom conf
+  :: ( HiddenClockResetEnable dom
      , Default a
      , KnownNat n
      , SaturatingNum a

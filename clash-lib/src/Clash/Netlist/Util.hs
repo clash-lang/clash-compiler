@@ -54,18 +54,17 @@ import           Clash.Core.Name
 import           Clash.Core.Pretty       (showPpr)
 import           Clash.Core.Subst
   (Subst (..), extendIdSubst, extendIdSubstList, extendInScopeId,
-   extendInScopeIdList, extendTvSubstList, mkSubst, substTm, substTy)
+   extendInScopeIdList, mkSubst, substTm)
 import           Clash.Core.Term         (Alt, LetBinding, Pat (..), Term (..))
 import           Clash.Core.TyCon
   (TyConName, TyConMap, tyConDataCons)
 import           Clash.Core.Type         (Type (..), TypeView (..),
                                           coreView1, splitTyConAppM, tyView, TyVar)
-import           Clash.Core.Util         (collectBndrs, termType)
+import           Clash.Core.Util         (collectBndrs, substArgTys, termType)
 import           Clash.Core.Var
   (Id, Var (..), mkLocalId, modifyVarName, Attr')
 import           Clash.Core.VarEnv
-  (InScopeSet, emptyVarSet, extendInScopeSetList, mkInScopeSet, mkVarSet,
-   unionVarSet, uniqAway, unitVarSet)
+  (InScopeSet, extendInScopeSetList, uniqAway)
 import           Clash.Netlist.Id        (IdType (..), stripDollarPrefixes)
 import           Clash.Netlist.Types     as HW
 import           Clash.Unique
@@ -348,7 +347,7 @@ mkADT builtInTranslation reprs m _tyString tc args = case tyConDataCons (m `look
   []  -> return (FilteredHWType (Void Nothing) [])
   dcs -> do
     let tcName           = nameOcc tc
-        substArgTyss     = map substArgTys dcs
+        substArgTyss     = map (`substArgTys` args) dcs
     argHTyss0           <- mapM (mapM (coreTypeToHWType builtInTranslation reprs m)) substArgTyss
     let argHTyss1        = map (\tys -> zip (map isFilteredVoid tys) tys) argHTyss0
     let areVoids         = map (map fst) argHTyss1
@@ -418,17 +417,6 @@ mkADT builtInTranslation reprs m _tyString tc args = case tyConDataCons (m `look
         return $ FilteredHWType (SP tcName $ zipWith
           (\dc tys ->  ( nameOcc (dcName dc), tys))
           dcs (map stripFiltered <$> elemHTys)) argHTyss1
- where
-  argsFVs = List.foldl' unionVarSet emptyVarSet
-                (map (Lens.foldMapOf typeFreeVars unitVarSet) args)
-
-  substArgTys dc =
-    let univTVs = dcUnivTyVars dc
-        extTVs  = dcExtTyVars dc
-        is      = mkInScopeSet (argsFVs `unionVarSet` mkVarSet extTVs)
-        -- See Note [The substitution invariant]
-        subst   = extendTvSubstList (mkSubst is) (univTVs `zipEqual` args)
-    in  map (substTy subst) (dcArgTys dc)
 
 -- | Simple check if a TyCon is recursively defined.
 isRecursiveTy :: TyConMap -> TyConName -> Bool

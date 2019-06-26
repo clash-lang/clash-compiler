@@ -52,7 +52,7 @@ let macT s (x,y) = (s',s)
 --   where
 --     s' = x * y + s
 --
--- mac :: HiddenClockResetEnable dom conf => 'Signal' dom (Int, Int) -> 'Signal' dom Int
+-- mac :: HiddenClockResetEnable dom  => 'Signal' dom (Int, Int) -> 'Signal' dom Int
 -- mac = 'mealy' macT 0
 -- @
 --
@@ -65,7 +65,7 @@ let macT s (x,y) = (s',s)
 --
 -- @
 -- dualMac
---   :: HiddenClockResetEnable dom conf
+--   :: HiddenClockResetEnable dom
 --   => ('Signal' dom Int, 'Signal' dom Int)
 --   -> ('Signal' dom Int, 'Signal' dom Int)
 --   -> 'Signal' dom Int
@@ -75,7 +75,7 @@ let macT s (x,y) = (s',s)
 --     s2 = 'mealy' mac 0 ('Clash.Signal.bundle' (b,y))
 -- @
 mealy
-  :: ( HiddenClockResetEnable dom conf
+  :: ( HiddenClockResetEnable dom
      , Undefined s )
   => (s -> i -> (s,o))
   -- ^ Transfer function in mealy machine form: @state -> input -> (newstate,output)@
@@ -114,7 +114,7 @@ mealy = hideClockResetEnable E.mealy
 --     (i2,b2) = 'mealyB' f 3 (i1,c)
 -- @
 mealyB
-  :: ( HiddenClockResetEnable dom conf
+  :: ( HiddenClockResetEnable dom
      , Undefined s
      , Bundle i
      , Bundle o )
@@ -130,7 +130,7 @@ mealyB = hideClockResetEnable E.mealyB
 
 -- | Infix version of 'mealyB'
 (<^>)
-  :: ( HiddenClockResetEnable dom conf
+  :: ( HiddenClockResetEnable dom
      , Undefined s
      , Bundle i
      , Bundle o )

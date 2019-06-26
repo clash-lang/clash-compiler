@@ -25,7 +25,7 @@ topEntity = exposeClockResetEnable output
     output = boolToBit . (== 0x00) . cpuOutMemAddr <$> cpuOut
 
 mealyState
-  :: ( HiddenClockResetEnable tag dom
+  :: ( HiddenClockResetEnable tag
      , Undefined s )
   => (i -> State s o)
   -> s

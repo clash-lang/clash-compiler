@@ -50,7 +50,7 @@ import Clash.XException       (deepErrorX, seqX, Undefined)
 -- * See "Clash.Sized.Fixed#creatingdatafiles" and "Clash.Explicit.BlockRam#usingrams"
 -- for ideas on how to use ROMs and RAMs
 romPow2
-  :: (KnownDomain dom conf, KnownNat n, Undefined a)
+  :: (KnownDomain dom, KnownNat n, Undefined a)
   => Clock dom
   -- ^ 'Clock' to synchronize to
   -> Enable dom
@@ -76,7 +76,7 @@ romPow2 = rom
 -- * See "Clash.Sized.Fixed#creatingdatafiles" and "Clash.Explicit.BlockRam#usingrams"
 -- for ideas on how to use ROMs and RAMs
 rom
-  :: (KnownDomain dom conf, KnownNat n, Undefined a, Enum addr)
+  :: (KnownDomain dom, KnownNat n, Undefined a, Enum addr)
   => Clock dom
   -- ^ 'Clock' to synchronize to
   -> Enable dom
@@ -94,8 +94,8 @@ rom = \clk en content rd -> rom# clk en content (fromEnum <$> rd)
 
 -- | ROM primitive
 rom#
-  :: forall dom n a conf
-   . (KnownDomain dom conf, KnownNat n, Undefined a)
+  :: forall dom n a
+   . (KnownDomain dom, KnownNat n, Undefined a)
   => Clock dom
   -- ^ 'Clock' to synchronize to
   -> Enable dom

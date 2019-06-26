@@ -34,7 +34,7 @@ For example, a data file @memory.bin@ containing the 9-bit unsigned number
 We can instantiate a BlockRAM using the content of the above file like so:
 
 @
-f :: HiddenClock dom conf -> Signal dom (Unsigned 3) -> Signal dom (Unsigned 9)
+f :: HiddenClock dom  -> Signal dom (Unsigned 3) -> Signal dom (Unsigned 9)
 f rd = 'Clash.Class.BitPack.unpack' '<$>' exposeClock 'blockRamFile' clk d7 \"memory.bin\" rd (signal Nothing)
 @
 
@@ -51,7 +51,7 @@ However, we can also interpret the same data as a tuple of a 6-bit unsigned
 number, and a 3-bit signed number:
 
 @
-g :: HiddenClock dom conf -> Signal dom (Unsigned 3) -> Signal dom (Unsigned 6,Signed 3)
+g :: HiddenClock dom  -> Signal dom (Unsigned 3) -> Signal dom (Unsigned 6,Signed 3)
 g clk rd = 'Clash.Class.BitPack.unpack' '<$>' exposeClock 'blockRamFile' clk d7 \"memory.bin\" rd (signal Nothing)
 @
 
@@ -123,11 +123,11 @@ import           Clash.Sized.Unsigned         (Unsigned)
 -- * See "Clash.Sized.Fixed#creatingdatafiles" for ideas on how to create your
 -- own data files.
 blockRamFilePow2
-  :: forall dom conf n m
+  :: forall dom  n m
    . ( KnownNat m
      , KnownNat n
-     , HiddenClock dom conf
-     , HiddenEnable dom conf
+     , HiddenClock dom
+     , HiddenEnable dom
      , HasCallStack )
   => FilePath
   -- ^ File describing the initial content of the blockRAM
@@ -171,8 +171,8 @@ blockRamFilePow2 = \fp rd wrM -> withFrozenCallStack
 blockRamFile
   :: ( KnownNat m
      , Enum addr
-     , HiddenClock dom conf
-     , HiddenEnable dom conf
+     , HiddenClock dom
+     , HiddenEnable dom
      , HasCallStack )
   => SNat n
   -- ^ Size of the blockRAM

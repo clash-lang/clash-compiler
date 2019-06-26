@@ -7,6 +7,7 @@ Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
 -}
 
 {-# LANGUAGE AllowAmbiguousTypes    #-}
+{-# LANGUAGE ConstraintKinds        #-}
 {-# LANGUAGE CPP                    #-}
 {-# LANGUAGE DataKinds              #-}
 {-# LANGUAGE DeriveAnyClass         #-}
@@ -45,6 +46,7 @@ module Clash.Signal.Internal
     -- * Domains
   , Domain
   , KnownDomain(..)
+  , KnownConfiguration
   , knownDomainByName
   , ActiveEdge(..)
   , SActiveEdge(..)
@@ -311,21 +313,24 @@ instance Show (SDomainConfiguration dom conf) where
       , show polarity
       ]
 
+type KnownConfiguration dom conf = (KnownDomain dom, KnownConf dom ~ conf)
+
 -- | A 'KnownDomain' constraint indicates that a circuit's behavior depends on
 -- some properties of a domain. See 'DomainConfiguration' for more information.
-class KnownSymbol dom => KnownDomain (dom :: Domain) (conf :: DomainConfiguration) | dom -> conf where
+class KnownSymbol dom => KnownDomain (dom :: Domain) where
+  type KnownConf dom :: DomainConfiguration
   -- | Returns 'SDomainConfiguration' corresponding to an instance's 'DomainConfiguration'.
   --
   -- Example usage:
   -- > knownDomain @System
   --
-  knownDomain :: SDomainConfiguration dom conf
+  knownDomain :: SDomainConfiguration dom (KnownConf dom)
 
 
 -- | Whether domain's memory elements are sensitive to a rising edge
 isSensitiveToRisingEdge
-  :: forall dom conf
-   . KnownDomain dom conf
+  :: forall dom
+   . KnownDomain dom
   => Bool
 isSensitiveToRisingEdge =
   case knownDomain @dom of
@@ -335,8 +340,8 @@ isSensitiveToRisingEdge =
 
 -- | Whether domain has asynchronous resets
 isAsynchronous
-  :: forall dom conf
-   . KnownDomain dom conf
+  :: forall dom
+   . KnownDomain dom
   => Bool
 isAsynchronous =
   case knownDomain @dom of
@@ -346,8 +351,8 @@ isAsynchronous =
 
 -- | Whether domain has defined initial values
 hasDefinedInitialValues
-  :: forall dom conf
-   . KnownDomain dom conf
+  :: forall dom
+   . KnownDomain dom
   => Bool
 hasDefinedInitialValues =
   case knownDomain @dom of
@@ -357,8 +362,8 @@ hasDefinedInitialValues =
 
 -- | Whether resets are active high
 isActiveHigh
-  :: forall dom conf
-   . KnownDomain dom conf
+  :: forall dom
+   . KnownDomain dom
   => Bool
 isActiveHigh =
   case knownDomain @dom of
@@ -371,24 +376,27 @@ isActiveHigh =
 -- >>> knownDomainByName (SSymbol @"System")
 -- SDomainConfiguration System d10000 SRising SAsynchronous SDefined SActiveHigh
 knownDomainByName
-  :: forall dom conf
-   . KnownDomain dom conf
+  :: forall dom
+   . KnownDomain dom
   => SSymbol dom
-  -> SDomainConfiguration dom conf
+  -> SDomainConfiguration dom (KnownConf dom)
 knownDomainByName =
   const knownDomain
 {-# INLINE knownDomainByName #-}
 
 -- | A /clock/ (and /reset/) dom with clocks running at 100 MHz
-instance KnownDomain System ('DomainConfiguration System 10000 'Rising 'Asynchronous 'Defined 'ActiveHigh) where
+instance KnownDomain System where
+  type KnownConf System = 'DomainConfiguration System 10000 'Rising 'Asynchronous 'Defined 'ActiveHigh
   knownDomain = SDomainConfiguration SSymbol SNat SRising SAsynchronous SDefined SActiveHigh
 
 -- | System instance with defaults set for Xilinx FPGAs
-instance KnownDomain XilinxSystem ('DomainConfiguration XilinxSystem 10000 'Rising 'Synchronous 'Defined 'ActiveHigh) where
+instance KnownDomain XilinxSystem where
+  type KnownConf XilinxSystem = 'DomainConfiguration XilinxSystem 10000 'Rising 'Synchronous 'Defined 'ActiveHigh
   knownDomain = SDomainConfiguration SSymbol SNat SRising SSynchronous SDefined SActiveHigh
 
 -- | System instance with defaults set for Intel FPGAs
-instance KnownDomain IntelSystem ('DomainConfiguration IntelSystem 10000 'Rising 'Asynchronous 'Defined 'ActiveHigh) where
+instance KnownDomain IntelSystem where
+  type KnownConf IntelSystem = 'DomainConfiguration IntelSystem 10000 'Rising 'Asynchronous 'Defined 'ActiveHigh
   knownDomain = SDomainConfiguration SSymbol SNat SRising SAsynchronous SDefined SActiveHigh
 
 -- | Convenience value to allow easy "subclassing" of System domain. Should
@@ -473,8 +481,8 @@ data VDomainConfiguration
 -- | Like 'knownDomain but yields a 'VDomainConfiguration'. Should only be used
 -- in combination with 'createDomain'.
 knownVDomain
-  :: forall dom conf
-   . KnownDomain dom conf
+  :: forall dom
+   . KnownDomain dom
   => VDomainConfiguration
 knownVDomain =
   vDomain (knownDomain @dom)
@@ -519,11 +527,13 @@ isValidDomainName _ = False
 createDomain :: VDomainConfiguration -> Q [Dec]
 createDomain (VDomainConfiguration name period edge reset init_ polarity) =
   if isValidDomainName name then do
-    kdType <- [t| KnownDomain $nameT ('DomainConfiguration $nameT $periodT $edgeT $resetKindT $initT $polarityT ) |]
+    kdType <- [t| KnownDomain $nameT |]
+    kcType <- [t| ('DomainConfiguration $nameT $periodT $edgeT $resetKindT $initT $polarityT) |]
     sDom <- [| SDomainConfiguration SSymbol SNat $edgeE $resetKindE $initE $polarityE |]
     let vTagImpl = AppTypeE (VarE 'knownVDomain) (LitT (StrTyLit name))
     let kdImpl = FunD 'knownDomain [Clause [] (NormalB sDom) []]
-    pure  [ InstanceD Nothing [] kdType [kdImpl]
+    let kcImpl = TySynInstD ''KnownConf (TySynEqn [LitT (StrTyLit name)] kcType)
+    pure  [ InstanceD Nothing [] kdType [kcImpl, kdImpl]
           , TySynD (mkName name) [] (LitT (StrTyLit name)  `SigT`  ConT ''Domain)
           , FunD (mkName ('v':name)) [Clause [] (NormalB vTagImpl) []]
           ]
@@ -753,8 +763,8 @@ instance Show (Clock dom) where
 
 -- | Get the clock period of a 'Clock' (in /ps/) as a 'Num'
 clockPeriod
-  :: forall dom conf a
-   . KnownDomain dom conf
+  :: forall dom  a
+   . KnownDomain dom
   => Num a
   => Clock dom
   -> a
@@ -780,7 +790,7 @@ clockTag (Clock dom) = dom
 --
 -- See 'DomainConfiguration' for more information on how to use synthesis domains.
 clockGen
-  :: KnownDomain dom conf
+  :: KnownDomain dom
   => Clock dom
 clockGen = Clock SSymbol
 {-# NOINLINE clockGen #-}
@@ -834,7 +844,7 @@ clockGen = Clock SSymbol
 --     rstB2          = 'resetGen' \@\"Slow\"
 -- @
 tbClockGen
-  :: KnownDomain dom conf
+  :: KnownDomain dom
   => Signal dom Bool
   -> Clock dom
 tbClockGen _clk = clockGen
@@ -858,8 +868,8 @@ tbEnableGen = toEnable (pure True)
 -- See 'tbClockGen' for example usage.
 --
 resetGen
-  :: forall dom conf
-   . KnownDomain dom conf
+  :: forall dom
+   . KnownDomain dom
   => Reset dom
 resetGen =
   if isActiveHigh @dom then
@@ -884,8 +894,8 @@ data Reset (dom :: Domain) = Reset (Signal dom Bool)
 -- <Clash-Explicit-Signal.html#metastability meta-stability> in the presence of
 -- asynchronous resets.
 unsafeToHighPolarity
-  :: forall dom conf
-   . KnownDomain dom conf
+  :: forall dom
+   . KnownDomain dom
   => Reset dom
   -> Signal dom Bool
 unsafeToHighPolarity (unsafeFromReset -> r) =
@@ -902,8 +912,8 @@ unsafeToHighPolarity (unsafeFromReset -> r) =
 -- <Clash-Explicit-Signal.html#metastability meta-stability> in the presence of
 -- asynchronous resets.
 unsafeToLowPolarity
-  :: forall dom conf
-   . KnownDomain dom conf
+  :: forall dom
+   . KnownDomain dom
   => Reset dom
   -> Signal dom Bool
 unsafeToLowPolarity (unsafeFromReset -> r) =
@@ -936,7 +946,7 @@ unsafeFromReset (Reset r) = r
 -- __NB__: You probably want to use 'unsafeFromLowPolarity' or
 -- 'unsafeFromHighPolarity'.
 unsafeToReset
-  :: KnownDomain dom conf
+  :: KnownDomain dom
   => Signal dom Bool
   -> Reset dom
 unsafeToReset r = Reset r
@@ -951,8 +961,8 @@ unsafeToReset r = Reset r
 -- <Clash-Explicit-Signal.html#metastability meta-stability> in the presence of
 -- asynchronous resets.
 unsafeFromHighPolarity
-  :: forall dom conf
-   . KnownDomain dom conf
+  :: forall dom
+   . KnownDomain dom
   => Signal dom Bool
   -- ^ Reset signal that's 'True' when active, and 'False' when inactive.
   -> Reset dom
@@ -967,8 +977,8 @@ unsafeFromHighPolarity r =
 -- <Clash-Explicit-Signal.html#metastability meta-stability> in the presence of
 -- asynchronous resets.
 unsafeFromLowPolarity
-  :: forall dom conf
-   . KnownDomain dom conf
+  :: forall dom
+   . KnownDomain dom
   => Signal dom Bool
   -- ^ Reset signal that's 'False' when active, and 'True' when inactive.
   -> Reset dom
@@ -976,7 +986,7 @@ unsafeFromLowPolarity r =
   unsafeToReset (if isActiveHigh @dom then not <$> r else r)
 
 -- | Invert reset signal
-invertReset :: KnownDomain dom conf => Reset dom -> Reset dom
+invertReset :: KnownDomain dom => Reset dom -> Reset dom
 invertReset = unsafeToReset . fmap not . unsafeFromReset
 
 
@@ -1021,8 +1031,8 @@ infixr 3 .&&.
 -- need to 'seq' it explicitly.
 
 delay#
-  :: forall dom a conf
-   . ( KnownDomain dom conf
+  :: forall dom a
+   . ( KnownDomain dom
      , Undefined a )
   => Clock dom
   -> Enable dom
@@ -1059,8 +1069,8 @@ delay# (Clock dom) (fromEnable -> en) powerUpVal0 =
 -- the Intel tooling __will ignore the power up value__ and use the reset value
 -- instead. Source: https://www.intel.com/content/www/us/en/programmable/support/support-resources/knowledge-base/solutions/rd01072011_91.html
 register#
-  :: forall dom conf a
-   . ( KnownDomain dom conf
+  :: forall dom  a
+   . ( KnownDomain dom
      , Undefined a )
   => Clock dom
   -> Reset dom

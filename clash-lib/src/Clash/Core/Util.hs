@@ -31,7 +31,8 @@ import           Data.Semigroup
 
 import Clash.Core.DataCon
   (DataCon (MkData), dcType, dcUnivTyVars, dcExtTyVars, dcArgTys)
-import Clash.Core.FreeVars                     (termFreeVarsX, tyFVsOfTypes)
+import Clash.Core.FreeVars
+  (termFreeVarsX, tyFVsOfTypes, typeFreeVars)
 import Clash.Core.Literal                      (literalType)
 import Clash.Core.Name
   (Name (..), OccName, mkUnsafeInternalName, mkUnsafeSystemName)
@@ -52,7 +53,8 @@ import Clash.Core.Var
   (Id, TyVar, Var (..), isLocalId, mkLocalId, mkTyVar)
 import Clash.Core.VarEnv
   (InScopeSet, VarEnv, emptyVarEnv, extendInScopeSet, extendVarEnv,
-   lookupVarEnv, mkInScopeSet, uniqAway, extendInScopeSetList, unionInScope)
+   lookupVarEnv, mkInScopeSet, uniqAway, extendInScopeSetList, unionInScope,
+   mkVarSet, unionVarSet, unitVarSet, emptyVarSet)
 import Clash.Unique
 import Clash.Util
 
@@ -897,3 +899,17 @@ undefinedTm
   :: Type
   -> Term
 undefinedTm = TyApp (Prim "Clash.Transformation." (PrimInfo undefinedTy WorkNever))
+
+substArgTys
+  :: DataCon
+  -> [Type]
+  -> [Type]
+substArgTys dc args =
+  let univTVs = dcUnivTyVars dc
+      extTVs  = dcExtTyVars dc
+      argsFVs = foldl' unionVarSet emptyVarSet
+                  (map (Lens.foldMapOf typeFreeVars unitVarSet) args)
+      is      = mkInScopeSet (argsFVs `unionVarSet` mkVarSet extTVs)
+      -- See Note [The substitution invariant]
+      subst   = extendTvSubstList (mkSubst is) (univTVs `zipEqual` args)
+  in  map (substTy subst) (dcArgTys dc)

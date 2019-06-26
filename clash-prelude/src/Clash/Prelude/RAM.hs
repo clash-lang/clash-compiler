@@ -48,8 +48,8 @@ import           Clash.Sized.Unsigned (Unsigned)
 -- RAM.
 asyncRam
   :: ( Enum addr
-     , HiddenClock dom conf
-     , HiddenEnable dom conf
+     , HiddenClock dom
+     , HiddenEnable dom
      , HasCallStack
      )
   => SNat n
@@ -74,8 +74,8 @@ asyncRam = \sz rd wrM -> withFrozenCallStack
 -- RAM.
 asyncRamPow2
   :: ( KnownNat n
-     , HiddenClock dom conf
-     , HiddenEnable dom conf
+     , HiddenClock dom
+     , HiddenEnable dom
      , HasCallStack )
   => Signal dom (Unsigned n)
   -- ^ Read address @r@

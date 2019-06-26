@@ -45,7 +45,7 @@ import           Clash.XException                 (Undefined)
 -- macT s (x,y) = x * y + s
 --
 -- mac
---   :: 'KnownDomain' dom conf
+--   :: 'KnownDomain' dom
 --   => 'Clock' dom
 --   -> 'Reset' dom
 --   -> 'Enable' dom
@@ -63,7 +63,7 @@ import           Clash.XException                 (Undefined)
 --
 -- @
 -- dualMac
---   :: 'KnownDomain' dom conf
+--   :: 'KnownDomain' dom
 --   => 'Clock' dom
 --   -> 'Reset' dom
 --   -> 'Enable' dom
@@ -76,7 +76,7 @@ import           Clash.XException                 (Undefined)
 --     s2 = 'moore' clk rst en mac id 0 ('bundle' (b,y))
 -- @
 moore
-  :: ( KnownDomain dom conf
+  :: ( KnownDomain dom
      , Undefined s )
   => Clock dom
   -- ^ 'Clock' to synchronize to
@@ -100,7 +100,7 @@ moore clk rst en ft fo iS =
 -- | Create a synchronous function from a combinational function describing
 -- a moore machine without any output logic
 medvedev
-  :: ( KnownDomain dom conf
+  :: ( KnownDomain dom
      , Undefined s )
   => Clock dom
   -> Reset dom
@@ -139,7 +139,7 @@ medvedev clk rst en tr st = moore clk rst en tr id st
 --     (i2,b2) = 'mooreB' clk rst en t o 3 (i1,c)
 -- @
 mooreB
-  :: ( KnownDomain dom conf
+  :: ( KnownDomain dom
      , Undefined s
      , Bundle i
      , Bundle o )
@@ -162,7 +162,7 @@ mooreB clk rst en ft fo iS i = unbundle (moore clk rst en ft fo iS (bundle i))
 
 -- | A version of 'medvedev' that does automatic 'Bundle'ing
 medvedevB
-  :: ( KnownDomain dom conf
+  :: ( KnownDomain dom
      , Undefined s
      , Bundle i
      , Bundle s )

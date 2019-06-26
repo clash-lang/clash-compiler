@@ -342,7 +342,7 @@ renderElem b (Period n) = do
     KnownDomain _ period _ _ _ _ ->
       return $ const $ Text.pack $ show period
     _ ->
-      error $ $(curLoc) ++ "Period: Expected KnownDomain, not: " ++ show ty
+      error $ $(curLoc) ++ "Period: Expected `KnownDomain` or `KnownConfiguration`, not: " ++ show ty
 
 renderElem b (Tag n) = do
   let (_, ty, _) = bbInputs b !! n
@@ -354,7 +354,7 @@ renderElem b (Tag n) = do
     Clock dom ->
       return (const (Text.pack (Data.Text.unpack dom)))
     _ ->
-      error $ $(curLoc) ++ "Tag: Expected KnownDomain, not: " ++ show ty
+      error $ $(curLoc) ++ "Tag: Expected `KnownDomain` or `KnownConfiguration`, not: " ++ show ty
 
 
 renderElem b (IF c t f) = do
@@ -422,28 +422,28 @@ renderElem b (IF c t f) = do
           KnownDomain _ _ edgeActual _ _ _ ->
             if edgeRequested == edgeActual then 1 else 0
           _ ->
-            error $ $(curLoc) ++ "ActiveEdge: Expected KnownDomain, not: " ++ show ty
+            error $ $(curLoc) ++ "ActiveEdge: Expected `KnownDomain` or `KnownConfiguration`, not: " ++ show ty
 
       (IsSync n) ->
         let (_, ty, _) = bbInputs b !! n in
         case stripVoid ty of
           KnownDomain _ _ _ Synchronous _ _ -> 1
           KnownDomain _ _ _ Asynchronous _ _ -> 0
-          _ -> error $ $(curLoc) ++ "IsSync: Expected KnownDomain, not: " ++ show ty
+          _ -> error $ $(curLoc) ++ "IsSync: Expected `KnownDomain` or `KnownConfiguration`, not: " ++ show ty
 
       (IsInitDefined n) ->
         let (_, ty, _) = bbInputs b !! n in
         case stripVoid ty of
           KnownDomain _ _ _ _ Defined _ -> 1
           KnownDomain _ _ _ _ Unknown _ -> 0
-          _ -> error $ $(curLoc) ++ "IsInitDefined: Expected KnownDomain, not: " ++ show ty
+          _ -> error $ $(curLoc) ++ "IsInitDefined: Expected `KnownDomain` or `KnownConfiguration`, not: " ++ show ty
 
       (IsActiveHigh n) ->
         let (_, ty, _) = bbInputs b !! n in
         case stripVoid ty of
           KnownDomain _ _ _ _ _ ActiveHigh -> 1
           KnownDomain _ _ _ _ _ ActiveLow -> 0
-          _ -> error $ $(curLoc) ++ "IsActiveHigh: Expected KnownDomain, not: " ++ show ty
+          _ -> error $ $(curLoc) ++ "IsActiveHigh: Expected `KnownDomain` or `KnownConfiguration`, not: " ++ show ty
 
       (StrCmp [Text t1] n) ->
         let (e,_,_) = bbInputs b !! n

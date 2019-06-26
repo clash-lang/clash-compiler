@@ -27,7 +27,7 @@ import Clash.Core.Pretty                (showPpr)
 import Clash.Core.TyCon                 (TyConMap, tyConDataCons)
 import Clash.Core.Type
   (LitTy (..), Type (..), TypeView (..), coreView, tyView)
-import Clash.Core.Util                  (tyNatSize)
+import Clash.Core.Util                  (tyNatSize, substArgTys)
 import Clash.Netlist.Util               (coreTypeToHWType, stripFiltered)
 import Clash.Netlist.Types
   (HWType(..), FilteredHWType(..), PortDirection (..))
@@ -131,22 +131,28 @@ ghcTypeToHWType iw floatSupport = go
           (fType . Void . Just . BiDirectional Out . BitVector . fromInteger) <$>
             mapExceptT (Just .coerce) (tyNatSize m szTy)
 
-        "Clash.Signal.Internal.KnownDomain"
-          | [_tag, dom] <- args
-          ->
-            case tyView dom of
-              TyConApp _ [tag0, period0, edge0, rstKind0, init0, polarity0] -> do
-                tag1      <- domTag tag0
-                period1   <- domPeriod period0
-                edge1     <- domEdge m edge0
-                rstKind1  <- domResetKind m rstKind0
-                init1     <- domInitBehavior m init0
-                polarity1 <- domResetPolarity m polarity0
+        -- XXX: this is a hack to get a KnownDomain from a KnownConfiguration
+        "GHC.Classes.(%,%)"
+          | [arg0@(tyView -> TyConApp kdNm _), _] <- args
+          , nameOcc kdNm == "Clash.Signal.Internal.KnownDomain"
+          -> ExceptT (go reprs m arg0)
 
-                let kd = KnownDomain (pack tag1) period1 edge1 rstKind1 init1 polarity1
-                returnN (Void (Just kd))
-              _ ->
-                ExceptT Nothing
+        "Clash.Signal.Internal.KnownDomain"
+          -> case tyConDataCons (m `lookupUniqMap'` tc) of
+               [dc] -> case substArgTys dc args of
+                 [_,tyView -> TyConApp _ [_,dom]] -> case tyView (coreView m dom) of
+                   TyConApp _ [tag0, period0, edge0, rstKind0, init0, polarity0] -> do
+                     tag1      <- domTag tag0
+                     period1   <- domPeriod period0
+                     edge1     <- domEdge m edge0
+                     rstKind1  <- domResetKind m rstKind0
+                     init1     <- domInitBehavior m init0
+                     polarity1 <- domResetPolarity m polarity0
+                     let kd = KnownDomain (pack tag1) period1 edge1 rstKind1 init1 polarity1
+                     returnN (Void (Just kd))
+                   _ -> ExceptT Nothing
+                 _ -> ExceptT Nothing
+               _ -> ExceptT Nothing
 
         "Clash.Signal.Internal.Clock"
           | [tag0] <- args
@@ -241,7 +247,6 @@ domTag ty = throwE $ "Can't translate domain tag" ++ showPpr ty
 domPeriod :: Type -> ExceptT String Maybe Integer
 domPeriod (LitTy (NumTy period)) = pure period
 domPeriod ty = throwE $ "Can't translate domain period" ++ showPpr ty
-
 
 fromType
   :: String

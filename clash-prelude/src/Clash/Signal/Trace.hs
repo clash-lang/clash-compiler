@@ -224,8 +224,8 @@ traceVecSignal# traceMap period vecTraceName (unbundle -> vecSignal) =
 -- multi-clock circuits. However 'traceSignal1' might be more convenient to
 -- use when the domain of your circuit is polymorphic.
 traceSignal
-  :: forall dom conf a
-   . ( KnownDomain dom conf
+  :: forall dom  a
+   . ( KnownDomain dom
      , KnownNat (BitSize a)
      , BitPack a
      , Undefined a
@@ -271,8 +271,8 @@ traceSignal1 traceName signal =
 -- multi-clock circuits. However 'traceSignal1' might be more convinient to
 -- use when the domain of your circuit is polymorphic.
 traceVecSignal
-  :: forall dom a conf n
-   . ( KnownDomain dom conf
+  :: forall dom a  n
+   . ( KnownDomain dom
      , KnownNat (BitSize a)
      , KnownNat n
      , BitPack a

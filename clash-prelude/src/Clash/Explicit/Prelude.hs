@@ -200,7 +200,7 @@ import Clash.XException
 -- ...
 window
   :: ( KnownNat n
-     , KnownDomain dom conf
+     , KnownDomain dom
      , Undefined a
      , Default a
      )
@@ -225,7 +225,7 @@ window clk rst en x = res
 --
 -- @
 -- windowD3
---   :: KnownDomain dom conf
+--   :: KnownDomain dom
 --   -> Clock dom
 --   -> Enable dom
 --   -> Reset dom
@@ -241,7 +241,7 @@ windowD
   :: ( KnownNat n
      , Undefined a
      , Default a
-     , KnownDomain dom conf )
+     , KnownDomain dom )
   => Clock dom
   -- ^ Clock to which the incoming signal is synchronized
   -> Reset dom

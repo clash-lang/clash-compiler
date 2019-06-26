@@ -51,7 +51,7 @@ let macT s (x,y) = x * y + s
 -- macT s (x,y) = x * y + s
 --
 -- mac
---   :: HiddenClockResetEnable dom conf
+--   :: HiddenClockResetEnable dom
 --   => 'Signal' dom (Int, Int)
 --   -> 'Signal' dom Int
 -- mac = 'moore' mac id 0
@@ -66,7 +66,7 @@ let macT s (x,y) = x * y + s
 --
 -- @
 -- dualMac
---   :: HiddenClockResetEnable dom conf
+--   :: HiddenClockResetEnable dom
 --   => ('Signal' dom Int, 'Signal' dom Int)
 --   -> ('Signal' dom Int, 'Signal' dom Int)
 --   -> 'Signal' dom Int
@@ -76,7 +76,7 @@ let macT s (x,y) = x * y + s
 --     s2 = 'moore' mac id 0 ('Clash.Signal.bundle' (b,y))
 -- @
 moore
-  :: ( HiddenClockResetEnable dom conf
+  :: ( HiddenClockResetEnable dom
      , Undefined s )
   => (s -> i -> s)
   -- ^ Transfer function in moore machine form: @state -> input -> newstate@
@@ -94,7 +94,7 @@ moore = hideClockResetEnable E.moore
 -- | Create a synchronous function from a combinational function describing
 -- a moore machine without any output logic
 medvedev
-  :: ( HiddenClockResetEnable dom conf
+  :: ( HiddenClockResetEnable dom
      , Undefined s )
   => (s -> i -> s)
   -> s
@@ -130,7 +130,7 @@ medvedev tr st = moore tr id st
 --     (i2,b2) = 'mooreB' t o 3 (i1,c)
 -- @
 mooreB
-  :: ( HiddenClockResetEnable dom conf
+  :: ( HiddenClockResetEnable dom
      , Undefined s
      , Bundle i
      , Bundle o )
@@ -148,7 +148,7 @@ mooreB = hideClockResetEnable E.mooreB
 
 -- | A version of 'medvedev' that does automatic 'Bundle'ing
 medvedevB
-  :: ( HiddenClockResetEnable dom conf
+  :: ( HiddenClockResetEnable dom
      , Undefined s
      , Bundle i
      , Bundle s )
