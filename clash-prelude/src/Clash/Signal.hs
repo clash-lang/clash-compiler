@@ -194,6 +194,9 @@ module Clash.Signal
     -- * Simulation functions (not synthesizable)
   , simulate
   , simulateB
+  , simulateN
+  , simulateWithReset
+  , simulateWithResetN
     -- ** lazy versions
   , simulate_lazy
   , simulateB_lazy
@@ -1498,7 +1501,14 @@ sampleN_lazy n s =
 -- [8,1,2,3...
 -- ...
 --
--- Where 'System' denotes the /domain/ to simulate on.
+-- Where 'System' denotes the /domain/ to simulate on. The reset line is
+-- asserted for a single cycle. The first value is therefore supplied twice to
+-- the circuit: once while reset is high, and once directly after. The first
+-- /output/ value (the value produced while the reset is asserted) is dropped.
+--
+-- If you only want to simulate a finite number of samples, see 'simulateN'. If
+-- you need the reset line to be asserted for more than one cycle or if you
+-- need a custom reset value, see 'simulateWithReset' and 'simulateWithResetN'.
 --
 -- __NB__: This function is not synthesizable
 simulate
@@ -1506,16 +1516,76 @@ simulate
    . ( KnownDomain dom
      , Undefined a
      , Undefined b )
-  => (HiddenClockResetEnable dom  =>
-      Signal dom a -> Signal dom b)
+  => (HiddenClockResetEnable dom => Signal dom a -> Signal dom b)
+  -- ^ Circuit to simulate, whose source potentially has a hidden clock, reset,
+  -- and/or enable.
+  -> [a]
+  -> [b]
+simulate f as = simulateWithReset (SNat @1) (head as) f as
+{-# INLINE simulate #-}
+
+-- | Same as 'simulate', but only sample the first /Int/ output values.
+--
+-- __NB__: This function is not synthesizable
+simulateN
+  :: forall dom a b
+   . ( KnownDomain dom
+     , Undefined a
+     , Undefined b )
+  => Int
+  -- ^ Number of cycles to simulate (excluding cycle spent in reset)
+  -> (HiddenClockResetEnable dom => Signal dom a -> Signal dom b)
   -- ^ 'Signal' we want to sample, whose source potentially has a hidden clock
   -- (and reset)
   -> [a]
   -> [b]
-simulate f0 =
-  let f1 = exposeClockResetEnable f0 clockGen resetGen enableGen in
-  tail . S.simulate f1 . dup1
-{-# NOINLINE simulate #-}
+simulateN n f as = simulateWithResetN (SNat @1) (head as) n f as
+{-# INLINE simulateN #-}
+
+-- | Same as 'simulate', but with the reset line asserted for /n/ cycles. Similar
+-- to 'simulate', 'simulateWithReset' will drop the output values produced while
+-- the reset is asserted. While the reset is asserted, the reset value /a/ is
+-- supplied to the circuit.
+simulateWithReset
+  :: forall dom a b n
+   . ( KnownDomain dom
+     , Undefined a
+     , Undefined b
+     , 1 <= n )
+  => SNat n
+  -- ^ Number of cycles to assert the reset
+  -> a
+  -- ^ Reset value
+  -> (HiddenClockResetEnable dom => Signal dom a -> Signal dom b)
+  -- ^ 'Signal' we want to sample, whose source potentially has a hidden clock
+  -- (and reset)
+  -> [a]
+  -> [b]
+simulateWithReset n resetVal f as =
+  S.simulateWithReset n resetVal (exposeClockResetEnable f) as
+{-# INLINE simulateWithReset #-}
+
+-- | Same as 'simulateWithReset', but only sample the first /Int/ output values.
+simulateWithResetN
+  :: forall dom a b n
+   . ( KnownDomain dom
+     , Undefined a
+     , Undefined b
+     , 1 <= n )
+  => SNat n
+  -- ^ Number of cycles to assert the reset
+  -> a
+  -- ^ Reset value
+  -> Int
+  -- ^ Number of cycles to simulate (excluding cycles spent in reset)
+  -> (HiddenClockResetEnable dom => Signal dom a -> Signal dom b)
+  -- ^ 'Signal' we want to sample, whose source potentially has a hidden clock
+  -- (and reset)
+  -> [a]
+  -> [b]
+simulateWithResetN nReset resetVal nSamples f as =
+  S.simulateWithResetN nReset resetVal nSamples (exposeClockResetEnable f) as
+{-# INLINE simulateWithResetN #-}
 
 
 -- | /Lazily/ simulate a (@'Signal' a -> 'Signal' b@) function given a list of

@@ -224,6 +224,8 @@ module Clash.Explicit.Signal
     -- * Simulation functions (not synthesizable)
   , simulate
   , simulateB
+  , simulateWithReset
+  , simulateWithResetN
     -- ** lazy versions
   , simulate_lazy
   , simulateB_lazy
@@ -246,11 +248,11 @@ module Clash.Explicit.Signal
 where
 
 import Data.Maybe                     (isJust, fromJust)
-import GHC.TypeLits                   (type (+))
+import GHC.TypeLits                   (type (+), type (<=))
 
 import Clash.Annotations.Primitive    (hasBlackBox)
 import Clash.Class.Num                (satSucc, SaturationMode(SatBound))
-import Clash.Promoted.Nat             (SNat(..))
+import Clash.Promoted.Nat             (SNat(..), snatToNum)
 import Clash.Signal.Bundle            (Bundle (..))
 import Clash.Signal.Internal
 import Clash.Sized.Index              (Index)
@@ -728,7 +730,65 @@ regEn clk rst gen initial en i =
   register clk rst (enable gen en) initial i
 {-# INLINE regEn #-}
 
--- * Product/Signal isomorphism
+-- * Simulation functions
+
+-- | Same as 'simulate', but with the reset line asserted for /n/ cycles. Similar
+-- to 'simulate', 'simulateWithReset' will drop the output values produced while
+-- the reset is asserted. While the reset is asserted, the first value from
+-- @[a]@ is fed to the circuit.
+simulateWithReset
+  :: forall dom a b n
+   . ( KnownDomain dom
+     , Undefined a
+     , Undefined b
+     , 1 <= n )
+  => SNat n
+  -- ^ Number of cycles to assert the reset
+  -> a
+  -- ^ Reset value
+  -> ( KnownDomain dom
+    => Clock dom
+    -> Reset dom
+    -> Enable dom
+    -> Signal dom a
+    -> Signal dom b )
+  -- ^ Circuit to simulate
+  -> [a]
+  -> [b]
+simulateWithReset n resetVal f as =
+  drop (snatToNum n) out
+ where
+  inp = replicate (snatToNum n) resetVal ++ as
+  rst = resetGenN @dom n
+  clk = clockGen
+  en  = enableGen
+  out = simulate (f clk rst en) inp
+{-# NOINLINE simulateWithReset #-}
+
+-- | Same as 'simulateWithReset', but only sample the first /Int/ output values.
+simulateWithResetN
+  :: ( KnownDomain dom
+     , Undefined a
+     , Undefined b
+     , 1 <= n )
+  => SNat n
+  -- ^ Number of cycles to assert the reset
+  -> a
+  -- ^ Reset value
+  -> Int
+  -- ^ Number of cycles to simulate (excluding cycle spent in reset)
+  -> ( KnownDomain dom
+    => Clock dom
+    -> Reset dom
+    -> Enable dom
+    -> Signal dom a
+    -> Signal dom b )
+  -- ^ Circuit to simulate
+  -> [a]
+  -> [b]
+simulateWithResetN nReset resetVal nSamples f as =
+  take nSamples (simulateWithReset nReset resetVal f as)
+{-# INLINE simulateWithResetN #-}
 
 -- | Simulate a (@'Unbundled' a -> 'Unbundled' b@) function given a list of
 -- samples of type /a/
