@@ -130,7 +130,7 @@ snatToNatural = naturalFromInteger . snatToInteger
 
 
 -- | Reify the type-level 'Nat' @n@ to it's term-level 'Num'ber.
-snatToNum :: Num a => SNat n -> a
+snatToNum :: forall a n . Num a => SNat n -> a
 snatToNum p@SNat = fromInteger (snatToInteger p)
 {-# INLINE snatToNum #-}
 
