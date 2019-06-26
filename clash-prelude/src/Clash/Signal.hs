@@ -895,12 +895,7 @@ sample
   -- (and reset)
   -> [a]
 sample s =
-  case knownDomain @dom of
-    SDomainConfiguration dom _ _ _ _ _ ->
-      let clk = Clock dom in
-      let rst = Reset (True :- pure False) in
-      let en = S.enableGen in
-      S.sample (exposeClockResetEnable s clk rst en)
+  S.sample (exposeClockResetEnable s clockGen (resetGen @dom) enableGen)
 {-# NOINLINE sample #-}
 
 -- | Get a list of /n/ samples from a 'Signal'
@@ -921,13 +916,9 @@ sampleN
   -- ^ 'Signal' we want to sample, whose source potentially has a hidden clock
   -- (and reset)
   -> [a]
-sampleN n s =
-  case knownDomain @dom of
-    SDomainConfiguration dom _ _ _ _ _ ->
-      let clk = Clock dom in
-      let rst = Reset (True :- pure False) in
-      let en = S.enableGen in
-      S.sampleN n (exposeClockResetEnable s clk rst en)
+sampleN n s0 =
+  let s1 = exposeClockResetEnable s0 clockGen (resetGen @dom) enableGen in
+  S.sampleN n s1
 {-# NOINLINE sampleN #-}
 
 -- | /Lazily/ get an infinite list of samples from a 'Clash.Signal.Signal'
@@ -946,12 +937,7 @@ sample_lazy
   -- (and reset)
   -> [a]
 sample_lazy s =
-  case knownDomain @dom of
-    SDomainConfiguration dom _ _ _ _ _ ->
-      let clk = Clock dom in
-      let rst = Reset (True :- pure False) in
-      let en = S.enableGen in
-      S.sample_lazy (exposeClockResetEnable s clk rst en)
+  S.sample_lazy (exposeClockResetEnable s clockGen (resetGen @dom) enableGen)
 {-# NOINLINE sample_lazy #-}
 
 -- | Lazily get a list of /n/ samples from a 'Signal'
@@ -971,12 +957,7 @@ sampleN_lazy
   -- (and reset)
   -> [a]
 sampleN_lazy n s =
-  case knownDomain @dom of
-    SDomainConfiguration dom _ _ _ _ _ ->
-      let clk = Clock dom in
-      let rst = Reset (True :- pure False) in
-      let en = S.enableGen in
-      S.sampleN_lazy n (exposeClockResetEnable s clk rst en)
+  S.sampleN_lazy n (exposeClockResetEnable s clockGen (resetGen @dom) enableGen)
 {-# NOINLINE sampleN_lazy #-}
 
 -- * Simulation functions
@@ -1002,14 +983,9 @@ simulate
   -- (and reset)
   -> [a]
   -> [b]
-simulate f =
-  case knownDomain @dom of
-    SDomainConfiguration dom _ _ _ _ _ ->
-      let clk = Clock dom in
-      let rst = Reset (True :- pure False) in
-      let en = S.enableGen in
-      -- TODO: Explain why we skip the the first value here
-      tail . S.simulate (exposeClockResetEnable f clk rst en) . dup1
+simulate f0 =
+  let f1 = exposeClockResetEnable f0 clockGen (resetGen @dom) enableGen in
+  tail . S.simulate f1 . dup1
 {-# NOINLINE simulate #-}
 
 -- | /Lazily/ simulate a (@'Signal' a -> 'Signal' b@) function given a list of
@@ -1029,13 +1005,9 @@ simulate_lazy
   -- clock (and reset)
   -> [a]
   -> [b]
-simulate_lazy f =
-  case knownDomain @dom of
-    SDomainConfiguration dom _ _ _ _ _ ->
-      let clk = Clock dom in
-      let rst = Reset (True :- pure False) in
-      let en = S.enableGen in
-      tail . S.simulate_lazy (exposeClockResetEnable f clk rst en) . dup1
+simulate_lazy f0 =
+  let f1 = exposeClockResetEnable f0 clockGen (resetGen @dom) enableGen in
+  tail . S.simulate_lazy f1 . dup1
 {-# NOINLINE simulate_lazy #-}
 
 -- | Simulate a (@'Unbundled' a -> 'Unbundled' b@) function given a list of
@@ -1059,13 +1031,9 @@ simulateB
   -- clock (and reset)
   -> [a]
   -> [b]
-simulateB f =
-  case knownDomain @dom of
-    SDomainConfiguration dom _ _ _ _ _ ->
-      let clk = Clock dom in
-      let rst = Reset (True :- pure False) in
-      let en = S.enableGen in
-      tail . S.simulateB (exposeClockResetEnable f clk rst en) . dup1
+simulateB f0 =
+  let f1 = exposeClockResetEnable f0 clockGen (resetGen @dom) enableGen in
+  tail . S.simulateB f1 . dup1
 {-# NOINLINE simulateB #-}
 
 -- | /Lazily/ simulate a (@'Unbundled' a -> 'Unbundled' b@) function given a
@@ -1087,13 +1055,9 @@ simulateB_lazy
   -- clock (and reset)
   -> [a]
   -> [b]
-simulateB_lazy f =
-  case knownDomain @dom of
-    SDomainConfiguration dom _ _ _ _ _ ->
-      let clk = Clock dom in
-      let rst = Reset (True :- pure False) in
-      let en = S.enableGen in
-      tail . S.simulateB_lazy (exposeClockResetEnable f clk rst en) . dup1
+simulateB_lazy f0 =
+  let f1 = exposeClockResetEnable f0 clockGen (resetGen @dom) enableGen in
+  tail . S.simulateB_lazy f1 . dup1
 {-# NOINLINE simulateB_lazy #-}
 
 dup1 :: [a] -> [a]
