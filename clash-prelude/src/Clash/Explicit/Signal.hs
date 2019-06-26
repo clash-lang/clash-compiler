@@ -769,8 +769,8 @@ simulateB_lazy f = simulate_lazy (bundle . f . unbundle)
 --
 -- Example:
 --
--- >>> let sampleReset = sampleN 8 . unsafeToHighPolarity
--- >>> sampleReset (holdReset @System clockGen enableGen (SNat @2) (resetGenN (SNat @3)))
+-- >>> let sampleWithReset = sampleN 8 . unsafeToHighPolarity
+-- >>> sampleWithReset (holdReset @System clockGen enableGen (SNat @2) (resetGenN (SNat @3)))
 -- [True,True,True,True,True,False,False,False]
 --
 -- 'holdReset' holds the reset for an additional 2 clock cycles for a total
@@ -778,7 +778,7 @@ simulateB_lazy f = simulate_lazy (bundle . f . unbundle)
 -- intermediate assertions of the reset signal:
 --
 -- >>> let rst = fromList [True, False, False, False, True, False, False, False]
--- >>> sampleReset (holdReset @System clockGen enableGen (SNat @2) (unsafeFromHighPolarity rst))
+-- >>> sampleWithReset (holdReset @System clockGen enableGen (SNat @2) (unsafeFromHighPolarity rst))
 -- [True,True,True,False,True,True,True,False]
 --
 holdReset
