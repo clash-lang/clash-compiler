@@ -71,7 +71,9 @@ import           GHC.Integer.Logarithms (integerLogBase#)
 -- GHC API
 import           PrelNames
   (integerTyConKey, typeNatAddTyFamNameKey, typeNatExpTyFamNameKey,
-   typeNatLeqTyFamNameKey, typeNatMulTyFamNameKey, typeNatSubTyFamNameKey)
+   typeNatLeqTyFamNameKey, typeNatMulTyFamNameKey, typeNatSubTyFamNameKey,
+   typeNatCmpTyFamNameKey, ltDataConKey, eqDataConKey, gtDataConKey)
+import           SrcLoc                 (wiredInSrcSpan)
 import           Unique                 (getKey)
 
 -- Local imports
@@ -462,6 +464,14 @@ reduceTypeFamily tcm (tyView -> TyConApp tc tys)
   = let [falseTc,trueTc] = map (coerce . dcName) (tyConDataCons boolTc)
     in  if i1 <= i2 then Just (mkTyConApp trueTc [] )
                     else Just (mkTyConApp falseTc [])
+
+  | nameUniq tc == getKey typeNatCmpTyFamNameKey -- "GHC.TypeNats.CmpNat"
+  , [i1, i2] <- mapMaybe (litView tcm) tys
+  = Just $ ConstTy $ TyCon $
+      case compare i1 i2 of
+        LT -> Name User "GHC.Types.LT" (getKey ltDataConKey) wiredInSrcSpan
+        EQ -> Name User "GHC.Types.EQ" (getKey eqDataConKey) wiredInSrcSpan
+        GT -> Name User "GHC.Types.GT" (getKey gtDataConKey) wiredInSrcSpan
 
   | nameOcc tc `elem` ["GHC.TypeLits.Extra.FLog", "GHC.TypeNats.FLog"]
   , [i1, i2] <- mapMaybe (litView tcm) tys
