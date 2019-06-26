@@ -21,6 +21,8 @@ module Clash.Class.Num
   , boundedAdd
   , boundedSub
   , boundedMul
+  , satSucc
+  , satPred
   )
 where
 
@@ -65,19 +67,29 @@ class (Bounded a, Num a) => SaturatingNum a where
   -- | Multiplication with parameterizable over- and underflow behavior
   satMul :: SaturationMode -> a -> a -> a
 
-{-# INLINE boundedAdd #-}
+-- | Get successor of (or in other words, add 1 to) given number
+satSucc :: SaturatingNum a => SaturationMode -> a -> a
+satSucc s n = satAdd s n 1
+{-# INLINE satSucc #-}
+
+-- | Get predecessor of (or in other words, subtract 1 from) given number
+satPred :: SaturatingNum a => SaturationMode -> a -> a
+satPred s n = satSub s n 1
+{-# INLINE satPred #-}
+
 -- | Addition that clips to 'maxBound' on overflow, and 'minBound' on underflow
 boundedAdd :: SaturatingNum a => a -> a -> a
 boundedAdd = satAdd SatBound
+{-# INLINE boundedAdd #-}
 
-{-# INLINE boundedSub #-}
 -- | Subtraction that clips to 'maxBound' on overflow, and 'minBound' on
 -- underflow
 boundedSub  :: SaturatingNum a => a -> a -> a
 boundedSub = satSub SatBound
+{-# INLINE boundedSub #-}
 
-{-# INLINE boundedMul #-}
 -- | Multiplication that clips to 'maxBound' on overflow, and 'minBound' on
 -- underflow
 boundedMul :: SaturatingNum a => a -> a -> a
 boundedMul = satMul SatBound
+{-# INLINE boundedMul #-}

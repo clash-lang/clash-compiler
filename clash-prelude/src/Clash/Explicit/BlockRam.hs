@@ -403,7 +403,6 @@ module Clash.Explicit.BlockRam
   )
 where
 
-import Control.Applicative    (liftA2)
 import Data.Maybe             (isJust)
 import qualified Data.Vector  as V
 import GHC.Stack              (HasCallStack, withFrozenCallStack)
@@ -411,7 +410,7 @@ import GHC.TypeLits           (KnownNat, type (^), type (<=))
 import Prelude                hiding (length, replicate)
 
 import Clash.Annotations.Primitive (hasBlackBox)
-import Clash.Class.Num        (SaturationMode(SatBound), satAdd)
+import Clash.Class.Num        (SaturationMode(SatBound), satSucc)
 import Clash.Explicit.Signal  (KnownDomain, Enable, register, fromEnable)
 import Clash.Signal.Internal
   (Clock(..), Reset, Signal (..), invertReset, (.&&.), mux)
@@ -836,7 +835,7 @@ blockRam1 clk rst0 en rstStrategy n@SNat a rd0 mw0 =
   rstInv = invertReset rst0
 
   waCounter :: Signal dom (Index n)
-  waCounter = register clk rstInv en 0 (liftA2 (satAdd SatBound) (pure 1) waCounter)
+  waCounter = register clk rstInv en 0 (satSucc SatBound <$> waCounter)
 
   wa0 = fst . fromJustX <$> mw0
   w0  = snd . fromJustX <$> mw0

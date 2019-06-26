@@ -34,7 +34,7 @@ import Prelude               hiding ((!!), length)
 import System.IO.Unsafe      (unsafeDupablePerformIO)
 
 import Clash.Annotations.Primitive (hasBlackBox)
-import Clash.Class.Num       (satAdd, SaturationMode(SatBound))
+import Clash.Class.Num       (satSucc, SaturationMode(SatBound))
 import Clash.Promoted.Nat    (SNat(..))
 import Clash.Explicit.Signal
   (Clock, Reset, Signal, toEnable, fromList, register, unbundle)
@@ -297,4 +297,4 @@ ignoreFor clk rst en SNat a i =
   mux ((==) <$> counter <*> (pure maxBound)) i (pure a)
  where
   counter :: Signal dom (Index (n+1))
-  counter = register clk rst en 0 (satAdd SatBound 1 <$> counter)
+  counter = register clk rst en 0 (satSucc SatBound <$> counter)
