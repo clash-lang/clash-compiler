@@ -116,26 +116,26 @@ assign ~RESULT = ~SYM[0];
     }
   }
 , { "BlackBox" :
-    { "name"      : "Clash.Signal.Internal.resetGen"
+    { "name"      : "Clash.Signal.Internal.resetGenN"
     , "workInfo"  : "Always"
     , "kind" : "Declaration"
-    , "type" :
-"resetGen :: KnownDomain dom      => Reset dom"
+    , "type" : "resetGenN :: (KnownDomain dom, 1 <= n) => SNat n -> Reset dom"
     , "template" :
 "// resetGen on
 // pragma translate_off
 ~IF~ISSYNC[0]~THEN
 reg ~TYPO ~GENSYM[rst][0];
-localparam ~GENSYM[reset_period][1] = 29998 + ~PERIOD[0]0;
+localparam ~GENSYM[reset_period][1] = 29998 + (~LIT[2] * ~PERIOD[0]0);
 initial begin
   #1 ~SYM[0] = ~IF ~ISACTIVEHIGH[0] ~THEN 1 ~ELSE 0 ~FI;
   #~SYM[1] ~SYM[0] = ~IF ~ISACTIVEHIGH[0] ~THEN 0 ~ELSE 1 ~FI;
 end
 assign ~RESULT = ~SYM[0];~ELSE
 reg ~TYPO ~SYM[0];
+localparam ~SYM[1] = 30001 + ((~LIT[2] - 1) * ~PERIOD[0]0);
 initial begin
   #1     ~SYM[0] = ~IF ~ISACTIVEHIGH[0] ~THEN 1 ~ELSE 0 ~FI;
-  #30001 ~SYM[0] = ~IF ~ISACTIVEHIGH[0] ~THEN 0 ~ELSE 1 ~FI;
+  #~SYM[1] ~SYM[0] = ~IF ~ISACTIVEHIGH[0] ~THEN 0 ~ELSE 1 ~FI;
 end
 assign ~RESULT = ~SYM[0]; ~FI
 // pragma translate_on

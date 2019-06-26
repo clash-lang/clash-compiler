@@ -247,6 +247,7 @@ runClashTest =
         , runTest ("tests" </> "shouldwork" </> "Signal") defBuild [] "RegisterSR"      (["","RegisterSR_testBench"],"RegisterSR_testBench",True)
         , runTest ("tests" </> "shouldwork" </> "Signal") defBuild [] "RegisterAE"      (["","RegisterAE_testBench"],"RegisterAE_testBench",True)
         , runTest ("tests" </> "shouldwork" </> "Signal") defBuild [] "RegisterSE"      (["","RegisterSE_testBench"],"RegisterSE_testBench",True)
+        , runTest ("tests" </> "shouldwork" </> "Signal") defBuild [] "ResetGen"        (["","ResetGen_testBench"],"ResetGen_testBench",True)
         , runTest ("tests" </> "shouldwork" </> "Signal") defBuild [] "ResetLow"        (["","ResetLow_testBench"],"ResetLow_testBench",True)
         , runTest ("tests" </> "shouldwork" </> "Signal") defBuild [] "Rom"             (["","Rom_testBench"],"Rom_testBench",True)
         , runTest ("tests" </> "shouldwork" </> "Signal") defBuild [] "RomFile"         (["","RomFile_testBench"],"RomFile_testBench",True)

@@ -130,6 +130,7 @@ can potentially introduce situations prone to meta-stability:
 -}
 
 {-# LANGUAGE DataKinds             #-}
+{-# LANGUAGE ExplicitNamespaces    #-}
 {-# LANGUAGE FlexibleInstances     #-}
 {-# LANGUAGE GADTs                 #-}
 {-# LANGUAGE MagicHash             #-}
@@ -137,9 +138,13 @@ can potentially introduce situations prone to meta-stability:
 {-# LANGUAGE RankNTypes            #-}
 {-# LANGUAGE ScopedTypeVariables   #-}
 {-# LANGUAGE TypeApplications      #-}
+{-# LANGUAGE TypeOperators         #-}
 {-# LANGUAGE ViewPatterns          #-}
 
 {-# LANGUAGE Trustworthy #-}
+
+{-# OPTIONS_GHC -fplugin=GHC.TypeLits.Normalise #-}
+{-# OPTIONS_GHC -fplugin=GHC.TypeLits.KnownNat.Solver #-}
 
 {-# OPTIONS_HADDOCK show-extensions #-}
 
@@ -193,6 +198,7 @@ module Clash.Explicit.Signal
   , unsafeFromHighPolarity
   , unsafeFromLowPolarity
   , resetSynchronizer
+  , holdReset
     -- * Basic circuit functions
   , enable
   , dflipflop
@@ -207,6 +213,7 @@ module Clash.Explicit.Signal
   , tbClockGen
   , tbEnableGen
   , resetGen
+  , resetGenN
   , systemClockGen
   , tbSystemClockGen
   , systemResetGen
@@ -239,15 +246,20 @@ module Clash.Explicit.Signal
 where
 
 import Data.Maybe                     (isJust, fromJust)
+import GHC.TypeLits                   (type (+))
 
 import Clash.Annotations.Primitive    (hasBlackBox)
+import Clash.Class.Num                (satSucc, SaturationMode(SatBound))
+import Clash.Promoted.Nat             (SNat(..))
 import Clash.Signal.Bundle            (Bundle (..))
 import Clash.Signal.Internal
+import Clash.Sized.Index              (Index)
 import Clash.XException               (Undefined, deepErrorX)
 
 {- $setup
 >>> :set -XDataKinds -XTypeApplications -XFlexibleInstances -XMultiParamTypeClasses -XTypeFamilies
 >>> import Clash.Explicit.Prelude
+>>> import Clash.Promoted.Nat (SNat(..))
 >>> import qualified Data.List as L
 >>> :{
 instance KnownDomain "Dom2" where
@@ -751,3 +763,38 @@ simulateB_lazy
   -- ^ Input samples
   -> [b]
 simulateB_lazy f = simulate_lazy (bundle . f . unbundle)
+
+
+-- | Hold reset for a number of cycles relative to an incoming reset signal.
+--
+-- Example:
+--
+-- >>> let sampleReset = sampleN 8 . unsafeToHighPolarity
+-- >>> sampleReset (holdReset @System clockGen enableGen (SNat @2) (resetGenN (SNat @3)))
+-- [True,True,True,True,True,False,False,False]
+--
+-- 'holdReset' holds the reset for an additional 2 clock cycles for a total
+-- of 5 clock cycles where the reset is asserted. 'holdReset' also works on
+-- intermediate assertions of the reset signal:
+--
+-- >>> let rst = fromList [True, False, False, False, True, False, False, False]
+-- >>> sampleReset (holdReset @System clockGen enableGen (SNat @2) (unsafeFromHighPolarity rst))
+-- [True,True,True,False,True,True,True,False]
+--
+holdReset
+  :: forall dom n
+   . KnownDomain dom
+  => Clock dom
+  -> Enable dom
+  -- ^ Global enable
+  -> SNat n
+  -- ^ Hold for /n/ cycles, counting from the moment the incoming reset
+  -- signal becomes deasserted.
+  -> Reset dom
+  -- ^ Reset to extend
+  -> Reset dom
+holdReset clk en SNat rst =
+  unsafeFromHighPolarity ((/=maxBound) <$> counter)
+ where
+  counter :: Signal dom (Index (n+1))
+  counter = register clk rst en 0 (satSucc SatBound <$> counter)

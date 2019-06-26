@@ -126,6 +126,7 @@ module Clash.Signal
   , unsafeFromHighPolarity
   , unsafeFromLowPolarity
   , E.resetSynchronizer
+  , holdReset
     -- ** Enabling
   , Enable(..)
   , toEnable
@@ -180,6 +181,7 @@ module Clash.Signal
   , tbClockGen
   , tbEnableGen
   , resetGen
+  , resetGenN
   , systemClockGen
   , tbSystemClockGen
   , systemResetGen
@@ -241,6 +243,7 @@ import           Clash.XException      (Undefined)
 
 {- $setup
 >>> :set -XFlexibleContexts -XTypeApplications
+>>> import Clash.Promoted.Nat (SNat(..))
 >>> import Clash.XException (printX)
 >>> import Control.Applicative (liftA2)
 >>> let oscillate = register False (not <$> oscillate)
@@ -1585,3 +1588,23 @@ unsafeSynchronizer
   -> Signal dom2 a
 unsafeSynchronizer =
   hideClock (hideClock S.unsafeSynchronizer)
+
+-- | Hold reset for a number of cycles relative to an implicit reset signal.
+--
+-- Example:
+--
+-- >>> sampleN @System 8 (unsafeToHighPolarity (holdReset (SNat @2)))
+-- [True,True,True,False,False,False,False,False]
+--
+-- 'holdReset' holds the reset for an additional 2 clock cycles for a total
+-- of 3 clock cycles where the reset is asserted.
+--
+holdReset
+  :: forall dom n
+   . HiddenClockResetEnable dom
+  => SNat n
+  -- ^ Hold for /n/ cycles, counting from the moment the incoming reset
+  -- signal becomes deasserted.
+  -> Reset dom
+holdReset n =
+  hideClockResetEnable (\clk rst en -> E.holdReset clk en n rst)
