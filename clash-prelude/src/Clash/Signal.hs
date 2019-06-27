@@ -95,6 +95,7 @@ module Clash.Signal
   , ResetKind(..)
   , SResetKind(..)
   , ResetPolarity(..)
+  , SResetPolarity(..)
   , DomainConfiguration(..)
   , SDomainConfiguration(..)
     -- ** Default domains
