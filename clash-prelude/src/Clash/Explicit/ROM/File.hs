@@ -125,8 +125,8 @@ import Clash.XException             (Undefined(deepErrorX))
 -- * See "Clash.Sized.Fixed#creatingdatafiles" for ideas on how to create your
 -- own data files.
 romFilePow2
-  :: forall dom conf n m
-   . (KnownNat m, KnownNat n, KnownDomain dom conf)
+  :: forall dom  n m
+   . (KnownNat m, KnownNat n, KnownDomain dom)
   => Clock dom
   -- ^ 'Clock' to synchronize to
   -> Enable dom
@@ -165,7 +165,7 @@ romFilePow2 = \clk en -> romFile clk en (pow2SNat (SNat @ n))
 -- * See "Clash.Sized.Fixed#creatingdatafiles" for ideas on how to create your
 -- own data files.
 romFile
-  :: (KnownNat m, Enum addr, KnownDomain dom conf)
+  :: (KnownNat m, Enum addr, KnownDomain dom)
   => Clock dom
   -- ^ 'Clock' to synchronize to
   -> Enable dom
@@ -183,7 +183,7 @@ romFile = \clk en sz file rd -> romFile# clk en sz file (fromEnum <$> rd)
 
 -- | romFile primitive
 romFile#
-  :: (KnownNat m, KnownDomain dom conf)
+  :: (KnownNat m, KnownDomain dom)
   => Clock dom
   -- ^ 'Clock' to synchronize to
   -> Enable dom

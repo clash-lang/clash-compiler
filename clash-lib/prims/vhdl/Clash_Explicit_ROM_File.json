@@ -3,7 +3,7 @@
     , "kind" : "Declaration"
     , "type" :
 "romFile# :: ( KnownNat m           --       ARG[0]
-             , KnownDomain dom conf--       ARG[1]
+             , KnownDomain dom      --       ARG[1]
           => Clock dom              -- clk,  ARG[2]
           -> Enable dom             -- en,   ARG[3]
           -> SNat n                 -- sz,   ARG[4]

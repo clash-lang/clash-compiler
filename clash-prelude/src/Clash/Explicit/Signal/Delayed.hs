@@ -92,8 +92,8 @@ let mac :: Clock System
 -- >>> sampleN 7 (delay3 systemClockGen resetGen enableGen (dfromList [0..]))
 -- [-1,-1,-1,-1,1,2,3]
 delayed
-  :: forall dom conf a n d
-   . ( KnownDomain dom conf
+  :: forall dom  a n d
+   . ( KnownDomain dom
      , KnownNat d
      , Undefined a )
   => Clock dom
@@ -142,7 +142,7 @@ delayed clk rst en m ds = coerce (delaySignal (coerce ds))
 --      -> DSignal dom (n + 3) a
 delayedI
   :: ( KnownNat d
-     , KnownDomain dom conf
+     , KnownDomain dom
      , Undefined a )
   => Clock dom
   -> Reset dom

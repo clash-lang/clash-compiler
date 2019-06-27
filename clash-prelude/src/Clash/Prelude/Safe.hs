@@ -176,7 +176,7 @@ It instead exports the identically named functions defined in terms of
 
 -- | Create a 'register' function for product-type like signals (e.g. '(Signal a, Signal b)')
 --
--- > rP :: HiddenClockResetEnable dom conf
+-- > rP :: HiddenClockResetEnable dom
 -- >    => (Signal dom Int, Signal dom Int)
 -- >    -> (Signal dom Int, Signal dom Int)
 -- > rP = registerB (8,8)
@@ -185,7 +185,7 @@ It instead exports the identically named functions defined in terms of
 -- [(8,8),(1,1),(2,2),(3,3)...
 -- ...
 registerB
-  :: ( HiddenClockResetEnable dom conf
+  :: ( HiddenClockResetEnable dom
      , Undefined a
      , Bundle a )
   => a
@@ -197,7 +197,7 @@ infixr 3 `registerB`
 
 -- | Give a pulse when the 'Signal' goes from 'minBound' to 'maxBound'
 isRising
-  :: ( HiddenClockResetEnable dom conf
+  :: ( HiddenClockResetEnable dom
      , Undefined a
      , Bounded a
      , Eq a )
@@ -210,7 +210,7 @@ isRising = hideClockResetEnable E.isRising
 
 -- | Give a pulse when the 'Signal' goes from 'maxBound' to 'minBound'
 isFalling
-  :: ( HiddenClockResetEnable dom conf
+  :: ( HiddenClockResetEnable dom
      , Undefined a
      , Bounded a
      , Eq a )
@@ -239,7 +239,7 @@ isFalling = hideClockResetEnable E.isFalling
 -- counter = 'Clash.Signal.regEn' 0 ('riseEvery' ('SNat' :: 'SNat' 10000000)) (counter + 1)
 -- @
 riseEvery
-  :: HiddenClockResetEnable dom conf
+  :: HiddenClockResetEnable dom
   => SNat n
   -> Signal dom Bool
 riseEvery = hideClockResetEnable E.riseEvery
@@ -266,7 +266,7 @@ riseEvery = hideClockResetEnable E.riseEvery
 -- >>> sampleN @System 200 (oscillate False d1) == sampleN @System 200 osc'
 -- True
 oscillate
-  :: HiddenClockResetEnable dom conf
+  :: HiddenClockResetEnable dom
   => Bool
   -> SNat n
   -> Signal dom Bool

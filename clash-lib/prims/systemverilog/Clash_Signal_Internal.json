@@ -3,7 +3,7 @@
     , "kind" : "Declaration"
     , "type" :
 "delay#
-  :: ( KnownDomain dom conf  -- ARG[0]
+  :: ( KnownDomain dom        -- ARG[0]
      , Undefined a )          -- ARG[1]
   => Clock dom                -- ARG[2]
   -> Enable dom               -- ARG[3]
@@ -30,7 +30,7 @@ assign ~RESULT = ~SYM[0];
     , "kind" : "Declaration"
     , "type" :
 "register#
-  :: ( KnownDomain dom conf   -- ARG[0]
+  :: ( KnownDomain dom        -- ARG[0]
      , Undefined a )          -- ARG[1]
   => Clock dom                -- ARG[2]
   -> Reset dom                -- ARG[3]
@@ -60,7 +60,7 @@ assign ~RESULT = ~SYM[0];
     , "warning" : "Clash.Signal.Internal.clockGen is not synthesizable!"
     , "type" :
 "clockGen
-  :: KnownDomain dom conf-- ARG[0]
+  :: KnownDomain dom     -- ARG[0]
   => Clock dom"
     , "template" :
 "// clockGen begin
@@ -87,7 +87,7 @@ end
     , "warning" : "Clash.Signal.Internal.tbClockGen is not synthesizable!"
     , "type" :
 "tbClockGen
-  :: KnownDomain dom conf-- ARG[0]
+  :: KnownDomain dom     -- ARG[0]
   => Signal dom Bool      -- ARG[1]
   -> Clock dom"
     , "template" :
@@ -115,7 +115,7 @@ end
     { "name" : "Clash.Signal.Internal.resetGen"
     , "workInfo" : "Always"
     , "kind" : "Declaration"
-    , "type" : "resetGen :: KnownDomain dom conf => Reset dom"
+    , "type" : "resetGen :: KnownDomain dom      => Reset dom"
     , "template" :
 "// resetGen begin
 // pragma translate_off

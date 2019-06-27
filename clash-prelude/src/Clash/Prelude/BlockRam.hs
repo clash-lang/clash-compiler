@@ -126,7 +126,7 @@ We initially create a memory out of simple registers:
 
 @
 dataMem
-  :: HiddenClockResetEnable dom conf
+  :: HiddenClockResetEnable dom
   => Signal dom MemAddr
   -- ^ Read address
   -> Signal dom (Maybe (MemAddr,Value))
@@ -150,7 +150,7 @@ And then connect everything:
 @
 system
   :: ( KnownNat n
-     , HiddenClockResetEnable dom conf
+     , HiddenClockResetEnable dom
      )
   => Vec n Instruction
   -> Signal dom Value
@@ -217,7 +217,7 @@ has the potential to be translated to a more efficient structure:
 @
 system2
   :: ( KnownNat n
-     , HiddenClockResetEnable dom conf )
+     , HiddenClockResetEnable dom  )
   => Vec n Instruction
   -> Signal dom Value
 system2 instrs = memOut
@@ -308,7 +308,7 @@ We can now finally instantiate our system with a 'blockRam':
 @
 system3
   :: (KnownNat n
-     , HiddenClockResetEnable dom conf )
+     , HiddenClockResetEnable dom  )
   => Vec n Instruction
   -> Signal dom Value
 system3 instrs = memOut
@@ -504,7 +504,7 @@ cpu regbank (memOut,instr) = (regbank',(rdAddr,(,aluOut) <$> wrAddrM,fromIntegra
 
 >>> :{
 dataMem
-  :: HiddenClockResetEnable dom conf
+  :: HiddenClockResetEnable dom
   => Signal dom MemAddr
   -> Signal dom (Maybe (MemAddr,Value))
   -> Signal dom Value
@@ -520,7 +520,7 @@ dataMem rd wrM = mealy dataMemT (C.replicate d32 0) (bundle (rd,wrM))
 
 >>> :{
 system
-  :: (KnownNat n, HiddenClockResetEnable dom conf)
+  :: (KnownNat n, HiddenClockResetEnable dom )
   => Vec n Instruction
   -> Signal dom Value
 system instrs = memOut
@@ -565,7 +565,7 @@ prog = -- 0 := 4
 >>> :{
 system2
   :: ( KnownNat n
-     , HiddenClockResetEnable dom conf )
+     , HiddenClockResetEnable dom  )
   => Vec n Instruction
   -> Signal dom Value
 system2 instrs = memOut
@@ -618,7 +618,7 @@ cpu2 (regbank,ldRegD) (memOut,instr) =
 >>> :{
 system3
   :: ( KnownNat n
-     , HiddenClockResetEnable dom conf )
+     , HiddenClockResetEnable dom  )
   => Vec n Instruction
   -> Signal dom Value
 system3 instrs = memOut
@@ -683,8 +683,8 @@ prog2 = -- 0 := 4
 -- * Use the adapter 'readNew' for obtaining write-before-read semantics like this: @readNew (blockRam inits) rd wrM@.
 blockRam
   :: ( HasCallStack
-     , HiddenClock dom conf
-     , HiddenEnable dom conf
+     , HiddenClock dom
+     , HiddenEnable dom
      , Undefined a
      , Enum addr
      )
@@ -706,9 +706,9 @@ blockRam = \cnt rd wrM -> withFrozenCallStack
 -- | Version of blockram that is initialized with the same value on all
 -- memory positions.
 blockRam1
-   :: forall n dom a r addr conf
+   :: forall n dom a r addr
    . ( HasCallStack
-     , HiddenClockResetEnable dom conf
+     , HiddenClockResetEnable dom
      , Undefined a
      , Enum addr
      , 1 <= n )
@@ -752,8 +752,8 @@ blockRam1 =
 -- * Use the adapter 'readNew' for obtaining write-before-read semantics like this: @readNew (blockRamPow2 inits) rd wrM@.
 blockRamPow2
   :: ( HasCallStack
-     , HiddenClock dom conf
-     , HiddenEnable dom conf
+     , HiddenClock dom
+     , HiddenEnable dom
      , Undefined a
      , KnownNat n
      )
@@ -784,7 +784,7 @@ blockRamPow2 = \cnt rd wrM -> withFrozenCallStack
 --      ... =>
 --      Signal dom addr -> Signal dom (Maybe (addr, a)) -> Signal dom a
 readNew
-  :: ( HiddenClockResetEnable dom conf
+  :: ( HiddenClockResetEnable dom
      , Undefined a
      , Eq addr )
   => (Signal dom addr -> Signal dom (Maybe (addr, a)) -> Signal dom a)

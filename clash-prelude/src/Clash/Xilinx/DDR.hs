@@ -42,8 +42,8 @@ import Clash.Explicit.DDR
 -- Reset values are @0@
 iddr
   :: ( HasCallStack
-     , KnownDomain fast ('DomainConfiguration fast fPeriod edge reset init polarity)
-     , KnownDomain slow ('DomainConfiguration slow (2*fPeriod) edge reset init polarity)
+     , KnownConfiguration fast ('DomainConfiguration fast fPeriod edge reset init polarity)
+     , KnownConfiguration slow ('DomainConfiguration slow (2*fPeriod) edge reset init polarity)
      , KnownNat m )
   => Clock slow
   -- ^ clock
@@ -64,8 +64,8 @@ iddr clk rst en = withFrozenCallStack ddrIn# clk rst en 0 0 0
 --
 -- Reset value is @0@
 oddr
-  :: ( KnownDomain fast ('DomainConfiguration fast fPeriod edge reset init polarity)
-     , KnownDomain slow ('DomainConfiguration slow (2*fPeriod) edge reset init polarity)
+  :: ( KnownConfiguration fast ('DomainConfiguration fast fPeriod edge reset init polarity)
+     , KnownConfiguration slow ('DomainConfiguration slow (2*fPeriod) edge reset init polarity)
      , KnownNat m )
   => Clock slow
   -- ^ clock
@@ -80,8 +80,8 @@ oddr
 oddr clk rst en = uncurry (withFrozenCallStack oddr# clk rst en) . unbundle
 
 oddr#
-  :: ( KnownDomain fast ('DomainConfiguration fast fPeriod edge reset init polarity)
-     , KnownDomain slow ('DomainConfiguration slow (2*fPeriod) edge reset init polarity)
+  :: ( KnownConfiguration fast ('DomainConfiguration fast fPeriod edge reset init polarity)
+     , KnownConfiguration slow ('DomainConfiguration slow (2*fPeriod) edge reset init polarity)
      , KnownNat m )
   => Clock slow
   -> Reset slow

@@ -38,8 +38,8 @@ import Unsafe.Coerce
 -- @
 clockWizard
   :: forall domIn domOut periodIn periodOut edge init polarity name
-   . ( KnownDomain domIn ('DomainConfiguration domIn periodIn edge 'Asynchronous init polarity)
-     , KnownDomain domOut ('DomainConfiguration domOut periodOut edge 'Asynchronous init polarity) )
+   . ( KnownConfiguration domIn  ('DomainConfiguration domIn periodIn edge 'Asynchronous init polarity)
+     , KnownConfiguration domOut ('DomainConfiguration domOut periodOut edge 'Asynchronous init polarity) )
   => SSymbol name
   -- ^ Name of the component, must correspond to the name entered in the
   -- \"Clock Wizard\" dialog.
@@ -79,8 +79,8 @@ clockWizard _ clk rst =
 -- @
 clockWizardDifferential
   :: forall domIn domOut periodIn periodOut edge init polarity name
-   . ( KnownDomain domIn ('DomainConfiguration domIn periodIn edge 'Asynchronous init polarity)
-     , KnownDomain domOut ('DomainConfiguration domOut periodOut edge 'Asynchronous init polarity) )
+   . ( KnownConfiguration domIn ('DomainConfiguration domIn periodIn edge 'Asynchronous init polarity)
+     , KnownConfiguration domOut ('DomainConfiguration domOut periodOut edge 'Asynchronous init polarity) )
   => SSymbol name
   -- ^ Name of the component, must correspond to the name entered in the
   -- \"Clock Wizard\" dialog.

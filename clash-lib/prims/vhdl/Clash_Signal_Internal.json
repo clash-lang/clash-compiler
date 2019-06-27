@@ -3,7 +3,7 @@
     , "kind" : "Declaration"
     , "type" :
 "delay#
-  :: ( KnownDomain dom conf  -- ARG[0]
+  :: ( KnownDomain dom        -- ARG[0]
      , Undefined a )          -- ARG[1]
   => Clock dom                -- ARG[2]
   -> Enable dom               -- ARG[3]
@@ -52,7 +52,7 @@ end block;~FI
     , "kind" : "Declaration"
     , "type" :
 "register#
-  :: ( KnownDomain dom conf   -- ARG[0]
+  :: ( KnownDomain dom        -- ARG[0]
      , Undefined a )          -- ARG[1]
   => Clock dom                -- ARG[2]
   -> Reset dom                -- ARG[3]
@@ -149,7 +149,7 @@ end block;~FI
     , "warning" : "Clash.Signal.Internal.clockGen is not synthesizable!"
     , "type" :
 "clockGen
-  :: KnownDomain dom conf-- ARG[0]
+  :: KnownDomain dom     -- ARG[0]
   => Clock dom"
     , "comment" :
         "ModelSim and Vivado seem to round time values to an integer number of picoseconds.
@@ -182,7 +182,7 @@ end process;
     , "warning" : "Clash.Signal.Internal.tbClockGen is not synthesizable!"
     , "type" :
 "tbClockGen
-  :: KnownDomain dom conf-- ARG[0]
+  :: KnownDomain dom     -- ARG[0]
   => Signal dom Bool     -- ARG[1]
   -> Clock dom"
     , "template" :
@@ -211,7 +211,7 @@ end process;
     , "workInfo"  : "Always"
     , "kind" : "Declaration"
     , "type" :
-"resetGen :: KnownDomain dom conf => Reset dom"
+"resetGen :: KnownDomain dom      => Reset dom"
     , "template" :
 "-- resetGen begin
 -- pragma translate_off
@@ -235,7 +235,7 @@ end process;
     , "workInfo"  : "Never"
     , "kind" : "Declaration"
     , "type" :
-"unsafeToReset :: KnownDomain dom conf => Signal dom Bool -> Reset dom"
+"unsafeToReset :: KnownDomain dom => Signal dom Bool -> Reset dom"
     , "template" : "~RESULT <= '1' when ~ARG[1] = true else '0';"
     }
   }

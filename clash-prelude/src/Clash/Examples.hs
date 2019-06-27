@@ -83,7 +83,7 @@ encoderCase enable binaryIn | enable =
 encoderCase _ _ = 0
 
 upCounter
-  :: HiddenClockResetEnable dom conf
+  :: HiddenClockResetEnable dom
   => Signal dom Bool
   -> Signal dom (Unsigned 8)
 upCounter enable = s
@@ -99,13 +99,13 @@ upCounterLdT s (ld,en,dIn) = (s',s)
        | otherwise = s
 
 upCounterLd
-  :: HiddenClockResetEnable dom conf
+  :: HiddenClockResetEnable dom
   => Signal dom (Bool, Bool, Unsigned 8)
   -> Signal dom (Unsigned 8)
 upCounterLd = mealy upCounterLdT 0
 
 upDownCounter
-  :: HiddenClockResetEnable dom conf
+  :: HiddenClockResetEnable dom
   => Signal dom Bool
   -> Signal dom (Unsigned 8)
 upDownCounter upDown = s
@@ -118,7 +118,7 @@ lfsrF' s = pack feedback ++# slice d15 d1 s
     feedback = s!5 `xor` s!3 `xor` s!2 `xor` s!0
 
 lfsrF
-  :: HiddenClockResetEnable dom conf
+  :: HiddenClockResetEnable dom
   => BitVector 16 -> Signal dom Bit
 lfsrF seed = msb <$> r
   where r = register seed (lfsrF' <$> r)
@@ -135,21 +135,21 @@ lfsrGP taps regs = zipWith xorM taps (fb +>> regs)
              | otherwise = x
 
 lfsrG
-  :: HiddenClockResetEnable dom conf
+  :: HiddenClockResetEnable dom
   => BitVector 16
   -> Signal dom Bit
 lfsrG seed = last (unbundle r)
   where r = register (unpack seed) (lfsrGP (unpack 0b0011010000000000) <$> r)
 
 grayCounter
-  :: HiddenClockResetEnable dom conf
+  :: HiddenClockResetEnable dom
   => Signal dom Bool
   -> Signal dom (BitVector 8)
 grayCounter en = gray <$> upCounter en
   where gray xs = pack (msb xs) ++# xor (slice d7 d1 xs) (slice d6 d0 xs)
 
 oneHotCounter
-  :: HiddenClockResetEnable dom conf
+  :: HiddenClockResetEnable dom
   => Signal dom Bool
   -> Signal dom (BitVector 8)
 oneHotCounter enable = s
@@ -174,7 +174,7 @@ crcT bv dIn = replaceBit 0  dInXor
     fb      = msb bv
 
 crc
-  :: HiddenClockResetEnable dom conf
+  :: HiddenClockResetEnable dom
   => Signal dom Bool
   -> Signal dom Bool
   -> Signal dom Bit
@@ -394,7 +394,7 @@ Using `register`:
 
 @
 upCounter
-  :: HiddenClockResetEnable dom conf
+  :: HiddenClockResetEnable dom
   => Signal dom Bool
   -> Signal dom (Unsigned 8)
 upCounter enable = s
@@ -408,7 +408,7 @@ Using `mealy`:
 
 @
 upCounterLd
-  :: HiddenClockResetEnable dom conf
+  :: HiddenClockResetEnable dom
   => Signal dom (Bool,Bool,Unsigned 8)
   -> Signal dom (Unsigned 8)
 upCounterLd = `mealy` upCounterLdT 0
@@ -426,7 +426,7 @@ Using `register` and `mux`:
 
 @
 upDownCounter
-  :: HiddenClockResetEnable dom conf
+  :: HiddenClockResetEnable dom
   => Signal dom Bool
   -> Signal dom (Unsigned 8)
 upDownCounter upDown = s
@@ -449,7 +449,7 @@ lfsrF' s = 'pack' feedback '++#' 'slice' d15 d1 s
     feedback = s'!'5 ``xor`` s'!'3 ``xor`` s'!'2 ``xor`` s'!'0
 
 lfsrF
-  :: HiddenClockResetEnable dom conf
+  :: HiddenClockResetEnable dom
   => BitVector 16
   -> Signal dom Bit
 lfsrF seed = 'msb' '<$>' r
@@ -470,7 +470,7 @@ lfsrGP taps regs = 'zipWith' xorM taps (fb '+>>' regs)
 Then we can instantiate a 16-bit LFSR as follows:
 
 @
-lfsrG :: HiddenClockResetEnable dom conf => BitVector 16 -> Signal dom Bit
+lfsrG :: HiddenClockResetEnable dom  => BitVector 16 -> Signal dom Bit
 lfsrG seed = 'last' ('unbundle' r)
   where r = 'register' ('unpack' seed) (lfsrGP ('unpack' 0b0011010000000000) '<$>' r)
 @
@@ -485,7 +485,7 @@ Using the previously defined @upCounter@:
 
 @
 grayCounter
-  :: HiddenClockResetEnable dom conf
+  :: HiddenClockResetEnable dom
   => Signal dom Bool
   -> Signal dom (BitVector 8)
 grayCounter en = gray '<$>' upCounter en
@@ -498,7 +498,7 @@ Basically a barrel-shifter:
 
 @
 oneHotCounter
-  :: HiddenClockResetEnable dom conf
+  :: HiddenClockResetEnable dom
   => Signal dom Bool
   -> Signal dom (BitVector 8)
 oneHotCounter enable = s
@@ -537,7 +537,7 @@ crcT bv dIn = 'replaceBit' 0  dInXor
     fb      = 'msb' bv
 
 crc
-  :: HiddenClockResetEnable dom conf
+  :: HiddenClockResetEnable dom
   => Signal dom Bool
   -> Signal dom Bool
   -> Signal dom Bit

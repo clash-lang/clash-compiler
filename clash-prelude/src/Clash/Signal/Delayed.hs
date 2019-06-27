@@ -71,9 +71,9 @@ import           Clash.XException              (Undefined)
 >>> :set -XDataKinds -XTypeOperators -XTypeApplications -XFlexibleContexts
 >>> import Clash.Prelude
 >>> let delay3 = delayed (-1 :> -1 :> -1 :> Nil)
->>> let delay2 = delayedI :: HiddenClockResetEnable dom conf => Int -> DSignal dom n Int -> DSignal dom (n + 2) Int
+>>> let delay2 = delayedI :: HiddenClockResetEnable dom  => Int -> DSignal dom n Int -> DSignal dom (n + 2) Int
 >>> let delayN2 = delayN d2
->>> let delayI2 = delayI :: HiddenClockResetEnable dom conf => Int -> DSignal dom n Int -> DSignal dom (n + 2) Int
+>>> let delayI2 = delayI :: HiddenClockResetEnable dom  => Int -> DSignal dom n Int -> DSignal dom (n + 2) Int
 >>> let countingSignals = Clash.Prelude.repeat (dfromList [0..]) :: Vec 4 (DSignal dom 0 Int)
 -}
 
@@ -81,7 +81,7 @@ import           Clash.XException              (Undefined)
 --
 -- @
 -- delay3
---   :: HiddenClockResetEnable dom conf
+--   :: HiddenClockResetEnable dom
 --   => 'DSignal' dom n Int
 --   -> 'DSignal' dom (n + 3) Int
 -- delay3 = 'delayed' (-1 ':>' -1 ':>' -1 ':>' 'Nil')
@@ -91,7 +91,7 @@ import           Clash.XException              (Undefined)
 -- [-1,-1,-1,-1,1,2,3]
 delayed
   :: ( KnownNat d
-     , HiddenClockResetEnable dom conf
+     , HiddenClockResetEnable dom
      , Undefined a
      )
   => Vec d a
@@ -103,7 +103,7 @@ delayed = hideClockResetEnable E.delayed
 --
 -- @
 -- delay2
---   :: HiddenClockResetEnable dom conf
+--   :: HiddenClockResetEnable dom
 --   => Int
 --   -> 'DSignal' dom n Int
 --   -> 'DSignal' dom (n + 2) Int
@@ -125,7 +125,7 @@ delayed = hideClockResetEnable E.delayed
 delayedI
   :: ( KnownNat d
      , Undefined a
-     , HiddenClockResetEnable dom conf )
+     , HiddenClockResetEnable dom  )
   => a
   -- ^ Initial value
   -> DSignal dom n a
@@ -136,7 +136,7 @@ delayedI = hideClockResetEnable E.delayedI
 --
 -- @
 -- delay2
---   :: HiddenClockResetEnable dom conf
+--   :: HiddenClockResetEnable dom
 --   => Int
 --   -> 'DSignal' dom n Int
 --   -> 'DSignal' dom (n + 2) Int
@@ -146,8 +146,8 @@ delayedI = hideClockResetEnable E.delayedI
 -- >>> printX $ sampleN @System 6 (toSignal (delayN2 (-1) (dfromList [1..])))
 -- [-1,-1,1,2,3,4]
 delayN
-  :: forall dom conf a d n
-   . ( HiddenClockResetEnable dom conf
+  :: forall dom  a d n
+   . ( HiddenClockResetEnable dom
      , Undefined a )
   => SNat d
   -> a
@@ -164,7 +164,7 @@ delayN d dflt = coerce . go (snatToInteger d) . coerce @_ @(Signal dom a)
 --
 -- @
 -- delayI2
---   :: HiddenClockResetEnable dom conf
+--   :: HiddenClockResetEnable dom
 --   => Int
 --   -> 'DSignal' dom n Int
 --   -> 'DSignal' dom (n + 2) Int
@@ -178,8 +178,8 @@ delayN d dflt = coerce . go (snatToInteger d) . coerce @_ @(Signal dom a)
 -- >>> sampleN @System 6 (toSignal (delayI @2 (-1) (dfromList [1..])))
 -- [-1,-1,1,2,3,4]
 delayI
-  :: forall d n a dom  conf
-   . ( HiddenClockResetEnable dom conf
+  :: forall d n a dom
+   . ( HiddenClockResetEnable dom
      , Undefined a
      , KnownNat d )
   => a
@@ -206,8 +206,8 @@ type instance Apply (DelayedFold dom n delay a) k = DSignal dom (n + (delay*k)) 
 -- >>> printX $ sampleN @System 8 (toSignal (delayedFold d2 (-1) (*) countingSignals))
 -- [-1,-1,1,1,0,1,16,81]
 delayedFold
-  :: forall dom conf n delay k a
-   . ( HiddenClockResetEnable dom conf
+  :: forall dom  n delay k a
+   . ( HiddenClockResetEnable dom
      , Undefined a
      , KnownNat delay
      , KnownNat k )

@@ -53,7 +53,7 @@ let macT s (x,y) = (s',s)
 --     s' = x * y + s
 --
 -- mac
---   :: 'KnownDomain' dom conf
+--   :: 'KnownDomain' dom
 --   => 'Clock' dom
 --   -> 'Reset' dom
 --   -> 'Enable' dom
@@ -71,7 +71,7 @@ let macT s (x,y) = (s',s)
 --
 -- @
 -- dualMac
---   :: 'KnownDomain' dom conf
+--   :: 'KnownDomain' dom
 --   => 'Clock' dom
 --   -> 'Reset' dom
 --   -> 'Enable' dom
@@ -84,7 +84,7 @@ let macT s (x,y) = (s',s)
 --     s2 = 'mealy' clk rst en mac 0 ('bundle' (b,y))
 -- @
 mealy
-  :: ( KnownDomain dom conf
+  :: ( KnownDomain dom
      , Undefined s )
   => Clock dom
   -- ^ 'Clock' to synchronize to
@@ -131,7 +131,7 @@ mealy clk rst en f iS =
 --     (i2,b2) = 'mealyB' clk rst en f 3 (i1,c)
 -- @
 mealyB
-  :: ( KnownDomain dom conf
+  :: ( KnownDomain dom
      , Undefined s
      , Bundle i
      , Bundle o )

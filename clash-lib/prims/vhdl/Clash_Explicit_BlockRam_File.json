@@ -3,7 +3,7 @@
     , "kind" : "Declaration"
     , "type" :
 "blockRamFile#
-  :: ( KnownDomain dom conf   -- ARG[0]
+  :: ( KnownDomain dom        -- ARG[0]
      , KnownNat m             -- ARG[1]
      , HasCallStack )         -- ARG[2]
   => Clock dom                -- clk,  ARG[3]

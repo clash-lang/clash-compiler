@@ -5,7 +5,7 @@ import Clash.CoSim
 import Clash.Explicit.Prelude
 
 verilog_register
-  :: KnownDomain d dom
+  :: KnownDomain d
   => Clock  d
   -> Reset d
   -> Signal d (Signed 64)

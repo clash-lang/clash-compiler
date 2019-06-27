@@ -600,7 +600,6 @@ outputTest' env target extraClashArgs extraGhcArgs modName funcName path =
              , "-XKindSignatures"
              , "-XMagicHash"
              , "-XMonoLocalBinds"
-             , "-XMultiParamTypeClasses"
              , "-XNoImplicitPrelude"
              , "-XNoMonomorphismRestriction"
 #if __GLASGOW_HASKELL__ < 806

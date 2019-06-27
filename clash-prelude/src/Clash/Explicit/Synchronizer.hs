@@ -75,8 +75,8 @@ import Clash.XException            (Undefined)
 --      'asyncFIFOSynchronizer'.
 dualFlipFlopSynchronizer
   :: ( Undefined a
-     , KnownDomain dom1 conf1
-     , KnownDomain dom2 conf2 )
+     , KnownDomain dom1
+     , KnownDomain dom2 )
   => Clock dom1
   -- ^ 'Clock' to which the incoming  data is synchronized
   -> Clock dom2
@@ -99,8 +99,8 @@ dualFlipFlopSynchronizer clk1 clk2 rst en i =
 -- * Asynchronous FIFO synchronizer
 
 fifoMem
-  :: ( KnownDomain wdom conf1
-     , KnownDomain rdom conf2 )
+  :: ( KnownDomain wdom
+     , KnownDomain rdom )
   => Clock wdom
   -> Clock rdom
   -> Enable wdom
@@ -163,8 +163,8 @@ isFull addrSize@SNat ptr s_ptr =
 --
 -- __NB__: This synchronizer can be used for __word__-synchronization.
 asyncFIFOSynchronizer
-  :: ( KnownDomain wdom wconf
-     , KnownDomain rdom rconf
+  :: ( KnownDomain wdom
+     , KnownDomain rdom
      , 2 <= addrSize )
   => SNat addrSize
   -- ^ Size of the internally used addresses, the  FIFO contains @2^addrSize@

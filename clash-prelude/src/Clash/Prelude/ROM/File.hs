@@ -34,7 +34,7 @@ We can instantiate a synchronous ROM using the content of the above file like
 so:
 
 @
-f :: HiddenClock dom conf => Signal dom (Unsigned 3) -> Signal dom (Unsigned 9)
+f :: HiddenClock dom  => Signal dom (Unsigned 3) -> Signal dom (Unsigned 9)
 f rd = 'Clash.Class.BitPack.unpack' '<$>' 'romFile' d7 \"memory.bin\" rd
 @
 
@@ -50,7 +50,7 @@ However, we can also interpret the same data as a tuple of a 6-bit unsigned
 number, and a 3-bit signed number:
 
 @
-g :: HiddenClock dom conf => Signal dom (Unsigned 3) -> Signal dom (Unsigned 6,Signed 3)
+g :: HiddenClock dom  => Signal dom (Unsigned 3) -> Signal dom (Unsigned 6,Signed 3)
 g rd = 'Clash.Class.BitPack.unpack' '<$>' 'romFile' d7 \"memory.bin\" rd
 @
 
@@ -272,8 +272,8 @@ asyncRomFile# sz file = (content !) -- Leave "(content !)" eta-reduced, see
 romFile
   :: ( KnownNat m
      , KnownNat n
-     , HiddenClock dom conf
-     , HiddenEnable dom conf
+     , HiddenClock dom
+     , HiddenEnable dom
      )
   => SNat n
   -- ^ Size of the ROM
@@ -310,11 +310,11 @@ romFile = hideEnable (hideClock E.romFile)
 -- * See "Clash.Sized.Fixed#creatingdatafiles" for ideas on how to create your
 -- own data files.
 romFilePow2
-  :: forall n m dom conf
+  :: forall n m dom
    . ( KnownNat m
      , KnownNat n
-     , HiddenClock dom conf
-     , HiddenEnable dom conf
+     , HiddenClock dom
+     , HiddenEnable dom
      )
   => FilePath
   -- ^ File describing the content of the ROM

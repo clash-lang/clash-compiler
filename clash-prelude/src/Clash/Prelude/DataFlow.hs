@@ -154,7 +154,7 @@ pureDF f = DF (\i iV oR -> (fmap f i,iV,oR))
 -- | Create a 'DataFlow' circuit from a Mealy machine description as those of
 -- "Clash.Prelude.Mealy"
 mealyDF
-  :: ( KnownDomain dom conf
+  :: ( KnownDomain dom
      , Undefined s )
   => Clock dom
   -> Reset dom
@@ -171,7 +171,7 @@ mealyDF clk rst gen f iS =
 -- | Create a 'DataFlow' circuit from a Moore machine description as those of
 -- "Clash.Prelude.Moore"
 mooreDF
-  :: ( KnownDomain dom conf
+  :: ( KnownDomain dom
      , Undefined s )
   => Clock dom
   -> Reset dom
@@ -218,8 +218,8 @@ fifoDF_mealy (mem,rptr,wptr) (wdata,winc,rinc) =
 -- fifo4 = 'fifoDF' d4 (2 :> 3 :> Nil)
 -- @
 fifoDF
-  :: forall addrSize m n a dom conf
-   . ( KnownDomain dom conf
+  :: forall addrSize m n a dom
+   . ( KnownDomain dom
      , Undefined a
      , KnownNat addrSize
      , KnownNat n
@@ -358,7 +358,7 @@ parNDF fs =
 --
 -- <<doc/loopDF_sync.svg>>
 loopDF
-  :: ( KnownDomain dom conf
+  :: ( KnownDomain dom
      , Undefined d
      , KnownNat m
      , KnownNat n

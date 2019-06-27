@@ -15,7 +15,7 @@ crc32Step prevCRC byte = entry `xor` (prevCRC `shiftR` 8)
     entry = asyncRom $(lift crc32Table) (truncateB prevCRC `xor` byte)
 
 crc32
-  :: HiddenClockResetEnable tag dom
+  :: HiddenClockResetEnable tag
   => Signal tag (BitVector 8) -> Signal tag (BitVector 32)
 crc32 = moore crc32Step complement 0xFFFFFFFF . register 0
 

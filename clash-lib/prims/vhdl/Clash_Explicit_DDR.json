@@ -5,8 +5,8 @@
 "ddrIn# :: forall a slow fast n pFast enabled synchronous.
            ( HasCallStack           -- ARG[0]
            , Undefined a            -- ARG[1]
-           , KnownDomain fast domf  -- ARG[2]
-           , KnownDomain slow doms  -- ARG[3]
+           , KnownConfi~ fast domf  -- ARG[2]
+           , KnownConfi~ slow doms  -- ARG[3]
         => Clock slow               -- ARG[4]
         -> Reset slow               -- ARG[5]
         -> Enable slow              -- ARG[6]
@@ -98,8 +98,8 @@ end block;
     , "type" :
 "ddrOut# :: ( HasCallStack               -- ARG[0]
             , Undefined a                -- ARG[1]
-            , KnownDomain fast domf      -- ARG[2]
-            , KnownDomain slow doms      -- ARG[3]
+            , KnownConfi~ fast domf      -- ARG[2]
+            , KnownConfi~ slow doms      -- ARG[3]
          => Clock slow                   -- ARG[4]
          -> Reset slow                   -- ARG[5]
          -> Enable slow                  -- ARG[6]

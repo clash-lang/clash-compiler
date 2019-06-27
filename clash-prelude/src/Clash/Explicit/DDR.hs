@@ -57,8 +57,8 @@ import Clash.Signal.Internal
 ddrIn
   :: ( HasCallStack
      , Undefined a
-     , KnownDomain fast ('DomainConfiguration fast fPeriod edge reset init polarity)
-     , KnownDomain slow ('DomainConfiguration slow (2*fPeriod) edge reset init polarity) )
+     , KnownConfiguration fast ('DomainConfiguration fast fPeriod edge reset init polarity)
+     , KnownConfiguration slow ('DomainConfiguration slow (2*fPeriod) edge reset init polarity) )
   => Clock slow
   -- ^ clock
   -> Reset slow
@@ -80,8 +80,8 @@ ddrIn#
   :: forall a slow fast fPeriod polarity edge reset init
    . ( HasCallStack
      , Undefined a
-     , KnownDomain fast ('DomainConfiguration fast fPeriod edge reset init polarity)
-     , KnownDomain slow ('DomainConfiguration slow (2*fPeriod) edge reset init polarity) )
+     , KnownConfiguration fast ('DomainConfiguration fast fPeriod edge reset init polarity)
+     , KnownConfiguration slow ('DomainConfiguration slow (2*fPeriod) edge reset init polarity) )
   => Clock slow
   -> Reset slow
   -> Enable slow
@@ -134,8 +134,8 @@ ddrIn# (Clock _) (unsafeToHighPolarity -> hRst) (fromEnable -> ena) i0 i1 i2 =
 ddrOut
   :: ( HasCallStack
      , Undefined a
-     , KnownDomain fast ('DomainConfiguration fast fPeriod edge reset init polarity)
-     , KnownDomain slow ('DomainConfiguration slow (2*fPeriod) edge reset init polarity) )
+     , KnownConfiguration fast ('DomainConfiguration fast fPeriod edge reset init polarity)
+     , KnownConfiguration slow ('DomainConfiguration slow (2*fPeriod) edge reset init polarity) )
   => Clock slow
   -> Reset slow
   -> Enable slow
@@ -152,8 +152,8 @@ ddrOut clk rst en i0 =
 ddrOut#
   :: ( HasCallStack
      , Undefined a
-     , KnownDomain fast ('DomainConfiguration fast fPeriod edge reset init polarity)
-     , KnownDomain slow ('DomainConfiguration slow (2*fPeriod) edge reset init polarity) )
+     , KnownConfiguration fast ('DomainConfiguration fast fPeriod edge reset init polarity)
+     , KnownConfiguration slow ('DomainConfiguration slow (2*fPeriod) edge reset init polarity) )
   => Clock slow
   -> Reset slow
   -> Enable slow

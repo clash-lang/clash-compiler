@@ -56,11 +56,11 @@ import Clash.XException      (errorX, maybeIsX)
 -- * See "Clash.Prelude.BlockRam#usingrams" for more information on how to use a
 -- RAM.
 asyncRamPow2
-  :: forall wdom rdom wconf rconf n a
+  :: forall wdom rdom n a
    . ( KnownNat n
      , HasCallStack
-     , KnownDomain wdom wconf
-     , KnownDomain rdom rconf
+     , KnownDomain wdom
+     , KnownDomain rdom
      )
   => Clock wdom
   -- ^ 'Clock' to which to synchronize the write port of the RAM
@@ -90,8 +90,8 @@ asyncRamPow2 = \wclk rclk en rd wrM -> withFrozenCallStack
 asyncRam
   :: ( Enum addr
      , HasCallStack
-     , KnownDomain wdom wconf
-     , KnownDomain rdom rconf
+     , KnownDomain wdom
+     , KnownDomain rdom
      )
   => Clock wdom
    -- ^ 'Clock' to which to synchronize the write port of the RAM
@@ -117,8 +117,8 @@ asyncRam = \wclk rclk gen sz rd wrM ->
 -- | RAM primitive
 asyncRam#
   :: ( HasCallStack
-     , KnownDomain wdom wconf
-     , KnownDomain rdom rconf )
+     , KnownDomain wdom
+     , KnownDomain rdom )
   => Clock wdom
   -- ^ 'Clock' to which to synchronize the write port of the RAM
   -> Clock rdom

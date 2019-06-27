@@ -9,8 +9,8 @@ createDomain vSystem{vTag="DomA"}
 createDomain vSystem{vTag="DomB"}
 
 multiClockAdd
-  :: ( HiddenClockResetEnable domA confA
-     , HiddenClockResetEnable domB confB )
+  :: ( HiddenClockResetEnable domA
+     , HiddenClockResetEnable domB )
   => Signal domA (Unsigned 16)
   -> Signal domB (Unsigned 16)
   -> Signal domA (Unsigned 16)
@@ -22,9 +22,9 @@ multiClockAdd a0 b0 = a1 + unsafeSynchronizer b2
   b2 = register 0 b1
 
 topEntityI
-  :: forall domA domB confA confB
-   . ( HiddenClockResetEnable domA confA
-     , HiddenClockResetEnable domB confB )
+  :: forall domA domB
+   . ( HiddenClockResetEnable domA
+     , HiddenClockResetEnable domB )
   => Signal domA (Unsigned 16)
   -> Signal domB (Unsigned 16)
   -> Signal domA (Unsigned 16)

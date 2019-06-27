@@ -10,8 +10,8 @@ func
 func d c = 0
 
 mod'
-    :: forall dom conf
-     . HiddenClockResetEnable dom conf
+    :: forall dom
+     . HiddenClockResetEnable dom
     => Signal dom (BitVector 32)
 mod' = o
     where

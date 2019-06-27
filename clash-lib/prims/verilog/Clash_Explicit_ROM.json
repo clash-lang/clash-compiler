@@ -2,7 +2,7 @@
     { "name" : "Clash.Explicit.ROM.rom#"
     , "kind" : "Declaration"
     , "type" :
-"rom# :: ( KnownDomain dom conf   ARG[0]
+"rom# :: ( KnownDomain dom        ARG[0]
          , KnownNat n    --       ARG[1]
          , Undefined a ) --       ARG[2]
       => Clock dom       -- clk,  ARG[3]

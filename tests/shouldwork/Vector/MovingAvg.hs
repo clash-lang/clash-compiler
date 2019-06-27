@@ -3,7 +3,7 @@ module MovingAvg where
 import Clash.Prelude
 
 windowN
-  :: HiddenClockResetEnable dom conf
+  :: HiddenClockResetEnable dom
   => Default a
   => KnownNat n
   => Undefined a

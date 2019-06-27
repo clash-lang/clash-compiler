@@ -5,7 +5,7 @@ import Clash.Explicit.Testbench
 import qualified Clash.Explicit.Prelude as Explicit
 
 zeroAt0
-  :: HiddenClockResetEnable dom conf
+  :: HiddenClockResetEnable dom
   => Signal dom (Unsigned 8) -> Signal dom (Unsigned 8)
 zeroAt0 a = mux en a 0
   where
