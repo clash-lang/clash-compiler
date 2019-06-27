@@ -12,7 +12,7 @@
     , "kind" : "Expression"
     , "workInfo"  : "Never"
     , "type" :
-"unsafeToReset :: KnownDomain dom conf => Signal dom Bool -> Reset dom"
+"unsafeToReset :: KnownDomain dom      => Signal dom Bool -> Reset dom"
     , "template" : "~ARG[1]"
     }
   }

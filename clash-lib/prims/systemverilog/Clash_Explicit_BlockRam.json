@@ -3,7 +3,7 @@
     , "kind" : "Declaration"
     , "type" :
 "blockRam#
-  :: ( KnownDomain dom conf   ARG[0]
+  :: ( KnownDomain dom        ARG[0]
      , HasCallStack  --       ARG[1]
      , Undefined a ) --       ARG[2]
   => Clock dom       -- clk,  ARG[3]
@@ -50,7 +50,7 @@ assign ~RESULT = ~FROMBV[~SYM[2]][~TYP[9]];
     , "kind" : "Declaration"
     , "type" :
 "blockRam1#
-  :: ( KnownDomain dom conf   ARG[0]
+  :: ( KnownDomain dom        ARG[0]
      , HasCallStack  --       ARG[1]
      , Undefined a ) --       ARG[2]
   => Clock dom       -- clk,  ARG[3]

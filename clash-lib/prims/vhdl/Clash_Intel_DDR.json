@@ -4,8 +4,8 @@
     , "type" :
 "altddioIn
   :: ( HasCallStack               -- ARG[0]
-     , KnownDomain fast domf      -- ARG[1]
-     , KnownDomain slow doms      -- ARG[2]
+     , KnownConfi~ fast domf      -- ARG[1]
+     , KnownConfi~ slow doms      -- ARG[2]
      , KnownNat m )               -- ARG[3]
   => SSymbol deviceFamily         -- ARG[4]
   -> Clock slow                   -- ARG[5]
@@ -52,8 +52,8 @@ end block;
     , "type" :
 "altddioOut#
   :: ( HasCallStack             -- ARG[0]
-     , KnownDomain fast domf    -- ARG[1]
-     , KnownDomain slow doms    -- ARG[2]
+     , KnownConfi~ fast domf    -- ARG[1]
+     , KnownConfi~ slow doms    -- ARG[2]
      , KnownNat m )             -- ARG[3]
   => SSymbol deviceFamily       -- ARG[4]
   -> Clock slow                 -- ARG[5]

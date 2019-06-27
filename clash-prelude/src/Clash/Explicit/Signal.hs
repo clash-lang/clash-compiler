@@ -44,15 +44,19 @@ made. Clash provides a standard implementation, called 'System', that is
 configured as follows:
 
 @
-instance 'KnownDomain' \"System\" (''Domain' \"System\" 10000 ''Rising' ''Asynchronous' ''Defined' ''ActiveHigh') where
+instance KnownDomain "System" where
+  type KnownConf "System" = 'DomainConfiguration "System" 10000 'Rising 'Asynchronous 'Defined 'ActiveHigh
   knownDomain = 'SDomainConfiguration' SSymbol SNat 'SRising' 'SAsynchronous' 'SDefined' 'SActiveHigh'
 @
 
 In words, \"System\" is a synthesis domain with a clock running with a period
 of 10000 /ps/ (100 MHz). Memory elements update their state on the rising edge
 of the clock, can be reset asynchronously with regards to the clock, and have
-defined power up values if applicable. To conveniently create domains use
-'createDomain'.
+defined power up values if applicable.
+
+In order to create a new domain, you don't have to instantiate it explicitly.
+Instead, you can have 'createDomain' create a domain for you. You can also use
+the same function to subclass existing domains.
 
 * __NB__: \"Bad things\"™  happen when you actually use a clock period of @0@,
 so do __not__ do that!

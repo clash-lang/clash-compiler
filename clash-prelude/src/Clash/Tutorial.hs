@@ -1330,16 +1330,16 @@ a general listing of the available template holes:
 * @~TAG[N]@: Name of given domain. Errors when called on an argument which is not
   a 'KnownDomain', 'Reset', or 'Clock'.
 * @~PERIOD[N]@: Clock period of given domain. Errors when called on an argument
-  which is not a 'KnownDomain'.
+  which is not a 'KnownDomain' or 'KnownConf'.
 * @~ISALWAYSENABLED[N]@: Is the @(N+1)@'th argument a an Enable line set to a constant
   True. Errors when called on an argument which is not an 'Enable'.
 * @~ISSYNC[N]@: Does synthesis domain at the @(N+1)@'th argument have synchronous resets. Errors
-  when called on an argument which is not a 'KnownDomain'.
+  when called on an argument which is not a 'KnownDomain' or 'KnownConf'.
 * @~ISINITDEFINED[N]@: Does synthesis domain at the @(N+1)@'th argument have defined initial
-  values. Errors when called on an argument which is not a 'KnownDomain'.
+  values. Errors when called on an argument which is not a 'KnownDomain' or 'KnownConf'.
 * @~ACTIVEEDGE[edge][N]@: Does synthesis domain at the @(N+1)@'th argument respond to
   /edge/. /edge/ must be one of 'Falling' or 'Rising'. Errors when called on an
-  argument which is not a 'KnownDomain'.
+  argument which is not a 'KnownDomain' or 'KnownConf'.
 * @~AND[\<HOLE1\>,\<HOLE2\>,..]@: Logically /and/ the conditions in the @\<HOLE\>@'s
 * @~VARS[N]@: VHDL: Return the variables at the @(N+1)@'th argument argument.
 * @~NAME[N]@: Render the @(N+1)@'th string literal argument as an identifier
@@ -1517,11 +1517,11 @@ What is /not/ possible is:
 
   @
   pow2Clocks
-    :: ( 'KnownDomain' domIn (''Domain' domIn pIn eIn rIn iIn polIn)
-       , 'KnownDomain' dom2  (''Domain' dom2 (2*pIn) e2 r2 i2 p2)
-       , 'KnownDomain' dom4  (''Domain' dom4 (4*pIn) e4 r4 i4 p4)
-       , 'KnownDomain' dom8  (''Domain' dom8 (8*pIn) e8 r8 i8 p8)
-       , 'KnownDomain' dom16 (''Domain' dom16 (16*pIn) e16 r16 i16 p16)
+    :: ( 'KnownConfiguration' domIn (''DomainConfiguration' domIn pIn eIn rIn iIn polIn)
+       , 'KnownConfiguration' dom2  (''DomainConfiguration' dom2 (2*pIn) e2 r2 i2 p2)
+       , 'KnownConfiguration' dom4  (''DomainConfiguration' dom4 (4*pIn) e4 r4 i4 p4)
+       , 'KnownConfiguration' dom8  (''DomainConfiguration' dom8 (8*pIn) e8 r8 i8 p8)
+       , 'KnownConfiguration' dom16 (''DomainConfiguration' dom16 (16*pIn) e16 r16 i16 p16)
     => 'Clock' domIn
     -> 'Reset' domIn
     -> ( 'Clock' dom16
@@ -1539,11 +1539,11 @@ What is /not/ possible is:
 
   @
   pow2Clocks'
-    :: ( 'KnownDomain' domIn (''Domain' domIn pIn eIn rIn iIn polIn)
-       , 'KnownDomain' dom2  (''Domain' dom2 (2*pIn) e2 r2 i2 p2)
-       , 'KnownDomain' dom4  (''Domain' dom4 (4*pIn) e4 r4 i4 p4)
-       , 'KnownDomain' dom8  (''Domain' dom8 (8*pIn) e8 r8 i8 p8)
-       , 'KnownDomain' dom16 (''Domain' dom16 (16*pIn) e16 r16 i16 p16)
+    :: ( 'KnownConfiguration' domIn (''DomainConfiguration' domIn pIn eIn rIn iIn polIn)
+       , 'KnownConfiguration' dom2  (''DomainConfiguration' dom2 (2*pIn) e2 r2 i2 p2)
+       , 'KnownConfiguration' dom4  (''DomainConfiguration' dom4 (4*pIn) e4 r4 i4 p4)
+       , 'KnownConfiguration' dom8  (''DomainConfiguration' dom8 (8*pIn) e8 r8 i8 p8)
+       , 'KnownConfiguration' dom16 (''DomainConfiguration' dom16 (16*pIn) e16 r16 i16 p16)
     => 'Clock' domIn
     -> 'Reset' domIn
     -> ( 'Clock' dom16

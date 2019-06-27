@@ -4,8 +4,8 @@
     , "type" :
 "iddr
   :: ( HasCallStack            -- ARG[0]
-     , KnownDomain fast domf   -- ARG[1]
-     , KnownDomain slow doms   -- ARG[2]
+     , KnownConfi~ fast domf   -- ARG[1]
+     , KnownConfi~ slow doms   -- ARG[2]
      , KnownNat m )            -- ARG[3]
   -> Clock slow                -- ARG[4]
   -> Reset slow                -- ARG[5]
@@ -48,8 +48,8 @@ assign ~RESULT = {~SYM[2],~SYM[1]};
     , "kind" : "Declaration"
     , "type" :
 "oddr#
-  :: ( KnownDomain fast domf    -- ARG[0]
-     , KnownDomain slow doms    -- ARG[1]
+  :: ( KnownConfi~ fast domf    -- ARG[0]
+     , KnownConfi~ slow doms    -- ARG[1]
      , KnownNat m )             -- ARG[2]
   => Clock slow                 -- ARG[3]
   -> Reset slow                 -- ARG[4]
