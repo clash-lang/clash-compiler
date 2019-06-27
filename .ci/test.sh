@@ -6,4 +6,4 @@ set -xeo pipefail
 cabal --write-ghc-environment-files=always new-build all
 
 cabal new-test clash-cosim clash-prelude
-cabal new-run -- clash-testsuite -j$THREADS
+cabal new-run -- clash-testsuite -j$THREADS --hide-successes
