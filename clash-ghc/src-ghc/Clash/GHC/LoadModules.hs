@@ -630,7 +630,6 @@ wantedLanguageExtensions df =
              , LangExt.FlexibleInstances
              , LangExt.KindSignatures
              , LangExt.MagicHash
-             , LangExt.MultiParamTypeClasses
              , LangExt.MonoLocalBinds
              , LangExt.QuasiQuotes
              , LangExt.ScopedTypeVariables

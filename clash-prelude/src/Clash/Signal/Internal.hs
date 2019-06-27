@@ -15,11 +15,8 @@ Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
 {-# LANGUAGE DeriveGeneric          #-}
 {-# LANGUAGE FlexibleContexts       #-}
 {-# LANGUAGE FlexibleInstances      #-}
-{-# LANGUAGE FunctionalDependencies #-}
 {-# LANGUAGE GADTs                  #-}
-{-# LANGUAGE KindSignatures         #-}
 {-# LANGUAGE MagicHash              #-}
-{-# LANGUAGE MultiParamTypeClasses  #-}
 {-# LANGUAGE ScopedTypeVariables    #-}
 {-# LANGUAGE StandaloneDeriving     #-}
 {-# LANGUAGE TemplateHaskell        #-}
