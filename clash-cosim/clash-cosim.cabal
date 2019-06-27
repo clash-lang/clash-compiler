@@ -1,0 +1,114 @@
+Name:           clash-cosim
+Version:        0.1
+Cabal-Version:  2.0
+License:        BSD2
+License-File:   LICENSE
+Author:         John Verheij <https://github.com/jgjverheij>
+Maintainer:     Martijn Bastiaan <martijn@qbaylogic.com>
+Homepage:       https://github.com/clash-lang/clash-cosim
+Category:       Hardware
+Synopsis:       Co-simulation in Clash
+Description:    clash-cosim implements Verilog cosimulation in Haskell and
+                integrates with Clash natively. Cosimulation allows a user to
+                write inline Verilog code and still produce an executable. For
+                user documentation, see: <https://github.com/clash-lang/clash-cosim>.
+Build-Type:     Custom
+tested-with:    GHC == 8.2.2, GHC == 8.4.3, GHC == 8.6.1
+
+--
+Data-Files:     src/cbits/cosim_vpi.vpi
+                src/cbits/cosim_vpi.sl
+                src/prims/verilog/Clash_CoSim_CoSimInstances.json
+
+extra-tmp-files: src/prims/verilog/Clash_CoSim_CoSimInstances.json
+
+Extra-Source-Files: src/cbits/comm/*.c
+                    src/cbits/comm/*.h
+                    src/cbits/control/*.c
+                    src/cbits/control/*.h
+                    src/cbits/include/*.h
+                    src/cbits/process/*.c
+                    src/cbits/process/*.h
+                    src/cbits/traversing/*.c
+                    src/cbits/traversing/*.h
+                    src/cbits/types/*.c
+                    src/cbits/types/*.h
+                    src/cbits/*.c
+                    src/cbits/Makefile
+                    src/prims/verilog/README.md
+                    tests/*.hs
+
+flag pedantic
+  description: Enable -Werror
+  default:     False
+  manual:      True
+
+custom-setup
+--  ghc-options:   -Wall -Werror
+  setup-depends: aeson,
+                 aeson-pretty,
+                 base >= 4.9.0 && < 5,
+                 directory,
+                 process,
+                 text,
+                 neat-interpolation >= 0.3.0,
+                 template-haskell >= 2.0.0,
+                 Cabal
+
+source-repository head
+  type: git
+  location: https://github.com/clash-lang/clash-cosim.git
+
+Library
+  default-language: Haskell2010
+  C-sources:        src/cbits/cosim_clash.c
+-- TODO: Reintroduce this option, without breaking tests:
+--  LD-Options:       --fatal-warnings
+  ghc-options:      -Wall -fexpose-all-unfoldings -fno-worker-wrapper
+  if flag(pedantic)
+    ghc-options: -Werror
+  CC-Options:       -fPIC -Wall -Werror -Wl,--fatal-warnings
+  HS-Source-Dirs:   src
+  Build-Depends:    base                      >= 4.9.0   && < 5,
+                    clash-prelude             >= 0.99,
+                    deepseq                   >= 1.4.0,
+                    ghc-typelits-extra        >= 0.2.1   && < 0.4,
+                    ghc-typelits-knownnat     >= 0.2.2   && < 0.7,
+                    ghc-typelits-natnormalise >= 0.4.2   && < 0.7,
+                    neat-interpolation        >= 0.3.0,
+                    parsec                    >= 3.0.0,
+                    random                    >= 1.0.0,
+                    template-haskell          >= 2.0.0,
+                    text
+
+  Exposed-Modules:  Clash.CoSim.CodeGeneration,
+                    Clash.CoSim.CoSimInstances,
+                    Clash.CoSim.DSLParser,
+                    Clash.CoSim.Simulator,
+                    Clash.CoSim.Types,
+                    Clash.CoSim,
+                    Paths_clash_cosim
+
+  Autogen-Modules:  Paths_clash_cosim
+  cpp-options:      -DCABAL
+
+test-suite test
+  default-language:
+    Haskell2010
+  type:
+    exitcode-stdio-1.0
+  hs-source-dirs:
+    tests
+  main-is:
+    test.hs
+  build-depends:
+      base >= 4 && < 5,
+      clash-cosim,
+      clash-prelude >= 0.99,
+      deepseq,
+      tasty >= 1.0,
+      tasty-hunit,
+      tasty-quickcheck
+  ghc-options:   -Wall
+  if flag(pedantic)
+    ghc-options: -Werror
