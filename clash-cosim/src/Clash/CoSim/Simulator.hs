@@ -361,7 +361,7 @@ parseInput doDup streams t = dup (toSignalStream t) : streams
 
 parseClock
   :: [SignalStream]
-  -> CS.Clock dom gated
+  -> CS.Clock dom
   -> [SignalStream]
 parseClock streams _clk = (cycle [[0],[1]]) : streams
 
@@ -408,7 +408,7 @@ class CoSim r where
 instance {-# OVERLAPPABLE #-} CoSimType r => CoSim r where
     coSim b s = parseOutput b (coSimStart s)
 
-instance {-# OVERLAPPING #-} (CoSim r) => CoSim (CS.Clock dom 'CS.Source -> r) where
+instance {-# OVERLAPPING #-} (CoSim r) => CoSim (CS.Clock dom -> r) where
     coSim _ s streams = coSim True s . parseClock streams
 
 instance {-# OVERLAPPING #-} (CoSimType t, CoSim r) => CoSim (t -> r) where
@@ -418,6 +418,6 @@ class CoSimType t where
     toSignalStream   :: t -> SignalStream
     fromSignalStream :: SignalStream -> t
 
-instance (ClashType a, CP.Undefined a) => CoSimType (CP.Signal clk a) where
+instance (ClashType a, CS.KnownDomain clk dom) => CoSimType (CP.Signal clk a) where
     toSignalStream   = map (wordPack . CP.pack) . CP.sample
     fromSignalStream = CP.fromList . map (CP.unpack . wordUnpack)
