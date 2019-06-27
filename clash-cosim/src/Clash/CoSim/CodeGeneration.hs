@@ -111,13 +111,10 @@ coSimTypeGen clks args = do
     let domName = mkName "dom"
     let dom     = return $ VarT domName
 
-    let confName = mkName "conf"
-    let conf     = return (VarT confName)
-
     -- Generate contraints:
     argConstraints <- sequence $ map (\name -> [t| ClashType $name |]) argTypeNames
     resConstraint  <- [t| ClashType $result |]
-    kdConstraint   <- [t| KnownDomain $dom $conf |]
+    kdConstraint   <- [t| KnownDomain $dom |]
     let constraints = kdConstraint : resConstraint : argConstraints
 
     -- Generate type:
@@ -127,5 +124,5 @@ coSimTypeGen clks args = do
     resSignalType  <- [t| Signal $dom $result |]
 
     let ctx = (fixedArgs ++ clkSignalTypes ++ argSignalTypes) `arrowsR` resSignalType
-    let varNames = resultName : domName : confName : argNames
+    let varNames = resultName : domName : argNames
     return $ ForallT (map PlainTV varNames) constraints ctx
