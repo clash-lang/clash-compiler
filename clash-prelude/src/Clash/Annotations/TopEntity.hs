@@ -59,27 +59,35 @@ For example, given the following specification:
 module Blinker where
 
 import Clash.Prelude
-import Clash.Intel.ClockGen
 
-type Dom50 = Dom \"System\" 20000
+'Clash.Signal.createDomain' vSystem{vTag=\"Dom50\", vPeriod=50000}
 
 topEntity
   :: Clock Dom50
-  -> Reset Dom50
+  -> Signal Dom50 Bool
   -> Signal Dom50 Bit
   -> Signal Dom50 (BitVector 8)
-topEntity clk rst key1 =
-    let  (pllOut,pllStable) = 'Clash.Intel.ClockGen.altpll' (SSymbol @ "altpll50") clk rst
-         rstSync            = 'Clash.Signal.resetSynchronizer' pllOut ('Clash.Signal.unsafeToAsyncReset' pllStable)
-    in   'Clash.Signal.exposeClockResetEnable' leds pllOut rstSync
-  where
-    key1R  = 'Clash.Prelude.isRising' 1 key1
-    leds   = 'Clash.Prelude.mealy' blinkerT (1,False,0) key1R
+topEntity clk rstBtn modeBtn =
+  'Clash.Signal.exposeClockResetEnable'
+    ('Clash.Prelude.mealy' blinkerT (1,False,0) . isRising 1)
+    clk
+    rstSync
+    en
+    modeBtn
+ where
+  en = `Clash.Signal.enableGen`
+
+  rstSync =
+    'Clash.Signal.resetSynchronizer'
+      clk
+      ('Clash.Signal.unsafeFromLowPolarity' rstBtn)
+      en
 
 blinkerT (leds,mode,cntr) key1R = ((leds',mode',cntr'),leds)
   where
     -- clock frequency = 50e6  (50 MHz)
     -- led update rate = 333e-3 (every 333ms)
+    cnt_max :: Index 16650001
     cnt_max = 16650000 -- 50e6 * 333e-3
 
     cntr' | cntr == cnt_max = 0
@@ -108,22 +116,12 @@ use work.blinker_types.all;
 
 entity blinker_topentity is
   port(-- clock
-       input_0  : in std_logic;
-       -- asynchronous reset: active high
-       input_1  : in std_logic;
-       input_2  : in std_logic_vector(0 downto 0);
-       output_0 : out std_logic_vector(7 downto 0));
+       clk       : in blinker_types.clk_dom50;
+       \rstBtn\  : in boolean;
+       \modeBtn\ : in std_logic;
+       result    : out std_logic_vector(7 downto 0));
 end;
-
-architecture structural of blinker_topentity is
-begin
-  blinker_topentity_0_inst : entity blinker_topentity_0
-    port map
-      (clk    => input_0
-      ,rst    => input_1
-      ,key1   => input_2
-      ,result => output_0);
-end;
+...
 @
 
 However, if we add the following 'Synthesize' annotation in the file:
@@ -153,22 +151,12 @@ use work.blinker_types.all;
 
 entity blinker is
   port(-- clock
-       CLOCK_50 : in std_logic;
-       -- asynchronous reset: active high
-       KEY0     : in std_logic;
-       KEY1     : in std_logic_vector(0 downto 0);
+       CLOCK_50 : in blinker_types.clk_dom50;
+       KEY0     : in boolean;
+       KEY1     : in std_logic;
        LED      : out std_logic_vector(7 downto 0));
 end;
-
-architecture structural of blinker is
-begin
-  blinker_topentity_inst : entity blinker_topentity
-    port map
-      (clk    => CLOCK_50
-      ,rst    => KEY0
-      ,key1   => KEY1
-      ,result => LED);
-end;
+...
 @
 
 Where we now have:
@@ -272,7 +260,7 @@ instance Lift TopEntity where
 -- @
 -- data T = MkT Int Bool
 --
--- {\-\# ANN topEntity (defSyn "f") \#-\}
+-- {\-\# ANN f (defSyn "f") \#-\}
 -- f :: Int -> T -> (T,Bool)
 -- f a b = ...
 -- @
@@ -281,19 +269,17 @@ instance Lift TopEntity where
 --
 -- @
 -- entity f is
---   port(input_0      : in signed(63 downto 0);
---        input_1_0    : in signed(63 downto 0);
---        input_1_1    : in boolean;
---        output_0_0_0 : out signed(63 downto 0);
---        output_0_0_1 : out boolean;
---        output_0_1   : out boolean);
+--   port(a      : in signed(63 downto 0);
+--        b_0    : in signed(63 downto 0);
+--        b_1    : in boolean;
+--        result : out f_types.tup2);
 -- end;
 -- @
 --
 -- However, we can change this by using 'PortName's. So by:
 --
 -- @
--- {\-\# ANN topEntity
+-- {\-\# ANN f
 --    (Synthesize
 --       { t_name   = "f"
 --       , t_inputs = [ PortName \"a\"
@@ -316,7 +302,7 @@ instance Lift TopEntity where
 -- If we want to name fields for tuples/records we have to use 'PortProduct'
 --
 -- @
--- {\-\# ANN topEntity
+-- {\-\# ANN f
 --    (Synthesize
 --       { t_name   = "f"
 --       , t_inputs = [ PortName \"a\"
@@ -333,7 +319,7 @@ instance Lift TopEntity where
 --   port(a     : in signed(63 downto 0);
 --        b     : in signed(63 downto 0);
 --        c     : in boolean;
---        q     : out f_types.t;
+--        res_q : out f_types.t;
 --        res_1 : out boolean);
 -- end;
 -- @
