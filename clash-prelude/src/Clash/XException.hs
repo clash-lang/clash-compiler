@@ -60,6 +60,7 @@ import GHC.Generics
 import GHC.Natural       (Natural)
 import GHC.Show          (appPrec)
 import GHC.Stack         (HasCallStack, callStack, prettyCallStack, withFrozenCallStack)
+import Numeric.Half      (Half)
 import System.IO.Unsafe  (unsafeDupablePerformIO)
 
 -- | An exception representing an \"uninitialized\" value.
@@ -666,6 +667,10 @@ instance Undefined Word32 where
   rnfX = rwhnfX
 
 instance Undefined Word64 where
+  deepErrorX = errorX
+  rnfX = rwhnfX
+
+instance Undefined Half where
   deepErrorX = errorX
   rnfX = rwhnfX
 
