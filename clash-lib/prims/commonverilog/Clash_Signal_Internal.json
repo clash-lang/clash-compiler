@@ -12,8 +12,8 @@
     , "kind" : "Expression"
     , "workInfo"  : "Never"
     , "type" :
-"unsafeToReset :: KnownDomain dom      => Signal dom Bool -> Reset dom"
-    , "template" : "~ARG[1]"
+"unsafeToReset :: Signal dom Bool -> Reset dom"
+    , "template" : "~ARG[0]"
     }
   }
 , { "BlackBox" :
