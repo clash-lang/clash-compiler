@@ -141,24 +141,32 @@ module Clash.Signal
   , hideClock
   , exposeClock
   , withClock
+  , withClock0
+  , withClockProxy
   , hasClock
     -- ** Hidden reset
   , HiddenReset
   , hideReset
   , exposeReset
   , withReset
+  , withReset0
+  , withResetProxy
   , hasReset
     -- ** Hidden enable
   , HiddenEnable
   , hideEnable
   , exposeEnable
   , withEnable
+  , withEnable0
+  , withEnableProxy
   , hasEnable
     -- ** Hidden clock, reset, and enable
   , HiddenClockResetEnable
   , hideClockResetEnable
   , exposeClockResetEnable
   , withClockResetEnable
+  , withClockResetEnable0
+  , withClockResetEnableProxy
   , SystemClockResetEnable
     -- * Basic circuit functions
   , dflipflop
@@ -214,6 +222,7 @@ import           GHC.TypeLits
   (KnownNat, KnownSymbol, AppendSymbol, Symbol)
 import           Data.Bits             (Bits) -- Haddock only
 import           Data.Maybe            (isJust, fromJust)
+import           Data.Proxy            (Proxy(..))
 import           Prelude
 import           Test.QuickCheck       (Property, property)
 
@@ -435,21 +444,51 @@ hideClock
 hideClock = \f -> f (fromLabel @(HiddenClockName dom))
 {-# INLINE hideClock #-}
 
--- | Connect an explicit 'Clock' to a function with a hidden 'Clock' argument.
+-- | Connect an explicit 'Clock' to a function with a hidden 'Clock'. This
+-- version (also see: 'withClockProxy' and 'withClock') applies a clock to
+-- a @Signal dom a@.
 --
--- @
--- withClock = 'flip' exposeClock
--- @
-withClock
-  :: forall dom r
+-- <Clash-Signal.html#hiddenclockandreset Click here to read more about hidden clocks, resets, and enables>
+withClock0
+  :: forall dom a
    . KnownDomain dom
   => Clock dom
   -- ^ The 'Clock' we want to connect
-  -> (HiddenClock dom  => r)
+  -> (HiddenClock dom => Signal dom a)
   -- ^ The function with a hidden 'Clock' argument
-  -> r
-withClock = \clk f -> expose @(HiddenClockName dom) f clk
+  -> Signal dom a
+withClock0 = \rst f -> expose @(HiddenClockName dom) f rst
+{-# INLINE withClock0 #-}
+
+-- | Connect an explicit 'Clock' to a function with a hidden 'Clock'. This
+-- version (also see: 'withClockProxy' and 'withClock0') takes a function
+-- taking at least one argument of type @Signal dom a@.
+--
+-- <Clash-Signal.html#hiddenclockandreset Click here to read more about hidden clocks, resets, and enables>
+withClock
+  :: forall dom r a
+   . KnownDomain dom
+  => Clock dom
+  -- ^ The 'Clock' we want to connect
+  -> (HiddenClock dom => Signal dom a -> r)
+  -- ^ The function with a hidden 'Clock' argument
+  -> (Signal dom a -> r)
+withClock = \rst f -> expose @(HiddenClockName dom) f rst
 {-# INLINE withClock #-}
+
+-- | Connect an explicit 'Clock' to a function with a hidden 'Clock'. This
+-- version (also see: 'withClock' and 'withClock0') takes a function
+-- taking a proxy argument witnessing /dom/.
+--
+-- <Clash-Signal.html#hiddenclockandreset Click here to read more about hidden clocks, resets, and enables>
+withClockProxy
+  :: forall dom r
+   . KnownDomain dom
+  => Clock dom
+  -> (HiddenClock dom => Proxy dom -> r)
+  -> r
+withClockProxy = \rst f -> expose @(HiddenClockName dom) (f (Proxy @dom)) rst
+{-# INLINE withClockProxy #-}
 
 -- | Connect a hidden 'Clock' to an argument where a normal 'Clock' argument
 -- was expected.
@@ -468,7 +507,7 @@ hasClock = fromLabel @(HiddenClockName dom)
 -- <Clash-Signal.html#hiddenclockandreset Click here to read more about hidden clocks, resets, and enables>
 exposeReset
   :: forall dom r
-   . (HiddenReset dom  => r)
+   . (HiddenReset dom => r)
   -- ^ The component with a hidden reset
   -> (KnownDomain dom => Reset dom -> r)
   -- ^ The component with its reset argument exposed
@@ -487,23 +526,51 @@ hideReset
 hideReset = \f -> f (fromLabel @(HiddenResetName dom))
 {-# INLINE hideReset #-}
 
--- | Connect an explicit 'Reset' to a function with a hidden 'Reset' argument.
---
--- @
--- withReset = 'flip' exposeReset
--- @
+-- | Connect an explicit 'Reset' to a function with a hidden 'Reset'. This
+-- version (also see: 'withResetProxy' and 'withReset') applies a reset to
+-- a @Signal dom a@.
 --
 -- <Clash-Signal.html#hiddenclockandreset Click here to read more about hidden clocks, resets, and enables>
-withReset
-  :: forall dom r
+withReset0
+  :: forall dom a
    . KnownDomain dom
   => Reset dom
   -- ^ The 'Reset' we want to connect
-  -> (HiddenReset dom  => r)
+  -> (HiddenReset dom => Signal dom a)
   -- ^ The function with a hidden 'Reset' argument
-  -> r
+  -> Signal dom a
+withReset0 = \rst f -> expose @(HiddenResetName dom) f rst
+{-# INLINE withReset0 #-}
+
+-- | Connect an explicit 'Reset' to a function with a hidden 'Reset'. This
+-- version (also see: 'withResetProxy' and 'withReset0') takes a function
+-- taking at least one argument of type @Signal dom a@.
+--
+-- <Clash-Signal.html#hiddenclockandreset Click here to read more about hidden clocks, resets, and enables>
+withReset
+  :: forall dom r a
+   . KnownDomain dom
+  => Reset dom
+  -- ^ The 'Reset' we want to connect
+  -> (HiddenReset dom => Signal dom a -> r)
+  -- ^ The function with a hidden 'Reset' argument
+  -> (Signal dom a -> r)
 withReset = \rst f -> expose @(HiddenResetName dom) f rst
 {-# INLINE withReset #-}
+
+-- | Connect an explicit 'Reset' to a function with a hidden 'Reset'. This
+-- version (also see: 'withReset' and 'withReset0') takes a function
+-- taking a proxy argument witnessing /dom/.
+--
+-- <Clash-Signal.html#hiddenclockandreset Click here to read more about hidden clocks, resets, and enables>
+withResetProxy
+  :: forall dom r
+   . KnownDomain dom
+  => Reset dom
+  -> (HiddenReset dom => Proxy dom -> r)
+  -> r
+withResetProxy = \rst f -> expose @(HiddenResetName dom) (f (Proxy @dom)) rst
+{-# INLINE withResetProxy #-}
 
 -- | Connect a hidden 'Reset' to an argument where a normal 'Reset' argument
 -- was expected.
@@ -541,23 +608,51 @@ hideEnable
 hideEnable = \f -> f (fromLabel @(HiddenEnableName dom))
 {-# INLINE hideEnable #-}
 
--- | Connect an explicit 'Enable' to a function with a hidden 'Enable' argument.
---
--- @
--- withEnable = 'flip' exposeEnable
--- @
+-- | Connect an explicit 'Enable' to a function with a hidden 'Enable'. This
+-- version (also see: 'withEnableProxy' and 'withEnable') applies an enable to
+-- a @Signal dom a@.
 --
 -- <Clash-Signal.html#hiddenclockandreset Click here to read more about hidden clocks, resets, and enables>
-withEnable
-  :: forall dom r
+withEnable0
+  :: forall dom a
    . KnownDomain dom
   => Enable dom
   -- ^ The 'Enable' we want to connect
-  -> (HiddenEnable dom  => r)
+  -> (HiddenEnable dom => Signal dom a)
   -- ^ The function with a hidden 'Enable' argument
-  -> r
+  -> Signal dom a
+withEnable0 = \rst f -> expose @(HiddenEnableName dom) f rst
+{-# INLINE withEnable0 #-}
+
+-- | Connect an explicit 'Enable' to a function with a hidden 'Enable'. This
+-- version (also see: 'withEnableProxy' and 'withEnable0') takes a function
+-- taking at least one argument of type @Signal dom a@.
+--
+-- <Clash-Signal.html#hiddenclockandreset Click here to read more about hidden clocks, resets, and enables>
+withEnable
+  :: forall dom r a
+   . KnownDomain dom
+  => Enable dom
+  -- ^ The 'Enable' we want to connect
+  -> (HiddenEnable dom => Signal dom a -> r)
+  -- ^ The function with a hidden 'Enable' argument
+  -> (Signal dom a -> r)
 withEnable = \rst f -> expose @(HiddenEnableName dom) f rst
 {-# INLINE withEnable #-}
+
+-- | Connect an explicit 'Enable' to a function with a hidden 'Enable'. This
+-- version (also see: 'withEnable' and 'withEnable0') takes a function
+-- taking a proxy argument witnessing /dom/.
+--
+-- <Clash-Signal.html#hiddenclockandreset Click here to read more about hidden clocks, resets, and enables>
+withEnableProxy
+  :: forall dom r
+   . KnownDomain dom
+  => Enable dom
+  -> (HiddenEnable dom => Proxy dom -> r)
+  -> r
+withEnableProxy = \rst f -> expose @(HiddenEnableName dom) (f (Proxy @dom)) rst
+{-# INLINE withEnableProxy #-}
 
 -- | Connect a hidden 'Enable' to an argument where a normal 'Enable' argument
 -- was expected.
@@ -631,41 +726,13 @@ hideClockResetEnable =
 {-# INLINE hideClockResetEnable #-}
 
 -- | Connect an explicit 'Clock' and 'Reset' to a function with a hidden
--- 'Clock' and 'Reset' argument. In order for this function to work as
--- expected, you need to explicitly relate the /dom/ in the arguments with
--- the result. You can do this either by supplying a type signature:
---
--- @
--- h :: Clock System -> Reset System -> Signal System Int
--- h = withClockReset clk rst f
--- @
---
--- Or by type applying both sides:
---
--- @
--- g = withClockReset @System clk rst (f @System)
--- @
---
--- If omitted, GHC / Clash will fail to infer the type you might expect. This
--- is a known limitation in GHC / Haskell for now. Monomorphism isn't
--- a requirement. I.e., the following is fine:
---
--- @
--- i :: Clock dom -> Reset dom -> Signal dom Int
--- i = withClockReset clk rst f
--- @
---
--- as well as
---
--- @
--- j = withClockReset @dom clk rst (f @dom)
--- @
---
--- .. as they both explicitly "connect" the /dom/ in the arguments and result.
+-- 'Clock' and 'Reset' argument. This version takes a signal that has yet
+-- to be applied to clock/reset/enable. Also see: 'withClockResetEnable'
+-- and 'withClockResetEnableProxy'.
 --
 -- <Clash-Signal.html#hiddenclockandreset Click here to read more about hidden clocks, resets, and enables>
-withClockResetEnable
-  :: forall dom r
+withClockResetEnable0
+  :: forall dom a
    . KnownDomain dom
   => Clock dom
   -- ^ The 'Clock' we want to connect
@@ -673,10 +740,43 @@ withClockResetEnable
   -- ^ The 'Reset' we want to connect
   -> Enable dom
   -- ^ The 'Enable' we want to connect
-  -> (HiddenClockResetEnable dom => r)
+  -> (HiddenClockResetEnable dom => Signal dom a)
   -- ^ The function with a hidden 'Clock', hidden 'Reset', and hidden
   -- 'Enable' argument
-  -> r
+  -> Signal dom a
+withClockResetEnable0 =
+  \clk rst en f ->
+    expose
+      @(HiddenEnableName dom)
+      ( expose
+          @(HiddenResetName dom)
+          ( expose
+              @(HiddenClockName dom)
+              f
+              clk)
+          rst )
+      en
+{-# INLINE withClockResetEnable0 #-}
+
+-- | Connect an explicit 'Clock' and 'Reset' to a function with a hidden
+-- 'Clock' and 'Reset' argument. This version takes a function whose first
+-- argument is of type @Signal dom a@. Also see: 'withClockResetEnable0'
+-- and 'withClockResetEnableProxy'.
+--
+-- <Clash-Signal.html#hiddenclockandreset Click here to read more about hidden clocks, resets, and enables>
+withClockResetEnable
+  :: forall dom r a
+   . KnownDomain dom
+  => Clock dom
+  -- ^ The 'Clock' we want to connect
+  -> Reset dom
+  -- ^ The 'Reset' we want to connect
+  -> Enable dom
+  -- ^ The 'Enable' we want to connect
+  -> (HiddenClockResetEnable dom => Signal dom a -> r)
+  -- ^ The function with a hidden 'Clock', hidden 'Reset', and hidden
+  -- 'Enable' argument
+  -> (Signal dom a -> r)
 withClockResetEnable =
   \clk rst en f ->
     expose
@@ -690,6 +790,37 @@ withClockResetEnable =
           rst )
       en
 {-# INLINE withClockResetEnable #-}
+
+-- | Connect an explicit 'Clock', 'Reset', and 'Enable' to a function with a
+-- hidden 'Clock', 'Reset', and 'Enable' argument.
+--
+-- <Clash-Signal.html#hiddenclockandreset Click here to read more about hidden clocks, resets, and enables>
+withClockResetEnableProxy
+  :: forall dom r
+   . KnownDomain dom
+  => Clock dom
+  -- ^ The 'Clock' we want to connect
+  -> Reset dom
+  -- ^ The 'Reset' we want to connect
+  -> Enable dom
+  -- ^ The 'Enable' we want to connect
+  -> (HiddenClockResetEnable dom => Proxy dom -> r)
+  -- ^ The function with a hidden 'Clock', hidden 'Reset', and hidden
+  -- 'Enable' argument
+  -> r
+withClockResetEnableProxy =
+  \clk rst en f ->
+    expose
+      @(HiddenEnableName dom)
+      ( expose
+          @(HiddenResetName dom)
+          ( expose
+              @(HiddenClockName dom)
+              (f (Proxy @dom))
+              clk)
+          rst )
+      en
+{-# INLINE withClockResetEnableProxy #-}
 
 -- * Basic circuit functions
 
