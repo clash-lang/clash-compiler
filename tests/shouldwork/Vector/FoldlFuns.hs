@@ -28,4 +28,4 @@ mod' = o
     o :: Signal dom (BitVector 32)
     o = f (pure 0)
 
-topEntity clk rst en = withClockResetEnable @System clk rst en (mod' @System)
+topEntity clk rst en = withClockResetEnable0 @System clk rst en (mod' @System)

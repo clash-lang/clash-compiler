@@ -291,6 +291,7 @@ test-suite unittests
                  Clash.Tests.BitVector
                  Clash.Tests.DerivingDataRepr
                  Clash.Tests.DerivingDataReprTypes
+                 Clash.Tests.Signal
                  Clash.Tests.Undefined
 
 
