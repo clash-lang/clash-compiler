@@ -83,6 +83,8 @@ module Clash.Signal.Internal
   , Clock (..)
   , clockTag
   , clockPeriod
+  , hzToPeriod
+  , periodToHz
     -- ** Enabling
   , Enable(..)
   , toEnable
@@ -153,6 +155,7 @@ import Data.Data                  (Data)
 import Data.Default.Class         (Default (..))
 import Data.Hashable              (Hashable)
 import GHC.Generics               (Generic)
+import GHC.Stack                  (HasCallStack)
 import GHC.TypeLits               (KnownSymbol, Nat, Symbol, type (<=))
 import Language.Haskell.TH.Syntax -- (Lift (..), Q, Dec)
 import Numeric.Natural            (Natural)
@@ -1368,3 +1371,28 @@ fromList_lazy = Prelude.foldr (:-) (error "finite list")
 -- __NB__: This function is not synthesizable
 simulate_lazy :: (Signal dom1 a -> Signal dom2 b) -> [a] -> [b]
 simulate_lazy f = sample_lazy . f . fromList_lazy
+
+-- | Calculate the period, in __ps__, given a frequency in __Hz__
+--
+-- i.e. to calculate the clock period for a circuit to run at 240 MHz we get
+--
+-- >>> hzToPeriod 240e6
+-- 4167
+--
+-- __NB__: This function is /not/ synthesizable
+-- __NB__: This function is lossy. I.e., hzToPeriod . periodToHz /= id.
+hzToPeriod :: HasCallStack => Double -> Natural
+hzToPeriod freq | freq <= 0.0 = error "Frequency must be strictly positive"
+                | otherwise   = ceiling ((1.0 / freq) / 1.0e-12)
+
+-- | Calculate the frequence in __Hz__, given the period in __ps__
+--
+-- i.e. to calculate the clock frequency of a clock with a period of 5000 ps:
+--
+-- >>> periodToHz 5000
+-- 2.0e8
+--
+-- __NB__: This function is /not/ synthesizable
+-- __NB__: This function is lossy. I.e., hzToPeriod . periodToHz /= id.
+periodToHz :: Natural -> Double
+periodToHz period = 1.0 / (1.0e-12 * fromIntegral period)

@@ -118,6 +118,8 @@ module Clash.Signal
   , knownVDomain
     -- * Clock
   , Clock
+  , periodToHz
+  , hzToPeriod
     -- ** Synchronization primitive
   , unsafeSynchronizer
     -- * Reset

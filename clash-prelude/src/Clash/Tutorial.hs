@@ -75,7 +75,6 @@ module Clash.Tutorial (
 where
 
 import Clash.Prelude
-import Clash.Explicit.Prelude (freqCalc)
 import Clash.Explicit.Testbench
 import Clash.XException (Undefined)
 import Control.Monad.ST
@@ -1896,18 +1895,18 @@ which runs at 20 MHz, and we have created an FFT component running at only 9
 MHz. We want to connect part of our design connected to the ADC, and running
 at 20 MHz, to part of our design connected to the FFT running at 9 MHz.
 
-We can calculate the clock periods using 'freqCalc':
+We can calculate the clock periods using 'hzToPeriod':
 
->>> freqCalc 20e6
+>>> hzToPeriod 20e6
 50000
->>> freqCalc 9e6
+>>> hzToPeriod 9e6
 111112
 
 We can then create the clock and reset domains:
 
 @
-'createDomain' vSystem{vTag=\"ADC\", vPeriod=freqCalc 20e6}
-'createDomain' vSystem{vTag=\"FFT\", vPeriod=freqCalc 9e6}
+'createDomain' vSystem{vTag=\"ADC\", vPeriod=hzToPeriod 20e6}
+'createDomain' vSystem{vTag=\"FFT\", vPeriod=hzToPeriod 9e6}
 @
 
 and subsequently a 256-space FIFO synchronizer that safely bridges the ADC clock

@@ -186,7 +186,9 @@ module Clash.Explicit.Signal
   , enableGen
     -- * Clock
   , Clock
-  , freqCalc
+  , freqCalc  -- DEPRECATED
+  , periodToHz
+  , hzToPeriod
     -- ** Synchronization primitive
   , unsafeSynchronizer
     -- * Reset
@@ -261,6 +263,7 @@ import Clash.XException               (Undefined, deepErrorX)
 
 {- $setup
 >>> :set -XDataKinds -XTypeApplications -XFlexibleInstances -XMultiParamTypeClasses -XTypeFamilies
+>>> :set -fno-warn-deprecations
 >>> import Clash.Explicit.Prelude
 >>> import Clash.Promoted.Nat (SNat(..))
 >>> import qualified Data.List as L
@@ -411,7 +414,8 @@ resetSynchronizer clk rst en =
 --
 -- __NB__: This function is /not/ synthesizable
 freqCalc :: Double -> Integer
-freqCalc freq = ceiling ((1.0 / freq) / 1.0e-12)
+freqCalc = toInteger . hzToPeriod
+{-# DEPRECATED freqCalc "Use 'hzToPeriod' instead." #-}
 
 -- ** Synchronization primitive
 -- | The 'unsafeSynchronizer' function is a primitive that must be used to
