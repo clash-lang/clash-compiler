@@ -191,6 +191,7 @@ module Clash.Explicit.Signal
   , hzToPeriod
     -- ** Synchronization primitive
   , unsafeSynchronizer
+  , veryUnsafeSynchronizer
     -- * Reset
   , Reset(..)
   , unsafeToReset
@@ -505,15 +506,24 @@ unsafeSynchronizer
   -- ^ 'Clock' of the outgoing signal
   -> Signal dom1 a
   -> Signal dom2 a
-unsafeSynchronizer clk1 clk2 s = s'
-  where
-    t1 = clockPeriod clk1
-    t2 = clockPeriod clk2
-    s' | t1 < t2   = compress   t2 t1 s
-       | t1 > t2   = oversample t1 t2 s
-       | otherwise = same s
-{-# NOINLINE unsafeSynchronizer #-}
-{-# ANN unsafeSynchronizer hasBlackBox #-}
+unsafeSynchronizer clk1 clk2 s =
+  veryUnsafeSynchronizer (clockPeriod clk1) (clockPeriod clk2) s
+{-# INLINE unsafeSynchronizer #-}
+
+-- | Same as 'unsafeSynchronizer', but with manually supplied clock periods.
+veryUnsafeSynchronizer
+  :: Int
+  -- ^ Period of clock belonging to 'dom1'
+  -> Int
+  -- ^ Period of clock belonging to 'dom2'
+  -> Signal dom1 a
+  -> Signal dom2 a
+veryUnsafeSynchronizer t1 t2 s
+  | t1 < t2   = compress   t2 t1 s
+  | t1 > t2   = oversample t1 t2 s
+  | otherwise = same s
+{-# NOINLINE veryUnsafeSynchronizer #-}
+{-# ANN veryUnsafeSynchronizer hasBlackBox #-}
 
 same :: Signal dom1 a -> Signal dom2 a
 same (s :- ss) = s :- same ss

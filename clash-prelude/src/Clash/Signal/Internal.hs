@@ -781,6 +781,7 @@ clockPeriod (Clock _) =
   case knownDomain @dom of
     SDomainConfiguration _dom period _edge _reset _init _polarity ->
       snatToNum period
+{-# NOINLINE clockPeriod #-}
 
 -- | Extract dom symbol from Clock
 clockTag

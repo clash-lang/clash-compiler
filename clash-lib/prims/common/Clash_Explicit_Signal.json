@@ -1,16 +1,14 @@
 [ { "BlackBox" :
-    { "name"      : "Clash.Explicit.Signal.unsafeSynchronizer"
+    { "name"      : "Clash.Explicit.Signal.veryUnsafeSynchronizer"
     , "workInfo"  : "Never"
     , "kind"      : "Expression"
     , "type" :
-"unsafeSynchronizer
-  :: ( KnownDomain dom1 conf1    -- ARG[0]
-     , KnownDomain dom2 conf2 )  -- ARG[1]
-  => Clock dom1                  -- ARG[2]
-  -> Clock dom2                  -- ARG[3]
-  -> Signal dom1 a               -- ARG[4]
+"veryUnsafeSynchronizer
+  :: Int                         -- ARG[0]
+  -> Int                         -- ARG[1]
+  -> Signal dom1 a               -- ARG[2]
   -> Signal dom2 a"
-    , "template"  : "~ARG[4]"
+    , "template"  : "~ARG[2]"
     }
   }
 ]
