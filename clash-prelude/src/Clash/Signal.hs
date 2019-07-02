@@ -93,6 +93,7 @@ module Clash.Signal
     -- * Domain
   , Domain
   , KnownDomain(..)
+  , KnownConfiguration
   , ActiveEdge(..)
   , SActiveEdge(..)
   , InitBehavior(..)
