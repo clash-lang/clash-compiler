@@ -43,3 +43,6 @@ cabal.config
 
 # Temporary directory for Clash testsuite
 /.clash-test-tmp
+
+# Nix output
+result*

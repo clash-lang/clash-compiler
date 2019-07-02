@@ -1,0 +1,50 @@
+{
+    "ghc-typelits-extra": {
+        "branch": "master",
+        "description": "Extra type-level operations on GHC.TypeLits.Nat and a custom solver",
+        "homepage": null,
+        "owner": "clash-lang",
+        "repo": "ghc-typelits-extra",
+        "rev": "a8de0b68b8216411cb862195354f251cd41bae50",
+        "sha256": "19iggfs1m6vn9q8wxx4d3g993933nribmm6qa106lj6qr7d5jqil",
+        "type": "tarball",
+        "url": "https://github.com/clash-lang/ghc-typelits-extra/archive/a8de0b68b8216411cb862195354f251cd41bae50.tar.gz",
+        "url_template": "https://github.com/<owner>/<repo>/archive/<rev>.tar.gz"
+    },
+    "gitignore": {
+        "branch": "master",
+        "description": "Nix function for filtering local git sources",
+        "homepage": "",
+        "owner": "hercules-ci",
+        "repo": "gitignore",
+        "rev": "ec5dd0536a5e4c3a99c797b86180f7261197c124",
+        "sha256": "0k2r8y21rn4kr5dmddd3906x0733fs3bb8hzfpabkdav3wcy3klv",
+        "type": "tarball",
+        "url": "https://github.com/hercules-ci/gitignore/archive/ec5dd0536a5e4c3a99c797b86180f7261197c124.tar.gz",
+        "url_template": "https://github.com/<owner>/<repo>/archive/<rev>.tar.gz"
+    },
+    "niv": {
+        "branch": "master",
+        "description": "Easy dependency management for Nix projects",
+        "homepage": "https://github.com/nmattia/niv",
+        "owner": "nmattia",
+        "repo": "niv",
+        "rev": "099f9ea92169c2edbc3ca33313b68f5e9686e800",
+        "sha256": "1rqaw2r5wbbfpbxjgwrwzf619la1iqvzp3mhq1mfz9vk4hjd3335",
+        "type": "tarball",
+        "url": "https://github.com/nmattia/niv/archive/099f9ea92169c2edbc3ca33313b68f5e9686e800.tar.gz",
+        "url_template": "https://github.com/<owner>/<repo>/archive/<rev>.tar.gz"
+    },
+    "nixpkgs": {
+        "branch": "nixos-19.03",
+        "description": "Nixpkgs/NixOS branches that track the Nixpkgs/NixOS channels",
+        "homepage": null,
+        "owner": "NixOS",
+        "repo": "nixpkgs-channels",
+        "rev": "8634c3b619909db7fc747faf8c03592986626e21",
+        "sha256": "0hcpy4q64vbqmlmnfcavfxilyygyzpwdsss8g3p73ikpic0j6ziq",
+        "type": "tarball",
+        "url": "https://github.com/NixOS/nixpkgs-channels/archive/8634c3b619909db7fc747faf8c03592986626e21.tar.gz",
+        "url_template": "https://github.com/<owner>/<repo>/archive/<rev>.tar.gz"
+    }
+}
