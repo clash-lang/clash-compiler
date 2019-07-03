@@ -37,9 +37,9 @@ module Clash.Promoted.Nat
     -- ** Conversion
   , snatToInteger, snatToNatural, snatToNum
     -- ** Arithmetic
-  , addSNat, mulSNat, powSNat, minSNat, maxSNat
+  , addSNat, mulSNat, powSNat, minSNat, maxSNat, succSNat
     -- *** Partial
-  , subSNat, divSNat, modSNat, flogBaseSNat, clogBaseSNat, logBaseSNat
+  , subSNat, divSNat, modSNat, flogBaseSNat, clogBaseSNat, logBaseSNat, predSNat
     -- *** Specialised
   , pow2SNat
     -- *** Comparison
@@ -202,6 +202,16 @@ subUNat :: UNat (m+n) -> UNat n -> UNat m
 subUNat x         UZero     = x
 subUNat (USucc x) (USucc y) = subUNat x y
 subUNat UZero     _         = error "subUNat: impossible: 0 + (n + 1) ~ 0"
+
+-- | Predecessor of a singleton natural number
+predSNat :: SNat (a+1) -> SNat (a)
+predSNat SNat = SNat
+{-# INLINE predSNat #-}
+
+-- | Successor of a singleton natural number
+succSNat :: SNat a -> SNat (a+1)
+succSNat SNat = SNat
+{-# INLINE succSNat #-}
 
 -- | Add two singleton natural numbers
 addSNat :: SNat a -> SNat b -> SNat (a+b)
