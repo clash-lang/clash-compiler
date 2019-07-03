@@ -63,6 +63,12 @@ module Clash.Signal.Internal
   , SResetPolarity(..)
   , DomainConfiguration(..)
   , SDomainConfiguration(..)
+  -- ** Configuration type families
+  , DomainPeriod
+  , DomainActiveEdge
+  , DomainResetKind
+  , DomainInitBehavior
+  , DomainResetPolarity
     -- ** Default domains
   , System
   , XilinxSystem
@@ -290,6 +296,70 @@ data DomainConfiguration
   -- ^ Whether resets are active high or active low
   }
   deriving (Typeable)
+
+-- | Helper type family for 'DomainPeriod'
+type family DomainConfigurationPeriod (config :: DomainConfiguration) :: Nat where
+  DomainConfigurationPeriod ('DomainConfiguration name period edge reset init polarity) = period
+
+-- | Helper type family for 'DomainActiveEdge'
+type family DomainConfigurationActiveEdge (config :: DomainConfiguration) :: ActiveEdge where
+  DomainConfigurationActiveEdge ('DomainConfiguration name period edge reset init polarity) = edge
+  
+-- | Helper type family for 'DomainResetKind'
+type family DomainConfigurationResetKind (config :: DomainConfiguration) :: ResetKind where
+  DomainConfigurationResetKind ('DomainConfiguration name period edge reset init polarity) = reset
+  
+-- | Helper type family for 'DomainInitBehavior'
+type family DomainConfigurationInitBehavior (config :: DomainConfiguration) :: InitBehavior where
+  DomainConfigurationInitBehavior ('DomainConfiguration name period edge reset init polarity) = init
+  
+-- | Helper type family for 'DomainResetPolarity'
+type family DomainConfigurationResetPolarity (config :: DomainConfiguration) :: ResetPolarity where
+  DomainConfigurationResetPolarity ('DomainConfiguration name period edge reset init polarity) = polarity
+
+-- | Convenience type to help to extract a period from a domain. Example usage:
+--
+-- @
+-- myFunc :: (KnownDomain dom, DomainPeriod dom ~ 6000) => ...
+-- @
+type DomainPeriod (dom :: Domain) =
+  DomainConfigurationPeriod (KnownConf dom)
+
+-- | Convenience type to help to extract the active edge from a domain. Example
+-- usage:
+--
+-- @
+-- myFunc :: (KnownDomain dom, DomainActiveEdge dom ~ 'Rising) => ...
+-- @
+type DomainActiveEdge (dom :: Domain) =
+  DomainConfigurationActiveEdge (KnownConf dom)
+
+-- | Convenience type to help to extract the reset synchronicity from a
+-- domain. Example usage:
+--
+-- @
+-- myFunc :: (KnownDomain dom, DomainResetKind dom ~ 'Asynchronous) => ...
+-- @
+type DomainResetKind (dom :: Domain) =
+  DomainConfigurationResetKind (KnownConf dom)
+
+-- | Convenience type to help to extract the initial value behavior from a
+-- domain. Example usage:
+--
+-- @
+-- myFunc :: (KnownDomain dom, DomainInitBehavior dom ~ 'Defined) => ...
+-- @
+type DomainInitBehavior (dom :: Domain) =
+  DomainConfigurationInitBehavior (KnownConf dom)
+
+-- | Convenience type to help to extract the reset polarity from a domain.
+-- Example usage:
+--
+-- @
+-- myFunc :: (KnownDomain dom, DomainResetPolarity dom ~ 'ActiveHigh) => ...
+-- @
+type DomainResetPolarity (dom :: Domain) =
+  DomainConfigurationResetPolarity (KnownConf dom)
 
 -- | Singleton version of 'DomainConfiguration'
 data SDomainConfiguration (dom :: Domain) (conf :: DomainConfiguration) where

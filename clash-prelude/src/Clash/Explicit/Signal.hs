@@ -165,6 +165,12 @@ module Clash.Explicit.Signal
   , SResetPolarity(..)
   , DomainConfiguration(..)
   , SDomainConfiguration(..)
+  -- ** Configuration type families
+  , DomainPeriod
+  , DomainActiveEdge
+  , DomainResetKind
+  , DomainInitBehavior
+  , DomainResetPolarity
     -- ** Default domains
   , System
   , XilinxSystem
