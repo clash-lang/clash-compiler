@@ -37,7 +37,7 @@ module Clash.Promoted.Nat
     -- ** Conversion
   , snatToInteger, snatToNatural, snatToNum
     -- ** Arithmetic
-  , addSNat, mulSNat, powSNat
+  , addSNat, mulSNat, powSNat, minSNat, maxSNat
     -- *** Partial
   , subSNat, divSNat, modSNat, flogBaseSNat, clogBaseSNat, logBaseSNat
     -- *** Specialised
@@ -79,7 +79,7 @@ where
 import Data.Kind          (Type)
 import GHC.TypeLits       (KnownNat, Nat, type (+), type (-), type (*),
                            type (^), type (<=), natVal)
-import GHC.TypeLits.Extra (CLog, FLog, Div, Log, Mod)
+import GHC.TypeLits.Extra (CLog, FLog, Div, Log, Mod, Min, Max)
 import GHC.Natural        (naturalFromInteger)
 import Language.Haskell.TH (appT, conT, litT, numTyLit, sigE)
 import Language.Haskell.TH.Syntax (Lift (..))
@@ -238,6 +238,12 @@ modSNat :: (1 <= b) => SNat a -> SNat b -> SNat (Mod a b)
 modSNat SNat SNat = SNat
 {-# INLINE modSNat #-}
 infixl 7 `modSNat`
+
+minSNat :: SNat a -> SNat b -> SNat (Min a b)
+minSNat SNat SNat = SNat
+
+maxSNat :: SNat a -> SNat b -> SNat (Max a b)
+maxSNat SNat SNat = SNat
 
 -- | Floor of the logarithm of a natural number
 flogBaseSNat :: (2 <= base, 1 <= x)
