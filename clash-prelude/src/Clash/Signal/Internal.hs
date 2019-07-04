@@ -7,6 +7,7 @@ Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
 -}
 
 {-# LANGUAGE AllowAmbiguousTypes    #-}
+{-# LANGUAGE BangPatterns           #-}
 {-# LANGUAGE ConstraintKinds        #-}
 {-# LANGUAGE CPP                    #-}
 {-# LANGUAGE DataKinds              #-}
@@ -642,7 +643,7 @@ instance Functor (Signal dom) where
   fmap = mapSignal#
 
 mapSignal# :: (a -> b) -> Signal dom a -> Signal dom b
-mapSignal# f (a :- as) = f a :- mapSignal# f as
+mapSignal# !f = go where go (a :- as) = f a :- go as
 {-# NOINLINE mapSignal# #-}
 {-# ANN mapSignal# hasBlackBox #-}
 
@@ -726,7 +727,7 @@ instance Traversable (Signal dom) where
   traverse = traverse#
 
 traverse# :: Applicative f => (a -> f b) -> Signal dom a -> f (Signal dom b)
-traverse# f (a :- s) = (:-) <$> f a <*> traverse# f s
+traverse# !f = go where go (a :- s) = (:-) <$> f a <*> go s
 {-# NOINLINE traverse# #-}
 {-# ANN traverse# hasBlackBox #-}
 
