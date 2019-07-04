@@ -183,8 +183,11 @@ module Clash.Explicit.Signal
   , vDomain
   , createDomain
   , knownVDomain
-  , isAsynchronous
-  , isActiveHigh
+  , clockPeriod
+  , activeEdge
+  , resetKind
+  , initBehavior
+  , resetPolarity
     -- ** Enabling
   , Enable(..)
   , toEnable
@@ -265,6 +268,8 @@ import Clash.Class.Num                (satSucc, SaturationMode(SatBound))
 import Clash.Promoted.Nat             (SNat(..), snatToNum)
 import Clash.Signal.Bundle            (Bundle (..))
 import Clash.Signal.Internal
+import Clash.Signal.Internal.Ambiguous
+  (knownVDomain, clockPeriod, activeEdge, resetKind, initBehavior, resetPolarity)
 import Clash.Sized.Index              (Index)
 import Clash.XException               (Undefined, deepErrorX)
 
@@ -404,13 +409,15 @@ resetSynchronizer
   -> Enable dom
   -> Reset dom
 resetSynchronizer clk rst en =
-  if isAsynchronous @dom then
-    let r1 = register clk rst en (isActiveHigh @dom) (pure (not (isActiveHigh @dom)))
-        r2 = register clk rst en (isActiveHigh @dom) r1
-     in unsafeToReset r2
-  else
-    -- Reset is already synchronous, nothing to do!
-    rst
+  case resetKind @dom of
+    SAsynchronous ->
+      let isActiveHigh = case resetPolarity @dom of { SActiveHigh -> True; _ -> False }
+          r1 = register clk rst en isActiveHigh (pure (not isActiveHigh))
+          r2 = register clk rst en isActiveHigh r1
+       in unsafeToReset r2
+    SSynchronous ->
+      -- Reset is already synchronous, nothing to do!
+      rst
 
 -- | Calculate the period, in __ps__, given a frequency in __Hz__
 --
@@ -512,8 +519,10 @@ unsafeSynchronizer
   -- ^ 'Clock' of the outgoing signal
   -> Signal dom1 a
   -> Signal dom2 a
-unsafeSynchronizer clk1 clk2 s =
-  veryUnsafeSynchronizer (clockPeriod clk1) (clockPeriod clk2) s
+unsafeSynchronizer _clk1 _clk2 =
+  veryUnsafeSynchronizer
+    (snatToNum (clockPeriod @dom1))
+    (snatToNum (clockPeriod @dom2))
 {-# INLINE unsafeSynchronizer #-}
 
 -- | Same as 'unsafeSynchronizer', but with manually supplied clock periods.

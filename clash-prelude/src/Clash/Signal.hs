@@ -122,6 +122,11 @@ module Clash.Signal
   , vDomain
   , createDomain
   , knownVDomain
+  , clockPeriod
+  , activeEdge
+  , resetKind
+  , initBehavior
+  , resetPolarity
     -- * Clock
   , Clock
   , periodToHz
@@ -255,6 +260,8 @@ import           Clash.Signal.Bundle   (Bundle (..))
 import           Clash.Signal.BiSignal --(BisignalIn, BisignalOut, )
 import           Clash.Signal.Internal hiding
   (sample, sample_lazy, sampleN, sampleN_lazy, simulate, simulate_lazy, testFor)
+import           Clash.Signal.Internal.Ambiguous
+  (knownVDomain, clockPeriod, activeEdge, resetKind, initBehavior, resetPolarity)
 import qualified Clash.Signal.Internal as S
 import           Clash.XException      (Undefined)
 

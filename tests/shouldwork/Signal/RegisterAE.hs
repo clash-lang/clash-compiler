@@ -1,3 +1,5 @@
+{-# LANGUAGE LambdaCase #-}
+
 module RegisterAE where
 
 -- Register: Asynchronous, Enabled
@@ -52,13 +54,17 @@ topEntityAE clk rst = topEntity clk arst en
     en = toEnable (enableInput clk rst enableGen)
 {-# NOINLINE topEntityAE #-}
 
+-- | Doing this case inline trips GHC 8.2/8.4 due to dead code. We sometimes
+-- want to run our whole testsuite with a different System domain though, so
+-- it's not _really_ dead code.
+oneOrThree :: SResetKind dom -> (Signed 8)
+oneOrThree = \case {SAsynchronous -> 1; SSynchronous -> 3}
+
 testBench :: Signal System Bool
 testBench = done
   where
-    expectedOutput = outputVerifier clk rst (1 :> 1 :> 2 :>
-                                             (if isAsynchronous @System
-                                              then 1
-                                              else 3) :> 1 :> 2 :> 2 :> 2 :>
+    expectedOutput = outputVerifier clk rst (1 :> 1 :> 2 :> oneOrThree (resetKind @System) :>
+                                             1 :> 2 :> 2 :> 2 :>
                                              3 :> 3 :> 3 :> Nil)
     done           = expectedOutput (topEntityAE clk rst)
     clk            = tbSystemClockGen (not <$> done)
