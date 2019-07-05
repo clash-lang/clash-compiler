@@ -6,6 +6,7 @@ Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
 -}
 
 {-# LANGUAGE CPP                   #-}
+{-# LANGUAGE BangPatterns          #-}
 {-# LANGUAGE DataKinds             #-}
 {-# LANGUAGE DeriveAnyClass        #-}
 {-# LANGUAGE DeriveGeneric         #-}
@@ -177,7 +178,7 @@ instance Functor (Signal domain) where
 
 {-# NOINLINE mapSignal# #-}
 mapSignal# :: (a -> b) -> Signal domain a -> Signal domain b
-mapSignal# f (a :- as) = f a :- mapSignal# f as
+mapSignal# !f = go where go (a :- as) = f a :- go as
 
 instance Applicative (Signal domain) where
   pure  = signal#
@@ -563,7 +564,9 @@ delay#
   -> Signal domain a
   -> Signal domain a
 delay# Clock {} =
-  \s -> withFrozenCallStack (deepErrorX "delay: initial value undefined") :- s
+  go (withFrozenCallStack (deepErrorX "delay: initial value undefined"))
+ where
+  go o as@(~(x :- xs)) = o `seqX` o :- (as `seq` go x xs)
 
 delay# (GatedClock _ _ en) =
     go (withFrozenCallStack (deepErrorX "delay: initial value undefined")) en
