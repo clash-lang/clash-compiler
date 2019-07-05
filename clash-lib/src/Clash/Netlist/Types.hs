@@ -8,6 +8,7 @@
   Type and instance definitions for Netlist modules
 -}
 
+{-# LANGUAGE CPP                        #-}
 {-# LANGUAGE DeriveAnyClass             #-}
 {-# LANGUAGE DeriveGeneric              #-}
 {-# LANGUAGE DerivingStrategies         #-}
@@ -19,6 +20,10 @@
 {-# LANGUAGE TemplateHaskell            #-}
 {-# LANGUAGE DeriveDataTypeable         #-}
 
+-- since GHC 8.6 we can haddock individual contructor fields \o/
+#if __GLASGOW_HASKELL__ >= 806
+#define FIELD ^
+#endif
 
 module Clash.Netlist.Types
   ( Declaration (..,NetDecl)
@@ -199,58 +204,43 @@ hwTypeAttrs _                       = []
 
 -- | Internals of a Component
 data Declaration
-  = Assignment !Identifier !Expr
-  -- ^ Signal assignment:
-  --
-  -- * Signal to assign
-  --
-  -- * Assigned expression
-  | CondAssignment !Identifier !HWType !Expr !HWType [(Maybe Literal,Expr)]
-  -- ^ Conditional signal assignment:
-  --
-  -- * Signal to assign
-  --
-  -- * Type of the result/alternatives
-  --
-  -- * Scrutinized expression
-  --
-  -- * Type of the scrutinee
-  --
-  -- * List of: (Maybe expression scrutinized expression is compared with,RHS of alternative)
-  | InstDecl EntityOrComponent (Maybe Comment) !Identifier !Identifier [(Expr,HWType,Expr)] [(Expr,PortDirection,HWType,Expr)]
-  -- ^ Instantiation of another component:
-  --
-  -- * Whether it's an entity or a component
-  --
-  -- * Comment to add to the generated code
-  --
-  -- * The component's (or entity's) name
-  --
-  -- * Instance label
-  --
-  -- * List of parameters for this component (param name, param type, param value)
-  --
-  -- * Ports (port name, port direction, type, assignment)
+  -- | Signal assignment
+  = Assignment
+      !Identifier -- FIELD Signal to assign
+      !Expr       -- FIELD Assigned expression
+
+  -- | Conditional signal assignment:
+  | CondAssignment
+      !Identifier            -- FIELD Signal to assign
+      !HWType                -- FIELD Type of the result/alternatives
+      !Expr                  -- FIELD Scrutinized expression
+      !HWType                -- FIELD Type of the scrutinee
+      [(Maybe Literal,Expr)] -- FIELD List of: (Maybe expression scrutinized expression is compared with,RHS of alternative)
+
+  -- | Instantiation of another component:
+  | InstDecl
+      EntityOrComponent                  -- FIELD Whether it's an entity or a component
+      (Maybe Comment)                    -- FIELD Comment to add to the generated code
+      !Identifier                        -- FIELD The component's (or entity's) name
+      !Identifier                        -- FIELD Instance label
+      [(Expr,HWType,Expr)]               -- FIELD List of parameters for this component (param name, param type, param value)
+      [(Expr,PortDirection,HWType,Expr)] -- FIELD Ports (port name, port direction, type, assignment)
+
+  -- | Instantiation of blackbox declaration
   | BlackBoxD
-      -- Primitive name:
-      !Text
-      -- VHDL only: add /library/ declarations:
-      [BlackBoxTemplate]
-      -- VHDL only: add /use/ declarations:
-      [BlackBoxTemplate]
-      -- Intel/Quartus only: create a /.qsys/ file from given template:
-      [((Text,Text),BlackBox)]
-      -- Template tokens:
-      !BlackBox
-      -- Context in which tokens should be rendered:
-      BlackBoxContext
-  -- ^ Instantiation of blackbox declaration
+      !Text                    -- FIELD Primitive name
+      [BlackBoxTemplate]       -- FIELD VHDL only: add @library@ declarations
+      [BlackBoxTemplate]       -- FIELD VHDL only: add @use@ declarations
+      [((Text,Text),BlackBox)] -- FIELD Intel Quartus only: create a @.qsys@ file from given template
+      !BlackBox                -- FIELD Template tokens
+      BlackBoxContext          -- FIELD Context in which tokens should be rendered
+
+  -- | Signal declaration
   | NetDecl'
-      (Maybe Comment)            -- Note; will be inserted as a comment in target hdl
-      WireOrReg                  -- Wire or register
-      !Identifier                -- Name of signal
-      (Either Identifier HWType) -- Pointer to type of signal or type of signal
-      -- ^ Signal declaration
+      (Maybe Comment)            -- FIELD Note; will be inserted as a comment in target hdl
+      WireOrReg                  -- FIELD Wire or register
+      !Identifier                -- FIELD Name of signal
+      (Either Identifier HWType) -- FIELD Pointer to type of signal or type of signal
   deriving Show
 
 data EntityOrComponent = Entity | Comp
@@ -282,11 +272,10 @@ instance NFData Declaration where
 -- | Expression Modifier
 data Modifier
   = Indexed (HWType,Int,Int) -- ^ Index the expression: (Type of expression,DataCon tag,Field Tag)
-  | DC (HWType,Int) -- ^ See expression in a DataCon context: (Type of the expression, DataCon tag)
-  | VecAppend -- ^ See the expression in the context of a Vector append operation
-  | RTreeAppend -- ^ See the expression in the context of a Tree append operation
-  | Sliced (HWType,Int,Int)
-  -- ^ Slice the identifier of the given type from start to end
+  | DC (HWType,Int)          -- ^ See expression in a DataCon context: (Type of the expression, DataCon tag)
+  | VecAppend                -- ^ See the expression in the context of a Vector append operation
+  | RTreeAppend              -- ^ See the expression in the context of a Tree append operation
+  | Sliced (HWType,Int,Int)  -- ^ Slice the identifier of the given type from start to end
   | Nested Modifier Modifier
   deriving Show
 
@@ -296,22 +285,16 @@ data Expr
   | DataCon    !HWType       !Modifier  [Expr] -- ^ DataCon application
   | Identifier !Identifier   !(Maybe Modifier) -- ^ Signal reference
   | DataTag    !HWType       !(Either Identifier Identifier) -- ^ @Left e@: tagToEnum\#, @Right e@: dataToTag\#
+
+  -- | Instantiation of a BlackBox expression
   | BlackBoxE
-      -- Primitive name:
-      !Text
-      -- VHDL only: add /library/ declarations:
-      [BlackBoxTemplate]
-      -- VHDL only: add /use/ declarations:
-      [BlackBoxTemplate]
-      -- Intel/Quartus only: create a /.qsys/ file from given template.
-      [((Text,Text),BlackBox)]
-      -- Template tokens:
-      !BlackBox
-      -- Context in which tokens should be rendered:
-      !BlackBoxContext
-      -- Wrap in paretheses?:
-      !Bool
-  -- ^ Instantiation of a BlackBox expression
+      !Text                    -- FIELD Primitive name
+      [BlackBoxTemplate]       -- FIELD VHDL only: add @library@ declarations
+      [BlackBoxTemplate]       -- FIELD VHDL only: add @use@ declarations:
+      [((Text,Text),BlackBox)] -- FIELD Intel/Quartus only: create a @.qsys@ file from given template.
+      !BlackBox                -- FIELD Template tokens
+      !BlackBoxContext         -- FIELD Context in which tokens should be rendered
+      !Bool                    -- FIELD Wrap in paretheses?
   | ConvBV     (Maybe Identifier) HWType Bool Expr
   | IfThenElse Expr Expr Expr
   deriving Show
