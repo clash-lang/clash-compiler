@@ -106,7 +106,7 @@ extendIdentifier typ nm ext =
 
 -- | Split a normalized term into: a list of arguments, a list of let-bindings,
 -- and a variable reference that is the body of the let-binding. Returns a
--- String containing the error is the term was not in a normalized form.
+-- String containing the error if the term was not in a normalized form.
 splitNormalized
   :: TyConMap
   -> Term
@@ -827,7 +827,7 @@ mkUniqueIdentifier typ nm = do
         seenIds %= HashMap.insert i' 0
         return i'
 
--- | Preserve the Netlist '_varEnv' and '_varCount' when executing a monadic action
+-- | Preserve the Netlist '_varCount','_curCompNm','_seenIds' when executing a monadic action
 preserveVarEnv :: NetlistMonad a
                -> NetlistMonad a
 preserveVarEnv action = do

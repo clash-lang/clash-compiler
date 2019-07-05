@@ -19,7 +19,7 @@ import           Clash.Netlist.BlackBox.Types
   (BlackBoxFunction, Element(Arg, Result), emptyBlackBoxMeta
   ,BlackBoxMeta, bbKind, TemplateKind(TDecl))
 
--- | Template function for Word8/Word16/.. Constructs "clean" literals. This
+-- | Template function for Word8,Word16,.. Constructs "clean" literals. This
 -- function generates valid (System)Verilog only!
 wordTF :: BlackBoxFunction
 wordTF = literalTF "GHC.Word.W" wordTF'

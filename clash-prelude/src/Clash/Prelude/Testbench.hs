@@ -66,7 +66,7 @@ assert msg actual expected ret =
 --  hideReset (hideClock E.assert) {-msg actual expected ret-}
 {-# INLINE assert #-}
 
--- | 
+-- |
 --
 -- Example:
 --
@@ -123,7 +123,7 @@ stimuliGenerator = hideReset (hideClock E.stimuliGenerator)
 -- expected value: 10, not equal to actual value: 9
 -- ,False,True,True]
 --
--- If your working with 'BitVector's containing don't care bit you should use 'outputVerifierBitVector'.
+-- If your working with 'BitVector's containing don't care bits you should use 'outputVerifierBitVector'.
 outputVerifier
   :: ( KnownNat l
      , Eq a

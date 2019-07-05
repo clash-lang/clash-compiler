@@ -295,7 +295,7 @@ data Expr
   = Literal    !(Maybe (HWType,Size)) !Literal -- ^ Literal expression
   | DataCon    !HWType       !Modifier  [Expr] -- ^ DataCon application
   | Identifier !Identifier   !(Maybe Modifier) -- ^ Signal reference
-  | DataTag    !HWType       !(Either Identifier Identifier) -- ^ @Left e@: tagToEnum#, @Right e@: dataToTag#
+  | DataTag    !HWType       !(Either Identifier Identifier) -- ^ @Left e@: tagToEnum\#, @Right e@: dataToTag\#
   | BlackBoxE
       -- Primitive name:
       !Text

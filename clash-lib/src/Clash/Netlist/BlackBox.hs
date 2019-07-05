@@ -208,7 +208,7 @@ mkArgument bndr e = do
                   ,hwTy,False),[])
     return ((e',t,l),d)
 
--- | Extract a compiled primitive from a gaurded primtive. Emit a warning if
+-- | Extract a compiled primitive from a guarded primitive. Emit a warning if
 -- the guard wants to, or fail entirely.
 extractPrimWarnOrFail
   :: TextS.Text

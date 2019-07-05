@@ -633,7 +633,7 @@ modifier offset (Nested m1 m2) = do
 modifier _ _ = Nothing
 
 -- | Turn a Netlist expression into a Verilog expression
-expr_ :: Bool -- ^ Enclose in parenthesis?
+expr_ :: Bool -- ^ Enclose in parentheses?
       -> Expr -- ^ Expr to convert
       -> VerilogM Doc
 expr_ _ (Literal sizeM lit) = exprLitV sizeM lit

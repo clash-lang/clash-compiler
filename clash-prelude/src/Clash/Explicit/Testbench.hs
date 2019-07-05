@@ -168,7 +168,7 @@ stimuliGenerator clk rst samples =
                 else s
 {-# INLINABLE stimuliGenerator #-}
 
--- | 
+-- |
 --
 -- Example:
 --
@@ -204,7 +204,7 @@ stimuliGenerator clk rst samples =
 -- expected value: 10, not equal to actual value: 9
 -- ,False,True]
 --
--- If your working with 'BitVector's containing don't care bit you should use 'outputVerifierBitVector'.
+-- If your working with 'BitVector's containing don't care bits you should use 'outputVerifierBitVector'.
 outputVerifier
   :: forall l dom   a
    . ( KnownNat l

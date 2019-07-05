@@ -32,7 +32,7 @@ getIntLit =
     Int64Literal i   -> Just i
     _                -> Nothing
 
--- | Template function for Int8/Int16/.. Constructs "clean" literals.
+-- | Template function for Int8,Int16,.. Constructs "clean" literals.
 intTF :: BlackBoxFunction
 intTF = literalTF "GHC.Int.I" intTF'
 

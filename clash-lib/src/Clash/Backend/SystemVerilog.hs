@@ -910,7 +910,7 @@ inst_ (BlackBoxD _ libs imps inc bs bbCtx) =
 inst_ (NetDecl' _ _ _ _) = return Nothing
 
 -- | Turn a Netlist expression into a SystemVerilog expression
-expr_ :: Bool -- ^ Enclose in parenthesis?
+expr_ :: Bool -- ^ Enclose in parentheses?
       -> Expr -- ^ Expr to convert
       -> SystemVerilogM Doc
 expr_ _ (Literal sizeM lit)                           = exprLitSV sizeM lit

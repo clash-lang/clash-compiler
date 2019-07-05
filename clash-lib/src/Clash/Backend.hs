@@ -50,7 +50,7 @@ class Backend state where
   primDirs :: state -> IO [FilePath]
 
   -- | Name of backend, used for directory to put output files in. Should be
-  -- | constant function / ignore argument.
+  --   constant function / ignore argument.
   name :: state -> String
 
   -- | File extension for target langauge
@@ -78,8 +78,10 @@ class Backend state where
   -- | Turn a Netlist Declaration to a HDL concurrent block
   inst             :: Declaration  -> Mon (State state) (Maybe Doc)
   -- | Turn a Netlist expression into a HDL expression
-  expr             :: Bool -> Expr -> Mon (State state) Doc
-  -- | Bit-width of Int/Word/Integer
+  expr             :: Bool -- ^ Enclose in parentheses?
+                   -> Expr -- ^ Expr to convert
+                   -> Mon (State state) Doc
+  -- | Bit-width of Int,Word,Integer
   iwWidth          :: State state Int
   -- | Convert to a bit-vector
   toBV             :: HWType -> LT.Text -> Mon (State state) Doc

@@ -1370,7 +1370,7 @@ inst_ (BlackBoxD _ libs imps inc bs bbCtx) =
 inst_ _ = return Nothing
 
 -- | Turn a Netlist expression into a VHDL expression
-expr_ :: Bool -- ^ Enclose in parenthesis?
+expr_ :: Bool -- ^ Enclose in parentheses?
      -> Expr -- ^ Expr to convert
      -> VHDLM Doc
 expr_ _ (Literal sizeM lit) = exprLit sizeM lit
