@@ -19,7 +19,7 @@ topEntity = pure (snd (mapAccumL (\acc _ -> (succ acc, acc)) 0 (map (const ()) i
 testBench :: Signal System Bool
 testBench = done
   where
-    expectedOutput = outputVerifier clk rst ((0 :> 1 :> 2 :> 3 :> 4 :> Nil) :> Nil)
+    expectedOutput = outputVerifier' clk rst ((0 :> 1 :> 2 :> 3 :> 4 :> Nil) :> Nil)
 
     done           = expectedOutput topEntity
     clk            = tbSystemClockGen (not <$> done)

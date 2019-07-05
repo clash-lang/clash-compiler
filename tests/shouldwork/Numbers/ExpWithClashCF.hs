@@ -16,7 +16,7 @@ topEntity = pack Exp.packedExpectedOutputs -- map Exp.topEntity Exp.testInput
 testBench :: Signal System Bool
 testBench = done
   where
-    expectedOutput = outputVerifierBitVector clk rst (expected :> Nil)
+    expectedOutput = outputVerifierBitVector' clk rst (expected :> Nil)
     done           = expectedOutput (pure topEntity)
     clk            = tbSystemClockGen (not <$> done)
     rst            = systemResetGen

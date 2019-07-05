@@ -72,7 +72,7 @@ testBench = done
           )
 
     expectedOutput =
-      outputVerifier clk rst
+      outputVerifier' clk rst
         (    0 :> 0
 
           -- Initial values should be all threes

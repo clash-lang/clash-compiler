@@ -13,7 +13,7 @@ testBench :: Signal System Bool
 testBench = done
   where
     testInput      = pure (replicate d4 (0 :> 1 :> 2 :> 3 :> Nil))
-    expectedOutput = outputVerifier clk rst (((0:>1:>2:>3:>Nil):>
+    expectedOutput = outputVerifier' clk rst (((0:>1:>2:>3:>Nil):>
                                       (3:>0:>1:>2:>Nil):>
                                       (2:>3:>0:>1:>Nil):>
                                       (1:>2:>3:>0:>Nil):>Nil):>Nil)

@@ -62,7 +62,7 @@ testBench = done
           ) :> Nil)
 
     expectedOutput =
-      outputVerifierBitVector
+      outputVerifierBitVector'
         clk
         rst
         (pack ( $(lift (pack aT))

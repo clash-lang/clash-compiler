@@ -2,6 +2,7 @@ module Multiply where
 
 import Clash.CoSim
 import Clash.Explicit.Prelude
+import Clash.Explicit.Testbench
 
 verilog_mult
   :: KnownDomain d
@@ -28,7 +29,7 @@ topEntity s = verilog_mult s s
 testBench :: Signal System Bool
 testBench = done
  where
-  done = outputVerifier clk aclr (4:>9:>16:>64:>81:>100:>Nil) res
+  done = outputVerifier' clk aclr (4:>9:>16:>64:>81:>100:>Nil) res
   res  = topEntity inp
   inp  = stimuliGenerator clk aclr (2:>3:>4:>8:>9:>10:>Nil)
   clk  = tbSystemClockGen (not <$> done)

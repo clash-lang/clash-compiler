@@ -34,7 +34,7 @@ testBench :: Signal System Bool
 testBench = done
   where
     testInput      = stimuliGenerator clk rst (2:>3:>(-2):>8:>Nil)
-    expectedOutput = outputVerifier clk rst (4:>12:>1:>20:>Nil)
+    expectedOutput = outputVerifier' clk rst (4:>12:>1:>20:>Nil)
     done           = expectedOutput (topEntity clk rst (enableGen) testInput)
     clk            = tbSystemClockGen (not <$> done)
     rst            = systemResetGen

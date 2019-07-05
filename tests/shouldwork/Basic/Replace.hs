@@ -21,7 +21,7 @@ topEntity = fmap head r
 testBench :: Signal System Bool
 testBench = done
   where
-    expectedOutput = outputVerifier clk rst (0 :> 1 :> 2 :> 3 :> Nil)
+    expectedOutput = outputVerifier' clk rst (0 :> 1 :> 2 :> 3 :> Nil)
     done           = expectedOutput (exposeClockResetEnable topEntity clk rst enableGen)
     clk            = tbSystemClockGen (not <$> done)
     rst            = systemResetGen

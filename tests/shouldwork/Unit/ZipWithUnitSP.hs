@@ -15,7 +15,7 @@ testBench :: Signal System Bool
 testBench = done
   where
     testInput      = stimuliGenerator clk rst (repeat (P ()) :> repeat Q :> Nil)
-    expectedOutput = outputVerifier clk rst (((0, P ()) :> (1, P ()) :> Nil)
+    expectedOutput = outputVerifier' clk rst (((0, P ()) :> (1, P ()) :> Nil)
                                           :> ((0, Q)    :> (1, Q)    :> Nil)
                                           :> Nil)
 

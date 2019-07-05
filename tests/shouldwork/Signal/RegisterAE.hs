@@ -5,6 +5,7 @@ module RegisterAE where
 -- Register: Asynchronous, Enabled
 
 import Clash.Explicit.Prelude
+import Clash.Explicit.Testbench
 
 testInput :: Vec 7 (Signed 8)
 testInput = 1 :> 2 :> 3 :> 4 :> 5 :> 6 :> 7 :> Nil
@@ -63,7 +64,7 @@ oneOrThree = \case {SAsynchronous -> 1; SSynchronous -> 3}
 testBench :: Signal System Bool
 testBench = done
   where
-    expectedOutput = outputVerifier clk rst (1 :> 1 :> 2 :> oneOrThree (resetKind @System) :>
+    expectedOutput = outputVerifier' clk rst (1 :> 1 :> 2 :> oneOrThree (resetKind @System) :>
                                              1 :> 2 :> 2 :> 2 :>
                                              3 :> 3 :> 3 :> Nil)
     done           = expectedOutput (topEntityAE clk rst)

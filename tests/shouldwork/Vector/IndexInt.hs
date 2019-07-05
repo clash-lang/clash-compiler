@@ -30,7 +30,7 @@ testBench = done
     testInput1     = (4 :> 5 :> 6 :> Nil, 1)
     testInput2     = (Nil, 1)
 
-    expectedOutput = outputVerifier clk rst (5 :> Nil)
+    expectedOutput = outputVerifier' clk rst (5 :> Nil)
     done           = expectedOutput (pure (topEntity testInput1 testInput2))
     clk            = tbSystemClockGen (not <$> done)
     rst            = systemResetGen

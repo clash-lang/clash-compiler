@@ -136,7 +136,7 @@ let testBench :: Signal System Bool
     testBench = done
       where
         testInput      = stimuliGenerator clk rst $(listToVecTH [(1,1) :: (Signed 9,Signed 9),(2,2),(3,3),(4,4)])
-        expectedOutput = outputVerifier clk rst $(listToVecTH [0 :: Signed 9,1,5,14,14,14,14])
+        expectedOutput = outputVerifier' clk rst $(listToVecTH [0 :: Signed 9,1,5,14,14,14,14])
         done           = expectedOutput (topEntity clk rst enableGen testInput)
         clk            = tbSystemClockGen (not <$> done)
         rst            = systemResetGen
@@ -628,7 +628,7 @@ testBench :: 'Signal' System Bool
 testBench = done
   where
     testInput    = 'stimuliGenerator' clk rst $('listToVecTH' [(1,1) :: ('Signed' 9,'Signed' 9),(2,2),(3,3),(4,4)])
-    expectOutput = 'outputVerifier' clk rst $('listToVecTH' [0 :: 'Signed' 9,1,5,14,14,14,14])
+    expectOutput = 'outputVerifier'' clk rst $('listToVecTH' [0 :: 'Signed' 9,1,5,14,14,14,14])
     done         = expectOutput (topEntity clk rst en testInput)
     en           = 'enableGen'
     clk          = 'tbSystemClockGen' (not '<$>' done)
@@ -654,7 +654,7 @@ expected value: 14, not equal to actual value: 62
 
 We can see that for the first 4 samples, everything is working as expected,
 after which warnings are being reported. The reason is that 'stimuliGenerator'
-will keep on producing the last sample, (4,4), while the 'outputVerifier' will
+will keep on producing the last sample, (4,4), while the 'outputVerifier'' will
 keep on expecting the last sample, 14. In the VHDL testbench these errors won't
 show, as the global clock will be stopped after 4 ticks.
 
@@ -2409,7 +2409,7 @@ testInput :: Signal (Signed 16)
 testInput = stimuliGenerator (2:>3:>(-2):>8:>Nil)
 
 expectedOutput :: Signal (Signed 16) -> Signal Bool
-expectedOutput = outputVerifier (4:>12:>1:>20:>Nil)
+expectedOutput = outputVerifier' (4:>12:>1:>20:>Nil)
 @
 
 FIR filter in current version:
@@ -2451,7 +2451,7 @@ testBench :: Signal System Bool
 testBench = done
   where
     testInput      = stimuliGenerator clk rst (2:>3:>(-2):>8:>Nil)
-    expectedOutput = outputVerifier clk rst (4:>12:>1:>20:>Nil)
+    expectedOutput = outputVerifier' clk rst (4:>12:>1:>20:>Nil)
     done           = expectedOutput (topEntity clk rst enableGen testInput)
     clk            = tbSystemClockGen (not \<$\> done)
     rst            = systemResetGen

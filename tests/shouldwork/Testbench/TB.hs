@@ -27,7 +27,7 @@ testBench = done
                       $(listToVecTH ([ (1,(Just (4,True), 0))
                                      , (3,(Nothing, 1))
                                      ]::[(Signed 4,(Maybe (Signed 8,Bool),Bit))]))
-    expectedOutput = outputVerifier clk rst
+    expectedOutput = outputVerifier' clk rst
                       $(listToVecTH ([(Nothing,0)
                                      ,(Just (4,True), 0)
                                      ]::[(Maybe (Signed 8,Bool),Bit)]))

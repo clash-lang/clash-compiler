@@ -93,7 +93,7 @@ testBench = done'
                                                     , (4, 4)
                                                     ])
 
-    expectedOutput = outputVerifier $(listToVecTH [ (0, 0) :: (Signed 9, Signed 9)
+    expectedOutput = outputVerifier' $(listToVecTH [ (0, 0) :: (Signed 9, Signed 9)
                                                   , (1, 1)
                                                   , (5, 5)
                                                   , (14, 14)

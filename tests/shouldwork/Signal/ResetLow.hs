@@ -3,6 +3,7 @@
 module ResetLow where
 
 import Clash.Explicit.Prelude
+import Clash.Explicit.Testbench
 
 createDomain vSystem{vTag="SystemLow", vPolarity=ActiveLow}
 
@@ -46,7 +47,7 @@ oneOrFour = \case {SAsynchronous -> 1; SSynchronous -> 4}
 testBench :: Signal SystemLow Bool
 testBench = done
   where
-    expectedOutput = outputVerifier clk rst (1 :> 1 :> 2 :> 3
+    expectedOutput = outputVerifier' clk rst (1 :> 1 :> 2 :> 3
                                                :> oneOrFour (resetKind @SystemLow)
                                                :> 1 :> 2 :> 3 :> 4
                                                :> 5 :> 6 :> Nil)

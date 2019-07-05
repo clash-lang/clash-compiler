@@ -194,12 +194,9 @@ module Clash.Signal
   , mux
     -- * Simulation and testbench functions
   , clockGen
-  , tbClockGen
-  , tbEnableGen
   , resetGen
   , resetGenN
   , systemClockGen
-  , tbSystemClockGen
   , systemResetGen
     -- * Boolean connectives
   , (.&&.), (.||.)
@@ -251,7 +248,7 @@ import           Test.QuickCheck       (Property, property)
 import           Clash.Class.HasDomain (WithSingleDomain, WithSpecificDomain)
 import qualified Clash.Explicit.Signal as E
 import           Clash.Explicit.Signal
-  (System, resetSynchronizer, systemClockGen, systemResetGen, tbSystemClockGen)
+  (System, resetSynchronizer, systemClockGen, systemResetGen)
 import qualified Clash.Explicit.Signal as S
 import           Clash.Hidden
 import           Clash.Promoted.Nat    (SNat (..), snatToNum)
@@ -1034,7 +1031,7 @@ hasEnable = fromLabel @(HiddenEnableName dom)
 -- testBench = done
 --   where
 --     testInput      = pure ((1 :> 2 :> 3 :> Nil) :> (4 :> 5 :> 6 :> Nil) :> Nil)
---     expectedOutput = outputVerifier ((1:>2:>3:>4:>5:>6:>Nil):>Nil)
+--     expectedOutput = outputVerifier' ((1:>2:>3:>4:>5:>6:>Nil):>Nil)
 --     done           = exposeClockResetEnable (expectedOutput (topEntity <$> testInput)) clk rst
 --     clk            = tbSystemClockGen (not <\$\> done)
 --     rst            = systemResetGen

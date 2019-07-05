@@ -54,7 +54,7 @@ testBench = done
     testInputA = stimuliGenerator clkA rstA (1 :> 2 :> 3 :> 4 :> Nil)
     testInputB = stimuliGenerator clkB rstB (5 :> 6 :> 7 :> 8 :> Nil)
 
-    expectedOutput = outputVerifier clkA rstA (0 :> 1 :> 7 :> 9 :> 11 :> Nil)
+    expectedOutput = outputVerifier' clkA rstA (0 :> 1 :> 7 :> 9 :> 11 :> Nil)
 
     done = expectedOutput (topEntity clkA rstA enableGen clkB rstB enableGen testInputA testInputB)
     clkA = tbClockGen (not <$> done)

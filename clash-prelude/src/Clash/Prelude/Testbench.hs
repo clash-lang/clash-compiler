@@ -6,7 +6,9 @@ License    :  BSD2 (see the file LICENSE)
 Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
 -}
 
+{-# LANGUAGE DataKinds           #-}
 {-# LANGUAGE FlexibleContexts    #-}
+{-# LANGUAGE TypeFamilies        #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 
 {-# LANGUAGE Unsafe #-}
@@ -17,9 +19,13 @@ module Clash.Prelude.Testbench
   ( -- * Testbench functions for circuits
     assert
   , ignoreFor
-  , outputVerifier
-  , outputVerifierBitVector
+  , outputVerifier'
+  , outputVerifierBitVector'
   , stimuliGenerator
+
+  , E.tbClockGen
+  , E.tbEnableGen
+  , E.tbSystemClockGen
   )
 where
 
@@ -27,8 +33,8 @@ import GHC.TypeLits                       (KnownNat)
 
 import qualified Clash.Explicit.Testbench as E
 import           Clash.Signal
-  (HiddenClock, HiddenReset, HiddenClockResetEnable, Signal, hideClock,
-  hideReset, hideClockResetEnable)
+  (HiddenClock, HiddenReset, HiddenClockResetEnable, Signal,
+  DomainResetKind, ResetKind(Asynchronous), hideClock, hideReset, hideClockResetEnable)
 import Clash.Promoted.Nat                 (SNat)
 import Clash.Sized.BitVector              (BitVector)
 import Clash.Sized.Vector                 (Vec)
@@ -38,13 +44,13 @@ import Clash.XException                   (ShowX)
 >>> :set -XTemplateHaskell -XDataKinds -XTypeApplications
 >>> import Clash.Prelude
 >>> let testInput = stimuliGenerator $(listToVecTH [(1::Int),3..21])
->>> let expectedOutput = outputVerifier $(listToVecTH ([70,99,2,3,4,5,7,8,9,10]::[Int]))
+>>> let expectedOutput = outputVerifier' $(listToVecTH ([70,99,2,3,4,5,7,8,9,10]::[Int]))
 -}
 
 -- | Compares the first two 'Signal's for equality and logs a warning when they
 -- are not equal. The second 'Signal' is considered the expected value. This
 -- function simply returns the third 'Signal' unaltered as its result. This
--- function is used by 'outputVerifier'.
+-- function is used by 'outputVerifier''.
 --
 --
 -- __NB__: This function /can/ be used in synthesizable designs.
@@ -61,9 +67,6 @@ assert
   -> Signal dom b
 assert msg actual expected ret =
   hideReset (hideClock E.assert) msg actual expected ret
-
---assert {-msg actual expected ret-} =
---  hideReset (hideClock E.assert) {-msg actual expected ret-}
 {-# INLINE assert #-}
 
 -- |
@@ -98,36 +101,37 @@ stimuliGenerator = hideReset (hideClock E.stimuliGenerator)
 -- expectedOutput
 --   :: HiddenClockResetEnable dom
 --   -> 'Signal' dom Int -> 'Signal' dom Bool
--- expectedOutput = 'outputVerifier' $('Clash.Sized.Vector.listToVecTH' ([70,99,2,3,4,5,7,8,9,10]::[Int]))
+-- expectedOutput = 'outputVerifier'' $('Clash.Sized.Vector.listToVecTH' ([70,99,2,3,4,5,7,8,9,10]::[Int]))
 -- @
 --
 -- >>> import qualified Data.List as List
 -- >>> sampleN 12 (expectedOutput (fromList ([0..10] List.++ [10,10,10])))
 -- <BLANKLINE>
--- cycle(system10000): 0, outputVerifier
+-- cycle(system10000): 0, outputVerifier'
 -- expected value: 70, not equal to actual value: 0
 -- [False
--- cycle(system10000): 1, outputVerifier
+-- cycle(system10000): 1, outputVerifier'
 -- expected value: 99, not equal to actual value: 1
 -- ,False,False,False,False,False
--- cycle(system10000): 6, outputVerifier
+-- cycle(system10000): 6, outputVerifier'
 -- expected value: 7, not equal to actual value: 6
 -- ,False
--- cycle(system10000): 7, outputVerifier
+-- cycle(system10000): 7, outputVerifier'
 -- expected value: 8, not equal to actual value: 7
 -- ,False
--- cycle(system10000): 8, outputVerifier
+-- cycle(system10000): 8, outputVerifier'
 -- expected value: 9, not equal to actual value: 8
 -- ,False
--- cycle(system10000): 9, outputVerifier
+-- cycle(system10000): 9, outputVerifier'
 -- expected value: 10, not equal to actual value: 9
 -- ,False,True,True]
 --
--- If your working with 'BitVector's containing don't care bits you should use 'outputVerifierBitVector'.
-outputVerifier
+-- If your working with 'BitVector's containing don't care bits you should use 'outputVerifierBitVector''.
+outputVerifier'
   :: ( KnownNat l
      , Eq a
      , ShowX a
+     , DomainResetKind dom ~ 'Asynchronous
      , HiddenClock dom
      , HiddenReset dom  )
   => Vec l a
@@ -136,15 +140,16 @@ outputVerifier
   -- ^ Signal to verify
   -> Signal dom Bool
   -- ^ Indicator that all samples are verified
-outputVerifier = hideReset (hideClock E.outputVerifier)
-{-# INLINE outputVerifier #-}
+outputVerifier' = hideReset (hideClock E.outputVerifier')
+{-# INLINE outputVerifier' #-}
 
 
--- | Same as 'outputVerifier',
+-- | Same as 'outputVerifier'',
 -- but can handle don't care bits in it's expected values.
-outputVerifierBitVector
+outputVerifierBitVector'
   :: ( KnownNat l
      , KnownNat n
+     , DomainResetKind dom ~ 'Asynchronous
      , HiddenClock dom
      , HiddenReset dom  )
   => Vec l (BitVector n)
@@ -153,8 +158,8 @@ outputVerifierBitVector
   -- ^ Signal to verify
   -> Signal dom Bool
   -- ^ Indicator that all samples are verified
-outputVerifierBitVector = hideReset (hideClock E.outputVerifierBitVector)
-{-# INLINE outputVerifierBitVector #-}
+outputVerifierBitVector' = hideReset (hideClock E.outputVerifierBitVector')
+{-# INLINE outputVerifierBitVector' #-}
 
 -- | Ignore signal for a number of cycles, while outputting a static value.
 ignoreFor

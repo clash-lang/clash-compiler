@@ -22,7 +22,7 @@ topEntity clk rst =
 testBench :: Signal System Bool
 testBench = done
   where
-    expectedOutput = outputVerifier clk rst ((22, 22, 1441814) :> Nil)
+    expectedOutput = outputVerifier' clk rst ((22, 22, 1441814) :> Nil)
     done           = expectedOutput (topEntity clk rst)
     clk            = tbSystemClockGen (not <$> done)
     rst            = systemResetGen

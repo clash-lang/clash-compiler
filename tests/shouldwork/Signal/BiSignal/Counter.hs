@@ -11,6 +11,7 @@ import Data.Int
 import Debug.Trace
 import qualified Prelude as P
 import Clash.Explicit.Prelude hiding (even, odd)
+import Clash.Explicit.Testbench
 import Clash.Signal hiding (sampleN)
 
 -- | Alternatively read / increment+write
@@ -63,4 +64,4 @@ testBench = done
   where
     clock          = tbSystemClockGen (not <$> done)
     done           = expectedOutput (topEntity clock systemResetGen enableGen)
-    expectedOutput = outputVerifier clock systemResetGen (1 :> 2 :> 3 :> 4 :> 5 :> 6 :> 7 :> Nil)
+    expectedOutput = outputVerifier' clock systemResetGen (1 :> 2 :> 3 :> 4 :> 5 :> 6 :> 7 :> Nil)

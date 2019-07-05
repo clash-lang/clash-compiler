@@ -72,7 +72,7 @@ expectedOutput
   :: Signal System (Signed 64)
   -> Signal System Bool
 expectedOutput =
-    outputVerifier
+    outputVerifier'
         systemClockGen
         systemResetGen
         (4:>12:>1:>20:>Nil)

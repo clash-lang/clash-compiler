@@ -89,7 +89,7 @@ testBench = done'
                                :> Just (JustC Blue)
                                :> Nil
 
-    expectedOutput = outputVerifier $ Red
+    expectedOutput = outputVerifier' $ Red
                                    :> Blue
                                    :> Green
                                    :> Blue

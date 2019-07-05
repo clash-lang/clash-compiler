@@ -104,8 +104,6 @@ module Clash.Signal.Internal
   , mux
     -- * Simulation and testbench functions
   , clockGen
-  , tbClockGen
-  , tbEnableGen
   , resetGen
   , resetGenN
     -- * Boolean connectives
@@ -802,66 +800,7 @@ clockGen = Clock SSymbol
 {-# NOINLINE clockGen #-}
 {-# ANN clockGen hasBlackBox #-}
 
--- | Clock generator to be used in the /testBench/ function.
---
--- To be used like:
---
--- @
--- clkSystem en = tbClockGen @System en
--- @
---
--- === __Example__
---
--- @
--- module Example where
---
--- import "Clash.Explicit.Prelude"
--- import "Clash.Explicit.Testbench"
---
--- -- Fast domain: twice as fast as \"Slow\"
--- 'createDomain' 'vSystem'{vTag=\"Fast\", vPeriod=10}
---
--- -- Slow domain: twice as slow as "Fast"
--- 'createDomain' 'vSystem'{vTag=\"Slow\", vPeriod=20}
---
--- topEntity
---   :: 'Clock' \"Fast\"
---   -> 'Reset' \"Fast\"
---   -> 'Enable' \"Fast\"
---   -> 'Clock' \"Slow\"
---   -> 'Signal' \"Fast\" (Unsigned 8)
---   -> 'Signal' \"Slow\" (Unsigned 8, Unsigned 8)
--- topEntity clk1 rst1 en1 clk2 i =
---   let h = register clk1 rst1 en1 0 (register clk1 rst1 en1 0 i)
---       l = register clk1 rst1 en1 0 i
---   in  unsafeSynchronizer clk1 clk2 (bundle (h, l))
---
--- testBench
---   :: 'Signal' \"Slow\" Bool
--- testBench = done
---   where
---     testInput      = 'Clash.Explicit.Testbench.stimuliGenerator' clkA1 rstA1 $('listToVecTH' [1::Unsigned 8,2,3,4,5,6,7,8])
---     expectedOutput = 'Clash.Explicit.Testbench.outputVerifier'   clkB2 rstB2 $('listToVecTH' [(0,0) :: (Unsigned 8, Unsigned 8),(1,2),(3,4),(5,6),(7,8)])
---     done           = expectedOutput (topEntity clkA1 rstA1 enableGen clkB2 testInput)
---     done'          = not \<$\> done
---     clkA1          = 'tbClockGen' \@\"Fast\" (unsafeSynchronizer clkB2 clkA1 done')
---     clkB2          = 'tbClockGen' \@\"Slow\" done'
---     rstA1          = 'resetGen' \@\"Fast\"
---     rstB2          = 'resetGen' \@\"Slow\"
--- @
-tbClockGen
-  :: KnownDomain dom
-  => Signal dom Bool
-  -> Clock dom
-tbClockGen _clk = clockGen
-{-# NOINLINE tbClockGen #-}
-{-# ANN tbClockGen hasBlackBox #-}
 
--- | Opaque enable signal that's always enabled. Won't be optimized away.
-tbEnableGen :: Enable tag
-tbEnableGen = toEnable (pure True)
-{-# NOINLINE tbEnableGen #-}
-{-# ANN tbEnableGen hasBlackBox #-}
 
 -- | Reset generator
 --

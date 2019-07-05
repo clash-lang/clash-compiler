@@ -17,7 +17,7 @@
     }
   }
 , { "BlackBox" :
-    { "name" : "Clash.Signal.Internal.tbEnableGen"
+    { "name" : "Clash.Explicit.Testbench.tbEnableGen"
     , "workInfo" : "Always"
     , "kind" : "Declaration"
     , "type" : "tbEnableGen :: Enable dom"

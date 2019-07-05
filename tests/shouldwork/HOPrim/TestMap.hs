@@ -1,6 +1,7 @@
 module TestMap where
 
 import Clash.Explicit.Prelude
+import Clash.Explicit.Testbench
 
 createDomain vSystem{vTag="System50", vPeriod=50000}
 
@@ -53,7 +54,7 @@ testBench :: Signal System50 Bool
 testBench = done
   where
     testInput      = stimuliGenerator clk50 rst50 ((5,True):>(4,False):>(2,True):>Nil)
-    expectedOutput = outputVerifier   clk50 rst50 (0:>4:>2:>0:>2:>Nil)
+    expectedOutput = outputVerifier'   clk50 rst50 (0:>4:>2:>0:>2:>Nil)
     done           = expectedOutput (topEntity clk50 rst50 enableGen (unbundle testInput))
     clk50          = tbClockGen @System50 (not <$> done)
     rst50          = resetGen @System50

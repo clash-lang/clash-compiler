@@ -3,6 +3,7 @@ module RegisterSR where
 -- Register: Synchronous, Regular
 
 import Clash.Explicit.Prelude
+import Clash.Explicit.Testbench
 
 testInput :: Vec 7 (Signed 8)
 testInput = 1 :> 2 :> 3 :> 4 :> 5 :> 6 :> 7 :> Nil
@@ -34,10 +35,9 @@ topEntitySR clk rst = topEntity clk srst
     srst = unsafeFromHighPolarity (resetInput clk rst enableGen)
 {-# NOINLINE topEntitySR #-}
 
-testBench :: Signal XilinxSystem Bool
+testBench :: Signal System Bool
 testBench = done
   where
-    expectedOutput = outputVerifier clk rst (1 :> 1 :> 2 :> 3 :> 1 :> 1 :> 2 :> 3 :> Nil)
-    done           = expectedOutput (topEntitySR clk rst)
-    clk            = tbClockGen (not <$> done)
-    rst            = resetGen
+    expectedOutput        = outputVerifier testClk resetGen (1 :> 1 :> 2 :> 3 :> 1 :> 1 :> 2 :> 3 :> Nil)
+    done                  = expectedOutput (topEntitySR circuitClk resetGen)
+    (testClk, circuitClk) = biTbClockGen @System @XilinxSystem (not <$> done)

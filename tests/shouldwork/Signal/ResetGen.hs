@@ -1,6 +1,7 @@
 module ResetGen where
 
 import Clash.Explicit.Prelude
+import Clash.Explicit.Testbench
 
 topEntity
   :: Clock System
@@ -15,10 +16,10 @@ testBench :: Signal System Bool
 testBench = done
   where
     expectedOutput =
-      outputVerifier
+      outputVerifier'
         clk
         rst
-        -- Note that outputVerifier skips first sample
+        -- Note that outputVerifier' skips first sample
         (  (True, True)
         :> (True, True)
         :> (False, True)

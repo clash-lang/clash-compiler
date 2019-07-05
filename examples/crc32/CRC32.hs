@@ -33,7 +33,7 @@ testBench :: Signal System Bool
 testBench = done
   where
     testInput      = stimuliGenerator clk rst $(listToVecTH (L.map (fromIntegral . ord) "CLaSH" :: [BitVector 8]))
-    expectedOutput = outputVerifier clk rst (0 :> 3523407757 :> 2920022741 :> 1535101039 :>
+    expectedOutput = outputVerifier' clk rst (0 :> 3523407757 :> 2920022741 :> 1535101039 :>
                         903986498 :> 3095867074 :> 3755410077 :> Nil)
     done           = expectedOutput (topEntity clk rst enableGen testInput)
     clk            = tbSystemClockGen (not <$> done)

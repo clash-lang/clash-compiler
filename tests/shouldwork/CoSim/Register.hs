@@ -3,6 +3,7 @@ module Register where
 
 import Clash.CoSim
 import Clash.Explicit.Prelude
+import Clash.Explicit.Testbench
 
 verilog_register
   :: KnownDomain d
@@ -39,7 +40,7 @@ topEntity clk arst = let s  = verilog_register clk arst (s' + 1)
 testBench :: Signal System Bool
 testBench = done
  where
-  done = outputVerifier clk aclr (0:>0:>1:>1:>2:>2:>3:>3:>4:>4:>Nil) res
+  done = outputVerifier' clk aclr (0:>0:>1:>1:>2:>2:>3:>3:>4:>4:>Nil) res
   res  = topEntity clk aclr
   clk  = tbSystemClockGen (not <$> done)
   aclr = systemResetGen

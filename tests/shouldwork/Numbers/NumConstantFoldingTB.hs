@@ -12,7 +12,7 @@ topEntity = NumConstantFolding.topEntity
 testBench :: Signal System Bool
 testBench = done
   where
-    expectedOutput = outputVerifier clk rst expected
+    expectedOutput = outputVerifier' clk rst expected
     done           = expectedOutput (pure topEntity)
     clk            = tbSystemClockGen (not <$> done)
     rst            = systemResetGen

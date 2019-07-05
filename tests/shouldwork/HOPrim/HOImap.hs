@@ -66,7 +66,7 @@ testBench :: Signal System Bool
 testBench = done
   where
     testInput      = stimuliGenerator clk rst $(listToVecTH ([(a,Just b) | b <- [1,2,3,4],  a <- [0,1,2,3]] :: [(Index 4, Maybe (Signed 5))]))
-    expectedOutput = outputVerifier   clk rst $(listToVecTH [$(listToVecTH [Just 2 :: Maybe (Signed 5),Nothing,Nothing,Nothing])
+    expectedOutput = outputVerifier'   clk rst $(listToVecTH [$(listToVecTH [Just 2 :: Maybe (Signed 5),Nothing,Nothing,Nothing])
                                                 ,$(listToVecTH [Nothing :: Maybe (Signed 5),Just 2,Nothing,Nothing])
                                                 ,$(listToVecTH [Nothing :: Maybe (Signed 5),Nothing,Just 0,Nothing])
                                                 ,$(listToVecTH [Nothing :: Maybe (Signed 5),Nothing,Nothing,Just (-1)])

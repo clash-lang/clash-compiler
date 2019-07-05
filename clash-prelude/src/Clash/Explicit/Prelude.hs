@@ -59,7 +59,7 @@ module Clash.Explicit.Prelude
     -- * Testbench functions
   , assert
   , stimuliGenerator
-  , outputVerifier
+  , outputVerifier'
     -- * Tracing
     -- ** Simple
   , traceSignal1

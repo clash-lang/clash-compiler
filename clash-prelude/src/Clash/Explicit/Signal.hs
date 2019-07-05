@@ -222,12 +222,9 @@ module Clash.Explicit.Signal
   , regEn
     -- * Simulation and testbench functions
   , clockGen
-  , tbClockGen
-  , tbEnableGen
   , resetGen
   , resetGenN
   , systemClockGen
-  , tbSystemClockGen
   , systemResetGen
     -- * Boolean connectives
   , (.&&.), (.||.)
@@ -325,30 +322,6 @@ systemClockGen
   :: Clock System
 systemClockGen = clockGen
 
--- | Clock generator for the 'System' clock domain.
---
--- __NB__: can be used in the /testBench/ function
---
--- === __Example__
---
--- @
--- topEntity :: Vec 2 (Vec 3 (Unsigned 8)) -> Vec 6 (Unsigned 8)
--- topEntity = concat
---
--- testBench :: Signal System Bool
--- testBench = done
---   where
---     testInput      = pure ((1 :> 2 :> 3 :> Nil) :> (4 :> 5 :> 6 :> Nil) :> Nil)
---     expectedOutput = outputVerifier ((1:>2:>3:>4:>5:>6:>Nil):>Nil)
---     done           = exposeClockResetEnable (expectedOutput (topEntity <$> testInput)) clk rst
---     clk            = 'tbSystemClockGen' (not <\$\> done)
---     rst            = systemResetGen
--- @
-tbSystemClockGen
-  :: Signal System Bool
-  -> Clock System
-tbSystemClockGen = tbClockGen
-
 -- | Reset generator for the 'System' clock domain.
 --
 -- __NB__: should only be used for simulation or the \testBench\ function.
@@ -363,7 +336,7 @@ tbSystemClockGen = tbClockGen
 -- testBench = done
 --   where
 --     testInput      = pure ((1 :> 2 :> 3 :> Nil) :> (4 :> 5 :> 6 :> Nil) :> Nil)
---     expectedOutput = outputVerifier ((1:>2:>3:>4:>5:>6:>Nil):>Nil)
+--     expectedOutput = outputVerifier' ((1:>2:>3:>4:>5:>6:>Nil):>Nil)
 --     done           = exposeClockResetEnable (expectedOutput (topEntity <$> testInput)) clk rst
 --     clk            = tbSystemClockGen (not <\$\> done)
 --     rst            = 'systemResetGen'

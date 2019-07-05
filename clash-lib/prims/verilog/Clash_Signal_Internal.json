@@ -83,7 +83,7 @@ assign ~RESULT = ~SYM[0];
     }
   }
 , { "BlackBox" :
-    { "name"      : "Clash.Signal.Internal.tbClockGen"
+    { "name" : "Clash.Explicit.Testbench.tbClockGen"
     , "workInfo"  : "Always"
     , "kind" : "Declaration"
     , "warning" : "Clash.Signal.Internal.tbClockGen is not synthesizable!"

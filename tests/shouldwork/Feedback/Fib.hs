@@ -17,7 +17,7 @@ topEntity = exposeClockResetEnable fib
 testBench :: Signal System Bool
 testBench = done
   where
-    expectedOutput = outputVerifier clk rst $(listToVecTH [1 :: Unsigned 64,1,2,3,5])
+    expectedOutput = outputVerifier' clk rst $(listToVecTH [1 :: Unsigned 64,1,2,3,5])
     done           = expectedOutput (topEntity clk rst enableGen)
     clk            = tbSystemClockGen (not <$> done)
     rst            = systemResetGen
