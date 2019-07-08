@@ -97,6 +97,7 @@ runClashTest =
         , clashTestGroup "ShouldFail"
           [ runFailingTest ("tests" </> "shouldfail") [VHDL] [] "RecursiveBoxed" (Just "Callgraph after normalisation contains following recursive components")
           , runFailingTest ("tests" </> "shouldfail") [VHDL] [] "RecursiveDatatype" (Just "Not in normal form: no Letrec")
+          , runFailingTest ("tests" </> "shouldfail") [VHDL] [] "RecursiveDatatype2" (Just "Can't translate recursive type:")
           , runFailingTest ("tests" </> "shouldfail" </> "InvalidPrimitive") [VHDL] ["-itests/shouldfail/InvalidPrimitive"] "InvalidPrimitive" (Just "InvalidPrimitive.json")
           -- Disabled, due to it eating gigabytes of memory:
           -- , runFailingTest ("tests" </> "shouldfail") defBuild [] "RecursivePoly" (Just "??")

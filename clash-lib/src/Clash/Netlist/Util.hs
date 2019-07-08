@@ -418,13 +418,34 @@ mkADT builtInTranslation reprs m _tyString tc args = case tyConDataCons (m `look
           (\dc tys ->  ( nameOcc (dcName dc), tys))
           dcs (map stripFiltered <$> elemHTys)) argHTyss1
 
--- | Simple check if a TyCon is recursively defined.
+-- | Check if a TyCon is recursively defined or if it contains anything that's recursive
+--
+-- Examples of recursive types
+--
+--  * self recursive
+--
+--      > data Rec0 t = A t | B (Rec0 t)
+--
+--  * mutually recursive
+--
+--      > data Rec1 t = C t | D (Rec2 t)
+--      > data Rec2 t = E t | F (Rec1 t)
+--
+--  * containing recursive fields
+--
+--      > data Rec3 t = G (Rec1 t)
 isRecursiveTy :: TyConMap -> TyConName -> Bool
-isRecursiveTy m tc = case tyConDataCons (m `lookupUniqMap'` tc) of
-    []  -> False
-    dcs -> let argTyss      = map dcArgTys dcs
-               argTycons    = (map fst . catMaybes) $ (concatMap . map) splitTyConAppM argTyss
-           in tc `elem` argTycons
+isRecursiveTy m = go []
+  where
+    go :: [TyConName] -> TyConName -> Bool
+    go seen tc
+      | tc `elem` seen = True
+      | otherwise = case tyConDataCons (m `lookupUniqMap'` tc) of
+          []  -> False
+          dcs ->
+            let argTyss      = map dcArgTys dcs
+                argTycons    = (map fst . catMaybes) $ (concatMap . map) splitTyConAppM argTyss
+            in any (go (tc:seen)) argTycons
 
 -- | Determines if a Core type is translatable to a HWType given a function that
 -- translates certain builtin types.
