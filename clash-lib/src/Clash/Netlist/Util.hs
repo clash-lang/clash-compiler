@@ -1272,13 +1272,14 @@ mkTopUnWrapper topEntity annM man dstId args = do
   (iResult ++) <$> case topOutputM of
     Nothing -> return []
     Just (_, (oports, unwrappers, idsO)) -> do
-        instLabel <- extendIdentifier Basic topName ("_" `Text.append` fst dstId)
+        instLabel0 <- extendIdentifier Basic topName ("_" `Text.append` fst dstId)
+        instLabel1 <- mkUniqueIdentifier Basic instLabel0
         let outpAssign = Assignment (fst dstId) (resBV topM idsO)
         let topCompDecl = InstDecl
                             Entity
                             (Just topName)
                             topName
-                            instLabel
+                            instLabel1
                             []
                             ( map (\(p,i,t) -> (Identifier p Nothing,In, t,Identifier i Nothing)) (concat iports) ++
                               map (\(p,o,t) -> (Identifier p Nothing,Out,t,Identifier o Nothing)) oports)
