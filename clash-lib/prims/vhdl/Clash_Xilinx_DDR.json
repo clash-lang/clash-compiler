@@ -19,9 +19,9 @@
 ~GENSYM[~COMPNAME_IDDR][0] : block
   signal ~GENSYM[dataout_l][1] : ~TYP[7];
   signal ~GENSYM[dataout_h][2] : ~TYP[7];
-  signal ~GENSYM[d][3]         : ~TYP[7];~IF ~ISALWAYSENABLED[4] ~THEN
+  signal ~GENSYM[d][3]         : ~TYP[7];~IF ~ISACTIVEENABLE[4] ~THEN
   signal ~GENSYM[ce_logic][4]: std_logic;~ELSE ~FI
-begin~IF ~ISALWAYSENABLED[4] ~THEN
+begin~IF ~ISACTIVEENABLE[4] ~THEN
   ~SYM[4] <= '1' when (~ARG[6]) else '0';~ELSE ~FI
   ~SYM[3] <= ~ARG[7];
 
@@ -37,7 +37,7 @@ begin~IF ~ISALWAYSENABLED[4] ~THEN
       Q1 => ~SYM[1](~SYM[8]),   -- 1-bit output for positive edge of clock
       Q2 => ~SYM[2](~SYM[8]),   -- 1-bit output for negative edge of clock
       C  => ~ARG[4],   -- 1-bit clock input
-      CE => ~IF ~ISALWAYSENABLED[6] ~THEN ~SYM[4] ~ELSE '1' ~FI,       -- 1-bit clock enable input
+      CE => ~IF ~ISACTIVEENABLE[6] ~THEN ~SYM[4] ~ELSE '1' ~FI,       -- 1-bit clock enable input
       D  => ~SYM[3](~SYM[8]),   -- 1-bit DDR data input
       R  => ~ARG[5],   -- 1-bit reset
       S  => '0'        -- 1-bit set
@@ -70,9 +70,9 @@ end block;
 ~GENSYM[~COMPNAME_ODDR][0] : block
   signal ~GENSYM[dataout_l][1] : ~TYPO;
   signal ~GENSYM[dataout_h][2] : ~TYPO;
-  signal ~GENSYM[q][3]         : ~TYPO;~IF ~ISALWAYSENABLED[5] ~THEN
+  signal ~GENSYM[q][3]         : ~TYPO;~IF ~ISACTIVEENABLE[5] ~THEN
   signal ~GENSYM[ce_logic][4]  : std_logic;~ELSE ~FI
-begin~IF ~ISALWAYSENABLED[5] ~THEN
+begin~IF ~ISACTIVEENABLE[5] ~THEN
   ~SYM[4] <= '1' when (~ARG[5]) else '0';~ELSE ~FI
   ~SYM[1] <= ~ARG[6];
   ~SYM[2] <= ~ARG[7];
@@ -87,7 +87,7 @@ begin~IF ~ISALWAYSENABLED[5] ~THEN
     port map (
       Q  => ~SYM[3](~SYM[8]),    -- 1-bit DDR output
       C  => ~ARG[3],   -- 1-bit clock input
-      CE => ~IF ~ISALWAYSENABLED[5] ~THEN ~SYM[4] ~ELSE '1' ~FI,       -- 1-bit clock enable input
+      CE => ~IF ~ISACTIVEENABLE[5] ~THEN ~SYM[4] ~ELSE '1' ~FI,       -- 1-bit clock enable input
       D1 => ~SYM[1](~SYM[8]),    -- 1-bit data input (positive edge)
       D2 => ~SYM[2](~SYM[8]),    -- 1-bit data input (negative edge)
       R  => ~ARG[4],    -- 1-bit reset input

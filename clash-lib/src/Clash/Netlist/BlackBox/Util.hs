@@ -402,7 +402,7 @@ renderElem b (IF c t f) = do
                       BlackBoxE {} -> 1
                       _            -> 0
 
-      (IsAlwaysEnabled n) ->
+      (IsActiveEnable n) ->
         let (e, ty, _) = bbInputs b !! n in
         case (e, ty) of
           (Literal Nothing (BoolLit True), Bool)  -> 0
@@ -412,9 +412,7 @@ renderElem b (IF c t f) = do
           (Literal Nothing (BoolLit False), Bool) -> 1
           (_, Bool)                               -> 1
           _ ->
-            error $ $(curLoc) ++ "IsAlwaysEnabled: Expected Bool, not: " ++ show ty
-
---        error $ show (e, ty, isLit, bbName b)
+            error $ $(curLoc) ++ "IsActiveEnable: Expected Bool, not: " ++ show ty
 
       (ActiveEdge edgeRequested n) ->
         let (_, ty, _) = bbInputs b !! n in
@@ -810,7 +808,7 @@ prettyElem (Sel e i) = do
 prettyElem (IsLit i) = renderOneLine <$> (string "~ISLIT" <> brackets (int i))
 prettyElem (IsVar i) = renderOneLine <$> (string "~ISVAR" <> brackets (int i))
 prettyElem (IsActiveHigh i) = renderOneLine <$> (string "~ISACTIVEHIGH" <> brackets (int i))
-prettyElem (IsAlwaysEnabled i) = renderOneLine <$> (string "~ISALWAYSENABLED" <> brackets (int i))
+prettyElem (IsActiveEnable i) = renderOneLine <$> (string "~ISACTIVEENABLE" <> brackets (int i))
 
 -- Domain attributes:
 prettyElem (Tag i) = renderOneLine <$> (string "~TAG" <> brackets (int i))
@@ -918,7 +916,7 @@ walkElement f el = maybeToList (f el) ++ walked
         IsSync _ -> []
         IsInitDefined _ -> []
         IsActiveHigh _ -> []
-        IsAlwaysEnabled _ -> []
+        IsActiveEnable _ -> []
         StrCmp es _ -> concatMap go es
         OutputWireReg _ -> []
         Vars _ -> []
@@ -958,7 +956,7 @@ usedArguments (N.BBTemplate t) = nub (concatMap (walkElement matchArg) t)
         Component (Decl i _) -> Just i
         Const i -> Just i
         IsLit i -> Just i
-        IsAlwaysEnabled i -> Just i
+        IsActiveEnable i -> Just i
         Lit i -> Just i
         Name i -> Just i
         Var _ i -> Just i

@@ -15,7 +15,7 @@
 ~SIGD[~GENSYM[ROM][1]][5];
 assign ~SYM[1] = ~LIT[5];
 
-logic [~SIZE[~TYPO]-1:0] ~GENSYM[~RESULT_q][2];~IF ~ISALWAYSENABLED[4] ~THEN
+logic [~SIZE[~TYPO]-1:0] ~GENSYM[~RESULT_q][2];~IF ~ISACTIVEENABLE[4] ~THEN
 always @(~IF~ACTIVEEDGE[Rising][0]~THENposedge~ELSEnegedge~FI ~ARG[3]) begin : ~GENSYM[~COMPNAME_rom][3]
   if (~ARG[4]) begin
     ~SYM[2] <= ~SYM[1][~ARG[6]];

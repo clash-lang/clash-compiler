@@ -47,7 +47,7 @@ begin
                 mod ~LIT[5]
   -- pragma translate_on
                 ;
-  ~IF ~VIVADO ~THEN ~IF ~ISALWAYSENABLED[4] ~THEN
+  ~IF ~VIVADO ~THEN ~IF ~ISACTIVEENABLE[4] ~THEN
   ~GENSYM[blockRamFile_sync][10] : process(~ARG[3])
   begin
     if ~IF~ACTIVEEDGE[Rising][0]~THENrising_edge~ELSEfalling_edge~FI(~ARG[3]) then
@@ -75,7 +75,7 @@ begin
       -- pragma translate_on
       ;
     end if;
-  end process;~FI ~ELSE ~IF ~ISALWAYSENABLED[4] ~THEN
+  end process;~FI ~ELSE ~IF ~ISACTIVEENABLE[4] ~THEN
   ~SYM[10] : process(~ARG[3])
   begin
     if ~IF~ACTIVEEDGE[Rising][0]~THENrising_edge~ELSEfalling_edge~FI(~ARG[3]) then
