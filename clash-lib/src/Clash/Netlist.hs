@@ -537,8 +537,9 @@ mkFunApp dstId fun args = do
                   outpAssign    = case compOutp of
                     Nothing -> []
                     Just (id_,hwtype) -> [(Identifier id_ Nothing,Out,hwtype,Identifier dstId Nothing)]
-              instLabel <- extendIdentifier Basic compName (StrictText.pack "_" `StrictText.append` dstId)
-              let instDecl      = InstDecl Entity Nothing compName instLabel [] (outpAssign ++ inpAssigns)
+              instLabel0 <- extendIdentifier Basic compName (StrictText.pack "_" `StrictText.append` dstId)
+              instLabel1 <- mkUniqueIdentifier Basic instLabel0
+              let instDecl      = InstDecl Entity Nothing compName instLabel1 [] (outpAssign ++ inpAssigns)
               return (argDecls ++ argDecls' ++ [instDecl])
             else error $ $(curLoc) ++ "under-applied normalized function"
         Nothing -> case args of
