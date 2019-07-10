@@ -546,12 +546,21 @@ createDomain (VDomainConfiguration name period edge reset init_ polarity) =
     kdType <- [t| KnownDomain $nameT |]
     kcType <- [t| ('DomainConfiguration $nameT $periodT $edgeT $resetKindT $initT $polarityT) |]
     sDom <- [| SDomainConfiguration SSymbol SNat $edgeE $resetKindE $initE $polarityE |]
+
     let vTagImpl = AppE (VarE 'vDomain) (AppTypeE (VarE 'knownDomain) (LitT (StrTyLit name)))
-    let kdImpl = FunD 'knownDomain [Clause [] (NormalB sDom) []]
-    let kcImpl = TySynInstD ''KnownConf (TySynEqn [LitT (StrTyLit name)] kcType)
-    pure  [ InstanceD Nothing [] kdType [kcImpl, kdImpl]
+        kdImpl = FunD 'knownDomain [Clause [] (NormalB sDom) []]
+        kcImpl = TySynInstD ''KnownConf (TySynEqn [LitT (StrTyLit name)] kcType)
+        vName = mkName ('v':name)
+
+    pure  [ -- KnownDomain instance (ex: instance KnownDomain "System" where ...)
+            InstanceD Nothing [] kdType [kcImpl, kdImpl]
+
+            -- Type synonym (ex: type System = "System")
           , TySynD (mkName name) [] (LitT (StrTyLit name)  `SigT`  ConT ''Domain)
-          , FunD (mkName ('v':name)) [Clause [] (NormalB vTagImpl) []]
+
+            -- vDomain helper (ex: vSystem = vDomain (knownDomain @System))
+          , SigD vName (ConT ''VDomainConfiguration)
+          , FunD vName [Clause [] (NormalB vTagImpl) []]
           ]
   else
     error ("Domain names should be a valid Haskell type name, not: " ++ name)
