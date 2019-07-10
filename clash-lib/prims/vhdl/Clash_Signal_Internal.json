@@ -11,7 +11,7 @@
   -> Signal clk a             -- ARG[5]
   -> Signal clk a"
     , "template" :
-"-- delay begin~IF ~ISALWAYSENABLED[3] ~THEN
+"-- delay begin~IF ~ISACTIVEENABLE[3] ~THEN
 ~GENSYM[~RESULT_delay][0] : block
   signal ~GENSYM[~RESULT_reg][1]   : ~TYPO ~IF ~ISINITDEFINED[0] ~THEN := ~CONST[4] ~ELSE ~FI;
 begin
@@ -62,7 +62,7 @@ end block;~FI
   -> Signal clk a             -- ARG[7]
   -> Signal clk a"
     , "template" :
-"-- register begin~IF ~ISALWAYSENABLED[4] ~THEN
+"-- register begin~IF ~ISACTIVEENABLE[4] ~THEN
 ~GENSYM[~COMPNAME_register][0] : block
   signal ~GENSYM[~RESULT_reg][1] : ~TYPO ~IF ~ISINITDEFINED[0] ~THEN := ~CONST[5] ~ELSE ~FI;
 begin

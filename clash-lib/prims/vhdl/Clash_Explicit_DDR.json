@@ -30,7 +30,7 @@ begin
     if ~IF~ACTIVEEDGE[Rising][2]~THENrising_edge~ELSEfalling_edge~FI(~ARG[4]) then
       if ~ARG[5] = ~IF~ISACTIVEHIGH[2]~THEN'1'~ELSE'0'~FI then
         ~SYM[1] <= ~ARG[8];
-      els~IF ~ISALWAYSENABLED[6] ~THENif ~ARG[6] then~ELSEe~FI
+      els~IF ~ISACTIVEENABLE[6] ~THENif ~ARG[6] then~ELSEe~FI
         ~SYM[1] <= ~ARG[10];
       end if;
     end if;
@@ -41,7 +41,7 @@ begin
     if ~IF~ACTIVEEDGE[Rising][2]~THENfalling_edge~ELSErising_edge~FI(~ARG[4]) then
       if ~ARG[5] = ~IF~ISACTIVEHIGH[2]~THEN'1'~ELSE'0'~FI then
         ~SYM[2] <= ~ARG[9];
-      els~IF ~ISALWAYSENABLED[6] ~THENif ~ARG[6] then~ELSEe~FI
+      els~IF ~ISACTIVEENABLE[6] ~THENif ~ARG[6] then~ELSEe~FI
         ~SYM[2] <= ~ARG[10];
       end if;
     end if;
@@ -52,7 +52,7 @@ begin
     if ~IF~ACTIVEEDGE[Rising][2]~THENrising_edge~ELSEfalling_edge~FI(~ARG[4]) then
       if ~ARG[5] = ~IF~ISACTIVEHIGH[2]~THEN'1'~ELSE'0'~FI then
         ~SYM[3] <= ~ARG[7];
-      els~IF ~ISALWAYSENABLED[6] ~THENif ~ARG[6] then~ELSEe~FI
+      els~IF ~ISACTIVEENABLE[6] ~THENif ~ARG[6] then~ELSEe~FI
         ~SYM[3] <= ~SYM[2];
       end if;
     end if;
@@ -64,7 +64,7 @@ begin
   begin
     if ~ARG[5] = ~IF~ISACTIVEHIGH[2]~THEN'1'~ELSE'0'~FI then
       ~SYM[1] <= ~ARG[8];
-    elsif ~IF ~ISALWAYSENABLED[6] ~THEN ~ARG[6] and ~ELSE ~FI ~IF~ACTIVEEDGE[Rising][2]~THENrising_edge~ELSEfalling_edge~FI(~ARG[4]) then
+    elsif ~IF ~ISACTIVEENABLE[6] ~THEN ~ARG[6] and ~ELSE ~FI ~IF~ACTIVEEDGE[Rising][2]~THENrising_edge~ELSEfalling_edge~FI(~ARG[4]) then
       ~SYM[1] <= ~ARG[10];
     end if;
   end process;
@@ -73,7 +73,7 @@ begin
   begin
     if ~ARG[5] = ~IF~ISACTIVEHIGH[2]~THEN'1'~ELSE'0'~FI then
       ~SYM[2] <= ~ARG[9];
-    elsif ~IF ~ISALWAYSENABLED[6] ~THEN ~ARG[6] and ~ELSE ~FI ~IF~ACTIVEEDGE[Rising][2]~THENfalling_edge~ELSErising_edge~FI(~ARG[4]) then
+    elsif ~IF ~ISACTIVEENABLE[6] ~THEN ~ARG[6] and ~ELSE ~FI ~IF~ACTIVEEDGE[Rising][2]~THENfalling_edge~ELSErising_edge~FI(~ARG[4]) then
       ~SYM[2] <= ~ARG[10];
     end if;
   end process;
@@ -82,7 +82,7 @@ begin
   begin
     if ~ARG[5] = ~IF~ISACTIVEHIGH[2]~THEN'1'~ELSE'0'~FI then
       ~SYM[3] <= ~ARG[7];
-    elsif ~IF ~ISALWAYSENABLED[6] ~THEN ~ARG[6] and ~ELSE ~FI ~IF~ACTIVEEDGE[Rising][2]~THENrising_edge~ELSEfalling_edge~FI(~ARG[4]) then
+    elsif ~IF ~ISACTIVEENABLE[6] ~THEN ~ARG[6] and ~ELSE ~FI ~IF~ACTIVEEDGE[Rising][2]~THENrising_edge~ELSEfalling_edge~FI(~ARG[4]) then
       ~SYM[3] <= ~SYM[2];
     end if;
   end process;
@@ -121,7 +121,7 @@ begin
     if ~IF~ACTIVEEDGE[Rising][2]~THENrising_edge~ELSEfalling_edge~FI(~ARG[4]) then
       if ~ARG[5] = ~IF~ISACTIVEHIGH[2]~THEN'1'~ELSE'0'~FI then
         ~SYM[1] <= ~ARG[7];
-      els~IF ~ISALWAYSENABLED[6] ~THENif ~ARG[6] then~ELSEe~FI
+      els~IF ~ISACTIVEENABLE[6] ~THENif ~ARG[6] then~ELSEe~FI
         ~SYM[1] <= ~ARG[8];
       end if;
     end if;
@@ -132,7 +132,7 @@ begin
     if ~IF~ACTIVEEDGE[Rising][2]~THENrising_edge~ELSEfalling_edge~FI(~ARG[4]) then
       if ~ARG[5] = ~IF~ISACTIVEHIGH[2]~THEN'1'~ELSE'0'~FI then
         ~SYM[2] <= ~ARG[7];
-      els~IF ~ISALWAYSENABLED[6] ~THENif ~ARG[6] then~ELSEe~FI
+      els~IF ~ISACTIVEENABLE[6] ~THENif ~ARG[6] then~ELSEe~FI
         ~SYM[2] <= ~ARG[9];
       end if;
     end if;
@@ -158,7 +158,7 @@ begin
     end if;
   end process;
  ~FI
-  ~RESULT <= ~IF~ACTIVEEDGE[Rising][2]~THEN~SYM[1]~ELSE~SYM[2]~FI when (~ARG[4] = '1' ~IF ~ISALWAYSENABLED[6] ~THEN and ~ARG[6] ~ELSE ~FI) else ~IF~ACTIVEEDGE[Rising][2]~THEN~SYM[2]~ELSE~SYM[1]~FI;
+  ~RESULT <= ~IF~ACTIVEEDGE[Rising][2]~THEN~SYM[1]~ELSE~SYM[2]~FI when (~ARG[4] = '1' ~IF ~ISACTIVEENABLE[6] ~THEN and ~ARG[6] ~ELSE ~FI) else ~IF~ACTIVEEDGE[Rising][2]~THEN~SYM[2]~ELSE~SYM[1]~FI;
 end block;
 -- ddrOut end"
     }

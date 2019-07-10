@@ -23,7 +23,7 @@ reg ~TYPO ~GENSYM[RAM][1] [0:~LIT[5]-1];
 initial begin
   $readmemb(~FILE[~LIT[6]],~SYM[1]);
 end
-~IF ~ISALWAYSENABLED[4] ~THEN
+~IF ~ISACTIVEENABLE[4] ~THEN
 always @(~IF~ACTIVEEDGE[Rising][0]~THENposedge~ELSEnegedge~FI ~ARG[3]) begin : ~GENSYM[~COMPNAME_blockRamFile][3]~IF ~VIVADO ~THEN
   if (~ARG[4]) begin
     if (~ARG[8]) begin

@@ -36,7 +36,7 @@ begin
   ~SYM[6] : process(~ARG[3])
   begin
     if ~IF~ACTIVEEDGE[Rising][0]~THENrising_edge~ELSEfalling_edge~FI(~ARG[3]) then
-      if ~ARG[7] ~IF ~ISALWAYSENABLED[4] ~THEN and ~ARG[4] ~ELSE ~FI then
+      if ~ARG[7] ~IF ~ISACTIVEENABLE[4] ~THEN and ~ARG[4] ~ELSE ~FI then
         ~SYM[2](~SYM[5]) <= ~TOBV[~ARG[9]][~TYP[9]];
       end if;
       ~RESULT <= fromSLV(~SYM[2](~SYM[4]))
@@ -49,7 +49,7 @@ begin
   ~SYM[6] : process(~ARG[3])
   begin
     if ~IF~ACTIVEEDGE[Rising][0]~THENrising_edge~ELSEfalling_edge~FI(~ARG[3]) then
-      if ~ARG[7] ~IF ~ISALWAYSENABLED[4] ~THEN and ~ARG[4] ~ELSE ~FI then
+      if ~ARG[7] ~IF ~ISACTIVEENABLE[4] ~THEN and ~ARG[4] ~ELSE ~FI then
         ~SYM[2](~SYM[5]) <= ~ARG[9];
       end if;
       ~RESULT <= ~SYM[2](~SYM[4])
@@ -103,7 +103,7 @@ begin
   ~SYM[6] : process(~ARG[3])
   begin
     if ~IF~ACTIVEEDGE[Rising][0]~THENrising_edge~ELSEfalling_edge~FI(~ARG[3]) then
-      if ~ARG[8] ~IF ~ISALWAYSENABLED[4] ~THEN and ~ARG[4] ~ELSE ~FI then
+      if ~ARG[8] ~IF ~ISACTIVEENABLE[4] ~THEN and ~ARG[4] ~ELSE ~FI then
         ~SYM[2](~SYM[5]) <= ~TOBV[~ARG[10]][~TYP[10]];
       end if;
       ~RESULT <= fromSLV(~SYM[2](~SYM[4]))
@@ -116,7 +116,7 @@ begin
   ~SYM[6] : process(~ARG[3])
   begin
     if ~IF~ACTIVEEDGE[Rising][0]~THENrising_edge~ELSEfalling_edge~FI(~ARG[3]) then
-      if ~ARG[8] ~IF ~ISALWAYSENABLED[4] ~THEN and ~ARG[4] ~ELSE ~FI then
+      if ~ARG[8] ~IF ~ISACTIVEENABLE[4] ~THEN and ~ARG[4] ~ELSE ~FI then
         ~SYM[2](~SYM[5]) <= ~ARG[10];
       end if;
       ~RESULT <= ~SYM[2](~SYM[4])

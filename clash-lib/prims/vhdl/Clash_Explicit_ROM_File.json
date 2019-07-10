@@ -35,7 +35,7 @@ begin
                 mod ~LIT[4]
   -- pragma translate_on
                 ;
-  ~IF ~ISALWAYSENABLED[3] ~THEN
+  ~IF ~ISACTIVEENABLE[3] ~THEN
   ~GENSYM[romFileSync][7] : process (~ARG[2])
   begin
     if (~IF~ACTIVEEDGE[Rising][1]~THENrising_edge~ELSEfalling_edge~FI(~ARG[2])) then

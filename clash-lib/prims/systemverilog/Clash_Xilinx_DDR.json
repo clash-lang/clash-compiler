@@ -31,7 +31,7 @@ for (~SYM[8]=0; ~SYM[8] < ~SIZE[~TYP[7]]; ~SYM[8]=~SYM[8]+1) begin : ~GENSYM[ddr
     .Q1(~SYM[1][~SYM[8]]),
     .Q2(~SYM[2][~SYM[8]]),
     .C(~ARG[4]),
-    .CE(~IF ~ISALWAYSENABLED[6] ~THEN ~ARG[6] ~ELSE 1'b1 ~FI),
+    .CE(~IF ~ISACTIVEENABLE[6] ~THEN ~ARG[6] ~ELSE 1'b1 ~FI),
     .D(~SYM[3][~SYM[8]]),
     .R(~ARG[5]),
     .S(1'b0)
@@ -76,7 +76,7 @@ for (~SYM[8]=0; ~SYM[8] < ~SIZE[~TYP[7]]; ~SYM[8]=~SYM[8]+1) begin : ~GENSYM[ddr
   ) ~GENSYM[~COMPNAME_ODDR][9] (
     .Q(~SYM[3][~SYM[8]]),
     .C(~ARG[3]),
-    .CE(~IF ~ISALWAYSENABLED[5] ~THEN ~ARG[5] ~ELSE 1'b1 ~FI),
+    .CE(~IF ~ISACTIVEENABLE[5] ~THEN ~ARG[5] ~ELSE 1'b1 ~FI),
     .D1(~SYM[1][~SYM[8]]),
     .D2(~SYM[2][~SYM[8]]),
     .R(~ARG[4]),
