@@ -158,6 +158,7 @@ Library
                       Clash.Prelude.ROM
                       Clash.Prelude.ROM.File
                       Clash.Prelude.Safe
+                      Clash.Prelude.Synchronizer
                       Clash.Prelude.Testbench
 
                       Clash.Promoted.Nat
