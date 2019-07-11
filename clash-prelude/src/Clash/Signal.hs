@@ -141,6 +141,7 @@ module Clash.Signal
   , unsafeToLowPolarity
   , unsafeFromHighPolarity
   , unsafeFromLowPolarity
+  , convertReset
   , E.resetSynchronizer
   , holdReset
     -- ** Enabling
@@ -1755,3 +1756,15 @@ fromListWithReset
   -> Signal dom a
 fromListWithReset = hideReset E.fromListWithReset
 {-# INLINE fromListWithReset #-}
+
+-- | Convert between different types of reset, adding a synchronizer in case
+-- it needs to convert from an asynchronous to a synchronous reset.
+convertReset
+  :: forall domA domB
+   . ( HiddenClock domA
+     , HiddenClock domB
+     )
+  => Reset domA
+  -> Reset domB
+convertReset =
+  E.convertReset hasClock hasClock

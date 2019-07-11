@@ -209,6 +209,7 @@ module Clash.Explicit.Signal
   , unsafeToLowPolarity
   , unsafeFromHighPolarity
   , unsafeFromLowPolarity
+  , convertReset
   , resetSynchronizer
   , holdReset
     -- * Basic circuit functions
@@ -257,18 +258,18 @@ module Clash.Explicit.Signal
   )
 where
 
-import Data.Maybe                     (isJust, fromJust)
-import GHC.TypeLits                   (type (+), type (<=))
+import           Data.Maybe                     (isJust, fromJust)
+import           GHC.TypeLits                   (type (+), type (<=))
 
-import Clash.Annotations.Primitive    (hasBlackBox)
-import Clash.Class.Num                (satSucc, SaturationMode(SatBound))
-import Clash.Promoted.Nat             (SNat(..), snatToNum)
-import Clash.Signal.Bundle            (Bundle (..))
-import Clash.Signal.Internal
-import Clash.Signal.Internal.Ambiguous
+import           Clash.Annotations.Primitive    (hasBlackBox)
+import           Clash.Class.Num                (satSucc, SaturationMode(SatBound))
+import           Clash.Promoted.Nat             (SNat(..), snatToNum)
+import           Clash.Signal.Bundle            (Bundle (..))
+import           Clash.Signal.Internal
+import           Clash.Signal.Internal.Ambiguous
   (knownVDomain, clockPeriod, activeEdge, resetKind, initBehavior, resetPolarity)
-import Clash.Sized.Index              (Index)
-import Clash.XException               (Undefined, deepErrorX)
+import           Clash.Sized.Index              (Index)
+import           Clash.XException               (Undefined, deepErrorX)
 
 {- $setup
 >>> :set -XDataKinds -XTypeApplications -XFlexibleInstances -XMultiParamTypeClasses -XTypeFamilies
@@ -883,3 +884,27 @@ fromListWithReset rst resetValue vals =
   go (r :- rs) _ | r = resetValue :- go rs vals
   go (_ :- rs) [] = deepErrorX "fromListWithReset: input ran out" :- go rs []
   go (_ :- rs) (a : as) = a :- go rs as
+
+-- | Convert between different types of reset, adding a synchronizer in case
+-- it needs to convert from an asynchronous to a synchronous reset.
+convertReset
+  :: forall domA domB
+   . ( KnownDomain domA
+     , KnownDomain domB
+     )
+  => Clock domA
+  -> Clock domB
+  -> Reset domA
+  -> Reset domB
+convertReset clkA clkB (unsafeToHighPolarity -> rstA0) =
+  unsafeFromHighPolarity rstA2
+ where
+  rstA1 = unsafeSynchronizer clkA clkB rstA0
+  rstA2 =
+    case (resetKind @domA, resetKind @domB) of
+      (SSynchronous,  SSynchronous)  -> rstA1
+      (SAsynchronous, SAsynchronous) -> rstA1
+      (SSynchronous,  SAsynchronous) -> rstA1
+      (SAsynchronous, SSynchronous) ->
+        delay clkB enableGen True $
+          delay clkB enableGen True rstA1
