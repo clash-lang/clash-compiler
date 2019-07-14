@@ -86,7 +86,7 @@ executable clashi
   default-language:   Haskell2010
 
 library
-  HS-Source-Dirs:     src-ghc
+  HS-Source-Dirs:     src-ghc, src-bin-common
   -- when we move to `cabal-version: 2.2`, we can use elif instead of these nested ifs, but ghc-8.2 comes with cabal-2.0
   if impl(ghc >= 8.6.0)
     HS-Source-Dirs:   src-bin-861
@@ -176,6 +176,7 @@ library
                       Clash.GHCi.UI.Tags
 
                       Clash.GHC.ClashFlags
+                      Clash.GHCi.Common
                       Clash.GHC.GHC2Core
                       Clash.GHC.LoadInterfaceFiles
                       Clash.GHC.Util

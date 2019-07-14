@@ -125,8 +125,8 @@ runClashTest =
         ]
 #ifdef COSIM
       , clashTestGroup "CoSim"
-        [ runTest ("tests" </> "shouldwork" </> "CoSim") [Verilog] ["-i../../../clash-cosim/src/prims/verilog"] "Multiply" (["","Multiply_testBench"],"Multiply_testBench",True)
-        , runTest ("tests" </> "shouldwork" </> "CoSim") [Verilog] ["-i../../../clash-cosim/src/prims/verilog"] "Register" (["","Register_testBench"],"Register_testBench",True)
+        [ runTest ("tests" </> "shouldwork" </> "CoSim") [Verilog] [] "Multiply" (["","Multiply_testBench"],"Multiply_testBench",True)
+        , runTest ("tests" </> "shouldwork" </> "CoSim") [Verilog] [] "Register" (["","Register_testBench"],"Register_testBench",True)
         ]
 #endif
       , clashTestGroup "CustomReprs"

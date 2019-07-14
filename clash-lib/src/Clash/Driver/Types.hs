@@ -87,6 +87,7 @@ data ClashOpts = ClashOpts { opt_inlineLimit :: Int
                            --
                            -- * /Just (Just x)/: replace undefined's by /x/ in
                            -- the HDL
+                           , opt_checkIDir   :: Bool
                            }
 
 
@@ -117,6 +118,7 @@ defClashOpts tmpDir
   , opt_escapedIds          = True
   , opt_ultra               = False
   , opt_forceUndefined      = Nothing
+  , opt_checkIDir           = True
   }
 
 -- | Information about the generated HDL between (sub)runs of the compiler
