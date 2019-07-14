@@ -144,6 +144,7 @@ import           Clash.Driver.Types (ClashOpts(..))
 import           Clash.GHC.Evaluator
 import           Clash.GHC.GenerateBindings
 import           Clash.GHC.NetlistTypes
+import           Clash.GHCi.Common
 import           Clash.Netlist.BlackBox.Types (HdlSyn)
 import           Clash.Util (clashLibVersion, reportTimeDiff)
 import qualified Data.HashMap.Strict as HM
@@ -1958,6 +1959,8 @@ makeHDL backend optsRef srcs = do
                   opts2 = opts1 { opt_hdlDir = maybe outputDir Just (opt_hdlDir opts1)
                                 , opt_importPaths = idirs}
                   backend' = backend iw syn esc frcUdf
+
+              checkImportDirs opts0 idirs
 
               primDirs <- Clash.Backend.primDirs backend'
 
