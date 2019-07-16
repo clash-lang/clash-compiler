@@ -759,17 +759,17 @@ mkRTree lrCon brCon resTy = go
                                                    ,resTy
                                                    ,(LitTy (NumTy (n-1)))])
 
--- | Determine whether a type is isomorphic to "Clash.Signal.Internal.Signal'"
+-- | Determine whether a type is isomorphic to "Clash.Signal.Internal.Signal"
 --
 -- It is i.e.:
 --
---   * Signal' clk a
---   * (Signal' clk a, Signal' clk b)
---   * Vec n (Signal' clk a)
+--   * Signal clk a
+--   * (Signal clk a, Signal clk b)
+--   * Vec n (Signal clk a)
 --   * data Wrap = W (Signal clk' Int)
 --   * etc.
 --
--- This also include BiSignals, i.e.:
+-- This also includes BiSignals, i.e.:
 --
 --   * BiSignalIn High System Int
 --   * etc.

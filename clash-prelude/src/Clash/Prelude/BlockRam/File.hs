@@ -35,7 +35,7 @@ We can instantiate a BlockRAM using the content of the above file like so:
 
 @
 f :: HiddenClock dom  -> Signal dom (Unsigned 3) -> Signal dom (Unsigned 9)
-f rd = 'Clash.Class.BitPack.unpack' '<$>' exposeClock 'blockRamFile' clk d7 \"memory.bin\" rd (signal Nothing)
+f rd = 'Clash.Class.BitPack.unpack' '<$>' exposeClock 'blockRamFile' clk d7 \"memory.bin\" rd (pure Nothing)
 @
 
 In the example above, we basically treat the BlockRAM as an synchronous ROM.
@@ -52,7 +52,7 @@ number, and a 3-bit signed number:
 
 @
 g :: HiddenClock dom  -> Signal dom (Unsigned 3) -> Signal dom (Unsigned 6,Signed 3)
-g clk rd = 'Clash.Class.BitPack.unpack' '<$>' exposeClock 'blockRamFile' clk d7 \"memory.bin\" rd (signal Nothing)
+g clk rd = 'Clash.Class.BitPack.unpack' '<$>' exposeClock 'blockRamFile' clk d7 \"memory.bin\" rd (pure Nothing)
 @
 
 And then we would see:
