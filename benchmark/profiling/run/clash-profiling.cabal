@@ -13,7 +13,7 @@ executable clash-profile-normalization-run
   main-is:             profile-normalization-run.hs
   default-language:    Haskell2010
   ghc-options:         -O2 -Wall
-  build-depends:       base                 >= 4.8      && < 5,
+  build-depends:       base                 >= 4.10     && < 5,
                        binary               >= 0.8.5    && < 0.11,
                        bytestring           >= 0.10.0.2 && < 0.11,
                        concurrent-supply    >= 0.1.7    && < 0.2,
@@ -37,7 +37,7 @@ executable clash-profile-netlist-run
   main-is:             profile-netlist-run.hs
   default-language:    Haskell2010
   ghc-options:         -O2 -Wall
-  build-depends:       base                 >= 4.8      && < 5,
+  build-depends:       base                 >= 4.10     && < 5,
                        binary               >= 0.8.5    && < 0.11,
                        bytestring           >= 0.10.0.2 && < 0.11,
                        concurrent-supply    >= 0.1.7    && < 0.2,

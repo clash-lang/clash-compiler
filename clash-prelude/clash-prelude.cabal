@@ -60,7 +60,7 @@ Extra-source-files:   README.md
 extra-doc-files:      doc/*.svg
 
 Cabal-version:        >=1.18
-Tested-with:          GHC == 8.2.2, GHC == 8.4.4, GHC == 8.6.4
+Tested-with:          GHC == 8.2.2, GHC == 8.4.4, GHC == 8.6.5, GHC == 8.8.1
 
 source-repository head
   type: git
@@ -251,7 +251,7 @@ Library
                       ViewPatterns
 
   Build-depends:      array                     >= 0.5.1.0 && < 0.6,
-                      base                      >= 4.8.0.0 && < 5,
+                      base                      >= 4.10    && < 5,
                       bifunctors                >= 5.4.0   && < 6.0,
                       binary                    >= 0.8.5   && < 0.11,
                       bytestring                >= 0.10.8  && < 0.11,
@@ -261,7 +261,7 @@ Library
                       data-default-class        >= 0.1.2   && < 0.2,
                       integer-gmp               >= 0.5.1.0 && < 1.1,
                       deepseq                   >= 1.4.1.0 && < 1.5,
-                      ghc-prim                  >= 0.3.1.0 && < 0.6,
+                      ghc-prim                  >= 0.5.1.0 && < 0.6,
                       ghc-typelits-extra        >= 0.3.1   && < 0.4,
                       ghc-typelits-knownnat     >= 0.6     && < 0.8,
                       ghc-typelits-natnormalise >= 0.6     && < 0.8,

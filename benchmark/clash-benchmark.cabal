@@ -14,7 +14,7 @@ library
   default-language:    Haskell2010
   ghc-options:         -O2 -Wall
   Exposed-Modules:     BenchmarkCommon
-  build-depends:       base                 >= 4.8      && < 5,
+  build-depends:       base                 >= 4.10     && < 5,
                        concurrent-supply    >= 0.1.7    && < 0.2,
                        containers           >= 0.5.4.0  && < 0.7,
                        ghc                  >= 8.2.0    && < 8.9,

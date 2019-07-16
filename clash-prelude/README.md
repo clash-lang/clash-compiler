@@ -4,12 +4,6 @@
 [![Hackage](https://img.shields.io/hackage/v/clash-prelude.svg)](https://hackage.haskell.org/package/clash-prelude)
 [![Hackage Dependencies](https://img.shields.io/hackage-deps/v/clash-prelude.svg?style=flat)](http://packdeps.haskellers.com/feed?needle=exact%3Aclash-prelude)
 
-__WARNING__
-Only works with GHC-8.2+
-([GHC 8.2](https://www.haskell.org/ghc/download_ghc_8_2_2),
- [GHC 8.4](https://www.haskell.org/ghc/download_ghc_8_4_4),
- [GHC 8.6](https://www.haskell.org/ghc/download_ghc_8_6_4))!
-
 Clash is a functional hardware description language that borrows both
 its syntax and semantics from the functional programming language
 Haskell. The Clash compiler transforms these high-level descriptions to
