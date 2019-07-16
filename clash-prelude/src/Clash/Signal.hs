@@ -1799,6 +1799,8 @@ dup1 _      = error "empty list"
 -- * QuickCheck combinators
 
 -- |  @testFor n s@ tests the signal /s/ for /n/ cycles.
+--
+-- __NB__: This function is not synthesizable
 testFor
   :: KnownDomain dom
   => Int

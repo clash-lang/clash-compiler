@@ -1214,6 +1214,8 @@ instance CoArbitrary a => CoArbitrary (Signal dom a) where
 -- @
 --
 -- @testFor n s@ tests the signal @s@ for @n@ cycles.
+--
+-- __NB__: This function is not synthesizable
 testFor :: Foldable f => Int -> f Bool -> Property
 testFor n = property . and . take n . sample
 
