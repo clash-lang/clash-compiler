@@ -295,15 +295,15 @@ type family DomainConfigurationPeriod (config :: DomainConfiguration) :: Nat whe
 -- | Helper type family for 'DomainActiveEdge'
 type family DomainConfigurationActiveEdge (config :: DomainConfiguration) :: ActiveEdge where
   DomainConfigurationActiveEdge ('DomainConfiguration name period edge reset init polarity) = edge
-  
+
 -- | Helper type family for 'DomainResetKind'
 type family DomainConfigurationResetKind (config :: DomainConfiguration) :: ResetKind where
   DomainConfigurationResetKind ('DomainConfiguration name period edge reset init polarity) = reset
-  
+
 -- | Helper type family for 'DomainInitBehavior'
 type family DomainConfigurationInitBehavior (config :: DomainConfiguration) :: InitBehavior where
   DomainConfigurationInitBehavior ('DomainConfiguration name period edge reset init polarity) = init
-  
+
 -- | Helper type family for 'DomainResetPolarity'
 type family DomainConfigurationResetPolarity (config :: DomainConfiguration) :: ResetPolarity where
   DomainConfigurationResetPolarity ('DomainConfiguration name period edge reset init polarity) = polarity
@@ -691,7 +691,7 @@ appSignal# (f :- fs) xs@(~(a :- as)) = f a :- (xs `seq` appSignal# fs as) -- See
 {- NOTE: Lazy ap
 Signal's ap, i.e (Applicative.<*>), must be lazy in it's second argument:
 
-> appSignal :: Signal' clk (a -> b) -> Signal' clk a -> Signal' clk b
+> appSignal :: Signal clk (a -> b) -> Signal clk a -> Signal clk b
 > appSignal (f :- fs) ~(a :- as) = f a :- appSignal fs as
 
 because some feedback loops, such as the loop described in 'system' in the
@@ -701,7 +701,7 @@ will lead to "Exception <<loop>>".
 However, this "naive" lazy version is _too_ lazy and induces spaceleaks.
 The current version:
 
-> appSignal# :: Signal' clk (a -> b) -> Signal' clk a -> Signal' clk b
+> appSignal# :: Signal clk (a -> b) -> Signal clk a -> Signal clk b
 > appSignal# (f :- fs) xs@(~(a :- as)) = f a :- (xs `seq` appSignal# fs as)
 
 Is lazy enough to handle the earlier mentioned feedback loops, but doesn't leak
