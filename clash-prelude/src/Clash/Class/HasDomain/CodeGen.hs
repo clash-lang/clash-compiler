@@ -12,6 +12,7 @@ module Clash.Class.HasDomain.CodeGen
   ) where
 
 import           Language.Haskell.TH.Syntax
+import           Clash.CPP                    (maxTupleSize)
 
 mkTup :: [Type] -> Type
 mkTup names@(length -> n) =
@@ -38,7 +39,7 @@ mkTryDomainTupleInstance tryDomainName mergeName n =
 
 mkTryDomainTuples :: Name -> Name -> Q [Dec]
 mkTryDomainTuples tryDomainName mergeName =
-  pure (map (mkTryDomainTupleInstance tryDomainName mergeName) [3..62])
+  pure (map (mkTryDomainTupleInstance tryDomainName mergeName) [3..maxTupleSize])
 
 
 -- | Creates an instance of the form:
@@ -63,4 +64,4 @@ mkHasDomainTupleInstance hasDomainName mergeName n =
 
 mkHasDomainTuples :: Name -> Name -> Q [Dec]
 mkHasDomainTuples hasDomainName mergeName =
-  pure (map (mkHasDomainTupleInstance hasDomainName mergeName) [3..62])
+  pure (map (mkHasDomainTupleInstance hasDomainName mergeName) [3..maxTupleSize])
