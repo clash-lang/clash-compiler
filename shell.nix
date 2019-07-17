@@ -5,7 +5,10 @@ with nixpkgs;
 mkShell {
   name = "clash-compiler-shell";
   buildInputs = [
-    # For dependency management
+    # For nix dependency management
     niv
+
+    # For quick clash experimentation
+    pkgs.haskellPackages.clash-ghc
   ];
 }
