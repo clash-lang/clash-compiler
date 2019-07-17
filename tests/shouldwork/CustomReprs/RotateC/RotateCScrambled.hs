@@ -102,7 +102,7 @@ testBench = done'
 
     done  = expectedOutput (topEntity testInput)
     done' =
-      withClockResetEnable0
+      withClockResetEnable
         (tbSystemClockGen (not <$> done'))
         systemResetGen
         enableGen

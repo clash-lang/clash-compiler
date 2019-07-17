@@ -45,10 +45,7 @@ topEntity
   -> Signal DomB (Unsigned 16)
   -> Signal DomA (Unsigned 16)
 topEntity clkA rstA enA clkB rstB enB a b =
-  exposeClockResetEnable
-    (exposeClockResetEnable (topEntityI @DomA @DomB) clkA rstA enA)
-    clkB rstB enB
-    a b
+  withSpecificClockResetEnable clkA rstA enA $ withSpecificClockResetEnable clkB rstB enB (topEntityI a) b
 {-# NOINLINE topEntity #-}
 
 testBench :: Signal DomA Bool
