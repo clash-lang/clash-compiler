@@ -22,6 +22,7 @@ import           Control.Monad                    (guard, when, unless, foldM)
 import           Control.Monad.Catch              (MonadMask)
 import           Control.Monad.IO.Class           (MonadIO)
 import           Control.Monad.State              (evalState, get)
+import           Control.Monad.State.Strict       (State)
 import           Data.Hashable                    (hash)
 import           Data.HashMap.Strict              (HashMap)
 import qualified Data.HashMap.Strict              as HashMap
@@ -76,7 +77,7 @@ import           Clash.Netlist.Util               (genComponentName, genTopCompo
 import           Clash.Netlist.BlackBox.Parser    (runParse)
 import           Clash.Netlist.BlackBox.Types     (BlackBoxTemplate, BlackBoxFunction)
 import           Clash.Netlist.Types
-  (BlackBox (..), Component (..), Identifier, FilteredHWType)
+  (BlackBox (..), Component (..), Identifier, FilteredHWType, HWMap)
 import           Clash.Normalize                  (checkNonRecursive, cleanupGraph,
                                                    normalize, runNormalization)
 import           Clash.Normalize.Util             (callGraph)
@@ -108,7 +109,8 @@ generateHDL
   -- ^ TyCon cache
   -> IntMap TyConName
   -- ^ Tuple TyCon cache
-  -> (CustomReprs -> TyConMap -> Type -> Maybe (Either String FilteredHWType))
+  -> (CustomReprs -> TyConMap -> Type ->
+      State HWMap (Maybe (Either String FilteredHWType)))
   -- ^ Hardcoded 'Type' -> 'HWType' translator
   -> PrimEvaluator
   -- ^ Hardcoded evaluator (delta-reduction)
@@ -615,7 +617,8 @@ normalizeEntity
   -- ^ TyCon cache
   -> IntMap TyConName
   -- ^ Tuple TyCon cache
-  -> (CustomReprs -> TyConMap -> Type -> Maybe (Either String FilteredHWType))
+  -> (CustomReprs -> TyConMap -> Type ->
+      State HWMap (Maybe (Either String FilteredHWType)))
   -- ^ Hardcoded 'Type' -> 'HWType' translator
   -> PrimEvaluator
   -- ^ Hardcoded evaluator (delta-reduction)

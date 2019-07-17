@@ -22,6 +22,7 @@ import Control.Monad.Fail                    (MonadFail(fail))
 import Control.Monad.Fix                     (MonadFix (..), fix)
 import Control.Monad.Reader                  (MonadReader (..))
 import Control.Monad.State                   (MonadState (..))
+import Control.Monad.State.Strict            (State)
 import Control.Monad.Writer                  (MonadWriter (..))
 import Data.IntMap.Strict                    (IntMap)
 import Data.Monoid                           (Any)
@@ -35,7 +36,7 @@ import Clash.Core.TyCon          (TyConName, TyConMap)
 import Clash.Core.Var            (Id)
 import Clash.Core.VarEnv         (InScopeSet, VarSet)
 import Clash.Driver.Types        (BindingMap, DebugLevel)
-import Clash.Netlist.Types       (FilteredHWType)
+import Clash.Netlist.Types       (FilteredHWType, HWMap)
 import Clash.Util
 
 import Clash.Annotations.BitRepresentation.Internal (CustomReprs)
@@ -69,7 +70,7 @@ data RewriteEnv
   , _typeTranslator :: CustomReprs
                     -> TyConMap
                     -> Type
-                    -> Maybe (Either String FilteredHWType)
+                    -> State HWMap (Maybe (Either String FilteredHWType))
   -- ^ Hardcode Type -> FilteredHWType translator
   , _tcCache        :: TyConMap
   -- ^ TyCon cache

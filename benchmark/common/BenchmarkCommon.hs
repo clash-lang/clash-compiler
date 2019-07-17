@@ -19,12 +19,13 @@ import Clash.GHC.GenerateBindings
 import Clash.GHC.LoadModules (ghcLibDir)
 import Clash.GHC.NetlistTypes
 import Clash.Netlist.BlackBox.Types (HdlSyn(Other))
-import Clash.Netlist.Types          (FilteredHWType)
+import Clash.Netlist.Types          (HWMap, FilteredHWType)
 import Clash.Primitives.Types
 
 import Util (OverridingBool(..))
 
 import qualified Control.Concurrent.Supply as Supply
+import Control.Monad.State.Strict   (State)
 import Data.IntMap.Strict           (IntMap)
 
 defaultTests :: [FilePath]
@@ -35,7 +36,8 @@ defaultTests =
   , "benchmark/tests/PipelinesViaFolds.hs"
   ]
 
-typeTrans :: (CustomReprs -> TyConMap -> Type -> Maybe (Either String FilteredHWType))
+typeTrans :: (CustomReprs -> TyConMap -> Type ->
+              State HWMap (Maybe (Either String FilteredHWType)))
 typeTrans = ghcTypeToHWType WORD_SIZE_IN_BITS True
 
 opts :: FilePath -> [FilePath] -> ClashOpts

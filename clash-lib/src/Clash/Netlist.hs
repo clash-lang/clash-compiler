@@ -22,7 +22,7 @@ import           Control.Lens                     ((.=),(^.),_2)
 import qualified Control.Lens                     as Lens
 import           Control.Monad                    (join)
 import           Control.Monad.IO.Class           (liftIO)
-import           Control.Monad.State.Strict       (runStateT)
+import           Control.Monad.State.Strict       (State, runStateT)
 import           Data.Binary.IEEE754              (floatToWord, doubleToWord)
 import           Data.Char                        (ord)
 import           Data.Either                      (partitionEithers)
@@ -89,7 +89,8 @@ genNetlist
   -- ^ Primitive definitions
   -> TyConMap
   -- ^ TyCon cache
-  -> (CustomReprs -> TyConMap -> Type -> Maybe (Either String FilteredHWType))
+  -> (CustomReprs -> TyConMap -> Type ->
+      State HWMap (Maybe (Either String FilteredHWType)))
   -- ^ Hardcoded Type -> HWType translator
   -> Int
   -- ^ Int/Word/Integer bit-width
@@ -137,7 +138,8 @@ runNetlistMonad
   -- ^ Primitive Definitions
   -> TyConMap
   -- ^ TyCon cache
-  -> (CustomReprs -> TyConMap -> Type -> Maybe (Either String FilteredHWType))
+  -> (CustomReprs -> TyConMap -> Type ->
+      State HWMap (Maybe (Either String FilteredHWType)))
   -- ^ Hardcode Type -> HWType translator
   -> Int
   -- ^ Int/Word/Integer bit-width
@@ -164,6 +166,7 @@ runNetlistMonad isTb opts reprs s tops p tcm typeTrans iw mkId extId ite seenIds
       NetlistState
         s 0 emptyVarEnv p typeTrans tcm (StrictText.empty,noSrcSpan) iw mkId
         extId HashMapS.empty seenIds' Set.empty names tops env 0 prefixM reprs opts isTb ite
+        HashMapS.empty
 
     (seenIds',names) = genNames mkId prefixM seenIds_ emptyVarEnv s
 
