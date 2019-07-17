@@ -21,7 +21,7 @@
 module Clash.Backend.VHDL (VHDLState) where
 
 import           Control.Applicative                  (liftA2)
-import           Control.Lens                         hiding (Indexed)
+import           Control.Lens                         hiding (Indexed, Empty)
 import           Control.Monad                        (forM,join,zipWithM)
 import           Control.Monad.State                  (State, StateT)
 import           Data.Bits                            (testBit, Bits)
@@ -1350,7 +1350,7 @@ inst_ (CondAssignment id_ _sig scrut scrutTy es) = fmap Just $
 inst_ (InstDecl entOrComp libM nm lbl gens pms) = do
     maybe (return ()) (\lib -> Mon (libraries %= (T.fromStrict lib:))) libM
     fmap Just $
-      nest 2 $ pretty lbl <+> colon <+> entOrComp'
+      nest 2 $ pretty lbl <+> colon <> entOrComp'
                 <+> maybe emptyDoc ((<> ".") . pretty) libM <> pretty nm <> line <> gms <> pms' <> semi
   where
     gms | [] <- gens = emptyDoc
@@ -1362,7 +1362,7 @@ inst_ (InstDecl entOrComp libM nm lbl gens pms) = do
       nest 2 $ "port map" <> line <> tupled (pure p)
     formalLength (Identifier i _) = fromIntegral (TextS.length i)
     formalLength _                = 0
-    entOrComp' = case entOrComp of { Entity ->"entity"; _ -> "component" }
+    entOrComp' = case entOrComp of { Entity -> " entity"; Comp -> " component"; Empty -> ""}
 
 inst_ (BlackBoxD _ libs imps inc bs bbCtx) =
   fmap Just (Mon (column (renderBlackBox libs imps inc bs bbCtx)))

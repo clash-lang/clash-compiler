@@ -243,7 +243,7 @@ data Declaration
       (Either Identifier HWType) -- FIELD Pointer to type of signal or type of signal
   deriving Show
 
-data EntityOrComponent = Entity | Comp
+data EntityOrComponent = Entity | Comp | Empty
   deriving Show
 
 data WireOrReg = Wire | Reg
