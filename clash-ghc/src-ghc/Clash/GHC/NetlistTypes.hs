@@ -118,8 +118,6 @@ ghcTypeToHWType iw floatSupport = go
         "GHC.Types.Double" | floatSupport -> returnN (BitVector 64)
         "GHC.Prim.~#"                   -> returnN (Void Nothing)
 
-        "GHC.Prim.Any" -> returnN (Void Nothing)
-
         "Clash.Signal.Internal.Signal" ->
           ExceptT $ MaybeT $ Just <$> coreTypeToHWType go reprs m (args !! 1)
 
