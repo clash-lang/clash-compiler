@@ -24,6 +24,9 @@ import           Control.Exception       (throw)
 import           Control.Lens            ((.=),(%=))
 import qualified Control.Lens            as Lens
 import           Control.Monad           (unless, when, zipWithM, join)
+import           Control.Monad.State.Strict
+  (State, evalState, get, modify, runState)
+import           Control.Monad.Trans.Except (ExceptT (..), runExceptT, throwE)
 import           Data.Either             (partitionEithers)
 import           Data.HashMap.Strict     (HashMap)
 import qualified Data.HashMap.Strict     as HashMap
@@ -128,13 +131,14 @@ unsafeCoreTypeToHWType'
   :: SrcSpan
   -- ^ Approximate location in original source file
   -> String
-  -> (CustomReprs -> TyConMap -> Type -> Maybe (Either String FilteredHWType))
+  -> (CustomReprs -> TyConMap -> Type ->
+      State HWMap (Maybe (Either String FilteredHWType)))
   -> CustomReprs
   -> TyConMap
   -> Type
-  -> HWType
+  -> State HWMap HWType
 unsafeCoreTypeToHWType' sp loc builtInTranslation reprs m ty =
-  stripFiltered (unsafeCoreTypeToHWType sp loc builtInTranslation reprs m ty)
+  stripFiltered <$> (unsafeCoreTypeToHWType sp loc builtInTranslation reprs m ty)
 
 -- | Converts a Core type to a HWType given a function that translates certain
 -- builtin types. Errors if the Core type is not translatable.
@@ -142,13 +146,14 @@ unsafeCoreTypeToHWType
   :: SrcSpan
   -- ^ Approximate location in original source file
   -> String
-  -> (CustomReprs -> TyConMap -> Type -> Maybe (Either String FilteredHWType))
+  -> (CustomReprs -> TyConMap -> Type ->
+      State HWMap (Maybe (Either String FilteredHWType)))
   -> CustomReprs
   -> TyConMap
   -> Type
-  -> FilteredHWType
+  -> State HWMap FilteredHWType
 unsafeCoreTypeToHWType sp loc builtInTranslation reprs m ty =
-  either (\msg -> throw (ClashException sp (loc ++ msg) Nothing)) id $
+  either (\msg -> throw (ClashException sp (loc ++ msg) Nothing)) id <$>
   coreTypeToHWType builtInTranslation reprs m ty
 
 -- | Same as @unsafeCoreTypeToHWTypeM@, but discards void filter information
@@ -164,14 +169,15 @@ unsafeCoreTypeToHWTypeM
   :: String
   -> Type
   -> NetlistMonad FilteredHWType
-unsafeCoreTypeToHWTypeM loc ty =
-  unsafeCoreTypeToHWType
-    <$> (snd <$> Lens.use curCompNm)
-    <*> pure loc
-    <*> Lens.use typeTranslator
-    <*> Lens.use customReprs
-    <*> Lens.use tcCache
-    <*> pure ty
+unsafeCoreTypeToHWTypeM loc ty = do
+  (_,cmpNm) <- Lens.use curCompNm
+  tt        <- Lens.use typeTranslator
+  reprs     <- Lens.use customReprs
+  tcm       <- Lens.use tcCache
+  htm0      <- Lens.use htyCache
+  let (hty,htm1) = runState (unsafeCoreTypeToHWType cmpNm loc tt reprs tcm ty) htm0
+  htyCache Lens..= htm1
+  return hty
 
 -- | Same as @coreTypeToHWTypeM@, but discards void filter information
 coreTypeToHWTypeM'
@@ -187,11 +193,14 @@ coreTypeToHWTypeM
   :: Type
   -- ^ Type to convert to HWType
   -> NetlistMonad (Maybe FilteredHWType)
-coreTypeToHWTypeM ty =
-  hush <$> (coreTypeToHWType <$> Lens.use typeTranslator
-                             <*> Lens.use customReprs
-                             <*> Lens.use tcCache
-                             <*> pure ty)
+coreTypeToHWTypeM ty = do
+  tt    <- Lens.use typeTranslator
+  reprs <- Lens.use customReprs
+  tcm   <- Lens.use tcCache
+  htm0  <- Lens.use htyCache
+  let (hty,htm1) = runState (coreTypeToHWType tt reprs tcm ty) htm0
+  htyCache Lens..= htm1
+  return (hush hty)
 
 packSP
   :: CustomReprs
@@ -273,42 +282,55 @@ fixCustomRepr _ _ typ = typ
 
 -- | Same as @coreTypeToHWType@, but discards void filter information
 coreTypeToHWType'
-  :: (CustomReprs -> TyConMap -> Type -> Maybe (Either String FilteredHWType))
+  :: (CustomReprs -> TyConMap -> Type ->
+      State HWMap (Maybe (Either String FilteredHWType)))
   -> CustomReprs
   -> TyConMap
   -> Type
   -- ^ Type to convert to HWType
-  -> Either String HWType
+  -> State HWMap (Either String HWType)
 coreTypeToHWType' builtInTranslation reprs m ty =
-  stripFiltered <$> coreTypeToHWType builtInTranslation reprs m ty
+  fmap stripFiltered <$> coreTypeToHWType builtInTranslation reprs m ty
 
 
 -- | Converts a Core type to a HWType given a function that translates certain
 -- builtin types. Returns a string containing the error message when the Core
 -- type is not translatable.
 coreTypeToHWType
-  :: (CustomReprs -> TyConMap -> Type -> Maybe (Either String FilteredHWType))
+  :: (CustomReprs -> TyConMap -> Type ->
+      State HWMap (Maybe (Either String FilteredHWType)))
   -> CustomReprs
   -> TyConMap
   -> Type
   -- ^ Type to convert to HWType
-  -> Either String FilteredHWType
-coreTypeToHWType builtInTranslation reprs m ty = go' ty
-  where
-    -- Try builtin translation; for now this is hardcoded to be the one in ghcTypeToHWType
-    go' :: Type -> Either String FilteredHWType
-    go' (builtInTranslation reprs m -> Just hwtyE) =
-      (\(FilteredHWType hwty filtered) ->
-        (FilteredHWType (fixCustomRepr reprs ty hwty) filtered)) <$> hwtyE
-    -- Strip transparant types:
-    go' (coreView1 m -> Just ty') =
-      coreTypeToHWType builtInTranslation reprs m ty'
-    -- Try to create hwtype based on AST:
-    go' (tyView -> TyConApp tc args) = do
-      FilteredHWType hwty filtered <- mkADT builtInTranslation reprs m (showPpr ty) tc args
-      return (FilteredHWType (fixCustomRepr reprs ty hwty) filtered)
-    -- All methods failed:
-    go' _ = Left $ "Can't translate non-tycon type: " ++ showPpr ty
+  -> State HWMap (Either String FilteredHWType)
+coreTypeToHWType builtInTranslation reprs m ty = do
+  htyM <- HashMap.lookup ty <$> get
+  case htyM of
+    Just hty -> return hty
+    _ -> do
+      hty0M <- builtInTranslation reprs m ty
+      hty1  <- go hty0M ty
+      modify (HashMap.insert ty hty1)
+      return hty1
+ where
+  -- Try builtin translation; for now this is hardcoded to be the one in ghcTypeToHWType
+  go :: Maybe (Either String FilteredHWType)
+     -> Type
+     -> State (HashMap Type (Either String FilteredHWType))
+              (Either String FilteredHWType)
+  go (Just hwtyE) _ = pure $
+    (\(FilteredHWType hwty filtered) ->
+      (FilteredHWType (fixCustomRepr reprs ty hwty) filtered)) <$> hwtyE
+  -- Strip transparant types:
+  go _ (coreView1 m -> Just ty') =
+    coreTypeToHWType builtInTranslation reprs m ty'
+  -- Try to create hwtype based on AST:
+  go _ (tyView -> TyConApp tc args) = runExceptT $ do
+    FilteredHWType hwty filtered <- mkADT builtInTranslation reprs m (showPpr ty) tc args
+    return (FilteredHWType (fixCustomRepr reprs ty hwty) filtered)
+  -- All methods failed:
+  go _ _ = return $ Left $ "Can't translate non-tycon type: " ++ showPpr ty
 
 -- | Generates original indices in list before filtering, given a list of
 -- removed indices.
@@ -325,7 +347,8 @@ originalIndices wereVoids =
 
 -- | Converts an algebraic Core type (split into a TyCon and its argument) to a HWType.
 mkADT
-  :: (CustomReprs -> TyConMap -> Type -> Maybe (Either String FilteredHWType))
+  :: (CustomReprs -> TyConMap -> Type ->
+      State HWMap (Maybe (Either String FilteredHWType)))
   -- ^ Hardcoded Type -> HWType translator
   -> CustomReprs
   -> TyConMap
@@ -336,19 +359,19 @@ mkADT
   -- ^ The TyCon
   -> [Type]
   -- ^ Its applied arguments
-  -> Either String FilteredHWType
+  -> ExceptT String (State HWMap) FilteredHWType
   -- ^ An error string or a tuple with the type and possibly a list of
   -- removed arguments.
 mkADT _ _ m tyString tc _
   | isRecursiveTy m tc
-  = Left $ $(curLoc) ++ "Can't translate recursive type: " ++ tyString
+  = throwE $ $(curLoc) ++ "Can't translate recursive type: " ++ tyString
 
 mkADT builtInTranslation reprs m _tyString tc args = case tyConDataCons (m `lookupUniqMap'` tc) of
   []  -> return (FilteredHWType (Void Nothing) [])
   dcs -> do
     let tcName           = nameOcc tc
         substArgTyss     = map (`substArgTys` args) dcs
-    argHTyss0           <- mapM (mapM (coreTypeToHWType builtInTranslation reprs m)) substArgTyss
+    argHTyss0           <- mapM (mapM (ExceptT . coreTypeToHWType builtInTranslation reprs m)) substArgTyss
     let argHTyss1        = map (\tys -> zip (map isFilteredVoid tys) tys) argHTyss0
     let areVoids         = map (map fst) argHTyss1
     let filteredArgHTyss = map (map snd . filter (not . fst)) argHTyss1
@@ -429,7 +452,8 @@ isRecursiveTy m tc = case tyConDataCons (m `lookupUniqMap'` tc) of
 -- | Determines if a Core type is translatable to a HWType given a function that
 -- translates certain builtin types.
 representableType
-  :: (CustomReprs -> TyConMap -> Type -> Maybe (Either String FilteredHWType))
+  :: (CustomReprs -> TyConMap -> Type ->
+      State HWMap (Maybe (Either String FilteredHWType)))
   -> CustomReprs
   -> Bool
   -- ^ String considered representable
@@ -437,7 +461,9 @@ representableType
   -> Type
   -> Bool
 representableType builtInTranslation reprs stringRepresentable m =
-    either (const False) isRepresentable . coreTypeToHWType' builtInTranslation reprs m
+    either (const False) isRepresentable .
+    flip evalState HashMap.empty .
+    coreTypeToHWType' builtInTranslation reprs m
   where
     isRepresentable hty = case hty of
       String            -> stringRepresentable
@@ -675,15 +701,11 @@ mkUniqueArguments subst0 (Just teM) args = do
                                (map fst subst))
   where
     go pM var = do
-      tcm       <- Lens.use tcCache
-      typeTrans <- Lens.use typeTranslator
-      reprs     <- Lens.use customReprs
-      (_,sp)    <- Lens.use curCompNm
       let i     = varName var
           i'    = nameOcc i
           ty    = varType var
-          fHwty = unsafeCoreTypeToHWType sp $(curLoc) typeTrans reprs tcm ty
-          FilteredHWType hwty _ = fHwty
+      fHwty <- unsafeCoreTypeToHWTypeM $(curLoc) ty
+      let FilteredHWType hwty _ = fHwty
       (ports,decls,_,pN) <- mkInput (filterVoidPorts fHwty <$> pM) (i',hwty)
       let pId  = mkLocalId ty (repName pN i)
       if isVoid hwty
@@ -709,15 +731,12 @@ mkUniqueResult subst0 Nothing res = do
     _         -> return Nothing
 
 mkUniqueResult subst0 (Just teM) res = do
-  tcm       <- Lens.use tcCache
-  typeTrans <- Lens.use typeTranslator
-  reprs     <- Lens.use customReprs
   (_,sp)    <- Lens.use curCompNm
   let o     = varName res
       o'    = nameOcc o
       ty    = varType res
-      fHwty = unsafeCoreTypeToHWType sp $(curLoc) typeTrans reprs tcm ty
-      FilteredHWType hwty _ = fHwty
+  fHwty <- unsafeCoreTypeToHWTypeM $(curLoc) ty
+  let FilteredHWType hwty _ = fHwty
       oPortSupply = fmap t_output teM
   when (containsBiSignalIn hwty)
     (throw (ClashException sp ($(curLoc) ++ "BiSignalIn cannot be part of a function's result. Use 'readFromBiSignal'.") Nothing))
@@ -758,13 +777,9 @@ idToOutPort var = do
 
 idToPort :: Id -> NetlistMonad (Maybe (Identifier,HWType))
 idToPort var = do
-  tcm <- Lens.use tcCache
-  typeTrans <- Lens.use typeTranslator
-  (_,sp) <- Lens.use curCompNm
-  reprs <- Lens.use customReprs
   let i  = varName var
       ty = varType var
-      hwTy = unsafeCoreTypeToHWType' sp $(curLoc) typeTrans reprs tcm ty
+  hwTy <- unsafeCoreTypeToHWTypeM' $(curLoc) ty
   if isVoid hwTy
     then return Nothing
     else return (Just (nameOcc i, hwTy))

@@ -17,8 +17,10 @@ where
 import Data.Coerce                      (coerce)
 import Data.Functor.Identity            (Identity (..))
 import Data.Text                        (pack)
+import Control.Monad.State.Strict       (State)
 import Control.Monad.Trans.Except
-  (ExceptT (..), mapExceptT, runExceptT, throwE)
+  (Except, ExceptT (..), mapExceptT, runExceptT, throwE)
+import Control.Monad.Trans.Maybe        (MaybeT (..))
 import Language.Haskell.TH.Syntax       (showName)
 
 import Clash.Core.DataCon               (DataCon (..))
@@ -30,7 +32,7 @@ import Clash.Core.Type
 import Clash.Core.Util                  (tyNatSize, substArgTys)
 import Clash.Netlist.Util               (coreTypeToHWType, stripFiltered)
 import Clash.Netlist.Types
-  (HWType(..), FilteredHWType(..), PortDirection (..))
+  (HWType(..), HWMap, FilteredHWType(..), PortDirection (..))
 import Clash.Signal.Internal
   (ResetPolarity(..), ActiveEdge(..), ResetKind(..)
   ,InitBehavior(..))
@@ -52,16 +54,18 @@ ghcTypeToHWType
   -- ^ Type constructor map
   -> Type
   -- ^ Type to convert to HWType
-  -> Maybe (Either String FilteredHWType)
+  -> State HWMap (Maybe (Either String FilteredHWType))
 ghcTypeToHWType iw floatSupport = go
   where
+    -- returnN :: HWType ->
     returnN t = return (FilteredHWType t [])
 
-    go reprs m (AnnType attrs typ) = runExceptT $ do
-      FilteredHWType typ' areVoids <- ExceptT $ return $ coreTypeToHWType go reprs m typ
+    go :: CustomReprs -> TyConMap -> Type -> State HWMap (Maybe (Either String FilteredHWType))
+    go reprs m (AnnType attrs typ) = fmap Just . runExceptT $ do
+      FilteredHWType typ' areVoids <- ExceptT $ coreTypeToHWType go reprs m typ
       return (FilteredHWType (Annotated attrs typ') areVoids)
 
-    go reprs m ty@(tyView -> TyConApp tc args) = runExceptT $
+    go reprs m ty@(tyView -> TyConApp tc args) = runMaybeT . runExceptT $
       case nameOcc tc of
         "GHC.Int.Int8"                  -> returnN (Signed 8)
         "GHC.Int.Int16"                 -> returnN (Signed 16)
@@ -117,25 +121,25 @@ ghcTypeToHWType iw floatSupport = go
         "GHC.Prim.Any" -> returnN (Void Nothing)
 
         "Clash.Signal.Internal.Signal" ->
-          ExceptT $ return $ coreTypeToHWType go reprs m (args !! 1)
+          ExceptT $ MaybeT $ Just <$> coreTypeToHWType go reprs m (args !! 1)
 
         "Clash.Signal.BiSignal.BiSignalIn" -> do
           let [_, _, szTy] = args
           let fType ty1 = FilteredHWType ty1 []
           (fType . BiDirectional In . BitVector . fromInteger) <$>
-            mapExceptT (Just .coerce) (tyNatSize m szTy)
+            liftE (tyNatSize m szTy)
 
         "Clash.Signal.BiSignal.BiSignalOut" -> do
           let [_, _, szTy] = args
           let fType ty1 = FilteredHWType ty1 []
           (fType . Void . Just . BiDirectional Out . BitVector . fromInteger) <$>
-            mapExceptT (Just .coerce) (tyNatSize m szTy)
+            liftE (tyNatSize m szTy)
 
         -- XXX: this is a hack to get a KnownDomain from a KnownConfiguration
         "GHC.Classes.(%,%)"
           | [arg0@(tyView -> TyConApp kdNm _), _] <- args
           , nameOcc kdNm == "Clash.Signal.Internal.KnownDomain"
-          -> ExceptT (go reprs m arg0)
+          -> ExceptT (MaybeT (go reprs m arg0))
 
         "Clash.Signal.Internal.KnownDomain"
           -> case tyConDataCons (m `lookupUniqMap'` tc) of
@@ -150,9 +154,9 @@ ghcTypeToHWType iw floatSupport = go
                      polarity1 <- domResetPolarity m polarity0
                      let kd = KnownDomain (pack tag1) period1 edge1 rstKind1 init1 polarity1
                      returnN (Void (Just kd))
-                   _ -> ExceptT Nothing
-                 _ -> ExceptT Nothing
-               _ -> ExceptT Nothing
+                   _ -> ExceptT (MaybeT (pure Nothing))
+                 _ -> ExceptT (MaybeT (pure Nothing))
+               _ -> ExceptT (MaybeT (pure Nothing))
 
         "Clash.Signal.Internal.Clock"
           | [tag0] <- args
@@ -169,33 +173,33 @@ ghcTypeToHWType iw floatSupport = go
         "Clash.Sized.Internal.BitVector.Bit" -> returnN Bit
 
         "Clash.Sized.Internal.BitVector.BitVector" -> do
-          n <- mapExceptT (Just . coerce) (tyNatSize m (head args))
+          n <- liftE (tyNatSize m (head args))
           case n of
             0 -> returnN (Void (Just (BitVector (fromInteger n))))
             _ -> returnN (BitVector (fromInteger n))
 
         "Clash.Sized.Internal.Index.Index" -> do
-          n <- mapExceptT (Just . coerce) (tyNatSize m (head args))
+          n <- liftE (tyNatSize m (head args))
           if n < 2
              then returnN (Void (Just (Index (fromInteger n))))
              else returnN (Index (fromInteger n))
 
         "Clash.Sized.Internal.Signed.Signed" -> do
-          n <- mapExceptT (Just . coerce) (tyNatSize m (head args))
+          n <- liftE (tyNatSize m (head args))
           if n == 0
              then returnN (Void (Just (Signed (fromInteger n))))
              else returnN (Signed (fromInteger n))
 
         "Clash.Sized.Internal.Unsigned.Unsigned" -> do
-          n <- mapExceptT (Just .coerce) (tyNatSize m (head args))
+          n <- liftE (tyNatSize m (head args))
           if n == 0
              then returnN (Void (Just (Unsigned (fromInteger n))))
              else returnN (Unsigned (fromInteger n))
 
         "Clash.Sized.Vector.Vec" -> do
           let [szTy,elTy] = args
-          sz0     <- mapExceptT (Just . coerce) (tyNatSize m szTy)
-          fElHWTy <- ExceptT $ return $ coreTypeToHWType go reprs m elTy
+          sz0     <- liftE (tyNatSize m szTy)
+          fElHWTy <- ExceptT $ MaybeT $ Just <$> coreTypeToHWType go reprs m elTy
 
           -- Treat Vec as a product type with a single constructor and N
           -- constructor fields.
@@ -214,8 +218,8 @@ ghcTypeToHWType iw floatSupport = go
 
         "Clash.Sized.RTree.RTree" -> do
           let [szTy,elTy] = args
-          sz0     <- mapExceptT (Just . coerce) (tyNatSize m szTy)
-          fElHWTy <- ExceptT $ return $ coreTypeToHWType go reprs m elTy
+          sz0     <- liftE (tyNatSize m szTy)
+          fElHWTy <- ExceptT $ MaybeT $ Just <$> coreTypeToHWType go reprs m elTy
 
           -- Treat RTree as a product type with a single constructor and 2^N
           -- constructor fields.
@@ -236,20 +240,27 @@ ghcTypeToHWType iw floatSupport = go
           (TyConApp (nameOcc -> "GHC.Types.Char") []) -> returnN String
           _ -> throwE $ "Can't translate type: " ++ showPpr ty
 
-        _ -> ExceptT Nothing
+        _ -> ExceptT (MaybeT (pure Nothing))
 
-    go _ _ _ = Nothing
+    go _ _ _ = pure Nothing
 
-domTag :: Type -> ExceptT String Maybe String
+liftE
+  :: Applicative m
+  => Except e a
+  -> ExceptT e (MaybeT m) a
+liftE = mapExceptT (MaybeT . pure . Just . coerce)
+
+domTag :: Monad m => Type -> ExceptT String (MaybeT m) String
 domTag (LitTy (SymTy tag)) = pure tag
 domTag ty = throwE $ "Can't translate domain tag" ++ showPpr ty
 
-domPeriod :: Type -> ExceptT String Maybe Integer
+domPeriod :: Monad m => Type -> ExceptT String (MaybeT m) Integer
 domPeriod (LitTy (NumTy period)) = pure period
 domPeriod ty = throwE $ "Can't translate domain period" ++ showPpr ty
 
 fromType
-  :: String
+  :: Monad m
+  => String
   -- ^ Name of type (for error reporting)
   -> [(String, a)]
   -- ^ [(Fully qualified constructor name, constructor value)
@@ -257,7 +268,7 @@ fromType
   -- ^ Constructor map (used to look through newtypes)
   -> Type
   -- ^ Type representing some constructor
-  -> ExceptT String Maybe a
+  -> ExceptT String (MaybeT m) a
 fromType tyNm constrs m ty =
   case tyView (coreView m ty) of
     TyConApp tcNm [] ->
@@ -274,9 +285,10 @@ fromType tyNm constrs m ty =
     throwE $ "Can't translate " ++ tyNm ++ showPpr ty
 
 domEdge
-  :: TyConMap
+  :: Monad m
+  => TyConMap
   -> Type
-  -> ExceptT String Maybe ActiveEdge
+  -> ExceptT String (MaybeT m) ActiveEdge
 domEdge =
   fromType
     (showName ''ActiveEdge)
@@ -284,9 +296,10 @@ domEdge =
     , (showName 'Falling, Falling) ]
 
 domResetKind
-  :: TyConMap
+  :: Monad m
+  => TyConMap
   -> Type
-  -> ExceptT String Maybe ResetKind
+  -> ExceptT String (MaybeT m) ResetKind
 domResetKind =
   fromType
     (showName ''ResetKind)
@@ -294,9 +307,10 @@ domResetKind =
     , (showName 'Asynchronous, Asynchronous) ]
 
 domInitBehavior
-  :: TyConMap
+  :: Monad m
+  => TyConMap
   -> Type
-  -> ExceptT String Maybe InitBehavior
+  -> ExceptT String (MaybeT m) InitBehavior
 domInitBehavior =
   fromType
     (showName ''InitBehavior)
@@ -304,9 +318,10 @@ domInitBehavior =
     , (showName 'Unknown, Unknown) ]
 
 domResetPolarity
-  :: TyConMap
+  :: Monad m
+  => TyConMap
   -> Type
-  -> ExceptT String Maybe ResetPolarity
+  -> ExceptT String (MaybeT m) ResetPolarity
 domResetPolarity =
   fromType
     (showName ''ResetPolarity)

@@ -18,6 +18,7 @@ library
                        concurrent-supply    >= 0.1.7    && < 0.2,
                        containers           >= 0.5.4.0  && < 0.6,
                        ghc                  >= 8.2.0    && < 8.8,
+                       mtl                  >= 2.1.2    && < 2.3,
                        unordered-containers >= 0.2.3.3  && < 0.3,
 
                        clash-ghc,

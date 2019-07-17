@@ -66,12 +66,14 @@ import           Control.Lens                (_2)
 import qualified Control.Lens                as Lens
 import qualified Control.Monad               as Monad
 import           Control.Monad.State         (StateT (..), modify)
+import           Control.Monad.State.Strict  (evalState)
 import           Control.Monad.Writer        (censor, lift, listen)
 import           Control.Monad.Trans.Except  (runExcept)
 import           Data.Bits                   ((.&.), complement)
 import           Data.Coerce                 (coerce)
 import qualified Data.Either                 as Either
 import qualified Data.HashMap.Lazy           as HashMap
+import qualified Data.HashMap.Strict         as HashMapS
 import qualified Data.List                   as List
 import qualified Data.Maybe                  as Maybe
 import qualified Data.Monoid                 as Monoid
@@ -511,7 +513,7 @@ caseCon ctx@(TransformContext is0 _) e@(Case subj ty alts)
             _ -> do
               let subjTy = termType tcm subj
               tran <- Lens.view typeTranslator
-              case coreTypeToHWType tran reprs tcm subjTy of
+              case (`evalState` HashMapS.empty) (coreTypeToHWType tran reprs tcm subjTy) of
                 Right (FilteredHWType (Void (Just hty)) _areVoids)
                   | hty `elem` [BitVector 0, Unsigned 0, Signed 0, Index 1]
                   -> caseCon ctx' (Case (Literal (IntegerLiteral 0)) ty alts)
@@ -528,7 +530,7 @@ caseCon ctx e@(Case subj ty alts) = do
   tcm <- Lens.view tcCache
   let subjTy = termType tcm subj
   tran <- Lens.view typeTranslator
-  case coreTypeToHWType tran reprs tcm subjTy of
+  case (`evalState` HashMapS.empty) (coreTypeToHWType tran reprs tcm subjTy) of
     Right (FilteredHWType (Void (Just hty)) _areVoids)
       | hty `elem` [BitVector 0, Unsigned 0, Signed 0, Index 1]
       -> caseCon ctx (Case (Literal (IntegerLiteral 0)) ty alts)

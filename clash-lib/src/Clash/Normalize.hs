@@ -22,6 +22,7 @@ import Data.Either
 import           Control.Concurrent.Supply        (Supply)
 import           Control.Lens                     ((.=),(^.),_1,_4)
 import qualified Control.Lens                     as Lens
+import           Control.Monad.State.Strict       (State)
 import           Data.Either                      (partitionEithers)
 import qualified Data.IntMap                      as IntMap
 import           Data.IntMap.Strict               (IntMap)
@@ -57,7 +58,8 @@ import           Clash.Core.VarEnv
    mkVarEnv, mkVarSet, notElemVarEnv, notElemVarSet, nullVarEnv, unionVarEnv)
 import           Clash.Driver.Types
   (BindingMap, ClashOpts (..), DebugLevel (..))
-import           Clash.Netlist.Types              (HWType (..), FilteredHWType(..))
+import           Clash.Netlist.Types
+  (HWType (..), HWMap, FilteredHWType(..))
 import           Clash.Netlist.Util
   (splitNormalized, coreTypeToHWType')
 import           Clash.Normalize.Strategy
@@ -84,7 +86,8 @@ runNormalization
   -- ^ UniqueSupply
   -> BindingMap
   -- ^ Global Binders
-  -> (CustomReprs -> TyConMap -> Type -> Maybe (Either String FilteredHWType))
+  -> (CustomReprs -> TyConMap -> Type ->
+      State HWMap (Maybe (Either String FilteredHWType)))
   -- ^ Hardcoded Type -> HWType translator
   -> CustomReprs
   -> TyConMap

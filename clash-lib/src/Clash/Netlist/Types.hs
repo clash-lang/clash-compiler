@@ -33,8 +33,9 @@ where
 
 import Control.DeepSeq
 import Control.Monad.Fail                   (MonadFail)
-import Control.Monad.State                  (State)
-import Control.Monad.State.Strict           (MonadIO, MonadState, StateT)
+import Control.Monad.State                  as Lazy (State)
+import Control.Monad.State.Strict           as Strict
+  (State,MonadIO, MonadState, StateT)
 import Data.Bits                            (testBit)
 import Data.Binary                          (Binary(..))
 import Data.Hashable                        (Hashable)
@@ -72,6 +73,8 @@ newtype NetlistMonad a =
   NetlistMonad { runNetlist :: StateT NetlistState IO a }
   deriving newtype (Functor, Monad, Applicative, MonadState NetlistState, MonadIO, MonadFail)
 
+type HWMap = HashMap Type (Either String FilteredHWType)
+
 -- | State of the NetlistMonad
 data NetlistState
   = NetlistState
@@ -83,7 +86,8 @@ data NetlistState
   -- ^ Cached components
   , _primitives     :: CompiledPrimMap
   -- ^ Primitive Definitions
-  , _typeTranslator :: CustomReprs -> TyConMap -> Type -> Maybe (Either String FilteredHWType)
+  , _typeTranslator :: CustomReprs -> TyConMap -> Type
+                    -> Strict.State HWMap (Maybe (Either String FilteredHWType))
   -- ^ Hardcoded Type -> HWType translator
   , _tcCache        :: TyConMap
   -- ^ TyCon cache
@@ -111,6 +115,7 @@ data NetlistState
   -- ^ Whether we're compiling a testbench (suppresses some warnings)
   , _backEndITE :: Bool
   -- ^ Whether the backend supports ifThenElse expressions
+  , _htyCache :: HWMap
   }
 
 -- | Signal reference
@@ -365,7 +370,7 @@ data TemplateFunction where
   TemplateFunction
     :: [Int]
     -> (BlackBoxContext -> Bool)
-    -> (forall s . Backend s => BlackBoxContext -> State s Doc)
+    -> (forall s . Backend s => BlackBoxContext -> Lazy.State s Doc)
     -> TemplateFunction
 
 instance Show BlackBox where
