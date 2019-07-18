@@ -197,6 +197,7 @@ Library
                       Clash.Examples
 
   other-modules:      Clash.Class.BitPack.Internal
+                      Clash.CPP
                       Clash.Signal.Bundle.Internal
                       Paths_clash_prelude
 

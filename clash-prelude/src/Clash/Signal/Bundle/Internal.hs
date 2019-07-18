@@ -1,7 +1,9 @@
+{-# LANGUAGE CPP             #-}
 {-# LANGUAGE TemplateHaskell #-}
 
 module Clash.Signal.Bundle.Internal where
 
+import           Clash.CPP             (maxTupleSize)
 import           Clash.Signal.Internal (Signal)
 import           Control.Monad         (replicateM)
 import           Data.List             (foldl')
@@ -22,13 +24,13 @@ deriveBundleTuples bundleTyName unbundledTyName bundleName unbundleName = do
   let bundleTy = ConT bundleTyName
       signal   = ConT ''Signal
 
-  allNames <- replicateM 62 (newName "a")
-  tempNames <- replicateM 62 (newName "b")
+  allNames <- replicateM maxTupleSize (newName "a")
+  tempNames <- replicateM maxTupleSize (newName "b")
   t <- newName "t"
   x <- newName "x"
   tup <- newName "tup"
 
-  pure $ flip map [2..62] $ \tupleNum ->
+  pure $ flip map [2..maxTupleSize] $ \tupleNum ->
     let names = take tupleNum allNames
         temps = take tupleNum tempNames
         vars  = fmap VarT names

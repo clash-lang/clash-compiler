@@ -3,10 +3,12 @@ Copyright  :  (C) 2019, QBayLogic B.V.
 License    :  BSD2 (see the file LICENSE)
 Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
 -}
+{-# LANGUAGE CPP             #-}
 {-# LANGUAGE TemplateHaskell #-}
 
 module Clash.Class.BitPack.Internal (deriveBitPackTuples) where
 
+import           Clash.CPP             (maxTupleSize)
 import           Control.Monad         (replicateM)
 import           Data.List             (foldl')
 import           GHC.TypeLits          (KnownNat)
@@ -29,13 +31,13 @@ deriveBitPackTuples bitPackName bitSizeName packName unpackName = do
       knownNat = ConT ''KnownNat
       plus     = ConT $ mkName "+"
 
-  allNames <- replicateM 62 (newName "a")
+  allNames <- replicateM maxTupleSize (newName "a")
   retupName <- newName "retup"
   x <- newName "x"
   y <- newName "y"
   tup <- newName "tup"
 
-  pure $ flip map [3..62] $ \tupleNum ->
+  pure $ flip map [3..maxTupleSize] $ \tupleNum ->
     let names  = take tupleNum allNames
         (v:vs) = fmap VarT names
         tuple xs = foldl' AppT (TupleT $ length xs) xs
