@@ -46,9 +46,7 @@ sudo add-apt-repository -u ppa:hvr/ghc
 sudo apt install ghc-8.4.4 cabal-install-3.0
 ```
 
-Add `/opt/ghc/bin` [to your PATH](https://askubuntu.com/questions/60218/how-to-add-a-directory-to-the-path). Clone `clash-compiler`:
-
-Finally, run Clash using `cabal`:
+Add `/opt/ghc/bin` [to your PATH](https://askubuntu.com/questions/60218/how-to-add-a-directory-to-the-path). Finally, run Clash using `cabal`:
 
 ```bash
 cabal run --write-ghc-environment-files=always -- clash
