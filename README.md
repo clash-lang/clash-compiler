@@ -29,6 +29,16 @@ Features of Clash:
 For updates and questions join the mailing list clash-language+subscribe@googlegroups.com or read the [forum](https://groups.google.com/d/forum/clash-language)
 
 # Using Clash from source
+Clone Clash from github using `git` and enter the cloned directory:
+
+```bash
+git clone https://github.com/clash-lang/clash-compiler.git
+cd clash-compiler
+```
+
+Use one of the build tools below to get Clash up and running.
+
+## Cabal
 Install Cabal >= 3.0 and GHC >= 8.4. Even though GHC 8.6 is supported, we currently recommend running 8.4 as the former contains some known bugs concerning documentation generation. If you're using Ubuntu, add [HVR's PPA](https://launchpad.net/~hvr/+archive/ubuntu/ghc) and install them using APT:
 
 ```bash
@@ -38,19 +48,24 @@ sudo apt install ghc-8.4.4 cabal-install-3.0
 
 Add `/opt/ghc/bin` [to your PATH](https://askubuntu.com/questions/60218/how-to-add-a-directory-to-the-path). Clone `clash-compiler`:
 
-```bash
-git clone https://github.com/clash-lang/clash-compiler.git
-cd clash-compiler
-```
-
 Finally, run Clash using `cabal`:
 
 ```bash
 cabal run --write-ghc-environment-files=always -- clash
 ```
 
-Alternatively, you can use [Stack](https://docs.haskellstack.org/en/stable/install_and_upgrade/) to build and run Clash too:
+## Stack
+
+You can use [Stack](https://docs.haskellstack.org/en/stable/install_and_upgrade/) to build and run Clash too:
 
 ```bash
 stack run -- clash
+```
+
+## Nix
+
+Or [use Nix](https://nixos.org/nix/download.html) to get a shell with the `clash` and `clashi` binaries on your PATH:
+
+```bash
+nix-shell
 ```
