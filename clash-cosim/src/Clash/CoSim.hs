@@ -56,7 +56,7 @@ compileVerilog explicitSettings source = do
   --
   --   coSimWrapper :: a1 -> a2 -> .. -> CoSimSettings -> aa1 -> aa2 -> r
   --
-  -- where a1, a2, .. are explicitely named arguments and aa1, aa2, .. are
+  -- where a1, a2, .. are explicitly named arguments and aa1, aa2, .. are
   -- anonymous arugments (thus allowing dot-free notation).
   settingsArg   <- newName "settings"
   namedClocks   <- mapM newName clkNames
