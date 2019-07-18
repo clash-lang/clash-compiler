@@ -1,4 +1,28 @@
 {
+    "type-errors": {
+        "branch": "master",
+        "description": "tools for writing better type errors ",
+        "homepage": null,
+        "owner": "isovector",
+        "repo": "type-errors",
+        "rev": "f171628f607d83de18bd96c1d4247674fece6b15",
+        "sha256": "1pkrns559mh1psp2ic4dybk8x91vcx04xpjx7m7msqx7xypfz2il",
+        "type": "tarball",
+        "url_template": "https://github.com/<owner>/<repo>/archive/<rev>.tar.gz",
+        "url": "https://github.com/isovector/type-errors/archive/f171628f607d83de18bd96c1d4247674fece6b15.tar.gz"
+    },
+    "first-class-families": {
+        "branch": "master",
+        "description": "First-class type families",
+        "homepage": null,
+        "owner": "Lysxia",
+        "repo": "first-class-families",
+        "rev": "bb6487804594c6d6cdc383011d81dc425e5a456c",
+        "sha256": "1y1a6fi2307z04bzl5jw38zqrzzhjfb59kp47xj0ibnmqqr7xyka",
+        "type": "tarball",
+        "url_template": "https://github.com/<owner>/<repo>/archive/<rev>.tar.gz",
+        "url": "https://github.com/Lysxia/first-class-families/archive/bb6487804594c6d6cdc383011d81dc425e5a456c.tar.gz"
+    },
     "ghc-typelits-extra": {
         "branch": "master",
         "description": "Extra type-level operations on GHC.TypeLits.Nat and a custom solver",

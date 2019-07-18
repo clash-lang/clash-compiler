@@ -29,6 +29,7 @@ aliases:
       paths:
         - cabal-store
         - ~/.stack
+        - /nix/store
 
   - &build
     run:
@@ -38,6 +39,21 @@ aliases:
         if [ -n "$CIRCLE_PR_NUMBER" ]; then
           .ci/build.sh
         fi
+
+  - &nix_setup
+    run:
+      name: Setup binaries (such as git)
+      command: |
+        nix-env -i git findutils gnugrep coreutils openssh
+
+        # Circle CI needs git/ssh in /usr/bin
+        ln -s $(find /nix -type f -name git | grep libexec | head -n1) /usr/bin
+        ln -s $(find /nix -type f -name ssh | grep openssh | head -n1) /usr/bin
+
+  - &nix_build
+    run:
+      name: Build dependencies and Clash itself with Nix
+      command: nix-build
 
   - &stack_build
     run:
@@ -84,10 +100,22 @@ aliases:
       - checkout
       - *merge_pullrequest
       - *submodules
-      - *setup
       - *cache_restore
       - *stack_build
       - *cache_save
+  - &build_with_nix
+    docker:
+      - image: nixos/nix
+    steps:
+      # I can't get caching to work on Nix due to missing certificates. Doesn't
+      # seem too bad though, thanks to nix binary caching of 99% of Clash's
+      # dependencies. cachix has been suggested to fix this (and! to improve
+      # the user experience for people building Clash with Nix).
+      - *nix_setup
+      - checkout
+      - *merge_pullrequest
+      - *submodules
+      - *nix_build
 
 workflows:
   version: 2
@@ -96,7 +124,8 @@ workflows:
       - ghc-8.2.2
       - ghc-8.4.4
       - ghc-8.6.5
-      - ghc-stack
+      - stack-build
+      - nix-build
 
 jobs:
   ghc-8.2.2:
@@ -114,8 +143,11 @@ jobs:
       <<: *env
       GHC: ghc-8.6.5
     <<: *build_default
-  ghc-stack:
+  stack-build:
     environment:
       <<: *env
-      GHC: ghc-8.6.5
     <<: *build_with_stack
+  nix-build:
+    environment:
+      <<: *env
+    <<: *build_with_nix
