@@ -67,7 +67,7 @@ import qualified Control.Lens                as Lens
 import qualified Control.Monad               as Monad
 import           Control.Monad.State         (StateT (..), modify)
 import           Control.Monad.State.Strict  (evalState)
-import           Control.Monad.Writer        (censor, lift, listen)
+import           Control.Monad.Writer        (lift, listen)
 import           Control.Monad.Trans.Except  (runExcept)
 import           Data.Bits                   ((.&.), complement)
 import           Data.Coerce                 (coerce)

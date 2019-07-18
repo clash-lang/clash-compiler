@@ -80,8 +80,8 @@ import           Clash.Util
 -- | Lift an action working in the '_extra' state to the 'RewriteMonad'
 zoomExtra :: State.State extra a
           -> RewriteMonad extra a
-zoomExtra m = R (\_ s -> case State.runState m (s ^. extra) of
-                           (a,s') -> (a,s {_extra = s'},mempty))
+zoomExtra m = R (\_ s w -> case State.runState m (s ^. extra) of
+                            (a,s') -> (a,s {_extra = s'},w))
 
 -- | Some transformations might erroneously introduce shadowing. For example,
 -- a transformation might result in:

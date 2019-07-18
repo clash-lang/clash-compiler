@@ -17,7 +17,6 @@ module Clash.Rewrite.Types where
 
 import Control.Concurrent.Supply             (Supply, freshId)
 import Control.Lens                          (use, (.=))
-import Control.Monad
 import Control.Monad.Fail                    (MonadFail(fail))
 import Control.Monad.Fix                     (MonadFix (..), fix)
 import Control.Monad.Reader                  (MonadReader (..))
@@ -90,29 +89,47 @@ makeLenses ''RewriteEnv
 -- generate fresh variables and unique identifiers. In addition, it keeps track
 -- if a transformation/rewrite has been successfully applied.
 newtype RewriteMonad extra a = R
-  { runR :: RewriteEnv -> RewriteState extra -> (a,RewriteState extra,Any) }
+  { unR :: RewriteEnv -> RewriteState extra -> Any -> (a,RewriteState extra,Any) }
+
+-- | Run the computation in the RewriteMonad
+runR
+  :: RewriteMonad extra a
+  -> RewriteEnv
+  -> RewriteState extra
+  -> (a, RewriteState extra, Any)
+runR m r s = unR m r s mempty
 
 instance MonadFail (RewriteMonad extra) where
   fail err = error ("RewriteMonad.fail: " ++ err)
 
 instance Functor (RewriteMonad extra) where
-  fmap f m = R (\r s -> case runR m r s of (a,s',w) -> (f a,s',w))
+  fmap f m = R $ \ r s w -> case unR m r s w of (a, s', w') -> (f a, s', w')
+  {-# INLINE fmap #-}
 
 instance Applicative (RewriteMonad extra) where
-  pure  = return
-  (<*>) = ap
+  pure a = R $ \ _ s w -> (a, s, w)
+  {-# INLINE pure #-}
+  R mf <*> R mx = R $ \ r s w -> case mf r s w of
+    (f,s',w') -> case mx r s' w' of
+      (x,s'',w'') -> (f x, s'', w'')
+  {-# INLINE (<*>) #-}
 
 instance Monad (RewriteMonad extra) where
-  return a = R (\_ s -> (a, s, mempty))
-  m >>= k  = R (\r s -> case runR m r s of
-                          (a,s',w) -> case runR (k a) r s' of
-                                        (b,s'',w') -> let w'' = mappend w w'
-                                                      in seq w'' (b,s'',w''))
+  return a = R $ \ _ s w -> (a, s, w)
+  {-# INLINE return #-}
+  m >>= k  =
+    R $ \ r s w -> case unR m r s w of
+      (a,s',w') -> unR (k a) r s' w'
+  {-# INLINE (>>=) #-}
+
 
 instance MonadState (RewriteState extra) (RewriteMonad extra) where
-  get     = R (\_ s -> (s,s,mempty))
-  put s   = R (\_ _ -> ((),s,mempty))
-  state f = R (\_ s -> case f s of (a,s') -> (a,s',mempty))
+  get = R $ \_ s w -> (s,s,w)
+  {-# INLINE get #-}
+  put s = R $ \_ _ w -> ((),s,w)
+  {-# INLINE put #-}
+  state f = R $ \_ s w -> case f s of (a,s') -> (a,s',w)
+  {-# INLINE state #-}
 
 instance MonadUnique (RewriteMonad extra) where
   getUniqueM = do
@@ -122,18 +139,33 @@ instance MonadUnique (RewriteMonad extra) where
     a `seq` return a
 
 instance MonadWriter Any (RewriteMonad extra) where
-  writer (a,w) = R (\_ s -> (a,s,w))
-  tell   w     = R (\_ s -> ((),s,w))
-  listen m     = R (\r s -> case runR m r s of (a,s',w) -> ((a,w),s',w))
-  pass   m     = R (\r s -> case runR m r s of ((a,f),s',w) -> (a, s', f w))
+  writer (a,w') = R $ \_ s w -> let wt = w `mappend` w' in wt `seq` (a,s,wt)
+  {-# INLINE writer #-}
+  tell w' = R $ \_ s w -> let wt = w `mappend` w' in wt `seq` ((),s,wt)
+  {-# INLINE tell #-}
+  listen m = R $ \r s w -> case runR m r s of
+    (a,s',w') -> let wt = w `mappend` w' in wt `seq` ((a,w'),s',wt)
+  {-# INLINE listen #-}
+  pass m = R $ \r s w -> case runR m r s of
+    ((a,f),s',w') -> let wt = w `mappend` f w' in wt `seq` (a, s', wt)
+  {-# INLINE pass #-}
+
+censor :: (Any -> Any) -> RewriteMonad extra a -> RewriteMonad extra a
+censor f m = R $ \r s w -> case runR m r s of
+  (a,s',w') -> let wt = w `mappend` f w' in wt `seq` (a, s', wt)
+{-# INLINE censor #-}
 
 instance MonadReader RewriteEnv (RewriteMonad extra) where
-   ask       = R (\r s -> (r,s,mempty))
-   local f m = R (\r s -> runR m (f r) s)
-   reader f  = R (\r s -> (f r,s,mempty))
+   ask = R $ \r s w -> (r,s,w)
+   {-# INLINE ask #-}
+   local f m = R $ \r s w -> unR m (f r) s w
+   {-# INLINE local #-}
+   reader f = R $ \r s w -> (f r,s,w)
+   {-# INLINE reader #-}
 
 instance MonadFix (RewriteMonad extra) where
-  mfix f = R (\r s -> fix $ \ ~(a,_,_) -> runR (f a) r s)
+  mfix f = R $ \r s w -> fix $ \ ~(a,_,_) -> unR (f a) r s w
+  {-# INLINE mfix #-}
 
 data TransformContext
   = TransformContext
