@@ -53,8 +53,9 @@ type NotFoundError (dom :: Domain) (t :: Type) =
   :$$$: "If that type contains that domain anyway, you might need to provide an"
   :$$$: "additional type instance of HasDomain. Example implementations:"
   :$$$: ""
-  :$$$: " * type instance HasDomain dom  (MyVector n a)     = HasDomain a"
+  :$$$: " * type instance HasDomain dom  (MyVector n a)     = HasDomain dom a"
   :$$$: " * type instance HasDomain dom1 (MyCircuit dom2 a) = DomEq dom1 dom2"
+  :$$$: " * type instance HasDomain dom1 (MyTuple a b)      = Merge dom a b"
   :$$$: ""
   :$$$: Outro
 
