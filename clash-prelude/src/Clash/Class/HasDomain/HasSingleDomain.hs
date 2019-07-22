@@ -149,6 +149,7 @@ type instance TryDomain t (RTree d a)           = TryDomain t a
 type instance TryDomain t (a -> b)              = Merge t a b
 type instance TryDomain t (a, b)                = Merge t a b
 
+type instance TryDomain t ()                    = 'NotFound
 type instance TryDomain t Bool                  = 'NotFound
 type instance TryDomain t Integer               = 'NotFound
 type instance TryDomain t Int                   = 'NotFound
