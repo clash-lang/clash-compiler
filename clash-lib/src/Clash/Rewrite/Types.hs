@@ -12,10 +12,13 @@
 {-# LANGUAGE MultiParamTypeClasses      #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE TemplateHaskell            #-}
+{-# LANGUAGE DeriveAnyClass             #-}
+{-# LANGUAGE DeriveGeneric              #-}
 
 module Clash.Rewrite.Types where
 
 import Control.Concurrent.Supply             (Supply, freshId)
+import Control.DeepSeq                       (NFData)
 import Control.Lens                          (use, (.=))
 import Control.Monad.Fail                    (MonadFail(fail))
 import Control.Monad.Fix                     (MonadFix (..), fix)
@@ -23,8 +26,11 @@ import Control.Monad.Reader                  (MonadReader (..))
 import Control.Monad.State                   (MonadState (..))
 import Control.Monad.State.Strict            (State)
 import Control.Monad.Writer                  (MonadWriter (..))
+import Data.Binary                           (Binary)
+import Data.Hashable                         (Hashable)
 import Data.IntMap.Strict                    (IntMap)
 import Data.Monoid                           (Any)
+import GHC.Generics
 
 import SrcLoc (SrcSpan)
 
@@ -39,6 +45,21 @@ import Clash.Netlist.Types       (FilteredHWType, HWMap)
 import Clash.Util
 
 import Clash.Annotations.BitRepresentation.Internal (CustomReprs)
+
+-- | State used by the inspection mechanism for recording rewrite steps.
+data RewriteStep
+  = RewriteStep
+  { t_ctx    :: Context
+  -- ^ current context
+  , t_name   :: String
+  -- ^ Name of the transformation
+  , t_bndrS  :: String
+  -- ^ Name of the current binder
+  , t_before :: Term
+  -- ^ Term before `apply`
+  , t_after  :: Term
+  -- ^ Term after `apply`
+  } deriving (Show, Generic, NFData, Hashable, Binary)
 
 -- | State of a rewriting session
 data RewriteState extra

@@ -374,6 +374,7 @@ anyM p (x:xs) = do
   else
     anyM p xs
 
+
 -- | Get the package id of the type of a value
 -- >>> pkgIdFromTypeable (undefined :: TopEntity)
 -- "clash-prelude-0.99.3-64904d90747cb49e17166bbc86fec8678918e4ead3847193a395b258e680373c"

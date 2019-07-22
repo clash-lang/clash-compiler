@@ -18,6 +18,7 @@
 module Clash.Core.Pretty
   ( PrettyPrec (..)
   , PrettyOptions (..)
+  , ClashDoc
   , ClashAnnotation (..)
   , SyntaxElement (..)
   , ppr, ppr'
