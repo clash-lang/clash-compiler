@@ -207,11 +207,12 @@ tBitVector16
     )
 
 tIndex
-  = ( cNum        @(Index 50000)
-    , cEq         @(Index 50000)
-    , cOrd        @(Index 50000)
-    , cIntegral   @(Index 50000)
-    -- no Bits, FiniteBits
+  = ( cNum            @(Index 50000)
+    , cEq             @(Index 50000)
+    , cOrd            @(Index 50000)
+    , cIntegral       @(Index 50000)
+    , cBits           @(Index 65536)
+    -- , cFiniteBits     @(Index 50000) -- broken
     , csClashSpecific @(Index 50000)
     , cResize         @(Index 50000)
     )

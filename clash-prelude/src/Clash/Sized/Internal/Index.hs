@@ -36,6 +36,9 @@ module Clash.Sized.Internal.Index
     Index (..)
     -- * Construction
   , fromSNat
+  -- * Accessors
+  -- ** Length information
+  , size#
     -- * Type classes
     -- ** BitPack
   , pack#
@@ -74,6 +77,7 @@ module Clash.Sized.Internal.Index
 where
 
 import Control.DeepSeq            (NFData (..))
+import Data.Bits                  (Bits (..), FiniteBits (..))
 import Data.Data                  (Data)
 import Data.Default.Class         (Default (..))
 import Data.Proxy                 (Proxy (..))
@@ -94,7 +98,9 @@ import Clash.Class.BitPack        (BitPack (..), packXWith)
 import Clash.Class.Num            (ExtendingNum (..), SaturatingNum (..),
                                    SaturationMode (..))
 import Clash.Class.Resize         (Resize (..))
-import {-# SOURCE #-} Clash.Sized.Internal.BitVector (BitVector (BV),undefError)
+import Clash.Prelude.BitIndex     (replaceBit)
+import {-# SOURCE #-} Clash.Sized.Internal.BitVector (BitVector (BV), high, low, undefError)
+import qualified Clash.Sized.Internal.BitVector as BV
 import Clash.Promoted.Nat         (SNat, snatToNum, leToPlusKN)
 import Clash.XException
   (ShowX (..), Undefined (..), errorX, showsPrecXWith, rwhnfX)
@@ -127,6 +133,10 @@ newtype Index (n :: Nat) =
     -- synthesizable.
     I { unsafeToInteger :: Integer }
   deriving (Data, Generic)
+
+{-# NOINLINE size# #-}
+size# :: (KnownNat n, 1 <= n) => Index n -> Int
+size# = BV.size# . pack#
 
 instance NFData (Index n) where
   rnf (I i) = rnf i `seq` ()
@@ -336,6 +346,31 @@ quot#,rem# :: Index n -> Index n -> Index n
 {-# NOINLINE toInteger# #-}
 toInteger# :: Index n -> Integer
 toInteger# (I n) = n
+
+instance (KnownNat n, 1 <= n) => Bits (Index n) where
+  a .&. b           = unpack# $ BV.and# (pack# a) (pack# b)
+  a .|. b           = unpack# $ BV.or# (pack# a) (pack# b)
+  xor a b           = unpack# $ BV.xor# (pack# a) (pack# b)
+  complement        = unpack# . BV.complement# . pack#
+  zeroBits          = unpack# zeroBits
+  bit i             = unpack# $ bit i
+  setBit v i        = unpack# $ replaceBit i high (pack# v)
+  clearBit v i      = unpack# $ replaceBit i low  (pack# v)
+  complementBit v i = unpack# $ complementBit (pack# v) i
+  testBit v i       = testBit (pack# v) i
+  bitSizeMaybe v    = Just (size# v)
+  bitSize           = size#
+  isSigned _        = False
+  shiftL v i        = unpack# $ shiftL (pack# v) i
+  shiftR v i        = unpack# $ shiftR (pack# v) i
+  rotateL v i       = unpack# $ rotateL (pack# v) i
+  rotateR v i       = unpack# $ rotateR (pack# v) i
+  popCount i        = popCount (pack# i)
+
+instance (KnownNat n, 1 <= n) => FiniteBits (Index n) where
+  finiteBitSize        = size#
+  countLeadingZeros  i = countLeadingZeros  (pack# i)
+  countTrailingZeros i = countTrailingZeros (pack# i)
 
 instance Resize Index where
   resize     = resize#
