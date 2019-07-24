@@ -47,6 +47,7 @@ data TyCon
   , tyConKind   :: !Kind        -- ^ Kind of the TyCon
   , tyConArity  :: !Int         -- ^ Number of type arguments
   , algTcRhs    :: !AlgTyConRhs -- ^ DataCon definitions
+  , isClassTc   :: !Bool        -- ^ Is this a class dictionary?
   }
   -- | Function TyCons (e.g. type families)
   | FunTyCon
