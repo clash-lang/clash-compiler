@@ -44,6 +44,7 @@ module Clash.Core.Type
   , isPolyFunCoreTy
   , isPolyTy
   , isFunTy
+  , isClassTy
   , applyFunTy
   , findFunSubst
   , reduceTypeFamily
@@ -560,3 +561,12 @@ normalizeType tcMap = go
     OtherType (ForAllTy tyvar ty')
       -> ForAllTy tyvar (go ty')
     _ -> ty
+
+isClassTy
+  :: TyConMap
+  -> Type
+  -> Bool
+isClassTy tcm (tyView -> TyConApp tcNm _) = case lookupUniqMap tcNm tcm of
+  Just tc -> isClassTc tc
+  Nothing -> False
+isClassTy _ _ = False

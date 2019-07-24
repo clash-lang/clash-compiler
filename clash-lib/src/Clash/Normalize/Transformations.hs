@@ -101,9 +101,9 @@ import           Clash.Core.Term
   (LetBinding, Pat (..), Term (..), CoreContext (..), PrimInfo (..),
    isLambdaBodyCtx, collectArgs)
 import           Clash.Core.Type             (Type, TypeView (..), applyFunTy,
-                                              isPolyFunCoreTy,
+                                              isPolyFunCoreTy, isClassTy,
                                               normalizeType, splitFunForallTy,
-                                              splitFunTy, typeKind,
+                                              splitFunTy,
                                               tyView)
 import           Clash.Core.TyCon            (TyConMap, tyConDataCons)
 import           Clash.Core.Util
@@ -398,8 +398,7 @@ inlineNonRep (TransformContext localScope _) e@(Case scrut altsTy alts)
             changed $ Case (mkApps scrutBody1 args) altsTy alts
           _ -> return e
   where
-    exception tcm ((tyView . typeKind tcm) -> TyConApp (nameOcc -> "GHC.Types.Constraint") _) = True
-    exception _ _ = False
+    exception = isClassTy
 
 inlineNonRep _ e = return e
 

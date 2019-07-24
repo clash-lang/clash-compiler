@@ -86,7 +86,7 @@ import TyCon      (AlgTyConRhs (..), TyCon, tyConName,
                    expandSynTyCon_maybe,
                    tyConArity,
                    tyConDataCons, tyConKind,
-                   tyConName, tyConUnique)
+                   tyConName, tyConUnique, isClassTyCon)
 import Type       (mkTvSubstPrs, substTy, coreView)
 import TyCoRep    (Coercion (..), TyLit (..), Type (..))
 import Unique     (Uniquable (..), Unique, getKey, hasKey)
@@ -164,6 +164,7 @@ makeTyCon fiEnvs tc = tycon
                 , C.tyConKind   = tcKind
                 , C.tyConArity  = tcArity
                 , C.algTcRhs    = tcRhs
+                , C.isClassTc   = isClassTyCon tc
                 }
             Nothing -> return (C.PrimTyCon (C.nameUniq tcName) tcName tcKind tcArity)
 
@@ -197,6 +198,7 @@ makeTyCon fiEnvs tc = tycon
             , C.tyConKind   = tcKind
             , C.tyConArity  = tcArity
             , C.algTcRhs    = tcDc
+            , C.isClassTc   = isClassTyCon tc
             }
 
         mkPrimTyCon = do
