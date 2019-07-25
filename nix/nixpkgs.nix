@@ -1,14 +1,14 @@
 { sources ? import ./sources.nix }:
 
 let
-  overlay = _: pkgs: {
+  overlay = _: nixpkgs: {
 
     # Nix tooling
     niv = (import sources.niv {}).niv;
-    gitignore = import sources.gitignore {};
+    gitignore = import sources.gitignore { inherit (nixpkgs) lib; };
 
     # Haskell overrides
-    haskellPackages = pkgs.haskellPackages.override {
+    haskellPackages = nixpkgs.haskellPackages.override {
       overrides = self: super: {
         # External overrides
         ghc-typelits-extra =
@@ -21,9 +21,9 @@ let
           self.callCabal2nix "first-class-families" sources.first-class-families {};
 
         # Internal overrides
-        clash-lib = import ../clash-lib {};
-        clash-ghc = import ../clash-ghc {};
-        clash-prelude = import ../clash-prelude {};
+        clash-lib = import ../clash-lib { inherit nixpkgs; };
+        clash-ghc = import ../clash-ghc { inherit nixpkgs; };
+        clash-prelude = import ../clash-prelude { inherit nixpkgs; };
       };
     };
   };
