@@ -1,5 +1,7 @@
 {-# LANGUAGE CPP #-}
 
+{-# OPTIONS_GHC -Wno-unused-top-binds #-}
+
 #include "MachDeps.h"
 #define HDLSYN Other
 
@@ -68,8 +70,7 @@ doHDL b src = do
 
     generateHDL (buildCustomReprs reprs) bindingsMap (Just b) primMap2 tcm tupTcm
       (ghcTypeToHWType WORD_SIZE_IN_BITS True) reduceConstant topEntities
-      (ClashOpts 20 20 15 0 DebugNone False True True Auto WORD_SIZE_IN_BITS
-        Nothing tmpDir HDLSYN True True ["."] Nothing True True False Nothing)
+      (defClashOpts tmpDir){opt_cachehdl = False, opt_dbgLevel = DebugSilent}
       (startTime,prepTime)
    ) (do
     removeDirectoryRecursive tmpDir
