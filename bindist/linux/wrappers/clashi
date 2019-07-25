@@ -1,0 +1,2 @@
+#!/bin/sh
+$(dirname $0)/nix-user-chroot -n $(dirname $0)/nix -m $(dirname $0)/bin/:/bin -- /bin/clashi $@
