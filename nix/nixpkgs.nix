@@ -1,14 +1,14 @@
 { sources ? import ./sources.nix }:
 
 let
-  overlay = _: pkgs: {
+  overlay = _: nixpkgs: {
 
     # Nix tooling
     niv = (import sources.niv {}).niv;
-    gitignore = import sources.gitignore {};
+    gitignore = import sources.gitignore { inherit (nixpkgs) lib; };
 
     # Haskell overrides
-    haskellPackages = pkgs.haskellPackages.override {
+    haskellPackages = nixpkgs.haskellPackages.override {
       overrides = self: super: {
         # External overrides
         ghc-typelits-extra =
