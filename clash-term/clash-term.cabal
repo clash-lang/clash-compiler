@@ -1,0 +1,36 @@
+Name:                 clash-term
+Version:              0.99
+Synopsis:             CAES Language for Synchronous Hardware
+Description:          Terminal-based inspection mechanism for optimization phases.
+Homepage:             http://www.clash-lang.org/
+bug-reports:          http://github.com/clash-lang/clash-compiler/issues
+License:              BSD2
+License-file:         LICENSE
+Author:               Orestis Melkonian
+Maintainer:           Orestis Melkonian <melkon.or@gmail.com>
+Copyright:            Copyright © 2019, QBayLogic
+Category:             Terminal
+Build-type:           Simple
+
+Extra-source-files:   README.md
+                      LICENSE_GHC
+                      theme.ini
+
+Cabal-version:        >=1.10
+
+source-repository head
+  type: git
+  location: https://github.com/clash-lang/clash-compiler.git
+
+executable clash-term
+  Main-Is:            Main.hs
+  Build-Depends:      base              >= 4.3.1.0  && < 5,
+                      clash-lib         >= 0.7.1    && < 1.0,
+                      binary            >= 0.8.5    && < 0.11,
+                      prettyprinter     >= 1.2.0.1  && < 2.0,
+                      bytestring        >= 0.10.0.2 && < 0.11,
+                      rewrite-inspector == 0.1.0.9
+
+  GHC-Options:        -Wall -threaded
+  extra-libraries:    pthread
+  default-language:   Haskell2010

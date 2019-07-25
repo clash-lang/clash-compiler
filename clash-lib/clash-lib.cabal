@@ -78,6 +78,12 @@ flag debug
    default: False
    manual: True
 
+flag history
+   description:
+     Emit rewrite history to disk
+   default: False
+   manual: True
+
 Library
   HS-Source-Dirs:     src
 
@@ -214,3 +220,6 @@ Library
 
   if flag(debug)
     cpp-options:      -DDEBUG
+
+  if flag(history)
+    cpp-options:      -DHISTORY

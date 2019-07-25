@@ -8,10 +8,12 @@
   Turn CoreHW terms into normalized CoreHW Terms
 -}
 
+{-# LANGUAGE CPP               #-}
 {-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE TupleSections #-}
+{-# LANGUAGE TupleSections     #-}
 {-# LANGUAGE TemplateHaskell   #-}
 {-# LANGUAGE ViewPatterns      #-}
+{-# LANGUAGE BangPatterns      #-}
 
 {-# OPTIONS_GHC -Wno-unused-imports #-}
 
@@ -23,6 +25,9 @@ import           Control.Concurrent.Supply        (Supply)
 import           Control.Lens                     ((.=),(^.),_1,_4)
 import qualified Control.Lens                     as Lens
 import           Control.Monad.State.Strict       (State)
+import           Data.Binary                      (encode)
+import qualified Data.ByteString                  as BS
+import qualified Data.ByteString.Lazy             as BL
 import           Data.Either                      (partitionEithers)
 import qualified Data.IntMap                      as IntMap
 import           Data.IntMap.Strict               (IntMap)
@@ -34,6 +39,7 @@ import qualified Data.Set                         as Set
 import qualified Data.Set.Lens                    as Lens
 import           Data.Semigroup                   ((<>))
 import           Data.Text.Prettyprint.Doc        (vcat)
+import           System.IO.Unsafe                 (unsafePerformIO)
 
 import           BasicTypes                       (InlineSpec (..))
 import           SrcLoc                           (SrcSpan,noSrcSpan)
@@ -72,7 +78,7 @@ import           Clash.Primitives.Types           (CompiledPrimMap)
 import           Clash.Rewrite.Combinators        ((>->),(!->))
 import           Clash.Rewrite.Types
   (RewriteEnv (..), RewriteState (..), bindings, curFun, dbgLevel, extra,
-   tcCache, topEntities, typeTranslator, customReprs)
+   tcCache, topEntities, typeTranslator, customReprs, RewriteStep (..))
 import           Clash.Rewrite.Util
   (apply, isUntranslatableType, runRewrite, runRewriteSession)
 import           Clash.Signal.Internal            (ResetKind (..))
@@ -311,11 +317,25 @@ flattenCallTree (CBranch (nm,(nm',sp,inl,tm)) used) = do
   let (toInline,il_used) = unzip il_ct
       subst = extendGblSubstList (mkSubst emptyInScopeSet) toInline
   newExpr <- case toInline of
-               [] -> return tm
-               _  -> do -- To have a cheap `appProp` transformation we need to
-                        -- deshadow, see also Note [AppProp no-shadow invariant]
-                        let tm1 = deShadowTerm emptyInScopeSet (substTm "flattenCallTree.flattenExpr" subst tm)
-                        rewriteExpr ("flattenExpr",flatten) (showPpr nm, tm1) (nm', sp)
+    [] -> return tm
+    _  -> do
+      -- To have a cheap `appProp` transformation we need to
+      -- deshadow, see also Note [AppProp no-shadow invariant]
+      let tm1 = deShadowTerm emptyInScopeSet (substTm "flattenCallTree.flattenExpr" subst tm)
+#ifdef HISTORY
+      -- NB: When HISTORY is on, emit binary data holding the recorded rewrite steps
+      let !_ = unsafePerformIO
+             $ BS.appendFile "history.dat"
+             $ BL.toStrict
+             $ encode RewriteStep
+                 { t_ctx    = []
+                 , t_name   = "INLINE"
+                 , t_bndrS  = showPpr (varName nm')
+                 , t_before = tm
+                 , t_after  = tm1
+                 }
+#endif
+      rewriteExpr ("flattenExpr",flatten) (showPpr nm, tm1) (nm', sp)
   let allUsed = newUsed ++ concat il_used
   -- inline all components when the resulting expression after flattening
   -- is still considered "cheap". This happens often at the topEntity which

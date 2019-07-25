@@ -18,6 +18,8 @@
 {-# LANGUAGE TemplateHaskell          #-}
 {-# LANGUAGE ViewPatterns             #-}
 
+{-# OPTIONS_GHC -Wno-unused-imports #-}
+
 module Clash.Rewrite.Util where
 
 import           Control.DeepSeq
@@ -40,6 +42,13 @@ import qualified Data.Set                    as Set
 import qualified Data.Set.Lens               as Lens
 import           Data.Text                   (Text)
 import qualified Data.Text                   as Text
+
+#ifdef HISTORY
+import           Data.Binary                 (encode)
+import qualified Data.ByteString             as BS
+import qualified Data.ByteString.Lazy        as BL
+import           System.IO.Unsafe            (unsafePerformIO)
+#endif
 
 import           BasicTypes                  (InlineSpec (..))
 import           SrcLoc                      (SrcSpan)
@@ -134,6 +143,22 @@ apply = \s rewrite ctx expr0 -> do
   let hasChanged = Monoid.getAny anyChanged
       !expr2     = if hasChanged then expr1 else expr0
   Monad.when hasChanged (transformCounter += 1)
+#ifdef HISTORY
+  -- NB: When HISTORY is on, emit binary data holding the recorded rewrite steps
+  Monad.when hasChanged $ do
+    (curBndr, _) <- Lens.use curFun
+    let !_ = unsafePerformIO
+             $ BS.appendFile "history.dat"
+             $ BL.toStrict
+             $ encode RewriteStep
+                 { t_ctx    = tfContext ctx
+                 , t_name   = s
+                 , t_bndrS  = showPpr (varName curBndr)
+                 , t_before = expr0
+                 , t_after  = expr1
+                 }
+    return ()
+#endif
   if lvl == DebugNone
     then return expr2
     else applyDebug lvl s expr0 hasChanged expr2
@@ -220,7 +245,7 @@ runRewrite
   -> RewriteMonad extra Term
 runRewrite name is rewrite expr = apply name rewrite (TransformContext is []) expr
 
--- | Evaluate a RewriteSession to its inner monad
+-- | Evaluate a RewriteSession to its inner monad.
 runRewriteSession :: RewriteEnv
                   -> RewriteState extra
                   -> RewriteMonad extra a
