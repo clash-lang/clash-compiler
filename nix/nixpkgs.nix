@@ -21,9 +21,9 @@ let
           self.callCabal2nix "first-class-families" sources.first-class-families {};
 
         # Internal overrides
-        clash-lib = import ../clash-lib {};
-        clash-ghc = import ../clash-ghc {};
-        clash-prelude = import ../clash-prelude {};
+        clash-lib = import ../clash-lib { inherit nixpkgs; };
+        clash-ghc = import ../clash-ghc { inherit nixpkgs; };
+        clash-prelude = import ../clash-prelude { inherit nixpkgs; };
       };
     };
   };
