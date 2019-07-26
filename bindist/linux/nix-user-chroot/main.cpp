@@ -46,7 +46,7 @@
 using namespace std;
 
 #define err_exit(format, ...) { fprintf(stderr, format ": %s\n", ##__VA_ARGS__, strerror(errno)); exit(EXIT_FAILURE); }
-static int child_proc(const char *rootdir, const char *nixdir, uint8_t clear_env, list<struct DirMapping> dirMappings, list<struct SetEnv> envMappings, const char *executable, char * const new_argv[]);
+static int child_proc(const char *rootdir, const char *nixdir, const char *pwd, uint8_t clear_env, list<struct DirMapping> dirMappings, list<struct SetEnv> envMappings, const char *executable, char * const new_argv[]);
 
 volatile uint8_t child_died = 0;
 int child_pid = 0;
@@ -57,6 +57,7 @@ static void usage(const char *pname) {
     fprintf(stderr, "\t-m <src>:<src>\tmap src on the host to dest in the sandbox\n");
     fprintf(stderr, "\t-d\tdelete all default dir mappings, may break things\n");
     fprintf(stderr, "\t-p <var>\tpreserve the value of a variable across the -c clear\n");
+    fprintf(stderr, "\t-w <var>\tset the working directory for the chrooted command\n");
     fprintf(stderr, "\t-e\tadd an /escape-hatch to the sandbox, and run (outside the sandbox) any strings written to it\n");
 
     exit(EXIT_FAILURE);
@@ -126,6 +127,7 @@ int main(int argc, char *argv[]) {
   uint8_t clear_env = 0;
   uint8_t enable_escape_hatch = 0;
   char *nixdir = NULL;
+  char *pwd = NULL;
   list<struct DirMapping> dirMappings;
   list<struct SetEnv> envMappings;
   const char *t;
@@ -144,7 +146,7 @@ int main(int argc, char *argv[]) {
 #undef x
 
   int opt;
-  while ((opt = getopt(argc, argv, "cen:m:dp:")) != -1) {
+  while ((opt = getopt(argc, argv, "cew:n:m:dp:")) != -1) {
     switch (opt) {
     case 'c':
       clear_env = 1;
@@ -165,6 +167,11 @@ int main(int argc, char *argv[]) {
     case 'd':
       dirMappings.clear();
       break;
+    case 'w':
+      pwd = realpath(optarg, NULL);
+      if (!pwd) {
+        err_exit("realpath(%s)", optarg)
+      }
     case 'p':
       t = getenv(optarg);
       if (t) {
@@ -177,6 +184,10 @@ int main(int argc, char *argv[]) {
   if (!nixdir) {
     fprintf(stderr, "-n <nixdir> is required\n");
     exit(EXIT_FAILURE);
+  }
+
+  if (!pwd) {
+    pwd = ((char*)std::string( "/" ).c_str());
   }
 
   if (argc <= optind) {
@@ -224,7 +235,7 @@ int main(int argc, char *argv[]) {
     char buf[10];
     read(unrace[0], buf, 10);
     close(unrace[0]);
-    return child_proc(rootdir, nixdir, clear_env, dirMappings, envMappings, argv[optind], argv + optind);
+    return child_proc(rootdir, nixdir, pwd, clear_env, dirMappings, envMappings, argv[optind], argv + optind);
   } else {
     close(unrace[0]);
     char fifopath[PATH_MAX];
@@ -254,7 +265,7 @@ int main(int argc, char *argv[]) {
   }
 }
 
-static int child_proc(const char *rootdir, const char *nixdir, uint8_t clear_env, list<struct DirMapping> dirMappings, list<struct SetEnv> envMappings, const char *executable, char * const new_argv[]) {
+static int child_proc(const char *rootdir, const char *nixdir, const char *pwd, uint8_t clear_env, list<struct DirMapping> dirMappings, list<struct SetEnv> envMappings, const char *executable, char * const new_argv[]) {
   // get uid, gid before going to new namespace
   uid_t uid = getuid();
   gid_t gid = getgid();
@@ -305,18 +316,12 @@ static int child_proc(const char *rootdir, const char *nixdir, uint8_t clear_env
   snprintf(map_buf, sizeof(map_buf), "%d %d 1", gid, gid);
   update_map(map_buf, "/proc/self/gid_map");
 
-  char cCurrentPath[FILENAME_MAX];
-  if (!getcwd(cCurrentPath, sizeof(cCurrentPath)))
-  {
-     err_exit("getcwd(%d)",errno);
-  }
-
   // chroot to rootdir
   if (chroot(rootdir) < 0) {
     err_exit("chroot(%s)", rootdir);
   }
 
-  chdir(cCurrentPath);
+  chdir(pwd);
 
   if (clear_env) clearenv();
   setenv("PATH", ENV_PATH, 1);
