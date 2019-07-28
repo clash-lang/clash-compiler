@@ -1,0 +1,29 @@
+name: clash
+version: '0.9999'
+summary: 'Clash: from Haskell to hardware'
+description: |
+  Clash is a functional hardware description language that borrows both its 
+  syntax and semantics from the functional programming language Haskell. The 
+  Clash compiler transforms these high-level descriptions to low-level 
+  synthesizable VHDL, Verilog, or SystemVerilog.
+confinement: strict
+grade: devel
+base: core18
+
+parts:
+  clash:
+    plugin: dump
+    source: clash-snap-bindist.tar.xz
+
+apps:
+  clash:
+    command: bin/clash
+    plugs: [home]
+
+  clashi:
+    command: bin/clashi
+    plugs: [home]
+
+layout:
+  /usr/nix:
+    bind: $SNAP/usr/nix
