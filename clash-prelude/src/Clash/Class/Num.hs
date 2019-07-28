@@ -46,15 +46,46 @@ class ExtendingNum a b where
 -- * Saturating arithmetic functions
 
 -- | Determine how overflow and underflow are handled by the functions in
--- 'SaturatingNum'
+-- 'SaturatingNum' and the `Index` type.
 data SaturationMode
-  = SatWrap  -- ^ Wrap around on overflow and underflow
-  | SatBound -- ^ Become 'maxBound' on overflow, and 'minBound' on underflow
-  | SatZero  -- ^ Become @0@ on overflow and underflow
+  = SatWrap   -- ^ Wrap around on overflow and underflow. Has additional hardware
+              -- cost for index type. Is free for signed and unsigned types
+  | SatBound  -- ^ Become 'maxBound' on overflow, and 'minBound' on underflow
+              -- Has additional hardware cost for all types.
+  | SatZero   -- ^ Become @0@ on overflow and underflow. Has additional hardware
+              -- cost for all types.
   | SatSymmetric -- ^ Become 'maxBound' on overflow, and (@'minBound' + 1@) on
                  -- underflow for signed numbers, and 'minBound' for unsigned
-                 -- numbers.
+                 -- numbers. Has additional hardware cost for all types.
+  | SatUnsafe -- ^ for signed and unsigned numbers the behaviour is the same as
+              -- SatWrap. For index numbers the Num and Bits operations can result
+              -- in errors if the result of the operation is outside of the range
+              -- of the index. The advantage is that there is no additional hardware
+              -- cost with the index type.
   deriving Eq
+
+newtype SSatMode (sat :: SaturationMode) = SSatMode SaturationMode
+
+class KnownSatMode (sat :: SaturationMode) where
+  satModeSing :: SSatMode sat
+
+instance KnownSatMode 'SatWrap where
+  satModeSing = SSatMode SatWrap
+
+instance KnownSatMode 'SatBound where
+  satModeSing = SSatMode SatBound
+
+instance KnownSatMode 'SatZero where
+  satModeSing = SSatMode SatZero
+
+instance KnownSatMode 'SatSymmetric where
+  satModeSing = SSatMode SatSymmetric
+
+instance KnownSatMode 'SatUnsafe where
+  satModeSing = SSatMode SatUnsafe
+
+satModeVal :: forall sat proxy. KnownSatMode sat => proxy sat -> SaturationMode
+satModeVal _ = case satModeSing :: SSatMode sat of { SSatMode x -> x }
 
 -- | 'Num' operators in which overflow and underflow behavior can be specified
 -- using 'SaturationMode'.
