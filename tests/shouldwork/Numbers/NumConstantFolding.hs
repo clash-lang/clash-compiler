@@ -113,6 +113,24 @@ cExtendingNum = (r1,r2,r3)
     r2 = sub @a @b (lit 22203) (lit 22202)
     r3 = mul @a @b (lit 22204) (lit 2)
 
+cIndex1 :: _
+cIndex1 = (r1a,r1b,r1c,r1d, r2a,r2b,r2c,r2d, r3a,r3b,r3c,r3d)
+  where
+    f :: Int -> Index 1 -> Int
+    f a = \x -> case x of {0 -> 0; 1 -> a}
+    r1a = f 22270 (satAdd SatWrap      (lit 0) (lit 0))
+    r2a = f 22271 (satSub SatWrap      (lit 0) (lit 0))
+    r3a = f 22272 (satMul SatWrap      (lit 0) (lit 0))
+    r1b = f 22273 (satAdd SatBound     (lit 0) (lit 0))
+    r2b = f 22274 (satSub SatBound     (lit 0) (lit 0))
+    r3b = f 22275 (satMul SatBound     (lit 0) (lit 0))
+    r1c = f 22276 (satAdd SatZero      (lit 0) (lit 0))
+    r2c = f 22277 (satSub SatZero      (lit 0) (lit 0))
+    r3c = f 22278 (satMul SatZero      (lit 0) (lit 0))
+    r1d = f 22279 (satAdd SatSymmetric (lit 0) (lit 0))
+    r2d = f 22280 (satSub SatSymmetric (lit 0) (lit 0))
+    r3d = f 22281 (satMul SatSymmetric (lit 0) (lit 0))
+
 cSaturatingNum :: forall n. (Num n, SaturatingNum n) => _
 cSaturatingNum = (r1a,r1b,r1c,r1d, r2a,r2b,r2c,r2d, r3a,r3b,r3c,r3d)
   where
@@ -213,6 +231,7 @@ tIndex
     , cIntegral       @(Index 50000)
     , cBits           @(Index 65536)
     -- , cFiniteBits     @(Index 50000) -- broken
+    , cIndex1 -- ensure special case for index 1 is verified
     , csClashSpecific @(Index 50000)
     , cResize         @(Index 50000)
     )

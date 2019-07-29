@@ -5,6 +5,7 @@ License    :  BSD2 (see the file LICENSE)
 Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
 -}
 
+{-# LANGUAGE BangPatterns          #-}
 {-# LANGUAGE CPP                   #-}
 {-# LANGUAGE DataKinds             #-}
 {-# LANGUAGE DeriveAnyClass        #-}
@@ -101,7 +102,7 @@ import Clash.Class.Resize         (Resize (..))
 import Clash.Prelude.BitIndex     (replaceBit)
 import {-# SOURCE #-} Clash.Sized.Internal.BitVector (BitVector (BV), high, low, undefError)
 import qualified Clash.Sized.Internal.BitVector as BV
-import Clash.Promoted.Nat         (SNat, snatToNum, leToPlusKN)
+import Clash.Promoted.Nat         (SNat(..), snatToNum, leToPlusKN)
 import Clash.XException
   (ShowX (..), Undefined (..), errorX, showsPrecXWith, rwhnfX)
 
@@ -278,23 +279,25 @@ times# :: Index m -> Index n -> Index (((m - 1) * (n - 1)) + 1)
 times# (I a) (I b) = I (a * b)
 
 instance (KnownNat n, 1 <= n) => SaturatingNum (Index n) where
-  satAdd SatWrap a b =
-    leToPlusKN @1 @n $
-      case plus# a b of
-        z | let m = fromInteger# (natVal (Proxy @ n))
-          , z >= m -> resize# (z - m)
-        z -> resize# z
+  satAdd SatWrap !a !b =
+    case snatToNum @Int (SNat @n) of
+      1 -> fromInteger# 0
+      _ -> leToPlusKN @1 @n $
+        case plus# a b of
+          z | let m = fromInteger# (natVal (Proxy @ n))
+            , z >= m -> resize# (z - m)
+          z -> resize# z
   satAdd SatZero a b =
     leToPlusKN @1 @n $
       case plus# a b of
-        z | let m = fromInteger# (natVal (Proxy @ n))
-          , z >= m -> fromInteger# 0
+        z | let m = fromInteger# (natVal (Proxy @ (n - 1)))
+          , z > m -> fromInteger# 0
         z -> resize# z
   satAdd _ a b =
     leToPlusKN @1 @n $
       case plus# a b of
-        z | let m = fromInteger# (natVal (Proxy @ n))
-          , z >= m -> maxBound#
+        z | let m = fromInteger# (natVal (Proxy @ (n - 1)))
+          , z > m -> maxBound#
         z -> resize# z
 
   satSub SatWrap a b =
@@ -307,22 +310,24 @@ instance (KnownNat n, 1 <= n) => SaturatingNum (Index n) where
        then fromInteger# 0
        else a -# b
 
-  satMul SatWrap a b =
-    leToPlusKN @1 @n $
-      case times# a b of
-        z -> let m = fromInteger# (natVal (Proxy @ n))
-             in resize# (z `mod` m)
+  satMul SatWrap !a !b =
+    case snatToNum @Int (SNat @n) of
+      1 -> fromInteger# 0
+      _ -> leToPlusKN @1 @n $
+        case times# a b of
+          z -> let m = fromInteger# (natVal (Proxy @ n))
+               in resize# (z `mod` m)
   satMul SatZero a b =
     leToPlusKN @1 @n $
       case times# a b of
-        z | let m = fromInteger# (natVal (Proxy @ n))
-          , z >= m -> fromInteger# 0
+        z | let m = fromInteger# (natVal (Proxy @ (n - 1)))
+          , z > m -> fromInteger# 0
         z -> resize# z
   satMul _ a b =
     leToPlusKN @1 @n $
       case times# a b of
-        z | let m = fromInteger# (natVal (Proxy @ n))
-          , z >= m -> maxBound#
+        z | let m = fromInteger# (natVal (Proxy @ (n - 1)))
+          , z > m -> maxBound#
         z -> resize# z
 
 instance KnownNat n => Real (Index n) where
