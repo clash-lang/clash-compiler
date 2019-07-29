@@ -5,7 +5,7 @@ ARG PARALLEL=-j8
 ENV DEBIAN_FRONTEND noninteractive
 ENV PATH /opt/ghc/bin:/opt/cabal/bin:$PATH
 
-ARG DEPS_GHC="pkg-config libgmp-dev"
+ARG DEPS_GHC="pkg-config libgmp-dev curl"
 ARG DEPS_CLASH="libtinfo-dev"
 ARG DEPS_CLASH_COSIM="g++-multilib make"
 ARG DEPS_IVERILOG_BUILD="autoconf bison flex gperf"
