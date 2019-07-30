@@ -56,7 +56,8 @@ import qualified Data.List                 as List
 import           Clash.Core.FreeVars
   (noFreeVarsOfType, localFVsOfTerms, tyFVsOfTypes)
 import           Clash.Core.Pretty         (ppr, fromPpr)
-import           Clash.Core.Term           (LetBinding, Pat (..), Term (..))
+import           Clash.Core.Term
+  (LetBinding, Pat (..), Term (..), TickInfo (..))
 import           Clash.Core.Type           (Type (..))
 import           Clash.Core.VarEnv
 import           Clash.Core.Var            (Id, Var (..), TyVar, isGlobalId)
@@ -476,7 +477,7 @@ substTm doc subst = go where
       (subst',bs') -> Letrec bs' (substTm doc subst' e)
     Case subj ty alts -> Case (go subj) (substTy subst ty) (map goAlt alts)
     Cast e t1 t2 -> Cast (go e) (substTy subst t1) (substTy subst t2)
-    Tick sp e -> Tick sp (go e)
+    Tick tick e -> Tick (goTick tick) (go e)
     tm -> tm
 
   goAlt (pat,alt) = case pat of
@@ -484,6 +485,9 @@ substTm doc subst = go where
       (subst1,tvs') -> case List.mapAccumL substIdBndr subst1 ids of
         (subst2,ids') -> (DataPat dc tvs' ids',substTm doc subst2 alt)
     _ -> (pat,go alt)
+
+  goTick t@(SrcSpan _)  = t
+  goTick (ModName m ty) = ModName m (substTy subst ty)
 
 -- | Find the substitution for an 'Id' in the 'Subst'
 lookupIdSubst
@@ -615,8 +619,8 @@ freshenTm is0 = go (mkSubst is0) where
         (is2,alts') -> (is2, Case subj' (substTy subst0 ty) alts')
     Cast e t1 t2 -> case go subst0 e of
       (is1, e') -> (is1, Cast e' (substTy subst0 t1) (substTy subst0 t2))
-    Tick sp e -> case go subst0 e of
-      (is1, e') -> (is1, Tick sp e')
+    Tick tick e -> case go subst0 e of
+       (is1, e') -> (is1, Tick (goTick subst0 tick) e')
     tm -> (substInScope subst0, tm)
 
   goBind subst0 xs =
@@ -634,6 +638,9 @@ freshenTm is0 = go (mkSubst is0) where
           (is3,alt') -> (is3,(DataPat dc tvs' ids',alt'))
     _ -> case go subst0 alt of
       (is1,alt') -> (is1,(pat,alt'))
+
+  goTick subst0 (ModName m ty) = ModName m (substTy subst0 ty)
+  goTick _      tick           = tick
 
 -- * AEQ
 

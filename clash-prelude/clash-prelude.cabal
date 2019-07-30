@@ -144,6 +144,8 @@ Library
                       Clash.Intel.ClockGen
                       Clash.Intel.DDR
 
+                      Clash.Magic
+
                       Clash.NamedTypes
 
                       Clash.Prelude

@@ -1,0 +1,16 @@
+[ { "Primitive" :
+    { "name"      : "Clash.Magic.prefixName"
+    , "primType"  : "Function"
+    }
+  }
+, { "Primitive" :
+    { "name"      : "Clash.Magic.suffixName"
+    , "primType"  : "Function"
+    }
+  }
+, { "Primitive" :
+    { "name"      : "Clash.Magic.setName"
+    , "primType"  : "Function"
+    }
+  }
+]

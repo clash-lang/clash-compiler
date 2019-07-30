@@ -43,7 +43,7 @@ import Data.Coerce
 import qualified Data.IntSet            as IntSet
 import Data.Monoid                      (All (..), Any (..))
 
-import Clash.Core.Term                  (Pat (..), Term (..))
+import Clash.Core.Term                  (Pat (..), Term (..), TickInfo (..))
 import Clash.Core.Type                  (Type (..))
 import Clash.Core.Var                   (Id, IdScope (..), TyVar, Var (..))
 import Clash.Core.VarEnv                (VarSet, unitVarSet)
@@ -274,7 +274,7 @@ termFreeVars' interesting f = go IntSet.empty where
     Cast tm t1 t2 -> Cast <$> go inScope tm
                           <*> typeFreeVars' interesting inScope f t1
                           <*> typeFreeVars' interesting inScope f t2
-    Tick sp tm -> Tick sp <$> go inScope tm
+    Tick tick tm -> Tick <$> goTick inScope tick <*> go inScope tm
     tm -> pure tm
 
   goBndr inScope v =
@@ -292,6 +292,10 @@ termFreeVars' interesting f = go IntSet.empty where
                          (foldr IntSet.insert inScope (map varUniq tvs))
                          (map varUniq ids)
     _ -> (,) <$> pure pat <*> go inScope alt
+
+  goTick inScope = \case
+    ModName m ty -> ModName m <$> typeFreeVars' interesting inScope f ty
+    tick         -> pure tick
 
 -- | Determine whether a type has no free type variables.
 noFreeVarsOfType

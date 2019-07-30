@@ -64,7 +64,7 @@ import           Clash.Core.Subst
   (aeqTerm, aeqType, extendIdSubst, mkSubst, substTm)
 import           Clash.Core.Term
   (LetBinding, Pat (..), Term (..), CoreContext (..), Context, PrimInfo (..),
-   TmName, WorkInfo (..), collectArgs, collectArgsTicks)
+   TmName, WorkInfo (..), TickInfo, collectArgs, collectArgsTicks)
 import           Clash.Core.TyCon
   (TyConMap, tyConDataCons)
 import           Clash.Core.Type             (KindOrType, Type (..),
@@ -712,7 +712,7 @@ specialise' :: Lens' extra (Map.Map (Id, Int, Either Term Type) Id) -- ^ Lens in
             -> Lens' extra Int -- ^ Lens into the specialisation limit
             -> TransformContext -- Transformation context
             -> Term -- ^ Original term
-            -> (Term, [Either Term Type], [SrcSpan]) -- ^ Function part of the term, split into root and applied arguments
+            -> (Term, [Either Term Type], [TickInfo]) -- ^ Function part of the term, split into root and applied arguments
             -> Either Term Type -- ^ Argument to specialize on
             -> RewriteMonad extra Term
 specialise' specMapLbl specHistLbl specLimitLbl (TransformContext is0 _) e (Var f, args, ticks) specArgIn = do

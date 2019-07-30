@@ -141,6 +141,8 @@ module Clash.Prelude
   , module Clash.NamedTypes
     -- ** Hidden arguments
   , module Clash.Hidden
+    -- ** Magic
+  , module Clash.Magic
     -- ** Haskell Prelude
     -- $hiding
   , module Prelude
@@ -166,6 +168,7 @@ import           Clash.Class.Num
 import           Clash.Class.Resize
 import qualified Clash.Explicit.Prelude      as E
 import           Clash.Hidden
+import           Clash.Magic
 import           Clash.NamedTypes
 import           Clash.Prelude.BitIndex
 import           Clash.Prelude.BitReduction

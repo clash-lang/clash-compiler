@@ -201,8 +201,7 @@ mkArgument bndr e = do
           return ((N.Literal (Just (Unsigned 64,64)) (N.NumLit i),hwTy,True),[])
         (C.Literal (NaturalLiteral n), [],_) ->
           return ((N.Literal (Just (Unsigned iw,iw)) (N.NumLit n),hwTy,True),[])
-        (Prim f _,args,ticks) -> do
-          let tickDecls = ticksToDecls ticks
+        (Prim f _,args,ticks) -> withTicks ticks $ \tickDecls -> do
           (e',d) <- mkPrimitive True False (Left bndr) f args ty tickDecls
           case e' of
             (Identifier _ _) -> return ((e',hwTy,False), d)
@@ -453,11 +452,11 @@ mkFunInput
        ,[((TextS.Text,TextS.Text),BlackBox)]
        ,BlackBoxContext)
       ,[Declaration])
-mkFunInput resId e = do
+mkFunInput resId e =
+ let (appE,args,ticks) = collectArgsTicks e
+ in  withTicks ticks $ \tickDecls -> do
   -- TODO: Rewrite this function to use blackbox functions. Right now it
   -- TODO: generates strings that are later parsed/interpreted again. Silly!
-  let (appE,args,ticks) = collectArgsTicks e
-      tickDecls = ticksToDecls ticks
   (bbCtx,dcls) <- mkBlackBoxContext "__INTERNAL__" resId (lefts args)
   templ <- case appE of
             Prim nm _ -> do
@@ -619,11 +618,11 @@ mkFunInput resId e = do
     goExpr app@(collectArgsTicks -> (C.Var fun,args@(_:_),ticks)) = do
       let (tmArgs,tyArgs) = partitionEithers args
       if null tyArgs
-        then do
-          let tickDecls = ticksToDecls ticks
-          appDecls <- mkFunApp "~RESULT" fun tmArgs tickDecls
-          nm <- mkUniqueIdentifier Basic "block"
-          return (Right ((nm,appDecls),Wire))
+        then
+          withTicks ticks $ \tickDecls -> do
+            appDecls <- mkFunApp "~RESULT" fun tmArgs tickDecls
+            nm <- mkUniqueIdentifier Basic "block"
+            return (Right ((nm,appDecls),Wire))
         else do
           (_,sp) <- Lens.use curCompNm
           throw (ClashException sp ($(curLoc) ++ "Not in normal form: Var-application with Type arguments:\n\n" ++ showPpr app) Nothing)

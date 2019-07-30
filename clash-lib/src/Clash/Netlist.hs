@@ -22,6 +22,7 @@ import           Control.Lens                     ((.=),(^.),_2)
 import qualified Control.Lens                     as Lens
 import           Control.Monad                    (join)
 import           Control.Monad.IO.Class           (liftIO)
+import           Control.Monad.Reader             (runReaderT)
 import           Control.Monad.State.Strict       (State, runStateT)
 import           Data.Binary.IEEE754              (floatToWord, doubleToWord)
 import           Data.Char                        (ord)
@@ -53,7 +54,7 @@ import           Clash.Core.Literal               (Literal (..))
 import           Clash.Core.Name                  (Name(..))
 import           Clash.Core.Pretty                (showPpr)
 import           Clash.Core.Term
-  (Alt, Pat (..), Term (..), collectArgs, collectArgsTicks, collectTicks)
+  (Alt, Pat (..), Term (..), TickInfo (..), collectArgs, collectArgsTicks, collectTicks)
 import qualified Clash.Core.Term                  as Core
 import           Clash.Core.Type
   (Type (..), coreView1, splitFunTys, splitCoreFunForallTy)
@@ -160,7 +161,8 @@ runNetlistMonad
   -- ^ Action to run
   -> IO (a, NetlistState)
 runNetlistMonad isTb opts reprs s tops p tcm typeTrans iw mkId extId ite seenIds_ env prefixM
-  = flip runStateT s'
+  = flip runReaderT (NetlistEnv "" "" Nothing)
+  . flip runStateT s'
   . runNetlist
   where
     s' =
@@ -276,7 +278,7 @@ mkNetDecl (id_,tm) = do
 
   where
     nm = varName id_
-    sp = case tm of {Tick s _ -> s; _ -> nameLoc nm}
+    sp = case tm of {Tick (SrcSpan s) _ -> s; _ -> nameLoc nm}
 
     termToWireOrReg :: Term -> NetlistMonad WireOrReg
     termToWireOrReg (stripTicks -> Case scrut _ alts0@(_:_:_)) = do
@@ -328,8 +330,8 @@ mkDeclarations'
   -- ^ RHS of the let-binder
   -> NetlistMonad [Declaration]
 mkDeclarations' bndr (collectTicks -> (Var v,ticks)) =
-  let tickDecls = ticksToDecls ticks
-  in  mkFunApp (id2identifier bndr) v [] tickDecls
+  withTicks ticks $ \tickDecls -> do
+  mkFunApp (id2identifier bndr) v [] tickDecls
 
 mkDeclarations' _ e@(collectTicks -> (Case _ _ [],_)) = do
   (_,sp) <- Lens.use curCompNm
@@ -343,14 +345,14 @@ mkDeclarations' _ e@(collectTicks -> (Case _ _ [],_)) = do
           Nothing
 
 mkDeclarations' bndr (collectTicks -> (Case scrut altTy alts@(_:_:_),ticks)) =
-  let tickDecls = ticksToDecls ticks
-  in  mkSelection (Right bndr) scrut altTy alts tickDecls
+  withTicks ticks $ \tickDecls -> do
+  mkSelection (Right bndr) scrut altTy alts tickDecls
 
 mkDeclarations' bndr app =
   let (appF,args0,ticks) = collectArgsTicks app
       (args,tyArgs) = partitionEithers args0
-      tickDecls = ticksToDecls ticks
-  in case appF of
+  in  withTicks ticks $ \tickDecls -> do
+  case appF of
     Var f
       | null tyArgs -> mkFunApp (id2identifier bndr) f args tickDecls
       | otherwise   -> do
@@ -552,8 +554,10 @@ mkFunApp dstId fun args tickDecls = do
                     Nothing -> []
                     Just (id_,hwtype) -> [(Identifier id_ Nothing,Out,hwtype,Identifier dstId Nothing)]
               instLabel0 <- extendIdentifier Basic compName (StrictText.pack "_" `StrictText.append` dstId)
-              instLabel1 <- mkUniqueIdentifier Basic instLabel0
-              let instDecl      = InstDecl Entity Nothing compName instLabel1 [] (outpAssign ++ inpAssigns)
+              instLabel1 <- fromMaybe instLabel0 <$> Lens.view setName
+              instLabel2 <- affixName instLabel1
+              instLabel3 <- mkUniqueIdentifier Basic instLabel2
+              let instDecl = InstDecl Entity Nothing compName instLabel3 [] (outpAssign ++ inpAssigns)
               return (argDecls ++ argDecls' ++ tickDecls ++ [instDecl])
             else error $ $(curLoc) ++ "under-applied normalized function"
         Nothing -> case args of
@@ -600,10 +604,10 @@ mkExpr _ _ _ (stripTicks -> Core.Literal l) = do
     ByteArrayLiteral (PV.Vector _ _ (ByteArray ba)) -> return (HW.Literal Nothing (NumLit (Jp# (BN# ba))),[])
     _ -> error $ $(curLoc) ++ "not an integer or char literal"
 
-mkExpr bbEasD bndr ty app = do
-  let (appF,args,ticks) = collectArgsTicks app
-      (tmArgs,tyArgs) = partitionEithers args
-      tickDecls = ticksToDecls ticks
+mkExpr bbEasD bndr ty app =
+ let (appF,args,ticks) = collectArgsTicks app
+     (tmArgs,tyArgs) = partitionEithers args
+ in  withTicks ticks $ \tickDecls -> do
   hwTy    <- unsafeCoreTypeToHWTypeM' $(curLoc) ty
   (_,sp) <- Lens.use curCompNm
   case appF of

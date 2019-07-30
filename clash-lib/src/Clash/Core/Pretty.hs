@@ -43,7 +43,8 @@ import qualified Outputable             as GHC
 import Clash.Core.DataCon               (DataCon (..))
 import Clash.Core.Literal               (Literal (..))
 import Clash.Core.Name                  (Name (..))
-import Clash.Core.Term                  (Pat (..), Term (..), CoreContext (..), primArg)
+import Clash.Core.Term
+  (Pat (..), Term (..), TickInfo (..), ModName (..), CoreContext (..), primArg)
 import Clash.Core.TyCon                 (TyCon (..), TyConName, isTupleTyConLike)
 import Clash.Core.Type                  (ConstTy (..), Kind, LitTy (..),
                                          Type (..), TypeView (..), tyView)
@@ -223,6 +224,12 @@ instance PrettyPrec Term where
       tDoc <- pprPrec prec t
       eDoc <- pprPrec prec e'
       return (tDoc <> line' <> eDoc)
+
+instance PrettyPrec TickInfo where
+  pprPrec prec (SrcSpan sp)   = pprPrec prec sp
+  pprPrec prec (ModName PrefixName t) = ("<prefixName>" <>) <$> pprPrec prec t
+  pprPrec prec (ModName SuffixName t) = ("<suffixName>" <>) <$> pprPrec prec t
+  pprPrec prec (ModName SetName t)    = ("<setName>" <>) <$> pprPrec prec t
 
 instance PrettyPrec SrcSpan where
   pprPrec _ sp = return ("<src>"<>pretty (GHC.showSDocUnsafe (GHC.ppr sp)))

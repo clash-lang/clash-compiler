@@ -120,6 +120,8 @@ module Clash.Explicit.Prelude
   , undefined
     -- ** Named types
   , module Clash.NamedTypes
+    -- ** Magic
+  , module Clash.Magic
     -- ** Haskell Prelude
     -- $hiding
   , module Prelude
@@ -143,6 +145,7 @@ import Clash.Class.BitPack
 import Clash.Class.Exp
 import Clash.Class.Num
 import Clash.Class.Resize
+import Clash.Magic
 import Clash.NamedTypes
 import Clash.Explicit.BlockRam
 import Clash.Explicit.BlockRam.File

@@ -9,6 +9,7 @@
 -}
 
 {-# LANGUAGE FlexibleContexts    #-}
+{-# LANGUAGE LambdaCase          #-}
 {-# LANGUAGE MonadFailDesugaring #-}
 {-# LANGUAGE MultiWayIf          #-}
 {-# LANGUAGE NamedFieldPuns      #-}
@@ -24,9 +25,11 @@ import           Control.Exception       (throw)
 import           Control.Lens            ((.=),(%=))
 import qualified Control.Lens            as Lens
 import           Control.Monad           (unless, when, zipWithM, join)
+import           Control.Monad.Reader    (ask, local)
 import           Control.Monad.State.Strict
   (State, evalState, get, modify, runState)
-import           Control.Monad.Trans.Except (ExceptT (..), runExceptT, throwE)
+import           Control.Monad.Trans.Except
+  (ExceptT (..), runExcept, runExceptT, throwE)
 import           Data.Either             (partitionEithers)
 import           Data.HashMap.Strict     (HashMap)
 import qualified Data.HashMap.Strict     as HashMap
@@ -59,13 +62,14 @@ import           Clash.Core.Pretty       (showPpr)
 import           Clash.Core.Subst
   (Subst (..), extendIdSubst, extendIdSubstList, extendInScopeId,
    extendInScopeIdList, mkSubst, substTm)
-import           Clash.Core.Term         (Alt, LetBinding, Pat (..), Term (..))
+import           Clash.Core.Term
+  (Alt, LetBinding, Pat (..), Term (..), TickInfo (..), ModName (..))
 import           Clash.Core.TyCon
   (TyConName, TyConMap, tyConDataCons)
 import           Clash.Core.Type         (Type (..), TypeView (..),
                                           coreView1, splitTyConAppM, tyView, TyVar)
 import           Clash.Core.Util
-  (collectBndrs, stripTicks, substArgTys, termType)
+  (collectBndrs, stripTicks, substArgTys, termType, tySym)
 import           Clash.Core.Var
   (Id, Var (..), mkLocalId, modifyVarName, Attr')
 import           Clash.Core.VarEnv
@@ -1782,8 +1786,45 @@ iteAlts sHTy [(pat0,alt0),(pat1,alt1)] | validIteSTy sHTy = case pat0 of
 
 iteAlts _ _ = Nothing
 
-ticksToDecls
-  :: [SrcSpan]
-  -> [Declaration]
-ticksToDecls =
-  map (TickDecl . Text.pack . showSDocUnsafe . ppr) . reverse . List.nub
+-- | Run a NetlistMonad computation in the context of the given source ticks and
+-- name modifier ticks
+withTicks
+  :: [TickInfo]
+  -> ([Declaration] -> NetlistMonad a)
+  -- ^ The source ticks are turned into 'TickDecl's and are passed as an argument
+  -- to the NetlistMonad computation. Name modifier ticks will change the local
+  -- environment for the NetlistMonad computation.
+  -> NetlistMonad a
+withTicks ticks0 k = do
+  let ticks1 = List.nub ticks0
+  go [] (reverse ticks1)
+ where
+  go decls [] = k (reverse decls)
+
+  go decls (SrcSpan sp:ticks) =
+    go (TickDecl (Text.pack (showSDocUnsafe (ppr sp))):decls) ticks
+
+  go decls (ModName m nm0:ticks) = do
+    tcm <- Lens.use tcCache
+    case runExcept (tySym tcm nm0) of
+      Right nm1 -> local (modName m nm1) (go decls ticks)
+      _ -> go decls ticks
+
+  modName PrefixName (Text.pack -> s2) env@(NetlistEnv {_prefixName = s1})
+    | Text.null s1 = env {_prefixName = s2}
+    | otherwise    = env {_prefixName = Text.append s1 (Text.append "_" s2)}
+  modName SuffixName (Text.pack -> s2) env@(NetlistEnv {_suffixName = s1})
+    | Text.null s1 = env {_suffixName = s2}
+    | otherwise    = env {_suffixName = Text.append s2 (Text.append "_" s1)}
+  modName SetName (Text.pack -> s) env = env {_setName = Just s}
+
+-- | Add the pre- and suffix names in the current environment to the given
+-- identifier
+affixName
+  :: Identifier
+  -> NetlistMonad Identifier
+affixName nm0 = do
+  NetlistEnv pre suf _ <- ask
+  let nm1 = if Text.null pre then nm0 else Text.append pre (Text.append "_" nm0)
+      nm2 = if Text.null suf then nm1 else Text.append nm1 (Text.append "_" suf)
+  return nm2
