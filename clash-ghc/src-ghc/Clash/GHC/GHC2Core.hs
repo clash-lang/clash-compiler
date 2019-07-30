@@ -16,7 +16,8 @@
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 
 module Clash.GHC.GHC2Core
-  ( GHC2CoreState
+  ( C2C
+  , GHC2CoreState
   , tyConMap
   , coreToTerm
   , coreToId
@@ -31,17 +32,17 @@ where
 
 -- External Modules
 import           Control.Lens                ((^.), (%~), (&), (%=))
-import           Control.Monad.Trans.Class   (lift)
-import           Control.Monad.Trans.Reader  (ReaderT)
-import qualified Control.Monad.Trans.Reader  as Reader
-import           Control.Monad.State         (State)
-import qualified Control.Monad.State.Lazy    as State
+import           Control.Monad.RWS.Lazy      (RWS)
+import qualified Control.Monad.RWS.Lazy      as RWS
 import qualified Data.ByteString.Char8       as Char8
 import           Data.Hashable               (Hashable (..))
 import           Data.HashMap.Lazy           (HashMap)
 import qualified Data.HashMap.Lazy           as HashMap
 import qualified Data.HashMap.Strict         as HSM
 import           Data.Maybe                  (catMaybes,fromMaybe,listToMaybe)
+#if !MIN_VERSION_base(4,11,0)
+import           Data.Semigroup
+#endif
 import           Data.Text                   (Text, isInfixOf,pack)
 import qualified Data.Text                   as Text
 import           Data.Text.Encoding          (decodeUtf8)
@@ -53,8 +54,8 @@ import CoAxiom    (CoAxiom (co_ax_branches), CoAxBranch (cab_lhs,cab_rhs),
 import Coercion   (coercionType,coercionKind)
 import CoreFVs    (exprSomeFreeVars)
 import CoreSyn
-  (AltCon (..), Bind (..), CoreExpr, Expr (..), Unfolding (..), collectArgs,
-   rhssOfAlts, unfoldingTemplate)
+  (AltCon (..), Bind (..), CoreExpr, Expr (..), Unfolding (..), Tickish (..),
+   collectArgs, rhssOfAlts, unfoldingTemplate)
 import DataCon    (DataCon, dataConExTyVars,
                    dataConName, dataConRepArgTys,
                    dataConTag, dataConTyCon,
@@ -77,7 +78,7 @@ import PrelNames  (tYPETyConKey)
 import OccName    (occNameString)
 import Outputable (showPpr)
 import Pair       (Pair (..))
-import SrcLoc     (SrcSpan, isGoodSrcSpan)
+import SrcLoc     (SrcSpan (..), isGoodSrcSpan, noSrcSpan)
 import TyCon      (AlgTyConRhs (..), TyCon, tyConName,
                    algTyConRhs, isAlgTyCon, isFamilyTyCon,
                    isFunTyCon, isNewTyCon,
@@ -123,6 +124,22 @@ makeLenses ''GHC2CoreState
 emptyGHC2CoreState :: GHC2CoreState
 emptyGHC2CoreState = GHC2CoreState C.emptyUniqMap HSM.empty
 
+newtype SrcSpanRB = SrcSpanRB {unSrcSpanRB :: SrcSpan}
+
+instance Semigroup SrcSpanRB where
+  (SrcSpanRB l) <> (SrcSpanRB r) =
+    if   isGoodSrcSpan r
+    then SrcSpanRB r
+    else SrcSpanRB l
+
+instance Monoid SrcSpanRB where
+  mempty = SrcSpanRB noSrcSpan
+#if !MIN_VERSION_base(4,11,0)
+  mappend = (<>)
+#endif
+
+type C2C = RWS SrcSpan SrcSpanRB GHC2CoreState
+
 makeAllTyCons
   :: GHC2CoreState
   -> FamInstEnvs
@@ -133,12 +150,12 @@ makeAllTyCons hm fiEnvs = go hm hm
         | C.nullUniqMap (new ^. tyConMap) = C.emptyUniqMap
         | otherwise                       = tcm `C.unionUniqMap` tcm'
       where
-        (tcm,old') = State.runState (T.mapM (makeTyCon fiEnvs) (new ^. tyConMap)) old
-        tcm'       = go old' (old' & tyConMap %~ (`C.differenceUniqMap` (old ^. tyConMap)))
+        (tcm,old', _) = RWS.runRWS (T.mapM (makeTyCon fiEnvs) (new ^. tyConMap)) noSrcSpan old
+        tcm'          = go old' (old' & tyConMap %~ (`C.differenceUniqMap` (old ^. tyConMap)))
 
 makeTyCon :: FamInstEnvs
           -> TyCon
-          -> State GHC2CoreState C.TyCon
+          -> C2C C.TyCon
 makeTyCon fiEnvs tc = tycon
   where
     tycon
@@ -224,14 +241,14 @@ makeTyCon fiEnvs tc = tycon
           tcKind <- coreToType (tyConKind tc)
           return (C.PrimTyCon (C.nameUniq tcName) tcName tcKind tcArity)
 
-        famInstToSubst :: FamInst -> State GHC2CoreState ([C.Type],C.Type)
+        famInstToSubst :: FamInst -> C2C ([C.Type],C.Type)
         famInstToSubst fi = do
           tys <- mapM coreToType  (fi_tys fi)
           ty  <- coreToType (fi_rhs fi)
           return (tys,ty)
 
 makeAlgTyConRhs :: AlgTyConRhs
-                -> State GHC2CoreState (Maybe C.AlgTyConRhs)
+                -> C2C (Maybe C.AlgTyConRhs)
 makeAlgTyConRhs algTcRhs = case algTcRhs of
 #if MIN_VERSION_ghc(8,6,0)
   DataTyCon dcs _ _ -> Just <$> C.DataTyCon <$> mapM coreToDataCon dcs
@@ -254,15 +271,16 @@ makeAlgTyConRhs algTcRhs = case algTcRhs of
 coreToTerm
   :: ResolvedPrimMap
   -> [Var]
-  -> SrcSpan
   -> CoreExpr
-  -> State GHC2CoreState C.Term
-coreToTerm primMap unlocs srcsp coreExpr = Reader.runReaderT (term coreExpr) srcsp
+  -> C2C C.Term
+coreToTerm primMap unlocs = term
   where
-    term :: CoreExpr -> ReaderT SrcSpan (State GHC2CoreState) C.Term
+    term :: CoreExpr -> C2C C.Term
     term e
       | (Var x,args) <- collectArgs e
-      , let nm = State.evalState (qualifiedNameString (varName x)) emptyGHC2CoreState
+      , let (nm, _) = RWS.evalRWS (qualifiedNameString (varName x))
+                                  noSrcSpan
+                                  emptyGHC2CoreState
       = go nm args
       | otherwise
       = term' e
@@ -303,38 +321,44 @@ coreToTerm primMap unlocs srcsp coreExpr = Reader.runReaderT (term coreExpr) src
           | [_nTy,_aTy,_kn,_typ,f] <- args
           = term f
         go _ _ = term' e
-    term' (Var x)                 = do
-      srcsp' <- Reader.ask
-      lift (var srcsp' x)
+    term' (Var x)                 = var x
     term' (Lit l)                 = return $ C.Literal (coreToLiteral l)
-    term' (App eFun (Type tyArg)) = C.TyApp <$> term eFun <*> lift (coreToType tyArg)
+    term' (App eFun (Type tyArg)) = C.TyApp <$> term eFun <*> coreToType tyArg
     term' (App eFun eArg)         = C.App   <$> term eFun <*> term eArg
-    term' (Lam x e) | isTyVar x   = C.TyLam <$> lift (coreToTyVar x) <*> addUsefull (getSrcSpan x) (term e)
-                    | otherwise   = C.Lam   <$> lift (coreToId x) <*> addUsefull (getSrcSpan x) (term e)
+    term' (Lam x e)
+      | isTyVar x
+      = C.TyLam <$> coreToTyVar x <*> addUsefull (getSrcSpan x) (term e)
+      | otherwise
+      = do
+        (e',sp) <- termSP (getSrcSpan x) e
+        x' <- coreToIdSP sp x
+        return (C.Lam  x' e')
     term' (Let (NonRec x e1) e2)  = do
-      x'  <- lift (coreToId x)
-      e1' <- addUsefull (getSrcSpan x) (term e1)
+      (e1',sp) <- termSP (getSrcSpan x) e1
+      x'  <- coreToIdSP sp x
       e2' <- term e2
       return (C.Letrec [(x', e1')] e2')
 
     term' (Let (Rec xes) e) = do
-      xes' <- mapM (\(x,b) -> (,) <$> lift (coreToId x)
-                                  <*> addUsefull (getSrcSpan x)
-                                                 (term b))
-                   xes
+      xes' <- mapM go xes
       e'   <- term e
       return (C.Letrec xes' e')
+     where
+      go (x,b) = do
+        (b',sp) <- termSP (getSrcSpan x) b
+        x' <- coreToIdSP sp x
+        return (x',b')
 
     term' (Case _ _ ty [])  = C.TyApp (C.Prim (pack "EmptyCase") (C.PrimInfo C.undefinedTy C.WorkNever))
-                                <$> lift (coreToType ty)
+                                <$> coreToType ty
     term' (Case e b ty alts) = do
      let usesBndr = any ( not . isEmptyVarSet . exprSomeFreeVars (== b))
                   $ rhssOfAlts alts
-     b'  <- lift (coreToId b)
-     e'  <- addUsefull (getSrcSpan b) (term e)
-     ty' <- lift (coreToType ty)
+     (e',sp) <- termSP (getSrcSpan b) e
+     b'  <- coreToIdSP sp b
+     ty' <- coreToType ty
      let caseTerm v =
-             C.Case v ty' <$> mapM (addUsefull (getSrcSpan b) . alt) alts
+             C.Case v ty' <$> mapM (addUsefull sp . alt sp) alts
      if usesBndr
       then do
         ct <- caseTerm (C.Var b')
@@ -343,24 +367,31 @@ coreToTerm primMap unlocs srcsp coreExpr = Reader.runReaderT (term coreExpr) src
 
     term' (Cast e co) = do
       let (Pair ty1 ty2) = coercionKind co
-      hasPrimCoM <- lift (hasPrimCo co)
-      ty1_I <- lift (isIntegerTy ty1)
-      ty2_I <- lift (isIntegerTy ty2)
+      hasPrimCoM <- hasPrimCo co
+      ty1_I <- isIntegerTy ty1
+      ty2_I <- isIntegerTy ty2
       case hasPrimCoM of
         Just _ | ty1_I || ty2_I
-          -> C.Cast <$> term e <*> lift (coreToType ty1) <*> lift (coreToType ty2)
+          -> C.Cast <$> term e <*> coreToType ty1 <*> coreToType ty2
         _ -> term e
+    term' (Tick (SourceNote rsp _) e) =
+      C.Tick (RealSrcSpan rsp) <$> addUsefull (RealSrcSpan rsp) (term e)
     term' (Tick _ e)        = term e
     term' (Type t)          = C.TyApp (C.Prim (pack "_TY_") (C.PrimInfo C.undefinedTy C.WorkNever)) <$>
-                                lift (coreToType t)
+                                coreToType t
     term' (Coercion co)     = C.TyApp (C.Prim (pack "_CO_") (C.PrimInfo C.undefinedTy C.WorkNever)) <$>
-                                lift (coreToType (coercionType co))
+                                coreToType (coercionType co)
+
+
+    termSP sp = fmap (second unSrcSpanRB) . RWS.listen . addUsefullR sp . term
+    coreToIdSP sp = RWS.local (\r -> if isGoodSrcSpan sp then sp else r) . coreToId
+
 
     lookupPrim :: Text -> Maybe (Maybe ResolvedPrimitive)
     lookupPrim nm = extractPrim <$> HashMap.lookup nm primMap
 
-    var srcsp' x = do
-        xPrim  <- coreToPrimVar x
+    var x = do
+        xPrim <- if isGlobalId x then coreToPrimVar x else coreToVar x
         let xNameS = C.nameOcc xPrim
         xType  <- coreToType (varType x)
         case isDataConId_maybe x of
@@ -370,7 +401,9 @@ coreToTerm primMap unlocs srcsp coreExpr = Reader.runReaderT (term coreExpr) src
               then let xInfo = idInfo x
                        unfolding = unfoldingInfo xInfo
                    in  case unfolding of
-                          CoreUnfolding {} -> Reader.runReaderT (term (unfoldingTemplate unfolding)) srcsp'
+                          CoreUnfolding {} -> do
+                            sp <- RWS.ask
+                            RWS.censor (const (SrcSpanRB sp)) (term (unfoldingTemplate unfolding))
                           NoUnfolding -> error ("No unfolding for DC wrapper: " ++ showPpr unsafeGlobalDynFlags x)
                           _ -> error ("Unexpected unfolding for DC wrapper: " ++ showPpr unsafeGlobalDynFlags x)
               else C.Data <$> coreToDataCon dc
@@ -406,14 +439,15 @@ coreToTerm primMap unlocs srcsp coreExpr = Reader.runReaderT (term coreExpr) src
               | otherwise
               -> C.Var <$> coreToId x
 
-    alt (DEFAULT   , _ , e) = (C.DefaultPat,) <$> term e
-    alt (LitAlt l  , _ , e) = (C.LitPat (coreToLiteral l),) <$> term e
-    alt (DataAlt dc, xs, e) = case span isTyVar xs of
-      (tyvs,tmvs) -> (,) <$> (C.DataPat <$>
-                                lift (coreToDataCon dc) <*>
-                                lift (mapM coreToTyVar tyvs) <*>
-                                lift (mapM coreToId tmvs))
-                         <*> term e
+    alt _   (DEFAULT   , _ , e) = (C.DefaultPat,) <$> term e
+    alt _   (LitAlt l  , _ , e) = (C.LitPat (coreToLiteral l),) <$> term e
+    alt sp0 (DataAlt dc, xs, e) = case span isTyVar xs of
+      (tyvs,tmvs) -> do
+        (e',sp1) <- termSP sp0 e
+        (,) <$> (C.DataPat <$> coreToDataCon dc
+                           <*> mapM coreToTyVar tyvs
+                           <*> mapM (coreToIdSP sp1) tmvs)
+            <*> pure e'
 
     coreToLiteral :: Literal
                   -> C.Literal
@@ -440,17 +474,31 @@ coreToTerm primMap unlocs srcsp coreExpr = Reader.runReaderT (term coreExpr) src
       MachNullAddr   -> C.StringLiteral []
       MachLabel fs _ _ -> C.StringLiteral (unpackFS fs)
 
-addUsefull :: SrcSpan -> ReaderT SrcSpan (State GHC2CoreState) a
-           -> ReaderT SrcSpan (State GHC2CoreState) a
-addUsefull x = Reader.local (\r -> if isGoodSrcSpan x then x else r)
+addUsefull :: SrcSpan
+           -> C2C a
+           -> C2C a
+addUsefull x m =
+  if isGoodSrcSpan x
+  then do a <- RWS.local (const x) m
+          RWS.tell (SrcSpanRB x)
+          return a
+  else m
 
-isIntegerTy :: Type -> State GHC2CoreState Bool
+addUsefullR :: SrcSpan
+            -> C2C a
+            -> C2C a
+addUsefullR x m =
+  if isGoodSrcSpan x
+  then RWS.local (const x) m
+  else m
+
+isIntegerTy :: Type -> C2C Bool
 isIntegerTy (TyConApp tc []) = do
   tcNm <- qualifiedNameString (tyConName tc)
   return (tcNm == "GHC.Integer.Type.Integer")
 isIntegerTy _ = return False
 
-hasPrimCo :: Coercion -> State GHC2CoreState (Maybe Type)
+hasPrimCo :: Coercion -> C2C (Maybe Type)
 hasPrimCo (TyConAppCo _ _ coers) = do
   tcs <- catMaybes <$> mapM hasPrimCo coers
   return (listToMaybe tcs)
@@ -505,7 +553,7 @@ hasPrimCo (SubCo co)    = hasPrimCo co
 hasPrimCo _ = return Nothing
 
 coreToDataCon :: DataCon
-              -> State GHC2CoreState C.DataCon
+              -> C2C C.DataCon
 coreToDataCon dc = do
     repTys <- mapM coreToType (dataConRepArgTys dc)
     dcTy   <- coreToType (varType $ dataConWorkId dc)
@@ -531,7 +579,7 @@ coreToDataCon dc = do
 
 typeConstructorToString
   :: TyCon
-  -> State GHC2CoreState String
+  -> C2C String
 typeConstructorToString constructor =
    Text.unpack . C.nameOcc <$> coreToName tyConName tyConUnique qualifiedNameString constructor
 
@@ -544,7 +592,7 @@ listTypeToListOfTypes (TyConApp _ [_, a, as]) = a : listTypeToListOfTypes as
 listTypeToListOfTypes _                       = []
 
 -- | Try to determine boolean value by looking at constructor name of type.
-boolTypeToBool :: Type -> State GHC2CoreState Bool
+boolTypeToBool :: Type -> C2C Bool
 boolTypeToBool (TyConApp constructor _args) = do
   constructorName <- typeConstructorToString constructor
   return $ case constructorName of
@@ -570,7 +618,7 @@ tyLitToInteger s = error $ unwords [ "Could not unpack given type to integer:"
 -- | Try to interpret a Type as an Attr
 coreToAttr
   :: Type
-  -> State GHC2CoreState C.Attr'
+  -> C2C C.Attr'
 coreToAttr (TyConApp ty args) = do
   let key   = args !! 0
   let value = args !! 1
@@ -595,7 +643,7 @@ coreToAttr t =
 
 coreToAttrs'
     :: [Type]
-    -> State GHC2CoreState [C.Attr']
+    -> C2C [C.Attr']
 coreToAttrs' [annotationType, _star, realType, attributes] = allAttrs
  where
   allAttrs = (++) <$> attrs <*> subAttrs
@@ -650,7 +698,7 @@ coreToAttrs' illegal =
 -- | If this type has an annotate type synonym, return list of attributes.
 coreToAttrs
   :: Type
-  -> State GHC2CoreState [C.Attr']
+  -> C2C [C.Attr']
 coreToAttrs (TyConApp tycon kindsOrTypes) = do
   name' <- typeConstructorToString tycon
 
@@ -668,7 +716,7 @@ coreToAttrs _ =
 annotateType
   :: Type
   -> C.Type
-  -> State GHC2CoreState C.Type
+  -> C2C C.Type
 annotateType ty cty = do
   attrs <- coreToAttrs ty
   case attrs of
@@ -679,7 +727,7 @@ annotateType ty cty = do
 -- exception of newtypes used as annotations (see: SynthesisAttributes).
 coreToType
   :: Type
-  -> State GHC2CoreState C.Type
+  -> C2C C.Type
 coreToType ty = ty'' >>= annotateType ty
   where
     ty'' =
@@ -689,7 +737,7 @@ coreToType ty = ty'' >>= annotateType ty
 
 coreToType'
   :: Type
-  -> State GHC2CoreState C.Type
+  -> C2C C.Type
 coreToType' (TyVarTy tv) = C.VarTy <$> coreToTyVar tv
 coreToType' (TyConApp tc args)
   | isFunTyCon tc = foldl C.AppTy (C.ConstTy C.Arrow) <$> mapM coreToType args
@@ -715,39 +763,41 @@ coreToTyLit (NumTyLit i) = C.NumTy (fromInteger i)
 coreToTyLit (StrTyLit s) = C.SymTy (unpackFS s)
 
 coreToTyVar :: TyVar
-            -> State GHC2CoreState C.TyVar
+            -> C2C C.TyVar
 coreToTyVar tv =
   C.mkTyVar <$> coreToType (varType tv) <*> coreToVar tv
 
 coreToId :: Id
-         -> State GHC2CoreState C.Id
-coreToId i =
+         -> C2C C.Id
+coreToId i = do
   C.mkId <$> coreToType (varType i) <*> pure scope <*> coreToVar i
  where
   scope = if isGlobalId i then C.GlobalId else C.LocalId
 
 coreToVar :: Var
-          -> State GHC2CoreState (C.Name a)
+          -> C2C (C.Name a)
 coreToVar = coreToName varName varUnique qualifiedNameStringM
 
 coreToPrimVar :: Var
-              -> State GHC2CoreState (C.Name C.Term)
+              -> C2C (C.Name C.Term)
 coreToPrimVar = coreToName varName varUnique qualifiedNameString
 
 coreToName
   :: (b -> Name)
   -> (b -> Unique)
-  -> (Name -> State GHC2CoreState Text)
+  -> (Name -> C2C Text)
   -> b
-  -> State GHC2CoreState (C.Name a)
+  -> C2C (C.Name a)
 coreToName toName toUnique toString v = do
   ns <- toString (toName v)
   let key  = getKey (toUnique v)
-      loc  = getSrcSpan (toName v)
+      locI = getSrcSpan (toName v)
       sort | ns == "ds" || Text.isPrefixOf "$" ns
            = C.System
            | otherwise
            = C.User
+  locR <- RWS.ask
+  let loc = if isGoodSrcSpan locI then locI else locR
   return (C.Name sort ns key loc)
 
 qualifiedNameString'
@@ -760,7 +810,7 @@ qualifiedNameString' n =
 
 qualifiedNameString
   :: Name
-  -> State GHC2CoreState Text
+  -> C2C Text
 qualifiedNameString n =
   makeCached n nameMap $
   return (fromMaybe "_INTERNAL_" (modNameM n) `Text.append` ('.' `Text.cons` occName))
@@ -769,7 +819,7 @@ qualifiedNameString n =
 
 qualifiedNameStringM
   :: Name
-  -> State GHC2CoreState Text
+  -> C2C Text
 qualifiedNameStringM n =
   makeCached n nameMap $
   return (maybe occName (\modName -> modName `Text.append` ('.' `Text.cons` occName)) (modNameM n))

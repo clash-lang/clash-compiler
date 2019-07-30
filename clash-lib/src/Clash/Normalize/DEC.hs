@@ -62,10 +62,10 @@ import Clash.Core.FreeVars
   (termFreeVars', typeFreeVars', localVarsDoNotOccurIn)
 import Clash.Core.Literal    (Literal (..))
 import Clash.Core.Term
-  (LetBinding, Pat (..), PrimInfo (..), Term (..), collectArgs)
+  (LetBinding, Pat (..), PrimInfo (..), Term (..), collectArgs, collectArgsTicks)
 import Clash.Core.TyCon      (tyConDataCons)
 import Clash.Core.Type       (Type, isPolyFunTy, mkTyConApp, splitFunForallTy)
-import Clash.Core.Util       (mkApps, patIds, termType)
+import Clash.Core.Util       (mkApps, mkTicks, patIds, termType)
 import Clash.Core.Var        (isGlobalId)
 import Clash.Core.VarEnv
   (InScopeSet, elemInScopeSet, notElemInScopeSet)
@@ -138,7 +138,7 @@ collectGlobals' inScope substitution seen (Case scrut ty alts) _eIsConstant = do
                                             (map fst collected ++ seen) scrut
   return (Case scrut' ty alts',collected ++ collected')
 
-collectGlobals' inScope substitution seen e@(collectArgs -> (fun, args@(_:_))) eIsconstant
+collectGlobals' inScope substitution seen e@(collectArgsTicks -> (fun, args@(_:_), ticks)) eIsconstant
   | not eIsconstant = do
     tcm <- Lens.view tcCache
     bndrs <- Lens.use bindings
@@ -167,7 +167,7 @@ collectGlobals' inScope substitution seen e@(collectArgs -> (fun, args@(_:_))) e
             return (e',(fun',(seen,Leaf args')):collected)
           _ -> do (args',collected) <- collectGlobalsArgs inScope substitution
                                                           seen args
-                  return (mkApps fun args',collected)
+                  return (mkApps (mkTicks fun ticks) args',collected)
       _ -> return (e,[])
 
 -- FIXME: This duplicates A LOT of let-bindings, where I just pray that after

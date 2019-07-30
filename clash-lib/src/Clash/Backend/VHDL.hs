@@ -1293,7 +1293,12 @@ patLitCustom _ x y = error $ $(curLoc) ++ unwords
 
 insts :: [Declaration] -> VHDLM Doc
 insts [] = emptyDoc
-insts is = vcat . punctuate line . fmap catMaybes $ mapM inst_ is
+insts (TickDecl id_:ds) = "--" <+> stringS id_ <> line <> insts ds
+insts (d:ds) = do
+  d' <- inst_ d
+  case d' of
+    Just doc -> pure doc <> line <> line <> insts ds
+    _ -> insts ds
 
 -- | Helper function for inst_, handling CustomSP and CustomSum
 inst_' :: TextS.Text -> Expr -> HWType -> [(Maybe Literal, Expr)] -> VHDLM (Maybe Doc)

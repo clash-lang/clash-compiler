@@ -14,8 +14,8 @@ where
 
 import           Control.Lens            ((%~),(&),view,_1)
 import           Control.Monad           (unless, when)
-import           Control.Monad.State     (State)
 import qualified Control.Monad.State     as State
+import qualified Control.Monad.RWS.Lazy  as RWS
 import           Data.Coerce             (coerce)
 import           Data.Either             (lefts, rights)
 import           Data.IntMap.Strict      (IntMap)
@@ -52,8 +52,9 @@ import           Clash.Core.Var          (Var (..), Id, IdScope (..), setIdScope
 import           Clash.Core.VarEnv
   (InScopeSet, VarEnv, emptyInScopeSet, extendInScopeSet, mkInScopeSet, mkVarEnv, unionVarEnv)
 import           Clash.Driver.Types      (BindingMap)
-import           Clash.GHC.GHC2Core      (GHC2CoreState, tyConMap, coreToId, coreToName, coreToTerm,
-                                          makeAllTyCons, qualifiedNameString, emptyGHC2CoreState)
+import           Clash.GHC.GHC2Core
+  (C2C, GHC2CoreState, tyConMap, coreToId, coreToName, coreToTerm,
+   makeAllTyCons, qualifiedNameString, emptyGHC2CoreState)
 import           Clash.GHC.LoadModules   (loadModules)
 import           Clash.Primitives.Types  (PrimMap, ResolvedPrimMap)
 import           Clash.Primitives.Util   (generatePrimMap)
@@ -95,7 +96,10 @@ generateBindings tmpDir useColor primDirs importDirs hdl modName dflagsM = do
    , customBitRepresentations
    , primGuards ) <- loadModules tmpDir useColor hdl modName dflagsM importDirs
   primMap <- generatePrimMap primGuards (concat [pFP, primDirs, importDirs])
-  let ((bindingsMap,clsVMap),tcMap) = State.runState (mkBindings primMap bindings clsOps unlocatable) emptyGHC2CoreState
+  let ((bindingsMap,clsVMap),tcMap,_) =
+        RWS.runRWS (mkBindings primMap bindings clsOps unlocatable)
+                   GHC.noSrcSpan
+                   emptyGHC2CoreState
       (tcMap',tupTcCache)           = mkTupTyCons tcMap
       tcCache                       = makeAllTyCons tcMap' fiEnvs
       allTcCache                    = tysPrimMap `unionUniqMap` tcCache
@@ -105,7 +109,7 @@ generateBindings tmpDir useColor primDirs importDirs hdl modName dflagsM = do
       clsMap                        = mapUniqMap (\(v,i) -> (v,GHC.noSrcSpan,GHC.Inline,mkClassSelector inScope0 allTcCache (varType v) i)) clsVMap
       allBindings                   = bindingsMap `unionVarEnv` clsMap
       topEntities'                  =
-        flip State.evalState tcMap' $ mapM (\(topEnt,annM,benchM) -> do
+        (\m -> fst (RWS.evalRWS m GHC.noSrcSpan tcMap')) $ mapM (\(topEnt,annM,benchM) -> do
           topEnt' <- coreToName GHC.varName GHC.varUnique qualifiedNameString topEnt
           benchM' <- traverse coreToId benchM
           return (topEnt',annM,benchM')) topEntities
@@ -130,24 +134,23 @@ mkBindings
   -- Class operations
   -> [GHC.CoreBndr]
   -- Unlocatable Expressions
-  -> State GHC2CoreState
-           ( BindingMap
-           , VarEnv (Id,Int)
-           )
+  -> C2C ( BindingMap
+         , VarEnv (Id,Int)
+         )
 mkBindings primMap bindings clsOps unlocatable = do
   bindingsList <- mapM (\case
     GHC.NonRec v e -> do
       let sp = GHC.getSrcSpan v
           inl = GHC.inlinePragmaSpec . GHC.inlinePragInfo $ GHC.idInfo v
-      tm <- coreToTerm primMap unlocatable sp e
+      tm <- RWS.local (const sp) (coreToTerm primMap unlocatable e)
       v' <- coreToId v
       checkPrimitive primMap v
       return [(v', (v', sp, inl, tm))]
     GHC.Rec bs -> do
       tms <- mapM (\(v,e) -> do
-                    let sp = GHC.getSrcSpan v
+                    let sp  = GHC.getSrcSpan v
                         inl = GHC.inlinePragmaSpec . GHC.inlinePragInfo $ GHC.idInfo v
-                    tm <- coreToTerm primMap unlocatable sp e
+                    tm <- RWS.local (const sp) (coreToTerm primMap unlocatable e)
                     v' <- coreToId v
                     checkPrimitive primMap v
                     return (v',sp,inl,tm)
@@ -175,7 +178,7 @@ mkBindings primMap bindings clsOps unlocatable = do
 --   * isn't marked NOINLINE
 --   * produces an error when evaluating its result to WHNF
 --   * isn't using all its arguments
-checkPrimitive :: PrimMap a -> GHC.CoreBndr -> State GHC2CoreState ()
+checkPrimitive :: PrimMap a -> GHC.CoreBndr -> C2C ()
 checkPrimitive primMap v = do
   name' <- qualifiedNameString (GHC.varName v)
   when (name' `HashMap.member` primMap) $ do
@@ -242,7 +245,11 @@ mkTupTyCons tcMap = (tcMap'',tupTcCache)
   where
     tupTyCons        = GHC.boolTyCon : GHC.promotedTrueDataCon : GHC.promotedFalseDataCon
                      : map (GHC.tupleTyCon GHC.Boxed) [2..62]
-    (tcNames,tcMap') = State.runState (mapM (\tc -> coreToName GHC.tyConName GHC.tyConUnique qualifiedNameString tc) tupTyCons) tcMap
+    (tcNames,tcMap',_) =
+      RWS.runRWS (mapM (\tc -> coreToName GHC.tyConName GHC.tyConUnique
+                                          qualifiedNameString tc) tupTyCons)
+                 GHC.noSrcSpan
+                 tcMap
     tupTcCache       = IMS.fromList (zip [2..62] (drop 3 tcNames))
     tupHM            = listToUniqMap (zip tcNames tupTyCons)
     tcMap''          = tcMap' & tyConMap %~ (`unionUniqMap` tupHM)

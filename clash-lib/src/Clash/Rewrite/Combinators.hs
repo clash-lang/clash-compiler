@@ -79,6 +79,9 @@ allR trans (TransformContext is c) (Case scrut ty alts) =
         is'       = extendInScopeSetList (extendInScopeSetList is tvs) ids
     in  (p,) <$> trans (TransformContext is' (CaseAlt p : c)) e
 
+allR trans (TransformContext is c) (Tick sp e) =
+  Tick sp <$> trans (TransformContext is (TickC sp:c)) e
+
 allR _ _ tm = pure tm
 
 infixr 6 >->

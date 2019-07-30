@@ -41,6 +41,7 @@ import           Data.Text               (Text)
 import qualified Data.Text               as Text
 import           Data.Text.Prettyprint.Doc (Doc)
 
+import           Outputable              (ppr, showSDocUnsafe)
 import           SrcLoc                  (SrcSpan)
 
 import           Clash.Annotations.BitRepresentation.ClashLib
@@ -63,7 +64,8 @@ import           Clash.Core.TyCon
   (TyConName, TyConMap, tyConDataCons)
 import           Clash.Core.Type         (Type (..), TypeView (..),
                                           coreView1, splitTyConAppM, tyView, TyVar)
-import           Clash.Core.Util         (collectBndrs, substArgTys, termType)
+import           Clash.Core.Util
+  (collectBndrs, stripTicks, substArgTys, termType)
 import           Clash.Core.Var
   (Id, Var (..), mkLocalId, modifyVarName, Attr')
 import           Clash.Core.VarEnv
@@ -116,7 +118,7 @@ splitNormalized
   -> (Either String ([Id],[LetBinding],Id))
 splitNormalized tcm expr = case collectBndrs expr of
   (args,Letrec xes e)
-    | (tmArgs,[]) <- partitionEithers args -> case e of
+    | (tmArgs,[]) <- partitionEithers args -> case stripTicks e of
         Var v -> Right (tmArgs,xes,v)
         _     -> Left ($(curLoc) ++ "Not in normal form: res not simple var")
     | otherwise -> Left ($(curLoc) ++ "Not in normal form: tyArgs")
@@ -1245,8 +1247,10 @@ mkTopUnWrapper
   -- ^ The name and type of the signal to which to assign the result
   -> [(Expr,HWType)]
   -- ^ The arguments
+  -> [Declaration]
+  -- ^ Tick declarations
   -> NetlistMonad [Declaration]
-mkTopUnWrapper topEntity annM man dstId args = do
+mkTopUnWrapper topEntity annM man dstId args tickDecls = do
   let inTys    = portInTypes man
       outTys   = portOutTypes man
       inNames  = portInNames man
@@ -1299,7 +1303,7 @@ mkTopUnWrapper topEntity annM man dstId args = do
                             ( map (\(p,i,t) -> (Identifier p Nothing,In, t,Identifier i Nothing)) (concat iports) ++
                               map (\(p,o,t) -> (Identifier p Nothing,Out,t,Identifier o Nothing)) oports)
 
-        return $ (topCompDecl:unwrappers) ++ [outpAssign]
+        return $ tickDecls ++ (topCompDecl:unwrappers) ++ [outpAssign]
 
 -- | Convert between BitVector for an argument
 argBV
@@ -1777,3 +1781,9 @@ iteAlts sHTy [(pat0,alt0),(pat1,alt1)] | validIteSTy sHTy = case pat0 of
   validIteSTy _             = False
 
 iteAlts _ _ = Nothing
+
+ticksToDecls
+  :: [SrcSpan]
+  -> [Declaration]
+ticksToDecls =
+  map (TickDecl . Text.pack . showSDocUnsafe . ppr) . reverse . List.nub

@@ -53,12 +53,13 @@ import           Clash.Core.Literal               (Literal (..))
 import           Clash.Core.Name                  (Name(..))
 import           Clash.Core.Pretty                (showPpr)
 import           Clash.Core.Term
-  (Alt, Pat (..), Term (..), collectArgs)
+  (Alt, Pat (..), Term (..), collectArgs, collectArgsTicks, collectTicks)
 import qualified Clash.Core.Term                  as Core
 import           Clash.Core.Type
   (Type (..), coreView1, splitFunTys, splitCoreFunForallTy)
 import           Clash.Core.TyCon                 (TyConMap)
-import           Clash.Core.Util                  (mkApps, termType)
+import           Clash.Core.Util
+  (mkApps, mkTicks, stripTicks, termType)
 import           Clash.Core.Var                   (Id, Var (..))
 import           Clash.Core.VarEnv
   (VarEnv, eltsVarEnv, emptyInScopeSet, emptyVarEnv, extendVarEnv, lookupVarEnv,
@@ -268,16 +269,17 @@ mkNetDecl (id_,tm) = do
   wr   <- termToWireOrReg tm
   if isVoid hwTy
      then return Nothing
-     else return . Just $ NetDecl' (addSrcNote (nameLoc nm))
+     else return . Just $ NetDecl' (addSrcNote sp)
              wr
              (id2identifier id_)
              (Right hwTy)
 
   where
     nm = varName id_
+    sp = case tm of {Tick s _ -> s; _ -> nameLoc nm}
 
     termToWireOrReg :: Term -> NetlistMonad WireOrReg
-    termToWireOrReg (Case scrut _ alts0@(_:_:_)) = do
+    termToWireOrReg (stripTicks -> Case scrut _ alts0@(_:_:_)) = do
       tcm <- Lens.use tcCache
       let scrutTy = termType tcm scrut
       scrutHTy <- unsafeCoreTypeToHWTypeM' $(curLoc) scrutTy
@@ -325,9 +327,11 @@ mkDeclarations'
   -> Term
   -- ^ RHS of the let-binder
   -> NetlistMonad [Declaration]
-mkDeclarations' bndr (Var v) = mkFunApp (id2identifier bndr) v []
+mkDeclarations' bndr (collectTicks -> (Var v,ticks)) =
+  let tickDecls = ticksToDecls ticks
+  in  mkFunApp (id2identifier bndr) v [] tickDecls
 
-mkDeclarations' _ e@(Case _ _ []) = do
+mkDeclarations' _ e@(collectTicks -> (Case _ _ [],_)) = do
   (_,sp) <- Lens.use curCompNm
   throw $ ClashException
           sp
@@ -338,14 +342,17 @@ mkDeclarations' _ e@(Case _ _ []) = do
                     ])
           Nothing
 
-mkDeclarations' bndr (Case scrut altTy alts@(_:_:_)) =
-  mkSelection (Right bndr) scrut altTy alts
+mkDeclarations' bndr (collectTicks -> (Case scrut altTy alts@(_:_:_),ticks)) =
+  let tickDecls = ticksToDecls ticks
+  in  mkSelection (Right bndr) scrut altTy alts tickDecls
 
 mkDeclarations' bndr app =
-  let (appF,(args,tyArgs)) = second partitionEithers $ collectArgs app
+  let (appF,args0,ticks) = collectArgsTicks app
+      (args,tyArgs) = partitionEithers args0
+      tickDecls = ticksToDecls ticks
   in case appF of
     Var f
-      | null tyArgs -> mkFunApp (id2identifier bndr) f args
+      | null tyArgs -> mkFunApp (id2identifier bndr) f args tickDecls
       | otherwise   -> do
         (_,sp) <- Lens.use curCompNm
         throw (ClashException sp ($(curLoc) ++ "Not in normal form: Var-application with Type arguments:\n\n" ++ showPpr app) Nothing)
@@ -361,12 +368,13 @@ mkDeclarations' bndr app =
       if isBiSignalOut hwTy && not (isWriteToBiSignalPrimitive app)
          then return []
          else do
-          (exprApp,declsApp) <- mkExpr False (Right bndr) (varType bndr) app
+          (exprApp,declsApp0) <- mkExpr False (Right bndr) (varType bndr) app
           let dstId = id2identifier bndr
               assn  = case exprApp of
                         Identifier _ Nothing -> []
                         _ -> [Assignment dstId exprApp]
-          return (declsApp ++ assn)
+              declsApp1 = if null declsApp0 then tickDecls else declsApp0
+          return (declsApp1 ++ assn)
 
 -- | Generate a declaration that selects an alternative based on the value of
 -- the scrutinee
@@ -375,8 +383,9 @@ mkSelection
   -> Term
   -> Type
   -> [Alt]
+  -> [Declaration]
   -> NetlistMonad [Declaration]
-mkSelection bndr scrut altTy alts0 = do
+mkSelection bndr scrut altTy alts0 tickDecls = do
   let dstId = either id id2identifier bndr
   tcm <- Lens.use tcCache
   let scrutTy = termType tcm scrut
@@ -396,7 +405,7 @@ mkSelection bndr scrut altTy alts0 = do
       altFId <- extendIdentifier Extended dstId "_sel_alt_f"
       (altTExpr,altTDecls) <- mkExpr False (Left altTId) altTy altT
       (altFExpr,altFDecls) <- mkExpr False (Left altFId) altTy altF
-      return $! scrutDecls ++ altTDecls ++ altFDecls ++
+      return $! scrutDecls ++ altTDecls ++ altFDecls ++ tickDecls ++
                 [Assignment dstId (IfThenElse scrutExpr altTExpr altFExpr)]
     _ -> do
       reprs <- Lens.use customReprs
@@ -405,7 +414,7 @@ mkSelection bndr scrut altTy alts0 = do
       (scrutExpr,scrutDecls) <- first (mkScrutExpr sp scrutHTy (fst (head alts1))) <$>
                                   mkExpr True (Left scrutId) scrutTy scrut
       (exprs,altsDecls)      <- (second concat . unzip) <$> mapM (mkCondExpr scrutHTy) alts1
-      return $! scrutDecls ++ altsDecls ++ [CondAssignment dstId altHTy scrutExpr scrutHTy exprs]
+      return $! scrutDecls ++ altsDecls ++ tickDecls ++ [CondAssignment dstId altHTy scrutExpr scrutHTy exprs]
  where
   mkCondExpr :: HWType -> (Pat,Term) -> NetlistMonad ((Maybe HW.Literal,Expr),[Declaration])
   mkCondExpr scrutHTy (pat,alt) = do
@@ -483,8 +492,9 @@ mkFunApp
   => Identifier -- ^ LHS of the let-binder
   -> Id -- ^ Name of the applied function
   -> [Term] -- ^ Function arguments
+  -> [Declaration] -- ^ Tick declarations
   -> NetlistMonad [Declaration]
-mkFunApp dstId fun args = do
+mkFunApp dstId fun args tickDecls = do
   topAnns <- Lens.use topEntityAnns
   tcm     <- Lens.use tcCache
   case lookupVarEnv fun topAnns of
@@ -515,6 +525,7 @@ mkFunApp dstId fun args = do
         Just man <- readMaybe <$> liftIO (readFile manFile)
         instDecls <- mkTopUnWrapper fun annM man (dstId,dstHWty)
                        (zip argExprs hWTysFiltered)
+                       tickDecls
         return (argDecls ++ instDecls)
 
       | otherwise -> error $ $(curLoc) ++ "under-applied TopEntity"
@@ -543,7 +554,7 @@ mkFunApp dstId fun args = do
               instLabel0 <- extendIdentifier Basic compName (StrictText.pack "_" `StrictText.append` dstId)
               instLabel1 <- mkUniqueIdentifier Basic instLabel0
               let instDecl      = InstDecl Entity Nothing compName instLabel1 [] (outpAssign ++ inpAssigns)
-              return (argDecls ++ argDecls' ++ [instDecl])
+              return (argDecls ++ argDecls' ++ tickDecls ++ [instDecl])
             else error $ $(curLoc) ++ "under-applied normalized function"
         Nothing -> case args of
           [] -> return [Assignment dstId (Identifier (nameOcc $ varName fun) Nothing)]
@@ -570,7 +581,7 @@ mkExpr :: HasCallStack
        -> Type -- ^ Type of the LHS of the let-binder
        -> Term -- ^ Term to convert to an expression
        -> NetlistMonad (Expr,[Declaration]) -- ^ Returned expression and a list of generate BlackBox declarations
-mkExpr _ _ _ (Core.Literal l) = do
+mkExpr _ _ _ (stripTicks -> Core.Literal l) = do
   iw <- Lens.use intWidth
   case l of
     IntegerLiteral i -> return (HW.Literal (Just (Signed iw,iw)) $ NumLit i, [])
@@ -590,13 +601,14 @@ mkExpr _ _ _ (Core.Literal l) = do
     _ -> error $ $(curLoc) ++ "not an integer or char literal"
 
 mkExpr bbEasD bndr ty app = do
-  let (appF,args) = collectArgs app
+  let (appF,args,ticks) = collectArgsTicks app
       (tmArgs,tyArgs) = partitionEithers args
+      tickDecls = ticksToDecls ticks
   hwTy    <- unsafeCoreTypeToHWTypeM' $(curLoc) ty
   (_,sp) <- Lens.use curCompNm
   case appF of
     Data dc -> mkDcApplication hwTy bndr dc tmArgs
-    Prim nm _ -> mkPrimitive False bbEasD bndr nm args ty
+    Prim nm _ -> mkPrimitive False bbEasD bndr nm args ty tickDecls
     Var f
       | null tmArgs -> return (Identifier (nameOcc $ varName f) Nothing,[])
       | not (null tyArgs) ->
@@ -605,7 +617,7 @@ mkExpr bbEasD bndr ty app = do
           argNm0 <- extendIdentifier Extended (either id id2identifier bndr) "_fun_arg"
           argNm1 <- mkUniqueIdentifier Extended argNm0
           hwTyA  <- unsafeCoreTypeToHWTypeM' $(curLoc) ty
-          decls  <- mkFunApp argNm1 f tmArgs
+          decls  <- mkFunApp argNm1 f tmArgs tickDecls
           return (Identifier argNm1 Nothing, NetDecl' Nothing Wire argNm1 (Right hwTyA):decls)
     Case scrut ty' [alt] -> mkProjection bbEasD bndr scrut ty' alt
     Case scrut tyA alts -> do
@@ -619,12 +631,12 @@ mkExpr bbEasD bndr ty app = do
       argNm0 <- extendIdentifier Extended (either id id2identifier bndr) "_sel_arg"
       argNm1 <- mkUniqueIdentifier Extended argNm0
       hwTyA  <- unsafeCoreTypeToHWTypeM' $(curLoc) tyA
-      decls  <- mkSelection (Left argNm1) scrut tyA alts
+      decls  <- mkSelection (Left argNm1) scrut tyA alts tickDecls
       return (Identifier argNm1 Nothing, NetDecl' Nothing wr argNm1 (Right hwTyA):decls)
     Letrec binders body -> do
       netDecls <- fmap catMaybes $ mapM mkNetDecl binders
       decls    <- concat <$> mapM (uncurry mkDeclarations) binders
-      (bodyE,bodyDecls) <- mkExpr bbEasD bndr ty (mkApps body args)
+      (bodyE,bodyDecls) <- mkExpr bbEasD bndr ty (mkApps (mkTicks body ticks) args)
       return (bodyE,netDecls ++ decls ++ bodyDecls)
     _ -> throw (ClashException sp ($(curLoc) ++ "Not in normal form: application of a Lambda-expression\n\n" ++ showPpr app) Nothing)
 

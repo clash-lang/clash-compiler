@@ -170,10 +170,10 @@ instance Backend SystemVerilogState where
   blockDecl _ ds  = do
     decs <- decls ds
     if isEmpty decs
-      then insts ds
+      then indent 2 (insts ds)
       else
         pure decs <> line <>
-        insts ds
+        indent 2 (insts ds)
   unextend = return rmSlash
   addIncludes inc = includes %= (inc++)
   addLibraries libs = libraries %= (libs ++)
@@ -551,7 +551,7 @@ module_ c =
 
   modHeader  = "module" <+> stringS (componentName c)
   modPorts   = indent 4 (tupleInputs inPorts <> line <> tupleOutputs outPorts <> semi)
-  modBody    = indent 2 (decls (declarations c)) <> line <> line <> insts (declarations c)
+  modBody    = indent 2 (decls (declarations c)) <> line <> line <> indent 2 (insts (declarations c))
   modEnding  = "endmodule"
 
   inPorts  = sequence [ sigPort (Nothing,isBiSignalIn ty) (i,ty) | (i,ty)  <- inputs c  ]
@@ -763,7 +763,12 @@ addAttrs attrs' t =
 
 insts :: [Declaration] -> SystemVerilogM Doc
 insts [] = emptyDoc
-insts is = indent 2 . vcat . punctuate line . fmap catMaybes $ mapM inst_ is
+insts (TickDecl id_:ds) = "//" <+> stringS id_ <> line <> insts ds
+insts (d:ds) = do
+  docM <- inst_ d
+  case docM of
+    Nothing -> insts ds
+    Just doc -> pure doc <> line <> line <> insts ds
 
 stdMatch
   :: Bits a
@@ -835,6 +840,8 @@ inst_' id_ scrut scrutTy es = fmap Just $
 
 -- | Turn a Netlist Declaration to a SystemVerilog concurrent block
 inst_ :: Declaration -> SystemVerilogM (Maybe Doc)
+inst_ (TickDecl {}) = return Nothing
+
 inst_ (Assignment id_ e) = fmap Just $
   "assign" <+> stringS id_ <+> equals <+> align (expr_ False e <> semi)
 

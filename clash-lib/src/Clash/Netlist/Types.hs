@@ -246,6 +246,9 @@ data Declaration
       WireOrReg                  -- FIELD Wire or register
       !Identifier                -- FIELD Name of signal
       (Either Identifier HWType) -- FIELD Pointer to type of signal or type of signal
+      -- ^ Signal declaration
+  | TickDecl Comment
+  -- ^ HDL tick corresponding to a Core tick
   deriving Show
 
 data EntityOrComponent = Entity | Comp | Empty

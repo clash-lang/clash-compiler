@@ -476,6 +476,7 @@ substTm doc subst = go where
       (subst',bs') -> Letrec bs' (substTm doc subst' e)
     Case subj ty alts -> Case (go subj) (substTy subst ty) (map goAlt alts)
     Cast e t1 t2 -> Cast (go e) (substTy subst t1) (substTy subst t2)
+    Tick sp e -> Tick sp (go e)
     tm -> tm
 
   goAlt (pat,alt) = case pat of
@@ -614,6 +615,8 @@ freshenTm is0 = go (mkSubst is0) where
         (is2,alts') -> (is2, Case subj' (substTy subst0 ty) alts')
     Cast e t1 t2 -> case go subst0 e of
       (is1, e') -> (is1, Cast e' (substTy subst0 t1) (substTy subst0 t2))
+    Tick sp e -> case go subst0 e of
+      (is1, e') -> (is1, Tick sp e')
     tm -> (substInScope subst0, tm)
 
   goBind subst0 xs =
@@ -749,6 +752,9 @@ acmpTerm' inScope = go (mkRnEnv inScope)
     go env e1 e2 `thenCompare`
     acmpType' env l1 l2 `thenCompare`
     acmpType' env r1 r2
+  -- Look through ticks for aeq
+  go env (Tick _ e1) e2 = go env e1 e2
+  go env e1 (Tick _ e2) = go env e1 e2
 
   go _ e1 e2 = compare (getRank e1) (getRank e2)
 
@@ -772,6 +778,7 @@ acmpTerm' inScope = go (mkRnEnv inScope)
     TyLam {}   -> 8
     Letrec {}  -> 9
     Case {}    -> 10
+    Tick {}    -> 11
 
 thenCompare :: Ordering -> Ordering -> Ordering
 thenCompare EQ rel = rel
