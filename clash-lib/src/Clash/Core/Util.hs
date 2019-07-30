@@ -41,7 +41,8 @@ import Clash.Core.Subst
   (extendTvSubst, mkSubst, mkTvSubst, substTy, substTyWith,
    substTyInVar, extendTvSubstList)
 import Clash.Core.Term
-  (LetBinding, Pat (..), PrimInfo (..), Term (..), Alt, WorkInfo (..), collectArgs)
+  (LetBinding, Pat (..), PrimInfo (..), Term (..), Alt, WorkInfo (..),
+   TickInfo (..), collectArgs)
 import Clash.Core.Type
   (Kind, LitTy (..), Type (..), TypeView (..),
    coreView, coreView1, isFunTy, isPolyFunCoreTy, mkFunTy, splitFunTy, tyView,
@@ -450,7 +451,7 @@ mkTyApps = foldl' TyApp
 
 mkTicks
   :: Term
-  -> [SrcSpan]
+  -> [TickInfo]
   -> Term
 mkTicks tm ticks = foldl' (\e s -> Tick s e) tm (nub ticks)
 
@@ -925,3 +926,13 @@ substArgTys dc args =
 stripTicks :: Term -> Term
 stripTicks (Tick _ e) = stripTicks e
 stripTicks e = e
+
+-- | Try to reduce an arbitrary type to a Symbol, and subsequently extract its
+-- String representation
+tySym
+  :: TyConMap
+  -> Type
+  -> Except String String
+tySym m (coreView1 m -> Just ty) = tySym m ty
+tySym _ (LitTy (SymTy s))        = return s
+tySym _ ty = throwE $ $(curLoc) ++ "Cannot reduce to a string:\n" ++ showPpr ty

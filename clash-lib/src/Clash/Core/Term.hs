@@ -10,6 +10,7 @@
 {-# LANGUAGE DeriveAnyClass        #-}
 {-# LANGUAGE DeriveGeneric         #-}
 {-# LANGUAGE FlexibleInstances     #-}
+{-# LANGUAGE LambdaCase            #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE TemplateHaskell       #-}
 {-# LANGUAGE ViewPatterns          #-}
@@ -20,10 +21,12 @@ module Clash.Core.Term
   , LetBinding
   , Pat (..)
   , Alt
+  , TickInfo (..), ModName (..)
   , PrimInfo (..)
   , WorkInfo (..)
   , CoreContext (..), Context, isLambdaBodyCtx, isTickCtx
   , collectArgs, collectArgsTicks, collectTicks, primArg
+  , partitionTicks
   )
 where
 
@@ -32,6 +35,7 @@ import Control.DeepSeq
 import Data.Binary                             (Binary)
 import Data.Either                             (lefts, rights)
 import Data.Hashable                           (Hashable)
+import Data.List                               (partition)
 import Data.Text                               (Text)
 import GHC.Generics
 import SrcLoc                                  (SrcSpan)
@@ -40,6 +44,7 @@ import SrcLoc                                  (SrcSpan)
 import Clash.Core.DataCon                      (DataCon)
 import Clash.Core.Literal                      (Literal)
 import Clash.Core.Name                         (Name (..))
+import {-# SOURCE #-} Clash.Core.Subst         (aeqType)
 import {-# SOURCE #-} Clash.Core.Type          (Type)
 import Clash.Core.Var                          (Id, TyVar)
 
@@ -57,8 +62,31 @@ data Term
   | Case    !Term !Type [Alt]               -- ^ Case-expression: subject, type of
                                             -- alternatives, list of alternatives
   | Cast    !Term !Type !Type               -- ^ Cast a term from one type to another
-  | Tick    !SrcSpan !Term                  -- ^ Location-annotated term
+  | Tick    !TickInfo !Term                 -- ^ Location-annotated term
   deriving (Show,Generic,NFData,Hashable,Binary)
+
+data TickInfo
+  = SrcSpan !SrcSpan
+  -- ^ Source tick, will get added by GHC by running clash with `-g`
+  | ModName !ModName !Type
+  -- ^ Modifier for naming module instantiations and registers, are added by
+  -- the user by using the functions @Clash.Magic.[prefixName,suffixName,setName]@
+  deriving (Show,Generic,NFData,Hashable,Binary)
+
+-- | Tag to indicate which instance/register name modifier was used
+data ModName
+  = PrefixName
+  -- ^ @Clash.Magic.prefixName@
+  | SuffixName
+  -- ^ @Clash.Magic.suffixName@
+  | SetName
+  -- ^ @Clash.Magic.setName@
+  deriving (Eq,Show,Generic,NFData,Hashable,Binary)
+
+instance Eq TickInfo where
+  (==) (SrcSpan sp1) (SrcSpan sp2) = sp1 == sp2
+  (==) (ModName sa1 nm1) (ModName sa2 nm2) = sa1 == sa2 && aeqType nm1 nm2
+  (==) _ _ = False
 
 data PrimInfo
   = PrimInfo
@@ -121,7 +149,7 @@ data CoreContext
   -- ^ Subject of a case-decomposition
   | CastBody
   -- ^ Body of a Cast
-  | TickC SrcSpan
+  | TickC TickInfo
   -- ^ Body of a Tick
   deriving (Show, Generic, NFData, Hashable, Binary)
 
@@ -177,7 +205,7 @@ collectArgs = go []
 
 collectTicks
   :: Term
-  -> (Term, [SrcSpan])
+  -> (Term, [TickInfo])
 collectTicks = go []
  where
   go ticks (Tick s e) = go (s:ticks) e
@@ -185,7 +213,7 @@ collectTicks = go []
 
 collectArgsTicks
   :: Term
-  -> (Term, [Either Term Type], [SrcSpan])
+  -> (Term, [Either Term Type], [TickInfo])
 collectArgsTicks = go [] []
  where
   go args ticks (App e1 e2) = go (Left e2:args) ticks     e1
@@ -206,3 +234,10 @@ primArg (collectArgs -> t) =
       Just (nm, length (rights args), length (lefts args))
     _ ->
       Nothing
+
+-- | Partition ticks in source ticks and nameMod ticks
+partitionTicks
+  :: [TickInfo]
+  -> ([TickInfo], [TickInfo])
+  -- ^ (source ticks, nameMod ticks)
+partitionTicks = partition (\case {SrcSpan {} -> True; _ -> False})

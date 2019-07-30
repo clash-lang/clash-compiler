@@ -33,6 +33,7 @@ where
 
 import Control.DeepSeq
 import Control.Monad.Fail                   (MonadFail)
+import Control.Monad.Reader                 (ReaderT, MonadReader)
 import Control.Monad.State                  as Lazy (State)
 import Control.Monad.State.Strict           as Strict
   (State,MonadIO, MonadState, StateT)
@@ -70,10 +71,22 @@ import Clash.Annotations.BitRepresentation.Internal
 -- | Monad that caches generated components (StateT) and remembers hidden inputs
 -- of components that are being generated (WriterT)
 newtype NetlistMonad a =
-  NetlistMonad { runNetlist :: StateT NetlistState IO a }
-  deriving newtype (Functor, Monad, Applicative, MonadState NetlistState, MonadIO, MonadFail)
+  NetlistMonad { runNetlist :: StateT NetlistState (ReaderT NetlistEnv IO) a }
+  deriving newtype (Functor, Monad, Applicative, MonadReader NetlistEnv,
+                    MonadState NetlistState, MonadIO, MonadFail)
 
 type HWMap = HashMap Type (Either String FilteredHWType)
+
+-- | Environment of the NetlistMonad
+data NetlistEnv
+  = NetlistEnv
+  { _prefixName  :: Identifier
+  -- ^ Prefix for instance/register names
+  , _suffixName :: Identifier
+  -- ^ Postfix for instance/register names
+  , _setName     :: Maybe Identifier
+  -- ^ (Maybe) user given instance/register name
+  }
 
 -- | State of the NetlistMonad
 data NetlistState
@@ -402,4 +415,5 @@ emptyBBContext n
   , bbCompName    = pack "__NOCOMPNAME__"
   }
 
+makeLenses ''NetlistEnv
 makeLenses ''NetlistState

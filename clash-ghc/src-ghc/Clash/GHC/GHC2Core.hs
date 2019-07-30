@@ -320,6 +320,16 @@ coreToTerm primMap unlocs = term
         go "Clash.Sized.BitVector.Internal.checkUnpackUndef" args
           | [_nTy,_aTy,_kn,_typ,f] <- args
           = term f
+        go "Clash.Magic.prefixName" args
+          | [Type nmTy,_aTy,f] <- args
+          = C.Tick <$> (C.ModName C.PrefixName <$> coreToType nmTy) <*> term f
+        go "Clash.Magic.suffixName" args
+          | [Type nmTy,_aTy,f] <- args
+          = C.Tick <$> (C.ModName C.SuffixName <$> coreToType nmTy) <*> term f
+        go "Clash.Magic.setName" args
+          | [Type nmTy,_aTy,f] <- args
+          = C.Tick <$> (C.ModName C.SetName <$> coreToType nmTy) <*> term f
+
         go _ _ = term' e
     term' (Var x)                 = var x
     term' (Lit l)                 = return $ C.Literal (coreToLiteral l)
@@ -375,7 +385,7 @@ coreToTerm primMap unlocs = term
           -> C.Cast <$> term e <*> coreToType ty1 <*> coreToType ty2
         _ -> term e
     term' (Tick (SourceNote rsp _) e) =
-      C.Tick (RealSrcSpan rsp) <$> addUsefull (RealSrcSpan rsp) (term e)
+      C.Tick (C.SrcSpan (RealSrcSpan rsp)) <$> addUsefull (RealSrcSpan rsp) (term e)
     term' (Tick _ e)        = term e
     term' (Type t)          = C.TyApp (C.Prim (pack "_TY_") (C.PrimInfo C.undefinedTy C.WorkNever)) <$>
                                 coreToType t
@@ -422,6 +432,12 @@ coreToTerm primMap unlocs = term
               | f == pack "GHC.Magic.runRW#"                 -> return (runRWTerm xType)
               | f == pack "Clash.Class.BitPack.packXWith"    -> return (packXWithTerm xType)
               | f == pack "Clash.Sized.Internal.BitVector.checkUnpackUndef" -> return (checkUnpackUndefTerm xType)
+              | f == pack "Clash.Magic.prefixName"
+              -> return (modNameTerm C.PrefixName xType)
+              | f == pack "Clash.Magic.postfixName"
+              -> return (modNameTerm C.SuffixName xType)
+              | f == pack "Clash.Magic.setName"
+              -> return (modNameTerm C.SetName xType)
               | otherwise                                    -> return (C.Prim xNameS (C.PrimInfo xType wi))
             Just (Just (BlackBox {workInfo = wi})) ->
               return $ C.Prim xNameS (C.PrimInfo xType wi)
@@ -1149,6 +1165,31 @@ checkUnpackUndefTerm (C.ForAllTy nTV (C.ForAllTy aTV funTy)) =
     fId               = C.mkLocalId fTy fName
 
 checkUnpackUndefTerm ty = error $ $(curLoc) ++ show ty
+
+-- | Given the type:
+--
+-- @forall (name :: Symbol) (a :: Type) . a -> (name ::: a)@
+--
+-- Generate the term:
+--
+-- @/\(name:Symbol)./\(a:Type).\(x:a) -> <TICK>x@
+modNameTerm
+  :: C.ModName
+  -> C.Type
+  -> C.Term
+modNameTerm sa (C.ForAllTy nmTV (C.ForAllTy aTV funTy)) =
+  C.TyLam nmTV (
+  C.TyLam aTV (
+  C.Lam   xId (
+  (C.Tick (C.ModName sa (C.VarTy nmTV)) (C.Var xId)))))
+  where
+    (C.FunTy xTy _)  = C.tyView funTy
+    -- Safe to use `mkUnsafeSystemName` here, because we're building the
+    -- identity \x.x, so any shadowing of 'x' would be the desired behavior.
+    xName            = C.mkUnsafeSystemName "x" 0
+    xId              = C.mkLocalId xTy xName
+
+modNameTerm _ ty = error $ $(curLoc) ++ show ty
 
 isDataConWrapId :: Id -> Bool
 isDataConWrapId v = case idDetails v of

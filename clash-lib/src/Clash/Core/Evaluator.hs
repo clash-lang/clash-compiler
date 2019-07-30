@@ -48,7 +48,7 @@ import           Clash.Core.VarEnv
 import           Clash.Driver.Types                      (BindingMap)
 import           Prelude                                 hiding (lookup)
 import           Clash.Unique
-import           Clash.Util                              (SrcSpan, curLoc)
+import           Clash.Util                              (curLoc)
 import           Clash.Pretty
 
 -- | The heap
@@ -70,7 +70,7 @@ data StackFrame
   | Instantiate Type
   | PrimApply  Text PrimInfo [Type] [Value] [Term]
   | Scrutinise Type [Alt]
-  | Tickish SrcSpan
+  | Tickish TickInfo
   deriving Show
 
 instance ClashPretty StackFrame where
@@ -91,7 +91,7 @@ instance ClashPretty StackFrame where
 
 mkTickish
   :: Stack
-  -> [SrcSpan]
+  -> [TickInfo]
   -> Stack
 mkTickish s sps = map Tickish sps ++ s
 

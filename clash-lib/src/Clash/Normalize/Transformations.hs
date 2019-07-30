@@ -98,8 +98,9 @@ import           Clash.Core.Subst
   (substTm, mkSubst, extendIdSubst, extendIdSubstList, extendTvSubst,
    extendTvSubstList, freshenTm, substTyInVar, deShadowTerm)
 import           Clash.Core.Term
-  (LetBinding, Pat (..), Term (..), CoreContext (..), PrimInfo (..),
-   isLambdaBodyCtx, isTickCtx, collectArgs, collectArgsTicks, collectTicks)
+  (LetBinding, Pat (..), Term (..), CoreContext (..), PrimInfo (..), TickInfo,
+   isLambdaBodyCtx, isTickCtx, collectArgs, collectArgsTicks, collectTicks,
+   partitionTicks)
 import           Clash.Core.Type             (Type, TypeView (..), applyFunTy,
                                               isPolyFunCoreTy, isClassTy,
                                               normalizeType, splitFunForallTy,
@@ -1157,7 +1158,7 @@ appPropFast ctx@(TransformContext is _) = \case
   e@TyApp {} -> uncurry3 (go is) (collectArgsTicks e)
   e          -> return e
  where
-  go :: InScopeSet -> Term -> [Either Term Type] -> [SrcSpan]
+  go :: InScopeSet -> Term -> [Either Term Type] -> [TickInfo]
      -> NormalizeSession Term
   go is0 (collectArgsTicks -> (fun,args0@(_:_),ticks0)) args1 ticks1 =
     go is0 fun (args0 ++ args1) (ticks0 ++ ticks1)
@@ -1356,7 +1357,11 @@ makeANF ctx@(TransformContext is0 _) e0
     (e2,(bndrs,_)) <- runStateT (bottomupR collectANF ctx e1) ([],is2)
     case bndrs of
       [] -> return e0
-      _  -> changed (Letrec bndrs e2)
+      _  -> do
+        let (e3,ticks) = collectTicks e2
+            (srcTicks,nmTicks) = partitionTicks ticks
+        -- Ensure that `AppendName` ticks still scope over the entire expression
+        changed (mkTicks (Letrec bndrs (mkTicks e3 srcTicks)) nmTicks)
 
 -- | Note [ANF InScopeSet]
 --
@@ -2236,12 +2241,14 @@ flattenLet (TransformContext is0 _) letrec@(Letrec _ _) = do
     _ -> return (Letrec binds' body)
   where
     go :: InScopeSet -> LetBinding -> NormalizeSession [LetBinding]
-    go isN (id_,stripTicks -> Letrec binds' body') = do
+    go isN (id_,collectTicks -> (Letrec binds' body',ticks)) = do
       let bodyOccs = Lens.foldMapByOf
                        freeLocalIds (unionVarEnvWith (+))
                        emptyVarEnv (`unitVarEnv` (1 :: Int))
                        body'
-      case binds' of
+          (srcTicks,nmTicks) = partitionTicks ticks
+      -- Distribute the name ticks of the let-expression over all the bindings
+      map (second (`mkTicks` nmTicks)) <$> case binds' of
         -- inline binders into the body when there's only a single binder, and
         -- only if that binder doesn't perform any work or is only used once in
         -- the body
@@ -2250,8 +2257,13 @@ flattenLet (TransformContext is0 _) letrec@(Letrec _ _) = do
              -- Except when the binder is recursive!
              then changed [(id',e'),(id_, body')]
              else let subst = extendIdSubst (mkSubst isN) id' e'
-                  in  changed [(id_, (substTm "flattenLetGo" subst body'))]
-        bs -> changed (bs ++ [(id_, body')])
+                  in  changed [(id_
+                               -- Only apply srcTicks to the body
+                               ,mkTicks (substTm "flattenLetGo" subst body')
+                                        srcTicks)]
+        bs -> changed (bs ++ [(id_
+                               -- Only apply srcTicks to the body
+                              ,mkTicks body' srcTicks)])
     go _ b = return [b]
 
 flattenLet _ e = return e
