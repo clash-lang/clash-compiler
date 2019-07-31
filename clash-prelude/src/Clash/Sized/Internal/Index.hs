@@ -106,6 +106,7 @@ import Clash.XException
 >>> import Clash.Sized.Internal.Index
 -}
 
+
 -- | Arbitrary-bounded unsigned integer represented by @ceil(log_2(n))@ bits.
 --
 -- Given an upper bound @n@, an 'Index' @n@ number has a range of: [0 .. @n@-1]
@@ -129,66 +130,61 @@ import Clash.XException
 -- >>> 2 * 4 :: Index 8
 -- *** Exception: X: Clash.Sized.Index: result 8 is out of bounds: [0..7]
 -- ...
-newtype SatIndex (sat :: SaturationMode) (n :: Nat) =
+newtype Index (sat :: SaturationMode) (n :: Nat) =
   -- | The constructor, 'I', and the field, 'unsafeToInteger', are not
   -- synthesizable.
   I { unsafeToInteger :: Integer }
   deriving (Data, Generic)
 
-type Index n = SatIndex 'SatUnsafe n
-
 {-# NOINLINE size# #-}
-size# :: (KnownNat n, 1 <= n) => SatIndex sat n -> Int
+size# :: (KnownNat n, 1 <= n) => Index sat n -> Int
 size# = BV.size# . pack#
 
-instance NFData (SatIndex sat n) where
+instance NFData (Index sat n) where
   rnf (I i) = rnf i `seq` ()
   {-# NOINLINE rnf #-}
 -- NOINLINE is needed so that Clash doesn't trip on the "Index ~# Integer"
 -- coercion
 
-instance (KnownSatMode sat, KnownNat n, 1 <= n) => BitPack (SatIndex sat n) where
-  type BitSize (SatIndex sat n) = CLog 2 n
+instance (KnownNat n, 1 <= n) => BitPack (Index sat n) where
+  type BitSize (Index sat n) = CLog 2 n
   pack   = packXWith pack#
   unpack = unpack#
 
 -- | Safely convert an `SNat` value to an `Index`
--- TODO: Remove this function??
-
 fromSNat
   :: (KnownSatMode sat, KnownNat n, KnownNat m, 1 <= n, 1 <= m, CmpNat n m ~ 'LT)
-  => SNat n
-  -> SatIndex sat m
+  => SNat n -> SatIndex sat m
 fromSNat = snatToNum
 
 {-# NOINLINE pack# #-}
 pack# :: SatIndex sat n -> BitVector (CLog 2 n)
-pack# (I i) = BV 0 (naturalFromInteger i)
+pack# (I i) = BV 0 i
 
 {-# NOINLINE unpack# #-}
 unpack# :: (KnownSatMode sat, KnownNat n, 1 <= n) => BitVector (CLog 2 n) -> SatIndex sat n
-unpack# (BV 0 i) = fromInteger_INLINE (naturalToInteger i)
+unpack# (BV 0 i) = fromInteger_INLINE i
 unpack# bv = undefError "Index.unpack" [bv]
 
-instance Eq (SatIndex sat n) where
+instance Eq (Index sat n) where
   (==) = eq#
   (/=) = neq#
 
 {-# NOINLINE eq# #-}
-eq# :: (SatIndex sat1 n) -> (SatIndex sat2 n) -> Bool
+eq# :: (Index sat1 n) -> (Index sat2 n) -> Bool
 (I n) `eq#` (I m) = n == m
 
 {-# NOINLINE neq# #-}
-neq# :: (SatIndex sat1 n) -> (SatIndex sat2 n) -> Bool
+neq# :: (Index sat1 n) -> (Index sat2 n) -> Bool
 (I n) `neq#` (I m) = n /= m
 
-instance Ord (SatIndex sat n) where
+instance Ord (Index sat n) where
   (<)  = lt#
   (>=) = ge#
   (>)  = gt#
   (<=) = le#
 
-lt#,ge#,gt#,le# :: SatIndex sat1 n -> SatIndex sat2 n -> Bool
+lt#,ge#,gt#,le# :: Index sat1 n -> Index sat2 n -> Bool
 {-# NOINLINE lt# #-}
 lt# (I n) (I m) = n < m
 {-# NOINLINE ge# #-}
@@ -200,7 +196,7 @@ le# (I n) (I m) = n <= m
 
 -- | The functions: 'enumFrom', 'enumFromThen', 'enumFromTo', and
 -- 'enumFromThenTo', are not synthesizable.
-instance KnownNat n => Enum (SatIndex sat n) where
+instance KnownNat n => Enum (Index sat n) where
   succ           = (+# fromInteger# 1)
   pred           = (-# fromInteger# 1)
   toEnum         = fromInteger# . toInteger
@@ -222,17 +218,17 @@ enumFromTo# :: Index n -> Index n -> [Index n]
 enumFromTo# x y = map I [unsafeToInteger x .. unsafeToInteger y]
 {-# NOINLINE enumFromTo# #-}
 {-# NOINLINE enumFromThenTo# #-}
-enumFrom#       :: forall n. KnownNat n => SatIndex sat n -> [SatIndex sat n]
-enumFromThen#   :: forall n. KnownNat n => SatIndex sat n -> SatIndex sat n -> [SatIndex sat n]
+enumFrom#       :: SatIndex sat n -> [SatIndex sat n]
+enumFromThen#   :: SatIndex sat n -> SatIndex sat n -> [SatIndex sat n]
 enumFromTo#     :: SatIndex sat n -> SatIndex sat n -> [SatIndex sat n]
 enumFromThenTo# :: SatIndex sat n -> SatIndex sat n -> SatIndex sat n -> [SatIndex sat n]
-enumFrom# x             = map fromInteger_INLINE [unsafeToInteger x .. unsafeToInteger (maxBound :: SatIndex sat n)]
-enumFromThen# x y       = map fromInteger_INLINE [unsafeToInteger x, unsafeToInteger y .. unsafeToInteger (maxBound :: SatIndex sat n)]
+enumFrom# x             = map fromInteger_INLINE [unsafeToInteger x ..]
+enumFromThen# x y       = map fromInteger_INLINE [unsafeToInteger x, unsafeToInteger y ..]
 enumFromTo# x y         = map I [unsafeToInteger x .. unsafeToInteger y]
 enumFromThenTo# x1 x2 y = map I [unsafeToInteger x1, unsafeToInteger x2 .. unsafeToInteger y]
 {-# NOINLINE enumFromThenTo# #-}
 
-instance KnownNat n => Bounded (SatIndex sat n) where
+instance KnownNat n => Bounded (Index sat n) where
   minBound = fromInteger# 0
   maxBound = maxBound#
 
@@ -244,20 +240,20 @@ maxBound# =
 {-# NOINLINE maxBound# #-}
 
 -- | Operators report an error on overflow and underflow
-instance (KnownSatMode sat, KnownNat n, 1 <= n) => Num (SatIndex sat n) where
-  (+)         = satAdd $ satModeVal $ Proxy @sat
-  (-)         = satSub $ satModeVal $ Proxy @sat
-  (*)         = satMul $ satModeVal $ Proxy @sat
+instance (KnownSatMode sat, KnownNat n, 1 <= n) => Num (Index sat n) where
+  (+)         = satAdd $ satMode @sat
+  (-)         = satSub $ satMode @sat
+  (*)         = satMul $ satMode @sat
   negate      = (maxBound# -#)
   abs         = id
   signum i    = if i == 0 then 0 else 1
   fromInteger = fromInteger#
 
-fromInteger# :: KnownNat n => Integer -> SatIndex sat n
+fromInteger# :: KnownNat n => Integer -> Index sat n
 {-# NOINLINE fromInteger# #-}
 fromInteger# = fromInteger_INLINE
 {-# INLINE fromInteger_INLINE #-}
-fromInteger_INLINE :: forall n sat. (HasCallStack, KnownNat n) => Integer -> SatIndex sat n
+fromInteger_INLINE :: forall n sat. (HasCallStack, KnownNat n) => Integer -> Index sat n
 fromInteger_INLINE i = bound `seq` if i > (-1) && i < bound then I i else err
   where
     bound = natVal (Proxy @n)
@@ -265,14 +261,14 @@ fromInteger_INLINE i = bound `seq` if i > (-1) && i < bound then I i else err
                    " is out of bounds: [0.." ++ show (bound - 1) ++ "]")
 
 
-instance ExtendingNum (SatIndex sat m) (SatIndex sat n) where
-  type AResult (SatIndex sat m) (SatIndex sat n) = SatIndex sat (m + n - 1)
+instance ExtendingNum (Index sat m) (Index sat n) where
+  type AResult (Index sat m) (Index sat n) = Index sat (m + n - 1)
   add  = plus#
   sub = minus#
-  type MResult (SatIndex sat m) (SatIndex sat n) = SatIndex sat (((m - 1) * (n - 1)) + 1)
+  type MResult (Index sat m) (Index sat n) = Index sat (((m - 1) * (n - 1)) + 1)
   mul = times#
 
-plus#, minus# :: SatIndex sat m -> SatIndex sat n -> SatIndex sat (m + n - 1)
+plus#, minus# :: Index sat m -> Index sat n -> Index sat (m + n - 1)
 {-# NOINLINE plus# #-}
 plus# (I a) (I b) = I (a + b)
 
@@ -285,10 +281,10 @@ minus# (I a) (I b) =
   in  res
 
 {-# NOINLINE times# #-}
-times# :: SatIndex sat m -> SatIndex sat n -> SatIndex sat (((m - 1) * (n - 1)) + 1)
+times# :: Index sat m -> Index sat n -> Index sat (((m - 1) * (n - 1)) + 1)
 times# (I a) (I b) = I (a * b)
 
-instance (KnownSatMode sat, KnownNat n, 1 <= n) => SaturatingNum (SatIndex sat n) where
+instance (KnownSatMode sat, KnownNat n, 1 <= n) => SaturatingNum (Index sat n) where
   satAdd SatWrap !a !b =
     case snatToNum @Integer (SNat @n) of
       1 -> fromInteger# 0
@@ -297,7 +293,13 @@ instance (KnownSatMode sat, KnownNat n, 1 <= n) => SaturatingNum (SatIndex sat n
           z | let m = fromInteger# (natVal (Proxy @ n))
             , z >= m -> resize# (z - m)
           z -> resize# z
-  satAdd SatUnsafe a b = a +# b
+  satAdd SatZero a b =
+    leToPlusKN @1 @n $
+      case plus# a b of
+        z | let m = fromInteger# (natVal (Proxy @ n))
+          , z >= m -> fromInteger# 0
+        z -> resize# z
+  satAdd SatError a b = a +# b
   satAdd _ a b =
     leToPlusKN @1 @n $
       case plus# a b of
@@ -309,7 +311,7 @@ instance (KnownSatMode sat, KnownNat n, 1 <= n) => SaturatingNum (SatIndex sat n
     if lt# a b
        then maxBound -# (b -# a) +# 1
        else a -# b
-  satSub SatUnsafe a b = a -# b
+  satSub SatError a b = a -# b
   satSub _ a b =
     if lt# a b
        then fromInteger# 0
@@ -328,7 +330,7 @@ instance (KnownSatMode sat, KnownNat n, 1 <= n) => SaturatingNum (SatIndex sat n
         z | let m = fromInteger# (natVal (Proxy @ (n - 1)))
           , z > m -> fromInteger# 0
         z -> resize# z
-  satMul SatUnsafe a b = a *# b
+  satMul SatError a b = a *# b
   satMul _ a b =
     leToPlusKN @1 @n $
       case times# a b of
@@ -336,7 +338,7 @@ instance (KnownSatMode sat, KnownNat n, 1 <= n) => SaturatingNum (SatIndex sat n
           , z > m -> maxBound#
         z -> resize# z
 
-(+#),(-#),(*#) :: KnownNat n => SatIndex sat n -> SatIndex sat n -> SatIndex sat n
+(+#),(-#),(*#) :: KnownNat n => Index sat n -> Index sat n -> Index sat n
 {-# NOINLINE (+#) #-}
 (+#) (I a) (I b) = fromInteger_INLINE $ a + b
 
@@ -346,10 +348,10 @@ instance (KnownSatMode sat, KnownNat n, 1 <= n) => SaturatingNum (SatIndex sat n
 {-# NOINLINE (*#) #-}
 (*#) (I a) (I b) = fromInteger_INLINE $ a * b
 
-instance (KnownSatMode sat, KnownNat n, 1 <= n) => Real (SatIndex sat n) where
+instance (KnownSatMode sat, KnownNat n, 1 <= n) => Real (Index sat n) where
   toRational = toRational . toInteger#
 
-instance (KnownSatMode sat, KnownNat n, 1 <= n) => Integral (SatIndex sat n) where
+instance (KnownSatMode sat, KnownNat n, 1 <= n) => Integral (Index sat n) where
   quot        = quot#
   rem         = rem#
   div         = quot#
@@ -358,14 +360,14 @@ instance (KnownSatMode sat, KnownNat n, 1 <= n) => Integral (SatIndex sat n) whe
   divMod  n d = (n `quot#` d,n `rem#` d)
   toInteger   = toInteger#
 
-quot#,rem# :: SatIndex sat n -> SatIndex sat n -> SatIndex sat n
+quot#,rem# :: Index sat n -> Index sat n -> Index sat n
 {-# NOINLINE quot# #-}
 (I a) `quot#` (I b) = I (a `div` b)
 {-# NOINLINE rem# #-}
 (I a) `rem#` (I b) = I (a `rem` b)
 
 {-# NOINLINE toInteger# #-}
-toInteger# :: SatIndex sat n -> Integer
+toInteger# :: Index sat n -> Integer
 toInteger# (I n) = n
 
 instance (KnownSatMode sat, KnownNat n, 1 <= n) => Parity (SatIndex sat n) where
@@ -392,32 +394,32 @@ instance (KnownSatMode sat, KnownNat n, 1 <= n) => Bits (SatIndex sat n) where
   rotateR v i       = unpack# $ rotateR (pack# v) i
   popCount i        = popCount (pack# i)
 
-instance (KnownSatMode sat, KnownNat n, 1 <= n) => FiniteBits (SatIndex sat n) where
+instance (KnownSatMode sat, KnownNat n, 1 <= n) => FiniteBits (Index sat n) where
   finiteBitSize        = size#
   countLeadingZeros  i = countLeadingZeros  (pack# i)
   countTrailingZeros i = countTrailingZeros (pack# i)
 
-instance Resize (SatIndex sat) where
+instance Resize (Index sat) where
   resize     = resize#
   zeroExtend = extend
   truncateB  = resize#
 
-resize# :: KnownNat m => SatIndex sat n -> SatIndex sat m
+resize# :: KnownNat m => Index sat n -> Index sat m
 resize# (I i) = fromInteger_INLINE i
 {-# NOINLINE resize# #-}
 
-instance KnownNat n => Lift (SatIndex sat n) where
+instance KnownNat n => Lift (Index sat n) where
   lift u@(I i) = sigE [| fromInteger# i |] (decIndex (natVal u))
   {-# NOINLINE lift #-}
 
 decIndex :: Integer -> TypeQ
-decIndex n = appT (conT ''SatIndex) (litT $ numTyLit n)
+decIndex n = appT (conT ''Index) (litT $ numTyLit n)
 
-instance Show (SatIndex sat n) where
+instance Show (Index sat n) where
   show (I i) = show i
   {-# NOINLINE show #-}
 
-instance ShowX (SatIndex sat n) where
+instance ShowX (Index sat n) where
   showsPrecX = showsPrecXWith showsPrec
 
 instance NFDataX (SatIndex sat n) where
@@ -425,17 +427,17 @@ instance NFDataX (SatIndex sat n) where
   rnfX = rwhnfX
 
 -- | None of the 'Read' class' methods are synthesizable.
-instance (KnownSatMode sat, KnownNat n, 1 <= n) => Read (SatIndex sat n) where
+instance (KnownSatMode sat, KnownNat n, 1 <= n) => Read (Index sat n) where
   readPrec = fromIntegral <$> (readPrec :: ReadPrec Natural)
 
-instance KnownNat n => Default (SatIndex sat n) where
+instance KnownNat n => Default (Index sat n) where
   def = fromInteger# 0
 
-instance (KnownSatMode sat, KnownNat n, 1 <= n) => Arbitrary (SatIndex sat n) where
+instance (KnownSatMode sat, KnownNat n, 1 <= n) => Arbitrary (Index sat n) where
   arbitrary = arbitraryBoundedIntegral
   shrink    = shrinkIndex
 
-shrinkIndex :: (KnownSatMode sat, KnownNat n, 1 <= n) => SatIndex sat n -> [SatIndex sat n]
+shrinkIndex :: (KnownSatMode sat, KnownNat n, 1 <= n) => Index sat n -> [Index sat n]
 shrinkIndex x | natVal x < 3 = case toInteger x of
                                  1 -> [0]
                                  _ -> []
@@ -443,5 +445,5 @@ shrinkIndex x | natVal x < 3 = case toInteger x of
               -- an upper bound less than 2 results in an error.
               | otherwise    = shrinkIntegral x
 
-instance (KnownSatMode sat, KnownNat n, 1 <= n) => CoArbitrary (SatIndex sat n) where
+instance (KnownSatMode sat, KnownNat n, 1 <= n) => CoArbitrary (Index sat n) where
   coarbitrary = coarbitraryIntegral

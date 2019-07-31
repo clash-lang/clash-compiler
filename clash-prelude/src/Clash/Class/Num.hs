@@ -57,35 +57,37 @@ data SaturationMode
   | SatSymmetric -- ^ Become 'maxBound' on overflow, and (@'minBound' + 1@) on
                  -- underflow for signed numbers, and 'minBound' for unsigned
                  -- numbers. Has additional hardware cost for all types.
-  | SatUnsafe -- ^ for signed and unsigned numbers the behaviour is the same as
+  | SatError  -- ^ for signed and unsigned numbers the behavior is the same as
               -- SatWrap. For index numbers the Num and Bits operations can result
               -- in errors if the result of the operation is outside of the range
               -- of the index. The advantage is that there is no additional hardware
               -- cost with the index type.
   deriving Eq
 
-newtype SSatMode (sat :: SaturationMode) = SSatMode SaturationMode
 
 class KnownSatMode (sat :: SaturationMode) where
-  satModeSing :: SSatMode sat
+  satMode :: SaturationMode
 
-instance KnownSatMode 'SatWrap where
-  satModeSing = SSatMode SatWrap
+instance {-# OVERLAPS #-} KnownSatMode 'SatWrap where
+  satMode = SatWrap
 
-instance KnownSatMode 'SatBound where
-  satModeSing = SSatMode SatBound
+instance {-# OVERLAPS #-} KnownSatMode 'SatBound where
+  satMode = SatBound
 
-instance KnownSatMode 'SatZero where
-  satModeSing = SSatMode SatZero
+instance {-# OVERLAPS #-} KnownSatMode 'SatZero where
+  satMode = SatZero
 
-instance KnownSatMode 'SatSymmetric where
-  satModeSing = SSatMode SatSymmetric
+instance {-# OVERLAPS #-} KnownSatMode 'SatSymmetric where
+  satMode = SatSymmetric
 
-instance KnownSatMode 'SatUnsafe where
-  satModeSing = SSatMode SatUnsafe
+instance {-# OVERLAPS #-} KnownSatMode 'SatError where
+  satMode = SatError
 
-satModeVal :: forall sat proxy. KnownSatMode sat => proxy sat -> SaturationMode
-satModeVal _ = case satModeSing :: SSatMode sat of { SSatMode x -> x }
+instance {-# INCOHERENT #-}
+  (TypeError (Text "SaturationMode isn't known. Add the `KnownSatMode` constraint"))
+  => KnownSatMode a where
+  satMode = undefined
+
 
 -- | 'Num' operators in which overflow and underflow behavior can be specified
 -- using 'SaturationMode'.
