@@ -19,6 +19,7 @@ stages:
     paths:
       - cabal-store/
   script:
+    - unset SNAPCRAFT_LOGIN_FILE
     - export GHC="$CI_JOB_NAME"
     - export THREADS=$(nproc)
     - export CABAL_JOBS=$(nproc)
