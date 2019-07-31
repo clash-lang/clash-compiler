@@ -112,6 +112,7 @@ snap:
         echo "Already built and published $(git rev-parse HEAD). Nothing to do!";
         exit 0;
       fi
+    - git rev-parse HEAD > snap-last-run-hash
     - cd bindist/linux/snap 
     - echo $SNAPCRAFT_LOGIN_FILE | base64 --decode --ignore-garbage > snapcraft.login
     - snapcraft login --with snapcraft.login
