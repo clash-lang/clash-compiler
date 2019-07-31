@@ -1,6 +1,11 @@
-image: leonschoorl/clash-ci-image:trusty
+stages:
+  - build
+  # TODO: add test stage to prevent cache throwouts if test failed?
+  - publish
 
 .tests:
+  image: leonschoorl/clash-ci-image:trusty
+  stage: build
   variables:
     GIT_SUBMODULE_STRATEGY: recursive
     TERM: xterm-color
@@ -14,6 +19,7 @@ image: leonschoorl/clash-ci-image:trusty
     paths:
       - cabal-store/
   script:
+    - unset SNAPCRAFT_LOGIN_FILE
     - export GHC="$CI_JOB_NAME"
     - export THREADS=$(nproc)
     - export CABAL_JOBS=$(nproc)
@@ -21,6 +27,9 @@ image: leonschoorl/clash-ci-image:trusty
     - .ci/setup.sh
     - .ci/build.sh
     - .ci/test.sh
+  # Don't run every night
+  except:
+    - schedules
 
 ghc-8.2.2:
   extends: .tests
@@ -28,11 +37,88 @@ ghc-8.4.4:
   extends: .tests
 ghc-8.6.5:
   extends: .tests
-
 ghc-head:
   # extends: .tests
+  stage: build
   allow_failure: true
   script:
     # Awaiting issue: https://github.com/goldfirere/singletons/issues/357
     - echo "GHC head currently disabled, because singletons doesn't build on ghc head"
     - exit 1
+  # Don't run every night
+  except:
+    - schedules
+
+# Create a binary distribution using nix, and store it in a tarball. A special
+# nix distribution is used that has its store installed on /usr/nix/store,
+# instead of the default /nix. This is used to work around a know limitation
+# of snap layouts. As of August 2019 the snapcraft docs mention:
+#
+#  > Layouts cannot currently create new top-level files or directories.
+#  > 
+#  >  - https://snapcraft.io/docs/snap-layouts
+# 
+# If this limitation is ever annulled, we can use a "proper" nix distribution.
+snap-bindist:
+  image: clashlang/nixbuntu:2.2.2
+  stage: build
+  cache:
+    key: usr-nix-$CI_JOB_NAME
+    paths:
+      # GitLab CI uses zip as a cache archive. For some reason, nix can't
+      # handle this (wrong permissions, missing symlinks?), so we pre-tar it.
+      - usr_nix.tar.xz
+  artifacts:
+    when: always
+    paths:
+      - nix_build.log
+      - bindist/linux/snap/clash-snap-bindist.tar.xz
+    expire_in: 1 week
+  script:
+    # TODO: Clean up nix-store after building
+    - export XZ_DEFAULTS="-T 0 -3"
+    - export ROOT=$(pwd)
+    - tar xf usr_nix.tar.xz -C / || true
+    - apt install ksh -y  # TODO: Remove need for ksh in mkBinDist.sh
+    - cd bindist/linux/snap && ./mkBinDist.sh &> $ROOT/nix_build.log
+    - tar cJf $ROOT/usr_nix.tar.xz /usr/nix
+
+  # Run every night or when explicitly triggered
+  only:
+    - schedules
+    - triggers
+
+# Use binary distribution built in `snap-bindist` to build a snap pacakge.
+snap:
+  image: snapcore/snapcraft
+  stage: publish
+  cache:
+    key: snap-last-run-hash
+    paths:
+      - snap-last-run-hash
+  artifacts:
+    when: always
+    paths:
+      - bindist/linux/snap/*.snap
+    expire_in: 1 week
+  variables:
+    # TODO: detect tags/branches and push to stable
+    RELEASE_CHANNEL: edge
+  script:
+    - apt install git -y
+    - touch snap-last-run-hash
+    - |
+      if [ "$(cat snap-last-run-hash)" == $(git rev-parse HEAD) ]; then
+        echo "Already built and published $(git rev-parse HEAD). Nothing to do!";
+        exit 0;
+      fi
+    - git rev-parse HEAD > snap-last-run-hash
+    - cd bindist/linux/snap 
+    - echo $SNAPCRAFT_LOGIN_FILE | base64 --decode --ignore-garbage > snapcraft.login
+    - snapcraft login --with snapcraft.login
+    - snapcraft
+    - snapcraft push *.snap --release ${RELEASE_CHANNEL}
+  only:
+    - schedules
+    - triggers
+
