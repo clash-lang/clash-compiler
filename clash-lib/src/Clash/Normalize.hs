@@ -343,7 +343,8 @@ flattenCallTree (CBranch (nm,(nm',sp,inl,tm)) used) = do
   if inl /= NoInline && isCheapFunction newExpr
      then do
         let (toInline',allUsed') = unzip (map goCheap allUsed)
-            subst' = extendGblSubstList (mkSubst emptyInScopeSet) toInline'
+            subst' = extendGblSubstList (mkSubst emptyInScopeSet)
+                                        (Maybe.catMaybes toInline')
         -- To have a cheap `appProp` transformation we need to
         -- deshadow, see also Note [AppProp no-shadow invariant]
         let tm1 = deShadowTerm emptyInScopeSet (substTm "flattenCallTree.flattenCheap" subst' newExpr)
@@ -361,8 +362,12 @@ flattenCallTree (CBranch (nm,(nm',sp,inl,tm)) used) = do
                  apply "flattenLet" flattenLet) !->
       topdownSucR (apply "topLet" topLet)
 
-    goCheap (CLeaf   (nm2,(_,_,_,e)))    = ((nm2,e),[])
-    goCheap (CBranch (nm2,(_,_,_,e)) us) = ((nm2,e),us)
+    goCheap c@(CLeaf   (nm2,(_,_,inl2,e)))
+      | inl2 == NoInline = (Nothing     ,[c])
+      | otherwise        = (Just (nm2,e),[])
+    goCheap c@(CBranch (nm2,(_,_,inl2,e)) us)
+      | inl2 == NoInline = (Nothing, [c])
+      | otherwise        = (Just (nm2,e),us)
 
 callTreeToList
   :: [Id]
