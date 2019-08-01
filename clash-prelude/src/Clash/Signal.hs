@@ -1390,6 +1390,12 @@ regEn initial en i =
 --
 -- > sample s == [s0, s1, s2, s3, ...
 --
+-- If the given component has not yet been given a clock, reset, or enable
+-- line, 'sample' will supply them. The reset will be asserted for a single
+-- cycle. 'sample' will not drop the value produced by the circuit while
+-- the reset was asserted. If you want this, or if you want more than a
+-- single cycle reset, consider using 'sampleWithReset'.
+--
 -- __NB__: This function is not synthesizable
 sample
   :: forall dom a
@@ -1409,6 +1415,12 @@ sample s =
 -- at consecutive clock cycles
 --
 -- > sampleN @System 3 s == [s0, s1, s2]
+--
+-- If the given component has not yet been given a clock, reset, or enable
+-- line, 'sampleN' will supply them. The reset will be asserted for a single
+-- cycle. 'sampleN' will not drop the value produced by the circuit while
+-- the reset was asserted. If you want this, or if you want more than a
+-- single cycle reset, consider using 'sampleWithResetN'.
 --
 -- __NB__: This function is not synthesizable
 sampleN
@@ -1475,6 +1487,11 @@ sampleWithResetN nReset nSamples f =
 --
 -- > sample s == [s0, s1, s2, s3, ...
 --
+-- If the given component has not yet been given a clock, reset, or enable
+-- line, 'sample_lazy' will supply them. The reset will be asserted for a
+-- single cycle. 'sample_lazy' will not drop the value produced by the
+-- circuit while the reset was asserted.
+--
 -- __NB__: This function is not synthesizable
 sample_lazy
   :: forall dom a
@@ -1493,6 +1510,11 @@ sample_lazy s =
 -- at consecutive clock cycles
 --
 -- > sampleN @System 3 s == [s0, s1, s2]
+--
+-- If the given component has not yet been given a clock, reset, or enable
+-- line, 'sampleN_lazy' will supply them. The reset will be asserted for a
+-- single cycle. 'sampleN_lazy' will not drop the value produced by the
+-- circuit while the reset was asserted.
 --
 -- __NB__: This function is not synthesizable
 sampleN_lazy
