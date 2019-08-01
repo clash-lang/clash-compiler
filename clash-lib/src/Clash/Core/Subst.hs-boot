@@ -1,3 +1,5 @@
+{-# OPTIONS_GHC -fno-warn-orphans #-}
+
 module Clash.Core.Subst where
 
 import GHC.Stack (HasCallStack)
@@ -15,3 +17,5 @@ aeqType
   :: Type
   -> Type
   -> Bool
+
+instance Eq Type

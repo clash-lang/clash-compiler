@@ -322,13 +322,13 @@ coreToTerm primMap unlocs = term
           = term f
         go "Clash.Magic.prefixName" args
           | [Type nmTy,_aTy,f] <- args
-          = C.Tick <$> (C.ModName C.PrefixName <$> coreToType nmTy) <*> term f
+          = C.Tick <$> (C.NameMod C.PrefixName <$> coreToType nmTy) <*> term f
         go "Clash.Magic.suffixName" args
           | [Type nmTy,_aTy,f] <- args
-          = C.Tick <$> (C.ModName C.SuffixName <$> coreToType nmTy) <*> term f
+          = C.Tick <$> (C.NameMod C.SuffixName <$> coreToType nmTy) <*> term f
         go "Clash.Magic.setName" args
           | [Type nmTy,_aTy,f] <- args
-          = C.Tick <$> (C.ModName C.SetName <$> coreToType nmTy) <*> term f
+          = C.Tick <$> (C.NameMod C.SetName <$> coreToType nmTy) <*> term f
 
         go _ _ = term' e
     term' (Var x)                 = var x
@@ -433,11 +433,11 @@ coreToTerm primMap unlocs = term
               | f == pack "Clash.Class.BitPack.packXWith"    -> return (packXWithTerm xType)
               | f == pack "Clash.Sized.Internal.BitVector.checkUnpackUndef" -> return (checkUnpackUndefTerm xType)
               | f == pack "Clash.Magic.prefixName"
-              -> return (modNameTerm C.PrefixName xType)
+              -> return (nameModTerm C.PrefixName xType)
               | f == pack "Clash.Magic.postfixName"
-              -> return (modNameTerm C.SuffixName xType)
+              -> return (nameModTerm C.SuffixName xType)
               | f == pack "Clash.Magic.setName"
-              -> return (modNameTerm C.SetName xType)
+              -> return (nameModTerm C.SetName xType)
               | otherwise                                    -> return (C.Prim xNameS (C.PrimInfo xType wi))
             Just (Just (BlackBox {workInfo = wi})) ->
               return $ C.Prim xNameS (C.PrimInfo xType wi)
@@ -1173,15 +1173,15 @@ checkUnpackUndefTerm ty = error $ $(curLoc) ++ show ty
 -- Generate the term:
 --
 -- @/\(name:Symbol)./\(a:Type).\(x:a) -> <TICK>x@
-modNameTerm
-  :: C.ModName
+nameModTerm
+  :: C.NameMod
   -> C.Type
   -> C.Term
-modNameTerm sa (C.ForAllTy nmTV (C.ForAllTy aTV funTy)) =
+nameModTerm sa (C.ForAllTy nmTV (C.ForAllTy aTV funTy)) =
   C.TyLam nmTV (
   C.TyLam aTV (
   C.Lam   xId (
-  (C.Tick (C.ModName sa (C.VarTy nmTV)) (C.Var xId)))))
+  (C.Tick (C.NameMod sa (C.VarTy nmTV)) (C.Var xId)))))
   where
     (C.FunTy xTy _)  = C.tyView funTy
     -- Safe to use `mkUnsafeSystemName` here, because we're building the
@@ -1189,7 +1189,7 @@ modNameTerm sa (C.ForAllTy nmTV (C.ForAllTy aTV funTy)) =
     xName            = C.mkUnsafeSystemName "x" 0
     xId              = C.mkLocalId xTy xName
 
-modNameTerm _ ty = error $ $(curLoc) ++ show ty
+nameModTerm _ ty = error $ $(curLoc) ++ show ty
 
 isDataConWrapId :: Id -> Bool
 isDataConWrapId v = case idDetails v of

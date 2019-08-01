@@ -487,7 +487,7 @@ substTm doc subst = go where
     _ -> (pat,go alt)
 
   goTick t@(SrcSpan _)  = t
-  goTick (ModName m ty) = ModName m (substTy subst ty)
+  goTick (NameMod m ty) = NameMod m (substTy subst ty)
 
 -- | Find the substitution for an 'Id' in the 'Subst'
 lookupIdSubst
@@ -639,7 +639,7 @@ freshenTm is0 = go (mkSubst is0) where
     _ -> case go subst0 alt of
       (is1,alt') -> (is1,(pat,alt'))
 
-  goTick subst0 (ModName m ty) = ModName m (substTy subst0 ty)
+  goTick subst0 (NameMod m ty) = NameMod m (substTy subst0 ty)
   goTick _      tick           = tick
 
 -- * AEQ

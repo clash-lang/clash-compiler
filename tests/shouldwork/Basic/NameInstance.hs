@@ -21,8 +21,20 @@ assertIn needle haystack
   | otherwise                   = P.error $ P.concat [ "Expected:\n\n  ", needle
                                                      , "\n\nIn:\n\n", haystack ]
 
+mainSystemVerilog :: IO ()
+mainSystemVerilog = do
+  [topDir] <- getArgs
+  content <- readFile (takeDirectory topDir </> "NameInstance_topEntity.sv")
+  assertIn "before_foo_after" content
+
 mainVerilog :: IO ()
 mainVerilog = do
   [topDir] <- getArgs
   content <- readFile (takeDirectory topDir </> "NameInstance_topEntity.v")
+  assertIn "before_foo_after" content
+
+mainVHDL :: IO ()
+mainVHDL = do
+  [topDir] <- getArgs
+  content <- readFile (takeDirectory topDir </> "nameinstance_topentity.vhdl")
   assertIn "before_foo_after" content
