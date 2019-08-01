@@ -79,6 +79,7 @@ snap-bindist:
     - export XZ_DEFAULTS="-T 0 -3"
     - export ROOT=$(pwd)
     - tar xf usr_nix.tar.xz -C / || true
+    - apt update
     - apt install ksh -y  # TODO: Remove need for ksh in mkBinDist.sh
     - cd bindist/linux/snap && ./mkBinDist.sh &> $ROOT/nix_build.log
     - tar cJf $ROOT/usr_nix.tar.xz /usr/nix
@@ -105,6 +106,7 @@ snap:
     # TODO: detect tags/branches and push to stable
     RELEASE_CHANNEL: edge
   script:
+    - apt update
     - apt install git -y
     - touch snap-last-run-hash
     - |
