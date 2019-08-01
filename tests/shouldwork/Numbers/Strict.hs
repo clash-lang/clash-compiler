@@ -42,7 +42,7 @@ testBench = done
   where
     testInput    = stimuliGenerator clk rst ((big1,big2) :> Nil)
     testEntity   = fmap $ map (`shiftR` 64) . uncurry topEntity
-    expectOutput = outputVerifier clk rst (repeat 0xc :> Nil)
+    expectOutput = outputVerifier' clk rst (repeat 0xc :> Nil)
     done         = expectOutput (testEntity testInput)
     clk          = tbSystemClockGen (not <$> done)
     rst          = systemResetGen

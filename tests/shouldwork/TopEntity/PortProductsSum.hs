@@ -34,7 +34,7 @@ topEntity = (pure 0, pure (Just 1))
 testBench :: Signal System Bool
 testBench = done
   where
-    expectedOutput = outputVerifier clk rst ((0, Just 1) :> (0, Just 1) :> Nil)
+    expectedOutput = outputVerifier' clk rst ((0, Just 1) :> (0, Just 1) :> Nil)
     done           = expectedOutput (bundle $ bundle <$> topEntity)
     clk            = tbSystemClockGen (not <$> done)
     rst            = systemResetGen

@@ -11,7 +11,7 @@ testBench :: Signal System Bool
 testBench = done
   where
     testInput      = pure (0.2,0.35)
-    expectedOutput = outputVerifier clk rst $(listToVecTH [0.06640625 :: UFixed 0 8])
+    expectedOutput = outputVerifier' clk rst $(listToVecTH [0.06640625 :: UFixed 0 8])
     done           = expectedOutput (topEntity <$> testInput)
     clk            = tbSystemClockGen (not <$> done)
     rst            = systemResetGen

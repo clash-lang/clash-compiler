@@ -52,7 +52,7 @@ testBench :: Signal System Bool
 testBench = done
   where
     testInput      = stimuliGenerator clk rst ((0:>1:>2:>3:>4:>5:>6:>7:>8:>9:>10:>11:>12:>13:>14:>15:>Nil):>Nil)
-    expectedOutput = outputVerifier   clk rst
+    expectedOutput = outputVerifier'   clk rst
                                       ((   0x99a0283a
                                         :> 0x16c4b42e
                                         :> 0x6e7fa00b

@@ -40,7 +40,7 @@ testBench = done'
 
     expectedOutput :: SystemClockResetEnable
                    => Signal System (BitVector 8) -> Signal System Bool
-    expectedOutput = outputVerifierBitVector $ ($$(bLit "1000....") :: BitVector 8)
+    expectedOutput = outputVerifierBitVector' $ ($$(bLit "1000....") :: BitVector 8)
                                             :> ($$(bLit "0100....") :: BitVector 8)
                                             :> ($$(bLit "00101011") :: BitVector 8)
                                             :> ($$(bLit "000101..") :: BitVector 8)

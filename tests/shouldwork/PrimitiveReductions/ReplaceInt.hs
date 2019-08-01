@@ -30,7 +30,7 @@ testBench :: Signal System Bool
 testBench = done
   where
     testInput      = stimuliGenerator clk rst (1 :> 2 :> 3 :> Nil)
-    expectedOutput = outputVerifier clk rst ( ('a' :> 'a' :> 'a' :> 'c' :> 'a' :> Nil)
+    expectedOutput = outputVerifier' clk rst ( ('a' :> 'a' :> 'a' :> 'c' :> 'a' :> Nil)
                                            :> ('a' :> 'x' :> 'a' :> 'c' :> 'a' :> Nil)
                                            :> ('a' :> 'x' :> 'x' :> 'c' :> 'a' :> Nil)
                                            :> ('a' :> 'x' :> 'x' :> 'x' :> 'a' :> Nil)

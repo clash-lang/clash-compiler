@@ -72,7 +72,7 @@ expectedOutput = (unpack 0x3F45628A, unpack 0x3FED4161686C9EEE, 1, 1) :> Nil
 testBench :: Signal System Bool
 testBench = done
   where
-    expectOutput = outputVerifier clk rst expectedOutput
+    expectOutput = outputVerifier' clk rst expectedOutput
     done         = expectOutput topEntity
     clk          = tbSystemClockGen (not <$> done)
     rst          = systemResetGen

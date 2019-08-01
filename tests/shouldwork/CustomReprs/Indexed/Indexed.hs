@@ -29,7 +29,7 @@ testBench = done'
                                 :> MkTA (True :> True :> Nil) 2
                                 :> Nil
 
-    expectedOutput = outputVerifier $ True
+    expectedOutput = outputVerifier' $ True
                                    :> False
                                    :> False
                                    :> True

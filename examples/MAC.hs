@@ -31,7 +31,7 @@ testBench :: Signal System Bool
 testBench = done
   where
     testInput      = stimuliGenerator clk rst $(listToVecTH [(1,1) :: (Signed 9,Signed 9),(2,2),(3,3),(4,4)])
-    expectedOutput = outputVerifier clk rst $(listToVecTH [0 :: Signed 9,1,5,14])
+    expectedOutput = outputVerifier' clk rst $(listToVecTH [0 :: Signed 9,1,5,14])
     done           = expectedOutput (topEntity clk rst (enableGen) testInput)
     clk            = tbSystemClockGen (not <$> done)
     rst            = systemResetGen

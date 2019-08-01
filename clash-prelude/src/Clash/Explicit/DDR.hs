@@ -91,12 +91,21 @@ ddrIn#
   -> Signal fast a
   -> Signal slow (a,a)
 ddrIn# (Clock _) (unsafeToHighPolarity -> hRst) (fromEnable -> ena) i0 i1 i2 =
-  (if isAsynchronous @fast then goAsync else goSync)
-    ( deepErrorX "ddrIn: initial value 0 undefined"
-    , deepErrorX "ddrIn: initial value 1 undefined"
-    , deepErrorX "ddrIn: initial value 2 undefined" )
-    hRst
-    ena
+  case resetKind @fast of
+    SAsynchronous ->
+      goAsync
+        ( deepErrorX "ddrIn: initial value 0 undefined"
+        , deepErrorX "ddrIn: initial value 1 undefined"
+        , deepErrorX "ddrIn: initial value 2 undefined" )
+        hRst
+        ena
+    SSynchronous ->
+      goSync
+        ( deepErrorX "ddrIn: initial value 0 undefined"
+        , deepErrorX "ddrIn: initial value 1 undefined"
+        , deepErrorX "ddrIn: initial value 2 undefined" )
+        hRst
+        ena
   where
     goSync
       :: (a, a, a)

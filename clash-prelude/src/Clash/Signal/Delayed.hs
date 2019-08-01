@@ -132,7 +132,7 @@ delayedI
   -> DSignal dom (n + d) a
 delayedI = hideClockResetEnable E.delayedI
 
--- | Delay a 'DSignal' for @d@ cycles, the value at time 0..d-1 is /undefined/.
+-- | Delay a 'DSignal' for @d@ cycles, the value at time 0..d-1 is /a/.
 --
 -- @
 -- delay2

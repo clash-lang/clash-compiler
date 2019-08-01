@@ -18,7 +18,7 @@ topEntity = pure (trepeat True)
 testBench :: Signal System Bool
 testBench = done
   where
-    expectedOutput = outputVerifier clk rst ($([| v2t (replicate d4 True) |]) :> Nil)
+    expectedOutput = outputVerifier' clk rst ($([| v2t (replicate d4 True) |]) :> Nil)
     done           = expectedOutput topEntity
     clk            = tbSystemClockGen (not <$> done)
     rst            = systemResetGen

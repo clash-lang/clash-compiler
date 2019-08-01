@@ -27,7 +27,7 @@ testBench :: Signal System Bool
 testBench = done
   where
     n              = 22
-    expectedOutput = outputVerifier clk rst ((n, n, n, 0, 0) :> Nil)
+    expectedOutput = outputVerifier' clk rst ((n, n, n, 0, 0) :> Nil)
     done           = expectedOutput (topEntity clk rst (pure n))
     clk            = tbSystemClockGen (not <$> done)
     rst            = systemResetGen

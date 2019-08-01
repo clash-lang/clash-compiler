@@ -12,12 +12,12 @@
     , "kind" : "Expression"
     , "workInfo"  : "Never"
     , "type" :
-"unsafeToReset :: KnownDomain dom      => Signal dom Bool -> Reset dom"
-    , "template" : "~ARG[1]"
+"unsafeToReset :: Signal dom Bool -> Reset dom"
+    , "template" : "~ARG[0]"
     }
   }
 , { "BlackBox" :
-    { "name" : "Clash.Signal.Internal.tbEnableGen"
+    { "name" : "Clash.Explicit.Testbench.tbEnableGen"
     , "workInfo" : "Always"
     , "kind" : "Declaration"
     , "type" : "tbEnableGen :: Enable dom"

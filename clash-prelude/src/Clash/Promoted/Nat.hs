@@ -37,9 +37,9 @@ module Clash.Promoted.Nat
     -- ** Conversion
   , snatToInteger, snatToNatural, snatToNum
     -- ** Arithmetic
-  , addSNat, mulSNat, powSNat
+  , addSNat, mulSNat, powSNat, minSNat, maxSNat, succSNat
     -- *** Partial
-  , subSNat, divSNat, modSNat, flogBaseSNat, clogBaseSNat, logBaseSNat
+  , subSNat, divSNat, modSNat, flogBaseSNat, clogBaseSNat, logBaseSNat, predSNat
     -- *** Specialised
   , pow2SNat
     -- *** Comparison
@@ -79,7 +79,7 @@ where
 import Data.Kind          (Type)
 import GHC.TypeLits       (KnownNat, Nat, type (+), type (-), type (*),
                            type (^), type (<=), natVal)
-import GHC.TypeLits.Extra (CLog, FLog, Div, Log, Mod)
+import GHC.TypeLits.Extra (CLog, FLog, Div, Log, Mod, Min, Max)
 import GHC.Natural        (naturalFromInteger)
 import Language.Haskell.TH (appT, conT, litT, numTyLit, sigE)
 import Language.Haskell.TH.Syntax (Lift (..))
@@ -130,7 +130,7 @@ snatToNatural = naturalFromInteger . snatToInteger
 
 
 -- | Reify the type-level 'Nat' @n@ to it's term-level 'Num'ber.
-snatToNum :: Num a => SNat n -> a
+snatToNum :: forall a n . Num a => SNat n -> a
 snatToNum p@SNat = fromInteger (snatToInteger p)
 {-# INLINE snatToNum #-}
 
@@ -203,6 +203,16 @@ subUNat x         UZero     = x
 subUNat (USucc x) (USucc y) = subUNat x y
 subUNat UZero     _         = error "subUNat: impossible: 0 + (n + 1) ~ 0"
 
+-- | Predecessor of a singleton natural number
+predSNat :: SNat (a+1) -> SNat (a)
+predSNat SNat = SNat
+{-# INLINE predSNat #-}
+
+-- | Successor of a singleton natural number
+succSNat :: SNat a -> SNat (a+1)
+succSNat SNat = SNat
+{-# INLINE succSNat #-}
+
 -- | Add two singleton natural numbers
 addSNat :: SNat a -> SNat b -> SNat (a+b)
 addSNat SNat SNat = SNat
@@ -238,6 +248,12 @@ modSNat :: (1 <= b) => SNat a -> SNat b -> SNat (Mod a b)
 modSNat SNat SNat = SNat
 {-# INLINE modSNat #-}
 infixl 7 `modSNat`
+
+minSNat :: SNat a -> SNat b -> SNat (Min a b)
+minSNat SNat SNat = SNat
+
+maxSNat :: SNat a -> SNat b -> SNat (Max a b)
+maxSNat SNat SNat = SNat
 
 -- | Floor of the logarithm of a natural number
 flogBaseSNat :: (2 <= base, 1 <= x)

@@ -12,7 +12,7 @@ testBench = done
   where
     testInput      = stimuliGenerator clk rst
                       $(listToVecTH ([(0,8,replicate d8 0)]::[(Integer,Unsigned 4,Vec 8 (Unsigned 4))]))
-    expectedOutput = outputVerifier clk rst
+    expectedOutput = outputVerifier' clk rst
                                     (((8:>0:>0:>0:>0:>0:>0:>0:>Nil):>
                                       (0:>7:>0:>0:>0:>0:>0:>0:>Nil):>
                                       (0:>0:>6:>0:>0:>0:>0:>0:>Nil):>

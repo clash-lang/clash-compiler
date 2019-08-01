@@ -17,7 +17,7 @@ testBench :: Signal System Bool
 testBench = done
   where
     expected = (unpack expectedBv, unpack expectedBv, unpack expectedBv, unpack expectedBv) :> Nil
-    expectedOutput = outputVerifier clk rst expected
+    expectedOutput = outputVerifier' clk rst expected
     done           = expectedOutput (pure topEntity)
     clk            = tbSystemClockGen (not <$> done)
     rst            = systemResetGen

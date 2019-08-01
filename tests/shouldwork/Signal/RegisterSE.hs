@@ -3,6 +3,7 @@ module RegisterSE where
 -- Register: Synchronous, Enabled
 
 import Clash.Explicit.Prelude
+import Clash.Explicit.Testbench
 
 testInput :: Vec 7 (Signed 8)
 testInput = 1 :> 2 :> 3 :> 4 :> 5 :> 6 :> 7 :> Nil
@@ -52,10 +53,9 @@ topEntitySE clk rst = topEntity clk arst en
     en = toEnable (enableInput clk rst enableGen)
 {-# NOINLINE topEntitySE #-}
 
-testBench :: Signal XilinxSystem Bool
+testBench :: Signal System Bool
 testBench = done
   where
-    expectedOutput = outputVerifier clk rst (1 :> 1 :> 2 :> 3 :> 1 :> 2 :> 2 :> 2 :> 3 :> 3 :> 3 :> Nil)
-    done           = expectedOutput (topEntitySE clk rst)
-    clk            = tbClockGen (not <$> done)
-    rst            = resetGen
+    expectedOutput        = outputVerifier testClk resetGen (1 :> 1 :> 2 :> 3 :> 1 :> 2 :> 2 :> 2 :> 3 :> 3 :> 3 :> Nil)
+    done                  = expectedOutput (topEntitySE circuitClk resetGen)
+    (testClk, circuitClk) = biTbClockGen @System @XilinxSystem (not <$> done)

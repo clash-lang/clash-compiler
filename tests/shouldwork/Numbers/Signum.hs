@@ -29,7 +29,7 @@ testBench = done
         )
 
     expectedOutput =
-      outputVerifier
+      outputVerifier'
         clk
         rst
         ( (0, 0, 0, 0) :>

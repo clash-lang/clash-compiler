@@ -3,6 +3,7 @@ module DelayedReset where
 
 import Clash.Explicit.Prelude
 import Clash.Annotations.TopEntity
+import Clash.Explicit.Testbench
 
 topEntity
   :: Clock System
@@ -32,7 +33,7 @@ topEntity clk reset en = (cycleCount, countFromReset, newResetSig)
 testBench :: Signal System Bool
 testBench = done
   where
-    expectedOutput = outputVerifier clk rst
+    expectedOutput = outputVerifier' clk rst
                        ((0,0,True) :>
                         (1,0,True) :>
                         (2,0,False) :>

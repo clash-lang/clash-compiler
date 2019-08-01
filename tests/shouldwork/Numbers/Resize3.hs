@@ -11,7 +11,7 @@ testBench :: Signal System Bool
 testBench = done
   where
     expectedOutput =
-      outputVerifier
+      outputVerifier'
         clk
         rst
         (    14

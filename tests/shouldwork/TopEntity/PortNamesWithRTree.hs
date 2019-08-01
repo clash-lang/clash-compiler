@@ -48,7 +48,7 @@ topEntity = pure (0, trepeat (A 1 2, B 3 4 5))
 testBench :: Signal System Bool
 testBench = done
   where
-    expectedOutput = outputVerifier clk rst ((0, trepeat (A 1 2, B 3 4 5)) :> Nil)
+    expectedOutput = outputVerifier' clk rst ((0, trepeat (A 1 2, B 3 4 5)) :> Nil)
     done           = expectedOutput topEntity
     clk            = tbSystemClockGen (not <$> done)
     rst            = systemResetGen

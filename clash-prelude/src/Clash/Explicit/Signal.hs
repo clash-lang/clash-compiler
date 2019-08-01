@@ -130,6 +130,7 @@ can potentially introduce situations prone to meta-stability:
 -}
 
 {-# LANGUAGE DataKinds             #-}
+{-# LANGUAGE ExplicitNamespaces    #-}
 {-# LANGUAGE FlexibleInstances     #-}
 {-# LANGUAGE GADTs                 #-}
 {-# LANGUAGE MagicHash             #-}
@@ -137,9 +138,13 @@ can potentially introduce situations prone to meta-stability:
 {-# LANGUAGE RankNTypes            #-}
 {-# LANGUAGE ScopedTypeVariables   #-}
 {-# LANGUAGE TypeApplications      #-}
+{-# LANGUAGE TypeOperators         #-}
 {-# LANGUAGE ViewPatterns          #-}
 
 {-# LANGUAGE Trustworthy #-}
+
+{-# OPTIONS_GHC -fplugin=GHC.TypeLits.Normalise #-}
+{-# OPTIONS_GHC -fplugin=GHC.TypeLits.KnownNat.Solver #-}
 
 {-# OPTIONS_HADDOCK show-extensions #-}
 
@@ -160,6 +165,12 @@ module Clash.Explicit.Signal
   , SResetPolarity(..)
   , DomainConfiguration(..)
   , SDomainConfiguration(..)
+  -- ** Configuration type families
+  , DomainPeriod
+  , DomainActiveEdge
+  , DomainResetKind
+  , DomainInitBehavior
+  , DomainResetPolarity
     -- ** Default domains
   , System
   , XilinxSystem
@@ -172,8 +183,11 @@ module Clash.Explicit.Signal
   , vDomain
   , createDomain
   , knownVDomain
-  , isAsynchronous
-  , isActiveHigh
+  , clockPeriod
+  , activeEdge
+  , resetKind
+  , initBehavior
+  , resetPolarity
     -- ** Enabling
   , Enable(..)
   , toEnable
@@ -181,9 +195,12 @@ module Clash.Explicit.Signal
   , enableGen
     -- * Clock
   , Clock
-  , freqCalc
+  , freqCalc  -- DEPRECATED
+  , periodToHz
+  , hzToPeriod
     -- ** Synchronization primitive
   , unsafeSynchronizer
+  , veryUnsafeSynchronizer
     -- * Reset
   , Reset(..)
   , unsafeToReset
@@ -192,7 +209,9 @@ module Clash.Explicit.Signal
   , unsafeToLowPolarity
   , unsafeFromHighPolarity
   , unsafeFromLowPolarity
+  , convertReset
   , resetSynchronizer
+  , holdReset
     -- * Basic circuit functions
   , enable
   , dflipflop
@@ -204,11 +223,9 @@ module Clash.Explicit.Signal
   , regEn
     -- * Simulation and testbench functions
   , clockGen
-  , tbClockGen
-  , tbEnableGen
   , resetGen
+  , resetGenN
   , systemClockGen
-  , tbSystemClockGen
   , systemResetGen
     -- * Boolean connectives
   , (.&&.), (.||.)
@@ -217,6 +234,8 @@ module Clash.Explicit.Signal
     -- * Simulation functions (not synthesizable)
   , simulate
   , simulateB
+  , simulateWithReset
+  , simulateWithResetN
     -- ** lazy versions
   , simulate_lazy
   , simulateB_lazy
@@ -224,6 +243,7 @@ module Clash.Explicit.Signal
   , sample
   , sampleN
   , fromList
+  , fromListWithReset
     -- ** lazy versions
   , sample_lazy
   , sampleN_lazy
@@ -238,16 +258,24 @@ module Clash.Explicit.Signal
   )
 where
 
-import Data.Maybe                     (isJust, fromJust)
+import           Data.Maybe                     (isJust, fromJust)
+import           GHC.TypeLits                   (type (+), type (<=))
 
-import Clash.Annotations.Primitive    (hasBlackBox)
-import Clash.Signal.Bundle            (Bundle (..))
-import Clash.Signal.Internal
-import Clash.XException               (Undefined, deepErrorX)
+import           Clash.Annotations.Primitive    (hasBlackBox)
+import           Clash.Class.Num                (satSucc, SaturationMode(SatBound))
+import           Clash.Promoted.Nat             (SNat(..), snatToNum)
+import           Clash.Signal.Bundle            (Bundle (..))
+import           Clash.Signal.Internal
+import           Clash.Signal.Internal.Ambiguous
+  (knownVDomain, clockPeriod, activeEdge, resetKind, initBehavior, resetPolarity)
+import           Clash.Sized.Index              (Index)
+import           Clash.XException               (Undefined, deepErrorX)
 
 {- $setup
 >>> :set -XDataKinds -XTypeApplications -XFlexibleInstances -XMultiParamTypeClasses -XTypeFamilies
+>>> :set -fno-warn-deprecations
 >>> import Clash.Explicit.Prelude
+>>> import Clash.Promoted.Nat (SNat(..))
 >>> import qualified Data.List as L
 >>> :{
 instance KnownDomain "Dom2" where
@@ -295,30 +323,6 @@ systemClockGen
   :: Clock System
 systemClockGen = clockGen
 
--- | Clock generator for the 'System' clock domain.
---
--- __NB__: can be used in the /testBench/ function
---
--- === __Example__
---
--- @
--- topEntity :: Vec 2 (Vec 3 (Unsigned 8)) -> Vec 6 (Unsigned 8)
--- topEntity = concat
---
--- testBench :: Signal System Bool
--- testBench = done
---   where
---     testInput      = pure ((1 :> 2 :> 3 :> Nil) :> (4 :> 5 :> 6 :> Nil) :> Nil)
---     expectedOutput = outputVerifier ((1:>2:>3:>4:>5:>6:>Nil):>Nil)
---     done           = exposeClockResetEnable (expectedOutput (topEntity <$> testInput)) clk rst
---     clk            = 'tbSystemClockGen' (not <\$\> done)
---     rst            = systemResetGen
--- @
-tbSystemClockGen
-  :: Signal System Bool
-  -> Clock System
-tbSystemClockGen = tbClockGen
-
 -- | Reset generator for the 'System' clock domain.
 --
 -- __NB__: should only be used for simulation or the \testBench\ function.
@@ -333,7 +337,7 @@ tbSystemClockGen = tbClockGen
 -- testBench = done
 --   where
 --     testInput      = pure ((1 :> 2 :> 3 :> Nil) :> (4 :> 5 :> 6 :> Nil) :> Nil)
---     expectedOutput = outputVerifier ((1:>2:>3:>4:>5:>6:>Nil):>Nil)
+--     expectedOutput = outputVerifier' ((1:>2:>3:>4:>5:>6:>Nil):>Nil)
 --     done           = exposeClockResetEnable (expectedOutput (topEntity <$> testInput)) clk rst
 --     clk            = tbSystemClockGen (not <\$\> done)
 --     rst            = 'systemResetGen'
@@ -379,13 +383,15 @@ resetSynchronizer
   -> Enable dom
   -> Reset dom
 resetSynchronizer clk rst en =
-  if isAsynchronous @dom then
-    let r1 = register clk rst en (isActiveHigh @dom) (pure (not (isActiveHigh @dom)))
-        r2 = register clk rst en (isActiveHigh @dom) r1
-     in unsafeToReset r2
-  else
-    -- Reset is already synchronous, nothing to do!
-    rst
+  case resetKind @dom of
+    SAsynchronous ->
+      let isActiveHigh = case resetPolarity @dom of { SActiveHigh -> True; _ -> False }
+          r1 = register clk rst en isActiveHigh (pure (not isActiveHigh))
+          r2 = register clk rst en isActiveHigh r1
+       in unsafeToReset r2
+    SSynchronous ->
+      -- Reset is already synchronous, nothing to do!
+      rst
 
 -- | Calculate the period, in __ps__, given a frequency in __Hz__
 --
@@ -396,7 +402,8 @@ resetSynchronizer clk rst en =
 --
 -- __NB__: This function is /not/ synthesizable
 freqCalc :: Double -> Integer
-freqCalc freq = ceiling ((1.0 / freq) / 1.0e-12)
+freqCalc = toInteger . hzToPeriod
+{-# DEPRECATED freqCalc "Use 'hzToPeriod' instead." #-}
 
 -- ** Synchronization primitive
 -- | The 'unsafeSynchronizer' function is a primitive that must be used to
@@ -486,15 +493,26 @@ unsafeSynchronizer
   -- ^ 'Clock' of the outgoing signal
   -> Signal dom1 a
   -> Signal dom2 a
-unsafeSynchronizer clk1 clk2 s = s'
-  where
-    t1 = clockPeriod clk1
-    t2 = clockPeriod clk2
-    s' | t1 < t2   = compress   t2 t1 s
-       | t1 > t2   = oversample t1 t2 s
-       | otherwise = same s
-{-# NOINLINE unsafeSynchronizer #-}
-{-# ANN unsafeSynchronizer hasBlackBox #-}
+unsafeSynchronizer _clk1 _clk2 =
+  veryUnsafeSynchronizer
+    (snatToNum (clockPeriod @dom1))
+    (snatToNum (clockPeriod @dom2))
+{-# INLINE unsafeSynchronizer #-}
+
+-- | Same as 'unsafeSynchronizer', but with manually supplied clock periods.
+veryUnsafeSynchronizer
+  :: Int
+  -- ^ Period of clock belonging to 'dom1'
+  -> Int
+  -- ^ Period of clock belonging to 'dom2'
+  -> Signal dom1 a
+  -> Signal dom2 a
+veryUnsafeSynchronizer t1 t2 s
+  | t1 < t2   = compress   t2 t1 s
+  | t1 > t2   = oversample t1 t2 s
+  | otherwise = same s
+{-# NOINLINE veryUnsafeSynchronizer #-}
+{-# ANN veryUnsafeSynchronizer hasBlackBox #-}
 
 same :: Signal dom1 a -> Signal dom2 a
 same (s :- ss) = s :- same ss
@@ -716,7 +734,65 @@ regEn clk rst gen initial en i =
   register clk rst (enable gen en) initial i
 {-# INLINE regEn #-}
 
--- * Product/Signal isomorphism
+-- * Simulation functions
+
+-- | Same as 'simulate', but with the reset line asserted for /n/ cycles. Similar
+-- to 'simulate', 'simulateWithReset' will drop the output values produced while
+-- the reset is asserted. While the reset is asserted, the first value from
+-- @[a]@ is fed to the circuit.
+simulateWithReset
+  :: forall dom a b m
+   . ( KnownDomain dom
+     , Undefined a
+     , Undefined b
+     , 1 <= m )
+  => SNat m
+  -- ^ Number of cycles to assert the reset
+  -> a
+  -- ^ Reset value
+  -> ( KnownDomain dom
+    => Clock dom
+    -> Reset dom
+    -> Enable dom
+    -> Signal dom a
+    -> Signal dom b )
+  -- ^ Circuit to simulate
+  -> [a]
+  -> [b]
+simulateWithReset m resetVal f as =
+  drop (snatToNum m) out
+ where
+  inp = replicate (snatToNum m) resetVal ++ as
+  rst = resetGenN @dom m
+  clk = clockGen
+  en  = enableGen
+  out = simulate (f clk rst en) inp
+{-# NOINLINE simulateWithReset #-}
+
+-- | Same as 'simulateWithReset', but only sample the first /Int/ output values.
+simulateWithResetN
+  :: ( KnownDomain dom
+     , Undefined a
+     , Undefined b
+     , 1 <= m )
+  => SNat m
+  -- ^ Number of cycles to assert the reset
+  -> a
+  -- ^ Reset value
+  -> Int
+  -- ^ Number of cycles to simulate (excluding cycle spent in reset)
+  -> ( KnownDomain dom
+    => Clock dom
+    -> Reset dom
+    -> Enable dom
+    -> Signal dom a
+    -> Signal dom b )
+  -- ^ Circuit to simulate
+  -> [a]
+  -> [b]
+simulateWithResetN nReset resetVal nSamples f as =
+  take nSamples (simulateWithReset nReset resetVal f as)
+{-# INLINE simulateWithResetN #-}
 
 -- | Simulate a (@'Unbundled' a -> 'Unbundled' b@) function given a list of
 -- samples of type /a/
@@ -751,3 +827,84 @@ simulateB_lazy
   -- ^ Input samples
   -> [b]
 simulateB_lazy f = simulate_lazy (bundle . f . unbundle)
+
+
+-- | Hold reset for a number of cycles relative to an incoming reset signal.
+--
+-- Example:
+--
+-- >>> let sampleWithReset = sampleN 8 . unsafeToHighPolarity
+-- >>> sampleWithReset (holdReset @System clockGen enableGen (SNat @2) (resetGenN (SNat @3)))
+-- [True,True,True,True,True,False,False,False]
+--
+-- 'holdReset' holds the reset for an additional 2 clock cycles for a total
+-- of 5 clock cycles where the reset is asserted. 'holdReset' also works on
+-- intermediate assertions of the reset signal:
+--
+-- >>> let rst = fromList [True, False, False, False, True, False, False, False]
+-- >>> sampleWithReset (holdReset @System clockGen enableGen (SNat @2) (unsafeFromHighPolarity rst))
+-- [True,True,True,False,True,True,True,False]
+--
+holdReset
+  :: forall dom n
+   . KnownDomain dom
+  => Clock dom
+  -> Enable dom
+  -- ^ Global enable
+  -> SNat n
+  -- ^ Hold for /n/ cycles, counting from the moment the incoming reset
+  -- signal becomes deasserted.
+  -> Reset dom
+  -- ^ Reset to extend
+  -> Reset dom
+holdReset clk en SNat rst =
+  unsafeFromHighPolarity ((/=maxBound) <$> counter)
+ where
+  counter :: Signal dom (Index (n+1))
+  counter = register clk rst en 0 (satSucc SatBound <$> counter)
+
+-- | Like 'fromList', but resets on reset and has a defined reset value.
+--
+-- >>> let rst = unsafeFromHighPolarity (fromList [True, True, False, False, True, False])
+-- >>> let res = fromListWithReset @System rst Nothing [Just 'a', Just 'b', Just 'c']
+-- >>> sampleN 6 res
+-- [Nothing,Nothing,Just 'a',Just 'b',Nothing,Just 'a']
+--
+-- __NB__: This function is not synthesizable
+fromListWithReset
+  :: forall dom a
+   . (KnownDomain dom, Undefined a)
+  => Reset dom
+  -> a
+  -> [a]
+  -> Signal dom a
+fromListWithReset rst resetValue vals =
+  go (unsafeToHighPolarity rst) vals
+ where
+  go (r :- rs) _ | r = resetValue :- go rs vals
+  go (_ :- rs) [] = deepErrorX "fromListWithReset: input ran out" :- go rs []
+  go (_ :- rs) (a : as) = a :- go rs as
+
+-- | Convert between different types of reset, adding a synchronizer in case
+-- it needs to convert from an asynchronous to a synchronous reset.
+convertReset
+  :: forall domA domB
+   . ( KnownDomain domA
+     , KnownDomain domB
+     )
+  => Clock domA
+  -> Clock domB
+  -> Reset domA
+  -> Reset domB
+convertReset clkA clkB (unsafeToHighPolarity -> rstA0) =
+  unsafeFromHighPolarity rstA2
+ where
+  rstA1 = unsafeSynchronizer clkA clkB rstA0
+  rstA2 =
+    case (resetKind @domA, resetKind @domB) of
+      (SSynchronous,  SSynchronous)  -> rstA1
+      (SAsynchronous, SAsynchronous) -> rstA1
+      (SSynchronous,  SAsynchronous) -> rstA1
+      (SAsynchronous, SSynchronous) ->
+        delay clkB enableGen True $
+          delay clkB enableGen True rstA1

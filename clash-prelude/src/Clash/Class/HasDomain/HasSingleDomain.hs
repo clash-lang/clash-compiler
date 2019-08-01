@@ -39,9 +39,9 @@ type MissingInstance =
         "This might happen if an instance for TryDomain is missing. Try to determine"
   :$$$: "which of the types miss an instance, and add them. Example implementations:"
   :$$$: ""
-  :$$$: " * type instance HasDomain t (MyVector n a)    = TryDomain t a"
-  :$$$: " * type instance HasDomain t (MyCircuit dom a) = Found dom"
-  :$$$: " * type instance HasDomain t Terminal          = NotFound"
+  :$$$: " * type instance TryDomain t (MyVector n a)    = TryDomain t a"
+  :$$$: " * type instance TryDomain t (MyCircuit dom a) = Found dom"
+  :$$$: " * type instance TryDomain t Terminal          = NotFound"
   :$$$: ""
   :$$$: "Alternatively, use one of the withSpecific* functions."
 
@@ -65,7 +65,7 @@ type Outro =
    :$$$: ""
 
 type NotFoundError (t :: Type) =
-       "Could not find a domain in the following type:"
+       "Could not find a non-ambiguous domain in the following type:"
   :$$$: ""
   :$$$: "  " :<<>>: t
   :$$$: ""
@@ -82,13 +82,17 @@ type AmbiguousError (t :: Type) (dom1 :: Domain) (dom2 :: Domain) =
   :$$$: Outro
 
 type StuckErrorMsg (orig :: Type) (n :: Type) =
-        "Could not determine whether the following type contained a domain:"
+        "Could not determine whether the following type contained a non-ambiguous domain:"
   :$$$: ""
   :$$$: "  " :<<>>: n
   :$$$: ""
   :$$$: "In the full type:"
   :$$$: ""
   :$$$: "  " :<<>>: orig
+  :$$$: ""
+  :$$$: "Does it contain one?"
+  :$$$: ""
+  :$$$: "------"
   :$$$: ""
   :$$$: MissingInstance
   :$$$: Outro
@@ -145,6 +149,7 @@ type instance TryDomain t (RTree d a)           = TryDomain t a
 type instance TryDomain t (a -> b)              = Merge t a b
 type instance TryDomain t (a, b)                = Merge t a b
 
+type instance TryDomain t ()                    = 'NotFound
 type instance TryDomain t Bool                  = 'NotFound
 type instance TryDomain t Integer               = 'NotFound
 type instance TryDomain t Int                   = 'NotFound

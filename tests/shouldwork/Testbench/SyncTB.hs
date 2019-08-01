@@ -1,5 +1,6 @@
 module SyncTB where
 
+import Clash.Explicit.Testbench
 import Clash.Explicit.Prelude
 import Clash.Signal (mux)
 
@@ -49,7 +50,7 @@ testBench
 testBench = done
   where
     testInput      = stimuliGenerator clk7 rst7 $(listToVecTH [(1::Integer)..20])
-    expectedOutput = outputVerifier   clk9 rst9
+    expectedOutput = outputVerifier'   clk9 rst9
                         (0 :> 1 :>  $(listToVecTH ([2,3,4,6,7,8,9,11,12,13,15,16]::[Integer])))
     done           = expectedOutput (zeroAt0 clk9 rst9 (topEntity clk2 clk7 clk9 testInput))
     done'          = not <$> done

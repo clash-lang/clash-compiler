@@ -10,7 +10,7 @@ topEntity = pure indicesI
 testBench :: Signal System Bool
 testBench = done
   where
-    expectedOutput = outputVerifier clk rst ((0:>1:>2:>3:>Nil):>Nil)
+    expectedOutput = outputVerifier' clk rst ((0:>1:>2:>3:>Nil):>Nil)
     done           = expectedOutput topEntity
     clk            = tbSystemClockGen (not <$> done)
     rst            = systemResetGen

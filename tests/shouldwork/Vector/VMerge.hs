@@ -11,7 +11,7 @@ testBench :: Signal System Bool
 testBench = done
   where
     testInput      = pure (iterateI (+1) 1,iterateI (+1) 3)
-    expectedOutput = outputVerifier clk rst ((1:>3:>2:>4:>Nil):>Nil)
+    expectedOutput = outputVerifier' clk rst ((1:>3:>2:>4:>Nil):>Nil)
     done           = expectedOutput (topEntity <$> testInput)
     clk            = tbSystemClockGen (not <$> done)
     rst            = systemResetGen

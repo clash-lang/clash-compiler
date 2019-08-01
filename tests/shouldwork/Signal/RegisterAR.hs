@@ -1,8 +1,11 @@
+{-# LANGUAGE LambdaCase #-}
+
 module RegisterAR where
 
 -- Register: Asynchronous, Regular
 
 import Clash.Explicit.Prelude
+import Clash.Explicit.Testbench
 
 testInput :: Vec 7 (Signed 8)
 testInput = 1 :> 2 :> 3 :> 4 :> 5 :> 6 :> 7 :> Nil
@@ -34,13 +37,16 @@ topEntityAR clk rst = topEntity clk arst
     arst = unsafeFromHighPolarity (resetInput clk rst enableGen)
 {-# NOINLINE topEntityAR #-}
 
+-- | Doing this case inline trips GHC 8.2/8.4 due to dead code. We sometimes
+-- want to run our whole testsuite with a different System domain though, so
+-- it's not _really_ dead code.
+oneOrThree :: SResetKind dom -> (Signed 8)
+oneOrThree = \case {SAsynchronous -> 1; SSynchronous -> 3}
+
 testBench :: Signal System Bool
 testBench = done
   where
-    expectedOutput = outputVerifier clk rst (1 :> 1 :> 2 :>
-                                             (if isAsynchronous @System
-                                              then 1
-                                              else 3) :> 1 :> 1 :> 2 :> 3 :> Nil)
+    expectedOutput = outputVerifier' clk rst (1 :> 1 :> 2 :> oneOrThree (resetKind @System) :> 1 :> 1 :> 2 :> 3 :> Nil)
     done           = expectedOutput (topEntityAR clk rst)
     clk            = tbSystemClockGen (not <$> done)
     rst            = systemResetGen

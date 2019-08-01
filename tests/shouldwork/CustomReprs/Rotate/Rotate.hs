@@ -83,7 +83,7 @@ testBench = done'
                                :> (Just Blue)
                                :> Nil
 
-    expectedOutput = outputVerifier $ Red
+    expectedOutput = outputVerifier' $ Red
                                    :> Green
                                    :> Blue
                                    :> Red

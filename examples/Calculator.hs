@@ -50,7 +50,7 @@ testBench :: Signal System Bool
 testBench = done
   where
     testInput      = stimuliGenerator clk rst $(listToVecTH [Imm 1::OPC Word,Push,Imm 2,Push,Pop,Pop,Pop,ADD])
-    expectedOutput = outputVerifier clk rst $(listToVecTH [Just 1 :: Maybe Word,Nothing,Just 2,Nothing,Nothing,Nothing,Nothing,Just 3])
+    expectedOutput = outputVerifier' clk rst $(listToVecTH [Just 1 :: Maybe Word,Nothing,Just 2,Nothing,Nothing,Nothing,Nothing,Just 3])
     done           = expectedOutput (topEntity clk rst (enableGen) testInput)
     clk            = tbSystemClockGen (not <$> done)
     rst            = systemResetGen

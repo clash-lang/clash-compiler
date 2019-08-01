@@ -49,6 +49,9 @@ module Clash.Prelude
   , moore
   , mooreB
   , registerB
+    -- * Synchronizer circuits for safe clock domain crossings
+  , dualFlipFlopSynchronizer
+  , asyncFIFOSynchronizer
     -- * ROMs
   , asyncRom
   , asyncRomPow2
@@ -174,6 +177,7 @@ import           Clash.Prelude.BlockRam.File
 import           Clash.Prelude.DataFlow
 import           Clash.Prelude.ROM.File
 import           Clash.Prelude.Safe
+import           Clash.Prelude.Synchronizer
 import           Clash.Promoted.Nat
 import           Clash.Promoted.Nat.TH
 import           Clash.Promoted.Nat.Literals
