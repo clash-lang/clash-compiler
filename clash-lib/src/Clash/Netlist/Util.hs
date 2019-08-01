@@ -63,7 +63,7 @@ import           Clash.Core.Subst
   (Subst (..), extendIdSubst, extendIdSubstList, extendInScopeId,
    extendInScopeIdList, mkSubst, substTm)
 import           Clash.Core.Term
-  (Alt, LetBinding, Pat (..), Term (..), TickInfo (..), ModName (..))
+  (Alt, LetBinding, Pat (..), Term (..), TickInfo (..), NameMod (..))
 import           Clash.Core.TyCon
   (TyConName, TyConMap, tyConDataCons)
 import           Clash.Core.Type         (Type (..), TypeView (..),
@@ -1804,7 +1804,7 @@ withTicks ticks0 k = do
   go decls (SrcSpan sp:ticks) =
     go (TickDecl (Text.pack (showSDocUnsafe (ppr sp))):decls) ticks
 
-  go decls (ModName m nm0:ticks) = do
+  go decls (NameMod m nm0:ticks) = do
     tcm <- Lens.use tcCache
     case runExcept (tySym tcm nm0) of
       Right nm1 -> local (modName m nm1) (go decls ticks)
@@ -1812,10 +1812,10 @@ withTicks ticks0 k = do
 
   modName PrefixName (Text.pack -> s2) env@(NetlistEnv {_prefixName = s1})
     | Text.null s1 = env {_prefixName = s2}
-    | otherwise    = env {_prefixName = Text.append s1 (Text.append "_" s2)}
+    | otherwise    = env {_prefixName = s1 <> "_" <> s2}
   modName SuffixName (Text.pack -> s2) env@(NetlistEnv {_suffixName = s1})
     | Text.null s1 = env {_suffixName = s2}
-    | otherwise    = env {_suffixName = Text.append s2 (Text.append "_" s1)}
+    | otherwise    = env {_suffixName = s2 <> "_" <> s1}
   modName SetName (Text.pack -> s) env = env {_setName = Just s}
 
 -- | Add the pre- and suffix names in the current environment to the given
@@ -1825,6 +1825,6 @@ affixName
   -> NetlistMonad Identifier
 affixName nm0 = do
   NetlistEnv pre suf _ <- ask
-  let nm1 = if Text.null pre then nm0 else Text.append pre (Text.append "_" nm0)
-      nm2 = if Text.null suf then nm1 else Text.append nm1 (Text.append "_" suf)
+  let nm1 = if Text.null pre then nm0 else pre <> "_" <> nm0
+      nm2 = if Text.null suf then nm1 else nm1 <> "_" <> suf
   return nm2

@@ -79,7 +79,7 @@ runClashTest =
         -- TODO: Fix for VHDL. ModelSim / GHDL simulate _extremely_ slowly
         , runTest ("tests" </> "shouldwork" </> "Basic") (defBuild \\ [VHDL]) [] "MultipleHidden"      (["","MultipleHidden_testBench"],"MultipleHidden_testBench",True)
         , runTest ("tests" </> "shouldwork" </> "Basic") defBuild [] "NameInstance"         ([""],"NameInstance_topEntity",False)
-        , outputTest ("tests" </> "shouldwork" </> "Basic") [Verilog]   [] [] "NameInstance" "main"
+        , outputTest ("tests" </> "shouldwork" </> "Basic") defBuild [] [] "NameInstance" "main"
         , runTest ("tests" </> "shouldwork" </> "Basic") defBuild [] "NameOverlap"         (["nameoverlap"],"nameoverlap",False)
         , runTest ("tests" </> "shouldwork" </> "Basic") defBuild [] "NestedPrimitives"    ([""],"NestedPrimitives_topEntity",False)
         , runTest ("tests" </> "shouldwork" </> "Basic") defBuild [] "NestedPrimitives2"   ([""],"NestedPrimitives2_topEntity",False)

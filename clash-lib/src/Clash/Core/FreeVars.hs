@@ -294,7 +294,7 @@ termFreeVars' interesting f = go IntSet.empty where
     _ -> (,) <$> pure pat <*> go inScope alt
 
   goTick inScope = \case
-    ModName m ty -> ModName m <$> typeFreeVars' interesting inScope f ty
+    NameMod m ty -> NameMod m <$> typeFreeVars' interesting inScope f ty
     tick         -> pure tick
 
 -- | Determine whether a type has no free type variables.
