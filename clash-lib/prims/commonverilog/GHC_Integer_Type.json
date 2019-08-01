@@ -136,6 +136,15 @@
     }
   }
 , { "BlackBox" :
+    { "name"      : "GHC.Integer.Type.integerToWord64"
+    , "workInfo"  : "Never"
+    , "kind"      : "Declaration"
+    , "type"      : "integerToWord :: Integer -> Word64#"
+    , "comment"   : "only used by 32 bit GHC"
+    , "template"  : "assign ~RESULT = $unsigned(~ARG[0]);"
+    }
+  }
+, { "BlackBox" :
     { "name"      : "GHC.Integer.Type.bitInteger"
     , "kind"      : "Expression"
     , "type"      : "bitInteger :: Int -> Integer"

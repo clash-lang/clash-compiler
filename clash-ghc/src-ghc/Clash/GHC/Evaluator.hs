@@ -505,7 +505,7 @@ reduceConstant isSubj tcm h k nm pInfo tys args = case nm of
                    , Left (Literal . WordLiteral . toInteger $ W# q)
                    , Left (Literal . WordLiteral . toInteger $ W# r)
                    , Left (Literal . IntLiteral  . toInteger $ I# s)])
--- decodeDouble_Int64# :: Double# -> (#Int#, Int##)
+-- decodeDouble_Int64# :: Double# -> (# Int64#, Int# #)
   "GHC.Prim.decodeDouble_Int64#" | [i] <- doubleLiterals' args
     -> let (_,tyView -> TyConApp tupTcNm tyArgs) = splitFunForallTy ty
            (Just tupTc) = lookupUniqMap tupTcNm tcm
@@ -514,7 +514,7 @@ reduceConstant isSubj tcm h k nm pInfo tys args = case nm of
            !(# p, q #) = decodeDouble_Int64# a
        in reduce $
           mkApps (Data tupDc) (map Right tyArgs ++
-                   [ Left (Literal . IntLiteral  . toInteger $ I# p)
+                   [ Left (Literal . IntLiteral  . toInteger $ I64# p)
                    , Left (Literal . IntLiteral  . toInteger $ I# q)])
 
 --------
