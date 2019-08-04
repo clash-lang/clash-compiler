@@ -169,7 +169,8 @@ generateHDL reprs bindingsMap hdlState primMap tcm tupTcm typeTrans eval
       mkId      = evalState mkIdentifier hdlState'
       extId     = evalState extendIdentifier hdlState'
       ite       = ifThenElseExpr hdlState'
-      topNm     = genTopComponentName mkId prefixM annM topEntity
+      topNm     = genTopComponentName (opt_newInlineStrat opts) mkId prefixM
+                                      annM topEntity
       topNmU    = Data.Text.unpack topNm
 
   unless (opt_cachehdl opts) $ putStrLn "Clash: Ignoring .manifest files"
@@ -262,7 +263,8 @@ generateHDL reprs bindingsMap hdlState primMap tcm tupTcm typeTrans eval
     Just tb | not sameBenchHash -> do
       putStrLn $ "Clash: Compiling " ++ Data.Text.unpack (nameOcc (varName tb))
 
-      let modName'  = genComponentName HashMap.empty mkId prefixM tb
+      let modName'  = genComponentName (opt_newInlineStrat opts) HashMap.empty
+                                       mkId prefixM tb
           hdlState2 = setModName modName' hdlState'
 
       -- 1. Normalise testBench

@@ -220,8 +220,8 @@ ghdlLibrary path modName lib =
           case lib' of
             [] ->
               case modName of
-                "FIR" -> "test_fir_topentity"
-                _     -> map toLower modName ++ "_topentity"
+                "FIR" -> "test_topentity"
+                _     -> "topentity"
             k ->
               k
 
@@ -627,11 +627,11 @@ outputTest' env target extraClashArgs extraGhcArgs modName funcName path =
       topFile =
         case target of
           VHDL ->
-            "vhdl" </> modName </> map toLower modName ++ "_topentity.vhdl"
+            "vhdl" </> modName </> "topentity.vhdl"
           Verilog ->
-            "verilog" </> modName </> modName ++ "_topEntity.v"
+            "verilog" </> modName </> "topEntity.v"
           SystemVerilog ->
-            "systemverilog" </> modName </> modName ++ "_topEntity.sv"
+            "systemverilog" </> modName </> "topEntity.sv"
 
       workDir = testDirectory path'
 

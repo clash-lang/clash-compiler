@@ -244,7 +244,7 @@ reservedWords = ["abs","access","after","alias","all","and","architecture"
   ,"unaffected","units","until","use","variable","vmode","vprop","vunit","wait"
   ,"when","while","with","xnor","xor","toslv","fromslv","tagtoenum","datatotag"
   ,"integer", "boolean", "std_logic", "std_logic_vector", "signed", "unsigned"
-  ,"to_integer", "to_signed", "to_unsigned", "string"] ++ timeUnits
+  ,"to_integer", "to_signed", "to_unsigned", "string","log"] ++ timeUnits
 
 filterReserved :: Identifier -> Identifier
 filterReserved s = if s `elem` reservedWords
