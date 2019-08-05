@@ -1913,6 +1913,7 @@ makeHDL backend optsRef srcs = do
                                 , opt_importPaths = idirs}
                   backend' = backend iw syn esc frcUdf
 
+              checkMonoLocalBinds dflags
               checkImportDirs opts0 idirs
 
               primDirs <- Clash.Backend.primDirs backend'
