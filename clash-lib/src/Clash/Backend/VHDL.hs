@@ -75,7 +75,7 @@ data VHDLState =
   VHDLState
   { _tyCache   :: (HashSet HWType)
   -- ^ Previously encountered HWTypes
-  , _tySeen    :: [Identifier]
+  , _tySeen    :: HashMap Identifier Word
   -- ^ Generated product types
   , _nameCache :: (HashMap (HWType, Bool) TextS.Text)
   -- ^ Cache for type names. Bool indicates whether this name includes length
@@ -112,7 +112,8 @@ primsRoot = return ("clash-lib" System.FilePath.</> "prims")
 #endif
 
 instance Backend VHDLState where
-  initBackend     = VHDLState HashSet.empty [] HashMap.empty "" noSrcSpan [] [] [] [] [] HashMapS.empty
+  initBackend     = VHDLState HashSet.empty HashMap.empty HashMap.empty ""
+                              noSrcSpan [] [] [] [] [] HashMapS.empty
   hdlKind         = const VHDL
   primDirs        = const $ do root <- primsRoot
                                return [ root System.FilePath.</> "common"
@@ -332,6 +333,8 @@ selectProductField fieldLabels fieldTypes fieldIndex =
 genVHDL :: Identifier -> SrcSpan -> HashMapS.HashMap Identifier Word -> Component -> VHDLM ((String,Doc),[(String,Doc)])
 genVHDL nm sp seen c = preserveSeen $ do
     Mon $ idSeen .= seen
+    -- Don't have type names conflict with component names
+    Mon $ tySeen %= HashMap.unionWith max seen
     Mon $ setSrcSpan sp
     v <- vhdl
     i <- Mon $ use includes
@@ -1155,13 +1158,17 @@ userTyName dflt nm0 hwTy = do
   mkId <- mkIdentifier <*> pure Basic
   let nm1 = (mkId . last . TextS.splitOn ".") nm0
       nm2 = if TextS.null nm1 then dflt else nm1
-      nm3 = if nm2 `elem` seen then go mkId seen (0::Integer) nm2 else nm2
-  tySeen %= (nm3:)
+      (nm3,count) = case HashMap.lookup nm2 seen of
+                      Just cnt -> go mkId seen cnt nm2
+                      Nothing  -> (nm2,0)
+  tySeen %= HashMap.insert nm3 count
   return nm3
   where
     go mkId seen count nm0' =
       let nm1' = nm0' `TextS.append` TextS.pack ('_':show count) in
-      if nm1' `elem` seen then go mkId seen (count+1) nm0' else nm1'
+      case HashMap.lookup nm1' seen of
+        Just _  -> go mkId seen (count+1) nm0'
+        Nothing -> (nm1',count+1)
 
 
 -- | Convert a Netlist HWType to an error VHDL value for that type
