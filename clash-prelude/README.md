@@ -1,6 +1,6 @@
 # Clash - A functional hardware description language
 
-[![Build Status](https://travis-ci.org/clash-lang/clash-prelude.svg?branch=master)](https://travis-ci.org/clash-lang/clash-prelude)
+[![Pipeline status](https://gitlab.com/clash-lang/clash-compiler/badges/master/pipeline.svg)](https://gitlab.com/clash-lang/clash-compiler/commits/master)
 [![Hackage](https://img.shields.io/hackage/v/clash-prelude.svg)](https://hackage.haskell.org/package/clash-prelude)
 [![Hackage Dependencies](https://img.shields.io/hackage-deps/v/clash-prelude.svg?style=flat)](http://packdeps.haskellers.com/feed?needle=exact%3Aclash-prelude)
 
