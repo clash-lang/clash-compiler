@@ -114,9 +114,10 @@ runClashTest =
         , runTest ("tests" </> "shouldwork" </> "BitVector") defBuild [] "AppendZero"       (["","AppendZero_testBench"],"AppendZero_testBench",True)
         ]
       , clashTestGroup "BlackBox"
-        [ outputTest ("tests" </> "shouldwork" </> "BlackBox") [VHDL]   [] [] "TemplateFunction" "main"
-        , outputTest ("tests" </> "shouldwork" </> "BlackBox") [VHDL]   [] [] "BlackBoxFunction" "main"
-        , outputTest ("tests" </> "shouldwork" </> "Signal")   defBuild [] [] "BlockRamLazy"     "main"
+        [ outputTest ("tests" </> "shouldwork" </> "BlackBox") [VHDL]   [] [] "TemplateFunction"   "main"
+        , outputTest ("tests" </> "shouldwork" </> "BlackBox") [VHDL]   [] [] "BlackBoxFunction"   "main"
+        , runTest    ("tests" </> "shouldwork" </> "BlackBox") [VHDL]   []    "BlackBoxFunctionHO" (["","BlackBoxFunctionHO_testBench"],"BlackBoxFunctionHO_testBench",True)
+        , outputTest ("tests" </> "shouldwork" </> "Signal")   defBuild [] [] "BlockRamLazy"       "main"
         ]
       , clashTestGroup "BoxedFunctions"
         [ runTest ("tests" </> "shouldwork" </> "BoxedFunctions") defBuild [] "DeadRecursiveBoxed" ([""],"DeadRecursiveBoxed_topEntity",False)

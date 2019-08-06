@@ -56,7 +56,7 @@ import           Clash.Core.Subst              (extendIdSubst, mkSubst, substTm)
 import           Clash.Core.Term               as C
   (Term (..), collectArgs, collectArgsTicks)
 import           Clash.Core.Type               as C (Type (..), ConstTy (..),
-                                                splitFunTys)
+                                                splitFunTys, splitFunTy)
 import           Clash.Core.TyCon              as C (tyConDataCons)
 import           Clash.Core.Util               (isFun, termType)
 import           Clash.Core.Var                as V
@@ -455,28 +455,40 @@ mkFunInput
 mkFunInput resId e =
  let (appE,args,ticks) = collectArgsTicks e
  in  withTicks ticks $ \tickDecls -> do
+  tcm <- Lens.use tcCache
   -- TODO: Rewrite this function to use blackbox functions. Right now it
   -- TODO: generates strings that are later parsed/interpreted again. Silly!
   (bbCtx,dcls) <- mkBlackBoxContext "__INTERNAL__" resId (lefts args)
   templ <- case appE of
             Prim nm _ -> do
               bb  <- extractPrimWarnOrFail nm
-              let
-                templ =
-                  case bb of
-                    P.BlackBox {..} ->
-                      Left (kind,outputReg,libraries,imports,includes,nm,template)
-                    P.Primitive pn _ pt ->
-                      error $ $(curLoc) ++ "Unexpected blackbox type: "
-                                        ++ "Primitive " ++ show pn
-                                        ++ " " ++ show pt
-                    P.BlackBoxHaskell pnm _ fn _ ->
-                      error $ $(curLoc) ++ "Unexpected blackbox type: "
-                                        ++ "BlackBoxHaskell" ++ show pnm
-                                        ++ " " ++ show fn ++ " <func>"
-              return templ
+              case bb of
+                P.BlackBox {..} ->
+                  pure (Left (kind,outputReg,libraries,imports,includes,nm,template))
+                P.Primitive pn _ pt ->
+                  error $ $(curLoc) ++ "Unexpected blackbox type: "
+                                    ++ "Primitive " ++ show pn
+                                    ++ " " ++ show pt
+                P.BlackBoxHaskell pName _workInfo fName (_, func) -> do
+                  -- Determine result type of this blackbox. If it's not a
+                  -- function, simply use its term type.
+                  let
+                    resTy0 = termType tcm e
+                    resTy1 =
+                      case splitFunTy tcm resTy0 of
+                        Just (_, t) -> t
+                        Nothing -> resTy0
+
+                  bbhRes <- func True (Right resId) pName args resTy1
+                  case bbhRes of
+                    Left err ->
+                      error $ $(curLoc) ++ show fName ++ " yielded an error: "
+                                        ++ err
+                    Right (BlackBoxMeta{..}, template) ->
+                      pure $
+                        Left ( bbKind, bbOutputReg, bbLibrary, bbImports
+                             , bbIncludes, pName, template)
             Data dc -> do
-              tcm <- Lens.use tcCache
               let eTy = termType tcm e
                   (_,resTy) = splitFunTys tcm eTy
 

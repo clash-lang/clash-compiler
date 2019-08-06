@@ -61,8 +61,10 @@ emptyBlackBoxMeta = BlackBoxMeta False TExpr [] [] []
 -- when having a need for blackbox functions, ... TODO: docs
 type BlackBoxFunction
    = Bool
-  -- ^ Treat BlackBox expression as declaration
-  -> (Either Identifier Id)
+  -- ^ Indicates whether caller needs a declaration. If set, the function is
+  -- still free to return an expression, but the caller will convert it to a
+  -- declaration.
+  -> (Either Identifier Id)  -- TODO: not useful? bb should just use ~RESULT
   -- ^ Id to assign the result to
   -> S.Text
   -- ^ Name of primitive
