@@ -39,17 +39,17 @@ cd clash-compiler
 Use one of the build tools below to get Clash up and running.
 
 ## Cabal
-Install Cabal >= 3.0 and GHC >= 8.4. Even though GHC 8.6 is supported, we currently recommend running 8.4 as the former contains some known bugs concerning documentation generation. If you're using Ubuntu, add [HVR's PPA](https://launchpad.net/~hvr/+archive/ubuntu/ghc) and install them using APT:
+Install Cabal >= 2.4 and GHC >= 8.4. Even though GHC 8.6 is supported, we currently recommend running 8.4 as the former contains some known bugs concerning documentation generation. If you're using Ubuntu, add [HVR's PPA](https://launchpad.net/~hvr/+archive/ubuntu/ghc) and install them using APT:
 
 ```bash
 sudo add-apt-repository -u ppa:hvr/ghc
-sudo apt install ghc-8.4.4 cabal-install-3.0
+sudo apt install ghc-8.4.4 cabal-install-2.4
 ```
 
 Add `/opt/ghc/bin` [to your PATH](https://askubuntu.com/questions/60218/how-to-add-a-directory-to-the-path). Finally, run Clash using `cabal`:
 
 ```bash
-cabal run --write-ghc-environment-files=always -- clash
+cabal new-run --write-ghc-environment-files=always -- clash
 ```
 
 ## Stack
