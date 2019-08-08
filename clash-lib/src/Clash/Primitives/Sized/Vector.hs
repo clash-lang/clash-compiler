@@ -22,7 +22,7 @@ import qualified Data.String.Interpolate as I
 import qualified Data.String.Interpolate.Util as I
 
 indexIntVerilog ::  BlackBoxFunction
-indexIntVerilog _isD _resId _primName args _ty = return ((meta,) <$> bb)
+indexIntVerilog _isD _primName args _ty = return ((meta,) <$> bb)
  where
   meta = BlackBoxMeta
        { bbOutputReg = False

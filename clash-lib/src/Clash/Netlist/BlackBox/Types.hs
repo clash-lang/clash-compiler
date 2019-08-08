@@ -30,9 +30,8 @@ import                GHC.Generics               (Generic)
 
 import                Clash.Core.Term            (Term)
 import                Clash.Core.Type            (Type)
-import                Clash.Core.Var             (Id)
 import {-# SOURCE #-} Clash.Netlist.Types
-  (BlackBox, Identifier, NetlistMonad)
+  (BlackBox, NetlistMonad)
 
 import qualified      Clash.Signal.Internal      as Signal
 
@@ -61,9 +60,9 @@ emptyBlackBoxMeta = BlackBoxMeta False TExpr [] [] []
 -- when having a need for blackbox functions, ... TODO: docs
 type BlackBoxFunction
    = Bool
-  -- ^ Treat BlackBox expression as declaration
-  -> (Either Identifier Id)
-  -- ^ Id to assign the result to
+  -- ^ Indicates whether caller needs a declaration. If set, the function is
+  -- still free to return an expression, but the caller will convert it to a
+  -- declaration.
   -> S.Text
   -- ^ Name of primitive
   -> [Either Term Type]
