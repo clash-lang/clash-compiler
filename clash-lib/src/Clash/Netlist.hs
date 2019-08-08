@@ -65,7 +65,7 @@ import           Clash.Core.Var                   (Id, Var (..))
 import           Clash.Core.VarEnv
   (VarEnv, eltsVarEnv, emptyInScopeSet, emptyVarEnv, extendVarEnv, lookupVarEnv,
    lookupVarEnv', mkVarEnv)
-import           Clash.Driver.Types               (BindingMap, ClashOpts)
+import           Clash.Driver.Types               (BindingMap, ClashOpts (..))
 import           Clash.Netlist.BlackBox
 import           Clash.Netlist.Id
 import           Clash.Netlist.Types              as HW
@@ -171,18 +171,20 @@ runNetlistMonad isTb opts reprs s tops p tcm typeTrans iw mkId extId ite seenIds
         extId HashMapS.empty seenIds' Set.empty names tops env 0 prefixM reprs opts isTb ite
         HashMapS.empty
 
-    (seenIds',names) = genNames mkId prefixM seenIds_ emptyVarEnv s
+    (seenIds',names) = genNames (opt_newInlineStrat opts) mkId prefixM seenIds_
+                                emptyVarEnv s
 
-genNames :: (IdType -> Identifier -> Identifier)
+genNames :: Bool
+         -> (IdType -> Identifier -> Identifier)
          -> (Maybe Identifier,Maybe Identifier)
          -> HashMap Identifier Word
          -> VarEnv Identifier
          -> BindingMap
          -> (HashMap Identifier Word, VarEnv Identifier)
-genNames mkId prefixM s0 m0 = foldl go (s0,m0)
+genNames newInlineStrat mkId prefixM s0 m0 = foldr go (s0,m0)
   where
-    go (s,m) (v,_,_,_) =
-      let nm' = genComponentName s mkId prefixM v
+    go (v,_,_,_) (s,m) =
+      let nm' = genComponentName newInlineStrat s mkId prefixM v
           s'  = HashMapS.insert nm' 0 s
           m'  = extendVarEnv v nm' m
       in (s', m')
@@ -518,7 +520,9 @@ mkFunApp dstId fun args tickDecls = do
         env  <- Lens.use hdlDir
         mkId <- Lens.use mkIdentifierFn
         prefixM <- Lens.use componentPrefix
-        let topName = StrictText.unpack (genTopComponentName mkId prefixM annM fun)
+        newInlineStrat <- opt_newInlineStrat <$> Lens.use clashOpts
+        let topName = StrictText.unpack
+                      (genTopComponentName newInlineStrat mkId prefixM annM fun)
             modName = takeWhile (/= '.')
                                 (StrictText.unpack (nameOcc (varName fun)))
         manFile <- case annM of

@@ -52,7 +52,7 @@ import           Clash.Annotations.BitRepresentation.ClashLib
 import           Clash.Annotations.BitRepresentation.Internal
   (CustomReprs, ConstrRepr'(..), DataRepr'(..), getDataRepr, getConstrRepr)
 import           Clash.Annotations.TopEntity (PortName (..), TopEntity (..))
-import           Clash.Driver.Types      (Manifest (..))
+import           Clash.Driver.Types      (Manifest (..), ClashOpts (..))
 import           Clash.Core.DataCon      (DataCon (..))
 import           Clash.Core.FreeVars     (freeLocalIds, typeFreeVars)
 import qualified Clash.Core.Literal      as C
@@ -1062,16 +1062,17 @@ mkRTreeChain d elTy es =
         ]
 
 genComponentName
-  :: HashMap Identifier Word
+  :: Bool
+  -> HashMap Identifier Word
   -> (IdType -> Identifier -> Identifier)
   -> (Maybe Identifier,Maybe Identifier)
   -> Id
   -> Identifier
-genComponentName seen mkIdFn prefixM nm =
+genComponentName newInlineStrat seen mkIdFn prefixM nm =
   let nm' = Text.splitOn (Text.pack ".") (nameOcc (varName nm))
       fn  = mkIdFn Basic (stripDollarPrefixes (last nm'))
       fn' = if Text.null fn then Text.pack "Component" else fn
-      prefix = maybe id (:) (snd prefixM) (init nm')
+      prefix = maybe id (:) (snd prefixM) (if newInlineStrat then [] else init nm')
       nm2 = Text.concat (intersperse (Text.pack "_") (prefix ++ [fn']))
       nm3 = mkIdFn Basic nm2
   in  case HashMap.lookup nm3 seen of
@@ -1086,17 +1087,18 @@ genComponentName seen mkIdFn prefixM nm =
              Nothing -> i'
 
 genTopComponentName
-  :: (IdType -> Identifier -> Identifier)
+  :: Bool
+  -> (IdType -> Identifier -> Identifier)
   -> (Maybe Identifier,Maybe Identifier)
   -> Maybe TopEntity
   -> Id
   -> Identifier
-genTopComponentName _mkIdFn prefixM (Just ann) _nm =
+genTopComponentName _oldInlineStrat _mkIdFn prefixM (Just ann) _nm =
   case prefixM of
     (Just p,_) -> p `Text.append` Text.pack ('_':t_name ann)
     _          -> Text.pack (t_name ann)
-genTopComponentName mkIdFn prefixM Nothing nm =
-  genComponentName HashMap.empty mkIdFn prefixM nm
+genTopComponentName oldInlineStrat mkIdFn prefixM Nothing nm =
+  genComponentName oldInlineStrat HashMap.empty mkIdFn prefixM nm
 
 
 -- | Strips one or more layers of attributes from a HWType; stops at first
@@ -1261,9 +1263,10 @@ mkTopUnWrapper topEntity annM man dstId args tickDecls = do
       outNames = portOutNames man
 
   -- component name
+  newInlineStrat <- opt_newInlineStrat <$> Lens.use clashOpts
   mkIdFn <- Lens.use mkIdentifierFn
   prefixM <- Lens.use componentPrefix
-  let topName = genTopComponentName mkIdFn prefixM annM topEntity
+  let topName = genTopComponentName newInlineStrat mkIdFn prefixM annM topEntity
       topM    = fmap (const topName) annM
 
   -- inputs

@@ -70,7 +70,7 @@ import qualified Paths_clash_lib
 data SystemVerilogState =
   SystemVerilogState
     { _tyCache   :: HashSet HWType -- ^ Previously encountered  HWTypes
-    , _tySeen    :: [Identifier] -- ^ Product type counter
+    , _tySeen    :: HashMapS.HashMap Identifier Word -- ^ Product type counter
     , _nameCache :: HashMap HWType Doc -- ^ Cache for previously generated product type names
     , _genDepth  :: Int -- ^ Depth of current generative block
     , _modNm     :: Identifier
@@ -104,7 +104,7 @@ primsRoot = return ("clash-lib" System.FilePath.</> "prims")
 #endif
 
 instance Backend SystemVerilogState where
-  initBackend     = SystemVerilogState HashSet.empty [] HashMap.empty 0 "" HashMapS.empty [] noSrcSpan [] [] [] [] []
+  initBackend     = SystemVerilogState HashSet.empty HashMapS.empty HashMap.empty 0 "" HashMapS.empty [] noSrcSpan [] [] [] [] []
   hdlKind         = const SystemVerilog
   primDirs        = const $ do root <- primsRoot
                                return [ root System.FilePath.</> "common"
@@ -241,6 +241,8 @@ filterReserved s = if s `elem` reservedWords
 genVerilog :: Identifier -> SrcSpan -> HashMapS.HashMap Identifier Word -> Component -> SystemVerilogM ((String,Doc),[(String,Doc)])
 genVerilog _ sp seen c = preserveSeen $ do
     Mon $ idSeen .= seen
+    -- Don't have type names conflict with module names
+    Mon $ tySeen %= HashMapS.unionWith max seen
     Mon $ setSrcSpan sp
     v    <- verilog
     incs <- Mon $ use includes
@@ -678,17 +680,17 @@ tyName t@(Product nm _ _)      = do
           nm'' = if TextS.null nm'
                     then "product"
                     else nm'
-          nm3  = if nm'' `elem` seen
-                    then go mkId seen (0::Integer) nm''
-                    else nm''
-      tySeen %= (nm3:)
+          (nm3,count) = case HashMapS.lookup nm'' seen of
+                          Just cnt -> go mkId seen cnt nm''
+                          Nothing  -> (nm'',0)
+      tySeen %= HashMap.insert nm3 count
       stringS nm3
 
     go mkId s i n =
       let n' = n `TextS.append` TextS.pack ('_':show i)
-      in  if n' `elem` s
-             then go mkId s (i+1) n
-             else n'
+      in  case HashMapS.lookup n' s of
+                 Just _  -> go mkId s (i+1) n
+                 Nothing -> (n',i+1)
 tyName t@(SP _ _) = "logic_vector_" <> int (typeSize t)
 tyName (Clock _)  = "logic"
 tyName (Reset {}) = "logic"
