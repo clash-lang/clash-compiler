@@ -69,7 +69,7 @@ literalTF
   -> (Bool -> [Either Term Type] -> Int -> (BlackBoxMeta, BlackBox))
   -- ^ Functions processing
   -> BlackBoxFunction
-literalTF baseName tf isDecl _resId primName args _resTy = return $
+literalTF baseName tf isDecl primName args _resTy = return $
   case readSize baseName primName of
     Nothing ->
       Left (concat ["Can only make blackboxes for '", unpack baseName, "X#'"])

@@ -17,7 +17,7 @@ import Clash.Annotations.Primitive (Primitive(..), HDL(..))
 import Clash.Explicit.Testbench
 
 myMultiplyTF :: BlackBoxFunction
-myMultiplyTF isD resId primName args ty = pure $
+myMultiplyTF isD primName args ty = pure $
   Right ( emptyBlackBoxMeta
         , BBTemplate
            [ Text "resize("

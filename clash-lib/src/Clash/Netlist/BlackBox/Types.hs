@@ -30,9 +30,8 @@ import                GHC.Generics               (Generic)
 
 import                Clash.Core.Term            (Term)
 import                Clash.Core.Type            (Type)
-import                Clash.Core.Var             (Id)
 import {-# SOURCE #-} Clash.Netlist.Types
-  (BlackBox, Identifier, NetlistMonad)
+  (BlackBox, NetlistMonad)
 
 import qualified      Clash.Signal.Internal      as Signal
 
@@ -64,8 +63,6 @@ type BlackBoxFunction
   -- ^ Indicates whether caller needs a declaration. If set, the function is
   -- still free to return an expression, but the caller will convert it to a
   -- declaration.
-  -> (Either Identifier Id)  -- TODO: not useful? bb should just use ~RESULT
-  -- ^ Id to assign the result to
   -> S.Text
   -- ^ Name of primitive
   -> [Either Term Type]

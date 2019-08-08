@@ -299,7 +299,7 @@ mkPrimitive bbEParen bbEasD dst nm args ty tickDecls =
     go =
       \case
         P.BlackBoxHaskell bbName wf funcName (_fHash, func) -> do
-          bbFunRes <- func bbEasD dst nm args ty
+          bbFunRes <- func bbEasD nm args ty
           case bbFunRes of
             Left err -> do
               -- Blackbox template function returned an error:
@@ -479,7 +479,7 @@ mkFunInput resId e =
                         Just (_, t) -> t
                         Nothing -> resTy0
 
-                  bbhRes <- func True (Right resId) pName args resTy1
+                  bbhRes <- func True pName args resTy1
                   case bbhRes of
                     Left err ->
                       error $ $(curLoc) ++ show fName ++ " yielded an error: "
