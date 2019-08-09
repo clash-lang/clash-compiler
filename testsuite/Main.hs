@@ -116,7 +116,7 @@ runClashTest =
       , clashTestGroup "BlackBox"
         [ outputTest ("tests" </> "shouldwork" </> "BlackBox") [VHDL]   [] [] "TemplateFunction"   "main"
         , outputTest ("tests" </> "shouldwork" </> "BlackBox") [VHDL]   [] [] "BlackBoxFunction"   "main"
-        , runTest    ("tests" </> "shouldwork" </> "BlackBox") [VHDL]   []    "BlackBoxFunctionHO" (["","BlackBoxFunctionHO_testBench"],"BlackBoxFunctionHO_testBench",True)
+        , runTest    ("tests" </> "shouldwork" </> "BlackBox") [VHDL]   []    "BlackBoxFunctionHO" (["","testBench"],"testBench",True)
         , outputTest ("tests" </> "shouldwork" </> "Signal")   defBuild [] [] "BlockRamLazy"       "main"
         ]
       , clashTestGroup "BoxedFunctions"
