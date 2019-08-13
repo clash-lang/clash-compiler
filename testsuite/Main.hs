@@ -64,7 +64,7 @@ runClashTest =
     , clashTestGroup "Unit"
       [ clashTestGroup "Basic"
         [ -- TODO: Enable AES test on SystemVerilog. See issue #569.
-          runTest ("tests" </> "shouldwork" </> "Basic") (defBuild \\ [SystemVerilog]) [] "AES"                 ([""],"topEntity",False)
+          runTest ("tests" </> "shouldwork" </> "Basic") defBuild [] "AES"                 ([""],"topEntity",False)
         , runTest ("tests" </> "shouldwork" </> "Basic") defBuild [] "BangData"            ([""],"topEntity",False)
         , runTest ("tests" </> "shouldwork" </> "Basic") defBuild [] "Trace"               ([""],"topEntity",False)
         , runTest ("tests" </> "shouldwork" </> "Basic") defBuild [] "ByteSwap32"          (["","testBench"],"testBench",True)

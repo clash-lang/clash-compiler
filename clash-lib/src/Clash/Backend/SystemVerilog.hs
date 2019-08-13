@@ -298,7 +298,6 @@ mkTyPackage_ modName hwtys = do
       | otherwise                        = ty1 == ty2
 
     isUnsigned :: HWType -> Bool
-    isUnsigned Bool                = True
     isUnsigned (Unsigned _)        = True
     isUnsigned (BitVector _)       = True
     isUnsigned (Index _)           = True
