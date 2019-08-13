@@ -76,8 +76,7 @@ runClashTest =
         , runTest ("tests" </> "shouldwork" </> "Basic") defBuild [] "IrrefError"          ([""],"topEntity",False)
         , runTest ("tests" </> "shouldwork" </> "Basic") defBuild [] "LambdaDrop"          ([""],"topEntity",False)
         , runTest ("tests" </> "shouldwork" </> "Basic") defBuild [] "LotOfStates"         (["","testBench"],"testBench",True)
-        -- TODO: Fix for VHDL. ModelSim / GHDL simulate _extremely_ slowly
-        , runTest ("tests" </> "shouldwork" </> "Basic") (defBuild \\ [VHDL]) [] "MultipleHidden"      (["","testBench"],"testBench",True)
+        , runTest ("tests" </> "shouldwork" </> "Basic") defBuild [] "MultipleHidden"      (["","testBench"],"testBench",True)
         , runTest ("tests" </> "shouldwork" </> "Basic") defBuild [] "NameInstance"         ([""],"topEntity",False)
         , outputTest ("tests" </> "shouldwork" </> "Basic") defBuild [] [] "NameInstance" "main"
         , runTest ("tests" </> "shouldwork" </> "Basic") defBuild [] "NameOverlap"         (["nameoverlap"],"nameoverlap",False)

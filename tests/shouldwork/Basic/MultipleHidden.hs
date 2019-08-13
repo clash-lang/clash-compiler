@@ -1,6 +1,7 @@
 module MultipleHidden where
 
 import Clash.Prelude
+import qualified Clash.Explicit.Prelude as E
 import Clash.Explicit.Testbench
 
 import Unsafe.Coerce (unsafeCoerce)
@@ -60,5 +61,5 @@ testBench = done
     clkA = tbClockGen (not <$> done)
     rstA = resetGen
 
-    clkB = clockGen
+    clkB = tbClockGen (E.unsafeSynchronizer clkA clkB (not <$> done))
     rstB = resetGen
