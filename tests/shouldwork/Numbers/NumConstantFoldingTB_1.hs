@@ -1,13 +1,13 @@
-module NumConstantFoldingTB where
+module NumConstantFoldingTB_1 where
 import Clash.Prelude
 import Clash.Explicit.Testbench
-import qualified NumConstantFolding
+import qualified NumConstantFolding_1
 
 instance ShowX Ordering
 
-expected = $(lift NumConstantFolding.topEntity) :> Nil
+expected = $(lift NumConstantFolding_1.topEntity) :> Nil
 
-topEntity = NumConstantFolding.topEntity
+topEntity = NumConstantFolding_1.topEntity
 
 testBench :: Signal System Bool
 testBench = done
