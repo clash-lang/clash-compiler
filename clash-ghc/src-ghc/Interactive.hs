@@ -13,4 +13,4 @@ import           System.Environment ( getArgs )
 import           Clash.Main         ( defaultMain )
 
 main :: IO ()
-main = getArgs >>= defaultMain . ("--interactive":)
+main = getArgs >>= defaultMain . (["--interactive","-fobject-code"]++)
