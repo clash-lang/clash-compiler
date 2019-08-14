@@ -238,6 +238,15 @@ generateHDL reprs bindingsMap hdlState primMap tcm tupTcm typeTrans eval
       putStrLn $ "Clash: Normalisation took " ++ prepNormDiff
 
       -- 2. Generate netlist for topEntity
+
+      -- [Note] Create HDL dir before netlist generation
+      --
+      -- Already create the directory where the HDL ends up being generated, as
+      -- we use directories relative to this final directory to find manifest
+      -- files belonging to other top entities. Failing to do so leads to #463
+      let dir = hdlDir </> maybe "" (const modName) annM
+      prepareDir (opt_cleanhdl opts) (extension hdlState') dir
+      -- Now start the netlist generation
       (netlist,seen') <-
         genNetlist False opts reprs transformedBindings topEntities primMap
                    tcm typeTrans iw mkId extId ite seen hdlDir prefixM topEntity
@@ -250,8 +259,6 @@ generateHDL reprs bindingsMap hdlState primMap tcm tupTcm typeTrans eval
       let topComponent = view _4 . head $ filter (Data.Text.isSuffixOf topNm . componentName . view _4) netlist
           (hdlDocs,manifest',dfiles,mfiles)  = createHDL hdlState' (Data.Text.pack modName) seen' netlist topComponent
                                    (topNm, Right manifest)
-          dir = hdlDir </> maybe "" (const modName) annM
-      prepareDir (opt_cleanhdl opts) (extension hdlState') dir
       mapM_ (writeHDL dir) hdlDocs
       copyDataFiles (opt_importPaths opts) dir dfiles
       writeMemoryDataFiles dir mfiles
@@ -275,6 +282,11 @@ generateHDL reprs bindingsMap hdlState primMap tcm tupTcm typeTrans eval
       putStrLn $ "Clash: Testbench normalisation took " ++ prepNormDiff
 
       -- 2. Generate netlist for topEntity
+
+      -- See [Note] Create HDL dir before netlist generation
+      let dir = hdlDir </> maybe "" t_name annM </> Data.Text.unpack modName'
+      prepareDir (opt_cleanhdl opts) (extension hdlState2) dir
+      -- Now start the netlist generation
       (netlist,seen'') <-
         genNetlist True opts reprs transformedBindings topEntities primMap
                    tcm typeTrans iw mkId extId ite seen' hdlDir prefixM tb
@@ -286,8 +298,6 @@ generateHDL reprs bindingsMap hdlState primMap tcm tupTcm typeTrans eval
       -- 3. Write HDL
       let (hdlDocs,_,dfiles,mfiles) = createHDL hdlState2 modName' seen'' netlist undefined
                            (topNm, Left manifest')
-          dir = hdlDir </> maybe "" t_name annM </> Data.Text.unpack modName'
-      prepareDir (opt_cleanhdl opts) (extension hdlState2) dir
       writeHDL (hdlDir </> maybe "" t_name annM) (head hdlDocs)
       mapM_ (writeHDL dir) (tail hdlDocs)
       copyDataFiles (opt_importPaths opts) dir dfiles
