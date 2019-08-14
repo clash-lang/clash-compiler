@@ -193,6 +193,7 @@ runClashTest =
       , clashTestGroup "Numbers"
         [ runTest ("tests" </> "shouldwork" </> "Numbers") defBuild [] "BitInteger"   (["","testBench"],"testBench",True)
         , runTest ("tests" </> "shouldwork" </> "Numbers") defBuild [] "Bounds"       (["","testBench"],"testBench",True)
+        , runTest ("tests" </> "shouldwork" </> "Numbers") defBuild [] "DivideByZero" (["","testBench"],"testBench",True)
         , runTest ("tests" </> "shouldwork" </> "Numbers") defBuild ["-itests/shouldwork/Numbers", "-fconstraint-solver-iterations=15"] "ExpWithGhcCF"        (["","testBench"],"testBench",True)
         , runTest ("tests" </> "shouldwork" </> "Numbers") defBuild ["-itests/shouldwork/Numbers", "-fconstraint-solver-iterations=15"] "ExpWithClashCF"        (["","testBench"],"testBench",True)
         , outputTest ("tests" </> "shouldwork" </> "Numbers") defBuild ["-itests/shouldwork/Numbers"] ["-itests/shouldwork/Numbers"] "ExpWithClashCF"  "main"

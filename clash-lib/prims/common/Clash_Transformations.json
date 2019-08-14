@@ -6,4 +6,12 @@
     , "template"  : "~ERRORO"
     }
   }
+, { "BlackBox" :
+    { "name"      : "Clash.Transformations.undefined"
+    , "workInfo"  : "Constant"
+    , "kind"      : "Expression"
+    , "type"      : "undefined :: forall a . a"
+    , "template"  : "~ERRORO"
+    }
+  }
 ]
