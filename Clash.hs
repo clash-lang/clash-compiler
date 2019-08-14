@@ -10,7 +10,6 @@ import Clash.Driver.Types
 import Clash.GHC.Evaluator
 import Clash.GHC.GenerateBindings
 import Clash.GHC.NetlistTypes
-import Clash.GHC.LoadModules (ghcLibDir)
 import Clash.Backend
 import Clash.Backend.SystemVerilog
 import Clash.Backend.VHDL
@@ -22,7 +21,6 @@ import Clash.Util
 import Control.DeepSeq
 import Control.Exception (finally)
 import qualified Data.Time.Clock as Clock
-import qualified Data.HashMap.Strict as HM
 import System.Directory (removeDirectoryRecursive)
 
 import GHC.Stack (HasCallStack)
@@ -55,20 +53,12 @@ doHDL b src = do
   finally (do
     startTime <- Clock.getCurrentTime
     pd      <- primDirs b
-    (bindingsMap,tcm,tupTcm,topEntities,primMap,reprs) <- generateBindings tmpDir Auto pd ["."] (hdlKind b) src Nothing
+    (bindingsMap,tcm,tupTcm,topEntities,primMap,reprs) <- generateBindings tmpDir Auto pd ["."] [] (hdlKind b) src Nothing
     prepTime <- startTime `deepseq` bindingsMap `deepseq` tcm `deepseq` reprs `deepseq` Clock.getCurrentTime
     let prepStartDiff = reportTimeDiff prepTime startTime
     putStrLn $ "Loading dependencies took " ++ prepStartDiff
 
-    -- Parse primitives:
-    startTime' <- Clock.getCurrentTime
-    topDir     <- ghcLibDir
-    primMap2   <- sequence $ HM.map (sequence . fmap (compilePrimitive ["."] [] topDir)) primMap
-    prepTime'  <- startTime `deepseq` primMap2 `seq` Clock.getCurrentTime
-    let prepStartDiff' = reportTimeDiff prepTime' startTime'
-    putStrLn $ "Parsing primitives took " ++ prepStartDiff'
-
-    generateHDL (buildCustomReprs reprs) bindingsMap (Just b) primMap2 tcm tupTcm
+    generateHDL (buildCustomReprs reprs) bindingsMap (Just b) primMap tcm tupTcm
       (ghcTypeToHWType WORD_SIZE_IN_BITS True) reduceConstant topEntities
       (defClashOpts tmpDir){opt_cachehdl = False, opt_dbgLevel = DebugSilent}
       (startTime,prepTime)

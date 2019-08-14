@@ -269,7 +269,7 @@ makeAlgTyConRhs algTcRhs = case algTcRhs of
   TupleTyCon {}    -> error "Cannot handle tuple tycons"
 
 coreToTerm
-  :: ResolvedPrimMap
+  :: CompiledPrimMap
   -> [Var]
   -> CoreExpr
   -> C2C C.Term
@@ -397,7 +397,7 @@ coreToTerm primMap unlocs = term
     coreToIdSP sp = RWS.local (\r -> if isGoodSrcSpan sp then sp else r) . coreToId
 
 
-    lookupPrim :: Text -> Maybe (Maybe ResolvedPrimitive)
+    lookupPrim :: Text -> Maybe (Maybe CompiledPrimitive)
     lookupPrim nm = extractPrim <$> HashMap.lookup nm primMap
 
     var x = do
