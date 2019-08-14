@@ -85,6 +85,8 @@ data SystemVerilogState =
     , _memoryDataFiles:: [(String,String)]
     -- ^ Files to be stored: (filename, contents). These files are generated
     -- during the execution of 'genNetlist'.
+    , _tyPkgCtx  :: Bool
+    -- ^ Are we in the context of generating the @_types@  package?
     , _intWidth  :: Int -- ^ Int/Word/Integer bit-width
     , _hdlsyn    :: HdlSyn
     , _escapedIds :: Bool
@@ -104,7 +106,9 @@ primsRoot = return ("clash-lib" System.FilePath.</> "prims")
 #endif
 
 instance Backend SystemVerilogState where
-  initBackend     = SystemVerilogState HashSet.empty HashMapS.empty HashMap.empty 0 "" HashMapS.empty [] noSrcSpan [] [] [] [] []
+  initBackend     = SystemVerilogState HashSet.empty HashMapS.empty HashMap.empty
+                                       0 "" HashMapS.empty [] noSrcSpan [] [] []
+                                       [] [] False
   hdlKind         = const SystemVerilog
   primDirs        = const $ do root <- primsRoot
                                return [ root System.FilePath.</> "common"
@@ -268,6 +272,7 @@ mkTyPackage_ :: Identifier
              -> [HWType]
              -> SystemVerilogM [(String,Doc)]
 mkTyPackage_ modName hwtys = do
+    Mon (tyPkgCtx .= True)
     normTys <- nub <$> mapM (normaliseType) (hwtys ++ usedTys)
     let
       needsDec    = nubBy eqReprTy $ normTys
@@ -275,11 +280,13 @@ mkTyPackage_ modName hwtys = do
       packageDec  = vcat $ fmap catMaybes $ mapM tyDec hwTysSorted
       funDecs     = vcat $ fmap catMaybes $ mapM funDec hwTysSorted
 
-    (:[]) A.<$> (TextS.unpack modName ++ "_types",) A.<$>
+    pkg <- (:[]) A.<$> (TextS.unpack modName ++ "_types",) A.<$>
        "package" <+> modNameD <> "_types" <> semi <> line <>
          indent 2 packageDec <> line <>
          indent 2 funDecs <> line <>
        "endpackage" <+> colon <+> modNameD <> "_types"
+    Mon (tyPkgCtx .= False)
+    return pkg
   where
     modNameD    = stringS modName
     usedTys     = concatMap mkUsedTys hwtys
@@ -452,24 +459,24 @@ lvType _ = pure Nothing
 
 funDec :: HWType -> SystemVerilogM (Maybe Doc)
 funDec ty@(Vector n elTy) | typeSize ty > 0 = Just A.<$>
-  "function" <+> "logic" <+> ranges <+> tName <> "_to_lv" <> parens (sigDecl "i" ty) <> semi <> line <>
+  "function" <+> "automatic" <+> "logic" <+> ranges <+> tName <> "_to_lv" <> parens (sigDecl "i" ty) <> semi <> line <>
   indent 2
     ("for" <+> parens ("int n = 0" <> semi <+> "n <" <+> int n <> semi <+> "n=n+1") <> line <>
       indent 2 (tName <> "_to_lv" <> brackets "n" <+> "=" <+> "i[n]" <> semi)) <> line <>
   "endfunction" <> line <>
-  "function" <+> tName <+> tName <> "_from_lv" <> parens ("logic" <+> ranges <+> "i") <> semi <> line <>
+  "function" <+> "automatic" <+> tName <+> tName <> "_from_lv" <> parens ("logic" <+> ranges <+> "i") <> semi <> line <>
   indent 2
     ("for" <+> parens ("int n = 0" <> semi <+> "n <" <+> int n <> semi <+> "n=n+1") <> line <>
       indent 2 (tName <> "_from_lv" <> brackets "n" <+> "=" <+> "i[n]" <> semi)) <> line <>
   "endfunction" <> line <>
   if n > 1 then
-    "function" <+> tName <+> tName <> "_cons" <> parens (sigDecl "x" elTy <> comma <> vecSigDecl "xs") <> semi <> line <>
+    "function" <+> "automatic" <+> tName <+> tName <> "_cons" <> parens (sigDecl "x" elTy <> comma <> vecSigDecl "xs") <> semi <> line <>
     indent 2
       (tName <> "_cons" <> brackets (int 0) <+> "=" <+> (toSLV elTy (Identifier "x" Nothing)) <> semi <> line <>
        tName <> "_cons" <> brackets (int 1 <> colon <> int (n-1)) <+> "=" <+> "xs" <> semi) <> line <>
     "endfunction"
   else
-    "function" <+> tName <+> tName <> "_cons" <> parens (sigDecl "x" elTy) <> semi <> line <>
+    "function" <+> "automatic" <+> tName <+> tName <> "_cons" <> parens (sigDecl "x" elTy) <> semi <> line <>
     indent 2
       (tName <> "_cons" <> brackets (int 0) <+> "=" <+> (toSLV elTy (Identifier "x" Nothing)) <> semi) <> line <>
     "endfunction"
@@ -497,19 +504,19 @@ funDec ty@(Vector n elTy) | typeSize ty > 0 = Just A.<$>
 
 
 funDec ty@(RTree n elTy) | typeSize elTy > 0 = Just A.<$>
-  "function" <+> "logic" <+> ranges <+> tName <> "_to_lv" <> parens (sigDecl "i" ty) <> semi <> line <>
+  "function" <+> "automatic" <+> "logic" <+> ranges <+> tName <> "_to_lv" <> parens (sigDecl "i" ty) <> semi <> line <>
   indent 2
     ("for" <+> parens ("int n = 0" <> semi <+> "n <" <+> int (2^n) <> semi <+> "n=n+1") <> line <>
       indent 2 (tName <> "_to_lv" <> brackets "n" <+> "=" <+> "i[n]" <> semi)) <> line <>
   "endfunction" <> line <>
-  "function" <+> tName <+> tName <> "_from_lv" <> parens ("logic" <+> ranges <+> "i") <> semi <> line <>
+  "function" <+> "automatic" <+> tName <+> tName <> "_from_lv" <> parens ("logic" <+> ranges <+> "i") <> semi <> line <>
   indent 2
     ("for" <+> parens ("int n = 0" <> semi <+> "n <" <+> int (2^n) <> semi <+> "n=n+1") <> line <>
       indent 2 (tName <> "_from_lv" <> brackets "n" <+> "=" <+> "i[n]" <> semi)) <> line <>
   "endfunction" <> line <>
   (if n > 0
       then
-        "function" <+> tName <+> tName <> "_br" <> parens (treeSigDecl "l" <> comma <> treeSigDecl "r") <> semi <> line <>
+        "function" <+> "automatic" <+> tName <+> tName <> "_br" <> parens (treeSigDecl "l" <> comma <> treeSigDecl "r") <> semi <> line <>
         indent 2
           (tName <> "_br" <> brackets (int 0 <> colon <> int (2^(n-1)-1)) <+> "=" <+> "l" <> semi <> line <>
            tName <> "_br" <> brackets (int (2^(n-1)) <> colon <> int (2^n-1)) <+> "=" <+> "r" <> semi) <> line <>
@@ -622,16 +629,15 @@ verilogType t_ = do
   Mon (tyCache %= HashSet.insert t)
   let logicOrWire | isBiSignalIn t = "wire"
                   | otherwise      = "logic"
+  pkgCtx <- Mon $ use tyPkgCtx
+  nm <- Mon $ use modNm
+  let pvrType = if pkgCtx
+                then tyName t
+                else stringS nm <> "_types::" <> tyName t
   case t of
-    Product {} -> do
-      nm <- Mon $ use modNm
-      stringS nm <> "_types::" <> tyName t
-    Vector _ _ -> do
-      nm <- Mon $ use modNm
-      stringS nm <> "_types::" <> tyName t
-    RTree _ _ -> do
-      nm <- Mon $ use modNm
-      stringS nm <> "_types::" <> tyName t
+    Product {}    -> pvrType
+    Vector {}     -> pvrType
+    RTree {}      -> pvrType
     Signed n      -> logicOrWire <+> "signed" <+> brackets (int (n-1) <> colon <> int 0)
     Clock _       -> "logic"
     Reset {}      -> "logic"
@@ -648,12 +654,15 @@ verilogTypeMark :: HWType -> SystemVerilogM Doc
 verilogTypeMark t_ = do
   t <- normaliseType t_
   Mon (tyCache %= HashSet.insert t)
+  pkgCtx <- Mon $ use tyPkgCtx
   nm <- Mon $ use modNm
-  let m = tyName t
+  let pvrType = if pkgCtx
+                then tyName t
+                else stringS nm <> "_types::" <> tyName t
   case t of
-    Product {} -> stringS nm <> "_types::" <> m
-    Vector _ _ -> stringS nm <> "_types::" <> m
-    RTree _ _ -> stringS nm <> "_types::" <> m
+    Product {} -> pvrType
+    Vector {}  -> pvrType
+    RTree {}   -> pvrType
     _ -> emptyDoc
 
 tyName :: HWType -> SystemVerilogM Doc
@@ -1187,29 +1196,31 @@ expr_ _ (DataTag (RTree _ _) (Right _)) = do
 
 expr_ b (ConvBV topM t True e) = do
   nm <- Mon $ use modNm
-  let nm' = stringS nm
+  pkgCtx <- Mon $ use tyPkgCtx
+  let prefix = if pkgCtx then stringS nm <> "_types::" else emptyDoc
   case t of
     Vector {} -> do
       Mon (tyCache %= HashSet.insert t)
-      maybe (nm' <> "_types::" ) ((<> "_types::") . stringS) topM <>
+      maybe prefix ((<> "_types::") . stringS) topM <>
         tyName t <> "_to_lv" <> parens (expr_ False e)
     RTree {} -> do
       Mon (tyCache %= HashSet.insert t)
-      maybe (nm' <> "_types::" ) ((<> "_types::") . stringS) topM <>
+      maybe prefix ((<> "_types::") . stringS) topM <>
         tyName t <> "_to_lv" <> parens (expr_ False e)
     _ -> expr b e
 
 expr_ b (ConvBV topM t False e) = do
   nm <- Mon $ use modNm
-  let nm' = stringS nm
+  pkgCtx <- Mon $ use tyPkgCtx
+  let prefix = if pkgCtx then stringS nm <> "_types::" else emptyDoc
   case t of
     Vector {} -> do
       Mon (tyCache %= HashSet.insert t)
-      maybe (nm' <> "_types::" ) ((<> "_types::") . stringS) topM <>
+      maybe prefix ((<> "_types::") . stringS) topM <>
         tyName t <> "_from_lv" <> parens (expr_ False e)
     RTree {} -> do
       Mon (tyCache %= HashSet.insert t)
-      maybe (nm' <> "_types::" ) ((<> "_types::") . stringS) topM <>
+      maybe prefix ((<> "_types::") . stringS) topM <>
         tyName t <> "_from_lv" <> parens (expr_ False e)
     _ -> expr b e
 
