@@ -16,7 +16,6 @@ import Clash.Driver
 import Clash.Driver.Types
 import Clash.GHC.Evaluator (reduceConstant)
 import Clash.GHC.GenerateBindings
-import Clash.GHC.LoadModules (ghcLibDir)
 import Clash.GHC.NetlistTypes
 import Clash.Netlist.BlackBox.Types (HdlSyn(Other))
 import Clash.Netlist.Types          (HWMap, FilteredHWType)
@@ -64,13 +63,11 @@ runInputStage
         )
 runInputStage tmpDir idirs src = do
   pds <- primDirs backend
-  (bindingsMap,tcm,tupTcm,topEntities,primMap,reprs) <- generateBindings tmpDir Auto pds idirs (hdlKind backend) src Nothing
+  (bindingsMap,tcm,tupTcm,topEntities,primMap,reprs) <- generateBindings tmpDir Auto pds idirs [] (hdlKind backend) src Nothing
   let topEntityNames = map (\(x,_,_) -> x) topEntities
       ((topEntity,_,_):_) = topEntities
       tm = topEntity
-  topDir   <- ghcLibDir
-  primMap2 <- sequence $ fmap (sequence . fmap (compilePrimitive [] [] topDir)) primMap
-  return (bindingsMap,tcm,tupTcm,topEntities, primMap2, buildCustomReprs reprs, topEntityNames,tm)
+  return (bindingsMap,tcm,tupTcm,topEntities, primMap, buildCustomReprs reprs, topEntityNames,tm)
 
 runNormalisationStage
   :: FilePath

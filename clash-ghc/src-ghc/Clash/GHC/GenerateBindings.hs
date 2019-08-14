@@ -7,13 +7,15 @@
 
 {-# LANGUAGE LambdaCase        #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE ViewPatterns      #-}
 
 module Clash.GHC.GenerateBindings
   (generateBindings)
 where
 
+import           Control.DeepSeq         (deepseq)
 import           Control.Lens            ((%~),(&),view,_1)
-import           Control.Monad           (unless, when)
+import           Control.Monad           (unless)
 import qualified Control.Monad.State     as State
 import qualified Control.Monad.RWS.Lazy  as RWS
 import           Data.Coerce             (coerce)
@@ -23,6 +25,7 @@ import qualified Data.IntMap.Strict      as IMS
 import qualified Data.HashMap.Strict     as HashMap
 import           Data.List               (isPrefixOf)
 import qualified Data.Text               as Text
+import qualified Data.Time.Clock         as Clock
 
 import qualified BasicTypes              as GHC
 import qualified CoreSyn                 as GHC
@@ -40,7 +43,7 @@ import qualified SrcLoc                  as GHC
 
 import           Clash.Annotations.BitRepresentation.Internal (DataRepr')
 import           Clash.Annotations.TopEntity (TopEntity)
-import           Clash.Annotations.Primitive (HDL)
+import           Clash.Annotations.Primitive (HDL, extractPrim)
 
 import           Clash.Core.Subst        (extendGblSubstList, mkSubst, substTm)
 import           Clash.Core.Term         (Term (..))
@@ -51,17 +54,21 @@ import           Clash.Core.Util         (mkLams, mkTyLams)
 import           Clash.Core.Var          (Var (..), Id, IdScope (..), setIdScope)
 import           Clash.Core.VarEnv
   (InScopeSet, VarEnv, emptyInScopeSet, extendInScopeSet, mkInScopeSet, mkVarEnv, unionVarEnv)
+import           Clash.Driver            (compilePrimitive)
 import           Clash.Driver.Types      (BindingMap)
 import           Clash.GHC.GHC2Core
   (C2C, GHC2CoreState, tyConMap, coreToId, coreToName, coreToTerm,
    makeAllTyCons, qualifiedNameString, emptyGHC2CoreState)
-import           Clash.GHC.LoadModules   (loadModules)
-import           Clash.Primitives.Types  (PrimMap, ResolvedPrimMap)
+import           Clash.GHC.LoadModules   (ghcLibDir, loadModules)
+import           Clash.Netlist.BlackBox.Util (usedArguments)
+import           Clash.Primitives.Types
+  (Primitive (..), CompiledPrimMap)
 import           Clash.Primitives.Util   (generatePrimMap)
 import           Clash.Rewrite.Util      (mkInternalVar, mkSelectorCase)
 import           Clash.Unique
   (listToUniqMap, lookupUniqMap, mapUniqMap, unionUniqMap, uniqMapToUniqSet)
-import           Clash.Util              ((***),first,traceIf)
+import           Clash.Util
+  ((***),first,traceIf,indexMaybe,reportTimeDiff)
 
 generateBindings
   :: FilePath
@@ -72,6 +79,8 @@ generateBindings
   -- ^ primitives (blackbox) directories
   -> [FilePath]
   -- ^ import directories (-i flag)
+  -> [FilePath]
+  -- ^ Package database
   -> HDL
   -- ^ HDL target
   -> String
@@ -83,10 +92,10 @@ generateBindings
            , Maybe TopEntity -- (maybe) TopEntity annotation
            , Maybe Id        -- (maybe) associated testbench
            )]
-        , ResolvedPrimMap  -- The primitives found in '.' and 'primDir'
+        , CompiledPrimMap  -- The primitives found in '.' and 'primDir'
         , [DataRepr']
         )
-generateBindings tmpDir useColor primDirs importDirs hdl modName dflagsM = do
+generateBindings tmpDir useColor primDirs importDirs dbs hdl modName dflagsM = do
   (  bindings
    , clsOps
    , unlocatable
@@ -95,9 +104,15 @@ generateBindings tmpDir useColor primDirs importDirs hdl modName dflagsM = do
    , pFP
    , customBitRepresentations
    , primGuards ) <- loadModules tmpDir useColor hdl modName dflagsM importDirs
-  primMap <- generatePrimMap primGuards (concat [pFP, primDirs, importDirs])
+  primMapR <- generatePrimMap primGuards (concat [pFP, primDirs, importDirs])
+  tdir <- maybe ghcLibDir (pure . GHC.topDir) dflagsM
+  startTime <- Clock.getCurrentTime
+  primMapC <-
+    sequence $ HashMap.map
+                 (sequence . fmap (compilePrimitive importDirs dbs tdir))
+                 primMapR
   let ((bindingsMap,clsVMap),tcMap,_) =
-        RWS.runRWS (mkBindings primMap bindings clsOps unlocatable)
+        RWS.runRWS (mkBindings primMapC bindings clsOps unlocatable)
                    GHC.noSrcSpan
                    emptyGHC2CoreState
       (tcMap',tupTcCache)           = mkTupTyCons tcMap
@@ -117,17 +132,21 @@ generateBindings tmpDir useColor primDirs importDirs hdl modName dflagsM = do
                                               Just (v,_,_,_) -> (v,annM,benchM)
                                               Nothing        -> error "This shouldn't happen"
                                           ) topEntities'
+  -- Parsing / compiling primitives:
+  prepTime  <- startTime `deepseq` primMapC `seq` Clock.getCurrentTime
+  let prepStartDiff = reportTimeDiff prepTime startTime
+  putStrLn $ "Clash: Parsing and compiling primitives took " ++ prepStartDiff
 
   return ( allBindings
          , allTcCache
          , tupTcCache
          , topEntities''
-         , primMap
+         , primMapC
          , customBitRepresentations
          )
 
 mkBindings
-  :: ResolvedPrimMap
+  :: CompiledPrimMap
   -> [GHC.CoreBind]
   -- Binders
   -> [(GHC.CoreBndr,Int)]
@@ -178,36 +197,47 @@ mkBindings primMap bindings clsOps unlocatable = do
 --   * isn't marked NOINLINE
 --   * produces an error when evaluating its result to WHNF
 --   * isn't using all its arguments
-checkPrimitive :: PrimMap a -> GHC.CoreBndr -> C2C ()
+checkPrimitive :: CompiledPrimMap -> GHC.CoreBndr -> C2C ()
 checkPrimitive primMap v = do
-  name' <- qualifiedNameString (GHC.varName v)
-  when (name' `HashMap.member` primMap) $ do
-    let
-      info = GHC.idInfo v
-      inline = GHC.inlinePragmaSpec $ GHC.inlinePragInfo info
-      strictness = GHC.strictnessInfo info
-      ty = GHC.varType v
-      (argTys,_resTy) = GHC.splitFunTys . snd . GHC.splitForAllTys $ ty
-      (dmdArgs,_dmdRes) = GHC.splitStrictSig strictness
-      nrOfArgs = length argTys
-      loc = case GHC.getSrcLoc v of
-              GHC.UnhelpfulLoc _ -> ""
-              GHC.RealSrcLoc l   -> showPpr l ++ ": "
-      warnIf cond msg = traceIf cond ("\n"++loc++"Warning: "++msg) return ()
-    qName <- Text.unpack <$> qualifiedNameString (GHC.varName v)
-    let primStr = "primitive " ++ qName ++ " "
-    unless (qName == "Clash.XException.errorX" || "GHC." `isPrefixOf` qName) $ do
-      warnIf (inline /= GHC.NoInline)
-        (primStr ++ "isn't marked NOINLINE."
-        ++ "\nThis might make Clash ignore this primitive.")
-      warnIf (GHC.appIsBottom strictness nrOfArgs)
-        (primStr
-        ++ "produces a result that can't be evaluated to WHNF, "
-        ++ "because it results in an error."
-        ++ "\nThis might make Clash ignore this primitive.")
-      warnIf (any GHC.isAbsDmd dmdArgs)
-        (primStr
-        ++ "isn't using all its arguments, some might be optimized away.")
+  nm <- qualifiedNameString (GHC.varName v)
+  case HashMap.lookup nm primMap of
+    Just (extractPrim -> Just (BlackBox _ _ _ _ _ _ _ inc templ)) -> do
+      let
+        info = GHC.idInfo v
+        inline = GHC.inlinePragmaSpec $ GHC.inlinePragInfo info
+        strictness = GHC.strictnessInfo info
+        ty = GHC.varType v
+        (argTys,_resTy) = GHC.splitFunTys . snd . GHC.splitForAllTys $ ty
+        (dmdArgs,_dmdRes) = GHC.splitStrictSig strictness
+        nrOfArgs = length argTys
+        loc = case GHC.getSrcLoc v of
+                GHC.UnhelpfulLoc _ -> ""
+                GHC.RealSrcLoc l   -> showPpr l ++ ": "
+        warnIf cond msg = traceIf cond ("\n"++loc++"Warning: "++msg) return ()
+      qName <- Text.unpack <$> qualifiedNameString (GHC.varName v)
+      let primStr = "primitive " ++ qName ++ " "
+      let usedArgs = usedArguments templ ++ concatMap (usedArguments . snd) inc
+
+      let warnArgs [] = return ()
+          warnArgs (x:xs) = do
+            warnIf (maybe False GHC.isAbsDmd (indexMaybe dmdArgs x))
+              ("The Haskell implementation of " ++ primStr ++ "isn't using argument #" ++
+               show (x+1) ++ ", but the corresponding primitive blackbox does.\n" ++
+               "This can lead to compile failures because GHC can replace these " ++
+               "arguments by an undefined value.")
+            warnArgs xs
+
+      unless (qName == "Clash.XException.errorX" || "GHC." `isPrefixOf` qName) $ do
+        warnIf (inline /= GHC.NoInline)
+          (primStr ++ "isn't marked NOINLINE."
+          ++ "\nThis might make Clash ignore this primitive.")
+        warnIf (GHC.appIsBottom strictness nrOfArgs)
+          ("The Haskell implementation of " ++ primStr
+          ++ "produces a result that always results in an error.\n"
+          ++ "This can lead to compile failures because GHC can replace entire "
+          ++ "calls to this primitive by an undefined value.")
+        warnArgs usedArgs
+    _ -> return ()
   where
     showPpr :: GHC.Outputable a => a -> String
     showPpr = GHC.showSDocUnsafe . GHC.ppr

@@ -6,6 +6,7 @@ License    :  BSD2 (see the file LICENSE)
 Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
 -}
 
+{-# LANGUAGE BangPatterns        #-}
 {-# LANGUAGE DataKinds           #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeApplications    #-}
@@ -46,9 +47,11 @@ import System.IO.Unsafe      (unsafeDupablePerformIO)
 import Clash.Annotations.Primitive (hasBlackBox)
 import Clash.Class.Num       (satSucc, SaturationMode(SatBound))
 import Clash.Promoted.Nat    (SNat(..), snatToNum)
+import Clash.Promoted.Symbol (SSymbol (..))
 import Clash.Explicit.Signal
   (Clock, Reset, System, Signal, clockPeriod, toEnable, fromList, register,
-  unbundle, unsafeSynchronizer, veryUnsafeSynchronizer, clockGen)
+  unbundle, unsafeSynchronizer, veryUnsafeSynchronizer)
+import Clash.Signal.Internal (Clock (..))
 import Clash.Signal
   (mux, DomainResetKind, ResetKind(Asynchronous), KnownDomain, Reset(..),
   Enable)
@@ -445,7 +448,7 @@ tbClockGen
   :: KnownDomain testDom
   => Signal testDom Bool
   -> Clock testDom
-tbClockGen _done = clockGen
+tbClockGen done = Clock (done `seq` SSymbol)
 {-# NOINLINE tbClockGen #-}
 {-# ANN tbClockGen hasBlackBox #-}
 
