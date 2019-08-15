@@ -22,6 +22,7 @@ module Clash.Core.Evaluator where
 import           Control.Arrow                           (second)
 import           Control.Concurrent.Supply               (Supply, freshId)
 import           Control.Lens                            (view, _4)
+import           Data.Bits                               (shiftL)
 import           Data.Either                             (lefts,rights)
 import           Data.List
   (foldl',mapAccumL,uncons)
@@ -445,17 +446,38 @@ primop
   -- ^ The remaining terms which must be evaluated to a value
   -> Maybe State
 primop eval tcm h k nm ty tys vs v []
-  | nm `elem` ["Clash.Sized.Internal.BitVector.fromInteger#"
-              ,"Clash.Sized.Internal.BitVector.fromInteger##"
-              ,"Clash.Sized.Internal.Index.fromInteger#"
-              ,"Clash.Sized.Internal.Signed.fromInteger#"
-              ,"Clash.Sized.Internal.Unsigned.fromInteger#"
+  | nm `elem` ["Clash.Sized.Internal.Index.fromInteger#"
               ,"GHC.CString.unpackCString#"
               ,"Clash.Transformations.removedArg"
               ,"GHC.Prim.MutableByteArray#"
               ]
               -- The above primitives are actually values, and not operations.
   = unwind eval tcm h k (PrimVal nm ty tys (vs ++ [v]))
+  | nm == "Clash.Sized.Internal.BitVector.fromInteger#"
+  = case (vs,v) of
+    ([Lit (NaturalLiteral n),mask],Lit (IntegerLiteral i)) ->
+      unwind eval tcm h k (PrimVal nm ty tys [Lit (NaturalLiteral n)
+                                             ,mask
+                                             ,Lit (IntegerLiteral (wrapUnsigned n i))])
+    _ -> error ($(curLoc) ++ "Internal error")
+  | nm == "Clash.Sized.Internal.BitVector.fromInteger##"
+  = case (vs,v) of
+    ([mask],Lit (IntegerLiteral i)) ->
+      unwind eval tcm h k (PrimVal nm ty tys [mask
+                                             ,Lit (IntegerLiteral (wrapUnsigned 1 i))])
+    _ -> error ($(curLoc) ++ "Internal error"  ++ show (vs,v))
+  | nm == "Clash.Sized.Internal.Signed.fromInteger#"
+  = case (vs,v) of
+    ([Lit (NaturalLiteral n)],Lit (IntegerLiteral i)) ->
+      unwind eval tcm h k (PrimVal nm ty tys [Lit (NaturalLiteral n)
+                                             ,Lit (IntegerLiteral (wrapSigned n i))])
+    _ -> error ($(curLoc) ++ "Internal error")
+  | nm == "Clash.Sized.Internal.Unsigned.fromInteger#"
+  = case (vs,v) of
+    ([Lit (NaturalLiteral n)],Lit (IntegerLiteral i)) ->
+      unwind eval tcm h k (PrimVal nm ty tys [Lit (NaturalLiteral n)
+                                             ,Lit (IntegerLiteral (wrapUnsigned n i))])
+    _ -> error ($(curLoc) ++ "Internal error")
   | otherwise = eval (isScrut k) tcm h k nm ty tys (vs ++ [v])
 primop eval tcm h0 k nm ty tys vs v [e]
   | nm `elem` [ "Clash.Sized.Vector.lazyV"
@@ -598,3 +620,16 @@ uniqueInHeap h ids x = case lookupVarEnv x' h of
  where
   (i,ids') = freshId ids
   x'       = modifyVarName (\nm -> nm {nameUniq = i}) x
+
+wrapUnsigned :: Integer -> Integer -> Integer
+wrapUnsigned n i = i `mod` sz
+ where
+  sz = 1 `shiftL` fromInteger n
+
+wrapSigned :: Integer -> Integer -> Integer
+wrapSigned n i = if mask == 0 then 0 else res
+ where
+  mask = 1 `shiftL` fromInteger (n - 1)
+  res  = case divMod i mask of
+           (s,i1) | even s    -> i1
+                  | otherwise -> i1 - mask
