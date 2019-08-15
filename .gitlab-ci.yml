@@ -27,9 +27,6 @@ stages:
     - .ci/setup.sh
     - .ci/build.sh
     - .ci/test.sh
-  # Don't run every night
-  except:
-    - schedules
 
 ghc-8.2.2:
   extends: .tests
@@ -45,9 +42,6 @@ ghc-head:
     # Awaiting issue: https://github.com/goldfirere/singletons/issues/357
     - echo "GHC head currently disabled, because singletons doesn't build on ghc head"
     - exit 1
-  # Don't run every night
-  except:
-    - schedules
 
 # Create a binary distribution using nix, and store it in a tarball. A special
 # nix distribution is used that has its store installed on /usr/nix/store,
