@@ -457,10 +457,13 @@ primop eval tcm h k nm ty tys vs v []
               -- The above primitives are actually values, and not operations.
   = unwind eval tcm h k (PrimVal nm ty tys (vs ++ [v]))
   | otherwise = eval (isScrut k) tcm h k nm ty tys (vs ++ [v])
-primop eval tcm h0 k nm ty tys [] v [e]
-  | nm == "Clash.Sized.Vector.lazyV"
+primop eval tcm h0 k nm ty tys vs v [e]
+  | nm `elem` [ "Clash.Sized.Vector.lazyV"
+              , "Clash.Sized.Vector.replicate"
+              , "Clash.Sized.Vector.replace_int"
+              ]
   = let (h1,i) = newLetBinding tcm h0 e
-    in  eval (isScrut k) tcm h1 k nm ty tys [v,Suspend (Var i)]
+    in  eval (isScrut k) tcm h1 k nm ty tys (vs ++ [v,Suspend (Var i)])
 primop _ _ h k nm ty tys vs v (e:es) =
   Just (h,PrimApply nm ty tys (vs ++ [v]) es:k,e)
 
