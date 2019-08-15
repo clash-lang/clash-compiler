@@ -161,6 +161,7 @@ runClashTest =
         ]
       , clashTestGroup "Feedback"
         [ runTest ("tests" </> "shouldwork" </> "Feedback") defBuild [] "Fib" (["","testBench"],"testBench",True)
+        , runTest ("tests" </> "shouldwork" </> "Feedback") defBuild [] "MutuallyRecursive" (["","testBench"],"testBench",True)
         ]
       , clashTestGroup "Fixed"
         [ runTest ("tests" </> "shouldwork" </> "Fixed") defBuild [] "Mixer"      (["","testBench"],"testBench",True)

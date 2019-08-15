@@ -57,7 +57,7 @@ import           GHC.Stack                   (HasCallStack)
 import           Clash.Core.DataCon          (dcExtTyVars)
 import           Clash.Core.FreeVars
   (freeLocalVars, hasLocalFreeVars, localIdDoesNotOccurIn, localIdOccursIn,
-   typeFreeVars, termFreeVars')
+   typeFreeVars, termFreeVars', freeIds)
 import           Clash.Core.Name
 import           Clash.Core.Pretty           (showPpr)
 import           Clash.Core.Subst
@@ -727,10 +727,10 @@ specialise' specMapLbl specHistLbl specLimitLbl (TransformContext is0 _) e (Var 
   tcm <- Lens.view tcCache
 
   let specArg = bimap (normalizeTermTypes tcm) (normalizeType tcm) specArgIn
-  -- Create binders and variable references for free variables in 'specArg'
-  -- (specBndrsIn,specVars) :: ([Either Id TyVar], [Either Term Type])
-  (specBndrsIn,specVars) <- specArgBndrsAndVars specArg
-  let argLen  = length args
+      -- Create binders and variable references for free variables in 'specArg'
+      -- (specBndrsIn,specVars) :: ([Either Id TyVar], [Either Term Type])
+      (specBndrsIn,specVars) = specArgBndrsAndVars specArg
+      argLen  = length args
       specBndrs :: [Either Id TyVar]
       specBndrs = map (Lens.over _Left (normalizeId tcm)) specBndrsIn
       specAbs :: Either Term Type
@@ -820,9 +820,9 @@ specialise' specMapLbl specHistLbl specLimitLbl (TransformContext is0 _) e (Var 
 
 specialise' _ _ _ _ctx _ (appE,args,ticks) (Left specArg) = do
   -- Create binders and variable references for free variables in 'specArg'
-  (specBndrs,specVars) <- specArgBndrsAndVars (Left specArg)
+  let (specBndrs,specVars) = specArgBndrsAndVars (Left specArg)
   -- Create specialized function
-  let newBody = mkAbstraction specArg specBndrs
+      newBody = mkAbstraction specArg specBndrs
   -- See if there's an existing binder that's alpha-equivalent to the
   -- specialized function
   existing <- filterUniqMap ((`aeqTerm` newBody) . (^. _4)) <$> Lens.use bindings
@@ -861,20 +861,15 @@ normalizeId _   tyvar     = tyvar
 -- | Create binders and variable references for free variables in 'specArg'
 specArgBndrsAndVars
   :: Either Term Type
-  -> RewriteMonad extra ([Either Id TyVar],[Either Term Type])
-specArgBndrsAndVars specArg = do
-  globalBndrs <- Lens.use bindings
+  -> ([Either Id TyVar], [Either Term Type])
+specArgBndrsAndVars specArg =
   let unitFV :: Var a -> Const (UniqSet TyVar,UniqSet Id) (Var a)
-      unitFV v@(Id {})
-        | v `notElemVarEnv` globalBndrs
-        = Const (emptyUniqSet,unitUniqSet (coerce v))
-        | otherwise
-        = mempty
+      unitFV v@(Id {}) = Const (emptyUniqSet,unitUniqSet (coerce v))
       unitFV v@(TyVar {}) = Const (unitUniqSet (coerce v),emptyUniqSet)
 
       (specFTVs,specFVs) = case specArg of
         Left tm  -> (eltsUniqSet *** eltsUniqSet) . getConst $
-                    Lens.foldMapOf (termFreeVars' (const True)) unitFV tm
+                    Lens.foldMapOf freeLocalVars unitFV tm
         Right ty -> (eltsUniqSet (Lens.foldMapOf typeFreeVars unitUniqSet ty),[] :: [Id])
 
       specTyBndrs = map Right specFTVs
@@ -883,4 +878,4 @@ specArgBndrsAndVars specArg = do
       specTyVars  = map (Right . VarTy) specFTVs
       specTmVars  = map (Left . Var) specFVs
 
-  return (specTyBndrs ++ specTmBndrs,specTyVars ++ specTmVars)
+  in  (specTyBndrs ++ specTmBndrs,specTyVars ++ specTmVars)
