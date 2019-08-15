@@ -198,6 +198,7 @@ runClashTest =
         , runTest ("tests" </> "shouldwork" </> "Numbers") defBuild ["-itests/shouldwork/Numbers", "-fconstraint-solver-iterations=15"] "ExpWithGhcCF"        (["","testBench"],"testBench",True)
         , runTest ("tests" </> "shouldwork" </> "Numbers") defBuild ["-itests/shouldwork/Numbers", "-fconstraint-solver-iterations=15"] "ExpWithClashCF"        (["","testBench"],"testBench",True)
         , outputTest ("tests" </> "shouldwork" </> "Numbers") defBuild ["-itests/shouldwork/Numbers"] ["-itests/shouldwork/Numbers"] "ExpWithClashCF"  "main"
+        , runTest ("tests" </> "shouldwork" </> "Numbers") [VHDL] [] "HalfAsBlackboxArg" ([""],"topEntity",False)
         -- TODO: re-enable for Verilog
         , runTest ("tests" </> "shouldwork" </> "Numbers") (defBuild \\ [Verilog]) ["-itests/shouldwork/Numbers"] "NumConstantFoldingTB_1"        (["","testBench"],"testBench",True)
         , outputTest ("tests" </> "shouldwork" </> "Numbers") defBuild ["-fconstraint-solver-iterations=15"] ["-itests/shouldwork/Numbers"] "NumConstantFolding_1"  "main"
