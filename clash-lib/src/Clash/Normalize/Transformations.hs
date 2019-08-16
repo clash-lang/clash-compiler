@@ -2204,9 +2204,11 @@ inlineCleanup (TransformContext is0 _) (Letrec binds body) = do
     inlineBndrs _   keep [] = keep
     inlineBndrs isN keep ((v,e):il) =
       let subst = extendIdSubst (mkSubst isN) v e
-      in  inlineBndrs isN
-            (map (second (substTm "inlineCleanup.inlineBndrs" subst)) keep)
-            (map (second (substTm "inlineCleanup.inlineBndrs" subst)) il)
+      in  if v `localIdOccursIn` e -- don't inline recursive binders
+          then inlineBndrs isN ((v,e):keep) il
+          else inlineBndrs isN
+                 (map (second (substTm "inlineCleanup.inlineBndrs" subst)) keep)
+                 (map (second (substTm "inlineCleanup.inlineBndrs" subst)) il)
       -- We must not forget to inline the /current/ @to-inline@ let-binding into
       -- the list of /remaining/ @to-inline@ let-bindings, because it might
       -- only occur in /remaining/ @to-inline@ bindings. If we don't, we would
