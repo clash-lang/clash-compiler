@@ -36,6 +36,7 @@ ghc-8.6.5:
   extends: .tests
 ghc-8.8.1:
   extends: .tests
+  allow_failure: true
 ghc-head:
   # extends: .tests
   stage: build
