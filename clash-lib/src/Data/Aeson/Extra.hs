@@ -19,6 +19,7 @@ import           System.FilePath      ()
 import           Clash.Util           (ClashException(..))
 import           SrcLoc               (mkGeneralSrcSpan)
 import           FastString           (mkFastString)
+import           GHC.Stack            (HasCallStack)
 
 -- Quick and dirty way of replacing fake escapes in naively converted bytestring
 replaceCommonEscapes :: Text -> Text
@@ -43,27 +44,36 @@ genLineErr full part = genLineErr' allLines interval errorLineN
     allLines   = T.lines $ replaceCommonEscapes $ pack $ show full
     interval   = (max 0 (errorLineN - 5), min (max 0 $ length allLines - 1) (errorLineN + 5))
 
--- | Parse a ByteString according to the given JSON template. Prints failures
--- on @stdout@, and returns 'Nothing' if parsing fails.
-decodeOrErr :: (FromJSON a)
-                => FilePath
-                -> ByteString -- ^ Bytestring to parse
-                -> Maybe a
+-- | Parse a ByteString according to the given JSON template. Throws exception
+-- if it fails.
+decodeOrErr
+  :: (HasCallStack, FromJSON a)
+  => FilePath
+  -- ^ Path read from (for error message)
+  -> ByteString
+  -- ^ Bytestring to parse
+  -> a
 decodeOrErr path contents =
   case parse json contents of
-    Done _ v -> case fromJSON v of
-                    Success a -> Just a
-                    Error msg -> clashError ("Could not deduce valid scheme for " ++ show path ++ ". Error was: \n\n" ++ msg)
+    Done _ v ->
+      case fromJSON v of
+        Success a ->
+          a
+        Error msg ->
+          clashError
+            ( "Could not deduce valid scheme for json in "
+           ++ show path ++ ". Error was: \n\n" ++ msg )
 
     -- JSON parse error:
-    Fail bytes cntxs msg -> clashError ("Could not read or parse " ++ show path ++ ". "
-                                 ++ (if null cntxs then "" else "Context was:\n  " ++ intercalate "\n  " cntxs)
-                                 ++ "\n\nError reported by Attoparsec was:\n  "
-                                 ++ msg
-                                 ++ "\n\nApproximate location of error:\n\n"
-                                 -- HACK: Replace with proper parser/fail logic in future. Or don't. It's not important.
-                                 ++ (unpack $ genLineErr contents bytes)
-                                 )
+    Fail bytes cntxs msg ->
+      clashError
+        ( "Could not read or parse json in " ++ show path ++ ". "
+       ++ (if null cntxs then "" else "Context was:\n  " ++ intercalate "\n  " cntxs)
+       ++ "\n\nError reported by Attoparsec was:\n  "
+       ++ msg
+       ++ "\n\nApproximate location of error:\n\n"
+       -- HACK: Replace with proper parser/fail logic in future. Or don't. It's not important.
+       ++ (unpack $ genLineErr contents bytes) )
   where
     loc = mkGeneralSrcSpan $ mkFastString path
     clashError msg = throw $ ClashException loc msg Nothing

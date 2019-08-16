@@ -117,6 +117,7 @@ runClashTest =
         , outputTest ("tests" </> "shouldwork" </> "BlackBox") [VHDL]   [] [] "BlackBoxFunction"   "main"
         , runTest    ("tests" </> "shouldwork" </> "BlackBox") [VHDL]   []    "BlackBoxFunctionHO" (["","testBench"],"testBench",True)
         , outputTest ("tests" </> "shouldwork" </> "Signal")   defBuild [] [] "BlockRamLazy"       "main"
+        , runFailingTest ("tests" </> "shouldfail" </> "BlackBox") [VHDL] [] "WrongReference" (Just "Function WrongReference.myMultiply was annotated with an inline primitive for WrongReference.myMultiplyX. These names should be the same.")
         ]
       , clashTestGroup "BoxedFunctions"
         [ runTest ("tests" </> "shouldwork" </> "BoxedFunctions") defBuild [] "DeadRecursiveBoxed" ([""],"topEntity",False)

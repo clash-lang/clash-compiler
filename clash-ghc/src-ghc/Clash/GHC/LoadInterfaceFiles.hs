@@ -14,20 +14,20 @@
 
 module Clash.GHC.LoadInterfaceFiles
   ( loadExternalExprs
-  , primitiveFilePath
+  , unresolvedPrimitives
   )
 where
 
 -- External Modules
 import           Control.Monad.IO.Class      (MonadIO (..))
-import           Data.Char                   (toLower)
+import qualified Data.ByteString.Lazy.UTF8   as BLU
+import qualified Data.ByteString.Lazy        as BL
 import           Data.Either                 (partitionEithers)
 import           Data.List                   (elemIndex, foldl', partition)
+import qualified Data.Text                   as Text
 import           Data.Maybe                  (isJust, isNothing,
                                               mapMaybe, catMaybes)
 import           Data.Word                   (Word8)
-import           System.Directory            (createDirectoryIfMissing)
-import           System.FilePath.Posix       ((<.>), (</>))
 
 -- GHC API
 import           Annotations (Annotation(..), getAnnTargetName_maybe)
@@ -61,6 +61,9 @@ import           Clash.Annotations.BitRepresentation.Internal
   (DataRepr', dataReprAnnToDataRepr')
 import           Clash.Annotations.Primitive
 import           Clash.Annotations.BitRepresentation (DataReprAnn)
+import           Clash.Primitives.Types              (UnresolvedPrimitive, name)
+import           Clash.Primitives.Util               (decodeOrErr)
+import           Clash.GHC.GHC2Core                  (qualifiedNameString')
 import           Clash.Util                          (curLoc, traceIf)
 
 runIfl :: GHC.GhcMonad m => GHC.Module -> TcRnTypes.IfL a -> m a
@@ -91,17 +94,16 @@ loadIface foundMod = do
 
 loadExternalExprs
   :: GHC.GhcMonad m
-  => FilePath
-  -> HDL
+  => HDL
   -> UniqSet.UniqSet CoreSyn.CoreBndr
   -> [CoreSyn.CoreBind]
   -> m ( [(CoreSyn.CoreBndr,CoreSyn.CoreExpr)] -- Binders
        , [(CoreSyn.CoreBndr,Int)]              -- Class Ops
        , [CoreSyn.CoreBndr]                    -- Unlocatable
-       , [FilePath]
+       , [Either UnresolvedPrimitive FilePath]
        , [DataRepr']
        )
-loadExternalExprs tmpDir hdl = go [] [] [] [] []
+loadExternalExprs hdl = go [] [] [] [] []
   where
     go locatedExprs clsOps unlocated pFP reprs _ [] =
       return (locatedExprs,clsOps,unlocated,pFP,reprs)
@@ -136,7 +138,7 @@ loadExternalExprs tmpDir hdl = go [] [] [] [] []
                           (elemIndex v clsIds)
             ) clsOps'
 
-      (locatedAndUnlocated, pFP', reprs') <- unzip3 <$> mapM (loadExprFromIface tmpDir hdl) fvs'
+      (locatedAndUnlocated, pFP', reprs') <- unzip3 <$> mapM (loadExprFromIface hdl) fvs'
       let (locatedExprs', unlocated') = partitionEithers locatedAndUnlocated
 
       let visited' = foldl' UniqSet.addListToUniqSet visited
@@ -155,16 +157,15 @@ loadExternalExprs tmpDir hdl = go [] [] [] [] []
 
 loadExprFromIface ::
   GHC.GhcMonad m
-  => FilePath
-  -> HDL
+  => HDL
   -> CoreSyn.CoreBndr
   -> m (Either
           (CoreSyn.CoreBndr,CoreSyn.CoreExpr) -- Located
           CoreSyn.CoreBndr                    -- Unlocated
-       ,[FilePath]
+       ,[Either UnresolvedPrimitive FilePath]
        ,[DataRepr']
        )
-loadExprFromIface tmpDir hdl bndr = do
+loadExprFromIface hdl bndr = do
   let moduleM = Name.nameModule_maybe $ Var.varName bndr
   case moduleM of
     Just nameMod -> runIfl nameMod $ do
@@ -176,7 +177,7 @@ loadExprFromIface tmpDir hdl bndr = do
           let nameFun = GHC.getOccName $ Var.varName bndr
           let declM = filter ((== nameFun) . Name.nameOccName . IfaceSyn.ifName) decls
           anns <- TcIface.tcIfaceAnnotations (GHC.mi_anns iface)
-          primFPs   <- loadPrimitiveAnnotations hdl tmpDir anns
+          primFPs   <- loadPrimitiveAnnotations hdl anns
           let reprs  = loadCustomReprAnnotations anns
           case declM of
             [namedDecl] -> do
@@ -217,11 +218,10 @@ loadCustomReprAnnotations anns =
 loadPrimitiveAnnotations ::
   MonadIO m
   => HDL
-  -> FilePath
   -> [Annotations.Annotation]
-  -> m [FilePath]
-loadPrimitiveAnnotations hdl tmpDir anns =
-  sequence $ mapMaybe (primitiveFilePath hdl tmpDir) prims
+  -> m [Either UnresolvedPrimitive FilePath]
+loadPrimitiveAnnotations hdl anns =
+  concat <$> mapM (unresolvedPrimitives hdl) prims
   where
     prims = mapMaybe filterPrim anns
     filterPrim (Annotations.Annotation target value) =
@@ -230,35 +230,51 @@ loadPrimitiveAnnotations hdl tmpDir anns =
       GhcPlugins.fromSerialized
         (GhcPlugins.deserializeWithData :: [Word8] -> Primitive)
 
-primitiveFilePath ::
-  MonadIO m
+unresolvedPrimitives
+  :: MonadIO m
   => HDL
-  -> FilePath
   -> (Annotations.CoreAnnTarget, Primitive)
-  -> Maybe (m FilePath)
-primitiveFilePath hdl tmpDir targetPrim =
+  -> m ([Either UnresolvedPrimitive FilePath])
+unresolvedPrimitives hdl targetPrim =
   case targetPrim of
-    (_, Primitive hdl' fp)
-      | hdl == hdl' -> Just $ pure fp
-    (target, InlinePrimitive hdl' content)
-      | hdl == hdl' -> Just . liftIO $ do
-        let qualifiedName =
-              case target of
-                Annotations.NamedTarget name -> Name.nameStableString name
-                Annotations.ModuleTarget mod' -> Module.moduleStableString mod'
-            inlinePrimsDir =
-              tmpDir </> "inline_primitives" </> map toLower (show hdl)
-            primFile = inlinePrimsDir </> qualifiedName <.> "json"
-        createDirectoryIfMissing True inlinePrimsDir
-        writeFile primFile content
-        return inlinePrimsDir
-    _ -> Nothing
+    (_, Primitive hdl' fp) | hdl == hdl' -> pure [Right fp]
 
-loadExprFromTyThing :: CoreSyn.CoreBndr
-                    -> GHC.TyThing
-                    -> Either
-                         (CoreSyn.CoreBndr,CoreSyn.CoreExpr)  -- Located Binder
-                         CoreSyn.CoreBndr                     -- unlocatable Var
+    (target, InlinePrimitive hdl' contentOrFp) | hdl == hdl' ->
+      case target of
+        -- Module annotation, can house many primitives
+        Annotations.ModuleTarget _ ->
+          liftIO (decodeOrErr contentOrFp <$> BL.readFile contentOrFp)
+        Annotations.NamedTarget targetName0 ->
+          let targetName1 = Text.unpack (qualifiedNameString' targetName0)
+              prim =
+                case decodeOrErr targetName1 (BLU.fromString contentOrFp) of
+                  [] -> error $ "No annotations found for " ++ targetName1
+                     ++ " even though it had an InlinePrimitive annotation."
+                  [p] -> p
+                  _ -> error $ "Multiple primitive definitions found in "
+                    ++ "InlinePrimitive annotation for " ++ targetName1 ++ ". "
+                    ++ "Expected a single one."
+
+              primName = Text.unpack (name prim) in
+
+          if primName /= targetName1 then
+            error $ concat
+              [ "Function " ++ targetName1 ++ " was annotated with an inline "
+              , "primitive for " ++ primName ++ ". These names "
+              , "should be the same." ]
+          else
+            pure [Left prim]
+    _ ->
+      -- Only consider the HDL (Verilog/SystemVerilog/VHDL) annotation we're
+      -- currently targeting.
+      pure []
+
+loadExprFromTyThing
+  :: CoreSyn.CoreBndr
+  -> GHC.TyThing
+  -> Either
+       (CoreSyn.CoreBndr,CoreSyn.CoreExpr)  -- Located Binder
+       CoreSyn.CoreBndr                     -- unlocatable Var
 loadExprFromTyThing bndr tyThing = case tyThing of
   GHC.AnId _id | Var.isId _id ->
     let _idInfo    = Var.idInfo _id

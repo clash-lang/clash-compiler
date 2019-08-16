@@ -125,7 +125,7 @@ data TemplateSource
   -- ^ Template source stored in file on filesystem
   | TInline Text
   -- ^ Template stored inline
-  deriving (Show, Eq)
+  deriving (Show, Eq, Generic, NFData)
 
 
 data TemplateFormat
@@ -171,7 +171,8 @@ data Primitive a b c d
     -- ^ Whether the primitive does any work, i.e. takes chip area
   , functionName :: BlackBoxFunctionName
   , function :: d
-    -- ^ Used to indicate type of template (declaration or expression).
+  -- ^ Holds blackbox function and its hash, (Int, BlackBoxFunction), in a
+  -- CompiledPrimitive.
   }
   -- | A primitive that carries additional information. These are "real"
   -- primitives, hardcoded in the compiler. For example: 'mapSignal' in
@@ -198,9 +199,7 @@ instance FromJSON UnresolvedPrimitive where
             templ <- (Just . TInline <$> conVal .: "template")
                  <|> (Just . TFile   <$> conVal .: "file")
                  <|> (pure Nothing)
-
             fName' <- either fail return (parseBBFN fName)
-
             return (BlackBoxHaskell name' wf fName' templ)
           "BlackBox"  ->
             BlackBox <$> conVal .: "name"

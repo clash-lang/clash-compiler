@@ -49,7 +49,7 @@ import qualified System.FilePath                  as FilePath
 import qualified System.IO                        as IO
 import           System.IO.Error                  (isDoesNotExistError)
 import           System.IO.Temp
-  (getCanonicalTemporaryDirectory, withTempDirectory, createTempDirectory)
+  (getCanonicalTemporaryDirectory, withTempDirectory)
 import qualified Text.PrettyPrint.ANSI.Leijen     as ANSI
 import           Text.Trifecta.Result
   (Result(Success, Failure), _errDoc)
@@ -89,12 +89,6 @@ import           Clash.Util                       (first, reportTimeDiff)
 -- | Get modification data of current clash binary.
 getClashModificationDate :: IO Clock.UTCTime
 getClashModificationDate = Directory.getModificationTime =<< getExecutablePath
-
--- | Creates a directory for all Clash's temporary files
-createTemporaryClashDirectory :: IO FilePath
-createTemporaryClashDirectory = do
-  tmp <- getCanonicalTemporaryDirectory
-  createTempDirectory tmp "clash"
 
 -- | Create a set of target HDL files for a set of functions
 generateHDL

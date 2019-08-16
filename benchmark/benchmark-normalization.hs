@@ -16,10 +16,8 @@ import           Criterion.Main
 
 import qualified Control.Concurrent.Supply    as Supply
 import           Control.DeepSeq              (NFData(rnf),rwhnf)
-import           Control.Exception            (finally)
 import           Data.IntMap.Strict           (IntMap)
 import           Data.List                    (break, isPrefixOf, partition)
-import           System.Directory             (removeDirectoryRecursive)
 import           System.Environment           (getArgs, withArgs)
 import           System.FilePath              (FilePath)
 
@@ -40,26 +38,19 @@ main = do
       tests | null fileArgs = defaultTests
             | otherwise     = fileArgs
 
-  tmpDir <- createTemporaryClashDirectory
+  withArgs optionArgs (defaultMain $ fmap (benchFile idirs1) tests)
 
-  finally (do
-    withArgs optionArgs (defaultMain $ fmap (benchFile tmpDir idirs1) tests)
-   ) (
-    removeDirectoryRecursive tmpDir
-   )
-
-benchFile :: FilePath -> [FilePath] -> FilePath -> Benchmark
-benchFile tmpDir idirs src =
-  env (setupEnv tmpDir idirs src) $
+benchFile :: [FilePath] -> FilePath -> Benchmark
+benchFile idirs src =
+  env (setupEnv idirs src) $
     \ ~((bindingsMap,tcm,tupTcm,_topEntities,primMap,reprs,topEntityNames,topEntity),supplyN) -> do
       bench ("normalization of " ++ src)
             (nf (normalizeEntity reprs bindingsMap primMap tcm tupTcm typeTrans
                                  reduceConstant topEntityNames
-                                 (opts tmpDir idirs) supplyN :: _ -> BindingMap) topEntity)
+                                 (opts idirs) supplyN :: _ -> BindingMap) topEntity)
 
 setupEnv
-  :: FilePath
-  -> [FilePath]
+  :: [FilePath]
   -> FilePath
   -> IO ((BindingMap, TyConMap, IntMap TyConName
          ,[(Id, Maybe TopEntity, Maybe Id)]
@@ -67,8 +58,8 @@ setupEnv
          )
         ,Supply.Supply
         )
-setupEnv tmpDir idirs src = do
-  inp <- runInputStage tmpDir idirs src
+setupEnv idirs src = do
+  inp <- runInputStage idirs src
   supplyN <- Supply.newSupply
   return (inp,supplyN)
 

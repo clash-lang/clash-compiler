@@ -17,6 +17,7 @@ module Clash.Primitives.Util
   ( generatePrimMap
   , hashCompiledPrimMap
   , constantArgs
+  , decodeOrErr
   ) where
 
 import           Control.DeepSeq        (force)
@@ -25,7 +26,6 @@ import           Data.Aeson.Extra       (decodeOrErr)
 import qualified Data.ByteString.Lazy   as LZ
 import qualified Data.HashMap.Lazy      as HashMap
 import qualified Data.HashMap.Strict    as HashMapStrict
-import           Data.Maybe             (fromMaybe)
 import qualified Data.Set               as Set
 import           Data.Hashable          (hash)
 import           Data.List              (isSuffixOf, sort)
@@ -100,14 +100,14 @@ resolvePrimitive' metaPath BlackBox{template=t, includes=i, ..} = do
 resolvePrimitive' metaPath (BlackBoxHaskell bbName wf funcName t) =
   (bbName,) . HasBlackBox . BlackBoxHaskell bbName wf funcName <$> (mapM (resolveTemplateSource metaPath) t)
 
--- | Interprets contents of json file as list of @Primitive@s.
+-- | Interprets contents of json file as list of @Primitive@s. Throws
+-- exception if it fails.
 resolvePrimitive
   :: HasCallStack
   => FilePath
   -> IO [(TS.Text, GuardedResolvedPrimitive)]
 resolvePrimitive fileName = do
-  let decode = fromMaybe [] . decodeOrErr fileName
-  prims <- decode <$> LZ.readFile fileName
+  prims <- decodeOrErr fileName <$> LZ.readFile fileName
   mapM (resolvePrimitive' fileName) prims
 
 addGuards
@@ -145,11 +145,14 @@ addGuards = foldl go
 -- files in the given directories.
 generatePrimMap
   :: HasCallStack
-  => [(TS.Text, PrimitiveGuard ())]
+  => [UnresolvedPrimitive]
+  -- ^ unresolved primitives found in annotations (in LoadModules and
+  -- LoadInterfaceFiles)
+  -> [(TS.Text, PrimitiveGuard ())]
   -> [FilePath]
   -- ^ Directories to search for primitive definitions
   -> IO ResolvedPrimMap
-generatePrimMap primGuards filePaths = do
+generatePrimMap unresolvedPrims primGuards filePaths = do
   primitiveFiles <- fmap concat $ mapM
      (\filePath -> do
          fpExists <- Directory.doesDirectoryExist filePath
@@ -162,8 +165,10 @@ generatePrimMap primGuards filePaths = do
              return []
      ) filePaths
 
-  primitives <- concat <$> mapM resolvePrimitive primitiveFiles
-  let primMap = HashMap.fromList primitives
+  primitives0 <- concat <$> mapM resolvePrimitive primitiveFiles
+  let metapaths = map (TS.unpack . name) unresolvedPrims
+  primitives1 <- sequence $ zipWith resolvePrimitive' metapaths unresolvedPrims
+  let primMap = HashMap.fromList (primitives0 ++ primitives1)
   return (force (addGuards primMap primGuards))
 
 -- | Determine what argument should be constant / literal

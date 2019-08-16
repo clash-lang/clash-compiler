@@ -19,9 +19,7 @@ import Clash.Annotations.BitRepresentation.Internal (buildCustomReprs)
 import Clash.Util
 
 import Control.DeepSeq
-import Control.Exception (finally)
 import qualified Data.Time.Clock as Clock
-import System.Directory (removeDirectoryRecursive)
 
 import GHC.Stack (HasCallStack)
 import Util (OverridingBool(..))
@@ -48,24 +46,17 @@ doHDL
   -> String
   -> IO ()
 doHDL b src = do
-  tmpDir <- createTemporaryClashDirectory
+  startTime <- Clock.getCurrentTime
+  pd      <- primDirs b
+  (bindingsMap,tcm,tupTcm,topEntities,primMap,reprs) <- generateBindings Auto pd ["."] [] (hdlKind b) src Nothing
+  prepTime <- startTime `deepseq` bindingsMap `deepseq` tcm `deepseq` reprs `deepseq` Clock.getCurrentTime
+  let prepStartDiff = reportTimeDiff prepTime startTime
+  putStrLn $ "Loading dependencies took " ++ prepStartDiff
 
-  finally (do
-    startTime <- Clock.getCurrentTime
-    pd      <- primDirs b
-    (bindingsMap,tcm,tupTcm,topEntities,primMap,reprs) <- generateBindings tmpDir Auto pd ["."] [] (hdlKind b) src Nothing
-    prepTime <- startTime `deepseq` bindingsMap `deepseq` tcm `deepseq` reprs `deepseq` Clock.getCurrentTime
-    let prepStartDiff = reportTimeDiff prepTime startTime
-    putStrLn $ "Loading dependencies took " ++ prepStartDiff
-
-    generateHDL (buildCustomReprs reprs) bindingsMap (Just b) primMap tcm tupTcm
-      (ghcTypeToHWType WORD_SIZE_IN_BITS True) reduceConstant topEntities
-      (defClashOpts tmpDir){opt_cachehdl = False, opt_dbgLevel = DebugSilent}
-      (startTime,prepTime)
-   ) (do
-    removeDirectoryRecursive tmpDir
-   )
-
+  generateHDL (buildCustomReprs reprs) bindingsMap (Just b) primMap tcm tupTcm
+    (ghcTypeToHWType WORD_SIZE_IN_BITS True) reduceConstant topEntities
+    defClashOpts{opt_cachehdl = False, opt_dbgLevel = DebugSilent}
+    (startTime,prepTime)
 
 main :: IO ()
 main = genVHDL "./examples/FIR.hs"

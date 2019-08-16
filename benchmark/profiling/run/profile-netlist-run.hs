@@ -4,19 +4,16 @@ import           Clash.Backend
 import           Clash.Core.Name
 import           Clash.Core.TyCon
 import           Clash.Core.Var
-import           Clash.Driver
 import           Clash.Driver.Types
 import           Clash.Netlist
 
 import           Control.DeepSeq              (deepseq)
-import           Control.Exception            (finally)
 import           Control.Monad.State          (evalState)
 import           Data.Binary                  (decode)
 import qualified Data.HashMap.Strict          as HashMap
 import           Data.List                    (partition)
 import           Data.Maybe                   (fromMaybe)
 import qualified Data.Text                    as Text
-import           System.Directory             (removeDirectoryRecursive)
 import           System.Environment           (getArgs)
 import           System.FilePath              (FilePath, (</>))
 
@@ -33,22 +30,16 @@ main = do
              | otherwise = tests0
       idirs1 = ".":map (drop 2) idirs0
 
-  tmpDir <- createTemporaryClashDirectory
+  res <- mapM (benchFile idirs1) tests1
+  deepseq res $ return ()
 
-  finally (do
-    res <- mapM (benchFile tmpDir idirs1) tests1
-    deepseq res $ return ()
-   ) (
-    removeDirectoryRecursive tmpDir
-   )
-
-benchFile :: FilePath -> [FilePath] -> FilePath -> IO ()
-benchFile tmpDir idirs src = do
+benchFile :: [FilePath] -> FilePath -> IO ()
+benchFile idirs src = do
   env <- setupEnv src
   putStrLn $ "Doing netlist generation of " ++ src
   let (transformedBindings,topEntities,primMap,tcm,reprs,topEntity) = env
       primMap'   = fmap (fmap unremoveBBfunc) primMap
-      opts1      = opts tmpDir idirs
+      opts1      = opts idirs
       iw         = opt_intWidth opts1
       topEntityS = Text.unpack (nameOcc (varName topEntity))
       modName    = takeWhile (/= '.') topEntityS
