@@ -30,7 +30,7 @@ repository head.hackage
 -- index state, to go along with the cabal.project.freeze file. update the index
 -- state by running `cabal update` twice and looking at the index state it
 -- displays to you (as the second update will be a no-op)
-index-state: 2019-07-12T19:15:41Z
+index-state: 2019-08-16T08:55:07Z
 
 package clash-ghc
   executable-dynamic: True
