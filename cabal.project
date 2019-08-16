@@ -17,20 +17,22 @@ allow-newer: *:Cabal, *:array, *:base, *:binary, *:^bytestring, *:containers,
   *:integer-gmp, *:libiserv, *:mtl, *:parsec, *:pretty, *:process, *:stm,
   *:template-haskell, *:terminfo, *:text, *:time, *:transformers, *:unix,
   *:xhtml, *:ghc-tcplugins-extra, *:ghc-typelits-natnormalise,
-  *:ghc-typelits-knownnat, *:ghc-typelits-extra
+  *:ghc-typelits-knownnat, *:ghc-typelits-extra,
+  *:aeson, *:th-abstraction, *:microlens
 
-repository head.hackage
-  url: http://head.hackage.haskell.org/
-  secure: True
-  root-keys: 07c59cb65787dedfaef5bd5f987ceb5f7e5ebf88b904bbd4c5cbdeb2ff71b740
-             2e8555dde16ebd8df076f1a8ef13b8f14c66bad8eafefd7d9e37d0ed711821fb
-             8f79fd2389ab2967354407ec852cbe73f2e8635793ac446d09461ffb99527f6e
-  key-threshold: 3
+repository head.hackage.ghc.haskell.org
+   url: https://ghc.gitlab.haskell.org/head.hackage/
+   secure: True
+   key-threshold: 3
+   root-keys:
+       7541f32a4ccca4f97aea3b22f5e593ba2c0267546016b992dfadcd2fe944e55d
+       26021a13b401500c8eb2761ca95c61f2d625bfef951b939a8124ed12ecf07329
+       f76d08be13e9a61a377a85e2fb63f4c5435d40f8feb3e12eb05905edb8cdea89
 
 -- index state, to go along with the cabal.project.freeze file. update the index
 -- state by running `cabal update` twice and looking at the index state it
 -- displays to you (as the second update will be a no-op)
-index-state: 2019-07-12T19:15:41Z
+index-state: 2019-08-16T08:55:07Z
 
 package clash-ghc
   executable-dynamic: True

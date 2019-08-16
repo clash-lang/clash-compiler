@@ -12,7 +12,6 @@ import           Data.Binary                  (decode)
 import           Data.IntMap.Strict           (IntMap)
 import           Data.List                    (partition)
 import           System.Environment           (getArgs)
-import           System.FilePath              (FilePath)
 
 import qualified Data.ByteString.Lazy as B
 

@@ -32,7 +32,6 @@ import           Data.List              (isSuffixOf, sort)
 import qualified Data.Text              as TS
 import           Data.Text.Lazy         (Text)
 import qualified Data.Text.Lazy.IO      as T
-import           Data.Traversable       (mapM)
 import           GHC.Stack              (HasCallStack)
 import qualified System.Directory       as Directory
 import qualified System.FilePath        as FilePath

@@ -1355,8 +1355,8 @@ takeI = withSNat take
 -- <1,2>
 -- >>> drop d4               (1:>2:>Nil)
 -- <BLANKLINE>
--- <interactive>:...
---     • Couldn't match expected type ‘2’ with actual type ‘4 + n0’
+-- <interactive>:...: error:
+--     • Couldn't match...type ‘4 + n0...
 --       The type variable ‘n0’ is ambiguous
 --     • In the first argument of ‘print’, namely ‘it’
 --       In a stmt of an interactive GHCi command: print it

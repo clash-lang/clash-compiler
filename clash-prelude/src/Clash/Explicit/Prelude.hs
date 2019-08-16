@@ -131,7 +131,6 @@ where
 import Control.Applicative
 import Data.Bits
 import Data.Default.Class
-import GHC.Generics (Generic, Generic1)
 import GHC.TypeLits
 import GHC.TypeLits.Extra
 import Language.Haskell.TH.Syntax  (Lift(..))
@@ -157,13 +156,10 @@ import Clash.Explicit.ROM.File
 import Clash.Explicit.Prelude.Safe
 import Clash.Explicit.Signal
 import Clash.Explicit.Signal.Delayed
-import Clash.Explicit.Synchronizer
-  (dualFlipFlopSynchronizer, asyncFIFOSynchronizer)
 import Clash.Explicit.Testbench
 import Clash.Prelude.BitIndex
 import Clash.Prelude.BitReduction
 import Clash.Prelude.DataFlow
-import Clash.Prelude.ROM            (asyncRom, asyncRomPow2)
 import Clash.Prelude.ROM.File       (asyncRomFile, asyncRomFilePow2)
 import Clash.Promoted.Nat
 import Clash.Promoted.Nat.TH

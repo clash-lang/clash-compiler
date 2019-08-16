@@ -1,7 +1,6 @@
 {-# OPTIONS_GHC -Wno-partial-type-signatures #-}
 
 import           System.Environment           (getArgs)
-import           System.FilePath              (FilePath)
 
 import           Data.Binary (encode)
 import qualified Data.ByteString.Lazy as B

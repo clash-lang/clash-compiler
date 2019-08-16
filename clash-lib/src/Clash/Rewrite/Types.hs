@@ -8,6 +8,7 @@
   Type and instance definitions for Rewrite modules
 -}
 
+{-# LANGUAGE CPP                        #-}
 {-# LANGUAGE FlexibleInstances          #-}
 {-# LANGUAGE MultiParamTypeClasses      #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
@@ -20,7 +21,9 @@ module Clash.Rewrite.Types where
 import Control.Concurrent.Supply             (Supply, freshId)
 import Control.DeepSeq                       (NFData)
 import Control.Lens                          (use, (.=))
+#if !MIN_VERSION_base(4,13,0)
 import Control.Monad.Fail                    (MonadFail(fail))
+#endif
 import Control.Monad.Fix                     (MonadFix (..), fix)
 import Control.Monad.Reader                  (MonadReader (..))
 import Control.Monad.State                   (MonadState (..))
@@ -31,8 +34,6 @@ import Data.Hashable                         (Hashable)
 import Data.IntMap.Strict                    (IntMap)
 import Data.Monoid                           (Any)
 import GHC.Generics
-
-import SrcLoc (SrcSpan)
 
 import Clash.Core.Evaluator      (GlobalHeap, PrimEvaluator)
 import Clash.Core.Term           (Term, Context)

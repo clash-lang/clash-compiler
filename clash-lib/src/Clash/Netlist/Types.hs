@@ -32,7 +32,9 @@ module Clash.Netlist.Types
 where
 
 import Control.DeepSeq
+#if !MIN_VERSION_base(4,13,0)
 import Control.Monad.Fail                   (MonadFail)
+#endif
 import Control.Monad.Reader                 (ReaderT, MonadReader)
 import Control.Monad.State                  as Lazy (State)
 import Control.Monad.State.Strict           as Strict

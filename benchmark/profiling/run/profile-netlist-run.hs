@@ -15,7 +15,7 @@ import           Data.List                    (partition)
 import           Data.Maybe                   (fromMaybe)
 import qualified Data.Text                    as Text
 import           System.Environment           (getArgs)
-import           System.FilePath              (FilePath, (</>))
+import           System.FilePath              ((</>))
 
 import qualified Data.ByteString.Lazy as B
 

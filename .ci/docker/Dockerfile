@@ -5,7 +5,7 @@ ARG PARALLEL=-j8
 ENV DEBIAN_FRONTEND noninteractive
 ENV PATH /opt/ghc/bin:/opt/cabal/bin:$PATH
 
-ARG DEPS_GHC="pkg-config libgmp-dev"
+ARG DEPS_GHC="pkg-config libgmp-dev curl"
 ARG DEPS_CLASH="libtinfo-dev"
 ARG DEPS_CLASH_COSIM="g++-multilib make"
 ARG DEPS_IVERILOG_BUILD="autoconf bison flex gperf"
@@ -39,7 +39,7 @@ RUN apt-get remove -y $DEPS_IVERILOG_BUILD && \
 RUN rm /etc/apt/apt.conf.d/docker-clean
 
 # Prefetch some packages for speedy installation
-ARG PREFETCH="cabal-install-2.4 ghc-8.2.2 ghc-8.4.4 ghc-8.6.5"
+ARG PREFETCH="cabal-install-2.4 cabal-install-3.0 ghc-8.2.2 ghc-8.4.4 ghc-8.6.5 ghc-8.8.1"
 
 ARG GHC_FETCH_DATE="unknown"
 RUN apt-get update && apt-get install -y --download-only $PREFETCH

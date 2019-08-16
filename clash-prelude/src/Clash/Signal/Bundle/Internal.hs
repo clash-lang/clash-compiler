@@ -40,11 +40,20 @@ deriveBundleTuples bundleTyName unbundledTyName bundleName unbundleName = do
         instTy = AppT bundleTy $ tuple vars
 
         -- Associated type Unbundled
+#if MIN_VERSION_template_haskell(2,15,0)
+        unbundledTypeEq =
+          TySynEqn Nothing
+            ((ConT unbundledTyName `AppT`
+                VarT t ) `AppT` tuple vars )
+            $ tuple $ map (AppT (signal `AppT` VarT t)) vars
+        unbundledType = TySynInstD unbundledTypeEq
+#else
         unbundledTypeEq =
           TySynEqn
             [ VarT t, tuple vars ]
             $ tuple $ map (AppT (signal `AppT` VarT t)) vars
         unbundledType = TySynInstD unbundledTyName unbundledTypeEq
+#endif
 
         bundleLambda = LamE (map VarP temps) (TupE $ map VarE temps)
         applicatives = VarE '(<$>) : repeat (VarE '(<*>))
