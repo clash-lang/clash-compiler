@@ -11,15 +11,11 @@ import Clash.Prelude hiding (writeFile)
 import Data.Text.IO  (writeFile)
 
 -- | Count and wrap around
-subCounter :: SystemClockResetEnable => Signal System (Index 3)
+subCounter :: SystemClockResetEnable => Signal System (SatIndex 'SatWrap 3)
 subCounter = traceSignal1 "sub" counter
   where
     counter =
-      register 0 (fmap succ' counter)
-
-    succ' c
-      | c == maxBound = 0
-      | otherwise     = c + 1
+      register 0 (fmap (+1) counter)
 
 -- | Count, but only when my subcounter is wrapping around
 mainCounter :: SystemClockResetEnable => Signal System (Signed 64)

@@ -33,7 +33,7 @@ import qualified Clash.Signal.Bundle           as B
 
 import           Clash.Sized.BitVector         (Bit, BitVector)
 import           Clash.Sized.Fixed             (Fixed)
-import           Clash.Sized.Index             (Index)
+import           Clash.Sized.Index             (SatIndex)
 import           Clash.Sized.RTree             (RTree, lazyT)
 import           Clash.Sized.Signed            (Signed)
 import           Clash.Sized.Unsigned          (Unsigned)
@@ -119,7 +119,7 @@ instance Bundle (Either a b)
 
 instance Bundle Bit
 instance Bundle (BitVector n)
-instance Bundle (Index n)
+instance Bundle (SatIndex sat n)
 instance Bundle (Fixed rep int frac)
 instance Bundle (Signed n)
 instance Bundle (Unsigned n)

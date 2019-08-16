@@ -574,6 +574,7 @@ decSigned n = appT (conT ''Signed) (litT $ numTyLit n)
 
 instance KnownNat n => SaturatingNum (Signed n) where
   satAdd SatWrap  a b = a +# b
+  satAdd SatError a b = a +# b
   satAdd SatBound a b =
     let r      = plus# a b
         (_,r') = split r
@@ -598,6 +599,7 @@ instance KnownNat n => SaturatingNum (Signed n) where
             _ -> minBoundSym#
 
   satSub SatWrap a b = a -# b
+  satSub SatError a b = a -# b
   satSub SatBound a b =
     let r      = minus# a b
         (_,r') = split r
@@ -622,6 +624,7 @@ instance KnownNat n => SaturatingNum (Signed n) where
             _ -> maxBound#
 
   satMul SatWrap a b = a *# b
+  satMul SatError a b = a *# b
   satMul SatBound a b =
     let r        = times# a b
         (rL,rR)  = split r

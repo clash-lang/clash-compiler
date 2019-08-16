@@ -8,7 +8,8 @@ Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE UndecidableInstances #-}
 
-{-# OPTIONS_GHC -fplugin GHC.TypeLits.KnownNat.Solver #-}
+{-# OPTIONS_GHC -fplugin GHC.TypeLits.Extra.Solver -fplugin GHC.TypeLits.KnownNat.Solver #-}
+{-# OPTIONS_GHC -fplugin GHC.TypeLits.Normalise  #-}
 
 module Clash.Class.Exp (Exp, ExpResult, (^)) where
 
@@ -16,8 +17,9 @@ import qualified Prelude                       as P
 import           Prelude                       hiding ((^))
 
 import           Clash.Annotations.Primitive   (hasBlackBox)
+import           Clash.Class.Num               (KnownSatMode)
 import           Clash.Promoted.Nat            (SNat(..), snatToInteger)
-import           Clash.Sized.Internal.Index    (Index)
+import           Clash.Sized.Internal.Index    (SatIndex)
 import           Clash.Sized.Internal.Signed   (Signed)
 import           Clash.Sized.Internal.Unsigned (Unsigned)
 
@@ -38,8 +40,8 @@ class Exp a where
     -> ExpResult a n
     -- ^ Resized result, guaranteed to not have overflown
 
-instance KnownNat m => Exp (Index m) where
-  type ExpResult (Index m) n = Index (Max 2 (m ^ n))
+instance (KnownSatMode sat, KnownNat m, 1 <= m) => Exp (SatIndex sat m) where
+  type ExpResult (SatIndex sat m) n = SatIndex sat (Max 2 (m ^ n))
 
   (^) = expIndex#
   {-# INLINE (^) #-}
@@ -57,10 +59,10 @@ instance KnownNat m => Exp (Unsigned m) where
   {-# INLINE (^) #-}
 
 expIndex#
-  :: KnownNat m
-  => Index m
+  :: (KnownSatMode sat, KnownNat m, 1 <= m)
+  => SatIndex sat m
   -> SNat n
-  -> Index (Max 2 (m ^ n))
+  -> SatIndex sat (Max 2 (m ^ n))
 expIndex# b e@SNat =
   fromInteger (toInteger b P.^ snatToInteger e)
 {-# NOINLINE expIndex# #-}

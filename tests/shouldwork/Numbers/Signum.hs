@@ -10,8 +10,8 @@ import Clash.Prelude
 import Clash.Explicit.Testbench
 
 topEntity
-  :: (Integer, Int, Index 5, Signed 5)
-  -> (Integer, Int, Index 5, Signed 5)
+  :: (Integer, Int, SatIndex 'SatError 5, Signed 5)
+  -> (Integer, Int, SatIndex 'SatError 5, Signed 5)
 topEntity (a, b, c, d) = (signum a, signum b, signum c, signum d)
 {-# NOINLINE topEntity #-}
 

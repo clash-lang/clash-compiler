@@ -28,7 +28,7 @@ module Clash.Prelude.Testbench
   )
 where
 
-import GHC.TypeLits                       (KnownNat)
+import GHC.TypeLits                       (KnownNat, type (<=))
 
 import qualified Clash.Explicit.Testbench as E
 import           Clash.Signal
@@ -104,7 +104,8 @@ assertBitVector msg actual expected ret =
 stimuliGenerator
   :: ( KnownNat l
      , HiddenClock dom
-     , HiddenReset dom  )
+     , HiddenReset dom
+     , 1 <= l  )
   => Vec l a
   -- ^ Samples to generate
   -> Signal dom a
@@ -155,7 +156,8 @@ outputVerifier'
      , ShowX a
      , DomainResetKind dom ~ 'Asynchronous
      , HiddenClock dom
-     , HiddenReset dom  )
+     , HiddenReset dom
+     , 1 <= l  )
   => Vec l a
   -- ^ Samples to compare with
   -> Signal dom a
@@ -173,7 +175,8 @@ outputVerifierBitVector'
      , KnownNat n
      , DomainResetKind dom ~ 'Asynchronous
      , HiddenClock dom
-     , HiddenReset dom  )
+     , HiddenReset dom
+     , 1 <= l  )
   => Vec l (BitVector n)
   -- ^ Samples to compare with
   -> Signal dom (BitVector n)

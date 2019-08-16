@@ -10,7 +10,7 @@ topEntity = pure @(Signal System)
   (test @(Unsigned 7)
   ,test @(Signed 9)
   ,test @(BitVector 11)
-  ,test @(Index 13)
+  ,test @(SatIndex 'SatError 13)
   ,test @Int
   ,test @Integer
   ,test @Word16

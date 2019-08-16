@@ -921,7 +921,7 @@ blockRam1 clk rst0 en rstStrategy n@SNat a rd0 mw0 =
   rstBool = register clk rst0 en True (pure False)
   rstInv = invertReset rst0
 
-  waCounter :: Signal dom (Index n)
+  waCounter :: Signal dom (SatIndex 'SatError n)
   waCounter = register clk rstInv en 0 (satSucc SatBound <$> waCounter)
 
   wa0 = fst . fromJustX <$> mw0

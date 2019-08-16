@@ -10,7 +10,7 @@ go
   -> Signal System Bool
 go _ = mealy update initialState
   where
-    initialState :: (Bool, Index 5)
+    initialState :: (Bool, SatIndex 'SatError 5)
     initialState = (False, minBound)
 
     update (c, index) i = ((c, index), c `xor` i)

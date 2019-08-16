@@ -207,7 +207,7 @@ reduceImap (TransformContext is0 ctx) n argElTy resElTy fun arg = do
                                   $ uncurry extractElems uniqs1 consCon argElTy 'I' n arg
             (Right idxTy:_,_) = splitFunForallTy (termType tcm fun)
             (TyConApp idxTcNm _) = tyView idxTy
-            -- fromInteger# :: KnownNat n => Integer -> Index n
+            -- fromInteger# :: KnownNat n => Integer -> SatIndex sat n
             idxFromIntegerTy = ForAllTy nTv
                                         (foldr mkFunTy
                                                (mkTyConApp idxTcNm

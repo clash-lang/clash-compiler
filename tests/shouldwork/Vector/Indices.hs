@@ -4,8 +4,8 @@ import Clash.Explicit.Prelude
 import Clash.Explicit.Testbench
 
 topEntity
-  :: Vec 2 (Index 2)
-  -> Vec 2 (Index 3)
+  :: Vec 2 (SatIndex 'SatError 2)
+  -> Vec 2 (SatIndex 'SatError 3)
 topEntity input = liftA2 add (indices SNat) input
 {-# NOINLINE topEntity #-}
 

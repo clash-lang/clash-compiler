@@ -607,7 +607,7 @@ hasPrimCo co@(AxiomInstCo _ _ coers) = do
       tcNm <- qualifiedNameString (tyConName tc)
       return (tcNm `elem` ["Clash.Sized.Internal.BitVector.Bit"
                           ,"Clash.Sized.Internal.BitVector.BitVector"
-                          ,"Clash.Sized.Internal.Index.Index"
+                          ,"Clash.Sized.Internal.Index.SatIndex"
                           ,"Clash.Sized.Internal.Signed.Signed"
                           ,"Clash.Sized.Internal.Unsigned.Unsigned"
                           ])

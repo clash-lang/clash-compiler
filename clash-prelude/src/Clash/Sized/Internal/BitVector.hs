@@ -663,11 +663,11 @@ instance KnownNat n => FiniteBits (BitVector n) where
   countLeadingZeros   = fromInteger . I.toInteger# . countLeadingZerosBV
   countTrailingZeros  = fromInteger . I.toInteger# . countTrailingZerosBV
 
-countLeadingZerosBV :: KnownNat n => BitVector n -> I.Index (n+1)
+countLeadingZerosBV :: KnownNat n => BitVector n -> I.SatIndex 'SatError (n+1)
 countLeadingZerosBV = V.foldr (\l r -> if eq## l low then 1 + r else 0) 0 . V.bv2v
 {-# INLINE countLeadingZerosBV #-}
 
-countTrailingZerosBV :: KnownNat n => BitVector n -> I.Index (n+1)
+countTrailingZerosBV :: KnownNat n => BitVector n -> I.SatIndex 'SatError (n+1)
 countTrailingZerosBV = V.foldl (\l r -> if eq## r low then 1 + l else 0) 0 . V.bv2v
 {-# INLINE countTrailingZerosBV #-}
 
@@ -898,7 +898,7 @@ rotateR# =
   sz = fromInteger (natVal (Proxy @n)) :: Int
   m  = 1 `shiftL` sz
 
-popCountBV :: forall n . KnownNat n => BitVector (n+1) -> I.Index (n+2)
+popCountBV :: forall n. KnownNat n => BitVector (n+1) -> I.SatIndex 'SatError (n+2)
 popCountBV bv =
   let v = V.bv2v bv
   in  sum (V.map (fromIntegral . pack#) v)
@@ -935,6 +935,7 @@ instance KnownNat n => SaturatingNum (BitVector n) where
     in  if msb# r == low
            then truncateB# r
            else minBound#
+  satAdd SatError a b = a +# b
   satAdd _ a b =
     let r  = plus# a b
     in  if msb# r == low
@@ -942,6 +943,7 @@ instance KnownNat n => SaturatingNum (BitVector n) where
            else maxBound#
 
   satSub SatWrap a b = a -# b
+  satSub SatError a b = a -# b
   satSub _ a b =
     let r = minus# a b
     in  if msb# r == low
@@ -949,6 +951,7 @@ instance KnownNat n => SaturatingNum (BitVector n) where
            else minBound#
 
   satMul SatWrap a b = a *# b
+  satMul SatError a b = a *# b
   satMul SatZero a b =
     let r       = times# a b
         (rL,rR) = split# r

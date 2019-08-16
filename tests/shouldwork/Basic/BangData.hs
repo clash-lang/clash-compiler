@@ -5,7 +5,7 @@ import Clash.Prelude
 
 data BangData
   = BangData
-  { d1 :: !(Index 15)
+  { d1 :: !(SatIndex 'SatError 15)
   , d2 :: !(Unsigned 8)
   }
 

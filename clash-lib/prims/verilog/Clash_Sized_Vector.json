@@ -123,7 +123,7 @@ end
     { "name"      : "Clash.Sized.Vector.imap"
     , "workInfo"  : "Never"
     , "kind"      : "Declaration"
-    , "type"      : "imap :: KnownNat n => (Index n -> a -> b) -> Vec n a -> Vec n b"
+    , "type"      : "imap :: forall sat n a b . (KnownNat n, 1 <= n) => (SatIndex sat n -> a -> b) -> Vec n a -> Vec n b"
     , "template"  :
 "// imap begin
 genvar ~GENSYM[i][1];
@@ -150,7 +150,7 @@ end
     { "name"      : "Clash.Sized.Vector.imap_go"
     , "workInfo"  : "Never"
     , "kind"      : "Declaration"
-    , "type"      : "imap :: Index n -> (Index n -> a -> b) -> Vec m a -> Vec m b"
+    , "type"      : "imap :: SatIndex 'SatError n -> ((SatIndex sat n -> a -> b) -> Vec m a -> Vec m b"
     , "template"  :
 "// imap begin
 genvar ~GENSYM[i][1];

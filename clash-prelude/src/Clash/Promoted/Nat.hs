@@ -501,9 +501,9 @@ stripZeros (B0 x)  = case stripZeros x of
 -- Example 1
 --
 -- @
--- f :: Index (n+1) -> Index (n + 1) -> Bool
+-- f :: Unsigned (n+1) -> Unsigned (n + 1) -> Bool
 --
--- g :: forall n. (1 '<=' n) => Index n -> Index n -> Bool
+-- g :: forall n. (1 '<=' n) => Unsigned n -> Unsigned n -> Bool
 -- g a b = 'leToPlus' \@1 \@n (f a b)
 -- @
 --

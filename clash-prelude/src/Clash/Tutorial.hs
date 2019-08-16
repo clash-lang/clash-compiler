@@ -316,7 +316,7 @@ You should read this as follows:
  * __@ma ::@__, @ma@ is of type..
 
  * __@Num a@__, there is some type called @a@ that is a @'Num'@. Examples of
-   instances of @'Num'@ are @'Int'@, @'Signed' 16@, @'Index' 32@, and @'Float'@.
+   instances of @'Num'@ are @'Int'@, @'Signed' 16@, @'SatIndex' 'SatWrap 32@, and @'Float'@.
 
  * __@a@__, @ma@'s first argument is of type @a@
 
@@ -910,7 +910,7 @@ blinkerT (leds,mode,cntr) key1R = ((leds',mode',cntr'),leds)
   where
     -- clock frequency = 50e6  (50 MHz)
     -- led update rate = 333e-3 (every 333ms)
-    cnt_max = 16650000 :: ('Index' 16650001) -- 50e6 * 333e-3
+    cnt_max = 16650000 :: ('SatIndex' 'SatError 16650001) -- 50e6 * 333e-3
 
     cntr' | cntr == cnt_max = 0
           | otherwise       = cntr + 1
@@ -2556,7 +2556,7 @@ blinkerT (leds, mode, cntr) key1R = ((leds', mode', cntr'), leds)
   where
     -- clock frequency = 50e6  (50 MHz)
     -- led update rate = 333e-3 (every 333ms)
-    cnt_max = 16650000 :: Index 16650001 -- 50e6 * 333e-3
+    cnt_max = 16650000 :: (SatIndex 'SatError 16650001) -- 50e6 * 333e-3
 
     cntr' | cntr == cnt_max = 0
           | otherwise       = cntr + 1

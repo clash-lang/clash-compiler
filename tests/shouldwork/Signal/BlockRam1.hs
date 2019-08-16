@@ -19,8 +19,8 @@ topEntity
   :: Clock System
   -> Reset System
   -> Enable System
-  -> Signal System (Index 1024)
-  -> Signal System (Maybe (Index 1024, Unsigned 8))
+  -> Signal System (SatIndex 'SatError 1024)
+  -> Signal System (Maybe (SatIndex 'SatError 1024, Unsigned 8))
   -> Signal System (Unsigned 8)
 topEntity = exposeClockResetEnable go where
 

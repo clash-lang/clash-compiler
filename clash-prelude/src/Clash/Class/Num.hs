@@ -15,6 +15,7 @@ module Clash.Class.Num
   ( -- * Arithmetic functions for arguments and results of different precision
     ExtendingNum (..)
     -- * Saturating arithmetic functions
+  , KnownSatMode (..)
   , SaturationMode (..)
   , SaturatingNum (..)
   , boundedAdd
@@ -24,6 +25,8 @@ module Clash.Class.Num
   , satPred
   )
 where
+
+import GHC.TypeLits               (TypeError, ErrorMessage (Text))
 
 -- * Arithmetic functions for arguments and results of different precision
 
@@ -46,7 +49,7 @@ class ExtendingNum a b where
 -- * Saturating arithmetic functions
 
 -- | Determine how overflow and underflow are handled by the functions in
--- 'SaturatingNum' and the `Index` type.
+-- 'SaturatingNum', `Index` and the `SatIndex` type.
 data SaturationMode
   = SatWrap   -- ^ Wrap around on overflow and underflow. Has additional hardware
               -- cost for index type. Is free for signed and unsigned types
@@ -83,8 +86,8 @@ instance {-# OVERLAPS #-} KnownSatMode 'SatSymmetric where
 instance {-# OVERLAPS #-} KnownSatMode 'SatError where
   satMode = SatError
 
-instance {-# INCOHERENT #-}
-  (TypeError (Text "SaturationMode isn't known. Add the `KnownSatMode` constraint"))
+instance {-# OVERLAPPABLE #-}
+  (TypeError ('Text "SaturationMode isn't known. Add the `KnownSatMode` constraint"))
   => KnownSatMode a where
   satMode = undefined
 

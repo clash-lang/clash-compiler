@@ -3,7 +3,7 @@ module FindIndex where
 import Clash.Prelude
 import Clash.Explicit.Testbench
 
-topEntity :: Vec 7 (Unsigned 8) -> Maybe (Index 7)
+topEntity :: Vec 7 (Unsigned 8) -> Maybe (SatIndex 'SatError 7)
 topEntity = findIndex (> 3)
 {-# NOINLINE topEntity #-}
 

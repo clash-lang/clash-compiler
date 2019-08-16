@@ -236,7 +236,8 @@ isFalling = hideClockResetEnable E.isFalling
 -- counter = 'Clash.Signal.regEn' 0 ('riseEvery' ('SNat' :: 'SNat' 10000000)) (counter + 1)
 -- @
 riseEvery
-  :: HiddenClockResetEnable dom
+  :: ( HiddenClockResetEnable dom
+     , 1 <= n  )
   => SNat n
   -> Signal dom Bool
 riseEvery = hideClockResetEnable E.riseEvery
@@ -263,7 +264,8 @@ riseEvery = hideClockResetEnable E.riseEvery
 -- >>> sampleN @System 200 (oscillate False d1) == sampleN @System 200 osc'
 -- True
 oscillate
-  :: HiddenClockResetEnable dom
+  :: ( HiddenClockResetEnable dom
+     , 1 <= n  )
   => Bool
   -> SNat n
   -> Signal dom Bool

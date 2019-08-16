@@ -7,7 +7,7 @@ import Clash.Explicit.Testbench
 
 data AB = A | B deriving (Eq, Generic, ShowX)
 
-ab :: KnownNat n => Index n -> AB -> AB
+ab :: KnownNat n => SatIndex 'SatError n -> AB -> AB
 ab n A = if n >  0 then A else B
 ab n B = if n == 0 then B else A
 {-# NOINLINE ab #-}

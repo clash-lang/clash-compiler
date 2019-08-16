@@ -7,7 +7,7 @@ data PQR = P () | Q | R () deriving (Eq, Show, Generic, ShowX)
 
 topEntity
   :: Vec 2 PQR
-  -> Vec 2 (Index 2, PQR)
+  -> Vec 2 (SatIndex 'SatError 2, PQR)
 topEntity xs = zipWith (,) indicesI xs
 {-# NOINLINE topEntity #-}
 

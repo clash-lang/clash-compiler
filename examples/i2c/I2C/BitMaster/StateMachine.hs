@@ -9,10 +9,10 @@ import I2C.Types
 
 data BitStateMachine
   = Idle
-  | Start (Index 5)
-  | Stop  (Index 4)
-  | Read  (Index 4)
-  | Write (Index 4)
+  | Start (SatIndex 'SatError 5)
+  | Stop  (SatIndex 'SatError 4)
+  | Read  (SatIndex 'SatError 4)
+  | Write (SatIndex 'SatError 4)
   deriving (Eq, Generic, NFDataX)
 
 data StateMachine

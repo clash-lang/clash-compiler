@@ -12,32 +12,34 @@ Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
 {-# OPTIONS_HADDOCK show-extensions #-}
 
 module Clash.Sized.Index
-  (Index, bv2i, fromSNat)
+  (SatIndex, Index, bv2i, fromSNat, toSatMode)
 where
 
 import GHC.TypeLits               (KnownNat, type (^))
 import GHC.TypeLits.Extra         (CLog) -- documentation only
 
+import Clash.Class.Num            (KnownSatMode)
 import Clash.Promoted.Nat         (SNat (..), pow2SNat)
 import Clash.Sized.BitVector      (BitVector)
 import Clash.Sized.Internal.Index
 
 -- | An alternative implementation of 'Clash.Class.BitPack.unpack' for the
--- 'Index' data type; for when you know the size of the 'BitVector' and want
--- to determine the size of the 'Index'.
+-- 'SatIndex' data type; for when you know the size of the 'BitVector' and want
+-- to determine the size of the 'SatIndex'.
 --
 -- That is, the type of 'Clash.Class.BitPack.unpack' is:
 --
 -- @
--- __unpack__ :: 'BitVector' ('CLog' 2 n) -> 'Index' n
+-- __unpack__ :: 'BitVector' ('CLog' 2 n) -> 'SatIndex' sat n
 -- @
 --
--- And is useful when you know the size of the 'Index', and want to get a value
+-- And is useful when you know the size of the 'SatIndex', and want to get a value
 -- from a 'BitVector' that is large enough (@CLog 2 n@) enough to hold an
--- 'Index'. Note that 'Clash.Class.BitPack.unpack' can fail at /run-time/ when
--- the value inside the 'BitVector' is higher than 'n-1'.
+-- 'SatIndex'. Note that 'Clash.Class.BitPack.unpack' can fail at /run-time/ when
+-- the value inside the 'BitVector' is higher than 'n-1' and `SatError` is used
+-- as the SaturationMode.
 --
 -- 'bv2i' on the other hand will /never/ fail at run-time, because the
 -- 'BitVector' argument determines the size.
-bv2i :: KnownNat n => BitVector n -> Index (2^n)
+bv2i :: KnownNat n => BitVector n -> SatIndex sat (2^n)
 bv2i = unpack#

@@ -464,6 +464,7 @@ decUnsigned n = appT (conT ''Unsigned) (litT $ numTyLit n)
 
 instance KnownNat n => SaturatingNum (Unsigned n) where
   satAdd SatWrap a b = a +# b
+  satAdd SatError a b = a +# b
   satAdd SatZero a b =
     let r = plus# a b
     in  case msb r of
@@ -476,6 +477,7 @@ instance KnownNat n => SaturatingNum (Unsigned n) where
           _ -> maxBound#
 
   satSub SatWrap a b = a -# b
+  satSub SatError a b = a -# b
   satSub _ a b =
     let r = minus# a b
     in  case msb r of
@@ -483,6 +485,7 @@ instance KnownNat n => SaturatingNum (Unsigned n) where
           _ -> minBound#
 
   satMul SatWrap a b = a *# b
+  satMul SatError a b = a *# b
   satMul SatZero a b =
     let r       = times# a b
         (rL,rR) = split r

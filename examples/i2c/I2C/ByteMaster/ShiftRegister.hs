@@ -9,7 +9,7 @@ import Control.Monad.State
 data ShiftRegister
   = ShiftRegister
   { _sr   :: Vec 8 Bit
-  , _dcnt :: Index 8
+  , _dcnt :: SatIndex 'SatError 8
   } deriving (Generic, NFDataX)
 
 makeLenses ''ShiftRegister

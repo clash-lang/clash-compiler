@@ -127,12 +127,13 @@ import Unsafe.Coerce              (unsafeCoerce)
 
 import Clash.Annotations.Primitive
   (Primitive(InlinePrimitive), HDL(..))
+import Clash.Class.Num            (SaturationMode (SatError))
 import Clash.Promoted.Nat
   (SNat (..), SNatLE (..), UNat (..), compareSNat, leToPlus, pow2SNat,
    snatProxy, snatToInteger, subSNat, withSNat, toUNat)
 import Clash.Promoted.Nat.Literals (d1)
 import Clash.Sized.Internal.BitVector (Bit, BitVector (..), split#)
-import Clash.Sized.Index          (Index)
+import Clash.Sized.Index          (SatIndex)
 
 import Clash.Class.BitPack        (packXWith, BitPack (..))
 import Clash.XException
@@ -182,7 +183,7 @@ let sortV_flip xs = map fst sorted :< (snd (last sorted))
 >>> let insertionSort   = vfold (const insert)
 >>> data IIndex (f :: TyFun Nat Type) :: Type
 >>> :set -XUndecidableInstances
->>> type instance Apply IIndex l = Index ((2^l)+1)
+>>> type instance Apply IIndex l = SatIndex 'SatError ((2^l)+1)
 >>> :{
 let populationCount' :: (KnownNat k, KnownNat (2^k)) => BitVector (2^k) -> Index ((2^k)+1)
     populationCount' bv = dtfold (Proxy @IIndex)
@@ -687,7 +688,7 @@ map f (x `Cons` xs) = f x `Cons` map f xs
 -- | Apply a function of every element of a vector and its index.
 --
 -- >>> :t imap (+) (2 :> 2 :> 2 :> 2 :> Nil)
--- imap (+) (2 :> 2 :> 2 :> 2 :> Nil) :: Vec 4 (Index 4)
+-- imap (+) (2 :> 2 :> 2 :> 2 :> Nil) :: Vec 4 (SatIndex 'SatError 4)
 -- >>> imap (+) (2 :> 2 :> 2 :> 2 :> Nil)
 -- <2,3,*** Exception: X: Clash.Sized.Index: result 4 is out of bounds: [0..3]
 -- ...
@@ -697,12 +698,14 @@ map f (x `Cons` xs) = f x `Cons` map f xs
 -- \"'imap' @f xs@\" corresponds to the following circuit layout:
 --
 -- <<doc/imap.svg>>
-imap :: forall n a b . KnownNat n => (Index n -> a -> b) -> Vec n a -> Vec n b
+imap
+  :: forall sat n a b . (KnownNat n, 1 <= n)
+  => (SatIndex sat n -> a -> b) -> Vec n a -> Vec n b
 imap f = go 0
   where
-    go :: Index n -> Vec m a -> Vec m b
+    go :: SatIndex 'SatError n -> Vec m a -> Vec m b
     go _ Nil           = Nil
-    go n (x `Cons` xs) = f n x `Cons` go (n+1) xs
+    go n (x `Cons` xs) = f (coerce n) x `Cons` go (n+1) xs
 {-# NOINLINE imap #-}
 
 -- | Zip two vectors with a functions that also takes the elements' indices.
@@ -720,7 +723,8 @@ imap f = go 0
 -- __NB:__ 'izipWith' is /strict/ in its second argument, and /lazy/ in its
 -- third. This matters when 'izipWith' is used in a recursive setting. See
 -- 'lazyV' for more information.
-izipWith :: KnownNat n => (Index n -> a -> b -> c) -> Vec n a -> Vec n b
+izipWith :: (KnownNat n, 1 <= n)
+         => (SatIndex sat n -> a -> b -> c) -> Vec n a -> Vec n b
          -> Vec n c
 izipWith f xs ys = imap (\i -> uncurry (f i)) (zip xs ys)
 {-# INLINE izipWith #-}
@@ -736,7 +740,9 @@ izipWith f xs ys = imap (\i -> uncurry (f i)) (zip xs ys)
 -- \"'ifoldr' @f z xs@\" corresponds to the following circuit layout:
 --
 -- <<doc/ifoldr.svg>>
-ifoldr :: KnownNat n => (Index n -> a -> b -> b) -> b -> Vec n a -> b
+ifoldr
+  :: (KnownNat n, 1 <= n)
+  => (SatIndex sat n -> a -> b -> b) -> b -> Vec n a -> b
 ifoldr f z xs = head ws
   where
     ws = izipWith f xs ((tail ws)) :< z
@@ -753,7 +759,9 @@ ifoldr f z xs = head ws
 -- \"'ifoldl' @f z xs@\" corresponds to the following circuit layout:
 --
 -- <<doc/ifoldl.svg>>
-ifoldl :: KnownNat n => (a -> Index n -> b -> a) -> a -> Vec n b -> a
+ifoldl
+  :: (KnownNat n, 1 <= n)
+  => (a -> SatIndex sat n -> b -> a) -> a -> Vec n b -> a
 ifoldl f z xs = last ws
   where
     ws = z `Cons` izipWith (\i b a -> f a i b) xs (init ws)
@@ -763,7 +771,7 @@ ifoldl f z xs = last ws
 --
 -- >>> indices d4
 -- <0,1,2,3>
-indices :: KnownNat n => SNat n -> Vec n (Index n)
+indices :: (KnownNat n, 1 <= n) => SNat n -> Vec n (SatIndex 'SatError n)
 indices _ = indicesI
 {-# INLINE indices #-}
 
@@ -772,7 +780,7 @@ indices _ = indicesI
 --
 -- >>> indicesI :: Vec 4 (Index 4)
 -- <0,1,2,3>
-indicesI :: KnownNat n => Vec n (Index n)
+indicesI :: (KnownNat n, 1 <= n) => Vec n (SatIndex 'SatError n)
 indicesI = imap const (repeat ())
 {-# INLINE indicesI #-}
 
@@ -783,7 +791,9 @@ indicesI = imap const (repeat ())
 -- Just 3
 -- >>> findIndex (> 8) (1:>3:>2:>4:>3:>5:>6:>Nil)
 -- Nothing
-findIndex :: KnownNat n => (a -> Bool) -> Vec n a -> Maybe (Index n)
+findIndex
+  :: (KnownNat n, 1 <= n)
+  => (a -> Bool) -> Vec n a -> Maybe (SatIndex sat n)
 findIndex f = ifoldr (\i a b -> if f a then Just i else b) Nothing
 {-# INLINE findIndex #-}
 
@@ -795,7 +805,7 @@ findIndex f = ifoldr (\i a b -> if f a then Just i else b) Nothing
 -- Just 1
 -- >>> elemIndex 8 (1:>3:>2:>4:>3:>5:>6:>Nil)
 -- Nothing
-elemIndex :: (KnownNat n, Eq a) => a -> Vec n a -> Maybe (Index n)
+elemIndex :: (KnownNat n, 1 <= n, Eq a) => a -> Vec n a -> Maybe (SatIndex 'SatError n)
 elemIndex x = findIndex (x ==)
 {-# INLINE elemIndex #-}
 
@@ -1661,7 +1671,7 @@ windows2d stY stX xss = map (transpose . (map (windows1d stX))) (windows1d stY x
 permute :: (Enum i, KnownNat n, KnownNat m)
         => (a -> a -> a)  -- ^ Combination function, /f/
         -> Vec n a        -- ^ Default values, /def/
-        -> Vec m i        -- ^ Index mapping, /is/
+        -> Vec m i        -- ^ SatIndex mapping, /is/
         -> Vec (m + k) a  -- ^ Vector to be permuted, /xs/
         -> Vec n a
 permute f defs is xs = ys
@@ -1684,7 +1694,7 @@ permute f defs is xs = ys
 -- <9,4,1,6,2,4>
 backpermute :: (Enum i, KnownNat n)
             => Vec n a  -- ^ Source vector, /xs/
-            -> Vec m i  -- ^ Index mapping, /is/
+            -> Vec m i  -- ^ SatIndex mapping, /is/
             -> Vec m a
 backpermute xs = map (xs!!)
 {-# INLINE backpermute #-}
@@ -1706,7 +1716,7 @@ backpermute xs = map (xs!!)
 -- latest mapping is chosen.
 scatter :: (Enum i, KnownNat n, KnownNat m)
         => Vec n a       -- ^ Default values, /def/
-        -> Vec m i       -- ^ Index mapping, /is/
+        -> Vec m i       -- ^ SatIndex mapping, /is/
         -> Vec (m + k) a -- ^ Vector to be scattered, /xs/
         -> Vec n a
 scatter = permute const
@@ -1726,7 +1736,7 @@ scatter = permute const
 -- <9,4,1,6,2,4>
 gather :: (Enum i, KnownNat n)
        => Vec n a  -- ^ Source vector, /xs/
-       -> Vec m i  -- ^ Index mapping, /is/
+       -> Vec m i  -- ^ SatIndex mapping, /is/
        -> Vec m a
 gather xs = map (xs!!)
 {-# INLINE gather #-}
@@ -2013,14 +2023,14 @@ dfold _ f z xs = go (snatProxy (asNatProxy xs)) xs
 -- As an example of when you might want to use 'dtfold' we will build a
 -- population counter: a circuit that counts the number of bits set to '1' in
 -- a 'BitVector'. Given a vector of /n/ bits, we only need we need a data type
--- that can represent the number /n/: 'Index' @(n+1)@. 'Index' @k@ has a range
--- of @[0 .. k-1]@ (using @ceil(log2(k))@ bits), hence we need 'Index' @n+1@.
+-- that can represent the number /n/: 'SatIndex' @'SatError@ @(n+1)@. 'SatIndex' @'SatError@ @k@ has a range
+-- of @[0 .. k-1]@ (using @ceil(log2(k))@ bits), hence we need 'SatIndex' @'SatError@ @n+1@.
 -- As an initial attempt we will use 'sum', because it gives a nice (@log2(n)@)
 -- tree-structure of adders:
 --
 -- @
 -- populationCount :: (KnownNat (n+1), KnownNat (n+2))
---                 => 'BitVector' (n+1) -> 'Index' (n+2)
+--                 => 'BitVector' (n+1) -> 'SatIndex' 'SatError (n+2)
 -- populationCount = sum . map fromIntegral . 'bv2v'
 -- @
 --
@@ -2028,7 +2038,7 @@ dfold _ f z xs = go (snatProxy (asNatProxy xs)) xs
 -- bit-width, i.e. all adders are of the type:
 --
 -- @
--- (+) :: 'Index' (n+2) -> 'Index' (n+2) -> 'Index' (n+2).
+-- (+) :: 'SatIndex' 'SatError (n+2) -> 'SatIndex' 'SatError (n+2) -> 'SatIndex' 'SatError (n+2).
 -- @
 --
 -- This is a \"problem\" because we could have a more efficient structure:
@@ -2037,30 +2047,30 @@ dfold _ f z xs = go (snatProxy (asNatProxy xs)) xs
 -- type:
 --
 -- @
--- 'Index' ((2^d)+1) -> 'Index' ((2^d)+1) -> 'Index' ((2^(d+1))+1)
+-- 'SatIndex' 'SatError ((2^d)+1) -> 'SatIndex' 'SatError ((2^d)+1) -> 'SatIndex' 'SatError ((2^(d+1))+1)
 -- @
 --
 -- We have such an adder in the form of the 'Clash.Class.Num.add' function, as
--- defined in the instance 'Clash.Class.Num.ExtendingNum' instance of 'Index'.
+-- defined in the instance 'Clash.Class.Num.ExtendingNum' instance of 'SatIndex'.
 -- However, we cannot simply use 'fold' to create a tree-structure of
 -- 'Clash.Class.Num.add'es:
 --
 -- >>> :{
 -- let populationCount' :: (KnownNat (n+1), KnownNat (n+2))
---                      => BitVector (n+1) -> Index (n+2)
+--                      => BitVector (n+1) -> SatIndex 'SatError (n+2)
 --     populationCount' = fold add . map fromIntegral . bv2v
 -- :}
 -- <BLANKLINE>
 -- <interactive>:...
 --     • Couldn't match type ‘((n + 2) + (n + 2)) - 1’ with ‘n + 2’
---       Expected type: Index (n + 2) -> Index (n + 2) -> Index (n + 2)
---         Actual type: Index (n + 2)
---                      -> Index (n + 2) -> AResult (Index (n + 2)) (Index (n + 2))
+--       Expected type: SatIndex 'SatError (n + 2) -> SatIndex 'SatError (n + 2) -> SatIndex 'SatError (n + 2)
+--         Actual type: SatIndex 'SatError (n + 2)
+--                      -> SatIndex 'SatError (n + 2) -> AResult (SatIndex 'SatError (n + 2)) (SatIndex 'SatError (n + 2))
 --     • In the first argument of ‘fold’, namely ‘add’
 --       In the first argument of ‘(.)’, namely ‘fold add’
 --       In the expression: fold add . map fromIntegral . bv2v
 --     • Relevant bindings include
---         populationCount' :: BitVector (n + 1) -> Index (n + 2)
+--         populationCount' :: BitVector (n + 1) -> SatIndex 'SatError (n + 2)
 --           (bound at ...)
 --
 -- because 'fold' expects a function of type \"@a -> a -> a@\", i.e. a function
@@ -2076,10 +2086,10 @@ dfold _ f z xs = go (snatProxy (asNatProxy xs)) xs
 -- import Data.Proxy
 --
 -- data IIndex (f :: 'TyFun' Nat *) :: *
--- type instance 'Apply' IIndex l = 'Index' ((2^l)+1)
+-- type instance 'Apply' IIndex l = 'SatIndex' 'SatError ((2^l)+1)
 --
 -- populationCount' :: (KnownNat k, KnownNat (2^k))
---                  => BitVector (2^k) -> Index ((2^k)+1)
+--                  => BitVector (2^k) -> SatIndex 'SatError ((2^k)+1)
 -- populationCount' bv = 'dtfold' (Proxy @IIndex)
 --                              fromIntegral
 --                              (\\_ x y -> 'Clash.Class.Num.add' x y)
@@ -2089,7 +2099,7 @@ dfold _ f z xs = go (snatProxy (asNatProxy xs)) xs
 -- And we can test that it works:
 --
 -- >>> :t populationCount' (7 :: BitVector 16)
--- populationCount' (7 :: BitVector 16) :: Index 17
+-- populationCount' (7 :: BitVector 16) :: SatIndex 'SatError 17
 -- >>> populationCount' (7 :: BitVector 16)
 -- 3
 --
@@ -2290,7 +2300,9 @@ instance (KnownNat n, Arbitrary a) => Arbitrary (Vec n a) where
 instance CoArbitrary a => CoArbitrary (Vec n a) where
   coarbitrary = coarbitrary . toList
 
-type instance Lens.Index   (Vec n a) = Index n
+-- Is it possible to let a user specifiy a SaturationMode here?
+-- Not quite clear to me how that syntax would look like.
+type instance Lens.Index   (Vec n a) = SatIndex 'SatError n
 type instance Lens.IxValue (Vec n a) = a
 instance KnownNat n => Lens.Ixed (Vec n a) where
   ix i f xs = replace_int xs (fromEnum i) <$> f (index_int xs (fromEnum i))

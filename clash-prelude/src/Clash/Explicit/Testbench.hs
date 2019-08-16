@@ -36,12 +36,12 @@ where
 
 import Control.Exception     (catch, evaluate)
 import Debug.Trace           (trace)
-import GHC.TypeLits          (KnownNat, type (+))
+import GHC.TypeLits          (KnownNat, type (+), type (<=))
 import Prelude               hiding ((!!), length)
 import System.IO.Unsafe      (unsafeDupablePerformIO)
 
 import Clash.Annotations.Primitive (hasBlackBox)
-import Clash.Class.Num       (satSucc, SaturationMode(SatBound))
+import Clash.Class.Num       (satSucc, SaturationMode(SatBound, SatError))
 import Clash.Promoted.Nat    (SNat(..), snatToNum)
 import Clash.Promoted.Symbol (SSymbol (..))
 import Clash.Explicit.Signal
@@ -51,7 +51,7 @@ import Clash.Signal.Internal (Clock (..), Reset (..))
 import Clash.Signal
   (mux, DomainResetKind, ResetKind(Asynchronous), KnownDomain,
   Enable)
-import Clash.Sized.Index     (Index)
+import Clash.Sized.Index     (SatIndex)
 import Clash.Sized.Internal.BitVector
   (BitVector, isLike)
 import Clash.Sized.Vector    (Vec, (!!), length)
@@ -165,7 +165,8 @@ assertBitVector clk (Reset _) msg checked expected returned =
 stimuliGenerator
   :: forall l dom   a
    . ( KnownNat l
-     , KnownDomain dom )
+     , KnownDomain dom
+     , 1 <= l)
   => Clock dom
   -- ^ Clock to which to synchronize the output signal
   -> Reset dom
@@ -177,7 +178,7 @@ stimuliGenerator clk rst samples =
     let (r,o) = unbundle (genT <$> register clk rst (toEnable (pure True)) 0 r)
     in  o
   where
-    genT :: Index l -> (Index l,a)
+    genT :: SatIndex 'SatError l -> (SatIndex 'SatError l,a)
     genT s = (s',samples !! s)
       where
         maxI = toEnum (length samples - 1)
@@ -195,7 +196,8 @@ outputVerifier'
      , KnownDomain dom
      , DomainResetKind dom ~ 'Asynchronous
      , Eq a
-     , ShowX a )
+     , ShowX a
+     , 1 <= l )
   => Clock dom
   -- ^ Clock to which the testbench is synchronized to
   -> Reset dom
@@ -258,7 +260,8 @@ outputVerifier
      , KnownDomain circuitDom
      , DomainResetKind testDom ~ 'Asynchronous
      , Eq a
-     , ShowX a )
+     , ShowX a
+     , 1 <= l )
   => Clock testDom
   -- ^ Clock to which the testbench is synchronized to (but not necessarily
   -- the circuit under test)
@@ -281,7 +284,7 @@ outputVerifier clk rst samples i0 =
         -- Only assert while not finished
     in  mux f' f' $ assert clk rst "outputVerifier" i1 e f'
   where
-    genT :: Index l -> (Index l,(a,Bool))
+    genT :: SatIndex 'SatError l -> (SatIndex 'SatError l,(a,Bool))
     genT s = (s',(samples !! s,finished))
       where
         maxI = toEnum (length samples - 1)
@@ -300,6 +303,7 @@ outputVerifierBitVector'
    . ( KnownNat l
      , KnownNat n
      , KnownDomain dom
+     , 1 <= l
      , DomainResetKind dom ~ 'Asynchronous
      )
   => Clock dom
@@ -323,6 +327,7 @@ outputVerifierBitVector
      , KnownNat n
      , KnownDomain testDom
      , KnownDomain circuitDom
+     , 1 <= l
      , DomainResetKind testDom ~ 'Asynchronous
      )
   => Clock testDom
@@ -345,7 +350,7 @@ outputVerifierBitVector clk rst samples i0 =
         -- Only assert while not finished
     in  mux f' f' $ assertBitVector clk rst "outputVerifierBitVector'" i1 e f'
   where
-    genT :: Index l -> (Index l,(BitVector n,Bool))
+    genT :: SatIndex 'SatError l -> (SatIndex 'SatError l,(BitVector n,Bool))
     genT s = (s',(samples !! s,finished))
       where
         maxI = toEnum (length samples - 1)
@@ -376,7 +381,7 @@ ignoreFor
 ignoreFor clk rst en SNat a i =
   mux ((==) <$> counter <*> (pure maxBound)) i (pure a)
  where
-  counter :: Signal dom (Index (n+1))
+  counter :: Signal dom (SatIndex 'SatError (n+1))
   counter = register clk rst en 0 (satSucc SatBound <$> counter)
 
 -- | Same as 'tbClockGen', but returns two clocks on potentially different
