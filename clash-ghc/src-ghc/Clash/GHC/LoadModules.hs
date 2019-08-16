@@ -29,6 +29,7 @@ where
 -- External Modules
 import           Clash.Annotations.Primitive     (HDL, PrimitiveGuard)
 import           Clash.Annotations.TopEntity     (TopEntity (..))
+import           Clash.Primitives.Types          (UnresolvedPrimitive)
 import           Clash.Util                      (ClashException(..), pkgIdFromTypeable)
 import           Control.Arrow                   (first, second)
 import           Control.DeepSeq                 (deepseq)
@@ -42,7 +43,7 @@ import           Data.Generics.Uniplate.DataOnly (transform)
 import           Data.Data                       (Data)
 import           Data.Typeable                   (Typeable)
 import           Data.List                       (foldl', lookup, nub)
-import           Data.Maybe                      (catMaybes, listToMaybe, mapMaybe)
+import           Data.Maybe                      (catMaybes, listToMaybe)
 import qualified Data.Text                       as Text
 import qualified Data.Time.Clock                 as Clock
 import           Language.Haskell.TH.Syntax      (lift)
@@ -91,7 +92,7 @@ import qualified Var
 
 -- Internal Modules
 import           Clash.GHC.GHC2Core                           (modNameM, qualifiedNameString')
-import           Clash.GHC.LoadInterfaceFiles                 (loadExternalExprs, primitiveFilePath)
+import           Clash.GHC.LoadInterfaceFiles                 (loadExternalExprs, unresolvedPrimitives)
 import           Clash.Util                                   (curLoc, noSrcSpan, reportTimeDiff)
 import           Clash.Annotations.BitRepresentation.Internal
   (DataRepr', dataReprAnnToDataRepr')
@@ -126,9 +127,7 @@ getProcessOutput command =
 #endif
 
 loadModules
-  :: FilePath
-  -- ^ Temporary directory
-  -> OverridingBool
+  :: OverridingBool
   -- ^ Use color
   -> HDL
   -- ^ HDL target
@@ -145,11 +144,11 @@ loadModules
         , [( CoreSyn.CoreBndr                    -- topEntity bndr
            , Maybe TopEntity                     -- (maybe) TopEntity annotation
            , Maybe CoreSyn.CoreBndr)]            -- (maybe) testBench bndr
-        , [FilePath]
+        , [Either UnresolvedPrimitive FilePath]
         , [DataRepr']
         , [(Text.Text, PrimitiveGuard ())]
         )
-loadModules tmpDir useColor hdl modName dflagsM idirs = do
+loadModules useColor hdl modName dflagsM idirs = do
   libDir <- MonadUtils.liftIO ghcLibDir
   startTime <- Clock.getCurrentTime
   GHC.runGhc (Just libDir) $ do
@@ -256,8 +255,8 @@ loadModules tmpDir useColor hdl modName dflagsM idirs = do
     let modStartDiff = reportTimeDiff modTime startTime
     MonadUtils.liftIO $ putStrLn $ "GHC: Parsing and optimising modules took: " ++ modStartDiff
 
-    (externalBndrs,clsOps,unlocatable,pFP,reprs) <-
-      loadExternalExprs tmpDir hdl (UniqSet.mkUniqSet binderIds) bindersC
+    (externalBndrs,clsOps,unlocatable,unresolvedPrimitives0,reprs) <-
+      loadExternalExprs hdl (UniqSet.mkUniqSet binderIds) bindersC
 
     let externalBndrIds = map fst externalBndrs
     let allBinderIds = externalBndrIds ++ binderIds
@@ -267,7 +266,7 @@ loadModules tmpDir useColor hdl modName dflagsM idirs = do
     MonadUtils.liftIO $ putStrLn $ "GHC: Loading external modules from interface files took: " ++ extModDiff
 
     -- Find local primitive annotations
-    pFP' <- findPrimitiveAnnotations hdl tmpDir binderIds
+    unresolvedPrimitives1 <- findPrimitiveAnnotations hdl binderIds
 
     hscEnv <- GHC.getSession
 #if MIN_VERSION_ghc(8,6,0)
@@ -319,11 +318,17 @@ loadModules tmpDir useColor hdl modName dflagsM idirs = do
         (_, _) ->
           Panic.pgmError $ $(curLoc) ++ "Multiple 'topEntities' found."
 
-    let pFP1   = nub $ pFP ++ pFP'
+    let unresolvedPrimitives2 = unresolvedPrimitives0 ++ unresolvedPrimitives1
         reprs1 = reprs ++ reprs'
 
-    annTime <- extTime `deepseq` length topEntities' `deepseq` pFP1 `deepseq`
-               reprs1 `deepseq` primGuards `deepseq` MonadUtils.liftIO Clock.getCurrentTime
+    annTime <-
+      extTime
+        `deepseq` length topEntities'
+        `deepseq` unresolvedPrimitives2
+        `deepseq` reprs1
+        `deepseq` primGuards
+        `deepseq` MonadUtils.liftIO Clock.getCurrentTime
+
     let annExtDiff = reportTimeDiff annTime extTime
     MonadUtils.liftIO $ putStrLn $ "GHC: Parsing annotations took: " ++ annExtDiff
 
@@ -332,7 +337,7 @@ loadModules tmpDir useColor hdl modName dflagsM idirs = do
            , unlocatable
            , (fst famInstEnvs, modFamInstEnvs')
            , topEntities'
-           , pFP1
+           , unresolvedPrimitives2
            , reprs1
            , primGuards
            )
@@ -492,10 +497,9 @@ findTestBenchAnnotations bndrs = do
 findPrimitiveAnnotations
   :: GHC.GhcMonad m
   => HDL
-  -> FilePath
   -> [CoreSyn.CoreBndr]
-  -> m [FilePath]
-findPrimitiveAnnotations hdl tmpDir bndrs = do
+  -> m [Either UnresolvedPrimitive FilePath]
+findPrimitiveAnnotations hdl bndrs = do
   let
     annTargets =
      map
@@ -509,8 +513,8 @@ findPrimitiveAnnotations hdl tmpDir bndrs = do
 
   anns <- findAnnotationsByTargets targets
 
-  sequence $
-    mapMaybe (primitiveFilePath hdl tmpDir)
+  concat <$>
+    mapM (unresolvedPrimitives hdl)
     (concat $ zipWith (\t -> map ((,) t)) targets anns)
 
 parseModule :: GHC.GhcMonad m => GHC.ModSummary -> m GHC.ParsedModule

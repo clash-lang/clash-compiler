@@ -3,12 +3,9 @@
 import           System.Environment           (getArgs)
 import           System.FilePath              (FilePath)
 
-import           Clash.Driver                 (createTemporaryClashDirectory)
-import           Control.Exception            (finally)
 import           Data.Binary (encode)
 import qualified Data.ByteString.Lazy as B
 import           Data.List                    (partition)
-import           System.Directory             (removeDirectoryRecursive)
 
 import           SerialiseInstances
 import           BenchmarkCommon
@@ -21,20 +18,14 @@ main = do
              | otherwise   = tests0
       idirs1 = ".":map (drop 2) idirs0
 
-  tmpDir <- createTemporaryClashDirectory
-
-  finally (do
-    mapM_ (prepareFile tmpDir idirs1) tests1
-   ) (
-    removeDirectoryRecursive tmpDir
-   )
+  mapM_ (prepareFile idirs1) tests1
 
 
-prepareFile :: FilePath -> [FilePath] -> FilePath -> IO ()
-prepareFile tmpDir idirs fIn = do
+prepareFile :: [FilePath] -> FilePath -> IO ()
+prepareFile idirs fIn = do
   putStrLn $ "Preparing: " ++ fIn
   let fOut = fIn ++ ".bin"
-  inp <- runNormalisationStage tmpDir idirs fIn
+  inp <- runNormalisationStage idirs fIn
   let (transformedBindings,topEntities,primMap,tcm,reprs,topEntity) = inp
       inp' = (transformedBindings,topEntities,fmap (fmap removeBBfunc) primMap,tcm,reprs,topEntity)
   putStrLn $ "Serialising to : " ++ fOut

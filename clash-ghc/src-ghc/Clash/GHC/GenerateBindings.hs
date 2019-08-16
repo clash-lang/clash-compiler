@@ -19,7 +19,7 @@ import           Control.Monad           (unless)
 import qualified Control.Monad.State     as State
 import qualified Control.Monad.RWS.Lazy  as RWS
 import           Data.Coerce             (coerce)
-import           Data.Either             (lefts, rights)
+import           Data.Either             (partitionEithers, lefts, rights)
 import           Data.IntMap.Strict      (IntMap)
 import qualified Data.IntMap.Strict      as IMS
 import qualified Data.HashMap.Strict     as HashMap
@@ -71,9 +71,7 @@ import           Clash.Util
   ((***),first,traceIf,indexMaybe,reportTimeDiff)
 
 generateBindings
-  :: FilePath
-  -- ^ Temporary directory
-  -> GHC.OverridingBool
+  :: GHC.OverridingBool
   -- ^ Use color
   -> [FilePath]
   -- ^ primitives (blackbox) directories
@@ -95,16 +93,16 @@ generateBindings
         , CompiledPrimMap  -- The primitives found in '.' and 'primDir'
         , [DataRepr']
         )
-generateBindings tmpDir useColor primDirs importDirs dbs hdl modName dflagsM = do
+generateBindings useColor primDirs importDirs dbs hdl modName dflagsM = do
   (  bindings
    , clsOps
    , unlocatable
    , fiEnvs
    , topEntities
-   , pFP
+   , partitionEithers -> (unresolvedPrims, pFP)
    , customBitRepresentations
-   , primGuards ) <- loadModules tmpDir useColor hdl modName dflagsM importDirs
-  primMapR <- generatePrimMap primGuards (concat [pFP, primDirs, importDirs])
+   , primGuards ) <- loadModules useColor hdl modName dflagsM importDirs
+  primMapR <- generatePrimMap unresolvedPrims primGuards (concat [pFP, primDirs, importDirs])
   tdir <- maybe ghcLibDir (pure . GHC.topDir) dflagsM
   startTime <- Clock.getCurrentTime
   primMapC <-
