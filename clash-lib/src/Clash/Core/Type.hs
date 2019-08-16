@@ -69,10 +69,18 @@ import           GHC.Integer            (smallInteger)
 import           GHC.Integer.Logarithms (integerLogBase#)
 
 -- GHC API
+#if __GLASGOW_HASKELL__ >= 808
+import           PrelNames
+  (ordLTDataConKey, ordEQDataConKey, ordGTDataConKey)
+#else
+import           Unique                 (Unique)
+import           PrelNames
+  (ltDataConKey, eqDataConKey, gtDataConKey)
+#endif
 import           PrelNames
   (integerTyConKey, typeNatAddTyFamNameKey, typeNatExpTyFamNameKey,
    typeNatLeqTyFamNameKey, typeNatMulTyFamNameKey, typeNatSubTyFamNameKey,
-   typeNatCmpTyFamNameKey, ltDataConKey, eqDataConKey, gtDataConKey)
+   typeNatCmpTyFamNameKey)
 import           SrcLoc                 (wiredInSrcSpan)
 import           Unique                 (getKey)
 
@@ -85,6 +93,13 @@ import           Clash.Core.TysPrim
 import           Clash.Core.Var
 import           Clash.Unique
 import           Clash.Util
+
+#if __GLASGOW_HASKELL__ <= 806
+ordLTDataConKey, ordEQDataConKey, ordGTDataConKey :: Unique.Unique
+ordLTDataConKey = ltDataConKey
+ordEQDataConKey = eqDataConKey
+ordGTDataConKey = gtDataConKey
+#endif
 
 varAttrs :: Var a -> [Attr']
 varAttrs t@(TyVar {}) =
@@ -469,9 +484,9 @@ reduceTypeFamily tcm (tyView -> TyConApp tc tys)
   , [i1, i2] <- mapMaybe (litView tcm) tys
   = Just $ ConstTy $ TyCon $
       case compare i1 i2 of
-        LT -> Name User "GHC.Types.LT" (getKey ltDataConKey) wiredInSrcSpan
-        EQ -> Name User "GHC.Types.EQ" (getKey eqDataConKey) wiredInSrcSpan
-        GT -> Name User "GHC.Types.GT" (getKey gtDataConKey) wiredInSrcSpan
+        LT -> Name User "GHC.Types.LT" (getKey ordLTDataConKey) wiredInSrcSpan
+        EQ -> Name User "GHC.Types.EQ" (getKey ordEQDataConKey) wiredInSrcSpan
+        GT -> Name User "GHC.Types.GT" (getKey ordGTDataConKey) wiredInSrcSpan
 
   | nameOcc tc `elem` ["GHC.TypeLits.Extra.FLog", "GHC.TypeNats.FLog"]
   , [i1, i2] <- mapMaybe (litView tcm) tys
