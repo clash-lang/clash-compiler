@@ -91,7 +91,8 @@ import           Clash.Core.Evaluator        (PureHeap, whnf')
 import           Clash.Core.Name
   (Name (..), NameSort (..), mkUnsafeSystemName)
 import           Clash.Core.FreeVars
-  (localIdOccursIn, localIdsDoNotOccurIn, freeLocalIds, termFreeTyVars, typeFreeVars, localVarsDoNotOccurIn)
+  (localIdOccursIn, localIdsDoNotOccurIn, freeLocalIds, termFreeTyVars,
+   typeFreeVars, localVarsDoNotOccurIn, hasLocalFreeVars)
 import           Clash.Core.Literal          (Literal (..))
 import           Clash.Core.Pretty           (showPpr)
 import           Clash.Core.Subst
@@ -1788,8 +1789,8 @@ reduceBinders is processed body ((id_,expr):binders) = case List.find ((== expr)
     Nothing -> reduceBinders is ((id_,expr):processed) body binders
 
 reduceConst :: HasCallStack => NormRewrite
-reduceConst ctx@(TransformContext is0 _) e@(App _ _)
-  | (Prim nm0 _, _) <- collectArgs e
+reduceConst ctx@(TransformContext is0 _) e0@(App _ _)
+  | not (hasLocalFreeVars e0)
   = do
     tcm <- Lens.view tcCache
     bndrs <- Lens.use bindings
@@ -1798,14 +1799,17 @@ reduceConst ctx@(TransformContext is0 _) e@(App _ _)
     let (ids1,ids2) = splitSupply ids
     uniqSupply Lens..= ids2
     gh <- Lens.use globalHeap
-    case whnf' primEval bndrs tcm gh ids1 is0 False e of
-      (gh',ph',e') -> do
+    case whnf' primEval bndrs tcm gh ids1 is0 False e0 of
+      (gh',ph',e1) -> do
         globalHeap Lens..= gh'
-        bindPureHeap ctx tcm ph' $ \_ctx' -> case e' of
-          (collectArgs -> (Prim nm1 _, _)) | nm0 == nm1 -> return e
-          _ -> changed e'
+        bindPureHeap ctx tcm ph' $ \_ctx' -> case e1 of
+          (collectArgs -> (f1, _))
+            | let (f0,_) = collectArgs e0
+            , f0 == f1
+            -> return e0
+          _ -> changed e1
 
-reduceConst _ e = return e
+reduceConst _ e  = return e
 
 -- | Replace primitives by their "definition" if they would lead to let-bindings
 -- with a non-representable type when a function is in ANF. This happens for
