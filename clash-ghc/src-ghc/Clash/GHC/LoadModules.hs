@@ -93,6 +93,7 @@ import qualified Var
 -- Internal Modules
 import           Clash.GHC.GHC2Core                           (modNameM, qualifiedNameString')
 import           Clash.GHC.LoadInterfaceFiles                 (loadExternalExprs, unresolvedPrimitives)
+import           Clash.GHCi.Common                            (checkMonoLocalBindsMod)
 import           Clash.Util                                   (curLoc, noSrcSpan, reportTimeDiff)
 import           Clash.Annotations.BitRepresentation.Internal
   (DataRepr', dataReprAnnToDataRepr')
@@ -331,6 +332,7 @@ loadModules useColor hdl modName dflagsM idirs = do
 
     let annExtDiff = reportTimeDiff annTime extTime
     MonadUtils.liftIO $ putStrLn $ "GHC: Parsing annotations took: " ++ annExtDiff
+    MonadUtils.liftIO $ mapM_ checkMonoLocalBindsMod modGraph2
 
     return ( bindersC ++ makeRecursiveGroups externalBndrs
            , clsOps
