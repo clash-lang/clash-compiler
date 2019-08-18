@@ -185,7 +185,8 @@ runClashTest =
         , runTest ("tests" </> "shouldwork" </> "GADTs") defBuild [] "TailOfTail"           (["", "testBench"],"testBench",True)
         ]
       , clashTestGroup "HOPrim"
-        [ runTest ("tests" </> "shouldwork" </> "HOPrim") defBuild [] "HOImap"    (["","testBench"],"testBench",True)
+        [ runTest ("tests" </> "shouldwork" </> "HOPrim") defBuild [] "HOIdx"     (["","testBench"],"testBench",True)
+        , runTest ("tests" </> "shouldwork" </> "HOPrim") defBuild [] "HOImap"    (["","testBench"],"testBench",True)
         , runTest ("tests" </> "shouldwork" </> "HOPrim") defBuild [] "Map"       (["","testBench"],"testBench",True)
         , runTest ("tests" </> "shouldwork" </> "HOPrim") defBuild [] "Map2"      (["","testBench"],"testBench",True)
         , runTest ("tests" </> "shouldwork" </> "HOPrim") defBuild [] "TestMap"   (["","testBench"],"testBench",True)

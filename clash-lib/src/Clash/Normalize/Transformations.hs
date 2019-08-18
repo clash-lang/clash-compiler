@@ -1283,9 +1283,13 @@ collectFlat :: Term -> Term -> Maybe [(Pat,Term)]
 collectFlat scrut (Case (collectEqArgs -> Just (scrut', val)) _ty [lAlt,rAlt])
   | scrut' == scrut
   = case collectArgs val of
-      (Prim nm' _,args') | isFromInt nm'
-        -> case last args' of
-            Left (Literal i) -> case (lAlt,rAlt) of
+      (Prim nm' _,args') | isFromInt nm' ->
+        go (last args')
+      (Data dc,args')    | nameOcc (dcName dc) == "GHC.Types.I#" ->
+        go (last args')
+      _ -> Nothing
+  where
+    go (Left (Literal i)) = case (lAlt,rAlt) of
               ((pl,el),(pr,er))
                 | isFalseDcPat pl || isTrueDcPat pr ->
                    case collectFlat scrut el of
@@ -1299,9 +1303,8 @@ collectFlat scrut (Case (collectEqArgs -> Just (scrut', val)) _ty [lAlt,rAlt])
                      Nothing    -> Just [(LitPat i, el)
                                         ,(DefaultPat, er)
                                         ]
-            _ -> Nothing
-      _ -> Nothing
-  where
+    go _ = Nothing
+
     isFalseDcPat (DataPat p _ _)
       = ((== "GHC.Types.False") . nameOcc . dcName) p
     isFalseDcPat _ = False
@@ -1322,6 +1325,9 @@ collectEqArgs (collectArgsTicks -> (Prim nm _, args, ticks))
     nm == "Clash.Sized.Internal.Unsigned.eq#"
     = let [_,Left scrut,Left val] = args
       in Just (mkTicks scrut ticks,val)
+  | nm == "Clash.Transformations.eqInt"
+    = let [Left scrut,Left val] = args
+      in  Just (mkTicks scrut ticks,val)
 collectEqArgs _ = Nothing
 
 type NormRewriteW = Transform (StateT ([LetBinding],InScopeSet) (RewriteMonad NormalizeState))
@@ -1991,6 +1997,15 @@ reduceNonRepPrim c@(TransformContext is0 ctx) e@(App _ _) | (Prim nm _, args, ti
                else return e
           _ -> return e
 
+      "Clash.Sized.Vector.index_int" | length args == 5 -> do
+        let ([_knArg,vArg,iArg],[nTy,aTy]) = Either.partitionEithers args
+        case runExcept (tyNatSize tcm nTy) of
+          Right n -> do
+            untranslatableTy <- isUntranslatableType_not_poly aTy
+            if untranslatableTy || shouldReduce1 || ultra
+               then (`mkTicks` ticks) <$> reduceIndex_int is0 n aTy vArg iArg
+               else return e
+          _ -> return e
 
       "Clash.Sized.Vector.imap" | length args == 6 -> do
         let [nTy,argElTy,resElTy] = Either.rights args

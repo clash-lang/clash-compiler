@@ -787,6 +787,106 @@ reduceReplace_int is0 n aTy vTy v i newA = do
   go _ ty = error $ $(curLoc) ++ "reduceReplace_int: argument does not have "
                                 ++ "a vector type: " ++ showPpr ty
 
+-- TODO: Take a shortcut when given index is a literal. Right now, this function
+-- TODO: simply creates a case statement for every element in the vector, which
+-- TODO: Clash will eliminate one-by-one if the index turned out to be literal.
+-- TODO: It would of course be best to not create the cases in the first place!
+reduceIndex_int
+  :: InScopeSet
+  -> Integer
+  -- ^ Size of vector
+  -> Type
+  -- ^ Type of vector element
+  -> Term
+  -- ^ Vector
+  -> Term
+  -- ^ Index
+  -> NormalizeSession Term
+reduceIndex_int is0 n aTy v i = do
+  tcm <- Lens.view tcCache
+  let vTy = termType tcm v
+  go tcm vTy
+ where
+  -- Basically creates:
+  --
+  -- case eqInt i0 curI of
+  --   True -> curA
+  --   _    -> next
+  --
+  -- where:
+  --
+  --   - curI is the index of the current element, which we statically know
+  --   - i0 is the index given to index_int
+  --   - curA is the element at index curI
+  --   - next; the value if the current index is not equal to index argument
+  --
+  index_intElement
+    :: TyConMap
+    -- ^ TyCon map
+    -> DataCon
+    -- Int datacon
+    -> Type
+    -- Int type
+    -> (Term, Integer)
+    -- ^ Element in the vector, and its corresponding index
+    -> Term
+    -- ^ The rest
+    -> Term
+  index_intElement tcm iDc iTy (cur,elIndex) next = case0
+   where
+    (Just boolTc) = lookupUniqMap (getKey boolTyConKey) tcm
+    [_,trueDc]    = tyConDataCons boolTc
+    eqInt         = eqIntPrim iTy (mkTyConApp (tyConName boolTc) [])
+    case0         = Case (mkApps eqInt [Left i
+                                       ,Left (mkApps (Data iDc)
+                                             [Left (Literal (IntLiteral elIndex))])
+                                       ])
+                         aTy
+                         [(DefaultPat, next)
+                         ,(DataPat trueDc [] [], cur)
+                         ]
+
+  -- Equality on lifted Int that returns a Bool
+  eqIntPrim
+    :: Type
+    -> Type
+    -> Term
+  eqIntPrim intTy boolTy =
+    Prim "Clash.Transformations.eqInt"
+         (PrimInfo (mkFunTy intTy (mkFunTy intTy boolTy)) WorkVariable)
+
+  go tcm (coreView1 tcm -> Just ty') = go tcm ty'
+  go tcm (tyView -> TyConApp vecTcNm _)
+    | (Just vecTc)     <- lookupUniqMap vecTcNm tcm
+    , [_nilCon,consCon] <- tyConDataCons vecTc
+    = do
+      -- Get data constructors of 'Int'
+      uniqs0                   <- Lens.use uniqSupply
+      let iTy                   = termType tcm i
+          (TyConApp iTcNm _)    = tyView iTy
+          (Just iTc)            = lookupUniqMap iTcNm tcm
+          [iDc]                 = tyConDataCons iTc
+
+      -- Get elements from vector
+          (uniqs1,(vars,elems)) = second (second concat . unzip)
+                                $ extractElems
+                                    uniqs0
+                                    is0
+                                    consCon
+                                    aTy
+                                    'I'
+                                    n
+                                    v
+
+      -- Build a right-biased tree of case-expressions
+      let indexed = foldr (index_intElement tcm iDc iTy)
+                              (undefinedTm aTy)
+                              (zip vars [0..])
+          lb      = Letrec (init elems) indexed
+      uniqSupply Lens..= uniqs1
+      changed lb
+  go _ ty = error $ $(curLoc) ++ "indexReplace_int: argument does not have "
+                              ++ "a vector type: " ++ showPpr ty
 
 -- | Replace an application of the @Clash.Sized.Vector.dtfold@ primitive on
 -- vectors of a known length @n@, by the fully unrolled recursive "definition"
