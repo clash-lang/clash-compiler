@@ -1024,8 +1024,8 @@ readNew
   :: ( KnownDomain dom
      , Undefined a
      , Eq addr )
-  => Reset dom
-  -> Clock dom
+  => Clock dom
+  -> Reset dom
   -> Enable dom
   -> (Signal dom addr -> Signal dom (Maybe (addr, a)) -> Signal dom a)
   -- ^ The @ram@ component
@@ -1035,7 +1035,7 @@ readNew
   -- ^ (Write address @w@, value to write)
   -> Signal dom a
   -- ^ Value of the @ram@ at address @r@ from the previous clock cycle
-readNew rst clk en ram rdAddr wrM = mux wasSame wasWritten $ ram rdAddr wrM
+readNew clk rst en ram rdAddr wrM = mux wasSame wasWritten $ ram rdAddr wrM
   where readNewT rd (Just (wr, wrdata)) = (wr == rd, wrdata)
         readNewT _  Nothing             = (False   , undefined)
 

@@ -117,7 +117,7 @@ import           Clash.Sized.Unsigned         (Unsigned)
 --
 -- * See "Clash.Prelude.BlockRam#usingrams" for more information on how to use a
 -- Block RAM.
--- * Use the adapter 'readNew'' for obtaining write-before-read semantics like this: @readNew' clk (blockRamFilePow2' clk file) rd wrM@.
+-- * Use the adapter 'Clash.Prelude.BlockRam.readNew' for obtaining write-before-read semantics like this: @'Clash.Prelude.BlockRam.readNew' clk ('blockRamFilePow2' clk file) rd wrM@.
 -- * See "Clash.Prelude.BlockRam.File#usingramfiles" for more information on how
 -- to instantiate a Block RAM with the contents of a data file.
 -- * See "Clash.Sized.Fixed#creatingdatafiles" for ideas on how to create your
@@ -163,7 +163,7 @@ blockRamFilePow2 = \fp rd wrM -> withFrozenCallStack
 --
 -- * See "Clash.Prelude.BlockRam#usingrams" for more information on how to use a
 -- Block RAM.
--- * Use the adapter 'readNew'' for obtaining write-before-read semantics like this: @readNew' clk (blockRamFile' clk size file) rd wrM@.
+-- * Use the adapter 'Clash.Prelude.BlockRam.readNew' for obtaining write-before-read semantics like this: @'Clash.Prelude.BlockRam.readNew' clk ('blockRamFile' clk size file) rd wrM@.
 -- * See "Clash.Prelude.BlockRam.File#usingramfiles" for more information on how
 -- to instantiate a Block RAM with the contents of a data file.
 -- * See "Clash.Sized.Fixed#creatingdatafiles" for ideas on how to create your

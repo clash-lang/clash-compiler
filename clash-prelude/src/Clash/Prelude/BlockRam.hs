@@ -825,5 +825,5 @@ readNew
   -- ^ (Write address @w@, value to write)
   -> Signal dom a
   -- ^ Value of the @ram@ at address @r@ from the previous clock cycle
-readNew = hideClockResetEnable (\clk rst -> E.readNew rst clk)
+readNew = hideClockResetEnable E.readNew
 {-# INLINE readNew #-}
