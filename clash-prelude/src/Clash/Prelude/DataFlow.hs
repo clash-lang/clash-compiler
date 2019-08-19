@@ -71,7 +71,7 @@ adhering to the 'DataFlow' type should:
  * Not consume data when validity is deasserted.
  * Only update its output when readiness is asserted.
 
-The 'DataFlow'' type is defined as:
+The 'DataFlow' type is defined as:
 
 @
 newtype DataFlow' dom iEn oEn i o

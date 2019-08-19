@@ -559,9 +559,9 @@ isIntegerTy :: Type -> Bool
 isIntegerTy (ConstTy (TyCon nm)) = nameUniq nm == getKey integerTyConKey
 isIntegerTy _ = False
 
--- Normalize a type, looking through Signals and newtypes
+-- | Normalize a type, looking through Signals and newtypes
 --
--- For example: Vec (6-1) (Unsigned (3+1)) normalizes to Vec 5 (Unsigned 4)
+-- For example: @Signal a (Vec (6-1) (Unsigned (3+1)))@ normalizes to @Vec 5 (Unsigned 4)@
 normalizeType :: TyConMap -> Type -> Type
 normalizeType tcMap = go
   where

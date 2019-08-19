@@ -872,7 +872,7 @@ but,
 
 @
 instance 'Bundle' Bool where
-  type 'Unbundled'' clk Bool = 'Signal'' clk Bool
+  type 'Unbundled' clk Bool = 'Signal' clk Bool
   bundle   s = s
   unbundle s = s
 @
@@ -1594,7 +1594,7 @@ import Data.Constraint.Nat    (leTrans)
 @
 
 Then we'll start with the /heart/ of the FIFO synchronizer, an asynchronous RAM
-in the form of 'asyncRam''. It's called an asynchronous RAM because the read
+in the form of 'asyncRam'. It's called an asynchronous RAM because the read
 port is not synchronized to any clock (though the write port is). Note that in
 Clash we don't really have asynchronous logic, there is only combinational and
 synchronous logic. As a consequence, we see in the type signature of
@@ -1950,7 +1950,7 @@ A list of often encountered errors and their solutions:
     ... = f a b (c,d)
     @
 
-    add the 'bundle'' function like so:
+    add the 'bundle' function like so:
 
     @
     ... = f a b ('bundle' (c,d))
