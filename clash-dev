@@ -1,2 +1,13 @@
 #!/bin/sh
-ghci -fobject-code -iclash-lib/src -iclash-ghc/src-ghc -Wall -DTOOL_VERSION_ghc=\"$(ghc --numeric-version)\" Clash.hs
+GHC_VERSION=$(ghc --numeric-version)
+GHC_MAJOR_VERSION=$(echo ${GHC_VERSION} | tr -d '.' | head -c2)
+GHC_BIN_SRC=$(ls -d clash-ghc/src-bin-${GHC_MAJOR_VERSION}*)
+
+ghci \
+  -fobject-code \
+  -iclash-ghc/src-bin-common/ \
+  -i${GHC_BIN_SRC} \
+  -iclash-lib/src \
+  -iclash-ghc/src-ghc \
+  -Wall -DTOOL_VERSION_ghc=\"${GHC_VERSION}\" \
+  Clash.hs
