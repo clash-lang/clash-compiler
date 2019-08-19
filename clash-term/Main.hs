@@ -32,7 +32,7 @@ main :: IO ()
 main = RW.runTerminal @Term "clash-term/theme.ini"
 
 -------------------------------
--- Cλash instance for Diff.
+-- Clash instance for Diff.
 decodeList :: forall a. Binary a => FilePath -> IO [a]
 decodeList fn = do
   bytes <- BL.readFile fn
