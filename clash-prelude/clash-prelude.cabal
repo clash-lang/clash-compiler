@@ -257,6 +257,7 @@ Library
                       singletons                >= 1.0     && < 3.0,
                       template-haskell          >= 2.12.0.0 && < 2.16,
                       th-lift                   >= 0.7.0    && < 0.8.0,
+                      th-lift-instances         >= 0.1.14   && < 0.2,
                       th-orphans                >= 0.13.1   && < 1.0,
                       text                      >= 0.11.3.1 && < 1.3,
                       time                      >= 1.8     && < 1.10,

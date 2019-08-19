@@ -62,9 +62,3 @@ source-repository-package
   type: git
   location: https://github.com/clash-lang/ghc-typelits-extra
   tag: a8de0b68b8216411cb862195354f251cd41bae50
-
--- Released `th-lift-instances` doesn't compile with `text-1.2.4` or higher
-source-repository-package
-  type: git
-  location: https://github.com/christiaanb/th-lift-instances
-  tag: 97ea9cf709f9a72d4df80c8ac56e72df1c695547
