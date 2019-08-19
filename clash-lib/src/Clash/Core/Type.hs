@@ -14,6 +14,7 @@
 {-# LANGUAGE FlexibleInstances     #-}
 {-# LANGUAGE MagicHash             #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE NamedFieldPuns        #-}
 {-# LANGUAGE OverloadedStrings     #-}
 {-# LANGUAGE TemplateHaskell       #-}
 {-# LANGUAGE ViewPatterns          #-}
@@ -591,7 +592,8 @@ isClassTy
   :: TyConMap
   -> Type
   -> Bool
-isClassTy tcm (tyView -> TyConApp tcNm _) = case lookupUniqMap tcNm tcm of
-  Just tc -> isClassTc tc
-  Nothing -> False
+isClassTy tcm (tyView -> TyConApp tcNm _) =
+  case lookupUniqMap tcNm tcm of
+    Just (AlgTyCon {isClassTc}) -> isClassTc
+    _ -> False
 isClassTy _ _ = False
