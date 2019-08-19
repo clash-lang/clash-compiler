@@ -136,7 +136,7 @@ import Clash.XException      (errorX, maybeIsX, seqX)
 --
 -- * See "Clash.Prelude.BlockRam#usingrams" for more information on how to use a
 -- Block RAM.
--- * Use the adapter 'readNew'' for obtaining write-before-read semantics like this: @readNew' clk (blockRamFilePow2' clk file) rd wrM@.
+-- * Use the adapter 'Clash.Explicit.BlockRam.readNew' for obtaining write-before-read semantics like this: @'Clash.Explicit.BlockRam.readNew' clk rst en (blockRamFilePow2' clk en file) rd wrM@.
 -- * See "Clash.Explicit.BlockRam.File#usingramfiles" for more information on how
 -- to instantiate a Block RAM with the contents of a data file.
 -- * See "Clash.Explicit.Fixed#creatingdatafiles" for ideas on how to create your
@@ -181,7 +181,7 @@ blockRamFilePow2 = \clk en file rd wrM -> withFrozenCallStack
 --
 -- * See "Clash.Explicit.BlockRam#usingrams" for more information on how to use a
 -- Block RAM.
--- * Use the adapter 'readNew'' for obtaining write-before-read semantics like this: @readNew' clk (blockRamFile' clk size file) rd wrM@.
+-- * Use the adapter 'Clash.Explicit.BlockRam.readNew' for obtaining write-before-read semantics like this: @'Clash.Explicit.BlockRam.readNew' clk rst en ('blockRamFile' clk en size file) rd wrM@.
 -- * See "Clash.Explicit.BlockRam.File#usingramfiles" for more information on how
 -- to instantiate a Block RAM with the contents of a data file.
 -- * See "Clash.Sized.Fixed#creatingdatafiles" for ideas on how to create your
