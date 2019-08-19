@@ -120,7 +120,7 @@ medvedev clk rst en tr st = moore clk rst en tr id st
 -- __o__ :: Int -> (Int, Bool)
 -- @
 --
--- When we want to make compositions of @t@ and @o@ in @g@ using 'moore'', we have to
+-- When we want to make compositions of @t@ and @o@ in @g@ using 'moore', we have to
 -- write:
 --
 -- @
@@ -130,7 +130,7 @@ medvedev clk rst en tr st = moore clk rst en tr id st
 --     (i2,b2) = 'unbundle' (moore clk rst en t o 3 ('bundle' (i1,c)))
 -- @
 --
--- Using 'mooreB'' however we can write:
+-- Using 'mooreB' however we can write:
 --
 -- @
 -- g clk rst en a b c = (b1,b2,i2)

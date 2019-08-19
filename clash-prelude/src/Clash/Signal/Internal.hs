@@ -193,11 +193,10 @@ data ActiveEdge
   -- ^ Elements are sensitive to the falling edge (high-to-low) of the clock.
   deriving (Show, Eq, Ord, Generic, NFData, Data, Hashable, Binary)
 
+-- | Singleton version of 'ActiveEdge'
 data SActiveEdge (edge :: ActiveEdge) where
   SRising  :: SActiveEdge 'Rising
-  -- See 'Rising' ^
   SFalling :: SActiveEdge 'Falling
-  -- See 'Falling' ^
 
 instance Show (SActiveEdge edge) where
   show SRising = "SRising"
@@ -397,7 +396,7 @@ class KnownSymbol dom => KnownDomain (dom :: Domain) where
   --
   knownDomain :: SDomainConfiguration dom (KnownConf dom)
 
--- | Version of 'knownDomain accepts a SSymbol. For example:
+-- | Version of 'knownDomain' that takes a 'SSymbol'. For example:
 --
 -- >>> knownDomainByName (SSymbol @"System")
 -- SDomainConfiguration System d10000 SRising SAsynchronous SDefined SActiveHigh
@@ -535,11 +534,11 @@ isValidDomainName _ = False
 --
 -- > type System10 = ..
 --
--- You can use that to dom Clocks/Resets/Enables/Signals. For example:
+-- You can use that as the dom to Clocks\/Resets\/Enables\/Signals. For example:
 -- @Signal System10 Int@. Additionally, it will create a 'VDomainConfiguration' that you can
 -- use in later calls to 'createDomain':
 --
--- > vSystem10 = 'knownVDomain' @System10
+-- > vSystem10 = knownVDomain @System10
 --
 createDomain :: VDomainConfiguration -> Q [Dec]
 createDomain (VDomainConfiguration name period edge reset init_ polarity) =

@@ -44,8 +44,8 @@ import           Clash.Sized.Vector            (Vec, lazyV)
 
 import           GHC.TypeLits                  (Nat)
 
--- | Isomorphism between a 'Clash.Explicit.Signal.Delayed' of a product type
--- (e.g. a tuple) and a product type of 'Clash.Explicit.Signal.Delayed''s.
+-- | Isomorphism between a 'DSignal' of a product type
+-- (e.g. a tuple) and a product type of 'DSignal's.
 --
 -- Instances of 'Bundle' must satisfy the following laws:
 --
@@ -69,7 +69,7 @@ import           GHC.TypeLits                  (Nat)
 -- data D = A | B
 --
 -- instance Bundle D where
---   type 'Unbundled'' dom delay D = 'DSignal'' dom d D
+--   type 'Unbundled' dom delay D = 'DSignal' dom d D
 --   'bundle'   _ s = s
 --   'unbundle' _ s = s
 -- @

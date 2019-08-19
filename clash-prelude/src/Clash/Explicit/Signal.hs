@@ -428,7 +428,7 @@ freqCalc = toInteger . hzToPeriod
 -- The 'unsafeSynchronizer' works in such a way that, given 2 clocks:
 --
 -- @
--- createDomain vSystem{tag="Dom7", vPeriod=7}
+-- createDomain vSystem{vName=\"Dom7\", vPeriod=7}
 --
 -- clk7 :: 'Clock' Dom7
 -- clk7 = 'clockGen'
@@ -440,7 +440,7 @@ freqCalc = toInteger . hzToPeriod
 -- and
 --
 -- @
--- createDomain vSystem{tag="Dom2", vPeriod=2}
+-- createDomain vSystem{vName=\"Dom2\", vPeriod=2}
 --
 -- clk2 :: 'Clock' Dom2
 -- clk2 = 'clockGen'

@@ -112,7 +112,7 @@ mealy clk rst en f iS =
 -- __f__ :: Int -> (Bool,Int) -> (Int,(Int,Bool))
 -- @
 --
--- When we want to make compositions of @f@ in @g@ using 'mealy'', we have to
+-- When we want to make compositions of @f@ in @g@ using 'mealy', we have to
 -- write:
 --
 -- @
@@ -122,7 +122,7 @@ mealy clk rst en f iS =
 --     (i2,b2) = 'unbundle' (mealy clk rst en f 3 ('bundle' (i1,c)))
 -- @
 --
--- Using 'mealyB'' however we can write:
+-- Using 'mealyB' however we can write:
 --
 -- @
 -- g clk rst en a b c = (b1,b2,i2)

@@ -74,7 +74,7 @@ import Clash.XException      (ShowX (..), XException)
 
 -- | Compares the first two 'Signal's for equality and logs a warning when they
 -- are not equal. The second 'Signal' is considered the expected value. This
--- function simply returns the third 'Signal'' unaltered as its result. This
+-- function simply returns the third 'Signal' unaltered as its result. This
 -- function is used by 'outputVerifier'.
 --
 --
