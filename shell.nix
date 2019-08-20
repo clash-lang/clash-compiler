@@ -9,6 +9,13 @@ mkShell {
     niv
 
     # For quick clash experimentation
-    pkgs.haskellPackages.clash-ghc
+    (pkgs.haskellPackages.ghcWithPackages (p: with p; [
+      clash-ghc
+
+      ghc-typelits-extra
+      ghc-typelits-knownnat
+      ghc-typelits-natnormalise
+    ])
+    )
   ];
 }
