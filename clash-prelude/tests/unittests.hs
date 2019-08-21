@@ -7,6 +7,7 @@ import qualified Clash.Tests.BitVector
 import qualified Clash.Tests.DerivingDataRepr
 import qualified Clash.Tests.Signal
 import qualified Clash.Tests.NFDataX
+import qualified Clash.Tests.TopEntityGen
 
 tests :: TestTree
 tests = testGroup "Unittests"
@@ -15,6 +16,7 @@ tests = testGroup "Unittests"
   , Clash.Tests.DerivingDataRepr.tests
   , Clash.Tests.Signal.tests
   , Clash.Tests.NFDataX.tests
+  , Clash.Tests.TopEntityGen.tests
   ]
 
 main :: IO ()
