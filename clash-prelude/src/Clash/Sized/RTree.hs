@@ -280,19 +280,23 @@ instance (KnownNat d, NFDataX a) => NFDataX (RTree d a) where
 --     populationCount' = tfold fromIntegral add . v2t . bv2v
 -- :}
 -- <BLANKLINE>
--- <interactive>:...
+--  <interactive>:...
 --     • Couldn't match type ‘(((2 ^ d) + 1) + ((2 ^ d) + 1)) - 1’
 --                      with ‘(2 ^ d) + 1’
 --       Expected type: SatIndex 'SatError ((2 ^ d) + 1)
---                      -> SatIndex 'SatError ((2 ^ d) + 1) -> SatIndex 'SatError ((2 ^ d) + 1)
+--                      -> SatIndex 'SatError ((2 ^ d) + 1)
+--                      -> SatIndex 'SatError ((2 ^ d) + 1)
 --         Actual type: SatIndex 'SatError ((2 ^ d) + 1)
 --                      -> SatIndex 'SatError ((2 ^ d) + 1)
---                      -> AResult (SatIndex 'SatError ((2 ^ d) + 1)) (SatIndex 'SatError ((2 ^ d) + 1))
+--                      -> AResult
+--                           (SatIndex 'SatError ((2 ^ d) + 1))
+--                           (SatIndex 'SatError ((2 ^ d) + 1))
 --     • In the second argument of ‘tfold’, namely ‘add’
 --       In the first argument of ‘(.)’, namely ‘tfold fromIntegral add’
 --       In the expression: tfold fromIntegral add . v2t . bv2v
 --     • Relevant bindings include
---         populationCount' :: BitVector (2 ^ d) -> SatIndex 'SatError ((2 ^ d) + 1)
+--         populationCount' :: BitVector (2 ^ d)
+--                             -> SatIndex 'SatError ((2 ^ d) + 1)
 --           (bound at ...)
 --
 -- because 'tfold' expects a function of type \"@b -> b -> b@\", i.e. a function

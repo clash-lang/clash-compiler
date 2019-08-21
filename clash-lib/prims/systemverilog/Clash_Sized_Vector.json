@@ -145,7 +145,7 @@ end
     { "name"      : "Clash.Sized.Vector.imap"
     , "workInfo"  : "Never"
     , "kind"      : "Declaration"
-    , "type"      : "imap :: forall sat n a b . (KnownNat n, 1 <= n) => (SatIndex sat n -> a -> b) -> Vec n a -> Vec n b"
+    , "type"      : "imap :: forall sat n a b . KnownNat n => (SatIndex sat n -> a -> b) -> Vec n a -> Vec n b"
     , "template"  :
 "// imap begin
 genvar ~GENSYM[n][1];
@@ -197,7 +197,7 @@ end
     { "name"      : "Clash.Sized.Vector.zipWith"
     , "workInfo"  : "Never"
     , "kind"      : "Declaration"
-    , "type"      : "zipWith :: (KnownNat n, 1 <= n) => (SatIndex sat n -> a -> b -> c) -> Vec n a -> Vec n b -> Vec n c"
+    , "type"      : "zipWith :: (a -> b -> c) -> Vec n a -> Vec n b -> Vec n c"
     , "template"  :
 "// zipWith begin
 genvar ~GENSYM[n][2];

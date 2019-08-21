@@ -185,7 +185,8 @@ ghcTypeToHWType iw floatSupport = go
             _ -> returnN (BitVector (fromInteger n))
 
         "Clash.Sized.Internal.Index.SatIndex" -> do
-          n <- liftE (tyNatSize m (head args))
+          let [_, szTy] = args
+          n <- liftE (tyNatSize m szTy)
           if n < 2
              then returnN (Void (Just (Index (fromInteger n))))
              else returnN (Index (fromInteger n))

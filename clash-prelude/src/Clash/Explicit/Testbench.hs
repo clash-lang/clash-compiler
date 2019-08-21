@@ -36,7 +36,7 @@ where
 
 import Control.Exception     (catch, evaluate)
 import Debug.Trace           (trace)
-import GHC.TypeLits          (KnownNat, type (+), type (<=))
+import GHC.TypeLits          (KnownNat, type (+))
 import Prelude               hiding ((!!), length)
 import System.IO.Unsafe      (unsafeDupablePerformIO)
 
@@ -165,8 +165,7 @@ assertBitVector clk (Reset _) msg checked expected returned =
 stimuliGenerator
   :: forall l dom   a
    . ( KnownNat l
-     , KnownDomain dom
-     , 1 <= l)
+     , KnownDomain dom )
   => Clock dom
   -- ^ Clock to which to synchronize the output signal
   -> Reset dom
@@ -196,8 +195,7 @@ outputVerifier'
      , KnownDomain dom
      , DomainResetKind dom ~ 'Asynchronous
      , Eq a
-     , ShowX a
-     , 1 <= l )
+     , ShowX a )
   => Clock dom
   -- ^ Clock to which the testbench is synchronized to
   -> Reset dom
@@ -260,8 +258,7 @@ outputVerifier
      , KnownDomain circuitDom
      , DomainResetKind testDom ~ 'Asynchronous
      , Eq a
-     , ShowX a
-     , 1 <= l )
+     , ShowX a )
   => Clock testDom
   -- ^ Clock to which the testbench is synchronized to (but not necessarily
   -- the circuit under test)
@@ -303,7 +300,6 @@ outputVerifierBitVector'
    . ( KnownNat l
      , KnownNat n
      , KnownDomain dom
-     , 1 <= l
      , DomainResetKind dom ~ 'Asynchronous
      )
   => Clock dom
@@ -327,7 +323,6 @@ outputVerifierBitVector
      , KnownNat n
      , KnownDomain testDom
      , KnownDomain circuitDom
-     , 1 <= l
      , DomainResetKind testDom ~ 'Asynchronous
      )
   => Clock testDom

@@ -15,8 +15,10 @@ Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
 
 {-# LANGUAGE Unsafe #-}
 
-{-# OPTIONS_GHC -fplugin GHC.TypeLits.KnownNat.Solver #-}
-{-# OPTIONS_GHC -fplugin GHC.TypeLits.Normalise       #-}
+{-# OPTIONS_GHC -fconstraint-solver-iterations=5      #-}
+{-# OPTIONS_GHC -fplugin=GHC.TypeLits.Normalise       #-}
+{-# OPTIONS_GHC -fplugin=GHC.TypeLits.KnownNat.Solver #-}
+{-# OPTIONS_GHC -fplugin=GHC.TypeLits.Extra.Solver    #-}
 
 {-# OPTIONS_HADDOCK show-extensions not-home #-}
 
@@ -89,7 +91,7 @@ import Clash.Sized.Internal.Mod   (naturalToInteger)
 import GHC.Stack                  (HasCallStack)
 import GHC.TypeLits               (KnownNat, Nat, type (+), type (-),
                                    type (*), type (<=), natVal)
-import GHC.TypeLits.Extra         (CLog)
+import GHC.TypeLits.Extra         (CLog, Max)
 import Test.QuickCheck.Arbitrary  (Arbitrary (..), CoArbitrary (..),
                                    arbitraryBoundedIntegral,
                                    coarbitraryIntegral, shrinkIntegral)
@@ -102,7 +104,7 @@ import Clash.Class.Resize         (Resize (..))
 import Clash.Prelude.BitIndex     (replaceBit)
 import {-# SOURCE #-} Clash.Sized.Internal.BitVector (BitVector (BV), high, low, undefError)
 import qualified Clash.Sized.Internal.BitVector as BV
-import Clash.Promoted.Nat         (SNat(..), snatToNum, natToInteger, leToPlusKN)
+import Clash.Promoted.Nat         (SNat(..), snatToNum, natToInteger)
 import Clash.XException
   (ShowX (..), NFDataX (..), errorX, showsPrecXWith, rwhnfX)
 
@@ -110,6 +112,9 @@ import Clash.XException
 >>> import Clash.Sized.Internal.Index
 -}
 
+{- $setup
+>>> :set -fconstraint-solver-iterations=5
+-}
 
 -- | Arbitrary-bounded unsigned integer represented by @ceil(log_2(n))@ bits.
 --
@@ -248,7 +253,7 @@ maxBound# =
 {-# NOINLINE maxBound# #-}
 
 -- | Operators report an error on overflow and underflow
-instance (KnownSatMode sat, KnownNat n, 1 <= n) => Num (SatIndex sat n) where
+instance (KnownSatMode sat, KnownNat n) => Num (SatIndex sat n) where
   (+)         = satAdd $ satMode @sat
   (-)         = satSub $ satMode @sat
   (*)         = satMul $ satMode @sat
@@ -270,13 +275,13 @@ fromInteger_INLINE i = bound `seq` if i > (-1) && i < bound then I i else err
 
 
 instance ExtendingNum (SatIndex sat m) (SatIndex sat n) where
-  type AResult (SatIndex sat m) (SatIndex sat n) = SatIndex sat (m + n - 1)
+  type AResult (SatIndex sat m) (SatIndex sat n) = SatIndex sat ((Max (m + n) 1) - 1)
   add  = plus#
   sub = minus#
-  type MResult (SatIndex sat m) (SatIndex sat n) = SatIndex sat (((m - 1) * (n - 1)) + 1)
+  type MResult (SatIndex sat m) (SatIndex sat n) = SatIndex sat ((((Max m 1) - 1) * ((Max n 1) - 1)) + 1)
   mul = times#
 
-plus#, minus# :: SatIndex sat m -> SatIndex sat n -> SatIndex sat (m + n - 1)
+plus#, minus# :: SatIndex sat m -> SatIndex sat n -> SatIndex sat ((Max (m + n) 1) - 1)
 {-# NOINLINE plus# #-}
 plus# (I a) (I b) = I (a + b)
 
@@ -289,35 +294,36 @@ minus# (I a) (I b) =
   in  res
 
 {-# NOINLINE times# #-}
-times# :: SatIndex sat m -> SatIndex sat n -> SatIndex sat (((m - 1) * (n - 1)) + 1)
+times# :: SatIndex sat m -> SatIndex sat n -> SatIndex sat ((((Max m 1) - 1) * ((Max n 1) - 1)) + 1)
 times# (I a) (I b) = I (a * b)
 
-instance (KnownSatMode sat, KnownNat n, 1 <= n) => SaturatingNum (SatIndex sat n) where
+instance (KnownSatMode sat, KnownNat n) => SaturatingNum (SatIndex sat n) where
   satAdd SatWrap !a !b =
     case snatToNum @Integer (SNat @n) of
       1 -> fromInteger# 0
-      _ -> leToPlusKN @1 @n $
-        case plus# a b of
-          z | let m = fromInteger# (natVal (Proxy @ n))
-            , z >= m -> resize# (z - m)
-          z -> resize# z
-  satAdd SatZero a b =
-    leToPlusKN @1 @n $
-      case plus# a b of
-        z | let m = fromInteger# (natVal (Proxy @ (n - 1)))
-          , z > m -> fromInteger# 0
+      _ -> case plus# a b of
+        z | let m = fromInteger# (natVal (Proxy @ n))
+          , z >= m -> resize# (z -# m)
+        z -> resize# z
+  satAdd SatZero !a !b =
+    case snatToNum @Int (SNat @n) of
+      1 -> fromInteger# 0
+      _ ->  case plus# a b of
+        z | let m = fromInteger# (natVal (Proxy @ n))
+          , z >= m -> fromInteger# 0
         z -> resize# z
   satAdd SatError a b = a +# b
-  satAdd _ a b =
-    leToPlusKN @1 @n $
-      case plus# a b of
-        z | let m = fromInteger# (natVal (Proxy @ (n - 1)))
-          , z > m -> maxBound#
+  satAdd _ !a !b =
+    case snatToNum @Int (SNat @n) of
+      1 -> fromInteger# 0
+      _ -> case plus# a b of
+        z | let m = fromInteger# (natVal (Proxy @ n))
+          , z >= m -> maxBound#
         z -> resize# z
 
   satSub SatWrap a b =
     if lt# a b
-       then maxBound -# (b -# a) +# 1
+       then maxBound -# (b -# a) +# (fromInteger# 1)
        else a -# b
   satSub SatError a b = a -# b
   satSub _ a b =
@@ -328,22 +334,23 @@ instance (KnownSatMode sat, KnownNat n, 1 <= n) => SaturatingNum (SatIndex sat n
   satMul SatWrap !a !b =
     case snatToNum @Integer (SNat @n) of
       1 -> fromInteger# 0
-      _ -> leToPlusKN @1 @n $
-        case times# a b of
-          z -> let m = fromInteger# (natVal (Proxy @ n))
-               in resize# (z `mod` m)
+      _ -> case times# a b of
+        z -> let m = fromInteger# (natVal (Proxy @ n))
+              in resize# (z `mod` m)
   satMul SatZero a b =
-    leToPlusKN @1 @n $
-      case times# a b of
-        z | let m = fromInteger# (natVal (Proxy @ (n - 1)))
-          , z > m -> fromInteger# 0
-        z -> resize# z
+    case snatToNum @Int (SNat @n) of
+      1 -> fromInteger# 0
+      _ -> case times# a b of
+          z | let m = fromInteger# (natVal (Proxy @ n))
+            , z >= m -> fromInteger# 0
+          z -> resize# z
   satMul SatError a b = a *# b
   satMul _ a b =
-    leToPlusKN @1 @n $
-      case times# a b of
-        z | let m = fromInteger# (natVal (Proxy @ (n - 1)))
-          , z > m -> maxBound#
+    case snatToNum @Int (SNat @n) of
+      1 -> fromInteger# 0
+      _ ->  case times# a b of
+        z | let m = fromInteger# (natVal (Proxy @ n))
+          , z >= m -> maxBound#
         z -> resize# z
 
 (+#),(-#),(*#) :: KnownNat n => SatIndex sat n -> SatIndex sat n -> SatIndex sat n
@@ -356,10 +363,10 @@ instance (KnownSatMode sat, KnownNat n, 1 <= n) => SaturatingNum (SatIndex sat n
 {-# NOINLINE (*#) #-}
 (*#) (I a) (I b) = fromInteger_INLINE $ a * b
 
-instance (KnownSatMode sat, KnownNat n, 1 <= n) => Real (SatIndex sat n) where
+instance (KnownSatMode sat, KnownNat n) => Real (SatIndex sat n) where
   toRational = toRational . toInteger#
 
-instance (KnownSatMode sat, KnownNat n, 1 <= n) => Integral (SatIndex sat n) where
+instance (KnownSatMode sat, KnownNat n) => Integral (SatIndex sat n) where
   quot        = quot#
   rem         = rem#
   div         = quot#

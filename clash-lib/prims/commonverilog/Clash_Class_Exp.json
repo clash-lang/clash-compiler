@@ -3,8 +3,8 @@
     "BlackBox": {
       "name": "Clash.Class.Exp.expIndex#",
       "kind": "Declaration",
-      "type": "expIndex# :: (KnownSatMode sat, KnownNat m, 1 <= m) => SatIndex sat m -> SNat n -> SatIndex sat (m ^ n)",
-      "template": "assign ~RESULT = ~DEVNULL[~ARG[0]]$signed(~ARG[1] ** ~LIT[2]);",
+      "type": "expIndex# :: (KnownSatMode sat, KnownNat m) => SatIndex sat m -> SNat n -> SatIndex sat (m ^ n)",
+      "template": "assign ~RESULT = ~DEVNULL[~ARG[1]]$signed(~ARG[2] ** ~LIT[3]);",
       "warning": "Exponentiation is only supported on relatively small constructs (< 32 bits). Ideally, Clash should have constant folded your expression. See https://github.com/clash-lang/clash-compiler/issues/593."
     }
   },

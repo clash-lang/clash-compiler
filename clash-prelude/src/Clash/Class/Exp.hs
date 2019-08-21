@@ -59,7 +59,7 @@ instance KnownNat m => Exp (Unsigned m) where
   {-# INLINE (^) #-}
 
 expIndex#
-  :: (KnownSatMode sat, KnownNat m, 1 <= m)
+  :: (KnownSatMode sat, KnownNat m)
   => SatIndex sat m
   -> SNat n
   -> SatIndex sat (Max 2 (m ^ n))

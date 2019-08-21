@@ -688,7 +688,8 @@ map f (x `Cons` xs) = f x `Cons` map f xs
 -- | Apply a function of every element of a vector and its index.
 --
 -- >>> :t imap (+) (2 :> 2 :> 2 :> 2 :> Nil)
--- imap (+) (2 :> 2 :> 2 :> 2 :> Nil) :: Vec 4 (SatIndex 'SatError 4)
+-- imap (+) (2 :> 2 :> 2 :> 2 :> Nil)
+--   :: KnownSatMode sat => Vec 4 (SatIndex sat 4)
 -- >>> imap (+) (2 :> 2 :> 2 :> 2 :> Nil)
 -- <2,3,*** Exception: X: Clash.Sized.Index: result 4 is out of bounds: [0..3]
 -- ...
@@ -699,7 +700,7 @@ map f (x `Cons` xs) = f x `Cons` map f xs
 --
 -- <<doc/imap.svg>>
 imap
-  :: forall sat n a b . (KnownNat n, 1 <= n)
+  :: forall sat n a b . KnownNat n
   => (SatIndex sat n -> a -> b) -> Vec n a -> Vec n b
 imap f = go 0
   where
@@ -710,10 +711,10 @@ imap f = go 0
 
 -- | Zip two vectors with a functions that also takes the elements' indices.
 --
--- >>> izipWith (\i a b -> i + a + b) (2 :> 2 :> Nil)  (3 :> 3:> Nil)
+-- >>> izipWith (\i a b -> i + a + b) (2 :> 2 :> Nil)  (3 :> 3:> Nil) @'SatError
 -- <*** Exception: X: Clash.Sized.Index: result 3 is out of bounds: [0..1]
 -- ...
--- >>> izipWith (\i a b -> fromIntegral i + a + b) (2 :> 2 :> Nil) (3 :> 3 :> Nil) :: Vec 2 (Unsigned 8)
+-- >>> izipWith (\(i a b -> fromIntegral i + a + b) (2 :> 2 :> Nil) (3 :> 3 :> Nil) :: Vec 2 (Unsigned 8)
 -- <5,6>
 --
 -- \"'imap' @f xs@\" corresponds to the following circuit layout:
@@ -723,7 +724,7 @@ imap f = go 0
 -- __NB:__ 'izipWith' is /strict/ in its second argument, and /lazy/ in its
 -- third. This matters when 'izipWith' is used in a recursive setting. See
 -- 'lazyV' for more information.
-izipWith :: (KnownNat n, 1 <= n)
+izipWith :: KnownNat n
          => (SatIndex sat n -> a -> b -> c) -> Vec n a -> Vec n b
          -> Vec n c
 izipWith f xs ys = imap (\i -> uncurry (f i)) (zip xs ys)
@@ -741,7 +742,7 @@ izipWith f xs ys = imap (\i -> uncurry (f i)) (zip xs ys)
 --
 -- <<doc/ifoldr.svg>>
 ifoldr
-  :: (KnownNat n, 1 <= n)
+  :: KnownNat n
   => (SatIndex sat n -> a -> b -> b) -> b -> Vec n a -> b
 ifoldr f z xs = head ws
   where
@@ -760,7 +761,7 @@ ifoldr f z xs = head ws
 --
 -- <<doc/ifoldl.svg>>
 ifoldl
-  :: (KnownNat n, 1 <= n)
+  :: KnownNat n
   => (a -> SatIndex sat n -> b -> a) -> a -> Vec n b -> a
 ifoldl f z xs = last ws
   where
@@ -771,7 +772,7 @@ ifoldl f z xs = last ws
 --
 -- >>> indices d4
 -- <0,1,2,3>
-indices :: (KnownNat n, 1 <= n) => SNat n -> Vec n (SatIndex 'SatError n)
+indices :: KnownNat n => SNat n -> Vec n (SatIndex 'SatError n)
 indices _ = indicesI
 {-# INLINE indices #-}
 
@@ -780,7 +781,7 @@ indices _ = indicesI
 --
 -- >>> indicesI :: Vec 4 (Index 4)
 -- <0,1,2,3>
-indicesI :: (KnownNat n, 1 <= n) => Vec n (SatIndex 'SatError n)
+indicesI :: KnownNat n => Vec n (SatIndex 'SatError n)
 indicesI = imap const (repeat ())
 {-# INLINE indicesI #-}
 
@@ -792,7 +793,7 @@ indicesI = imap const (repeat ())
 -- >>> findIndex (> 8) (1:>3:>2:>4:>3:>5:>6:>Nil)
 -- Nothing
 findIndex
-  :: (KnownNat n, 1 <= n)
+  :: KnownNat n
   => (a -> Bool) -> Vec n a -> Maybe (SatIndex sat n)
 findIndex f = ifoldr (\i a b -> if f a then Just i else b) Nothing
 {-# INLINE findIndex #-}
@@ -805,7 +806,7 @@ findIndex f = ifoldr (\i a b -> if f a then Just i else b) Nothing
 -- Just 1
 -- >>> elemIndex 8 (1:>3:>2:>4:>3:>5:>6:>Nil)
 -- Nothing
-elemIndex :: (KnownNat n, 1 <= n, Eq a) => a -> Vec n a -> Maybe (SatIndex 'SatError n)
+elemIndex :: (KnownNat n, Eq a) => a -> Vec n a -> Maybe (SatIndex 'SatError n)
 elemIndex x = findIndex (x ==)
 {-# INLINE elemIndex #-}
 
@@ -1671,7 +1672,7 @@ windows2d stY stX xss = map (transpose . (map (windows1d stX))) (windows1d stY x
 permute :: (Enum i, KnownNat n, KnownNat m)
         => (a -> a -> a)  -- ^ Combination function, /f/
         -> Vec n a        -- ^ Default values, /def/
-        -> Vec m i        -- ^ SatIndex mapping, /is/
+        -> Vec m i        -- ^ Index mapping, /is/
         -> Vec (m + k) a  -- ^ Vector to be permuted, /xs/
         -> Vec n a
 permute f defs is xs = ys
@@ -1694,7 +1695,7 @@ permute f defs is xs = ys
 -- <9,4,1,6,2,4>
 backpermute :: (Enum i, KnownNat n)
             => Vec n a  -- ^ Source vector, /xs/
-            -> Vec m i  -- ^ SatIndex mapping, /is/
+            -> Vec m i  -- ^ Index mapping, /is/
             -> Vec m a
 backpermute xs = map (xs!!)
 {-# INLINE backpermute #-}
@@ -1716,7 +1717,7 @@ backpermute xs = map (xs!!)
 -- latest mapping is chosen.
 scatter :: (Enum i, KnownNat n, KnownNat m)
         => Vec n a       -- ^ Default values, /def/
-        -> Vec m i       -- ^ SatIndex mapping, /is/
+        -> Vec m i       -- ^ Index mapping, /is/
         -> Vec (m + k) a -- ^ Vector to be scattered, /xs/
         -> Vec n a
 scatter = permute const
@@ -1736,7 +1737,7 @@ scatter = permute const
 -- <9,4,1,6,2,4>
 gather :: (Enum i, KnownNat n)
        => Vec n a  -- ^ Source vector, /xs/
-       -> Vec m i  -- ^ SatIndex mapping, /is/
+       -> Vec m i  -- ^ Index mapping, /is/
        -> Vec m a
 gather xs = map (xs!!)
 {-# INLINE gather #-}
@@ -2063,15 +2064,18 @@ dfold _ f z xs = go (snatProxy (asNatProxy xs)) xs
 -- <BLANKLINE>
 -- <interactive>:...
 --     • Couldn't match type ‘((n + 2) + (n + 2)) - 1’ with ‘n + 2’
---       Expected type: SatIndex 'SatError (n + 2) -> SatIndex 'SatError (n + 2) -> SatIndex 'SatError (n + 2)
+--       Expected type: SatIndex 'SatError (n + 2)
+--                       -> SatIndex 'SatError (n + 2) -> SatIndex 'SatError (n + 2)
 --         Actual type: SatIndex 'SatError (n + 2)
---                      -> SatIndex 'SatError (n + 2) -> AResult (SatIndex 'SatError (n + 2)) (SatIndex 'SatError (n + 2))
+--                       -> SatIndex 'SatError (n + 2)
+--                       -> AResult
+--                           (SatIndex 'SatError (n + 2)) (SatIndex 'SatError (n + 2))
 --     • In the first argument of ‘fold’, namely ‘add’
 --       In the first argument of ‘(.)’, namely ‘fold add’
 --       In the expression: fold add . map fromIntegral . bv2v
 --     • Relevant bindings include
 --         populationCount' :: BitVector (n + 1) -> SatIndex 'SatError (n + 2)
---           (bound at ...)
+--           (bound at <interactive>:...)
 --
 -- because 'fold' expects a function of type \"@a -> a -> a@\", i.e. a function
 -- where the arguments and result all have exactly the same type.

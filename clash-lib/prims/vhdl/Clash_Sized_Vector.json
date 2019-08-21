@@ -130,7 +130,7 @@ end generate;~FI
     { "name"      : "Clash.Sized.Vector.imap"
     , "workInfo"  : "Never"
     , "kind"      : "Declaration"
-    , "type"      : "imap :: :: forall sat n a b . (KnownNat n, 1 <= n) => (SatIndex sat n -> a -> b) -> Vec n a -> Vec n b"
+    , "type"      : "imap :: :: forall sat n a b . KnownNat n => (SatIndex sat n -> a -> b) -> Vec n a -> Vec n b"
     , "template"  :
 "-- imap begin
 ~GENSYM[imap][0] : block

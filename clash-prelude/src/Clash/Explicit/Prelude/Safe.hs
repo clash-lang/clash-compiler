@@ -215,8 +215,7 @@ isFalling clk rst en is s = liftA2 edgeDetect prev s
 -- @'Clash.Explicit.Signal.mux'@, in order to delay a register by a known amount.
 riseEvery
   :: forall dom  n
-   . ( KnownDomain dom
-     , 1 <= n  )
+   . KnownDomain dom
   => Clock dom
   -> Reset dom
   -> Enable dom
@@ -234,8 +233,7 @@ riseEvery clk rst en SNat = moore clk rst en transfer output 0 (pure ())
 -- | Oscillate a @'Bool'@ for a given number of cycles, given the starting state.
 oscillate
   :: forall dom  n
-   . ( KnownDomain dom
-     , 1 <= n  )
+   . KnownDomain dom
   => Clock dom
   -> Reset dom
   -> Enable dom

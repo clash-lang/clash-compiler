@@ -11,10 +11,11 @@ Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
 module Clash.Sized.Internal.Index where
 
 import Data.Kind (Type)
-import GHC.TypeLits (KnownNat, Nat, type (<=))
+import GHC.TypeLits (KnownNat, Nat)
+import Clash.Class.Num (SaturationMode, KnownSatMode)
 
 type role SatIndex phantom phantom
 data SatIndex :: SaturationMode -> Nat -> Type
 
-instance (KnownSatMode sat, KnownNat n, 1 <= n) => Num (SatIndex sat n)
+instance (KnownSatMode sat, KnownNat n) => Num (SatIndex sat n)
 toInteger# :: SatIndex sat n -> Integer

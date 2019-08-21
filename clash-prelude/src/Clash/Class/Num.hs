@@ -11,6 +11,7 @@ Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
 
 {-# OPTIONS_HADDOCK show-extensions #-}
 
+
 module Clash.Class.Num
   ( -- * Arithmetic functions for arguments and results of different precision
     ExtendingNum (..)
@@ -67,7 +68,6 @@ data SaturationMode
               -- cost with the index type.
   deriving Eq
 
-
 class KnownSatMode (sat :: SaturationMode) where
   satMode :: SaturationMode
 
@@ -86,7 +86,7 @@ instance {-# OVERLAPS #-} KnownSatMode 'SatSymmetric where
 instance {-# OVERLAPS #-} KnownSatMode 'SatError where
   satMode = SatError
 
-instance {-# OVERLAPPABLE #-}
+instance {-# INCOHERENT #-}
   (TypeError ('Text "SaturationMode isn't known. Add the `KnownSatMode` constraint"))
   => KnownSatMode a where
   satMode = undefined
