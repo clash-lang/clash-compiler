@@ -68,6 +68,7 @@ module Clash.Prelude
     -- * BlockRAM primitives
   , blockRam
   , blockRamPow2
+  , blockRamU
   , blockRam1
   , E.ResetStrategy(..)
     -- ** BlockRAM primitives initialized with a data file
