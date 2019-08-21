@@ -46,7 +46,7 @@ import Clash.Core.Term
 import Clash.Core.Type
   (Kind, LitTy (..), Type (..), TypeView (..),
    coreView, coreView1, isFunTy, isPolyFunCoreTy, mkFunTy, splitFunTy, tyView,
-   undefinedTy)
+   undefinedTy, isTypeFamilyApplication)
 import Clash.Core.TyCon
   (TyConMap, tyConDataCons)
 import Clash.Core.TysPrim                      (typeNatKind)
@@ -106,12 +106,12 @@ catSolutions = mapMaybe getSol
   getSol _ = Nothing
 
 -- | Solve given equations and return all non-absurd solutions
-solveNonAbsurds :: [(Type, Type)] -> [(TyVar, Type)]
-solveNonAbsurds [] = []
-solveNonAbsurds (eq:eqs) =
-  solved ++ solveNonAbsurds eqs
+solveNonAbsurds :: TyConMap -> [(Type, Type)] -> [(TyVar, Type)]
+solveNonAbsurds _tcm [] = []
+solveNonAbsurds tcm (eq:eqs) =
+  solved ++ solveNonAbsurds tcm eqs
  where
-  solvers = [pure . solveAdd, solveEq]
+  solvers = [pure . solveAdd, solveEq tcm]
   solved = catSolutions (concat [s eq | s <- solvers])
 
 -- | Solve simple equalities such as:
@@ -122,8 +122,8 @@ solveNonAbsurds (eq:eqs) =
 --   * SomeType 3 5 ~ SomeType a b
 --   * SomeType a 5 ~ SomeType 3 b
 --
-solveEq :: (Type, Type) -> [TypeEqSolution]
-solveEq (left, right) =
+solveEq :: TyConMap -> (Type, Type) -> [TypeEqSolution]
+solveEq tcm (coreView tcm -> left, coreView tcm -> right) =
   case (left, right) of
     (VarTy tyVar, ConstTy {}) ->
       -- a ~ 3
@@ -138,15 +138,21 @@ solveEq (left, right) =
       -- 3 /= 5
       if left /= right then [AbsurdSolution] else []
     _ ->
-      case (tyView left, tyView right) of
-        (TyConApp leftNm leftTys, TyConApp rightNm rightTys) ->
-          -- SomeType a b ~ SomeType 3 5 (or other way around)
-          if leftNm == rightNm then
-            concat (map solveEq (zip leftTys rightTys))
-          else
-            [AbsurdSolution]
-        _ ->
-          []
+      -- The call to 'coreView' at the start of 'solveEq' should have reduced
+      -- all solvable type families. If we encounter one here that means the
+      -- type family is stuck (and that we shouldn't compare it to anything!).
+      if any (isTypeFamilyApplication tcm) [left, right] then
+        []
+      else
+        case (tyView left, tyView right) of
+          (TyConApp leftNm leftTys, TyConApp rightNm rightTys) ->
+            -- SomeType a b ~ SomeType 3 5 (or other way around)
+            if leftNm == rightNm then
+              concat (map (solveEq tcm) (zip leftTys rightTys))
+            else
+              [AbsurdSolution]
+          _ ->
+            []
 
 -- | Solve equations supported by @normalizeAdd@. See documentation of
 -- @TypeEqSolution@ to understand the return value.
@@ -203,7 +209,7 @@ isAbsurdEq
 isAbsurdEq tcm ((left0, right0)) =
   case (coreView tcm left0, coreView tcm right0) of
     (solveAdd -> AbsurdSolution) -> True
-    lr -> any (==AbsurdSolution) (solveEq lr)
+    lr -> any (==AbsurdSolution) (solveEq tcm lr)
 
 -- Safely substitute global type variables in a list of potentially
 -- shadowing type variables.
@@ -870,7 +876,7 @@ dataConInstArgTysE is0 tcm (MkData { dcArgTys, dcExtTyVars, dcUnivTyVars }) inst
     -- ^ Maybe ([type of non-existential])
   go exts0 args0 =
     let eqs = catMaybes (map (typeEq tcm) args0) in
-    case solveNonAbsurds eqs of
+    case solveNonAbsurds tcm eqs of
       [] ->
         Just args0
       sols ->
