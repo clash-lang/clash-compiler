@@ -283,12 +283,12 @@ genvar ~GENSYM[d][5];
 genvar ~GENSYM[i][6];
 ~GENERATE
 if (~SYM[4] != 0) begin : ~GENSYM[make_tree][7]
-  for (~SYM[5] = (~SYM[4] - 1); ~SYM[5] >= 0; ~SYM[5]=~SYM[5]-1) begin : tree_depth
-    for (~SYM[6] = 0; ~SYM[6] < (2**~SYM[5]); ~SYM[6] = ~SYM[6]+1) begin : tree_depth_loop
+  for (~SYM[5] = ~SYM[4]; ~SYM[5] > 0; ~SYM[5]=~SYM[5]-1) begin : tree_depth
+    for (~SYM[6] = 0; ~SYM[6] < (2**(~SYM[5]-1)); ~SYM[6] = ~SYM[6]+1) begin : tree_depth_loop
     ~INST 0
-      ~OUTPUT <= ~SYM[0][~INCLUDENAME[0](~SYM[4]+1,~SYM[5]+1)+~SYM[6]]~ ~TYPO~
-      ~INPUT  <= ~SYM[0][~INCLUDENAME[0](~SYM[4]+1,~SYM[5]+2)+(2*~SYM[6])]~ ~TYPO~
-      ~INPUT  <= ~SYM[0][~INCLUDENAME[0](~SYM[4]+1,~SYM[5]+2)+(2*~SYM[6])+1]~ ~TYPO~
+      ~OUTPUT <= ~SYM[0][~INCLUDENAME[0](~SYM[4]+1,~SYM[5])+~SYM[6]]~ ~TYPO~
+      ~INPUT  <= ~SYM[0][~INCLUDENAME[0](~SYM[4]+1,~SYM[5]+1)+(2*~SYM[6])]~ ~TYPO~
+      ~INPUT  <= ~SYM[0][~INCLUDENAME[0](~SYM[4]+1,~SYM[5]+1)+(2*~SYM[6])+1]~ ~TYPO~
     ~INST
     end
   end
