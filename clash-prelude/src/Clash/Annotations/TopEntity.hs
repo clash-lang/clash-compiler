@@ -253,7 +253,7 @@ data TopEntity
   -- g = ...
   -- @
   | TestBench TH.Name
-  deriving (Data,Show,Generic)
+  deriving (Eq,Data,Show,Generic)
 
 instance Lift TopEntity where
   lift (Synthesize name inputs output) =
@@ -355,7 +355,7 @@ data PortName
   -- 2. The prefix for any unnamed ports below the 'PortProduct'
   --
   -- You can use an empty String ,\"\" , in case you want an auto-generated name.
-  deriving (Data,Show,Generic,Lift)
+  deriving (Eq,Data,Show,Generic,Lift)
 
 -- | Default 'Synthesize' annotation which has no specified names for the input
 -- and output ports.
