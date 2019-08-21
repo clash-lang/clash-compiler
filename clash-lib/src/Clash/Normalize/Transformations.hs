@@ -323,7 +323,7 @@ elemExistentials (TransformContext is0 _) (Case scrut altsTy alts0) = do
     -- Eliminate free type variables if possible
     go :: InScopeSet -> TyConMap -> (Pat, Term) -> NormalizeSession (Pat, Term)
     go is2 tcm alt@(DataPat dc exts0 xs0, term0) =
-      case solveNonAbsurds (altEqs tcm alt) of
+      case solveNonAbsurds tcm (altEqs tcm alt) of
         -- No equations solved:
         [] -> return alt
         -- One or more equations solved:
