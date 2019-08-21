@@ -10,7 +10,10 @@ zeroAt0
   -> Signal dom (Unsigned 8)
 zeroAt0 a = mux en a 0
   where
-    en = register False (pure True)
+    en =
+      delay False $
+      delay False $
+      (pure True)
 
 topEntity
   :: Clock System
@@ -73,7 +76,7 @@ testBench = done
 
     expectedOutput =
       outputVerifier' clk rst
-        (    0 :> 0
+        (    0 :> 3
 
           -- Initial values should be all threes
           :> 3
@@ -91,11 +94,11 @@ testBench = done
           :> 8
           :> 9
           :> 10
-          :> 0   -- < Reset is high, so we won't read '11'
+          :> 11
 
           -- Reset for two cycles
-          :> 0
-          :> 0
+          :> 8
+          :> 3
 
           -- Check whether reset worked
           :> 3
