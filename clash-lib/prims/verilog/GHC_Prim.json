@@ -79,11 +79,11 @@ genvar ~GENSYM[d][6];
 genvar ~GENSYM[i][7];
 ~GENERATE
 if (~SYM[2] != 0) begin : ~GENSYM[make_tree][8]
-  for (~SYM[6] = (~SYM[2] - 1); ~SYM[6] >= 0; ~SYM[6]=~SYM[6]-1) begin : ~GENSYM[tree_depth][9]
-    for (~SYM[7] = 0; ~SYM[7] < (2**~SYM[6]); ~SYM[7] = ~SYM[7]+1) begin : ~GENSYM[tree_depth_loop][10]
-      assign ~SYM[3][~INCLUDENAME[0]_depth2Index(~SYM[2]+1,~SYM[6]+1)+~SYM[7]] =
-             ~SYM[3][~INCLUDENAME[0]_depth2Index(~SYM[2]+1,~SYM[6]+2)+(2*~SYM[7])] +
-             ~SYM[3][~INCLUDENAME[0]_depth2Index(~SYM[2]+1,~SYM[6]+2)+(2*~SYM[7])+1];
+  for (~SYM[6] = ~SYM[2]; ~SYM[6] > 0; ~SYM[6]=~SYM[6]-1) begin : ~GENSYM[tree_depth][9]
+    for (~SYM[7] = 0; ~SYM[7] < (2**(~SYM[6]-1)); ~SYM[7] = ~SYM[7]+1) begin : ~GENSYM[tree_depth_loop][10]
+      assign ~SYM[3][~INCLUDENAME[0]_depth2Index(~SYM[2]+1,~SYM[6])+~SYM[7]] =
+             ~SYM[3][~INCLUDENAME[0]_depth2Index(~SYM[2]+1,~SYM[6]+1)+(2*~SYM[7])] +
+             ~SYM[3][~INCLUDENAME[0]_depth2Index(~SYM[2]+1,~SYM[6]+1)+(2*~SYM[7])+1];
     end
   end
 end
@@ -145,11 +145,11 @@ genvar ~GENSYM[d][6];
 genvar ~GENSYM[i][7];
 ~GENERATE
 if (~SYM[2] != 0) begin : ~GENSYM[make_tree][8]
-  for (~SYM[6] = (~SYM[2] - 1); ~SYM[6] >= 0; ~SYM[6]=~SYM[6]-1) begin : ~GENSYM[tree_depth][9]
-    for (~SYM[7] = 0; ~SYM[7] < (2**~SYM[6]); ~SYM[7] = ~SYM[7]+1) begin : ~GENSYM[tree_depth_loop][10]
-      assign ~SYM[3][~INCLUDENAME[0]_depth2Index(~SYM[2]+1,~SYM[6]+1)+~SYM[7]] =
-             ~SYM[3][~INCLUDENAME[0]_depth2Index(~SYM[2]+1,~SYM[6]+2)+(2*~SYM[7])] +
-             ~SYM[3][~INCLUDENAME[0]_depth2Index(~SYM[2]+1,~SYM[6]+2)+(2*~SYM[7])+1];
+  for (~SYM[6] = ~SYM[2]; ~SYM[6] > 0; ~SYM[6]=~SYM[6]-1) begin : ~GENSYM[tree_depth][9]
+    for (~SYM[7] = 0; ~SYM[7] < (2**(~SYM[6]-1)); ~SYM[7] = ~SYM[7]+1) begin : ~GENSYM[tree_depth_loop][10]
+      assign ~SYM[3][~INCLUDENAME[0]_depth2Index(~SYM[2]+1,~SYM[6])+~SYM[7]] =
+             ~SYM[3][~INCLUDENAME[0]_depth2Index(~SYM[2]+1,~SYM[6]+1)+(2*~SYM[7])] +
+             ~SYM[3][~INCLUDENAME[0]_depth2Index(~SYM[2]+1,~SYM[6]+1)+(2*~SYM[7])+1];
     end
   end
 end
@@ -211,11 +211,11 @@ genvar ~GENSYM[d][6];
 genvar ~GENSYM[i][7];
 ~GENERATE
 if (~SYM[2] != 0) begin : ~GENSYM[make_tree][8]
-  for (~SYM[6] = (~SYM[2] - 1); ~SYM[6] >= 0; ~SYM[6]=~SYM[6]-1) begin : ~GENSYM[tree_depth][9]
-    for (~SYM[7] = 0; ~SYM[7] < (2**~SYM[6]); ~SYM[7] = ~SYM[7]+1) begin : ~GENSYM[tree_depth_loop][10]
-      assign ~SYM[3][~INCLUDENAME[0]_depth2Index(~SYM[2]+1,~SYM[6]+1)+~SYM[7]] =
-             ~SYM[3][~INCLUDENAME[0]_depth2Index(~SYM[2]+1,~SYM[6]+2)+(2*~SYM[7])] +
-             ~SYM[3][~INCLUDENAME[0]_depth2Index(~SYM[2]+1,~SYM[6]+2)+(2*~SYM[7])+1];
+  for (~SYM[6] = ~SYM[2]; ~SYM[6] > 0; ~SYM[6]=~SYM[6]-1) begin : ~GENSYM[tree_depth][9]
+    for (~SYM[7] = 0; ~SYM[7] < (2**(~SYM[6]-1)); ~SYM[7] = ~SYM[7]+1) begin : ~GENSYM[tree_depth_loop][10]
+      assign ~SYM[3][~INCLUDENAME[0]_depth2Index(~SYM[2]+1,~SYM[6])+~SYM[7]] =
+             ~SYM[3][~INCLUDENAME[0]_depth2Index(~SYM[2]+1,~SYM[6]+1)+(2*~SYM[7])] +
+             ~SYM[3][~INCLUDENAME[0]_depth2Index(~SYM[2]+1,~SYM[6]+1)+(2*~SYM[7])+1];
     end
   end
 end
@@ -277,11 +277,11 @@ genvar ~GENSYM[d][6];
 genvar ~GENSYM[i][7];
 ~GENERATE
 if (~SYM[2] != 0) begin : ~GENSYM[make_tree][8]
-  for (~SYM[6] = (~SYM[2] - 1); ~SYM[6] >= 0; ~SYM[6]=~SYM[6]-1) begin : ~GENSYM[tree_depth][9]
-    for (~SYM[7] = 0; ~SYM[7] < (2**~SYM[6]); ~SYM[7] = ~SYM[7]+1) begin : ~GENSYM[tree_depth_loop][10]
-      assign ~SYM[3][~INCLUDENAME[0]_depth2Index(~SYM[2]+1,~SYM[6]+1)+~SYM[7]] =
-             ~SYM[3][~INCLUDENAME[0]_depth2Index(~SYM[2]+1,~SYM[6]+2)+(2*~SYM[7])] +
-             ~SYM[3][~INCLUDENAME[0]_depth2Index(~SYM[2]+1,~SYM[6]+2)+(2*~SYM[7])+1];
+  for (~SYM[6] = ~SYM[2]; ~SYM[6] > 0; ~SYM[6]=~SYM[6]-1) begin : ~GENSYM[tree_depth][9]
+    for (~SYM[7] = 0; ~SYM[7] < (2**(~SYM[6]-1)); ~SYM[7] = ~SYM[7]+1) begin : ~GENSYM[tree_depth_loop][10]
+      assign ~SYM[3][~INCLUDENAME[0]_depth2Index(~SYM[2]+1,~SYM[6])+~SYM[7]] =
+             ~SYM[3][~INCLUDENAME[0]_depth2Index(~SYM[2]+1,~SYM[6]+1)+(2*~SYM[7])] +
+             ~SYM[3][~INCLUDENAME[0]_depth2Index(~SYM[2]+1,~SYM[6]+1)+(2*~SYM[7])+1];
     end
   end
 end
@@ -343,11 +343,11 @@ genvar ~GENSYM[d][6];
 genvar ~GENSYM[i][7];
 ~GENERATE
 if (~SYM[2] != 0) begin : ~GENSYM[make_tree][8]
-  for (~SYM[6] = (~SYM[2] - 1); ~SYM[6] >= 0; ~SYM[6]=~SYM[6]-1) begin : ~GENSYM[tree_depth][9]
-    for (~SYM[7] = 0; ~SYM[7] < (2**~SYM[6]); ~SYM[7] = ~SYM[7]+1) begin : ~GENSYM[tree_depth_loop][10]
-      assign ~SYM[3][~INCLUDENAME[0]_depth2Index(~SYM[2]+1,~SYM[6]+1)+~SYM[7]] =
-             ~SYM[3][~INCLUDENAME[0]_depth2Index(~SYM[2]+1,~SYM[6]+2)+(2*~SYM[7])] +
-             ~SYM[3][~INCLUDENAME[0]_depth2Index(~SYM[2]+1,~SYM[6]+2)+(2*~SYM[7])+1];
+  for (~SYM[6] = ~SYM[2]; ~SYM[6] > 0; ~SYM[6]=~SYM[6]-1) begin : ~GENSYM[tree_depth][9]
+    for (~SYM[7] = 0; ~SYM[7] < (2**(~SYM[6]-1)); ~SYM[7] = ~SYM[7]+1) begin : ~GENSYM[tree_depth_loop][10]
+      assign ~SYM[3][~INCLUDENAME[0]_depth2Index(~SYM[2]+1,~SYM[6])+~SYM[7]] =
+             ~SYM[3][~INCLUDENAME[0]_depth2Index(~SYM[2]+1,~SYM[6]+1)+(2*~SYM[7])] +
+             ~SYM[3][~INCLUDENAME[0]_depth2Index(~SYM[2]+1,~SYM[6]+1)+(2*~SYM[7])+1];
     end
   end
 end
