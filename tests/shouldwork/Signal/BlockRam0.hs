@@ -1,4 +1,4 @@
-module BlockRam1 where
+module BlockRam0 where
 
 import Clash.Prelude
 import Clash.Explicit.Testbench
@@ -6,8 +6,8 @@ import qualified Clash.Explicit.Prelude as Explicit
 
 zeroAt0
   :: HiddenClockResetEnable dom
-  => Signal dom (Unsigned 8)
-  -> Signal dom (Unsigned 8)
+  => Signal dom (Unsigned 10)
+  -> Signal dom (Unsigned 10)
 zeroAt0 a = mux en a 0
   where
     en =
@@ -20,16 +20,16 @@ topEntity
   -> Reset System
   -> Enable System
   -> Signal System (Index 1024)
-  -> Signal System (Maybe (Index 1024, Unsigned 8))
-  -> Signal System (Unsigned 8)
+  -> Signal System (Maybe (Index 1024, Unsigned 10))
+  -> Signal System (Unsigned 10)
 topEntity = exposeClockResetEnable go where
 
   go rd wr = zeroAt0 dout where
     dout =
-      blockRam1
+      blockRamU
         ClearOnReset
         (SNat @1024)
-        (3 :: Unsigned 8)
+        ((+22) . unpack . pack :: Index 1024 -> Unsigned 10)
         rd
         wr
 {-# NOINLINE topEntity #-}
@@ -41,12 +41,6 @@ testBench = done
       unbundle $ stimuliGenerator
         clk rst
         (    (True,  0, Nothing)
-
-          -- Confirm initial values
-          :> (False, 0, Nothing)
-          :> (False, 1, Nothing)
-          :> (False, 2, Nothing)
-          :> (False, 3, Nothing)
 
           -- Write some values
           :> (False, 0, Just (0, 8))
@@ -76,33 +70,27 @@ testBench = done
 
     expectedOutput =
       outputVerifier' clk rst
-        (    0 :> 3
-
-          -- Initial values should be all threes
-          :> 3
-          :> 3
-          :> 3
-          :> 3
+        (    0 :> 22
 
           -- Read address zero while writing data
-          :> 3
-          :> 8
-          :> 8
-          :> 8
+          :> 22
+          :> 22
+          :> 22
+          :> 22
 
           -- Read written values back from BRAM
-          :> 8
+          :> 22
           :> 9
           :> 10
           :> 11
 
           -- Reset for two cycles
-          :> 8
-          :> 3
+          :> 22
+          :> 22
 
           -- Check whether reset worked
-          :> 3
-          :> 3
+          :> 22
+          :> 23
           :> 10
           :> 11
 

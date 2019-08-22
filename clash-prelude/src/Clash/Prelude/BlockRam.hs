@@ -386,6 +386,7 @@ module Clash.Prelude.BlockRam
   ( -- * BlockRAM synchronized to the system clock
     blockRam
   , blockRamPow2
+  , blockRamU
   , blockRam1
   , E.ResetStrategy(..)
     -- * Read/Write conflict resolution
@@ -399,6 +400,7 @@ import           GHC.Stack               (HasCallStack, withFrozenCallStack)
 import qualified Clash.Explicit.BlockRam as E
 import           Clash.Promoted.Nat      (SNat)
 import           Clash.Signal
+import           Clash.Sized.Index       (Index)
 import           Clash.Sized.Unsigned    (Unsigned)
 import           Clash.Sized.Vector      (Vec)
 import           Clash.XException        (Undefined)
@@ -703,6 +705,34 @@ blockRam = \cnt rd wrM -> withFrozenCallStack
   (hideEnable (hideClock E.blockRam) cnt rd wrM)
 {-# INLINE blockRam #-}
 
+-- | Version of blockram that has no default values set. May be cleared to a
+-- arbitrary state using a reset function.
+blockRamU
+   :: forall n dom a r addr
+   . ( HasCallStack
+     , HiddenClockResetEnable dom
+     , Undefined a
+     , Enum addr
+     , 1 <= n )
+  => E.ResetStrategy r
+  -- ^ Whether to clear BRAM on asserted reset ('ClearOnReset') or
+  -- not ('NoClearOnReset'). Reset needs to be asserted at least /n/ cycles to
+  -- clear the BRAM.
+  -> SNat n
+  -- ^ Number of elements in BRAM
+  -> (Index n -> a)
+  -- ^ If applicable (see first argument), reset BRAM using this function.
+  -> Signal dom addr
+  -- ^ Read address @r@
+  -> Signal dom (Maybe (addr, a))
+  -- ^ (write address @w@, value to write)
+  -> Signal dom a
+  -- ^ Value of the @blockRAM@ at address @r@ from the previous clock cycle
+blockRamU =
+  \rstStrategy cnt initF rd wrM -> withFrozenCallStack
+    (hideClockResetEnable E.blockRamU) rstStrategy cnt initF rd wrM
+{-# INLINE blockRamU #-}
+
 -- | Version of blockram that is initialized with the same value on all
 -- memory positions.
 blockRam1
@@ -727,8 +757,8 @@ blockRam1
   -> Signal dom a
   -- ^ Value of the @blockRAM@ at address @r@ from the previous clock cycle
 blockRam1 =
-  \rstStrategy cnt rd wrM -> withFrozenCallStack
-    (hideClockResetEnable E.blockRam1) rstStrategy cnt rd wrM
+  \rstStrategy cnt initValue rd wrM -> withFrozenCallStack
+    (hideClockResetEnable E.blockRam1) rstStrategy cnt initValue rd wrM
 {-# INLINE blockRam1 #-}
 
 -- | Create a blockRAM with space for 2^@n@ elements

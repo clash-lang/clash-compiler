@@ -247,6 +247,7 @@ runClashTest =
         [ runTest ("tests" </> "shouldwork" </> "Signal") defBuild [] "AlwaysHigh"      ([""],"topEntity",False)
         , outputTest ("tests" </> "shouldwork" </> "Signal") defBuild [] [] "BlockRamLazy"    "main"
         , runTest ("tests" </> "shouldwork" </> "Signal") defBuild [] "BlockRamFile"    (["","testBench"],"testBench",True)
+        , runTest ("tests" </> "shouldwork" </> "Signal") defBuild [] "BlockRam0"        (["","testBench"],"testBench",True)
         , runTest ("tests" </> "shouldwork" </> "Signal") defBuild [] "BlockRam1"        (["","testBench"],"testBench",True)
         , runTest ("tests" </> "shouldwork" </> "Signal") defBuild [] "BlockRamTest"    ([""],"topEntity",False)
         , runTest ("tests" </> "shouldwork" </> "Signal") defBuild [] "DelayedReset"    (["","testBench"],"testBench",True)
