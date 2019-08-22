@@ -4,6 +4,7 @@ License    :  BSD2 (see the file LICENSE)
 Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
 -}
 
+{-# LANGUAGE CPP                       #-}
 {-# LANGUAGE RankNTypes                #-}
 {-# LANGUAGE TypeApplications          #-}
 {-# LANGUAGE FlexibleContexts          #-}
@@ -96,9 +97,14 @@ tests =
           let rst0 = fromList [True, True, False, False, True, True]
               rst1 = unsafeFromHighPolarity rst0
               reg  = register 'a' (pure 'b')
+#ifdef CLASH_MULTIPLE_HIDDEN
               sig = withReset rst1 reg
+#else
+              sig = withReset @System rst1 reg
+#endif
           in  testCase "withReset behavior" (sampleN @System 6 sig @?= "aaabaa")
 
+#ifdef CLASH_MULTIPLE_HIDDEN
           -- See: https://github.com/clash-lang/clash-compiler/pull/669
         , testCase "test0nok_0" (acte "withReset resetGen test0")
         , testCase "test0nok_1" (acte "withReset (resetGen @System) test0")
@@ -149,11 +155,13 @@ tests =
           ++ "-> Signal dom4 a)" )
 
         , testCase "test5nok_0" (acte "withSpecificReset resetGen test5")
+#endif
         ]
     ]
 
 -- Tests below should survive compilation:
 test0ok_0 = withReset @System (resetGen @System) (test0 @System @System)
+#ifdef CLASH_MULTIPLE_HIDDEN
 test0ok_1 = withReset resetGen (test0 @System @System)
 test0ok_2 = withSpecificReset (resetGen @System) (test0 @System)
 test0ok_3 = withSpecificReset (resetGen @System) (test0 @_ @System)
@@ -167,3 +175,4 @@ test4ok_2 = withSpecificReset (resetGen @System) (test4 @_ @System @_ @_)
 test4ok_3 = withSpecificReset (resetGen @System) (test4 @_ @_ @System @_)
 
 test5ok_0 = withSpecificReset (resetGen @System) (test5 @System @_)
+#endif

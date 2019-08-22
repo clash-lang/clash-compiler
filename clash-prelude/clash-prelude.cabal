@@ -75,6 +75,15 @@ flag super-strict
   default: False
   manual: True
 
+flag multiple-hidden
+  description:
+    Allow multiple hidden clocks, resets, and enables to be used. This is an
+    experimental feature, possibly triggering confusing error messages. By
+    default, it is enabled on development versions of Clash and disabled on
+    releases.
+  default: False
+  manual: True
+
 flag doctests
   description:
     You can disable testing with doctests using `-f-doctests`.
@@ -102,6 +111,12 @@ Library
 
   if flag(super-strict)
     CPP-Options: -DCLASH_SUPER_STRICT
+
+  if flag(multiple-hidden)
+    CPP-Options: -DCLASH_MULTIPLE_HIDDEN
+
+  if flag(multiple-hidden)
+    Exposed-modules:  Clash.Prelude.Synchronizer
 
   Exposed-modules:    Clash.Annotations.TopEntity
                       Clash.Annotations.Primitive
@@ -160,7 +175,6 @@ Library
                       Clash.Prelude.ROM
                       Clash.Prelude.ROM.File
                       Clash.Prelude.Safe
-                      Clash.Prelude.Synchronizer
                       Clash.Prelude.Testbench
 
                       Clash.Promoted.Nat

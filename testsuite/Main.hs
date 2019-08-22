@@ -76,7 +76,9 @@ runClashTest =
         , runTest ("tests" </> "shouldwork" </> "Basic") defBuild [] "IrrefError"          ([""],"topEntity",False)
         , runTest ("tests" </> "shouldwork" </> "Basic") defBuild [] "LambdaDrop"          ([""],"topEntity",False)
         , runTest ("tests" </> "shouldwork" </> "Basic") defBuild [] "LotOfStates"         (["","testBench"],"testBench",True)
+#ifdef CLASH_MULTIPLE_HIDDEN
         , runTest ("tests" </> "shouldwork" </> "Basic") defBuild [] "MultipleHidden"      (["","testBench"],"testBench",True)
+#endif
         , runTest ("tests" </> "shouldwork" </> "Basic") defBuild [] "NameInstance"         ([""],"topEntity",False)
         , outputTest ("tests" </> "shouldwork" </> "Basic") defBuild [] [] "NameInstance" "main"
         , runTest ("tests" </> "shouldwork" </> "Basic") defBuild [] "NameOverlap"         (["nameoverlap"],"nameoverlap",False)
