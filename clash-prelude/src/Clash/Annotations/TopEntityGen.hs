@@ -52,9 +52,11 @@ makeTopEntity 'topEntity
 {-# LANGUAGE TypeOperators       #-}
 
 module Clash.Annotations.TopEntityGen
-  ( makeTopEntity
+  ( -- * To create a Synthesize annotation pragma
+    makeTopEntity
   , makeTopEntityWithName
   , makeTopEntityWithName'
+    -- * To create a TopEntity value
   , buildTopEntity
   , buildTopEntity'
   )
@@ -64,7 +66,6 @@ import           Clash.Annotations.TopEntity (PortName(..), TopEntity(..))
 import           Clash.NamedTypes
 
 import           Language.Haskell.TH
--- import           Language.Haskell.TH.Syntax
 
 import Data.Functor.Foldable (para)
 import Data.Functor.Foldable.TH
