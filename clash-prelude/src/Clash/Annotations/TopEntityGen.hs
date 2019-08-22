@@ -1,4 +1,37 @@
--- TODO: Doc
+{-|
+
+This module can automatically generate TopEntity definitions from 'Clash.NamedTypes'
+annotations.
+
+@
+import Clash.Annotations.TopEntityGen
+
+data Named
+  = Named
+  { name1 :: "named1" ::: BitVector 3
+  , name2 :: "named2" ::: BitVector 5
+  }
+
+topEntity :: "tup1" ::: Signal System (Int, Bool)
+          -> "tup2" ::: (Signal System Int, Signal System Bool)
+          -> "tup3" ::: Signal System ("int":::Int, "bool":::Bool)
+          -> "tup4" ::: ("int":::Signal System Int, "bool":::Signal System Bool)
+          -> "custom" ::: Signal System Named
+          -> "outTup" ::: Signal System ("outint":::Int, "outbool":::Bool)
+topEntity = undefined
+makeTopEntity 'topEntity
+-- ===>
+--  {-# ANN topEntity Synthesize "topEntity3"
+--     [ PortName "tup1"
+--     , PortName "tup2"
+--     , PortProduct "tup3" [PortName "int",PortName "bool"]
+--     , PortProduct "tup4" [PortName "int",PortName "bool"]
+--     , PortProduct "custom" [PortName "named1",PortName "named2"]
+--     ]
+--     (PortProduct "outTup" [PortName "outint",PortName "outbool"])
+--     #-}
+@
+-}
 
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 -- Required to 'makeBaseFunctor' of 'Language.Haskell.TH.Syntax.Type'
