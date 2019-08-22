@@ -20,7 +20,7 @@ stages:
       - cabal-store/
   script:
     - unset SNAPCRAFT_LOGIN_FILE
-    - export GHC="$CI_JOB_NAME"
+    - export GHC="${GHC:-$CI_JOB_NAME}"
     - export THREADS=$(nproc)
     - export CABAL_JOBS=$(nproc)
     - export
@@ -37,6 +37,11 @@ ghc-8.6.5:
 ghc-8.8.1:
   extends: .tests
   allow_failure: true
+ghc-8.4.4-singular-hidden:
+  extends: .tests
+  variables:
+    MULTIPLE_HIDDEN: "no"
+    GHC: ghc-8.4.4
 ghc-head:
   # extends: .tests
   stage: build
@@ -52,9 +57,9 @@ ghc-head:
 # of snap layouts. As of August 2019 the snapcraft docs mention:
 #
 #  > Layouts cannot currently create new top-level files or directories.
-#  > 
+#  >
 #  >  - https://snapcraft.io/docs/snap-layouts
-# 
+#
 # If this limitation is ever annulled, we can use a "proper" nix distribution.
 snap-bindist:
   image: clashlang/nixbuntu:2.2.2
@@ -110,7 +115,7 @@ snap-bindist:
         exit 0;
       fi
     - git rev-parse HEAD > snap-last-run-hash
-    - cd bindist/linux/snap 
+    - cd bindist/linux/snap
     - echo $SNAPCRAFT_LOGIN_FILE | base64 --decode --ignore-garbage > snapcraft.login
     - snapcraft login --with snapcraft.login
     - snapcraft
