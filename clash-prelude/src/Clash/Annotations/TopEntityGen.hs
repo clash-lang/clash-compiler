@@ -21,6 +21,9 @@
 module Clash.Annotations.TopEntityGen
   ( makeTopEntity
   , makeTopEntityWithName
+  , makeTopEntityWithName'
+  , buildTopEntity
+  , buildTopEntity'
   )
 where
 
@@ -96,8 +99,8 @@ toArgNames split ty = go (0::Int) ty []
                       ++ "\n got name " ++ show f
     go _ _ acc = return acc
 
-buildTopEntity :: Name -> Type -> Maybe String -> TExpQ TopEntity
-buildTopEntity name ty topName = do
+buildTopEntity' :: Maybe String -> (Name, Type) -> TExpQ TopEntity
+buildTopEntity' topName (name, ty) = do
     -- get a Name for this type operator so we can check it
     -- in the ArrowTy case
     split <- [t| (:::) |]
@@ -114,14 +117,22 @@ buildTopEntity name ty topName = do
         , t_output = out
         } ||]
 
+buildTopEntity :: Maybe String -> Name -> ExpQ
+buildTopEntity topName name =
+  fmap unType $ getNameBinding name >>= buildTopEntity' topName
+
+getNameBinding :: Name -> Q (Name, Type)
+getNameBinding n = reify n >>= \case
+  VarI name ty _ -> return (name, ty)
+  _ -> fail "getNameBinding: Invalid Name, must be a top-level binding!"
+
 -- Wrap a 'TopEntity' expression in an annotation pragma
 makeTopEntityWithName' :: Name -> Maybe String -> DecQ
-makeTopEntityWithName' n topName = reify n >>= \case
-  VarI name ty _ ->
-    let prag t = PragmaD (AnnP (valueAnnotation name) t)
-     in fmap (prag . unType) (buildTopEntity name ty topName)
-  -- failure case: we weren't provided with the name of a binder
-  _ -> fail "makeTopEntity: invalid Name, must be a top-level binding!"
+makeTopEntityWithName' n topName = do
+  (name,ty) <- getNameBinding n
+  topEntity <- buildTopEntity' topName (name,ty)
+  let prag t = PragmaD (AnnP (valueAnnotation name) t)
+  return $ prag $ unType topEntity
 
 -- | Automatically create a @'TopEntity'@ for a given @'Name'@, using the given
 -- @'String'@ to specify the name of the generated RTL entity.
