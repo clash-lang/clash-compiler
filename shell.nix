@@ -2,6 +2,8 @@
 
 with nixpkgs;
 
+let clash = pkgs.haskellPackages.ghcWithPackages (pkgs: [ pkgs.clash-ghc ]);
+in
 mkShell {
   name = "clash-compiler-shell";
   buildInputs = [
@@ -9,6 +11,6 @@ mkShell {
     niv
 
     # For quick clash experimentation
-    pkgs.haskellPackages.clash-ghc
+    clash
   ];
 }
