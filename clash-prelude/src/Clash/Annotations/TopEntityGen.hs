@@ -1,3 +1,8 @@
+-- TODO: Doc
+
+{-# OPTIONS_GHC -fno-warn-orphans #-}
+-- Required to 'makeBaseFunctor' of 'Language.Haskell.TH.Syntax.Type'
+
 {-# LANGUAGE DataKinds           #-}
 {-# LANGUAGE DeriveFoldable      #-}
 {-# LANGUAGE DeriveFunctor       #-}
