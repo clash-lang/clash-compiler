@@ -7,8 +7,8 @@ LFLAGS =
 CFLAGS = -Wall -O2 
 
 cosim_vpi.sl: cosim_vpi.c
-	$(CC) $(CFLAGS) -o cosim_vpi.o -c -m32 -fPIC -fno-stack-protector -g cosim_vpi.c
-	ld $(LFLAGS) -melf_i386 -shared -E -o cosim_vpi.sl cosim_vpi.o
+	$(CC) $(CFLAGS) -o cosim_vpi.o -c -fPIC -fno-stack-protector -g cosim_vpi.c
+	ld $(LFLAGS) -shared -E -o cosim_vpi.sl cosim_vpi.o
 
 cosim_vpi.vpi: cosim_vpi.c
 	$(VPI) --name=cosim_vpi cosim_vpi.c
