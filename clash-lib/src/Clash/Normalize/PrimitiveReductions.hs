@@ -46,6 +46,7 @@ import           Unique                           (getKey)
 
 import           Clash.Core.DataCon               (DataCon)
 import           Clash.Core.Literal               (Literal (..))
+import           Clash.Core.Name                  (nameOcc)
 import           Clash.Core.Pretty                (showPpr)
 import           Clash.Core.Term
   (CoreContext (..), PrimInfo (..), Term (..), WorkInfo (..), Pat (..))
@@ -90,6 +91,7 @@ reduceReverse inScope0 n elTy vArg = do
   go tcm (coreView1 tcm -> Just ty') = go tcm ty'
   go tcm (tyView -> TyConApp vecTcNm _)
     | Just vecTc <- lookupUniqMap vecTcNm tcm
+      , nameOcc vecTcNm == "Clash.Sized.Vector.Vec"
     , [nilCon, consCon] <- tyConDataCons vecTc
     = do
       uniqs0 <- Lens.use uniqSupply
@@ -122,6 +124,7 @@ reduceZipWith (TransformContext is0 ctx) n lhsElTy rhsElTy resElTy fun lhsArg rh
     go tcm (coreView1 tcm -> Just ty') = go tcm ty'
     go tcm (tyView -> TyConApp vecTcNm _)
       | (Just vecTc) <- lookupUniqMap vecTcNm tcm
+      , nameOcc vecTcNm == "Clash.Sized.Vector.Vec"
       , [nilCon,consCon] <- tyConDataCons vecTc
       = do
         uniqs0 <- Lens.use uniqSupply
@@ -157,6 +160,7 @@ reduceMap (TransformContext is0 ctx) n argElTy resElTy fun arg = do
     go tcm (coreView1 tcm -> Just ty') = go tcm ty'
     go tcm (tyView -> TyConApp vecTcNm _)
       | (Just vecTc)     <- lookupUniqMap vecTcNm tcm
+      , nameOcc vecTcNm == "Clash.Sized.Vector.Vec"
       , [nilCon,consCon] <- tyConDataCons vecTc
       = do
         uniqs0 <- Lens.use uniqSupply
@@ -189,6 +193,7 @@ reduceImap (TransformContext is0 ctx) n argElTy resElTy fun arg = do
     go tcm (coreView1 tcm -> Just ty') = go tcm ty'
     go tcm (tyView -> TyConApp vecTcNm _)
       | (Just vecTc)     <- lookupUniqMap vecTcNm tcm
+      , nameOcc vecTcNm == "Clash.Sized.Vector.Vec"
       , [nilCon,consCon] <- tyConDataCons vecTc
       = do
         uniqs0 <- Lens.use uniqSupply
@@ -238,6 +243,7 @@ reduceTraverse (TransformContext is0 ctx) n aTy fTy bTy dict fun arg = do
     go tcm apDictTcNm (coreView1 tcm -> Just ty') = go tcm apDictTcNm ty'
     go tcm apDictTcNm (tyView -> TyConApp vecTcNm _)
       | (Just vecTc) <- lookupUniqMap vecTcNm tcm
+      , nameOcc vecTcNm == "Clash.Sized.Vector.Vec"
       , [nilCon,consCon] <- tyConDataCons vecTc
       = do
         uniqs0 <- Lens.use uniqSupply
@@ -370,6 +376,7 @@ reduceFoldr (TransformContext is0 ctx) n aTy fun start arg = do
     go tcm (coreView1 tcm -> Just ty') = go tcm ty'
     go tcm (tyView -> TyConApp vecTcNm _)
       | (Just vecTc) <- lookupUniqMap vecTcNm tcm
+      , nameOcc vecTcNm == "Clash.Sized.Vector.Vec"
       , [_,consCon] <- tyConDataCons vecTc
       = do
         uniqs0 <- Lens.use uniqSupply
@@ -404,6 +411,7 @@ reduceFold (TransformContext is0 ctx) n aTy fun arg = do
     go tcm (coreView1 tcm -> Just ty') = go tcm ty'
     go tcm (tyView -> TyConApp vecTcNm _)
       | (Just vecTc) <- lookupUniqMap vecTcNm tcm
+      , nameOcc vecTcNm == "Clash.Sized.Vector.Vec"
       , [_,consCon]  <- tyConDataCons vecTc
       = do
         uniqs0 <- Lens.use uniqSupply
@@ -447,6 +455,7 @@ reduceDFold inScope n aTy fun start arg = do
     go tcm (coreView1 tcm -> Just ty') = go tcm ty'
     go tcm (tyView -> TyConApp vecTcNm _)
       | (Just vecTc) <- lookupUniqMap vecTcNm tcm
+      , nameOcc vecTcNm == "Clash.Sized.Vector.Vec"
       , [_,consCon]  <- tyConDataCons vecTc
       = do
         uniqs0 <- Lens.use uniqSupply
@@ -487,6 +496,7 @@ reduceHead inScope n aTy vArg = do
     go tcm (coreView1 tcm -> Just ty') = go tcm ty'
     go tcm (tyView -> TyConApp vecTcNm _)
       | (Just vecTc) <- lookupUniqMap vecTcNm tcm
+      , nameOcc vecTcNm == "Clash.Sized.Vector.Vec"
       , [_,consCon]  <- tyConDataCons vecTc
       = do
         uniqs0 <- Lens.use uniqSupply
@@ -514,6 +524,7 @@ reduceTail inScope n aTy vArg = do
     go tcm (coreView1 tcm -> Just ty') = go tcm ty'
     go tcm (tyView -> TyConApp vecTcNm _)
       | (Just vecTc) <- lookupUniqMap vecTcNm tcm
+      , nameOcc vecTcNm == "Clash.Sized.Vector.Vec"
       , [_,consCon]  <- tyConDataCons vecTc
       = do
         uniqs0 <- Lens.use uniqSupply
@@ -542,6 +553,7 @@ reduceLast inScope n aTy vArg = do
     go tcm (coreView1 tcm -> Just ty') = go tcm ty'
     go tcm (tyView -> TyConApp vecTcNm _)
       | (Just vecTc) <- lookupUniqMap vecTcNm tcm
+      , nameOcc vecTcNm == "Clash.Sized.Vector.Vec"
       , [_,consCon]  <- tyConDataCons vecTc
       = do
         uniqs0 <- Lens.use uniqSupply
@@ -571,6 +583,7 @@ reduceInit inScope n aTy vArg = do
     go tcm (coreView1 tcm -> Just ty') = go tcm ty'
     go tcm (tyView -> TyConApp vecTcNm _)
       | (Just vecTc) <- lookupUniqMap vecTcNm tcm
+      , nameOcc vecTcNm == "Clash.Sized.Vector.Vec"
       , [nilCon,consCon]  <- tyConDataCons vecTc
       = do
         uniqs0 <- Lens.use uniqSupply
@@ -606,6 +619,7 @@ reduceAppend inScope n m aTy lArg rArg = do
     go tcm (coreView1 tcm -> Just ty') = go tcm ty'
     go tcm (tyView -> TyConApp vecTcNm _)
       | (Just vecTc) <- lookupUniqMap vecTcNm tcm
+      , nameOcc vecTcNm == "Clash.Sized.Vector.Vec"
       , [_,consCon]  <- tyConDataCons vecTc
       = do uniqs0 <- Lens.use uniqSupply
            let (uniqs1,(vars,elems)) = second (second concat . unzip)
@@ -633,6 +647,7 @@ reduceUnconcat n 0 aTy arg = do
     go tcm (coreView1 tcm -> Just ty') = go tcm ty'
     go tcm (tyView -> TyConApp vecTcNm _)
       | (Just vecTc)     <- lookupUniqMap vecTcNm tcm
+      , nameOcc vecTcNm == "Clash.Sized.Vector.Vec"
       , [nilCon,consCon] <- tyConDataCons vecTc
       = let nilVec           = mkVec nilCon consCon aTy 0 []
             innerVecTy       = mkTyConApp vecTcNm [LitTy (NumTy 0), aTy]
@@ -658,6 +673,7 @@ reduceTranspose n 0 aTy arg = do
     go tcm (coreView1 tcm -> Just ty') = go tcm ty'
     go tcm (tyView -> TyConApp vecTcNm _)
       | (Just vecTc)     <- lookupUniqMap vecTcNm tcm
+      , nameOcc vecTcNm == "Clash.Sized.Vector.Vec"
       , [nilCon,consCon] <- tyConDataCons vecTc
       = let nilVec           = mkVec nilCon consCon aTy 0 []
             innerVecTy       = mkTyConApp vecTcNm [LitTy (NumTy 0), aTy]
@@ -679,6 +695,7 @@ reduceReplicate n aTy eTy arg = do
     go tcm (coreView1 tcm -> Just ty') = go tcm ty'
     go tcm (tyView -> TyConApp vecTcNm _)
       | (Just vecTc)     <- lookupUniqMap vecTcNm tcm
+      , nameOcc vecTcNm == "Clash.Sized.Vector.Vec"
       , [nilCon,consCon] <- tyConDataCons vecTc
       = let retVec = mkVec nilCon consCon aTy n (replicate (fromInteger n) arg)
         in  changed retVec
@@ -758,6 +775,7 @@ reduceReplace_int is0 n aTy vTy v i newA = do
   go tcm (coreView1 tcm -> Just ty') = go tcm ty'
   go tcm (tyView -> TyConApp vecTcNm _)
     | (Just vecTc)     <- lookupUniqMap vecTcNm tcm
+      , nameOcc vecTcNm == "Clash.Sized.Vector.Vec"
     , [nilCon,consCon] <- tyConDataCons vecTc
     = do
       -- Get data constructors of 'Int'
@@ -858,6 +876,7 @@ reduceIndex_int is0 n aTy v i = do
   go tcm (coreView1 tcm -> Just ty') = go tcm ty'
   go tcm (tyView -> TyConApp vecTcNm _)
     | (Just vecTc)     <- lookupUniqMap vecTcNm tcm
+    , nameOcc vecTcNm == "Clash.Sized.Vector.Vec"
     , [_nilCon,consCon] <- tyConDataCons vecTc
     = do
       -- Get data constructors of 'Int'
@@ -907,6 +926,7 @@ reduceDTFold inScope n aTy lrFun brFun arg = do
     go tcm (coreView1 tcm -> Just ty') = go tcm ty'
     go tcm (tyView -> TyConApp vecTcNm _)
       | (Just vecTc) <- lookupUniqMap vecTcNm tcm
+      , nameOcc vecTcNm == "Clash.Sized.Vector.Vec"
       , [_,consCon]  <- tyConDataCons vecTc
       = do uniqs0 <- Lens.use uniqSupply
            let (uniqs1,(vars,elems)) = second (second concat . unzip)
@@ -954,6 +974,7 @@ reduceTFold inScope n aTy lrFun brFun arg = do
     go tcm (coreView1 tcm -> Just ty') = go tcm ty'
     go tcm (tyView -> TyConApp treeTcNm _)
       | (Just treeTc) <- lookupUniqMap treeTcNm tcm
+      , nameOcc treeTcNm == "Clash.Sized.RTree.RTree"
       , [lrCon,brCon] <- tyConDataCons treeTc
       = do uniqs0 <- Lens.use uniqSupply
            let (uniqs1,(vars,elems)) = extractTElems uniqs0 inScope lrCon brCon aTy 'T' n arg
@@ -991,6 +1012,7 @@ reduceTReplicate n aTy eTy arg = do
     go tcm (coreView1 tcm -> Just ty') = go tcm ty'
     go tcm (tyView -> TyConApp treeTcNm _)
       | (Just treeTc) <- lookupUniqMap treeTcNm tcm
+      , nameOcc treeTcNm == "Clash.Sized.RTree.RTree"
       , [lrCon,brCon] <- tyConDataCons treeTc
       = let retVec = mkRTree lrCon brCon aTy n (replicate (2^n) arg)
         in  changed retVec
