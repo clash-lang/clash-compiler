@@ -244,7 +244,8 @@ runClashTest =
         ]
       , clashTestGroup "RTree"
         [ runTest ("tests" </> "shouldwork" </> "RTree") defBuild [] "TFold"       ([""],"topEntity",False)
-        , runTest ("tests" </> "shouldwork" </> "RTree") defBuild [] "TRepeat"  ([""],"topEntity",False)
+        , runTest ("tests" </> "shouldwork" </> "RTree") defBuild [] "TRepeat"  (["","testBench"],"testBench",True)
+        , runTest ("tests" </> "shouldwork" </> "RTree") defBuild [] "TRepeat2"  (["","testBench"],"testBench",True)
         , runTest ("tests" </> "shouldwork" </> "RTree") defBuild [] "TZip"        ([""],"topEntity",False)
       ]
       , clashTestGroup "Signal"
