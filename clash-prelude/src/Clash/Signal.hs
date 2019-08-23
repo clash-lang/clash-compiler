@@ -66,6 +66,7 @@ never create a clock that goes any faster!
 Check out 'IntelSystem' and 'XilinxSystem' too!
 -}
 
+{-# LANGUAGE CPP                   #-}
 {-# LANGUAGE ConstraintKinds       #-}
 {-# LANGUAGE DataKinds             #-}
 {-# LANGUAGE ExplicitNamespaces    #-}
@@ -78,6 +79,9 @@ Check out 'IntelSystem' and 'XilinxSystem' too!
 {-# LANGUAGE ScopedTypeVariables   #-}
 {-# LANGUAGE TypeApplications      #-}
 {-# LANGUAGE TypeOperators         #-}
+#if __GLASGOW_HASKELL__ < 806
+{-# LANGUAGE TypeInType #-}
+#endif
 
 {-# LANGUAGE Trustworthy #-}
 
@@ -131,8 +135,10 @@ module Clash.Signal
   , Clock
   , periodToHz
   , hzToPeriod
+#ifdef CLASH_MULTIPLE_HIDDEN
     -- ** Synchronization primitive
   , unsafeSynchronizer
+#endif
     -- * Reset
   , Reset(..)
   , unsafeToReset
@@ -141,7 +147,9 @@ module Clash.Signal
   , unsafeToLowPolarity
   , unsafeFromHighPolarity
   , unsafeFromLowPolarity
+#ifdef CLASH_MULTIPLE_HIDDEN
   , convertReset
+#endif
   , E.resetSynchronizer
   , holdReset
     -- ** Enabling
@@ -164,25 +172,31 @@ module Clash.Signal
   , HiddenReset
   , hideReset
   , exposeReset
-  , exposeSpecificReset
   , withReset
+#ifdef CLASH_MULTIPLE_HIDDEN
+  , exposeSpecificReset
   , withSpecificReset
+#endif
   , hasReset
     -- ** Hidden enable
   , HiddenEnable
   , hideEnable
   , exposeEnable
-  , exposeSpecificEnable
   , withEnable
+#ifdef CLASH_MULTIPLE_HIDDEN
+  , exposeSpecificEnable
   , withSpecificEnable
+#endif
   , hasEnable
     -- ** Hidden clock, reset, and enable
   , HiddenClockResetEnable
   , hideClockResetEnable
   , exposeClockResetEnable
-  , exposeSpecificClockResetEnable
   , withClockResetEnable
+#ifdef CLASH_MULTIPLE_HIDDEN
+  , exposeSpecificClockResetEnable
   , withSpecificClockResetEnable
+#endif
   , SystemClockResetEnable
     -- * Basic circuit functions
   , dflipflop
@@ -241,12 +255,15 @@ where
 import           GHC.TypeLits
   (KnownNat, KnownSymbol, AppendSymbol, Symbol, type (<=))
 import           Data.Bits             (Bits) -- Haddock only
-import           Data.Maybe            (isJust, fromJust)
 import           Data.Proxy            (Proxy(..))
 import           Prelude
 import           Test.QuickCheck       (Property, property)
 
+#ifdef CLASH_MULTIPLE_HIDDEN
 import           Clash.Class.HasDomain (WithSingleDomain, WithSpecificDomain)
+#else
+import           Clash.Class.HasDomain (WithSpecificDomain)
+#endif
 import qualified Clash.Explicit.Signal as E
 import           Clash.Explicit.Signal
   (System, resetSynchronizer, systemClockGen, systemResetGen)
@@ -398,9 +415,15 @@ topEntity2 clk rst =
 
 -}
 
+#ifdef CLASH_MULTIPLE_HIDDEN
 type HiddenClockName dom = AppendSymbol dom "_clk"
 type HiddenResetName dom = AppendSymbol dom "_rst"
 type HiddenEnableName dom = AppendSymbol dom "_en"
+#else
+type HiddenClockName (dom :: Domain) = "clock"
+type HiddenResetName (dom :: Domain) = "reset"
+type HiddenEnableName (dom :: Domain) = "enable"
+#endif
 
 -- | A /constraint/ that indicates the component has a hidden 'Clock'
 --
@@ -444,7 +467,10 @@ type SystemClockResetEnable =
   )
 
 -- | Expose a hidden 'Clock' argument of a component, so it can be applied
--- explicitly. This function can only be used on components with a single
+-- explicitly.
+--
+#ifdef CLASH_MULTIPLE_HIDDEN
+-- This function can only be used on components with a single
 -- domain. For example, this function will refuse when:
 --
 -- @
@@ -460,6 +486,7 @@ type SystemClockResetEnable =
 -- If you want to expose a clock of a component working on multiple domains
 -- (such as the first example), use 'exposeSpecificClock'.
 --
+#endif
 -- <Clash-Signal.html#hiddenclockandreset Click here to read more about hidden clocks, resets, and enables>
 --
 -- === __Example__
@@ -480,8 +507,11 @@ type SystemClockResetEnable =
 --
 exposeClock
   :: forall dom  r
-   . WithSingleDomain dom r
-  => (HiddenClock dom => r)
+   .
+#ifdef CLASH_MULTIPLE_HIDDEN
+     WithSingleDomain dom r =>
+#endif
+     (HiddenClock dom => r)
   -- ^ The component with a hidden clock
   -> (KnownDomain dom => Clock dom -> r)
   -- ^ The component with its clock argument exposed
@@ -533,9 +563,11 @@ hideClock
 hideClock = \f -> f (fromLabel @(HiddenClockName dom))
 {-# INLINE hideClock #-}
 
--- | Connect an explicit 'Clock' to a function with a hidden 'Clock'. This
--- function can only be used on components with a single domain. For example,
--- this function will refuse when:
+-- | Connect an explicit 'Clock' to a function with a hidden 'Clock'.
+--
+#ifdef CLASH_MULTIPLE_HIDDEN
+-- This function can only be used on components with a single domain. For
+-- example, this function will refuse when:
 --
 -- @
 -- r ~ HiddenClock dom => Signal dom1 a -> Signal dom2 a
@@ -550,6 +582,7 @@ hideClock = \f -> f (fromLabel @(HiddenClockName dom))
 -- If you want to connect a clock to a component working on multiple domains
 -- (such as the first example), use 'withSpecificClock'.
 --
+#endif
 -- <Clash-Signal.html#hiddenclockandreset Click here to read more about hidden clocks, resets, and enables>
 --
 -- === __Example__
@@ -570,7 +603,11 @@ hideClock = \f -> f (fromLabel @(HiddenClockName dom))
 --
 withClock
   :: forall dom r
-   . (KnownDomain dom, WithSingleDomain dom r)
+   .
+#ifdef CLASH_MULTIPLE_HIDDEN
+     WithSingleDomain dom r =>
+#endif
+     KnownDomain dom
   => Clock dom
   -- ^ The 'Clock' we want to connect
   -> (HiddenClock dom => r)
@@ -625,8 +662,11 @@ hasClock = fromLabel @(HiddenClockName dom)
 {-# INLINE hasClock #-}
 
 -- | Expose a hidden 'Reset' argument of a component, so it can be applied
--- explicitly. This function can only be used on components with a single
--- domain. For example, this function will refuse when:
+-- explicitly.
+--
+#ifdef CLASH_MULTIPLE_HIDDEN
+-- This function can only be used on components with a single domain. For
+-- example, this function will refuse when:
 --
 -- @
 -- r ~ HiddenReset dom => Signal dom1 a -> Signal dom2 a
@@ -643,6 +683,7 @@ hasClock = fromLabel @(HiddenClockName dom)
 --
 -- <Clash-Signal.html#hiddenclockandreset Click here to read more about hidden clocks, resets, and enables>
 --
+#endif
 -- === __Example__
 -- Usage with a /polymorphic/ domain:
 --
@@ -661,8 +702,11 @@ hasClock = fromLabel @(HiddenClockName dom)
 --
 exposeReset
   :: forall dom r
-   . WithSingleDomain dom r
-  => (HiddenReset dom => r)
+   .
+#ifdef CLASH_MULTIPLE_HIDDEN
+     WithSingleDomain dom r =>
+#endif
+     (HiddenReset dom => r)
   -- ^ The component with a hidden reset
   -> (KnownDomain dom => Reset dom -> r)
   -- ^ The component with its reset argument exposed
@@ -714,9 +758,11 @@ hideReset
 hideReset = \f -> f (fromLabel @(HiddenResetName dom))
 {-# INLINE hideReset #-}
 
--- | Connect an explicit 'Reset' to a function with a hidden 'Reset'. This
--- function can only be used on components with a single domain. For example,
--- this function will refuse when:
+-- | Connect an explicit 'Reset' to a function with a hidden 'Reset'.
+--
+#ifdef CLASH_MULTIPLE_HIDDEN
+-- This function can only be used on components with a single domain. For
+-- example, this function will refuse when:
 --
 -- @
 -- r ~ HiddenReset dom => Signal dom1 a -> Signal dom2 a
@@ -733,6 +779,7 @@ hideReset = \f -> f (fromLabel @(HiddenResetName dom))
 --
 -- <Clash-Signal.html#hiddenclockandreset Click here to read more about hidden clocks, resets, and enables>
 --
+#endif
 -- === __Example__
 -- Usage with a _polymorphic_ domain:
 --
@@ -751,7 +798,11 @@ hideReset = \f -> f (fromLabel @(HiddenResetName dom))
 --
 withReset
   :: forall dom r
-   . (KnownDomain dom, WithSingleDomain dom r)
+   .
+#ifdef CLASH_MULTIPLE_HIDDEN
+     WithSingleDomain dom r =>
+#endif
+     KnownDomain dom
   => Reset dom
   -- ^ The 'Reset' we want to connect
   -> (HiddenReset dom => r)
@@ -806,8 +857,11 @@ hasReset = fromLabel @(HiddenResetName dom)
 {-# INLINE hasReset #-}
 
 -- | Expose a hidden 'Enable' argument of a component, so it can be applied
--- explicitly. This function can only be used on components with a single
--- domain. For example, this function will refuse when:
+-- explicitly.
+--
+#ifdef CLASH_MULTIPLE_HIDDEN
+-- This function can only be used on components with a single domain. For
+-- example, this function will refuse when:
 --
 -- @
 -- r ~ HiddenEnable dom => Signal dom1 a -> Signal dom2 a
@@ -822,6 +876,7 @@ hasReset = fromLabel @(HiddenResetName dom)
 -- If you want to expose a enable of a component working on multiple domains
 -- (such as the first example), use 'exposeSpecificEnable'.
 --
+#endif
 -- <Clash-Signal.html#hiddenclockandreset Click here to read more about hidden clocks, resets, and enables>
 --
 -- === __Example__
@@ -841,13 +896,15 @@ hasReset = fromLabel @(HiddenResetName dom)
 -- [5,5,6,7,8,9,10,11,12,13]
 --
 exposeEnable
-  :: forall dom  r
-   . WithSingleDomain dom r
-  => (HiddenEnable dom => r)
+  :: forall dom  r .
+#ifdef CLASH_MULTIPLE_HIDDEN
+     WithSingleDomain dom r =>
+#endif
+     (HiddenEnable dom => r)
   -- ^ The component with a hidden reset
   -> (KnownDomain dom => Enable dom -> r)
   -- ^ The component with its reset argument exposed
-exposeEnable = \f gen -> expose @(HiddenEnableName dom) f gen
+exposeEnable = \f gen -> exposeSpecificEnable (const f) gen (Proxy @dom)
 {-# INLINE exposeEnable #-}
 
 -- | Expose a hidden 'Enable' argument of a component, so it can be applied
@@ -895,9 +952,11 @@ hideEnable
 hideEnable = \f -> f (fromLabel @(HiddenEnableName dom))
 {-# INLINE hideEnable #-}
 
--- | Connect an explicit 'Enable' to a function with a hidden 'Enable'. This
--- function can only be used on components with a single domain. For example,
--- this function will refuse when:
+-- | Connect an explicit 'Enable' to a function with a hidden 'Enable'.
+--
+#ifdef CLASH_MULTIPLE_HIDDEN
+-- This function can only be used on components with a single domain. For
+-- example, this function will refuse when:
 --
 -- @
 -- r ~ HiddenEnable dom => Signal dom1 a -> Signal dom2 a
@@ -912,6 +971,7 @@ hideEnable = \f -> f (fromLabel @(HiddenEnableName dom))
 -- If you want to connect a enable to a component working on multiple domains
 -- (such as the first example), use 'withSpecificEnable'.
 --
+#endif
 -- <Clash-Signal.html#hiddenclockandreset Click here to read more about hidden clocks, resets, and enables>
 --
 -- === __Example__
@@ -932,7 +992,10 @@ hideEnable = \f -> f (fromLabel @(HiddenEnableName dom))
 --
 withEnable
   :: forall dom r
-   . (KnownDomain dom, WithSingleDomain dom r)
+   . KnownDomain dom
+#ifdef CLASH_MULTIPLE_HIDDEN
+  => WithSingleDomain dom r
+#endif
   => Enable dom
   -- ^ The 'Enable' we want to connect
   -> (HiddenEnable dom => r)
@@ -988,8 +1051,11 @@ hasEnable = fromLabel @(HiddenEnableName dom)
 
 
 -- | Expose a hidden 'Clock', 'Reset', and 'Enable' argument of a component, so
--- it can be applied explicitly. This function can only be used on components
--- with a single domain. For example, this function will refuse when:
+-- it can be applied explicitly.
+--
+#ifdef CLASH_MULTIPLE_HIDDEN
+-- This function can only be used on components with a single domain. For
+-- example, this function will refuse when:
 --
 -- @
 -- r ~ HiddenClockResetEnable dom => Signal dom1 a -> Signal dom2 a
@@ -1004,6 +1070,7 @@ hasEnable = fromLabel @(HiddenEnableName dom)
 -- If you want to expose a clock, reset, and enable of a component working on
 -- multiple domains (such as the first example), use 'exposeSpecificClockResetEnable'.
 --
+#endif
 -- <Clash-Signal.html#hiddenclockandreset Click here to read more about hidden clocks, resets, and enables>
 --
 -- === __Example__
@@ -1038,9 +1105,11 @@ hasEnable = fromLabel @(HiddenEnableName dom)
 --     rst            = systemResetGen
 -- @
 exposeClockResetEnable
-  :: forall dom r
-   . WithSingleDomain dom r
-  => (HiddenClockResetEnable dom => r)
+  :: forall dom r .
+#ifdef CLASH_MULTIPLE_HIDDEN
+     WithSingleDomain dom r =>
+#endif
+     (HiddenClockResetEnable dom => r)
   -- ^ The component with hidden clock, reset, and enable arguments
   -> (KnownDomain dom => Clock dom -> Reset dom -> Enable dom -> r)
   -- ^ The component with its clock, reset, and enable arguments exposed
@@ -1049,6 +1118,7 @@ exposeClockResetEnable =
     exposeSpecificClock (exposeSpecificReset (exposeEnable f)) clk rst en
 {-# INLINE exposeClockResetEnable #-}
 
+#ifdef CLASH_MULTIPLE_HIDDEN
 -- | Expose a hidden 'Clock', 'Reset', and 'Enable' argument of a component, so
 -- it can be applied explicitly. This function can be used on components with
 -- multiple domains. As opposed to 'exposeClockResetEnable', callers should
@@ -1084,6 +1154,7 @@ exposeSpecificClockResetEnable =
   \f clk rst en ->
     exposeSpecificClock (exposeSpecificReset (exposeSpecificEnable f)) clk rst en
 {-# INLINE exposeSpecificClockResetEnable #-}
+#endif
 
 -- -- | Hide the 'Clock' and 'Reset' arguments of a component, so they can be
 -- -- routed implicitly
@@ -1104,8 +1175,11 @@ hideClockResetEnable =
 {-# INLINE hideClockResetEnable #-}
 
 -- | Connect an explicit 'Clock', 'Reset', and 'Enable' to a function with a
--- hidden 'Clock', 'Reset', and 'Enable'. This function can only be used on
--- components with a single domain. For example, this function will refuse when:
+-- hidden 'Clock', 'Reset', and 'Enable'.
+--
+#ifdef CLASH_MULTIPLE_HIDDEN
+-- This function can only be used on components with a single domain. For
+-- example, this function will refuse when:
 --
 -- @
 -- r ~ HiddenClockResetEnable dom => Signal dom1 a -> Signal dom2 a
@@ -1120,6 +1194,7 @@ hideClockResetEnable =
 -- If you want to connect a enable to a component working on multiple domains
 -- (such as the first example), use 'withSpecificClockResetEnable'.
 --
+#endif
 -- <Clash-Signal.html#hiddenclockandreset Click here to read more about hidden clocks, resets, and enables>
 --
 -- === __Example__
@@ -1140,7 +1215,10 @@ hideClockResetEnable =
 --
 withClockResetEnable
   :: forall dom r
-   . (KnownDomain dom, WithSingleDomain dom r)
+   . KnownDomain dom
+#ifdef CLASH_MULTIPLE_HIDDEN
+  => WithSingleDomain dom r
+#endif
   => Clock dom
   -- ^ The 'Clock' we want to connect
   -> Reset dom
@@ -1406,7 +1484,7 @@ sample
   -- (and reset)
   -> [a]
 sample s =
-  S.sample (exposeClockResetEnable s clockGen resetGen enableGen)
+  S.sample (exposeClockResetEnable @dom s clockGen resetGen enableGen)
 {-# NOINLINE sample #-}
 
 -- | Get a list of /n/ samples from a 'Signal'
@@ -1434,7 +1512,7 @@ sampleN
   -- (and reset)
   -> [a]
 sampleN n s0 =
-  let s1 = exposeClockResetEnable s0 clockGen resetGen enableGen in
+  let s1 = exposeClockResetEnable @dom s0 clockGen resetGen enableGen in
   S.sampleN n s1
 {-# NOINLINE sampleN #-}
 
@@ -1501,7 +1579,7 @@ sample_lazy
   -- (and reset)
   -> [a]
 sample_lazy s =
-  S.sample_lazy (exposeClockResetEnable s clockGen resetGen enableGen)
+  S.sample_lazy (exposeClockResetEnable @dom s clockGen resetGen enableGen)
 {-# NOINLINE sample_lazy #-}
 
 -- | Lazily get a list of /n/ samples from a 'Signal'
@@ -1526,7 +1604,7 @@ sampleN_lazy
   -- (and reset)
   -> [a]
 sampleN_lazy n s =
-  S.sampleN_lazy n (exposeClockResetEnable s clockGen resetGen enableGen)
+  S.sampleN_lazy n (exposeClockResetEnable @dom s clockGen resetGen enableGen)
 {-# NOINLINE sampleN_lazy #-}
 
 -- * Simulation functions
@@ -1643,7 +1721,7 @@ simulate_lazy
   -> [a]
   -> [b]
 simulate_lazy f0 =
-  let f1 = exposeClockResetEnable f0 clockGen resetGen enableGen in
+  let f1 = exposeClockResetEnable @dom f0 clockGen resetGen enableGen in
   tail . S.simulate_lazy f1 . dup1
 {-# NOINLINE simulate_lazy #-}
 
@@ -1731,6 +1809,7 @@ testFor
   -> Property
 testFor n s = property (and (Clash.Signal.sampleN n s))
 
+#ifdef CLASH_MULTIPLE_HIDDEN
 -- ** Synchronization primitive
 -- | Implicit version of 'Clash.Explicit.Signal.unsafeSynchronizer'.
 unsafeSynchronizer
@@ -1741,6 +1820,7 @@ unsafeSynchronizer
   -> Signal dom2 a
 unsafeSynchronizer =
   hideClock (hideClock S.unsafeSynchronizer)
+#endif
 
 -- | Hold reset for a number of cycles relative to an implicit reset signal.
 --
@@ -1779,6 +1859,7 @@ fromListWithReset
 fromListWithReset = hideReset E.fromListWithReset
 {-# INLINE fromListWithReset #-}
 
+#ifdef CLASH_MULTIPLE_HIDDEN
 -- | Convert between different types of reset, adding a synchronizer in case
 -- it needs to convert from an asynchronous to a synchronous reset.
 convertReset
@@ -1790,3 +1871,4 @@ convertReset
   -> Reset domB
 convertReset =
   E.convertReset hasClock hasClock
+#endif

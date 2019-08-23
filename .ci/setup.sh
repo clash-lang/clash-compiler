@@ -16,3 +16,11 @@ apt-get install -yq $CABAL $GHC
 cabal --version
 ghc --version
 cp .ci/cabal.project.local .
+
+if [[ "$MULTIPLE_HIDDEN" == "yes" ]]; then
+  sed -i 's/flags: +doctests/flags: +doctests +multiple-hidden/g' cabal.project.local
+elif [[ "$MULTIPLE_HIDDEN" == "no" ]]; then
+  sed -i 's/flags: +doctests/flags: +doctests -multiple-hidden/g' cabal.project.local
+fi
+
+cat cabal.project.local
