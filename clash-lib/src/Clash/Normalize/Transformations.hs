@@ -2040,7 +2040,7 @@ reduceNonRepPrim c@(TransformContext is0 ctx) e@(App _ _) | (Prim nm _, args, ti
           Right n -> do
             untranslatableTy <- isUntranslatableType False aTy
             if untranslatableTy || shouldReduce1
-               then (`mkTicks` ticks) <$> reduceReplicate n aTy eTy vArg
+               then (`mkTicks` ticks) <$> reduceTReplicate n aTy eTy vArg
                else return e
           _ -> return e
       "Clash.Sized.Internal.BitVector.split#" | length args == 4 -> do

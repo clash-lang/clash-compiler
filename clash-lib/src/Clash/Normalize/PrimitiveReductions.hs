@@ -994,7 +994,7 @@ reduceTReplicate n aTy eTy arg = do
       , [lrCon,brCon] <- tyConDataCons treeTc
       = let retVec = mkRTree lrCon brCon aTy n (replicate (2^n) arg)
         in  changed retVec
-    go _ ty = error $ $(curLoc) ++ "reduceTReplicate: argument does not have a vector type: " ++ showPpr ty
+    go _ ty = error $ $(curLoc) ++ "reduceTReplicate: argument does not have a RTree type: " ++ showPpr ty
 
 buildSNat :: DataCon -> Integer -> Term
 buildSNat snatDc i =
