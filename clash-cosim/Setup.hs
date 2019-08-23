@@ -150,7 +150,7 @@ cosimBuild args flags pkgDescription localBuildInfo = do
 
                 This might occur when (a component of) gcc is missing. On Ubuntu systems, run:
 
-                    sudo apt install build-essential g++-multilib
+                    sudo apt install build-essential
                 |]
         Right _ ->
             return ()
