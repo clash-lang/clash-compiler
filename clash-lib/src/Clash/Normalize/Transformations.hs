@@ -1835,19 +1835,27 @@ reduceConst _ e = return e
 --
 -- Currently, it only handles the following functions:
 --
--- * Clash.Sized.Vector.map
 -- * Clash.Sized.Vector.zipWith
+-- * Clash.Sized.Vector.map
 -- * Clash.Sized.Vector.traverse#
--- * Clash.Sized.Vector.foldr
 -- * Clash.Sized.Vector.fold
+-- * Clash.Sized.Vector.foldr
 -- * Clash.Sized.Vector.dfold
 -- * Clash.Sized.Vector.(++)
 -- * Clash.Sized.Vector.head
 -- * Clash.Sized.Vector.tail
+-- * Clash.Sized.Vector.last
+-- * Clash.Sized.Vector.init
 -- * Clash.Sized.Vector.unconcat
 -- * Clash.Sized.Vector.transpose
 -- * Clash.Sized.Vector.replicate
+-- * Clash.Sized.Vector.replace_int
+-- * Clash.Sized.Vector.imap
 -- * Clash.Sized.Vector.dtfold
+-- * Clash.Sized.RTree.tdfold
+-- * Clash.Sized.RTree.treplicate
+-- * Clash.Sized.Internal.BitVector.split#
+-- * Clash.Sized.Internal.BitVector.eq#
 reduceNonRepPrim :: HasCallStack => NormRewrite
 reduceNonRepPrim c@(TransformContext is0 ctx) e@(App _ _) | (Prim nm _, args, ticks) <- collectArgsTicks e = do
   tcm <- Lens.view tcCache
@@ -2040,7 +2048,7 @@ reduceNonRepPrim c@(TransformContext is0 ctx) e@(App _ _) | (Prim nm _, args, ti
           Right n -> do
             untranslatableTy <- isUntranslatableType False aTy
             if untranslatableTy || shouldReduce1
-               then (`mkTicks` ticks) <$> reduceReplicate n aTy eTy vArg
+               then (`mkTicks` ticks) <$> reduceTReplicate n aTy eTy vArg
                else return e
           _ -> return e
       "Clash.Sized.Internal.BitVector.split#" | length args == 4 -> do
