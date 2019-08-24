@@ -3,18 +3,23 @@ all:: cosim_vpi.vpi libcosim_clash.so cosim_vpi.sl
 
 CC = gcc
 VPI = iverilog-vpi
-LFLAGS =
-CFLAGS = -Wall -O2 
+CFLAGS = -Wall -O2
+UNAME_S = $(shell uname -s)
+ifeq ($(UNAME_S),Darwin)
+	LFLAGS = -dylib -export_dynamic -flat_namespace -undefined suppress -macosx_version_min 10.14
+else
+	LFLAGS = -shared -E
+endif
 
 cosim_vpi.sl: cosim_vpi.c
 	$(CC) $(CFLAGS) -o cosim_vpi.o -c -fPIC -fno-stack-protector -g cosim_vpi.c
-	ld $(LFLAGS) -shared -E -o cosim_vpi.sl cosim_vpi.o
+	ld $(LFLAGS) -o cosim_vpi.sl cosim_vpi.o
 
 cosim_vpi.vpi: cosim_vpi.c
 	$(VPI) --name=cosim_vpi cosim_vpi.c
-	
-libcosim_clash.so: cosim_clash.c 
-	$(CC) $(CFLAGS) -fPIC -o cosim_clash.o -c cosim_clash.c 
+
+libcosim_clash.so: cosim_clash.c
+	$(CC) $(CFLAGS) -fPIC -o cosim_clash.o -c cosim_clash.c
 	$(CC) $(CFLAGS) -shared -o libcosim_clash.so cosim_clash.o
 
 # remove created files
