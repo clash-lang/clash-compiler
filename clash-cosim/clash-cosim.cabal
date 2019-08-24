@@ -63,11 +63,12 @@ Library
   default-language: Haskell2010
   C-sources:        src/cbits/cosim_clash.c
 -- TODO: Reintroduce this option, without breaking tests:
+-- Note: macOS ld doesn't accept --fatal-warnings
 --  LD-Options:       --fatal-warnings
   ghc-options:      -Wall -fexpose-all-unfoldings -fno-worker-wrapper
   if flag(pedantic)
     ghc-options: -Werror
-  CC-Options:       -fPIC -Wall -Werror -Wl,--fatal-warnings
+  CC-Options:       -fPIC -Wall -Werror
   HS-Source-Dirs:   src
   Build-Depends:    base                      >= 4.9.0   && < 5,
                     clash-prelude             >= 0.99,
