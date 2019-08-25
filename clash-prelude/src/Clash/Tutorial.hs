@@ -961,8 +961,8 @@ import "Clash.Signal"
 import "Clash.Prelude"
 import "Clash.Intel.ClockGen"
 
-'createDomain' vSystem{vTag=\"DomInput\", vPeriod=20000}
-'createDomain' vSystem{vTag=\"Dom50\", vPeriod=50000}
+'createDomain' vSystem{vName=\"DomInput\", vPeriod=20000}
+'createDomain' vSystem{vName=\"Dom50\", vPeriod=50000}
 
 topEntity
   :: Clock \"DomInput\"
@@ -1905,8 +1905,8 @@ We can calculate the clock periods using 'hzToPeriod':
 We can then create the clock and reset domains:
 
 @
-'createDomain' vSystem{vTag=\"ADC\", vPeriod=hzToPeriod 20e6}
-'createDomain' vSystem{vTag=\"FFT\", vPeriod=hzToPeriod 9e6}
+'createDomain' vSystem{vName=\"ADC\", vPeriod=hzToPeriod 20e6}
+'createDomain' vSystem{vName=\"FFT\", vPeriod=hzToPeriod 9e6}
 @
 
 and subsequently a 256-space FIFO synchronizer that safely bridges the ADC clock
@@ -2508,8 +2508,8 @@ import "Clash.Signal"
 import "Clash.Prelude"
 import "Clash.Intel.ClockGen"
 
-'createDomain' 'vSystem'{vTag="DomInput", vPeriod=20000}
-'createDomain' 'vSystem'{vTag="Dom50", vPeriod=50000}
+'createDomain' 'vSystem'{vName="DomInput", vPeriod=20000}
+'createDomain' 'vSystem'{vName="Dom50", vPeriod=50000}
 
 {\-\# ANN topEntity
   ('Synthesize'

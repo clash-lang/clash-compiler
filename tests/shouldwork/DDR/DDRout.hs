@@ -6,13 +6,13 @@ import Clash.Explicit.Testbench
 import Clash.Intel.DDR
 import Clash.Xilinx.DDR
 
-createDomain vSystem{vTag="AsyncReal", vPeriod=2000, vReset=Asynchronous}  -- real clock domain
---createDomain vSystem{vTag="AsyncDDR", vPeriod=1000, vReset=Asynchronous}  -- fake ddr domain (same as TB)
-createDomain vSystem{vTag="SyncReal", vPeriod=2000, vReset=Synchronous}  -- real clock domain
-createDomain vSystem{vTag="SyncDDR", vPeriod=1000, vReset=Synchronous}  -- fake ddr domain
+createDomain vSystem{vName="AsyncReal", vPeriod=2000, vResetKind=Asynchronous}  -- real clock domain
+--createDomain vSystem{vName="AsyncDDR", vPeriod=1000, vResetKind=Asynchronous}  -- fake ddr domain (same as TB)
+createDomain vSystem{vName="SyncReal", vPeriod=2000, vResetKind=Synchronous}  -- real clock domain
+createDomain vSystem{vName="SyncDDR", vPeriod=1000, vResetKind=Synchronous}  -- fake ddr domain
 
 -- | Domain used for testbench itself
-createDomain vSystem{vTag="TB", vPeriod=1000, vReset=Asynchronous}
+createDomain vSystem{vName="TB", vPeriod=1000, vResetKind=Asynchronous}
 type AsyncDDR = TB
 
 {-

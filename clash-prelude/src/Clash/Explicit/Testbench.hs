@@ -414,10 +414,10 @@ biTbClockGen done = (testClk, circuitClk)
 -- import "Clash.Explicit.Testbench"
 --
 -- -- Fast domain: twice as fast as \"Slow\"
--- 'createDomain' 'vSystem'{vTag=\"Fast\", vPeriod=10}
+-- 'createDomain' 'vSystem'{vName=\"Fast\", vPeriod=10}
 --
 -- -- Slow domain: twice as slow as "Fast"
--- 'createDomain' 'vSystem'{vTag=\"Slow\", vPeriod=20}
+-- 'createDomain' 'vSystem'{vName=\"Slow\", vPeriod=20}
 --
 -- topEntity
 --   :: 'Clock' \"Fast\"

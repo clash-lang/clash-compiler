@@ -11,10 +11,10 @@ data LedMode
   deriving (Generic, Undefined)
 
 -- Define a synthesis domain with a clock with a period of 20000 /ps/.
-createDomain vSystem{vTag="Input", vPeriod=20000}
+createDomain vSystem{vName="Input", vPeriod=20000}
 
 -- Define a synthesis domain with a clock with a period of 50000 /ps/.
-createDomain vSystem{vTag="Dom50", vPeriod=50000}
+createDomain vSystem{vName="Dom50", vPeriod=50000}
 
 {-# ANN topEntity
   (Synthesize
