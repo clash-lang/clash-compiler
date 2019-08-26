@@ -2,8 +2,9 @@
 {-# LANGUAGE LambdaCase #-}
 
 module Clash.GHCi.Common
-  ( checkImportDirs,
-    checkMonoLocalBinds
+  ( checkImportDirs
+  , checkMonoLocalBinds
+  , checkMonoLocalBindsMod
   ) where
 
 -- Clash
@@ -15,7 +16,8 @@ import qualified EnumSet                as GHC (member) -- ghc84, ghc86
 #else
 import qualified Data.IntSet            as IntSet -- ghc82
 #endif
-import qualified GHC                    (DynFlags, extensionFlags)
+import qualified GHC                    (DynFlags, ModSummary (..), Module (..),
+                                         extensionFlags, moduleNameString)
 import qualified GHC.LanguageExtensions as LangExt (Extension (..))
 import           Panic                  (GhcException (..), throwGhcException)
 
@@ -23,20 +25,37 @@ import           Control.Monad          (forM_, unless, when)
 import           System.Directory       (doesDirectoryExist)
 import           System.IO              (hPutStrLn, stderr)
 
+-- | Checks whether MonoLocalBinds language extension is enabled or not in
+-- modules.
+checkMonoLocalBindsMod :: GHC.ModSummary -> IO ()
+checkMonoLocalBindsMod x =
+  unless (active . GHC.ms_hspp_opts $ x) (hPutStrLn stderr $ msg x)
+  where
+    msg = messageWith . GHC.moduleNameString . GHC.moduleName . GHC.ms_mod
+
+-- | Checks whether MonoLocalBinds language extension is enabled when generating
+-- the HDL directly e.g. in GHCi. modules.
 checkMonoLocalBinds :: GHC.DynFlags -> IO ()
 checkMonoLocalBinds dflags =
-  unless (active dflags) (hPutStrLn stderr msg)
-  where
-    msg = "Warning: Extension MonoLocalBinds disabled. This might lead to unexpected logic duplication."
-#if MIN_VERSION_base(4,11,0)
-    -- ghc84, ghc86
-    active = GHC.member LangExt.MonoLocalBinds . GHC.extensionFlags
-#else
-    -- ghc82
-    active = member LangExt.MonoLocalBinds . GHC.extensionFlags
+  unless (active dflags) (hPutStrLn stderr $ messageWith "")
 
-    member :: Enum a => a -> IntSet.IntSet -> Bool
-    member = IntSet.member . fromEnum
+messageWith :: String -> String
+messageWith srcModule
+  | srcModule == []  = msgStem ++ "."
+  | otherwise = msgStem ++ " in module: " ++ srcModule
+  where
+    msgStem = "Warning: Extension MonoLocalBinds disabled. This might lead to unexpected logic duplication"
+
+active :: GHC.DynFlags -> Bool
+#if MIN_VERSION_base(4,11,0)
+-- ghc84, ghc86
+active = GHC.member LangExt.MonoLocalBinds . GHC.extensionFlags
+#else
+-- ghc82
+active = member LangExt.MonoLocalBinds . GHC.extensionFlags
+
+member :: Enum a => a -> IntSet.IntSet -> Bool
+member = IntSet.member . fromEnum
 #endif
 
 checkImportDirs :: Foldable t => ClashOpts -> t FilePath -> IO ()
