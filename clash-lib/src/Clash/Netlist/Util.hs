@@ -163,7 +163,7 @@ unsafeCoreTypeToHWType
   -> State HWMap FilteredHWType
 unsafeCoreTypeToHWType sp loc builtInTranslation reprs m ty =
   either (\msg -> throw (ClashException sp (loc ++ msg) Nothing)) id <$>
-  coreTypeToHWType builtInTranslation reprs m ty
+    coreTypeToHWType builtInTranslation reprs m ty
 
 -- | Same as @unsafeCoreTypeToHWTypeM@, but discards void filter information
 unsafeCoreTypeToHWTypeM'
