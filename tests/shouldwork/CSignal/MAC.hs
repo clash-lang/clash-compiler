@@ -2,7 +2,7 @@ module MAC where
 
 import Clash.Explicit.Prelude
 
-createDomain vSystem{vTag="DomA101", vPeriod=101}
+createDomain vSystem{vName="DomA101", vPeriod=101}
 
 topEntity
   :: Clock DomA101

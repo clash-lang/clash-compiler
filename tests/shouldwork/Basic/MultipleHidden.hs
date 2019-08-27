@@ -6,8 +6,8 @@ import Clash.Explicit.Testbench
 
 import Unsafe.Coerce (unsafeCoerce)
 
-createDomain vSystem{vTag="DomA"}
-createDomain vSystem{vTag="DomB"}
+createDomain vSystem{vName="DomA"}
+createDomain vSystem{vName="DomB"}
 
 multiClockAdd
   :: ( HiddenClockResetEnable domA

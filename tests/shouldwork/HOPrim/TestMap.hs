@@ -3,7 +3,7 @@ module TestMap where
 import Clash.Explicit.Prelude
 import Clash.Explicit.Testbench
 
-createDomain vSystem{vTag="System50", vPeriod=50000}
+createDomain vSystem{vName="System50", vPeriod=50000}
 
 type Word1 = Signed 18 -- SFixed 9 9
 type RomFunction = (Unsigned 9 -> Word1)

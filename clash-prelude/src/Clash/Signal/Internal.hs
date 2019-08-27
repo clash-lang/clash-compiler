@@ -277,14 +277,14 @@ data DomainConfiguration
   -- ^ Domain name
   , _period :: Nat
   -- ^ Period of clock in /ps/
-  , _edge :: ActiveEdge
+  , _activeEdge :: ActiveEdge
   -- ^ Active edge of the clock
-  , _reset :: ResetKind
+  , _resetKind :: ResetKind
   -- ^ Whether resets are synchronous (edge-sensitive) or asynchronous (level-sensitive)
-  , _init :: InitBehavior
+  , _initBehavior :: InitBehavior
   -- ^ Whether the initial (or "power up") value of memory elements is
   -- unknown/undefined, or configurable to a specific value
-  , _polarity :: ResetPolarity
+  , _resetPolarity :: ResetPolarity
   -- ^ Whether resets are active high or active low
   }
   deriving (Typeable)
@@ -429,7 +429,7 @@ instance KnownDomain IntelSystem where
 -- be used in combination with 'createDomain'. For example, if you just want to
 -- change the period but leave all other settings in tact use:
 --
--- > createDomain vSystem{vTag="System10", vPeriod=10}
+-- > createDomain vSystem{vName="System10", vPeriod=10}
 --
 vSystem :: VDomainConfiguration
 vSystem = vDomain (knownDomain @System)
@@ -447,7 +447,7 @@ type System = ("System" :: Domain)
 -- be used in combination with 'createDomain'. For example, if you just want to
 -- change the period but leave all other settings in tact use:
 --
--- > createDomain vIntelSystem{vTag="Intel10", vPeriod=10}
+-- > createDomain vIntelSystem{vName="Intel10", vPeriod=10}
 --
 vIntelSystem :: VDomainConfiguration
 vIntelSystem = vDomain (knownDomain @IntelSystem)
@@ -464,7 +464,7 @@ type IntelSystem = ("IntelSystem" :: Domain)
 -- be used in combination with 'createDomain'. For example, if you just want to
 -- change the period but leave all other settings in tact use:
 --
--- > createDomain vXilinxSystem{vTag="Xilinx10", vPeriod=10}
+-- > createDomain vXilinxSystem{vName="Xilinx10", vPeriod=10}
 --
 vXilinxSystem :: VDomainConfiguration
 vXilinxSystem = vDomain (knownDomain @XilinxSystem)
@@ -480,27 +480,27 @@ type XilinxSystem = ("XilinxSystem" :: Domain)
 -- | Same as SDomainConfiguration but allows for easy updates through record update syntax.
 -- Should be used in combination with 'vDomain' and 'createDomain'. Example:
 --
--- > createDomain (knownVDomain @System){vTag="System10", vPeriod=10}
+-- > createDomain (knownVDomain @System){vName="System10", vPeriod=10}
 --
 -- This duplicates the settings in the "System" domain, replaces the name and
 -- period, and creates an instance for it. As most users often want to update
 -- the system domain, a shortcut is available in the form:
 --
--- > createDomain vSystem{vTag="System10", vPeriod=10}
+-- > createDomain vSystem{vName="System10", vPeriod=10}
 --
 data VDomainConfiguration
   = VDomainConfiguration
-  { vTag    :: String
+  { vName :: String
   -- ^ Corresponds to '_name' on 'DomainConfiguration'
   , vPeriod :: Natural
   -- ^ Corresponds to '_period' on 'DomainConfiguration'
-  , vEdge   :: ActiveEdge
+  , vActiveEdge :: ActiveEdge
   -- ^ Corresponds to '_edge' on 'DomainConfiguration'
-  , vReset  :: ResetKind
+  , vResetKind :: ResetKind
   -- ^ Corresponds to '_reset' on 'DomainConfiguration'
-  , vInit   :: InitBehavior
+  , vInitBehavior :: InitBehavior
   -- ^ Corresponds to '_init' on 'DomainConfiguration'
-  , vPolarity :: ResetPolarity
+  , vResetPolarity :: ResetPolarity
   -- ^ Corresponds to '_polarity' on 'DomainConfiguration'
   }
 
@@ -523,13 +523,13 @@ isValidDomainName _ = False
 
 -- | Convenience method to express new domains in terms of others.
 --
--- > createDomain (knownVDomain @System){vTag="System10", vPeriod=10}
+-- > createDomain (knownVDomain @System){vName="System10", vPeriod=10}
 --
 -- This duplicates the settings in the "System" domain, replaces the name and
 -- period, and creates an instance for it. As most users often want to update
 -- the system domain, a shortcut is available in the form:
 --
--- > createDomain vSystem{vTag="System10", vPeriod=10}
+-- > createDomain vSystem{vName="System10", vPeriod=10}
 --
 -- The function will create two extra identifiers. The first:
 --
@@ -548,10 +548,10 @@ createDomain (VDomainConfiguration name period edge reset init_ polarity) =
     kcType <- [t| ('DomainConfiguration $nameT $periodT $edgeT $resetKindT $initT $polarityT) |]
     sDom <- [| SDomainConfiguration SSymbol SNat $edgeE $resetKindE $initE $polarityE |]
 
-    let vTagImpl = AppE (VarE 'vDomain) (AppTypeE (VarE 'knownDomain) (LitT (StrTyLit name)))
+    let vNameImpl = AppE (VarE 'vDomain) (AppTypeE (VarE 'knownDomain) (LitT (StrTyLit name)))
         kdImpl = FunD 'knownDomain [Clause [] (NormalB sDom) []]
         kcImpl = mkTySynInstD ''KnownConf [LitT (StrTyLit name)] kcType
-        vName = mkName ('v':name)
+        vName' = mkName ('v':name)
 
     pure  [ -- KnownDomain instance (ex: instance KnownDomain "System" where ...)
             InstanceD Nothing [] kdType [kcImpl, kdImpl]
@@ -560,8 +560,8 @@ createDomain (VDomainConfiguration name period edge reset init_ polarity) =
           , TySynD (mkName name) [] (LitT (StrTyLit name)  `SigT`  ConT ''Domain)
 
             -- vDomain helper (ex: vSystem = vDomain (knownDomain @System))
-          , SigD vName (ConT ''VDomainConfiguration)
-          , FunD vName [Clause [] (NormalB vTagImpl) []]
+          , SigD vName' (ConT ''VDomainConfiguration)
+          , FunD vName' [Clause [] (NormalB vNameImpl) []]
           ]
   else
     error ("Domain names should be a valid Haskell type name, not: " ++ name)
