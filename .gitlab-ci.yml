@@ -119,9 +119,6 @@ snap-bindist:
     - snapcraft login --with snapcraft.login
     - snapcraft
     - snapcraft push *.snap --release ${RELEASE_CHANNEL}
-  only:
-    - schedules
-    - triggers
 
 snap-edge:
   extends: .snap
