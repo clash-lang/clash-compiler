@@ -10,11 +10,6 @@
 {-# OPTIONS_GHC -Wno-partial-type-signatures #-}
 {-# OPTIONS_GHC -fconstraint-solver-iterations=10 #-}
 
--- Plugins don't load automatically when running the output tests
-{-# OPTIONS_GHC -fplugin=GHC.TypeLits.Extra.Solver #-}
-{-# OPTIONS_GHC -fplugin=GHC.TypeLits.Normalise #-}
-{-# OPTIONS_GHC -fplugin=GHC.TypeLits.KnownNat.Solver #-}
-
 module AutoReg where
 import Data.Int
 import Clash.Prelude
