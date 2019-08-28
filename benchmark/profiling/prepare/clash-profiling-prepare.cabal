@@ -16,8 +16,8 @@ library
   Exposed-Modules:     SerialiseInstances
   build-depends:       base                  >= 4.8      && < 5,
                        binary                >= 0.8.5    && < 0.11,
-                       hashable              >= 1.1.2.3  && < 1.3,
-                       template-haskell      >= 2.12.0.0 && < 2.15,
+                       hashable              >= 1.1.2.3  && < 1.4,
+                       template-haskell      >= 2.12.0.0 && < 2.16,
                        unordered-containers  >= 0.2.3.3  && < 0.3,
 
                        clash-lib,
@@ -27,12 +27,12 @@ executable clash-profile-normalization-prepare
   main-is:             profile-normalization-prepare.hs
   default-language:    Haskell2010
   ghc-options:         -Wall
-  build-depends:       base                  >= 4.8      && < 5,
-                       binary                >= 0.8.5    && < 0.11,
+  build-depends:       base,
+                       binary,
                        bytestring            >= 0.10.0.2 && < 0.11,
                        directory             >= 1.3.0.0  && < 1.4,
                        filepath              >= 1.4      && < 1.5,
-                       ghc                   >= 8.2.0    && < 8.6,
+                       ghc                   >= 8.2.0    && < 8.9,
 
                        clash-lib,
                        clash-benchmark,
@@ -42,12 +42,12 @@ executable clash-profile-netlist-prepare
   main-is:             profile-netlist-prepare.hs
   default-language:    Haskell2010
   ghc-options:         -Wall
-  build-depends:       base                  >= 4.8      && < 5,
-                       binary                >= 0.8.5    && < 0.11,
+  build-depends:       base,
+                       binary,
                        bytestring            >= 0.10.0.2 && < 0.11,
                        directory             >= 1.3.0.0  && < 1.4,
                        filepath              >= 1.4      && < 1.5,
-                       ghc                   >= 8.2.0    && < 8.6,
+                       ghc                   >= 8.2.0    && < 8.9,
 
                        clash-lib,
                        clash-benchmark,
