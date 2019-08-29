@@ -39,7 +39,7 @@
 
 {-# LANGUAGE Unsafe #-}
 
-{-# OPTIONS_HADDOCK show-extensions #-}
+{-# OPTIONS_HADDOCK show-extensions, not-home #-}
 
 module Clash.Prelude
   ( -- * Creating synchronous sequential circuits

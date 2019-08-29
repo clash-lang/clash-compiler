@@ -16,7 +16,7 @@ defined in "Clash.Prelude".
 {-# LANGUAGE Unsafe #-}
 
 {-# OPTIONS_GHC -fplugin GHC.TypeLits.KnownNat.Solver #-}
-{-# OPTIONS_HADDOCK show-extensions #-}
+{-# OPTIONS_HADDOCK show-extensions, not-home #-}
 
 module Clash.Explicit.Prelude
   ( -- * Creating synchronous sequential circuits
