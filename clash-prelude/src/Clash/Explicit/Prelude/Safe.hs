@@ -18,7 +18,7 @@ defined in "Clash.Prelude".
 
 {-# LANGUAGE Safe #-}
 
-{-# OPTIONS_HADDOCK show-extensions #-}
+{-# OPTIONS_HADDOCK show-extensions, not-home #-}
 
 module Clash.Explicit.Prelude.Safe
   ( -- * Creating synchronous sequential circuits
