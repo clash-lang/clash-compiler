@@ -118,7 +118,7 @@ medvedev tr st = moore tr id st
 -- g a b c = (b1,b2,i2)
 --   where
 --     (i1,b1) = 'Clash.Signal.unbundle' ('moore' t o 0 ('Clash.Signal.bundle' (a,b)))
---     (i2,b2) = 'Clash.Signal.unbundle' ('moore' t o 3 ('Clash.Signal.bundle' (i1,c)))
+--     (i2,b2) = 'Clash.Signal.unbundle' ('moore' t o 3 ('Clash.Signal.bundle' (c,i1)))
 -- @
 --
 -- Using 'mooreB' however we can write:
@@ -127,7 +127,7 @@ medvedev tr st = moore tr id st
 -- g a b c = (b1,b2,i2)
 --   where
 --     (i1,b1) = 'mooreB' t o 0 (a,b)
---     (i2,b2) = 'mooreB' t o 3 (i1,c)
+--     (i2,b2) = 'mooreB' t o 3 (c,i1)
 -- @
 mooreB
   :: ( HiddenClockResetEnable dom
