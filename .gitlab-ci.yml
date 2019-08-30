@@ -20,6 +20,7 @@ stages:
       - cabal-store/
   script:
     - unset SNAPCRAFT_LOGIN_FILE
+    - unset HACKAGE_PASSWORD
     - export GHC="${GHC:-$CI_JOB_NAME}"
     - export THREADS=$(nproc)
     - export CABAL_JOBS=$(nproc)
@@ -49,6 +50,64 @@ ghc-head:
     # Awaiting issue: https://github.com/goldfirere/singletons/issues/357
     - echo "GHC head currently disabled, because singletons doesn't build on ghc head"
     - exit 1
+
+hackage-sdist:
+  extends: .tests
+  variables:
+    GHC: ghc-8.8.1
+  script:
+    - export GHC="${GHC:-$CI_JOB_NAME}"
+    - export THREADS=$(nproc)
+    - export CABAL_JOBS=$(nproc)
+    - .ci/setup.sh
+    - .ci/build_sdist.sh clash-prelude
+    - .ci/build_sdist.sh clash-lib
+    - .ci/build_sdist.sh clash-ghc
+  artifacts:
+    paths:
+      - clash-*.tar.gz  # clash-{prelude,lib,ghc}-$version{-docs,}.tar.gz
+    expire_in: 1 week
+  only:
+    - tags
+    - schedules
+    - triggers
+
+.hackage:
+  extends: .tests
+  stage: publish
+  cache:
+    key: hackage
+  variables:
+    GHC: ghc-8.8.1
+  script:
+    - export GHC="${GHC:-$CI_JOB_NAME}"
+    - export THREADS=$(nproc)
+    - export CABAL_JOBS=$(nproc)
+    - .ci/setup.sh
+    - .ci/publish_sdist.sh clash-prelude
+    - .ci/publish_sdist.sh clash-lib
+    - .ci/publish_sdist.sh clash-ghc
+
+# "Publish" a release candidate
+hackage-release-candidate:
+  extends: .hackage
+
+  variables:
+    HACKAGE_RELEASE: "no"
+
+  only:
+    - schedules
+    - triggers
+
+# Release new version of Clash to Hackage
+hackage-release:
+  extends: .hackage
+
+  variables:
+    HACKAGE_RELEASE: "yes"
+
+  only:
+    - tags
 
 # Create a binary distribution using nix, and store it in a tarball. A special
 # nix distribution is used that has its store installed on /usr/nix/store,
@@ -119,9 +178,6 @@ snap-bindist:
     - snapcraft login --with snapcraft.login
     - snapcraft
     - snapcraft push *.snap --release ${RELEASE_CHANNEL}
-  only:
-    - schedules
-    - triggers
 
 snap-edge:
   extends: .snap

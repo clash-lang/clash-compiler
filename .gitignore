@@ -28,6 +28,8 @@ cabal.config
 *.aux
 *.hp
 *.bin
+*.log
+*.tar.gz
 
 *~
 *.DS_Store
