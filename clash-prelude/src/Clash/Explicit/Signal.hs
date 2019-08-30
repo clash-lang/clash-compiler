@@ -500,6 +500,20 @@ unsafeSynchronizer _clk1 _clk2 =
 {-# INLINE unsafeSynchronizer #-}
 
 -- | Same as 'unsafeSynchronizer', but with manually supplied clock periods.
+--
+-- Note: this unsafeSynchronizer is defined to be consistent with the vhdl and verilog
+-- implementations however as only synchronous signals are represented in Clash this
+-- cannot be done precisely and can lead to odd behaviour. For example,
+-- @
+-- sample $ unsafeSynchronizer @Dom2 @Dom7 . unsafeSynchronizer @Dom7 @Dom2 $ fromList [0..10]
+-- > [0,4,4,4,7,7,7,7,11,11,11..
+-- @
+-- is quite different from the identity,
+-- @
+-- sample $ fromList [0..10]
+-- > [0,1,2,3,4,5,6,7,8,9,10..
+-- @
+-- with values appearing from the "future".
 veryUnsafeSynchronizer
   :: Int
   -- ^ Period of clock belonging to 'dom1'
@@ -508,15 +522,18 @@ veryUnsafeSynchronizer
   -> Signal dom1 a
   -> Signal dom2 a
 veryUnsafeSynchronizer t1 t2
+  -- this case is just an optimisation for when the periods are the same
   | t1 == t2 = same
+
   | otherwise = go 0
+
   where
   same :: Signal dom1 a -> Signal dom2 a
   same (s :- ss) = s :- same ss
 
   go :: Int -> Signal dom1 a -> Signal dom2 a
   go relativeTime (a :- s)
-    | relativeTime < t1 = a :- go (relativeTime + t2) (a :- s)
+    | relativeTime <= 0 = a :- go (relativeTime + t2) (a :- s)
     | otherwise = go (relativeTime - t1) s
 {-# NOINLINE veryUnsafeSynchronizer #-}
 {-# ANN veryUnsafeSynchronizer hasBlackBox #-}
