@@ -603,7 +603,7 @@ instance NFDataX b => NFDataX (a -> b) where
 
 instance NFDataX a => NFDataX (Down a) where
   deepErrorX = Down . deepErrorX
-  rnfX d@(~(Down x))= if isLeft (isX d) then rnfX x else ()
+  rnfX d@(~(Down x)) = if isLeft (isX d) then () else rnfX x
 
 instance NFDataX Bool
 instance NFDataX a => NFDataX [a]
