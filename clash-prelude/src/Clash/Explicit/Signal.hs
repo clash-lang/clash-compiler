@@ -507,46 +507,14 @@ veryUnsafeSynchronizer
   -- ^ Period of clock belonging to 'dom2'
   -> Signal dom1 a
   -> Signal dom2 a
-veryUnsafeSynchronizer t1 t2 s
-  | t1 < t2   = compress   t2 t1 s
-  | t1 > t2   = oversample t1 t2 s
-  | otherwise = same s
+veryUnsafeSynchronizer t1 t2 = go 0
+  where
+  go :: Int -> Signal dom1 a -> Signal dom2 a
+  go relativeTime (a :- s)
+    | relativeTime < t1 = a :- go (relativeTime + t2) (a :- s)
+    | otherwise = go (relativeTime - t1) s
 {-# NOINLINE veryUnsafeSynchronizer #-}
 {-# ANN veryUnsafeSynchronizer hasBlackBox #-}
-
-same :: Signal dom1 a -> Signal dom2 a
-same (s :- ss) = s :- same ss
-
-oversample :: Int -> Int -> Signal dom1 a -> Signal dom2 a
-oversample high low (s :- ss) = s :- oversampleS (reverse (repSchedule high low)) ss
-
-oversampleS :: [Int] -> Signal dom1 a -> Signal dom2 a
-oversampleS sched = oversample' sched
-  where
-    oversample' []     s       = oversampleS sched s
-    oversample' (d:ds) (s:-ss) = prefixN d s (oversample' ds ss)
-
-    prefixN 0 _ s = s
-    prefixN n x s = x :- prefixN (n-1) x s
-
-compress :: Int -> Int -> Signal dom1 a -> Signal dom2 a
-compress high low s = compressS (repSchedule high low) s
-
-compressS :: [Int] -> Signal dom1 a -> Signal dom2 a
-compressS sched = compress' sched
-  where
-    compress' []     s           = compressS sched s
-    compress' (d:ds) ss@(s :- _) = s :- compress' ds (dropS d ss)
-
-    dropS 0 s         = s
-    dropS n (_ :- ss) = dropS (n-1) ss
-
-repSchedule :: Int -> Int -> [Int]
-repSchedule high low = take low $ repSchedule' low high 1
-  where
-    repSchedule' cnt th rep
-      | cnt < th  = repSchedule' (cnt+low) th (rep + 1)
-      | otherwise = rep : repSchedule' (cnt + low) (th + high) 1
 
 -- * Basic circuit functions
 
