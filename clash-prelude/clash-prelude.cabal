@@ -154,6 +154,8 @@ Library
                       Clash.Explicit.Synchronizer
                       Clash.Explicit.Testbench
 
+                      Clash.HaskellPrelude
+
                       Clash.Hidden
 
                       Clash.Intel.ClockGen

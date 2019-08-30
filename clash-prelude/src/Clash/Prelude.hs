@@ -32,10 +32,11 @@
   Some circuit examples can be found in "Clash.Examples".
 -}
 
-{-# LANGUAGE CPP              #-}
-{-# LANGUAGE DataKinds        #-}
-{-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE TypeOperators    #-}
+{-# LANGUAGE CPP               #-}
+{-# LANGUAGE DataKinds         #-}
+{-# LANGUAGE FlexibleContexts  #-}
+{-# LANGUAGE NoImplicitPrelude #-}
+{-# LANGUAGE TypeOperators     #-}
 
 {-# LANGUAGE Unsafe #-}
 
@@ -151,7 +152,7 @@ module Clash.Prelude
   , module Clash.Magic
     -- ** Haskell Prelude
     -- $hiding
-  , module Prelude
+  , module Clash.HaskellPrelude
   )
 where
 
@@ -161,10 +162,7 @@ import           Data.Default.Class
 import           GHC.TypeLits
 import           GHC.TypeLits.Extra
 import           Language.Haskell.TH.Syntax  (Lift(..))
-import           Prelude hiding
-  ((++), (!!), concat, concatMap, drop, foldl, foldl1, foldr, foldr1, head, init,
-   iterate, last, length, map, repeat, replicate, reverse, scanl, scanr, splitAt,
-   tail, take, unzip, unzip3, zip, zip3, zipWith, zipWith3, undefined, (^))
+import           Clash.HaskellPrelude
 
 import           Clash.Annotations.TopEntity
 import           Clash.Class.BitPack
