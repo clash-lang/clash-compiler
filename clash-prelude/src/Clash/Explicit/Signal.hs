@@ -507,8 +507,13 @@ veryUnsafeSynchronizer
   -- ^ Period of clock belonging to 'dom2'
   -> Signal dom1 a
   -> Signal dom2 a
-veryUnsafeSynchronizer t1 t2 = go 0
+veryUnsafeSynchronizer t1 t2
+  | t1 == t2 = same
+  | otherwise = go 0
   where
+  same :: Signal dom1 a -> Signal dom2 a
+  same (s :- ss) = s :- same ss
+
   go :: Int -> Signal dom1 a -> Signal dom2 a
   go relativeTime (a :- s)
     | relativeTime < t1 = a :- go (relativeTime + t2) (a :- s)
