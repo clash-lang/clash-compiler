@@ -5,11 +5,14 @@
 
 module Clash.Tests.NFDataX where
 
-import Test.Tasty
-import Test.Tasty.HUnit
+import           Test.Tasty
+import           Test.Tasty.HUnit
 
-import GHC.Generics (Generic)
-import Clash.XException (NFDataX(rnfX), errorX)
+import           GHC.Generics         (Generic)
+import           Clash.Class.BitPack  (pack)
+import           Clash.Sized.Vector   (Vec(..))
+import           Clash.XException     (NFDataX(rnfX, hasUndefined), errorX)
+import           Data.Ord             (Down (Down))
 
 data Void                                  deriving (Generic, NFDataX)
 data Unit    = Unit                        deriving (Generic, NFDataX)
@@ -64,6 +67,8 @@ tests =
         , testCase "Either1"   $ rnfX (undef :: Either Int Int)       @?= ()
         , testCase "Either2"   $ rnfX (Left undef :: Either Int Int)  @?= ()
         , testCase "Either3"   $ rnfX (Right undef :: Either Int Int) @?= ()
+        , testCase "Down1"     $ rnfX (Down undef :: Down Int)        @?= ()
+        , testCase "Down2"     $ rnfX (undef :: Down Int)             @?= ()
         ]
     ]
 
