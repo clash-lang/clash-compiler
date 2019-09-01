@@ -120,13 +120,13 @@ Library
     Exposed-modules:  Clash.Prelude.Synchronizer
 
   Exposed-modules:    Clash.Annotations.TopEntity
-                      Clash.Annotations.TopEntityGen
                       Clash.Annotations.Primitive
                       Clash.Annotations.BitRepresentation
                       Clash.Annotations.BitRepresentation.Deriving
                       Clash.Annotations.BitRepresentation.Internal
                       Clash.Annotations.BitRepresentation.Util
                       Clash.Annotations.SynthesisAttributes
+                      Clash.Annotations.TH
 
                       Clash.Class.BitPack
                       Clash.Class.Exp
@@ -328,7 +328,7 @@ test-suite unittests
                  Clash.Tests.DerivingDataReprTypes
                  Clash.Tests.Signal
                  Clash.Tests.NFDataX
-                 Clash.Tests.TopEntityGen
+                 Clash.Tests.TopEntityGeneration
 
 
 benchmark benchmark-clash-prelude

@@ -51,7 +51,7 @@ makeTopEntity 'topEntity
 {-# LANGUAGE TypeFamilies        #-}
 {-# LANGUAGE TypeOperators       #-}
 
-module Clash.Annotations.TopEntityGen
+module Clash.Annotations.TH
   ( -- * To create a Synthesize annotation pragma
     makeTopEntity
   , makeTopEntityWithName

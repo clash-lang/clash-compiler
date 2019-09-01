@@ -2,13 +2,13 @@
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE TypeOperators #-}
 
-module Clash.Tests.TopEntityGen where
+module Clash.Tests.TopEntityGeneration where
 
 import Test.Tasty
 import Test.Tasty.HUnit
 
 import Clash.Prelude hiding (undefined)
-import Clash.Annotations.TopEntityGen
+import Clash.Annotations.TH
 
 data Unnamed = Unnamed Int
 data Simple = Simple ("simple1" ::: Int) ("simple2" ::: Bool)
@@ -83,7 +83,7 @@ expectedTopEntity3 =
 tests :: TestTree
 tests =
   testGroup
-    "topEntityGen"
+    "TopEntityGeneration"
     [ testCase "topEntity1" $
       $(buildTopEntity Nothing 'topEntity1) @?= expectedTopEntity1
     , testCase "topEntity2" $
