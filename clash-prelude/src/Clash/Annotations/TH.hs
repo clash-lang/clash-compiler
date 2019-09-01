@@ -62,21 +62,28 @@ module Clash.Annotations.TH
   )
 where
 
-import           Clash.Annotations.TopEntity (PortName(..), TopEntity(..))
-import           Clash.NamedTypes
-
+import           Data.Foldable                  ( fold )
 import           Language.Haskell.TH
 
-import Data.Functor.Foldable (para)
-import Data.Functor.Foldable.TH
-import Data.Foldable (fold)
+import           Data.Functor.Foldable          ( para )
+import           Data.Functor.Foldable.TH
+
+import           Clash.Annotations.TopEntity    ( PortName(..)
+                                                , TopEntity(..)
+                                                )
+import           Clash.NamedTypes
+
 
 $(makeBaseFunctor ''Type)
 
--- A helper function for recursively walking a 'Type' tree and
--- building a list of 'PortName's
-buildPorts :: Type                                        -- Type to split at
-           -> TypeF (Type, Q [PortName]) -> Q [PortName]  -- Fold step
+-- | A helper function for recursively walking a 'Type' tree and
+-- building a list of 'PortName's.
+buildPorts
+  :: Type
+  -- ^ Type to split at
+  -> TypeF (Type, Q [PortName])
+  -- ^ Case under scrutiny, paramorphism style
+  -> Q [PortName]
 buildPorts split (AppTF (AppT split' (LitT (StrTyLit name)), _) (_,c))
   -- Is there a '<String> ::: <something>' annotation?
   | split' == split
@@ -97,18 +104,18 @@ buildPorts split (ConTF name) = do
     TyConI (DataD _ _ _ _ [NormalC _ xs] _) ->
       buildFromConstructor $ map snd xs
     _ -> return []
-  where buildFromConstructor =
-          fmap mconcat . mapM (para (buildPorts split))
+ where
+   buildFromConstructor = fmap mconcat . mapM (para (buildPorts split))
 buildPorts _ f = do
   -- Just collect names
   f' <- mapM snd f
   return $ fold f'
 
--- matches a type `a -> b`
+-- | Matches a type `a -> b`
 pattern ArrowTy :: Type -> Type -> Type
 pattern ArrowTy a b = AppT (AppT ArrowT a) b
 
--- Get the return 'PortName' from a splitter and function type
+-- | Get the result 'PortName' from a function type
 toReturnName :: Type -> Type -> Q PortName
 toReturnName split (ArrowTy _ b) = toReturnName split b
 toReturnName split b             =
@@ -118,7 +125,7 @@ toReturnName split b             =
      [x] -> return x
      xs -> return $ PortProduct "" xs
 
--- Get the argument 'PortName's from a splitter and function type
+-- | Get the argument 'PortName's from a function type
 toArgNames :: Type -> Type -> Q [PortName]
 toArgNames split ty = go (0::Int) ty []
   where
@@ -133,13 +140,14 @@ toArgNames split ty = go (0::Int) ty []
                       ++ "\n got name " ++ show f
     go _ _ acc = return acc
 
+-- | Return a typed expression for a 'TopEntity' of a given @('Name', 'Type')@.
 buildTopEntity' :: Maybe String -> (Name, Type) -> TExpQ TopEntity
 buildTopEntity' topName (name, ty) = do
     -- get a Name for this type operator so we can check it
     -- in the ArrowTy case
     split <- [t| (:::) |]
-    ins <- toArgNames split ty
-    out <- toReturnName split ty
+    ins   <- toArgNames split ty
+    out   <- toReturnName split ty
 
     let outName = case topName of
           Just name' -> name'          -- user specified name
@@ -151,16 +159,18 @@ buildTopEntity' topName (name, ty) = do
         , t_output = out
         } ||]
 
+-- | Return an untyped expression for a 'TopEntity' of a given 'Name'.
 buildTopEntity :: Maybe String -> Name -> ExpQ
 buildTopEntity topName name =
   fmap unType $ getNameBinding name >>= buildTopEntity' topName
 
+-- | Turn the 'Name' of a value to a @('Name', 'Type')@
 getNameBinding :: Name -> Q (Name, Type)
 getNameBinding n = reify n >>= \case
   VarI name ty _ -> return (name, ty)
   _ -> fail "getNameBinding: Invalid Name, must be a top-level binding!"
 
--- Wrap a 'TopEntity' expression in an annotation pragma
+-- | Wrap a 'TopEntity' expression in an annotation pragma
 makeTopEntityWithName' :: Name -> Maybe String -> DecQ
 makeTopEntityWithName' n topName = do
   (name,ty) <- getNameBinding n

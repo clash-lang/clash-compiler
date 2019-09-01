@@ -1,6 +1,6 @@
 {-# LANGUAGE DataKinds       #-}
 {-# LANGUAGE TemplateHaskell #-}
-{-# LANGUAGE TypeOperators #-}
+{-# LANGUAGE TypeOperators   #-}
 
 module Clash.Tests.TopEntityGeneration where
 
@@ -30,7 +30,7 @@ topEntity1 = undefined
 makeTopEntity 'topEntity1
 
 expectedTopEntity1 :: TopEntity
-expectedTopEntity1 = 
+expectedTopEntity1 =
  Synthesize "topEntity1"
     [PortName "in1", PortName "in2"]
     (PortName "out")
