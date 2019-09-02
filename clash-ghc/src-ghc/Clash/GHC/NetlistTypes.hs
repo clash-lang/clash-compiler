@@ -238,6 +238,10 @@ ghcTypeToHWType iw floatSupport = go
           (TyConApp (nameOcc -> "GHC.Types.Char") []) -> returnN String
           _ -> throwE $ "Can't translate type: " ++ showPpr ty
 
+        -- To ensure that Clash doesn't get stuck working away callstacks that
+        -- never end up being used in the generated HDL.
+        "GHC.Stack.Types.CallStack" -> returnN (Void Nothing)
+
         _ -> ExceptT (MaybeT (pure Nothing))
 
     go _ _ _ = pure Nothing
