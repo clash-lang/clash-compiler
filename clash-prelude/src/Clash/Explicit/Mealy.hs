@@ -119,7 +119,7 @@ mealy clk rst en f iS =
 -- g clk rst en a b c = (b1,b2,i2)
 --   where
 --     (i1,b1) = 'unbundle' (mealy clk rst en f 0 ('bundle' (a,b)))
---     (i2,b2) = 'unbundle' (mealy clk rst en f 3 ('bundle' (i1,c)))
+--     (i2,b2) = 'unbundle' (mealy clk rst en f 3 ('bundle' (c,i1)))
 -- @
 --
 -- Using 'mealyB' however we can write:
@@ -128,7 +128,7 @@ mealy clk rst en f iS =
 -- g clk rst en a b c = (b1,b2,i2)
 --   where
 --     (i1,b1) = 'mealyB' clk rst en f 0 (a,b)
---     (i2,b2) = 'mealyB' clk rst en f 3 (i1,c)
+--     (i2,b2) = 'mealyB' clk rst en f 3 (c,i1)
 -- @
 mealyB
   :: ( KnownDomain dom

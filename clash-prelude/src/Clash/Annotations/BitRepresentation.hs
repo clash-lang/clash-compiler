@@ -81,7 +81,7 @@ liftQ = (>>= TH.lift)
 -- @
 --
 -- This specifies that @R@ should be encoded as 0b00, @G@ as 0b01, and
--- @B@ as 0b10. The first binary value in every @ConstRepr@ in this example
+-- @B@ as 0b10. The first binary value in every @ConstrRepr@ in this example
 -- is a mask, indicating which bits in the data type are relevant. In this case
 -- all of the bits are.
 --
@@ -91,19 +91,20 @@ liftQ = (>>= TH.lift)
 -- {-# ANN module ( DataReprAnn
 --                    $(liftQ [t|Maybe Color|])
 --                    2
---                    [ ConstRepr 'Nothing 0b11 0b11 []
---                    , ConstRepr 'Just 0b00 0b00 [0b11]
+--                    [ ConstrRepr 'Nothing 0b11 0b11 []
+--                    , ConstrRepr 'Just 0b00 0b00 [0b11]
 --                    ] ) #-}
 -- @
 --
 -- By default, @Maybe Color@ is a data type which consumes 3 bits. A single bit
 -- to indicate the constructor (either @Just@ or @Nothing@), and two bits to encode
--- the first field of @Just@. Notice that we saved a single bit, by exploiting
+-- the first field of @Just@. Notice that we saved a single bit by exploiting
 -- the fact that @Color@ only uses three values (0, 1, 2), but takes two bits
 -- to encode it. We can therefore use the last - unused - value (3), to encode
 -- one of the constructors of @Maybe@. We indicate which bits encode the
--- underlying @Color@ by passing /[0b11]/ to ConstRepr. This indicates that the
--- first field is encoded in the first and second bit of the whole datatype (0b11).
+-- underlying @Color@ field of @Just@ by passing /[0b11]/ to ConstrRepr. This
+-- indicates that the first field is encoded in the first and second bit of the
+-- whole datatype (0b11).
 data DataReprAnn =
   DataReprAnn
     -- Type this annotation is for:

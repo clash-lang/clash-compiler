@@ -102,7 +102,7 @@ mealy = hideClockResetEnable E.mealy
 -- g a b c = (b1,b2,i2)
 --   where
 --     (i1,b1) = 'Clash.Signal.unbundle' ('mealy' f 0 ('Clash.Signal.bundle' (a,b)))
---     (i2,b2) = 'Clash.Signal.unbundle' ('mealy' f 3 ('Clash.Signal.bundle' (i1,c)))
+--     (i2,b2) = 'Clash.Signal.unbundle' ('mealy' f 3 ('Clash.Signal.bundle' (c,i1)))
 -- @
 --
 -- Using 'mealyB' however we can write:
@@ -111,7 +111,7 @@ mealy = hideClockResetEnable E.mealy
 -- g a b c = (b1,b2,i2)
 --   where
 --     (i1,b1) = 'mealyB' f 0 (a,b)
---     (i2,b2) = 'mealyB' f 3 (i1,c)
+--     (i2,b2) = 'mealyB' f 3 (c,i1)
 -- @
 mealyB
   :: ( HiddenClockResetEnable dom

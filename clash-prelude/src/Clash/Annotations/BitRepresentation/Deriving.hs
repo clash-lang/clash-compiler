@@ -7,7 +7,7 @@ This module contains:
 
   * Template Haskell functions for deriving 'BitPack' instances given a
     custom bit representation as those defined in
-    'Clash.Annotations.BitRepresentation'.
+    "Clash.Annotations.BitRepresentation".
 
   * Template Haskell functions for deriving custom bit representations,
     e.g. one-hot, for a data type.

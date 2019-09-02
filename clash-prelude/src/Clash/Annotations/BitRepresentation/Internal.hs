@@ -56,7 +56,7 @@ data DataRepr' =
     [ConstrRepr']
       deriving (Show, Generic, NFData, Eq, Typeable, Hashable, Ord)
 
--- | Internal version of ConstRepr
+-- | Internal version of ConstrRepr
 data ConstrRepr' =
   ConstrRepr'
     -- Qualified name of constructor:

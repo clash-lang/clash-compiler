@@ -127,7 +127,7 @@ medvedev clk rst en tr st = moore clk rst en tr id st
 -- g clk rst en a b c = (b1,b2,i2)
 --   where
 --     (i1,b1) = 'unbundle' (moore clk rst en t o 0 ('bundle' (a,b)))
---     (i2,b2) = 'unbundle' (moore clk rst en t o 3 ('bundle' (i1,c)))
+--     (i2,b2) = 'unbundle' (moore clk rst en t o 3 ('bundle' (c,i1)))
 -- @
 --
 -- Using 'mooreB' however we can write:
@@ -136,7 +136,7 @@ medvedev clk rst en tr st = moore clk rst en tr id st
 -- g clk rst en a b c = (b1,b2,i2)
 --   where
 --     (i1,b1) = 'mooreB' clk rst en t o 0 (a,b)
---     (i2,b2) = 'mooreB' clk rst en t o 3 (i1,c)
+--     (i2,b2) = 'mooreB' clk rst en t o 3 (c,i1)
 -- @
 mooreB
   :: ( KnownDomain dom
