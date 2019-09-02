@@ -45,7 +45,6 @@ import           GHC.Int
 import           GHC.Integer
   (decodeDoubleInteger,encodeDoubleInteger,compareInteger,orInteger,andInteger,
    xorInteger,complementInteger,absInteger,signumInteger)
-import           GHC.Integer.GMP.Internals (Integer (..), BigNat (..))
 import           GHC.Natural
 import           GHC.Prim
 import           GHC.Real            (Ratio (..))
@@ -67,7 +66,8 @@ import           Unique              (getKey)
 import           Clash.Class.BitPack (pack,unpack)
 import           Clash.Core.DataCon  (DataCon (..))
 import           Clash.Core.Evaluator
-  (Heap (..), PrimEvaluator, Stack, Value (..), valToTerm, whnf)
+  (Heap (..), PrimEvaluator, Stack, Value (..), valToTerm, whnf, integerLiteral,
+  naturalLiteral)
 import           Clash.Core.Literal  (Literal (..))
 import           Clash.Core.Name
   (Name (..), NameSort (..), mkUnsafeSystemName)
@@ -3340,31 +3340,9 @@ naturalLiterals args = case naturalLiterals' args of
 
 integerLiterals' :: [Value] -> [Integer]
 integerLiterals' = typedLiterals' integerLiteral
- where
-  integerLiteral x = case x of
-    Lit (IntegerLiteral i)      -> Just i
-    DC dc [Left (Literal (IntLiteral i))]
-      | dcTag dc == 1
-      -> Just i
-    DC dc [Left (Literal (ByteArrayLiteral (Vector.Vector _ _ (ByteArray.ByteArray ba))))]
-      | dcTag dc == 2
-      -> Just (Jp# (BN# ba))
-      | dcTag dc == 3
-      -> Just (Jn# (BN# ba))
-    _ -> Nothing
 
 naturalLiterals' :: [Value] -> [Integer]
 naturalLiterals' = typedLiterals' naturalLiteral
- where
-  naturalLiteral x = case x of
-    Lit (NaturalLiteral i) -> Just i
-    DC dc [Left (Literal (WordLiteral i))]
-      | dcTag dc == 1
-      -> Just i
-    DC dc [Left (Literal (ByteArrayLiteral (Vector.Vector _ _ (ByteArray.ByteArray ba))))]
-      | dcTag dc == 2
-      -> Just (Jp# (BN# ba))
-    _ -> Nothing
 
 intLiterals :: [Value] -> Maybe (Integer,Integer)
 intLiterals args = case args of
