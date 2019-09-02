@@ -1,5 +1,5 @@
 Name:                 clash-term
-Version:              0.99
+Version:              1.1.0
 Synopsis:             CAES Language for Synchronous Hardware
 Description:          Terminal-based inspection mechanism for optimization phases.
 Homepage:             http://www.clash-lang.org/
@@ -25,7 +25,7 @@ source-repository head
 executable clash-term
   Main-Is:            Main.hs
   Build-Depends:      base              >= 4.3.1.0  && < 5,
-                      clash-lib         >= 0.7.1    && < 1.0,
+                      clash-lib         >= 1.1      && < 1.2,
                       binary            >= 0.8.5    && < 0.11,
                       prettyprinter     >= 1.2.0.1  && < 2.0,
                       bytestring        >= 0.10.0.2 && < 0.11,
