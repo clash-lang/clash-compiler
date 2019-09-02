@@ -426,6 +426,32 @@ instantiate h k (TyLambda x e) ty = (h,k,substTm "Evaluator.instantiate" subst e
   is0    = mkInScopeSet (localFVsOfTerms [e] `unionUniqSet` tyFVsOfTypes [ty])
 instantiate _ _ _ _ = error "not a ty lambda"
 
+naturalLiteral :: Value -> Maybe Integer
+naturalLiteral v =
+  case v of
+    Lit (NaturalLiteral i) -> Just i
+    DC dc [Left (Literal (WordLiteral i))]
+      | dcTag dc == 1
+      -> Just i
+    DC dc [Left (Literal (ByteArrayLiteral (PV.Vector _ _ (BA.ByteArray ba))))]
+      | dcTag dc == 2
+      -> Just (Jp# (BN# ba))
+    _ -> Nothing
+
+integerLiteral :: Value -> Maybe Integer
+integerLiteral v =
+  case v of
+    Lit (IntegerLiteral i) -> Just i
+    DC dc [Left (Literal (IntLiteral i))]
+      | dcTag dc == 1
+      -> Just i
+    DC dc [Left (Literal (ByteArrayLiteral (PV.Vector _ _ (BA.ByteArray ba))))]
+      | dcTag dc == 2
+      -> Just (Jp# (BN# ba))
+      | dcTag dc == 3
+      -> Just (Jn# (BN# ba))
+    _ -> Nothing
+
 -- | Evaluation of primitive operations
 primop
   :: PrimEvaluator
@@ -455,29 +481,29 @@ primop eval tcm h k nm ty tys vs v []
   = unwind eval tcm h k (PrimVal nm ty tys (vs ++ [v]))
   | nm == "Clash.Sized.Internal.BitVector.fromInteger#"
   = case (vs,v) of
-    ([Lit (NaturalLiteral n),mask],Lit (IntegerLiteral i)) ->
+    ([naturalLiteral -> Just n,mask], integerLiteral -> Just i) ->
       unwind eval tcm h k (PrimVal nm ty tys [Lit (NaturalLiteral n)
                                              ,mask
                                              ,Lit (IntegerLiteral (wrapUnsigned n i))])
-    _ -> error ($(curLoc) ++ "Internal error")
+    _ -> error ($(curLoc) ++ "Internal error"  ++ show (vs,v))
   | nm == "Clash.Sized.Internal.BitVector.fromInteger##"
   = case (vs,v) of
-    ([mask],Lit (IntegerLiteral i)) ->
+    ([mask], integerLiteral -> Just i) ->
       unwind eval tcm h k (PrimVal nm ty tys [mask
                                              ,Lit (IntegerLiteral (wrapUnsigned 1 i))])
     _ -> error ($(curLoc) ++ "Internal error"  ++ show (vs,v))
   | nm == "Clash.Sized.Internal.Signed.fromInteger#"
   = case (vs,v) of
-    ([Lit (NaturalLiteral n)],Lit (IntegerLiteral i)) ->
+    ([naturalLiteral -> Just n],integerLiteral -> Just i) ->
       unwind eval tcm h k (PrimVal nm ty tys [Lit (NaturalLiteral n)
                                              ,Lit (IntegerLiteral (wrapSigned n i))])
-    _ -> error ($(curLoc) ++ "Internal error")
+    _ -> error ($(curLoc) ++ "Internal error"  ++ show (vs,v))
   | nm == "Clash.Sized.Internal.Unsigned.fromInteger#"
   = case (vs,v) of
-    ([Lit (NaturalLiteral n)],Lit (IntegerLiteral i)) ->
+    ([naturalLiteral -> Just n],integerLiteral -> Just i) ->
       unwind eval tcm h k (PrimVal nm ty tys [Lit (NaturalLiteral n)
                                              ,Lit (IntegerLiteral (wrapUnsigned n i))])
-    _ -> error ($(curLoc) ++ "Internal error")
+    _ -> error ($(curLoc) ++ "Internal error"  ++ show (vs,v))
   | otherwise = eval (isScrut k) tcm h k nm ty tys (vs ++ [v])
 primop eval tcm h0 k nm ty tys vs v [e]
   | nm `elem` [ "Clash.Sized.Vector.lazyV"
