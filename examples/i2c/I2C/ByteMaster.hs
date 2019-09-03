@@ -12,7 +12,7 @@ import I2C.ByteMaster.ShiftRegister
 import I2C.Types
 
 data ByteStateMachine = Idle | Start | Read | Write | Ack | Stop
-  deriving (Show, Generic, Undefined)
+  deriving (Show, Generic, NFDataX)
 
 data ByteMasterS
   = ByteS
@@ -25,7 +25,7 @@ data ByteMasterS
   , _hostAck    :: Bool             -- host cmd acknowlegde register
   , _ackOut     :: Bool             -- slave ack register
   }
-  deriving (Generic, Undefined)
+  deriving (Generic, NFDataX)
 
 makeLenses ''ByteMasterS
 

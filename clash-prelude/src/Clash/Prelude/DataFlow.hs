@@ -60,7 +60,7 @@ import Clash.Signal.Bundle    (Bundle (..))
 import Clash.Explicit.Signal  (Clock, Reset, Signal, Enable, enable, register)
 import Clash.Sized.BitVector  (BitVector)
 import Clash.Sized.Vector
-import Clash.XException       (errorX, Undefined)
+import Clash.XException       (errorX, NFDataX)
 
 {- | Dataflow circuit with bidirectional synchronization channels.
 
@@ -155,7 +155,7 @@ pureDF f = DF (\i iV oR -> (fmap f i,iV,oR))
 -- "Clash.Prelude.Mealy"
 mealyDF
   :: ( KnownDomain dom
-     , Undefined s )
+     , NFDataX s )
   => Clock dom
   -> Reset dom
   -> Enable dom
@@ -172,7 +172,7 @@ mealyDF clk rst gen f iS =
 -- "Clash.Prelude.Moore"
 mooreDF
   :: ( KnownDomain dom
-     , Undefined s )
+     , NFDataX s )
   => Clock dom
   -> Reset dom
   -> Enable dom
@@ -220,7 +220,7 @@ fifoDF_mealy (mem,rptr,wptr) (wdata,winc,rinc) =
 fifoDF
   :: forall addrSize m n a dom
    . ( KnownDomain dom
-     , Undefined a
+     , NFDataX a
      , KnownNat addrSize
      , KnownNat n
      , KnownNat m
@@ -359,7 +359,7 @@ parNDF fs =
 -- <<doc/loopDF_sync.svg>>
 loopDF
   :: ( KnownDomain dom
-     , Undefined d
+     , NFDataX d
      , KnownNat m
      , KnownNat n
      , KnownNat addrSize

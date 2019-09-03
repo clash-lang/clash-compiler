@@ -56,7 +56,7 @@ import Clash.Signal.Internal
 -- [(X,X),((-1),(-2)),((-3),2),(3,4),(5,6)]
 ddrIn
   :: ( HasCallStack
-     , Undefined a
+     , NFDataX a
      , KnownConfiguration fast ('DomainConfiguration fast fPeriod edge reset init polarity)
      , KnownConfiguration slow ('DomainConfiguration slow (2*fPeriod) edge reset init polarity) )
   => Clock slow
@@ -79,7 +79,7 @@ ddrIn clk rst en (i0,i1,i2) =
 ddrIn#
   :: forall a slow fast fPeriod polarity edge reset init
    . ( HasCallStack
-     , Undefined a
+     , NFDataX a
      , KnownConfiguration fast ('DomainConfiguration fast fPeriod edge reset init polarity)
      , KnownConfiguration slow ('DomainConfiguration slow (2*fPeriod) edge reset init polarity) )
   => Clock slow
@@ -142,7 +142,7 @@ ddrIn# (Clock _) (unsafeToHighPolarity -> hRst) (fromEnable -> ena) i0 i1 i2 =
 -- [-1,-1,-1,2,3,4,5]
 ddrOut
   :: ( HasCallStack
-     , Undefined a
+     , NFDataX a
      , KnownConfiguration fast ('DomainConfiguration fast fPeriod edge reset init polarity)
      , KnownConfiguration slow ('DomainConfiguration slow (2*fPeriod) edge reset init polarity) )
   => Clock slow
@@ -160,7 +160,7 @@ ddrOut clk rst en i0 =
 
 ddrOut#
   :: ( HasCallStack
-     , Undefined a
+     , NFDataX a
      , KnownConfiguration fast ('DomainConfiguration fast fPeriod edge reset init polarity)
      , KnownConfiguration slow ('DomainConfiguration slow (2*fPeriod) edge reset init polarity) )
   => Clock slow

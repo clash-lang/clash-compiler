@@ -184,7 +184,7 @@ It instead exports the identically named functions defined in terms of
 -- ...
 registerB
   :: ( HiddenClockResetEnable dom
-     , Undefined a
+     , NFDataX a
      , Bundle a )
   => a
   -> Unbundled dom a
@@ -196,7 +196,7 @@ infixr 3 `registerB`
 -- | Give a pulse when the 'Signal' goes from 'minBound' to 'maxBound'
 isRising
   :: ( HiddenClockResetEnable dom
-     , Undefined a
+     , NFDataX a
      , Bounded a
      , Eq a )
   => a
@@ -209,7 +209,7 @@ isRising = hideClockResetEnable E.isRising
 -- | Give a pulse when the 'Signal' goes from 'maxBound' to 'minBound'
 isFalling
   :: ( HiddenClockResetEnable dom
-     , Undefined a
+     , NFDataX a
      , Bounded a
      , Eq a )
   => a

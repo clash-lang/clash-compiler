@@ -100,7 +100,7 @@ import Clash.Sized.BitVector      (BitVector, (++#))
 import Clash.Sized.Signed         (Signed)
 import Clash.Sized.Unsigned       (Unsigned)
 import Clash.XException
-  (ShowX (..), Undefined (..), isX, errorX, showsPrecXWith)
+  (ShowX (..), NFDataX (..), isX, errorX, showsPrecXWith)
 
 {- $setup
 >>> :set -XDataKinds
@@ -276,7 +276,7 @@ instance ( size ~ (int + frac), KnownNat frac, Integral (rep size)
          ) => ShowX (Fixed rep int frac) where
   showsPrecX = showsPrecXWith showsPrec
 
-instance Undefined (rep (int + frac)) => Undefined (Fixed rep int frac) where
+instance NFDataX (rep (int + frac)) => NFDataX (Fixed rep int frac) where
   deepErrorX = Fixed . errorX
   rnfX f@(~(Fixed x)) = if isLeft (isX f) then () else rnfX x
 

@@ -14,7 +14,7 @@ data States = S_0
             | S_8
             | S_9
             | S_10
-            deriving (Enum, Eq, Generic, Undefined)
+            deriving (Enum, Eq, Generic, NFDataX)
 
 fsm :: States
     -> Unsigned 8

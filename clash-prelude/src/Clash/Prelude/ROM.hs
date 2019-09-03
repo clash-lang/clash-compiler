@@ -40,7 +40,7 @@ import           Clash.Signal
 import           Clash.Sized.Unsigned (Unsigned)
 import           Clash.Sized.Vector   (Vec, length, toList)
 
-import           Clash.XException     (Undefined)
+import           Clash.XException     (NFDataX)
 
 -- | An asynchronous/combinational ROM with space for @n@ elements
 --
@@ -108,7 +108,7 @@ asyncRom# content rd = arr ! rd
 -- for ideas on how to use ROMs and RAMs
 rom
   :: forall dom n m a
-   . ( Undefined a
+   . ( NFDataX a
      , KnownNat n
      , KnownNat m
      , HiddenClock dom
@@ -136,7 +136,7 @@ rom = hideEnable (hideClock E.rom)
 romPow2
   :: forall dom n a
    . ( KnownNat n
-     , Undefined a
+     , NFDataX a
      , HiddenClock dom
      , HiddenEnable dom  )
   => Vec (2^n) a

@@ -8,7 +8,7 @@ data LedMode
   -- ^ After some period, rotate active led to the left
   | Complement
   -- ^ After some period, turn on all disable LEDs, and vice versa
-  deriving (Generic, Undefined)
+  deriving (Generic, NFDataX)
 
 -- Define a synthesis domain with a clock with a period of 20000 /ps/.
 createDomain vSystem{vName="Input", vPeriod=20000}

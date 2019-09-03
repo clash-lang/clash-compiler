@@ -23,7 +23,7 @@ where
 
 import           Clash.Explicit.Signal
   (KnownDomain, Bundle (..), Clock, Reset, Signal, Enable, register)
-import           Clash.XException      (Undefined)
+import           Clash.XException      (NFDataX)
 
 {- $setup
 >>> :set -XDataKinds -XTypeApplications
@@ -85,7 +85,7 @@ let macT s (x,y) = (s',s)
 -- @
 mealy
   :: ( KnownDomain dom
-     , Undefined s )
+     , NFDataX s )
   => Clock dom
   -- ^ 'Clock' to synchronize to
   -> Reset dom
@@ -132,7 +132,7 @@ mealy clk rst en f iS =
 -- @
 mealyB
   :: ( KnownDomain dom
-     , Undefined s
+     , NFDataX s
      , Bundle i
      , Bundle o )
   => Clock dom

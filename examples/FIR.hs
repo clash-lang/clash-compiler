@@ -14,7 +14,7 @@ fir
      , Default a
      , KnownNat n
      , SaturatingNum a
-     , Undefined a )
+     , NFDataX a )
   => Vec (n + 1) a -> Signal tag a -> Signal tag a
 fir coeffs x_t = y_t
   where

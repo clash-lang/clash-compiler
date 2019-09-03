@@ -21,7 +21,7 @@ import qualified Clash.Explicit.Synchronizer as E
 import           Clash.Promoted.Nat          (SNat)
 import           Clash.Signal
   (HiddenClockResetEnable, HiddenClock, Signal, hasClock, hasReset, hasEnable)
-import           Clash.XException            (Undefined)
+import           Clash.XException            (NFDataX)
 import           GHC.TypeLits                (type (<=))
 
 -- | Synchronizer based on two sequentially connected flip-flops.
@@ -47,7 +47,7 @@ import           GHC.TypeLits                (type (<=))
 --      If you want to have /safe/ __word__-synchronization use
 --      'asyncFIFOSynchronizer'.
 dualFlipFlopSynchronizer
-  :: ( Undefined a
+  :: ( NFDataX a
      , HiddenClock dom1
      , HiddenClockResetEnable dom2
      )

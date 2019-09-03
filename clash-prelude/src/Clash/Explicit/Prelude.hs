@@ -198,7 +198,7 @@ import Clash.XException
 window
   :: ( KnownNat n
      , KnownDomain dom
-     , Undefined a
+     , NFDataX a
      , Default a
      )
   => Clock dom
@@ -236,7 +236,7 @@ window clk rst en x = res
 -- ...
 windowD
   :: ( KnownNat n
-     , Undefined a
+     , NFDataX a
      , Default a
      , KnownDomain dom )
   => Clock dom

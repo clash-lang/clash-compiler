@@ -20,7 +20,7 @@ data BusStatusCtrl
   , _stopCondition  :: Bool        -- stop detected
   , _busy           :: Bool        -- internal busy signal
   , _cmdStop        :: Bool        -- STOP command
-  } deriving (Generic, Undefined)
+  } deriving (Generic, NFDataX)
 
 makeLenses ''BusStatusCtrl
 

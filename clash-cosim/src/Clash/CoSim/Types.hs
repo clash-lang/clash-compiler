@@ -14,7 +14,7 @@ module Clash.CoSim.Types where
 import Data.Data (Data, Typeable)
 
 import Clash.Prelude (BitPack, BitSize, KnownNat)
-import Clash.XException (Undefined)
+import Clash.XException (NFDataX)
 
 -- | Settings passed to the simulator. Does not affect synthetization.
 data CoSimSettings = CoSimSettings
@@ -45,7 +45,7 @@ defaultSettings = CoSimSettings
 -- can be simultated.
 type ClashType a = ( BitPack a
                    , KnownNat (BitSize a)
-                   , Undefined a
+                   , NFDataX a
                    )
 
 -- | Supported simulators
