@@ -12,7 +12,7 @@ module Clash.Tutorial (
   -- * Introduction
   -- $introduction
 
-  -- * Installation
+  -- * Install Clash
   -- $installation
 
   -- * Working with this tutorial
@@ -213,84 +213,7 @@ our first circuit.
 -}
 
 {- $installation
-The Clash compiler and Prelude library for circuit design only work with the
-<http://haskell.org/ghc GHC> Haskell compiler version 8.2.1 or higher.
-
-  (1) Install __GHC 8.2.1 or higher__
-
-      * Download and install <https://www.haskell.org/ghc/download_ghc_8_4_3 GHC for your platform>.
-        Unix user can use @./configure prefix=\<LOCATION\>@ to set the installation
-        location.
-
-      * Make sure that the @bin@ directory of __GHC__ is in your @PATH@.
-
-    In case you cannot find what you are looking for on <https://www.haskell.org/ghc/download_ghc_8_4_3>,
-    you can, /alternatively/, use the following instructions:
-
-      * Ubuntu:
-
-          * Run: @sudo add-apt-repository -y ppa:hvr/ghc@
-          * Run: @sudo apt-get update@
-          * Run: @sudo apt-get install cabal-install-2.2 ghc-8.4.3 libtinfo-dev@
-          * Update your @PATH@ with: @\/opt\/ghc\/bin@, @\/opt\/cabal\/bin@, and @\$HOME\/.cabal\/bin@
-          * Run: @cabal update@
-          * Skip step 2.
-
-      * OS X:
-
-          * Follow the instructions on: <https://www.haskell.org/platform/mac.html Haskell Platform Mac OS X>
-            to install the /minimal/ Haskell platform
-          * Run: @cabal update@
-          * Skip step 2.
-
-      * Windows:
-
-          * Follow the instructions on: <https://www.haskell.org/platform/windows.html Haskell Platform Windows>
-            to install the /minimal/ Haskell platform
-          * Run: @cabal update@
-          * Skip step 2.
-
-  (2) Install __Cabal (version 2.2 or higher)__
-
-      * Binary, when available:
-
-          * Download the binary for <http://www.haskell.org/cabal/download.html cabal-install>
-          * Put the binary in a location mentioned in your @PATH@
-          * Add @cabal@'s @bin@ directory to your @PATH@:
-
-              * Windows: @%appdata%\\cabal\\bin@
-              * Unix: @\$HOME\/.cabal\/bin@
-
-      * Source:
-
-          * Download the sources for <http://hackage.haskell.org/package/cabal-install cabal-install>
-          * Unpack (@tar xf@) the archive and @cd@ to the directory
-          * Run: @sh bootstrap.sh@
-          * Follow the instructions to add @cabal@ to your @PATH@
-
-      * Run @cabal update@
-
-  (2) Install __Clash__
-
-      * Run:
-
-          * Linux: @cabal install clash-ghc --enable-documentation --enable-executable-dynamic@
-          * Other: @cabal install clash-ghc --enable-documentation@
-
-      * /This is going to take awhile, so have a refreshment/
-
-  (4) Verify that everything is working by:
-
-      * Downloading the <https://raw.githubusercontent.com/clash-lang/clash-compiler/36a60d7979012b39bcaac66ec7048a7ec7167fbe/examples/FIR.hs Fir.hs> example
-      * Run: @clashi FIR.hs@
-      * Execute, in the interpreter, the @:vhdl@ command
-      * Execute, in the interpreter, the @:verilog@ command
-      * Execute, in the interpreter, the @:systemverilog@ command
-      * Exit the interpreter using @:q@
-      * Examine the VHDL code in the @vhdl@ directory
-      * Examine the Verilog code in the @verilog@ directory
-      * Examine the SystemVerilog code in the @systemverilog@ directory
-
+For installation instructions, see <https://clash-lang.org/install/ clash-lang.org/install/>.
 -}
 
 {- $working
@@ -299,7 +222,7 @@ at the same time. If you followed the installation instructions, you already
 know how to start the Clash compiler in interpretive mode:
 
 @
-clashi
+clash.clashi  # When installed from source, use 'clashi'
 @
 
 For those familiar with Haskell/GHC, this is indeed just @GHCi@, with three
