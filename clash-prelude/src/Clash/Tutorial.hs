@@ -2125,12 +2125,20 @@ Here is a list of Haskell features for which the Clash compiler has only
     For \"easy\" 'Vec'tor literals you should use Template Haskell splices and
     the 'listToVecTH' /meta/-function that as we have seen earlier in this tutorial.
 
-* __GADT pattern matching__
+* __GADTs__
 
-    While pattern matching for regular ADTs is supported, pattern matching for
-    GADTs is __not__. The constructors 'Cons' and 'Nil' of the 'Vec'tor type,
-    which is also a GADT, are __no__ exception! However, you can use the
-    convenient ':>' pattern synonym.
+    Clash has experimental support for GADTs. Similar to recursive types, Clash
+    can't determine bit-sizes of GADTs. Notable exceptions to this rule are
+    'Vec' and 'RTree'. You can still use your own GADTs, as long as they can be
+    removed through static analysis. For example, the following case will be
+    optimized away and is therefore fine to use:
+
+    @
+    x =
+      case 'resetKind' @@'System' of
+        SAsynchronous -> 'a'
+        SSynchronous -> 'b'
+    @
 
 * __Floating point types__
 
