@@ -45,11 +45,11 @@ Homepage:             http://www.clash-lang.org/
 bug-reports:          http://github.com/clash-lang/clash-prelude/issues
 License:              BSD2
 License-file:         LICENSE
-Author:               Christiaan Baaij
-Maintainer:           Christiaan Baaij <christiaan.baaij@gmail.com>
+Author:               The Clash Authors
+Maintainer:           QBayLogic B.V. <devops@qbaylogic.com>
 Copyright:            Copyright © 2013-2016, University of Twente,
                                   2016-2017, Myrtle Software Ltd,
-                                  2017     , QBayLogic, Google Inc.
+                                  2017-2019, QBayLogic B.V., Google Inc.
 Category:             Hardware
 Build-type:           Simple
 
