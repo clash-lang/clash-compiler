@@ -8,12 +8,11 @@ License:              BSD2
 License-file:         LICENSE
 Author:               Orestis Melkonian
 Maintainer:           Orestis Melkonian <melkon.or@gmail.com>
-Copyright:            Copyright © 2019, QBayLogic
+Copyright:            Copyright © 2019, QBayLogic B.V.
 Category:             Terminal
 Build-type:           Simple
 
 Extra-source-files:   README.md
-                      LICENSE_GHC
                       theme.ini
 
 Cabal-version:        >=1.10
