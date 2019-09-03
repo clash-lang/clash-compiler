@@ -8,10 +8,10 @@ import Control.Applicative
 
 data DbState = DbInitDisp (Unsigned 4) | DbWriteRam (Signed 14) (Signed 14)
              | DbDone
-    deriving (Show, Eq, Generic, Undefined)
+    deriving (Show, Eq, Generic, NFDataX)
 
 data DbS = DbS { dbS :: DbState }
-  deriving (Generic, Undefined)
+  deriving (Generic, NFDataX)
 
 
 topEntity

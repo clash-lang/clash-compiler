@@ -80,7 +80,7 @@ import Clash.Promoted.Nat.Literals (d1)
 import Clash.Sized.Index           (Index)
 import Clash.Sized.Vector          (Vec (..), (!!), (++), dtfold, replace)
 import Clash.XException
-  (ShowX (..), Undefined (..), isX, showsX, showsPrecXWith)
+  (ShowX (..), NFDataX (..), isX, showsX, showsPrecXWith)
 
 {- $setup
 >>> :set -XDataKinds
@@ -226,7 +226,7 @@ instance (KnownNat d, Arbitrary a) => Arbitrary (RTree d a) where
 instance (KnownNat d, CoArbitrary a) => CoArbitrary (RTree d a) where
   coarbitrary = coarbitrary . toList
 
-instance (KnownNat d, Undefined a) => Undefined (RTree d a) where
+instance (KnownNat d, NFDataX a) => NFDataX (RTree d a) where
   deepErrorX x = pure (deepErrorX x)
 
   rnfX t = if isLeft (isX t) then () else go t

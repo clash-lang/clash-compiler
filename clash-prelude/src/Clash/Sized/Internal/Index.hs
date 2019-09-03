@@ -104,7 +104,7 @@ import {-# SOURCE #-} Clash.Sized.Internal.BitVector (BitVector (BV), high, low,
 import qualified Clash.Sized.Internal.BitVector as BV
 import Clash.Promoted.Nat         (SNat(..), snatToNum, leToPlusKN)
 import Clash.XException
-  (ShowX (..), Undefined (..), errorX, showsPrecXWith, rwhnfX)
+  (ShowX (..), NFDataX (..), errorX, showsPrecXWith, rwhnfX)
 
 -- | Arbitrary-bounded unsigned integer represented by @ceil(log_2(n))@ bits.
 --
@@ -400,7 +400,7 @@ instance Show (Index n) where
 instance ShowX (Index n) where
   showsPrecX = showsPrecXWith showsPrec
 
-instance Undefined (Index n) where
+instance NFDataX (Index n) where
   deepErrorX = errorX
   rnfX = rwhnfX
 

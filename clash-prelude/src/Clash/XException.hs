@@ -40,7 +40,7 @@ module Clash.XException
     -- * Strict evaluation
   , seqX, forceX, deepseqX, rwhnfX, defaultSeqX
     -- * Structured undefined / deep evaluation with undefined values
-  , Undefined (rnfX, deepErrorX)
+  , NFDataX (rnfX, deepErrorX)
   )
 where
 
@@ -74,7 +74,7 @@ instance Exception XException
 -- | Either 'seqX' or 'deepSeqX' depending on the value of the cabal flag
 -- '-fsuper-strict'. If enabled, 'defaultSeqX' will be 'deepseqX', otherwise
 -- 'seqX'. Flag defaults to /false/ and thus 'seqX'.
-defaultSeqX :: Undefined a => a -> b -> b
+defaultSeqX :: NFDataX a => a -> b -> b
 #ifdef CLASH_SUPER_STRICT
 defaultSeqX = deepseqX
 #else
@@ -450,13 +450,13 @@ instance GShowX UWord where
 -- | a variant of 'deepseqX' that is useful in some circumstances:
 --
 -- > forceX x = x `deepseqX` x
-forceX :: Undefined a => a -> a
+forceX :: NFDataX a => a -> a
 forceX x = x `deepseqX` x
 {-# INLINE forceX #-}
 
 -- | 'deepseqX': fully evaluates the first argument, before returning the
 -- second. Does not propagate 'XException's.
-deepseqX :: Undefined a => a -> b -> b
+deepseqX :: NFDataX a => a -> b -> b
 deepseqX a b = rnfX a `seq` b
 {-# NOINLINE deepseqX #-}
 
@@ -464,13 +464,13 @@ deepseqX a b = rnfX a `seq` b
 --
 -- Equivalent to @\\x -> 'seqX' x ()@.
 --
--- Useful for defining 'Undefined.rnfX' for types for which NF=WHNF holds.
+-- Useful for defining 'NFDataX.rnfX' for types for which NF=WHNF holds.
 rwhnfX :: a -> ()
 rwhnfX = (`seqX` ())
 {-# INLINE rwhnfX #-}
 
--- | Hidden internal type-class. Adds a generic implementation for the "NFDataX"
--- part of 'Undefined'
+-- | Hidden internal type-class. Adds a generic implementation for the "NFData"
+-- part of 'NFDataX'
 class GNFDataX arity f where
   grnfX :: RnfArgs arity a -> f a -> ()
 
@@ -487,7 +487,7 @@ data RnfArgs arity a where
 instance GNFDataX arity U1 where
   grnfX _ u = if isLeft (isX u) then () else case u of U1 -> ()
 
-instance Undefined a => GNFDataX arity (K1 i a) where
+instance NFDataX a => GNFDataX arity (K1 i a) where
   grnfX _ = rnfX . unK1
   {-# INLINEABLE grnfX #-}
 
@@ -542,12 +542,12 @@ class NFDataX1 f where
 
 -- | Class that houses functions dealing with /undefined/ values in Clash. See
 -- 'deepErrorX' and 'rnfX'.
-class Undefined a where
+class NFDataX a where
   -- | Create a value where all the elements have an 'errorX', but the spine
   -- is defined.
   deepErrorX :: HasCallStack => String -> a
 
-  default deepErrorX :: (HasCallStack, Generic a, GUndefined (Rep a)) => String -> a
+  default deepErrorX :: (HasCallStack, Generic a, GDeepErrorX (Rep a)) => String -> a
   deepErrorX = withFrozenCallStack $ to . gDeepErrorX
 
   -- | Evaluate a value to NF. As opposed to 'NFData's 'rnf', it does not bubble
@@ -557,124 +557,124 @@ class Undefined a where
   default rnfX :: (Generic a, GNFDataX Zero (Rep a)) => a -> ()
   rnfX = grnfX RnfArgs0 . from
 
-instance Undefined ()
-instance (Undefined a, Undefined b) => Undefined (a,b)
-instance (Undefined a, Undefined b, Undefined c) => Undefined (a,b,c)
-instance (Undefined a, Undefined b, Undefined c, Undefined d) => Undefined (a,b,c,d)
-instance (Undefined a, Undefined b, Undefined c, Undefined d, Undefined e) => Undefined (a,b,c,d,e)
-instance (Undefined a, Undefined b, Undefined c, Undefined d, Undefined e ,Undefined f)
-  => Undefined (a,b,c,d,e,f)
-instance (Undefined a, Undefined b, Undefined c, Undefined d, Undefined e
-         ,Undefined f, Undefined g)
-  => Undefined (a,b,c,d,e,f,g)
-instance (Undefined a, Undefined b, Undefined c, Undefined d, Undefined e
-         ,Undefined f, Undefined g, Undefined h)
-  => Undefined (a,b,c,d,e,f,g,h)
-instance (Undefined a, Undefined b, Undefined c, Undefined d, Undefined e
-         ,Undefined f, Undefined g, Undefined h, Undefined i)
-  => Undefined (a,b,c,d,e,f,g,h,i)
-instance (Undefined a, Undefined b, Undefined c, Undefined d, Undefined e
-         ,Undefined f, Undefined g, Undefined h, Undefined i, Undefined j)
-  => Undefined (a,b,c,d,e,f,g,h,i,j)
-instance (Undefined a, Undefined b, Undefined c, Undefined d, Undefined e
-         ,Undefined f, Undefined g, Undefined h, Undefined i, Undefined j
-         ,Undefined k)
-  => Undefined (a,b,c,d,e,f,g,h,i,j,k)
-instance (Undefined a, Undefined b, Undefined c, Undefined d, Undefined e
-         ,Undefined f, Undefined g, Undefined h, Undefined i, Undefined j
-         ,Undefined k, Undefined l)
-  => Undefined (a,b,c,d,e,f,g,h,i,j,k,l)
-instance (Undefined a, Undefined b, Undefined c, Undefined d, Undefined e
-         ,Undefined f, Undefined g, Undefined h, Undefined i, Undefined j
-         ,Undefined k, Undefined l, Undefined m)
-  => Undefined (a,b,c,d,e,f,g,h,i,j,k,l,m)
-instance (Undefined a, Undefined b, Undefined c, Undefined d, Undefined e
-         ,Undefined f, Undefined g, Undefined h, Undefined i, Undefined j
-         ,Undefined k, Undefined l, Undefined m, Undefined n)
-  => Undefined (a,b,c,d,e,f,g,h,i,j,k,l,m,n)
-instance (Undefined a, Undefined b, Undefined c, Undefined d, Undefined e
-         ,Undefined f, Undefined g, Undefined h, Undefined i, Undefined j
-         ,Undefined k, Undefined l, Undefined m, Undefined n, Undefined o)
-  => Undefined (a,b,c,d,e,f,g,h,i,j,k,l,m,n,o)
+instance NFDataX ()
+instance (NFDataX a, NFDataX b) => NFDataX (a,b)
+instance (NFDataX a, NFDataX b, NFDataX c) => NFDataX (a,b,c)
+instance (NFDataX a, NFDataX b, NFDataX c, NFDataX d) => NFDataX (a,b,c,d)
+instance (NFDataX a, NFDataX b, NFDataX c, NFDataX d, NFDataX e) => NFDataX (a,b,c,d,e)
+instance (NFDataX a, NFDataX b, NFDataX c, NFDataX d, NFDataX e ,NFDataX f)
+  => NFDataX (a,b,c,d,e,f)
+instance (NFDataX a, NFDataX b, NFDataX c, NFDataX d, NFDataX e
+         ,NFDataX f, NFDataX g)
+  => NFDataX (a,b,c,d,e,f,g)
+instance (NFDataX a, NFDataX b, NFDataX c, NFDataX d, NFDataX e
+         ,NFDataX f, NFDataX g, NFDataX h)
+  => NFDataX (a,b,c,d,e,f,g,h)
+instance (NFDataX a, NFDataX b, NFDataX c, NFDataX d, NFDataX e
+         ,NFDataX f, NFDataX g, NFDataX h, NFDataX i)
+  => NFDataX (a,b,c,d,e,f,g,h,i)
+instance (NFDataX a, NFDataX b, NFDataX c, NFDataX d, NFDataX e
+         ,NFDataX f, NFDataX g, NFDataX h, NFDataX i, NFDataX j)
+  => NFDataX (a,b,c,d,e,f,g,h,i,j)
+instance (NFDataX a, NFDataX b, NFDataX c, NFDataX d, NFDataX e
+         ,NFDataX f, NFDataX g, NFDataX h, NFDataX i, NFDataX j
+         ,NFDataX k)
+  => NFDataX (a,b,c,d,e,f,g,h,i,j,k)
+instance (NFDataX a, NFDataX b, NFDataX c, NFDataX d, NFDataX e
+         ,NFDataX f, NFDataX g, NFDataX h, NFDataX i, NFDataX j
+         ,NFDataX k, NFDataX l)
+  => NFDataX (a,b,c,d,e,f,g,h,i,j,k,l)
+instance (NFDataX a, NFDataX b, NFDataX c, NFDataX d, NFDataX e
+         ,NFDataX f, NFDataX g, NFDataX h, NFDataX i, NFDataX j
+         ,NFDataX k, NFDataX l, NFDataX m)
+  => NFDataX (a,b,c,d,e,f,g,h,i,j,k,l,m)
+instance (NFDataX a, NFDataX b, NFDataX c, NFDataX d, NFDataX e
+         ,NFDataX f, NFDataX g, NFDataX h, NFDataX i, NFDataX j
+         ,NFDataX k, NFDataX l, NFDataX m, NFDataX n)
+  => NFDataX (a,b,c,d,e,f,g,h,i,j,k,l,m,n)
+instance (NFDataX a, NFDataX b, NFDataX c, NFDataX d, NFDataX e
+         ,NFDataX f, NFDataX g, NFDataX h, NFDataX i, NFDataX j
+         ,NFDataX k, NFDataX l, NFDataX m, NFDataX n, NFDataX o)
+  => NFDataX (a,b,c,d,e,f,g,h,i,j,k,l,m,n,o)
 
-instance Undefined b => Undefined (a -> b) where
+instance NFDataX b => NFDataX (a -> b) where
   deepErrorX = pure . deepErrorX
   rnfX = rwhnfX
 
-instance Undefined a => Undefined (Down a) where
+instance NFDataX a => NFDataX (Down a) where
   deepErrorX = Down . deepErrorX
   rnfX d@(~(Down x))= if isLeft (isX d) then rnfX x else ()
 
-instance Undefined Bool
-instance Undefined a => Undefined [a]
-instance (Undefined a, Undefined b) => Undefined (Either a b)
-instance Undefined a => Undefined (Maybe a)
+instance NFDataX Bool
+instance NFDataX a => NFDataX [a]
+instance (NFDataX a, NFDataX b) => NFDataX (Either a b)
+instance NFDataX a => NFDataX (Maybe a)
 
-instance Undefined Char where
+instance NFDataX Char where
   deepErrorX = errorX
   rnfX = rwhnfX
 
-instance Undefined Double where
+instance NFDataX Double where
   deepErrorX = errorX
   rnfX = rwhnfX
 
-instance Undefined Float where
+instance NFDataX Float where
   deepErrorX = errorX
   rnfX = rwhnfX
 
-instance Undefined Int where
+instance NFDataX Int where
   deepErrorX = errorX
   rnfX = rwhnfX
 
-instance Undefined Int8 where
+instance NFDataX Int8 where
   deepErrorX = errorX
   rnfX = rwhnfX
 
-instance Undefined Int16 where
+instance NFDataX Int16 where
   deepErrorX = errorX
   rnfX = rwhnfX
 
-instance Undefined Int32 where
+instance NFDataX Int32 where
   deepErrorX = errorX
   rnfX = rwhnfX
 
-instance Undefined Int64 where
+instance NFDataX Int64 where
   deepErrorX = errorX
   rnfX = rwhnfX
 
-instance Undefined Integer where
+instance NFDataX Integer where
   deepErrorX = errorX
   rnfX = rwhnfX
 
-instance Undefined Natural where
+instance NFDataX Natural where
   deepErrorX = errorX
   rnfX = rwhnfX
 
-instance Undefined Word where
+instance NFDataX Word where
   deepErrorX = errorX
   rnfX = rwhnfX
 
-instance Undefined Word8 where
+instance NFDataX Word8 where
   deepErrorX = errorX
   rnfX = rwhnfX
 
-instance Undefined Word16 where
+instance NFDataX Word16 where
   deepErrorX = errorX
   rnfX = rwhnfX
 
-instance Undefined Word32 where
+instance NFDataX Word32 where
   deepErrorX = errorX
   rnfX = rwhnfX
 
-instance Undefined Word64 where
+instance NFDataX Word64 where
   deepErrorX = errorX
   rnfX = rwhnfX
 
-instance Undefined Half where
+instance NFDataX Half where
   deepErrorX = errorX
   rnfX = rwhnfX
 
-instance Undefined a => Undefined (Seq a) where
+instance NFDataX a => NFDataX (Seq a) where
   deepErrorX = errorX
   rnfX s =
     if isLeft (isX s) then () else go s
@@ -682,43 +682,43 @@ instance Undefined a => Undefined (Seq a) where
     go Empty = ()
     go (x :<| xs) = rnfX x `seq` go xs
 
-instance Undefined a => Undefined (Ratio a) where
+instance NFDataX a => NFDataX (Ratio a) where
   deepErrorX = errorX
   rnfX r = rnfX (numerator r) `seq` rnfX (denominator r)
 
-instance Undefined a => Undefined (Complex a) where
+instance NFDataX a => NFDataX (Complex a) where
   deepErrorX = errorX
 
-instance (Undefined a, Undefined b) => Undefined (SG.Arg a b)
-instance Undefined (SG.All)
-instance Undefined (SG.Any)
-instance Undefined a => Undefined (SG.Dual a)
-instance Undefined a => Undefined (SG.Endo a)
-instance Undefined a => Undefined (SG.First a)
-instance Undefined a => Undefined (SG.Last a)
-instance Undefined a => Undefined (SG.Max a)
-instance Undefined a => Undefined (SG.Min a)
-instance Undefined a => Undefined (SG.Option a)
-instance Undefined a => Undefined (SG.Product a)
-instance Undefined a => Undefined (SG.Sum a)
+instance (NFDataX a, NFDataX b) => NFDataX (SG.Arg a b)
+instance NFDataX (SG.All)
+instance NFDataX (SG.Any)
+instance NFDataX a => NFDataX (SG.Dual a)
+instance NFDataX a => NFDataX (SG.Endo a)
+instance NFDataX a => NFDataX (SG.First a)
+instance NFDataX a => NFDataX (SG.Last a)
+instance NFDataX a => NFDataX (SG.Max a)
+instance NFDataX a => NFDataX (SG.Min a)
+instance NFDataX a => NFDataX (SG.Option a)
+instance NFDataX a => NFDataX (SG.Product a)
+instance NFDataX a => NFDataX (SG.Sum a)
 
-class GUndefined f where
+class GDeepErrorX f where
   gDeepErrorX :: HasCallStack => String -> f a
 
-instance GUndefined V1 where
+instance GDeepErrorX V1 where
   gDeepErrorX = errorX
 
-instance GUndefined U1 where
+instance GDeepErrorX U1 where
   gDeepErrorX = const U1
 
-instance (GUndefined a) => GUndefined (M1 m d a) where
+instance (GDeepErrorX a) => GDeepErrorX (M1 m d a) where
   gDeepErrorX e = M1 (gDeepErrorX e)
 
-instance (GUndefined f, GUndefined g) => GUndefined (f :*: g) where
+instance (GDeepErrorX f, GDeepErrorX g) => GDeepErrorX (f :*: g) where
   gDeepErrorX e = gDeepErrorX e :*: gDeepErrorX e
 
-instance Undefined c => GUndefined (K1 i c) where
+instance NFDataX c => GDeepErrorX (K1 i c) where
   gDeepErrorX e = K1 (deepErrorX e)
 
-instance GUndefined (f :+: g) where
+instance GDeepErrorX (f :+: g) where
   gDeepErrorX = errorX

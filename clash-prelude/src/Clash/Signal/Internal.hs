@@ -164,7 +164,7 @@ import Test.QuickCheck            (Arbitrary (..), CoArbitrary(..), Property,
 import Clash.Promoted.Nat         (SNat (..), snatToNum, snatToNatural)
 import Clash.Promoted.Symbol      (SSymbol (..), ssymbolToString)
 import Clash.XException
-  (Undefined, errorX, deepseqX, defaultSeqX, deepErrorX)
+  (NFDataX, errorX, deepseqX, defaultSeqX, deepErrorX)
 
 {- $setup
 >>> :set -XDataKinds
@@ -1027,7 +1027,7 @@ infixr 3 .&&.
 delay#
   :: forall dom a
    . ( KnownDomain dom
-     , Undefined a )
+     , NFDataX a )
   => Clock dom
   -> Enable dom
   -> a
@@ -1065,7 +1065,7 @@ delay# (Clock dom) (fromEnable -> en) powerUpVal0 =
 register#
   :: forall dom  a
    . ( KnownDomain dom
-     , Undefined a )
+     , NFDataX a )
   => Clock dom
   -> Reset dom
   -> Enable dom
@@ -1235,7 +1235,7 @@ testFor n = property . and . take n . sample
 -- > sample s == [s0, s1, s2, s3, ...
 --
 -- __NB__: This function is not synthesizable
-sample :: (Foldable f, Undefined a) => f a -> [a]
+sample :: (Foldable f, NFDataX a) => f a -> [a]
 sample = foldr (\a b -> deepseqX a (a : b)) []
 
 -- | The above type is a generalization for:
@@ -1252,7 +1252,7 @@ sample = foldr (\a b -> deepseqX a (a : b)) []
 -- > sampleN 3 s == [s0, s1, s2]
 --
 -- __NB__: This function is not synthesizable
-sampleN :: (Foldable f, Undefined a) => Int -> f a -> [a]
+sampleN :: (Foldable f, NFDataX a) => Int -> f a -> [a]
 sampleN n = take n . sample
 
 -- | Create a 'Clash.Signal.Signal' from a list
@@ -1264,7 +1264,7 @@ sampleN n = take n . sample
 -- [1,2]
 --
 -- __NB__: This function is not synthesizable
-fromList :: Undefined a => [a] -> Signal dom a
+fromList :: NFDataX a => [a] -> Signal dom a
 fromList = Prelude.foldr (\a b -> deepseqX a (a :- b)) (errorX "finite list")
 
 -- * Simulation functions (not synthesizable)
@@ -1277,7 +1277,7 @@ fromList = Prelude.foldr (\a b -> deepseqX a (a :- b)) (errorX "finite list")
 -- ...
 --
 -- __NB__: This function is not synthesizable
-simulate :: (Undefined a, Undefined b) => (Signal dom1 a -> Signal dom2 b) -> [a] -> [b]
+simulate :: (NFDataX a, NFDataX b) => (Signal dom1 a -> Signal dom2 b) -> [a] -> [b]
 simulate f = sample . f . fromList
 
 -- | The above type is a generalization for:

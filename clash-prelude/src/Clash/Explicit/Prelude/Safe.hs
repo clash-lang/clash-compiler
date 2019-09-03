@@ -165,7 +165,7 @@ import Clash.XException
 -- ...
 registerB
   :: ( KnownDomain dom
-     , Undefined a
+     , NFDataX a
      , Bundle a )
   => Clock dom
   -> Reset dom
@@ -180,7 +180,7 @@ registerB clk rst en i =
 -- | Give a pulse when the 'Signal' goes from 'minBound' to 'maxBound'
 isRising
   :: ( KnownDomain dom
-     , Undefined a
+     , NFDataX a
      , Bounded a
      , Eq a )
   => Clock dom
@@ -198,7 +198,7 @@ isRising clk rst en is s = liftA2 edgeDetect prev s
 -- | Give a pulse when the 'Signal' goes from 'maxBound' to 'minBound'
 isFalling
   :: ( KnownDomain dom
-     , Undefined a
+     , NFDataX a
      , Bounded a
      , Eq a )
   => Clock dom

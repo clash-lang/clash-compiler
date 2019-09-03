@@ -101,7 +101,7 @@ import qualified Clash.Sized.Vector    as Vector
 import           Clash.Class.BitPack   (BitPack, BitSize, pack, unpack)
 import           Clash.Promoted.Nat    (snatToNum, SNat(..))
 import           Clash.Signal.Internal (sample)
-import           Clash.XException      (deepseqX, Undefined)
+import           Clash.XException      (deepseqX, NFDataX)
 import           Clash.Sized.Internal.BitVector
   (BitVector(BV))
 
@@ -149,7 +149,7 @@ mkTrace
   :: HasCallStack
   => KnownNat (BitSize a)
   => BitPack a
-  => Undefined a
+  => NFDataX a
   => Signal dom a
   -> [Value]
 mkTrace signal = sample (unsafeToTup . pack <$> signal)
@@ -162,7 +162,7 @@ traceSignal#
   :: forall dom a
    . ( KnownNat (BitSize a)
      , BitPack a
-     , Undefined a
+     , NFDataX a
      , Typeable a )
   => IORef TraceMap
   -- ^ Map to store the trace
@@ -198,7 +198,7 @@ traceVecSignal#
    . ( KnownNat (BitSize a)
      , KnownNat n
      , BitPack a
-     , Undefined a
+     , NFDataX a
      , Typeable a )
   => IORef TraceMap
   -- ^ Map to store the traces
@@ -228,7 +228,7 @@ traceSignal
    . ( KnownDomain dom
      , KnownNat (BitSize a)
      , BitPack a
-     , Undefined a
+     , NFDataX a
      , Typeable a )
   => String
   -- ^ Name of signal in the VCD output
@@ -252,7 +252,7 @@ traceSignal traceName signal =
 traceSignal1
   :: ( KnownNat (BitSize a)
      , BitPack a
-     , Undefined a
+     , NFDataX a
      , Typeable a )
   => String
   -- ^ Name of signal in the VCD output
@@ -276,7 +276,7 @@ traceVecSignal
      , KnownNat (BitSize a)
      , KnownNat n
      , BitPack a
-     , Undefined a
+     , NFDataX a
      , Typeable a )
   => String
   -- ^ Name of signal in debugging output. Will be appended by _0, _1, ..., _n.
@@ -302,7 +302,7 @@ traceVecSignal1
   :: ( KnownNat (BitSize a)
      , KnownNat n
      , BitPack a
-     , Undefined a
+     , NFDataX a
      , Typeable a )
   => String
   -- ^ Name of signal in debugging output. Will be appended by _0, _1, ..., _n.
@@ -460,7 +460,7 @@ dumpVCD## (offset, cycles) traceMap now
 
 -- | Same as @dumpVCD@, but supplied with a custom tracemap
 dumpVCD#
-  :: Undefined a
+  :: NFDataX a
   => IORef TraceMap
   -- ^ Map with collected traces
   -> (Int, Int)
@@ -492,7 +492,7 @@ dumpVCD# traceMap slice signal traceNames = do
 -- Evaluates /cntrOut/ long enough in order for to guarantee that the @main@,
 -- and @sub@ traces end up in the generated VCD file.
 dumpVCD
-  :: Undefined a
+  :: NFDataX a
   => (Int, Int)
   -- ^ (offset, number of samples)
   -> Signal dom a
@@ -505,7 +505,7 @@ dumpVCD = dumpVCD# traceMap#
 -- | Dump a number of samples to a replayable bytestring.
 dumpReplayable
   :: forall a dom
-   . Undefined a
+   . NFDataX a
   => Int
   -- ^ Number of samples
   -> Signal dom a
@@ -527,7 +527,7 @@ dumpReplayable n oSignal traceName = do
 replay
   :: forall a dom n
    . ( Typeable a
-     , Undefined a
+     , NFDataX a
      , BitPack a
      , KnownNat n
      , n ~ BitSize a )
@@ -562,7 +562,7 @@ decodeSamples bytes0 =
 
 -- | Keep evaluating given signal until all trace names are present.
 waitForTraces#
-  :: Undefined a
+  :: NFDataX a
   => IORef TraceMap
   -- ^ Map with collected traces
   -> Signal dom a

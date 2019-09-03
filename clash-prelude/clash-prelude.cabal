@@ -323,7 +323,7 @@ test-suite unittests
                  Clash.Tests.DerivingDataRepr
                  Clash.Tests.DerivingDataReprTypes
                  Clash.Tests.Signal
-                 Clash.Tests.Undefined
+                 Clash.Tests.NFDataX
 
 
 benchmark benchmark-clash-prelude

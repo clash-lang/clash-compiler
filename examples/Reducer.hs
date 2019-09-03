@@ -50,7 +50,7 @@ equalDiscr _             _             = False
 data DiscrState = Discr { prevIndex :: ArrayIndex
                         , curDiscr  :: Unsigned DiscrSize
                         }
-                        deriving (Generic, Undefined)
+                        deriving (Generic, NFDataX)
 
 type InputState = Vec (AdderDepth + 1) Cell
 
@@ -59,7 +59,7 @@ type FpState    = Vec AdderDepth Cell
 data ResState   = Res { cellMem  :: Vec DiscrRange Cell
                       , indexMem :: Vec DiscrRange ArrayIndex
                       }
-                      deriving (Generic, Undefined)
+                      deriving (Generic, NFDataX)
 
 -- ===========================================================
 -- = Discrimintor: Hands out new discriminator to the system =
