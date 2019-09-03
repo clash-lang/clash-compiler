@@ -1,4 +1,4 @@
-resolver: lts-13.28
+resolver: lts-14.4
 
 packages:
 - clash-prelude
@@ -8,8 +8,3 @@ packages:
 
 extra-deps:
 - ./clash-cosim
-- type-errors-0.2.0.0@sha256:b8f97a0cf72f4fcdc9bfd02d753f84e65e5e5d165d53f82947a95cdcbd7f2945
-- first-class-families-0.5.0.0@sha256:6e1488c502d5b1e780739a53edab65a307c6bf94d4232fab70e696e87f0fa087
-
-- git: https://github.com/clash-lang/ghc-typelits-extra
-  commit: a8de0b68b8216411cb862195354f251cd41bae50
