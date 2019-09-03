@@ -22,7 +22,7 @@ data BitMasterS
   , _slaveWait      :: Bool            -- clock generation signal
   , _cnt            :: Unsigned 16     -- clock divider counter (synthesis)
   }
-  deriving (Generic, Undefined)
+  deriving (Generic, NFDataX)
 
 makeLenses ''BitMasterS
 

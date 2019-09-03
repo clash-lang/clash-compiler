@@ -28,7 +28,7 @@ tests = testGroup "Inline verilog"
 -- "normal" Haskell types.
 bin
     :: forall t a
-     . (t ~ Signal System a, Undefined a)
+     . (t ~ Signal System a, NFDataX a)
     => (t -> t -> t)
     -> a
     -> a

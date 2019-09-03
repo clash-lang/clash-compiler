@@ -269,7 +269,7 @@ import           Clash.Signal.Internal
 import           Clash.Signal.Internal.Ambiguous
   (knownVDomain, clockPeriod, activeEdge, resetKind, initBehavior, resetPolarity)
 import           Clash.Sized.Index              (Index)
-import           Clash.XException               (Undefined, deepErrorX)
+import           Clash.XException               (NFDataX, deepErrorX)
 
 {- $setup
 >>> :set -XDataKinds -XTypeApplications -XFlexibleInstances -XMultiParamTypeClasses -XTypeFamilies
@@ -552,7 +552,7 @@ enable e0 e1 =
 -- Initial value will be undefined.
 dflipflop
   :: ( KnownDomain dom
-     , Undefined a )
+     , NFDataX a )
   => Clock dom
   -> Signal dom a
   -> Signal dom a
@@ -571,7 +571,7 @@ dflipflop clk i =
 -- [0,1,2]
 delay
   :: ( KnownDomain dom
-     , Undefined a )
+     , NFDataX a )
   => Clock dom
   -- ^ Clock
   -> Enable dom
@@ -591,7 +591,7 @@ delay = delay#
 -- [0,1,2,2,2,5,6]
 delayMaybe
   :: ( KnownDomain dom
-     , Undefined a )
+     , NFDataX a )
   => Clock dom
   -- ^ Clock
   -> Enable dom
@@ -612,7 +612,7 @@ delayMaybe clk gen dflt i =
 -- [0,1,2,2,2,5,6]
 delayEn
   :: ( KnownDomain dom
-     , Undefined a )
+     , NFDataX a )
   => Clock dom
   -- ^ Clock
   -> Enable dom
@@ -634,7 +634,7 @@ delayEn clk gen dflt en i =
 -- [8,8,1,2,3]
 register
   :: ( KnownDomain dom
-     , Undefined a )
+     , NFDataX a )
   => Clock dom
   -- ^ clock
   -> Reset dom
@@ -673,7 +673,7 @@ register clk rst gen initial i =
 -- [0,0,0,1,1,2,2,3,3]
 regMaybe
   :: ( KnownDomain dom
-     , Undefined a )
+     , NFDataX a )
   => Clock dom
   -- ^ Clock
   -> Reset dom
@@ -705,7 +705,7 @@ regMaybe clk rst en initial iM =
 -- [0,0,0,1,1,2,2,3,3]
 regEn
   :: ( KnownDomain dom
-     , Undefined a
+     , NFDataX a
      )
   => Clock dom
   -- ^ Clock
@@ -733,8 +733,8 @@ regEn clk rst gen initial en i =
 simulateWithReset
   :: forall dom a b m
    . ( KnownDomain dom
-     , Undefined a
-     , Undefined b
+     , NFDataX a
+     , NFDataX b
      , 1 <= m )
   => SNat m
   -- ^ Number of cycles to assert the reset
@@ -762,8 +762,8 @@ simulateWithReset m resetVal f as =
 -- | Same as 'simulateWithReset', but only sample the first /Int/ output values.
 simulateWithResetN
   :: ( KnownDomain dom
-     , Undefined a
-     , Undefined b
+     , NFDataX a
+     , NFDataX b
      , 1 <= m )
   => SNat m
   -- ^ Number of cycles to assert the reset
@@ -793,7 +793,7 @@ simulateWithResetN nReset resetVal nSamples f as =
 --
 -- __NB__: This function is not synthesizable
 simulateB
-  :: (Bundle a, Bundle b, Undefined a, Undefined b)
+  :: (Bundle a, Bundle b, NFDataX a, NFDataX b)
   => (Unbundled dom1 a -> Unbundled dom2 b)
   -- ^ The function we want to simulate
   -> [a]
@@ -863,7 +863,7 @@ holdReset clk en SNat rst =
 -- __NB__: This function is not synthesizable
 fromListWithReset
   :: forall dom a
-   . (KnownDomain dom, Undefined a)
+   . (KnownDomain dom, NFDataX a)
   => Reset dom
   -> a
   -> [a]

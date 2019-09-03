@@ -98,7 +98,7 @@ import Clash.Promoted.Nat           (SNat (..), pow2SNat, snatToNum)
 import Clash.Sized.BitVector        (BitVector)
 import Clash.Explicit.Signal        (Clock, Enable, Signal, KnownDomain, delay)
 import Clash.Sized.Unsigned         (Unsigned)
-import Clash.XException             (Undefined(deepErrorX))
+import Clash.XException             (NFDataX(deepErrorX))
 
 
 -- | A ROM with a synchronous read port, with space for 2^@n@ elements

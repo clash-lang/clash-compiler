@@ -6,7 +6,7 @@ windowN
   :: HiddenClockResetEnable dom
   => Default a
   => KnownNat n
-  => Undefined a
+  => NFDataX a
   => SNat (n+1)
   -> Signal dom a
   -> Vec (n + 1) (Signal dom a)

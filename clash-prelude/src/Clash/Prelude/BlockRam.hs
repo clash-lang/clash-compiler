@@ -44,7 +44,7 @@ data Reg
   | RegC
   | RegD
   | RegE
-  deriving (Eq, Show, Enum, Generic, Undefined)
+  deriving (Eq, Show, Enum, Generic, NFDataX)
 
 data Operator = Add | Sub | Incr | Imm | CmpGt
   deriving (Eq, Show)
@@ -403,7 +403,7 @@ import           Clash.Signal
 import           Clash.Sized.Index       (Index)
 import           Clash.Sized.Unsigned    (Unsigned)
 import           Clash.Sized.Vector      (Vec)
-import           Clash.XException        (Undefined)
+import           Clash.XException        (NFDataX)
 
 {- $setup
 >>> import Clash.Prelude as C
@@ -422,7 +422,7 @@ data Reg
   | RegC
   | RegD
   | RegE
-  deriving (Eq,Show,Enum,C.Generic,Undefined)
+  deriving (Eq,Show,Enum,C.Generic,NFDataX)
 :}
 
 >>> :{
@@ -687,7 +687,7 @@ blockRam
   :: ( HasCallStack
      , HiddenClock dom
      , HiddenEnable dom
-     , Undefined a
+     , NFDataX a
      , Enum addr
      )
   => Vec n a
@@ -711,7 +711,7 @@ blockRamU
    :: forall n dom a r addr
    . ( HasCallStack
      , HiddenClockResetEnable dom
-     , Undefined a
+     , NFDataX a
      , Enum addr
      , 1 <= n )
   => E.ResetStrategy r
@@ -739,7 +739,7 @@ blockRam1
    :: forall n dom a r addr
    . ( HasCallStack
      , HiddenClockResetEnable dom
-     , Undefined a
+     , NFDataX a
      , Enum addr
      , 1 <= n )
   => E.ResetStrategy r
@@ -784,7 +784,7 @@ blockRamPow2
   :: ( HasCallStack
      , HiddenClock dom
      , HiddenEnable dom
-     , Undefined a
+     , NFDataX a
      , KnownNat n
      )
   => Vec (2^n) a
@@ -815,7 +815,7 @@ blockRamPow2 = \cnt rd wrM -> withFrozenCallStack
 --      Signal dom addr -> Signal dom (Maybe (addr, a)) -> Signal dom a
 readNew
   :: ( HiddenClockResetEnable dom
-     , Undefined a
+     , NFDataX a
      , Eq addr )
   => (Signal dom addr -> Signal dom (Maybe (addr, a)) -> Signal dom a)
   -- ^ The @ram@ component

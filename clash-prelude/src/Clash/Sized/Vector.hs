@@ -142,7 +142,7 @@ import Clash.Sized.Index          (Index)
 
 import Clash.Class.BitPack        (packXWith, BitPack (..))
 import Clash.XException
-  (ShowX (..), Undefined (..), showsX, showsPrecXWith, seqX)
+  (ShowX (..), NFDataX (..), showsX, showsPrecXWith, seqX)
 
 {- $setup
 >>> :set -XDataKinds
@@ -348,7 +348,7 @@ traverse# f (x `Cons` xs) = Cons <$> f x <*> traverse# f xs
 instance (Default a, KnownNat n) => Default (Vec n a) where
   def = repeat def
 
-instance (Undefined a, KnownNat n) => Undefined (Vec n a) where
+instance (NFDataX a, KnownNat n) => NFDataX (Vec n a) where
   deepErrorX x = repeat (deepErrorX x)
 
   rnfX v =

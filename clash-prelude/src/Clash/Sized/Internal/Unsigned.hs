@@ -103,7 +103,7 @@ import Clash.Prelude.BitReduction     (reduceOr)
 import Clash.Sized.Internal.BitVector (BitVector (BV), Bit, high, low, undefError)
 import qualified Clash.Sized.Internal.BitVector as BV
 import Clash.XException
-  (ShowX (..), Undefined (..), errorX, showsPrecXWith, rwhnfX)
+  (ShowX (..), NFDataX (..), errorX, showsPrecXWith, rwhnfX)
 
 -- | Arbitrary-width unsigned integer represented by @n@ bits
 --
@@ -159,7 +159,7 @@ instance Show (Unsigned n) where
 instance ShowX (Unsigned n) where
   showsPrecX = showsPrecXWith showsPrec
 
-instance Undefined (Unsigned n) where
+instance NFDataX (Unsigned n) where
   deepErrorX = errorX
   rnfX = rwhnfX
 

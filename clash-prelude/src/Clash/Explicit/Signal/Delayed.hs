@@ -51,7 +51,7 @@ import Clash.Signal.Delayed.Internal
 import Clash.Explicit.Signal
   (KnownDomain, Clock, Reset, Signal, Enable, register,  bundle, unbundle)
 
-import Clash.XException           (Undefined)
+import Clash.XException           (NFDataX)
 
 {- $setup
 >>> :set -XDataKinds
@@ -95,7 +95,7 @@ delayed
   :: forall dom  a n d
    . ( KnownDomain dom
      , KnownNat d
-     , Undefined a )
+     , NFDataX a )
   => Clock dom
   -> Reset dom
   -> Enable dom
@@ -143,7 +143,7 @@ delayed clk rst en m ds = coerce (delaySignal (coerce ds))
 delayedI
   :: ( KnownNat d
      , KnownDomain dom
-     , Undefined a )
+     , NFDataX a )
   => Clock dom
   -> Reset dom
   -> Enable dom

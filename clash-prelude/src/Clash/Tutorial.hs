@@ -76,7 +76,7 @@ where
 
 import Clash.Prelude
 import Clash.Explicit.Testbench
-import Clash.XException (Undefined)
+import Clash.XException (NFDataX)
 import Control.Monad.ST
 import Data.Array
 import Data.Char
@@ -339,7 +339,7 @@ the definition of one of the sequential primitives, the @'register'@ function:
 @
 register
      ( 'HiddenClockResetEnable' dom dom
-     , 'Clash.XException.Undefined' a )
+     , 'Clash.XException.NFDataX' a )
   => a
   -> 'Signal' dom a
   -> 'Signal' dom a
@@ -427,7 +427,7 @@ shape of @macT@:
 
 @
 mealy
-  :: ('HiddenClockResetEnable' dom dom, 'Clash.XException.Undefined' s)
+  :: ('HiddenClockResetEnable' dom dom, 'Clash.XException.NFDataX' s)
   => (s -> i -> (s,o))
   -> s
   -> ('Signal' dom i -> 'Signal' dom o)
@@ -668,7 +668,7 @@ structure.
     @
     asStateM
       :: ( 'HiddenClockResetEnable' dom dom
-         , 'Undefined' s )
+         , 'NFDataX' s )
       => (i -> 'Control.Monad.State.Lazy.State' s o)
       -> s
       -> ('Signal' dom i -> 'Signal' dom o)
@@ -1080,7 +1080,7 @@ import Clash.XException       (defaultSeqX)
 
 blockRam#
   :: ( HasCallStack
-     , Undefined a )
+     , NFDataX a )
   => 'Clock' dom           -- ^ 'Clock' to synchronize to
   -> 'Enable' dom          -- ^ Global enable
   -> 'Vec' n a             -- ^ Initial content of the BRAM, also
@@ -1126,7 +1126,7 @@ And for which the /declaration/ primitive is:
   , "type" :
 "blockRam#
   :: ( HasCallStack  --       ARG[0]
-     , Undefined a ) --       ARG[1]
+     , NFDataX a ) --       ARG[1]
   => Clock dom       -- clk,  ARG[2]
   -> Enable dom      -- en,   ARG[3]
   -> Vec n a         -- init, ARG[4]
@@ -1308,7 +1308,7 @@ and
   , "type" :
 "blockRam#
   :: ( HasCallStack  --       ARG[0]
-     , Undefined a ) --       ARG[1]
+     , NFDataX a ) --       ARG[1]
   => Clock dom       -- clk,  ARG[2]
   => Enable dom      -- en,   ARG[3]
   -> Vec n a         -- init, ARG[4]
@@ -1379,7 +1379,7 @@ and
   , "type" :
 "blockRam#
   :: ( HasCallStack  --       ARG[0]
-     , Undefined a ) --       ARG[1]
+     , NFDataX a ) --       ARG[1]
   => Clock dom       -- clk,  ARG[2]
   -> Enable dom      -- en,   ARG[3]
   -> Vec n a         -- init, ARG[4]
@@ -2362,7 +2362,7 @@ fir
      , Default a
      , KnownNat n
      , SaturatingNum a
-     , Undefined a )
+     , NFDataX a )
   => Vec (n + 1) a -> Signal dom a -> Signal dom a
 fir coeffs x_t = y_t
   where
