@@ -69,7 +69,7 @@ module Clash.Tutorial (
   -- * Clash vs Lava
   -- $vslava
 
-  -- * Migration guide from Clash 0.7
+  -- * Migration guide from Clash 0.99
   -- $migration
   )
 where
@@ -2268,57 +2268,48 @@ and / or easy to use as the standard Haskell features.
 
 {- $migration
 
-* The top name in the module hierarchy has changed from \"@CLaSH@\" to
-  \"@Clash@\".
+* Clash has overhauled the way synthesis options are represented. You can read
+  about this change in the blogpost: <https://clash-lang.org/blog/0005-synthesis-domain/ New feature: configurable initial values>.
+  The executive summary is as follows:
 
-* There is no longer any distinction between @Signal@ and @Signal'@, there is
-  only 'Signal' which has a /dom/ and /value/ type variable.
++------------------------------------------------------------------------------+--------------------------------------------------------------------+
+| __0.99__                                                                     | __1.0__                                                            |
++------------------------------------------------------------------------------+--------------------------------------------------------------------+
+| @topEntity (clk::Clock d 'Source) rst = withClockReset f clk  rst@           | @topEntity clk rst = withClockResetEnable clk rst enableGen f@     |
++------------------------------------------------------------------------------+--------------------------------------------------------------------+
+| @topEntity (clk::Clock d 'Gated) rst  = withClockReset f clk  rst@           | @topEntity clk rst enable = withClockResetEnable clk rst enable f@ |
++------------------------------------------------------------------------------+--------------------------------------------------------------------+
+| @data A = ... @ (and @A@ is used as state, for example in register or mealy) | @data A = ... deriving (Generic,NFDataX)@                          |
++------------------------------------------------------------------------------+--------------------------------------------------------------------+
+| @SystemClockReset@                                                           | @SystemClockResetEnable@                                           |
++------------------------------------------------------------------------------+--------------------------------------------------------------------+
+| @HiddenClockReset dom gated sync@                                            | @HiddenClockResetEnable dom@                                       |
++------------------------------------------------------------------------------+--------------------------------------------------------------------+
+| @HiddenClock dom gated@                                                      | @HiddenClock dom@                                                  |
++------------------------------------------------------------------------------+--------------------------------------------------------------------+
+| @HiddenReset dom sync@                                                       | @HiddenReset dom@                                                  |
++------------------------------------------------------------------------------+--------------------------------------------------------------------+
+| @Clock dom gated@                                                            | @Clock dom@                                                        |
++------------------------------------------------------------------------------+--------------------------------------------------------------------+
+| @Reset dom sync@                                                             | @Reset dom@                                                        |
++------------------------------------------------------------------------------+--------------------------------------------------------------------+
 
-    @
-    data Signal (dom :: Domain) a
-    @
+* @outputVerifier@ now operates on two domains. If you only need one, simply
+  change it to @outputVerifier'@
 
-  The /dom/ refers to a synthesis domain. See "Clash.Explicit.Signal" for more
-  information on domains and how to use them.
-
-* The \"@Clash.Prelude.Explicit@\" module has been removed because all 'Signal's
-  have a /domain/ annotation now. There is a "Clash.Explicit.Prelude" module,
-  but it serves a different purpose: it exports a prelude where all synchronous
-  components have an explicit clock (and reset) value; "Clash.Prelude" exports
-  synchronous components with <Clash-Signal.html#hiddenclockandreset hidden clock and reset> arguments.
-  Note that "Clash.Prelude" and "Clash.Explicit.Prelude" have overlapping
-  definitions, meaning you must use /qualified/ imports to disambiguate.
-
-* All synchronous components have clock and reset arguments now, they appear as
-  <Clash-Signal.html#hiddenclockandreset hidden> arguments when you use
-  "Clash.Prelude", and as normal arguments when you use "Clash.Explicit.Prelude".
-
-* HDL Testbench generation is no longer predicated on the existence of a
-  top-level /testInput/ and /expectedOutput/ function. Instead, top-level functions
-  called /testBench/ are now picked up as the entry-point for HDL test benches.
-  Alternatively you can use a 'Clash.Annotations.TestBench' /ANN/ pragma.
-
-* 'Clash.Annotations.TopEntity' annotations have received a complete overhaul,
-  and you should just rewrite them from scratch. Additionally, designs can
-  contain multiple 'Clash.Annotations.Synthesize' to split generated HDL over
-  multiple output directories.
-
-* With the overhaul of 'Clash.Annotations.TopEntity' annotations and the
-  introduction of explicit clock and reset arguments, PLLs and other clock
-  sources are now regular Clash functions such as those found in
-  "Clash.Intel.ClockGen" and "Clash.Xilinx.ClockGen".
-
+* For an overview of all other changes, check out <https://github.com/clash-lang/clash-compiler/blob/1.0/clash-ghc/CHANGELOG.md the changelog>
 
 === Examples
 
 ==== FIR filter
 
-FIR filter in Clash 0.7:
+FIR filter in Clash 1.0:
 
 @
 module FIR where
 
-import CLaSH.Prelude
+import Clash.Prelude
+import Clash.Explicit.Testbench
 
 dotp :: SaturatingNum a
      => Vec (n + 1) a
@@ -2326,26 +2317,36 @@ dotp :: SaturatingNum a
      -> a
 dotp as bs = fold boundedPlus (zipWith boundedMult as bs)
 
-fir :: (Default a, KnownNat n, SaturatingNum a)
-    => Vec (n + 1) a -> Signal a -> Signal a
+fir
+  :: (Default a, KnownNat n, SaturatingNum a, HiddenClockReset domain gated synchronous)
+  => Vec (n + 1) a -> Signal domain a -> Signal domain a
 fir coeffs x_t = y_t
   where
     y_t = dotp coeffs \<$\> bundle xs
     xs  = window x_t
 
-topEntity :: Signal (Signed 16) -> Signal (Signed 16)
-topEntity = fir (2:>3:>(-2):>8:>Nil)
+topEntity
+  :: Clock  System Source
+  -> Reset  System Asynchronous
+  -> Signal System (Signed 16)
+  -> Signal System (Signed 16)
+topEntity = exposeClockReset (fir (2:>3:>(-2):>8:>Nil))
+{-# NOINLINE topEntity #-}
 
-testInput :: Signal (Signed 16)
-testInput = stimuliGenerator (2:>3:>(-2):>8:>Nil)
-
-expectedOutput :: Signal (Signed 16) -> Signal Bool
-expectedOutput = outputVerifier' (4:>12:>1:>20:>Nil)
+testBench :: Signal System Bool
+testBench = done
+  where
+    testInput      = stimuliGenerator clk rst (2:>3:>(-2):>8:>Nil)
+    expectedOutput = outputVerifier clk rst (4:>12:>1:>20:>Nil)
+    done           = expectedOutput (topEntity clk rst testInput)
+    clk            = tbSystemClockGen (not \<$\> done)
+    rst            = systemResetGen
 @
 
 FIR filter in current version:
 
 @
+
 module FIR where
 
 import Clash.Prelude
@@ -2363,7 +2364,7 @@ fir
      , KnownNat n
      , SaturatingNum a
      , NFDataX a )
-  => Vec (n + 1) a -> Signal dom a -> Signal dom a
+  => Vec (n + 1) a -> Signal tag a -> Signal tag a
 fir coeffs x_t = y_t
   where
     y_t = dotp coeffs \<$\> bundle xs
@@ -2390,28 +2391,37 @@ testBench = done
 
 ==== Blinker circuit
 
-Blinker circuit in Clash 0.7:
+Blinker circuit in Clash 0.99:
 
 @
+{-# LANGUAGE NoMonoLocalBinds #-}
 module Blinker where
 
-import CLaSH.Prelude
+import Clash.Prelude
+import Clash.Promoted.Symbol
+import Clash.Intel.ClockGen
+
+type Dom50 = Dom \"System\" 20000
 
 {\-\# ANN topEntity
-  (defTop
-    { t_name     = "blinker"
-    , t_inputs   = [\"KEY1\"]
-    , t_outputs  = [\"LED\"]
-    , t_extraIn  = [ (\"CLOCK_50\", 1)
-                   , (\"KEY0\"    , 1)
-                   ]
-    , t_clocks   = [ altpll "altpll50" "CLOCK_50(0)" "not KEY0(0)" ]
+  (Synthesize
+    { t_name   = \"blinker\"
+    , t_inputs = [ PortName \"CLOCK_50\"
+                 , PortName \"KEY0\"
+                 , PortName \"KEY1\"
+                 ]
+    , t_output = PortName \"LED\"
     }) \#-\}
-topEntity :: Signal Bit -> Signal (BitVector 8)
-topEntity key1 = leds
+topEntity
+  :: Clock Dom50 Source
+  -> Reset Dom50 Asynchronous
+  -> Signal Dom50 Bit
+  -> Signal Dom50 (BitVector 8)
+topEntity clk rst =
+    exposeClockReset (mealy blinkerT (1,False,0) . isRising 1) pllOut rstSync
   where
-    key1R = isRising 1 key1
-    leds  = mealy blinkerT (1,False,0) key1R
+    (pllOut,pllStable) = altpll \@Dom50 (SSymbol \@ \"altpll50\") clk rst
+    rstSync            = resetSynchronizer pllOut (unsafeToAsyncReset pllStable)
 
 blinkerT (leds,mode,cntr) key1R = ((leds',mode',cntr'),leds)
   where
@@ -2430,17 +2440,26 @@ blinkerT (leds,mode,cntr) key1R = ((leds',mode',cntr'),leds)
           | otherwise = leds
 @
 
-Blinker in the current version:
+Blinker in Clash 1.0:
 
 @
 module Blinker where
 
-import "Clash.Signal"
-import "Clash.Prelude"
-import "Clash.Intel.ClockGen"
+import Clash.Prelude
+import Clash.Intel.ClockGen
 
-'createDomain' 'vSystem'{vName="DomInput", vPeriod=20000}
-'createDomain' 'vSystem'{vName="Dom50", vPeriod=50000}
+data LedMode
+  = Rotate
+  -- ^ After some period, rotate active led to the left
+  | Complement
+  -- ^ After some period, turn on all disable LEDs, and vice versa
+  deriving (Generic, 'Undefined')
+
+-- Define a synthesis domain with a clock with a period of 20000 /ps/.
+'createDomain' 'vSystem'{vName=\"Input\", vPeriod=20000}
+
+-- Define a synthesis domain with a clock with a period of 50000 /ps/.
+'createDomain' 'vSystem'{vName=\"Dom50\", vPeriod=50000}
 
 {\-\# ANN topEntity
   ('Synthesize'
@@ -2452,42 +2471,76 @@ import "Clash.Intel.ClockGen"
     , t_output = PortName \"LED\"
     }) \#-\}
 topEntity
-  :: 'Clock' \"DomInput\"
-  -> 'Signal' \"DomInput\" Bool
-  -> 'Signal' \"Dom50\" Bit
-  -> 'Signal' \"Dom50\" (BitVector 8)
-topEntity clk rst =
-  'exposeClockResetEnable' circuit pllOut rstSync enableGen
+  :: Clock Input
+  -- ^ Incoming clock
+  -> Signal Input Bool
+  -- ^ Reset signal, straight from KEY0
+  -> Signal Dom50 Bit
+  -- ^ Mode choice, straight from KEY1. See \'LedMode\'.
+  -> Signal Dom50 (BitVector 8)
+  -- ^ Output containing 8 bits, corresponding to 8 LEDs
+topEntity clk20 rstBtn modeBtn =
+  exposeClockResetEnable
+    (mealy blinkerT initialStateBlinkerT . isRising 1)
+    clk50
+    rstSync
+    en
+    modeBtn
  where
-  circuit = 'mealy' blinkerT (1,False,0) . 'Clash.Prelude.isRising' 1
+  -- | Enable line for subcomponents: we'll keep it always running
+  en = enableGen
 
-  (pllOut, pllStable) =
-    'Clash.Intel.ClockGen.altpll'
-      \@\"Dom50\"
+  -- Start with the first LED turned on, in rotate mode, with the counter on zero
+  initialStateBlinkerT = (1, Rotate, 0)
+
+  -- Signal coming from the reset button is low when pressed, and high when
+  -- not pressed. We convert this signal to the polarity of our domain with
+  -- 'unsafeFromActiveLow'.
+  rst = 'Clash.Signal.unsafeFromLowPolarity' rstBtn
+
+  -- Instantiate a PLL: this stabilizes the incoming clock signal and indicates
+  -- when the signal is stable. We're also using it to transform an incoming
+  -- clock signal running at 20 MHz to a clock signal running at 50 MHz.
+  (clk50, pllStable) =
+    altpll
+      \@Dom50
       (SSymbol \@\"altpll50\")
-      clk
-      ('Clash.Signal.unsafeFromLowPolarity' rst)
+      clk20
+      rst
 
+  -- Synchronize reset to clock signal coming from PLL. We want the reset to
+  -- remain active while the PLL is NOT stable, hence the conversion with
+  -- 'unsafeFromActiveLow'
   rstSync =
     'Clash.Signal.resetSynchronizer'
-      pllOut
-      ('Clash.Signal.unsafeFromLowPolarity' pllStable)
-      enableGen
+      clk50
+      (unsafeFromLowPolarity pllStable)
+      en
 
-blinkerT (leds,mode,cntr) key1R = ((leds',mode',cntr'),leds)
+flipMode :: LedMode -> LedMode
+flipMode Rotate = Complement
+flipMode Complement = Rotate
+
+blinkerT
+  :: (BitVector 8, LedMode, Index 16650001)
+  -> Bool
+  -> ((BitVector 8, LedMode, Index 16650001), BitVector 8)
+blinkerT (leds, mode, cntr) key1R = ((leds', mode', cntr'), leds)
   where
     -- clock frequency = 50e6  (50 MHz)
     -- led update rate = 333e-3 (every 333ms)
-    cnt_max = 16650000 :: (Index 16650001) -- 50e6 * 333e-3
+    cnt_max = 16650000 :: Index 16650001 -- 50e6 * 333e-3
 
     cntr' | cntr == cnt_max = 0
           | otherwise       = cntr + 1
 
-    mode' | key1R     = not mode
+    mode' | key1R     = flipMode mode
           | otherwise = mode
 
-    leds' | cntr == 0 = if mode then complement leds
-                                else rotateL leds 1
+    leds' | cntr == 0 =
+              case mode of
+                Rotate -> rotateL leds 1
+                Complement -> complement leds
           | otherwise = leds
 @
 -}
