@@ -2119,8 +2119,8 @@ Here is a list of Haskell features for which the Clash compiler has only
     is trivial for values of the elementary types, sum types, and product types,
     putting a fixed upper bound on recursive types is not (always) feasible.
     This means that the ubiquitous list type is unsupported! The only recursive
-    type that is currently supported by the Clash compiler is the 'Vec'tor type,
-    for which the compiler has hard-coded knowledge.
+    types that are currently supported by the Clash compiler is the 'Vec'tor and
+    'RTree' types, for which the compiler has hard-coded knowledge.
 
     For \"easy\" 'Vec'tor literals you should use Template Haskell splices and
     the 'listToVecTH' /meta/-function that as we have seen earlier in this tutorial.
