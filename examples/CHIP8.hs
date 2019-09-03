@@ -26,7 +26,7 @@ topEntity = exposeClockResetEnable output
 
 mealyState
   :: ( HiddenClockResetEnable tag
-     , Undefined s )
+     , NFDataX s )
   => (i -> State s o)
   -> s
   -> (Signal tag i -> Signal tag o)
@@ -36,7 +36,7 @@ data Phase
     = Init
     | Fetch1
     | Exec
-    deriving (Generic, Undefined)
+    deriving (Generic, NFDataX)
 
 data CPUIn = CPUIn
     { cpuInMem :: Word8
@@ -46,7 +46,7 @@ data CPUState = CPUState
     { pc :: Word8
     , phase :: Phase
     }
-    deriving (Generic, Undefined)
+    deriving (Generic, NFDataX)
 
 initState :: CPUState
 initState = CPUState

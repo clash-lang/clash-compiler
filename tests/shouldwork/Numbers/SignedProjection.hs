@@ -10,7 +10,7 @@ module SignedProjection where
 import qualified Prelude
 import Clash.Prelude
 
-data Complex a = a :+ a deriving (Show, Lift, Generic, ShowX, Undefined, Functor)
+data Complex a = a :+ a deriving (Show, Lift, Generic, ShowX, NFDataX, Functor)
 
 realPart :: Complex a -> a
 realPart (x :+ _) = x

@@ -50,7 +50,7 @@ import Clash.Promoted.Nat         (SNat)
 import Clash.Signal.Internal      (Domain)
 import Clash.Explicit.Signal
   (Signal, fromList, fromList_lazy)
-import Clash.XException           (Undefined)
+import Clash.XException           (NFDataX)
 
 {- $setup
 >>> :set -XDataKinds
@@ -91,7 +91,7 @@ newtype DSignal (dom :: Domain) (delay :: Nat) a =
 -- [1,2]
 --
 -- __NB__: This function is not synthesizable
-dfromList :: Undefined a => [a] -> DSignal dom 0 a
+dfromList :: NFDataX a => [a] -> DSignal dom 0 a
 dfromList = coerce . fromList
 
 -- | Create a 'DSignal' from a list

@@ -156,7 +156,7 @@ import Clash.Class.Resize         (Resize (..))
 import Clash.Promoted.Nat
   (SNat (..), SNatLE (..), compareSNat, snatToInteger, snatToNum)
 import Clash.XException
-  (ShowX (..), Undefined (..), errorX, showsPrecXWith, rwhnfX)
+  (ShowX (..), NFDataX (..), errorX, showsPrecXWith, rwhnfX)
 
 import {-# SOURCE #-} qualified Clash.Sized.Vector         as V
 import {-# SOURCE #-} qualified Clash.Sized.Internal.Index as I
@@ -219,7 +219,7 @@ instance Show Bit where
 instance ShowX Bit where
   showsPrecX = showsPrecXWith showsPrec
 
-instance Undefined Bit where
+instance NFDataX Bit where
   deepErrorX = errorX
   rnfX = rwhnfX
 
@@ -365,7 +365,7 @@ instance KnownNat n => Show (BitVector n) where
 instance KnownNat n => ShowX (BitVector n) where
   showsPrecX = showsPrecXWith showsPrec
 
-instance Undefined (BitVector n) where
+instance NFDataX (BitVector n) where
   deepErrorX = errorX
   rnfX = rwhnfX
 
@@ -975,7 +975,7 @@ undefined# =
 {-# NOINLINE undefined# #-}
 
 -- | Check if one BitVector is like another.
--- Undefined bits in the second argument are interpreted as don't care bits.
+-- NFDataX bits in the second argument are interpreted as don't care bits.
 --
 -- >>> let expected = $$(bLit "1.") :: BitVector 2
 -- >>> let checked  = $$(bLit "11") :: BitVector 2

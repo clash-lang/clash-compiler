@@ -229,7 +229,7 @@ window
   :: ( HiddenClockResetEnable dom
      , KnownNat n
      , Default a
-     , Undefined a )
+     , NFDataX a )
   => Signal dom a
   -- ^ Signal to create a window over
   -> Vec (n + 1) (Signal dom a)
@@ -252,7 +252,7 @@ windowD
   :: ( HiddenClockResetEnable dom
      , KnownNat n
      , Default a
-     , Undefined a )
+     , NFDataX a )
   => Signal dom a
   -- ^ Signal to create a window over
   -> Vec (n + 1) (Signal dom a)

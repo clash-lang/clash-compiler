@@ -27,7 +27,7 @@ where
 
 import qualified Clash.Explicit.Moore as E
 import           Clash.Signal
-import           Clash.XException                     (Undefined)
+import           Clash.XException                     (NFDataX)
 
 {- $setup
 >>> :set -XDataKinds -XTypeApplications
@@ -77,7 +77,7 @@ let macT s (x,y) = x * y + s
 -- @
 moore
   :: ( HiddenClockResetEnable dom
-     , Undefined s )
+     , NFDataX s )
   => (s -> i -> s)
   -- ^ Transfer function in moore machine form: @state -> input -> newstate@
   -> (s -> o)
@@ -95,7 +95,7 @@ moore = hideClockResetEnable E.moore
 -- a moore machine without any output logic
 medvedev
   :: ( HiddenClockResetEnable dom
-     , Undefined s )
+     , NFDataX s )
   => (s -> i -> s)
   -> s
   -> (Signal dom i -> Signal dom s)
@@ -131,7 +131,7 @@ medvedev tr st = moore tr id st
 -- @
 mooreB
   :: ( HiddenClockResetEnable dom
-     , Undefined s
+     , NFDataX s
      , Bundle i
      , Bundle o )
   => (s -> i -> s)
@@ -149,7 +149,7 @@ mooreB = hideClockResetEnable E.mooreB
 -- | A version of 'medvedev' that does automatic 'Bundle'ing
 medvedevB
   :: ( HiddenClockResetEnable dom
-     , Undefined s
+     , NFDataX s
      , Bundle i
      , Bundle s )
   => (s -> i -> s)

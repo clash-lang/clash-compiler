@@ -3,24 +3,24 @@
 {-# LANGUAGE DeriveGeneric  #-}
 {-# LANGUAGE MagicHash      #-}
 
-module Clash.Tests.Undefined where
+module Clash.Tests.NFDataX where
 
 import Test.Tasty
 import Test.Tasty.HUnit
 
 import GHC.Generics (Generic)
-import Clash.XException (Undefined(rnfX), errorX)
+import Clash.XException (NFDataX(rnfX), errorX)
 
-data Void                                  deriving (Generic, Undefined)
-data Unit    = Unit                        deriving (Generic, Undefined)
-data Wrapper = Wrapper Int                 deriving (Generic, Undefined)
-data Sum     = SumTypeA | SumTypeB         deriving (Generic, Undefined)
-data BigSum  = BS1 | BS2 | BS3 | BS4 | BS5 deriving (Generic, Undefined)
-data Product = Product Int Int             deriving (Generic, Undefined)
-data SP      = S Int Int | P Int           deriving (Generic, Undefined)
-data Rec0    = Rec0 {  }                   deriving (Generic, Undefined)
-data Rec1    = Rec1 { a :: Int }           deriving (Generic, Undefined)
-data Rec2    = Rec2 { b :: Int, c :: Int } deriving (Generic, Undefined)
+data Void                                  deriving (Generic, NFDataX)
+data Unit    = Unit                        deriving (Generic, NFDataX)
+data Wrapper = Wrapper Int                 deriving (Generic, NFDataX)
+data Sum     = SumTypeA | SumTypeB         deriving (Generic, NFDataX)
+data BigSum  = BS1 | BS2 | BS3 | BS4 | BS5 deriving (Generic, NFDataX)
+data Product = Product Int Int             deriving (Generic, NFDataX)
+data SP      = S Int Int | P Int           deriving (Generic, NFDataX)
+data Rec0    = Rec0 {  }                   deriving (Generic, NFDataX)
+data Rec1    = Rec1 { a :: Int }           deriving (Generic, NFDataX)
+data Rec2    = Rec2 { b :: Int, c :: Int } deriving (Generic, NFDataX)
 
 undef :: a
 undef = errorX "!"
@@ -29,7 +29,7 @@ undef = errorX "!"
 tests :: TestTree
 tests =
   testGroup
-    "Undefined"
+    "NFDataX"
     [ testGroup
         "Generic"
         [ testCase "Unit"     $ rnfX (undef :: Unit)                  @?= ()

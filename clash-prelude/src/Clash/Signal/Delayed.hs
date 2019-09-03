@@ -65,7 +65,7 @@ import           Clash.Signal
   (HiddenClockResetEnable , hideClockResetEnable, Signal, delay)
 
 import           Clash.Promoted.Nat            (SNat (..), snatToInteger)
-import           Clash.XException              (Undefined)
+import           Clash.XException              (NFDataX)
 
 {- $setup
 >>> :set -XDataKinds -XTypeOperators -XTypeApplications -XFlexibleContexts
@@ -92,7 +92,7 @@ import           Clash.XException              (Undefined)
 delayed
   :: ( KnownNat d
      , HiddenClockResetEnable dom
-     , Undefined a
+     , NFDataX a
      )
   => Vec d a
   -> DSignal dom n a
@@ -124,7 +124,7 @@ delayed = hideClockResetEnable E.delayed
 --      a -> DSignal dom n a -> DSignal dom (n + 3) a
 delayedI
   :: ( KnownNat d
-     , Undefined a
+     , NFDataX a
      , HiddenClockResetEnable dom  )
   => a
   -- ^ Initial value
@@ -148,7 +148,7 @@ delayedI = hideClockResetEnable E.delayedI
 delayN
   :: forall dom  a d n
    . ( HiddenClockResetEnable dom
-     , Undefined a )
+     , NFDataX a )
   => SNat d
   -> a
   -- ^ Initial value
@@ -180,7 +180,7 @@ delayN d dflt = coerce . go (snatToInteger d) . coerce @_ @(Signal dom a)
 delayI
   :: forall d n a dom
    . ( HiddenClockResetEnable dom
-     , Undefined a
+     , NFDataX a
      , KnownNat d )
   => a
   -- ^ Initial value
@@ -208,7 +208,7 @@ type instance Apply (DelayedFold dom n delay a) k = DSignal dom (n + (delay*k)) 
 delayedFold
   :: forall dom  n delay k a
    . ( HiddenClockResetEnable dom
-     , Undefined a
+     , NFDataX a
      , KnownNat delay
      , KnownNat k )
   => SNat delay

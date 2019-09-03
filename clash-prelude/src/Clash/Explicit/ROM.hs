@@ -38,7 +38,7 @@ import Clash.Signal.Internal
   (Clock (..), KnownDomain, Signal (..), Enable, fromEnable)
 import Clash.Sized.Unsigned   (Unsigned)
 import Clash.Sized.Vector     (Vec, length, toList)
-import Clash.XException       (deepErrorX, seqX, Undefined)
+import Clash.XException       (deepErrorX, seqX, NFDataX)
 
 -- | A ROM with a synchronous read port, with space for 2^@n@ elements
 --
@@ -50,7 +50,7 @@ import Clash.XException       (deepErrorX, seqX, Undefined)
 -- * See "Clash.Sized.Fixed#creatingdatafiles" and "Clash.Explicit.BlockRam#usingrams"
 -- for ideas on how to use ROMs and RAMs
 romPow2
-  :: (KnownDomain dom, KnownNat n, Undefined a)
+  :: (KnownDomain dom, KnownNat n, NFDataX a)
   => Clock dom
   -- ^ 'Clock' to synchronize to
   -> Enable dom
@@ -76,7 +76,7 @@ romPow2 = rom
 -- * See "Clash.Sized.Fixed#creatingdatafiles" and "Clash.Explicit.BlockRam#usingrams"
 -- for ideas on how to use ROMs and RAMs
 rom
-  :: (KnownDomain dom, KnownNat n, Undefined a, Enum addr)
+  :: (KnownDomain dom, KnownNat n, NFDataX a, Enum addr)
   => Clock dom
   -- ^ 'Clock' to synchronize to
   -> Enable dom
@@ -95,7 +95,7 @@ rom = \clk en content rd -> rom# clk en content (fromEnum <$> rd)
 -- | ROM primitive
 rom#
   :: forall dom n a
-   . (KnownDomain dom, KnownNat n, Undefined a)
+   . (KnownDomain dom, KnownNat n, NFDataX a)
   => Clock dom
   -- ^ 'Clock' to synchronize to
   -> Enable dom

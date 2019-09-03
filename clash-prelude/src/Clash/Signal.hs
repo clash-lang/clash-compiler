@@ -278,7 +278,7 @@ import           Clash.Signal.Internal hiding
 import           Clash.Signal.Internal.Ambiguous
   (knownVDomain, clockPeriod, activeEdge, resetKind, initBehavior, resetPolarity)
 import qualified Clash.Signal.Internal as S
-import           Clash.XException      (Undefined)
+import           Clash.XException      (NFDataX)
 
 {- $setup
 >>> :set -XFlexibleContexts -XTypeApplications
@@ -1281,7 +1281,7 @@ withSpecificClockResetEnable =
 dflipflop
   :: forall dom a
    . ( HiddenClock dom
-     , Undefined a )
+     , NFDataX a )
   => Signal dom a
   -> Signal dom a
 dflipflop =
@@ -1295,7 +1295,7 @@ dflipflop =
 -- [0,1,2]
 delay
   :: forall dom a
-   . ( Undefined a
+   . ( NFDataX a
      , HiddenClock dom
      , HiddenEnable dom  )
   => a
@@ -1319,7 +1319,7 @@ delay dflt i =
 -- [0,1,2,2,2,5,6]
 delayMaybe
   :: forall dom a
-   . ( Undefined a
+   . ( NFDataX a
      , HiddenClock dom
      , HiddenEnable dom  )
   => a
@@ -1342,7 +1342,7 @@ delayMaybe dflt i =
 -- [0,1,2,2,2,5,6]
 delayEn
   :: forall dom a
-   . ( Undefined a
+   . ( NFDataX a
      , HiddenClock dom
      , HiddenEnable dom  )
   => a
@@ -1368,7 +1368,7 @@ delayEn dflt en i =
 register
   :: forall dom a
    . ( HiddenClockResetEnable dom
-     , Undefined a )
+     , NFDataX a )
   => a
   -- ^ Reset value
   --
@@ -1409,7 +1409,7 @@ infixr 3 `register`
 regMaybe
   :: forall dom a
    . ( HiddenClockResetEnable dom
-     , Undefined a )
+     , NFDataX a )
   => a
   -- ^ Reset value. 'regMaybe' outputs the reset value when the reset is active.
   -> Signal dom (Maybe a)
@@ -1441,7 +1441,7 @@ infixr 3 `regMaybe`
 regEn
   :: forall dom a
    . ( HiddenClockResetEnable dom
-     , Undefined a )
+     , NFDataX a )
   => a
   -- ^ Reset value
   --
@@ -1478,7 +1478,7 @@ regEn initial en i =
 sample
   :: forall dom a
    . ( KnownDomain dom
-     , Undefined a )
+     , NFDataX a )
   => (HiddenClockResetEnable dom  => Signal dom a)
   -- ^ 'Signal' we want to sample, whose source potentially has a hidden clock
   -- (and reset)
@@ -1504,7 +1504,7 @@ sample s =
 sampleN
   :: forall dom a
    . ( KnownDomain dom
-     , Undefined a )
+     , NFDataX a )
   => Int
   -- ^ Number of samples to produce
   -> (HiddenClockResetEnable dom => Signal dom a)
@@ -1524,7 +1524,7 @@ sampleN n s0 =
 sampleWithReset
   :: forall dom a m
    . ( KnownDomain dom
-     , Undefined a
+     , NFDataX a
      , 1 <= m )
   => SNat m
   -- ^ Number of cycles to assert the reset
@@ -1545,7 +1545,7 @@ sampleWithReset nReset f0 =
 sampleWithResetN
   :: forall dom a m
    . ( KnownDomain dom
-     , Undefined a
+     , NFDataX a
      , 1 <= m )
   => SNat m
   -- ^ Number of cycles to assert the reset
@@ -1629,8 +1629,8 @@ sampleN_lazy n s =
 simulate
   :: forall dom a b
    . ( KnownDomain dom
-     , Undefined a
-     , Undefined b )
+     , NFDataX a
+     , NFDataX b )
   => (HiddenClockResetEnable dom => Signal dom a -> Signal dom b)
   -- ^ Circuit to simulate, whose source potentially has a hidden clock, reset,
   -- and/or enable.
@@ -1645,8 +1645,8 @@ simulate f as = simulateWithReset (SNat @1) (head as) f as
 simulateN
   :: forall dom a b
    . ( KnownDomain dom
-     , Undefined a
-     , Undefined b )
+     , NFDataX a
+     , NFDataX b )
   => Int
   -- ^ Number of cycles to simulate (excluding cycle spent in reset)
   -> (HiddenClockResetEnable dom => Signal dom a -> Signal dom b)
@@ -1664,8 +1664,8 @@ simulateN n f as = simulateWithResetN (SNat @1) (head as) n f as
 simulateWithReset
   :: forall dom a b m
    . ( KnownDomain dom
-     , Undefined a
-     , Undefined b
+     , NFDataX a
+     , NFDataX b
      , 1 <= m )
   => SNat m
   -- ^ Number of cycles to assert the reset
@@ -1684,8 +1684,8 @@ simulateWithReset n resetVal f as =
 simulateWithResetN
   :: forall dom a b m
    . ( KnownDomain dom
-     , Undefined a
-     , Undefined b
+     , NFDataX a
+     , NFDataX b
      , 1 <= m )
   => SNat m
   -- ^ Number of cycles to assert the reset
@@ -1738,8 +1738,8 @@ simulateB
    . ( KnownDomain dom
      , Bundle a
      , Bundle b
-     , Undefined a
-     , Undefined b
+     , NFDataX a
+     , NFDataX b
      )
   => (HiddenClockResetEnable dom  =>
       Unbundled dom a -> Unbundled dom b)
@@ -1854,7 +1854,7 @@ holdReset m =
 -- __NB__: This function is not synthesizable
 fromListWithReset
   :: forall dom a
-   . (HiddenReset dom, Undefined a)
+   . (HiddenReset dom, NFDataX a)
   => a
   -> [a]
   -> Signal dom a

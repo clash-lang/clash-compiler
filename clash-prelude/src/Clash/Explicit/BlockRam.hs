@@ -424,7 +424,7 @@ import           Clash.Sized.Index      (Index)
 import           Clash.Sized.Vector     (Vec, replicate, toList, iterateI)
 import qualified Clash.Sized.Vector     as CV
 import           Clash.XException
-  (maybeIsX, seqX, Undefined, deepErrorX, defaultSeqX, errorX)
+  (maybeIsX, seqX, NFDataX, deepErrorX, defaultSeqX, errorX)
 
 {- $setup
 >>> import Clash.Explicit.Prelude as C
@@ -442,7 +442,7 @@ data Reg
   | RegC
   | RegD
   | RegE
-  deriving (Eq,Show,Enum,C.Generic,Undefined)
+  deriving (Eq,Show,Enum,C.Generic,NFDataX)
 :}
 
 >>> :{
@@ -719,7 +719,7 @@ fromJustX (Just x) = x
 blockRam
   :: ( KnownDomain dom
      , HasCallStack
-     , Undefined a
+     , NFDataX a
      , Enum addr )
   => Clock dom
   -- ^ 'Clock' to synchronize to
@@ -765,7 +765,7 @@ blockRam = \clk gen content rd wrM ->
 blockRamPow2
   :: ( KnownDomain dom
      , HasCallStack
-     , Undefined a
+     , NFDataX a
      , KnownNat n )
   => Clock dom
   -- ^ 'Clock' to synchronize to
@@ -798,7 +798,7 @@ blockRamU
    :: forall n dom a r addr
    . ( KnownDomain dom
      , HasCallStack
-     , Undefined a
+     , NFDataX a
      , Enum addr
      , 1 <= n )
   => Clock dom
@@ -855,7 +855,7 @@ blockRamU#
   :: forall n dom a
    . ( KnownDomain dom
      , HasCallStack
-     , Undefined a )
+     , NFDataX a )
   => Clock dom
   -- ^ 'Clock' to synchronize to
   -> Enable dom
@@ -889,7 +889,7 @@ blockRam1
    :: forall n dom a r addr
    . ( KnownDomain dom
      , HasCallStack
-     , Undefined a
+     , NFDataX a
      , Enum addr
      , 1 <= n )
   => Clock dom
@@ -946,7 +946,7 @@ blockRam1#
   :: forall n dom a
    . ( KnownDomain dom
      , HasCallStack
-     , Undefined a )
+     , NFDataX a )
   => Clock dom
   -- ^ 'Clock' to synchronize to
   -> Enable dom
@@ -975,7 +975,7 @@ blockRam1# clk en n a =
 blockRam#
   :: ( KnownDomain dom
      , HasCallStack
-     , Undefined a )
+     , NFDataX a )
   => Clock dom
   -- ^ 'Clock' to synchronize to
   -> Enable dom
@@ -1022,7 +1022,7 @@ blockRam# (Clock _) gen content rd wen =
 -- | Create read-after-write blockRAM from a read-before-write one
 readNew
   :: ( KnownDomain dom
-     , Undefined a
+     , NFDataX a
      , Eq addr )
   => Clock dom
   -> Reset dom

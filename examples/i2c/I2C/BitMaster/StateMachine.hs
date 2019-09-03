@@ -13,7 +13,7 @@ data BitStateMachine
   | Stop  (Index 4)
   | Read  (Index 4)
   | Write (Index 4)
-  deriving (Eq, Generic, Undefined)
+  deriving (Eq, Generic, NFDataX)
 
 data StateMachine
   = StateMachine
@@ -22,7 +22,7 @@ data StateMachine
   , _sdaChk    :: Bool            -- check SDA status (multi-master arbiter)
   , _cmdAck    :: Bool            -- command completed
   , _bitStateM :: BitStateMachine -- State Machine
-  } deriving (Generic, Undefined)
+  } deriving (Generic, NFDataX)
 
 makeLenses ''StateMachine
 

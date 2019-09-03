@@ -25,7 +25,7 @@ where
 
 import           Clash.Explicit.Signal
   (KnownDomain, Bundle (..), Clock, Reset, Signal, Enable, register)
-import           Clash.XException                 (Undefined)
+import           Clash.XException                 (NFDataX)
 
 {- $setup
 >>> :set -XDataKinds -XTypeApplications
@@ -77,7 +77,7 @@ import           Clash.XException                 (Undefined)
 -- @
 moore
   :: ( KnownDomain dom
-     , Undefined s )
+     , NFDataX s )
   => Clock dom
   -- ^ 'Clock' to synchronize to
   -> Reset dom
@@ -101,7 +101,7 @@ moore clk rst en ft fo iS =
 -- a moore machine without any output logic
 medvedev
   :: ( KnownDomain dom
-     , Undefined s )
+     , NFDataX s )
   => Clock dom
   -> Reset dom
   -> Enable dom
@@ -140,7 +140,7 @@ medvedev clk rst en tr st = moore clk rst en tr id st
 -- @
 mooreB
   :: ( KnownDomain dom
-     , Undefined s
+     , NFDataX s
      , Bundle i
      , Bundle o )
   => Clock dom
@@ -163,7 +163,7 @@ mooreB clk rst en ft fo iS i = unbundle (moore clk rst en ft fo iS (bundle i))
 -- | A version of 'medvedev' that does automatic 'Bundle'ing
 medvedevB
   :: ( KnownDomain dom
-     , Undefined s
+     , NFDataX s
      , Bundle i
      , Bundle s )
   => Clock dom
