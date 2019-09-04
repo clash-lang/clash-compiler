@@ -2,8 +2,8 @@ Name:                 clash-term
 Version:              1.1.0
 Synopsis:             CAES Language for Synchronous Hardware
 Description:          Terminal-based inspection mechanism for optimization phases.
-Homepage:             http://www.clash-lang.org/
-bug-reports:          http://github.com/clash-lang/clash-compiler/issues
+Homepage:             https://clash-lang.org/
+bug-reports:          https://github.com/clash-lang/clash-compiler/issues
 License:              BSD2
 License-file:         LICENSE
 Author:               Orestis Melkonian
@@ -20,6 +20,7 @@ Cabal-version:        >=1.10
 source-repository head
   type: git
   location: https://github.com/clash-lang/clash-compiler.git
+  subdir: clash-term
 
 executable clash-term
   Main-Is:            Main.hs

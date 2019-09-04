@@ -175,7 +175,7 @@ defaultGhciSettings opts =
 ghciWelcomeMsg :: String
 ghciWelcomeMsg = "CLaSHi, version " ++ Data.Version.showVersion Paths_clash_ghc.version ++
                  " (using clash-lib, version " ++ Data.Version.showVersion clashLibVersion ++
-                 "):\nhttp://www.clash-lang.org/  :? for help"
+                 "):\nhttps://clash-lang.org/  :? for help"
 
 ghciCommands :: IORef ClashOpts -> [Command]
 ghciCommands opts = map mkCmd [

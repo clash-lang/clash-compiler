@@ -2,7 +2,7 @@
 Copyright : © 2015-2016, Christiaan Baaij,
               2017     , Google Inc.
               2019     , Myrtle Software Ltd
-Licence   : Creative Commons 4.0 (CC BY 4.0) (http://creativecommons.org/licenses/by/4.0/)
+Licence   : Creative Commons 4.0 (CC BY 4.0) (https://creativecommons.org/licenses/by/4.0/)
 -}
 
 {-# LANGUAGE NoImplicitPrelude, CPP, TemplateHaskell, DataKinds, BinaryLiterals,

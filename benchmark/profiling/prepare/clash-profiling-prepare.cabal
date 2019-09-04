@@ -2,7 +2,7 @@ name:                clash-profiling-prepare
 version:             0.1.0
 synopsis:            Runs ghc frontend and prepares input for clash-profile-normalization-run
 -- description:
-homepage:            http://www.clash-lang.org/
+homepage:            https://clash-lang.org/
 license:             BSD2
 author:              Leon Schoorl
 category:            Testing
