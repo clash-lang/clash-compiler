@@ -42,7 +42,7 @@ Description:
   general overview of the library you should however check out "Clash.Prelude".
   Some circuit examples can be found in "Clash.Examples".
 Homepage:             http://www.clash-lang.org/
-bug-reports:          http://github.com/clash-lang/clash-prelude/issues
+bug-reports:          http://github.com/clash-lang/clash-compiler/issues
 License:              BSD2
 License-file:         LICENSE
 Author:               The Clash Authors
