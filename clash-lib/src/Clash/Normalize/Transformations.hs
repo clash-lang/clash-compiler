@@ -1017,12 +1017,29 @@ inlineSmall _ e = return e
 -- | Specialise functions on arguments which are constant, except when they
 -- are clock, reset generators.
 constantSpec :: HasCallStack => NormRewrite
-constantSpec ctx e@(App e1 e2)
+constantSpec ctx@(TransformContext is0 tfCtx) e@(App e1 e2)
   | (Var {}, args) <- collectArgs e1
   , (_, []) <- Either.partitionEithers args
   , null $ Lens.toListOf termFreeTyVars e2
-  = do e2Speccable <- canConstantSpec e2
-       if e2Speccable then specializeNorm ctx e else return e
+  = do specInfo<- constantSpecInfo ctx e2
+       if csrFoundConstant specInfo then
+         let newBindings = csrNewBindings specInfo in
+         if null newBindings then
+           -- Whole of e2 is constant
+           specializeNorm ctx (App e1 e2)
+         else do
+           -- Parts of e2 are constant
+           let is1 = extendInScopeSetList is0 (fst <$> csrNewBindings specInfo)
+           -- Deshadow because appPropFast will be called after constantSpec
+           deShadowTerm is0
+            <$> Letrec newBindings
+            <$> specializeNorm
+                  (TransformContext is1 tfCtx)
+                  (App e1 (csrNewTerm specInfo))
+
+       else
+        -- e2 has no constant parts
+        return e
 constantSpec _ e = return e
 
 
