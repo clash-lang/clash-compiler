@@ -180,10 +180,10 @@ snap-bindist:
     - snapcraft
     - snapcraft push *.snap --release ${RELEASE_CHANNEL}
 
-snap-edge:
+snap-beta:
   extends: .snap
   variables:
-    RELEASE_CHANNEL: edge
+    RELEASE_CHANNEL: beta
   only:
     - schedules
     - triggers
