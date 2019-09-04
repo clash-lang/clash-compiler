@@ -2,7 +2,7 @@ name:                clash-benchmark
 version:             0.1.0
 synopsis:            Criterion based Clash benchmark
 -- description:
-homepage:            http://www.clash-lang.org/
+homepage:            https://clash-lang.org/
 license:             BSD2
 author:              Leon Schoorl
 category:            Testing

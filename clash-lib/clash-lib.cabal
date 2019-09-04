@@ -36,14 +36,14 @@ Description:
   .
   Front-ends (for: parsing, typecheck, etc.) are provided by separate packages:
   .
-  * <http://hackage.haskell.org/package/clash-ghc GHC/Haskell Frontend>
+  * <https://hackage.haskell.org/package/clash-ghc GHC/Haskell Frontend>
   .
   * <https://github.com/christiaanb/Idris-dev Idris Frontend>
   .
   .
-  Prelude library: <http://hackage.haskell.org/package/clash-prelude>
-Homepage:             http://www.clash-lang.org/
-bug-reports:          http://github.com/clash-lang/clash-compiler/issues
+  Prelude library: <https://hackage.haskell.org/package/clash-prelude>
+Homepage:             https://clash-lang.org/
+bug-reports:          https://github.com/clash-lang/clash-compiler/issues
 License:              BSD2
 License-file:         LICENSE
 Author:               The Clash Authors
@@ -71,6 +71,7 @@ Cabal-version:        >=1.10
 source-repository head
   type: git
   location: https://github.com/clash-lang/clash-compiler.git
+  subdir: clash-lib
 
 flag debug
    description:

@@ -695,7 +695,7 @@ Signal's ap, i.e (Applicative.<*>), must be lazy in it's second argument:
 > appSignal (f :- fs) ~(a :- as) = f a :- appSignal fs as
 
 because some feedback loops, such as the loop described in 'system' in the
-example at http://hackage.haskell.org/package/clash-prelude-0.10.10/docs/Clash-Prelude-BlockRam.html,
+example at https://hackage.haskell.org/package/clash-prelude-1.0.0/docs/Clash-Prelude-BlockRam.html,
 will lead to "Exception <<loop>>".
 
 However, this "naive" lazy version is _too_ lazy and induces spaceleaks.

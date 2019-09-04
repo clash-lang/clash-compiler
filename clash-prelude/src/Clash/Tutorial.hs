@@ -2,7 +2,7 @@
 Copyright : © 2014-2016, Christiaan Baaij,
               2017-2019, Myrtle Software Ltd
               2017     , QBayLogic, Google Inc.
-Licence   : Creative Commons 4.0 (CC BY 4.0) (http://creativecommons.org/licenses/by/4.0/)
+Licence   : Creative Commons 4.0 (CC BY 4.0) (https://creativecommons.org/licenses/by/4.0/)
 -}
 
 {-# LANGUAGE NoImplicitPrelude, MagicHash #-}
