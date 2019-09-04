@@ -13,7 +13,8 @@
 {-# LANGUAGE ViewPatterns      #-}
 
 module Clash.Normalize.Util
- ( isConstantArg
+ ( ConstantSpecInfo(..)
+ , isConstantArg
  , shouldReduce
  , alreadyInlined
  , addNewInline
@@ -24,7 +25,7 @@ module Clash.Normalize.Util
  , classifyFunction
  , isCheapFunction
  , isNonRecursiveGlobalVar
- , canConstantSpec
+ , constantSpecInfo
  , normalizeTopLvlBndr
  , rewriteExpr
  , removedTm
@@ -33,6 +34,8 @@ module Clash.Normalize.Util
 
 import           Control.Lens            ((&),(+~),(%=),(^.),_4,(.=))
 import qualified Control.Lens            as Lens
+import           Data.Bifunctor          (bimap)
+import           Data.Either             (lefts)
 import qualified Data.List               as List
 import qualified Data.Map                as Map
 import qualified Data.HashMap.Strict     as HashMapS
@@ -50,20 +53,24 @@ import           Clash.Core.Term
    collectArgs)
 import           Clash.Core.TyCon        (TyConMap)
 import           Clash.Core.Type         (Type, undefinedTy)
-import           Clash.Core.Util         (isClockOrReset, isPolyFun, termType)
+import           Clash.Core.Util
+  (isClockOrReset, isPolyFun, termType, mkApps)
 import           Clash.Core.Var          (Id, Var (..), isGlobalId)
 import           Clash.Core.VarEnv
   (VarEnv, emptyInScopeSet, emptyVarEnv, extendVarEnv, extendVarEnvWith,
-   lookupVarEnv, unionVarEnvWith, unitVarEnv)
+   lookupVarEnv, unionVarEnvWith, unitVarEnv, extendInScopeSetList)
 import           Clash.Driver.Types      (BindingMap, DebugLevel (..))
 import {-# SOURCE #-} Clash.Normalize.Strategy (normalization)
 import           Clash.Normalize.Types
 import           Clash.Primitives.Util   (constantArgs)
 import           Clash.Rewrite.Types
-  (RewriteMonad, bindings, curFun, dbgLevel, extra, tcCache)
-import           Clash.Rewrite.Util      (runRewrite, specialise)
+  (RewriteMonad, TransformContext(..), bindings, curFun, dbgLevel, extra,
+   tcCache)
+import           Clash.Rewrite.Util
+  (runRewrite, specialise, mkTmBinderFor, mkDerivedName)
 import           Clash.Unique
-import           Clash.Util              (SrcSpan, anyM, makeCachedU, traceIf)
+import           Clash.Util
+  (SrcSpan, anyM, makeCachedU, traceIf, mapAccumLM)
 
 -- | Determine if argument should reduce to a constant given a primitive and
 -- an argument number. Caches results.
@@ -171,36 +178,156 @@ isRecursiveBndr f = do
           (extra.recursiveComponents) %= extendVarEnv f isR
           return isR
 
--- | Test if we can constant specialize current term in current function. The
--- rules are, we can constant fold if:
---
---   * Term does not carry a clock or reset
---   * Term is constant is @isConstant@ sense, and additionally when term is a
---     global, non-recursive variable
---
-canConstantSpec
-  :: Term
-  -> RewriteMonad NormalizeState Bool
-canConstantSpec e = do
+data ConstantSpecInfo =
+  ConstantSpecInfo
+    { csrNewBindings :: [(Id, Term)]
+    -- ^ New let-bindings to be created for all the non-constants found
+    , csrNewTerm :: !Term
+    -- ^ A term where all the non-constant constructs are replaced by variable
+    -- references (found in 'csrNewBindings')
+    , csrFoundConstant :: !Bool
+    -- ^ Whether the algorithm found a constant at all. (If it didn't, it's no
+    -- use creating any new let-bindings!)
+    } deriving (Show)
+
+-- | Indicate term is fully constant (don't bind anything)
+constantCsr :: Term -> ConstantSpecInfo
+constantCsr t = ConstantSpecInfo [] t True
+
+-- | Bind given term to a new variable and indicate that it's fully non-constant
+bindCsr
+  :: TransformContext
+  -> Term
+  -> RewriteMonad NormalizeState ConstantSpecInfo
+bindCsr ctx@(TransformContext is0 _) oldTerm = do
+  -- TODO: Seems like the need to put global ids in scope has been made obsolete
+  -- TODO: by a recent change in Clash. Investigate whether this is true.
   tcm <- Lens.view tcCache
+  newId <- mkTmBinderFor is0 tcm (mkDerivedName ctx "bindCsr") oldTerm
+  pure (ConstantSpecInfo
+    { csrNewBindings = [(newId, oldTerm)]
+    , csrNewTerm = Var newId
+    , csrFoundConstant = False
+    })
+
+mergeCsrs
+  :: TransformContext
+  -> Term
+  -- ^ "Old" term
+  -> ([Either Term Type] -> Term)
+  -- ^ Proposed new term in case any constants were found
+  -> [Either Term Type]
+  -- ^ Subterms
+  -> RewriteMonad NormalizeState ConstantSpecInfo
+mergeCsrs ctx oldTerm proposedTerm subTerms = do
+  subCsrs <- snd <$> mapAccumLM constantSpecInfoFolder ctx subTerms
+
+  -- If any arguments are constant (and hence can be constant specced), a new
+  -- term is created with these constants left in, but variable parts let-bound.
+  -- There's one edge case: whenever a term has _no_ arguments. This happens for
+  -- constructors without fields, or -depending on their WorkInfo- primitives
+  -- without args. We still set 'csrFoundConstant', because we know the newly
+  -- proposed term will be fully constant.
+  let
+    anyArgsOrResultConstant =
+      null (lefts subCsrs) || any csrFoundConstant (lefts subCsrs)
+
+  if anyArgsOrResultConstant then
+    pure (ConstantSpecInfo
+      { csrNewBindings = concatMap csrNewBindings (lefts subCsrs)
+      , csrNewTerm = proposedTerm (bimap csrNewTerm id <$> subCsrs)
+      , csrFoundConstant = True
+      })
+  else do
+    -- No constructs were found to be constant, so we might as well refer to the
+    -- whole thing with a new let-binding (instead of creating a number of
+    -- "smaller" let-bindings)
+    bindCsr ctx oldTerm
+
+ where
+  constantSpecInfoFolder
+    :: TransformContext
+    -> Either Term Type
+    -> RewriteMonad NormalizeState (TransformContext, Either ConstantSpecInfo Type)
+  constantSpecInfoFolder localCtx (Right typ) =
+    pure (localCtx, Right typ)
+  constantSpecInfoFolder localCtx@(TransformContext is0 tfCtx) (Left term) = do
+    specInfo <- constantSpecInfo localCtx term
+    let newIds = map fst (csrNewBindings specInfo)
+    let is1 = extendInScopeSetList is0 newIds
+    pure (TransformContext is1 tfCtx, Left specInfo)
+
+
+-- | Calculate constant spec info. The goal of this function is to analyze a
+-- given term and yield a new term that:
+--
+--  * Leaves all the constant parts as they were.
+--  * Has all _variable_ parts replaced by a newly generated identifier.
+--
+-- The result structure will additionally contain:
+--
+--  * Whether the function found any constant parts at all
+--  * A list of let-bindings binding the aforementioned identifiers with
+--    the term they replaced.
+--
+-- This can be used in functions wanting to constant specialize over
+-- partially constant data structures.
+constantSpecInfo
+  :: TransformContext
+  -> Term
+  -> RewriteMonad NormalizeState ConstantSpecInfo
+constantSpecInfo ctx e = do
+  tcm <- Lens.view tcCache
+  -- Don't constant spec clocks or resets, they're either:
+  --
+  --  * A simple wire (Var), therefore not interesting to spec
+  --  * A clock/reset generator, and speccing a generator weirds out HDL simulators.
+  --
+  -- I believe we can remove this special case in the future by looking at the
+  -- primitive's workinfo.
   if isClockOrReset tcm (termType tcm e) then
     case collectArgs e of
-      (Prim nm _, _) -> return (nm == "Clash.Transformations.removedArg")
-      _              -> return False
+      (Prim "Clash.Transformations.removedArg" _, _) ->
+        pure (constantCsr e)
+      _ -> do
+        bindCsr ctx e
   else
+    -- TODO: use collectArgsWithTicks
     case collectArgs e of
-      (Data _, args)   -> and <$> mapM (either canConstantSpec (const (pure True))) args
-      (Prim _ _, args) -> and <$> mapM (either canConstantSpec (const (pure True))) args
-      (Lam _ _, _)     -> pure (not (hasLocalFreeVars e))
-      (Var f, args)    -> do
+      (dc@(Data _), args) ->
+        mergeCsrs ctx e (mkApps dc) args
+
+      -- TODO: Work with prim's WorkInfo?
+      (prim@(Prim _ _), args) -> do
+        csr <- mergeCsrs ctx e (mkApps prim) args
+        if null (csrNewBindings csr) then
+          pure csr
+        else
+          bindCsr ctx e
+
+      (Lam _ _, _) ->
+        if hasLocalFreeVars e then
+          bindCsr ctx e
+        else
+          pure (constantCsr e)
+
+      (var@(Var f), args) -> do
         (curF, _) <- Lens.use curFun
-
-        argsConst <- and <$> mapM (either canConstantSpec (const (pure True))) args
         isNonRecGlobVar <- isNonRecursiveGlobalVar e
-        return (argsConst && isNonRecGlobVar && f /= curF)
+        if isNonRecGlobVar && f /= curF then do
+          csr <- mergeCsrs ctx e (mkApps var) args
+          if null (csrNewBindings csr) then
+            pure csr
+          else
+            bindCsr ctx e
+        else
+          bindCsr ctx e
 
-      (Literal _,_)    -> pure True
-      _                -> pure False
+      (Literal _,_) ->
+        pure (constantCsr e)
+
+      _ ->
+        bindCsr ctx e
 
 -- | A call graph counts the number of occurrences that a functions 'g' is used
 -- in 'f'.

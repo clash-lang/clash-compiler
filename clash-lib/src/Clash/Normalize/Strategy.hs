@@ -58,7 +58,9 @@ constantPropagation = inlineAndPropagate >->
     spec               = bottomupR (applyMany specTransformations)
     caseFlattening     = repeatR (topdownR (apply "caseFlat" caseFlat))
     dec                = repeatR (topdownR (apply "DEC" disjointExpressionConsolidation))
-    conSpec            = bottomupR (apply "constantSpec" constantSpec)
+    conSpec            = bottomupR  ((apply "appPropCS" appPropFast !->
+                                     bottomupR (apply "constantSpec" constantSpec)) >-!
+                                     apply "constantSpec" constantSpec)
 
     transPropagateAndInline :: [(String,NormRewrite)]
     transPropagateAndInline =
