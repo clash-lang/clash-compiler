@@ -194,6 +194,11 @@ setSym mkUniqueIdentifierM bbCtx l = do
                          ; Result _ | Identifier t _ <- fst (bbResult bbCtx)
                                     -> Text.fromStrict t
                          ; CompName -> Text.fromStrict (bbCompName bbCtx)
+                         ; CtxName  -> case bbCtxName bbCtx of
+                                         Just nm -> Text.fromStrict nm
+                                         _ | Identifier t _ <- fst (bbResult bbCtx)
+                                           -> Text.fromStrict t
+                                         _ -> error "internal error"
                          ; _   -> error "unexpected element in GENSYM"})
 
 selectNewName
@@ -855,6 +860,7 @@ prettyElem (Template bbname source) = do
   renderOneLine <$> (string "~TEMPLATE"
                                   <> brackets (string $ Text.concat bbname')
                                   <> brackets (string $ Text.concat source'))
+prettyElem CtxName = return "~CTXNAME"
 
 -- | Recursively walk @Element@, applying @f@ to each element in the tree.
 walkElement
@@ -921,6 +927,7 @@ walkElement f el = maybeToList (f el) ++ walked
         Vars _ -> []
         Repeat es1 es2 ->
           concatMap go es1 ++ concatMap go es2
+        CtxName -> []
 
 -- | Determine variables used in an expression. Used for VHDL sensitivity list.
 -- Also see: https://github.com/clash-lang/clash-compiler/issues/365
@@ -1003,6 +1010,7 @@ usedArguments (N.BBTemplate t) = nub (concatMap (walkElement matchArg) t)
         TypElem _ -> Nothing
         TypM _ -> Nothing
         Vars _ -> Nothing
+        CtxName -> Nothing
 
 onBlackBox
   :: (BlackBoxTemplate -> r)

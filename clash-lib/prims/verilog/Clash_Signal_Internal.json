@@ -12,8 +12,8 @@
   -> Signal clk a"
     , "template" :
 "// delay begin,
-reg ~TYPO ~GENSYM[~RESULT_reg][0] ~IF ~ISINITDEFINED[0] ~THEN = ~CONST[4] ~ELSE ~FI;~IF ~ISACTIVEENABLE[3] ~THEN
-always @(~IF~ACTIVEEDGE[Rising][0]~THENposedge~ELSEnegedge~FI ~ARG[2]) begin : ~GENSYM[~RESULT_delay][1]
+reg ~TYPO ~GENSYM[~CTXNAME][0] ~IF ~ISINITDEFINED[0] ~THEN = ~CONST[4] ~ELSE ~FI;~IF ~ISACTIVEENABLE[3] ~THEN
+always @(~IF~ACTIVEEDGE[Rising][0]~THENposedge~ELSEnegedge~FI ~ARG[2]) begin : ~GENSYM[~CTXNAME_delay][1]
   if (~ARG[3]) begin
     ~SYM[0] <= ~ARG[5];
   end
@@ -41,8 +41,8 @@ assign ~RESULT = ~SYM[0];
   -> Signal clk a"
     , "template" :
 "// register begin
-reg ~TYPO ~GENSYM[~RESULT_reg][0] ~IF ~ISINITDEFINED[0] ~THEN = ~CONST[5] ~ELSE ~FI;
-always @(~IF~ACTIVEEDGE[Rising][0]~THENposedge~ELSEnegedge~FI ~ARG[2]~IF ~ISSYNC[0] ~THEN ~ELSE or ~IF ~ISACTIVEHIGH[0] ~THEN posedge ~ELSE negedge ~FI ~ARG[3]~FI) begin : ~GENSYM[~RESULT_register][1]
+reg ~TYPO ~GENSYM[~CTXNAME][0] ~IF ~ISINITDEFINED[0] ~THEN = ~CONST[5] ~ELSE ~FI;
+always @(~IF~ACTIVEEDGE[Rising][0]~THENposedge~ELSEnegedge~FI ~ARG[2]~IF ~ISSYNC[0] ~THEN ~ELSE or ~IF ~ISACTIVEHIGH[0] ~THEN posedge ~ELSE negedge ~FI ~ARG[3]~FI) begin : ~GENSYM[~CTXNAME_register][1]
   if (~IF ~ISACTIVEHIGH[0] ~THEN ~ELSE ! ~FI~ARG[3]) begin
     ~SYM[0] <= ~CONST[6];
   end else ~IF ~ISACTIVEENABLE[4] ~THEN if (~ARG[4]) ~ELSE ~FI begin

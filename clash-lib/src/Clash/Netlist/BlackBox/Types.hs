@@ -174,6 +174,9 @@ data Element
   | DevNull [Element]
   -- ^ Evaluate <hole> but swallow output
   | SigD [Element] !(Maybe Int)
+  | CtxName
+  -- ^ The "context name", name set by `Clash.Magic.setName`, defaults to the
+  -- name of the closest binder
   deriving (Show, Generic, NFData, Binary, Hashable)
 
 -- | Component instantiation hole. First argument indicates which function argument

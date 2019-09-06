@@ -129,6 +129,7 @@ pTagE =  Result True       <$  string "~ERESULT"
      <|> ActiveEdge        <$> (string "~ACTIVEEDGE" *> brackets pEdge) <*> brackets' natural'
      <|> IsSync            <$> (string "~ISSYNC" *> brackets' natural')
      <|> IsInitDefined     <$> (string "~ISINITDEFINED" *> brackets' natural')
+     <|> CtxName           <$  string "~CTXNAME"
 
 natural' :: TokenParsing m => m Int
 natural' = fmap fromInteger natural

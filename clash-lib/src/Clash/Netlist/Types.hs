@@ -373,6 +373,9 @@ data BlackBoxContext
   -- is equal to the scoping level of this context.
   , bbCompName :: Identifier
   -- ^ The component the BlackBox is instantiated in
+  , bbCtxName :: Maybe Identifier
+  -- ^ The "context name", name set by `Clash.Magic.setName`, defaults to the
+  -- name of the closest binder
   }
   deriving Show
 
@@ -415,6 +418,7 @@ emptyBBContext n
   , bbQsysIncName = []
   , bbLevel       = (-1)
   , bbCompName    = pack "__NOCOMPNAME__"
+  , bbCtxName     = Nothing
   }
 
 makeLenses ''NetlistEnv
