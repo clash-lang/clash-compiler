@@ -27,7 +27,7 @@ import           Data.Either                   (lefts, partitionEithers)
 import qualified Data.HashMap.Lazy             as HashMap
 import qualified Data.IntMap                   as IntMap
 import           Data.List                     (elemIndex)
-import           Data.Maybe                    (catMaybes, fromJust)
+import           Data.Maybe                    (catMaybes, fromJust, fromMaybe)
 import           Data.Semigroup.Monad
 import qualified Data.Set                      as Set
 import           Data.Text.Lazy                (fromStrict)
@@ -119,7 +119,14 @@ mkBlackBoxContext bbName resId args = do
     lvl <- Lens.use curBBlvl
     (nm,_) <- Lens.use curCompNm
 
-    return ( Context bbName (res,resTy) imps funs [] lvl nm
+    -- Set "context name" to value set by `Clash.Magic.setName`, default to the
+    -- name of the closest binder
+    ctxName1 <- fromMaybe resNm <$> Lens.view setName
+    -- Update "context name" with prefixes and suffixes set by
+    -- `Clash.Magic.prefixName` and `Clash.Magic.suffixName`
+    ctxName2 <- affixName ctxName1
+
+    return ( Context bbName (res,resTy) imps funs [] lvl nm (Just ctxName2)
            , concat impDecls ++ concat funDecls
            )
   where
