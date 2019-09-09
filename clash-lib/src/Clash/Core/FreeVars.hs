@@ -45,7 +45,8 @@ import Data.Monoid                      (All (..), Any (..))
 
 import Clash.Core.Term                  (Pat (..), Term (..), TickInfo (..))
 import Clash.Core.Type                  (Type (..))
-import Clash.Core.Var                   (Id, IdScope (..), TyVar, Var (..))
+import Clash.Core.Var
+  (Id, IdScope (..), TyVar, Var (..), isLocalId)
 import Clash.Core.VarEnv                (VarSet, unitVarSet)
 
 -- | Gives the free type-variables in a Type, implemented as a 'Fold'
@@ -169,9 +170,7 @@ freeIds = termFreeVars' isId where
 -- | Calculate the /local/ free identifiers of an expression: the free
 -- identifiers that are not bound in the global environment.
 freeLocalIds :: Fold Term Id
-freeLocalIds = termFreeVars' isLocalId where
-  isLocalId (Id {idScope = LocalId}) = True
-  isLocalId _ = False
+freeLocalIds = termFreeVars' isLocalId
 
 -- | Calculate the /global/ free identifiers of an expression: the free
 -- identifiers that are bound in the global environment.
@@ -244,13 +243,13 @@ termFreeVars'
   -> Term
   -> f Term
 termFreeVars' interesting f = go IntSet.empty where
-  go inScope = \case
-    Var v -> v1 <* typeFreeVars' interesting inScope1 f (varType v)
+  go inLocalScope = \case
+    Var v -> v1 <* typeFreeVars' interesting inLocalScope1 f (varType v)
       where
         isInteresting = interesting v
-        vInScope      = varUniq v `IntSet.member` inScope
-        inScope1
-          | vInScope  = inScope
+        vInScope      = isLocalId v && varUniq v `IntSet.member` inLocalScope
+        inLocalScope1
+          | vInScope  = inLocalScope
           | otherwise = IntSet.empty -- See Note [Closing over type variables]
 
         v1 | isInteresting
@@ -259,42 +258,60 @@ termFreeVars' interesting f = go IntSet.empty where
            | otherwise
            = pure (Var v)
 
-    Lam id_ tm -> Lam <$> goBndr inScope id_
-                      <*> go (IntSet.insert (varUniq id_) inScope) tm
-    TyLam tv tm -> TyLam <$> goBndr inScope tv
-                         <*> go (IntSet.insert (varUniq tv) inScope) tm
-    App l r -> App <$> go inScope l <*> go inScope r
-    TyApp l r -> TyApp <$> go inScope l
-                       <*> typeFreeVars' interesting inScope f r
-    Letrec bs e -> Letrec <$> traverse (goBind inScope') bs <*> go inScope' e
-      where inScope' = foldr IntSet.insert inScope (map (varUniq.fst) bs)
-    Case subj ty alts -> Case <$> go inScope subj
-                              <*> typeFreeVars' interesting inScope f ty
-                              <*> traverse (goAlt inScope) alts
-    Cast tm t1 t2 -> Cast <$> go inScope tm
-                          <*> typeFreeVars' interesting inScope f t1
-                          <*> typeFreeVars' interesting inScope f t2
-    Tick tick tm -> Tick <$> goTick inScope tick <*> go inScope tm
+    Lam id_ tm ->
+      Lam <$> goBndr inLocalScope id_
+          <*> go (IntSet.insert (varUniq id_) inLocalScope) tm
+    TyLam tv tm ->
+      TyLam <$> goBndr inLocalScope tv
+            <*> go (IntSet.insert (varUniq tv) inLocalScope) tm
+
+    App l r ->
+      App <$> go inLocalScope l <*> go inLocalScope r
+
+    TyApp l r ->
+      TyApp <$> go inLocalScope l
+            <*> typeFreeVars' interesting inLocalScope f r
+
+    Letrec bs e ->
+      Letrec <$> traverse (goBind inLocalScope') bs
+             <*> go inLocalScope' e
+      where
+        inLocalScope' = foldr IntSet.insert inLocalScope (map (varUniq.fst) bs)
+
+    Case subj ty alts ->
+      Case <$> go inLocalScope subj
+           <*> typeFreeVars' interesting inLocalScope f ty
+           <*> traverse (goAlt inLocalScope) alts
+
+    Cast tm t1 t2 ->
+      Cast <$> go inLocalScope tm
+           <*> typeFreeVars' interesting inLocalScope f t1
+           <*> typeFreeVars' interesting inLocalScope f t2
+
+    Tick tick tm ->
+      Tick <$> goTick inLocalScope tick
+      <*> go inLocalScope tm
+
     tm -> pure tm
 
-  goBndr inScope v =
-    (\t -> v  {varType = t}) <$> typeFreeVars' interesting inScope f (varType v)
+  goBndr inLocalScope v =
+    (\t -> v  {varType = t}) <$> typeFreeVars' interesting inLocalScope f (varType v)
 
-  goBind inScope (l,r) = (,) <$> goBndr inScope l <*> go inScope r
+  goBind inLocalScope (l,r) = (,) <$> goBndr inLocalScope l <*> go inLocalScope r
 
-  goAlt inScope (pat,alt) = case pat of
+  goAlt inLocalScope (pat,alt) = case pat of
     DataPat dc tvs ids -> (,) <$> (DataPat <$> pure dc
-                                           <*> traverse (goBndr inScope') tvs
-                                           <*> traverse (goBndr inScope') ids)
-                              <*> go inScope' alt
+                                           <*> traverse (goBndr inLocalScope') tvs
+                                           <*> traverse (goBndr inLocalScope') ids)
+                              <*> go inLocalScope' alt
       where
-        inScope' = foldr IntSet.insert
-                         (foldr IntSet.insert inScope (map varUniq tvs))
+        inLocalScope' = foldr IntSet.insert
+                         (foldr IntSet.insert inLocalScope (map varUniq tvs))
                          (map varUniq ids)
-    _ -> (,) <$> pure pat <*> go inScope alt
+    _ -> (,) <$> pure pat <*> go inLocalScope alt
 
-  goTick inScope = \case
-    NameMod m ty -> NameMod m <$> typeFreeVars' interesting inScope f ty
+  goTick inLocalScope = \case
+    NameMod m ty -> NameMod m <$> typeFreeVars' interesting inLocalScope f ty
     tick         -> pure tick
 
 -- | Determine whether a type has no free type variables.
