@@ -85,6 +85,12 @@ flag history
    default: False
    manual: True
 
+flag unittests
+  description:
+    You can disable testing with unittests using `-f-unittests`.
+  default: True
+  manual: True
+
 Library
   HS-Source-Dirs:     src
 
@@ -224,3 +230,27 @@ Library
 
   if flag(history)
     cpp-options:      -DHISTORY
+
+test-suite unittests
+  type:             exitcode-stdio-1.0
+  default-language: Haskell2010
+  main-is:          unittests.hs
+  ghc-options:      -Wall
+  hs-source-dirs:   tests
+
+  if !flag(unittests)
+    buildable: False
+  else
+    build-depends:
+      clash-prelude,
+      clash-lib,
+
+      ghc-typelits-knownnat,
+
+      base,
+      ghc,
+      lens,
+      tasty         >= 1.2      && < 1.3,
+      tasty-hunit
+
+  Other-Modules: Clash.Tests.Core.FreeVars
