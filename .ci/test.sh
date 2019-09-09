@@ -39,8 +39,8 @@ if [[ ${tag_version} != "" && ${version} != ${tag_version} ]]; then
         echo "\$CI_COMMIT_TAG should start with a 'v'. Found: ${CI_COMMIT_TAG}"
         exit 1;
     fi
-fi   
+fi
 
 # Run actual tests
-cabal new-test clash-cosim clash-prelude
+cabal new-test clash-cosim clash-prelude clash-lib
 cabal new-run -- clash-testsuite -j$THREADS --hide-successes
