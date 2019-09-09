@@ -48,7 +48,7 @@ import Clash.Core.Term
 import Clash.Core.TyCon                 (TyCon (..), TyConName, isTupleTyConLike)
 import Clash.Core.Type                  (ConstTy (..), Kind, LitTy (..),
                                          Type (..), TypeView (..), tyView)
-import Clash.Core.Var                   (Id, TyVar, Var (..))
+import Clash.Core.Var                   (Id, TyVar, Var (..), IdScope(..))
 import Clash.Util
 import Clash.Pretty
 
@@ -206,7 +206,10 @@ instance PrettyPrec LitTy where
 
 instance PrettyPrec Term where
   pprPrec prec e = case e of
-    Var x           -> pprPrec prec (varName x)
+    Var x           -> do
+      v <- pprPrec prec (varName x)
+      s <- pprPrecIdScope x
+      pure (v <> brackets s)
     Data dc         -> pprPrec prec dc
     Literal l       -> pprPrec prec l
     Prim nm _       -> pprPrecPrim prec nm
@@ -283,6 +286,11 @@ instance PrettyPrec Pat where
             , nest 2 (sep xs') ]
     LitPat l   -> pprM l
     DefaultPat -> return "_"
+
+pprPrecIdScope :: Monad m => Var a -> m ClashDoc
+pprPrecIdScope (TyVar {}) = pure "TyVar"
+pprPrecIdScope (Id _ _ _ GlobalId) = pure "GlobalId"
+pprPrecIdScope (Id _ _ _ LocalId) = pure "LocalId"
 
 pprPrecPrim :: Monad m => Rational -> Text -> m ClashDoc
 pprPrecPrim prec nm =
