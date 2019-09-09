@@ -350,13 +350,12 @@ mkDeclarations' bndr (collectTicks -> (Case scrut altTy alts@(_:_:_),ticks)) =
   withTicks ticks $ \tickDecls -> do
   mkSelection (Right bndr) scrut altTy alts tickDecls
 
-mkDeclarations' bndr app =
+mkDeclarations' bndr app = do
   let (appF,args0,ticks) = collectArgsTicks app
       (args,tyArgs) = partitionEithers args0
-  in  withTicks ticks $ \tickDecls -> do
   case appF of
     Var f
-      | null tyArgs -> mkFunApp (id2identifier bndr) f args tickDecls
+      | null tyArgs -> withTicks ticks (mkFunApp (id2identifier bndr) f args)
       | otherwise   -> do
         (_,sp) <- Lens.use curCompNm
         throw (ClashException sp ($(curLoc) ++ "Not in normal form: Var-application with Type arguments:\n\n" ++ showPpr app) Nothing)
@@ -377,7 +376,9 @@ mkDeclarations' bndr app =
               assn  = case exprApp of
                         Identifier _ Nothing -> []
                         _ -> [Assignment dstId exprApp]
-              declsApp1 = if null declsApp0 then tickDecls else declsApp0
+          declsApp1 <- if null declsApp0
+                       then withTicks ticks return
+                       else pure declsApp0
           return (declsApp1 ++ assn)
 
 -- | Generate a declaration that selects an alternative based on the value of
