@@ -11,14 +11,18 @@ packages:
   ./benchmark/profiling/run/*.cabal
   ./clash-term/*.cabal
 
-allow-newer: *:Cabal, *:array, *:base, *:binary, *:^bytestring, *:containers,
-  *:deepseq, *:directory, *:filepath, *:ghc, *:ghc-boot, *:ghc-boot-th,
-  *:ghc-compact, *:ghc-heap, *:ghc-prim, *:ghci, *:haskeline, *:hpc,
-  *:integer-gmp, *:libiserv, *:mtl, *:parsec, *:pretty, *:process, *:stm,
-  *:template-haskell, *:terminfo, *:text, *:time, *:transformers, *:unix,
-  *:xhtml, *:ghc-tcplugins-extra, *:ghc-typelits-natnormalise,
-  *:ghc-typelits-knownnat, *:ghc-typelits-extra,
-  *:aeson, *:th-abstraction, *:microlens
+
+allow-newer:
+  vector-th-unbox:base, vector-th-unbox:template-haskell
+  , concurrent-supply:hashable
+  , hint:ghc
+  , first-class-families:base
+
+  -- needed by clash-term
+  , rewrite-inspector:hashable
+  , brick:base
+  -- needed by criterion for benchmark
+  , microstache:base
 
 repository head.hackage.ghc.haskell.org
    url: https://ghc.gitlab.haskell.org/head.hackage/
@@ -32,7 +36,7 @@ repository head.hackage.ghc.haskell.org
 -- index state, to go along with the cabal.project.freeze file. update the index
 -- state by running `cabal update` twice and looking at the index state it
 -- displays to you (as the second update will be a no-op)
-index-state: 2019-08-29T14:22:16Z
+index-state: 2019-09-09T10:45:29Z
 
 package clash-ghc
   executable-dynamic: True
