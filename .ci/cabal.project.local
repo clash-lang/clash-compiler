@@ -8,6 +8,7 @@ package *
 package clash-lib
   ghc-options: -Werror
   documentation: True
+  tests: True
   flags: +debug
 package clash-prelude
   ghc-options: -Werror
