@@ -26,16 +26,16 @@ mainCounter :: SystemClockResetEnable => Signal System (Signed 64)
 mainCounter = traceSignal1 "main" counter
   where
     counter =
-      register 0 (fmap succ' $ bundle (subcounter,counter))
+      register 0 (fmap succ' $ bundle (subCounter,counter))
 
     succ' (sc, c)
       | sc == maxBound = c + 1
       | otherwise      = c
 
 -- | Collect traces, and dump them to a VCD file.
-main :: SystemClockResetEnable => IO ()
+main :: IO ()
 main = do
-  let cntrOut = exposeClockResetEnable mainCounter systemClockGen systemResetGen
+  let cntrOut = exposeClockResetEnable mainCounter systemClockGen systemResetGen enableGen
   vcd <- dumpVCD (0, 100) cntrOut ["main", "sub"]
   case vcd of
     Left msg ->
