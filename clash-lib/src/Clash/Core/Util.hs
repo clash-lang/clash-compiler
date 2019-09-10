@@ -18,7 +18,6 @@ import           Control.Concurrent.Supply     (Supply, freshId)
 import qualified Control.Lens                  as Lens
 import Control.Monad.Trans.Except              (Except, throwE)
 import           Data.Coerce                   (coerce)
-import qualified Data.IntSet                   as IntSet
 import qualified Data.HashSet                  as HashSet
 import Data.List
   (foldl', mapAccumR, elemIndices, nub)
@@ -32,7 +31,7 @@ import           Data.Semigroup
 import Clash.Core.DataCon
   (DataCon (MkData), dcType, dcUnivTyVars, dcExtTyVars, dcArgTys)
 import Clash.Core.FreeVars
-  (termFreeVarsX, tyFVsOfTypes, typeFreeVars)
+  (tyFVsOfTypes, typeFreeVars)
 import Clash.Core.Literal                      (literalType)
 import Clash.Core.Name
   (Name (..), OccName, mkUnsafeInternalName, mkUnsafeSystemName)
@@ -591,15 +590,6 @@ appendToVec consCon resTy vec = go
                                                    [(LitTy (NumTy n))
                                                    ,resTy
                                                    ,(LitTy (NumTy (n-1)))])
-
-
-availableUniques
-  :: Term
-  -> [Unique]
-availableUniques t = [ n | n <- [0..] , n `IntSet.notMember` avoid ]
- where
-  avoid = Lens.foldMapOf termFreeVarsX (\a i -> IntSet.insert (varUniq a) i) t
-            IntSet.empty
 
 -- | Create let-bindings with case-statements that select elements out of a
 -- vector. Returns both the variables to which element-selections are bound

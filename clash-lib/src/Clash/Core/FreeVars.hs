@@ -13,7 +13,6 @@
 module Clash.Core.FreeVars
   (-- * Free variable calculation
     typeFreeVars
-  , termFreeVarsX
   , freeIds
   , freeLocalVars
   , freeLocalIds
@@ -196,19 +195,6 @@ termFreeTyVars :: Fold Term TyVar
 termFreeTyVars = termFreeVars' isTV where
   isTV (TyVar {}) = True
   isTV _          = False
-
--- | Gives the free variables of a Term, implemented as a 'Fold'
---
--- The 'Fold' is closed over the types of variables, so:
---
--- @
--- foldMapOf termFreeVars unitVarSet (case (x : (a:* -> k) Int)) of {}) = {x, a, k}
--- @
---
--- __NB__ this collects both global and local IDs, and you almost __NEVER__ want
--- to use this. Use one of the other FV calculations instead
-termFreeVarsX :: Fold Term (Var a)
-termFreeVarsX = termFreeVars' (const True)
 
 -- | Gives the "interesting" free variables in a Term, implemented as a 'Fold'
 --
