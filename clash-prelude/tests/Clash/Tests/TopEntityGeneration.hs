@@ -4,6 +4,8 @@
 
 module Clash.Tests.TopEntityGeneration where
 
+import Language.Haskell.TH.Syntax (recover)
+
 import Test.Tasty
 import Test.Tasty.HUnit
 
@@ -80,15 +82,38 @@ expectedTopEntity3 =
     ]
     (PortProduct "outTup" [PortName "outint",PortName "outbool"])
 
+topEntityFailure1
+  :: "int"     ::: Signal System Int
+  -> "tuple"   ::: ("tup1" ::: Signal System (BitVector 7), "tup2" ::: Signal System (BitVector 9))
+  -> "simple"  ::: Signal System Simple
+  -> "named"   ::: Signal System Named
+  -> Signal System Embedded
+  -> "out"     ::: Signal System Bool
+topEntityFailure1 = undefined
+
+topEntityFailure2
+  :: "int"     ::: Signal System Int
+  -> "tuple"   ::: ("tup1" ::: Signal System (BitVector 7), "tup2" ::: Signal System (BitVector 9))
+  -> "simple"  ::: Signal System Simple
+  -> "named"   ::: Signal System Named
+  -> Signal System Int
+  -> "out"     ::: Signal System Bool
+topEntityFailure2 = undefined
+
 tests :: TestTree
 tests =
   testGroup
     "TopEntityGeneration"
     [ testCase "topEntity1" $
-      $(buildTopEntity Nothing 'topEntity1) @?= expectedTopEntity1
+      $(recover ([| () |]) (buildTopEntity Nothing 'topEntity1)) @?= expectedTopEntity1
     , testCase "topEntity2" $
-      $(buildTopEntity Nothing 'topEntity2) @?= expectedTopEntity2
+      $(recover ([| () |]) (buildTopEntity Nothing 'topEntity2)) @?= expectedTopEntity2
     , testCase "topEntity3" $
-      $(buildTopEntity Nothing 'topEntity3) @?= expectedTopEntity3
+      $(recover ([| () |]) (buildTopEntity Nothing 'topEntity3)) @?= expectedTopEntity3
+
+    , testCase "topEntityFailure1" $
+      $(recover ([| () |]) (buildTopEntity Nothing 'topEntityFailure1)) @?= ()
+    , testCase "topEntityFailure2" $
+      $(recover ([| () |]) (buildTopEntity Nothing 'topEntityFailure2)) @?= ()
     ]
 
