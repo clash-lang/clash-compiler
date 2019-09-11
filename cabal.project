@@ -24,6 +24,9 @@ allow-newer:
   -- needed by criterion for benchmark
   , microstache:base
 
+  -- doesn't work yet with 8.8
+  , prettyprinter:base
+
 repository head.hackage.ghc.haskell.org
    url: https://ghc.gitlab.haskell.org/head.hackage/
    secure: True
@@ -36,7 +39,7 @@ repository head.hackage.ghc.haskell.org
 -- index state, to go along with the cabal.project.freeze file. update the index
 -- state by running `cabal update` twice and looking at the index state it
 -- displays to you (as the second update will be a no-op)
-index-state: 2019-09-09T10:45:29Z
+index-state: 2019-09-11T01:34:34Z
 
 package clash-ghc
   executable-dynamic: True
