@@ -480,6 +480,49 @@ isConstantNotClockReset e = do
         _ -> return False
      else pure (isConstant e)
 
+-- TODO: Remove function after using WorkInfo in 'isWorkFreeIsh'
+isWorkFreeClockOrReset
+  :: TyConMap
+  -> Term
+  -> Maybe Bool
+isWorkFreeClockOrReset tcm e =
+  let eTy = termType tcm e in
+  if isClockOrReset tcm eTy then
+    case collectArgs e of
+      (Prim nm _,_) -> Just (nm == "Clash.Transformations.removedArg")
+      (Var _, []) -> Just True
+      _ -> Just False
+  else
+    Nothing
+
+-- | A conservative version of 'isWorkFree'. Is used to determine in 'bindConstantVar'
+-- to determine whether an expression can be "bound" (locally inlined). While
+-- binding workfree expressions won't result in extra work for the circuit, it
+-- might very well cause extra work for Clash. In fact, using 'isWorkFree' in
+-- 'bindConstantVar' makes Clash two orders of magnitude slower for some of our
+-- test cases.
+--
+-- In effect, this function is a version of 'isConstant' that also considers
+-- references to clocks and resets constant. This allows us to bind
+-- HiddenClock(ResetEnable) constructs, allowing Clash to constant spec
+-- subconstants - most notably KnownDomain. Doing that enables Clash to
+-- eliminate any case-constructs on it.
+isWorkFreeIsh
+  :: Term
+  -> RewriteMonad extra Bool
+isWorkFreeIsh e = do
+  tcm <- Lens.view tcCache
+  case isWorkFreeClockOrReset tcm e of
+    Just b -> pure b
+    Nothing ->
+      case collectArgs e of
+        (Data _, args)   -> allM (either isWorkFreeIsh (pure . const True)) args
+        -- TODO: Use WorkInfo
+        (Prim _ _, args) -> allM (either isWorkFreeIsh (pure . const True)) args
+        (Lam _ _, _)     -> pure (not (hasLocalFreeVars e))
+        (Literal _,_)    -> pure True
+        _                -> pure False
+
 inlineOrLiftBinders
   :: (LetBinding -> RewriteMonad extra Bool)
   -- ^ Property test
