@@ -136,7 +136,7 @@ toArgNames split ty = go (0::Int) ty []
         case name of
           [a] -> return (a:v)
           f   -> fail $ "Failed to get a single name for argument " ++ show i
-                      ++ "\n a.k.a. " ++ show x
+                      ++ "\n a.k.a. " ++ pprint x
                       ++ "\n got name " ++ show f
     go _ _ acc = return acc
 
