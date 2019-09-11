@@ -1,6 +1,8 @@
 {-# LANGUAGE DataKinds       #-}
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE TypeOperators   #-}
+{-# LANGUAGE TypeFamilies    #-}
+{-# LANGUAGE GADTs           #-}
 
 module Clash.Tests.TopEntityGeneration where
 
@@ -24,6 +26,27 @@ data Embedded
   { name3 :: "embedded1" ::: Simple
   , name4 :: "embedded2" ::: Bool
   }
+newtype Single = Single ("s" ::: Int)
+
+data Gadt x where
+  Gadt :: ("gadt" ::: Int) -> Gadt Int
+
+type family CF x y z where
+  CF Int Int Int = ("cfiii" ::: Single)
+  CF Bool Int Int = ("cfbii" ::: Single)
+type family OF x y z
+type instance OF Int Int Int = ("ofiii" ::: Single)
+type instance OF Bool Int Int = ("ofbii" ::: Single)
+
+data family X x y z
+data instance X Int Int Int = X1 ("xiii" ::: Int)
+newtype instance X Bool Int Int = X2 ("xbii" ::: Int)
+
+data Impossible = L ("left" ::: Int) | R ("right" ::: Bool)
+
+data FailureTy1 = TwoF1 ("one" ::: Int) Int
+data FailureTy2 = TwoF2 ("one" ::: Int) Simple
+data SuccessTy = TwoS ("one" ::: Int) Single
 
 topEntity1 :: "in1" ::: Signal System Int
            -> "in2" ::: Signal System Bool
@@ -73,7 +96,7 @@ makeTopEntity 'topEntity3
 
 expectedTopEntity3 :: TopEntity
 expectedTopEntity3 =
- Synthesize "topEntity3"
+  Synthesize "topEntity3"
     [ PortName "tup1"
     , PortName "tup2"
     , PortProduct "tup3" [PortName "int",PortName "bool"]
@@ -81,6 +104,44 @@ expectedTopEntity3 =
     , PortProduct "custom" [PortName "named1",PortName "named2"]
     ]
     (PortProduct "outTup" [PortName "outint",PortName "outbool"])
+
+topEntity4 :: Signal System (Gadt Int)
+           -> Signal System Single
+           -> Signal System (CF Int Int Int)
+           -> Signal System (CF Bool Int Int)
+           -> Signal System (OF Int Int Int)
+           -> Signal System (OF Bool Int Int)
+           -> Signal System (X Int Int Int)
+           -> Signal System (X Bool Int Int)
+           -> Signal System Single
+topEntity4 = undefined
+makeTopEntity 'topEntity4
+
+expectedTopEntity4 :: TopEntity
+expectedTopEntity4 =
+  Synthesize "topEntity4"
+    [ PortName "gadt"
+    , PortName "s"
+    , PortProduct "cfiii" [PortName "s"]
+    , PortProduct "cfbii" [PortName "s"]
+    , PortProduct "ofiii" [PortName "s"]
+    , PortProduct "ofbii" [PortName "s"]
+    , PortName "xiii"
+    , PortName "xbii"
+    ]
+    (PortName "s")
+
+topEntity5 :: "in1" ::: Signal System SuccessTy
+           -> "out" ::: Signal System Int
+topEntity5 = undefined
+makeTopEntity 'topEntity5
+
+expectedTopEntity5 :: TopEntity
+expectedTopEntity5 =
+ Synthesize "topEntity5"
+    [PortProduct "in1" [PortName "one", PortName "s"]]
+    (PortName "out")
+
 
 topEntityFailure1
   :: "int"     ::: Signal System Int
@@ -100,6 +161,21 @@ topEntityFailure2
   -> "out"     ::: Signal System Bool
 topEntityFailure2 = undefined
 
+topEntityFailure3
+  :: "int"     ::: Signal System Impossible
+  -> "out"     ::: Signal System Bool
+topEntityFailure3 = undefined
+
+topEntityFailure4
+  :: "int"     ::: Signal System FailureTy1
+  -> "out"     ::: Signal System Bool
+topEntityFailure4 = undefined
+
+topEntityFailure5
+  :: "int"     ::: Signal System FailureTy2
+  -> "out"     ::: Signal System Bool
+topEntityFailure5 = undefined
+
 tests :: TestTree
 tests =
   testGroup
@@ -110,10 +186,20 @@ tests =
       $(recover ([| () |]) (buildTopEntity Nothing 'topEntity2)) @?= expectedTopEntity2
     , testCase "topEntity3" $
       $(recover ([| () |]) (buildTopEntity Nothing 'topEntity3)) @?= expectedTopEntity3
+    , testCase "topEntity4" $
+      $(recover ([| () |]) (buildTopEntity Nothing 'topEntity4)) @?= expectedTopEntity4
+    , testCase "topEntity5" $
+      $(recover ([| () |]) (buildTopEntity Nothing 'topEntity5)) @?= expectedTopEntity5
 
     , testCase "topEntityFailure1" $
       $(recover ([| () |]) (buildTopEntity Nothing 'topEntityFailure1)) @?= ()
     , testCase "topEntityFailure2" $
       $(recover ([| () |]) (buildTopEntity Nothing 'topEntityFailure2)) @?= ()
+    , testCase "topEntityFailure3" $
+      $(recover ([| () |]) (buildTopEntity Nothing 'topEntityFailure3)) @?= ()
+    , testCase "topEntityFailure4" $
+      $(recover ([| () |]) (buildTopEntity Nothing 'topEntityFailure4)) @?= ()
+    , testCase "topEntityFailure5" $
+      $(recover ([| () |]) (buildTopEntity Nothing 'topEntityFailure5)) @?= ()
     ]
 
