@@ -401,3 +401,12 @@ uncurry3
   -> d
 uncurry3 = \f (a,b,c) -> f a b c
 {-# INLINE uncurry3 #-}
+
+allM :: (Monad m) => (a -> m Bool) -> [a] -> m Bool
+allM _ [] = return True
+allM p (x:xs) = do
+  q <- p x
+  if q then
+    allM p xs
+  else
+    return False

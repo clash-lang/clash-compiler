@@ -813,7 +813,7 @@ bindConstantVar = inlineBinders test
   where
     test _ (_,stripTicks -> e) = case isLocalVar e of
       True -> return True
-      _    -> isConstantNotClockReset e >>= \case
+      _    -> isWorkFreeIsh e >>= \case
         True -> Lens.use (extra.inlineConstantLimit) >>= \case
           0 -> return True
           n -> return (termSize e <= n)
