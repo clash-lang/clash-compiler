@@ -37,6 +37,7 @@ module Clash.Unique
     -- *** Searching
   , elemUniqMap
   , notElemUniqMap
+  , elemUniqMapDirectly
     -- ** Folding
   , foldrWithUnique
     -- ** Conversions
@@ -90,9 +91,11 @@ type Unique = Int
 
 class Uniquable a where
   getUnique :: a -> Unique
+  setUnique :: a -> Unique -> a
 
 instance Uniquable Int where
   getUnique i = i
+  setUnique _i0 i1 = i1
 
 -- | Map indexed by a 'Uniquable' key
 newtype UniqMap a = UniqMap (IntMap a)
@@ -186,7 +189,15 @@ elemUniqMap
   => a
   -> UniqMap b
   -> Bool
-elemUniqMap k (UniqMap m) = IntMap.member (getUnique k) m
+elemUniqMap k = elemUniqMapDirectly (getUnique k)
+
+-- | Check whether an element exists in the uniqmap based on a given `Unique`
+elemUniqMapDirectly
+  :: Unique
+  -> UniqMap b
+  -> Bool
+elemUniqMapDirectly k (UniqMap m) = k `IntMap.member` m
+{-# INLINE elemUniqMapDirectly #-}
 
 -- | Check whether a key is not in the map
 notElemUniqMap

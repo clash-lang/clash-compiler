@@ -78,9 +78,9 @@ import           Clash.Core.Var
   (Id, IdScope (..), TyVar, Var (..), isLocalId, mkGlobalId, mkLocalId, mkTyVar)
 import           Clash.Core.VarEnv
   (InScopeSet, VarEnv, elemVarSet, extendInScopeSetList, mkInScopeSet,
-   notElemVarEnv, uniqAway)
+   notElemVarEnv, uniqAway, uniqAway')
 import           Clash.Driver.Types
-  (DebugLevel (..))
+  (DebugLevel (..), BindingMap)
 import           Clash.Netlist.Util          (representableType)
 import           Clash.Rewrite.Types
 import           Clash.Unique
@@ -300,14 +300,14 @@ mkBinderFor
   -> Either Term Type -- ^ Type or Term to bind
   -> m (Either Id TyVar)
 mkBinderFor is tcm name (Left term) = do
-  name' <- cloneName name
+  name' <- cloneNameWithInScopeSet is name
   let ty = termType tcm term
-  return (Left (uniqAway is (mkLocalId ty (coerce name'))))
+  return (Left (mkLocalId ty (coerce name')))
 
 mkBinderFor is tcm name (Right ty) = do
-  name' <- cloneName name
+  name' <- cloneNameWithInScopeSet is name
   let ki = typeKind tcm ty
-  return (Right (uniqAway is (mkTyVar ki (coerce name'))))
+  return (Right (mkTyVar ki (coerce name')))
 
 -- | Make a new, unique, identifier
 mkInternalVar
@@ -578,7 +578,11 @@ liftBinding (var@Id {varName = idName} ,e) = do
   tcm       <- Lens.view tcCache
   let newBodyTy = termType tcm $ mkTyLams (mkLams e boundFVs) boundFTVs
   (cf,sp)   <- Lens.use curFun
-  newBodyNm <- cloneName (appendToName (varName cf) ("_" `Text.append` nameOcc idName))
+  binders <- Lens.use bindings
+  newBodyNm <-
+    cloneNameWithBindingMap
+      binders
+      (appendToName (varName cf) ("_" `Text.append` nameOcc idName))
   let newBodyId = mkGlobalId newBodyTy newBodyNm {nameSort = Internal}
 
   -- Make a new expression, consisting of the the lifted function applied to
@@ -629,6 +633,14 @@ liftBinding (var@Id {varName = idName} ,e) = do
 
 liftBinding _ = error $ $(curLoc) ++ "liftBinding: invalid core, expr bound to tyvar"
 
+-- | Ensure that the 'Unique' of a variable does not occur in the 'BindingMap'
+uniqAwayBinder
+  :: BindingMap
+  -> Name a
+  -> Name a
+uniqAwayBinder binders nm =
+  uniqAway' (`elemUniqMapDirectly` binders) (nameUniq nm) nm
+
 -- | Make a global function for a name-term tuple
 mkFunction
   :: TmName
@@ -640,9 +652,10 @@ mkFunction
   -> RewriteMonad extra Id
   -- ^ Name with a proper unique and the type of the function
 mkFunction bndrNm sp inl body = do
-  tcm    <- Lens.view tcCache
+  tcm <- Lens.view tcCache
   let bodyTy = termType tcm body
-  bodyNm <- cloneName bndrNm
+  binders <- Lens.use bindings
+  bodyNm <- cloneNameWithBindingMap binders bndrNm
   addGlobalBind bodyNm bodyTy sp inl body
   return (mkGlobalId bodyTy bodyNm)
 
@@ -658,14 +671,27 @@ addGlobalBind vNm ty sp inl body = do
   let vId = mkGlobalId ty vNm
   (ty,body) `deepseq` bindings %= extendUniqMap vNm (vId,sp,inl,body)
 
--- | Create a new name out of the given name, but with another unique
-cloneName
+-- | Create a new name out of the given name, but with another unique. Resulting
+-- unique is guaranteed to not be in the given InScopeSet.
+cloneNameWithInScopeSet
   :: (Monad m, MonadUnique m)
-  => Name a
+  => InScopeSet
+  -> Name a
   -> m (Name a)
-cloneName nm = do
+cloneNameWithInScopeSet is nm = do
   i <- getUniqueM
-  return nm {nameUniq = i}
+  return (uniqAway is (setUnique nm i))
+
+-- | Create a new name out of the given name, but with another unique. Resulting
+-- unique is guaranteed to not be in the given BindingMap.
+cloneNameWithBindingMap
+  :: (Monad m, MonadUnique m)
+  => BindingMap
+  -> Name a
+  -> m (Name a)
+cloneNameWithBindingMap binders nm = do
+  i <- getUniqueM
+  return (uniqAway' (`elemUniqMapDirectly` binders) i (setUnique nm i))
 
 {-# INLINE isUntranslatable #-}
 -- | Determine if a term cannot be represented in hardware
