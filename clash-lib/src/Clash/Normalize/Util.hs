@@ -50,11 +50,11 @@ import           Clash.Core.Pretty       (showPpr)
 import           Clash.Core.Subst        (deShadowTerm)
 import           Clash.Core.Term
   (Context, CoreContext(AppArg), PrimInfo (..), Term (..), WorkInfo (..),
-   collectArgs)
+   TickInfo, collectArgs, collectArgsTicks)
 import           Clash.Core.TyCon        (TyConMap)
 import           Clash.Core.Type         (Type, undefinedTy)
 import           Clash.Core.Util
-  (isClockOrReset, isPolyFun, termType, mkApps)
+  (isClockOrReset, isPolyFun, termType, mkApps, mkTicks)
 import           Clash.Core.Var          (Id, Var (..), isGlobalId)
 import           Clash.Core.VarEnv
   (VarEnv, emptyInScopeSet, emptyVarEnv, extendVarEnv, extendVarEnvWith,
@@ -212,6 +212,8 @@ bindCsr ctx@(TransformContext is0 _) oldTerm = do
 
 mergeCsrs
   :: TransformContext
+  -> [TickInfo]
+  -- ^ Ticks to wrap around proposed new term
   -> Term
   -- ^ "Old" term
   -> ([Either Term Type] -> Term)
@@ -219,7 +221,7 @@ mergeCsrs
   -> [Either Term Type]
   -- ^ Subterms
   -> RewriteMonad NormalizeState ConstantSpecInfo
-mergeCsrs ctx oldTerm proposedTerm subTerms = do
+mergeCsrs ctx ticks oldTerm proposedTerm subTerms = do
   subCsrs <- snd <$> mapAccumLM constantSpecInfoFolder ctx subTerms
 
   -- If any arguments are constant (and hence can be constant specced), a new
@@ -233,9 +235,10 @@ mergeCsrs ctx oldTerm proposedTerm subTerms = do
       null (lefts subCsrs) || any csrFoundConstant (lefts subCsrs)
 
   if anyArgsOrResultConstant then
+    let newTerm = proposedTerm (bimap csrNewTerm id <$> subCsrs)  in
     pure (ConstantSpecInfo
       { csrNewBindings = concatMap csrNewBindings (lefts subCsrs)
-      , csrNewTerm = proposedTerm (bimap csrNewTerm id <$> subCsrs)
+      , csrNewTerm = mkTicks newTerm ticks
       , csrFoundConstant = True
       })
   else do
@@ -292,30 +295,29 @@ constantSpecInfo ctx e = do
       _ -> do
         bindCsr ctx e
   else
-    -- TODO: use collectArgsWithTicks
-    case collectArgs e of
-      (dc@(Data _), args) ->
-        mergeCsrs ctx e (mkApps dc) args
+    case collectArgsTicks e of
+      (dc@(Data _), args, ticks) ->
+        mergeCsrs ctx ticks e (mkApps dc) args
 
       -- TODO: Work with prim's WorkInfo?
-      (prim@(Prim _ _), args) -> do
-        csr <- mergeCsrs ctx e (mkApps prim) args
+      (prim@(Prim _ _), args, ticks) -> do
+        csr <- mergeCsrs ctx ticks e (mkApps prim) args
         if null (csrNewBindings csr) then
           pure csr
         else
           bindCsr ctx e
 
-      (Lam _ _, _) ->
+      (Lam _ _, _, _ticks) ->
         if hasLocalFreeVars e then
           bindCsr ctx e
         else
           pure (constantCsr e)
 
-      (var@(Var f), args) -> do
+      (var@(Var f), args, ticks) -> do
         (curF, _) <- Lens.use curFun
         isNonRecGlobVar <- isNonRecursiveGlobalVar e
         if isNonRecGlobVar && f /= curF then do
-          csr <- mergeCsrs ctx e (mkApps var) args
+          csr <- mergeCsrs ctx ticks e (mkApps var) args
           if null (csrNewBindings csr) then
             pure csr
           else
@@ -323,7 +325,7 @@ constantSpecInfo ctx e = do
         else
           bindCsr ctx e
 
-      (Literal _,_) ->
+      (Literal _,_, _ticks) ->
         pure (constantCsr e)
 
       _ ->
