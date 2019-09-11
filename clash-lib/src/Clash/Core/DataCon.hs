@@ -39,6 +39,7 @@ data DataCon
   { dcName :: !DcName
   -- ^ Name of the DataCon
   , dcUniq :: {-# UNPACK #-} !Unique
+  -- ^ Invariant: forall x . dcUniq x ~ nameUniq (dcName x)
   , dcTag :: !ConTag
   -- ^ Syntactical position in the type definition
   , dcType :: !Type
@@ -67,6 +68,7 @@ instance Ord DataCon where
 
 instance Uniquable DataCon where
   getUnique = dcUniq
+  setUnique dc u = dc {dcUniq=u, dcName=(dcName dc){nameUniq=u}}
 
 -- | Syntactical position of the DataCon in the type definition
 type ConTag = Int

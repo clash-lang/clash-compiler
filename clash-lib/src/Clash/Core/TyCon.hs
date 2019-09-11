@@ -83,6 +83,7 @@ instance Eq TyCon where
 
 instance Uniquable TyCon where
   getUnique = tyConUniq
+  setUnique tyCon u = tyCon {tyConUniq=u}
 
 -- | TyCon reference
 type TyConName = Name TyCon

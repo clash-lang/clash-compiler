@@ -72,6 +72,7 @@ module Clash.Core.VarEnv
   , varSetInScope
     -- ** Unique generation
   , uniqAway
+  , uniqAway'
     -- * Dual renaming
   , RnEnv
     -- ** Construction
@@ -88,7 +89,7 @@ module Clash.Core.VarEnv
   )
 where
 
-import Data.Binary                         (Binary)
+import           Data.Binary               (Binary)
 import           Data.Coerce               (coerce)
 import qualified Data.List                 as List
 import           Data.Maybe                (fromMaybe)
@@ -394,32 +395,39 @@ emptyInScopeSet = mkInScopeSet emptyVarSet
 
 -- | Ensure that the 'Unique' of a variable does not occur in the 'InScopeSet'
 uniqAway
-  :: InScopeSet
-  -> Var a
-  -> Var a
-uniqAway inScopeSet var
-  | var `elemInScopeSet` inScopeSet -- make a new one
-  = uniqAway' inScopeSet var
-  | otherwise                       -- Nothing to do
-  = var
+  :: (Uniquable a, ClashPretty a)
+  => InScopeSet
+  -> a
+  -> a
+uniqAway (InScopeSet set n) a =
+  uniqAway' (`elemUniqSetDirectly` set) n a
 
 uniqAway'
-  :: InScopeSet
-  -> Var a
-  -> Var a
-uniqAway' (InScopeSet set n) var = try 1 where
-  origUniq = varUniq var
+  :: (Uniquable a, ClashPretty a)
+  => (Unique -> Bool)
+  -- ^ Unique in scope test
+  -> Int
+  -- ^ Seed
+  -> a
+  -> a
+uniqAway' inScopeTest n u =
+  if inScopeTest (getUnique u) then
+    try 1
+  else
+    u
+ where
+  origUniq = getUnique u
   try k
     | debugIsOn && k > 1000
     = pprPanic "uniqAway loop:" msg
-    | uniq `elemUniqSetDirectly` set
+    | inScopeTest uniq
     = try (k + 1)
     | k > 3
-    = pprTraceDebug "uniqAway:" msg (setVarUnique var uniq)
+    = pprTraceDebug "uniqAway:" msg (setUnique u uniq)
     | otherwise
-    = setVarUnique var uniq
+    = setUnique u uniq
     where
-      msg  = fromPretty k <+> "tries" <+> clashPretty (varName var) <+> fromPretty n
+      msg  = fromPretty k <+> "tries" <+> clashPretty u <+> fromPretty n
       uniq = deriveUnique origUniq (n * k)
 
 deriveUnique
@@ -497,7 +505,7 @@ rnTyBndr rv@(RnEnv {rn_envLTy = lenv, rn_envRTy = renv, rn_inScope = inScope}) b
   -- Find a new type-binder not in scope in either term
   newB | not (bL `elemInScopeSet` inScope) = bL
        | not (bR `elemInScopeSet` inScope) = bR
-       | otherwise                         = uniqAway' inScope bL
+       | otherwise                         = uniqAway inScope bL
 
 {- Note [Rebinding and shadowing]
 Imagine:
@@ -546,7 +554,7 @@ rnTmBndr rv@(RnEnv {rn_envLTm = lenv, rn_envRTm = renv, rn_inScope = inScope}) b
   -- Find a new type-binder not in scope in either term
   newB | not (bL `elemInScopeSet` inScope) = bL
        | not (bR `elemInScopeSet` inScope) = bR
-       | otherwise                         = uniqAway' inScope bL
+       | otherwise                         = uniqAway inScope bL
 
 -- | Applies 'rnTmBndr' to several variables: the two variable lists must be of
 -- equal length.
