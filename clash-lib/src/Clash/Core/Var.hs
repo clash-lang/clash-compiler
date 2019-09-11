@@ -69,12 +69,14 @@ data Var a
   = TyVar
   { varName :: !(Name a)
   , varUniq :: {-# UNPACK #-} !Unique
+  -- ^ Invariant: forall x . varUniq x ~ nameUniq (varName x)
   , varType :: Kind
   }
   -- | Constructor for term variables
   | Id
   { varName :: !(Name a)
   , varUniq :: {-# UNPACK #-} !Unique
+  -- ^ Invariant: forall x . varUniq x ~ nameUniq (varName x)
   , varType :: Type
   , idScope :: IdScope
   }
@@ -95,6 +97,7 @@ instance Ord (Var a) where
 
 instance Uniquable (Var a) where
   getUnique = varUniq
+  setUnique var u = var {varUniq=u, varName=(varName var){nameUniq=u}}
 
 data IdScope = GlobalId | LocalId
   deriving (Show,Generic,NFData,Hashable,Binary,Eq,Ord)

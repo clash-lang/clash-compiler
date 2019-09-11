@@ -52,6 +52,7 @@ instance Hashable (Name a) where
 
 instance Uniquable (Name a) where
   getUnique = nameUniq
+  setUnique nm u = nm {nameUniq=u}
 
 type OccName = Text
 
