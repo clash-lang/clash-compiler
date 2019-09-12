@@ -3,7 +3,7 @@
 This module can automatically generate TopEntity definitions from 'Clash.NamedTypes'
 annotations. Type/data families will resolve a single step (non-recusive).
 
-See 'clash-prelude/tests/Clash/Tests/TopEntityGeneration.hs' for more examples.
+See "Clash.Tests.TopEntityGeneration" for more examples.
 
 @
 import Clash.Annotations.TopEntityGen
