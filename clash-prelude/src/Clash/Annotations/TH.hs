@@ -230,7 +230,11 @@ expandFamilies (AppTF a b) = do
         FamilyI (ClosedTypeFamilyD (TypeFamilyHead _ bds _ _) eqs) _ ->
           if length bds == length xs then
             case find ((==) xs . tySynArgs) eqs of
+#if MIN_VERSION_template_haskell(2,15,0)
+              Just (TySynEqn _ _ r) -> return r
+#else
               Just (TySynEqn _ r) -> return r
+#else
               _ -> return (AppT a' b')
                 -- ^ We didn't find a matching instance so give up.
           else return (AppT a' b')
@@ -264,7 +268,11 @@ expandFamilies (AppTF a b) = do
   unApp (AppT l r) = unApp l . (r :)
   unApp t = (t :)
 
+#if MIN_VERSION_template_haskell(2,15,0)
+  tySynArgs (TySynEqn _ args _) = tail (unApp args [])
+#else
   tySynArgs (TySynEqn args _) = args
+#endif
 
   familyArity (FamilyI (OpenTypeFamilyD (TypeFamilyHead _ xs _ _)) _) =
     Just (length xs)
