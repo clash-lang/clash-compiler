@@ -236,9 +236,9 @@ expandFamilies (AppTF a b) = do
               Just (TySynEqn _ r) -> return r
 #endif
               _ -> return (AppT a' b')
-                -- ^ We didn't find a matching instance so give up.
+                -- We didn't find a matching instance so give up.
           else return (AppT a' b')
-                -- ^ We don't yet have all the arguments.
+                -- We don't yet have all the arguments.
         -- Now for open type families and data families
         _ ->
           case familyArity info of
@@ -255,7 +255,7 @@ expandFamilies (AppTF a b) = do
                   case cs of
                     [c] -> return $ ConT (getName c)
                     _ -> return $ PromotedTupleT 0
-                      -- ^ Ignore sum type in a data family by replacing with
+                      -- Ignore sum type in a data family by replacing with
                       -- empty tuple. We don't want to fail because this subtree
                       -- might not be relevant to naming.
                 z -> fail
