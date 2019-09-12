@@ -1,8 +1,9 @@
-{-# LANGUAGE DataKinds       #-}
-{-# LANGUAGE TemplateHaskell #-}
-{-# LANGUAGE TypeOperators   #-}
-{-# LANGUAGE TypeFamilies    #-}
-{-# LANGUAGE GADTs           #-}
+{-# LANGUAGE DataKinds        #-}
+{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE TemplateHaskell  #-}
+{-# LANGUAGE TypeOperators    #-}
+{-# LANGUAGE TypeFamilies     #-}
+{-# LANGUAGE GADTs            #-}
 
 module Clash.Tests.TopEntityGeneration where
 
@@ -142,6 +143,18 @@ expectedTopEntity5 =
     [PortProduct "in1" [PortName "one", PortName "s"]]
     (PortName "out")
 
+topEntity6 :: (HiddenClockResetEnable System)
+           => "in1" ::: Signal System SuccessTy
+           -> "out" ::: Signal System Int
+topEntity6 = undefined
+makeTopEntity 'topEntity6
+
+expectedTopEntity6 :: TopEntity
+expectedTopEntity6 =
+ Synthesize "topEntity6"
+    [PortProduct "in1" [PortName "one", PortName "s"]]
+    (PortName "out")
+
 
 topEntityFailure1
   :: "int"     ::: Signal System Int
@@ -176,6 +189,11 @@ topEntityFailure5
   -> "out"     ::: Signal System Bool
 topEntityFailure5 = undefined
 
+topEntityFailure6
+  :: "int"     ::: Signal System a
+  -> "out"     ::: Signal System Bool
+topEntityFailure6 = undefined
+
 tests :: TestTree
 tests =
   testGroup
@@ -190,6 +208,8 @@ tests =
       $(recover ([| () |]) (buildTopEntity Nothing 'topEntity4)) @?= expectedTopEntity4
     , testCase "topEntity5" $
       $(recover ([| () |]) (buildTopEntity Nothing 'topEntity5)) @?= expectedTopEntity5
+    , testCase "topEntity6" $
+      $(recover ([| () |]) (buildTopEntity Nothing 'topEntity6)) @?= expectedTopEntity6
 
     , testCase "topEntityFailure1" $
       $(recover ([| () |]) (buildTopEntity Nothing 'topEntityFailure1)) @?= ()
@@ -201,5 +221,7 @@ tests =
       $(recover ([| () |]) (buildTopEntity Nothing 'topEntityFailure4)) @?= ()
     , testCase "topEntityFailure5" $
       $(recover ([| () |]) (buildTopEntity Nothing 'topEntityFailure5)) @?= ()
+    , testCase "topEntityFailure6" $
+      $(recover ([| () |]) (buildTopEntity Nothing 'topEntityFailure6)) @?= ()
     ]
 

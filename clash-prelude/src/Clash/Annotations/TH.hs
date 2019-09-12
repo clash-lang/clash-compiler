@@ -333,14 +333,27 @@ toArgNames split ty = go (0::Int) ty []
                       ++ "\n got name " ++ show f
     go _ _ acc = return acc
 
+-- | Remove constraints from a type. Fail if there are free type variables.
+removeConstraints :: Type -> Q Type
+removeConstraints (ForallT [] _ x) = removeConstraints x
+removeConstraints (ForallT xs _ x) =
+  fail $  "Found free type variables on TopEntity!\n"
+       ++ pprint xs
+       ++ "\nattached to\n"
+       ++ pprint x
+removeConstraints x = return x
+
 -- | Return a typed expression for a 'TopEntity' of a given @('Name', 'Type')@.
 buildTopEntity' :: Maybe String -> (Name, Type) -> TExpQ TopEntity
 buildTopEntity' topName (name, ty) = do
     -- get a Name for this type operator so we can check it
     -- in the ArrowTy case
     split <- [t| (:::) |]
-    ins   <- toArgNames split ty
-    out   <- toReturnName split ty
+
+    ty' <- removeConstraints ty
+
+    ins   <- toArgNames split ty'
+    out   <- toReturnName split ty'
 
     let outName = case topName of
           Just name' -> name'          -- user specified name
