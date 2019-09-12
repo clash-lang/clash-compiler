@@ -234,7 +234,7 @@ expandFamilies (AppTF a b) = do
               Just (TySynEqn _ _ r) -> return r
 #else
               Just (TySynEqn _ r) -> return r
-#else
+#endif
               _ -> return (AppT a' b')
                 -- ^ We didn't find a matching instance so give up.
           else return (AppT a' b')
