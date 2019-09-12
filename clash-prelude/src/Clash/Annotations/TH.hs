@@ -67,8 +67,13 @@ module Clash.Annotations.TH
   )
 where
 
-import           Data.Foldable                  ( fold, find )
+import           Data.Foldable                  ( fold
+                                                , find
+                                                )
 import qualified Data.Set                      as Set
+#if !(MIN_VERSION_base(4,11,0))
+import           Data.Semigroup                as Semigroup
+#endif
 import           Language.Haskell.TH
 
 import           Data.Functor.Foldable          ( cata, para, embed )
@@ -96,6 +101,9 @@ instance Semigroup (Naming a) where
 
 instance Monoid (Naming a) where
   mempty = Complete []
+#if !(MIN_VERSION_base(4,11,0))
+  mappend = (Semigroup.<>)
+#endif
 
 -- | A template haskell helper function. Get the 'Type's from a 'Con'.
 getTypes :: Con -> [Type]
