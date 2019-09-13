@@ -1,0 +1,38 @@
+cabal-version:       >=1.10
+
+name:                clash-cores
+version:             0.1.0.0
+-- synopsis:
+-- description:
+-- bug-reports:
+-- license:
+license-file:        LICENSE
+author:              QBayLogic B.V.
+maintainer:          devops@qbaylogic.com
+-- copyright:
+-- category:
+build-type:          Simple
+extra-source-files:  CHANGELOG.md
+
+library
+  exposed-modules:     Clash.Cores.SPI
+  -- other-modules:
+  -- other-extensions:
+  ghc-options:         -fexpose-all-unfoldings
+                       -fplugin GHC.TypeLits.Extra.Solver
+                       -fplugin GHC.TypeLits.Normalise
+                       -fplugin GHC.TypeLits.KnownNat.Solver
+  default-extensions:  DataKinds
+                       FlexibleContexts
+                       NoImplicitPrelude
+                       ScopedTypeVariables
+                       TypeApplications
+                       TypeFamilies
+                       TypeOperators
+  build-depends:       base >=4.12 && <4.13,
+                       clash-prelude >=1.0 && < 1.1,
+                       ghc-typelits-natnormalise >= 0.7,
+                       ghc-typelits-extra >= 0.3.1,
+                       ghc-typelits-knownnat >= 0.7
+  hs-source-dirs:      src
+  default-language:    Haskell2010
