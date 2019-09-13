@@ -26,7 +26,7 @@ import           Control.Monad.Reader             (runReaderT)
 import           Control.Monad.State.Strict       (State, runStateT)
 import           Data.Binary.IEEE754              (floatToWord, doubleToWord)
 import           Data.Char                        (ord)
-import           Data.Either                      (partitionEithers)
+import           Data.Either                      (lefts, partitionEithers)
 import           Data.HashMap.Strict              (HashMap)
 import qualified Data.HashMap.Strict              as HashMapS
 import qualified Data.HashMap.Lazy                as HashMap
@@ -102,6 +102,8 @@ genNetlist
   -- ^ extend valid identifiers
   -> Bool
   -- ^ Whether the backend supports ifThenElse expressions
+  -> SomeBackend
+  -- ^ The current HDL backend
   -> HashMap Identifier Word
   -- ^ Seen components
   -> FilePath
@@ -111,9 +113,9 @@ genNetlist
   -> Id
   -- ^ Name of the @topEntity@
   -> IO ([([Bool],SrcSpan,HashMap Identifier Word,Component)],HashMap Identifier Word)
-genNetlist isTb opts reprs globals tops primMap tcm typeTrans iw mkId extId ite seen env prefixM topEntity = do
+genNetlist isTb opts reprs globals tops primMap tcm typeTrans iw mkId extId ite be seen env prefixM topEntity = do
   (_,s) <- runNetlistMonad isTb opts reprs globals (mkTopEntityMap tops)
-             primMap tcm typeTrans iw mkId extId ite seen env prefixM $
+             primMap tcm typeTrans iw mkId extId ite be seen env prefixM $
              genComponent topEntity
   return ( eltsVarEnv $ _components s
          , _seenComps s
@@ -151,6 +153,8 @@ runNetlistMonad
   -- ^ extend valid identifiers
   -> Bool
   -- ^ Whether the backend supports ifThenElse expressions
+  -> SomeBackend
+  -- ^ The current HDL backend
   -> HashMap Identifier Word
   -- ^ Seen components
   -> FilePath
@@ -160,7 +164,7 @@ runNetlistMonad
   -> NetlistMonad a
   -- ^ Action to run
   -> IO (a, NetlistState)
-runNetlistMonad isTb opts reprs s tops p tcm typeTrans iw mkId extId ite seenIds_ env prefixM
+runNetlistMonad isTb opts reprs s tops p tcm typeTrans iw mkId extId ite be seenIds_ env prefixM
   = flip runReaderT (NetlistEnv "" "" Nothing)
   . flip runStateT s'
   . runNetlist
@@ -168,7 +172,7 @@ runNetlistMonad isTb opts reprs s tops p tcm typeTrans iw mkId extId ite seenIds
     s' =
       NetlistState
         s 0 emptyVarEnv p typeTrans tcm (StrictText.empty,noSrcSpan) iw mkId
-        extId HashMapS.empty seenIds' Set.empty names tops env 0 prefixM reprs opts isTb ite
+        extId HashMapS.empty seenIds' Set.empty names tops env 0 prefixM reprs opts isTb ite be
         HashMapS.empty
 
     (seenIds',names) = genNames (opt_newInlineStrat opts) mkId prefixM seenIds_
@@ -246,13 +250,13 @@ genComponentT compName componentExpr = do
 
   case resultM of
     Just result -> do
-      Just (NetDecl' _ rw _ _) <- mkNetDecl . head $ filter ((==result) . fst) binders
+      Just (NetDecl' _ rw _ _ _) <- mkNetDecl . head $ filter ((==result) . fst) binders
 
       let (compOutps',resUnwrappers') = case compOutps of
             [oport] -> ([(rw,oport)],resUnwrappers)
             _       -> let NetDecl n res resTy = head resUnwrappers
                        in  (map (Wire,) compOutps
-                           ,NetDecl' n rw res (Right resTy):tail resUnwrappers
+                           ,NetDecl' n rw res (Right resTy) Nothing:tail resUnwrappers
                            )
           component      = Component componentName2 compInps compOutps'
                              (netDecls ++ argWrappers ++ decls ++ resUnwrappers')
@@ -267,16 +271,18 @@ genComponentT compName componentExpr = do
       return (wereVoids, sp, ids, component)
 
 mkNetDecl :: (Id, Term) -> NetlistMonad (Maybe Declaration)
-mkNetDecl (id_,tm) = do
+mkNetDecl (id_,tm) = preserveVarEnv $ do
   let typ             = varType id_
   hwTy <- unsafeCoreTypeToHWTypeM' $(curLoc) typ
   wr   <- termToWireOrReg tm
+  rIM  <- getResInit (id_,tm)
   if isVoid hwTy
      then return Nothing
      else return . Just $ NetDecl' (addSrcNote sp)
              wr
              (id2identifier id_)
              (Right hwTy)
+             rIM
 
   where
     nm = varName id_
@@ -301,6 +307,30 @@ mkNetDecl (id_,tm) = do
     addSrcNote loc = if isGoodSrcSpan loc
                         then Just (StrictText.pack (showSDocUnsafe (ppr loc)))
                         else Nothing
+
+    -- Set the initialization value of a signal when a primitive wants to set it
+    getResInit
+      :: (Id,Term) -> NetlistMonad (Maybe Expr)
+    getResInit (i,collectArgsTicks -> (k,args,ticks)) = case k of
+      Prim pNm _ -> extractPrimWarnOrFail pNm >>= go pNm
+      _ -> return Nothing
+     where
+      go pNm (BlackBox {resultInit = Just nmD}) = withTicks ticks $ \_ -> do
+        (bbCtx,_) <- mkBlackBoxContext pNm i (lefts args)
+        (bbTempl,templDecl) <- prepareBlackBox pNm nmD bbCtx
+        case templDecl of
+          [] -> return (Just (BlackBoxE pNm [] [] [] bbTempl bbCtx False))
+          _  -> do
+            (_,sloc) <- Lens.use curCompNm
+            throw (ClashException sloc
+                    (unwords [ $(curLoc)
+                             , "signal initialization requires declarations:\n"
+                             , show templDecl
+                             ])
+                    Nothing)
+      go _ _ = return Nothing
+
+
 
 
 isWriteToBiSignalPrimitive :: Term -> Bool
@@ -617,7 +647,7 @@ mkExpr bbEasD bndr ty app =
   (_,sp) <- Lens.use curCompNm
   case appF of
     Data dc -> mkDcApplication hwTy bndr dc tmArgs
-    Prim nm _ -> mkPrimitive False bbEasD bndr nm args ty tickDecls
+    Prim nm pinfo -> mkPrimitive False bbEasD bndr (nm,pinfo) args ty tickDecls
     Var f
       | null tmArgs -> return (Identifier (nameOcc $ varName f) Nothing,[])
       | not (null tyArgs) ->
@@ -627,7 +657,8 @@ mkExpr bbEasD bndr ty app =
           argNm1 <- mkUniqueIdentifier Extended argNm0
           hwTyA  <- unsafeCoreTypeToHWTypeM' $(curLoc) ty
           decls  <- mkFunApp argNm1 f tmArgs tickDecls
-          return (Identifier argNm1 Nothing, NetDecl' Nothing Wire argNm1 (Right hwTyA):decls)
+          return ( Identifier argNm1 Nothing
+                 , NetDecl' Nothing Wire argNm1 (Right hwTyA) Nothing:decls)
     Case scrut ty' [alt] -> mkProjection bbEasD bndr scrut ty' alt
     Case scrut tyA alts -> do
       tcm <- Lens.use tcCache
@@ -641,7 +672,8 @@ mkExpr bbEasD bndr ty app =
       argNm1 <- mkUniqueIdentifier Extended argNm0
       hwTyA  <- unsafeCoreTypeToHWTypeM' $(curLoc) tyA
       decls  <- mkSelection (Left argNm1) scrut tyA alts tickDecls
-      return (Identifier argNm1 Nothing, NetDecl' Nothing wr argNm1 (Right hwTyA):decls)
+      return ( Identifier argNm1 Nothing
+             , NetDecl' Nothing wr argNm1 (Right hwTyA) Nothing:decls)
     Letrec binders body -> do
       netDecls <- fmap catMaybes $ mapM mkNetDecl binders
       decls    <- concat <$> mapM (uncurry mkDeclarations) binders

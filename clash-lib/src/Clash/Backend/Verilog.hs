@@ -317,7 +317,7 @@ addSeen :: Component -> VerilogM ()
 addSeen c = do
   let iport = [iName | (iName, _) <- inputs c]
       oport = [oName | (_, (oName, _)) <- outputs c]
-      nets  = mapMaybe (\case {NetDecl' _ _ i _ -> Just i; _ -> Nothing}) $ declarations c
+      nets  = mapMaybe (\case {NetDecl' _ _ i _ _ -> Just i; _ -> Nothing}) $ declarations c
   Mon $ idSeen %= (HashMap.unionWith max (HashMap.fromList (concatMap (map (,0)) [iport,oport,nets])))
 
 -- render a type; by default, removing zero-sizes is an aesthetic operation
@@ -402,13 +402,20 @@ renderAttr (BoolAttr'    key False) = pack $ concat [key, " = ", "0"]
 renderAttr (Attr'        key      ) = pack $ key
 
 decl :: Declaration -> VerilogM (Maybe Doc)
-decl (NetDecl' noteM wr id_ tyE) =
+decl (NetDecl' noteM wr id_ tyE iEM) =
   Just A.<$> maybe id addNote noteM (addAttrs attrs (wireOrRegDoc wr <+> tyDec tyE))
   where
-    tyDec (Left  ty) = stringS ty <+> stringS id_
-    tyDec (Right ty) = sigDecl (stringS id_) ty
+    tyDec (Left  ty) = stringS ty <+> stringS id_ <> iE
+    tyDec (Right ty) = sigDecl (stringS id_) ty <> iE
     addNote n = mappend ("//" <+> stringS n <> line)
     attrs = fromMaybe [] (hwTypeAttrs A.<$> either (const Nothing) Just tyE)
+    iE    = maybe emptyDoc (noEmptyInit . expr_ False) iEM
+
+    noEmptyInit d = do
+      d1 <- d
+      if isEmpty d1
+         then emptyDoc
+         else (space <> "=" <+> d)
 
 decl _ = return Nothing
 
@@ -542,7 +549,7 @@ inst_ (InstDecl _ _ nm lbl ps pms) = fmap Just $
 inst_ (BlackBoxD _ libs imps inc bs bbCtx) =
   fmap Just (Mon (column (renderBlackBox libs imps inc bs bbCtx)))
 
-inst_ (NetDecl' _ _ _ _) = return Nothing
+inst_ (NetDecl' {}) = return Nothing
 
 -- | Calculate the beginning and end index into a variable, to get the
 -- desired field.

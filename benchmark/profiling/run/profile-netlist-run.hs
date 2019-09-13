@@ -6,6 +6,7 @@ import           Clash.Core.TyCon
 import           Clash.Core.Var
 import           Clash.Driver.Types
 import           Clash.Netlist
+import           Clash.Netlist.Types          hiding (backend, hdlDir)
 
 import           Control.DeepSeq              (deepseq)
 import           Control.Monad.State          (evalState)
@@ -54,7 +55,7 @@ benchFile idirs src = do
                          takeWhile (/= '.') topEntityS
   (netlist,_) <-
     genNetlist False opts1 reprs transformedBindings topEntities primMap'
-               tcm typeTrans iw mkId1 extId ite seen hdlDir prefixM topEntity
+               tcm typeTrans iw mkId1 extId ite (SomeBackend hdlState') seen hdlDir prefixM topEntity
   netlist `deepseq` putStrLn ".. done\n"
 
 setupEnv

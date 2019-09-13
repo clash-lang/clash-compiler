@@ -89,10 +89,13 @@ resolvePrimitive'
   -> IO (TS.Text, GuardedResolvedPrimitive)
 resolvePrimitive' _metaPath (Primitive name wf primType) =
   return (name, HasBlackBox (Primitive name wf primType))
-resolvePrimitive' metaPath BlackBox{template=t, includes=i, ..} = do
-  let resolvedIncludes = mapM (traverse (traverse (traverse (resolveTemplateSource metaPath)))) i
-      resolved         = traverse (traverse (resolveTemplateSource metaPath)) t
-  bb <- BlackBox name workInfo kind () outputReg libraries imports <$> resolvedIncludes <*> resolved
+resolvePrimitive' metaPath BlackBox{template=t, includes=i, resultName=r, resultInit=ri, ..} = do
+  let resolveSourceM = traverse (traverse (resolveTemplateSource metaPath))
+  bb <- BlackBox name workInfo kind () outputReg libraries imports
+          <$> mapM (traverse resolveSourceM) i
+          <*> traverse resolveSourceM r
+          <*> traverse resolveSourceM ri
+          <*> resolveSourceM t
   case warning of
     Just w  -> pure (name, WarnNonSynthesizable (TS.unpack w) bb)
     Nothing -> pure (name, HasBlackBox bb)
@@ -172,9 +175,15 @@ generatePrimMap unresolvedPrims primGuards filePaths = do
 
 -- | Determine what argument should be constant / literal
 constantArgs :: TS.Text -> CompiledPrimitive -> Set.Set Int
-constantArgs nm BlackBox {template = BBTemplate template} =
-  Set.fromList (fromIntForce ++ concatMap (walkElement getConstant) template)
+constantArgs nm BlackBox {template = templ@(BBTemplate _), resultInit = tRIM} =
+  Set.fromList (concat [ fromIntForce
+                       , maybe [] walkTemplate tRIM
+                       , walkTemplate templ
+                       ])
  where
+  walkTemplate (BBTemplate t) = concatMap (walkElement getConstant) t
+  walkTemplate _ = []
+
   getConstant (Lit i)      = Just i
   getConstant (Const i)    = Just i
   getConstant _            = Nothing
