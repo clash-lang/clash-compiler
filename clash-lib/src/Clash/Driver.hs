@@ -76,7 +76,7 @@ import           Clash.Netlist.Util               (genComponentName, genTopCompo
 import           Clash.Netlist.BlackBox.Parser    (runParse)
 import           Clash.Netlist.BlackBox.Types     (BlackBoxTemplate, BlackBoxFunction)
 import           Clash.Netlist.Types
-  (BlackBox (..), Component (..), Identifier, FilteredHWType, HWMap)
+  (BlackBox (..), Component (..), Identifier, FilteredHWType, HWMap, SomeBackend (..))
 import           Clash.Normalize                  (checkNonRecursive, cleanupGraph,
                                                    normalize, runNormalization)
 import           Clash.Normalize.Util             (callGraph)
@@ -242,7 +242,7 @@ generateHDL reprs bindingsMap hdlState primMap tcm tupTcm typeTrans eval
       -- Now start the netlist generation
       (netlist,seen') <-
         genNetlist False opts reprs transformedBindings topEntities primMap
-                   tcm typeTrans iw mkId extId ite seen hdlDir prefixM topEntity
+                   tcm typeTrans iw mkId extId ite (SomeBackend hdlState') seen hdlDir prefixM topEntity
 
       netlistTime <- netlist `deepseq` Clock.getCurrentTime
       let normNetDiff = reportTimeDiff netlistTime normTime
@@ -282,7 +282,7 @@ generateHDL reprs bindingsMap hdlState primMap tcm tupTcm typeTrans eval
       -- Now start the netlist generation
       (netlist,seen'') <-
         genNetlist True opts reprs transformedBindings topEntities primMap
-                   tcm typeTrans iw mkId extId ite seen' hdlDir prefixM tb
+                   tcm typeTrans iw mkId extId ite (SomeBackend hdlState') seen' hdlDir prefixM tb
 
       netlistTime <- netlist `deepseq` Clock.getCurrentTime
       let normNetDiff = reportTimeDiff netlistTime normTime
@@ -409,12 +409,14 @@ compilePrimitive idirs pkgDbs topDir (BlackBoxHaskell bbName wf bbGenName source
     go args Nothing = do
       loadImportAndInterpret idirs args topDir qualMod funcName "BlackBoxFunction"
 
-compilePrimitive idirs pkgDbs topDir (BlackBox pNm wf tkind () oReg libM imps incs templ) = do
+compilePrimitive idirs pkgDbs topDir (BlackBox pNm wf tkind () oReg libM imps incs rM riM templ) = do
   libM'  <- mapM parseTempl libM
   imps'  <- mapM parseTempl imps
   incs'  <- mapM (traverse parseBB) incs
   templ' <- parseBB templ
-  return (BlackBox pNm wf tkind () oReg libM' imps' incs' templ')
+  rM'    <- traverse parseBB rM
+  riM'   <- traverse parseBB riM
+  return (BlackBox pNm wf tkind () oReg libM' imps' incs' rM' riM' templ')
  where
   iArgs = concatMap (("-package-db":) . (:[])) pkgDbs
 

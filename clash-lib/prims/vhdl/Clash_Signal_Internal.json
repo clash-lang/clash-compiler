@@ -10,40 +10,32 @@
   -> a                        -- ARG[4]
   -> Signal clk a             -- ARG[5]
   -> Signal clk a"
+    , "resultName" : { "template" : "~CTXNAME" }
+    , "resultInit" : { "template" : "~IF~ISINITDEFINED[0]~THEN~CONST[4]~ELSE~FI" }
     , "template" :
 "-- delay begin~IF ~ISACTIVEENABLE[3] ~THEN
-~GENSYM[~RESULT_delay][0] : block
-  signal ~GENSYM[~RESULT_reg][1]   : ~TYPO ~IF ~ISINITDEFINED[0] ~THEN := ~CONST[4] ~ELSE ~FI;
+~GENSYM[~RESULT_delay][4] : process(~ARG[2])
 begin
-  ~RESULT <= ~SYM[1];
-  ~GENSYM[~RESULT_dly][4] : process(~ARG[2])
-  begin
-    if ~IF~ACTIVEEDGE[Rising][0]~THENrising_edge~ELSEfalling_edge~FI(~ARG[2]) then
-      if ~ARG[3] then
-        ~SYM[1] <= ~ARG[5]
-        -- pragma translate_off
-        after 1 ps
-        -- pragma translate_on
-        ;
-      end if;
-    end if;
-  end process;
-end block;~ELSE
-~SYM[0] : block
-  signal ~SYM[1] : ~TYPO := ~CONST[4];
-begin
-  ~RESULT <= ~SYM[1];
-  ~SYM[4] : process(~ARG[2])
-  begin
-    if ~IF~ACTIVEEDGE[Rising][0]~THENrising_edge~ELSEfalling_edge~FI(~ARG[2]) then
-      ~SYM[1] <= ~ARG[5]
+  if ~IF~ACTIVEEDGE[Rising][0]~THENrising_edge~ELSEfalling_edge~FI(~ARG[2]) then
+    if ~ARG[3] then
+      ~RESULT <= ~ARG[5]
       -- pragma translate_off
       after 1 ps
       -- pragma translate_on
       ;
     end if;
-  end process;
-end block;~FI
+  end if;
+end process;~ELSE
+~SYM[4] : process(~ARG[2])
+begin
+  if ~IF~ACTIVEEDGE[Rising][0]~THENrising_edge~ELSEfalling_edge~FI(~ARG[2]) then
+    ~RESULT <= ~ARG[5]
+    -- pragma translate_off
+    after 1 ps
+    -- pragma translate_on
+    ;
+  end if;
+end process;~FI
 -- delay end"
     }
   }
@@ -61,84 +53,76 @@ end block;~FI
   -> a                        -- ARG[6] (reset value)
   -> Signal clk a             -- ARG[7]
   -> Signal clk a"
+    , "resultName" : { "template" : "~CTXNAME" }
+    , "resultInit" : { "template" : "~IF~ISINITDEFINED[0]~THEN~CONST[5]~ELSE~FI" }
     , "template" :
-"-- register begin~IF ~ISACTIVEENABLE[4] ~THEN
-~GENSYM[~COMPNAME_register][0] : block
-  signal ~GENSYM[~RESULT_reg][1] : ~TYPO ~IF ~ISINITDEFINED[0] ~THEN := ~CONST[5] ~ELSE ~FI;
+"-- register begin~IF ~ISACTIVEENABLE[4] ~THEN ~IF ~ISSYNC[0] ~THEN
+~GENSYM[~RESULT_register][2] : process(~ARG[2])
 begin
-  ~RESULT <= ~SYM[1]; ~IF ~ISSYNC[0] ~THEN
-  ~GENSYM[~RESULT_r][2] : process(~ARG[2])
-  begin
-    if ~IF~ACTIVEEDGE[Rising][0]~THENrising_edge~ELSEfalling_edge~FI(~ARG[2]) then
-      if ~ARG[3] = ~IF ~ISACTIVEHIGH[0] ~THEN '1' ~ELSE '0' ~FI then
-        ~SYM[1] <= ~CONST[6]
-        -- pragma translate_off
-        after 1 ps
-        -- pragma translate_on
-        ;
-      elsif ~ARG[4] then
-        ~SYM[1] <= ~ARG[7]
-        -- pragma translate_off
-        after 1 ps
-        -- pragma translate_on
-        ;
-      end if;
-    end if;
-  end process;~ELSE
-  ~SYM[2] : process(~ARG[2],~ARG[3])
-  begin
+  if ~IF~ACTIVEEDGE[Rising][0]~THENrising_edge~ELSEfalling_edge~FI(~ARG[2]) then
     if ~ARG[3] = ~IF ~ISACTIVEHIGH[0] ~THEN '1' ~ELSE '0' ~FI then
-      ~SYM[1] <= ~CONST[6];
-    elsif ~IF~ACTIVEEDGE[Rising][0]~THENrising_edge~ELSEfalling_edge~FI(~ARG[2]) then
-      if ~ARG[4] then
-        ~SYM[1] <= ~ARG[7]
-        -- pragma translate_off
-        after 1 ps
-        -- pragma translate_on
-        ;
-      end if;
-    end if;
-  end process;~FI
-end block;~ELSE
-~SYM[0] : block
-  signal ~SYM[1] : ~TYPO := ~CONST[5];
-begin
-  ~RESULT <= ~SYM[1]; ~IF ~ISSYNC[0] ~THEN
-  ~SYM[2] : process(~ARG[2])
-  begin
-    if ~IF~ACTIVEEDGE[Rising][0]~THENrising_edge~ELSEfalling_edge~FI(~ARG[2]) then
-      if ~ARG[3] = ~IF ~ISACTIVEHIGH[0] ~THEN '1' ~ELSE '0' ~FI then
-        ~SYM[1] <= ~CONST[6]
-        -- pragma translate_off
-        after 1 ps
-        -- pragma translate_on
-        ;
-      else
-        ~SYM[1] <= ~ARG[7]
-        -- pragma translate_off
-        after 1 ps
-        -- pragma translate_on
-        ;
-      end if;
-    end if;
-  end process;~ELSE
-  ~SYM[2] : process(~ARG[2],~ARG[3])
-  begin
-    if ~ARG[3] = ~IF ~ISACTIVEHIGH[0] ~THEN '1' ~ELSE '0' ~FI then
-      ~SYM[1] <= ~CONST[6]
+      ~RESULT <= ~CONST[6]
       -- pragma translate_off
       after 1 ps
       -- pragma translate_on
       ;
-    elsif ~IF~ACTIVEEDGE[Rising][0]~THENrising_edge~ELSEfalling_edge~FI(~ARG[2]) then
-      ~SYM[1] <= ~ARG[7]
+    elsif ~ARG[4] then
+      ~RESULT <= ~ARG[7]
       -- pragma translate_off
       after 1 ps
       -- pragma translate_on
       ;
     end if;
-  end process;~FI
-end block;~FI
+  end if;
+end process;~ELSE
+~SYM[2] : process(~ARG[2],~ARG[3])
+begin
+  if ~ARG[3] = ~IF ~ISACTIVEHIGH[0] ~THEN '1' ~ELSE '0' ~FI then
+    ~RESULT <= ~CONST[6];
+  elsif ~IF~ACTIVEEDGE[Rising][0]~THENrising_edge~ELSEfalling_edge~FI(~ARG[2]) then
+    if ~ARG[4] then
+      ~RESULT <= ~ARG[7]
+      -- pragma translate_off
+      after 1 ps
+      -- pragma translate_on
+      ;
+    end if;
+  end if;
+end process;~FI~ELSE ~IF ~ISSYNC[0] ~THEN
+~SYM[2] : process(~ARG[2])
+begin
+  if ~IF~ACTIVEEDGE[Rising][0]~THENrising_edge~ELSEfalling_edge~FI(~ARG[2]) then
+    if ~ARG[3] = ~IF ~ISACTIVEHIGH[0] ~THEN '1' ~ELSE '0' ~FI then
+      ~RESULT <= ~CONST[6]
+      -- pragma translate_off
+      after 1 ps
+      -- pragma translate_on
+      ;
+    else
+      ~RESULT <= ~ARG[7]
+      -- pragma translate_off
+      after 1 ps
+      -- pragma translate_on
+      ;
+    end if;
+  end if;
+end process;~ELSE
+~SYM[2] : process(~ARG[2],~ARG[3])
+begin
+  if ~ARG[3] = ~IF ~ISACTIVEHIGH[0] ~THEN '1' ~ELSE '0' ~FI then
+    ~RESULT <= ~CONST[6]
+    -- pragma translate_off
+    after 1 ps
+    -- pragma translate_on
+    ;
+  elsif ~IF~ACTIVEEDGE[Rising][0]~THENrising_edge~ELSEfalling_edge~FI(~ARG[2]) then
+    ~RESULT <= ~ARG[7]
+    -- pragma translate_off
+    after 1 ps
+    -- pragma translate_on
+    ;
+  end if;
+end process;~FI~FI
 -- register end"
     }
   }

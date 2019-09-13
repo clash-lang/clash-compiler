@@ -130,8 +130,14 @@ data NetlistState
   -- ^ Whether we're compiling a testbench (suppresses some warnings)
   , _backEndITE :: Bool
   -- ^ Whether the backend supports ifThenElse expressions
+  , _backend :: SomeBackend
+  -- ^ The current HDL backend
   , _htyCache :: HWMap
   }
+
+-- | Existentially quantified backend
+data SomeBackend where
+  SomeBackend :: Backend backend => backend -> SomeBackend
 
 -- | Signal reference
 type Identifier = Text
@@ -261,6 +267,7 @@ data Declaration
       WireOrReg                  -- FIELD Wire or register
       !Identifier                -- FIELD Name of signal
       (Either Identifier HWType) -- FIELD Pointer to type of signal or type of signal
+      (Maybe Expr)               -- FIELD Initial value
       -- ^ Signal declaration
   | TickDecl Comment
   -- ^ HDL tick corresponding to a Core tick
@@ -282,9 +289,9 @@ pattern NetDecl
   -> HWType
   -- ^ Type of signal
   -> Declaration
-pattern NetDecl note d ty <- NetDecl' note Wire d (Right ty)
+pattern NetDecl note d ty <- NetDecl' note Wire d (Right ty) _
   where
-    NetDecl note d ty = NetDecl' note Wire d (Right ty)
+    NetDecl note d ty = NetDecl' note Wire d (Right ty) Nothing
 
 data PortDirection = In | Out
   deriving (Eq,Ord,Show,Generic,NFData,Hashable)

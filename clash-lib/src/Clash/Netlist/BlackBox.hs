@@ -53,11 +53,11 @@ import           Clash.Core.Name
 import           Clash.Core.Pretty             (showPpr)
 import           Clash.Core.Subst              (extendIdSubst, mkSubst, substTm)
 import           Clash.Core.Term               as C
-  (Term (..), collectArgs, collectArgsTicks)
+  (PrimInfo, Term (..), collectArgs, collectArgsTicks)
 import           Clash.Core.Type               as C (Type (..), ConstTy (..),
                                                 splitFunTys, splitFunTy)
 import           Clash.Core.TyCon              as C (tyConDataCons)
-import           Clash.Core.Util               (isFun, termType)
+import           Clash.Core.Util               (isFun, mkApps, termType)
 import           Clash.Core.Var                as V
   (Id, Var (..), mkLocalId, modifyVarName)
 import           Clash.Core.VarEnv
@@ -207,8 +207,8 @@ mkArgument bndr e = do
           return ((N.Literal (Just (Unsigned 64,64)) (N.NumLit i),hwTy,True),[])
         (C.Literal (NaturalLiteral n), [],_) ->
           return ((N.Literal (Just (Unsigned iw,iw)) (N.NumLit n),hwTy,True),[])
-        (Prim f _,args,ticks) -> withTicks ticks $ \tickDecls -> do
-          (e',d) <- mkPrimitive True False (Left bndr) f args ty tickDecls
+        (Prim f pinfo,args,ticks) -> withTicks ticks $ \tickDecls -> do
+          (e',d) <- mkPrimitive True False (Left bndr) (f,pinfo) args ty tickDecls
           case e' of
             (Identifier _ _) -> return ((e',hwTy,False), d)
             _                -> return ((e',hwTy,isLiteral e), d)
@@ -287,8 +287,8 @@ mkPrimitive
   -- ^ Treat BlackBox expression as declaration
   -> Either Identifier Id
   -- ^ Id to assign the result to
-  -> TextS.Text
-  -- ^ Name of primitive
+  -> (TextS.Text, PrimInfo)
+  -- ^ Name and info of primitive
   -> [Either Term Type]
   -- ^ Arguments
   -> Type
@@ -296,7 +296,7 @@ mkPrimitive
   -> [Declaration]
   -- ^ Tick declarations
   -> NetlistMonad (Expr,[Declaration])
-mkPrimitive bbEParen bbEasD dst nm args ty tickDecls =
+mkPrimitive bbEParen bbEasD dst (nm,pinfo) args ty tickDecls =
   go =<< extractPrimWarnOrFail nm
   where
     go
@@ -318,14 +318,14 @@ mkPrimitive bbEParen bbEasD dst nm args ty tickDecls =
             Right (BlackBoxMeta {..}, bbTemplate) ->
               -- Blackbox template generation succesful. Rerun 'go', but this time
               -- around with a 'normal' @BlackBox@
-              go (P.BlackBox bbName wf bbKind () bbOutputReg bbLibrary bbImports bbIncludes bbTemplate)
-        p@P.BlackBox {outputReg = wr} ->
+              go (P.BlackBox bbName wf bbKind () bbOutputReg bbLibrary bbImports bbIncludes
+                    Nothing Nothing bbTemplate)
+        p@P.BlackBox {} ->
           case kind p of
             TDecl -> do
               let tempD = template p
                   pNm = name p
-                  wr' = if wr then Reg else Wire
-              resM <- resBndr True wr' dst
+              resM <- resBndr True dst
               case resM of
                 Just (dst',dstNm,dstDecl) -> do
                   (bbCtx,ctxDcls)   <- mkBlackBoxContext nm dst' (lefts args)
@@ -339,7 +339,7 @@ mkPrimitive bbEParen bbEasD dst nm args ty tickDecls =
                   pNm = name p
               if bbEasD
                 then do
-                  resM <- resBndr True Wire dst
+                  resM <- resBndr True dst
                   case resM of
                     Just (dst',dstNm,dstDecl) -> do
                       (bbCtx,ctxDcls)     <- mkBlackBoxContext nm dst' (lefts args)
@@ -351,7 +351,7 @@ mkPrimitive bbEParen bbEasD dst nm args ty tickDecls =
                       return (Identifier dstNm Nothing, dstDecl ++ ctxDcls ++ templDecl ++ [tmpAssgn])
                     Nothing -> return (Identifier "__VOID__" Nothing,[])
                 else do
-                  resM <- resBndr False Wire dst
+                  resM <- resBndr False dst
                   case resM of
                     Just (dst',_,_) -> do
                       (bbCtx,ctxDcls)      <- mkBlackBoxContext nm dst' (lefts args)
@@ -417,11 +417,10 @@ mkPrimitive bbEParen bbEasD dst nm args ty tickDecls =
 
     resBndr
       :: Bool
-      -> WireOrReg
       -> (Either Identifier Id)
       -> NetlistMonad (Maybe (Id,Identifier,[Declaration]))
       -- Nothing when the binder would have type `Void`
-    resBndr mkDec wr dst' = case dst' of
+    resBndr mkDec dst' = case dst' of
       Left dstL -> case mkDec of
         False -> do
           -- TODO: check that it's okay to use `mkUnsafeSystemName`
@@ -429,16 +428,15 @@ mkPrimitive bbEParen bbEasD dst nm args ty tickDecls =
               id_ = mkLocalId ty nm'
           return (Just (id_,dstL,[]))
         True -> do
-          nm'  <- extendIdentifier Extended dstL "_res"
-          nm'' <- mkUniqueIdentifier Extended nm'
+          nm1 <- extendIdentifier Extended dstL "_res"
+          nm2 <- mkUniqueIdentifier Extended nm1
           -- TODO: check that it's okay to use `mkUnsafeInternalName`
-          let nm3 = mkUnsafeSystemName nm'' 0
-          hwTy <- N.unsafeCoreTypeToHWTypeM' $(curLoc) ty
-          let id_    = mkLocalId ty nm3
-              idDecl = NetDecl' Nothing wr nm'' (Right hwTy)
-          case hwTy of
-            Void {} -> return Nothing
-            _       -> return (Just (id_,nm'',[idDecl]))
+          let nm3 = mkUnsafeSystemName nm2 0
+              id_ = mkLocalId ty nm3
+          idDeclM <- mkNetDecl (id_,mkApps (Prim nm pinfo) args)
+          case idDeclM of
+            Nothing     -> return Nothing
+            Just idDecl -> return (Just (id_,nm2,[idDecl]))
       Right dstR -> return (Just (dstR,nameOcc . varName $ dstR,[]))
 
 -- | Create an template instantiation text and a partial blackbox content for an
@@ -701,7 +699,7 @@ mkFunInput resId e =
           let binders' = map (\(id_,tm) -> (goR result id_,tm)) binders
           netDecls <- fmap catMaybes . mapM mkNetDecl $ filter ((/= result) . fst) binders
           decls    <- concat <$> mapM (uncurry mkDeclarations) binders'
-          Just (NetDecl' _ rw _ _) <- mkNetDecl . head $ filter ((==result) . fst) binders
+          Just (NetDecl' _ rw _ _ _) <- mkNetDecl . head $ filter ((==result) . fst) binders
           nm <- mkUniqueIdentifier Basic "fun"
           return (Right ((nm,netDecls ++ decls),rw))
         Nothing -> return (Right (("",[]),Wire))

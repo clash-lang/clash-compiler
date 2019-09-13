@@ -199,7 +199,7 @@ checkPrimitive :: CompiledPrimMap -> GHC.CoreBndr -> C2C ()
 checkPrimitive primMap v = do
   nm <- qualifiedNameString (GHC.varName v)
   case HashMap.lookup nm primMap of
-    Just (extractPrim -> Just (BlackBox _ _ _ _ _ _ _ inc templ)) -> do
+    Just (extractPrim -> Just (BlackBox _ _ _ _ _ _ _ inc r ri templ)) -> do
       let
         info = GHC.idInfo v
         inline = GHC.inlinePragmaSpec $ GHC.inlinePragInfo info
@@ -214,7 +214,11 @@ checkPrimitive primMap v = do
         warnIf cond msg = traceIf cond ("\n"++loc++"Warning: "++msg) return ()
       qName <- Text.unpack <$> qualifiedNameString (GHC.varName v)
       let primStr = "primitive " ++ qName ++ " "
-      let usedArgs = usedArguments templ ++ concatMap (usedArguments . snd) inc
+      let usedArgs = concat [ maybe [] usedArguments r
+                            , maybe [] usedArguments ri
+                            , usedArguments templ
+                            , concatMap (usedArguments . snd) inc
+                            ]
 
       let warnArgs [] = return ()
           warnArgs (x:xs) = do

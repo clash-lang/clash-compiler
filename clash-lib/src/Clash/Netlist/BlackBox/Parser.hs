@@ -55,7 +55,7 @@ pEdge =
 pTagD :: Parser Element
 pTagD =  IF <$> (symbol "~IF" *> pTagE)
             <*> (spaces *> (string "~THEN" *> pBlackBoxD))
-            <*> (string "~ELSE" *> pBlackBoxD <* string "~FI")
+            <*> (string "~ELSE" *> option ([Text ""]) pBlackBoxD <* string "~FI")
      <|> Component <$> pDecl
      <|> pTagE
 

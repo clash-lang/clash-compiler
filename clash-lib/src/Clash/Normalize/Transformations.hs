@@ -752,14 +752,18 @@ removeUnusedExpr :: HasCallStack => NormRewrite
 removeUnusedExpr _ e@(collectArgsTicks -> (p@(Prim nm pInfo),args,ticks)) = do
   bbM <- HashMap.lookup nm <$> Lens.use (extra.primitives)
   case bbM of
-    Just (extractPrim ->  Just (BlackBox pNm _ _ _ _ _ _ inc templ)) -> do
+    Just (extractPrim ->  Just (BlackBox pNm _ _ _ _ _ _ inc r ri templ)) -> do
       let usedArgs | isFromInt pNm
                    = [0,1,2]
                    | nm `elem` ["Clash.Annotations.BitRepresentation.Deriving.dontApplyInHDL"
                                ]
                    = [0,1]
                    | otherwise
-                   = usedArguments templ ++ concatMap (usedArguments . snd) inc
+                   = concat [ maybe [] usedArguments r
+                            , maybe [] usedArguments ri
+                            , usedArguments templ
+                            , concatMap (usedArguments . snd) inc
+                            ]
       tcm <- Lens.view tcCache
       args' <- go tcm 0 usedArgs args
       if args == args'

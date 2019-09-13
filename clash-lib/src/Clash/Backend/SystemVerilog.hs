@@ -600,7 +600,7 @@ addSeen :: Component -> SystemVerilogM ()
 addSeen c = do
   let iport = map fst (inputs c)
       oport = map (fst.snd) $ outputs c
-      nets  = mapMaybe (\case {NetDecl' _ _ i _ -> Just i; _ -> Nothing}) $ declarations c
+      nets  = mapMaybe (\case {NetDecl' _ _ i _ _ -> Just i; _ -> Nothing}) $ declarations c
   Mon (idSeen %= (HashMapS.unionWith max (HashMapS.fromList (concatMap (map (,0)) [iport,oport,nets]))))
   Mon (oports .= oport)
 
@@ -742,13 +742,20 @@ decls ds = do
       _  -> punctuate' semi (A.pure dsDoc)
 
 decl :: Declaration -> SystemVerilogM (Maybe Doc)
-decl (NetDecl' noteM _ id_ tyE) =
+decl (NetDecl' noteM _ id_ tyE iEM) =
   Just A.<$> maybe id addNote noteM (addAttrs attrs (typ tyE))
   where
-    typ (Left  ty) = stringS ty <+> stringS id_
-    typ (Right ty) = sigDecl (stringS id_) ty
+    typ (Left  ty) = stringS ty <+> stringS id_ <> iE
+    typ (Right ty) = sigDecl (stringS id_) ty <> iE
     addNote n = mappend ("//" <+> stringS n <> line)
     attrs = fromMaybe [] (hwTypeAttrs A.<$> either (const Nothing) Just tyE)
+    iE = maybe emptyDoc (noEmptyInit . expr_ False) iEM
+
+    noEmptyInit d = do
+      d1 <- d
+      if isEmpty d1
+         then emptyDoc
+         else (space <> "=" <+> d)
 
 decl _ = return Nothing
 
@@ -924,7 +931,7 @@ inst_ (InstDecl _ _ nm lbl ps pms) = fmap Just $
 inst_ (BlackBoxD _ libs imps inc bs bbCtx) =
   fmap Just (Mon (column (renderBlackBox libs imps inc bs bbCtx)))
 
-inst_ (NetDecl' _ _ _ _) = return Nothing
+inst_ (NetDecl' {}) = return Nothing
 
 -- | Turn a Netlist expression into a SystemVerilog expression
 expr_ :: Bool -- ^ Enclose in parentheses?

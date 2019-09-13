@@ -159,6 +159,10 @@ data Primitive a b c d
     -- ^ Create files to be included with the generated primitive. The fields
     -- are ((name, extension), content), where content is a template of the file
     -- Defaults to @[]@ when not specified in the /.json/ file
+  , resultName :: Maybe b
+    -- ^ (Maybe) Control the generated name of the result
+  , resultInit :: Maybe b
+    -- ^ (Maybe) Control the initial/power-up value of the result
   , template :: b
     -- ^ Used to indiciate type of template (declaration or expression). Will be
     -- filled with @Template@ or an @Either decl expr@.
@@ -210,6 +214,8 @@ instance FromJSON UnresolvedPrimitive where
                      <*> conVal .:? "libraries" .!= []
                      <*> conVal .:? "imports" .!= []
                      <*> (conVal .:? "includes" .!= [] >>= traverse parseInclude)
+                     <*> (conVal .:? "resultName" >>= maybe (pure Nothing) parseResult) .!= Nothing
+                     <*> (conVal .:? "resultInit" >>= maybe (pure Nothing) parseResult) .!= Nothing
                      <*> parseTemplate conVal
           "Primitive" ->
             Primitive <$> conVal .: "name"
@@ -247,6 +253,10 @@ instance FromJSON UnresolvedPrimitive where
       parseBBFN' = either fail return . parseBBFN
 
       defTemplateFunction = BlackBoxFunctionName ["Template"] "template"
+
+      parseResult (Object c) =
+        Just . Just <$> parseTemplate c
+      parseResult e = fail $ "[7] unexpected result: " ++ show e
 
   parseJSON unexpected =
     fail $ "[3] Expected: BlackBox or Primitive object, got: " ++ show unexpected

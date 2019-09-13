@@ -271,7 +271,10 @@ renderBlackBox libs imps includes bb bbCtx = do
   bb' <- case bb of
         N.BBTemplate bt   -> do
           t <- renderTemplate bbNamedCtx bt
-          return (\col -> PP.nest (col-2) (PP.pretty (t (col + 2))))
+          return (\col -> let t1 = t (col + 2)
+                          in  if Text.null t1
+                              then PP.emptyDoc
+                              else PP.nest (col-2) (PP.pretty t1))
         N.BBFunction _ _ (N.TemplateFunction _ _ bf)  -> do
           t <- bf bbNamedCtx
           return (\_ -> t)
@@ -676,6 +679,13 @@ renderTag b (Template filenameL sourceL) = case file of
           return (Text.unpack filename, Text.unpack source)
 
 renderTag b CompName = pure (Text.fromStrict (bbCompName b))
+
+renderTag b CtxName = case bbCtxName b of
+  Just nm -> return (Text.fromStrict nm)
+  _ | Identifier t _ <- fst (bbResult b)
+    -> return (Text.fromStrict t)
+  _ -> error "internal error"
+
 
 renderTag _ e = do e' <- getMon (prettyElem e)
                    error $ $(curLoc) ++ "Unable to evaluate: " ++ show e'

@@ -28,11 +28,12 @@ import           Control.Lens            ((.=),(%=))
 import qualified Control.Lens            as Lens
 import           Control.Monad           (unless, when, zipWithM, join)
 import           Control.Monad.Reader    (ask, local)
+import qualified Control.Monad.State as State
 import           Control.Monad.State.Strict
   (State, evalState, get, modify, runState)
 import           Control.Monad.Trans.Except
   (ExceptT (..), runExcept, runExceptT, throwE)
-import           Data.Either             (partitionEithers)
+import           Data.Either             (lefts, partitionEithers)
 import           Data.HashMap.Strict     (HashMap)
 import qualified Data.HashMap.Strict     as HashMap
 import           Data.String             (fromString)
@@ -46,6 +47,7 @@ import           Data.Semigroup          ((<>))
 #endif
 import           Data.Text               (Text)
 import qualified Data.Text               as Text
+import           Data.Text.Lazy          (toStrict)
 import           Data.Text.Prettyprint.Doc (Doc)
 
 import           Outputable              (ppr, showSDocUnsafe)
@@ -66,7 +68,8 @@ import           Clash.Core.Subst
   (Subst (..), extendIdSubst, extendIdSubstList, extendInScopeId,
    extendInScopeIdList, mkSubst, substTm)
 import           Clash.Core.Term
-  (Alt, LetBinding, Pat (..), Term (..), TickInfo (..), NameMod (..))
+  (Alt, LetBinding, Pat (..), Term (..), TickInfo (..), NameMod (..),
+   collectArgsTicks)
 import           Clash.Core.TyCon
   (TyConName, TyConMap, tyConDataCons)
 import           Clash.Core.Type         (Type (..), TypeView (..),
@@ -77,8 +80,11 @@ import           Clash.Core.Var
   (Id, Var (..), mkLocalId, modifyVarName, Attr')
 import           Clash.Core.VarEnv
   (InScopeSet, extendInScopeSetList, uniqAway)
+import {-# SOURCE #-} Clash.Netlist.BlackBox
+import {-# SOURCE #-} Clash.Netlist.BlackBox.Util
 import           Clash.Netlist.Id        (IdType (..), stripDollarPrefixes)
 import           Clash.Netlist.Types     as HW
+import           Clash.Primitives.Types
 import           Clash.Unique
 import           Clash.Util
 
@@ -665,9 +671,9 @@ mkUniqueNormalized is0 topMM (args,binds,res) = do
           return (varName res3,substRes'
                  ,[(res1, Var res3)])
       -- Replace occurences of "<X>" by "<X>_rec"
-      let resN    = varName res
-          bndrs'  = map (\i -> if varName i == resN then modifyVarName (const res2) i else i) bndrs
-          (bndrsL,r:bndrsR) = break ((== res2).varName) bndrs'
+      let resN = varName res
+      bndrs' <- mapM (setBinderName resN res2) binds
+      let (bndrsL,r:bndrsR) = break ((== res2).varName) bndrs'
       -- Make let-binders unique
       (bndrsL',substL) <- mkUnique subst'' bndrsL
       (bndrsR',substR) <- mkUnique substL  bndrsR
@@ -678,6 +684,43 @@ mkUniqueNormalized is0 topMM (args,binds,res) = do
     Nothing -> do
       (bndrs', substArgs') <- mkUnique substArgs bndrs
       return (wereVoids,iports,iwrappers,[],[],zip bndrs' (map (substTm ("mkUniqueNormalized2" :: Doc ()) substArgs') exprs),Nothing)
+
+-- | Set the name of the binder
+--
+-- Normally, it just keeps the existing name, but there are two exceptions:
+--
+-- 1. The binding is recursive, and also the return value; in this case it's
+--    suffixed with `_rec`
+-- 2. The binding binds a primitive that has a name control field
+setBinderName
+  :: Name Term
+  -- ^ The name of the binding that's recursive and is also the result the
+  -- return value
+  -> Name Term
+  -- ^ The above mentioned name suffixed by "_rec"
+  -> (Id,Term)
+  -- ^ The binding
+  -> NetlistMonad Id
+setBinderName resN res2 (i,collectArgsTicks -> (k,args,ticks)) = case k of
+  Prim nm _ -> extractPrimWarnOrFail nm >>= go nm
+  _ -> return goDef
+ where
+  go nm (BlackBox {resultName = Just (BBTemplate nmD)}) = withTicks ticks $ \_ -> do
+    (bbCtx,_) <- preserveVarEnv (mkBlackBoxContext nm goDef (lefts args))
+    be <- Lens.use backend
+    let q = case be of
+              SomeBackend s -> toStrict ((State.evalState (renderTemplate bbCtx nmD) s) 0)
+    if nameOcc (varName i) == q
+       then return goDef
+       else if varName i == resN
+            then return (modifyVarName (\_ -> res2 {nameOcc = q}) i)
+            else return (modifyVarName (\n -> n {nameOcc = q}) i)
+
+  go _ _ = return goDef
+
+  goDef = if varName i == resN
+             then modifyVarName (const res2) i
+             else i
 
 mkUniqueArguments
   :: Subst
@@ -1439,7 +1482,7 @@ mkTopInput topM inps pM = case pM of
     go' (PortName _) ((iN,iTy):inps') (_,hwty) = do
       iN' <- mkUniqueIdentifier Extended iN
       return (inps',([(iN,iN',hwty)]
-                    ,[NetDecl' Nothing Wire iN' (Left iTy)]
+                    ,[NetDecl' Nothing Wire iN' (Left iTy) Nothing]
                     ,Right (iN',hwty)))
 
     go' (PortName _) [] _ = error "This shouldnt happen"
@@ -1630,7 +1673,7 @@ mkTopOutput' topM outps pM = case pM of
     go' (PortName _) ((oN,oTy):outps') (_,hwty) = do
       oN' <- mkUniqueIdentifier Extended oN
       return (outps',([(oN,oN',hwty)]
-                     ,[NetDecl' Nothing Wire oN' (Left oTy)]
+                     ,[NetDecl' Nothing Wire oN' (Left oTy) Nothing]
                      ,Right (oN',hwty)))
 
     go' (PortName _) [] _ = error "This shouldnt happen"

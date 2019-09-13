@@ -183,7 +183,7 @@ instance Backend VHDLState where
   blockDecl nm ds = do
     decs <- decls ds
     let attrs = [ (id_, attr)
-                | NetDecl' _ _ id_ (Right hwtype) <- ds
+                | NetDecl' _ _ id_ (Right hwtype) _ <- ds
                 , attr <- hwTypeAttrs hwtype]
     if isEmpty decs
        then insts ds
@@ -847,13 +847,13 @@ architecture c = do {
   }
  where
    netdecls    = filter isNetDecl (declarations c)
-   declAttrs   = [(id_, attr) | NetDecl' _ _ id_ (Right hwtype) <- netdecls, attr <- hwTypeAttrs hwtype]
+   declAttrs   = [(id_, attr) | NetDecl' _ _ id_ (Right hwtype) _ <- netdecls, attr <- hwTypeAttrs hwtype]
    inputAttrs  = [(id_, attr) | (id_, hwtype) <- inputs c, attr <- hwTypeAttrs hwtype]
    outputAttrs = [(id_, attr) | (_wireOrReg, (id_, hwtype)) <- outputs c, attr <- hwTypeAttrs hwtype]
 
    isNetDecl :: Declaration -> Bool
-   isNetDecl (NetDecl' _ _ _ (Right _)) = True
-   isNetDecl _                          = False
+   isNetDecl (NetDecl' _ _ _ (Right _) _) = True
+   isNetDecl _                            = False
 
 attrType
   :: t ~ HashMap T.Text T.Text
@@ -1225,10 +1225,16 @@ decls ds = do
       _  -> punctuate' semi (pure dsDoc)
 
 decl :: Int ->  Declaration -> VHDLM (Maybe (Doc,Int))
-decl l (NetDecl' noteM _ id_ ty) = Just <$> (,fromIntegral (TextS.length id_)) <$>
-  maybe id addNote noteM ("signal" <+> fill l (pretty id_) <+> colon <+> either pretty sizedQualTyName ty)
+decl l (NetDecl' noteM _ id_ ty iEM) = Just <$> (,fromIntegral (TextS.length id_)) <$>
+  maybe id addNote noteM ("signal" <+> fill l (pretty id_) <+> colon <+> either pretty sizedQualTyName ty <> iE)
   where
     addNote n = mappend ("--" <+> pretty n <> line)
+    iE = maybe emptyDoc (noEmptyInit . expr_ False) iEM
+    noEmptyInit d = do
+      d1 <- d
+      if isEmpty d1
+         then emptyDoc
+         else (space <> ":=" <+> d)
 
 decl _ (InstDecl Comp _ nm _ gens pms) = fmap (Just . (,0)) $ do
   { rec (p,ls) <- fmap unzip $ sequence [ (,formalLength i) <$> fill (maximum ls) (expr_ False i) <+> colon <+> portDir dir <+> sizedQualTyName ty | (i,dir,ty,_) <- pms ]
