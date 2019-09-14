@@ -1,8 +1,9 @@
-{-# LANGUAGE BinaryLiterals #-}
-{-# LANGUAGE DeriveAnyClass #-}
-{-# LANGUAGE DeriveGeneric  #-}
-{-# LANGUAGE LambdaCase     #-}
-{-# LANGUAGE ViewPatterns   #-}
+{-# LANGUAGE BinaryLiterals      #-}
+{-# LANGUAGE DeriveAnyClass      #-}
+{-# LANGUAGE DeriveGeneric       #-}
+{-# LANGUAGE LambdaCase          #-}
+{-# LANGUAGE ViewPatterns        #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 
 module Clash.Cores.LatticeSemi.IO
   ( sbio
@@ -10,6 +11,8 @@ module Clash.Cores.LatticeSemi.IO
   , PinOutputConfig(..)
   , PinInputConfig(..)
   ) where
+
+import           Data.Functor                ((<&>))
 
 import           Clash.Prelude
 import           Clash.Signal.BiSignal       (BiSignalDefault(Floating))
@@ -103,13 +106,16 @@ data OutputSelect
   deriving (Show, Generic, BitPack)
 
 sbio
-  :: ( HiddenClock dom  -- INPUT_CLK
+  :: forall dom
+   . ( HiddenClock dom  -- INPUT_CLK
      , HiddenEnable dom -- CLK_ENABLE
      )
   => BitVector 6
   -- ^ Config, see SBTICETechnologyLibrary201504.pdf, p88
   -> BiSignalIn 'Floating dom 1
   -- ^ PACKAGE_PIN
+  -> Signal dom Bit
+  -- ^ LATCH_INPUT_VALUE
   -> Signal dom Bit
   -- ^ D_OUT_0
   -> Signal dom Bit
@@ -120,12 +126,42 @@ sbio
      , Signal dom Bit               -- D_IN_0
      , Signal dom Bit               -- D_IN_1
      )
-sbio pinConf pkgPinIn dOut_0 dOut_1 outputEnable0 =
+sbio pinConf pkgPinIn latchInput dOut_0 dOut_1 outputEnable0 =
   ( pkgPinOut
-  , pure (errorX "d_in_0 not yet implemented")
+  , dIn_0
   , pure (errorX "d_in_1 not yet implemented")
   )
  where
+  pkgPinInRead :: Signal dom Bit
+  pkgPinInRead = readFromBiSignal pkgPinIn
+
+  -- Combine (static) input pin configuration values with (dynamic) value
+  -- of LATCH_INPUT_VALUE
+  pinType =
+    latchInput <&> \li ->
+      unpack $
+      pack $
+        ( (li .|. (pinConf ! 1))
+        , (pinConf ! 0)
+        )
+
+  clockLessLatchErr =
+    "Either LATCH_INPUT_VALUE was asserted or pin type was set to one of " <>
+    "INPUT_REGISTERED_LATCH or PIN_INPUT_LATCH. This is currently not " <>
+    "supported by this 'Clash.Cores.LatticeSemi.IO.sbio', due to CLash not " <>
+    "supporting clockless latches."
+
+  latch_dIn_0 =
+    pinType <&>
+      \case
+        PIN_INPUT_REGISTERED -> True
+        PIN_INPUT -> False
+        PIN_INPUT_REGISTERED_LATCH -> errorX clockLessLatchErr
+        PIN_INPUT_LATCH -> errorX clockLessLatchErr
+
+  dIn_0 =
+    mux latch_dIn_0 (dflipflop pkgPinInRead) pkgPinInRead
+
   outputEnable1 =
     case unpack (slice d5 d4 pinConf) of
       EnableLow     -> pure False
