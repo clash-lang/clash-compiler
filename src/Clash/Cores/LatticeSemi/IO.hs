@@ -17,6 +17,8 @@ import           Data.Functor                ((<&>))
 import           Clash.Prelude
 import           Clash.Signal.BiSignal       (BiSignalDefault(Floating))
 
+import           GHC.Stack
+
 toMaybe :: Bool -> a -> Maybe a
 toMaybe True a = Just a
 toMaybe False _a = Nothing
@@ -105,9 +107,20 @@ data OutputSelect
   | SelectLatchedInvertedD0
   deriving (Show, Generic, BitPack)
 
+dflipflopE
+  :: ( HasCallStack
+     , HiddenClock dom
+     , HiddenEnable dom
+     , NFDataX a
+     )
+  => Signal dom a
+  -> Signal dom a
+dflipflopE = delay (deepErrorX "dflipflopE: undefined initial value")
+
 sbio
   :: forall dom
-   . ( HiddenClock dom  -- INPUT_CLK
+   . ( HasCallStack
+     , HiddenClock dom  -- INPUT_CLK
      , HiddenEnable dom -- CLK_ENABLE
      )
   => BitVector 6
@@ -160,7 +173,7 @@ sbio pinConf pkgPinIn latchInput dOut_0 _dOut_1 outputEnable0 =
         PIN_INPUT_LATCH -> errorX clockLessLatchErr
 
   dIn_0 =
-    mux latch_dIn_0 (dflipflop pkgPinInRead) pkgPinInRead
+    mux latch_dIn_0 (dflipflopE pkgPinInRead) pkgPinInRead
 
   outputEnable1 =
     case unpack (slice d5 d4 pinConf) of
