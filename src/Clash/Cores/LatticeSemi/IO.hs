@@ -2,22 +2,26 @@
 {-# LANGUAGE DeriveAnyClass      #-}
 {-# LANGUAGE DeriveGeneric       #-}
 {-# LANGUAGE LambdaCase          #-}
+{-# LANGUAGE TypeApplications    #-}
 {-# LANGUAGE ViewPatterns        #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 
 module Clash.Cores.LatticeSemi.IO
   ( sbio
   , spiConfig
+  , topEntity -- TODO: Remove
   , PinOutputConfig(..)
   , PinInputConfig(..)
   ) where
 
-import           Data.Functor                ((<&>))
-
-import           Clash.Prelude
-import           Clash.Signal.BiSignal       (BiSignalDefault(Floating))
-
+import           Data.Functor                 ((<&>))
 import           GHC.Stack
+
+import           Clash.Annotations.Primitive  (Primitive(..), HDL(..))
+import           Clash.Prelude
+import           Clash.Signal.BiSignal        (BiSignalDefault(Floating))
+
+import           Clash.Cores.LatticeSemi.Blackboxes.IO  (sbioTF)
 
 toMaybe :: Bool -> a -> Maybe a
 toMaybe True a = Just a
@@ -191,3 +195,8 @@ sbio pinConf pkgPinIn latchInput dOut_0 _dOut_1 outputEnable0 =
     writeToBiSignal
       pkgPinIn
       (toMaybe <$> outputEnable1 <*> pkgPinWriteInput)
+{-# NOINLINE sbio #-}
+{-# ANN sbio (InlinePrimitive Verilog "[ { \"BlackBox\" : { \"name\" : \"Clash.Cores.LatticeSemi.IO.sbio\", \"kind\": \"Declaration\", \"format\": \"Haskell\", \"templateFunction\": \"Clash.Cores.LatticeSemi.Blackboxes.IO.sbioTF\"}} ]") #-}
+
+topEntity pkgPinIn latchInput dOut_0 _dOut_1 outputEnable =
+  sbio @System 0b101001 pkgPinIn latchInput dOut_0 _dOut_1 outputEnable
