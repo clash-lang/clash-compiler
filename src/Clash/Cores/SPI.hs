@@ -28,13 +28,13 @@ spiSlave
                 , Maybe (BitVector n) -- DOUT
                 )
 spiSlave (SPISlaveConfig mode) ss mosi sck din =
-  moore go cvt ((0 :: Index n,undefined,unpack undefined#),(1,False,0))
+  moore go cvt ((0 :: Index n,undefined,unpack undefined#),(repeat 1,False,0))
                (bundle ( delay False ss
                        , delay undefined mosi
                        , delay undefined sck
                        , din ))
  where
-  cvt (_,(mosi,done,dout)) = (mosi,if done then Just dout else Nothing)
+  cvt (_,(mosi,done,dout)) = (head mosi,if done then Just dout else Nothing)
 
   go ((bitCntQ,sckOldQ,dataQ),(misoQ,doneQ,doutQ)) (ssQ,mosiQ,sckQ,dinI)
     = ((bitCntD,sckQ,dataD),(misoD,doneD,doutD))
@@ -58,8 +58,10 @@ spiSlave (SPISlaveConfig mode) ss mosi sck din =
         = doutQ
 
       misoD
-        | ssQ || shiftSck
-        = head @(n-1) dataQ
+        | ssQ
+        = unpack dinI
+        | shiftSck
+        = tail @(n-1) misoQ :< 1
         | otherwise
         = misoQ
 

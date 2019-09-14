@@ -1,6 +1,7 @@
 module Test.Cores.SPI where
 
 import Clash.Prelude
+import qualified Clash.Explicit.Prelude as E
 import Clash.Explicit.Testbench
 import Clash.Sized.Internal.BitVector (undefined#)
 
@@ -38,39 +39,7 @@ misoCapture mode =
 
 test = done
  where
-  testInput = stimuliGenerator clk rst
-                $(listToVecTH
-                    -- SS  , MOSI  , SCK
-                    [(True , 0::Bit, False)
-                    -- 1
-                    ,(False, 1     , False)
-                    ,(False, 1     , True )
-                    -- 0
-                    ,(False, 0     , False)
-                    ,(False, 0     , True )
-                    -- 0
-                    ,(False, 0     , False)
-                    ,(False, 0     , True )
-                    -- 0
-                    ,(False, 0     , False)
-                    ,(False, 0     , True )
-                    -- 0
-                    ,(False, 0     , False)
-                    ,(False, 0     , True )
-                    -- 1
-                    ,(False, 1     , False)
-                    ,(False, 1     , True )
-                    -- 1
-                    ,(False, 1     , False)
-                    ,(False, 1     , True )
-                    -- 0
-                    ,(False, 0     , False)
-                    ,(False, 0     , True )
-                    -- disable
-                    ,(False, 0     , False)
-                    ,(True , 0     , False)
-                    ]
-                 )
+  testInput = stimuliGenerator clk rst mode0
   (ss,mosi,sck) = unbundle testInput
   din = pure (0b01100111 :: BitVector 8)
   dutOutput = exposeClockResetEnable (spiSlave @8 (SPISlaveConfig SPIMode0))
@@ -79,12 +48,127 @@ test = done
 
   (miso,dout) = unbundle dutOutput
   misoC = exposeClockResetEnable (misoCapture @8 SPIMode1) clk rst enableGen
-            (bundle (ss,miso,sck))
+            (bundle (E.delay clk enableGen False ss
+                    ,miso
+                    ,E.delay clk enableGen undefined sck))
 
-  done = outputVerifier' clk rst
-            $(listToVecTH (
+  done = outputVerifier' clk rst mode0Exp
+            (bundle (dout,misoC))
+  clk = tbSystemClockGen (not <$> done)
+  rst = systemResetGen
+
+mode0 = $(listToVecTH
+            -- SS  , MOSI  , SCK
+            [(True , 0::Bit, False)
+            ,(True , 0     , False)
+            ,(False, 1     , False)
+            -- 1
+            ,(False, 1     , False)
+            ,(False, 1     , True )
+            -- 0
+            ,(False, 0     , False)
+            ,(False, 0     , True )
+            -- 0
+            ,(False, 0     , False)
+            ,(False, 0     , True )
+            -- 0
+            ,(False, 0     , False)
+            ,(False, 0     , True )
+            -- 0
+            ,(False, 0     , False)
+            ,(False, 0     , True )
+            -- 1
+            ,(False, 1     , False)
+            ,(False, 1     , True )
+            -- 1
+            ,(False, 1     , False)
+            ,(False, 1     , True )
+            -- 0
+            ,(False, 0     , False)
+            ,(False, 0     , True )
+            -- disable
+            ,(False, 0     , False)
+            ,(True , 0     , False)
+            ]
+         )
+
+mode0Exp = $(listToVecTH (
                 -- DOUT, MISOC
                 [(Nothing        , Nothing)
+                ,(Nothing        , Nothing)
+                ,(Nothing        , Nothing)
+                -- 0
+                ,(Nothing        , Nothing)
+                ,(Nothing        , Nothing)
+                -- 0
+                ,(Nothing        , Nothing)
+                ,(Nothing        , Nothing)
+                -- 1
+                ,(Nothing        , Nothing)
+                ,(Nothing        , Nothing)
+                -- 1
+                ,(Nothing        , Nothing)
+                ,(Nothing        , Nothing)
+                -- 0
+                ,(Nothing        , Nothing)
+                ,(Nothing        , Nothing)
+                -- 0
+                ,(Nothing        , Nothing)
+                ,(Nothing        , Nothing)
+                -- 1
+                ,(Nothing        , Nothing)
+                ,(Nothing        , Nothing)
+                -- 1
+                ,(Nothing        , Nothing)
+                ,(Nothing        , Nothing)
+                -- 1
+                ,(Nothing        , Nothing)
+                ,(Just 0b10000110, Nothing)
+                -- Finish
+                ,(Nothing        , Just 0b01100111)
+                ] :: [(Maybe (BitVector 8), Maybe (BitVector 8))])
+             )
+
+mode1 = $(listToVecTH
+            -- SS  , MOSI  , SCK
+            [(True , 0::Bit, False)
+            ,(True , 0     , False)
+            ,(False, 1     , False)
+            -- 1
+            ,(False, 1     , True)
+            ,(False, 1     , False )
+            -- 0
+            ,(False, 0     , True)
+            ,(False, 0     , False )
+            -- 0
+            ,(False, 0     , True)
+            ,(False, 0     , False )
+            -- 0
+            ,(False, 0     , True)
+            ,(False, 0     , False )
+            -- 0
+            ,(False, 0     , True)
+            ,(False, 0     , False )
+            -- 1
+            ,(False, 1     , True)
+            ,(False, 1     , False )
+            -- 1
+            ,(False, 1     , True)
+            ,(False, 1     , False )
+            -- 0
+            ,(False, 0     , True)
+            ,(False, 0     , False )
+            -- disable
+            ,(False, 0     , False)
+            ,(True , 0     , False)
+            ]
+         )
+
+mode1Exp = $(listToVecTH (
+                -- DOUT, MISOC
+                [(Nothing        , Nothing)
+                ,(Nothing        , Nothing)
+                ,(Nothing        , Nothing)
                 -- 0
                 ,(Nothing        , Nothing)
                 ,(Nothing        , Nothing)
@@ -110,12 +194,9 @@ test = done
                 ,(Nothing        , Nothing)
                 ,(Nothing        , Nothing)
                 -- 1
-                ,(Nothing        , Nothing)
-                ,(Just 0b10000110, Just 0b01100111)
+                ,(Nothing        , Just 0b01100111)
+                ,(Just 0b10000110, Nothing)
                 -- Finish
                 ,(Nothing        , Nothing)
                 ] :: [(Maybe (BitVector 8), Maybe (BitVector 8))])
              )
-            (bundle (dout,misoC))
-  clk = tbSystemClockGen (not <$> done)
-  rst = systemResetGen
