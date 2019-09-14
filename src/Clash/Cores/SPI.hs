@@ -46,10 +46,10 @@ spiSlave ss mosi sck din =
         = doutQ
 
       misoD
-        | fallingSck = head @(n-1) dataQ
+        | not ssQ && fallingSck = head @(n-1) dataQ
         | otherwise  = misoQ
 
-      doneD = risingSck && bitCntQ == maxBound
+      doneD = not ssQ && risingSck && bitCntQ == maxBound
 
       risingSck  = not sckOldQ && sckQ
       fallingSck = sckOldQ && not sckQ
