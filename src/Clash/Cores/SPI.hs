@@ -1,6 +1,7 @@
 module Clash.Cores.SPI where
 
 import Clash.Prelude
+import Clash.Sized.Internal.BitVector
 import Clash.Explicit.Testbench
 
 spiSlave
@@ -19,7 +20,7 @@ spiSlave
                 , BitVector n -- DOUT
                 )
 spiSlave ss mosi sck din =
-  moore go snd ((0 :: Index n,undefined,undefined),(1,False,0))
+  moore go snd ((0 :: Index n,undefined,unpack undefined#),(1,False,0))
                (bundle ( delay False ss
                        , delay undefined mosi
                        , delay undefined sck

@@ -2,6 +2,7 @@ module Test.Cores.SPI where
 
 import Clash.Prelude
 import Clash.Explicit.Testbench
+import Clash.Sized.Internal.BitVector (undefined#)
 
 import Clash.Cores.SPI
 
@@ -49,7 +50,7 @@ test = done
                 -- MISO , DONE , DOUT
                 [(1::Bit, False, 0 :: BitVector 8)
                 -- 0
-                ,(0     , False, 0)
+                ,(unpack undefined#, False, 0)
                 ,(0     , False, 0)
                 -- 0
                 ,(0     , False, 0)

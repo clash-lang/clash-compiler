@@ -25,6 +25,7 @@ library
   default-extensions:  BinaryLiterals
                        DataKinds
                        FlexibleContexts
+                       MagicHash
                        NoImplicitPrelude
                        ScopedTypeVariables
                        TemplateHaskell
