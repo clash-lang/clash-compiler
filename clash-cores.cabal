@@ -16,6 +16,7 @@ extra-source-files:  CHANGELOG.md
 
 library
   exposed-modules:     Clash.Cores.SPI
+                       Clash.Cores.LatticeSemi.IO
   -- other-modules:
   -- other-extensions:
   ghc-options:         -fexpose-all-unfoldings
