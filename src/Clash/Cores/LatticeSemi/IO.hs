@@ -26,7 +26,7 @@ spiConfig
   :: PinInputConfig
   -> PinOutputConfig
   -> BitVector 6
-spiConfig pi po = pack po ++# pack pi
+spiConfig pic poc = pack poc ++# pack pic
 
 data PinInputConfig
   = PIN_INPUT_REGISTERED
@@ -126,7 +126,7 @@ sbio
      , Signal dom Bit               -- D_IN_0
      , Signal dom Bit               -- D_IN_1
      )
-sbio pinConf pkgPinIn latchInput dOut_0 dOut_1 outputEnable0 =
+sbio pinConf pkgPinIn latchInput dOut_0 _dOut_1 outputEnable0 =
   ( pkgPinOut
   , dIn_0
   , pure (errorX "d_in_1 not yet implemented")
@@ -141,8 +141,8 @@ sbio pinConf pkgPinIn latchInput dOut_0 dOut_1 outputEnable0 =
     latchInput <&> \li ->
       unpack $
       pack $
-        ( (li .|. (pinConf ! 1))
-        , (pinConf ! 0)
+        ( (li .|. (pinConf ! (1 :: Int)))
+        , (pinConf ! (0 :: Int))
         )
 
   clockLessLatchErr =

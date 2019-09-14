@@ -23,6 +23,7 @@ library
                        -fplugin GHC.TypeLits.Extra.Solver
                        -fplugin GHC.TypeLits.Normalise
                        -fplugin GHC.TypeLits.KnownNat.Solver
+                       -Wall
   default-extensions:  BinaryLiterals
                        DataKinds
                        FlexibleContexts
