@@ -6,6 +6,7 @@ import Clash.Explicit.Testbench
 import Clash.Sized.Internal.BitVector (undefined#)
 
 import Clash.Cores.SPI
+import Clash.Cores.LatticeSemi.IO
 
 misoCapture
   :: forall n dom
@@ -17,7 +18,7 @@ misoCapture
 misoCapture mode =
   moore go snd ((0 :: Index n,undefined,unpack undefined#),Nothing)
  where
-  go ((cntQ,oldSckQ,datQ),resQ) (ss,miso,sck) = ((cntD,sck,datD),resD)
+  go ((cntQ,oldSckQ,datQ),_resQ) (ss,miso,sck) = ((cntD,sck,datD),resD)
    where
     cntD | ss = 0
          | captureSck = if cntQ == maxBound then 0 else cntQ + 1
@@ -37,19 +38,34 @@ misoCapture mode =
     captureSck = if mode == SPIMode0 || mode == SPIMode3
                  then risingSck else fallingSck
 
+spiSlaveLattice
+  :: forall dom n
+   . (HiddenClockResetEnable dom, 1 <= n, KnownNat n)
+  => BiSignalIn 'Floating dom 1
+  -> Signal dom Bool
+  -> Signal dom Bit
+  -> Signal dom Bool
+  -> Signal dom (BitVector n)
+  -> (BiSignalOut 'Floating dom 1, Signal dom (Maybe (BitVector n)))
+spiSlaveLattice =
+  spiSlave (SPISlaveConfig SPIMode0 sbioX)
+ where
+  sbioX bin en dout = bout
+   where
+    (bout,_,_) = sbio 0b101001 bin (pure 0) dout (pure undefined) en
+
 test = done
  where
   testInput = stimuliGenerator clk rst mode0
   (ss,mosi,sck) = unbundle testInput
   din = pure (0b01100111 :: BitVector 8)
-  dutOutput = exposeClockResetEnable (spiSlave @8 (SPISlaveConfig SPIMode0))
-                clk rst enableGen
-                ss mosi sck din
+  (miso,dout) = exposeClockResetEnable spiSlaveLattice
+                  clk rst enableGen
+                  (veryUnsafeToBiSignalIn miso) ss mosi sck din
 
-  (miso,dout) = unbundle dutOutput
   misoC = exposeClockResetEnable (misoCapture @8 SPIMode1) clk rst enableGen
             (bundle (E.delay clk enableGen False ss
-                    ,miso
+                    ,readFromBiSignal (veryUnsafeToBiSignalIn miso)
                     ,E.delay clk enableGen undefined sck))
 
   done = outputVerifier' clk rst mode0Exp

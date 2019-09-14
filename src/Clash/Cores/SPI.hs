@@ -6,15 +6,21 @@ import Clash.Sized.Internal.BitVector
 data SPIMode = SPIMode0 | SPIMode1 | SPIMode2 | SPIMode3
   deriving Eq
 
-data SPISlaveConfig
+data SPISlaveConfig ds dom
   = SPISlaveConfig
   { spiSlaveConfigMode :: SPIMode
+  , spiSlaveConfigBuffer
+      :: BiSignalIn ds dom 1
+      -> Signal dom Bool
+      -> Signal dom Bit
+      -> BiSignalOut ds dom 1
   }
 
 spiSlave
-  :: forall n dom
+  :: forall n ds dom
    . (HiddenClockResetEnable dom, KnownNat n, 1 <= n)
-  => SPISlaveConfig
+  => SPISlaveConfig ds dom
+  -> BiSignalIn ds dom 1
   -> Signal dom Bool
   -- ^ Slave select
   -> Signal dom Bit
@@ -23,15 +29,19 @@ spiSlave
   -- ^ SCK
   -> Signal dom (BitVector n)
   -- ^ DIN
-  -> Signal dom ( Bit -- MISO
-                , Maybe (BitVector n) -- DOUT
-                )
-spiSlave (SPISlaveConfig mode) ss mosi sck din =
-  moore go cvt ((0 :: Index n,undefined,unpack undefined#),(repeat 1,False,0))
-               (bundle ( delay False ss
-                       , delay undefined mosi
-                       , delay undefined sck
-                       , din ))
+  -> (BiSignalOut ds dom 1, Signal dom (Maybe (BitVector n)))
+spiSlave (SPISlaveConfig mode buf) bin ss mosi sck din =
+  let ssN = delay undefined ss
+      (miso,dout) = mooreB go cvt
+                      ( (0 :: Index n,undefined,unpack undefined#)
+                      , (repeat 1,False,0))
+                      ( ssN
+                      , delay undefined mosi
+                      , delay undefined sck
+                      , din
+                      )
+      bout = buf bin (not <$> ssN) miso
+  in  (bout,dout)
  where
   cvt (_,(miso,done,dout)) = (head miso,if done then Just dout else Nothing)
 
