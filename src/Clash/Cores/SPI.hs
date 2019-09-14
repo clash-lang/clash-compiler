@@ -2,7 +2,6 @@ module Clash.Cores.SPI where
 
 import Clash.Prelude
 import Clash.Sized.Internal.BitVector
-import Clash.Explicit.Testbench
 
 data SPIMode = SPIMode0 | SPIMode1 | SPIMode2 | SPIMode3
   deriving Eq
@@ -34,9 +33,9 @@ spiSlave (SPISlaveConfig mode) ss mosi sck din =
                        , delay undefined sck
                        , din ))
  where
-  cvt (_,(mosi,done,dout)) = (head mosi,if done then Just dout else Nothing)
+  cvt (_,(miso,done,dout)) = (head miso,if done then Just dout else Nothing)
 
-  go ((bitCntQ,sckOldQ,dataQ),(misoQ,doneQ,doutQ)) (ssQ,mosiQ,sckQ,dinI)
+  go ((bitCntQ,sckOldQ,dataQ),(misoQ,_doneQ,doutQ)) (ssQ,mosiQ,sckQ,dinI)
     = ((bitCntD,sckQ,dataD),(misoD,doneD,doutD))
     where
       bitCntD
