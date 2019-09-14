@@ -10,3 +10,6 @@ dist-newstyle/
 *.dyn_o-boot
 *.dyn_hi
 *.dyn_hi-boot
+
+# IntelliJ
+.idea
