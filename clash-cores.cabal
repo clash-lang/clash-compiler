@@ -22,10 +22,12 @@ library
                        -fplugin GHC.TypeLits.Extra.Solver
                        -fplugin GHC.TypeLits.Normalise
                        -fplugin GHC.TypeLits.KnownNat.Solver
-  default-extensions:  DataKinds
+  default-extensions:  BinaryLiterals
+                       DataKinds
                        FlexibleContexts
                        NoImplicitPrelude
                        ScopedTypeVariables
+                       TemplateHaskell
                        TypeApplications
                        TypeFamilies
                        TypeOperators
