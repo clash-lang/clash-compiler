@@ -1,5 +1,8 @@
 module Test.Cores.SPI where
 
+import Data.Maybe
+import qualified Prelude as P
+
 import Clash.Prelude
 import qualified Clash.Explicit.Prelude as E
 import Clash.Explicit.Testbench
@@ -38,6 +41,9 @@ misoCapture mode =
     captureSck = if mode == SPIMode0 || mode == SPIMode3
                  then risingSck else fallingSck
 
+testMode :: SPIMode
+testMode = SPIMode3
+
 spiSlaveLattice
   :: forall dom n
    . (HiddenClockResetEnable dom, 1 <= n, KnownNat n)
@@ -48,7 +54,7 @@ spiSlaveLattice
   -> Signal dom (BitVector n)
   -> (BiSignalOut 'Floating dom 1, Signal dom (Maybe (BitVector n)))
 spiSlaveLattice =
-  spiSlave (SPISlaveConfig SPIMode1 sbioX)
+  spiSlave (SPISlaveConfig testMode sbioX)
  where
   sbioX bin en dout = bout
    where
@@ -57,19 +63,19 @@ spiSlaveLattice =
 testSlave :: Signal System Bool
 testSlave = done
  where
-  testInput = stimuliGenerator clk rst mode0
+  testInput = stimuliGenerator clk rst mode1
   (ss,mosi,sck) = unbundle testInput
   din = pure (0b01100111 :: BitVector 8)
   (miso,dout) = exposeClockResetEnable spiSlaveLattice
                   clk rst enableGen
                   (veryUnsafeToBiSignalIn miso) ss mosi sck din
 
-  misoC = exposeClockResetEnable (misoCapture @8 SPIMode1) clk rst enableGen
+  misoC = exposeClockResetEnable (misoCapture @8 SPIMode0) clk rst enableGen
             (bundle (E.delay clk enableGen False ss
                     ,readFromBiSignal (veryUnsafeToBiSignalIn miso)
                     ,E.delay clk enableGen undefined sck))
 
-  done = outputVerifier' clk rst mode0Exp
+  done = outputVerifier' clk rst mode1Exp
             (bundle (dout,misoC))
   clk = tbSystemClockGen (not <$> done)
   rst = systemResetGen
@@ -77,30 +83,31 @@ testSlave = done
 
 masterInBP
   :: KnownDomain dom
-  => Clock dom
+  => BitVector 8
+  -> Clock dom
   -> Reset dom
   -> Signal dom Bool
   -> Signal dom (Maybe (BitVector 8))
-masterInBP clk rst =
+masterInBP val clk rst =
   E.moore clk rst enableGen
           (\_ i -> i)
-          (\b -> if b then Nothing else Just 0b10000110)
+          (\b -> if b then Nothing else Just val)
           True
 
 testMasterSlave :: Signal System (Maybe (BitVector 8), Maybe (BitVector 8))
 testMasterSlave = bundle (slaveOut,masterOut)
  where
-  slaveIn = pure (0b01100111 :: BitVector 8)
+  slaveIn = pure (0b01100101 :: BitVector 8)
   (misoZ,slaveOut) =
     exposeClockResetEnable spiSlaveLattice
       clk rst enableGen miso ss mosi sck slaveIn
   miso = veryUnsafeToBiSignalIn misoZ
 
-  masterIn = masterInBP clk rst bp
+  masterIn = masterInBP (0b01110111 :: BitVector 8) clk rst bp
 
-  (masterOut,bp,mosi,sck,ss) =
+  (masterOut,bp,ss,mosi,sck) =
     exposeClockResetEnable spiMaster
-      clk rst enableGen SPIMode1 (readFromBiSignal miso) masterIn
+      clk rst enableGen testMode (readFromBiSignal miso) masterIn
 
   clk = systemClockGen
   rst = systemResetGen

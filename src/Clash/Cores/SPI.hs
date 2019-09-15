@@ -1,6 +1,6 @@
 module Clash.Cores.SPI where
 
-import Data.Maybe (isJust)
+import Data.Maybe (fromMaybe, isJust)
 import Clash.Prelude
 import Clash.Sized.Internal.BitVector
 
@@ -16,6 +16,70 @@ data SPISlaveConfig ds dom
       -> Signal dom Bit
       -> BiSignalOut ds dom 1
   }
+
+spiCommon
+  :: forall n dom
+   . (HiddenClockResetEnable dom, KnownNat n, 1 <= n)
+  => SPIMode
+  -> Signal dom Bool
+  -- ^ Slave select
+  -> Signal dom Bit
+  -- ^ Slave: MOSI; Master: MISO
+  -> Signal dom Bool
+  -- ^ SCK
+  -> Signal dom (BitVector n)
+  -> ( Signal dom Bit -- Slave: MISO; Master: MOSI
+     , Signal dom (Maybe (BitVector n))
+     )
+spiCommon mode ssI msI sckI dinI =
+  mooreB go cvt ( 0 :: Index n      -- cntR
+                , undefined         -- sckOldR
+                , unpack undefined# -- dataInR
+                , unpack undefined# -- dataOutR
+                , False             -- doneR
+                )
+                (ssI,msI,sckI,dinI)
+ where
+  cvt (_,_,dataInQ,dataOutQ,doneQ) =
+    ( head dataOutQ
+    , if doneQ
+         then Just (pack dataInQ)
+         else Nothing
+    )
+
+  go (cntQ,sckOldQ,dataInQ,dataOutQ,_) (ss,ms,sck,din) =
+    (cntD,sck,dataInD,dataOutD,doneD)
+   where
+    cntD
+      | ss        = 0
+      | sampleSck = if cntQ == maxBound then 0 else cntQ + 1
+      | otherwise = cntQ
+
+    dataInD
+      | ss        = unpack undefined#
+      | sampleSck = tail @(n-1) dataInQ :< ms
+      | otherwise = dataInQ
+
+    dataOutD
+      | ss        = unpack din
+      | shiftSck  = if cntQ == maxBound && cntD == 0
+                       then unpack din
+                       else if (mode == SPIMode1 || mode == SPIMode3) && cntQ == 0
+                               then dataOutQ
+                               else tail @(n-1) dataOutQ :< unpack undefined#
+      | otherwise = dataOutQ
+
+    doneD = not ss && sampleSck && cntQ == maxBound
+
+    risingSck  = not sckOldQ && sck
+    fallingSck = sckOldQ && not sck
+
+    sampleSck = if mode == SPIMode0 || mode == SPIMode3
+                then risingSck else fallingSck
+
+    shiftSck  = if mode == SPIMode1 || mode == SPIMode2
+                then risingSck else fallingSck
+
 
 spiSlave
   :: forall n ds dom
@@ -33,57 +97,11 @@ spiSlave
   -> (BiSignalOut ds dom 1, Signal dom (Maybe (BitVector n)))
 spiSlave (SPISlaveConfig mode buf) bin ss mosi sck din =
   let ssN = delay undefined ss
-      (miso,dout) = mooreB go cvt
-                      ( (0 :: Index n,undefined,unpack undefined#)
-                      , (repeat 1,False,0))
-                      ( ssN
-                      , delay undefined mosi
-                      , delay undefined sck
-                      , din
-                      )
+      (miso,dout) = spiCommon mode ssN (delay undefined mosi)
+                                       (delay undefined sck)
+                                       din
       bout = buf bin (not <$> ssN) miso
   in  (bout,dout)
- where
-  cvt (_,(miso,done,dout)) = (head miso,if done then Just dout else Nothing)
-
-  go ((bitCntQ,sckOldQ,dataQ),(misoQ,_doneQ,doutQ)) (ssQ,mosiQ,sckQ,dinI)
-    = ((bitCntD,sckQ,dataD),(misoD,doneD,doutD))
-    where
-      bitCntD
-        | ssQ       = 0
-        | sampleSck = if bitCntQ == maxBound then 0 else bitCntQ + 1
-        | otherwise = bitCntQ
-
-      dataD
-        | ssQ       = unpack dinI
-        | sampleSck = if bitCntQ == maxBound
-                      then unpack dinI
-                      else tail dataQ :< mosiQ
-        | otherwise = dataQ
-
-      doutD
-        | doneD
-        = pack (tail dataQ :< mosiQ)
-        | otherwise
-        = doutQ
-
-      misoD
-        | ssQ
-        = unpack dinI
-        | shiftSck
-        = tail @(n-1) misoQ :< 1
-        | otherwise
-        = misoQ
-
-      doneD = not ssQ && sampleSck && bitCntQ == maxBound
-
-      risingSck  = not sckOldQ && sckQ
-      fallingSck = sckOldQ && not sckQ
-
-      sampleSck = if mode == SPIMode0 || mode == SPIMode3
-                  then risingSck else fallingSck
-      shiftSck = if mode == SPIMode1 || mode == SPIMode2
-                 then risingSck else fallingSck
 
 spiMaster
   :: forall n dom
@@ -95,67 +113,60 @@ spiMaster
   -- ^ Data: Master -> Slave
   -> ( Signal dom (Maybe (BitVector n)) -- Data: Slave -> Master
      , Signal dom Bool -- Busy
-     , Signal dom Bit -- MOSI
-     , Signal dom Bool -- SCK
      , Signal dom Bool -- SS
+     , Signal dom Bit  -- MOSI
+     , Signal dom Bool -- SCK
      )
-spiMaster _mode misoI dinI =
-  mooreB go cvt ( 0 :: Index n    -- cntR
-                , unpack 0        -- dataR
-                , 0 :: Unsigned 1 -- sckR
-                , 0               -- mosiR
-                , Idle            -- stateR
-                , 0               -- dataOutR
-                , False           -- newDataR
-                )
-                (misoI, dinI)
+spiMaster mode miso din =
+  let (mosi,dout)   = spiCommon mode
+                        (delay undefined ss)
+                        (delay undefined miso)
+                        (delay undefined sck)
+                        (fromMaybe undefined# <$> din)
+      (ss,sck,busy) = spiGen mode din
+  in  (dout,busy,ss,mosi,sck)
+
+spiGen
+  :: forall n dom
+   . (HiddenClockResetEnable dom, KnownNat n, 1 <= n)
+  => SPIMode
+  -> Signal dom (Maybe (BitVector n))
+  -> (Signal dom Bool, Signal dom Bool, Signal dom Bool)
+spiGen mode = unbundle . moore go cvt (0 :: Index (2*n),False,Idle)
  where
-  cvt (_cntQ,_dataQ,sckQ,mosiQ,stateQ,dataOutQ,newDataQ)
-    = ( if newDataQ then Just dataOutQ else Nothing
-      , stateQ /= Idle
-      , mosiQ
-      , msb sckQ == low && stateQ == Transfer
-      , stateQ == Idle
-      )
+  cvt (_,sck,st) =
+    ( st == Idle
+    , if mode == SPIMode0 || mode == SPIMode1
+      then sck
+      else not sck
+    , st /= Idle)
 
-  go (cntQ,dataQ,sckQ,mosiQ,stateQ,dataOutQ,_newDataQ) (miso,din) =
-    (cntD,dataD,sckD,mosiD,stateD,dataOutD,newDataD)
+  go (cntQ,sckQ,stQ) din = (cntD,sckD,stD)
    where
-    sckD = case stateQ of
-      Idle -> 0
-      WaitHalf -> if sckQ == 0 then 0 else sckQ + 1
-      _ -> sckQ + 1
+    stD = case stQ of
+      Idle | isJust din -> Wait
+      Wait -> Transfer0
 
-    dataD = case stateQ of
-      Idle     -> maybe dataQ unpack din
-      Transfer -> if sckQ == 0 then tail @(n-1) dataQ :< miso else dataQ
-      _        -> dataQ
+      Transfer1 | cntQ == maxBound -> Finish
+                | otherwise -> Transfer0
+      Transfer0 -> Transfer1
+      Finish -> Idle
+      _ -> stQ
 
-    mosiD = case stateQ of
-      Transfer | sckQ == 0 -> head dataQ
-      _ -> mosiQ
+    cntD = case stQ of
+      Transfer1 -> if cntQ == maxBound then 0 else cntQ+1
+      Transfer0 -> cntQ
+      _ -> 0
 
-    cntD = case stateQ of
-      Idle -> 0
-      Transfer | sckQ == 1 -> cntQ + 1
-      _ -> cntQ
-
-    newDataD = case stateQ of
-      Transfer -> cntQ == maxBound
-      _ -> False
-
-    dataOutD = case stateQ of
-      Transfer | cntQ == maxBound -> pack dataQ
-      _ -> dataOutQ
-
-    stateD = case stateQ of
-      Idle | isJust din -> WaitHalf
-      WaitHalf | sckQ == 0 -> Transfer
-      Transfer | cntQ == maxBound -> Idle
-      _ -> stateQ
+    sckD = case stQ of
+      Wait | mode == SPIMode1 || mode == SPIMode3 -> not sckQ
+      Transfer1 -> not sckQ
+      _ -> sckQ
 
 data SPIMasterState
   = Idle
-  | WaitHalf
-  | Transfer
+  | Wait
+  | Transfer0
+  | Transfer1
+  | Finish
   deriving (Eq, Generic, NFDataX)

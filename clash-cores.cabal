@@ -33,6 +33,7 @@ library
                        FlexibleContexts
                        MagicHash
                        NoImplicitPrelude
+                       NoStarIsType
                        ScopedTypeVariables
                        TemplateHaskell
                        TypeApplications
