@@ -3,6 +3,9 @@ module Test.Cores.SPI where
 import Data.Maybe
 import qualified Prelude as P
 
+import Test.Tasty
+import Test.Tasty.HUnit
+
 import Clash.Prelude
 import qualified Clash.Explicit.Prelude as E
 import Clash.Explicit.Testbench
@@ -62,8 +65,14 @@ testMasterSlave = bundle (slaveOut,masterOut)
   rst = systemResetGen
 
 masterX =
-  let s = sampleN 500 testMasterSlave
+  let s = sampleN 100 testMasterSlave
       (ss,ms) = P.unzip s
       ss0 = catMaybes ss
       ms0 = catMaybes ms
   in  ((ss0,P.length ss0),(ms0,P.length ms0))
+
+tests :: TestTree
+tests =
+  testGroup "SPI"
+  [ testCase "Mode2" (masterX @?= (([0b01100111],1),([0b01100111],1)))
+  ]

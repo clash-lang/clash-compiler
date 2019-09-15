@@ -4,22 +4,26 @@ name:                clash-cores
 version:             0.1.0.0
 -- synopsis:
 -- description:
--- bug-reports:
--- license:
+bug-reports:         https://github.com/clash-lang/clash-cores/issues
+license:             BSD2
 license-file:        LICENSE
 author:              QBayLogic B.V.
 maintainer:          devops@qbaylogic.com
--- copyright:
--- category:
+copyright:           Copyright © 2019, Foamspace Corp.
+category:            Hardware
 build-type:          Simple
 extra-source-files:  CHANGELOG.md
+
+flag unittests
+  description:
+    You can disable testing with unittests using `-f-unittests`.
+  default: True
+  manual: True
 
 library
   exposed-modules:     Clash.Cores.SPI
                        Clash.Cores.LatticeSemi.IO
                        Clash.Cores.LatticeSemi.Blackboxes.IO
-  -- other-modules:
-  -- other-extensions:
   ghc-options:         -fexpose-all-unfoldings
                        -fplugin GHC.TypeLits.Extra.Solver
                        -fplugin GHC.TypeLits.Normalise
@@ -51,3 +55,40 @@ library
 
   hs-source-dirs:      src
   default-language:    Haskell2010
+
+test-suite unittests
+  type:             exitcode-stdio-1.0
+  default-language: Haskell2010
+  main-is:          unittests.hs
+  ghc-options:      -Wall
+  hs-source-dirs:   test
+
+  default-extensions:  BinaryLiterals
+                       DataKinds
+                       DeriveAnyClass
+                       DeriveGeneric
+                       DerivingStrategies
+                       FlexibleContexts
+                       MagicHash
+                       NoImplicitPrelude
+                       NoStarIsType
+                       ScopedTypeVariables
+                       TemplateHaskell
+                       TypeApplications
+                       TypeFamilies
+                       TypeOperators
+
+  if !flag(unittests)
+    buildable: False
+  else
+    build-depends:
+      clash-prelude,
+      clash-cores,
+
+      base,
+      hint          >= 0.7      && < 0.10,
+      tasty         >= 1.2      && < 1.3,
+      tasty-hunit,
+      template-haskell
+
+  Other-Modules: Test.Cores.SPI
