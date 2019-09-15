@@ -42,7 +42,7 @@ misoCapture mode =
                  then risingSck else fallingSck
 
 testMode :: SPIMode
-testMode = SPIMode3
+testMode = SPIMode0
 
 spiSlaveLattice
   :: forall dom n
@@ -97,20 +97,27 @@ masterInBP val clk rst =
 testMasterSlave :: Signal System (Maybe (BitVector 8), Maybe (BitVector 8))
 testMasterSlave = bundle (slaveOut,masterOut)
  where
-  slaveIn = pure (0b01100101 :: BitVector 8)
+  slaveIn = pure (0b01100111 :: BitVector 8)
   (misoZ,slaveOut) =
     exposeClockResetEnable spiSlaveLattice
       clk rst enableGen miso ss mosi sck slaveIn
   miso = veryUnsafeToBiSignalIn misoZ
 
-  masterIn = masterInBP (0b01110111 :: BitVector 8) clk rst bp
+  masterIn = masterInBP (0b01100111 :: BitVector 8) clk rst bp
 
   (masterOut,bp,ss,mosi,sck) =
     exposeClockResetEnable spiMaster
-      clk rst enableGen testMode (readFromBiSignal miso) masterIn
+      clk rst enableGen testMode d2 (readFromBiSignal miso) masterIn
 
   clk = systemClockGen
   rst = systemResetGen
+
+masterX =
+  let s = sampleN 500 testMasterSlave
+      (ss,ms) = P.unzip s
+      ss0 = catMaybes ss
+      ms0 = catMaybes ms
+  in  ((ss0,P.length ss0),(ms0,P.length ms0))
 
 mode0 :: Vec 21 (Bool, Bit, Bool)
 mode0 = $(listToVecTH

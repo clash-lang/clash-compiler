@@ -104,9 +104,12 @@ spiSlave (SPISlaveConfig mode buf) bin ss mosi sck din =
   in  (bout,dout)
 
 spiMaster
-  :: forall n dom
-   . (HiddenClockResetEnable dom, KnownNat n, 1 <= n)
+  :: forall n m dom
+   . (HiddenClockResetEnable dom, KnownNat n, 1 <= n, 2 <= m)
   => SPIMode
+  -- ^ SPI Mode
+  -> SNat m
+  -- ^ Clock divider
   -> Signal dom Bit
   -- ^ MISO
   -> Signal dom (Maybe (BitVector n))
@@ -117,22 +120,23 @@ spiMaster
      , Signal dom Bit  -- MOSI
      , Signal dom Bool -- SCK
      )
-spiMaster mode miso din =
+spiMaster mode fN miso din =
   let (mosi,dout)   = spiCommon mode
                         (delay undefined ss)
                         (delay undefined miso)
                         (delay undefined sck)
                         (fromMaybe undefined# <$> din)
-      (ss,sck,busy) = spiGen mode din
+      (ss,sck,busy) = spiGen mode fN din
   in  (dout,busy,ss,mosi,sck)
 
 spiGen
-  :: forall n dom
-   . (HiddenClockResetEnable dom, KnownNat n, 1 <= n)
+  :: forall n m dom
+   . (HiddenClockResetEnable dom, KnownNat n, 1 <= n, 2 <= m)
   => SPIMode
+  -> SNat m
   -> Signal dom (Maybe (BitVector n))
   -> (Signal dom Bool, Signal dom Bool, Signal dom Bool)
-spiGen mode = unbundle . moore go cvt (0 :: Index (2*n),False,Idle)
+spiGen mode SNat = unbundle . moore go cvt (0 :: Index (2*n),False,Idle @ m)
  where
   cvt (_,sck,st) =
     ( st == Idle
@@ -145,28 +149,29 @@ spiGen mode = unbundle . moore go cvt (0 :: Index (2*n),False,Idle)
    where
     stD = case stQ of
       Idle | isJust din -> Wait
-      Wait -> Transfer0
+      Wait -> Transfer 0
 
-      Transfer1 | cntQ == maxBound -> Finish
-                | otherwise -> Transfer0
-      Transfer0 -> Transfer1
+      Transfer n
+        | n /= maxBound -> Transfer (n+1)
+        | cntQ == maxBound -> Finish
+        | otherwise -> Transfer 0
       Finish -> Idle
       _ -> stQ
 
     cntD = case stQ of
-      Transfer1 -> if cntQ == maxBound then 0 else cntQ+1
-      Transfer0 -> cntQ
+      Transfer n
+        | n == maxBound -> if cntQ == maxBound then 0 else cntQ+1
+        | otherwise -> cntQ
       _ -> 0
 
     sckD = case stQ of
       Wait | mode == SPIMode1 || mode == SPIMode3 -> not sckQ
-      Transfer1 -> not sckQ
+      Transfer n | n == maxBound -> not sckQ
       _ -> sckQ
 
-data SPIMasterState
+data SPIMasterState n
   = Idle
   | Wait
-  | Transfer0
-  | Transfer1
+  | Transfer (Index n)
   | Finish
   deriving (Eq, Generic, NFDataX)
