@@ -1,3 +1,10 @@
+{-|
+  Copyright   :  (C) 2019, Foamspace corp
+  License     :  BSD2 (see the file LICENSE)
+  Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
+
+  HDL generation functionality for LATTICE ICE IO primitives.
+-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE ViewPatterns      #-}
 
@@ -17,19 +24,24 @@ import           Clash.Netlist.BlackBox.Util
 import           Clash.Netlist.Id
 import           Clash.Netlist.Types
 
-match
-  :: (HasCallStack, Show a, Eq a)
-  => a
-  -> a
+pinConfigLiteral
+  :: HasCallStack
+  => Bool
   -> ()
-match a0 a1 =
-  if a0 == a1 then
-    ()
-  else
-    error $ "Couldn't match " <> show a0 <> " with " <> show a1 <> " at "
-         <> prettyCallStack callStack
+pinConfigLiteral True = ()
+pinConfigLiteral False =
+  error $
+    "The first argument of 'Clash.Cores.LatticeSemi.IO.sbio', configuring " <>
+    "SB_IO's pinType, must be statically known. The given argument either " <>
+    "wasn't or Clash failed to deduce it was. To force Clash to calculate " <>
+    "the argument at compile time, use Template Haskell. For example:\n\n" <>
 
+    "    let pinType = $(lift (spiConfig PIN_INPUT PIN_OUTPUT_TRISTATE)) in\n" <>
+    "    sbio pinType pkgPin latchInput ..\n\n" <>
 
+    prettyCallStack callStack
+
+-- | Generates HDL for SB_IO for the LATTICE ICE
 sbioTF :: TemplateFunction
 sbioTF = TemplateFunction used valid sbioTemplate
  where
@@ -86,7 +98,7 @@ sbioTemplate bbCtx = do
   [ _HasCallStack
    , (clk, clkTy, _)
    , (en, enTy, _)
-   , (pinConfig, pinTy, match True -> ())
+   , (pinConfig, pinTy, pinConfigLiteral -> ())
    , (packagePin, packagePinTy, _)
    , (latchInput, Bit, _)
    , (dOut0, Bit, _)

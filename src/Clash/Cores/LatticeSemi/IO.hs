@@ -1,3 +1,12 @@
+{-|
+  Copyright   :  (C) 2019, Foamspace corp
+  License     :  BSD2 (see the file LICENSE)
+  Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
+
+  LATTICE ICE IO primitives. Implementations are documented in the
+  <http://www.latticesemi.com/~/media/LatticeSemi/Documents/TechnicalBriefs/SBTICETechnologyLibrary201504.pdf LATTICE ICE Technology Library>,
+  referred to as LITL.
+-}
 {-# LANGUAGE BinaryLiterals      #-}
 {-# LANGUAGE DeriveAnyClass      #-}
 {-# LANGUAGE DeriveGeneric       #-}
@@ -9,7 +18,6 @@
 module Clash.Cores.LatticeSemi.IO
   ( sbio
   , spiConfig
-  , topEntity -- TODO: Remove
   , PinOutputConfig(..)
   , PinInputConfig(..)
   ) where
@@ -27,36 +35,64 @@ toMaybe :: Bool -> a -> Maybe a
 toMaybe True a = Just a
 toMaybe False _a = Nothing
 
--- | Create configuration bitvector based on pin function mnemonics
+-- | Create configuration bitvector based on pin function mnemonics. See
+-- documentation on "PinInputConfig" and "PinOutputConfig" for more information.
 spiConfig
   :: PinInputConfig
   -> PinOutputConfig
   -> BitVector 6
 spiConfig pic poc = pack poc ++# pack pic
 
+-- | Input pinType  mnemonics as documented in the first table of LITL p88. Note
+-- that @PIN_INPUT_DDR@ is missing. Use 'PIN_INPUT_REGISTERED' instead.
 data PinInputConfig
   = PIN_INPUT_REGISTERED
+  -- ^ Input data is registered in input cell. Same as @PIN_INPUT_DDR@.
   | PIN_INPUT
+  -- ^ Simple input pin (D_IN_0)
   | PIN_INPUT_REGISTERED_LATCH
+  -- ^ (Not supported by Clash simulation.) Disables internal data changes on
+  -- the physical input pin by latching the value on the input register.
   | PIN_INPUT_LATCH
--- Use PIN_INPUT_LATCH instead:
---  | PIN_INPUT_DDR
+  -- ^ (Not supported by Clash simulation.) Disables internal data changes on
+  -- the physical input pin by latching the value.
   deriving (Show, Generic, BitPack)
 
+-- | Output pinType  mnemonics as documented in the second table of LITL p88.
 data PinOutputConfig
   = PIN_NO_OUTPUT
+  -- ^ Disables the output function
   | PIN_OUTPUT
+  -- ^ Simple output pin, (no enable)
   | PIN_OUTPUT_TRISTATE
+  -- ^ The output pin may be tristated using the enable
   | PIN_OUTPUT_ENABLE_REGISTERED
+  -- ^ The output pin may be tristated using a registered enable signal
   | PIN_OUTPUT_REGISTERED
+  -- ^ (Not supported by Clash simulation.)  Output registered, (no enable)
   | PIN_OUTPUT_REGISTERED_ENABLE
+  -- ^ (Not supported by Clash simulation.) Output registered with enable (enable
+  -- is not registered)
   | PIN_OUTPUT_REGISTERED_ENABLE_REGISTERED
+  -- ^ (Not supported by Clash simulation.) Output registered and enable
+  -- registered
   | PIN_OUTPUT_DDR
+  -- ^ (Not supported by Clash simulation.) Output DDR data is clocked out on
+  -- rising and falling clock edges
   | PIN_OUTPUT_DDR_ENABLE
+  -- ^ (Not supported by Clash simulation.) Output data is clocked out on rising
+  -- and falling clock edges
   | PIN_OUTPUT_DDR_ENABLE_REGISTERED
+  -- ^ (Not supported by Clash simulation.) Output DDR data with registered
+  -- enable signal
   | PIN_OUTPUT_REGISTERED_INVERTED
+  --  ^ (Not supported by Clash simulation.) Output registered signal is inverted
   | PIN_OUTPUT_REGISTERED_ENABLE_INVERTED
+  -- ^ (Not supported by Clash simulation.) Output signal is registered and
+  -- inverted (no enable function)
   | PIN_OUTPUT_REGISTERED_ENABLE_REGISTERED_INVERTED
+  -- ^ (Not supported by Clash simulation.) Output signal is registered and
+  -- inverted, the enable/tristate control is registered.
   deriving (Show)
 
 instance BitPack PinOutputConfig where
@@ -121,6 +157,7 @@ dflipflopE
   -> Signal dom a
 dflipflopE = delay (deepErrorX "dflipflopE: undefined initial value")
 
+-- | SB_IO primitive as described in LITL p87.
 sbio
   :: forall dom
    . ( HasCallStack
@@ -128,7 +165,7 @@ sbio
      , HiddenEnable dom -- CLK_ENABLE
      )
   => BitVector 6
-  -- ^ Config, see SBTICETechnologyLibrary201504.pdf, p88
+  -- ^ Config, see 'spiConfig'
   -> BiSignalIn 'Floating dom 1
   -- ^ PACKAGE_PIN
   -> Signal dom Bit
@@ -199,7 +236,3 @@ sbio pinConf pkgPinIn latchInput dOut_0 _dOut_1 outputEnable0 =
 {-# ANN sbio (InlinePrimitive SystemVerilog "[ { \"BlackBox\" : { \"name\" : \"Clash.Cores.LatticeSemi.IO.sbio\", \"kind\": \"Declaration\", \"format\": \"Haskell\", \"templateFunction\": \"Clash.Cores.LatticeSemi.Blackboxes.IO.sbioTF\"}} ]") #-}
 {-# ANN sbio (InlinePrimitive Verilog "[ { \"BlackBox\" : { \"name\" : \"Clash.Cores.LatticeSemi.IO.sbio\", \"kind\": \"Declaration\", \"format\": \"Haskell\", \"templateFunction\": \"Clash.Cores.LatticeSemi.Blackboxes.IO.sbioTF\"}} ]") #-}
 {-# ANN sbio (InlinePrimitive VHDL "[ { \"BlackBox\" : { \"name\" : \"Clash.Cores.LatticeSemi.IO.sbio\", \"kind\": \"Declaration\", \"format\": \"Haskell\", \"templateFunction\": \"Clash.Cores.LatticeSemi.Blackboxes.IO.sbioTF\"}} ]") #-}
-
-
-topEntity pkgPinIn latchInput dOut_0 _dOut_1 outputEnable =
-  sbio @System 0b101001 pkgPinIn latchInput dOut_0 _dOut_1 outputEnable
