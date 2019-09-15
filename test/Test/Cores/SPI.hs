@@ -48,13 +48,14 @@ spiSlaveLattice
   -> Signal dom (BitVector n)
   -> (BiSignalOut 'Floating dom 1, Signal dom (Maybe (BitVector n)))
 spiSlaveLattice =
-  spiSlave (SPISlaveConfig SPIMode0 sbioX)
+  spiSlave (SPISlaveConfig SPIMode1 sbioX)
  where
   sbioX bin en dout = bout
    where
     (bout,_,_) = sbio 0b101001 bin (pure 0) dout (pure undefined) en
 
-test = done
+testSlave :: Signal System Bool
+testSlave = done
  where
   testInput = stimuliGenerator clk rst mode0
   (ss,mosi,sck) = unbundle testInput
@@ -73,6 +74,38 @@ test = done
   clk = tbSystemClockGen (not <$> done)
   rst = systemResetGen
 
+
+masterInBP
+  :: KnownDomain dom
+  => Clock dom
+  -> Reset dom
+  -> Signal dom Bool
+  -> Signal dom (Maybe (BitVector 8))
+masterInBP clk rst =
+  E.moore clk rst enableGen
+          (\_ i -> i)
+          (\b -> if b then Nothing else Just 0b10000110)
+          True
+
+testMasterSlave :: Signal System (Maybe (BitVector 8), Maybe (BitVector 8))
+testMasterSlave = bundle (slaveOut,masterOut)
+ where
+  slaveIn = pure (0b01100111 :: BitVector 8)
+  (misoZ,slaveOut) =
+    exposeClockResetEnable spiSlaveLattice
+      clk rst enableGen miso ss mosi sck slaveIn
+  miso = veryUnsafeToBiSignalIn misoZ
+
+  masterIn = masterInBP clk rst bp
+
+  (masterOut,bp,mosi,sck,ss) =
+    exposeClockResetEnable spiMaster
+      clk rst enableGen SPIMode1 (readFromBiSignal miso) masterIn
+
+  clk = systemClockGen
+  rst = systemResetGen
+
+mode0 :: Vec 21 (Bool, Bit, Bool)
 mode0 = $(listToVecTH
             -- SS  , MOSI  , SCK
             [(True , 0::Bit, False)
@@ -108,6 +141,7 @@ mode0 = $(listToVecTH
             ]
          )
 
+mode0Exp :: Vec 24 (Maybe (BitVector 8), Maybe (BitVector 8))
 mode0Exp = $(listToVecTH (
                 -- DOUT, MISOC
                 [(Nothing        , Nothing)
@@ -142,9 +176,12 @@ mode0Exp = $(listToVecTH (
                 ,(Just 0b10000110, Nothing)
                 -- Finish
                 ,(Nothing        , Just 0b01100111)
+                ,(Nothing        , Nothing)
+                ,(Nothing        , Nothing)
                 ] :: [(Maybe (BitVector 8), Maybe (BitVector 8))])
              )
 
+mode1 :: Vec 21 (Bool, Bit, Bool)
 mode1 = $(listToVecTH
             -- SS  , MOSI  , SCK
             [(True , 0::Bit, False)
@@ -180,6 +217,7 @@ mode1 = $(listToVecTH
             ]
          )
 
+mode1Exp :: Vec 22 (Maybe (BitVector 8), Maybe (BitVector 8))
 mode1Exp = $(listToVecTH (
                 -- DOUT, MISOC
                 [(Nothing        , Nothing)

@@ -27,6 +27,9 @@ library
                        -Wall
   default-extensions:  BinaryLiterals
                        DataKinds
+                       DeriveAnyClass
+                       DeriveGeneric
+                       DerivingStrategies
                        FlexibleContexts
                        MagicHash
                        NoImplicitPrelude

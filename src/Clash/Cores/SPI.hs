@@ -1,10 +1,11 @@
 module Clash.Cores.SPI where
 
+import Data.Maybe (isJust)
 import Clash.Prelude
 import Clash.Sized.Internal.BitVector
 
 data SPIMode = SPIMode0 | SPIMode1 | SPIMode2 | SPIMode3
-  deriving Eq
+  deriving (Eq)
 
 data SPISlaveConfig ds dom
   = SPISlaveConfig
@@ -83,3 +84,78 @@ spiSlave (SPISlaveConfig mode buf) bin ss mosi sck din =
                   then risingSck else fallingSck
       shiftSck = if mode == SPIMode1 || mode == SPIMode2
                  then risingSck else fallingSck
+
+spiMaster
+  :: forall n dom
+   . (HiddenClockResetEnable dom, KnownNat n, 1 <= n)
+  => SPIMode
+  -> Signal dom Bit
+  -- ^ MISO
+  -> Signal dom (Maybe (BitVector n))
+  -- ^ Data: Master -> Slave
+  -> ( Signal dom (Maybe (BitVector n)) -- Data: Slave -> Master
+     , Signal dom Bool -- Busy
+     , Signal dom Bit -- MOSI
+     , Signal dom Bool -- SCK
+     , Signal dom Bool -- SS
+     )
+spiMaster _mode misoI dinI =
+  mooreB go cvt ( 0 :: Index n    -- cntR
+                , unpack 0        -- dataR
+                , 0 :: Unsigned 1 -- sckR
+                , 0               -- mosiR
+                , Idle            -- stateR
+                , 0               -- dataOutR
+                , False           -- newDataR
+                )
+                (misoI, dinI)
+ where
+  cvt (_cntQ,_dataQ,sckQ,mosiQ,stateQ,dataOutQ,newDataQ)
+    = ( if newDataQ then Just dataOutQ else Nothing
+      , stateQ /= Idle
+      , mosiQ
+      , msb sckQ == low && stateQ == Transfer
+      , stateQ == Idle
+      )
+
+  go (cntQ,dataQ,sckQ,mosiQ,stateQ,dataOutQ,_newDataQ) (miso,din) =
+    (cntD,dataD,sckD,mosiD,stateD,dataOutD,newDataD)
+   where
+    sckD = case stateQ of
+      Idle -> 0
+      WaitHalf -> if sckQ == 0 then 0 else sckQ + 1
+      _ -> sckQ + 1
+
+    dataD = case stateQ of
+      Idle     -> maybe dataQ unpack din
+      Transfer -> if sckQ == 0 then tail @(n-1) dataQ :< miso else dataQ
+      _        -> dataQ
+
+    mosiD = case stateQ of
+      Transfer | sckQ == 0 -> head dataQ
+      _ -> mosiQ
+
+    cntD = case stateQ of
+      Idle -> 0
+      Transfer | sckQ == 1 -> cntQ + 1
+      _ -> cntQ
+
+    newDataD = case stateQ of
+      Transfer -> cntQ == maxBound
+      _ -> False
+
+    dataOutD = case stateQ of
+      Transfer | cntQ == maxBound -> pack dataQ
+      _ -> dataOutQ
+
+    stateD = case stateQ of
+      Idle | isJust din -> WaitHalf
+      WaitHalf | sckQ == 0 -> Transfer
+      Transfer | cntQ == maxBound -> Idle
+      _ -> stateQ
+
+data SPIMasterState
+  = Idle
+  | WaitHalf
+  | Transfer
+  deriving (Eq, Generic, NFDataX)
