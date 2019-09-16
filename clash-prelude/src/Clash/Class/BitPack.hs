@@ -30,6 +30,7 @@ Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
 module Clash.Class.BitPack
   ( BitPack (..)
   , bitCoerce
+  , bitCoerceMap
   , boolToBV
   , boolToBit
   , bitToBool
@@ -149,10 +150,26 @@ packXWith f x =
 -- 59
 -- >>> pack (59 :: Unsigned 6)
 -- 11_1011
-bitCoerce :: (BitPack a, BitPack b, BitSize a ~ BitSize b)
-          => a
-          -> b
+bitCoerce
+  :: (BitPack a, BitPack b, BitSize a ~ BitSize b)
+  => a
+  -> b
 bitCoerce = unpack . pack
+
+-- | Map a value by first coercing to another type through its bit representation.
+--
+-- >>> pack (-5 :: Signed 32)
+-- 1111_1111_1111_1111_1111_1111_1111_1011
+-- >>> bitCoerceMap @(Vec 4 (BitVector 8)) (replace 1 0) (-5 :: Signed 32)
+-- -16711685
+-- >>> pack (-16711685 :: Signed 32)
+-- 1111_1111_0000_0000_1111_1111_1111_1011
+bitCoerceMap
+  :: forall a b . (BitPack a, BitPack b, BitSize a ~ BitSize b)
+  => (a -> a)
+  -> b
+  -> b
+bitCoerceMap f = bitCoerce . f . bitCoerce
 
 instance BitPack Bool where
   type BitSize Bool = 1
