@@ -7,17 +7,21 @@
 -}
 module Clash.Cores.SPI
   ( SPIMode (..)
+    -- * SPI master
+  , spiMaster
     -- * SPI slave
   , SPISlaveConfig (..)
   , spiSlave
-    -- * SPI master
-  , spiMaster
+    -- ** Vendor configured SPI slaves
+  , spiSlaveLatticeSBIO
   )
 where
 
 import Data.Maybe (fromMaybe, isJust)
 import Clash.Prelude
 import Clash.Sized.Internal.BitVector
+
+import Clash.Cores.LatticeSemi.IO
 
 -- | SPI mode
 --
@@ -53,8 +57,14 @@ data SPISlaveConfig ds dom
   { spiSlaveConfigMode :: SPIMode
   -- ^ SPI mode
   , spiSlaveConfigLatch :: Bool
-  -- ^ Whether to latch the SPI pins, only set to False when the
-  -- SCK frequency is lower than the Core clock.
+  -- ^ Whether to latch the SPI pins
+  --
+  -- Recommended:
+  --
+  -- * Set to /True/ when core clock is /more/ than twice as fast as the SCK
+  --   Clock: 2*SCK < Core
+  --
+  -- * Set to /False/ when core clock is twice as fast, or as fast, as the SCK
   , spiSlaveConfigBuffer
       :: BiSignalIn ds dom 1
       -> Signal dom Bool
@@ -136,15 +146,19 @@ spiSlave
   => SPISlaveConfig ds dom
   -- ^ Configure SPI mode and tri-state buffer
   -> BiSignalIn ds dom 1
-  -- ^ Inout port connected to the tri-state buffer
+  -- ^ Master Input Slave Output (MISO)
+  --
+  -- Inout port connected to the tri-state buffer for the
   -> Signal dom Bool
-  -- ^ Slave select
+  -- ^ Slave select (SS)
   -> Signal dom Bit
-  -- ^ MOSI
+  -- ^ Master Output Slave Input (MOSI)
   -> Signal dom Bool
-  -- ^ SCK
+  -- ^ Serial Clock (SCLK)
   -> Signal dom (BitVector n)
-  -- ^ Input captured the moment slave select goes low
+  -- ^ Data to send from master to slave
+  --
+  -- Input is latched the moment slave select goes low
   -> ( BiSignalOut ds dom 1
      , Signal dom (Maybe (BitVector n)))
   -- ^ First part of the tuple can be ignored. Second part of the tuple
@@ -240,3 +254,44 @@ data SPIMasterState n
   | Transfer (Index n)
   | Finish
   deriving (Eq, Generic, NFDataX)
+
+-- | SPI slave configurable SPI mode, using the SB_IO tri-state buffer
+-- found on Lattice Semiconductor FPGAs
+spiSlaveLatticeSBIO
+  :: forall dom n
+   . (HiddenClockResetEnable dom, 1 <= n, KnownNat n)
+  => SPIMode
+  -- ^ SPI Mode
+  -> Bool
+  -- ^ Whether to latch the SPI pins
+  --
+  -- Recommended:
+  --
+  -- * Set to /True/ when core clock is /more/ than twice as fast as the SCK
+  --   Clock: 2*SCK < Core
+  --
+  -- * Set to /False/ when core clock is twice as fast, or as fast, as the SCK
+  -> BiSignalIn 'Floating dom 1
+  -- ^ Master Input Slave Output (MISO)
+  --
+  -- Inout port connected to the tri-state buffer for the
+  -> Signal dom Bool
+  -- ^ Slave select (SS)
+  -> Signal dom Bit
+  -- ^ Master Output Slave Input (MOSI)
+  -> Signal dom Bool
+  -- ^ Serial Clock (SCLK)
+  -> Signal dom (BitVector n)
+  -- ^ Data to send from master to slave
+  --
+  -- Input is latched the moment slave select goes low
+  -> ( BiSignalOut 'Floating dom 1
+     , Signal dom (Maybe (BitVector n)))
+  -- ^ First part of the tuple can be ignored. Second part of the tuple
+  -- is (Maybe) the word send by the master to the slave
+spiSlaveLatticeSBIO mode latchSPI =
+  spiSlave (SPISlaveConfig mode latchSPI sbioX)
+ where
+  sbioX bin en dout = bout
+   where
+    (bout,_,_) = sbio 0b101001 bin (pure 0) dout (pure undefined) en
