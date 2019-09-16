@@ -1,5 +1,6 @@
-# Revision history for foam-spi
+# Revision history for clash-cores
 
 ## 0.1.0.0 -- YYYY-mm-dd
 
-* First version. Released on an unsuspecting world.
+* Add SPI master and slave cores
+* Add Lattice Semi SB_IO primitive
