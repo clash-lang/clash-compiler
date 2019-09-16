@@ -33,14 +33,14 @@ testMasterSlave = bundle (slaveOut,masterOut)
   slaveIn = pure (0b01100111 :: BitVector 8)
   (misoZ,slaveOut) =
     exposeClockResetEnable spiSlaveLatticeSBIO
-      clk rst enableGen testMode True miso ss mosi sck slaveIn
+      clk rst enableGen testMode True sclk mosi miso ss slaveIn
   miso = veryUnsafeToBiSignalIn misoZ
 
   masterIn = masterInBP (0b01100111 :: BitVector 8) clk rst bp
 
-  (masterOut,bp,ss,mosi,sck) =
+  (sclk,mosi,ss,bp,masterOut) =
     exposeClockResetEnable spiMaster
-      clk rst enableGen testMode d4 (readFromBiSignal miso) masterIn
+      clk rst enableGen testMode d4 masterIn (readFromBiSignal miso)
 
   clk = systemClockGen
   rst = systemResetGen

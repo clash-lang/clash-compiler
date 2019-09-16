@@ -145,29 +145,32 @@ spiSlave
    . (HiddenClockResetEnable dom, KnownNat n, 1 <= n)
   => SPISlaveConfig ds dom
   -- ^ Configure SPI mode and tri-state buffer
+  -> Signal dom Bool
+  -- ^ Serial Clock (SCLK)
+  -> Signal dom Bit
+  -- ^ Master Output Slave Input (MOSI)
   -> BiSignalIn ds dom 1
   -- ^ Master Input Slave Output (MISO)
   --
-  -- Inout port connected to the tri-state buffer for the
+  -- Inout port connected to the tri-state buffer for the MISO
   -> Signal dom Bool
   -- ^ Slave select (SS)
-  -> Signal dom Bit
-  -- ^ Master Output Slave Input (MOSI)
-  -> Signal dom Bool
-  -- ^ Serial Clock (SCLK)
   -> Signal dom (BitVector n)
   -- ^ Data to send from master to slave
   --
   -- Input is latched the moment slave select goes low
   -> ( BiSignalOut ds dom 1
      , Signal dom (Maybe (BitVector n)))
-  -- ^ First part of the tuple can be ignored. Second part of the tuple
-  -- is (Maybe) the word send by the master
-spiSlave (SPISlaveConfig mode latch buf) bin ss mosi sck din =
+  -- ^ Parts of the tuple:
+  --
+  -- 1. The "out" part of the inout port of the MISO; used only for simulation.
+  --
+  -- 2. (Maybe) the word send by the master
+spiSlave (SPISlaveConfig mode latch buf) sclk mosi bin ss din =
   let ssL   = if latch then delay undefined ss   else ss
       mosiL = if latch then delay undefined mosi else mosi
-      sckL  = if latch then delay undefined sck  else sck
-      (miso,dout) = spiCommon mode ssL mosiL sckL din
+      sclkL = if latch then delay undefined sclk else sclk
+      (miso,dout) = spiCommon mode ssL mosiL sclkL din
       bout = buf bin (not <$> ssL) miso
   in  (bout,dout)
 
@@ -184,25 +187,34 @@ spiMaster
   -- ^ Clock divider (half period)
   --
   -- If set to two or higher, the MISO line will be latched
-  -> Signal dom Bit
-  -- ^ MISO
   -> Signal dom (Maybe (BitVector n))
-  -- ^ Data: Master -> Slave
-  -> ( Signal dom (Maybe (BitVector n)) -- Data: Slave -> Master
-     , Signal dom Bool -- Busy
-     , Signal dom Bool -- SS
+  -- ^ Data to send from master to slave, transmission starts when receiving
+  -- /Just/ a value
+  -> Signal dom Bit
+  -- ^ Master Input Slave Output (MISO)
+  -> ( Signal dom Bool -- SCK
      , Signal dom Bit  -- MOSI
-     , Signal dom Bool -- SCK
+     , Signal dom Bool -- SS
+     , Signal dom Bool -- Busy
+     , Signal dom (Maybe (BitVector n)) -- Data: Slave -> Master
      )
-spiMaster mode fN miso din =
-  let (mosi,dout)   = spiCommon mode ssL misoL sckL
+  -- ^ Parts of the tuple:
+  --
+  -- 1. Serial Clock (SCLK)
+  -- 2. Master Output Slave Input (MOSI)
+  -- 3. Slave select (SS)
+  -- 4. Busy signal indicating that a transmission is in progress, new words on
+  --    the data line will be ignored when /True/
+  -- 5. (Maybe) the word send from the slave to the master
+spiMaster mode fN din miso =
+  let (mosi,dout)   = spiCommon mode ssL misoL sclkL
                         (fromMaybe undefined# <$> din)
       latch = snatToInteger fN /= 1
       ssL   = if latch then delay undefined ss   else ss
       misoL = if latch then delay undefined miso else miso
-      sckL  = if latch then delay undefined sck  else sck
-      (ss,sck,busy) = spiGen mode fN din
-  in  (dout,busy,ss,mosi,sck)
+      sclkL = if latch then delay undefined sclk else sclk
+      (ss,sclk,busy) = spiGen mode fN din
+  in  (sclk,mosi,ss,busy,dout)
 
 -- | Generate slave select and SCK
 spiGen
@@ -271,24 +283,27 @@ spiSlaveLatticeSBIO
   --   Clock: 2*SCK < Core
   --
   -- * Set to /False/ when core clock is twice as fast, or as fast, as the SCK
+  -> Signal dom Bool
+  -- ^ Serial Clock (SCLK)
+  -> Signal dom Bit
+  -- ^ Master Output Slave Input (MOSI)
   -> BiSignalIn 'Floating dom 1
   -- ^ Master Input Slave Output (MISO)
   --
-  -- Inout port connected to the tri-state buffer for the
+  -- Inout port connected to the tri-state buffer for the MISO
   -> Signal dom Bool
   -- ^ Slave select (SS)
-  -> Signal dom Bit
-  -- ^ Master Output Slave Input (MOSI)
-  -> Signal dom Bool
-  -- ^ Serial Clock (SCLK)
   -> Signal dom (BitVector n)
-  -- ^ Data to send from master to slave
+  -- ^ Data to send from slave to master
   --
   -- Input is latched the moment slave select goes low
   -> ( BiSignalOut 'Floating dom 1
      , Signal dom (Maybe (BitVector n)))
-  -- ^ First part of the tuple can be ignored. Second part of the tuple
-  -- is (Maybe) the word send by the master to the slave
+  -- ^ Parts of the tuple:
+  --
+  -- 1. The "out" part of the inout port of the MISO; used only for simulation.
+  --
+  -- 2. (Maybe) the word send by the master
 spiSlaveLatticeSBIO mode latchSPI =
   spiSlave (SPISlaveConfig mode latchSPI sbioX)
  where
