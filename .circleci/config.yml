@@ -18,14 +18,23 @@ aliases:
         if [ -n "$CIRCLE_PR_NUMBER" ]; then
           .ci/setup.sh
         fi
+  - &cache_calc_key
+    run:
+      name: Calculate cache key
+      command: |
+        if [ -n "$CIRCLE_PR_NUMBER" ]; then
+          md5sum .circleci/config.yml cabal.project .ci/cabal.project.local */*.cabal > .circleci_cachekey
+        else
+          echo not running > .circleci_cachekey
+        fi
   - &cache_restore
     restore_cache:
       keys:
-        - cabal-store-{{ .Environment.CIRCLE_JOB }}-{{ checksum ".circleci/config.yml" }}-{{ checksum "cabal.project" }}
-        - cabal-store-{{ .Environment.CIRCLE_JOB }}-
+        - cache-{{ .Environment.CIRCLE_JOB }}-{{ checksum ".circleci_cachekey" }}
+        - cache-{{ .Environment.CIRCLE_JOB }}-
   - &cache_save
     save_cache:
-      key: cabal-store-{{ .Environment.CIRCLE_JOB }}-{{ checksum ".circleci/config.yml" }}-{{ checksum "cabal.project" }}
+      key: cache-{{ .Environment.CIRCLE_JOB }}-{{ checksum ".circleci_cachekey" }}
       paths:
         - cabal-store
         - ~/.stack
@@ -89,10 +98,11 @@ aliases:
       - *merge_pullrequest
       - *submodules
       - *setup
+      - *cache_calc_key
       - *cache_restore
       - *build
-      - *run_tests
       - *cache_save
+      - *run_tests
   - &build_with_stack
     docker:
       - image: leonschoorl/clash-ci-image:trusty
@@ -100,6 +110,7 @@ aliases:
       - checkout
       - *merge_pullrequest
       - *submodules
+      - *cache_calc_key
       - *cache_restore
       - *stack_build
       - *cache_save
