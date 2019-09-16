@@ -20,15 +20,26 @@ flag unittests
   default: True
   manual: True
 
+flag haddock
+  description:
+    Work-around haddock bug on GHC 8.6.*
+  default: False
+  manual: True
+
 library
   exposed-modules:     Clash.Cores.SPI
                        Clash.Cores.LatticeSemi.IO
                        Clash.Cores.LatticeSemi.Blackboxes.IO
   ghc-options:         -fexpose-all-unfoldings
-                       -fplugin GHC.TypeLits.Extra.Solver
+                       -Wall
+
+  if flag(haddock)
+    ghc-options:       -fdefer-type-errors
+  else
+    ghc-options:       -fplugin GHC.TypeLits.Extra.Solver
                        -fplugin GHC.TypeLits.Normalise
                        -fplugin GHC.TypeLits.KnownNat.Solver
-                       -Wall
+
   default-extensions:  BinaryLiterals
                        DataKinds
                        DeriveAnyClass
