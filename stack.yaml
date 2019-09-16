@@ -1,0 +1,11 @@
+resolver: lts-14.5
+
+packages:
+  - .
+
+extra-deps:
+  - clash-prelude-1.0.0
+  - clash-lib-1.0.0
+  - clash-ghc-1.0.0
+  - ghc-typelits-knownnat-0.7@sha256:55a30f3dbe2b6c48e3b279c9b6341b0edca17f658e1173ce561ac3d58c51fcc9,4849
+  - ghc-typelits-natnormalise-0.7@sha256:227ea92f133f4d2754e7c2a559a29450df4f1c354698a9614d4578cf979737d0,3415

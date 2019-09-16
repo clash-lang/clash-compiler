@@ -13,3 +13,6 @@ dist-newstyle/
 
 # IntelliJ
 .idea
+
+# stack
+stack.yaml.lock
