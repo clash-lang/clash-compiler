@@ -88,7 +88,7 @@ import Language.Haskell.TH.Syntax (Lift(..))
 import Numeric.Natural            (Natural)
 import GHC.Generics               (Generic)
 import GHC.Stack                  (HasCallStack)
-import GHC.TypeLits               (CmpNat, KnownNat, Nat, type (+), type (-),
+import GHC.TypeLits               (KnownNat, Nat, type (+), type (-),
                                    type (*), type (<=), natVal)
 import GHC.TypeLits.Extra         (CLog)
 import Test.QuickCheck.Arbitrary  (Arbitrary (..), CoArbitrary (..),
@@ -151,7 +151,7 @@ instance (KnownNat n, 1 <= n) => BitPack (Index n) where
   unpack = unpack#
 
 -- | Safely convert an `SNat` value to an `Index`
-fromSNat :: (KnownNat m, CmpNat n m ~ 'LT) => SNat n -> Index m
+fromSNat :: (KnownNat m, n <= m + 1) => SNat n -> Index m
 fromSNat = snatToNum
 
 {-# NOINLINE pack# #-}
