@@ -1,3 +1,10 @@
+{-|
+  Copyright   :  (C) 2019, Foamspace corp
+  License     :  BSD2 (see the file LICENSE)
+  Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
+
+  Tests for SPI master and slave cores
+-}
 module Test.Cores.SPI where
 
 import qualified Data.List as L

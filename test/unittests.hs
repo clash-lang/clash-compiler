@@ -1,3 +1,10 @@
+{-|
+  Copyright   :  (C) 2019, Foamspace corp
+  License     :  BSD2 (see the file LICENSE)
+  Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
+
+  Test driver
+-}
 module Main where
 
 import Prelude
