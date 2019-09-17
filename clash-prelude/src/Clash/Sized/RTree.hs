@@ -235,6 +235,12 @@ instance (KnownNat d, NFDataX a) => NFDataX (RTree d a) where
     go (LR_ x)   = rnfX x
     go (BR_ l r) = rnfX l `seq` rnfX r
 
+  hasUndefined t = if isLeft (isX t) then True else go t
+   where
+    go :: RTree d a -> Bool
+    go (LR_ x)   = hasUndefined x
+    go (BR_ l r) = hasUndefined l || hasUndefined r
+
 
 -- | A /dependently/ typed fold over trees.
 --
