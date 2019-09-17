@@ -93,8 +93,8 @@ spiCommon
 spiCommon mode ssI msI sckI dinI =
   mooreB go cvt ( 0 :: Index n      -- cntR
                 , undefined         -- sckOldR
-                , unpack undefined# -- dataInR
-                , unpack undefined# -- dataOutR
+                , deepErrorX "no initial dataInR"
+                , deepErrorX "no initial dataOutR"
                 , False             -- doneR
                 )
                 (ssI,msI,sckI,dinI)
