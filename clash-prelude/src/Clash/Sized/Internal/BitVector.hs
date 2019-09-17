@@ -135,6 +135,7 @@ import Control.Lens               (Index, Ixed (..), IxValue)
 import Data.Bits                  (Bits (..), FiniteBits (..))
 import Data.Data                  (Data)
 import Data.Default.Class         (Default (..))
+import Data.Either                (isLeft)
 import Data.Proxy                 (Proxy (..))
 import Data.Typeable              (Typeable, typeOf)
 import GHC.Generics               (Generic)
@@ -156,7 +157,7 @@ import Clash.Class.Resize         (Resize (..))
 import Clash.Promoted.Nat
   (SNat (..), SNatLE (..), compareSNat, snatToInteger, snatToNum)
 import Clash.XException
-  (ShowX (..), NFDataX (..), errorX, showsPrecXWith, rwhnfX)
+  (ShowX (..), NFDataX (..), errorX, isX, showsPrecXWith, rwhnfX)
 
 import {-# SOURCE #-} qualified Clash.Sized.Vector         as V
 import {-# SOURCE #-} qualified Clash.Sized.Internal.Index as I
@@ -222,6 +223,7 @@ instance ShowX Bit where
 instance NFDataX Bit where
   deepErrorX = errorX
   rnfX = rwhnfX
+  hasUndefined bv = isLeft (isX bv) || unsafeMask# bv /= 0
 
 instance Lift Bit where
   lift (Bit m i) = [| fromInteger## m i |]
@@ -368,6 +370,7 @@ instance KnownNat n => ShowX (BitVector n) where
 instance NFDataX (BitVector n) where
   deepErrorX = errorX
   rnfX = rwhnfX
+  hasUndefined bv = isLeft (isX bv) || unsafeMask bv /= 0
 
 -- | Create a binary literal
 --

@@ -111,6 +111,7 @@ import Data.Constraint            ((:-)(..), Dict (..))
 import Data.Constraint.Nat        (leZero)
 import Data.Data
   (Data (..), Constr, DataType, Fixity (..), Typeable, mkConstr, mkDataType)
+import Data.Either                (isLeft)
 import Data.Default.Class         (Default (..))
 import qualified Data.Foldable    as F
 import Data.Kind                  (Type)
@@ -142,7 +143,7 @@ import Clash.Sized.Index          (Index)
 
 import Clash.Class.BitPack        (packXWith, BitPack (..))
 import Clash.XException
-  (ShowX (..), NFDataX (..), showsX, showsPrecXWith, seqX)
+  (ShowX (..), NFDataX (..), showsX, showsPrecXWith, seqX, isX)
 
 {- $setup
 >>> :set -XDataKinds
@@ -357,6 +358,12 @@ instance (NFDataX a, KnownNat n) => NFDataX (Vec n a) where
     -- a recursive function.
     seqX (foldl (\() -> rnfX) () v) ()
 
+  hasUndefined v =
+    if isLeft (isX v) then True else go v
+   where
+    go :: forall m b . (NFDataX b, KnownNat m) => Vec m b -> Bool
+    go Nil = False
+    go (x `Cons` xs) = hasUndefined x || hasUndefined xs
 
 {-# INLINE singleton #-}
 -- | Create a vector of one element
