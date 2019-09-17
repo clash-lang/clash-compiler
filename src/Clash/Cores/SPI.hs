@@ -92,6 +92,7 @@ spiCommon
      )
 spiCommon mode ssI msI sckI dinI =
   mooreB go cvt ( 0 :: Index n      -- cntR
+                , False             -- cntOldR
                 , undefined         -- sckOldR
                 , deepErrorX "no initial dataInR"
                 , deepErrorX "no initial dataOutR"
@@ -99,15 +100,15 @@ spiCommon mode ssI msI sckI dinI =
                 )
                 (ssI,msI,sckI,dinI)
  where
-  cvt (_,_,dataInQ,dataOutQ,doneQ) =
+  cvt (_,_,_,dataInQ,dataOutQ,doneQ) =
     ( head dataOutQ
     , if doneQ
          then Just (pack dataInQ)
          else Nothing
     )
 
-  go (cntQ,sckOldQ,dataInQ,dataOutQ,_) (ss,ms,sck,din) =
-    (cntD,sck,dataInD,dataOutD,doneD)
+  go (cntQ,cntOldQ,sckOldQ,dataInQ,dataOutQ,_) (ss,ms,sck,din) =
+    (cntD,cntOldD,sck,dataInD,dataOutD,doneD)
    where
     cntD
       | ss        = 0
@@ -121,12 +122,19 @@ spiCommon mode ssI msI sckI dinI =
 
     dataOutD
       | ss        = unpack din
-      | shiftSck  = if cntQ == maxBound && cntD == 0
+      | shiftSck  = if cntOldQ
                        then unpack din
                        else if (mode == SPIMode1 || mode == SPIMode3) && cntQ == 0
                                then dataOutQ
                                else tail @(n-1) dataOutQ :< unpack undefined#
       | otherwise = dataOutQ
+
+    -- The counter is updated during the capture moment
+    -- But we need to know during the shift moment whether the counter
+    -- overflowed to determine whether we need to load new data or shift
+    -- the existing data. That's why we capture it here.
+    cntOldD | not ss && shiftSck = cntQ == maxBound
+            | otherwise          = cntOldQ
 
     doneD = not ss && sampleSck && cntQ == maxBound
 

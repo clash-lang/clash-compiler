@@ -99,6 +99,49 @@ testMasterSlave spiMode latchSPI divHalf mVal sVal duration =
   clk = systemClockGen
   rst = systemResetGen
 
+testMasterSlaveMultiWord
+  :: 1 <= m
+  => SPIMode
+  -- ^ SPI Mode
+  -> Bool
+  -- ^ Whether the SPI slave should latch SPI signals
+  -> SNat m
+  -- ^ Half-period of the clock divider for the SPI master
+  -> BitVector 16
+  -- ^ Value master sends to slave
+  -> BitVector 8
+  -- ^ Value slave sends to master
+  -> Int
+  -- ^ Sample duration
+  -> ([([BitVector 8],Int)],([BitVector 16],Int))
+  -- ^
+  --
+  -- 1.1 Different slave outputs captured, should be equal to master value
+  -- 1.2 Number of slave outputs captured
+  -- 2.1 Different master outputs captured, should be equal to slave value
+  -- 2.2 Number of master outputs captured
+testMasterSlaveMultiWord spiMode latchSPI divHalf mVal sVal duration =
+   let s = sampleN duration (bundle (slaveOut,masterOut))
+       (slaveOutS,masterOutS) = P.unzip s
+       ss0 = L.group (L.sort (catMaybes slaveOutS))
+       ms0 = catMaybes masterOutS
+   in  (L.map (\x -> (L.nub x,P.length x)) ss0,(L.nub ms0,P.length ms0))
+ where
+  slaveIn = pure sVal
+  (misoZ,slaveOut) =
+    exposeClockResetEnable spiSlaveLatticeSBIO
+      clk rst enableGen spiMode latchSPI sclk mosi miso ss slaveIn
+  miso = veryUnsafeToBiSignalIn misoZ
+
+  masterIn = masterInBP mVal clk rst bp
+
+  (sclk,mosi,ss,bp,masterOut) =
+    exposeClockResetEnable spiMaster
+      clk rst enableGen spiMode divHalf masterIn (readFromBiSignal miso)
+
+  clk = systemClockGen
+  rst = systemResetGen
+
 testMasterMultiSlave
   :: 1 <= m
   => SPIMode
@@ -217,5 +260,31 @@ tests =
         , testCase "Mode3, Divider:2, Slave latch: False"
             (testMasterMultiSlave SPIMode3 False d1 0b0110011101 0b0110010101 (3*25) @?=
              (([0b0110011101],1),([0b0110011101],1),([0b0110011101],1),([0b0110010101],3)))
+        ]
+    , testGroup "Single slave, multiple words"
+        [ testCase "Mode0, Divider:8, Slave latch: True"
+            (testMasterSlaveMultiWord SPIMode0 True d4 0b0101010100001111 0b10010101 (5*84) @?=
+             ([([0b00001111],3),([0b01010101],3)],([0b01001010110010101],3)))
+        , testCase "Mode1, Divider:8, Slave latch: True"
+            (testMasterSlaveMultiWord SPIMode1 True d4 0b0101010100001111 0b0110010101 (5*84) @?=
+             ([([0b00001111],3),([0b01010101],3)],([0b01001010110010101],3)))
+        , testCase "Mode2, Divider:8, Slave latch: True"
+            (testMasterSlaveMultiWord SPIMode2 True d4 0b0101010100001111 0b0110010101 (5*84) @?=
+             ([([0b00001111],3),([0b01010101],3)],([0b01001010110010101],3)))
+        , testCase "Mode3, Divider:8, Slave latch: True"
+            (testMasterSlaveMultiWord SPIMode3 True d4 0b0101010100001111 0b0110010101 (5*84) @?=
+             ([([0b00001111],3),([0b01010101],3)],([0b01001010110010101],3)))
+        , testCase "Mode0, Divider:2, Slave latch: False"
+            (testMasterSlaveMultiWord SPIMode0 False d1 0b0101010100001111 0b0110010101 (5*25) @?=
+             ([([0b00001111],3),([0b01010101],3)],([0b01001010110010101],3)))
+        , testCase "Mode1, Divider:2, Slave latch: False"
+            (testMasterSlaveMultiWord SPIMode1 False d1 0b0101010100001111 0b0110010101 (5*25) @?=
+             ([([0b00001111],3),([0b01010101],3)],([0b01001010110010101],3)))
+        , testCase "Mode2, Divider:2, Slave latch: False"
+            (testMasterSlaveMultiWord SPIMode2 False d1 0b0101010100001111 0b0110010101 (5*25) @?=
+             ([([0b00001111],3),([0b01010101],3)],([0b01001010110010101],3)))
+        , testCase "Mode3, Divider:2, Slave latch: False"
+            (testMasterSlaveMultiWord SPIMode3 False d1 0b0101010100001111 0b0110010101 (5*25) @?=
+             ([([0b00001111],3),([0b01010101],3)],([0b01001010110010101],3)))
         ]
     ]
