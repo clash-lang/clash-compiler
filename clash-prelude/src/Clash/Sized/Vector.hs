@@ -365,6 +365,8 @@ instance (NFDataX a, KnownNat n) => NFDataX (Vec n a) where
     go Nil = False
     go (x `Cons` xs) = hasUndefined x || hasUndefined xs
 
+  ensureSpine = map ensureSpine . lazyV
+
 {-# INLINE singleton #-}
 -- | Create a vector of one element
 --

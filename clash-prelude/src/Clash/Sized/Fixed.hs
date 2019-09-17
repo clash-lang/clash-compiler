@@ -280,6 +280,7 @@ instance NFDataX (rep (int + frac)) => NFDataX (Fixed rep int frac) where
   deepErrorX = Fixed . errorX
   rnfX f@(~(Fixed x)) = if isLeft (isX f) then () else rnfX x
   hasUndefined f@(~(Fixed x)) = if isLeft (isX f) then True else hasUndefined x
+  ensureSpine ~(Fixed x) = Fixed x
 
 -- | None of the 'Read' class' methods are synthesizable.
 instance (size ~ (int + frac), KnownNat frac, Bounded (rep size), Integral (rep size))

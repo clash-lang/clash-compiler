@@ -40,7 +40,7 @@ module Clash.XException
     -- * Strict evaluation
   , seqX, forceX, deepseqX, rwhnfX, defaultSeqX
     -- * Structured undefined / deep evaluation with undefined values
-  , NFDataX (rnfX, deepErrorX, hasUndefined)
+  , NFDataX (rnfX, deepErrorX, hasUndefined, ensureSpine)
   )
 where
 
@@ -534,6 +534,34 @@ instance NFDataX1 f => GNFDataX One (Rec1 f) where
 instance (NFDataX1 f, GNFDataX One g) => GNFDataX One (f :.: g) where
   grnfX args = liftRnfX (grnfX args) . unComp1
 
+class GEnsureSpine f where
+  gEnsureSpine :: f a -> f a
+
+instance GEnsureSpine U1 where
+  gEnsureSpine _u = U1
+
+instance NFDataX a => GEnsureSpine (K1 i a) where
+  gEnsureSpine = K1 . ensureSpine . unK1
+  {-# INLINEABLE gEnsureSpine #-}
+
+instance GEnsureSpine a => GEnsureSpine (M1 i c a) where
+  gEnsureSpine a = M1 (gEnsureSpine (unM1 a))
+  {-# INLINEABLE gEnsureSpine #-}
+
+instance (GEnsureSpine a, GEnsureSpine b) => GEnsureSpine (a :*: b) where
+  gEnsureSpine ~(x :*: y) = gEnsureSpine x :*: gEnsureSpine y
+  {-# INLINEABLE gEnsureSpine #-}
+
+instance (GEnsureSpine a, GEnsureSpine b) => GEnsureSpine (a :+: b) where
+  gEnsureSpine lrx =
+    case lrx of
+      (L1 x) -> L1 (gEnsureSpine x)
+      (R1 x) -> R1 (gEnsureSpine x)
+  {-# INLINEABLE gEnsureSpine #-}
+
+instance GEnsureSpine V1 where
+  gEnsureSpine _ = error "Unreachable code?"
+
 -- | A class of functors that can be fully evaluated, according to semantics
 -- of NFDataX.
 class NFDataX1 f where
@@ -615,6 +643,19 @@ class NFDataX a where
   default hasUndefined :: (Generic a, GHasUndefined (Rep a)) => a -> Bool
   hasUndefined = gHasUndefined . from
 
+  -- | Create a value where at the very least the spine is defined. For example:
+  --
+  -- >>> spined = ensureSpine (errorX "?" :: (Int, Int))
+  -- >>> case spined of (_, _) -> 'a'
+  -- 'a'
+  --
+  -- For users familiar with 'Clash.Sized.Vector.lazyV': this is the generalized
+  -- version of it.
+  ensureSpine :: a -> a
+
+  default ensureSpine :: (Generic a, GEnsureSpine (Rep a)) => a -> a
+  ensureSpine = to . gEnsureSpine . from
+
   -- | Evaluate a value to NF. As opposed to 'NFData's 'rnf', it does not bubble
   -- up 'XException's.
   rnfX :: a -> ()
@@ -666,11 +707,13 @@ instance NFDataX b => NFDataX (a -> b) where
   deepErrorX = pure . deepErrorX
   rnfX = rwhnfX
   hasUndefined = error "hasUndefined on Undefined (a -> b): Not Yet Implemented"
+  ensureSpine = id
 
 instance NFDataX a => NFDataX (Down a) where
   deepErrorX = Down . deepErrorX
   rnfX d@(~(Down x)) = if isLeft (isX d) then () else rnfX x
   hasUndefined d@(~(Down x))= if isLeft (isX d) then True else hasUndefined x
+  ensureSpine ~(Down x) = Down (ensureSpine x)
 
 instance NFDataX Bool
 instance NFDataX a => NFDataX [a]
@@ -681,81 +724,97 @@ instance NFDataX Char where
   deepErrorX = errorX
   rnfX = rwhnfX
   hasUndefined = isLeft . isX
+  ensureSpine = id
 
 instance NFDataX Double where
   deepErrorX = errorX
   rnfX = rwhnfX
   hasUndefined = isLeft . isX
+  ensureSpine = id
 
 instance NFDataX Float where
   deepErrorX = errorX
   rnfX = rwhnfX
   hasUndefined = isLeft . isX
+  ensureSpine = id
 
 instance NFDataX Int where
   deepErrorX = errorX
   rnfX = rwhnfX
   hasUndefined = isLeft . isX
+  ensureSpine = id
 
 instance NFDataX Int8 where
   deepErrorX = errorX
   rnfX = rwhnfX
   hasUndefined = isLeft . isX
+  ensureSpine = id
 
 instance NFDataX Int16 where
   deepErrorX = errorX
   rnfX = rwhnfX
   hasUndefined = isLeft . isX
+  ensureSpine = id
 
 instance NFDataX Int32 where
   deepErrorX = errorX
   rnfX = rwhnfX
   hasUndefined = isLeft . isX
+  ensureSpine = id
 
 instance NFDataX Int64 where
   deepErrorX = errorX
   rnfX = rwhnfX
   hasUndefined = isLeft . isX
+  ensureSpine = id
 
 instance NFDataX Integer where
   deepErrorX = errorX
   rnfX = rwhnfX
   hasUndefined = isLeft . isX
+  ensureSpine = id
 
 instance NFDataX Natural where
   deepErrorX = errorX
   rnfX = rwhnfX
   hasUndefined = isLeft . isX
+  ensureSpine = id
 
 instance NFDataX Word where
   deepErrorX = errorX
   rnfX = rwhnfX
   hasUndefined = isLeft . isX
+  ensureSpine = id
 
 instance NFDataX Word8 where
   deepErrorX = errorX
   rnfX = rwhnfX
   hasUndefined = isLeft . isX
+  ensureSpine = id
 
 instance NFDataX Word16 where
   deepErrorX = errorX
   rnfX = rwhnfX
   hasUndefined = isLeft . isX
+  ensureSpine = id
 
 instance NFDataX Word32 where
   deepErrorX = errorX
   rnfX = rwhnfX
   hasUndefined = isLeft . isX
+  ensureSpine = id
 
 instance NFDataX Word64 where
   deepErrorX = errorX
   rnfX = rwhnfX
   hasUndefined = isLeft . isX
+  ensureSpine = id
 
 instance NFDataX Half where
   deepErrorX = errorX
   rnfX = rwhnfX
   hasUndefined = isLeft . isX
+  ensureSpine = id
 
 instance NFDataX a => NFDataX (Seq a) where
   deepErrorX = errorX
@@ -764,6 +823,7 @@ instance NFDataX a => NFDataX (Seq a) where
    where
     go Empty = ()
     go (x :<| xs) = rnfX x `seq` go xs
+  ensureSpine = id
 
   hasUndefined s =
     if isLeft (isX s) then True else go s
@@ -775,6 +835,7 @@ instance NFDataX a => NFDataX (Ratio a) where
   deepErrorX = errorX
   rnfX r = rnfX (numerator r) `seq` rnfX (denominator r)
   hasUndefined r = isLeft (isX (numerator r)) || isLeft (isX (denominator r))
+  ensureSpine = id
 
 instance NFDataX a => NFDataX (Complex a) where
   deepErrorX = errorX

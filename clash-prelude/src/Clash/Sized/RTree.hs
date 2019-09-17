@@ -241,6 +241,8 @@ instance (KnownNat d, NFDataX a) => NFDataX (RTree d a) where
     go (LR_ x)   = hasUndefined x
     go (BR_ l r) = hasUndefined l || hasUndefined r
 
+  ensureSpine = fmap ensureSpine . lazyT
+
 
 -- | A /dependently/ typed fold over trees.
 --

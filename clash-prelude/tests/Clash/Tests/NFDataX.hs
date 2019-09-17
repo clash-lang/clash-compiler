@@ -1,8 +1,9 @@
-{-# LANGUAGE CPP            #-}
-{-# LANGUAGE DataKinds      #-}
-{-# LANGUAGE DeriveAnyClass #-}
-{-# LANGUAGE DeriveGeneric  #-}
-{-# LANGUAGE MagicHash      #-}
+{-# LANGUAGE CPP              #-}
+{-# LANGUAGE DataKinds        #-}
+{-# LANGUAGE DeriveAnyClass   #-}
+{-# LANGUAGE DeriveGeneric    #-}
+{-# LANGUAGE MagicHash        #-}
+{-# LANGUAGE TypeApplications #-}
 
 module Clash.Tests.NFDataX where
 
@@ -12,19 +13,24 @@ import           Test.Tasty.HUnit
 import           GHC.Generics         (Generic)
 import           Clash.Class.BitPack  (pack)
 import           Clash.Sized.Vector   (Vec(..))
-import           Clash.XException     (NFDataX(rnfX, hasUndefined), errorX)
+import           Clash.XException
+  (NFDataX(rnfX, hasUndefined, deepErrorX), errorX)
 import           Data.Ord             (Down (Down))
 
-data Void                                  deriving (Generic, NFDataX)
-data Unit    = Unit                        deriving (Generic, NFDataX)
-data Wrapper = Wrapper Int                 deriving (Generic, NFDataX)
-data Sum     = SumTypeA | SumTypeB         deriving (Generic, NFDataX)
-data BigSum  = BS1 | BS2 | BS3 | BS4 | BS5 deriving (Generic, NFDataX)
-data Product = Product Int Int             deriving (Generic, NFDataX)
-data SP      = S Int Int | P Int           deriving (Generic, NFDataX)
-data Rec0    = Rec0 {  }                   deriving (Generic, NFDataX)
-data Rec1    = Rec1 { a :: Int }           deriving (Generic, NFDataX)
-data Rec2    = Rec2 { b :: Int, c :: Int } deriving (Generic, NFDataX)
+data Void                                     deriving (Generic, NFDataX)
+data Unit       = Unit                        deriving (Generic, NFDataX)
+data Wrapper    = Wrapper Int                 deriving (Generic, NFDataX)
+data Sum        = SumTypeA | SumTypeB         deriving (Generic, NFDataX)
+data BigSum     = BS1 | BS2 | BS3 | BS4 | BS5 deriving (Generic, NFDataX)
+data Product    = Product Int Int             deriving (Generic, NFDataX)
+data SP         = S Int Int | P Int           deriving (Generic, NFDataX)
+data Rec0       = Rec0 {  }                   deriving (Generic, NFDataX)
+data Rec1       = Rec1 { a :: Int }           deriving (Generic, NFDataX)
+data Rec2       = Rec2 { b :: Int, c :: Int } deriving (Generic, NFDataX)
+data ProductRec = ProductRec Rec1 (Unit, Sum) deriving (Generic, NFDataX)
+
+dundef :: NFDataX a => a
+dundef = deepErrorX "!"
 
 undef :: a
 undef = errorX "!"
@@ -119,6 +125,15 @@ tests =
         , testCase "Maybe"      $ hasUndefined (Nothing :: Maybe Bool)          @?= False
         , testCase "BitVector1" $ hasUndefined (pack (Nothing :: Maybe Bool))   @?= True
         , testCase "BitVector2" $ hasUndefined (pack (Just True:: Maybe Bool))  @?= False
+        ]
+    , testGroup
+        "GenericDeepErrorX"
+        [ testCase "Unit"       $ case dundef @Unit of Unit -> ()           @?= ()
+        , testCase "Wrapper1"   $ case dundef @Wrapper of Wrapper _ -> ()   @?= ()
+        , testCase "Product1"   $ case dundef @Product of Product _ _ -> () @?= ()
+        , testCase "Rec1_1"     $ case dundef @Rec1 of Rec1 {} -> ()        @?= ()
+        , testCase "Rec2_1"     $ case dundef @Rec2 of Rec2 {} -> ()        @?= ()
+        , testCase "ProductRec" $ case dundef @ProductRec of ProductRec (Rec1 _) (Unit, _) -> () @?= ()
         ]
     ]
 
