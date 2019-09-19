@@ -50,7 +50,6 @@ import qualified System.IO                        as IO
 import           System.IO.Error                  (isDoesNotExistError)
 import           System.IO.Temp
   (getCanonicalTemporaryDirectory, withTempDirectory)
-import qualified Text.PrettyPrint.ANSI.Leijen     as ANSI
 import           Text.Trifecta.Result
   (Result(Success, Failure), _errDoc)
 import           Text.Read                        (readMaybe)
@@ -425,7 +424,8 @@ compilePrimitive idirs pkgDbs topDir (BlackBox pNm wf tkind () oReg libM imps in
     -> m BlackBoxTemplate
   parseTempl t = case runParse t of
     Failure errInfo
-      -> error (ANSI.displayS (ANSI.renderCompact (_errDoc errInfo)) "")
+      -> error ("Parsing template for blackbox " ++ Data.Text.unpack pNm ++ " failed:\n"
+               ++ show (_errDoc errInfo))
     Success t'
       -> pure t'
 

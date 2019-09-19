@@ -40,7 +40,6 @@ import qualified Data.Text.Prettyprint.Doc       as PP
 import           Data.Text.Prettyprint.Doc.Extra
 import           System.FilePath                 (replaceBaseName, takeBaseName,
                                                   takeFileName, (<.>))
-import qualified Text.PrettyPrint.ANSI.Leijen    as ANSI
 import           Text.Printf
 import           Text.Read                       (readEither)
 import           Text.Trifecta.Result            hiding (Err)
@@ -463,7 +462,7 @@ renderElem b e = fmap const (renderTag b e)
 parseFail :: Text -> BlackBoxTemplate
 parseFail t = case runParse t of
   Failure errInfo ->
-    error (ANSI.displayS (ANSI.renderCompact (_errDoc errInfo)) "")
+    error (show (_errDoc errInfo))
   Success templ -> templ
 
 idToExpr
