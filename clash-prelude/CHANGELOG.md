@@ -3,6 +3,17 @@
 ## 1.1.0
 * New features:
   * `Bundle ((f :*: g) a)` instance
+  * `makeTopEntity` Template Haskell function for generating TopEntity annotations
+    intended to cover the majority of use cases. Generation failures should either
+    result in an explicit error, or a valid annotation of an empty `PortProduct`.
+    Any discrepancy between the _shape_ of generated annotations and the _shape_
+    of the Clash compiler is a bug. Known limitations:
+    * Type application (excluding `Signal`s and `:::`) is best effort:
+    * Data types with type parameters will work if the generator can discover a
+      single relevant constructor after attempting type application.
+    * Arbitrary explicit clock/reset/enables are supported, but only a single
+      `HiddenClockResetEnable` constraint is supported.
+    * Data/type family support is best effort.
 
 ## 1.0.0 *September 3rd 2019*
 * New features:
