@@ -16,7 +16,7 @@ Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
 {-# OPTIONS_HADDOCK show-extensions #-}
 
 module Clash.Sized.Index
-  (Index, bv2i)
+  (Index, bv2i, fromSNat)
 where
 
 import GHC.TypeLits               (KnownNat, type (^))
