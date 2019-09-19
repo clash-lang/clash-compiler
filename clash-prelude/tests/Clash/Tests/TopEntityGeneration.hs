@@ -30,6 +30,11 @@ data Embedded
   { name3 :: "embedded1" ::: Simple
   , name4 :: "embedded2" ::: Bool
   }
+data OneSide
+  = OneSide
+  { name5 :: "embedded1" ::: Simple
+  , name6 :: Bool
+  }
 newtype Single = Single ("s" ::: Int)
 
 data Gadt x where
@@ -43,14 +48,15 @@ type instance OF Int Int Int = ("ofiii" ::: Single)
 type instance OF Bool Int Int = ("ofbii" ::: Single)
 
 data family X x y z
-data instance X Int Int Int = X1 ("xiii" ::: Int)
+data instance X Int Int Int = X1 ("xiii" ::: Int) ("xiii2" ::: Bool)
 newtype instance X Bool Int Int = X2 ("xbii" ::: Int)
 
 data Impossible = L ("left" ::: Int) | R ("right" ::: Bool)
 
 data FailureTy1 = TwoF1 ("one" ::: Int) Int
-data FailureTy2 = TwoF2 ("one" ::: Int) Simple
 data SuccessTy = TwoS ("one" ::: Int) Single
+
+data Passthrough a b = Passthrough a b
 
 topEntity1 :: "in1" ::: Signal System Int
            -> "in2" ::: Signal System Bool
@@ -89,7 +95,10 @@ expectedTopEntity2 =
     ]
     (PortName "out")
 
-topEntity3 :: "tup1" ::: Signal System (Int, Bool)
+topEntity3 :: "clk" ::: Clock System
+           -> "rst" ::: Reset System
+           -> "en"  ::: Enable System
+           -> "tup1" ::: Signal System (Int, Bool)
            -> "tup2" ::: (Signal System Int, Signal System Bool)
            -> "tup3" ::: Signal System ("int":::Int, "bool":::Bool)
            -> "tup4" ::: ("int":::Signal System Int, "bool":::Signal System Bool)
@@ -101,7 +110,10 @@ makeTopEntity 'topEntity3
 expectedTopEntity3 :: TopEntity
 expectedTopEntity3 =
   Synthesize "topEntity3"
-    [ PortName "tup1"
+    [ PortName "clk"
+    , PortName "rst"
+    , PortName "en"
+    , PortName "tup1"
     , PortName "tup2"
     , PortProduct "tup3" [PortName "int",PortName "bool"]
     , PortProduct "tup4" [PortName "int",PortName "bool"]
@@ -130,12 +142,13 @@ expectedTopEntity4 =
     , PortProduct "cfbii" [PortName "s"]
     , PortProduct "ofiii" [PortName "s"]
     , PortProduct "ofbii" [PortName "s"]
-    , PortName "xiii"
+    , PortProduct "" [PortName "xiii", PortName "xiii2"]
     , PortName "xbii"
     ]
     (PortName "s")
 
 topEntity5 :: "in1" ::: Signal System SuccessTy
+           -> "ab"     ::: Signal System (Passthrough (Passthrough Simple Simple) Simple)
            -> "out" ::: Signal System Int
 topEntity5 = undefined
 makeTopEntity 'topEntity5
@@ -143,7 +156,11 @@ makeTopEntity 'topEntity5
 expectedTopEntity5 :: TopEntity
 expectedTopEntity5 =
  Synthesize "topEntity5"
-    [PortProduct "in1" [PortName "one", PortName "s"]]
+    [ PortProduct "in1" [PortName "one", PortName "s"]
+    , PortProduct "ab" [PortProduct "" [PortProduct "" [PortName "simple1",PortName "simple2"]
+                                       ,PortProduct "" [PortName "simple1",PortName "simple2"]]
+                       ,PortProduct "" [PortName "simple1",PortName "simple2"]]
+    ]
     (PortName "out")
 
 topEntity6 :: (HiddenClockResetEnable System)
@@ -162,12 +179,30 @@ expectedTopEntity6 =
     (PortName "out")
 
 
+topEntity7 :: (HiddenClockResetEnable System)
+           => "in1" ::: Signal System (Vec 3 Int)
+           -> "in2" ::: Signal System (Vec 3 Simple)
+           -> "passthrough" ::: Signal System (Passthrough Single Single)
+           -> "out" ::: Signal System Int
+topEntity7 = undefined
+makeTopEntity 'topEntity7
+
+expectedTopEntity7 :: TopEntity
+expectedTopEntity7 =
+ Synthesize "topEntity7"
+    [ PortProduct "" [PortName "clk", PortName "rst", PortName "en"]
+    , PortName "in1"
+    , PortName "in2"
+    , PortProduct "passthrough" [PortName "s", PortName "s"]
+    ]
+    (PortName "out")
+
 topEntityFailure1
   :: "int"     ::: Signal System Int
   -> "tuple"   ::: ("tup1" ::: Signal System (BitVector 7), "tup2" ::: Signal System (BitVector 9))
   -> "simple"  ::: Signal System Simple
   -> "named"   ::: Signal System Named
-  -> Signal System Embedded
+  -> Signal System OneSide
   -> "out"     ::: Signal System Bool
 topEntityFailure1 = undefined
 
@@ -191,7 +226,7 @@ topEntityFailure4
 topEntityFailure4 = undefined
 
 topEntityFailure5
-  :: "int"     ::: Signal System FailureTy2
+  :: "int"     ::: Signal System (Passthrough (Passthrough Simple Int) Simple)
   -> "out"     ::: Signal System Bool
 topEntityFailure5 = undefined
 
@@ -208,6 +243,11 @@ topEntityFailure7
   -> "out"     ::: Signal System Bool
 topEntityFailure7 = undefined
 #endif
+
+topEntityFailure8
+  :: "int"     ::: Signal System (Passthrough Int Simple )
+  -> "out"     ::: Signal System Bool
+topEntityFailure8 = undefined
 
 -- This splice is needed to make sure TH.names are in the type environment
 -- during reify for the expected failure cases.
@@ -235,6 +275,9 @@ tests =
       , testCase "topEntity6" $
           $(unTypeQ $ maybeBuildTopEntity Nothing 'topEntity6)
           @?= Just expectedTopEntity6
+      , testCase "topEntity7" $
+          $(unTypeQ $ maybeBuildTopEntity Nothing 'topEntity7)
+          @?= Just expectedTopEntity7
       ]
     , testGroup "Expected failures"
       [ testCase "topEntityFailure1" $
@@ -253,6 +296,8 @@ tests =
       , testCase "topEntityFailure7" $
           $(unTypeQ $ maybeBuildTopEntity Nothing 'topEntityFailure7) @?= failed
 #endif
+      , testCase "topEntityFailure8" $
+          $(unTypeQ $ maybeBuildTopEntity Nothing 'topEntityFailure8) @?= failed
       ]
     ]
  where
