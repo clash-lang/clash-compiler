@@ -118,7 +118,6 @@ Library
 
   Build-depends:      aeson                   >= 0.6.2.0  && < 1.5,
                       ansi-terminal           >= 0.8.0.0  && < 0.10,
-                      ansi-wl-pprint          >= 0.6.8.2  && < 1.0,
                       attoparsec              >= 0.10.4.0 && < 0.14,
                       base                    >= 4.10     && < 5,
                       binary                  >= 0.8.5    && < 0.11,
@@ -150,7 +149,7 @@ Library
                       text-show               >= 3.7      && < 3.9,
                       time                    >= 1.4.0.1  && < 1.10,
                       transformers            >= 0.5.2.0  && < 0.6,
-                      trifecta                >= 1.7.1.1  && < 2.1,
+                      trifecta                >= 1.7.1.1  && < 2.2,
                       vector                  >= 0.11     && < 1.0,
                       vector-binary-instances >= 0.2.3.5  && < 0.3,
                       unordered-containers    >= 0.2.3.3  && < 0.3
