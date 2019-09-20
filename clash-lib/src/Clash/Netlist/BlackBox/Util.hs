@@ -191,6 +191,13 @@ setSym mkUniqueIdentifierM bbCtx l = do
                                              error $ $(curLoc) ++  "Could not convert "
                                                                ++ "~NAME[" ++ show i ++ "]"
                                                                ++ " to string:" ++ msg
+                         ; Lit i  -> case elementToText bbCtx (Lit i) of
+                                         Right t ->
+                                             t
+                                         Left msg ->
+                                             error $ $(curLoc) ++  "Could not convert "
+                                                               ++ "~LIT[" ++ show i ++ "]"
+                                                               ++ " to string:" ++ msg
                          ; Result _ | Identifier t _ <- fst (bbResult bbCtx)
                                     -> Text.fromStrict t
                          ; CompName -> Text.fromStrict (bbCompName bbCtx)
@@ -708,6 +715,7 @@ elementToText _bbCtx e = error $ "Unexpected string like: " ++ show e
 exprToString
   :: Expr
   -> Maybe String
+exprToString (Literal _ (NumLit i)) = Just (show i)
 exprToString (Literal _ (StringLit l)) = Just l
 exprToString (BlackBoxE "Clash.Promoted.Symbol.SSymbol" _ _ _ _ ctx _) =
   let (e',_,_) = head (bbInputs ctx)
