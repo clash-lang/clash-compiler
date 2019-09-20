@@ -304,14 +304,31 @@ step eval tcm (h, k, e) = case e of
         []  -> eval (isScrut k) tcm h k nm pInfo [] []
         tys -> let (h2,e') = mkAbstr (h,e) tys
                in  step eval tcm (h2,k,e')
+  App (Cast e1 ty1 ty2) e2 -> case (tyView ty1, tyView ty2) of
+    (FunTy a1 r1, FunTy a2 r2) -> Just (h,k,Cast (App e1 (Cast e2 a2 a1)) r1 r2)
+    _ -> error "Expecting cast of a function"
   (App e1 e2)  -> let (h2,id_) = newLetBinding tcm h e2
                   in  Just (h2,Apply id_:k,e1)
+  TyApp (Cast _ cty1 cty2) _ -> case (cty1,cty2) of
+    (ForAllTy {}, ForAllTy {})
+      -> trace (unwords [ "WARNING:"
+                        , $(curLoc)
+                        , "Clash cannot symbolically evaluate casts of type quantifications."])
+               Nothing
+    _ -> error "Expecting cast of a forall"
   (TyApp e1 ty) -> Just (h,Instantiate ty:k,e1)
-  (Case scrut ty alts) -> Just (h,Scrutinise ty alts:k,scrut)
+  Case (Cast {}) _ _
+    -> trace (unwords [ "WARNING:"
+                      , $(curLoc)
+                      , "Clash cannot symbolically evaluate casts of case-subjects"])
+             Nothing
+  Case scrut ty alts -> Just (h,Scrutinise ty alts:k,scrut)
   (Letrec bs e') -> Just (allocate h k bs e')
   Tick sp e' -> Just (h,Tickish sp:k,e')
-  Cast _ _ _ -> trace (unlines ["WARNING: " ++ $(curLoc) ++ "Clash currently can't symbolically evaluate casts"
-                                    ,"If you have testcase that produces this message, please open an issue about it."]) Nothing
+  Cast (Cast e' ty1 _) _ ty2 -> Just (h,k,Cast e' ty1 ty2)
+  Cast e1 ty1 ty2 -> do
+    (h2,k2,e2) <- step eval tcm (h,k,e1)
+    pure (h2,k2,Cast e2 ty1 ty2)
 
 newLetBinding
   :: TyConMap
