@@ -1487,18 +1487,22 @@ reduceConstant tcm isSubj pInfo tys args mach = case primName pInfo of
 
 -- Bits
   "Clash.Sized.Internal.BitVector.and##"
-    | [(0,i),(0,j)] <- bitLiterals args
-    -> reduce (mkBitLit ty 0 (i .&. j))
+    | [i,j] <- bitLiterals args
+    -> let Bit msk val = BitVector.and## (toBit i) (toBit j)
+       in reduce (mkBitLit ty msk val)
   "Clash.Sized.Internal.BitVector.or##"
-    | [(0,i),(0,j)] <- bitLiterals args
-    -> reduce (mkBitLit ty 0 (i .|. j))
+    | [i,j] <- bitLiterals args
+    -> let Bit msk val = BitVector.or## (toBit i) (toBit j)
+       in reduce (mkBitLit ty msk val)
   "Clash.Sized.Internal.BitVector.xor##"
-    | [(0,i),(0,j)] <- bitLiterals args
-    -> reduce (mkBitLit ty 0 (i `xor` j))
+    | [i,j] <- bitLiterals args
+    -> let Bit msk val = BitVector.xor## (toBit i) (toBit j)
+       in reduce (mkBitLit ty msk val)
 
   "Clash.Sized.Internal.BitVector.complement##"
-    | [(0,i)] <- bitLiterals args
-    -> reduce (mkBitLit ty 0 (complement i))
+    | [i] <- bitLiterals args
+    -> let Bit msk val = BitVector.complement## (toBit i)
+       in reduce (mkBitLit ty msk val)
 
 -- Pack
   "Clash.Sized.Internal.BitVector.pack#"
@@ -3575,6 +3579,9 @@ toBV = uncurry BV
 
 splitBV :: BitVector n -> (Integer,Integer)
 splitBV (BV msk val) = (msk,val)
+
+toBit :: (Integer,Integer) -> Bit
+toBit = uncurry Bit
 
 valArgs
   :: Value
