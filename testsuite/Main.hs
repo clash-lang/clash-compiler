@@ -250,6 +250,7 @@ runClashTest = defaultMain $ clashTestRoot
         , runTest "ExtendingNumZero" def
         , runTest "GenericBitPack" def{clashFlags=["-fconstraint-solver-iterations=15"]}
         , runTest "AppendZero" def
+        , runTest "UnpackUndefined" def{hdlSim=False}
         ]
       , clashTestGroup "BlackBox"
         [ outputTest ("tests" </> "shouldwork" </> "BlackBox") [VHDL]   [] [] "TemplateFunction"   "main"
@@ -376,6 +377,7 @@ runClashTest = defaultMain $ clashTestRoot
         , runTest "Signum" def
         , runTest "Strict" def
         , runTest "T1019" def{hdlSim=False}
+        , outputTest ("tests" </> "shouldwork" </> "Numbers") allTargets [] ["-itests/shouldwork/Numbers"] "UndefinedConstantFolding"  "main"
         , runTest "UnsignedZero" def
         ]
       , clashTestGroup "Polymorphism"
