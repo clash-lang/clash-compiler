@@ -63,7 +63,8 @@ module Clash.Annotations.TH
   , makeTopEntityWithName'
     -- * To create a TopEntity value
   , buildTopEntity
-  , buildTopEntity'
+  , maybeBuildTopEntity
+  , getNameBinding
   )
 where
 
@@ -87,6 +88,7 @@ import           Clash.Annotations.TopEntity    ( PortName(..)
                                                 , TopEntity(..)
                                                 )
 import           Clash.NamedTypes
+import           Clash.Signal                   (HiddenClockResetEnable)
 
 $(makeBaseFunctor ''Type)
 
@@ -115,7 +117,7 @@ getTypes (GadtC _ xs _)    = map snd xs
 getTypes (RecGadtC _ xs _) = map (view _3) xs
 
 -- | A template haskell helper function. Get the 'Name' of a 'Con'. These names
--- are only used in type/data family resolution which is best effort, 
+-- are only used in type/data family resolution which is best effort,
 -- so for Gadts we just take the first name.
 getName :: Con -> Name
 getName (NormalC n _)          = n
@@ -333,26 +335,50 @@ toArgNames split ty = go (0::Int) ty []
                       ++ "\n got name " ++ show f
     go _ _ acc = return acc
 
--- | Remove constraints from a type. Fail if there are free type variables.
-removeConstraints :: Type -> Q Type
-removeConstraints (ForallT [] _ x) = removeConstraints x
-removeConstraints (ForallT xs _ x) =
+-- | Remove constraints from a type.
+-- Fail if:
+-- - There are free type variables.
+-- - There are multiple hidden clocks
+handleConstraints :: Type -> Bool -> Q (Type, Bool)
+handleConstraints (ForallT [] [] x) b = handleConstraints x b
+handleConstraints (ForallT xs@(_:_) _ x) _ =
   fail $  "Found free type variables on TopEntity!\n"
        ++ pprint xs
        ++ "\nattached to\n"
        ++ pprint x
-removeConstraints x = return x
+handleConstraints (ForallT _ c x) b
+  | hiddenClocks == 0 = handleConstraints x b
+  | hiddenClocks == 1 && not b = handleConstraints x True
+  | hiddenClocks > 1
+    || hiddenClocks == 1 && b
+    = fail "Can't generate topEntity for multiple hidden clocks!"
+ where
+  hiddenClocks = foldl countHiddenClocks (0 :: Integer) c
+  countHiddenClocks acc (AppT (ConT a) _)
+    | a == ''Clash.Signal.HiddenClockResetEnable
+      = acc + 1
+  countHiddenClocks acc _ = acc
+handleConstraints x b = return (x, b)
 
 -- | Return a typed expression for a 'TopEntity' of a given @('Name', 'Type')@.
-buildTopEntity' :: Maybe String -> (Name, Type) -> TExpQ TopEntity
-buildTopEntity' topName (name, ty) = do
+buildTopEntity :: Maybe String -> (Name, Type) -> TExpQ TopEntity
+buildTopEntity topName (name, ty) = do
     -- get a Name for this type operator so we can check it
     -- in the ArrowTy case
     split <- [t| (:::) |]
 
-    ty' <- removeConstraints ty
+    (ty', hasHiddenClock) <- handleConstraints ty False
 
-    ins   <- toArgNames split ty'
+    let clock = if hasHiddenClock
+                then [ PortProduct ""
+                       [ PortName "clk"
+                       , PortName "rst"
+                       , PortName "en"
+                       ]
+                     ]
+                else []
+
+    ins   <- mappend clock <$> toArgNames split ty'
     out   <- toReturnName split ty'
 
     let outName = case topName of
@@ -365,10 +391,13 @@ buildTopEntity' topName (name, ty) = do
         , t_output = out
         } ||]
 
--- | Return an untyped expression for a 'TopEntity' of a given 'Name'.
-buildTopEntity :: Maybe String -> Name -> ExpQ
-buildTopEntity topName name =
-  fmap unType $ getNameBinding name >>= buildTopEntity' topName
+-- | Return a maybe untyped expression for a 'TopEntity' of a given 'Name'.
+-- This will return an 'TExp' of 'Nothing' if 'TopEntity' generation failed.
+maybeBuildTopEntity :: Maybe String -> Name -> Q (TExp (Maybe TopEntity))
+maybeBuildTopEntity topName name = do
+  recover ([|| Nothing ||]) $ do
+    let expr = getNameBinding name >>= buildTopEntity topName
+    [|| Just ($$expr) ||]
 
 -- | Turn the 'Name' of a value to a @('Name', 'Type')@
 getNameBinding :: Name -> Q (Name, Type)
@@ -380,7 +409,7 @@ getNameBinding n = reify n >>= \case
 makeTopEntityWithName' :: Name -> Maybe String -> DecQ
 makeTopEntityWithName' n topName = do
   (name,ty) <- getNameBinding n
-  topEntity <- buildTopEntity' topName (name,ty)
+  topEntity <- buildTopEntity topName (name,ty)
   let prag t = PragmaD (AnnP (valueAnnotation name) t)
   return $ prag $ unType topEntity
 
