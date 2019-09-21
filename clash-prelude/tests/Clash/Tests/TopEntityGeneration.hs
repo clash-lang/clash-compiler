@@ -1,13 +1,16 @@
 {-# LANGUAGE DataKinds        #-}
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE TemplateHaskell  #-}
 {-# LANGUAGE TypeOperators    #-}
 {-# LANGUAGE TypeFamilies     #-}
 {-# LANGUAGE GADTs            #-}
 
+{-# LANGUAGE CPP              #-}
+
 module Clash.Tests.TopEntityGeneration where
 
-import Language.Haskell.TH.Syntax (recover)
+import Language.Haskell.TH.Syntax (unTypeQ)
 
 import Test.Tasty
 import Test.Tasty.HUnit
@@ -144,6 +147,8 @@ expectedTopEntity5 =
     (PortName "out")
 
 topEntity6 :: (HiddenClockResetEnable System)
+           => (1~1, Eq Int)
+           => (Ord Int)
            => "in1" ::: Signal System SuccessTy
            -> "out" ::: Signal System Int
 topEntity6 = undefined
@@ -152,7 +157,8 @@ makeTopEntity 'topEntity6
 expectedTopEntity6 :: TopEntity
 expectedTopEntity6 =
  Synthesize "topEntity6"
-    [PortProduct "in1" [PortName "one", PortName "s"]]
+    [ PortProduct "" [ PortName "clk", PortName "rst", PortName "en"]
+    , PortProduct "in1" [PortName "one", PortName "s"]]
     (PortName "out")
 
 
@@ -194,34 +200,61 @@ topEntityFailure6
   -> "out"     ::: Signal System Bool
 topEntityFailure6 = undefined
 
+#if MULTIPLE_HIDDEN
+topEntityFailure7
+  :: HiddenClockResetEnable System
+  => HiddenClockResetEnable XilinxSystem
+  => "int"     ::: Signal System Int
+  -> "out"     ::: Signal System Bool
+topEntityFailure7 = undefined
+#endif
+
+-- This splice is needed to make sure TH.names are in the type environment
+-- during reify for the expected failure cases.
+$( return [] )
+
 tests :: TestTree
 tests =
-  testGroup
-    "TopEntityGeneration"
-    [ testCase "topEntity1" $
-      $(recover ([| () |]) (buildTopEntity Nothing 'topEntity1)) @?= expectedTopEntity1
-    , testCase "topEntity2" $
-      $(recover ([| () |]) (buildTopEntity Nothing 'topEntity2)) @?= expectedTopEntity2
-    , testCase "topEntity3" $
-      $(recover ([| () |]) (buildTopEntity Nothing 'topEntity3)) @?= expectedTopEntity3
-    , testCase "topEntity4" $
-      $(recover ([| () |]) (buildTopEntity Nothing 'topEntity4)) @?= expectedTopEntity4
-    , testCase "topEntity5" $
-      $(recover ([| () |]) (buildTopEntity Nothing 'topEntity5)) @?= expectedTopEntity5
-    , testCase "topEntity6" $
-      $(recover ([| () |]) (buildTopEntity Nothing 'topEntity6)) @?= expectedTopEntity6
-
-    , testCase "topEntityFailure1" $
-      $(recover ([| () |]) (buildTopEntity Nothing 'topEntityFailure1)) @?= ()
-    , testCase "topEntityFailure2" $
-      $(recover ([| () |]) (buildTopEntity Nothing 'topEntityFailure2)) @?= ()
-    , testCase "topEntityFailure3" $
-      $(recover ([| () |]) (buildTopEntity Nothing 'topEntityFailure3)) @?= ()
-    , testCase "topEntityFailure4" $
-      $(recover ([| () |]) (buildTopEntity Nothing 'topEntityFailure4)) @?= ()
-    , testCase "topEntityFailure5" $
-      $(recover ([| () |]) (buildTopEntity Nothing 'topEntityFailure5)) @?= ()
-    , testCase "topEntityFailure6" $
-      $(recover ([| () |]) (buildTopEntity Nothing 'topEntityFailure6)) @?= ()
+  testGroup "TopEntityGeneration"
+    [ testGroup "Expected successes"
+      [ testCase "topEntity1" $
+          $(unTypeQ $ maybeBuildTopEntity Nothing 'topEntity1)
+          @?= Just expectedTopEntity1
+      , testCase "topEntity2" $
+          $(unTypeQ $ maybeBuildTopEntity Nothing 'topEntity2)
+          @?= Just expectedTopEntity2
+      , testCase "topEntity3" $
+          $(unTypeQ $ maybeBuildTopEntity Nothing 'topEntity3)
+          @?= Just expectedTopEntity3
+      , testCase "topEntity4" $
+          $(unTypeQ $ maybeBuildTopEntity Nothing 'topEntity4)
+          @?= Just expectedTopEntity4
+      , testCase "topEntity5" $
+          $(unTypeQ $ maybeBuildTopEntity Nothing 'topEntity5)
+          @?= Just expectedTopEntity5
+      , testCase "topEntity6" $
+          $(unTypeQ $ maybeBuildTopEntity Nothing 'topEntity6)
+          @?= Just expectedTopEntity6
+      ]
+    , testGroup "Expected failures"
+      [ testCase "topEntityFailure1" $
+          $(unTypeQ $ maybeBuildTopEntity Nothing 'topEntityFailure1) @?= failed
+      , testCase "topEntityFailure2" $
+          $(unTypeQ $ maybeBuildTopEntity Nothing 'topEntityFailure2) @?= failed
+      , testCase "topEntityFailure3" $
+          $(unTypeQ $ maybeBuildTopEntity Nothing 'topEntityFailure3) @?= failed
+      , testCase "topEntityFailure4" $
+          $(unTypeQ $ maybeBuildTopEntity Nothing 'topEntityFailure4) @?= failed
+      , testCase "topEntityFailure5" $
+          $(unTypeQ $ maybeBuildTopEntity Nothing 'topEntityFailure5) @?= failed
+      , testCase "topEntityFailure6" $
+          $(unTypeQ $ maybeBuildTopEntity Nothing 'topEntityFailure6) @?= failed
+#if MULTIPLE_HIDDEN
+      , testCase "topEntityFailure7" $
+          $(unTypeQ $ maybeBuildTopEntity Nothing 'topEntityFailure7) @?= failed
+#endif
+      ]
     ]
+ where
+  failed = Nothing :: Maybe TopEntity
 
