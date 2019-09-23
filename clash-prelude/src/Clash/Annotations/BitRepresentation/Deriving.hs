@@ -201,7 +201,7 @@ typeSize typ = do
   bitSizeInstances <- reifyInstances ''BitSize [typ]
   case bitSizeInstances of
     [] ->
-      error $ unwords [
+      fail $ unwords [
           "Could not find custom bit representation nor BitSize instance"
         , "for", show typ ++ "." ]
 #if MIN_VERSION_template_haskell(2,15,0)
@@ -213,7 +213,7 @@ typeSize typ = do
     [_impl] ->
       [| fromIntegral $ natVal (Proxy :: Proxy (BitSize $(return typ))) |]
     unexp ->
-      error $ "Unexpected result from reifyInstances: " ++ show unexp
+      fail $ "Unexpected result from reifyInstances: " ++ show unexp
 
 -- | Generate bitmask from a given bit, with a certain size
 bitmask
@@ -394,7 +394,7 @@ deriveDataRepr constrDerivator fieldsDerivator typ = do
           ($dataSize + constrSize)
           $(listE constrReprs) |]
     _ ->
-      error $ "Could not derive dataRepr for: " ++ show info
+      fail $ "Could not derive dataRepr for: " ++ show info
 
     where
       (ConT tyConstrName, typeArgs) = collectTypeArgs typ
@@ -572,16 +572,17 @@ packedMaybeDerivator :: DataReprAnn -> Derivator
 packedMaybeDerivator (DataReprAnn _ size _) typ =
   case maybeCon of
     ConT nm ->
-      if nm == ''Maybe then
+      if nm == ''Maybe then do
         let err = unwords [ "Could not derive packed maybe for:", show typ
                           , ";", "Does its subtype have any space left to store"
-                          , "the constructor in?" ] in
-        lift =<< (fromMaybe $ error err) <$> (packedMaybe (size - 1) maybeTyp)
+                          , "the constructor in?" ]
+        packedM <- packedMaybe (size - 1) maybeTyp
+        (fromMaybe (fail err) . fmap lift) packedM
       else
-        error $ unwords [ "You can only pass Maybe types to packedMaybeDerivator,"
+        fail $ unwords [ "You can only pass Maybe types to packedMaybeDerivator,"
                         , "not", show nm]
     unexpected ->
-      error $ "packedMaybeDerivator: unexpected constructor: " ++ show unexpected
+      fail $ "packedMaybeDerivator: unexpected constructor: " ++ show unexpected
   where
     (maybeCon, head -> maybeTyp) = collectTypeArgs typ
 
@@ -739,7 +740,7 @@ group bs = (length head', head bs) : rest
     rest  = group tail'
 
 bitToExpr' :: (Int, Bit) -> Q Exp -- BitVector n
-bitToExpr' (0, _) = error $ "Unexpected group length: 0"
+bitToExpr' (0, _) = fail $ "Unexpected group length: 0"
 bitToExpr' (numTyLit' -> n, Util.H) =
   [| complement (resize (pack low) :: BitVector $n) |]
 bitToExpr' (numTyLit' -> n, Util.L) =
@@ -748,7 +749,7 @@ bitToExpr' (numTyLit' -> n, _) =
   [| undefined# :: BitVector $n |]
 
 bitsToExpr :: [Bit] -> Q Exp -- BitVector n
-bitsToExpr [] = error $ "Unexpected empty bit list"
+bitsToExpr [] = fail $ "Unexpected empty bit list"
 bitsToExpr bits =
   foldl1
     (\v1 v2 -> [| $v1 ++# $v2 |])
@@ -763,7 +764,7 @@ select'
   -> [(Int, Int)]
   -> Q Exp
 select' _vec [] =
-  error $ "Unexpected empty list of intervals"
+  fail $ "Unexpected empty list of intervals"
 select' vec ranges =
   foldl1 (\v1 v2 -> [| $v1 ++# $v2 |]) $ map (return . select'') ranges
     where
@@ -793,7 +794,7 @@ select
   -- ^ Select bits
   -> Q Exp
 select _fields (Lit []) =
-  error $ "Unexpected empty literal."
+  fail $ "Unexpected empty literal."
 select _fields (Lit lits) = do
   let size = length lits
   vec <- bitsToExpr lits
@@ -899,10 +900,10 @@ deriveBitPack typQ = do
   anns <- collectDataReprs
   typ  <- typQ
 
-  let ann = case filter (\(DataReprAnn t _ _) -> t == typ) anns of
-              [a] -> a
-              []  -> error $ "No custom bit annotation found."
-              _   -> error $ "Overlapping bit annotations found."
+  ann <- case filter (\(DataReprAnn t _ _) -> t == typ) anns of
+              [a] -> return a
+              []  -> fail "No custom bit annotation found."
+              _   -> fail "Overlapping bit annotations found."
 
   packFunc   <- buildPack ann
   unpackFunc <- buildUnpack ann
@@ -923,6 +924,6 @@ deriveBitPack typQ = do
                ]
   alreadyIsInstance <- isInstance ''BitPack [typ]
   if alreadyIsInstance then
-    error $ show typ ++ " already has a BitPack instance."
+    fail $ show typ ++ " already has a BitPack instance."
   else
     return bpInst
