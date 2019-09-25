@@ -1,5 +1,9 @@
 # Changelog for [`clash-prelude` package](http://hackage.haskell.org/package/clash-prelude)
 
+## 1.1.0
+* New features:
+  * `Bundle ((f :*: g) a)` instance
+
 ## 1.0.0 *September 3rd 2019*
 * New features:
   * API changes: check the migration guide at the end of `Clash.Tutorial`
