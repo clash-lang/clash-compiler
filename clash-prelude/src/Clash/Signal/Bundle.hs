@@ -1,6 +1,7 @@
 {-|
 Copyright  :  (C) 2013-2016, University of Twente,
                   2017-2019, Myrtle Software Ltd, Google Inc.
+                       2019, QBayLogic B.V.
 License    :  BSD2 (see the file LICENSE)
 Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
 
@@ -29,6 +30,8 @@ module Clash.Signal.Bundle
   )
 where
 
+import Data.Functor.Compose
+import GHC.Generics
 import GHC.TypeLits                 (KnownNat)
 import Prelude                      hiding (head, map, tail)
 
@@ -143,3 +146,11 @@ instance KnownNat d => Bundle (RTree d a) where
   type Unbundled t (RTree d a) = RTree d (Signal t a)
   bundle   = sequenceA
   unbundle = sequenceA . fmap lazyT
+
+instance Bundle ((f :*: g) a) where
+  type Unbundled t ((f :*: g) a) = (Compose (Signal t) f :*: Compose (Signal t) g) a
+  bundle (Compose l :*: Compose r) = (:*:) <$> l <*> r
+  unbundle s = Compose (getL <$> s) :*: Compose (getR <$> s)
+   where
+    getL (l :*: _) = l
+    getR (_ :*: r) = r
