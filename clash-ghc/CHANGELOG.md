@@ -1,5 +1,9 @@
 # Changelog for the [`clash-ghc`](http://hackage.haskell.org/package/clash-ghc) package
 
+## 1.1.0
+* Fixes issues:
+  * [#811](https://github.com/clash-lang/clash-compiler/issues/811)
+
 ## 1.0.0 *September 3rd 2019*
 * 10x - 50x faster compile times
 * New features:

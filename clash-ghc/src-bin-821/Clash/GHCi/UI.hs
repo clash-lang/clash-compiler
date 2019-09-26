@@ -1871,7 +1871,7 @@ makeHDL' :: Clash.Backend.Backend backend
          -> IORef ClashOpts
          -> [FilePath]
          -> InputT GHCi ()
-makeHDL' backend opts lst = makeHDL backend opts =<< case lst of
+makeHDL' backend opts lst = go =<< case lst of
   srcs@(_:_) -> return srcs
   []         -> do
     modGraph <- GHC.getModuleGraph
@@ -1879,6 +1879,25 @@ makeHDL' backend opts lst = makeHDL backend opts =<< case lst of
     return $ case (reverse sortedGraph) of
       ((AcyclicSCC top) : _) -> maybeToList $ (GHC.ml_hs_file . GHC.ms_location) top
       _                      -> []
+ where
+  go srcs = do
+    dflags <- GHC.getSessionDynFlags
+    goX dflags srcs `gfinally` recover dflags
+
+  goX dflags srcs = do
+    (dflagsX,_,_) <- parseDynamicFlagsCmdLine dflags
+                       [ noLoc "-fobject-code"   -- For #439
+                       , noLoc "-fforce-recomp"  -- Actually compile to object-code
+                       , noLoc "-keep-tmp-files" -- To prevent linker errors from
+                                                 -- multiple calls to :hdl command
+                       ]
+    _ <- GHC.setSessionDynFlags dflagsX
+    reloadModule ""
+    makeHDL backend opts srcs
+
+  recover dflags = do
+    _ <- GHC.setSessionDynFlags dflags
+    reloadModule ""
 
 makeHDL :: GHC.GhcMonad m
         => Clash.Backend.Backend backend
