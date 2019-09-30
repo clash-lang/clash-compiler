@@ -178,6 +178,7 @@ applyDebug
   -- ^ New expression
   -> RewriteMonad extra Term
 applyDebug lvl name exprOld hasChanged exprNew =
+ traceIf (lvl == DebugTry) ("Trying: " ++ name) $
  traceIf (lvl >= DebugAll) ("Trying: " ++ name ++ " on:\n" ++ before) $ do
   Monad.when (lvl > DebugNone && hasChanged) $ do
     tcm                  <- Lens.view tcCache
