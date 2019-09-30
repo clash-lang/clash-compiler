@@ -42,7 +42,9 @@ data DebugLevel
   | DebugFinal
   -- ^ Show completely normalized expressions
   | DebugName
-  -- ^ Names of applied transformations
+  -- ^ Show names of applied transformations
+  | DebugTry
+  -- ^ Show names of tried AND applied transformations
   | DebugApplied
   -- ^ Show sub-expressions after a successful rewrite
   | DebugAll
