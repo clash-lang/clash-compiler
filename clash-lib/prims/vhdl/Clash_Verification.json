@@ -1,0 +1,43 @@
+[ { "BlackBox" :
+    { "name" : "Clash.Verification.past"
+    , "kind" : "Expression"
+    , "workInfo" : "Constant"
+    , "type" :
+"past
+  :: HiddenClock dom -- ARG[0]
+  => Signal dom Bool -- ARG[1]
+  -> Signal dom Bool"
+    , "template" : "prev(~ARG[1])"
+    }
+  }
+, { "BlackBox" :
+    { "name" : "Clash.Verification.assertAt#"
+    , "kind" : "Declaration"
+    , "workInfo" : "Always"
+    , "type" :
+"assertAt#
+  :: KnownDomain dom
+  => Clock dom
+  -> Signal dom Bool
+  -> a
+  -> a"
+    , "template" :
+"-- psl assert (always ~ARG[2]) @~IF~ACTIVEEDGE[Rising][0]~THENrising_edge~ELSEfalling_edge~FI (~ARG[1]);
+~RESULT <= ~ARG[3];"
+    }
+  }
+, { "BlackBox" :
+    { "name" : "Clash.Verification.assertAlways"
+    , "kind" : "Declaration"
+    , "workInfo" : "Always"
+    , "type" :
+"assertAlways
+  :: Signal dom Bool
+  -> a
+  -> a"
+    , "template" :
+"-- psl assert (always ~ARG[0]);
+assign ~RESULT = ~ARG[1];"
+    }
+  }
+]

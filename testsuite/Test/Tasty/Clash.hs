@@ -262,7 +262,7 @@ ghdlMake
 ghdlMake path modName subdirs libs entName =
   (testName, test)
   where
-    args = concat [ ["-m"]
+    args = concat [ ["-m", "-fpsl"]
                -- TODO: Automatically detect GCC/linker version
                -- Enable flags when running newer versions of the (GCC) linker.
                -- , ["-Wl,-no-pie"]

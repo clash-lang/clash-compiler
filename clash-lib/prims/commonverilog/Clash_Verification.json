@@ -1,0 +1,13 @@
+[ { "BlackBox" :
+    { "name" : "Clash.Verification.past"
+    , "kind" : "Expression"
+    , "workInfo" : "Constant"
+    , "type" :
+"past
+  :: HiddenClock dom -- ARG[0]
+  => Signal dom Bool -- ARG[1]
+  -> Signal dom Bool"
+    , "template" : "$past(~ARG[1])"
+    }
+  }
+]

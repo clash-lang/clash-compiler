@@ -1,0 +1,31 @@
+[ { "BlackBox" :
+    { "name" : "Clash.Verification.assertAt#"
+    , "kind" : "Declaration"
+    , "workInfo" : "Always"
+    , "type" :
+"assertAt#
+  :: KnownDomain dom
+  => Clock dom
+  -> Signal dom Bool
+  -> a
+  -> a"
+    , "template" :
+"assert property (@(~IF~ACTIVEEDGE[Rising][0]~THENposedge~ELSEnegedge~FI ~ARG[1]) ~ARG[2]);
+assign ~RESULT = ~ARG[3];"
+    }
+  }
+, { "BlackBox" :
+    { "name" : "Clash.Verification.assertAlways"
+    , "kind" : "Declaration"
+    , "workInfo" : "Always"
+    , "type" :
+"assertAlways
+  :: Signal dom Bool
+  -> a
+  -> a"
+    , "template" :
+"assert property (~ARG[0]);
+assign ~RESULT = ~ARG[1];"
+    }
+  }
+]

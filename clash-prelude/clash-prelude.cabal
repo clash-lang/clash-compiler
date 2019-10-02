@@ -210,6 +210,8 @@ Library
                       Clash.Sized.Internal.Signed
                       Clash.Sized.Internal.Unsigned
 
+                      Clash.Verification
+
                       Clash.XException
 
                       Clash.Xilinx.ClockGen
