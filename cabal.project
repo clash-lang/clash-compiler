@@ -51,3 +51,7 @@ package clash-lib
 optional-packages:
   clash-cosim/clash-cosim.cabal,
   clash-term/clash-term.cabal
+
+-- rewrite-inspector is currently failing because it lacks an upper bound
+-- and the API for vty has changed
+constraints: vty < 5.26
