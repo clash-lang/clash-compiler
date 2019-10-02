@@ -7,6 +7,7 @@ Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
 PLL and other clock-related components for Intel (Altera) FPGAs
 -}
 
+{-# LANGUAGE BangPatterns      #-}
 {-# LANGUAGE DataKinds         #-}
 {-# LANGUAGE FlexibleContexts  #-}
 {-# LANGUAGE ExplicitForAll    #-}
@@ -53,7 +54,7 @@ altpll
   -- ^ Reset for the PLL
   -> (Clock domOut, Signal domOut Bool)
   -- ^ (Stable PLL clock, PLL lock)
-altpll _ = clocks
+altpll !_ = clocks
 {-# NOINLINE altpll #-}
 
 -- | A clock source that corresponds to the Intel/Quartus \"Altera PLL\"
@@ -95,5 +96,5 @@ alteraPll
   -> Reset domIn
   -- ^ Reset for the PLL
   -> t
-alteraPll _ = clocks
+alteraPll !_ = clocks
 {-# NOINLINE alteraPll #-}
