@@ -6,6 +6,7 @@ Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
 PLL and other clock-related components for Xilinx FPGAs
 -}
 
+{-# LANGUAGE BangPatterns     #-}
 {-# LANGUAGE DataKinds        #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE ExplicitForAll   #-}
@@ -53,7 +54,7 @@ clockWizard
   -- ^ Reset for the PLL
   -> (Clock domOut, Enable domOut)
   -- ^ (Stable PLL clock, PLL lock)
-clockWizard _ clk rst =
+clockWizard !_ clk rst =
   (unsafeCoerce clk, unsafeCoerce (toEnable (unsafeToHighPolarity rst)))
 {-# NOINLINE clockWizard #-}
 {-# ANN clockWizard hasBlackBox #-}
@@ -96,7 +97,7 @@ clockWizardDifferential
   -- ^ Reset for the PLL
   -> (Clock domOut, Enable domOut)
   -- ^ (Stable PLL clock, PLL lock)
-clockWizardDifferential _name (Clock _) (Clock _) rst =
+clockWizardDifferential !_name (Clock _) (Clock _) rst =
   (Clock SSymbol, unsafeCoerce (toEnable (unsafeToHighPolarity rst)))
 {-# NOINLINE clockWizardDifferential #-}
 {-# ANN clockWizardDifferential hasBlackBox #-}
