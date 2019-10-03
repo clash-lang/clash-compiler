@@ -58,10 +58,12 @@ data NormalizeState
   , _primitiveArgs :: Map Text (Set Int)
   -- ^ Cache for looking up constantness of blackbox arguments
   , _recursiveComponents :: VarEnv Bool
-  -- ^ Map telling whether a components is recursively defined.
+  -- ^ Map telling whether a component is recursively defined.
   --
   -- NB: there are only no mutually-recursive component, only self-recursive
   -- ones.
+  , _workFreeComponents :: VarEnv Bool
+  -- ^ Map telling whether a component is work free
   , _newInlineStrategy :: Bool
   -- ^ Flattening stage should use the new (no-)inlining strategy
   , _normalizeUltra :: Bool

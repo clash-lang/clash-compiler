@@ -105,13 +105,15 @@ runNormalization
   -> CompiledPrimMap
   -- ^ Primitive Definitions
   -> VarEnv Bool
-  -- ^ Map telling whether a components is part of a recursive group
+  -- ^ Map telling whether a component is part of a recursive group
+  -> VarEnv Bool
+  -- ^ Map telling whether a component is work free
   -> [Id]
   -- ^ topEntities
   -> NormalizeSession a
   -- ^ NormalizeSession to run
   -> a
-runNormalization opts supply globals typeTrans reprs tcm tupTcm eval primMap rcsMap topEnts
+runNormalization opts supply globals typeTrans reprs tcm tupTcm eval primMap rcsMap wfMap topEnts
   = runRewriteSession rwEnv rwState
   where
     rwEnv     = RewriteEnv
@@ -144,6 +146,7 @@ runNormalization opts supply globals typeTrans reprs tcm tupTcm eval primMap rcs
                   primMap
                   Map.empty
                   rcsMap
+                  wfMap
                   (opt_newInlineStrat opts)
                   (opt_ultra opts)
 

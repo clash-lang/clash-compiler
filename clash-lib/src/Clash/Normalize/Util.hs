@@ -21,6 +21,7 @@ module Clash.Normalize.Util
  , specializeNorm
  , isRecursiveBndr
  , isClosed
+ , isWorkFree
  , callGraph
  , classifyFunction
  , isCheapFunction
@@ -32,6 +33,7 @@ module Clash.Normalize.Util
  )
  where
 
+import           Control.Applicative     (liftA2)
 import           Control.Lens            ((&),(+~),(%=),(^.),_4,(.=))
 import qualified Control.Lens            as Lens
 import           Data.Bifunctor          (bimap)
@@ -40,6 +42,7 @@ import qualified Data.List               as List
 import qualified Data.Map                as Map
 import qualified Data.HashMap.Strict     as HashMapS
 import           Data.Text               (Text)
+import           GHC.Stack               (HasCallStack)
 
 import           BasicTypes              (InlineSpec)
 
@@ -52,10 +55,10 @@ import           Clash.Core.Term
   (Context, CoreContext(AppArg), PrimInfo (..), Term (..), WorkInfo (..),
    TickInfo, collectArgs, collectArgsTicks)
 import           Clash.Core.TyCon        (TyConMap)
-import           Clash.Core.Type         (Type, undefinedTy)
+import           Clash.Core.Type         (Type, isPolyFunTy, undefinedTy)
 import           Clash.Core.Util
   (isClockOrReset, isPolyFun, termType, mkApps, mkTicks)
-import           Clash.Core.Var          (Id, Var (..), isGlobalId)
+import           Clash.Core.Var          (Id, Var (..), isGlobalId, isLocalId)
 import           Clash.Core.VarEnv
   (VarEnv, emptyInScopeSet, emptyVarEnv, extendVarEnv, extendVarEnvWith,
    lookupVarEnv, unionVarEnvWith, unitVarEnv, extendInScopeSetList)
@@ -67,10 +70,62 @@ import           Clash.Rewrite.Types
   (RewriteMonad, TransformContext(..), bindings, curFun, dbgLevel, extra,
    tcCache)
 import           Clash.Rewrite.Util
-  (runRewrite, specialise, mkTmBinderFor, mkDerivedName)
+  (runRewrite, specialise, mkTmBinderFor, mkDerivedName, isConstant)
 import           Clash.Unique
 import           Clash.Util
-  (SrcSpan, anyM, makeCachedU, traceIf, mapAccumLM)
+  (SrcSpan, allM, anyM, makeCachedU, traceIf, mapAccumLM)
+
+-- | Determines whether a global binder is work free. Errors if binder does
+-- not exist.
+isWorkFreeBinder :: HasCallStack => Id -> NormalizeSession Bool
+isWorkFreeBinder bndr =
+  makeCachedU bndr (extra.workFreeComponents) $ do
+    bExprM <- lookupVarEnv bndr <$> Lens.use bindings
+    case bExprM of
+      Nothing ->
+        error ("isWorkFreeBinder: couldn't find binder: " ++ showPpr bndr)
+      Just (_, _, _, bExpr) ->
+        isWorkFree bExpr
+
+-- | Determine whether a term does any work, i.e. adds to the size of the circuit
+isWorkFree
+  :: Term
+  -> NormalizeSession Bool
+isWorkFree (collectArgs -> (fun,args)) = case fun of
+  Var i -> do
+    isRec <- isRecursiveBndr i
+    let isPoly = isPolyFunTy (varType i)
+    if isLocalId i && not isPoly then
+      pure True
+    else if isGlobalId i && not isRec then do
+      isWorkFreeBinder i
+    else
+      pure False
+  Data {}          -> allM isWorkFreeArg args
+  Literal {}       -> pure True
+  Prim _ pInfo -> case primWorkInfo pInfo of
+    WorkConstant   -> pure True -- We can ignore the arguments, because this
+                                -- primitive outputs a constant regardless of its
+                                -- arguments
+    WorkNever      -> allM isWorkFreeArg args
+    WorkVariable   -> pure (all isConstantArg' args)
+    WorkAlways     -> pure False -- Things like clock or reset generator always
+                                 -- perform work
+  Lam _ e          -> liftA2 (&&) (isWorkFree e) (allM isWorkFreeArg args)
+  TyLam _ e        -> liftA2 (&&) (isWorkFree e) (allM isWorkFreeArg args)
+  Letrec bs e ->
+    and <$> sequence [ isWorkFree e
+                     , allM (isWorkFree . snd) bs
+                     , allM isWorkFreeArg args ]
+  Case s _ [(_,a)] ->
+    and <$> sequence [ isWorkFree s
+                     , isWorkFree a
+                     , allM isWorkFreeArg args ]
+  Cast e _ _       -> liftA2 (&&) (isWorkFree e) (allM isWorkFreeArg args)
+  _                -> pure False
+ where
+  isWorkFreeArg = either isWorkFree (pure . const True)
+  isConstantArg' = either isConstant (const True)
 
 -- | Determine if argument should reduce to a constant given a primitive and
 -- an argument number. Caches results.

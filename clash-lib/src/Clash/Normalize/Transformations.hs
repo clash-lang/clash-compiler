@@ -1122,8 +1122,9 @@ constantSpec _ e = return e
 -- we inline global binders, we ensure that inlined expression is deshadowed
 -- taking the InScopeSet of the context into account.
 appProp :: HasCallStack => NormRewrite
-appProp (TransformContext is0 _) (App (collectTicks -> (Lam v e,ticks)) arg) =
-  if isWorkFree arg || isVar arg
+appProp (TransformContext is0 _) (App (collectTicks -> (Lam v e,ticks)) arg) = do
+  iwf <- isWorkFree arg
+  if iwf || isVar arg
     then do
       let subst = extendIdSubst (mkSubst is0) v arg
       changed $ mkTicks (substTm "appProp.AppLam" subst e) ticks
@@ -1134,9 +1135,10 @@ appProp _ (App (collectTicks -> (Letrec v e, ticks)) arg) = do
 
 appProp ctx@(TransformContext is0 _) (App (collectTicks -> (Case scrut ty alts,ticks)) arg) = do
   tcm <- Lens.view tcCache
+  iwf <- isWorkFree arg
   let argTy = termType tcm arg
       ty' = applyFunTy tcm ty argTy
-  if isWorkFree arg || isVar arg
+  if iwf || isVar arg
     then do
       let alts' = map (second (`App` arg)) alts
       changed $ mkTicks (Case scrut ty' alts') ticks
@@ -1185,7 +1187,8 @@ appPropFast ctx@(TransformContext is _) = \case
 
   go is0 (Lam v e) (Left arg:args) ticks = do
     setChanged
-    if isWorkFree arg || isVar arg
+    iwf <- isWorkFree arg
+    if iwf || isVar arg
       then do
         let subst = extendIdSubst (mkSubst is0) v arg
         (`mkTicks` ticks) <$> go is0 (substTm "appPropFast.AppLam" subst e) args []
@@ -1236,9 +1239,10 @@ appPropFast ctx@(TransformContext is _) = \case
 
   goCaseArg isA0 ty0 ls0 (Left arg:args0) = do
     tcm <- Lens.view tcCache
+    iwf <- isWorkFree arg
     let argTy = termType tcm arg
         ty1   = applyFunTy tcm ty0 argTy
-    case isWorkFree arg || isVar arg of
+    case iwf || isVar arg of
       True -> do
         (ty2,ls1,args1) <- goCaseArg isA0 ty1 ls0 args0
         return (ty2,ls1,Left arg:args1)
@@ -2276,8 +2280,9 @@ flattenLet (TransformContext is0 _) letrec@(Letrec _ _) = do
   case binds' of
     -- inline binders into the body when there's only a single binder, and only
     -- if that binder doesn't perform any work or is only used once in the body
-    [(id',e')] | Just occ <- lookupVarEnv id' bodyOccs, isWorkFree e' || occ < 2 ->
-      if id' `localIdOccursIn` e'
+    [(id',e')] | Just occ <- lookupVarEnv id' bodyOccs -> do
+      iwf <- isWorkFree e'
+      if not (iwf || occ < 2) || id' `localIdOccursIn` e'
          -- Except when the binder is recursive!
          then return (Letrec binds' body)
          else let subst = extendIdSubst (mkSubst is2) id' e'
@@ -2296,18 +2301,22 @@ flattenLet (TransformContext is0 _) letrec@(Letrec _ _) = do
         -- inline binders into the body when there's only a single binder, and
         -- only if that binder doesn't perform any work or is only used once in
         -- the body
-        [(id',e')] | Just occ <- lookupVarEnv id' bodyOccs, isWorkFree e' || occ < 2 ->
-          if id' `localIdOccursIn` e'
+        [(id',e')] | Just occ <- lookupVarEnv id' bodyOccs -> do
+          iwf <- isWorkFree e'
+          if iwf || occ < 2 then
+            if id' `localIdOccursIn` e' then
              -- Except when the binder is recursive!
-             then changed [(id',e'),(id_, body')]
-             else let subst = extendIdSubst (mkSubst isN) id' e'
-                  in  changed [(id_
-                               -- Only apply srcTicks to the body
-                               ,mkTicks (substTm "flattenLetGo" subst body')
-                                        srcTicks)]
-        bs -> changed (bs ++ [(id_
-                               -- Only apply srcTicks to the body
-                              ,mkTicks body' srcTicks)])
+             changed [(id',e'),(id_, body')]
+            else
+              let subst = extendIdSubst (mkSubst isN) id' e' in
+              -- Only apply srcTicks to the body
+              changed [(id_, mkTicks (substTm "flattenLetGo" subst body') srcTicks)]
+          else
+              -- Only apply srcTicks to the body
+            changed ([(id', e'), (id_, mkTicks body' srcTicks)])
+        bs ->
+          -- Only apply srcTicks to the body
+          changed (bs ++ [(id_, mkTicks body' srcTicks)])
     go _ b = return [b]
 
 flattenLet _ e = return e

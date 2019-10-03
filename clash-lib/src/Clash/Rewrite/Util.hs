@@ -426,33 +426,6 @@ substituteBinders inScope ((bndr,val):rest) others res =
          , map (second (substTm "substituteBindersOthers" subst)) others
          )
 
--- | Determine whether a term does any work, i.e. adds to the size of the circuit
-isWorkFree
-  :: Term
-  -> Bool
-isWorkFree (collectArgs -> (fun,args)) = case fun of
-  Var i            -> isLocalId i && not (isPolyFunTy (varType i))
-  Data {}          -> all isWorkFreeArg args
-  Literal {}       -> True
-  Prim _ pInfo -> case primWorkInfo pInfo of
-    WorkConstant   -> True -- We can ignore the arguments, because this
-                           -- primitive outputs a constant regardless of its
-                           -- arguments
-    WorkNever      -> all isWorkFreeArg args
-    WorkVariable   -> all isConstantArg args
-    WorkAlways     -> False -- Things like clock or reset generator always
-                            -- perform work
-  Lam _ e          -> isWorkFree e && all isWorkFreeArg args
-  TyLam _ e        -> isWorkFree e && all isWorkFreeArg args
-  Letrec bs e ->
-    isWorkFree e && all (isWorkFree . snd) bs && all isWorkFreeArg args
-  Case s _ [(_,a)] -> isWorkFree s && isWorkFree a && all isWorkFreeArg args
-  Cast e _ _       -> isWorkFree e && all isWorkFreeArg args
-  _                -> False
- where
-  isWorkFreeArg = either isWorkFree (const True)
-  isConstantArg = either isConstant (const True)
-
 isFromInt :: Text -> Bool
 isFromInt nm = nm == "Clash.Sized.Internal.BitVector.fromInteger##" ||
                nm == "Clash.Sized.Internal.BitVector.fromInteger#" ||

@@ -648,4 +648,4 @@ normalizeEntity reprs bindingsMap primMap tcm tupTcm typeTrans eval topEntities
                 return cleaned
     transformedBindings = runNormalization opts supply bindingsMap
                             typeTrans reprs tcm tupTcm eval primMap emptyVarEnv
-                            topEntities doNorm
+                            emptyVarEnv topEntities doNorm
