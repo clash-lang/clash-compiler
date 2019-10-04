@@ -45,9 +45,7 @@ ghc-8.6.5-singular-hidden:
 #  stage: build
 #  allow_failure: true
 #  script:
-#    # Awaiting issue: https://github.com/goldfirere/singletons/issues/357
-#    - echo "GHC head currently disabled, because singletons doesn't build on ghc head"
-#    - exit 1
+#    TODO test with HEAD
 
 hackage-sdist:
   extends: .tests

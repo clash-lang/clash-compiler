@@ -145,12 +145,6 @@ jobs:
       <<: *env
       GHC: ghc-8.4.4
     <<: *build_default
-  ghc-8.6.5-singular-hidden:
-    environment:
-      <<: *env
-      GHC: ghc-8.6.5
-      MULTIPLE_HIDDEN: no
-    <<: *build_default
   ghc-8.6.5:
     environment:
       <<: *env
@@ -160,6 +154,12 @@ jobs:
     environment:
       <<: *env
       GHC: ghc-8.8.1
+    <<: *build_default
+  ghc-8.6.5-singular-hidden:
+    environment:
+      <<: *env
+      GHC: ghc-8.6.5
+      MULTIPLE_HIDDEN: no
     <<: *build_default
   stack-build:
     environment:
