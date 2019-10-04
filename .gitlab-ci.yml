@@ -6,6 +6,7 @@ stages:
 .tests:
   image: leonschoorl/clash-ci-image:trusty
   stage: build
+  interruptible: true
   variables:
     GIT_SUBMODULE_STRATEGY: recursive
     TERM: xterm-color
@@ -49,6 +50,7 @@ ghc-8.6.5-singular-hidden:
 
 hackage-sdist:
   extends: .tests
+  interruptible: false
   variables:
     GHC: ghc-8.8.1
   script:
@@ -70,6 +72,7 @@ hackage-sdist:
 
 .hackage:
   extends: .tests
+  interruptible: false
   stage: publish
   cache:
     key: hackage
