@@ -253,7 +253,7 @@ sigPort :: Maybe WireOrReg
         -> VerilogM Doc
 sigPort wor pName hwType =
     addAttrs (hwTypeAttrs hwType)
-      (portType <+> verilogType' True hwType <+> stringS pName <> encodingNote hwType)
+      (portType <+> verilogType hwType <+> stringS pName <> encodingNote hwType)
   where
     portType = case wor of
                  Nothing   -> if isBiSignalIn hwType then "inout" else "input"
@@ -320,35 +320,14 @@ addSeen c = do
       nets  = mapMaybe (\case {NetDecl' _ _ i _ -> Just i; _ -> Nothing}) $ declarations c
   Mon $ idSeen %= (HashMap.unionWith max (HashMap.fromList (concatMap (map (,0)) [iport,oport,nets])))
 
--- render a type; by default, removing zero-sizes is an aesthetic operation
--- and is only valid for decls (e.g. when rendering module ports), so don't
--- do it by default to be safe
 verilogType :: HWType -> VerilogM Doc
-verilogType = verilogType' False
-
-verilogType' :: Bool -> HWType -> VerilogM Doc
-verilogType' isDecl t =
-  let -- if the size is zero, it's single bit, so if we're
-      -- emitting a decl, then we can skip it - but we can't
-      -- skip it when selecting other values (e.g a slice)
-      renderVerilogTySize l
-        | l == 0 && isDecl = emptyDoc
-        | otherwise        = brackets (int l <> colon <> int 0)
-
-      -- signed types have to be rendered specially
-      getVerilogTy (Signed n) = ("signed" <> space, n)
-      getVerilogTy _          = (emptyDoc,    typeSize t)
-
-  in case t of
-       -- special case: Bit, Bool, clocks and resets
-       Clock {} -> emptyDoc
-       Reset {} -> emptyDoc
-       Bit      -> emptyDoc
-       Bool     -> emptyDoc
-
-       -- otherwise, print the type and prefix
-       ty | (prefix, sz) <- getVerilogTy ty
-         -> prefix <> renderVerilogTySize (sz-1)
+verilogType t = case t of
+  Signed n -> "signed" <+> brackets (int (n-1) <> colon <> int 0)
+  Clock {} -> emptyDoc
+  Reset {} -> emptyDoc
+  Bit      -> emptyDoc
+  Bool     -> emptyDoc
+  _        -> brackets (int (typeSize t -1) <> colon <> int 0)
 
 sigDecl :: VerilogM Doc -> HWType -> VerilogM Doc
 sigDecl d t = verilogType t <+> d
