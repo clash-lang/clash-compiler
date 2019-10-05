@@ -13,7 +13,6 @@ Description:    clash-cosim implements Verilog cosimulation in Haskell and
                 write inline Verilog code and still produce an executable. For
                 user documentation, see: <https://github.com/clash-lang/clash-cosim>.
 Build-Type:     Custom
-tested-with:    GHC == 8.2.2, GHC == 8.4.4, GHC == 8.6.5, GHC == 8.8.1
 
 --
 Data-Files:     src/cbits/cosim_vpi.vpi

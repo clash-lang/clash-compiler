@@ -6,6 +6,7 @@ stages:
 .tests:
   image: leonschoorl/clash-ci-image:trusty
   stage: build
+  interruptible: true
   variables:
     GIT_SUBMODULE_STRATEGY: recursive
     TERM: xterm-color
@@ -29,30 +30,27 @@ stages:
     - .ci/build.sh
     - .ci/test.sh
 
-ghc-8.2.2:
-  extends: .tests
 ghc-8.4.4:
   extends: .tests
-ghc-8.6.5:
-  extends: .tests
+#ghc-8.6.5:
+#  extends: .tests
 ghc-8.8.1:
   extends: .tests
-ghc-8.4.4-singular-hidden:
+ghc-8.6.5-singular-hidden:
   extends: .tests
   variables:
     MULTIPLE_HIDDEN: "no"
-    GHC: ghc-8.4.4
-ghc-head:
-  # extends: .tests
-  stage: build
-  allow_failure: true
-  script:
-    # Awaiting issue: https://github.com/goldfirere/singletons/issues/357
-    - echo "GHC head currently disabled, because singletons doesn't build on ghc head"
-    - exit 1
+    GHC: ghc-8.6.5
+#ghc-head:
+#  # extends: .tests
+#  stage: build
+#  allow_failure: true
+#  script:
+#    TODO test with HEAD
 
 hackage-sdist:
   extends: .tests
+  interruptible: false
   variables:
     GHC: ghc-8.8.1
   script:
@@ -74,6 +72,7 @@ hackage-sdist:
 
 .hackage:
   extends: .tests
+  interruptible: false
   stage: publish
   cache:
     key: hackage
@@ -194,4 +193,3 @@ snap-stable:
     RELEASE_CHANNEL: stable
   only:
     - tags
-

@@ -132,30 +132,18 @@ workflows:
   version: 2
   build_and_test_clash:
     jobs:
-      - ghc-8.2.2
       - ghc-8.4.4
-      - ghc-8.4.4-singular-hidden
-      - ghc-8.6.5
+      - ghc-8.6.5-singular-hidden
+      # - ghc-8.6.5
       - ghc-8.8.1
       - stack-build
       - nix-build
 
 jobs:
-  ghc-8.2.2:
-    environment:
-      <<: *env
-      GHC: ghc-8.2.2
-    <<: *build_default
   ghc-8.4.4:
     environment:
       <<: *env
       GHC: ghc-8.4.4
-    <<: *build_default
-  ghc-8.4.4-singular-hidden:
-    environment:
-      <<: *env
-      GHC: ghc-8.4.4
-      MULTIPLE_HIDDEN: no
     <<: *build_default
   ghc-8.6.5:
     environment:
@@ -166,6 +154,12 @@ jobs:
     environment:
       <<: *env
       GHC: ghc-8.8.1
+    <<: *build_default
+  ghc-8.6.5-singular-hidden:
+    environment:
+      <<: *env
+      GHC: ghc-8.6.5
+      MULTIPLE_HIDDEN: no
     <<: *build_default
   stack-build:
     environment:
