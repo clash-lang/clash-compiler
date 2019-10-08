@@ -14,7 +14,7 @@ Control module instance, and register, names in generated HDL code.
 module Clash.Magic where
 
 import Clash.NamedTypes ((:::))
-import GHC.TypeLits     (Symbol)
+import GHC.TypeLits     (Nat,Symbol)
 
 -- | Prefix instance and register names with the given 'Symbol'
 prefixName
@@ -27,6 +27,12 @@ suffixName
   :: forall (name :: Symbol) a . a -> name ::: a
 suffixName = id
 {-# NOINLINE suffixName #-}
+
+-- | Suffix instance and register names with the given 'Nat'
+suffixNameFromNat
+  :: forall (name :: Nat) a . a -> name ::: a
+suffixNameFromNat = id
+{-# NOINLINE suffixNameFromNat #-}
 
 -- | Name the instance or register with the given 'Symbol', instead of using
 -- an auto-generated name. Pre- and suffixes annotated with 'prefixName' and

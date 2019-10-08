@@ -9,6 +9,11 @@
     }
   }
 , { "Primitive" :
+    { "name"      : "Clash.Magic.suffixNameFromNat"
+    , "primType"  : "Function"
+    }
+  }
+, { "Primitive" :
     { "name"      : "Clash.Magic.setName"
     , "primType"  : "Function"
     }
