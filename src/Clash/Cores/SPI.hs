@@ -187,14 +187,21 @@ spiSlave (SPISlaveConfig mode latch buf) sclk mosi bin ss din =
 -- Adds latch to MISO line if the (half period) clock divider is
 -- set to 2 or higher.
 spiMaster
-  :: forall n m dom
-   . (HiddenClockResetEnable dom, KnownNat n, 1 <= n, 1 <= m)
+  :: forall n halfPeriod waitTime dom
+   . ( HiddenClockResetEnable dom
+     , KnownNat n
+     , 1 <= n
+     , 1 <= halfPeriod
+     , 1 <= waitTime )
   => SPIMode
   -- ^ SPI Mode
-  -> SNat m
+  -> SNat halfPeriod
   -- ^ Clock divider (half period)
   --
   -- If set to two or higher, the MISO line will be latched
+  -> SNat waitTime
+  -- ^ (core clock) cycles between de-asserting slave-select and start of
+  -- the SPI clock
   -> Signal dom (Maybe (BitVector n))
   -- ^ Data to send from master to slave, transmission starts when receiving
   -- /Just/ a value
@@ -214,28 +221,34 @@ spiMaster
   -- 4. Busy signal indicating that a transmission is in progress, new words on
   --    the data line will be ignored when /True/
   -- 5. (Maybe) the word send from the slave to the master
-spiMaster mode fN din miso =
+spiMaster mode fN fW din miso =
   let (mosi,dout)   = spiCommon mode ssL misoL sclkL
                         (fromMaybe undefined# <$> din)
       latch = snatToInteger fN /= 1
       ssL   = if latch then delay undefined ss   else ss
       misoL = if latch then delay undefined miso else miso
       sclkL = if latch then delay undefined sclk else sclk
-      (ss,sclk,busy) = spiGen mode fN din
+      (ss,sclk,busy) = spiGen mode fN fW din
   in  (sclk,mosi,ss,busy,dout)
 
 -- | Generate slave select and SCK
 spiGen
-  :: forall n m dom
-   . (HiddenClockResetEnable dom, KnownNat n, 1 <= n, 1 <= m)
+  :: forall n halfPeriod waitTime dom
+   . ( HiddenClockResetEnable dom
+     , KnownNat n
+     , 1 <= n
+     , 1 <= halfPeriod
+     , 1 <= waitTime )
   => SPIMode
-  -> SNat m
+  -> SNat halfPeriod
+  -> SNat waitTime
   -> Signal dom (Maybe (BitVector n))
   -> ( Signal dom Bool
      , Signal dom Bool
      , Signal dom Bool
      )
-spiGen mode SNat = unbundle . moore go cvt (0 :: Index (2*n),False,Idle @ m)
+spiGen mode SNat SNat =
+  unbundle . moore go cvt (0 :: Index (2*n),False,Idle @halfPeriod @waitTime)
  where
   cvt (_,sck,st) =
     ( st == Idle
@@ -247,8 +260,12 @@ spiGen mode SNat = unbundle . moore go cvt (0 :: Index (2*n),False,Idle @ m)
   go (cntQ,sckQ,stQ) din = (cntD,sckD,stD)
    where
     stD = case stQ of
-      Idle | isJust din -> Wait
-      Wait -> Transfer 0
+      Idle
+        | isJust din -> Wait maxBound
+
+      Wait 0 -> Transfer 0
+      Wait w -> Wait (w - 1)
+
 
       Transfer n
         | n /= maxBound -> Transfer (n+1)
@@ -264,14 +281,14 @@ spiGen mode SNat = unbundle . moore go cvt (0 :: Index (2*n),False,Idle @ m)
       _ -> 0
 
     sckD = case stQ of
-      Wait | mode == SPIMode1 || mode == SPIMode3 -> not sckQ
+      Wait 0 | mode == SPIMode1 || mode == SPIMode3 -> not sckQ
       Transfer n | n == maxBound -> not sckQ
       _ -> sckQ
 
-data SPIMasterState n
+data SPIMasterState halfPeriod waitTime
   = Idle
-  | Wait
-  | Transfer (Index n)
+  | Wait (Index waitTime)
+  | Transfer (Index halfPeriod)
   | Finish
   deriving (Eq, Generic, NFDataX)
 
