@@ -15,12 +15,10 @@ import           Prelude
 import           Control.Monad.State
 import           Data.Semigroup.Monad               (getMon)
 import           Data.Text.Prettyprint.Doc.Extra
-import qualified Data.Text as TextS
 import           GHC.Stack
   (HasCallStack, prettyCallStack, callStack)
 
 import           Clash.Backend
-import           Clash.Netlist.BlackBox.Util
 import           Clash.Netlist.Id
 import           Clash.Netlist.Types
 
@@ -97,8 +95,8 @@ sbioTemplate bbCtx = do
  where
   [ _HasCallStack
    , (clk, clkTy, _)
-   , (en, enTy, _)
-   , (pinConfig, pinTy, pinConfigLiteral -> ())
+   , (en, _enTy, _)
+   , (pinConfig, _pinTy, pinConfigLiteral -> ())
    , (packagePin, packagePinTy, _)
    , (latchInput, Bit, _)
    , (dOut0, Bit, _)
@@ -106,4 +104,4 @@ sbioTemplate bbCtx = do
    , (outputEnable, Bool, _)
    ] = bbInputs bbCtx
 
-  (Identifier result Nothing,resTy@(Product _ _ (tail -> tys))) = bbResult bbCtx
+  (Identifier result Nothing,resTy) = bbResult bbCtx

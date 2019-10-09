@@ -27,9 +27,6 @@ import           GHC.Stack
 
 import           Clash.Annotations.Primitive  (Primitive(..), HDL(..))
 import           Clash.Prelude
-import           Clash.Signal.BiSignal        (BiSignalDefault(Floating))
-
-import           Clash.Cores.LatticeSemi.Blackboxes.IO  (sbioTF)
 
 toMaybe :: Bool -> a -> Maybe a
 toMaybe True a = Just a
