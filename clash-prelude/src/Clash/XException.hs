@@ -55,6 +55,7 @@ import Data.Ratio        (Ratio, numerator, denominator)
 import qualified Data.Semigroup as SG
 import Data.Sequence     (Seq(Empty, (:<|)))
 import Data.Word         (Word8,Word16,Word32,Word64)
+import Foreign.C.Types   (CUShort)
 import GHC.Exts          (Char (C#), Double (D#), Float (F#), Int (I#), Word (W#))
 import GHC.Generics
 import GHC.Natural       (Natural)
@@ -805,6 +806,12 @@ instance NFDataX Word32 where
   ensureSpine = id
 
 instance NFDataX Word64 where
+  deepErrorX = errorX
+  rnfX = rwhnfX
+  hasUndefined = isLeft . isX
+  ensureSpine = id
+
+instance NFDataX CUShort where
   deepErrorX = errorX
   rnfX = rwhnfX
   hasUndefined = isLeft . isX
