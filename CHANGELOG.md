@@ -53,6 +53,7 @@
 * Deprecations & removals:
   * Removed support for GHC 8.2 ([#842](https://github.com/clash-lang/clash-compiler/pull/842))
   * Removed support for older cabal versions, only Cabal >=2.2 supported ([#851](https://github.com/clash-lang/clash-compiler/pull/851))
+  * Reset and Enable constructors are now only exported from Clash.Signal.Internal
 
 ## 1.0.0 *September 3rd 2019*
 * 10x - 50x faster compile times

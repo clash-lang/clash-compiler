@@ -189,7 +189,7 @@ module Clash.Explicit.Signal
   , initBehavior
   , resetPolarity
     -- ** Enabling
-  , Enable(..)
+  , Enable
   , toEnable
   , fromEnable
   , enableGen
@@ -202,7 +202,7 @@ module Clash.Explicit.Signal
   , unsafeSynchronizer
   , veryUnsafeSynchronizer
     -- * Reset
-  , Reset(..)
+  , Reset
   , unsafeToReset
   , unsafeFromReset
   , unsafeToHighPolarity
