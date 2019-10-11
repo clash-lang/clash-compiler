@@ -22,6 +22,7 @@ topEntity i =  popCount @Word j
             :> popCount @Int64 j
             :> popCount @(BitVector 7) j
             :> popCount @(Signed 9) j
+            :> popCount @(Signed 101) j
             :> popCount @(Unsigned 11) j
             :> Nil
   where

@@ -69,7 +69,6 @@ import           Control.Monad.State         (StateT (..), modify)
 import           Control.Monad.State.Strict  (evalState)
 import           Control.Monad.Writer        (lift, listen)
 import           Control.Monad.Trans.Except  (runExcept)
-import           Data.Bits                   ((.&.), complement)
 import           Data.Coerce                 (coerce)
 import qualified Data.Either                 as Either
 import qualified Data.HashMap.Lazy           as HashMap
@@ -1921,10 +1920,9 @@ reduceNonRepPrim c@(TransformContext is0 ctx) e@(App _ _) | (Prim nm _, args, ti
           _ -> return e
       "Clash.Sized.Vector.fold" | length args == 4 -> do
         let [aTy,nTy] = Either.rights args
-            isPow2 x  = x /= 0 && (x .&. (complement x + 1)) == x
         untranslatableTy <- isUntranslatableType_not_poly aTy
         case runExcept (tyNatSize tcm nTy) of
-          Right n | not (isPow2 (n + 1)) || untranslatableTy || shouldReduce1 || ultra || n == 0 ->
+          Right n | untranslatableTy || shouldReduce1 || ultra || n == 0 ->
             let [fun,arg] = Either.lefts args
             in  (`mkTicks` ticks) <$> reduceFold c (n + 1) aTy fun arg
           _ -> return e
