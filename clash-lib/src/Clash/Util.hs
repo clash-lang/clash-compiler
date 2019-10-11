@@ -264,11 +264,30 @@ indexMaybe [] _     = Nothing
 indexMaybe (x:_)  0 = Just x
 indexMaybe (_:xs) n = indexMaybe xs (n-1)
 
+-- | Same as 'indexNote' with last two arguments swapped
+indexNote'
+  :: HasCallStack
+  => String
+  -- ^ Error message to display
+  -> Int
+  -- ^ Index /n/
+  -> [a]
+  -- ^ List to index
+  -> a
+  -- ^ Error or element /n/
+indexNote' = flip . indexNote
+
 -- | Unsafe indexing, return a custom error message when indexing fails
-indexNote :: String
-          -> [a]
-          -> Int
-          -> a
+indexNote
+  :: HasCallStack
+  => String
+  -- ^ Error message to display
+  -> [a]
+  -- ^ List to index
+  -> Int
+  -- ^ Index /n/
+  -> a
+  -- ^ Error or element /n/
 indexNote note = \xs i -> fromMaybe (error note) (indexMaybe xs i)
 
 -- | Safe version of 'head'

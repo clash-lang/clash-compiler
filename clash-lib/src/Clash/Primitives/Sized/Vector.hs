@@ -24,13 +24,7 @@ import qualified Data.String.Interpolate.Util as I
 indexIntVerilog ::  BlackBoxFunction
 indexIntVerilog _isD _primName args _ty = return ((meta,) <$> bb)
  where
-  meta = BlackBoxMeta
-       { bbOutputReg = False
-       , bbKind      = bbKi
-       , bbLibrary   = []
-       , bbImports   = []
-       , bbIncludes  = []
-       }
+  meta = emptyBlackBoxMeta{bbKind=bbKi}
 
   bbKi = case args of
     [_nTy,_aTy,_kn,_v,Left ix]

@@ -26,7 +26,7 @@ import           Control.Monad.Reader             (runReaderT)
 import           Control.Monad.State.Strict       (State, runStateT)
 import           Data.Binary.IEEE754              (floatToWord, doubleToWord)
 import           Data.Char                        (ord)
-import           Data.Either                      (lefts, partitionEithers)
+import           Data.Either                      (partitionEithers)
 import           Data.HashMap.Strict              (HashMap)
 import qualified Data.HashMap.Strict              as HashMapS
 import qualified Data.HashMap.Lazy                as HashMap
@@ -316,7 +316,7 @@ mkNetDecl (id_,tm) = preserveVarEnv $ do
       _ -> return Nothing
      where
       go pNm (BlackBox {resultInit = Just nmD}) = withTicks ticks $ \_ -> do
-        (bbCtx,_) <- mkBlackBoxContext pNm i (lefts args)
+        (bbCtx,_) <- mkBlackBoxContext pNm i args
         (bbTempl,templDecl) <- prepareBlackBox pNm nmD bbCtx
         case templDecl of
           [] -> return (Just (BlackBoxE pNm [] [] [] bbTempl bbCtx False))

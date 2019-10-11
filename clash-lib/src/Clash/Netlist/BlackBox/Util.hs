@@ -31,7 +31,7 @@ import           Data.List                       (nub)
 #if !MIN_VERSION_base(4,11,0)
 import           Data.Monoid
 #endif
-import           Data.Maybe                      (mapMaybe, maybeToList)
+import           Data.Maybe                      (mapMaybe, maybeToList, fromJust)
 import           Data.Semigroup.Monad
 import qualified Data.Text
 import           Data.Text.Lazy                  (Text)
@@ -44,7 +44,7 @@ import           Text.Printf
 import           Text.Read                       (readEither)
 import           Text.Trifecta.Result            hiding (Err)
 
-import           Clash.Backend                   (Backend (..), Usage (..))
+import           Clash.Backend                   (Backend (..), Usage (..), mkUniqueIdentifier)
 import qualified Clash.Backend                   as Backend
 import           Clash.Netlist.BlackBox.Parser
 import           Clash.Netlist.BlackBox.Types
@@ -100,7 +100,7 @@ verifyBlackBoxContext bbCtx (N.BBTemplate t) = and (concatMap (walkElement verif
           case indexMaybe (bbInputs bbCtx) n of
             Just (_, _, b) -> b
             _              -> False
-        Component (Decl n l') ->
+        Component (Decl n _subn l') ->
           case IntMap.lookup n (bbFunctions bbCtx) of
             Just _ ->
               all (\(x,y) ->
@@ -174,8 +174,8 @@ setSym mkUniqueIdentifierM bbCtx l = do
             _1 %= (IntMap.insert i t')
             return (GenSym [Text (Text.fromStrict t')] i)
           Just _ -> error ("Symbol #" ++ show (t,i) ++ " is already defined")
-      Component (Decl n l') ->
-        Component <$> (Decl n <$> mapM (combineM (mapM setSym') (mapM setSym')) l')
+      Component (Decl n subN l') ->
+        Component <$> (Decl n subN <$> mapM (combineM (mapM setSym') (mapM setSym')) l')
       IF c t f      -> IF <$> pure c <*> mapM setSym' t <*> mapM setSym' f
       SigD e' m     -> SigD <$> (mapM setSym' e') <*> pure m
       BV t e' m     -> BV <$> pure t <*> mapM setSym' e' <*> pure m
@@ -290,27 +290,32 @@ renderBlackBox libs imps includes bb bbCtx = do
   return bb'
 
 -- | Render a single template element
-renderElem :: Backend backend
-           => BlackBoxContext
-           -> Element
-           -> State backend (Int -> Text)
-renderElem b (Component (Decl n (l:ls))) = do
+renderElem
+  :: HasCallStack
+  => Backend backend
+  => BlackBoxContext
+  -> Element
+  -> State backend (Int -> Text)
+renderElem b (Component (Decl n subN (l:ls))) = do
   (o,oTy,_) <- idToExpr <$> combineM (lineToIdentifier b) (return . lineToType b) l
   is <- mapM (fmap idToExpr . combineM (lineToIdentifier b) (return . lineToType b)) ls
-  let Just (templ0,_,libs,imps,inc,pCtx)  = IntMap.lookup n (bbFunctions b)
+  let func0 = IntMap.lookup n (bbFunctions b)
+      errr = concat [ "renderElem: not enough functions rendered? Needed "
+                    , show (subN +1 ), " got only ", show (length (fromJust func0)) ]
+      func1 = indexNote' errr subN <$> func0
+      Just (templ0,_,libs,imps,inc,pCtx) = func1
       b' = pCtx { bbResult = (o,oTy), bbInputs = bbInputs pCtx ++ is }
       layoutOptions = LayoutOptions (AvailablePerLine 120 0.4)
+      render = N.BBTemplate . parseFail . renderLazy . layoutPretty layoutOptions
 
   templ1 <-
     case templ0 of
       Left t ->
         return t
-      Right (nm,ds) -> do
-        block <- getMon (blockDecl nm ds)
-        return $ N.BBTemplate
-               $ parseFail
-               $ renderLazy
-               $ layoutPretty layoutOptions block
+      Right (nm0,ds) -> do
+        nm1 <- mkUniqueIdentifier Basic nm0
+        block <- getMon (blockDecl nm1 ds)
+        return (render block)
 
   templ4 <-
     case templ1 of
@@ -326,10 +331,7 @@ renderElem b (Component (Decl n (l:ls))) = do
             nm2 <- Backend.mkUniqueIdentifier Basic "bb"
             let bbD = BlackBoxD nm1 libs imps inc (N.BBTemplate templ3) b'
             block <- getMon (blockDecl nm2 (templDecls ++ [bbD]))
-            return $ N.BBTemplate
-                   $ parseFail
-                   $ renderLazy
-                   $ layoutPretty layoutOptions block
+            return (render block)
 
   if verifyBlackBoxContext b' templ4
     then do
@@ -637,7 +639,7 @@ renderTag b (IncludeName n) = case indexMaybe (bbQsysIncName b) n of
   Just nm -> return (Text.fromStrict nm)
   _ -> error $ $(curLoc) ++ "~INCLUDENAME[" ++ show n ++ "] does not correspond to any index of the 'includes' field that is specified in the primitive definition"
 renderTag b (OutputWireReg n) = case IntMap.lookup n (bbFunctions b) of
-  Just (_,rw,_,_,_,_) -> case rw of {N.Wire -> return "wire"; N.Reg -> return "reg"}
+  Just ((_,rw,_,_,_,_):_) -> case rw of {N.Wire -> return "wire"; N.Reg -> return "reg"}
   _ -> error $ $(curLoc) ++ "~OUTPUTWIREREG[" ++ show n ++ "] used where argument " ++ show n ++ " is not a function"
 renderTag b (Repeat [es] [i]) = do
   i'  <- Text.unpack <$> renderTag b i
@@ -745,17 +747,20 @@ prettyBlackBox :: Monad m
                -> Mon m Text
 prettyBlackBox bbT = Text.concat <$> mapM prettyElem bbT
 
-prettyElem :: Monad m
-           => Element
-           -> Mon m Text
+prettyElem
+  :: (HasCallStack, Monad m)
+  => Element
+  -> Mon m Text
 prettyElem (Text t) = return t
-prettyElem (Component (Decl i args)) = do
+prettyElem (Component (Decl i 0 args)) = do
   args' <- mapM (\(a,b) -> (,) <$> prettyBlackBox a <*> prettyBlackBox b) args
   renderOneLine <$>
     (nest 2 (string "~INST" <+> int i <> line <>
         string "~OUTPUT" <+> string "=>" <+> string (fst (head args')) <+> string (snd (head args')) <+> string "~" <> line <>
         vcat (mapM (\(a,b) -> string "~INPUT" <+> string "=>" <+> string a <+> string b <+> string "~") (tail args')))
       <> line <> string "~INST")
+prettyElem (Component (Decl {})) =
+  error $ $(curLoc) ++ "prettyElem can't (yet) render ~INST when subfuncion /= 0!"
 prettyElem (Result b) = if b then return "~ERESULT" else return "~RESULT"
 prettyElem (Arg b i) = renderOneLine <$> (if b then string "~EARG" else string "~ARG" <> brackets (int i))
 prettyElem (Lit i) = renderOneLine <$> (string "~LIT" <> brackets (int i))
@@ -894,7 +899,7 @@ walkElement f el = maybeToList (f el) ++ walked
       -- TODO: alternatives. It would probably be better to replace it by Lens
       -- TODO: logic?
       case el of
-        Component (Decl _ args) ->
+        Component (Decl _ _ args) ->
           concatMap (\(a,b) -> concatMap go a ++ concatMap go b) args
         IndexType e -> go e
         FilePath e -> go e
@@ -977,7 +982,7 @@ usedArguments (N.BBTemplate t) = nub (concatMap (walkElement matchArg) t)
     matchArg =
       \case
         Arg _ i -> Just i
-        Component (Decl i _) -> Just i
+        Component (Decl i _ _) -> Just i
         Const i -> Just i
         IsLit i -> Just i
         IsActiveEnable i -> Just i

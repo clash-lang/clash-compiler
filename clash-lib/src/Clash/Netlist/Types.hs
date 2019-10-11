@@ -361,12 +361,12 @@ data BlackBoxContext
   { bbName      :: Text -- ^ Blackbox function name (for error reporting)
   , bbResult    :: (Expr,HWType) -- ^ Result name and type
   , bbInputs    :: [(Expr,HWType,Bool)] -- ^ Argument names, types, and whether it is a literal
-  , bbFunctions :: IntMap (Either BlackBox (Identifier,[Declaration])
+  , bbFunctions :: IntMap [(Either BlackBox (Identifier,[Declaration])
                           ,WireOrReg
                           ,[BlackBoxTemplate]
                           ,[BlackBoxTemplate]
                           ,[((Text,Text),BlackBox)]
-                          ,BlackBoxContext)
+                          ,BlackBoxContext)]
   -- ^ Function arguments (subset of inputs):
   --
   -- * ( Blackbox Template

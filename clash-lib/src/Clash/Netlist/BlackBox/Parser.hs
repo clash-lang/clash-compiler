@@ -61,7 +61,7 @@ pTagD =  IF <$> (symbol "~IF" *> pTagE)
 
 -- | Parse a Declaration
 pDecl :: Parser Decl
-pDecl = Decl <$> (symbol "~INST" *> natural') <*>
+pDecl = Decl <$> (symbol "~INST" *> natural') <*> pure 0 <*>
         ((:) <$> pOutput <*> many pInput) <* string "~INST"
 
 -- | Parse the output tag of Declaration
