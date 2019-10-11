@@ -108,6 +108,7 @@ module Clash.Explicit.Prelude
   , Lift (..)
     -- ** Type classes
     -- *** Clash
+  , module Clash.Class.AutoReg
   , module Clash.Class.BitPack
   , module Clash.Class.Exp
   , module Clash.Class.Num
@@ -138,6 +139,7 @@ import Language.Haskell.TH.Syntax  (Lift(..))
 import Clash.HaskellPrelude
 
 import Clash.Annotations.TopEntity
+import Clash.Class.AutoReg
 import Clash.Class.BitPack
 import Clash.Class.Exp
 import Clash.Class.Num

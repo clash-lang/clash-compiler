@@ -35,6 +35,7 @@
 {-# LANGUAGE CPP               #-}
 {-# LANGUAGE DataKinds         #-}
 {-# LANGUAGE FlexibleContexts  #-}
+{-# LANGUAGE MonoLocalBinds    #-}
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE TypeOperators     #-}
 
@@ -133,6 +134,8 @@ module Clash.Prelude
   , Lift (..)
     -- ** Type classes
     -- *** Clash
+  -- , module Clash.Class.AutoReg
+  , autoReg, deriveAutoReg
   , module Clash.Class.BitPack
   , module Clash.Class.Exp
   , module Clash.Class.Num
@@ -159,12 +162,14 @@ where
 import           Control.Applicative
 import           Data.Bits
 import           Data.Default.Class
+import           GHC.Stack                   (HasCallStack)
 import           GHC.TypeLits
 import           GHC.TypeLits.Extra
 import           Language.Haskell.TH.Syntax  (Lift(..))
 import           Clash.HaskellPrelude
 
 import           Clash.Annotations.TopEntity
+import           Clash.Class.AutoReg         (AutoReg, deriveAutoReg)
 import           Clash.Class.BitPack
 import           Clash.Class.Exp
 import           Clash.Class.Num
@@ -259,3 +264,11 @@ windowD
   -- ^ Window of at least size 1
 windowD = hideClockResetEnable E.windowD
 {-# INLINE windowD #-}
+
+-- | Implicit version of 'Clash.Class.AutoReg.autoReg'
+autoReg
+  :: (HasCallStack, HiddenClockResetEnable dom, AutoReg a)
+  => a
+  -> Signal dom a
+  -> Signal dom a
+autoReg = hideClockResetEnable E.autoReg
