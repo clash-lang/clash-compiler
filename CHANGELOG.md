@@ -10,6 +10,9 @@
   * Fix blackbox issues causing Clash to generate invalid HDL ([#865](https://github.com/clash-lang/clash-compiler/pull/865))
   * Error on unparsed trailing garbage in JSON "files"
 
+* Deprecations & removals:
+  * Reset and Enable constructors are now only exported from Clash.Signal.Internal
+
 ## 1.0.1 *October 17th 2019*
 * Fixes issues:
   * [#810](https://github.com/clash-lang/clash-compiler/issues/810): Verilog backend now correctly specifies type of `BitVector 1`

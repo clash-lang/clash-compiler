@@ -140,7 +140,7 @@ module Clash.Signal
   , unsafeSynchronizer
 #endif
     -- * Reset
-  , Reset(..)
+  , Reset
   , unsafeToReset
   , unsafeFromReset
   , unsafeToHighPolarity
@@ -153,7 +153,7 @@ module Clash.Signal
   , E.resetSynchronizer
   , holdReset
     -- ** Enabling
-  , Enable(..)
+  , Enable
   , toEnable
   , fromEnable
   , S.enableGen
