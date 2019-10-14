@@ -1,12 +1,12 @@
 {-|
 
 This module can automatically generate TopEntity definitions from 'Clash.NamedTypes'
-annotations. Annotations try to be as accurate to the shape of the Clash compiler output.
+annotations. Annotations involving data/type families must be inspected for correctness.
 Not all cases can be handled with automatic generation due to the difficulty of type manipulation
 in template Haskell. In particular annotations _inside_ the following is unlikely to work:
 
-- Data/type family constructors referencing other data/type families.
-- Recursive data types
+- Data/type family referencing other data/type families.
+- Annotations inside recursive data types
 - Clock constraints other than a single HiddenClockResetEnable. (You can still
   use arbitrary explicit clock/reset/enables!)
 
@@ -87,10 +87,10 @@ import           Language.Haskell.TH
 
 import           Data.Functor.Foldable          ( cata, para, embed )
 import           Data.Functor.Foldable.TH
-import           Control.Lens                   ( view, (%~), (?~), (&)
-                                                , _1, _2, _3
+import           Control.Lens                   ( (%~), (&), (.~)
+                                                , _1, _2
                                                 )
-import           Control.Monad                  ((>=>))
+import           Control.Monad                  ((>=>), mfilter, liftM2)
 import           Control.Monad.Trans.Reader     (ReaderT(..), asks, local)
 import           Control.Monad.Trans.Class      (lift)
 import           Language.Haskell.TH.Instances  ( )
@@ -127,19 +127,11 @@ instance (Semigroup a, Monoid a) => Monoid (Naming a) where
 #endif
 
 -- | Track seen 'Name's, and track current 'Info' for error reporting.
-type TrackData = (Set.Set Name, Maybe Info)
+type ErrorContext = String
+type TrackData = (Set.Set Name, ErrorContext)
 type Tracked m a = ReaderT TrackData m a
 
 -- * Utility functions
-
--- | A Template Haskell helper function. Get the 'Type's from a 'Con'.
-getTypes :: Con -> [Type]
-getTypes (NormalC _ xs)    = map snd xs
-getTypes (RecC _ xs)       = map (view _3) xs
-getTypes (InfixC x _ y)    = [snd x, snd y]
-getTypes (ForallC _ _ c)   = getTypes c
-getTypes (GadtC _ xs _)    = map snd xs
-getTypes (RecGadtC _ xs _) = map (view _3) xs
 
 -- | A Template Haskell helper function. Get the 'Name' of a 'Con'. These names
 -- are only used in type/data family resolution which is best effort,
@@ -170,11 +162,6 @@ unarrow :: Type -> [Type]
 unarrow (ArrowTy x y) = x : unarrow y
 unarrow _ = []
 
--- | Remove constraints from a type
-stripConstraints :: Type -> Type
-stripConstraints (ForallT _ _ x) = stripConstraints x
-stripConstraints x = x
-
 -- | Collapse a list of 'PortNames' into a single 'PortName'
 collapseNames :: [PortName] -> [PortName]
 collapseNames [] = []
@@ -185,14 +172,36 @@ collapseNames xs = [PortProduct "" xs]
 failMsg :: String -> String
 failMsg s = "TopEntity generation error: " ++ s
 
--- | Track a new seen 'Name' and update 'Info' for error handling
-visit :: Name -> Info -> Tracked m a -> Tracked m a
-visit name info = local (\t -> t & _1 %~ Set.insert name
-                                 & _2 ?~ info)
+-- | Retrieve current error context
+errorContext :: Tracked Q String
+errorContext = asks snd
 
--- | Retrieve current 'Info'
-getInfo :: Tracked Q (Maybe Info)
-getInfo = asks snd
+-- | Failure message with prefix in a 'Tracked' context
+failMsgWithContext :: String -> Tracked Q String
+failMsgWithContext s = (++) (failMsg s) <$> errorContext
+
+-- | Track a new seen 'Name' and update 'Info' for error handling
+visit :: (Show b) => Name -> b -> Tracked m a -> Tracked m a
+visit name a = local (\t -> t & _1 %~ Set.insert name
+                              & _2 .~ show a)
+
+-- | Grab the 'Name's of type variables in a datatype
+datatypeVars' :: DatatypeInfo -> [Name]
+#if MIN_VERSION_th_abstraction(0,3,0)
+datatypeVars' d = tvName <$> datatypeVars d
+#else
+datatypeVars' d = name <$> datatypeVars d
+ where
+  name (VarT n) = n
+  name (SigT n _) = name n
+  name e = error $ "Unexpected datatype variable name of type " ++ show e
+#endif
+
+-- | Run a 'Name' through the template haskell machinery, getting a
+-- 'DatatypeInfo' if the 'Name' specified a datatype. The result is processed by
+-- a given function or a default 'a' is returned in the style of 'maybe'.
+tryReifyDatatype :: a -> (DatatypeInfo -> a) -> Name -> Tracked Q a
+tryReifyDatatype a f name = lift (recover (pure a) $ f <$> reifyDatatype name)
 
 -- * Type tree folding / unfolding
 
@@ -203,57 +212,38 @@ portsFromTypes
 portsFromTypes xs = do
   (mconcat <$> mapM f xs)
   >>= \case
-    Complete names | length names > 0 && length names /= length xs -> do
-      info <- getInfo
-      return $ HasFail
-             $ failMsg "Partially named constructor arguments!\n"
-             ++ maybe "" pprint info
+    Complete names | length names > 0 && length names /= length xs ->
+      HasFail <$> failMsgWithContext "Partially named constructor arguments!\n"
     x -> return x
  where
   f = fmap (fmap collapseNames) . expandFamiliesAndGatherNames
 
 -- | Flag sum types as failing if they have any constructors with names.
 handleNamesInSum
-  :: [Con]
+  :: [ConstructorInfo]
   -> Tracked Q (Naming [PortName])
 handleNamesInSum xs =
-  (fold <$> mapM portsFromTypes (getTypes <$> xs)) >>= \case
+  (fold <$> mapM portsFromTypes (constructorFields <$> xs)) >>= \case
     Complete [] -> return $ Complete []
-    x -> do
-      info <- getInfo
-      return $ mappend x
-             $ HasFail
-             $ failMsg "Annotated sum types not supported!\n"
-             ++ maybe "" pprint info
+    x ->
+      mappend x . HasFail <$> failMsgWithContext "Annotated sum types not supported!\n"
 
 -- | Build a list of 'PortName's from a Template Haskell 'Name'
-nameToPorts
+datatypeNameToPorts
   :: Name
   -- ^ Name to investigate
   -> Tracked Q (Naming [PortName])
-nameToPorts name = do
+datatypeNameToPorts name = do
   seen <- asks fst
   if Set.member name seen
   then return $ Complete []
   else do
-    -- Recur on types by reifying the name.
-    -- This allows us to find splits defined in data types.
-    info <- lift $ reify name
+    constructors <- tryReifyDatatype [] datatypeCons name
 
-    names <- case info of
-      TyConI (getConstructors -> [x]) ->
-        visit name info $ portsFromTypes (getTypes x)
-      TyConI (getConstructors -> xs)  ->
-        -- This case can't have any valid name annotations as it is a sum type,
-        -- but we decend to check for existence annotations to flag an error.
-        visit name info $ handleNamesInSum xs
-      DataConI _ ty _ -> do
-        let xs = unarrow (stripConstraints ty)
-        visit name info $ portsFromTypes xs
-      PrimTyConI _ _ _ -> return $ Complete []
-      _ -> return $ HasFail
-                  $ failMsg "Unhandled type during building PortName tree: "
-                  ++ pprint info
+    names <- case constructors of
+      []  -> return $ Complete []
+      [x] -> visit name x $ portsFromTypes (constructorFields x)
+      xs  -> visit name xs $ handleNamesInSum xs
 
     return $ case names of
       BackTrack ns ->
@@ -262,21 +252,15 @@ nameToPorts name = do
           x  -> BackTrack x
       x -> x
  where
-  getConstructors (DataD _ _ _ _ x _)        = x
-  getConstructors (NewtypeD _ _ _ _ x _)     = [x]
-  getConstructors (DataInstD _ _ _ _ x _)    = x
-  getConstructors (NewtypeInstD _ _ _ _ x _) = [x]
-  getConstructors _                          = []
-
   firstUsage seen x = name == x && Set.notMember x seen
 
 -- | A helper function for recursively walking a 'Type' tree and
 -- building a list of 'PortName's.
-gatherNames
+typeTreeToPorts
   :: TypeF (Type, Tracked Q (Naming [PortName]))
   -- ^ Case under scrutiny, paramorphism style
   -> Tracked Q (Naming [PortName])
-gatherNames (AppTF (AppT (ConT split) (LitT (StrTyLit name)), _) (_,c))
+typeTreeToPorts (AppTF (AppT (ConT split) (LitT (StrTyLit name)), _) (_,c))
   -- Is there a '<String> ::: <something>' annotation?
   | split == ''(:::)
   -- We found our split. If:
@@ -287,33 +271,24 @@ gatherNames (AppTF (AppT (ConT split) (LitT (StrTyLit name)), _) (_,c))
     Complete xs -> return $ Complete [PortProduct name xs]
     x           -> return x
 
-gatherNames (ConTF name) = nameToPorts name
-gatherNames f@(AppTF (a,a') (b,_)) = do
-  -- 1. Gather types applied to a head type
-  -- 2. Check if head is a datatype
-  -- 3. Apply tail types to head datatype free type variables
-  -- 4. Attempt to get a unique constructor
+typeTreeToPorts (ConTF name) = datatypeNameToPorts name
+typeTreeToPorts f@(AppTF (a,a') (b,_)) = do
+  -- 1. Gather types applied to a head type, on the unprocessed subtree
   case unapp (AppT a b) of
     (ConT n : xs) -> do
-      lift (recover (pure Nothing) (Just <$> reifyDatatype n)) >>= \case
-        Just d | length xs == length (datatypeVars d) -> do
-          case applyContext xs d of
-            -- Good news- we've found a unique constructor
-            [c] -> do
-              let name = constructorName c
-              info <- lift $ reify name
-              visit name info $ portsFromTypes (constructorFields c)
+      -- 2. Check if head is a datatype
+      dataTy <- tryReifyDatatype Nothing Just n
 
-            -- We failed to apply even though we have the correct number of args
-            -- so just attempt to continue by returning the ports inside of
-            -- the head type.
-            _ -> a'
+      let -- 3. Apply tail types to head datatype free type variables
+          hasAllArgs          = \x -> length xs == length (datatypeVars x)
+          constructors = applyContext xs <$> mfilter hasAllArgs dataTy
 
-        -- It looks like we haven't got enough type arguments here so we can
-        -- return the default of ports inside the head type. (If enough types
-        -- are applied further down the tree, we will try again to correctly
-        -- apply the types.)
-        _ -> a'
+          -- 4. Attempt to get a unique constructor
+          getSingleConstructor cs = do [c] <- cs; return c
+          constructor = getSingleConstructor constructors
+
+      -- If any steps failed, return the PortNames according to the head type.
+      maybe a' (visit n (ppr n) . portsFromTypes . constructorFields) constructor
 
     -- We're not applying to a 'ConT' so lets try best effort of getting names
     -- from all applied types
@@ -322,17 +297,10 @@ gatherNames f@(AppTF (a,a') (b,_)) = do
       return $ fold f'
  where
   -- Substitute types into datatype type arguments
-  applyContext ctx d = applySubstitution (Map.fromList $ zip vars ctx) <$> datatypeCons d
-#if MIN_VERSION_th_abstraction(0,3,0)
-   where vars = tvName <$> datatypeVars d
-#else
-   where vars = name <$> datatypeVars d
-         name (VarT n) = n
-         name (SigT n _) = name n
-         name e = error $ "Unexpected datatype variable name of type " ++ show e
-#endif
+  tyMap ctx d = (Map.fromList $ zip (datatypeVars' d) ctx)
+  applyContext ctx d = applySubstitution (tyMap ctx d) <$> datatypeCons d
 
-gatherNames f = do
+typeTreeToPorts f = do
   -- Just collect names
   f' <- mapM snd f
   return $ fold f'
@@ -400,13 +368,13 @@ expandFamilies (AppTF a b) = do
   familyArity _ = Nothing
 expandFamilies t = embed <$> sequence t
 
--- | Runs 'expandFamilies' and then 'gatherNames'
+-- | Runs 'expandFamilies' and then 'typeTreeToPorts'
 expandFamiliesAndGatherNames
   :: Type
   -- ^ Type to investigate
   -> Tracked Q (Naming [PortName])
 expandFamiliesAndGatherNames =
-  cata expandFamilies >=> para gatherNames
+  cata expandFamilies >=> para typeTreeToPorts
 
 -- | Build a possible failing 'PortName' tree and unwrap the 'Naming' result.
 buildPorts
@@ -414,7 +382,7 @@ buildPorts
   -- ^ Type to investigate
   -> Q [PortName]
 buildPorts x = do
-  flip runReaderT (Set.empty, Nothing) $ expandFamiliesAndGatherNames x
+  flip runReaderT (Set.empty, "") $ expandFamiliesAndGatherNames x
     >>= \case
       Complete xs -> return xs
       HasFail err -> fail err
@@ -452,11 +420,7 @@ handleConstraints (ForallT [] [] x) clk = handleConstraints x clk
 handleConstraints (ForallT xs@(_:_) _ _) _ =
   fail $ failMsg "Free type variables!\n"
        ++ pprint xs
-handleConstraints (ForallT _ c x) clk
-  | hiddenClocks == Other
-    = fail $ failMsg "TH generation for multiple hidden clocks and"
-           ++ " HiddenClock/HiddenReset/HiddenEnable currently unsupported!"
-  | otherwise = handleConstraints x hiddenClocks
+handleConstraints (ForallT _ c x) clk = handleConstraints x hiddenClocks
  where
   hiddenClocks = foldl findHiddenClocks clk c
   findHiddenClocks a (AppT (ConT b) _)
@@ -471,23 +435,22 @@ handleConstraints (ForallT _ c x) clk
   findHiddenClocks a _ = a
 handleConstraints x clk = return (x, clk)
 
+clockToPorts :: ClockType -> Q [PortName]
+clockToPorts None = return []
+clockToPorts (SingleClockResetEnable) =
+  return [PortProduct "" [ PortName "clk" , PortName "rst" , PortName "en" ]]
+clockToPorts Other =
+  fail $ failMsg "TH generation for multiple hidden clocks and"
+       ++ " HiddenClock/HiddenReset/HiddenEnable currently unsupported!"
+
 -- *
 
 -- | Return a typed expression for a 'TopEntity' of a given @('Name', 'Type')@.
 buildTopEntity :: Maybe String -> (Name, Type) -> TExpQ TopEntity
 buildTopEntity topName (name, ty) = do
-    (ty', clockConstraints) <- handleConstraints ty None
+    (ty', clock) <- handleConstraints ty None
 
-    let clock = if clockConstraints == SingleClockResetEnable
-                then [ PortProduct ""
-                       [ PortName "clk"
-                       , PortName "rst"
-                       , PortName "en"
-                       ]
-                     ]
-                else []
-
-    ins   <- mappend clock <$> toArgNames ty'
+    ins   <- liftM2 (<>) (clockToPorts clock) (toArgNames ty')
     out   <- toReturnName ty'
 
     let outName = case topName of
