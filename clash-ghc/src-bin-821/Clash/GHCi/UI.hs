@@ -171,7 +171,7 @@ defaultGhciSettings opts =
     }
 
 ghciWelcomeMsg :: String
-ghciWelcomeMsg = "CLaSHi, version " ++ Data.Version.showVersion Paths_clash_ghc.version ++
+ghciWelcomeMsg = "Clashi, version " ++ Data.Version.showVersion Paths_clash_ghc.version ++
                  " (using clash-lib, version " ++ Data.Version.showVersion clashLibVersion ++
                  "):\nhttp://www.clash-lang.org/  :? for help"
 

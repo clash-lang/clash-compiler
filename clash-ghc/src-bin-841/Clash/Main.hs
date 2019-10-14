@@ -831,7 +831,7 @@ showSupportedExtensions :: IO ()
 showSupportedExtensions = mapM_ putStrLn supportedLanguagesAndExtensions
 
 showVersion :: IO ()
-showVersion = putStrLn $ concat [ "CLaSH, version "
+showVersion = putStrLn $ concat [ "Clash, version "
                                 , Data.Version.showVersion Paths_clash_ghc.version
                                 , " (using clash-lib, version: "
                                 , Data.Version.showVersion clashLibVersion
