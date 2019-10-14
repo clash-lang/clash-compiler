@@ -338,7 +338,7 @@ the definition of one of the sequential primitives, the @'register'@ function:
 
 @
 register
-     ( 'HiddenClockResetEnable' dom dom
+     ( 'HiddenClockResetEnable' dom
      , 'Clash.XException.NFDataX' a )
   => a
   -> 'Signal' dom a
@@ -427,7 +427,7 @@ shape of @macT@:
 
 @
 mealy
-  :: ('HiddenClockResetEnable' dom dom, 'Clash.XException.NFDataX' s)
+  :: ('HiddenClockResetEnable' dom, 'Clash.XException.NFDataX' s)
   => (s -> i -> (s,o))
   -> s
   -> ('Signal' dom i -> 'Signal' dom o)
@@ -667,7 +667,7 @@ structure.
 
     @
     asStateM
-      :: ( 'HiddenClockResetEnable' dom dom
+      :: ( 'HiddenClockResetEnable' dom
          , 'NFDataX' s )
       => (i -> 'Control.Monad.State.Lazy.State' s o)
       -> s
@@ -734,9 +734,11 @@ Why do we need these 'bundle', and 'unbundle' functions you might ask? When we
 look at the type of 'mealy':
 
 @
-__mealy__ :: (s -> i -> (s,o))
-      -> s
-      -> ('Signal' i -> 'Signal' o)
+__mealy__
+  :: HiddenClockResetEnable dom
+  => (s -> i -> (s,o))
+  -> s
+  -> ('Signal' dom i -> 'Signal' dom o)
 @
 
 we see that the resulting function has an input of type @'Signal' i@, and an
@@ -762,8 +764,8 @@ __unbundle__ :: 'Signal' dom (Int,Bool) -> ('Signal' dom Int, 'Signal' dom Bool)
 The /true/ types of these two functions are, however:
 
 @
-__bundle__   :: 'Bundle' a => 'Unbundled' domain a -> 'Signal' dom a
-__unbundle__ :: 'Bundle' a => 'Signal' dom a -> 'Unbundled' domain a
+__bundle__   :: 'Bundle' a => 'Unbundled' dom a -> 'Signal' dom a
+__unbundle__ :: 'Bundle' a => 'Signal' dom a -> 'Unbundled' dom a
 @
 
 'Unbundled' is an <https://downloads.haskell.org/~ghc/latest/docs/html/users_guide/glasgow_exts.html#associated-data-and-type-families associated type family>
@@ -786,7 +788,7 @@ That is:
 
 @
 instance 'Bundle' (a,b) where
-  type 'Unbundled' domain (a,b) = ('Signal' dom a, 'Signal' dom b)
+  type 'Unbundled' dom (a,b) = ('Signal' dom a, 'Signal' dom b)
   bundle   (a,b) = (,) '<$>' a '<*>' b
   unbundle tup   = (fst '<$>' tup, snd '<*>' tup)
 @
@@ -812,8 +814,8 @@ mealyB
   :: ('Bundle' i, 'Bundle' o)
   => (s -> i -> (s,o))
   -> s
-  -> 'Unbundled' domain i
-  -> 'Unbundled' domain o
+  -> 'Unbundled' dom i
+  -> 'Unbundled' dom o
 @
 
 Using 'mealyB' we can define @g@ as:
@@ -2318,8 +2320,8 @@ dotp :: SaturatingNum a
 dotp as bs = fold boundedPlus (zipWith boundedMult as bs)
 
 fir
-  :: (Default a, KnownNat n, SaturatingNum a, HiddenClockReset domain gated synchronous)
-  => Vec (n + 1) a -> Signal domain a -> Signal domain a
+  :: (Default a, KnownNat n, SaturatingNum a, HiddenClockResetEnable dom)
+  => Vec (n + 1) a -> Signal dom a -> Signal dom a
 fir coeffs x_t = y_t
   where
     y_t = dotp coeffs \<$\> bundle xs
