@@ -7,8 +7,14 @@
   Types used in BlackBox modules
 -}
 
+{-# LANGUAGE CPP            #-}
 {-# LANGUAGE DeriveAnyClass #-}
 {-# LANGUAGE DeriveGeneric  #-}
+
+-- since GHC 8.6 we can haddock individual contructor fields \o/
+#if __GLASGOW_HASKELL__ >= 806
+#define FIELD ^
+#endif
 
 module Clash.Netlist.BlackBox.Types
  ( BlackBoxMeta(..)
@@ -44,16 +50,17 @@ data TemplateKind
 -- fields. (They are intentionally renamed to prevent name clashes.)
 data BlackBoxMeta =
   BlackBoxMeta { bbOutputReg :: Bool
-               , bbKind      :: TemplateKind
-               , bbLibrary   :: [BlackBoxTemplate]
-               , bbImports   :: [BlackBoxTemplate]
-               , bbIncludes  :: [((S.Text, S.Text), BlackBox)]
+               , bbKind :: TemplateKind
+               , bbLibrary :: [BlackBoxTemplate]
+               , bbImports :: [BlackBoxTemplate]
+               , bbFunctionPlurality :: [(Int, Int)]
+               , bbIncludes :: [((S.Text, S.Text), BlackBox)]
                }
 
 -- | Use this value in your blackbox template function if you do want to
 -- accept the defaults as documented in @Clash.Primitives.Types.BlackBox@.
 emptyBlackBoxMeta :: BlackBoxMeta
-emptyBlackBoxMeta = BlackBoxMeta False TExpr [] [] []
+emptyBlackBoxMeta = BlackBoxMeta False TExpr [] [] [] []
 
 -- | A BlackBox function generates a blackbox template, given the inputs and
 -- result type of the function it should provide a blackbox for. This is useful
@@ -186,7 +193,21 @@ data Element
 --
 -- The LHS of the tuple is the name of the signal, while the RHS of the tuple
 -- is the type of the signal
-data Decl = Decl !Int [(BlackBoxTemplate,BlackBoxTemplate)]
+data Decl
+  = Decl
+      !Int
+      -- FIELD Argument position of the function to instantiate
+      !Int
+      -- FIELD Subposition of function: blackboxes can request multiple instances
+      -- to be rendered of their given functions. This subposition indicates the
+      -- nth function instance to be rendered (zero-indexed).
+      --
+      -- This is a hack: the proper solution would postpone rendering the
+      -- function until the very last moment. The blackbox language has no way
+      -- to indicate the subposition, and every ~INST will default its subposition
+      -- to zero. Haskell blackboxes can use this data type.
+      [(BlackBoxTemplate,BlackBoxTemplate)]
+      -- FIELD (name of signal, type of signal)
   deriving (Show, Generic, NFData, Binary, Hashable)
 
 data HdlSyn = Vivado | Quartus | Other

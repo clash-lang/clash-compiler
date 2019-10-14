@@ -20,7 +20,7 @@ module Clash.Netlist.BlackBox where
 import           Control.Exception             (throw)
 import           Control.Lens                  ((<<%=),(%=))
 import qualified Control.Lens                  as Lens
-import           Control.Monad                 (when)
+import           Control.Monad                 (when, replicateM)
 import           Control.Monad.IO.Class        (liftIO)
 import           Data.Char                     (ord)
 import           Data.Either                   (lefts, partitionEithers)
@@ -34,6 +34,8 @@ import           Data.Text.Lazy                (fromStrict)
 import qualified Data.Text.Lazy                as Text
 import           Data.Text                     (unpack)
 import qualified Data.Text                     as TextS
+import           GHC.Stack
+  (callStack, prettyCallStack)
 import qualified System.Console.ANSI           as ANSI
 import           System.Console.ANSI
   ( hSetSGR, SGR(SetConsoleIntensity, SetColor), Color(Magenta)
@@ -44,7 +46,8 @@ import           TextShow                      (showt)
 import           Util                          (OverridingBool(..))
 
 import           Clash.Annotations.Primitive
-  (PrimitiveGuard(HasBlackBox, WarnNonSynthesizable, WarnAlways, DontTranslate))
+  (PrimitiveGuard(HasBlackBox, WarnNonSynthesizable, WarnAlways, DontTranslate),
+   extractPrim)
 import           Clash.Core.DataCon            as D (dcTag)
 import           Clash.Core.FreeVars           (freeIds)
 import           Clash.Core.Literal            as L (Literal (..))
@@ -74,6 +77,7 @@ import           Clash.Netlist.Id              (IdType (..))
 import           Clash.Netlist.Types           as N
 import           Clash.Netlist.Util            as N
 import           Clash.Primitives.Types        as P
+import qualified Clash.Primitives.Util         as P
 import           Clash.Unique                  (lookupUniqMap')
 import           Clash.Util
 
@@ -102,19 +106,22 @@ mkBlackBoxContext
   -- ^ Blackbox function name
   -> Id
   -- ^ Identifier binding the primitive/blackbox application
-  -> [Term]
+  -> [Either Term Type]
   -- ^ Arguments of the primitive/blackbox application
   -> NetlistMonad (BlackBoxContext,[Declaration])
-mkBlackBoxContext bbName resId args = do
+mkBlackBoxContext bbName resId args@(lefts -> termArgs) = do
     -- Make context inputs
-    tcm             <- Lens.use tcCache
     let resNm = nameOcc (varName resId)
-    (imps,impDecls) <- unzip <$> mapM (mkArgument resNm) args
-    (funs,funDecls) <- mapAccumLM (addFunction tcm) IntMap.empty (zip args [0..])
+    resTy <- unsafeCoreTypeToHWTypeM' $(curLoc) (V.varType resId)
+    (imps,impDecls) <- unzip <$> mapM (mkArgument resNm) termArgs
+    (funs,funDecls) <-
+      mapAccumLM
+        (addFunction (V.varType resId))
+        IntMap.empty
+        (zip termArgs [0..])
 
     -- Make context result
     let res = Identifier resNm Nothing
-    resTy <- unsafeCoreTypeToHWTypeM' $(curLoc) (V.varType resId)
 
     lvl <- Lens.use curBBlvl
     (nm,_) <- Lens.use curCompNm
@@ -130,13 +137,27 @@ mkBlackBoxContext bbName resId args = do
            , concat impDecls ++ concat funDecls
            )
   where
-    addFunction tcm im (arg,i) = if isFun tcm arg
-      then do curBBlvl Lens.+= 1
-              (f,d) <- mkFunInput resId arg
-              curBBlvl Lens.-= 1
-              let im' = IntMap.insert i f im
-              return (im',d)
-      else return (im,[])
+    addFunction resTy im (arg,i) = do
+      tcm <- Lens.use tcCache
+      if isFun tcm arg then do
+        -- Only try to calculate function plurality when primitive actually
+        -- exists. Here to prevent crashes on __INTERNAL__ primitives.
+        prim <- HashMap.lookup bbName <$> Lens.use primitives
+        funcPlurality <-
+          case extractPrim <$> prim of
+            Just (Just p) ->
+              P.getFunctionPlurality p args resTy i
+            _ ->
+              pure 1
+
+        curBBlvl Lens.+= 1
+        (fs,ds) <- unzip <$> replicateM funcPlurality (mkFunInput resId arg)
+        curBBlvl Lens.-= 1
+
+        let im' = IntMap.insert i fs im
+        return (im', concat ds)
+      else
+        return (im, [])
 
 prepareBlackBox
   :: TextS.Text
@@ -226,7 +247,8 @@ mkArgument bndr e = do
 -- | Extract a compiled primitive from a guarded primitive. Emit a warning if
 -- the guard wants to, or fail entirely.
 extractPrimWarnOrFail
-  :: TextS.Text
+  :: HasCallStack
+  => TextS.Text
   -- ^ Name of primitive
   -> NetlistMonad CompiledPrimitive
 extractPrimWarnOrFail nm = do
@@ -242,6 +264,7 @@ extractPrimWarnOrFail nm = do
       let msg = $(curLoc) ++ "No blackbox found for: " ++ unpack nm
              ++ ". Did you forget to include directories containing "
              ++ "primitives? You can use '-i/my/prim/dir' to achieve this."
+             ++ (if debugIsOn then "\n\n" ++ prettyCallStack callStack ++ "\n\n" else [])
       throw (ClashException sp msg Nothing)
  where
   go
@@ -255,6 +278,7 @@ extractPrimWarnOrFail nm = do
     let msg = $(curLoc) ++ "Clash was forced to translate '" ++ unpack nm
            ++ "', but this value was marked with DontTranslate. Did you forget"
            ++ " to include a blackbox for one of the constructs using this?"
+           ++ (if debugIsOn then "\n\n" ++ prettyCallStack callStack ++ "\n\n" else [])
     throw (ClashException sp msg Nothing)
 
   go (WarnAlways warning cp) = do
@@ -318,8 +342,9 @@ mkPrimitive bbEParen bbEasD dst (nm,pinfo) args ty tickDecls =
             Right (BlackBoxMeta {..}, bbTemplate) ->
               -- Blackbox template generation succesful. Rerun 'go', but this time
               -- around with a 'normal' @BlackBox@
-              go (P.BlackBox bbName wf bbKind () bbOutputReg bbLibrary bbImports bbIncludes
-                    Nothing Nothing bbTemplate)
+              go (P.BlackBox
+                    bbName wf bbKind () bbOutputReg bbLibrary bbImports
+                    bbFunctionPlurality bbIncludes Nothing Nothing bbTemplate)
         p@P.BlackBox {} ->
           case kind p of
             TDecl -> do
@@ -328,7 +353,7 @@ mkPrimitive bbEParen bbEasD dst (nm,pinfo) args ty tickDecls =
               resM <- resBndr True dst
               case resM of
                 Just (dst',dstNm,dstDecl) -> do
-                  (bbCtx,ctxDcls)   <- mkBlackBoxContext nm dst' (lefts args)
+                  (bbCtx,ctxDcls)   <- mkBlackBoxContext nm dst' args
                   (templ,templDecl) <- prepareBlackBox pNm tempD bbCtx
                   let bbDecl = N.BlackBoxD pNm (libraries p) (imports p)
                                            (includes p) templ bbCtx
@@ -342,7 +367,7 @@ mkPrimitive bbEParen bbEasD dst (nm,pinfo) args ty tickDecls =
                   resM <- resBndr True dst
                   case resM of
                     Just (dst',dstNm,dstDecl) -> do
-                      (bbCtx,ctxDcls)     <- mkBlackBoxContext nm dst' (lefts args)
+                      (bbCtx,ctxDcls)     <- mkBlackBoxContext nm dst' args
                       (bbTempl,templDecl) <- prepareBlackBox pNm tempE bbCtx
                       let tmpAssgn = Assignment dstNm
                                         (BlackBoxE pNm (libraries p) (imports p)
@@ -354,7 +379,7 @@ mkPrimitive bbEParen bbEasD dst (nm,pinfo) args ty tickDecls =
                   resM <- resBndr False dst
                   case resM of
                     Just (dst',_,_) -> do
-                      (bbCtx,ctxDcls)      <- mkBlackBoxContext nm dst' (lefts args)
+                      (bbCtx,ctxDcls)      <- mkBlackBoxContext nm dst' args
                       (bbTempl,templDecl0) <- prepareBlackBox pNm tempE bbCtx
                       let templDecl1 = case nm of
                             "Clash.Sized.Internal.BitVector.fromInteger#"
@@ -462,7 +487,7 @@ mkFunInput resId e =
   tcm <- Lens.use tcCache
   -- TODO: Rewrite this function to use blackbox functions. Right now it
   -- TODO: generates strings that are later parsed/interpreted again. Silly!
-  (bbCtx,dcls) <- mkBlackBoxContext "__INTERNAL__" resId (lefts args)
+  (bbCtx,dcls) <- mkBlackBoxContext "__INTERNAL__" resId args
   templ <- case appE of
             Prim nm _ -> do
               bb  <- extractPrimWarnOrFail nm

@@ -33,7 +33,7 @@ import           Control.Monad.State.Strict
   (State, evalState, get, modify, runState)
 import           Control.Monad.Trans.Except
   (ExceptT (..), runExcept, runExceptT, throwE)
-import           Data.Either             (lefts, partitionEithers)
+import           Data.Either             (partitionEithers)
 import           Data.HashMap.Strict     (HashMap)
 import qualified Data.HashMap.Strict     as HashMap
 import           Data.String             (fromString)
@@ -706,7 +706,7 @@ setBinderName resN res2 (i,collectArgsTicks -> (k,args,ticks)) = case k of
   _ -> return goDef
  where
   go nm (BlackBox {resultName = Just (BBTemplate nmD)}) = withTicks ticks $ \_ -> do
-    (bbCtx,_) <- preserveVarEnv (mkBlackBoxContext nm goDef (lefts args))
+    (bbCtx,_) <- preserveVarEnv (mkBlackBoxContext nm goDef args)
     be <- Lens.use backend
     let q = case be of
               SomeBackend s -> toStrict ((State.evalState (renderTemplate bbCtx nmD) s) 0)
@@ -894,9 +894,22 @@ mkUniqueIdentifier typ nm = do
         seenIds %= HashMap.insert i' 0
         return i'
 
--- | Preserve the Netlist '_varCount','_curCompNm','_seenIds' when executing a monadic action
-preserveVarEnv :: NetlistMonad a
-               -> NetlistMonad a
+-- | Preserve the complete state before running an action, and restore it
+-- afterwards.
+preserveState
+  :: NetlistMonad a
+  -> NetlistMonad a
+preserveState action = do
+  state <- State.get
+  val <- action
+  State.put state
+  pure val
+
+-- | Preserve the Netlist '_varCount','_curCompNm','_seenIds' when executing
+-- a monadic action
+preserveVarEnv
+  :: NetlistMonad a
+  -> NetlistMonad a
 preserveVarEnv action = do
   -- store state
   vCnt  <- Lens.use varCount

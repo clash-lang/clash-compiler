@@ -409,14 +409,14 @@ compilePrimitive idirs pkgDbs topDir (BlackBoxHaskell bbName wf bbGenName source
     go args Nothing = do
       loadImportAndInterpret idirs args topDir qualMod funcName "BlackBoxFunction"
 
-compilePrimitive idirs pkgDbs topDir (BlackBox pNm wf tkind () oReg libM imps incs rM riM templ) = do
+compilePrimitive idirs pkgDbs topDir (BlackBox pNm wf tkind () oReg libM imps fPlural incs rM riM templ) = do
   libM'  <- mapM parseTempl libM
   imps'  <- mapM parseTempl imps
   incs'  <- mapM (traverse parseBB) incs
   templ' <- parseBB templ
   rM'    <- traverse parseBB rM
   riM'   <- traverse parseBB riM
-  return (BlackBox pNm wf tkind () oReg libM' imps' incs' rM' riM' templ')
+  return (BlackBox pNm wf tkind () oReg libM' imps' fPlural incs' rM' riM' templ')
  where
   iArgs = concatMap (("-package-db":) . (:[])) pkgDbs
 
