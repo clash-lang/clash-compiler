@@ -134,6 +134,8 @@ import qualified Prelude          as P
 import Test.QuickCheck            (Arbitrary (..), CoArbitrary (..))
 import Unsafe.Coerce              (unsafeCoerce)
 
+import Clash.Annotations.Primitive
+  (Primitive(InlinePrimitive), HDL(..))
 import Clash.Promoted.Nat
   (SNat (..), SNatLE (..), UNat (..), compareSNat, leToPlus, pow2SNat,
    snatProxy, snatToInteger, subSNat, withSNat, toUNat)
@@ -1009,6 +1011,9 @@ fold f vs = fold' (toList vs)
       where
         (ys,zs) = P.splitAt (P.length xs `div` 2) xs
 {-# NOINLINE fold #-}
+{-# ANN fold (InlinePrimitive VHDL "[ { \"BlackBoxHaskell\" : { \"name\" : \"Clash.Sized.Vector.fold\", \"templateFunction\" : \"Clash.Primitives.Sized.Vector.foldBBF\"}} ]") #-}
+{-# ANN fold (InlinePrimitive Verilog "[ { \"BlackBoxHaskell\" : { \"name\" : \"Clash.Sized.Vector.fold\", \"templateFunction\" : \"Clash.Primitives.Sized.Vector.foldBBF\"}} ]") #-}
+{-# ANN fold (InlinePrimitive SystemVerilog "[ { \"BlackBoxHaskell\" : { \"name\" : \"Clash.Sized.Vector.fold\", \"templateFunction\" : \"Clash.Primitives.Sized.Vector.foldBBF\"}} ]") #-}
 
 -- | 'scanl' is similar to 'foldl', but returns a vector of successive reduced
 -- values from the left:

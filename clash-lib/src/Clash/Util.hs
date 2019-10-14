@@ -429,3 +429,9 @@ allM p (x:xs) = do
     allM p xs
   else
     return False
+
+traceWith :: (a -> String) -> a -> a
+traceWith f a = trace (f a) a
+
+traceShowWith :: Show b => (a -> b) -> a -> a
+traceShowWith f a = trace (show (f a)) a

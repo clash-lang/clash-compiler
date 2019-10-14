@@ -266,52 +266,6 @@ end block;~ELSE
     }
   }
 , { "BlackBox" :
-    { "name"      : "Clash.Sized.Vector.fold"
-    , "workInfo"  : "Never"
-    , "kind"      : "Declaration"
-    , "type"      : "fold :: (a -> a -> a) -> Vec (n+1) a -> a"
-    , "comment"   : "THIS ONLY WORKS FOR POWER OF TWO LENGTH VECTORS"
-    , "template"  :
-"-- fold begin
-~GENSYM[fold][0] : block
-  -- given a level and a depth, calculate the corresponding index into the
-  -- intermediate array
-  function ~GENSYM[depth2Index][1] (levels,depth : in natural) return natural is
-  begin
-    return (2 ** levels - 2 ** depth);
-  end function;
-~IF ~VIVADO ~THEN
-  type ~GENSYM[fold_res_type][2] is array(natural range <>) of ~TYPO;
-  signal ~GENSYM[intermediate][3] : ~SYM[2](0 to (2*~LENGTH[~TYP[1]])-2);~ELSE
-  signal ~SYM[3] : ~TYPM[1](0 to (2*~LENGTH[~TYP[1]])-2);~FI
-  constant ~GENSYM[levels][5] : natural := natural (ceil (log2 (real (~LENGTH[~TYP[1]]))));
-begin
-  -- put input array into the first half of the intermediate array~IF ~VIVADO ~THEN
-  ~SYM[6] : for ~SYM[7] in 0 to (~LENGTH[~TYP[1]] - 1) generate
-    ~SYM[3](~SYM[7]) <= fromSLV(~VAR[vec][1](~SYM[7]));
-  end generate;~ELSE
-  ~SYM[3](0 to ~LENGTH[~TYP[1]]-1) <= ~VAR[vec][1];~FI
-
-  -- Create the tree of instantiated components
-  ~GENSYM[make_tree][8] : if ~SYM[5] /= 0 generate
-    ~GENSYM[tree_depth][9] : for ~GENSYM[d][10] in ~SYM[5]-1 downto 0 generate
-      ~GENSYM[tree_depth_loop][11] : for ~GENSYM[i][12] in 0 to (natural(2**~SYM[10]) - 1) generate
-        ~INST 0
-          ~OUTPUT <= ~SYM[3](~SYM[1](~SYM[5]+1,~SYM[10]+1)+~SYM[12])~ ~TYPO~
-          ~INPUT  <= ~SYM[3](~SYM[1](~SYM[5]+1,~SYM[10]+2)+(2*~SYM[12]))~ ~TYPO~
-          ~INPUT  <= ~SYM[3](~SYM[1](~SYM[5]+1,~SYM[10]+2)+(2*~SYM[12])+1)~ ~TYPO~
-        ~INST
-      end generate;
-    end generate;
-  end generate;
-
-  -- The last element of the intermediate array holds the result
-  ~RESULT <= ~SYM[3]((2*~LENGTH[~TYP[1]])-2);
-end block;
--- fold end"
-    }
-  }
-, { "BlackBox" :
     { "name"      : "Clash.Sized.Vector.index_int"
     , "kind"      : "Declaration"
     , "type"      : "index_int :: KnownNat n => Vec n a -> Int -> a"
