@@ -1,7 +1,15 @@
 # Changelog for the [`clash-ghc`](http://hackage.haskell.org/package/clash-ghc) package
 
 ## 1.1.0
+* New features (API):
+  * `NFDataX.ensureSpine`, see [#748](https://github.com/clash-lang/clash-compiler/pull/803)
+  * Added tools to generate top entity annotations, see [#795](https://github.com/clash-lang/clash-compiler/pull/795). Thanks @blaxill!
+  
+* New internal features:
+  * Add `DebugTry`: print name of all tried transformations, even if they didn't succeed
+
 * Fixes issues:
+  * [#810](https://github.com/clash-lang/clash-compiler/issues/810)
   * [#811](https://github.com/clash-lang/clash-compiler/issues/811)
 
 ## 1.0.0 *September 3rd 2019*
