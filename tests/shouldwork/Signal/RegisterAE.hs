@@ -55,7 +55,7 @@ topEntityAE clk rst = topEntity clk arst en
     en = toEnable (enableInput clk rst enableGen)
 {-# NOINLINE topEntityAE #-}
 
--- | Doing this case inline trips GHC 8.2/8.4 due to dead code. We sometimes
+-- | Doing this case inline trips GHC 8.4 due to dead code. We sometimes
 -- want to run our whole testsuite with a different System domain though, so
 -- it's not _really_ dead code.
 oneOrThree :: SResetKind dom -> (Signed 8)

@@ -38,7 +38,7 @@ topEntity1 clk rst = topEntity clk arst enableGen
     arst = unsafeToReset (resetInput clk rst enableGen)
 {-# NOINLINE topEntity1 #-}
 
--- | Doing this case inline trips GHC 8.2/8.4 due to dead code. We sometimes
+-- | Doing this case inline trips GHC 8.4 due to dead code. We sometimes
 -- want to run our whole testsuite with a different System domain though, so
 -- it's not _really_ dead code.
 oneOrFour :: SResetKind dom -> (Signed 8)
