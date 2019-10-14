@@ -1880,8 +1880,12 @@ reduceConst _ e = return e
 -- * Clash.Sized.RTree.treplicate
 -- * Clash.Sized.Internal.BitVector.split#
 -- * Clash.Sized.Internal.BitVector.eq#
-reduceNonRepPrim :: HasCallStack => NormRewrite
-reduceNonRepPrim c@(TransformContext is0 ctx) e@(App _ _) | (Prim nm _, args, ticks) <- collectArgsTicks e = do
+reduceNonRepPrim
+  :: HasCallStack
+  => Bool
+  -- ^ Allow new let-bindings to be generated
+  -> NormRewrite
+reduceNonRepPrim allowLbs c@(TransformContext is0 ctx) e@(App _ _) | (Prim nm _, args, ticks) <- collectArgsTicks e = do
   tcm <- Lens.view tcCache
   shouldReduce1 <- shouldReduce ctx
   ultra <- Lens.use (extra.normalizeUltra)
@@ -1902,7 +1906,7 @@ reduceNonRepPrim c@(TransformContext is0 ctx) e@(App _ _) | (Prim nm _, args, ti
             if or untranslatableTys || shouldReduce1 || ultra || n < 2
                then let [fun,lhsArg,rhsArg] = Either.lefts args
                     in  (`mkTicks` ticks) <$>
-                        reduceZipWith c n lhsElTy rhsElty resElTy fun lhsArg rhsArg
+                        reduceZipWith c allowLbs n lhsElTy rhsElty resElTy fun lhsArg rhsArg
                else return e
           _ -> return e
       "Clash.Sized.Vector.map" | length args == 5 -> do
@@ -1912,7 +1916,7 @@ reduceNonRepPrim c@(TransformContext is0 ctx) e@(App _ _) | (Prim nm _, args, ti
             untranslatableTys <- mapM isUntranslatableType_not_poly [argElTy,resElTy]
             if or untranslatableTys || shouldReduce1 || ultra || n < 2
                then let [fun,arg] = Either.lefts args
-                    in  (`mkTicks` ticks) <$> reduceMap c n argElTy resElTy fun arg
+                    in  (`mkTicks` ticks) <$> reduceMap c allowLbs n argElTy resElTy fun arg
                else return e
           _ -> return e
       "Clash.Sized.Vector.traverse#" | length args == 7 ->
@@ -1920,7 +1924,7 @@ reduceNonRepPrim c@(TransformContext is0 ctx) e@(App _ _) | (Prim nm _, args, ti
         in  case runExcept (tyNatSize tcm nTy) of
           Right n ->
             let [dict,fun,arg] = Either.lefts args
-            in  (`mkTicks` ticks) <$> reduceTraverse c n aTy fTy bTy dict fun arg
+            in  (`mkTicks` ticks) <$> reduceTraverse c allowLbs n aTy fTy bTy dict fun arg
           _ -> return e
       "Clash.Sized.Vector.fold" | length args == 4 -> do
         let [aTy,nTy] = Either.rights args
@@ -1928,7 +1932,7 @@ reduceNonRepPrim c@(TransformContext is0 ctx) e@(App _ _) | (Prim nm _, args, ti
         case runExcept (tyNatSize tcm nTy) of
           Right n | untranslatableTy || shouldReduce1 || ultra || n == 0 ->
             let [fun,arg] = Either.lefts args
-            in  (`mkTicks` ticks) <$> reduceFold c (n + 1) aTy fun arg
+            in  (`mkTicks` ticks) <$> reduceFold c allowLbs (n + 1) aTy fun arg
           _ -> return e
       "Clash.Sized.Vector.foldr" | length args == 6 ->
         let [aTy,bTy,nTy] = Either.rights args
@@ -1937,13 +1941,13 @@ reduceNonRepPrim c@(TransformContext is0 ctx) e@(App _ _) | (Prim nm _, args, ti
             untranslatableTys <- mapM isUntranslatableType_not_poly [aTy,bTy]
             if or untranslatableTys || shouldReduce1 || ultra
               then let [fun,start,arg] = Either.lefts args
-                   in  (`mkTicks` ticks) <$> reduceFoldr c n aTy fun start arg
+                   in  (`mkTicks` ticks) <$> reduceFoldr c allowLbs n aTy fun start arg
               else return e
           _ -> return e
       "Clash.Sized.Vector.dfold" | length args == 8 ->
         let ([_kn,_motive,fun,start,arg],[_mTy,nTy,aTy]) = Either.partitionEithers args
         in  case runExcept (tyNatSize tcm nTy) of
-          Right n -> (`mkTicks` ticks) <$> reduceDFold is0 n aTy fun start arg
+          Right n -> (`mkTicks` ticks) <$> reduceDFold is0 allowLbs n aTy fun start arg
           _ -> return e
       "Clash.Sized.Vector.++" | length args == 5 ->
         let [nTy,aTy,mTy] = Either.rights args
@@ -1955,7 +1959,7 @@ reduceNonRepPrim c@(TransformContext is0 ctx) e@(App _ _) | (Prim nm _, args, ti
                 | otherwise -> do
                     untranslatableTy <- isUntranslatableType_not_poly aTy
                     if untranslatableTy || shouldReduce1
-                       then (`mkTicks` ticks) <$> reduceAppend is0 n m aTy lArg rArg
+                       then (`mkTicks` ticks) <$> reduceAppend is0 allowLbs n m aTy lArg rArg
                        else return e
               _ -> return e
       "Clash.Sized.Vector.head" | length args == 3 -> do
@@ -1975,7 +1979,7 @@ reduceNonRepPrim c@(TransformContext is0 ctx) e@(App _ _) | (Prim nm _, args, ti
           Right n -> do
             untranslatableTy <- isUntranslatableType_not_poly aTy
             if untranslatableTy || shouldReduce1
-               then (`mkTicks` ticks) <$> reduceTail is0 (n+1) aTy vArg
+               then (`mkTicks` ticks) <$> reduceTail is0 allowLbs (n+1) aTy vArg
                else return e
           _ -> return e
       "Clash.Sized.Vector.last" | length args == 3 -> do
@@ -1995,7 +1999,7 @@ reduceNonRepPrim c@(TransformContext is0 ctx) e@(App _ _) | (Prim nm _, args, ti
           Right n -> do
             untranslatableTy <- isUntranslatableType_not_poly aTy
             if untranslatableTy || shouldReduce1
-               then (`mkTicks` ticks) <$> reduceInit is0 (n+1) aTy vArg
+               then (`mkTicks` ticks) <$> reduceInit is0 allowLbs (n+1) aTy vArg
                else return e
           _ -> return e
       "Clash.Sized.Vector.unconcat" | length args == 6 -> do
@@ -2024,7 +2028,7 @@ reduceNonRepPrim c@(TransformContext is0 ctx) e@(App _ _) | (Prim nm _, args, ti
           Right n -> do
             untranslatableTy <- isUntranslatableType_not_poly aTy
             if untranslatableTy || shouldReduce1 || ultra
-               then (`mkTicks` ticks) <$> reduceReplace_int is0 n aTy eTy vArg iArg aArg
+               then (`mkTicks` ticks) <$> reduceReplace_int is0 allowLbs n aTy eTy vArg iArg aArg
                else return e
           _ -> return e
 
@@ -2034,7 +2038,7 @@ reduceNonRepPrim c@(TransformContext is0 ctx) e@(App _ _) | (Prim nm _, args, ti
           Right n -> do
             untranslatableTy <- isUntranslatableType_not_poly aTy
             if untranslatableTy || shouldReduce1 || ultra
-               then (`mkTicks` ticks) <$> reduceIndex_int is0 n aTy vArg iArg
+               then (`mkTicks` ticks) <$> reduceIndex_int is0 allowLbs n aTy vArg iArg
                else return e
           _ -> return e
 
@@ -2045,20 +2049,20 @@ reduceNonRepPrim c@(TransformContext is0 ctx) e@(App _ _) | (Prim nm _, args, ti
             untranslatableTys <- mapM isUntranslatableType_not_poly [argElTy,resElTy]
             if or untranslatableTys || shouldReduce1 || ultra || n < 2
                then let [_,fun,arg] = Either.lefts args
-                    in  (`mkTicks` ticks) <$> reduceImap c n argElTy resElTy fun arg
+                    in  (`mkTicks` ticks) <$> reduceImap c allowLbs n argElTy resElTy fun arg
                else return e
           _ -> return e
       "Clash.Sized.Vector.dtfold" | length args == 8 ->
         let ([_kn,_motive,lrFun,brFun,arg],[_mTy,nTy,aTy]) = Either.partitionEithers args
         in  case runExcept (tyNatSize tcm nTy) of
-          Right n -> (`mkTicks` ticks) <$> reduceDTFold is0 n aTy lrFun brFun arg
+          Right n -> (`mkTicks` ticks) <$> reduceDTFold is0 allowLbs n aTy lrFun brFun arg
           _ -> return e
 
       "Clash.Sized.Vector.reverse"
         | ultra
         , ([vArg],[nTy,aTy]) <- Either.partitionEithers args
         , Right n <- runExcept (tyNatSize tcm nTy)
-        -> (`mkTicks` ticks) <$> reduceReverse is0 n aTy vArg
+        -> (`mkTicks` ticks) <$> reduceReverse is0 allowLbs n aTy vArg
 
       "Clash.Sized.RTree.tdfold" | length args == 8 ->
         let ([_kn,_motive,lrFun,brFun,arg],[_mTy,nTy,aTy]) = Either.partitionEithers args
@@ -2116,7 +2120,7 @@ reduceNonRepPrim c@(TransformContext is0 ctx) e@(App _ _) | (Prim nm _, args, ti
          then return (null $ Lens.toListOf typeFreeVars t)
          else return False
 
-reduceNonRepPrim _ e = return e
+reduceNonRepPrim _ _ e = return e
 
 -- | This transformation lifts applications of global binders out of
 -- alternatives of case-statements.

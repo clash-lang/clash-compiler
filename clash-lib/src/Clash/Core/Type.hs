@@ -35,6 +35,7 @@ module Clash.Core.Type
   , typeKind
   , mkTyConTy
   , mkFunTy
+  , mkFunTy'
   , mkTyConApp
   , splitFunTy
   , splitFunTys
@@ -220,8 +221,18 @@ newTyConInstRhs (tvs,ty) tys
     (tys1, tys2) = splitAtList tvs tys
 
 -- | Make a function type of an argument and result type
-mkFunTy :: Type -> Type -> Type
+mkFunTy
+  :: Type -- ^ a
+  -> Type -- ^ b
+  -> Type -- ^ a -> b
 mkFunTy t1 = AppTy (AppTy (ConstTy Arrow) t1)
+
+-- | Make a function type of argument types and a result type
+mkFunTy'
+  :: [Type] -- ^ [a, b, c, ..]
+  -> Type   -- ^ r
+  -> Type   -- ^ a -> b -> c -> r
+mkFunTy' = flip (foldr mkFunTy)
 
 -- | Make a TyCon Application out of a TyCon and a list of argument types
 mkTyConApp :: TyConName -> [Type] -> Type

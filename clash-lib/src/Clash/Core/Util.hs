@@ -14,6 +14,7 @@
 
 module Clash.Core.Util where
 
+import           PrelNames                     (intTyConKey)
 import           Control.Concurrent.Supply     (Supply, freshId)
 import qualified Control.Lens                  as Lens
 import Control.Monad.Trans.Except              (Except, throwE)
@@ -27,12 +28,14 @@ import           Data.Text.Prettyprint.Doc     (line)
 #if !MIN_VERSION_base(4,11,0)
 import           Data.Semigroup
 #endif
+import           Unique                        (getKey)
 
 import Clash.Core.DataCon
   (DataCon (MkData), dcType, dcUnivTyVars, dcExtTyVars, dcArgTys)
 import Clash.Core.FreeVars
   (tyFVsOfTypes, typeFreeVars)
-import Clash.Core.Literal                      (literalType)
+import Clash.Core.Literal
+  (Literal(IntLiteral,NaturalLiteral), literalType)
 import Clash.Core.Name
   (Name (..), OccName, mkUnsafeInternalName, mkUnsafeSystemName)
 import Clash.Core.Pretty                       (ppr, showPpr)
@@ -45,10 +48,11 @@ import Clash.Core.Term
 import Clash.Core.Type
   (Kind, LitTy (..), Type (..), TypeView (..),
    coreView, coreView1, isFunTy, isPolyFunCoreTy, mkFunTy, splitFunTy, tyView,
-   undefinedTy, isTypeFamilyApplication)
+   undefinedTy, isTypeFamilyApplication, mkTyConApp, mkFunTy', ConstTy(..))
 import Clash.Core.TyCon
-  (TyConMap, tyConDataCons)
-import Clash.Core.TysPrim                      (typeNatKind)
+  (TyConMap, tyConDataCons, tyConName)
+import Clash.Core.TysPrim
+  (typeNatKind, naturalPrimTy, liftedTypeKind)
 import Clash.Core.Var
   (Id, TyVar, Var (..), isLocalId, mkLocalId, mkTyVar)
 import Clash.Core.VarEnv
@@ -640,6 +644,131 @@ extractElems supply inScope consCon resTy s maxN vec =
     rhs       = Case e restTy [(pat,Var rest)]
 
     (uniqs3,restVs) = go (n-1) uniqs2 (Var restNId)
+
+-- | Similar to extractElems, but does not generate let-bindings. Generates
+-- case statements instead, that is:
+--
+--     [ case vec of {Cons x0 _xs0 -> x0}
+--     , case (case vec of {Cons _x0 xs0 -> xs0}) of {Cons x1 _xs1 -> x1}
+--     , ...
+--
+extractElemsFromWorkFreeVecWithCases
+  :: Supply
+  -- ^ Unique supply
+  -> InScopeSet
+  -- ^ (Superset of) in scope variables
+  -> DataCon
+  -- ^ The Cons (:>) constructor
+  -> Type
+  -- ^ The element type
+  -> Char
+  -- ^ Char to append to the bound variable names
+  -> Integer
+  -- ^ Length of the vector
+  -> Term
+  -- ^ The vector
+  -> [Term]
+extractElemsFromWorkFreeVecWithCases supply inScope conCons elementTy s maxN vec
+  -- If the given vector is a data constructor application (and is work-free)
+  -- we can immediately return the element without generating 'index_int'
+  -- constructs
+  | (Data {}, [_, _, _, Left _co, Left el, Left rest]) <- collectArgs vec =
+  el : extractElemsFromWorkFreeVecWithCases supply inScope conCons elementTy s (maxN - 1) rest
+extractElemsFromWorkFreeVecWithCases supply inScope consCon elementTy s maxN vec =
+  snd (go maxN (supply, inScope) vec)
+ where
+  go
+    :: Integer
+    -- ^ Length of vector
+    -> (Supply, InScopeSet)
+    -> Term
+    -- ^ Vector
+    -> ( (Supply, InScopeSet)
+       , [Term]
+       )
+  go 0 uniqs0 _ = (uniqs0,[])
+  go n uniqs0 e =
+    ( uniqs3
+    , lhs : restVs
+    )
+   where
+    tys = [(LitTy (NumTy n)), elementTy, (LitTy (NumTy (n-1)))]
+    (Just idTys) = dataConInstArgTys consCon tys
+    restTy       = last idTys
+
+    (uniqs1, mTV) = mkUniqSystemTyVar uniqs0 ("m",typeNatKind)
+    (uniqs2, [co, el, rest]) =
+      mapAccumR mkUniqSystemId uniqs1 $ zip
+        [ "_co_"
+        , "el" `T.append` (s `T.cons` T.pack (show (maxN-n)))
+        ,"rest" `T.append` (s `T.cons` T.pack (show (maxN-n)))
+        ]
+        idTys
+
+    pat = DataPat consCon [mTV] [co,el,rest]
+    lhs = Case e elementTy  [(pat,Var el)]
+    rhs = Case e restTy [(pat,Var rest)]
+
+    (uniqs3, restVs) = go (n-1) uniqs2 rhs
+
+-- | Similar to extractElems, but does not generate let-bindings. Used index_int
+-- to generate indexing, or directly extract elements if given vector is a
+-- data constructor application.
+extractElemsFromWorkFreeVec
+  :: HasCallStack
+  => TyConMap
+  -> Type
+  -- ^ The element typem
+  -> Integer
+  -- ^ Length of the vector
+  -> Term
+  -- ^ The vector
+  -> [Term]
+extractElemsFromWorkFreeVec _tcm _elementTy 0 _vec = []
+extractElemsFromWorkFreeVec tcm elementTy maxN vec
+  -- If the given vector is a data constructor application (and is work-free)
+  -- we can immediately return the element without generating 'index_int'
+  -- constructs
+  | (Data {}, [_, _, _, Left _co, Left el, Left rest]) <- collectArgs vec =
+  el : extractElemsFromWorkFreeVec tcm elementTy (maxN - 1) rest
+extractElemsFromWorkFreeVec tcm elementTy maxN vec =
+  -- Given vector is not a data constructor application, so we have to generate
+  -- 'index_int' constructs.
+  map index_int [0..maxN-1]
+ where
+  vecTcNm =
+    case tyView (termType tcm vec) of
+      TyConApp vecTcNm' _ -> vecTcNm'
+      _ -> error "Panic: Couldn't extract type constructor name of a Vec."
+
+  (Just intTc) = lookupUniqMap (getKey intTyConKey) tcm
+  [iDc] = tyConDataCons intTc
+
+  index_intPrim =
+    Prim
+      "Clash.Sized.Vector.index_int"
+      (PrimInfo
+         (ForAllTy nTV (
+         ForAllTy aTV (
+         (mkFunTy'
+           [ naturalPrimTy
+           , mkTyConApp vecTcNm [VarTy nTV, VarTy aTV]
+           , ConstTy (TyCon (tyConName intTc))]
+           elementTy ))))
+        WorkVariable)
+
+  index_int n =
+    index_intPrim
+      `TyApp` (LitTy (NumTy maxN))
+      `TyApp` elementTy
+      -- Following argument should be a KnowNat, but Clash accepts literals too
+      -- internally:
+      `App` (Literal (NaturalLiteral maxN))
+      `App` vec
+      `App` mkApps (Data iDc) [Left (Literal (IntLiteral n))]
+
+  nTV = mkTyVar typeNatKind (mkUnsafeSystemName "n" 0)
+  aTV = mkTyVar liftedTypeKind (mkUnsafeSystemName "a" 1)
 
 -- | Create let-bindings with case-statements that select elements out of a
 -- tree. Returns both the variables to which element-selections are bound

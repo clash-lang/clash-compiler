@@ -360,7 +360,10 @@ flattenCallTree (CBranch (nm,(nm',sp,inl,tm)) used) = do
                  apply "bindConstantVar" bindConstantVar >->
                  apply "caseCon" caseCon >->
                  apply "reduceConst" reduceConst >->
-                 apply "reduceNonRepPrim" reduceNonRepPrim >->
+                 -- We expect the term to be in Clash's normal form. Introducing
+                 -- new let-bindings would break that invariant. We therefore
+                 -- ask 'reduceNonRepPrim' to not generate them:
+                 apply "reduceNonRepPrim" (reduceNonRepPrim False) >->
                  apply "removeUnusedExpr" removeUnusedExpr >->
                  apply "flattenLet" flattenLet) !->
       topdownSucR (apply "topLet" topLet)

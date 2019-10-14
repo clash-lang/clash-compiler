@@ -579,7 +579,7 @@ substTyWith tvs tys =
   substTy (zipTvSubst tvs tys)
 
 -- | Ensure that non of the binders in an expression shadow each-other, nor
--- conflict with he in-scope set
+-- conflict with the in-scope set
 deShadowTerm
   :: HasCallStack
   => InScopeSet

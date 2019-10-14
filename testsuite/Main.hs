@@ -194,7 +194,7 @@ runClashTest =
         , runTest ("tests" </> "shouldwork" </> "HOPrim") defBuild [] "Map"       (["","testBench"],"testBench",True)
         , runTest ("tests" </> "shouldwork" </> "HOPrim") defBuild [] "Map2"      (["","testBench"],"testBench",True)
         , runTest ("tests" </> "shouldwork" </> "HOPrim") defBuild [] "TestMap"   (["","testBench"],"testBench",True)
-        , runTest ("tests" </> "shouldwork" </> "HOPrim") defBuild ["-fclash-inline-limit=100"] "Transpose" (["","testBench"],"testBench",True)
+        , runTest ("tests" </> "shouldwork" </> "HOPrim") defBuild ["-fclash-inline-limit=30"] "Transpose" (["","testBench"],"testBench",True)
         , runTest ("tests" </> "shouldwork" </> "HOPrim") defBuild [] "VecFun"    (["","testBench"],"testBench",True)
       ]
       , clashTestGroup "Numbers"

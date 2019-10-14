@@ -11,6 +11,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecordWildCards   #-}
 {-# LANGUAGE ViewPatterns      #-}
+{-# LANGUAGE MagicHash         #-}
 
 module Clash.Normalize.Util
  ( ConstantSpecInfo(..)
@@ -30,6 +31,7 @@ module Clash.Normalize.Util
  , normalizeTopLvlBndr
  , rewriteExpr
  , removedTm
+ , numLiteral
  )
  where
 
@@ -42,6 +44,8 @@ import qualified Data.List               as List
 import qualified Data.Map                as Map
 import qualified Data.HashMap.Strict     as HashMapS
 import           Data.Text               (Text)
+import           GHC.Integer.GMP.Internals
+  (Integer (..), BigNat (..))
 import           GHC.Stack               (HasCallStack)
 
 import           BasicTypes              (InlineSpec)
@@ -49,6 +53,8 @@ import           BasicTypes              (InlineSpec)
 import           Clash.Annotations.Primitive (extractPrim)
 import           Clash.Core.FreeVars
   (globalIds, hasLocalFreeVars, globalIdOccursIn)
+import           Clash.Core.DataCon      (dcTag)
+import qualified Clash.Core.Literal      as L
 import           Clash.Core.Pretty       (showPpr)
 import           Clash.Core.Subst        (deShadowTerm)
 import           Clash.Core.Term
@@ -69,6 +75,8 @@ import           Clash.Primitives.Util   (constantArgs)
 import           Clash.Rewrite.Types
   (RewriteMonad, TransformContext(..), bindings, curFun, dbgLevel, extra,
    tcCache)
+import qualified Data.Primitive.ByteArray    as BA
+import qualified Data.Vector.Primitive       as PV
 import           Clash.Rewrite.Util
   (runRewrite, specialise, mkTmBinderFor, mkDerivedName, isConstant)
 import           Clash.Unique
@@ -86,6 +94,23 @@ isWorkFreeBinder bndr =
         error ("isWorkFreeBinder: couldn't find binder: " ++ showPpr bndr)
       Just (_, _, _, bExpr) ->
         isWorkFree bExpr
+
+numLiteral :: Term -> NormalizeSession (Maybe Integer)
+numLiteral v =
+  pure (go v)
+ where
+  go :: Term -> Maybe Integer
+  go (Literal (L.IntegerLiteral i)) = Just i
+  go (Literal (L.IntLiteral i)) = Just i
+  go (Literal (L.NaturalLiteral i)) = Just i
+  go (Literal (L.Int64Literal i)) = Just i
+  go t =
+    case collectArgs t of
+      (Data dc, [Left (Literal (L.IntLiteral i))]) | dcTag dc == 1 -> Just i
+      (Data dc, [Left (Literal (L.ByteArrayLiteral (PV.Vector _ _ (BA.ByteArray ba))))])
+        | dcTag dc == 2 -> Just (Jp# (BN# ba))
+        | dcTag dc == 3 -> Just (Jn# (BN# ba))
+      _ -> Nothing
 
 -- | Determine whether a term does any work, i.e. adds to the size of the circuit
 isWorkFree
