@@ -62,8 +62,7 @@ tests =
         , testCase "Rec2_1"   $ rnfX (undef :: Rec2)                  @?= ()
         , testCase "Rec2_2"   $ rnfX (Rec2 3 undef)                   @?= ()
         , testCase "Rec2_3"   $ rnfX (Rec2 undef 5)                   @?= ()
---          Test case broken on 8.2.2:
---        , testCase "Void"     $ rnfX (undef :: Void)                  @?= ()
+        , testCase "Void"     $ rnfX (undef :: Void)                  @?= ()
         ]
     , testGroup
         "ManualRnf"
@@ -99,8 +98,7 @@ tests =
         , testCase "Rec2_1"   $ hasUndefined (undef :: Rec2)                  @?= True
         , testCase "Rec2_2"   $ hasUndefined (Rec2 3 undef)                   @?= True
         , testCase "Rec2_3"   $ hasUndefined (Rec2 undef 5)                   @?= True
---          Test case broken on 8.2.2:
---        , testCase "Void"     $ rnfX (undef :: Void)                  @?= True
+        , testCase "Void"     $ hasUndefined (undef :: Void)                  @?= True
         ]
     , testGroup
         "GenericHasUndefinedFalse"

@@ -1,3 +1,4 @@
+Cabal-version:        2.2
 Name:                 clash-ghc
 Version:              1.1.0
 Synopsis:             CAES Language for Synchronous Hardware
@@ -32,7 +33,7 @@ Description:
   Prelude library: <https://hackage.haskell.org/package/clash-prelude>
 Homepage:             https://clash-lang.org/
 bug-reports:          https://github.com/clash-lang/clash-compiler/issues
-License:              BSD2
+License:              BSD-2-Clause
 License-file:         LICENSE
 Author:               The Clash Authors
 Maintainer:           QBayLogic B.V. <devops@qbaylogic.com>
@@ -46,10 +47,7 @@ Extra-source-files:   README.md,
                       CHANGELOG.md,
                       LICENSE_GHC,
                       cbits/PosixSource.h,
-                      src-bin-821/Clash/GHCi/HsVersions.h
                       src-bin-841/Clash/GHCi/HsVersions.h
-
-Cabal-version:        >=1.10
 
 source-repository head
   type: git
@@ -88,18 +86,12 @@ executable clashi
 
 library
   HS-Source-Dirs:     src-ghc, src-bin-common
-  -- when we move to `cabal-version: 2.2`, we can use elif instead of these nested ifs, but ghc-8.2 comes with cabal-2.0
   if impl(ghc >= 8.7.0)
-    HS-Source-Dirs:   src-bin-881
-  else
-    if impl(ghc >= 8.6.0)
-      HS-Source-Dirs:   src-bin-861
-    else
-      if impl(ghc >= 8.4.1)
-        HS-Source-Dirs:   src-bin-841
-      else
-        if impl(ghc >= 8.2.1)
-          HS-Source-Dirs:   src-bin-821
+    HS-Source-Dirs: src-bin-881
+  elif impl(ghc >= 8.6.0)
+    HS-Source-Dirs: src-bin-861
+  elif impl(ghc >= 8.4.1)
+    HS-Source-Dirs: src-bin-841
 
   default-language:   Haskell2010
   GHC-Options:        -Wall -fno-warn-name-shadowing
@@ -127,7 +119,7 @@ library
                       containers                >= 0.5.4.0  && < 0.7,
                       directory                 >= 1.2      && < 1.4,
                       filepath                  >= 1.3      && < 1.5,
-                      ghc                       >= 8.2.0    && < 8.9,
+                      ghc                       >= 8.4.0    && < 8.9,
                       process                   >= 1.2      && < 1.7,
                       hashable                  >= 1.1.2.3  && < 1.4,
                       haskeline                 >= 0.7.0.3  && < 0.8,
@@ -145,9 +137,9 @@ library
                       ghc-typelits-natnormalise >= 0.6      && < 0.8,
                       deepseq                   >= 1.3.0.2  && < 1.5,
                       time                      >= 1.4.0.1  && < 1.10,
-                      ghc-boot                  >= 8.2.0    && < 8.9,
+                      ghc-boot                  >= 8.4.0    && < 8.9,
                       ghc-prim                  >= 0.3.1.0  && < 0.6,
-                      ghci                      >= 8.2.0    && < 8.9,
+                      ghci                      >= 8.4.0    && < 8.9,
                       uniplate                  >= 1.6.12   && < 1.8,
                       reflection                >= 2.1.2    && < 3.0,
                       integer-gmp               >= 1.0.1.0  && < 2.0,
