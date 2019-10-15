@@ -1,3 +1,4 @@
+Cabal-version:        2.2
 Name:                 clash-lib
 Version:              1.1.0
 Synopsis:             CAES Language for Synchronous Hardware - As a Library
@@ -44,7 +45,7 @@ Description:
   Prelude library: <https://hackage.haskell.org/package/clash-prelude>
 Homepage:             https://clash-lang.org/
 bug-reports:          https://github.com/clash-lang/clash-compiler/issues
-License:              BSD2
+License:              BSD-2-Clause
 License-file:         LICENSE
 Author:               The Clash Authors
 Maintainer:           QBayLogic B.V. <devops@qbaylogic.com>
@@ -65,8 +66,6 @@ Data-files:
   prims/verilog/*.json,
   prims/systemverilog/*.json,
   prims/vhdl/*.json
-
-Cabal-version:        >=1.10
 
 source-repository head
   type: git
@@ -153,6 +152,8 @@ Library
                       vector                  >= 0.11     && < 1.0,
                       vector-binary-instances >= 0.2.3.5  && < 0.3,
                       unordered-containers    >= 0.2.3.3  && < 0.3
+
+  Autogen-Modules:    Paths_clash_lib
 
   Exposed-modules:    Clash.Annotations.BitRepresentation.ClashLib
 
