@@ -1,7 +1,7 @@
+Cabal-Version:  2.2
 Name:           clash-cosim
 Version:        0.1
-Cabal-Version:  2.0
-License:        BSD2
+License:        BSD-2-Clause
 License-File:   LICENSE
 Author:         John Verheij <https://github.com/jgjverheij>
 Maintainer:     Martijn Bastiaan <martijn@qbaylogic.com>
@@ -80,6 +80,8 @@ Library
                     random                    >= 1.0.0,
                     template-haskell          >= 2.0.0,
                     text
+
+  Autogen-Modules:  Paths_clash_cosim
 
   Exposed-Modules:  Clash.CoSim.CodeGeneration,
                     Clash.CoSim.CoSimInstances,

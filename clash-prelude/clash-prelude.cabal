@@ -1,3 +1,4 @@
+Cabal-version:        2.2
 Name:                 clash-prelude
 Version:              1.1.0
 Synopsis:             CAES Language for Synchronous Hardware - Prelude library
@@ -43,7 +44,7 @@ Description:
   Some circuit examples can be found in "Clash.Examples".
 Homepage:             https://clash-lang.org/
 bug-reports:          https://github.com/clash-lang/clash-compiler/issues
-License:              BSD2
+License:              BSD-2-Clause
 License-file:         LICENSE
 Author:               The Clash Authors
 Maintainer:           QBayLogic B.V. <devops@qbaylogic.com>
@@ -58,8 +59,6 @@ Extra-source-files:   README.md
                       AUTHORS.md
 
 extra-doc-files:      doc/*.svg
-
-Cabal-version:        >=1.18
 
 source-repository head
   type: git
@@ -117,6 +116,8 @@ Library
 
   if flag(multiple-hidden)
     Exposed-modules:  Clash.Prelude.Synchronizer
+
+  Autogen-Modules:    Paths_clash_prelude
 
   Exposed-modules:    Clash.Annotations.TopEntity
                       Clash.Annotations.Primitive

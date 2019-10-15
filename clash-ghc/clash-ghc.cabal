@@ -159,6 +159,8 @@ library
   Include-dirs:       cbits
   C-Sources:          cbits/hschooks.c
 
+  Autogen-Modules:    Paths_clash_ghc
+
   Exposed-Modules:    Clash.Main
 
                       -- exposed for use by the benchmarks
