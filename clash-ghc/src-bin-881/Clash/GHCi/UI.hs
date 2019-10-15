@@ -2073,6 +2073,7 @@ makeHDL' backend opts lst = go =<< case lst of
     goX dflags srcs `gfinally` recover dflags
 
   goX dflags srcs = do
+    -- Issue #439 step 1
     (dflagsX,_,_) <- parseDynamicFlagsCmdLine dflags
                        [ noLoc "-fobject-code"   -- For #439
                        , noLoc "-fforce-recomp"  -- Actually compile to object-code
@@ -2081,6 +2082,12 @@ makeHDL' backend opts lst = go =<< case lst of
                        ]
     _ <- GHC.setSessionDynFlags dflagsX
     reloadModule ""
+    -- Issue #439 step 2
+    -- Unload any object files
+    -- This fixes: https://github.com/clash-lang/clash-compiler/issues/439#issuecomment-522015868
+    env <- GHC.getSession
+    liftIO (unload env [])
+    -- Finally generate the HDL
     makeHDL backend opts srcs
 
   recover dflags = do
