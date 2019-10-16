@@ -7,9 +7,10 @@
   * [#439](https://github.com/clash-lang/clash-compiler/issues/439): Template Haskell splices and TopEntity annotations can now be used in clashi
   * [#818](https://github.com/clash-lang/clash-compiler/issues/818): Fixed various mistakes in tutorial
   * [#662](https://github.com/clash-lang/clash-compiler/issues/662): Clash will now constant specialize partially constant constructs
-  
+
 * Small fixes without issue reports:
   * Fix bug in `rnfX` defined for `Down` ([814fd52](https://github.com/clash-lang/clash-compiler/commit/814fd520191123be38af8ef28fc49130424f3b93))
+  * Report blackbox name when encountering an error in 'setSym' ([#858](https://github.com/clash-lang/clash-compiler/pull/858))
 
 ## 1.0.0 *September 3rd 2019*
 * 10x - 50x faster compile times
