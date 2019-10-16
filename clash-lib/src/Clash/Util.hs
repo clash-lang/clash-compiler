@@ -36,7 +36,7 @@ import Data.Function                  as X (on)
 import Data.Hashable                  (Hashable)
 import Data.HashMap.Lazy              (HashMap)
 import qualified Data.HashMap.Lazy    as HashMapL
-import Data.Maybe                     (fromMaybe)
+import Data.Maybe                     (fromMaybe, listToMaybe, catMaybes)
 import Data.Text.Prettyprint.Doc
 import Data.Text.Prettyprint.Doc.Render.String
 import Data.Version                   (Version)
@@ -435,3 +435,12 @@ traceWith f a = trace (f a) a
 
 traceShowWith :: Show b => (a -> b) -> a -> a
 traceShowWith f a = trace (show (f a)) a
+
+-- | Left-biased choice on maybes
+orElse :: Maybe a -> Maybe a -> Maybe a
+orElse x@(Just _) _y = x
+orElse _x y = y
+
+-- | Left-biased choice on maybes
+orElses :: [Maybe a] -> Maybe a
+orElses = listToMaybe . catMaybes
