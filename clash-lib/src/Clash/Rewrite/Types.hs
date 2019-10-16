@@ -33,6 +33,7 @@ import Data.Binary                           (Binary)
 import Data.Hashable                         (Hashable)
 import Data.IntMap.Strict                    (IntMap)
 import Data.Monoid                           (Any)
+import qualified Data.Set                    as Set
 import GHC.Generics
 
 import Clash.Core.Evaluator      (GlobalHeap, PrimEvaluator)
@@ -87,7 +88,9 @@ makeLenses ''RewriteState
 data RewriteEnv
   = RewriteEnv
   { _dbgLevel       :: DebugLevel
-  -- ^ Lvl at which we print debugging messages
+  -- ^ Level at which we print debugging messages
+  , _dbgTransformations :: Set.Set String
+  -- ^ Transformations to print debugging info for
   , _typeTranslator :: CustomReprs
                     -> TyConMap
                     -> Type
