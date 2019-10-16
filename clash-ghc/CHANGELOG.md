@@ -1,8 +1,15 @@
 # Changelog for the [`clash-ghc`](http://hackage.haskell.org/package/clash-ghc) package
 
-## 1.1.0
+## 1.0.1
 * Fixes issues:
-  * [#811](https://github.com/clash-lang/clash-compiler/issues/811)
+  * [#810](https://github.com/clash-lang/clash-compiler/issues/810): Verilog backend now correctly specifies type of `BitVector 1`
+  * [#811](https://github.com/clash-lang/clash-compiler/issues/811): Improve module load behavior in clashi
+  * [#439](https://github.com/clash-lang/clash-compiler/issues/439): Template Haskell splices and TopEntity annotations can now be used in clashi
+  * [#818](https://github.com/clash-lang/clash-compiler/issues/818): Fixed various mistakes in tutorial
+  * [#662](https://github.com/clash-lang/clash-compiler/issues/662): Clash will now constant specialize partially constant constructs
+  
+* Small fixes without issue reports:
+  * Fix bug in `rnfX` defined for `Down` ([814fd52](https://github.com/clash-lang/clash-compiler/commit/814fd520191123be38af8ef28fc49130424f3b93))
 
 ## 1.0.0 *September 3rd 2019*
 * 10x - 50x faster compile times
