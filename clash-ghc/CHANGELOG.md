@@ -4,13 +4,24 @@
 * New features (API):
   * `NFDataX.ensureSpine`, see [#748](https://github.com/clash-lang/clash-compiler/pull/803)
   * Added tools to generate top entity annotations, see [#795](https://github.com/clash-lang/clash-compiler/pull/795). Thanks @blaxill!
+  * Added `Bundle ((f :*: g) a)` instance
   
 * New internal features:
   * Add `DebugTry`: print name of all tried transformations, even if they didn't succeed
 
 * Fixes issues:
-  * [#810](https://github.com/clash-lang/clash-compiler/issues/810)
-  * [#811](https://github.com/clash-lang/clash-compiler/issues/811)
+  * [#810](https://github.com/clash-lang/clash-compiler/issues/810): Verilog backend now correctly specifies type of `BitVector 1`
+  * [#811](https://github.com/clash-lang/clash-compiler/issues/811): Improve module load behavior in clashi
+  * [#439](https://github.com/clash-lang/clash-compiler/issues/439): Template Haskell splices and TopEntity annotations can now be used in clashi
+  * [#662](https://github.com/clash-lang/clash-compiler/issues/662): Clash will now constant specialize partially constant constructs
+
+* Small fixes without issue reports:
+  * Fix bug in `rnfX` defined for `Down` ([baef30e](https://github.com/clash-lang/clash-compiler/commit/baef30eae03dc02ba847ffbb8fae7f365c5287c2))
+  * Render numbers inside gensym ([bc76f0f](https://github.com/clash-lang/clash-compiler/commit/bc76f0f1934fd6e6ed9c33bcf950dae21e2f7903))
+  
+* Deprecations & removals:
+  * Removed support for GHC 8.2 ([#842](https://github.com/clash-lang/clash-compiler/pull/842))
+  * Removed support for older cabal versions, only Cabal >=2.2 supported ([#851](https://github.com/clash-lang/clash-compiler/pull/851))
 
 ## 1.0.0 *September 3rd 2019*
 * 10x - 50x faster compile times
