@@ -1,5 +1,5 @@
 name:                clash-profiling
-version:             0.1.0
+version:             0.0.0
 synopsis:            A profilable run of the Clash normalization process
 -- description:
 homepage:            https://clash-lang.org/

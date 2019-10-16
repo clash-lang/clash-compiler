@@ -1,5 +1,5 @@
 name:                clash-benchmark
-version:             0.1.0
+version:             0.0.0
 synopsis:            Criterion based Clash benchmark
 -- description:
 homepage:            https://clash-lang.org/

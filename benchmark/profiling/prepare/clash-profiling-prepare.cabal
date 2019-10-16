@@ -1,5 +1,5 @@
 name:                clash-profiling-prepare
-version:             0.1.0
+version:             0.0.0
 synopsis:            Runs ghc frontend and prepares input for clash-profile-normalization-run
 -- description:
 homepage:            https://clash-lang.org/
