@@ -274,7 +274,7 @@ runClashTest =
         , runTest ("tests" </> "shouldwork" </> "Signal" </> "BiSignal") defBuild [] "CounterHalfTuple" (["","testBench"],"testBench",True)
         , runTest ("tests" </> "shouldwork" </> "Signal" </> "BiSignal") defBuild [] "CounterHalfTupleRev" (["","testBench"],"testBench",True)
 
-        , runFailingTest ("tests" </> "shouldfail" </> "Signal") defBuild [] "MAC" (Just "Can't match template for \"Clash.Signal.Internal.register#\"")
+        , runFailingTest ("tests" </> "shouldfail" </> "Signal") defBuild [] "MAC" (Just "Couldn't instantiate blackbox for Clash.Signal.Internal.register#")
         ]
       , clashTestGroup "SynthesisAttributes"
         [ outputTest ("tests" </> "shouldwork" </> "SynthesisAttributes") defBuild [] [] "Simple"  "main"
