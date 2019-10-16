@@ -1,6 +1,6 @@
 Cabal-Version:  2.2
 Name:           clash-cosim
-Version:        0.1
+Version:        0.0.0
 License:        BSD-2-Clause
 License-File:   LICENSE
 Author:         John Verheij <https://github.com/jgjverheij>

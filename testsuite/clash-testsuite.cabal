@@ -2,7 +2,7 @@
 -- documentation, see https://haskell.org/cabal/users-guide/
 
 name:                clash-testsuite
-version:             0.1.0.0
+version:             0.0.0
 synopsis:            Clash Testsuite
 -- description:
 homepage:            https://clash-lang.org/
