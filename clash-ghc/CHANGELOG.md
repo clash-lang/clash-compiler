@@ -7,7 +7,8 @@
   * Added `Bundle ((f :*: g) a)` instance
   
 * New internal features:
-  * Add `DebugTry`: print name of all tried transformations, even if they didn't succeed
+  * [#821](https://github.com/clash-lang/clash-compiler/pull/821): Add `DebugTry`: print name of all tried transformations, even if they didn't succeed
+  * [#856](https://github.com/clash-lang/clash-compiler/pull/856): Add `-fclash-debug-transformations`: only print debug info for specific transformations
 
 * Fixes issues:
   * [#810](https://github.com/clash-lang/clash-compiler/issues/810): Verilog backend now correctly specifies type of `BitVector 1`

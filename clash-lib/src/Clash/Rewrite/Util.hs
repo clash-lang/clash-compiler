@@ -33,6 +33,7 @@ import           Control.Monad.Fail          (MonadFail)
 #endif
 import qualified Control.Monad.State.Strict  as State
 import qualified Control.Monad.Writer        as Writer
+import           Data.Bool                   (bool)
 import           Data.Bifunctor              (bimap)
 import           Data.Coerce                 (coerce)
 import           Data.Functor.Const          (Const (..))
@@ -139,7 +140,6 @@ apply
   -- ^ Transformation to be applied
   -> Rewrite extra
 apply = \s rewrite ctx expr0 -> do
-  lvl <- Lens.view dbgLevel
   (expr1,anyChanged) <- Writer.listen (rewrite ctx expr0)
   let hasChanged = Monoid.getAny anyChanged
       !expr2     = if hasChanged then expr1 else expr0
@@ -160,14 +160,19 @@ apply = \s rewrite ctx expr0 -> do
                  }
     return ()
 #endif
+  lvl <- Lens.view dbgLevel
+  transformations <- Lens.view dbgTransformations
+
   if lvl == DebugNone
     then return expr2
-    else applyDebug lvl s expr0 hasChanged expr2
+    else applyDebug lvl transformations s expr0 hasChanged expr2
 {-# INLINE apply #-}
 
 applyDebug
   :: DebugLevel
   -- ^ The current debugging level
+  -> Set.Set String
+  -- ^ Transformations to debug
   -> String
   -- ^ Name of the transformation
   -> Term
@@ -177,7 +182,12 @@ applyDebug
   -> Term
   -- ^ New expression
   -> RewriteMonad extra Term
-applyDebug lvl name exprOld hasChanged exprNew =
+applyDebug lvl transformations name exprOld hasChanged exprNew
+  | not (Set.null transformations) =
+    let newLvl = bool DebugNone lvl (name `Set.member` transformations) in
+    applyDebug newLvl Set.empty name exprOld hasChanged exprNew
+
+applyDebug lvl _transformations name exprOld hasChanged exprNew =
  traceIf (lvl == DebugTry) ("Trying: " ++ name) $
  traceIf (lvl >= DebugAll) ("Trying: " ++ name ++ " on:\n" ++ before) $ do
   Monad.when (lvl > DebugNone && hasChanged) $ do

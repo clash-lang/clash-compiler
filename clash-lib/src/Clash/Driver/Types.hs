@@ -15,18 +15,17 @@ module Clash.Driver.Types where
 -- For Int/Word size
 #include "MachDeps.h"
 
-import Data.Text         (Text)
+import           BasicTypes                     (InlineSpec)
+import qualified Data.Set                       as Set
+import           Data.Text                      (Text)
+import           SrcLoc                         (SrcSpan)
+import           Util                           (OverridingBool(..))
 
-import BasicTypes        (InlineSpec)
-import SrcLoc            (SrcSpan)
+import           Clash.Core.Term                (Term)
+import           Clash.Core.Var                 (Id)
+import           Clash.Core.VarEnv              (VarEnv)
 
-import Clash.Core.Term   (Term)
-import Clash.Core.Var    (Id)
-import Clash.Core.VarEnv (VarEnv)
-
-import Clash.Netlist.BlackBox.Types (HdlSyn (..))
-
-import Util (OverridingBool(..))
+import           Clash.Netlist.BlackBox.Types   (HdlSyn (..))
 
 -- | Global function binders
 --
@@ -56,6 +55,7 @@ data ClashOpts = ClashOpts { opt_inlineLimit :: Int
                            , opt_inlineFunctionLimit :: Word
                            , opt_inlineConstantLimit :: Word
                            , opt_dbgLevel    :: DebugLevel
+                           , opt_dbgTransformations :: Set.Set String
                            , opt_cachehdl    :: Bool
                            , opt_cleanhdl    :: Bool
                            , opt_primWarn    :: Bool
@@ -96,6 +96,7 @@ defClashOpts :: ClashOpts
 defClashOpts
   = ClashOpts
   { opt_dbgLevel            = DebugNone
+  , opt_dbgTransformations  = Set.empty
   , opt_inlineLimit         = 20
   , opt_specLimit           = 20
   , opt_inlineFunctionLimit = 15
