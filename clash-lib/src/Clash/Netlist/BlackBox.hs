@@ -136,23 +136,21 @@ prepareBlackBox
   -> BlackBox
   -> BlackBoxContext
   -> NetlistMonad (BlackBox,[Declaration])
-prepareBlackBox pNm templ bbCtx =
-  if verifyBlackBoxContext bbCtx templ
-     then do
-        (t2,decls) <-
-          onBlackBox
-            (fmap (first BBTemplate) . setSym mkUniqueIdentifier bbCtx)
-            (\bbName bbHash bbFunc -> pure (BBFunction bbName bbHash bbFunc, []))
-            templ
-        return (t2,decls)
-     else do
-       (_,sp) <- Lens.use curCompNm
-       templ' <- onBlackBox (getMon . prettyBlackBox)
-                            (\n h f -> return $ Text.pack $ show (BBFunction n h f))
-                            templ
-       let msg = $(curLoc) ++ "Can't match template for " ++ show pNm ++ " :\n\n" ++ Text.unpack templ' ++
-                "\n\nwith context:\n\n" ++ show bbCtx
-       throw (ClashException sp msg Nothing)
+prepareBlackBox _pNm templ bbCtx =
+  case verifyBlackBoxContext bbCtx templ of
+    Nothing -> do
+      (t2,decls) <-
+        onBlackBox
+          (fmap (first BBTemplate) . setSym mkUniqueIdentifier bbCtx)
+          (\bbName bbHash bbFunc -> pure (BBFunction bbName bbHash bbFunc, []))
+          templ
+      return (t2,decls)
+    Just err0 -> do
+      (_,sp) <- Lens.use curCompNm
+      let err1 = concat [ "Couldn't instantiate blackbox for "
+                        , Data.Text.unpack (bbName bbCtx), ". Verification "
+                        , "procedure reported:\n\n" ++ err0 ]
+      throw (ClashException sp ($(curLoc) ++ err1) Nothing)
 
 -- | Determine if a term represents a literal
 isLiteral :: Term -> Bool
