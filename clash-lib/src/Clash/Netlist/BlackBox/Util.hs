@@ -85,35 +85,54 @@ verifyBlackBoxContext
   -- ^ Blackbox to verify
   -> N.BlackBox
   -- ^ Template to check against
-  -> Bool
-verifyBlackBoxContext bbCtx (N.BBFunction _ _ (N.TemplateFunction _ f _)) = f bbCtx
-verifyBlackBoxContext bbCtx (N.BBTemplate t) = and (concatMap (walkElement verify') t)
+  -> Maybe String
+verifyBlackBoxContext bbCtx (N.BBFunction _ _ (N.TemplateFunction _ f _)) =
+  if f bbCtx then
+    Nothing
+  else
+    -- TODO: Make TemplateFunction return a string
+    Just ("Template function for returned False")
+verifyBlackBoxContext bbCtx (N.BBTemplate t) =
+  orElses (concatMap (walkElement verify') t)
   where
+    concatTups = concatMap (\(x, y) -> [x, y])
+
     verify' e =
       Just $
       case e of
         Lit n ->
           case indexMaybe (bbInputs bbCtx) n of
-            Just (_, _, b) -> b
-            _              -> False
+            Just (inp, _, False) ->
+              Just ( "Argument " ++ show n ++ " should be literal, as blackbox "
+                  ++ "used ~LIT[" ++ show n ++ "], but was:\n\n" ++ show inp)
+            _ -> Nothing
         Const n ->
           case indexMaybe (bbInputs bbCtx) n of
-            Just (_, _, b) -> b
-            _              -> False
+            Just (inp, _, False) ->
+              Just ( "Argument " ++ show n ++ " should be literal, as blackbox "
+                  ++ "used ~CONST[" ++ show n ++ "], but was:\n\n" ++ show inp)
+            _ -> Nothing
         Component (Decl n l') ->
           case IntMap.lookup n (bbFunctions bbCtx) of
-            Just _ ->
-              all (\(x,y) ->
-                      verifyBlackBoxContext bbCtx (N.BBTemplate x) &&
-                         verifyBlackBoxContext bbCtx (N.BBTemplate y)) l'
+            Just _func ->
+              orElses $
+                map
+                  (verifyBlackBoxContext bbCtx . N.BBTemplate)
+                  (concatTups l')
             Nothing ->
-              False
+              Just ( "Blackbox requested instantiation of function at argument "
+                  ++ show n ++ ", but BlackBoxContext did not contain one.")
         _ ->
           case inputHole e of
             Nothing ->
-              True
+              Nothing
             Just n ->
-              n < length (bbInputs bbCtx)
+              case indexMaybe (bbInputs bbCtx) n of
+                Just _ -> Nothing
+                Nothing ->
+                  Just ( "Blackbox required at least " ++ show (n+1)
+                      ++ " arguments, but only " ++ show (length (bbInputs bbCtx))
+                      ++ " were passed." )
 
 extractLiterals :: BlackBoxContext
                 -> [Expr]
@@ -323,15 +342,16 @@ renderElem b (Component (Decl n (l:ls))) = do
                    $ renderLazy
                    $ layoutPretty layoutOptions block
 
-  if verifyBlackBoxContext b' templ4
-    then do
+  case verifyBlackBoxContext b' templ4 of
+    Nothing -> do
       bb <- renderBlackBox libs imps inc templ4 b'
       return (renderLazy . layoutPretty layoutOptions . bb)
-    else do
+    Just err0 -> do
       sp <- getSrcSpan
-      throw (ClashException sp ($(curLoc) ++ "\nCan't match context:\n"
-                                          ++ show b' ++ "\nwith template:\n"
-                                          ++ show templ0) Nothing)
+      let err1 = concat [ "Couldn't instantiate blackbox for "
+                        , Data.Text.unpack (bbName b), ". Verification procedure "
+                        , "reported:\n\n" ++ err0 ]
+      throw (ClashException sp ($(curLoc) ++ err1) Nothing)
 
 renderElem b (SigD e m) = do
   e' <- Text.concat <$> mapM (fmap ($ 0) . renderElem b) e
