@@ -837,7 +837,7 @@ letCast _ (Cast (stripTicks -> Letrec binds body) ty1 ty2) =
 letCast _ e = return e
 
 
--- | Push cast over an argument to a funtion into that function
+-- | Push cast over an argument to a function into that function
 --
 -- This is done by specializing on the casted argument.
 -- Example:
@@ -850,20 +850,24 @@ letCast _ e = return e
 --   y = f' a
 --     where f' x' = (\x -> g x) (cast x')
 -- @
+--
+-- The reason d'etre for this transformation is that we hope to end up with
+-- and expression where two casts are "back-to-back" after which we can
+-- eliminate them in 'eliminateCastCast'.
 argCastSpec :: HasCallStack => NormRewrite
-argCastSpec ctx e@(App _ (stripTicks -> Cast e' _ _)) = case e' of
-  Var {} -> go
-  Cast (Var {}) _ _ -> go
-  _ -> warn go
-  where
-    go = specializeNorm ctx e
-    warn = trace (unlines ["WARNING: " ++ $(curLoc) ++ "specializing a function on a possibly non work-free cast."
-                          ,"Generated HDL implementation might contain duplicate work."
-                          ,"Please report this as a bug."
-                          ,""
-                          ,"Expression where this occurs:"
-                          ,showPpr e
-                          ])
+argCastSpec ctx e@(App _ (stripTicks -> Cast e' _ _)) =
+  if isWorkFree e' then
+    go
+  else
+    warn go
+ where
+  go = specializeNorm ctx e
+  warn = trace (unwords
+    [ "WARNING:", $(curLoc), "specializing a function on a non work-free"
+    , "cast. Generated HDL implementation might contain duplicate work."
+    , "Please report this as a bug.", "\n\nExpression where this occured:"
+    , "\n\n" ++ showPpr e
+    ])
 argCastSpec _ e = return e
 
 -- | Only inline casts that just contain a 'Var', because these are guaranteed work-free.
