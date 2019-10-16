@@ -7,6 +7,7 @@
   * [#439](https://github.com/clash-lang/clash-compiler/issues/439): Template Haskell splices and TopEntity annotations can now be used in clashi
   * [#818](https://github.com/clash-lang/clash-compiler/issues/818): Fixed various mistakes in tutorial
   * [#662](https://github.com/clash-lang/clash-compiler/issues/662): Clash will now constant specialize partially constant constructs
+  * [#700](https://github.com/clash-lang/clash-compiler/issues/700): Check work content of expression in cast before warning users. Should eliminate a lot of (superfluous) warnings about "specializing on non work-free cast"s.
 
 * Small fixes without issue reports:
   * Fix bug in `rnfX` defined for `Down` ([814fd52](https://github.com/clash-lang/clash-compiler/commit/814fd520191123be38af8ef28fc49130424f3b93))
