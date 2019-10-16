@@ -134,6 +134,8 @@ setSym mkUniqueIdentifierM bbCtx l = do
     (a,(_,decls)) <- runStateT (mapM setSym' l) (IntMap.empty,IntMap.empty)
     return (a,concatMap snd (IntMap.elems decls))
   where
+    bbnm = Data.Text.unpack (bbName bbCtx)
+
     setSym'
       :: Element
       -> StateT ( IntMap.IntMap Identifier
@@ -173,7 +175,10 @@ setSym mkUniqueIdentifierM bbCtx l = do
             t' <- lift (mkUniqueIdentifierM Basic (Text.toStrict (concatT t)))
             _1 %= (IntMap.insert i t')
             return (GenSym [Text (Text.fromStrict t')] i)
-          Just _ -> error ("Symbol #" ++ show (t,i) ++ " is already defined")
+          Just _ ->
+            error ("Symbol #" ++ show (t,i)
+                ++ " is already defined in BlackBox for: "
+                ++ bbnm)
       Component (Decl n l') ->
         Component <$> (Decl n <$> mapM (combineM (mapM setSym') (mapM setSym')) l')
       IF c t f      -> IF <$> pure c <*> mapM setSym' t <*> mapM setSym' f
@@ -182,19 +187,21 @@ setSym mkUniqueIdentifierM bbCtx l = do
       _             -> pure e
 
     concatT :: [Element] -> Text
-    concatT = Text.concat
-            . map (\case { Text t -> t
-                         ; Name i -> case elementToText bbCtx (Name i) of
-                                         Right t ->
-                                             t
-                                         Left msg ->
-                                             error $ $(curLoc) ++  "Could not convert "
-                                                               ++ "~NAME[" ++ show i ++ "]"
-                                                               ++ " to string:" ++ msg
-                         ; Result _ | Identifier t _ <- fst (bbResult bbCtx)
-                                    -> Text.fromStrict t
-                         ; CompName -> Text.fromStrict (bbCompName bbCtx)
-                         ; _   -> error "unexpected element in GENSYM"})
+    concatT = Text.concat . map (
+      \case
+        Text t -> t
+        Name i ->
+          case elementToText bbCtx (Name i) of
+            Right t -> t
+            Left msg ->
+              error $ $(curLoc) ++  "Could not convert ~NAME[" ++ show i ++ "]"
+                   ++ " to string:" ++ msg ++ "\n\nError occured while "
+                   ++ "processing blackbox for " ++ bbnm
+        Result _ | Identifier t _ <- fst (bbResult bbCtx) -> Text.fromStrict t
+        CompName -> Text.fromStrict (bbCompName bbCtx)
+        _ -> error $ $(curLoc) ++ "Unexpected element in GENSYM when processing "
+                  ++ "blackbox for " ++ bbnm
+        )
 
 selectNewName
     :: Foldable t
