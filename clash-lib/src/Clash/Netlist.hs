@@ -61,7 +61,7 @@ import           Clash.Core.Type
   (Type (..), coreView1, splitFunTys, splitCoreFunForallTy)
 import           Clash.Core.TyCon                 (TyConMap)
 import           Clash.Core.Util
-  (mkApps, mkTicks, stripTicks, termType)
+  (mkApps, mkTicks, splitShouldSplit, stripTicks, termType)
 import           Clash.Core.Var                   (Id, Var (..))
 import           Clash.Core.VarEnv
   (VarEnv, eltsVarEnv, emptyInScopeSet, emptyVarEnv, extendVarEnv, lookupVarEnv,
@@ -531,12 +531,15 @@ mkFunApp dstId fun args tickDecls = do
   tcm     <- Lens.use tcCache
   case lookupVarEnv fun topAnns of
     Just (ty,annM)
-      | let (fArgTys,fResTy) = splitFunTys tcm ty
-      , length fArgTys == length args
+      | let (fArgTys0,fResTy) = splitFunTys tcm ty
+      -- Take into account that clocks and stuff are split off from any product
+      -- types containing them
+      , let fArgTys1 = splitShouldSplit tcm fArgTys0
+      , length fArgTys1 == length args
       -> do
-        argHWTys <- mapM (unsafeCoreTypeToHWTypeM' $(curLoc)) fArgTys
+        argHWTys <- mapM (unsafeCoreTypeToHWTypeM' $(curLoc)) fArgTys1
         (argExprs, concat -> argDecls) <- unzip <$>
-          mapM (\(e,t) -> mkExpr False (Left dstId) t e) (zip args fArgTys)
+          mapM (\(e,t) -> mkExpr False (Left dstId) t e) (zip args fArgTys1)
 
         -- Filter void arguments, but make sure to render their declarations:
         let

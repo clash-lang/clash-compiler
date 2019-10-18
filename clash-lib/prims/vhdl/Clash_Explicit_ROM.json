@@ -26,16 +26,8 @@ begin
   ~GENSYM[romSync][6] : process (~ARG[3])
   begin
     if (~IF~ACTIVEEDGE[Rising][0]~THENrising_edge~ELSEfalling_edge~FI(~ARG[3])~IF ~ISACTIVEENABLE[4] ~THEN and ~ARG[4] ~ELSE ~FI) then~IF ~VIVADO ~THEN
-      ~RESULT <= ~FROMBV[~SYM[2](~SYM[3])][~TYPO]
-      -- pragma translate_off
-      after 1 ps
-      -- pragma translate_on
-      ;~ELSE
-      ~RESULT <= ~SYM[2](~SYM[3])
-      -- pragma translate_off
-      after 1 ps
-      -- pragma translate_on
-      ;~FI
+      ~RESULT <= ~FROMBV[~SYM[2](~SYM[3])][~TYPO];~ELSE
+      ~RESULT <= ~SYM[2](~SYM[3]);~FI
     end if;
   end process;
 end block;

@@ -29,7 +29,8 @@ import Clash.Rewrite.Util
 -- | Normalisation transformation
 normalization :: NormRewrite
 normalization = rmDeadcode >-> constantPropagation >-> etaTL >-> rmUnusedExpr >-!-> anf >-!-> rmDeadcode >->
-                bindConst >-> letTL >-> evalConst >-!-> cse >-!-> cleanup >-> recLetRec
+                bindConst >-> letTL >-> evalConst >-!-> cse >-!-> cleanup >->
+                recLetRec >-> splitArgs
   where
     etaTL      = apply "etaTL" etaExpansionTL !-> topdownR (apply "applicationPropagation" appPropFast)
     anf        = topdownR (apply "nonRepANF" nonRepANF) >-> apply "ANF" makeANF >-> topdownR (apply "caseCon" caseCon)
@@ -47,6 +48,8 @@ normalization = rmDeadcode >-> constantPropagation >-> etaTL >-> rmUnusedExpr >-
                                       ,("bindConstantVar", bindConstantVar)
                                       ,("letFlat"        , flattenLet)])
                  >-> rmDeadcode >-> letTL
+    splitArgs  = topdownR (apply "separateArguments" separateArguments) !->
+                 topdownR (apply "caseCon" caseCon)
 
 
 constantPropagation :: NormRewrite

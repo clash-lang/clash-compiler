@@ -18,22 +18,14 @@
 begin
   if ~IF~ACTIVEEDGE[Rising][0]~THENrising_edge~ELSEfalling_edge~FI(~ARG[2]) then
     if ~ARG[3] then
-      ~RESULT <= ~ARG[5]
-      -- pragma translate_off
-      after 1 ps
-      -- pragma translate_on
-      ;
+      ~RESULT <= ~ARG[5];
     end if;
   end if;
 end process;~ELSE
 ~SYM[4] : process(~ARG[2])
 begin
   if ~IF~ACTIVEEDGE[Rising][0]~THENrising_edge~ELSEfalling_edge~FI(~ARG[2]) then
-    ~RESULT <= ~ARG[5]
-    -- pragma translate_off
-    after 1 ps
-    -- pragma translate_on
-    ;
+    ~RESULT <= ~ARG[5];
   end if;
 end process;~FI
 -- delay end"
@@ -61,17 +53,9 @@ end process;~FI
 begin
   if ~IF~ACTIVEEDGE[Rising][0]~THENrising_edge~ELSEfalling_edge~FI(~ARG[2]) then
     if ~ARG[3] = ~IF ~ISACTIVEHIGH[0] ~THEN '1' ~ELSE '0' ~FI then
-      ~RESULT <= ~CONST[6]
-      -- pragma translate_off
-      after 1 ps
-      -- pragma translate_on
-      ;
+      ~RESULT <= ~CONST[6];
     elsif ~ARG[4] then
-      ~RESULT <= ~ARG[7]
-      -- pragma translate_off
-      after 1 ps
-      -- pragma translate_on
-      ;
+      ~RESULT <= ~ARG[7];
     end if;
   end if;
 end process;~ELSE
@@ -81,11 +65,7 @@ begin
     ~RESULT <= ~CONST[6];
   elsif ~IF~ACTIVEEDGE[Rising][0]~THENrising_edge~ELSEfalling_edge~FI(~ARG[2]) then
     if ~ARG[4] then
-      ~RESULT <= ~ARG[7]
-      -- pragma translate_off
-      after 1 ps
-      -- pragma translate_on
-      ;
+      ~RESULT <= ~ARG[7];
     end if;
   end if;
 end process;~FI~ELSE ~IF ~ISSYNC[0] ~THEN
@@ -93,34 +73,18 @@ end process;~FI~ELSE ~IF ~ISSYNC[0] ~THEN
 begin
   if ~IF~ACTIVEEDGE[Rising][0]~THENrising_edge~ELSEfalling_edge~FI(~ARG[2]) then
     if ~ARG[3] = ~IF ~ISACTIVEHIGH[0] ~THEN '1' ~ELSE '0' ~FI then
-      ~RESULT <= ~CONST[6]
-      -- pragma translate_off
-      after 1 ps
-      -- pragma translate_on
-      ;
+      ~RESULT <= ~CONST[6];
     else
-      ~RESULT <= ~ARG[7]
-      -- pragma translate_off
-      after 1 ps
-      -- pragma translate_on
-      ;
+      ~RESULT <= ~ARG[7];
     end if;
   end if;
 end process;~ELSE
 ~SYM[2] : process(~ARG[2],~ARG[3])
 begin
   if ~ARG[3] = ~IF ~ISACTIVEHIGH[0] ~THEN '1' ~ELSE '0' ~FI then
-    ~RESULT <= ~CONST[6]
-    -- pragma translate_off
-    after 1 ps
-    -- pragma translate_on
-    ;
+    ~RESULT <= ~CONST[6];
   elsif ~IF~ACTIVEEDGE[Rising][0]~THENrising_edge~ELSEfalling_edge~FI(~ARG[2]) then
-    ~RESULT <= ~ARG[7]
-    -- pragma translate_off
-    after 1 ps
-    -- pragma translate_on
-    ;
+    ~RESULT <= ~ARG[7];
   end if;
 end process;~FI~FI
 -- register end"

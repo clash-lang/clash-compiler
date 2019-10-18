@@ -39,11 +39,7 @@ begin
       if ~ARG[7] ~IF ~ISACTIVEENABLE[4] ~THEN and ~ARG[4] ~ELSE ~FI then
         ~SYM[2](~SYM[5]) <= ~TOBV[~ARG[9]][~TYP[9]];
       end if;
-      ~RESULT <= fromSLV(~SYM[2](~SYM[4]))
-      -- pragma translate_off
-      after 1 ps
-      -- pragma translate_on
-      ;
+      ~RESULT <= fromSLV(~SYM[2](~SYM[4]));
     end if;
   end process; ~ELSE
   ~SYM[6] : process(~ARG[3])
@@ -52,11 +48,7 @@ begin
       if ~ARG[7] ~IF ~ISACTIVEENABLE[4] ~THEN and ~ARG[4] ~ELSE ~FI then
         ~SYM[2](~SYM[5]) <= ~ARG[9];
       end if;
-      ~RESULT <= ~SYM[2](~SYM[4])
-      -- pragma translate_off
-      after 1 ps
-      -- pragma translate_on
-      ;
+      ~RESULT <= ~SYM[2](~SYM[4]);
     end if;
   end process; ~FI
 end block;
@@ -105,11 +97,7 @@ begin
       if ~ARG[7] ~IF ~ISACTIVEENABLE[4] ~THEN and ~ARG[4] ~ELSE ~FI then
         ~SYM[2](~SYM[5]) <= ~TOBV[~ARG[9]][~TYP[9]];
       end if;
-      ~RESULT <= fromSLV(~SYM[2](~SYM[4]))
-      -- pragma translate_off
-      after 1 ps
-      -- pragma translate_on
-      ;
+      ~RESULT <= fromSLV(~SYM[2](~SYM[4]));
     end if;
   end process; ~ELSE
   ~SYM[6] : process(~ARG[3])
@@ -118,11 +106,7 @@ begin
       if ~ARG[7] ~IF ~ISACTIVEENABLE[4] ~THEN and ~ARG[4] ~ELSE ~FI then
         ~SYM[2](~SYM[5]) <= ~ARG[9];
       end if;
-      ~RESULT <= ~SYM[2](~SYM[4])
-      -- pragma translate_off
-      after 1 ps
-      -- pragma translate_on
-      ;
+      ~RESULT <= ~SYM[2](~SYM[4]);
     end if;
   end process; ~FI
 end block;
@@ -172,11 +156,7 @@ begin
       if ~ARG[8] ~IF ~ISACTIVEENABLE[4] ~THEN and ~ARG[4] ~ELSE ~FI then
         ~SYM[2](~SYM[5]) <= ~TOBV[~ARG[10]][~TYP[10]];
       end if;
-      ~RESULT <= fromSLV(~SYM[2](~SYM[4]))
-      -- pragma translate_off
-      after 1 ps
-      -- pragma translate_on
-      ;
+      ~RESULT <= fromSLV(~SYM[2](~SYM[4]));
     end if;
   end process; ~ELSE
   ~SYM[6] : process(~ARG[3])
@@ -185,11 +165,7 @@ begin
       if ~ARG[8] ~IF ~ISACTIVEENABLE[4] ~THEN and ~ARG[4] ~ELSE ~FI then
         ~SYM[2](~SYM[5]) <= ~ARG[10];
       end if;
-      ~RESULT <= ~SYM[2](~SYM[4])
-      -- pragma translate_off
-      after 1 ps
-      -- pragma translate_on
-      ;
+      ~RESULT <= ~SYM[2](~SYM[4]);
     end if;
   end process; ~FI
 end block;

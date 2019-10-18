@@ -21,7 +21,8 @@ import           Data.Coerce                   (coerce)
 import qualified Data.HashSet                  as HashSet
 import Data.List
   (foldl', mapAccumR, elemIndices, nub)
-import Data.Maybe                              (fromJust, mapMaybe, catMaybes)
+import Data.Maybe
+  (fromJust, isJust, mapMaybe, catMaybes)
 import qualified Data.Text                     as T
 import           Data.Text.Prettyprint.Doc     (line)
 #if !MIN_VERSION_base(4,11,0)
@@ -933,3 +934,73 @@ tyLitShow m (coreView1 m -> Just ty) = tyLitShow m ty
 tyLitShow _ (LitTy (SymTy s))        = return s
 tyLitShow _ (LitTy (NumTy s))        = return (show s)
 tyLitShow _ ty = throwE $ $(curLoc) ++ "Cannot reduce to a string:\n" ++ showPpr ty
+
+-- | Determine whether we should split away types from a product type, i.e.
+-- clocks should always be separate arguments, and not part of a product.
+shouldSplit
+  :: TyConMap
+  -> Type
+  -- ^ Type to examine
+  -> Maybe (Term,[Type])
+  -- ^ If we want to split values of the given type then we have /Just/:
+  --
+  -- 1. The (type-applied) data-constructor which, when applied to values of
+  --    the types in 2., creates a value of the examined type
+  --
+  -- 2. The arguments types of the product we are trying to split.
+  --
+  -- Note that we only split one level at a time (although we check all the way
+  -- down), e.g. given /(Int, (Clock, Bool))/ we return:
+  --
+  -- > Just ((,) @Int @(Clock, Bool), [Int, (Clock, Bool)])
+  --
+  -- An outer loop is required to subsequently split the /(Clock, Bool)/ tuple.
+shouldSplit tcm = shouldSplit0 tcm . tyView . coreView tcm
+
+-- | Worker of 'shouldSplit', works on 'TypeView' instead of 'Type'
+shouldSplit0
+  :: TyConMap
+  -> TypeView
+  -> Maybe (Term,[Type])
+shouldSplit0 tcm (TyConApp tcNm tyArgs)
+  | Just tc <- lookupUniqMap tcNm tcm
+  , [dc] <- tyConDataCons tc
+  , let dcArgs  = substArgTys dc tyArgs
+  , let dcArgVs = map (tyView . coreView tcm) dcArgs
+  = if any (\ty -> isJust (shouldSplit0 tcm ty) || splitTy ty) dcArgVs then
+      Just (mkApps (Data dc) (map Right tyArgs), dcArgs)
+    else
+      Nothing
+ where
+  -- Currently we're only interested in splitting of Clock, Reset, and Enable
+  splitTy (TyConApp tcNm0 _)
+    = nameOcc tcNm0 `elem` [ "Clash.Signal.Internal.Clock"
+                           , "Clash.Signal.Internal.Reset"
+                           , "Clash.Signal.Internal.Enable"
+                           ]
+  splitTy _ = False
+
+shouldSplit0 _ _ = Nothing
+
+-- | Potentially split apart a list of function argument types. e.g. given:
+--
+-- > [Int,(Clock,(Reset,Bool)),Char]
+--
+-- we return
+--
+-- > [Int,Clock,Reset,Bool,Char]
+--
+-- But we would leave
+--
+-- > [Int, (Bool,Int), Char]
+--
+-- unchanged.
+splitShouldSplit
+  :: TyConMap
+  -> [Type]
+  -> [Type]
+splitShouldSplit tcm = foldr go []
+ where
+  go ty rest = case shouldSplit tcm ty of
+    Just (_,tys) -> splitShouldSplit tcm tys ++ rest
+    Nothing      -> ty : rest
