@@ -446,10 +446,13 @@ caseCon (TransformContext is0 _) (Case scrut ty alts)
                   [] -> e
                   _  ->
                     -- See Note [CaseCon deshadow]
-                    let ((is3,substIds),binds') = List.mapAccumL newBinder
-                                                    (is1,[]) binds
+                    let ((is3,substIds),binds1) =
+                          List.mapAccumL newBinder (is1,[]) binds
                         subst = extendIdSubstList (mkSubst is3) substIds
-                    in  Letrec binds' (substTm "caseCon0" subst e)
+                        body  = substTm "caseCon0" subst e
+                    in  case Maybe.catMaybes binds1 of
+                          []     -> body
+                          binds2 -> Letrec binds2 body
         let subst = extendTvSubstList (mkSubst is1)
                   $ zip tvs (drop (length (dcUnivTyVars dc)) (Either.rights args))
         changed (substTm "caseCon1" subst e')
@@ -460,10 +463,13 @@ caseCon (TransformContext is0 _) (Case scrut ty alts)
     equalCon dc (DataPat dc' _ _) = dcTag dc == dcTag dc'
     equalCon _  _                 = False
 
-    newBinder (isN0,substN) (x,arg) =
-      let x'   = uniqAway isN0 x
-          isN1 = extendInScopeSet isN0 x'
-      in  ((isN1,(x,Var x'):substN),(x',arg))
+    newBinder (isN0,substN) (x,arg)
+      | isWorkFree arg
+      = ((isN0,(x,arg):substN),Nothing)
+      | otherwise
+      = let x'   = uniqAway isN0 x
+            isN1 = extendInScopeSet isN0 x'
+        in  ((isN1,(x,Var x'):substN),Just (x',arg))
 
 caseCon _ c@(Case (stripTicks -> Literal l) _ alts) = case List.find (equalLit . fst) alts of
     Just (LitPat _,e) -> changed e
