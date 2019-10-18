@@ -57,6 +57,7 @@ module Clash.Normalize.Transformations
   , argCastSpec
   , etaExpandSyn
   , appPropFast
+  , separateArguments
   )
 where
 
@@ -104,15 +105,16 @@ import           Clash.Core.Type             (Type, TypeView (..), applyFunTy,
                                               isPolyFunCoreTy, isClassTy,
                                               normalizeType, splitFunForallTy,
                                               splitFunTy,
-                                              tyView)
+                                              tyView, mkPolyFunTy)
 import           Clash.Core.TyCon            (TyConMap, tyConDataCons)
 import           Clash.Core.Util
   (isCon, isFun, isLet, isPolyFun, isPrim,
    isSignalType, isVar, mkApps, mkLams, mkVec, piResultTy, termSize, termType,
    tyNatSize, patVars, isAbsurdAlt, altEqs, substInExistentialsList,
-   solveNonAbsurds, patIds, isLocalVar, undefinedTm, stripTicks, mkTicks)
+   solveNonAbsurds, patIds, isLocalVar, undefinedTm, stripTicks, mkTicks,
+   shouldSplit)
 import           Clash.Core.Var
-  (Id, Var (..), isGlobalId, isLocalId, mkLocalId)
+  (Id, TyVar, Var (..), isGlobalId, isLocalId, mkLocalId)
 import           Clash.Core.VarEnv
   (InScopeSet, VarEnv, VarSet, elemVarSet,
    emptyVarEnv, emptyVarSet, extendInScopeSet, extendInScopeSetList, lookupVarEnv,
@@ -2321,3 +2323,69 @@ flattenLet (TransformContext is0 _) letrec@(Letrec _ _) = do
     go _ b = return [b]
 
 flattenLet _ e = return e
+
+-- | Split apart (global) function arguments that contain types that we
+-- want to separate off, e.g. Clocks. Works on both the definition side (i.e. the
+-- lambda), and the call site (i.e. the application of the global variable). e.g.
+-- turns
+--
+-- > f :: (Clock System, Reset System) -> Signal System Int
+--
+-- into
+--
+-- > f :: Clock System -> Reset System -> Signal System Int
+separateArguments :: HasCallStack => NormRewrite
+separateArguments ctx@(TransformContext is0 _) e@(Lam b eb0) = do
+  tcm <- Lens.view tcCache
+  case shouldSplit tcm (varType b) of
+    Just (dc,argTys@(_:_:_)) -> do
+      let nm      = mkDerivedName ctx (nameOcc (varName b))
+          bs0     = map (`mkLocalId` nm) argTys
+          (is1,bs1) = List.mapAccumL newBinder is0 bs0
+          subst   = extendIdSubst (mkSubst is1) b (mkApps dc (map (Left . Var) bs1))
+          eb1     = substTm "separateArguments" subst eb0
+      changed (mkLams eb1 bs1)
+    _ ->
+      return e
+ where
+  newBinder isN0 x =
+    let x'   = uniqAway isN0 x
+        isN1 = extendInScopeSet isN0 x'
+    in  (isN1,x')
+
+separateArguments (TransformContext is0 _) e@(collectArgsTicks -> (Var g, args, ticks))
+  | isGlobalId g = do
+  -- We ensure that both the type of the global variable reference is updated
+  -- to take into account the changed arguments, and that we apply the global
+  -- function with the split apart arguments.
+  let (argTys0,resTy) = splitFunForallTy (varType g)
+  (concat -> args1, Monoid.getAny -> hasChanged)
+    <- listen (mapM (uncurry splitArg) (zip argTys0 args))
+  if hasChanged then
+    let (argTys1,args2) = unzip args1
+        gTy = mkPolyFunTy resTy argTys1
+    in  return (mkApps (mkTicks (Var g {varType = gTy}) ticks) args2)
+  else
+    return e
+
+ where
+  -- Split a single argument
+  splitArg
+    :: Either TyVar Type
+    -- The quantifier/function argument type of the global variable
+    -> Either Term Type
+    -- The applied type argument or term argument
+    -> NormalizeSession [(Either TyVar Type,Either Term Type)]
+  splitArg tv arg@(Right _)    = return [(tv,arg)]
+  splitArg ty arg@(Left tmArg) = do
+    tcm <- Lens.view tcCache
+    let argTy = termType tcm tmArg
+    case shouldSplit tcm argTy of
+      Just (_,argTys@(_:_:_)) -> do
+        tmArgs <- mapM (mkSelectorCase ($(curLoc) ++ "splitArg") is0 tcm tmArg 1)
+                       [0..length argTys - 1]
+        changed (map ((ty,) . Left) tmArgs)
+      _ ->
+        return [(ty,arg)]
+
+separateArguments _ e = return e

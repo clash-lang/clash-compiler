@@ -55,11 +55,7 @@ begin
         if ~ARG[8] then
           ~SYM[3](~SYM[6]) <= to_bitvector(~ARG[10]);
         end if;
-        ~RESULT <= to_stdlogicvector(~SYM[3](~SYM[5]))
-        -- pragma translate_off
-        after 1 ps
-        -- pragma translate_on
-        ;
+        ~RESULT <= to_stdlogicvector(~SYM[3](~SYM[5]));
       end if;
     end if;
   end process;~ELSE
@@ -69,11 +65,7 @@ begin
       if ~ARG[8] then
         ~SYM[3](~SYM[6]) <= to_bitvector(~ARG[10]);
       end if;
-      ~RESULT <= to_stdlogicvector(~SYM[3](~SYM[5]))
-      -- pragma translate_off
-      after 1 ps
-      -- pragma translate_on
-      ;
+      ~RESULT <= to_stdlogicvector(~SYM[3](~SYM[5]));
     end if;
   end process;~FI ~ELSE ~IF ~ISACTIVEENABLE[4] ~THEN
   ~SYM[10] : process(~ARG[3])
@@ -83,11 +75,7 @@ begin
         ~SYM[3](~SYM[6]) <= to_bitvector(~ARG[10]);
       end if;
       if ~ARG[4] then
-        ~RESULT <= to_stdlogicvector(~SYM[3](~SYM[5]))
-        -- pragma translate_off
-        after 1 ps
-        -- pragma translate_on
-        ;
+        ~RESULT <= to_stdlogicvector(~SYM[3](~SYM[5]));
       end if;
     end if;
   end process;~ELSE
@@ -97,11 +85,7 @@ begin
       if ~ARG[8] then
         ~SYM[3](~SYM[6]) <= to_bitvector(~ARG[10]);
       end if;
-      ~RESULT <= to_stdlogicvector(~SYM[3](~SYM[5]))
-      -- pragma translate_off
-      after 1 ps
-      -- pragma translate_on
-      ;
+      ~RESULT <= to_stdlogicvector(~SYM[3](~SYM[5]));
     end if;
   end process;~FI ~FI
 end block;

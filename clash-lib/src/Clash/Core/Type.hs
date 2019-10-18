@@ -35,6 +35,7 @@ module Clash.Core.Type
   , typeKind
   , mkTyConTy
   , mkFunTy
+  , mkPolyFunTy
   , mkTyConApp
   , splitFunTy
   , splitFunTys
@@ -302,6 +303,16 @@ splitFunForallTy = go []
     go args (ForAllTy tv ty)          = go (Left tv:args) ty
     go args (tyView -> FunTy arg res) = go (Right arg:args) res
     go args ty                        = (reverse args,ty)
+
+-- | Make a polymorphic function type out of a result type and a list of
+-- quantifiers and function argument types
+mkPolyFunTy
+  :: Type
+  -- ^ Result type
+  -> [Either TyVar Type]
+  -- ^ List of quantifiers and function argument types
+  -> Type
+mkPolyFunTy = foldr (either ForAllTy mkFunTy)
 
 -- | Split a poly-function type in a: list of type-binders and argument types,
 -- and the result type. Looks through 'Signal' and type functions.
