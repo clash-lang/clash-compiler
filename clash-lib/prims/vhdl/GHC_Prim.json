@@ -549,7 +549,7 @@ end block;
     , "type"      : "clz16 :: Word# -> Word#"
     , "template"  :
 "-- clz16 begin
-clz16~SYM[0] : block
+~GENSYM[clz16][0] : block
   function ~GENSYM[enc][1] (constant a : unsigned(1 downto 0)) return unsigned is
   begin
     case a is
@@ -594,7 +594,7 @@ end block;
     , "type"      : "clz32 :: Word# -> Word#"
     , "template"  :
 "-- clz32 begin
-clz32~SYM[0] : block
+~GENSYM[clz32][0] : block
   function ~GENSYM[enc][1] (constant a : unsigned(1 downto 0)) return unsigned is
   begin
     case a is
@@ -641,7 +641,7 @@ end block;
     , "type"      : "clz64 :: Word# -> Word#"
     , "template"  :
 "-- clz64 begin
-clz64~SYM[0] : block
+~GENSYM[clz64][0] : block
   function ~GENSYM[enc][1] (constant a : unsigned(1 downto 0)) return unsigned is
   begin
     case a is
@@ -690,7 +690,7 @@ end block;
     , "type"      : "clz :: Word# -> Word#"
     , "template"  :
 "-- clz begin
-clz~SYM[0] : block
+~GENSYM[clz][0] : block
   function ~GENSYM[enc][1] (constant a : unsigned(1 downto 0)) return unsigned is
   begin
     case a is
