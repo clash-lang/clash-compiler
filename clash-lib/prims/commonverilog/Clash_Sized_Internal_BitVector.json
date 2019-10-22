@@ -88,7 +88,7 @@
     , "workInfo"  : "Never"
     , "kind"      : "Expression"
     , "type"      : "fromInteger## :: Integer -> Integer -> Bit"
-    , "template"  : "~ARG[0][0] ? 1'bx : ~ARG[1][0]"
+    , "template"  : "~VAR[i][0][0] ? 1'bx : ~VAR[i][1][0]"
     }
   }
 , { "BlackBox" :
