@@ -331,7 +331,7 @@ endfunction"
     , "template" :
 "// clz8 begin
 logic [0:7] ~GENSYM[v][1];
-assign ~SYM[1] = ~ARG[0][7:0];
+assign ~SYM[1] = ~VAR[i][0][7:0];
 
 logic [0:7] ~GENSYM[e][2];
 genvar ~GENSYM[n][3];
@@ -399,7 +399,7 @@ endfunction"
     , "template" :
 "// clz16 begin
 logic [0:15] ~GENSYM[v][1];
-assign ~SYM[1] = ~ARG[0][15:0];
+assign ~SYM[1] = ~VAR[i][0][15:0];
 
 logic [0:15] ~GENSYM[e][2];
 genvar ~GENSYM[i][3];
@@ -483,7 +483,7 @@ endfunction"
     , "template" :
 "// clz32 begin
 logic [0:31] ~GENSYM[v][1];
-assign ~SYM[1] = ~ARG[0][31:0];
+assign ~SYM[1] = ~VAR[i][0][31:0];
 
 logic [0:31] ~GENSYM[e][2];
 genvar ~GENSYM[i][3];
@@ -583,7 +583,7 @@ endfunction"
     , "template" :
 "// clz64 begin
 logic [0:63] ~GENSYM[v][1];
-assign ~SYM[1] = ~ARG[0][63:0];
+assign ~SYM[1] = ~VAR[i][0][63:0];
 
 logic [0:63] ~GENSYM[e][2];
 genvar ~GENSYM[i][3];
@@ -700,7 +700,7 @@ endfunction"
 "// clz begin
 ~IF ~IW64 ~THEN
 logic [0:63] ~GENSYM[v][1];
-assign ~SYM[1] = ~ARG[0][63:0];
+assign ~SYM[1] = ~VAR[i][0][63:0];
 
 logic [0:63] ~GENSYM[e][2];
 genvar ~GENSYM[i][3];
@@ -790,7 +790,7 @@ end
 ~ENDGENERATE
 ~ELSE
 logic [0:31] ~SYM[1];
-assign ~SYM[1] = ~ARG[0][31:0];
+assign ~SYM[1] = ~VAR[i][0][31:0];
 
 logic [0:31] ~SYM[2];
 genvar ~SYM[3];
