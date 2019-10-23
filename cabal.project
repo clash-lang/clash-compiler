@@ -43,6 +43,9 @@ optional-packages:
   clash-cosim/clash-cosim.cabal,
   clash-term/clash-term.cabal
 
--- rewrite-inspector is currently failing because it lacks an upper bound
--- and the API for vty has changed
-constraints: vty < 5.26
+
+-- Released `rewrite-inspector` doesn't compile with GHC 8.8
+source-repository-package
+  type: git
+  location: https://github.com/martijnbastiaan/rewrite-inspector/
+  tag: c62c146f2107a6855a731e78adb08cf2ba89f7d3
