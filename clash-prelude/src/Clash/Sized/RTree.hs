@@ -472,16 +472,17 @@ tzipWith :: forall a b c d . KnownNat d => (a -> b -> c) -> RTree d a -> RTree d
 tzipWith f = tdfold (Proxy @(ZipWithTree b c)) lr br
   where
     lr :: a -> RTree 0 b -> RTree 0 c
-    lr a (LR b) = LR (f a b)
-    lr _ _      = error "impossible"
+    lr a t = LR (f a (textract t))
 
     br :: SNat l
        -> (RTree l b -> RTree l c)
        -> (RTree l b -> RTree l c)
        -> RTree (l+1) b
        -> RTree (l+1) c
-    br _ fl fr (BR l r) = BR (fl l) (fr r)
-    br _ _  _  _        = error "impossible"
+    br _ fl fr t = BR (fl l) (fr r)
+      where
+        (l,r) = tsplit t
+
 
 -- | 'tzip' takes two trees and returns a tree of corresponding pairs.
 tzip :: KnownNat d => RTree d a -> RTree d b -> RTree d (a,b)
@@ -506,4 +507,4 @@ tunzip = tdfold (Proxy @(UnzipTree a b)) lr br
 lazyT :: KnownNat d
       => RTree d a
       -> RTree d a
-lazyT = tzipWith (flip const) (trepeat undefined)
+lazyT = tzipWith (flip const) (trepeat ())

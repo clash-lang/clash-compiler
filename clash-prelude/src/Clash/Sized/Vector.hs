@@ -1870,9 +1870,9 @@ lengthS _ = SNat
 lazyV :: KnownNat n
       => Vec n a
       -> Vec n a
-lazyV = lazyV' (repeat undefined)
+lazyV = lazyV' (repeat ())
   where
-    lazyV' :: Vec n a -> Vec n a -> Vec n a
+    lazyV' :: Vec n () -> Vec n a -> Vec n a
     lazyV' Nil           _  = Nil
     lazyV' (_ `Cons` xs) ys = head ys `Cons` lazyV' xs (tail ys)
 {-# NOINLINE lazyV #-}
