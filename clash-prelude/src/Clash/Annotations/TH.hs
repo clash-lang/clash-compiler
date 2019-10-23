@@ -75,9 +75,7 @@ module Clash.Annotations.TH
   )
 where
 
-import           Data.Foldable                  ( fold
-                                                , find
-                                                )
+import           Data.Foldable                  ( fold)
 import qualified Data.Set                      as Set
 import qualified Data.Map                      as Map
 #if !(MIN_VERSION_base(4,11,0))
@@ -85,12 +83,12 @@ import           Data.Semigroup                as Semigroup
 #endif
 import           Language.Haskell.TH
 
-import           Data.Functor.Foldable          ( cata, para, embed )
+import           Data.Functor.Foldable          ( para )
 import           Data.Functor.Foldable.TH
 import           Control.Lens                   ( (%~), (&), (.~)
-                                                , _1, _2
+                                                , _1, _2, _3, view
                                                 )
-import           Control.Monad                  ((>=>), mfilter, liftM2)
+import           Control.Monad                  (mfilter, liftM2)
 import           Control.Monad.Trans.Reader     (ReaderT(..), asks, local)
 import           Control.Monad.Trans.Class      (lift)
 import           Language.Haskell.TH.Instances  ( )
@@ -108,12 +106,12 @@ import           Clash.Signal.Delayed           (DSignal)
 $(makeBaseFunctor ''Type)
 
 -- | A datatype to track failing naming in a subtree.
-data Naming a = Complete a | HasFail String | BackTrack [Name]
+data Naming a = Complete a | HasFail String | BackTrack (Set.Set Name)
   deriving Functor
 
 instance Semigroup a => Semigroup (Naming a) where
   Complete a <> Complete b     = Complete $ a <> b
-  BackTrack n1 <> BackTrack n2 = BackTrack $ n1 ++ n2
+  BackTrack n1 <> BackTrack n2 = BackTrack $ n1 <> n2
   BackTrack n <> _             = BackTrack n
   _ <> BackTrack n             = BackTrack n
   HasFail e1 <> HasFail e2     = HasFail $ e1 ++ "\n" ++ e2
@@ -132,19 +130,6 @@ type TrackData = (Set.Set Name, ErrorContext)
 type Tracked m a = ReaderT TrackData m a
 
 -- * Utility functions
-
--- | A Template Haskell helper function. Get the 'Name' of a 'Con'. These names
--- are only used in type/data family resolution which is best effort,
--- so for Gadts we just take the first name.
-getName :: Con -> Name
-getName (NormalC n _)          = n
-getName (RecC    n _)          = n
-getName (InfixC  _ n _)        = n
-getName (ForallC _ _ c)        = getName c
-getName (GadtC    (n : _) _ _) = n
-getName (RecGadtC (n : _) _ _) = n
-getName (GadtC    [] _ _) = error "Encountered GADT with no constructors?"
-getName (RecGadtC [] _ _) = error "Encountered GADT with no constructors?"
 
 -- | Matches a type `a -> b`
 pattern ArrowTy :: Type -> Type -> Type
@@ -216,7 +201,7 @@ portsFromTypes xs = do
       HasFail <$> failMsgWithContext "Partially named constructor arguments!\n"
     x -> return x
  where
-  f = fmap (fmap collapseNames) . expandFamiliesAndGatherNames
+  f = fmap (fmap collapseNames) . gatherNames
 
 -- | Flag sum types as failing if they have any constructors with names.
 handleNamesInSum
@@ -228,34 +213,43 @@ handleNamesInSum xs =
     x ->
       mappend x . HasFail <$> failMsgWithContext "Annotated sum types not supported!\n"
 
+-- | Build a list of 'PortName's from a Template Haskell 'Con' and a free
+-- variable mapping
+constructorToPorts :: Con -> Map.Map Name Type -> Tracked Q (Naming [PortName])
+constructorToPorts c m = do
+  let xs = applySubstitution m (ctys c)
+  portsFromTypes xs
+ where
+  ctys (NormalC _ (fmap snd -> tys)) = tys
+  ctys (RecC _ (fmap (view _3) -> tys)) = tys
+  ctys (InfixC _ _ (snd -> ty)) = [ty]
+  ctys (ForallC _ _ c') = ctys c'
+  ctys (GadtC _ (fmap snd -> tys) _) = tys
+  ctys (RecGadtC _ (fmap (view _3) -> tys) _) = tys
+
 -- | Build a list of 'PortName's from a Template Haskell 'Name'
 datatypeNameToPorts
   :: Name
-  -- ^ Name to investigate
   -> Tracked Q (Naming [PortName])
 datatypeNameToPorts name = do
-  seen <- asks fst
-  if Set.member name seen
-  then return $ Complete []
-  else do
-    constructors <- tryReifyDatatype [] datatypeCons name
+  constructors <- tryReifyDatatype [] datatypeCons name
 
-    names <- case constructors of
-      []  -> return $ Complete []
-      [x] -> visit name x $ portsFromTypes (constructorFields x)
-      xs  -> visit name xs $ handleNamesInSum xs
+  names <- case constructors of
+    []  -> return $ Complete []
+    [x] -> portsFromTypes (constructorFields x)
+    xs  -> handleNamesInSum xs
 
-    return $ case names of
-      BackTrack ns ->
-        case filter (firstUsage seen) ns of
-          [] -> Complete []
-          x  -> BackTrack x
-      x -> x
- where
-  firstUsage seen x = name == x && Set.notMember x seen
+  case names of
+    BackTrack ns | Set.member name ns -> do
+      lift $ reportWarning $ "Make sure HDL port names are correct:\n"
+                           ++ "Backtracked when constructing " ++ pprint name
+                           ++ "\n(Type appears recursive)"
+      return $ case (Set.delete name ns) of
+        e | e == Set.empty -> Complete []
+        xs -> BackTrack xs
+    _ -> return names
 
--- | A helper function for recursively walking a 'Type' tree and
--- building a list of 'PortName's.
+-- | Recursively walking a 'Type' tree and building a list of 'PortName's.
 typeTreeToPorts
   :: TypeF (Type, Tracked Q (Naming [PortName]))
   -- ^ Case under scrutiny, paramorphism style
@@ -271,110 +265,139 @@ typeTreeToPorts (AppTF (AppT (ConT split) (LitT (StrTyLit name)), _) (_,c))
     Complete xs -> return $ Complete [PortProduct name xs]
     x           -> return x
 
-typeTreeToPorts (ConTF name) = datatypeNameToPorts name
-typeTreeToPorts f@(AppTF (a,a') (b,_)) = do
-  -- 1. Gather types applied to a head type, on the unprocessed subtree
+typeTreeToPorts (ConTF name) = do
+  -- Only attempt to resolve a subtree for names we haven't seen before
+  seen <- asks fst
+  if Set.member name seen
+  then return $ BackTrack $ Set.singleton name
+  else visit name name $ do
+    info <- lift $ reify name
+    case info of
+      -- Either `name` is an unannotated primitive
+      PrimTyConI _ _ _ -> return $ Complete []
+      -- ... or a type synonym
+      TyConI (TySynD _ _ t) -> gatherNames t
+      -- ... or something "datatype" like
+      _ -> datatypeNameToPorts name
+
+typeTreeToPorts f@(AppTF (a,a') (b,b')) = do
+  -- Gather types applied to a head type
   case unapp (AppT a b) of
-    (ConT n : xs) -> do
-      -- 2. Check if head is a datatype
-      dataTy <- tryReifyDatatype Nothing Just n
+    -- Return the inner type for signals
+    (ConT x : _ : _ : []) | x == ''Clash.Signal.Signal -> b'
+    (ConT x : _ : _ : _ : []) | x == ''Clash.Signal.Delayed.DSignal -> b'
 
-      let -- 3. Apply tail types to head datatype free type variables
-          hasAllArgs          = \x -> length xs == length (datatypeVars x)
-          constructors = applyContext xs <$> mfilter hasAllArgs dataTy
-
-          -- 4. Attempt to get a unique constructor
-          getSingleConstructor cs = do [c] <- cs; return c
-          constructor = getSingleConstructor constructors
-
-      -- If any steps failed, return the PortNames according to the head type.
-      maybe a' (visit n (ppr n) . portsFromTypes . constructorFields) constructor
-
-    -- We're not applying to a 'ConT' so lets try best effort of getting names
-    -- from all applied types
-    _ -> do
-      f' <- mapM snd f
-      return $ fold f'
- where
-  -- Substitute types into datatype type arguments
-  tyMap ctx d = (Map.fromList $ zip (datatypeVars' d) ctx)
-  applyContext ctx d = applySubstitution (tyMap ctx d) <$> datatypeCons d
-
-typeTreeToPorts f = do
-  -- Just collect names
-  f' <- mapM snd f
-  return $ fold f'
-
--- | Helper algebra to expand first level (non-recursive) type/data family
--- instances in a best effort manner. Data family instances with sum type
--- constructors are ignored.
-expandFamilies :: TypeF (Tracked Q Type) -> Tracked Q Type
-expandFamilies (AppTF a b) = do
-  a' <- a
-  b' <- b
-  case unapp (AppT a' b') of
-    -- Simplify by replacing Signals/DSignals with the type they contain
-    (ConT x : _ : y : []) | x == ''Clash.Signal.Signal -> return y
-    (ConT x : _ : _ : y : []) | x == ''Clash.Signal.Delayed.DSignal -> return y
+    -- Other handled type applications are
+    -- 1. Type synonyms
+    -- 2. Closed type families
+    -- 3. Open type and data families
+    -- 4. Regular data types
     (ConT x : xs) -> do
       info <- lift $ reify x
       case info of
+        -- 1. Type synonym case is just inserting the relevant port tree
+        (TyConI (TySynD _ synvars def)) -> do
+          gatherNames $ applyContext xs (tvName <$> synvars) def
 
-        -- Closed type families have to be handled separately
-        FamilyI (ClosedTypeFamilyD (TypeFamilyHead _ bds _ _) eqs) _ ->
-          if length bds == length xs then
-            case find ((==) xs . tySynArgs) eqs of
+        -- 2. Match argument lengths, substitute types, and then insert the port
+        -- tree
+        FamilyI (ClosedTypeFamilyD (TypeFamilyHead _ bds _ _) eqs) _
+          | length bds == length xs ->
+            case filter ((==) xs . applyFamilyBindings xs info . tySynArgs) eqs of
 #if MIN_VERSION_template_haskell(2,15,0)
-              Just (TySynEqn _ _ r) -> return r
+              [TySynEqn _ _ r] ->
 #else
-              Just (TySynEqn _ r) -> return r
+              [TySynEqn _ r]   ->
 #endif
-              _ -> return (AppT a' b')
-                -- We didn't find a matching instance so give up.
-          else return (AppT a' b')
-                  -- We don't yet have all the arguments.
+                gatherNames (applyFamilyBindings xs info r)
 
-        -- Check for open type families and data families
+              -- We didn't find a (single) matching instance so give up. Is this
+              -- impossible?
+              _ -> return $ Complete []
+
+        -- 3. Match argument lengths then:
+        --   - Substitute port tree for type family
+        --   - Try to get a unique constructor for data families and build
+        --     port tree from the constructor
         _ | familyArity info == Just (length xs) -> do
           (lift $ reifyInstances x xs) >>= \case
 #if MIN_VERSION_template_haskell(2,15,0)
-            [TySynInstD (TySynEqn _ _ t)] -> return t
+            [TySynInstD (TySynEqn _ _ r)] ->
 #else
-            [TySynInstD _ (TySynEqn _ t)] -> return t
+            [TySynInstD _ (TySynEqn _ r)] ->
 #endif
-            [NewtypeInstD _ _ _ _ c _] -> return $ ConT (getName c)
+                gatherNames (applyFamilyBindings xs info r)
+
+            [NewtypeInstD _ _ _ _ c _] -> constructorToPorts c (familyTyMap xs info)
             [DataInstD    _ _ _ _ cs _] -> do
               case cs of
-                [c] -> return $ ConT (getName c)
-                _ -> return $ PromotedTupleT 0
-                  -- Ignore sum type in a data family by replacing with
-                  -- empty tuple. We don't want to fail because this subtree
-                  -- might not be relevant to naming.
+                [c] -> constructorToPorts c (familyTyMap xs info)
+                _ -> return $ Complete []
             y -> fail $ failMsg "Encountered unexpected type during family application!"
-                      ++ " Perhaps a missing instance?\n" ++ pprint y
+                      ++ pprint y
 
-        _ -> return (AppT a' b')
-    _ -> return (AppT a' b')
+        -- 4. Check if head really is a datatype, apply free variables,
+        --    and attempt to get a unique constructor
+        _ -> do
+          dataTy <- tryReifyDatatype Nothing Just x
+
+          let -- Apply tail types to head datatype free type variables
+              hasAllArgs   = \vs -> length xs == length (datatypeVars vs)
+              constructors = applyDatatypeContext xs <$> mfilter hasAllArgs dataTy
+
+              -- Attempt to get a unique constructor
+              getSingleConstructor cs = do [c] <- cs; return c
+              constructor = getSingleConstructor constructors
+
+          -- If any steps failed, return the PortNames according to the head type.
+          maybe a' (visit x (ppr x) . portsFromTypes . constructorFields) constructor
+
+    -- If head is a tuple or list then we take all the names
+    (ListT:_)    -> fold <$> mapM snd f
+    (TupleT _:_) -> fold <$> mapM snd f
+
+    -- We're not applying to a head 'ConT' so lets try best effort of getting names
+    -- from all applied types
+    _ -> do
+      lift $ reportWarning $ "Make sure HDL port names are correct:\n"
+                           ++ "Type application with non ConT head:\n:("
+                           ++ pprint (AppT a b)
+      f' <- mapM snd f
+      return $ fold f'
  where
+  tyMap ctx holes = Map.fromList $ zip holes ctx
+  familyTyMap ctx (familyBindings -> Just holes) = tyMap ctx (tvName <$> holes)
+  familyTyMap _ _  = error "familyTyMap called with non family argument!"
+  applyContext ctx holes = applySubstitution (tyMap ctx holes)
+  applyDatatypeContext ctx d = applyContext ctx (datatypeVars' d) <$> datatypeCons d
+  applyFamilyBindings ctx (familyBindings -> Just holes) t
+    = applyContext ctx (tvName <$> holes) t
+  applyFamilyBindings _ _ _ = error "familyTyMap called with non family argument!"
+
 #if MIN_VERSION_template_haskell(2,15,0)
   tySynArgs (TySynEqn _ args _) = tail (unapp args)
 #else
   tySynArgs (TySynEqn args _) = args
 #endif
 
-  familyArity (FamilyI (OpenTypeFamilyD (TypeFamilyHead _ xs _ _)) _) =
-    Just (length xs)
-  familyArity (FamilyI (DataFamilyD _ xs _) _) = Just (length xs)
-  familyArity _ = Nothing
-expandFamilies t = embed <$> sequence t
+  familyBindings (FamilyI (ClosedTypeFamilyD (TypeFamilyHead _ xs _ _) _) _) = Just xs
+  familyBindings (FamilyI (OpenTypeFamilyD (TypeFamilyHead _ xs _ _)) _) = Just xs
+  familyBindings (FamilyI (DataFamilyD _ xs _) _) = Just xs
+  familyBindings _ = Nothing
+  familyArity = fmap length . familyBindings
 
--- | Runs 'expandFamilies' and then 'typeTreeToPorts'
-expandFamiliesAndGatherNames
+typeTreeToPorts f = do
+  -- Just collect names
+  f' <- mapM snd f
+  return $ fold f'
+
+-- | Gather naming tree attached to a 'Type' and its inner 'Type's
+gatherNames
   :: Type
   -- ^ Type to investigate
   -> Tracked Q (Naming [PortName])
-expandFamiliesAndGatherNames =
-  cata expandFamilies >=> para typeTreeToPorts
+gatherNames =
+  para typeTreeToPorts
 
 -- | Build a possible failing 'PortName' tree and unwrap the 'Naming' result.
 buildPorts
@@ -382,11 +405,11 @@ buildPorts
   -- ^ Type to investigate
   -> Q [PortName]
 buildPorts x = do
-  flip runReaderT (Set.empty, "") $ expandFamiliesAndGatherNames x
+  flip runReaderT (Set.empty, "") $ gatherNames x
     >>= \case
       Complete xs -> return xs
       HasFail err -> fail err
-      BackTrack n -> fail $ failMsg "Encountered recursive type at entry! " ++ pprint n
+      BackTrack n -> fail $ failMsg "Encountered recursive type at entry! " ++ show n
 
 -- | Get the result 'PortName' from a function type
 toReturnName :: Type -> Q PortName

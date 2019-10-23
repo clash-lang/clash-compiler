@@ -1,3 +1,5 @@
+{-# OPTIONS_GHC -Wwarn #-}
+
 {-# LANGUAGE DataKinds        #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE TypeApplications #-}
@@ -17,6 +19,8 @@ import Test.Tasty.HUnit
 
 import Clash.Prelude hiding (undefined)
 import Clash.Annotations.TH
+
+type Pair a = ("left" ::: a, "right" ::: a)
 
 data Unnamed = Unnamed Int
 data Simple = Simple ("simple1" ::: Int) ("simple2" ::: Bool)
@@ -197,6 +201,22 @@ expectedTopEntity7 =
     ]
     (PortName "out")
 
+topEntity8 :: (HiddenClockResetEnable System)
+           => "pair" ::: Signal System (Pair Bool)
+           -> "pair" ::: Signal System (Pair Single)
+           -> "out" ::: Signal System Int
+topEntity8 = undefined
+makeTopEntity 'topEntity8
+
+expectedTopEntity8 :: TopEntity
+expectedTopEntity8 =
+ Synthesize "topEntity8"
+    [ PortProduct "" [PortName "clk", PortName "rst", PortName "en"]
+    , PortProduct "pair" [PortName "left", PortName "right"]
+    , PortProduct "pair" [PortProduct "left" [PortName "s"], PortProduct "right" [PortName "s"]]
+    ]
+    (PortName "out")
+
 topEntityFailure1
   :: "int"     ::: Signal System Int
   -> "tuple"   ::: ("tup1" ::: Signal System (BitVector 7), "tup2" ::: Signal System (BitVector 9))
@@ -278,6 +298,9 @@ tests =
       , testCase "topEntity7" $
           $(unTypeQ $ maybeBuildTopEntity Nothing 'topEntity7)
           @?= Just expectedTopEntity7
+      , testCase "topEntity8" $
+          $(unTypeQ $ maybeBuildTopEntity Nothing 'topEntity8)
+          @?= Just expectedTopEntity8
       ]
     , testGroup "Expected failures"
       [ testCase "topEntityFailure1" $
