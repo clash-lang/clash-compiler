@@ -65,6 +65,8 @@ import System.IO.Unsafe  (unsafeDupablePerformIO)
 
 -- $setup
 -- >>> import Clash.Class.BitPack (pack)
+-- >>> import Clash.Sized.Vector (Vec)
+-- >>> import Clash.Sized.RTree (RTree)
 -- >>> :set -fplugin GHC.TypeLits.Normalise
 -- >>> :set -fplugin GHC.TypeLits.KnownNat.Solver
 
@@ -648,6 +650,10 @@ class NFDataX a where
   -- >>> spined = ensureSpine (errorX "?" :: (Int, Int))
   -- >>> case spined of (_, _) -> 'a'
   -- 'a'
+  -- >>> fmap (const 'b') (ensureSpine undefined :: Vec 3 Int)
+  -- <'b','b','b'>
+  -- >>> fmap (const 'c') (ensureSpine undefined :: RTree 2 Int)
+  -- <<'c','c'>,<'c','c'>>
   --
   -- For users familiar with 'Clash.Sized.Vector.lazyV': this is the generalized
   -- version of it.
