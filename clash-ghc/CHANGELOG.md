@@ -9,6 +9,7 @@
   * [#662](https://github.com/clash-lang/clash-compiler/issues/662): Clash will now constant specialize partially constant constructs
   * [#700](https://github.com/clash-lang/clash-compiler/issues/700): Check work content of expression in cast before warning users. Should eliminate a lot of (superfluous) warnings about "specializing on non work-free cast"s.
   * [#837](https://github.com/clash-lang/clash-compiler/issues/837): Blackboxes will now report clearer error messages if they're given unexpected arguments.
+  * [#869](https://github.com/clash-lang/clash-compiler/issues/869): PLL is duplicated in Blinker.hs example
 
 * Small fixes without issue reports:
   * Fix bug in `rnfX` defined for `Down` ([814fd52](https://github.com/clash-lang/clash-compiler/commit/814fd520191123be38af8ef28fc49130424f3b93))
