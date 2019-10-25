@@ -161,9 +161,9 @@ setSym mkUniqueIdentifierM bbCtx l = do
                 m
                 Element
     setSym' e = case e of
-      Var nm i | i < length (bbInputs bbCtx) -> case bbInputs bbCtx !! i of
+      ToVar nm i | i < length (bbInputs bbCtx) -> case bbInputs bbCtx !! i of
         (Identifier nm' Nothing,_,_) ->
-          return (Var [Text (Text.fromStrict nm')] i)
+          return (ToVar [Text (Text.fromStrict nm')] i)
 
         (e',hwTy,_) -> do
           varM <- IntMap.lookup i <$> use _2
@@ -176,8 +176,8 @@ setSym mkUniqueIdentifierM bbCtx l = do
                          ,N.Assignment nm' e'
                          ]
               _2 %= (IntMap.insert i (nm',decls))
-              return (Var [Text (Text.fromStrict nm')] i)
-            Just (nm',_) -> return (Var [Text (Text.fromStrict nm')] i)
+              return (ToVar [Text (Text.fromStrict nm')] i)
+            Just (nm',_) -> return (ToVar [Text (Text.fromStrict nm')] i)
       Sym _ i -> do
         symM <- IntMap.lookup i <$> use _1
         case symM of
@@ -585,7 +585,7 @@ renderTag b e@(Name _i) =
       Left msg -> error $ $(curLoc) ++ unwords [ "Error when reducing to string"
                                                , "in ~NAME construct:", msg ]
 
-renderTag _ (Var [Text t] _) = return t
+renderTag _ (ToVar [Text t] _) = return t
 renderTag _ (Sym t _) = return t
 
 renderTag b (BV True es e) = do
@@ -793,7 +793,7 @@ prettyElem (Arg b i) = renderOneLine <$> (if b then string "~EARG" else string "
 prettyElem (Lit i) = renderOneLine <$> (string "~LIT" <> brackets (int i))
 prettyElem (Const i) = renderOneLine <$> (string "~CONST" <> brackets (int i))
 prettyElem (Name i) = renderOneLine <$> (string "~NAME" <> brackets (int i))
-prettyElem (Var es i) = do
+prettyElem (ToVar es i) = do
   es' <- prettyBlackBox es
   renderOneLine <$> (string "~VAR" <> brackets (string es') <> brackets (int i))
 prettyElem (Sym _ i) = renderOneLine <$> (string "~SYM" <> brackets (int i))
@@ -945,7 +945,7 @@ walkElement f el = maybeToList (f el) ++ walked
         Const _ -> []
         Lit _ -> []
         Name _ -> []
-        Var es _ -> concatMap go es
+        ToVar es _ -> concatMap go es
         Sym _ _ -> []
         Typ _ -> []
         TypM _ -> []
@@ -994,8 +994,8 @@ usedVariables (BlackBoxE _ _ _ _ t bb _) = nub (sList ++ sList')
     matchArg (Arg _ i) = Just i
     matchArg _         = Nothing
 
-    matchVar (Var [Text v] _) = Just (Text.toStrict v)
-    matchVar _                = Nothing
+    matchVar (ToVar [Text v] _) = Just (Text.toStrict v)
+    matchVar _                  = Nothing
 
     t'     = onBlackBox id (\_ _ _ -> []) t
     usedIs = mapMaybe (indexMaybe (bbInputs bb)) (concatMap (walkElement matchArg) t')
@@ -1016,7 +1016,7 @@ getUsedArguments (N.BBTemplate t) = nub (concatMap (walkElement matchArg) t)
         IsActiveEnable i -> Just i
         Lit i -> Just i
         Name i -> Just i
-        Var _ i -> Just i
+        ToVar _ i -> Just i
 
         -- Domain properties (only need type):
         IsInitDefined _ -> Nothing

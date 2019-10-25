@@ -82,7 +82,7 @@ pTagE =  Result True       <$  string "~ERESULT"
      <|> Const             <$> (string "~CONST" *> brackets' natural')
      <|> Lit               <$> (string "~LIT" *> brackets' natural')
      <|> Name              <$> (string "~NAME" *> brackets' natural')
-     <|> Var               <$> try (string "~VAR" *> brackets' pSigD) <*> brackets' natural'
+     <|> ToVar             <$> try (string "~VAR" *> brackets' pSigD) <*> brackets' natural'
      <|> (Sym Text.empty)  <$> (string "~SYM" *> brackets' natural')
      <|> Typ Nothing       <$  string "~TYPO"
      <|> (Typ . Just)      <$> try (string "~TYP" *> brackets' natural')
