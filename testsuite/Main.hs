@@ -107,6 +107,7 @@ runClashTest =
       , clashTestGroup "BitVector"
         [ runTest ("tests" </> "shouldwork" </> "BitVector") defBuild [] "Box"              (["","testBench"],"testBench",True)
         , runTest ("tests" </> "shouldwork" </> "BitVector") defBuild [] "BoxGrow"          (["","testBench"],"testBench",True)
+        , runTest ("tests" </> "shouldwork" </> "BitVector") defBuild [] "CLZ"              (["","testBench"],"testBench",True)
         , runTest ("tests" </> "shouldwork" </> "BitVector") defBuild [] "RePack"           ([""],"topEntity",False)
         , runTest ("tests" </> "shouldwork" </> "BitVector") defBuild [] "ReduceZero"       (["","testBench"],"testBench",True)
         , runTest ("tests" </> "shouldwork" </> "BitVector") defBuild [] "ReduceOne"        (["","testBench"],"testBench",True)
