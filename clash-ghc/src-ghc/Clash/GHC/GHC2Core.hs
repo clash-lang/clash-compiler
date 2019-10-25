@@ -455,12 +455,12 @@ coreToTerm primMap unlocs = term
             Just Nothing ->
               -- Was guarded by "DontTranslate". We don't know yet if Clash will
               -- actually use it later on, so we don't err here.
-              return $ C.Prim xNameS (C.PrimInfo xType C.WorkAlways)
+              return $ C.Prim xNameS (C.PrimInfo xType C.WorkVariable)
             Nothing
               | x `elem` unlocs
-              -> return (C.Prim xNameS (C.PrimInfo xType C.WorkAlways))
+              -> return (C.Prim xNameS (C.PrimInfo xType C.WorkVariable))
               | pack "$cshow" `isInfixOf` xNameS
-              -> return (C.Prim xNameS (C.PrimInfo xType C.WorkAlways))
+              -> return (C.Prim xNameS (C.PrimInfo xType C.WorkVariable))
               | otherwise
               -> C.Var <$> coreToId x
 

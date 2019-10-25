@@ -527,12 +527,16 @@ isWorkFreeIsh e = do
     Just b -> pure b
     Nothing ->
       case collectArgs e of
-        (Data _, args)   -> allM (either isWorkFreeIsh (pure . const True)) args
-        -- TODO: Use WorkInfo
-        (Prim _ _, args) -> allM (either isWorkFreeIsh (pure . const True)) args
+        (Data _, args)   -> allM isWorkFreeIshArg args
+        (Prim _ pInfo, args) -> case primWorkInfo pInfo of
+          WorkAlways     -> pure False -- Things like clock or reset generator always
+                                       -- perform work
+          _              -> allM isWorkFreeIshArg args
         (Lam _ _, _)     -> pure (not (hasLocalFreeVars e))
         (Literal _,_)    -> pure True
         _                -> pure False
+ where
+  isWorkFreeIshArg = either isWorkFreeIsh (pure . const True)
 
 inlineOrLiftBinders
   :: (LetBinding -> RewriteMonad extra Bool)
