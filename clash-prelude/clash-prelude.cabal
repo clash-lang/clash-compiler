@@ -325,9 +325,12 @@ test-suite unittests
       hint          >= 0.7      && < 0.10,
       tasty         >= 1.2      && < 1.3,
       tasty-hunit,
+      tasty-quickcheck,
       template-haskell
 
-  Other-Modules: Clash.Tests.BitPack
+  Other-Modules:
+                 Clash.Tests.AutoReg
+                 Clash.Tests.BitPack
                  Clash.Tests.BitVector
                  Clash.Tests.DerivingDataRepr
                  Clash.Tests.DerivingDataReprTypes

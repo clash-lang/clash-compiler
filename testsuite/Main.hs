@@ -62,7 +62,10 @@ runClashTest =
       , runTest ("examples" </> "i2c")   defBuild ["-O2","-fclash-component-prefix","test"] "I2C"          (["test_i2c","test_bitmaster","test_bytemaster"],"test_i2c",False)
       ]
     , clashTestGroup "Unit"
-      [ clashTestGroup "Basic"
+      [ clashTestGroup "AutoReg"
+        [ outputTest ("tests" </> "shouldwork" </> "AutoReg") defBuild [] [] "AutoReg" "main"
+        ]
+      , clashTestGroup "Basic"
         [ -- TODO: Enable AES test on SystemVerilog. See issue #569.
           runTest ("tests" </> "shouldwork" </> "Basic") defBuild [] "AES"                 ([""],"topEntity",False)
         , runTest ("tests" </> "shouldwork" </> "Basic") defBuild [] "BangData"            ([""],"topEntity",False)
