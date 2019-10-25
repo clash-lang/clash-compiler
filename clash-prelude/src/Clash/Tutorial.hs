@@ -385,8 +385,8 @@ most contexts.
 The 'register' function is our primary sequential building block to capture
 /state/. It is used internally by one of the "Clash.Prelude" function that we
 will use to describe our MAC circuit. Note that the following paragraphs will
-only show one of many ways to specify a sequential circuit, at the section we
-will show a couple more.
+only show one of many ways to specify a sequential circuit, in the section
+<#mac6 Alternative specifications> we will show a couple more.
 
 A principled way to describe a sequential circuit is to use one of the classic
 machine models, within the Clash prelude library offer standard function to
@@ -466,6 +466,7 @@ if the function is monomorphic:
 topEntity
   :: 'Clock' 'System'
   -> 'Reset' 'System'
+  -> 'Enable' 'System'
   -> 'Signal' 'System' ('Signed' 9, 'Signed' 9)
   -> 'Signal' 'System' ('Signed' 9)
 topEntity = 'exposeClockResetEnable' mac
@@ -512,7 +513,7 @@ Our 'topEntity' meets those restrictions, and so we can convert it successfully
 to VHDL by executing the @:vhdl@ command in the interpreter. This will create
 a directory called 'vhdl', which contains a directory called @MAC@, which
 ultimately contains all the generated VHDL files. You can now load these files
-into your favourite VHDL synthesis tool, marking @mac_topentity.vhdl@ as the file
+into your favourite VHDL synthesis tool, marking @topentity.vhdl@ as the file
 containing the top level entity.
 -}
 
@@ -583,13 +584,13 @@ show, as the global clock will be stopped after 4 ticks.
 
 You should now again run @:vhdl@ in the interpreter; this time the compiler
 will take a bit longer to generate all the circuits. Inside the @.\/vhdl\/MAC@
-directory you will now also find a /mac_testbench/ subdirectory containing all
-the @vhdl@ files for the /test bench/.
+directory you will now also find a /testbench/ subdirectory containing all the
+@vhdl@ files for the /test bench/.
 
 
 After compilation is finished you  load all the files in your favourite VHDL
 simulation tool. Once all files are loaded into the VHDL simulator, run the
-simulation on the @mac_testbench_testbench@ entity.
+simulation on the @testbench@ entity.
 On questasim / modelsim: doing a @run -all@ will finish once the output verifier
 will assert its output to @true@. The generated testbench, modulo the clock
 signal generator(s), is completely synthesizable. This means that if you want to
@@ -613,7 +614,7 @@ next section where we will describe another DSP classic: an FIR filter
 structure.
 -}
 
-{- $mac6
+{- $mac6 #mac6#
 * __'Num' instance for 'Signal'__:
 
     @'Signal' a@ is also also considered a 'Num'eric type as long as the value
@@ -704,7 +705,7 @@ topEntity
   -> 'Enable' 'System'
   -> 'Signal' 'System' ('Signed' 16)
   -> 'Signal' 'System' ('Signed' 16)
-topEntity = exposeClockResetEnableEnable (fir (0 ':>' 1 ':>' 2 ':>' 3 ':>' 'Nil'))
+topEntity = exposeClockResetEnable (fir (0 ':>' 1 ':>' 2 ':>' 3 ':>' 'Nil'))
 @
 
 Here we can see that, although the Clash compiler handles recursive function
@@ -741,10 +742,10 @@ __mealy__
   -> ('Signal' dom i -> 'Signal' dom o)
 @
 
-we see that the resulting function has an input of type @'Signal' i@, and an
-output of @'Signal' o@. However, the type of @(a,b)@ in the definition of @g@ is:
-@('Signal' Bool, 'Signal' Int)@. And the type of @(i1,b1)@ is of type
-@('Signal' Int, 'Signal' Bool)@.
+we see that the resulting function has an input of type @'Signal' dom i@, and
+an output of @'Signal' dom o@. However, the type of @(a,b)@ in the definition
+of @g@ is: @('Signal' dom Bool, 'Signal' dom Int)@. And the type of @(i1,b1)@
+is of type @('Signal' dom Int, 'Signal' dom Bool)@.
 
 Syntactically, @'Signal' dom (Bool,Int)@ and @('Signal' dom Bool,
 'Signal' dom Int)@ are /unequal/.
@@ -772,8 +773,9 @@ __unbundle__ :: 'Bundle' a => 'Signal' dom a -> 'Unbundled' dom a
 belonging to the 'Bundle' <http://en.wikipedia.org/wiki/Type_class type class>,
 which, together with 'bundle' and 'unbundle' defines the isomorphism between a
 product type of 'Signal's and a 'Signal' of a product type. That is, while
-@(Signal a, Signal b)@ and @Signal (a,b)@ are not equal, they are /isomorphic/
-and can be converted from, or to, the other using 'bundle' and 'unbundle'.
+@('Signal' dom a, 'Signal' dom b)@ and @'Signal' dom (a,b)@ are not equal,
+they are /isomorphic/ and can be converted from, or to, the other using
+'bundle' and 'unbundle'.
 
 Instances of this 'Bundle' type-class are defined as /isomorphisms/ for:
 
@@ -797,7 +799,7 @@ but,
 
 @
 instance 'Bundle' Bool where
-  type 'Unbundled' clk Bool = 'Signal' clk Bool
+  type 'Unbundled' dom Bool = 'Signal' dom Bool
   bundle   s = s
   unbundle s = s
 @
@@ -917,7 +919,7 @@ blinkerT (leds,mode,cntr) key1R = ((leds',mode',cntr'),leds)
           | otherwise = leds
 @
 
-The Clash compiler will normally generate the following @blinker_topEntity.vhdl@ file:
+The Clash compiler will normally generate the following @topentity.vhdl@ file:
 
 @
 -- Automatically generated VHDL-93
@@ -929,7 +931,7 @@ use std.textio.all;
 use work.all;
 use work.blinker_types.all;
 
-entity blinker_topentity is
+entity topentity is
   port(-- clock
        clk  : in blinker_types.clk_dominput;
        rst  : in boolean;
@@ -937,7 +939,7 @@ entity blinker_topentity is
        leds : out std_logic_vector(7 downto 0));
 end;
 
-architecture structural of blinker_topentity is
+architecture structural of topentity is
  ...
 end;
 @
@@ -1014,7 +1016,7 @@ as \"regular\" primitives. The compiler looks for primitives in four locations:
 
 Where redefined primitives in the current directory or include directories will
 overwrite those in the official install location. For now, files containing
-primitive definitions must have an @.json@ file-extension.
+primitive definitions must have a @.json@ file-extension.
 
 Clash differentiates between two types of primitives, /expression/ primitives
 and /declaration/ primitives, corresponding to whether the primitive is a VHDL
@@ -1034,6 +1036,7 @@ For which the VHDL /expression/ primitive is:
 { \"BlackBox\" :
   { "name"     : "Clash.Sized.Internal.Signed.*#"
   , "kind"     : \"Expression\"
+  , "type"      : "(*#) :: KnownNat n => Signed n -> Signed n -> Signed n"
   , "template" : "resize(~ARG[1] * ~ARG[2], ~LIT[0])"
   }
 }
@@ -1081,7 +1084,8 @@ import Clash.XException       (defaultSeqX)
 
 
 blockRam#
-  :: ( HasCallStack
+  :: ( KnownDomain dom
+     , HasCallStack
      , NFDataX a )
   => 'Clock' dom           -- ^ 'Clock' to synchronize to
   -> 'Enable' dom          -- ^ Global enable
@@ -1127,55 +1131,56 @@ And for which the /declaration/ primitive is:
   , "kind" : \"Declaration\"
   , "type" :
 "blockRam#
-  :: ( HasCallStack  --       ARG[0]
-     , NFDataX a ) --       ARG[1]
-  => Clock dom       -- clk,  ARG[2]
-  -> Enable dom      -- en,   ARG[3]
-  -> Vec n a         -- init, ARG[4]
-  -> Signal dom Int  -- rd,   ARG[5]
-  -> Signal dom Bool -- wren, ARG[6]
-  -> Signal dom Int  -- wr,   ARG[7]
-  -> Signal dom a    -- din,  ARG[8]
+  :: ( KnownDomain dom        ARG[0]
+     , HasCallStack  --       ARG[1]
+     , NFDataX a )   --       ARG[2]
+  => Clock dom       -- clk,  ARG[3]
+  -> Enable dom      -- en,   ARG[4]
+  -> Vec n a         -- init, ARG[5]
+  -> Signal dom Int  -- rd,   ARG[6]
+  -> Signal dom Bool -- wren, ARG[7]
+  -> Signal dom Int  -- wr,   ARG[8]
+  -> Signal dom a    -- din,  ARG[9]
   -> Signal dom a"
     , "template" :
 "-- blockRam begin
-~GENSYM[~RESULT_blockRam][0] : block
-  signal ~GENSYM[~RESULT_RAM][1] : ~TYP[4] := ~CONST[4];
-  signal ~GENSYM[rd][3]  : integer range 0 to ~LENGTH[~TYP[4]] - 1;
-  signal ~GENSYM[wr][4]  : integer range 0 to ~LENGTH[~TYP[4]] - 1;
+~GENSYM[~RESULT_blockRam][1] : block
+  signal ~GENSYM[~RESULT_RAM][2] : ~TYP[5] := ~CONST[5];
+  signal ~GENSYM[rd][4]  : integer range 0 to ~LENGTH[~TYP[5]] - 1;
+  signal ~GENSYM[wr][5]  : integer range 0 to ~LENGTH[~TYP[5]] - 1;
 begin
-  ~SYM[3] <= to_integer(~ARG[5])
+  ~SYM[4] <= to_integer(~ARG[6])
   -- pragma translate_off
-                mod ~LENGTH[~TYP[4]]
+                mod ~LENGTH[~TYP[5]]
   -- pragma translate_on
                 ;
 
-  ~SYM[4] <= to_integer(~ARG[7])
+  ~SYM[5] <= to_integer(~ARG[8])
   -- pragma translate_off
-                mod ~LENGTH[~TYP[4]]
+                mod ~LENGTH[~TYP[5]]
   -- pragma translate_on
                 ;
 ~IF ~VIVADO ~THEN
-  ~SYM[5] : process(~ARG[2])
+  ~SYM[6] : process(~ARG[3])
   begin
-    if rising_edge(~ARG[2]) then
-      if ~ARG[6] ~IF ~ISACTIVEENABLE[3] ~THEN and ~ARG[3] ~ELSE ~FI then
-        ~SYM[1](~SYM[4]) <= ~TOBV[~ARG[8]][~TYP[8]];
+    if ~IF~ACTIVEEDGE[Rising][0]~THENrising_edge~ELSEfalling_edge~FI(~ARG[3]) then
+      if ~ARG[7] ~IF ~ISACTIVEENABLE[4] ~THEN and ~ARG[4] ~ELSE ~FI then
+        ~SYM[2](~SYM[5]) <= ~TOBV[~ARG[9]][~TYP[9]];
       end if;
-      ~RESULT <= fromSLV(~SYM[1](~SYM[3]))
+      ~RESULT <= fromSLV(~SYM[2](~SYM[4]))
       -- pragma translate_off
       after 1 ps
       -- pragma translate_on
       ;
     end if;
   end process; ~ELSE
-  ~SYM[5] : process(~ARG[2])
+  ~SYM[6] : process(~ARG[3])
   begin
-    if rising_edge(~ARG[2]) then
-      if ~ARG[6] ~IF ~ISACTIVEENABLE[3] ~THEN and ~ARG[3] ~ELSE ~FI then
-        ~SYM[1](~SYM[4]) <= ~ARG[8];
+    if ~IF~ACTIVEEDGE[Rising][0]~THENrising_edge~ELSEfalling_edge~FI(~ARG[3]) then
+      if ~ARG[7] ~IF ~ISACTIVEENABLE[4] ~THEN and ~ARG[4] ~ELSE ~FI then
+        ~SYM[2](~SYM[5]) <= ~ARG[9];
       end if;
-      ~RESULT <= ~SYM[1](~SYM[3])
+      ~RESULT <= ~SYM[2](~SYM[4])
       -- pragma translate_off
       after 1 ps
       -- pragma translate_on
@@ -1206,7 +1211,7 @@ a general listing of the available template holes:
 * @~TYPO@: VHDL type of the result.
 * @~TYPM[N]@: VHDL type/name/ of the @(N+1)@'th argument; used in /type/
   /qualification/.
-* @~TYPM@: VHDL type/name/ of the result; used in /type qualification/.
+* @~TYPMO@: VHDL type/name/ of the result; used in /type qualification/.
 * @~ERROR[N]@: Error value for the VHDL type of the @(N+1)@'th argument.
 * @~ERRORO@: Error value for the VHDL type of the result.
 * @~GENSYM[\<NAME\>][N]@: Create a unique name, trying to stay as close to
@@ -1228,7 +1233,7 @@ a general listing of the available template holes:
 * @~IF \<CONDITION\> ~THEN \<THEN\> ~ELSE \<ELSE\> ~FI@: renders the \<ELSE\>
   part when \<CONDITION\> evaluates to /0/, and renders the \<THEN\> in all
   other cases. Valid @\<CONDITION\>@s are @~LENGTH[\<HOLE\>]@, @~SIZE[\<HOLE\>]@,
-  @~DEPTH[\<HOLE\>]@, @~VIVADO@, @~IW64@, @~ISLIT[N]@, @~ISVAR[N], @~ISACTIVEENABLE[N]@,
+  @~DEPTH[\<HOLE\>]@, @~VIVADO@, @~IW64@, @~ISLIT[N]@, @~ISVAR[N]@, @~ISACTIVEENABLE[N]@,
   @~ISSYNC[N]@, and @~AND[\<HOLE1\>,\<HOLE2\>,..]@.
 * @~VIVADO@: /1/ when Clash compiler is invoked with the @-fclash-xilinx@ or
   @-fclash-vivado@ flag. To be used with in an @~IF .. ~THEN .. ~ElSE .. ~FI@
@@ -1238,14 +1243,14 @@ a general listing of the available template holes:
   The @\<TYPE\>@ hole indicates the type of the expression and must be either
   @~TYP[N]@, @~TYPO@, or @~TYPELEM[\<HOLE\>]@.
 * @~FROMBV[\<HOLE\>][\<TYPE\>]@: create conversion code that so that the
-  expression in @\<HOLE\>@, which has a bit vector (@std_logic_vector@) type, is
-  converted to type indicated by @\<TYPE\>@. The @\<TYPE\>@ hole indicates the
-  must be either @~TYP[N]@, @~TYPO@, or @~TYPELEM[\<HOLE\>]@.
+  expression in @\<HOLE\>@, which has a bit vector (@std_logic_vector@) type,
+  is converted to type indicated by @\<TYPE\>@. The @\<TYPE\>@ hole must be
+  either @~TYP[N]@, @~TYPO@, or @~TYPELEM[\<HOLE\>]@.
 * @~INCLUDENAME[N]@: the generated name of the @N@'th included component.
 * @~FILEPATH[\<HOLE\>]@: The argument mentioned in @\<HOLE\>@ is a file which
   must be copied to the location of the generated HDL.
 * @~GENERATE@: Verilog: create a /generate/ statement, except when already in
-  as /generate/ context.
+  a /generate/ context.
 * @~ENDGENERATE@: Verilog: create an /endgenerate/ statement, except when already
   in a /generate/ context.
 * @~ISLIT[N]@: Is the @(N+1)@'th argument to the function a literal.
@@ -1266,7 +1271,7 @@ a general listing of the available template holes:
   /edge/. /edge/ must be one of 'Falling' or 'Rising'. Errors when called on an
   argument which is not a 'KnownDomain' or 'KnownConf'.
 * @~AND[\<HOLE1\>,\<HOLE2\>,..]@: Logically /and/ the conditions in the @\<HOLE\>@'s
-* @~VARS[N]@: VHDL: Return the variables at the @(N+1)@'th argument argument.
+* @~VARS[N]@: VHDL: Return the variables at the @(N+1)@'th argument.
 * @~NAME[N]@: Render the @(N+1)@'th string literal argument as an identifier
   instead of a string literal. Fails when the @(N+1)@'th argument is not a
   string literal.
@@ -1296,6 +1301,7 @@ For those who are interested, the equivalent Verilog primitives are:
 { \"BlackBox\" :
   { "name"     : "Clash.Sized.Internal.Signed.*#"
   , "kind"     : \"Expression\"
+  , "type"     : "(*#) :: KnownNat n => Signed n -> Signed n -> Signed n"
   , "template" : "~ARG[1] * ~ARG[2]"
   }
 }
@@ -1309,49 +1315,50 @@ and
   , "kind" : \"Declaration\"
   , "type" :
 "blockRam#
-  :: ( HasCallStack  --       ARG[0]
-     , NFDataX a ) --       ARG[1]
-  => Clock dom       -- clk,  ARG[2]
-  => Enable dom      -- en,   ARG[3]
-  -> Vec n a         -- init, ARG[4]
-  -> Signal dom Int  -- rd,   ARG[5]
-  -> Signal dom Bool -- wren, ARG[6]
-  -> Signal dom Int  -- wr,   ARG[7]
-  -> Signal dom a    -- din,  ARG[8]
+  :: ( KnownDomain dom        ARG[0]
+     , HasCallStack  --       ARG[1]
+     , NFDataX a )   --       ARG[2]
+  => Clock dom       -- clk,  ARG[3]
+  => Enable dom      -- en,   ARG[4]
+  -> Vec n a         -- init, ARG[5]
+  -> Signal dom Int  -- rd,   ARG[6]
+  -> Signal dom Bool -- wren, ARG[7]
+  -> Signal dom Int  -- wr,   ARG[8]
+  -> Signal dom a    -- din,  ARG[9]
   -> Signal dom a"
     , "outputReg" : true
     , "template" :
 "// blockRam begin
-reg ~TYPO ~GENSYM[~RESULT_RAM][0] [0:~LENGTH[~TYP[4]]-1];
+reg ~TYPO ~GENSYM[~RESULT_RAM][1] [0:~LENGTH[~TYP[5]]-1];
 
-reg ~TYP[4] ~GENSYM[ram_init][2];
-integer ~GENSYM[i][3];
+reg ~TYP[5] ~GENSYM[ram_init][3];
+integer ~GENSYM[i][4];
 initial begin
-  ~SYM[2] = ~CONST[4];
-  for (~SYM[3]=0; ~SYM[3] < ~LENGTH[~TYP[4]]; ~SYM[3] = ~SYM[3] + 1) begin
-    ~SYM[0][~LENGTH[~TYP[4]]-1-~SYM[3]] = ~SYM[2][~SYM[3]*~SIZE[~TYPO]+:~SIZE[~TYPO]];
+  ~SYM[3] = ~CONST[5];
+  for (~SYM[4]=0; ~SYM[4] < ~LENGTH[~TYP[5]]; ~SYM[4] = ~SYM[4] + 1) begin
+    ~SYM[1][~LENGTH[~TYP[5]]-1-~SYM[4]] = ~SYM[3][~SYM[4]*~SIZE[~TYPO]+:~SIZE[~TYPO]];
   end
 end
-~IF ~ISACTIVEENABLE[3] ~THEN
-always @(posedge ~ARG[2]) begin : ~GENSYM[~RESULT_blockRam][4]~IF ~VIVADO ~THEN
-  if (~ARG[3]) begin
-    if (~ARG[6]) begin
-      ~SYM[0][~ARG[7]] <= ~ARG[8];
+~IF ~ISACTIVEENABLE[4] ~THEN
+always @(~IF~ACTIVEEDGE[Rising][0]~THENposedge~ELSEnegedge~FI ~ARG[3]) begin : ~GENSYM[~RESULT_blockRam][5]~IF ~VIVADO ~THEN
+  if (~ARG[4]) begin
+    if (~ARG[7]) begin
+      ~SYM[1][~ARG[8]] <= ~ARG[9];
     end
-    ~RESULT <= ~SYM[0][~ARG[5]];
+    ~RESULT <= ~SYM[1][~ARG[6]];
   end~ELSE
-  if (~ARG[6] & ~ARG[3]) begin
-    ~SYM[0][~ARG[7]] <= ~ARG[8];
+  if (~ARG[7] & ~ARG[4]) begin
+    ~SYM[1][~ARG[8]] <= ~ARG[9];
   end
-  if (~ARG[3]) begin
-    ~RESULT <= ~SYM[0][~ARG[5]];
+  if (~ARG[4]) begin
+    ~RESULT <= ~SYM[1][~ARG[6]];
   end~FI
 end~ELSE
-always @(posedge ~ARG[2]) begin : ~SYM[4]
-  if (~ARG[6]) begin
-    ~SYM[0][~ARG[7]] <= ~ARG[8];
+always @(~IF~ACTIVEEDGE[Rising][0]~THENposedge~ELSEnegedge~FI ~ARG[3]) begin : ~SYM[5]
+  if (~ARG[7]) begin
+    ~SYM[1][~ARG[8]] <= ~ARG[9];
   end
-  ~RESULT <= ~SYM[0][~ARG[5]];
+  ~RESULT <= ~SYM[1][~ARG[6]];
 end~FI
 // blockRam end"
   }
@@ -1367,6 +1374,7 @@ And the equivalent SystemVerilog primitives are:
 { \"BlackBox\" :
   { "name"     : "Clash.Sized.Internal.Signed.*#"
   , "kind"     : \"Expression\"
+  , "type"     : "(*#) :: KnownNat n => Signed n -> Signed n -> Signed n"
   , "template" : "~ARG[1] * ~ARG[2]"
   }
 }
@@ -1380,44 +1388,45 @@ and
   , "kind" : \"Declaration\"
   , "type" :
 "blockRam#
-  :: ( HasCallStack  --       ARG[0]
-     , NFDataX a ) --       ARG[1]
-  => Clock dom       -- clk,  ARG[2]
-  -> Enable dom      -- en,   ARG[3]
-  -> Vec n a         -- init, ARG[4]
-  -> Signal dom Int  -- rd,   ARG[5]
-  -> Signal dom Bool -- wren, ARG[6]
-  -> Signal dom Int  -- wr,   ARG[7]
-  -> Signal dom a    -- din,  ARG[8]
+  :: ( KnownDomain dom        ARG[0]
+     , HasCallStack  --       ARG[1]
+     , NFDataX a )   --       ARG[2]
+  => Clock dom       -- clk,  ARG[3]
+  -> Enable dom      -- en,   ARG[4]
+  -> Vec n a         -- init, ARG[5]
+  -> Signal dom Int  -- rd,   ARG[6]
+  -> Signal dom Bool -- wren, ARG[7]
+  -> Signal dom Int  -- wr,   ARG[8]
+  -> Signal dom a    -- din,  ARG[9]
   -> Signal dom a"
     , "template" :
 "// blockRam begin
-~SIGD[~GENSYM[RAM][0]][4];
-logic [~SIZE[~TYP[8]]-1:0] ~GENSYM[~RESULT_q][1];
+~SIGD[~GENSYM[RAM][1]][5];
+logic [~SIZE[~TYP[9]]-1:0] ~GENSYM[~RESULT_q][2];
 initial begin
-  ~SYM[0] = ~CONST[4];
-end~IF ~ISACTIVEENABLE[3] ~THEN
-always @(posedge ~ARG[2]) begin : ~GENSYM[~COMPNAME_blockRam][2]~IF ~VIVADO ~THEN
-  if (~ARG[3]) begin
-    if (~ARG[6]) begin
-      ~SYM[0][~ARG[7]] <= ~TOBV[~ARG[8]][~TYP[8]];
+  ~SYM[1] = ~CONST[5];
+end~IF ~ISACTIVEENABLE[4] ~THEN
+always @(~IF~ACTIVEEDGE[Rising][0]~THENposedge~ELSEnegedge~FI ~ARG[3]) begin : ~GENSYM[~COMPNAME_blockRam][3]~IF ~VIVADO ~THEN
+  if (~ARG[4]) begin
+    if (~ARG[7]) begin
+      ~SYM[1][~ARG[8]] <= ~TOBV[~ARG[9]][~TYP[9]];
     end
-    ~SYM[1] <= ~SYM[0][~ARG[5]];
+    ~SYM[2] <= ~SYM[1][~ARG[6]];
   end~ELSE
-  if (~ARG[6] & ~ARG[3]) begin
-    ~SYM[0][~ARG[7]] <= ~TOBV[~ARG[8]][~TYP[8]];
+  if (~ARG[7] & ~ARG[4]) begin
+    ~SYM[1][~ARG[8]] <= ~TOBV[~ARG[9]][~TYP[9]];
   end
-  if (~ARG[3]) begin
-    ~SYM[1] <= ~SYM[0][~ARG[5]];
+  if (~ARG[4]) begin
+    ~SYM[2] <= ~SYM[1][~ARG[6]];
   end~FI
 end~ELSE
-always @(posedge ~ARG[2]) begin : ~SYM[2]
-  if (~ARG[6]) begin
-    ~SYM[0][~ARG[7]] <= ~TOBV[~ARG[8]][~TYP[8]];
+always @(~IF~ACTIVEEDGE[Rising][0]~THENposedge~ELSEnegedge~FI ~ARG[3]) begin : ~SYM[3]
+  if (~ARG[7]) begin
+    ~SYM[1][~ARG[8]] <= ~TOBV[~ARG[9]][~TYP[9]];
   end
-  ~SYM[1] <= ~SYM[0][~ARG[5]];
+  ~SYM[2] <= ~SYM[1][~ARG[6]];
 end~FI
-assign ~RESULT = ~FROMBV[~SYM[1]][~TYP[8]];
+assign ~RESULT = ~FROMBV[~SYM[2]][~TYP[9]];
 // blockRam end"
   }
 }
@@ -1529,10 +1538,10 @@ synchronous logic. As a consequence, we see in the type signature of
 __asyncRam__
   :: ( 'Enum' addr
      , 'HasCallStack'
-     , 'KnownDomain' wdom wconf
-     , 'KnownDomain' rdom rconf
+     , 'KnownDomain' wdom
+     , 'KnownDomain' rdom
      )
-  => 'Clock' wdom                     -- ^ Clock to which to synchronize the write port of the RAM
+  => 'Clock' wdom                     -- ^ 'Clock' to which to synchronize the write port of the RAM
   -> 'Clock' rdom                     -- ^ 'Clock' to which the read address signal, @r@, is synchronized to
   -> 'Enable' wdom                    -- ^ Global enable
   -> 'SNat' n                         -- ^ Size @n@ of the RAM
@@ -1628,8 +1637,8 @@ We create a dual flip-flop synchronizer to be used to synchronize the
 Gray-encoded pointers between the two clock domains:
 
 @
-ptrSync clk1 clk2 rst2 =
-  'Clash.Explicit.Signal.register' clk2 rst2 0 . 'Clash.Explicit.Signal.register' clk2 rst2 0 . 'Clash.Explicit.Signal.unsafeSynchronizer' clk1 clk2
+ptrSync clk1 clk2 rst2 en2 =
+  'Clash.Explicit.Signal.register' clk2 rst2 en2 0 . 'Clash.Explicit.Signal.register' clk2 rst2 en2 0 . 'Clash.Explicit.Signal.unsafeSynchronizer' clk1 clk2
 @
 
 It uses the 'unsafeSynchronizer' primitive, which is needed to go from one clock
@@ -1639,12 +1648,12 @@ The 'unsafeSynchronizer' primitive is turned into a (bundle of) wire(s) by the
 Clash compiler, so developers must ensure that it is only used as part of a
 proper synchronizer.
 
-Finally we combine all the component in:
+Finally we combine all the components in:
 
 @
 asyncFIFOSynchronizer
-  :: ( 'KnownDomain' wdom wconf
-     , 'KnownDomain' rdom rconf
+  :: ( 'KnownDomain' wdom
+     , 'KnownDomain' rdom
      , 2 <= addrSize )
   => SNat addrSize
   -- ^ Size of the internally used addresses, the  FIFO contains @2^addrSize@
@@ -1666,8 +1675,8 @@ asyncFIFOSynchronizer
 asyncFIFOSynchronizer addrSize\@SNat wclk rclk wrst rrst wen ren rinc wdataM =
   (rdata, rempty, wfull)
  where
-  s_rptr = 'dualFlipFlopSynchronizer' rclk wclk wrst wen 0 rptr
-  s_wptr = 'dualFlipFlopSynchronizer' wclk rclk rrst ren 0 wptr
+  s_rptr = ptrSync rclk wclk wrst wen rptr
+  s_wptr = ptrSync wclk rclk rrst ren wptr
 
   rdata =
     fifoMem
@@ -1736,7 +1745,6 @@ ptrCompareT addrSize\@SNat flagGen (bin, ptr, flag) (s_ptr, inc) =
   bin' = bin + 'boolToBV' (inc && not flag)
   ptr' = (bin' \`shiftR\` 1) \`xor\` bin'
   addr = 'truncateB' bin
-
   flag' = flagGen ptr' s_ptr
 
 -- FIFO empty: when next pntr == synchronized wptr or on reset
@@ -1760,13 +1768,13 @@ isFull addrSize\@SNat ptr s_ptr = case leTrans \@1 \@2 \@addrSize of
 wptrFullInit = (0, 0, False)
 
 -- Dual flip-flop synchronizer
-ptrSync clk1 clk2 rst2 =
-  'Clash.Explicit.Signal.register' clk2 rst2 0 . 'Clash.Explicit.Signal.register' clk2 rst2 0 . 'Clash.Explicit.Signal.unsafeSynchronizer' clk1 clk2
+ptrSync clk1 clk2 rst2 en2 =
+  'Clash.Explicit.Signal.register' clk2 rst2 en2 0 . 'Clash.Explicit.Signal.register' clk2 rst2 en2 0 . 'Clash.Explicit.Signal.unsafeSynchronizer' clk1 clk2
 
 -- Async FIFO synchronizer
 asyncFIFOSynchronizer
-  :: ( 'KnownDomain' wdom wconf
-     , 'KnownDomain' rdom rconf
+  :: ( 'KnownDomain' wdom
+     , 'KnownDomain' rdom
      , 2 <= addrSize )
   => SNat addrSize
   -- ^ Size of the internally used addresses, the  FIFO contains @2^addrSize@
@@ -1788,8 +1796,8 @@ asyncFIFOSynchronizer
 asyncFIFOSynchronizer addrSize\@SNat wclk rclk wrst rrst wen ren rinc wdataM =
   (rdata, rempty, wfull)
  where
-  s_rptr = 'dualFlipFlopSynchronizer' rclk wclk wrst wen 0 rptr
-  s_wptr = 'dualFlipFlopSynchronizer' wclk rclk rrst ren 0 wptr
+  s_rptr = ptrSync rclk wclk wrst wen rptr
+  s_wptr = ptrSync wclk rclk rrst ren wptr
 
   rdata =
     fifoMem
@@ -1843,6 +1851,8 @@ adcToFFT
   -> 'Clock' \"FFT\"
   -> 'Reset' \"ADC\"
   -> 'Reset' \"FFT\"
+  -> 'Enable' \"ADC\"
+  -> 'Enable' \"FFT\"
   -> 'Signal' \"FFT\" Bool
   -> 'Signal' \"ADC\" (Maybe (SFixed 8 8))
   -> ( 'Signal' \"FFT\" (SFixed 8 8)
@@ -1866,10 +1876,10 @@ A list of often encountered errors and their solutions:
 * __Type error: Couldn't match expected type @'Signal' dom (a,b)@ with actual type__
   __@('Signal' dom a, 'Signal' dom b)@__:
 
-    Signals of product types and product types (to which tuples belong) of
-    signals are __isomorphic__ due to synchronisity principle, but are not
-    (structurally) equal. Use the 'bundle' function to convert from a product type
-    to the signal type. So if your code which gives the error looks like:
+    Signals of product types and product types of signals are __isomorphic__
+    due to synchronisity principle, but are not (structurally) equal. Tuples
+    are a product type. Use the 'bundle' function to convert from a product
+    type to the signal type. So if your code which gives the error looks like:
 
     @
     ... = f a b (c,d)
@@ -1889,10 +1899,11 @@ A list of often encountered errors and their solutions:
 * __Type error: Couldn't match expected type @('Signal' dom a, 'Signal' dom b)@ with__
   __ actual type @'Signal' dom (a,b)@__:
 
-    Product types (to which tuples belong) of signals and signals of product
-    types are __isomorphic__ due to synchronicity principle, but are not
-    (structurally) equal. Use the 'unbundle' function to convert from a signal
-    type to the product type. So if your code which gives the error looks like:
+    Product types of signals and signals of product types are __isomorphic__
+    due to synchronicity principle, but are not (structurally) equal. Tuples
+    are a product type. Use the 'unbundle' function to convert from a signal
+    type to the product type. So if your code which gives the error looks
+    like:
 
     @
     (c,d) = f a b
@@ -1921,8 +1932,8 @@ A list of often encountered errors and their solutions:
     The solution for all the above listed reasons is quite simple: remove them.
     That is, make sure that the @topEntity@ is completely monomorphic and
     first-order. Also remove any variables and constants/literals that have a
-    non-representable type, see <#unsupported Unsupported Haskell features> to
-    find out which types are not representable.
+    non-representable type; see <#limitations Limitations of Clash> to find
+    out which types are not representable.
 
 * __Clash.Normalize(94): Expr belonging to bndr: \<FUNCTION\> remains__
   __recursive after normalization__:
@@ -1944,7 +1955,7 @@ A list of often encountered errors and their solutions:
 
     @
     topEntity
-      :: 'SystemClockReset'
+      :: 'SystemClockResetEnable'
       => 'Signal' 'System' ('Signed' 8)
       -> 'Signal' 'System' ('Signed' 8)
       -> 'Signal' 'System' ('Signed' 8)
@@ -2052,6 +2063,7 @@ Here is a list of Haskell features for which the Clash compiler has only
         n'th Fibbonaci number on the n'th clock cycle:
 
         @
+        fibS :: SystemClockResetEnable => Signal System (Unsigned 64)
         fibS = r
           where r = 'register' 0 r + 'register' 0 ('register' 1 r)
         @
@@ -2072,11 +2084,11 @@ Here is a list of Haskell features for which the Clash compiler has only
         of bubble sort:
 
         @
-        sortV xs = 'map' fst sorted :< (snd ('last' sorted))
+        sortVL xs = 'map' fst sorted ':<' (snd ('last' sorted))
          where
-           lefts  = 'head' xs :> 'map' snd ('init' sorted)
+           lefts  = 'head' xs :> map snd ('init' sorted)
            rights = 'tail' xs
-           sorted = 'zipWith' compareSwapL lefts rights
+           sorted = 'zipWith' compareSwapL ('lazyV' lefts) rights
         @
 
         Where we can clearly see that 'lefts' and 'sorted' are defined in terms
@@ -2305,7 +2317,7 @@ and / or easy to use as the standard Haskell features.
 
 ==== FIR filter
 
-FIR filter in Clash 1.0:
+FIR filter in Clash 0.99:
 
 @
 module FIR where
@@ -2320,8 +2332,8 @@ dotp :: SaturatingNum a
 dotp as bs = fold boundedPlus (zipWith boundedMult as bs)
 
 fir
-  :: (Default a, KnownNat n, SaturatingNum a, HiddenClockResetEnable dom)
-  => Vec (n + 1) a -> Signal dom a -> Signal dom a
+  :: (Default a, KnownNat n, SaturatingNum a, HiddenClockReset domain gated synchronous)
+  => Vec (n + 1) a -> Signal domain a -> Signal domain a
 fir coeffs x_t = y_t
   where
     y_t = dotp coeffs \<$\> bundle xs
@@ -2333,7 +2345,7 @@ topEntity
   -> Signal System (Signed 16)
   -> Signal System (Signed 16)
 topEntity = exposeClockReset (fir (2:>3:>(-2):>8:>Nil))
-{-# NOINLINE topEntity #-}
+{\-\# NOINLINE topEntity \#-\}
 
 testBench :: Signal System Bool
 testBench = done
@@ -2345,7 +2357,7 @@ testBench = done
     rst            = systemResetGen
 @
 
-FIR filter in current version:
+FIR filter in Clash 1.0:
 
 @
 
@@ -2366,7 +2378,7 @@ fir
      , KnownNat n
      , SaturatingNum a
      , NFDataX a )
-  => Vec (n + 1) a -> Signal tag a -> Signal tag a
+  => Vec (n + 1) a -> Signal dom a -> Signal dom a
 fir coeffs x_t = y_t
   where
     y_t = dotp coeffs \<$\> bundle xs
@@ -2379,7 +2391,7 @@ topEntity
   -> Signal System (Signed 16)
   -> Signal System (Signed 16)
 topEntity = exposeClockResetEnable (fir (2:>3:>(-2):>8:>Nil))
-{-# NOINLINE topEntity #-}
+{\-\# NOINLINE topEntity \#-\}
 
 testBench :: Signal System Bool
 testBench = done
@@ -2396,7 +2408,7 @@ testBench = done
 Blinker circuit in Clash 0.99:
 
 @
-{-# LANGUAGE NoMonoLocalBinds #-}
+{\-\# LANGUAGE NoMonoLocalBinds \#-\}
 module Blinker where
 
 import Clash.Prelude
@@ -2455,7 +2467,7 @@ data LedMode
   -- ^ After some period, rotate active led to the left
   | Complement
   -- ^ After some period, turn on all disable LEDs, and vice versa
-  deriving (Generic, 'Undefined')
+  deriving (Generic, 'NFDataX')
 
 -- Define a synthesis domain with a clock with a period of 20000 /ps/.
 'createDomain' 'vSystem'{vName=\"Input\", vPeriod=20000}
