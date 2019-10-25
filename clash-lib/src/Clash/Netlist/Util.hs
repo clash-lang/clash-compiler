@@ -246,11 +246,8 @@ fixCustomRepr reprs (coreToType' -> Right tyName) sum_@(Sum name subtys) =
   case getDataRepr tyName reprs of
     Just dRepr@(DataRepr' name' size constrs) ->
       if length constrs == length subtys then
-        CustomSum
-          name
-          dRepr
-          (fromIntegral size)
-          [packSum reprs ty | ty <- subtys]
+        let cs = CustomSum name dRepr (fromIntegral size) (map (packSum reprs) subtys)
+        in if size <= 0 then Void (Just cs) else cs
       else
         error $ $(curLoc) ++ (Text.unpack $ Text.unwords
           [ "Type "
@@ -272,11 +269,8 @@ fixCustomRepr reprs (coreToType' -> Right tyName) sp@(SP name subtys) =
   case getDataRepr tyName reprs of
     Just dRepr@(DataRepr' name' size constrs) ->
       if length constrs == length subtys then
-        CustomSP
-          name
-          dRepr
-          (fromIntegral size)
-          [packSP reprs ty | ty <- subtys]
+        let csp = CustomSP name dRepr (fromIntegral size) (map (packSP reprs) subtys)
+        in if size <= 0 then Void (Just csp) else csp
       else
         error $ $(curLoc) ++ (Text.unpack $ Text.unwords
           [ "Type "
