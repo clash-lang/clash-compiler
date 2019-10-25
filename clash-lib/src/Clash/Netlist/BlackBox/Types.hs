@@ -121,7 +121,7 @@ data Element
   -- ^ Like Arg, but input hole must be a literal
   | Name !Int
   -- ^ Name hole
-  | Var [Element] !Int
+  | ToVar [Element] !Int
   -- ^ Like Arg but only insert variable reference (creating an assignment
   -- elsewhere if necessary).
   | Sym !Text !Int
