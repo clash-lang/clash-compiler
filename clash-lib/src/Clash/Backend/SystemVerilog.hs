@@ -157,10 +157,10 @@ instance Backend SystemVerilogState where
   blockDecl _ ds  = do
     decs <- decls ds
     if isEmpty decs
-      then indent 2 (insts ds)
+      then insts ds
       else
         pure decs <> line <>
-        indent 2 (insts ds)
+        insts ds
   unextend = return rmSlash
   addIncludes inc = includes %= (inc++)
   addLibraries libs = libraries %= (libs ++)
