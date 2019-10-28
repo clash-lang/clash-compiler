@@ -15,7 +15,6 @@ library
   ghc-options:         -O2 -Wall
   Exposed-Modules:     BenchmarkCommon
   build-depends:       base                 >= 4.10     && < 5,
-                       concurrent-supply    >= 0.1.7    && < 0.2,
                        containers           >= 0.5.4.0  && < 0.7,
                        ghc                  >= 8.4.0    && < 8.9,
                        mtl                  >= 2.1.2    && < 2.3,
@@ -30,7 +29,6 @@ executable clash-benchmark-normalization
   default-language:    Haskell2010
   ghc-options:         -O2 -Wall
   build-depends:       base,
-                       concurrent-supply,
                        containers,
                        criterion            >= 1.5.0.0  && < 1.6,
                        deepseq              >= 1.4      && < 1.5,
