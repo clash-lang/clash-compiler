@@ -84,6 +84,7 @@ flagsClash r = [
   , defFlag "fclash-no-escaped-identifiers"      $ NoArg (liftEwM (setNoEscapedIds r))
   , defFlag "fclash-compile-ultra"               $ NoArg (liftEwM (setUltra r))
   , defFlag "fclash-force-undefined"             $ OptIntSuffix (setUndefined r)
+  , defFlag "fclash-no-catch-errors"             $ NoArg (liftEwM (setNoCatchErrors r))
   ]
 
 -- | Print deprecated flag warning
@@ -145,6 +146,9 @@ setNoCache r = modifyIORef r (\c -> c {opt_cachehdl = False})
 
 setNoIDirCheck :: IORef ClashOpts -> IO ()
 setNoIDirCheck r = modifyIORef r (\c -> c {opt_checkIDir = False})
+
+setNoCatchErrors :: IORef ClashOpts -> IO ()
+setNoCatchErrors r = modifyIORef r (\c -> c {opt_catchErrors = False})
 
 setNoClean :: IORef ClashOpts -> IO ()
 setNoClean r = modifyIORef r (\c -> c {opt_cleanhdl = False})

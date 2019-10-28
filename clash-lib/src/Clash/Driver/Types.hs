@@ -89,6 +89,12 @@ data ClashOpts = ClashOpts { opt_inlineLimit :: Int
                            -- * /Just (Just x)/: replace undefined's by /x/ in
                            -- the HDL
                            , opt_checkIDir   :: Bool
+                           , opt_catchErrors :: Bool
+                           -- ^ Whether to catch errors in Clash. Settings this
+                           -- to false might cause 'please report as GHC bug' to
+                           -- appear. On the flipside, it might generate more
+                           -- informative error messages when debugging the
+                           -- compiler - especially on profiling builds.
                            }
 
 
@@ -117,6 +123,7 @@ defClashOpts
   , opt_ultra               = False
   , opt_forceUndefined      = Nothing
   , opt_checkIDir           = True
+  , opt_catchErrors         = True
   }
 
 -- | Information about the generated HDL between (sub)runs of the compiler
