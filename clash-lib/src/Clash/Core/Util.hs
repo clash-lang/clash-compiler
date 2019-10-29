@@ -923,12 +923,13 @@ stripTicks :: Term -> Term
 stripTicks (Tick _ e) = stripTicks e
 stripTicks e = e
 
--- | Try to reduce an arbitrary type to a Symbol, and subsequently extract its
--- String representation
-tySym
+-- | Try to reduce an arbitrary type to a literal type (Symbol or Nat),
+-- and subsequently extract its String representation
+tyLitShow
   :: TyConMap
   -> Type
   -> Except String String
-tySym m (coreView1 m -> Just ty) = tySym m ty
-tySym _ (LitTy (SymTy s))        = return s
-tySym _ ty = throwE $ $(curLoc) ++ "Cannot reduce to a string:\n" ++ showPpr ty
+tyLitShow m (coreView1 m -> Just ty) = tyLitShow m ty
+tyLitShow _ (LitTy (SymTy s))        = return s
+tyLitShow _ (LitTy (NumTy s))        = return (show s)
+tyLitShow _ ty = throwE $ $(curLoc) ++ "Cannot reduce to a string:\n" ++ showPpr ty

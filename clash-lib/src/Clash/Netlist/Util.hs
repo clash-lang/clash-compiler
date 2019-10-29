@@ -75,7 +75,7 @@ import           Clash.Core.TyCon
 import           Clash.Core.Type         (Type (..), TypeView (..),
                                           coreView1, splitTyConAppM, tyView, TyVar)
 import           Clash.Core.Util
-  (collectBndrs, stripTicks, substArgTys, termType, tySym)
+  (collectBndrs, stripTicks, substArgTys, termType, tyLitShow)
 import           Clash.Core.Var
   (Id, Var (..), mkLocalId, modifyVarName, Attr')
 import           Clash.Core.VarEnv
@@ -1862,7 +1862,7 @@ withTicks ticks0 k = do
 
   go decls (NameMod m nm0:ticks) = do
     tcm <- Lens.use tcCache
-    case runExcept (tySym tcm nm0) of
+    case runExcept (tyLitShow tcm nm0) of
       Right nm1 -> local (modName m nm1) (go decls ticks)
       _ -> go decls ticks
 
