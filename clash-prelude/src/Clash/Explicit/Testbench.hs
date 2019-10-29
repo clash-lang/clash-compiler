@@ -23,6 +23,7 @@ Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
 module Clash.Explicit.Testbench
   ( -- * Testbench functions for circuits
     assert
+  , assertBitVector
   , ignoreFor
   , stimuliGenerator
 
