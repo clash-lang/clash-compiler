@@ -5,6 +5,9 @@
   * `NFDataX.ensureSpine`, see [#748](https://github.com/clash-lang/clash-compiler/pull/803)
   * Added tools to generate top entity annotations, see [#795](https://github.com/clash-lang/clash-compiler/pull/795). Thanks @blaxill!
   * Added `Bundle ((f :*: g) a)` instance
+  * Added `NFDataX CUShort` instance`
+  * Clash's internal type family solver now recognizes `AppendSymbol` and `CmpSymbol`
+  * Added `Clash.Magic.suffixNameFromNat`: can be used in cases where `suffixName` is too slow
   
 * New internal features:
   * [#821](https://github.com/clash-lang/clash-compiler/pull/821): Add `DebugTry`: print name of all tried transformations, even if they didn't succeed
@@ -19,6 +22,8 @@
   * [#700](https://github.com/clash-lang/clash-compiler/issues/700): Check work content of expression in cast before warning users. Should eliminate a lot of (superfluous) warnings about "specializing on non work-free cast"s.
   * [#837](https://github.com/clash-lang/clash-compiler/issues/837): Blackboxes will now report clearer error messages if they're given unexpected arguments.
   * [#869](https://github.com/clash-lang/clash-compiler/issues/869): PLL is no longer duplicated in Blinker.hs example
+  * [#749](https://github.com/clash-lang/clash-compiler/issues/749): Clash's dependencies now all work with GHC 8.8, allowing `clash-{prelude,lib,ghc}` to be compiled from hacakge soon.
+  * [#871](https://github.com/clash-lang/clash-compiler/issues/871): RTree Bundle instance is now properly lazy
 
 * Small fixes without issue reports:
   * Fix bug in `rnfX` defined for `Down` ([baef30e](https://github.com/clash-lang/clash-compiler/commit/baef30eae03dc02ba847ffbb8fae7f365c5287c2))
@@ -26,6 +31,7 @@
   * Report blackbox name when encountering an error in 'setSym' ([#858](https://github.com/clash-lang/clash-compiler/pull/858))
   * Fix blackbox issues causing Clash to generate invalid HDL ([#865](https://github.com/clash-lang/clash-compiler/pull/865))
   * Treat types with a zero-width custom bit representation like other zero-width constructs ([#874](https://github.com/clash-lang/clash-compiler/pull/874))
+  * TH code for auto deriving bit representations now produces nicer error messages ([7190793](https://github.com/clash-lang/clash-compiler/commit/7190793928545f85157f9b8d4b8ec2edb2cd8a26))
   
 * Deprecations & removals:
   * Removed support for GHC 8.2 ([#842](https://github.com/clash-lang/clash-compiler/pull/842))
