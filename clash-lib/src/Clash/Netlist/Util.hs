@@ -37,7 +37,7 @@ import           Data.Either             (partitionEithers)
 import           Data.HashMap.Strict     (HashMap)
 import qualified Data.HashMap.Strict     as HashMap
 import           Data.String             (fromString)
-import           Data.List               (intersperse, unzip4, sort, intercalate)
+import           Data.List               (intersperse, unzip4, intercalate)
 import qualified Data.List               as List
 import           Data.Maybe              (catMaybes,fromMaybe,isNothing)
 import           Data.Monoid             (First (..))
@@ -49,6 +49,7 @@ import           Data.Text               (Text)
 import qualified Data.Text               as Text
 import           Data.Text.Lazy          (toStrict)
 import           Data.Text.Prettyprint.Doc (Doc)
+import           TextShow                (showt)
 
 import           Outputable              (ppr, showSDocUnsafe)
 
@@ -218,7 +219,8 @@ coreTypeToHWTypeM ty = do
   return (hush hty)
 
 packSP
-  :: CustomReprs
+  :: HasCallStack
+  => CustomReprs
   -> (Text, c)
   -> (ConstrRepr', Text, c)
 packSP reprs (name, tys) =
@@ -228,7 +230,8 @@ packSP reprs (name, tys) =
       [ "Could not find custom representation for", Text.unpack name ]
 
 packSum
-  :: CustomReprs
+  :: HasCallStack
+  => CustomReprs
   -> Text
   -> (ConstrRepr', Text)
 packSum reprs name =
@@ -237,57 +240,57 @@ packSum reprs name =
     Nothing   -> error $ $(curLoc) ++ unwords
       [ "Could not find custom representation for", Text.unpack name ]
 
-fixCustomRepr
+-- | Helper function of 'maybeConvertToCustomRepr'
+convertToCustomRepr
+  :: HasCallStack
+  => CustomReprs
+  -> DataRepr'
+  -> HWType
+  -> HWType
+convertToCustomRepr reprs dRepr@(DataRepr' name' size constrs) (Sum name subtys) =
+  if length constrs == length subtys then
+    let cs = CustomSum name dRepr (fromIntegral size) (map (packSum reprs) subtys)
+    in if size <= 0 then Void (Just cs) else cs
+  else
+    error (Text.unpack (Text.unwords
+      [ "Type ", showt name', "has", showt (length subtys), "constructors: \n\n"
+      , Text.unlines [Text.append " * " id_ | id_ <- subtys]
+      , "\n\nBut the custom bit representation only specified"
+      , showt (length constrs), "constructors:\n\n"
+      , Text.unlines [" * " <> id_ | (ConstrRepr' id_ _ _ _ _) <- constrs]
+      ]))
+
+convertToCustomRepr reprs dRepr@(DataRepr' name' size constrs) (SP name subtys) =
+  if length constrs == length subtys then
+    let csp = CustomSP name dRepr (fromIntegral size) (map (packSP reprs) subtys)
+    in if size <= 0 then Void (Just csp) else csp
+  else
+    error (Text.unpack (Text.unwords
+      [ "Type ", showt $ name', "has", showt (length subtys), "constructors: \n\n"
+      , Text.unlines [" * " <> id_ | (id_, _) <- subtys]
+      , "\n\nBut the custom bit representation only specified"
+      , showt (length constrs), "constructors:\n\n"
+      , Text.unlines $ [Text.append " * " id_ | (ConstrRepr' id_ _ _ _ _) <- constrs]
+      ]))
+
+convertToCustomRepr _ _ typ = typ
+
+-- | Given a map containing custom bit representation, a type, and the same
+-- type represented as HWType, convert the HWType to a CustomSP/CustomSum if
+-- it has a custom bit representation.
+maybeConvertToCustomRepr
   :: CustomReprs
+  -- ^ Map containing all custom representations index on its type
   -> Type
+  -- ^ Custom reprs are index on type, so we need the clash core type to look
+  -- it up.
   -> HWType
+  -- ^ Type of previous argument represented as a HWType
   -> HWType
-fixCustomRepr reprs (coreToType' -> Right tyName) sum_@(Sum name subtys) =
-  case getDataRepr tyName reprs of
-    Just dRepr@(DataRepr' name' size constrs) ->
-      if length constrs == length subtys then
-        let cs = CustomSum name dRepr (fromIntegral size) (map (packSum reprs) subtys)
-        in if size <= 0 then Void (Just cs) else cs
-      else
-        error $ $(curLoc) ++ (Text.unpack $ Text.unwords
-          [ "Type "
-          , Text.pack $ show name'
-          , "has"
-          , Text.pack $ show $ length subtys
-          , "constructors: \n\n"
-          , Text.intercalate "\n" $ sort [Text.append " * " id_ | id_ <- subtys]
-          , "\n\nBut the custom bit representation only specified"
-          , Text.pack $ show $ length constrs
-          , "constructors:\n\n"
-          , Text.intercalate "\n" $ sort [Text.append " * " id_ | (ConstrRepr' id_ _ _ _ _) <- constrs]
-          ])
-    Nothing ->
-      -- No custom representation found
-      sum_
-
-fixCustomRepr reprs (coreToType' -> Right tyName) sp@(SP name subtys) =
-  case getDataRepr tyName reprs of
-    Just dRepr@(DataRepr' name' size constrs) ->
-      if length constrs == length subtys then
-        let csp = CustomSP name dRepr (fromIntegral size) (map (packSP reprs) subtys)
-        in if size <= 0 then Void (Just csp) else csp
-      else
-        error $ $(curLoc) ++ (Text.unpack $ Text.unwords
-          [ "Type "
-          , Text.pack $ show $ name'
-          , "has"
-          , Text.pack $ show $ length subtys
-          , "constructors: \n\n"
-          , Text.intercalate "\n" $ sort [Text.append " * " id_ | (id_, _) <- subtys]
-          , "\n\nBut the custom bit representation only specified"
-          , Text.pack $ show $ length constrs, "constructors:\n\n"
-          , Text.intercalate "\n" $ sort [Text.append " * " id_ | (ConstrRepr' id_ _ _ _ _) <- constrs]
-          ])
-    Nothing ->
-      -- No custom representation found
-      sp
-
-fixCustomRepr _ _ typ = typ
+maybeConvertToCustomRepr reprs (coreToType' -> Right tyName) hwTy
+  | Just dRepr <- getDataRepr tyName reprs =
+    convertToCustomRepr reprs dRepr hwTy
+maybeConvertToCustomRepr _reprs _ty hwTy = hwTy
 
 -- | Same as @coreTypeToHWType@, but discards void filter information
 coreTypeToHWType'
@@ -330,14 +333,14 @@ coreTypeToHWType builtInTranslation reprs m ty = do
               (Either String FilteredHWType)
   go (Just hwtyE) _ = pure $
     (\(FilteredHWType hwty filtered) ->
-      (FilteredHWType (fixCustomRepr reprs ty hwty) filtered)) <$> hwtyE
+      (FilteredHWType (maybeConvertToCustomRepr reprs ty hwty) filtered)) <$> hwtyE
   -- Strip transparant types:
   go _ (coreView1 m -> Just ty') =
     coreTypeToHWType builtInTranslation reprs m ty'
   -- Try to create hwtype based on AST:
   go _ (tyView -> TyConApp tc args) = runExceptT $ do
     FilteredHWType hwty filtered <- mkADT builtInTranslation reprs m (showPpr ty) tc args
-    return (FilteredHWType (fixCustomRepr reprs ty hwty) filtered)
+    return (FilteredHWType (maybeConvertToCustomRepr reprs ty hwty) filtered)
   -- All methods failed:
   go _ _ = return $ Left $ "Can't translate non-tycon type: " ++ showPpr ty
 

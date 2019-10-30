@@ -4,12 +4,20 @@ License    :  BSD2 (see the file LICENSE)
 Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
 -}
 
+{-# LANGUAGE CPP                #-}
 {-# LANGUAGE DeriveAnyClass     #-}
 {-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE DeriveGeneric      #-}
+{-# LANGUAGE DerivingStrategies #-}
+{-# LANGUAGE DerivingVia        #-}
 {-# LANGUAGE OverloadedStrings  #-}
 {-# LANGUAGE RankNTypes         #-}
 {-# LANGUAGE TemplateHaskell    #-}
+
+-- since GHC 8.6 we can haddock individual contructor fields \o/
+#if __GLASGOW_HASKELL__ >= 806
+#define FIELD ^
+#endif
 
 module Clash.Annotations.BitRepresentation.Internal
   ( buildCustomReprs
@@ -33,6 +41,8 @@ import qualified Data.Text                                as Text
 import           Data.Typeable                            (Typeable)
 import qualified Language.Haskell.TH.Syntax               as TH
 import           GHC.Generics                             (Generic)
+import qualified TextShow                                 as TS
+import qualified TextShow.Generic                         as TS
 
 
 -- | Simple version of template haskell type. Used internally to match on.
@@ -44,31 +54,24 @@ data Type'
   | LitTy' Integer
   -- ^ Numeral literal (used in BitVector 10, for example)
     deriving (Generic, NFData, Eq, Typeable, Hashable, Ord, Show)
+    deriving TS.TextShow via TS.FromGeneric (Type')
 
 -- | Internal version of DataRepr
 data DataRepr' =
   DataRepr'
-    -- Qualified name of type (recursive):
-    Type'
-    -- Size of data type:
-    Size
-    -- Constructors:
-    [ConstrRepr']
+    Type'         -- FIELD Simple representation of data type
+    Size          -- FIELD Size of data type
+    [ConstrRepr'] -- FIELD Constructors
       deriving (Show, Generic, NFData, Eq, Typeable, Hashable, Ord)
 
 -- | Internal version of ConstrRepr
 data ConstrRepr' =
   ConstrRepr'
-    -- Qualified name of constructor:
-    Text.Text
-    -- Syntactical position in the custom representations definition:
-    Int
-    -- Mask needed to determine constructor:
-    BitMask
-    -- Value after applying mask:
-    Value
-    -- Indicates where fields are stored:
-    [FieldAnn]
+    Text.Text  -- FIELD Qualified name of constructor:
+    Int        -- FIELD Syntactical position in the custom representations definition:
+    BitMask    -- FIELD Mask needed to determine constructor:
+    Value      -- FIELD Value after applying mask:
+    [FieldAnn] -- FIELD Indicates where fields are stored:
       deriving (Show, Generic, NFData, Eq, Typeable, Ord, Hashable)
 
 constrReprToConstrRepr' :: Int -> ConstrRepr -> ConstrRepr'
@@ -108,11 +111,11 @@ getConstrRepr :: Text.Text -> CustomReprs -> Maybe ConstrRepr'
 getConstrRepr name (_, reprs) = Map.lookup name reprs
 
 -- | Add CustomRepr to existing index
-buildCustomRepr :: CustomReprs -> DataRepr' -> CustomReprs
-buildCustomRepr (dMap, cMap) d@(DataRepr' name _size constrReprs) =
+addCustomRepr :: CustomReprs -> DataRepr' -> CustomReprs
+addCustomRepr (dMap, cMap) d@(DataRepr' name _size constrReprs) =
   let insertConstr c@(ConstrRepr' name' _ _ _ _) cMap' = Map.insert name' c cMap' in
   (Map.insert name d dMap, foldr insertConstr cMap constrReprs)
 
 -- | Create indices based on names of constructors and data types
 buildCustomReprs :: [DataRepr'] -> CustomReprs
-buildCustomReprs = foldl buildCustomRepr (Map.empty, Map.empty)
+buildCustomReprs = foldl addCustomRepr (Map.empty, Map.empty)
