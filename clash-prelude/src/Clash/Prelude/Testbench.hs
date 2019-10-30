@@ -18,6 +18,7 @@ Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
 module Clash.Prelude.Testbench
   ( -- * Testbench functions for circuits
     assert
+  , assertBitVector
   , ignoreFor
   , outputVerifier'
   , outputVerifierBitVector'
@@ -68,6 +69,22 @@ assert
 assert msg actual expected ret =
   hideReset (hideClock E.assert) msg actual expected ret
 {-# INLINE assert #-}
+
+-- | The same as 'assert', but can handle don't care bits in it's expected value.
+assertBitVector
+  :: (KnownNat n, HiddenClock dom , HiddenReset dom )
+  => String
+  -- ^ Additional message
+  -> Signal dom (BitVector n)
+  -- ^ Checked value
+  -> Signal dom (BitVector n)
+  -- ^ Expected value
+  -> Signal dom b
+  -- ^ Return value
+  -> Signal dom b
+assertBitVector msg actual expected ret =
+  hideReset (hideClock E.assertBitVector) msg actual expected ret
+{-# INLINE assertBitVector #-}
 
 -- |
 --
