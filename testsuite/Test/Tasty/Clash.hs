@@ -591,8 +591,8 @@ outputTest' env target extraClashArgs extraGhcArgs modName funcName path =
              , "-XDataKinds"
              , "-XDeriveAnyClass"
              , "-XDeriveGeneric"
-             , "-XDerivingStrategies"
              , "-XDeriveLift"
+             , "-XDerivingStrategies"
              , "-XExplicitForAll"
              , "-XExplicitNamespaces"
              , "-XFlexibleContexts"
@@ -600,23 +600,23 @@ outputTest' env target extraClashArgs extraGhcArgs modName funcName path =
              , "-XKindSignatures"
              , "-XMagicHash"
              , "-XMonoLocalBinds"
-             , "-XNoImplicitPrelude"
-             , "-XNoMonomorphismRestriction"
-#if __GLASGOW_HASKELL__ < 806
-             , "-XTypeInType"
-#endif
-#if __GLASGOW_HASKELL__ >= 806
-             , "-XNoStarIsType"
-#endif
-             , "-XNoStrict"
-             , "-XNoStrictData"
              , "-XQuasiQuotes"
              , "-XScopedTypeVariables"
              , "-XTemplateHaskell"
              , "-XTemplateHaskellQuotes"
              , "-XTypeApplications"
              , "-XTypeFamilies"
+#if __GLASGOW_HASKELL__ < 806
+             , "-XTypeInType"
+#endif
              , "-XTypeOperators"
+             , "-XNoImplicitPrelude"
+             , "-XNoMonomorphismRestriction"
+#if __GLASGOW_HASKELL__ >= 806
+             , "-XNoStarIsType"
+#endif
+             , "-XNoStrict"
+             , "-XNoStrictData"
              , "-DOUTPUTTEST"
              , "--ghc-arg=-main-is"
              , "--ghc-arg=" ++ modName ++ "." ++ funcName ++ show target

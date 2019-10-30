@@ -643,14 +643,14 @@ wantedLanguageExtensions df =
              , LangExt.TemplateHaskellQuotes
              , LangExt.TypeApplications
              , LangExt.TypeFamilies
-             , LangExt.TypeOperators
 #if __GLASGOW_HASKELL__ < 806
              , LangExt.TypeInType
 #endif
+             , LangExt.TypeOperators
              ]
     unwanted = [ LangExt.ImplicitPrelude
                , LangExt.MonomorphismRestriction
-#if MIN_VERSION_ghc(8,6,0)
+#if __GLASGOW_HASKELL__ >= 806
                , LangExt.StarIsType
 #endif
                , LangExt.Strict
