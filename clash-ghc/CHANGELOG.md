@@ -8,6 +8,7 @@
   * Added `NFDataX CUShort` instance`
   * Clash's internal type family solver now recognizes `AppendSymbol` and `CmpSymbol`
   * Added `Clash.Magic.suffixNameFromNat`: can be used in cases where `suffixName` is too slow
+  * Added `Clash.Class.AutoReg`. Improves the chances of synthesis tools inferring clock-gated registers, when used. See [#873](https://github.com/clash-lang/clash-compiler/pull/873).
   
 * New internal features:
   * [#821](https://github.com/clash-lang/clash-compiler/pull/821): Add `DebugTry`: print name of all tried transformations, even if they didn't succeed
