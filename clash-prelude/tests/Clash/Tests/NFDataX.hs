@@ -14,7 +14,7 @@ import           GHC.Generics         (Generic)
 import           Clash.Class.BitPack  (pack)
 import           Clash.Sized.Vector   (Vec(..))
 import           Clash.XException
-  (NFDataX(rnfX, hasUndefined, deepErrorX), errorX)
+  (NFDataX(rnfX, hasUndefined, deepErrorX), errorX, ensureSpine)
 import           Data.Ord             (Down (Down))
 
 data Void                                     deriving (Generic, NFDataX)
@@ -28,6 +28,9 @@ data Rec0       = Rec0 {  }                   deriving (Generic, NFDataX)
 data Rec1       = Rec1 { a :: Int }           deriving (Generic, NFDataX)
 data Rec2       = Rec2 { b :: Int, c :: Int } deriving (Generic, NFDataX)
 data ProductRec = ProductRec Rec1 (Unit, Sum) deriving (Generic, NFDataX)
+
+sundef :: NFDataX a => a
+sundef = ensureSpine undef
 
 dundef :: NFDataX a => a
 dundef = deepErrorX "!"
@@ -63,6 +66,36 @@ tests =
         , testCase "Rec2_2"   $ rnfX (Rec2 3 undef)                   @?= ()
         , testCase "Rec2_3"   $ rnfX (Rec2 undef 5)                   @?= ()
         , testCase "Void"     $ rnfX (undef :: Void)                  @?= ()
+        ]
+    , testGroup
+        "Tuples"
+        [ -- Test Template Haskell generated hasUndefined instance for tuples
+          testCase "HU1"  $ hasUndefined (undef :: (Int, Int))                  @?= True
+        , testCase "HU3"  $ hasUndefined ((undef, undef) :: (Int, Int))         @?= True
+        , testCase "HU2"  $ hasUndefined ((undef, 1) :: (Int, Int))             @?= True
+        , testCase "HU4"  $ hasUndefined ((1, undef) :: (Int, Int))             @?= True
+        , testCase "HU4"  $ hasUndefined ((1, 2) :: (Int, Int))                 @?= False
+        , testCase "HU5"  $ hasUndefined ((undef, 1) :: (Rec2, Int))            @?= True
+        , testCase "HU6"  $ hasUndefined ((Rec2 undef undef, 1) :: (Rec2, Int)) @?= True
+        , testCase "HU7"  $ hasUndefined ((Rec2 1 undef, 1) :: (Rec2, Int))     @?= True
+        , testCase "HU8"  $ hasUndefined ((Rec2 1 1, 1) :: (Rec2, Int))         @?= False
+
+          -- Test Template Haskell generated rnfX instance for tuples
+        , testCase "RnfX1"  $ rnfX (undef :: (Int, Int))                  @?= ()
+        , testCase "RnfX3"  $ rnfX ((undef, undef) :: (Int, Int))         @?= ()
+        , testCase "RnfX2"  $ rnfX ((undef, 1) :: (Int, Int))             @?= ()
+        , testCase "RnfX4"  $ rnfX ((1, undef) :: (Int, Int))             @?= ()
+        , testCase "RnfX4"  $ rnfX ((1, 2) :: (Int, Int))                 @?= ()
+        , testCase "RnfX5"  $ rnfX ((undef, 1) :: (Rec2, Int))            @?= ()
+        , testCase "RnfX6"  $ rnfX ((Rec2 undef undef, 1) :: (Rec2, Int)) @?= ()
+        , testCase "RnfX7"  $ rnfX ((Rec2 1 undef, 1) :: (Rec2, Int))     @?= ()
+        , testCase "RnfX8"  $ rnfX ((Rec2 1 1, 1) :: (Rec2, Int))         @?= ()
+
+          -- Test Template Haskell generated deepErrorX/ensureSpine instance for tuples
+        , testCase "DU" $ case dundef @(Unit, Unit) of (Unit, Unit) -> () @?= ()
+        , testCase "ES1" $ case ensureSpine undef of () -> () @?= ()
+        , testCase "ES1" $ case ensureSpine undef of ((), ()) -> () @?= ()
+        , testCase "ES2" $ case ensureSpine @(Unit, Unit) undef of (Unit, Unit) -> () @?= ()
         ]
     , testGroup
         "ManualRnf"
@@ -132,6 +165,15 @@ tests =
         , testCase "Rec1_1"     $ case dundef @Rec1 of Rec1 {} -> ()        @?= ()
         , testCase "Rec2_1"     $ case dundef @Rec2 of Rec2 {} -> ()        @?= ()
         , testCase "ProductRec" $ case dundef @ProductRec of ProductRec (Rec1 _) (Unit, _) -> () @?= ()
+        ]
+    , testGroup
+        "GenericEnsureSpine"
+        [ testCase "Unit"       $ case sundef @Unit of Unit -> ()           @?= ()
+        , testCase "Wrapper1"   $ case sundef @Wrapper of Wrapper _ -> ()   @?= ()
+        , testCase "Product1"   $ case sundef @Product of Product _ _ -> () @?= ()
+        , testCase "Rec1_1"     $ case sundef @Rec1 of Rec1 {} -> ()        @?= ()
+        , testCase "Rec2_1"     $ case sundef @Rec2 of Rec2 {} -> ()        @?= ()
+        , testCase "ProductRec" $ case sundef @ProductRec of ProductRec (Rec1 _) (Unit, _) -> () @?= ()
         ]
     ]
 

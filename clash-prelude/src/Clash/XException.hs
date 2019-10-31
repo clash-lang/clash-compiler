@@ -26,6 +26,7 @@ CallStack (from HasCallStack):
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE ScopedTypeVariables   #-}
 {-# LANGUAGE StandaloneDeriving    #-}
+{-# LANGUAGE TemplateHaskell       #-}
 {-# LANGUAGE TypeOperators         #-}
 
 {-# LANGUAGE Trustworthy #-}
@@ -44,25 +45,29 @@ module Clash.XException
   )
 where
 
-import Control.Exception (Exception, catch, evaluate, throw)
-import Control.DeepSeq   (NFData, rnf)
-import Data.Complex      (Complex)
-import Data.Either       (isLeft)
-import Data.Foldable     (toList)
-import Data.Int          (Int8,Int16,Int32,Int64)
-import Data.Ord          (Down (Down))
-import Data.Ratio        (Ratio, numerator, denominator)
-import qualified Data.Semigroup as SG
-import Data.Sequence     (Seq(Empty, (:<|)))
-import Data.Word         (Word8,Word16,Word32,Word64)
-import Foreign.C.Types   (CUShort)
-import GHC.Exts          (Char (C#), Double (D#), Float (F#), Int (I#), Word (W#))
-import GHC.Generics
-import GHC.Natural       (Natural)
-import GHC.Show          (appPrec)
-import GHC.Stack         (HasCallStack, callStack, prettyCallStack, withFrozenCallStack)
-import Numeric.Half      (Half)
-import System.IO.Unsafe  (unsafeDupablePerformIO)
+import           Clash.CPP           (maxTupleSize)
+import           Clash.XException.TH (mkNFDataXTupleInstances)
+import           Control.Exception   (Exception, catch, evaluate, throw)
+import           Control.DeepSeq     (NFData, rnf)
+import           Data.Complex        (Complex)
+import           Data.Either         (isLeft)
+import           Data.Foldable       (toList)
+import           Data.Int            (Int8, Int16, Int32, Int64)
+import           Data.Ord            (Down (Down))
+import           Data.Ratio          (Ratio, numerator, denominator)
+import qualified Data.Semigroup      as SG
+import           Data.Sequence       (Seq(Empty, (:<|)))
+import           Data.Word           (Word8, Word16, Word32, Word64)
+import           Foreign.C.Types     (CUShort)
+import           GHC.Exts
+  (Char (C#), Double (D#), Float (F#), Int (I#), Word (W#))
+import           GHC.Generics
+import           GHC.Natural         (Natural)
+import           GHC.Show            (appPrec)
+import           GHC.Stack
+  (HasCallStack, callStack, prettyCallStack, withFrozenCallStack)
+import           Numeric.Half        (Half)
+import           System.IO.Unsafe    (unsafeDupablePerformIO)
 
 -- $setup
 -- >>> import Clash.Class.BitPack (pack)
@@ -671,44 +676,6 @@ class NFDataX a where
   rnfX = grnfX RnfArgs0 . from
 
 instance NFDataX ()
-instance (NFDataX a, NFDataX b) => NFDataX (a,b)
-instance (NFDataX a, NFDataX b, NFDataX c) => NFDataX (a,b,c)
-instance (NFDataX a, NFDataX b, NFDataX c, NFDataX d) => NFDataX (a,b,c,d)
-instance (NFDataX a, NFDataX b, NFDataX c, NFDataX d, NFDataX e) => NFDataX (a,b,c,d,e)
-instance (NFDataX a, NFDataX b, NFDataX c, NFDataX d, NFDataX e ,NFDataX f)
-  => NFDataX (a,b,c,d,e,f)
-instance (NFDataX a, NFDataX b, NFDataX c, NFDataX d, NFDataX e
-         ,NFDataX f, NFDataX g)
-  => NFDataX (a,b,c,d,e,f,g)
-instance (NFDataX a, NFDataX b, NFDataX c, NFDataX d, NFDataX e
-         ,NFDataX f, NFDataX g, NFDataX h)
-  => NFDataX (a,b,c,d,e,f,g,h)
-instance (NFDataX a, NFDataX b, NFDataX c, NFDataX d, NFDataX e
-         ,NFDataX f, NFDataX g, NFDataX h, NFDataX i)
-  => NFDataX (a,b,c,d,e,f,g,h,i)
-instance (NFDataX a, NFDataX b, NFDataX c, NFDataX d, NFDataX e
-         ,NFDataX f, NFDataX g, NFDataX h, NFDataX i, NFDataX j)
-  => NFDataX (a,b,c,d,e,f,g,h,i,j)
-instance (NFDataX a, NFDataX b, NFDataX c, NFDataX d, NFDataX e
-         ,NFDataX f, NFDataX g, NFDataX h, NFDataX i, NFDataX j
-         ,NFDataX k)
-  => NFDataX (a,b,c,d,e,f,g,h,i,j,k)
-instance (NFDataX a, NFDataX b, NFDataX c, NFDataX d, NFDataX e
-         ,NFDataX f, NFDataX g, NFDataX h, NFDataX i, NFDataX j
-         ,NFDataX k, NFDataX l)
-  => NFDataX (a,b,c,d,e,f,g,h,i,j,k,l)
-instance (NFDataX a, NFDataX b, NFDataX c, NFDataX d, NFDataX e
-         ,NFDataX f, NFDataX g, NFDataX h, NFDataX i, NFDataX j
-         ,NFDataX k, NFDataX l, NFDataX m)
-  => NFDataX (a,b,c,d,e,f,g,h,i,j,k,l,m)
-instance (NFDataX a, NFDataX b, NFDataX c, NFDataX d, NFDataX e
-         ,NFDataX f, NFDataX g, NFDataX h, NFDataX i, NFDataX j
-         ,NFDataX k, NFDataX l, NFDataX m, NFDataX n)
-  => NFDataX (a,b,c,d,e,f,g,h,i,j,k,l,m,n)
-instance (NFDataX a, NFDataX b, NFDataX c, NFDataX d, NFDataX e
-         ,NFDataX f, NFDataX g, NFDataX h, NFDataX i, NFDataX j
-         ,NFDataX k, NFDataX l, NFDataX m, NFDataX n, NFDataX o)
-  => NFDataX (a,b,c,d,e,f,g,h,i,j,k,l,m,n,o)
 
 instance NFDataX b => NFDataX (a -> b) where
   deepErrorX = pure . deepErrorX
@@ -886,3 +853,5 @@ instance NFDataX c => GDeepErrorX (K1 i c) where
 
 instance GDeepErrorX (f :+: g) where
   gDeepErrorX = errorX
+
+mkNFDataXTupleInstances [2..maxTupleSize]

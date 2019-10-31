@@ -212,6 +212,7 @@ Library
                       Clash.Sized.Internal.Unsigned
 
                       Clash.XException
+                      Clash.XException.TH
 
                       Clash.Xilinx.ClockGen
                       Clash.Xilinx.DDR
