@@ -221,7 +221,7 @@ data HDL
 -- {\-\# ANN example (InlinePrimitive VHDL $ unindent [i|
 --   [ { \"BlackBox\" :
 --       { "name" : "InlinePrimitive.example"
---       , "kind": "Declaration"
+--       , "kind": \"Declaration\"
 --       , "template" :
 --   "-- begin InlinePrimitive example:
 --   ~GENSYM[example][0] : block

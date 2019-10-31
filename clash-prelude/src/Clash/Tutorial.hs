@@ -892,14 +892,14 @@ import "Clash.Intel.ClockGen"
 'createDomain' vSystem{vName=\"Dom50\", vPeriod=50000}
 
 topEntity
-  :: Clock \"DomInput\"
-  -> Signal \"DomInput\" Bool
-  -> Signal \"Dom50\" Bit
-  -> Signal \"Dom50\" (BitVector 8)
+  :: Clock DomInput
+  -> Signal DomInput Bool
+  -> Signal Dom50 Bit
+  -> Signal Dom50 (BitVector 8)
 topEntity clk rst =
     'exposeClockResetEnable' ('mealy' blinkerT (1,False,0) . Clash.Prelude.isRising 1) pllOut rstSync 'enableGen'
   where
-    (pllOut,pllStable) = 'Clash.Intel.ClockGen.altpll' @"Dom50" (SSymbol @"altpll50") clk ('Clash.Signal.unsafeFromLowPolarity' rst)
+    (pllOut,pllStable) = 'Clash.Intel.ClockGen.altpll' \@Dom50 (SSymbol \@\"altpll50\") clk ('Clash.Signal.unsafeFromLowPolarity' rst)
     rstSync            = 'Clash.Signal.resetSynchronizer' pllOut ('Clash.Signal.unsafeFromLowPolarity' pllStable) enableGen
 
 blinkerT (leds,mode,cntr) key1R = ((leds',mode',cntr'),leds)
@@ -2434,7 +2434,7 @@ topEntity
 topEntity clk rst =
     exposeClockReset (mealy blinkerT (1,False,0) . isRising 1) pllOut rstSync
   where
-    (pllOut,pllStable) = altpll \@Dom50 (SSymbol \@ \"altpll50\") clk rst
+    (pllOut,pllStable) = altpll \@Dom50 (SSymbol \@\"altpll50\") clk rst
     rstSync            = resetSynchronizer pllOut (unsafeToAsyncReset pllStable)
 
 blinkerT (leds,mode,cntr) key1R = ((leds',mode',cntr'),leds)

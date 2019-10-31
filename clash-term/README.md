@@ -8,9 +8,15 @@ For detailed documentation and example visualizations, see the following [README
 
 ## Usage Instructions
 
-1. Run `clash` with the 'history' flag, which will write the rewrite history in `history.dat`:
+0. Enable the `history` flag on the clash-lib package, by adding to your cabal.project.local:
+```
+package clash-lib
+  flags: history
+```
+
+1. Run `clash`, which will write the rewrite history in `history.dat`:
 ```bash
-> cabal new-run -- clash --vhdl -f history DebugName examples/ALU.hs
+> cabal new-run -- clash --vhdl examples/ALU.hs
 ```
 
 2. The rewrite history has now been dumped to the file system, in `history.dat`.

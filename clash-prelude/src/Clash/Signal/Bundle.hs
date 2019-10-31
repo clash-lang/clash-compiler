@@ -67,9 +67,9 @@ import Clash.Sized.RTree            (RTree, lazyT)
 -- data D = A | B
 --
 -- instance Bundle D where
---   type 'Unbundled'' clk D = 'Signal'' clk D
---   'bundle'   _ s = s
---   'unbundle' _ s = s
+--   type 'Unbundled' clk D = 'Signal' clk D
+--   'bundle'   s = s
+--   'unbundle' s = s
 -- @
 --
 class Bundle a where
