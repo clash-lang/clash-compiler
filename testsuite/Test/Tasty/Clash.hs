@@ -617,6 +617,7 @@ outputTest' env target extraClashArgs extraGhcArgs modName funcName path =
              , "-XTypeApplications"
              , "-XTypeFamilies"
              , "-XTypeOperators"
+             , "-DOUTPUTTEST"
              , "--ghc-arg=-main-is"
              , "--ghc-arg=" ++ modName ++ "." ++ funcName ++ show target
              ] ++ map ("--ghc-arg="++) extraGhcArgs ++

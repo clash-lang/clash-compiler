@@ -128,6 +128,7 @@ Library
                       Clash.Annotations.SynthesisAttributes
                       Clash.Annotations.TH
 
+                      Clash.Class.AutoReg
                       Clash.Class.BitPack
                       Clash.Class.Exp
                       Clash.Class.HasDomain
@@ -218,7 +219,10 @@ Library
                       Clash.Tutorial
                       Clash.Examples
 
-  other-modules:      Clash.Class.BitPack.Internal
+  other-modules:
+                      Clash.Class.AutoReg.Instances
+                      Clash.Class.AutoReg.Internal
+                      Clash.Class.BitPack.Internal
                       Clash.CPP
                       Clash.Signal.Bundle.Internal
                       Language.Haskell.TH.Compat
@@ -321,9 +325,12 @@ test-suite unittests
       hint          >= 0.7      && < 0.10,
       tasty         >= 1.2      && < 1.3,
       tasty-hunit,
+      tasty-quickcheck,
       template-haskell
 
-  Other-Modules: Clash.Tests.BitPack
+  Other-Modules:
+                 Clash.Tests.AutoReg
+                 Clash.Tests.BitPack
                  Clash.Tests.BitVector
                  Clash.Tests.DerivingDataRepr
                  Clash.Tests.DerivingDataReprTypes
