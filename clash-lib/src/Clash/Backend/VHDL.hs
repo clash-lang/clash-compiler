@@ -1934,6 +1934,10 @@ toSLV (Vector n elTy) (Identifier id_ Nothing) = do
   where
     selNames = map (fmap (T.toStrict . renderOneLine) ) $ [pretty id_ <> parens (int i) | i <- [0 .. (n-1)]]
     selIds   = map (fmap (`Identifier` Nothing)) selNames
+-- Don't split up newtype wrappers, or void-filtered types
+toSLV (Vector _ _) e@(DataCon _ (DC (Void Nothing, -1)) _) = do
+  nm <- Mon $ use modNm
+  pretty (TextS.toLower nm) <> "_types.toSLV" <> parens (expr_ False e)
 toSLV (Vector n elTy) (DataCon _ _ es) =
   "std_logic_vector'" <> (parens $ vcat $ punctuate " & " (zipWithM toSLV [elTy,Vector (n-1) elTy] es))
 toSLV (Vector _ _) e = do

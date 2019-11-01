@@ -358,6 +358,7 @@ runClashTest =
         , runTest ("tests" </> "shouldwork" </> "Vector") defBuild [] "VecConst"   ([""],"topEntity",False)
         , runTest ("tests" </> "shouldwork" </> "Vector") defBuild [] "VecOfSum"   ([""],"topEntity",False)
         , runTest ("tests" </> "shouldwork" </> "Vector") defBuild [] "T452"       ([""],"topEntity",False)
+        , runTest ("tests" </> "shouldwork" </> "Vector") [VHDL]   [] "T895"       ([""],"topEntity",False)
         ]
       ]
     ]
