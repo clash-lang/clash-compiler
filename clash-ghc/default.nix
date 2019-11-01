@@ -3,8 +3,5 @@
 with nixpkgs.pkgs;
 with gitignore;
 
-haskell.lib.overrideCabal
+haskell.lib.enableSharedExecutables
   (haskellPackages.callCabal2nix "clash-ghc" (gitignoreSource ./.) {})
-  (_: {
-    enableSharedExecutables = true;
-  })
