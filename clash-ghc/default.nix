@@ -3,4 +3,5 @@
 with nixpkgs.pkgs;
 with gitignore;
 
-haskellPackages.callCabal2nix "clash-ghc" (gitignoreSource ./.) {}
+haskell.lib.enableSharedExecutables
+  (haskellPackages.callCabal2nix "clash-ghc" (gitignoreSource ./.) {})
