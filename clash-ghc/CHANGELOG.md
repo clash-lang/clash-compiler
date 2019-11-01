@@ -15,6 +15,7 @@
   * Fix bug in `rnfX` defined for `Down` ([814fd52](https://github.com/clash-lang/clash-compiler/commit/814fd520191123be38af8ef28fc49130424f3b93))
   * Report blackbox name when encountering an error in 'setSym' ([#858](https://github.com/clash-lang/clash-compiler/pull/858))
   * Fix blackbox issues causing Clash to generate invalid HDL ([#865](https://github.com/clash-lang/clash-compiler/pull/865))
+  * Adds '--enable-shared-executables' for nix builds; this should make Clash run _much_ faster ([#894](https://github.com/clash-lang/clash-compiler/pull/894))
 
 ## 1.0.0 *September 3rd 2019*
 * 10x - 50x faster compile times
