@@ -12,17 +12,10 @@ packages:
   ./clash-term/*.cabal
 
 
-allow-newer:
-    concurrent-supply:hashable
-
-  -- needed by clash-term
-  , rewrite-inspector:hashable
-  , brick:base
-
 -- index state, to go along with the cabal.project.freeze file. update the index
 -- state by running `cabal update` twice and looking at the index state it
 -- displays to you (as the second update will be a no-op)
-index-state: 2019-09-30T07:38:42Z
+index-state: 2019-10-29T08:01:38Z
 
 package clash-ghc
   executable-dynamic: True
@@ -42,7 +35,3 @@ package clash-lib
 optional-packages:
   clash-cosim/clash-cosim.cabal,
   clash-term/clash-term.cabal
-
--- rewrite-inspector is currently failing because it lacks an upper bound
--- and the API for vty has changed
-constraints: vty < 5.26
