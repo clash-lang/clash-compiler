@@ -238,6 +238,7 @@ runClashTest = defaultMain $ clashTestRoot
         , runTest "ExpWithClashCF" def{clashFlags=["-itests/shouldwork/Numbers", "-fconstraint-solver-iterations=15"]}
         , outputTest ("tests" </> "shouldwork" </> "Numbers") allTargets ["-itests/shouldwork/Numbers"] ["-itests/shouldwork/Numbers"] "ExpWithClashCF"  "main"
         , runTest "HalfAsBlackboxArg" def{hdlTargets=[VHDL], hdlSim=False}
+        , runTest "IntegralTB" def{clashFlags=["-itests/shouldwork/Numbers"]}
         -- TODO: re-enable for Verilog
         , runTest "NumConstantFoldingTB_1" def{clashFlags=["-itests/shouldwork/Numbers"]}
         , outputTest ("tests" </> "shouldwork" </> "Numbers") allTargets ["-fconstraint-solver-iterations=15"] ["-itests/shouldwork/Numbers"] "NumConstantFolding_1"  "main"
