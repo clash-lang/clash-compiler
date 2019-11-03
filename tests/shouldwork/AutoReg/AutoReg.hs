@@ -68,20 +68,25 @@ topEntity
   :: Clock System -> Reset System
   -> Signal System (BitVector 32)
   -> _
-topEntity clk rst xs = withClockResetEnable clk rst enableGen $ bundle $
-  ( test @(Unsigned 16) xs
-  , test @Bool xs
-  , test @(Tup2 Bool Bool) xs
-  , test @(Tup3 Bool Bool Bool) xs
-  , test @(Maybe Bool) xs
-  , test @(Maybe (Maybe Bool)) xs
-  , test @(OtherPair Int8 Int16) xs
-  , test @Concrete xs
-  , test @(InfixDataCon Bool Bool) xs
-  , test @((),Bool) xs
-  , test @(Vec 2 Bool) xs
-  , test @(Vec 2 (Maybe Bool)) xs
-  , test @(Maybe (Vec 2 (Maybe Bool))) xs
+topEntity clk rst xs = withClockResetEnable clk rst enableGen $
+  -- This used to be one big tuple. We split it up so we can get away with
+  -- -DMAX_TUPLE_SIZE=12, which considerably improves compilation speed of
+  -- clash-prelude
+  ( ( test @(Unsigned 16) xs
+    , test @Bool xs
+    , test @(Tup2 Bool Bool) xs
+    , test @(Tup3 Bool Bool Bool) xs
+    , test @(Maybe Bool) xs
+    , test @(Maybe (Maybe Bool)) xs
+    , test @(OtherPair Int8 Int16) xs
+    )
+  , ( test @Concrete xs
+    , test @(InfixDataCon Bool Bool) xs
+    , test @((),Bool) xs
+    , test @(Vec 2 Bool) xs
+    , test @(Vec 2 (Maybe Bool)) xs
+    , test @(Maybe (Vec 2 (Maybe Bool))) xs
+    )
   )
 #endif
 

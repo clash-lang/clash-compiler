@@ -65,30 +65,33 @@ testBench = done
       outputVerifierBitVector'
         clk
         rst
-        (pack ( $(lift (pack aT))
-              , $(lift (pack bT))
-              , $(lift (pack cT))
-              , $(lift (pack dT))
-              , $(lift (pack eT))
-              , $(lift (pack fT))
-              , $(lift (pack gT))
-              , $(lift (pack hT))
-              , $(lift (pack iT))
-              , $(lift (pack jT))
-              , $(lift (pack kT))
-
-              , $$(bLit "00100010")  :: BitVector 8
-              , $$(bLit "000")       :: BitVector 3
-              , $$(bLit "001")       :: BitVector 3
-              , $$(bLit "010")       :: BitVector 3
-              , $$(bLit "110")       :: BitVector 3
-              , $$(bLit "000100010") :: BitVector 9
-              , $$(bLit "100001010") :: BitVector 9
-              , $$(bLit "0001000001") :: BitVector 10
-              , $$(bLit "01010.....") :: BitVector 10
-              , $$(bLit "1000001...") :: BitVector 10
-              , $$(bLit "00100010")  :: BitVector 8
-
+        -- This used to be one big tuple. We split it up so we can get away with
+        -- -DMAX_TUPLE_SIZE=12, which considerably improves compilation speed of
+        -- clash-prelude
+        (pack ( ( $(lift (pack aT))
+                , $(lift (pack bT))
+                , $(lift (pack cT))
+                , $(lift (pack dT))
+                , $(lift (pack eT))
+                , $(lift (pack fT))
+                , $(lift (pack gT))
+                , $(lift (pack hT))
+                , $(lift (pack iT))
+                , $(lift (pack jT))
+                , $(lift (pack kT))
+                )
+              , ( $$(bLit "00100010")  :: BitVector 8
+                , $$(bLit "000")       :: BitVector 3
+                , $$(bLit "001")       :: BitVector 3
+                , $$(bLit "010")       :: BitVector 3
+                , $$(bLit "110")       :: BitVector 3
+                , $$(bLit "000100010") :: BitVector 9
+                , $$(bLit "100001010") :: BitVector 9
+                , $$(bLit "0001000001") :: BitVector 10
+                , $$(bLit "01010.....") :: BitVector 10
+                , $$(bLit "1000001...") :: BitVector 10
+                , $$(bLit "00100010")  :: BitVector 8
+                )
               ) :> Nil)
 
     done           = expectedOutput (topEntity <$> testInput)
