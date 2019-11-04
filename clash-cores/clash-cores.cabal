@@ -55,8 +55,8 @@ library
                        TypeFamilies
                        TypeOperators
   build-depends:       base                      >= 4.12 && <4.14,
-                       clash-prelude             >= 1.0 && < 1.1,
-                       clash-lib                 >= 1.0 && < 1.1,
+                       clash-prelude             >= 1.0 && < 1.2,
+                       clash-lib                 >= 1.0 && < 1.2,
                        ghc-typelits-natnormalise >= 0.7,
                        ghc-typelits-extra        >= 0.3.1,
                        ghc-typelits-knownnat     >= 0.7,
