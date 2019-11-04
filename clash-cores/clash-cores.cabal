@@ -1,7 +1,7 @@
 cabal-version:       >=1.10
 
 name:                clash-cores
-version:             0.1.0.0
+version:             1.1.0
 synopsis:            A collection of IP cores for Clash
 description:         A collection of IP cores for Clash
 bug-reports:         https://github.com/clash-lang/clash-cores/issues
