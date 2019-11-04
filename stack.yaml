@@ -8,3 +8,4 @@ packages:
 
 extra-deps:
 - ./clash-cosim
+- ./clash-cores

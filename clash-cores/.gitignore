@@ -1,0 +1,18 @@
+dist/
+dist-newstyle/
+.stack-work/
+.ghc.environment.*
+*.o
+*.o-boot
+*.hi
+*.hi-boot
+*.dyn_o
+*.dyn_o-boot
+*.dyn_hi
+*.dyn_hi-boot
+
+# IntelliJ
+.idea
+
+# stack
+stack.yaml.lock

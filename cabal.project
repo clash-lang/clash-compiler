@@ -33,4 +33,5 @@ package clash-lib
 
 optional-packages:
   clash-cosim/clash-cosim.cabal,
-  clash-term/clash-term.cabal
+  clash-term/clash-term.cabal,
+  clash-cores/clash-cores.cabal
