@@ -48,13 +48,16 @@ library
                        FlexibleContexts
                        MagicHash
                        NoImplicitPrelude
-                       NoStarIsType
                        ScopedTypeVariables
                        TemplateHaskell
                        TypeApplications
                        TypeFamilies
                        TypeOperators
-  build-depends:       base                      >= 4.12 && <4.14,
+
+  if impl(ghc >= 8.6)
+    default-extensions: NoStarIsType
+
+  build-depends:       base                      >= 4.10 && < 5,
                        clash-prelude             >= 1.0 && < 1.2,
                        clash-lib                 >= 1.0 && < 1.2,
                        ghc-typelits-natnormalise >= 0.7,
