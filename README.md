@@ -25,8 +25,12 @@ Features of Clash:
 
   * Support for multiple clock domains, with type safe clock domain crossing.
 
-# Support
-For updates and questions join the mailing list clash-language+subscribe@googlegroups.com or read the [forum](https://groups.google.com/d/forum/clash-language)
+# Community
+**Mailing list**: for updates and questions join the mailing list clash-language+subscribe@googlegroups.com or read the [forum](https://groups.google.com/d/forum/clash-language)
+
+**Slack**: Invite yourself at [fpchat-invite.herokuapp.com](https://fpchat-invite.herokuapp.com/). To join #clash, click on "Channels" and search for "clash".
+
+**IRC**: [freenode#clash-lang](https://webchat.freenode.net/#clash-lang)
 
 # Using Clash from source
 Clone Clash from github using `git` and enter the cloned directory:
