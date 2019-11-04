@@ -1,0 +1,109 @@
+cabal-version:       >=1.10
+
+name:                clash-cores
+version:             0.1.0.0
+synopsis:            A collection of IP cores for Clash
+description:         A collection of IP cores for Clash
+bug-reports:         https://github.com/clash-lang/clash-cores/issues
+license:             BSD2
+license-file:        LICENSE
+author:              QBayLogic B.V.
+maintainer:          devops@qbaylogic.com
+copyright:           Copyright © 2019, Foamspace Corp.
+category:            Hardware
+build-type:          Simple
+extra-source-files:  CHANGELOG.md
+
+flag unittests
+  description:
+    You can disable testing with unittests using `-f-unittests`.
+  default: True
+  manual: True
+
+flag haddock
+  description:
+    Work-around haddock bug on GHC 8.6.*
+  default: False
+  manual: True
+
+library
+  exposed-modules:     Clash.Cores.SPI
+                       Clash.Cores.LatticeSemi.IO
+                       Clash.Cores.LatticeSemi.Blackboxes.IO
+  ghc-options:         -fexpose-all-unfoldings
+                       -Wall
+
+  if flag(haddock)
+    ghc-options:       -fdefer-type-errors
+  else
+    ghc-options:       -fplugin GHC.TypeLits.Extra.Solver
+                       -fplugin GHC.TypeLits.Normalise
+                       -fplugin GHC.TypeLits.KnownNat.Solver
+
+  default-extensions:  BinaryLiterals
+                       DataKinds
+                       DeriveAnyClass
+                       DeriveGeneric
+                       DerivingStrategies
+                       FlexibleContexts
+                       MagicHash
+                       NoImplicitPrelude
+                       NoStarIsType
+                       ScopedTypeVariables
+                       TemplateHaskell
+                       TypeApplications
+                       TypeFamilies
+                       TypeOperators
+  build-depends:       base                      >= 4.12 && <4.14,
+                       clash-prelude             >= 1.0 && < 1.1,
+                       clash-lib                 >= 1.0 && < 1.1,
+                       ghc-typelits-natnormalise >= 0.7,
+                       ghc-typelits-extra        >= 0.3.1,
+                       ghc-typelits-knownnat     >= 0.7,
+                       mtl                       >= 2.1.1 && < 2.3,
+                       reducers                  >= 3.12.2 && < 4.0,
+                       text                      >= 1.2.2 && < 1.3
+
+  hs-source-dirs:      src
+  default-language:    Haskell2010
+
+test-suite unittests
+  type:             exitcode-stdio-1.0
+  default-language: Haskell2010
+  main-is:          unittests.hs
+  ghc-options:      -Wall
+                    -fplugin GHC.TypeLits.Extra.Solver
+                    -fplugin GHC.TypeLits.Normalise
+                    -fplugin GHC.TypeLits.KnownNat.Solver
+  hs-source-dirs:   test
+
+  default-extensions:  BinaryLiterals
+                       DataKinds
+                       DeriveAnyClass
+                       DeriveGeneric
+                       DerivingStrategies
+                       FlexibleContexts
+                       MagicHash
+                       NoImplicitPrelude
+                       NoStarIsType
+                       ScopedTypeVariables
+                       TemplateHaskell
+                       TypeApplications
+                       TypeFamilies
+                       TypeOperators
+
+  if !flag(unittests)
+    buildable: False
+  else
+    build-depends:
+      clash-prelude,
+      clash-cores,
+
+      base,
+      ghc-typelits-natnormalise >= 0.7,
+      ghc-typelits-extra        >= 0.3.1,
+      ghc-typelits-knownnat     >= 0.7,
+      tasty                     >= 1.2 && < 1.3,
+      tasty-hunit
+
+  Other-Modules: Test.Cores.SPI
