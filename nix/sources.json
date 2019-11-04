@@ -1,40 +1,4 @@
 {
-    "type-errors": {
-        "branch": "master",
-        "description": "tools for writing better type errors ",
-        "homepage": null,
-        "owner": "isovector",
-        "repo": "type-errors",
-        "rev": "f171628f607d83de18bd96c1d4247674fece6b15",
-        "sha256": "1pkrns559mh1psp2ic4dybk8x91vcx04xpjx7m7msqx7xypfz2il",
-        "type": "tarball",
-        "url_template": "https://github.com/<owner>/<repo>/archive/<rev>.tar.gz",
-        "url": "https://github.com/isovector/type-errors/archive/f171628f607d83de18bd96c1d4247674fece6b15.tar.gz"
-    },
-    "first-class-families": {
-        "branch": "master",
-        "description": "First-class type families",
-        "homepage": null,
-        "owner": "Lysxia",
-        "repo": "first-class-families",
-        "rev": "bb6487804594c6d6cdc383011d81dc425e5a456c",
-        "sha256": "1y1a6fi2307z04bzl5jw38zqrzzhjfb59kp47xj0ibnmqqr7xyka",
-        "type": "tarball",
-        "url_template": "https://github.com/<owner>/<repo>/archive/<rev>.tar.gz",
-        "url": "https://github.com/Lysxia/first-class-families/archive/bb6487804594c6d6cdc383011d81dc425e5a456c.tar.gz"
-    },
-    "ghc-typelits-extra": {
-        "branch": "master",
-        "description": "Extra type-level operations on GHC.TypeLits.Nat and a custom solver",
-        "homepage": null,
-        "owner": "clash-lang",
-        "repo": "ghc-typelits-extra",
-        "rev": "a8de0b68b8216411cb862195354f251cd41bae50",
-        "sha256": "19iggfs1m6vn9q8wxx4d3g993933nribmm6qa106lj6qr7d5jqil",
-        "type": "tarball",
-        "url": "https://github.com/clash-lang/ghc-typelits-extra/archive/a8de0b68b8216411cb862195354f251cd41bae50.tar.gz",
-        "url_template": "https://github.com/<owner>/<repo>/archive/<rev>.tar.gz"
-    },
     "gitignore": {
         "branch": "master",
         "description": "Nix function for filtering local git sources",
@@ -60,15 +24,15 @@
         "url_template": "https://github.com/<owner>/<repo>/archive/<rev>.tar.gz"
     },
     "nixpkgs": {
-        "branch": "nixos-19.03",
+        "branch": "nixos-19.09",
         "description": "Nixpkgs/NixOS branches that track the Nixpkgs/NixOS channels",
         "homepage": null,
         "owner": "NixOS",
         "repo": "nixpkgs-channels",
-        "rev": "8634c3b619909db7fc747faf8c03592986626e21",
-        "sha256": "0hcpy4q64vbqmlmnfcavfxilyygyzpwdsss8g3p73ikpic0j6ziq",
+        "rev": "d5291756487d70bc336e33512a9baf9fa1788faf",
+        "sha256": "0mhqhq21y5vrr1f30qd2bvydv4bbbslvyzclhw0kdxmkgg3z4c92",
         "type": "tarball",
-        "url": "https://github.com/NixOS/nixpkgs-channels/archive/8634c3b619909db7fc747faf8c03592986626e21.tar.gz",
+        "url": "https://github.com/NixOS/nixpkgs-channels/archive/d5291756487d70bc336e33512a9baf9fa1788faf.tar.gz",
         "url_template": "https://github.com/<owner>/<repo>/archive/<rev>.tar.gz"
     }
 }
