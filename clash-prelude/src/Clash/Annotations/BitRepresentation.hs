@@ -43,6 +43,7 @@ type BitMask  = Integer
 type Value    = Integer
 type Size     = Int
 
+-- | BitMask used to mask fields
 type FieldAnn = BitMask
 
 -- | Lift values inside of 'TH.Q' to a Template Haskell expression

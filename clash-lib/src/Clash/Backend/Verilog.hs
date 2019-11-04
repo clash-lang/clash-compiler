@@ -50,13 +50,14 @@ import           Data.Text.Prettyprint.Doc.Extra
 import qualified Data.Version
 #endif
 import qualified System.FilePath
+import           GHC.Stack                            (HasCallStack)
 
 import           Clash.Annotations.Primitive          (HDL (..))
 import           Clash.Annotations.BitRepresentation  (BitMask)
 import           Clash.Annotations.BitRepresentation.ClashLib
   (bitsToBits)
 import           Clash.Annotations.BitRepresentation.Internal
-  (ConstrRepr'(..))
+  (ConstrRepr'(..), DataRepr'(..), ConstrRepr'(..))
 import           Clash.Annotations.BitRepresentation.Util
   (BitOrigin(Lit, Field), bitOrigins, bitRanges, isContinuousMask)
 import           Clash.Core.Var                       (Attr'(..))
@@ -68,7 +69,7 @@ import           Clash.Netlist.Id                     (IdType (..), mkBasicId')
 import           Clash.Netlist.Types                  hiding (_intWidth, intWidth)
 import           Clash.Netlist.Util                   hiding (mkIdentifier, extendIdentifier)
 import           Clash.Util
-  (SrcSpan, noSrcSpan, curLoc, traceIf, (<:>),on,first)
+  (SrcSpan, noSrcSpan, curLoc, traceIf, (<:>), on, first, indexNote)
 
 
 
@@ -444,9 +445,14 @@ patLitCustom (CustomSP _name _dataRepr size reprs) (NumLit (fromIntegral -> i)) 
   let (cRepr, _id, _tys) = reprs !! i in
   patLitCustom' size cRepr
 
+patLitCustom hwTy _
+  | CustomProduct _name dataRepr size _maybeFieldNames _reprs <- hwTy
+  , DataRepr' _typ _size [cRepr] <- dataRepr =
+  patLitCustom' size cRepr
+
 patLitCustom x y = error $ $(curLoc) ++ unwords
-  [ "You can only pass CustomSP / CustomSum and a NumLit to this function,"
-  , "not", show x, "and", show y]
+  [ "You can only pass CustomSP / CustomSum / CustomProduct and a NumLit to "
+  , "this function, not", show x, "and", show y ]
 
 patMod :: HWType -> Literal -> Literal
 patMod hwTy (NumLit i) = NumLit (i `mod` (2 ^ typeSize hwTy))
@@ -498,10 +504,13 @@ inst_ (CondAssignment id_ _ scrut _ [(Just (BoolLit b), l),(_,r)]) = fmap Just $
   where
     (t,f) = if b then (l,r) else (r,l)
 
-inst_ (CondAssignment id_ _ scrut scrutTy@(CustomSP _ _ _ _) es) =
+inst_ (CondAssignment id_ _ scrut scrutTy@(CustomSP {}) es) =
   inst_' id_ scrut scrutTy es
 
-inst_ (CondAssignment id_ _ scrut scrutTy@(CustomSum _ _ _ _) es) =
+inst_ (CondAssignment id_ _ scrut scrutTy@(CustomSum {}) es) =
+  inst_' id_ scrut scrutTy es
+
+inst_ (CondAssignment id_ _ scrut scrutTy@(CustomProduct {}) es) =
   inst_' id_ scrut scrutTy es
 
 inst_ (CondAssignment id_ _ scrut scrutTy es) = fmap Just $
@@ -534,7 +543,8 @@ inst_ (NetDecl' {}) = return Nothing
 -- desired field.
 -- Also returns the HWType of the result.
 modifier
-  :: Int
+  :: HasCallStack
+  => Int
   -- ^ Offset, only used when we have nested modifiers
   -> Modifier
   -> Maybe (Int,Int,HWType)
@@ -599,13 +609,32 @@ modifier offset (Indexed (ty@(RTree _ argTy),10,fI)) = Just (start+offset,end+of
     start   = typeSize ty - (fI * argSize) - 1
     end     = start - argSize + 1
 
-modifier offset (Indexed (CustomSP _id _dataRepr _size args,dcI,fI)) =
+modifier offset (Indexed (CustomSP typName _dataRepr _size args,dcI,fI)) =
   case bitRanges (anns !! fI) of
-    [(start,end)] -> Just (start+offset,end+offset, argTy)
-    _ -> error ($(curLoc) ++ "Cannot handle projection out of a non-contiguously encoded field")
+    [(start,end)] ->
+      Just (start+offset,end+offset, argTy)
+    _ ->
+      error $ $(curLoc) ++ "Cannot handle projection out of a "
+           ++ "non-contiguously or zero-width encoded field. Tried to project "
+           ++ "field " ++ show fI ++ " of constructor " ++ show dcI ++ " of "
+           ++ "data type " ++ show typName ++  "."
  where
   (ConstrRepr' _name _n _mask _value anns, _, argTys) = args !! dcI
   argTy = argTys !! fI
+
+modifier offset (Indexed (CustomProduct typName dataRepr _size _maybeFieldNames args,dcI,fI))
+  | DataRepr' _typ _size [cRepr] <- dataRepr
+  , ConstrRepr' _cName _pos _mask _val fieldAnns <- cRepr =
+  case bitRanges (fieldAnns !! fI) of
+    [(start,end)] ->
+      Just (start+offset,end+offset, argTy)
+    _ ->
+      error $ $(curLoc) ++ "Cannot handle projection out of a "
+           ++ "non-contiguously or zero-width encoded field. Tried to project "
+           ++ "field " ++ show fI ++ " of constructor " ++ show dcI ++ " of "
+           ++ "data type " ++ show typName ++ "."
+ where
+  argTy = map snd args !! fI
 
 modifier offset (DC (ty@(SP _ _),_)) = Just (start+offset,end+offset, ty)
   where
@@ -623,6 +652,56 @@ modifier offset (Nested m1 m2) = do
 
 modifier _ _ = Nothing
 
+-- | Render a data constructor application for data constructors having a
+-- custom bit representation.
+customReprDataCon
+  :: DataRepr'
+  -- ^ Custom representation of data type
+  -> ConstrRepr'
+  -- ^ Custom representation of a specific constructor of @dataRepr@
+  -> [(HWType, Expr)]
+  -- ^ Arguments applied to constructor
+  -> VerilogM Doc
+customReprDataCon dataRepr constrRepr args =
+  (flip fromMaybe) (errOnNonContinuous 0 anns) $
+  braces $ hcat $ punctuate ", " $ mapM range' origins
+    where
+      anns = crFieldAnns constrRepr
+      size = drSize dataRepr
+
+      errOnNonContinuous :: Int -> [BitMask] -> Maybe a
+      errOnNonContinuous _ [] = Nothing
+      errOnNonContinuous fieldnr (ann:anns') =
+        if isContinuousMask ann then
+          errOnNonContinuous (fieldnr + 1) anns'
+        else
+          error $ $(curLoc) ++ unlines [
+              "Error while processing custom bit representation:\n"
+            , unwords ["Field", show fieldnr, "of constructor"
+            , show (crName constrRepr), "of type\n"]
+            , "  " ++ show (drType dataRepr) ++ "\n"
+            , "has a non-continuous fieldmask:\n"
+            , "  " ++ (map bit_char' $ toBits size ann) ++ "\n"
+            , unwords [ "This is not supported in Verilog. Change the mask to a"
+                      , "continuous one, or render using VHDL or SystemVerilog."
+                      ]
+            ]
+
+      -- Build bit representations for all constructor arguments
+      argExprs = map (expr_ False) (map snd args) :: [VerilogM Doc]
+
+      -- Spread bits of constructor arguments using masks
+      origins = bitOrigins dataRepr constrRepr :: [BitOrigin]
+
+      range'
+        :: BitOrigin
+        -> VerilogM Doc
+      range' (Lit (bitsToBits -> ns)) =
+        int (length ns) <> squote <> "b" <> hcat (mapM (bit_char undefValue) ns)
+      range' (Field n _start _end) =
+        argExprs !! n
+
+
 -- | Turn a Netlist expression into a Verilog expression
 expr_ :: Bool -- ^ Enclose in parentheses?
       -> Expr -- ^ Expr to convert
@@ -631,12 +710,26 @@ expr_ _ (Literal sizeM lit) = exprLitV sizeM lit
 
 expr_ _ (Identifier id_ Nothing) = stringS id_
 
-expr_ _ (Identifier id_ (Just (Indexed (CustomSP _id _dataRepr _size args,dcI,fI)))) =
-  braces $ hcat $ punctuate ", " $ sequence ranges
-    where
-      (ConstrRepr' _name _n _mask _value anns, _, _argTys) = args !! dcI
-      ranges = map range' $ bitRanges (anns !! fI)
-      range' (start, end) = stringS id_ <> brackets (int start <> ":" <> int end)
+expr_ _ (Identifier id_ (Just (Indexed (CustomSP _id dataRepr _size args,dcI,fI)))) =
+  case fieldTy of
+    Void {} -> error (unexpectedProjectionErrorMsg dataRepr dcI fI)
+    _       -> braces $ hcat $ punctuate ", " $ sequence ranges
+ where
+  (ConstrRepr' _name _n _mask _value anns, _, fieldTypes) = args !! dcI
+  ranges = map range' $ bitRanges (anns !! fI)
+  range' (start, end) = stringS id_ <> brackets (int start <> ":" <> int end)
+  fieldTy = indexNote ($(curLoc) ++ "panic") fieldTypes fI
+
+expr_ _ (Identifier d_ (Just (Indexed (CustomProduct _id dataRepr _size _maybeFieldNames tys, dcI, fI))))
+  | DataRepr' _typ _size [cRepr] <- dataRepr
+  , ConstrRepr' _cName _pos _mask _val anns <- cRepr =
+  let ranges = map range' (bitRanges (anns !! fI)) in
+  case fieldTy of
+    Void {} -> error (unexpectedProjectionErrorMsg dataRepr dcI fI)
+    _       -> braces $ hcat $ punctuate ", " $ sequence ranges
+ where
+  (_fieldAnn, fieldTy) = indexNote ($(curLoc) ++ "panic") tys fI
+  range' (start, end) = stringS d_ <> brackets (int start <> ":" <> int end)
 
 -- See [Note] integer projection
 expr_ _ (Identifier id_ (Just (Indexed ((Signed w),_,_))))  = do
@@ -705,44 +798,12 @@ expr_ _ (DataCon ty@(Sum _ _) (DC (_,i)) []) = int (typeSize ty) <> "'d" <> int 
 expr_ _ (DataCon ty@(CustomSum _ _ _ tys) (DC (_,i)) []) =
   let (ConstrRepr' _ _ _ value _) = fst $ tys !! i in
   int (typeSize ty) <> squote <> "d" <> int (fromIntegral value)
-expr_ _ (DataCon (CustomSP name' dataRepr size args) (DC (_,constrNr)) es) =
-  (flip fromMaybe) (errOnNonContinuous 0 anns) $
-  braces $ hcat $ punctuate ", " $ mapM range' origins
-    where
-      (cRepr, _, _) = args !! constrNr
-      (ConstrRepr' _name _n _mask _value anns) = cRepr
-
-      errOnNonContinuous :: Int -> [BitMask] -> Maybe a
-      errOnNonContinuous _ [] = Nothing
-      errOnNonContinuous fieldnr (ann:anns') =
-        if isContinuousMask ann then
-          errOnNonContinuous (fieldnr + 1) anns'
-        else
-          error $ $(curLoc) ++ unlines [
-              "Error while processing custom bit representation:\n"
-            , unwords ["Field", show fieldnr, "of constructor", show constrNr, "of type\n"]
-            , "  " ++ show name' ++ "\n"
-            , "has a non-continuous fieldmask:\n"
-            , "  " ++ (map bit_char' $ toBits size ann) ++ "\n"
-            , unwords [ "This is not supported in Verilog. Change the mask to a"
-                      , "continuous one, or render using VHDL or SystemVerilog."
-                      ]
-            ]
-
-      -- Build bit representations for all constructor arguments
-      argExprs = map (expr_ False) es :: [VerilogM Doc]
-
-      -- Spread bits of constructor arguments using masks
-      origins = bitOrigins dataRepr cRepr :: [BitOrigin]
-
-      range'
-        :: BitOrigin
-        -> VerilogM Doc
-      range' (Lit (bitsToBits -> ns)) =
-        int (length ns) <> squote <> "b" <> hcat (mapM (bit_char undefValue) ns)
-      range' (Field n _start _end) =
-        argExprs !! n
-
+expr_ _ (DataCon (CustomSP _name dataRepr _size constrs) (DC (_,constrNr)) es) =
+  let (cRepr, _, argTys) = constrs !! constrNr in
+  customReprDataCon dataRepr cRepr (zip argTys es)
+expr_ _ (DataCon (CustomProduct _ dataRepr _size _labels tys) _ es) |
+  DataRepr' _typ _size [cRepr] <- dataRepr =
+  customReprDataCon dataRepr cRepr (zip (map snd tys) es)
 expr_ _ (DataCon (Product {}) _ es) = listBraces (mapM (expr_ False) es)
 
 expr_ _ (BlackBoxE pNm _ _ _ _ bbCtx _)

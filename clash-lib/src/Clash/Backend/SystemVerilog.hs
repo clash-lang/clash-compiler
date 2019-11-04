@@ -44,7 +44,7 @@ import qualified System.FilePath
 
 import           Clash.Annotations.Primitive          (HDL (..))
 import           Clash.Annotations.BitRepresentation.Internal
-  (ConstrRepr'(..))
+  (ConstrRepr'(..), DataRepr'(..))
 import           Clash.Annotations.BitRepresentation.ClashLib
   (bitsToBits)
 import           Clash.Annotations.BitRepresentation.Util
@@ -59,7 +59,7 @@ import           Clash.Netlist.Id                     (IdType (..), mkBasicId')
 import           Clash.Netlist.Types                  hiding (_intWidth, intWidth)
 import           Clash.Netlist.Util                   hiding (mkIdentifier, extendIdentifier)
 import           Clash.Util
-  (SrcSpan, noSrcSpan, curLoc, makeCached, (<:>), first, on, traceIf)
+  (SrcSpan, noSrcSpan, curLoc, makeCached, (<:>), first, on, traceIf, indexNote)
 import           Clash.Util.Graph                     (reverseTopSort)
 
 #ifdef CABAL
@@ -825,8 +825,8 @@ patLitCustom (CustomSP _name _dataRepr size reprs) (NumLit (fromIntegral -> i)) 
   patLitCustom' size cRepr
 
 patLitCustom x y = error $ $(curLoc) ++ unwords
-  [ "You can only pass CustomSP / CustomSum and a NumLit to this function,"
-  , "not", show x, "and", show y]
+  [ "You can only pass CustomSP / CustomSum / CustomProduct and a NumLit to"
+  , "this function, not", show x, "and", show y]
 
 patMod :: HWType -> Literal -> Literal
 patMod hwTy (NumLit i) = NumLit (i `mod` (2 ^ typeSize hwTy))
@@ -887,10 +887,13 @@ inst_ (CondAssignment id_ ty scrut _ [(Just (BoolLit b), l),(_,r)]) = fmap Just 
   where
     (t,f) = if b then (l,r) else (r,l)
 
-inst_ (CondAssignment id_ _ scrut scrutTy@(CustomSP _ _ _ _) es) =
+inst_ (CondAssignment id_ _ scrut scrutTy@(CustomSP {}) es) =
   inst_' id_ scrut scrutTy es
 
-inst_ (CondAssignment id_ _ scrut scrutTy@(CustomSum _ _ _ _) es) =
+inst_ (CondAssignment id_ _ scrut scrutTy@(CustomSum {}) es) =
+  inst_' id_ scrut scrutTy es
+
+inst_ (CondAssignment id_ _ scrut scrutTy@(CustomProduct {}) es) =
   inst_' id_ scrut scrutTy es
 
 inst_ (CondAssignment id_ ty scrut scrutTy es) = fmap Just $ do
@@ -933,19 +936,80 @@ inst_ (BlackBoxD _ libs imps inc bs bbCtx) =
 
 inst_ (NetDecl' {}) = return Nothing
 
+-- | Render a data constructor application for data constructors having a
+-- custom bit representation.
+customReprDataCon
+  :: DataRepr'
+  -- ^ Custom representation of data type
+  -> ConstrRepr'
+  -- ^ Custom representation of a specific constructor of @dataRepr@
+  -> [(HWType, Expr)]
+  -- ^ Arguments applied to constructor
+  -> SystemVerilogM Doc
+customReprDataCon dataRepr constrRepr args =
+  braces $ hcat $ punctuate ", " $ mapM range' origins
+    where
+      size = drSize dataRepr
+
+      -- Build bit representations for all constructor arguments
+      argExprs = map (uncurry toSLV) args :: [SystemVerilogM Doc]
+
+      -- Spread bits of constructor arguments using masks
+      origins = bitOrigins dataRepr constrRepr :: [BitOrigin]
+
+      range'
+        :: BitOrigin
+        -> SystemVerilogM Doc
+      range' (Lit (bitsToBits -> ns)) =
+        int (length ns) <> squote <> "b" <> hcat (mapM (bit_char undefValue) ns)
+      range' (Field n start end) =
+        -- We want to select the bits starting from 'start' downto and including
+        -- 'end'. We cannot use slice notation in Verilog, as the preceding
+        -- expression might not be an identifier.
+        let fsize = start - end + 1 in
+        let expr' = argExprs !! n in
+
+        if | fsize == size ->
+               -- If sizes are equal, rotating / resizing amounts to doing nothing
+               expr'
+           | end == 0 ->
+               -- Rotating is not necessary if relevant bits are already at the end
+               int fsize <> squote <> parens expr'
+           | otherwise ->
+               -- Select bits 'start' downto and including 'end'
+               let rotated  = parens expr' <+> ">>" <+> int end in
+               int fsize <> squote <> parens rotated
+
 -- | Turn a Netlist expression into a SystemVerilog expression
 expr_ :: Bool -- ^ Enclose in parentheses?
       -> Expr -- ^ Expr to convert
       -> SystemVerilogM Doc
-expr_ _ (Literal sizeM lit)                           = exprLitSV sizeM lit
-expr_ _ (Identifier id_ Nothing)                      = stringS id_
-expr_ _ (Identifier id_ (Just (Indexed (CustomSP _id _dataRepr _size args,dcI,fI)))) =
-  expFromSLV resultType (braces $ hcat $ punctuate ", " $ sequence ranges)
-    where
-      (ConstrRepr' _name _n _mask _value anns, _, argTys) = args !! dcI
-      resultType = argTys !! fI
-      ranges = map range' $ bitRanges (anns !! fI)
-      range' (start, end) = stringS id_ <> brackets (int start <> ":" <> int end)
+expr_ _ (Literal sizeM lit) = exprLitSV sizeM lit
+expr_ _ (Identifier id_ Nothing) = stringS id_
+expr_ _ (Identifier id_ (Just (Indexed (CustomSP _id dataRepr _size args,dcI,fI)))) =
+  case fieldTy of
+    Void {} ->
+      error (unexpectedProjectionErrorMsg dataRepr dcI fI)
+    _ ->
+      expFromSLV fieldTy (braces $ hcat $ punctuate ", " $ sequence ranges)
+ where
+  (ConstrRepr' _name _n _mask _value anns, _, fieldTypes) = args !! dcI
+  ranges = map range' $ bitRanges (anns !! fI)
+  range' (start, end) = stringS id_ <> brackets (int start <> ":" <> int end)
+  fieldTy = indexNote ($(curLoc) ++ "panic") fieldTypes fI
+
+expr_ _ (Identifier id_ (Just (Indexed (CustomProduct _id dataRepr _size _maybeFieldNames args,dcI,fI)))) =
+  case fieldTy of
+    Void {} ->
+      error (unexpectedProjectionErrorMsg dataRepr dcI fI)
+    _ ->
+      expFromSLV fieldTy (braces $ hcat $ punctuate ", " $ sequence ranges)
+ where
+  (anns, fieldTypes) = unzip args
+  ranges = map range' $ bitRanges (anns !! fI)
+  range' (start, end) = stringS id_ <> brackets (int start <> ":" <> int end)
+  fieldTy = indexNote ($(curLoc) ++ "panic") fieldTypes fI
+
 expr_ _ (Identifier id_ (Just (Indexed (ty@(SP _ args),dcI,fI)))) = fromSLV argTy id_ start end
   where
     argTys   = snd $ args !! dcI
@@ -1103,39 +1167,13 @@ expr_ _ (DataCon ty@(Sum _ _) (DC (_,i)) []) = int (typeSize ty) <> "'d" <> int 
 expr_ _ (DataCon ty@(CustomSum _ _ _ tys) (DC (_,i)) []) =
   let (ConstrRepr' _ _ _ value _) = fst $ tys !! i in
   int (typeSize ty) <> squote <> "d" <> int (fromIntegral value)
-expr_ _ (DataCon (CustomSP _ dataRepr size args) (DC (_,i)) es) =
-  braces $ hcat $ punctuate ", " $ mapM range' origins
-    where
-      (cRepr, _, argTys) = args !! i
+expr_ _ (DataCon (CustomSP _ dataRepr _size args) (DC (_,i)) es) =
+  let (cRepr, _, argTys) = args !! i in
+  customReprDataCon dataRepr cRepr (zip argTys es)
+expr_ _ (DataCon (CustomProduct _ dataRepr _size _labels tys) _ es) |
+  DataRepr' _typ _size [cRepr] <- dataRepr =
+  customReprDataCon dataRepr cRepr (zip (map snd tys) es)
 
-      -- Build bit representations for all constructor arguments
-      argExprs = zipWith toSLV argTys es :: [SystemVerilogM Doc]
-
-      -- Spread bits of constructor arguments using masks
-      origins = bitOrigins dataRepr cRepr :: [BitOrigin]
-
-      range'
-        :: BitOrigin
-        -> SystemVerilogM Doc
-      range' (Lit (bitsToBits -> ns)) =
-        int (length ns) <> squote <> "b" <> hcat (mapM (bit_char undefValue) ns)
-      range' (Field n start end) =
-        -- We want to select the bits starting from 'start' downto and including
-        -- 'end'. We cannot use slice notation in Verilog, as the preceding
-        -- expression might not be an identifier.
-        let fsize = start - end + 1 in
-        let expr' = argExprs !! n in
-
-        if | fsize == size ->
-               -- If sizes are equal, rotating / resizing amounts to doing nothing
-               expr'
-           | end == 0 ->
-               -- Rotating is not necessary if relevant bits are already at the end
-               int fsize <> squote <> parens expr'
-           | otherwise ->
-               -- Select bits 'start' downto and including 'end'
-               let rotated  = parens expr' <+> ">>" <+> int end in
-               int fsize <> squote <> parens rotated
 expr_ _ (DataCon (Product _ _ tys) _ es) = listBraces (zipWithM toSLV tys es)
 
 expr_ _ (BlackBoxE pNm _ _ _ _ bbCtx _)

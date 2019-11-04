@@ -150,6 +150,11 @@ runClashTest =
         , runTest ("tests" </> "shouldwork" </> "CustomReprs" </> "Rotate")        defBuild [] "Rotate"                 (["", "testBench"],"testBench",True)
         , runTest ("tests" </> "shouldwork" </> "CustomReprs" </> "Deriving")      defBuild [] "BitPackDerivation"      (["", "testBench"],"testBench",True)
         , runTest ("tests" </> "shouldwork" </> "CustomReprs" </> "Indexed")       defBuild [] "Indexed"                (["", "testBench"],"testBench",True)
+
+        , runTest ("tests" </> "shouldwork" </> "CustomReprs" </> "ZeroWidth") defBuild [] "ZeroWidth" ([""],"topEntity",False)
+        , runFailingTest ("tests" </> "shouldwork" </> "CustomReprs" </> "ZeroWidth") defBuild [] "FailGracefully1" (Just "Unexpected projection of zero-width type")
+        , runFailingTest ("tests" </> "shouldwork" </> "CustomReprs" </> "ZeroWidth") defBuild [] "FailGracefully2" (Just "Unexpected projection of zero-width type")
+        , runFailingTest ("tests" </> "shouldwork" </> "CustomReprs" </> "ZeroWidth") defBuild [] "FailGracefully3" (Just "Unexpected projection of zero-width type")
         ]
       , clashTestGroup "DDR"
         [ runTest ("tests" </> "shouldwork" </> "DDR") defBuild [] "DDRinGA" (["","testBench"],"testBench",True)

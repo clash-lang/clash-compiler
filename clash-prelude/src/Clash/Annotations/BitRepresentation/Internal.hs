@@ -14,16 +14,12 @@ Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
 {-# LANGUAGE RankNTypes         #-}
 {-# LANGUAGE TemplateHaskell    #-}
 
--- since GHC 8.6 we can haddock individual contructor fields \o/
-#if __GLASGOW_HASKELL__ >= 806
-#define FIELD ^
-#endif
-
 module Clash.Annotations.BitRepresentation.Internal
   ( buildCustomReprs
   , dataReprAnnToDataRepr'
   , constrReprToConstrRepr'
   , getConstrRepr
+  , uncheckedGetConstrRepr
   , getDataRepr
   , thTypeToType'
   , ConstrRepr'(..)
@@ -37,10 +33,12 @@ import           Clash.Annotations.BitRepresentation
 import           Control.DeepSeq                          (NFData)
 import           Data.Hashable                            (Hashable)
 import qualified Data.Map                                 as Map
+import           Data.Maybe                               (fromMaybe)
 import qualified Data.Text                                as Text
 import           Data.Typeable                            (Typeable)
 import qualified Language.Haskell.TH.Syntax               as TH
 import           GHC.Generics                             (Generic)
+import           GHC.Stack                                (HasCallStack)
 import qualified TextShow                                 as TS
 import qualified TextShow.Generic                         as TS
 
@@ -57,22 +55,30 @@ data Type'
     deriving TS.TextShow via TS.FromGeneric (Type')
 
 -- | Internal version of DataRepr
-data DataRepr' =
-  DataRepr'
-    Type'         -- FIELD Simple representation of data type
-    Size          -- FIELD Size of data type
-    [ConstrRepr'] -- FIELD Constructors
-      deriving (Show, Generic, NFData, Eq, Typeable, Hashable, Ord)
+data DataRepr' = DataRepr'
+  { drType :: Type'
+  -- ^ Simple representation of data type
+  , drSize :: Size
+  -- ^ Size of data type
+  , drConstrs :: [ConstrRepr']
+  -- ^ Constructors
+  }
+  deriving (Show, Generic, NFData, Eq, Typeable, Hashable, Ord)
 
 -- | Internal version of ConstrRepr
-data ConstrRepr' =
-  ConstrRepr'
-    Text.Text  -- FIELD Qualified name of constructor:
-    Int        -- FIELD Syntactical position in the custom representations definition:
-    BitMask    -- FIELD Mask needed to determine constructor:
-    Value      -- FIELD Value after applying mask:
-    [FieldAnn] -- FIELD Indicates where fields are stored:
-      deriving (Show, Generic, NFData, Eq, Typeable, Ord, Hashable)
+data ConstrRepr' = ConstrRepr'
+  { crName :: Text.Text
+  -- ^ Qualified name of constructor
+  , crPosition :: Int
+  -- ^ Syntactical position in the custom representations definition
+  , crMask :: BitMask
+  -- ^ Mask needed to determine constructor
+  , crValue :: Value
+  -- ^ Value after applying mask
+  , crFieldAnns :: [FieldAnn]
+  -- ^ Indicates where fields are stored
+  }
+  deriving (Show, Generic, NFData, Eq, Typeable, Ord, Hashable)
 
 constrReprToConstrRepr' :: Int -> ConstrRepr -> ConstrRepr'
 constrReprToConstrRepr' n (ConstrRepr name mask value fieldanns) =
@@ -109,6 +115,17 @@ getDataRepr name (reprs, _) = Map.lookup name reprs
 -- | Lookup constructor representation based on name
 getConstrRepr :: Text.Text -> CustomReprs -> Maybe ConstrRepr'
 getConstrRepr name (_, reprs) = Map.lookup name reprs
+
+-- | Unchecked version of getConstrRepr
+uncheckedGetConstrRepr
+  :: HasCallStack
+  => Text.Text
+  -> CustomReprs
+  -> ConstrRepr'
+uncheckedGetConstrRepr name (_, reprs) =
+  fromMaybe
+    (error ("Could not find custom representation for" ++ Text.unpack name))
+    (Map.lookup name reprs)
 
 -- | Add CustomRepr to existing index
 addCustomRepr :: CustomReprs -> DataRepr' -> CustomReprs

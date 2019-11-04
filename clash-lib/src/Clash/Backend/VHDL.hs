@@ -20,6 +20,7 @@
 
 module Clash.Backend.VHDL (VHDLState) where
 
+import           Control.Arrow                        (second)
 import           Control.Applicative                  (liftA2)
 import           Control.Lens                         hiding (Indexed, Empty)
 import           Control.Monad                        (forM,join,zipWithM)
@@ -49,7 +50,7 @@ import           TextShow                             (showt)
 
 import           Clash.Annotations.Primitive          (HDL (..))
 import           Clash.Annotations.BitRepresentation.Internal
-  (ConstrRepr'(..))
+  (ConstrRepr'(..), DataRepr'(..))
 import           Clash.Annotations.BitRepresentation.ClashLib
   (bitsToBits)
 import           Clash.Annotations.BitRepresentation.Util
@@ -63,7 +64,8 @@ import           Clash.Netlist.Id                     (IdType (..), mkBasicId')
 import           Clash.Netlist.Types                  hiding (_intWidth, intWidth)
 import           Clash.Netlist.Util                   hiding (mkIdentifier)
 import           Clash.Util
-  (SrcSpan, noSrcSpan, clogBase, curLoc, first, makeCached, on, traceIf, (<:>))
+  (SrcSpan, noSrcSpan, clogBase, curLoc, first, makeCached, on, traceIf, (<:>),
+   indexNote)
 import           Clash.Util.Graph                     (reverseTopSort)
 
 #ifdef CABAL
@@ -401,6 +403,8 @@ mkUsedTys hwty = hwty : case hwty of
   SP _ elTys           -> concatMap mkUsedTys (concatMap snd elTys)
   BiDirectional _ elTy -> mkUsedTys elTy
   Annotated _ elTy     -> mkUsedTys elTy
+  CustomProduct _ _ _ _ tys0 ->
+    concatMap mkUsedTys (map snd tys0)
   CustomSP _ _ _ tys0 ->
     let tys1 = concat [tys | (_repr, _id, tys) <- tys0] in
     concatMap mkUsedTys tys1
@@ -452,6 +456,10 @@ topSortHWTys hwtys = sorted
       let tys1 = concat [tys | (_repr, _id, tys) <- tys0] in
       let tys2 = [HashMap.lookup (mkVecZ ty) nodesI | ty <- tys1] in
       map (nodesI HashMap.! t,) (catMaybes tys2)
+
+    edge t@(CustomProduct _ _ _ _ (map snd -> tys0)) =
+      let tys1 = [HashMap.lookup (mkVecZ ty) nodesI | ty <- tys0] in
+      map (nodesI HashMap.! t,) (catMaybes tys1)
 
     edge _ = []
 
@@ -516,6 +524,7 @@ tyDec hwty = do
     SP _ _            -> typAliasDec hwty
     Sum _ _           -> typAliasDec hwty
     CustomSum _ _ _ _ -> typAliasDec hwty
+    CustomProduct {}  -> typAliasDec hwty
 
     -- VHDL builtin types:
     BitVector _ -> emptyDoc
@@ -1006,7 +1015,8 @@ tyName t = do
 -- Some type names do not have specific names, but are instead basic types
 -- in VHDL.
 tyName'
-  :: Bool
+  :: HasCallStack
+  => Bool
   -- ^ Include length information in first part of name. For example, say we
   -- want to generate a name for a vector<signed>, where the vector is of length
   -- 5, and signed has 64 bits. When given `True`, this function would
@@ -1023,7 +1033,7 @@ tyName' rec0 (filterTransparent -> t) = do
     KnownDomain {} ->
       return (error ($(curLoc) ++ "Forced to print KnownDomain tyName"))
     Void _ ->
-      return (error ($(curLoc) ++ "Forced to print Void tyName"))
+      return (error ($(curLoc) ++ "Forced to print Void tyName: " ++ show t))
     Bool          -> return "boolean"
     Signed n      ->
       let app = if rec0 then ["_", showt n] else [] in
@@ -1068,6 +1078,8 @@ tyName' rec0 (filterTransparent -> t) = do
       Mon $ makeCached (t, False) nameCache (userTyName "sp" nm t)
     Product nm _ _ ->
       Mon $ makeCached (t, False) nameCache (userTyName "product" nm t)
+    CustomProduct nm _ _ _ _ ->
+      Mon $ makeCached (t, False) nameCache (userTyName "product" nm t)
     Annotated _ hwTy ->
       tyName' rec0 hwTy
     BiDirectional _ hwTy ->
@@ -1102,6 +1114,7 @@ normaliseType hwty = case hwty of
   SP _ _            -> BitVector (typeSize hwty)
   Sum _ _           -> BitVector (typeSize hwty)
   CustomSum _ _ _ _ -> BitVector (typeSize hwty)
+  CustomProduct {}  -> BitVector (typeSize hwty)
 
   -- Transparent types:
   Annotated _ elTy -> normaliseType elTy
@@ -1135,6 +1148,10 @@ filterTransparent hwty = case hwty of
   CustomSP nm0 drepr size constrs ->
     CustomSP nm0 drepr size
       (map (\(repr, nm1, tys) -> (repr, nm1, map filterTransparent tys)) constrs)
+
+  CustomProduct nm0 drepr size maybeFieldNames constrs ->
+    CustomProduct nm0 drepr size maybeFieldNames
+      (map (second filterTransparent) constrs)
 
   -- Transparent types:
   Annotated _ elTy -> elTy
@@ -1331,7 +1348,6 @@ inst_' id_ scrut scrutTy es = fmap Just $
                                               <+> "else"
                                               <:> conds es'
 
-
 -- | Turn a Netlist Declaration to a VHDL concurrent block
 inst_ :: Declaration -> VHDLM (Maybe Doc)
 inst_ (Assignment id_ e) = fmap Just $
@@ -1350,6 +1366,9 @@ inst_ (CondAssignment id_ _ scrut scrutTy@(CustomSP _ _ _ _) es) =
   inst_' id_ scrut scrutTy es
 
 inst_ (CondAssignment id_ _ scrut scrutTy@(CustomSum _ _ _ _) es) =
+  inst_' id_ scrut scrutTy es
+
+inst_ (CondAssignment id_ _ scrut scrutTy@(CustomProduct _ _ _ _ _) es) =
   inst_' id_ scrut scrutTy es
 
 inst_ (CondAssignment id_ _sig scrut scrutTy es) = fmap Just $
@@ -1387,26 +1406,88 @@ inst_ (BlackBoxD _ libs imps inc bs bbCtx) =
 
 inst_ _ = return Nothing
 
+-- | Render a data constructor application for data constructors having a
+-- custom bit representation.
+customReprDataCon
+  :: DataRepr'
+  -- ^ Custom representation of data type
+  -> ConstrRepr'
+  -- ^ Custom representation of a specific constructor of @dataRepr@
+  -> [(HWType, Expr)]
+  -- ^ Arguments applied to constructor
+  -> VHDLM Doc
+customReprDataCon dataRepr constrRepr args =
+  "std_logic_vector'" <> parens (hcat $ punctuate " & " $ mapM range origins)
+    where
+      DataRepr' _typ size _constrs = dataRepr
+
+      -- Build bit representations for all constructor arguments
+      argSLVs = map (uncurry toSLV) args :: [VHDLM Doc]
+
+      -- Spread bits of constructor arguments using masks
+      origins = bitOrigins dataRepr constrRepr :: [BitOrigin]
+
+      range
+        :: BitOrigin
+        -> VHDLM Doc
+      range (Lit (bitsToBits -> ns)) =
+        dquotes $ hcat $ mapM bit_char ns
+      range (Field n start end) =
+        -- We want to select the bits starting from 'start' downto and including
+        -- 'end'. We cannot use "(start downto end)" in VHDL, as the preceeding
+        -- expression might be anything. This notation only works on identifiers
+        -- unfortunately.
+        let fsize = start - end + 1 in
+        let expr' = argSLVs !! n in
+
+        -- HACK: While expr' is a std_logic_vector (see call `toSLV`), it cannot
+        -- be cast to unsigned in case of literals. This is fixed by explicitly
+        -- casting it to std_logic_vector.
+        let unsigned = "unsigned" <> parens ("std_logic_vector'" <> parens expr') in
+
+        if | fsize == size ->
+               -- If sizes are equal, rotating / resizing amounts to doing nothing
+               expr'
+           | end == 0 ->
+               -- Rotating is not necessary if relevant bits are already at the end
+               let resized = "resize" <> parens (unsigned <> comma <> int fsize) in
+               "std_logic_vector" <> parens resized
+           | otherwise ->
+               -- Select bits 'start' downto and including 'end'
+               let rotated  = unsigned <+> "srl" <+> int end in
+               let resized = "resize" <> parens (rotated <> comma <> int fsize) in
+               "std_logic_vector" <> parens resized
+
 -- | Turn a Netlist expression into a VHDL expression
-expr_ :: Bool -- ^ Enclose in parentheses?
-     -> Expr -- ^ Expr to convert
-     -> VHDLM Doc
+expr_
+  :: HasCallStack
+  => Bool
+  -- ^ Enclose in parentheses?
+  -> Expr
+  -- ^ Expr to convert
+  -> VHDLM Doc
 expr_ _ (Literal sizeM lit) = exprLit sizeM lit
 expr_ _ (Identifier id_ Nothing) = pretty id_
-expr_ _ (Identifier id_ (Just (Indexed (CustomSP _id _dataRepr _size args,dcI,fI)))) = do
-  nm <- Mon $ use modNm
-  let cast = qualTyName resultType <> squote
-  let fSLV = stringS (TextS.toLower nm) <> "_types.fromSLV"
-  cast <> parens (fSLV <> parens (hcat $ punctuate " & " $ ranges))
-    where
-      resultType = fieldTypes !! fI
-      (ConstrRepr' _name _n _mask _value anns, _, fieldTypes) = args !! dcI
+expr_ _ (Identifier id_ (Just (Indexed (CustomSP _id dataRepr _size args,dcI,fI)))) =
+  case fieldTy of
+    Void {} ->
+      error (unexpectedProjectionErrorMsg dataRepr dcI fI)
+    _ -> do
+      nm <- Mon $ use modNm
+      let cast = qualTyName resultType <> squote
+      let fSLV = stringS (TextS.toLower nm) <> "_types.fromSLV"
+      cast <> parens (fSLV <> parens (hcat $ punctuate " & " $ ranges))
+ where
+  resultType = fieldTypes !! fI
+  (ConstrRepr' _name _n _mask _value anns, _, fieldTypes) = args !! dcI
 
-      ranges =
-        mapM range $ bitRanges (anns !! fI)
+  ranges =
+    mapM range $ bitRanges (anns !! fI)
 
-      range (start, end) =
-        pretty id_ <> parens (int start <+> "downto" <+> int end)
+  range (start, end) =
+    pretty id_ <> parens (int start <+> "downto" <+> int end)
+
+  fieldTy = indexNote ($(curLoc) ++ "panic") fieldTypes fI
 
 expr_ b (Identifier id_ (Just (Indexed (ty@(SP _ args),dcI,fI)))) = do
   nm <- Mon $ use modNm
@@ -1424,6 +1505,20 @@ expr_ b (Identifier id_ (Just (Indexed (ty@(SP _ args),dcI,fI)))) = do
    other    = otherSize argTys (fI-1)
    start    = typeSize ty - 1 - conSize ty - other
    end      = start - argSize + 1
+
+expr_ _ (Identifier id_ (Just (Indexed (CustomProduct _ dataRepr _ _ tys, dcI, fI)))) =
+  case fieldTy of
+    Void {} ->
+      error (unexpectedProjectionErrorMsg dataRepr dcI fI)
+    _ -> do
+      modNm' <- Mon (use modNm)
+      let cast = qualTyName fieldTy <> squote
+      let fSLV = stringS (TextS.toLower modNm') <> "_types.fromSLV"
+      cast <> parens (fSLV <> parens (hcat $ punctuate " & " $ ranges))
+ where
+  (fieldAnn, fieldTy) = indexNote ($(curLoc) ++ "panic") tys fI
+  ranges = mapM range (bitRanges fieldAnn)
+  range (start, end) = pretty id_ <> parens (int start <+> "downto" <+> int end)
 
 expr_ _ (Identifier id_ (Just (Indexed (ty@(Product _ labels tys),_,fI)))) =
   pretty id_ <> dot <> tyName ty <> selectProductField labels tys fI
@@ -1640,47 +1735,12 @@ expr_ _ (DataCon ty@(Sum _ _) (DC (_,i)) []) =
 expr_ _ (DataCon ty@(CustomSum _ _ _ tys) (DC (_,i)) []) =
   let (ConstrRepr' _ _ _ value _) = fst $ tys !! i in
   "std_logic_vector" <> parens ("to_unsigned" <> parens (int (fromIntegral value) <> comma <> int (typeSize ty)))
-expr_ _ (DataCon (CustomSP _ dataRepr size args) (DC (_,i)) es) =
-  "std_logic_vector'" <> parens (hcat $ punctuate " & " $ mapM range origins)
-    where
-      (cRepr, _, argTys) = args !! i
-
-      -- Build bit representations for all constructor arguments
-      argExprs = zipWith toSLV argTys es :: [VHDLM Doc]
-
-      -- Spread bits of constructor arguments using masks
-      origins = bitOrigins dataRepr cRepr :: [BitOrigin]
-
-      range
-        :: BitOrigin
-        -> VHDLM Doc
-      range (Lit (bitsToBits -> ns)) =
-        dquotes $ hcat $ mapM bit_char ns
-      range (Field n start end) =
-        -- We want to select the bits starting from 'start' downto and including
-        -- 'end'. We cannot use "(start downto end)" in VHDL, as the preceeding
-        -- expression might be anything. This notation only works on identifiers
-        -- unfortunately.
-        let fsize = start - end + 1 in
-        let expr' = argExprs !! n in
-
-        -- HACK: While expr' is a std_logic_vector (see call `toSLV`), it cannot
-        -- be cast to unsigned in case of literals. This is fixed by explicitly
-        -- casting it to std_logic_vector.
-        let unsigned = "unsigned" <> parens ("std_logic_vector'" <> parens expr') in
-
-        if | fsize == size ->
-               -- If sizes are equal, rotating / resizing amounts to doing nothing
-               expr'
-           | end == 0 ->
-               -- Rotating is not necessary if relevant bits are already at the end
-               let resized = "resize" <> parens (unsigned <> comma <> int fsize) in
-               "std_logic_vector" <> parens resized
-           | otherwise ->
-               -- Select bits 'start' downto and including 'end'
-               let rotated  = unsigned <+> "srl" <+> int end in
-               let resized = "resize" <> parens (rotated <> comma <> int fsize) in
-               "std_logic_vector" <> parens resized
+expr_ _ (DataCon (CustomSP _ dataRepr _size args) (DC (_,i)) es) =
+  let (cRepr, _, argTys) = args !! i in
+  customReprDataCon dataRepr cRepr (zip argTys es)
+expr_ _ (DataCon (CustomProduct _ dataRepr _size _labels tys) _ es) |
+  DataRepr' _typ _size [cRepr] <- dataRepr =
+  customReprDataCon dataRepr cRepr (zip (map snd tys) es)
 
 expr_ _ (DataCon ty@(Product _ labels tys) _ es) =
     tupled $ zipWithM (\i e' -> tyName ty <> selectProductField labels tys i <+> rarrow <+> expr_ False e') [0..] es
@@ -1894,7 +1954,7 @@ bit_char U = do
     Just (Just i) -> "'" <> int i <> "'"
 bit_char Z = char 'Z'
 
-toSLV :: HWType -> Expr -> VHDLM Doc
+toSLV :: HasCallStack => HWType -> Expr -> VHDLM Doc
 toSLV Bool         e = do
   nm <- Mon $ use modNm
   pretty (TextS.toLower nm) <> "_types.toSLV" <> parens (expr_ False e)
@@ -1925,11 +1985,18 @@ toSLV t@(Product _ labels tys) (Identifier id_ Nothing) = do
     selIds   = map (fmap (\n -> Identifier n Nothing)) selNames
 toSLV (Product _ _ tys) (DataCon _ _ es) = do
   encloseSep lparen rparen " & " (zipWithM toSLV tys es)
+toSLV (CustomProduct _ _ _ _ _) e = do
+  -- Custom representations are represented as bitvectors in HDL, so we don't
+  -- need to do anything.
+  expr_ False e
 toSLV (Product _ _ _) e = do
   nm <- Mon $ use modNm
   pretty (TextS.toLower nm) <> "_types.toSLV" <> parens (expr_ False e)
 toSLV (SP _ _) e       = expr_ False e
-toSLV (CustomSP _ _ _ _) e = expr_ False e
+toSLV (CustomSP _ _ _ _) e =
+  -- Custom representations are represented as bitvectors in HDL, so we don't
+  -- need to do anything.
+  expr_ False e
 toSLV (Vector n elTy) (Identifier id_ Nothing) = do
     selIds' <- sequence selIds
     syn <- Mon hdlSyn
@@ -1973,6 +2040,7 @@ fromSLV t@(Product _ labels tys) id_ start _ = do
     args       = zipWith3 (`fromSLV` id_) tys starts ends
 
 fromSLV (CustomSP _ _ _ _)  id_ start end = pretty id_ <> parens (int start <+> "downto" <+> int end)
+fromSLV (CustomProduct {})  id_ start end = pretty id_ <> parens (int start <+> "downto" <+> int end)
 fromSLV (SP _ _)            id_ start end = pretty id_ <> parens (int start <+> "downto" <+> int end)
 fromSLV (Vector n elTy)     id_ start _   =
     if n > 1 then tupled args
