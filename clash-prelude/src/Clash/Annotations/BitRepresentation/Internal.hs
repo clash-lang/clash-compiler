@@ -8,11 +8,10 @@ Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
 {-# LANGUAGE DeriveAnyClass     #-}
 {-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE DeriveGeneric      #-}
-{-# LANGUAGE DerivingStrategies #-}
-{-# LANGUAGE DerivingVia        #-}
 {-# LANGUAGE OverloadedStrings  #-}
 {-# LANGUAGE RankNTypes         #-}
 {-# LANGUAGE TemplateHaskell    #-}
+{-# LANGUAGE TypeApplications   #-}
 
 module Clash.Annotations.BitRepresentation.Internal
   ( buildCustomReprs
@@ -31,6 +30,7 @@ module Clash.Annotations.BitRepresentation.Internal
 import           Clash.Annotations.BitRepresentation
   (BitMask, Value, Size, FieldAnn, DataReprAnn(..), ConstrRepr(..))
 import           Control.DeepSeq                          (NFData)
+import           Data.Coerce                              (coerce)
 import           Data.Hashable                            (Hashable)
 import qualified Data.Map                                 as Map
 import           Data.Maybe                               (fromMaybe)
@@ -52,7 +52,15 @@ data Type'
   | LitTy' Integer
   -- ^ Numeral literal (used in BitVector 10, for example)
     deriving (Generic, NFData, Eq, Typeable, Hashable, Ord, Show)
-    deriving TS.TextShow via TS.FromGeneric (Type')
+
+-- Replace with
+--
+--   deriving TS.TextShow via TS.FromGeneric (Type')
+--
+-- after dropping support for GHC 8.4
+instance TS.TextShow Type' where
+  showt = TS.showt . coerce @_ @(TS.FromGeneric (Type'))
+  showb = TS.showb . coerce @_ @(TS.FromGeneric (Type'))
 
 -- | Internal version of DataRepr
 data DataRepr' = DataRepr'
