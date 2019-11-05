@@ -8,6 +8,7 @@
 * Small fixes without issue reports:
   * Adds '--enable-shared-executables' for nix builds; this should make Clash run _much_ faster ([#894](https://github.com/clash-lang/clash-compiler/pull/894))
   * Fix blackbox issues causing Clash to generate invalid HDL ([#865](https://github.com/clash-lang/clash-compiler/pull/865))
+  * Error on unparsed trailing garbage in JSON "files"
 
 ## 1.0.1 *October 17th 2019*
 * Fixes issues:
