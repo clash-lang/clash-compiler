@@ -28,9 +28,9 @@ masterInBP
   -> Signal dom (Maybe (BitVector n))
 masterInBP val clk rst =
   E.moore clk rst enableGen
-          (\_ i -> i)
-          (\b -> if b then Nothing else Just val)
-          True
+    (flip const)
+    (\b -> if b then Nothing else Just val)
+    True
 
 slaveAddressRotate
   :: forall n dom
@@ -215,163 +215,98 @@ testMasterMultiSlave spiMode latchSPI divHalf wait mVal sVal duration =
   clk = systemClockGen
   rst = systemResetGen
 
+singleSlave :: [TestTree]
+singleSlave =
+  [testLatch, testNoLatch] <*> [SPIMode0, SPIMode1, SPIMode2, SPIMode3]
+ where
+  testLatch spi =
+    testCase (show spi <> ", Divider 8, Slave Latch") $
+      testMasterSlave spi True d4 d1 0b0110011101 0b0110010101 (3 * 84)
+        @?= (([0b0110011101], 3), ([0b0110010101], 3))
+
+  testNoLatch spi =
+    testCase (show spi <> ", Divider 2, No Slave Latch") $
+      testMasterSlave spi False d1 d1 0b0110011101 0b0110010101 (3 * 25)
+        @?= (([0b0110011101], 3), ([0b0110010101], 3))
+
+multipleSlaves :: [TestTree]
+multipleSlaves =
+  [testLatch, testNoLatch] <*> [SPIMode0, SPIMode1, SPIMode2, SPIMode3]
+ where
+  testLatch spi =
+    testCase (show spi <> ", Divider 8, Slave Latch") $
+      testMasterMultiSlave spi True d4 d1 0b0110011101 0b0110010101 (3 * 84)
+        @?= (([0b0110011101],1),([0b0110011101],1),([0b0110011101],1),([0b0110010101],3))
+
+  testNoLatch spi =
+    testCase (show spi <> ", Divider 2, No Slave Latch") $
+      testMasterMultiSlave spi False d1 d1 0b0110011101 0b0110010101 (3 * 25)
+        @?= (([0b0110011101],1),([0b0110011101],1),([0b0110011101],1),([0b0110010101],3))
+
+singleSlaveMultipleWords :: [TestTree]
+singleSlaveMultipleWords =
+  [testLatch, testNoLatch] <*> [SPIMode0, SPIMode1, SPIMode2, SPIMode3]
+ where
+  testLatch spi =
+    testCase (show spi <> ", Divider 8, Slave Latch") $
+      testMasterSlaveMultiWord spi True d4 d1 0b0101010100001111 0b10010101 (5 * 84)
+        @?= ([([0b00001111], 3), ([0b01010101], 3)], ([0b01001010110010101], 3))
+
+  testNoLatch spi =
+    testCase (show spi <> ", Divider 2, No Slave Latch") $
+      testMasterSlaveMultiWord spi False d1 d1 0b0101010100001111 0b0110010101 (5 * 25)
+        @?= ([([0b00001111],3),([0b01010101],3)],([0b01001010110010101],3))
+
+singleSlaveWait :: [TestTree]
+singleSlaveWait =
+  [testLatch, testNoLatch] <*> [SPIMode0, SPIMode1, SPIMode2, SPIMode3]
+ where
+  testLatch spi =
+    testCase (show spi <> ", Divider 8, Slave Latch") $
+      testMasterSlave spi True d4 d3 0b0110011101 0b0110010101 (3 * 87)
+        @?= (([0b0110011101],3),([0b0110010101],3))
+
+  testNoLatch spi =
+    testCase (show spi <> ", Divider 2, No Slave Latch") $
+      testMasterSlave spi False d1 d3 0b0110011101 0b0110010101 (3 * 27)
+        @?= (([0b0110011101],3),([0b0110010101],3))
+
+multipleSlavesWait :: [TestTree]
+multipleSlavesWait =
+  [testLatch, testNoLatch] <*> [SPIMode0, SPIMode1, SPIMode2, SPIMode3]
+ where
+  testLatch spi =
+    testCase (show spi <> ", Divider 8, Slave Latch") $
+      testMasterMultiSlave spi True d4 d3 0b0110011101 0b0110010101 (3 * 87)
+        @?= (([0b0110011101],1),([0b0110011101],1),([0b0110011101],1),([0b0110010101],3))
+
+  testNoLatch spi =
+    testCase (show spi <> ", Divider 2, No Slave Latch") $
+      testMasterMultiSlave spi False d1 d3 0b0110011101 0b0110010101 (3 * 27)
+        @?= (([0b0110011101],1),([0b0110011101],1),([0b0110011101],1),([0b0110010101],3))
+
+singleSlaveMultipleWordsWait :: [TestTree]
+singleSlaveMultipleWordsWait =
+  [testLatch, testNoLatch] <*> [SPIMode0, SPIMode1, SPIMode2, SPIMode3]
+ where
+  testLatch spi =
+    testCase (show spi <> ", Divider 8, Slave Latch") $
+      testMasterSlaveMultiWord spi True d4 d3 0b0101010100001111 0b10010101 (5 * 87)
+        @?= ([([0b00001111],3),([0b01010101],3)],([0b01001010110010101],3))
+
+  testNoLatch spi =
+    testCase (show spi <> ", Divider 2, No Slave Latch") $
+      testMasterSlaveMultiWord spi False d1 d3 0b0101010100001111 0b10010101 (5 * 27)
+        @?= ([([0b00001111],3),([0b01010101],3)],([0b01001010110010101],3))
+
 tests :: TestTree
 tests =
   testGroup "SPI"
-    [testGroup "Single slave"
-        [ testCase "Mode0, Divider:8, Slave latch: True"
-            (testMasterSlave SPIMode0 True d4 d1 0b0110011101 0b0110010101 (3*84) @?=
-             (([0b0110011101],3),([0b0110010101],3)))
-        , testCase "Mode1, Divider:8, Slave latch: True"
-            (testMasterSlave SPIMode1 True d4 d1 0b0110011101 0b0110010101 (3*84) @?=
-             (([0b0110011101],3),([0b0110010101],3)))
-        , testCase "Mode2, Divider:8, Slave latch: True"
-            (testMasterSlave SPIMode2 True d4 d1 0b0110011101 0b0110010101 (3*84) @?=
-             (([0b0110011101],3),([0b0110010101],3)))
-        , testCase "Mode3, Divider:8, Slave latch: True"
-            (testMasterSlave SPIMode3 True d4 d1 0b0110011101 0b0110010101 (3*84) @?=
-             (([0b0110011101],3),([0b0110010101],3)))
-        , testCase "Mode0, Divider:2, Slave latch: False"
-            (testMasterSlave SPIMode0 False d1 d1 0b0110011101 0b0110010101 (3*25) @?=
-             (([0b0110011101],3),([0b0110010101],3)))
-        , testCase "Mode1, Divider:2, Slave latch: False"
-            (testMasterSlave SPIMode1 False d1 d1 0b0110011101 0b0110010101 (3*25) @?=
-             (([0b0110011101],3),([0b0110010101],3)))
-        , testCase "Mode2, Divider:2, Slave latch: False"
-            (testMasterSlave SPIMode2 False d1 d1 0b0110011101 0b0110010101 (3*25) @?=
-             (([0b0110011101],3),([0b0110010101],3)))
-        , testCase "Mode3, Divider:2, Slave latch: False"
-            (testMasterSlave SPIMode3 False d1 d1 0b0110011101 0b0110010101 (3*25) @?=
-             (([0b0110011101],3),([0b0110010101],3)))
-        ]
-    ,testGroup "Multiple slaves (3 slaves)"
-        [ testCase "Mode0, Divider:8, Slave latch: True"
-            (testMasterMultiSlave SPIMode0 True d4 d1 0b0110011101 0b0110010101 (3*84) @?=
-             (([0b0110011101],1),([0b0110011101],1),([0b0110011101],1),([0b0110010101],3)))
-        , testCase "Mode1, Divider:8, Slave latch: True"
-            (testMasterMultiSlave SPIMode1 True d4 d1 0b0110011101 0b0110010101 (3*84) @?=
-             (([0b0110011101],1),([0b0110011101],1),([0b0110011101],1),([0b0110010101],3)))
-        , testCase "Mode2, Divider:8, Slave latch: True"
-            (testMasterMultiSlave SPIMode2 True d4 d1 0b0110011101 0b0110010101 (3*84) @?=
-             (([0b0110011101],1),([0b0110011101],1),([0b0110011101],1),([0b0110010101],3)))
-        , testCase "Mode3, Divider:8, Slave latch: True"
-            (testMasterMultiSlave SPIMode3 True d4 d1 0b0110011101 0b0110010101 (3*84) @?=
-             (([0b0110011101],1),([0b0110011101],1),([0b0110011101],1),([0b0110010101],3)))
-        , testCase "Mode0, Divider:2, Slave latch: False"
-            (testMasterMultiSlave SPIMode0 False d1 d1 0b0110011101 0b0110010101 (3*25) @?=
-             (([0b0110011101],1),([0b0110011101],1),([0b0110011101],1),([0b0110010101],3)))
-        , testCase "Mode1, Divider:2, Slave latch: False"
-            (testMasterMultiSlave SPIMode1 False d1 d1 0b0110011101 0b0110010101 (3*25) @?=
-             (([0b0110011101],1),([0b0110011101],1),([0b0110011101],1),([0b0110010101],3)))
-        , testCase "Mode2, Divider:2, Slave latch: False"
-            (testMasterMultiSlave SPIMode2 False d1 d1 0b0110011101 0b0110010101 (3*25) @?=
-             (([0b0110011101],1),([0b0110011101],1),([0b0110011101],1),([0b0110010101],3)))
-        , testCase "Mode3, Divider:2, Slave latch: False"
-            (testMasterMultiSlave SPIMode3 False d1 d1 0b0110011101 0b0110010101 (3*25) @?=
-             (([0b0110011101],1),([0b0110011101],1),([0b0110011101],1),([0b0110010101],3)))
-        ]
-    , testGroup "Single slave, multiple words"
-        [ testCase "Mode0, Divider:8, Slave latch: True"
-            (testMasterSlaveMultiWord SPIMode0 True d4 d1 0b0101010100001111 0b10010101 (5*84) @?=
-             ([([0b00001111],3),([0b01010101],3)],([0b01001010110010101],3)))
-        , testCase "Mode1, Divider:8, Slave latch: True"
-            (testMasterSlaveMultiWord SPIMode1 True d4 d1 0b0101010100001111 0b0110010101 (5*84) @?=
-             ([([0b00001111],3),([0b01010101],3)],([0b01001010110010101],3)))
-        , testCase "Mode2, Divider:8, Slave latch: True"
-            (testMasterSlaveMultiWord SPIMode2 True d4 d1 0b0101010100001111 0b0110010101 (5*84) @?=
-             ([([0b00001111],3),([0b01010101],3)],([0b01001010110010101],3)))
-        , testCase "Mode3, Divider:8, Slave latch: True"
-            (testMasterSlaveMultiWord SPIMode3 True d4 d1 0b0101010100001111 0b0110010101 (5*84) @?=
-             ([([0b00001111],3),([0b01010101],3)],([0b01001010110010101],3)))
-        , testCase "Mode0, Divider:2, Slave latch: False"
-            (testMasterSlaveMultiWord SPIMode0 False d1 d1 0b0101010100001111 0b0110010101 (5*25) @?=
-             ([([0b00001111],3),([0b01010101],3)],([0b01001010110010101],3)))
-        , testCase "Mode1, Divider:2, Slave latch: False"
-            (testMasterSlaveMultiWord SPIMode1 False d1 d1 0b0101010100001111 0b0110010101 (5*25) @?=
-             ([([0b00001111],3),([0b01010101],3)],([0b01001010110010101],3)))
-        , testCase "Mode2, Divider:2, Slave latch: False"
-            (testMasterSlaveMultiWord SPIMode2 False d1 d1 0b0101010100001111 0b0110010101 (5*25) @?=
-             ([([0b00001111],3),([0b01010101],3)],([0b01001010110010101],3)))
-        , testCase "Mode3, Divider:2, Slave latch: False"
-            (testMasterSlaveMultiWord SPIMode3 False d1 d1 0b0101010100001111 0b0110010101 (5*25) @?=
-             ([([0b00001111],3),([0b01010101],3)],([0b01001010110010101],3)))
-        ]
-    , testGroup "Single slave, 3 cycle wait"
-        [ testCase "Mode0, Divider:8, Slave latch: True"
-            (testMasterSlave SPIMode0 True d4 d3 0b0110011101 0b0110010101 (3*87) @?=
-             (([0b0110011101],3),([0b0110010101],3)))
-        , testCase "Mode1, Divider:8, Slave latch: True"
-            (testMasterSlave SPIMode1 True d4 d3 0b0110011101 0b0110010101 (3*87) @?=
-             (([0b0110011101],3),([0b0110010101],3)))
-        , testCase "Mode2, Divider:8, Slave latch: True"
-            (testMasterSlave SPIMode2 True d4 d3 0b0110011101 0b0110010101 (3*87) @?=
-             (([0b0110011101],3),([0b0110010101],3)))
-        , testCase "Mode3, Divider:8, Slave latch: True"
-            (testMasterSlave SPIMode3 True d4 d3 0b0110011101 0b0110010101 (3*87) @?=
-             (([0b0110011101],3),([0b0110010101],3)))
-        , testCase "Mode0, Divider:2, Slave latch: False"
-            (testMasterSlave SPIMode0 False d1 d3 0b0110011101 0b0110010101 (3*27) @?=
-             (([0b0110011101],3),([0b0110010101],3)))
-        , testCase "Mode1, Divider:2, Slave latch: False"
-            (testMasterSlave SPIMode1 False d1 d3 0b0110011101 0b0110010101 (3*27) @?=
-             (([0b0110011101],3),([0b0110010101],3)))
-        , testCase "Mode2, Divider:2, Slave latch: False"
-            (testMasterSlave SPIMode2 False d1 d3 0b0110011101 0b0110010101 (3*27) @?=
-             (([0b0110011101],3),([0b0110010101],3)))
-        , testCase "Mode3, Divider:2, Slave latch: False"
-            (testMasterSlave SPIMode3 False d1 d3 0b0110011101 0b0110010101 (3*27) @?=
-             (([0b0110011101],3),([0b0110010101],3)))
-        ]
-    , testGroup "Multiple slaves (3 slaves), 3 cycle wait"
-        [ testCase "Mode0, Divider:8, Slave latch: True"
-            (testMasterMultiSlave SPIMode0 True d4 d3 0b0110011101 0b0110010101 (3*87) @?=
-             (([0b0110011101],1),([0b0110011101],1),([0b0110011101],1),([0b0110010101],3)))
-        , testCase "Mode1, Divider:8, Slave latch: True"
-            (testMasterMultiSlave SPIMode1 True d4 d3 0b0110011101 0b0110010101 (3*87) @?=
-             (([0b0110011101],1),([0b0110011101],1),([0b0110011101],1),([0b0110010101],3)))
-        , testCase "Mode2, Divider:8, Slave latch: True"
-            (testMasterMultiSlave SPIMode2 True d4 d3 0b0110011101 0b0110010101 (3*87) @?=
-             (([0b0110011101],1),([0b0110011101],1),([0b0110011101],1),([0b0110010101],3)))
-        , testCase "Mode3, Divider:8, Slave latch: True"
-            (testMasterMultiSlave SPIMode3 True d4 d3 0b0110011101 0b0110010101 (3*87) @?=
-             (([0b0110011101],1),([0b0110011101],1),([0b0110011101],1),([0b0110010101],3)))
-        , testCase "Mode0, Divider:2, Slave latch: False"
-            (testMasterMultiSlave SPIMode0 False d1 d3 0b0110011101 0b0110010101 (3*27) @?=
-             (([0b0110011101],1),([0b0110011101],1),([0b0110011101],1),([0b0110010101],3)))
-        , testCase "Mode1, Divider:2, Slave latch: False"
-            (testMasterMultiSlave SPIMode1 False d1 d3 0b0110011101 0b0110010101 (3*27) @?=
-             (([0b0110011101],1),([0b0110011101],1),([0b0110011101],1),([0b0110010101],3)))
-        , testCase "Mode2, Divider:2, Slave latch: False"
-            (testMasterMultiSlave SPIMode2 False d1 d3 0b0110011101 0b0110010101 (3*27) @?=
-             (([0b0110011101],1),([0b0110011101],1),([0b0110011101],1),([0b0110010101],3)))
-        , testCase "Mode3, Divider:2, Slave latch: False"
-            (testMasterMultiSlave SPIMode3 False d1 d3 0b0110011101 0b0110010101 (3*27) @?=
-             (([0b0110011101],1),([0b0110011101],1),([0b0110011101],1),([0b0110010101],3)))
-        ]
-    , testGroup "Single slave, multiple words, 3 cycle wait"
-        [ testCase "Mode0, Divider:8, Slave latch: True"
-            (testMasterSlaveMultiWord SPIMode0 True d4 d3 0b0101010100001111 0b10010101 (5*87) @?=
-             ([([0b00001111],3),([0b01010101],3)],([0b01001010110010101],3)))
-        , testCase "Mode1, Divider:8, Slave latch: True"
-            (testMasterSlaveMultiWord SPIMode1 True d4 d3 0b0101010100001111 0b0110010101 (5*87) @?=
-             ([([0b00001111],3),([0b01010101],3)],([0b01001010110010101],3)))
-        , testCase "Mode2, Divider:8, Slave latch: True"
-            (testMasterSlaveMultiWord SPIMode2 True d4 d3 0b0101010100001111 0b0110010101 (5*87) @?=
-             ([([0b00001111],3),([0b01010101],3)],([0b01001010110010101],3)))
-        , testCase "Mode3, Divider:8, Slave latch: True"
-            (testMasterSlaveMultiWord SPIMode3 True d4 d3 0b0101010100001111 0b0110010101 (5*87) @?=
-             ([([0b00001111],3),([0b01010101],3)],([0b01001010110010101],3)))
-        , testCase "Mode0, Divider:2, Slave latch: False"
-            (testMasterSlaveMultiWord SPIMode0 False d1 d3 0b0101010100001111 0b0110010101 (5*27) @?=
-             ([([0b00001111],3),([0b01010101],3)],([0b01001010110010101],3)))
-        , testCase "Mode1, Divider:2, Slave latch: False"
-            (testMasterSlaveMultiWord SPIMode1 False d1 d3 0b0101010100001111 0b0110010101 (5*27) @?=
-             ([([0b00001111],3),([0b01010101],3)],([0b01001010110010101],3)))
-        , testCase "Mode2, Divider:2, Slave latch: False"
-            (testMasterSlaveMultiWord SPIMode2 False d1 d3 0b0101010100001111 0b0110010101 (5*27) @?=
-             ([([0b00001111],3),([0b01010101],3)],([0b01001010110010101],3)))
-        , testCase "Mode3, Divider:2, Slave latch: False"
-            (testMasterSlaveMultiWord SPIMode3 False d1 d3 0b0101010100001111 0b0110010101 (5*27) @?=
-             ([([0b00001111],3),([0b01010101],3)],([0b01001010110010101],3)))
-        ]
+    [ testGroup "Single slave" singleSlave
+    , testGroup "Multiple slaves (3)" multipleSlaves
+    , testGroup "Single slave, multiple words" singleSlaveMultipleWords
+    , testGroup "Single slave, 3 cycle wait" singleSlaveWait
+    , testGroup "Multiple slaves (3), 3 cycle wait" multipleSlavesWait
+    , testGroup "Single slave, multiple words, 3 cycle wait" singleSlaveMultipleWordsWait
     ]
+

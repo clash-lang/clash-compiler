@@ -18,6 +18,7 @@ module Clash.Cores.SPI
 where
 
 import Data.Maybe (fromMaybe, isJust)
+
 import Clash.Prelude
 import Clash.Sized.Internal.BitVector
 
@@ -49,9 +50,8 @@ data SPIMode
   --
   -- Clock is idle high, data is sampled on falling edge of SCK,
   -- data is shifted on falling edge of SCK.
-  deriving (Eq)
+  deriving (Eq, Show)
 
--- | SPI slave configuration
 data SPISlaveConfig ds dom
   = SPISlaveConfig
   { spiSlaveConfigMode :: SPIMode

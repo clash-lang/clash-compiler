@@ -110,3 +110,4 @@ test-suite unittests
       tasty-hunit
 
   Other-Modules: Test.Cores.SPI
+
