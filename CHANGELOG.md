@@ -20,11 +20,10 @@
   * Clash's internal type family solver now recognizes `AppendSymbol` and `CmpSymbol`
   * Added `Clash.Magic.suffixNameFromNat`: can be used in cases where `suffixName` is too slow
   * Added `Clash.Class.AutoReg`. Improves the chances of synthesis tools inferring clock-gated registers, when used. See [#873](https://github.com/clash-lang/clash-compiler/pull/873).
-  
+
 * New internal features:
   * [#821](https://github.com/clash-lang/clash-compiler/pull/821): Add `DebugTry`: print name of all tried transformations, even if they didn't succeed
   * [#856](https://github.com/clash-lang/clash-compiler/pull/856): Add `-fclash-debug-transformations`: only print debug info for specific transformations
-  * [#879](https://github.com/clash-lang/clash-compiler/pull/879): Add `-fclash-no-catch-errors`: don't try and catch errors in Clash compiler; let GHC handle it instead
 
 * Fixes issues:
   * [#810](https://github.com/clash-lang/clash-compiler/issues/810): Verilog backend now correctly specifies type of `BitVector 1`
