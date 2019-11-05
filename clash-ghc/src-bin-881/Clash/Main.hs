@@ -295,12 +295,7 @@ main' postLoadMode dflags0 args flagWarnings clashOpts = do
        GHC.printException e
        liftIO $ exitWith (ExitFailure 1)) $ do
     clashOpts' <- liftIO (readIORef clashOpts)
-    let
-      clash fun =
-        if opt_catchErrors clashOpts' then
-          gcatch (fun clashOpts srcs) (handleClashException dflags6 clashOpts')
-        else
-          fun clashOpts srcs
+    let clash fun = gcatch (fun clashOpts srcs) (handleClashException dflags6 clashOpts')
     case postLoadMode of
        ShowInterface f        -> liftIO $ doShowIface dflags6 f
        DoMake                 -> doMake srcs

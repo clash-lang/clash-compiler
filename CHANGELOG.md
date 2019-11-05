@@ -20,11 +20,10 @@
   * Clash's internal type family solver now recognizes `AppendSymbol` and `CmpSymbol`
   * Added `Clash.Magic.suffixNameFromNat`: can be used in cases where `suffixName` is too slow
   * Added `Clash.Class.AutoReg`. Improves the chances of synthesis tools inferring clock-gated registers, when used. See [#873](https://github.com/clash-lang/clash-compiler/pull/873).
-  
+
 * New internal features:
   * [#821](https://github.com/clash-lang/clash-compiler/pull/821): Add `DebugTry`: print name of all tried transformations, even if they didn't succeed
   * [#856](https://github.com/clash-lang/clash-compiler/pull/856): Add `-fclash-debug-transformations`: only print debug info for specific transformations
-  * [#879](https://github.com/clash-lang/clash-compiler/pull/879): Add `-fclash-no-catch-errors`: don't try and catch errors in Clash compiler; let GHC handle it instead
 
 * Fixes issues:
   * [#810](https://github.com/clash-lang/clash-compiler/issues/810): Verilog backend now correctly specifies type of `BitVector 1`
@@ -48,10 +47,12 @@
   * TH code for auto deriving bit representations now produces nicer error messages ([7190793](https://github.com/clash-lang/clash-compiler/commit/7190793928545f85157f9b8d4b8ec2edb2cd8a26))
   * Adds '--enable-shared-executables' for nix builds; this should make Clash run _much_ faster ([#894](https://github.com/clash-lang/clash-compiler/pull/894))
   * Custom bit representations can now mark fields as zero-width without crashing the compiler ([#898](https://github.com/clash-lang/clash-compiler/pull/898))
-  
+  * Error on unparsed trailing garbage in JSON "files"
+
 * Deprecations & removals:
   * Removed support for GHC 8.2 ([#842](https://github.com/clash-lang/clash-compiler/pull/842))
   * Removed support for older cabal versions, only Cabal >=2.2 supported ([#851](https://github.com/clash-lang/clash-compiler/pull/851))
+  * Reset and Enable constructors are now only exported from Clash.Signal.Internal
 
 ## 1.0.0 *September 3rd 2019*
 * 10x - 50x faster compile times
