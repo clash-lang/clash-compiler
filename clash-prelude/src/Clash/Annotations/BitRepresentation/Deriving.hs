@@ -895,6 +895,29 @@ buildUnpack (DataReprAnn _name _size constrs) = do
 -- the generated instance might conflict with existing implementations (for
 -- example, an instance for /Maybe a/ exists, yielding conflicts for any
 -- alternative implementations).
+--
+--
+-- Usage:
+--
+-- @
+-- data Color = R | G | B
+-- {-# ANN module (DataReprAnn
+--                   $(liftQ [t|Color|])
+--                   2
+--                   [ ConstrRepr 'R 0b11 0b00 []
+--                   , ConstrRepr 'G 0b11 0b01 []
+--                   , ConstrRepr 'B 0b11 0b10 []
+--                   ]) #-}
+-- deriveBitPack [t| Color |]
+--
+-- data MaybeColor = JustColor Color
+--                 | NothingColor deriving (Generic,BitPack)
+--
+-- @
+--
+-- __NB__: Because of the way template haskell works the order here matters,
+-- if you try to derive MaybeColor before deriveBitPack Color it will complain
+-- about missing an instance BitSize Color.
 deriveBitPack :: Q Type -> Q [Dec]
 deriveBitPack typQ = do
   anns <- collectDataReprs
