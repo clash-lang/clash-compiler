@@ -4,18 +4,21 @@ License    :  BSD2 (see the file LICENSE)
 Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
 -}
 
+{-# LANGUAGE CPP                #-}
 {-# LANGUAGE DeriveAnyClass     #-}
 {-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE DeriveGeneric      #-}
 {-# LANGUAGE OverloadedStrings  #-}
 {-# LANGUAGE RankNTypes         #-}
 {-# LANGUAGE TemplateHaskell    #-}
+{-# LANGUAGE TypeApplications   #-}
 
 module Clash.Annotations.BitRepresentation.Internal
   ( buildCustomReprs
   , dataReprAnnToDataRepr'
   , constrReprToConstrRepr'
   , getConstrRepr
+  , uncheckedGetConstrRepr
   , getDataRepr
   , thTypeToType'
   , ConstrRepr'(..)
@@ -27,12 +30,17 @@ module Clash.Annotations.BitRepresentation.Internal
 import           Clash.Annotations.BitRepresentation
   (BitMask, Value, Size, FieldAnn, DataReprAnn(..), ConstrRepr(..))
 import           Control.DeepSeq                          (NFData)
+import           Data.Coerce                              (coerce)
 import           Data.Hashable                            (Hashable)
 import qualified Data.Map                                 as Map
+import           Data.Maybe                               (fromMaybe)
 import qualified Data.Text                                as Text
 import           Data.Typeable                            (Typeable)
 import qualified Language.Haskell.TH.Syntax               as TH
 import           GHC.Generics                             (Generic)
+import           GHC.Stack                                (HasCallStack)
+import qualified TextShow                                 as TS
+import qualified TextShow.Generic                         as TS
 
 
 -- | Simple version of template haskell type. Used internally to match on.
@@ -45,31 +53,40 @@ data Type'
   -- ^ Numeral literal (used in BitVector 10, for example)
     deriving (Generic, NFData, Eq, Typeable, Hashable, Ord, Show)
 
+-- Replace with
+--
+--   deriving TS.TextShow via TS.FromGeneric (Type')
+--
+-- after dropping support for GHC 8.4
+instance TS.TextShow Type' where
+  showt = TS.showt . coerce @_ @(TS.FromGeneric (Type'))
+  showb = TS.showb . coerce @_ @(TS.FromGeneric (Type'))
+
 -- | Internal version of DataRepr
-data DataRepr' =
-  DataRepr'
-    -- Qualified name of type (recursive):
-    Type'
-    -- Size of data type:
-    Size
-    -- Constructors:
-    [ConstrRepr']
-      deriving (Show, Generic, NFData, Eq, Typeable, Hashable, Ord)
+data DataRepr' = DataRepr'
+  { drType :: Type'
+  -- ^ Simple representation of data type
+  , drSize :: Size
+  -- ^ Size of data type
+  , drConstrs :: [ConstrRepr']
+  -- ^ Constructors
+  }
+  deriving (Show, Generic, NFData, Eq, Typeable, Hashable, Ord)
 
 -- | Internal version of ConstrRepr
-data ConstrRepr' =
-  ConstrRepr'
-    -- Qualified name of constructor:
-    Text.Text
-    -- Syntactical position in the custom representations definition:
-    Int
-    -- Mask needed to determine constructor:
-    BitMask
-    -- Value after applying mask:
-    Value
-    -- Indicates where fields are stored:
-    [FieldAnn]
-      deriving (Show, Generic, NFData, Eq, Typeable, Ord, Hashable)
+data ConstrRepr' = ConstrRepr'
+  { crName :: Text.Text
+  -- ^ Qualified name of constructor
+  , crPosition :: Int
+  -- ^ Syntactical position in the custom representations definition
+  , crMask :: BitMask
+  -- ^ Mask needed to determine constructor
+  , crValue :: Value
+  -- ^ Value after applying mask
+  , crFieldAnns :: [FieldAnn]
+  -- ^ Indicates where fields are stored
+  }
+  deriving (Show, Generic, NFData, Eq, Typeable, Ord, Hashable)
 
 constrReprToConstrRepr' :: Int -> ConstrRepr -> ConstrRepr'
 constrReprToConstrRepr' n (ConstrRepr name mask value fieldanns) =
@@ -107,12 +124,23 @@ getDataRepr name (reprs, _) = Map.lookup name reprs
 getConstrRepr :: Text.Text -> CustomReprs -> Maybe ConstrRepr'
 getConstrRepr name (_, reprs) = Map.lookup name reprs
 
+-- | Unchecked version of getConstrRepr
+uncheckedGetConstrRepr
+  :: HasCallStack
+  => Text.Text
+  -> CustomReprs
+  -> ConstrRepr'
+uncheckedGetConstrRepr name (_, reprs) =
+  fromMaybe
+    (error ("Could not find custom representation for" ++ Text.unpack name))
+    (Map.lookup name reprs)
+
 -- | Add CustomRepr to existing index
-buildCustomRepr :: CustomReprs -> DataRepr' -> CustomReprs
-buildCustomRepr (dMap, cMap) d@(DataRepr' name _size constrReprs) =
+addCustomRepr :: CustomReprs -> DataRepr' -> CustomReprs
+addCustomRepr (dMap, cMap) d@(DataRepr' name _size constrReprs) =
   let insertConstr c@(ConstrRepr' name' _ _ _ _) cMap' = Map.insert name' c cMap' in
   (Map.insert name d dMap, foldr insertConstr cMap constrReprs)
 
 -- | Create indices based on names of constructors and data types
 buildCustomReprs :: [DataRepr'] -> CustomReprs
-buildCustomReprs = foldl buildCustomRepr (Map.empty, Map.empty)
+buildCustomReprs = foldl addCustomRepr (Map.empty, Map.empty)

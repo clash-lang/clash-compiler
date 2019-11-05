@@ -73,7 +73,6 @@ import           Clash.Netlist.Util
 import           Clash.Primitives.Types           as P
 import           Clash.Util
 
-
 -- | Generate a hierarchical netlist out of a set of global binders with
 -- @topEntity@ at the top.
 genNetlist
@@ -776,10 +775,17 @@ mkDcApplication dstHType bndr dc args = do
   argHWTys            <- mapM coreTypeToHWTypeM' argTys
   -- Filter out the arguments of hwtype `Void` and only translate
   -- them to the intermediate HDL afterwards
-  let argsBundled   = zip argHWTys (zip args argTys)
-      (hWTysFiltered,argsFiltered) = unzip
+  let argsBundled = zip argHWTys (zip args argTys)
+      (hWTysFiltered, argsFiltered) = unzip
         (filter (maybe True (not . isVoid) . fst) argsBundled)
-  (argExprs,argDecls) <- fmap (second concat . unzip) $! mapM (\(e,t) -> mkExpr False (Left argNm) t e) argsFiltered
+
+  (argExprs, argDecls) <-
+    fmap
+      (second concat . unzip) $!
+      (mapM
+        (\(e,t) -> mkExpr False (Left argNm) t e)
+        argsFiltered)
+
   fmap (,argDecls) $! case (hWTysFiltered,argExprs) of
     -- Is the DC just a newtype wrapper?
     ([Just argHwTy],[argExpr]) | argHwTy == dstHType ->
@@ -793,6 +799,11 @@ mkDcApplication dstHType bndr dc args = do
           LT -> error $ $(curLoc) ++ "Over-applied constructor"
           GT -> error $ $(curLoc) ++ "Under-applied constructor"
       Product _ _ dcArgs ->
+        case compare (length dcArgs) (length argExprs) of
+          EQ -> return (HW.DataCon dstHType (DC (dstHType,0)) argExprs)
+          LT -> error $ $(curLoc) ++ "Over-applied constructor"
+          GT -> error $ $(curLoc) ++ "Under-applied constructor"
+      CustomProduct _ _ _ _ dcArgs ->
         case compare (length dcArgs) (length argExprs) of
           EQ -> return (HW.DataCon dstHType (DC (dstHType,0)) argExprs)
           LT -> error $ $(curLoc) ++ "Over-applied constructor"

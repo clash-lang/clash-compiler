@@ -53,6 +53,7 @@ import Language.Haskell.TH.Syntax           (Lift)
 
 import SrcLoc                               (SrcSpan)
 
+import Clash.Annotations.BitRepresentation  (FieldAnn)
 import Clash.Annotations.TopEntity          (TopEntity)
 import Clash.Backend                        (Backend)
 import Clash.Core.Type                      (Type)
@@ -216,6 +217,9 @@ data HWType
   | CustomSum !Identifier !DataRepr' !Size [(ConstrRepr', Identifier)]
   -- ^ Same as Sum, but with a user specified bit representation. For more info,
   -- see: Clash.Annotations.BitRepresentations.
+  | CustomProduct !Identifier !DataRepr' !Size (Maybe [Text]) [(FieldAnn, HWType)]
+  -- ^ Same as Product, but with a user specified bit representation. For more
+  -- info, see: Clash.Annotations.BitRepresentations.
   | Annotated [Attr'] !HWType
   -- ^ Annotated with HDL attributes
   | KnownDomain !Identifier !Integer !ActiveEdge !ResetKind !InitBehavior !ResetPolarity

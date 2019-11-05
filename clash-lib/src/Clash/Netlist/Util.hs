@@ -37,7 +37,7 @@ import           Data.Either             (partitionEithers)
 import           Data.HashMap.Strict     (HashMap)
 import qualified Data.HashMap.Strict     as HashMap
 import           Data.String             (fromString)
-import           Data.List               (intersperse, unzip4, sort, intercalate)
+import           Data.List               (intersperse, unzip4, intercalate)
 import qualified Data.List               as List
 import           Data.Maybe              (catMaybes,fromMaybe,isNothing)
 import           Data.Monoid             (First (..))
@@ -55,7 +55,8 @@ import           Outputable              (ppr, showSDocUnsafe)
 import           Clash.Annotations.BitRepresentation.ClashLib
   (coreToType')
 import           Clash.Annotations.BitRepresentation.Internal
-  (CustomReprs, ConstrRepr'(..), DataRepr'(..), getDataRepr, getConstrRepr)
+  (CustomReprs, ConstrRepr'(..), DataRepr'(..), getDataRepr,
+   uncheckedGetConstrRepr)
 import           Clash.Annotations.TopEntity (PortName (..), TopEntity (..))
 import           Clash.Driver.Types      (Manifest (..), ClashOpts (..))
 import           Clash.Core.DataCon      (DataCon (..))
@@ -217,77 +218,102 @@ coreTypeToHWTypeM ty = do
   htyCache Lens..= htm1
   return (hush hty)
 
-packSP
-  :: CustomReprs
-  -> (Text, c)
-  -> (ConstrRepr', Text, c)
-packSP reprs (name, tys) =
-  case getConstrRepr name reprs of
-    Just repr -> (repr, name, tys)
-    Nothing   -> error $ $(curLoc) ++ unwords
-      [ "Could not find custom representation for", Text.unpack name ]
+-- | Constructs error message for unexpected projections out of a type annotated
+-- with a custom bit representation.
+unexpectedProjectionErrorMsg
+  :: DataRepr'
+  -> Int
+  -- ^ Constructor index
+  -> Int
+  -- ^ Field index
+  -> String
+unexpectedProjectionErrorMsg dataRepr cI fI =
+     "Unexpected projection of zero-width type: " ++ show (drType dataRepr)
+  ++ ". Tried to make a projection of field " ++ show fI ++ " of "
+  ++ constrNm ++ ". Did you try to project a field marked as zero-width"
+  ++ " by a custom bit representation annotation?"
+ where
+   constrNm = show (crName (drConstrs dataRepr !! cI))
 
-packSum
-  :: CustomReprs
-  -> Text
-  -> (ConstrRepr', Text)
-packSum reprs name =
-  case getConstrRepr name reprs of
-    Just repr -> (repr, name)
-    Nothing   -> error $ $(curLoc) ++ unwords
-      [ "Could not find custom representation for", Text.unpack name ]
+-- | Helper function of 'maybeConvertToCustomRepr'
+convertToCustomRepr
+  :: HasCallStack
+  => CustomReprs
+  -> DataRepr'
+  -> HWType
+  -> HWType
+convertToCustomRepr reprs dRepr@(DataRepr' name' size constrs) hwTy =
+  if length constrs == nConstrs then
+    if size <= 0 then
+      Void (Just cs)
+    else
+      cs
+  else
+    error (unwords
+      [ "Type", show name', "has", show nConstrs, "constructor(s), "
+      , "but the custom bit representation only specified", show (length constrs)
+      , "constructors."
+      ])
+ where
+  cs = insertVoids $ case hwTy of
+    Sum name conIds ->
+      CustomSum name dRepr size (map packSum conIds)
+    SP name conIdsAndFieldTys ->
+      CustomSP name dRepr size (map packSP conIdsAndFieldTys)
+    Product name maybeFieldNames fieldTys
+      | [ConstrRepr' _cName _pos _mask _val fieldAnns] <- constrs ->
+      CustomProduct name dRepr size maybeFieldNames (zip fieldAnns fieldTys)
+    _ ->
+      error
+        ( "Found a custom bit representation annotation " ++ show dRepr ++ ", "
+       ++ "but it was applied to an unsupported HWType: " ++ show hwTy ++ ".")
 
-fixCustomRepr
+  nConstrs :: Int
+  nConstrs = case hwTy of
+    (Sum _name conIds) -> length conIds
+    (SP _name conIdsAndFieldTys) -> length conIdsAndFieldTys
+    (Product {}) -> 1
+    _ -> error ("Unexpected HWType: " ++ show hwTy)
+
+  packSP (name, tys) = (uncheckedGetConstrRepr name reprs, name, tys)
+  packSum name = (uncheckedGetConstrRepr name reprs, name)
+
+  -- Replace some "hwTy" with "Void (Just hwTy)" if the custom bit
+  -- representation indicated that field is represented by zero bits. We can't
+  -- simply remove them, as we'll later have to deal with an "overapplied"
+  -- constructor. If we remove the arguments altogether, we wouldn't know which
+  -- - on their own potentially non-void! - arguments to ignore.
+  insertVoids :: HWType -> HWType
+  insertVoids (CustomSP i d s constrs0) =
+    CustomSP i d s (map go0 constrs0)
+   where
+    go0 (con@(ConstrRepr' _ _ _ _ fieldAnns), i0, hwTys) =
+      (con, i0, zipWith go1 fieldAnns hwTys)
+    go1 0 hwTy0 = Void (Just hwTy0)
+    go1 _ hwTy0 = hwTy0
+  insertVoids (CustomProduct i d s f fieldAnns) =
+    CustomProduct i d s f (map go fieldAnns)
+   where
+    go (0, hwTy0) = (0, Void (Just hwTy0))
+    go (n, hwTy0) = (n, hwTy0)
+  insertVoids hwTy0 = hwTy0
+
+-- | Given a map containing custom bit representation, a type, and the same
+-- type represented as HWType, convert the HWType to a CustomSP/CustomSum if
+-- it has a custom bit representation.
+maybeConvertToCustomRepr
   :: CustomReprs
+  -- ^ Map containing all custom representations index on its type
   -> Type
+  -- ^ Custom reprs are index on type, so we need the clash core type to look
+  -- it up.
   -> HWType
+  -- ^ Type of previous argument represented as a HWType
   -> HWType
-fixCustomRepr reprs (coreToType' -> Right tyName) sum_@(Sum name subtys) =
-  case getDataRepr tyName reprs of
-    Just dRepr@(DataRepr' name' size constrs) ->
-      if length constrs == length subtys then
-        let cs = CustomSum name dRepr (fromIntegral size) (map (packSum reprs) subtys)
-        in if size <= 0 then Void (Just cs) else cs
-      else
-        error $ $(curLoc) ++ (Text.unpack $ Text.unwords
-          [ "Type "
-          , Text.pack $ show name'
-          , "has"
-          , Text.pack $ show $ length subtys
-          , "constructors: \n\n"
-          , Text.intercalate "\n" $ sort [Text.append " * " id_ | id_ <- subtys]
-          , "\n\nBut the custom bit representation only specified"
-          , Text.pack $ show $ length constrs
-          , "constructors:\n\n"
-          , Text.intercalate "\n" $ sort [Text.append " * " id_ | (ConstrRepr' id_ _ _ _ _) <- constrs]
-          ])
-    Nothing ->
-      -- No custom representation found
-      sum_
-
-fixCustomRepr reprs (coreToType' -> Right tyName) sp@(SP name subtys) =
-  case getDataRepr tyName reprs of
-    Just dRepr@(DataRepr' name' size constrs) ->
-      if length constrs == length subtys then
-        let csp = CustomSP name dRepr (fromIntegral size) (map (packSP reprs) subtys)
-        in if size <= 0 then Void (Just csp) else csp
-      else
-        error $ $(curLoc) ++ (Text.unpack $ Text.unwords
-          [ "Type "
-          , Text.pack $ show $ name'
-          , "has"
-          , Text.pack $ show $ length subtys
-          , "constructors: \n\n"
-          , Text.intercalate "\n" $ sort [Text.append " * " id_ | (id_, _) <- subtys]
-          , "\n\nBut the custom bit representation only specified"
-          , Text.pack $ show $ length constrs, "constructors:\n\n"
-          , Text.intercalate "\n" $ sort [Text.append " * " id_ | (ConstrRepr' id_ _ _ _ _) <- constrs]
-          ])
-    Nothing ->
-      -- No custom representation found
-      sp
-
-fixCustomRepr _ _ typ = typ
+maybeConvertToCustomRepr reprs (coreToType' -> Right tyName) hwTy
+  | Just dRepr <- getDataRepr tyName reprs =
+    convertToCustomRepr reprs dRepr hwTy
+maybeConvertToCustomRepr _reprs _ty hwTy = hwTy
 
 -- | Same as @coreTypeToHWType@, but discards void filter information
 coreTypeToHWType'
@@ -330,14 +356,14 @@ coreTypeToHWType builtInTranslation reprs m ty = do
               (Either String FilteredHWType)
   go (Just hwtyE) _ = pure $
     (\(FilteredHWType hwty filtered) ->
-      (FilteredHWType (fixCustomRepr reprs ty hwty) filtered)) <$> hwtyE
+      (FilteredHWType (maybeConvertToCustomRepr reprs ty hwty) filtered)) <$> hwtyE
   -- Strip transparant types:
   go _ (coreView1 m -> Just ty') =
     coreTypeToHWType builtInTranslation reprs m ty'
   -- Try to create hwtype based on AST:
   go _ (tyView -> TyConApp tc args) = runExceptT $ do
     FilteredHWType hwty filtered <- mkADT builtInTranslation reprs m (showPpr ty) tc args
-    return (FilteredHWType (fixCustomRepr reprs ty hwty) filtered)
+    return (FilteredHWType (maybeConvertToCustomRepr reprs ty hwty) filtered)
   -- All methods failed:
   go _ _ = return $ Left $ "Can't translate non-tycon type: " ++ showPpr ty
 
@@ -512,6 +538,7 @@ typeSize (BiDirectional In h) = typeSize h
 typeSize (BiDirectional Out _) = 0
 typeSize (CustomSP _ _ size _) = fromIntegral size
 typeSize (CustomSum _ _ size _) = fromIntegral size
+typeSize (CustomProduct _ _ size _ _) = fromIntegral size
 typeSize (Annotated _ ty) = typeSize ty
 
 -- | Determines the bitsize of the constructor of a type
