@@ -8,6 +8,7 @@
 module Test.Cores.SPI where
 
 import qualified Prelude as P (length, unzip)
+import           Data.Bifunctor (bimap)
 import qualified Data.List as L (group, nub, sort, unzip4)
 import           Data.Maybe
 import           Test.Tasty
@@ -79,106 +80,64 @@ type TestFn halfPeriod waitTime master slave a =
   -> a
   -- ^ Output of test function (depends on test)
 
+-- Run SPI and sample from master and slave. Supplying a transformation
+-- function for master samples and slave samples allows different things to
+-- be tested.
+--
+sampleSPI
+  :: (KnownNat master, KnownNat slave
+     , 1 <= halfPeriod, 1 <= waitTime, 1 <= master, 1 <= slave)
+  => ([Maybe (BitVector master)] -> masterOut)
+  -- ^ Function to turn samples of master to some type
+  -> ([Maybe (BitVector slave)] -> slaveOut)
+  -- ^ Function to turn samples of slaves to some type
+  -> TestFn halfPeriod waitTime master slave (slaveOut, masterOut)
+sampleSPI mF sF mode latch divHalf wait mVal sVal duration =
+  let samples = sampleN duration $ bundle (slaveOut, masterOut)
+   in bimap sF mF $ P.unzip samples
+ where
+  (misoZ, slaveOut) =
+    exposeClockResetEnable spiSlaveLatticeSBIO clk rst enableGen
+      mode latch sclk mosi miso ss (pure sVal)
+
+  miso = veryUnsafeToBiSignalIn misoZ
+  masterIn = masterInBP mVal clk rst bp
+
+  (sclk, mosi, ss, bp, masterOut) =
+    exposeClockResetEnable spiMaster clk rst enableGen
+      mode divHalf wait masterIn (readFromBiSignal miso)
+
+  clk = systemClockGen
+  rst = systemResetGen
+
 testMasterSlave
   :: (1 <= halfPeriod, 1 <= waitTime)
   => TestFn halfPeriod waitTime 10 10 (Value 10, Value 10)
-  -- ^ Outputs (slave, master)
-testMasterSlave spiMode latchSPI divHalf wait mVal sVal duration =
-   let s = sampleN duration (bundle (slaveOut,masterOut))
-       (slaveOutS,masterOutS) = P.unzip s
-       ss0 = catMaybes slaveOutS
-       ms0 = catMaybes masterOutS
-   in  ((L.nub ss0,P.length ss0),(L.nub ms0,P.length ms0))
+  -- ^ Outputs (slave0, master)
+testMasterSlave =
+  sampleSPI samplesToValue samplesToValue
  where
-  slaveIn = pure sVal
-  (misoZ,slaveOut) =
-    exposeClockResetEnable spiSlaveLatticeSBIO
-      clk rst enableGen spiMode latchSPI sclk mosi miso ss slaveIn
-  miso = veryUnsafeToBiSignalIn misoZ
-
-  masterIn = masterInBP mVal clk rst bp
-
-  (sclk,mosi,ss,bp,masterOut) =
-    exposeClockResetEnable spiMaster
-      clk rst enableGen spiMode divHalf wait masterIn (readFromBiSignal miso)
-
-  clk = systemClockGen
-  rst = systemResetGen
+  samplesToValue x =
+    let x' = catMaybes x in (L.nub x', P.length x')
 
 testMasterSlaveMultiWord
   :: (1 <= halfPeriod, 1 <= waitTime)
-  => SPIMode
-  -- ^ SPI Mode
-  -> Bool
-  -- ^ Whether the SPI slave should latch SPI signals
-  -> SNat halfPeriod
-  -- ^ Half-period of the clock divider for the SPI master
-  -> SNat waitTime
-  -- ^ (core clock) cycles between de-assertion of slave-select and start of
-  -- the SPI clock
-  -> BitVector 16
-  -- ^ Value master sends to slave
-  -> BitVector 8
-  -- ^ Value slave sends to master
-  -> Int
-  -- ^ Sample duration
-  -> ([([BitVector 8],Int)],([BitVector 16],Int))
-  -- ^
-  --
-  -- 1.1 Different slave outputs captured, should be equal to master value
-  -- 1.2 Number of slave outputs captured
-  -- 2.1 Different master outputs captured, should be equal to slave value
-  -- 2.2 Number of master outputs captured
-testMasterSlaveMultiWord spiMode latchSPI divHalf wait mVal sVal duration =
-   let s = sampleN duration (bundle (slaveOut,masterOut))
-       (slaveOutS,masterOutS) = P.unzip s
-       ss0 = L.group (L.sort (catMaybes slaveOutS))
-       ms0 = catMaybes masterOutS
-   in  (fmap (\x -> (L.nub x,P.length x)) ss0,(L.nub ms0,P.length ms0))
+  => TestFn halfPeriod waitTime 16 8 ([Value 8], Value 16)
+  -- ^ Outputs ([slave0 values], master)
+testMasterSlaveMultiWord =
+  sampleSPI samplesToValue samplesToValues
  where
-  slaveIn = pure sVal
-  (misoZ,slaveOut) =
-    exposeClockResetEnable spiSlaveLatticeSBIO
-      clk rst enableGen spiMode latchSPI sclk mosi miso ss slaveIn
-  miso = veryUnsafeToBiSignalIn misoZ
+  samplesToValue x =
+    let x' = catMaybes x in (L.nub x', P.length x')
 
-  masterIn = masterInBP mVal clk rst bp
-
-  (sclk,mosi,ss,bp,masterOut) =
-    exposeClockResetEnable spiMaster
-      clk rst enableGen spiMode divHalf wait masterIn (readFromBiSignal miso)
-
-  clk = systemClockGen
-  rst = systemResetGen
+  samplesToValues xs =
+    let xs' = L.group . L.sort $ catMaybes xs
+     in fmap (\x -> (L.nub x, P.length x)) xs'
 
 testMasterMultiSlave
   :: (1 <= halfPeriod, 1 <= waitTime)
-  => SPIMode
-  -- ^ SPI Mode
-  -> Bool
-  -- ^ Whether the SPI slave should latch SPI signals
-  -> SNat halfPeriod
-  -- ^ Half-period of the clock divider for the SPI master
-  -> SNat waitTime
-  -- ^ (core clock) cycles between de-assertion of slave-select and start of
-  -- the SPI clock
-  -> BitVector 10
-  -- ^ Value master sends to slave
-  -> BitVector 10
-  -- ^ Value slave sends to master
-  -> Int
-  -- ^ Sample duration
-  -> (([BitVector 10],Int)
-     ,([BitVector 10],Int)
-     ,([BitVector 10],Int)
-     ,([BitVector 10],Int))
-  -- ^
-  --
-  -- 1.1 Different slave 0 outputs captured, should be equal to master value
-  -- 1.2 Number of slave 0 outputs captured
-  -- ...
-  -- N.1 Different master outputs captured, should be equal to slave value
-  -- N.2 Number of master outputs captured
+  => TestFn halfPeriod waitTime 10 10 (Value 10, Value 10, Value 10, Value 10)
+  -- ^ Outputs (slave0, slave1, slave2, master)
 testMasterMultiSlave spiMode latchSPI divHalf wait mVal sVal duration =
    let s = sampleN duration (bundle (slaveOut0,slaveOut1,slaveOut2,masterOut))
        (slaveOut0MS,slaveOut1MS,slaveOut2MS,masterOutMS) = L.unzip4 s
