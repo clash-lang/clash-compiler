@@ -97,14 +97,14 @@ sampleSPI mF sF mode latch divHalf wait mVal sVal duration =
    in bimap sF mF $ P.unzip samples
  where
   (misoZ, slaveOut) =
-    exposeClockResetEnable spiSlaveLatticeSBIO clk rst enableGen
+    exposeSpecificClockResetEnable spiSlaveLatticeSBIO clk rst enableGen
       mode latch sclk mosi miso ss (pure sVal)
 
   miso = veryUnsafeToBiSignalIn misoZ
   masterIn = masterInBP mVal clk rst bp
 
   (sclk, mosi, ss, bp, masterOut) =
-    exposeClockResetEnable spiMaster clk rst enableGen
+    exposeSpecificClockResetEnable spiMaster clk rst enableGen
       mode divHalf wait masterIn (readFromBiSignal miso)
 
   clk = systemClockGen
@@ -152,15 +152,15 @@ testMasterMultiSlave spiMode latchSPI divHalf wait mVal sVal duration =
  where
   slaveIn = pure sVal
   (misoZ0,slaveOut0) =
-    exposeClockResetEnable spiSlaveLatticeSBIO
+    exposeSpecificClockResetEnable spiSlaveLatticeSBIO
       clk rst enableGen spiMode latchSPI sclk mosi miso ss0 slaveIn
 
   (misoZ1,slaveOut1) =
-    exposeClockResetEnable spiSlaveLatticeSBIO
+    exposeSpecificClockResetEnable spiSlaveLatticeSBIO
       clk rst enableGen spiMode latchSPI sclk mosi miso ss1 slaveIn
 
   (misoZ2,slaveOut2) =
-    exposeClockResetEnable spiSlaveLatticeSBIO
+    exposeSpecificClockResetEnable spiSlaveLatticeSBIO
       clk rst enableGen spiMode latchSPI sclk mosi miso ss2 slaveIn
 
   miso = veryUnsafeToBiSignalIn
@@ -171,7 +171,7 @@ testMasterMultiSlave spiMode latchSPI divHalf wait mVal sVal duration =
   (ss2 :> ss1 :> ss0 :> Nil) = slaveAddressRotate @3 clk rst (ss,bp)
 
   (sclk,mosi,ss,bp,masterOut) =
-    exposeClockResetEnable spiMaster
+    exposeSpecificClockResetEnable spiMaster
       clk rst enableGen spiMode divHalf wait masterIn (readFromBiSignal miso)
 
   clk = systemClockGen

@@ -4,8 +4,9 @@ packages:
 - clash-prelude
 - clash-lib
 - clash-ghc
+- clash-cores
 # - testsuite # still uses cabal new-build internally
 
 extra-deps:
 - ./clash-cosim
-- ./clash-cores
+
