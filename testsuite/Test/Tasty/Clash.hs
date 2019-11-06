@@ -1,7 +1,10 @@
-{-# LANGUAGE CPP #-}
+{-# LANGUAGE CPP            #-}
+{-# LANGUAGE NamedFieldPuns #-}
+
 module Test.Tasty.Clash where
 
 import           Data.Char                 (toLower)
+import           Data.Default              (Default, def)
 import qualified Data.List                 as List
 import           Data.List                 (intercalate)
 import qualified Data.Text                 as T
@@ -24,6 +27,60 @@ data BuildTarget
   | Verilog
   deriving (Show, Eq, Ord)
 
+data Entities
+  = AutoEntities
+  | Entities [String]
+
+stringEntities :: TestOptions -> [String]
+stringEntities TestOptions{entities,hdlSim} =
+  case (entities, hdlSim) of
+    (Entities es, _) -> es
+    (AutoEntities, True) -> ["", "testBench"]
+    (AutoEntities, False) -> [""]
+
+data TopEntity
+  = AutoTopEntity
+  | TopEntity String
+
+stringTopEntity :: TestOptions -> String
+stringTopEntity TestOptions{topEntity,hdlSim} =
+  case (topEntity, hdlSim) of
+    (TopEntity e, _) -> e
+    (AutoTopEntity, True) -> "testBench"
+    (AutoTopEntity, False) -> "topEntity"
+
+data TestOptions =
+  TestOptions
+    { hdlSim :: Bool
+    -- ^ Run hdl simulators (GHDL, ModelSim, etc.)
+    , hdlTargets :: [BuildTarget]
+    -- ^ Run tests for these targets
+    , clashFlags :: [String]
+    -- ^ Extra flags to pass to Clash
+    , entities :: Entities
+    -- ^ Entities to compile in simulator. Default is to autodeduce based
+    -- on 'hdlSim'.
+    , topEntity :: TopEntity
+    -- ^ Top entity to compile. Default is to autodeduce based on 'hdlSim'.
+    }
+
+
+defBuild :: [BuildTarget]
+#ifdef DISABLE_SV_TESTS
+defBuild = [VHDL, Verilog]
+#else
+defBuild = [VHDL, Verilog, SystemVerilog]
+#endif
+
+instance Default TestOptions where
+  def =
+    TestOptions
+      { hdlSim=True
+      , hdlTargets=defBuild
+      , clashFlags=[]
+      , entities=AutoEntities
+      , topEntity=AutoTopEntity
+      }
 
 -- | Single directory for this test run. All tests are run relative to this
 -- directory. This does require all test names to be unique, which is checked
@@ -375,102 +432,86 @@ vsim path modName entName =
       ]
 
 
-runTest'
-  :: FilePath
-  -- ^ Directory test files are located
+runTest1
+  :: String
+  -> TestOptions
+  -> [String]
   -> BuildTarget
-  -- ^ Targets which should be tested
-  -> [String]
-  -- ^ Commandline options passed to Clash
-  -> String
-  -- ^ Name of test
-  -> [String]
-  -- ^ Directories to import in simulator
-  -> String
-  -- ^ Function to test/run
-  -> Bool
-  -- ^ Run HDL simulations. If False, functions will only be compiled with
-  -- the simulators, but never executed.
-  -> [TestName]
-  -- ^ Parent test names in order of distance to the test. That is, the last
-  -- item in the list will be the root node, while the first one will be the
-  -- one closest to the test.
   -> TestTree
-runTest' env VHDL extraArgs modName subdirs entName doSim path =
+runTest1 modName testOptions@TestOptions{hdlSim,clashFlags} path VHDL =
   withResource acquire tastyRelease (const seqTests)
-    where
-      vhdlDir = "vhdl"
-      modDir  = vhdlDir </> modName
-      workDir = modDir </> "work"
-      acquire = tastyAcquire path' [vhdlDir, modDir, workDir]
-      path'   = "VHDL":path
+ where
+   subdirs = stringEntities testOptions
+   entName = stringTopEntity testOptions
+   env     = foldl (</>) sourceDirectory (reverse (tail path))
+   vhdlDir = "vhdl"
+   modDir  = vhdlDir </> modName
+   workDir = modDir </> "work"
+   acquire = tastyAcquire path' [vhdlDir, modDir, workDir]
+   path'   = "VHDL":path
 
-      libs
-        | length subdirs == 1 = []
-        | otherwise           = subdirs List.\\ [entName]
+   libs
+     | length subdirs == 1 = []
+     | otherwise           = subdirs List.\\ [entName]
 
-      seqTests :: TestTree
-      seqTests = testGroup "VHDL" (sequenceTests path' tests)
+   seqTests :: TestTree
+   seqTests = testGroup "VHDL" (sequenceTests path' tests)
 
-      tests = concat $ [
-          [ clashHDL VHDL (sourceDirectory </> env) extraArgs modName (testDirectory path') ]
-        , map (ghdlLibrary path' modName) libs
-        , [ghdlImport path' modName (subdirs List.\\ libs)]
-        , [ghdlMake path' modName subdirs libs entName]
-        ] ++ [if doSim then [ghdlSim path' modName (noConflict entName subdirs)] else []]
+   tests = concat $ [
+       [ clashHDL VHDL env clashFlags modName (testDirectory path') ]
+     , map (ghdlLibrary path' modName) libs
+     , [ghdlImport path' modName (subdirs List.\\ libs)]
+     , [ghdlMake path' modName subdirs libs entName]
+     ] ++ [if hdlSim then [ghdlSim path' modName (noConflict entName subdirs)] else []]
 
-runTest' env Verilog extraArgs modName subdirs entName doSim path =
+runTest1 modName testOptions@TestOptions{hdlSim,clashFlags} path Verilog =
   withResource acquire tastyRelease (const seqTests)
-    where
-      verilogDir = "verilog"
-      modDir     = verilogDir </> modName
-      acquire    = tastyAcquire path' [verilogDir, modDir]
-      path'      = "Verilog":path
+ where
+   subdirs = stringEntities testOptions
+   entName = stringTopEntity testOptions
+   env     = foldl (</>) sourceDirectory (reverse (tail path))
+   verilogDir = "verilog"
+   modDir     = verilogDir </> modName
+   acquire    = tastyAcquire path' [verilogDir, modDir]
+   path'      = "Verilog":path
 
-      seqTests = testGroup "Verilog" $ sequenceTests path' $
-        [ clashHDL Verilog (sourceDirectory </> env) extraArgs modName (testDirectory path')
-        , iverilog path' modName subdirs entName
-        ] ++ if doSim then [vvp path' modName (noConflict entName subdirs)] else []
+   seqTests = testGroup "Verilog" $ sequenceTests path' $
+     [ clashHDL Verilog env clashFlags modName (testDirectory path')
+     , iverilog path' modName subdirs entName
+     ] ++ if hdlSim then [vvp path' modName (noConflict entName subdirs)] else []
 --           ++ map (\f -> f (cwDir </> env) Verilog verilogDir modDir modName entName)
 
-runTest' env SystemVerilog extraArgs modName subdirs entName doSim path =
+runTest1 modName testOptions@TestOptions{hdlSim,clashFlags} path SystemVerilog =
   withResource acquire tastyRelease (const seqTests)
-    where
-      svDir   = "systemverilog"
-      modDir  = svDir </> modName
-      acquire = tastyAcquire path' [svDir, modDir]
-      path'   = "SystemVerilog":path
+ where
+   subdirs = stringEntities testOptions
+   entName = stringTopEntity testOptions
+   env     = foldl (</>) sourceDirectory (reverse (tail path))
+   svDir   = "systemverilog"
+   modDir  = svDir </> modName
+   acquire = tastyAcquire path' [svDir, modDir]
+   path'   = "SystemVerilog":path
 
-      seqTests = testGroup "SystemVerilog" $ sequenceTests path' $ concat $
-        [ [ clashHDL SystemVerilog (sourceDirectory </> env) extraArgs modName (testDirectory path') ]
-          , vlog path' modName subdirs
-          ] ++ [if doSim then [vsim path' modName entName] else []]
-            -- ++ [map (\f -> f (cwDir </> env) SystemVerilog svDir modDir modName entName) ]
+   seqTests = testGroup "SystemVerilog" $ sequenceTests path' $ concat $
+     [ [ clashHDL SystemVerilog env clashFlags modName (testDirectory path') ]
+       , vlog path' modName subdirs
+       ] ++ [if hdlSim then [vsim path' modName entName] else []]
+         -- ++ [map (\f -> f (cwDir </> env) SystemVerilog svDir modDir modName entName) ]
 
 runTest
-  :: FilePath
-  -- ^ Directory test files are in
-  -> [BuildTarget]
-  -- ^ Targets which should be tested
-  -> [String]
-  -- ^ Commandline options passed to Clash
-  -> String
+  :: String
   -- ^ Name of test
-  -> ([String], String, Bool)
-  -- ^ ( Directories to import in simulator
-  --   , Function to test/run/
-  --   , Run HDL simulations. If False, functions will only be compiled with
-  --     the simulators, but never executed. )
+  -> TestOptions
+  -- ^ See "TestOptions"
   -> [TestName]
   -- ^ Parent test names in order of distance to the test. That is, the last
   -- item in the list will be the root node, while the first one will be the
-  -- one closest to the test.
+  -- one closest to the test. Should correspond to directories on filesystem.
   -> TestTree
-runTest env targets extraArgs modName (subdirs, entName, doSim) path =
-  testGroup modName (map runTest'' targets)
-    where
-      runTest'' target =
-        runTest' env target extraArgs modName subdirs entName doSim (modName:path)
+runTest modName testOptions path =
+  testGroup modName (map runTest2 (hdlTargets testOptions))
+ where
+  runTest2 = runTest1 modName testOptions (modName:path)
 
 runFailingTest'
   :: Bool
