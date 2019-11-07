@@ -65,18 +65,14 @@ data TestOptions =
     }
 
 
-defBuild :: [BuildTarget]
-#ifdef DISABLE_SV_TESTS
-defBuild = [VHDL, Verilog]
-#else
-defBuild = [VHDL, Verilog, SystemVerilog]
-#endif
+allTargets :: [BuildTarget]
+allTargets = [VHDL, Verilog, SystemVerilog]
 
 instance Default TestOptions where
   def =
     TestOptions
       { hdlSim=True
-      , hdlTargets=defBuild
+      , hdlTargets=allTargets
       , clashFlags=[]
       , entities=AutoEntities
       , topEntity=AutoTopEntity

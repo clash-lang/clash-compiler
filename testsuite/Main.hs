@@ -77,11 +77,11 @@ runClashTest = defaultMain $ clashTestRoot
       , runFailingTest ("tests" </> "shouldfail") [VHDL] [] "RecursiveDatatype" (Just "Not in normal form: no Letrec")
       , runFailingTest ("tests" </> "shouldfail" </> "InvalidPrimitive") [VHDL] ["-itests/shouldfail/InvalidPrimitive"] "InvalidPrimitive" (Just "InvalidPrimitive.json")
       -- Disabled, due to it eating gigabytes of memory:
-      -- , runFailingTest ("tests" </> "shouldfail") defBuild [] "RecursivePoly" (Just "??")
+      -- , runFailingTest ("tests" </> "shouldfail") allTargets [] "RecursivePoly" (Just "??")
       ]
     , clashTestGroup "shouldwork"
       [ clashTestGroup "AutoReg"
-        [ outputTest ("tests" </> "shouldwork" </> "AutoReg") defBuild [] [] "AutoReg" "main"
+        [ outputTest ("tests" </> "shouldwork" </> "AutoReg") allTargets [] [] "AutoReg" "main"
         ]
       , clashTestGroup "Basic"
         [ -- TODO: Enable AES test on SystemVerilog. See issue #569.
@@ -101,7 +101,7 @@ runClashTest = defaultMain $ clashTestRoot
         , runTest "MultipleHidden" def
 #endif
         , runTest "NameInstance" def{hdlSim=False}
-        , outputTest ("tests" </> "shouldwork" </> "Basic") defBuild [] [] "NameInstance" "main"
+        , outputTest ("tests" </> "shouldwork" </> "Basic") allTargets [] [] "NameInstance" "main"
         , runTest "NameOverlap" def{
             entities=Entities ["nameoverlap"]
           , topEntity=TopEntity "nameoverlap"
@@ -137,7 +137,7 @@ runClashTest = defaultMain $ clashTestRoot
         [ outputTest ("tests" </> "shouldwork" </> "BlackBox") [VHDL]   [] [] "TemplateFunction"   "main"
         , outputTest ("tests" </> "shouldwork" </> "BlackBox") [VHDL]   [] [] "BlackBoxFunction"   "main"
         , runTest "BlackBoxFunctionHO" def{hdlTargets=[VHDL]}
-        , outputTest ("tests" </> "shouldwork" </> "Signal")   defBuild [] [] "BlockRamLazy"       "main"
+        , outputTest ("tests" </> "shouldwork" </> "Signal")   allTargets [] [] "BlockRamLazy"       "main"
         , runFailingTest ("tests" </> "shouldfail" </> "BlackBox") [VHDL] [] "WrongReference" (Just "Function WrongReference.myMultiply was annotated with an inline primitive for WrongReference.myMultiplyX. These names should be the same.")
         ]
       , clashTestGroup "BoxedFunctions"
@@ -170,9 +170,9 @@ runClashTest = defaultMain $ clashTestRoot
 
         , clashTestGroup "ZeroWidth"
           [ runTest "ZeroWidth" def{hdlSim=False}
-          , runFailingTest ("tests" </> "shouldwork" </> "CustomReprs" </> "ZeroWidth") defBuild [] "FailGracefully1" (Just "Unexpected projection of zero-width type")
-          , runFailingTest ("tests" </> "shouldwork" </> "CustomReprs" </> "ZeroWidth") defBuild [] "FailGracefully2" (Just "Unexpected projection of zero-width type")
-          , runFailingTest ("tests" </> "shouldwork" </> "CustomReprs" </> "ZeroWidth") defBuild [] "FailGracefully3" (Just "Unexpected projection of zero-width type")
+          , runFailingTest ("tests" </> "shouldwork" </> "CustomReprs" </> "ZeroWidth") allTargets [] "FailGracefully1" (Just "Unexpected projection of zero-width type")
+          , runFailingTest ("tests" </> "shouldwork" </> "CustomReprs" </> "ZeroWidth") allTargets [] "FailGracefully2" (Just "Unexpected projection of zero-width type")
+          , runFailingTest ("tests" </> "shouldwork" </> "CustomReprs" </> "ZeroWidth") allTargets [] "FailGracefully3" (Just "Unexpected projection of zero-width type")
           ]
         ]
       , clashTestGroup "DDR"
@@ -231,13 +231,13 @@ runClashTest = defaultMain $ clashTestRoot
         , runTest "DivideByZero" def
         , runTest "ExpWithGhcCF" def{clashFlags=["-itests/shouldwork/Numbers", "-fconstraint-solver-iterations=15"]}
         , runTest "ExpWithClashCF" def{clashFlags=["-itests/shouldwork/Numbers", "-fconstraint-solver-iterations=15"]}
-        , outputTest ("tests" </> "shouldwork" </> "Numbers") defBuild ["-itests/shouldwork/Numbers"] ["-itests/shouldwork/Numbers"] "ExpWithClashCF"  "main"
+        , outputTest ("tests" </> "shouldwork" </> "Numbers") allTargets ["-itests/shouldwork/Numbers"] ["-itests/shouldwork/Numbers"] "ExpWithClashCF"  "main"
         , runTest "HalfAsBlackboxArg" def{hdlTargets=[VHDL], hdlSim=False}
         -- TODO: re-enable for Verilog
         , runTest "NumConstantFoldingTB_1" def{clashFlags=["-itests/shouldwork/Numbers"]}
-        , outputTest ("tests" </> "shouldwork" </> "Numbers") defBuild ["-fconstraint-solver-iterations=15"] ["-itests/shouldwork/Numbers"] "NumConstantFolding_1"  "main"
+        , outputTest ("tests" </> "shouldwork" </> "Numbers") allTargets ["-fconstraint-solver-iterations=15"] ["-itests/shouldwork/Numbers"] "NumConstantFolding_1"  "main"
         , runTest "NumConstantFoldingTB_2" def{clashFlags=["-itests/shouldwork/Numbers"]}
-        , outputTest ("tests" </> "shouldwork" </> "Numbers") defBuild ["-fconstraint-solver-iterations=15"] ["-itests/shouldwork/Numbers"] "NumConstantFolding_2"  "main"
+        , outputTest ("tests" </> "shouldwork" </> "Numbers") allTargets ["-fconstraint-solver-iterations=15"] ["-itests/shouldwork/Numbers"] "NumConstantFolding_2"  "main"
 #if MIN_VERSION_base(4,12,0)
         -- Naturals are broken on GHC <= 8.4. See https://github.com/clash-lang/clash-compiler/pull/473
         , runTest "Naturals" def
@@ -261,8 +261,8 @@ runClashTest = defaultMain $ clashTestRoot
         , runTest "LocalPoly" def{hdlSim=False}
         ]
       , clashTestGroup "PrimitiveGuards"
-        [ runFailingTest ("tests" </> "shouldfail" </> "PrimitiveGuards") defBuild [] "HasBlackBox" (Just "No BlackBox definition for 'HasBlackBox.primitive' even though this value was annotated with 'HasBlackBox'.")
-        , runFailingTest ("tests" </> "shouldfail" </> "PrimitiveGuards") defBuild [] "DontTranslate" (Just "Clash was forced to translate 'DontTranslate.primitive', but this value was marked with DontTranslate. Did you forget to include a blackbox for one of the constructs using this?")
+        [ runFailingTest ("tests" </> "shouldfail" </> "PrimitiveGuards") allTargets [] "HasBlackBox" (Just "No BlackBox definition for 'HasBlackBox.primitive' even though this value was annotated with 'HasBlackBox'.")
+        , runFailingTest ("tests" </> "shouldfail" </> "PrimitiveGuards") allTargets [] "DontTranslate" (Just "Clash was forced to translate 'DontTranslate.primitive', but this value was marked with DontTranslate. Did you forget to include a blackbox for one of the constructs using this?")
         , runWarningTest ("tests" </> "shouldwork" </> "PrimitiveGuards") [VHDL] [] "WarnAlways" (Just "You shouldn't use 'primitive'!")
         ]
 
@@ -278,7 +278,7 @@ runClashTest = defaultMain $ clashTestRoot
       ]
       , clashTestGroup "Signal"
         [ runTest "AlwaysHigh" def{hdlSim=False}
-        , outputTest ("tests" </> "shouldwork" </> "Signal") defBuild [] [] "BlockRamLazy"    "main"
+        , outputTest ("tests" </> "shouldwork" </> "Signal") allTargets [] [] "BlockRamLazy"    "main"
         , runTest "BlockRamFile" def
         , runTest "BlockRam0" def
         , runTest "BlockRam1" def
@@ -308,15 +308,15 @@ runClashTest = defaultMain $ clashTestRoot
           , runTest "CounterHalfTupleRev" def
           ]
 
-        , runFailingTest ("tests" </> "shouldfail" </> "Signal") defBuild [] "MAC" (Just "Couldn't instantiate blackbox for Clash.Signal.Internal.register#")
+        , runFailingTest ("tests" </> "shouldfail" </> "Signal") allTargets [] "MAC" (Just "Couldn't instantiate blackbox for Clash.Signal.Internal.register#")
         ]
       , clashTestGroup "SynthesisAttributes"
-        [ outputTest ("tests" </> "shouldwork" </> "SynthesisAttributes") defBuild [] [] "Simple"  "main"
-        , outputTest ("tests" </> "shouldwork" </> "SynthesisAttributes") defBuild [] [] "Product" "main"
+        [ outputTest ("tests" </> "shouldwork" </> "SynthesisAttributes") allTargets [] [] "Simple"  "main"
+        , outputTest ("tests" </> "shouldwork" </> "SynthesisAttributes") allTargets [] [] "Product" "main"
         , runTest "Product" def
         , clashTestGroup "ShouldFail" [
-            runFailingTest ("tests" </> "shouldfail" </> "SynthesisAttributes") defBuild [] "ProductInArgs"   (Just "Attempted to split Product into a number of HDL ports.")
-          , runFailingTest ("tests" </> "shouldfail" </> "SynthesisAttributes") defBuild [] "ProductInResult" (Just "Attempted to split Product into a number of HDL ports.")
+            runFailingTest ("tests" </> "shouldfail" </> "SynthesisAttributes") allTargets [] "ProductInArgs"   (Just "Attempted to split Product into a number of HDL ports.")
+          , runFailingTest ("tests" </> "shouldfail" </> "SynthesisAttributes") allTargets [] "ProductInResult" (Just "Attempted to split Product into a number of HDL ports.")
           ]
         ]
       , clashTestGroup "Testbench"

@@ -22,8 +22,8 @@ package clash-cosim
 
 package clash-testsuite
   ghc-options: -Werror
-  -- enable cosim & disable systemverilog testing (needs modelsim)
-  flags: disable-sv-tests cosim
+  -- enable cosim
+  flags: cosim
 
 package clash-ghc
   ghc-options: -Werror
