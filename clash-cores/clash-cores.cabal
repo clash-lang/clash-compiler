@@ -94,7 +94,9 @@ test-suite unittests
   if !flag(unittests)
     buildable: False
 
-  other-Modules: Test.Cores.SPI
+  other-Modules:
+    Test.Cores.Base
+    Test.Cores.SPI
 
   build-depends:
     clash-cores,

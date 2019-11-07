@@ -118,7 +118,7 @@ spiCommon
   -- ^ SCK
   -> Signal dom (BitVector n)
   -> ( Signal dom Bit   -- Slave: MISO; Master: MOSI
-     , Signal dom Bool  -- Acknowledgement Signal
+     , Signal dom Bool  -- Acknowledge start of transfer
      , Signal dom (Maybe (BitVector n))
      )
 spiCommon mode ssI msI sckI dinI =
@@ -127,20 +127,21 @@ spiCommon mode ssI msI sckI dinI =
                 , undefined         -- sckOldR
                 , deepErrorX "no initial dataInR"
                 , deepErrorX "no initial dataOutR"
+                , False             -- ackR
                 , False             -- doneR
                 )
                 (ssI,msI,sckI,dinI)
  where
-  cvt (_,_,_,dataInQ,dataOutQ,doneQ) =
+  cvt (_,_,_,dataInQ,dataOutQ,ackQ,doneQ) =
     ( head dataOutQ
-    , undefined -- TODO Initial acknoledgement signal
+    , ackQ
     , if doneQ
          then Just (pack dataInQ)
          else Nothing
     )
 
-  go (cntQ,cntOldQ,sckOldQ,dataInQ,dataOutQ,_) (ss,ms,sck,din) =
-    (cntD,cntOldD,sck,dataInD,dataOutD,doneD)
+  go (cntQ,cntOldQ,sckOldQ,dataInQ,dataOutQ,_,_) (ss,ms,sck,din) =
+    (cntD,cntOldD,sck,dataInD,dataOutD,ackD,doneD)
    where
     cntD
       | ss        = 0
@@ -168,14 +169,15 @@ spiCommon mode ssI msI sckI dinI =
     cntOldD | not ss && shiftSck = cntQ == maxBound
             | otherwise          = cntOldQ
 
+    ackD  = not ss && shiftSck && cntQ == 1
     doneD = not ss && sampleSck && cntQ == maxBound
-
-    risingSck  = not sckOldQ && sck
-    fallingSck = sckOldQ && not sck
 
     (sampleSck, shiftSck)
       | sampleOnRising mode = (risingSck, fallingSck)
       | otherwise           = (fallingSck, risingSck)
+     where
+      risingSck  = not sckOldQ && sck
+      fallingSck = sckOldQ && not sck
 
 -- | SPI slave configurable SPI mode and tri-state buffer
 spiSlave
@@ -198,6 +200,7 @@ spiSlave
   --
   -- Input is latched the moment slave select goes low
   -> ( BiSignalOut ds dom 1
+     , Signal dom Bool
      , Signal dom (Maybe (BitVector n)))
   -- ^ Parts of the tuple:
   --
@@ -208,9 +211,9 @@ spiSlave (SPISlaveConfig mode latch buf) sclk mosi bin ss din =
   let ssL   = if latch then delay undefined ss   else ss
       mosiL = if latch then delay undefined mosi else mosi
       sclkL = if latch then delay undefined sclk else sclk
-      (miso, _, dout) = spiCommon mode ssL mosiL sclkL din -- TODO: Handle ack?
+      (miso, ack, dout) = spiCommon mode ssL mosiL sclkL din
       bout = buf bin (not <$> ssL) miso
-  in  (bout,dout)
+  in  (bout, ack, dout)
 
 -- | SPI master configurable in the SPI mode and clock divider
 --
@@ -241,6 +244,7 @@ spiMaster
      , Signal dom Bit  -- MOSI
      , Signal dom Bool -- SS
      , Signal dom Bool -- Busy
+     , Signal dom Bool -- Acknowledge
      , Signal dom (Maybe (BitVector n)) -- Data: Slave -> Master
      )
   -- ^ Parts of the tuple:
@@ -252,14 +256,14 @@ spiMaster
   --    the data line will be ignored when /True/
   -- 5. (Maybe) the word send from the slave to the master
 spiMaster mode fN fW din miso =
-  let (mosi,_,dout)   = spiCommon mode ssL misoL sclkL  -- TODO Handle ack?
+  let (mosi, ack, dout)   = spiCommon mode ssL misoL sclkL
                         (fromMaybe undefined# <$> din)
       latch = snatToInteger fN /= 1
       ssL   = if latch then delay undefined ss   else ss
       misoL = if latch then delay undefined miso else miso
       sclkL = if latch then delay undefined sclk else sclk
-      (ss,sclk,busy) = spiGen mode fN fW din
-  in  (sclk,mosi,ss,busy,dout)
+      (ss, sclk, busy) = spiGen mode fN fW din
+  in  (sclk, mosi, ss, busy, ack, dout)
 
 -- | Generate slave select and SCK
 spiGen
@@ -352,6 +356,7 @@ spiSlaveLatticeSBIO
   --
   -- Input is latched the moment slave select goes low
   -> ( BiSignalOut 'Floating dom 1
+     , Signal dom Bool
      , Signal dom (Maybe (BitVector n)))
   -- ^ Parts of the tuple:
   --

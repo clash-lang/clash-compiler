@@ -7,8 +7,7 @@
 -}
 module Test.Cores.SPI where
 
-import qualified Prelude as P (length, unzip)
-import           Data.Bifunctor (bimap)
+import qualified Prelude as P (length)
 import qualified Data.List as L (group, nub, sort, unzip4)
 import           Data.Maybe
 import           Test.Tasty
@@ -17,18 +16,7 @@ import           Clash.Prelude
 import qualified Clash.Explicit.Prelude as E
 import           Clash.Cores.SPI
 
-masterInBP
-  :: KnownDomain dom
-  => BitVector n
-  -> Clock dom
-  -> Reset dom
-  -> Signal dom Bool
-  -> Signal dom (Maybe (BitVector n))
-masterInBP val clk rst =
-  E.moore clk rst enableGen
-    (flip const)
-    (\b -> if b then Nothing else Just val)
-    True
+import           Test.Cores.Base
 
 slaveAddressRotate
   :: forall n dom
@@ -39,20 +27,16 @@ slaveAddressRotate
   -> Vec n (Signal dom Bool)
 slaveAddressRotate clk rst =
   E.mealyB clk rst enableGen
-    (\(cntQ,bQ) (ss,b) ->
+    (\(cntQ, bQ) (ss, b) ->
         let bF = bQ && not b
             cntD | bF = if cntQ == maxBound then 0 else cntQ + 1
                  | otherwise = cntQ
 
-            oH = map (ss ||) (unpack (complement (bin2onehot cntQ)))
-        in  ((cntD,b),oH))
-    (0 :: Index n,False)
-
-bin2onehot
-  :: (KnownNat n, 1 <= n)
-  => Index n
-  -> BitVector n
-bin2onehot = setBit 0 . fromEnum
+            oH = (ss ||) <$> (unpack . complement $ bin2onehot cntQ)
+        in  ((cntD, b), oH))
+    (0 :: Index n, False)
+ where
+  bin2onehot = setBit 0 . fromEnum
 
 -- Values from SPI master / slave.
 -- This is a pair of distinct readings and the number of readings.
@@ -80,42 +64,13 @@ type TestFn halfPeriod waitTime master slave a =
   -> a
   -- ^ Output of test function (depends on test)
 
--- Run SPI and sample from master and slave. Supplying a transformation
--- function for master samples and slave samples allows different things to
--- be tested.
---
-sampleSPI
-  :: (KnownNat master, KnownNat slave
-     , 1 <= halfPeriod, 1 <= waitTime, 1 <= master, 1 <= slave)
-  => ([Maybe (BitVector master)] -> masterOut)
-  -- ^ Function to turn samples of master to some type
-  -> ([Maybe (BitVector slave)] -> slaveOut)
-  -- ^ Function to turn samples of slaves to some type
-  -> TestFn halfPeriod waitTime master slave (slaveOut, masterOut)
-sampleSPI mF sF mode latch divHalf wait mVal sVal duration =
-  let samples = sampleN duration $ bundle (slaveOut, masterOut)
-   in bimap sF mF $ P.unzip samples
- where
-  (misoZ, slaveOut) =
-    exposeSpecificClockResetEnable spiSlaveLatticeSBIO clk rst enableGen
-      mode latch sclk mosi miso ss (pure sVal)
-
-  miso = veryUnsafeToBiSignalIn misoZ
-  masterIn = masterInBP mVal clk rst bp
-
-  (sclk, mosi, ss, bp, masterOut) =
-    exposeSpecificClockResetEnable spiMaster clk rst enableGen
-      mode divHalf wait masterIn (readFromBiSignal miso)
-
-  clk = systemClockGen
-  rst = systemResetGen
-
 testMasterSlave
   :: (1 <= halfPeriod, 1 <= waitTime)
   => TestFn halfPeriod waitTime 10 10 (Value 10, Value 10)
   -- ^ Outputs (slave0, master)
-testMasterSlave =
-  sampleSPI samplesToValue samplesToValue
+testMasterSlave mode latch halfPeriod wait mVal sVal duration =
+  let spis = sampleSPI mode latch halfPeriod wait mVal sVal duration
+   in (samplesToValue (ssSlaveOut spis), samplesToValue (ssMasterOut spis))
  where
   samplesToValue x =
     let x' = catMaybes x in (L.nub x', P.length x')
@@ -124,8 +79,9 @@ testMasterSlaveMultiWord
   :: (1 <= halfPeriod, 1 <= waitTime)
   => TestFn halfPeriod waitTime 16 8 ([Value 8], Value 16)
   -- ^ Outputs ([slave0 values], master)
-testMasterSlaveMultiWord =
-  sampleSPI samplesToValue samplesToValues
+testMasterSlaveMultiWord mode latch halfPeriod wait mVal sVal duration =
+  let spis = sampleSPI mode latch halfPeriod wait mVal sVal duration
+   in (samplesToValues (ssSlaveOut spis), samplesToValue (ssMasterOut spis))
  where
   samplesToValue x =
     let x' = catMaybes x in (L.nub x', P.length x')
@@ -151,26 +107,26 @@ testMasterMultiSlave spiMode latchSPI divHalf wait mVal sVal duration =
        ,(L.nub masterOutS,P.length masterOutS))
  where
   slaveIn = pure sVal
-  (misoZ0,slaveOut0) =
+  (misoZ0, _, slaveOut0) =
     exposeSpecificClockResetEnable spiSlaveLatticeSBIO
       clk rst enableGen spiMode latchSPI sclk mosi miso ss0 slaveIn
 
-  (misoZ1,slaveOut1) =
+  (misoZ1, _, slaveOut1) =
     exposeSpecificClockResetEnable spiSlaveLatticeSBIO
       clk rst enableGen spiMode latchSPI sclk mosi miso ss1 slaveIn
 
-  (misoZ2,slaveOut2) =
+  (misoZ2, _, slaveOut2) =
     exposeSpecificClockResetEnable spiSlaveLatticeSBIO
       clk rst enableGen spiMode latchSPI sclk mosi miso ss2 slaveIn
 
   miso = veryUnsafeToBiSignalIn
          (mergeBiSignalOuts (misoZ2 :> misoZ1 :> misoZ0 :> Nil))
 
-  masterIn = masterInBP mVal clk rst bp
+  masterIn = masterInBP clk rst mVal bp
 
   (ss2 :> ss1 :> ss0 :> Nil) = slaveAddressRotate @3 clk rst (ss,bp)
 
-  (sclk,mosi,ss,bp,masterOut) =
+  (sclk, mosi, ss, bp, _, masterOut) =
     exposeSpecificClockResetEnable spiMaster
       clk rst enableGen spiMode divHalf wait masterIn (readFromBiSignal miso)
 
