@@ -30,7 +30,8 @@ import Clash.Rewrite.Util
 normalization :: NormRewrite
 normalization = rmDeadcode >-> constantPropagation >-> etaTL >-> rmUnusedExpr >-!-> anf >-!-> rmDeadcode >->
                 bindConst >-> letTL >-> evalConst >-!-> cse >-!-> cleanup >->
-                recLetRec >-> splitArgs
+                xOptim >-> rmDeadcode >->
+                cleanup >-> recLetRec >-> splitArgs
   where
     etaTL      = apply "etaTL" etaExpansionTL !-> topdownR (apply "applicationPropagation" appPropFast)
     anf        = topdownR (apply "nonRepANF" nonRepANF) >-> apply "ANF" makeANF >-> topdownR (apply "caseCon" caseCon)
@@ -42,6 +43,7 @@ normalization = rmDeadcode >-> constantPropagation >-> etaTL >-> rmUnusedExpr >-
     -- See [Note] bottomup traversal evalConst:
     evalConst  = bottomupR (apply "evalConst" reduceConst)
     cse        = topdownR (apply "CSE" simpleCSE)
+    xOptim     = bottomupR (apply "xOptimize" xOptimize)
     cleanup    = topdownR (apply "etaExpandSyn" etaExpandSyn) >->
                  topdownSucR (apply "inlineCleanup" inlineCleanup) !->
                  innerMost (applyMany [("caseCon"        , caseCon)
