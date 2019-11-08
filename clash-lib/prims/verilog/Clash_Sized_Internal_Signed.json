@@ -32,13 +32,13 @@ assign ~RESULT = $signed(~SYM[6][~SIZE[~TYPO]-1:0]);
     , "template"  :
 "// modSigned begin
 // remainder
-~SIGD[~GENSYM[rem_res][0]][0];
+wire ~SIGD[~GENSYM[rem_res][0]][0];
 assign ~SYM[0] = ~VAR[dividend][0] % ~VAR[divider][1];
 
 // modulo
 assign ~RESULT = (~VAR[dividend][0][~SIZE[~TYPO]-1] == ~VAR[divider][1][~SIZE[~TYPO]-1]) ?
                  ~SYM[0] :
-                 (~VAR[dividend][0] == ~SIZE[~TYPO]'sd0 ? ~SIZE[~TYPO]'sd0 : ~SYM[0] + ~VAR[divider][1]);
+                 (~SYM[0] == ~SIZE[~TYPO]'sd0 ? ~SIZE[~TYPO]'sd0 : ~SYM[0] + ~VAR[divider][1]);
 // modSigned end"
     }
   }
