@@ -1190,7 +1190,11 @@ userTyName dflt nm0 hwTy = do
 
 -- | Convert a Netlist HWType to an error VHDL value for that type
 sizedQualTyNameErrValue :: HWType -> VHDLM Doc
-sizedQualTyNameErrValue Bool                = "true"
+sizedQualTyNameErrValue Bool                = do
+  udf <- Mon (use undefValue)
+  case udf of
+    Just (Just 0) -> "false"
+    _             -> "true"
 sizedQualTyNameErrValue Bit                 = singularErrValue
 sizedQualTyNameErrValue t@(Vector n elTy)   = do
   syn <-Mon hdlSyn
