@@ -17,6 +17,7 @@ module Clash.Cores.SPI
   ) where
 
 import Data.Maybe (fromMaybe, isJust)
+import Test.QuickCheck as QC
 
 import Clash.Prelude
 import Clash.Sized.Internal.BitVector
@@ -57,6 +58,9 @@ data SPIMode
   --
   -- TL;DR Data is shifted on the rising edge of SCK.
   deriving (Eq, Show)
+
+instance Arbitrary SPIMode where
+  arbitrary = QC.elements [SPIMode0, SPIMode1, SPIMode2, SPIMode3]
 
 idleOnLow :: SPIMode -> Bool
 idleOnLow SPIMode0 = True

@@ -14,6 +14,11 @@ category:            Hardware
 build-type:          Simple
 extra-source-files:  CHANGELOG.md
 
+tested-with:
+  GHC == 8.4.4,
+  GHC == 8.6.5,
+  GHC == 8.8.1
+
 flag unittests
   description:
     You can disable testing with unittests using `-f-unittests`.
@@ -66,6 +71,7 @@ common basic-config
     ghc-typelits-natnormalise >= 0.6,
     ghc-typelits-extra        >= 0.3.1,
     ghc-typelits-knownnat     >= 0.6,
+    QuickCheck
 
 library
   import: basic-config
@@ -95,11 +101,14 @@ test-suite unittests
     buildable: False
 
   other-Modules:
-    Test.Cores.Base
+    Test.Cores.Internal.SampleSPI
+    Test.Cores.Internal.Signals
     Test.Cores.SPI
+    Test.Cores.SPI.MultiSlave
 
   build-depends:
     clash-cores,
     tasty        >= 1.2 && < 1.3,
-    tasty-hunit
+    tasty-hunit,
+    tasty-quickcheck
 

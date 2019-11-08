@@ -10,12 +10,12 @@ module Main where
 import Prelude
 import Test.Tasty
 
-import qualified Test.Cores.SPI
+import qualified Test.Cores.SPI as SPI
+import qualified Test.Cores.SPI.MultiSlave as Mul
 
 tests :: TestTree
-tests = testGroup "Unittests"
-  [ Test.Cores.SPI.tests
-  ]
+tests = testGroup "Unittests" [SPI.tests, Mul.tests]
 
 main :: IO ()
 main = defaultMain tests
+
