@@ -751,7 +751,7 @@ removeUnusedExpr :: HasCallStack => NormRewrite
 removeUnusedExpr _ e@(collectArgsTicks -> (p@(Prim nm pInfo),args,ticks)) = do
   bbM <- HashMap.lookup nm <$> Lens.use (extra.primitives)
   case bbM of
-    Just (extractPrim ->  Just (BlackBox pNm _ _ _ _ _ _ _ inc r ri templ)) -> do
+    Just (extractPrim ->  Just (BlackBox pNm _ _ _ _ _ _ _ _ inc r ri templ)) -> do
       let usedArgs | isFromInt pNm
                    = [0,1,2]
                    | nm `elem` ["Clash.Annotations.BitRepresentation.Deriving.dontApplyInHDL"

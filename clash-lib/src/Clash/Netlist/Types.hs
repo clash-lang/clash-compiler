@@ -331,6 +331,8 @@ data Expr
       !Bool                    -- FIELD Wrap in paretheses?
   | ConvBV     (Maybe Identifier) HWType Bool Expr
   | IfThenElse Expr Expr Expr
+  -- | Do nothing
+  | Noop
   deriving Show
 
 -- | Literals used in an expression

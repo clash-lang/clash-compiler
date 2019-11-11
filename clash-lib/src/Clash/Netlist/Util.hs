@@ -106,12 +106,6 @@ isVoid _       = False
 isFilteredVoid :: FilteredHWType -> Bool
 isFilteredVoid = isVoid . stripFiltered
 
-isBiSignalOut :: HWType -> Bool
-isBiSignalOut (Void (Just (BiDirectional Out _))) = True
-isBiSignalOut (Vector n ty) | n /= 0              = isBiSignalOut ty
-isBiSignalOut (RTree _ ty)                        = isBiSignalOut ty
-isBiSignalOut _                                   = False
-
 mkIdentifier :: IdType -> Identifier -> NetlistMonad Identifier
 mkIdentifier typ nm = Lens.use mkIdentifierFn <*> pure typ <*> pure nm
 

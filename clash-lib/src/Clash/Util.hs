@@ -218,6 +218,11 @@ traceIf True  msg = trace msg
 traceIf False _   = id
 {-# INLINE traceIf #-}
 
+-- | A version of 'concatMap' that works with a monadic predicate.
+concatMapM :: Monad m => (a -> m [b]) -> [a] -> m [b]
+concatMapM f as = concat <$> sequence (map f as)
+{-# INLINE concatMapM #-}
+
 -- | Monadic version of 'Data.List.partition'
 partitionM :: Monad m
            => (a -> m Bool)

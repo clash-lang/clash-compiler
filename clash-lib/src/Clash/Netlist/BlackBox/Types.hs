@@ -25,9 +25,11 @@ module Clash.Netlist.BlackBox.Types
  , Element(..)
  , Decl(..)
  , HdlSyn(..)
+ , RenderVoid(..)
  ) where
 
 import                Control.DeepSeq            (NFData)
+import                Data.Aeson                 (FromJSON)
 import                Data.Binary                (Binary)
 import                Data.Hashable              (Hashable)
 import                Data.Text.Lazy             (Text)
@@ -40,6 +42,15 @@ import {-# SOURCE #-} Clash.Netlist.Types
   (BlackBox, NetlistMonad)
 
 import qualified      Clash.Signal.Internal      as Signal
+
+-- | Whether this primitive should be rendered when its result type is void.
+-- Defaults to 'NoRenderVoid'.
+data RenderVoid
+  = RenderVoid
+  -- ^ Render blackbox, even if result type is void
+  | NoRenderVoid
+  -- ^ Don't render blackbox result type is void. Default for all blackboxes.
+  deriving (Show, Generic, NFData, Binary, Hashable, FromJSON)
 
 data TemplateKind
   = TDecl
@@ -55,12 +66,13 @@ data BlackBoxMeta =
                , bbImports :: [BlackBoxTemplate]
                , bbFunctionPlurality :: [(Int, Int)]
                , bbIncludes :: [((S.Text, S.Text), BlackBox)]
+               , bbRenderVoid :: RenderVoid
                }
 
 -- | Use this value in your blackbox template function if you do want to
 -- accept the defaults as documented in @Clash.Primitives.Types.BlackBox@.
 emptyBlackBoxMeta :: BlackBoxMeta
-emptyBlackBoxMeta = BlackBoxMeta False TExpr [] [] [] []
+emptyBlackBoxMeta = BlackBoxMeta False TExpr [] [] [] [] NoRenderVoid
 
 -- | A BlackBox function generates a blackbox template, given the inputs and
 -- result type of the function it should provide a blackbox for. This is useful

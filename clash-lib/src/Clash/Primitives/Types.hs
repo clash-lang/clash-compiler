@@ -39,7 +39,7 @@ import {-# SOURCE #-} Clash.Netlist.Types
 import           Clash.Annotations.Primitive  (PrimitiveGuard)
 import           Clash.Core.Term (WorkInfo (..))
 import           Clash.Netlist.BlackBox.Types
-  (BlackBoxFunction, BlackBoxTemplate, TemplateKind (..))
+  (BlackBoxFunction, BlackBoxTemplate, TemplateKind (..), RenderVoid(..))
 import           Control.Applicative          ((<|>))
 import           Control.DeepSeq              (NFData)
 import           Data.Aeson
@@ -142,6 +142,9 @@ data Primitive a b c d
     -- ^ Name of the primitive
   , workInfo  :: WorkInfo
     -- ^ Whether the primitive does any work, i.e. takes chip area
+  , renderVoid :: RenderVoid
+    -- ^ Whether this primitive should be rendered when its result type is
+    -- void. Defaults to 'NoRenderVoid'.
   , kind      :: TemplateKind
     -- ^ Whether this results in an expression or a declaration
   , warning  :: c
@@ -226,6 +229,7 @@ instance FromJSON UnresolvedPrimitive where
           "BlackBox"  ->
             BlackBox <$> conVal .: "name"
                      <*> (conVal .:? "workInfo" >>= maybe (pure Nothing) parseWorkInfo) .!= WorkVariable
+                     <*> conVal .:? "renderVoid" .!= NoRenderVoid
                      <*> (conVal .: "kind" >>= parseTemplateKind)
                      <*> conVal .:? "warning"
                      <*> conVal .:? "outputReg" .!= False

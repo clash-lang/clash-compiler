@@ -341,7 +341,7 @@ mkPrimitive bbEParen bbEasD dst (nm,pinfo) args ty tickDecls =
               -- Blackbox template generation succesful. Rerun 'go', but this time
               -- around with a 'normal' @BlackBox@
               go (P.BlackBox
-                    bbName wf bbKind () bbOutputReg bbLibrary bbImports
+                    bbName wf bbRenderVoid bbKind () bbOutputReg bbLibrary bbImports
                     bbFunctionPlurality bbIncludes Nothing Nothing bbTemplate)
         p@P.BlackBox {} ->
           case kind p of
@@ -356,7 +356,18 @@ mkPrimitive bbEParen bbEasD dst (nm,pinfo) args ty tickDecls =
                   let bbDecl = N.BlackBoxD pNm (libraries p) (imports p)
                                            (includes p) templ bbCtx
                   return (Identifier dstNm Nothing,dstDecl ++ ctxDcls ++ templDecl ++ tickDecls ++ [bbDecl])
-                Nothing -> return (Identifier "__VOID__" Nothing,[])
+
+                -- Render declarations as a Noop when requested
+                Nothing | RenderVoid <- renderVoid p -> do
+                  let dst1 = mkLocalId ty (mkUnsafeSystemName "__VOID_TDECL_NOOP__" 0)
+                  (bbCtx,ctxDcls) <- mkBlackBoxContext nm dst1 args
+                  (templ,templDecl) <- prepareBlackBox pNm tempD bbCtx
+                  let bbDecl = N.BlackBoxD pNm (libraries p) (imports p)
+                                           (includes p) templ bbCtx
+                  return (Noop, ctxDcls ++ templDecl ++ tickDecls ++ [bbDecl])
+
+                -- Otherwise don't render them
+                Nothing -> return (Identifier "__VOID_TDECL__" Nothing,[])
             TExpr -> do
               let tempE = template p
                   pNm = name p
@@ -372,7 +383,18 @@ mkPrimitive bbEParen bbEasD dst (nm,pinfo) args ty tickDecls =
                                                    (includes p) bbTempl bbCtx
                                                    bbEParen)
                       return (Identifier dstNm Nothing, dstDecl ++ ctxDcls ++ templDecl ++ [tmpAssgn])
-                    Nothing -> return (Identifier "__VOID__" Nothing,[])
+
+                    -- Render expression as a Noop when requested
+                    Nothing | RenderVoid <- renderVoid p -> do
+                      let dst1 = mkLocalId ty (mkUnsafeSystemName "__VOID_TEXPRD_NOOP__" 0)
+                      (bbCtx,ctxDcls) <- mkBlackBoxContext nm dst1 args
+                      (templ,templDecl) <- prepareBlackBox pNm tempE bbCtx
+                      let bbDecl = N.BlackBoxD pNm (libraries p) (imports p)
+                                               (includes p) templ bbCtx
+                      return (Noop, ctxDcls ++ templDecl ++ tickDecls ++ [bbDecl])
+
+                    -- Otherwise don't render them
+                    Nothing -> return (Identifier "__VOID_TEXPRD__" Nothing,[])
                 else do
                   resM <- resBndr False dst
                   case resM of
@@ -392,6 +414,16 @@ mkPrimitive bbEParen bbEasD dst (nm,pinfo) args ty tickDecls =
                               | [N.Literal _ (NumLit _), N.Literal _ _] <- extractLiterals bbCtx -> []
                             _ -> templDecl0
                       return (BlackBoxE pNm (libraries p) (imports p) (includes p) bbTempl bbCtx bbEParen,ctxDcls ++ templDecl1)
+                    -- Render expression as a Noop when requested
+                    Nothing | RenderVoid <- renderVoid p -> do
+                      let dst1 = mkLocalId ty (mkUnsafeSystemName "__VOID_TEXPRE_NOOP__" 0)
+                      (bbCtx,ctxDcls) <- mkBlackBoxContext nm dst1 args
+                      (templ,templDecl) <- prepareBlackBox pNm tempE bbCtx
+                      let bbDecl = N.BlackBoxD pNm (libraries p) (imports p)
+                                               (includes p) templ bbCtx
+                      return (Noop, ctxDcls ++ templDecl ++ tickDecls ++ [bbDecl])
+
+                    -- Otherwise don't render them
                     Nothing -> return (Identifier "__VOID__" Nothing,[])
         P.Primitive pNm _ _
           | pNm == "GHC.Prim.tagToEnum#" -> do
@@ -443,24 +475,29 @@ mkPrimitive bbEParen bbEasD dst (nm,pinfo) args ty tickDecls =
       -> (Either Identifier Id)
       -> NetlistMonad (Maybe (Id,Identifier,[Declaration]))
       -- Nothing when the binder would have type `Void`
-    resBndr mkDec dst' = case dst' of
-      Left dstL -> case mkDec of
-        False -> do
-          -- TODO: check that it's okay to use `mkUnsafeSystemName`
-          let nm' = mkUnsafeSystemName dstL 0
-              id_ = mkLocalId ty nm'
-          return (Just (id_,dstL,[]))
-        True -> do
-          nm1 <- extendIdentifier Extended dstL "_res"
-          nm2 <- mkUniqueIdentifier Extended nm1
-          -- TODO: check that it's okay to use `mkUnsafeInternalName`
-          let nm3 = mkUnsafeSystemName nm2 0
-              id_ = mkLocalId ty nm3
-          idDeclM <- mkNetDecl (id_,mkApps (Prim nm pinfo) args)
-          case idDeclM of
-            Nothing     -> return Nothing
-            Just idDecl -> return (Just (id_,nm2,[idDecl]))
-      Right dstR -> return (Just (dstR,nameOcc . varName $ dstR,[]))
+    resBndr mkDec dst' = do
+      resHwTy <- unsafeCoreTypeToHWTypeM' $(curLoc) ty
+      if isVoid resHwTy then
+        pure Nothing
+      else
+        case dst' of
+          Left dstL -> case mkDec of
+            False -> do
+              -- TODO: check that it's okay to use `mkUnsafeSystemName`
+              let nm' = mkUnsafeSystemName dstL 0
+                  id_ = mkLocalId ty nm'
+              return (Just (id_,dstL,[]))
+            True -> do
+              nm1 <- extendIdentifier Extended dstL "_res"
+              nm2 <- mkUniqueIdentifier Extended nm1
+              -- TODO: check that it's okay to use `mkUnsafeInternalName`
+              let nm3 = mkUnsafeSystemName nm2 0
+                  id_ = mkLocalId ty nm3
+              idDeclM <- mkNetDecl (id_,mkApps (Prim nm pinfo) args)
+              case idDeclM of
+                Nothing     -> return Nothing
+                Just idDecl -> return (Just (id_,nm2,[idDecl]))
+          Right dstR -> return (Just (dstR,nameOcc . varName $ dstR,[]))
 
 -- | Create an template instantiation text and a partial blackbox content for an
 -- argument term, given that the term is a function. Errors if the term is not

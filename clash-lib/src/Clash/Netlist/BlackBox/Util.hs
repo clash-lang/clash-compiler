@@ -15,6 +15,7 @@
 {-# LANGUAGE RankNTypes          #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TemplateHaskell     #-}
+{-# LANGUAGE ViewPatterns        #-}
 
 module Clash.Netlist.BlackBox.Util where
 
@@ -55,7 +56,7 @@ import           Clash.Netlist.Types             (BlackBoxContext (..),
                                                   Modifier (..),
                                                   Declaration(BlackBoxD))
 import qualified Clash.Netlist.Types             as N
-import           Clash.Netlist.Util              (typeSize)
+import           Clash.Netlist.Util              (typeSize, isVoid)
 import           Clash.Signal.Internal
   (ResetKind(..), ResetPolarity(..), InitBehavior(..))
 import           Clash.Util
@@ -102,13 +103,13 @@ verifyBlackBoxContext bbCtx (N.BBTemplate t) =
       case e of
         Lit n ->
           case indexMaybe (bbInputs bbCtx) n of
-            Just (inp, _, False) ->
+            Just (inp, isVoid -> False, False) ->
               Just ( "Argument " ++ show n ++ " should be literal, as blackbox "
                   ++ "used ~LIT[" ++ show n ++ "], but was:\n\n" ++ show inp)
             _ -> Nothing
         Const n ->
           case indexMaybe (bbInputs bbCtx) n of
-            Just (inp, _, False) ->
+            Just (inp, isVoid -> False, False) ->
               Just ( "Argument " ++ show n ++ " should be literal, as blackbox "
                   ++ "used ~CONST[" ++ show n ++ "], but was:\n\n" ++ show inp)
             _ -> Nothing
@@ -989,6 +990,7 @@ walkElement f el = maybeToList (f el) ++ walked
 -- | Determine variables used in an expression. Used for VHDL sensitivity list.
 -- Also see: https://github.com/clash-lang/clash-compiler/issues/365
 usedVariables :: Expr -> [Identifier]
+usedVariables Noop              = []
 usedVariables (Identifier i _)  = [i]
 usedVariables (DataCon _ _ es)  = concatMap usedVariables es
 usedVariables (DataTag _ e')    = [either id id e']
