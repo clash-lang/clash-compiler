@@ -535,6 +535,8 @@ mkFunApp dstId fun args tickDecls = do
       , length fArgTys == length args
       -> do
         argHWTys <- mapM (unsafeCoreTypeToHWTypeM' $(curLoc)) fArgTys
+        voidDecls <- renderVoids (zip (map Just argHWTys) args)
+
         -- Filter out the arguments of hwtype `Void` and only translate them
         -- to the intermediate HDL afterwards
         let argsBundled   = zip argHWTys (zip args fArgTys)
@@ -560,7 +562,7 @@ mkFunApp dstId fun args tickDecls = do
         instDecls <- mkTopUnWrapper fun annM man (dstId,dstHWty)
                        (zip argExprs hWTysFiltered)
                        tickDecls
-        return (argDecls ++ instDecls)
+        return (argDecls ++ instDecls ++ voidDecls)
 
       | otherwise -> error $ $(curLoc) ++ "under-applied TopEntity"
     _ -> do
@@ -644,19 +646,22 @@ mkExpr bbEasD bndr ty app =
  in  withTicks ticks $ \tickDecls -> do
   hwTy    <- unsafeCoreTypeToHWTypeM' $(curLoc) ty
   (_,sp) <- Lens.use curCompNm
+  hwTyA  <- unsafeCoreTypeToHWTypeM' $(curLoc) ty
   case appF of
     Data dc -> mkDcApplication hwTy bndr dc tmArgs
     Prim nm pinfo -> mkPrimitive False bbEasD bndr (nm,pinfo) args ty tickDecls
     Var f
-      -- TODO: Figure out whether we must handle zero-width, zero-argument vars?
-      | null tmArgs -> return (Identifier (nameOcc $ varName f) Nothing,[])
+      | null tmArgs ->
+          if isVoid hwTyA then
+            return (Noop, [])
+          else
+            return (Identifier (nameOcc $ varName f) Nothing, [])
       | not (null tyArgs) ->
           throw (ClashException sp ($(curLoc) ++ "Not in normal form: "
             ++ "Var-application with Type arguments:\n\n" ++ showPpr app) Nothing)
       | otherwise -> do
           argNm0 <- extendIdentifier Extended (either id id2identifier bndr) "_fun_arg"
           argNm1 <- mkUniqueIdentifier Extended argNm0
-          hwTyA  <- unsafeCoreTypeToHWTypeM' $(curLoc) ty
           decls  <- mkFunApp argNm1 f tmArgs tickDecls
           if isVoid hwTyA then
             return (Noop, decls)
@@ -674,7 +679,6 @@ mkExpr bbEasD bndr ty app =
                  _ -> Reg
       argNm0 <- extendIdentifier Extended (either id id2identifier bndr) "_sel_arg"
       argNm1 <- mkUniqueIdentifier Extended argNm0
-      hwTyA  <- unsafeCoreTypeToHWTypeM' $(curLoc) tyA
       decls  <- mkSelection (Left argNm1) scrut tyA alts tickDecls
       if isVoid hwTyA then
         return (Noop, decls)
