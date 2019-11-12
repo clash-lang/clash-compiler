@@ -102,8 +102,7 @@ module Clash.Sized.Vector
     -- ** 'BitPack' instance
   , concatBitVector#
   , unconcatBitVector#
-  )
-where
+  ) where
 
 import Control.DeepSeq            (NFData (..))
 import qualified Control.Lens     as Lens hiding (pattern (:>), pattern (:<))
@@ -272,7 +271,10 @@ instance NFData a => NFData (Vec n a) where
 --
 -- Can be used as a pattern:
 --
--- >>> let f (x :> y :> _) = x + y
+-- >>> :{
+-- f :: Num a => Vec ((n + 1) + 1) a -> a
+-- f (x :> y :> _) = x + y
+-- :}
 -- >>> :t f
 -- f :: Num a => Vec ((n + 1) + 1) a -> a
 -- >>> f (3:>4:>5:>6:>7:>Nil)
@@ -287,12 +289,13 @@ instance NFData a => NFData (Vec n a) where
 -- 12
 --
 pattern (:>)
-  :: forall n a
+  :: forall m a
    . ()
-  => forall m
-   . (n ~ (m + 1))
-  => a -> Vec m a -> Vec n a
+  => forall n
+   . ((n + 1) ~ m)
+  => a -> Vec n a -> Vec m a
 pattern x :> xs = Cons x xs
+{-# COMPLETE (:>) #-}
 
 infixr 5 :>
 
@@ -306,7 +309,10 @@ infixr 5 :>
 --
 -- Can be used as a pattern:
 --
--- >>> let f (_ :< y :< x) = y + x
+-- >>> :{
+-- f :: Num a => Vec ((n + 1) + 1) a -> a
+-- f (_ :< y :< x) = y + x
+-- :}
 -- >>> :t f
 -- f :: Num a => Vec ((n + 1) + 1) a -> a
 -- >>> f (3:>4:>5:>6:>7:>Nil)
@@ -329,6 +335,7 @@ pattern (:<)
 pattern xs :< x <- (snocPattern -> Cons x xs)
   where
     xs :< x = xs ++ singleton x
+{-# COMPLETE (:<) #-}
 
 infixl 5 :<
 
@@ -1361,7 +1368,7 @@ replace i y xs = replace_int xs (fromEnum i) y
 -- <interactive>:...
 --     • Couldn't match type ‘4 + n0’ with ‘2’
 --       Expected type: Vec (4 + n0) a
---         Actual type: Vec (1 + 1) a
+--         Actual type: Vec 2 a
 --       The type variable ‘n0’ is ambiguous
 --     • In the second argument of ‘take’, namely ‘(1 :> 2 :> Nil)’
 --       In the expression: take d4 (1 :> 2 :> Nil)
