@@ -1,5 +1,5 @@
 {-|
-Copyright  :  (C) 2013-2016, University of Twente,
+Copyright  :  (C) 2014-2016, University of Twente,
                   2017     , Myrtle Software Ltd
 License    :  BSD2 (see the file LICENSE)
 Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
@@ -152,6 +152,7 @@ import Clash.XException
 >>> :set -XTypeOperators
 >>> :set -XTemplateHaskell
 >>> :set -XFlexibleContexts
+>>> :set -XScopedTypeVariables
 >>> :set -XTypeApplications
 >>> :set -fplugin GHC.TypeLits.Normalise
 >>> import Clash.Prelude
@@ -263,29 +264,27 @@ instance NFData a => NFData (Vec n a) where
 
 -- | Add an element to the head of a vector.
 --
--- >>> 3:>4:>5:>Nil
+-- >>> 3 :> 4 :> 5 :> Nil
 -- <3,4,5>
--- >>> let x = 3:>4:>5:>Nil
+-- >>> let x = 3 :> 4 :> 5 :> Nil
 -- >>> :t x
 -- x :: Num a => Vec 3 a
 --
 -- Can be used as a pattern:
 --
--- >>> :{
--- f :: Num a => Vec ((n + 1) + 1) a -> a
--- f (x :> y :> _) = x + y
--- :}
+-- >>> :set -Wno-incomplete-patterns
+-- >>> let f :: Num a => Vec (n + 2) a -> a; f (x :> y :> _) = x + y
 -- >>> :t f
--- f :: Num a => Vec ((n + 1) + 1) a -> a
--- >>> f (3:>4:>5:>6:>7:>Nil)
+-- f :: Num a => Vec (n + 2) a -> a
+-- >>> f (3 :> 4 :> 5 :> 6 :> 7 :> Nil)
 -- 7
 --
 -- Also in conjunctions with (':<'):
 --
--- >>> let g (a :> b :> (_ :< y :< x)) = a + b +  x + y
+-- >>> let g :: Num a => Vec (n + 4) a -> a; g (a :> b :> (_ :< y :< x)) = a + b +  x + y
 -- >>> :t g
--- g :: Num a => Vec ((((n + 1) + 1) + 1) + 1) a -> a
--- >>> g (1:>2:>3:>4:>5:>Nil)
+-- g :: Num a => Vec (n + 4) a -> a
+-- >>> g (1 :> 2 :> 3 :> 4 :> 5 :> Nil)
 -- 12
 --
 pattern (:>)
@@ -295,37 +294,34 @@ pattern (:>)
    . ((n + 1) ~ m)
   => a -> Vec n a -> Vec m a
 pattern x :> xs = Cons x xs
-{-# COMPLETE (:>) #-}
 
 infixr 5 :>
 
 -- | Add an element to the tail of a vector.
 --
--- >>> (3:>4:>5:>Nil) :< 1
+-- >>> (3 :> 4 :> 5 :> Nil) :< 1
 -- <3,4,5,1>
--- >>> let x = (3:>4:>5:>Nil) :< 1
+-- >>> let x = (3 :> 4 :> 5 :> Nil) :< 1
 -- >>> :t x
 -- x :: Num a => Vec 4 a
 --
 -- Can be used as a pattern:
 --
--- >>> :{
--- f :: Num a => Vec ((n + 1) + 1) a -> a
--- f (_ :< y :< x) = y + x
--- :}
+-- >>> :set -Wno-incomplete-patterns
+-- >>> let f :: Num a => Vec (n + 2) a -> a; f (_ :< y :< x) = y + x
 -- >>> :t f
--- f :: Num a => Vec ((n + 1) + 1) a -> a
--- >>> f (3:>4:>5:>6:>7:>Nil)
+-- f :: Num a => Vec (n + 2) a -> a
+-- >>> f (3 :> 4 :> 5 :> 6 :> 7 :> Nil)
 -- 13
 --
 -- Also in conjunctions with (':>'):
 --
--- >>> let g (a :> b :> (_ :< y :< x)) = a + b +  x + y
+-- >>> let g :: Num a => Vec (n + 4) a -> a; g (a :> b :> (_ :< y :< x)) = a + b + x + y
 -- >>> :t g
--- g :: Num a => Vec ((((n + 1) + 1) + 1) + 1) a -> a
--- >>> g (1:>2:>3:>4:>5:>Nil)
+-- g :: Num a => Vec (n + 4) a -> a
+-- >>> g (1 :> 2 :> 3 :> 4 :> 5 :> Nil)
 -- 12
-
+--
 pattern (:<)
   :: forall m a
    . ()
@@ -335,7 +331,6 @@ pattern (:<)
 pattern xs :< x <- (snocPattern -> Cons x xs)
   where
     xs :< x = xs ++ singleton x
-{-# COMPLETE (:<) #-}
 
 infixl 5 :<
 
