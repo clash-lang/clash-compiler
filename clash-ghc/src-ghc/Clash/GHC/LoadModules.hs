@@ -584,6 +584,7 @@ wantedOptimizationFlags df =
                , Opt_Loopification -- STG pass, don't care
                , Opt_CprAnal -- The worker/wrapper introduced by CPR breaks Clash, see [NOTE: CPR breaks Clash]
                , Opt_FullLaziness -- increases sharing, but seems to result in worse circuits (in both area and propagation delay)
+               , Opt_WorkerWrapper -- can cause data constructions of Clocks/Resets to be exposed
                ]
 
     -- Coercions between Integer and Clash' numeric primitives cause Clash to
