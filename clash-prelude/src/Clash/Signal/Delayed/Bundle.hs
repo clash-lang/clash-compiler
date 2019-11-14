@@ -69,9 +69,9 @@ import           GHC.TypeLits                  (Nat)
 -- data D = A | B
 --
 -- instance Bundle D where
---   type 'Unbundled' dom delay D = 'DSignal' dom d D
---   'bundle'   _ s = s
---   'unbundle' _ s = s
+--   type 'Unbundled' dom delay D = 'DSignal' dom delay D
+--   'bundle'   s = s
+--   'unbundle' s = s
 -- @
 --
 class Bundle a where

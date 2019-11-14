@@ -24,8 +24,8 @@ handleClashException df opts e = case fromException e of
                  | otherwise = empty
     throwOneError (mkPlainErrMsg df sp (text s $$ srcInfo' $$ showExtra (opt_errorExtra opts) eM))
   _ -> case fromException e of
-    Just (ErrorCall msg) ->
-      throwOneError (mkPlainErrMsg df noSrcSpan (text "Clash error call:" $$ text msg))
+    Just (ErrorCallWithLocation _ _) ->
+      throwOneError (mkPlainErrMsg df noSrcSpan (text "Clash error call:" $$ text (show e)))
     _ -> case fromException e of
       Just (e' :: SourceError) -> do
         GHC.printException e'

@@ -14,6 +14,8 @@ import           Data.List            (intercalate)
 import           Data.Aeson           (FromJSON, Result (..), fromJSON, json)
 import           Data.Attoparsec.Lazy (Result (..), parse)
 import           Data.ByteString.Lazy (ByteString)
+import qualified Data.ByteString.Lazy as BS
+import qualified Data.ByteString.Lazy.Char8 as BSChar
 import           System.FilePath      ()
 
 import           Clash.Util           (ClashException(..))
@@ -55,8 +57,12 @@ decodeOrErr
   -> a
 decodeOrErr path contents =
   case parse json contents of
-    Done _ v ->
+    Done leftover v ->
       case fromJSON v of
+        Success _ | BS.any notWhitespace leftover ->
+          clashError ("After parsing " ++  show path
+                 ++ ", found unparsed trailing garbage:\n"
+                 ++ BSChar.unpack leftover)
         Success a ->
           a
         Error msg ->
@@ -77,3 +83,5 @@ decodeOrErr path contents =
   where
     loc = mkGeneralSrcSpan $ mkFastString path
     clashError msg = throw $ ClashException loc msg Nothing
+    notWhitespace c = BS.notElem c whitespace
+      where whitespace = BSChar.pack " \t\n\r"
