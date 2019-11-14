@@ -414,9 +414,11 @@ import           Prelude                hiding (length, replicate)
 import           Clash.Annotations.Primitive
   (hasBlackBox)
 import           Clash.Class.Num        (SaturationMode(SatBound), satSucc)
-import           Clash.Explicit.Signal  (KnownDomain, Enable, register, fromEnable)
+import           Clash.Explicit.Signal
+  (KnownDomain, Enable, register, fromEnable, enable)
 import           Clash.Signal.Internal
-  (Clock(..), Reset, Signal (..), invertReset, (.&&.), mux)
+  (Clock(..), Reset, Signal (..), Stream (..), invertReset, mux,
+  mergeSignalMetas#)
 import           Clash.Promoted.Nat     (SNat(..))
 import           Clash.Signal.Bundle    (unbundle)
 import           Clash.Sized.Unsigned   (Unsigned)
@@ -995,14 +997,24 @@ blockRam#
   -- ^ Value to write (at address @w@)
   -> Signal dom a
   -- ^ Value of the @blockRAM@ at address @r@ from the previous clock cycle
-blockRam# (Clock _) gen content rd wen =
-  go
+blockRam# (Clock _) ena0 content rd0 wen0 wa0 din0 =
+  Signal meta $ go
     (V.fromList (toList content))
     (withFrozenCallStack (deepErrorX "blockRam: intial value undefined"))
-    (fromEnable gen)
-    rd
-    (fromEnable gen .&&. wen)
+    ena1
+    rd1
+    ena2
+    wa1
+    din1
  where
+  ~(Signal m1 ena1) = fromEnable ena0
+  ~(Signal m2 ena2) = fromEnable (enable ena0 wen0)
+  ~(Signal m3 rd1) = rd0
+  ~(Signal m4 wa1) = wa0
+  ~(Signal m5 din1) = din0
+
+  meta = mergeSignalMetas# [m1, m2, m3, m4, m5]
+
   go !ram o ret@(~(re :- res)) rt@(~(r :- rs)) et@(~(e :- en)) wt@(~(w :- wr)) dt@(~(d :- din)) =
     let ram' = d `defaultSeqX` upd ram e (fromEnum w) d
         o'   = if re then ram V.! r else o

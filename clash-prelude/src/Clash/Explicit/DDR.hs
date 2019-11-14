@@ -90,29 +90,36 @@ ddrIn#
   -> a
   -> Signal fast a
   -> Signal slow (a,a)
-ddrIn# (Clock _) (unsafeToHighPolarity -> hRst) (fromEnable -> ena) i0 i1 i2 =
+ddrIn# (Clock _) rst0 ena0 i0 i1 i2 inp0 =
+  Signal (mergeSignalMetas# [m1, m2, m3]) $
   case resetKind @fast of
     SAsynchronous ->
       goAsync
         ( deepErrorX "ddrIn: initial value 0 undefined"
         , deepErrorX "ddrIn: initial value 1 undefined"
         , deepErrorX "ddrIn: initial value 2 undefined" )
-        hRst
-        ena
+        rst1
+        ena1
+        inp1
     SSynchronous ->
       goSync
         ( deepErrorX "ddrIn: initial value 0 undefined"
         , deepErrorX "ddrIn: initial value 1 undefined"
         , deepErrorX "ddrIn: initial value 2 undefined" )
-        hRst
-        ena
+        rst1
+        ena1
+        inp1
   where
+    ~(Signal m1 ena1) = fromEnable ena0
+    ~(Signal m2 inp1) = inp0
+    ~(Signal m3 rst1) = unsafeToHighPolarity rst0
+
     goSync
       :: (a, a, a)
-      -> Signal slow Bool
-      -> Signal slow Bool
-      -> Signal fast a
-      -> Signal slow (a,a)
+      -> Stream slow Bool
+      -> Stream slow Bool
+      -> Stream fast a
+      -> Stream slow (a,a)
     goSync (o0,o1,o2) rt@(~(r :- rs)) ~(e :- es) as@(~(x0 :- x1 :- xs)) =
       let (o0',o1',o2') = if r then (i0,i1,i2) else (o2,x0,x1)
       in o0 `seqX` o1 `seqX` (o0,o1)
@@ -121,10 +128,10 @@ ddrIn# (Clock _) (unsafeToHighPolarity -> hRst) (fromEnable -> ena) i0 i1 i2 =
 
     goAsync
       :: (a, a, a)
-      -> Signal slow Bool
-      -> Signal slow Bool
-      -> Signal fast a
-      -> Signal slow (a, a)
+      -> Stream slow Bool
+      -> Stream slow Bool
+      -> Stream fast a
+      -> Stream slow (a, a)
     goAsync (o0,o1,o2) ~(r :- rs) ~(e :- es) as@(~(x0 :- x1 :- xs)) =
       let (o0',o1',o2',o3',o4') = if r then (i0,i1,i0,i1,i2) else (o0,o1,o2,x0,x1)
       in o0' `seqX` o1' `seqX` (o0',o1')
@@ -176,8 +183,9 @@ ddrOut# clk rst en i0 xs ys =
     -- first input.
     --
     -- That is why we drop the first value of the stream.
-    let (_ :- out) = zipSig xs' ys' in out
+    let (_ :- out) = zipSig (toStream# xs') (toStream# ys') in Signal meta out
   where
+    meta = mergeSignalMeta# (meta# xs') (meta# ys')
     xs' = register# clk rst en (error "ddrOut: unreachable error") i0 xs
     ys' = register# clk rst en (deepErrorX "ddrOut: initial value undefined") i0 ys
     zipSig (a :- as) (b :- bs) = a :- b :- zipSig as bs

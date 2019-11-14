@@ -129,6 +129,7 @@ can potentially introduce situations prone to meta-stability:
 
 -}
 
+{-# LANGUAGE BangPatterns          #-}
 {-# LANGUAGE DataKinds             #-}
 {-# LANGUAGE ExplicitNamespaces    #-}
 {-# LANGUAGE FlexibleInstances     #-}
@@ -521,17 +522,17 @@ veryUnsafeSynchronizer
   -- ^ Period of clock belonging to 'dom2'
   -> Signal dom1 a
   -> Signal dom2 a
-veryUnsafeSynchronizer t1 t2
+veryUnsafeSynchronizer t1 t2 (Signal m stream)
   -- this case is just an optimisation for when the periods are the same
-  | t1 == t2 = same
+  | t1 == t2 = Signal m (same stream)
 
-  | otherwise = go 0
+  | otherwise = Signal m (go 0 stream)
 
   where
-  same :: Signal dom1 a -> Signal dom2 a
+  same :: Stream dom1 a -> Stream dom2 a
   same (s :- ss) = s :- same ss
 
-  go :: Int -> Signal dom1 a -> Signal dom2 a
+  go :: Int -> Stream dom1 a -> Stream dom2 a
   go relativeTime (a :- s)
     | relativeTime <= 0 = a :- go (relativeTime + t2) (a :- s)
     | otherwise = go (relativeTime - t1) s
@@ -868,8 +869,8 @@ fromListWithReset
   -> a
   -> [a]
   -> Signal dom a
-fromListWithReset rst resetValue vals =
-  go (unsafeToHighPolarity rst) vals
+fromListWithReset (unsafeToHighPolarity -> Signal !meta rst) resetValue vals =
+  Signal meta (go rst vals)
  where
   go (r :- rs) _ | r = resetValue :- go rs vals
   go (_ :- rs) [] = deepErrorX "fromListWithReset: input ran out" :- go rs []

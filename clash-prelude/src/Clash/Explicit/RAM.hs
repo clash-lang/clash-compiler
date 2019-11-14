@@ -43,7 +43,8 @@ import qualified Data.Vector as V
 import Clash.Explicit.Signal
   (unbundle, unsafeSynchronizer, KnownDomain, enable)
 import Clash.Promoted.Nat    (SNat (..), snatToNum, pow2SNat)
-import Clash.Signal.Internal (Clock (..), Signal (..), Enable, fromEnable)
+import Clash.Signal.Internal
+  (Clock (..), Signal (..), Stream (..), Enable, fromEnable, mergeSignalMetas#)
 import Clash.Sized.Unsigned  (Unsigned)
 import Clash.XException      (errorX, maybeIsX)
 
@@ -137,18 +138,23 @@ asyncRam#
   -- ^ Value to write (at address @w@)
   -> Signal rdom a
   -- ^ Value of the @RAM@ at address @r@
-asyncRam# wclk rclk en sz rd we wr din =
-    unsafeSynchronizer wclk rclk dout
+asyncRam# wclk rclk en0 sz rd0 we0 wr0 din0 =
+    unsafeSynchronizer wclk rclk (Signal meta dout)
   where
-    rd'  = unsafeSynchronizer rclk wclk rd
+    ~(Signal m1 en1) = fromEnable (enable en0 we0)
+    ~(Signal m2 rd1) = unsafeSynchronizer rclk wclk rd0
+    ~(Signal m3 wr1) = wr0
+    ~(Signal m4 din1) = din0
+
+    meta = mergeSignalMetas# [m1, m2, m3, m4]
+
     ramI = V.replicate
               (snatToNum sz)
               (withFrozenCallStack (errorX "asyncRam#: initial value undefined"))
-    en' = fromEnable (enable en we)
-    dout = go ramI rd' en' wr din
+    dout = go ramI rd1 en1 wr1 din1
 
-    go :: V.Vector a -> Signal wdom Int -> Signal wdom Bool
-       -> Signal wdom Int -> Signal wdom a -> Signal wdom a
+    go :: V.Vector a -> Stream wdom Int -> Stream wdom Bool
+       -> Stream wdom Int -> Stream wdom a -> Stream wdom a
     go !ram (r :- rs) (e :- es) (w :- ws) (d :- ds) =
       let ram' = upd ram e (fromEnum w) d
           o    = ram V.! r

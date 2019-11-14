@@ -122,7 +122,8 @@ import           Clash.Class.BitPack        (BitPack (..))
 import           Clash.Sized.BitVector      (BitVector)
 import qualified Clash.Sized.Vector         as V
 import           Clash.Sized.Vector         (Vec)
-import           Clash.Signal.Internal      (Signal(..), Domain, head#, tail#)
+import           Clash.Signal.Internal
+  (Signal(..), Stream(..), Domain, head#, tail#, meta#, mergeSignalMetas#)
 import           Clash.XException           (errorX)
 
 import           GHC.TypeLits               (KnownNat, Nat)
@@ -180,17 +181,6 @@ instance Monoid (BiSignalOut defaultState dom n) where
 #if !MIN_VERSION_base(4,11,0)
   mappend (BiSignalOut b1) (BiSignalOut b2) = BiSignalOut $ b1 ++ b2
 #endif
-
--- /Lazily/ prepend a value to a 'BiSignalIn'.
---
--- Uses a /reified/ 'SBiSignalDefault', the 'Given' constraint, so we can fully
--- create 'BiSignalIn' "out of nowhere" when dealing with circular definitions.
-prepend#
-  :: Given (SBiSignalDefault ds)
-  => Maybe (BitVector n)
-  -> BiSignalIn ds d n
-  -> BiSignalIn ds d n
-prepend# a ~(BiSignalIn _ as) = BiSignalIn given (a :- as)
 
 readFromBiSignal#
   :: ( HasCallStack
@@ -263,10 +253,17 @@ veryUnsafeToBiSignalIn
      )
   => BiSignalOut ds d n
   -> BiSignalIn ds d n
-veryUnsafeToBiSignalIn (BiSignalOut signals) = prepend# result biSignalOut'
-  where
+veryUnsafeToBiSignalIn ~(BiSignalOut signals) =
+  BiSignalIn given (Signal meta (go streams0))
+ where
+  meta = mergeSignalMetas# (map meta# signals)
+  streams0 = [stream | ~(Signal _ stream) <- signals]
+
+  go streams1 =
+    result :- go (map tail# streams1)
+   where
     -- Enforce that only one component is writing
-    result = case filter (isJust . head#) signals of
+    result = case filter (isJust . head#) streams1 of
       []  -> Nothing
       [w] -> head# w
       _   -> errorX err
@@ -274,9 +271,6 @@ veryUnsafeToBiSignalIn (BiSignalOut signals) = prepend# result biSignalOut'
     err = unwords
       [ "Multiple components wrote to the BiSignal. This is undefined behavior"
       , "in hardware and almost certainly a logic error. The components wrote:\n"
-      , intercalate "\n  " (map (show . head#) signals)
+      , intercalate "\n  " (map (show . head#) streams1)
       ]
-
-    -- Recursive step
-    biSignalOut' = veryUnsafeToBiSignalIn $ BiSignalOut $ map tail# signals
 {-# NOINLINE veryUnsafeToBiSignalIn #-}

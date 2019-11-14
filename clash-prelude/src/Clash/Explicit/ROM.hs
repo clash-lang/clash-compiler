@@ -14,6 +14,7 @@ ROMs
 {-# LANGUAGE RankNTypes          #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeOperators       #-}
+{-# LANGUAGE ViewPatterns        #-}
 
 {-# LANGUAGE Trustworthy #-}
 
@@ -35,7 +36,8 @@ import GHC.TypeLits           (KnownNat, type (^))
 import Prelude hiding         (length)
 
 import Clash.Signal.Internal
-  (Clock (..), KnownDomain, Signal (..), Enable, fromEnable)
+  (Clock (..), KnownDomain, Signal (..), Stream (..), Enable,
+   mergeSignalMeta#, fromEnable)
 import Clash.Sized.Unsigned   (Unsigned)
 import Clash.Sized.Vector     (Vec, length, toList)
 import Clash.XException       (deepErrorX, seqX, NFDataX)
@@ -108,11 +110,13 @@ rom#
   -- ^ Read address @rd@
   -> Signal dom a
   -- ^ The value of the ROM at address @rd@ from the previous clock cycle
-rom# _ en content rd =
-  go
-    (withFrozenCallStack (deepErrorX "rom: initial value undefined"))
-    (fromEnable en)
-    ((arr !) <$> rd)
+rom# _ (fromEnable -> ~(Signal m1 en)) content ~(Signal m2 rd) =
+  Signal
+    (mergeSignalMeta# m1 m2)
+    (go
+      (withFrozenCallStack (deepErrorX "rom: initial value undefined"))
+      en
+      ((arr !) <$> rd))
  where
   szI = length content
   arr = listArray (0,szI-1) (toList content)

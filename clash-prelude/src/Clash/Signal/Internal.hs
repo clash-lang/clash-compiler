@@ -45,8 +45,13 @@ Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
 module Clash.Signal.Internal
   ( -- * Datatypes
     Signal(..)
+  , Stream(..)
   , head#
   , tail#
+  , mergeSignalMeta#
+  , mergeSignalMetas#
+  , meta#
+  , toStream#
     -- * Domains
   , Domain
   , KnownDomain(..)
@@ -149,6 +154,7 @@ import Data.Binary                (Binary)
 import Data.Char                  (isAsciiUpper, isAlphaNum, isAscii)
 import Data.Coerce                (coerce)
 import Data.Data                  (Data)
+import Data.Default               (def)
 import Data.Default.Class         (Default (..))
 import Data.Hashable              (Hashable)
 import Data.Proxy                 (Proxy(..))
@@ -647,30 +653,78 @@ Check out 'IntelSystem' and 'XilinxSystem' too!
 See the module documentation of "Clash.Signal" for more information about
 domains.
 -}
-data Signal (dom :: Domain) a
-  -- | The constructor, @(':-')@, is __not__ synthesizable.
-  = a :- Signal dom a
+data Signal (dom :: Domain) a =
+  -- | Signal is a simple wrapper containing meta-information ("SignalMeta")
+  -- and a stream of values ("Stream")
+  Signal SignalMeta (Stream dom a)
 
-head# :: Signal dom a -> a
+-- | Meta data of a signal
+data SignalMeta = SignalMeta
+  {
+
+  }
+
+emptySignalMeta :: SignalMeta
+emptySignalMeta = SignalMeta
+
+class HasSignalMeta a where
+  meta# :: a -> SignalMeta
+
+instance HasSignalMeta (Signal dom a) where
+  meta# (Signal meta _) = meta
+
+instance HasSignalMeta (Enable dom) where
+  meta# = meta# . fromEnable
+
+instance HasSignalMeta (Reset dom) where
+  meta# = meta# . unsafeFromReset
+
+mergeSignalMeta# :: SignalMeta -> SignalMeta -> SignalMeta
+mergeSignalMeta# SignalMeta SignalMeta = SignalMeta
+
+mergeSignalMetas# :: HasCallStack => [SignalMeta] -> SignalMeta
+mergeSignalMetas# = foldl mergeSignalMeta# emptySignalMeta
+
+instance Default SignalMeta where
+  def = SignalMeta
+
+-- | Carries the values of a "Signal"
+data Stream (dom :: Domain) a
+  -- | The constructor, @(':-')@, is __not__ synthesizable.
+  = a :- Stream dom a
+
+toStream# :: Signal dom a -> Stream dom a
+toStream# (Signal _meta stream) = stream
+
+head# :: Stream dom a -> a
 head# (x' :- _ )  = x'
 
-tail# :: Signal dom a -> Signal dom a
+tail# :: Stream dom a -> Stream dom a
 tail# (_  :- xs') = xs'
 
-instance Show a => Show (Signal dom a) where
+instance Show a => Show (Stream dom a) where
   show (x :- xs) = show x ++ " " ++ show xs
 
+instance Show a => Show (Signal dom a) where
+  show = show . toStream#
+
 instance Lift a => Lift (Signal dom a) where
-  lift ~(x :- _) = [| signal# x |]
+  lift ~(toStream# -> x :- _) = [| signal# x |]
 
 instance Default a => Default (Signal dom a) where
   def = signal# def
 
+instance Functor (Stream dom) where
+  fmap = mapStream#
+
 instance Functor (Signal dom) where
   fmap = mapSignal#
 
+mapStream# :: (a -> b) -> Stream dom a -> Stream dom b
+mapStream# f (a :- as) = f a :- mapStream# f as
+
 mapSignal# :: (a -> b) -> Signal dom a -> Signal dom b
-mapSignal# f (a :- as) = f a :- mapSignal# f as
+mapSignal# f (Signal meta stream) = Signal meta (mapStream# f stream)
 {-# NOINLINE mapSignal# #-}
 {-# ANN mapSignal# hasBlackBox #-}
 
@@ -678,13 +732,20 @@ instance Applicative (Signal dom) where
   pure  = signal#
   (<*>) = appSignal#
 
+stream# :: a -> Stream dom a
+stream# a = let s = a :- s in s
+
 signal# :: a -> Signal dom a
-signal# a = let s = a :- s in s
+signal# a = Signal def (stream# a)
 {-# NOINLINE signal# #-}
 {-# ANN signal# hasBlackBox #-}
 
+appStream# :: Stream dom (a -> b) -> Stream dom a -> Stream dom b
+appStream# (f :- fs) xs@(~(a :- as)) = f a :- (xs `seq` appStream# fs as) -- See [NOTE: Lazy ap]
+
 appSignal# :: Signal dom (a -> b) -> Signal dom a -> Signal dom b
-appSignal# (f :- fs) xs@(~(a :- as)) = f a :- (xs `seq` appSignal# fs as) -- See [NOTE: Lazy ap]
+appSignal# (Signal fMeta fs) ~(Signal aMeta as) =
+  Signal (mergeSignalMeta# fMeta aMeta) (appStream# fs as)
 {-# NOINLINE appSignal# #-}
 {-# ANN appSignal# hasBlackBox #-}
 
@@ -710,14 +771,22 @@ of the second argument is evaluated as soon as the tail of the result is evaluat
 -}
 
 
+joinStream# :: Stream dom (Stream dom a) -> Stream dom a
+joinStream# ~(xs :- xss) = head# xs :- joinStream# (mapStream# tail# xss)
+
 -- | __WARNING: EXTREMELY EXPERIMENTAL__
 --
 -- The circuit semantics of this operation are unclear and/or non-existent.
 -- There is a good reason there is no 'Monad' instance for 'Signal''.
 --
 -- Is currently treated as 'id' by the Clash compiler.
+--
+-- This function does not preserve Signal meta information. This might cause
+-- issues with traces, validation, or testing primitives.
 joinSignal# :: Signal dom (Signal dom a) -> Signal dom a
-joinSignal# ~(xs :- xss) = head# xs :- joinSignal# (mapSignal# tail# xss)
+joinSignal# s@(Signal meta _) =
+ let xss = toStream# (fmap toStream# s) in
+ Signal meta (joinStream# xss)
 {-# NOINLINE joinSignal# #-}
 {-# ANN joinSignal# hasBlackBox #-}
 
@@ -739,6 +808,9 @@ instance Num a => Num (Signal dom a) where
 instance Foldable (Signal dom) where
   foldr = foldr#
 
+foldr## :: (a -> b -> b) -> b -> Stream dom a -> b
+foldr## f z (a :- s) = a `f` (foldr## f z s)
+
 -- | __NB__: Not synthesizable
 --
 -- __NB__: In \"@'foldr#' f z s@\":
@@ -746,15 +818,18 @@ instance Foldable (Signal dom) where
 -- * The function @f@ should be /lazy/ in its second argument.
 -- * The @z@ element will never be used.
 foldr# :: (a -> b -> b) -> b -> Signal dom a -> b
-foldr# f z (a :- s) = a `f` (foldr# f z s)
+foldr# f z (Signal _meta stream) = foldr## f z stream
 {-# NOINLINE foldr# #-}
 {-# ANN foldr# hasBlackBox #-}
 
 instance Traversable (Signal dom) where
   traverse = traverse#
 
+traverse## :: Applicative f => (a -> f b) -> Stream dom a -> f (Stream dom b)
+traverse## f (a :- s) = (:-) <$> f a <*> traverse## f s
+
 traverse# :: Applicative f => (a -> f b) -> Signal dom a -> f (Signal dom b)
-traverse# f (a :- s) = (:-) <$> f a <*> traverse# f s
+traverse# f (Signal meta stream) = Signal meta <$> traverse## f stream
 {-# NOINLINE traverse# #-}
 {-# ANN traverse# hasBlackBox #-}
 
@@ -1033,8 +1108,8 @@ delay#
   -> a
   -> Signal dom a
   -> Signal dom a
-delay# (Clock dom) (fromEnable -> en) powerUpVal0 =
-    go powerUpVal1 en
+delay# (Clock dom) (fromEnable -> (Signal m1 en)) powerUpVal0 (Signal m2 as) =
+    Signal (mergeSignalMeta# m1 m2) (go powerUpVal1 en as)
   where
     powerUpVal1 :: a
     powerUpVal1 =
@@ -1044,10 +1119,10 @@ delay# (Clock dom) (fromEnable -> en) powerUpVal0 =
         SDomainConfiguration _dom _period _edge _sync SUnknown _polarity ->
           deepErrorX ("First value of `delay` unknown on domain " ++ show dom)
 
-    go o (e :- es) as@(~(x :- xs)) =
+    go o (e :- es) stream@(~(x :- xs)) =
       let o' = if e then x else o
       -- See [Note: register strictness annotations]
-      in  o `defaultSeqX` o :- (as `seq` go o' es xs)
+      in  o `defaultSeqX` o :- (stream `seq` go o' es xs)
 {-# NOINLINE delay# #-}
 {-# ANN delay# hasBlackBox #-}
 
@@ -1075,13 +1150,18 @@ register#
   -- ^ Reset value
   -> Signal dom a
   -> Signal dom a
-register# (Clock dom) rst (fromEnable -> ena) powerUpVal0 resetVal =
+register# (Clock dom) rst0 (fromEnable -> enaS) powerUpVal0 resetVal inpS =
+  Signal (mergeSignalMetas# [m1, m2, m3]) $
   case knownDomainByName dom of
     SDomainConfiguration _name _period _edge SSynchronous _init _polarity ->
-      goSync powerUpVal1 (unsafeToHighPolarity rst) ena
+      goSync powerUpVal1 rst1 ena inp
     SDomainConfiguration _name _period _edge SAsynchronous _init _polarity ->
-      goAsync powerUpVal1 (unsafeToHighPolarity rst) ena
+      goAsync powerUpVal1 rst1 ena inp
  where
+  ~(Signal m1 ena) = enaS
+  ~(Signal m2 rst1) = unsafeToHighPolarity rst0
+  ~(Signal m3 inp) = inpS
+
   powerUpVal1 :: a
   powerUpVal1 =
     case knownDomainByName dom of
@@ -1092,10 +1172,10 @@ register# (Clock dom) rst (fromEnable -> ena) powerUpVal0 resetVal =
 
   goSync
     :: a
-    -> Signal dom Bool
-    -> Signal dom Bool
-    -> Signal dom a
-    -> Signal dom a
+    -> Stream dom Bool
+    -> Stream dom Bool
+    -> Stream dom a
+    -> Stream dom a
   goSync o rt@(~(r :- rs)) enas@(~(e :- es)) as@(~(x :- xs)) =
     let oE = if e then x else o
         oR = if r then resetVal else oE
@@ -1104,10 +1184,10 @@ register# (Clock dom) rst (fromEnable -> ena) powerUpVal0 resetVal =
 
   goAsync
     :: a
-    -> Signal dom Bool
-    -> Signal dom Bool
-    -> Signal dom a
-    -> Signal dom a
+    -> Stream dom Bool
+    -> Stream dom Bool
+    -> Stream dom a
+    -> Stream dom a
   goAsync o (r :- rs) enas@(~(e :- es)) as@(~(x :- xs)) =
     let oR = if r then resetVal else o
         oE = if r then resetVal else (if e then x else o)
@@ -1199,8 +1279,11 @@ instance Fractional a => Fractional (Signal dom a) where
   recip        = fmap recip
   fromRational = signal# . fromRational
 
-instance Arbitrary a => Arbitrary (Signal dom a) where
+instance Arbitrary a => Arbitrary (Stream dom a) where
   arbitrary = liftA2 (:-) arbitrary arbitrary
+
+instance Arbitrary a => Arbitrary (Signal dom a) where
+  arbitrary = Signal def <$> arbitrary
 
 instance CoArbitrary a => CoArbitrary (Signal dom a) where
   coarbitrary xs gen = do
@@ -1265,7 +1348,7 @@ sampleN n = take n . sample
 --
 -- __NB__: This function is not synthesizable
 fromList :: NFDataX a => [a] -> Signal dom a
-fromList = Prelude.foldr (\a b -> deepseqX a (a :- b)) (errorX "finite list")
+fromList = Signal def . Prelude.foldr (\a b -> deepseqX a (a :- b)) (errorX "finite list")
 
 -- * Simulation functions (not synthesizable)
 
@@ -1324,7 +1407,7 @@ sampleN_lazy n = take n . sample_lazy
 --
 -- __NB__: This function is not synthesizable
 fromList_lazy :: [a] -> Signal dom a
-fromList_lazy = Prelude.foldr (:-) (error "finite list")
+fromList_lazy = Signal def . Prelude.foldr (:-) (error "finite list")
 
 -- * Simulation functions (not synthesizable)
 

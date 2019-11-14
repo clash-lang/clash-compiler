@@ -106,10 +106,12 @@ import GHC.TypeLits          (KnownNat)
 import Numeric               (readInt)
 import System.IO.Unsafe      (unsafePerformIO)
 
+import Clash.Explicit.Signal (enable)
 import Clash.Promoted.Nat    (SNat (..), pow2SNat)
 import Clash.Sized.BitVector (BitVector)
 import Clash.Signal.Internal
-  (Clock(..), Signal (..), Enable, KnownDomain, fromEnable, (.&&.))
+  (Clock(..), Signal (..), Stream(..), Enable, KnownDomain, fromEnable,
+  mergeSignalMetas#)
 import Clash.Signal.Bundle   (unbundle)
 import Clash.Sized.Unsigned  (Unsigned)
 import Clash.XException      (errorX, maybeIsX, seqX)
@@ -232,24 +234,34 @@ blockRamFile#
   -- ^ Value to write (at address @w@)
   -> Signal dom (BitVector m)
   -- ^ Value of the @blockRAM@ at address @r@ from the previous clock cycle
-blockRamFile# (Clock _) ena _sz file rd wen =
-  go
+blockRamFile# (Clock _) ena0 _sz file rd0 wen0 wa0 din0 =
+  Signal meta $ go
     ramI
     (withFrozenCallStack (errorX "blockRamFile#: intial value undefined"))
-    (fromEnable ena)
-    rd
-    (fromEnable ena .&&. wen)
+    ena1
+    rd1
+    ena2
+    wa1
+    din1
   where
+    ~(Signal m1 ena1) = fromEnable ena0
+    ~(Signal m2 ena2) = fromEnable (enable ena0 wen0)
+    ~(Signal m3 rd1) = rd0
+    ~(Signal m4 wa1) = wa0
+    ~(Signal m5 din1) = din0
+
+    meta = mergeSignalMetas# [m1, m2, m3, m4, m5]
+
     -- clock enable
     go
       :: V.Vector (BitVector m)
       -> BitVector m
-      -> Signal dom Bool
-      -> Signal dom Int
-      -> Signal dom Bool
-      -> Signal dom Int
-      -> Signal dom (BitVector m)
-      -> Signal dom (BitVector m)
+      -> Stream dom Bool
+      -> Stream dom Int
+      -> Stream dom Bool
+      -> Stream dom Int
+      -> Stream dom (BitVector m)
+      -> Stream dom (BitVector m)
     go !ram o (re :- res) (r :- rs) (e :- en) (w :- wr) (d :- din) =
       let ram' = upd ram e (fromEnum w) d
           o'   = if re then ram V.! r else o
