@@ -493,3 +493,9 @@ unwantedLanguageExtensions =
   , LangExt.Strict
   , LangExt.StrictData
   ]
+
+filterOnFst :: (a -> Bool) -> [(a, b)] -> [b]
+filterOnFst f xs = map snd (filter (f . fst) xs)
+
+filterOnSnd :: (b -> Bool) -> [(a, b)] -> [a]
+filterOnSnd f xs = map fst (filter (f . snd) xs)

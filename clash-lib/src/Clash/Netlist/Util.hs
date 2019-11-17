@@ -97,6 +97,10 @@ stripFiltered (FilteredHWType hwty _filtered) = hwty
 flattenFiltered :: FilteredHWType -> [[Bool]]
 flattenFiltered (FilteredHWType _hwty filtered) = map (map fst) filtered
 
+isVoidMaybe :: Bool -> Maybe HWType -> Bool
+isVoidMaybe dflt Nothing = dflt
+isVoidMaybe _dflt (Just t) = isVoid t
+
 -- | Determines if type is a zero-width construct ("void")
 isVoid :: HWType -> Bool
 isVoid Void {} = True

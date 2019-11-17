@@ -535,17 +535,14 @@ mkFunApp dstId fun args tickDecls = do
       , length fArgTys == length args
       -> do
         argHWTys <- mapM (unsafeCoreTypeToHWTypeM' $(curLoc)) fArgTys
-        voidDecls <- renderVoids (zip (map Just argHWTys) args)
+        (argExprs, concat -> argDecls) <- unzip <$>
+          mapM (\(e,t) -> mkExpr False (Left dstId) t e) (zip args fArgTys)
 
-        -- Filter out the arguments of hwtype `Void` and only translate them
-        -- to the intermediate HDL afterwards
-        let argsBundled   = zip argHWTys (zip args fArgTys)
-            argsFiltered  = filter (not . isVoid . fst) argsBundled
-            argsFiltered' = map snd argsFiltered
-            hWTysFiltered = filter (not . isVoid) argHWTys
-        (argExprs,argDecls) <- second concat . unzip <$>
-                                 mapM (\(e,t) -> mkExpr False (Left dstId) t e)
-                                 argsFiltered'
+        -- Filter void arguments, but make sure to render their declarations:
+        let
+          filteredTypeExprs = filter (not . isVoid . fst) (zip argHWTys argExprs)
+          (hWTysFiltered, argExprsFiltered) = unzip filteredTypeExprs
+
         dstHWty  <- unsafeCoreTypeToHWTypeM' $(curLoc) fResTy
         env  <- Lens.use hdlDir
         mkId <- Lens.use mkIdentifierFn
@@ -560,9 +557,9 @@ mkFunApp dstId fun args tickDecls = do
           Nothing -> return (env </> topName <.> "manifest")
         Just man <- readMaybe <$> liftIO (readFile manFile)
         instDecls <- mkTopUnWrapper fun annM man (dstId,dstHWty)
-                       (zip argExprs hWTysFiltered)
+                       (zip argExprsFiltered hWTysFiltered)
                        tickDecls
-        return (argDecls ++ instDecls ++ voidDecls)
+        return (argDecls ++ instDecls)
 
       | otherwise -> error $ $(curLoc) ++ "under-applied TopEntity"
     _ -> do
@@ -572,18 +569,20 @@ mkFunApp dstId fun args tickDecls = do
           (_,_,_,Component compName compInps co _) <- preserveVarEnv $ genComponent fun
           let argTys = map (termType tcm) args
           argHWTys <- mapM coreTypeToHWTypeM' argTys
-          voidDecls <- renderVoids (zip argHWTys args)
-          -- Filter out the arguments of hwtype `Void` and only translate
-          -- them to the intermediate HDL afterwards
-          let argsBundled   = zip argHWTys (zip args argTys)
-              argsFiltered  = filter (maybe True (not . isVoid) . fst) argsBundled
-              argsFiltered' = map snd argsFiltered
-              tysFiltered   = map snd argsFiltered'
-              compOutp      = snd <$> listToMaybe co
-          if length tysFiltered == length compInps
+
+          (argExprs, concat -> argDecls) <- unzip <$>
+            mapM (\(e,t) -> mkExpr False (Left dstId) t e) (zip args argTys)
+
+          -- Filter void arguments, but make sure to render their declarations:
+          let
+            argTypeExprs = zip argHWTys (zip argTys argExprs)
+            filteredTypeExprs = filterOnFst (not . isVoidMaybe True) argTypeExprs
+            (argTysFiltered, argsFiltered) = unzip filteredTypeExprs
+
+          let compOutp = snd <$> listToMaybe co
+          if length argTysFiltered == length compInps
             then do
-              (argExprs,argDecls)   <- fmap (second concat . unzip) $! mapM (\(e,t) -> mkExpr False (Left dstId) t e) argsFiltered'
-              (argExprs',argDecls') <- (second concat . unzip) <$> mapM (toSimpleVar dstId) (zip argExprs tysFiltered)
+              (argExprs',argDecls') <- (second concat . unzip) <$> mapM (toSimpleVar dstId) (zip argsFiltered argTysFiltered)
               let inpAssigns    = zipWith (\(i,t) e -> (Identifier i Nothing,In,t,e)) compInps argExprs'
                   outpAssign    = case compOutp of
                     Nothing -> []
@@ -593,7 +592,7 @@ mkFunApp dstId fun args tickDecls = do
               instLabel2 <- affixName instLabel1
               instLabel3 <- mkUniqueIdentifier Basic instLabel2
               let instDecl = InstDecl Entity Nothing compName instLabel3 [] (outpAssign ++ inpAssigns)
-              return (voidDecls ++ argDecls ++ argDecls' ++ tickDecls ++ [instDecl])
+              return (argDecls ++ argDecls' ++ tickDecls ++ [instDecl])
             else error $ $(curLoc) ++ "under-applied normalized function"
         Nothing -> case args of
           -- TODO: Figure out what to do with zero-width constructs
@@ -784,18 +783,6 @@ mkProjection mkDec bndr scrut altTy alt@(pat,v) = do
     nestModifier m Nothing           = m
     nestModifier (Just m1) (Just m2) = Just (Nested m1 m2)
 
--- | Given a list of (potentially) zero-width terms, render them if there is
--- a blackbox insisting they be rendered.
-renderVoids :: [(Maybe HWType, Term)] -> NetlistMonad [Declaration]
-renderVoids terms = do
-  tcm <- Lens.use tcCache
-  concatMapM
-    (renderVoid0 tcm)
-    (map snd (filter (maybe False isVoid . fst) terms))
- where
-  renderVoid0 :: TyConMap -> Term -> NetlistMonad [Declaration]
-  renderVoid0 tcm t = snd <$> mkExpr False (Left "__ignored__") (termType tcm t) t
-
 -- | Generate an expression for a DataCon application occurring on the RHS of a let-binder
 mkDcApplication
     :: HasCallStack
@@ -815,21 +802,20 @@ mkDcApplication dstHType bndr dc args = do
   let argTys = map (termType tcm) args
   argNm <- either return (\b -> extendIdentifier Extended (nameOcc (varName b)) "_dc_arg") bndr
   argHWTys <- mapM coreTypeToHWTypeM' argTys
-  voidDecls <- renderVoids (zip argHWTys args)
-  -- Filter out the arguments of hwtype `Void` and only translate
-  -- them to the intermediate HDL afterwards
-  let argsBundled = zip argHWTys (zip args argTys)
-      (hWTysFiltered, argsFiltered) = unzip
-        (filter (maybe True (not . isVoid) . fst) argsBundled)
 
-  (argExprs, argDecls) <-
-    fmap
-      (second concat . unzip) $!
-      (mapM
-        (\(e,t) -> mkExpr False (Left argNm) t e)
-        argsFiltered)
+  (argExprs, concat -> argDecls) <- unzip <$>
+    mapM (\(e,t) -> mkExpr False (Left argNm) t e) (zip args argTys)
 
-  fmap (,argDecls++voidDecls) $! case (hWTysFiltered,argExprs) of
+  -- Filter void arguments, but make sure to render their declarations:
+  let
+    filteredTypeExprDecls =
+      filter
+        (not . isVoidMaybe True . fst)
+        (zip argHWTys argExprs)
+
+    (hWTysFiltered, argExprsFiltered) = unzip filteredTypeExprDecls
+
+  fmap (,argDecls) $! case (hWTysFiltered,argExprsFiltered) of
     -- Is the DC just a newtype wrapper?
     ([Just argHwTy],[argExpr]) | argHwTy == dstHType ->
       return (HW.DataCon dstHType (DC (Void Nothing,-1)) [argExpr])
@@ -837,18 +823,18 @@ mkDcApplication dstHType bndr dc args = do
       SP _ dcArgPairs -> do
         let dcI      = dcTag dc - 1
             dcArgs   = snd $ indexNote ($(curLoc) ++ "No DC with tag: " ++ show dcI) dcArgPairs dcI
-        case compare (length dcArgs) (length argExprs) of
-          EQ -> return (HW.DataCon dstHType (DC (dstHType,dcI)) argExprs)
+        case compare (length dcArgs) (length argExprsFiltered) of
+          EQ -> return (HW.DataCon dstHType (DC (dstHType,dcI)) argExprsFiltered)
           LT -> error $ $(curLoc) ++ "Over-applied constructor"
           GT -> error $ $(curLoc) ++ "Under-applied constructor"
       Product _ _ dcArgs ->
-        case compare (length dcArgs) (length argExprs) of
-          EQ -> return (HW.DataCon dstHType (DC (dstHType,0)) argExprs)
+        case compare (length dcArgs) (length argExprsFiltered) of
+          EQ -> return (HW.DataCon dstHType (DC (dstHType,0)) argExprsFiltered)
           LT -> error $ $(curLoc) ++ "Over-applied constructor"
           GT -> error $ $(curLoc) ++ "Under-applied constructor"
       CustomProduct _ _ _ _ dcArgs ->
-        case compare (length dcArgs) (length argExprs) of
-          EQ -> return (HW.DataCon dstHType (DC (dstHType,0)) argExprs)
+        case compare (length dcArgs) (length argExprsFiltered) of
+          EQ -> return (HW.DataCon dstHType (DC (dstHType,0)) argExprsFiltered)
           LT -> error $ $(curLoc) ++ "Over-applied constructor"
           GT -> error $ $(curLoc) ++ "Under-applied constructor"
       Sum _ _ ->
@@ -860,8 +846,8 @@ mkDcApplication dstHType bndr dc args = do
         let argTup = indexNote note dcArgsTups dcI
         let (_, _, dcArgs) = argTup
 
-        case compare (length dcArgs) (length argExprs) of
-          EQ -> return (HW.DataCon dstHType (DC (dstHType, dcI)) argExprs)
+        case compare (length dcArgs) (length argExprsFiltered) of
+          EQ -> return (HW.DataCon dstHType (DC (dstHType, dcI)) argExprsFiltered)
           LT -> error $ $(curLoc) ++ "Over-applied constructor"
           GT -> error $ $(curLoc) ++ "Under-applied constructor"
 
@@ -874,16 +860,16 @@ mkDcApplication dstHType bndr dc args = do
                    tg -> error $ $(curLoc) ++ "unknown bool literal: " ++ showPpr dc ++ "(tag: " ++ show tg ++ ")"
         in  return dc'
       Vector 0 _ -> return (HW.DataCon dstHType VecAppend [])
-      Vector 1 _ -> case argExprs of
+      Vector 1 _ -> case argExprsFiltered of
                       [e] -> return (HW.DataCon dstHType VecAppend [e])
                       _ -> error $ $(curLoc) ++ "Unexpected number of arguments for `Cons`: " ++ showPpr args
-      Vector _ _ -> case argExprs of
+      Vector _ _ -> case argExprsFiltered of
                       [e1,e2] -> return (HW.DataCon dstHType VecAppend [e1,e2])
                       _ -> error $ $(curLoc) ++ "Unexpected number of arguments for `Cons`: " ++ showPpr args
-      RTree 0 _ -> case argExprs of
+      RTree 0 _ -> case argExprsFiltered of
                       [e] -> return (HW.DataCon dstHType RTreeAppend [e])
                       _ -> error $ $(curLoc) ++ "Unexpected number of arguments for `LR`: " ++ showPpr args
-      RTree _ _ -> case argExprs of
+      RTree _ _ -> case argExprsFiltered of
                       [e1,e2] -> return (HW.DataCon dstHType RTreeAppend [e1,e2])
                       _ -> error $ $(curLoc) ++ "Unexpected number of arguments for `BR`: " ++ showPpr args
       String ->
@@ -894,16 +880,16 @@ mkDcApplication dstHType bndr dc args = do
       Void {} -> return (Identifier "__VOID__" Nothing)
       Signed _
         | dcNm == "GHC.Integer.Type.S#"
-        -> pure (head argExprs)
+        -> pure (head argExprsFiltered)
         | dcNm == "GHC.Integer.Type.Jp#"
-        -> pure (head argExprs)
+        -> pure (head argExprsFiltered)
         | dcNm == "GHC.Integer.Type.Jn#"
-        , HW.Literal Nothing (NumLit i) <- head argExprs
+        , HW.Literal Nothing (NumLit i) <- head argExprsFiltered
         -> pure (HW.Literal Nothing (NumLit (negate i)))
       Unsigned _
         | dcNm == "GHC.Natural.NatS#"
-        -> pure (head argExprs)
+        -> pure (head argExprsFiltered)
         | dcNm == "GHC.Natural.NatJ#"
-        -> pure (head argExprs)
+        -> pure (head argExprsFiltered)
       _ ->
         error $ $(curLoc) ++ "mkDcApplication undefined for: " ++ show (dstHType,dc,args,argHWTys)
