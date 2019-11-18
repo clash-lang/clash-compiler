@@ -13,6 +13,7 @@ import           System.Environment        (getEnv)
 import           System.FilePath           ((</>),(<.>))
 import           System.IO.Unsafe          (unsafePerformIO)
 import           System.IO.Temp            (createTempDirectory)
+import           Clash.Util                (wantedLanguageExtensions, unwantedLanguageExtensions)
 
 import Test.Tasty
   (TestTree, TestName, DependencyType(AllSucceed), testGroup, withResource, after)
@@ -617,51 +618,22 @@ outputTest' env target extraClashArgs extraGhcArgs modName funcName path =
 
       modDir = (map (toLower) (show target)) </> modName
 
-    -- Also update @Clash.GHC.LoadModules.wantedLanguagesExtensions@ when
-    -- updating this list!
       args = [ "new-exec"
              , "--write-ghc-environment-files=never"
              , "--"
              , "runghc"
-             , "-XBinaryLiterals"
-             , "-XConstraintKinds"
-             , "-XDataKinds"
-             , "-XDeriveAnyClass"
-             , "-XDeriveGeneric"
-             , "-XDeriveLift"
-             , "-XDerivingStrategies"
-             , "-XExplicitForAll"
-             , "-XExplicitNamespaces"
-             , "-XFlexibleContexts"
-             , "-XFlexibleInstances"
-             , "-XKindSignatures"
-             , "-XMagicHash"
-             , "-XMonoLocalBinds"
-             , "-XQuasiQuotes"
-             , "-XScopedTypeVariables"
-             , "-XTemplateHaskell"
-             , "-XTemplateHaskellQuotes"
-             , "-XTypeApplications"
-             , "-XTypeFamilies"
-#if __GLASGOW_HASKELL__ < 806
-             , "-XTypeInType"
-#endif
-             , "-XTypeOperators"
-             , "-XNoImplicitPrelude"
-             , "-XNoMonomorphismRestriction"
-#if __GLASGOW_HASKELL__ >= 806
-             , "-XNoStarIsType"
-#endif
-             , "-XNoStrict"
-             , "-XNoStrictData"
-             , "-DOUTPUTTEST"
+             ]
+             ++ langExts ++
+             [ "-DOUTPUTTEST"
              , "--ghc-arg=-main-is"
              , "--ghc-arg=" ++ modName ++ "." ++ funcName ++ show target
              ] ++ map ("--ghc-arg="++) extraGhcArgs ++
              [ env </> modName <.> "hs"
              , workDir </> topFile
              ]
-
+      langExts = map ("-X" ++) $
+                      map show wantedLanguageExtensions ++
+                      map ("No" ++ ) (map show unwantedLanguageExtensions)
       topFile =
         case target of
           VHDL ->

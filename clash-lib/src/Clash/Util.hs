@@ -47,6 +47,7 @@ import Control.Lens
 import Debug.Trace                    (trace)
 import GHC.Base                       (Int(..),isTrue#,(==#),(+#))
 import GHC.Integer.Logarithms         (integerLogBase#)
+import qualified GHC.LanguageExtensions.Type as LangExt
 import GHC.Stack                      (HasCallStack, callStack, prettyCallStack)
 import Type.Reflection                (tyConPackage, typeRepTyCon, typeOf)
 import qualified Language.Haskell.TH  as TH
@@ -444,3 +445,46 @@ orElse _x y = y
 -- | Left-biased choice on maybes
 orElses :: [Maybe a] -> Maybe a
 orElses = listToMaybe . catMaybes
+
+-- These language extensions are used for
+--  * the interactive session inside clashi
+--  * compiling files with clash
+--  * running output tests with runghc
+--  * compiling (local) Template/Blackbox functions with Hint
+wantedLanguageExtensions, unwantedLanguageExtensions :: [LangExt.Extension]
+wantedLanguageExtensions =
+  [ LangExt.BinaryLiterals
+  , LangExt.ConstraintKinds
+  , LangExt.DataKinds
+  , LangExt.DeriveAnyClass
+  , LangExt.DeriveGeneric
+  , LangExt.DeriveLift
+  , LangExt.DerivingStrategies
+  , LangExt.ExplicitForAll
+  , LangExt.ExplicitNamespaces
+  , LangExt.FlexibleContexts
+  , LangExt.FlexibleInstances
+  , LangExt.KindSignatures
+  , LangExt.MagicHash
+  , LangExt.MonoLocalBinds
+  , LangExt.QuasiQuotes
+  , LangExt.ScopedTypeVariables
+  , LangExt.TemplateHaskell
+  , LangExt.TemplateHaskellQuotes
+  , LangExt.TypeApplications
+  , LangExt.TypeFamilies
+  , LangExt.TypeOperators
+#if !MIN_VERSION_ghc(8,6,0)
+  , LangExt.TypeInType
+#endif
+  ]
+
+unwantedLanguageExtensions =
+  [ LangExt.ImplicitPrelude
+  , LangExt.MonomorphismRestriction
+#if MIN_VERSION_ghc(8,6,0)
+  , LangExt.StarIsType
+#endif
+  , LangExt.Strict
+  , LangExt.StrictData
+  ]

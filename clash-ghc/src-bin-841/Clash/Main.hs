@@ -92,7 +92,7 @@ import           Clash.Driver.Types (ClashOpts (..), defClashOpts)
 import           Clash.GHC.ClashFlags
 import           Clash.Netlist.BlackBox.Types (HdlSyn (..))
 import           Clash.Util (clashLibVersion)
-import           Clash.GHC.LoadModules (ghcLibDir, wantedLanguageExtensions)
+import           Clash.GHC.LoadModules (ghcLibDir, setWantedLanguageExtensions)
 import           Clash.GHC.Util (handleClashException)
 
 -----------------------------------------------------------------------------
@@ -166,7 +166,7 @@ defaultMain = flip withArgs $ do
             GHC.runGhc (Just libDir) $ do
 
             dflags <- GHC.getSessionDynFlags
-            let dflagsExtra = wantedLanguageExtensions dflags
+            let dflagsExtra = setWantedLanguageExtensions dflags
 
                 ghcTyLitNormPlugin = GHC.mkModuleName "GHC.TypeLits.Normalise"
                 ghcTyLitExtrPlugin = GHC.mkModuleName "GHC.TypeLits.Extra.Solver"

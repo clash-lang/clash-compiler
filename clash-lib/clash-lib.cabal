@@ -131,6 +131,7 @@ Library
                       exceptions              >= 0.8.3    && < 0.11.0,
                       filepath                >= 1.3.0.1  && < 1.5,
                       ghc                     >= 8.4.0    && < 8.9,
+                      ghc-boot-th,
                       hashable                >= 1.2.1.0  && < 1.4,
                       hint                    >= 0.7      && < 0.10,
                       integer-gmp             >= 1.0      && < 1.1,
