@@ -881,15 +881,20 @@ mkDcApplication dstHType bndr dc args = do
       Signed _
         | dcNm == "GHC.Integer.Type.S#"
         -> pure (head argExprsFiltered)
+        -- ByteArray# are non-translatable / void, except when they're literals
         | dcNm == "GHC.Integer.Type.Jp#"
-        -> pure (head argExprsFiltered)
+        , HW.Literal Nothing (NumLit _) <- head argExprs
+        -> pure (head argExprs)
         | dcNm == "GHC.Integer.Type.Jn#"
-        , HW.Literal Nothing (NumLit i) <- head argExprsFiltered
+        -- ByteArray# are non-translatable / void, except when they're literals
+        , HW.Literal Nothing (NumLit i) <- head argExprs
         -> pure (HW.Literal Nothing (NumLit (negate i)))
       Unsigned _
         | dcNm == "GHC.Natural.NatS#"
         -> pure (head argExprsFiltered)
         | dcNm == "GHC.Natural.NatJ#"
-        -> pure (head argExprsFiltered)
+        -- ByteArray# are non-translatable / void, except when they're literals
+        , HW.Literal Nothing (NumLit _) <- head argExprs
+        -> pure (head argExprs)
       _ ->
         error $ $(curLoc) ++ "mkDcApplication undefined for: " ++ show (dstHType,dc,args,argHWTys)
