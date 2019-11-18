@@ -41,6 +41,7 @@ import           Data.Text.Prettyprint.Doc.Extra
    renderOneLine)
 import qualified Data.Time.Clock                  as Clock
 import qualified Language.Haskell.Interpreter     as Hint
+import qualified Language.Haskell.Interpreter.Extension as Hint
 import qualified Language.Haskell.Interpreter.Unsafe as Hint
 import qualified System.Directory                 as Directory
 import           System.Environment               (getExecutablePath)
@@ -83,7 +84,7 @@ import           Clash.Normalize.Util             (callGraph)
 import           Clash.Primitives.Types
 import           Clash.Primitives.Util            (hashCompiledPrimMap)
 import           Clash.Unique                     (keysUniqMap, lookupUniqMap')
-import           Clash.Util                       (first, reportTimeDiff)
+import           Clash.Util                       (first, reportTimeDiff, wantedLanguageExtensions, unwantedLanguageExtensions)
 
 -- | Get modification data of current clash binary.
 getClashModificationDate :: IO Clock.UTCTime
@@ -350,12 +351,17 @@ loadImportAndInterpret iPaths0 interpreterArgs topDir qualMod funcName typ = do
       Hint.unsafeRunInterpreterWithArgsLibdir interpreterArgs topDir $ do
         Hint.reset
         iPaths1 <- (iPaths0++) <$> Hint.get Hint.searchPath
-        Hint.set [Hint.searchPath Hint.:= iPaths1]
+        Hint.set [ Hint.searchPath Hint.:= iPaths1
+                 , Hint.languageExtensions Hint.:= langExts]
         Hint.loadModules [qualMod]
         Hint.setImports [ "Clash.Netlist.BlackBox.Types", "Clash.Netlist.Types", qualMod]
         Hint.unsafeInterpret funcName typ
     Right _ -> do
       return bbfE
+ where
+   langExts = map Hint.asExtension $
+                map show wantedLanguageExtensions ++
+                map ("No" ++ ) (map show unwantedLanguageExtensions)
 
 -- | Compiles blackbox functions and parses blackbox templates.
 compilePrimitive

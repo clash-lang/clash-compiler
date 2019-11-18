@@ -16,7 +16,7 @@
 module Clash.GHC.LoadModules
   ( loadModules
   , ghcLibDir
-  , wantedLanguageExtensions
+  , setWantedLanguageExtensions
   )
 where
 
@@ -94,7 +94,8 @@ import qualified Var
 import           Clash.GHC.GHC2Core                           (modNameM, qualifiedNameString')
 import           Clash.GHC.LoadInterfaceFiles                 (loadExternalExprs, unresolvedPrimitives)
 import           Clash.GHCi.Common                            (checkMonoLocalBindsMod)
-import           Clash.Util                                   (curLoc, noSrcSpan, reportTimeDiff)
+import           Clash.Util                                   (curLoc, noSrcSpan, reportTimeDiff
+                                                              ,wantedLanguageExtensions, unwantedLanguageExtensions)
 import           Clash.Annotations.BitRepresentation.Internal
   (DataRepr', dataReprAnnToDataRepr')
 
@@ -165,7 +166,7 @@ loadModules useColor hdl modName dflagsM idirs = do
 #else
                   df <- GHC.getSessionDynFlags
 #endif
-                  let df1 = wantedLanguageExtensions df
+                  let df1 = setWantedLanguageExtensions df
                   let ghcTyLitNormPlugin = GHC.mkModuleName "GHC.TypeLits.Normalise"
                       ghcTyLitExtrPlugin = GHC.mkModuleName "GHC.TypeLits.Extra.Solver"
                       ghcTyLitKNPlugin   = GHC.mkModuleName "GHC.TypeLits.KnownNat.Solver"
@@ -617,45 +618,10 @@ wantedOptimizationFlags df =
 -- everything is done properly, we should enable it again.
 
 
-wantedLanguageExtensions :: GHC.DynFlags -> GHC.DynFlags
-wantedLanguageExtensions df =
+setWantedLanguageExtensions :: GHC.DynFlags -> GHC.DynFlags
+setWantedLanguageExtensions df =
     foldl' DynFlags.xopt_unset
-      (foldl' DynFlags.xopt_set df wanted) unwanted
-  where
-    -- Also update @Test.Tasty.Clash.outputTest'@ when updating this list!
-    wanted = [ LangExt.BinaryLiterals
-             , LangExt.ConstraintKinds
-             , LangExt.DataKinds
-             , LangExt.DeriveAnyClass
-             , LangExt.DeriveGeneric
-             , LangExt.DeriveLift
-             , LangExt.DerivingStrategies
-             , LangExt.ExplicitForAll
-             , LangExt.ExplicitNamespaces
-             , LangExt.FlexibleContexts
-             , LangExt.FlexibleInstances
-             , LangExt.KindSignatures
-             , LangExt.MagicHash
-             , LangExt.MonoLocalBinds
-             , LangExt.QuasiQuotes
-             , LangExt.ScopedTypeVariables
-             , LangExt.TemplateHaskell
-             , LangExt.TemplateHaskellQuotes
-             , LangExt.TypeApplications
-             , LangExt.TypeFamilies
-#if __GLASGOW_HASKELL__ < 806
-             , LangExt.TypeInType
-#endif
-             , LangExt.TypeOperators
-             ]
-    unwanted = [ LangExt.ImplicitPrelude
-               , LangExt.MonomorphismRestriction
-#if __GLASGOW_HASKELL__ >= 806
-               , LangExt.StarIsType
-#endif
-               , LangExt.Strict
-               , LangExt.StrictData
-               ]
+      (foldl' DynFlags.xopt_set df wantedLanguageExtensions) unwantedLanguageExtensions
 
 -- | Remove all strictness annotations:
 --
