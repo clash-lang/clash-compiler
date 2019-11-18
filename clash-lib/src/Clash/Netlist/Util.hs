@@ -1881,6 +1881,8 @@ withTicks ticks0 k = do
  where
   go decls [] = k (reverse decls)
 
+  go decls (NoDeDup:ticks) = go decls ticks
+
   go decls (SrcSpan sp:ticks) =
     go (TickDecl (Text.pack (showSDocUnsafe (ppr sp))):decls) ticks
 

@@ -62,7 +62,8 @@ import Clash.Core.FreeVars
   (termFreeVars', typeFreeVars', localVarsDoNotOccurIn)
 import Clash.Core.Literal    (Literal (..))
 import Clash.Core.Term
-  (LetBinding, Pat (..), PrimInfo (..), Term (..), collectArgs, collectArgsTicks)
+  (LetBinding, Pat (..), PrimInfo (..), Term (..), TickInfo (..), collectArgs,
+   collectArgsTicks)
 import Clash.Core.TyCon      (tyConDataCons)
 import Clash.Core.Type       (Type, isPolyFunTy, mkTyConApp, splitFunForallTy)
 import Clash.Core.Util       (mkApps, mkTicks, patIds, termType)
@@ -154,7 +155,7 @@ collectGlobals' inScope substitution seen e@(collectArgsTicks -> (fun, args@(_:_
       -- Don't lift out non-representable values, because they cannot be let-bound
       -- in our desired normal form.
       False -> do
-        isInteresting <- interestingToLift inScope eval fun args
+        isInteresting <- interestingToLift inScope eval fun args ticks
         case isInteresting of
           Just fun' | fun' `notElem` seen -> do
             (args',collected) <- collectGlobalsArgs inScope substitution
@@ -442,17 +443,20 @@ interestingToLift
   -- ^ Term in function position
   -> [Either Term Type]
   -- ^ Arguments
+  -> [TickInfo]
+  -- ^ Tick annoations
   -> RewriteMonad extra (Maybe Term)
-interestingToLift inScope _ e@(Var v) _ =
-  if isGlobalId v ||  v `elemInScopeSet` inScope
+interestingToLift inScope _ e@(Var v) _ ticks =
+  if NoDeDup `notElem` ticks && (isGlobalId v ||  v `elemInScopeSet` inScope)
      then pure (Just e)
      else pure Nothing
-interestingToLift inScope eval e@(Prim nm pInfo) args = do
+interestingToLift inScope eval e@(Prim nm pInfo) args ticks
+  | NoDeDup `notElem` ticks = do
   let anyArgNotConstant = any (not . isConstant) lArgs
   case List.lookup nm interestingPrims of
     Just t | t || anyArgNotConstant -> pure (Just e)
     _ -> do
-      let isInteresting = uncurry (interestingToLift inScope eval) . collectArgs
+      let isInteresting = uncurry3 (interestingToLift inScope eval) . collectArgsTicks
       if isHOTy (primType pInfo) then do
         anyInteresting <- anyM (fmap Maybe.isJust . isInteresting) lArgs
         if anyInteresting then pure (Just e) else pure Nothing
@@ -527,4 +531,4 @@ interestingToLift inScope eval e@(Prim nm pInfo) args = do
     isHOTy t = case splitFunForallTy t of
       (args',_) -> any isPolyFunTy (Either.rights args')
 
-interestingToLift _ _ _ _ = pure Nothing
+interestingToLift _ _ _ _ _ = pure Nothing

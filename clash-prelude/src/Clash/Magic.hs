@@ -1,7 +1,7 @@
 {-|
   Copyright   :  (C) 2019, Myrtle Software Ltd
   License     :  BSD2 (see the file LICENSE)
-  Maintainer  :  QBayLogic B.V. <clash@qbaylogic.com>
+  Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
 
 Control module instance, and register, names in generated HDL code.
 -}
@@ -88,3 +88,62 @@ setName
   :: forall (name :: Symbol) a . a -> name ::: a
 setName = id
 {-# NOINLINE setName #-}
+
+-- | Do not deduplicate, i.e. /keep/, an applied function inside a
+-- case-alternative; do not try to share the function between multiple
+-- branches.
+--
+-- By default Clash converts
+--
+-- @
+-- case x of
+--   A -> f 3 y
+--   B -> f x x
+--   C -> h x
+-- @
+--
+-- to
+--
+-- @
+-- let f_arg0 = case x of {A -> 3; _ -> x}
+--     f_arg1 = case x of {A -> y; _ -> x}
+--     f_out  = f f_arg0 f_arg1
+-- in  case x of
+--       A -> f_out
+--       B -> f_out
+--       C -> h x
+-- @
+--
+-- i.e. it deduplicates functions (and operators such as multiplication) between
+-- case-alternatives to save on area. This comes at the cost of multiplexing the
+-- arguments for the deduplicated function.
+--
+-- There are two reasons you would want to stop Clash from doing this:
+--
+-- 1. The deduplicated function is in the critical path, and the addition of the
+--    multiplexers further increased the propagation delay.
+--
+-- 2. Clash's heuristics were off, and the addition of the multiplexers actually
+--    made the final circuit larger instead of smaller.
+--
+-- In these cases you want to tell Clash not to deduplicate:
+--
+-- @
+-- case x of
+--   A -> 'noDeDup' f 3 y
+--   B -> f x x
+--   C -> h x
+-- @
+--
+-- Where the application of /f/ in the /A/-alternative is now explicitly not
+-- deduplicated, and given that the /f/ in the B-alternative is the only
+-- remaining application of /f/ in the case-expression it is also not
+-- deduplicated.
+--
+-- Note that if the /C/-alternative also had an application of /f/, then the
+-- applications of /f/ in the /B/- and /C/-alternatives would have been
+-- deduplicated; i.e. the final circuit would have had two application of /f/.
+noDeDup
+  :: forall a . a -> a
+noDeDup = id
+{-# NOINLINE noDeDup #-}
