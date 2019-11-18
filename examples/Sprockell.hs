@@ -186,12 +186,12 @@ alu opCode (x, y) = (z, cnd)
             Neg     -> \x y -> -x
             Add     -> (+)          -- goes without saying
             Sub     -> (-)
-            Mul     -> (*)
+            Mul     -> noDeDup (*)
             Equal   -> (tobit.).(==)    -- test for equality; result 0 or 1
             NEq     -> (tobit.).(/=)    -- test for inequality
             Gt      -> (tobit.).(>)
             Lt      -> (tobit.).(<)
-            And     -> (*)
+            And     -> noDeDup (*)
             Or      -> \x y -> 0
             Not     -> \x y -> 1-x
             NoOp    -> \x y -> 0        -- result will always be 0

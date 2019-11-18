@@ -98,7 +98,7 @@ import           Clash.Core.Subst
   (substTm, mkSubst, extendIdSubst, extendIdSubstList, extendTvSubst,
    extendTvSubstList, freshenTm, substTyInVar, deShadowTerm)
 import           Clash.Core.Term
-  (LetBinding, Pat (..), Term (..), CoreContext (..), PrimInfo (..), TickInfo,
+  (LetBinding, Pat (..), Term (..), CoreContext (..), PrimInfo (..), TickInfo (..),
    isLambdaBodyCtx, isTickCtx, collectArgs, collectArgsTicks, collectTicks,
    partitionTicks)
 import           Clash.Core.Type             (Type, TypeView (..), applyFunTy,
@@ -1817,13 +1817,15 @@ reduceBinders
   -> ([LetBinding],Term)
 reduceBinders _  processed body [] = (processed,body)
 reduceBinders is processed body ((id_,expr):binders) = case List.find ((== expr) . snd) processed of
-    Just (id2,_) ->
+    Just (id2,_)
+      | (_,_,ticks) <- collectArgsTicks expr
+      , NoDeDup `notElem` ticks ->
       let subst      = extendIdSubst (mkSubst is) id_ (Var id2)
           processed' = map (second (substTm "reduceBinders.processed" subst)) processed
           binders'   = map (second (substTm "reduceBinders.binders"   subst)) binders
           body'      = substTm "reduceBinders.body" subst body
       in  reduceBinders is processed' body' binders'
-    Nothing -> reduceBinders is ((id_,expr):processed) body binders
+    _ -> reduceBinders is ((id_,expr):processed) body binders
 
 reduceConst :: HasCallStack => NormRewrite
 reduceConst ctx@(TransformContext is0 _) e@(App _ _)
