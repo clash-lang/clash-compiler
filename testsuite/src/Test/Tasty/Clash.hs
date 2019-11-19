@@ -1,5 +1,7 @@
-{-# LANGUAGE CPP            #-}
-{-# LANGUAGE NamedFieldPuns #-}
+{-# LANGUAGE DataKinds          #-}
+{-# LANGUAGE GADTs              #-}
+{-# LANGUAGE KindSignatures     #-}
+{-# LANGUAGE NamedFieldPuns     #-}
 
 module Test.Tasty.Clash where
 
@@ -27,6 +29,11 @@ data BuildTarget
   | SystemVerilog
   | Verilog
   deriving (Show, Eq, Ord)
+
+data SBuildTarget (target :: BuildTarget) where
+  SVHDL          :: SBuildTarget 'VHDL
+  SVerilog       :: SBuildTarget 'Verilog
+  SSystemVerilog :: SBuildTarget 'SystemVerilog
 
 data Entities
   = AutoEntities
@@ -190,6 +197,7 @@ clashCmd target sourceDir extraArgs modName oDir =
         , ["-odir", oDir]
         , ["-hidir", oDir]
         , ["-fclash-debug", "DebugSilent"]
+        , ["-package", "clash-testsuite"]
         ]
 
       target' =
@@ -625,6 +633,8 @@ outputTest' env target extraClashArgs extraGhcArgs modName funcName path =
              ]
              ++ langExts ++
              [ "-DOUTPUTTEST"
+             , "--ghc-arg=-package"
+             , "--ghc-arg=clash-testsuite"
              , "--ghc-arg=-main-is"
              , "--ghc-arg=" ++ modName ++ "." ++ funcName ++ show target
              ] ++ map ("--ghc-arg="++) extraGhcArgs ++
@@ -673,3 +683,72 @@ outputTest env targets extraClashArgs extraGhcArgs modName funcName path =
   let path' = testName : path in
   testGroup testName
     [outputTest' env target extraClashArgs extraGhcArgs modName funcName path' | target <- targets]
+
+netlistTest'
+  :: FilePath
+  -- ^ Work directory
+  -> BuildTarget
+  -- ^ Build target
+  -> [String]
+  -- ^ Extra GHC arguments
+  -> String
+  -- ^ Module name
+  -> String
+  -- ^ Base function name
+  -> [TestName]
+  -- ^ Parent test names in order of distance to the test. That is, the last
+  -- item in the list will be the root node, while the first one will be the
+  -- one closest to the test.
+  -> TestTree
+netlistTest' env target extraGhcArgs modName funcName path =
+  withResource acquire tastyRelease (const seqTests)
+    where
+      path' = show target:path
+      acquire = tastyAcquire path' [modDir]
+
+      modDir = (map (toLower) (show target)) </> modName
+
+      args = [ "new-exec"
+             , "--write-ghc-environment-files=never"
+             , "--"
+             , "runghc"
+             ]
+             ++ langExts ++
+             [ "-DNETLISTTEST"
+             , "--ghc-arg=-package"
+             , "--ghc-arg=clash-testsuite"
+             , "--ghc-arg=-main-is"
+             , "--ghc-arg=" ++ modName ++ "." ++ funcName ++ show target
+             ] ++ map ("--ghc-arg="++) extraGhcArgs ++
+             [ env </> modName <.> "hs"
+             ]
+      langExts = map ("-X" ++) $
+                      map show wantedLanguageExtensions ++
+                      map ("No" ++ ) (map show unwantedLanguageExtensions)
+
+      seqTests = testGroup (show target) $ sequenceTests path' $
+        [ ("runghc", testProgram "runghc" "cabal" args NoGlob PrintStdErr False Nothing)
+        ]
+
+netlistTest
+  :: FilePath
+  -- ^ Work directory
+  -> [BuildTarget]
+  -- ^ Build targets
+  -> [String]
+  -- ^ Extra GHC arguments
+  -> String
+  -- ^ Module name
+  -> String
+  -- ^ Base function name
+  -> [TestName]
+  -- ^ Parent test names in order of distance to the test. That is, the last
+  -- item in the list will be the root node, while the first one will be the
+  -- one closest to the test.
+  -> TestTree
+netlistTest env targets extraGhcArgs modName funcName path =
+  let testName = modName ++ " [netlist test]" in
+  let path' = testName : path in
+  testGroup testName
+    [netlistTest' env target extraGhcArgs modName funcName path' | target <- targets]
+
