@@ -96,7 +96,7 @@ resolvePrimitive' _metaPath (Primitive name wf primType) =
   return (name, HasBlackBox (Primitive name wf primType))
 resolvePrimitive' metaPath BlackBox{template=t, includes=i, resultName=r, resultInit=ri, ..} = do
   let resolveSourceM = traverse (traverse (resolveTemplateSource metaPath))
-  bb <- BlackBox name workInfo kind () outputReg libraries imports functionPlurality
+  bb <- BlackBox name workInfo renderVoid kind () outputReg libraries imports functionPlurality
           <$> mapM (traverse resolveSourceM) i
           <*> traverse resolveSourceM r
           <*> traverse resolveSourceM ri

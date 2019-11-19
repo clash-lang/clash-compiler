@@ -199,7 +199,7 @@ checkPrimitive :: CompiledPrimMap -> GHC.CoreBndr -> C2C ()
 checkPrimitive primMap v = do
   nm <- qualifiedNameString (GHC.varName v)
   case HashMap.lookup nm primMap of
-    Just (extractPrim -> Just (BlackBox _ _ _ _ _ _ _ _ inc r ri templ)) -> do
+    Just (extractPrim -> Just (BlackBox _ _ _ _ _ _ _ _ _ inc r ri templ)) -> do
       let
         info = GHC.idInfo v
         inline = GHC.inlinePragmaSpec $ GHC.inlinePragInfo info

@@ -218,6 +218,11 @@ traceIf True  msg = trace msg
 traceIf False _   = id
 {-# INLINE traceIf #-}
 
+-- | A version of 'concatMap' that works with a monadic predicate.
+concatMapM :: Monad m => (a -> m [b]) -> [a] -> m [b]
+concatMapM f as = concat <$> sequence (map f as)
+{-# INLINE concatMapM #-}
+
 -- | Monadic version of 'Data.List.partition'
 partitionM :: Monad m
            => (a -> m Bool)
@@ -488,3 +493,9 @@ unwantedLanguageExtensions =
   , LangExt.Strict
   , LangExt.StrictData
   ]
+
+filterOnFst :: (a -> Bool) -> [(a, b)] -> [b]
+filterOnFst f xs = map snd (filter (f . fst) xs)
+
+filterOnSnd :: (b -> Bool) -> [(a, b)] -> [a]
+filterOnSnd f xs = map fst (filter (f . snd) xs)

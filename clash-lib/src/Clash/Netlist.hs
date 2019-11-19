@@ -8,12 +8,13 @@
   Create Netlists out of normalized CoreHW Terms
 -}
 
-{-# LANGUAGE MagicHash       #-}
+{-# LANGUAGE MagicHash         #-}
+{-# LANGUAGE MultiWayIf        #-}
 {-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE RecordWildCards #-}
-{-# LANGUAGE TemplateHaskell #-}
-{-# LANGUAGE TupleSections   #-}
-{-# LANGUAGE ViewPatterns    #-}
+{-# LANGUAGE RecordWildCards   #-}
+{-# LANGUAGE TemplateHaskell   #-}
+{-# LANGUAGE TupleSections     #-}
+{-# LANGUAGE ViewPatterns      #-}
 
 module Clash.Netlist where
 
@@ -330,15 +331,7 @@ mkNetDecl (id_,tm) = preserveVarEnv $ do
       go _ _ = return Nothing
 
 
-
-
-isWriteToBiSignalPrimitive :: Term -> Bool
-isWriteToBiSignalPrimitive e = case collectArgs e of
-  (Prim nm _,_) -> nm == StrictText.pack "Clash.Signal.BiSignal.writeToBiSignal#"
-  _             -> False
-
--- | Generate a list of Declarations for a let-binder, return an empty list
--- if the bound expression is represented by 0 bits
+-- | Generate a list of Declarations for a let-binder
 mkDeclarations
   :: HasCallStack
   => Id
@@ -346,25 +339,11 @@ mkDeclarations
   -> Term
   -- ^ RHS of the let-binder
   -> NetlistMonad [Declaration]
-mkDeclarations bndr e = do
-  hty <- unsafeCoreTypeToHWTypeM' $(curLoc) (varType bndr)
-  if isVoid hty && not (isBiSignalOut hty)
-     then return []
-     else mkDeclarations' bndr e
-
--- | Generate a list of Declarations for a let-binder
-mkDeclarations'
-  :: HasCallStack
-  => Id
-  -- ^ LHS of the let-binder
-  -> Term
-  -- ^ RHS of the let-binder
-  -> NetlistMonad [Declaration]
-mkDeclarations' bndr (collectTicks -> (Var v,ticks)) =
+mkDeclarations bndr (collectTicks -> (Var v,ticks)) =
   withTicks ticks $ \tickDecls -> do
   mkFunApp (id2identifier bndr) v [] tickDecls
 
-mkDeclarations' _ e@(collectTicks -> (Case _ _ [],_)) = do
+mkDeclarations _ e@(collectTicks -> (Case _ _ [],_)) = do
   (_,sp) <- Lens.use curCompNm
   throw $ ClashException
           sp
@@ -375,11 +354,11 @@ mkDeclarations' _ e@(collectTicks -> (Case _ _ [],_)) = do
                     ])
           Nothing
 
-mkDeclarations' bndr (collectTicks -> (Case scrut altTy alts@(_:_:_),ticks)) =
+mkDeclarations bndr (collectTicks -> (Case scrut altTy alts@(_:_:_),ticks)) =
   withTicks ticks $ \tickDecls -> do
   mkSelection (Right bndr) scrut altTy alts tickDecls
 
-mkDeclarations' bndr app = do
+mkDeclarations bndr app = do
   let (appF,args0,ticks) = collectArgsTicks app
       (args,tyArgs) = partitionEithers args0
   case appF of
@@ -388,27 +367,28 @@ mkDeclarations' bndr app = do
       | otherwise   -> do
         (_,sp) <- Lens.use curCompNm
         throw (ClashException sp ($(curLoc) ++ "Not in normal form: Var-application with Type arguments:\n\n" ++ showPpr app) Nothing)
-    -- Do not generate any assignments writing to a BiSignalOut, as these
-    -- do not have any significance in a HDL. The single exception occurs
-    -- when writing to a BiSignal using the primitive 'writeToBiSignal'. In
-    -- the generate HDL it will write to an inout port, NOT the variable
-    -- having the actual type BiSignalOut.
-    -- _ | isBiSignalOut (id2type bndr) && (not $ isWriteToBiSignalPrimitive app) ->
-    --     return []
     _ -> do
-      hwTy <- unsafeCoreTypeToHWTypeM' $(curLoc) (id2type bndr)
-      if isBiSignalOut hwTy && not (isWriteToBiSignalPrimitive app)
-         then return []
-         else do
-          (exprApp,declsApp0) <- mkExpr False (Right bndr) (varType bndr) app
-          let dstId = id2identifier bndr
-              assn  = case exprApp of
-                        Identifier _ Nothing -> []
-                        _ -> [Assignment dstId exprApp]
-          declsApp1 <- if null declsApp0
-                       then withTicks ticks return
-                       else pure declsApp0
-          return (declsApp1 ++ assn)
+      (exprApp,declsApp0) <- mkExpr False (Right bndr) (varType bndr) app
+      let dstId = id2identifier bndr
+          assn  =
+            case exprApp of
+              Identifier _ Nothing ->
+                -- Supplied 'bndr' was used to assign a result to, so we
+                -- don't have to manually turn it into a declaration
+                []
+              Noop ->
+                -- Rendered expression rendered a "noop" - a list of
+                -- declarations without a result. Used for things like
+                -- mealy IO / inline assertions.
+                []
+              _ ->
+                -- Turn returned expression into declaration by assigning
+                -- it to 'dstId'
+                [Assignment dstId exprApp]
+      declsApp1 <- if null declsApp0
+                   then withTicks ticks return
+                   else pure declsApp0
+      return (declsApp1 ++ assn)
 
 -- | Generate a declaration that selects an alternative based on the value of
 -- the scrutinee
@@ -427,6 +407,7 @@ mkSelection bndr scrut altTy alts0 tickDecls = do
   scrutId  <- extendIdentifier Extended dstId "_selection"
   (_,sp) <- Lens.use curCompNm
   ite <- Lens.use backEndITE
+  altHTy <- unsafeCoreTypeToHWTypeM' $(curLoc) altTy
   case iteAlts scrutHTy alts0 of
     Just (altT,altF)
       | ite
@@ -439,16 +420,33 @@ mkSelection bndr scrut altTy alts0 tickDecls = do
       altFId <- extendIdentifier Extended dstId "_sel_alt_f"
       (altTExpr,altTDecls) <- mkExpr False (Left altTId) altTy altT
       (altFExpr,altFDecls) <- mkExpr False (Left altFId) altTy altF
-      return $! scrutDecls ++ altTDecls ++ altFDecls ++ tickDecls ++
+      -- This logic (and the same logic a few lines below) is faulty in the
+      -- sense that it won't generate "void decls" if the alternatives' type
+      -- is void, but the type of the scrut isn't. Ideally, we'd like to pass
+      -- a boolean to 'mkExpr' indicating that it should only render "void decls"
+      -- but that it should skip any others.
+      --
+      -- TODO: Fix ^
+      if | isVoid altHTy && isVoid scrutHTy
+          -> return $! scrutDecls ++ altTDecls ++ altFDecls
+         | isVoid altHTy
+          -> return $! altTDecls ++ altFDecls
+         | otherwise
+          -> return $! scrutDecls ++ altTDecls ++ altFDecls ++ tickDecls ++
                 [Assignment dstId (IfThenElse scrutExpr altTExpr altFExpr)]
     _ -> do
       reprs <- Lens.use customReprs
       let alts1 = (reorderDefault . reorderCustom tcm reprs scrutTy) alts0
-      altHTy                 <- unsafeCoreTypeToHWTypeM' $(curLoc) altTy
       (scrutExpr,scrutDecls) <- first (mkScrutExpr sp scrutHTy (fst (head alts1))) <$>
                                   mkExpr True (Left scrutId) scrutTy scrut
       (exprs,altsDecls)      <- (second concat . unzip) <$> mapM (mkCondExpr scrutHTy) alts1
-      return $! scrutDecls ++ altsDecls ++ tickDecls ++ [CondAssignment dstId altHTy scrutExpr scrutHTy exprs]
+      if | isVoid altHTy && isVoid scrutHTy
+          -> return $! altsDecls ++ scrutDecls
+         | isVoid altHTy
+          -> return $! altsDecls
+         | otherwise
+          -> return $! scrutDecls ++ altsDecls ++ tickDecls
+           ++ [CondAssignment dstId altHTy scrutExpr scrutHTy exprs]
  where
   mkCondExpr :: HWType -> (Pat,Term) -> NetlistMonad ((Maybe HW.Literal,Expr),[Declaration])
   mkCondExpr scrutHTy (pat,alt) = do
@@ -537,15 +535,14 @@ mkFunApp dstId fun args tickDecls = do
       , length fArgTys == length args
       -> do
         argHWTys <- mapM (unsafeCoreTypeToHWTypeM' $(curLoc)) fArgTys
-        -- Filter out the arguments of hwtype `Void` and only translate them
-        -- to the intermediate HDL afterwards
-        let argsBundled   = zip argHWTys (zip args fArgTys)
-            argsFiltered  = filter (not . isVoid . fst) argsBundled
-            argsFiltered' = map snd argsFiltered
-            hWTysFiltered = filter (not . isVoid) argHWTys
-        (argExprs,argDecls) <- second concat . unzip <$>
-                                 mapM (\(e,t) -> mkExpr False (Left dstId) t e)
-                                 argsFiltered'
+        (argExprs, concat -> argDecls) <- unzip <$>
+          mapM (\(e,t) -> mkExpr False (Left dstId) t e) (zip args fArgTys)
+
+        -- Filter void arguments, but make sure to render their declarations:
+        let
+          filteredTypeExprs = filter (not . isVoid . fst) (zip argHWTys argExprs)
+          (hWTysFiltered, argExprsFiltered) = unzip filteredTypeExprs
+
         dstHWty  <- unsafeCoreTypeToHWTypeM' $(curLoc) fResTy
         env  <- Lens.use hdlDir
         mkId <- Lens.use mkIdentifierFn
@@ -560,7 +557,7 @@ mkFunApp dstId fun args tickDecls = do
           Nothing -> return (env </> topName <.> "manifest")
         Just man <- readMaybe <$> liftIO (readFile manFile)
         instDecls <- mkTopUnWrapper fun annM man (dstId,dstHWty)
-                       (zip argExprs hWTysFiltered)
+                       (zip argExprsFiltered hWTysFiltered)
                        tickDecls
         return (argDecls ++ instDecls)
 
@@ -572,17 +569,20 @@ mkFunApp dstId fun args tickDecls = do
           (_,_,_,Component compName compInps co _) <- preserveVarEnv $ genComponent fun
           let argTys = map (termType tcm) args
           argHWTys <- mapM coreTypeToHWTypeM' argTys
-          -- Filter out the arguments of hwtype `Void` and only translate
-          -- them to the intermediate HDL afterwards
-          let argsBundled   = zip argHWTys (zip args argTys)
-              argsFiltered  = filter (maybe True (not . isVoid) . fst) argsBundled
-              argsFiltered' = map snd argsFiltered
-              tysFiltered   = map snd argsFiltered'
-              compOutp      = snd <$> listToMaybe co
-          if length tysFiltered == length compInps
+
+          (argExprs, concat -> argDecls) <- unzip <$>
+            mapM (\(e,t) -> mkExpr False (Left dstId) t e) (zip args argTys)
+
+          -- Filter void arguments, but make sure to render their declarations:
+          let
+            argTypeExprs = zip argHWTys (zip argTys argExprs)
+            filteredTypeExprs = filterOnFst (not . isVoidMaybe True) argTypeExprs
+            (argTysFiltered, argsFiltered) = unzip filteredTypeExprs
+
+          let compOutp = snd <$> listToMaybe co
+          if length argTysFiltered == length compInps
             then do
-              (argExprs,argDecls)   <- fmap (second concat . unzip) $! mapM (\(e,t) -> mkExpr False (Left dstId) t e) argsFiltered'
-              (argExprs',argDecls') <- (second concat . unzip) <$> mapM (toSimpleVar dstId) (zip argExprs tysFiltered)
+              (argExprs',argDecls') <- (second concat . unzip) <$> mapM (toSimpleVar dstId) (zip argsFiltered argTysFiltered)
               let inpAssigns    = zipWith (\(i,t) e -> (Identifier i Nothing,In,t,e)) compInps argExprs'
                   outpAssign    = case compOutp of
                     Nothing -> []
@@ -595,6 +595,7 @@ mkFunApp dstId fun args tickDecls = do
               return (argDecls ++ argDecls' ++ tickDecls ++ [instDecl])
             else error $ $(curLoc) ++ "under-applied normalized function"
         Nothing -> case args of
+          -- TODO: Figure out what to do with zero-width constructs
           [] -> return [Assignment dstId (Identifier (nameOcc $ varName fun) Nothing)]
           _ -> error $ $(curLoc) ++ "Unknown function: " ++ showPpr fun
 
@@ -644,20 +645,28 @@ mkExpr bbEasD bndr ty app =
  in  withTicks ticks $ \tickDecls -> do
   hwTy    <- unsafeCoreTypeToHWTypeM' $(curLoc) ty
   (_,sp) <- Lens.use curCompNm
+  hwTyA  <- unsafeCoreTypeToHWTypeM' $(curLoc) ty
   case appF of
     Data dc -> mkDcApplication hwTy bndr dc tmArgs
     Prim nm pinfo -> mkPrimitive False bbEasD bndr (nm,pinfo) args ty tickDecls
     Var f
-      | null tmArgs -> return (Identifier (nameOcc $ varName f) Nothing,[])
+      | null tmArgs ->
+          if isVoid hwTyA then
+            return (Noop, [])
+          else
+            return (Identifier (nameOcc $ varName f) Nothing, [])
       | not (null tyArgs) ->
-          throw (ClashException sp ($(curLoc) ++ "Not in normal form: Var-application with Type arguments:\n\n" ++ showPpr app) Nothing)
+          throw (ClashException sp ($(curLoc) ++ "Not in normal form: "
+            ++ "Var-application with Type arguments:\n\n" ++ showPpr app) Nothing)
       | otherwise -> do
           argNm0 <- extendIdentifier Extended (either id id2identifier bndr) "_fun_arg"
           argNm1 <- mkUniqueIdentifier Extended argNm0
-          hwTyA  <- unsafeCoreTypeToHWTypeM' $(curLoc) ty
           decls  <- mkFunApp argNm1 f tmArgs tickDecls
-          return ( Identifier argNm1 Nothing
-                 , NetDecl' Nothing Wire argNm1 (Right hwTyA) Nothing:decls)
+          if isVoid hwTyA then
+            return (Noop, decls)
+          else
+            return ( Identifier argNm1 Nothing
+                   , NetDecl' Nothing Wire argNm1 (Right hwTyA) Nothing:decls)
     Case scrut ty' [alt] -> mkProjection bbEasD bndr scrut ty' alt
     Case scrut tyA alts -> do
       tcm <- Lens.use tcCache
@@ -669,10 +678,12 @@ mkExpr bbEasD bndr ty app =
                  _ -> Reg
       argNm0 <- extendIdentifier Extended (either id id2identifier bndr) "_sel_arg"
       argNm1 <- mkUniqueIdentifier Extended argNm0
-      hwTyA  <- unsafeCoreTypeToHWTypeM' $(curLoc) tyA
       decls  <- mkSelection (Left argNm1) scrut tyA alts tickDecls
-      return ( Identifier argNm1 Nothing
-             , NetDecl' Nothing wr argNm1 (Right hwTyA) Nothing:decls)
+      if isVoid hwTyA then
+        return (Noop, decls)
+      else
+        return ( Identifier argNm1 Nothing
+               , NetDecl' Nothing wr argNm1 (Right hwTyA) Nothing:decls)
     Letrec binders body -> do
       netDecls <- fmap catMaybes $ mapM mkNetDecl binders
       decls    <- concat <$> mapM (uncurry mkDeclarations) binders
@@ -707,52 +718,70 @@ mkProjection mkDec bndr scrut altTy alt@(pat,v) = do
                  ++ showPpr e) Nothing)
   sHwTy <- unsafeCoreTypeToHWTypeM' $(curLoc) scrutTy
   vHwTy <- unsafeCoreTypeToHWTypeM' $(curLoc) altTy
-  (selId,modM,decls) <- do
-    scrutNm <- either return
-                 (\b -> extendIdentifier Extended
-                          (id2identifier b)
-                          "_projection")
-                 bndr
+  scrutRendered <- do
+    scrutNm <-
+      either
+        return
+        (\b -> extendIdentifier Extended (id2identifier b) "_projection")
+        bndr
     (scrutExpr,newDecls) <- mkExpr False (Left scrutNm) scrutTy scrut
     case scrutExpr of
-      Identifier newId modM -> return (newId,modM,newDecls)
+      Identifier newId modM ->
+        pure (Right (newId, modM, newDecls))
+      Noop ->
+        -- Scrutinee was a zero-width / void construct. We need to render its
+        -- declarations, but it's no use assigning it to a new variable.
+        -- TODO: Figure out whether we need to render alternatives too.
+        -- TODO: seems useless?
+        pure (Left newDecls)
       _ -> do
         scrutNm' <- mkUniqueIdentifier Extended scrutNm
         let scrutDecl = NetDecl Nothing scrutNm' sHwTy
             scrutAssn = Assignment scrutNm' scrutExpr
-        return (scrutNm',Nothing,newDecls ++ [scrutDecl,scrutAssn])
+        pure (Right (scrutNm', Nothing, newDecls ++ [scrutDecl, scrutAssn]))
 
-  let altVarId = nameOcc (varName varTm)
-  modifier <- case pat of
+  case scrutRendered of
+    Left newDecls -> pure (Noop, newDecls)
+    Right (selId, modM, decls) -> do
+      let altVarId = nameOcc (varName varTm)
+      modifier <- case pat of
         DataPat dc exts tms -> do
-          let tms' = if bindsExistentials exts tms
-                       then throw (ClashException sp ($(curLoc) ++ "Not in normal form: Pattern binds existential variables:\n\n" ++ showPpr e) Nothing)
-                       else tms
+          let
+            tms' =
+              if bindsExistentials exts tms then
+                throw (ClashException sp ($(curLoc)
+                  ++ "Not in normal form: Pattern binds existential variables:\n\n"
+                  ++ showPpr e) Nothing)
+              else
+                tms
           argHWTys <- mapM coreTypeToHWTypeM' (map varType tms)
           let tmsBundled   = zip argHWTys tms'
               tmsFiltered  = filter (maybe False (not . isVoid) . fst) tmsBundled
               tmsFiltered' = map snd tmsFiltered
           case elemIndex varTm {varType = altTy} tmsFiltered' of
-               Nothing -> pure Nothing
-               Just fI
-                | sHwTy /= vHwTy -> pure $ nestModifier modM (Just (Indexed (sHwTy,dcTag dc - 1,fI)))
-                -- When element and subject have the same HW-type,
-                -- then the projections is just the identity
-                | otherwise      -> pure $ nestModifier modM (Just (DC (Void Nothing,0)))
-        _ -> throw (ClashException sp ($(curLoc) ++ "Not in normal form: Unexpected pattern in case-projection:\n\n" ++ showPpr e) Nothing)
-  let extractExpr = Identifier (maybe altVarId (const selId) modifier) modifier
-  case bndr of
-    Left scrutNm | mkDec -> do
-      scrutNm' <- mkUniqueIdentifier Extended scrutNm
-      let scrutDecl = NetDecl Nothing scrutNm' vHwTy
-          scrutAssn = Assignment scrutNm' extractExpr
-      return (Identifier scrutNm' Nothing,scrutDecl:scrutAssn:decls)
-    _ -> return (extractExpr,decls)
+            Nothing -> pure Nothing
+            Just fI
+              | sHwTy /= vHwTy ->
+                pure $ nestModifier modM (Just (Indexed (sHwTy,dcTag dc - 1,fI)))
+              -- When element and subject have the same HW-type,
+              -- then the projections is just the identity
+              | otherwise ->
+                pure $ nestModifier modM (Just (DC (Void Nothing,0)))
+        _ -> throw (ClashException sp ($(curLoc)
+               ++ "Not in normal form: Unexpected pattern in case-projection:\n\n"
+               ++ showPpr e) Nothing)
+      let extractExpr = Identifier (maybe altVarId (const selId) modifier) modifier
+      case bndr of
+        Left scrutNm | mkDec -> do
+          scrutNm' <- mkUniqueIdentifier Extended scrutNm
+          let scrutDecl = NetDecl Nothing scrutNm' vHwTy
+              scrutAssn = Assignment scrutNm' extractExpr
+          return (Identifier scrutNm' Nothing,scrutDecl:scrutAssn:decls)
+        _ -> return (extractExpr,decls)
   where
     nestModifier Nothing  m          = m
     nestModifier m Nothing           = m
     nestModifier (Just m1) (Just m2) = Just (Nested m1 m2)
-
 
 -- | Generate an expression for a DataCon application occurring on the RHS of a let-binder
 mkDcApplication
@@ -769,24 +798,24 @@ mkDcApplication
     -- ^ Returned expression and a list of generate BlackBox declarations
 mkDcApplication dstHType bndr dc args = do
   let dcNm = nameOcc (dcName dc)
-  tcm                 <- Lens.use tcCache
-  let argTys          = map (termType tcm) args
+  tcm <- Lens.use tcCache
+  let argTys = map (termType tcm) args
   argNm <- either return (\b -> extendIdentifier Extended (nameOcc (varName b)) "_dc_arg") bndr
-  argHWTys            <- mapM coreTypeToHWTypeM' argTys
-  -- Filter out the arguments of hwtype `Void` and only translate
-  -- them to the intermediate HDL afterwards
-  let argsBundled = zip argHWTys (zip args argTys)
-      (hWTysFiltered, argsFiltered) = unzip
-        (filter (maybe True (not . isVoid) . fst) argsBundled)
+  argHWTys <- mapM coreTypeToHWTypeM' argTys
 
-  (argExprs, argDecls) <-
-    fmap
-      (second concat . unzip) $!
-      (mapM
-        (\(e,t) -> mkExpr False (Left argNm) t e)
-        argsFiltered)
+  (argExprs, concat -> argDecls) <- unzip <$>
+    mapM (\(e,t) -> mkExpr False (Left argNm) t e) (zip args argTys)
 
-  fmap (,argDecls) $! case (hWTysFiltered,argExprs) of
+  -- Filter void arguments, but make sure to render their declarations:
+  let
+    filteredTypeExprDecls =
+      filter
+        (not . isVoidMaybe True . fst)
+        (zip argHWTys argExprs)
+
+    (hWTysFiltered, argExprsFiltered) = unzip filteredTypeExprDecls
+
+  fmap (,argDecls) $! case (hWTysFiltered,argExprsFiltered) of
     -- Is the DC just a newtype wrapper?
     ([Just argHwTy],[argExpr]) | argHwTy == dstHType ->
       return (HW.DataCon dstHType (DC (Void Nothing,-1)) [argExpr])
@@ -794,18 +823,18 @@ mkDcApplication dstHType bndr dc args = do
       SP _ dcArgPairs -> do
         let dcI      = dcTag dc - 1
             dcArgs   = snd $ indexNote ($(curLoc) ++ "No DC with tag: " ++ show dcI) dcArgPairs dcI
-        case compare (length dcArgs) (length argExprs) of
-          EQ -> return (HW.DataCon dstHType (DC (dstHType,dcI)) argExprs)
+        case compare (length dcArgs) (length argExprsFiltered) of
+          EQ -> return (HW.DataCon dstHType (DC (dstHType,dcI)) argExprsFiltered)
           LT -> error $ $(curLoc) ++ "Over-applied constructor"
           GT -> error $ $(curLoc) ++ "Under-applied constructor"
       Product _ _ dcArgs ->
-        case compare (length dcArgs) (length argExprs) of
-          EQ -> return (HW.DataCon dstHType (DC (dstHType,0)) argExprs)
+        case compare (length dcArgs) (length argExprsFiltered) of
+          EQ -> return (HW.DataCon dstHType (DC (dstHType,0)) argExprsFiltered)
           LT -> error $ $(curLoc) ++ "Over-applied constructor"
           GT -> error $ $(curLoc) ++ "Under-applied constructor"
       CustomProduct _ _ _ _ dcArgs ->
-        case compare (length dcArgs) (length argExprs) of
-          EQ -> return (HW.DataCon dstHType (DC (dstHType,0)) argExprs)
+        case compare (length dcArgs) (length argExprsFiltered) of
+          EQ -> return (HW.DataCon dstHType (DC (dstHType,0)) argExprsFiltered)
           LT -> error $ $(curLoc) ++ "Over-applied constructor"
           GT -> error $ $(curLoc) ++ "Under-applied constructor"
       Sum _ _ ->
@@ -817,8 +846,8 @@ mkDcApplication dstHType bndr dc args = do
         let argTup = indexNote note dcArgsTups dcI
         let (_, _, dcArgs) = argTup
 
-        case compare (length dcArgs) (length argExprs) of
-          EQ -> return (HW.DataCon dstHType (DC (dstHType, dcI)) argExprs)
+        case compare (length dcArgs) (length argExprsFiltered) of
+          EQ -> return (HW.DataCon dstHType (DC (dstHType, dcI)) argExprsFiltered)
           LT -> error $ $(curLoc) ++ "Over-applied constructor"
           GT -> error $ $(curLoc) ++ "Under-applied constructor"
 
@@ -831,16 +860,16 @@ mkDcApplication dstHType bndr dc args = do
                    tg -> error $ $(curLoc) ++ "unknown bool literal: " ++ showPpr dc ++ "(tag: " ++ show tg ++ ")"
         in  return dc'
       Vector 0 _ -> return (HW.DataCon dstHType VecAppend [])
-      Vector 1 _ -> case argExprs of
+      Vector 1 _ -> case argExprsFiltered of
                       [e] -> return (HW.DataCon dstHType VecAppend [e])
                       _ -> error $ $(curLoc) ++ "Unexpected number of arguments for `Cons`: " ++ showPpr args
-      Vector _ _ -> case argExprs of
+      Vector _ _ -> case argExprsFiltered of
                       [e1,e2] -> return (HW.DataCon dstHType VecAppend [e1,e2])
                       _ -> error $ $(curLoc) ++ "Unexpected number of arguments for `Cons`: " ++ showPpr args
-      RTree 0 _ -> case argExprs of
+      RTree 0 _ -> case argExprsFiltered of
                       [e] -> return (HW.DataCon dstHType RTreeAppend [e])
                       _ -> error $ $(curLoc) ++ "Unexpected number of arguments for `LR`: " ++ showPpr args
-      RTree _ _ -> case argExprs of
+      RTree _ _ -> case argExprsFiltered of
                       [e1,e2] -> return (HW.DataCon dstHType RTreeAppend [e1,e2])
                       _ -> error $ $(curLoc) ++ "Unexpected number of arguments for `BR`: " ++ showPpr args
       String ->
@@ -851,28 +880,21 @@ mkDcApplication dstHType bndr dc args = do
       Void {} -> return (Identifier "__VOID__" Nothing)
       Signed _
         | dcNm == "GHC.Integer.Type.S#"
-        -> pure (head argExprs)
+        -> pure (head argExprsFiltered)
+        -- ByteArray# are non-translatable / void, except when they're literals
         | dcNm == "GHC.Integer.Type.Jp#"
+        , HW.Literal Nothing (NumLit _) <- head argExprs
         -> pure (head argExprs)
         | dcNm == "GHC.Integer.Type.Jn#"
+        -- ByteArray# are non-translatable / void, except when they're literals
         , HW.Literal Nothing (NumLit i) <- head argExprs
         -> pure (HW.Literal Nothing (NumLit (negate i)))
       Unsigned _
         | dcNm == "GHC.Natural.NatS#"
-        -> pure (head argExprs)
+        -> pure (head argExprsFiltered)
         | dcNm == "GHC.Natural.NatJ#"
+        -- ByteArray# are non-translatable / void, except when they're literals
+        , HW.Literal Nothing (NumLit _) <- head argExprs
         -> pure (head argExprs)
---      KnownDomain {} ->
---        return (Identifier "__KNOWNDOMAIN__" Nothing)
---        pure $
---        error $ $(curLoc) ++ "mkDcApplication undefined for KnownDomain. "
---                          ++ "Did a blackbox definition try to render it? "
---                          ++ "Context: \n\n"
---                          ++ "dstHType: " ++ show dstHType ++ "\n\n"
---                          ++ "dc: " ++ show dc ++ "\n\n"
---                          ++ "args: " ++ show args ++ "\n\n"
---                          ++ "argHWTys: " ++ show argHWTys ++ "\n\n"
---                          ++ "Callstack: "
---                          ++ prettyCallStack callStack
       _ ->
         error $ $(curLoc) ++ "mkDcApplication undefined for: " ++ show (dstHType,dc,args,argHWTys)

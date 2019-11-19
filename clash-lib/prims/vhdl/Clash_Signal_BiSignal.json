@@ -1,6 +1,7 @@
 [ { "BlackBox" :
     { "name" : "Clash.Signal.BiSignal.writeToBiSignal#",
       "kind" : "Declaration",
+      "renderVoid": "RenderVoid",
       "type" :
 "writeToBiSignal#
   :: HasCallStack                   -- ARG[0]

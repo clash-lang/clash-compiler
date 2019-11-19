@@ -97,6 +97,10 @@ stripFiltered (FilteredHWType hwty _filtered) = hwty
 flattenFiltered :: FilteredHWType -> [[Bool]]
 flattenFiltered (FilteredHWType _hwty filtered) = map (map fst) filtered
 
+isVoidMaybe :: Bool -> Maybe HWType -> Bool
+isVoidMaybe dflt Nothing = dflt
+isVoidMaybe _dflt (Just t) = isVoid t
+
 -- | Determines if type is a zero-width construct ("void")
 isVoid :: HWType -> Bool
 isVoid Void {} = True
@@ -105,12 +109,6 @@ isVoid _       = False
 -- | Same as @isVoid@, but on @FilteredHWType@ instead of @HWType@
 isFilteredVoid :: FilteredHWType -> Bool
 isFilteredVoid = isVoid . stripFiltered
-
-isBiSignalOut :: HWType -> Bool
-isBiSignalOut (Void (Just (BiDirectional Out _))) = True
-isBiSignalOut (Vector n ty) | n /= 0              = isBiSignalOut ty
-isBiSignalOut (RTree _ ty)                        = isBiSignalOut ty
-isBiSignalOut _                                   = False
 
 mkIdentifier :: IdType -> Identifier -> NetlistMonad Identifier
 mkIdentifier typ nm = Lens.use mkIdentifierFn <*> pure typ <*> pure nm
@@ -1369,28 +1367,27 @@ mkTopUnWrapper topEntity annM man dstId args tickDecls = do
   let iResult = inpAssigns ++ concat wrappers
       result = ("result",snd dstId)
 
-  topOutputM <- mkTopOutput
-                  topM
-                  (zip outNames outTys)
-                  (head oPortSupply)
-                  result
+  instLabel0 <- extendIdentifier Basic topName ("_" `Text.append` fst dstId)
+  instLabel1 <- mkUniqueIdentifier Basic instLabel0
+  topOutputM <- mkTopOutput topM (zip outNames outTys) (head oPortSupply) result
 
-  (iResult ++) <$> case topOutputM of
-    Nothing -> return []
+  let
+    topCompDecl oports =
+      InstDecl
+        Entity
+        (Just topName)
+        topName
+        instLabel1
+        []
+        ( map (\(p,i,t) -> (Identifier p Nothing,In, t,Identifier i Nothing)) (concat iports) ++
+          map (\(p,o,t) -> (Identifier p Nothing,Out,t,Identifier o Nothing)) oports)
+
+  case topOutputM of
+    Nothing ->
+      pure (topCompDecl [] : iResult)
     Just (_, (oports, unwrappers, idsO)) -> do
-        instLabel0 <- extendIdentifier Basic topName ("_" `Text.append` fst dstId)
-        instLabel1 <- mkUniqueIdentifier Basic instLabel0
         let outpAssign = Assignment (fst dstId) (resBV topM idsO)
-        let topCompDecl = InstDecl
-                            Entity
-                            (Just topName)
-                            topName
-                            instLabel1
-                            []
-                            ( map (\(p,i,t) -> (Identifier p Nothing,In, t,Identifier i Nothing)) (concat iports) ++
-                              map (\(p,o,t) -> (Identifier p Nothing,Out,t,Identifier o Nothing)) oports)
-
-        return $ tickDecls ++ (topCompDecl:unwrappers) ++ [outpAssign]
+        pure (iResult ++ tickDecls ++ (topCompDecl oports:unwrappers) ++ [outpAssign])
 
 -- | Convert between BitVector for an argument
 argBV
