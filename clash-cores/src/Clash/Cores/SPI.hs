@@ -6,18 +6,18 @@
   SPI master and slave core
 -}
 module Clash.Cores.SPI
-  ( SPIMode (..)
+  ( SPIMode(..)
     -- * SPI master
   , spiMaster
     -- * SPI slave
-  , SPISlaveConfig (..)
+  , SPISlaveConfig(..)
   , spiSlave
     -- ** Vendor configured SPI slaves
   , spiSlaveLatticeSBIO
-  )
-where
+  ) where
 
 import Data.Maybe (fromMaybe, isJust)
+import Test.QuickCheck as QC
 
 import Clash.Prelude
 import Clash.Sized.Internal.BitVector
@@ -27,30 +27,64 @@ import Clash.Cores.LatticeSemi.IO
 -- | SPI mode
 --
 -- * CPOL: Clock POLarity
---
 -- * CPHA: Clock PHAse
 data SPIMode
   = SPIMode0
   -- ^ CPOL = 0, CPHA = 0
   --
-  -- Clock is idle low, data is sampled on rising edge of SCK,
-  -- data is shifted on falling edge of SCK.
+  -- Clock is idle low, so the leading edge is rising.
+  -- Phase is low, so data is sampled on the leading edge.
+  --
+  -- TL;DR Data is shifted on the rising edge of SCK.
   | SPIMode1
   -- ^ CPOL = 0, CPHA = 1
   --
-  -- Clock is idle low, data is sampled on falling edge of SCK,
-  -- data is shifted on rising edge of SCK.
+  -- Clock is idle low, so the leading edge is rising.
+  -- Phase is high, so data is sampled on the trailing edge.
+  --
+  -- TL;DR Data is shifted on the falling edge of SCK.
   | SPIMode2
   -- ^ CPOL = 1, CPHA = 0
   --
-  -- Clock is idle high, data is sampled on rising edge of SCK,
-  -- data is shifted on falling edge of SCK.
+  -- Clock is idle high, so the leading edge is falling.
+  -- Phase is low, so data is sampled on the leading edge.
+  --
+  -- TL;DR Data is shifted on the falling edge of SCK.
   | SPIMode3
   -- ^ CPOL = 1, CPHA = 1
   --
-  -- Clock is idle high, data is sampled on falling edge of SCK,
-  -- data is shifted on falling edge of SCK.
+  -- Clock is idle high, so the leading edge is falling.
+  -- Phase is high, so data is sampled on the trailing edge.
+  --
+  -- TL;DR Data is shifted on the rising edge of SCK.
   deriving (Eq, Show)
+
+instance Arbitrary SPIMode where
+  arbitrary = QC.elements [SPIMode0, SPIMode1, SPIMode2, SPIMode3]
+
+idleOnLow :: SPIMode -> Bool
+idleOnLow SPIMode0 = True
+idleOnLow SPIMode1 = True
+idleOnLow _        = False
+
+idleOnHigh :: SPIMode -> Bool
+idleOnHigh = not . idleOnLow
+
+sampleOnRising :: SPIMode -> Bool
+sampleOnRising SPIMode0 = True
+sampleOnRising SPIMode3 = True
+sampleOnRising _        = False
+
+sampleOnFalling :: SPIMode -> Bool
+sampleOnFalling = not . sampleOnRising
+
+sampleOnLeading :: SPIMode -> Bool
+sampleOnLeading SPIMode0 = True
+sampleOnLeading SPIMode2 = True
+sampleOnLeading _        = False
+
+sampleOnTrailing :: SPIMode -> Bool
+sampleOnTrailing = not . sampleOnLeading
 
 data SPISlaveConfig ds dom
   = SPISlaveConfig
@@ -87,7 +121,8 @@ spiCommon
   -> Signal dom Bool
   -- ^ SCK
   -> Signal dom (BitVector n)
-  -> ( Signal dom Bit -- Slave: MISO; Master: MOSI
+  -> ( Signal dom Bit   -- Slave: MISO; Master: MOSI
+     , Signal dom Bool  -- Acknowledge start of transfer
      , Signal dom (Maybe (BitVector n))
      )
 spiCommon mode ssI msI sckI dinI =
@@ -96,19 +131,21 @@ spiCommon mode ssI msI sckI dinI =
                 , undefined         -- sckOldR
                 , deepErrorX "no initial dataInR"
                 , deepErrorX "no initial dataOutR"
+                , False             -- ackR
                 , False             -- doneR
                 )
                 (ssI,msI,sckI,dinI)
  where
-  cvt (_,_,_,dataInQ,dataOutQ,doneQ) =
+  cvt (_,_,_,dataInQ,dataOutQ,ackQ,doneQ) =
     ( head dataOutQ
+    , ackQ
     , if doneQ
          then Just (pack dataInQ)
          else Nothing
     )
 
-  go (cntQ,cntOldQ,sckOldQ,dataInQ,dataOutQ,_) (ss,ms,sck,din) =
-    (cntD,cntOldD,sck,dataInD,dataOutD,doneD)
+  go (cntQ,cntOldQ,sckOldQ,dataInQ,dataOutQ,_,_) (ss,ms,sck,din) =
+    (cntD,cntOldD,sck,dataInD,dataOutD,ackD,doneD)
    where
     cntD
       | ss        = 0
@@ -124,7 +161,7 @@ spiCommon mode ssI msI sckI dinI =
       | ss        = unpack din
       | shiftSck  = if cntOldQ
                        then unpack din
-                       else if (mode == SPIMode1 || mode == SPIMode3) && cntQ == 0
+                       else if sampleOnTrailing mode && cntQ == 0
                                then dataOutQ
                                else tail @(n-1) dataOutQ :< unpack undefined#
       | otherwise = dataOutQ
@@ -136,16 +173,15 @@ spiCommon mode ssI msI sckI dinI =
     cntOldD | not ss && shiftSck = cntQ == maxBound
             | otherwise          = cntOldQ
 
+    ackD  = not ss && shiftSck && cntQ == 1
     doneD = not ss && sampleSck && cntQ == maxBound
 
-    risingSck  = not sckOldQ && sck
-    fallingSck = sckOldQ && not sck
-
-    sampleSck = if mode == SPIMode0 || mode == SPIMode3
-                then risingSck else fallingSck
-
-    shiftSck  = if mode == SPIMode1 || mode == SPIMode2
-                then risingSck else fallingSck
+    (sampleSck, shiftSck)
+      | sampleOnRising mode = (risingSck, fallingSck)
+      | otherwise           = (fallingSck, risingSck)
+     where
+      risingSck  = not sckOldQ && sck
+      fallingSck = sckOldQ && not sck
 
 -- | SPI slave configurable SPI mode and tri-state buffer
 spiSlave
@@ -168,6 +204,7 @@ spiSlave
   --
   -- Input is latched the moment slave select goes low
   -> ( BiSignalOut ds dom 1
+     , Signal dom Bool
      , Signal dom (Maybe (BitVector n)))
   -- ^ Parts of the tuple:
   --
@@ -178,9 +215,9 @@ spiSlave (SPISlaveConfig mode latch buf) sclk mosi bin ss din =
   let ssL   = if latch then delay undefined ss   else ss
       mosiL = if latch then delay undefined mosi else mosi
       sclkL = if latch then delay undefined sclk else sclk
-      (miso,dout) = spiCommon mode ssL mosiL sclkL din
+      (miso, ack, dout) = spiCommon mode ssL mosiL sclkL din
       bout = buf bin (not <$> ssL) miso
-  in  (bout,dout)
+  in  (bout, ack, dout)
 
 -- | SPI master configurable in the SPI mode and clock divider
 --
@@ -211,6 +248,7 @@ spiMaster
      , Signal dom Bit  -- MOSI
      , Signal dom Bool -- SS
      , Signal dom Bool -- Busy
+     , Signal dom Bool -- Acknowledge
      , Signal dom (Maybe (BitVector n)) -- Data: Slave -> Master
      )
   -- ^ Parts of the tuple:
@@ -222,14 +260,14 @@ spiMaster
   --    the data line will be ignored when /True/
   -- 5. (Maybe) the word send from the slave to the master
 spiMaster mode fN fW din miso =
-  let (mosi,dout)   = spiCommon mode ssL misoL sclkL
+  let (mosi, ack, dout)   = spiCommon mode ssL misoL sclkL
                         (fromMaybe undefined# <$> din)
       latch = snatToInteger fN /= 1
       ssL   = if latch then delay undefined ss   else ss
       misoL = if latch then delay undefined miso else miso
       sclkL = if latch then delay undefined sclk else sclk
-      (ss,sclk,busy) = spiGen mode fN fW din
-  in  (sclk,mosi,ss,busy,dout)
+      (ss, sclk, busy) = spiGen mode fN fW din
+  in  (sclk, mosi, ss, busy, ack, dout)
 
 -- | Generate slave select and SCK
 spiGen
@@ -250,12 +288,11 @@ spiGen
 spiGen mode SNat SNat =
   unbundle . moore go cvt (0 :: Index (2*n),False,Idle @halfPeriod @waitTime)
  where
-  cvt (_,sck,st) =
+  cvt (_, sck, st) =
     ( st == Idle
-    , if mode == SPIMode0 || mode == SPIMode1
-      then sck
-      else not sck
-    , st /= Idle)
+    , if idleOnLow mode then sck else not sck
+    , st /= Idle
+    )
 
   go (cntQ,sckQ,stQ) din = (cntD,sckD,stD)
    where
@@ -281,7 +318,7 @@ spiGen mode SNat SNat =
       _ -> 0
 
     sckD = case stQ of
-      Wait 0 | mode == SPIMode1 || mode == SPIMode3 -> not sckQ
+      Wait 0 | sampleOnTrailing mode -> not sckQ
       Transfer n | n == maxBound -> not sckQ
       _ -> sckQ
 
@@ -323,6 +360,7 @@ spiSlaveLatticeSBIO
   --
   -- Input is latched the moment slave select goes low
   -> ( BiSignalOut 'Floating dom 1
+     , Signal dom Bool
      , Signal dom (Maybe (BitVector n)))
   -- ^ Parts of the tuple:
   --
