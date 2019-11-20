@@ -56,10 +56,8 @@ module Clash.Signal.Internal
   , mergeSignalMeta#
   , mergeSignalMetas#
   , metaNameMap
-  , metaNameMap1
   , meta#
   , toStream#
-  , getRandomMetaId
     -- * Domains
   , Domain
   , KnownDomain(..)
@@ -156,7 +154,6 @@ where
 
 import           Clash.Annotations.Primitive (hasBlackBox)
 import           Control.Applicative        (liftA2, liftA3)
-import           Control.Arrow              (second)
 import           Control.DeepSeq            (NFData)
 import           Data.Binary                (Binary, decode)
 import           Data.ByteString.Lazy       (fromStrict)
@@ -709,22 +706,9 @@ getRandomMetaId = MetaId <$> decode <$> fromStrict <$> getEntropy 32
 -- | Remove meta ids from a meta hashmap, leaving only a mapping from meta names
 -- to their values.
 metaNameMap
-  :: (HashSet MetaId -> HashMap MetaId (MetaName, a))
-  -> HashMap MetaName [a]
-metaNameMap fm =
-  let m = fm HashSet.empty in
-  HashMap.fromListWith (<>) (map (second pure) (HashMap.elems m))
-
--- | Same as 'metaNameMap', but assumes meta names in given meta map correspond
--- to only a single value. If it doesn't, 'metaNameMap1' returns a list of meta
--- names violating this property.
-metaNameMap1
-  :: (HashSet MetaId -> HashMap MetaId (MetaName, a))
-  -> Either [MetaName] (HashMap MetaName a)
-metaNameMap1 (metaNameMap -> m) =
-  case filter (\(_, v) -> length v > 1) (HashMap.toList m) of
-    [] -> Right (HashMap.map head m)
-    dups -> Left (map fst dups)
+  :: (HashSet MetaId -> HashMap MetaName a)
+  -> HashMap MetaName a
+metaNameMap fm = fm HashSet.empty
 
 {-
 Note [The why and how of "SignalMeta"]

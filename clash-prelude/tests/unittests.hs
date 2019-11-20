@@ -7,6 +7,7 @@ import qualified Clash.Tests.BitPack
 import qualified Clash.Tests.BitVector
 import qualified Clash.Tests.DerivingDataRepr
 import qualified Clash.Tests.Signal
+import qualified Clash.Tests.Signal.Trace
 import qualified Clash.Tests.NFDataX
 import qualified Clash.Tests.TopEntityGeneration
 
@@ -17,6 +18,7 @@ tests = testGroup "Unittests"
   , Clash.Tests.BitVector.tests
   , Clash.Tests.DerivingDataRepr.tests
   , Clash.Tests.Signal.tests
+  , Clash.Tests.Signal.Trace.tests
   , Clash.Tests.NFDataX.tests
   , Clash.Tests.TopEntityGeneration.tests
   ]
