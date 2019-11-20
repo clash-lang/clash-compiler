@@ -39,6 +39,7 @@ runClashTest :: IO ()
 runClashTest = defaultMain $ clashTestRoot
   [ clashTestGroup "netlist"
     [ netlistTest ("tests" </> "shouldwork" </> "Netlist") allTargets [] "Identity" "main"
+    , netlistTest ("tests" </> "shouldwork" </> "Netlist") [VHDL] [] "NoDeDup" "main"
     ]
   , clashTestGroup "examples"
     [ runTest "ALU" def{hdlSim=False}
