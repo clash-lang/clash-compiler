@@ -22,6 +22,7 @@
   * Added `Clash.Class.AutoReg`. Improves the chances of synthesis tools inferring clock-gated registers, when used. See [#873](https://github.com/clash-lang/clash-compiler/pull/873).
   * `Clash.Magic.suffixNameP`, `Clash.Magic.suffixNameFromNatP`: enable prefixing of name suffixes
   * Added `Clash.Magic.noDeDup`: can be used to instruct Clash to /not/ share a function between multiple branches
+  * Added `Clash.Annotations.Primitive.idBlackBoxTH`: can be used to easily create blackboxes that simply forward one of its arguments.
 
 * New internal features:
   * [#821](https://github.com/clash-lang/clash-compiler/pull/821): Add `DebugTry`: print name of all tried transformations, even if they didn't succeed

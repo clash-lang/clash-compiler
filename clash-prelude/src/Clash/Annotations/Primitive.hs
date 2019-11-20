@@ -11,12 +11,12 @@ templates.
 {-# LANGUAGE DeriveAnyClass        #-}
 {-# LANGUAGE DeriveDataTypeable    #-}
 {-# LANGUAGE DeriveFunctor         #-}
-{-# LANGUAGE DeriveTraversable     #-}
 {-# LANGUAGE DeriveGeneric         #-}
+{-# LANGUAGE DeriveLift            #-}
+{-# LANGUAGE DeriveTraversable     #-}
 {-# LANGUAGE LambdaCase            #-}
+{-# LANGUAGE QuasiQuotes           #-}
 {-# LANGUAGE TemplateHaskellQuotes #-}
-
-{-# LANGUAGE Safe #-}
 
 {-# OPTIONS_HADDOCK show-extensions #-}
 
@@ -29,13 +29,18 @@ module Clash.Annotations.Primitive
   , PrimitiveGuard(..)
   , HDL(..)
   , extractPrim
+  , idBlackBoxTH
   ) where
 
 import           Control.DeepSeq                          (NFData)
 import           Data.Binary                              (Binary)
 import           Data.Data
 import           Data.Hashable                            (Hashable)
+import           Data.String.Interpolate                  (i)
+import           Data.String.Interpolate.Util             (unindent)
 import           GHC.Generics                             (Generic)
+
+import           Language.Haskell.TH.Syntax
 
 
 -- The commented code directly below this comment is affected by an old
@@ -154,7 +159,7 @@ data HDL
   = SystemVerilog
   | Verilog
   | VHDL
-  deriving (Eq, Show, Read, Data, Generic, NFData, Hashable)
+  deriving (Eq, Show, Read, Data, Generic, NFData, Hashable, Enum, Bounded, Lift)
 
 -- | The 'Primitive' constructor instructs the clash compiler to look for primitive
 -- HDL templates in the indicated directory. 'InlinePrimitive' is equivalent but
@@ -241,7 +246,7 @@ data Primitive
   -- ^ Description of a primitive for a given 'HDL' in a file at 'FilePath'
   | InlinePrimitive HDL String
   -- ^ Description of a primitive for a given 'HDL' as an inline 'String'
-  deriving (Show, Read, Data, Generic, NFData, Hashable)
+  deriving (Show, Read, Data, Generic, NFData, Hashable, Lift)
 
 -- | Guard primitive functions. This will help Clash generate better error
 -- messages. You can annotate a function like:
@@ -292,3 +297,37 @@ extractPrim =
     WarnNonSynthesizable _ a -> Just a
     WarnAlways _ a           -> Just a
     DontTranslate            -> Nothing
+
+idBlackBox
+  :: Name
+  -> Int
+  -> HDL
+  -> Primitive
+idBlackBox nm usedArg hdl = InlinePrimitive hdl $ unindent [i|
+  [{ "BlackBox" :
+     { "name" : "#{nm}"
+     , "kind": "Expression"
+     , "template" : "~ARG[#{usedArg}]"
+     , "workInfo" : "Never"
+     }
+   }] |]
+
+idBlackBoxTH' :: Name -> Int -> HDL -> Q Dec
+idBlackBoxTH' nm usedArg hdl = do
+  annE <- lift (idBlackBox nm usedArg hdl)
+  pure (PragmaD (AnnP (ValueAnnotation nm) annE))
+
+-- | Create blackbox simply containing simply forwarding one of the arguments.
+-- This is useful if you want a function to affect simulation, but have it do
+-- nothing in hardware.
+--
+-- === Example usage
+--
+-- @
+-- mySeq :: a -> b -> b
+-- mySeq !a b = b
+-- {-# NOINLINE mySeq #-}
+-- idBlackBoxTH 'mySeq 1
+-- @
+idBlackBoxTH :: Name -> Int -> Q [Dec]
+idBlackBoxTH nm usedArg = mapM (idBlackBoxTH' nm usedArg) [minBound..maxBound]
