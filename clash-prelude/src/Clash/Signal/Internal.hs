@@ -16,6 +16,7 @@ Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
 {-# LANGUAGE FlexibleInstances      #-}
 {-# LANGUAGE GADTs                  #-}
 {-# LANGUAGE MagicHash              #-}
+{-# LANGUAGE OverloadedStrings      #-}
 {-# LANGUAGE ScopedTypeVariables    #-}
 {-# LANGUAGE StandaloneDeriving     #-}
 {-# LANGUAGE TemplateHaskell        #-}
@@ -48,10 +49,17 @@ module Clash.Signal.Internal
   , Stream(..)
   , head#
   , tail#
+    -- * Signal meta information
+  , SignalTrace(..)
+  , SignalMeta(..)
+  , MetaName
   , mergeSignalMeta#
   , mergeSignalMetas#
+  , metaNameMap
+  , metaNameMap1
   , meta#
   , toStream#
+  , getRandomMetaId
     -- * Domains
   , Domain
   , KnownDomain(..)
@@ -146,30 +154,40 @@ module Clash.Signal.Internal
   )
 where
 
-import Type.Reflection            (Typeable)
-import Control.Applicative        (liftA2, liftA3)
-import Control.DeepSeq            (NFData)
-import Clash.Annotations.Primitive (hasBlackBox)
-import Data.Binary                (Binary)
-import Data.Char                  (isAsciiUpper, isAlphaNum, isAscii)
-import Data.Coerce                (coerce)
-import Data.Data                  (Data)
-import Data.Default               (def)
-import Data.Default.Class         (Default (..))
-import Data.Hashable              (Hashable)
-import Data.Proxy                 (Proxy(..))
-import GHC.Generics               (Generic)
-import GHC.Stack                  (HasCallStack)
-import GHC.TypeLits               (KnownSymbol, Nat, Symbol, type (<=))
-import Language.Haskell.TH.Syntax -- (Lift (..), Q, Dec)
-import Language.Haskell.TH.Compat (mkTySynInstD)
-import Numeric.Natural            (Natural)
-import Test.QuickCheck            (Arbitrary (..), CoArbitrary(..), Property,
-                                   property)
+import           Clash.Annotations.Primitive (hasBlackBox)
+import           Control.Applicative        (liftA2, liftA3)
+import           Control.Arrow              (second)
+import           Control.DeepSeq            (NFData)
+import           Data.Binary                (Binary, decode)
+import           Data.ByteString.Lazy       (fromStrict)
+import qualified Data.ByteString.Lazy       as ByteStringLazy
+import           Data.Char                  (isAsciiUpper, isAlphaNum, isAscii)
+import           Data.Coerce                (coerce)
+import           Data.Data                  (Data)
+import           Data.Default.Class         (Default (..))
+import           Data.Hashable              (Hashable)
+import           Data.Int                   (Int64)
+import           Data.HashSet               (HashSet)
+import qualified Data.HashSet               as HashSet
+import           Data.HashMap.Strict        (HashMap)
+import qualified Data.HashMap.Strict        as HashMap
+import           Data.Proxy                 (Proxy(..))
+import qualified Data.Text                  as Text
+import           GHC.Generics               (Generic)
+import           GHC.Stack                  (HasCallStack)
+import           GHC.TypeLits               (KnownSymbol, Nat, Symbol, type (<=))
+import           Language.Haskell.TH.Compat (mkTySynInstD)
+import           Language.Haskell.TH.Syntax -- (Lift (..), Q, Dec)
+import           Numeric.Natural            (Natural)
+import           System.Entropy             (getEntropy)
+import           System.IO.Unsafe           (unsafePerformIO)
+import           Test.QuickCheck
+  (Arbitrary (..), CoArbitrary(..), Property, property)
+import           Type.Reflection            (Typeable)
 
-import Clash.Promoted.Nat         (SNat (..), snatToNum, snatToNatural)
-import Clash.Promoted.Symbol      (SSymbol (..), ssymbolToString)
-import Clash.XException
+import           Clash.Promoted.Nat         (SNat (..), snatToNum, snatToNatural)
+import           Clash.Promoted.Symbol      (SSymbol (..), ssymbolToString)
+import           Clash.XException
   (NFDataX, errorX, deepseqX, defaultSeqX, deepErrorX)
 
 {- $setup
@@ -658,14 +676,114 @@ data Signal (dom :: Domain) a =
   -- and a stream of values ("Stream")
   Signal SignalMeta (Stream dom a)
 
--- | Meta data of a signal
-data SignalMeta = SignalMeta
-  {
+-- | Stores an inline trace of a signal. Can be used to debug circuit internals.
+-- For more information see "Clash.Signal.Trace".
+data SignalTrace = SignalTrace
+  { stTypeRepr :: !ByteStringLazy.ByteString
+  -- ^ Serialized representation of type stored in last field. This is
+  -- needed to support 'Clash.Signal.Trace.dumpReplayable'
+  , stPeriod :: !Int
+  -- ^ Clock period of serialized signal
+  , stWidth :: !Int
+  -- ^ Bit size of type
+  , stTrace :: [(Integer, Integer)]
+  -- ^ Actual trace: (mask, value)
+  }
 
+type MetaName = Text.Text
+
+-- | 256-bit number used to store signal meta identifiers. See 'SignalMeta' for
+-- more information.
+newtype MetaId =
+  MetaId (Int64, Int64, Int64, Int64)
+    deriving (Generic, Eq, Hashable, Show)
+
+-- | Used to generate meta ids to allow fast / safe merging of 'SignalMeta'.
+-- You'll probably want to use this in combination with 'unsafePerformIO'. If
+-- you do, make sure to read:
+--
+-- http://hackage.haskell.org/package/base-4.12.0.0/docs/System-IO-Unsafe.html
+getRandomMetaId :: IO MetaId
+getRandomMetaId = MetaId <$> decode <$> fromStrict <$> getEntropy 32
+
+-- | Remove meta ids from a meta hashmap, leaving only a mapping from meta names
+-- to their values.
+metaNameMap
+  :: (HashSet MetaId -> HashMap MetaId (MetaName, a))
+  -> HashMap MetaName [a]
+metaNameMap fm =
+  let m = fm HashSet.empty in
+  HashMap.fromListWith (<>) (map (second pure) (HashMap.elems m))
+
+-- | Same as 'metaNameMap', but assumes meta names in given meta map correspond
+-- to only a single value. If it doesn't, 'metaNameMap1' returns a list of meta
+-- names violating this property.
+metaNameMap1
+  :: (HashSet MetaId -> HashMap MetaId (MetaName, a))
+  -> Either [MetaName] (HashMap MetaName a)
+metaNameMap1 (metaNameMap -> m) =
+  case filter (\(_, v) -> length v > 1) (HashMap.toList m) of
+    [] -> Right (HashMap.map head m)
+    dups -> Left (map fst dups)
+
+{-
+Note [The why and how of "SignalMeta"]
+--------------------------------------------------------------
+For various features, most notably traces (see "Clash.Signal.Trace") and
+assertions (see "Clash.Validation"), we'd like access to some data structure
+created inside a design. For example, a user might want to trace a signal
+for debugging purposes. At first glance, we've got three basic design options:
+
+  1. Make the user propagate the trace all the way to their top-level function
+  2. Use 'unsafePerformIO' to print every value to stdout
+  3. Use 'unsafePerformIO' to store the trace in a global map
+
+All three of these options leave a lot to be desired. We either ask too much of
+the user (1) or we introduce all the dragons that come with 'unsafePerformIO'
+(2, 3).
+
+"SignalMeta" tries to solve these problems by redefining "Signal" to not just
+be a stream of values (~ `a :- Signal a`), but a product of meta information and
+the stream. 'traceSignal' can now store its trace in the signal's metadata. Any
+time two signals are combined, the combinator should make sure the metadata from
+both signals is propagated in the combined one. Ignoring blackboxes for now, the
+only function combining two signals is '<*>' from the "Applicative" instance of
+"Signal". So the next question is, what should the implementation of the
+function merging the two metadatas look like? The most obvious implementation
+(assuming SignalMeta carries some hashmap) would be:
+
+@
+  mergeMeta :: SignalMeta -> SignalMeta -> SignalMeta
+  mergeMeta (SignalMeta f1) (SignalMeta f2) = SignalMeta (HashMap.union f1 f2)
+@
+
+This simple implementation doesn't really work though. In a feedback loop 'f1'
+and 'f2' might (indirectly) be the result of @HashMap.union f1 f2@. Using it
+therefore sets off an infinite loop.
+
+We'd like to break the infinite loop triggered by the naive version of
+'mergeMeta' written earlier. Instead of adding data to the map directly, we
+store a function instead. This function takes a set of _seen_ identifiers. Every
+merge-point ('mergeMeta') will generate a unique id and return the aforementioned
+function with that id in scope. The function will check whether it has seen it's
+own merge-point before. If it hasn't, it will add itself to the set of seen ids
+and merge the incoming metadatas. If its own id _is_ in there, it can assume all
+the metadata it would add is already in the metadata the caller collected so
+far. It can therefore break the loop and simply return an empty map.
+
+-}
+
+-- | Meta data of a signal. Used to propagate internal design structures to the
+-- top level "automagically". See Note [The why and how of "SignalMeta"].
+data SignalMeta = SignalMeta
+  { smTraces :: HashSet MetaId -> HashMap MetaName SignalTrace
+  -- ^ Stores traces made in "Clash.Signal.Trace". Use 'metaNameMap' and
+  -- 'metaNameMap1' to obtain the actual map.
   }
 
 emptySignalMeta :: SignalMeta
-emptySignalMeta = SignalMeta
+emptySignalMeta = SignalMeta (const HashMap.empty)
+{-# NOINLINE emptySignalMeta #-}
 
 class HasSignalMeta a where
   meta# :: a -> SignalMeta
@@ -679,14 +797,32 @@ instance HasSignalMeta (Enable dom) where
 instance HasSignalMeta (Reset dom) where
   meta# = meta# . unsafeFromReset
 
+-- | Merge metadata present in two "SignalMeta"s. Use this if you're manually
+-- deconstructing Signal in blackboxes.
 mergeSignalMeta# :: SignalMeta -> SignalMeta -> SignalMeta
-mergeSignalMeta# SignalMeta SignalMeta = SignalMeta
+mergeSignalMeta# m1 m2 = mySmId `seq` SignalMeta smTracesF
+ where
+  mySmId = unsafePerformIO getRandomMetaId
 
+  -- See Note [The why and how of "SignalMeta"]
+  smTracesF
+    :: HashSet MetaId
+    -- ^ Tracemaps detected so far
+    -> HashMap MetaName SignalTrace
+  smTracesF seen0
+    | HashSet.size seen0 > 1024 * 1024 = error "smTracesF: loop detected?"
+    | HashSet.member mySmId seen0 = HashMap.empty
+    | otherwise = HashMap.union (smTraces m1 seen1) (smTraces m2 seen1)
+   where
+    seen1 = HashSet.insert mySmId seen0
+{-# NOINLINE mergeSignalMeta# #-}
+
+-- | Same as 'mergeSignalMeta#', but over a list of "SignalMeta"s
 mergeSignalMetas# :: HasCallStack => [SignalMeta] -> SignalMeta
 mergeSignalMetas# = foldl mergeSignalMeta# emptySignalMeta
 
 instance Default SignalMeta where
-  def = SignalMeta
+  def = emptySignalMeta
 
 -- | Carries the values of a "Signal"
 data Stream (dom :: Domain) a
@@ -807,6 +943,9 @@ instance Num a => Num (Signal dom a) where
 -- * The @z@ element will never be used.
 instance Foldable (Signal dom) where
   foldr = foldr#
+
+instance Foldable (Stream dom) where
+  foldr = foldr##
 
 foldr## :: (a -> b -> b) -> b -> Stream dom a -> b
 foldr## f z (a :- s) = a `f` (foldr## f z s)
@@ -1108,7 +1247,7 @@ delay#
   -> a
   -> Signal dom a
   -> Signal dom a
-delay# (Clock dom) (fromEnable -> (Signal m1 en)) powerUpVal0 (Signal m2 as) =
+delay# (Clock dom) (fromEnable -> ~(Signal m1 en)) powerUpVal0 ~(Signal m2 as) =
     Signal (mergeSignalMeta# m1 m2) (go powerUpVal1 en as)
   where
     powerUpVal1 :: a
