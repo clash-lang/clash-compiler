@@ -338,6 +338,12 @@ coreToTerm primMap unlocs = term
         go "Clash.Magic.suffixNameFromNat" args
           | [Type nmTy,_aTy,f] <- args
           = C.Tick <$> (C.NameMod C.SuffixName <$> coreToType nmTy) <*> term f
+        go "Clash.Magic.suffixNameP" args
+          | [Type nmTy,_aTy,f] <- args
+          = C.Tick <$> (C.NameMod C.SuffixNameP <$> coreToType nmTy) <*> term f
+        go "Clash.Magic.suffixNameFromNatP" args
+          | [Type nmTy,_aTy,f] <- args
+          = C.Tick <$> (C.NameMod C.SuffixNameP <$> coreToType nmTy) <*> term f
         go "Clash.Magic.setName" args
           | [Type nmTy,_aTy,f] <- args
           = C.Tick <$> (C.NameMod C.SetName <$> coreToType nmTy) <*> term f

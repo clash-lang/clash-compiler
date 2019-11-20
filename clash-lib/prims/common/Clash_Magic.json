@@ -14,6 +14,16 @@
     }
   }
 , { "Primitive" :
+    { "name"      : "Clash.Magic.suffixNameP"
+    , "primType"  : "Function"
+    }
+  }
+, { "Primitive" :
+    { "name"      : "Clash.Magic.suffixNameFromNatP"
+    , "primType"  : "Function"
+    }
+  }
+, { "Primitive" :
     { "name"      : "Clash.Magic.setName"
     , "primType"  : "Function"
     }

@@ -176,7 +176,7 @@ instance (KnownNat n, AutoReg a) => AutoReg (Vec n a) where
     bundle $ smap go (lazyV initVal) <*> unbundle xs
    where
     go :: forall (i :: Nat). SNat i -> a  -> Signal dom a -> Signal dom a
-    go SNat = suffixNameFromNat @i . autoReg clk rst en
+    go SNat = suffixNameFromNatP @i . autoReg clk rst en
 
 instance (KnownNat d, AutoReg a) => AutoReg (RTree d a) where
   autoReg clk rst en initVal xs =
@@ -250,8 +250,8 @@ instance (AutoReg a, AutoReg b, ..) => AutoReg (Product a b ..) where
       field1 = (\(MkProduct _ x ...) -> x) <$> input
       ...
       MkProduct initVal0 initVal1 ... = initVal
-      sig0 = suffixName @"getA" autoReg clk rst en initVal0 field0
-      sig1 = suffixName @"getB" autoReg clk rst en initVal1 field1
+      sig0 = suffixNameP @"getA" autoReg clk rst en initVal0 field0
+      sig1 = suffixNameP @"getB" autoReg clk rst en initVal1 field1
       ...
 -}
 deriveAutoRegProduct :: DatatypeInfo -> ConstructorInfo -> DecsQ
@@ -313,7 +313,7 @@ deriveAutoRegProduct tyInfo conInfo = go (constructorName conInfo) fieldInfos
         nameMe = case nameM of
           Nothing -> [| id |]
           Just nm -> let nmSym = litT $ strTyLit (nameBase nm)
-                     in [| suffixName @($nmSym) |]
+                     in [| suffixNameP @($nmSym) |]
 
     partDecls <- concat <$> (sequence $ zipWith4 genAutoRegDecl
                                                  (varP <$> sigs)
