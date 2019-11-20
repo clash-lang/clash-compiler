@@ -37,7 +37,10 @@ clashTestGroup testName testTrees =
 
 runClashTest :: IO ()
 runClashTest = defaultMain $ clashTestRoot
-  [ clashTestGroup "examples"
+  [ clashTestGroup "netlist"
+    [ netlistTest ("tests" </> "shouldwork" </> "Netlist") allTargets [] "Identity" "main"
+    ]
+  , clashTestGroup "examples"
     [ runTest "ALU" def{hdlSim=False}
     , runTest "Blinker" def{
         hdlSim=False
