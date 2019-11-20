@@ -79,6 +79,8 @@ data NameMod
   -- ^ @Clash.Magic.prefixName@
   | SuffixName
   -- ^ @Clash.Magic.suffixName@
+  | SuffixNameP
+  -- ^ @Clash.Magic.suffixNameP@
   | SetName
   -- ^ @Clash.Magic.setName@
   deriving (Eq,Show,Generic,NFData,Hashable,Binary)

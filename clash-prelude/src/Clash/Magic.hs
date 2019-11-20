@@ -34,6 +34,52 @@ suffixNameFromNat
 suffixNameFromNat = id
 {-# NOINLINE suffixNameFromNat #-}
 
+-- | Suffix instance and register names with the given 'Symbol', but add it
+-- in front of other suffixes.
+--
+-- When you write
+--
+-- @
+-- suffixName \@\"A\" (suffixName \@\"B\" f))
+-- @
+--
+-- you get register and instance names inside /f/ with the suffix: "_B_A"
+--
+-- However, if you want them in the other order you can write:
+--
+-- @
+-- suffixNameP \@\"A\" (suffixName \@\"B\" f))
+-- @
+--
+-- so that names inside /f/ will have the suffix "_A_B"
+suffixNameP
+  :: forall (name :: Symbol) a . a -> name ::: a
+suffixNameP = id
+{-# NOINLINE suffixNameP #-}
+
+-- | Suffix instance and register names with the given 'Nat', but add it in
+-- front of other suffixes.
+--
+-- When you write
+--
+-- @
+-- suffixNameNat \@1 (suffixName \@\"B\" f))
+-- @
+--
+-- you get register and instance names inside /f/ with the suffix: "_B_1"
+--
+-- However, if you want them in the other order you can write:
+--
+-- @
+-- suffixNameNatP \@1 (suffixName \@\"B\" f))
+-- @
+--
+-- so that names inside /f/ will have the suffix "_1_B"
+suffixNameFromNatP
+  :: forall (name :: Nat) a . a -> name ::: a
+suffixNameFromNatP = id
+{-# NOINLINE suffixNameFromNatP #-}
+
 -- | Name the instance or register with the given 'Symbol', instead of using
 -- an auto-generated name. Pre- and suffixes annotated with 'prefixName' and
 -- 'suffixName' will be added to both instances and registers named with

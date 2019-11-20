@@ -232,6 +232,7 @@ instance PrettyPrec TickInfo where
   pprPrec prec (SrcSpan sp)   = pprPrec prec sp
   pprPrec prec (NameMod PrefixName t) = ("<prefixName>" <>) <$> pprPrec prec t
   pprPrec prec (NameMod SuffixName t) = ("<suffixName>" <>) <$> pprPrec prec t
+  pprPrec prec (NameMod SuffixNameP t) = ("<suffixNameP>" <>) <$> pprPrec prec t
   pprPrec prec (NameMod SetName t)    = ("<setName>" <>) <$> pprPrec prec t
 
 instance PrettyPrec SrcSpan where

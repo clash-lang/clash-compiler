@@ -1896,6 +1896,9 @@ withTicks ticks0 k = do
   modName SuffixName (Text.pack -> s2) env@(NetlistEnv {_suffixName = s1})
     | Text.null s1 = env {_suffixName = s2}
     | otherwise    = env {_suffixName = s2 <> "_" <> s1}
+  modName SuffixNameP (Text.pack -> s2) env@(NetlistEnv {_suffixName = s1})
+    | Text.null s1 = env {_suffixName = s2}
+    | otherwise    = env {_suffixName = s1 <> "_" <> s2}
   modName SetName (Text.pack -> s) env = env {_setName = Just s}
 
 -- | Add the pre- and suffix names in the current environment to the given
