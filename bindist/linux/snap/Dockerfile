@@ -3,8 +3,7 @@
 FROM ubuntu:18.04
 
 ENV \
-  NIXPKGS_VERSION=19.03 \
-  NIX_VERSION=2.2.2 \
+  NIX_VERSION=2.3.1 \
   PREFIX=/usr \
   ROOT=/usr/nix \
   STORE=/usr/nix/store \
