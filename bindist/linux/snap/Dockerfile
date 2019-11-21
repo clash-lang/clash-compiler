@@ -10,6 +10,8 @@ ENV \
   VAR=/usr/nix/var \
   BUILD_DEPS='git apt-utils software-properties-common build-essential libbrotli-dev libbrotli1 liblzma-dev curl libcurl4-openssl-dev sqlite libsqlite3-dev pkg-config libcrypto++-dev libcrypto++6 openssl libssl-dev bzip2 libbz2-dev libeditline-dev libeditline0 libreadline-dev libreadline7 libseccomp-dev libgc-dev wget'
 
+COPY edolstra.gpg edolstra.gpg
+
 RUN apt update \
   # Install deps
   && apt install $BUILD_DEPS -y \
