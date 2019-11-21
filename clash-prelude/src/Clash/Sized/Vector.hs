@@ -1,5 +1,5 @@
 {-|
-Copyright  :  (C) 2014-2016, University of Twente,
+Copyright  :  (C) 2013-2016, University of Twente,
                   2017     , Myrtle Software Ltd
 License    :  BSD2 (see the file LICENSE)
 Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
@@ -262,6 +262,8 @@ cCons = mkConstr tVec "Cons" [] Prefix
 instance NFData a => NFData (Vec n a) where
   rnf = foldl (\() -> rnf) ()
 
+{-# COMPLETE (:>)       #-}
+{-# COMPLETE Nil, (:>)  #-}
 -- | Add an element to the head of a vector.
 --
 -- >>> 3 :> 4 :> 5 :> Nil
@@ -297,6 +299,8 @@ pattern x :> xs = Cons x xs
 
 infixr 5 :>
 
+{-# COMPLETE (:<)       #-}
+{-# COMPLETE Nil, (:<)  #-}
 -- | Add an element to the tail of a vector.
 --
 -- >>> (3 :> 4 :> 5 :> Nil) :< 1
@@ -326,16 +330,17 @@ pattern (:<)
   :: forall m a
    . ()
   => forall n
-   . (m ~ n)
-  => Vec n a -> a -> Vec (m + 1) a
+   . ((n + 1) ~ m)
+  => Vec n a -> a -> Vec m a
 pattern xs :< x <- (snocPattern -> Cons x xs)
   where
     xs :< x = xs ++ singleton x
 
 infixl 5 :<
 
-snocPattern :: Vec (n + 1) a -> Vec (n + 1) a
-snocPattern xs  = Cons (last xs) (init xs)
+snocPattern :: Vec n a -> Vec n a
+snocPattern Nil         = Nil
+snocPattern xs@(_ :> _) = last xs :> init xs
 {-# INLINE snocPattern #-}
 
 
