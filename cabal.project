@@ -16,6 +16,10 @@ packages:
 -- displays to you (as the second update will be a no-op)
 index-state: 2019-10-29T08:01:38Z
 
+-- For some reason the `clash-testsuite` executable fails to run without
+-- this, as it cannot find the related library...
+tests: True
+
 package clash-ghc
   executable-dynamic: True
 
