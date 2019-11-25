@@ -49,6 +49,7 @@
   * Adds '--enable-shared-executables' for nix builds; this should make Clash run _much_ faster ([#894](https://github.com/clash-lang/clash-compiler/pull/894))
   * Custom bit representations can now mark fields as zero-width without crashing the compiler ([#898](https://github.com/clash-lang/clash-compiler/pull/898))
   * Error on unparsed trailing garbage in JSON "files"
+  * Fix instance Data Vec ([#933](https://github.com/clash-lang/clash-compiler/pull/933))
 
 * Deprecations & removals:
   * Removed support for GHC 8.2 ([#842](https://github.com/clash-lang/clash-compiler/pull/842))
