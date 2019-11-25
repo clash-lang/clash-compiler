@@ -10,6 +10,7 @@ Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
 {-# LANGUAGE DataKinds            #-}
 {-# LANGUAGE FlexibleInstances    #-}
 {-# LANGUAGE GADTs                #-}
+{-# LANGUAGE InstanceSigs         #-}
 {-# LANGUAGE KindSignatures       #-}
 {-# LANGUAGE MagicHash            #-}
 {-# LANGUAGE PatternSynonyms      #-}
@@ -249,6 +250,17 @@ instance (KnownNat n, Typeable a, Data a) => Data (Vec n a) where
   toConstr Nil        = cNil
   toConstr (Cons _ _) = cCons
   dataTypeOf _        = tVec
+
+  gfoldl
+    :: (forall d b. Data d => c (d -> b) -> d -> c b)
+    -> (forall g. g -> c g)
+    -> Vec n a
+    -> c (Vec n a)
+  gfoldl f z xs = case compareSNat (SNat @n) (SNat @0) of
+    SNatLE -> case leZero @n of
+                  Sub Dict -> z Nil
+    SNatGT -> let (y :> ys) = xs
+              in (z @(a -> Vec (n-1) a -> Vec n a) (:>) `f` y `f` ys)
 
 tVec :: DataType
 tVec = mkDataType "Vec" [cNil, cCons]
