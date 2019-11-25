@@ -61,16 +61,16 @@ testMasterMultiSlave divHalf wait mVal sVal mode latch duration =
  where
   slaveIn = pure sVal
   (misoZ0, _, slaveOut0) =
-    exposeSpecificClockResetEnable spiSlaveLatticeSBIO
-      clk rst enableGen mode latch sclk mosi miso ss0 slaveIn
+    withClockResetEnable clk rst enableGen
+      (spiSlaveLatticeSBIO mode latch sclk mosi miso ss0 slaveIn)
 
   (misoZ1, _, slaveOut1) =
-    exposeSpecificClockResetEnable spiSlaveLatticeSBIO
-      clk rst enableGen mode latch sclk mosi miso ss1 slaveIn
+    withClockResetEnable clk rst enableGen
+      (spiSlaveLatticeSBIO mode latch sclk mosi miso ss1 slaveIn)
 
   (misoZ2, _, slaveOut2) =
-    exposeSpecificClockResetEnable spiSlaveLatticeSBIO
-      clk rst enableGen mode latch sclk mosi miso ss2 slaveIn
+    withClockResetEnable clk rst enableGen
+      (spiSlaveLatticeSBIO mode latch sclk mosi miso ss2 slaveIn)
 
   miso = veryUnsafeToBiSignalIn
          (mergeBiSignalOuts (misoZ2 :> misoZ1 :> misoZ0 :> Nil))
@@ -80,8 +80,8 @@ testMasterMultiSlave divHalf wait mVal sVal mode latch duration =
   (ss2 :> ss1 :> ss0 :> Nil) = slaveAddressRotate @3 clk rst (ss,bp)
 
   (sclk, mosi, ss, bp, masterAck, masterOut) =
-    exposeSpecificClockResetEnable spiMaster
-      clk rst enableGen mode divHalf wait masterIn (readFromBiSignal miso)
+    withClockResetEnable clk rst enableGen
+      (spiMaster mode divHalf wait masterIn (readFromBiSignal miso))
 
   clk = systemClockGen
   rst = systemResetGen
