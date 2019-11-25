@@ -19,6 +19,10 @@ package clash-cosim
   ghc-options: -Werror
   documentation: True
   tests: True
+package clash-cores
+  ghc-options: -Werror
+  documentation: True
+  tests: True
 
 package clash-testsuite
   ghc-options: -Werror

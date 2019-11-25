@@ -67,16 +67,10 @@ idleOnLow SPIMode0 = True
 idleOnLow SPIMode1 = True
 idleOnLow _        = False
 
-idleOnHigh :: SPIMode -> Bool
-idleOnHigh = not . idleOnLow
-
 sampleOnRising :: SPIMode -> Bool
 sampleOnRising SPIMode0 = True
 sampleOnRising SPIMode3 = True
 sampleOnRising _        = False
-
-sampleOnFalling :: SPIMode -> Bool
-sampleOnFalling = not . sampleOnRising
 
 sampleOnLeading :: SPIMode -> Bool
 sampleOnLeading SPIMode0 = True
