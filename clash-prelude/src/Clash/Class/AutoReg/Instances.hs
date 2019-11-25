@@ -27,9 +27,4 @@ deriveAutoReg ''Down
 
 deriveAutoReg ''Ratio
 
--- TODO: this needs NFDataX instances to maxTupleSize that in turn need
--- TODO: generic instances for large tuples, but this slows GHC down by a
--- TODO: lot. See: https://phabricator.haskell.org/D2899. Maybe we could add
--- TODO: -flarge-tuples to clash-prelude?
--- deriveAutoRegTuples [2..maxTupleSize]
-deriveAutoRegTuples [2..min maxTupleSize 15]
+deriveAutoRegTuples [2..maxTupleSize]
