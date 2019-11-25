@@ -1,6 +1,11 @@
 module Clash.Class.HasDomain
   ( WithSpecificDomain
   , WithSingleDomain
+
+  , HasDomain
+  , TryDomain
+  , TryDomainResult(..)
+  , DomEq
   ) where
 
 -- Compilation is split across modules to maximize GHC parallelism

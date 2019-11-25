@@ -96,6 +96,7 @@ topEntity clk rst = readFromBiSignal bus'
 {-# LANGUAGE ScopedTypeVariables    #-}
 {-# LANGUAGE TypeFamilies           #-}
 {-# LANGUAGE TypeOperators          #-}
+{-# LANGUAGE UndecidableInstances   #-}
 #if __GLASGOW_HASKELL__ < 806
 {-# LANGUAGE TypeInType #-}
 #endif
@@ -118,6 +119,7 @@ import           Data.Kind                  (Type)
 import           Data.List                  (intercalate)
 import           Data.Maybe                 (fromMaybe,fromJust,isJust)
 
+import           Clash.Class.HasDomain
 import           Clash.Class.BitPack        (BitPack (..))
 import           Clash.Sized.BitVector      (BitVector)
 import qualified Clash.Sized.Vector         as V
@@ -166,6 +168,9 @@ data BiSignalIn (ds :: BiSignalDefault) (dom :: Domain) (n :: Nat)
 -- the signals may write at a single time step.
 newtype BiSignalOut (ds :: BiSignalDefault) (dom :: Domain) (n :: Nat)
   = BiSignalOut [Signal dom (Maybe (BitVector n))]
+
+type instance HasDomain dom1 (BiSignalOut ds dom2 n) = DomEq dom1 dom2
+type instance TryDomain t (BiSignalOut ds dom n) = 'Found dom
 
 #if MIN_VERSION_base(4,11,0)
 instance Semigroup (BiSignalOut defaultState dom n) where

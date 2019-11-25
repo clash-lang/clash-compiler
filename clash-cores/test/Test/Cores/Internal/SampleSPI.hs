@@ -72,15 +72,15 @@ sampleCycling genM genS divHalf wait mVals sVals mode latch duration =
   slaveIn = genS clk rst sVals sAck
 
   (misoZ, sAck, sOut) =
-    exposeSpecificClockResetEnable spiSlaveLatticeSBIO clk rst enableGen
-      mode latch sclk mosi miso ss slaveIn
+    withClockResetEnable clk rst enableGen
+      (spiSlaveLatticeSBIO mode latch sclk mosi miso ss slaveIn)
 
   miso = veryUnsafeToBiSignalIn misoZ
   masterIn = genM clk rst mVals mAck bp
 
   (sclk, mosi, ss, bp, mAck, mOut) =
-    exposeSpecificClockResetEnable spiMaster clk rst enableGen
-      mode divHalf wait masterIn (readFromBiSignal miso)
+    withClockResetEnable clk rst enableGen
+      (spiMaster mode divHalf wait masterIn (readFromBiSignal miso))
 
   clk = systemClockGen
   rst = systemResetGen
