@@ -71,7 +71,8 @@ reg ~TYPO ~GENSYM[clk][0];
 // 1 = 0.1ps
 localparam ~GENSYM[half_period][1] = (~PERIOD[0]0 / 2);
 always begin
-  ~SYM[0] = ~IF~ACTIVEEDGE[Rising][0]~THEN 0 ~ELSE 1 ~FI;
+  // Delay of 1 mitigates race conditions (https://github.com/steveicarus/iverilog/issues/160)
+  #1 ~SYM[0] = ~IF~ACTIVEEDGE[Rising][0]~THEN 0 ~ELSE 1 ~FI;
   #30000 forever begin
     ~SYM[0] = ~ ~SYM[0];
     #~SYM[1];
@@ -101,7 +102,8 @@ reg ~TYPO ~GENSYM[clk][0];
 // 1 = 0.1ps
 localparam ~GENSYM[half_period][1] = (~PERIOD[0]0 / 2);
 always begin
-  ~SYM[0] = ~IF~ACTIVEEDGE[Rising][0]~THEN 0 ~ELSE 1 ~FI;
+  // Delay of 1 mitigates race conditions (https://github.com/steveicarus/iverilog/issues/160)
+  #1 ~SYM[0] = ~IF~ACTIVEEDGE[Rising][0]~THEN 0 ~ELSE 1 ~FI;
   #30000 forever begin
     if (~ ~ARG[1]) begin
       $finish;

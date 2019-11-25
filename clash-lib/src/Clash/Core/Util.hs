@@ -10,6 +10,7 @@
 {-# LANGUAGE NamedFieldPuns    #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TemplateHaskell   #-}
+{-# LANGUAGE TupleSections     #-}
 {-# LANGUAGE ViewPatterns      #-}
 
 module Clash.Core.Util where
@@ -21,6 +22,7 @@ import           Data.Coerce                   (coerce)
 import qualified Data.HashSet                  as HashSet
 import Data.List
   (foldl', mapAccumR, elemIndices, nub)
+import           Data.List.Extra               (nubOrd)
 import Data.Maybe
   (fromJust, isJust, mapMaybe, catMaybes)
 import qualified Data.Text                     as T
@@ -32,7 +34,7 @@ import           Data.Semigroup
 import Clash.Core.DataCon
   (DataCon (MkData), dcType, dcUnivTyVars, dcExtTyVars, dcArgTys)
 import Clash.Core.FreeVars
-  (tyFVsOfTypes, typeFreeVars)
+  (tyFVsOfTypes, typeFreeVars, freeLocalIds)
 import Clash.Core.Literal                      (literalType)
 import Clash.Core.Name
   (Name (..), OccName, mkUnsafeInternalName, mkUnsafeSystemName)
@@ -58,6 +60,7 @@ import Clash.Core.VarEnv
    mkVarSet, unionVarSet, unitVarSet, emptyVarSet)
 import Clash.Unique
 import Clash.Util
+import Clash.Util.Graph
 
 -- | Type environment/context
 type Gamma = VarEnv Type
@@ -955,7 +958,10 @@ shouldSplit
   -- > Just ((,) @Int @(Clock, Bool), [Int, (Clock, Bool)])
   --
   -- An outer loop is required to subsequently split the /(Clock, Bool)/ tuple.
-shouldSplit tcm = shouldSplit0 tcm . tyView . coreView tcm
+shouldSplit tcm (tyView ->  TyConApp (nameOcc -> "Clash.Explicit.SimIO.SimIO") [tyArg]) =
+  -- We also look through `SimIO` to find things like Files
+  shouldSplit tcm tyArg
+shouldSplit tcm ty = shouldSplit0 tcm (tyView (coreView tcm ty))
 
 -- | Worker of 'shouldSplit', works on 'TypeView' instead of 'Type'
 shouldSplit0
@@ -977,6 +983,11 @@ shouldSplit0 tcm (TyConApp tcNm tyArgs)
     = nameOcc tcNm0 `elem` [ "Clash.Signal.Internal.Clock"
                            , "Clash.Signal.Internal.Reset"
                            , "Clash.Signal.Internal.Enable"
+                           -- iverilog doesn't like it when we put file handles
+                           -- in a bitvector, so we need to make sure Clash
+                           -- splits them off
+                           , "Clash.Explicit.SimIO.File"
+                           , "GHC.IO.Handle.Types.Handle"
                            ]
   splitTy _ = False
 
@@ -1004,3 +1015,30 @@ splitShouldSplit tcm = foldr go []
   go ty rest = case shouldSplit tcm ty of
     Just (_,tys) -> splitShouldSplit tcm tys ++ rest
     Nothing      -> ty : rest
+
+-- | Do an inverse topological sorting of the let-bindings in a let-expression
+inverseTopSortLetBindings
+  :: HasCallStack
+  => Term
+  -> Term
+inverseTopSortLetBindings e@(Letrec bndrs0 res) =
+  case reverseTopSort (nodes0 ++ nodes1) (concat edges) of
+    Left err -> error err
+    Right (catMaybes -> bndrs1) ->
+      if length bndrs0 == length bndrs1 then
+        Letrec bndrs1 res
+      else
+        error "internal error"
+ where
+  (nodes0,edges) =
+    unzip $ map
+      (\(i,eB) ->
+        let u = varUniq i
+            fvs = map varUniq (nubOrd (Lens.toListOf freeLocalIds eB))
+            edges0 = map (u,) fvs
+        in  ((u, Just (i,eB)),edges0))
+      bndrs0
+
+  nodes1 = map ((,Nothing) . varUniq) (nub (Lens.toListOf freeLocalIds e))
+
+inverseTopSortLetBindings e = e

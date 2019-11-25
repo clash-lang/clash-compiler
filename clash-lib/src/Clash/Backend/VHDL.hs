@@ -1088,6 +1088,7 @@ tyName' rec0 (filterTransparent -> t) = do
       tyName' rec0 hwTy
     BiDirectional _ hwTy ->
       tyName' rec0 hwTy
+    FileType -> return "file"
 
 -- | Returns underlying type of given HWType. That is, the type by which it
 -- eventually will be represented in VHDL.
@@ -1104,6 +1105,7 @@ normaliseType hwty = case hwty of
   String        -> hwty
   Integer       -> hwty
   Bit           -> hwty
+  FileType      -> hwty
 
   -- Complex types, for which a user defined type is made in VHDL:
   Vector _ _    -> hwty
@@ -1139,6 +1141,7 @@ filterTransparent hwty = case hwty of
   Index _           -> hwty
   Sum _ _           -> hwty
   CustomSum _ _ _ _ -> hwty
+  FileType          -> hwty
 
   Vector n elTy     -> Vector n (filterTransparent elTy)
   RTree n elTy      -> RTree n (filterTransparent elTy)

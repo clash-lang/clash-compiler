@@ -9,6 +9,7 @@ module Clash.Netlist
   ,mkExpr
   ,mkDcApplication
   ,mkDeclarations
+  ,mkDeclarations'
   ,mkNetDecl
   ,mkProjection
   ,mkSelection
@@ -21,7 +22,7 @@ import Clash.Core.Term      (Alt,LetBinding,Term)
 import Clash.Core.Type      (Type)
 import Clash.Core.Var       (Id)
 import Clash.Netlist.Types  (Expr, HWType, Identifier, NetlistMonad, Component,
-                             Declaration)
+                             Declaration, NetlistId, DeclarationType)
 import SrcLoc               (SrcSpan)
 
 import GHC.Stack (HasCallStack)
@@ -32,28 +33,29 @@ genComponent :: HasCallStack
 
 mkExpr :: HasCallStack
        => Bool
-       -> Either Identifier Id
-       -> Type
+       -> DeclarationType
+       -> NetlistId
        -> Term
        -> NetlistMonad (Expr,[Declaration])
 
 mkDcApplication :: HasCallStack
-                => HWType
-                -> Either Identifier Id
+                => [HWType]
+                -> NetlistId
                 -> DataCon
                 -> [Term]
                 -> NetlistMonad (Expr,[Declaration])
 
 mkProjection
   :: Bool
-  -> Either Identifier Id
+  -> NetlistId
   -> Term
   -> Type
   -> Alt
   -> NetlistMonad (Expr, [Declaration])
 
 mkSelection
-  :: Either Identifier Id
+  :: DeclarationType
+  -> NetlistId
   -> Term
   -> Type
   -> [Alt]
@@ -63,6 +65,7 @@ mkSelection
 mkNetDecl :: LetBinding -> NetlistMonad (Maybe Declaration)
 
 mkDeclarations :: HasCallStack => Id -> Term -> NetlistMonad [Declaration]
+mkDeclarations' :: HasCallStack => DeclarationType -> Id -> Term -> NetlistMonad [Declaration]
 
 mkFunApp
   :: HasCallStack

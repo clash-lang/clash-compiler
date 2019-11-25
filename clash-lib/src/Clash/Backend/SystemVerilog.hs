@@ -59,6 +59,7 @@ import           Clash.Netlist.BlackBox.Util
 import           Clash.Netlist.Id                     (IdType (..), mkBasicId')
 import           Clash.Netlist.Types                  hiding (_intWidth, intWidth)
 import           Clash.Netlist.Util                   hiding (mkIdentifier, extendIdentifier)
+import           Clash.Signal.Internal                (ActiveEdge (..))
 import           Clash.Util
   (SrcSpan, noSrcSpan, curLoc, makeCached, (<:>), first, on, traceIf, indexNote)
 import           Clash.Util.Graph                     (reverseTopSort)
@@ -647,6 +648,7 @@ verilogType t_ = do
     Bit           -> "logic"
     Bool          -> "logic"
     String        -> "string"
+    FileType      -> "integer"
     _ -> logicOrWire <+> brackets (int (typeSize t -1) <> colon <> int 0)
 
 sigDecl :: SystemVerilogM Doc -> HWType -> SystemVerilogM Doc
@@ -931,6 +933,8 @@ inst_ (InstDecl _ _ nm lbl ps pms) = fmap Just $
 inst_ (BlackBoxD _ libs imps inc bs bbCtx) =
   fmap Just (Mon (column (renderBlackBox libs imps inc bs bbCtx)))
 
+inst_ (Seq ds) = Just <$> seqs ds
+
 inst_ (NetDecl' {}) = return Nothing
 
 -- | Render a data constructor application for data constructors having a
@@ -976,6 +980,62 @@ customReprDataCon dataRepr constrRepr args =
                -- Select bits 'start' downto and including 'end'
                let rotated  = parens expr' <+> ">>" <+> int end in
                int fsize <> squote <> parens rotated
+
+seq_ :: Seq -> SystemVerilogM Doc
+seq_ (AlwaysClocked edge clk ds) =
+  "always @" <>
+    parens (case edge of {Rising -> "posedge"; _ -> "negedge"} <+>
+            expr_ False clk) <+> "begin" <> line <>
+    indent 2 (seqs ds) <> line <>
+  "end"
+
+seq_ (Initial ds) =
+  "initial begin" <> line <>
+  indent 2 (seqs ds) <> line <>
+  "end"
+
+seq_ (AlwaysComb ds) =
+  "always @* begin" <> line <>
+  indent 2 (seqs ds) <> line <>
+  "end"
+
+seq_ (Branch scrut scrutTy es) =
+    "case" <> parens (expr_ True scrut) <> line <>
+      (indent 2 $ vcat $ conds es) <> line <>
+    "endcase"
+   where
+        conds :: [(Maybe Literal,[Seq])] -> SystemVerilogM [Doc]
+        conds [] =
+          return []
+        conds [(_,sq)] =
+          ("default" <+> colon <+> "begin" <> line <>
+            indent 2 (seqs sq) <> line <>
+          "end") <:> return []
+        conds ((Nothing,sq):_) =
+          ("default" <+> colon <+> "begin" <> line <>
+            indent 2 (seqs sq) <> line <>
+          "end") <:> return []
+        conds ((Just c ,sq):es') =
+          (exprLitSV (Just (scrutTy,conSize scrutTy)) c <+> colon <+> "begin" <> line <>
+            indent 2 (seqs sq) <> line <>
+          "end") <:> conds es'
+
+seq_ (SeqDecl sd) = case sd of
+  Assignment id_ e ->
+    stringS id_ <+> equals <+> expr_ False e <> semi
+
+  BlackBoxD {} ->
+    fromMaybe <$> emptyDoc <*> inst_ sd
+
+  Seq ds ->
+    seqs ds
+
+  _ -> error (show sd)
+
+seqs :: [Seq] -> SystemVerilogM Doc
+seqs [] = emptyDoc
+seqs (SeqDecl (TickDecl id_):ds) = "//" <+> stringS id_ <> line <> seqs ds
+seqs (d:ds) = seq_ d <> line <> line <> seqs ds
 
 -- | Turn a Netlist expression into a SystemVerilog expression
 expr_ :: Bool -- ^ Enclose in parentheses?
