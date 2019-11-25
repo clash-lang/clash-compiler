@@ -513,6 +513,7 @@ representableType builtInTranslation reprs stringRepresentable m =
 typeSize :: HWType
          -> Int
 typeSize (Void {}) = 0
+typeSize FileType = 32 -- (ref. page 287 of IEEE 1364-2005)
 typeSize String = 0
 typeSize Integer = 0
 typeSize (KnownDomain {}) = 0
@@ -634,7 +635,8 @@ filterVoidPorts filtered pp@(PortProduct _s _ps) =
 -- | Uniquely rename all the variables and their references in a normalized
 -- term
 mkUniqueNormalized
-  :: InScopeSet
+  :: HasCallStack
+  => InScopeSet
   -> Maybe (Maybe TopEntity)
   -- ^ Top entity annotation where:
   --

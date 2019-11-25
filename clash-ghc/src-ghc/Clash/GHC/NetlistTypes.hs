@@ -242,6 +242,19 @@ ghcTypeToHWType iw floatSupport = go
         -- never end up being used in the generated HDL.
         "GHC.Stack.Types.CallStack" -> returnN (Void Nothing)
 
+        "Clash.Explicit.SimIO.SimIO" ->
+          ExceptT $ MaybeT $ Just <$> coreTypeToHWType go reprs m (head args)
+
+        "Clash.Explicit.SimIO.File" -> returnN FileType
+
+        "Clash.Explicit.SimIO.Reg" -> do
+          let [aTy] = args
+          ExceptT (MaybeT (Just <$> coreTypeToHWType go reprs m aTy))
+
+        "GHC.STRef.STRef" -> do
+          let [_,aTy] = args
+          ExceptT (MaybeT (Just <$> coreTypeToHWType go reprs m aTy))
+
         _ -> ExceptT (MaybeT (pure Nothing))
 
     go _ _ _ = pure Nothing

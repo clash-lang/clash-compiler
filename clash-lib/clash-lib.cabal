@@ -130,6 +130,7 @@ Library
                       directory               >= 1.2.0.1  && < 1.4,
                       errors                  >= 1.4.2    && < 2.4,
                       exceptions              >= 0.8.3    && < 0.11.0,
+                      extra                   >= 1.6.18   && < 1.7,
                       filepath                >= 1.3.0.1  && < 1.5,
                       ghc                     >= 8.4.0    && < 8.9,
                       ghc-boot-th,

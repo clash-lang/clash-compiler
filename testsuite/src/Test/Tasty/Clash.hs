@@ -28,7 +28,7 @@ data BuildTarget
   = VHDL
   | SystemVerilog
   | Verilog
-  deriving (Show, Eq, Ord)
+  deriving (Eq, Ord, Show)
 
 data SBuildTarget (target :: BuildTarget) where
   SVHDL          :: SBuildTarget 'VHDL
@@ -70,6 +70,8 @@ data TestOptions =
     -- on 'hdlSim'.
     , topEntity :: TopEntity
     -- ^ Top entity to compile. Default is to autodeduce based on 'hdlSim'.
+    , stdErrEmptyFail :: Bool
+    -- ^ Whether an empty stderr means test failure
     }
 
 
@@ -84,6 +86,7 @@ instance Default TestOptions where
       , clashFlags=[]
       , entities=AutoEntities
       , topEntity=AutoTopEntity
+      , stdErrEmptyFail=True
       }
 
 -- | Single directory for this test run. All tests are run relative to this
@@ -237,11 +240,11 @@ sequenceTests path (unzip -> (testNames, testTrees)) =
   zipWith applyAfter testPatterns testTrees
     where
       -- Make pattern for a single test
-      pattern :: TestName -> String
-      pattern nm = "$0 == \"" ++ intercalate "." (reverse (nm:path)) ++ "\""
+      pat :: TestName -> String
+      pat nm = "$0 == \"" ++ intercalate "." (reverse (nm:path)) ++ "\""
 
       -- Test patterns for all given tests such that each executes sequentially
-      testPatterns = init (map (fmap pattern) (Nothing : map Just testNames))
+      testPatterns = init (map (fmap pat) (Nothing : map Just testNames))
 
       -- | Generate pattenrs given parent patterns and item patterns
       applyAfter :: Maybe String -> TestTree -> TestTree
@@ -382,15 +385,17 @@ noConflict nm seen
       | otherwise                  = (nm ++ show n)
 
 vvp
-  :: [TestName]
+  :: Bool
+  -- ^ Whether an empty stderr means test failure
+  -> [TestName]
   -- ^ Path to test
   -> String
   -- ^ Module name
   -> String
   -- ^ Name of the testbench object
   -> (TestName, TestTree)
-vvp path modName entName =
-  ("vvp", testProgram "vvp" "vvp" [entName] NoGlob PrintStdErr True (Just workDir))
+vvp stdF path modName entName =
+  ("vvp", testProgram "vvp" "vvp" [entName] NoGlob PrintStdErr stdF (Just workDir))
     where
       workDir = testDirectory path </> "verilog" </> modName
 
@@ -470,7 +475,7 @@ runTest1 modName testOptions@TestOptions{hdlSim,clashFlags} path VHDL =
      , [ghdlMake path' modName subdirs libs entName]
      ] ++ [if hdlSim then [ghdlSim path' modName (noConflict entName subdirs)] else []]
 
-runTest1 modName testOptions@TestOptions{hdlSim,clashFlags} path Verilog =
+runTest1 modName testOptions@TestOptions{hdlSim,clashFlags,stdErrEmptyFail} path Verilog =
   withResource acquire tastyRelease (const seqTests)
  where
    subdirs = stringEntities testOptions
@@ -484,7 +489,7 @@ runTest1 modName testOptions@TestOptions{hdlSim,clashFlags} path Verilog =
    seqTests = testGroup "Verilog" $ sequenceTests path' $
      [ clashHDL Verilog env clashFlags modName (testDirectory path')
      , iverilog path' modName subdirs entName
-     ] ++ if hdlSim then [vvp path' modName (noConflict entName subdirs)] else []
+     ] ++ if hdlSim then [vvp stdErrEmptyFail path' modName (noConflict entName subdirs)] else []
 --           ++ map (\f -> f (cwDir </> env) Verilog verilogDir modDir modName entName)
 
 runTest1 modName testOptions@TestOptions{hdlSim,clashFlags} path SystemVerilog =

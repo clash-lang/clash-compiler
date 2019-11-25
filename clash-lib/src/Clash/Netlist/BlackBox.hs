@@ -26,7 +26,7 @@ import           Data.Char                     (ord)
 import           Data.Either                   (lefts, partitionEithers)
 import qualified Data.HashMap.Lazy             as HashMap
 import qualified Data.IntMap                   as IntMap
-import           Data.List                     (elemIndex)
+import           Data.List                     (elemIndex, partition)
 import           Data.Maybe                    (catMaybes, fromJust, fromMaybe)
 import           Data.Semigroup.Monad
 import qualified Data.Set                      as Set
@@ -48,6 +48,8 @@ import           Util                          (OverridingBool(..))
 import           Clash.Annotations.Primitive
   (PrimitiveGuard(HasBlackBox, WarnNonSynthesizable, WarnAlways, DontTranslate),
    extractPrim)
+import           Clash.Annotations.TopEntity
+  (TopEntity(Synthesize), PortName(PortName))
 import           Clash.Core.DataCon            as D (dcTag)
 import           Clash.Core.FreeVars           (freeIds)
 import           Clash.Core.Literal            as L (Literal (..))
@@ -56,18 +58,19 @@ import           Clash.Core.Name
 import           Clash.Core.Pretty             (showPpr)
 import           Clash.Core.Subst              (extendIdSubst, mkSubst, substTm)
 import           Clash.Core.Term               as C
-  (PrimInfo, Term (..), collectArgs, collectArgsTicks)
-import           Clash.Core.Type               as C (Type (..), ConstTy (..),
-                                                splitFunTys, splitFunTy)
-import           Clash.Core.TyCon              as C (tyConDataCons)
-import           Clash.Core.Util               (isFun, mkApps, termType)
+  (PrimInfo (..), Term (..), WorkInfo (..), collectArgs, collectArgsTicks)
+import           Clash.Core.Type               as C
+  (Type (..), ConstTy (..), TypeView (..), mkFunTy, splitFunTys, splitFunTy, tyView)
+import           Clash.Core.TyCon              as C (TyConMap, tyConDataCons)
+import           Clash.Core.Util
+  (collectBndrs, inverseTopSortLetBindings, isFun, mkApps, splitShouldSplit, termType)
 import           Clash.Core.Var                as V
   (Id, Var (..), mkLocalId, modifyVarName)
 import           Clash.Core.VarEnv
   (extendInScopeSet, mkInScopeSet, lookupVarEnv, uniqAway, unitVarSet)
 import {-# SOURCE #-} Clash.Netlist
   (genComponent, mkDcApplication, mkDeclarations, mkExpr, mkNetDecl,
-   mkProjection, mkSelection, mkFunApp)
+   mkProjection, mkSelection, mkFunApp, mkDeclarations')
 import qualified Clash.Backend                 as Backend
 import           Clash.Driver.Types
   (opt_primWarn, opt_color, ClashOpts)
@@ -78,6 +81,7 @@ import           Clash.Netlist.Types           as N
 import           Clash.Netlist.Util            as N
 import           Clash.Primitives.Types        as P
 import qualified Clash.Primitives.Util         as P
+import           Clash.Signal.Internal         (ActiveEdge (..))
 import           Clash.Unique                  (lookupUniqMap')
 import           Clash.Util
 
@@ -227,15 +231,15 @@ mkArgument bndr e = do
         (C.Literal (NaturalLiteral n), [],_) ->
           return ((N.Literal (Just (Unsigned iw,iw)) (N.NumLit n),hwTy,True),[])
         (Prim f pinfo,args,ticks) -> withTicks ticks $ \tickDecls -> do
-          (e',d) <- mkPrimitive True False (Left bndr) (f,pinfo) args ty tickDecls
+          (e',d) <- mkPrimitive True False (NetlistId bndr ty) (f,pinfo) args tickDecls
           case e' of
             (Identifier _ _) -> return ((e',hwTy,False), d)
             _                -> return ((e',hwTy,isLiteral e), d)
         (Data dc, args,_) -> do
-          (exprN,dcDecls) <- mkDcApplication hwTy (Left bndr) dc (lefts args)
+          (exprN,dcDecls) <- mkDcApplication [hwTy] (NetlistId bndr ty) dc (lefts args)
           return ((exprN,hwTy,isLiteral e),dcDecls)
         (Case scrut ty' [alt],[],_) -> do
-          (projection,decls) <- mkProjection False (Left bndr) scrut ty' alt
+          (projection,decls) <- mkProjection False (NetlistId bndr ty) scrut ty' alt
           return ((projection,hwTy,False),decls)
         _ ->
           return ((Identifier (error ($(curLoc) ++ "Forced to evaluate unexpected function argument: " ++ eTyMsg)) Nothing
@@ -307,20 +311,20 @@ mkPrimitive
   -- ^ Put BlackBox expression in parenthesis
   -> Bool
   -- ^ Treat BlackBox expression as declaration
-  -> Either Identifier Id
+  -> NetlistId
   -- ^ Id to assign the result to
   -> (TextS.Text, PrimInfo)
   -- ^ Name and info of primitive
   -> [Either Term Type]
   -- ^ Arguments
-  -> Type
-  -- ^ Result type
   -> [Declaration]
   -- ^ Tick declarations
   -> NetlistMonad (Expr,[Declaration])
-mkPrimitive bbEParen bbEasD dst (nm,pinfo) args ty tickDecls =
+mkPrimitive bbEParen bbEasD dst (nm,pinfo) args tickDecls =
   go =<< extractPrimWarnOrFail nm
   where
+    ty = head (netlistTypes dst)
+
     go
       :: CompiledPrimitive
       -> NetlistMonad (Expr, [Declaration])
@@ -348,7 +352,7 @@ mkPrimitive bbEParen bbEasD dst (nm,pinfo) args ty tickDecls =
             TDecl -> do
               let tempD = template p
                   pNm = name p
-              resM <- resBndr True dst
+              resM <- resBndr1 True dst
               case resM of
                 Just (dst',dstNm,dstDecl) -> do
                   (bbCtx,ctxDcls)   <- mkBlackBoxContext nm dst' args
@@ -367,13 +371,13 @@ mkPrimitive bbEParen bbEasD dst (nm,pinfo) args ty tickDecls =
                   return (Noop, ctxDcls ++ templDecl ++ tickDecls ++ [bbDecl])
 
                 -- Otherwise don't render them
-                Nothing -> return (Identifier "__VOID_TDECL__" Nothing,[])
+                Nothing -> return (Noop,[])
             TExpr -> do
               let tempE = template p
                   pNm = name p
               if bbEasD
                 then do
-                  resM <- resBndr True dst
+                  resM <- resBndr1 True dst
                   case resM of
                     Just (dst',dstNm,dstDecl) -> do
                       (bbCtx,ctxDcls)     <- mkBlackBoxContext nm dst' args
@@ -396,7 +400,7 @@ mkPrimitive bbEParen bbEasD dst (nm,pinfo) args ty tickDecls =
                     -- Otherwise don't render them
                     Nothing -> return (Identifier "__VOID_TEXPRD__" Nothing,[])
                 else do
-                  resM <- resBndr False dst
+                  resM <- resBndr1 False dst
                   case resM of
                     Just (dst',_,_) -> do
                       (bbCtx,ctxDcls)      <- mkBlackBoxContext nm dst' args
@@ -433,12 +437,13 @@ mkPrimitive bbEParen bbEasD dst (nm,pinfo) args ty tickDecls =
                   tcm <- Lens.use tcCache
                   let dcs = tyConDataCons (tcm `lookupUniqMap'` tcN)
                       dc  = dcs !! fromInteger i
-                  (exprN,dcDecls) <- mkDcApplication hwTy dst dc []
+                  (exprN,dcDecls) <- mkDcApplication [hwTy] dst dc []
                   return (exprN,dcDecls)
                 [Right _, Left scrut] -> do
                   tcm     <- Lens.use tcCache
                   let scrutTy = termType tcm scrut
-                  (scrutExpr,scrutDecls) <- mkExpr False (Left "c$tte_rhs") scrutTy scrut
+                  (scrutExpr,scrutDecls) <-
+                    mkExpr False Concurrent (NetlistId "c$tte_rhs" scrutTy) scrut
                   case scrutExpr of
                     Identifier id_ Nothing -> return (DataTag hwTy (Left id_),scrutDecls)
                     _ -> do
@@ -456,7 +461,8 @@ mkPrimitive bbEParen bbEasD dst (nm,pinfo) args ty tickDecls =
                 tcm      <- Lens.use tcCache
                 let scrutTy = termType tcm scrut
                 scrutHTy <- unsafeCoreTypeToHWTypeM' $(curLoc) scrutTy
-                (scrutExpr,scrutDecls) <- mkExpr False (Left "c$dtt_rhs") scrutTy scrut
+                (scrutExpr,scrutDecls) <-
+                  mkExpr False Concurrent (NetlistId "c$dtt_rhs" scrutTy) scrut
                 case scrutExpr of
                   Identifier id_ Nothing -> return (DataTag scrutHTy (Right id_),scrutDecls)
                   _ -> do
@@ -465,15 +471,95 @@ mkPrimitive bbEParen bbEasD dst (nm,pinfo) args ty tickDecls =
                         netAssignRhs = Assignment tmpRhs scrutExpr
                     return (DataTag scrutHTy (Right tmpRhs),[netDeclRhs,netAssignRhs] ++ scrutDecls)
               _ -> error $ $(curLoc) ++ "dataToTag: " ++ show (map (either showPpr showPpr) args)
+
+          | pNm == "Clash.Explicit.SimIO.mealyIO" -> do
+              resM <- resBndr1 True dst
+              case resM of
+                Just (_,dstNm,dstDecl) -> do
+                  tcm <- Lens.use tcCache
+                  mealyDecls <- collectMealy dstNm dst tcm (lefts args)
+                  return (Noop, dstDecl ++ mealyDecls)
+                Nothing -> return (Noop,[])
+
+          | pNm == "Clash.Explicit.SimIO.bindSimIO#" ->
+              collectBindIO dst (lefts args)
+
+          | pNm == "Clash.Explicit.SimIO.apSimIO#" -> do
+              collectAppIO dst (lefts args) []
+
+          | pNm == "Clash.Explicit.SimIO.fmapSimIO#" -> do
+              resM <- resBndr1 True dst
+              case resM of
+                Just (_,dstNm,dstDecl) -> do
+                  tcm <- Lens.use tcCache
+                  let (fun0:arg0:_) = lefts args
+                      arg1 = unSimIO tcm arg0
+                      fun1 = case fun0 of
+                        Lam b bE ->
+                          let is0 = mkInScopeSet (Lens.foldMapOf freeIds unitVarSet fun0)
+                              subst = extendIdSubst (mkSubst is0) b arg1
+                          in  substTm "mkPrimitive.fmapSimIO" subst bE
+                        _ -> mkApps fun0 [Left arg1]
+                  (expr,bindDecls) <- mkExpr False Sequential dst fun1
+                  let assn = case expr of
+                               Noop -> []
+                               _ -> [Assignment dstNm expr]
+                  return (Identifier dstNm Nothing, dstDecl ++ bindDecls ++ assn)
+                Nothing -> do
+                  let (_:arg0:_) = lefts args
+                  (_,bindDecls) <- mkExpr True Sequential dst arg0
+                  return (Noop, bindDecls)
+
+          | pNm == "Clash.Explicit.SimIO.unSimIO#" ->
+              mkExpr False Sequential dst (head (lefts args))
+
+          | pNm == "Clash.Explicit.SimIO.pureSimIO#" -> do
+              (expr,decls) <- mkExpr False Sequential dst (head (lefts args))
+              resM <- resBndr True dst
+              case resM of
+                Just (_,dstNms,dstDecl) -> case expr of
+                  Noop ->
+                    return (Noop,decls)
+                  _ -> case dstNms of
+                    [dstNm] ->
+                      return ( Identifier dstNm Nothing
+                             , dstDecl ++ decls ++ [Assignment dstNm expr])
+                    _ -> error "internal error"
+                _ ->
+                  return (Noop,decls)
+
           | otherwise ->
               return (BlackBoxE "" [] [] []
                         (BBTemplate [Text $ mconcat ["NO_TRANSLATION_FOR:",fromStrict pNm]])
                         (emptyBBContext pNm) False,[])
 
+    -- Do we need to create a new identifier to assign the result?
+    --
+    -- CoreId: No, this is an original LHS of a let-binder, and already has a
+    --         corresponding NetDecl; unlike NetlistIds, it is not already
+    --         assigned, it will be assigned by the BlackBox/Primitive.
+    --
+    -- NetlistId: This is a derived (either from an CoreId or other NetlistId)
+    --            identifier created in the NetlistMonad that's already being
+    --            used in an assignment, i.e. we cannot assign it again.
+    --
+    --            So if it is a declaration BlackBox (indicated by 'mkDec'),
+    --            we will have to create a new NetlistId, create a NetDecl for
+    --            it, and use this new NetlistId for the assignment inside the
+    --            declaration BlackBox
+    --
+    -- MultiId: This is like a CoreId, but it's split over multiple identifiers
+    --          because it was originally of a product type where the element
+    --          types should not be part of an aggregate type in the generated
+    --          HDL (e.g. Clocks should not be part of an aggregate, because
+    --          tools like verilator don't like it)
     resBndr
       :: Bool
-      -> (Either Identifier Id)
-      -> NetlistMonad (Maybe (Id,Identifier,[Declaration]))
+      -- Do we need to create and declare a new identifier in case we're given
+      -- a NetlistId?
+      -> NetlistId
+      -- CoreId/NetlistId/MultiId
+      -> NetlistMonad (Maybe ([Id],[Identifier],[Declaration]))
       -- Nothing when the binder would have type `Void`
     resBndr mkDec dst' = do
       resHwTy <- unsafeCoreTypeToHWTypeM' $(curLoc) ty
@@ -481,12 +567,12 @@ mkPrimitive bbEParen bbEasD dst (nm,pinfo) args ty tickDecls =
         pure Nothing
       else
         case dst' of
-          Left dstL -> case mkDec of
+          NetlistId dstL _ -> case mkDec of
             False -> do
               -- TODO: check that it's okay to use `mkUnsafeSystemName`
               let nm' = mkUnsafeSystemName dstL 0
                   id_ = mkLocalId ty nm'
-              return (Just (id_,dstL,[]))
+              return (Just ([id_],[dstL],[]))
             True -> do
               nm1 <- extendIdentifier Extended dstL "_res"
               nm2 <- mkUniqueIdentifier Extended nm1
@@ -496,8 +582,247 @@ mkPrimitive bbEParen bbEasD dst (nm,pinfo) args ty tickDecls =
               idDeclM <- mkNetDecl (id_,mkApps (Prim nm pinfo) args)
               case idDeclM of
                 Nothing     -> return Nothing
-                Just idDecl -> return (Just (id_,nm2,[idDecl]))
-          Right dstR -> return (Just (dstR,nameOcc . varName $ dstR,[]))
+                Just idDecl -> return (Just ([id_],[nm2],[idDecl]))
+          CoreId dstR -> return (Just ([dstR],[nameOcc . varName $ dstR],[]))
+          MultiId ids -> return (Just (ids,map (nameOcc . varName) ids,[]))
+
+    -- Like resBndr, but fails on MultiId
+    resBndr1
+      :: HasCallStack
+      => Bool
+      -> NetlistId
+      -> NetlistMonad (Maybe (Id,Identifier,[Declaration]))
+    resBndr1 mkDec dst' = resBndr mkDec dst' >>= \case
+      Nothing -> pure Nothing
+      Just ([id_],[nm_],decls) -> pure (Just (id_,nm_,decls))
+      _ -> error "internal error"
+
+-- | Turn a 'mealyIO' expression into a two sequential processes, one "initial"
+-- process for the starting state, and one clocked sequential process.
+collectMealy
+  :: HasCallStack
+  => Identifier
+  -- ^ Identifier to assign the final result to
+  -> NetlistId
+  -- ^ Id to assign the final result to
+  -> TyConMap
+  -> [Term]
+  -- ^ The arguments to 'mealyIO'
+  -> NetlistMonad [Declaration]
+collectMealy dstNm dst tcm (kd:clk:mealyFun:mealyInit:mealyIn:_) = do
+  let (lefts -> args0,res0) = collectBndrs mealyFun
+      is0 = mkInScopeSet (Lens.foldMapOf freeIds unitVarSet res0 <>
+                          Lens.foldMapOf freeIds unitVarSet mealyInit <>
+                          Lens.foldMapOf freeIds unitVarSet mealyIn)
+      -- Given that we're creating a sequential list of statements from the
+      -- let-bindings, make sure that everything is inverse topologically sorted
+      (bs,res) = case inverseTopSortLetBindings res0 of
+        Letrec bsN (C.Var resN) -> (bsN,resN)
+        Letrec bsN e ->
+          let u = case dst of
+                    CoreId u0 -> u0
+                    _ -> uniqAway is0
+                           (mkLocalId (termType tcm e)
+                                      (mkUnsafeSystemName "mealyres" 0))
+          in  (bsN ++ [(u,e)], u)
+        e ->
+          let u = case dst of
+                    CoreId u0 -> u0
+                    _ -> uniqAway is0
+                           (mkLocalId (termType tcm e)
+                                      (mkUnsafeSystemName "mealyres" 0))
+          in  ([(u,e)], u)
+      -- Drop the 'State# World' argument
+      args1 = init args0
+      -- Take into account that the state argument is split over multiple
+      -- binders because it contained types that are not allowed to occur in
+      -- a HDL aggregate type
+      mealyInitLength = length (splitShouldSplit tcm [termType tcm mealyInit])
+      (sArgs,iArgs) = splitAt mealyInitLength args1
+  -- Give all binders a unique name
+  normE <- mkUniqueNormalized is0
+             (Just (Just (Synthesize "" [] (PortName ""))))
+             ([],map (,mealyInit) sArgs ++ map (,mealyIn) iArgs ++ bs,res)
+  case normE of
+    -- We're not expecting any input or output wrappers
+    (_,[],[],_,[],binders0,Just result) -> do
+      let (sBinders,binders1) = splitAt (length sArgs) binders0
+          (iBinders,binders2) = splitAt (length iArgs) binders1
+          -- Get all the "original" let-bindings, without the above "mealyres".
+          -- We don't want to make a NetDecl for it.
+          bindersN = case res0 of
+            Letrec _ (C.Var {}) -> binders2
+            _                   -> init binders2
+
+      -- Create new net declarations for state-binders, input-binders, and all
+      -- the "original" let-bindings in 'mealyFun'
+      --
+      -- The first set is only assigned in the always block, so they must be
+      -- 'reg' in Verilog terminology
+      netDeclsSeq <- fmap catMaybes (mapM mkNetDecl (sBinders ++ bindersN))
+      -- The second set is assigned using concurrent assignment, so don't need
+      -- to be 'reg'
+      netDeclsInp <- fmap catMaybes (mapM mkNetDecl iBinders)
+
+      -- If the 'mealyFun' was not a let-expression with a variable reference
+      -- as a body then we used the LHS of the entire 'mealyIO' expression as
+      -- a new let-binding; otherwise 'mkUniqueNormalized' would not work.
+      --
+      -- However, 'mkUniqueNormalized' made a new unique name for that LHS,
+      -- which is not what we want. We want to assign the last expression to the
+      -- LHS of 'mealyIO'.
+      let bindersE = case res0 of
+                        Letrec _ (C.Var {}) -> binders2
+                        _ -> case dst of
+                          -- See above why we do this.
+                          CoreId u0 -> init binders2 ++ [(u0,snd (last binders2))]
+                          _ -> binders2
+      seqDecls <- concat <$> mapM (uncurry (mkDeclarations' Sequential)) bindersE
+
+      -- When the body the let-expression of 'mealyFun' was variable reference,
+      -- or in case we had to create a new identifier because the original LHS
+      -- was not available: then we need to assign
+      (resExpr,resDecls) <- case res0 of
+        Letrec _ (C.Var {}) -> mkExpr False Concurrent dst (C.Var result)
+        _ -> case dst of
+          CoreId {} -> pure (Noop,[])
+          _ -> mkExpr False Concurrent dst (C.Var result)
+      let resAssn = case resExpr of
+            Noop -> []
+            _ -> [Seq [AlwaysComb [SeqDecl (Assignment dstNm resExpr)]]]
+
+      -- Create the declarations for the "initial state" block
+      let sDst = case sBinders of
+                   [(b,_)] -> CoreId b
+                   _       -> MultiId (map fst sBinders)
+      (exprInit,initDecls) <- mkExpr False Sequential sDst mealyInit
+      let initAssign = case exprInit of
+            Identifier _ Nothing -> []
+            Noop -> []
+            _ -> [Assignment (id2identifier (fst (head sBinders))) exprInit]
+
+      -- Create the declarations that corresponding to the input
+      let iDst = case iBinders of
+                   [(b,_)] -> CoreId b
+                   _       -> MultiId (map fst iBinders)
+      (exprArg,inpDeclsMisc) <- mkExpr False Concurrent iDst mealyIn
+
+      -- Split netdecl declarations and other declarations
+      let (netDeclsSeqMisc,seqDeclsOther) = partition isNet (seqDecls ++ resDecls)
+          (netDeclsInit,initDeclsOther)   = partition isNet initDecls
+      -- All assignments happens within a sequential block, so the nets need to
+      -- be of type 'reg' in Verilog nomenclature
+      let netDeclsSeq1 = map toReg (netDeclsSeq ++ netDeclsSeqMisc ++ netDeclsInit)
+
+      -- We run mealy block in the opposite clock edge of the the ambient system
+      -- because we're basically clocked logic; so we need to have our outputs
+      -- ready before the ambient system starts sampling them. The clockGen code
+      -- ensures that the "opposite" edge always comes first.
+      kdTy <- unsafeCoreTypeToHWTypeM $(curLoc) (termType tcm kd)
+      let edge = case stripVoid (stripFiltered kdTy) of
+                   KnownDomain _ _ Rising _ _ _  -> Falling
+                   KnownDomain _ _ Falling _ _ _ -> Rising
+                   _ -> error "internal error"
+      (clkExpr,clkDecls) <-
+        mkExpr False Concurrent (NetlistId "__MEALY_CLK__" (termType tcm clk)) clk
+
+      -- collect the declarations related to the input
+      let netDeclsInp1 = netDeclsInp ++ inpDeclsMisc
+
+      -- Collate everything
+      return (clkDecls ++ netDeclsSeq1 ++ netDeclsInp1 ++
+                [ Assignment (id2identifier (fst (head iBinders))) exprArg
+                , Seq [Initial (map SeqDecl (initDeclsOther ++ initAssign))]
+                , Seq [AlwaysClocked edge clkExpr (map SeqDecl seqDeclsOther)]
+                ] ++ resAssn)
+    _ -> error "internal error"
+ where
+  isNet NetDecl' {} = True
+  isNet _ = False
+
+  toReg (NetDecl' cmM _ r ty eM) = NetDecl' cmM Reg r ty eM
+  toReg d = d
+
+collectMealy _ _ _ _ = error "internal error"
+
+-- | Collect the sequential declarations for 'bindIO'
+collectBindIO :: NetlistId -> [Term] -> NetlistMonad (Expr,[Declaration])
+collectBindIO dst (m:Lam x q@(Lam _ e):_) = do
+  tcm <- Lens.use tcCache
+  ds0 <- collectAction tcm
+  case splitNormalized tcm q of
+    Right (args,bs0,res) -> do
+      let Letrec bs _ = inverseTopSortLetBindings (Letrec bs0 (C.Var res))
+      let is0 = mkInScopeSet (Lens.foldMapOf freeIds unitVarSet q)
+      normE <- mkUniqueNormalized is0 Nothing (args,bs,res)
+      case normE of
+        (_,_,[],_,[],binders,Just result) -> do
+          ds1 <- concat <$> mapM (uncurry (mkDeclarations' Sequential)) binders
+          netDecls <- fmap catMaybes (mapM mkNetDecl binders)
+          let assn = Assignment (netlistId1 id id2identifier dst)
+                                (Identifier (id2identifier result) Nothing)
+          return (Noop, (netDecls ++ ds0 ++ ds1 ++ [assn]))
+        _ -> error "internal error"
+    _ -> case e of
+      Letrec {} -> error "internal error"
+      (collectArgs -> (Prim nm _,args))
+        | nm == "Clash.Explicit.SimIO.bindSimIO#" -> do
+            (expr,ds1) <- collectBindIO dst (lefts args)
+            return (expr, ds0 ++ ds1)
+      _ -> do
+        (expr,ds1) <- mkExpr False Sequential dst e
+        return (expr, ds0 ++ ds1)
+ where
+  collectAction tcm = case splitNormalized tcm m of
+    Right (args,bs0,res) -> do
+      let Letrec bs _ = inverseTopSortLetBindings (Letrec bs0 (C.Var res))
+      let is0 = mkInScopeSet (Lens.foldMapOf freeIds unitVarSet m)
+      normE <- mkUniqueNormalized is0 Nothing (args,(x,m):bs,res)
+      case normE of
+        (_,_,[],_,[],binders,Just result) -> do
+          let binders1 = tail binders ++ [(fst (head binders), C.Var result)]
+          ds1 <- concat <$> mapM (uncurry (mkDeclarations' Sequential)) binders1
+          netDecls <- fmap catMaybes (mapM mkNetDecl binders)
+          return (netDecls ++ ds1)
+        _ -> error "internal error"
+    _ -> do
+      netDecls <- fmap catMaybes (mapM mkNetDecl [(x,m)])
+      ds1 <- mkDeclarations' Sequential x m
+      return (netDecls ++ ds1)
+
+collectBindIO _ es = error ("internal error:\n" ++ showPpr es)
+
+-- | Collect the sequential declarations for 'appIO'
+collectAppIO :: NetlistId -> [Term] -> [Term] -> NetlistMonad (Expr,[Declaration])
+collectAppIO dst (fun1:arg1:_) rest = case collectArgs fun1 of
+  (Prim "Clash.Explicit.SimIO.fmapSimIO#" _,(lefts -> (fun0:arg0:_))) -> do
+    tcm <- Lens.use tcCache
+    let argN = map (Left . unSimIO tcm) (arg0:arg1:rest)
+    mkExpr False Sequential dst (mkApps fun0 argN)
+  (Prim "Clash.Explicit.SimIO.apSimIO#" _,(lefts -> args)) -> do
+    collectAppIO dst args (arg1:rest)
+  _ -> error ("internal error:\n" ++ showPpr (fun1:arg1:rest))
+
+
+collectAppIO _ es _ = error ("internal error:\n" ++ showPpr es)
+
+-- | Unwrap the new-type wrapper for things of type SimIO, this is needed to
+-- allow applications of the `State# World` token to the underlying IO type.
+--
+-- XXX: this is most likely needed because Ghc2Core that threw away the cast
+-- that this unwrapping; we should really start to support casts.
+unSimIO
+  :: TyConMap
+  -> Term
+  -> Term
+unSimIO tcm arg =
+  let argTy = termType tcm arg
+  in  case tyView argTy of
+        TyConApp _ [tcArg] ->
+          mkApps (Prim "Clash.Explicit.SimIO.unSimIO#"
+                       (PrimInfo (mkFunTy argTy tcArg) WorkNever))
+                 [Left arg]
+        _ -> error ("internal error:\n" ++ showPpr arg)
 
 -- | Create an template instantiation text and a partial blackbox content for an
 -- argument term, given that the term is a function. Errors if the term is not
@@ -705,7 +1030,7 @@ mkFunInput resId e =
     goExpr e' = do
       tcm <- Lens.use tcCache
       let eType = termType tcm e'
-      (appExpr,appDecls) <- mkExpr False (Left "c$bb_res") eType e'
+      (appExpr,appDecls) <- mkExpr False Concurrent (NetlistId "c$bb_res" eType) e'
       let assn = Assignment "~RESULT" appExpr
       nm <- if null appDecls
                then return ""
@@ -727,7 +1052,9 @@ mkFunInput resId e =
       return (Right (("",[assn]),Wire))
 
     go _ _ (Case scrut ty [alt]) = do
-      (projection,decls) <- mkProjection False (Left "c$bb_res") scrut ty alt
+      tcm <- Lens.use tcCache
+      let sTy = termType tcm scrut
+      (projection,decls) <- mkProjection False (NetlistId "c$bb_res" sTy) scrut ty alt
       let assn = Assignment "~RESULT" projection
       nm <- if null decls
                then return ""
@@ -737,7 +1064,7 @@ mkFunInput resId e =
     go _ _ (Case scrut ty alts@(_:_:_)) = do
       -- TODO: check that it's okay to use `mkUnsafeSystemName`
       let resId'  = resId {varName = mkUnsafeSystemName "~RESULT" 0}
-      selectionDecls <- mkSelection (Right resId') scrut ty alts []
+      selectionDecls <- mkSelection Concurrent (CoreId resId') scrut ty alts []
       nm <- mkUniqueIdentifier Basic "selection"
       tcm <- Lens.use tcCache
       let scrutTy = termType tcm scrut

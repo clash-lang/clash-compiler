@@ -1,0 +1,31 @@
+[ { "Primitive" :
+    { "name"     : "Clash.Explicit.SimIO.mealyIO"
+    , "primType" : "Function"
+    }
+  }
+, { "Primitive" :
+    { "name"     : "Clash.Explicit.SimIO.fmapSimIO#"
+    , "primType" : "Function"
+    }
+  }
+, { "Primitive" :
+    { "name"     : "Clash.Explicit.SimIO.pureSimIO#"
+    , "primType" : "Function"
+    }
+  }
+, { "Primitive" :
+    { "name"     : "Clash.Explicit.SimIO.apSimIO#"
+    , "primType" : "Function"
+    }
+  }
+, { "Primitive" :
+    { "name"     : "Clash.Explicit.SimIO.bindSimIO#"
+    , "primType" : "Function"
+    }
+  }
+, { "Primitive" :
+    { "name"     : "Clash.Explicit.SimIO.unSimIO#"
+    , "primType" : "Function"
+    }
+  }
+]

@@ -20,4 +20,5 @@ where
 import Prelude hiding
   ((++), (!!), concat, concatMap, drop, even, foldl, foldl1, foldr, foldr1, head, init,
    iterate, last, length, map, odd, repeat, replicate, reverse, scanl, scanr, splitAt,
-   tail, take, unzip, unzip3, zip, zip3, zipWith, zipWith3, undefined, (^))
+   tail, take, unzip, unzip3, zip, zip3, zipWith, zipWith3, undefined, (^),
+   getChar, putChar, getLine)
