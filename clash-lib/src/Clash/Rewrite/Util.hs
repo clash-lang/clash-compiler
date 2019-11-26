@@ -292,7 +292,7 @@ mkDerivedName (TransformContext _ ctx) sf = case closestLetBinder ctx of
 
 -- | Make a new binder and variable reference for a term
 mkTmBinderFor
-  :: (Monad m, MonadUnique m, MonadFail m)
+  :: (MonadUnique m, MonadFail m)
   => InScopeSet
   -> TyConMap -- ^ TyCon cache
   -> Name a -- ^ Name of the new binder
@@ -304,7 +304,7 @@ mkTmBinderFor is tcm name e = do
 
 -- | Make a new binder and variable reference for either a term or a type
 mkBinderFor
-  :: (Monad m, MonadUnique m, MonadFail m)
+  :: (MonadUnique m, MonadFail m)
   => InScopeSet
   -> TyConMap -- ^ TyCon cache
   -> Name a -- ^ Name of the new binder
@@ -322,7 +322,7 @@ mkBinderFor is tcm name (Right ty) = do
 
 -- | Make a new, unique, identifier
 mkInternalVar
-  :: (Monad m, MonadUnique m)
+  :: (MonadUnique m)
   => InScopeSet
   -> OccName
   -- ^ Name of the identifier
@@ -689,7 +689,7 @@ addGlobalBind vNm ty sp inl body = do
 -- | Create a new name out of the given name, but with another unique. Resulting
 -- unique is guaranteed to not be in the given InScopeSet.
 cloneNameWithInScopeSet
-  :: (Monad m, MonadUnique m)
+  :: (MonadUnique m)
   => InScopeSet
   -> Name a
   -> m (Name a)
@@ -700,7 +700,7 @@ cloneNameWithInScopeSet is nm = do
 -- | Create a new name out of the given name, but with another unique. Resulting
 -- unique is guaranteed to not be in the given BindingMap.
 cloneNameWithBindingMap
-  :: (Monad m, MonadUnique m)
+  :: (MonadUnique m)
   => BindingMap
   -> Name a
   -> m (Name a)
@@ -739,7 +739,7 @@ isUntranslatableType stringRepresentable ty =
 
 -- | Make a binder that should not be referenced
 mkWildValBinder
-  :: (Monad m, MonadUnique m)
+  :: (MonadUnique m)
   => InScopeSet
   -> Type
   -> m Id
@@ -748,7 +748,7 @@ mkWildValBinder is = mkInternalVar is "wild"
 -- | Make a case-decomposition that extracts a field out of a (Sum-of-)Product type
 mkSelectorCase
   :: HasCallStack
-  => (Functor m, Monad m, MonadUnique m)
+  => (Functor m, MonadUnique m)
   => String -- ^ Name of the caller of this function
   -> InScopeSet
   -> TyConMap -- ^ TyCon cache

@@ -58,6 +58,7 @@ module Clash.Normalize.Transformations
   , etaExpandSyn
   , appPropFast
   , separateArguments
+  , xOptimize
   )
 where
 
@@ -80,7 +81,7 @@ import qualified Data.Monoid                 as Monoid
 import qualified Data.Primitive.ByteArray    as BA
 import qualified Data.Text                   as Text
 import qualified Data.Vector.Primitive       as PV
-import           Debug.Trace                 (trace)
+import           Debug.Trace
 import           GHC.Integer.GMP.Internals   (Integer (..), BigNat (..))
 
 import           BasicTypes                  (InlineSpec (..))
@@ -98,7 +99,7 @@ import           Clash.Core.Subst
   (substTm, mkSubst, extendIdSubst, extendIdSubstList, extendTvSubst,
    extendTvSubstList, freshenTm, substTyInVar, deShadowTerm)
 import           Clash.Core.Term
-  (LetBinding, Pat (..), Term (..), CoreContext (..), PrimInfo (..), TickInfo (..),
+  (LetBinding, Pat (..), Term (..), CoreContext (..), PrimInfo (..), TickInfo(..), WorkInfo(WorkConstant), Alt,
    isLambdaBodyCtx, isTickCtx, collectArgs, collectArgsTicks, collectTicks,
    partitionTicks)
 import           Clash.Core.Type             (Type, TypeView (..), applyFunTy,
@@ -121,8 +122,9 @@ import           Clash.Core.VarEnv
    notElemVarSet, unionVarEnvWith, unionVarSet, unionInScope, unitVarEnv,
    unitVarSet, mkVarSet, mkInScopeSet, uniqAway)
 import           Clash.Driver.Types          (DebugLevel (..))
+import           Clash.Netlist.BlackBox.Types (Element(Err))
 import           Clash.Netlist.BlackBox.Util (usedArguments)
-import           Clash.Netlist.Types         (HWType (..), FilteredHWType(..))
+import           Clash.Netlist.Types         (BlackBox(..), HWType (..), FilteredHWType(..))
 import           Clash.Netlist.Util
   (coreTypeToHWType, representableType, splitNormalized, bindsExistentials)
 import           Clash.Normalize.DEC
@@ -2391,3 +2393,110 @@ separateArguments (TransformContext is0 _) e@(collectArgsTicks -> (Var g, args, 
         return [(ty,arg)]
 
 separateArguments _ e = return e
+
+-- | Remove all undefined alternatives from case expressions, replacing them
+-- with the value of another defined alternative. If there is one defined
+-- alternative, the entire expression is replaced with that alternative. If
+-- there are no defined alternatives, the entire expression is replaced with
+-- a call to 'errorX'.
+--
+-- e.g. It converts
+--
+--     case x of
+--       D1 a -> f a
+--       D2   -> undefined
+--       D3   -> undefined
+--
+-- to
+--
+--     let subj = x
+--         a    = case subj of
+--                  D1 a -> field0
+--      in f a
+--
+-- where fieldN is an internal variable referring to the nth argument of a
+-- data constructor.
+--
+xOptimize :: HasCallStack => NormRewrite
+xOptimize (TransformContext is0 _) e@(Case subj ty alts) = do
+  defPart <- partitionM (isPrimError . snd) alts
+
+  case defPart of
+    ([], _)    -> return e
+    (_, [])    -> changed (Prim "Clash.XException.errorX" (PrimInfo ty WorkConstant))
+    (_, [alt]) -> xOptimizeSingle is0 subj alt
+    (_, defs)  -> xOptimizeMany is0 subj ty defs
+
+xOptimize _ e = return e
+
+-- Return an expression equivalent to the alternative given. When only one
+-- alternative is defined the result of this function is used to replace the
+-- case expression.
+--
+xOptimizeSingle :: InScopeSet -> Term -> Alt -> NormalizeSession Term
+xOptimizeSingle is subj (DataPat dc tvs vars, expr) = do
+  tcm    <- Lens.view tcCache
+  subjId <- mkInternalVar is "subj" (termType tcm subj)
+
+  let fieldTys = fmap varType vars
+  lets <- Monad.zipWithM (mkFieldSelector is subjId dc tvs fieldTys) vars [0..]
+
+  changed (Letrec ((subjId, subj) : lets) expr)
+
+xOptimizeSingle _ _ (_, expr) = changed expr
+
+-- Given a list of alternatives which are defined, create a new case
+-- expression which only ever returns a defined value.
+--
+xOptimizeMany
+  :: HasCallStack
+  => InScopeSet
+  -> Term
+  -> Type
+  -> [Alt]
+  -> NormalizeSession Term
+xOptimizeMany is subj ty defs@(d:ds)
+  | isAnyDefault defs = changed (Case subj ty defs)
+  | otherwise = do
+      newAlt <- xOptimizeSingle is subj d
+      changed (Case subj ty $ ds <> [(DefaultPat, newAlt)])
+ where
+  isAnyDefault :: [Alt] -> Bool
+  isAnyDefault = any ((== DefaultPat) . fst)
+
+xOptimizeMany _ _ _ [] =
+  error $ $(curLoc) ++ "Report as bug: xOptimizeMany error: No defined alternatives"
+
+mkFieldSelector
+  :: MonadUnique m
+  => InScopeSet
+  -> Id 
+  -- ^ subject id
+  -> DataCon
+  -> [TyVar]
+  -> [Type]
+  -- ^ concrete types of fields
+  -> Id
+  -> Int
+  -> m LetBinding
+mkFieldSelector is0 subj dc tvs fieldTys nm index = do
+  fields <- mapM (\ty -> mkInternalVar is0 "field" ty) fieldTys
+  let alt = (DataPat dc tvs fields, Var $ fields !! index)
+  return (nm, Case (Var subj) (fieldTys !! index) [alt])
+
+-- Check whether a term is really a black box primitive representing an error.
+-- Such values are undefined and are removed in X Optimization.
+--
+isPrimError :: Term -> NormalizeSession Bool
+isPrimError (collectArgs -> (Prim nm _, _)) = do
+  prim <- Lens.use (extra . primitives . Lens.at nm)
+
+  case prim >>= extractPrim of
+    Just p  -> return (isErr p)
+    Nothing -> return False
+ where
+  isErr BlackBox{template=(BBTemplate [Err _])} = True
+  isErr _ = False
+
+isPrimError _ = return False
+

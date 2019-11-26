@@ -24,6 +24,7 @@
   * Added `Clash.Magic.noDeDup`: can be used to instruct Clash to /not/ share a function between multiple branches
 
 * New internal features:
+  * [#918](https://github.com/clash-lang/clash-compiler/pull/935): Add X-Optimization to normalization passes
   * [#821](https://github.com/clash-lang/clash-compiler/pull/821): Add `DebugTry`: print name of all tried transformations, even if they didn't succeed
   * [#856](https://github.com/clash-lang/clash-compiler/pull/856): Add `-fclash-debug-transformations`: only print debug info for specific transformations
   * [#911](https://github.com/clash-lang/clash-compiler/pull/911): Add 'RenderVoid' option to blackboxes

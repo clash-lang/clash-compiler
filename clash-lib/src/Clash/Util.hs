@@ -129,7 +129,7 @@ pprDebugAndThen cont heading prettyMsg =
   doc = sep [heading, nest 2 prettyMsg]
 
 -- | A class that can generate unique numbers
-class MonadUnique m where
+class Monad m => MonadUnique m where
   -- | Get a new unique
   getUniqueM :: m Int
 

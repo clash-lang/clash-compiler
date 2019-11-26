@@ -399,7 +399,13 @@ runClashTest = defaultMain $ clashTestRoot
         , runTest "VecOfSum" def{hdlSim=False}
         , runTest "T452" def{hdlSim=False}
         , runTest "T895" def{hdlSim=False,hdlTargets=[VHDL]}
-        ] -- end Vector
+        ] -- end vector
+      , clashTestGroup "XOptimization"
+        [ netlistTest ("tests" </> "shouldwork" </> "XOptimization") allTargets [] "OneDefinedDataPat" "main"
+        , netlistTest ("tests" </> "shouldwork" </> "XOptimization") allTargets [] "OneDefinedLitPat" "main"
+        , netlistTest ("tests" </> "shouldwork" </> "XOptimization") allTargets [] "OneDefinedDefaultPat" "main"
+        , netlistTest ("tests" </> "shouldwork" </> "XOptimization") allTargets [] "ManyDefined" "main"
+        ]
       ] -- end shouldwork
     ] -- end tests
   ] -- end .
