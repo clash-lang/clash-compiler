@@ -71,7 +71,7 @@ import Clash.XException
 -}
 
 -- | Convert to and from a 'BitVector'
-class BitPack a where
+class KnownNat (BitSize a) => BitPack a where
   -- | Number of 'Clash.Sized.BitVector.Bit's needed to represents elements
   -- of type @a@
   --
@@ -281,7 +281,7 @@ instance BitPack () where
   pack   _ = minBound
   unpack _ = ()
 
-instance (KnownNat (BitSize a), KnownNat (BitSize b), BitPack a, BitPack b) =>
+instance (BitPack a, BitPack b) =>
     BitPack (a,b) where
   type BitSize (a,b) = BitSize a + BitSize b
   pack = let go (a,b) = pack a ++# pack b in packXWith go
@@ -388,23 +388,14 @@ instance GBitPack U1 where
 
 -- Instances derived using Generic
 instance ( BitPack a
-         , KnownNat (BitSize a)
          , BitPack b
-         , KnownNat (BitSize b)
          ) => BitPack (Either a b)
 
-instance ( BitPack a
-         , KnownNat (BitSize a)
-         ) => BitPack (Maybe a)
+instance BitPack a => BitPack (Maybe a)
 
 #if MIN_VERSION_base(4,12,0)
-instance ( BitPack a
-         , KnownNat (BitSize a)
-         ) => BitPack (Complex a)
-
-instance ( BitPack a
-         , KnownNat (BitSize a)
-         ) => BitPack (Down a)
+instance BitPack a => BitPack (Complex a)
+instance BitPack a => BitPack (Down a)
 #endif
 
 -- | Zero-extend a 'Bool'ean value to a 'BitVector' of the appropriate size.

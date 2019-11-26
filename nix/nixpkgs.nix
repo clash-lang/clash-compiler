@@ -12,9 +12,8 @@ let
       overrides = self: super: {
         # External overrides
 
-        # Example:
-        # ghc-typelits-extra =
-        #  self.callCabal2nix "ghc-typelits-extra" sources.ghc-typelits-extra {};
+        ghc-typelits-knownnat =
+         self.callCabal2nix "ghc-typelits-knownnat" sources.ghc-typelits-knownnat {};
 
         # Internal overrides
         clash-lib = import ../clash-lib { inherit nixpkgs; };

@@ -147,7 +147,7 @@ cSaturatingNum = (r1a,r1b,r1c,r1d, r2a,r2b,r2c,r2d, r3a,r3b,r3c,r3d)
     r2d = satSub @n SatSymmetric (lit 22242) (lit 22243)
     r3d = satMul @n SatSymmetric (lit 22244) (lit 22245)
 
-cBitPack :: forall n. (Num n, BitPack n, KnownNat (BitSize n)) => _
+cBitPack :: forall n. (Num n, BitPack n) => _
 cBitPack = (r1,r2)
   where
     r1 = pack @n (lit 22250) + (lit 1000)
@@ -184,7 +184,7 @@ csGenericHaskell
     , cFiniteBits @n
     )
 
-csClashSpecific :: forall n. (Num n, BitPack n, KnownNat (BitSize n), ExtendingNum n n, SaturatingNum n) => _
+csClashSpecific :: forall n. (Num n, BitPack n, ExtendingNum n n, SaturatingNum n) => _
 csClashSpecific = (cBitPack @n, cExtendingNum @n @n, cSaturatingNum @n)
 
 

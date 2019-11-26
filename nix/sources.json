@@ -34,5 +34,17 @@
         "type": "tarball",
         "url": "https://github.com/NixOS/nixpkgs-channels/archive/08e503bac6decf9a3e01b79ab1f9788bf76380b1.tar.gz",
         "url_template": "https://github.com/<owner>/<repo>/archive/<rev>.tar.gz"
+    },
+    "ghc-typelits-knownnat": {
+        "branch": "master",
+        "description": "Derive KnownNat constraints from other KnownNat constraints",
+        "homepage": null,
+        "owner": "clash-lang",
+        "repo": "ghc-typelits-knownnat",
+        "rev": "cc73e761086e2d48acdf134b06ad3af47e115166",
+        "sha256": "151pd1bi9ynln2dm1rijz7cjp4f6jlrmcj6s6kwvgjl22rqb9b2h",
+        "type": "tarball",
+        "url": "https://github.com/clash-lang/ghc-typelits-knownnat/archive/cc73e761086e2d48acdf134b06ad3af47e115166.tar.gz",
+        "url_template": "https://github.com/<owner>/<repo>/archive/<rev>.tar.gz"
     }
 }

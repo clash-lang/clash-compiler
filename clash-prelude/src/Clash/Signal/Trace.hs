@@ -147,7 +147,6 @@ traceMap# = unsafePerformIO (newIORef Map.empty)
 
 mkTrace
   :: HasCallStack
-  => KnownNat (BitSize a)
   => BitPack a
   => NFDataX a
   => Signal dom a
@@ -160,8 +159,7 @@ mkTrace signal = sample (unsafeToTup . pack <$> signal)
 -- was previously registered.
 traceSignal#
   :: forall dom a
-   . ( KnownNat (BitSize a)
-     , BitPack a
+   . ( BitPack a
      , NFDataX a
      , Typeable a )
   => IORef TraceMap
@@ -195,8 +193,7 @@ traceSignal# traceMap period traceName signal =
 -- an error.
 traceVecSignal#
   :: forall dom n a
-   . ( KnownNat (BitSize a)
-     , KnownNat n
+   . ( KnownNat n
      , BitPack a
      , NFDataX a
      , Typeable a )
@@ -226,7 +223,6 @@ traceVecSignal# traceMap period vecTraceName (unbundle -> vecSignal) =
 traceSignal
   :: forall dom  a
    . ( KnownDomain dom
-     , KnownNat (BitSize a)
      , BitPack a
      , NFDataX a
      , Typeable a )
@@ -250,8 +246,7 @@ traceSignal traceName signal =
 -- multiple clocks. Use 'traceSignal' when working with circuits that have
 -- multiple clocks.
 traceSignal1
-  :: ( KnownNat (BitSize a)
-     , BitPack a
+  :: ( BitPack a
      , NFDataX a
      , Typeable a )
   => String
@@ -273,7 +268,6 @@ traceSignal1 traceName signal =
 traceVecSignal
   :: forall dom a  n
    . ( KnownDomain dom
-     , KnownNat (BitSize a)
      , KnownNat n
      , BitPack a
      , NFDataX a
@@ -299,8 +293,7 @@ traceVecSignal traceName signal =
 -- multiple clocks. Use 'traceSignal' when working with circuits that have
 -- multiple clocks.
 traceVecSignal1
-  :: ( KnownNat (BitSize a)
-     , KnownNat n
+  :: ( KnownNat n
      , BitPack a
      , NFDataX a
      , Typeable a )

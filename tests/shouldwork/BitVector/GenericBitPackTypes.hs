@@ -13,11 +13,7 @@ data FooProduct a b
   = FooProduct a b
     deriving Generic
 
-instance ( BitPack a
-         , BitPack b
-         , KnownNat (BitSize a)
-         , KnownNat (BitSize b)
-         ) => BitPack (FooProduct a b)
+instance (BitPack a, BitPack b) => BitPack (FooProduct a b)
 
 
 -- | Sum type
@@ -37,11 +33,7 @@ data FooSP1 a b
   | FooSP1_BA b a
     deriving (Generic)
 
-instance ( BitPack a
-         , BitPack b
-         , KnownNat (BitSize a)
-         , KnownNat (BitSize b)
-         ) => BitPack (FooSP1 a b)
+instance (BitPack a, BitPack b) => BitPack (FooSP1 a b)
 --
 -- | Foo sum-of-products non-aligned
 data FooSP2 a b
@@ -51,11 +43,7 @@ data FooSP2 a b
     deriving (Generic)
 
 
-instance ( BitPack a
-         , BitPack b
-         , KnownNat (BitSize a)
-         , KnownNat (BitSize b)
-         ) => BitPack (FooSP2 a b)
+instance (BitPack a, BitPack b) => BitPack (FooSP2 a b)
 
 -- Testsuite data (in separate module to circumvent TH stage restrictions):
 type U1 = Unsigned 3

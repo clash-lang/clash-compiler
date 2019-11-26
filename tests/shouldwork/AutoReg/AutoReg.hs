@@ -22,25 +22,21 @@ import System.FilePath ((</>), takeDirectory)
 
 #ifndef OUTPUTTEST
 data Tup2 a b = MkTup2 { getA :: a, getB :: b } deriving (Generic,NFDataX)
-instance (BitPack a,BitPack b, KnownNat (BitSize a),KnownNat (BitSize b)) => BitPack (Tup2 a b)
+instance (BitPack a,BitPack b) => BitPack (Tup2 a b)
 deriveAutoReg ''Tup2
 
 
 data Tup3 a b c = MkTup3 { fieldA :: a, fieldB :: b, fieldC :: c } deriving (Generic,NFDataX)
-instance
-  ( BitPack a,BitPack b,BitPack c
-  , KnownNat (BitSize a), KnownNat (BitSize b), KnownNat (BitSize c)
-  )
-    => BitPack (Tup3 a b c)
+instance (BitPack a, BitPack b, BitPack c) => BitPack (Tup3 a b c)
 deriveAutoReg ''Tup3
 
 
 newtype OtherPair a b = OtherPair (Tup2 a b) deriving (Generic,NFDataX)
-instance (BitPack a,BitPack b, KnownNat (BitSize a),KnownNat (BitSize b)) => BitPack (OtherPair a b)
+instance (BitPack a, BitPack b) => BitPack (OtherPair a b)
 deriveAutoReg ''OtherPair
 
 data Tup2_ a b c = MkTup2_ a b deriving (Generic,NFDataX)
-instance (BitPack a,BitPack b, KnownNat (BitSize a),KnownNat (BitSize b)) => BitPack (Tup2_ a b c)
+instance (BitPack a, BitPack b) => BitPack (Tup2_ a b c)
 deriveAutoReg ''Tup2_
 -- NOTE: For some reason this deriveAutoReg ''Tup2_ creates invalid code when
 -- run by runghc-8.4.4 for the output test. (newer versions are ok)
@@ -50,7 +46,7 @@ data Concrete = BoolAndInt Bool Int8 deriving (Generic,NFDataX,BitPack)
 deriveAutoReg ''Concrete
 
 data InfixDataCon a b = a :-.- b deriving (Generic,NFDataX)
-instance (BitPack a,BitPack b,KnownNat (BitSize a),KnownNat (BitSize b)) => BitPack (InfixDataCon a b)
+instance (BitPack a, BitPack b) => BitPack (InfixDataCon a b)
 deriveAutoReg ''InfixDataCon
 
 
@@ -58,7 +54,7 @@ test
   :: forall a dom n rest
    . ( HiddenClockResetEnable dom
      , AutoReg a, BitPack a
-     , KnownNat (BitSize a), KnownNat n, KnownNat rest
+     , KnownNat n, KnownNat rest
      , rest ~ (n-(BitSize a))
      )
   => Signal dom (BitVector n) -> Signal dom a

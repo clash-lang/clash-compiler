@@ -201,7 +201,7 @@ instance KnownNat d => Traversable (RTree d) where
                       (fmap LR . f)
                       (const (liftA2 BR))
 
-instance (KnownNat d, KnownNat (BitSize a), BitPack a) =>
+instance (KnownNat d, BitPack a) =>
   BitPack (RTree d a) where
   type BitSize (RTree d a) = (2^d) * (BitSize a)
   pack   = packXWith (pack . t2v)

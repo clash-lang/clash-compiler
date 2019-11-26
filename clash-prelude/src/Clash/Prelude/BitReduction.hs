@@ -13,8 +13,6 @@ Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
 
 module Clash.Prelude.BitReduction where
 
-import GHC.TypeLits                   (KnownNat)
-
 import Clash.Class.BitPack            (BitPack (..))
 import Clash.Sized.Internal.BitVector (Bit, reduceAnd#, reduceOr#, reduceXor#)
 
@@ -39,7 +37,7 @@ import Clash.Sized.Internal.BitVector (Bit, reduceAnd#, reduceOr#, reduceXor#)
 --
 -- >>> reduceAnd (0 :: Unsigned 0)
 -- 1
-reduceAnd :: (BitPack a, KnownNat (BitSize a)) => a -> Bit
+reduceAnd :: BitPack a => a -> Bit
 reduceAnd v = reduceAnd# (pack v)
 
 {-# INLINE reduceOr #-}
@@ -58,7 +56,7 @@ reduceAnd v = reduceAnd# (pack v)
 --
 -- >>> reduceOr (0 :: Unsigned 0)
 -- 0
-reduceOr :: (BitPack a, KnownNat (BitSize a)) => a -> Bit
+reduceOr :: BitPack a => a -> Bit
 reduceOr v = reduceOr# (pack v)
 
 {-# INLINE reduceXor #-}
@@ -81,5 +79,5 @@ reduceOr v = reduceOr# (pack v)
 --
 -- >>> reduceXor (0 :: Unsigned 0)
 -- 0
-reduceXor :: (BitPack a, KnownNat (BitSize a)) => a -> Bit
+reduceXor :: BitPack a => a -> Bit
 reduceXor v = reduceXor# (pack v)
