@@ -42,7 +42,7 @@ import Clash.Sized.Internal.BitVector (BitVector, Bit, index#, lsb#, msb#,
 -- >>> (7 :: Unsigned 6) ! 6
 -- *** Exception: (!): 6 is out of range [5..0]
 -- ...
-(!) :: (BitPack a, KnownNat (BitSize a), Enum i) => a -> i -> Bit
+(!) :: (BitPack a, Enum i) => a -> i -> Bit
 (!) v i = index# (pack v) (fromEnum i)
 
 {-# INLINE slice #-}
@@ -96,8 +96,7 @@ split v = split# (pack v)
 -- >>> replaceBit 6 0 (-5 :: Signed 6)
 -- *** Exception: replaceBit: 6 is out of range [5..0]
 -- ...
-replaceBit :: (BitPack a, KnownNat (BitSize a), Enum i) => i -> Bit -> a
-           -> a
+replaceBit :: (BitPack a, Enum i) => i -> Bit -> a -> a
 replaceBit i b v = unpack (replaceBit# (pack v) (fromEnum i) b)
 
 {-# INLINE setSlice #-}
@@ -134,7 +133,7 @@ setSlice m n w v = unpack (setSlice# (pack v) m n w)
 -- 00_0100
 -- >>> msb (4 :: Signed 6)
 -- 0
-msb :: (BitPack a, KnownNat (BitSize a)) => a -> Bit
+msb :: BitPack a => a -> Bit
 msb v = msb# (pack v)
 
 {-# INLINE lsb #-}

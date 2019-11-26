@@ -9,4 +9,5 @@ packages:
 
 extra-deps:
 - ./clash-cosim
+- ghc-typelits-knownnat-0.7.1@sha256:52a647119137e572a957b62fd7a747448670c8f91138c26c48e1828a6ca7b6da,4708
 

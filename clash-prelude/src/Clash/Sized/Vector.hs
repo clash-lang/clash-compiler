@@ -2183,7 +2183,7 @@ smap f xs = reverse
                   Nil (reverse xs)
 {-# INLINE smap #-}
 
-instance (KnownNat n, KnownNat (BitSize a), BitPack a) => BitPack (Vec n a) where
+instance (KnownNat n, BitPack a) => BitPack (Vec n a) where
   type BitSize (Vec n a) = n * (BitSize a)
   pack   = packXWith (concatBitVector# . map pack)
   unpack = map unpack . unconcatBitVector#

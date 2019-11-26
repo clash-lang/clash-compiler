@@ -157,10 +157,7 @@ oneHotCounter enable = s
     s = register 1 (mux enable (rotateL <$> s <*> 1) s)
 
 crcT
-  :: ( Bits a
-     , KnownNat (BitSize a)
-     , BitPack a
-     )
+  :: (Bits a, BitPack a)
   => a
   -> Bit
   -> a

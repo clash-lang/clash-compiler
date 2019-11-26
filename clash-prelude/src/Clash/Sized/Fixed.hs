@@ -39,6 +39,7 @@ BEWARE: rounding by truncation introduces a sign bias!
 
 {-# LANGUAGE Trustworthy #-}
 
+{-# OPTIONS_GHC -fplugin=GHC.TypeLits.Normalise #-}
 {-# OPTIONS_GHC -fplugin GHC.TypeLits.KnownNat.Solver #-}
 {-# OPTIONS_HADDOCK show-extensions #-}
 
@@ -437,7 +438,6 @@ type NumFixedC rep int frac
               (int + ((int + frac) + frac))
     , BitPack (rep ((int + int) + (frac + frac)))
     , Bits    (rep ((int + int) + (frac + frac)))
-    , KnownNat (BitSize (rep (int + frac)))
     , BitPack (rep (int + frac))
     , Enum    (rep (int + frac))
     , Bits    (rep (int + frac))

@@ -212,7 +212,6 @@ readFromBiSignal# (BiSignalIn ds s) =
 -- | Read the value from an __inout__ port
 readFromBiSignal
   :: ( HasCallStack
-     , KnownNat (BitSize a)
      , BitPack a)
   => BiSignalIn ds d (BitSize a)
   -- ^ A 'BiSignalIn' with a number of bits needed to represent /a/
