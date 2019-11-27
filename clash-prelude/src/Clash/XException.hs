@@ -46,7 +46,7 @@ module Clash.XException
 where
 
 import           Clash.CPP           (maxTupleSize)
-import           Clash.XException.TH (mkNFDataXTupleInstances)
+import           Clash.XException.TH
 import           Control.Exception   (Exception, catch, evaluate, throw)
 import           Control.DeepSeq     (NFData, rnf)
 import           Data.Complex        (Complex)
@@ -278,29 +278,6 @@ genericShowsPrecX :: (Generic a, GShowX (Rep a)) => Int -> a -> ShowS
 genericShowsPrecX n = gshowsPrecX Pref n . from
 
 instance ShowX ()
-instance (ShowX a, ShowX b) => ShowX (a,b)
-instance (ShowX a, ShowX b, ShowX c) => ShowX (a,b,c)
-instance (ShowX a, ShowX b, ShowX c, ShowX d) => ShowX (a,b,c,d)
-instance (ShowX a, ShowX b, ShowX c, ShowX d, ShowX e) => ShowX (a,b,c,d,e)
-instance (ShowX a, ShowX b, ShowX c, ShowX d, ShowX e, ShowX f) => ShowX (a,b,c,d,e,f)
-instance (ShowX a, ShowX b, ShowX c, ShowX d, ShowX e, ShowX f, ShowX g) => ShowX (a,b,c,d,e,f,g)
-
--- Show is defined up to 12-tuples, but GHC.Generics only has Generic instances
--- up to 7-tuples, hence we need these orphan instances.
-deriving instance Generic ((,,,,,,,) a b c d e f g h)
-deriving instance Generic ((,,,,,,,,) a b c d e f g h i)
-deriving instance Generic ((,,,,,,,,,) a b c d e f g h i j)
-deriving instance Generic ((,,,,,,,,,,) a b c d e f g h i j k)
-deriving instance Generic ((,,,,,,,,,,,) a b c d e f g h i j k l)
-
-instance (ShowX a, ShowX b, ShowX c, ShowX d, ShowX e, ShowX f, ShowX g, ShowX h) => ShowX (a,b,c,d,e,f,g,h)
-instance (ShowX a, ShowX b, ShowX c, ShowX d, ShowX e, ShowX f, ShowX g, ShowX h, ShowX i) => ShowX (a,b,c,d,e,f,g,h,i)
-instance (ShowX a, ShowX b, ShowX c, ShowX d, ShowX e, ShowX f, ShowX g, ShowX h, ShowX i, ShowX j)
-  => ShowX (a,b,c,d,e,f,g,h,i,j)
-instance (ShowX a, ShowX b, ShowX c, ShowX d, ShowX e, ShowX f, ShowX g, ShowX h, ShowX i, ShowX j, ShowX k)
-  => ShowX (a,b,c,d,e,f,g,h,i,j,k)
-instance (ShowX a, ShowX b, ShowX c, ShowX d, ShowX e, ShowX f, ShowX g, ShowX h, ShowX i, ShowX j, ShowX k, ShowX l)
-  => ShowX (a,b,c,d,e,f,g,h,i,j,k,l)
 
 instance {-# OVERLAPPABLE #-} ShowX a => ShowX [a] where
   showsPrecX _ = showListX
@@ -842,4 +819,5 @@ instance NFDataX c => GDeepErrorX (K1 i c) where
 instance GDeepErrorX (f :+: g) where
   gDeepErrorX = errorX
 
+mkShowXTupleInstances [2..maxTupleSize]
 mkNFDataXTupleInstances [2..maxTupleSize]
