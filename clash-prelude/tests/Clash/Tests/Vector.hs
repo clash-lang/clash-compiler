@@ -1,9 +1,14 @@
 {-# OPTIONS_GHC -fplugin GHC.TypeLits.Normalise #-}
 
+{-# LANGUAGE CPP              #-}
 {-# LANGUAGE DataKinds        #-}
 {-# LANGUAGE TemplateHaskell  #-}
 {-# LANGUAGE TypeFamilies     #-}
 {-# LANGUAGE TypeOperators    #-}
+
+#if __GLASGOW_HASKELL__ <= 804
+{-# OPTIONS_GHC -fno-warn-incomplete-patterns #-}
+#endif
 
 module Clash.Tests.Vector where
 
@@ -76,11 +81,8 @@ tests = testGroup "Vector"
   , testCase "test1" $ assertType "Int"
       "let x :: Int; (x :> _) = test1 (Nil :: Vec 0 Int) in x"
 
-  , testGroup "Untouchable GADT Patterns" 
-    [ testCase "Cons" $ assertError "is untouchable"
-        "let f x@(Cons _ _) = x in f undefined"
-    
-    , testCase "(:>)" $ assertError "is untouchable"
+  , testGroup "Untouchable GADT Patterns"
+    [ testCase "(:>)" $ assertError "is untouchable"
         "let f x@(_ :> _) = x in f undefined"
 
     , testCase "(:<)" $ assertError "is untouchable"

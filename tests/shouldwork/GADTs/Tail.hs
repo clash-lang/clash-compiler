@@ -4,7 +4,7 @@ import Clash.Prelude
 import Clash.Explicit.Testbench
 
 tail' :: Vec (n+1) (Signed 16) -> Vec n (Signed 16)
-tail' (Cons x xs) = xs
+tail' (x :> xs) = xs
 {-# NOINLINE tail' #-}
 
 topEntity :: Vec 3 (Signed 16) -> Vec 2 (Signed 16)
