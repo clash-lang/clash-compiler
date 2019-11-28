@@ -38,7 +38,7 @@ Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
 
 module Clash.Sized.Vector
   ( -- * 'Vec'tor data type
-    Vec(Nil,(:>),(:<))
+    Vec(Nil,(:>),Cons,(:<))
     -- * Accessors
     -- ** Length information
   , length, lengthS
@@ -275,6 +275,46 @@ cCons = mkConstr tVec ":>" [] Prefix
 instance NFData a => NFData (Vec n a) where
   rnf = foldl (\() -> rnf) ()
 
+
+{-# COMPLETE Nil, (:>)  #-}
+-- | Add an element to the head of a vector.
+--
+-- >>> 3 :> 4 :> 5 :> Nil
+-- <3,4,5>
+-- >>> let x = 3 :> 4 :> 5 :> Nil
+-- >>> :t x
+-- x :: Num b => Vec 3 b
+--
+-- Can be used as a pattern:
+--
+-- >>> :set -Wno-incomplete-patterns
+-- >>> let f :: Num a => Vec (n + 2) a -> a; f (x :> y :> _) = x + y
+-- >>> :t f
+-- f :: Num a => Vec (n + 2) a -> a
+-- >>> f (3 :> 4 :> 5 :> 6 :> 7 :> Nil)
+-- 7
+--
+-- Also in conjunctions with (':<'):
+--
+-- >>> let g :: Num a => Vec (n + 4) a -> a; g (a :> b :> (_ :< y :< x)) = a + b +  x + y
+-- >>> :t g
+-- g :: Num a => Vec (n + 4) a -> a
+-- >>> g (1 :> 2 :> 3 :> 4 :> 5 :> Nil)
+-- 12
+--
+-- N.B.: Deprecated! Use (:>)
+pattern Cons
+  :: forall m a
+   . ()
+  => forall n
+   . ((n + 1) ~ m)
+  => a -> Vec n a -> Vec m a
+pattern Cons x xs = x :> xs
+{-# DEPRECATED Cons "Cons will be removed in Clash 1.4. Use :> instead." #-}
+
+infixr 5 `Cons`
+
+
 {-# COMPLETE Nil, (:<)  #-}
 -- | Add an element to the tail of a vector.
 --
@@ -282,7 +322,7 @@ instance NFData a => NFData (Vec n a) where
 -- <3,4,5,1>
 -- >>> let x = (3 :> 4 :> 5 :> Nil) :< 1
 -- >>> :t x
--- x :: Num b => Vec 4 b
+-- x :: Num a => Vec 4 a
 --
 -- Can be used as a pattern:
 --
