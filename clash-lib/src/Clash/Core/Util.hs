@@ -544,7 +544,7 @@ termSize (Case subj _ alts) = sum (subjSz:altSzs)
 
 -- | Create a vector of supplied elements
 mkVec :: DataCon -- ^ The Nil constructor
-      -> DataCon -- ^ The Cons (:>) constructor
+      -> DataCon -- ^ The (:>) constructor
       -> Type    -- ^ Element type
       -> Integer -- ^ Length of the vector
       -> [Term]  -- ^ Elements to put in the vector
@@ -571,7 +571,7 @@ mkVec nilCon consCon resTy = go
                                                      ,(LitTy (NumTy (n-1)))])
 
 -- | Append elements to the supplied vector
-appendToVec :: DataCon -- ^ The Cons (:>) constructor
+appendToVec :: DataCon -- ^ The (:>) constructor
             -> Type    -- ^ Element type
             -> Term    -- ^ The vector to append the elements to
             -> Integer -- ^ Length of the vector
@@ -601,7 +601,7 @@ extractElems
   -> InScopeSet
   -- ^ (Superset of) in scope variables
   -> DataCon
-  -- ^ The Cons (:>) constructor
+  -- ^ The (:>) constructor
   -> Type
   -- ^ The element type
   -> Char

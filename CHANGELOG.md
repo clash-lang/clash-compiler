@@ -23,6 +23,7 @@
   * `Clash.Magic.suffixNameP`, `Clash.Magic.suffixNameFromNatP`: enable prefixing of name suffixes
   * Added `Clash.Magic.noDeDup`: can be used to instruct Clash to /not/ share a function between multiple branches
   * A `BitPack a` constraint now implies a `KnownNat (BitSize a)` constraint, so you won't have to add it manually anymore. See [#942](https://github.com/clash-lang/clash-compiler/pull/942).
+  * `Vec`'s `Cons` is gone in favor of `:>`. You can now use the actual constructor instead of a pattern to do pattern matches! See [#943](https://github.com/clash-lang/clash-compiler/pull/943).
 
 * New internal features:
   * [#918](https://github.com/clash-lang/clash-compiler/pull/935): Add X-Optimization to normalization passes

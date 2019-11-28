@@ -38,7 +38,7 @@ Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
 
 module Clash.Sized.Vector
   ( -- * 'Vec'tor data type
-    Vec(Nil,(:>),(:<),Cons)
+    Vec(Nil,(:>),Cons,(:<))
     -- * Accessors
     -- ** Length information
   , length, lengthS
@@ -119,7 +119,7 @@ import Data.Proxy                 (Proxy (..))
 import Data.Singletons.Prelude    (TyFun,Apply,type (@@))
 import GHC.TypeLits               (CmpNat, KnownNat, Nat, type (+), type (-), type (*),
                                    type (^), type (<=), natVal)
-import GHC.Base                   (Int(I#),Int#,isTrue#)
+import GHC.Base                   (Int(I#), Int#, isTrue#, liftA2)
 import GHC.Generics               hiding (Fixity (..))
 import GHC.Prim                   ((==#),(<#),(-#))
 import Language.Haskell.TH        (ExpQ)
@@ -208,9 +208,9 @@ let populationCount' :: (KnownNat k, KnownNat (2^k)) => BitVector (2^k) -> Index
 --   ending at @'length' - 1@.
 data Vec :: Nat -> Type -> Type where
   Nil  :: Vec 0 a
-  Cons :: a -> Vec n a -> Vec (n + 1) a
+  (:>) :: a -> Vec n a -> Vec (n + 1) a
 
-infixr 5 `Cons`
+infixr 5 :>
 
 -- | In many cases, this Generic instance only allows generic
 -- functions/instances over vectors of at least size 1, due to the
@@ -223,7 +223,7 @@ instance KnownNat n => Generic (Vec n a) where
   type Rep (Vec n a) =
     D1 ('MetaData "Vec" "Clash.Data.Vector" "clash-prelude" 'False)
       (C1 ('MetaCons "Nil" 'PrefixI 'False) U1 :+:
-       C1 ('MetaCons "Cons" 'PrefixI 'False)
+       C1 ('MetaCons ":>" 'PrefixI 'False)
         (S1 ('MetaSel 'Nothing
                 'NoSourceUnpackedness
                 'NoSourceStrictness
@@ -234,22 +234,23 @@ instance KnownNat n => Generic (Vec n a) where
                 'NoSourceStrictness
                 'DecidedLazy)
             (Rec0 (Vec (n-1) a))))
-  from Nil         = M1 (L1 (M1 U1))
-  from (Cons x xs) = M1 (R1 (M1 (M1 (K1 x) :*: M1 (K1 xs))))
+  from Nil       = M1 (L1 (M1 U1))
+  from (x :> xs) = M1 (R1 (M1 (M1 (K1 x) :*: M1 (K1 xs))))
   to (M1 g) = case compareSNat (SNat @n) (SNat @0) of
     SNatLE -> case leZero @n of
       Sub Dict -> Nil
     SNatGT -> case g of
-      R1 (M1 (M1 (K1 p) :*: M1 (K1 q))) -> Cons p q
+      R1 (M1 (M1 (K1 p) :*: M1 (K1 q))) -> p :> q
+      L1 _ -> error "Generic (Vec n a): not reachable"
 
 instance (KnownNat n, Typeable a, Data a) => Data (Vec n a) where
   gunfold k z _ = case compareSNat (SNat @n) (SNat @0) of
     SNatLE -> case leZero @n of
       Sub Dict -> z Nil
-    SNatGT -> k (k (z @(a -> Vec (n-1) a -> Vec n a) Cons))
-  toConstr Nil        = cNil
-  toConstr (Cons _ _) = cCons
-  dataTypeOf _        = tVec
+    SNatGT -> k (k (z @(a -> Vec (n-1) a -> Vec n a) (:>)))
+  toConstr Nil = cNil
+  toConstr (_ :> _) = cCons
+  dataTypeOf _ = tVec
 
   gfoldl
     :: (forall d b. Data d => c (d -> b) -> d -> c b)
@@ -269,12 +270,12 @@ cNil :: Constr
 cNil = mkConstr tVec "Nil" [] Prefix
 
 cCons :: Constr
-cCons = mkConstr tVec "Cons" [] Prefix
+cCons = mkConstr tVec ":>" [] Prefix
 
 instance NFData a => NFData (Vec n a) where
   rnf = foldl (\() -> rnf) ()
 
-{-# COMPLETE (:>)       #-}
+
 {-# COMPLETE Nil, (:>)  #-}
 -- | Add an element to the head of a vector.
 --
@@ -282,7 +283,7 @@ instance NFData a => NFData (Vec n a) where
 -- <3,4,5>
 -- >>> let x = 3 :> 4 :> 5 :> Nil
 -- >>> :t x
--- x :: Num a => Vec 3 a
+-- x :: Num b => Vec 3 b
 --
 -- Can be used as a pattern:
 --
@@ -301,17 +302,19 @@ instance NFData a => NFData (Vec n a) where
 -- >>> g (1 :> 2 :> 3 :> 4 :> 5 :> Nil)
 -- 12
 --
-pattern (:>)
+-- N.B.: Deprecated! Use (:>)
+pattern Cons
   :: forall m a
    . ()
   => forall n
    . ((n + 1) ~ m)
   => a -> Vec n a -> Vec m a
-pattern x :> xs = Cons x xs
+pattern Cons x xs = x :> xs
+{-# DEPRECATED Cons "Cons will be removed in Clash 1.4. Use :> instead." #-}
 
-infixr 5 :>
+infixr 5 `Cons`
 
-{-# COMPLETE (:<)       #-}
+
 {-# COMPLETE Nil, (:<)  #-}
 -- | Add an element to the tail of a vector.
 --
@@ -344,7 +347,7 @@ pattern (:<)
   => forall n
    . ((n + 1) ~ m)
   => Vec n a -> a -> Vec m a
-pattern xs :< x <- (snocPattern -> Cons x xs)
+pattern xs :< x <- (snocPattern -> x :> xs)
   where
     xs :< x = xs ++ singleton x
 
@@ -375,8 +378,8 @@ instance ShowX a => ShowX (Vec n a) where
           punc (x :> xs)  = \s -> showsX x (',':punc xs s)
 
 instance (KnownNat n, Eq a) => Eq (Vec n a) where
-  (==) Nil _            = True
-  (==) v1@(Cons _ _) v2 = fold (&&) (zipWith (==) v1 v2)
+  (==) Nil _ = True
+  (==) v1@(_ :> _) v2 = fold (&&) (zipWith (==) v1 v2)
 
 instance (KnownNat n, Ord a) => Ord (Vec n a) where
   compare x y = foldr f EQ $ zipWith compare x y
@@ -411,7 +414,7 @@ instance (KnownNat n, 1 <= n) => Traversable (Vec n) where
 {-# NOINLINE traverse# #-}
 traverse# :: forall a f b n . Applicative f => (a -> f b) -> Vec n a -> f (Vec n b)
 traverse# _ Nil       = pure Nil
-traverse# f (x :> xs) = Cons <$> f x <*> traverse# f xs
+traverse# f (x :> xs) = liftA2 (:>) (f x) (traverse# f xs)
 
 instance (Default a, KnownNat n) => Default (Vec n a) where
   def = repeat def
@@ -1380,7 +1383,7 @@ replace i y xs = replace_int xs (fromEnum i) y
 -- <interactive>:...
 --     • Couldn't match type ‘4 + n0’ with ‘2’
 --       Expected type: Vec (4 + n0) a
---         Actual type: Vec 2 a
+--         Actual type: Vec (1 + 1) a
 --       The type variable ‘n0’ is ambiguous
 --     • In the second argument of ‘take’, namely ‘(1 :> 2 :> Nil)’
 --       In the expression: take d4 (1 :> 2 :> Nil)
@@ -1577,7 +1580,7 @@ transpose = traverse# id
 --
 -- >>> let xs = (1:>2:>3:>4:>5:>6:>Nil)
 -- >>> :t xs
--- xs :: Num a => Vec 6 a
+-- xs :: Num b => Vec 6 b
 -- >>> :t stencil1d d2 sum xs
 -- stencil1d d2 sum xs :: Num b => Vec 5 b
 -- >>> stencil1d d2 sum xs
@@ -1599,7 +1602,7 @@ stencil1d stX f xs = map f (windows1d stX xs)
 --
 -- >>> let xss = ((1:>2:>3:>4:>Nil):>(5:>6:>7:>8:>Nil):>(9:>10:>11:>12:>Nil):>(13:>14:>15:>16:>Nil):>Nil)
 -- >>> :t xss
--- xss :: Num a => Vec 4 (Vec 4 a)
+-- xss :: Num b => Vec 4 (Vec 4 b)
 -- >>> :t stencil2d d2 d2 (sum . map sum) xss
 -- stencil2d d2 d2 (sum . map sum) xss :: Num b => Vec 3 (Vec 3 b)
 -- >>> stencil2d d2 d2 (sum . map sum) xss
@@ -1618,7 +1621,7 @@ stencil2d stY stX f xss = (map.map) f (windows2d stY stX xss)
 --
 -- >>> let xs = (1:>2:>3:>4:>5:>6:>Nil)
 -- >>> :t xs
--- xs :: Num a => Vec 6 a
+-- xs :: Num b => Vec 6 b
 -- >>> :t windows1d d2 xs
 -- windows1d d2 xs :: Num a => Vec 5 (Vec 2 a)
 -- >>> windows1d d2 xs
@@ -1640,7 +1643,7 @@ windows1d stX xs = map (take stX) (rotations xs)
 --
 -- >>> let xss = ((1:>2:>3:>4:>Nil):>(5:>6:>7:>8:>Nil):>(9:>10:>11:>12:>Nil):>(13:>14:>15:>16:>Nil):>Nil)
 -- >>> :t xss
--- xss :: Num a => Vec 4 (Vec 4 a)
+-- xss :: Num b => Vec 4 (Vec 4 b)
 -- >>> :t windows2d d2 d2 xss
 -- windows2d d2 d2 xss :: Num a => Vec 3 (Vec 3 (Vec 2 (Vec 2 a)))
 -- >>> windows2d d2 d2 xss
@@ -1957,7 +1960,7 @@ lazyV = lazyV' (repeat ())
 -- While the type of (':>') is:
 --
 -- >>> :t (:>)
--- (:>) :: a -> Vec n a -> Vec (n + 1) a
+-- (:>) :: b -> Vec n b -> Vec (n + 1) b
 --
 -- We thus need a @fold@ function that can handle the growing vector type:
 -- 'dfold'. Compared to 'foldr', 'dfold' takes an extra parameter, called the

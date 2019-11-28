@@ -293,8 +293,8 @@ caseElemNonReachable _ e = return e
 -- existential should be. For example, consider Vec:
 --
 --    data Vec :: Nat -> Type -> Type where
---      Nil       :: Vec 0 a
---      Cons x xs :: a -> Vec n a -> Vec (n + 1) a
+--      Nil  :: Vec 0 a
+--      (:>) :: a -> Vec n a -> Vec (n + 1) a
 --
 -- Thus, 'null' (annotated with existentials) could look like:
 --
@@ -302,7 +302,7 @@ caseElemNonReachable _ e = return e
 --    null v =
 --      case v of
 --        Nil  {n ~ 0}                                     -> True
---        Cons {n1:Nat} {n~n1+1} (x :: a) (xs :: Vec n1 a) -> False
+--        (:>) {n1:Nat} {n~n1+1} (x :: a) (xs :: Vec n1 a) -> False
 --
 -- When it's applied to a vector of length 5, this becomes:
 --
@@ -310,7 +310,7 @@ caseElemNonReachable _ e = return e
 --    null v =
 --      case v of
 --        Nil  {5 ~ 0}                                     -> True
---        Cons {n1:Nat} {5~n1+1} (x :: a) (xs :: Vec n1 a) -> False
+--        (:>) {n1:Nat} {5~n1+1} (x :: a) (xs :: Vec n1 a) -> False
 --
 -- This function solves 'n1' and replaces every occurrence with its solution. A
 -- very limited number of solutions are currently recognized: only adds (such
@@ -800,9 +800,9 @@ removeUnusedExpr _ e@(Case _ _ [(DataPat _ [] xs,altExpr)]) =
      else return e
 
 -- Replace any expression that creates a Vector of size 0 within the application
--- of the Cons constructor, by the Nil constructor.
+-- of the (:>) constructor, by the Nil constructor.
 removeUnusedExpr _ e@(collectArgsTicks -> (Data dc, [_,Right aTy,Right nTy,_,Left a,Left nil],ticks))
-  | nameOcc (dcName dc) == "Clash.Sized.Vector.Cons"
+  | nameOcc (dcName dc) == "Clash.Sized.Vector.:>"
   = do
     tcm <- Lens.view tcCache
     case runExcept (tyNatSize tcm nTy) of
@@ -2470,7 +2470,7 @@ xOptimizeMany _ _ _ [] =
 mkFieldSelector
   :: MonadUnique m
   => InScopeSet
-  -> Id 
+  -> Id
   -- ^ subject id
   -> DataCon
   -> [TyVar]
