@@ -26,21 +26,24 @@ test (fromInteger -> x) (fromInteger -> y) =
 
 topEntity :: (Integer, Integer) -> _
 topEntity (x,y) =
-  ( test @Integer x y
-  , test @Int x y
-  , test @Int8 x y
-  , test @Int16 x y
-  , test @Int32 x y
-  , test @Int64 x y
-  , test @Word x y
-  , test @Word8 x y
-  , test @Word16 x y
-  , test @Word32 x y
-  , test @Word64 x y
-  , test @(Signed 8) x y
-  , test @(Unsigned 8) x y
-  , test @(BitVector 8) x y
-  , test @(Index 128) (abs x) (abs y)
+  ( ( test @Integer x y
+    , test @Int x y
+    , test @Int8 x y
+    , test @Int16 x y
+    , test @Int32 x y
+    , test @Int64 x y
+    )
+  , ( test @Word x y
+    , test @Word8 x y
+    , test @Word16 x y
+    , test @Word32 x y
+    , test @Word64 x y
+    )
+  , ( test @(Signed 8) x y
+    , test @(Unsigned 8) x y
+    , test @(BitVector 8) x y
+    , test @(Index 128) (abs x) (abs y)
+    )
   )
 {-# NOINLINE topEntity #-}
 
@@ -60,9 +63,4 @@ deriving instance (Lift a, Lift b, Lift c, Lift d, Lift e, Lift f, Lift g, Lift 
       => Lift (a,b,c,d,e,f,g,h,i,j,k)
 deriving instance (Lift a, Lift b, Lift c, Lift d, Lift e, Lift f, Lift g, Lift h, Lift i, Lift j, Lift k, Lift l)
       => Lift (a,b,c,d,e,f,g,h,i,j,k,l)
-deriving instance (Lift a, Lift b, Lift c, Lift d, Lift e, Lift f, Lift g, Lift h, Lift i, Lift j, Lift k, Lift l, Lift m)
-      => Lift (a,b,c,d,e,f,g,h,i,j,k,l,m)
-deriving instance (Lift a, Lift b, Lift c, Lift d, Lift e, Lift f, Lift g, Lift h, Lift i, Lift j, Lift k, Lift l, Lift m, Lift n)
-      => Lift (a,b,c,d,e,f,g,h,i,j,k,l,m,n)
-deriving instance (Lift a, Lift b, Lift c, Lift d, Lift e, Lift f, Lift g, Lift h, Lift i, Lift j, Lift k, Lift l, Lift m, Lift n, Lift o)
-      => Lift (a,b,c,d,e,f,g,h,i,j,k,l,m,n,o)
+

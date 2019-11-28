@@ -200,21 +200,24 @@ bvSpecific = (r1,r2,r3,r4)
     r4 = (lit 22007 :: BitVector 16) ! 0
 
 fromIntegralConversions
-  = ( convertTo @Integer
-    , convertTo @Int
-    , convertTo @Int8
-    , convertTo @Int16
-    , convertTo @Int32
-    , convertTo @Int64
-    , convertTo @Word
-    , convertTo @Word8
-    , convertTo @Word16
-    , convertTo @Word32
-    , convertTo @Word64
-    , convertTo @(Signed 16)
-    , convertTo @(Unsigned 16)
-    , convertTo @(BitVector 16)
-    , convertTo @(Index 30000)
+  = ( ( convertTo @Integer
+      , convertTo @Int
+      , convertTo @Int8
+      , convertTo @Int16
+      , convertTo @Int32
+      , convertTo @Int64
+      )
+    , ( convertTo @Word
+      , convertTo @Word8
+      , convertTo @Word16
+      , convertTo @Word32
+      , convertTo @Word64
+      )
+    , ( convertTo @(Signed 16)
+      , convertTo @(Unsigned 16)
+      , convertTo @(BitVector 16)
+      , convertTo @(Index 30000)
+      )
     )
     where
       convertTo :: forall b. Num b => _
@@ -294,11 +297,6 @@ deriving instance (Lift a, Lift b, Lift c, Lift d, Lift e, Lift f, Lift g, Lift 
       => Lift (a,b,c,d,e,f,g,h,i,j,k)
 deriving instance (Lift a, Lift b, Lift c, Lift d, Lift e, Lift f, Lift g, Lift h, Lift i, Lift j, Lift k, Lift l)
       => Lift (a,b,c,d,e,f,g,h,i,j,k,l)
-deriving instance (Lift a, Lift b, Lift c, Lift d, Lift e, Lift f, Lift g, Lift h, Lift i, Lift j, Lift k, Lift l, Lift m)
-      => Lift (a,b,c,d,e,f,g,h,i,j,k,l,m)
-deriving instance (Lift a, Lift b, Lift c, Lift d, Lift e, Lift f, Lift g, Lift h, Lift i, Lift j, Lift k, Lift l, Lift m, Lift n)
-      => Lift (a,b,c,d,e,f,g,h,i,j,k,l,m,n)
-deriving instance (Lift a, Lift b, Lift c, Lift d, Lift e, Lift f, Lift g, Lift h, Lift i, Lift j, Lift k, Lift l, Lift m, Lift n, Lift o)
-      => Lift (a,b,c,d,e,f,g,h,i,j,k,l,m,n,o)
+
 deriving instance Lift Ordering
 
