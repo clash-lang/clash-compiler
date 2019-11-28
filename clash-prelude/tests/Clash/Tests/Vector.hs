@@ -103,9 +103,11 @@ tests = testGroup "Vector"
 
 middleL :: Vec (n + 2) a -> Vec n a
 middleL ((_ :> xs) :< _) = xs
+middleL _ = error "middleL: unreachable"
 
 middleR :: Vec (n + 2) a -> Vec n a
 middleR (_ :> (xs :< _)) = xs
+middleR _ = error "middleR: unreachable"
 
 issueEx1 :: (KnownNat n) => Vec n a -> Vec n a
 issueEx1 Nil         = Nil

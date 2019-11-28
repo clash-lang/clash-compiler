@@ -32,9 +32,7 @@ Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
 {-# OPTIONS_GHC -fplugin GHC.TypeLits.KnownNat.Solver #-}
 {-# OPTIONS_GHC -fplugin GHC.TypeLits.Normalise       #-}
 
-#if __GLASGOW_HASKELL__ <= 804
 {-# OPTIONS_GHC -fno-warn-incomplete-patterns -fno-warn-redundant-constraints #-}
-#endif
 
 {-# OPTIONS_HADDOCK show-extensions #-}
 
@@ -213,7 +211,6 @@ data Vec :: Nat -> Type -> Type where
   (:>) :: a -> Vec n a -> Vec (n + 1) a
 
 infixr 5 :>
-{-# COMPLETE (:>) #-}
 
 -- | In many cases, this Generic instance only allows generic
 -- functions/instances over vectors of at least size 1, due to the
@@ -278,7 +275,6 @@ cCons = mkConstr tVec ":>" [] Prefix
 instance NFData a => NFData (Vec n a) where
   rnf = foldl (\() -> rnf) ()
 
-{-# COMPLETE (:<)       #-}
 {-# COMPLETE Nil, (:<)  #-}
 -- | Add an element to the tail of a vector.
 --
