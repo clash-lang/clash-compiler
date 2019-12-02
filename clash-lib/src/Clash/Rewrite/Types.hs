@@ -90,6 +90,7 @@ data RewriteEnv
   { _dbgLevel       :: DebugLevel
   -- ^ Level at which we print debugging messages
   , _dbgTransformations :: Set.Set String
+  , _aggressiveXOpt :: Bool
   -- ^ Transformations to print debugging info for
   , _typeTranslator :: CustomReprs
                     -> TyConMap

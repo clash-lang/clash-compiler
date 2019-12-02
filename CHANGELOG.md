@@ -26,7 +26,7 @@
   * `Vec`'s `Cons` is gone in favor of `:>`. You can now use the actual constructor instead of a pattern to do pattern matches! See [#943](https://github.com/clash-lang/clash-compiler/pull/943).
 
 * New internal features:
-  * [#918](https://github.com/clash-lang/clash-compiler/pull/935): Add X-Optimization to normalization passes
+  * [#918](https://github.com/clash-lang/clash-compiler/pull/935): Add X-Optimization to normalization passes (-fclash-aggressive-x-optimization)
   * [#821](https://github.com/clash-lang/clash-compiler/pull/821): Add `DebugTry`: print name of all tried transformations, even if they didn't succeed
   * [#856](https://github.com/clash-lang/clash-compiler/pull/856): Add `-fclash-debug-transformations`: only print debug info for specific transformations
   * [#911](https://github.com/clash-lang/clash-compiler/pull/911): Add 'RenderVoid' option to blackboxes

@@ -2419,13 +2419,18 @@ separateArguments _ e = return e
 --
 xOptimize :: HasCallStack => NormRewrite
 xOptimize (TransformContext is0 _) e@(Case subj ty alts) = do
-  defPart <- partitionM (isPrimError . snd) alts
+  runXOpt <- Lens.view aggressiveXOpt
 
-  case defPart of
-    ([], _)    -> return e
-    (_, [])    -> changed (Prim "Clash.XException.errorX" (PrimInfo ty WorkConstant))
-    (_, [alt]) -> xOptimizeSingle is0 subj alt
-    (_, defs)  -> xOptimizeMany is0 subj ty defs
+  if runXOpt then do
+    defPart <- partitionM (isPrimError . snd) alts
+
+    case defPart of
+      ([], _)    -> return e
+      (_, [])    -> changed (Prim "Clash.XException.errorX" (PrimInfo ty WorkConstant))
+      (_, [alt]) -> xOptimizeSingle is0 subj alt
+      (_, defs)  -> xOptimizeMany is0 subj ty defs
+  else
+    return e
 
 xOptimize _ e = return e
 

@@ -70,5 +70,5 @@ getComponent (_, _, _, x) = x
 
 mainVHDL :: IO ()
 mainVHDL = do
-  netlist <- runToNetlistStage SVHDL [] testPath
+  netlist <- runToNetlistStage SVHDL id testPath
   mapM_ (assertNumTwiceInsts . getComponent) netlist

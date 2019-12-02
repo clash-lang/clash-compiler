@@ -5,6 +5,7 @@ import           Test.Tasty.Clash
 import           Test.Tasty.Clash.NetlistTest
 
 import           Clash.Prelude
+import           Clash.Driver.Types
 import           Clash.Netlist.Types
 
 data MaybeIntBool
@@ -38,18 +39,21 @@ testPath = "tests/shouldwork/XOptimization/ManyDefined.hs"
 getComponent :: (a, b, c, d) -> d
 getComponent (_, _, _, x) = x
 
+enableXOpt :: ClashOpts -> ClashOpts
+enableXOpt c = c { opt_aggressiveXOpt = True }
+
 mainVHDL :: IO ()
 mainVHDL = do
-  netlist <- runToNetlistStage SVHDL [] testPath
+  netlist <- runToNetlistStage SVHDL enableXOpt testPath
   mapM_ (assertOneAltPerDefined . getComponent) netlist
 
 mainVerilog :: IO ()
 mainVerilog = do
-  netlist <- runToNetlistStage SVerilog [] testPath
+  netlist <- runToNetlistStage SVerilog enableXOpt testPath
   mapM_ (assertOneAltPerDefined . getComponent) netlist
 
 mainSystemVerilog :: IO ()
 mainSystemVerilog = do
-  netlist <- runToNetlistStage SSystemVerilog [] testPath
+  netlist <- runToNetlistStage SSystemVerilog enableXOpt testPath
   mapM_ (assertOneAltPerDefined . getComponent) netlist
 

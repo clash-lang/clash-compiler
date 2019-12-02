@@ -1,6 +1,7 @@
 module OneDefinedDataPat where
 
 import Clash.Prelude
+import Clash.Driver.Types
 import Clash.Netlist.Types
 
 import Test.Tasty.Clash
@@ -27,18 +28,21 @@ testPath = "tests/shouldwork/XOptimization/OneDefinedDataPat.hs"
 getComponent :: (a, b, c, d) -> d
 getComponent (_, _, _, x) = x
 
+enableXOpt :: ClashOpts -> ClashOpts
+enableXOpt c = c { opt_aggressiveXOpt = True }
+
 mainVHDL :: IO ()
 mainVHDL = do
-  netlist <- runToNetlistStage SVHDL [] testPath
+  netlist <- runToNetlistStage SVHDL enableXOpt testPath
   mapM_ (assertNoMux . getComponent) netlist
 
 mainVerilog :: IO ()
 mainVerilog = do
-  netlist <- runToNetlistStage SVerilog [] testPath
+  netlist <- runToNetlistStage SVerilog enableXOpt testPath
   mapM_ (assertNoMux . getComponent) netlist
 
 mainSystemVerilog :: IO ()
 mainSystemVerilog = do
-  netlist <- runToNetlistStage SSystemVerilog [] testPath
+  netlist <- runToNetlistStage SSystemVerilog enableXOpt testPath
   mapM_ (assertNoMux . getComponent) netlist
 
