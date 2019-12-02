@@ -89,6 +89,10 @@ data ClashOpts = ClashOpts { opt_inlineLimit :: Int
                            -- * /Just (Just x)/: replace undefined's by /x/ in
                            -- the HDL
                            , opt_checkIDir   :: Bool
+                           , opt_aggressiveXOpt :: Bool
+                           -- ^ Enable aggressive X optimization, which may
+                           -- remove undefineds from generated HDL by replaced
+                           -- with defined alternatives.
                            }
 
 
@@ -117,6 +121,7 @@ defClashOpts
   , opt_ultra               = False
   , opt_forceUndefined      = Nothing
   , opt_checkIDir           = True
+  , opt_aggressiveXOpt      = False
   }
 
 -- | Information about the generated HDL between (sub)runs of the compiler

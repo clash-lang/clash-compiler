@@ -84,6 +84,7 @@ flagsClash r = [
   , defFlag "fclash-no-escaped-identifiers"      $ NoArg (liftEwM (setNoEscapedIds r))
   , defFlag "fclash-compile-ultra"               $ NoArg (liftEwM (setUltra r))
   , defFlag "fclash-force-undefined"             $ OptIntSuffix (setUndefined r)
+  , defFlag "fclash-aggressive-x-optimization"   $ NoArg (liftEwM (setAggressiveXOpt r))
   ]
 
 -- | Print deprecated flag warning
@@ -209,3 +210,7 @@ setUndefined _ (Just x) | x < 0 || x > 1 =
            " not in range [0,1]")
 setUndefined r iM =
   liftEwM (modifyIORef r (\c -> c {opt_forceUndefined = Just iM}))
+
+setAggressiveXOpt :: IORef ClashOpts -> IO ()
+setAggressiveXOpt r = modifyIORef r (\c -> c { opt_aggressiveXOpt = True })
+

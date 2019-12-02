@@ -117,6 +117,7 @@ runNormalization opts supply globals typeTrans reprs tcm tupTcm eval primMap rcs
     rwEnv     = RewriteEnv
                   (opt_dbgLevel opts)
                   (opt_dbgTransformations opts)
+                  (opt_aggressiveXOpt opts)
                   typeTrans
                   tcm
                   tupTcm

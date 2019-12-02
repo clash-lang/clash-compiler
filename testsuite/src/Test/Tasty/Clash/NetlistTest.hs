@@ -61,12 +61,11 @@ typeTrans
   -> State HWMap (Maybe (Either String FilteredHWType))
 typeTrans = ghcTypeToHWType WORD_SIZE_IN_BITS True
 
-mkClashOpts :: [FilePath] -> ClashOpts
-mkClashOpts idirs = defClashOpts
+mkClashOpts :: ClashOpts
+mkClashOpts = defClashOpts
   { opt_cachehdl     = False
   , opt_errorExtra   = True
   , opt_floatSupport = True
-  , opt_importPaths  = idirs
   }
 
 type family TargetToState (target :: BuildTarget) where
@@ -83,18 +82,17 @@ runToNetlistStage
   :: (Backend (TargetToState target))
   => SBuildTarget target
   -- ^ Singleton for the build target
-  -> [FilePath]
-  -- ^ Include dirs for imports / primitives
+  -> (ClashOpts -> ClashOpts)
+  -- ^ Function to modify the default clash options
   -> FilePath
   -- ^ Module to load
   -> IO [([Bool], SrcSpan, HashMap Identifier Word, Component)]
-runToNetlistStage target idirs src = do
+runToNetlistStage target f src = do
   pds <- primDirs backend
   (bm, tcm, tupTcm, tes, pm, rs)
-    <- generateBindings Auto pds idirs [] (hdlKind backend) src Nothing
+    <- generateBindings Auto pds (opt_importPaths opts) [] (hdlKind backend) src Nothing
 
-  let opts    = mkClashOpts idirs
-      teNames = fmap fstTriple tes
+  let teNames = fmap fstTriple tes
       te      = fstTriple (P.head tes)
       reprs   = buildCustomReprs rs
 
@@ -106,6 +104,7 @@ runToNetlistStage target idirs src = do
   fmap (force . fst) $ netlistFrom (transformedBindings, tcm, tes, pm, reprs, te)
  where
   backend = mkBackend target
+  opts = f mkClashOpts
 
   fstTriple (x, _, _) = x
 
@@ -113,7 +112,6 @@ runToNetlistStage target idirs src = do
     genNetlist False opts rs bm tes pm tcm typeTrans
       iw mkId1 extId ite (SomeBackend hdlSt) seen hdlDir prefixM te
    where
-    opts    = mkClashOpts idirs
     iw      = opt_intWidth opts
     teS     = Text.unpack . nameOcc $ varName te
     modN    = takeWhile (/= '.') teS
