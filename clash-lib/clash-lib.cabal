@@ -171,6 +171,8 @@ Library
                       Clash.Core.Pretty
                       Clash.Core.Subst
                       Clash.Core.Term
+                      Clash.Core.TermLiteral
+                      Clash.Core.TermLiteral.TH
                       Clash.Core.TyCon
                       Clash.Core.Type
                       Clash.Core.TysPrim
