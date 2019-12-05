@@ -1368,7 +1368,9 @@ mkTopUnWrapper topEntity annM man dstId args tickDecls = do
       result = ("result",snd dstId)
 
   instLabel0 <- extendIdentifier Basic topName ("_" `Text.append` fst dstId)
-  instLabel1 <- mkUniqueIdentifier Basic instLabel0
+  instLabel1 <- fromMaybe instLabel0 <$> Lens.view setName
+  instLabel2 <- affixName instLabel1
+  instLabel3 <- mkUniqueIdentifier Basic instLabel2
   topOutputM <- mkTopOutput topM (zip outNames outTys) (head oPortSupply) result
 
   let
@@ -1377,7 +1379,7 @@ mkTopUnWrapper topEntity annM man dstId args tickDecls = do
         Entity
         (Just topName)
         topName
-        instLabel1
+        instLabel3
         []
         ( map (\(p,i,t) -> (Identifier p Nothing,In, t,Identifier i Nothing)) (concat iports) ++
           map (\(p,o,t) -> (Identifier p Nothing,Out,t,Identifier o Nothing)) oports)
