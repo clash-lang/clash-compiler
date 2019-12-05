@@ -30,8 +30,9 @@ import           Data.IntMap                             (IntMap)
 import qualified Data.Primitive.ByteArray                as BA
 import qualified Data.Vector.Primitive                   as PV
 import           Data.Text                               (Text)
+import qualified Data.Text as Text
 import           Data.Text.Prettyprint.Doc
-import           Debug.Trace                             (trace)
+import           Debug.Trace
 import           GHC.Integer.GMP.Internals
   (Integer (..), BigNat (..))
 import           Clash.Core.DataCon
@@ -356,14 +357,20 @@ force :: Heap -> Stack -> Id -> Maybe State
 force (Heap gh g@(GPureHeap gbl) h ids is) k x' = case lookupVarEnv x' h of
     Nothing -> case lookupVarEnv x' gbl of
       Just e | isGlobalId x'
-        -> Just ( Heap gh (GPureHeap (delVarEnv gbl x')) h ids is
+        -> let e' = tickExpr e
+            in Just ( Heap gh (GPureHeap (delVarEnv gbl x')) h ids is
                 , GUpdate x':k
-                , deShadowTerm is e
+                , deShadowTerm is e'
                 )
       _ -> Nothing
-    Just e -> Just (Heap gh g (delVarEnv h x') ids is,Update x':k,e)
+    Just e -> let e' = tickExpr e
+               in Just (Heap gh g (delVarEnv h x') ids is,Update x':k,e')
     -- Removing the heap-bound value on a force ensures we do not get stuck on
     -- expressions such as: "let x = x in x"
+ where
+  tickExpr = Tick (NameMod PrefixName (LitTy . SymTy $ toStr x'))
+  unQualName = snd . Text.breakOnEnd "."
+  toStr = Text.unpack . unQualName . flip Text.snoc '_' . nameOcc . varName
 
 -- | Unwind the stack by 1
 unwind

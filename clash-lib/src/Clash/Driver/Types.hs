@@ -27,10 +27,15 @@ import           Clash.Core.VarEnv              (VarEnv)
 
 import           Clash.Netlist.BlackBox.Types   (HdlSyn (..))
 
+
+-- A function binder in the global environment.
+--
+type Binding = (Id, SrcSpan, InlineSpec, Term)
+
 -- | Global function binders
 --
--- Global functions cannot be mutually recursive, only self-recursive
-type BindingMap = VarEnv (Id,SrcSpan,InlineSpec,Term)
+-- Global functions cannot be mutually recursive, only self-recursive.
+type BindingMap = VarEnv Binding
 
 -- | Debug Message Verbosity
 data DebugLevel

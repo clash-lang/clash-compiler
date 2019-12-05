@@ -90,7 +90,7 @@ import           Clash.Annotations.Primitive (extractPrim)
 import           Clash.Core.DataCon          (DataCon (..))
 import           Clash.Core.Evaluator        (PureHeap, whnf')
 import           Clash.Core.Name
-  (Name (..), NameSort (..), mkUnsafeSystemName)
+  (Name (..), NameSort (..), mkUnsafeSystemName, nameOcc)
 import           Clash.Core.FreeVars
   (localIdOccursIn, localIdsDoNotOccurIn, freeLocalIds, termFreeTyVars, typeFreeVars, localVarsDoNotOccurIn)
 import           Clash.Core.Literal          (Literal (..))
@@ -99,9 +99,11 @@ import           Clash.Core.Subst
   (substTm, mkSubst, extendIdSubst, extendIdSubstList, extendTvSubst,
    extendTvSubstList, freshenTm, substTyInVar, deShadowTerm)
 import           Clash.Core.Term
-  (LetBinding, Pat (..), Term (..), CoreContext (..), PrimInfo (..), TickInfo(..), WorkInfo(WorkConstant), Alt,
-   isLambdaBodyCtx, isTickCtx, collectArgs, collectArgsTicks, collectTicks,
-   partitionTicks)
+  ( LetBinding, Pat (..), Term (..), CoreContext (..), PrimInfo (..)
+  , TickInfo(..) , WorkInfo(WorkConstant), Alt, TickInfo
+  , isLambdaBodyCtx, isTickCtx, collectArgs
+  , collectArgsTicks, collectTicks , partitionTicks
+  )
 import           Clash.Core.Type             (Type, TypeView (..), applyFunTy,
                                               isPolyFunCoreTy, isClassTy,
                                               normalizeType, splitFunForallTy,
@@ -377,18 +379,18 @@ inlineNonRep (TransformContext localScope _) e@(Case scrut altsTy alts)
     let scrutTy = termType tcm scrut
         noException = not (exception tcm scrutTy)
     if noException && (Maybe.fromMaybe 0 isInlined) > limit
-      then do
-        traceIf True (concat [$(curLoc) ++ "InlineNonRep: " ++ showPpr (varName f)
-                             ," already inlined " ++ show limit ++ " times in:"
-                             , showPpr (varName cf)
-                             , "\nType of the subject is: " ++ showPpr scrutTy
-                             , "\nFunction " ++ showPpr (varName cf)
-                             , " will not reach a normal form, and compilation"
-                             , " might fail."
-                             , "\nRun with '-fclash-inline-limit=N' to increase"
-                             , " the inlining limit to N."
-                             ])
-                     (return e)
+      then
+        trace (concat [ $(curLoc) ++ "InlineNonRep: " ++ showPpr (varName f)
+                      ," already inlined " ++ show limit ++ " times in:"
+                      , showPpr (varName cf)
+                      , "\nType of the subject is: " ++ showPpr scrutTy
+                      , "\nFunction " ++ showPpr (varName cf)
+                      , " will not reach a normal form, and compilation"
+                      , " might fail."
+                      , "\nRun with '-fclash-inline-limit=N' to increase"
+                      , " the inlining limit to N."
+                      ])
+              (return e)
       else do
         bodyMaybe   <- lookupVarEnv f <$> Lens.use bindings
         nonRepScrut <- not <$> (representableType <$> Lens.view typeTranslator
@@ -399,9 +401,14 @@ inlineNonRep (TransformContext localScope _) e@(Case scrut altsTy alts)
         case (nonRepScrut, bodyMaybe) of
           (True,Just (_,_,_,scrutBody0)) -> do
             Monad.when noException (zoomExtra (addNewInline f cf))
+
             -- See Note [AppProp no-shadow invariant]
             let scrutBody1 = deShadowTerm localScope scrutBody0
-            changed $ Case (mkApps (mkTicks scrutBody1 ticks) args) altsTy alts
+            let scrutBody2 = mkTicks scrutBody1 (mkInlineTick f : ticks)
+            let scrutBody3 = mkApps scrutBody2 args
+
+            changed $ Case scrutBody3 altsTy alts
+
           _ -> return e
   where
     exception = isClassTy
@@ -706,7 +713,7 @@ nonRepANF _ e = return e
 -- the body is a variable-reference.
 topLet :: HasCallStack => NormRewrite
 topLet (TransformContext is0 ctx) e
-  | all (\c -> isLambdaBodyCtx c || isTickCtx c) ctx && not (isLet e)
+  | all (\c -> isLambdaBodyCtx c || isTickCtx c) ctx && not (isLet e) && not (isTick e)
   = do
   untranslatable <- isUntranslatable False e
   if untranslatable
@@ -714,6 +721,9 @@ topLet (TransformContext is0 ctx) e
     else do tcm <- Lens.view tcCache
             argId <- mkTmBinderFor is0 tcm (mkUnsafeSystemName "result" 0) e
             changed (Letrec [(argId, e)] (Var argId))
+ where
+  isTick Tick{} = True
+  isTick _ = False
 
 topLet (TransformContext is0 ctx) e@(Letrec binds body)
   | all (\c -> isLambdaBodyCtx c || isTickCtx c) ctx
@@ -968,8 +978,11 @@ inlineWorkFree (TransformContext localScope _) e@(collectArgsTicks -> (Var f,arg
             if isRecBndr
                then return e
                else do
-                 -- See Note [AppProp no-shadow invariant]
-                 changed (mkApps (mkTicks (deShadowTerm localScope body) ticks) args)
+                 let tm0 = deShadowTerm localScope body
+                 let tm1 = mkTicks tm0 (mkInlineTick f : ticks)
+
+                 changed $ mkApps tm1 args
+
           _ -> return e
   where
     -- an expression is has work when it contains free local variables,
@@ -1025,8 +1038,13 @@ inlineSmall (TransformContext localScope _) e@(collectArgsTicks -> (Var f,args,t
           if not isRecBndr && inl /= NoInline && termSize body < sizeLimit
              then do
                -- See Note [AppProp no-shadow invariant]
-               changed (mkApps (mkTicks (deShadowTerm localScope body) ticks) args)
+               let tm0 = deShadowTerm localScope body
+               let tm1 = mkTicks tm0 (mkInlineTick f : ticks)
+
+               changed $ mkApps tm1 args
+
              else return e
+
         _ -> return e
 
 inlineSmall _ e = return e
@@ -1690,7 +1708,7 @@ recToLetRec (TransformContext is0 []) e = do
     -- corresponding (sub)field from the target variable.
     --
     -- TODO: See [Note: Breaks on constants and predetermined equality]
-    eqApp tcm v args (collectArgs -> (Var v',args'))
+    eqApp tcm v args (collectArgs . stripTicks -> (Var v',args'))
       | isGlobalId v'
       , v == v'
       , let args2 = Either.lefts args'
@@ -1698,9 +1716,9 @@ recToLetRec (TransformContext is0 []) e = do
       = and (zipWith (eqArg tcm) args args2)
     eqApp _ _ _ _ = False
 
-    eqArg _ v1 v2@(Var {})
+    eqArg _ v1 v2@(stripTicks -> Var {})
       = v1 == v2
-    eqArg tcm v1 v2@(collectArgs -> (Data _, args'))
+    eqArg tcm v1 v2@(collectArgs . stripTicks -> (Data _, args'))
       | let t1 = termType tcm v1
       , let t2 = termType tcm v2
       , t1 == t2
@@ -1733,7 +1751,7 @@ recToLetRec (TransformContext is0 []) e = do
     --     construction of `y` with `(fst x, fst x)`.
     --
     eqDat :: Term -> [Int] -> Term -> Bool
-    eqDat v fTrace (collectArgs -> (Data _, args)) =
+    eqDat v fTrace (collectArgs . stripTicks -> (Data _, args)) =
       and (zipWith (eqDat v) (map (:fTrace) [0..]) (Either.lefts args))
     eqDat v1 fTrace v2 =
       case stripProjection (reverse fTrace) v1 v2 of
