@@ -106,6 +106,7 @@ runClashTest = defaultMain $ clashTestRoot
 #endif
         , runTest "NameInstance" def{hdlSim=False}
         , outputTest ("tests" </> "shouldwork" </> "Basic") allTargets [] [] "NameInstance" "main"
+        , outputTest ("tests" </> "shouldwork" </> "Basic") [VHDL] [] [] "SetName" "main"
         , runTest "NameOverlap" def{
             entities=Entities ["nameoverlap"]
           , topEntity=TopEntity "nameoverlap"
