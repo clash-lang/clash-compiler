@@ -19,8 +19,6 @@
 
 module Clash.Normalize where
 
-import Data.Either
-
 import           Control.Concurrent.Supply        (Supply)
 import           Control.Lens                     ((.=),(^.),_1,_4)
 import qualified Control.Lens                     as Lens
@@ -49,6 +47,7 @@ import           Clash.Annotations.BitRepresentation.Internal
 import           Clash.Core.Evaluator             (PrimEvaluator)
 import           Clash.Core.FreeVars
   (freeLocalIds, globalIds, globalIdOccursIn, localIdDoesNotOccurIn)
+import           Clash.Core.Name (nameOcc) -- TODO
 import           Clash.Core.Pretty                (showPpr, ppr)
 import           Clash.Core.Subst
   (deShadowTerm, extendGblSubstList, mkSubst, substTm)
@@ -63,7 +62,7 @@ import           Clash.Core.VarEnv
    extendVarEnv, lookupVarEnv, mapVarEnv, mapMaybeVarEnv, mkInScopeSet,
    mkVarEnv, mkVarSet, notElemVarEnv, notElemVarSet, nullVarEnv, unionVarEnv)
 import           Clash.Driver.Types
-  (BindingMap, ClashOpts (..), DebugLevel (..))
+  (BindingMap, Binding, ClashOpts (..), DebugLevel (..))
 import           Clash.Netlist.Types
   (HWType (..), HWMap, FilteredHWType(..))
 import           Clash.Netlist.Util
@@ -233,8 +232,12 @@ cleanupGraph topEntity norm
        return (mkVarEnv $ snd $ callTreeToList [] ctFlat)
 cleanupGraph _ norm = return norm
 
-data CallTree = CLeaf   (Id,(Id,SrcSpan,InlineSpec,Term))
-              | CBranch (Id,(Id,SrcSpan,InlineSpec,Term)) [CallTree]
+-- | A tree of identifiers and their bindings, with branches containing
+-- additional bindings which are used. See "Clash.Driver.Types.Binding".
+--
+data CallTree
+  = CLeaf   (Id, Binding)
+  | CBranch (Id, Binding) [CallTree]
 
 mkCallTree
   :: [Id]

@@ -104,6 +104,7 @@ runClashTest = defaultMain $ clashTestRoot
 #ifdef CLASH_MULTIPLE_HIDDEN
         , runTest "MultipleHidden" def
 #endif
+        , outputTest ("tests" </> "shouldwork" </> "Basic") allTargets [] [] "NameInlining" "main"
         , runTest "NameInstance" def{hdlSim=False}
         , outputTest ("tests" </> "shouldwork" </> "Basic") allTargets [] [] "NameInstance" "main"
         , outputTest ("tests" </> "shouldwork" </> "Basic") [VHDL] [] [] "SetName" "main"

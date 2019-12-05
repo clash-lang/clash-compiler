@@ -29,6 +29,7 @@ module Clash.Normalize.Util
  , normalizeTopLvlBndr
  , rewriteExpr
  , removedTm
+ , mkInlineTick
  )
  where
 
@@ -40,19 +41,21 @@ import qualified Data.List               as List
 import qualified Data.Map                as Map
 import qualified Data.HashMap.Strict     as HashMapS
 import           Data.Text               (Text)
+import qualified Data.Text as Text
 
 import           BasicTypes              (InlineSpec)
 
 import           Clash.Annotations.Primitive (extractPrim)
 import           Clash.Core.FreeVars
   (globalIds, hasLocalFreeVars, globalIdOccursIn)
+import           Clash.Core.Name         (Name(nameOcc))
 import           Clash.Core.Pretty       (showPpr)
 import           Clash.Core.Subst        (deShadowTerm)
 import           Clash.Core.Term
   (Context, CoreContext(AppArg), PrimInfo (..), Term (..), WorkInfo (..),
-   TickInfo, collectArgs, collectArgsTicks)
+   TickInfo(NameMod), NameMod(PrefixName), collectArgs, collectArgsTicks)
 import           Clash.Core.TyCon        (TyConMap)
-import           Clash.Core.Type         (Type, undefinedTy)
+import           Clash.Core.Type         (Type(LitTy), LitTy(SymTy), undefinedTy)
 import           Clash.Core.Util
   (isClockOrReset, isPolyFun, termType, mkApps, mkTicks)
 import           Clash.Core.Var          (Id, Var (..), isGlobalId)
@@ -432,3 +435,20 @@ removedTm
   -> Term
 removedTm =
   TyApp (Prim "Clash.Transformations.removedArg" (PrimInfo undefinedTy WorkNever))
+
+-- | A tick to prefix an inlined expression with it's original name.
+-- For example, given
+--
+--     foo = bar  -- ...
+--     bar = baz  -- ...
+--     baz = quuz -- ...
+--
+-- if bar is inlined into foo, then the name of the component should contain
+-- the name of the inlined component. This tick ensures that the component in
+-- foo is called bar_baz instead of just baz.
+--
+mkInlineTick :: Id -> TickInfo
+mkInlineTick n = NameMod PrefixName (LitTy . SymTy $ toStr n)
+ where
+  toStr = Text.unpack . snd . Text.breakOnEnd "." . nameOcc . varName
+

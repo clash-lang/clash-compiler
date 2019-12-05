@@ -70,13 +70,13 @@ import           Clash.Core.Subst
    extendInScopeIdList, mkSubst, substTm)
 import           Clash.Core.Term
   (Alt, LetBinding, Pat (..), Term (..), TickInfo (..), NameMod (..),
-   collectArgsTicks)
+   collectArgsTicks, collectTicks)
 import           Clash.Core.TyCon
   (TyConName, TyConMap, tyConDataCons)
 import           Clash.Core.Type         (Type (..), TypeView (..),
                                           coreView1, splitTyConAppM, tyView, TyVar)
 import           Clash.Core.Util
-  (collectBndrs, stripTicks, substArgTys, termType, tyLitShow)
+  (collectBndrs, stripTicks, substArgTys, termType, tyLitShow, mkTicks)
 import           Clash.Core.Var
   (Id, Var (..), mkLocalId, modifyVarName, Attr')
 import           Clash.Core.VarEnv
@@ -129,9 +129,9 @@ splitNormalized
   -> Term
   -> (Either String ([Id],[LetBinding],Id))
 splitNormalized tcm expr = case collectBndrs expr of
-  (args,Letrec xes e)
+  (args, collectTicks -> (Letrec xes e, ticks))
     | (tmArgs,[]) <- partitionEithers args -> case stripTicks e of
-        Var v -> Right (tmArgs,xes,v)
+        Var v -> Right (tmArgs, fmap (second (`mkTicks` ticks)) xes,v)
         _     -> Left ($(curLoc) ++ "Not in normal form: res not simple var")
     | otherwise -> Left ($(curLoc) ++ "Not in normal form: tyArgs")
   _ ->
