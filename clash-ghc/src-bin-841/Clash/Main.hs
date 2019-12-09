@@ -160,7 +160,7 @@ defaultMain = flip withArgs $ do
                    ShowSupportedExtensions   -> showSupportedExtensions
                    ShowVersion               -> showVersion
                    ShowNumVersion            -> putStrLn cProjectVersion
-                   ShowOptions isInteractive -> showOptions isInteractive
+                   ShowOptions isInteractive -> showOptions isInteractive r
         Right postStartupMode ->
             -- start our GHC session
             GHC.runGhc (Just libDir) $ do
@@ -838,12 +838,13 @@ showVersion = putStrLn $ concat [ "Clash, version "
                                 , ")"
                                 ]
 
-showOptions :: Bool -> IO ()
-showOptions isInteractive = putStr (unlines availableOptions)
+showOptions :: Bool -> IORef ClashOpts -> IO ()
+showOptions isInteractive = putStr . unlines . availableOptions
     where
-      availableOptions = concat [
-        flagsForCompletion isInteractive,
-        map ('-':) (getFlagNames mode_flags)
+      availableOptions opts = concat
+        [ flagsForCompletion isInteractive
+        , map ('-':) (getFlagNames mode_flags)
+        , map ('-':) (getFlagNames (flagsClash opts))
         ]
       getFlagNames opts         = map flagName opts
 

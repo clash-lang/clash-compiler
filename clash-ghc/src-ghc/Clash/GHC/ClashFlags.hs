@@ -11,6 +11,7 @@
 
 module Clash.GHC.ClashFlags
   ( parseClashFlags
+  , flagsClash
   )
 where
 
