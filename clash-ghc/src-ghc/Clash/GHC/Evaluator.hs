@@ -1085,10 +1085,16 @@ reduceConstant isSubj tcm h k nm pInfo tys args = case nm of
     | [Lit (IntLiteral i), Lit (IntLiteral j)] <- args
     -> reduce (integerToIntLiteral $ i ^ j)
 
-  -- XXX: Very fragile. /$s^_f/ is a specialized version of ^_f. That means that
-  -- it is type applied to some specific type.
-  "Data.Singletons.TypeLits.Internal.$s^_f"
-    | Just (i,j) <- naturalLiterals args
+  -- Type level ^    -- XXX: Very fragile
+  -- These is are specialized versions of ^_f, named by some combination of ghc and singletons.
+  "Data.Singletons.TypeLits.Internal.$s^_f"            -- ghc-8.4.4, singletons-2.4.1
+    | [i,j] <- naturalLiterals' args
+    -> reduce (Literal (NaturalLiteral (i ^ j)))
+  "Data.Singletons.TypeLits.Internal.$fSingI->^@#@$_f" -- ghc-8.6.5, singletons-2.5.1
+    | [i,j] <- naturalLiterals' args
+    -> reduce (Literal (NaturalLiteral (i ^ j)))
+  "Data.Singletons.TypeLits.Internal.%^_f"             -- ghc-8.8.1, singletons-2.6
+    | [i,j] <- naturalLiterals' args
     -> reduce (Literal (NaturalLiteral (i ^ j)))
 
   "GHC.TypeLits.natVal"

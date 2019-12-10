@@ -332,6 +332,7 @@ runClashTest = defaultMain $ clashTestRoot
         ]
       , clashTestGroup "Types"
         [ runTest "TypeFamilyReduction" def{hdlSim=False}
+        , runTest "NatExp" def{hdlSim=False}
         ]
       , clashTestGroup "TopEntity"
         -- VHDL tests disabled for now: I can't figure out how to generate a static name whilst retaining the ability to actually test..
