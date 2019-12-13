@@ -335,7 +335,6 @@ test-suite unittests
       clash-prelude,
 
       ghc-typelits-knownnat,
-      ghc-typelits-natnormalise,
 
       base,
       hint          >= 0.7      && < 0.10,
@@ -353,7 +352,6 @@ test-suite unittests
                  Clash.Tests.Signal
                  Clash.Tests.NFDataX
                  Clash.Tests.TopEntityGeneration
-                 Clash.Tests.Vector
 
 
 benchmark benchmark-clash-prelude

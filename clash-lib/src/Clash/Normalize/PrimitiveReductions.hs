@@ -311,7 +311,7 @@ reduceTraverse (TransformContext is0 ctx) n aTy fTy bTy dict fun arg = do
 -- > (:>) <$> x0 <*> ((:>) <$> x1 <*> pure Nil)
 mkTravVec :: TyConName -- ^ Vec tcon
           -> DataCon   -- ^ Nil con
-          -> DataCon   -- ^ :> con
+          -> DataCon   -- ^ Cons con
           -> Term      -- ^ 'pure' term
           -> Term      -- ^ '<*>' term
           -> Term      -- ^ 'fmap' term

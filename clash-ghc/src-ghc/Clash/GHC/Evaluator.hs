@@ -3691,7 +3691,7 @@ mkIndexLit' (rTy,nTy,kn) = mkIndexLit rTy nTy kn
 -- | Create a vector of supplied elements
 mkVecCons
   :: DataCon
-  -- ^ The (:>) constructor
+  -- ^ The Cons (:>) constructor
   -> Type
   -- ^ Element type
   -> Integer

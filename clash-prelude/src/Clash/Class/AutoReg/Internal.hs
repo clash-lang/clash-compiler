@@ -17,7 +17,7 @@
 {-# LANGUAGE ViewPatterns         #-}
 
 #if __GLASGOW_HASKELL__ < 806
-{-# OPTIONS_GHC -fno-warn-unused-pattern-binds #-}
+{-# OPTIONS_GHC -Wwarn=unused-pattern-binds #-}
 #endif
 
 module Clash.Class.AutoReg.Internal
