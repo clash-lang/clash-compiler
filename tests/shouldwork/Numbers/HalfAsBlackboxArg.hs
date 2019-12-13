@@ -9,7 +9,7 @@ g :: KnownNat n => Vec n Half -> Half
 g v =
   case v of
     Nil -> Half 5
-    a :> as -> a
+    Cons a as -> a
 
 topEntity =
   ( g (replicate d3 (Half 7))
