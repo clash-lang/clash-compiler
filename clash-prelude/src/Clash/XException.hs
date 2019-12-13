@@ -285,16 +285,13 @@ instance (ShowX a, ShowX b, ShowX c, ShowX d, ShowX e) => ShowX (a,b,c,d,e)
 instance (ShowX a, ShowX b, ShowX c, ShowX d, ShowX e, ShowX f) => ShowX (a,b,c,d,e,f)
 instance (ShowX a, ShowX b, ShowX c, ShowX d, ShowX e, ShowX f, ShowX g) => ShowX (a,b,c,d,e,f,g)
 
--- Show is defined up to 15-tuples, but GHC.Generics only has Generic instances
+-- Show is defined up to 12-tuples, but GHC.Generics only has Generic instances
 -- up to 7-tuples, hence we need these orphan instances.
 deriving instance Generic ((,,,,,,,) a b c d e f g h)
 deriving instance Generic ((,,,,,,,,) a b c d e f g h i)
 deriving instance Generic ((,,,,,,,,,) a b c d e f g h i j)
 deriving instance Generic ((,,,,,,,,,,) a b c d e f g h i j k)
 deriving instance Generic ((,,,,,,,,,,,) a b c d e f g h i j k l)
-deriving instance Generic ((,,,,,,,,,,,,) a b c d e f g h i j k l m)
-deriving instance Generic ((,,,,,,,,,,,,,) a b c d e f g h i j k l m n)
-deriving instance Generic ((,,,,,,,,,,,,,,) a b c d e f g h i j k l m n o)
 
 instance (ShowX a, ShowX b, ShowX c, ShowX d, ShowX e, ShowX f, ShowX g, ShowX h) => ShowX (a,b,c,d,e,f,g,h)
 instance (ShowX a, ShowX b, ShowX c, ShowX d, ShowX e, ShowX f, ShowX g, ShowX h, ShowX i) => ShowX (a,b,c,d,e,f,g,h,i)
@@ -304,15 +301,6 @@ instance (ShowX a, ShowX b, ShowX c, ShowX d, ShowX e, ShowX f, ShowX g, ShowX h
   => ShowX (a,b,c,d,e,f,g,h,i,j,k)
 instance (ShowX a, ShowX b, ShowX c, ShowX d, ShowX e, ShowX f, ShowX g, ShowX h, ShowX i, ShowX j, ShowX k, ShowX l)
   => ShowX (a,b,c,d,e,f,g,h,i,j,k,l)
-instance (ShowX a, ShowX b, ShowX c, ShowX d, ShowX e, ShowX f, ShowX g, ShowX h, ShowX i, ShowX j, ShowX k, ShowX l
-         ,ShowX m)
-  => ShowX (a,b,c,d,e,f,g,h,i,j,k,l,m)
-instance (ShowX a, ShowX b, ShowX c, ShowX d, ShowX e, ShowX f, ShowX g, ShowX h, ShowX i, ShowX j, ShowX k, ShowX l
-         ,ShowX m, ShowX n)
-  => ShowX (a,b,c,d,e,f,g,h,i,j,k,l,m,n)
-instance (ShowX a, ShowX b, ShowX c, ShowX d, ShowX e, ShowX f, ShowX g, ShowX h, ShowX i, ShowX j, ShowX k, ShowX l
-         ,ShowX m, ShowX n, ShowX o)
-  => ShowX (a,b,c,d,e,f,g,h,i,j,k,l,m,n,o)
 
 instance {-# OVERLAPPABLE #-} ShowX a => ShowX [a] where
   showsPrecX _ = showListX
