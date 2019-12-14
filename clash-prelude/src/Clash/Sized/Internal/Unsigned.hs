@@ -77,6 +77,8 @@ module Clash.Sized.Internal.Unsigned
   )
 where
 
+import Prelude hiding                 (even, odd)
+
 import Control.DeepSeq                (NFData (..))
 import Control.Lens                   (Index, Ixed (..), IxValue)
 import Data.Bits                      (Bits (..), FiniteBits (..))
@@ -97,6 +99,7 @@ import Test.QuickCheck.Arbitrary      (Arbitrary (..), CoArbitrary (..),
 import Clash.Class.BitPack            (BitPack (..), packXWith)
 import Clash.Class.Num                (ExtendingNum (..), SaturatingNum (..),
                                        SaturationMode (..))
+import Clash.Class.Parity             (Parity (..))
 import Clash.Class.Resize             (Resize (..))
 import Clash.Prelude.BitIndex         ((!), msb, replaceBit, split)
 import Clash.Prelude.BitReduction     (reduceOr)
@@ -332,6 +335,10 @@ rem# (U i) (U j) = U (i `rem` j)
 {-# NOINLINE toInteger# #-}
 toInteger# :: Unsigned n -> Integer
 toInteger# (U i) = i
+
+instance KnownNat n => Parity (Unsigned n) where
+  even = even . pack
+  odd = odd . pack
 
 instance KnownNat n => Bits (Unsigned n) where
   (.&.)             = and#

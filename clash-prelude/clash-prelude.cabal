@@ -150,6 +150,7 @@ Library
                       Clash.Class.HasDomain.CodeGen
                       Clash.Class.HasDomain.Common
                       Clash.Class.Num
+                      Clash.Class.Parity
                       Clash.Class.Resize
 
                       Clash.Clocks

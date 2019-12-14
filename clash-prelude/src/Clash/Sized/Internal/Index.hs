@@ -77,6 +77,8 @@ module Clash.Sized.Internal.Index
   )
 where
 
+import Prelude hiding             (even, odd)
+
 import Control.DeepSeq            (NFData (..))
 import Data.Bits                  (Bits (..), FiniteBits (..))
 import Data.Data                  (Data)
@@ -98,6 +100,7 @@ import Test.QuickCheck.Arbitrary  (Arbitrary (..), CoArbitrary (..),
 import Clash.Class.BitPack        (BitPack (..), packXWith)
 import Clash.Class.Num            (ExtendingNum (..), SaturatingNum (..),
                                    SaturationMode (..))
+import Clash.Class.Parity         (Parity (..))
 import Clash.Class.Resize         (Resize (..))
 import Clash.Prelude.BitIndex     (replaceBit)
 import {-# SOURCE #-} Clash.Sized.Internal.BitVector (BitVector (BV), high, low, undefError)
@@ -351,6 +354,10 @@ quot#,rem# :: Index n -> Index n -> Index n
 {-# NOINLINE toInteger# #-}
 toInteger# :: Index n -> Integer
 toInteger# (I n) = n
+
+instance (KnownNat n, 1 <= n) => Parity (Index n) where
+  even = even . pack
+  odd = odd . pack
 
 instance (KnownNat n, 1 <= n) => Bits (Index n) where
   a .&. b           = unpack# $ BV.and# (pack# a) (pack# b)
