@@ -85,6 +85,8 @@ module Clash.Sized.Internal.Signed
   )
 where
 
+import Prelude hiding                 (odd, even)
+
 import Control.DeepSeq                (NFData (..))
 import Control.Lens                   (Index, Ixed (..), IxValue)
 import Data.Bits                      (Bits (..), FiniteBits (..))
@@ -104,6 +106,7 @@ import Test.QuickCheck.Arbitrary      (Arbitrary (..), CoArbitrary (..),
 import Clash.Class.BitPack            (BitPack (..), packXWith)
 import Clash.Class.Num                (ExtendingNum (..), SaturatingNum (..),
                                        SaturationMode (..))
+import Clash.Class.Parity             (Parity (..))
 import Clash.Class.Resize             (Resize (..))
 import Clash.Prelude.BitIndex         ((!), msb, replaceBit, split)
 import Clash.Prelude.BitReduction     (reduceAnd, reduceOr)
@@ -355,6 +358,10 @@ mod# (S a) (S b) = S (a `mod` b)
 {-# NOINLINE toInteger# #-}
 toInteger# :: Signed n -> Integer
 toInteger# (S n) = n
+
+instance KnownNat n => Parity (Signed n) where
+  even = even . pack
+  odd = odd . pack
 
 instance KnownNat n => Bits (Signed n) where
   (.&.)             = and#

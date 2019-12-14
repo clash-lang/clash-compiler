@@ -2,6 +2,9 @@
 
 ## 1.1.0
 * New features (API):
+  * `Clash.Class.Parity` type class replaces Prelude `odd` and `even` functions due
+    to assumptions that don't hold for Clash specific numerical types, see
+    [#970](https://github.com/clash-lang/clash-compiler/pull/970).
   * `NFDataX.ensureSpine`, see [#748](https://github.com/clash-lang/clash-compiler/pull/803)
   * `makeTopEntity` Template Haskell function for generating TopEntity annotations
     intended to cover the majority of use cases. Generation failures should either
