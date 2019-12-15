@@ -280,7 +280,7 @@ times# (I a) (I b) = I (a * b)
 
 instance (KnownNat n, 1 <= n) => SaturatingNum (Index n) where
   satAdd SatWrap !a !b =
-    case snatToNum @Int (SNat @n) of
+    case snatToNum @Integer (SNat @n) of
       1 -> fromInteger# 0
       _ -> leToPlusKN @1 @n $
         case plus# a b of
@@ -311,7 +311,7 @@ instance (KnownNat n, 1 <= n) => SaturatingNum (Index n) where
        else a -# b
 
   satMul SatWrap !a !b =
-    case snatToNum @Int (SNat @n) of
+    case snatToNum @Integer (SNat @n) of
       1 -> fromInteger# 0
       _ -> leToPlusKN @1 @n $
         case times# a b of
