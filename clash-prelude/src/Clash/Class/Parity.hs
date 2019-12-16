@@ -89,12 +89,9 @@ instance Parity Word32 where
   even = even . pack
   odd = odd . pack
 
-
-#if WORD_SIZE_IN_BITS >= 64
 instance Parity Word64 where
   even = even . pack
   odd = odd . pack
-#endif
 
 instance Parity Int where
   even = even . pack
@@ -112,10 +109,6 @@ instance Parity Int32 where
   even = even . pack
   odd = odd . pack
 
-#if WORD_SIZE_IN_BITS >= 64
 instance Parity Int64 where
   even = even . pack
   odd = odd . pack
-#endif
-
-

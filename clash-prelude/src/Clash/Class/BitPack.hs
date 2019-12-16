@@ -199,12 +199,10 @@ instance BitPack Int32 where
   pack   = packXWith fromIntegral
   unpack = checkUnpackUndef fromIntegral
 
-#if WORD_SIZE_IN_BITS >= 64
 instance BitPack Int64 where
   type BitSize Int64 = 64
   pack   = packXWith fromIntegral
   unpack = checkUnpackUndef fromIntegral
-#endif
 
 instance BitPack Word where
   type BitSize Word = WORD_SIZE_IN_BITS
@@ -226,12 +224,10 @@ instance BitPack Word32 where
   pack   = packXWith fromIntegral
   unpack = checkUnpackUndef fromIntegral
 
-#if WORD_SIZE_IN_BITS >= 64
 instance BitPack Word64 where
   type BitSize Word64 = 64
   pack   = packXWith fromIntegral
   unpack = checkUnpackUndef fromIntegral
-#endif
 
 instance BitPack Float where
   type BitSize Float = 32
