@@ -12,6 +12,7 @@
 {-# LANGUAGE FlexibleInstances     #-}
 {-# LANGUAGE LambdaCase            #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE ScopedTypeVariables   #-}
 {-# LANGUAGE TemplateHaskell       #-}
 {-# LANGUAGE ViewPatterns          #-}
 
@@ -24,8 +25,8 @@ module Clash.Core.Term
   , TickInfo (..), NameMod (..)
   , PrimInfo (..)
   , WorkInfo (..)
-  , CoreContext (..), Context, isLambdaBodyCtx, isTickCtx
-  , collectArgs, collectArgsTicks, collectTicks, primArg
+  , CoreContext (..), Context, isLambdaBodyCtx, isTickCtx, walkTerm
+  , collectArgs, collectArgsTicks, collectTicks, collectTermIds, primArg
   , partitionTicks
   )
 where
@@ -33,7 +34,9 @@ where
 -- External Modules
 import Control.DeepSeq
 import Data.Binary                             (Binary)
+import qualified Data.DList                    as DList
 import Data.Either                             (lefts, rights)
+import Data.Maybe                              (catMaybes)
 import Data.Hashable                           (Hashable)
 import Data.List                               (partition)
 import Data.Text                               (Text)
@@ -241,3 +244,46 @@ partitionTicks
   -> ([TickInfo], [TickInfo])
   -- ^ (source ticks, nameMod ticks)
 partitionTicks = partition (\case {SrcSpan {} -> True; _ -> False})
+
+-- | Visit all terms in a term, testing it with a predicate, and returning
+-- a list of predicate yields.
+walkTerm :: forall a . (Term -> Maybe a) -> Term -> [a]
+walkTerm f = catMaybes . DList.toList . go
+ where
+  go :: Term -> DList.DList (Maybe a)
+  go t = DList.cons (f t) $ case t of
+    Var _ -> mempty
+    Data _ -> mempty
+    Literal _ -> mempty
+    Prim _ _ -> mempty
+    Lam _ t1 -> go t1
+    TyLam _ t1 -> go t1
+    App t1 t2 -> go t1 <> go t2
+    TyApp t1 _ -> pure (f t1)
+    Letrec bndrs t1 -> pure (f t1) <> mconcat (map (go . snd) bndrs)
+    Case t1 _ alts -> pure (f t1) <> mconcat (map (go . snd) alts)
+    Cast t1 _ _ -> go t1
+    Tick _ t1 -> pure (f t1)
+
+-- Collect all term ids mentioned in a term
+collectTermIds :: Term -> [Id]
+collectTermIds = concat . walkTerm (Just . go)
+ where
+  go :: Term -> [Id]
+  go (Var i) = [i]
+  go (Lam i _) = [i]
+  go (Letrec bndrs _) = map fst bndrs
+  go (Case _ _ alts) = concatMap (pat . fst) alts
+  go (Data _) = []
+  go (Literal _) = []
+  go (Prim _ _) = []
+  go (TyLam _ _) = []
+  go (App _ _) = []
+  go (TyApp _ _) = []
+  go (Cast _ _ _) = []
+  go (Tick _ _) = []
+
+  pat :: Pat -> [Id]
+  pat (DataPat _ _ ids) = ids
+  pat (LitPat _) = []
+  pat DefaultPat = []
