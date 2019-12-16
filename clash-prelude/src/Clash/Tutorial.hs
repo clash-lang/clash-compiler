@@ -1272,6 +1272,7 @@ a general listing of the available template holes:
   /edge/. /edge/ must be one of 'Falling' or 'Rising'. Errors when called on an
   argument which is not a 'KnownDomain' or 'KnownConf'.
 * @~AND[\<HOLE1\>,\<HOLE2\>,..]@: Logically /and/ the conditions in the @\<HOLE\>@'s
+* @~VAR[\<NAME\>][N]@: Like @~ARG[N]@ but binds the argument to a variable named NAME.
 * @~VARS[N]@: VHDL: Return the variables at the @(N+1)@'th argument.
 * @~NAME[N]@: Render the @(N+1)@'th string literal argument as an identifier
   instead of a string literal. Fails when the @(N+1)@'th argument is not a
