@@ -356,7 +356,10 @@ force :: Heap -> Stack -> Id -> Maybe State
 force (Heap gh g@(GPureHeap gbl) h ids is) k x' = case lookupVarEnv x' h of
     Nothing -> case lookupVarEnv x' gbl of
       Just e | isGlobalId x'
-        -> Just (Heap gh (GPureHeap (delVarEnv gbl x')) h ids is,GUpdate x':k,e)
+        -> Just ( Heap gh (GPureHeap (delVarEnv gbl x')) h ids is
+                , GUpdate x':k
+                , deShadowTerm is e
+                )
       _ -> Nothing
     Just e -> Just (Heap gh g (delVarEnv h x') ids is,Update x':k,e)
     -- Removing the heap-bound value on a force ensures we do not get stuck on
