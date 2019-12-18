@@ -2201,6 +2201,37 @@ disjointExpressionConsolidation ctx@(TransformContext is0 _) e@(Case _scrut _ty 
           nm'' = last (Text.splitOn "." nm) `Text.append` "Out"
       mkInternalVar isN nm'' ty
 
+isInteresting 
+   :: VarEnv Int 
+   -> CompiledPrimMap 
+   -> VarSet 
+   -> (Id, Term) 
+   -> Bool 
+ isInteresting allOccs prims bodyFVs (id_,(fst.collectArgs) -> tm) 
+   | nameSort (varName id_) /= User 
+   , id_ `notElemVarSet` bodyFVs 
+   = case tm of 
+       Prim nm _ 
+         | Just (extractPrim -> Just p@(BlackBox {})) <- HashMap.lookup nm prims 
+         , TExpr <- kind p 
+         , Just occ <- lookupVarEnv id_ allOccs 
+         , occ < 2 
+         -> True 
+       Case _ _ [_] -> True 
+       Data _ -> True 
+       _ -> False 
+   | id_ `notElemVarSet` bodyFVs 
+   = case tm of 
+       Case _ _ [(DataPat dcE _ _,_)] 
+         -> let nm = (nameOcc (dcName dcE)) 
+            in -- Inlines WW projection that exposes internals of the BitVector types 
+               nm == "Clash.Sized.Internal.BitVector.BV"  || 
+               nm == "Clash.Sized.Internal.BitVector.Bit" || 
+               -- Inlines projections out of constraint-tuples (e.g. HiddenClockReset) 
+               "GHC.Classes" `Text.isPrefixOf` nm 
+       _ -> False 
+  
+ isInteresting _ _ _ _ = False 
     l2m = go []
       where
         go _  []     = []
