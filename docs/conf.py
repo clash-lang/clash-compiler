@@ -14,7 +14,6 @@ sys.path.insert(0, os.path.abspath('.'))
 needs_sphinx = '1.6'
 
 extensions = [
-    'sphinx.ext.intersphinx',
     'sphinx.ext.todo',
     'sphinx.ext.mathjax',
     'sphinx.ext.extlinks'
@@ -29,7 +28,7 @@ master_doc = 'index'
 project = 'Clash'
 copyright = '2017-2019, The Clash Developers'
 author = 'The Clash Developers'
-version = '0.99'
+version = '1.0.1'
 release = version
 
 # Syntax highlighting
@@ -43,15 +42,12 @@ exclude_patterns = ['_build']
 # If true, `todo` and `todoList` produce output, else they produce nothing.
 todo_include_todos = True
 
-# Example configuration for intersphinx: refer to the Python standard library.
-intersphinx_mapping = {'https://docs.python.org/': None}
-
 # -- Options for HTML output ----------------------------------------------
 
 html_title = f"Clash Language {release} Manual"
 html_short_title = f"Clash {release} Manual"
 html_theme_path = ['.']
-html_theme = 'default' # clash-theme
+html_theme = 'sphinx_rtd_theme'
 html_logo = None
 #html_static_path = ['images']
 html_show_copyright = True
@@ -63,11 +59,7 @@ htmlhelp_basename = 'ClashManual'
 latex_engine = 'xelatex'
 
 latex_elements = {
-    'papersize': 'a4paper',
-    'preamble': '''
-\\usepackage{makeidx}
-\setlength{\\tymin}{45pt}
-''',
+    'papersize': 'a4paper'
 }
 
 # Grouping the document tree into LaTeX files. List of tuples

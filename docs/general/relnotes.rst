@@ -1,15 +1,17 @@
 .. _relnotes:
 
-=============================
-Release notes for Clash 1.0.0
-=============================
+Release Notes for Clash 1.0
+===========================
 
 The significant changes to core parts of the compiler and libraries are listed
-in the following sections. There have also been numerous bug fixes and
-performance improvements over the 0.7 branch.
+in the following sections. Small bug fixes and performance improvements are not
+listed here, for more information see the changelog_.
 
-.. note:: Clash 1.0 requires GHC 8.2.1 **exactly**, and, consequently, Cabal 2.0
-          *at minimum*.
+.. _changelog: https://github.com/clash-lang/clash-compiler/blob/1.0/CHANGELOG.md
+
+.. note::
+  Clash 1.0.0 is currently tested on GHC versions 8.4.4, 8.6.5 and 8.8.1. Using
+  any GHC version outside of these may work, but is not officially supported.
 
 Highlights
 ----------
@@ -17,47 +19,35 @@ Highlights
 Clash has seen several major updates for the 1.0 release, the most significant
 improvements being:
 
-- New, **explicit clock lining and reset control**, along with a simpler
-  interface based on *implicit parameters*. As a result of this, features like
-  DDR and PLL primitives can now be defined almost entirely using Clash itself
-  (and some basic primitives).
+- New, explicit clock lining and reset control, along with a simpler interface
+  based on implicit parameters. As a result of this change, features like DDR
+  and PLL primitives can now be defined almost entirely using Clash and some
+  basic primitives.
 
-  .. warning:: This effectively breaks all known Clash programs, as the
-               ``Signal`` type has changed and has a new parameter!
+  .. warning::
+    This effectively breaks all known Clash programs, due to the ``Signal``
+    type changing.
 
-- A **new namespace for** ``clash-prelude``. Previously, it was under the name
-  ``CLaSH``, but is now under the name ``Clash``! Your fingers and
-  auto-completion engine will thank you.
+- A new namespace for ``clash-prelude``. Previously, it was under the name
+  ``CLaSH``, but is now under the name ``Clash``.
 
-  .. warning:: This effectively breaks all known Clash programs! But you can fix
-               it with ``sed``.
+  .. warning::
+    This breaks all known Clash programs.
 
-- Support for **multiple** ``TopEntity`` **annotations in a single project**.
-  Previously, the Clash compiler only allowed you to have a single ``topEntity``
-  function within your set of modules, and would only generate a single HDL
-  module per invocation. Clash can now handle multiple ``TopEntity`` functions
-  -- in any number of modules -- and generate appropriate HDL modules that
-  interface with each other.
+- Support for multiple ``TopEntity`` annotations in a single project.
+  Previously, the Clash compiler only allowed you to have a single
+  ``topEntity`` function within your set of modules, and would only generate a
+  single HDL module per invocation. Clash now handles multiple ``TopEntity``
+  functions and generates corresponding HDL modules.
 
-- The Xilinx and Intel PLL/clocking interfaces **have moved to separate
-  packages** outside of ``clash-prelude``, inside the new ``clash-xilinx`` and
-  ``clash-intel`` packages.
+- An improved optimizer has landed, that does better constant folding, is more
+  aggressive in eliminating indirection, and generates more readable HDL output.
 
-- An **improved optimizer** has landed, that does better constant folding, is
-  more aggressive in eliminating indirection, and generates more readable HDL
-  output.
+- The compile-time performance of the RTL synthesis has improved, in some cases
+  exponentially (with respect to the input program). Additionally, the compiler
+  does not generate large programs from small ones as much.
 
-- The **compile-time performance of the RTL synthesis has improved**, in some
-  cases exponentially (with respect to the input program), thanks to some
-  reports, tuning, new algorithms, and a lot of analysis. At the same time, the
-  compiler also more cleanly backs off and does not "generate" large programs
-  from small ones as much. Overall, Clash should compile your programs faster
-  and generate RTL quicker than before.
-
-- **Code cleanup and consolidation in the compiler**, with more to come over
-  time.
-
-Full details
+Full Details
 ------------
 
 .. todo:: Lorem ipsum...
