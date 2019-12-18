@@ -14,5 +14,5 @@ beautiful prose for `Phabricator <https://phabricator.org>`_, released under the
 .. _BSD2 License: https://opensource.org/licenses/BSD-2-Clause
 .. _Apache 2.0 License: https://opensource.org/licenses/Apache-2.0
 
-.. literalinclude:: ./LICENSE.txt
+.. literalinclude:: ../LICENSE
    :language: text
