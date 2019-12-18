@@ -17,7 +17,7 @@ import           Control.DeepSeq         (deepseq)
 import           Control.Lens            ((%~),(&),view,_1)
 import           Control.Monad           (unless)
 import qualified Control.Monad.State     as State
-import qualified Control.Monad.RWS.Lazy  as RWS
+import qualified Control.Monad.RWS.Strict as RWS
 import           Data.Coerce             (coerce)
 import           Data.Either             (partitionEithers, lefts, rights)
 import           Data.IntMap.Strict      (IntMap)

@@ -7,10 +7,14 @@ Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
 {-# LANGUAGE ViewPatterns          #-}
 {-# LANGUAGE TemplateHaskellQuotes #-}
 
-module Clash.XException.TH (mkNFDataXTupleInstances) where
+module Clash.XException.TH
+  ( mkShowXTupleInstances
+  , mkNFDataXTupleInstances
+  ) where
 
-import           Language.Haskell.TH.Syntax
-import           Data.Either                  (isLeft)
+import Data.Either (isLeft)
+import Data.List (intersperse)
+import Language.Haskell.TH.Syntax
 
 -- Spliced in in XException, so these names should be in scope:
 isXName, hasUndefinedName, deepErrorXName, rnfXName, ensureSpineName :: Name
@@ -20,12 +24,65 @@ deepErrorXName = mkName "deepErrorX"
 rnfXName = mkName "rnfX"
 ensureSpineName = mkName "ensureSpine"
 
+showxName :: Name
+showxName = mkName "ShowX"
+
+showXFnName :: Name
+showXFnName = mkName "showX"
+
+showsPrecXName :: Name
+showsPrecXName = mkName "showsPrecX"
+
 nfdataxName :: Name
 nfdataxName = mkName "NFDataX"
 
 mkTup :: [Type] -> Type
 mkTup names@(length -> n) =
   foldl AppT (TupleT n) names
+
+-- | Creates an instance of the form:
+--
+--  instance (ShowX a0, ShowX a1) => ShowX (a0, a1)
+--
+-- With /n/ number of variables.
+mkShowXTupleInstance :: Int -> Dec
+mkShowXTupleInstance n =
+  InstanceD Nothing constraints instanceTyp [showsPrecXDecl, showXDecl]
+ where
+  constraints = fmap (AppT (ConT showxName)) vars
+  instanceTyp = ConT showxName `AppT` mkTup vars
+  names = fmap (mkName . ('a':) . show) [0..n-1]
+  vars = fmap VarT names
+
+  x = mkName "x"
+  s = mkName "s"
+
+  showsPrecXDecl = FunD showsPrecXName
+    [ Clause
+        [WildP, VarP x, VarP s]
+        (NormalB
+          (VarE 'mappend `AppE` (VarE showXFnName `AppE` VarE x) `AppE` VarE s))
+        []
+    ]
+
+  showXDecl = FunD showXFnName
+    [ Clause
+        [TupP (fmap VarP names)]
+        (NormalB
+          (VarE 'mconcat `AppE` (ListE
+            ([LitE (StringL "(")]
+               <> intersperse (LitE (StringL ",")) (fmap toShowX names)
+               <> [LitE (StringL ")")]))))
+        []
+    ]
+   where
+    toShowX a = VarE showXFnName `AppE` VarE a
+
+-- | Creates instances of ShowX for all tuple sizes listed.
+-- See 'mkShowXTupleInstance' for more information.
+mkShowXTupleInstances :: [Int] -> Q [Dec]
+mkShowXTupleInstances tupSizes =
+  return (fmap mkShowXTupleInstance tupSizes)
 
 -- | Creates an instance of the form:
 --
@@ -93,7 +150,6 @@ mkNFDataXTupleInstance n =
        (NormalB (TupE (replicate n (VarE deepErrorXName `AppE` VarE s))))
        []
      ]
-
 
 mkNFDataXTupleInstances :: [Int] -> Q [Dec]
 mkNFDataXTupleInstances tupSizes =
