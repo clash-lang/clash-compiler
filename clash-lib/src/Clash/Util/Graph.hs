@@ -5,6 +5,7 @@
 
   Collection of utilities
 -}
+
 module Clash.Util.Graph (topSort, reverseTopSort) where
 
 import           Data.Tuple            (swap)

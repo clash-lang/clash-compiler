@@ -10,7 +10,6 @@
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TemplateHaskell   #-}
-{-# LANGUAGE ViewPatterns      #-}
 {-# LANGUAGE LambdaCase        #-}
 
 {-# OPTIONS_GHC -fno-warn-orphans #-}

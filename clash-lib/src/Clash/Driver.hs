@@ -9,8 +9,6 @@
 -}
 
 {-# LANGUAGE NondecreasingIndentation #-}
-{-# LANGUAGE ScopedTypeVariables      #-}
-{-# LANGUAGE TupleSections            #-}
 
 module Clash.Driver where
 

@@ -10,16 +10,12 @@
 
 {-# LANGUAGE CPP                        #-}
 {-# LANGUAGE DeriveAnyClass             #-}
-{-# LANGUAGE DeriveGeneric              #-}
-{-# LANGUAGE DerivingStrategies         #-}
-{-# LANGUAGE DeriveLift                 #-}
 {-# LANGUAGE GADTs                      #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE LambdaCase                 #-}
 {-# LANGUAGE PatternSynonyms            #-}
 {-# LANGUAGE RankNTypes                 #-}
 {-# LANGUAGE TemplateHaskell            #-}
-{-# LANGUAGE DeriveDataTypeable         #-}
 
 -- since GHC 8.6 we can haddock individual contructor fields \o/
 #if __GLASGOW_HASKELL__ >= 806

@@ -6,10 +6,6 @@
   Rewriting combinators and traversals
 -}
 
-{-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE TupleSections       #-}
-{-# LANGUAGE ViewPatterns        #-}
-
 module Clash.Rewrite.Combinators
   ( allR
   , (!->)

@@ -3,6 +3,10 @@ GHC_VERSION=$(ghc --numeric-version)
 GHC_MAJOR_VERSION=$(echo ${GHC_VERSION} | tr -d '.' | head -c2)
 GHC_BIN_SRC=$(ls -d clash-ghc/src-bin-${GHC_MAJOR_VERSION}*)
 
+if [ ${GHC_MAJOR_VERSION} != 84 ]; then
+  XNoStarIsType="-XNoStarIsType"
+fi
+
 ghci \
   -fobject-code \
   -iclash-ghc/src-bin-common/ \
@@ -10,4 +14,9 @@ ghci \
   -iclash-lib/src \
   -iclash-ghc/src-ghc \
   -Wall -DTOOL_VERSION_ghc=\"${GHC_VERSION}\" \
+  -XBangPatterns -XBinaryLiterals -XDataKinds -XDefaultSignatures \
+  -XDeriveDataTypeable -XDeriveFoldable -XDeriveFunctor -XDeriveGeneric \
+  -XDeriveLift -XDeriveTraversable -XDerivingStrategies -XInstanceSigs \
+  -XKindSignatures ${XNoStarIsType} -XScopedTypeVariables -XStandaloneDeriving \
+  -XTupleSections -XTypeApplications -XTypeOperators -XViewPatterns \
   Clash.hs

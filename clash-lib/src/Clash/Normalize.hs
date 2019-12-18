@@ -10,10 +10,7 @@
 
 {-# LANGUAGE CPP               #-}
 {-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE TupleSections     #-}
 {-# LANGUAGE TemplateHaskell   #-}
-{-# LANGUAGE ViewPatterns      #-}
-{-# LANGUAGE BangPatterns      #-}
 
 {-# OPTIONS_GHC -Wno-unused-imports #-}
 

@@ -9,8 +9,6 @@
 
 {-# LANGUAGE CPP            #-}
 {-# LANGUAGE DeriveAnyClass #-}
-{-# LANGUAGE DeriveGeneric  #-}
-
 -- since GHC 8.6 we can haddock individual contructor fields \o/
 #if __GLASGOW_HASKELL__ >= 806
 #define FIELD ^

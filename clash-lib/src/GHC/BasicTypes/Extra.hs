@@ -4,9 +4,6 @@
   Maintainer  :  Christiaan Baaij <christiaan.baaij@gmail.com>
 -}
 
-{-# LANGUAGE DeriveGeneric      #-}
-{-# LANGUAGE StandaloneDeriving #-}
-
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 
 module GHC.BasicTypes.Extra where

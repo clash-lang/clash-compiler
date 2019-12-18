@@ -10,8 +10,7 @@
 {-# LANGUAGE FlexibleInstances    #-}
 {-# LANGUAGE MagicHash            #-}
 {-# LANGUAGE OverloadedStrings    #-}
-{-# LANGUAGE Rank2Types           #-}
-{-# LANGUAGE TupleSections        #-}
+{-# LANGUAGE RankNTypes           #-}
 
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 

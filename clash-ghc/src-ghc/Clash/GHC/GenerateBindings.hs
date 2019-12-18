@@ -7,7 +7,6 @@
 
 {-# LANGUAGE LambdaCase        #-}
 {-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE ViewPatterns      #-}
 
 module Clash.GHC.GenerateBindings
   (generateBindings)

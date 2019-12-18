@@ -8,7 +8,6 @@
 
 {-# LANGUAGE CPP               #-}
 {-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE ViewPatterns      #-}
 
 module Clash.Netlist.Id
   ( IdType (..)

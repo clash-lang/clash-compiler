@@ -7,10 +7,7 @@
 
 {-# LANGUAGE CPP                 #-}
 {-# LANGUAGE RecordWildCards     #-}
-{-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TemplateHaskell     #-}
-{-# LANGUAGE TupleSections       #-}
-{-# LANGUAGE ViewPatterns #-}
 
 module Clash.GHC.LoadInterfaceFiles
   ( loadExternalExprs

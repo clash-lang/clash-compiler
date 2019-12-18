@@ -1,4 +1,6 @@
-{-# LANGUAGE RecordWildCards, LambdaCase #-}
+{-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE RecordWildCards #-}
+
 module Clash.GHCi.Leak
   ( LeakIndicators
   , getLeakIndicators

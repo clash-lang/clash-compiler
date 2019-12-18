@@ -7,7 +7,6 @@
 -}
 
 {-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE ViewPatterns      #-}
 
 module Clash.Primitives.Intel.ClockGen where
 

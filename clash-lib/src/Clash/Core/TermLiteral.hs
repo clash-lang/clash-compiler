@@ -7,7 +7,6 @@ Tools to convert a 'Term' into its "real" representation
 -}
 {-# LANGUAGE FlexibleInstances     #-}
 {-# LANGUAGE TemplateHaskell       #-}
-{-# LANGUAGE ViewPatterns          #-}
 
 module Clash.Core.TermLiteral
   ( TermLiteral

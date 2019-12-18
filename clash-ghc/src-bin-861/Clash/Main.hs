@@ -1,4 +1,6 @@
-{-# LANGUAGE CPP, NondecreasingIndentation, ScopedTypeVariables, TupleSections #-}
+{-# LANGUAGE CPP #-}
+{-# LANGUAGE NondecreasingIndentation #-}
+
 {-# OPTIONS -fno-warn-incomplete-patterns -optc-DNON_POSIX_SOURCE #-}
 
 -----------------------------------------------------------------------------

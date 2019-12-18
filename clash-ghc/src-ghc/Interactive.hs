@@ -5,6 +5,7 @@
 
   Entry point for the @clashi@ executable.
 -}
+
 module Main
   ( main -- :: IO ()
   ) where
