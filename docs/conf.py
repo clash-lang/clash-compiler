@@ -1,5 +1,3 @@
-# -*- coding: utf-8 -*-
-#
 # Clash documentation build configuration file.
 #
 # This file is execfile()d with the current directory set to its
@@ -7,12 +5,14 @@
 
 import os
 import sys
+
 sys.path.insert(0, os.path.abspath('.'))
 
 # -- General configuration ------------------------------------------------
 
 # Sphinx configuration
 needs_sphinx = '1.6'
+
 extensions = [
     'sphinx.ext.intersphinx',
     'sphinx.ext.todo',
@@ -26,10 +26,10 @@ source_encoding = 'utf-8-sig'
 master_doc = 'index'
 
 # Project information
-project = u'Clash'
-copyright = u'2017, The Clash Developers'
-author = u'The Clash Developers'
-version = u'0.99'
+project = 'Clash'
+copyright = '2017-2019, The Clash Developers'
+author = 'The Clash Developers'
+version = '0.99'
 release = version
 
 # Syntax highlighting
@@ -48,8 +48,8 @@ intersphinx_mapping = {'https://docs.python.org/': None}
 
 # -- Options for HTML output ----------------------------------------------
 
-html_title = "Clash Language %s Manual" % release
-html_short_title = "Clash %s Manual" % release
+html_title = f"Clash Language {release} Manual"
+html_short_title = f"Clash {release} Manual"
 html_theme_path = ['.']
 html_theme = 'default' # clash-theme
 html_logo = None
@@ -60,11 +60,12 @@ htmlhelp_basename = 'ClashManual'
 
 # -- Options for LaTeX output ---------------------------------------------
 
+latex_engine = 'xelatex'
+
 latex_elements = {
-    'inputenc': '',
-    'utf8extra': '',
+    'papersize': 'a4paper',
     'preamble': '''
-\usepackage{makeidx}
+\\usepackage{makeidx}
 \setlength{\\tymin}{45pt}
 ''',
 }
@@ -73,7 +74,7 @@ latex_elements = {
 # (source start file, target name, title,
 #  author, documentclass [howto, manual, or own class]).
 latex_documents = [
-    ( master_doc, 'clash-docs.tex', u'Clash Documentation',
+    ( master_doc, 'clash-docs.tex', 'Clash Documentation',
      author, 'manual'),
 ]
 
@@ -85,7 +86,7 @@ latex_show_pagerefs = True
 # One entry per manual page. List of tuples
 # (source start file, name, description, authors, manual section).
 man_pages = [
-    ('clash', 'clash', u'the Clash Compiler', author, 1)
+    ('clash', 'clash', 'the Clash Compiler', author, 1)
 ]
 
 # -- Options for Texinfo output -------------------------------------------
@@ -94,7 +95,7 @@ man_pages = [
 # (source start file, target name, title, author,
 #  dir menu entry, description, category)
 texinfo_documents = [
-    (master_doc, 'Clash', u'Clash Documentation',
+    (master_doc, 'Clash', 'Clash Documentation',
      author, 'Clash', 'One line description of project.',
      'Miscellaneous'),
 ]
