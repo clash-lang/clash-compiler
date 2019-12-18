@@ -14,14 +14,8 @@ see ALTDDIO userguide for the specifics:
 -}
 
 {-# LANGUAGE CPP              #-}
-{-# LANGUAGE DataKinds        #-}
 {-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE MagicHash        #-}
 {-# LANGUAGE TypeFamilies     #-}
-{-# LANGUAGE TypeOperators    #-}
-#if __GLASGOW_HASKELL__ >= 806
-{-# LANGUAGE NoStarIsType #-}
-#endif
 
 module Clash.Intel.DDR
   ( altddioIn

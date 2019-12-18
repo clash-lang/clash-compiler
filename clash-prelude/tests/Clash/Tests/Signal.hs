@@ -5,10 +5,9 @@ Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
 -}
 
 {-# LANGUAGE CPP                       #-}
-{-# LANGUAGE RankNTypes                #-}
-{-# LANGUAGE TypeApplications          #-}
 {-# LANGUAGE FlexibleContexts          #-}
 {-# LANGUAGE NoMonomorphismRestriction #-}
+{-# LANGUAGE RankNTypes                #-}
 
 {-# OPTIONS_GHC -Wno-missing-signatures #-}
 

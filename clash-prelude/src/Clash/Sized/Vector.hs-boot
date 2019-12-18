@@ -11,11 +11,12 @@ Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
 {-# LANGUAGE TypeOperators   #-}
 module Clash.Sized.Vector where
 
+import Data.Kind (Type)
 import GHC.TypeLits  (KnownNat, Nat, type (<=))
 import {-# SOURCE #-} Clash.Sized.Internal.BitVector (BitVector, Bit)
 
 type role Vec nominal representational
-data Vec :: Nat -> * -> *
+data Vec :: Nat -> Type -> Type
 
 instance (KnownNat n, 1 <= n) => Foldable (Vec n)
 

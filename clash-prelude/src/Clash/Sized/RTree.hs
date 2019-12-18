@@ -5,23 +5,12 @@ Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
 -}
 
 {-# LANGUAGE CPP                  #-}
-{-# LANGUAGE DataKinds            #-}
 {-# LANGUAGE GADTs                #-}
-{-# LANGUAGE InstanceSigs         #-}
-{-# LANGUAGE KindSignatures       #-}
 {-# LANGUAGE PatternSynonyms      #-}
 {-# LANGUAGE RankNTypes           #-}
-{-# LANGUAGE ScopedTypeVariables  #-}
 {-# LANGUAGE TemplateHaskell      #-}
-{-# LANGUAGE TupleSections        #-}
-{-# LANGUAGE TypeApplications     #-}
 {-# LANGUAGE TypeFamilies         #-}
-{-# LANGUAGE TypeOperators        #-}
 {-# LANGUAGE UndecidableInstances #-}
-{-# LANGUAGE ViewPatterns         #-}
-#if __GLASGOW_HASKELL__ >= 806
-{-# LANGUAGE NoStarIsType #-}
-#endif
 
 {-# LANGUAGE Trustworthy #-}
 
@@ -92,7 +81,8 @@ import Clash.XException
 >>> :set -fplugin GHC.TypeLits.Normalise
 >>> :set -XUndecidableInstances
 >>> import Clash.Prelude
->>> data IIndex (f :: TyFun Nat *) :: *
+>>> import Data.Kind
+>>> data IIndex (f :: TyFun Nat Type) :: Type
 >>> type instance Apply IIndex l = Index ((2^l)+1)
 >>> :{
 let populationCount' :: (KnownNat k, KnownNat (2^k)) => BitVector (2^k) -> Index ((2^k)+1)

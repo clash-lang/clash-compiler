@@ -19,17 +19,8 @@ or "Clash.Xilinx.DDR".
 -}
 
 {-# LANGUAGE CPP                 #-}
-{-# LANGUAGE DataKinds           #-}
 {-# LANGUAGE FlexibleContexts    #-}
-{-# LANGUAGE MagicHash           #-}
-{-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE TypeApplications    #-}
 {-# LANGUAGE TypeFamilies        #-}
-{-# LANGUAGE TypeOperators       #-}
-{-# LANGUAGE ViewPatterns        #-}
-#if __GLASGOW_HASKELL__ >= 806
-{-# LANGUAGE NoStarIsType #-}
-#endif
 
 module Clash.Explicit.DDR
   ( ddrIn

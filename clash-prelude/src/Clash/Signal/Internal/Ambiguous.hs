@@ -1,7 +1,5 @@
 {-# LANGUAGE AllowAmbiguousTypes    #-}
 {-# LANGUAGE RankNTypes             #-}
-{-# LANGUAGE ScopedTypeVariables    #-}
-{-# LANGUAGE TypeApplications       #-}
 {-# LANGUAGE TypeFamilies           #-}
 
 module Clash.Signal.Internal.Ambiguous

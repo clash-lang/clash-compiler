@@ -5,9 +5,14 @@ Copyright : © 2015-2016, Christiaan Baaij,
 Licence   : Creative Commons 4.0 (CC BY 4.0) (https://creativecommons.org/licenses/by/4.0/)
 -}
 
-{-# LANGUAGE NoImplicitPrelude, CPP, TemplateHaskell, DataKinds, BinaryLiterals,
-             FlexibleContexts, GADTs, TypeOperators, TypeApplications,
-             RecordWildCards, DeriveGeneric, DeriveAnyClass #-}
+{-# LANGUAGE CPP #-}
+{-# LANGUAGE DeriveAnyClass #-}
+{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE GADTs #-}
+{-# LANGUAGE NoImplicitPrelude #-}
+{-# LANGUAGE RecordWildCards #-}
+{-# LANGUAGE TemplateHaskell #-}
+
 {-# OPTIONS_GHC -fno-warn-unused-imports #-}
 {-# OPTIONS_GHC -fno-warn-unused-binds #-}
 {-# OPTIONS_GHC -fno-warn-type-defaults #-}
@@ -548,6 +553,7 @@ crc enable ld dIn = s
 {- $uart
 @
 {\-\# LANGUAGE RecordWildCards \#-\}
+
 module UART (uart) where
 
 import Clash.Prelude

@@ -1,4 +1,5 @@
 {-# LANGUAGE CPP #-}
+
 module Language.Haskell.TH.Compat where
 import           Language.Haskell.TH
 

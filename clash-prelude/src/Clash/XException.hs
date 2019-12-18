@@ -16,19 +16,13 @@ CallStack (from HasCallStack):
 -}
 
 {-# LANGUAGE CPP                   #-}
-{-# LANGUAGE DefaultSignatures     #-}
-{-# LANGUAGE DeriveGeneric         #-}
 {-# LANGUAGE EmptyCase             #-}
 {-# LANGUAGE FlexibleContexts      #-}
 {-# LANGUAGE FlexibleInstances     #-}
 {-# LANGUAGE GADTs                 #-}
-{-# LANGUAGE MagicHash             #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
-{-# LANGUAGE ScopedTypeVariables   #-}
 {-# LANGUAGE StandaloneDeriving    #-}
 {-# LANGUAGE TemplateHaskell       #-}
-{-# LANGUAGE TypeOperators         #-}
-
 {-# LANGUAGE Trustworthy #-}
 
 {-# OPTIONS_GHC -Wno-orphans #-}

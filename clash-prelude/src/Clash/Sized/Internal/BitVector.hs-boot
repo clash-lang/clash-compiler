@@ -11,9 +11,10 @@ module Clash.Sized.Internal.BitVector where
 
 import GHC.TypeLits (KnownNat,Nat)
 import GHC.Stack    (HasCallStack)
+import Data.Kind    (Type)
 
 type role BitVector phantom
-data BitVector :: Nat -> *
+data BitVector :: Nat -> Type
 data Bit
 
 undefError :: (HasCallStack, KnownNat n) => String -> [BitVector n] -> a

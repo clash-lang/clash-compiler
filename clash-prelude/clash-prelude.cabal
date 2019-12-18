@@ -111,10 +111,36 @@ flag benchmarks
   default: True
   manual: True
 
+common common-options
+  default-language:   Haskell2010
+  default-extensions: BangPatterns
+                      BinaryLiterals
+                      DataKinds
+                      DefaultSignatures
+                      DeriveDataTypeable
+                      DeriveFoldable
+                      DeriveFunctor
+                      DeriveGeneric
+                      DeriveLift
+                      DeriveTraversable
+                      DerivingStrategies
+                      InstanceSigs
+                      KindSignatures
+                      MagicHash
+                      ScopedTypeVariables
+                      StandaloneDeriving
+                      TupleSections
+                      TypeApplications
+                      TypeOperators
+                      ViewPatterns
+
+  if impl(ghc >= 8.6)
+      default-extensions: NoStarIsType
+
 Library
+  import:             common-options
   HS-Source-Dirs:     src
 
-  default-language:   Haskell2010
   ghc-options:        -Wall -fexpose-all-unfoldings -fno-worker-wrapper
   CPP-Options:        -DCABAL
 
@@ -245,32 +271,17 @@ Library
                       Paths_clash_prelude
 
   other-extensions:   CPP
-                      BangPatterns
                       ConstraintKinds
-                      DataKinds
-                      DefaultSignatures
-                      DeriveDataTypeable
-                      DeriveTraversable
-                      DeriveLift
                       FlexibleContexts
                       FlexibleInstances
                       GADTs
                       GeneralizedNewtypeDeriving
-                      InstanceSigs
-                      KindSignatures
-                      MagicHash
                       MultiParamTypeClasses
                       PatternSynonyms
-                      Rank2Types
-                      ScopedTypeVariables
-                      StandaloneDeriving
+                      RankNTypes
                       TemplateHaskell
-                      TupleSections
-                      TypeApplications
                       TypeFamilies
-                      TypeOperators
                       UndecidableInstances
-                      ViewPatterns
 
   Build-depends:      array                     >= 0.5.1.0 && < 0.6,
                       base                      >= 4.10    && < 5,
@@ -324,8 +335,8 @@ test-suite doctests
       doctest >= 0.16.1
 
 test-suite unittests
+  import:           common-options
   type:             exitcode-stdio-1.0
-  default-language: Haskell2010
   main-is:          unittests.hs
   ghc-options:      -Wall
   hs-source-dirs:   tests

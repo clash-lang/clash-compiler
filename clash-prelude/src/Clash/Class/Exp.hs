@@ -5,14 +5,7 @@ Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
 -}
 
 {-# LANGUAGE CPP           #-}
-{-# LANGUAGE DataKinds     #-}
-{-# LANGUAGE MagicHash     #-}
 {-# LANGUAGE TypeFamilies  #-}
-{-# LANGUAGE TypeOperators #-}
-
-#if __GLASGOW_HASKELL__ >= 806
-{-# LANGUAGE NoStarIsType  #-}
-#endif
 
 {-# OPTIONS_GHC -fplugin GHC.TypeLits.KnownNat.Solver #-}
 

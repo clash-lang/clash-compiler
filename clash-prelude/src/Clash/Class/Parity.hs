@@ -5,11 +5,7 @@ Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
 -}
 
 {-# LANGUAGE CPP                  #-}
-{-# LANGUAGE DefaultSignatures    #-}
 {-# LANGUAGE FlexibleContexts     #-}
-{-# LANGUAGE ScopedTypeVariables  #-}
-{-# LANGUAGE TypeApplications     #-}
-{-# LANGUAGE MagicHash            #-}
 
 {-# OPTIONS_GHC -fplugin=GHC.TypeLits.Extra.Solver #-}
 {-# OPTIONS_GHC -fplugin=GHC.TypeLits.Normalise #-}

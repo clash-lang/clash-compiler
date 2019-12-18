@@ -7,7 +7,6 @@ Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
 
 {-# LANGUAGE TemplateHaskell   #-}
 {-# LANGUAGE QuasiQuotes       #-}
-{-# LANGUAGE ViewPatterns      #-}
 
 module Clash.Clocks.Deriving (deriveClocksInstances) where
 

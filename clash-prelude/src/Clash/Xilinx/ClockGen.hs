@@ -6,11 +6,9 @@ Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
 PLL and other clock-related components for Xilinx FPGAs
 -}
 
-{-# LANGUAGE BangPatterns     #-}
-{-# LANGUAGE DataKinds        #-}
 {-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE ExplicitForAll   #-}
 {-# LANGUAGE GADTs            #-}
+
 module Clash.Xilinx.ClockGen where
 
 import Clash.Annotations.Primitive    (hasBlackBox)

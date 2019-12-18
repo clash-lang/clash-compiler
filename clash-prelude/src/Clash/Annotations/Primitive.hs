@@ -9,10 +9,6 @@ templates.
 -}
 
 {-# LANGUAGE DeriveAnyClass        #-}
-{-# LANGUAGE DeriveDataTypeable    #-}
-{-# LANGUAGE DeriveFunctor         #-}
-{-# LANGUAGE DeriveTraversable     #-}
-{-# LANGUAGE DeriveGeneric         #-}
 {-# LANGUAGE LambdaCase            #-}
 {-# LANGUAGE TemplateHaskellQuotes #-}
 

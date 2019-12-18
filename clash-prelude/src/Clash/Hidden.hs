@@ -8,14 +8,9 @@ Hidden arguments
 
 {-# LANGUAGE AllowAmbiguousTypes    #-}
 {-# LANGUAGE ConstraintKinds        #-}
-{-# LANGUAGE DataKinds              #-}
 {-# LANGUAGE FunctionalDependencies #-}
-{-# LANGUAGE KindSignatures         #-}
 {-# LANGUAGE MultiParamTypeClasses  #-}
-{-# LANGUAGE Rank2Types             #-}
-{-# LANGUAGE ScopedTypeVariables    #-}
-{-# LANGUAGE TypeApplications       #-}
-
+{-# LANGUAGE RankNTypes             #-}
 {-# LANGUAGE Trustworthy #-}
 
 module Clash.Hidden

@@ -5,6 +5,7 @@ Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
 -}
 
 {-# LANGUAGE CPP #-}
+
 {-# OPTIONS_HADDOCK hide #-}
 
 #ifndef MAX_TUPLE_SIZE

@@ -19,6 +19,7 @@ codes:
 
 @
 {\-\# LANGUAGE RecordWildCards, TupleSections, DeriveAnyClass, TypeApplications \#-\}
+
 module CPU where
 
 import Clash.Prelude
@@ -372,12 +373,8 @@ This concludes the short introduction to using 'blockRam'.
 
 -}
 
-{-# LANGUAGE DataKinds           #-}
 {-# LANGUAGE FlexibleContexts    #-}
 {-# LANGUAGE GADTs               #-}
-{-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE TypeOperators       #-}
-
 {-# LANGUAGE Safe #-}
 
 {-# OPTIONS_HADDOCK show-extensions #-}

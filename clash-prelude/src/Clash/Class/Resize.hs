@@ -4,10 +4,6 @@ License    :  BSD2 (see the file LICENSE)
 Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
 -}
 
-{-# LANGUAGE DataKinds      #-}
-{-# LANGUAGE KindSignatures #-}
-{-# LANGUAGE TypeOperators  #-}
-
 {-# LANGUAGE Safe #-}
 
 {-# OPTIONS_GHC -fplugin GHC.TypeLits.KnownNat.Solver #-}
@@ -15,10 +11,11 @@ Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
 
 module Clash.Class.Resize where
 
+import Data.Kind (Type)
 import GHC.TypeLits (Nat, KnownNat, type (+))
 
 -- | Coerce a value to be represented by a different number of bits
-class Resize (f :: Nat -> *) where
+class Resize (f :: Nat -> Type) where
   -- | A sign-preserving resize operation
   --
   -- * For signed datatypes: Increasing the size of the number replicates the

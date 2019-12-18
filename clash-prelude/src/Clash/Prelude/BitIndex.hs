@@ -4,10 +4,7 @@ License    :  BSD2 (see the file LICENSE)
 Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
 -}
 
-{-# LANGUAGE DataKinds        #-}
 {-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE MagicHash        #-}
-{-# LANGUAGE TypeOperators    #-}
 {-# LANGUAGE TypeFamilies     #-}
 
 {-# LANGUAGE Trustworthy #-}

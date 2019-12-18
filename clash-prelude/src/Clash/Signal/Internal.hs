@@ -8,24 +8,14 @@ Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
 
 {-# LANGUAGE ConstraintKinds        #-}
 {-# LANGUAGE CPP                    #-}
-{-# LANGUAGE DataKinds              #-}
 {-# LANGUAGE DeriveAnyClass         #-}
-{-# LANGUAGE DeriveDataTypeable     #-}
-{-# LANGUAGE DeriveGeneric          #-}
 {-# LANGUAGE FlexibleContexts       #-}
 {-# LANGUAGE FlexibleInstances      #-}
 {-# LANGUAGE GADTs                  #-}
-{-# LANGUAGE MagicHash              #-}
-{-# LANGUAGE ScopedTypeVariables    #-}
 {-# LANGUAGE StandaloneDeriving     #-}
 {-# LANGUAGE TemplateHaskell        #-}
-{-# LANGUAGE TypeApplications       #-}
 {-# LANGUAGE TypeFamilies           #-}
-{-# LANGUAGE TypeOperators          #-}
-{-# LANGUAGE ViewPatterns           #-}
-#if __GLASGOW_HASKELL__ >= 806
-{-# LANGUAGE NoStarIsType #-}
-#endif
+
 #if __GLASGOW_HASKELL__ < 806
 {-# LANGUAGE TypeInType #-}
 #endif

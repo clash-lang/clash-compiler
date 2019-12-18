@@ -15,14 +15,8 @@ For more information about the Xilinx DDR primitives see:
 -}
 
 {-# LANGUAGE CPP              #-}
-{-# LANGUAGE DataKinds        #-}
 {-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE MagicHash        #-}
 {-# LANGUAGE TypeFamilies     #-}
-{-# LANGUAGE TypeOperators    #-}
-#if __GLASGOW_HASKELL__ >= 806
-{-# LANGUAGE NoStarIsType #-}
-#endif
 
 module Clash.Xilinx.DDR
   ( iddr

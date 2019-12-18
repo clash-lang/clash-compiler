@@ -1,9 +1,5 @@
 {-# LANGUAGE CPP              #-}
-{-# LANGUAGE DataKinds        #-}
 {-# LANGUAGE DeriveAnyClass   #-}
-{-# LANGUAGE DeriveGeneric    #-}
-{-# LANGUAGE MagicHash        #-}
-{-# LANGUAGE TypeApplications #-}
 
 module Clash.Tests.NFDataX where
 

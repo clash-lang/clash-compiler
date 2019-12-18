@@ -7,13 +7,9 @@ Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
 Generic clock related utilities.
 -}
 
-{-# LANGUAGE DataKinds           #-}
 {-# LANGUAGE FlexibleInstances   #-}
 {-# LANGUAGE GADTs               #-}
 {-# LANGUAGE TemplateHaskell     #-}
-{-# LANGUAGE InstanceSigs        #-}
-{-# LANGUAGE TypeApplications    #-}
-{-# LANGUAGE ScopedTypeVariables #-}
 
 module Clash.Clocks (Clocks, clocks) where
 

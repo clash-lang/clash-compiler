@@ -10,10 +10,11 @@ Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
 {-# LANGUAGE RoleAnnotations #-}
 module Clash.Sized.Internal.Index where
 
+import Data.Kind (Type)
 import GHC.TypeLits (KnownNat, Nat)
 
 type role Index phantom
-data Index :: Nat -> *
+data Index :: Nat -> Type
 
 instance KnownNat n => Num (Index n)
 toInteger# :: Index n -> Integer

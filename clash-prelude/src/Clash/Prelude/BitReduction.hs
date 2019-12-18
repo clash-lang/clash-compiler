@@ -5,8 +5,6 @@ Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
 -}
 
 {-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE MagicHash        #-}
-
 {-# LANGUAGE Trustworthy #-}
 
 {-# OPTIONS_HADDOCK show-extensions #-}

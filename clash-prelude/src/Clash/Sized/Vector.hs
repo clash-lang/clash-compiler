@@ -5,27 +5,14 @@ License    :  BSD2 (see the file LICENSE)
 Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
 -}
 
-{-# LANGUAGE BangPatterns         #-}
 {-# LANGUAGE CPP                  #-}
-{-# LANGUAGE DataKinds            #-}
 {-# LANGUAGE FlexibleInstances    #-}
 {-# LANGUAGE GADTs                #-}
-{-# LANGUAGE InstanceSigs         #-}
-{-# LANGUAGE KindSignatures       #-}
-{-# LANGUAGE MagicHash            #-}
 {-# LANGUAGE PatternSynonyms      #-}
-{-# LANGUAGE Rank2Types           #-}
-{-# LANGUAGE ScopedTypeVariables  #-}
+{-# LANGUAGE RankNTypes           #-}
 {-# LANGUAGE TemplateHaskell      #-}
-{-# LANGUAGE TupleSections        #-}
-{-# LANGUAGE TypeApplications     #-}
 {-# LANGUAGE TypeFamilies         #-}
-{-# LANGUAGE TypeOperators        #-}
 {-# LANGUAGE UndecidableInstances #-}
-{-# LANGUAGE ViewPatterns         #-}
-#if __GLASGOW_HASKELL__ >= 806
-{-# LANGUAGE NoStarIsType #-}
-#endif
 
 {-# LANGUAGE Trustworthy #-}
 
@@ -157,6 +144,7 @@ import Clash.XException
 >>> :set -XTypeApplications
 >>> :set -fplugin GHC.TypeLits.Normalise
 >>> import Clash.Prelude
+>>> import Data.Kind
 >>> let compareSwapL a b = if a < b then (a,b) else (b,a)
 >>> :{
 let sortV xs = map fst sorted :< (snd (last sorted))
@@ -182,13 +170,13 @@ let sortV_flip xs = map fst sorted :< (snd (last sorted))
         sorted = zipWith (flip compareSwapL) rights lefts
 :}
 
->>> data Append (m :: Nat) (a :: *) (f :: TyFun Nat *) :: *
+>>> data Append (m :: Nat) (a :: Type) (f :: TyFun Nat Type) :: Type
 >>> type instance Apply (Append m a) l = Vec (l + m) a
 >>> let append' xs ys = dfold (Proxy :: Proxy (Append m a)) (const (:>)) ys xs
 >>> let compareSwap a b = if a > b then (a,b) else (b,a)
 >>> let insert y xs     = let (y',xs') = mapAccumL compareSwap y xs in xs' :< y'
 >>> let insertionSort   = vfold (const insert)
->>> data IIndex (f :: TyFun Nat *) :: *
+>>> data IIndex (f :: TyFun Nat Type) :: Type
 >>> :set -XUndecidableInstances
 >>> type instance Apply IIndex l = Index ((2^l)+1)
 >>> :{

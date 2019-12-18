@@ -197,10 +197,6 @@ g = ...
 
 -}
 
-{-# LANGUAGE DeriveDataTypeable #-}
-{-# LANGUAGE DeriveGeneric      #-}
-{-# LANGUAGE DeriveLift         #-}
-
 {-# LANGUAGE TemplateHaskellQuotes #-}
 
 {-# LANGUAGE Safe #-}

@@ -19,6 +19,7 @@ codes:
 
 @
 {\-\# LANGUAGE RecordWildCards, TupleSections, DeriveAnyClass \#-\}
+
 module CPU where
 
 import Clash.Explicit.Prelude
@@ -373,15 +374,7 @@ This concludes the short introduction to using 'blockRam'.
 
 -}
 
-{-# LANGUAGE BangPatterns        #-}
-{-# LANGUAGE DataKinds           #-}
 {-# LANGUAGE GADTs               #-}
-{-# LANGUAGE KindSignatures      #-}
-{-# LANGUAGE MagicHash           #-}
-{-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE TypeApplications    #-}
-{-# LANGUAGE TypeOperators       #-}
-
 {-# LANGUAGE Trustworthy #-}
 
 {-# OPTIONS_GHC -fplugin GHC.TypeLits.KnownNat.Solver #-}

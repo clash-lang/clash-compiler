@@ -20,8 +20,6 @@ You can generate more 'SNat' literals using 'decLiteralsD' from "Clash.Promoted.
 
 {-# LANGUAGE CPP             #-}
 {-# LANGUAGE TemplateHaskell #-}
-{-# LANGUAGE DataKinds       #-}
-
 {-# LANGUAGE Trustworthy #-}
 
 {-# OPTIONS_HADDOCK show-extensions, prune #-}

@@ -3,6 +3,7 @@
   License     :  BSD2 (see the file LICENSE)
   Maintainer  :  Christiaan Baaij <christiaan.baaij@gmail.com>
 -}
+
 module Clash.Class.AutoReg
   ( AutoReg (autoReg)
   , deriveAutoReg

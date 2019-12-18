@@ -9,9 +9,7 @@
   (<https://github.com/clash-lang/clash-compiler/issues>).
 -}
 {-# LANGUAGE DeriveAnyClass #-}
-{-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE PolyKinds     #-}
-{-# LANGUAGE TypeOperators #-}
 {-# LANGUAGE Safe #-}
 
 module Clash.Annotations.SynthesisAttributes

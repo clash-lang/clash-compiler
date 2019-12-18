@@ -4,18 +4,11 @@
   Maintainer  :  Christiaan Baaij <christiaan.baaij@gmail.com>
 -}
 {-# LANGUAGE CPP                  #-}
-{-# LANGUAGE DataKinds            #-}
 {-# LANGUAGE FlexibleContexts     #-}
 {-# LANGUAGE FlexibleInstances    #-}
-{-# LANGUAGE InstanceSigs         #-}
-{-# LANGUAGE ScopedTypeVariables  #-}
 {-# LANGUAGE TemplateHaskell      #-}
-{-# LANGUAGE TypeApplications     #-}
 {-# LANGUAGE TypeFamilies         #-}
-{-# LANGUAGE TypeOperators        #-}
 {-# LANGUAGE UndecidableInstances #-} -- needed for constraint on the Fixed instance
-{-# LANGUAGE ViewPatterns         #-}
-
 #if __GLASGOW_HASKELL__ < 806
 {-# OPTIONS_GHC -Wwarn=unused-pattern-binds #-}
 #endif

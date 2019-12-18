@@ -1,8 +1,5 @@
-{-# LANGUAGE BinaryLiterals  #-}
-{-# LANGUAGE DataKinds       #-}
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE LambdaCase      #-}
-{-# LANGUAGE ViewPatterns    #-}
 
 module Clash.Tests.BitVector where
 
