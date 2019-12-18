@@ -32,13 +32,12 @@ where
 
 -- External Modules
 import           Control.Lens                ((^.), (%~), (&), (%=))
-import           Control.Monad.RWS.Lazy      (RWS)
-import qualified Control.Monad.RWS.Lazy      as RWS
+import           Control.Monad.RWS.Strict    (RWS)
+import qualified Control.Monad.RWS.Strict    as RWS
 import qualified Data.ByteString.Char8       as Char8
 import           Data.Hashable               (Hashable (..))
-import           Data.HashMap.Lazy           (HashMap)
-import qualified Data.HashMap.Lazy           as HashMap
-import qualified Data.HashMap.Strict         as HSM
+import           Data.HashMap.Strict         (HashMap)
+import qualified Data.HashMap.Strict         as HashMap
 import           Data.Maybe                  (catMaybes,fromMaybe,listToMaybe)
 #if !MIN_VERSION_base(4,11,0)
 import           Data.Semigroup
@@ -131,7 +130,7 @@ data GHC2CoreState
 makeLenses ''GHC2CoreState
 
 emptyGHC2CoreState :: GHC2CoreState
-emptyGHC2CoreState = GHC2CoreState C.emptyUniqMap HSM.empty
+emptyGHC2CoreState = GHC2CoreState C.emptyUniqMap HashMap.empty
 
 newtype SrcSpanRB = SrcSpanRB {unSrcSpanRB :: SrcSpan}
 
