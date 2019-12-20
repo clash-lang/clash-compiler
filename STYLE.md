@@ -183,6 +183,27 @@ exceptions =
   :> West :> Middle :> Nil
 ```
 
+### Language pragmas
+Place LANGUAGE pragmas right after a module's documentation. Do not align the `#-}`s. `Safe`, `Unsafe`, or in some way "special" language pragmas should follow the normal ones separated by a single blank line. Pragmas should be ordered alphabetically. Example:
+
+```haskell
+{-|
+  .. docs ..
+-}
+
+{-# LANGUAGE CPP #-}
+{-# LANGUAGE DataKinds #-}
+{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE QuasiQuotes #-}
+
+#if __GLASGOW_HASKELL__ < 806
+{-# LANGUAGE TypeInType #-}
+#endif
+
+{-# LANGUAGE Safe #-}
+```
+
+
 ### Pragmas
 
 Put pragmas immediately following the function they apply to. Example:
