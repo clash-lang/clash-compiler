@@ -5,11 +5,11 @@
   License     :  BSD2 (see the file LICENSE)
   Maintainer  :  Christiaan Baaij <christiaan.baaij@gmail.com>
 -}
-{-# LANGUAGE CPP                        #-}
-{-# LANGUAGE GADTs                      #-}
+{-# LANGUAGE CPP #-}
+{-# LANGUAGE GADTs #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
-{-# LANGUAGE MultiParamTypeClasses      #-}
-{-# LANGUAGE TypeFamilies               #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE TypeFamilies #-}
 
 #if __GLASGOW_HASKELL__ < 806
 {-# LANGUAGE TypeInType #-}

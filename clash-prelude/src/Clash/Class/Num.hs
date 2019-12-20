@@ -5,7 +5,7 @@ Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
 -}
 
 {-# LANGUAGE MultiParamTypeClasses #-}
-{-# LANGUAGE TypeFamilies          #-}
+{-# LANGUAGE TypeFamilies #-}
 
 {-# LANGUAGE Safe #-}
 

@@ -1,5 +1,5 @@
 {-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE DataKinds         #-}
+{-# LANGUAGE DataKinds #-}
 
 module TemplateFunction where
 

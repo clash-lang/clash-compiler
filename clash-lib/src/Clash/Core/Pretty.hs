@@ -9,8 +9,8 @@
 
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE TemplateHaskell   #-}
-{-# LANGUAGE LambdaCase        #-}
+{-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE LambdaCase #-}
 
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 

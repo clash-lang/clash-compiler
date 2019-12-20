@@ -7,11 +7,11 @@
   Term representation in the CoreHW language: System F + LetRec + Case
 -}
 
-{-# LANGUAGE DeriveAnyClass        #-}
-{-# LANGUAGE FlexibleInstances     #-}
-{-# LANGUAGE LambdaCase            #-}
+{-# LANGUAGE DeriveAnyClass #-}
+{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
-{-# LANGUAGE TemplateHaskell       #-}
+{-# LANGUAGE TemplateHaskell #-}
 
 module Clash.Core.Term
   ( Term (..)

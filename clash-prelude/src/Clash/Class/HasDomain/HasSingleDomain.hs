@@ -4,12 +4,12 @@ License    :  BSD2 (see the file LICENSE)
 Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
 -}
 
-{-# LANGUAGE CPP                  #-}
-{-# LANGUAGE ConstraintKinds      #-}
-{-# LANGUAGE PolyKinds            #-}
-{-# LANGUAGE FlexibleInstances    #-}
-{-# LANGUAGE TemplateHaskell      #-}
-{-# LANGUAGE TypeFamilies         #-}
+{-# LANGUAGE CPP #-}
+{-# LANGUAGE ConstraintKinds #-}
+{-# LANGUAGE PolyKinds #-}
+{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE UndecidableInstances #-}
 
 #if __GLASGOW_HASKELL__ < 806

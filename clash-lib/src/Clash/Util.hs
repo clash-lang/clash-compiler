@@ -6,11 +6,11 @@
   Assortment of utility function used in the Clash library
 -}
 
-{-# LANGUAGE CPP                  #-}
-{-# LANGUAGE FlexibleInstances    #-}
-{-# LANGUAGE MagicHash            #-}
-{-# LANGUAGE OverloadedStrings    #-}
-{-# LANGUAGE RankNTypes           #-}
+{-# LANGUAGE CPP #-}
+{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE MagicHash #-}
+{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE RankNTypes #-}
 
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 

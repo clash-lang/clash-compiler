@@ -18,9 +18,9 @@ to dedicated hardware resources use the functions from "Clash.Intel.DDR"
 or "Clash.Xilinx.DDR".
 -}
 
-{-# LANGUAGE CPP                 #-}
-{-# LANGUAGE FlexibleContexts    #-}
-{-# LANGUAGE TypeFamilies        #-}
+{-# LANGUAGE CPP #-}
+{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE TypeFamilies #-}
 
 module Clash.Explicit.DDR
   ( ddrIn

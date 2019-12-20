@@ -4,8 +4,8 @@ License    :  BSD2 (see the file LICENSE)
 Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
 -}
 
-{-# LANGUAGE PolyKinds          #-}
-{-# LANGUAGE TypeFamilies       #-}
+{-# LANGUAGE PolyKinds #-}
+{-# LANGUAGE TypeFamilies #-}
 
 module Clash.Class.HasDomain.Common
   ( Unlines

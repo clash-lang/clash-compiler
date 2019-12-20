@@ -7,13 +7,13 @@
   Generate VHDL for assorted Netlist datatypes
 -}
 
-{-# LANGUAGE CPP                 #-}
-{-# LANGUAGE LambdaCase          #-}
-{-# LANGUAGE MultiWayIf          #-}
-{-# LANGUAGE OverloadedStrings   #-}
-{-# LANGUAGE RecursiveDo         #-}
-{-# LANGUAGE TemplateHaskell     #-}
-{-# LANGUAGE TypeFamilies        #-}
+{-# LANGUAGE CPP #-}
+{-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE MultiWayIf #-}
+{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE RecursiveDo #-}
+{-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE TypeFamilies #-}
 
 module Clash.Backend.VHDL (VHDLState) where
 

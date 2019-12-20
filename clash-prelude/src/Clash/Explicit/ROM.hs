@@ -8,8 +8,8 @@ Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
 ROMs
 -}
 
-{-# LANGUAGE GADTs               #-}
-{-# LANGUAGE RankNTypes          #-}
+{-# LANGUAGE GADTs #-}
+{-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE Trustworthy #-}
 
 {-# OPTIONS_GHC -fplugin GHC.TypeLits.KnownNat.Solver #-}

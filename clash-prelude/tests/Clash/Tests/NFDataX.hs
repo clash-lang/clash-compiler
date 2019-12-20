@@ -1,5 +1,5 @@
-{-# LANGUAGE CPP              #-}
-{-# LANGUAGE DeriveAnyClass   #-}
+{-# LANGUAGE CPP #-}
+{-# LANGUAGE DeriveAnyClass #-}
 
 module Clash.Tests.NFDataX where
 

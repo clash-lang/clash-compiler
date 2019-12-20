@@ -8,10 +8,10 @@
   Type and instance definitions for Primitive
 -}
 
-{-# LANGUAGE DeriveAnyClass    #-}
+{-# LANGUAGE DeriveAnyClass #-}
 {-# LANGUAGE FlexibleInstances #-}
-{-# LANGUAGE LambdaCase        #-}
-{-# LANGUAGE NamedFieldPuns    #-}
+{-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE OverloadedStrings #-}
 
 module Clash.Primitives.Types

@@ -6,7 +6,7 @@
   Transform/format a Netlist Identifier so that it is acceptable as a HDL identifier
 -}
 
-{-# LANGUAGE CPP               #-}
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE OverloadedStrings #-}
 
 module Clash.Netlist.Id

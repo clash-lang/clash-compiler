@@ -29,8 +29,8 @@
   Some circuit examples can be found in "Clash.Examples".
 -}
 
-{-# LANGUAGE FlexibleContexts    #-}
-{-# LANGUAGE NoImplicitPrelude   #-}
+{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE Safe #-}
 
 {-# OPTIONS_HADDOCK show-extensions, not-home #-}

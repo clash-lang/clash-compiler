@@ -8,9 +8,9 @@
   Turn CoreHW terms into normalized CoreHW Terms
 -}
 
-{-# LANGUAGE CPP               #-}
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE TemplateHaskell   #-}
+{-# LANGUAGE TemplateHaskell #-}
 
 {-# OPTIONS_GHC -Wno-unused-imports #-}
 

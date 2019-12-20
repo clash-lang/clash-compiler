@@ -6,10 +6,10 @@
   Maintainer  :  Christiaan Baaij <christiaan.baaij@gmail.com>
 -}
 
-{-# LANGUAGE CPP                 #-}
-{-# LANGUAGE FlexibleContexts    #-}
-{-# LANGUAGE RecordWildCards     #-}
-{-# LANGUAGE TemplateHaskell     #-}
+{-# LANGUAGE CPP #-}
+{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE RecordWildCards #-}
+{-# LANGUAGE TemplateHaskell #-}
 
 module Clash.GHC.LoadModules
   ( loadModules

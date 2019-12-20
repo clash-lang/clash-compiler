@@ -4,12 +4,12 @@ License    :  BSD2 (see the file LICENSE)
 Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
 -}
 
-{-# LANGUAGE CPP                  #-}
-{-# LANGUAGE GADTs                #-}
-{-# LANGUAGE PatternSynonyms      #-}
-{-# LANGUAGE RankNTypes           #-}
-{-# LANGUAGE TemplateHaskell      #-}
-{-# LANGUAGE TypeFamilies         #-}
+{-# LANGUAGE CPP #-}
+{-# LANGUAGE GADTs #-}
+{-# LANGUAGE PatternSynonyms #-}
+{-# LANGUAGE RankNTypes #-}
+{-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE UndecidableInstances #-}
 
 {-# LANGUAGE Trustworthy #-}

@@ -8,15 +8,15 @@
   Utilities for converting Core Type/Term to Netlist datatypes
 -}
 
-{-# LANGUAGE CPP                 #-}
-{-# LANGUAGE FlexibleContexts    #-}
+{-# LANGUAGE CPP #-}
+{-# LANGUAGE FlexibleContexts #-}
 #if !MIN_VERSION_ghc(8,8,0)
 {-# LANGUAGE MonadFailDesugaring #-}
 #endif
-{-# LANGUAGE MultiWayIf          #-}
-{-# LANGUAGE NamedFieldPuns      #-}
-{-# LANGUAGE OverloadedStrings   #-}
-{-# LANGUAGE TemplateHaskell     #-}
+{-# LANGUAGE MultiWayIf #-}
+{-# LANGUAGE NamedFieldPuns #-}
+{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE TemplateHaskell #-}
 
 module Clash.Netlist.Util where
 

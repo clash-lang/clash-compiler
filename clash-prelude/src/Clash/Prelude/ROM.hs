@@ -9,7 +9,7 @@ ROMs
 -}
 
 {-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE RankNTypes       #-}
+{-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE Safe #-}
 
 {-# OPTIONS_GHC -fplugin GHC.TypeLits.KnownNat.Solver #-}

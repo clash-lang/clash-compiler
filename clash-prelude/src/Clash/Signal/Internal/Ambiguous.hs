@@ -1,6 +1,6 @@
-{-# LANGUAGE AllowAmbiguousTypes    #-}
-{-# LANGUAGE RankNTypes             #-}
-{-# LANGUAGE TypeFamilies           #-}
+{-# LANGUAGE AllowAmbiguousTypes #-}
+{-# LANGUAGE RankNTypes #-}
+{-# LANGUAGE TypeFamilies #-}
 
 module Clash.Signal.Internal.Ambiguous
   ( knownVDomain

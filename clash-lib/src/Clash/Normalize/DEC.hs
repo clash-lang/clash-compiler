@@ -27,8 +27,8 @@
 -}
 
 {-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE RecursiveDo       #-}
-{-# LANGUAGE TemplateHaskell   #-}
+{-# LANGUAGE RecursiveDo #-}
+{-# LANGUAGE TemplateHaskell #-}
 
 module Clash.Normalize.DEC
   (collectGlobals

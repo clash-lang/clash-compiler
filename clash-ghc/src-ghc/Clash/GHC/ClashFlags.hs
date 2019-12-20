@@ -5,8 +5,8 @@
   Maintainer  :  Christiaan Baaij <christiaan.baaij@gmail.com>
 -}
 
-{-# LANGUAGE CPP           #-}
-{-# LANGUAGE LambdaCase    #-}
+{-# LANGUAGE CPP #-}
+{-# LANGUAGE LambdaCase #-}
 
 module Clash.GHC.ClashFlags
   ( parseClashFlags

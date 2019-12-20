@@ -1,10 +1,10 @@
 {-# OPTIONS_GHC -Wwarn #-}
 
-{-# LANGUAGE CPP              #-}
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE GADTs            #-}
-{-# LANGUAGE TemplateHaskell  #-}
-{-# LANGUAGE TypeFamilies     #-}
+{-# LANGUAGE GADTs #-}
+{-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE TypeFamilies #-}
 
 module Clash.Tests.TopEntityGeneration where
 

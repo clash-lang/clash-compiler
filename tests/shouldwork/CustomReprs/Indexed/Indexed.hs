@@ -1,5 +1,5 @@
 {-# LANGUAGE TemplateHaskell #-}
-{-# LANGUAGE QuasiQuotes     #-}
+{-# LANGUAGE QuasiQuotes #-}
 
 module Indexed where
 

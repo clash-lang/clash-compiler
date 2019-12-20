@@ -4,8 +4,8 @@ License    :  BSD2 (see the file LICENSE)
 Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
 -}
 
-{-# LANGUAGE CPP           #-}
-{-# LANGUAGE TypeFamilies  #-}
+{-# LANGUAGE CPP #-}
+{-# LANGUAGE TypeFamilies #-}
 
 {-# OPTIONS_GHC -fplugin GHC.TypeLits.KnownNat.Solver #-}
 

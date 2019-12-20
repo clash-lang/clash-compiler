@@ -5,8 +5,8 @@ License    :  BSD2 (see the file LICENSE)
 Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
 -}
 
-{-# LANGUAGE TemplateHaskell   #-}
-{-# LANGUAGE QuasiQuotes       #-}
+{-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE QuasiQuotes #-}
 
 module Clash.Clocks.Deriving (deriveClocksInstances) where
 

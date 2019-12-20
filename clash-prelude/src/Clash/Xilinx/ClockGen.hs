@@ -7,7 +7,7 @@ PLL and other clock-related components for Xilinx FPGAs
 -}
 
 {-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE GADTs            #-}
+{-# LANGUAGE GADTs #-}
 
 module Clash.Xilinx.ClockGen where
 

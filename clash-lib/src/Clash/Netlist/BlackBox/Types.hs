@@ -7,7 +7,7 @@
   Types used in BlackBox modules
 -}
 
-{-# LANGUAGE CPP            #-}
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE DeriveAnyClass #-}
 -- since GHC 8.6 we can haddock individual contructor fields \o/
 #if __GLASGOW_HASKELL__ >= 806

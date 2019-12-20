@@ -8,9 +8,9 @@ Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
 RAM primitives with a combinational read port.
 -}
 
-{-# LANGUAGE CPP                 #-}
-{-# LANGUAGE FlexibleContexts    #-}
-{-# LANGUAGE TypeFamilies        #-}
+{-# LANGUAGE CPP #-}
+{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE Safe #-}
 
 {-# OPTIONS_HADDOCK show-extensions #-}

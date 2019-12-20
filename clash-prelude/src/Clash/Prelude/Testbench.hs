@@ -6,8 +6,8 @@ License    :  BSD2 (see the file LICENSE)
 Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
 -}
 
-{-# LANGUAGE FlexibleContexts    #-}
-{-# LANGUAGE TypeFamilies        #-}
+{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE Unsafe #-}
 
 {-# OPTIONS_HADDOCK show-extensions #-}

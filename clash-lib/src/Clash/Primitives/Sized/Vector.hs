@@ -1,7 +1,7 @@
-{-# LANGUAGE CPP                 #-}
-{-# LANGUAGE OverloadedStrings   #-}
-{-# LANGUAGE QuasiQuotes         #-}
-{-# LANGUAGE TemplateHaskell     #-}
+{-# LANGUAGE CPP #-}
+{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE QuasiQuotes #-}
+{-# LANGUAGE TemplateHaskell #-}
 
 module Clash.Primitives.Sized.Vector where
 

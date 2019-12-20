@@ -3,11 +3,11 @@
   License     :  BSD2 (see the file LICENSE)
   Maintainer  :  Christiaan Baaij <christiaan.baaij@gmail.com>
 -}
-{-# LANGUAGE CPP                  #-}
-{-# LANGUAGE FlexibleContexts     #-}
-{-# LANGUAGE FlexibleInstances    #-}
-{-# LANGUAGE TemplateHaskell      #-}
-{-# LANGUAGE TypeFamilies         #-}
+{-# LANGUAGE CPP #-}
+{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE UndecidableInstances #-} -- needed for constraint on the Fixed instance
 #if __GLASGOW_HASKELL__ < 806
 {-# OPTIONS_GHC -Wwarn=unused-pattern-binds #-}

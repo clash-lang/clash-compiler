@@ -1,7 +1,7 @@
 {-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE DataKinds         #-}
-{-# LANGUAGE ViewPatterns      #-}
-{-# LANGUAGE TypeOperators     #-}
+{-# LANGUAGE DataKinds #-}
+{-# LANGUAGE ViewPatterns #-}
+{-# LANGUAGE TypeOperators #-}
 
 module BlackBoxFunctionHO where
 

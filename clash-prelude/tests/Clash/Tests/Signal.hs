@@ -4,10 +4,10 @@ License    :  BSD2 (see the file LICENSE)
 Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
 -}
 
-{-# LANGUAGE CPP                       #-}
-{-# LANGUAGE FlexibleContexts          #-}
+{-# LANGUAGE CPP #-}
+{-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE NoMonomorphismRestriction #-}
-{-# LANGUAGE RankNTypes                #-}
+{-# LANGUAGE RankNTypes #-}
 
 {-# OPTIONS_GHC -Wno-missing-signatures #-}
 

@@ -7,7 +7,7 @@
   Builtin Type and Kind definitions
 -}
 
-{-# LANGUAGE CPP               #-}
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE OverloadedStrings #-}
 
 module Clash.Core.TysPrim

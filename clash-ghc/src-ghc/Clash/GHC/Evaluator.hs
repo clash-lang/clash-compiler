@@ -6,12 +6,12 @@
   Maintainer  :  Christiaan Baaij <christiaan.baaij@gmail.com>
 -}
 
-{-# LANGUAGE CPP               #-}
-{-# LANGUAGE MagicHash         #-}
+{-# LANGUAGE CPP #-}
+{-# LANGUAGE MagicHash #-}
 {-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE RankNTypes        #-}
-{-# LANGUAGE TemplateHaskell   #-}
-{-# LANGUAGE UnboxedTuples     #-}
+{-# LANGUAGE RankNTypes #-}
+{-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE UnboxedTuples #-}
 
 module Clash.GHC.Evaluator where
 

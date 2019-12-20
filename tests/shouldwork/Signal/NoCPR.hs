@@ -1,4 +1,4 @@
-{-# LANGUAGE DataKinds     #-}
+{-# LANGUAGE DataKinds #-}
 
 module NoCPR where
 

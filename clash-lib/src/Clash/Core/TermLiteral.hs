@@ -5,8 +5,8 @@ Maintainer  :  Christiaan Baaij <christiaan.baaij@gmail.com>
 
 Tools to convert a 'Term' into its "real" representation
 -}
-{-# LANGUAGE FlexibleInstances     #-}
-{-# LANGUAGE TemplateHaskell       #-}
+{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE TemplateHaskell #-}
 
 module Clash.Core.TermLiteral
   ( TermLiteral

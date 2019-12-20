@@ -23,14 +23,14 @@ BEWARE: rounding by truncation introduces a sign bias!
 * Truncation for negative numbers effectively results in: round towards -infinity.
 -}
 
-{-# LANGUAGE ConstraintKinds            #-}
-{-# LANGUAGE FlexibleContexts           #-}
+{-# LANGUAGE ConstraintKinds #-}
+{-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
-{-# LANGUAGE MultiParamTypeClasses      #-}
-{-# LANGUAGE StandaloneDeriving         #-}
-{-# LANGUAGE TemplateHaskell            #-}
-{-# LANGUAGE TypeFamilies               #-}
-{-# LANGUAGE UndecidableInstances       #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE StandaloneDeriving #-}
+{-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE UndecidableInstances #-}
 
 {-# LANGUAGE Trustworthy #-}
 

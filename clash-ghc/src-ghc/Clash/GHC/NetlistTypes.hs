@@ -6,7 +6,7 @@
 -}
 
 {-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE TemplateHaskell   #-}
+{-# LANGUAGE TemplateHaskell #-}
 
 module Clash.GHC.NetlistTypes
   (ghcTypeToHWType)

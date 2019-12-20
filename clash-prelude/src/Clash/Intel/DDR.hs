@@ -13,9 +13,9 @@ see ALTDDIO userguide for the specifics:
 <https://www.altera.com/content/dam/altera-www/global/en_US/pdfs/literature/ug/ug_altddio.pdf>
 -}
 
-{-# LANGUAGE CPP              #-}
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE TypeFamilies     #-}
+{-# LANGUAGE TypeFamilies #-}
 
 module Clash.Intel.DDR
   ( altddioIn

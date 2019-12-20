@@ -8,9 +8,9 @@
   Utility functions to generate Primitives
 -}
 
-{-# LANGUAGE NamedFieldPuns    #-}
+{-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE RecordWildCards   #-}
+{-# LANGUAGE RecordWildCards #-}
 
 module Clash.Primitives.Util
   ( generatePrimMap

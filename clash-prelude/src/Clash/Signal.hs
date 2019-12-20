@@ -66,13 +66,13 @@ never create a clock that goes any faster!
 Check out 'IntelSystem' and 'XilinxSystem' too!
 -}
 
-{-# LANGUAGE CPP                   #-}
-{-# LANGUAGE ConstraintKinds       #-}
-{-# LANGUAGE ExplicitNamespaces    #-}
-{-# LANGUAGE FlexibleContexts      #-}
-{-# LANGUAGE GADTs                 #-}
+{-# LANGUAGE CPP #-}
+{-# LANGUAGE ConstraintKinds #-}
+{-# LANGUAGE ExplicitNamespaces #-}
+{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE GADTs #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
-{-# LANGUAGE RankNTypes            #-}
+{-# LANGUAGE RankNTypes #-}
 
 {-# LANGUAGE Trustworthy #-}
 

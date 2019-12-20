@@ -10,10 +10,10 @@
 
 -}
 
-{-# LANGUAGE LambdaCase        #-}
-{-# LANGUAGE MagicHash         #-}
+{-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE MagicHash #-}
 {-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE TemplateHaskell   #-}
+{-# LANGUAGE TemplateHaskell #-}
 
 module Clash.Core.Evaluator where
 

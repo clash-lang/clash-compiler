@@ -1,6 +1,6 @@
-{-# LANGUAGE CPP                        #-}
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
-{-# LANGUAGE OverloadedStrings          #-}
+{-# LANGUAGE OverloadedStrings #-}
 
 module Clash.Unique
   ( -- * Unique

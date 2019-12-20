@@ -6,11 +6,11 @@ Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
 Hidden arguments
 -}
 
-{-# LANGUAGE AllowAmbiguousTypes    #-}
-{-# LANGUAGE ConstraintKinds        #-}
+{-# LANGUAGE AllowAmbiguousTypes #-}
+{-# LANGUAGE ConstraintKinds #-}
 {-# LANGUAGE FunctionalDependencies #-}
-{-# LANGUAGE MultiParamTypeClasses  #-}
-{-# LANGUAGE RankNTypes             #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE Trustworthy #-}
 
 module Clash.Hidden

@@ -1,9 +1,9 @@
-{-# LANGUAGE AllowAmbiguousTypes   #-}
-{-# LANGUAGE DeriveLift            #-}
+{-# LANGUAGE AllowAmbiguousTypes #-}
+{-# LANGUAGE DeriveLift #-}
 {-# LANGUAGE PartialTypeSignatures #-}
-{-# LANGUAGE ScopedTypeVariables   #-}
-{-# LANGUAGE StandaloneDeriving    #-}
-{-# LANGUAGE ViewPatterns          #-}
+{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE StandaloneDeriving #-}
+{-# LANGUAGE ViewPatterns #-}
 
 
 {-# OPTIONS_GHC -Wno-partial-type-signatures #-}

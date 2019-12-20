@@ -69,7 +69,7 @@ __>>> L.tail $ sampleN 4 $ g systemClockGen (fromList [3..5])__
 @
 -}
 
-{-# LANGUAGE FlexibleContexts    #-}
+{-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE Unsafe #-}
 
 {-# OPTIONS_HADDOCK show-extensions #-}

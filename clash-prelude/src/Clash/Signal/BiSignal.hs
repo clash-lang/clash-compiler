@@ -83,14 +83,14 @@ topEntity clk rst = readFromBiSignal bus'
 @
 -}
 
-{-# LANGUAGE CPP                    #-}
-{-# LANGUAGE FlexibleContexts       #-}
-{-# LANGUAGE FlexibleInstances      #-}
-{-# LANGUAGE GADTs                  #-}
-{-# LANGUAGE MultiParamTypeClasses  #-}
-{-# LANGUAGE RankNTypes             #-}
-{-# LANGUAGE TypeFamilies           #-}
-{-# LANGUAGE UndecidableInstances   #-}
+{-# LANGUAGE CPP #-}
+{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE GADTs #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE RankNTypes #-}
+{-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE UndecidableInstances #-}
 
 #if __GLASGOW_HASKELL__ < 806
 {-# LANGUAGE TypeInType #-}

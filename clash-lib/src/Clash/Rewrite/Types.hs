@@ -8,12 +8,12 @@
   Type and instance definitions for Rewrite modules
 -}
 
-{-# LANGUAGE CPP                        #-}
-{-# LANGUAGE FlexibleInstances          #-}
-{-# LANGUAGE MultiParamTypeClasses      #-}
+{-# LANGUAGE CPP #-}
+{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
-{-# LANGUAGE TemplateHaskell            #-}
-{-# LANGUAGE DeriveAnyClass             #-}
+{-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE DeriveAnyClass #-}
 
 module Clash.Rewrite.Types where
 

@@ -11,8 +11,8 @@ This module defines the explicitly clocked counterparts of the functions
 defined in "Clash.Prelude".
 -}
 
-{-# LANGUAGE FlexibleContexts    #-}
-{-# LANGUAGE NoImplicitPrelude   #-}
+{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE Safe #-}
 
 {-# OPTIONS_HADDOCK show-extensions, not-home #-}

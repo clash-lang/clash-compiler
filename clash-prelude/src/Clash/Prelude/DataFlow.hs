@@ -8,9 +8,9 @@ Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
 Self-synchronizing circuits based on data-flow principles.
 -}
 
-{-# LANGUAGE FlexibleInstances     #-}
+{-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
-{-# LANGUAGE TypeFamilies          #-}
+{-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE Safe #-}
 
 {-# OPTIONS_GHC -fplugin GHC.TypeLits.KnownNat.Solver #-}

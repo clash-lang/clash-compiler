@@ -129,11 +129,11 @@ can potentially introduce situations prone to meta-stability:
 
 -}
 
-{-# LANGUAGE ExplicitNamespaces    #-}
-{-# LANGUAGE FlexibleInstances     #-}
-{-# LANGUAGE GADTs                 #-}
+{-# LANGUAGE ExplicitNamespaces #-}
+{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE GADTs #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
-{-# LANGUAGE RankNTypes            #-}
+{-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE Trustworthy #-}
 
 {-# OPTIONS_GHC -fplugin=GHC.TypeLits.Normalise #-}

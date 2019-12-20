@@ -1,4 +1,4 @@
-{-# LANGUAGE CPP             #-}
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE TemplateHaskell #-}
 
 module Clash.Signal.Bundle.Internal where

@@ -1,5 +1,5 @@
 {-# LANGUAGE TemplateHaskell #-}
-{-# LANGUAGE LambdaCase      #-}
+{-# LANGUAGE LambdaCase #-}
 
 module Clash.Tests.BitVector where
 

@@ -4,8 +4,8 @@
   Maintainer  :  Christiaan Baaij <christiaan.baaij@gmail.com>
 -}
 
-{-# LANGUAGE DeriveAnyClass     #-}
-{-# LANGUAGE TemplateHaskell    #-}
+{-# LANGUAGE DeriveAnyClass #-}
+{-# LANGUAGE TemplateHaskell #-}
 
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 

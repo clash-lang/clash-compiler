@@ -6,10 +6,10 @@
   Maintainer  :  Christiaan Baaij <christiaan.baaij@gmail.com>
 -}
 
-{-# LANGUAGE CPP              #-}
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE TemplateHaskell  #-}
+{-# LANGUAGE TemplateHaskell #-}
 
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 

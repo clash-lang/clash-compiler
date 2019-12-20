@@ -373,8 +373,8 @@ This concludes the short introduction to using 'blockRam'.
 
 -}
 
-{-# LANGUAGE FlexibleContexts    #-}
-{-# LANGUAGE GADTs               #-}
+{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE GADTs #-}
 {-# LANGUAGE Safe #-}
 
 {-# OPTIONS_HADDOCK show-extensions #-}

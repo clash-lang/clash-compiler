@@ -5,11 +5,11 @@
   License     :  BSD2 (see the file LICENSE)
   Maintainer  :  Christiaan Baaij <christiaan.baaij@gmail.com>
 -}
-{-# LANGUAGE CPP                    #-}
-{-# LANGUAGE FlexibleContexts       #-}
-{-# LANGUAGE NoImplicitPrelude      #-}
-{-# LANGUAGE PolyKinds              #-}
-{-# LANGUAGE TypeFamilies           #-}
+{-# LANGUAGE CPP #-}
+{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE NoImplicitPrelude #-}
+{-# LANGUAGE PolyKinds #-}
+{-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE TypeFamilyDependencies #-}
 
 #if __GLASGOW_HASKELL__ < 806

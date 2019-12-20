@@ -46,14 +46,14 @@ makeTopEntity 'topEntity
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 -- Required to 'makeBaseFunctor' of 'Language.Haskell.TH.Syntax.Type'
 
-{-# LANGUAGE CPP                 #-}
-{-# LANGUAGE GADTs               #-}
-{-# LANGUAGE LambdaCase          #-}
-{-# LANGUAGE PatternSynonyms     #-}
-{-# LANGUAGE PolyKinds           #-}
-{-# LANGUAGE StandaloneDeriving  #-}
-{-# LANGUAGE TemplateHaskell     #-}
-{-# LANGUAGE TypeFamilies        #-}
+{-# LANGUAGE CPP #-}
+{-# LANGUAGE GADTs #-}
+{-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE PatternSynonyms #-}
+{-# LANGUAGE PolyKinds #-}
+{-# LANGUAGE StandaloneDeriving #-}
+{-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE TypeFamilies #-}
 
 module Clash.Annotations.TH
   ( -- * To create a Synthesize annotation pragma

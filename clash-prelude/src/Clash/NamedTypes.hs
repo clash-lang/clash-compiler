@@ -33,7 +33,7 @@ fifo @System
 
 -}
 
-{-# LANGUAGE PolyKinds     #-}
+{-# LANGUAGE PolyKinds #-}
 {-# LANGUAGE Safe #-}
 
 {-# OPTIONS_HADDOCK show-extensions #-}

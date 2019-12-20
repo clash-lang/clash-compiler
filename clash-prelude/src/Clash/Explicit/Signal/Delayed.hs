@@ -10,8 +10,8 @@ Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE TypeFamilies #-}
-{-# LANGUAGE UndecidableInstances #-}
 {-# LANGUAGE Trustworthy #-}
+{-# LANGUAGE UndecidableInstances #-}
 
 #if __GLASGOW_HASKELL__ < 806
 {-# LANGUAGE TypeInType #-}
