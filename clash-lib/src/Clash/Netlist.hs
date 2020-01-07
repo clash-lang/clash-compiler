@@ -250,12 +250,12 @@ genComponentT compName componentExpr = do
 
   case resultM of
     Just result -> do
-      Just (NetDecl' _ rw _ _ _) <- mkNetDecl . head $ filter ((==result) . fst) binders
+      Just (NetDecl' _ rw _ _ rIM) <- mkNetDecl . head $ filter ((==result) . fst) binders
 
       let (compOutps',resUnwrappers') = case compOutps of
-            [oport] -> ([(rw,oport)],resUnwrappers)
+            [oport] -> ([(rw,oport,rIM)],resUnwrappers)
             _       -> let NetDecl n res resTy = head resUnwrappers
-                       in  (map (Wire,) compOutps
+                       in  (map (Wire,,Nothing) compOutps
                            ,NetDecl' n rw res (Right resTy) Nothing:tail resUnwrappers
                            )
           component      = Component componentName2 compInps compOutps'
@@ -582,7 +582,7 @@ mkFunApp dstId fun args tickDecls = do
             filteredTypeExprs = filterOnFst (not . isVoidMaybe True) argTypeExprs
             (argTysFiltered, argsFiltered) = unzip filteredTypeExprs
 
-          let compOutp = snd <$> listToMaybe co
+          let compOutp = (\(_,x,_) -> x) <$> listToMaybe co
           if length argTysFiltered == length compInps
             then do
               (argExprs',argDecls') <- (second concat . unzip) <$> mapM (toSimpleVar dstId) (zip argsFiltered argTysFiltered)

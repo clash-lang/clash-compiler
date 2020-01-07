@@ -251,15 +251,18 @@ genVerilog sp seen c = preserveSeen $ do
 sigPort :: Maybe WireOrReg
         -> TextS.Text
         -> HWType
+        -> Maybe Expr
         -> VerilogM Doc
-sigPort wor pName hwType =
+sigPort wor pName hwType iEM =
     addAttrs (hwTypeAttrs hwType)
-      (portType <+> verilogType hwType <+> stringS pName <> encodingNote hwType)
+      (portType <+> verilogType hwType <+> stringS pName <> iE <> encodingNote hwType)
   where
     portType = case wor of
                  Nothing   -> if isBiSignalIn hwType then "inout" else "input"
                  Just Wire -> "output" <+> "wire"
                  Just Reg  -> "output" <+> "reg"
+
+    iE = maybe emptyDoc (noEmptyInit . expr_ False) iEM
 
 module_ :: Component -> VerilogM Doc
 module_ c = addSeen c *> modVerilog <* Mon (imports .= [])
@@ -275,8 +278,8 @@ module_ c = addSeen c *> modVerilog <* Mon (imports .= [])
     modBody    = indent 2 (decls (declarations c)) <> line <> line <> indent 2 (insts (declarations c))
     modEnding  = "endmodule"
 
-    inPorts  = sequence [ sigPort Nothing id_ hwType | (id_, hwType) <- inputs c  ]
-    outPorts = sequence [ sigPort (Just wireOrReg) id_ hwType | (wireOrReg, (id_, hwType)) <- outputs c ]
+    inPorts  = sequence [ sigPort Nothing id_ hwType Nothing | (id_, hwType) <- inputs c  ]
+    outPorts = sequence [ sigPort (Just wireOrReg) id_ hwType iEM | (wireOrReg, (id_, hwType), iEM) <- outputs c ]
 
     -- slightly more readable than 'tupled', makes the output Haskell-y-er
     commafy v = (comma <> space) <> pure v
@@ -317,7 +320,7 @@ wireOrRegDoc Reg  = "reg"
 addSeen :: Component -> VerilogM ()
 addSeen c = do
   let iport = [iName | (iName, _) <- inputs c]
-      oport = [oName | (_, (oName, _)) <- outputs c]
+      oport = [oName | (_, (oName, _), _) <- outputs c]
       nets  = mapMaybe (\case {NetDecl' _ _ i _ _ -> Just i; _ -> Nothing}) $ declarations c
   Mon $ idSeen %= (HashMap.unionWith max (HashMap.fromList (concatMap (map (,0)) [iport,oport,nets])))
 
@@ -391,13 +394,14 @@ decl (NetDecl' noteM wr id_ tyE iEM) =
     attrs = fromMaybe [] (hwTypeAttrs A.<$> either (const Nothing) Just tyE)
     iE    = maybe emptyDoc (noEmptyInit . expr_ False) iEM
 
-    noEmptyInit d = do
-      d1 <- d
-      if isEmpty d1
-         then emptyDoc
-         else (space <> "=" <+> d)
-
 decl _ = return Nothing
+
+noEmptyInit :: VerilogM Doc -> VerilogM Doc
+noEmptyInit d = do
+  d1 <- d
+  if isEmpty d1
+     then emptyDoc
+     else (space <> "=" <+> d)
 
 insts :: [Declaration] -> VerilogM Doc
 insts [] = emptyDoc

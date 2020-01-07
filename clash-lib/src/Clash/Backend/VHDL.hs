@@ -790,13 +790,17 @@ port :: Num t
      -> HWType
      -> VHDLM Doc
      -> Int
+     -> Maybe Expr
      -> VHDLM (Doc, t)
-port elName hwType portDirection fillToN =
-  (,fromIntegral $ TextS.length elName) <$> (encodingNote hwType <> fill fillToN (pretty elName) <+> colon <+> direction <+> sizedQualTyName hwType)
+port elName hwType portDirection fillToN iEM =
+  (,fromIntegral $ TextS.length elName) <$>
+  (encodingNote hwType <> fill fillToN (pretty elName) <+> colon <+> direction
+   <+> sizedQualTyName hwType <> iE)
  where
   direction | isBiSignalIn hwType = "inout"
             | otherwise           = portDirection
 
+  iE = maybe emptyDoc (noEmptyInit . expr_ False) iEM
 
 -- [Note] Hack entity attributes in architecture
 --
@@ -827,15 +831,15 @@ entity c = do
           _     -> indent 2 (rports p) <> "end" <> semi
       )
   where
-    ports l = sequence $ [port iName hwType "in" l | (iName, hwType) <- inputs c]
-                      ++ [port oName hwType "out" l | (_, (oName, hwType)) <- outputs c]
+    ports l = sequence $ [port iName hwType "in" l Nothing | (iName, hwType) <- inputs c]
+                      ++ [port oName hwType "out" l iEM | (_, (oName, hwType), iEM) <- outputs c]
 
     rports p = "port" <> (parens (align (vcat (punctuate semi (pure p))))) <> semi
 
     rattrs      = renderAttrs attrs
     attrs       = inputAttrs ++ outputAttrs
     inputAttrs  = [(id_, attr) | (id_, hwtype) <- inputs c, attr <- hwTypeAttrs hwtype]
-    outputAttrs = [(id_, attr) | (_wireOrReg, (id_, hwtype)) <- outputs c, attr <- hwTypeAttrs hwtype]
+    outputAttrs = [(id_, attr) | (_wireOrReg, (id_, hwtype), _) <- outputs c, attr <- hwTypeAttrs hwtype]
 
 
 architecture :: Component -> VHDLM Doc
@@ -858,7 +862,7 @@ architecture c = do {
    netdecls    = filter isNetDecl (declarations c)
    declAttrs   = [(id_, attr) | NetDecl' _ _ id_ (Right hwtype) _ <- netdecls, attr <- hwTypeAttrs hwtype]
    inputAttrs  = [(id_, attr) | (id_, hwtype) <- inputs c, attr <- hwTypeAttrs hwtype]
-   outputAttrs = [(id_, attr) | (_wireOrReg, (id_, hwtype)) <- outputs c, attr <- hwTypeAttrs hwtype]
+   outputAttrs = [(id_, attr) | (_wireOrReg, (id_, hwtype), _) <- outputs c, attr <- hwTypeAttrs hwtype]
 
    isNetDecl :: Declaration -> Bool
    isNetDecl (NetDecl' _ _ _ (Right _) _) = True
@@ -1251,11 +1255,6 @@ decl l (NetDecl' noteM _ id_ ty iEM) = Just <$> (,fromIntegral (TextS.length id_
   where
     addNote n = mappend ("--" <+> pretty n <> line)
     iE = maybe emptyDoc (noEmptyInit . expr_ False) iEM
-    noEmptyInit d = do
-      d1 <- d
-      if isEmpty d1
-         then emptyDoc
-         else (space <> ":=" <+> d)
 
 decl _ (InstDecl Comp _ nm _ gens pms) = fmap (Just . (,0)) $ do
   { rec (p,ls) <- fmap unzip $ sequence [ (,formalLength i) <$> fill (maximum ls) (expr_ False i) <+> colon <+> portDir dir <+> sizedQualTyName ty | (i,dir,ty,_) <- pms ]
@@ -1275,6 +1274,13 @@ decl _ (InstDecl Comp _ nm _ gens pms) = fmap (Just . (,0)) $ do
     portDir Out = "out"
 
 decl _ _ = return Nothing
+
+noEmptyInit :: VHDLM Doc -> VHDLM Doc
+noEmptyInit d = do
+  d1 <- d
+  if isEmpty d1
+     then emptyDoc
+     else (space <> ":=" <+> d)
 
 stdMatch
   :: Bits a

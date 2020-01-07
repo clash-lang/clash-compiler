@@ -524,9 +524,9 @@ createHDL backend modName seen components top (topName,manifestE) = flip evalSta
       let topInNames = map fst (inputs top)
       topInTypes  <- mapM (fmap (Text.toStrict . renderOneLine) .
                            hdlType (External topName) . snd) (inputs top)
-      let topOutNames = map (fst . snd) (outputs top)
+      let topOutNames = map (fst . (\(_,x,_) -> x)) (outputs top)
       topOutTypes <- mapM (fmap (Text.toStrict . renderOneLine) .
-                           hdlType (External topName) . snd . snd) (outputs top)
+                           hdlType (External topName) . snd . (\(_,x,_) -> x)) (outputs top)
       let compNames = map (componentName . view _4) components
       return (m { portInNames    = topInNames
                 , portInTypes    = topInTypes

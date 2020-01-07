@@ -562,8 +562,8 @@ module_ c =
   modBody    = indent 2 (decls (declarations c)) <> line <> line <> indent 2 (insts (declarations c))
   modEnding  = "endmodule"
 
-  inPorts  = sequence [ sigPort (Nothing,isBiSignalIn ty) (i,ty) | (i,ty)  <- inputs c  ]
-  outPorts = sequence [ sigPort (Just wr,False) p | (wr, p) <- outputs c ]
+  inPorts  = sequence [ sigPort (Nothing,isBiSignalIn ty) (i,ty) Nothing | (i,ty)  <- inputs c  ]
+  outPorts = sequence [ sigPort (Just wr,False) p iEM | (wr, p, iEM) <- outputs c ]
 
   wr2ty (Nothing,isBidirectional)
     | isBidirectional
@@ -574,9 +574,11 @@ module_ c =
     = "output"
 
   -- map a port to its verilog type, port name, and any encoding notes
-  sigPort (wr2ty -> portTy) (nm, hwTy)
+  sigPort (wr2ty -> portTy) (nm, hwTy) iEM
     = addAttrs (hwTypeAttrs hwTy)
-        (portTy <+> sigDecl (stringS nm) hwTy <+> encodingNote hwTy)
+        (portTy <+> sigDecl (stringS nm) hwTy <> iE <+> encodingNote hwTy)
+    where
+      iE = maybe emptyDoc (noEmptyInit . expr_ False) iEM
   -- slightly more readable than 'tupled', makes the output Haskell-y-er
   commafy v = (comma <> space) <> pure v
 
@@ -599,7 +601,7 @@ module_ c =
 addSeen :: Component -> SystemVerilogM ()
 addSeen c = do
   let iport = map fst (inputs c)
-      oport = map (fst.snd) $ outputs c
+      oport = map (fst . (\(_,x,_)->x)) $ outputs c
       nets  = mapMaybe (\case {NetDecl' _ _ i _ _ -> Just i; _ -> Nothing}) $ declarations c
   Mon (idSeen %= (HashMapS.unionWith max (HashMapS.fromList (concatMap (map (,0)) [iport,oport,nets]))))
   Mon (oports .= oport)
@@ -751,13 +753,14 @@ decl (NetDecl' noteM _ id_ tyE iEM) =
     attrs = fromMaybe [] (hwTypeAttrs A.<$> either (const Nothing) Just tyE)
     iE = maybe emptyDoc (noEmptyInit . expr_ False) iEM
 
-    noEmptyInit d = do
-      d1 <- d
-      if isEmpty d1
-         then emptyDoc
-         else (space <> "=" <+> d)
-
 decl _ = return Nothing
+
+noEmptyInit :: SystemVerilogM Doc -> SystemVerilogM Doc
+noEmptyInit d = do
+  d1 <- d
+  if isEmpty d1
+     then emptyDoc
+     else (space <> "=" <+> d)
 
 -- | Convert single attribute to systemverilog syntax
 renderAttr :: Attr' -> Text.Text
