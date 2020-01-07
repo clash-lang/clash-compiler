@@ -57,7 +57,8 @@ import           System.IO.Unsafe    (unsafeDupablePerformIO)
 import           BasicTypes          (Boxity (..))
 import           Name                (getSrcSpan, nameOccName, occNameString)
 import           PrelNames
-  (typeNatAddTyFamNameKey, typeNatMulTyFamNameKey, typeNatSubTyFamNameKey)
+  (typeNatAddTyFamNameKey, typeNatMulTyFamNameKey, typeNatSubTyFamNameKey,
+   trueDataConKey, falseDataConKey)
 import           SrcLoc              (wiredInSrcSpan)
 import qualified TyCon
 import           TysWiredIn          (tupleTyCon)
@@ -838,18 +839,38 @@ reduceConstant isSubj tcm h k nm pInfo tys args = case nm of
     -> reduce (boolToBoolLiteral tcm ty (i >= j))
 
   "GHC.Classes.&&"
-    | [DC lCon _
-      ,DC rCon _] <- args
-    -> reduce $ boolToBoolLiteral tcm ty
-         ((nameOcc (dcName lCon) == "GHC.Types.True") &&
-          (nameOcc (dcName rCon) == "GHC.Types.True"))
+    | [ lArg , rArg ] <- args
+    -- evaluation of the arguments is deferred until the evaluation of the primop
+    -- to make `&&` lazy in both arguments
+    , (h1, [], lArgWHNF) <- whnf reduceConstant tcm True (h , [], valToTerm lArg)
+    , (h2, [], rArgWHNF) <- whnf reduceConstant tcm True (h1, [], valToTerm rArg)
+    -> case [ lArgWHNF, rArgWHNF ] of
+         [ Data lCon, Data rCon ] ->
+           Just $ (h2,k,) $ boolToBoolLiteral tcm ty (isTrueDC lCon && isTrueDC rCon)
+         [ Data lCon, _ ]
+           | isTrueDC lCon -> reduce rArgWHNF
+           | otherwise     -> reduce (boolToBoolLiteral tcm ty False)
+         [ _, Data rCon ]
+           | isTrueDC rCon -> reduce lArgWHNF
+           | otherwise     -> reduce (boolToBoolLiteral tcm ty False)
+         _ -> Nothing
 
   "GHC.Classes.||"
-    | [DC lCon _
-      ,DC rCon _] <- args
-    -> reduce $ boolToBoolLiteral tcm ty
-         ((nameOcc (dcName lCon) == "GHC.Types.True") ||
-          (nameOcc (dcName rCon) == "GHC.Types.True"))
+    -- evaluation of the arguments is deferred until the evaluation of the primop
+    -- to make `||` lazy in both arguments
+    | [ lArg , rArg ] <- args
+    , (h1, [], lArgWHNF) <- whnf reduceConstant tcm True (h , [], valToTerm lArg)
+    , (h2, [], rArgWHNF) <- whnf reduceConstant tcm True (h1, [], valToTerm rArg)
+    -> case [ lArgWHNF, rArgWHNF ] of
+         [ Data lCon, Data rCon ] ->
+           Just $ (h2,k,) $ boolToBoolLiteral tcm ty (isTrueDC lCon || isTrueDC rCon)
+         [ Data lCon, _ ]
+           | isFalseDC lCon -> reduce rArgWHNF
+           | otherwise      -> reduce (boolToBoolLiteral tcm ty True)
+         [ _, Data rCon ]
+           | isFalseDC rCon -> reduce lArgWHNF
+           | otherwise      -> reduce (boolToBoolLiteral tcm ty True)
+         _ -> Nothing
 
   "GHC.Classes.divInt#" | Just (i,j) <- intLiterals args
     -> reduce (integerToIntLiteral (i `div` j))
@@ -4284,3 +4305,7 @@ ghcTyconToTyConName tc =
 
 svoid :: (State# RealWorld -> State# RealWorld) -> IO ()
 svoid m0 = IO (\s -> case m0 s of s' -> (# s', () #))
+
+isTrueDC,isFalseDC :: DataCon -> Bool
+isTrueDC dc  = dcUniq dc == getKey trueDataConKey
+isFalseDC dc = dcUniq dc == getKey falseDataConKey

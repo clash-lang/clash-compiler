@@ -92,7 +92,8 @@ import           Clash.Core.Evaluator        (PureHeap, whnf')
 import           Clash.Core.Name
   (Name (..), NameSort (..), mkUnsafeSystemName, nameOcc)
 import           Clash.Core.FreeVars
-  (localIdOccursIn, localIdsDoNotOccurIn, freeLocalIds, termFreeTyVars, typeFreeVars, localVarsDoNotOccurIn)
+  (localIdOccursIn, localIdsDoNotOccurIn, freeLocalIds, termFreeTyVars,
+   typeFreeVars, localVarsDoNotOccurIn, localIdDoesNotOccurIn)
 import           Clash.Core.Literal          (Literal (..))
 import           Clash.Core.Pretty           (showPpr)
 import           Clash.Core.Subst
@@ -834,14 +835,14 @@ removeUnusedExpr _ e = return e
 bindConstantVar :: HasCallStack => NormRewrite
 bindConstantVar = inlineBinders test
   where
-    test _ (_,stripTicks -> e) = case isLocalVar e of
-      True -> return True
+    test _ (i,stripTicks -> e) = case isLocalVar e of
+      -- Don't inline `let x = x in x`, it throws  us in an infinite loop
+      True -> return (i `localIdDoesNotOccurIn` e)
       _    -> isWorkFreeIsh e >>= \case
         True -> Lens.use (extra.inlineConstantLimit) >>= \case
           0 -> return True
           n -> return (termSize e <= n)
         _ -> return False
-    -- test _ _ = return False
 
 -- | Push a cast over a case into it's alternatives.
 caseCast :: HasCallStack => NormRewrite
