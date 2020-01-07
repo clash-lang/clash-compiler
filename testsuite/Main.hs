@@ -406,7 +406,9 @@ runClashTest = defaultMain $ clashTestRoot
         , runTest "T895" def{hdlSim=False,hdlTargets=[VHDL]}
         ] -- end vector
       , clashTestGroup "XOptimization"
-        [ netlistTest ("tests" </> "shouldwork" </> "XOptimization") allTargets [] "OneDefinedDataPat" "main"
+        [ outputTest  ("tests" </> "shouldwork" </> "XOptimization") allTargets [] [] "Conjunction"  "main"
+        , outputTest  ("tests" </> "shouldwork" </> "XOptimization") allTargets [] [] "Disjunction"  "main"
+        , netlistTest ("tests" </> "shouldwork" </> "XOptimization") allTargets [] "OneDefinedDataPat" "main"
         , netlistTest ("tests" </> "shouldwork" </> "XOptimization") allTargets [] "OneDefinedLitPat" "main"
         , netlistTest ("tests" </> "shouldwork" </> "XOptimization") allTargets [] "OneDefinedDefaultPat" "main"
         , netlistTest ("tests" </> "shouldwork" </> "XOptimization") allTargets [] "ManyDefined" "main"

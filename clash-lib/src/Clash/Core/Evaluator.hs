@@ -264,8 +264,29 @@ step eval tcm (h, k, e) = case e of
     , let ty = primType pInfo
     , (tys,_) <- splitFunForallTy ty
     -> case compare (length args) (length tys) of
-         EQ -> let (e':es) = lefts args
-               in  Just (h,PrimApply nm pInfo (rights args) [] es:k,e')
+         EQ -> case lefts args of
+                  -- We make boolean conjunction and disjunction extra lazy by
+                  -- deferring the evaluation of the arguments during the evaluation
+                  -- of the primop rule.
+                  --
+                  -- This allows us to implement:
+                  --
+                  -- x && True  --> x
+                  -- x && False --> False
+                  -- x || True  --> True
+                  -- x || False --> x
+                  --
+                  -- even when that 'x' is _|_. This makes the evaluation
+                  -- rule lazier than the actual Haskel implementations which
+                  -- are strict in the first argument and lazy in the second.
+                  [a0,a1 ] | nm `elem` ["GHC.Classes.&&","GHC.Classes.||"] ->
+                    let (h0,i) = newLetBinding tcm h  a0
+                        (h1,j) = newLetBinding tcm h0 a1
+                    in  eval (isScrut k) tcm h1 k nm pInfo []
+                             [Suspend (Var i),Suspend (Var j)]
+                  (e':es) ->
+                    Just (h,PrimApply nm pInfo (rights args) [] es:k,e')
+                  _ -> error "internal error"
          LT -> let (tys',_) = splitFunForallTy (termType tcm e)
                    (h2,e') = mkAbstr (h,e) tys'
                in  step eval tcm (h2,k,e')
@@ -519,6 +540,8 @@ primop eval tcm h0 k nm ty tys vs v [e]
   | nm `elem` [ "Clash.Sized.Vector.lazyV"
               , "Clash.Sized.Vector.replicate"
               , "Clash.Sized.Vector.replace_int"
+              , "GHC.Classes.&&"
+              , "GHC.Classes.||"
               ]
   = let (h1,i) = newLetBinding tcm h0 e
     in  eval (isScrut k) tcm h1 k nm ty tys (vs ++ [v,Suspend (Var i)])
