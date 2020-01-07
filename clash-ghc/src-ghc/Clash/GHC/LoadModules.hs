@@ -189,7 +189,7 @@ loadModules useColor hdl modName dflagsM idirs = do
                                     (DynFlags.targetPlatform dflags)
                     , DynFlags.reductionDepth = 1000
                     }
-    let dflags2 = wantedOptimizationFlags dflags1
+    let dflags2 = unwantedOptimizationFlags dflags1
     let ghcDynamic = case lookup "GHC Dynamic" (DynFlags.compilerInfo dflags) of
                       Just "YES" -> True
                       _          -> False
@@ -213,7 +213,9 @@ loadModules useColor hdl modName dflagsM idirs = do
         -- 'topSortModuleGraph' ensures that modGraph2, and hence tidiedMods
         -- are in topological order, i.e. the root module is last.
         modGraph2 = Digraph.flattenSCCs (GHC.topSortModuleGraph True modGraph' Nothing)
-    tidiedMods <- mapM (\m -> do { pMod  <- parseModule m
+    tidiedMods <- mapM (\m -> do { oldDFlags <- GHC.getSessionDynFlags
+                                 ; pMod  <- parseModule m
+                                 ; _ <- GHC.setSessionDynFlags (GHC.ms_hspp_opts (GHC.pm_mod_summary pMod))
                                  ; tcMod <- GHC.typecheckModule (removeStrictnessAnnotations pMod)
                                  -- The purpose of the home package table (HPT) is to track
                                  -- the already compiled modules, so subsequent modules can
@@ -243,6 +245,7 @@ loadModules useColor hdl modName dflagsM idirs = do
                                  ; (tidy_guts,_) <- MonadUtils.liftIO $ TidyPgm.tidyProgram hsc_env simpl_guts
                                  ; let pgm        = HscTypes.cg_binds tidy_guts
                                  ; let modFamInstEnv = TcRnTypes.tcg_fam_inst_env $ fst $ GHC.tm_internals_ tcMod
+                                 ; _ <- GHC.setSessionDynFlags oldDFlags
                                  ; return (pgm,modFamInstEnv)
                                  }
                          ) modGraph2
@@ -532,35 +535,16 @@ disableOptimizationsFlags :: GHC.ModSummary -> GHC.ModSummary
 disableOptimizationsFlags ms@(GHC.ModSummary {..})
   = ms {GHC.ms_hspp_opts = dflags}
   where
-    dflags = wantedOptimizationFlags (ms_hspp_opts
+    dflags = unwantedOptimizationFlags (ms_hspp_opts
               { DynFlags.optLevel = 2
               , DynFlags.reductionDepth = 1000
               })
 
-wantedOptimizationFlags :: GHC.DynFlags -> GHC.DynFlags
-wantedOptimizationFlags df =
+unwantedOptimizationFlags :: GHC.DynFlags -> GHC.DynFlags
+unwantedOptimizationFlags df =
   foldl' DynFlags.xopt_unset
-    (foldl' DynFlags.gopt_unset
-        (foldl' DynFlags.gopt_set df wanted) unwanted) unwantedLang
+    (foldl' DynFlags.gopt_unset df unwanted) unwantedLang
   where
-    wanted = [ Opt_CSE -- CSE
-             , Opt_Specialise -- Specialise on types, specialise type-class-overloaded function defined in this module for the types
-             , Opt_DoLambdaEtaExpansion -- transform nested series of lambdas into one with multiple arguments, helps us achieve only top-level lambdas
-             , Opt_CaseMerge -- We want fewer case-statements
-             , Opt_DictsCheap -- Makes dictionaries seem cheap to optimizer: hopefully inline
-             , Opt_ExposeAllUnfoldings -- We need all the unfoldings we can get
-             , Opt_ForceRecomp -- Force recompilation: never bad
-             , Opt_EnableRewriteRules -- Reduce number of functions
-             , Opt_SimplPreInlining -- Inlines simple functions, we only care about the major first-order structure
-             , Opt_StaticArgumentTransformation -- Turn on the static argument transformation, which turns a recursive function into a non-recursive one with a local recursive loop.
-             , Opt_FloatIn -- Moves let-bindings inwards, although it defeats the normal-form with a single top-level let-binding, it helps with other transformations
-             , Opt_DictsStrict -- Hopefully helps remove class method selectors
-             , Opt_DmdTxDictSel -- I think demand and strictness are related, strictness helps with dead-code, enable
-             , Opt_Strictness -- Strictness analysis helps with dead-code analysis. However, see [NOTE: CPR breaks Clash]
-             , Opt_SpecialiseAggressively -- Needed to compile Fixed point number functions quickly
-             , Opt_CrossModuleSpecialise -- Needed to compile Fixed point number functions quickly
-             ]
-
     unwanted = [ Opt_LiberateCase -- Perform unrolling of recursive RHS: avoid
                , Opt_SpecConstr -- Creates local-functions: avoid
                , Opt_IgnoreAsserts -- We don't care about assertions
@@ -620,8 +604,29 @@ wantedOptimizationFlags df =
 
 setWantedLanguageExtensions :: GHC.DynFlags -> GHC.DynFlags
 setWantedLanguageExtensions df =
-    foldl' DynFlags.xopt_unset
-      (foldl' DynFlags.xopt_set df wantedLanguageExtensions) unwantedLanguageExtensions
+   foldl' DynFlags.gopt_set
+    (foldl' DynFlags.xopt_unset
+      (foldl' DynFlags.xopt_set df wantedLanguageExtensions) unwantedLanguageExtensions)
+      wantedOptimizations
+ where
+  wantedOptimizations =
+    [ Opt_CSE -- CSE
+    , Opt_Specialise -- Specialise on types, specialise type-class-overloaded function defined in this module for the types
+    , Opt_DoLambdaEtaExpansion -- transform nested series of lambdas into one with multiple arguments, helps us achieve only top-level lambdas
+    , Opt_CaseMerge -- We want fewer case-statements
+    , Opt_DictsCheap -- Makes dictionaries seem cheap to optimizer: hopefully inline
+    , Opt_ExposeAllUnfoldings -- We need all the unfoldings we can get
+    , Opt_ForceRecomp -- Force recompilation: never bad
+    , Opt_EnableRewriteRules -- Reduce number of functions
+    , Opt_SimplPreInlining -- Inlines simple functions, we only care about the major first-order structure
+    , Opt_StaticArgumentTransformation -- Turn on the static argument transformation, which turns a recursive function into a non-recursive one with a local recursive loop.
+    , Opt_FloatIn -- Moves let-bindings inwards, although it defeats the normal-form with a single top-level let-binding, it helps with other transformations
+    , Opt_DictsStrict -- Hopefully helps remove class method selectors
+    , Opt_DmdTxDictSel -- I think demand and strictness are related, strictness helps with dead-code, enable
+    , Opt_Strictness -- Strictness analysis helps with dead-code analysis. However, see [NOTE: CPR breaks Clash]
+    , Opt_SpecialiseAggressively -- Needed to compile Fixed point number functions quickly
+    , Opt_CrossModuleSpecialise -- Needed to compile Fixed point number functions quickly
+    ]
 
 -- | Remove all strictness annotations:
 --
