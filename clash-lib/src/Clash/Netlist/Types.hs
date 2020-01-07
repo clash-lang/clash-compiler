@@ -150,7 +150,7 @@ data Component
   = Component
   { componentName :: !Identifier -- ^ Name of the component
   , inputs        :: [(Identifier,HWType)] -- ^ Input ports
-  , outputs       :: [(WireOrReg,(Identifier,HWType))] -- ^ Output ports
+  , outputs       :: [(WireOrReg,(Identifier,HWType),Maybe Expr)] -- ^ Output ports
   , declarations  :: [Declaration] -- ^ Internal declarations
   }
   deriving Show
@@ -334,6 +334,9 @@ data Expr
   -- | Do nothing
   | Noop
   deriving Show
+
+instance NFData Expr where
+  rnf x = x `seq` ()
 
 -- | Literals used in an expression
 data Literal

@@ -638,7 +638,7 @@ mkFunInput resId e =
                   normalized <- Lens.use bindings
                   case lookupVarEnv fun normalized of
                     Just _ -> do
-                      (wereVoids,_,_,N.Component compName compInps [snd -> compOutp] _) <-
+                      (wereVoids,_,_,N.Component compName compInps [(_,compOutp,_)] _) <-
                         preserveVarEnv $ genComponent fun
 
                       let inpAssign (i, t) e' = (Identifier i Nothing, In, t, e')
