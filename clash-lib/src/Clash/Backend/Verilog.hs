@@ -25,6 +25,7 @@ module Clash.Backend.Verilog
   , exprLit
   , bits
   , bit_char
+  , noEmptyInit
   )
 where
 
@@ -396,12 +397,12 @@ decl (NetDecl' noteM wr id_ tyE iEM) =
 
 decl _ = return Nothing
 
-noEmptyInit :: VerilogM Doc -> VerilogM Doc
+noEmptyInit :: (Monad m, Semigroup (m Doc)) => m Doc -> m Doc
 noEmptyInit d = do
   d1 <- d
   if isEmpty d1
      then emptyDoc
-     else (space <> "=" <+> d)
+     else (space <> string "=" <+> d)
 
 insts :: [Declaration] -> VerilogM Doc
 insts [] = emptyDoc

@@ -18,7 +18,7 @@ assertAssignsInOut :: Component -> IO ()
 assertAssignsInOut (Component _ [i] [o] ds) =
   case ds of
     [Assignment oName (Identifier iName Nothing)]
-      | iName == fst i && oName == fst (snd o) -> return ()
+      | iName == fst i && oName == fst ((\(_,x,_) -> x) o) -> return ()
       | otherwise -> P.error "Incorrect input/output names"
 
     _ -> P.error "Identity circuit performs more than just one assignment"

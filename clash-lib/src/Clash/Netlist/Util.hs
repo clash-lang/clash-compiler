@@ -60,7 +60,7 @@ import           Clash.Annotations.BitRepresentation.Internal
 import           Clash.Annotations.TopEntity (PortName (..), TopEntity (..))
 import           Clash.Driver.Types      (Manifest (..), ClashOpts (..))
 import           Clash.Core.DataCon      (DataCon (..))
-import           Clash.Core.FreeVars     (freeLocalIds, typeFreeVars)
+import           Clash.Core.FreeVars     (localIdOccursIn, typeFreeVars)
 import qualified Clash.Core.Literal      as C
 import           Clash.Core.Name
   (Name (..), appendToName, nameOcc)
@@ -667,7 +667,7 @@ mkUniqueNormalized is0 topMM (args,binds,res) = do
 
   -- Make arguments unique
   let is1 = is0 `extendInScopeSetList` (args ++ bndrs)
-  (wereVoids, iports,iwrappers,substArgs) <- mkUniqueArguments (mkSubst is1) topMM args
+  (wereVoids,iports,iwrappers,substArgs) <- mkUniqueArguments (mkSubst is1) topMM args
 
   -- Make result unique. This might yield 'Nothing' in which case the result
   -- was a single BiSignalOut. This is superfluous in the HDL, as the argument
@@ -675,71 +675,89 @@ mkUniqueNormalized is0 topMM (args,binds,res) = do
   resM <- mkUniqueResult substArgs topMM res
   case resM of
     Just (oports,owrappers,res1,substRes) -> do
-      let usesOutput = concatMap (filter ( == res)
-                                         . Lens.toListOf freeLocalIds
-                                         ) exprs
-      -- If the let-binder carrying the result is used in a feedback loop
-      -- rename the let-binder to "<X>_rec", and assign the "<X>_rec" to
-      -- "<X>". We do this because output ports in most HDLs cannot be read.
-      (res2,subst'',extraBndr) <- case usesOutput of
-        [] -> return (varName res1
-                     ,substRes
-                     ,[] :: [(Id, Term)])
-        _  -> do
-          ([res3],substRes') <- mkUnique substRes [modifyVarName (`appendToName` "_rec") res]
-          return (varName res3,substRes'
-                 ,[(res1, Var res3)])
-      -- Replace occurences of "<X>" by "<X>_rec"
-      let resN = varName res
-      bndrs' <- mapM (setBinderName resN res2) binds
-      let (bndrsL,r:bndrsR) = break ((== res2).varName) bndrs'
-      -- Make let-binders unique
-      (bndrsL',substL) <- mkUnique subst'' bndrsL
-      (bndrsR',substR) <- mkUnique substL  bndrsR
+      -- Check whether any of the binders reference the result
+      let resRead = any (localIdOccursIn res) exprs
+      -- Rename some of the binders, see 'setBinderName' when this happens.
+      ((res2,subst1,extraBndr),bndrs1) <-
+        mapAccumLM (setBinderName substRes res resRead) (res1,substRes,[]) binds
+      -- Make let-binders unique, the result binder is already unique, so we
+      -- can skip it.
+      let (bndrsL,r:bndrsR) = break ((== res2)) bndrs1
+      (bndrsL1,substL) <- mkUnique subst1 bndrsL
+      (bndrsR1,substR) <- mkUnique substL bndrsR
       -- Replace old IDs by updated unique IDs in the RHSs of the let-binders
-      let exprs' = map (substTm ("mkUniqueNormalized1" :: Doc ()) substR) exprs
+      let exprs1 = map (substTm ("mkUniqueNormalized1" :: Doc ()) substR) exprs
       -- Return the uniquely named arguments, let-binders, and result
-      return (wereVoids,iports,iwrappers,oports,owrappers,zip (bndrsL' ++ r:bndrsR') exprs' ++ extraBndr,Just res1)
+      return ( wereVoids
+             , iports
+             , iwrappers
+             , oports
+             , owrappers
+             , zip (bndrsL1 ++ r:bndrsR1) exprs1 ++ extraBndr
+             , Just res1)
     Nothing -> do
-      (bndrs', substArgs') <- mkUnique substArgs bndrs
-      return (wereVoids,iports,iwrappers,[],[],zip bndrs' (map (substTm ("mkUniqueNormalized2" :: Doc ()) substArgs') exprs),Nothing)
+      (bndrs1, substArgs1) <- mkUnique substArgs bndrs
+      return ( wereVoids
+             , iports
+             , iwrappers
+             , []
+             , []
+             , zip bndrs1
+                   (map (substTm ("mkUniqueNormalized2" :: Doc ()) substArgs1) exprs)
+             ,Nothing)
 
 -- | Set the name of the binder
 --
 -- Normally, it just keeps the existing name, but there are two exceptions:
 --
--- 1. The binding is recursive, and also the return value; in this case it's
---    suffixed with `_rec`
+-- 1. It's the binding for the result which is also referenced by another binding;
+--    in this case it's suffixed with `_rec`
 -- 2. The binding binds a primitive that has a name control field
+--
+-- 2. takes priority over 1. Additionally, we create an additional binder when
+-- the return value gets a new name.
 setBinderName
-  :: Name Term
-  -- ^ The name of the binding that's recursive and is also the result the
-  -- return value
-  -> Name Term
-  -- ^ The above mentioned name suffixed by "_rec"
+  :: Subst
+  -- ^ Current substitution
+  -> Id
+  -- ^ The binder for the result
+  -> Bool
+  -- ^ Whether the result binder is referenced by another binder
+  -> (Id, Subst, [(Id,Term)])
+  -- ^ * The (renamed) binder for the result
+  --   * The updated substitution in case the result binder is renamed
+  --   * A new binding, to assign the result in case the original binder for
+  --     the result got renamed.
   -> (Id,Term)
   -- ^ The binding
-  -> NetlistMonad Id
-setBinderName resN res2 (i,collectArgsTicks -> (k,args,ticks)) = case k of
+  -> NetlistMonad ((Id, Subst, [(Id,Term)]),Id)
+setBinderName subst res resRead m@(resN,_,_) (i,collectArgsTicks -> (k,args,ticks)) = case k of
   Prim nm _ -> extractPrimWarnOrFail nm >>= go nm
-  _ -> return goDef
+  _ -> goDef
  where
   go nm (BlackBox {resultName = Just (BBTemplate nmD)}) = withTicks ticks $ \_ -> do
-    (bbCtx,_) <- preserveVarEnv (mkBlackBoxContext nm goDef args)
+    (bbCtx,_) <- preserveVarEnv (mkBlackBoxContext nm i args)
     be <- Lens.use backend
-    let q = case be of
-              SomeBackend s -> toStrict ((State.evalState (renderTemplate bbCtx nmD) s) 0)
-    if nameOcc (varName i) == q
-       then return goDef
-       else if varName i == resN
-            then return (modifyVarName (\_ -> res2 {nameOcc = q}) i)
-            else return (modifyVarName (\n -> n {nameOcc = q}) i)
+    let bbRetValName = case be of
+          SomeBackend s -> toStrict ((State.evalState (renderTemplate bbCtx nmD) s) 0)
+        i1 = modifyVarName (\n -> n {nameOcc = bbRetValName}) i
+    if res == i1 then do
+      ([i2],subst1) <- mkUnique subst [i1]
+      return ((i2,subst1,[(resN,Var i2)]),i2)
+    else
+      return (m,i1)
 
-  go _ _ = return goDef
+  go _ _ = goDef
 
-  goDef = if varName i == resN
-             then modifyVarName (const res2) i
-             else i
+  goDef
+    | i == res && resRead
+    = do
+      ([i1],subst1) <- mkUnique subst [modifyVarName (`appendToName` "_rec") res]
+      return ((i1, subst1, [(resN,Var i1)]),i1)
+    | i == res
+    = return (m,resN)
+    | otherwise
+    = return (m,i)
 
 mkUniqueArguments
   :: Subst

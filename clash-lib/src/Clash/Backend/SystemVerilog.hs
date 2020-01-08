@@ -51,7 +51,8 @@ import           Clash.Annotations.BitRepresentation.Util
   (BitOrigin(Lit, Field), bitOrigins, bitRanges)
 import           Clash.Core.Var                       (Attr'(..))
 import           Clash.Backend
-import           Clash.Backend.Verilog                (bits, bit_char, encodingNote, exprLit, include, uselibs)
+import           Clash.Backend.Verilog
+  (bits, bit_char, encodingNote, exprLit, include, noEmptyInit, uselibs)
 import           Clash.Netlist.BlackBox.Types         (HdlSyn (..))
 import           Clash.Netlist.BlackBox.Util
   (extractLiterals, renderBlackBox, renderFilePath)
@@ -754,13 +755,6 @@ decl (NetDecl' noteM _ id_ tyE iEM) =
     iE = maybe emptyDoc (noEmptyInit . expr_ False) iEM
 
 decl _ = return Nothing
-
-noEmptyInit :: SystemVerilogM Doc -> SystemVerilogM Doc
-noEmptyInit d = do
-  d1 <- d
-  if isEmpty d1
-     then emptyDoc
-     else (space <> "=" <+> d)
 
 -- | Convert single attribute to systemverilog syntax
 renderAttr :: Attr' -> Text.Text

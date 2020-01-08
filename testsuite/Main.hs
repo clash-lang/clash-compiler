@@ -232,6 +232,11 @@ runClashTest = defaultMain $ clashTestRoot
         , runTest "Transpose" def
         , runTest "VecFun" def
       ]
+      , clashTestGroup "Naming"
+        [ runTest "T967a" def{hdlSim=False}
+        , runTest "T967b" def{hdlSim=False}
+        , runTest "T967c" def{hdlSim=False}
+        ]
       , clashTestGroup "Numbers"
         [ runTest "BitInteger" def
         , runTest "Bounds" def
