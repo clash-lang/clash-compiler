@@ -19,6 +19,7 @@ let
         clash-lib = import ../clash-lib { inherit nixpkgs; };
         clash-ghc = import ../clash-ghc { inherit nixpkgs; };
         clash-prelude = import ../clash-prelude { inherit nixpkgs; };
+        clash-cores = import ../clash-cores { inherit nixpkgs; };
       };
     };
   };
