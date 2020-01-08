@@ -78,7 +78,6 @@ flagsClash r = [
   , defFlag "fclash-intwidth"                    $ IntSuffix (setIntWidth r)
   , defFlag "fclash-error-extra"                 $ NoArg (liftEwM (setErrorExtra r))
   , defFlag "fclash-float-support"               $ NoArg (liftEwM (setFloatSupport r))
-  , defFlag "fclash-allow-zero-width"            $ NoArg (setAllowZeroWidth r)
   , defFlag "fclash-component-prefix"            $ SepArg (liftEwM . setComponentPrefix r)
   , defFlag "fclash-old-inline-strategy"         $ NoArg (liftEwM (setOldInlineStrategy r))
   , defFlag "fclash-no-escaped-identifiers"      $ NoArg (liftEwM (setNoEscapedIds r))
@@ -183,11 +182,6 @@ setErrorExtra r = modifyIORef r (\c -> c {opt_errorExtra = True})
 
 setFloatSupport :: IORef ClashOpts -> IO ()
 setFloatSupport r = modifyIORef r (\c -> c {opt_floatSupport = True})
-
-setAllowZeroWidth :: IORef ClashOpts -> EwM IO ()
-setAllowZeroWidth _ = do
-  addWarn ("-fclash-allow-zero-width is deprecated and will be removed in Clash 1.0")
-  -- liftEwM (modifyIORef r (\c -> c {opt_allowZero = True}))
 
 setComponentPrefix
   :: IORef ClashOpts
