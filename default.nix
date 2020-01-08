@@ -2,4 +2,4 @@
 
 with nixpkgs.pkgs.haskellPackages;
 
-{ inherit clash-ghc clash-lib clash-prelude; }
+{ inherit clash-ghc clash-lib clash-prelude clash-cores; }
