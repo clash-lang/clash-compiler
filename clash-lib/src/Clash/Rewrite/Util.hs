@@ -62,7 +62,7 @@ import           Clash.Core.FreeVars
 import           Clash.Core.Name
 import           Clash.Core.Pretty           (showPpr)
 import           Clash.Core.Subst
-  (aeqTerm, aeqType, extendIdSubst, mkSubst, substTm)
+  (aeqTerm, aeqType, deShadowTerm, extendIdSubst, mkSubst, substTm)
 import           Clash.Core.Term
   (LetBinding, Pat (..), Term (..), CoreContext (..), Context, PrimInfo (..),
    TmName, WorkInfo (..), TickInfo, collectArgs, collectArgsTicks)
@@ -564,7 +564,8 @@ inlineOrLiftBinders condition inlineOrLift (TransformContext inScope0 _) expr@(L
           newExpr = case others3 of
                       [] -> res''
                       _  -> Letrec others3 res''
-      changed newExpr
+      -- See Note [AppProp no-shadow invariant]
+      changed (deShadowTerm inScope0 newExpr)
 
 inlineOrLiftBinders _ _ _ e = return e
 
