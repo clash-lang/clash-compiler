@@ -284,6 +284,8 @@ runClashTest = defaultMain $ clashTestRoot
         , runTest "TRepeat2" def
         , runTest "TZip" def{hdlSim=False}
       ]
+      , clashTestGroup "Shadowing"
+        [ runTest "T990" def ]
       , clashTestGroup "Signal"
         [ runTest "AlwaysHigh" def{hdlSim=False}
         , outputTest ("tests" </> "shouldwork" </> "Signal") allTargets [] [] "BlockRamLazy"    "main"
