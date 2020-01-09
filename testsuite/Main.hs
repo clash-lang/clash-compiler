@@ -146,6 +146,7 @@ runClashTest = defaultMain $ clashTestRoot
         , outputTest ("tests" </> "shouldwork" </> "Signal")   allTargets [] [] "BlockRamLazy"       "main"
         , outputTest ("tests" </> "shouldwork" </> "BlackBox") [VHDL]   [] [] "ZeroWidth"          "main"
         , runFailingTest ("tests" </> "shouldfail" </> "BlackBox") [VHDL] [] "WrongReference" (Just "Function WrongReference.myMultiply was annotated with an inline primitive for WrongReference.myMultiplyX. These names should be the same.")
+        , runTest "T919" def{hdlSim=False}
         ]
       , clashTestGroup "BoxedFunctions"
         [ runTest "DeadRecursiveBoxed" def{hdlSim=False}
