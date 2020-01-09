@@ -27,6 +27,8 @@ The Product/Signal isomorphism
 
 module Clash.Signal.Bundle
   ( Bundle (..)
+  -- ** Internal
+  , vecBundle#
   )
 where
 

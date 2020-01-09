@@ -334,6 +334,10 @@ instance KnownNat n => Applicative (Vec n) where
   pure      = repeat
   fs <*> xs = zipWith ($) fs xs
 
+{-# RULES
+"zipWith$map" forall f xs ys. zipWith (\g a -> g a) (map f xs) ys = zipWith f xs ys
+  #-}
+
 instance (KnownNat n, 1 <= n) => F.Foldable (Vec n) where
   fold      = leToPlus @1 @n $ fold mappend
   foldMap f = leToPlus @1 @n $ fold mappend . map f
