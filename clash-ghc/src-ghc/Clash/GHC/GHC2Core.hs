@@ -35,6 +35,7 @@ import           Control.Lens                ((^.), (%~), (&), (%=))
 import           Control.Monad.RWS.Strict    (RWS)
 import qualified Control.Monad.RWS.Strict    as RWS
 import qualified Data.ByteString.Char8       as Char8
+import           Data.Char                   (isDigit)
 import           Data.Hashable               (Hashable (..))
 import           Data.HashMap.Strict         (HashMap)
 import qualified Data.HashMap.Strict         as HashMap
@@ -851,7 +852,9 @@ coreToName toName toUnique toString v = do
   ns <- toString (toName v)
   let key  = getKey (toUnique v)
       locI = getSrcSpan (toName v)
-      sort | ns == "ds" || Text.isPrefixOf "$" ns
+      -- Is it one of [ds,ds1,ds2,..]
+      isDSX = maybe False (maybe True (isDigit . fst) . Text.uncons) . Text.stripPrefix "ds"
+      sort | isDSX ns || Text.isPrefixOf "$" ns
            = C.System
            | otherwise
            = C.User
