@@ -145,6 +145,7 @@ can potentially introduce situations prone to meta-stability:
 
 {-# OPTIONS_GHC -fplugin=GHC.TypeLits.Normalise #-}
 {-# OPTIONS_GHC -fplugin=GHC.TypeLits.KnownNat.Solver #-}
+{-# OPTIONS_GHC -Wno-orphans #-}
 
 {-# OPTIONS_HADDOCK show-extensions #-}
 
@@ -264,11 +265,12 @@ import           GHC.TypeLits                   (type (+), type (<=))
 import           Clash.Annotations.Primitive    (hasBlackBox)
 import           Clash.Class.Num                (satSucc, SaturationMode(SatBound))
 import           Clash.Promoted.Nat             (SNat(..), snatToNum)
-import           Clash.Signal.Bundle            (Bundle (..))
+import           Clash.Signal.Bundle            (Bundle (..), vecBundle#)
 import           Clash.Signal.Internal
 import           Clash.Signal.Internal.Ambiguous
   (knownVDomain, clockPeriod, activeEdge, resetKind, initBehavior, resetPolarity)
 import           Clash.Sized.Index              (Index)
+import qualified Clash.Sized.Vector
 import           Clash.XException               (NFDataX, deepErrorX)
 
 {- $setup
@@ -898,3 +900,5 @@ convertReset clkA clkB (unsafeToHighPolarity -> rstA0) =
       (SAsynchronous, SSynchronous) ->
         delay clkB enableGen True $
           delay clkB enableGen True rstA1
+
+{-# RULES "sequenceAVecSignal" Clash.Sized.Vector.traverse# (\x -> x) = vecBundle# #-}
