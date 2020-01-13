@@ -11,8 +11,15 @@ Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
 {-# LANGUAGE GADTs                      #-}
 {-# LANGUAGE MultiParamTypeClasses      #-}
 {-# LANGUAGE ScopedTypeVariables        #-}
+{-# LANGUAGE TypeApplications           #-}
 {-# LANGUAGE TypeFamilies               #-}
 {-# LANGUAGE TypeOperators              #-}
+{-# LANGUAGE UndecidableInstances #-}
+#if __GLASGOW_HASKELL__ >= 806
+{-# LANGUAGE NoStarIsType #-}
+#else
+{-# LANGUAGE TypeInType #-}
+#endif
 
 {-# LANGUAGE Trustworthy #-}
 
@@ -24,6 +31,9 @@ module Clash.Explicit.Signal.Delayed
     -- * Delay-annotated synchronous signals
   , delayed
   , delayedI
+  , delayN
+  , delayI
+  , delayedFold
   , feedback
     -- * Signal \<-\> DSignal conversion
   , fromSignal
@@ -39,18 +49,21 @@ module Clash.Explicit.Signal.Delayed
 where
 
 import Data.Coerce                (coerce)
-import GHC.TypeLits               (KnownNat, type (+))
+import Data.Kind                  (Type)
+import Data.Proxy                 (Proxy (..))
+import Data.Singletons.Prelude    (Apply, TyFun, type (@@))
+import GHC.TypeLits               (KnownNat, Nat, type (+), type (^), type (*))
 import Prelude                    hiding (head, length, repeat)
 
 import Clash.Sized.Vector
-  (Vec, head, length, repeat, shiftInAt0, singleton)
+  (Vec, dtfold, head, length, repeat, shiftInAt0, singleton)
 import Clash.Signal.Delayed.Internal
   (DSignal(..), dfromList, dfromList_lazy, fromSignal, toSignal,
    unsafeFromSignal, antiDelay, feedback)
 
 import Clash.Explicit.Signal
-  (KnownDomain, Clock, Reset, Signal, Enable, register,  bundle, unbundle)
-
+  (KnownDomain, Clock, Domain, Reset, Signal, Enable, register, delay, bundle, unbundle)
+import Clash.Promoted.Nat         (SNat (..), snatToInteger)
 import Clash.XException           (NFDataX)
 
 {- $setup
@@ -59,6 +72,9 @@ import Clash.XException           (NFDataX)
 >>> import Clash.Explicit.Prelude
 >>> let delay3 clk rst en = delayed clk rst en (-1 :> -1 :> -1 :> Nil)
 >>> let delay2 clk rst en = (delayedI clk rst en :: Int -> DSignal System n Int -> DSignal System (n + 2) Int)
+>>> let delayN2 = delayN d2
+>>> let delayI2 = delayI :: KnownDomain dom => Int -> Enable dom -> Clock dom -> DSignal dom n Int -> DSignal dom (n + 2) Int
+>>> let countingSignals = Clash.Prelude.repeat (dfromList [0..]) :: Vec 4 (DSignal dom 0 Int)
 >>> :{
 let mac :: Clock System
         -> Reset System
@@ -81,7 +97,8 @@ let mac :: Clock System
 --
 -- @
 -- delay3
---   :: Clock dom
+--   :: KnownDomain dom
+--   => Clock dom
 --   -> Reset dom
 --   -> Enable dom
 --   -> 'DSignal' dom n Int
@@ -117,7 +134,8 @@ delayed clk rst en m ds = coerce (delaySignal (coerce ds))
 --
 -- @
 -- delay2
---   :: Clock dom
+--   :: KnownDomain dom
+--   => Clock dom
 --   -> Reset dom
 --   -> Enable dom
 --   -> Int
@@ -152,3 +170,110 @@ delayedI
   -> DSignal dom n a
   -> DSignal dom (n + d) a
 delayedI clk rst en dflt = delayed clk rst en (repeat dflt)
+
+-- | Delay a 'DSignal' for @d@ cycles, the value at time 0..d-1 is /a/.
+--
+-- @
+-- delayN2
+--   :: 'KnownDomain' dom
+--   => Int
+--   -> 'Enable' dom
+--   -> 'Clock' dom
+--   -> 'DSignal' dom n Int
+--   -> 'DSignal' dom (n + 2) Int
+-- delayN2 = 'delayN' d2
+-- @
+--
+-- >>> printX $ sampleN 6 (toSignal (delayN2 (-1) enableGen systemClockGen (dfromList [1..])))
+-- [-1,-1,1,2,3,4]
+delayN
+  :: forall dom a d n
+   . ( KnownDomain dom
+     , NFDataX a )
+  => SNat d
+  -> a
+  -- ^ Initial value
+  -> Enable dom
+  -> Clock dom
+  -> DSignal dom n a
+  -> DSignal dom (n+d) a
+delayN d dflt ena clk = coerce . go (snatToInteger d) . coerce @_ @(Signal dom a)
+  where
+    go 0 = id
+    go i = delay clk ena dflt . go (i-1)
+
+-- | Delay a 'DSignal' for @d@ cycles, where @d@ is derived from the context.
+-- The value at time 0..d-1 is a default value.
+--
+-- @
+-- delayI2
+--   :: 'KnownDomain' dom
+--   => Int
+--   -> 'Enable' dom
+--   -> 'Clock' dom
+--   -> 'DSignal' dom n Int
+--   -> 'DSignal' dom (n + 2) Int
+-- delayI2 = 'delayI'
+-- @
+--
+-- >>> sampleN 6 (toSignal (delayI2 (-1) enableGen systemClockGen (dfromList [1..])))
+-- [-1,-1,1,2,3,4]
+--
+-- You can also use type application to do the same:
+-- >>> sampleN 6 (toSignal (delayI @2 (-1) enableGen systemClockGen (dfromList [1..])))
+-- [-1,-1,1,2,3,4]
+delayI
+  :: forall d n a dom
+   . ( NFDataX a
+     , KnownDomain dom
+     , KnownNat d )
+  => a
+  -- ^ Initial value
+  -> Enable dom
+  -> Clock dom
+  -> DSignal dom n a
+  -> DSignal dom (n+d) a
+delayI dflt = delayN (SNat :: SNat d) dflt
+
+data DelayedFold (dom :: Domain) (n :: Nat) (delay :: Nat) (a :: Type) (f :: TyFun Nat Type) :: Type
+type instance Apply (DelayedFold dom n delay a) k = DSignal dom (n + (delay*k)) a
+
+-- | Tree fold over a 'Vec' of 'DSignal's with a combinatorial function,
+-- and delaying @delay@ cycles after each application.
+-- Values at times 0..(delay*k)-1 are set to a default.
+--
+-- @
+-- countingSignals :: Vec 4 (DSignal dom 0 Int)
+-- countingSignals = repeat (dfromList [0..])
+-- @
+--
+-- >>> printX $ sampleN 6 (toSignal (delayedFold  d1 (-1) (+) enableGen systemClockGen countingSignals))
+-- [-1,-2,0,4,8,12]
+--
+-- >>> printX $ sampleN 8 (toSignal (delayedFold d2 (-1) (*) enableGen systemClockGen countingSignals))
+-- [-1,-1,1,1,0,1,16,81]
+delayedFold
+  :: forall dom  n delay k a
+   . ( NFDataX a
+     , KnownDomain dom
+     , KnownNat delay
+     , KnownNat k )
+  => SNat delay
+  -- ^ Delay applied after each step
+  -> a
+  -- ^ Initial value
+  -> (a -> a -> a)
+  -- ^ Fold operation to apply
+  -> Enable dom
+  -> Clock dom
+  -> Vec (2^k) (DSignal dom n a)
+  -- ^ Vector input of size 2^k
+  -> DSignal dom (n + (delay * k)) a
+  -- ^ Output Signal delayed by (delay * k)
+delayedFold _ dflt op ena clk = dtfold (Proxy :: Proxy (DelayedFold dom n delay a)) id go
+  where
+    go :: SNat l
+       -> DelayedFold dom n delay a @@ l
+       -> DelayedFold dom n delay a @@ l
+       -> DelayedFold dom n delay a @@ (l+1)
+    go SNat x y = delayI dflt ena clk (op <$> x <*> y)

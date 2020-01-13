@@ -57,6 +57,8 @@ module Clash.Explicit.Prelude
   , windowD
   , isRising
   , isFalling
+  , riseEvery
+  , oscillate
     -- * Testbench functions
   , assert
   , stimuliGenerator
