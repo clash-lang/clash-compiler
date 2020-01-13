@@ -1013,7 +1013,8 @@ inlineWorkFree (TransformContext localScope _) e@(Var f) = do
           if isRecBndr
              then return e
              else do
-              (_,_,_,body) <- normalizeTopLvlBndr f top
+              topEnts <- Lens.view topEntities
+              (_,_,_,body) <- normalizeTopLvlBndr (f `elemVarSet` topEnts) f top
               -- See Note [AppProp no-shadow invariant]
               changed (deShadowTerm localScope body)
         _ -> return e
