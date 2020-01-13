@@ -1,45 +1,55 @@
-FROM ubuntu:trusty
+FROM ubuntu:bionic
 
-ARG PARALLEL=-j8
+ENV LANG=C.UTF-8 LC_ALL=C.UTF-8 PATH=/opt/bin:/opt/ghc/bin:/opt/cabal/bin:$PATH
 
-ENV DEBIAN_FRONTEND noninteractive
-ENV PATH /opt/ghc/bin:/opt/cabal/bin:$PATH
-
-ARG DEPS_GHC="pkg-config libgmp-dev curl"
+ARG DEPS_GHC="curl libc6-dev libgmp-dev pkg-config"
+ARG DEPS_CABAL="zlib1g-dev"
+ARG DEPS_GHDL="clang gcc gnat llvm-dev"
+ARG DEPS_IVERILOG="autoconf bison flex gperf"
 ARG DEPS_CLASH="libtinfo-dev"
-ARG DEPS_CLASH_COSIM="g++-multilib make"
-ARG DEPS_IVERILOG_BUILD="autoconf bison flex gperf"
+ARG DEPS_CLASH_COSIM="make"
 
-# enable UTF-8 support
-RUN locale-gen en_US.UTF-8 && update-locale LANG=en_US.UTF-8
-ENV LANG=en_US.UTF-8
-
-# add ghdl & ghc PPA's
 COPY ppa-trusted-keys/* /etc/apt/trusted.gpg.d/
-RUN apt-get update && \
-    echo "deb http://ppa.launchpad.net/pgavin/ghdl/ubuntu trusty main" > /etc/apt/sources.list.d/pgavin-ghdl-trusty.list && \
-    echo "deb http://ppa.launchpad.net/hvr/ghc/ubuntu trusty main" > /etc/apt/sources.list.d/hvr-ghc-trusty.list && \
-    apt-get update
 
-RUN apt-get -y install git $DEPS_GHC $DEPS_CLASH $DEPS_CLASH_COSIM ghdl
+RUN echo "deb http://ppa.launchpad.net/hvr/ghc/ubuntu bionic main" \
+      > /etc/apt/sources.list.d/hvr-ghc.list \
+ && apt-get update \
+ && apt-get install -y --no-install-recommends --no-install-suggests \
+      $DEPS_GHC $DEPS_CABAL \
+      $DEPS_GHDL $DEPS_IVERILOG \
+      $DEPS_CLASH $DEPS_CLASH_COSIM \
+      ca-certificates \
+      git \
+ && curl -L 'https://github.com/ghdl/ghdl/archive/v0.36.tar.gz' \
+      | tar -xz \
+ && curl -L 'https://github.com/steveicarus/iverilog/archive/v10_3.tar.gz' \
+      | tar -xz
 
-# needed for iverilog build
-RUN apt-get install -y $DEPS_IVERILOG_BUILD
-# install iverilog
-RUN git clone -b v10-branch --depth 1 https://github.com/steveicarus/iverilog.git iverilog-source && \
-    cd iverilog-source && sh autoconf.sh && ./configure && \
-    make $PARALLEL && make install && cd .. && rm -r iverilog-source
+WORKDIR /ghdl-0.36/build
 
-# Cleanup
-RUN apt-get remove -y $DEPS_IVERILOG_BUILD && \
-    apt-get autoremove -y && \
-    apt-get clean
+RUN ../configure --with-llvm-config --prefix=/opt \
+ && make -j$(nproc) \
+ && make install
 
-# keep the apt package cache
-RUN rm /etc/apt/apt.conf.d/docker-clean
+WORKDIR /iverilog-10_3
 
-# Prefetch some packages for speedy installation
-ARG PREFETCH="cabal-install-2.4 cabal-install-3.0 ghc-8.2.2 ghc-8.4.4 ghc-8.6.5 ghc-8.8.1"
+RUN chmod a+x autoconf.sh \
+ && ./autoconf.sh \
+ && ./configure --prefix=/opt \
+ && make -j$(nproc) \
+ && make install
 
-ARG GHC_FETCH_DATE="unknown"
-RUN apt-get update && apt-get install -y --download-only $PREFETCH
+WORKDIR /
+
+RUN apt-get remove -y $DEPS_IVERILOG \
+ && rm -Rf ghdl-0.36 iverilog-10_3 \
+ && apt-get autoremove -y --purge \
+ && apt-get clean \
+ && rm /etc/apt/apt.conf.d/docker-clean \
+ && apt-get install -y --download-only \
+      cabal-install-2.4 \
+      cabal-install-3.0 \
+      ghc-8.4.4 \
+      ghc-8.6.5 \
+      ghc-8.8.1
+

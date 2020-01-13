@@ -4,7 +4,7 @@ stages:
   - publish
 
 .tests:
-  image: leonschoorl/clash-ci-image:trusty
+  image: clashlang/clash-ci:2020-01-13
   stage: build
   variables:
     GIT_SUBMODULE_STRATEGY: recursive
