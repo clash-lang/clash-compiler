@@ -69,8 +69,8 @@ import           Clash.Core.Name                  (Name (..))
 import           Clash.Core.Term                  (Term)
 import           Clash.Core.Type                  (Type)
 import           Clash.Core.TyCon                 (TyConMap, TyConName)
-import           Clash.Core.Var                   (Id, varName)
-import           Clash.Core.VarEnv                (emptyVarEnv)
+import           Clash.Core.Var                   (Id, varName, varUniq)
+import           Clash.Core.VarEnv                (elemVarEnv, emptyVarEnv)
 import           Clash.Driver.Types
 import           Clash.Netlist                    (genNetlist)
 import           Clash.Netlist.Util               (genComponentName, genTopComponentName)
@@ -85,6 +85,7 @@ import           Clash.Primitives.Types
 import           Clash.Primitives.Util            (hashCompiledPrimMap)
 import           Clash.Unique                     (keysUniqMap, lookupUniqMap')
 import           Clash.Util                       (first, reportTimeDiff, wantedLanguageExtensions, unwantedLanguageExtensions)
+import           Clash.Util.Graph                 (reverseTopSort)
 
 -- | Get modification data of current clash binary.
 getClashModificationDate :: IO Clock.UTCTime
@@ -120,8 +121,9 @@ generateHDL
   -> (Clock.UTCTime,Clock.UTCTime)
   -> IO ()
 generateHDL reprs bindingsMap hdlState primMap tcm tupTcm typeTrans eval
-  topEntities opts (startTime,prepTime) = go prepTime HashMap.empty topEntities where
-
+  topEntities opts (startTime,prepTime) =
+    go prepTime HashMap.empty (sortTop bindingsMap topEntities)
+ where
   go prevTime _ [] = putStrLn $ "Clash: Total compilation took " ++
                                 reportTimeDiff prevTime startTime
 
@@ -656,3 +658,36 @@ normalizeEntity reprs bindingsMap primMap tcm tupTcm typeTrans eval topEntities
     transformedBindings = runNormalization opts supply bindingsMap
                             typeTrans reprs tcm tupTcm eval primMap emptyVarEnv
                             topEntities doNorm
+
+-- | topologically sort the top entities
+sortTop
+  :: BindingMap
+  -> [( Id
+      , Maybe TopEntity
+      , Maybe Id
+      )]
+  -- ^ topEntity bndr
+  -- + (maybe) TopEntity annotation
+  -- + (maybe) testBench bndr
+  -> [( Id
+      , Maybe TopEntity
+      , Maybe Id
+      )]
+  -- ^ topEntity bndr
+  -- + (maybe) TopEntity annotation
+  -- + (maybe) testBench bndr
+sortTop bindingsMap topEntities =
+  let (nodes,edges) = unzip (map go topEntities)
+  in  case reverseTopSort nodes (concat edges) of
+        Left msg   -> error msg
+        Right tops -> tops
+ where
+  go t@(topE,_,tbM) =
+    let topRefs = goRefs topE topE
+        tbRefs  = maybe [] (goRefs topE) tbM
+    in  ((varUniq topE,t)
+         ,map ((\(v,_,_) -> (varUniq topE, varUniq v))) (tbRefs ++ topRefs))
+
+  goRefs top i =
+    let cg = callGraph bindingsMap i
+    in  filter (\(v,_,_) -> v /= top && v /= i && v `elemVarEnv` cg) topEntities

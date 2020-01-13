@@ -359,6 +359,7 @@ runClashTest = defaultMain $ clashTestRoot
         , runTest "PortNamesWithRTree" def{hdlTargets=[Verilog],entities=Entities ["", "PortNamesWithRTree_topEntity", "PortNamesWithRTree_testBench"], topEntity=TopEntity "PortNamesWithRTree_testBench"}
         , outputTest ("tests" </> "shouldwork" </> "TopEntity") [Verilog] [] [] "PortNamesWithRTree" "main"
         , runTest "TopEntHOArg" def{entities=Entities ["f", "g"], topEntity=TopEntity "f", hdlSim=False}
+        , runTest "T701" def {hdlSim=False,entities=Entities ["mynot", ""]}
         ]
       , clashTestGroup "Unit"
         [ runTest "Imap" def
