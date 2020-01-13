@@ -30,11 +30,11 @@ aliases:
   - &cache_restore
     restore_cache:
       keys:
-        - cache-{{ .Environment.CIRCLE_JOB }}-{{ checksum ".circleci_cachekey" }}
-        - cache-{{ .Environment.CIRCLE_JOB }}-
+        - cache-{{ .Environment.CIRCLE_JOB }}-{{ checksum ".ci/docker/Dockerfile" }}-{{ checksum ".circleci_cachekey" }}
+        - cache-{{ .Environment.CIRCLE_JOB }}-{{ checksum ".ci/docker/Dockerfile" }}-
   - &cache_save
     save_cache:
-      key: cache-{{ .Environment.CIRCLE_JOB }}-{{ checksum ".circleci_cachekey" }}
+      key: cache-{{ .Environment.CIRCLE_JOB }}-{{ checksum ".ci/docker/Dockerfile" }}-{{ checksum ".circleci_cachekey" }}
       paths:
         - cabal-store
         - ~/.stack
