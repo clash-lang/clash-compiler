@@ -181,6 +181,7 @@ runClashTest = defaultMain $ clashTestRoot
           , runFailingTest ("tests" </> "shouldwork" </> "CustomReprs" </> "ZeroWidth") allTargets [] "FailGracefully2" (Just "Unexpected projection of zero-width type")
           , runFailingTest ("tests" </> "shouldwork" </> "CustomReprs" </> "ZeroWidth") allTargets [] "FailGracefully3" (Just "Unexpected projection of zero-width type")
           ]
+        , runTest "T694" def{hdlSim=False,hdlTargets=[VHDL]}
         ]
       , clashTestGroup "DDR"
         [ runTest "DDRinGA" def
