@@ -44,21 +44,25 @@ import           Data.Text               (Text)
 import qualified Data.Text as Text
 
 import           BasicTypes              (InlineSpec)
+import           PrelNames               (eqTyConKey)
+import           Unique                  (getKey)
 
 import           Clash.Annotations.Primitive (extractPrim)
 import           Clash.Core.FreeVars
   (globalIds, hasLocalFreeVars, globalIdOccursIn)
-import           Clash.Core.Name         (Name(nameOcc))
+import           Clash.Core.Name         (Name(nameOcc,nameUniq))
 import           Clash.Core.Pretty       (showPpr)
-import           Clash.Core.Subst        (deShadowTerm)
+import           Clash.Core.Subst
+  (deShadowTerm, extendTvSubstList, mkSubst, substTm)
 import           Clash.Core.Term
   (Context, CoreContext(AppArg), PrimInfo (..), Term (..), WorkInfo (..),
    TickInfo(NameMod), NameMod(PrefixName), collectArgs, collectArgsTicks)
 import           Clash.Core.TyCon        (TyConMap)
-import           Clash.Core.Type         (Type(LitTy), LitTy(SymTy), undefinedTy)
+import           Clash.Core.Type
+  (Type(LitTy, VarTy), LitTy(SymTy), TypeView (TyConApp), tyView, undefinedTy)
 import           Clash.Core.Util
   (isClockOrReset, isPolyFun, termType, mkApps, mkTicks)
-import           Clash.Core.Var          (Id, Var (..), isGlobalId)
+import           Clash.Core.Var          (Id, TyVar, Var (..), isGlobalId)
 import           Clash.Core.VarEnv
   (VarEnv, emptyInScopeSet, emptyVarEnv, extendVarEnv, extendVarEnvWith,
    lookupVarEnv, unionVarEnvWith, unitVarEnv, extendInScopeSetList)
@@ -391,10 +395,11 @@ isCheapFunction tm = case classifyFunction tm of
     | otherwise       -> False
 
 normalizeTopLvlBndr
-  :: Id
+  :: Bool
+  -> Id
   -> (Id, SrcSpan, InlineSpec, Term)
   -> NormalizeSession (Id, SrcSpan, InlineSpec, Term)
-normalizeTopLvlBndr nm (nm',sp,inl,tm) = makeCachedU nm (extra.normalized) $ do
+normalizeTopLvlBndr isTop nm (nm',sp,inl,tm) = makeCachedU nm (extra.normalized) $ do
   tcm <- Lens.view tcCache
   let nmS = showPpr (varName nm)
   -- We deshadow the term because sometimes GHC gives us
@@ -406,11 +411,39 @@ normalizeTopLvlBndr nm (nm',sp,inl,tm) = makeCachedU nm (extra.normalized) $ do
   -- Additionally, it allows for a much cheaper `appProp`
   -- transformation, see Note [AppProp no-shadow invariant]
   let tm1 = deShadowTerm emptyInScopeSet tm
+      tm2 = if isTop then substWithTyEq [] [] tm1 else tm1
   old <- Lens.use curFun
-  tm2 <- rewriteExpr ("normalization",normalization) (nmS,tm1) (nm',sp)
+  tm3 <- rewriteExpr ("normalization",normalization) (nmS,tm2) (nm',sp)
   curFun .= old
-  let ty' = termType tcm tm2
-  return (nm' {varType = ty'},sp,inl,tm2)
+  let ty' = termType tcm tm3
+  return (nm' {varType = ty'},sp,inl,tm3)
+
+-- | Turn type equality constraints into substitutions and apply them.
+--
+-- So given:
+--
+-- > /\dom . \(eq : dom ~ "System") . \(eta : Signal dom Bool) . eta
+--
+-- we create the substitution [dom := "System"] and apply it to create:
+--
+-- > \(eta : Signal "System" Bool) . eta
+--
+-- __NB:__ Users of this function should ensure it's only applied to TopEntities
+substWithTyEq
+  :: [TyVar]
+  -> [(TyVar,Type)]
+  -> Term
+  -> Term
+substWithTyEq tvs cvs (TyLam tv e) = substWithTyEq (tv:tvs) cvs e
+substWithTyEq tvs cvs (Lam v e)
+  | TyConApp (nameUniq -> tcUniq) [_,VarTy tv, ty] <- tyView (varType v)
+  , tcUniq == getKey eqTyConKey
+  , tv `elem` tvs
+  = substWithTyEq (tvs List.\\ [tv]) ((tv,ty):cvs) e
+substWithTyEq tvs cvs@(_:_) e =
+  let e1 = List.foldl' (flip TyLam) e tvs
+  in  substTm "substWithTyEq" (extendTvSubstList (mkSubst emptyInScopeSet) cvs) e1
+substWithTyEq tvs _ e = List.foldl' (flip TyLam) e tvs
 
 -- | Rewrite a term according to the provided transformation
 rewriteExpr :: (String,NormRewrite) -- ^ Transformation to apply

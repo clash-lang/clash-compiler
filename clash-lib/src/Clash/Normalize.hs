@@ -171,7 +171,8 @@ normalize' nm = do
       resTyRep <- not <$> isUntranslatableType False resTy
       if resTyRep
          then do
-            tmNorm <- normalizeTopLvlBndr nm (nm',sp,inl,tm)
+            topEnts <- Lens.view topEntities
+            tmNorm <- normalizeTopLvlBndr (nm `elemVarSet` topEnts) nm (nm',sp,inl,tm)
             let usedBndrs = Lens.toListOf globalIds (tmNorm ^. _4)
             traceIf (nm `elem` usedBndrs)
                     (concat [ $(curLoc),"Expr belonging to bndr: ",nmS ," (:: "
@@ -180,7 +181,6 @@ normalize' nm = do
                             , showPpr (tmNorm ^. _4) ])
                     (return ())
             prevNorm <- mapVarEnv (Lens.view _1) <$> Lens.use (extra.normalized)
-            topEnts  <- Lens.view topEntities
             let toNormalize = filter (`notElemVarSet` topEnts)
                             $ filter (`notElemVarEnv` (extendVarEnv nm nm prevNorm)) usedBndrs
             return (toNormalize,(nm,tmNorm))
