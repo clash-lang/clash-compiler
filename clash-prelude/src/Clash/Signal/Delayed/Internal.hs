@@ -47,9 +47,7 @@ import Language.Haskell.TH.Syntax (Lift)
 import Test.QuickCheck            (Arbitrary, CoArbitrary)
 
 import Clash.Promoted.Nat         (SNat)
-import Clash.Signal.Internal      (Domain)
-import Clash.Explicit.Signal
-  (Signal, fromList, fromList_lazy)
+import Clash.Signal.Internal      (Signal, Domain, fromList, fromList_lazy)
 import Clash.XException           (NFDataX)
 
 {- $setup

@@ -11,18 +11,13 @@ Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
 {-# LANGUAGE FlexibleContexts     #-}
 {-# LANGUAGE KindSignatures       #-}
 {-# LANGUAGE ScopedTypeVariables  #-}
-{-# LANGUAGE TypeApplications     #-}
 {-# LANGUAGE TypeFamilies         #-}
 {-# LANGUAGE TypeOperators        #-}
-{-# LANGUAGE UndecidableInstances #-}
 #if __GLASGOW_HASKELL__ >= 806
 {-# LANGUAGE NoStarIsType #-}
 #endif
-#if __GLASGOW_HASKELL__ < 806
-{-# LANGUAGE TypeInType #-}
-#endif
 
-{-# LANGUAGE Trustworthy #-}
+{-# LANGUAGE Safe #-}
 
 {-# OPTIONS_GHC -fplugin GHC.TypeLits.Normalise       #-}
 
@@ -48,23 +43,19 @@ module Clash.Signal.Delayed
   )
 where
 
-import           Data.Coerce                   (coerce)
-import           Data.Kind                     (Type)
-import           Data.Proxy                    (Proxy(..))
 import           GHC.TypeLits
-  (KnownNat, type (^), type (+), type (*), Nat)
-import           Data.Singletons.Prelude       (Apply, TyFun, type (@@))
+  (KnownNat, type (^), type (+), type (*))
 
-import           Clash.Signal.Internal         (Domain)
 import Clash.Signal.Delayed.Internal
   (DSignal(..), dfromList, dfromList_lazy, fromSignal, toSignal,
    unsafeFromSignal, antiDelay, feedback)
 import qualified Clash.Explicit.Signal.Delayed as E
-import           Clash.Sized.Vector            (Vec, dtfold)
+import           Clash.Sized.Vector            (Vec)
 import           Clash.Signal
-  (HiddenClockResetEnable , hideClockResetEnable, Signal, delay)
+  (HiddenClock, HiddenClockResetEnable, HiddenEnable, hideClock,
+   hideClockResetEnable, hideEnable)
 
-import           Clash.Promoted.Nat            (SNat (..), snatToInteger)
+import           Clash.Promoted.Nat            (SNat (..))
 import           Clash.XException              (NFDataX)
 
 {- $setup
@@ -135,29 +126,27 @@ delayedI = hideClockResetEnable E.delayedI
 -- | Delay a 'DSignal' for @d@ cycles, the value at time 0..d-1 is /a/.
 --
 -- @
--- delay2
+-- delayN2
 --   :: HiddenClockResetEnable dom
 --   => Int
 --   -> 'DSignal' dom n Int
 --   -> 'DSignal' dom (n + 2) Int
--- delay2 = 'delayN' d2
+-- delayN2 = 'delayN' d2
 -- @
 --
 -- >>> printX $ sampleN @System 6 (toSignal (delayN2 (-1) (dfromList [1..])))
 -- [-1,-1,1,2,3,4]
 delayN
   :: forall dom  a d n
-   . ( HiddenClockResetEnable dom
+   . ( HiddenClock dom
+     , HiddenEnable dom
      , NFDataX a )
   => SNat d
   -> a
   -- ^ Initial value
   -> DSignal dom n a
   -> DSignal dom (n+d) a
-delayN d dflt = coerce . go (snatToInteger d) . coerce @_ @(Signal dom a)
-  where
-    go 0 = id
-    go i = delay dflt . go (i-1)
+delayN d dflt = hideClock (hideEnable (E.delayN d dflt))
 
 -- | Delay a 'DSignal' for @d@ cycles, where @d@ is derived from the context.
 -- The value at time 0..d-1 is a default value.
@@ -188,9 +177,6 @@ delayI
   -> DSignal dom (n+d) a
 delayI dflt = delayN (SNat :: SNat d) dflt
 
-data DelayedFold (dom :: Domain) (n :: Nat) (delay :: Nat) (a :: Type) (f :: TyFun Nat Type) :: Type
-type instance Apply (DelayedFold dom n delay a) k = DSignal dom (n + (delay*k)) a
-
 -- | Tree fold over a 'Vec' of 'DSignal's with a combinatorial function,
 -- and delaying @delay@ cycles after each application.
 -- Values at times 0..(delay*k)-1 are set to a default.
@@ -207,7 +193,8 @@ type instance Apply (DelayedFold dom n delay a) k = DSignal dom (n + (delay*k)) 
 -- [-1,-1,1,1,0,1,16,81]
 delayedFold
   :: forall dom  n delay k a
-   . ( HiddenClockResetEnable dom
+   . ( HiddenClock dom
+     , HiddenEnable dom
      , NFDataX a
      , KnownNat delay
      , KnownNat k )
@@ -221,10 +208,4 @@ delayedFold
   -- ^ Vector input of size 2^k
   -> DSignal dom (n + (delay * k)) a
   -- ^ Output Signal delayed by (delay * k)
-delayedFold _ dflt op = dtfold (Proxy :: Proxy (DelayedFold dom n delay a)) id go
-  where
-    go :: SNat l
-       -> DelayedFold dom n delay a @@ l
-       -> DelayedFold dom n delay a @@ l
-       -> DelayedFold dom n delay a @@ (l+1)
-    go SNat x y = delayI dflt (op <$> x <*> y)
+delayedFold d dflt f = hideClock (hideEnable (E.delayedFold d dflt f))

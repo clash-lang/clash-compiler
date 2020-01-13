@@ -152,6 +152,9 @@ can potentially introduce situations prone to meta-stability:
 module Clash.Explicit.Signal
   ( -- * Synchronous signal
     Signal
+  , BiSignalIn
+  , BiSignalOut
+  , BiSignalDefault(..)
     -- * Domain
   , Domain
   , KnownDomain(..)
@@ -222,6 +225,7 @@ module Clash.Explicit.Signal
   , register
   , regMaybe
   , regEn
+  , mux
     -- * Simulation and testbench functions
   , clockGen
   , resetGen
@@ -243,6 +247,8 @@ module Clash.Explicit.Signal
     -- * List \<-\> Signal conversion (not synthesizable)
   , sample
   , sampleN
+  , sampleWithReset
+  , sampleWithResetN
   , fromList
   , fromListWithReset
     -- ** lazy versions
@@ -256,6 +262,11 @@ module Clash.Explicit.Signal
   , (.==.), (./=.)
     -- ** 'Ord'-like
   , (.<.), (.<=.), (.>=.), (.>.)
+    -- * Bisignal functions
+  , veryUnsafeToBiSignalIn
+  , readFromBiSignal
+  , writeToBiSignal
+  , mergeBiSignalOuts
   )
 where
 
@@ -266,6 +277,7 @@ import           Clash.Annotations.Primitive    (hasBlackBox)
 import           Clash.Class.Num                (satSucc, SaturationMode(SatBound))
 import           Clash.Promoted.Nat             (SNat(..), snatToNum)
 import           Clash.Signal.Bundle            (Bundle (..), vecBundle#)
+import           Clash.Signal.BiSignal
 import           Clash.Signal.Internal
 import           Clash.Signal.Internal.Ambiguous
   (knownVDomain, clockPeriod, activeEdge, resetKind, initBehavior, resetPolarity)
@@ -900,5 +912,53 @@ convertReset clkA clkB (unsafeToHighPolarity -> rstA0) =
       (SAsynchronous, SSynchronous) ->
         delay clkB enableGen True $
           delay clkB enableGen True rstA1
+
+-- | Get a list of samples from a 'Signal', while asserting the reset line
+-- for /n/ clock cycles. 'sampleWithReset' does not return the first /n/ cycles,
+-- i.e., when the reset is asserted.
+--
+-- __NB__: This function is not synthesizable
+sampleWithReset
+  :: forall dom a m
+   . ( KnownDomain dom
+     , NFDataX a
+     , 1 <= m )
+  => SNat m
+  -- ^ Number of cycles to assert the reset
+  -> (KnownDomain dom
+      => Clock dom
+      -> Reset dom
+      -> Enable dom
+      -> Signal dom a)
+  -- ^ 'Signal' to sample
+  -> [a]
+sampleWithReset nReset f0 =
+  let f1 = f0 clockGen (resetGenN @dom nReset) enableGen in
+  drop (snatToNum nReset) (sample f1)
+{-# NOINLINE sampleWithReset #-}
+
+-- | Get a fine list of /m/ samples from a 'Signal', while asserting the reset line
+-- for /n/ clock cycles. 'sampleWithReset' does not return the first /n/ cycles,
+-- i.e., while the reset is asserted.
+--
+-- __NB__: This function is not synthesizable
+sampleWithResetN
+  :: forall dom a m
+   . ( KnownDomain dom
+     , NFDataX a
+     , 1 <= m )
+  => SNat m
+  -- ^ Number of cycles to assert the reset
+  -> Int
+  -- ^ Number of samples to produce
+  -> (KnownDomain dom
+      => Clock dom
+      -> Reset dom
+      -> Enable dom
+      -> Signal dom a)
+  -- ^ 'Signal' to sample
+  -> [a]
+sampleWithResetN nReset nSamples f =
+  take nSamples (sampleWithReset nReset f)
 
 {-# RULES "sequenceAVecSignal" Clash.Sized.Vector.traverse# (\x -> x) = vecBundle# #-}
