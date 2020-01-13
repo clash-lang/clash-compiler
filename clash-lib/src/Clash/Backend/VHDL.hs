@@ -1986,6 +1986,7 @@ toSLV (CustomSum _ _dataRepr size reprs) (DataCon _ (DC (_,i)) _) =
   let (ConstrRepr' _ _ _ value _) = fst $ reprs !! i in
   let unsigned = "to_unsigned" <> parens (int (fromIntegral value) <> comma <> int size) in
   "std_logic_vector" <> parens unsigned
+toSLV (CustomSum {}) e = "std_logic_vector" <> parens (expr_ False e)
 toSLV t@(Product _ labels tys) (Identifier id_ Nothing) = do
     selIds' <- sequence selIds
     encloseSep lparen rparen " & " (zipWithM toSLV tys selIds')
