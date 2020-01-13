@@ -7,6 +7,7 @@
 -}
 
 {-# LANGUAGE CPP #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE MagicHash #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RankNTypes #-}
@@ -15,18 +16,17 @@
 
 module Clash.GHC.Evaluator where
 
-import           Control.Applicative (liftA2)
 import           Control.Concurrent.Supply  (Supply,freshId)
 import           Control.DeepSeq            (force)
 import           Control.Exception          (ArithException(..), Exception, tryJust, evaluate)
-import           Control.Monad              (ap)
+import           Control.Monad.State.Strict (State, MonadState)
+import qualified Control.Monad.State.Strict as State
 import           Control.Monad.Trans.Except (runExcept)
 import           Data.Bits
 import           Data.Char           (chr,ord)
 import qualified Data.Either         as Either
 import qualified Data.IntMap         as IntMap
-import           Data.Maybe
-  (fromMaybe, mapMaybe, catMaybes)
+import           Data.Maybe (fromMaybe, mapMaybe)
 import qualified Data.List           as List
 import qualified Data.Primitive.ByteArray as ByteArray
 import           Data.Proxy          (Proxy)
@@ -95,21 +95,14 @@ import Clash.Sized.Internal.Signed   (Signed   (..))
 import Clash.Sized.Internal.Unsigned (Unsigned (..))
 import Clash.XException (isX)
 
-newtype PrimEvalMonad a = PEM { runPEM :: Supply -> (a,Supply) }
-
-instance Functor PrimEvalMonad where
-  fmap f m = PEM (\s -> case runPEM m s of (a,s') -> (f a, s'))
-
-instance Applicative PrimEvalMonad where
-  pure  = return
-  (<*>) = ap
-
-instance Monad PrimEvalMonad where
-  return a = PEM (\s -> (a,s))
-  m >>= k  = PEM (\s -> case runPEM m s of (a,s') -> runPEM (k a) s')
+newtype PrimEvalMonad a = PEM (State Supply a)
+  deriving (Functor, Applicative, Monad, MonadState Supply)
 
 instance MonadUnique PrimEvalMonad where
-  getUniqueM = PEM (\s -> case freshId s of (!i,!s') -> (i,s'))
+  getUniqueM = PEM $ State.state (\s -> case freshId s of (!i,!s') -> (i,s'))
+
+runPEM :: PrimEvalMonad a -> Supply -> (a, Supply)
+runPEM (PEM m) = State.runState m
 
 reduceConstant :: PrimEvaluator
 reduceConstant isSubj tcm h k nm pInfo tys args = case nm of
@@ -3339,61 +3332,61 @@ reduceConstant isSubj tcm h k nm pInfo tys args = case nm of
 
     catchDivByZero = makeUndefinedIf (==DivideByZero)
 
-typedLiterals' :: (Value -> Maybe a) -> [Value] -> [a]
-typedLiterals' typedLiteral = mapMaybe typedLiteral
+-- Helper functions for literals
+
+pairOf :: (Value -> Maybe a) -> [Value] -> Maybe (a, a)
+pairOf f [x, y] = (,) <$> f x <*> f y
+pairOf _ _ = Nothing
+
+listOf :: (Value -> Maybe a) -> [Value] -> [a]
+listOf = mapMaybe
 
 doubleLiterals' :: [Value] -> [Rational]
-doubleLiterals' = typedLiterals' doubleLiteral
+doubleLiterals' = listOf doubleLiteral
   where
     doubleLiteral x = case x of
       Lit (DoubleLiteral i) -> Just i
       _ -> Nothing
 
 floatLiterals' :: [Value] -> [Rational]
-floatLiterals' = typedLiterals' floatLiteral
+floatLiterals' = listOf floatLiteral
   where
     floatLiteral x = case x of
       Lit (FloatLiteral i) -> Just i
       _ -> Nothing
 
 integerLiterals :: [Value] -> Maybe (Integer, Integer)
-integerLiterals args = case integerLiterals' args of
-  [i,j] -> Just (i,j)
-  _ -> Nothing
+integerLiterals = pairOf integerLiteral
 
 naturalLiterals :: [Value] -> Maybe (Integer, Integer)
-naturalLiterals args = case naturalLiterals' args of
-  [i,j] -> Just (i, j)
-  _ -> Nothing
+naturalLiterals = pairOf naturalLiteral
 
 integerLiterals' :: [Value] -> [Integer]
-integerLiterals' = typedLiterals' integerLiteral
+integerLiterals' = listOf integerLiteral
 
 naturalLiterals' :: [Value] -> [Integer]
-naturalLiterals' = typedLiterals' naturalLiteral
+naturalLiterals' = listOf naturalLiteral
 
 intLiterals :: [Value] -> Maybe (Integer,Integer)
-intLiterals args = case args of
-  [Lit (IntLiteral i), Lit (IntLiteral j)] -> Just (i,j)
-  _ -> Nothing
+intLiterals = pairOf intLiteral
 
 intLiterals' :: [Value] -> [Integer]
-intLiterals' = typedLiterals' intLiteral
-  where
-    intLiteral x = case x of
-      Lit (IntLiteral i) -> Just i
-      _ -> Nothing
+intLiterals' = listOf intLiteral
+
+intLiteral :: Value -> Maybe Integer
+intLiteral x = case x of
+  Lit (IntLiteral i) -> Just i
+  _ -> Nothing
 
 intCLiteral :: Value -> Maybe Integer
 intCLiteral (DC _ [Left (Literal (IntLiteral i))]) = Just i
 intCLiteral _                                      = Nothing
 
 intCLiterals :: [Value] -> Maybe (Integer, Integer)
-intCLiterals (a1:a2:_) = liftA2 (,) (intCLiteral a1) (intCLiteral a2)
-intCLiterals _         = Nothing
+intCLiterals = pairOf intCLiteral
 
 intCLiterals' :: [Value] -> [Integer]
-intCLiterals' = catMaybes . map intCLiteral
+intCLiterals' = listOf intCLiteral
 
 mkIntCLiteral
   :: HasCallStack
@@ -3409,39 +3402,32 @@ mkIntCLiteral v _i =
   error $ "Report as bug: mkIntCLiteral was called with wrong value: " ++ show v
 
 wordLiterals :: [Value] -> Maybe (Integer,Integer)
-wordLiterals args = case args of
-  [Lit (WordLiteral i), Lit (WordLiteral j)] -> Just (i,j)
-  _ -> Nothing
+wordLiterals = pairOf wordLiteral
+
 wordLiterals' :: [Value] -> [Integer]
-wordLiterals' = typedLiterals' wordLiteral
-  where
-    wordLiteral x = case x of
-      Lit (WordLiteral i) -> Just i
-      _ -> Nothing
+wordLiterals' = listOf wordLiteral
+
+wordLiteral :: Value -> Maybe Integer
+wordLiteral x = case x of
+  Lit (WordLiteral i) -> Just i
+  _ -> Nothing
 
 charLiterals :: [Value] -> Maybe (Char,Char)
-charLiterals args = case args of
-  [Lit (CharLiteral i), Lit (CharLiteral j)] -> Just (i,j)
-  _ -> Nothing
+charLiterals = pairOf charLiteral
 
 charLiterals' :: [Value] -> [Char]
-charLiterals' = typedLiterals' charLiteral
-  where
-    charLiteral x = case x of
-      Lit (CharLiteral c) -> Just c
-      _ -> Nothing
+charLiterals' = listOf charLiteral
+
+charLiteral :: Value -> Maybe Char
+charLiteral x = case x of
+  Lit (CharLiteral c) -> Just c
+  _ -> Nothing
 
 sizedLiterals :: Text -> [Value] -> Maybe (Integer,Integer)
-sizedLiterals szCon args
-  = case args of
-      ([ PrimVal nm  _ _ [_, Lit (IntegerLiteral i)]
-       , PrimVal nm' _ _ [_, Lit (IntegerLiteral j)]])
-        | nm  == szCon
-        , nm' == szCon -> Just (i,j)
-      _ -> Nothing
+sizedLiterals szCon = pairOf (sizedLiteral szCon)
 
 sizedLiterals' :: Text -> [Value] -> [Integer]
-sizedLiterals' szCon = typedLiterals' (sizedLiteral szCon)
+sizedLiterals' szCon = listOf (sizedLiteral szCon)
 
 sizedLiteral :: Text -> Value -> Maybe Integer
 sizedLiteral szCon val = case val of
@@ -3451,7 +3437,7 @@ sizedLiteral szCon val = case val of
 bitLiterals
   :: [Value]
   -> [(Integer,Integer)]
-bitLiterals = map normalizeBit . typedLiterals' go
+bitLiterals = map normalizeBit . mapMaybe go
  where
   normalizeBit (msk,v) = (msk .&. 1, v .&. 1)
   go val = case val of
@@ -3466,31 +3452,25 @@ indexLiterals     = sizedLiterals "Clash.Sized.Internal.Index.fromInteger#"
 signedLiterals    = sizedLiterals "Clash.Sized.Internal.Signed.fromInteger#"
 unsignedLiterals  = sizedLiterals "Clash.Sized.Internal.Unsigned.fromInteger#"
 
-bitVectorLiterals
-  :: [Value] -> Maybe ((Integer,Integer),(Integer,Integer))
-bitVectorLiterals args
-  = case args of
-      ([ PrimVal nm  _ _ [_, Lit (IntegerLiteral mi), Lit (IntegerLiteral i)]
-       , PrimVal nm' _ _ [_, Lit (IntegerLiteral mj), Lit (IntegerLiteral j)]])
-        | nm  == "Clash.Sized.Internal.BitVector.fromInteger#"
-        , nm' == "Clash.Sized.Internal.BitVector.fromInteger#" -> Just ((mi,i),(mj,j))
-      _ -> Nothing
-
 indexLiterals', signedLiterals', unsignedLiterals'
   :: [Value] -> [Integer]
 indexLiterals'     = sizedLiterals' "Clash.Sized.Internal.Index.fromInteger#"
 signedLiterals'    = sizedLiterals' "Clash.Sized.Internal.Signed.fromInteger#"
 unsignedLiterals'  = sizedLiterals' "Clash.Sized.Internal.Unsigned.fromInteger#"
 
+bitVectorLiterals
+  :: [Value] -> Maybe ((Integer,Integer),(Integer,Integer))
+bitVectorLiterals = pairOf bitVectorLiteral
+
 bitVectorLiterals'
   :: [Value] -> [(Integer,Integer)]
-bitVectorLiterals' = mapMaybe go
- where
-  go :: Value -> Maybe (Integer,Integer)
-  go val = case val of
-    PrimVal nm  _ _ [_, Lit (IntegerLiteral mi), Lit (IntegerLiteral i)]
-      | nm == "Clash.Sized.Internal.BitVector.fromInteger#" -> Just (mi, i)
-    _ -> Nothing
+bitVectorLiterals' = listOf bitVectorLiteral
+
+bitVectorLiteral :: Value -> Maybe (Integer, Integer)
+bitVectorLiteral v = case v of
+  (PrimVal nm _ _ [_, Lit (IntegerLiteral m), Lit (IntegerLiteral i)])
+    | nm == "Clash.Sized.Internal.BitVector.fromInteger#" -> Just (m, i)
+  _ -> Nothing
 
 toBV :: (Integer,Integer) -> BitVector n
 toBV = uncurry BV
@@ -3562,8 +3542,8 @@ extractKnownNatVal tcm tys = fmap snd (extractKnownNat tcm tys)
 -- where nTy is the Type of n
 -- and   nInt is its value as an Integer
 extractKnownNats :: TyConMap -> [Type] -> [(Type, Integer)]
-extractKnownNats tcm tys =
-  catMaybes (map (extractKnownNat tcm . pure)  tys)
+extractKnownNats tcm =
+  mapMaybe (extractKnownNat tcm . pure)
 
 extractKnownNatVals :: TyConMap -> [Type] -> [Integer]
 extractKnownNatVals tcm tys = map snd (extractKnownNats tcm tys)
