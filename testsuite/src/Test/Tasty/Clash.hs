@@ -457,7 +457,8 @@ runTest1 modName testOptions@TestOptions{hdlSim,clashFlags} path VHDL =
 
    libs
      | length subdirs == 1 = []
-     | otherwise           = subdirs List.\\ [entName]
+     | hdlSim              = subdirs List.\\ [entName]
+     | otherwise           = subdirs List.\\ [entName,""]
 
    seqTests :: TestTree
    seqTests = testGroup "VHDL" (sequenceTests path' tests)
