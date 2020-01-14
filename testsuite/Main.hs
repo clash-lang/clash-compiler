@@ -340,6 +340,7 @@ runClashTest = defaultMain $ clashTestRoot
           ]
 
         , runFailingTest ("tests" </> "shouldfail" </> "Signal") allTargets [] "MAC" (Just "Couldn't instantiate blackbox for Clash.Signal.Internal.register#")
+        , runTest "T1007" def{hdlSim=False}
         ]
       , clashTestGroup "SimIO"
         [ runTest "Test00" def {hdlTargets=[Verilog], stdErrEmptyFail=False, topEntity=TopEntity "topEntity"}
