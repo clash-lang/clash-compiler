@@ -68,7 +68,7 @@ import           Clash.Class.BitPack (pack,unpack)
 import           Clash.Core.DataCon  (DataCon (..))
 import           Clash.Core.Evaluator
   (Heap (..), PrimEvaluator, Stack, Value (..), valToTerm, whnf, integerLiteral,
-  naturalLiteral)
+  naturalLiteral, collectValueTicks)
 import           Clash.Core.Literal  (Literal (..))
 import           Clash.Core.Name
   (Name (..), NameSort (..), mkUnsafeSystemName)
@@ -3338,17 +3338,19 @@ listOf = mapMaybe
 
 doubleLiterals' :: [Value] -> [Rational]
 doubleLiterals' = listOf doubleLiteral
-  where
-    doubleLiteral x = case x of
-      Lit (DoubleLiteral i) -> Just i
-      _ -> Nothing
+
+doubleLiteral :: Value -> Maybe Rational
+doubleLiteral (collectValueTicks -> (v, _)) = case v of
+  Lit (DoubleLiteral i) -> Just i
+  _ -> Nothing
 
 floatLiterals' :: [Value] -> [Rational]
 floatLiterals' = listOf floatLiteral
-  where
-    floatLiteral x = case x of
-      Lit (FloatLiteral i) -> Just i
-      _ -> Nothing
+
+floatLiteral :: Value -> Maybe Rational
+floatLiteral (collectValueTicks -> (v, _)) = case v of
+  Lit (FloatLiteral i) -> Just i
+  _ -> Nothing
 
 integerLiterals :: [Value] -> Maybe (Integer, Integer)
 integerLiterals = pairOf integerLiteral
@@ -3369,13 +3371,14 @@ intLiterals' :: [Value] -> [Integer]
 intLiterals' = listOf intLiteral
 
 intLiteral :: Value -> Maybe Integer
-intLiteral x = case x of
+intLiteral (collectValueTicks -> (v, _)) = case v of
   Lit (IntLiteral i) -> Just i
   _ -> Nothing
 
 intCLiteral :: Value -> Maybe Integer
-intCLiteral (DC _ [Left (Literal (IntLiteral i))]) = Just i
-intCLiteral _                                      = Nothing
+intCLiteral (collectValueTicks -> (v, _)) = case v of
+  (DC _ [Left (Literal (IntLiteral i))]) -> Just i
+  _ -> Nothing
 
 intCLiterals :: [Value] -> Maybe (Integer, Integer)
 intCLiterals = pairOf intCLiteral
@@ -3383,6 +3386,7 @@ intCLiterals = pairOf intCLiteral
 intCLiterals' :: [Value] -> [Integer]
 intCLiterals' = listOf intCLiteral
 
+-- TODO Collect ticks and re-tick ?
 mkIntCLiteral
   :: HasCallStack
   => Value
@@ -3403,7 +3407,7 @@ wordLiterals' :: [Value] -> [Integer]
 wordLiterals' = listOf wordLiteral
 
 wordLiteral :: Value -> Maybe Integer
-wordLiteral x = case x of
+wordLiteral (collectValueTicks -> (v, _)) = case v of
   Lit (WordLiteral i) -> Just i
   _ -> Nothing
 
@@ -3414,7 +3418,7 @@ charLiterals' :: [Value] -> [Char]
 charLiterals' = listOf charLiteral
 
 charLiteral :: Value -> Maybe Char
-charLiteral x = case x of
+charLiteral (collectValueTicks -> (v, _)) = case v of
   Lit (CharLiteral c) -> Just c
   _ -> Nothing
 
@@ -3425,7 +3429,7 @@ sizedLiterals' :: Text -> [Value] -> [Integer]
 sizedLiterals' szCon = listOf (sizedLiteral szCon)
 
 sizedLiteral :: Text -> Value -> Maybe Integer
-sizedLiteral szCon val = case val of
+sizedLiteral szCon (collectValueTicks -> (v, _)) = case v of
   PrimVal p _ [_, Lit (IntegerLiteral i)]
     | primName p == szCon -> Just i
   _ -> Nothing
@@ -3463,7 +3467,7 @@ bitVectorLiterals'
 bitVectorLiterals' = listOf bitVectorLiteral
 
 bitVectorLiteral :: Value -> Maybe (Integer, Integer)
-bitVectorLiteral val = case val of
+bitVectorLiteral (collectValueTicks -> (v, _)) = case v of
   (PrimVal p _ [_, Lit (IntegerLiteral m), Lit (IntegerLiteral i)])
     | primName p == "Clash.Sized.Internal.BitVector.fromInteger#" -> Just (m, i)
   _ -> Nothing
@@ -3477,10 +3481,11 @@ splitBV (BV msk val) = (msk,val)
 valArgs
   :: Value
   -> Maybe [Term]
-valArgs val = case val of
-  PrimVal _ _ vs -> Just (fmap valToTerm vs)
-  DC _ args -> Just (Either.lefts args)
-  _ -> Nothing
+valArgs (collectValueTicks -> (v, _)) =
+  case v of
+    PrimVal _ _ vs -> Just (fmap valToTerm vs)
+    DC _ args -> Just (Either.lefts args)
+    _ -> Nothing
 
 -- Tries to match literal arguments to a function like
 --   (Unsigned.shiftL#  :: forall n. KnownNat n => Unsigned n -> Int -> Unsigned n)

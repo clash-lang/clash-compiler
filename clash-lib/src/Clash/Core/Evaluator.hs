@@ -90,12 +90,6 @@ instance ClashPretty StackFrame where
   clashPretty (Tickish sp) =
     hsep ["Tick", fromPpr sp]
 
-mkTickish
-  :: Stack
-  -> [TickInfo]
-  -> Stack
-mkTickish s sps = map Tickish sps ++ s
-
 -- Values
 data Value
   = Lambda Id Term
@@ -111,7 +105,21 @@ data Value
   -- function. So some primitives are values.
   | Suspend Term
   -- ^ Used by lazy primitives
+  | TickValue TickInfo Value
+  -- ^ Preserve ticks from Terms in Values
+  | CastValue Value Type Type
+  -- ^ Preserve casts from Terms in Values
   deriving Show
+
+-- Collect all the ticks from a value, exposing the ticked value.
+--
+collectValueTicks
+  :: Value
+  -> (Value, [TickInfo])
+collectValueTicks = go []
+ where
+  go ticks (TickValue t v) = go (t:ticks) v
+  go ticks v = (v, ticks)
 
 -- | State of the evaluator
 type State = (Heap, Stack, Term)
@@ -187,7 +195,7 @@ unwindStack (h@(Heap gh gbl h' ids is),(kf:k'),e) = case kf of
               (e:tms))
   Instantiate ty ->
     unwindStack (h,k',TyApp e ty)
-  Apply id_ -> do
+  Apply id_ ->
     case lookupVarEnv id_ h' of
       Just e' -> unwindStack (h,k',App e e')
       Nothing -> error $ unlines
@@ -332,6 +340,11 @@ step eval tcm (h, k, e) = case e of
   (Case scrut ty alts) -> Just (h,Scrutinise ty alts:k,scrut)
   (Letrec bs e') -> Just (allocate h k bs e')
   Tick sp e' -> Just (h,Tickish sp:k,e')
+  -- TODO Rewrite cast to primitive if it matches a compatible cast, namely
+  --
+  --   * {Integer, BitVector n} -> {Unsigned n, Signed n, Index n}
+  --   * {Unsigned n, Signed n, Index n} -> {Integer, BitVector n}
+  --
   Cast _ _ _ -> trace (unlines ["WARNING: " ++ $(curLoc) ++ "Clash currently can't symbolically evaluate casts"
                                     ,"If you have testcase that produces this message, please open an issue about it."]) Nothing
 
@@ -356,7 +369,7 @@ newLetBindings'
   -> [Either Term Type]
   -> (Heap,[Either Term Type])
 newLetBindings' tcm =
-    (second (map (either (Left . toVar) (Right . id))) .) . mapAccumL go
+    (second (map (either (Left . Var) Right)) .) . mapAccumL go
   where
     go h (Left tm)  = second Left (newLetBinding tcm h tm)
     go h (Right ty) = (h,Right ty)
@@ -433,12 +446,8 @@ valToTerm v = case v of
   PrimVal ty tys vs    -> foldl' App (foldl' TyApp (Prim ty) tys)
                                  (map valToTerm vs)
   Suspend e            -> e
-
-toVar :: Id -> Term
-toVar x = Var x
-
-toType :: TyVar -> Type
-toType x = VarTy x
+  TickValue t x        -> Tick t (valToTerm x)
+  CastValue x t1 t2    -> Cast (valToTerm x) t1 t2
 
 -- | Apply a value to a function
 apply :: Heap -> Stack -> Value -> Id -> State
@@ -458,7 +467,7 @@ instantiate h k (TyLambda x e) ty = (h,k,substTm "Evaluator.instantiate" subst e
 instantiate _ _ _ _ = error "not a ty lambda"
 
 naturalLiteral :: Value -> Maybe Integer
-naturalLiteral v =
+naturalLiteral (collectValueTicks -> (v, _)) =
   case v of
     Lit (NaturalLiteral i) -> Just i
     DC dc [Left (Literal (WordLiteral i))]
@@ -470,7 +479,7 @@ naturalLiteral v =
     _ -> Nothing
 
 integerLiteral :: Value -> Maybe Integer
-integerLiteral v =
+integerLiteral (collectValueTicks -> (v, _)) =
   case v of
     Lit (IntegerLiteral i) -> Just i
     DC dc [Left (Literal (IntLiteral i))]
@@ -543,8 +552,8 @@ primop eval tcm h0 k ty tys vs v [e]
                        ]
   = let (h1,i) = newLetBinding tcm h0 e
     in  eval (isScrut k) tcm h1 k ty tys (vs ++ [v,Suspend (Var i)])
-primop _ _ h k ty tys vs v (e:es) =
-  Just (h,PrimApply ty tys (vs ++ [v]) es:k,e)
+primop _ _ h k ty tys vs (collectValueTicks -> (v, ts)) (e:es) =
+  Just (h,PrimApply ty tys (vs ++ [foldr TickValue v ts]) es:k,e)
 
 -- | Evaluate a case-expression
 scrutinise :: Heap -> Stack -> Value -> [Alt] -> State
