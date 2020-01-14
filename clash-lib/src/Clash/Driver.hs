@@ -31,6 +31,7 @@ import           Data.IntMap                      (IntMap)
 import           Data.List                        (intercalate)
 import           Data.Maybe                       (fromMaybe)
 import           Data.Semigroup.Monad
+import qualified Data.Set                         as Set
 import qualified Data.Text
 import           Data.Text.Lazy                   (Text)
 import qualified Data.Text.Lazy                   as Text
@@ -55,6 +56,7 @@ import           Text.Trifecta.Result
   (Result(Success, Failure), _errDoc)
 import           Text.Read                        (readMaybe)
 import           SrcLoc                           (SrcSpan)
+import           Util                             (OverridingBool(Auto))
 import           GHC.BasicTypes.Extra             ()
 
 import           Clash.Annotations.Primitive
@@ -172,10 +174,43 @@ generateHDL reprs bindingsMap hdlState primMap tcm tupTcm typeTrans eval
   unless (opt_cachehdl opts) $ putStrLn "Clash: Ignoring .manifest files"
 
   -- Calculate the hash over the callgraph and the topEntity annotation
-  (sameTopHash,sameBenchHash,manifest) <- do
+  (useCacheTop,useCacheBench,manifest) <- do
     clashModDate <- getClashModificationDate
 
     let primMapHash = hashCompiledPrimMap primMap
+
+    let optsHash = hash opts { -- Ignore the following settings, they don't
+                               -- affect the generated HDL:
+                               -- 1. Debug
+                               opt_dbgLevel           = DebugNone
+                             , opt_dbgTransformations = Set.empty
+                               -- 2. Caching
+                             , opt_cachehdl           = True
+                               -- 3. Warnings
+                             , opt_primWarn           = True
+                             , opt_color              = Auto
+                             , opt_errorExtra         = False
+                             , opt_checkIDir          = True
+                               -- Ignore the following settings, they don't
+                               -- affect the generated HDL. However, they do
+                               -- influence whether HDL can be generated at all.
+                               --
+                               -- So later on we check whether the new flags
+                               -- changed in such a way that they could affect
+                               -- successful compilation, and use that information
+                               -- to decide whether to use caching or not.
+                               --
+                               -- 1. termination measures
+                             , opt_inlineLimit       = 20
+                             , opt_specLimit         = 20
+                               -- 2. Float support
+                             , opt_floatSupport      = False
+                               -- Finally, also ignore the HDL dir setting,
+                               -- because when a user moves the entire dir
+                               -- with generated HDL, they probably still want
+                               -- to use that as a cache
+                             , opt_hdlDir            = Nothing
+                             }
 
     let
       topHash =
@@ -183,6 +218,7 @@ generateHDL reprs bindingsMap hdlState primMap tcm tupTcm typeTrans eval
              , primMapHash
              , show clashModDate
              , callGraphBindings bindingsMap topEntity
+             , optsHash
              )
 
     let
@@ -191,9 +227,10 @@ generateHDL reprs bindingsMap hdlState primMap tcm tupTcm typeTrans eval
           Nothing -> Nothing
           Just bench ->
             let terms = callGraphBindings bindingsMap bench in
-            Just (hash (annM, primMapHash, show clashModDate, terms))
+            Just (hash (annM, primMapHash, show clashModDate, terms, optsHash))
 
-    let manifestI  = Manifest (topHash,benchHashM) [] [] [] [] []
+    let succesFlagsI = (opt_inlineLimit opts,opt_specLimit opts,opt_floatSupport opts)
+        manifestI    = Manifest (topHash,benchHashM) succesFlagsI [] [] [] [] []
 
     let
       manFile =
@@ -206,10 +243,18 @@ generateHDL reprs bindingsMap hdlState primMap tcm tupTcm typeTrans eval
             else (>>= readMaybe) . either (const Nothing) Just <$>
               tryJust (guard . isDoesNotExistError) (readFile manFile)
     return (maybe (False,False,manifestI)
-                  (\man -> (fst (manifestHash man) == topHash
-                           ,snd (manifestHash man) == benchHashM
-                           ,man {manifestHash = (topHash,benchHashM)}
-                           ))
+                  (\man ->
+                    let allowCache (inl0,spec0,fl0) (inl1,spec1,fl1) =
+                          inl0 <= inl1 && spec0 <= spec1 && (not (fl0 && not fl1))
+                        flagsAllowCache = allowCache (succesFlags man) succesFlagsI
+                    in  (flagsAllowCache && fst (manifestHash man) == topHash
+                        ,flagsAllowCache && snd (manifestHash man) == benchHashM
+                        ,man { manifestHash = (topHash,benchHashM)
+                             , succesFlags  = if flagsAllowCache
+                                                 then succesFlags man
+                                                 else succesFlagsI
+                             }
+                        ))
                   manM)
 
   (supplyN,supplyTB) <- Supply.splitSupply
@@ -218,7 +263,7 @@ generateHDL reprs bindingsMap hdlState primMap tcm tupTcm typeTrans eval
                    <$> Supply.newSupply
   let topEntityNames = map (\(x,_,_) -> x) topEntities
 
-  (topTime,manifest',seen') <- if sameTopHash
+  (topTime,manifest',seen') <- if useCacheTop
     then do
       putStrLn ("Clash: Using cached result for: " ++ Data.Text.unpack (nameOcc (varName topEntity)))
       topTime <- Clock.getCurrentTime
@@ -263,7 +308,7 @@ generateHDL reprs bindingsMap hdlState primMap tcm tupTcm typeTrans eval
       return (topTime,manifest',seen')
 
   benchTime <- case benchM of
-    Just tb | not sameBenchHash -> do
+    Just tb | not useCacheBench -> do
       putStrLn $ "Clash: Compiling " ++ Data.Text.unpack (nameOcc (varName tb))
 
       let modName'  = genComponentName (opt_newInlineStrat opts) HashMap.empty

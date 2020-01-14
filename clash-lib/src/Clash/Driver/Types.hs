@@ -9,11 +9,17 @@
 -}
 
 {-# LANGUAGE CPP #-}
+{-# LANGUAGE DeriveAnyClass #-}
+{-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE RecordWildCards #-}
 
 module Clash.Driver.Types where
 
 -- For Int/Word size
 #include "MachDeps.h"
+
+import           GHC.Generics
+import           Data.Hashable
 
 import           BasicTypes                     (InlineSpec)
 import qualified Data.Set                       as Set
@@ -53,7 +59,7 @@ data DebugLevel
   -- ^ Show sub-expressions after a successful rewrite
   | DebugAll
   -- ^ Show all sub-expressions on which a rewrite is attempted
-  deriving (Eq,Ord,Read)
+  deriving (Eq,Ord,Read,Enum,Generic,Hashable)
 
 data ClashOpts = ClashOpts { opt_inlineLimit :: Int
                            , opt_specLimit   :: Int
@@ -100,6 +106,43 @@ data ClashOpts = ClashOpts { opt_inlineLimit :: Int
                            -- with defined alternatives.
                            }
 
+instance Hashable ClashOpts where
+  hashWithSalt s ClashOpts {..} =
+    s `hashWithSalt`
+    opt_inlineLimit `hashWithSalt`
+    opt_specLimit `hashWithSalt`
+    opt_inlineFunctionLimit `hashWithSalt`
+    opt_inlineConstantLimit `hashWithSalt`
+    opt_dbgLevel `hashSet`
+    opt_dbgTransformations `hashWithSalt`
+    opt_cachehdl `hashWithSalt`
+    opt_cleanhdl `hashWithSalt`
+    opt_primWarn `hashWithSalt`
+    opt_cleanhdl `hashOverridingBool`
+    opt_color `hashWithSalt`
+    opt_intWidth `hashWithSalt`
+    opt_hdlDir `hashWithSalt`
+    opt_hdlSyn `hashWithSalt`
+    opt_errorExtra `hashWithSalt`
+    opt_floatSupport `hashWithSalt`
+    opt_importPaths `hashWithSalt`
+    opt_componentPrefix `hashWithSalt`
+    opt_newInlineStrat `hashWithSalt`
+    opt_escapedIds `hashWithSalt`
+    opt_ultra `hashWithSalt`
+    opt_forceUndefined `hashWithSalt`
+    opt_checkIDir `hashWithSalt`
+    opt_aggressiveXOpt
+   where
+    hashOverridingBool :: Int -> OverridingBool -> Int
+    hashOverridingBool s1 Auto = hashWithSalt s1 (0 :: Int)
+    hashOverridingBool s1 Always = hashWithSalt s1 (1 :: Int)
+    hashOverridingBool s1 Never = hashWithSalt s1 (2 :: Int)
+    infixl 0 `hashOverridingBool`
+
+    hashSet :: Hashable a => Int -> Set.Set a -> Int
+    hashSet = Set.foldl' hashWithSalt
+    infixl 0 `hashSet`
 
 defClashOpts :: ClashOpts
 defClashOpts
@@ -135,6 +178,12 @@ data Manifest
   { manifestHash :: (Int,Maybe Int)
     -- ^ Hash of the TopEntity and all its dependencies
     --   + (maybe) Hash of the TestBench and all its dependencies
+  , succesFlags  :: (Int,Int,Bool)
+    -- ^ Compiler flags used to achieve successful compilation:
+    --
+    --   * opt_inlineLimit
+    --   * opt_specLimit
+    --   * opt_floatSupport
   , portInNames  :: [Text]
   , portInTypes  :: [Text]
     -- ^ The rendered versions of the types of the input ports of the TopEntity
