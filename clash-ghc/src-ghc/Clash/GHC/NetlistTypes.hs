@@ -28,7 +28,7 @@ import Clash.Core.Name                  (Name (..))
 import Clash.Core.Pretty                (showPpr)
 import Clash.Core.TyCon                 (TyConMap, tyConDataCons)
 import Clash.Core.Type
-  (LitTy (..), Type (..), TypeView (..), coreView, tyView)
+  (LitTy (..), Type (..), TypeView (..), coreView, coreView1, tyView)
 import Clash.Core.Util                  (tyNatSize, substArgTys)
 import Clash.Netlist.Util               (coreTypeToHWType, stripFiltered)
 import Clash.Netlist.Types
@@ -144,8 +144,8 @@ ghcTypeToHWType iw floatSupport = go
                [dc] -> case substArgTys dc args of
                  [_,tyView -> TyConApp _ [_,dom]] -> case tyView (coreView m dom) of
                    TyConApp _ [tag0, period0, edge0, rstKind0, init0, polarity0] -> do
-                     tag1      <- domTag tag0
-                     period1   <- domPeriod period0
+                     tag1      <- domTag m tag0
+                     period1   <- domPeriod m period0
                      edge1     <- domEdge m edge0
                      rstKind1  <- domResetKind m rstKind0
                      init1     <- domInitBehavior m init0
@@ -159,13 +159,13 @@ ghcTypeToHWType iw floatSupport = go
         "Clash.Signal.Internal.Clock"
           | [tag0] <- args
           -> do
-            tag1 <- domTag tag0
+            tag1 <- domTag m tag0
             returnN (Clock (pack tag1))
 
         "Clash.Signal.Internal.Reset"
           | [tag0] <- args
           -> do
-            tag1 <- domTag tag0
+            tag1 <- domTag m tag0
             returnN (Reset (pack tag1))
 
         "Clash.Sized.Internal.BitVector.Bit" -> returnN Bit
@@ -265,13 +265,15 @@ liftE
   -> ExceptT e (MaybeT m) a
 liftE = mapExceptT (MaybeT . pure . Just . coerce)
 
-domTag :: Monad m => Type -> ExceptT String (MaybeT m) String
-domTag (LitTy (SymTy tag)) = pure tag
-domTag ty = throwE $ "Can't translate domain tag" ++ showPpr ty
+domTag :: Monad m => TyConMap -> Type -> ExceptT String (MaybeT m) String
+domTag m (coreView1 m -> Just ty) = domTag m ty
+domTag _ (LitTy (SymTy tag)) = pure tag
+domTag _ ty = throwE $ "Internal error. Cannot translate domain tag:\n" ++ showPpr ty
 
-domPeriod :: Monad m => Type -> ExceptT String (MaybeT m) Integer
-domPeriod (LitTy (NumTy period)) = pure period
-domPeriod ty = throwE $ "Can't translate domain period" ++ showPpr ty
+domPeriod :: Monad m => TyConMap -> Type -> ExceptT String (MaybeT m) Integer
+domPeriod m (coreView1 m -> Just ty) = domPeriod m ty
+domPeriod _ (LitTy (NumTy period)) = pure period
+domPeriod _ ty = throwE $ "Internal error. Cannot translate domain period:\n" ++ showPpr ty
 
 fromType
   :: Monad m
