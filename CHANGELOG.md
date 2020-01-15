@@ -27,12 +27,25 @@
   * Added `Clash.Magic.noDeDup`: can be used to instruct Clash to /not/ share a function between multiple branches
   * A `BitPack a` constraint now implies a `KnownNat (BitSize a)` constraint, so you won't have to add it manually anymore. See [#942](https://github.com/clash-lang/clash-compiler/pull/942).
   * `Clash.Explicit.SimIO`: ((System)Verilog only) I/O actions that can be translated to HDL I/O; useful for generated test benches.
+  * Export `Clash.Explicit.Testbench.assertBitVector` [#888](https://github.com/clash-lang/clash-compiler/pull/888/files)
+  * Add `Clash.Prelude.Testbench.assertBitVector` to achieve feature parity with `Clash.Explicit.Testbench`. [#891](https://github.com/clash-lang/clash-compiler/pull/891/files)
+  * Add `Clash.XException.NFDataX.ensureSpine` [#803](https://github.com/clash-lang/clash-compiler/pull/803)
+  * Add `Clash.Class.BitPack.bitCoerceMap` [#798](https://github.com/clash-lang/clash-compiler/pull/798)
+
+* New features (Compiler):
+  * [#961](https://github.com/clash-lang/clash-compiler/pull/961): Show `-fclash-*` Options in `clash --show-options`
 
 * New internal features:
   * [#918](https://github.com/clash-lang/clash-compiler/pull/935): Add X-Optimization to normalization passes (-fclash-aggressive-x-optimization)
   * [#821](https://github.com/clash-lang/clash-compiler/pull/821): Add `DebugTry`: print name of all tried transformations, even if they didn't succeed
   * [#856](https://github.com/clash-lang/clash-compiler/pull/856): Add `-fclash-debug-transformations`: only print debug info for specific transformations
   * [#911](https://github.com/clash-lang/clash-compiler/pull/911): Add 'RenderVoid' option to blackboxes
+  * [#958](https://github.com/clash-lang/clash-compiler/pull/958): Prefix names of inlined functions
+  * [#947](https://github.com/clash-lang/clash-compiler/pull/947): Add "Clash.Core.TermLiteral"
+  * [#887](https://github.com/clash-lang/clash-compiler/pull/887): Show nicer error messages when failing in TH code
+  * [#884](https://github.com/clash-lang/clash-compiler/pull/884): Teach reduceTypeFamily about AppendSymbol and CmpSymbol
+  * [#784](https://github.com/clash-lang/clash-compiler/pull/784): Print whether `Id` is global or local in ppr output
+  * [#781](https://github.com/clash-lang/clash-compiler/pull/781): Use naming contexts in register names
 
 * Fixes issues:
   * [#974](https://github.com/clash-lang/clash-compiler/issues/974): Fix indirect shadowing in `reduceNonRepPrim`
@@ -51,6 +64,17 @@
   * [#880](https://github.com/clash-lang/clash-compiler/issues/880): Custom bit representations can now be used on product types too
   * [#976](https://github.com/clash-lang/clash-compiler/issues/976): Prevent shadowing in Clash's core evaluator
   * [#1007](https://github.com/clash-lang/clash-compiler/issues/1007): Can't translate domain tagType.Errors.IfStuck...
+  * [#967](https://github.com/clash-lang/clash-compiler/issues/967): Naming registers disconnects their output
+  * [#990](https://github.com/clash-lang/clash-compiler/issues/990): Internal shadowing bug results in incorrect HDL
+  * [#945](https://github.com/clash-lang/clash-compiler/issues/945): Rewrite rules for Vec Applicative Functor
+  * [#919](https://github.com/clash-lang/clash-compiler/issues/919): Clash generating invalid Verilog after Vec operations #919
+Closed
+  * [#996](https://github.com/clash-lang/clash-compiler/issues/996): Ambiguous clock when using `ClearOnReset` and `resetGen` together
+  * [#701](https://github.com/clash-lang/clash-compiler/issues/701): Unexpected behaviour with the `Synthesize` annotation
+  * [#694](https://github.com/clash-lang/clash-compiler/issues/694): Custom bit representation error only with VHDL
+  * [#347](https://github.com/clash-lang/clash-compiler/issues/347): topEntity synthesis fails due to insufficient type-level normalisation
+  * [#626](https://github.com/clash-lang/clash-compiler/issues/626): Missing Clash.Explicit.Prelude definitions
+  * [#960](https://github.com/clash-lang/clash-compiler/issues/626): Blackbox Error Caused by Simple map
 
 * Fixes without issue reports:
   * Fix bug in `rnfX` defined for `Down` ([baef30e](https://github.com/clash-lang/clash-compiler/commit/baef30eae03dc02ba847ffbb8fae7f365c5287c2))
@@ -64,11 +88,17 @@
   * Throw an error if there's data left to parse after successfully parsing a valid JSON construct ([#904](https://github.com/clash-lang/clash-compiler/pull/904))
   * `Data.gfoldl` is now manually implemented, in turn fixing issues with `gshow` ([#933](https://github.com/clash-lang/clash-compiler/pull/933))
   * Fix a number of issues with blackbox implementations ([#934](https://github.com/clash-lang/clash-compiler/pull/934))
+  * Don't inline registers with non-constant clock and reset ([#998](https://github.com/clash-lang/clash-compiler/pull/998))
+  * Inline let-binders called [dsN | N <- [1..]] ([#992](https://github.com/clash-lang/clash-compiler/pull/992))
+  * ClockGens use their name at the Haskell level [#827](https://github.com/clash-lang/clash-compiler/pull/827)
+  * Render numbers inside gensym [#809](https://github.com/clash-lang/clash-compiler/pull/809)
+  * Don't overwrite existing binders when specializing [#790](https://github.com/clash-lang/clash-compiler/pull/790)
 
 * Deprecations & removals:
   * Removed support for GHC 8.2 ([#842](https://github.com/clash-lang/clash-compiler/pull/842))
   * Removed support for older cabal versions, only Cabal >=2.2 supported ([#851](https://github.com/clash-lang/clash-compiler/pull/851))
   * Reset and Enable constructors are now only exported from Clash.Signal.Internal
+  * [#986](https://github.com/clash-lang/clash-compiler/issues/986) Remove -fclash-allow-zero-width flag
 
 ## 1.0.0 *September 3rd 2019*
 * 10x - 50x faster compile times
