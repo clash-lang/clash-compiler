@@ -5,6 +5,3 @@ packages:
 - clash-lib
 - clash-ghc
 # - testsuite # still uses cabal new-build internally
-
-extra-deps:
-- ./clash-cosim
