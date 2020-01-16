@@ -10,7 +10,8 @@ Fixed point numbers
 * 'Fixed' has an instance for 'Fractional' meaning you use fractional
   literals @(3.75 :: 'SFixed' 4 18)@.
 * Both integer literals and fractional literals are clipped to 'minBound' and
- 'maxBound'.
+  'maxBound'. __NB__ Needs the `-XNegativeLiterals` language extension to work
+  for signed numbers.
 * There is no 'Floating' instance for 'Fixed', but you can use @$$('fLit' d)@
   to create 'Fixed' point literal from 'Double' constant at compile-time.
 * Use <#constraintsynonyms Constraint synonyms> when writing type signatures
@@ -442,6 +443,7 @@ type NumFixedC rep int frac
     , Enum    (rep (int + frac))
     , Bits    (rep (int + frac))
     , Ord     (rep (int + frac))
+    , Integral (rep (int + frac))
     , Resize  rep
     , KnownNat int
     , KnownNat frac
@@ -475,15 +477,20 @@ instance (NumFixedC rep int frac) => Num (Fixed rep int frac) where
   (+)              = boundedAdd
   (*)              = boundedMul
   (-)              = boundedSub
-  negate (Fixed a) = Fixed (negate a)
+  negate           = boundedSub (Fixed 0)
   abs    (Fixed a) = Fixed (abs a)
   signum (Fixed a)
     | a == 0       = 0
     | a <  0       = -1
     | otherwise    = 1
   fromInteger i    = let fSH = fromInteger (natVal (Proxy @frac))
-                         res = Fixed (fromInteger i `shiftL` fSH)
-                     in  res
+                         res = i `shiftL` fSH
+                         rMax = toInteger (maxBound :: rep (int + frac))
+                         rMin = toInteger (minBound :: rep (int + frac))
+                         sat | res > rMax = rMax
+                             | res < rMin = rMin
+                             | otherwise  = res
+                     in  Fixed (fromInteger sat)
 
 instance (BitPack (rep (int + frac))) => BitPack (Fixed rep int frac) where
   type BitSize (Fixed rep int frac) = BitSize (rep (int + frac))
