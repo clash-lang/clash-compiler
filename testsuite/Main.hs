@@ -137,6 +137,7 @@ runClashTest = defaultMain $ clashTestRoot
         , runTest "Shift" def{hdlSim=False}
         , runTest "SimpleConstructor" def{hdlSim=False}
         , runTest "T347" def{hdlSim=False}
+        , runTest "T1012" def{hdlSim=False}
         , runTest "TagToEnum" def{hdlSim=False}
         , runTest "TestIndex" def{hdlSim=False}
         , runTest "Time" def
