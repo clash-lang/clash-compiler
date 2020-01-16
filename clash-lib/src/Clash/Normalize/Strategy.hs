@@ -28,12 +28,11 @@ import Clash.Rewrite.Util
 
 -- | Normalisation transformation
 normalization :: NormRewrite
-normalization = rmDeadcode >-> constantPropagation >-> etaTL >-> rmUnusedExpr >-!-> anf >-!-> rmDeadcode >->
+normalization = rmDeadcode >-> constantPropagation >-> rmUnusedExpr >-!-> anf >-!-> rmDeadcode >->
                 bindConst >-> letTL >-> evalConst >-!-> cse >-!-> cleanup >->
                 xOptim >-> rmDeadcode >->
                 cleanup >-> recLetRec >-> splitArgs
   where
-    etaTL      = apply "etaTL" etaExpansionTL !-> topdownR (apply "applicationPropagation" appPropFast)
     anf        = topdownR (apply "nonRepANF" nonRepANF) >-> apply "ANF" makeANF >-> topdownR (apply "caseCon" caseCon)
     letTL      = topdownSucR (apply "topLet" topLet)
     recLetRec  = apply "recToLetRec" recToLetRec
@@ -56,9 +55,10 @@ normalization = rmDeadcode >-> constantPropagation >-> etaTL >-> rmUnusedExpr >-
 
 constantPropagation :: NormRewrite
 constantPropagation = inlineAndPropagate >->
-                     caseFlattening >-> dec >-> spec >-> dec >->
+                     caseFlattening >-> etaTL >-> dec >-> spec >-> dec >->
                      conSpec
   where
+    etaTL              = apply "etaTL" etaExpansionTL !-> topdownR (apply "applicationPropagation" appPropFast)
     inlineAndPropagate = repeatR (topdownR (applyMany transPropagateAndInline) >-> inlineNR)
     spec               = bottomupR (applyMany specTransformations)
     caseFlattening     = repeatR (topdownR (apply "caseFlat" caseFlat))
