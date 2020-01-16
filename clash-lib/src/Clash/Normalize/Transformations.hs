@@ -258,8 +258,8 @@ nonRepSpec _ e = return e
 
 -- | Lift the let-bindings out of the subject of a Case-decomposition
 caseLet :: HasCallStack => NormRewrite
-caseLet _ (Case (Letrec xes e) ty alts) =
-  changed (Letrec xes (Case e ty alts))
+caseLet _ (Case (collectTicks -> (Letrec xes e,ticks)) ty alts) =
+  changed (Letrec (map (second (`mkTicks` ticks)) xes) (Case (mkTicks e ticks) ty alts))
 
 caseLet _ e = return e
 
