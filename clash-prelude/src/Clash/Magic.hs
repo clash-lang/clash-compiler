@@ -89,6 +89,52 @@ setName
 setName = id
 {-# NOINLINE setName #-}
 
+-- | Force deduplication, i.e. share a function or operator between multiple
+-- branches.
+--
+-- By default Clash converts
+--
+-- @
+-- case x of
+--   A -> 3 * y
+--   B -> x * x
+-- @
+--
+-- to
+--
+-- @
+-- let f_arg0 = case x of {A -> 3; _ -> x}
+--     f_arg1 = case x of {A -> y; _ -> x}
+--     f_out  = f_arg0 * f_arg1
+-- in  case x of
+--       A -> f_out
+--       B -> f_out
+-- @
+--
+-- However, it won't do this for:
+--
+-- @
+-- case x of
+--   A -> 3 + y
+--   B -> x + x
+-- @
+--
+-- Because according to the internal heuristics the multiplexer introduced for
+-- the deduplication are more expensive than the addition. This might not be
+-- the case for your particular platform.
+--
+-- In these cases you can force Clash to deduplicate by:
+--
+-- @
+-- case x of
+--   A -> 'deDup' (3 + y)
+--   B -> 'deDup' (x + x)
+-- @
+deDup
+  :: forall a . a -> a
+deDup = id
+{-# NOINLINE deDup #-}
+
 -- | Do not deduplicate, i.e. /keep/, an applied function inside a
 -- case-alternative; do not try to share the function between multiple
 -- branches.

@@ -488,6 +488,7 @@ substTm doc subst = go where
 
   goTick t@(SrcSpan _)  = t
   goTick (NameMod m ty) = NameMod m (substTy subst ty)
+  goTick t@DeDup        = t
   goTick t@NoDeDup      = t
 
 -- | Find the substitution for an 'Id' in the 'Subst'

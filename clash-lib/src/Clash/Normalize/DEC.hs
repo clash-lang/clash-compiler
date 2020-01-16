@@ -459,6 +459,7 @@ interestingToLift inScope eval e@(Prim nm pInfo) args ticks
   let anyArgNotConstant = any (not . isConstant) lArgs
   case List.lookup nm interestingPrims of
     Just t | t || anyArgNotConstant -> pure (Just e)
+    _ | DeDup `elem` ticks -> pure (Just e)
     _ -> do
       let isInteresting = uncurry3 (interestingToLift inScope eval) . collectArgsTicks
       if isHOTy (primType pInfo) then do
