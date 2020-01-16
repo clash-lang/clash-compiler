@@ -184,6 +184,10 @@ collectGlobals' inScope substitution seen (Letrec lbs body) _eIsConstant = do
          ,map (second (second (LB lbs'))) (collected ++ collected')
          )
 
+collectGlobals' inScope substitution seen (Tick t e) eIsConstant = do
+  (e',collected) <- collectGlobals' inScope substitution seen e eIsConstant
+  return (Tick t e',collected)
+
 collectGlobals' _ _ _ e _ = return (e,[])
 
 -- | Collect 'CaseTree's for (potentially) disjoint applications of globals out
