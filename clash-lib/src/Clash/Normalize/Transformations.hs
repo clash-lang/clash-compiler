@@ -447,24 +447,25 @@ inlineNonRep _ e = return e
 -- @
 caseCon :: HasCallStack => NormRewrite
 caseCon (TransformContext is0 _) (Case scrut ty alts)
-  | (Data dc, args) <- collectArgs scrut
+  | (Data dc, args, ticks) <- collectArgsTicks scrut
   = case List.find (equalCon dc . fst) alts of
       Just (DataPat _ tvs xs, e) -> do
         let is1 = extendInScopeSetList (extendInScopeSetList is0 tvs) xs
         let fvs = Lens.foldMapOf freeLocalIds unitVarSet e
             (binds,_) = List.partition ((`elemVarSet` fvs) . fst)
                       $ zip xs (Either.lefts args)
-            e' = case binds of
+            binds1 = map (second (`mkTicks` ticks)) binds
+            e' = case binds1 of
                   [] -> e
                   _  ->
                     -- See Note [CaseCon deshadow]
-                    let ((is3,substIds),binds1) =
-                          List.mapAccumL newBinder (is1,[]) binds
+                    let ((is3,substIds),binds2) =
+                          List.mapAccumL newBinder (is1,[]) binds1
                         subst = extendIdSubstList (mkSubst is3) substIds
                         body  = substTm "caseCon0" subst e
-                    in  case Maybe.catMaybes binds1 of
+                    in  case Maybe.catMaybes binds2 of
                           []     -> body
-                          binds2 -> Letrec binds2 body
+                          binds3 -> Letrec binds3 body
         let subst = extendTvSubstList (mkSubst is1)
                   $ zip tvs (drop (length (dcUnivTyVars dc)) (Either.rights args))
         changed (substTm "caseCon1" subst e')
