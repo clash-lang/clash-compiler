@@ -347,6 +347,9 @@ coreToTerm primMap unlocs = term
         go "Clash.Magic.setName" args
           | [Type nmTy,_aTy,f] <- args
           = C.Tick <$> (C.NameMod C.SetName <$> coreToType nmTy) <*> term f
+        go "Clash.Magic.deDup" args
+          | [_aTy,f] <- args
+          = C.Tick C.DeDup <$> term f
         go "Clash.Magic.noDeDup" args
           | [_aTy,f] <- args
           = C.Tick C.NoDeDup <$> term f

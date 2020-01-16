@@ -1903,6 +1903,8 @@ withTicks ticks0 k = do
  where
   go decls [] = k (reverse decls)
 
+  go decls (DeDup:ticks) = go decls ticks
+
   go decls (NoDeDup:ticks) = go decls ticks
 
   go decls (SrcSpan sp:ticks) =

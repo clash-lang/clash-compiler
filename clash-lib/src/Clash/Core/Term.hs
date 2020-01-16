@@ -74,6 +74,8 @@ data TickInfo
   | NameMod !NameMod !Type
   -- ^ Modifier for naming module instantiations and registers, are added by
   -- the user by using the functions @Clash.Magic.[prefixName,suffixName,setName]@
+  | DeDup
+  -- ^ Deduplicate, i.e. try to share expressions between multiple branches.
   | NoDeDup
   -- ^ Do not deduplicate, i.e. /keep/, an expression inside a case-alternative;
   -- do not try to share expressions between multiple branches.
