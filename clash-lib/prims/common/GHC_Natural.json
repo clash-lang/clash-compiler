@@ -32,5 +32,12 @@
       "template": "~ARG[0] - ~ARG[1]",
       "warning": "GHC.Natural.minusNatural: Naturals are dynamically sized in simulation, but fixed-length after synthesization. Use carefully."
     }
+  },
+  {
+    "Primitive": {
+      "name": "GHC.Natural.gcdNatural",
+      "workInfo" : "Never",
+      "primType": "Function"
+    }
   }
 ]

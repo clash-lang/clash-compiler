@@ -1093,6 +1093,12 @@ reduceConstant isSubj tcm h k nm pInfo tys args = case nm of
      let nTy = snd (splitFunForallTy ty) in
      reduce (checkNaturalRange1 nTy w id)
 
+  "GHC.Natural.gcdNatural"
+    | Just (i,j) <- naturalLiterals args
+    ->
+     let nTy = snd (splitFunForallTy ty) in
+     reduce (checkNaturalRange2 nTy i j gcd)
+
   -- GHC.Real.^  -- XXX: Very fragile
   --   ^_f, $wf, $wf1 are specialisations of the internal function f in the implementation of (^) in GHC.Real
   "GHC.Real.^_f"  -- :: Integer -> Integer -> Integer
