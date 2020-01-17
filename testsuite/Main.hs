@@ -282,6 +282,7 @@ runClashTest = defaultMain $ clashTestRoot
         , runTest "SignedZero" def
         , runTest "Signum" def
         , runTest "Strict" def
+        , runTest "T1019" def{hdlSim=False}
         , runTest "UnsignedZero" def
         ]
       , clashTestGroup "Polymorphism"
