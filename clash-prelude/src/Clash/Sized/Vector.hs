@@ -1027,9 +1027,7 @@ fold f vs = fold' (toList vs)
       where
         (ys,zs) = P.splitAt (P.length xs `div` 2) xs
 {-# NOINLINE fold #-}
-{-# ANN fold (InlinePrimitive VHDL "[ { \"BlackBoxHaskell\" : { \"name\" : \"Clash.Sized.Vector.fold\", \"templateFunction\" : \"Clash.Primitives.Sized.Vector.foldBBF\"}} ]") #-}
-{-# ANN fold (InlinePrimitive Verilog "[ { \"BlackBoxHaskell\" : { \"name\" : \"Clash.Sized.Vector.fold\", \"templateFunction\" : \"Clash.Primitives.Sized.Vector.foldBBF\"}} ]") #-}
-{-# ANN fold (InlinePrimitive SystemVerilog "[ { \"BlackBoxHaskell\" : { \"name\" : \"Clash.Sized.Vector.fold\", \"templateFunction\" : \"Clash.Primitives.Sized.Vector.foldBBF\"}} ]") #-}
+{-# ANN fold (InlinePrimitive [VHDL,Verilog,SystemVerilog] "[ { \"BlackBoxHaskell\" : { \"name\" : \"Clash.Sized.Vector.fold\", \"templateFunction\" : \"Clash.Primitives.Sized.Vector.foldBBF\"}} ]") #-}
 
 -- | 'scanl' is similar to 'foldl', but returns a vector of successive reduced
 -- values from the left:

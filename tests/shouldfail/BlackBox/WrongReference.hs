@@ -13,7 +13,7 @@ import Clash.Netlist.Types
 import Clash.Netlist.BlackBox.Types
 import Clash.Annotations.Primitive (Primitive(..), HDL(..))
 
-{-# ANN myMultiply (InlinePrimitive VHDL "[ { \"BlackBoxHaskell\" : { \"name\" : \"WrongReference.myMultiplyX\", \"templateFunction\" : \"Foo.bar\"}} ]") #-}
+{-# ANN myMultiply (InlinePrimitive [VHDL] "[ { \"BlackBoxHaskell\" : { \"name\" : \"WrongReference.myMultiplyX\", \"templateFunction\" : \"Foo.bar\"}} ]") #-}
 myMultiply
   :: Signal System Int
   -> Signal System Int

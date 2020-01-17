@@ -84,7 +84,7 @@ coSimGen' clks args = do
 
     -- Clash blackbox pragma
     primDir        <- runIO $ getDataFileName "src/prims/verilog"
-    primitiveAnn   <- [| Primitive Verilog primDir |]
+    primitiveAnn   <- [| Primitive [Verilog] primDir |]
     let blackboxAnn = PragmaD $ AnnP (ValueAnnotation coSimName) primitiveAnn
 
     return [coSimType, coSim, inline, blackboxAnn]

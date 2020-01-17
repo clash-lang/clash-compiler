@@ -19,7 +19,7 @@ myMultiplyTF isD primName args ty = pure $
         , BBTemplate [Text "123456 * ", ArgGen 0 0, Text " * ", ArgGen 0 1]
         )
 
-{-# ANN myMultiply (InlinePrimitive VHDL "[ { \"BlackBoxHaskell\" : { \"name\" : \"BlackBoxFunction.myMultiply\", \"templateFunction\" : \"BlackBoxFunction.myMultiplyTF\"}} ]") #-}
+{-# ANN myMultiply (InlinePrimitive [VHDL] "[ { \"BlackBoxHaskell\" : { \"name\" : \"BlackBoxFunction.myMultiply\", \"templateFunction\" : \"BlackBoxFunction.myMultiplyTF\"}} ]") #-}
 myMultiply
   :: Signal System Int
   -> Signal System Int

@@ -26,7 +26,7 @@ myMultiplyTF isD primName args ty = pure $
            ]
         )
 
-{-# ANN myMultiply (InlinePrimitive VHDL "[ { \"BlackBoxHaskell\" : { \"name\" : \"BlackBoxFunctionHO.myMultiply\", \"templateFunction\" : \"BlackBoxFunctionHO.myMultiplyTF\"}} ]") #-}
+{-# ANN myMultiply (InlinePrimitive [VHDL] "[ { \"BlackBoxHaskell\" : { \"name\" : \"BlackBoxFunctionHO.myMultiply\", \"templateFunction\" : \"BlackBoxFunctionHO.myMultiplyTF\"}} ]") #-}
 myMultiply
   :: Signed 64
   -> Signed 64

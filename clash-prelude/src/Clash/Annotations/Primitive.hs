@@ -197,7 +197,7 @@ data HDL
 -- import qualified Paths_myfancyip
 -- import           System.IO.Unsafe
 --
--- {\-\# ANN module (Primitive VHDL (unsafePerformIO Paths_myfancyip.getDataDir \<\/\> "path" \<\/\> "to")) \#-\}
+-- {\-\# ANN module (Primitive [VHDL] (unsafePerformIO Paths_myfancyip.getDataDir \<\/\> "path" \<\/\> "to")) \#-\}
 -- \#endif
 -- @
 --
@@ -218,7 +218,7 @@ data HDL
 -- import           Data.String.Interpolate      (i)
 -- import           Data.String.Interpolate.Util (unindent)
 --
--- {\-\# ANN example (InlinePrimitive VHDL $ unindent [i|
+-- {\-\# ANN example (InlinePrimitive [VHDL] $ unindent [i|
 --   [ { \"BlackBox\" :
 --       { "name" : "InlinePrimitive.example"
 --       , "kind": \"Declaration\"
@@ -237,10 +237,10 @@ data HDL
 -- example = fmap succ
 -- @
 data Primitive
-  = Primitive HDL FilePath
-  -- ^ Description of a primitive for a given 'HDL' in a file at 'FilePath'
-  | InlinePrimitive HDL String
-  -- ^ Description of a primitive for a given 'HDL' as an inline 'String'
+  = Primitive [HDL] FilePath
+  -- ^ Description of a primitive for a given 'HDL's in a file at 'FilePath'
+  | InlinePrimitive [HDL] String
+  -- ^ Description of a primitive for a given 'HDL's as an inline 'String'
   deriving (Show, Read, Data, Generic, NFData, Hashable)
 
 -- | Guard primitive functions. This will help Clash generate better error

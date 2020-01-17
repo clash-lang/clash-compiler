@@ -21,6 +21,6 @@ primitive =
 
 {-# NOINLINE primitive #-}
 {-# ANN primitive (warnAlways "You shouldn't use 'primitive'!") #-}
-{-# ANN primitive (InlinePrimitive VHDL "[ { \"BlackBoxHaskell\" : { \"name\" : \"WarnAlways.primitive\", \"templateFunction\" : \"WarnAlways.primitiveTF\"}} ]") #-}
+{-# ANN primitive (InlinePrimitive [VHDL] "[ { \"BlackBoxHaskell\" : { \"name\" : \"WarnAlways.primitive\", \"templateFunction\" : \"WarnAlways.primitiveTF\"}} ]") #-}
 
 topEntity = primitive
