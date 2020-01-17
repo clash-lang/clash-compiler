@@ -489,7 +489,7 @@ caseCon _ c@(Case (stripTicks -> Literal l) _ alts) = case List.find (equalLit .
     equalLit _               = False
 
 caseCon ctx@(TransformContext is0 _) e@(Case subj ty alts)
-  | (Prim _ _,_) <- collectArgs subj = do
+  | (Prim _,_) <- collectArgs subj = do
     reprs <- Lens.view customReprs
     tcm <- Lens.view tcCache
     bndrs <- Lens.use bindings
@@ -507,27 +507,27 @@ caseCon ctx@(TransformContext is0 _) e@(Case subj ty alts)
           subj' -> case collectArgsTicks subj' of
             (Data _,_,_) -> caseCon ctx' (Case subj' ty alts)
 #if MIN_VERSION_ghc(8,2,2)
-            (Prim nm ty',_:msgOrCallStack:_,ticks)
-              | nm == "Control.Exception.Base.absentError" ->
-                let e' = mkApps (mkTicks (Prim nm ty') ticks)
+            (Prim ty',_:msgOrCallStack:_,ticks)
+              | primName ty' == "Control.Exception.Base.absentError" ->
+                let e' = mkApps (mkTicks (Prim ty') ticks)
                                 [Right ty,msgOrCallStack]
                 in  changed e'
 #endif
 
-            (Prim nm ty',repTy:_:msgOrCallStack:_,ticks)
-              | nm `elem` ["Control.Exception.Base.patError"
+            (Prim ty',repTy:_:msgOrCallStack:_,ticks)
+              | primName ty' `elem` ["Control.Exception.Base.patError"
 #if !MIN_VERSION_ghc(8,2,2)
                           ,"Control.Exception.Base.absentError"
 #endif
                           ,"GHC.Err.undefined"] ->
-                let e' = mkApps (mkTicks (Prim nm ty') ticks)
+                let e' = mkApps (mkTicks (Prim ty') ticks)
                                 [repTy,Right ty,msgOrCallStack]
                 in  changed e'
-            (Prim nm ty',[_],ticks)
-              | nm `elem` [ "Clash.Transformations.undefined"
+            (Prim ty',[_],ticks)
+              | primName ty' `elem` [ "Clash.Transformations.undefined"
                           , "Clash.GHC.Evaluator.undefined"
                           , "EmptyCase"] ->
-                let e' = mkApps (mkTicks (Prim nm ty') ticks) [Right ty]
+                let e' = mkApps (mkTicks (Prim ty') ticks) [Right ty]
                 in changed e'
             _ -> do
               let subjTy = termType tcm subj
@@ -771,15 +771,15 @@ deadCode _ e@(Letrec xes body) = do
 deadCode _ e = return e
 
 removeUnusedExpr :: HasCallStack => NormRewrite
-removeUnusedExpr _ e@(collectArgsTicks -> (p@(Prim nm pInfo),args,ticks)) = do
-  bbM <- HashMap.lookup nm <$> Lens.use (extra.primitives)
+removeUnusedExpr _ e@(collectArgsTicks -> (p@(Prim pInfo),args,ticks)) = do
+  bbM <- HashMap.lookup (primName pInfo) <$> Lens.use (extra.primitives)
   case bbM of
     Just (extractPrim ->  Just (BlackBox pNm _ _ _ _ _ _ _ _ inc r ri templ)) -> do
       let usedArgs | isFromInt pNm
                    = [0,1,2]
-                   | nm `elem` ["Clash.Annotations.BitRepresentation.Deriving.dontApplyInHDL"
-                               ,"Clash.Sized.Vector.splitAt"
-                               ]
+                   | primName pInfo `elem` [ "Clash.Annotations.BitRepresentation.Deriving.dontApplyInHDL"
+                                           , "Clash.Sized.Vector.splitAt"
+                                           ]
                    = [0,1]
                    | otherwise
                    = concat [ maybe [] usedArguments r
@@ -1340,7 +1340,7 @@ collectFlat :: Term -> Term -> Maybe [(Pat,Term)]
 collectFlat scrut (Case (collectEqArgs -> Just (scrut', val)) _ty [lAlt,rAlt])
   | scrut' == scrut
   = case collectArgs val of
-      (Prim nm' _,args') | isFromInt nm' ->
+      (Prim p,args') | isFromInt (primName p) ->
         go (last args')
       (Data dc,args')    | nameOcc (dcName dc) == "GHC.Types.I#" ->
         go (last args')
@@ -1373,7 +1373,7 @@ collectFlat scrut (Case (collectEqArgs -> Just (scrut', val)) _ty [lAlt,rAlt])
 collectFlat _ _ = Nothing
 
 collectEqArgs :: Term -> Maybe (Term,Term)
-collectEqArgs (collectArgsTicks -> (Prim nm _, args, ticks))
+collectEqArgs (collectArgsTicks -> (Prim p, args, ticks))
   | nm == "Clash.Sized.Internal.BitVector.eq#"
     = let [_,_,Left scrut,Left val] = args
       in Just (mkTicks scrut ticks,val)
@@ -1385,6 +1385,9 @@ collectEqArgs (collectArgsTicks -> (Prim nm _, args, ticks))
   | nm == "Clash.Transformations.eqInt"
     = let [Left scrut,Left val] = args
       in  Just (mkTicks scrut ticks,val)
+ where
+  nm = primName p
+
 collectEqArgs _ = Nothing
 
 type NormRewriteW = Transform (StateT ([LetBinding],InScopeSet) (RewriteMonad NormalizeState))
@@ -1528,7 +1531,7 @@ collectANF ctx e@(App appf arg)
         return (App appf body)
       _ -> return e
  where
-  isSimBind (Prim nm _) = nm == "Clash.Explicit.SimIO.bindSimIO#"
+  isSimBind (Prim p) = primName p == "Clash.Explicit.SimIO.bindSimIO#"
   isSimBind _ = False
 
 collectANF _ (Letrec binds body) = do
@@ -1912,7 +1915,7 @@ reduceBinders is processed body ((id_,expr):binders) = case List.find ((== expr)
 
 reduceConst :: HasCallStack => NormRewrite
 reduceConst ctx@(TransformContext is0 _) e@(App _ _)
-  | (Prim nm0 _, _) <- collectArgs e
+  | (Prim p0, _) <- collectArgs e
   = do
     tcm <- Lens.view tcCache
     bndrs <- Lens.use bindings
@@ -1925,7 +1928,7 @@ reduceConst ctx@(TransformContext is0 _) e@(App _ _)
       (gh',ph',e') -> do
         globalHeap Lens..= gh'
         bindPureHeap ctx tcm ph' $ \_ctx' -> case e' of
-          (collectArgs -> (Prim nm1 _, _)) | nm0 == nm1 -> return e
+          (collectArgs -> (Prim p1, _)) | primName p0 == primName p1 -> return e
           _ -> changed e'
 
 reduceConst _ e = return e
@@ -1974,7 +1977,7 @@ reduceConst _ e = return e
 -- * Clash.Sized.Internal.BitVector.split#
 -- * Clash.Sized.Internal.BitVector.eq#
 reduceNonRepPrim :: HasCallStack => NormRewrite
-reduceNonRepPrim c@(TransformContext is0 ctx) e@(App _ _) | (Prim nm _, args, ticks) <- collectArgsTicks e = do
+reduceNonRepPrim c@(TransformContext is0 ctx) e@(App _ _) | (Prim p, args, ticks) <- collectArgsTicks e = do
   tcm <- Lens.view tcCache
   shouldReduce1 <- shouldReduce ctx
   ultra <- Lens.use (extra.normalizeUltra)
@@ -1986,7 +1989,7 @@ reduceNonRepPrim c@(TransformContext is0 ctx) e@(App _ _) | (Prim nm _, args, ti
           [nilCon,consCon] = tyConDataCons vecTc
           nilE = mkVec nilCon consCon aTy 0 []
       changed (mkTicks nilE ticks)
-    tv -> case nm of
+    tv -> case primName p of
       "Clash.Sized.Vector.zipWith" | length args == 7 -> do
         let [lhsElTy,rhsElty,resElTy,nTy] = Either.rights args
         case runExcept (tyNatSize tcm nTy) of
@@ -2259,7 +2262,7 @@ disjointExpressionConsolidation ctx@(TransformContext is0 _) e@(Case _scrut _ty 
       let ty  = termType tcm e'
           nm  = case collectArgs fun of
                    (Var v,_)      -> nameOcc (varName v)
-                   (Prim nm' _,_) -> nm'
+                   (Prim p,_) -> primName p
                    _             -> "complex_expression_"
           nm'' = last (Text.splitOn "." nm) `Text.append` "Out"
       mkInternalVar isN nm'' ty
@@ -2311,14 +2314,15 @@ inlineCleanup (TransformContext is0 _) (Letrec binds body) = do
       | nameSort (varName id_) /= User
       , id_ `notElemVarSet` bodyFVs
       = case tm of
-          Prim nm _
-            | Just (extractPrim -> Just p@(BlackBox {})) <- HashMap.lookup nm prims
+          Prim pInfo
+            | let nm = primName pInfo
+            , Just (extractPrim -> Just p@(BlackBox {})) <- HashMap.lookup nm prims
             , TExpr <- kind p
             , Just occ <- lookupVarEnv id_ allOccs
             , occ < 2
             -> True
             | otherwise
-            -> nm `elem` ["Clash.Explicit.SimIO.bindSimIO#"]
+            -> primName pInfo `elem` ["Clash.Explicit.SimIO.bindSimIO#"]
           Case _ _ [_] -> True
           Data _ -> True
           Case _ aTy (_:_:_)
@@ -2327,8 +2331,8 @@ inlineCleanup (TransformContext is0 _) (Letrec binds body) = do
           _ -> False
       | id_ `notElemVarSet` bodyFVs
       = case tm of
-          Prim nm _
-            | nm `elem` [ "Clash.Explicit.SimIO.openFile"
+          Prim pInfo
+            | primName pInfo `elem` [ "Clash.Explicit.SimIO.openFile"
                         , "Clash.Explicit.SimIO.fgetc"
                         , "Clash.Explicit.SimIO.feof"
                         ]
@@ -2336,7 +2340,7 @@ inlineCleanup (TransformContext is0 _) (Letrec binds body) = do
             , occ < 2
             -> True
             | otherwise
-            -> nm `elem` ["Clash.Explicit.SimIO.bindSimIO#"]
+            -> primName pInfo `elem` ["Clash.Explicit.SimIO.bindSimIO#"]
           Case _ _ [(DataPat dcE _ _,_)]
             -> let nm = (nameOcc (dcName dcE))
                in -- Inlines WW projection that exposes internals of the BitVector types
@@ -2526,7 +2530,7 @@ xOptimize (TransformContext is0 _) e@(Case subj ty alts) = do
 
     case defPart of
       ([], _)    -> return e
-      (_, [])    -> changed (Prim "Clash.XException.errorX" (PrimInfo ty WorkConstant))
+      (_, [])    -> changed (Prim (PrimInfo "Clash.XException.errorX" ty WorkConstant))
       (_, [alt]) -> xOptimizeSingle is0 subj alt
       (_, defs)  -> xOptimizeMany is0 subj ty defs
   else
@@ -2593,8 +2597,8 @@ mkFieldSelector is0 subj dc tvs fieldTys nm index = do
 -- Such values are undefined and are removed in X Optimization.
 --
 isPrimError :: Term -> NormalizeSession Bool
-isPrimError (collectArgs -> (Prim nm _, _)) = do
-  prim <- Lens.use (extra . primitives . Lens.at nm)
+isPrimError (collectArgs -> (Prim pInfo, _)) = do
+  prim <- Lens.use (extra . primitives . Lens.at (primName pInfo))
 
   case prim >>= extractPrim of
     Just p  -> return (isErr p)

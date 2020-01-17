@@ -212,8 +212,7 @@ reduceImap (TransformContext is0 ctx) n argElTy resElTy fun arg = do
                                                (mkTyConApp idxTcNm
                                                            [VarTy nTv])
                                                [integerPrimTy,integerPrimTy])
-            idxFromInteger   = Prim "Clash.Sized.Internal.Index.fromInteger#"
-                                    (PrimInfo idxFromIntegerTy WorkNever)
+            idxFromInteger   = Prim (PrimInfo "Clash.Sized.Internal.Index.fromInteger#" idxFromIntegerTy WorkNever)
             idxs             = map (App (App (TyApp idxFromInteger (LitTy (NumTy n)))
                                              (Literal (IntegerLiteral (toInteger n))))
                                    . Literal . IntegerLiteral . toInteger) [0..(n-1)]
@@ -778,8 +777,7 @@ reduceReplace_int is0 n aTy vTy v i newA = do
     -> Type
     -> Term
   eqIntPrim intTy boolTy =
-    Prim "Clash.Transformations.eqInt"
-         (PrimInfo (mkFunTy intTy (mkFunTy intTy boolTy)) WorkVariable)
+    Prim (PrimInfo "Clash.Transformations.eqInt" (mkFunTy intTy (mkFunTy intTy boolTy)) WorkVariable)
 
   go tcm (coreView1 tcm -> Just ty') = go tcm ty'
   go tcm (tyView -> TyConApp vecTcNm _)
@@ -879,8 +877,7 @@ reduceIndex_int is0 n aTy v i = do
     -> Type
     -> Term
   eqIntPrim intTy boolTy =
-    Prim "Clash.Transformations.eqInt"
-         (PrimInfo (mkFunTy intTy (mkFunTy intTy boolTy)) WorkVariable)
+    Prim (PrimInfo "Clash.Transformations.eqInt" (mkFunTy intTy (mkFunTy intTy boolTy)) WorkVariable)
 
   go tcm (coreView1 tcm -> Just ty') = go tcm ty'
   go tcm (tyView -> TyConApp vecTcNm _)

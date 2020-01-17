@@ -450,10 +450,10 @@ interestingToLift inScope _ e@(Var v) _ ticks =
   if NoDeDup `notElem` ticks && (isGlobalId v ||  v `elemInScopeSet` inScope)
      then pure (Just e)
      else pure Nothing
-interestingToLift inScope eval e@(Prim nm pInfo) args ticks
+interestingToLift inScope eval e@(Prim pInfo) args ticks
   | NoDeDup `notElem` ticks = do
   let anyArgNotConstant = any (not . isConstant) lArgs
-  case List.lookup nm interestingPrims of
+  case List.lookup (primName pInfo) interestingPrims of
     Just t | t || anyArgNotConstant -> pure (Just e)
     _ | DeDup `elem` ticks -> pure (Just e)
     _ -> do
@@ -512,12 +512,12 @@ interestingToLift inScope eval e@(Prim nm pInfo) args ticks
     termIsPow2 e' = case eval e' of
       Literal (IntegerLiteral n) -> isPow2 n
       a -> case collectArgs a of
-        (Prim nm' _,[Right _,Left _,Left (Literal (IntegerLiteral n))])
-          | isFromInteger nm' -> isPow2 n
-        (Prim nm' _,[Right _,Left _,Left _,Left (Literal (IntegerLiteral n))])
-          | nm' == "Clash.Sized.Internal.BitVector.fromInteger#"  -> isPow2 n
-        (Prim nm' _,[Right _,       Left _,Left (Literal (IntegerLiteral n))])
-          | nm' == "Clash.Sized.Internal.BitVector.fromInteger##" -> isPow2 n
+        (Prim p,[Right _,Left _,Left (Literal (IntegerLiteral n))])
+          | isFromInteger (primName p) -> isPow2 n
+        (Prim p,[Right _,Left _,Left _,Left (Literal (IntegerLiteral n))])
+          | primName p == "Clash.Sized.Internal.BitVector.fromInteger#"  -> isPow2 n
+        (Prim p,[Right _,       Left _,Left (Literal (IntegerLiteral n))])
+          | primName p == "Clash.Sized.Internal.BitVector.fromInteger##" -> isPow2 n
 
         _ -> False
 

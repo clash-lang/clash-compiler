@@ -296,17 +296,17 @@ constantSpecInfo ctx e = do
   -- primitive's workinfo.
   if isClockOrReset tcm (termType tcm e) then
     case collectArgs e of
-      (Prim "Clash.Transformations.removedArg" _, _) ->
-        pure (constantCsr e)
-      _ -> do
-        bindCsr ctx e
+      (Prim p, _) 
+        | primName p == "Clash.Transformations.removedArg" ->
+          pure (constantCsr e)
+      _ -> bindCsr ctx e
   else
     case collectArgsTicks e of
       (dc@(Data _), args, ticks) ->
         mergeCsrs ctx ticks e (mkApps dc) args
 
       -- TODO: Work with prim's WorkInfo?
-      (prim@(Prim _ _), args, ticks) -> do
+      (prim@(Prim _), args, ticks) -> do
         csr <- mergeCsrs ctx ticks e (mkApps prim) args
         if null (csrNewBindings csr) then
           pure csr
@@ -466,7 +466,7 @@ removedTm
   :: Type
   -> Term
 removedTm =
-  TyApp (Prim "Clash.Transformations.removedArg" (PrimInfo undefinedTy WorkNever))
+  TyApp (Prim (PrimInfo "Clash.Transformations.removedArg" undefinedTy WorkNever))
 
 -- | A tick to prefix an inlined expression with it's original name.
 -- For example, given

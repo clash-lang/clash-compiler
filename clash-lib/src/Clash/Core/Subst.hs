@@ -51,12 +51,13 @@ where
 import           Data.Coerce               (coerce)
 import           Data.Text.Prettyprint.Doc
 import qualified Data.List                 as List
+import           Data.Ord                  (comparing)
 
 import           Clash.Core.FreeVars
   (noFreeVarsOfType, localFVsOfTerms, tyFVsOfTypes)
 import           Clash.Core.Pretty         (ppr, fromPpr)
 import           Clash.Core.Term
-  (LetBinding, Pat (..), Term (..), TickInfo (..))
+  (LetBinding, Pat (..), Term (..), TickInfo (..), PrimInfo(primName))
 import           Clash.Core.Type           (Type (..))
 import           Clash.Core.VarEnv
 import           Clash.Core.Var            (Id, Var (..), TyVar, isGlobalId)
@@ -733,7 +734,7 @@ acmpTerm' inScope = go (mkRnEnv inScope)
   go env (Var id1) (Var id2)   = compare (rnOccLId env id1) (rnOccRId env id2)
   go _   (Data dc1) (Data dc2) = compare dc1 dc2
   go _   (Literal l1) (Literal l2) = compare l1 l2
-  go _   (Prim p1 _) (Prim p2 _) = compare p1 p2
+  go _   (Prim p1) (Prim p2) = comparing primName p1 p2
   go env (Lam b1 e1) (Lam b2 e2) =
     acmpType' env (varType b1) (varType b2) `thenCompare`
     go (rnTmBndr env b1 b2) e1 e2

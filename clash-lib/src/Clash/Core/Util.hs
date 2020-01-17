@@ -278,7 +278,7 @@ termType m e = case e of
   Var t          -> varType t
   Data dc        -> dcType dc
   Literal l      -> literalType l
-  Prim _ t       -> primType t
+  Prim t         -> primType t
   Lam v e'       -> mkFunTy (varType v) (termType m e')
   TyLam tv e'    -> ForAllTy tv (termType m e')
   App _ _        -> case collectArgs e of
@@ -899,13 +899,13 @@ dataConInstArgTys (MkData { dcArgTys, dcUnivTyVars, dcExtTyVars }) inst_tys =
 primCo
   :: Type
   -> Term
-primCo ty = Prim "_CO_" (PrimInfo ty WorkNever)
+primCo ty = Prim (PrimInfo "_CO_" ty WorkNever)
 
 -- | Make an undefined term
 undefinedTm
   :: Type
   -> Term
-undefinedTm = TyApp (Prim "Clash.Transformations.undefined" (PrimInfo undefinedTy WorkNever))
+undefinedTm = TyApp (Prim (PrimInfo "Clash.Transformations.undefined" undefinedTy WorkNever))
 
 substArgTys
   :: DataCon

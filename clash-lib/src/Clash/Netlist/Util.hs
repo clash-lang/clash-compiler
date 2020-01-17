@@ -68,7 +68,7 @@ import           Clash.Core.Subst
    extendInScopeIdList, mkSubst, substTm)
 import           Clash.Core.Term
   (Alt, LetBinding, Pat (..), Term (..), TickInfo (..), NameMod (..),
-   collectArgsTicks, collectTicks)
+   collectArgsTicks, collectTicks, PrimInfo(primName))
 import           Clash.Core.TyCon
   (TyConName, TyConMap, tyConDataCons)
 import           Clash.Core.Type         (Type (..), TypeView (..),
@@ -732,7 +732,7 @@ setBinderName
   -- ^ The binding
   -> NetlistMonad ((Id, Subst, [(Id,Term)]),Id)
 setBinderName subst res resRead m@(resN,_,_) (i,collectArgsTicks -> (k,args,ticks)) = case k of
-  Prim nm _ -> extractPrimWarnOrFail nm >>= go nm
+  Prim p -> let nm = primName p in extractPrimWarnOrFail nm >>= go nm
   _ -> goDef
  where
   go nm (BlackBox {resultName = Just (BBTemplate nmD)}) = withTicks ticks $ \_ -> do
