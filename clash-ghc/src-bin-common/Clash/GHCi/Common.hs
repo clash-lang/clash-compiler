@@ -5,12 +5,14 @@ module Clash.GHCi.Common
   ( checkImportDirs
   , checkMonoLocalBinds
   , checkMonoLocalBindsMod
+  , checkClashDynamic
   ) where
 
 -- Clash
 import           Clash.Driver.Types     (ClashOpts (..))
 
 -- The GHC interface
+import qualified DynFlags
 #if MIN_VERSION_base(4,11,0)
 import qualified EnumSet                as GHC (member) -- ghc84, ghc86
 #else
@@ -64,3 +66,14 @@ checkImportDirs opts idirs = when (opt_checkIDir opts) $
     doesDirectoryExist dir >>= \case
       False -> throwGhcException (CmdLineError $ "Missing directory: " ++ dir)
       _     -> return ()
+
+checkClashDynamic :: GHC.DynFlags -> IO ()
+checkClashDynamic dflags = do
+  let isStatic = case lookup "GHC Dynamic" (DynFlags.compilerInfo dflags) of
+        Just "YES" -> False
+        _          -> True
+  when isStatic
+    (hPutStrLn stderr (unlines
+      ["WARNING: Clash is linked statically, which can lead to long startup times."
+      ,"See https://gitlab.haskell.org/ghc/ghc/issues/15524"
+      ]))

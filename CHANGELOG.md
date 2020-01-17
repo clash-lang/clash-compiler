@@ -77,6 +77,7 @@ Closed
   * [#626](https://github.com/clash-lang/clash-compiler/issues/626): Missing Clash.Explicit.Prelude definitions
   * [#960](https://github.com/clash-lang/clash-compiler/issues/626): Blackbox Error Caused by Simple map
   * [#1012](https://github.com/clash-lang/clash-compiler/issues/1012): Case-let doesn't look through ticks
+  * [#430](https://github.com/clash-lang/clash-compiler/issues/430): Issue warning when not compiled with `executable-dynamic: True`
 
 * Fixes without issue reports:
   * Fix bug in `rnfX` defined for `Down` ([baef30e](https://github.com/clash-lang/clash-compiler/commit/baef30eae03dc02ba847ffbb8fae7f365c5287c2))

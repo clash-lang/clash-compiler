@@ -79,6 +79,7 @@ import Data.Maybe
 
 -- clash additions
 import           Paths_clash_ghc
+import           Clash.GHCi.Common (checkClashDynamic)
 import           Clash.GHCi.UI (makeHDL)
 import           Exception (gcatch)
 import           Data.IORef (IORef, newIORef, readIORef)
@@ -166,6 +167,7 @@ defaultMain = flip withArgs $ do
             GHC.runGhc (Just libDir) $ do
 
             dflags <- GHC.getSessionDynFlags
+            liftIO (checkClashDynamic dflags)
             let dflagsExtra = setWantedLanguageExtensions dflags
 
                 ghcTyLitNormPlugin = GHC.mkModuleName "GHC.TypeLits.Normalise"
