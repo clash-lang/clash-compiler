@@ -670,29 +670,36 @@ runGHCi paths maybe_exprs = do
   case maybe_exprs of
         Nothing ->
           do
+            -- Set different defaulting rules (See #280)
+            runGHCiExpressions ["default ((),[],Integer,Int,Double,String)"]
+
             -- enter the interactive loop
             runGHCiInput $ runCommands $ nextInputLine show_prompt is_tty
-        Just exprs -> do
+        Just exprs ->
             -- just evaluate the expression we were given
-            enqueueCommands exprs
-            let hdle e = do st <- getGHCiState
-                            -- flush the interpreter's stdout/stderr on exit (#3890)
-                            flushInterpBuffers
-                            -- Jump through some hoops to get the
-                            -- current progname in the exception text:
-                            -- <progname>: <exception>
-                            liftIO $ withProgName (progname st)
-                                   $ topHandler e
-                                   -- this used to be topHandlerFastExit, see #2228
-            runInputTWithPrefs defaultPrefs defaultSettings $ do
-                -- make `ghc -e` exit nonzero on invalid input, see Trac #7962
-                _ <- runCommands' hdle
-                     (Just $ hdle (toException $ ExitFailure 1) >> return ())
-                     (return Nothing)
-                return ()
+            runGHCiExpressions exprs
 
   -- and finally, exit
   liftIO $ when (verbosity dflags > 0) $ putStrLn "Leaving Clashi."
+
+runGHCiExpressions :: [String] -> GHCi ()
+runGHCiExpressions exprs = do
+    enqueueCommands exprs
+    let hdle e = do st <- getGHCiState
+                    -- flush the interpreter's stdout/stderr on exit (#3890)
+                    flushInterpBuffers
+                    -- Jump through some hoops to get the
+                    -- current progname in the exception text:
+                    -- <progname>: <exception>
+                    liftIO $ withProgName (progname st)
+                           $ topHandler e
+                           -- this used to be topHandlerFastExit, see #2228
+    runInputTWithPrefs defaultPrefs defaultSettings $ do
+        -- make `ghc -e` exit nonzero on invalid input, see Trac #7962
+        _ <- runCommands' hdle
+             (Just $ hdle (toException $ ExitFailure 1) >> return ())
+             (return Nothing)
+        return ()
 
 runGHCiInput :: InputT GHCi a -> GHCi a
 runGHCiInput f = do
