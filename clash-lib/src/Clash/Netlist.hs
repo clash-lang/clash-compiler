@@ -57,7 +57,7 @@ import           Clash.Core.Literal               (Literal (..))
 import           Clash.Core.Name                  (Name(..))
 import           Clash.Core.Pretty                (showPpr)
 import           Clash.Core.Term
-  (Alt, Pat (..), Term (..), TickInfo (..), collectArgs, collectArgsTicks, collectTicks)
+  (Alt, Pat (..), Term (..), TickInfo (..), PrimInfo(primName), collectArgs, collectArgsTicks, collectTicks)
 import qualified Clash.Core.Term                  as Core
 import           Clash.Core.Type
   (Type (..), coreView1, splitFunTys, splitCoreFunForallTy)
@@ -299,11 +299,11 @@ mkNetDecl (id_,tm) = preserveVarEnv $ do
       case iteAlts scrutHTy alts0 of
         Just _ | ite -> return Wire
         _ -> return Reg
-    termToWireOrReg (collectArgs -> (Prim nm' _,_)) = do
-      bbM <- HashMap.lookup nm' <$> Lens.use primitives
+    termToWireOrReg (collectArgs -> (Prim p,_)) = do
+      bbM <- HashMap.lookup (primName p) <$> Lens.use primitives
       case bbM of
         Just (extractPrim -> Just BlackBox {..}) | outputReg -> return Reg
-        _ | nm' == "Clash.Explicit.SimIO.mealyIO" -> return Reg
+        _ | primName p == "Clash.Explicit.SimIO.mealyIO" -> return Reg
         _ -> return Wire
     termToWireOrReg _ = return Wire
 
@@ -315,7 +315,7 @@ mkNetDecl (id_,tm) = preserveVarEnv $ do
     getResInit
       :: (Id,Term) -> NetlistMonad (Maybe Expr)
     getResInit (i,collectArgsTicks -> (k,args,ticks)) = case k of
-      Prim pNm _ -> extractPrimWarnOrFail pNm >>= go pNm
+      Prim p -> extractPrimWarnOrFail (primName p) >>= go (primName p)
       _ -> return Nothing
      where
       go pNm (BlackBox {resultInit = Just nmD}) = withTicks ticks $ \_ -> do
@@ -690,7 +690,7 @@ mkExpr bbEasD declType bndr app =
   let hwTyA = head hwTys
   case appF of
     Data dc -> mkDcApplication hwTys bndr dc tmArgs
-    Prim nm pinfo -> mkPrimitive False bbEasD bndr (nm,pinfo) args tickDecls
+    Prim pInfo -> mkPrimitive False bbEasD bndr pInfo args tickDecls
     Var f
       | null tmArgs ->
           if isVoid hwTyA then

@@ -56,7 +56,7 @@ data Term
   = Var     !Id                             -- ^ Variable reference
   | Data    !DataCon                        -- ^ Datatype constructor
   | Literal !Literal                        -- ^ Literal
-  | Prim    !Text !PrimInfo                 -- ^ Primitive
+  | Prim    !PrimInfo                       -- ^ Primitive
   | Lam     !Id Term                        -- ^ Term-abstraction
   | TyLam   !TyVar Term                     -- ^ Type-abstraction
   | App     !Term !Term                     -- ^ Application
@@ -93,12 +93,11 @@ data NameMod
   -- ^ @Clash.Magic.setName@
   deriving (Eq,Show,Generic,NFData,Hashable,Binary)
 
-data PrimInfo
-  = PrimInfo
-  { primType     :: !Type
+data PrimInfo = PrimInfo
+  { primName     :: !Text
+  , primType     :: !Type
   , primWorkInfo :: !WorkInfo
-  }
-  deriving (Show,Generic,NFData,Hashable,Binary)
+  } deriving (Show,Generic,NFData,Hashable,Binary)
 
 data WorkInfo
   = WorkConstant
@@ -235,8 +234,8 @@ primArg
   -- ^ If @Term@ was a primitive: (name of primitive, #type args, #term args)
 primArg (collectArgs -> t) =
   case t of
-    (Prim nm _, args) ->
-      Just (nm, length (rights args), length (lefts args))
+    (Prim p, args) ->
+      Just (primName p, length (rights args), length (lefts args))
     _ ->
       Nothing
 
@@ -257,7 +256,7 @@ walkTerm f = catMaybes . DList.toList . go
     Var _ -> mempty
     Data _ -> mempty
     Literal _ -> mempty
-    Prim _ _ -> mempty
+    Prim _ -> mempty
     Lam _ t1 -> go t1
     TyLam _ t1 -> go t1
     App t1 t2 -> go t1 <> go t2
@@ -278,7 +277,7 @@ collectTermIds = concat . walkTerm (Just . go)
   go (Case _ _ alts) = concatMap (pat . fst) alts
   go (Data _) = []
   go (Literal _) = []
-  go (Prim _ _) = []
+  go (Prim _) = []
   go (TyLam _ _) = []
   go (App _ _) = []
   go (TyApp _ _) = []

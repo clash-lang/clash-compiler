@@ -383,7 +383,7 @@ coreToTerm primMap unlocs = term
         x' <- coreToIdSP sp x
         return (x',b')
 
-    term' (Case _ _ ty [])  = C.TyApp (C.Prim (pack "EmptyCase") (C.PrimInfo C.undefinedTy C.WorkNever))
+    term' (Case _ _ ty [])  = C.TyApp (C.Prim (C.PrimInfo (pack "EmptyCase") C.undefinedTy C.WorkNever))
                                 <$> coreToType ty
     term' (Case e b ty alts) = do
      let usesBndr = any ( not . isEmptyVarSet . exprSomeFreeVars (== b))
@@ -411,9 +411,9 @@ coreToTerm primMap unlocs = term
     term' (Tick (SourceNote rsp _) e) =
       C.Tick (C.SrcSpan (RealSrcSpan rsp)) <$> addUsefull (RealSrcSpan rsp) (term e)
     term' (Tick _ e)        = term e
-    term' (Type t)          = C.TyApp (C.Prim (pack "_TY_") (C.PrimInfo C.undefinedTy C.WorkNever)) <$>
+    term' (Type t)          = C.TyApp (C.Prim (C.PrimInfo (pack "_TY_") C.undefinedTy C.WorkNever)) <$>
                                 coreToType t
-    term' (Coercion co)     = C.TyApp (C.Prim (pack "_CO_") (C.PrimInfo C.undefinedTy C.WorkNever)) <$>
+    term' (Coercion co)     = C.TyApp (C.Prim (C.PrimInfo (pack "_CO_") C.undefinedTy C.WorkNever)) <$>
                                 coreToType (coercionType co)
 
 
@@ -430,7 +430,7 @@ coreToTerm primMap unlocs = term
         xType  <- coreToType (varType x)
         case isDataConId_maybe x of
           Just dc -> case lookupPrim xNameS of
-            Just p  -> return $ C.Prim xNameS (C.PrimInfo xType (maybe C.WorkVariable workInfo p))
+            Just p  -> return $ C.Prim (C.PrimInfo xNameS xType (maybe C.WorkVariable workInfo p))
             Nothing -> if isDataConWrapId x && not (isNewTyCon (dataConTyCon dc))
               then let xInfo = idInfo x
                        unfolding = unfoldingInfo xInfo
@@ -462,20 +462,20 @@ coreToTerm primMap unlocs = term
               -> return (nameModTerm C.SuffixName xType)
               | f == pack "Clash.Magic.setName"
               -> return (nameModTerm C.SetName xType)
-              | otherwise                                    -> return (C.Prim xNameS (C.PrimInfo xType wi))
+              | otherwise                                    -> return (C.Prim (C.PrimInfo xNameS xType wi))
             Just (Just (BlackBox {workInfo = wi})) ->
-              return $ C.Prim xNameS (C.PrimInfo xType wi)
+              return $ C.Prim (C.PrimInfo xNameS xType wi)
             Just (Just (BlackBoxHaskell {workInfo = wi})) ->
-              return $ C.Prim xNameS (C.PrimInfo xType wi)
+              return $ C.Prim (C.PrimInfo xNameS xType wi)
             Just Nothing ->
               -- Was guarded by "DontTranslate". We don't know yet if Clash will
               -- actually use it later on, so we don't err here.
-              return $ C.Prim xNameS (C.PrimInfo xType C.WorkVariable)
+              return $ C.Prim (C.PrimInfo xNameS xType C.WorkVariable)
             Nothing
               | x `elem` unlocs
-              -> return (C.Prim xNameS (C.PrimInfo xType C.WorkVariable))
+              -> return (C.Prim (C.PrimInfo xNameS xType C.WorkVariable))
               | pack "$cshow" `isInfixOf` xNameS
-              -> return (C.Prim xNameS (C.PrimInfo xType C.WorkVariable))
+              -> return (C.Prim (C.PrimInfo xNameS xType C.WorkVariable))
               | otherwise
               -> C.Var <$> coreToId x
 
@@ -1149,7 +1149,7 @@ runRWTerm (C.ForAllTy rTV (C.ForAllTy oTV funTy)) =
   C.TyLam rTV (
   C.TyLam oTV (
   C.Lam   fId (
-  (C.App (C.Var fId) (C.Prim rwNm (C.PrimInfo rwTy C.WorkNever))))))
+  (C.App (C.Var fId) (C.Prim (C.PrimInfo rwNm rwTy C.WorkNever))))))
   where
     (C.FunTy fTy _)  = C.tyView funTy
     (C.FunTy rwTy _) = C.tyView fTy

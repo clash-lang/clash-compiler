@@ -44,7 +44,7 @@ import Clash.Core.DataCon               (DataCon (..))
 import Clash.Core.Literal               (Literal (..))
 import Clash.Core.Name                  (Name (..))
 import Clash.Core.Term
-  (Pat (..), Term (..), TickInfo (..), NameMod (..), CoreContext (..), primArg)
+  (Pat (..), Term (..), TickInfo (..), NameMod (..), CoreContext (..), primArg, PrimInfo(primName))
 import Clash.Core.TyCon                 (TyCon (..), TyConName, isTupleTyConLike)
 import Clash.Core.Type                  (ConstTy (..), Kind, LitTy (..),
                                          Type (..), TypeView (..), tyView)
@@ -212,7 +212,7 @@ instance PrettyPrec Term where
       pure (v <> brackets s)
     Data dc         -> pprPrec prec dc
     Literal l       -> pprPrec prec l
-    Prim nm _       -> pprPrecPrim prec nm
+    Prim p          -> pprPrecPrim prec (primName p)
     Lam  v e1       -> annotate (AnnContext $ LamBody v) <$>
                          pprPrecLam prec [v] e1
     TyLam tv e1     -> annotate (AnnContext $ TyLamBody tv) <$>
