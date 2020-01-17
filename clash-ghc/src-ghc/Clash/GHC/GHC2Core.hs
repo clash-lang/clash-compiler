@@ -986,42 +986,42 @@ mapSignalTerm ty = error $ $(curLoc) ++ show ty
 
 -- | Given the type:
 --
--- @forall a. forall clk. a -> Signal clk a@
+-- @forall a. forall dom. a -> Signal dom a@
 --
 -- Generate the term
 --
--- @/\(a:*)./\(clk:Clock).\(x:Signal clk a).x@
+-- @/\(a:*)./\(dom:Domain).\(x:Signal dom a).x@
 signalTerm :: C.Type
            -> C.Term
-signalTerm (C.ForAllTy aTV (C.ForAllTy clkTV funTy)) =
+signalTerm (C.ForAllTy aTV (C.ForAllTy domTV funTy)) =
     C.TyLam aTV (
-    C.TyLam clkTV (
+    C.TyLam domTV (
     C.Lam   xId (
     C.Var   xId)))
   where
-    (C.FunTy _ aTy) = C.tyView funTy
+    (C.FunTy _ saTy) = C.tyView funTy
     xName = C.mkUnsafeSystemName "x" 0
-    xId   = C.mkLocalId aTy xName
+    xId   = C.mkLocalId saTy xName
 
 signalTerm ty = error $ $(curLoc) ++ show ty
 
 -- | Given the type:
 --
 -- @
--- forall clk. forall a. forall b. Signal clk (a -> b) -> Signal clk a ->
--- Signal clk b
+-- forall dom. forall a. forall b. Signal dom (a -> b) -> Signal dom a ->
+-- Signal dom b
 -- @
 --
 -- Generate the term:
 --
 -- @
--- /\(clk:Clock)./\(a:*)./\(b:*).\(f : (Signal clk a -> Signal clk b)).
--- \(x : Signal clk a).f x
+-- /\(dom:Domain)./\(a:*)./\(b:*).\(f : (Signal dom a -> Signal dom b)).
+-- \(x : Signal dom a).f x
 -- @
 appSignalTerm :: C.Type
               -> C.Term
-appSignalTerm (C.ForAllTy clkTV (C.ForAllTy aTV (C.ForAllTy bTV funTy))) =
-    C.TyLam clkTV (
+appSignalTerm (C.ForAllTy domTV (C.ForAllTy aTV (C.ForAllTy bTV funTy))) =
+    C.TyLam domTV (
     C.TyLam aTV (
     C.TyLam bTV (
     C.Lam   fId (
@@ -1029,12 +1029,12 @@ appSignalTerm (C.ForAllTy clkTV (C.ForAllTy aTV (C.ForAllTy bTV funTy))) =
     C.App (C.Var fId) (C.Var xId))))))
   where
     (C.FunTy _ funTy'') = C.tyView funTy
-    (C.FunTy aTy bTy)   = C.tyView funTy''
+    (C.FunTy saTy sbTy)   = C.tyView funTy''
     fName = C.mkUnsafeSystemName "f" 0
     xName = C.mkUnsafeSystemName "x" 1
-    fTy   = C.mkFunTy aTy bTy
+    fTy   = C.mkFunTy saTy sbTy
     fId   = C.mkLocalId fTy fName
-    xId   = C.mkLocalId aTy xName
+    xId   = C.mkLocalId saTy xName
 
 appSignalTerm ty = error $ $(curLoc) ++ show ty
 
@@ -1048,7 +1048,7 @@ appSignalTerm ty = error $ $(curLoc) ++ show ty
 -- Generate the term:
 --
 -- @
--- /\(t:Clock)./\(n:Nat)./\(a:*).\(vs:Signal t (Vec n a)).vs
+-- /\(t:Domain)./\(n:Nat)./\(a:*).\(vs:Signal t (Vec n a)).vs
 -- @
 vecUnwrapTerm :: C.Type
               -> C.Term
@@ -1068,23 +1068,23 @@ vecUnwrapTerm ty = error $ $(curLoc) ++ show ty
 -- | Given the type:
 --
 -- @
--- forall f.forall a.forall b.forall clk.Applicative f => (a -> f b) ->
--- CSignal clk a -> f (Signal clk b)
+-- forall f.forall a.forall b.forall dom.Applicative f => (a -> f b) ->
+-- Signal dom a -> f (Signal dom b)
 -- @
 --
 -- Generate the term:
 --
 -- @
--- /\(f:* -> *)./\(a:*)./\(b:*)./\(clk:Clock).\(dict:Applicative f).
--- \(g:a -> f b).\(x:Signal clk a).g x
+-- /\(f:* -> *)./\(a:*)./\(b:*)./\(dom:Clock).\(dict:Applicative f).
+-- \(g:a -> f b).\(x:Signal dom a).g x
 -- @
 traverseTerm :: C.Type
              -> C.Term
-traverseTerm (C.ForAllTy fTV (C.ForAllTy aTV (C.ForAllTy bTV (C.ForAllTy clkTV funTy)))) =
+traverseTerm (C.ForAllTy fTV (C.ForAllTy aTV (C.ForAllTy bTV (C.ForAllTy domTV funTy)))) =
     C.TyLam fTV (
     C.TyLam aTV (
     C.TyLam bTV (
-    C.TyLam clkTV (
+    C.TyLam domTV (
     C.Lam   dictId (
     C.Lam   gId (
     C.Lam   xId (
@@ -1136,11 +1136,11 @@ dollarTerm ty = error $ $(curLoc) ++ show ty
 
 -- | Given the type:
 --
--- @forall a. forall clk. Signal clk (Signal clk a) -> Signal clk a@
+-- @forall a. forall dom. Signal dom (Signal dom a) -> Signal dom a@
 --
 -- Generate the term
 --
--- @/\(a:*)./\(clk:Clock).\(x:Signal clk a).x@
+-- @/\(a:*)./\(dom:Domain).\(x:Signal dom a).x@
 joinTerm :: C.Type
          -> C.Term
 joinTerm ty@(C.ForAllTy {}) = signalTerm ty
@@ -1195,7 +1195,7 @@ idTerm ty = error $ $(curLoc) ++ show ty
 --
 -- @forall (r :: RuntimeRep) (o :: TYPE r).(State# RealWorld -> o) -> o@
 --
--- Genereate the term:
+-- Generate the term:
 --
 -- @/\(r:RuntimeRep)./\(o:TYPE r).\(f:State# RealWord -> o) -> f realWorld#@
 runRWTerm
@@ -1219,7 +1219,7 @@ runRWTerm ty = error $ $(curLoc) ++ show ty
 --
 -- @forall (n :: Nat) (a :: Type) .Knownnat n => (a -> BitVector n) -> a -> BitVector n@
 --
--- Genereate the term:
+-- Generate the term:
 --
 -- @/\(n:Nat)./\(a:TYPE r).\(kn:KnownNat n).\(f:a -> BitVector n).f@
 packXWithTerm
@@ -1245,7 +1245,7 @@ packXWithTerm ty = error $ $(curLoc) ++ show ty
 --
 -- @forall (n :: Nat) (a :: Type) .Knownnat n => Typeable a => (BitVector n -> a) -> BitVector n -> a@
 --
--- Genereate the term:
+-- Generate the term:
 --
 -- @/\(n:Nat)./\(a:TYPE r).\(kn:KnownNat n).\(f:a -> BitVector n).f@
 checkUnpackUndefTerm
