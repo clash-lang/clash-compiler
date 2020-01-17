@@ -491,12 +491,10 @@ end process;
     , "template"  : "std_logic_vector(unsigned(~ARG[1]) rem unsigned(~ARG[2]))"
     }
   }
-, { "BlackBox" :
+, { "BlackBoxHaskell" :
     { "name"      : "Clash.Sized.Internal.BitVector.toInteger#"
     , "workInfo"  : "Never"
-    , "kind"      : "Expression"
-    , "type"      : "toInteger# :: KnownNat n => BitVector n -> Integer"
-    , "template"  : "~IF~SIZE[~TYP[1]]~THENsigned(std_logic_vector(resize(unsigned(~ARG[1]),~SIZE[~TYPO])))~ELSEto_signed(0,64)~FI"
+    , "templateFunction" : "Clash.Primitives.Sized.ToInteger.bvToIntegerVHDL"
     }
   }
 , { "BlackBox" :

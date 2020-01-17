@@ -40,12 +40,10 @@
     , "template"  : "~IF~SIZE[~TYP[0]]~THEN~ARG[0] <= ~ARG[1]~ELSE1'b1~FI"
     }
   }
-, { "BlackBox" :
+, { "BlackBoxHaskell" :
     { "name"      : "Clash.Sized.Internal.Signed.toInteger#"
     , "workInfo"  : "Never"
-    , "kind"      : "Expression"
-    , "type"      : "toInteger# :: Signed n -> Integer"
-    , "template"  : "~IF~SIZE[~TYP[0]]~THEN~IF~CMPLE[~SIZE[~TYPO]][~SIZE[~TYP[0]]]~THEN$signed(~VAR[i][0][0+:~SIZE[~TYPO]])~ELSE$signed({{(~SIZE[~TYPO]-~SIZE[~TYP[0]]) {1'b0}},~VAR[i][0]})~FI~ELSE~SIZE[~TYPO]'sd0~FI"
+    , "templateFunction" : "Clash.Primitives.Sized.ToInteger.signedToIntegerVerilog"
     }
   }
 , { "BlackBox" :

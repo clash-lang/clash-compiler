@@ -130,12 +130,10 @@
     , "template"  : "~ARG[0] rem ~ARG[1]"
     }
   }
-, { "BlackBox" :
+, { "BlackBoxHaskell" :
     { "name"      : "Clash.Sized.Internal.Unsigned.toInteger#"
     , "workInfo"  : "Never"
-    , "kind"      : "Expression"
-    , "type"      : "toInteger# :: Unsigned n -> Integer"
-    , "template"  : "~IF~SIZE[~TYP[0]]~THENsigned(std_logic_vector(resize(~ARG[0],~SIZE[~TYPO])))~ELSEto_signed(0,64)~FI"
+    , "templateFunction" : "Clash.Primitives.Sized.ToInteger.unsignedToIntegerVHDL"
     }
   }
 , { "BlackBox" :
