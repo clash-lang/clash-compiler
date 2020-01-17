@@ -121,12 +121,10 @@
     , "template"  : "~ARG[0] % ~ARG[1]"
     }
   }
-, { "BlackBox" :
+, { "BlackBoxHaskell" :
     { "name"      : "Clash.Sized.Internal.Index.toInteger#"
     , "workInfo"  : "Never"
-    , "kind"      : "Expression"
-    , "type"      : "toInteger# :: Index n -> Integer"
-    , "template"  : "~IF~SIZE[~TYP[0]]~THEN~IF~CMPLE[~SIZE[~TYPO]][~SIZE[~TYP[0]]]~THEN$signed(~VAR[i][0][0+:~SIZE[~TYPO]])~ELSE$signed({{(~SIZE[~TYPO]-~SIZE[~TYP[0]]) {1'b0}},~VAR[i][0]})~FI~ELSE~SIZE[~TYPO]'sd0~FI"
+    , "templateFunction" : "Clash.Primitives.Sized.ToInteger.indexToIntegerVerilog"
     }
   }
 , { "BlackBox" :

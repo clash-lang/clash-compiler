@@ -209,6 +209,7 @@ Library
                       Clash.Primitives.GHC.Literal
                       Clash.Primitives.GHC.Word
                       Clash.Primitives.Intel.ClockGen
+                      Clash.Primitives.Sized.ToInteger
                       Clash.Primitives.Sized.Vector
 
                       Clash.Rewrite.Combinators

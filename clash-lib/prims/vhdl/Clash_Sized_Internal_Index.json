@@ -121,12 +121,10 @@
     , "template"  : "~ARG[0] rem ~ARG[1]"
     }
   }
-, { "BlackBox" :
+, { "BlackBoxHaskell" :
     { "name"      : "Clash.Sized.Internal.Index.toInteger#"
     , "workInfo"  : "Never"
-    , "kind"      : "Expression"
-    , "type"      : "toInteger# :: Index n -> Integer"
-    , "template"  : "~IF~SIZE[~TYP[0]]~THENsigned(std_logic_vector(resize(~ARG[0],~SIZE[~TYPO])))~ELSEto_signed(0,64)~FI"
+    , "templateFunction" : "Clash.Primitives.Sized.ToInteger.indexToIntegerVHDL"
     }
   }
 , { "BlackBox" :

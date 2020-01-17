@@ -169,12 +169,10 @@ end block;
     , "template"  : "~ARG[0] mod ~ARG[1]"
     }
   }
-, { "BlackBox" :
+, { "BlackBoxHaskell" :
     { "name"      : "Clash.Sized.Internal.Signed.toInteger#"
     , "workInfo"  : "Never"
-    , "kind"      : "Expression"
-    , "type"      : "toInteger# :: Signed n -> Integer"
-    , "template"  : "~IF~SIZE[~TYP[0]]~THENresize(~ARG[0],~SIZE[~TYPO])~ELSEto_signed(0,64)~FI"
+    , "templateFunction" : "Clash.Primitives.Sized.ToInteger.signedToIntegerVHDL"
     }
   }
 , { "BlackBox" :
