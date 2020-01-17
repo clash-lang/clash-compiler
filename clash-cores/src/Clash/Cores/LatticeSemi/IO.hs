@@ -230,6 +230,4 @@ sbio pinConf pkgPinIn latchInput dOut_0 _dOut_1 outputEnable0 =
       pkgPinIn
       (toMaybe <$> outputEnable1 <*> pkgPinWriteInput)
 {-# NOINLINE sbio #-}
-{-# ANN sbio (InlinePrimitive SystemVerilog "[ { \"BlackBox\" : { \"name\" : \"Clash.Cores.LatticeSemi.IO.sbio\", \"kind\": \"Declaration\", \"format\": \"Haskell\", \"templateFunction\": \"Clash.Cores.LatticeSemi.Blackboxes.IO.sbioTF\"}} ]") #-}
-{-# ANN sbio (InlinePrimitive Verilog "[ { \"BlackBox\" : { \"name\" : \"Clash.Cores.LatticeSemi.IO.sbio\", \"kind\": \"Declaration\", \"format\": \"Haskell\", \"templateFunction\": \"Clash.Cores.LatticeSemi.Blackboxes.IO.sbioTF\"}} ]") #-}
-{-# ANN sbio (InlinePrimitive VHDL "[ { \"BlackBox\" : { \"name\" : \"Clash.Cores.LatticeSemi.IO.sbio\", \"kind\": \"Declaration\", \"format\": \"Haskell\", \"templateFunction\": \"Clash.Cores.LatticeSemi.Blackboxes.IO.sbioTF\"}} ]") #-}
+{-# ANN sbio (InlinePrimitive [VHDL,Verilog,SystemVerilog] "[ { \"BlackBox\" : { \"name\" : \"Clash.Cores.LatticeSemi.IO.sbio\", \"kind\": \"Declaration\", \"format\": \"Haskell\", \"templateFunction\": \"Clash.Cores.LatticeSemi.Blackboxes.IO.sbioTF\"}} ]") #-}

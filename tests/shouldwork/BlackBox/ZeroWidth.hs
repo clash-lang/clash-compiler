@@ -24,7 +24,7 @@ answer = "A nervous wreck."
 comment :: String -> ()
 comment !_s = ()
 {-# NOINLINE comment #-}
-{-# ANN comment (InlinePrimitive VHDL $ unindent [i|
+{-# ANN comment (InlinePrimitive [VHDL] $ unindent [i|
   [ { "BlackBox" :
       { "name"      : "ZeroWidth.comment"
       , "kind"      : "Declaration"

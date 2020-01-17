@@ -36,7 +36,7 @@ myMultiplyTemplate bbCtx = do
   getMon $ blockDecl x [NetDecl Nothing y Bool]
 
 
-{-# ANN myMultiply (InlinePrimitive VHDL "[ { \"BlackBox\" : { \"name\" : \"TemplateFunction.myMultiply\", \"kind\": \"Declaration\", \"format\": \"Haskell\", \"templateFunction\": \"TemplateFunction.myMultiplyTF\"}} ]") #-}
+{-# ANN myMultiply (InlinePrimitive [VHDL] "[ { \"BlackBox\" : { \"name\" : \"TemplateFunction.myMultiply\", \"kind\": \"Declaration\", \"format\": \"Haskell\", \"templateFunction\": \"TemplateFunction.myMultiplyTF\"}} ]") #-}
 myMultiply
   :: Signal System Int
   -> Signal System Int

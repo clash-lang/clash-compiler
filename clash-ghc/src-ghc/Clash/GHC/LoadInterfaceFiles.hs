@@ -237,9 +237,9 @@ unresolvedPrimitives
   -> m ([Either UnresolvedPrimitive FilePath])
 unresolvedPrimitives hdl targetPrim =
   case targetPrim of
-    (_, Primitive hdl' fp) | hdl == hdl' -> pure [Right fp]
+    (_, Primitive hdls fp) | hdl `elem` hdls -> pure [Right fp]
 
-    (target, InlinePrimitive hdl' contentOrFp) | hdl == hdl' ->
+    (target, InlinePrimitive hdls contentOrFp) | hdl `elem` hdls ->
       case target of
         -- Module annotation, can house many primitives
         Annotations.ModuleTarget _ ->

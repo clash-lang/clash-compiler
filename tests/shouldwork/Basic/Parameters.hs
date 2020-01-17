@@ -50,7 +50,7 @@ myAddTemplate bbCtx = do
     ]
 
 {-# ANN myAdd
-  (InlinePrimitive VHDL [I.i|
+  (InlinePrimitive [VHDL] [I.i|
   [ { "BlackBox" :
        { "name" : "Parameters.myAdd"
        , "templateFunction" : "Parameters.myAddTF"
@@ -80,7 +80,7 @@ end;" }] } } ] |] )
  #-}
 
 {-# ANN myAdd
-  (InlinePrimitive Verilog [I.i|
+  (InlinePrimitive [Verilog] [I.i|
   [ { "BlackBox" :
       { "name" : "Parameters.myAdd"
       , "templateFunction" : "Parameters.myAddTF"
@@ -103,7 +103,7 @@ endmodule"       }] } } ] |] )
  #-}
 
 {-# ANN myAdd
-  (InlinePrimitive SystemVerilog [I.i|
+  (InlinePrimitive [SystemVerilog] [I.i|
   [ { "BlackBox" :
       { "name" : "Parameters.myAdd"
       , "templateFunction" : "Parameters.myAddTF"
