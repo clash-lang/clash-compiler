@@ -46,5 +46,17 @@
         "type": "tarball",
         "url": "https://github.com/clash-lang/ghc-typelits-knownnat/archive/cc73e761086e2d48acdf134b06ad3af47e115166.tar.gz",
         "url_template": "https://github.com/<owner>/<repo>/archive/<rev>.tar.gz"
+    },
+    "ghc-typelits-extra": {
+        "branch": "master",
+        "description": "Extra type-level operations on GHC.TypeLits.Nat and a custom solver",
+        "homepage": null,
+        "owner": "clash-lang",
+        "repo": "ghc-typelits-extra",
+        "rev": "310d83b4dc2141b790ebdb0c19c34294854b2c93",
+        "sha256": "1fgla50kkg1za5p5m9sc56rnwyissfb4rwjhlfz4gnhi5nc1890p",
+        "type": "tarball",
+        "url": "https://github.com/clash-lang/ghc-typelits-extra/archive/310d83b4dc2141b790ebdb0c19c34294854b2c93.tar.gz",
+        "url_template": "https://github.com/<owner>/<repo>/archive/<rev>.tar.gz"
     }
 }

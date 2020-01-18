@@ -15,6 +15,9 @@ let
         ghc-typelits-knownnat =
          self.callCabal2nix "ghc-typelits-knownnat" sources.ghc-typelits-knownnat {};
 
+        ghc-typelits-extra =
+         self.callCabal2nix "ghc-typelits-extra" sources.ghc-typelits-extra {};
+
         # Internal overrides
         clash-lib = import ../clash-lib { inherit nixpkgs; };
         clash-ghc = import ../clash-ghc { inherit nixpkgs; };

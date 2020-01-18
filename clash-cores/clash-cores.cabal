@@ -69,7 +69,7 @@ common basic-config
     base                      >= 4.10  && < 5,
     clash-prelude             >= 1.1   && < 1.2,
     ghc-typelits-natnormalise >= 0.6,
-    ghc-typelits-extra        >= 0.3.1,
+    ghc-typelits-extra        >= 0.3.2,
     ghc-typelits-knownnat     >= 0.6,
     QuickCheck
 
