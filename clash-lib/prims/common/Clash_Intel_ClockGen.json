@@ -2,6 +2,12 @@
     { "name"      : "Clash.Intel.ClockGen.altpll"
     , "workInfo"  : "Always"
     , "kind"      : "Declaration"
+    , "includes"  : [ {"extension": "qsys"
+                      ,"name": "altpll"
+                      ,"format": "Haskell"
+                      ,"templateFunction": "Clash.Primitives.Intel.ClockGen.altpllQsysTF"
+                      }
+                    ]
     , "format"    : "Haskell"
     , "templateFunction" : "Clash.Primitives.Intel.ClockGen.altpllTF"
     }
@@ -10,6 +16,12 @@
     { "name"      : "Clash.Intel.ClockGen.alteraPll"
     , "workInfo"  : "Always"
     , "kind"      : "Declaration"
+    , "includes"  : [ {"extension": "qsys"
+                      ,"name": "altera_pll"
+                      ,"format": "Haskell"
+                      ,"templateFunction": "Clash.Primitives.Intel.ClockGen.alteraPllQsysTF"
+                      }
+                    ]
     , "format"    : "Haskell"
     , "templateFunction" : "Clash.Primitives.Intel.ClockGen.alteraPllTF"
     }

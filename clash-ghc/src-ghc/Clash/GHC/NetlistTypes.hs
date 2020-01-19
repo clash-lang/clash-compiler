@@ -133,9 +133,19 @@ ghcTypeToHWType iw floatSupport = go
 
         -- XXX: this is a hack to get a KnownDomain from a KnownConfiguration
         "GHC.Classes.(%,%)"
-          | [arg0@(tyView -> TyConApp kdNm _), _] <- args
+          | [arg0@(tyView -> TyConApp kdNm _), arg1] <- args
           , nameOcc kdNm == "Clash.Signal.Internal.KnownDomain"
-          -> ExceptT (MaybeT (go reprs m arg0))
+          -> case tyView arg1 of
+                TyConApp kdNm1 _
+                  | nameOcc kdNm1 == "Clash.Signal.Internal.KnownDomain"
+                  -> do k1 <- (stripVoid . stripFiltered) <$> ExceptT (MaybeT (go reprs m arg0))
+                        k2 <- (stripVoid . stripFiltered) <$> ExceptT (MaybeT (go reprs m arg1))
+                        returnN (Void (Just (Product "(%,%)" Nothing [k1,k2])))
+                  where
+                    stripVoid (Void (Just t)) = t
+                    stripVoid t = t
+                _ -> ExceptT (MaybeT (go reprs m arg0))
+
 
         "Clash.Signal.Internal.KnownDomain"
           -> case tyConDataCons (m `lookupUniqMap'` tc) of
