@@ -92,6 +92,12 @@ import           Clash.Util
 stripFiltered :: FilteredHWType -> HWType
 stripFiltered (FilteredHWType hwty _filtered) = hwty
 
+-- | Strip as many "Void" layers as possible. Might still return a Void if the
+-- void doesn't contain a hwtype.
+stripVoid :: HWType -> HWType
+stripVoid (Void (Just e)) = stripVoid e
+stripVoid e = e
+
 flattenFiltered :: FilteredHWType -> [[Bool]]
 flattenFiltered (FilteredHWType _hwty filtered) = map (map fst) filtered
 
@@ -456,8 +462,14 @@ mkADT builtInTranslation reprs m _tyString tc args = case tyConDataCons (m `look
         -- If none of the dataconstructors have fields, and there are 1 or less
         -- of them, this type only has one inhabitant. It can therefore be
         -- represented by zero bits, and is therefore empty:
-        | length dcs <= 1 ->
-          return (FilteredHWType (Void Nothing) argHTyss1)
+        | length dcs <= 1 -> case argHTyss0 of
+            [argHTys0] ->
+              -- We need this to preserve constraint-tuples of `KnownDomains`
+              let argHTys1 = map (stripVoid . stripFiltered) argHTys0
+              in  return (FilteredHWType
+                            (Void (Just (Product tcName Nothing argHTys1)))
+                            argHTyss1)
+            _ -> return (FilteredHWType (Void Nothing) argHTyss1)
         -- None of the dataconstructors have fields. This type is therefore a
         -- simple Sum type.
         | otherwise ->

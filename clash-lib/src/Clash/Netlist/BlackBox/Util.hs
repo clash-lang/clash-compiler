@@ -54,16 +54,10 @@ import           Clash.Netlist.Types             (BlackBoxContext (..),
                                                   Modifier (..),
                                                   Declaration(BlackBoxD))
 import qualified Clash.Netlist.Types             as N
-import           Clash.Netlist.Util              (typeSize, isVoid)
+import           Clash.Netlist.Util              (typeSize, isVoid, stripVoid)
 import           Clash.Signal.Internal
   (ResetKind(..), ResetPolarity(..), InitBehavior(..))
 import           Clash.Util
-
--- | Strip as many "Void" layers as possible. Might still return a Void if the
--- void doesn't contain a hwtype.
-stripVoid :: HWType -> HWType
-stripVoid (Void (Just e)) = stripVoid e
-stripVoid e = e
 
 inputHole :: Element -> Maybe Int
 inputHole = \case

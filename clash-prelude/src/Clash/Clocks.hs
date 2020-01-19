@@ -7,18 +7,25 @@ Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
 Generic clock related utilities.
 -}
 
+{-# LANGUAGE ConstrainedClassMethods #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE TypeFamilies #-}
 
-module Clash.Clocks (Clocks, clocks) where
+module Clash.Clocks (Clocks(..)) where
+
+import Data.Kind (Constraint)
 
 import Clash.Signal.Internal
 import Clash.Clocks.Deriving (deriveClocksInstances)
 
 class Clocks t where
+  type ClocksCxt t :: Constraint
+
   clocks
-    :: Clock domIn
+    :: (KnownDomain domIn, ClocksCxt t)
+    => Clock domIn
     -> Reset domIn
     -> t
 

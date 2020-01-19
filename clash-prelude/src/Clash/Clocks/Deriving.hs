@@ -5,6 +5,7 @@ License    :  BSD2 (see the file LICENSE)
 Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
 -}
 
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE QuasiQuotes #-}
 {-# LANGUAGE TemplateHaskell #-}
 
@@ -20,8 +21,17 @@ import Unsafe.Coerce               (unsafeCoerce)
 derive' :: Int -> Q Dec
 derive' n = do
   -- (Clock d0, Clock d1, )
-  instType  <- foldM (\a n' -> AppT a <$> clkType n') (TupleT $ n + 1) [1..n]
-  instType' <- (AppT (ConT $ mkName "Clocks") . AppT instType) <$> lockType
+  instType0 <- foldM (\a n' -> AppT a <$> clkType n') (TupleT $ n + 1) [1..n]
+  instType1 <- AppT instType0 <$> lockType
+  let instHead = AppT (ConT $ mkName "Clocks") instType1
+
+  cxtRHS <- foldM (\a n' -> AppT a <$> knownDomainCxt n') (TupleT n) [1..n]
+#if MIN_VERSION_template_haskell(2,15,0)
+  let cxtLHS = AppT (ConT $ mkName "ClocksCxt") instType1
+  let cxtTy  = TySynInstD (TySynEqn Nothing cxtLHS cxtRHS)
+#else
+  let cxtTy  = TySynInstD (mkName "ClocksCxt") (TySynEqn [instType1] cxtRHS)
+#endif
 
   -- Function definition of 'clocks'
   let clk = mkName "clk"
@@ -34,13 +44,17 @@ derive' n = do
   let funcBody  = NormalB instTuple
   let instFunc  = FunD (mkName "clocks") [Clause [VarP clk, VarP rst] funcBody []]
 
-  return $ InstanceD Nothing [] instType' [instFunc, noInline]
+  return $ InstanceD Nothing [] instHead [cxtTy, instFunc, noInline]
 
   where
     -- | Generate type @Clock dom@ with fresh @dom@ variable
     clkType n' =
       let c = varT $ mkName ("c" ++ show n') in
       [t| Clock $c |]
+
+    knownDomainCxt n' =
+      let c = varT $ mkName ("c" ++ show n') in
+      [t| KnownDomain $c |]
 
     -- | Generate type @Signal dom 'Bool@ with fresh @dom@ variable
     lockType =

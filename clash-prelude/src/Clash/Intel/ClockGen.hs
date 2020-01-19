@@ -14,13 +14,15 @@ module Clash.Intel.ClockGen
   , alteraPll
   ) where
 
-import Clash.Clocks           (clocks, Clocks)
+import Clash.Clocks           (Clocks (..))
 import Clash.Promoted.Symbol  (SSymbol)
 import Clash.Signal.Internal
-  (Signal, Clock, Reset)
+  (Signal, Clock, Reset, KnownDomain (..))
 
 
 -- | A clock source that corresponds to the Intel/Quartus \"ALTPLL\" component
+-- (Arria GX, Arria II, Stratix IV, Stratix III, Stratix II, Stratix,
+--  Cyclone 10 LP, Cyclone IV, Cyclone III, Cyclone II, Cyclone)
 -- with settings to provide a stable 'Clock' from a single free-running input
 --
 -- Only works when configured with:
@@ -38,11 +40,11 @@ import Clash.Signal.Internal
 -- @
 altpll
   :: forall domOut domIn name
-   . SSymbol name
-  -- ^ Name of the component, must correspond to the name entered in the QSys
-  -- dialog.
+   . (KnownDomain domIn, KnownDomain domOut)
+  => SSymbol name
+  -- ^ Name of the component instance.
   --
-  -- For example, when you entered \"altPLL50\", instantiate as follows:
+  -- Instantiate as follows:
   --
   -- > SSymbol @"altPLL50"
   -> Clock domIn
@@ -51,12 +53,12 @@ altpll
   -- ^ Reset for the PLL
   -> (Clock domOut, Signal domOut Bool)
   -- ^ (Stable PLL clock, PLL lock)
-altpll !_ = clocks
+altpll !_ = knownDomain @domIn `seq` knownDomain @domOut `seq` clocks
 {-# NOINLINE altpll #-}
 
 -- | A clock source that corresponds to the Intel/Quartus \"Altera PLL\"
--- component with settings to provide a stable 'Clock' from a single
--- free-running input
+-- component (Arria V, Stratix V, Cyclone V) with settings to provide a stable
+-- 'Clock' from a single free-running input
 --
 -- Only works when configured with:
 --
@@ -80,12 +82,11 @@ altpll !_ = clocks
 --
 -- respectively.
 alteraPll
-  :: Clocks t
+  :: (Clocks t, KnownDomain domIn, ClocksCxt t)
   => SSymbol name
-  -- ^ Name of the component, must correspond to the name entered in the QSys
-  -- dialog.
+  -- ^ Name of the component instance.
   --
-  -- For example, when you entered \"alteraPLL50\", instantiate as follows:
+  -- Instantiate as follows:
   --
   -- > SSymbol @"alteraPLL50"
   -> Clock domIn
