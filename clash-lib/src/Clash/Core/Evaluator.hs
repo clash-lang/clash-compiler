@@ -499,7 +499,6 @@ primop
   -> Heap
   -> Stack
   -> PrimInfo
-  -- ^ Type of the primitive
   -> [Type]
   -- ^ Applied types
   -> [Value]
@@ -509,51 +508,51 @@ primop
   -> [Term]
   -- ^ The remaining terms which must be evaluated to a value
   -> Maybe State
-primop eval tcm h k ty tys vs v []
-  | primName ty `elem` [ "Clash.Sized.Internal.Index.fromInteger#"
+primop eval tcm h k p tys vs v []
+  | primName p  `elem` [ "Clash.Sized.Internal.Index.fromInteger#"
                        , "GHC.CString.unpackCString#"
                        , "Clash.Transformations.removedArg"
                        , "GHC.Prim.MutableByteArray#"
                        ]
               -- The above primitives are actually values, and not operations.
-  = unwind eval tcm h k (PrimVal ty tys (vs ++ [v]))
-  | primName ty == "Clash.Sized.Internal.BitVector.fromInteger#"
+  = unwind eval tcm h k (PrimVal p tys (vs ++ [v]))
+  | primName p == "Clash.Sized.Internal.BitVector.fromInteger#"
   = case (vs,v) of
     ([naturalLiteral -> Just n,mask], integerLiteral -> Just i) ->
-      unwind eval tcm h k (PrimVal ty tys [Lit (NaturalLiteral n)
+      unwind eval tcm h k (PrimVal p tys [Lit (NaturalLiteral n)
                                              ,mask
                                              ,Lit (IntegerLiteral (wrapUnsigned n i))])
     _ -> error ($(curLoc) ++ "Internal error"  ++ show (vs,v))
-  | primName ty == "Clash.Sized.Internal.BitVector.fromInteger##"
+  | primName p == "Clash.Sized.Internal.BitVector.fromInteger##"
   = case (vs,v) of
     ([mask], integerLiteral -> Just i) ->
-      unwind eval tcm h k (PrimVal ty tys [mask
+      unwind eval tcm h k (PrimVal p tys [mask
                                              ,Lit (IntegerLiteral (wrapUnsigned 1 i))])
     _ -> error ($(curLoc) ++ "Internal error"  ++ show (vs,v))
-  | primName ty == "Clash.Sized.Internal.Signed.fromInteger#"
+  | primName p == "Clash.Sized.Internal.Signed.fromInteger#"
   = case (vs,v) of
     ([naturalLiteral -> Just n],integerLiteral -> Just i) ->
-      unwind eval tcm h k (PrimVal ty tys [Lit (NaturalLiteral n)
+      unwind eval tcm h k (PrimVal p tys [Lit (NaturalLiteral n)
                                              ,Lit (IntegerLiteral (wrapSigned n i))])
     _ -> error ($(curLoc) ++ "Internal error"  ++ show (vs,v))
-  | primName ty == "Clash.Sized.Internal.Unsigned.fromInteger#"
+  | primName p == "Clash.Sized.Internal.Unsigned.fromInteger#"
   = case (vs,v) of
     ([naturalLiteral -> Just n],integerLiteral -> Just i) ->
-      unwind eval tcm h k (PrimVal ty tys [Lit (NaturalLiteral n)
+      unwind eval tcm h k (PrimVal p tys [Lit (NaturalLiteral n)
                                              ,Lit (IntegerLiteral (wrapUnsigned n i))])
     _ -> error ($(curLoc) ++ "Internal error"  ++ show (vs,v))
-  | otherwise = eval (isScrut k) tcm h k ty tys (vs ++ [v])
-primop eval tcm h0 k ty tys vs v [e]
-  | primName ty `elem` [ "Clash.Sized.Vector.lazyV"
+  | otherwise = eval (isScrut k) tcm h k p tys (vs ++ [v])
+primop eval tcm h0 k p tys vs v [e]
+  | primName p  `elem` [ "Clash.Sized.Vector.lazyV"
                        , "Clash.Sized.Vector.replicate"
                        , "Clash.Sized.Vector.replace_int"
                        , "GHC.Classes.&&"
                        , "GHC.Classes.||"
                        ]
   = let (h1,i) = newLetBinding tcm h0 e
-    in  eval (isScrut k) tcm h1 k ty tys (vs ++ [v,Suspend (Var i)])
-primop _ _ h k ty tys vs (collectValueTicks -> (v, ts)) (e:es) =
-  Just (h,PrimApply ty tys (vs ++ [foldr TickValue v ts]) es:k,e)
+    in  eval (isScrut k) tcm h1 k p tys (vs ++ [v,Suspend (Var i)])
+primop _ _ h k p tys vs (collectValueTicks -> (v, ts)) (e:es) =
+  Just (h,PrimApply p tys (vs ++ [foldr TickValue v ts]) es:k,e)
 
 -- | Evaluate a case-expression
 scrutinise :: Heap -> Stack -> Value -> [Alt] -> State
