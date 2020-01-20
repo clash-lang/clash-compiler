@@ -97,6 +97,8 @@ data PrimInfo = PrimInfo
   { primName     :: !Text
   , primType     :: !Type
   , primWorkInfo :: !WorkInfo
+  , primCoreBndr :: !(Maybe Id)
+    -- ^ Maybe reference to the core implementation of this prim
   } deriving (Show,Generic,NFData,Hashable,Binary)
 
 data WorkInfo

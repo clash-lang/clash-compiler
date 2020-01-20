@@ -629,7 +629,7 @@ reduceConstant isSubj tcm h k pInfo tys args = case primName pInfo of
            mbaTy = mkFunTy intPrimTy (last tyArgs)
            newE = mkApps (Data tupDc) (map Right tyArgs ++
                     [Left (Prim rwTy)
-                    ,Left (mkApps (Prim (PrimInfo "GHC.Prim.MutableByteArray#" mbaTy WorkNever))
+                    ,Left (mkApps (Prim (PrimInfo "GHC.Prim.MutableByteArray#" mbaTy WorkNever Nothing))
                                   [Left (Literal . IntLiteral $ toInteger p)])
                     ])
        in Just (h',k,newE)
@@ -2825,7 +2825,7 @@ reduceConstant isSubj tcm h k pInfo tys args = case primName pInfo of
     , Right n <- runExcept (tyNatSize tcm nTy)
     , let iLit = mkIndexLit (Either.rights tyArgs' !! 0) nTy n 0
     -> reduceWHNF $
-       mkApps (Prim (PrimInfo "Clash.Sized.Vector.imap_go" (vecImapGoTy vecTcNm indexTcNm) WorkNever))
+       mkApps (Prim (PrimInfo "Clash.Sized.Vector.imap_go" (vecImapGoTy vecTcNm indexTcNm) WorkNever Nothing))
               [Right nTy
               ,Right nTy
               ,Right aTy
@@ -2854,7 +2854,7 @@ reduceConstant isSubj tcm h k pInfo tys args = case primName pInfo of
                          ,Right (LitTy (NumTy (m'-1)))
                          ,Right aTy
                          ,Right bTy
-                         ,Left (mkApps (Prim (PrimInfo "Clash.Sized.Internal.Index.+#" (indexAddTy indexTcNm) WorkVariable))
+                         ,Left (mkApps (Prim (PrimInfo "Clash.Sized.Internal.Index.+#" (indexAddTy indexTcNm) WorkVariable Nothing))  -- TODO add real binding
                                        [Right nTy
                                        ,Left (Literal (NaturalLiteral n'))
                                        ,Left (valToTerm n)
@@ -2938,7 +2938,7 @@ reduceConstant isSubj tcm h k pInfo tys args = case primName pInfo of
                   n1mTy  = LitTy (NumTy n1)
                   n1m'ty = LitTy (NumTy (n1-1))
                   splitAtCall =
-                   mkApps (Prim (PrimInfo "Clash.Sized.Vector.fold_split" (foldSplitAtTy vecTcNm) WorkNever))
+                   mkApps (Prim (PrimInfo "Clash.Sized.Vector.fold_split" (foldSplitAtTy vecTcNm) WorkNever Nothing))
                           [Right mTy
                           ,Right n1mTy
                           ,Right aTy
@@ -3760,14 +3760,14 @@ naturalToNaturalLiteral = Literal . NaturalLiteral . toInteger
 
 bConPrim :: Type -> Term
 bConPrim (tyView -> TyConApp bTcNm _)
-  = Prim (PrimInfo "Clash.Sized.Internal.BitVector.fromInteger##" funTy WorkNever)
+  = Prim (PrimInfo "Clash.Sized.Internal.BitVector.fromInteger##" funTy WorkNever Nothing)
   where
     funTy      = foldr1 mkFunTy [integerPrimTy,integerPrimTy,mkTyConApp bTcNm []]
 bConPrim _ = error $ $(curLoc) ++ "called with incorrect type"
 
 bvConPrim :: Type -> Term
 bvConPrim (tyView -> TyConApp bvTcNm _)
-  = Prim (PrimInfo "Clash.Sized.Internal.BitVector.fromInteger#" (ForAllTy nTV funTy) WorkNever)
+  = Prim (PrimInfo "Clash.Sized.Internal.BitVector.fromInteger#" (ForAllTy nTV funTy) WorkNever Nothing)
   where
     funTy = foldr1 mkFunTy [naturalPrimTy,integerPrimTy,integerPrimTy,mkTyConApp bvTcNm [nVar]]
     nName = mkUnsafeSystemName "n" 0
@@ -3777,7 +3777,7 @@ bvConPrim _ = error $ $(curLoc) ++ "called with incorrect type"
 
 indexConPrim :: Type -> Term
 indexConPrim (tyView -> TyConApp indexTcNm _)
-  = Prim (PrimInfo "Clash.Sized.Internal.Index.fromInteger#" (ForAllTy nTV funTy) WorkNever)
+  = Prim (PrimInfo "Clash.Sized.Internal.Index.fromInteger#" (ForAllTy nTV funTy) WorkNever Nothing)
   where
     funTy        = foldr1 mkFunTy [naturalPrimTy,integerPrimTy,mkTyConApp indexTcNm [nVar]]
     nName      = mkUnsafeSystemName "n" 0
@@ -3787,7 +3787,7 @@ indexConPrim _ = error $ $(curLoc) ++ "called with incorrect type"
 
 signedConPrim :: Type -> Term
 signedConPrim (tyView -> TyConApp signedTcNm _)
-  = Prim (PrimInfo "Clash.Sized.Internal.Signed.fromInteger#" (ForAllTy nTV funTy) WorkNever)
+  = Prim (PrimInfo "Clash.Sized.Internal.Signed.fromInteger#" (ForAllTy nTV funTy) WorkNever Nothing)
   where
     funTy        = foldr1 mkFunTy [naturalPrimTy,integerPrimTy,mkTyConApp signedTcNm [nVar]]
     nName      = mkUnsafeSystemName "n" 0
@@ -3797,7 +3797,7 @@ signedConPrim _ = error $ $(curLoc) ++ "called with incorrect type"
 
 unsignedConPrim :: Type -> Term
 unsignedConPrim (tyView -> TyConApp unsignedTcNm _)
-  = Prim (PrimInfo "Clash.Sized.Internal.Unsigned.fromInteger#" (ForAllTy nTV funTy) WorkNever)
+  = Prim (PrimInfo "Clash.Sized.Internal.Unsigned.fromInteger#" (ForAllTy nTV funTy) WorkNever Nothing)
   where
     funTy        = foldr1 mkFunTy [naturalPrimTy,integerPrimTy,mkTyConApp unsignedTcNm [nVar]]
     nName        = mkUnsafeSystemName "n" 0
@@ -3969,14 +3969,14 @@ vecHeadPrim
   -- ^ Vec TyCon name
   -> Term
 vecHeadPrim vecTcNm =
-  Prim (PrimInfo "Clash.Sized.Vector.head" (vecHeadTy vecTcNm) WorkNever)
+  Prim (PrimInfo "Clash.Sized.Vector.head" (vecHeadTy vecTcNm) WorkNever Nothing)  -- TODO add real binding
 
 vecLastPrim
   :: TyConName
   -- ^ Vec TyCon name
   -> Term
 vecLastPrim vecTcNm =
-  Prim (PrimInfo "Clash.Sized.Vector.last" (vecHeadTy vecTcNm) WorkNever)
+  Prim (PrimInfo "Clash.Sized.Vector.last" (vecHeadTy vecTcNm) WorkNever Nothing)  -- TODO add real binding
 
 vecHeadTy
   :: TyConName
@@ -4001,14 +4001,14 @@ vecTailPrim
   -- ^ Vec TyCon name
   -> Term
 vecTailPrim vecTcNm =
-  Prim (PrimInfo "Clash.Sized.Vector.tail" (vecTailTy vecTcNm) WorkNever)
+  Prim (PrimInfo "Clash.Sized.Vector.tail" (vecTailTy vecTcNm) WorkNever Nothing)  -- TODO add real binding
 
 vecInitPrim
   :: TyConName
   -- ^ Vec TyCon name
   -> Term
 vecInitPrim vecTcNm =
-  Prim (PrimInfo "Clash.Sized.Vector.init" (vecTailTy vecTcNm) WorkNever)
+  Prim (PrimInfo "Clash.Sized.Vector.init" (vecTailTy vecTcNm) WorkNever Nothing)  -- TODO add real binding
 
 vecTailTy
   :: TyConName
@@ -4037,7 +4037,7 @@ splitAtPrim
   -- ^ Vec TyCon name
   -> Term
 splitAtPrim snatTcNm vecTcNm =
-  Prim (PrimInfo "Clash.Sized.Vector.splitAt" (splitAtTy snatTcNm vecTcNm) WorkNever)
+  Prim (PrimInfo "Clash.Sized.Vector.splitAt" (splitAtTy snatTcNm vecTcNm) WorkNever Nothing)  -- TODO add real binding
 
 splitAtTy
   :: TyConName
@@ -4104,7 +4104,7 @@ vecAppendPrim
   -- ^ Vec TyCon name
   -> Term
 vecAppendPrim vecNm =
-  Prim (PrimInfo "Clash.Sized.Vector.++" (vecAppendTy vecNm) WorkNever)
+  Prim (PrimInfo "Clash.Sized.Vector.++" (vecAppendTy vecNm) WorkNever Nothing)  -- TODO add real binding
 
 vecAppendTy
   :: TyConName
@@ -4137,7 +4137,7 @@ vecZipWithPrim
   -- ^ Vec TyCon name
   -> Term
 vecZipWithPrim vecNm =
-  Prim (PrimInfo "Clash.Sized.Vector.zipWith" (vecAppendTy vecNm) WorkNever)
+  Prim (PrimInfo "Clash.Sized.Vector.zipWith" (vecAppendTy vecNm) WorkNever Nothing)  -- TODO add real binding
 
 vecZipWithTy
   :: TyConName
@@ -4209,7 +4209,7 @@ bvAppendPrim
   -- ^ BitVector TyCon Name
   -> Term
 bvAppendPrim bvTcNm =
-  Prim (PrimInfo "Clash.Sized.Internal.BitVector.++#" (bvAppendTy bvTcNm) WorkNever)
+  Prim (PrimInfo "Clash.Sized.Internal.BitVector.++#" (bvAppendTy bvTcNm) WorkNever Nothing)  -- TODO add real binding
 
 bvAppendTy
   :: TyConName
@@ -4234,7 +4234,7 @@ bvSplitPrim
   -- ^ BitVector TyCon Name
   -> Term
 bvSplitPrim bvTcNm =
-  Prim (PrimInfo "Clash.Sized.Internal.BitVector.split#" (bvSplitTy bvTcNm) WorkNever)
+  Prim (PrimInfo "Clash.Sized.Internal.BitVector.split#" (bvSplitTy bvTcNm) WorkNever Nothing)  -- TODO add real binding
 
 bvSplitTy
   :: TyConName
