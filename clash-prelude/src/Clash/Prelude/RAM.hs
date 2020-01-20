@@ -10,8 +10,9 @@ RAM primitives with a combinational read port.
 
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE Safe #-}
 {-# LANGUAGE TypeFamilies #-}
+
+{-# LANGUAGE Safe #-}
 
 {-# OPTIONS_HADDOCK show-extensions #-}
 

@@ -4,8 +4,8 @@ License    :  BSD2 (see the file LICENSE)
 Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
 -}
 
-{-# LANGUAGE DataKinds       #-}
-{-# LANGUAGE KindSignatures  #-}
+{-# LANGUAGE DataKinds #-}
+{-# LANGUAGE KindSignatures #-}
 {-# LANGUAGE RoleAnnotations #-}
 module Clash.Sized.Internal.BitVector where
 

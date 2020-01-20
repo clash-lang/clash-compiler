@@ -31,6 +31,7 @@
 
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE NoImplicitPrelude #-}
+
 {-# LANGUAGE Safe #-}
 
 {-# OPTIONS_HADDOCK show-extensions, not-home #-}

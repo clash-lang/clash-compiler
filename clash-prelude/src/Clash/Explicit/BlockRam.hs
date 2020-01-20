@@ -375,6 +375,7 @@ This concludes the short introduction to using 'blockRam'.
 -}
 
 {-# LANGUAGE GADTs #-}
+
 {-# LANGUAGE Trustworthy #-}
 
 {-# OPTIONS_GHC -fplugin GHC.TypeLits.KnownNat.Solver #-}

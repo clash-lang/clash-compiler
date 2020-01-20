@@ -23,6 +23,7 @@ CallStack (from HasCallStack):
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE TemplateHaskell #-}
+
 {-# LANGUAGE Trustworthy #-}
 
 {-# OPTIONS_GHC -Wno-orphans #-}

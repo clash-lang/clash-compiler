@@ -11,6 +11,7 @@ Hidden arguments
 {-# LANGUAGE FunctionalDependencies #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE RankNTypes #-}
+
 {-# LANGUAGE Trustworthy #-}
 
 module Clash.Hidden

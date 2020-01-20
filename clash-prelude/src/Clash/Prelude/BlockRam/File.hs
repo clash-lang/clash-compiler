@@ -67,6 +67,7 @@ __>>> L.tail $ sampleN 4 $ g (fromList [3..5])__
 
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE GADTs #-}
+
 {-# LANGUAGE Unsafe #-}
 
 {-# OPTIONS_HADDOCK show-extensions #-}

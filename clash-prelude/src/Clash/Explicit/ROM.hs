@@ -10,6 +10,7 @@ ROMs
 
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE RankNTypes #-}
+
 {-# LANGUAGE Trustworthy #-}
 
 {-# OPTIONS_GHC -fplugin GHC.TypeLits.KnownNat.Solver #-}

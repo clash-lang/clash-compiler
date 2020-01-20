@@ -10,6 +10,7 @@
 -}
 {-# LANGUAGE DeriveAnyClass #-}
 {-# LANGUAGE PolyKinds #-}
+
 {-# LANGUAGE Safe #-}
 
 module Clash.Annotations.SynthesisAttributes

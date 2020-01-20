@@ -72,6 +72,7 @@ __>>> L.tail $ sampleN 4 $ g systemClockGen (fromList [3..5])__
 -}
 
 {-# LANGUAGE GADTs #-}
+
 {-# LANGUAGE Unsafe #-}
 
 {-# OPTIONS_GHC -fplugin GHC.TypeLits.KnownNat.Solver #-}

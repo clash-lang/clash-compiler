@@ -10,6 +10,7 @@ defined in "Clash.Prelude".
 -}
 
 {-# LANGUAGE NoImplicitPrelude #-}
+
 {-# LANGUAGE Unsafe #-}
 
 {-# OPTIONS_GHC -fplugin GHC.TypeLits.KnownNat.Solver #-}

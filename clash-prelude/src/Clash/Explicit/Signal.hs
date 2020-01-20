@@ -134,6 +134,7 @@ can potentially introduce situations prone to meta-stability:
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE RankNTypes #-}
+
 {-# LANGUAGE Trustworthy #-}
 
 {-# OPTIONS_GHC -fplugin=GHC.TypeLits.Normalise #-}
