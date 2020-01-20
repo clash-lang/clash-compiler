@@ -1,5 +1,5 @@
-{-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE Arrows #-}
+{-# LANGUAGE RankNTypes #-}
 
 module T990 (topEntity, testBench) where
 

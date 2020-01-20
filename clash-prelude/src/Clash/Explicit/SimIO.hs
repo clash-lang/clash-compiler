@@ -6,8 +6,8 @@
   I\/O actions that are translatable to HDL
 -}
 
-{-# LANGUAGE DataKinds, GADTs, TypeApplications #-}
 {-# LANGUAGE BangPatterns, MagicHash, TypeOperators, ScopedTypeVariables, FlexibleContexts #-}
+{-# LANGUAGE DataKinds, GADTs, TypeApplications #-}
 
 module Clash.Explicit.SimIO
   ( -- * I\/O environment for simulation

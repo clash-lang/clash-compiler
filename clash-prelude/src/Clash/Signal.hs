@@ -66,8 +66,8 @@ never create a clock that goes any faster!
 Check out 'IntelSystem' and 'XilinxSystem' too!
 -}
 
-{-# LANGUAGE CPP #-}
 {-# LANGUAGE ConstraintKinds #-}
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE ExplicitNamespaces #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE GADTs #-}

@@ -6,7 +6,7 @@
   HDL generation functionality for LATTICE ICE IO primitives.
 -}
 {-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE ViewPatterns      #-}
+{-# LANGUAGE ViewPatterns #-}
 
 module Clash.Cores.LatticeSemi.Blackboxes.IO (sbioTF) where
 

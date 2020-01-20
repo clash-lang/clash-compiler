@@ -1,5 +1,5 @@
-{-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving, DerivingStrategies #-}
+{-# LANGUAGE RecordWildCards #-}
 module CHIP8 where
 
 -- Thanks to Dr. Gergő Érdi:
