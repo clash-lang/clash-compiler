@@ -267,6 +267,10 @@ step eval tcm (h, k, e) = case e of
                in  step eval tcm (h2,k,e')
          GT -> error "Overapplied DC"
     | (Prim pInfo,args,_ticks) <- collectArgsTicks e
+    , Just bndr <- primCoreBndr pInfo
+    , primName pInfo == "Clash.Sized.Vector.head" -- try to evaluate head with Core evaluator
+    -> step eval tcm (h, k, (mkApps (Var bndr) args))
+    | (Prim pInfo,args,_ticks) <- collectArgsTicks e
     , let nm = primName pInfo
     , let ty = primType pInfo
     , (tys,_) <- splitFunForallTy ty
