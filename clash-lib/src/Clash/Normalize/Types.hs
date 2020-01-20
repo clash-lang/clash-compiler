@@ -7,7 +7,7 @@
   Types used in Normalize modules
 -}
 
-{-# LANGUAGE TemplateHaskell   #-}
+{-# LANGUAGE TemplateHaskell #-}
 
 module Clash.Normalize.Types where
 

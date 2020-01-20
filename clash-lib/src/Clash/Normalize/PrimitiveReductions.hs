@@ -30,10 +30,9 @@
     * Clash.Sized.Vector.transpose
 -}
 
-{-# LANGUAGE CPP               #-}
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE TemplateHaskell   #-}
-{-# LANGUAGE ViewPatterns      #-}
+{-# LANGUAGE TemplateHaskell #-}
 
 module Clash.Normalize.PrimitiveReductions where
 

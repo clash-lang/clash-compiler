@@ -1,5 +1,5 @@
 {-# OPTIONS_GHC -Wno-orphans    #-}
-{-# LANGUAGE DeriveFunctor      #-}
+{-# LANGUAGE DeriveFunctor #-}
 {-# LANGUAGE StandaloneDeriving #-}
 module SerialiseInstances where
 

@@ -18,9 +18,8 @@ d1024 = SNat :: SNat 1024
 You can generate more 'SNat' literals using 'decLiteralsD' from "Clash.Promoted.Nat.TH"
 -}
 
-{-# LANGUAGE CPP             #-}
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE TemplateHaskell #-}
-{-# LANGUAGE DataKinds       #-}
 
 {-# LANGUAGE Trustworthy #-}
 

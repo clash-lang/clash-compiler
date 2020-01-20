@@ -84,7 +84,33 @@ executable clashi
   extra-libraries:    pthread
   default-language:   Haskell2010
 
+common common-options
+  default-language:   Haskell2010
+  default-extensions: BangPatterns
+                      BinaryLiterals
+                      DataKinds
+                      DefaultSignatures
+                      DeriveDataTypeable
+                      DeriveFoldable
+                      DeriveFunctor
+                      DeriveGeneric
+                      DeriveLift
+                      DeriveTraversable
+                      DerivingStrategies
+                      InstanceSigs
+                      KindSignatures
+                      ScopedTypeVariables
+                      StandaloneDeriving
+                      TupleSections
+                      TypeApplications
+                      TypeOperators
+                      ViewPatterns
+
+  if impl(ghc >= 8.6)
+      default-extensions: NoStarIsType
+
 library
+  import:             common-options
   HS-Source-Dirs:     src-ghc, src-bin-common
   if impl(ghc >= 8.7.0)
     HS-Source-Dirs: src-bin-881
@@ -93,24 +119,13 @@ library
   elif impl(ghc >= 8.4.1)
     HS-Source-Dirs: src-bin-841
 
-  default-language:   Haskell2010
   GHC-Options:        -Wall -fno-warn-name-shadowing
   CPP-Options:        -DGHCI
-  default-extensions: ForeignFunctionInterface
-                      UnboxedTuples
-                      FlexibleInstances
-                      MagicHash
-                      CPP
-                      PatternGuards
-                      NondecreasingIndentation
 
   other-extensions:   FlexibleContexts
                       OverloadedStrings
                       RecordWildCards
-                      ScopedTypeVariables
                       TemplateHaskell
-                      TupleSections
-                      ViewPatterns
 
   Build-Depends:      array                     >= 0.4      && < 0.6,
                       base                      >= 4.10     && < 5,

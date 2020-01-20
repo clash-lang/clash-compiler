@@ -1,5 +1,5 @@
-{-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE BinaryLiterals #-}
+{-# LANGUAGE TemplateHaskell #-}
 
 module ReprCompactScrambled
   ( testBench

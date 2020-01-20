@@ -14,15 +14,9 @@ For more information about the Xilinx DDR primitives see:
   <https://www.xilinx.com/support/documentation/sw_manuals/xilinx2018_3/ug953-vivado-7series-libraries.pdf>
 -}
 
-{-# LANGUAGE CPP              #-}
-{-# LANGUAGE DataKinds        #-}
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE MagicHash        #-}
-{-# LANGUAGE TypeFamilies     #-}
-{-# LANGUAGE TypeOperators    #-}
-#if __GLASGOW_HASKELL__ >= 806
-{-# LANGUAGE NoStarIsType #-}
-#endif
+{-# LANGUAGE TypeFamilies #-}
 
 module Clash.Xilinx.DDR
   ( iddr

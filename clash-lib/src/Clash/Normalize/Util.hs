@@ -6,11 +6,9 @@
   Utility functions used by the normalisation transformations
 -}
 
-{-# LANGUAGE BangPatterns      #-}
-{-# LANGUAGE LambdaCase        #-}
+{-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE RecordWildCards   #-}
-{-# LANGUAGE ViewPatterns      #-}
+{-# LANGUAGE RecordWildCards #-}
 
 module Clash.Normalize.Util
  ( ConstantSpecInfo(..)

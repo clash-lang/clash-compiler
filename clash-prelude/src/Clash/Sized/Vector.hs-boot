@@ -4,18 +4,19 @@ License    :  BSD2 (see the file LICENSE)
 Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
 -}
 
-{-# LANGUAGE DataKinds       #-}
-{-# LANGUAGE GADTs           #-}
-{-# LANGUAGE KindSignatures  #-}
+{-# LANGUAGE DataKinds #-}
+{-# LANGUAGE GADTs #-}
+{-# LANGUAGE KindSignatures #-}
 {-# LANGUAGE RoleAnnotations #-}
-{-# LANGUAGE TypeOperators   #-}
+{-# LANGUAGE TypeOperators #-}
 module Clash.Sized.Vector where
 
+import Data.Kind (Type)
 import GHC.TypeLits  (KnownNat, Nat, type (<=))
 import {-# SOURCE #-} Clash.Sized.Internal.BitVector (BitVector, Bit)
 
 type role Vec nominal representational
-data Vec :: Nat -> * -> *
+data Vec :: Nat -> Type -> Type
 
 instance (KnownNat n, 1 <= n) => Foldable (Vec n)
 

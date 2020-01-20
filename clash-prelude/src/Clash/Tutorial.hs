@@ -5,7 +5,8 @@ Copyright : © 2014-2016, Christiaan Baaij,
 Licence   : Creative Commons 4.0 (CC BY 4.0) (https://creativecommons.org/licenses/by/4.0/)
 -}
 
-{-# LANGUAGE NoImplicitPrelude, MagicHash #-}
+{-# LANGUAGE NoImplicitPrelude #-}
+
 {-# OPTIONS_GHC -fno-warn-unused-imports #-}
 
 module Clash.Tutorial (
@@ -2409,6 +2410,7 @@ Blinker circuit in Clash 0.99:
 
 @
 {\-\# LANGUAGE NoMonoLocalBinds \#-\}
+
 module Blinker where
 
 import Clash.Prelude

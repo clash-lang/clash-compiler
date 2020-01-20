@@ -23,20 +23,14 @@ BEWARE: rounding by truncation introduces a sign bias!
 * Truncation for negative numbers effectively results in: round towards -infinity.
 -}
 
-{-# LANGUAGE ConstraintKinds            #-}
-{-# LANGUAGE DataKinds                  #-}
-{-# LANGUAGE DeriveDataTypeable         #-}
-{-# LANGUAGE FlexibleContexts           #-}
+{-# LANGUAGE ConstraintKinds #-}
+{-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
-{-# LANGUAGE KindSignatures             #-}
-{-# LANGUAGE MultiParamTypeClasses      #-}
-{-# LANGUAGE ScopedTypeVariables        #-}
-{-# LANGUAGE StandaloneDeriving         #-}
-{-# LANGUAGE TemplateHaskell            #-}
-{-# LANGUAGE TypeApplications           #-}
-{-# LANGUAGE TypeOperators              #-}
-{-# LANGUAGE TypeFamilies               #-}
-{-# LANGUAGE UndecidableInstances       #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE StandaloneDeriving #-}
+{-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE UndecidableInstances #-}
 
 {-# LANGUAGE Trustworthy #-}
 
@@ -77,6 +71,7 @@ import Data.Bits                  (Bits (..), FiniteBits)
 import Data.Data                  (Data)
 import Data.Default.Class         (Default (..))
 import Data.Either                (isLeft)
+import Data.Kind                  (Type)
 import Text.Read                  (Read(..))
 import Data.List                  (find)
 import Data.Maybe                 (fromJust)
@@ -123,7 +118,7 @@ import Clash.XException
 --
 -- The 'Num' operators for this type saturate to 'maxBound' on overflow and
 -- 'minBound' on underflow, and use truncation as the rounding method.
-newtype Fixed (rep :: Nat -> *) (int :: Nat) (frac :: Nat) =
+newtype Fixed (rep :: Nat -> Type) (int :: Nat) (frac :: Nat) =
   Fixed { unFixed :: rep (int + frac) }
 
 deriving instance NFData (rep (int + frac)) => NFData (Fixed rep int frac)

@@ -5,9 +5,8 @@
 
   Blackbox generation for GHC.Int.IntX# data constructors. (System)Verilog only!
 -}
-{-# LANGUAGE LambdaCase        #-}
+{-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE ViewPatterns      #-}
 
 module Clash.Primitives.GHC.Int (intTF) where
 

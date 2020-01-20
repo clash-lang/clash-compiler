@@ -1,4 +1,5 @@
-{-# LANGUAGE MagicHash, UnboxedTuples #-}
+{-# LANGUAGE MagicHash #-}
+{-# LANGUAGE UnboxedTuples #-}
 
 -- | Utilities for GHCi.
 module Clash.GHCi.Util where

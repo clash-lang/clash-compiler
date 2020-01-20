@@ -8,15 +8,13 @@
   Utilities for rewriting: e.g. inlining, specialisation, etc.
 -}
 
-{-# LANGUAGE BangPatterns             #-}
-{-# LANGUAGE CPP                      #-}
-{-# LANGUAGE LambdaCase               #-}
+{-# LANGUAGE CPP #-}
+{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE NondecreasingIndentation #-}
-{-# LANGUAGE OverloadedStrings        #-}
-{-# LANGUAGE Rank2Types               #-}
-{-# LANGUAGE FlexibleContexts         #-}
-{-# LANGUAGE TemplateHaskell          #-}
-{-# LANGUAGE ViewPatterns             #-}
+{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE RankNTypes #-}
+{-# LANGUAGE TemplateHaskell #-}
 
 {-# OPTIONS_GHC -Wno-unused-imports #-}
 

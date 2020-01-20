@@ -6,9 +6,7 @@ Maintainer  :  Christiaan Baaij <christiaan.baaij@gmail.com>
 Synchronizer circuits for safe clock domain crossings
 -}
 
-{-# LANGUAGE DataKinds             #-}
-{-# LANGUAGE TypeOperators         #-}
-{-# LANGUAGE TypeFamilies          #-}
+{-# LANGUAGE TypeFamilies #-}
 
 module Clash.Prelude.Synchronizer
   ( -- * Bit-synchronizers

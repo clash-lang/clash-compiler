@@ -8,13 +8,9 @@ Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
 Self-synchronizing circuits based on data-flow principles.
 -}
 
-{-# LANGUAGE DataKinds             #-}
-{-# LANGUAGE FlexibleInstances     #-}
-{-# LANGUAGE MagicHash             #-}
+{-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
-{-# LANGUAGE ScopedTypeVariables   #-}
-{-# LANGUAGE TypeFamilies          #-}
-{-# LANGUAGE TypeOperators         #-}
+{-# LANGUAGE TypeFamilies #-}
 
 {-# LANGUAGE Safe #-}
 

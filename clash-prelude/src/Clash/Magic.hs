@@ -6,11 +6,6 @@
 Control module instance, and register, names in generated HDL code.
 -}
 
-{-# LANGUAGE DataKinds      #-}
-{-# LANGUAGE ExplicitForAll #-}
-{-# LANGUAGE KindSignatures #-}
-{-# LANGUAGE TypeOperators  #-}
-
 module Clash.Magic where
 
 import Clash.NamedTypes ((:::))

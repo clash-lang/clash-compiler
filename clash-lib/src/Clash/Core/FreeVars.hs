@@ -6,9 +6,8 @@
   Free variable calculations
 -}
 
-{-# LANGUAGE LambdaCase   #-}
-{-# LANGUAGE RankNTypes   #-}
-{-# LANGUAGE ViewPatterns #-}
+{-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE RankNTypes #-}
 
 module Clash.Core.FreeVars
   (-- * Free variable calculation

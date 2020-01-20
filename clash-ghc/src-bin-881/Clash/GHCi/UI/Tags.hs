@@ -7,6 +7,7 @@
 -----------------------------------------------------------------------------
 
 {-# OPTIONS_GHC -fno-warn-name-shadowing #-}
+
 module Clash.GHCi.UI.Tags (
   createCTagsWithLineNumbersCmd,
   createCTagsWithRegExesCmd,

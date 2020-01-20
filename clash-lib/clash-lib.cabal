@@ -90,30 +90,50 @@ flag unittests
   default: True
   manual: True
 
+common common-options
+  default-language:   Haskell2010
+  default-extensions: BangPatterns
+                      BinaryLiterals
+                      DataKinds
+                      DefaultSignatures
+                      DeriveDataTypeable
+                      DeriveFoldable
+                      DeriveFunctor
+                      DeriveGeneric
+                      DeriveLift
+                      DeriveTraversable
+                      DerivingStrategies
+                      InstanceSigs
+                      KindSignatures
+                      ScopedTypeVariables
+                      StandaloneDeriving
+                      TupleSections
+                      TypeApplications
+                      TypeOperators
+                      ViewPatterns
+
+  if impl(ghc >= 8.6)
+      default-extensions: NoStarIsType
+
+
 Library
+  import:             common-options
   HS-Source-Dirs:     src
 
-  default-language:   Haskell2010
   ghc-options:        -Wall
   CPP-Options:        -DCABAL
 
   other-extensions:   CPP
                       DeriveAnyClass
-                      DeriveGeneric
-                      DeriveFoldable
-                      DeriveFunctor
                       FlexibleContexts
                       FlexibleInstances
                       GeneralizedNewtypeDeriving
                       LambdaCase
                       MultiParamTypeClasses
                       OverloadedStrings
-                      Rank2Types
+                      RankNTypes
                       RecordWildCards
-                      ScopedTypeVariables
                       TemplateHaskell
-                      TupleSections
-                      ViewPatterns
 
   Build-depends:      aeson                   >= 0.6.2.0  && < 1.5,
                       ansi-terminal           >= 0.8.0.0  && < 0.10,
@@ -238,6 +258,7 @@ Library
     cpp-options:      -DHISTORY
 
 test-suite unittests
+  import:           common-options
   type:             exitcode-stdio-1.0
   default-language: Haskell2010
   main-is:          unittests.hs

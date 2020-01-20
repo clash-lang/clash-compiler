@@ -1,4 +1,3 @@
-{-# LANGUAGE ScopedTypeVariables #-}
 module Clash.GHC.Util where
 
 import ErrUtils           (mkPlainErrMsg)

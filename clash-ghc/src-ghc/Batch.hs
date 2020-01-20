@@ -5,6 +5,7 @@
 
   Entry point for the @clash@ executable.
 -}
+
 module Main
   ( main -- :: IO ()
   ) where

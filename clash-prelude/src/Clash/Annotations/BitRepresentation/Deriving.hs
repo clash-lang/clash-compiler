@@ -13,20 +13,13 @@ This module contains:
     e.g. one-hot, for a data type.
 
 -}
-{-# LANGUAGE CPP                #-}
-{-# LANGUAGE DataKinds          #-}
-{-# LANGUAGE DeriveAnyClass     #-}
-{-# LANGUAGE DeriveDataTypeable #-}
-{-# LANGUAGE DeriveGeneric      #-}
-{-# LANGUAGE DeriveLift         #-}
-{-# LANGUAGE LambdaCase         #-}
-{-# LANGUAGE MagicHash          #-}
-{-# LANGUAGE MultiWayIf         #-}
-{-# LANGUAGE QuasiQuotes        #-}
+{-# LANGUAGE CPP #-}
+{-# LANGUAGE DeriveAnyClass #-}
+{-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE MultiWayIf #-}
+{-# LANGUAGE QuasiQuotes #-}
 {-# LANGUAGE StandaloneDeriving #-}
-{-# LANGUAGE TemplateHaskell    #-}
-{-# LANGUAGE ViewPatterns       #-}
-
+{-# LANGUAGE TemplateHaskell #-}
 -- See: https://ghc.haskell.org/trac/ghc/ticket/14959. TODO: Consider putting
 -- the offending function (bitsToInteger') in a separate module.
 {-# OPTIONS_GHC -O0 #-}

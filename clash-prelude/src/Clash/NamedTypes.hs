@@ -33,8 +33,7 @@ fifo @System
 
 -}
 
-{-# LANGUAGE PolyKinds     #-}
-{-# LANGUAGE TypeOperators #-}
+{-# LANGUAGE PolyKinds #-}
 
 {-# LANGUAGE Safe #-}
 

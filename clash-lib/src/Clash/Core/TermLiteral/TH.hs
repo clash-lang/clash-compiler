@@ -1,5 +1,4 @@
 {-# LANGUAGE TemplateHaskellQuotes #-}
-{-# LANGUAGE ViewPatterns          #-}
 
 module Clash.Core.TermLiteral.TH
   (  deriveTermToData

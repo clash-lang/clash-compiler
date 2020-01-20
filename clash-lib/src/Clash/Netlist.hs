@@ -8,14 +8,12 @@
   Create Netlists out of normalized CoreHW Terms
 -}
 
-{-# LANGUAGE LambdaCase        #-}
-{-# LANGUAGE MagicHash         #-}
-{-# LANGUAGE MultiWayIf        #-}
+{-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE MagicHash #-}
+{-# LANGUAGE MultiWayIf #-}
 {-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE RecordWildCards   #-}
-{-# LANGUAGE TemplateHaskell   #-}
-{-# LANGUAGE TupleSections     #-}
-{-# LANGUAGE ViewPatterns      #-}
+{-# LANGUAGE RecordWildCards #-}
+{-# LANGUAGE TemplateHaskell #-}
 
 module Clash.Netlist where
 

@@ -7,10 +7,9 @@
   Capture-free substitution function for CoreHW
 -}
 
-{-# LANGUAGE CPP               #-}
-{-# LANGUAGE LambdaCase        #-}
+{-# LANGUAGE CPP #-}
+{-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE ViewPatterns      #-}
 
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 

@@ -9,9 +9,7 @@ This module defines the explicitly clocked counterparts of the functions
 defined in "Clash.Prelude".
 -}
 
-{-# LANGUAGE DataKinds         #-}
 {-# LANGUAGE NoImplicitPrelude #-}
-{-# LANGUAGE TypeOperators     #-}
 
 {-# LANGUAGE Unsafe #-}
 

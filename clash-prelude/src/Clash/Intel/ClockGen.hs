@@ -7,10 +7,7 @@ Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
 PLL and other clock-related components for Intel (Altera) FPGAs
 -}
 
-{-# LANGUAGE BangPatterns      #-}
-{-# LANGUAGE DataKinds         #-}
-{-# LANGUAGE FlexibleContexts  #-}
-{-# LANGUAGE ExplicitForAll    #-}
+{-# LANGUAGE FlexibleContexts #-}
 
 module Clash.Intel.ClockGen
   ( altpll
