@@ -187,6 +187,7 @@ Library
 
                       Clash.Core.DataCon
                       Clash.Core.Evaluator
+                      Clash.Core.Evaluator.Types
                       Clash.Core.FreeVars
                       Clash.Core.Literal
                       Clash.Core.Name

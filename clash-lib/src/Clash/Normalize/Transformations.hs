@@ -85,7 +85,8 @@ import           BasicTypes                  (InlineSpec (..))
 
 import           Clash.Annotations.Primitive (extractPrim)
 import           Clash.Core.DataCon          (DataCon (..))
-import           Clash.Core.Evaluator        (PureHeap, whnf')
+import           Clash.Core.Evaluator        (whnf')
+import           Clash.Core.Evaluator.Types  (PureHeap)
 import           Clash.Core.Name
   (Name (..), NameSort (..), mkUnsafeSystemName, nameOcc)
 import           Clash.Core.FreeVars
@@ -493,13 +494,13 @@ caseCon ctx@(TransformContext is0 _) e@(Case subj ty alts)
     reprs <- Lens.view customReprs
     tcm <- Lens.view tcCache
     bndrs <- Lens.use bindings
-    primEval <- Lens.view evaluator
+    (primEval, primUnwind) <- Lens.view evaluator
     ids <- Lens.use uniqSupply
     let (ids1,ids2) = splitSupply ids
     uniqSupply Lens..= ids2
     gh <- Lens.use globalHeap
     lvl <- Lens.view dbgLevel
-    case whnf' primEval bndrs tcm gh ids1 is0 True subj of
+    case whnf' primEval primUnwind bndrs tcm gh ids1 is0 True subj of
       (gh',ph',v) -> do
         globalHeap Lens..= gh'
         bindPureHeap ctx tcm ph' $ \ctx' -> case stripTicks v of
@@ -1919,12 +1920,12 @@ reduceConst ctx@(TransformContext is0 _) e@(App _ _)
   = do
     tcm <- Lens.view tcCache
     bndrs <- Lens.use bindings
-    primEval <- Lens.view evaluator
+    (primEval, primUnwind) <- Lens.view evaluator
     ids <- Lens.use uniqSupply
     let (ids1,ids2) = splitSupply ids
     uniqSupply Lens..= ids2
     gh <- Lens.use globalHeap
-    case whnf' primEval bndrs tcm gh ids1 is0 False e of
+    case whnf' primEval primUnwind bndrs tcm gh ids1 is0 False e of
       (gh',ph',e') -> do
         globalHeap Lens..= gh'
         bindPureHeap ctx tcm ph' $ \_ctx' -> case e' of

@@ -139,12 +139,12 @@ collectGlobals' inScope substitution seen e@(collectArgsTicks -> (fun, args@(_:_
   | not eIsconstant = do
     tcm <- Lens.view tcCache
     bndrs <- Lens.use bindings
-    primEval <- Lens.view evaluator
+    (primEval, primUnwind) <- Lens.view evaluator
     gh <- Lens.use globalHeap
     ids <- Lens.use uniqSupply
     let (ids1,ids2) = splitSupply ids
     uniqSupply Lens..= ids2
-    let eval = (Lens.view Lens._3) . whnf' primEval bndrs tcm gh ids1 inScope False
+    let eval = (Lens.view Lens._3) . whnf' primEval primUnwind bndrs tcm gh ids1 inScope False
         eTy  = termType tcm e
     untran <- isUntranslatableType False eTy
     case untran of

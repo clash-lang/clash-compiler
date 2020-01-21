@@ -64,7 +64,7 @@ import           Clash.Annotations.BitRepresentation.Internal
 import           Clash.Annotations.TopEntity      (TopEntity (..))
 import           Clash.Annotations.TopEntity.Extra ()
 import           Clash.Backend
-import           Clash.Core.Evaluator             (PrimEvaluator)
+import           Clash.Core.Evaluator.Types       (PrimStep, PrimUnwind)
 import           Clash.Core.Name                  (Name (..))
 import           Clash.Core.Term                  (Term)
 import           Clash.Core.Type                  (Type)
@@ -107,7 +107,7 @@ generateHDL
   -> (CustomReprs -> TyConMap -> Type ->
       State HWMap (Maybe (Either String FilteredHWType)))
   -- ^ Hardcoded 'Type' -> 'HWType' translator
-  -> PrimEvaluator
+  -> (PrimStep, PrimUnwind)
   -- ^ Hardcoded evaluator (delta-reduction)
   -> [( Id
       , Maybe TopEntity
@@ -680,7 +680,7 @@ normalizeEntity
   -> (CustomReprs -> TyConMap -> Type ->
       State HWMap (Maybe (Either String FilteredHWType)))
   -- ^ Hardcoded 'Type' -> 'HWType' translator
-  -> PrimEvaluator
+  -> (PrimStep, PrimUnwind)
   -- ^ Hardcoded evaluator (delta-reduction)
   -> [Id]
   -- ^ TopEntities
