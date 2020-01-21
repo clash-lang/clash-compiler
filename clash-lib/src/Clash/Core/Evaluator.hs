@@ -17,7 +17,6 @@
 
 module Clash.Core.Evaluator where
 
-import           Control.Arrow                           (second)
 import           Control.Concurrent.Supply               (Supply, freshId)
 import           Control.Lens                            (view, _4)
 import           Data.Bits                               (shiftL)
@@ -156,11 +155,11 @@ whnf eval tcm isSubj (h,k,e) =
   where
     ty = termType tcm e
 
-    go s = case step eval tcm s of
+    go s@(h',k',e') = case step e' eval tcm h' k' of
       Just s' -> go s'
       Nothing
-        | Just e' <- unwindStack s
-        -> e'
+        | Just e'' <- unwindStack s
+        -> e''
         | otherwise
         -> error $ showDoc $ ppr e
 
@@ -236,102 +235,167 @@ This is why the Primitive Evaluator gets a flag telling whether it should
 evaluate these special primitives.
 -}
 
--- | Small-step operational semantics.
-step
-  :: PrimEvaluator
-  -> TyConMap
-  -> State
-  -> Maybe State
-step eval tcm (h, k, e) = case e of
-  Var v        -> force h k v
-  (Lam x e')   -> unwind eval tcm h k (Lambda x e')
-  (TyLam x e') -> unwind eval tcm h k (TyLambda x e')
-  (Literal l)  -> unwind eval tcm h k (Lit l)
-  (App e1 e2)
-    | (Data dc,args,_ticks) <- collectArgsTicks e
-    , (tys,_) <- splitFunForallTy (dcType dc)
-    -> case compare (length args) (length tys) of
-         EQ -> unwind eval tcm h k (DC dc args)
-         LT -> let (tys',_) = splitFunForallTy (termType tcm e)
-                   (h2,e')  = mkAbstr (h,e) tys'
-               in  step eval tcm (h2,k,e')
-         GT -> error "Overapplied DC"
-    | (Prim pInfo,args,_ticks) <- collectArgsTicks e
-    , let nm = primName pInfo
-    , let ty = primType pInfo
-    , (tys,_) <- splitFunForallTy ty
-    -> case compare (length args) (length tys) of
-         EQ -> case lefts args of
-                  -- We make boolean conjunction and disjunction extra lazy by
-                  -- deferring the evaluation of the arguments during the evaluation
-                  -- of the primop rule.
-                  --
-                  -- This allows us to implement:
-                  --
-                  -- x && True  --> x
-                  -- x && False --> False
-                  -- x || True  --> True
-                  -- x || False --> x
-                  --
-                  -- even when that 'x' is _|_. This makes the evaluation
-                  -- rule lazier than the actual Haskel implementations which
-                  -- are strict in the first argument and lazy in the second.
-                  [a0,a1 ] | nm `elem` ["GHC.Classes.&&","GHC.Classes.||"] ->
+-- | A single step in the partial evaluator. The result is the new heap and
+-- stack, and the next expression to be reduced.
+--
+type Step = PrimEvaluator -> TyConMap -> Heap -> Stack -> Maybe State
+
+stepVar :: Id -> Step
+stepVar i _ _ h k = force h k i
+
+stepData :: DataCon -> Step
+stepData dc f tcm h k = unwind f tcm h k (DC dc [])
+
+stepLiteral :: Literal -> Step
+stepLiteral l f tcm h k = unwind f tcm h k (Lit l)
+
+stepPrim :: PrimInfo -> Step
+stepPrim pInfo f tcm h k
+  | primName pInfo == "GHC.Prim.realWorld#" =
+      unwind f tcm h k (PrimVal pInfo [] [])
+
+  | otherwise =
+      case fst $ splitFunForallTy (primType pInfo) of
+        []  -> f (isScrut k) tcm h k pInfo [] []
+        tys -> newBinder tys (Prim pInfo) f tcm h k
+
+stepLam :: Id -> Term -> Step
+stepLam x e f tcm h k = unwind f tcm h k (Lambda x e)
+
+stepTyLam :: TyVar -> Term -> Step
+stepTyLam x e f tcm h k = unwind f tcm h k (TyLambda x e)
+
+stepApp :: Term -> Term -> Step
+stepApp x y f tcm h k =
+  case term of
+    Data dc ->
+      let tys = fst $ splitFunForallTy (dcType dc)
+       in case compare (length args) (length tys) of
+            EQ -> unwind f tcm h k (DC dc args)
+            LT -> newBinder tys' (App x y) f tcm h k
+            GT -> error "Overapplied DC"
+
+    Prim p ->
+      let tys = fst $ splitFunForallTy (primType p)
+       in case compare (length args) (length tys) of
+            EQ -> case lefts args of
+              -- We make boolean conjunction and disjunction extra lazy by
+              -- deferring the evaluation of the arguments during the evaluation
+              -- of the primop rule.
+              --
+              -- This allows us to implement:
+              --
+              -- x && True  --> x
+              -- x && False --> False
+              -- x || True  --> True
+              -- x || False --> x
+              --
+              -- even when that 'x' is _|_. This makes the evaluation
+              -- rule lazier than the actual Haskel implementations which
+              -- are strict in the first argument and lazy in the second.
+              [a0, a1] | primName p `elem` ["GHC.Classes.&&","GHC.Classes.||"] ->
                     let (h0,i) = newLetBinding tcm h  a0
                         (h1,j) = newLetBinding tcm h0 a1
-                    in  eval (isScrut k) tcm h1 k pInfo []
-                             [Suspend (Var i),Suspend (Var j)]
-                  (e':es) ->
-                    Just (h,PrimApply pInfo (rights args) [] es:k,e')
-                  _ -> error "internal error"
-         LT -> let (tys',_) = splitFunForallTy (termType tcm e)
-                   (h2,e') = mkAbstr (h,e) tys'
-               in  step eval tcm (h2,k,e')
-         GT -> let (h2,id_) = newLetBinding tcm h e2
-               in  Just (h2,Apply id_:k,e1)
-  (TyApp e1 ty)
-    | (Data dc,args,_ticks) <- collectArgsTicks e
-    , (tys,_) <- splitFunForallTy (dcType dc)
-    -> case compare (length args) (length tys) of
-         EQ -> unwind eval tcm h k (DC dc args)
-         LT -> let (tys',_) = splitFunForallTy (termType tcm e)
-                   (h2,e') = mkAbstr (h,e) tys'
-               in  step eval tcm (h2,k,e')
-         GT -> error "Overapplied DC"
-    | (Prim pInfo,args,_ticks) <- collectArgsTicks e
-    , let nm = primName pInfo
-    , let ty' = primType pInfo
-    , (tys,_) <- splitFunForallTy ty'
-    -> case compare (length args) (length tys) of
-         EQ -> case lefts args of
-              [] | nm `elem` ["Clash.Transformations.removedArg"]
-                 -- The above primitives are actually values, and not operations.
-                 -> unwind eval tcm h k (PrimVal pInfo (rights args) [])
-                 | otherwise
-                 -> eval (isScrut k) tcm h k pInfo (rights args) []
-              (e':es) -> Just (h,PrimApply pInfo (rights args) [] es:k,e')
-         LT -> let (tys',_) = splitFunForallTy (termType tcm e)
-                   (h2,e') = mkAbstr (h,e) tys'
-               in  step eval tcm (h2,k,e')
-         GT -> Just (h,Instantiate ty:k,e1)
-  (Data dc) -> unwind eval tcm h k (DC dc [])
-  (Prim pInfo)
-    | primName pInfo == "GHC.Prim.realWorld#"
-    -> unwind eval tcm h k (PrimVal pInfo [] [])
-    | otherwise
-    , let ty' = primType pInfo
-    -> case fst (splitFunForallTy ty')  of
-        []  -> eval (isScrut k) tcm h k pInfo [] []
-        tys -> let (h2,e') = mkAbstr (h,e) tys
-               in  step eval tcm (h2,k,e')
-  (App e1 e2)  -> let (h2,id_) = newLetBinding tcm h e2
-                  in  Just (h2,Apply id_:k,e1)
-  (TyApp e1 ty) -> Just (h,Instantiate ty:k,e1)
-  (Case scrut ty alts) -> Just (h,Scrutinise ty alts:k,scrut)
-  (Letrec bs e') -> Just (allocate h k bs e')
-  Tick sp e' -> Just (h,Tickish sp:k,e')
-  Cast _ _ _ -> trace (unlines ["WARNING: " ++ $(curLoc) ++ "Clash currently can't symbolically evaluate casts"
-                                    ,"If you have testcase that produces this message, please open an issue about it."]) Nothing
+                    in  f (isScrut k) tcm h1 k p [] [Suspend (Var i), Suspend (Var j)]
+
+              (e':es) ->
+                    Just (h, PrimApply p (rights args) [] es:k, e')
+
+              _ -> error "internal error"
+       
+            LT -> newBinder tys' (App x y) f tcm h k
+
+            GT -> let (h0, n) = newLetBinding tcm h y
+                   in Just (h0, Apply n : k, x)
+
+    _ -> let (h0, n) = newLetBinding tcm h y
+          in Just (h0, Apply n : k, x)
+ where
+  (term, args, _) = collectArgsTicks (App x y)
+  tys' = fst . splitFunForallTy . termType tcm $ App x y
+
+stepTyApp :: Term -> Type -> Step
+stepTyApp x ty f tcm h k =
+  case term of
+    Data dc ->
+      let tys = fst $ splitFunForallTy (dcType dc)
+       in case compare (length args) (length tys) of
+            EQ -> unwind f tcm h k (DC dc args)
+            LT -> newBinder tys' (TyApp x ty) f tcm h k
+            GT -> error "Overapplied DC"
+
+    Prim p ->
+      let tys = fst $ splitFunForallTy (primType p)
+       in case compare (length args) (length tys) of
+            EQ -> case lefts args of
+                    [] | primName p == "Clash.Transformations.removedArg" ->
+                            unwind f tcm h k (PrimVal p (rights args) [])
+
+                       | otherwise ->
+                            f (isScrut k) tcm h k p (rights args) []
+
+                    (e':es) -> Just (h, PrimApply p (rights args) [] es : k, e')
+
+            LT -> newBinder tys' (TyApp x ty) f tcm h k
+            GT -> Just (h, Instantiate ty : k, x)
+
+    _ -> Just (h, Instantiate ty : k, x)
+ where
+  (term, args, _) = collectArgsTicks (TyApp x ty)
+  tys' = fst . splitFunForallTy . termType tcm $ TyApp x ty
+
+stepLetRec :: [LetBinding] -> Term -> Step
+stepLetRec bs x _ _ h k = Just (allocate h k bs x)
+
+stepCase :: Term -> Type -> [Alt] -> Step
+stepCase scrut ty alts _ _ h k = Just (h, Scrutinise ty alts : k, scrut)
+
+-- TODO Support stepwise evaluation of casts.
+--
+stepCast :: Term -> Type -> Type -> Step
+stepCast _ _ _ _ _ _ _ =
+  flip trace Nothing $ unlines
+    [ "WARNING: " <> $(curLoc) <> "Clash can't symbolically evaluate casts"
+    , "Please file an issue at https://github.com/clash-lang/clash-compiler/issues"
+    ] 
+
+stepTick :: TickInfo -> Term -> Step
+stepTick tick x _ _ h k = Just (h, Tickish tick : k, x)
+
+-- | Small-step operational semantics.
+step :: Term -> Step
+step (Var i) = stepVar i
+step (Data dc) = stepData dc
+step (Literal l) = stepLiteral l
+step (Prim p) = stepPrim p
+step (Lam v x) = stepLam v x
+step (TyLam v x) = stepTyLam v x
+step (App x y) = stepApp x y
+step (TyApp x ty) = stepTyApp x ty
+step (Letrec bs x) = stepLetRec bs x
+step (Case scrut ty alts) = stepCase scrut ty alts
+step (Cast x a b) = stepCast x a b
+step (Tick t x) = stepTick t x
+
+-- | Take a list of types or type variables and create a lambda / type lambda
+-- for each one around the given term.
+--
+newBinder :: [Either TyVar Type] -> Term -> Step
+newBinder tys x f tcm h k =
+  let (h', x') = mkAbstr (h, x) tys
+   in step x' f tcm h' k
+ where
+  mkAbstr
+    :: (Heap,Term)
+    -> [Either TyVar Type]
+    -> (Heap,Term)
+  mkAbstr = foldr go
+    where
+      go (Left tv)  (h',e')          =
+        (h',TyLam tv (TyApp e' (VarTy tv)))
+      go (Right ty) (Heap gh gbl h' ids is,e') =
+        let ((ids',_), n) = mkUniqSystemId (ids,is) ("x",ty)
+        in  (Heap gh gbl h' ids' is,Lam n (App e' (Var n)))
 
 newLetBinding
   :: TyConMap
@@ -347,29 +411,6 @@ newLetBinding tcm h@(Heap gh gbl h' ids is0) e
   where
     ty = termType tcm e
     ((ids',is1),id_) = mkUniqSystemId (ids,is0) ("x",ty)
-
-newLetBindings'
-  :: TyConMap
-  -> Heap
-  -> [Either Term Type]
-  -> (Heap,[Either Term Type])
-newLetBindings' tcm =
-    (second (map (either (Left . toVar) (Right . id))) .) . mapAccumL go
-  where
-    go h (Left tm)  = second Left (newLetBinding tcm h tm)
-    go h (Right ty) = (h,Right ty)
-
-mkAbstr
-  :: (Heap,Term)
-  -> [Either TyVar Type]
-  -> (Heap,Term)
-mkAbstr = foldr go
-  where
-    go (Left tv)  (h,e)          =
-      (h,TyLam tv (TyApp e (VarTy tv)))
-    go (Right ty) (Heap gh gbl h ids is,e) =
-      let ((ids',_),id_) = mkUniqSystemId (ids,is) ("x",ty)
-      in  (Heap gh gbl h ids' is,Lam id_ (App e (Var id_)))
 
 -- | Force the evaluation of a variable.
 force :: Heap -> Stack -> Id -> Maybe State
@@ -481,7 +522,9 @@ integerLiteral v =
       -> Just (Jn# (BN# ba))
     _ -> Nothing
 
--- | Evaluation of primitive operations
+-- | Evaluation of primitive operations.
+-- TODO This should really be in Clash.GHC.Evaluator -- the evaluator in
+-- clash-lib should NEVER refer to GHC primitives.
 primop
   :: PrimEvaluator
   -> TyConMap
@@ -657,24 +700,18 @@ letSubst
   :: PureHeap
   -> Supply
   -> Id
-  -> ( Supply
-     , (Id,(Id,Term)))
+  -> (Supply, (Id, (Id, Term)))
 letSubst h acc id0 =
   let (acc',id1) = uniqueInHeap h acc id0
   in  (acc',(id1,(id0,Var id1)))
-
--- | Create a name that's unique in the heap
-uniqueInHeap
-  :: PureHeap
-  -> Supply
-  -> Id
-  -> (Supply, Id)
-uniqueInHeap h ids x = case lookupVarEnv x' h of
-  Just _ -> uniqueInHeap h ids' x
-  _ -> (ids',x')
  where
-  (i,ids') = freshId ids
-  x'       = modifyVarName (\nm -> nm {nameUniq = i}) x
+  -- | Create a name that's unique in the heap
+  uniqueInHeap :: PureHeap -> Supply -> Id -> (Supply, Id)
+  uniqueInHeap h' ids x =
+    maybe (ids', x') (const $ uniqueInHeap h' ids' x) (lookupVarEnv x' h')
+   where
+    (i,ids') = freshId ids
+    x'       = modifyVarName (`setUnique` i) x
 
 wrapUnsigned :: Integer -> Integer -> Integer
 wrapUnsigned n i = i `mod` sz
