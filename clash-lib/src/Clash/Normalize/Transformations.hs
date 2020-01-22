@@ -2297,8 +2297,10 @@ inlineCleanup (TransformContext is0 _) (Letrec binds body) = do
       bodyFVs       = Lens.foldMapOf freeLocalIds unitVarSet body
       (il,keep)     = List.partition (isInteresting allOccs prims bodyFVs) binds
       keep'         = inlineBndrs is1 keep il
-  if null il then return  (Letrec binds body)
-             else changed (Letrec keep' body)
+
+  if | null il -> return  (Letrec binds body)
+     | null keep' -> changed body
+     | otherwise -> changed (Letrec keep' body)
   where
     -- Determine whether a let-binding is interesting to inline
     isInteresting
