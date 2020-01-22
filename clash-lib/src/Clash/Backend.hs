@@ -5,6 +5,7 @@
   Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
 -}
 
+{-# LANGUAGE CPP               #-}
 {-# LANGUAGE OverloadedStrings #-}
 
 module Clash.Backend where
@@ -29,6 +30,27 @@ import {-# SOURCE #-} Clash.Netlist.Types
 import Clash.Netlist.BlackBox.Types
 
 import Clash.Annotations.Primitive          (HDL)
+
+#ifdef CABAL
+import qualified Paths_clash_lib
+import qualified Data.Version
+#else
+import qualified System.FilePath
+#endif
+
+primsRoot :: IO FilePath
+#ifdef CABAL
+primsRoot = Paths_clash_lib.getDataFileName "prims"
+#else
+primsRoot = return ("clash-lib" System.FilePath.</> "prims")
+#endif
+
+clashVer :: String
+#ifdef CABAL
+clashVer = Data.Version.showVersion Paths_clash_lib.version
+#else
+clashVer = "development"
+#endif
 
 type ModName = Identifier
 

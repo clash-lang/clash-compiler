@@ -45,9 +45,6 @@ import           Data.Text.Lazy                       (pack)
 import qualified Data.Text.Lazy                       as Text
 import qualified Data.Text                            as TextS
 import           Data.Text.Prettyprint.Doc.Extra
-#ifdef CABAL
-import qualified Data.Version
-#endif
 import qualified System.FilePath
 import           GHC.Stack                            (HasCallStack)
 
@@ -72,12 +69,6 @@ import           Clash.Util
   (SrcSpan, noSrcSpan, curLoc, traceIf, (<:>), on, first, indexNote)
 
 
-
-
-#ifdef CABAL
-import qualified Paths_clash_lib
-#endif
-
 -- | State for the 'Clash.Backend.Verilog.VerilogM' monad:
 data VerilogState =
   VerilogState
@@ -99,16 +90,6 @@ data VerilogState =
     }
 
 makeLenses ''VerilogState
-
-squote :: Mon (State VerilogState) Doc
-squote = string "'"
-
-primsRoot :: IO FilePath
-#ifdef CABAL
-primsRoot = Paths_clash_lib.getDataFileName "prims"
-#else
-primsRoot = return ("clash-lib" System.FilePath.</> "prims")
-#endif
 
 instance Backend VerilogState where
   initBackend     = VerilogState 0 HashMap.empty noSrcSpan [] [] [] [] []
@@ -236,11 +217,6 @@ genVerilog sp seen c = preserveSeen $ do
     incs <- Mon $ use includes
     return ((TextS.unpack cName,v),incs)
   where
-#ifdef CABAL
-    clashVer = Data.Version.showVersion Paths_clash_lib.version
-#else
-    clashVer = "development"
-#endif
     cName    = componentName c
     commentHeader
          = "/* AUTOMATICALLY GENERATED VERILOG-2001 SOURCE CODE."

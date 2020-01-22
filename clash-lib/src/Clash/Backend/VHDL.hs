@@ -65,10 +65,6 @@ import           Clash.Util
    indexNote)
 import           Clash.Util.Graph                     (reverseTopSort)
 
-#ifdef CABAL
-import qualified Paths_clash_lib
-#endif
-
 -- | State for the 'Clash.Netlist.VHDL.VHDLM' monad:
 data VHDLState =
   VHDLState
@@ -99,16 +95,6 @@ data VHDLState =
   }
 
 makeLenses ''VHDLState
-
-squote :: Mon (State VHDLState) Doc
-squote = string "'"
-
-primsRoot :: IO FilePath
-#ifdef CABAL
-primsRoot = Paths_clash_lib.getDataFileName "prims"
-#else
-primsRoot = return ("clash-lib" System.FilePath.</> "prims")
-#endif
 
 instance Backend VHDLState where
   initBackend     = VHDLState HashSet.empty HashMap.empty HashMap.empty ""
