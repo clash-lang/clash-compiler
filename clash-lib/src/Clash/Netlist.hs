@@ -632,7 +632,10 @@ mkFunApp dstId fun args tickDecls = do
               instLabel3 <- mkUniqueIdentifier Basic instLabel2
               let instDecl = InstDecl Entity Nothing compName instLabel3 [] (outpAssign ++ inpAssigns)
               return (argDecls ++ argDecls' ++ tickDecls ++ [instDecl])
-            else error $ $(curLoc) ++ "under-applied normalized function"
+            else error $ $(curLoc) ++ "under-applied normalized function: " ++ showPpr fun
+                                   ++ ". Applied arguments: \n\n" ++ showPpr args
+                                   ++ "\n\nApplied filtered arguments:\n\n" ++ show argsFiltered
+                                   ++ "\n\nComp inputs:\n\n " ++ show compInps
         Nothing -> case args of
           -- TODO: Figure out what to do with zero-width constructs
           [] -> return [Assignment dstId (Identifier (nameOcc $ varName fun) Nothing)]
