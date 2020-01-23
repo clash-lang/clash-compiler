@@ -72,7 +72,8 @@ import           Clash.Core.Type             (KindOrType, Type (..),
                                               typeKind, tyView, isPolyFunTy)
 import           Clash.Core.Util
   (isPolyFun, mkAbstraction, mkApps, mkLams, mkTicks,
-   mkTmApps, mkTyApps, mkTyLams, termType, dataConInstArgTysE, isClockOrReset)
+   mkTmApps, mkTyApps, mkTyLams, termType, dataConInstArgTysE, isClockOrReset,
+   isEnable)
 import           Clash.Core.Var
   (Id, IdScope (..), TyVar, Var (..), isLocalId, mkGlobalId, mkLocalId, mkTyVar)
 import           Clash.Core.VarEnv
@@ -490,16 +491,18 @@ isConstantNotClockReset e = do
      else pure (isConstant e)
 
 -- TODO: Remove function after using WorkInfo in 'isWorkFreeIsh'
-isWorkFreeClockOrReset
+isWorkFreeClockOrResetOrEnable
   :: TyConMap
   -> Term
   -> Maybe Bool
-isWorkFreeClockOrReset tcm e =
+isWorkFreeClockOrResetOrEnable tcm e =
   let eTy = termType tcm e in
-  if isClockOrReset tcm eTy then
+  if isClockOrReset tcm eTy || isEnable tcm eTy then
     case collectArgs e of
       (Prim nm _,_) -> Just (nm == "Clash.Transformations.removedArg")
       (Var _, []) -> Just True
+      (Data _, []) -> Just True -- For Enable True/False
+      (Literal _,_) -> Just True
       _ -> Just False
   else
     Nothing
@@ -521,7 +524,7 @@ isWorkFreeIsh
   -> RewriteMonad extra Bool
 isWorkFreeIsh e = do
   tcm <- Lens.view tcCache
-  case isWorkFreeClockOrReset tcm e of
+  case isWorkFreeClockOrResetOrEnable tcm e of
     Just b -> pure b
     Nothing ->
       case collectArgs e of

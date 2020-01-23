@@ -785,6 +785,17 @@ isSignalType tcm ty = go HashSet.empty ty
 
     go _ _ = False
 
+-- | Determines whether given type is an (alias of en) Enable line.
+isEnable
+  :: TyConMap
+  -> Type
+  -> Bool
+isEnable m ty0
+  | TyConApp (nameOcc -> "Clash.Signal.Internal.Enable") _ <- tyView ty0 = True
+  | Just ty1 <- coreView1 m ty0 = isEnable m ty1
+isEnable _ _ = False
+
+-- | Determines whether given type is an (alias of en) Clock or Reset line
 isClockOrReset
   :: TyConMap
   -> Type
