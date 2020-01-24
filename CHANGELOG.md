@@ -83,6 +83,8 @@
   * [#1019](https://github.com/clash-lang/clash-compiler/issues/1019): Clash breaks on constants defined in terms of `GHC.Natural.gcdNatural`
   * [#1025](https://github.com/clash-lang/clash-compiler/issues/1025): `inlineCleanup`will not produce empty letrecs anymore
   * [#1030](https://github.com/clash-lang/clash-compiler/issues/1030): `bindConstantVar` will bind (workfree) constructs
+  * [#977](https://github.com/clash-lang/clash-compiler/issues/977): Clash now checks an important property its interal circuit representation should have when ran in debug mode. This should make it much easier to track down bugs caused by faulty transformations violating this property.
+  * [#1035](https://github.com/clash-lang/clash-compiler/issues/1035): Fixed deshadowing issue when inlining global binders.
 
 * Fixes without issue reports:
   * Fix bug in `rnfX` defined for `Down` ([baef30e](https://github.com/clash-lang/clash-compiler/commit/baef30eae03dc02ba847ffbb8fae7f365c5287c2))
