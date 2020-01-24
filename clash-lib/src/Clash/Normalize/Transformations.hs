@@ -240,14 +240,12 @@ nonRepSpec ctx@(TransformContext is0 _) e@(App e1 e2)
       = do
         fTmM <- lookupVarEnv f <$> Lens.use bindings
         case fTmM of
-          Just (fNm,_,_,tm)
-            | nameSort (varName fNm) == Internal
-            -> do
-              tm' <- censor (const mempty)
-                            (bottomupR appProp ctx
-                                       (mkApps (mkTicks tm ticks) fArgs))
-              -- See Note [AppProp no-shadow invariant]
-              return (deShadowTerm is0 tm')
+          -- See Note [AppProp no-shadow invariant]
+          Just (fNm, _, _, deShadowTerm is0 -> tm)
+            | nameSort (varName fNm) == Internal ->
+               censor
+                 (const mempty)
+                 (bottomupR appProp ctx (mkApps (mkTicks tm ticks) fArgs))
           _ -> return app
       | otherwise = return app
 
