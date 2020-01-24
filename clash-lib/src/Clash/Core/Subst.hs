@@ -456,7 +456,7 @@ substTyVarBndr subst@(TvSubst inScope tenv) oldVar =
          | otherwise    = uniqAway inScope
                             (oldVar {varType = substTyUnchecked subst oldKi})
 
--- | Substitute within a 'Type'
+-- | Substitute within a 'Term'
 substTm
   :: HasCallStack
   => Doc ()
@@ -498,10 +498,16 @@ lookupIdSubst
   -> Id
   -> Term
 lookupIdSubst doc (Subst inScope tmS _ genv) v
+  -- TODO: We currently deshadow substitution bodies of local variables to
+  -- TODO: keep the invariant of 'appProp' and 'appPropFast'. We should probably
+  -- TODO: do this for global binders too:
   | isGlobalId v = case lookupVarEnv v genv of
                      Just e -> e
                      _      -> Var v
-  | Just e <- lookupVarEnv v tmS = e
+  | Just e <- lookupVarEnv v tmS = case e of
+      Var {} -> e
+      -- See Note [AppProp no-shadow invariant]
+      _ -> deShadowTerm inScope e
   -- Vital! See 'IdSubstEnv' Note [Extending the Subst]
   | Just v' <- lookupInScope inScope v = Var (coerce v')
   | otherwise = WARN(True, "Subst.lookupIdSubst" <+> doc <+> fromPpr v)
