@@ -43,6 +43,7 @@ module Clash.Core.VarEnv
   , unitVarSet
     -- ** Modification
   , delVarSetByKey
+  , delVar
   , unionVarSet
     -- ** Working with predicates
     -- *** Searching
@@ -305,6 +306,13 @@ delVarSetByKey
   -> VarSet
   -> VarSet
 delVarSetByKey = delUniqSetDirectly
+
+-- | Remove a variable
+delVar
+  :: VarSet
+  -> Var a
+  -> VarSet
+delVar s v = delVarSetByKey (getUnique v) s
 
 -- | Create a set from a list of variables
 mkVarSet

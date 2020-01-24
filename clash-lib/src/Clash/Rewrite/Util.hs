@@ -20,6 +20,7 @@
 
 module Clash.Rewrite.Util where
 
+import           Control.Applicative         ((<|>))
 import           Control.DeepSeq
 import           Control.Exception           (throw)
 import           Control.Lens
@@ -37,12 +38,14 @@ import           Data.Coerce                 (coerce)
 import           Data.Functor.Const          (Const (..))
 import           Data.List                   (group, sort)
 import qualified Data.Map                    as Map
-import           Data.Maybe                  (catMaybes,isJust,mapMaybe)
+import           Data.Maybe
+  (catMaybes, isJust, fromJust, mapMaybe, listToMaybe)
 import qualified Data.Monoid                 as Monoid
 import qualified Data.Set                    as Set
 import qualified Data.Set.Lens               as Lens
 import           Data.Text                   (Text)
 import qualified Data.Text                   as Text
+import           Util                        (nubSort)
 
 #ifdef HISTORY
 import           Data.Binary                 (encode)
@@ -78,7 +81,8 @@ import           Clash.Core.Var
   (Id, IdScope (..), TyVar, Var (..), isLocalId, mkGlobalId, mkLocalId, mkTyVar)
 import           Clash.Core.VarEnv
   (InScopeSet, VarEnv, elemVarSet, extendInScopeSetList, mkInScopeSet,
-   notElemVarEnv, uniqAway, uniqAway')
+   notElemVarEnv, uniqAway, uniqAway', emptyInScopeSet, extendInScopeSet,
+   elemInScopeSet, mkVarSet, delVar, unionInScope)
 import           Clash.Driver.Types
   (DebugLevel (..), BindingMap)
 import           Clash.Netlist.Util          (representableType)
@@ -92,44 +96,54 @@ zoomExtra :: State.State extra a
 zoomExtra m = R (\_ s w -> case State.runState m (s ^. extra) of
                             (a,s') -> (a,s {_extra = s'},w))
 
--- | Some transformations might erroneously introduce shadowing. For example,
--- a transformation might result in:
---
---   let a = ...
---       b = ...
---       a = ...
---
--- where the last 'a', shadows the first, while Clash assumes that this can't
--- happen. This function finds those constructs and a list of found duplicates.
---
-findAccidentialShadows :: Term -> [[Id]]
-findAccidentialShadows =
-  \case
-    Var {}      -> []
-    Data {}     -> []
-    Literal {}  -> []
-    Prim {}     -> []
-    Lam _ t     -> findAccidentialShadows t
-    TyLam _ t   -> findAccidentialShadows t
-    App t1 t2   -> concatMap findAccidentialShadows [t1, t2]
-    TyApp t _   -> findAccidentialShadows t
-    Cast t _ _  -> findAccidentialShadows t
-    Tick _ t    -> findAccidentialShadows t
-    Case t _ as ->
-      concatMap (findInPat . fst) as ++
-        concatMap findAccidentialShadows (t : map snd as)
-    Letrec bs t ->
-      findDups (map fst bs) ++ findAccidentialShadows t
-
+-- | Searches a term for shadowing variables. Returns an id if it found one.
+findShadow
+  :: InScopeSet
+  -> Term
+  -> Maybe Id
+findShadow = go
  where
-  findInPat :: Pat -> [[Id]]
-  findInPat (LitPat _)        = []
-  findInPat (DefaultPat)      = []
-  findInPat (DataPat _ _ ids) = findDups ids
+  go :: InScopeSet -> Term -> Maybe Id
+  go is0 = \case
+    Var {} -> Nothing
+    Data {} -> Nothing
+    Literal {} -> Nothing
+    Prim {} -> Nothing
+    Lam v t -> check1 is0 (v, t)
+    TyLam _ t -> go is0 t
+    App t1 t2 -> go is0 t1 <|> go is0 t2
+    TyApp t _ -> go is0 t
+    Cast t _ _ -> go is0 t
+    Tick _ t -> go is0 t
+    Case t _ as -> go is0 t <|> orElses (map (patCheck is0) as)
+    Letrec bs t ->
+      let
+        vars = map fst bs
+        iss0 = map (mkInScopeSet . delVar (mkVarSet vars)) vars
+        iss1 = map (unionInScope is0) iss0
+        is1 = extendInScopeSetList is0 vars
+      in
+        go is1 t <|> orElses (zipWith check1 iss1 bs) <|> dupCheck vars
 
-  findDups :: [Id] -> [[Id]]
-  findDups ids = filter ((1 <) . length) (group (sort ids))
+  dupCheck :: [Id] -> Maybe Id
+  dupCheck ids =
+    let dups = filter ((1 <) . length) (group (sort ids)) in
+    orElses (map listToMaybe dups)
 
+  patCheck :: InScopeSet -> (Pat, Term) -> Maybe Id
+  patCheck is0 (DataPat _ _ vs, t) = go (extendInScopeSetList is0 vs) t
+  patCheck is0 (_, t) = go is0 t
+
+  check1 :: InScopeSet -> (Id, Term) -> Maybe Id
+  check1 is0 (v, t) = check is0 ([v], t)
+
+  check :: InScopeSet -> ([Id], Term) -> Maybe Id
+  check is0 (vs, t) =
+    let
+      shadow0 = go (extendInScopeSetList is0 vs) t
+      shadow1 = listToMaybe (filter (`elemInScopeSet` is0) vs)
+    in
+      shadow0 <|> shadow1
 
 -- | Record if a transformation is successfully applied
 apply
@@ -164,11 +178,13 @@ apply = \s rewrite ctx expr0 -> do
 
   if lvl == DebugNone
     then return expr2
-    else applyDebug lvl transformations s expr0 hasChanged expr2
+    else applyDebug (tfInScope ctx) lvl transformations s expr0 hasChanged expr2
 {-# INLINE apply #-}
 
 applyDebug
-  :: DebugLevel
+  :: InScopeSet
+  -- ^ In scope set of (applied) transformation
+  -> DebugLevel
   -- ^ The current debugging level
   -> Set.Set String
   -- ^ Transformations to debug
@@ -181,22 +197,22 @@ applyDebug
   -> Term
   -- ^ New expression
   -> RewriteMonad extra Term
-applyDebug lvl transformations name exprOld hasChanged exprNew
+applyDebug inScope lvl transformations name exprOld hasChanged exprNew
   | not (Set.null transformations) =
     let newLvl = bool DebugNone lvl (name `Set.member` transformations) in
-    applyDebug newLvl Set.empty name exprOld hasChanged exprNew
+    applyDebug inScope newLvl Set.empty name exprOld hasChanged exprNew
 
-applyDebug lvl _transformations name exprOld hasChanged exprNew =
+applyDebug inScope lvl _transformations name exprOld hasChanged exprNew =
  traceIf (lvl == DebugTry) ("Trying: " ++ name) $
  traceIf (lvl >= DebugAll) ("Trying: " ++ name ++ " on:\n" ++ before) $ do
   Monad.when (lvl > DebugNone && hasChanged) $ do
-    tcm                  <- Lens.view tcCache
-    let beforeTy          = termType tcm exprOld
-        beforeFV          = Lens.setOf freeLocalVars exprOld
-        afterTy           = termType tcm exprNew
-        afterFV           = Lens.setOf freeLocalVars exprNew
-        newFV             = not (afterFV `Set.isSubsetOf` beforeFV)
-        accidentalShadows = findAccidentialShadows exprNew
+    tcm <- Lens.view tcCache
+    let beforeTy = termType tcm exprOld
+        beforeFV = Lens.setOf freeLocalVars exprOld
+        afterTy = termType tcm exprNew
+        afterFV = Lens.setOf freeLocalVars exprNew
+        newFV = not (afterFV `Set.isSubsetOf` beforeFV)
+        shadow = findShadow inScope exprNew
 
     Monad.when newFV $
             error ( concat [ $(curLoc)
@@ -208,13 +224,13 @@ applyDebug lvl _transformations name exprOld hasChanged exprNew =
                            , "\nAfter: " ++ showPpr (Set.toList afterFV)
                            ]
                   )
-    Monad.when (not (null accidentalShadows)) $
+    Monad.when (isJust shadow) $
       error ( concat [ $(curLoc)
                      , "Error when applying rewrite ", name
                      , " to:\n" , before
                      , "\nResult:\n" ++ after ++ "\n"
-                     , "It accidentally creates shadowing let/case-bindings:\n"
-                     , " ", showPpr accidentalShadows, "\n"
+                     , "It accidentally creates shadowing bindings:\n"
+                     , " ", showPpr (fromJust shadow), "\n"
                      , "This usually means that a transformation did not extend "
                      , "or incorrectly extended its InScopeSet before applying a "
                      , "substitution."
