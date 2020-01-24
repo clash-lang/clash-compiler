@@ -1162,10 +1162,15 @@ appProp (TransformContext is0 _) (App (collectTicks -> (Lam v e,ticks)) arg) =
     then do
       let subst = extendIdSubst (mkSubst is0) v arg
       changed $ mkTicks (substTm "appProp.AppLam" subst e) ticks
-    else changed $ Letrec [(v, arg)] (mkTicks e ticks)
+    else do
+      -- See Note [AppProp deshadow]
+      let arg1 = deShadowTerm (extendInScopeSet is0 v) arg
+      changed $ Letrec [(v, arg1)] (mkTicks e ticks)
 
-appProp _ (App (collectTicks -> (Letrec v e, ticks)) arg) = do
-  changed (Letrec v (App (mkTicks e ticks) arg))
+appProp (TransformContext is0 _) (App (collectTicks -> (Letrec v e, ticks)) arg) = do
+  -- See Note [AppProp deshadow]
+  let arg1 = deShadowTerm (extendInScopeSetList is0 (map fst v)) arg
+  changed (Letrec v (App (mkTicks e ticks) arg1))
 
 appProp ctx@(TransformContext is0 _) (App (collectTicks -> (Case scrut ty alts,ticks)) arg) = do
   tcm <- Lens.view tcCache
@@ -1173,7 +1178,10 @@ appProp ctx@(TransformContext is0 _) (App (collectTicks -> (Case scrut ty alts,t
       ty' = applyFunTy tcm ty argTy
   if isWorkFree arg || isVar arg
     then do
-      let alts' = map (second (`App` arg)) alts
+      let is1   = List.foldl' extendInScopeSetList is0 (map (patVars . fst) alts)
+          -- See Note [AppProp deshadow]
+          arg1  = deShadowTerm is1 arg
+          alts' = map (second (`App` arg1)) alts
       changed $ mkTicks (Case scrut ty' alts') ticks
     else do
       -- See Note [AppProp deshadow]
@@ -1226,7 +1234,8 @@ appPropFast ctx@(TransformContext is _) = \case
         (`mkTicks` ticks) <$> go is0 (substTm "appPropFast.AppLam" subst e) args []
       else do
         let is1 = extendInScopeSet is0 v
-        Letrec [(v, arg)] <$> go is1 e args ticks
+        -- See Note [AppProp deShadow]
+        Letrec [(v, deShadowTerm is1 arg)] <$> go is1 e args ticks
 
   go is0 (Letrec vs e) args@(_:_) ticks = do
     setChanged
@@ -1250,13 +1259,18 @@ appPropFast ctx@(TransformContext is _) = \case
       _  -> do
         let vbs = map fst vs
             is1 = extendInScopeSetList is0 vbs
-        Letrec vs . (`mkTicks` ticks) . Case scrut ty1 <$> mapM (goAlt is1 args1) alts
+            -- See Note [AppProp deShadow]
+            vs1 = map (second (deShadowTerm is1)) vs
+        Letrec vs1 . (`mkTicks` ticks) . Case scrut ty1 <$> mapM (goAlt is1 args1) alts
 
   go is0 (Tick sp e) args ticks = do
     setChanged
     go is0 e args (sp:ticks)
 
-  go _ fun args ticks = return (mkApps (mkTicks fun ticks) args)
+  go is0 fun args ticks =
+    -- See Note [AppProp deShadow]
+    let args1 = map (either (Left . deShadowTerm is0) Right) args
+    in  return (mkApps (mkTicks fun ticks) args1)
 
   goAlt is0 args0 (p,e) = do
     let (tvs,ids) = patIds p
@@ -2575,7 +2589,7 @@ xOptimizeMany _ _ _ [] =
 mkFieldSelector
   :: MonadUnique m
   => InScopeSet
-  -> Id 
+  -> Id
   -- ^ subject id
   -> DataCon
   -> [TyVar]
