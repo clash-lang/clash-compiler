@@ -253,9 +253,14 @@ nonRepSpec _ e = return e
 
 -- | Lift the let-bindings out of the subject of a Case-decomposition
 caseLet :: HasCallStack => NormRewrite
-caseLet _ (Case (collectTicks -> (Letrec xes e,ticks)) ty alts) =
-  changed (Letrec (map (second (`mkTicks` ticks)) xes) (Case (mkTicks e ticks) ty alts))
-
+caseLet (TransformContext is0 _) (Case scrut ty alts)
+  | (Letrec xes0 e0, ticks) <- collectTicks scrut =
+    let
+      is1 = extendInScopeSetList is0 (map fst xes0)
+      xes1 = map (second (`mkTicks` ticks)) xes0
+      e1 = mkTicks e0 ticks
+    in
+      changed (Letrec xes1 (deShadowTerm is1 (Case e1 ty alts)))
 caseLet _ e = return e
 
 -- | Remove non-reachable alternatives. For example, consider:
