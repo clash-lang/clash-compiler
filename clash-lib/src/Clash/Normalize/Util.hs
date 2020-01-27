@@ -406,9 +406,6 @@ normalizeTopLvlBndr isTop nm (nm',sp,inl,tm) = makeCachedU nm (extra.normalized)
   -- global binder, sometimes causing the inliner to go
   -- into a loop. Deshadowing freshens all the bindings
   -- to avoid this.
-  --
-  -- Additionally, it allows for a much cheaper `appProp`
-  -- transformation, see Note [AppProp no-shadow invariant]
   let tm1 = deShadowTerm emptyInScopeSet tm
       tm2 = if isTop then substWithTyEq [] [] tm1 else tm1
   old <- Lens.use curFun

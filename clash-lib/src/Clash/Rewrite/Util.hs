@@ -567,8 +567,7 @@ inlineOrLiftBinders condition inlineOrLift (TransformContext inScope0 _) expr@(L
           newExpr = case others3 of
                       [] -> res''
                       _  -> Letrec others3 res''
-      -- See Note [AppProp no-shadow invariant]
-      changed (deShadowTerm inScope0 newExpr)
+      changed newExpr
 
 inlineOrLiftBinders _ _ _ e = return e
 

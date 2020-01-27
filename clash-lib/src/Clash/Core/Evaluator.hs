@@ -226,7 +226,7 @@ stepApp x y m tcm =
                 Just . setTerm e' $ stackPush (PrimApply p (rights args) [] es) m
 
               _ -> error "internal error"
-       
+
             LT -> newBinder tys' (App x y) m tcm
 
             GT -> let (m0, n) = newLetBinding tcm m y
@@ -283,7 +283,7 @@ stepCast _ _ _ _ _ =
   flip trace Nothing $ unlines
     [ "WARNING: " <> $(curLoc) <> "Clash can't symbolically evaluate casts"
     , "Please file an issue at https://github.com/clash-lang/clash-compiler/issues"
-    ] 
+    ]
 
 stepTick :: TickInfo -> Term -> Step
 stepTick tick x m _ =
@@ -438,7 +438,7 @@ scrutinise (Lit l) alts m = case alts of
   go def (_:alts1) = go def alts1
 
 scrutinise (DC dc xs) alts m
-  | altE:_ <- [substAlt altDc tvs pxs xs altE
+  | altE:_ <- [substInAlt altDc tvs pxs xs altE
               | (DataPat altDc tvs pxs,altE) <- alts, altDc == dc ] ++
               [altE | (DefaultPat,altE) <- alts ]
   = setTerm altE m
@@ -468,8 +468,8 @@ scrutinise v@(PrimVal p _ vs) alts m
 
 scrutinise v alts _ = error ("scrutinise: " ++ showPpr (Case (valToTerm v) (ConstTy Arrow) alts))
 
-substAlt :: DataCon -> [TyVar] -> [Id] -> [Either Term Type] -> Term -> Term
-substAlt dc tvs xs args e = substTm "Evaluator.substAlt" subst e
+substInAlt :: DataCon -> [TyVar] -> [Id] -> [Either Term Type] -> Term -> Term
+substInAlt dc tvs xs args e = substTm "Evaluator.substInAlt" subst e
  where
   tys        = rights args
   tms        = lefts args

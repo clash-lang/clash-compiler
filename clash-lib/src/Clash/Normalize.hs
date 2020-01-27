@@ -47,7 +47,7 @@ import           Clash.Core.FreeVars
 import           Clash.Core.Name (nameOcc) -- TODO
 import           Clash.Core.Pretty                (showPpr, ppr)
 import           Clash.Core.Subst
-  (deShadowTerm, extendGblSubstList, mkSubst, substTm)
+  (extendGblSubstList, mkSubst, substTm)
 import           Clash.Core.Term                  (Term (..), collectArgsTicks)
 import           Clash.Core.Type                  (Type, splitCoreFunForallTy)
 import           Clash.Core.TyCon
@@ -321,9 +321,7 @@ flattenCallTree (CBranch (nm,(nm',sp,inl,tm)) used) = do
   newExpr <- case toInline of
     [] -> return tm
     _  -> do
-      -- To have a cheap `appProp` transformation we need to
-      -- deshadow, see also Note [AppProp no-shadow invariant]
-      let tm1 = deShadowTerm emptyInScopeSet (substTm "flattenCallTree.flattenExpr" subst tm)
+      let tm1 = substTm "flattenCallTree.flattenExpr" subst tm
 #ifdef HISTORY
       -- NB: When HISTORY is on, emit binary data holding the recorded rewrite steps
       let !_ = unsafePerformIO
@@ -347,9 +345,7 @@ flattenCallTree (CBranch (nm,(nm',sp,inl,tm)) used) = do
         let (toInline',allUsed') = unzip (map goCheap allUsed)
             subst' = extendGblSubstList (mkSubst emptyInScopeSet)
                                         (Maybe.catMaybes toInline')
-        -- To have a cheap `appProp` transformation we need to
-        -- deshadow, see also Note [AppProp no-shadow invariant]
-        let tm1 = deShadowTerm emptyInScopeSet (substTm "flattenCallTree.flattenCheap" subst' newExpr)
+        let tm1 = substTm "flattenCallTree.flattenCheap" subst' newExpr
         newExpr' <- rewriteExpr ("flattenCheap",flatten) (showPpr nm, tm1) (nm', sp)
         return (CBranch (nm,(nm',sp,inl,newExpr')) (concat allUsed'))
      else return (CBranch (nm,(nm',sp,inl,newExpr)) allUsed)
