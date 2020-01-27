@@ -109,7 +109,10 @@ snatProxy :: KnownNat n => proxy n -> SNat n
 snatProxy _ = SNat
 
 instance Show (SNat n) where
-  show p@SNat = 'd' : show (snatToInteger p)
+  show p@SNat | n <= 1024 = 'd' : show n
+              | otherwise = "SNat @" <> show n
+    where
+      n = snatToInteger p
 
 instance ShowX (SNat n) where
   showsPrecX = showsPrecXWith showsPrec
