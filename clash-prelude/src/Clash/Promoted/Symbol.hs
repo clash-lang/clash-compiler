@@ -18,6 +18,7 @@ module Clash.Promoted.Symbol
 where
 
 import Language.Haskell.TH.Syntax
+import GHC.Show     (appPrec)
 import GHC.TypeLits (KnownSymbol, Symbol, symbolVal)
 
 -- | Singleton value for a type-level string @s@
@@ -32,7 +33,8 @@ instance KnownSymbol s => Lift (SSymbol (s :: Symbol)) where
 
 
 instance Show (SSymbol s) where
-  show s@SSymbol = symbolVal s
+  showsPrec d s@SSymbol = showParen (d > appPrec) $
+    showString "SSymbol @" . shows (ssymbolToString s)
 
 {-# INLINE ssymbolProxy #-}
 -- | Create a singleton symbol literal @'SSymbol' s@ from a proxy for
