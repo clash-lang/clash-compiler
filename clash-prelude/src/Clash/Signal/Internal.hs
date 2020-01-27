@@ -361,17 +361,7 @@ data SDomainConfiguration (dom :: Domain) (conf :: DomainConfiguration) where
     -- Whether resets are active high or active low ^
     -> SDomainConfiguration dom ('DomainConfiguration dom period edge reset init polarity)
 
-instance Show (SDomainConfiguration dom conf) where
-  show (SDomainConfiguration dom period edge reset init_ polarity) =
-    unwords
-      [ "SDomainConfiguration"
-      , show dom
-      , show period
-      , show edge
-      , show reset
-      , show init_
-      , show polarity
-      ]
+deriving instance Show (SDomainConfiguration dom conf)
 
 type KnownConfiguration dom conf = (KnownDomain dom, KnownConf dom ~ conf)
 
@@ -389,7 +379,7 @@ class KnownSymbol dom => KnownDomain (dom :: Domain) where
 -- | Version of 'knownDomain' that takes a 'SSymbol'. For example:
 --
 -- >>> knownDomainByName (SSymbol @"System")
--- SDomainConfiguration System d10000 SRising SAsynchronous SDefined SActiveHigh
+-- SDomainConfiguration (SSymbol @"System") (SNat @10000) SRising SAsynchronous SDefined SActiveHigh
 knownDomainByName
   :: forall dom
    . KnownDomain dom
@@ -774,7 +764,7 @@ enableGen = toEnable (pure True)
 data Clock (dom :: Domain) = Clock (SSymbol dom)
 
 instance Show (Clock dom) where
-  show (Clock dom) = "<Clock: " ++ show dom ++ ">"
+  show (Clock dom) = "<Clock: " ++ ssymbolToString dom ++ ">"
 
 -- | Extract dom symbol from Clock
 clockTag

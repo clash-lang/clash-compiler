@@ -68,6 +68,7 @@ module Clash.Promoted.Nat
 where
 
 import Data.Kind          (Type)
+import GHC.Show           (appPrec)
 import GHC.TypeLits       (KnownNat, Nat, type (+), type (-), type (*),
                            type (^), type (<=), natVal)
 import GHC.TypeLits.Extra (CLog, FLog, Div, Log, Mod, Min, Max)
@@ -100,10 +101,11 @@ snatProxy :: KnownNat n => proxy n -> SNat n
 snatProxy _ = SNat
 
 instance Show (SNat n) where
-  show p@SNat | n <= 1024 = 'd' : show n
-              | otherwise = "SNat @" <> show n
-    where
-      n = snatToInteger p
+  showsPrec d p@SNat | n <= 1024 = showChar 'd' . shows n
+                     | otherwise = showParen (d > appPrec) $
+                                     showString "SNat @" . shows n
+   where
+    n = snatToInteger p
 
 instance ShowX (SNat n) where
   showsPrecX = showsPrecXWith showsPrec
