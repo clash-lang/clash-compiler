@@ -19,7 +19,7 @@ RUN echo "deb http://ppa.launchpad.net/hvr/ghc/ubuntu bionic main" \
       $DEPS_GHDL $DEPS_IVERILOG \
       $DEPS_CLASH $DEPS_CLASH_COSIM \
       ca-certificates \
-      git \
+      git ssh \
  && curl -L 'https://github.com/ghdl/ghdl/archive/v0.36.tar.gz' \
       | tar -xz \
  && curl -L 'https://github.com/steveicarus/iverilog/archive/v10_3.tar.gz' \
