@@ -30,11 +30,11 @@ aliases:
   - &cache_restore
     restore_cache:
       keys:
-        - cache-{{ .Environment.CIRCLE_JOB }}-{{ checksum ".circleci_cachekey" }}
-        - cache-{{ .Environment.CIRCLE_JOB }}-
+        - cache-{{ .Environment.CIRCLE_JOB }}-{{ checksum ".ci/docker/Dockerfile" }}-{{ checksum ".circleci_cachekey" }}
+        - cache-{{ .Environment.CIRCLE_JOB }}-{{ checksum ".ci/docker/Dockerfile" }}-
   - &cache_save
     save_cache:
-      key: cache-{{ .Environment.CIRCLE_JOB }}-{{ checksum ".circleci_cachekey" }}
+      key: cache-{{ .Environment.CIRCLE_JOB }}-{{ checksum ".ci/docker/Dockerfile" }}-{{ checksum ".circleci_cachekey" }}
       paths:
         - cabal-store
         - ~/.stack
@@ -92,7 +92,7 @@ aliases:
 
   - &build_default
     docker:
-      - image: leonschoorl/clash-ci-image:trusty
+      - image: clashlang/clash-ci:2020-01-13
     steps:
       - checkout
       - *merge_pullrequest
@@ -105,7 +105,7 @@ aliases:
       - *run_tests
   - &build_with_stack
     docker:
-      - image: leonschoorl/clash-ci-image:trusty
+      - image: clashlang/clash-ci:2020-01-13
     steps:
       - checkout
       - *merge_pullrequest
