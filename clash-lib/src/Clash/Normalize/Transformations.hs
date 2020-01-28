@@ -1684,11 +1684,12 @@ etaExpansionTL (TransformContext is0 ctx) (Letrec xes e) = do
           (TransformContext (extendInScopeSetList is0 bndrs)
                             (LetBody bndrs:ctx))
           e
-  case stripLambda e' of
-    (bs@(_:_),e2) -> do
-      let e3 = Letrec xes e2
-      changed (mkLams e3 bs)
-    _ -> return (Letrec xes e')
+  deShadowTerm is0 <$>
+    case stripLambda e' of
+      (bs@(_:_),e2) -> do
+        let e3 = Letrec xes e2
+        changed (mkLams e3 bs)
+      _ -> changed (Letrec xes e')
   where
     stripLambda :: Term -> ([Id],Term)
     stripLambda (Lam bndr e0) =
@@ -1710,7 +1711,7 @@ etaExpansionTL (TransformContext is0 ctx) e
         e' <- etaExpansionTL (TransformContext (extendInScopeSet is0 newId)
                                                (LamBody newId:ctx))
                              (App e (Var newId))
-        changed (Lam newId e')
+        changed (deShadowTerm is0 (Lam newId e'))
       else return e
 
 -- | Eta-expand functions with a Synthesize annotation, needed to allow such
