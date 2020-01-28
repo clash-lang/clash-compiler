@@ -51,5 +51,4 @@ RUN apt-get remove -y $DEPS_IVERILOG \
       cabal-install-3.0 \
       ghc-8.4.4 \
       ghc-8.6.5 \
-      ghc-8.8.1
-
+      ghc-8.8.2
