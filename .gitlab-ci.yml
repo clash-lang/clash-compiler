@@ -4,7 +4,7 @@ stages:
   - publish
 
 .tests:
-  image: clashlang/clash-ci:2020-01-13
+  image: clashlang/clash-ci:2020-01-28
   stage: build
   interruptible: true
   variables:
