@@ -281,3 +281,4 @@ test-suite unittests
       tasty-hunit
 
   Other-Modules: Clash.Tests.Core.FreeVars
+                 Clash.Tests.Core.Subst
