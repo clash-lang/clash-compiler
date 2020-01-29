@@ -459,7 +459,10 @@ caseCon (TransformContext is0 _) (Case scrut ty alts)
                     in  case Maybe.catMaybes binds2 of
                           []     -> body
                           binds3 -> Letrec binds3 body
-        let subst = extendTvSubstList (mkSubst is1)
+        -- Use the original inScopeSet 'is0' here, not the extended inScopeSet
+        -- 'is1', otherwise we'd make the "caseCon1" substitution substitute
+        -- free variables that were shadowed by the pattern!
+        let subst = extendTvSubstList (mkSubst is0)
                   $ zip tvs (drop (length (dcUnivTyVars dc)) (Either.rights args))
         changed (substTm "caseCon1" subst e')
       _ -> case alts of
