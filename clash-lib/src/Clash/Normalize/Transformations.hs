@@ -101,6 +101,7 @@ import           Clash.Core.Term
   , TickInfo(..) , WorkInfo(WorkConstant), Alt, TickInfo
   , isLambdaBodyCtx, isTickCtx, collectArgs
   , collectArgsTicks, collectTicks , partitionTicks
+  , mkLetrec
   )
 import           Clash.Core.Type             (Type, TypeView (..), applyFunTy,
                                               isPolyFunCoreTy, isClassTy,
@@ -425,64 +426,64 @@ inlineNonRep _ e = return e
 -- Imagine:
 --
 -- @
--- case D (f a b) (g x y) of
+-- case D (\a -> f a b) (g x y) of
 --   D a b -> h a
 -- @
 --
 -- rewriting this to:
 --
 -- @
--- let a = f a b
+-- let a = \a -> f a b
 -- in  h a
 -- @
 --
--- is very bad because the newly introduced let-binding now captures the free
--- variable 'a' in 'f a b'.
+-- is bad because the newly introduced let-binding introduces shadowing.
 --
 -- instead me must rewrite to:
 --
 -- @
--- let a1 = f a b
--- in  h a1
+-- let a = \a1 -> f a1 b
+-- in  h a
 -- @
+--
+-- UPDATE 2020-01-29: this example used to read:
+--
+-- @
+-- case D (f a b) (g x y) of
+--   D a b -> h a
+-- @
+--
+-- However, this input already shadows 'a' in the 'D a b' pattern and is
+-- therefore erroneous input.
+--
 caseCon :: HasCallStack => NormRewrite
 caseCon (TransformContext is0 _) (Case scrut ty alts)
-  | (Data dc, args, ticks) <- collectArgsTicks scrut
+  | (Data dc, args0, ticks) <- collectArgsTicks scrut
   = case List.find (equalCon dc . fst) alts of
-      Just (DataPat _ tvs xs, e) -> do
-        let is1 = extendInScopeSetList (extendInScopeSetList is0 tvs) xs
-        let fvs = Lens.foldMapOf freeLocalIds unitVarSet e
-            (binds,_) = List.partition ((`elemVarSet` fvs) . fst)
-                      $ zip xs (Either.lefts args)
-            binds1 = map (second (`mkTicks` ticks)) binds
-            e' = case binds1 of
-                  [] -> e
-                  _  ->
-                    -- See Note [CaseCon deshadow]
-                    let ((is3,substIds),binds2) =
-                          List.mapAccumL newBinder (is1,[]) binds1
-                        subst = extendIdSubstList (mkSubst is3) substIds
-                        body  = substTm "caseCon0" subst e
-                    in  case Maybe.catMaybes binds2 of
-                          []     -> body
-                          binds3 -> Letrec binds3 body
-        let subst = extendTvSubstList (mkSubst is1)
-                  $ zip tvs (drop (length (dcUnivTyVars dc)) (Either.rights args))
-        changed (substTm "caseCon1" subst e')
-      _ -> case alts of
-             ((DefaultPat,e):_) -> changed e
-             _ -> changed (undefinedTm ty)
-  where
-    equalCon dc (DataPat dc' _ _) = dcTag dc == dcTag dc'
-    equalCon _  _                 = False
+      Just (dp@(DataPat _ tvs xs), body0) -> do
+        let
+          -- See Note [CaseCon deshadow]
+          is1 = extendInScopeSetList is0 (patVars dp)
+          args1 = map (deShadowTerm is1) (Either.lefts args0)
+          binds0 = zip xs (map (`mkTicks` ticks) args1)
 
-    newBinder (isN0,substN) (x,arg)
-      | isWorkFree arg
-      = ((isN0,(x,arg):substN),Nothing)
-      | otherwise
-      = let x'   = uniqAway isN0 x
-            isN1 = extendInScopeSet isN0 x'
-        in  ((isN1,(x,Var x'):substN),Just (x',arg))
+          -- Don't bother let-binding variables that aren't used in body0
+          freeVars = Lens.foldMapOf freeLocalIds unitVarSet body0
+          binds1 = filter (\(v, _) -> (v `elemVarSet` freeVars)) binds0
+          body1 = mkLetrec binds1 body0
+
+          -- Substitute existential type vars
+          subst0 = zip tvs (drop (length (dcUnivTyVars dc)) (Either.rights args0))
+          subst1 = extendTvSubstList (mkSubst is1) subst0
+
+        changed (substTm "caseCon" subst1 body1)
+      _ ->
+        case alts of
+          ((DefaultPat,e):_) -> changed e
+          _ -> changed (undefinedTm ty)
+ where
+  equalCon dc (DataPat dc' _ _) = dcTag dc == dcTag dc'
+  equalCon _  _                 = False
 
 caseCon _ c@(Case (stripTicks -> Literal l) _ alts) = case List.find (equalLit . fst) alts of
     Just (LitPat _,e) -> changed e

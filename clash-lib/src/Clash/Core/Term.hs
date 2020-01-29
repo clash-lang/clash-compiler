@@ -22,7 +22,7 @@ module Clash.Core.Term
   , TickInfo (..), NameMod (..)
   , PrimInfo (..)
   , WorkInfo (..)
-  , CoreContext (..), Context, isLambdaBodyCtx, isTickCtx, walkTerm
+  , CoreContext (..), Context, isLambdaBodyCtx, isTickCtx, walkTerm, mkLetrec
   , collectArgs, collectArgsTicks, collectTicks, collectTermIds, primArg
   , partitionTicks
   )
@@ -64,6 +64,11 @@ data Term
   | Cast    !Term !Type !Type               -- ^ Cast a term from one type to another
   | Tick    !TickInfo !Term                 -- ^ Annotated term
   deriving (Show,Generic,NFData,Hashable,Binary)
+
+-- Same as constructor 'Letrec', but returns term if it binds nothing.
+mkLetrec :: [LetBinding] -> Term -> Term
+mkLetrec [] t = t
+mkLetrec bs t = Letrec bs t
 
 data TickInfo
   = SrcSpan !SrcSpan
