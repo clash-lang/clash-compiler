@@ -6,6 +6,7 @@ stages:
 .tests:
   image: clashlang/clash-ci:2020-01-13
   stage: build
+  interruptible: true
   variables:
     GIT_SUBMODULE_STRATEGY: recursive
     TERM: xterm-color
@@ -31,17 +32,21 @@ stages:
 
 ghc-8.2.2:
   extends: .tests
-ghc-8.4.4:
+ghc-8.4.4-singular-hidden:
   extends: .tests
+  variables:
+    MULTIPLE_HIDDEN: "no"
+    GHC: ghc-8.4.4
 ghc-8.6.5:
   extends: .tests
-ghc-8.8.1:
+ghc-8.8.2:
   extends: .tests
 
 hackage-sdist:
   extends: .tests
+  interruptible: false
   variables:
-    GHC: ghc-8.8.1
+    GHC: ghc-8.8.2
   script:
     - export GHC="${GHC:-$CI_JOB_NAME}"
     - export THREADS=$(nproc)
@@ -61,11 +66,12 @@ hackage-sdist:
 
 .hackage:
   extends: .tests
+  interruptible: false
   stage: publish
   cache:
     key: hackage
   variables:
-    GHC: ghc-8.8.1
+    GHC: ghc-8.8.2
   script:
     - export GHC="${GHC:-$CI_JOB_NAME}"
     - export THREADS=$(nproc)
@@ -181,4 +187,3 @@ snap-stable:
     RELEASE_CHANNEL: stable
   only:
     - tags
-
