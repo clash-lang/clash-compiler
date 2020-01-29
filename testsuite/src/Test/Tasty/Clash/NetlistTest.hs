@@ -32,7 +32,7 @@ import           Clash.Core.Type
 import           Clash.Core.Var
 import           Clash.Driver as Driver
 import           Clash.Driver.Types
-import           Clash.GHC.Evaluator (reduceConstant)
+import           Clash.GHC.Evaluator
 import           Clash.GHC.GenerateBindings
 import           Clash.GHC.NetlistTypes
 import           Clash.Netlist
@@ -99,7 +99,7 @@ runToNetlistStage target f src = do
   supplyN <- Supply.newSupply
 
   let transformedBindings = normalizeEntity reprs bm pm tcm tupTcm typeTrans
-          reduceConstant teNames opts supplyN te
+          primEvaluator teNames opts supplyN te
 
   fmap (force . fst) $ netlistFrom (transformedBindings, tcm, tes, pm, reprs, te)
  where

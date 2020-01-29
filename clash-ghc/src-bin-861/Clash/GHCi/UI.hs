@@ -2059,7 +2059,7 @@ makeHDL backend optsRef srcs = do
                   tcm
                   tupTcm
                   (ghcTypeToHWType iw fp)
-                  reduceConstant
+                  primEvaluator
                   topEntities
                   opts2
                   (startTime,prepTime)

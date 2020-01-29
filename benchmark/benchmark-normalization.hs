@@ -9,7 +9,7 @@ import           Clash.Core.TyCon
 import           Clash.Core.Var
 import           Clash.Driver
 import           Clash.Driver.Types
-import           Clash.GHC.Evaluator          (reduceConstant)
+import           Clash.GHC.Evaluator
 import           Clash.Primitives.Types
 
 import           Criterion.Main
@@ -45,7 +45,7 @@ benchFile idirs src =
     \ ~((bindingsMap,tcm,tupTcm,_topEntities,primMap,reprs,topEntityNames,topEntity),supplyN) -> do
       bench ("normalization of " ++ src)
             (nf (normalizeEntity reprs bindingsMap primMap tcm tupTcm typeTrans
-                                 reduceConstant topEntityNames
+                                 primEvaluator topEntityNames
                                  (opts idirs) supplyN :: _ -> BindingMap) topEntity)
 
 setupEnv

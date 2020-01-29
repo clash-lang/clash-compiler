@@ -41,7 +41,7 @@ import           SrcLoc                           (SrcSpan,noSrcSpan)
 
 import           Clash.Annotations.BitRepresentation.Internal
   (CustomReprs)
-import           Clash.Core.Evaluator             (PrimEvaluator)
+import           Clash.Core.Evaluator.Types       (PrimStep, PrimUnwind)
 import           Clash.Core.FreeVars
   (freeLocalIds, globalIds, globalIdOccursIn, localIdDoesNotOccurIn)
 import           Clash.Core.Name (nameOcc) -- TODO
@@ -96,7 +96,7 @@ runNormalization
   -- ^ TyCon cache
   -> IntMap TyConName
   -- ^ Tuple TyCon cache
-  -> PrimEvaluator
+  -> (PrimStep, PrimUnwind)
   -- ^ Hardcoded evaluator (delta-reduction)
   -> CompiledPrimMap
   -- ^ Primitive Definitions

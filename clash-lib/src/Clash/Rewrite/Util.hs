@@ -443,7 +443,7 @@ isWorkFree (collectArgs -> (fun,args)) = case fun of
   Var i            -> isLocalId i && not (isPolyFunTy (varType i))
   Data {}          -> all isWorkFreeArg args
   Literal {}       -> True
-  Prim _ pInfo -> case primWorkInfo pInfo of
+  Prim pInfo -> case primWorkInfo pInfo of
     WorkConstant   -> True -- We can ignore the arguments, because this
                            -- primitive outputs a constant regardless of its
                            -- arguments
@@ -473,7 +473,7 @@ isFromInt nm = nm == "Clash.Sized.Internal.BitVector.fromInteger##" ||
 isConstant :: Term -> Bool
 isConstant e = case collectArgs e of
   (Data _, args)   -> all (either isConstant (const True)) args
-  (Prim _ _, args) -> all (either isConstant (const True)) args
+  (Prim _, args) -> all (either isConstant (const True)) args
   (Lam _ _, _)     -> not (hasLocalFreeVars e)
   (Literal _,_)    -> True
   _                -> False
@@ -486,7 +486,7 @@ isConstantNotClockReset e = do
   let eTy = termType tcm e
   if isClockOrReset tcm eTy
      then case collectArgs e of
-        (Prim nm _,_) -> return (nm == "Clash.Transformations.removedArg")
+        (Prim p,_) -> return (primName p == "Clash.Transformations.removedArg")
         _ -> return False
      else pure (isConstant e)
 
@@ -499,7 +499,7 @@ isWorkFreeClockOrResetOrEnable tcm e =
   let eTy = termType tcm e in
   if isClockOrReset tcm eTy || isEnable tcm eTy then
     case collectArgs e of
-      (Prim nm _,_) -> Just (nm == "Clash.Transformations.removedArg")
+      (Prim p,_) -> Just (primName p == "Clash.Transformations.removedArg")
       (Var _, []) -> Just True
       (Data _, []) -> Just True -- For Enable True/False
       (Literal _,_) -> Just True
@@ -529,7 +529,7 @@ isWorkFreeIsh e = do
     Nothing ->
       case collectArgs e of
         (Data _, args)   -> allM isWorkFreeIshArg args
-        (Prim _ pInfo, args) -> case primWorkInfo pInfo of
+        (Prim pInfo, args) -> case primWorkInfo pInfo of
           WorkAlways     -> pure False -- Things like clock or reset generator always
                                        -- perform work
           WorkVariable   -> pure (all isConstantArg args)
