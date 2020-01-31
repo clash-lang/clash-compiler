@@ -34,12 +34,13 @@ module Clash.XException
     -- * Printing 'X' exceptions as \"X\"
   , ShowX (..), showsX, printX, showsPrecXWith
     -- * Strict evaluation
-  , seqX, forceX, deepseqX, rwhnfX, defaultSeqX
+  , seqX, forceX, deepseqX, rwhnfX, defaultSeqX, hwSeqX
     -- * Structured undefined / deep evaluation with undefined values
   , NFDataX (rnfX, deepErrorX, hasUndefined, ensureSpine)
   )
 where
 
+import           Clash.Annotations.Primitive (hasBlackBox)
 import           Clash.CPP           (maxTupleSize)
 import           Clash.XException.TH
 import           Control.Exception   (Exception, catch, evaluate, throw)
@@ -110,6 +111,25 @@ seqX a b = unsafeDupablePerformIO
   (catch (evaluate a >> return b) (\(XException _) -> return b))
 {-# NOINLINE seqX #-}
 infixr 0 `seqX`
+
+-- | Like 'seqX' in simulation, but will force its first argument to be rendered
+-- in HDL. This is useful for components that need to be rendered in hardware,
+-- but otherwise have no meaning in simulation. An example of such a component
+-- would be an ILA: a component monitoring an internal signal of a design. The
+-- output of such a component (typically a unit) can be passed as the first
+-- argument to 'hwSeqX' to ensure the ILA ends up in the generated HDL.
+--
+-- __NB__: the result of 'hwSeqX' must (indirectly) be used at the very top of
+-- a design. If it's not, Clash will remove it like it does for any other unused
+-- circuit parts.
+--
+-- __NB__: Make sure the blackbox for the component with zero-width results
+-- uses 'Clash.Netlist.BlackBox.Types.RenderVoid'
+hwSeqX :: a -> b -> b
+hwSeqX = seqX
+{-# NOINLINE hwSeqX #-}
+{-# ANN hwSeqX hasBlackBox #-}
+infixr 0 `hwSeqX`
 
 -- | Evaluate a value with given function, returning 'Nothing' if it throws
 -- 'XException'.
