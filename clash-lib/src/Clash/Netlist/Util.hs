@@ -779,9 +779,10 @@ mkUniqueArguments subst0 Nothing args = do
   ports <- mapM idToInPort args'
   return (map isNothing ports, catMaybes ports, [], subst1)
 
-mkUniqueArguments subst0 (Just teM) args = do
-  let iPortSupply = maybe (repeat Nothing) (extendPorts . t_inputs) teM
-  ports0 <- zipWithM go iPortSupply args
+mkUniqueArguments subst0 (Just teM) args0 = do
+  let iPortSupply0 = maybe (repeat Nothing) (extendPorts . t_inputs) teM
+  (iPortSupply1, args1) <- unzip <$> removeKnownDomains iPortSupply0 args0
+  ports0 <- zipWithM go iPortSupply1 args1
   let (ports1, decls, subst) = unzip3 (catMaybes ports0)
   return ( map isNothing ports0
          , concat ports1
@@ -800,6 +801,21 @@ mkUniqueArguments subst0 (Just teM) args = do
       if isVoid hwty
          then return Nothing
          else return (Just (ports,decls,(pId,(var,Var pId))))
+
+    -- TODO: Remove this hack.
+    removeKnownDomains
+      :: [Maybe PortName]
+      -> [Id]
+      -> NetlistMonad [(Maybe PortName, Id)]
+    removeKnownDomains _ [] = pure []
+    removeKnownDomains [] ids = pure (zip (repeat Nothing) ids)
+    removeKnownDomains (pM:pMs) (id_:ids) = do
+      hwTy <- unsafeCoreTypeToHWTypeM $(curLoc) (varType id_)
+      case hwTy of
+        FilteredHWType (Void (Just (KnownDomain {}))) _ ->
+          ((Nothing, id_) :) <$> (removeKnownDomains (pM:pMs) ids)
+        _ ->
+          ((pM, id_) :) <$> removeKnownDomains pMs ids
 
 
 mkUniqueResult

@@ -381,6 +381,7 @@ runClashTest = defaultMain $ clashTestRoot
         , outputTest ("tests" </> "shouldwork" </> "TopEntity") [Verilog] [] [] "PortNamesWithRTree" "main"
         , runTest "TopEntHOArg" def{entities=Entities ["f", "g"], topEntity=TopEntity "f", hdlSim=False}
         , runTest "T701" def {hdlSim=False,entities=Entities ["mynot", ""]}
+        , runTest "T1033" def {hdlSim=False}
         ]
       , clashTestGroup "Unit"
         [ runTest "Imap" def
