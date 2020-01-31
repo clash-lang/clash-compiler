@@ -33,6 +33,7 @@
   * Add `Clash.Class.BitPack.bitCoerceMap` [#798](https://github.com/clash-lang/clash-compiler/pull/798)
   * Add `Clash.Magic.deDup`: instruct Clash to force sharing an operator between multiple branches of a case-expression
   * `InlinePrimitive` can now support multiple backends simultaneously [#425](https://github.com/clash-lang/clash-compiler/issues/425)
+  * Add `Clash.XException.hwSeqX`: render declarations of an argument, but don't assign it to a result signal
 
 * New features (Compiler):
   * [#961](https://github.com/clash-lang/clash-compiler/pull/961): Show `-fclash-*` Options in `clash --show-options`

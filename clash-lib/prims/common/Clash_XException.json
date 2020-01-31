@@ -22,4 +22,12 @@
      , "template"  : "~ARG[2]"
      }
   }
+, { "BlackBox" :
+     { "name"      : "Clash.XException.hwSeqX"
+     , "workInfo"  : "Never"
+     , "kind"      : "Expression"
+     , "type"      : "hwSeqX :: a -> b -> b"
+     , "template"  : "~DEVNULL[~VAR[x][0]]~ARG[1]"
+     }
+  }
 ]
