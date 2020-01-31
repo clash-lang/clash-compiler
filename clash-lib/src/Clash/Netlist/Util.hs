@@ -1272,8 +1272,8 @@ mkOutput' pM = case pM of
       pN <- uniquePortName p o
       return ([(pN,hwty)],[],pN)
 
-    go' (PortProduct p ps) (o,hwty) = do
-      pN <- uniquePortName p o
+    go' (PortProduct p ps) (_,hwty) = do
+      pN <- mkUniqueIdentifier Basic (Text.pack p)
       let (attrs, hwty') = stripAttributes hwty
       case hwty' of
         Vector sz hwty'' -> do
@@ -1298,12 +1298,12 @@ mkOutput' pM = case pM of
           results <- zipWithM appendIdentifier (map (pN,) hwtys) [0..]
           let ps'            = extendPorts $ map (prefixParent p) ps
           (ports,decls,ids) <- unzip3 <$> uncurry (zipWithM mkOutput') (ps', results)
+          let netdecl = NetDecl Nothing pN hwty'
           case ids of
-            [i] -> let netdecl = NetDecl Nothing pN hwty'
-                       assign  = Assignment i (Identifier pN Nothing)
+            [i] -> let assign  = Assignment i (Identifier pN Nothing)
                    in  return (concat ports,netdecl:assign:concat decls,pN)
-            _   -> let netdecl = NetDecl Nothing pN hwty'
-                       assigns = zipWith (assignId pN hwty' 0) ids [0..]
+
+            _   -> let assigns = zipWith (assignId pN hwty' 0) ids [0..]
                    in  if null attrs then
                          return (concat ports,netdecl:assigns ++ concat decls,pN)
                        else
