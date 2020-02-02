@@ -407,7 +407,7 @@ dumpVCD## (offset, cycles) traceMap now
   format 1 label (0,1)   = ['1', label, '\n']
   format 1 label (1,_)   = ['x', label, '\n']
   format 1 label (mask,val) =
-    error $ "Can't format 1 bit wide value for " ++ show label ++ ": value " ++ show val ++ " and mask " ++ show mask 
+    error $ "Can't format 1 bit wide value for " ++ show label ++ ": value " ++ show val ++ " and mask " ++ show mask
   format n label (mask,val) =
     "b" ++ map digit (reverse [0..n-1]) ++ " " ++ [label]
     where

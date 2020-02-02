@@ -36,20 +36,20 @@ mainVHDL :: IO ()
 mainVHDL = do
   [topDir] <- getArgs
   content  <- readFile (takeDirectory topDir </> "f" </> "f.vhdl")
-  
+
   assertIn "g_foo" content
 
 mainVerilog :: IO ()
 mainVerilog = do
   [topDir] <- getArgs
   content  <- readFile (takeDirectory topDir </> "f" </> "f.v")
-  
+
   assertIn "g_foo" content
 
 mainSystemVerilog :: IO ()
 mainSystemVerilog = do
   [topDir] <- getArgs
   content  <- readFile (takeDirectory topDir </> "f" </> "f.sv")
-  
+
   assertIn "g_foo" content
 

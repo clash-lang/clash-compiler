@@ -226,7 +226,7 @@ stepApp x y m tcm =
                 Just . setTerm e' $ stackPush (PrimApply p (rights args) [] es) m
 
               _ -> error "internal error"
-       
+
             LT -> newBinder tys' (App x y) m tcm
 
             GT -> let (m0, n) = newLetBinding tcm m y
@@ -283,7 +283,7 @@ stepCast _ _ _ _ _ =
   flip trace Nothing $ unlines
     [ "WARNING: " <> $(curLoc) <> "Clash can't symbolically evaluate casts"
     , "Please file an issue at https://github.com/clash-lang/clash-compiler/issues"
-    ] 
+    ]
 
 stepTick :: TickInfo -> Term -> Step
 stepTick tick x m _ =

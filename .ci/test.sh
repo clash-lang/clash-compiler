@@ -1,5 +1,13 @@
 #!/bin/bash
-set -xeo pipefail
+set -xo pipefail
+
+egrep ' $' -n -r . --include=*.{hs,hs-boot,sh} --exclude-dir=dist-newstyle
+if [[ $? == 0 ]]; then
+    echo "EOL whitespace detected. See ^"
+    exit 1;
+fi
+
+set -e
 
 # Create a ghc environment file needed for the doctests
 # On cabal>=2.4.1.0 and ghc<8.4.4 this isn't done automaticly

@@ -14,8 +14,8 @@ if [[ "$HACKAGE_RELEASE" == "yes" ]]; then
     cabal upload --publish --documentation --username=${HACKAGE_USERNAME} --password=${PASSWORD} ${DDIST}
 elif [[ "$HACKAGE_RELEASE" == "no" ]]; then
     # Upload as release candidate
-    cabal upload --username=${HACKAGE_USERNAME} --password=${PASSWORD} ${SDIST} 
-    cabal upload --documentation --username=${HACKAGE_USERNAME} --password=${PASSWORD} ${DDIST} 
+    cabal upload --username=${HACKAGE_USERNAME} --password=${PASSWORD} ${SDIST}
+    cabal upload --documentation --username=${HACKAGE_USERNAME} --password=${PASSWORD} ${DDIST}
 else
     echo "Unrecognized \$HACAKGE_RELEASE: $HACAKGE_RELEASE"
     exit 1;

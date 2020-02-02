@@ -5,7 +5,7 @@ set -x
 # Path to thhe nix file containing the derivation we want to package
 NIXFILE=$(dirname $0)/bindist.nix
 
-# "drv" will be set to the path inside /nix/store which contains the resulting 
+# "drv" will be set to the path inside /nix/store which contains the resulting
 # the derivation
 drv=$(nix-build $NIXFILE)
 
@@ -17,7 +17,7 @@ tmpdir=$(mktemp -d)
 trap "rm -rf $tmpdir" EXIT
 cd $tmpdir
 
-# create symlinks inside target's /bin to every executable in the derivation 
+# create symlinks inside target's /bin to every executable in the derivation
 # (non-transitively)
 mkdir -p bin
 for binary in $(find ${drv}/bin); do

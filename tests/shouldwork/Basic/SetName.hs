@@ -24,7 +24,7 @@ h x y = if signum (x - y) == 1 then x else y
     { t_name   = "h"
     , t_inputs = [PortName "x", PortName "y"]
     , t_output = PortName "diff"
-    }) #-} 
+    }) #-}
 
 assertIn :: String -> String -> IO ()
 assertIn needle haystack
