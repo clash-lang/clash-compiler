@@ -37,7 +37,6 @@ import           Data.Bifunctor          (bimap)
 import           Data.Either             (lefts)
 import qualified Data.List               as List
 import qualified Data.Map                as Map
-import           Data.Maybe              (fromMaybe)
 import qualified Data.HashMap.Strict     as HashMapS
 import           Data.Text               (Text)
 import qualified Data.Text as Text
@@ -407,7 +406,7 @@ normalizeTopLvlBndr isTop nm (Binding nm' sp inl tm) = makeCachedU nm (extra.nor
   -- into a loop. Deshadowing freshens all the bindings
   -- to avoid this.
   let tm1 = deShadowTerm emptyInScopeSet tm
-      tm2 = if isTop then fromMaybe tm1 (substWithTyEq [] [] [] tm1) else tm1
+      tm2 = if isTop then substWithTyEq tm1 else tm1
   old <- Lens.use curFun
   tm3 <- rewriteExpr ("normalization",normalization) (nmS,tm2) (nm',sp)
   curFun .= old
@@ -426,26 +425,30 @@ normalizeTopLvlBndr isTop nm (Binding nm' sp inl tm) = makeCachedU nm (extra.nor
 --
 -- __NB:__ Users of this function should ensure it's only applied to TopEntities
 substWithTyEq
-  :: [TyVar]
-  -> [(TyVar,Type)]
-  -> [Id]
+  :: Term
   -> Term
-  -> Maybe Term
-  -- ^ 'Nothing' if 'substWithTyEq' didn't have to substitute anything
-substWithTyEq tvs cvs ids_ (TyLam tv e) = substWithTyEq (tv:tvs) cvs ids_ e
-substWithTyEq tvs cvs ids_ (Lam v e)
-  | TyConApp (nameUniq -> tcUniq) [_,VarTy tv, ty] <- tyView (varType v)
-  , tcUniq == getKey eqTyConKey
-  , tv `elem` tvs
-  = substWithTyEq (tvs List.\\ [tv]) ((tv,ty):cvs) (v:ids_) e
-substWithTyEq tvs cvs@(_:_) ids_ e =
-  let
-    e1 = List.foldl' (flip TyLam) e tvs
-    subst0 = extendTvSubstList (mkSubst emptyInScopeSet) cvs
-    subst1 = extendIdSubstList subst0 [(v, removedTm (varType v)) | v <- ids_]
-  in
-    Just (substTm "substWithTyEq" subst1 e1)
-substWithTyEq _ _ _ _ = Nothing
+substWithTyEq e0 = go [] [] [] e0
+ where
+  go
+    :: [TyVar]
+    -> [(TyVar,Type)]
+    -> [Id]
+    -> Term
+    -> Term
+  go tvs cvs ids_ (TyLam tv e) = go (tv:tvs) cvs ids_ e
+  go tvs cvs ids_ (Lam v e)
+    | TyConApp (nameUniq -> tcUniq) [_,VarTy tv, ty] <- tyView (varType v)
+    , tcUniq == getKey eqTyConKey
+    , tv `elem` tvs
+    = go (tvs List.\\ [tv]) ((tv,ty):cvs) (v:ids_) e
+  go tvs cvs@(_:_) ids_ e =
+    let
+      e1 = List.foldl' (flip TyLam) e tvs
+      subst0 = extendTvSubstList (mkSubst emptyInScopeSet) cvs
+      subst1 = extendIdSubstList subst0 [(v, removedTm (varType v)) | v <- ids_]
+    in
+      (substTm "substWithTyEq" subst1 e1)
+  go _ _ _ _ = e0
 
 -- | Rewrite a term according to the provided transformation
 rewriteExpr :: (String,NormRewrite) -- ^ Transformation to apply
@@ -486,4 +489,3 @@ mkInlineTick :: Id -> TickInfo
 mkInlineTick n = NameMod PrefixName (LitTy . SymTy $ toStr n)
  where
   toStr = Text.unpack . snd . Text.breakOnEnd "." . nameOcc . varName
-
