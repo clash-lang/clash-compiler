@@ -2582,7 +2582,7 @@ xOptimizeMany _ _ _ [] =
 mkFieldSelector
   :: MonadUnique m
   => InScopeSet
-  -> Id 
+  -> Id
   -- ^ subject id
   -> DataCon
   -> [TyVar]

@@ -296,7 +296,7 @@ constantSpecInfo ctx e = do
   -- primitive's workinfo.
   if isClockOrReset tcm (termType tcm e) then
     case collectArgs e of
-      (Prim p, _) 
+      (Prim p, _)
         | primName p == "Clash.Transformations.removedArg" ->
           pure (constantCsr e)
       _ -> bindCsr ctx e

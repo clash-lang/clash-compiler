@@ -21,7 +21,7 @@ SDIST=$(grep "Wrote tarball sdist to" -A 1 sdist.log | tail -n 1)
 # Extract location of documentation tarball
 DDIST=$(grep "Documentation tarball created:" -A 1 haddock.log | tail -n 1)
 
-# Copy 
+# Copy
 cd -
 cp $SDIST $(basename $SDIST)  # Example: clash-prelude-0.9999.tar.gz
 cp $DDIST $(basename $DDIST)  # Example: clash-prelude-0.9999-docs.tar.gz
