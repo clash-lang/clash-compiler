@@ -37,6 +37,7 @@ import           Data.Bifunctor          (bimap)
 import           Data.Either             (lefts)
 import qualified Data.List               as List
 import qualified Data.Map                as Map
+import           Data.Maybe              (fromMaybe)
 import qualified Data.HashMap.Strict     as HashMapS
 import           Data.Text               (Text)
 import qualified Data.Text as Text
@@ -51,7 +52,7 @@ import           Clash.Core.FreeVars
 import           Clash.Core.Name         (Name(nameOcc,nameUniq))
 import           Clash.Core.Pretty       (showPpr)
 import           Clash.Core.Subst
-  (deShadowTerm, extendTvSubstList, mkSubst, substTm)
+  (deShadowTerm, extendTvSubstList, mkSubst, substTm, extendIdSubstList)
 import           Clash.Core.Term
   (Context, CoreContext(AppArg), PrimInfo (..), Term (..), WorkInfo (..),
    TickInfo(NameMod), NameMod(PrefixName), collectArgs, collectArgsTicks)
@@ -407,7 +408,7 @@ normalizeTopLvlBndr isTop nm (nm',sp,inl,tm) = makeCachedU nm (extra.normalized)
   -- into a loop. Deshadowing freshens all the bindings
   -- to avoid this.
   let tm1 = deShadowTerm emptyInScopeSet tm
-      tm2 = if isTop then substWithTyEq [] [] tm1 else tm1
+      tm2 = if isTop then fromMaybe tm1 (substWithTyEq [] [] [] tm1) else tm1
   old <- Lens.use curFun
   tm3 <- rewriteExpr ("normalization",normalization) (nmS,tm2) (nm',sp)
   curFun .= old
@@ -428,18 +429,24 @@ normalizeTopLvlBndr isTop nm (nm',sp,inl,tm) = makeCachedU nm (extra.normalized)
 substWithTyEq
   :: [TyVar]
   -> [(TyVar,Type)]
+  -> [Id]
   -> Term
-  -> Term
-substWithTyEq tvs cvs (TyLam tv e) = substWithTyEq (tv:tvs) cvs e
-substWithTyEq tvs cvs (Lam v e)
+  -> Maybe Term
+  -- ^ 'Nothing' if 'substWithTyEq' didn't have to substitute anything
+substWithTyEq tvs cvs ids_ (TyLam tv e) = substWithTyEq (tv:tvs) cvs ids_ e
+substWithTyEq tvs cvs ids_ (Lam v e)
   | TyConApp (nameUniq -> tcUniq) [_,VarTy tv, ty] <- tyView (varType v)
   , tcUniq == getKey eqTyConKey
   , tv `elem` tvs
-  = substWithTyEq (tvs List.\\ [tv]) ((tv,ty):cvs) e
-substWithTyEq tvs cvs@(_:_) e =
-  let e1 = List.foldl' (flip TyLam) e tvs
-  in  substTm "substWithTyEq" (extendTvSubstList (mkSubst emptyInScopeSet) cvs) e1
-substWithTyEq tvs _ e = List.foldl' (flip TyLam) e tvs
+  = substWithTyEq (tvs List.\\ [tv]) ((tv,ty):cvs) (v:ids_) e
+substWithTyEq tvs cvs@(_:_) ids_ e =
+  let
+    e1 = List.foldl' (flip TyLam) e tvs
+    subst0 = extendTvSubstList (mkSubst emptyInScopeSet) cvs
+    subst1 = extendIdSubstList subst0 [(v, removedTm (varType v)) | v <- ids_]
+  in
+    Just (substTm "substWithTyEq" subst1 e1)
+substWithTyEq _ _ _ _ = Nothing
 
 -- | Rewrite a term according to the provided transformation
 rewriteExpr :: (String,NormRewrite) -- ^ Transformation to apply
