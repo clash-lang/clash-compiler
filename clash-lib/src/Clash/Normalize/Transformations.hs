@@ -96,7 +96,7 @@ import           Clash.Core.Literal          (Literal (..))
 import           Clash.Core.Pretty           (showPpr)
 import           Clash.Core.Subst
   (substTm, mkSubst, extendIdSubst, extendIdSubstList, extendTvSubst,
-   extendTvSubstList, freshenTm, substTyInVar, deShadowTerm)
+   extendTvSubstList, freshenTm, substTyInVar, deShadowTerm, deShadowAlt)
 import           Clash.Core.Term
   ( LetBinding, Pat (..), Term (..), CoreContext (..), PrimInfo (..)
   , TickInfo(..) , WorkInfo(WorkConstant), Alt, TickInfo
@@ -208,7 +208,7 @@ typeSpec _ e = return e
 
 -- | Specialize functions on their non-representable argument
 nonRepSpec :: HasCallStack => NormRewrite
-nonRepSpec ctx@(TransformContext is0 _) e@(App e1 e2)
+nonRepSpec ctx e@(App e1 e2)
   | (Var {}, args) <- collectArgs e1
   , (_, [])     <- Either.partitionEithers args
   , null $ Lens.toListOf termFreeTyVars e2
@@ -243,12 +243,9 @@ nonRepSpec ctx@(TransformContext is0 _) e@(App e1 e2)
         case fTmM of
           Just (fNm,_,_,tm)
             | nameSort (varName fNm) == Internal
-            -> do
-              tm' <- censor (const mempty)
-                            (bottomupR appProp ctx
-                                       (mkApps (mkTicks tm ticks) fArgs))
-              -- See Note [AppProp no-shadow invariant]
-              return (deShadowTerm is0 tm')
+            -> censor (const mempty)
+                      (bottomupR appProp ctx
+                                 (mkApps (mkTicks tm ticks) fArgs))
           _ -> return app
       | otherwise = return app
 
@@ -367,7 +364,7 @@ caseCase _ e = return e
 -- | Inline function with a non-representable result if it's the subject
 -- of a Case-decomposition
 inlineNonRep :: HasCallStack => NormRewrite
-inlineNonRep (TransformContext localScope _) e@(Case scrut altsTy alts)
+inlineNonRep _ e@(Case scrut altsTy alts)
   | (Var f, args,ticks) <- collectArgsTicks scrut
   , isGlobalId f
   = do
@@ -401,12 +398,10 @@ inlineNonRep (TransformContext localScope _) e@(Case scrut altsTy alts)
           (True,Just (_,_,_,scrutBody0)) -> do
             Monad.when noException (zoomExtra (addNewInline f cf))
 
-            -- See Note [AppProp no-shadow invariant]
-            let scrutBody1 = deShadowTerm localScope scrutBody0
-            let scrutBody2 = mkTicks scrutBody1 (mkInlineTick f : ticks)
-            let scrutBody3 = mkApps scrutBody2 args
+            let scrutBody1 = mkTicks scrutBody0 (mkInlineTick f : ticks)
+            let scrutBody2 = mkApps scrutBody1 args
 
-            changed $ Case scrutBody3 altsTy alts
+            changed $ Case scrutBody2 altsTy alts
 
           _ -> return e
   where
@@ -464,7 +459,10 @@ caseCon (TransformContext is0 _) (Case scrut ty alts)
                     in  case Maybe.catMaybes binds2 of
                           []     -> body
                           binds3 -> Letrec binds3 body
-        let subst = extendTvSubstList (mkSubst is1)
+        -- Use the original inScopeSet 'is0' here, not the extended inScopeSet
+        -- 'is1', otherwise we'd make the "caseCon1" substitution substitute
+        -- free variables that were shadowed by the pattern!
+        let subst = extendTvSubstList (mkSubst is0)
                   $ zip tvs (drop (length (dcUnivTyVars dc)) (Either.rights args))
         changed (substTm "caseCon1" subst e')
       _ -> case alts of
@@ -962,7 +960,7 @@ splitCastWork _ e = return e
 -- | Inline work-free functions, i.e. fully applied functions that evaluate to
 -- a constant
 inlineWorkFree :: HasCallStack => NormRewrite
-inlineWorkFree (TransformContext localScope _) e@(collectArgsTicks -> (Var f,args@(_:_),ticks))
+inlineWorkFree _ e@(collectArgsTicks -> (Var f,args@(_:_),ticks))
   = do
     tcm <- Lens.view tcCache
     let eTy = termType tcm e
@@ -983,10 +981,8 @@ inlineWorkFree (TransformContext localScope _) e@(collectArgsTicks -> (Var f,arg
             if isRecBndr
                then return e
                else do
-                 let tm0 = deShadowTerm localScope body
-                 let tm1 = mkTicks tm0 (mkInlineTick f : ticks)
-
-                 changed $ mkApps tm1 args
+                 let tm = mkTicks body (mkInlineTick f : ticks)
+                 changed $ mkApps tm args
 
           _ -> return e
   where
@@ -1000,7 +996,7 @@ inlineWorkFree (TransformContext localScope _) e@(collectArgsTicks -> (Var f,arg
           isSignal = isSignalType tcm e'Ty
       return (not (null fvIds) || isSignal)
 
-inlineWorkFree (TransformContext localScope _) e@(Var f) = do
+inlineWorkFree _ e@(Var f) = do
   tcm <- Lens.view tcCache
   let fTy      = varType f
       closed   = not (isPolyFunCoreTy tcm fTy)
@@ -1019,8 +1015,7 @@ inlineWorkFree (TransformContext localScope _) e@(Var f) = do
              else do
               topEnts <- Lens.view topEntities
               (_,_,_,body) <- normalizeTopLvlBndr (f `elemVarSet` topEnts) f top
-              -- See Note [AppProp no-shadow invariant]
-              changed (deShadowTerm localScope body)
+              changed body
         _ -> return e
     else return e
 
@@ -1028,7 +1023,7 @@ inlineWorkFree _ e = return e
 
 -- | Inline small functions
 inlineSmall :: HasCallStack => NormRewrite
-inlineSmall (TransformContext localScope _) e@(collectArgsTicks -> (Var f,args,ticks)) = do
+inlineSmall _ e@(collectArgsTicks -> (Var f,args,ticks)) = do
   untranslatable <- isUntranslatable True e
   topEnts <- Lens.view topEntities
   let lv = isLocalId f
@@ -1043,12 +1038,8 @@ inlineSmall (TransformContext localScope _) e@(collectArgsTicks -> (Var f,args,t
           isRecBndr <- isRecursiveBndr f
           if not isRecBndr && inl /= NoInline && termSize body < sizeLimit
              then do
-               -- See Note [AppProp no-shadow invariant]
-               let tm0 = deShadowTerm localScope body
-               let tm1 = mkTicks tm0 (mkInlineTick f : ticks)
-
-               changed $ mkApps tm1 args
-
+               let tm = mkTicks body (mkInlineTick f : ticks)
+               changed $ mkApps tm args
              else return e
 
         _ -> return e
@@ -1071,9 +1062,7 @@ constantSpec ctx@(TransformContext is0 tfCtx) e@(App e1 e2)
          else do
            -- Parts of e2 are constant
            let is1 = extendInScopeSetList is0 (fst <$> csrNewBindings specInfo)
-           -- Deshadow because appPropFast will be called after constantSpec
-           deShadowTerm is0
-            <$> Letrec newBindings
+           Letrec newBindings
             <$> specializeNorm
                   (TransformContext is1 tfCtx)
                   (App e1 (csrNewTerm specInfo))
@@ -1089,7 +1078,9 @@ constantSpec _ e = return e
 -- | Propagate arguments of application inwards; except for 'Lam' where the
 -- argument becomes let-bound.
 --
--- Note [AppProp deshadow]
+-- Note [AppProp no shadowing]
+--
+-- Case 1.
 --
 -- Imagine:
 --
@@ -1109,15 +1100,15 @@ constantSpec _ e = return e
 -- is very bad because 'b' in 'h a b' is now bound by the pattern instead of the
 -- newly introduced let-binding
 --
--- instead me must rewrite to:
+-- instead me must deshadow w.r.t. the new variable and rewrite to:
 --
 -- @
--- let b1 = f x y
+-- let b = f x y
 -- in  case x of
---       D a b -> h a b1
+--       D a b1 -> h a b
 -- @
 --
--- Note [AppProp no-shadow invariant]
+-- Case 2.
 --
 -- Imagine
 --
@@ -1133,7 +1124,16 @@ constantSpec _ e = return e
 -- @
 --
 -- would be very bad, because the let-binding suddenly captures the free
--- variable in @u@. The same for:
+-- variable in @u@. To prevent this from happening we over-approximate and check
+-- whether @x@ is in the current InScopeSet, and deshadow if that's the case,
+-- i.e. we then rewrite to:
+--
+-- let x1 = u
+-- in  e [x:=x1]
+--
+-- Case 3.
+--
+-- The same for:
 --
 -- @
 -- (let x = w in e) u
@@ -1147,28 +1147,33 @@ constantSpec _ e = return e
 --
 -- would be bad because the let-binding now captures the free variable in @u@.
 --
--- To prevent this from happening, we can either:
---
--- 1. Rename the bindings, so that they cannot capture
--- 2. Ensure that @AppProp@ is only called in a context where there is no
---    shadowing, i.e. the bindings can never never collide with the current
---    inScopeSet.
---
--- We have gone for option 2 so that AppProp requires less computation and
--- because AppProp is such a commonly applied transformation. This
--- means that when normalisation starts we deshadow the expression, and when
--- we inline global binders, we ensure that inlined expression is deshadowed
--- taking the InScopeSet of the context into account.
+-- To prevent this from happening, we unconditionally deshadow the function part
+-- of the application w.r.t. the free variables in the argument part of the
+-- application. It is okay to over-approximate in this case and deshadow w.r.t
+-- the current InScopeSet.
 appProp :: HasCallStack => NormRewrite
 appProp (TransformContext is0 _) (App (collectTicks -> (Lam v e,ticks)) arg) =
   if isWorkFree arg || isVar arg
     then do
       let subst = extendIdSubst (mkSubst is0) v arg
       changed $ mkTicks (substTm "appProp.AppLam" subst e) ticks
-    else changed $ Letrec [(v, arg)] (mkTicks e ticks)
+    else do
+      let vNew = uniqAway is0 v
+      -- See Note [AppProp no shadowing]
+      -- 'uniqAway' only picks a new unique if the unique of the identifier is
+      -- in the given in-scope set
+      if v == vNew then
+        changed $ Letrec [(v, arg)] (mkTicks e ticks)
+      else do
+        let subst = extendIdSubst (mkSubst is0) v (Var vNew)
+            e1    = substTm "appProp.AppLam_to_LetApp" subst e
+        changed $ Letrec [(vNew, arg)] (mkTicks e1 ticks)
 
-appProp _ (App (collectTicks -> (Letrec v e, ticks)) arg) = do
-  changed (Letrec v (App (mkTicks e ticks) arg))
+
+appProp (TransformContext is0 _) (App (collectTicks -> (Letrec v e, ticks)) arg) = do
+  -- Note [AppProp no shadowing]
+  let Letrec v1 e1 = deShadowTerm is0 (Letrec v e)
+  changed (Letrec v1 (App (mkTicks e1 ticks) arg))
 
 appProp ctx@(TransformContext is0 _) (App (collectTicks -> (Case scrut ty alts,ticks)) arg) = do
   tcm <- Lens.view tcCache
@@ -1176,10 +1181,11 @@ appProp ctx@(TransformContext is0 _) (App (collectTicks -> (Case scrut ty alts,t
       ty' = applyFunTy tcm ty argTy
   if isWorkFree arg || isVar arg
     then do
-      let alts' = map (second (`App` arg)) alts
-      changed $ mkTicks (Case scrut ty' alts') ticks
+      -- Note [AppProp no shadowing]
+      let alts1 = map (second (`App` arg) . deShadowAlt is0) alts
+      changed $ mkTicks (Case scrut ty' alts1) ticks
     else do
-      -- See Note [AppProp deshadow]
+      -- See Note [AppProp no shadowing]
       let is2 = unionInScope is0 ((mkInScopeSet . mkVarSet . concatMap (patVars . fst)) alts)
       boundArg <- mkTmBinderFor is2 tcm (mkDerivedName ctx "app_arg") arg
       let alts' = map (second (`App` (Var boundArg))) alts
@@ -1207,13 +1213,14 @@ appProp _ e = return e
 --
 -- The idea is that this reduces the number of traversals, which hopefully leads
 -- to shorter compile times.
---
--- Implementation only works if terms are fully deshadowed, see
--- Note [AppProp deshadow]
 appPropFast :: HasCallStack => NormRewrite
 appPropFast ctx@(TransformContext is _) = \case
-  e@App {}   -> uncurry3 (go is) (collectArgsTicks e)
-  e@TyApp {} -> uncurry3 (go is) (collectArgsTicks e)
+  e@App {}
+    | let (fun,args,ticks) = collectArgsTicks e
+    -> go is (deShadowTerm is fun) args ticks
+  e@TyApp {}
+    | let (fun,args,ticks) = collectArgsTicks e
+    -> go is (deShadowTerm is fun) args ticks
   e          -> return e
  where
   go :: InScopeSet -> Term -> [Either Term Type] -> [TickInfo]
@@ -1229,12 +1236,13 @@ appPropFast ctx@(TransformContext is _) = \case
         (`mkTicks` ticks) <$> go is0 (substTm "appPropFast.AppLam" subst e) args []
       else do
         let is1 = extendInScopeSet is0 v
-        Letrec [(v, arg)] <$> go is1 e args ticks
+        Letrec [(v, arg)] <$> go is1 (deShadowTerm is1 e) args ticks
 
   go is0 (Letrec vs e) args@(_:_) ticks = do
     setChanged
     let vbs  = map fst vs
         is1  = extendInScopeSetList is0 vbs
+    -- XXX: 'vs' should already be deshadowed w.r.t. 'is0'
     Letrec vs <$> go is1 e args ticks
 
   go is0 (TyLam tv e) (Right t:args) ticks = do
@@ -1251,9 +1259,10 @@ appPropFast ctx@(TransformContext is _) = \case
     case vs of
       [] -> (`mkTicks` ticks) . Case scrut ty1 <$> mapM (goAlt is0 args1) alts
       _  -> do
-        let vbs = map fst vs
-            is1 = extendInScopeSetList is0 vbs
-        Letrec vs . (`mkTicks` ticks) . Case scrut ty1 <$> mapM (goAlt is1 args1) alts
+        let vbs   = map fst vs
+            is1   = extendInScopeSetList is0 vbs
+            alts1 = map (deShadowAlt is1) alts
+        Letrec vs . (`mkTicks` ticks) . Case scrut ty1 <$> mapM (goAlt is1 args1) alts1
 
   go is0 (Tick sp e) args ticks = do
     setChanged
@@ -1848,7 +1857,7 @@ recToLetRec _ e = return e
 
 -- | Inline a function with functional arguments
 inlineHO :: HasCallStack => NormRewrite
-inlineHO (TransformContext is0 _) e@(App _ _)
+inlineHO _ e@(App _ _)
   | (Var f, args, ticks) <- collectArgsTicks e
   = do
     tcm <- Lens.view tcCache
@@ -1866,8 +1875,7 @@ inlineHO (TransformContext is0 _) e@(App _ _)
                   case bodyMaybe of
                     Just (_,_,_,body) -> do
                       zoomExtra (addNewInline f cf)
-                      -- See Note [AppProp no-shadow invariant]
-                      changed (mkApps (mkTicks (deShadowTerm is0 body) ticks) args)
+                      changed (mkApps (mkTicks body ticks) args)
                     _ -> return e
       else return e
 

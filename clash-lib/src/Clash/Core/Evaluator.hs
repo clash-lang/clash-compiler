@@ -438,7 +438,7 @@ scrutinise (Lit l) alts m = case alts of
   go def (_:alts1) = go def alts1
 
 scrutinise (DC dc xs) alts m
-  | altE:_ <- [substAlt altDc tvs pxs xs altE
+  | altE:_ <- [substInAlt altDc tvs pxs xs altE
               | (DataPat altDc tvs pxs,altE) <- alts, altDc == dc ] ++
               [altE | (DefaultPat,altE) <- alts ]
   = setTerm altE m
@@ -468,8 +468,8 @@ scrutinise v@(PrimVal p _ vs) alts m
 
 scrutinise v alts _ = error ("scrutinise: " ++ showPpr (Case (valToTerm v) (ConstTy Arrow) alts))
 
-substAlt :: DataCon -> [TyVar] -> [Id] -> [Either Term Type] -> Term -> Term
-substAlt dc tvs xs args e = substTm "Evaluator.substAlt" subst e
+substInAlt :: DataCon -> [TyVar] -> [Id] -> [Either Term Type] -> Term -> Term
+substInAlt dc tvs xs args e = substTm "Evaluator.substInAlt" subst e
  where
   tys        = rights args
   tms        = lefts args

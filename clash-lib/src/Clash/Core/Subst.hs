@@ -39,8 +39,10 @@ module Clash.Core.Subst
   , extendGblSubstList
     -- ** Applying substitutions
   , substTm
+  , substAlt
     -- * Variable renaming
   , deShadowTerm
+  , deShadowAlt
   , freshenTm
     -- * Alpha equivalence
   , aeqType
@@ -491,6 +493,21 @@ substTm doc subst = go where
   goTick t@DeDup        = t
   goTick t@NoDeDup      = t
 
+-- | Substitute within a case-alternative
+substAlt
+  :: HasCallStack
+  => Doc ()
+  -> Subst
+  -- ^ The substitution
+  -> (Pat, Term)
+  -- ^ The alternative in which to apply the substitution
+  -> (Pat, Term)
+substAlt doc subst (pat,alt) = case pat of
+  DataPat dc tvs ids -> case List.mapAccumL substTyVarBndr' subst tvs of
+    (subst1,tvs1) -> case List.mapAccumL substIdBndr subst1 ids of
+      (subst2,ids1) -> (DataPat dc tvs1 ids1,substTm doc subst2 alt)
+  _ -> (pat, substTm doc subst alt)
+
 -- | Find the substitution for an 'Id' in the 'Subst'
 lookupIdSubst
   :: HasCallStack
@@ -595,6 +612,15 @@ deShadowTerm
   -> Term
   -> Term
 deShadowTerm is e = substTm "deShadowTerm" (mkSubst is) e
+
+-- | Ensure that non of the binders in an alternative shadow each-other, nor
+-- conflict with the in-scope set
+deShadowAlt ::
+  HasCallStack =>
+  InScopeSet ->
+  (Pat, Term) ->
+  (Pat, Term)
+deShadowAlt is = substAlt "deShadowAlt" (mkSubst is)
 
 -- | A much stronger variant of `deShadowTerm` that ensures that all bound
 -- variables are unique.
