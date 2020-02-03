@@ -253,6 +253,7 @@ runClashTest = defaultMain $ clashTestRoot
         [ runTest "T967a" def{hdlSim=False}
         , runTest "T967b" def{hdlSim=False}
         , runTest "T967c" def{hdlSim=False}
+        , netlistTest ("tests" </> "shouldwork" </> "Naming") allTargets [] "T1041" "main"
         ]
       , clashTestGroup "Numbers"
         [ runTest "BitInteger" def

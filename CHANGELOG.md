@@ -85,6 +85,7 @@
   * [#1030](https://github.com/clash-lang/clash-compiler/issues/1030): `bindConstantVar` will bind (workfree) constructs
   * [#1034](https://github.com/clash-lang/clash-compiler/issues/1034): Error (10137): object "pllLock" on lhs must have a variable data type
   * [#1046](https://github.com/clash-lang/clash-compiler/issues/1046): Don't confuse term/type namespaces in 'lookupIdSubst'
+  * [#1041](https://github.com/clash-lang/clash-compiler/issues/1041): Nested product types incorrectly decomposed into ports
 
 * Fixes without issue reports:
   * Fix bug in `rnfX` defined for `Down` ([baef30e](https://github.com/clash-lang/clash-compiler/commit/baef30eae03dc02ba847ffbb8fae7f365c5287c2))
