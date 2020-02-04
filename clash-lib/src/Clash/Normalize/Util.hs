@@ -437,7 +437,7 @@ substWithTyEq e0 = go [] [] [] e0
     -> Term
   go tvs cvs ids_ (TyLam tv e) = go (tv:tvs) cvs ids_ e
   go tvs cvs ids_ (Lam v e)
-    | TyConApp (nameUniq -> tcUniq) [_,VarTy tv, ty] <- tyView (varType v)
+    | TyConApp (nameUniq -> tcUniq) (tvFirst -> Just (tv, ty)) <- tyView (varType v)
     , tcUniq == getKey eqTyConKey
     , tv `elem` tvs
     = go (tvs List.\\ [tv]) ((tv,ty):cvs) (v:ids_) e
@@ -449,6 +449,11 @@ substWithTyEq e0 = go [] [] [] e0
     in
       (substTm "substWithTyEq" subst1 e1)
   go _ _ _ _ = e0
+
+  -- Type equality (~) is symetrical, so users could write: (dom ~ System) or (System ~ dom)
+  tvFirst [_, VarTy tv, ty] = Just (tv, ty)
+  tvFirst [_, ty, VarTy tv] = Just (tv, ty)
+  tvFirst _ = Nothing
 
 -- | Rewrite a term according to the provided transformation
 rewriteExpr :: (String,NormRewrite) -- ^ Transformation to apply
