@@ -90,8 +90,10 @@ runClashTest = defaultMain $ clashTestRoot
     ]
   , clashTestGroup "tests"
     [ clashTestGroup "shouldfail"
-      [ runFailingTest ("tests" </> "shouldfail") [VHDL] [] "RecursiveBoxed" (Just "Callgraph after normalisation contains following recursive components")
-      , runFailingTest ("tests" </> "shouldfail") [VHDL] [] "RecursiveDatatype" (Just "Not in normal form: no Letrec")
+      [ runFailingTest ("tests" </> "shouldfail") [VHDL] [] "RecursiveBoxed" (Just {- RecursiveBoxed.g... -} " already inlined 20 times in:RecursiveBoxed.topEntity")
+      , runFailingTest ("tests" </> "shouldfail") [VHDL] [] "RecursiveDatatype" (Just "This bndr has a non-representable return type and can't be normalized:")
+      , runFailingTest ("tests" </> "shouldfail") [VHDL] [] "Poly" (Just "Clash can only normalize monomorphic functions, but this is polymorphic:")
+      , runFailingTest ("tests" </> "shouldfail") [VHDL] ["-fclash-error-extra"] "Poly2" (Just "Even after applying type equality constraints it remained polymorphic:")
       , runFailingTest ("tests" </> "shouldfail" </> "InvalidPrimitive") [VHDL] ["-itests/shouldfail/InvalidPrimitive"] "InvalidPrimitive" (Just "InvalidPrimitive.json")
       -- Disabled, due to it eating gigabytes of memory:
       -- , runFailingTest ("tests" </> "shouldfail") allTargets [] "RecursivePoly" (Just "??")
