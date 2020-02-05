@@ -166,8 +166,8 @@ instance PrettyPrec (Name a) where
   pprPrec p (viewName -> (qual, occ, uniq)) = do
     qual' <- annotate (AnnSyntax Qualifier) <$> pprPrec p qual
     occ'  <- pprPrec p occ
-    uniq' <- annotate (AnnSyntax Unique) <$> pprPrec p uniq
-    return $ qual' <> occ' <> brackets uniq'
+    uniq' <- annotate (AnnSyntax Unique) . brackets <$> (pprPrec p uniq)
+    return $ qual' <> occ' <> uniq'
 
 instance ClashPretty (Name a) where
   clashPretty = fromPpr
@@ -491,4 +491,3 @@ startsVarSym c = isSymbolASCII c || (ord c > 0x7f && isSymbol c)
 
 isSymbolASCII :: Char -> Bool
 isSymbolASCII c = c `elem` ("!#$%&*+./<=>?@\\^|~-" :: String)
-
