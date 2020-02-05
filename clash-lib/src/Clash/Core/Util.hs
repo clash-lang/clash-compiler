@@ -982,11 +982,32 @@ shouldSplit0 tcm (TyConApp tcNm tyArgs)
   , [dc] <- tyConDataCons tc
   , let dcArgs  = substArgTys dc tyArgs
   , let dcArgVs = map (tyView . coreView tcm) dcArgs
-  = if any (\ty -> isJust (shouldSplit0 tcm ty) || splitTy ty) dcArgVs then
+  = if any shouldSplitTy dcArgVs && not (isHidden tcNm tyArgs) then
       Just (mkApps (Data dc) (map Right tyArgs), dcArgs)
     else
       Nothing
  where
+  shouldSplitTy :: TypeView -> Bool
+  shouldSplitTy ty = isJust (shouldSplit0 tcm ty) || splitTy ty
+
+  -- Hidden constructs (HiddenClock, HiddenReset, ..) don't need to be split
+  -- because KnownDomain will be filtered anyway during netlist generation due
+  -- to it being a zero-width type
+  --
+  -- TODO: This currently only handles (IP $x, KnownDomain) given that $x is any
+  -- TODO: of the constructs handled in 'splitTy'. In practise this means only
+  -- TODO: HiddenClock, HiddenReset, and HiddenEnable are handled. If a user were
+  -- TODO: to define their own versions with -for example- the elements of the
+  -- TODO: tuple swapped, 'isHidden' wouldn't recognize it. We could generalize
+  -- TODO: this in the future.
+  --
+  isHidden :: Name a -> [Type] -> Bool
+  isHidden nm [a1, a2] | TyConApp a2Nm _ <- tyView a2 =
+       nameOcc nm == "GHC.Classes.(%,%)"
+    && splitTy (tyView (stripIP a1))
+    && nameOcc a2Nm == "Clash.Signal.Internal.KnownDomain"
+  isHidden _ _ = False
+
   -- Currently we're only interested in splitting of Clock, Reset, and Enable
   splitTy (TyConApp tcNm0 _)
     = nameOcc tcNm0 `elem` [ "Clash.Signal.Internal.Clock"
@@ -1024,6 +1045,12 @@ splitShouldSplit tcm = foldr go []
   go ty rest = case shouldSplit tcm ty of
     Just (_,tys) -> splitShouldSplit tcm tys ++ rest
     Nothing      -> ty : rest
+
+-- | Strip implicit parameter wrappers (IP)
+stripIP :: Type -> Type
+stripIP t@(tyView -> TyConApp tcNm [_a1, a2]) =
+  if nameOcc tcNm == "GHC.Classes.IP" then a2 else t
+stripIP t = t
 
 -- | Do an inverse topological sorting of the let-bindings in a let-expression
 inverseTopSortLetBindings
