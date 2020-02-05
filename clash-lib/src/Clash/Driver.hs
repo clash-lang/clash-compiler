@@ -77,7 +77,8 @@ import           Clash.Netlist.Util               (genComponentName, genTopCompo
 import           Clash.Netlist.BlackBox.Parser    (runParse)
 import           Clash.Netlist.BlackBox.Types     (BlackBoxTemplate, BlackBoxFunction)
 import           Clash.Netlist.Types
-  (BlackBox (..), Component (..), Identifier, FilteredHWType, HWMap, SomeBackend (..))
+  (BlackBox (..), Component (..), Identifier, FilteredHWType, HWMap,
+   SomeBackend (..), TopEntityT(..))
 import           Clash.Normalize                  (checkNonRecursive, cleanupGraph,
                                                    normalize, runNormalization)
 import           Clash.Normalize.Util             (callGraph)
@@ -109,13 +110,8 @@ generateHDL
   -- ^ Hardcoded 'Type' -> 'HWType' translator
   -> (PrimStep, PrimUnwind)
   -- ^ Hardcoded evaluator (delta-reduction)
-  -> [( Id
-      , Maybe TopEntity
-      , Maybe Id
-      )]
-  -- ^ topEntity bndr
-  -- + (maybe) TopEntity annotation
-  -- + (maybe) testBench bndr
+  -> [TopEntityT]
+  -- ^ Topentities and associated testbench
   -> ClashOpts
   -- ^ Debug information level for the normalization process
   -> (Clock.UTCTime,Clock.UTCTime)
@@ -128,7 +124,7 @@ generateHDL reprs bindingsMap hdlState primMap tcm tupTcm typeTrans eval
                                 reportTimeDiff prevTime startTime
 
   -- Process the next TopEntity
-  go prevTime seen ((topEntity,annM,benchM):topEntities') = do
+  go prevTime seen (TopEntityT topEntity annM benchM:topEntities') = do
   let topEntityS = Data.Text.unpack (nameOcc (varName topEntity))
   putStrLn $ "Clash: Compiling " ++ topEntityS
 
@@ -259,7 +255,7 @@ generateHDL reprs bindingsMap hdlState primMap tcm tupTcm typeTrans eval
                     . snd
                     . Supply.freshId
                    <$> Supply.newSupply
-  let topEntityNames = map (\(x,_,_) -> x) topEntities
+  let topEntityNames = map topId topEntities
 
   (topTime,manifest',seen') <- if useCacheTop
     then do
@@ -705,32 +701,23 @@ normalizeEntity reprs bindingsMap primMap tcm tupTcm typeTrans eval topEntities
 -- | topologically sort the top entities
 sortTop
   :: BindingMap
-  -> [( Id
-      , Maybe TopEntity
-      , Maybe Id
-      )]
-  -- ^ topEntity bndr
-  -- + (maybe) TopEntity annotation
-  -- + (maybe) testBench bndr
-  -> [( Id
-      , Maybe TopEntity
-      , Maybe Id
-      )]
-  -- ^ topEntity bndr
-  -- + (maybe) TopEntity annotation
-  -- + (maybe) testBench bndr
+  -> [TopEntityT]
+  -> [TopEntityT]
 sortTop bindingsMap topEntities =
   let (nodes,edges) = unzip (map go topEntities)
   in  case reverseTopSort nodes (concat edges) of
         Left msg   -> error msg
         Right tops -> tops
  where
-  go t@(topE,_,tbM) =
+  go t@(TopEntityT topE _ tbM) =
     let topRefs = goRefs topE topE
         tbRefs  = maybe [] (goRefs topE) tbM
     in  ((varUniq topE,t)
-         ,map ((\(v,_,_) -> (varUniq topE, varUniq v))) (tbRefs ++ topRefs))
+         ,map ((\top -> (varUniq topE, varUniq (topId top)))) (tbRefs ++ topRefs))
 
   goRefs top i =
     let cg = callGraph bindingsMap i
-    in  filter (\(v,_,_) -> v /= top && v /= i && v `elemVarEnv` cg) topEntities
+    in
+      filter
+        (\t -> topId t /= top && topId t /= i && topId t `elemVarEnv` cg)
+        topEntities

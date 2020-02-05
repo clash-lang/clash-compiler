@@ -68,6 +68,17 @@ import Clash.Util                           (HasCallStack, makeLenses)
 import Clash.Annotations.BitRepresentation.Internal
   (CustomReprs, DataRepr', ConstrRepr')
 
+-- | Structure describing a top entity: it's id, its port annotations, and
+-- associated testbench.
+data TopEntityT = TopEntityT
+  { topId :: Id
+  -- ^ Id of top entity
+  , topAnnotation :: Maybe TopEntity
+  -- ^ (Maybe) a topentity annotation
+  , associatedTestbench :: Maybe Id
+  -- ^ (Maybe) a test bench associated with the topentity
+  } deriving (Generic)
+
 -- | Monad that caches generated components (StateT) and remembers hidden inputs
 -- of components that are being generated (WriterT)
 newtype NetlistMonad a =
@@ -115,7 +126,7 @@ data NetlistState
   -- filter duplicate warning invocations for dubious blackbox instantiations,
   -- see GitHub pull request #286.
   , _componentNames :: VarEnv Identifier
-  , _topEntityAnns  :: VarEnv (Type, Maybe TopEntity)
+  , _topEntityAnns  :: VarEnv TopEntityT
   , _hdlDir         :: FilePath
   , _curBBlvl       :: Int
   -- ^ The current scoping level assigned to black box contexts

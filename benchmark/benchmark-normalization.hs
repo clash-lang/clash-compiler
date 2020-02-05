@@ -4,12 +4,12 @@
 {-# OPTIONS_GHC -Wno-partial-type-signatures #-}
 
 import           Clash.Annotations.BitRepresentation.Internal (CustomReprs)
-import           Clash.Annotations.TopEntity
 import           Clash.Core.TyCon
 import           Clash.Core.Var
 import           Clash.Driver
 import           Clash.Driver.Types
 import           Clash.GHC.Evaluator
+import           Clash.Netlist.Types          (TopEntityT)
 import           Clash.Primitives.Types
 
 import           Criterion.Main
@@ -52,7 +52,7 @@ setupEnv
   :: [FilePath]
   -> FilePath
   -> IO ((BindingMap, TyConMap, IntMap TyConName
-         ,[(Id, Maybe TopEntity, Maybe Id)]
+         ,[TopEntityT]
          ,CompiledPrimMap, CustomReprs, [Id], Id
          )
         ,Supply.Supply

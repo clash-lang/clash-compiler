@@ -1,4 +1,3 @@
-import           Clash.Annotations.TopEntity
 import           Clash.Annotations.BitRepresentation.Internal (CustomReprs)
 import           Clash.Backend
 import           Clash.Core.Name
@@ -61,7 +60,7 @@ benchFile idirs src = do
 setupEnv
   :: FilePath
   -> IO (BindingMap
-        ,[(Id, Maybe TopEntity, Maybe Id)]
+        ,[TopEntityT]
         ,CompiledPrimMap'
         ,TyConMap
         ,CustomReprs

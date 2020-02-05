@@ -85,7 +85,7 @@ genNetlist
   -- ^ Custom bit representations for certain types
   -> BindingMap
   -- ^ Global binders
-  -> [(Id,Maybe TopEntity,Maybe Id)]
+  -> [TopEntityT]
   -- ^ All the TopEntities
   -> CompiledPrimMap
   -- ^ Primitive definitions
@@ -114,17 +114,15 @@ genNetlist
   -- ^ Name of the @topEntity@
   -> IO ([([Bool],SrcSpan,HashMap Identifier Word,Component)],HashMap Identifier Word)
 genNetlist isTb opts reprs globals tops primMap tcm typeTrans iw mkId extId ite be seen env prefixM topEntity = do
-  (_,s) <- runNetlistMonad isTb opts reprs globals (mkTopEntityMap tops)
+  (_,s) <- runNetlistMonad isTb opts reprs globals topEntityMap
              primMap tcm typeTrans iw mkId extId ite be seen env prefixM $
              genComponent topEntity
   return ( eltsVarEnv $ _components s
          , _seenComps s
          )
   where
-    mkTopEntityMap
-      :: [(Id,Maybe TopEntity,Maybe Id)]
-      -> VarEnv (Type,Maybe TopEntity)
-    mkTopEntityMap = mkVarEnv . map (\(a,b,_) -> (a,(varType a,b)))
+    topEntityMap :: VarEnv TopEntityT
+    topEntityMap = mkVarEnv (zip (map topId tops) tops)
 
 -- | Run a NetlistMonad action in a given environment
 runNetlistMonad
@@ -136,7 +134,7 @@ runNetlistMonad
   -- ^ Custom bit representations for certain types
   -> BindingMap
   -- ^ Global binders
-  -> VarEnv (Type, Maybe TopEntity)
+  -> VarEnv TopEntityT
   -- ^ TopEntity annotations
   -> CompiledPrimMap
   -- ^ Primitive Definitions
@@ -219,7 +217,7 @@ genComponentT
 genComponentT compName componentExpr = do
   varCount .= 0
   componentName1 <- (`lookupVarEnv'` compName) <$> Lens.use componentNames
-  topEntMM <- fmap snd . lookupVarEnv compName <$> Lens.use topEntityAnns
+  topEntMM <- fmap topAnnotation . lookupVarEnv compName <$> Lens.use topEntityAnns
   prefixM <- Lens.use componentPrefix
   let componentName2 = case (prefixM,join topEntMM) of
                          ((Just p,_),Just ann) -> p `StrictText.append` StrictText.pack ('_':t_name ann)
@@ -233,8 +231,8 @@ genComponentT compName componentExpr = do
   -- HACK: Determine resulttype of this function by looking at its definition
   -- in topEntityAnns, instead of looking at its last binder (which obscure
   -- any attributes [see: Clash.Annotations.SynthesisAttributes]).
-  topEntityTypeM     <- lookupVarEnv compName <$> Lens.use topEntityAnns
-  let topEntityTypeM' = snd . splitCoreFunForallTy tcm . fst <$> topEntityTypeM
+  topEntityTypeM <- lookupVarEnv compName <$> Lens.use topEntityAnns
+  let topEntityTypeM' = snd . splitCoreFunForallTy tcm . varType . topId <$> topEntityTypeM
 
   seenIds .= HashMapS.empty
   (wereVoids,compInps,argWrappers,compOutps,resUnwrappers,binders,resultM) <-
@@ -564,13 +562,15 @@ mkFunApp dstId fun args tickDecls = do
   topAnns <- Lens.use topEntityAnns
   tcm     <- Lens.use tcCache
   case lookupVarEnv fun topAnns of
-    Just (ty,annM)
-      | let (fArgTys0,fResTy) = splitFunTys tcm ty
+    Just topEntity
+      | let ty = varType (topId topEntity)
+      , let (fArgTys0,fResTy) = splitFunTys tcm ty
       -- Take into account that clocks and stuff are split off from any product
       -- types containing them
       , let fArgTys1 = splitShouldSplit tcm fArgTys0
       , length fArgTys1 == length args
       -> do
+        let annM = topAnnotation topEntity
         argHWTys <- mapM (unsafeCoreTypeToHWTypeM' $(curLoc)) fArgTys1
         (argExprs, concat -> argDecls) <- unzip <$>
           mapM (\(e,t) -> mkExpr False Concurrent (NetlistId dstId t) e)

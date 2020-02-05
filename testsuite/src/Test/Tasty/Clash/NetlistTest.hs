@@ -92,8 +92,8 @@ runToNetlistStage target f src = do
   (bm, tcm, tupTcm, tes, pm, rs)
     <- generateBindings Auto pds (opt_importPaths opts) [] (hdlKind backend) src Nothing
 
-  let teNames = fmap fstTriple tes
-      te      = fstTriple (P.head tes)
+  let teNames = fmap topId tes
+      te      = topId (P.head tes)
       reprs   = buildCustomReprs rs
 
   supplyN <- Supply.newSupply
@@ -105,8 +105,6 @@ runToNetlistStage target f src = do
  where
   backend = mkBackend target
   opts = f mkClashOpts
-
-  fstTriple (x, _, _) = x
 
   netlistFrom (bm, tcm, tes, pm, rs, te) =
     genNetlist False opts rs bm tes pm tcm typeTrans
