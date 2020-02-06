@@ -8,13 +8,15 @@
   Module that connects all the parts of the Clash compiler library
 -}
 
+{-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE NondecreasingIndentation #-}
+{-# LANGUAGE QuasiQuotes #-}
 
 module Clash.Driver where
 
 import qualified Control.Concurrent.Supply        as Supply
 import           Control.DeepSeq
-import           Control.Exception                (tryJust, bracket)
+import           Control.Exception                (tryJust, bracket, throw)
 import           Control.Lens                     (view, (^.), _4)
 import           Control.Monad                    (guard, when, unless, foldM)
 import           Control.Monad.Catch              (MonadMask)
@@ -30,6 +32,8 @@ import           Data.List                        (intercalate)
 import           Data.Maybe                       (fromMaybe)
 import           Data.Semigroup.Monad
 import qualified Data.Set                         as Set
+import           Data.String.Interpolate          (i)
+import           Data.String.Interpolate.Util     (unindent)
 import qualified Data.Text
 import           Data.Text.Lazy                   (Text)
 import qualified Data.Text.Lazy                   as Text
@@ -53,7 +57,9 @@ import           System.IO.Temp
 import           Text.Trifecta.Result
   (Result(Success, Failure), _errDoc)
 import           Text.Read                        (readMaybe)
+import           PrelNames                        (eqTyConKey)
 import           SrcLoc                           (SrcSpan)
+import           Unique                           (getKey)
 import           Util                             (OverridingBool(Auto))
 import           GHC.BasicTypes.Extra             ()
 
@@ -61,31 +67,119 @@ import           Clash.Annotations.Primitive
   (HDL (..))
 import           Clash.Annotations.BitRepresentation.Internal
   (CustomReprs)
-import           Clash.Annotations.TopEntity      (TopEntity (..))
+import           Clash.Annotations.TopEntity
+  (TopEntity (..), PortName(PortName, PortProduct))
 import           Clash.Annotations.TopEntity.Extra ()
 import           Clash.Backend
 import           Clash.Core.Evaluator.Types       (PrimStep, PrimUnwind)
 import           Clash.Core.Name                  (Name (..))
-import           Clash.Core.Term                  (Term)
-import           Clash.Core.Type                  (Type)
+import           Clash.Core.Pretty                (PrettyOptions(..), showPpr')
+import           Clash.Core.Term                  (Term(TyLam, Lam))
+import           Clash.Core.Type
+  (Type(VarTy), TypeView(TyConApp), tyView)
 import           Clash.Core.TyCon                 (TyConMap, TyConName)
-import           Clash.Core.Var                   (Id, varName, varUniq)
-import           Clash.Core.VarEnv                (elemVarEnv, emptyVarEnv)
+import           Clash.Core.Var
+  (Id, varName, varUniq, varType)
+import           Clash.Core.VarEnv
+  (elemVarEnv, emptyVarEnv, emptyInScopeSet, lookupVarEnv)
 import           Clash.Driver.Types
 import           Clash.Netlist                    (genNetlist)
 import           Clash.Netlist.Util               (genComponentName, genTopComponentName)
 import           Clash.Netlist.BlackBox.Parser    (runParse)
 import           Clash.Netlist.BlackBox.Types     (BlackBoxTemplate, BlackBoxFunction)
 import           Clash.Netlist.Types
-  (BlackBox (..), Component (..), Identifier, FilteredHWType, HWMap, SomeBackend (..))
+  (BlackBox (..), Component (..), Identifier, FilteredHWType, HWMap,
+   SomeBackend (..), TopEntityT(..))
 import           Clash.Normalize                  (checkNonRecursive, cleanupGraph,
                                                    normalize, runNormalization)
+import           Clash.Normalize.Transformations  (separateLambda)
 import           Clash.Normalize.Util             (callGraph)
 import           Clash.Primitives.Types
 import           Clash.Primitives.Util            (hashCompiledPrimMap)
+import           Clash.Rewrite.Types              (TransformContext(..))
 import           Clash.Unique                     (keysUniqMap, lookupUniqMap')
-import           Clash.Util                       (first, reportTimeDiff, wantedLanguageExtensions, unwantedLanguageExtensions)
+import           Clash.Util
+  (ClashException(..), HasCallStack, first, reportTimeDiff,
+   wantedLanguageExtensions, unwantedLanguageExtensions)
 import           Clash.Util.Graph                 (reverseTopSort)
+
+-- | Worker function of 'splitTopEntityT'
+splitTopAnn
+  :: TyConMap
+  -> SrcSpan
+  -- ^ Source location of top entity (for error reporting)
+  -> Term
+  -- ^ Top entity body
+  -> TopEntity
+  -- ^ Port annotations for top entity
+  -> TopEntity
+  -- ^ New top entity with split ports (or the old one if not applicable)
+splitTopAnn tcm sp (TyLam _ e) t = splitTopAnn tcm sp e t
+splitTopAnn tcm sp (Lam v e) t
+  -- Skip eq dicts, see 'substWithTyEq'
+  | TyConApp (nameUniq -> tcUniq) [_,VarTy _, _] <- tyView (varType v)
+  , tcUniq == getKey eqTyConKey
+  = splitTopAnn tcm sp e t
+splitTopAnn tcm sp e t@Synthesize{t_inputs} =
+  t{t_inputs=go e t_inputs}
+ where
+  go :: Term -> [PortName] -> [PortName]
+  go _ [] = []
+  go (Lam b eb) (p:ps) =
+    case separateLambda tcm tctx b eb of
+      Just (newLam, n) ->
+        -- Port must be split up into 'n' pieces.. can it?
+        case p of
+          PortProduct nm portNames0 ->
+            let
+              newPortNames = map (PortName . show) [(0::Int)..]
+              portNames1 = map (prependName nm) (portNames0 ++ newPortNames)
+            in
+              go newLam (take n portNames1 ++ ps)
+          PortName nm ->
+            throw (flip (ClashException sp) Nothing $ unindent $ [i|
+              Couldn't separate clock, reset, or enable from a product type due
+              to a malformed Synthesize annotation. All clocks, resets, and
+              enables should be given a unique port name.
+
+              Type to split:
+
+              #{showPpr' (PrettyOptions False True False) (varType b)}
+
+              Given port annotation: #{p}. You might want to use the
+              following instead: PortProduct #{show nm} []. This allows Clash to
+              autogenerate names based the name #{show nm}.
+            |])
+      Nothing ->
+        -- No need to split the port, carrying on..
+        p : go eb ps
+  go _ ps = ps
+
+  -- Empty transformcontext; this transformation doesn't care about binder names
+  tctx = TransformContext emptyInScopeSet []
+
+  prependName :: String -> PortName -> PortName
+  prependName p (PortProduct nm ps) = PortProduct (p ++ "_" ++ nm) ps
+  prependName p (PortName nm) = PortName (p ++ "_" ++ nm)
+
+splitTopAnn _ _ _ t = t
+
+-- When splitting up a single argument into multiple arguments (see docs of
+-- 'separateArguments') we should make sure to update TopEntity annotations
+-- accordingly. See: https://github.com/clash-lang/clash-compiler/issues/1033
+splitTopEntityT
+  :: HasCallStack
+  => TyConMap
+  -> BindingMap
+  -> TopEntityT
+  -> TopEntityT
+splitTopEntityT tcm bindingsMap tt@(TopEntityT id_ (Just t@(Synthesize {})) _) =
+  case lookupVarEnv id_ bindingsMap of
+    Just (_id, sp, _, term) ->
+      tt{topAnnotation=Just (splitTopAnn tcm sp term t)}
+    Nothing ->
+      error "Internal error in 'splitTopEntityT'. Please report as a bug."
+splitTopEntityT _ _ t = t
 
 -- | Get modification data of current clash binary.
 getClashModificationDate :: IO Clock.UTCTime
@@ -109,26 +203,23 @@ generateHDL
   -- ^ Hardcoded 'Type' -> 'HWType' translator
   -> (PrimStep, PrimUnwind)
   -- ^ Hardcoded evaluator (delta-reduction)
-  -> [( Id
-      , Maybe TopEntity
-      , Maybe Id
-      )]
-  -- ^ topEntity bndr
-  -- + (maybe) TopEntity annotation
-  -- + (maybe) testBench bndr
+  -> [TopEntityT]
+  -- ^ Topentities and associated testbench
   -> ClashOpts
   -- ^ Debug information level for the normalization process
   -> (Clock.UTCTime,Clock.UTCTime)
   -> IO ()
 generateHDL reprs bindingsMap hdlState primMap tcm tupTcm typeTrans eval
-  topEntities opts (startTime,prepTime) =
-    go prepTime HashMap.empty (sortTop bindingsMap topEntities)
+  topEntities0 opts (startTime,prepTime) =
+    go prepTime HashMap.empty (sortTop bindingsMap topEntities1)
  where
+  topEntities1 = map (splitTopEntityT tcm bindingsMap) topEntities0
+
   go prevTime _ [] = putStrLn $ "Clash: Total compilation took " ++
                                 reportTimeDiff prevTime startTime
 
   -- Process the next TopEntity
-  go prevTime seen ((topEntity,annM,benchM):topEntities') = do
+  go prevTime seen (TopEntityT topEntity annM benchM:topEntities') = do
   let topEntityS = Data.Text.unpack (nameOcc (varName topEntity))
   putStrLn $ "Clash: Compiling " ++ topEntityS
 
@@ -259,7 +350,7 @@ generateHDL reprs bindingsMap hdlState primMap tcm tupTcm typeTrans eval
                     . snd
                     . Supply.freshId
                    <$> Supply.newSupply
-  let topEntityNames = map (\(x,_,_) -> x) topEntities
+  let topEntityNames = map topId topEntities1
 
   (topTime,manifest',seen') <- if useCacheTop
     then do
@@ -287,7 +378,7 @@ generateHDL reprs bindingsMap hdlState primMap tcm tupTcm typeTrans eval
       prepareDir (opt_cleanhdl opts) (extension hdlState') dir
       -- Now start the netlist generation
       (netlist,seen') <-
-        genNetlist False opts reprs transformedBindings topEntities primMap
+        genNetlist False opts reprs transformedBindings topEntities1 primMap
                    tcm typeTrans iw mkId extId ite (SomeBackend hdlState') seen hdlDir prefixM topEntity
 
       netlistTime <- netlist `deepseq` Clock.getCurrentTime
@@ -327,7 +418,7 @@ generateHDL reprs bindingsMap hdlState primMap tcm tupTcm typeTrans eval
       prepareDir (opt_cleanhdl opts) (extension hdlState2) dir
       -- Now start the netlist generation
       (netlist,seen'') <-
-        genNetlist True opts reprs transformedBindings topEntities primMap
+        genNetlist True opts reprs transformedBindings topEntities1 primMap
                    tcm typeTrans iw mkId extId ite (SomeBackend hdlState') seen' hdlDir prefixM tb
 
       netlistTime <- netlist `deepseq` Clock.getCurrentTime
@@ -705,32 +796,23 @@ normalizeEntity reprs bindingsMap primMap tcm tupTcm typeTrans eval topEntities
 -- | topologically sort the top entities
 sortTop
   :: BindingMap
-  -> [( Id
-      , Maybe TopEntity
-      , Maybe Id
-      )]
-  -- ^ topEntity bndr
-  -- + (maybe) TopEntity annotation
-  -- + (maybe) testBench bndr
-  -> [( Id
-      , Maybe TopEntity
-      , Maybe Id
-      )]
-  -- ^ topEntity bndr
-  -- + (maybe) TopEntity annotation
-  -- + (maybe) testBench bndr
+  -> [TopEntityT]
+  -> [TopEntityT]
 sortTop bindingsMap topEntities =
   let (nodes,edges) = unzip (map go topEntities)
   in  case reverseTopSort nodes (concat edges) of
         Left msg   -> error msg
         Right tops -> tops
  where
-  go t@(topE,_,tbM) =
+  go t@(TopEntityT topE _ tbM) =
     let topRefs = goRefs topE topE
         tbRefs  = maybe [] (goRefs topE) tbM
     in  ((varUniq topE,t)
-         ,map ((\(v,_,_) -> (varUniq topE, varUniq v))) (tbRefs ++ topRefs))
+         ,map ((\top -> (varUniq topE, varUniq (topId top)))) (tbRefs ++ topRefs))
 
-  goRefs top i =
-    let cg = callGraph bindingsMap i
-    in  filter (\(v,_,_) -> v /= top && v /= i && v `elemVarEnv` cg) topEntities
+  goRefs top i_ =
+    let cg = callGraph bindingsMap i_
+    in
+      filter
+        (\t -> topId t /= top && topId t /= i_ && topId t `elemVarEnv` cg)
+        topEntities

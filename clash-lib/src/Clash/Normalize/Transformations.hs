@@ -55,6 +55,7 @@ module Clash.Normalize.Transformations
   , etaExpandSyn
   , appPropFast
   , separateArguments
+  , separateLambda
   , xOptimize
   )
 where
@@ -2443,6 +2444,38 @@ flattenLet (TransformContext is0 _) letrec@(Letrec _ _) = do
 
 flattenLet _ e = return e
 
+-- | Worker function of 'separateArguments'. It's reused in "Clash.Driver".
+separateLambda
+  :: TyConMap
+  -> TransformContext
+  -> Id
+  -- ^ Lambda binder
+  -> Term
+  -- ^ Lambda body
+  -> Maybe (Term, Int)
+  -- ^ If lambda is split up, this function returns a Just containing the new
+  -- term plus the number of binders the single lambda binder was split up into.
+separateLambda tcm ctx@(TransformContext is0 _) b eb0 =
+  case shouldSplit tcm (varType b) of
+    Just (dc,argTys@(_:_:_)) ->
+      let
+        nm = mkDerivedName ctx (nameOcc (varName b))
+        bs0 = map (`mkLocalId` nm) argTys
+        (is1, bs1) = List.mapAccumL newBinder is0 bs0
+        subst = extendIdSubst (mkSubst is1) b (mkApps dc (map (Left . Var) bs1))
+        eb1 = substTm "separateArguments" subst eb0
+      in
+        Just (mkLams eb1 bs1, length bs1)
+    _ ->
+      Nothing
+ where
+  newBinder isN0 x =
+    let
+      x' = uniqAway isN0 x
+      isN1 = extendInScopeSet isN0 x'
+    in
+      (isN1, x')
+
 -- | Split apart (global) function arguments that contain types that we
 -- want to separate off, e.g. Clocks. Works on both the definition side (i.e. the
 -- lambda), and the call site (i.e. the application of the global variable). e.g.
@@ -2454,23 +2487,11 @@ flattenLet _ e = return e
 --
 -- > f :: Clock System -> Reset System -> Signal System Int
 separateArguments :: HasCallStack => NormRewrite
-separateArguments ctx@(TransformContext is0 _) e@(Lam b eb0) = do
+separateArguments ctx e0@(Lam b eb) = do
   tcm <- Lens.view tcCache
-  case shouldSplit tcm (varType b) of
-    Just (dc,argTys@(_:_:_)) -> do
-      let nm      = mkDerivedName ctx (nameOcc (varName b))
-          bs0     = map (`mkLocalId` nm) argTys
-          (is1,bs1) = List.mapAccumL newBinder is0 bs0
-          subst   = extendIdSubst (mkSubst is1) b (mkApps dc (map (Left . Var) bs1))
-          eb1     = substTm "separateArguments" subst eb0
-      changed (mkLams eb1 bs1)
-    _ ->
-      return e
- where
-  newBinder isN0 x =
-    let x'   = uniqAway isN0 x
-        isN1 = extendInScopeSet isN0 x'
-    in  (isN1,x')
+  case separateLambda tcm ctx b eb of
+    Just (e1, _n) -> changed e1
+    Nothing -> return e0
 
 separateArguments (TransformContext is0 _) e@(collectArgsTicks -> (Var g, args, ticks))
   | isGlobalId g = do

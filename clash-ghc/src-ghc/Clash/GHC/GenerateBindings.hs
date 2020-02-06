@@ -41,7 +41,6 @@ import qualified Var                     as GHC
 import qualified SrcLoc                  as GHC
 
 import           Clash.Annotations.BitRepresentation.Internal (DataRepr')
-import           Clash.Annotations.TopEntity (TopEntity)
 import           Clash.Annotations.Primitive (HDL, extractPrim)
 
 import           Clash.Core.Subst        (extendGblSubstList, mkSubst, substTm)
@@ -60,6 +59,7 @@ import           Clash.GHC.GHC2Core
    makeAllTyCons, qualifiedNameString, emptyGHC2CoreState)
 import           Clash.GHC.LoadModules   (ghcLibDir, loadModules)
 import           Clash.Netlist.BlackBox.Util (usedArguments)
+import           Clash.Netlist.Types     (TopEntityT(..))
 import           Clash.Primitives.Types
   (Primitive (..), CompiledPrimMap)
 import           Clash.Primitives.Util   (generatePrimMap)
@@ -85,10 +85,7 @@ generateBindings
   -> IO ( BindingMap
         , TyConMap
         , IntMap TyConName
-        , [( Id
-           , Maybe TopEntity -- (maybe) TopEntity annotation
-           , Maybe Id        -- (maybe) associated testbench
-           )]
+        , [TopEntityT]
         , CompiledPrimMap  -- The primitives found in '.' and 'primDir'
         , [DataRepr']
         )
@@ -124,11 +121,13 @@ generateBindings useColor primDirs importDirs dbs hdl modName dflagsM = do
         (\m -> fst (RWS.evalRWS m GHC.noSrcSpan tcMap')) $ mapM (\(topEnt,annM,benchM) -> do
           topEnt' <- coreToName GHC.varName GHC.varUnique qualifiedNameString topEnt
           benchM' <- traverse coreToId benchM
-          return (topEnt',annM,benchM')) topEntities
-      topEntities''                 = map (\(topEnt,annM,benchM) -> case lookupUniqMap topEnt allBindings of
-                                              Just (v,_,_,_) -> (v,annM,benchM)
-                                              Nothing        -> error "This shouldn't happen"
-                                          ) topEntities'
+          return (topEnt', annM, benchM')) topEntities
+      topEntities'' =
+        map (\(topEnt, annM, benchM) ->
+                case lookupUniqMap topEnt allBindings of
+                  Just (v,_,_,_) -> TopEntityT v annM benchM
+                  Nothing -> error "This shouldn't happen"
+            ) topEntities'
   -- Parsing / compiling primitives:
   prepTime  <- startTime `deepseq` primMapC `seq` Clock.getCurrentTime
   let prepStartDiff = reportTimeDiff prepTime startTime

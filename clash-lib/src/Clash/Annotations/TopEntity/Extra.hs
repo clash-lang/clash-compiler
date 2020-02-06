@@ -9,12 +9,14 @@
 module Clash.Annotations.TopEntity.Extra where
 
 import Clash.Annotations.TopEntity (TopEntity, PortName)
+import Clash.Netlist.Types (TopEntityT)
 import Language.Haskell.TH.Syntax
   (ModName, Name, NameFlavour, NameSpace, PkgName, OccName)
 import Data.Binary                 (Binary)
 import Data.Hashable               (Hashable)
 import Control.DeepSeq             (NFData)
 
+instance Binary TopEntityT
 instance Binary TopEntity
 instance Binary PortName
 
@@ -25,6 +27,7 @@ instance Binary ModName
 instance Binary NameSpace
 instance Binary PkgName
 
+instance Hashable TopEntityT
 instance Hashable TopEntity
 instance Hashable PortName
 
@@ -35,6 +38,7 @@ instance Hashable NameSpace
 instance Hashable PkgName
 instance Hashable OccName
 
+instance NFData TopEntityT
 instance NFData TopEntity
 instance NFData PortName
 

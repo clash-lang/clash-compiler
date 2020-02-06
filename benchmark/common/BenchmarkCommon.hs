@@ -6,7 +6,6 @@
 module BenchmarkCommon where
 
 import Clash.Annotations.BitRepresentation.Internal (CustomReprs, buildCustomReprs)
-import Clash.Annotations.TopEntity
 import Clash.Backend
 import Clash.Backend.VHDL
 import Clash.Core.TyCon
@@ -18,7 +17,7 @@ import Clash.GHC.Evaluator
 import Clash.GHC.GenerateBindings
 import Clash.GHC.NetlistTypes
 import Clash.Netlist.BlackBox.Types (HdlSyn(Other))
-import Clash.Netlist.Types          (HWMap, FilteredHWType)
+import Clash.Netlist.Types          (HWMap, FilteredHWType, TopEntityT, topId)
 import Clash.Primitives.Types
 
 import Util (OverridingBool(..))
@@ -58,7 +57,7 @@ runInputStage
   -> IO (BindingMap
         ,TyConMap
         ,IntMap TyConName
-        ,[(Id, Maybe TopEntity, Maybe Id)]
+        ,[TopEntityT]
         ,CompiledPrimMap
         ,CustomReprs
         ,[Id]
@@ -67,16 +66,15 @@ runInputStage
 runInputStage idirs src = do
   pds <- primDirs backend
   (bindingsMap,tcm,tupTcm,topEntities,primMap,reprs) <- generateBindings Auto pds idirs [] (hdlKind backend) src Nothing
-  let topEntityNames = map (\(x,_,_) -> x) topEntities
-      ((topEntity,_,_):_) = topEntities
-      tm = topEntity
+  let topEntityNames = map topId topEntities
+      tm = head topEntityNames
   return (bindingsMap,tcm,tupTcm,topEntities, primMap, buildCustomReprs reprs, topEntityNames,tm)
 
 runNormalisationStage
   :: [FilePath]
   -> String
   -> IO (BindingMap
-        ,[(Id, Maybe TopEntity, Maybe Id)]
+        ,[TopEntityT]
         ,CompiledPrimMap
         ,TyConMap
         ,CustomReprs

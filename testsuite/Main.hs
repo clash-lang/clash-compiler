@@ -95,6 +95,7 @@ runClashTest = defaultMain $ clashTestRoot
       , runFailingTest ("tests" </> "shouldfail" </> "InvalidPrimitive") [VHDL] ["-itests/shouldfail/InvalidPrimitive"] "InvalidPrimitive" (Just "InvalidPrimitive.json")
       -- Disabled, due to it eating gigabytes of memory:
       -- , runFailingTest ("tests" </> "shouldfail") allTargets [] "RecursivePoly" (Just "??")
+      , runFailingTest ("tests" </> "shouldfail" </> "TopEntity") allTargets [] "T1033" (Just "PortProduct \"wrong\" []")
       ]
     , clashTestGroup "shouldwork"
       [ clashTestGroup "AutoReg"
@@ -382,6 +383,8 @@ runClashTest = defaultMain $ clashTestRoot
         , outputTest ("tests" </> "shouldwork" </> "TopEntity") [Verilog] [] [] "PortNamesWithRTree" "main"
         , runTest "TopEntHOArg" def{entities=Entities ["f", "g"], topEntity=TopEntity "f", hdlSim=False}
         , runTest "T701" def {hdlSim=False,entities=Entities ["mynot", ""]}
+        , runTest "T1033" def {hdlSim=False,entities=Entities ["top", ""], topEntity=TopEntity "top"}
+        , outputTest ("tests" </> "shouldwork" </> "TopEntity") allTargets [] [] "T1033" "main"
         ]
       , clashTestGroup "Unit"
         [ runTest "Imap" def
