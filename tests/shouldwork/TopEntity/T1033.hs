@@ -11,7 +11,8 @@ import qualified Prelude as P
   (Synthesize
     { t_name   = "top"
     , t_inputs =
-        [ PortName "theHiddenClock"
+        [ PortName "dummy name for the TyEq-constraint"
+        , PortName "theHiddenClock"
         , PortProduct "en_int" [PortName "theEnable", PortName "a"]
         , PortProduct "int_int_rst" [PortName "b", PortProduct "int_rst" []]
         ]
@@ -19,7 +20,7 @@ import qualified Prelude as P
     }
   )#-}
 topEntity
-  :: ( dom ~ System       -- Check whether Clash skips eq constraints
+  :: ( dom ~ System        -- gets the 1st name, just like it would be ~ARG[0] in a blackbox
      , HiddenClock dom )   -- Hidden* consists of some construct and a
                            -- KnownDomain. We don't want them to split off.
   => (Enable dom, Signal dom Int)

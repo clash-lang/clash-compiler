@@ -28,6 +28,8 @@ module Clash.Normalize.Util
  , rewriteExpr
  , removedTm
  , mkInlineTick
+ , substWithTyEq
+ , tvSubstWithTyEq
  )
  where
 
@@ -50,13 +52,15 @@ import           Clash.Core.FreeVars
 import           Clash.Core.Name         (Name(nameOcc,nameUniq))
 import           Clash.Core.Pretty       (showPpr)
 import           Clash.Core.Subst
-  (deShadowTerm, extendTvSubstList, mkSubst, substTm, extendIdSubstList)
+  (deShadowTerm, extendTvSubst, extendTvSubstList, mkSubst, substTm, substTy,
+   substId, extendIdSubst)
 import           Clash.Core.Term
   (Context, CoreContext(AppArg), PrimInfo (..), Term (..), WorkInfo (..),
    TickInfo(NameMod), NameMod(PrefixName), collectArgs, collectArgsTicks)
 import           Clash.Core.TyCon        (TyConMap)
 import           Clash.Core.Type
-  (Type(LitTy, VarTy), LitTy(SymTy), TypeView (TyConApp), tyView, undefinedTy)
+  (Type(LitTy, VarTy), LitTy(SymTy), TypeView (..), tyView, undefinedTy,
+   splitFunForallTy, splitTyConAppM, mkPolyFunTy)
 import           Clash.Core.Util
   (isClockOrReset, isPolyFun, termType, mkApps, mkTicks)
 import           Clash.Core.Var          (Id, TyVar, Var (..), isGlobalId)
@@ -421,39 +425,66 @@ normalizeTopLvlBndr isTop nm (Binding nm' sp inl tm) = makeCachedU nm (extra.nor
 --
 -- we create the substitution [dom := "System"] and apply it to create:
 --
--- > \(eta : Signal "System" Bool) . eta
+-- > \(eq : "System" ~ "System") . \(eta : Signal "System" Bool) . eta
 --
 -- __NB:__ Users of this function should ensure it's only applied to TopEntities
 substWithTyEq
   :: Term
   -> Term
-substWithTyEq e0 = go [] [] [] e0
+substWithTyEq e0 = go [] False [] e0
  where
   go
     :: [TyVar]
-    -> [(TyVar,Type)]
+    -> Bool
     -> [Id]
     -> Term
     -> Term
-  go tvs cvs ids_ (TyLam tv e) = go (tv:tvs) cvs ids_ e
-  go tvs cvs ids_ (Lam v e)
+  go tvs changed ids_ (TyLam tv e) = go (tv:tvs) changed ids_ e
+  go tvs changed ids_ (Lam v e)
     | TyConApp (nameUniq -> tcUniq) (tvFirst -> Just (tv, ty)) <- tyView (varType v)
     , tcUniq == getKey eqTyConKey
     , tv `elem` tvs
-    = go (tvs List.\\ [tv]) ((tv,ty):cvs) (v:ids_) e
-  go tvs cvs@(_:_) ids_ e =
+    = let
+        subst0 = extendTvSubst (mkSubst emptyInScopeSet) tv ty
+        subst1 = extendIdSubst subst0 v (removedTm (varType v))
+      in go (tvs List.\\ [tv]) True (substId subst0 v : ids_) (substTm "substWithTyEq e" subst1 e)
+    | otherwise = go tvs changed (v:ids_) e
+  go tvs True ids_ e =
     let
       e1 = List.foldl' (flip TyLam) e tvs
-      subst0 = extendTvSubstList (mkSubst emptyInScopeSet) cvs
-      subst1 = extendIdSubstList subst0 [(v, removedTm (varType v)) | v <- ids_]
-    in
-      (substTm "substWithTyEq" subst1 e1)
-  go _ _ _ _ = e0
+      e2 = List.foldl' (flip Lam) e1 ids_
+    in e2
+  go _ False _ _ = e0
 
-  -- Type equality (~) is symetrical, so users could write: (dom ~ System) or (System ~ dom)
-  tvFirst [_, VarTy tv, ty] = Just (tv, ty)
-  tvFirst [_, ty, VarTy tv] = Just (tv, ty)
-  tvFirst _ = Nothing
+-- Type equality (~) is symmetrical, so users could write: (dom ~ System) or (System ~ dom)
+tvFirst :: [Type] -> Maybe (TyVar, Type)
+tvFirst [_, VarTy tv, ty] = Just (tv, ty)
+tvFirst [_, ty, VarTy tv] = Just (tv, ty)
+tvFirst _ = Nothing
+
+-- | The type equivalent of 'substWithTyEq'
+tvSubstWithTyEq
+  :: Type
+  -> Type
+tvSubstWithTyEq ty0 = go [] args0
+ where
+  (args0,tyRes) = splitFunForallTy ty0
+
+  go :: [(TyVar,Type)] -> [Either TyVar Type] -> Type
+  go eqs (Right arg : args)
+    | Just (tc,tcArgs) <- splitTyConAppM arg
+    , nameUniq tc == getKey eqTyConKey
+    , Just eq <- tvFirst tcArgs
+    = go (eq:eqs) args
+    | otherwise = go eqs args
+  go eqs (Left _tv : args)
+    = go eqs args -- drop (ForAll) tv
+  go []  [] = ty0 -- no eq constraints, returning original type
+  go eqs [] = substTy subst ty2
+   where
+     subst = extendTvSubstList (mkSubst emptyInScopeSet) eqs
+     args2 = args0 List.\\ (map (Left . fst) eqs)
+     ty2 = mkPolyFunTy tyRes args2
 
 -- | Rewrite a term according to the provided transformation
 rewriteExpr :: (String,NormRewrite) -- ^ Transformation to apply
