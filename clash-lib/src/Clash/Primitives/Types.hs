@@ -20,6 +20,7 @@ module Clash.Primitives.Types
   , TemplateFormat(..)
   , BlackBoxFunctionName(..)
   , Primitive(..)
+  , UsedArguments(..)
   , GuardedCompiledPrimitive
   , GuardedResolvedPrimitive
   , PrimMap
@@ -129,6 +130,14 @@ data TemplateFormat
   | THaskell
   deriving (Show, Generic, Hashable, NFData)
 
+-- | Data type to indicate what arguments are in use by a BlackBox
+data UsedArguments
+  = UsedArguments [Int]
+  -- ^ Only these are used
+  | IgnoredArguments [Int]
+  -- ^ All but these are used
+  deriving (Show, Generic, Hashable, NFData, Binary)
+
 -- | Externally defined primitive
 data Primitive a b c d
   -- | Primitive template written in a Clash specific templating language
@@ -189,6 +198,8 @@ data Primitive a b c d
     -- ^ Name of the primitive
   , workInfo  :: WorkInfo
     -- ^ Whether the primitive does any work, i.e. takes chip area
+  , usedArguments :: UsedArguments
+  -- ^ Arguments used by blackbox. Used to remove arguments during normalization.
   , functionName :: BlackBoxFunctionName
   , function :: d
   -- ^ Holds blackbox function and its hash, (Int, BlackBoxFunction), in a
@@ -213,6 +224,16 @@ instance FromJSON UnresolvedPrimitive where
       [(conKey,Object conVal)] ->
         case conKey of
           "BlackBoxHaskell"  -> do
+            usedArguments <- conVal .:? "usedArguments"
+            ignoredArguments <- conVal .:? "ignoredArguments"
+            args <-
+              case (usedArguments, ignoredArguments) of
+                (Nothing, Nothing) -> pure (IgnoredArguments [])
+                (Just a, Nothing) -> pure (UsedArguments a)
+                (Nothing, Just a) -> pure (IgnoredArguments a)
+                (Just _, Just _) ->
+                  fail "[8] Don't use both 'usedArguments' and 'ignoredArguments'"
+
             name' <- conVal .: "name"
             wf    <- ((conVal .:? "workInfo" >>= maybe (pure Nothing) parseWorkInfo) .!= WorkVariable)
             fName <- conVal .: "templateFunction"
@@ -220,7 +241,7 @@ instance FromJSON UnresolvedPrimitive where
                  <|> (Just . TFile   <$> conVal .: "file")
                  <|> (pure Nothing)
             fName' <- either fail return (parseBBFN fName)
-            return (BlackBoxHaskell name' wf fName' templ)
+            return (BlackBoxHaskell name' wf args fName' templ)
           "BlackBox"  ->
             BlackBox <$> conVal .: "name"
                      <*> (conVal .:? "workInfo" >>= maybe (pure Nothing) parseWorkInfo) .!= WorkVariable

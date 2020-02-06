@@ -1009,9 +1009,9 @@ usedVariables (BlackBoxE _ _ _ _ t bb _) = nub (sList ++ sList')
     sList' = concatMap (walkElement matchVar) t'
 
 -- | Collect arguments (e.g., ~ARG, ~LIT) used in this blackbox
-usedArguments :: N.BlackBox -> [Int]
-usedArguments (N.BBFunction _nm _hsh (N.TemplateFunction k _ _)) = k
-usedArguments (N.BBTemplate t) = nub (concatMap (walkElement matchArg) t)
+getUsedArguments :: N.BlackBox -> [Int]
+getUsedArguments (N.BBFunction _nm _hsh (N.TemplateFunction k _ _)) = k
+getUsedArguments (N.BBTemplate t) = nub (concatMap (walkElement matchArg) t)
   where
     matchArg =
       \case

@@ -103,8 +103,9 @@ resolvePrimitive' metaPath BlackBox{template=t, includes=i, resultName=r, result
   case warning of
     Just w  -> pure (name, WarnNonSynthesizable (TS.unpack w) bb)
     Nothing -> pure (name, HasBlackBox bb)
-resolvePrimitive' metaPath (BlackBoxHaskell bbName wf funcName t) =
-  (bbName,) . HasBlackBox . BlackBoxHaskell bbName wf funcName <$> (mapM (resolveTemplateSource metaPath) t)
+resolvePrimitive' metaPath (BlackBoxHaskell bbName wf usedArgs funcName t) =
+  (bbName,) . HasBlackBox . BlackBoxHaskell bbName wf usedArgs funcName <$>
+    (mapM (resolveTemplateSource metaPath) t)
 
 -- | Interprets contents of json file as list of @Primitive@s. Throws
 -- exception if it fails.

@@ -328,7 +328,7 @@ mkPrimitive bbEParen bbEasD dst pInfo args tickDecls =
       -> NetlistMonad (Expr, [Declaration])
     go =
       \case
-        P.BlackBoxHaskell bbName wf funcName (_fHash, func) -> do
+        P.BlackBoxHaskell bbName wf _usedArgs funcName (_fHash, func) -> do
           bbFunRes <- func bbEasD (primName pInfo) args ty
           case bbFunRes of
             Left err -> do
@@ -855,7 +855,7 @@ mkFunInput resId e =
                   error $ $(curLoc) ++ "Unexpected blackbox type: "
                                     ++ "Primitive " ++ show pn
                                     ++ " " ++ show pt
-                P.BlackBoxHaskell pName _workInfo fName (_, func) -> do
+                P.BlackBoxHaskell pName _workInfo _usedArgs fName (_, func) -> do
                   -- Determine result type of this blackbox. If it's not a
                   -- function, simply use its term type.
                   let
