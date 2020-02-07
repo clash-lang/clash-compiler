@@ -220,7 +220,7 @@ applyDebug lvl _transformations name exprOld hasChanged exprNew =
                      , "substitution."
                      ])
 
-    traceIf (lvl >= DebugAll && (beforeTy `aeqType` afterTy))
+    traceIf (lvl >= DebugApplied && (not (beforeTy `aeqType` afterTy)))
             ( concat [ $(curLoc)
                      , "Error when applying rewrite ", name
                      , " to:\n" , before

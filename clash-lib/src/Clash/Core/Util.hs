@@ -9,6 +9,7 @@
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE QuasiQuotes #-}
 {-# LANGUAGE TemplateHaskell #-}
 
 module Clash.Core.Util where
@@ -23,6 +24,7 @@ import Data.List
 import           Data.List.Extra               (nubOrd)
 import Data.Maybe
   (fromJust, isJust, mapMaybe, catMaybes)
+import qualified Data.String.Interpolate       as I
 import qualified Data.Text                     as T
 import           Data.Text.Prettyprint.Doc     (line)
 #if !MIN_VERSION_base(4,11,0)
@@ -39,7 +41,7 @@ import Clash.Core.Name
 import Clash.Core.Pretty                       (ppr, showPpr)
 import Clash.Core.Subst
   (extendTvSubst, mkSubst, mkTvSubst, substTy, substTyWith,
-   substTyInVar, extendTvSubstList)
+   substTyInVar, extendTvSubstList, aeqType)
 import Clash.Core.Term
   (LetBinding, Pat (..), PrimInfo (..), Term (..), Alt, WorkInfo (..),
    TickInfo (..), collectArgs)
@@ -327,7 +329,8 @@ applyTypeToArgs e m opTy args = go opTy args
 -- Do not iterate 'piResultTy', because it's inefficient to substitute one
 -- variable at a time; instead use 'piResultTys'
 piResultTy
-  :: TyConMap
+  :: HasCallStack
+  => TyConMap
   -> Type
   -> Type
   -> Type
@@ -340,15 +343,26 @@ piResultTy m ty arg = case piResultTyMaybe m ty arg of
 -- Do not iterate 'piResultTyMaybe', because it's inefficient to substitute one
 -- variable at a time; instead use 'piResultTys'
 piResultTyMaybe
-  :: TyConMap
+  :: HasCallStack
+  => TyConMap
   -> Type
   -> Type
   -> Maybe Type
 piResultTyMaybe m ty arg
   | Just ty' <- coreView1 m ty
   = piResultTyMaybe m ty' arg
-  | FunTy _ res <- tyView ty
-  = Just res
+  | FunTy a res <- tyView ty
+  = if debugIsOn && not (aeqType a arg) then error [I.i|
+      Unexpected application. A function with type:
+
+        #{showPpr ty}
+
+      Got applied to an argument of type:
+
+        #{showPpr arg}
+    |]
+    else
+      Just res
   | ForAllTy tv res <- ty
   = let emptySubst = mkSubst (mkInScopeSet (tyFVsOfTypes [arg,res]))
     in  Just (substTy (extendTvSubst emptySubst tv arg) res)
@@ -379,7 +393,8 @@ piResultTyMaybe m ty arg
 -- For efficiency reasons, when there are no foralls, we simply drop arrows from
 -- a function type/kind.
 piResultTys
-  :: TyConMap
+  :: HasCallStack
+  => TyConMap
   -> Type
   -> [Type]
   -> Type
@@ -387,8 +402,18 @@ piResultTys _ ty [] = ty
 piResultTys m ty origArgs@(arg:args)
   | Just ty' <- coreView1 m ty
   = piResultTys m ty' origArgs
-  | FunTy _ res <- tyView ty
-  = piResultTys m res args
+  | FunTy a res <- tyView ty
+  = if debugIsOn && not (aeqType a arg) then error [I.i|
+      Unexpected application. A function with type:
+
+        #{showPpr ty}
+
+      Got applied to an argument of type:
+
+        #{showPpr arg}
+    |]
+    else
+      piResultTys m res args
   | ForAllTy tv res <- ty
   = go (extendVarEnv tv arg emptyVarEnv) res args
   | otherwise
