@@ -16,6 +16,8 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TemplateHaskell #-}
 
+#include "../../ClashDebug.h"
+
 module Clash.Normalize.Transformations
   ( appProp
   , caseLet
@@ -78,6 +80,7 @@ import qualified Data.Maybe                  as Maybe
 import qualified Data.Monoid                 as Monoid
 import qualified Data.Primitive.ByteArray    as BA
 import qualified Data.Text                   as Text
+import           Data.Text.Prettyprint.Doc   ((<+>))
 import qualified Data.Vector.Primitive       as PV
 import           Debug.Trace
 import           GHC.Integer.GMP.Internals   (Integer (..), BigNat (..))
@@ -94,7 +97,7 @@ import           Clash.Core.FreeVars
   (localIdOccursIn, localIdsDoNotOccurIn, freeLocalIds, termFreeTyVars,
    typeFreeVars, localVarsDoNotOccurIn, localIdDoesNotOccurIn)
 import           Clash.Core.Literal          (Literal (..))
-import           Clash.Core.Pretty           (showPpr)
+import           Clash.Core.Pretty           (ppr, showPpr)
 import           Clash.Core.Subst
   (substTm, mkSubst, extendIdSubst, extendIdSubstList, extendTvSubst,
    extendTvSubstList, freshenTm, substTyInVar, deShadowTerm, deShadowAlt)
@@ -106,7 +109,7 @@ import           Clash.Core.Term
   )
 import           Clash.Core.Type             (Type, TypeView (..), applyFunTy,
                                               isPolyFunCoreTy, isClassTy,
-                                              normalizeType, splitFunForallTy,
+                                              splitFunForallTy,
                                               splitFunTy,
                                               tyView, mkPolyFunTy, coreView)
 import           Clash.Core.TyCon            (TyConMap, tyConDataCons)
@@ -838,6 +841,7 @@ removeUnusedExpr _ e = return e
 bindConstantVar :: HasCallStack => NormRewrite
 bindConstantVar = inlineBinders test
   where
+    test b (i,stripTicks -> (Cast e _ _)) = test b (i,e)
     test _ (i,stripTicks -> e) = case isLocalVar e of
       -- Don't inline `let x = x in x`, it throws  us in an infinite loop
       True -> return (i `localIdDoesNotOccurIn` e)
@@ -849,9 +853,10 @@ bindConstantVar = inlineBinders test
 
 -- | Push a cast over a case into it's alternatives.
 caseCast :: HasCallStack => NormRewrite
-caseCast _ (Cast (stripTicks -> Case subj ty alts) ty1 ty2) = do
-  let alts' = map (\(p,e) -> (p, Cast e ty1 ty2)) alts
-  changed (Case subj ty alts')
+caseCast _ e0@(Cast (collectTicks -> (Case subj tyA alts,ticks)) ty1 ty2) =
+  WARN( tyA /= ty1, "Bad Cast of Case:" <+> ppr e0 ) do
+    let alts' = map (\(p,e) -> (p, Cast e ty1 ty2)) alts
+    changed (mkTicks (Case subj ty2 alts') ticks)
 caseCast _ e = return e
 
 -- | Push a cast over a Letrec into it's body
@@ -879,19 +884,23 @@ letCast _ e = return e
 -- and expression where two casts are "back-to-back" after which we can
 -- eliminate them in 'eliminateCastCast'.
 argCastSpec :: HasCallStack => NormRewrite
-argCastSpec ctx e@(App _ (stripTicks -> Cast e' _ _)) =
-  if isWorkFree e' then
-    go
-  else
-    warn go
- where
-  go = specializeNorm ctx e
-  warn = trace (unwords
-    [ "WARNING:", $(curLoc), "specializing a function on a non work-free"
-    , "cast. Generated HDL implementation might contain duplicate work."
-    , "Please report this as a bug.", "\n\nExpression where this occured:"
-    , "\n\n" ++ showPpr e
-    ])
+argCastSpec ctx@(TransformContext is0 ctx0) e@(App e0 (collectTicks -> (Cast eA t1 t2,ticks)))
+  | (Var {}, _) <- collectArgs e0 = do
+  tcm <- Lens.view tcCache
+  eARep <- representableType <$> Lens.view typeTranslator
+                             <*> Lens.view customReprs
+                             <*> pure False
+                             <*> pure tcm
+                             <*> pure t1
+  if isWorkFree eA || not eARep then
+    specializeNorm ctx e
+  else do
+    specId <- mkTmBinderFor is0 tcm (mkUnsafeSystemName "argCastSpec" 0) eA
+    let is1 = extendInScopeSet is0 specId
+    e1 <- specializeNorm (TransformContext is1 (LetBody [specId]:ctx0))
+                         (App e0 (Cast (Var specId) t1 t2))
+    changed (Letrec [(specId,mkTicks eA ticks)] e1)
+
 argCastSpec _ e = return e
 
 -- | Only inline casts that just contain a 'Var', because these are guaranteed work-free.
@@ -908,20 +917,19 @@ inlineCast = inlineBinders test
 --   (cast :: b -> a) $ (cast :: a -> b) x   ==> x
 -- @
 eliminateCastCast :: HasCallStack => NormRewrite
-eliminateCastCast _ c@(Cast (stripTicks -> Cast e tyA tyB) tyB' tyC) = do
-  tcm <- Lens.view tcCache
-  let ntyA  = normalizeType tcm tyA
-      ntyB  = normalizeType tcm tyB
-      ntyB' = normalizeType tcm tyB'
-      ntyC  = normalizeType tcm tyC
-  if ntyB == ntyB' && ntyA == ntyC then changed e
-                                   else throwError
-  where throwError = do
-          (nm,sp) <- Lens.use curFun
-          throw (ClashException sp ($(curLoc) ++ showPpr nm
-                  ++ ": Found 2 nested casts whose types don't line up:\n"
-                  ++ showPpr c)
-                Nothing)
+eliminateCastCast _ c@(Cast (collectTicks -> (Cast e tyA tyB, ticks)) tyB' tyC)
+  | tyB == tyB'
+  = if tyA == tyC then
+      changed (mkTicks e ticks)
+    else
+      changed (Cast (mkTicks e ticks) tyA tyC)
+  | otherwise
+  = do
+    (nm,sp) <- Lens.use curFun
+    throw (ClashException sp ($(curLoc) ++ showPpr nm
+            ++ ": Found 2 nested casts whose types don't line up:\n"
+            ++ showPpr c)
+          Nothing)
 
 eliminateCastCast _ e = return e
 
@@ -1192,6 +1200,17 @@ appProp ctx@(TransformContext is0 _) (App (collectTicks -> (Case scrut ty alts,t
       let alts' = map (second (`App` (Var boundArg))) alts
       changed (Letrec [(boundArg, arg)] (mkTicks (Case scrut ty' alts') ticks))
 
+appProp _ e0@(App (collectTicks -> (Cast e tyA tyB,ticks)) arg) =
+  case (tyView tyA, tyView tyB) of
+    (FunTy tyAArg tyARes,FunTy tyBArg tyBRes) ->
+      changed (Cast (App (mkTicks e ticks) (Cast arg tyBArg tyAArg)) tyARes tyBRes)
+    _ -> do
+      (nm,sp) <- Lens.use curFun
+      throw (ClashException sp ($(curLoc) ++ showPpr nm
+              ++ ": AppProp expected FunTy:\n"
+              ++ showPpr e0)
+            Nothing)
+
 appProp (TransformContext is0 _) (TyApp (collectTicks -> (TyLam tv e,ticks)) t) = do
   let subst = extendTvSubst (mkSubst is0) tv t
   changed $ mkTicks (substTm "appProp.TyAppTyLam" subst e) ticks
@@ -1204,6 +1223,13 @@ appProp _ (TyApp (collectTicks -> (Case scrut altsTy alts,ticks)) ty) = do
   tcm <- Lens.view tcCache
   let ty' = piResultTy tcm altsTy ty
   changed (mkTicks (Case scrut ty' alts') ticks)
+
+appProp _ e0@(TyApp (collectTicks -> (Cast {},_)) _) = do
+ (nm,sp) <- Lens.use curFun
+ throw (ClashException sp ($(curLoc) ++ showPpr nm
+         ++ ": AppProp TPush not implemented:\n"
+         ++ showPpr e0)
+       Nothing)
 
 appProp _ e = return e
 
@@ -1268,6 +1294,40 @@ appPropFast ctx@(TransformContext is _) = \case
   go is0 (Tick sp e) args ticks = do
     setChanged
     go is0 e args (sp:ticks)
+
+  go is0 c@(Cast e tyA tyB) args0 ticks = case args0 of
+    [] -> Cast <$> go is0 e args0 ticks <*> pure tyA <*> pure tyB
+    (Left arg:args1) -> do
+      setChanged
+      case (tyView tyA,tyView tyB) of
+        (FunTy aa ar,FunTy ba br)
+          -> Cast <$> go is0 e (Left (Cast arg ba aa):args1) ticks
+                  <*> pure ar
+                  <*> pure br
+        (TyConApp sigTc [_domTy,fTy],FunTy ba br)
+          | nameOcc sigTc == "Clash.Signal.Internal.Signal"
+          , FunTy aa ar <- tyView fTy
+          , aa == ba
+          , ar == br
+          -> go is0 e (Left arg:args1) ticks
+        (FunTy aa ar,TyConApp sigTc [_domTy,fTy])
+          | nameOcc sigTc == "Clash.Signal.Internal.Signal"
+          , FunTy ba br <- tyView fTy
+          , aa == ba
+          , ar == br
+          -> go is0 e (Left arg:args1) ticks
+        _ -> do
+          (nm,sp) <- Lens.use curFun
+          throw (ClashException sp ($(curLoc) ++ showPpr nm
+                  ++ ": AppPropFast FunTy expected:\n"
+                  ++ showPpr (App c arg))
+                Nothing)
+    _ -> do
+      (nm,sp) <- Lens.use curFun
+      throw (ClashException sp ($(curLoc) ++ showPpr nm
+              ++ ": AppPropFast TPush unimplemented:\n"
+              ++ showPpr c)
+            Nothing)
 
   go _ fun args ticks = return (mkApps (mkTicks fun ticks) args)
 
