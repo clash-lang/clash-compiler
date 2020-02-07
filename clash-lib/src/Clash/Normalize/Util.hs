@@ -386,6 +386,7 @@ classifyFunction = go (TermClassification 0 0 0)
       (_:_:_) -> c & selection  +~ 1
       _ -> c
     go !c (Tick _ e) = go c e
+    go !c (Cast e _ _) = go c e
     go c _ = c
 
 -- | Determine whether a function adds a lot of hardware or not.

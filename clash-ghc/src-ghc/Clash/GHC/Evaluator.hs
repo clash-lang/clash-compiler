@@ -44,7 +44,6 @@ import           Clash.Core.Var
 import           Clash.Core.VarEnv
 import           Clash.Debug
 import           Clash.Unique
-import           Clash.Util                              (curLoc)
 
 import           Clash.GHC.Evaluator.Primitive
 
@@ -128,6 +127,8 @@ stepTyLam x e = ghcUnwind (TyLambda x e)
 stepApp :: Term -> Term -> Step
 stepApp x y m tcm =
   case term of
+    Cast {} -> error "stepApp QQ"
+
     Data dc ->
       let tys = fst $ splitFunForallTy (dcType dc)
        in case compare (length args) (length tys) of
@@ -177,6 +178,8 @@ stepApp x y m tcm =
 stepTyApp :: Term -> Type -> Step
 stepTyApp x ty m tcm =
   case term of
+    Cast {} -> error "stepTyApp QQ"
+
     Data dc ->
       let tys = fst $ splitFunForallTy (dcType dc)
        in case compare (length args) (length tys) of
@@ -210,17 +213,14 @@ stepLetRec :: [LetBinding] -> Term -> Step
 stepLetRec bs x m _ = Just (allocate bs x m)
 
 stepCase :: Term -> Type -> [Alt] -> Step
+stepCase (Cast {}) _ty _alts _m _ = error "stepCase QQ"
 stepCase scrut ty alts m _ =
   Just . setTerm scrut $ stackPush (Scrutinise ty alts) m
 
 -- TODO Support stepwise evaluation of casts.
 --
 stepCast :: Term -> Type -> Type -> Step
-stepCast _ _ _ _ _ =
-  flip trace Nothing $ unlines
-    [ "WARNING: " <> $(curLoc) <> "Clash can't symbolically evaluate casts"
-    , "Please file an issue at https://github.com/clash-lang/clash-compiler/issues"
-    ]
+stepCast x ty1 ty2 m _ = Just . setTerm x $ stackPush (Castish ty1 ty2) m
 
 stepTick :: TickInfo -> Term -> Step
 stepTick tick x m _ =
@@ -290,6 +290,7 @@ ghcUnwind v m tcm = do
   go (PrimApply p tys vs tms) = ghcPrimUnwind tcm p tys vs v tms
   go (Scrutinise altTy as)    = return . scrutinise v altTy as
   go (Tickish _)              = return . setTerm (valToTerm v)
+  go (Castish ty1 ty2)        = error "TODO"
 
 -- | Update the Heap with the evaluated term
 update :: IdScope -> Id -> Value -> Machine -> Machine
@@ -456,4 +457,3 @@ letSubst h acc id0 =
    where
     (i,ids') = freshId ids
     x'       = modifyVarName (`setUnique` i) x
-

@@ -232,9 +232,9 @@ coreView1 tcMap ty = case tyView ty of
     | nameOcc tcNm == "Clash.Signal.BiSignal.BiSignalOut"
     , [_,_,_,elTy] <- args
     -> Just elTy
-    | nameOcc tcNm == "Clash.Signal.Internal.Signal"
-    , [_,elTy] <- args
-    -> Just elTy
+    -- | nameOcc tcNm == "Clash.Signal.Internal.Signal"
+    -- , [_,elTy] <- args
+    -- -> Just elTy
     | otherwise
     -> case tcMap `lookupUniqMap'` tcNm of
          AlgTyCon {algTcRhs = (NewTyCon _ nt)}

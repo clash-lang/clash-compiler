@@ -58,7 +58,8 @@ import           Clash.Core.Name
 import           Clash.Core.Pretty             (showPpr)
 import           Clash.Core.Subst              (extendIdSubst, mkSubst, substTm)
 import           Clash.Core.Term               as C
-  (PrimInfo (..), Term (..), WorkInfo (..), collectArgs, collectArgsTicks, collectBndrs, mkApps)
+  (PrimInfo (..), Term (..), WorkInfo (..), collectArgs, collectArgsTicks,
+   collectBndrs, mkApps, mkTicks)
 import           Clash.Core.TermInfo
 import           Clash.Core.Type               as C
   (Type (..), ConstTy (..), TypeView (..), mkFunTy, splitFunTys, splitFunTy, tyView)
@@ -193,6 +194,7 @@ isLiteral e = case collectArgs e of
   (Data _, args)   -> all (either isLiteral (const True)) args
   (Prim _, args) -> all (either isLiteral (const True)) args
   (C.Literal _,_)  -> True
+  (Cast e0 _ _, args) -> all (either isLiteral (const True)) (Left e0:args)
   _                -> False
 
 mkArgument
@@ -248,6 +250,7 @@ mkArgument bbName bndr nArg e = do
         (Case scrut ty' [alt],[],_) -> do
           (projection,decls) <- mkProjection False (NetlistId bndr ty) scrut ty' alt
           return ((projection,hwTy,False),decls)
+        (Cast e0 _ _,[],ticks) -> mkArgument bbName bndr nArg (mkTicks e0 ticks)
         (Letrec _bnds _term, [], _ticks) -> do
           (exprN, letDecls) <- mkExpr False Concurrent (NetlistId bndr ty) e
           return ((exprN,hwTy,False),letDecls)

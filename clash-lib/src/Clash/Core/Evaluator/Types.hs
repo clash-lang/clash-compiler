@@ -140,6 +140,10 @@ unwindStack m
           let term = Tick sp (getTerm m')
            in unwindStack (setTerm term m')
 
+        Castish ty1 ty2 ->
+          let term = Cast (getTerm m') ty1 ty2
+           in unwindStack (setTerm term m')
+
 -- | A single step in the partial evaluator. The result is the new heap and
 -- stack, and the next expression to be reduced.
 --
@@ -220,6 +224,7 @@ data StackFrame
   | PrimApply  PrimInfo [Type] [Value] [Term]
   | Scrutinise Type [Alt]
   | Tickish TickInfo
+  | Castish Type Type
   deriving Show
 
 instance ClashPretty StackFrame where
@@ -237,6 +242,8 @@ instance ClashPretty StackFrame where
           fromPpr (Case (Literal (CharLiteral '_')) a b)]
   clashPretty (Tickish sp) =
     hsep ["Tick", fromPpr sp]
+  clashPretty (Castish ty1 ty2) =
+    hsep ["Cast", fromPpr ty1, fromPpr ty2]
 
 -- Values
 data Value
@@ -349,4 +356,3 @@ getTerm = mTerm
 
 setTerm :: Term -> Machine -> Machine
 setTerm x m = m { mTerm = x }
-

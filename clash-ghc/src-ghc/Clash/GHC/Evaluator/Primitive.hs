@@ -3580,6 +3580,9 @@ naturalLiteral v =
     DC dc [Left (Literal (ByteArrayLiteral (BA.ByteArray ba)))]
       | dcTag dc == 2
       -> Just (Jp# (BN# ba))
+    CastValue v0 _ _
+      | Just n <- naturalLiteral v0
+      -> Just n
     _ -> Nothing
 
 integerLiterals' :: [Value] -> [Integer]
