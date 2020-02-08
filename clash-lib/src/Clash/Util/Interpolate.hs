@@ -184,6 +184,9 @@ i = QuasiQuoter {
             fail "Parse error in expression!" :: Q Exp
           Right e -> return e
 
+-------------------------------------------------------------------
+-- Everything below this line is unchanged from neat-interpolate --
+-------------------------------------------------------------------
 decodeNewlines :: String -> String
 decodeNewlines = go
   where
