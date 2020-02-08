@@ -155,6 +155,7 @@ Library
                       ghc                     >= 8.4.0    && < 8.9,
                       ghc-boot-th,
                       hashable                >= 1.2.1.0  && < 1.4,
+                      haskell-src-meta        >= 0.8      && < 0.9,
                       hint                    >= 0.7      && < 0.10,
                       integer-gmp             >= 1.0      && < 1.1,
                       interpolate             >= 0.2.0    && < 1.0,
@@ -240,6 +241,7 @@ Library
                       Clash.Unique
                       Clash.Util
                       Clash.Util.Graph
+                      Clash.Util.Interpolate
                       Clash.Pretty
 
                       Data.Text.Prettyprint.Doc.Extra
