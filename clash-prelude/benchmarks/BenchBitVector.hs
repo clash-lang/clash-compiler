@@ -1,4 +1,4 @@
-{-# LANGUAGE CPP, DataKinds, MagicHash, TypeOperators, TemplateHaskell #-}
+{-# LANGUAGE CPP, DataKinds, MagicHash, TypeOperators, TemplateHaskell, NoStarIsType #-}
 
 {-# OPTIONS_GHC -ddump-simpl -ddump-splices -ddump-to-file #-}
 
