@@ -159,6 +159,7 @@ splitTopAnn tcm sp e t@Synthesize{t_inputs} =
   tctx = TransformContext emptyInScopeSet []
 
   prependName :: String -> PortName -> PortName
+  prependName "" pn = pn
   prependName p (PortProduct nm ps) = PortProduct (p ++ "_" ++ nm) ps
   prependName p (PortName nm) = PortName (p ++ "_" ++ nm)
 
