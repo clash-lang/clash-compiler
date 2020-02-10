@@ -1,4 +1,7 @@
-{-# LANGUAGE CPP, DataKinds, MagicHash, TypeOperators, TemplateHaskell, NoStarIsType #-}
+{-# LANGUAGE CPP, DataKinds, MagicHash, TypeOperators, TemplateHaskell #-}
+#if __GLASGOW_HASKELL__ >= 806
+{-# LANGUAGE NoStarIsType #-}
+#endif
 
 {-# OPTIONS_GHC -ddump-simpl -ddump-splices -ddump-to-file #-}
 
