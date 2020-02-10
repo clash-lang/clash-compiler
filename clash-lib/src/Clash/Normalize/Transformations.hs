@@ -99,7 +99,8 @@ import           Clash.Core.Literal          (Literal (..))
 import           Clash.Core.Pretty           (showPpr)
 import           Clash.Core.Subst
   (substTm, mkSubst, extendIdSubst, extendIdSubstList, extendTvSubst,
-   extendTvSubstList, freshenTm, substTyInVar, deShadowTerm, deShadowAlt)
+   extendTvSubstList, freshenTm, substTyInVar, deShadowTerm, deShadowAlt,
+   deshadowLetExpr)
 import           Clash.Core.Term
   ( LetBinding, Pat (..), Term (..), CoreContext (..), PrimInfo (..)
   , TickInfo(..) , WorkInfo(WorkConstant), Alt, TickInfo
@@ -256,8 +257,37 @@ nonRepSpec _ e = return e
 
 -- | Lift the let-bindings out of the subject of a Case-decomposition
 caseLet :: HasCallStack => NormRewrite
-caseLet _ (Case (collectTicks -> (Letrec xes e,ticks)) ty alts) =
-  changed (Letrec (map (second (`mkTicks` ticks)) xes) (Case (mkTicks e ticks) ty alts))
+caseLet (TransformContext is0 _) (Case (collectTicks -> (Letrec xes e,ticks)) ty alts) = do
+  -- Note [CaseLet deshadow]
+  -- Imagine
+  --
+  -- @
+  -- case (let x = u in e) of {p -> a}
+  -- @
+  --
+  -- where `a` has a free variable named `x`.
+  --
+  -- Simply transforming the above to:
+  --
+  -- @
+  -- let x = u in case e of {p -> a}
+  -- @
+  --
+  -- would be very bad, because now the let-binding captures the free x variable
+  -- in a.
+  --
+  -- We must therefor rename `x` so that it doesn't capture the free variables
+  -- in the alternative:
+  --
+  -- @
+  -- let x1 = u[x:=x1] in case e[x:=x1] of {p -> a}
+  -- @
+  --
+  -- It is safe to over-approximate the free variables in `a` by simply taking
+  -- the current InScopeSet.
+  let (xes1,e1) = deshadowLetExpr is0 xes e
+  changed (Letrec (map (second (`mkTicks` ticks)) xes1)
+                  (Case (mkTicks e1 ticks) ty alts))
 
 caseLet _ e = return e
 
@@ -722,13 +752,16 @@ caseOneAlt e = return e
 -- | Bring an application of a DataCon or Primitive in ANF, when the argument is
 -- is considered non-representable
 nonRepANF :: HasCallStack => NormRewrite
-nonRepANF ctx e@(App appConPrim arg)
+nonRepANF ctx@(TransformContext is0 _) e@(App appConPrim arg)
   | (conPrim, _) <- collectArgs e
   , isCon conPrim || isPrim conPrim
   = do
     untranslatable <- isUntranslatable False arg
     case (untranslatable,stripTicks arg) of
-      (True,Letrec binds body) -> changed (Letrec binds (App appConPrim body))
+      (True,Letrec binds body) ->
+        -- This is a situation similar to Note [CaseLet deshadow]
+        let (binds1,body1) = deshadowLetExpr is0 binds body
+        in  changed (Letrec binds1 (App appConPrim body1))
       (True,Case {})  -> specializeNorm ctx e
       (True,Lam {})   -> specializeNorm ctx e
       (True,TyLam {}) -> specializeNorm ctx e

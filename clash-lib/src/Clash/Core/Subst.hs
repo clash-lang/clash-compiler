@@ -44,6 +44,7 @@ module Clash.Core.Subst
   , deShadowTerm
   , deShadowAlt
   , freshenTm
+  , deshadowLetExpr
     -- * Alpha equivalence
   , aeqType
   , aeqTerm
@@ -621,6 +622,23 @@ deShadowAlt ::
   (Pat, Term) ->
   (Pat, Term)
 deShadowAlt is = substAlt "deShadowAlt" (mkSubst is)
+
+-- | Ensure that non of the let-bindings of a let-expression shadow w.r.t the
+-- in-scope set
+deshadowLetExpr
+  :: HasCallStack
+  => InScopeSet
+  -- ^ Current InScopeSet
+  -> [LetBinding]
+  -- ^ Bindings of the let-expression
+  -> Term
+  -- ^ The body of the let-expression
+  -> ([LetBinding],Term)
+  -- ^ Deshadowed let-bindings, where let-bound expressions and the let-body
+  -- properly reference the renamed variables
+deshadowLetExpr is bs e =
+  case substBind "deshadowLetBindings" (mkSubst is) bs of
+    (s1,bs1) -> (bs1, substTm "deShadowLetBody" s1 e)
 
 -- | A much stronger variant of `deShadowTerm` that ensures that all bound
 -- variables are unique.
