@@ -15,6 +15,7 @@ package clash-prelude
   documentation: True
   flags: +doctests
   tests: True
+  benchmarks: True
 package clash-cosim
   ghc-options: -Werror
   documentation: True
