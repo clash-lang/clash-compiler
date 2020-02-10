@@ -2478,7 +2478,7 @@ flattenLet (TransformContext is0 _) letrec@(Letrec _ _) = do
 
 flattenLet _ e = return e
 
--- | Worker function of 'separateArguments'. It's reused in "Clash.Driver".
+-- | Worker function of 'separateArguments'.
 separateLambda
   :: TyConMap
   -> TransformContext
@@ -2486,9 +2486,8 @@ separateLambda
   -- ^ Lambda binder
   -> Term
   -- ^ Lambda body
-  -> Maybe (Term, Int)
-  -- ^ If lambda is split up, this function returns a Just containing the new
-  -- term plus the number of binders the single lambda binder was split up into.
+  -> Maybe Term
+  -- ^ If lambda is split up, this function returns a Just containing the new term
 separateLambda tcm ctx@(TransformContext is0 _) b eb0 =
   case shouldSplit tcm (varType b) of
     Just (dc,argTys@(_:_:_)) ->
@@ -2499,7 +2498,7 @@ separateLambda tcm ctx@(TransformContext is0 _) b eb0 =
         subst = extendIdSubst (mkSubst is1) b (mkApps dc (map (Left . Var) bs1))
         eb1 = substTm "separateArguments" subst eb0
       in
-        Just (mkLams eb1 bs1, length bs1)
+        Just (mkLams eb1 bs1)
     _ ->
       Nothing
  where
@@ -2524,7 +2523,7 @@ separateArguments :: HasCallStack => NormRewrite
 separateArguments ctx e0@(Lam b eb) = do
   tcm <- Lens.view tcCache
   case separateLambda tcm ctx b eb of
-    Just (e1, _n) -> changed e1
+    Just e1 -> changed e1
     Nothing -> return e0
 
 separateArguments (TransformContext is0 _) e@(collectArgsTicks -> (Var g, args, ticks))

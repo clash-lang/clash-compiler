@@ -74,14 +74,15 @@ import           Clash.Backend
 import           Clash.Core.Evaluator.Types       (PrimStep, PrimUnwind)
 import           Clash.Core.Name                  (Name (..))
 import           Clash.Core.Pretty                (PrettyOptions(..), showPpr')
-import           Clash.Core.Term                  (Term(TyLam, Lam))
+import           Clash.Core.Term                  (Term)
 import           Clash.Core.Type
-  (Type(VarTy), TypeView(TyConApp), tyView)
+  (Type(VarTy, ForAllTy, AnnType), TypeView(TyConApp, FunTy), tyView, mkFunTy)
 import           Clash.Core.TyCon                 (TyConMap, TyConName)
+import           Clash.Core.Util                  (shouldSplit)
 import           Clash.Core.Var
   (Id, varName, varUniq, varType)
 import           Clash.Core.VarEnv
-  (elemVarEnv, emptyVarEnv, emptyInScopeSet, lookupVarEnv)
+  (elemVarEnv, emptyVarEnv, lookupVarEnv)
 import           Clash.Driver.Types
 import           Clash.Netlist                    (genNetlist)
 import           Clash.Netlist.Util               (genComponentName, genTopComponentName)
@@ -92,11 +93,9 @@ import           Clash.Netlist.Types
    SomeBackend (..), TopEntityT(..))
 import           Clash.Normalize                  (checkNonRecursive, cleanupGraph,
                                                    normalize, runNormalization)
-import           Clash.Normalize.Transformations  (separateLambda)
 import           Clash.Normalize.Util             (callGraph)
 import           Clash.Primitives.Types
 import           Clash.Primitives.Util            (hashCompiledPrimMap)
-import           Clash.Rewrite.Types              (TransformContext(..))
 import           Clash.Unique                     (keysUniqMap, lookupUniqMap')
 import           Clash.Util
   (ClashException(..), HasCallStack, first, reportTimeDiff,
@@ -108,32 +107,33 @@ splitTopAnn
   :: TyConMap
   -> SrcSpan
   -- ^ Source location of top entity (for error reporting)
-  -> Term
+  -> Type
   -- ^ Top entity body
   -> TopEntity
   -- ^ Port annotations for top entity
   -> TopEntity
   -- ^ New top entity with split ports (or the old one if not applicable)
-splitTopAnn tcm sp (TyLam _ e) t = splitTopAnn tcm sp e t
-splitTopAnn tcm sp (Lam v e) t
+splitTopAnn tcm sp (tyView -> FunTy a res) t
   -- Skip eq dicts, see 'substWithTyEq'
-  | TyConApp (nameUniq -> tcUniq) [_,VarTy _, _] <- tyView (varType v)
+  | TyConApp (nameUniq -> tcUniq) [_,VarTy _, _] <- tyView a
   , tcUniq == getKey eqTyConKey
-  = splitTopAnn tcm sp e t
-splitTopAnn tcm sp e t@Synthesize{t_inputs} =
-  t{t_inputs=go e t_inputs}
+  = splitTopAnn tcm sp res t
+splitTopAnn tcm sp typ@(tyView -> FunTy {}) t@Synthesize{t_inputs} =
+  t{t_inputs=go typ t_inputs}
  where
-  go :: Term -> [PortName] -> [PortName]
+  go :: Type -> [PortName] -> [PortName]
   go _ [] = []
-  go (Lam b eb) (p:ps) =
-    case separateLambda tcm tctx b eb of
-      Just (newLam, n) ->
+  go (tyView -> FunTy a res) (p:ps) =
+    case shouldSplit tcm a of
+      Just (_,argTys@(_:_:_)) ->
         -- Port must be split up into 'n' pieces.. can it?
         case p of
           PortProduct nm portNames0 ->
             let
+              n = length argTys
               newPortNames = map (PortName . show) [(0::Int)..]
               portNames1 = map (prependName nm) (portNames0 ++ newPortNames)
+              newLam = foldr1 mkFunTy (argTys ++ [res])
             in
               go newLam (take n portNames1 ++ ps)
           PortName nm ->
@@ -144,26 +144,25 @@ splitTopAnn tcm sp e t@Synthesize{t_inputs} =
 
               Type to split:
 
-              #{showPpr' (PrettyOptions False True False) (varType b)}
+              #{showPpr' (PrettyOptions False True False) a}
 
               Given port annotation: #{p}. You might want to use the
               following instead: PortProduct #{show nm} []. This allows Clash to
               autogenerate names based the name #{show nm}.
             |])
-      Nothing ->
+      _ ->
         -- No need to split the port, carrying on..
-        p : go eb ps
-  go _ ps = ps
-
-  -- Empty transformcontext; this transformation doesn't care about binder names
-  tctx = TransformContext emptyInScopeSet []
+        p : go res ps
+  go _ty ps = ps
 
   prependName :: String -> PortName -> PortName
   prependName "" pn = pn
   prependName p (PortProduct nm ps) = PortProduct (p ++ "_" ++ nm) ps
   prependName p (PortName nm) = PortName (p ++ "_" ++ nm)
 
-splitTopAnn _ _ _ t = t
+splitTopAnn tcm sp (ForAllTy _tyVar typ) t = splitTopAnn tcm sp typ t
+splitTopAnn tcm sp (AnnType _anns typ) t = splitTopAnn tcm sp typ t
+splitTopAnn _tcm _sp _typ t = t
 
 -- When splitting up a single argument into multiple arguments (see docs of
 -- 'separateArguments') we should make sure to update TopEntity annotations
@@ -176,8 +175,8 @@ splitTopEntityT
   -> TopEntityT
 splitTopEntityT tcm bindingsMap tt@(TopEntityT id_ (Just t@(Synthesize {})) _) =
   case lookupVarEnv id_ bindingsMap of
-    Just (_id, sp, _, term) ->
-      tt{topAnnotation=Just (splitTopAnn tcm sp term t)}
+    Just (_id, sp, _, _) ->
+      tt{topAnnotation=Just (splitTopAnn tcm sp (varType id_) t)}
     Nothing ->
       error "Internal error in 'splitTopEntityT'. Please report as a bug."
 splitTopEntityT _ _ t = t
