@@ -511,14 +511,14 @@ compilePrimitive
   -> ResolvedPrimitive
   -- ^ Primitive to compile
   -> IO CompiledPrimitive
-compilePrimitive idirs pkgDbs topDir (BlackBoxHaskell bbName wf bbGenName source) = do
+compilePrimitive idirs pkgDbs topDir (BlackBoxHaskell bbName wf usedArgs bbGenName source) = do
   let interpreterArgs = concatMap (("-package-db":) . (:[])) pkgDbs
   -- Compile a blackbox template function or fetch it from an already compiled file.
   r <- go interpreterArgs source
   processHintError
     (show bbGenName)
     bbName
-    (\bbFunc -> BlackBoxHaskell bbName wf bbGenName (hash source, bbFunc))
+    (\bbFunc -> BlackBoxHaskell bbName wf usedArgs bbGenName (hash source, bbFunc))
     r
   where
     qualMod = intercalate "." modNames

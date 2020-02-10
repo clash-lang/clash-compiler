@@ -13,6 +13,7 @@
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE MagicHash #-}
 {-# LANGUAGE MultiWayIf #-}
+{-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TemplateHaskell #-}
 
@@ -74,6 +75,7 @@ import qualified Data.Either                 as Either
 import qualified Data.HashMap.Lazy           as HashMap
 import qualified Data.HashMap.Strict         as HashMapS
 import qualified Data.List                   as List
+import           Data.List                   ((\\))
 import qualified Data.Maybe                  as Maybe
 import qualified Data.Monoid                 as Monoid
 import qualified Data.Primitive.ByteArray    as BA
@@ -125,7 +127,7 @@ import           Clash.Core.VarEnv
    unitVarSet, mkVarSet, mkInScopeSet, uniqAway)
 import           Clash.Driver.Types          (DebugLevel (..))
 import           Clash.Netlist.BlackBox.Types (Element(Err))
-import           Clash.Netlist.BlackBox.Util (usedArguments)
+import           Clash.Netlist.BlackBox.Util (getUsedArguments)
 import           Clash.Netlist.Types         (BlackBox(..), HWType (..), FilteredHWType(..))
 import           Clash.Netlist.Util
   (coreTypeToHWType, representableType, splitNormalized, bindsExistentials)
@@ -134,7 +136,7 @@ import           Clash.Normalize.PrimitiveReductions
 import           Clash.Normalize.Types
 import           Clash.Normalize.Util
 import           Clash.Primitives.Types
-  (Primitive(..), TemplateKind(TExpr), CompiledPrimMap)
+  (Primitive(..), TemplateKind(TExpr), CompiledPrimMap, UsedArguments(..))
 import           Clash.Rewrite.Combinators
 import           Clash.Rewrite.Types
 import           Clash.Rewrite.Util
@@ -773,26 +775,36 @@ deadCode _ e = return e
 removeUnusedExpr :: HasCallStack => NormRewrite
 removeUnusedExpr _ e@(collectArgsTicks -> (p@(Prim pInfo),args,ticks)) = do
   bbM <- HashMap.lookup (primName pInfo) <$> Lens.use (extra.primitives)
-  case bbM of
-    Just (extractPrim ->  Just (BlackBox pNm _ _ _ _ _ _ _ _ inc r ri templ)) -> do
-      let usedArgs | isFromInt pNm
-                   = [0,1,2]
-                   | primName pInfo `elem` [ "Clash.Annotations.BitRepresentation.Deriving.dontApplyInHDL"
-                                           , "Clash.Sized.Vector.splitAt"
-                                           ]
-                   = [0,1]
-                   | otherwise
-                   = concat [ maybe [] usedArguments r
-                            , maybe [] usedArguments ri
-                            , usedArguments templ
-                            , concatMap (usedArguments . snd) inc
-                            ]
+  let
+    usedArgs0 =
+      case Monad.join (extractPrim <$> bbM) of
+        Just (BlackBoxHaskell{usedArguments}) ->
+          case usedArguments of
+            UsedArguments used -> Just used
+            IgnoredArguments ignored -> Just ([0..length args - 1] \\ ignored)
+        Just (BlackBox pNm _ _ _ _ _ _ _ _ inc r ri templ) -> Just $
+          if | isFromInt pNm -> [0,1,2]
+             | primName pInfo `elem` [ "Clash.Annotations.BitRepresentation.Deriving.dontApplyInHDL"
+                                     , "Clash.Sized.Vector.splitAt"
+                                     ] -> [0,1]
+             | otherwise -> concat [ maybe [] getUsedArguments r
+                                   , maybe [] getUsedArguments ri
+                                   , getUsedArguments templ
+                                   , concatMap (getUsedArguments . snd) inc ]
+        _ ->
+          Nothing
+
+  case usedArgs0 of
+    Nothing ->
+      return e
+    Just usedArgs1 -> do
       tcm <- Lens.view tcCache
-      args' <- go tcm 0 usedArgs args
-      if args == args'
-         then return e
-         else changed (mkApps (mkTicks p ticks) args')
-    _ -> return e
+      args' <- go tcm 0 usedArgs1 args
+      if args == args' then
+        return e
+      else
+        changed (mkApps (mkTicks p ticks) args')
+
   where
     arity = length . Either.rights . fst $ splitFunForallTy (primType pInfo)
 

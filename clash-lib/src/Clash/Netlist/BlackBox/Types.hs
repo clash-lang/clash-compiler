@@ -99,7 +99,7 @@ type BlackBoxTemplate = [Element]
 --  - Clash.Netlist.BlackBox.Types.renderElem
 --  - Clash.Netlist.BlackBox.Types.renderTag
 --  - Clash.Netlist.BlackBox.Types.setSym
---  - Clash.Netlist.BlackBox.Types.usedArguments
+--  - Clash.Netlist.BlackBox.Types.getUsedArguments
 --  - Clash.Netlist.BlackBox.Types.usedVariables
 --  - Clash.Netlist.BlackBox.Types.verifyBlackBoxContext
 --  - Clash.Netlist.BlackBox.Types.walkElement

@@ -58,7 +58,7 @@ import           Clash.GHC.GHC2Core
   (C2C, GHC2CoreState, tyConMap, coreToId, coreToName, coreToTerm,
    makeAllTyCons, qualifiedNameString, emptyGHC2CoreState)
 import           Clash.GHC.LoadModules   (ghcLibDir, loadModules)
-import           Clash.Netlist.BlackBox.Util (usedArguments)
+import           Clash.Netlist.BlackBox.Util (getUsedArguments)
 import           Clash.Netlist.Types     (TopEntityT(..))
 import           Clash.Primitives.Types
   (Primitive (..), CompiledPrimMap)
@@ -212,10 +212,10 @@ checkPrimitive primMap v = do
         warnIf cond msg = traceIf cond ("\n"++loc++"Warning: "++msg) return ()
       qName <- Text.unpack <$> qualifiedNameString (GHC.varName v)
       let primStr = "primitive " ++ qName ++ " "
-      let usedArgs = concat [ maybe [] usedArguments r
-                            , maybe [] usedArguments ri
-                            , usedArguments templ
-                            , concatMap (usedArguments . snd) inc
+      let usedArgs = concat [ maybe [] getUsedArguments r
+                            , maybe [] getUsedArguments ri
+                            , getUsedArguments templ
+                            , concatMap (getUsedArguments . snd) inc
                             ]
 
       let warnArgs [] = return ()

@@ -49,6 +49,7 @@
   * [#884](https://github.com/clash-lang/clash-compiler/pull/884): Teach reduceTypeFamily about AppendSymbol and CmpSymbol
   * [#784](https://github.com/clash-lang/clash-compiler/pull/784): Print whether `Id` is global or local in ppr output
   * [#781](https://github.com/clash-lang/clash-compiler/pull/781): Use naming contexts in register names
+  * [#1061](https://github.com/clash-lang/clash-compiler/pull/1061): Add 'usedArguments' to BlackBoxHaskell blackboxes
 
 * Fixes issues:
   * [#974](https://github.com/clash-lang/clash-compiler/issues/974): Fix indirect shadowing in `reduceNonRepPrim`
