@@ -350,7 +350,7 @@ elemExistentials _ e = return e
 
 -- | Move a Case-decomposition from the subject of a Case-decomposition to the alternatives
 caseCase :: HasCallStack => NormRewrite
-caseCase _ e@(Case (stripTicks -> Case scrut alts1Ty alts1) alts2Ty alts2)
+caseCase (TransformContext is0 _) e@(Case (stripTicks -> Case scrut alts1Ty alts1) alts2Ty alts2)
   = do
     ty1Rep <- representableType <$> Lens.view typeTranslator
                                 <*> Lens.view customReprs
@@ -358,7 +358,29 @@ caseCase _ e@(Case (stripTicks -> Case scrut alts1Ty alts1) alts2Ty alts2)
                                 <*> Lens.view tcCache
                                 <*> pure alts1Ty
     if not ty1Rep
-      then let newAlts = map (second (\altE -> Case altE alts2Ty alts2)) alts1
+      -- Deshadow to prevent accidental capture of free variables of inner
+      -- case. Imagine:
+      --
+      --   case (case a of {x -> x}) of {_ -> x}
+      --
+      -- 'x' is introduced the inner 'case' and used (as a free variable) in
+      -- the outer one. The goal of 'caseCase' is to rewrite cases such that
+      -- their subjects aren't cases. This is achieved by 'pushing' the outer
+      -- case to all the alternatives of the inner one. Naively doing so in
+      -- this example would cause an accidental capture:
+      --
+      --   case a of {x -> case x of {_ -> x}}
+      --
+      -- Suddenly, the 'x' in the alternative of the inner case statement
+      -- refers to the one introduced by the outer one, instead of being a
+      -- free variable. To prevent this, we deshadow the alternatives of the
+      -- original inner case. We now end up with:
+      --
+      --   case a of {x1 -> case x1 of {_ -> x}}
+      --
+      then let newAlts = map
+                           (second (\altE -> Case altE alts2Ty alts2))
+                           (map (deShadowAlt is0) alts1)
            in  changed $ Case scrut alts2Ty newAlts
       else return e
 
