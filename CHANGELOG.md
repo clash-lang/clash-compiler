@@ -108,6 +108,7 @@
   * ClockGens use their name at the Haskell level [#827](https://github.com/clash-lang/clash-compiler/pull/827)
   * Render numbers inside gensym [#809](https://github.com/clash-lang/clash-compiler/pull/809)
   * Don't overwrite existing binders when specializing [#790](https://github.com/clash-lang/clash-compiler/pull/790)
+  * Deshadow in 'caseCase' [#1067](https://github.com/clash-lang/clash-compiler/pull/1067)
 
 * Deprecations & removals:
   * Removed support for GHC 8.2 ([#842](https://github.com/clash-lang/clash-compiler/pull/842))
