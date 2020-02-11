@@ -69,7 +69,15 @@ data Node
 type Indent = Int
 
 format :: [Node] -> String
-format = showLines . nodesToLines
+format = stripWhiteSpace . showLines . nodesToLines
+ where
+  go _ [] = []
+  go n (c:cs) | c == ' ' = go (n+1) cs
+  go 0 (c:cs) = c : go 0 cs
+  go n cs = replicate n ' ' ++ (go 0 cs)
+
+  stripWhiteSpace = go 0 . dropWhile isSpace
+
 
 showLines :: [Line] -> String
 showLines [] = ""
@@ -153,8 +161,8 @@ nodesToLines =
     go (Literal "") = []
     go (Literal s0) =
       let
-        pre = takeWhile (not . isSpace) s0
-        post = dropWhile (not . isSpace) s0
+        pre = takeWhile (not . (==' ')) s0
+        post = dropWhile (not . (== ' ')) s0
       in case post of
         [] -> [Literal s0]
         (_:s1) -> Literal (pre ++ " ") : go (Literal s1)
@@ -168,8 +176,8 @@ nodesToLines =
     ns@(Expression _:_) -> Line 0 ns
     (Literal s:ns) ->
       Line
-        (length (takeWhile isSpace s))
-        (Literal (dropWhile isSpace s):ns)
+        (length (takeWhile (==' ') s))
+        (Literal (dropWhile (==' ') s):ns)
 
   -- collects list of nodes, where each list is a single line
   collectLines collected todo =

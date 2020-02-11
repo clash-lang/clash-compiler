@@ -285,3 +285,4 @@ test-suite unittests
 
   Other-Modules: Clash.Tests.Core.FreeVars
                  Clash.Tests.Core.Subst
+                 Clash.Tests.Util.Interpolate
