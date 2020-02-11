@@ -61,7 +61,6 @@ module Clash.Normalize.Transformations
   )
 where
 
-import           Control.Concurrent.Supply   (splitSupply)
 import           Control.Exception           (throw)
 import           Control.Lens                (_2)
 import qualified Control.Lens                as Lens
@@ -88,8 +87,6 @@ import           BasicTypes                  (InlineSpec (..))
 
 import           Clash.Annotations.Primitive (extractPrim)
 import           Clash.Core.DataCon          (DataCon (..))
-import           Clash.Core.Evaluator        (whnf')
-import           Clash.Core.Evaluator.Types  (PureHeap)
 import           Clash.Core.Name
   (Name (..), NameSort (..), mkUnsafeSystemName, nameOcc)
 import           Clash.Core.FreeVars
@@ -141,8 +138,7 @@ import           Clash.Primitives.Types
 import           Clash.Rewrite.Combinators
 import           Clash.Rewrite.Types
 import           Clash.Rewrite.Util
-import           Clash.Unique
-  (Unique, lookupUniqMap, toListUniqMap)
+import           Clash.Unique                (lookupUniqMap)
 import           Clash.Util
 
 inlineOrLiftNonRep :: HasCallStack => NormRewrite
@@ -494,149 +490,153 @@ inlineNonRep _ e = return e
 -- in  h a1
 -- @
 caseCon :: HasCallStack => NormRewrite
-caseCon (TransformContext is0 _) (Case scrut ty alts)
-  | (Data dc, args, ticks) <- collectArgsTicks scrut
-  = case List.find (equalCon dc . fst) alts of
-      Just (DataPat _ tvs xs, e) -> do
-        let is1 = extendInScopeSetList (extendInScopeSetList is0 tvs) xs
-        let fvs = Lens.foldMapOf freeLocalIds unitVarSet e
-            (binds,_) = List.partition ((`elemVarSet` fvs) . fst)
-                      $ zip xs (Either.lefts args)
-            binds1 = map (second (`mkTicks` ticks)) binds
-            e' = case binds1 of
-                  [] -> e
-                  _  ->
-                    -- See Note [CaseCon deshadow]
-                    let ((is3,substIds),binds2) =
-                          List.mapAccumL newBinder (is1,[]) binds1
-                        subst = extendIdSubstList (mkSubst is3) substIds
-                        body  = substTm "caseCon0" subst e
-                    in  case Maybe.catMaybes binds2 of
-                          []     -> body
-                          binds3 -> Letrec binds3 body
-        -- Use the original inScopeSet 'is0' here, not the extended inScopeSet
-        -- 'is1', otherwise we'd make the "caseCon1" substitution substitute
-        -- free variables that were shadowed by the pattern!
-        let subst = extendTvSubstList (mkSubst is0)
-                  $ zip tvs (drop (length (dcUnivTyVars dc)) (Either.rights args))
-        changed (substTm "caseCon1" subst e')
-      _ -> case alts of
-             ((DefaultPat,e):_) -> changed e
-             _ -> changed (undefinedTm ty)
-  where
-    equalCon dc (DataPat dc' _ _) = dcTag dc == dcTag dc'
-    equalCon _  _                 = False
+caseCon ctx@(TransformContext is0 _) e@(Case subj ty alts) = case collectArgsTicks subj of
+  -- The subject is an applied data constructor
+  (Data dc, args, ticks) -> case List.find (equalCon . fst) alts of
+    Just (DataPat _ tvs xs, altE) -> do
+      let is1 = extendInScopeSetList (extendInScopeSetList is0 tvs) xs
+      let fvs = Lens.foldMapOf freeLocalIds unitVarSet altE
+          (binds,_) = List.partition ((`elemVarSet` fvs) . fst)
+                    $ zip xs (Either.lefts args)
+          binds1 = map (second (`mkTicks` ticks)) binds
+          altE1 = case binds1 of
+            [] -> altE
+            _  ->
+              -- See Note [CaseCon deshadow]
+              let
+                ((is3,substIds),binds2) = List.mapAccumL newBinder (is1,[]) binds1
+                subst = extendIdSubstList (mkSubst is3) substIds
+                body  = substTm "caseCon0" subst altE
+              in
+                case Maybe.catMaybes binds2 of
+                  []     -> body
+                  binds3 -> Letrec binds3 body
+      -- Use the original inScopeSet 'is0' here, not the extended inScopeSet
+      -- 'is1', otherwise we'd make the "caseCon1" substitution substitute
+      -- free variables that were shadowed by the pattern!
+      let subst = extendTvSubstList (mkSubst is0)
+                $ zip tvs (drop (length (dcUnivTyVars dc)) (Either.rights args))
+      changed (substTm "caseCon1" subst altE1)
+    _ -> case alts of
+           -- In Core, default patterns always come first, so we match against
+           -- that if there is one, and we couldn't match with any of the data
+           -- patterns.
+           ((DefaultPat,altE):_) -> changed altE
+           _ -> changed (undefinedTm ty)
+    where
+      -- Check whether the pattern matches the data constructor
+      equalCon (DataPat dcPat _ _) = dcTag dc == dcTag dcPat
+      equalCon _                   = False
 
-    newBinder (isN0,substN) (x,arg)
-      | isWorkFree arg
-      = ((isN0,(x,arg):substN),Nothing)
-      | otherwise
-      = let x'   = uniqAway isN0 x
-            isN1 = extendInScopeSet isN0 x'
-        in  ((isN1,(x,Var x'):substN),Just (x',arg))
+      -- Decide whether the applied arguments of the data constructor should
+      -- be let-bound, or substituted into the alternative. We decide this
+      -- based on the fact on whether the argument has the potential to make
+      -- the circuit larger than needed if we were to duplicate that argument.
+      newBinder (isN0,substN) (x,arg)
+        | isWorkFree arg
+        = ((isN0,(x,arg):substN),Nothing)
+        | otherwise
+        = let x'   = uniqAway isN0 x
+              isN1 = extendInScopeSet isN0 x'
+          in  ((isN1,(x,Var x'):substN),Just (x',arg))
 
-caseCon _ c@(Case (stripTicks -> Literal l) _ alts) = case List.find (equalLit . fst) alts of
-    Just (LitPat _,e) -> changed e
-    _ -> matchLiteralContructor c l alts
-  where
-    equalLit (LitPat l')     = l == l'
-    equalLit _               = False
 
-caseCon ctx@(TransformContext is0 _) e@(Case subj ty alts)
-  | (Prim _,_) <- collectArgs subj = do
+  -- The subject is a literal
+  (Literal l,_,_) -> case List.find (equalLit . fst) alts of
+    Just (LitPat _,altE) -> changed altE
+    _ -> matchLiteralContructor e l alts
+    where
+      equalLit (LitPat l')     = l == l'
+      equalLit _               = False
+
+
+  -- The subject is an applied primitive
+  (Prim _,_,_) ->
+    -- We try to reduce the applied primitive to WHNF
+    whnfRW True ctx subj $ \ctx1 subj1 -> case collectArgsTicks subj1 of
+      -- WHNF of subject is a literal, try `caseCon` with that
+      (Literal l,_,_) -> caseCon ctx1 (Case (Literal l) ty alts)
+      -- WHNF of subject is a data-constructor, try `caseCon` with that
+      (Data _,_,_) -> caseCon ctx1 (Case subj1 ty alts)
+#if MIN_VERSION_ghc(8,2,2)
+      -- WHNF of subject is _|_, in the form of `absentError`: that means that
+      -- the entire case-expression is evaluates to _|_
+      (Prim pInfo,_:msgOrCallStack:_,ticks)
+        | primName pInfo == "Control.Exception.Base.absentError" ->
+        let e1 = mkApps (mkTicks (Prim pInfo) ticks)
+                        [Right ty,msgOrCallStack]
+        in  changed e1
+#endif
+      -- WHNF of subject is _|_, in the form of `absentError`, `patError`,
+      -- or `undefined`: that means the entire case-expression is _|_
+      (Prim pInfo,repTy:_:msgOrCallStack:_,ticks)
+        | primName pInfo `elem` ["Control.Exception.Base.patError"
+#if !MIN_VERSION_ghc(8,2,2)
+                                ,"Control.Exception.Base.absentError"
+#endif
+                                ,"GHC.Err.undefined"] ->
+        let e1 = mkApps (mkTicks (Prim pInfo) ticks)
+                        [repTy,Right ty,msgOrCallStack]
+        in  changed e1
+      -- WHNF of subject is _|_, in the form of our internal _|_-values: that
+      -- means the entire case-expression is _|_
+      (Prim pInfo,[_],ticks)
+        | primName pInfo `elem` [ "Clash.Transformations.undefined"
+                                , "Clash.GHC.Evaluator.undefined"
+                                , "EmptyCase"] ->
+        let e1 = mkApps (mkTicks (Prim pInfo) ticks) [Right ty]
+        in changed e1
+      -- WHNF of subject is non of the above, so either a variable reference,
+      -- or a primitive for which the evaluator doesn't have any evaluation
+      -- rules.
+      _ -> do
+        tcm <- Lens.view tcCache
+        let subjTy = termType tcm subj
+        tran <- Lens.view typeTranslator
+        reprs <- Lens.view customReprs
+        case (`evalState` HashMapS.empty) (coreTypeToHWType tran reprs tcm subjTy) of
+          Right (FilteredHWType (Void (Just hty)) _areVoids)
+            | hty `elem` [BitVector 0, Unsigned 0, Signed 0, Index 1]
+            -- If we know that the type of the subject is zero-bits wide and
+            -- one of the Clash number types. Then the only valid alternative is
+            -- the one that can match on the literal "0", so try 'caseCon' with
+            -- that.
+            -> caseCon ctx1 (Case (Literal (IntegerLiteral 0)) ty alts)
+          _ -> do
+            let ret = caseOneAlt e
+            -- Otherwise check whether the entire case-expression has a single
+            -- alternative, and pick that one.
+            lvl <- Lens.view dbgLevel
+            if lvl > DebugNone then do
+              let subjIsConst = isConstant subj
+              -- In debug mode we always report missing evaluation rules for the
+              -- primitive evaluator
+              traceIf (lvl > DebugNone && subjIsConst)
+                      ("Irreducible constant as case subject: " ++ showPpr subj ++
+                       "\nCan be reduced to: " ++ showPpr subj1) ret
+            else
+              ret
+
+
+  -- The subject is something else
+  _ -> do
     reprs <- Lens.view customReprs
     tcm <- Lens.view tcCache
-    bndrs <- Lens.use bindings
-    (primEval, primUnwind) <- Lens.view evaluator
-    ids <- Lens.use uniqSupply
-    let (ids1,ids2) = splitSupply ids
-    uniqSupply Lens..= ids2
-    gh <- Lens.use globalHeap
-    lvl <- Lens.view dbgLevel
-    case whnf' primEval primUnwind bndrs tcm gh ids1 is0 True subj of
-      (gh',ph',v) -> do
-        globalHeap Lens..= gh'
-        bindPureHeap ctx tcm ph' $ \ctx' -> case stripTicks v of
-          Literal l -> caseCon ctx' (Case (Literal l) ty alts)
-          subj' -> case collectArgsTicks subj' of
-            (Data _,_,_) -> caseCon ctx' (Case subj' ty alts)
-#if MIN_VERSION_ghc(8,2,2)
-            (Prim ty',_:msgOrCallStack:_,ticks)
-              | primName ty' == "Control.Exception.Base.absentError" ->
-                let e' = mkApps (mkTicks (Prim ty') ticks)
-                                [Right ty,msgOrCallStack]
-                in  changed e'
-#endif
-
-            (Prim ty',repTy:_:msgOrCallStack:_,ticks)
-              | primName ty' `elem` ["Control.Exception.Base.patError"
-#if !MIN_VERSION_ghc(8,2,2)
-                          ,"Control.Exception.Base.absentError"
-#endif
-                          ,"GHC.Err.undefined"] ->
-                let e' = mkApps (mkTicks (Prim ty') ticks)
-                                [repTy,Right ty,msgOrCallStack]
-                in  changed e'
-            (Prim ty',[_],ticks)
-              | primName ty' `elem` [ "Clash.Transformations.undefined"
-                          , "Clash.GHC.Evaluator.undefined"
-                          , "EmptyCase"] ->
-                let e' = mkApps (mkTicks (Prim ty') ticks) [Right ty]
-                in changed e'
-            _ -> do
-              let subjTy = termType tcm subj
-              tran <- Lens.view typeTranslator
-              case (`evalState` HashMapS.empty) (coreTypeToHWType tran reprs tcm subjTy) of
-                Right (FilteredHWType (Void (Just hty)) _areVoids)
-                  | hty `elem` [BitVector 0, Unsigned 0, Signed 0, Index 1]
-                  -> caseCon ctx' (Case (Literal (IntegerLiteral 0)) ty alts)
-                _ -> do
-                  let ret = caseOneAlt e
-                  if lvl > DebugNone then do
-                    let subjIsConst = isConstant subj
-                    traceIf (lvl > DebugNone && subjIsConst) ("Irreducible constant as case subject: " ++ showPpr subj ++ "\nCan be reduced to: " ++ showPpr subj') ret
-                  else
-                    ret
-
-caseCon ctx e@(Case subj ty alts) = do
-  reprs <- Lens.view customReprs
-  tcm <- Lens.view tcCache
-  let subjTy = termType tcm subj
-  tran <- Lens.view typeTranslator
-  case (`evalState` HashMapS.empty) (coreTypeToHWType tran reprs tcm subjTy) of
-    Right (FilteredHWType (Void (Just hty)) _areVoids)
-      | hty `elem` [BitVector 0, Unsigned 0, Signed 0, Index 1]
-      -> caseCon ctx (Case (Literal (IntegerLiteral 0)) ty alts)
-    _ -> caseOneAlt e
+    let subjTy = termType tcm subj
+    tran <- Lens.view typeTranslator
+    case (`evalState` HashMapS.empty) (coreTypeToHWType tran reprs tcm subjTy) of
+      Right (FilteredHWType (Void (Just hty)) _areVoids)
+        | hty `elem` [BitVector 0, Unsigned 0, Signed 0, Index 1]
+        -- If we know that the type of the subject is zero-bits wide and
+        -- one of the Clash number types. Then the only valid alternative is
+        -- the one that can match on the literal "0", so try 'caseCon' with
+        -- that.
+        -> caseCon ctx (Case (Literal (IntegerLiteral 0)) ty alts)
+        -- Otherwise check whether the entire case-expression has a single
+        -- alternative, and pick that one.
+      _ -> caseOneAlt e
 
 caseCon _ e = return e
-
-
--- | Binds variables on the PureHeap over the result of the rewrite
---
--- To prevent unnecessary rewrites only do this when rewrite changed something.
-bindPureHeap
-  :: TransformContext
-  -> TyConMap
-  -> PureHeap
-  -> (TransformContext -> RewriteMonad extra Term)
-  -> RewriteMonad extra Term
-bindPureHeap (TransformContext is0 ctxs) tcm heap rw = do
-  (e, Monoid.getAny -> hasChanged) <- listen $ rw ctx'
-  if hasChanged && not (null bndrs)
-    then return $ Letrec bndrs e
-    else return e
-  where
-    bndrs = map toLetBinding $ toListUniqMap heap
-    heapIds = map fst bndrs
-    is1 = extendInScopeSetList is0 heapIds
-    ctx' = TransformContext is1 (LetBody heapIds : ctxs)
-
-    toLetBinding :: (Unique,Term) -> LetBinding
-    toLetBinding (uniq,term) = (nm, term)
-      where
-        ty = termType tcm term
-        nm = mkLocalId ty (mkUnsafeSystemName "x" uniq) -- See [Note: Name re-creation]
 
 {- [Note: Name re-creation]
 The names of heap bound variables are safely generate with mkUniqSystemId in Clash.Core.Evaluator.newLetBinding.
@@ -1991,22 +1991,11 @@ reduceBinders is processed body ((id_,expr):binders) = case List.find ((== expr)
     _ -> reduceBinders is ((id_,expr):processed) body binders
 
 reduceConst :: HasCallStack => NormRewrite
-reduceConst ctx@(TransformContext is0 _) e@(App _ _)
+reduceConst ctx e@(App _ _)
   | (Prim p0, _) <- collectArgs e
-  = do
-    tcm <- Lens.view tcCache
-    bndrs <- Lens.use bindings
-    (primEval, primUnwind) <- Lens.view evaluator
-    ids <- Lens.use uniqSupply
-    let (ids1,ids2) = splitSupply ids
-    uniqSupply Lens..= ids2
-    gh <- Lens.use globalHeap
-    case whnf' primEval primUnwind bndrs tcm gh ids1 is0 False e of
-      (gh',ph',e') -> do
-        globalHeap Lens..= gh'
-        bindPureHeap ctx tcm ph' $ \_ctx' -> case e' of
-          (collectArgs -> (Prim p1, _)) | primName p0 == primName p1 -> return e
-          _ -> changed e'
+  = whnfRW False ctx e $ \_ctx1 e1 -> case e1 of
+      (collectArgs -> (Prim p1, _)) | primName p0 == primName p1 -> return e
+      _ -> changed e1
 
 reduceConst _ e = return e
 

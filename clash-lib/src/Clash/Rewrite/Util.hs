@@ -20,6 +20,7 @@
 
 module Clash.Rewrite.Util where
 
+import           Control.Concurrent.Supply   (splitSupply)
 import           Control.DeepSeq
 import           Control.Exception           (throw)
 import           Control.Lens
@@ -54,6 +55,8 @@ import           System.IO.Unsafe            (unsafePerformIO)
 import           BasicTypes                  (InlineSpec (..))
 
 import           Clash.Core.DataCon          (dcExtTyVars)
+import           Clash.Core.Evaluator        (whnf')
+import           Clash.Core.Evaluator.Types  (PureHeap)
 import           Clash.Core.FreeVars
   (freeLocalVars, hasLocalFreeVars, localIdDoesNotOccurIn, localIdOccursIn,
    typeFreeVars, termFreeVars', freeIds)
@@ -966,3 +969,51 @@ specArgBndrsAndVars specArg =
       specTmVars  = map (Left . Var) specFVs
 
   in  (specTyBndrs ++ specTmBndrs,specTyVars ++ specTmVars)
+
+-- | Evaluate an expression to weak-head normal form (WHNF), and apply a
+-- transformation on the expression in WHNF.
+whnfRW
+  :: Bool
+  -- ^ Whether the expression we're reducing to WHNF is the subject of a
+  -- case expression.
+  -> TransformContext
+  -> Term
+  -> Rewrite extra
+  -> RewriteMonad extra Term
+whnfRW isSubj ctx@(TransformContext is0 _) e rw = do
+  tcm <- Lens.view tcCache
+  bndrs <- Lens.use bindings
+  (primEval, primUnwind) <- Lens.view evaluator
+  ids <- Lens.use uniqSupply
+  let (ids1,ids2) = splitSupply ids
+  uniqSupply Lens..= ids2
+  gh <- Lens.use globalHeap
+  case whnf' primEval primUnwind bndrs tcm gh ids1 is0 isSubj e of
+    (gh1,ph,v) -> do
+      globalHeap Lens..= gh1
+      bindPureHeap tcm ph rw ctx v
+
+-- | Binds variables on the PureHeap over the result of the rewrite
+--
+-- To prevent unnecessary rewrites only do this when rewrite changed something.
+bindPureHeap
+  :: TyConMap
+  -> PureHeap
+  -> Rewrite extra
+  -> Rewrite extra
+bindPureHeap tcm heap rw (TransformContext is0 hist) e = do
+  (e1, Monoid.getAny -> hasChanged) <- Writer.listen $ rw ctx e
+  if hasChanged && not (null bndrs)
+    then return $ Letrec bndrs e1
+    else return e1
+  where
+    bndrs = map toLetBinding $ toListUniqMap heap
+    heapIds = map fst bndrs
+    is1 = extendInScopeSetList is0 heapIds
+    ctx = TransformContext is1 (LetBody heapIds : hist)
+
+    toLetBinding :: (Unique,Term) -> LetBinding
+    toLetBinding (uniq,term) = (nm, term)
+      where
+        ty = termType tcm term
+        nm = mkLocalId ty (mkUnsafeSystemName "x" uniq) -- See [Note: Name re-creation]
