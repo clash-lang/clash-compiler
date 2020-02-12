@@ -119,7 +119,7 @@ library
   elif impl(ghc >= 8.4.1)
     HS-Source-Dirs: src-bin-841
 
-  GHC-Options:        -Wall -fno-warn-name-shadowing
+  GHC-Options:        -Wall
   CPP-Options:        -DGHCI
 
   other-extensions:   FlexibleContexts
