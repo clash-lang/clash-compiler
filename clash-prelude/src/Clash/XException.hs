@@ -146,7 +146,7 @@ infixr 0 `hwSeqX`
 -- > maybeX isX (3, _|_)            = Just (3, _|_)
 -- > maybeX isX _|_                 = _|_
 --
-maybeX :: NFData a => (a -> Either String a) -> a -> Maybe a
+maybeX :: (a -> Either String a) -> a -> Maybe a
 maybeX f a = either (const Nothing) Just (f a)
 
 -- | Fully evaluate a value, returning 'Nothing' if it throws 'XException'.
@@ -167,7 +167,7 @@ maybeHasX = maybeX hasX
 -- > maybeIsX (3, XException msg) = Just (3, XException msg)
 -- > maybeIsX (3, _|_)            = Just (3, _|_)
 -- > maybeIsX _|_                 = _|_
-maybeIsX :: NFData a => a -> Maybe a
+maybeIsX :: a -> Maybe a
 maybeIsX = maybeX isX
 
 -- | Fully evaluate a value, returning @'Left' msg@ if it throws 'XException'.
