@@ -32,8 +32,6 @@ import           Data.List                        (intercalate)
 import           Data.Maybe                       (fromMaybe)
 import           Data.Semigroup.Monad
 import qualified Data.Set                         as Set
-import           Data.String.Interpolate          (i)
-import           Data.String.Interpolate.Util     (unindent)
 import qualified Data.Text
 import           Data.Text.Lazy                   (Text)
 import qualified Data.Text.Lazy                   as Text
@@ -97,6 +95,7 @@ import           Clash.Normalize.Util             (callGraph)
 import           Clash.Primitives.Types
 import           Clash.Primitives.Util            (hashCompiledPrimMap)
 import           Clash.Unique                     (keysUniqMap, lookupUniqMap')
+import           Clash.Util.Interpolate           (i)
 import           Clash.Util
   (ClashException(..), HasCallStack, first, reportTimeDiff,
    wantedLanguageExtensions, unwantedLanguageExtensions)
@@ -137,18 +136,16 @@ splitTopAnn tcm sp typ@(tyView -> FunTy {}) t@Synthesize{t_inputs} =
             in
               go newLam (take n portNames1 ++ ps)
           PortName nm ->
-            throw (flip (ClashException sp) Nothing $ unindent $ [i|
+            throw (flip (ClashException sp) Nothing $ [i|
               Couldn't separate clock, reset, or enable from a product type due
               to a malformed Synthesize annotation. All clocks, resets, and
-              enables should be given a unique port name.
+              enables should be given a unique port name. Type to be split:
 
-              Type to split:
-
-              #{showPpr' (PrettyOptions False True False) a}
+                #{showPpr' (PrettyOptions False True False) a}
 
               Given port annotation: #{p}. You might want to use the
               following instead: PortProduct #{show nm} []. This allows Clash to
-              autogenerate names based the name #{show nm}.
+              autogenerate names based on the name #{show nm}.
             |])
       _ ->
         -- No need to split the port, carrying on..

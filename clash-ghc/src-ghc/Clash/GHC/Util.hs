@@ -1,5 +1,8 @@
+{-# LANGUAGE QuasiQuotes #-}
+
 module Clash.GHC.Util where
 
+import Outputable         (SDoc)
 import ErrUtils           (mkPlainErrMsg)
 import GHC                (GhcMonad(..), printException)
 import GhcPlugins         (DynFlags, SourceError, ($$), blankLine, empty, isGoodSrcSpan, liftIO, noSrcSpan, text, throwOneError)
@@ -9,7 +12,15 @@ import GHC.Exception      (SomeException)
 import System.Exit        (ExitCode(ExitFailure), exitWith)
 
 import Clash.Util         (ClashException(..))
+import Clash.Util.Interpolate (i)
 import Clash.Driver.Types (ClashOpts(..))
+
+-- | Like 'lines', but returning a horizontally spaced SDoc instead of a list:
+--
+-- >>> textLines "a\nb"
+-- a $$ b
+textLines :: String -> SDoc
+textLines s = foldl1 ($$) (map text (lines s))
 
 handleClashException
   :: GhcMonad m
@@ -21,7 +32,7 @@ handleClashException df opts e = case fromException e of
   Just (ClashException sp s eM) -> do
     let srcInfo' | isGoodSrcSpan sp = srcInfo
                  | otherwise = empty
-    throwOneError (mkPlainErrMsg df sp (text s $$ srcInfo' $$ showExtra (opt_errorExtra opts) eM))
+    throwOneError (mkPlainErrMsg df sp (blankLine $$ textLines s $$ blankLine $$ srcInfo' $$ showExtra (opt_errorExtra opts) eM))
   _ -> case fromException e of
     Just (ErrorCallWithLocation _ _) ->
       throwOneError (mkPlainErrMsg df noSrcSpan (text "Clash error call:" $$ text (show e)))
@@ -31,9 +42,12 @@ handleClashException df opts e = case fromException e of
         liftIO $ exitWith (ExitFailure 1)
       _ -> throwOneError (mkPlainErrMsg df noSrcSpan (text "Other error:" $$ text (displayException e)))
   where
-    srcInfo = text "NB: The source location of the error is not exact, only indicative, as it is acquired after optimisations." $$
-              text "The actual location of the error can be in a function that is inlined." $$
-              text "To prevent inlining of those functions, annotate them with a NOINLINE pragma."
+    srcInfo = textLines [i|
+      The source location of the error is not exact, only indicative, as it
+      is acquired after optimizations. The actual location of the error can be
+      in a function that is inlined. To prevent inlining of those functions,
+      annotate them with a NOINLINE pragma.
+    |]
 
     showExtra False (Just _)   =
       blankLine $$
