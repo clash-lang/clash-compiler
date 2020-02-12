@@ -90,6 +90,7 @@
   * [#1041](https://github.com/clash-lang/clash-compiler/issues/1041): Nested product types incorrectly decomposed into ports
   * [#1058](https://github.com/clash-lang/clash-compiler/issues/1058): Prevent substitution warning when using type equalities in top entities
   * [#1033](https://github.com/clash-lang/clash-compiler/issues/1033): Fix issue where Clash breaks when using Clock/Reset/Enable in product types in combination with Synthesize annotations
+  * [#1075](https://github.com/clash-lang/clash-compiler/issues/1075): Removed superfluous constraints on 'maybeX' and 'maybeIsX'
 
 * Fixes without issue reports:
   * Fix bug in `rnfX` defined for `Down` ([baef30e](https://github.com/clash-lang/clash-compiler/commit/baef30eae03dc02ba847ffbb8fae7f365c5287c2))
