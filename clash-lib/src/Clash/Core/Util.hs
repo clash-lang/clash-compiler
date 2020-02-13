@@ -50,7 +50,7 @@ import Clash.Core.Type
    coreView, coreView1, isFunTy, isPolyFunCoreTy, mkFunTy, splitFunTy, tyView,
    undefinedTy, isTypeFamilyApplication)
 import Clash.Core.TyCon
-  (TyConMap, tyConDataCons)
+  (TyConMap, TyConName, tyConDataCons)
 import Clash.Core.TysPrim                      (typeNatKind)
 import Clash.Core.Var
   (Id, TyVar, Var (..), isLocalId, mkLocalId, mkTyVar)
@@ -995,15 +995,17 @@ shouldSplit
 shouldSplit tcm (tyView ->  TyConApp (nameOcc -> "Clash.Explicit.SimIO.SimIO") [tyArg]) =
   -- We also look through `SimIO` to find things like Files
   shouldSplit tcm tyArg
-shouldSplit tcm ty = shouldSplit0 tcm (tyView (coreView tcm ty))
+shouldSplit tcm ty = shouldSplit0 emptyUniqSet tcm (tyView (coreView tcm ty))
 
 -- | Worker of 'shouldSplit', works on 'TypeView' instead of 'Type'
 shouldSplit0
-  :: TyConMap
+  :: UniqSet TyConName
+  -> TyConMap
   -> TypeView
   -> Maybe (Term,[Type])
-shouldSplit0 tcm (TyConApp tcNm tyArgs)
-  | Just tc <- lookupUniqMap tcNm tcm
+shouldSplit0 seen tcm (TyConApp tcNm tyArgs)
+  | tcNm `notElemUniqSet` seen
+  , Just tc <- lookupUniqMap tcNm tcm
   , [dc] <- tyConDataCons tc
   , let dcArgs  = substArgTys dc tyArgs
   , let dcArgVs = map (tyView . coreView tcm) dcArgs
@@ -1012,8 +1014,10 @@ shouldSplit0 tcm (TyConApp tcNm tyArgs)
     else
       Nothing
  where
+  seen1 = extendUniqSet seen tcNm
+
   shouldSplitTy :: TypeView -> Bool
-  shouldSplitTy ty = isJust (shouldSplit0 tcm ty) || splitTy ty
+  shouldSplitTy ty = isJust (shouldSplit0 seen1 tcm ty) || splitTy ty
 
   -- Hidden constructs (HiddenClock, HiddenReset, ..) don't need to be split
   -- because KnownDomain will be filtered anyway during netlist generation due
@@ -1046,7 +1050,7 @@ shouldSplit0 tcm (TyConApp tcNm tyArgs)
                            ]
   splitTy _ = False
 
-shouldSplit0 _ _ = Nothing
+shouldSplit0 _ _ _ = Nothing
 
 -- | Potentially split apart a list of function argument types. e.g. given:
 --

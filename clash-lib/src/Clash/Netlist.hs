@@ -351,6 +351,9 @@ mkDeclarations'
   -> Term
   -- ^ RHS of the let-binder
   -> NetlistMonad [Declaration]
+mkDeclarations' declType bndr (collectTicks -> (Cast e _ _,ticks)) =
+  mkDeclarations' declType bndr (mkTicks e ticks)
+
 mkDeclarations' _declType bndr (collectTicks -> (Var v,ticks)) =
   withTicks ticks $ \tickDecls -> do
   mkFunApp (id2identifier bndr) v [] tickDecls
@@ -734,6 +737,9 @@ mkExpr bbEasD declType bndr app =
       decls    <- concat <$> mapM (uncurry mkDeclarations) binders
       (bodyE,bodyDecls) <- mkExpr bbEasD declType bndr (mkApps (mkTicks body ticks) args)
       return (bodyE,netDecls ++ decls ++ bodyDecls)
+
+    Cast e0 _ _ | null args ->
+      mkExpr bbEasD declType bndr (mkTicks e0 ticks)
     _ -> throw (ClashException sp ($(curLoc) ++ "Not in normal form: application of a Lambda-expression\n\n" ++ showPpr app) Nothing)
 
 -- | Generate an expression that projects a field out of a data-constructor.

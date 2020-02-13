@@ -140,6 +140,10 @@ unwindStack m
           let term = Tick sp (getTerm m')
            in unwindStack (setTerm term m')
 
+        Castish ty1 ty2 ->
+          let term = Cast (getTerm m') ty1 ty2
+           in unwindStack (setTerm term m')
+
 -- | A single step in the partial evaluator. The result is the new heap and
 -- stack, and the next expression to be reduced.
 --
@@ -232,6 +236,8 @@ stepApp x y m tcm =
             GT -> let (m0, n) = newLetBinding tcm m y
                    in Just . setTerm x $ stackPush (Apply n) m0
 
+    Cast {} -> error "stepApp QQ"
+
     _ -> let (m0, n) = newLetBinding tcm m y
           in Just . setTerm x $ stackPush (Apply n) m0
  where
@@ -264,6 +270,8 @@ stepTyApp x ty m tcm =
             LT -> newBinder tys' (TyApp x ty) m tcm
             GT -> Just . setTerm x $ stackPush (Instantiate ty) m
 
+    Cast {} -> error "stepTyApp QQ"
+
     _ -> Just . setTerm x $ stackPush (Instantiate ty) m
  where
   (term, args, _) = collectArgsTicks (TyApp x ty)
@@ -273,17 +281,14 @@ stepLetRec :: [LetBinding] -> Term -> Step
 stepLetRec bs x m _ = Just (allocate bs x m)
 
 stepCase :: Term -> Type -> [Alt] -> Step
+stepCase (Cast {}) _ty _alts _m _ = error "stepCase QQ"
 stepCase scrut ty alts m _ =
   Just . setTerm scrut $ stackPush (Scrutinise ty alts) m
 
 -- TODO Support stepwise evaluation of casts.
 --
 stepCast :: Term -> Type -> Type -> Step
-stepCast _ _ _ _ _ =
-  flip trace Nothing $ unlines
-    [ "WARNING: " <> $(curLoc) <> "Clash can't symbolically evaluate casts"
-    , "Please file an issue at https://github.com/clash-lang/clash-compiler/issues"
-    ]
+stepCast x ty1 ty2 m _ = Just . setTerm x $ stackPush (Castish ty1 ty2) m
 
 stepTick :: TickInfo -> Term -> Step
 stepTick tick x m _ =
@@ -356,7 +361,8 @@ unwind tcm m v = do
   go (Instantiate ty)         = return . instantiate v ty
   go (PrimApply p tys vs tms) = mPrimUnwind m tcm p tys vs v tms
   go (Scrutinise _ as)        = return . scrutinise v as
-  go (Tickish _)              = return . setTerm (valToTerm v)
+  go (Tickish t)              = flip (unwind tcm) (TickValue t v)
+  go (Castish ty1 ty2)        = flip (unwind tcm) (CastValue v ty1 ty2)
 
 -- | Update the Heap with the evaluated term
 update :: IdScope -> Id -> Value -> Machine -> Machine

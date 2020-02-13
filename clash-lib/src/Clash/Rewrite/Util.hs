@@ -226,15 +226,15 @@ applyDebug lvl _transformations name exprOld hasChanged exprNew =
                      , "substitution."
                      ])
 
-    traceIf (lvl >= DebugApplied && (not (beforeTy `aeqType` afterTy)))
-            ( concat [ $(curLoc)
+    Monad.when (lvl >= DebugApplied && (not (beforeTy `aeqType` afterTy))) $
+      error ( concat [ $(curLoc)
                      , "Error when applying rewrite ", name
                      , " to:\n" , before
                      , "\nResult:\n" ++ after ++ "\n"
                      , "Changes type from:\n", showPpr beforeTy
                      , "\nto:\n", showPpr afterTy
                      ]
-            ) (return ())
+            )
 
   Monad.when (lvl >= DebugApplied && not hasChanged && not (exprOld `aeqTerm` exprNew)) $
     error $ $(curLoc) ++ "Expression changed without notice(" ++ name ++  "): before"
@@ -403,6 +403,8 @@ tailCalls id_ = \case
     in  case scrutTl of
           Just 0 | all (/= Nothing) altsTl -> Just (sum (catMaybes altsTl))
           _ -> Nothing
+  Tick _ e -> tailCalls id_ e
+  Cast e _ _ -> tailCalls id_ e
   _ -> Just 0
 
 -- | Determines whether a function has the following shape:
@@ -462,7 +464,7 @@ isWorkFree (collectArgs -> (fun,args)) = case fun of
   Letrec bs e ->
     isWorkFree e && all (isWorkFree . snd) bs && all isWorkFreeArg args
   Case s _ [(_,a)] -> isWorkFree s && isWorkFree a && all isWorkFreeArg args
-  Cast e _ _       -> isWorkFree e && all isWorkFreeArg args
+  Cast e _ _       -> isWorkFree (mkApps e args)
   _                -> False
  where
   isWorkFreeArg = either isWorkFree (const True)
@@ -482,6 +484,7 @@ isConstant e = case collectArgs e of
   (Prim _, args) -> all (either isConstant (const True)) args
   (Lam _ _, _)     -> not (hasLocalFreeVars e)
   (Literal _,_)    -> True
+  (Cast e0 _ _,args) -> all (either isConstant (const True)) (Left e0:args)
   _                -> False
 
 isConstantNotClockReset
@@ -509,6 +512,7 @@ isWorkFreeClockOrResetOrEnable tcm e =
       (Var _, []) -> Just True
       (Data _, []) -> Just True -- For Enable True/False
       (Literal _,_) -> Just True
+      (Cast e0 _ _,[]) -> isWorkFreeClockOrResetOrEnable tcm e0
       _ -> Just False
   else
     Nothing
@@ -531,19 +535,21 @@ isWorkFreeIsh
 isWorkFreeIsh e = do
   tcm <- Lens.view tcCache
   case isWorkFreeClockOrResetOrEnable tcm e of
-    Just b -> pure b
-    Nothing ->
-      case collectArgs e of
-        (Data _, args)   -> allM isWorkFreeIshArg args
-        (Prim pInfo, args) -> case primWorkInfo pInfo of
-          WorkAlways     -> pure False -- Things like clock or reset generator always
-                                       -- perform work
-          WorkVariable   -> pure (all isConstantArg args)
-          _              -> allM isWorkFreeIshArg args
-        (Lam _ _, _)     -> pure (not (hasLocalFreeVars e))
-        (Literal _,_)    -> pure True
-        _                -> pure False
+    Just b  -> pure b
+    Nothing -> go e
  where
+  go e0 = case collectArgs e0 of
+    (Data _, args)   -> allM isWorkFreeIshArg args
+    (Prim pInfo, args) -> case primWorkInfo pInfo of
+      WorkAlways     -> pure False -- Things like clock or reset generator always
+                                   -- perform work
+      WorkVariable   -> pure (all isConstantArg args)
+      _              -> allM isWorkFreeIshArg args
+    (Lam _ _, _)     -> pure (not (hasLocalFreeVars e))
+    (Literal _,_)    -> pure True
+    (Cast e1 _ _,args) -> go (mkApps e1 args)
+    _                -> pure False
+
   isWorkFreeIshArg = either isWorkFreeIsh (pure . const True)
   isConstantArg    = either isConstant (const True)
 
@@ -884,9 +890,9 @@ specialise' specMapLbl specHistLbl specLimitLbl (TransformContext is0 _) e (Var 
                       -- are inlined, meaning the state-transition-function
                       -- and the memory element will be in a single function.
                       gTmM <- fmap (lookupUniqMap (varName g)) $ Lens.use bindings
-                      return (g,maybe inl (^. _3) gTmM, maybe specArg (Left . (`mkApps` gArgs) . (^. _4)) gTmM)
-                    else return (f,inl,specArg)
-                _ -> return (f,inl,specArg)
+                      return (g,maybe inl (^. _3) gTmM, maybe specArgIn (Left . (`mkApps` gArgs) . (^. _4)) gTmM)
+                    else return (f,inl,specArgIn)
+                _ -> return (f,inl,specArgIn)
               -- Create specialized functions
               let newBody = mkAbstraction (mkApps bodyTm (argVars ++ [specArg'])) (boundArgs ++ specBndrs)
               newf <- mkFunction (varName fId) sp inl' newBody

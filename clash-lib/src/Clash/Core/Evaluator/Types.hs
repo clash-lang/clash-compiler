@@ -117,6 +117,7 @@ data StackFrame
   | PrimApply  PrimInfo [Type] [Value] [Term]
   | Scrutinise Type [Alt]
   | Tickish TickInfo
+  | Castish Type Type
   deriving Show
 
 instance ClashPretty StackFrame where
@@ -134,6 +135,8 @@ instance ClashPretty StackFrame where
           fromPpr (Case (Literal (CharLiteral '_')) a b)]
   clashPretty (Tickish sp) =
     hsep ["Tick", fromPpr sp]
+  clashPretty (Castish ty1 ty2) =
+    hsep ["Cast", fromPpr ty1, fromPpr ty2]
 
 -- Values
 data Value

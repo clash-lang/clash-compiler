@@ -61,7 +61,8 @@ import           Clash.Core.Type               as C
   (Type (..), ConstTy (..), TypeView (..), mkFunTy, splitFunTys, splitFunTy, tyView)
 import           Clash.Core.TyCon              as C (TyConMap, tyConDataCons)
 import           Clash.Core.Util
-  (collectBndrs, inverseTopSortLetBindings, isFun, mkApps, splitShouldSplit, termType)
+  (collectBndrs, inverseTopSortLetBindings, isFun, mkApps, splitShouldSplit,
+   termType, mkTicks)
 import           Clash.Core.Var                as V
   (Id, Var (..), mkLocalId, modifyVarName)
 import           Clash.Core.VarEnv
@@ -188,6 +189,7 @@ isLiteral e = case collectArgs e of
   (Data _, args)   -> all (either isLiteral (const True)) args
   (Prim _, args) -> all (either isLiteral (const True)) args
   (C.Literal _,_)  -> True
+  (Cast e0 _ _, args) -> all (either isLiteral (const True)) (Left e0:args)
   _                -> False
 
 mkArgument
@@ -239,6 +241,7 @@ mkArgument bndr e = do
         (Case scrut ty' [alt],[],_) -> do
           (projection,decls) <- mkProjection False (NetlistId bndr ty) scrut ty' alt
           return ((projection,hwTy,False),decls)
+        (Cast e0 _ _,[],ticks) -> mkArgument bndr (mkTicks e0 ticks)
         _ ->
           return ((Identifier (error ($(curLoc) ++ "Forced to evaluate unexpected function argument: " ++ eTyMsg)) Nothing
                   ,hwTy,False),[])

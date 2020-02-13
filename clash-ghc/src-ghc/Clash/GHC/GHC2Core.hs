@@ -91,7 +91,7 @@ import TyCon      (AlgTyConRhs (..), TyCon, tyConName,
                    tyConArity,
                    tyConDataCons, tyConKind,
                    tyConName, tyConUnique, isClassTyCon)
-import Type       (mkTvSubstPrs, substTy, coreView)
+import Type       (mkTvSubstPrs, substTy, coreView, piResultTys)
 import TyCoRep    (Coercion (..), TyLit (..), Type (..))
 import Unique     (Uniquable (..), Unique, getKey, hasKey)
 import Var        (Id, TyVar, Var, idDetails,
@@ -288,71 +288,101 @@ coreToTerm primMap unlocs = term
       , let (nm, _) = RWS.evalRWS (qualifiedNameString (varName x))
                                   noSrcSpan
                                   emptyGHC2CoreState
-      = go nm args
+      = go nm (varType x) args
       | otherwise
       = term' e
       where
         -- Remove most Signal transformers
-        go "Clash.Signal.Internal.mapSignal#"  args
-          | length args == 5
-          = term (App (args!!3) (args!!4))
-        go "Clash.Signal.Internal.signal#"     args
+        go "Clash.Signal.Internal.mapSignal#"  pTy args
+          | [Type aTy, Type bTy, Type domTy, fTm, aSigTm] <- args
+          = do
+            let aSigTy = piResultTys pTy [bTy,aTy,domTy,aTy,aTy]
+                bSigTy = piResultTys pTy [aTy,bTy,domTy,bTy,bTy]
+            aTyC <- coreToType aTy
+            bTyC <- coreToType bTy
+            aSigTyC <- coreToType aSigTy
+            bSigTyC  <- coreToType bSigTy
+            C.Cast <$> (C.App <$> term fTm
+                              <*> (C.Cast <$> term aSigTm
+                                          <*> pure aSigTyC
+                                          <*> pure aTyC))
+                   <*> pure bTyC
+                   <*> pure bSigTyC
+        go "Clash.Signal.Internal.signal#"     pty args
+          | [Type aTy, Type domTy, aTm] <- args
+          = let aSigTy = piResultTys pty [aTy,domTy,aTy]
+            in  C.Cast <$> term aTm <*> coreToType aTy <*> coreToType aSigTy
+        go "Clash.Signal.Internal.appSignal#"  pTy args
+          | [Type domTy, Type aTy, Type bTy, fSigTm, aSigTm] <- args
+          = do
+            let aSigTy = piResultTys pTy [domTy,bTy,aTy,aTy,aTy]
+                bSigTy = piResultTys pTy [domTy,aTy,bTy,bTy,bTy]
+                fSigTy = piResultTys pTy [domTy,aTy,FunTy aTy bTy,aTy,aTy]
+            aTyC     <- coreToType aTy
+            bTyC     <- coreToType bTy
+            aSigTyC  <- coreToType aSigTy
+            bSigTyC  <- coreToType bSigTy
+            fSigTyC  <- coreToType fSigTy
+            let fTyC = C.mkFunTy aTyC bTyC
+            C.Cast <$> (C.App <$> (C.Cast <$> term fSigTm
+                                          <*> pure fSigTyC
+                                          <*> pure fTyC)
+                              <*> (C.Cast <$> term aSigTm
+                                          <*> pure aSigTyC
+                                          <*> pure aTyC))
+                   <*> pure bTyC
+                   <*> pure bSigTyC
+        go "Clash.Signal.Internal.joinSignal#" _ args
           | length args == 3
           = term (args!!2)
-        go "Clash.Signal.Internal.appSignal#"  args
-          | length args == 5
-          = term (App (args!!3) (args!!4))
-        go "Clash.Signal.Internal.joinSignal#" args
-          | length args == 3
-          = term (args!!2)
-        go "Clash.Signal.Bundle.vecBundle#"    args
+        go "Clash.Signal.Bundle.vecBundle#"    _ args
           | length args == 4
           = term (args!!3)
         --- Remove `$`
-        go "GHC.Base.$"                        args
+        go "GHC.Base.$"                        _ args
           | length args == 5
           = term (App (args!!3) (args!!4))
-        go "GHC.Magic.noinline"                args   -- noinline :: forall a. a -> a
+        go "GHC.Magic.noinline"                _ args   -- noinline :: forall a. a -> a
           | [_ty, x] <- args
           = term x
         -- Remove most CallStack logic
-        go "GHC.Stack.Types.PushCallStack"     args = term (last args)
-        go "GHC.Stack.Types.FreezeCallStack"   args = term (last args)
-        go "GHC.Stack.withFrozenCallStack"     args
+        go "GHC.Stack.Types.PushCallStack"     _ args = term (last args)
+        go "GHC.Stack.Types.FreezeCallStack"   _ args = term (last args)
+        go "GHC.Stack.withFrozenCallStack"     _ args
           | length args == 3
           = term (App (args!!2) (args!!1))
-        go "Clash.Class.BitPack.packXWith" args
+        go "Clash.Class.BitPack.packXWith" _ args
           | [_nTy,_aTy,_kn,f] <- args
           = term f
-        go "Clash.Sized.BitVector.Internal.checkUnpackUndef" args
+        go "Clash.Sized.BitVector.Internal.checkUnpackUndef" _ args
           | [_nTy,_aTy,_kn,_typ,f] <- args
           = term f
-        go "Clash.Magic.prefixName" args
+        go "Clash.Magic.prefixName" _ args
           | [Type nmTy,_aTy,f] <- args
           = C.Tick <$> (C.NameMod C.PrefixName <$> coreToType nmTy) <*> term f
-        go "Clash.Magic.suffixName" args
+        go "Clash.Magic.suffixName" _ args
           | [Type nmTy,_aTy,f] <- args
           = C.Tick <$> (C.NameMod C.SuffixName <$> coreToType nmTy) <*> term f
-        go "Clash.Magic.suffixNameFromNat" args
+        go "Clash.Magic.suffixNameFromNat" _ args
           | [Type nmTy,_aTy,f] <- args
           = C.Tick <$> (C.NameMod C.SuffixName <$> coreToType nmTy) <*> term f
-        go "Clash.Magic.suffixNameP" args
+        go "Clash.Magic.suffixNameP" _ args
           | [Type nmTy,_aTy,f] <- args
           = C.Tick <$> (C.NameMod C.SuffixNameP <$> coreToType nmTy) <*> term f
-        go "Clash.Magic.suffixNameFromNatP" args
+        go "Clash.Magic.suffixNameFromNatP" _ args
           | [Type nmTy,_aTy,f] <- args
           = C.Tick <$> (C.NameMod C.SuffixNameP <$> coreToType nmTy) <*> term f
-        go "Clash.Magic.setName" args
+        go "Clash.Magic.setName" _ args
           | [Type nmTy,_aTy,f] <- args
           = C.Tick <$> (C.NameMod C.SetName <$> coreToType nmTy) <*> term f
-        go "Clash.Magic.deDup" args
+        go "Clash.Magic.deDup" _ args
           | [_aTy,f] <- args
           = C.Tick C.DeDup <$> term f
-        go "Clash.Magic.noDeDup" args
+        go "Clash.Magic.noDeDup" _ args
           | [_aTy,f] <- args
           = C.Tick C.NoDeDup <$> term f
 
-        go _ _ = term' e
+        go _ _ _ = term' e
     term' (Var x)                 = var x
     term' (Lit l)                 = return $ C.Literal (coreToLiteral l)
     term' (App eFun (Type tyArg)) = C.TyApp <$> term eFun <*> coreToType tyArg
@@ -405,7 +435,7 @@ coreToTerm primMap unlocs = term
       case hasPrimCoM of
         Just _ | ty1_I || ty2_I
           -> C.Cast <$> term e <*> coreToType ty1 <*> coreToType ty2
-        _ -> term e
+        _ -> C.Cast <$> term e <*> coreToType ty1 <*> coreToType ty2
     term' (Tick (SourceNote rsp _) e) =
       C.Tick (C.SrcSpan (RealSrcSpan rsp)) <$> addUsefull (RealSrcSpan rsp) (term e)
     term' (Tick _ e)        = term e
