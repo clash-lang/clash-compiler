@@ -388,6 +388,7 @@ runClashTest = defaultMain $ clashTestRoot
         , runTest "T1033" def {hdlSim=False,entities=Entities ["top", ""], topEntity=TopEntity "top"}
         , outputTest ("tests" </> "shouldwork" </> "TopEntity") allTargets [] [] "T1033" "main"
         , outputTest ("tests" </> "shouldwork" </> "TopEntity") allTargets [] [] "T1072" "main"
+        , outputTest ("tests" </> "shouldwork" </> "TopEntity") allTargets [] [] "T1074" "main"
         ]
       , clashTestGroup "Unit"
         [ runTest "Imap" def

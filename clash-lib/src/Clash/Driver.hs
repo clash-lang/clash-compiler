@@ -143,6 +143,7 @@ splitTopAnn tcm sp typ@(tyView -> FunTy {}) t@Synthesize{t_inputs} =
       _ ->
         -- No need to split the port, carrying on..
         p : go res ps
+  go (ForAllTy _tyVar ty) ps = go ty ps
   go _ty ps = ps
 
   prependName :: String -> PortName -> PortName
