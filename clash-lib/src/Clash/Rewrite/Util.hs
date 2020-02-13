@@ -88,6 +88,7 @@ import           Clash.Netlist.Util          (representableType)
 import           Clash.Rewrite.Types
 import           Clash.Unique
 import           Clash.Util
+import           GHC.FastString.Extra
 
 -- | Lift an action working in the '_extra' state to the 'RewriteMonad'
 zoomExtra :: State.State extra a
@@ -289,7 +290,7 @@ closestLetBinder (_:ctx)              = closestLetBinder ctx
 
 mkDerivedName :: TransformContext -> OccName -> TmName
 mkDerivedName (TransformContext _ ctx) sf = case closestLetBinder ctx of
-  Just id_ -> appendToName (varName id_) ('_' `Text.cons` sf)
+  Just id_ -> appendToName (varName id_) ('_' `consFS` sf)
   _ -> mkUnsafeInternalName sf 0
 
 -- | Make a new binder and variable reference for a term
@@ -465,7 +466,7 @@ isWorkFree (collectArgs -> (fun,args)) = case fun of
   isWorkFreeArg = either isWorkFree (const True)
   isConstantArg = either isConstant (const True)
 
-isFromInt :: Text -> Bool
+isFromInt :: FastString -> Bool
 isFromInt nm = nm == "Clash.Sized.Internal.BitVector.fromInteger##" ||
                nm == "Clash.Sized.Internal.BitVector.fromInteger#" ||
                nm == "Clash.Sized.Internal.Index.fromInteger#" ||
@@ -603,7 +604,7 @@ liftBinding (var@Id {varName = idName} ,e) = do
   newBodyNm <-
     cloneNameWithBindingMap
       binders
-      (appendToName (varName cf) ("_" `Text.append` nameOcc idName))
+      (appendToName (varName cf) ('_' `consFS` nameOcc idName))
   let newBodyId = mkGlobalId newBodyTy newBodyNm {nameSort = Internal}
 
   -- Make a new expression, consisting of the the lifted function applied to
@@ -855,7 +856,7 @@ specialise' specMapLbl specHistLbl specLimitLbl (TransformContext is0 _) e (Var 
                         Nothing)
             else do
               let existingNames = collectBndrsMinusApps bodyTm
-                  newNames      = [ mkUnsafeInternalName ("pTS" `Text.append` Text.pack (show n)) n
+                  newNames      = [ mkUnsafeInternalName (fsLit ('p':'T':'S':show n)) n
                                   | n <- [(0::Int)..]
                                   ]
               -- Make new binders for existing arguments

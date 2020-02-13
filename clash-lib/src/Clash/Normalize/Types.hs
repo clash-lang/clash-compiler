@@ -14,7 +14,6 @@ module Clash.Normalize.Types where
 import Control.Monad.State.Strict (State)
 import Data.Map                   (Map)
 import Data.Set                   (Set)
-import Data.Text                  (Text)
 
 import Clash.Core.Term        (Term)
 import Clash.Core.Type        (Type)
@@ -24,6 +23,7 @@ import Clash.Driver.Types     (BindingMap)
 import Clash.Primitives.Types (CompiledPrimMap)
 import Clash.Rewrite.Types    (Rewrite, RewriteMonad)
 import Clash.Util
+import GHC.FastString.Extra   (FastString)
 
 -- | State of the 'NormalizeMonad'
 data NormalizeState
@@ -55,7 +55,7 @@ data NormalizeState
   -- ^ Size of a constant below which it is always inlined; 0 = no limit
   , _primitives :: CompiledPrimMap
   -- ^ Primitive Definitions
-  , _primitiveArgs :: Map Text (Set Int)
+  , _primitiveArgs :: Map FastString (Set Int)
   -- ^ Cache for looking up constantness of blackbox arguments
   , _recursiveComponents :: VarEnv Bool
   -- ^ Map telling whether a components is recursively defined.

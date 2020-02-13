@@ -42,6 +42,7 @@ import Clash.Core.Name                  (Name (..))
 import {-# SOURCE #-} Clash.Core.Term   (Term, TmName)
 import {-# SOURCE #-} Clash.Core.Type   (Kind, Type, TyName)
 import Clash.Unique
+import GHC.FastString.Extra
 
 
 -- | Interal version of Clash.Annotations.SynthesisAttributes.Attr.
@@ -49,17 +50,17 @@ import Clash.Unique
 -- Needed because Clash.Annotations.SynthesisAttributes.Attr uses the Symbol
 -- kind for names, which do not have a term-level representation
 data Attr'
-  = BoolAttr' String Bool
-  | IntegerAttr' String Integer
-  | StringAttr' String String
-  | Attr' String
+  = BoolAttr' FastString Bool
+  | IntegerAttr' FastString Integer
+  | StringAttr' FastString FastString
+  | Attr' FastString
   deriving (Eq, Show, NFData, Generic, Hashable, Ord, Binary)
 
 attrName :: Attr' -> String
-attrName (BoolAttr' n _)    = n
-attrName (IntegerAttr' n _) = n
-attrName (StringAttr' n _)  = n
-attrName (Attr' n)          = n
+attrName (BoolAttr' n _)    = unpackFS n
+attrName (IntegerAttr' n _) = unpackFS n
+attrName (StringAttr' n _)  = unpackFS n
+attrName (Attr' n)          = unpackFS n
 
 -- | Variables in CoreHW
 data Var a

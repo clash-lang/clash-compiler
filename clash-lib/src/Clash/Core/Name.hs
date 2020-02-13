@@ -22,11 +22,12 @@ import           Control.DeepSeq                        (NFData)
 import           Data.Binary                            (Binary)
 import           Data.Function                          (on)
 import           Data.Hashable                          (Hashable (..))
-import           Data.Text                              (Text, append)
 import           GHC.BasicTypes.Extra                   ()
 import           GHC.Generics                           (Generic)
 import           GHC.SrcLoc.Extra                       ()
 import           SrcLoc                                 (SrcSpan, noSrcSpan)
+
+import           GHC.FastString.Extra
 
 import           Clash.Unique
 
@@ -53,7 +54,7 @@ instance Uniquable (Name a) where
   getUnique = nameUniq
   setUnique nm u = nm {nameUniq=u}
 
-type OccName = Text
+type OccName = FastString
 
 data NameSort
   = User
@@ -62,19 +63,23 @@ data NameSort
   deriving (Eq,Ord,Show,Generic,NFData,Hashable,Binary)
 
 mkUnsafeSystemName
-  :: Text
+  :: OccName
   -> Unique
   -> Name a
 mkUnsafeSystemName s i = Name System s i noSrcSpan
 
 mkUnsafeInternalName
-  :: Text
+  :: OccName
   -> Unique
   -> Name a
-mkUnsafeInternalName s i = Name Internal ("c$" `append` s) i noSrcSpan
+mkUnsafeInternalName s i = Name Internal (internalPrefix `appendFS` s) i noSrcSpan
 
-appendToName :: Name a -> Text -> Name a
+appendToName :: Name a -> FastString -> Name a
 appendToName (Name sort nm uniq loc) s = Name Internal nm2 uniq loc
   where
-    nm1 = case sort of {Internal -> nm; _ -> "c$" `append` nm}
-    nm2 = nm1 `append` s
+    nm1 = case sort of {Internal -> nm; _ -> internalPrefix `appendFS` nm}
+    nm2 = nm1 `appendFS` s
+
+internalPrefix :: OccName
+internalPrefix = fsLit "c$"
+

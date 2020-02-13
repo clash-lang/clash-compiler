@@ -36,7 +36,6 @@ import Data.Either                             (lefts, rights)
 import Data.Maybe                              (catMaybes)
 import Data.Hashable                           (Hashable)
 import Data.List                               (partition)
-import Data.Text                               (Text)
 import GHC.Generics
 import SrcLoc                                  (SrcSpan)
 
@@ -47,6 +46,7 @@ import Clash.Core.Name                         (Name (..))
 import {-# SOURCE #-} Clash.Core.Subst         () -- instance Eq Type
 import {-# SOURCE #-} Clash.Core.Type          (Type)
 import Clash.Core.Var                          (Id, TyVar)
+import GHC.FastString.Extra
 
 -- | Term representation in the CoreHW language: System F + LetRec + Case
 data Term
@@ -91,7 +91,7 @@ data NameMod
   deriving (Eq,Show,Generic,NFData,Hashable,Binary)
 
 data PrimInfo = PrimInfo
-  { primName     :: !Text
+  { primName     :: !FastString
   , primType     :: !Type
   , primWorkInfo :: !WorkInfo
   } deriving (Show,Generic,NFData,Hashable,Binary)
@@ -130,7 +130,7 @@ type Alt = (Pat,Term)
 data CoreContext
   = AppFun
   -- ^ Function position of an application
-  | AppArg (Maybe (Text, Int, Int))
+  | AppArg (Maybe (FastString, Int, Int))
   -- ^ Argument position of an application. If this is an argument applied to
   -- a primitive, a tuple is defined containing (name of the primitive, #type
   -- args, #term args)
@@ -227,7 +227,7 @@ collectArgsTicks = go [] []
 primArg
   :: Term
   -- ^ Function application
-  -> Maybe (Text, Int, Int)
+  -> Maybe (FastString, Int, Int)
   -- ^ If @Term@ was a primitive: (name of primitive, #type args, #term args)
 primArg (collectArgs -> t) =
   case t of

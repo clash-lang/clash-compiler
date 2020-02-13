@@ -86,6 +86,7 @@ import           Clash.Netlist.Types     as HW
 import           Clash.Primitives.Types
 import           Clash.Unique
 import           Clash.Util
+import           GHC.FastString.Extra
 
 -- | Throw away information indicating which constructor fields were filtered
 -- due to being void.
@@ -400,7 +401,7 @@ mkADT _ _ m tyString tc _
 mkADT builtInTranslation reprs m _tyString tc args = case tyConDataCons (m `lookupUniqMap'` tc) of
   []  -> return (FilteredHWType (Void Nothing) [])
   dcs -> do
-    let tcName           = nameOcc tc
+    let tcName           = fsToText (nameOcc tc)
         substArgTyss     = map (`substArgTys` args) dcs
     argHTyss0           <- mapM (mapM (ExceptT . coreTypeToHWType builtInTranslation reprs m)) substArgTyss
     let argHTyss1        = map (\tys -> zip (map isFilteredVoid tys) tys) argHTyss0
@@ -461,7 +462,7 @@ mkADT builtInTranslation reprs m _tyString tc args = case tyConDataCons (m `look
         -- None of the dataconstructors have fields. This type is therefore a
         -- simple Sum type.
         | otherwise ->
-          return (FilteredHWType (Sum tcName $ map (nameOcc . dcName) dcs) argHTyss1)
+          return (FilteredHWType (Sum tcName $ map (fsToText . nameOcc . dcName) dcs) argHTyss1)
 
       -- A sum of product, due to multiple constructors, where at least one
       -- of the constructor has one or more fields modulo empty fields. Example:
@@ -469,7 +470,7 @@ mkADT builtInTranslation reprs m _tyString tc args = case tyConDataCons (m `look
       -- >>> data YZA = Y Int | Z () | A
       (_,elemHTys) ->
         return $ FilteredHWType (SP tcName $ zipWith
-          (\dc tys ->  ( nameOcc (dcName dc), tys))
+          (\dc tys ->  (fsToText (nameOcc (dcName dc)), tys))
           dcs (map stripFiltered <$> elemHTys)) argHTyss1
 
 -- | Simple check if a TyCon is recursively defined.
@@ -732,7 +733,7 @@ setBinderName
   -- ^ The binding
   -> NetlistMonad ((Id, Subst, [(Id,Term)]),Id)
 setBinderName subst res resRead m@(resN,_,_) (i,collectArgsTicks -> (k,args,ticks)) = case k of
-  Prim p -> let nm = primName p in extractPrimWarnOrFail nm >>= go nm
+  Prim p -> let nm = fsToText (primName p) in extractPrimWarnOrFail nm >>= go nm
   _ -> goDef
  where
   go nm (BlackBox {resultName = Just (BBTemplate nmD)}) = withTicks ticks $ \_ -> do
@@ -740,7 +741,7 @@ setBinderName subst res resRead m@(resN,_,_) (i,collectArgsTicks -> (k,args,tick
     be <- Lens.use backend
     let bbRetValName = case be of
           SomeBackend s -> toStrict ((State.evalState (renderTemplate bbCtx nmD) s) 0)
-        i1 = modifyVarName (\n -> n {nameOcc = bbRetValName}) i
+        i1 = modifyVarName (\n -> n {nameOcc = textToFS bbRetValName}) i
     if res == i1 then do
       ([i2],subst1) <- mkUnique subst [i1]
       return ((i2,subst1,[(resN,Var i2)]),i2)
@@ -791,7 +792,7 @@ mkUniqueArguments subst0 (Just teM) args = do
   where
     go pM var = do
       let i     = varName var
-          i'    = nameOcc i
+          i'    = fsToText (nameOcc i)
           ty    = varType var
       fHwty <- unsafeCoreTypeToHWTypeM $(curLoc) ty
       let FilteredHWType hwty _ = fHwty
@@ -822,7 +823,7 @@ mkUniqueResult subst0 Nothing res = do
 mkUniqueResult subst0 (Just teM) res = do
   (_,sp)    <- Lens.use curCompNm
   let o     = varName res
-      o'    = nameOcc o
+      o'    = fsToText (nameOcc o)
       ty    = varType res
   fHwty <- unsafeCoreTypeToHWTypeM $(curLoc) ty
   let FilteredHWType hwty _ = fHwty
@@ -871,16 +872,16 @@ idToPort var = do
   hwTy <- unsafeCoreTypeToHWTypeM' $(curLoc) ty
   if isVoid hwTy
     then return Nothing
-    else return (Just (nameOcc i, hwTy))
+    else return (Just (fsToText (nameOcc i), hwTy))
 
 id2type :: Id -> Type
 id2type = varType
 
 id2identifier :: Id -> Identifier
-id2identifier = nameOcc . varName
+id2identifier = fsToText . nameOcc . varName
 
 repName :: Text -> Name a -> Name a
-repName s (Name sort' _ i loc) = Name sort' s i loc
+repName s (Name sort' _ i loc) = Name sort' (textToFS s) i loc
 
 -- | Make a set of IDs unique; also returns a substitution from old ID to new
 -- updated unique ID.
@@ -1165,7 +1166,7 @@ genComponentName
   -> Id
   -> Identifier
 genComponentName newInlineStrat seen mkIdFn prefixM nm =
-  let nm' = Text.splitOn (Text.pack ".") (nameOcc (varName nm))
+  let nm' = Text.splitOn (Text.pack ".") (fsToText (nameOcc (varName nm)))
       fn  = mkIdFn Basic (stripDollarPrefixes (last nm'))
       fn' = if Text.null fn then Text.pack "Component" else fn
       prefix = maybe id (:) (snd prefixM) (if newInlineStrat then [] else init nm')

@@ -53,6 +53,7 @@ import           Clash.Netlist.BlackBox.Util
   (walkElement)
 import           Clash.Netlist.BlackBox.Types
   (Element(Const, Lit), BlackBoxMeta(..))
+import           GHC.FastString.Extra
 
 hashCompiledPrimitive :: CompiledPrimitive -> Int
 hashCompiledPrimitive (Primitive {name, primSort}) = hash (name, primSort)
@@ -90,7 +91,7 @@ resolvePrimitive'
   :: HasCallStack
   => FilePath
   -> UnresolvedPrimitive
-  -> IO (TS.Text, GuardedResolvedPrimitive)
+  -> IO (FastString, GuardedResolvedPrimitive)
 resolvePrimitive' _metaPath (Primitive name wf primType) =
   return (name, HasBlackBox (Primitive name wf primType))
 resolvePrimitive' metaPath BlackBox{template=t, includes=i, resultName=r, resultInit=ri, ..} = do
@@ -112,18 +113,18 @@ resolvePrimitive' metaPath (BlackBoxHaskell bbName wf usedArgs funcName t) =
 resolvePrimitive
   :: HasCallStack
   => FilePath
-  -> IO [(TS.Text, GuardedResolvedPrimitive)]
+  -> IO [(FastString, GuardedResolvedPrimitive)]
 resolvePrimitive fileName = do
   prims <- decodeOrErr fileName <$> LZ.readFile fileName
   mapM (resolvePrimitive' fileName) prims
 
 addGuards
   :: ResolvedPrimMap
-  -> [(TS.Text, PrimitiveGuard ())]
+  -> [(FastString, PrimitiveGuard ())]
   -> ResolvedPrimMap
 addGuards = foldl go
  where
-  lookupPrim :: TS.Text -> ResolvedPrimMap -> Maybe ResolvedPrimitive
+  lookupPrim :: FastString -> ResolvedPrimMap -> Maybe ResolvedPrimitive
   lookupPrim nm primMap = join (extractPrim <$> HashMapStrict.lookup nm primMap)
 
   go primMap (nm, guard) =
@@ -131,18 +132,18 @@ addGuards = foldl go
       nm
       (case (lookupPrim nm primMap, guard) of
         (Nothing, HasBlackBox _) ->
-          error $ "No BlackBox definition for '" ++ TS.unpack nm ++ "' even"
+          error $ "No BlackBox definition for '" ++ unpackFS nm ++ "' even"
                ++ " though this value was annotated with 'HasBlackBox'."
         (Nothing, WarnNonSynthesizable _ _) ->
-          error $ "No BlackBox definition for '" ++ TS.unpack nm ++ "' even"
+          error $ "No BlackBox definition for '" ++ unpackFS nm ++ "' even"
                ++ " though this value was annotated with 'WarnNonSynthesizable'"
                ++ ", implying it has a BlackBox."
         (Nothing, WarnAlways _ _) ->
-          error $ "No BlackBox definition for '" ++ TS.unpack nm ++ "' even"
+          error $ "No BlackBox definition for '" ++ unpackFS nm ++ "' even"
                ++ " though this value was annotated with 'WarnAlways'"
                ++ ", implying it has a BlackBox."
         (Just _, DontTranslate) ->
-          error (TS.unpack nm ++ " was annotated with DontTranslate, but a "
+          error (unpackFS nm ++ " was annotated with DontTranslate, but a "
                                  ++ "BlackBox definition was found anyway.")
         (Nothing, DontTranslate) -> DontTranslate
         (Just p, g) -> fmap (const p) g)
@@ -155,7 +156,7 @@ generatePrimMap
   => [UnresolvedPrimitive]
   -- ^ unresolved primitives found in annotations (in LoadModules and
   -- LoadInterfaceFiles)
-  -> [(TS.Text, PrimitiveGuard ())]
+  -> [(FastString, PrimitiveGuard ())]
   -> [FilePath]
   -- ^ Directories to search for primitive definitions
   -> IO ResolvedPrimMap
@@ -173,13 +174,13 @@ generatePrimMap unresolvedPrims primGuards filePaths = do
      ) filePaths
 
   primitives0 <- concat <$> mapM resolvePrimitive primitiveFiles
-  let metapaths = map (TS.unpack . name) unresolvedPrims
+  let metapaths = map (unpackFS . name) unresolvedPrims
   primitives1 <- sequence $ zipWith resolvePrimitive' metapaths unresolvedPrims
   let primMap = HashMap.fromList (primitives0 ++ primitives1)
   return (force (addGuards primMap primGuards))
 
 -- | Determine what argument should be constant / literal
-constantArgs :: TS.Text -> CompiledPrimitive -> Set.Set Int
+constantArgs :: FastString -> CompiledPrimitive -> Set.Set Int
 constantArgs nm BlackBox {template = templ@(BBTemplate _), resultInit = tRIM} =
   Set.fromList (concat [ fromIntForce
                        , maybe [] walkTemplate tRIM
@@ -242,11 +243,11 @@ getFunctionPlurality
   -- a function in the first place. State of monad will not be modified.
 getFunctionPlurality (Primitive {}) _args _resTy _n = pure 1
 getFunctionPlurality (BlackBoxHaskell {name, function, functionName}) args resTy n = do
-  errOrMeta <- preserveState ((snd function) False name args resTy)
+  errOrMeta <- preserveState ((snd function) False (fsToText name) args resTy)
   case errOrMeta of
     Left err ->
       error $ concat [ "Tried to determine function plurality for "
-                     , TS.unpack name, " by quering ", show functionName
+                     , unpackFS name, " by quering ", show functionName
                      , ". Function returned an error message instead:\n\n"
                      , err ]
     Right (BlackBoxMeta {bbFunctionPlurality}, _bb) ->

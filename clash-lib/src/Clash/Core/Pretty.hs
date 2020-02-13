@@ -50,6 +50,7 @@ import Clash.Core.Type                  (ConstTy (..), Kind, LitTy (..),
 import Clash.Core.Var                   (Id, TyVar, Var (..), IdScope(..))
 import Clash.Util
 import Clash.Pretty
+import GHC.FastString.Extra
 
 -- | Options for the pretty-printer, controlling which elements to hide.
 data PrettyOptions = PrettyOptions
@@ -153,7 +154,7 @@ vsepHard = concatWith (\x y -> x <> hardline <> y)
 
 viewName :: Name a -> (Text, Text, Text)
 viewName n = (qual, occ, T.pack $ show $ nameUniq n)
-  where (qual, occ) = T.breakOnEnd "." $ nameOcc n
+  where (qual, occ) = T.breakOnEnd "." $ fsToText (nameOcc n)
 
 instance PrettyPrec (Name a) where
   pprPrec p (viewName -> (qual, occ, uniq)) = do
@@ -198,7 +199,7 @@ instance PrettyPrec TyCon where
 
 instance Pretty LitTy where
   pretty (NumTy i) = pretty i
-  pretty (SymTy s) = dquotes $ pretty s
+  pretty (SymTy s) = dquotes $ pretty (fsToText s)
 
 instance PrettyPrec LitTy where
   pprPrec _ = return . annotate (AnnSyntax LitS) . pretty
@@ -211,7 +212,7 @@ instance PrettyPrec Term where
       pure (v <> brackets s)
     Data dc         -> pprPrec prec dc
     Literal l       -> pprPrec prec l
-    Prim p          -> pprPrecPrim prec (primName p)
+    Prim p          -> pprPrecPrim prec (fsToText (primName p))
     Lam  v e1       -> annotate (AnnContext $ LamBody v) <$>
                          pprPrecLam prec [v] e1
     TyLam tv e1     -> annotate (AnnContext $ TyLamBody tv) <$>
@@ -460,7 +461,7 @@ pprTcApp p pp tc tys
   where isSym = isSymName tc
 
 isSymName :: Name a -> Bool
-isSymName n = go (nameOcc n)
+isSymName n = go (fsToText (nameOcc n))
   where
     go s | T.null s           = False
          | isUpper $ T.head s = isLexConSym s

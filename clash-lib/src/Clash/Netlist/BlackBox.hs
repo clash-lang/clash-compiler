@@ -82,6 +82,7 @@ import qualified Clash.Primitives.Util         as P
 import           Clash.Signal.Internal         (ActiveEdge (..))
 import           Clash.Unique                  (lookupUniqMap')
 import           Clash.Util
+import           GHC.FastString.Extra
 
 -- | Emits (colorized) warning to stderr
 warn
@@ -104,7 +105,7 @@ warn opts msg = do
 
 -- | Generate the context for a BlackBox instantiation.
 mkBlackBoxContext
-  :: TextS.Text
+  :: FastString
   -- ^ Blackbox function name
   -> Id
   -- ^ Identifier binding the primitive/blackbox application
@@ -113,7 +114,7 @@ mkBlackBoxContext
   -> NetlistMonad (BlackBoxContext,[Declaration])
 mkBlackBoxContext bbName resId args@(lefts -> termArgs) = do
     -- Make context inputs
-    let resNm = nameOcc (varName resId)
+    let resNm = fsToText (nameOcc (varName resId))
     resTy <- unsafeCoreTypeToHWTypeM' $(curLoc) (V.varType resId)
     (imps,impDecls) <- unzip <$> mapM (mkArgument resNm) termArgs
     (funs,funDecls) <-
@@ -178,7 +179,7 @@ prepareBlackBox _pNm templ bbCtx =
     Just err0 -> do
       (_,sp) <- Lens.use curCompNm
       let err1 = concat [ "Couldn't instantiate blackbox for "
-                        , Data.Text.unpack (bbName bbCtx), ". Verification "
+                        , unpackFS (bbName bbCtx), ". Verification "
                         , "procedure reported:\n\n" ++ err0 ]
       throw (ClashException sp ($(curLoc) ++ err1) Nothing)
 
@@ -207,11 +208,11 @@ mkArgument bndr e = do
       Nothing
         | (Prim p,_) <- collectArgs e
         , primName p == "Clash.Transformations.removedArg"
-        -> return ((Identifier (primName p) Nothing, Void Nothing, False),[])
+        -> return ((Identifier (unpackFS (primName p)) Nothing, Void Nothing, False),[])
         | otherwise
         -> return ((error ($(curLoc) ++ "Forced to evaluate untranslatable type: " ++ eTyMsg), Void Nothing, False), [])
       Just hwTy -> case collectArgsTicks e of
-        (C.Var v,[],_) -> return ((Identifier (nameOcc (varName v)) Nothing,hwTy,False),[])
+        (C.Var v,[],_) -> return ((Identifier (unpackFS (nameOcc (varName v))) Nothing,hwTy,False),[])
         (C.Literal (IntegerLiteral i),[],_) ->
           return ((N.Literal (Just (Signed iw,iw)) (N.NumLit i),hwTy,True),[])
         (C.Literal (IntLiteral i), [],_) ->
@@ -248,7 +249,7 @@ mkArgument bndr e = do
 -- the guard wants to, or fail entirely.
 extractPrimWarnOrFail
   :: HasCallStack
-  => TextS.Text
+  => FastString
   -- ^ Name of primitive
   -> NetlistMonad CompiledPrimitive
 extractPrimWarnOrFail nm = do
@@ -261,7 +262,7 @@ extractPrimWarnOrFail nm = do
     Nothing -> do
       -- Blackbox requested, but no blackbox found at all!
       (_,sp) <- Lens.use curCompNm
-      let msg = $(curLoc) ++ "No blackbox found for: " ++ unpack nm
+      let msg = $(curLoc) ++ "No blackbox found for: " ++ unpackFS nm
              ++ ". Did you forget to include directories containing "
              ++ "primitives? You can use '-i/my/prim/dir' to achieve this."
              ++ (if debugIsOn then "\n\n" ++ prettyCallStack callStack ++ "\n\n" else [])
@@ -568,21 +569,21 @@ mkPrimitive bbEParen bbEasD dst pInfo args tickDecls =
           NetlistId dstL _ -> case mkDec of
             False -> do
               -- TODO: check that it's okay to use `mkUnsafeSystemName`
-              let nm' = mkUnsafeSystemName dstL 0
+              let nm' = mkUnsafeSystemName (textToFS dstL) 0
                   id_ = mkLocalId ty nm'
               return (Just ([id_],[dstL],[]))
             True -> do
               nm1 <- extendIdentifier Extended dstL "_res"
               nm2 <- mkUniqueIdentifier Extended nm1
               -- TODO: check that it's okay to use `mkUnsafeInternalName`
-              let nm3 = mkUnsafeSystemName nm2 0
+              let nm3 = mkUnsafeSystemName (textToFS nm2) 0
                   id_ = mkLocalId ty nm3
               idDeclM <- mkNetDecl (id_,mkApps (Prim pInfo) args)
               case idDeclM of
                 Nothing     -> return Nothing
                 Just idDecl -> return (Just ([id_],[nm2],[idDecl]))
-          CoreId dstR -> return (Just ([dstR],[nameOcc . varName $ dstR],[]))
-          MultiId ids -> return (Just (ids,map (nameOcc . varName) ids,[]))
+          CoreId dstR -> return (Just ([dstR],[fsToText .nameOcc . varName $ dstR],[]))
+          MultiId ids -> return (Just (ids,map (fsToText . nameOcc . varName) ids,[]))
 
     -- Like resBndr, but fails on MultiId
     resBndr1
@@ -865,7 +866,7 @@ mkFunInput resId e =
                         Just (_, t) -> t
                         Nothing -> resTy0
 
-                  bbhRes <- func True pName args resTy1
+                  bbhRes <- func True (fsToText pName) args resTy1
                   case bbhRes of
                     Left err ->
                       error $ $(curLoc) ++ show fName ++ " yielded an error: "
@@ -996,7 +997,7 @@ mkFunInput resId e =
         (\bbName bbHash (TemplateFunction k g _) -> do
           let f' bbCtx' = do
                 let assn = Assignment "~RESULT"
-                            (BlackBoxE nm libs imps inc templ' bbCtx' False)
+                            (BlackBoxE (fsToText nm) libs imps inc templ' bbCtx' False)
                 p <- getMon (Backend.blockDecl "" [assn])
                 return p
           return ((Left (BBFunction bbName bbHash (TemplateFunction k g f'))
@@ -1036,8 +1037,8 @@ mkFunInput resId e =
 
     go is0 n (Lam id_ e') = do
       lvl <- Lens.use curBBlvl
-      let nm    = TextS.concat
-                    ["~ARGN[",TextS.pack (show lvl),"][",TextS.pack (show n),"]"]
+      let nm    = concatFS
+                    ["~ARGN[",fsLit (show lvl),"][",fsLit (show n),"]"]
           v'    = uniqAway is0 (modifyVarName (\v -> v {nameOcc = nm}) id_)
           subst = extendIdSubst (mkSubst is0) id_ (C.Var v')
           e''   = substTm "mkFunInput.goLam" subst e'
@@ -1045,7 +1046,7 @@ mkFunInput resId e =
       go is1 (n+(1::Int)) e''
 
     go _ _ (C.Var v) = do
-      let assn = Assignment "~RESULT" (Identifier (nameOcc (varName v)) Nothing)
+      let assn = Assignment "~RESULT" (Identifier (fsToText (nameOcc (varName v))) Nothing)
       return (Right (("",[assn]),Wire))
 
     go _ _ (Case scrut ty [alt]) = do

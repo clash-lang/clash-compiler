@@ -39,7 +39,6 @@ import qualified Data.List               as List
 import qualified Data.Map                as Map
 import           Data.Maybe              (fromMaybe)
 import qualified Data.HashMap.Strict     as HashMapS
-import           Data.Text               (Text)
 import qualified Data.Text as Text
 
 import           BasicTypes              (InlineSpec)
@@ -77,11 +76,12 @@ import           Clash.Rewrite.Util
 import           Clash.Unique
 import           Clash.Util
   (SrcSpan, anyM, makeCachedU, traceIf, mapAccumLM)
+import           GHC.FastString.Extra
 
 -- | Determine if argument should reduce to a constant given a primitive and
 -- an argument number. Caches results.
 isConstantArg
-  :: Text
+  :: FastString
   -- ^ Primitive name
   -> Int
   -- ^ Argument number
@@ -486,5 +486,5 @@ removedTm =
 mkInlineTick :: Id -> TickInfo
 mkInlineTick n = NameMod PrefixName (LitTy . SymTy $ toStr n)
  where
-  toStr = Text.unpack . snd . Text.breakOnEnd "." . nameOcc . varName
+  toStr = textToFS . snd . Text.breakOnEnd "." . fsToText .  nameOcc . varName
 

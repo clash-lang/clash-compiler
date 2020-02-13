@@ -140,6 +140,7 @@ import           Clash.Rewrite.Types
 import           Clash.Rewrite.Util
 import           Clash.Unique                (lookupUniqMap)
 import           Clash.Util
+import           GHC.FastString.Extra
 
 inlineOrLiftNonRep :: HasCallStack => NormRewrite
 inlineOrLiftNonRep = inlineOrLiftBinders nonRepTest inlineTest
@@ -1801,13 +1802,13 @@ etaExpandSyn _ e = return e
 isClassConstraint :: Type -> Bool
 isClassConstraint (tyView -> TyConApp nm0 _) =
   if -- Constraint tuple:
-     | "GHC.Classes.(%" `Text.isInfixOf` nm1 -> True
+     | "GHC.Classes.(%" `isInfixOfFS` nm1 -> True
      -- Constraint class:
-     | "C:" `Text.isInfixOf` nm2 -> True
+     | "C:" `isInfixOfFS` nm2 -> True
      | otherwise -> False
  where
   nm1 = nameOcc nm0
-  nm2 = snd (Text.breakOnEnd "." nm1)
+  nm2 = snd (breakOnEndFS "." nm1)
 
 isClassConstraint _ = False
 
@@ -2330,7 +2331,7 @@ disjointExpressionConsolidation ctx@(TransformContext is0 _) e@(Case _scrut _ty 
                    (Var v,_)      -> nameOcc (varName v)
                    (Prim p,_) -> primName p
                    _             -> "complex_expression_"
-          nm'' = last (Text.splitOn "." nm) `Text.append` "Out"
+          nm'' = textToFS (last (Text.splitOn "." (fsToText nm))) `appendFS` "Out"
       mkInternalVar isN nm'' ty
 
     l2m = go []
@@ -2415,7 +2416,7 @@ inlineCleanup (TransformContext is0 _) (Letrec binds body) = do
                   nm == "Clash.Sized.Internal.BitVector.BV"  ||
                   nm == "Clash.Sized.Internal.BitVector.Bit" ||
                   -- Inlines projections out of constraint-tuples (e.g. HiddenClockReset)
-                  "GHC.Classes" `Text.isPrefixOf` nm
+                  "GHC.Classes" `isInfixOfFS` nm
           Case _ aTy (_:_:_)
             | TyConApp (nameOcc -> "Clash.Explicit.SimIO.SimIO") _ <- tyView aTy
             -> True

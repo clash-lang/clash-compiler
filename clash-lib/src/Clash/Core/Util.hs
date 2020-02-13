@@ -25,7 +25,6 @@ import           Data.List.Extra               (nubOrd)
 import Data.Maybe
   (fromJust, isJust, mapMaybe, catMaybes)
 import qualified Data.String.Interpolate       as I
-import qualified Data.Text                     as T
 import           Data.Text.Prettyprint.Doc     (line)
 #if !MIN_VERSION_base(4,11,0)
 import           Data.Semigroup
@@ -61,6 +60,7 @@ import Clash.Core.VarEnv
 import Clash.Unique
 import Clash.Util
 import Clash.Util.Graph
+import GHC.FastString.Extra
 
 -- | Type environment/context
 type Gamma = VarEnv Type
@@ -653,8 +653,8 @@ extractElems supply inScope consCon resTy s maxN vec =
     (uniqs1,mTV) = mkUniqSystemTyVar uniqs0 ("m",typeNatKind)
     (uniqs2,[elNId,restNId,co,el,rest]) =
       mapAccumR mkUniqSystemId uniqs1 $ zip
-        ["el" `T.append` (s `T.cons` T.pack (show (maxN-n)))
-        ,"rest" `T.append` (s `T.cons` T.pack (show (maxN-n)))
+        [fsLit ('e':'l':s:show (maxN-n))
+        ,fsLit ('r':'e':'s':'t':s:show (maxN-n))
         ,"_co_"
         ,"el"
         ,"rest"
@@ -705,7 +705,7 @@ extractTElems supply inScope lrCon brCon resTy s maxN tree =
 
     (uniqs1,[elNId,co,el]) =
       mapAccumR mkUniqSystemId uniqs0 $ zip
-        [ "el" `T.append` (s `T.cons` T.pack (show (head ks)))
+        [ fsLit ('e':'l':s:show (head ks))
         , "_co_"
         , "el"
         ]
@@ -728,8 +728,8 @@ extractTElems supply inScope lrCon brCon resTy s maxN tree =
     brTy = last idTys
     (uniqs2,[ltNId,rtNId,co,lt,rt]) =
       mapAccumR mkUniqSystemId uniqs1 $ zip
-        ["lt" `T.append` (s `T.cons` T.pack (show b0))
-        ,"rt" `T.append` (s `T.cons` T.pack (show b1))
+        [fsLit ('l':'t':s:show b0)
+        ,fsLit ('r':'t':s:show b1)
         ,"_co_"
         ,"lt"
         ,"rt"
@@ -968,7 +968,7 @@ tyLitShow
   -> Type
   -> Except String String
 tyLitShow m (coreView1 m -> Just ty) = tyLitShow m ty
-tyLitShow _ (LitTy (SymTy s))        = return s
+tyLitShow _ (LitTy (SymTy s))        = return (unpackFS s)
 tyLitShow _ (LitTy (NumTy s))        = return (show s)
 tyLitShow _ ty = throwE $ $(curLoc) ++ "Cannot reduce to a string:\n" ++ showPpr ty
 

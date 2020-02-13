@@ -32,8 +32,6 @@ import qualified Data.List           as List
 import qualified Data.Primitive.ByteArray as ByteArray
 import           Data.Proxy          (Proxy)
 import           Data.Reflection     (reifyNat)
-import           Data.Text           (Text)
-import qualified Data.Text           as Text
 import qualified Data.Vector.Primitive as Vector
 import           Debug.Trace         (trace)
 import           GHC.Float
@@ -52,7 +50,7 @@ import           GHC.Word
 import           System.IO.Unsafe    (unsafeDupablePerformIO)
 
 import           BasicTypes          (Boxity (..))
-import           Name                (getSrcSpan, nameOccName, occNameString)
+import           Name                (getSrcSpan, nameOccName, occNameFS)
 import           PrelNames
   (typeNatAddTyFamNameKey, typeNatMulTyFamNameKey, typeNatSubTyFamNameKey,
    trueDataConKey, falseDataConKey)
@@ -67,7 +65,8 @@ import           Clash.Core.Evaluator
 import           Clash.Core.Evaluator.Types
 import           Clash.Core.Literal  (Literal (..))
 import           Clash.Core.Name
-  (Name (..), NameSort (..), mkUnsafeSystemName)
+  (Name (..), NameSort (..), OccName, mkUnsafeSystemName)
+import qualified Clash.Core.PrelNames as CPrel
 import           Clash.Core.Pretty   (showPpr)
 import           Clash.Core.Term
   (Pat (..), PrimInfo (..), Term (..), WorkInfo (..))
@@ -86,6 +85,7 @@ import           Clash.Rewrite.Util  (mkSelectorCase)
 import           Clash.Unique        (lookupUniqMap)
 import           Clash.Util
   (MonadUnique (..), clogBase, flogBase, curLoc)
+import           GHC.FastString.Extra
 
 import Clash.Promoted.Nat.Unsafe (unsafeSNat)
 import qualified Clash.Sized.Internal.BitVector as BitVector
@@ -3514,13 +3514,13 @@ charLiteral x = case x of
   Lit (CharLiteral c) -> Just c
   _ -> Nothing
 
-sizedLiterals :: Text -> [Value] -> Maybe (Integer,Integer)
+sizedLiterals :: OccName -> [Value] -> Maybe (Integer,Integer)
 sizedLiterals szCon = pairOf (sizedLiteral szCon)
 
-sizedLiterals' :: Text -> [Value] -> [Integer]
+sizedLiterals' :: OccName -> [Value] -> [Integer]
 sizedLiterals' szCon = listOf (sizedLiteral szCon)
 
-sizedLiteral :: Text -> Value -> Maybe Integer
+sizedLiteral :: OccName -> Value -> Maybe Integer
 sizedLiteral szCon val = case val of
   PrimVal p _ [_, Lit (IntegerLiteral i)]
     | primName p == szCon -> Just i
@@ -3582,7 +3582,7 @@ valArgs v =
 -- Tries to match literal arguments to a function like
 --   (Unsigned.shiftL#  :: forall n. KnownNat n => Unsigned n -> Int -> Unsigned n)
 sizedLitIntLit
-  :: Text -> TyConMap -> [Type] -> [Value]
+  :: OccName -> TyConMap -> [Type] -> [Value]
   -> Maybe (Type,Integer,Integer,Integer)
 sizedLitIntLit szCon tcm tys args
   | Just (nTy,kn) <- extractKnownNat tcm tys
@@ -4319,9 +4319,8 @@ ghcTyconToTyConName
 ghcTyconToTyConName tc =
     Name User n' (getKey (TyCon.tyConUnique tc)) (getSrcSpan n)
   where
-    n'      = fromMaybe "_INTERNAL_" (modNameM n) `Text.append`
-              ('.' `Text.cons` Text.pack occName)
-    occName = occNameString $ nameOccName n
+    n'      = fromMaybe CPrel._INTERNAL (modNameM n) `appendFS`
+              ('.' `consFS` occNameFS (nameOccName n))
     n       = TyCon.tyConName tc
 
 svoid :: (State# RealWorld -> State# RealWorld) -> IO ()

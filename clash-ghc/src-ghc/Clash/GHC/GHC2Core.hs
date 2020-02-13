@@ -8,6 +8,7 @@
 
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE MultiWayIf #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TemplateHaskell #-}
 
@@ -41,8 +42,6 @@ import           Data.Maybe                  (catMaybes,fromMaybe,listToMaybe)
 #if !MIN_VERSION_base(4,11,0)
 import           Data.Semigroup
 #endif
-import           Data.Text                   (Text, isInfixOf,pack)
-import qualified Data.Text                   as Text
 import           Data.Text.Encoding          (decodeUtf8)
 import qualified Data.Traversable            as T
 
@@ -74,11 +73,11 @@ import Literal    (Literal (..))
 #if MIN_VERSION_ghc(8,6,0)
 import Literal    (LitNumType (..))
 #endif
-import Module     (moduleName, moduleNameString)
+import Module     (moduleName, moduleNameFS)
 import Name       (Name, nameModule_maybe,
                    nameOccName, nameUnique, getSrcSpan)
 import PrelNames  (tYPETyConKey)
-import OccName    (occNameString)
+import OccName    (occNameFS)
 import Outputable (showPpr)
 import Pair       (Pair (..))
 import SrcLoc     (SrcSpan (..), isGoodSrcSpan)
@@ -93,6 +92,7 @@ import TyCon      (AlgTyConRhs (..), TyCon, tyConName,
                    tyConName, tyConUnique, isClassTyCon)
 import Type       (mkTvSubstPrs, substTy, coreView)
 import TyCoRep    (Coercion (..), TyLit (..), Type (..))
+import TysWiredIn (listTyCon, promotedFalseDataCon, promotedTrueDataCon)
 import Unique     (Uniquable (..), Unique, getKey, hasKey)
 import Var        (Id, TyVar, Var, idDetails,
                    isTyVar, varName, varType,
@@ -109,6 +109,7 @@ import           Clash.Annotations.Primitive (extractPrim)
 import qualified Clash.Core.DataCon          as C
 import qualified Clash.Core.Literal          as C
 import qualified Clash.Core.Name             as C
+import qualified Clash.Core.PrelNames        as C
 import qualified Clash.Core.Term             as C
 import qualified Clash.Core.TyCon            as C
 import qualified Clash.Core.Type             as C
@@ -116,6 +117,7 @@ import qualified Clash.Core.Var              as C
 import           Clash.Primitives.Types
 import qualified Clash.Unique                as C
 import           Clash.Util
+import           GHC.FastString.Extra
 
 instance Hashable Name where
   hashWithSalt s = hashWithSalt s . getKey . nameUnique
@@ -123,7 +125,7 @@ instance Hashable Name where
 data GHC2CoreState
   = GHC2CoreState
   { _tyConMap :: C.UniqMap TyCon
-  , _nameMap  :: HashMap Name Text
+  , _nameMap  :: HashMap Name FastString
   }
 
 makeLenses ''GHC2CoreState
@@ -381,7 +383,7 @@ coreToTerm primMap unlocs = term
         x' <- coreToIdSP sp x
         return (x',b')
 
-    term' (Case _ _ ty [])  = C.TyApp (C.Prim (C.PrimInfo (pack "EmptyCase") C.undefinedTy C.WorkNever))
+    term' (Case _ _ ty [])  = C.TyApp (C.Prim (C.PrimInfo C._EMPTYCASE C.undefinedTy C.WorkNever))
                                 <$> coreToType ty
     term' (Case e b ty alts) = do
      let usesBndr = any ( not . isEmptyVarSet . exprSomeFreeVars (== b))
@@ -409,9 +411,9 @@ coreToTerm primMap unlocs = term
     term' (Tick (SourceNote rsp _) e) =
       C.Tick (C.SrcSpan (RealSrcSpan rsp)) <$> addUsefull (RealSrcSpan rsp) (term e)
     term' (Tick _ e)        = term e
-    term' (Type t)          = C.TyApp (C.Prim (C.PrimInfo (pack "_TY_") C.undefinedTy C.WorkNever)) <$>
+    term' (Type t)          = C.TyApp (C.Prim (C.PrimInfo C._TY C.undefinedTy C.WorkNever)) <$>
                                 coreToType t
-    term' (Coercion co)     = C.TyApp (C.Prim (C.PrimInfo (pack "_CO_") C.undefinedTy C.WorkNever)) <$>
+    term' (Coercion co)     = C.TyApp (C.Prim (C.PrimInfo C._CO C.undefinedTy C.WorkNever)) <$>
                                 coreToType (coercionType co)
 
 
@@ -419,7 +421,7 @@ coreToTerm primMap unlocs = term
     coreToIdSP sp = RWS.local (\r -> if isGoodSrcSpan sp then sp else r) . coreToId
 
 
-    lookupPrim :: Text -> Maybe (Maybe CompiledPrimitive)
+    lookupPrim :: FastString -> Maybe (Maybe CompiledPrimitive)
     lookupPrim nm = extractPrim <$> HashMap.lookup nm primMap
 
     var x = do
@@ -441,24 +443,24 @@ coreToTerm primMap unlocs = term
               else C.Data <$> coreToDataCon dc
           Nothing -> case lookupPrim xNameS of
             Just (Just (Primitive f wi _))
-              | f == pack "Clash.Signal.Internal.mapSignal#" -> return (mapSignalTerm xType)
-              | f == pack "Clash.Signal.Internal.signal#"    -> return (signalTerm xType)
-              | f == pack "Clash.Signal.Internal.appSignal#" -> return (appSignalTerm xType)
-              | f == pack "Clash.Signal.Internal.traverse#"  -> return (traverseTerm xType)
-              | f == pack "Clash.Signal.Internal.joinSignal#" -> return (joinTerm xType)
-              | f == pack "Clash.Signal.Bundle.vecBundle#"   -> return (vecUnwrapTerm xType)
-              | f == pack "GHC.Base.$"                       -> return (dollarTerm xType)
-              | f == pack "GHC.Stack.withFrozenCallStack"    -> return (withFrozenCallStackTerm xType)
-              | f == pack "GHC.Magic.noinline"               -> return (idTerm xType)
-              | f == pack "GHC.Magic.lazy"                   -> return (idTerm xType)
-              | f == pack "GHC.Magic.runRW#"                 -> return (runRWTerm xType)
-              | f == pack "Clash.Class.BitPack.packXWith"    -> return (packXWithTerm xType)
-              | f == pack "Clash.Sized.Internal.BitVector.checkUnpackUndef" -> return (checkUnpackUndefTerm xType)
-              | f == pack "Clash.Magic.prefixName"
+              | f == C.fsMapSignalFn -> return (mapSignalTerm xType)
+              | f == C.fsSignalFn    -> return (signalTerm xType)
+              | f == C.fsAppSignalFn -> return (appSignalTerm xType)
+              | f == C.fsTraverSignalFn -> return (traverseTerm xType)
+              | f == C.fsJoinSignalFn -> return (joinTerm xType)
+              | f == C.fsVecBundleFn   -> return (vecUnwrapTerm xType)
+              | f == C.fsDollarFn      -> return (dollarTerm xType)
+              | f == C.fsWithFrozenCallStackFn    -> return (withFrozenCallStackTerm xType)
+              | f == C.fsNoinlineFn               -> return (idTerm xType)
+              | f == C.fsLazyFn                   -> return (idTerm xType)
+              | f == C.fsRunRWFn                 -> return (runRWTerm xType)
+              | f == C.fsPackXWithFn    -> return (packXWithTerm xType)
+              | f == C.fsCheckUnpackUndefFn -> return (checkUnpackUndefTerm xType)
+              | f == C.fsPrefixNameFn
               -> return (nameModTerm C.PrefixName xType)
-              | f == pack "Clash.Magic.postfixName"
+              | f == C.fsPostFixNameFn
               -> return (nameModTerm C.SuffixName xType)
-              | f == pack "Clash.Magic.setName"
+              | f == C.fsSetNameFn
               -> return (nameModTerm C.SetName xType)
               | otherwise                                    -> return (C.Prim (C.PrimInfo xNameS xType wi))
             Just (Just (BlackBox {workInfo = wi})) ->
@@ -636,12 +638,9 @@ coreToDataCon dc = do
 
 typeConstructorToString
   :: TyCon
-  -> C2C String
+  -> C2C FastString
 typeConstructorToString constructor =
-   Text.unpack . C.nameOcc <$> coreToName tyConName tyConUnique qualifiedNameString constructor
-
-_ATTR_NAME :: String
-_ATTR_NAME = "Clash.Annotations.SynthesisAttributes.Attr"
+  C.nameOcc <$> coreToName tyConName tyConUnique qualifiedNameString constructor
 
 -- | Flatten a list type structure to a list of types.
 listTypeToListOfTypes :: Type -> [Type]
@@ -650,19 +649,19 @@ listTypeToListOfTypes _                       = []
 
 -- | Try to determine boolean value by looking at constructor name of type.
 boolTypeToBool :: Type -> C2C Bool
-boolTypeToBool (TyConApp constructor _args) = do
-  constructorName <- typeConstructorToString constructor
-  return $ case constructorName of
-    "GHC.Types.True"  -> True
-    "GHC.Types.False" -> False
-    _ -> error $ "Expected boolean constructor, got:" ++ constructorName
+boolTypeToBool (TyConApp tc _args) =
+  if | tc == promotedTrueDataCon  -> return True
+     | tc == promotedFalseDataCon -> return False
+     | otherwise -> do
+         tcName <- typeConstructorToString tc
+         error $ "Expected boolean constructor, got:" ++ unpackFS tcName
 boolTypeToBool s =
   error $ unwords [ "Could not unpack given type to bool:"
                   , showPpr unsafeGlobalDynFlags s ]
 
 -- | Returns string of (LitTy (StrTyLit s)) construction.
-tyLitToString :: Type -> String
-tyLitToString (LitTy (StrTyLit s)) = unpackFS s
+tyLitToString :: Type -> FastString
+tyLitToString (LitTy (StrTyLit s)) = s
 tyLitToString s = error $ unwords [ "Could not unpack given type to string:"
                                   , showPpr unsafeGlobalDynFlags s ]
 
@@ -676,23 +675,22 @@ tyLitToInteger s = error $ unwords [ "Could not unpack given type to integer:"
 coreToAttr
   :: Type
   -> C2C C.Attr'
-coreToAttr (TyConApp ty args) = do
+coreToAttr (TyConApp tc args) = do
   let key   = args !! 0
   let value = args !! 1
-  name' <- typeConstructorToString ty
-  case name' of
-    "Clash.Annotations.SynthesisAttributes.StringAttr" ->
+  tcName <- typeConstructorToString tc
+  if | tcName == C.fsStringAttrDc  ->
         return $ C.StringAttr' (tyLitToString key) (tyLitToString value)
-    "Clash.Annotations.SynthesisAttributes.IntegerAttr" ->
+     | tcName == C.fsIntegerAttrDc ->
         return $ C.IntegerAttr' (tyLitToString key) (tyLitToInteger value)
-    "Clash.Annotations.SynthesisAttributes.BoolAttr" -> do
+     | tcName == C.fsBoolAttrDc -> do
         bool <- boolTypeToBool value
         return $ C.BoolAttr' (tyLitToString key) bool
-    "Clash.Annotations.SynthesisAttributes.Attr" ->
+     | tcName == C.fsAttrDc ->
         return $ C.Attr' (tyLitToString key)
-    _ ->
+     | otherwise ->
         error $ unwords [ "Expected StringAttr, IntegerAttr, BoolAttr or Attr"
-                        , "constructor, got:" ++ name' ]
+                        , "constructor, got:" ++ unpackFS tcName ]
 
 coreToAttr t =
   error $ unwords [ "Expected type constructor (TyConApp), but got:"
@@ -710,40 +708,38 @@ coreToAttrs' [annotationType, realType, attributes] = allAttrs
 
   attrs =
     case annotationType of
-      TyConApp ty [TyConApp ty' _args'] -> do
-        name'  <- typeConstructorToString ty
-        name'' <- typeConstructorToString ty'
-
-        let result | name' == "GHC.Types.[]" && name'' == _ATTR_NAME =
+      TyConApp tc1 [TyConApp tc2 _args1] -> do
+        nameTc2 <- typeConstructorToString tc2
+        let result | tc1 == listTyCon && nameTc2 == C.fsAttrTy =
                       -- List of attributes
                       sequence $ map coreToAttr (listTypeToListOfTypes attributes)
-                   | name' == "GHC.Types.[]" =
+                   | tc1 == listTyCon =
                       -- List, but unknown types
                       error $ $(curLoc) ++ unwords [ "Annotate expects an"
                                                    , "Attr or a list of"
                                                    , "Attr's, but got a list"
-                                                   , "of:", name'']
-                   | otherwise =
-                        -- Some unknown nested type
+                                                   , "of:", unpackFS nameTc2]
+                   | otherwise = do
+                      nameTc1 <- typeConstructorToString tc1
+                      -- Some unknown nested type
                       error $ $(curLoc) ++ unwords [ "Annotate expects an"
                                                    , "Attr or a list of"
                                                    , "Attr's, but got:"
-                                                   , name' ]
+                                                   , unpackFS nameTc1 ]
 
         result
 
-      TyConApp ty _args -> do
-        name' <- typeConstructorToString ty
-        if name' == _ATTR_NAME
+      TyConApp tc1 _args -> do
+        nameTc1 <- typeConstructorToString tc1
+        if nameTc1 == C.fsAttrTy
           then
             -- Single annotation
             sequence [coreToAttr attributes]
           else do
             -- Annotation to something we don't recognize (not a list,
             -- nor an Attr)
-            tystr <- typeConstructorToString ty
             error $ unwords [ "Annotate expects an Attr or a list of Attr's,"
-                            , "but got:", tystr ]
+                            , "but got:", unpackFS nameTc1 ]
       _ ->
         error $ $(curLoc) ++ unwords [ "Expected TyConApp, not:"
                                      , showPpr unsafeGlobalDynFlags annotationType]
@@ -821,7 +817,7 @@ coreToType' t@(CoercionTy _) = error ("Cannot handle CoercionTy " ++ showPpr uns
 coreToTyLit :: TyLit
             -> C.LitTy
 coreToTyLit (NumTyLit i) = C.NumTy (fromInteger i)
-coreToTyLit (StrTyLit s) = C.SymTy (unpackFS s)
+coreToTyLit (StrTyLit s) = C.SymTy s
 
 coreToTyVar :: TyVar
             -> C2C C.TyVar
@@ -846,7 +842,7 @@ coreToPrimVar = coreToName varName varUnique qualifiedNameString
 coreToName
   :: (b -> Name)
   -> (b -> Unique)
-  -> (Name -> C2C Text)
+  -> (Name -> C2C FastString)
   -> b
   -> C2C (C.Name a)
 coreToName toName toUnique toString v = do
@@ -854,47 +850,49 @@ coreToName toName toUnique toString v = do
   let key  = getKey (toUnique v)
       locI = getSrcSpan (toName v)
       -- Is it one of [ds,ds1,ds2,..]
-      isDSX = maybe False (maybe True (isDigit . fst) . Text.uncons) . Text.stripPrefix "ds"
-      sort | isDSX ns || Text.isPrefixOf "$" ns
-           = C.System
-           | otherwise
-           = C.User
+      sort = case unpackFS ns of
+               ('$':_) -> C.System
+               ('d':'s':rest) -> case rest of
+                  [] -> C.System
+                  (n:_) | isDigit n -> C.System
+                        | otherwise -> C.User
+               _ -> C.User
   locR <- RWS.ask
   let loc = if isGoodSrcSpan locI then locI else locR
   return (C.Name sort ns key loc)
 
 qualifiedNameString'
   :: Name
-  -> Text
+  -> FastString
 qualifiedNameString' n =
-  fromMaybe "_INTERNAL_" (modNameM n) `Text.append` ('.' `Text.cons` occName)
+  fromMaybe C._INTERNAL (modNameM n) `appendFS` ('.' `consFS` occName)
  where
-  occName = pack (occNameString (nameOccName n))
+  occName = occNameFS (nameOccName n)
 
 qualifiedNameString
   :: Name
-  -> C2C Text
+  -> C2C FastString
 qualifiedNameString n =
   makeCached n nameMap $
-  return (fromMaybe "_INTERNAL_" (modNameM n) `Text.append` ('.' `Text.cons` occName))
+  return (fromMaybe C._INTERNAL (modNameM n) `appendFS` ('.' `consFS` occName))
  where
-  occName = pack (occNameString (nameOccName n))
+  occName = occNameFS (nameOccName n)
 
 qualifiedNameStringM
   :: Name
-  -> C2C Text
+  -> C2C FastString
 qualifiedNameStringM n =
   makeCached n nameMap $
-  return (maybe occName (\modName -> modName `Text.append` ('.' `Text.cons` occName)) (modNameM n))
+  return (maybe occName (\modName -> modName `appendFS` ('.' `consFS` occName)) (modNameM n))
  where
-  occName = pack (occNameString (nameOccName n))
+  occName = occNameFS (nameOccName n)
 
 modNameM :: Name
-         -> Maybe Text
+         -> Maybe FastString
 modNameM n = do
   module_ <- nameModule_maybe n
   let moduleNm = moduleName module_
-  return (pack (moduleNameString moduleNm))
+  return (moduleNameFS moduleNm)
 
 -- | Given the type:
 --
@@ -1153,7 +1151,7 @@ runRWTerm (C.ForAllTy rTV (C.ForAllTy oTV funTy)) =
     (C.FunTy rwTy _) = C.tyView fTy
     fName            = C.mkUnsafeSystemName "f" 0
     fId              = C.mkLocalId fTy fName
-    rwNm             = pack "GHC.Prim.realWorld#"
+    rwNm             = fsLit "GHC.Prim.realWorld#"
 
 runRWTerm ty = error $ $(curLoc) ++ show ty
 

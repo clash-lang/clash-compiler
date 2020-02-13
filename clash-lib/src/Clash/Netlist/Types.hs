@@ -64,6 +64,7 @@ import Clash.Primitives.Types               (CompiledPrimMap)
 import Clash.Signal.Internal
   (ResetPolarity, ActiveEdge, ResetKind, InitBehavior)
 import Clash.Util                           (HasCallStack, makeLenses)
+import GHC.FastString.Extra
 
 import Clash.Annotations.BitRepresentation.Internal
   (CustomReprs, DataRepr', ConstrRepr')
@@ -402,7 +403,7 @@ toBit m i = if testBit m 0
 -- | Context used to fill in the holes of a BlackBox template
 data BlackBoxContext
   = Context
-  { bbName      :: Text -- ^ Blackbox function name (for error reporting)
+  { bbName      :: FastString -- ^ Blackbox function name (for error reporting)
   , bbResult    :: (Expr,HWType) -- ^ Result name and type
   , bbInputs    :: [(Expr,HWType,Bool)] -- ^ Argument names, types, and whether it is a literal
   , bbFunctions :: IntMap [(Either BlackBox (Identifier,[Declaration])
@@ -523,7 +524,7 @@ data DeclarationType
   = Concurrent
   | Sequential
 
-emptyBBContext :: Text -> BlackBoxContext
+emptyBBContext :: FastString -> BlackBoxContext
 emptyBBContext n
   = Context
   { bbName        = n

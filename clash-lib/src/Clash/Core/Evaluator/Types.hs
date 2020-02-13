@@ -25,6 +25,7 @@ import Clash.Core.Type (Type)
 import Clash.Core.Var (Id, IdScope(..), TyVar)
 import Clash.Core.VarEnv
 import Clash.Pretty (ClashPretty(..), fromPretty)
+import GHC.FastString.Extra
 
 {- [Note: forcing special primitives]
 Clash uses the `whnf` function in two places (for now):
@@ -125,7 +126,7 @@ instance ClashPretty StackFrame where
   clashPretty (Apply i) = hsep ["Apply", fromPpr i]
   clashPretty (Instantiate t) = hsep ["Instantiate", fromPpr t]
   clashPretty (PrimApply p tys vs ts) =
-    hsep ["PrimApply", fromPretty (primName p), "::", fromPpr (primType p),
+    hsep ["PrimApply", fromPretty (fsToText (primName p)), "::", fromPpr (primType p),
           "; type args=", fromPpr tys,
           "; val args=", fromPpr (map valToTerm vs),
           "term args=", fromPpr ts]

@@ -20,7 +20,7 @@ import SrcLoc
    realSrcSpanStart, realSrcSpanEnd,
    srcLocFile, srcLocLine, srcLocCol,
    srcSpanFile, srcSpanStartLine, srcSpanEndLine, srcSpanStartCol, srcSpanEndCol)
-import FastString                           (FastString (..), bytesFS, mkFastStringByteList)
+import GHC.FastString.Extra ()
 
 deriving instance Generic SrcSpan
 instance Hashable SrcSpan
@@ -30,9 +30,6 @@ instance Hashable RealSrcSpan where
     hashWithSalt salt (srcSpanFile rss,srcSpanStartLine rss, srcSpanEndLine rss
                       ,srcSpanStartCol rss, srcSpanEndCol rss)
 
-instance Hashable FastString where
-  hashWithSalt salt fs = hashWithSalt salt (uniq fs)
-
 instance Binary SrcSpan
 instance Binary RealSrcSpan where
   put r = put (realSrcSpanStart r, realSrcSpanEnd r)
@@ -41,7 +38,3 @@ instance Binary RealSrcSpan where
 instance Binary RealSrcLoc where
   put r = put (srcLocFile r, srcLocLine r, srcLocCol r)
   get = (\(file,line,col) -> mkRealSrcLoc file line col) <$> get
-
-instance Binary FastString where
-  put str = put $ bytesFS str
-  get = mkFastStringByteList <$> get

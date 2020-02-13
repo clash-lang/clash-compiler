@@ -48,6 +48,7 @@ import qualified Data.HashMap.Strict          as H
 import           Data.List                    (intercalate)
 import qualified Data.Text                    as S
 import           Data.Text.Lazy               (Text)
+import           GHC.FastString.Extra         (FastString)
 import           GHC.Generics                 (Generic)
 import           GHC.Stack                    (HasCallStack)
 
@@ -68,7 +69,7 @@ type GuardedCompiledPrimitive = PrimitiveGuard CompiledPrimitive
 type CompiledPrimMap          = PrimMap GuardedCompiledPrimitive
 
 -- | A @PrimMap@ maps primitive names to a @Primitive@
-type PrimMap a = H.HashMap S.Text a
+type PrimMap a = H.HashMap FastString a
 
 -- | A BBFN is a parsed version of a fully qualified function name. It is
 -- guaranteed to have at least one module name which is not /Main/.
@@ -142,7 +143,7 @@ data UsedArguments
 data Primitive a b c d
   -- | Primitive template written in a Clash specific templating language
   = BlackBox
-  { name      :: !S.Text
+  { name      :: !FastString
     -- ^ Name of the primitive
   , workInfo  :: WorkInfo
     -- ^ Whether the primitive does any work, i.e. takes chip area
@@ -194,7 +195,7 @@ data Primitive a b c d
   }
   -- | Primitive template rendered by a Haskell function (given as raw source code)
   | BlackBoxHaskell
-  { name :: !S.Text
+  { name :: !FastString
     -- ^ Name of the primitive
   , workInfo  :: WorkInfo
     -- ^ Whether the primitive does any work, i.e. takes chip area
@@ -209,7 +210,7 @@ data Primitive a b c d
   -- primitives, hardcoded in the compiler. For example: 'mapSignal' in
   -- @GHC2Core.coreToTerm@.
   | Primitive
-  { name     :: !S.Text
+  { name     :: !FastString
     -- ^ Name of the primitive
   , workInfo  :: WorkInfo
     -- ^ Whether the primitive does any work, i.e. takes chip area

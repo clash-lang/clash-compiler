@@ -26,7 +26,6 @@ where
 -- External Import
 import Control.DeepSeq
 import Data.Binary                            (Binary)
-import qualified Data.Text as T
 import GHC.Generics
 
 -- Internal Imports
@@ -36,6 +35,7 @@ import {-# SOURCE #-} Clash.Core.Type         (Kind, Type)
 import Clash.Core.Var                         (TyVar)
 import Clash.Unique
 import Clash.Util
+import GHC.FastString.Extra
 
 -- | Type Constructor
 data TyCon
@@ -114,10 +114,10 @@ mkKindTyCon name kind
 isTupleTyConLike :: TyConName -> Bool
 isTupleTyConLike nm = tupleName (nameOcc nm)
   where
-    tupleName nm'
-      | '(' <- T.head nm'
-      , ')' <- T.last nm'
-      = T.all (== ',') (T.init $ T.tail nm')
+    tupleName (unpackFS -> nm')
+      | '(' <- head nm'
+      , ')' <- last nm'
+      = all (== ',') (init $ tail nm')
     tupleName _ = False
 
 -- | Get the DataCons belonging to a TyCon

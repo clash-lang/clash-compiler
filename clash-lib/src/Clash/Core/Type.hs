@@ -95,6 +95,7 @@ import           Clash.Core.TysPrim
 import           Clash.Core.Var
 import           Clash.Unique
 import           Clash.Util
+import           GHC.FastString.Extra
 
 #if __GLASGOW_HASKELL__ <= 806
 ordLTDataConKey, ordEQDataConKey, ordGTDataConKey :: Unique.Unique
@@ -139,7 +140,7 @@ data ConstTy
 -- | Literal Types
 data LitTy
   = NumTy !Integer
-  | SymTy !String
+  | SymTy !FastString
   deriving (Eq,Ord,Show,Generic,NFData,Hashable,Binary)
 
 -- | The level above types
@@ -510,7 +511,7 @@ reduceTypeFamily tcm (tyView -> TyConApp tc tys)
 
   | nameUniq tc == getKey typeSymbolAppendFamNameKey  -- GHC.TypeLits.AppendSymbol"
   , [s1, s2] <- mapMaybe (symLitView tcm) tys
-  = Just (LitTy (SymTy (s1 ++ s2)))
+  = Just (LitTy (SymTy (s1 `appendFS` s2)))
 
   | nameOcc tc `elem` ["GHC.TypeLits.Extra.FLog", "GHC.TypeNats.FLog"]
   , [i1, i2] <- mapMaybe (litView tcm) tys
@@ -570,7 +571,7 @@ litView _ (LitTy (NumTy i))                = Just i
 litView m (reduceTypeFamily m -> Just ty') = litView m ty'
 litView _ _ = Nothing
 
-symLitView :: TyConMap -> Type -> Maybe String
+symLitView :: TyConMap -> Type -> Maybe FastString
 symLitView _ (LitTy (SymTy s))                = Just s
 symLitView m (reduceTypeFamily m -> Just ty') = symLitView m ty'
 symLitView _ _ = Nothing

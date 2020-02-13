@@ -58,6 +58,7 @@ import           Clash.Netlist.Util              (typeSize, isVoid)
 import           Clash.Signal.Internal
   (ResetKind(..), ResetPolarity(..), InitBehavior(..))
 import           Clash.Util
+import           GHC.FastString.Extra
 
 -- | Strip as many "Void" layers as possible. Might still return a Void if the
 -- void doesn't contain a hwtype.
@@ -158,7 +159,7 @@ setSym mkUniqueIdentifierM bbCtx l = do
     (a,(_,decls)) <- runStateT (mapM setSym' l) (IntMap.empty,IntMap.empty)
     return (a,concatMap snd (IntMap.elems decls))
   where
-    bbnm = Data.Text.unpack (bbName bbCtx)
+    bbnm = unpackFS (bbName bbCtx)
 
     setSym'
       :: Element
@@ -372,7 +373,7 @@ renderElem b (Component (Decl n subN (l:ls))) = do
     Just err0 -> do
       sp <- getSrcSpan
       let err1 = concat [ "Couldn't instantiate blackbox for "
-                        , Data.Text.unpack (bbName b), ". Verification procedure "
+                        , unpackFS (bbName b), ". Verification procedure "
                         , "reported:\n\n" ++ err0 ]
       throw (ClashException sp ($(curLoc) ++ err1) Nothing)
 

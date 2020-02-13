@@ -47,6 +47,7 @@ import           Clash.Driver.Types                      (BindingMap)
 import           Clash.Pretty
 import           Clash.Unique
 import           Clash.Util                              (curLoc)
+import           GHC.FastString.Extra
 
 whnf'
   :: PrimStep
@@ -165,7 +166,7 @@ stepVar i m _
   -- expressions such as: "let x = x in x"
   tickExpr = Tick (NameMod PrefixName (LitTy . SymTy $ toStr i))
   unQualName = snd . Text.breakOnEnd "."
-  toStr = Text.unpack . unQualName . flip Text.snoc '_' . nameOcc . varName
+  toStr = fsLit . Text.unpack . unQualName . flip Text.snoc '_' . fsToText . nameOcc . varName
 
 stepData :: DataCon -> Step
 stepData dc m tcm = unwind tcm m (DC dc [])

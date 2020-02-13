@@ -21,7 +21,6 @@ import qualified Data.ByteString.Lazy.UTF8   as BLU
 import qualified Data.ByteString.Lazy        as BL
 import           Data.Either                 (partitionEithers)
 import           Data.List                   (elemIndex, foldl', partition)
-import qualified Data.Text                   as Text
 import           Data.Maybe                  (isJust, isNothing,
                                               mapMaybe, catMaybes)
 import           Data.Word                   (Word8)
@@ -62,6 +61,7 @@ import           Clash.Primitives.Types              (UnresolvedPrimitive, name)
 import           Clash.Primitives.Util               (decodeOrErr)
 import           Clash.GHC.GHC2Core                  (qualifiedNameString')
 import           Clash.Util                          (curLoc, traceIf)
+import           GHC.FastString.Extra
 
 runIfl :: GHC.GhcMonad m => GHC.Module -> TcRnTypes.IfL a -> m a
 runIfl modName action = do
@@ -242,22 +242,22 @@ unresolvedPrimitives hdl targetPrim =
         Annotations.ModuleTarget _ ->
           liftIO (decodeOrErr contentOrFp <$> BL.readFile contentOrFp)
         Annotations.NamedTarget targetName0 ->
-          let targetName1 = Text.unpack (qualifiedNameString' targetName0)
+          let targetName1 = qualifiedNameString' targetName0
               prim =
-                case decodeOrErr targetName1 (BLU.fromString contentOrFp) of
-                  [] -> error $ "No annotations found for " ++ targetName1
+                case decodeOrErr (unpackFS targetName1) (BLU.fromString contentOrFp) of
+                  [] -> error $ "No annotations found for " ++ unpackFS targetName1
                      ++ " even though it had an InlinePrimitive annotation."
                   [p] -> p
                   _ -> error $ "Multiple primitive definitions found in "
-                    ++ "InlinePrimitive annotation for " ++ targetName1 ++ ". "
+                    ++ "InlinePrimitive annotation for " ++ unpackFS targetName1 ++ ". "
                     ++ "Expected a single one."
 
-              primName = Text.unpack (name prim) in
+              primName = name prim in
 
           if primName /= targetName1 then
             error $ concat
-              [ "Function " ++ targetName1 ++ " was annotated with an inline "
-              , "primitive for " ++ primName ++ ". These names "
+              [ "Function " ++ unpackFS targetName1 ++ " was annotated with an inline "
+              , "primitive for " ++ unpackFS primName ++ ". These names "
               , "should be the same." ]
           else
             pure [Left prim]

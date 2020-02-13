@@ -42,7 +42,6 @@ import           Data.Data                       (Data)
 import           Data.Typeable                   (Typeable)
 import           Data.List                       (foldl', nub)
 import           Data.Maybe                      (catMaybes, listToMaybe)
-import qualified Data.Text                       as Text
 import qualified Data.Time.Clock                 as Clock
 import           Language.Haskell.TH.Syntax      (lift)
 
@@ -96,6 +95,7 @@ import           Clash.Util                                   (curLoc, noSrcSpan
                                                               ,wantedLanguageExtensions, unwantedLanguageExtensions)
 import           Clash.Annotations.BitRepresentation.Internal
   (DataRepr', dataReprAnnToDataRepr')
+import           GHC.FastString.Extra
 
 ghcLibDir :: IO FilePath
 #ifdef USE_GHC_PATHS
@@ -146,7 +146,7 @@ loadModules
            , Maybe CoreSyn.CoreBndr)]            -- (maybe) testBench bndr
         , [Either UnresolvedPrimitive FilePath]
         , [DataRepr']
-        , [(Text.Text, PrimitiveGuard ())]
+        , [(FastString, PrimitiveGuard ())]
         )
 loadModules useColor hdl modName dflagsM idirs = do
   libDir <- MonadUtils.liftIO ghcLibDir
@@ -442,7 +442,7 @@ findNamedAnnotations bndrs =
 findPrimitiveGuardAnnotations
   :: GHC.GhcMonad m
   => [CoreSyn.CoreBndr]
-  -> m [(Text.Text, (PrimitiveGuard ()))]
+  -> m [(FastString, (PrimitiveGuard ()))]
 findPrimitiveGuardAnnotations bndrs = do
   anns0 <- findNamedAnnotations bndrs
   let anns1 = errOnDuplicateAnnotations "PrimitiveGuard" bndrs anns0
@@ -490,11 +490,11 @@ findTestBenchAnnotations bndrs = do
         "TestBench named: " ++ show tb ++ " not found"
     findTB _ = Panic.pgmError "Unexpected Synthesize"
 
-    eqNm thNm bndr = Text.pack (show thNm) == qualNm
+    eqNm thNm bndr = fsLit (show thNm) == qualNm
       where
         bndrNm  = Var.varName bndr
-        qualNm  = maybe occName (\modName -> modName `Text.append` ('.' `Text.cons` occName)) (modNameM bndrNm)
-        occName = Text.pack (OccName.occNameString (Name.nameOccName bndrNm))
+        qualNm  = maybe occName (\modName -> modName `appendFS` ('.' `consFS` occName)) (modNameM bndrNm)
+        occName = OccName.occNameFS (Name.nameOccName bndrNm)
 
 -- | Find primitive annotations bound to given binders, or annotations made
 -- in modules of those binders.
