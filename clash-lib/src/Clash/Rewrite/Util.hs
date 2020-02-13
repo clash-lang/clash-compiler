@@ -989,7 +989,7 @@ whnfRW isSubj ctx@(TransformContext is0 _) e rw = do
   uniqSupply Lens..= ids2
   gh <- Lens.use globalHeap
   case whnf' primEval primUnwind bndrs tcm gh ids1 is0 isSubj e of
-    (gh1,ph,v) -> do
+    (!gh1,ph,v) -> do
       globalHeap Lens..= gh1
       bindPureHeap tcm ph rw ctx v
 

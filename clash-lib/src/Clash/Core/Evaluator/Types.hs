@@ -10,8 +10,8 @@
 module Clash.Core.Evaluator.Types where
 
 import Control.Concurrent.Supply (Supply)
-import Data.IntMap (IntMap)
-import qualified Data.IntMap as IntMap (insert, lookup)
+import Data.IntMap.Strict (IntMap)
+import qualified Data.IntMap.Strict as IntMap (insert, lookup)
 import Data.List (foldl')
 import Data.Maybe (isJust)
 import Data.Text.Prettyprint.Doc (hsep)
