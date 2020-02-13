@@ -177,6 +177,7 @@ inlineOrLiftNonRep = inlineOrLiftBinders nonRepTest inlineTest
                                         else Monoid.Sum 0)
                               res)
           _ -> 0
+{-# SCC inlineOrLiftNonRep #-}
 
 {- [Note] join points and void wrappers
 Join points are functions that only occur in tail-call positions within an
@@ -205,6 +206,7 @@ typeSpec ctx e@(TyApp e1 ty)
   = specializeNorm ctx e
 
 typeSpec _ e = return e
+{-# SCC typeSpec #-}
 
 -- | Specialize functions on their non-representable argument
 nonRepSpec :: HasCallStack => NormRewrite
@@ -250,6 +252,7 @@ nonRepSpec ctx e@(App e1 e2)
       | otherwise = return app
 
 nonRepSpec _ e = return e
+{-# SCC nonRepSpec #-}
 
 -- | Lift the let-bindings out of the subject of a Case-decomposition
 caseLet :: HasCallStack => NormRewrite
@@ -286,6 +289,7 @@ caseLet (TransformContext is0 _) (Case (collectTicks -> (Letrec xes e,ticks)) ty
                   (Case (mkTicks e1 ticks) ty alts))
 
 caseLet _ e = return e
+{-# SCC caseLet #-}
 
 -- | Remove non-reachable alternatives. For example, consider:
 --
@@ -315,6 +319,7 @@ caseElemNonReachable _ case0@(Case scrut altsTy alts0) = do
     _  -> changed =<< caseOneAlt (Case scrut altsTy altsOther)
 
 caseElemNonReachable _ e = return e
+{-# SCC caseElemNonReachable #-}
 
 -- | Tries to eliminate existentials by using heuristics to determine what the
 -- existential should be. For example, consider Vec:
@@ -373,6 +378,7 @@ elemExistentials (TransformContext is0 _) (Case scrut altsTy alts0) = do
     go _ _ alt = return alt
 
 elemExistentials _ e = return e
+{-# SCC elemExistentials #-}
 
 -- | Move a Case-decomposition from the subject of a Case-decomposition to the alternatives
 caseCase :: HasCallStack => NormRewrite
@@ -411,6 +417,7 @@ caseCase (TransformContext is0 _) e@(Case (stripTicks -> Case scrut alts1Ty alts
       else return e
 
 caseCase _ e = return e
+{-# SCC caseCase #-}
 
 -- | Inline function with a non-representable result if it's the subject
 -- of a Case-decomposition
@@ -459,6 +466,7 @@ inlineNonRep _ e@(Case scrut altsTy alts)
     exception = isClassTy
 
 inlineNonRep _ e = return e
+{-# SCC inlineNonRep #-}
 
 -- | Specialize a Case-decomposition (replace by the RHS of an alternative) if
 -- the subject is (an application of) a DataCon; or if there is only a single
@@ -637,6 +645,7 @@ caseCon ctx@(TransformContext is0 _) e@(Case subj ty alts) = case collectArgsTic
       _ -> caseOneAlt e
 
 caseCon _ e = return e
+{-# SCC caseCon #-}
 
 {- [Note: Name re-creation]
 The names of heap bound variables are safely generate with mkUniqSystemId in Clash.Core.Evaluator.newLetBinding.
@@ -732,6 +741,7 @@ matchLiteralContructor c (NaturalLiteral l) alts = go (reverse alts)
 matchLiteralContructor _ _ ((DefaultPat,e):_) = changed e
 matchLiteralContructor c _ _ =
   error $ $(curLoc) ++ "Report as bug: caseCon error: " ++ showPpr c
+{-# SCC matchLiteralContructor #-}
 
 caseOneAlt :: Term -> RewriteMonad extra Term
 caseOneAlt e@(Case _ _ [(pat,altE)]) = case pat of
@@ -748,6 +758,7 @@ caseOneAlt (Case _ _ alts@((_,alt):_:_))
   = changed alt
 
 caseOneAlt e = return e
+{-# SCC caseOneAlt #-}
 
 -- | Bring an application of a DataCon or Primitive in ANF, when the argument is
 -- is considered non-representable
@@ -768,6 +779,7 @@ nonRepANF ctx@(TransformContext is0 _) e@(App appConPrim arg)
       _               -> return e
 
 nonRepANF _ e = return e
+{-# SCC nonRepANF #-}
 
 -- | Ensure that top-level lambda's eventually bind a let-expression of which
 -- the body is a variable-reference.
@@ -799,6 +811,7 @@ topLet (TransformContext is0 ctx) e@(Letrec binds body)
         changed (Letrec (binds ++ [(argId,body)]) (Var argId))
 
 topLet _ e = return e
+{-# SCC topLet #-}
 
 -- Misc rewrites
 
@@ -826,6 +839,7 @@ deadCode _ e@(Letrec xes body) = do
       in findUsedBndrs (used ++ explore) explore' other'
 
 deadCode _ e = return e
+{-# SCC deadCode #-}
 
 removeUnusedExpr :: HasCallStack => NormRewrite
 removeUnusedExpr _ e@(collectArgsTicks -> (p@(Prim pInfo),args,ticks)) = do
@@ -899,6 +913,7 @@ removeUnusedExpr _ e@(collectArgsTicks -> (Data dc, [_,Right aTy,Right nTy,_,Lef
       _ -> return e
 
 removeUnusedExpr _ e = return e
+{-# SCC removeUnusedExpr #-}
 
 -- | Inline let-bindings when the RHS is either a local variable reference or
 -- is constant (except clock or reset generators)
@@ -913,6 +928,7 @@ bindConstantVar = inlineBinders test
           0 -> return True
           n -> return (termSize e <= n)
         _ -> return False
+{-# SCC bindConstantVar #-}
 
 -- | Push a cast over a case into it's alternatives.
 caseCast :: HasCallStack => NormRewrite
@@ -920,12 +936,15 @@ caseCast _ (Cast (stripTicks -> Case subj ty alts) ty1 ty2) = do
   let alts' = map (\(p,e) -> (p, Cast e ty1 ty2)) alts
   changed (Case subj ty alts')
 caseCast _ e = return e
+{-# SCC caseCast #-}
+
 
 -- | Push a cast over a Letrec into it's body
 letCast :: HasCallStack => NormRewrite
 letCast _ (Cast (stripTicks -> Letrec binds body) ty1 ty2) =
   changed $ Letrec binds (Cast body ty1 ty2)
 letCast _ e = return e
+{-# SCC letCast #-}
 
 
 -- | Push cast over an argument to a function into that function
@@ -960,6 +979,7 @@ argCastSpec ctx e@(App _ (stripTicks -> Cast e' _ _)) =
     , "\n\n" ++ showPpr e
     ])
 argCastSpec _ e = return e
+{-# SCC argCastSpec #-}
 
 -- | Only inline casts that just contain a 'Var', because these are guaranteed work-free.
 -- These are the result of the 'splitCastWork' transformation.
@@ -968,6 +988,7 @@ inlineCast = inlineBinders test
   where
     test _ (_, (Cast (stripTicks -> Var {}) _ _)) = return True
     test _ _ = return False
+{-# SCC inlineCast #-}
 
 -- | Eliminate two back to back casts where the type going in and coming out are the same
 --
@@ -991,6 +1012,7 @@ eliminateCastCast _ c@(Cast (stripTicks -> Cast e tyA tyB) tyB' tyC) = do
                 Nothing)
 
 eliminateCastCast _ e = return e
+{-# SCC eliminateCastCast #-}
 
 -- | Make a cast work-free by splitting the work of to a separate binding
 --
@@ -1023,6 +1045,7 @@ splitCastWork ctx@(TransformContext is0 _) unchanged@(Letrec vs e') = do
       _ -> return [x]
 
 splitCastWork _ e = return e
+{-# SCC splitCastWork #-}
 
 
 -- | Inline work-free functions, i.e. fully applied functions that evaluate to
@@ -1088,6 +1111,7 @@ inlineWorkFree _ e@(Var f) = do
     else return e
 
 inlineWorkFree _ e = return e
+{-# SCC inlineWorkFree #-}
 
 -- | Inline small functions
 inlineSmall :: HasCallStack => NormRewrite
@@ -1113,6 +1137,7 @@ inlineSmall _ e@(collectArgsTicks -> (Var f,args,ticks)) = do
         _ -> return e
 
 inlineSmall _ e = return e
+{-# SCC inlineSmall #-}
 
 -- | Specialise functions on arguments which are constant, except when they
 -- are clock, reset generators.
@@ -1139,6 +1164,7 @@ constantSpec ctx@(TransformContext is0 tfCtx) e@(App e1 e2)
         -- e2 has no constant parts
         return e
 constantSpec _ e = return e
+{-# SCC constantSpec #-}
 
 
 -- Experimental
@@ -1273,6 +1299,7 @@ appProp _ (TyApp (collectTicks -> (Case scrut altsTy alts,ticks)) ty) = do
   changed (mkTicks (Case scrut ty' alts') ticks)
 
 appProp _ e = return e
+{-# SCC appProp #-}
 
 -- | Unlike 'appProp', which propagates a single argument in an application one
 -- level down (and should be called in an innermost traversal), 'appPropFast'
@@ -1364,6 +1391,7 @@ appPropFast ctx@(TransformContext is _) = \case
         return (ty2,(boundArg,arg):ls1,Left (Var boundArg):args1)
 
   goCaseArg _ ty ls [] = return (ty,ls,[])
+{-# SCC appPropFast #-}
 
 -- | Flatten ridiculous case-statements generated by GHC
 --
@@ -1413,6 +1441,7 @@ caseFlat _ e@(Case (collectEqArgs -> Just (scrut',_)) ty _)
          Nothing    -> return e
 
 caseFlat _ e = return e
+{-# SCC caseFlat #-}
 
 collectFlat :: Term -> Term -> Maybe [(Pat,Term)]
 collectFlat scrut (Case (collectEqArgs -> Just (scrut', val)) _ty [lAlt,rAlt])
@@ -1449,6 +1478,7 @@ collectFlat scrut (Case (collectEqArgs -> Just (scrut', val)) _ty [lAlt,rAlt])
     isTrueDcPat _ = False
 
 collectFlat _ _ = Nothing
+{-# SCC collectFlat #-}
 
 collectEqArgs :: Term -> Maybe (Term,Term)
 collectEqArgs (collectArgsTicks -> (Prim p, args, ticks))
@@ -1537,6 +1567,7 @@ makeANF ctx@(TransformContext is0 _) e0
             (srcTicks,nmTicks) = partitionTicks ticks
         -- Ensure that `AppendName` ticks still scope over the entire expression
         changed (mkTicks (Letrec bndrs (mkTicks e3 srcTicks)) nmTicks)
+{-# SCC makeANF #-}
 
 -- | Note [ANF InScopeSet]
 --
@@ -1733,6 +1764,7 @@ collectANF ctx (Case subj ty alts) = do
         return (pId,patExpr)
 
 collectANF _ e = return e
+{-# SCC collectANF #-}
 
 -- | Eta-expand top-level lambda's (DON'T use in a traversal!)
 etaExpansionTL :: HasCallStack => NormRewrite
@@ -1776,6 +1808,7 @@ etaExpansionTL (TransformContext is0 ctx) e
                              (App e (Var newId))
         changed (Lam newId e')
       else return e
+{-# SCC etaExpansionTL #-}
 
 -- | Eta-expand functions with a Synthesize annotation, needed to allow such
 -- functions to appear as arguments to higher-order primitives.
@@ -1797,6 +1830,7 @@ etaExpandSyn (TransformContext is0 ctx) e@(collectArgs -> (Var f, _)) = do
     _ -> return e
 
 etaExpandSyn _ e = return e
+{-# SCC etaExpandSyn #-}
 
 isClassConstraint :: Type -> Bool
 isClassConstraint (tyView -> TyConApp nm0 _) =
@@ -1922,6 +1956,7 @@ recToLetRec (TransformContext is0 []) e = do
       Nothing
 
 recToLetRec _ e = return e
+{-# SCC recToLetRec #-}
 
 -- | Inline a function with functional arguments
 inlineHO :: HasCallStack => NormRewrite
@@ -1948,6 +1983,7 @@ inlineHO _ e@(App _ _)
       else return e
 
 inlineHO _ e = return e
+{-# SCC inlineHO #-}
 
 -- | Simplified CSE, only works on let-bindings, works from top to bottom
 simpleCSE :: HasCallStack => NormRewrite
@@ -1959,6 +1995,7 @@ simpleCSE (TransformContext is0 _) e@(Letrec binders body) = do
      else return e
 
 simpleCSE _ e = return e
+{-# SCC simpleCSE #-}
 
 reduceBindersFix
   :: InScopeSet
@@ -1989,6 +2026,7 @@ reduceBinders is processed body ((id_,expr):binders) = case List.find ((== expr)
           body'      = substTm "reduceBinders.body" subst body
       in  reduceBinders is processed' body' binders'
     _ -> reduceBinders is ((id_,expr):processed) body binders
+{-# SCC reduceBinders #-}
 
 reduceConst :: HasCallStack => NormRewrite
 reduceConst ctx e@(App _ _)
@@ -1998,6 +2036,7 @@ reduceConst ctx e@(App _ _)
       _ -> changed e1
 
 reduceConst _ e = return e
+{-# SCC reduceConst #-}
 
 -- | Replace primitives by their "definition" if they would lead to let-bindings
 -- with a non-representable type when a function is in ANF. This happens for
@@ -2279,6 +2318,7 @@ reduceNonRepPrim c@(TransformContext is0 ctx) e@(App _ _) | (Prim p, args, ticks
          else return False
 
 reduceNonRepPrim _ e = return e
+{-# SCC reduceNonRepPrim #-}
 
 -- | This transformation lifts applications of global binders out of
 -- alternatives of case-statements.
@@ -2339,6 +2379,7 @@ disjointExpressionConsolidation ctx@(TransformContext is0 _) e@(Case _scrut _ty 
         go xs (y:ys) = (xs ++ ys) : go (xs ++ [y]) ys
 
 disjointExpressionConsolidation _ e = return e
+{-# SCC disjointExpressionConsolidation #-}
 
 -- | Given a function in the desired normal form, inline all the following
 -- let-bindings:
@@ -2445,6 +2486,7 @@ inlineCleanup (TransformContext is0 _) (Letrec binds body) = do
       -- introduce free variables, because the @to-inline@ bindings are removed.
 
 inlineCleanup _ e = return e
+{-# SCC inlineCleanup #-}
 
 -- | Flatten's letrecs after `inlineCleanup`
 --
@@ -2499,6 +2541,7 @@ flattenLet (TransformContext is0 _) letrec@(Letrec _ _) = do
     go _ b = return [b]
 
 flattenLet _ e = return e
+{-# SCC flattenLet #-}
 
 -- | Worker function of 'separateArguments'.
 separateLambda
@@ -2530,6 +2573,7 @@ separateLambda tcm ctx@(TransformContext is0 _) b eb0 =
       isN1 = extendInScopeSet isN0 x'
     in
       (isN1, x')
+{-# SCC separateLambda #-}
 
 -- | Split apart (global) function arguments that contain types that we
 -- want to separate off, e.g. Clocks. Works on both the definition side (i.e. the
@@ -2584,6 +2628,7 @@ separateArguments (TransformContext is0 _) e@(collectArgsTicks -> (Var g, args, 
         return [(ty,arg)]
 
 separateArguments _ e = return e
+{-# SCC separateArguments #-}
 
 -- | Remove all undefined alternatives from case expressions, replacing them
 -- with the value of another defined alternative. If there is one defined
@@ -2624,6 +2669,7 @@ xOptimize (TransformContext is0 _) e@(Case subj ty alts) = do
     return e
 
 xOptimize _ e = return e
+{-# SCC xOptimize #-}
 
 -- Return an expression equivalent to the alternative given. When only one
 -- alternative is defined the result of this function is used to replace the
