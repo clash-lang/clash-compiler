@@ -142,6 +142,12 @@ apply
   -- ^ Transformation to be applied
   -> Rewrite extra
 apply = \s rewrite ctx expr0 -> do
+  lvl <- Lens.view dbgLevel
+  dbgTranss <- Lens.view dbgTransformations
+  let isTryLvl = lvl == DebugTry || lvl >= DebugAll
+      isRelevantTrans = s `Set.member` dbgTranss || Set.null dbgTranss
+  traceIf (isTryLvl && isRelevantTrans) ("Trying: " ++ s) (pure ())
+
   (expr1,anyChanged) <- Writer.listen (rewrite ctx expr0)
   let hasChanged = Monoid.getAny anyChanged
       !expr2     = if hasChanged then expr1 else expr0
@@ -162,12 +168,10 @@ apply = \s rewrite ctx expr0 -> do
                  }
     return ()
 #endif
-  lvl <- Lens.view dbgLevel
-  transformations <- Lens.view dbgTransformations
 
   if lvl == DebugNone
     then return expr2
-    else applyDebug lvl transformations s expr0 hasChanged expr2
+    else applyDebug lvl dbgTranss s expr0 hasChanged expr2
 {-# INLINE apply #-}
 
 applyDebug
@@ -190,8 +194,7 @@ applyDebug lvl transformations name exprOld hasChanged exprNew
     applyDebug newLvl Set.empty name exprOld hasChanged exprNew
 
 applyDebug lvl _transformations name exprOld hasChanged exprNew =
- traceIf (lvl == DebugTry) ("Trying: " ++ name) $
- traceIf (lvl >= DebugAll) ("Trying: " ++ name ++ " on:\n" ++ before) $ do
+ traceIf (lvl >= DebugAll) ("Tried: " ++ name ++ " on:\n" ++ before) $ do
   Monad.when (lvl > DebugNone && hasChanged) $ do
     tcm                  <- Lens.view tcCache
     let beforeTy          = termType tcm exprOld
