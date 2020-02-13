@@ -80,7 +80,6 @@ Check out 'IntelSystem' and 'XilinxSystem' too!
 {-# LANGUAGE TypeInType #-}
 #endif
 
-{-# OPTIONS_GHC -fno-warn-unused-imports #-}
 {-# OPTIONS_HADDOCK show-extensions #-}
 
 module Clash.Signal
@@ -145,7 +144,7 @@ module Clash.Signal
 #ifdef CLASH_MULTIPLE_HIDDEN
   , convertReset
 #endif
-  , E.resetSynchronizer
+  , resetSynchronizer
   , holdReset
     -- ** Enabling
   , Enable
@@ -248,26 +247,24 @@ module Clash.Signal
   , mergeBiSignalOuts
   )
 where
-
-import           GHC.TypeLits
-  (KnownNat, KnownSymbol, AppendSymbol, Symbol, type (<=))
-import           Data.Bits             (Bits) -- Haddock only
+import           GHC.TypeLits          (type (<=))
 import           Data.Proxy            (Proxy(..))
 import           Prelude
 import           Test.QuickCheck       (Property, property)
 
+
 #ifdef CLASH_MULTIPLE_HIDDEN
-import           Clash.Class.HasDomain (WithSingleDomain, WithSpecificDomain)
-#else
-import           Clash.Class.HasDomain (WithSpecificDomain)
+import           GHC.TypeLits          (AppendSymbol)
+import           Clash.Class.HasDomain (WithSingleDomain)
 #endif
+
+import           Clash.Class.HasDomain (WithSpecificDomain)
 import qualified Clash.Explicit.Signal as E
 import           Clash.Explicit.Signal
-  (System, resetSynchronizer, systemClockGen, systemResetGen)
+  (resetSynchronizer, systemClockGen, systemResetGen)
 import qualified Clash.Explicit.Signal as S
 import           Clash.Hidden
 import           Clash.Promoted.Nat    (SNat (..), snatToNum)
-import           Clash.Promoted.Symbol (SSymbol (..))
 import           Clash.Signal.Bundle
   (Bundle (..), EmptyTuple(..), TaggedEmptyTuple(..))
 import           Clash.Signal.BiSignal --(BisignalIn, BisignalOut, )
@@ -275,7 +272,6 @@ import           Clash.Signal.Internal hiding
   (sample, sample_lazy, sampleN, sampleN_lazy, simulate, simulate_lazy, testFor)
 import           Clash.Signal.Internal.Ambiguous
   (knownVDomain, clockPeriod, activeEdge, resetKind, initBehavior, resetPolarity)
-import qualified Clash.Signal.Internal as S
 import           Clash.XException      (NFDataX)
 
 {- $setup

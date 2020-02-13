@@ -13,42 +13,32 @@
 {-# LANGUAGE QuasiQuotes #-}
 {-# LANGUAGE TemplateHaskell #-}
 
-{-# OPTIONS_GHC -Wno-unused-imports #-}
-
 module Clash.Normalize where
 
 import           Control.Concurrent.Supply        (Supply)
 import           Control.Exception                (throw)
-import           Control.Lens                     ((.=),(^.),_1,_4)
 import qualified Control.Lens                     as Lens
 import           Control.Monad                    (when)
 import           Control.Monad.State.Strict       (State)
-import           Data.Binary                      (encode)
-import qualified Data.ByteString                  as BS
-import qualified Data.ByteString.Lazy             as BL
 import           Data.Default                     (def)
 import           Data.Either                      (lefts,partitionEithers)
 import qualified Data.IntMap                      as IntMap
 import           Data.IntMap.Strict               (IntMap)
 import           Data.List
-  (groupBy, intersect, mapAccumL, sortBy)
+  (intersect, mapAccumL)
 import qualified Data.Map                         as Map
 import qualified Data.Maybe                       as Maybe
 import qualified Data.Set                         as Set
 import qualified Data.Set.Lens                    as Lens
-import           Data.Semigroup                   ((<>))
 import           Data.Text.Prettyprint.Doc        (vcat)
-import           System.IO.Unsafe                 (unsafePerformIO)
 
 import           BasicTypes                       (InlineSpec (..))
-import           SrcLoc                           (SrcSpan,noSrcSpan)
 
 import           Clash.Annotations.BitRepresentation.Internal
   (CustomReprs)
 import           Clash.Core.Evaluator.Types       (PrimStep, PrimUnwind)
 import           Clash.Core.FreeVars
   (freeLocalIds, globalIds, globalIdOccursIn, localIdDoesNotOccurIn)
-import           Clash.Core.Name (nameOcc) -- TODO
 import           Clash.Core.Pretty                (PrettyOptions(..), showPpr, showPpr', ppr)
 import           Clash.Core.Subst
   (extendGblSubstList, mkSubst, substTm)
@@ -57,18 +47,18 @@ import           Clash.Core.Type                  (Type, splitCoreFunForallTy)
 import           Clash.Core.TyCon
   (TyConMap, TyConName)
 import           Clash.Core.Type                  (isPolyTy)
-import           Clash.Core.Util                  (mkApps, mkTicks, termType)
+import           Clash.Core.Util                  (mkApps, mkTicks)
 import           Clash.Core.Var                   (Id, varName, varType)
 import           Clash.Core.VarEnv
   (VarEnv, elemVarSet, eltsVarEnv, emptyInScopeSet, emptyVarEnv,
-   extendVarEnv, lookupVarEnv, mapVarEnv, mapMaybeVarEnv, mkInScopeSet,
+   extendVarEnv, lookupVarEnv, mapVarEnv, mapMaybeVarEnv,
    mkVarEnv, mkVarSet, notElemVarEnv, notElemVarSet, nullVarEnv, unionVarEnv)
 import           Clash.Driver.Types
   (BindingMap, Binding(..), ClashOpts (..), DebugLevel (..))
 import           Clash.Netlist.Types
-  (HWType (..), HWMap, FilteredHWType(..))
+  (HWMap, FilteredHWType(..))
 import           Clash.Netlist.Util
-  (splitNormalized, coreTypeToHWType')
+  (splitNormalized)
 import           Clash.Normalize.Strategy
 import           Clash.Normalize.Transformations
   (appPropFast, bindConstantVar, caseCon, flattenLet, reduceConst, topLet,
@@ -78,13 +68,22 @@ import           Clash.Normalize.Util
 import           Clash.Primitives.Types           (CompiledPrimMap)
 import           Clash.Rewrite.Combinators        ((>->),(!->),repeatR,topdownR)
 import           Clash.Rewrite.Types
-  (RewriteEnv (..), RewriteState (..), bindings, curFun, dbgLevel, extra,
-   tcCache, topEntities, typeTranslator, customReprs, RewriteStep (..))
+  (RewriteEnv (..), RewriteState (..), bindings, dbgLevel, extra,
+   tcCache, topEntities)
 import           Clash.Rewrite.Util
-  (apply, isUntranslatableType, runRewrite, runRewriteSession)
-import           Clash.Signal.Internal            (ResetKind (..))
+  (apply, isUntranslatableType, runRewriteSession)
 import           Clash.Util
 import           Clash.Util.Interpolate           (i)
+
+#ifdef HISTORY
+import           Data.Binary                      (encode)
+import qualified Data.ByteString                  as BS
+import qualified Data.ByteString.Lazy             as BL
+
+import           System.IO.Unsafe                 (unsafePerformIO)
+import           Clash.Rewrite.Types (RewriteStep(..))
+#endif
+
 
 -- | Run a NormalizeSession in a given environment
 runNormalization
