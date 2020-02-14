@@ -35,12 +35,12 @@ handleClashException df opts e = case fromException e of
     throwOneError (mkPlainErrMsg df sp (blankLine $$ textLines s $$ blankLine $$ srcInfo' $$ showExtra (opt_errorExtra opts) eM))
   _ -> case fromException e of
     Just (ErrorCallWithLocation _ _) ->
-      throwOneError (mkPlainErrMsg df noSrcSpan (text "Clash error call:" $$ text (show e)))
+      throwOneError (mkPlainErrMsg df noSrcSpan (text "Clash error call:" $$ textLines (show e)))
     _ -> case fromException e of
       Just (e' :: SourceError) -> do
         GHC.printException e'
         liftIO $ exitWith (ExitFailure 1)
-      _ -> throwOneError (mkPlainErrMsg df noSrcSpan (text "Other error:" $$ text (displayException e)))
+      _ -> throwOneError (mkPlainErrMsg df noSrcSpan (text "Other error:" $$ textLines (displayException e)))
   where
     srcInfo = textLines [i|
       The source location of the error is not exact, only indicative, as it
@@ -55,5 +55,5 @@ handleClashException df opts e = case fromException e of
     showExtra True  (Just msg) =
       blankLine $$
       text "Additional information:" $$ blankLine $$
-      text msg
+      textLines msg
     showExtra _ _ = empty
