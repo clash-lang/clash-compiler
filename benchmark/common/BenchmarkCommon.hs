@@ -30,6 +30,7 @@ defaultTests :: [FilePath]
 defaultTests =
   [ "examples/FIR.hs"
   , "examples/Queens.hs"
+  , "examples/Reducer.hs"
   , "benchmark/tests/BundleMapRepeat.hs"
   , "benchmark/tests/PipelinesViaFolds.hs"
   ]

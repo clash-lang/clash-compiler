@@ -11,6 +11,7 @@
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE TypeFamilies #-}
 
 module Clash.Core.Name
   ( module Clash.Core.Name
@@ -20,8 +21,12 @@ where
 
 import           Control.DeepSeq                        (NFData)
 import           Data.Binary                            (Binary)
+import           Data.Coerce                            (coerce)
 import           Data.Function                          (on)
+import           Data.GenericTrie.Internal              (TrieKey (..), Trie (..))
 import           Data.Hashable                          (Hashable (..))
+import           Data.IntMap                            (IntMap)
+import qualified Data.IntMap                            as IntMap
 import           Data.Text                              (Text, append)
 import           GHC.BasicTypes.Extra                   ()
 import           GHC.Generics                           (Generic)
@@ -42,6 +47,41 @@ data Name a
 instance Eq (Name a) where
   (==) = (==) `on` nameUniq
   (/=) = (/=) `on` nameUniq
+
+instance TrieKey (Name a) where
+  type TrieRep (Name a)   = IntMap
+  trieLookup k (MkTrie x)       = IntMap.lookup (nameUniq k) x
+  trieInsert k v (MkTrie t)     = MkTrie (IntMap.insert (nameUniq k) v t)
+  trieDelete k (MkTrie t)       = MkTrie (IntMap.delete (nameUniq k) t)
+  trieEmpty                     = MkTrie IntMap.empty
+  trieSingleton k v             = MkTrie (IntMap.singleton (nameUniq k) v)
+  trieNull (MkTrie x)           = IntMap.null x
+  trieMap f (MkTrie x)          = MkTrie (IntMap.map f x)
+  trieTraverse f (MkTrie x)     = fmap MkTrie (traverse f x)
+  trieShowsPrec p (MkTrie x)    = showsPrec p x
+  trieMapMaybeWithKey f (MkTrie x)  = MkTrie (IntMap.mapMaybeWithKey (withNameUniq f) x)
+  trieFoldWithKey f z (MkTrie x)    = IntMap.foldrWithKey (withNameUniq f) z x
+  trieTraverseWithKey f (MkTrie x)  = fmap MkTrie (IntMap.traverseWithKey (withNameUniq f) x)
+  trieMergeWithKey f g h (MkTrie x) (MkTrie y) = MkTrie (IntMap.mergeWithKey (withNameUniq f) (coerce g) (coerce h) x y)
+  {-# INLINABLE trieEmpty #-}
+  {-# INLINABLE trieInsert #-}
+  {-# INLINABLE trieLookup #-}
+  {-# INLINABLE trieDelete #-}
+  {-# INLINABLE trieSingleton #-}
+  {-# INLINABLE trieFoldWithKey #-}
+  {-# INLINABLE trieShowsPrec #-}
+  {-# INLINABLE trieTraverse #-}
+  {-# INLINABLE trieTraverseWithKey #-}
+  {-# INLINABLE trieNull #-}
+  {-# INLINABLE trieMap #-}
+  {-# INLINABLE trieMergeWithKey #-}
+  {-# INLINABLE trieMapMaybeWithKey #-}
+
+withNameUniq
+  :: (Name a -> r)
+  -> (Unique -> r)
+withNameUniq f k = f (Name Internal "" k noSrcSpan)
+{-# INLINE withNameUniq #-}
 
 instance Ord (Name a) where
   compare = compare `on` nameUniq

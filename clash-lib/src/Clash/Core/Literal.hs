@@ -21,6 +21,7 @@ where
 import Control.DeepSeq                        (NFData (..))
 import Data.Binary                            (Binary)
 import Data.Vector.Binary                     ()
+import Data.GenericTrie.Extra                 (TrieKey)
 import Data.Hashable                          (Hashable)
 import Data.Vector.Primitive.Extra            (Vector)
 import Data.Word                              (Word8)
@@ -47,7 +48,7 @@ data Literal
   | CharLiteral     !Char
   | NaturalLiteral  !Integer
   | ByteArrayLiteral !(Vector Word8)
-  deriving (Eq,Ord,Show,Generic,NFData,Hashable,Binary)
+  deriving (Eq,Ord,Show,Generic,NFData,Hashable,Binary,TrieKey)
 
 -- | Determines the Type of a Literal
 literalType :: Literal

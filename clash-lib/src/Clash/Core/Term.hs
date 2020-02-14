@@ -12,6 +12,7 @@
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE TypeFamilies #-}
 
 module Clash.Core.Term
   ( Term (..)
@@ -34,8 +35,13 @@ import Data.Binary                             (Binary)
 import qualified Data.DList                    as DList
 import Data.Either                             (lefts, rights)
 import Data.Maybe                              (catMaybes)
+import Data.GenericTrie.Internal               (TrieKey (..), Trie (..))
 import Data.Hashable                           (Hashable)
+import Data.HashMap.Strict                     (HashMap)
+import qualified Data.HashMap.Strict           as HashMap
 import Data.List                               (partition)
+import Data.Map                                (Map)
+import qualified Data.Map                      as Map
 import Data.Text                               (Text)
 import GHC.Generics
 import SrcLoc                                  (SrcSpan)
@@ -63,7 +69,7 @@ data Term
                                             -- alternatives, list of alternatives
   | Cast    !Term !Type !Type               -- ^ Cast a term from one type to another
   | Tick    !TickInfo !Term                 -- ^ Annotated term
-  deriving (Show,Generic,NFData,Hashable,Binary)
+  deriving (Show,Generic,NFData,Hashable,Binary,TrieKey)
 
 data TickInfo
   = SrcSpan !SrcSpan
@@ -76,7 +82,23 @@ data TickInfo
   | NoDeDup
   -- ^ Do not deduplicate, i.e. /keep/, an expression inside a case-alternative;
   -- do not try to share expressions between multiple branches.
-  deriving (Eq,Show,Generic,NFData,Hashable,Binary)
+  deriving (Eq,Ord,Show,Generic,NFData,Hashable,Binary)
+
+instance TrieKey TickInfo where
+  type TrieRep TickInfo = Map TickInfo
+  trieLookup k (MkTrie x) = Map.lookup k x
+  trieInsert k v (MkTrie x) = MkTrie (Map.insert k v x)
+  trieDelete          = error "trieDelete"
+  trieEmpty           = MkTrie (Map.empty)
+  trieSingleton k v   = MkTrie (Map.singleton k v)
+  trieNull            = error "trieNull"
+  trieMap             = error "trieMap"
+  trieTraverse        = error "trieTraverse"
+  trieShowsPrec       = error "trieShowsPrec"
+  trieMapMaybeWithKey = error "trieMapMaybeWithKey"
+  trieFoldWithKey     = error "trieFoldWithKey"
+  trieTraverseWithKey = error "trieTraverseWithKey"
+  trieMergeWithKey    = error "trieMergeWithKey"
 
 -- | Tag to indicate which instance/register name modifier was used
 data NameMod
@@ -88,13 +110,42 @@ data NameMod
   -- ^ @Clash.Magic.suffixNameP@
   | SetName
   -- ^ @Clash.Magic.setName@
-  deriving (Eq,Show,Generic,NFData,Hashable,Binary)
+  deriving (Eq,Ord,Show,Generic,NFData,Hashable,Binary)
 
 data PrimInfo = PrimInfo
   { primName     :: !Text
   , primType     :: !Type
   , primWorkInfo :: !WorkInfo
   } deriving (Show,Generic,NFData,Hashable,Binary)
+
+instance TrieKey PrimInfo where
+  type TrieRep PrimInfo         = HashMap Text
+  trieLookup k (MkTrie x)       = HashMap.lookup (primName k) x
+  trieInsert k v (MkTrie t)     = MkTrie (HashMap.insert (primName k) v t)
+  trieDelete k (MkTrie t)       = MkTrie (HashMap.delete (primName k) t)
+  trieEmpty                     = MkTrie HashMap.empty
+  trieSingleton k v             = MkTrie (HashMap.singleton (primName k) v)
+  trieNull (MkTrie x)           = HashMap.null x
+  trieMap f (MkTrie x)          = MkTrie (HashMap.map f x)
+  trieTraverse f (MkTrie x)     = fmap MkTrie (traverse f x)
+  trieShowsPrec p (MkTrie x)    = showsPrec p x
+  trieMapMaybeWithKey           = error "PrimInfo.trieMapMaybeWithKey not implemented"
+  trieFoldWithKey               = error "PrimInfo.trieFoldWithKey not implemented"
+  trieTraverseWithKey           = error "PrimInfo.trieTraverseWithKey not implemented"
+  trieMergeWithKey              = error "PrimInfo.trieMergeWithKey not implemented"
+  {-# INLINABLE trieEmpty #-}
+  {-# INLINABLE trieInsert #-}
+  {-# INLINABLE trieLookup #-}
+  {-# INLINABLE trieDelete #-}
+  {-# INLINABLE trieSingleton #-}
+  {-# INLINABLE trieFoldWithKey #-}
+  {-# INLINABLE trieShowsPrec #-}
+  {-# INLINABLE trieTraverse #-}
+  {-# INLINABLE trieTraverseWithKey #-}
+  {-# INLINABLE trieNull #-}
+  {-# INLINABLE trieMap #-}
+  {-# INLINABLE trieMergeWithKey #-}
+  {-# INLINABLE trieMapMaybeWithKey #-}
 
 data WorkInfo
   = WorkConstant
@@ -122,7 +173,7 @@ data Pat
   -- ^ Literal pattern
   | DefaultPat
   -- ^ Default pattern
-  deriving (Eq,Ord,Show,Generic,NFData,Hashable,Binary)
+  deriving (Eq,Ord,Show,Generic,NFData,Hashable,Binary,TrieKey)
 
 type Alt = (Pat,Term)
 

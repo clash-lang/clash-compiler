@@ -175,7 +175,8 @@ Library
                       trifecta                >= 1.7.1.1  && < 2.2,
                       vector                  >= 0.11     && < 1.0,
                       vector-binary-instances >= 0.2.3.5  && < 0.3,
-                      unordered-containers    >= 0.2.3.3  && < 0.3
+                      unordered-containers    >= 0.2.3.3  && < 0.3,
+                      generic-trie            >= 0.3.1
 
   Autogen-Modules:    Paths_clash_lib
 
@@ -248,6 +249,7 @@ Library
 
   Other-Modules:      Clash.Annotations.TopEntity.Extra
                       Data.Aeson.Extra
+                      Data.GenericTrie.Extra
                       Data.Semigroup.Monad.Extra
                       Data.Vector.Primitive.Extra
                       GHC.BasicTypes.Extra

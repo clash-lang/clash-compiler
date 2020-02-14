@@ -10,7 +10,9 @@
 {-# LANGUAGE DeriveAnyClass #-}
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE NamedFieldPuns #-}
+{-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RankNTypes #-}
+{-# LANGUAGE TypeFamilies #-}
 
 module Clash.Core.Var
   ( Attr' (..)
@@ -35,10 +37,14 @@ where
 
 import Control.DeepSeq                  (NFData (..))
 import Data.Binary                      (Binary)
+import Data.Coerce                      (coerce)
 import Data.Function                    (on)
+import Data.GenericTrie.Internal        (TrieKey (..), Trie (..))
 import Data.Hashable                    (Hashable)
+import Data.IntMap                      (IntMap)
+import qualified Data.IntMap            as IntMap
 import GHC.Generics                     (Generic)
-import Clash.Core.Name                  (Name (..))
+import Clash.Core.Name                  (Name (..), NameSort (..), noSrcSpan)
 import {-# SOURCE #-} Clash.Core.Term   (Term, TmName)
 import {-# SOURCE #-} Clash.Core.Type   (Kind, Type, TyName)
 import Clash.Unique
@@ -53,7 +59,7 @@ data Attr'
   | IntegerAttr' String Integer
   | StringAttr' String String
   | Attr' String
-  deriving (Eq, Show, NFData, Generic, Hashable, Ord, Binary)
+  deriving (Eq, Show, NFData, Generic, Hashable, Ord, Binary,TrieKey)
 
 attrName :: Attr' -> String
 attrName (BoolAttr' n _)    = n
@@ -79,6 +85,41 @@ data Var a
   , idScope :: IdScope
   }
   deriving (Show,Generic,NFData,Hashable,Binary)
+
+instance TrieKey (Var a) where
+  type TrieRep (Var a) = IntMap
+  trieLookup k (MkTrie x)       = IntMap.lookup (varUniq k) x
+  trieInsert k v (MkTrie t)     = MkTrie (IntMap.insert (varUniq k) v t)
+  trieDelete k (MkTrie t)       = MkTrie (IntMap.delete (varUniq k) t)
+  trieEmpty                     = MkTrie IntMap.empty
+  trieSingleton k v             = MkTrie (IntMap.singleton (varUniq k) v)
+  trieNull (MkTrie x)           = IntMap.null x
+  trieMap f (MkTrie x)          = MkTrie (IntMap.map f x)
+  trieTraverse f (MkTrie x)     = fmap MkTrie (traverse f x)
+  trieShowsPrec p (MkTrie x)    = showsPrec p x
+  trieMapMaybeWithKey f (MkTrie x)  = MkTrie (IntMap.mapMaybeWithKey (withVarKey f) x)
+  trieFoldWithKey f z (MkTrie x)    = IntMap.foldrWithKey (withVarKey f) z x
+  trieTraverseWithKey f (MkTrie x)  = fmap MkTrie (IntMap.traverseWithKey (withVarKey f) x)
+  trieMergeWithKey f g h (MkTrie x) (MkTrie y) = MkTrie (IntMap.mergeWithKey (withVarKey f) (coerce g) (coerce h) x y)
+  {-# INLINABLE trieEmpty #-}
+  {-# INLINABLE trieInsert #-}
+  {-# INLINABLE trieLookup #-}
+  {-# INLINABLE trieDelete #-}
+  {-# INLINABLE trieSingleton #-}
+  {-# INLINABLE trieFoldWithKey #-}
+  {-# INLINABLE trieShowsPrec #-}
+  {-# INLINABLE trieTraverse #-}
+  {-# INLINABLE trieTraverseWithKey #-}
+  {-# INLINABLE trieNull #-}
+  {-# INLINABLE trieMap #-}
+  {-# INLINABLE trieMergeWithKey #-}
+  {-# INLINABLE trieMapMaybeWithKey #-}
+
+withVarKey
+  :: (Var a -> r)
+  -> (Unique -> r)
+withVarKey f k = f (TyVar (Name Internal "" k noSrcSpan) k (error "withVarKey"))
+{-# INLINE withVarKey #-}
 
 -- | Gets a _key_ in the DBMS sense: a value that uniquely identifies a
 -- Var. In case of a "Var" that is its unique and (if applicable) scope

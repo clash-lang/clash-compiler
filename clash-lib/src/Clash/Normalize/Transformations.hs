@@ -141,9 +141,12 @@ import           Clash.Rewrite.Util
 import           Clash.Unique                (lookupUniqMap)
 import           Clash.Util
 
+import qualified Data.GenericTrie as GenericTrie
+
 inlineOrLiftNonRep :: HasCallStack => NormRewrite
 inlineOrLiftNonRep = inlineOrLiftBinders nonRepTest inlineTest
   where
+    {-# SCC nonRepTest #-}
     nonRepTest :: (Id, Term) -> RewriteMonad extra Bool
     nonRepTest (Id {varType = ty}, _)
       = not <$> (representableType <$> Lens.view typeTranslator
@@ -153,6 +156,7 @@ inlineOrLiftNonRep = inlineOrLiftBinders nonRepTest inlineTest
                                    <*> pure ty)
     nonRepTest _ = return False
 
+    {-# SCC inlineTest #-}
     inlineTest :: Term -> (Id, Term) -> RewriteMonad extra Bool
     inlineTest e (id_, e')
       = not . or <$> sequence -- We do __NOT__ inline:
@@ -167,6 +171,7 @@ inlineOrLiftNonRep = inlineOrLiftBinders nonRepTest inlineTest
       where
         -- The number of free occurrences of the binder in the entire
         -- let-expression
+        {-# SCC freeOccurances #-}
         freeOccurances :: Int
         freeOccurances = case e of
           Letrec _ res -> do
@@ -2007,25 +2012,26 @@ reduceBindersFix is binders body =
      then reduceBindersFix is reduced body'
      else (binders,body)
  where
-  (reduced,body') = reduceBinders is [] body binders
+  (reduced,body') = reduceBinders is GenericTrie.empty [] body binders
 
 reduceBinders
   :: InScopeSet
+  -> GenericTrie.Trie Term Id
   -> [LetBinding]
   -> Term
   -> [LetBinding]
   -> ([LetBinding],Term)
-reduceBinders _  processed body [] = (processed,body)
-reduceBinders is processed body ((id_,expr):binders) = case List.find ((== expr) . snd) processed of
-    Just (id2,_)
+reduceBinders _ _ processed body [] = (processed,body)
+reduceBinders is processedT processed body ((id_,expr):binders) = case GenericTrie.lookup expr processedT of
+    Just !id2
       | (_,_,ticks) <- collectArgsTicks expr
       , NoDeDup `notElem` ticks ->
       let subst      = extendIdSubst (mkSubst is) id_ (Var id2)
           processed' = map (second (substTm "reduceBinders.processed" subst)) processed
           binders'   = map (second (substTm "reduceBinders.binders"   subst)) binders
           body'      = substTm "reduceBinders.body" subst body
-      in  reduceBinders is processed' body' binders'
-    _ -> reduceBinders is ((id_,expr):processed) body binders
+      in  reduceBinders is processedT processed' body' binders'
+    _ -> reduceBinders is (GenericTrie.insert expr id_ processedT) ((id_,expr):processed) body binders
 {-# SCC reduceBinders #-}
 
 reduceConst :: HasCallStack => NormRewrite

@@ -10,10 +10,10 @@ topEntity = pipeline
   where
     pipeline :: Signal System Word32 -> Signal System Word32
     -- slow normalisation, 32s
-    pipeline = foldr (\x acc -> stage x . acc) id $ iterate d32 (+1) 1
+    -- pipeline = foldr (\x acc -> stage x . acc) id $ iterate d32 (+1) 1
 
     -- slow normalisation, killed after 60s
-    -- pipeline = foldr (.) id $ map stage $ iterate d32 (+1) 1
+    pipeline = foldr (.) id $ map stage $ iterate d48 (+1) 1
 
     -- fast normalisation, 1s
     -- pipeline =

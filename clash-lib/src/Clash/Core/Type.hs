@@ -61,6 +61,7 @@ where
 import           Control.DeepSeq        as DS
 import           Data.Binary            (Binary)
 import           Data.Coerce            (coerce)
+import           Data.GenericTrie       (TrieKey)
 import           Data.Hashable          (Hashable)
 import           Data.List              (foldl')
 import           Data.Maybe             (isJust, mapMaybe)
@@ -121,7 +122,7 @@ data Type
   | AppTy    !Type !Type        -- ^ Type Application
   | LitTy    !LitTy             -- ^ Type literal
   | AnnType  [Attr'] !Type      -- ^ Annotated type, see Clash.Annotations.SynthesisAttributes
-  deriving (Show,Generic,NFData,Hashable,Binary)
+  deriving (Show,Generic,NFData,Hashable,Binary,TrieKey)
 
 -- | An easier view on types
 data TypeView
@@ -134,13 +135,13 @@ data TypeView
 data ConstTy
   = TyCon !TyConName -- ^ TyCon type
   | Arrow            -- ^ Function type
-  deriving (Eq,Ord,Show,Generic,NFData,Hashable,Binary)
+  deriving (Eq,Ord,Show,Generic,NFData,Hashable,Binary,TrieKey)
 
 -- | Literal Types
 data LitTy
   = NumTy !Integer
   | SymTy !String
-  deriving (Eq,Ord,Show,Generic,NFData,Hashable,Binary)
+  deriving (Eq,Ord,Show,Generic,NFData,Hashable,Binary,TrieKey)
 
 -- | The level above types
 type Kind       = Type
