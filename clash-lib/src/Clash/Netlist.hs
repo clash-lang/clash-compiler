@@ -11,7 +11,9 @@
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE MagicHash #-}
 {-# LANGUAGE MultiWayIf #-}
+{-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE QuasiQuotes #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE TemplateHaskell #-}
 
@@ -62,7 +64,7 @@ import           Clash.Core.Type
 import           Clash.Core.TyCon                 (TyConMap)
 import           Clash.Core.Util
   (mkApps, mkTicks, splitShouldSplit, stripTicks, termType)
-import           Clash.Core.Var                   (Id, Var (..))
+import           Clash.Core.Var                   (Id, Var (..), isGlobalId)
 import           Clash.Core.VarEnv
   (VarEnv, eltsVarEnv, emptyInScopeSet, emptyVarEnv, extendVarEnv, lookupVarEnv,
    lookupVarEnv', mkVarEnv)
@@ -73,6 +75,7 @@ import           Clash.Netlist.Types              as HW
 import           Clash.Netlist.Util
 import           Clash.Primitives.Types           as P
 import           Clash.Util
+import qualified Clash.Util.Interpolate           as I
 
 -- | Generate a hierarchical netlist out of a set of global binders with
 -- @topEntity@ at the top.
@@ -561,8 +564,8 @@ mkFunApp
 mkFunApp dstId fun args tickDecls = do
   topAnns <- Lens.use topEntityAnns
   tcm     <- Lens.use tcCache
-  case lookupVarEnv fun topAnns of
-    Just topEntity
+  case (isGlobalId fun, lookupVarEnv fun topAnns) of
+    (True, Just topEntity)
       | let ty = varType (topId topEntity)
       , let (fArgTys0,fResTy) = splitFunTys tcm ty
       -- Take into account that clocks and stuff are split off from any product
@@ -600,10 +603,15 @@ mkFunApp dstId fun args tickDecls = do
         return (argDecls ++ instDecls)
 
       | otherwise -> error $ $(curLoc) ++ "under-applied TopEntity"
-    _ -> do
+    (True, Nothing) -> do
       normalized <- Lens.use bindings
       case lookupVarEnv fun normalized of
-        Just _ -> do
+        Nothing -> error [I.i|
+          Internal error: unknown normalized binder:
+
+            #{showPpr fun}
+        |]
+        Just (Binding{bindingTerm}) -> do
           (_,_,_,Component compName compInps co _) <- preserveVarEnv $ genComponent fun
           let argTys = map (termType tcm) args
           argHWTys <- mapM coreTypeToHWTypeM' argTys
@@ -632,14 +640,51 @@ mkFunApp dstId fun args tickDecls = do
               instLabel3 <- mkUniqueIdentifier Basic instLabel2
               let instDecl = InstDecl Entity Nothing compName instLabel3 [] (outpAssign ++ inpAssigns)
               return (argDecls ++ argDecls' ++ tickDecls ++ [instDecl])
-            else error $ $(curLoc) ++ "under-applied normalized function: " ++ showPpr fun
-                                   ++ ". Applied arguments: \n\n" ++ showPpr args
-                                   ++ "\n\nApplied filtered arguments:\n\n" ++ show argsFiltered
-                                   ++ "\n\nComp inputs:\n\n " ++ show compInps
-        Nothing -> case args of
+            else error [I.i|
+              Under-applied normalized function at component #{compName}:
+
+              #{showPpr fun}
+
+              Core:
+
+              #{showPpr bindingTerm}
+
+              Applied to arguments:
+              #{showPpr args}
+
+              Applied to filtered arguments:
+              #{argsFiltered}
+
+              Component inputs:
+              #{compInps}
+            |]
+    _ ->
+      case args of
+        [] ->
           -- TODO: Figure out what to do with zero-width constructs
-          [] -> return [Assignment dstId (Identifier (nameOcc $ varName fun) Nothing)]
-          _ -> error $ $(curLoc) ++ "Unknown function: " ++ showPpr fun
+          return [Assignment dstId (Identifier (nameOcc $ varName fun) Nothing)]
+        _ -> error [I.i|
+          Netlist generation encountered a local function. This should not
+          happen. Function:
+
+            #{showPpr fun}
+
+          Arguments:
+
+            #{showPpr args}
+
+          Posssible user issues:
+
+            * A top entity has an higher-order argument, e.g (Int -> Int) or
+            Maybe (Int -> Int)
+
+          Possible internal compiler issues:
+
+            * 'bindOrLiftNonRep' failed to fire
+
+            * 'caseCon' failed to eliminate something of a type such as
+            "Maybe (Int -> Int)"
+          |]
 
 toSimpleVar :: Identifier
             -> (Expr,Type)
