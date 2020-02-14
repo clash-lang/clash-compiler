@@ -160,7 +160,7 @@ instance PrettyPrec (Name a) where
     qual' <- annotate (AnnSyntax Qualifier) <$> pprPrec p qual
     occ'  <- pprPrec p occ
     uniq' <- annotate (AnnSyntax Unique) <$> pprPrec p uniq
-    return $ qual' <> occ' <> uniq'
+    return $ qual' <> occ' <> brackets uniq'
 
 instance ClashPretty (Name a) where
   clashPretty = fromPpr
