@@ -18,7 +18,7 @@
 module Clash.Netlist where
 
 import           Control.Exception                (throw)
-import           Control.Lens                     ((.=),(^.),_2)
+import           Control.Lens                     ((.=))
 import qualified Control.Lens                     as Lens
 import           Control.Monad                    (join)
 import           Control.Monad.IO.Class           (liftIO)
@@ -66,7 +66,7 @@ import           Clash.Core.Var                   (Id, Var (..))
 import           Clash.Core.VarEnv
   (VarEnv, eltsVarEnv, emptyInScopeSet, emptyVarEnv, extendVarEnv, lookupVarEnv,
    lookupVarEnv', mkVarEnv)
-import           Clash.Driver.Types               (BindingMap, ClashOpts (..))
+import           Clash.Driver.Types               (BindingMap, Binding(..), ClashOpts (..))
 import           Clash.Netlist.BlackBox
 import           Clash.Netlist.Id
 import           Clash.Netlist.Types              as HW
@@ -185,10 +185,10 @@ genNames :: Bool
          -> (HashMap Identifier Word, VarEnv Identifier)
 genNames newInlineStrat mkId prefixM s0 m0 = foldr go (s0,m0)
   where
-    go (v,_,_,_) (s,m) =
-      let nm' = genComponentName newInlineStrat s mkId prefixM v
+    go b (s,m) =
+      let nm' = genComponentName newInlineStrat s mkId prefixM (bindingId b)
           s'  = HashMapS.insert nm' 0 s
-          m'  = extendVarEnv v nm' m
+          m'  = extendVarEnv (bindingId b) nm' m
       in (s', m')
 
 -- | Generate a component for a given function (caching)
@@ -203,8 +203,8 @@ genComponent compName = do
     Nothing -> do
       (_,sp) <- Lens.use curCompNm
       throw (ClashException sp ($(curLoc) ++ "No normalized expression found for: " ++ show compName) Nothing)
-    Just (_,_,_,expr_) -> do
-      makeCachedU compName components $ genComponentT compName expr_
+    Just b -> do
+      makeCachedU compName components $ genComponentT compName (bindingTerm b)
 
 -- | Generate a component for a given function
 genComponentT
@@ -223,7 +223,7 @@ genComponentT compName componentExpr = do
                          ((Just p,_),Just ann) -> p `StrictText.append` StrictText.pack ('_':t_name ann)
                          (_,Just ann) -> StrictText.pack (t_name ann)
                          _ -> componentName1
-  sp <- ((^. _2) . (`lookupVarEnv'` compName)) <$> Lens.use bindings
+  sp <- (bindingLoc . (`lookupVarEnv'` compName)) <$> Lens.use bindings
   curCompNm .= (componentName2,sp)
 
   tcm <- Lens.use tcCache

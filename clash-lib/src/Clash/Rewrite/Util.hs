@@ -83,7 +83,7 @@ import           Clash.Core.VarEnv
   (InScopeSet, VarEnv, elemVarSet, extendInScopeSetList, mkInScopeSet,
    notElemVarEnv, uniqAway, uniqAway')
 import           Clash.Driver.Types
-  (DebugLevel (..), BindingMap)
+  (DebugLevel (..), BindingMap, Binding(..))
 import           Clash.Netlist.Util          (representableType)
 import           Clash.Rewrite.Types
 import           Clash.Unique
@@ -624,7 +624,7 @@ liftBinding (var@Id {varName = idName} ,e) = do
       newBody = mkTyLams (mkLams e' boundFVs) boundFTVs
 
   -- Check if an alpha-equivalent global binder already exists
-  aeqExisting <- (eltsUniqMap . filterUniqMap ((`aeqTerm` newBody) . (^. _4))) <$> Lens.use bindings
+  aeqExisting <- (eltsUniqMap . filterUniqMap ((`aeqTerm` newBody) . bindingTerm)) <$> Lens.use bindings
   case aeqExisting of
     -- If it doesn't, create a new binder
     [] -> do -- Add the created function to the list of global bindings
@@ -637,20 +637,21 @@ liftBinding (var@Id {varName = idName} ,e) = do
                                     -- function at this moment for a reason!
                                     -- (termination, CSE and DEC oppertunities,
                                     -- ,etc.)
-                                    (newBodyId
-                                    ,sp
+                                    (Binding
+                                      newBodyId
+                                      sp
 #if MIN_VERSION_ghc(8,4,1)
-                                    ,NoUserInline
+                                      NoUserInline
 #else
-                                    ,EmptyInlineSpec
+                                      EmptyInlineSpec
 #endif
-                                    ,newBody)
+                                      newBody)
              -- Return the new binder
              return (var, newExpr)
     -- If it does, use the existing binder
-    ((k,_,_,_):_) ->
+    (b:_) ->
       let newExpr' = mkTmApps
-                      (mkTyApps (Var k)
+                      (mkTyApps (Var $ bindingId b)
                                 (map VarTy boundFTVs))
                       (map Var boundFVs)
       in  return (var, newExpr')
@@ -693,7 +694,7 @@ addGlobalBind
   -> RewriteMonad extra ()
 addGlobalBind vNm ty sp inl body = do
   let vId = mkGlobalId ty vNm
-  (ty,body) `deepseq` bindings %= extendUniqMap vNm (vId,sp,inl,body)
+  (ty,body) `deepseq` bindings %= extendUniqMap vNm (Binding vId sp inl body)
 
 -- | Create a new name out of the given name, but with another unique. Resulting
 -- unique is guaranteed to not be in the given InScopeSet.
@@ -842,7 +843,7 @@ specialise' specMapLbl specHistLbl specLimitLbl (TransformContext is0 _) e (Var 
       -- Determine if we can specialize f
       bodyMaybe <- fmap (lookupUniqMap (varName f)) $ Lens.use bindings
       case bodyMaybe of
-        Just (_,sp,inl,bodyTm) -> do
+        Just (Binding _ sp inl bodyTm) -> do
           -- Determine if we see a sequence of specialisations on a growing argument
           specHistM <- lookupUniqMap f <$> Lens.use (extra.specHistLbl)
           specLim   <- Lens.use (extra . specLimitLbl)
@@ -884,7 +885,7 @@ specialise' specMapLbl specHistLbl specLimitLbl (TransformContext is0 _) e (Var 
                       -- are inlined, meaning the state-transition-function
                       -- and the memory element will be in a single function.
                       gTmM <- fmap (lookupUniqMap (varName g)) $ Lens.use bindings
-                      return (g,maybe inl (^. _3) gTmM, maybe specArg (Left . (`mkApps` gArgs) . (^. _4)) gTmM)
+                      return (g,maybe inl bindingSpec gTmM, maybe specArg (Left . (`mkApps` gArgs) . bindingTerm) gTmM)
                     else return (f,inl,specArg)
                 _ -> return (f,inl,specArg)
               -- Create specialized functions
@@ -918,7 +919,7 @@ specialise' _ _ _ _ctx _ (appE,args,ticks) (Left specArg) = do
       newBody = mkAbstraction specArg specBndrs
   -- See if there's an existing binder that's alpha-equivalent to the
   -- specialized function
-  existing <- filterUniqMap ((`aeqTerm` newBody) . (^. _4)) <$> Lens.use bindings
+  existing <- filterUniqMap ((`aeqTerm` newBody) . bindingTerm) <$> Lens.use bindings
   -- Create a new function if an alpha-equivalent binder doesn't exist
   newf <- case eltsUniqMap existing of
     [] -> do (cf,sp) <- Lens.use curFun
@@ -930,7 +931,7 @@ specialise' _ _ _ _ctx _ (appE,args,ticks) (Left specArg) = do
                         EmptyInlineSpec
 #endif
                         newBody
-    ((k,_,_,_):_) -> return k
+    (b:_) -> return (bindingId b)
   -- Create specialized argument
   let newArg  = Left $ mkApps (Var newf) specVars
   -- Use specialized argument

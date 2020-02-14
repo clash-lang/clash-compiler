@@ -31,7 +31,7 @@ module Clash.Normalize.Util
  )
  where
 
-import           Control.Lens            ((&),(+~),(%=),(^.),_4,(.=))
+import           Control.Lens            ((&),(+~),(%=),(.=))
 import qualified Control.Lens            as Lens
 import           Data.Bifunctor          (bimap)
 import           Data.Either             (lefts)
@@ -42,7 +42,6 @@ import qualified Data.HashMap.Strict     as HashMapS
 import           Data.Text               (Text)
 import qualified Data.Text as Text
 
-import           BasicTypes              (InlineSpec)
 import           PrelNames               (eqTyConKey)
 import           Unique                  (getKey)
 
@@ -65,7 +64,7 @@ import           Clash.Core.Var          (Id, TyVar, Var (..), isGlobalId)
 import           Clash.Core.VarEnv
   (VarEnv, emptyInScopeSet, emptyVarEnv, extendVarEnv, extendVarEnvWith,
    lookupVarEnv, unionVarEnvWith, unitVarEnv, extendInScopeSetList)
-import           Clash.Driver.Types      (BindingMap, DebugLevel (..))
+import           Clash.Driver.Types      (BindingMap, Binding(..), DebugLevel (..))
 import {-# SOURCE #-} Clash.Normalize.Strategy (normalization)
 import           Clash.Normalize.Types
 import           Clash.Primitives.Util   (constantArgs)
@@ -177,11 +176,11 @@ isRecursiveBndr f = do
       fBodyM <- lookupVarEnv f <$> Lens.use bindings
       case fBodyM of
         Nothing -> return False
-        Just (_,_,_,fBody) -> do
+        Just b -> do
           -- There are no global mutually-recursive functions, only self-recursive
           -- ones, so checking whether 'f' is part of the free variables of the
           -- body of 'f' is sufficient.
-          let isR = f `globalIdOccursIn` fBody
+          let isR = f `globalIdOccursIn` bindingTerm b
           (extra.recursiveComponents) %= extendVarEnv f isR
           return isR
 
@@ -353,7 +352,7 @@ callGraph bndrs rt = go emptyVarEnv (varUniq rt)
       | Nothing     <- lookupUniqMap root cg
       , Just rootTm <- lookupUniqMap root bndrs =
       let used = Lens.foldMapByOf globalIds (unionVarEnvWith (+))
-                  emptyVarEnv (`unitUniqMap` 1) (rootTm ^. _4)
+                  emptyVarEnv (`unitUniqMap` 1) (bindingTerm rootTm)
           cg'  = extendUniqMap root used cg
       in  List.foldl' go cg' (keysUniqMap used)
     go cg _ = cg
@@ -397,9 +396,9 @@ isCheapFunction tm = case classifyFunction tm of
 normalizeTopLvlBndr
   :: Bool
   -> Id
-  -> (Id, SrcSpan, InlineSpec, Term)
-  -> NormalizeSession (Id, SrcSpan, InlineSpec, Term)
-normalizeTopLvlBndr isTop nm (nm',sp,inl,tm) = makeCachedU nm (extra.normalized) $ do
+  -> Binding
+  -> NormalizeSession Binding
+normalizeTopLvlBndr isTop nm (Binding nm' sp inl tm) = makeCachedU nm (extra.normalized) $ do
   tcm <- Lens.view tcCache
   let nmS = showPpr (varName nm)
   -- We deshadow the term because sometimes GHC gives us
@@ -413,7 +412,7 @@ normalizeTopLvlBndr isTop nm (nm',sp,inl,tm) = makeCachedU nm (extra.normalized)
   tm3 <- rewriteExpr ("normalization",normalization) (nmS,tm2) (nm',sp)
   curFun .= old
   let ty' = termType tcm tm3
-  return (nm' {varType = ty'},sp,inl,tm3)
+  return (Binding nm'{varType = ty'} sp inl tm3)
 
 -- | Turn type equality constraints into substitutions and apply them.
 --
