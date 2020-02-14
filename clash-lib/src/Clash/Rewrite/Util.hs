@@ -267,10 +267,10 @@ runRewriteSession :: RewriteEnv
                   -> RewriteState extra
                   -> RewriteMonad extra a
                   -> a
-runRewriteSession r s m = traceIf True ("Clash: Applied " ++
-                                        show (s' ^. transformCounter) ++
-                                        " transformations")
-                                  a
+runRewriteSession r s m =
+  traceIf (_dbgLevel r > DebugNone)
+    ("Clash: Applied " ++ show (s' ^. transformCounter) ++ " transformations")
+    a
   where
     (a,s',_) = runR m r s
 
