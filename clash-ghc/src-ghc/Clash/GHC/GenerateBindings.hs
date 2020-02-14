@@ -13,7 +13,7 @@ module Clash.GHC.GenerateBindings
 where
 
 import           Control.DeepSeq         (deepseq)
-import           Control.Lens            ((%~),(&),view,_1)
+import           Control.Lens            ((%~),(&))
 import           Control.Monad           (unless)
 import qualified Control.Monad.State     as State
 import qualified Control.Monad.RWS.Strict as RWS
@@ -53,7 +53,7 @@ import           Clash.Core.Var          (Var (..), Id, IdScope (..), setIdScope
 import           Clash.Core.VarEnv
   (InScopeSet, VarEnv, emptyInScopeSet, extendInScopeSet, mkInScopeSet, mkVarEnv, unionVarEnv)
 import           Clash.Driver            (compilePrimitive)
-import           Clash.Driver.Types      (BindingMap)
+import           Clash.Driver.Types      (BindingMap, Binding(..))
 import           Clash.GHC.GHC2Core
   (C2C, GHC2CoreState, tyConMap, coreToId, coreToName, coreToTerm,
    makeAllTyCons, qualifiedNameString, emptyGHC2CoreState)
@@ -113,9 +113,9 @@ generateBindings useColor primDirs importDirs dbs hdl modName dflagsM = do
       tcCache                       = makeAllTyCons tcMap' fiEnvs
       allTcCache                    = tysPrimMap `unionUniqMap` tcCache
       inScope0 = mkInScopeSet (uniqMapToUniqSet
-                      ((mapUniqMap (coerce . view _1) bindingsMap) `unionUniqMap`
-                       (mapUniqMap (coerce . view _1) clsMap)))
-      clsMap                        = mapUniqMap (\(v,i) -> (v,GHC.noSrcSpan,GHC.Inline,mkClassSelector inScope0 allTcCache (varType v) i)) clsVMap
+                      ((mapUniqMap (coerce . bindingId) bindingsMap) `unionUniqMap`
+                       (mapUniqMap (coerce . bindingId) clsMap)))
+      clsMap                        = mapUniqMap (\(v,i) -> (Binding v GHC.noSrcSpan GHC.Inline (mkClassSelector inScope0 allTcCache (varType v) i))) clsVMap
       allBindings                   = bindingsMap `unionVarEnv` clsMap
       topEntities'                  =
         (\m -> fst (RWS.evalRWS m GHC.noSrcSpan tcMap')) $ mapM (\(topEnt,annM,benchM) -> do
@@ -125,7 +125,7 @@ generateBindings useColor primDirs importDirs dbs hdl modName dflagsM = do
       topEntities'' =
         map (\(topEnt, annM, benchM) ->
                 case lookupUniqMap topEnt allBindings of
-                  Just (v,_,_,_) -> TopEntityT v annM benchM
+                  Just b -> TopEntityT (bindingId b) annM benchM
                   Nothing -> error "This shouldn't happen"
             ) topEntities'
   -- Parsing / compiling primitives:
@@ -160,7 +160,7 @@ mkBindings primMap bindings clsOps unlocatable = do
       tm <- RWS.local (const sp) (coreToTerm primMap unlocatable e)
       v' <- coreToId v
       checkPrimitive primMap v
-      return [(v', (v', sp, inl, tm))]
+      return [(v', (Binding v' sp inl tm))]
     GHC.Rec bs -> do
       tms <- mapM (\(v,e) -> do
                     let sp  = GHC.getSrcSpan v
@@ -168,15 +168,15 @@ mkBindings primMap bindings clsOps unlocatable = do
                     tm <- RWS.local (const sp) (coreToTerm primMap unlocatable e)
                     v' <- coreToId v
                     checkPrimitive primMap v
-                    return (v',sp,inl,tm)
+                    return (Binding v' sp inl tm)
                   ) bs
       case tms of
-        [(v,sp,inl,tm)] -> return [(v, (v, sp, inl, tm))]
-        _ -> let vsL   = map (setIdScope LocalId . view _1) tms
+        [Binding v sp inl tm] -> return [(v, Binding v sp inl tm)]
+        _ -> let vsL   = map (setIdScope LocalId . bindingId) tms
                  vsV   = map Var vsL
                  subst = extendGblSubstList (mkSubst emptyInScopeSet) (zip vsL vsV)
-                 lbs   = zipWith (\(_,_,_,e) vL -> (vL,substTm "mkBindings" subst e)) tms vsL
-                 tms1  = zipWith (\(v,sp,inl,_) (_,e) -> (v,(v,sp,inl,Letrec lbs e))) tms lbs
+                 lbs   = zipWith (\b vL -> (vL,substTm "mkBindings" subst (bindingTerm b))) tms vsL
+                 tms1  = zipWith (\b (_, e) -> (bindingId b, b { bindingTerm = Letrec lbs e })) tms lbs
              in  return tms1
     ) bindings
   clsOpList    <- mapM (\(v,i) -> do

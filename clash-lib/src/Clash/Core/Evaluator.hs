@@ -43,7 +43,7 @@ import           Clash.Core.Type
 import           Clash.Core.Util
 import           Clash.Core.Var
 import           Clash.Core.VarEnv
-import           Clash.Driver.Types                      (BindingMap)
+import           Clash.Driver.Types                      (BindingMap, Binding(..))
 import           Clash.Pretty
 import           Clash.Unique
 import           Clash.Util                              (curLoc)
@@ -65,7 +65,7 @@ whnf' eval fu bm tcm ph ids is isSubj e =
   toResult x = (mHeapPrim x, mHeapLocal x, mTerm x)
 
   m  = Machine eval fu ph gh emptyVarEnv [] ids is e
-  gh = mapVarEnv (\(_, _, _, x) -> x) bm
+  gh = mapVarEnv bindingTerm bm
 
 -- | Evaluate to WHNF given an existing Heap and Stack
 whnf

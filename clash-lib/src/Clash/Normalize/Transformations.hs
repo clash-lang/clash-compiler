@@ -123,7 +123,7 @@ import           Clash.Core.VarEnv
    emptyVarEnv, emptyVarSet, extendInScopeSet, extendInScopeSetList, lookupVarEnv,
    notElemVarSet, unionVarEnvWith, unionVarSet, unionInScope, unitVarEnv,
    unitVarSet, mkVarSet, mkInScopeSet, uniqAway)
-import           Clash.Driver.Types          (DebugLevel (..))
+import           Clash.Driver.Types          (Binding(..), DebugLevel (..))
 import           Clash.Netlist.BlackBox.Types (Element(Err))
 import           Clash.Netlist.BlackBox.Util (getUsedArguments)
 import           Clash.Netlist.Types         (BlackBox(..), HWType (..), FilteredHWType(..))
@@ -243,11 +243,11 @@ nonRepSpec ctx e@(App e1 e2)
       = do
         fTmM <- lookupVarEnv f <$> Lens.use bindings
         case fTmM of
-          Just (fNm,_,_,tm)
-            | nameSort (varName fNm) == Internal
+          Just b
+            | nameSort (varName (bindingId b)) == Internal
             -> censor (const mempty)
                       (bottomupR appProp ctx
-                                 (mkApps (mkTicks tm ticks) fArgs))
+                                 (mkApps (mkTicks (bindingTerm b) ticks) fArgs))
           _ -> return app
       | otherwise = return app
 
@@ -453,13 +453,13 @@ inlineNonRep _ e@(Case scrut altsTy alts)
                                                   <*> Lens.view tcCache
                                                   <*> pure scrutTy)
         case (nonRepScrut, bodyMaybe) of
-          (True,Just (_,_,_,scrutBody0)) -> do
+          (True,Just b) -> do
             Monad.when noException (zoomExtra (addNewInline f cf))
 
-            let scrutBody1 = mkTicks scrutBody0 (mkInlineTick f : ticks)
-            let scrutBody2 = mkApps scrutBody1 args
+            let scrutBody0 = mkTicks (bindingTerm b) (mkInlineTick f : ticks)
+            let scrutBody1 = mkApps scrutBody0 args
 
-            changed $ Case scrutBody2 altsTy alts
+            changed $ Case scrutBody1 altsTy alts
 
           _ -> return e
   where
@@ -1067,12 +1067,12 @@ inlineWorkFree _ e@(collectArgsTicks -> (Var f,args@(_:_),ticks))
         bndrs <- Lens.use bindings
         case lookupVarEnv f bndrs of
           -- Don't inline recursive expressions
-          Just (_,_,_,body) -> do
+          Just b -> do
             isRecBndr <- isRecursiveBndr f
             if isRecBndr
                then return e
                else do
-                 let tm = mkTicks body (mkInlineTick f : ticks)
+                 let tm = mkTicks (bindingTerm b) (mkInlineTick f : ticks)
                  changed $ mkApps tm args
 
           _ -> return e
@@ -1105,8 +1105,8 @@ inlineWorkFree _ e@(Var f) = do
              then return e
              else do
               topEnts <- Lens.view topEntities
-              (_,_,_,body) <- normalizeTopLvlBndr (f `elemVarSet` topEnts) f top
-              changed body
+              b <- normalizeTopLvlBndr (f `elemVarSet` topEnts) f top
+              changed (bindingTerm b)
         _ -> return e
     else return e
 
@@ -1126,11 +1126,11 @@ inlineSmall _ e@(collectArgsTicks -> (Var f,args,ticks)) = do
       sizeLimit <- Lens.use (extra.inlineFunctionLimit)
       case lookupVarEnv f bndrs of
         -- Don't inline recursive expressions
-        Just (_,_,inl,body) -> do
+        Just b -> do
           isRecBndr <- isRecursiveBndr f
-          if not isRecBndr && inl /= NoInline && termSize body < sizeLimit
+          if not isRecBndr && bindingSpec b /= NoInline && termSize (bindingTerm b) < sizeLimit
              then do
-               let tm = mkTicks body (mkInlineTick f : ticks)
+               let tm = mkTicks (bindingTerm b) (mkInlineTick f : ticks)
                changed $ mkApps tm args
              else return e
 
@@ -1976,9 +1976,9 @@ inlineHO _ e@(App _ _)
                 else do
                   bodyMaybe <- lookupVarEnv f <$> Lens.use bindings
                   case bodyMaybe of
-                    Just (_,_,_,body) -> do
+                    Just b -> do
                       zoomExtra (addNewInline f cf)
-                      changed (mkApps (mkTicks body ticks) args)
+                      changed (mkApps (mkTicks (bindingTerm b) ticks) args)
                     _ -> return e
       else return e
 

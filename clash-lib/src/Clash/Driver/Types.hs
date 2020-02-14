@@ -18,25 +18,31 @@ module Clash.Driver.Types where
 -- For Int/Word size
 #include "MachDeps.h"
 
-import           GHC.Generics
+import           Control.DeepSeq                (NFData)
+import           Data.Binary                    (Binary)
 import           Data.Hashable
-
-import           BasicTypes                     (InlineSpec)
 import qualified Data.Set                       as Set
 import           Data.Text                      (Text)
+import           GHC.Generics                   (Generic)
+
+import           BasicTypes                     (InlineSpec)
 import           SrcLoc                         (SrcSpan)
 import           Util                           (OverridingBool(..))
 
 import           Clash.Core.Term                (Term)
 import           Clash.Core.Var                 (Id)
 import           Clash.Core.VarEnv              (VarEnv)
-
 import           Clash.Netlist.BlackBox.Types   (HdlSyn (..))
 
 
 -- A function binder in the global environment.
 --
-type Binding = (Id, SrcSpan, InlineSpec, Term)
+data Binding = Binding
+  { bindingId :: Id
+  , bindingLoc :: SrcSpan
+  , bindingSpec :: InlineSpec
+  , bindingTerm :: Term
+  } deriving (Binary, Generic, NFData, Show)
 
 -- | Global function binders
 --

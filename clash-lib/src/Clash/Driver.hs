@@ -17,7 +17,7 @@ module Clash.Driver where
 import qualified Control.Concurrent.Supply        as Supply
 import           Control.DeepSeq
 import           Control.Exception                (tryJust, bracket, throw)
-import           Control.Lens                     (view, (^.), _4)
+import           Control.Lens                     (view, _4)
 import           Control.Monad                    (guard, when, unless, foldM)
 import           Control.Monad.Catch              (MonadMask)
 import           Control.Monad.IO.Class           (MonadIO)
@@ -172,7 +172,7 @@ splitTopEntityT
   -> TopEntityT
 splitTopEntityT tcm bindingsMap tt@(TopEntityT id_ (Just t@(Synthesize {})) _) =
   case lookupVarEnv id_ bindingsMap of
-    Just (_id, sp, _, _) ->
+    Just (Binding _id sp _ _) ->
       tt{topAnnotation=Just (splitTopAnn tcm sp (varType id_) t)}
     Nothing ->
       error "Internal error in 'splitTopEntityT'. Please report as a bug."
@@ -750,7 +750,7 @@ callGraphBindings
   -- ^ Root of the call graph
   -> [Term]
 callGraphBindings bindingsMap tm =
-  map ((^. _4) . (bindingsMap `lookupUniqMap'`)) (keysUniqMap cg)
+  map (bindingTerm . (bindingsMap `lookupUniqMap'`)) (keysUniqMap cg)
   where
     cg = callGraph bindingsMap tm
 
