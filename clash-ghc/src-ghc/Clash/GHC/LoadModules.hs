@@ -10,6 +10,7 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE QuasiQuotes #-}
 
 module Clash.GHC.LoadModules
   ( loadModules
@@ -29,6 +30,7 @@ import           Clash.Annotations.Primitive     (HDL, PrimitiveGuard)
 import           Clash.Annotations.TopEntity     (TopEntity (..))
 import           Clash.Primitives.Types          (UnresolvedPrimitive)
 import           Clash.Util                      (ClashException(..), pkgIdFromTypeable)
+import qualified Clash.Util.Interpolate          as I
 import           Control.Arrow                   (first, second)
 import           Control.DeepSeq                 (deepseq)
 import           Control.Exception               (throw)
@@ -304,10 +306,15 @@ loadModules useColor hdl modName dflagsM idirs = do
     topEntities' <-
       case (topEntities, topSyn) of
         ([], []) ->
-          Panic.pgmError $ unwords [ "No 'topEntity', nor function with a"
-                                   , "'Synthesize' annotation found in root"
-                                   , "module:"
-                                   , (Outputable.showSDocUnsafe (ppr rootModule)) ]
+          let modName1 = Outputable.showSDocUnsafe (ppr rootModule) in
+          Panic.pgmError [I.i|
+            No top-level function called 'topEntity' found, nor a function with
+            a 'Synthesize' annotation in module #{modName1}. Did you forget to
+            export them?
+
+            For more information on 'Synthesize' annotations, check out the
+            documentation of "Clash.Annotations.TopEntity".
+          |]
         ([], _) ->
           return allSyn'
         ([x], _) ->
