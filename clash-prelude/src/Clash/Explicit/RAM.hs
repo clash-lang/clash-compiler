@@ -32,7 +32,7 @@ where
 import Data.Maybe            (fromJust, isJust)
 import GHC.Stack             (HasCallStack, withFrozenCallStack)
 import GHC.TypeLits          (KnownNat)
-import qualified Data.Vector as V
+import qualified Data.Sequence as Seq
 
 import Clash.Explicit.Signal
   (unbundle, unsafeSynchronizer, KnownDomain, enable)
@@ -135,25 +135,25 @@ asyncRam# wclk rclk en sz rd we wr din =
     unsafeSynchronizer wclk rclk dout
   where
     rd'  = unsafeSynchronizer rclk wclk rd
-    ramI = V.replicate
+    ramI = Seq.replicate
               (snatToNum sz)
               (withFrozenCallStack (errorX "asyncRam#: initial value undefined"))
     en' = fromEnable (enable en we)
     dout = go ramI rd' en' wr din
 
-    go :: V.Vector a -> Signal wdom Int -> Signal wdom Bool
+    go :: Seq.Seq a -> Signal wdom Int -> Signal wdom Bool
        -> Signal wdom Int -> Signal wdom a -> Signal wdom a
     go !ram (r :- rs) (e :- es) (w :- ws) (d :- ds) =
       let ram' = upd ram e (fromEnum w) d
-          o    = ram V.! r
+          o    = ram `Seq.index` r
       in  o :- go ram' rs es ws ds
 
     upd ram we' waddr d = case maybeIsX we' of
       Nothing -> case maybeIsX waddr of
-        Nothing -> V.map (const (seq waddr d)) ram
-        Just wa -> ram V.// [(wa,d)]
+        Nothing -> fmap (const (seq waddr d)) ram
+        Just wa -> Seq.update wa d ram
       Just True -> case maybeIsX waddr of
-        Nothing -> V.map (const (seq waddr d)) ram
-        Just wa -> ram V.// [(wa,d)]
+        Nothing -> fmap (const (seq waddr d)) ram
+        Just wa -> Seq.update wa d ram
       _ -> ram
 {-# NOINLINE asyncRam# #-}

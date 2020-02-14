@@ -386,4 +386,5 @@ benchmark benchmark-clash-prelude
 
   Other-Modules:    BenchBitVector
                     BenchFixed
+                    BenchRAM
                     BenchSigned

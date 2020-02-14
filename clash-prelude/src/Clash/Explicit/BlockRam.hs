@@ -400,7 +400,7 @@ module Clash.Explicit.BlockRam
 where
 
 import           Data.Maybe             (isJust)
-import qualified Data.Vector  as V
+import qualified Data.Sequence          as Seq
 import           GHC.Stack              (HasCallStack, withFrozenCallStack)
 import           GHC.TypeLits           (KnownNat, type (^), type (<=))
 import           Prelude                hiding (length, replicate)
@@ -991,7 +991,7 @@ blockRam#
   -- ^ Value of the @blockRAM@ at address @r@ from the previous clock cycle
 blockRam# (Clock _) gen content rd wen =
   go
-    (V.fromList (toList content))
+    (Seq.fromList (toList content))
     (withFrozenCallStack (deepErrorX "blockRam: intial value undefined"))
     (fromEnable gen)
     rd
@@ -999,16 +999,16 @@ blockRam# (Clock _) gen content rd wen =
  where
   go !ram o ret@(~(re :- res)) rt@(~(r :- rs)) et@(~(e :- en)) wt@(~(w :- wr)) dt@(~(d :- din)) =
     let ram' = d `defaultSeqX` upd ram e (fromEnum w) d
-        o'   = if re then ram V.! r else o
+        o'   = if re then ram `Seq.index` r else o
     in  o `seqX` o :- (ret `seq` rt `seq` et `seq` wt `seq` dt `seq` go ram' o' res rs en wr din)
 
   upd ram we waddr d = case maybeIsX we of
     Nothing -> case maybeIsX waddr of
-      Nothing -> V.map (const (seq waddr d)) ram
-      Just wa -> ram V.// [(wa,d)]
+      Nothing -> fmap (const (seq waddr d)) ram
+      Just wa -> Seq.update wa d ram
     Just True -> case maybeIsX waddr of
-      Nothing -> V.map (const (seq waddr d)) ram
-      Just wa -> ram V.// [(wa,d)]
+      Nothing -> fmap (const (seq waddr d)) ram
+      Just wa -> Seq.update wa d ram
     _ -> ram
 {-# ANN blockRam# hasBlackBox #-}
 {-# NOINLINE blockRam# #-}
