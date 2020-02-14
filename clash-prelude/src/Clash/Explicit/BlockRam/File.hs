@@ -94,7 +94,7 @@ where
 
 import Data.Char             (digitToInt)
 import Data.Maybe            (fromJust, isJust, listToMaybe)
-import qualified Data.Vector as V
+import qualified Data.Sequence as Seq
 import GHC.Stack             (HasCallStack, withFrozenCallStack)
 import GHC.TypeLits          (KnownNat)
 import Numeric               (readInt)
@@ -236,7 +236,7 @@ blockRamFile# (Clock _) ena _sz file rd wen =
   where
     -- clock enable
     go
-      :: V.Vector (BitVector m)
+      :: Seq.Seq (BitVector m)
       -> BitVector m
       -> Signal dom Bool
       -> Signal dom Int
@@ -246,22 +246,22 @@ blockRamFile# (Clock _) ena _sz file rd wen =
       -> Signal dom (BitVector m)
     go !ram o (re :- res) (r :- rs) (e :- en) (w :- wr) (d :- din) =
       let ram' = upd ram e (fromEnum w) d
-          o'   = if re then ram V.! r else o
+          o'   = if re then ram `Seq.index` r else o
       in  o `seqX` o :- go ram' o' res rs en wr din
 
     upd ram we waddr d = case maybeIsX we of
       Nothing -> case maybeIsX waddr of
-        Nothing -> V.map (const (seq waddr d)) ram
-        Just wa -> ram V.// [(wa,d)]
+        Nothing -> fmap (const (seq waddr d)) ram
+        Just wa -> Seq.update wa d ram
       Just True -> case maybeIsX waddr of
-        Nothing -> V.map (const (seq waddr d)) ram
-        Just wa -> ram V.// [(wa,d)]
+        Nothing -> fmap (const (seq waddr d)) ram
+        Just wa -> Seq.update wa d ram
       _ -> ram
 
     content = unsafePerformIO (initMem file)
 
-    ramI :: V.Vector (BitVector m)
-    ramI = V.fromList content
+    ramI :: Seq.Seq (BitVector m)
+    ramI = Seq.fromList content
 {-# NOINLINE blockRamFile# #-}
 
 -- | __NB:__ Not synthesizable

@@ -2,6 +2,7 @@ module Main where
 
 import Criterion.Main
 
+import qualified BenchRAM       as RAM
 import qualified BenchBitVector as BV
 import qualified BenchFixed     as F
 import qualified BenchSigned    as S
@@ -10,7 +11,14 @@ main :: IO ()
 main =
   defaultMain
   [
-    bgroup "BitVector"
+    bgroup "RAMs"
+        [ RAM.asyncRamBench
+        , RAM.asyncRomBench
+        , RAM.blockRamBench
+        , RAM.blockRamROBench
+        , RAM.romBench
+        ]
+  , bgroup "BitVector"
         [ BV.addBench
         , BV.negateBench
         , BV.subBench
