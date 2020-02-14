@@ -42,6 +42,8 @@ import           Data.Maybe                  (catMaybes,isJust,mapMaybe)
 import qualified Data.Monoid                 as Monoid
 import qualified Data.Set                    as Set
 import qualified Data.Set.Lens               as Lens
+import qualified Data.Set.Ordered            as OSet
+import qualified Data.Set.Ordered.Extra      as OSet
 import           Data.Text                   (Text)
 import qualified Data.Text                   as Text
 
@@ -951,18 +953,42 @@ normalizeId :: TyConMap -> Id -> Id
 normalizeId tcm v@(Id {}) = v {varType = normalizeType tcm (varType v)}
 normalizeId _   tyvar     = tyvar
 
+-- Note [Collect free-variables in an insertion-ordered set]
+--
+-- In order for the specialization cache to work, 'specArgBndrsAndVars' should
+-- yield (alpha equivalent) results for the same specialization. While collecting
+-- free variables in a given term or type it should therefore keep a stable
+-- ordering based on the order in which it finds free vars. To see why,
+-- consider the following two pseudo-code calls to 'specialise':
+--
+--     specialise {f ('a', x[123], y[456])}
+--     specialise {f ('b', x[456], y[123])}
+--
+-- Collecting the binders in a VarSet would yield the following (unique ordered)
+-- sets:
+--
+--     {x[123], y[456]}
+--     {y[123], x[456]}
+--
+-- ..and therefore breaking specializing caching. We now track them in insert-
+-- ordered sets, yielding:
+--
+--     {x[123], y[456]}
+--     {x[456], y[123]}
+--
 
 -- | Create binders and variable references for free variables in 'specArg'
 specArgBndrsAndVars
   :: Either Term Type
   -> ([Either Id TyVar], [Either Term Type])
 specArgBndrsAndVars specArg =
-  let unitFV :: Var a -> Const (UniqSet TyVar,UniqSet Id) (Var a)
-      unitFV v@(Id {}) = Const (emptyUniqSet,unitUniqSet (coerce v))
-      unitFV v@(TyVar {}) = Const (unitUniqSet (coerce v),emptyUniqSet)
+  -- See Note [Collect free-variables in an insertion-ordered set]
+  let unitFV :: Var a -> Const (OSet.OLSet TyVar, OSet.OLSet Id) (Var a)
+      unitFV v@(Id {}) = Const (mempty, coerce (OSet.singleton (coerce v)))
+      unitFV v@(TyVar {}) = Const (coerce (OSet.singleton (coerce v)), mempty)
 
       (specFTVs,specFVs) = case specArg of
-        Left tm  -> (eltsUniqSet *** eltsUniqSet) . getConst $
+        Left tm  -> (OSet.toListL *** OSet.toListL) . getConst $
                     Lens.foldMapOf freeLocalVars unitFV tm
         Right ty -> (eltsUniqSet (Lens.foldMapOf typeFreeVars unitUniqSet ty),[] :: [Id])
 

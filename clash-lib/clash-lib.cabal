@@ -161,6 +161,7 @@ Library
                       interpolate             >= 0.2.0    && < 1.0,
                       lens                    >= 3.9.2    && < 4.19,
                       mtl                     >= 2.1.2    && < 2.3,
+                      ordered-containers      >= 0.2      && < 0.3,
                       parsers                 >= 0.12.8   && < 1.0,
                       prettyprinter           >= 1.2.0.1  && < 2.0,
                       primitive               >= 0.5.0.1  && < 1.0,
@@ -249,6 +250,7 @@ Library
   Other-Modules:      Clash.Annotations.TopEntity.Extra
                       Data.Aeson.Extra
                       Data.Semigroup.Monad.Extra
+                      Data.Set.Ordered.Extra
                       Data.Vector.Primitive.Extra
                       GHC.BasicTypes.Extra
                       GHC.SrcLoc.Extra
