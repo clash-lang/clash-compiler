@@ -105,10 +105,13 @@ ddrIn# (Clock _) (unsafeToHighPolarity -> hRst) (fromEnable -> ena) i0 i1 i2 =
       -> Signal fast a
       -> Signal slow (a,a)
     goSync (o0,o1,o2) rt@(~(r :- rs)) ~(e :- es) as@(~(x0 :- x1 :- xs)) =
-      let (o0',o1',o2') = if r then (i0,i1,i2) else (o2,x0,x1)
-      in o0 `seqX` o1 `seqX` (o0,o1)
-           :- (rt `seq` as `seq` if e then goSync (o0',o1',o2') rs es xs
-                                      else goSync (o0 ,o1 ,o2)  rs es xs)
+      let (o0',o1',o2') =
+            case r of
+              X (Right rB) -> if rB then (i0,i1,i2) else (o2,fromX x0,fromX x1)
+      in o0 `seq` o1 `seq` X (Right (o0,o1))
+           :- (rt `seq` as `seq` case e of
+                                  X (Right eB) -> if eB then goSync (o0',o1',o2') rs es xs
+                                                        else goSync (o0 ,o1 ,o2)  rs es xs)
 
     goAsync
       :: (a, a, a)
@@ -117,10 +120,13 @@ ddrIn# (Clock _) (unsafeToHighPolarity -> hRst) (fromEnable -> ena) i0 i1 i2 =
       -> Signal fast a
       -> Signal slow (a, a)
     goAsync (o0,o1,o2) ~(r :- rs) ~(e :- es) as@(~(x0 :- x1 :- xs)) =
-      let (o0',o1',o2',o3',o4') = if r then (i0,i1,i0,i1,i2) else (o0,o1,o2,x0,x1)
-      in o0' `seqX` o1' `seqX` (o0',o1')
-           :- (as `seq` if e then goAsync (o2',o3',o4') rs es xs
-                             else goAsync (o0',o1',o2') rs es xs)
+      let (o0',o1',o2',o3',o4') =
+            case r of
+              X (Right rB) -> if rB then (i0,i1,i0,i1,i2) else (o0,o1,o2,fromX x0,fromX x1)
+      in o0' `seq` o1' `seq` X (Right (o0',o1'))
+           :- (as `seq` case e of
+                          X (Right eB) -> if eB then goAsync (o2',o3',o4') rs es xs
+                                                else goAsync (o0',o1',o2') rs es xs)
 
 {-# NOINLINE ddrIn# #-}
 {-# ANN ddrIn# hasBlackBox #-}

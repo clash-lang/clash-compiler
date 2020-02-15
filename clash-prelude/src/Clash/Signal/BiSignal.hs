@@ -119,7 +119,7 @@ import           Clash.Class.BitPack        (BitPack (..))
 import           Clash.Sized.BitVector      (BitVector)
 import qualified Clash.Sized.Vector         as V
 import           Clash.Sized.Vector         (Vec)
-import           Clash.Signal.Internal      (Signal(..), Domain, head#, tail#)
+import           Clash.Signal.Internal      (Signal(..), Domain, head#, tail#, X (..))
 import           Clash.XException           (errorX)
 
 import           GHC.TypeLits               (KnownNat, Nat)
@@ -187,7 +187,7 @@ instance Monoid (BiSignalOut defaultState dom n) where
 -- create 'BiSignalIn' "out of nowhere" when dealing with circular definitions.
 prepend#
   :: Given (SBiSignalDefault ds)
-  => Maybe (BitVector n)
+  => X (Maybe (BitVector n))
   -> BiSignalIn ds d n
   -> BiSignalIn ds d n
 prepend# a ~(BiSignalIn _ as) = BiSignalIn given (a :- as)
@@ -265,10 +265,10 @@ veryUnsafeToBiSignalIn
 veryUnsafeToBiSignalIn (BiSignalOut signals) = prepend# result biSignalOut'
   where
     -- Enforce that only one component is writing
-    result = case filter (isJust . head#) signals of
-      []  -> Nothing
+    result = case filter (either (const False) isJust . unX . head#) signals of
+      []  -> X (Right (Nothing))
       [w] -> head# w
-      _   -> errorX err
+      _   -> X (Left err)
 
     err = unwords
       [ "Multiple components wrote to the BiSignal. This is undefined behavior"

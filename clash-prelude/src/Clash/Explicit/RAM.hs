@@ -37,7 +37,7 @@ import qualified Data.Sequence as Seq
 import Clash.Explicit.Signal
   (unbundle, unsafeSynchronizer, KnownDomain, enable)
 import Clash.Promoted.Nat    (SNat (..), snatToNum, pow2SNat)
-import Clash.Signal.Internal (Clock (..), Signal (..), Enable, fromEnable)
+import Clash.Signal.Internal (Clock (..), Signal (..), X (..), Enable, fromEnable)
 import Clash.Sized.Unsigned  (Unsigned)
 import Clash.XException      (errorX, maybeIsX)
 
@@ -141,19 +141,21 @@ asyncRam# wclk rclk en sz rd we wr din =
     en' = fromEnable (enable en we)
     dout = go ramI rd' en' wr din
 
-    go :: Seq.Seq a -> Signal wdom Int -> Signal wdom Bool
+    go :: Seq.Seq (X a) -> Signal wdom Int -> Signal wdom Bool
        -> Signal wdom Int -> Signal wdom a -> Signal wdom a
     go !ram (r :- rs) (e :- es) (w :- ws) (d :- ds) =
-      let ram' = upd ram e (fromEnum w) d
-          o    = ram `Seq.index` r
+      let ram' = upd ram e (fromEnum <$> w) d
+          o    = case r of
+                   X (Right ra) -> ram `Seq.index` ra
+                   X (Left msg) -> X (Left msg)
       in  o :- go ram' rs es ws ds
 
-    upd ram we' waddr d = case maybeIsX we' of
-      Nothing -> case maybeIsX waddr of
-        Nothing -> fmap (const (seq waddr d)) ram
-        Just wa -> Seq.update wa d ram
-      Just True -> case maybeIsX waddr of
-        Nothing -> fmap (const (seq waddr d)) ram
-        Just wa -> Seq.update wa d ram
+    upd ram we' waddr d = case we' of
+      X (Left _) -> case waddr of
+        X (Left _)   -> fmap (const (seq waddr d)) ram
+        X (Right wa) -> Seq.update wa d ram
+      X (Right True) -> case waddr of
+        X (Left _)   -> fmap (const (seq waddr d)) ram
+        X (Right wa) -> Seq.update wa d ram
       _ -> ram
 {-# NOINLINE asyncRam# #-}

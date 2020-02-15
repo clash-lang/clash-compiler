@@ -410,15 +410,14 @@ import           Clash.Annotations.Primitive
 import           Clash.Class.Num        (SaturationMode(SatBound), satSucc)
 import           Clash.Explicit.Signal  (KnownDomain, Enable, register, fromEnable)
 import           Clash.Signal.Internal
-  (Clock(..), Reset, Signal (..), invertReset, (.&&.), mux)
+  (Clock(..), Reset, Signal (..), invertReset, (.&&.), mux, X (..), toX)
 import           Clash.Promoted.Nat     (SNat(..))
 import           Clash.Signal.Bundle    (unbundle)
 import           Clash.Sized.Unsigned   (Unsigned)
 import           Clash.Sized.Index      (Index)
 import           Clash.Sized.Vector     (Vec, replicate, toList, iterateI)
 import qualified Clash.Sized.Vector     as CV
-import           Clash.XException
-  (maybeIsX, seqX, NFDataX, deepErrorX, defaultSeqX, errorX)
+import           Clash.XException       (NFDataX, deepErrorX, errorX)
 
 {- $setup
 >>> import Clash.Explicit.Prelude as C
@@ -991,24 +990,31 @@ blockRam#
   -- ^ Value of the @blockRAM@ at address @r@ from the previous clock cycle
 blockRam# (Clock _) gen content rd wen =
   go
-    (Seq.fromList (toList content))
-    (withFrozenCallStack (deepErrorX "blockRam: intial value undefined"))
+    (Seq.fromList (fmap toX (toList content)))
+    (X (Left "blockRam: intial value undefined"))
     (fromEnable gen)
     rd
     (fromEnable gen .&&. wen)
  where
   go !ram o ret@(~(re :- res)) rt@(~(r :- rs)) et@(~(e :- en)) wt@(~(w :- wr)) dt@(~(d :- din)) =
-    let ram' = d `defaultSeqX` upd ram e (fromEnum w) d
-        o'   = if re then ram `Seq.index` r else o
-    in  o `seqX` o :- (ret `seq` rt `seq` et `seq` wt `seq` dt `seq` go ram' o' res rs en wr din)
+    let ram' = d `seq` upd ram e (fromEnum <$> w) d
+        o'   = case re of
+                 X (Right reB) ->
+                  if reB then
+                    case r of
+                      X (Right rA) -> ram `Seq.index` rA
+                      X (Left msg) -> X (Left msg)
+                  else o
+                 X (Left msg) -> X (Left msg)
+    in  o `seq` o :- (ret `seq` rt `seq` et `seq` wt `seq` dt `seq` go ram' o' res rs en wr din)
 
-  upd ram we waddr d = case maybeIsX we of
-    Nothing -> case maybeIsX waddr of
-      Nothing -> fmap (const (seq waddr d)) ram
-      Just wa -> Seq.update wa d ram
-    Just True -> case maybeIsX waddr of
-      Nothing -> fmap (const (seq waddr d)) ram
-      Just wa -> Seq.update wa d ram
+  upd ram we waddr d = case we of
+    X (Left _) -> case waddr of
+      X (Left _) -> fmap (const (seq waddr d)) ram
+      X (Right wa) -> Seq.update wa d ram
+    X (Right True) -> case waddr of
+      X (Left _) -> fmap (const (seq waddr d)) ram
+      X (Right wa) -> Seq.update wa d ram
     _ -> ram
 {-# ANN blockRam# hasBlackBox #-}
 {-# NOINLINE blockRam# #-}

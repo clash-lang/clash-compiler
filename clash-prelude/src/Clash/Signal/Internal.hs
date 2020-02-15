@@ -128,6 +128,10 @@ module Clash.Signal.Internal
   , traverse#
   -- * EXTREMELY EXPERIMENTAL
   , joinSignal#
+  , X (..)
+  , toX
+  , fromX
+  , xXX
   )
 where
 
@@ -153,8 +157,7 @@ import Test.QuickCheck            (Arbitrary (..), CoArbitrary(..), Property,
 
 import Clash.Promoted.Nat         (SNat (..), snatToNum, snatToNatural)
 import Clash.Promoted.Symbol      (SSymbol (..), ssymbolToString)
-import Clash.XException
-  (NFDataX, errorX, deepseqX, defaultSeqX, deepErrorX)
+import Clash.XException           (NFDataX, errorX, deepseqX, deepErrorX, isX)
 
 {- $setup
 >>> :set -XDataKinds
@@ -627,11 +630,36 @@ Check out 'IntelSystem' and 'XilinxSystem' too!
 See the module documentation of "Clash.Signal" for more information about
 domains.
 -}
+newtype X a = X {unX :: Either String a }
+  deriving (Functor, Foldable, Traversable)
+
+instance Applicative X where
+  pure  = toX
+  (X f) <*> (X a) = X (f <*> a)
+  liftA2 f (X a) (X b) = X (liftA2 f a b)
+
+toX :: a -> X a
+toX = X . isX
+{-# INLINE toX #-}
+
+xXX :: String -> X a
+xXX = X . Left
+{-# INLINE xXX #-}
+
+fromX :: X a -> a
+fromX (X (Left m))  = errorX m
+fromX (X (Right a)) = a
+{-# INLINE fromX #-}
+
+instance Show a => Show (X a) where
+  show (X (Left _))  = "X"
+  show (X (Right a)) = show a
+
 data Signal (dom :: Domain) a
   -- | The constructor, @(':-')@, is __not__ synthesizable.
-  = a :- Signal dom a
+  = X a :- Signal dom a
 
-head# :: Signal dom a -> a
+head# :: Signal dom a -> X a
 head# (x' :- _ )  = x'
 
 tail# :: Signal dom a -> Signal dom a
@@ -641,7 +669,7 @@ instance Show a => Show (Signal dom a) where
   show (x :- xs) = show x ++ " " ++ show xs
 
 instance Lift a => Lift (Signal dom a) where
-  lift ~(x :- _) = [| signal# x |]
+  lift ~((X x) :- _) = [| signal# (X x) |]
 
 instance Default a => Default (Signal dom a) where
   def = signal# def
@@ -650,7 +678,7 @@ instance Functor (Signal dom) where
   fmap = mapSignal#
 
 mapSignal# :: (a -> b) -> Signal dom a -> Signal dom b
-mapSignal# f (a :- as) = f a :- mapSignal# f as
+mapSignal# f (a :- as) = fmap f a :- mapSignal# f as
 {-# NOINLINE mapSignal# #-}
 {-# ANN mapSignal# hasBlackBox #-}
 
@@ -659,12 +687,14 @@ instance Applicative (Signal dom) where
   (<*>) = appSignal#
 
 signal# :: a -> Signal dom a
-signal# a = let s = a :- s in s
+signal# a = let s = aX :- s in s
+  where
+    aX = toX a
 {-# NOINLINE signal# #-}
 {-# ANN signal# hasBlackBox #-}
 
 appSignal# :: Signal dom (a -> b) -> Signal dom a -> Signal dom b
-appSignal# (f :- fs) xs@(~(a :- as)) = f a :- (xs `seq` appSignal# fs as) -- See [NOTE: Lazy ap]
+appSignal# (f :- fs) xs@(~(a :- as)) = (f <*> a) :- (xs `seq` appSignal# fs as) -- See [NOTE: Lazy ap]
 {-# NOINLINE appSignal# #-}
 {-# ANN appSignal# hasBlackBox #-}
 
@@ -697,7 +727,8 @@ of the second argument is evaluated as soon as the tail of the result is evaluat
 --
 -- Is currently treated as 'id' by the Clash compiler.
 joinSignal# :: Signal dom (Signal dom a) -> Signal dom a
-joinSignal# ~(xs :- xss) = head# xs :- joinSignal# (mapSignal# tail# xss)
+joinSignal# = error "joinSignal# not implemented"
+-- joinSignal# ~(xs :- xss) = head# xs :- joinSignal# (mapSignal# tail# xss)
 {-# NOINLINE joinSignal# #-}
 {-# ANN joinSignal# hasBlackBox #-}
 
@@ -726,7 +757,7 @@ instance Foldable (Signal dom) where
 -- * The function @f@ should be /lazy/ in its second argument.
 -- * The @z@ element will never be used.
 foldr# :: (a -> b -> b) -> b -> Signal dom a -> b
-foldr# f z (a :- s) = a `f` (foldr# f z s)
+foldr# f z (a :- s) = fromX a `f` (foldr# f z s)
 {-# NOINLINE foldr# #-}
 {-# ANN foldr# hasBlackBox #-}
 
@@ -734,7 +765,7 @@ instance Traversable (Signal dom) where
   traverse = traverse#
 
 traverse# :: Applicative f => (a -> f b) -> Signal dom a -> f (Signal dom b)
-traverse# f (a :- s) = (:-) <$> f a <*> traverse# f s
+traverse# f (a :- s) = (:-) <$> traverse f a <*> traverse# f s
 {-# NOINLINE traverse# #-}
 {-# ANN traverse# hasBlackBox #-}
 
@@ -1016,18 +1047,20 @@ delay#
 delay# (Clock dom) (fromEnable -> en) powerUpVal0 =
     go powerUpVal1 en
   where
-    powerUpVal1 :: a
+    powerUpVal1 :: X a
     powerUpVal1 =
       case knownDomainByName dom of
         SDomainConfiguration _dom _period _edge _sync SDefined _polarity ->
-          powerUpVal0
+          toX powerUpVal0
         SDomainConfiguration _dom _period _edge _sync SUnknown _polarity ->
-          deepErrorX ("First value of `delay` unknown on domain " ++ show dom)
+          xXX ("First value of `delay` unknown on domain " ++ show dom)
 
     go o (e :- es) as@(~(x :- xs)) =
-      let o' = if e then x else o
+      let o' = case e of
+                 X (Left m)   -> X (Left m)
+                 X (Right eB) -> if eB then x else o
       -- See [Note: register strictness annotations]
-      in  o `defaultSeqX` o :- (as `seq` go o' es xs)
+      in  o `seq` o :- (as `seq` go o' es xs)
 {-# NOINLINE delay# #-}
 {-# ANN delay# hasBlackBox #-}
 
@@ -1062,37 +1095,51 @@ register# (Clock dom) rst (fromEnable -> ena) powerUpVal0 resetVal =
     SDomainConfiguration _name _period _edge SAsynchronous _init _polarity ->
       goAsync powerUpVal1 (unsafeToHighPolarity rst) ena
  where
-  powerUpVal1 :: a
+  powerUpVal1 :: X a
   powerUpVal1 =
     case knownDomainByName dom of
       SDomainConfiguration _dom _period _edge _sync SDefined _polarity ->
-        powerUpVal0
+        toX powerUpVal0
       SDomainConfiguration _dom _period _edge _sync SUnknown _polarity ->
-        deepErrorX ("First value of register undefined on domain " ++ show dom)
+        xXX ("First value of register undefined on domain " ++ show dom)
+
+  resetValX :: X a
+  resetValX = toX resetVal
 
   goSync
-    :: a
+    :: X a
     -> Signal dom Bool
     -> Signal dom Bool
     -> Signal dom a
     -> Signal dom a
   goSync o rt@(~(r :- rs)) enas@(~(e :- es)) as@(~(x :- xs)) =
-    let oE = if e then x else o
-        oR = if r then resetVal else oE
+    let oE = case e of
+               X (Right eB) -> if eB then x else o
+               X (Left msg) -> X (Left msg)
+        oR = case r of
+               X (Right rB) -> if rB then resetValX else oE
+               X (Left msg) -> X (Left msg)
         -- [Note: register strictness annotations]
-    in  o `defaultSeqX` o :- (rt `seq` enas `seq` as `seq` goSync oR rs es xs)
+    in  o `seq` o :- (rt `seq` enas `seq` as `seq` goSync oR rs es xs)
 
   goAsync
-    :: a
+    :: X a
     -> Signal dom Bool
     -> Signal dom Bool
     -> Signal dom a
     -> Signal dom a
   goAsync o (r :- rs) enas@(~(e :- es)) as@(~(x :- xs)) =
-    let oR = if r then resetVal else o
-        oE = if r then resetVal else (if e then x else o)
+    let (oR,oE) =
+          case r of
+            X (Right rB) ->
+              if rB then (resetValX,resetValX) else (resetValX,case e of
+                X (Left msg) -> X (Left msg)
+                X (Right eB) -> if eB then x else o)
+            X (Left msg) -> (X (Left msg), X (Left msg))
+    -- let oR = if r then resetVal else o
+    --     oE = if r then resetVal else (if e then x else o)
         -- [Note: register strictness annotations]
-    in  oR `defaultSeqX` oR :- (as `seq` enas `seq` goAsync oE rs es xs)
+    in  oR `seq` oR :- (as `seq` enas `seq` goAsync oE rs es xs)
 {-# NOINLINE register# #-}
 {-# ANN register# hasBlackBox #-}
 
@@ -1180,7 +1227,7 @@ instance Fractional a => Fractional (Signal dom a) where
   fromRational = signal# . fromRational
 
 instance Arbitrary a => Arbitrary (Signal dom a) where
-  arbitrary = liftA2 (:-) arbitrary arbitrary
+  arbitrary = liftA2 (:-) (X . Right <$> arbitrary) arbitrary
 
 instance CoArbitrary a => CoArbitrary (Signal dom a) where
   coarbitrary xs gen = do
@@ -1245,7 +1292,7 @@ sampleN n = take n . sample
 --
 -- __NB__: This function is not synthesizable
 fromList :: NFDataX a => [a] -> Signal dom a
-fromList = Prelude.foldr (\a b -> deepseqX a (a :- b)) (errorX "finite list")
+fromList = Prelude.foldr (\a b -> let aX = toX a in aX `seq` (aX :- b)) (errorX "finite list")
 
 -- * Simulation functions (not synthesizable)
 
@@ -1304,7 +1351,7 @@ sampleN_lazy n = take n . sample_lazy
 --
 -- __NB__: This function is not synthesizable
 fromList_lazy :: [a] -> Signal dom a
-fromList_lazy = Prelude.foldr (:-) (error "finite list")
+fromList_lazy = Prelude.foldr (\a b -> toX a :- b) (error "finite list")
 
 -- * Simulation functions (not synthesizable)
 

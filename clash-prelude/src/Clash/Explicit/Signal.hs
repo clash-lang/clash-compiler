@@ -879,9 +879,9 @@ fromListWithReset
 fromListWithReset rst resetValue vals =
   go (unsafeToHighPolarity rst) vals
  where
-  go (r :- rs) _ | r = resetValue :- go rs vals
-  go (_ :- rs) [] = deepErrorX "fromListWithReset: input ran out" :- go rs []
-  go (_ :- rs) (a : as) = a :- go rs as
+  go (r :- rs) _ | either (const True) id (unX r) = toX resetValue :- go rs vals
+  go (_ :- rs) [] = X (Left "fromListWithReset: input ran out") :- go rs []
+  go (_ :- rs) (a : as) = toX a :- go rs as
 
 -- | Convert between different types of reset, adding a synchronizer in case
 -- it needs to convert from an asynchronous to a synchronous reset.

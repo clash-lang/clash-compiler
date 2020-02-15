@@ -93,6 +93,7 @@ module Clash.Explicit.BlockRam.File
 where
 
 import Data.Char             (digitToInt)
+import Data.Coerce           (coerce)
 import Data.Maybe            (fromJust, isJust, listToMaybe)
 import qualified Data.Sequence as Seq
 import GHC.Stack             (HasCallStack, withFrozenCallStack)
@@ -103,7 +104,7 @@ import System.IO.Unsafe      (unsafePerformIO)
 import Clash.Promoted.Nat    (SNat (..), pow2SNat)
 import Clash.Sized.BitVector (BitVector)
 import Clash.Signal.Internal
-  (Clock(..), Signal (..), Enable, KnownDomain, fromEnable, (.&&.))
+  (Clock(..), Signal (..), Enable, KnownDomain, fromEnable, (.&&.), X (..))
 import Clash.Signal.Bundle   (unbundle)
 import Clash.Sized.Unsigned  (Unsigned)
 import Clash.XException      (errorX, maybeIsX, seqX)
@@ -236,8 +237,8 @@ blockRamFile# (Clock _) ena _sz file rd wen =
   where
     -- clock enable
     go
-      :: Seq.Seq (BitVector m)
-      -> BitVector m
+      :: Seq.Seq (X (BitVector m))
+      -> X (BitVector m)
       -> Signal dom Bool
       -> Signal dom Int
       -> Signal dom Bool
@@ -245,23 +246,30 @@ blockRamFile# (Clock _) ena _sz file rd wen =
       -> Signal dom (BitVector m)
       -> Signal dom (BitVector m)
     go !ram o (re :- res) (r :- rs) (e :- en) (w :- wr) (d :- din) =
-      let ram' = upd ram e (fromEnum w) d
-          o'   = if re then ram `Seq.index` r else o
-      in  o `seqX` o :- go ram' o' res rs en wr din
+      let ram' = upd ram e (fromEnum <$> w) d
+          o'   = case re of
+                   X (Right reB) ->
+                    if reB then
+                      case r of
+                        X (Right rA) -> ram `Seq.index` rA
+                        X (Left msg) -> X (Left msg)
+                    else o
+                   X (Left msg) -> X (Left msg)
+      in  o `seq` o :- go ram' o' res rs en wr din
 
-    upd ram we waddr d = case maybeIsX we of
-      Nothing -> case maybeIsX waddr of
-        Nothing -> fmap (const (seq waddr d)) ram
-        Just wa -> Seq.update wa d ram
-      Just True -> case maybeIsX waddr of
-        Nothing -> fmap (const (seq waddr d)) ram
-        Just wa -> Seq.update wa d ram
+    upd ram we waddr d = case we of
+      X (Left _) -> case waddr of
+        X (Left _)   -> fmap (const (seq waddr d)) ram
+        X (Right wa) -> Seq.update wa d ram
+      X (Right True) -> case waddr of
+        X (Left _)   -> fmap (const (seq waddr d)) ram
+        X (Right wa) -> Seq.update wa d ram
       _ -> ram
 
     content = unsafePerformIO (initMem file)
 
-    ramI :: Seq.Seq (BitVector m)
-    ramI = Seq.fromList content
+    ramI :: Seq.Seq (X (BitVector m))
+    ramI = Seq.fromList (fmap (X . Right) content)
 {-# NOINLINE blockRamFile# #-}
 
 -- | __NB:__ Not synthesizable

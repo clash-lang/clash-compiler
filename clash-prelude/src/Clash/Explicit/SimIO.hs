@@ -329,5 +329,5 @@ mealyIO
 mealyIO !_ f (SimIO i) inp = unsafePerformIO (i >>= go inp)
  where
   go q@(~(k :- ks)) s =
-    (:-) <$> unSimIO (f s k) <*> unsafeInterleaveIO ((q `seq` go ks s))
+    (:-) <$> unSimIO (traverse (f s) k) <*> unsafeInterleaveIO ((q `seq` go ks s))
 {-# NOINLINE mealyIO #-}

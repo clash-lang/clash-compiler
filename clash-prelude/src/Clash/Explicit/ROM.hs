@@ -31,7 +31,7 @@ import GHC.TypeLits           (KnownNat, type (^))
 import Prelude hiding         (length)
 
 import Clash.Signal.Internal
-  (Clock (..), KnownDomain, Signal (..), Enable, fromEnable)
+  (Clock (..), KnownDomain, Signal (..), Enable, X (..), xXX, fromEnable)
 import Clash.Sized.Unsigned   (Unsigned)
 import Clash.Sized.Vector     (Vec, length, toList)
 import Clash.XException       (deepErrorX, seqX, NFDataX)
@@ -106,7 +106,7 @@ rom#
   -- ^ The value of the ROM at address @rd@ from the previous clock cycle
 rom# _ en content rd =
   go
-    (withFrozenCallStack (deepErrorX "rom: initial value undefined"))
+    (xXX "rom: initial value undefined")
     (fromEnable en)
     ((arr !) <$> rd)
  where
@@ -115,5 +115,8 @@ rom# _ en content rd =
 
   go o (e :- es) as@(~(x :- xs)) =
     -- See [Note: register strictness annotations]
-    o `seqX` o :- (as `seq` if e then go x es xs else go o es xs)
+    o `seq` o :- (as `seq` case e of
+                             X (Left msg) -> go (X (Left msg)) es xs
+                             X (Right eB) -> if eB then go x es xs
+                                                   else go o es xs)
 {-# NOINLINE rom# #-}
