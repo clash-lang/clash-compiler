@@ -97,7 +97,7 @@ import           Clash.Core.Pretty           (showPpr)
 import           Clash.Core.Subst
   (substTm, mkSubst, extendIdSubst, extendIdSubstList, extendTvSubst,
    extendTvSubstList, freshenTm, substTyInVar, deShadowTerm, deShadowAlt,
-   deshadowLetExpr)
+   deshadowLetExpr, AeqHashTerm (..))
 import           Clash.Core.Term
   ( LetBinding, Pat (..), Term (..), CoreContext (..), PrimInfo (..)
   , TickInfo(..) , WorkInfo(WorkConstant), Alt, TickInfo
@@ -2007,25 +2007,25 @@ reduceBindersFix is binders body =
      then reduceBindersFix is reduced body'
      else (binders,body)
  where
-  (reduced,body') = reduceBinders is [] body binders
+  (reduced,body') = reduceBinders is HashMapS.empty body binders
 
 reduceBinders
   :: InScopeSet
-  -> [LetBinding]
+  -> HashMapS.HashMap AeqHashTerm LetBinding
   -> Term
   -> [LetBinding]
   -> ([LetBinding],Term)
-reduceBinders _  processed body [] = (processed,body)
-reduceBinders is processed body ((id_,expr):binders) = case List.find ((== expr) . snd) processed of
+reduceBinders _  processed body [] = (HashMapS.elems processed,body)
+reduceBinders is processed body ((id_,expr):binders) = case HashMapS.lookup (AeqHashTerm expr) processed of
     Just (id2,_)
       | (_,_,ticks) <- collectArgsTicks expr
       , NoDeDup `notElem` ticks ->
       let subst      = extendIdSubst (mkSubst is) id_ (Var id2)
-          processed' = map (second (substTm "reduceBinders.processed" subst)) processed
+          processed' = fmap (second (substTm "reduceBinders.processed" subst)) processed
           binders'   = map (second (substTm "reduceBinders.binders"   subst)) binders
           body'      = substTm "reduceBinders.body" subst body
       in  reduceBinders is processed' body' binders'
-    _ -> reduceBinders is ((id_,expr):processed) body binders
+    _ -> reduceBinders is (HashMapS.insert (AeqHashTerm expr) (id_,expr) processed) body binders
 {-# SCC reduceBinders #-}
 
 reduceConst :: HasCallStack => NormRewrite

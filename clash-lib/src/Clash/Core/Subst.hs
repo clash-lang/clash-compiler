@@ -48,6 +48,8 @@ module Clash.Core.Subst
     -- * Alpha equivalence
   , aeqType
   , aeqTerm
+    -- ** Hashing
+  , AeqHashTerm (..)
   )
 where
 
@@ -55,7 +57,9 @@ import           Data.Coerce               (coerce)
 import           Data.Text.Prettyprint.Doc
 import qualified Data.List                 as List
 import           Data.Ord                  (comparing)
+import           Data.Hashable
 
+import           Clash.Core.DataCon
 import           Clash.Core.FreeVars
   (noFreeVarsOfType, localFVsOfTerms, tyFVsOfTypes)
 import           Clash.Core.Pretty         (ppr, fromPpr)
@@ -731,6 +735,8 @@ acmpType' = go
   go env (AppTy s1 t1) (AppTy s2 t2) =
     go env s1 s2 `thenCompare` go env t1 t2
   go _ (LitTy l1) (LitTy l2) = compare l1 l2
+  go env (AnnType _ t1) t2 = go env t1 t2
+  go env t1 (AnnType _ t2) = go env t1 t2
   go _ t1 t2 = compare (getRank t1) (getRank t2)
 
   getRank :: Type -> Word
@@ -855,3 +861,66 @@ instance Eq Term where
 
 instance Ord Term where
   compare = acmpTerm
+
+newtype AeqHashTerm = AeqHashTerm Term
+
+instance Eq AeqHashTerm where
+  (AeqHashTerm t1) == (AeqHashTerm t2) = aeqTerm t1 t2
+
+instance Hashable AeqHashTerm where
+  hashWithSalt s (AeqHashTerm t) = aeqTmHash s t
+
+-- XXX: Improve hash, i.e. fewer collisions
+aeqTmHash :: Int -> Term -> Int
+aeqTmHash = go 0 emptyVarEnv
+ where
+  go :: Int -> VarEnv Int -> Int -> Term -> Int
+  go !cnt !env !salt = \case
+    Var i -> case lookupVarEnv i env of
+      Just j  -> hashWithSalt salt j
+      Nothing -> hashWithSalt salt (varUniq i)
+    Data dc   -> hashWithSalt salt (dcUniq dc)
+    Literal l -> hashWithSalt salt l
+    Prim p    -> hashWithSalt salt (primName p)
+    Lam b e   -> go (cnt+1)
+                    (extendVarEnv b cnt env)
+                    (hashWithSalt salt (varUniq b))
+                    e
+    TyLam b e -> go (cnt+1)
+                    (extendVarEnv b cnt env)
+                    (hashWithSalt salt (varUniq b))
+                    e
+    App e1 e2 -> go cnt env (go cnt env salt e2) e1
+    TyApp e t -> go cnt env (goTy cnt env salt t) e
+    Letrec bs body ->
+      let (ids,rhs)   = unzip bs
+          (cntN,envN) = extendAeqEnv (cnt,env) ids
+          saltN       = List.foldl' (\s e -> go cntN envN s e) salt rhs
+      in  go cntN envN saltN body
+    Case e _ alts -> List.foldl' (goAlt cnt env) (go cnt env salt e) alts
+    Cast e t1 t2  -> go cnt env (List.foldl (goTy cnt env) salt [t1,t2]) e
+    Tick _ e -> go cnt env salt e
+
+  goAlt !cnt !env !salt = \case
+    (DefaultPat,e) -> go cnt env salt e
+    (LitPat l,e)   -> go cnt env (hashWithSalt salt l) e
+    (DataPat dc tvs ids,e) ->
+      let (cnt1,env1) = extendAeqEnv (extendAeqEnv (cnt,env) tvs) ids
+      in  go cnt1 env1 (hashWithSalt salt (dcUniq dc)) e
+
+  goTy :: Int -> VarEnv Int -> Int -> Type -> Int
+  goTy !cnt !env !salt = \case
+    VarTy i -> case lookupVarEnv i env of
+      Just j  -> hashWithSalt salt j
+      Nothing -> hashWithSalt salt (varUniq i)
+    ConstTy c -> hashWithSalt salt c
+    ForAllTy b ty -> goTy (cnt+1)
+                          (extendVarEnv b cnt env)
+                          (hashWithSalt salt (varUniq b))
+                          ty
+    AppTy t1 t2 -> goTy cnt env (goTy cnt env salt t2) t1
+    LitTy l -> hashWithSalt salt l
+    AnnType _ t -> goTy cnt env salt t
+
+  extendAeqEnv :: (Int,VarEnv Int) -> [Var a] -> (Int,VarEnv Int)
+  extendAeqEnv = List.foldl' (\(!s,!m) b -> (s+1,extendVarEnv b s m))
