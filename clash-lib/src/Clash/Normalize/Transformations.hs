@@ -104,11 +104,12 @@ import           Clash.Core.Term
   , isLambdaBodyCtx, isTickCtx, collectArgs
   , collectArgsTicks, collectTicks , partitionTicks
   )
-import           Clash.Core.Type             (Type, TypeView (..), applyFunTy,
+import           Clash.Core.Type             (Type (..), TypeView (..), applyFunTy,
                                               isPolyFunCoreTy, isClassTy,
                                               normalizeType, splitFunForallTy,
                                               splitFunTy,
-                                              tyView, mkPolyFunTy, coreView)
+                                              tyView, mkPolyFunTy, coreView,
+                                              LitTy (..), coreView1)
 import           Clash.Core.TyCon            (TyConMap, tyConDataCons)
 import           Clash.Core.Util
   (isCon, isFun, isLet, isPolyFun, isPrim,
@@ -498,7 +499,9 @@ inlineNonRep _ e = return e
 -- in  h a1
 -- @
 caseCon :: HasCallStack => NormRewrite
-caseCon ctx@(TransformContext is0 _) e@(Case subj ty alts) = case collectArgsTicks subj of
+caseCon ctx@(TransformContext is0 _) e@(Case subj ty alts) = do
+ tcm <- Lens.view tcCache
+ case collectArgsTicks subj of
   -- The subject is an applied data constructor
   (Data dc, args, ticks) -> case List.find (equalCon . fst) alts of
     Just (DataPat _ tvs xs, altE) -> do
@@ -598,7 +601,6 @@ caseCon ctx@(TransformContext is0 _) e@(Case subj ty alts) = case collectArgsTic
       -- or a primitive for which the evaluator doesn't have any evaluation
       -- rules.
       _ -> do
-        tcm <- Lens.view tcCache
         let subjTy = termType tcm subj
         tran <- Lens.view typeTranslator
         reprs <- Lens.view customReprs
@@ -626,23 +628,34 @@ caseCon ctx@(TransformContext is0 _) e@(Case subj ty alts) = case collectArgsTic
               ret
 
 
-  -- The subject is something else
-  _ -> do
-    reprs <- Lens.view customReprs
-    tcm <- Lens.view tcCache
-    let subjTy = termType tcm subj
-    tran <- Lens.view typeTranslator
-    case (`evalState` HashMapS.empty) (coreTypeToHWType tran reprs tcm subjTy) of
-      Right (FilteredHWType (Void (Just hty)) _areVoids)
-        | hty `elem` [BitVector 0, Unsigned 0, Signed 0, Index 1]
-        -- If we know that the type of the subject is zero-bits wide and
-        -- one of the Clash number types. Then the only valid alternative is
-        -- the one that can match on the literal "0", so try 'caseCon' with
-        -- that.
-        -> caseCon ctx (Case (Literal (IntegerLiteral 0)) ty alts)
-        -- Otherwise check whether the entire case-expression has a single
-        -- alternative, and pick that one.
-      _ -> caseOneAlt e
+  -- The subject is a variable
+  (Var v, [], _) | isNum0 (varType v) ->
+    -- If we know that the type of the subject is zero-bits wide and
+    -- one of the Clash number types. Then the only valid alternative is
+    -- the one that can match on the literal "0", so try 'caseCon' with
+    -- that.
+    caseCon ctx (Case (Literal (IntegerLiteral 0)) ty alts)
+   where
+    isNum0 (tyView -> TyConApp (nameOcc -> tcNm) [arg])
+      | tcNm `elem`
+        ["Clash.Sized.Internal.BitVector.BitVector"
+        ,"Clash.Sized.Internal.Unsigned.Unsigned"
+        ,"Clash.Sized.Internal.Signed.Signed"
+        ]
+      = isLitX 0 arg
+      | tcNm ==
+        "Clash.Sized.Internal.Index.Index"
+      = isLitX 1 arg
+    isNum0 (coreView1 tcm -> Just t) = isNum0 t
+    isNum0 _ = False
+
+    isLitX n (LitTy (NumTy m)) = n == m
+    isLitX n (coreView1 tcm -> Just t) = isLitX n t
+    isLitX _ _ = False
+
+  -- Otherwise check whether the entire case-expression has a single
+  -- alternative, and pick that one.
+  _ -> caseOneAlt e
 
 caseCon _ e = return e
 {-# SCC caseCon #-}
