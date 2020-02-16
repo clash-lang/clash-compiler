@@ -95,7 +95,7 @@ import           Clash.Core.FreeVars
 import           Clash.Core.Literal          (Literal (..))
 import           Clash.Core.Pretty           (showPpr)
 import           Clash.Core.Subst
-  (substTm, mkSubst, extendIdSubst, extendIdSubstList, extendTvSubst,
+  (Subst, substTm, mkSubst, extendIdSubst, extendIdSubstList, extendTvSubst,
    extendTvSubstList, freshenTm, substTyInVar, deShadowTerm, deShadowAlt,
    deshadowLetExpr)
 import           Clash.Core.Term
@@ -115,7 +115,7 @@ import           Clash.Core.Util
    isSignalType, isVar, mkApps, mkLams, mkVec, piResultTy, termSize, termType,
    tyNatSize, patVars, isAbsurdAlt, altEqs, substInExistentialsList,
    solveNonAbsurds, patIds, isLocalVar, undefinedTm, stripTicks, mkTicks,
-   shouldSplit)
+   shouldSplit, inverseTopSortLetBindings)
 import           Clash.Core.Var
   (Id, TyVar, Var (..), isGlobalId, isLocalId, mkLocalId)
 import           Clash.Core.VarEnv
@@ -1985,47 +1985,63 @@ inlineHO _ e@(App _ _)
 inlineHO _ e = return e
 {-# SCC inlineHO #-}
 
--- | Simplified CSE, only works on let-bindings, works from top to bottom
+-- | Simplified CSE, only works on let-bindings, does an inverse topological
+-- sort of the let-bindings and then works from top to bottom
+--
+-- XXX: Check whether inverse top-sort followed by single traversal removes as
+-- many binders as the previous "apply-until-fixpoint" approach in the presence
+-- of recursive groups in the let-bindings. If not but just for checking whether
+-- changes to transformation affect the eventual size of the circuit, it would
+-- be really helpful if we tracked circuit size in the regression/test suite.
+-- On the two examples that were tested, Reducer and PipelinesViaFolds, this new
+-- version of CSE removed the same amount of let-binders.
 simpleCSE :: HasCallStack => NormRewrite
-simpleCSE (TransformContext is0 _) e@(Letrec binders body) = do
-  let is1 = extendInScopeSetList is0 (map fst binders)
-  let (reducedBindings,body') = reduceBindersFix is1 binders body
-  if length binders /= length reducedBindings
-     then changed (Letrec reducedBindings body')
-     else return e
+simpleCSE (TransformContext is0 _) (inverseTopSortLetBindings -> Letrec bndrs body) = do
+  let is1 = extendInScopeSetList is0 (map fst bndrs)
+  (subst,bndrs1) <- reduceBinders (mkSubst is1) [] bndrs
+  -- TODO: check whether a substitution over the body is enough, the reason I'm
+  -- doing a substitution over the the binders as well is that I don't know in
+  -- what order a recursive group shows up in a inverse topological sort.
+  -- Depending on the order and forgetting to apply the substitution over the
+  -- let-bindings might lead to the introduction of free variables.
+  --
+  -- NB: don't apply the substitution to the entire let-expression, and that
+  -- would rename the let-bindings because they've been added to the InScopeSet
+  -- of the substitution.
+  let bndrs2 = map (second (substTm "simpleCSE.bndrs" subst)) bndrs1
+      body1  = substTm "simpleCSE.body" subst body
+  return (Letrec bndrs2 body1)
 
 simpleCSE _ e = return e
 {-# SCC simpleCSE #-}
 
-reduceBindersFix
-  :: InScopeSet
-  -> [LetBinding]
-  -> Term
-  -> ([LetBinding],Term)
-reduceBindersFix is binders body =
-  if length binders /= length reduced
-     then reduceBindersFix is reduced body'
-     else (binders,body)
- where
-  (reduced,body') = reduceBinders is [] body binders
-
+-- | XXX: is given inverse topologically sorted binders, but returns
+-- topologically sorted binders
+--
+-- TODO: check further speed improvements:
+--
+-- 1. Store the processed binders in a `Map Expr LetBinding`:
+--    * Trades O(1) `cons` and O(n)*aeqTerm `find` for:
+--    * O(log n)*aeqTerm `insert` and O(log n)*aeqTerm `lookup`
+-- 2. Store the processed binders in a `AEQTrie Expr LetBinding`
+--    * Trades O(1) `cons` and O(n)*aeqTerm `find` for:
+--    * O(e) `insert` and O(e) `lookup`
 reduceBinders
-  :: InScopeSet
+  :: Subst
   -> [LetBinding]
-  -> Term
   -> [LetBinding]
-  -> ([LetBinding],Term)
-reduceBinders _  processed body [] = (processed,body)
-reduceBinders is processed body ((id_,expr):binders) = case List.find ((== expr) . snd) processed of
-    Just (id2,_)
-      | (_,_,ticks) <- collectArgsTicks expr
-      , NoDeDup `notElem` ticks ->
-      let subst      = extendIdSubst (mkSubst is) id_ (Var id2)
-          processed' = map (second (substTm "reduceBinders.processed" subst)) processed
-          binders'   = map (second (substTm "reduceBinders.binders"   subst)) binders
-          body'      = substTm "reduceBinders.body" subst body
-      in  reduceBinders is processed' body' binders'
-    _ -> reduceBinders is ((id_,expr):processed) body binders
+  -> RewriteMonad NormalizeState (Subst, [LetBinding])
+reduceBinders !subst processed [] = return (subst,processed)
+reduceBinders !subst processed ((i,substTm "reduceBinders" subst -> e):rest)
+  | (_,_,ticks) <- collectArgsTicks e
+  , NoDeDup `notElem` ticks
+  , Just (i1,_) <- List.find ((== e) . snd) processed
+  = do
+    let subst1 = extendIdSubst subst i (Var i1)
+    setChanged
+    reduceBinders subst1 processed rest
+  | otherwise
+  = reduceBinders subst ((i,e):processed) rest
 {-# SCC reduceBinders #-}
 
 reduceConst :: HasCallStack => NormRewrite

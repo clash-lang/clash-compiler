@@ -19,11 +19,13 @@ import qualified Control.Lens                  as Lens
 import Control.Monad.Trans.Except              (Except, throwE)
 import           Data.Coerce                   (coerce)
 import qualified Data.HashSet                  as HashSet
+import qualified Data.Graph                    as Graph
 import Data.List
   (foldl', mapAccumR, elemIndices, nub)
-import           Data.List.Extra               (nubOrd)
 import Data.Maybe
   (fromJust, isJust, mapMaybe, catMaybes)
+import qualified Data.Set                      as Set
+import qualified Data.Set.Lens                 as Lens
 import qualified Data.String.Interpolate       as I
 import qualified Data.Text                     as T
 import           Data.Text.Prettyprint.Doc     (line)
@@ -60,7 +62,6 @@ import Clash.Core.VarEnv
    mkVarSet, unionVarSet, unitVarSet, emptyVarSet)
 import Clash.Unique
 import Clash.Util
-import Clash.Util.Graph
 
 -- | Type environment/context
 type Gamma = VarEnv Type
@@ -1082,24 +1083,24 @@ inverseTopSortLetBindings
   :: HasCallStack
   => Term
   -> Term
-inverseTopSortLetBindings e@(Letrec bndrs0 res) =
-  case reverseTopSort (nodes0 ++ nodes1) (concat edges) of
-    Left err -> error err
-    Right (catMaybes -> bndrs1) ->
-      if length bndrs0 == length bndrs1 then
-        Letrec bndrs1 res
-      else
-        error "internal error"
+inverseTopSortLetBindings (Letrec bndrs0 res) =
+  let (graph,nodeMap,_) =
+        Graph.graphFromEdges
+          (map (\(i,e) -> let fvs = fmap varUniq
+                                    (Set.elems (Lens.setOf freeLocalIds e) )
+                          in  ((i,e),varUniq i,fvs)) bndrs0)
+      nodes  = postOrd graph
+      bndrs1 = map ((\(x,_,_) -> x) . nodeMap) nodes
+  in  Letrec bndrs1 res
  where
-  (nodes0,edges) =
-    unzip $ map
-      (\(i,eB) ->
-        let u = varUniq i
-            fvs = map varUniq (nubOrd (Lens.toListOf freeLocalIds eB))
-            edges0 = map (u,) fvs
-        in  ((u, Just (i,eB)),edges0))
-      bndrs0
+  postOrd :: Graph.Graph -> [Graph.Vertex]
+  postOrd g = postorderF (Graph.dff g) []
 
-  nodes1 = map ((,Nothing) . varUniq) (nub (Lens.toListOf freeLocalIds e))
+  postorderF :: Graph.Forest a -> [a] -> [a]
+  postorderF ts = foldr (.) id (map postorder ts)
+
+  postorder :: Graph.Tree a -> [a] -> [a]
+  postorder (Graph.Node a ts) = postorderF ts . (a :)
 
 inverseTopSortLetBindings e = e
+{-# SCC inverseTopSortLetBindings #-}

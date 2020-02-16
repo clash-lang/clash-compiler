@@ -29,6 +29,7 @@ import Data.IntMap.Strict           (IntMap)
 defaultTests :: [FilePath]
 defaultTests =
   [ "examples/FIR.hs"
+  , "examples/Reducer.hs"
   , "examples/Queens.hs"
   , "benchmark/tests/BundleMapRepeat.hs"
   , "benchmark/tests/PipelinesViaFolds.hs"
