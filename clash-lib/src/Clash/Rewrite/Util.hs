@@ -1022,6 +1022,7 @@ whnfRW isSubj ctx@(TransformContext is0 _) e rw = do
     (!gh1,ph,v) -> do
       globalHeap Lens..= gh1
       bindPureHeap tcm ph rw ctx v
+{-# SCC whnfRW #-}
 
 -- | Binds variables on the PureHeap over the result of the rewrite
 --
