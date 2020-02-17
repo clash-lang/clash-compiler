@@ -1,0 +1,79 @@
+#!/bin/bash
+# Auto-restarts ghcid sessions based on changes in dependencies. I.e.,
+# while repling clash-lib, any changes in clash-prelude would trigger a
+# reload.
+#
+# Usage:
+#
+#     repld clash-prelude
+#
+# would start a ghcid session for clash-prelude. Any additional options
+# passed to the script would be passed down to ghcid. For example:
+#
+#     repld clash-prelude -T main
+#
+# would execute test 'main' if clash-prelude compiles successfully.
+# Shortcuts exist for all supported libraries:
+#
+#   * `p`, `prelude`, `clash-prelude`
+#   * `l`, `lib`, `clash-lib`
+#   * `g`, `ghc`, `clash-ghc`
+#   * `dev`, `clash-dev`
+#
+# That means the following will start a repl-loop for clash-lib:
+#
+#     repld l
+
+set -e
+
+inotifywait --help | grep -e "^inotifywait"
+ghcid --version
+
+if [[ $1 == "p" || $1 == "prelude" || $1 == "clash-prelude" ]]; then
+  target="cabal new-repl clash-prelude"
+  watch="clash-prelude/clash-prelude.cabal"
+elif [[ $1 == "l" || $1 == "lib" || $1 == "clash-lib" ]]; then
+  target="cabal new-repl clash-lib"
+  watch="clash-prelude clash-lib/clash-lib.cabal"
+elif [[ $1 == "g" || $1 == "ghc" || $1 == "clash-ghc" ]]; then
+  target="cabal new-repl clash-ghc --repl-options=-fobject-code"
+  watch="clash-prelude clash-lib clash-ghc/clash-ghc.cabal"
+elif [[ $1 == "dev" || $1 == "clash-dev" ]]; then
+  target="./clash-dev"
+  watch="clash-prelude clash-lib/clash-lib.cabal clash-ghc/clash-ghc.cabal"
+else
+  echo "Unrecognized target. Use one of:"  > /dev/stderr
+  echo "  p, prelude, clash-prelude"       > /dev/stderr
+  echo "  l, lib, clash-lib"               > /dev/stderr
+  echo "  g, ghc, clash-ghc"               > /dev/stderr
+  echo "  dev, clash-dev"                  > /dev/stderr
+  exit 1;
+fi
+
+
+
+restart_cmd=""
+for w in ${watch}; do
+ restart_cmd="${restart_cmd} --restart=${w}"
+done
+
+set -x
+set +e
+
+while true; do
+  if [[ ${target} == "./clash-dev" ]]; then
+    cabal new-build clash-prelude --write-ghc-environment-files=always
+    sed -i '/clash-lib/d' .ghc.environment.x86_64-linux-*
+    sed -i '/clash-ghc/d' .ghc.environment.x86_64-linux-*
+  fi
+
+  # Restart logic currently blocked by
+  # https://github.com/ndmitchell/ghcid/issues/273
+  # https://github.com/ndmitchell/ghcid/pull/300
+  ghcid -c "${target}" ${restart_cmd} ${@:2}
+
+  inotifywait -e modify,create,delete -r ${watch}
+  if [[ $? == 130 ]]; then
+    exit 130
+  fi
+done
