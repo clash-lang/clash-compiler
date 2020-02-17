@@ -224,8 +224,27 @@ i = QuasiQuoter {
         reifyExpression :: String -> Q Exp
         reifyExpression s = case parseExp s of
           Left _ -> do
-            fail "Parse error in expression!" :: Q Exp
+            fail ("Parse error in expression: " ++ s) :: Q Exp
           Right e -> return e
+
+parseNodes :: String -> [Node]
+parseNodes = go ""
+  where
+    go :: String -> String -> [Node]
+    go acc input = case input of
+      ""  -> [(lit . reverse) acc]
+      '\\':x:xs -> go (x:'\\':acc) xs
+      '#':'{':xs -> goExpr input acc [] xs
+      x:xs -> go (x:acc) xs
+    -- allow '}' to be escaped in code sections
+    goExpr input accLit accExpr xs = case span (\x -> x /= '}' && x /= '\\') xs of
+      (ys, '}' :zs) -> (lit . reverse) accLit : Expression (reverse accExpr ++ ys) : go "" zs
+      (ys, '\\':'}':zs) -> goExpr input accLit ('}' : reverse ys ++ accExpr) zs
+      (ys, '\\':zs) -> goExpr input accLit ('\\' : reverse ys ++ accExpr) zs
+      (_, "") -> [lit (reverse accLit ++ input)]
+      _ -> error "(impossible) parseError in parseNodes"
+    lit :: String -> Node
+    lit = Literal . unescape
 
 -------------------------------------------------------------------
 -- Everything below this line is unchanged from neat-interpolate --
@@ -237,21 +256,6 @@ decodeNewlines = go
       '\r' : '\n' : ys -> '\n' : go ys
       y : ys -> y : go ys
       [] -> []
-
-parseNodes :: String -> [Node]
-parseNodes = go ""
-  where
-    go :: String -> String -> [Node]
-    go acc input = case input of
-      ""  -> [(lit . reverse) acc]
-      '\\':x:xs -> go (x:'\\':acc) xs
-      '#':'{':xs -> case span (/= '}') xs of
-        (ys, _:zs) -> (lit . reverse) acc : Expression ys : go "" zs
-        (_, "") -> [lit (reverse acc ++ input)]
-      x:xs -> go (x:acc) xs
-
-    lit :: String -> Node
-    lit = Literal . unescape
 
 toString :: Show a => a -> String
 toString a = let s = show a in fromMaybe s (readMaybe s)
@@ -363,4 +367,3 @@ unescape = go
     readOct xs = case N.readOct xs of
       [(n, "")] -> n
       _ -> error "Data.String.Interpolate.Util.readHex: no parse"
-
