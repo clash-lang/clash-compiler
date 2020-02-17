@@ -12,7 +12,7 @@ import qualified Clash.Util.Interpolate as I
 import Test.Tasty
 import Test.Tasty.HUnit
 
-test1, test2, test3, test4, test5, test6, test7, test8 :: String
+test1, test2, test3, test4, test5, test6, test7, test8, test9 :: String
 test1 = [I.i| Simple |]
 test2 = [I.i|
   Single line
@@ -46,6 +46,16 @@ test8 = [I.i|
   looooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooong word
 |]
 
+data SomeRecord = SomeRecord { getField :: Int }
+someRecord :: SomeRecord
+someRecord = SomeRecord 5
+-- test that we can escape closing '}'
+test9 = [I.i| #{ "\\" ++ show (getField someRecord { getField=6*7
+                                                  \}
+                              )
+               }
+            |]
+
 tests :: TestTree
 tests =
   testGroup
@@ -56,6 +66,7 @@ tests =
     , testCase "test4" $ "One Two Three" @=? test4
     , testCase "test5" $ "One\n  Two\nThree" @=? test5
     , testCase "test6" $ test5 @=? test6
-    , testCase "test7" $ test7 @=? ("The big test:\n\n" ++ test5)
-    , testCase "test8" $ test8 @=? "looooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooong \nword"
+    , testCase "test7" $ test7 @?= ("The big test:\n\n" ++ test5)
+    , testCase "test8" $ test8 @?= "looooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooong \nword"
+    , testCase "test9" $ test9 @?= "\\42"
     ]
