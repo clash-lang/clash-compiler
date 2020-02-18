@@ -398,6 +398,18 @@ anyM p (x:xs) = do
   else
     anyM p xs
 
+-- | short-circuiting monadic version of 'or'
+orM
+  :: (Monad m)
+  => [m Bool]
+  -> m Bool
+orM [] = pure False
+orM (x:xs) = do
+  p <- x
+  if p then
+    pure True
+  else
+    orM xs
 
 -- | Get the package id of the type of a value
 -- >>> pkgIdFromTypeable (undefined :: TopEntity)

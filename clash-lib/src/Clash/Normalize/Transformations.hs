@@ -2120,7 +2120,6 @@ reduceConst _ e = return e
 reduceNonRepPrim :: HasCallStack => NormRewrite
 reduceNonRepPrim c@(TransformContext is0 ctx) e@(App _ _) | (Prim p, args, ticks) <- collectArgsTicks e = do
   tcm <- Lens.view tcCache
-  shouldReduce1 <- shouldReduce ctx
   ultra <- Lens.use (extra.normalizeUltra)
   let eTy = termType tcm e
   case tyView eTy of
@@ -2130,59 +2129,71 @@ reduceNonRepPrim c@(TransformContext is0 ctx) e@(App _ _) | (Prim p, args, ticks
           [nilCon,consCon] = tyConDataCons vecTc
           nilE = mkVec nilCon consCon aTy 0 []
       changed (mkTicks nilE ticks)
-    tv -> case primName p of
-      "Clash.Sized.Vector.zipWith" | length args == 7 -> do
+    tv -> let argLen = length args in case primName p of
+      "Clash.Sized.Vector.zipWith" | argLen == 7 -> do
         let [lhsElTy,rhsElty,resElTy,nTy] = Either.rights args
         case runExcept (tyNatSize tcm nTy) of
           Right n -> do
-            untranslatableTys <- mapM isUntranslatableType_not_poly [lhsElTy,rhsElty,resElTy]
-            if or untranslatableTys || shouldReduce1 || ultra || n < 2
+            shouldReduce1 <- orM [ pure (ultra || n < 2)
+                                 , shouldReduce ctx
+                                 , anyM isUntranslatableType_not_poly
+                                        [lhsElTy,rhsElty,resElTy] ]
+            if shouldReduce1
                then let [fun,lhsArg,rhsArg] = Either.lefts args
                     in  (`mkTicks` ticks) <$>
                         reduceZipWith c n lhsElTy rhsElty resElTy fun lhsArg rhsArg
                else return e
           _ -> return e
-      "Clash.Sized.Vector.map" | length args == 5 -> do
+      "Clash.Sized.Vector.map" | argLen == 5 -> do
         let [argElTy,resElTy,nTy] = Either.rights args
         case runExcept (tyNatSize tcm nTy) of
           Right n -> do
-            untranslatableTys <- mapM isUntranslatableType_not_poly [argElTy,resElTy]
-            if or untranslatableTys || shouldReduce1 || ultra || n < 2
+            shouldReduce1 <- orM [ pure (ultra || n < 2 )
+                                 , shouldReduce ctx
+                                 , anyM isUntranslatableType_not_poly
+                                        [argElTy,resElTy] ]
+            if shouldReduce1
                then let [fun,arg] = Either.lefts args
                     in  (`mkTicks` ticks) <$> reduceMap c n argElTy resElTy fun arg
                else return e
           _ -> return e
-      "Clash.Sized.Vector.traverse#" | length args == 7 ->
+      "Clash.Sized.Vector.traverse#" | argLen == 7 ->
         let [aTy,fTy,bTy,nTy] = Either.rights args
         in  case runExcept (tyNatSize tcm nTy) of
           Right n ->
             let [dict,fun,arg] = Either.lefts args
             in  (`mkTicks` ticks) <$> reduceTraverse c n aTy fTy bTy dict fun arg
           _ -> return e
-      "Clash.Sized.Vector.fold" | length args == 4 -> do
+      "Clash.Sized.Vector.fold" | argLen == 4 -> do
         let [aTy,nTy] = Either.rights args
-        untranslatableTy <- isUntranslatableType_not_poly aTy
         case runExcept (tyNatSize tcm nTy) of
-          Right n | untranslatableTy || shouldReduce1 || ultra || n == 0 ->
-            let [fun,arg] = Either.lefts args
-            in  (`mkTicks` ticks) <$> reduceFold c (n + 1) aTy fun arg
+          Right n -> do
+            shouldReduce1 <- orM [ pure (ultra || n == 0)
+                                 , shouldReduce ctx
+                                 , isUntranslatableType_not_poly aTy ]
+            if shouldReduce1 then
+              let [fun,arg] = Either.lefts args
+              in  (`mkTicks` ticks) <$> reduceFold c (n + 1) aTy fun arg
+            else return e
           _ -> return e
-      "Clash.Sized.Vector.foldr" | length args == 6 ->
+      "Clash.Sized.Vector.foldr" | argLen == 6 ->
         let [aTy,bTy,nTy] = Either.rights args
         in  case runExcept (tyNatSize tcm nTy) of
           Right n -> do
-            untranslatableTys <- mapM isUntranslatableType_not_poly [aTy,bTy]
-            if or untranslatableTys || shouldReduce1 || ultra
+            shouldReduce1 <- orM [ pure ultra
+                                 , shouldReduce ctx
+                                 , anyM isUntranslatableType_not_poly [aTy,bTy] ]
+            if shouldReduce1
               then let [fun,start,arg] = Either.lefts args
                    in  (`mkTicks` ticks) <$> reduceFoldr c n aTy fun start arg
               else return e
           _ -> return e
-      "Clash.Sized.Vector.dfold" | length args == 8 ->
+      "Clash.Sized.Vector.dfold" | argLen == 8 ->
         let ([_kn,_motive,fun,start,arg],[_mTy,nTy,aTy]) = Either.partitionEithers args
         in  case runExcept (tyNatSize tcm nTy) of
           Right n -> (`mkTicks` ticks) <$> reduceDFold is0 n aTy fun start arg
           _ -> return e
-      "Clash.Sized.Vector.++" | length args == 5 ->
+      "Clash.Sized.Vector.++" | argLen == 5 ->
         let [nTy,aTy,mTy] = Either.rights args
             [lArg,rArg]   = Either.lefts args
         in case (runExcept (tyNatSize tcm nTy), runExcept (tyNatSize tcm mTy)) of
@@ -2190,102 +2201,117 @@ reduceNonRepPrim c@(TransformContext is0 ctx) e@(App _ _) | (Prim p, args, ticks
                 | n == 0 -> changed rArg
                 | m == 0 -> changed lArg
                 | otherwise -> do
-                    untranslatableTy <- isUntranslatableType_not_poly aTy
-                    if untranslatableTy || shouldReduce1
+                    shouldReduce1 <- orM [ shouldReduce ctx
+                                         , isUntranslatableType_not_poly aTy ]
+                    if shouldReduce1
                        then (`mkTicks` ticks) <$> reduceAppend is0 n m aTy lArg rArg
                        else return e
               _ -> return e
-      "Clash.Sized.Vector.head" | length args == 3 -> do
+      "Clash.Sized.Vector.head" | argLen == 3 -> do
         let [nTy,aTy] = Either.rights args
             [vArg]    = Either.lefts args
         case runExcept (tyNatSize tcm nTy) of
           Right n -> do
-            untranslatableTy <- isUntranslatableType_not_poly aTy
-            if untranslatableTy || shouldReduce1
+            shouldReduce1 <- orM [ shouldReduce ctx
+                                 , isUntranslatableType_not_poly aTy ]
+            if shouldReduce1
                then (`mkTicks` ticks) <$> reduceHead is0 (n+1) aTy vArg
                else return e
           _ -> return e
-      "Clash.Sized.Vector.tail" | length args == 3 -> do
+      "Clash.Sized.Vector.tail" | argLen == 3 -> do
         let [nTy,aTy] = Either.rights args
             [vArg]    = Either.lefts args
         case runExcept (tyNatSize tcm nTy) of
           Right n -> do
-            untranslatableTy <- isUntranslatableType_not_poly aTy
-            if untranslatableTy || shouldReduce1
+            shouldReduce1 <- orM [ shouldReduce ctx
+                                 , isUntranslatableType_not_poly aTy ]
+            if shouldReduce1
                then (`mkTicks` ticks) <$> reduceTail is0 (n+1) aTy vArg
                else return e
           _ -> return e
-      "Clash.Sized.Vector.last" | length args == 3 -> do
+      "Clash.Sized.Vector.last" | argLen == 3 -> do
         let [nTy,aTy] = Either.rights args
             [vArg]    = Either.lefts args
         case runExcept (tyNatSize tcm nTy) of
           Right n -> do
-            untranslatableTy <- isUntranslatableType_not_poly aTy
-            if untranslatableTy || shouldReduce1
+            shouldReduce1 <- orM [ shouldReduce ctx
+                                 , isUntranslatableType_not_poly aTy
+                                 ]
+            if shouldReduce1
                then (`mkTicks` ticks) <$> reduceLast is0 (n+1) aTy vArg
                else return e
           _ -> return e
-      "Clash.Sized.Vector.init" | length args == 3 -> do
+      "Clash.Sized.Vector.init" | argLen == 3 -> do
         let [nTy,aTy] = Either.rights args
             [vArg]    = Either.lefts args
         case runExcept (tyNatSize tcm nTy) of
           Right n -> do
-            untranslatableTy <- isUntranslatableType_not_poly aTy
-            if untranslatableTy || shouldReduce1
+            shouldReduce1 <- orM [ shouldReduce ctx
+                                 , isUntranslatableType_not_poly aTy ]
+            if shouldReduce1
                then (`mkTicks` ticks) <$> reduceInit is0 (n+1) aTy vArg
                else return e
           _ -> return e
-      "Clash.Sized.Vector.unconcat" | length args == 6 -> do
+      "Clash.Sized.Vector.unconcat" | argLen == 6 -> do
         let ([_knN,_sm,arg],[mTy,nTy,aTy]) = Either.partitionEithers args
         case (runExcept (tyNatSize tcm nTy), runExcept (tyNatSize tcm mTy)) of
           (Right n, Right 0) -> (`mkTicks` ticks) <$> reduceUnconcat n 0 aTy arg
           _ -> return e
-      "Clash.Sized.Vector.transpose" | length args == 5 -> do
+      "Clash.Sized.Vector.transpose" | argLen == 5 -> do
         let ([_knN,arg],[mTy,nTy,aTy]) = Either.partitionEithers args
         case (runExcept (tyNatSize tcm nTy), runExcept (tyNatSize tcm mTy)) of
           (Right n, Right 0) -> (`mkTicks` ticks) <$> reduceTranspose n 0 aTy arg
           _ -> return e
-      "Clash.Sized.Vector.replicate" | length args == 4 -> do
+      "Clash.Sized.Vector.replicate" | argLen == 4 -> do
         let ([_sArg,vArg],[nTy,aTy]) = Either.partitionEithers args
         case runExcept (tyNatSize tcm nTy) of
           Right n -> do
-            untranslatableTy <- isUntranslatableType_not_poly aTy
-            if untranslatableTy || shouldReduce1
+            shouldReduce1 <- orM [ shouldReduce ctx
+                                 , isUntranslatableType_not_poly aTy
+                                 ]
+            if shouldReduce1
                then (`mkTicks` ticks) <$> reduceReplicate n aTy eTy vArg
                else return e
           _ -> return e
        -- replace_int :: KnownNat n => Vec n a -> Int -> a -> Vec n a
-      "Clash.Sized.Vector.replace_int" | length args == 6 -> do
+      "Clash.Sized.Vector.replace_int" | argLen == 6 -> do
         let ([_knArg,vArg,iArg,aArg],[nTy,aTy]) = Either.partitionEithers args
         case runExcept (tyNatSize tcm nTy) of
           Right n -> do
-            untranslatableTy <- isUntranslatableType_not_poly aTy
-            if untranslatableTy || shouldReduce1 || ultra
+            shouldReduce1 <- orM [ pure ultra
+                                 , shouldReduce ctx
+                                 , isUntranslatableType_not_poly aTy
+                                 ]
+            if shouldReduce1
                then (`mkTicks` ticks) <$> reduceReplace_int is0 n aTy eTy vArg iArg aArg
                else return e
           _ -> return e
 
-      "Clash.Sized.Vector.index_int" | length args == 5 -> do
+      "Clash.Sized.Vector.index_int" | argLen == 5 -> do
         let ([_knArg,vArg,iArg],[nTy,aTy]) = Either.partitionEithers args
         case runExcept (tyNatSize tcm nTy) of
           Right n -> do
-            untranslatableTy <- isUntranslatableType_not_poly aTy
-            if untranslatableTy || shouldReduce1 || ultra
+            shouldReduce1 <- orM [ pure ultra
+                                 , shouldReduce ctx
+                                 , isUntranslatableType_not_poly aTy ]
+            if shouldReduce1
                then (`mkTicks` ticks) <$> reduceIndex_int is0 n aTy vArg iArg
                else return e
           _ -> return e
 
-      "Clash.Sized.Vector.imap" | length args == 6 -> do
+      "Clash.Sized.Vector.imap" | argLen == 6 -> do
         let [nTy,argElTy,resElTy] = Either.rights args
         case runExcept (tyNatSize tcm nTy) of
           Right n -> do
-            untranslatableTys <- mapM isUntranslatableType_not_poly [argElTy,resElTy]
-            if or untranslatableTys || shouldReduce1 || ultra || n < 2
+            shouldReduce1 <- orM [ pure (ultra || n < 2)
+                                 , shouldReduce ctx
+                                 , anyM isUntranslatableType_not_poly [argElTy,resElTy] ]
+            if shouldReduce1
                then let [_,fun,arg] = Either.lefts args
                     in  (`mkTicks` ticks) <$> reduceImap c n argElTy resElTy fun arg
                else return e
           _ -> return e
-      "Clash.Sized.Vector.dtfold" | length args == 8 ->
+      "Clash.Sized.Vector.dtfold" | argLen == 8 ->
         let ([_kn,_motive,lrFun,brFun,arg],[_mTy,nTy,aTy]) = Either.partitionEithers args
         in  case runExcept (tyNatSize tcm nTy) of
           Right n -> (`mkTicks` ticks) <$> reduceDTFold is0 n aTy lrFun brFun arg
@@ -2297,21 +2323,22 @@ reduceNonRepPrim c@(TransformContext is0 ctx) e@(App _ _) | (Prim p, args, ticks
         , Right n <- runExcept (tyNatSize tcm nTy)
         -> (`mkTicks` ticks) <$> reduceReverse is0 n aTy vArg
 
-      "Clash.Sized.RTree.tdfold" | length args == 8 ->
+      "Clash.Sized.RTree.tdfold" | argLen == 8 ->
         let ([_kn,_motive,lrFun,brFun,arg],[_mTy,nTy,aTy]) = Either.partitionEithers args
         in  case runExcept (tyNatSize tcm nTy) of
           Right n -> (`mkTicks` ticks) <$> reduceTFold is0 n aTy lrFun brFun arg
           _ -> return e
-      "Clash.Sized.RTree.treplicate" | length args == 4 -> do
+      "Clash.Sized.RTree.treplicate" | argLen == 4 -> do
         let ([_sArg,vArg],[nTy,aTy]) = Either.partitionEithers args
         case runExcept (tyNatSize tcm nTy) of
           Right n -> do
-            untranslatableTy <- isUntranslatableType False aTy
-            if untranslatableTy || shouldReduce1
+            shouldReduce1 <- orM [ shouldReduce ctx
+                                 , isUntranslatableType False aTy ]
+            if shouldReduce1
                then (`mkTicks` ticks) <$> reduceTReplicate n aTy eTy vArg
                else return e
           _ -> return e
-      "Clash.Sized.Internal.BitVector.split#" | length args == 4 -> do
+      "Clash.Sized.Internal.BitVector.split#" | argLen == 4 -> do
         let ([_knArg,bvArg],[nTy,mTy]) = Either.partitionEithers args
         case (runExcept (tyNatSize tcm nTy), runExcept (tyNatSize tcm mTy), tv) of
           (Right n, Right m, TyConApp tupTcNm [lTy,rTy])
