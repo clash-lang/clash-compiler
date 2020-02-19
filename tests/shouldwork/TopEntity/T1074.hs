@@ -10,8 +10,7 @@ import GHC.Stack
   (Synthesize
     { t_name   = "top"
     , t_inputs =
-        [ PortName "dom1 ~ System", PortName "HasCallStack", PortName "dom2 ~ System"
-        , PortProduct "" [PortName "theClock", PortName "theReset"]
+        [ PortProduct "" [PortName "theClock", PortName "theReset"]
         , PortName "theInput"
         ]
     , t_output = PortName "theResult"

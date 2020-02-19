@@ -11,8 +11,7 @@ import qualified Prelude as P
   (Synthesize
     { t_name   = "top"
     , t_inputs =
-        [ PortName "dummy name for the TyEq-constraint"
-        , PortName "theHiddenClock"
+        [ PortName "theHiddenClock"
         , PortProduct "en_int" [PortName "theEnable", PortName "a"]
         , PortProduct "int_int_rst" [PortName "b", PortProduct "int_rst" []]
         ]

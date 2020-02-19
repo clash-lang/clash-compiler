@@ -55,6 +55,10 @@ import           System.IO.Temp
 import           Text.Trifecta.Result
   (Result(Success, Failure), _errDoc)
 import           Text.Read                        (readMaybe)
+
+import           PrelNames               (eqTyConKey, ipClassKey)
+import           Unique                  (getKey)
+
 import           SrcLoc                           (SrcSpan)
 import           Util                             (OverridingBool(Auto))
 import           GHC.BasicTypes.Extra             ()
@@ -72,7 +76,7 @@ import           Clash.Core.Name                  (Name (..))
 import           Clash.Core.Pretty                (PrettyOptions(..), showPpr')
 import           Clash.Core.Term                  (Term)
 import           Clash.Core.Type
-  (Type(ForAllTy, AnnType), TypeView(FunTy), tyView, mkFunTy)
+  (Type(ForAllTy, LitTy, AnnType), TypeView(..), tyView, mkFunTy, LitTy(SymTy))
 import           Clash.Core.TyCon                 (TyConMap, TyConName)
 import           Clash.Core.Util                  (shouldSplit)
 import           Clash.Core.Var
@@ -115,7 +119,15 @@ splitTopAnn tcm sp typ@(tyView -> FunTy {}) t@Synthesize{t_inputs} =
  where
   go :: Type -> [PortName] -> [PortName]
   go _ [] = []
-  go (tyView -> FunTy a res) (p:ps) =
+  go (tyView -> FunTy a res) (p:ps)
+   | shouldNotHavePortName a
+     -- Insert dummy PortName for args for which the user shouldn't have
+     -- to provide a name.
+     -- Ideally this would be any (non Hidden{Clock,Reset,Enable}) constraint.
+     -- But because we can't properly detect constraints,
+     -- we only skip some specific one. see "shouldNotHavePortName"
+     = PortName "" : go res (p:ps)
+   | otherwise =
     case shouldSplit tcm a of
       Just (_,argTys@(_:_:_)) ->
         -- Port must be split up into 'n' pieces.. can it?
@@ -150,6 +162,16 @@ splitTopAnn tcm sp typ@(tyView -> FunTy {}) t@Synthesize{t_inputs} =
   prependName "" pn = pn
   prependName p (PortProduct nm ps) = PortProduct (p ++ "_" ++ nm) ps
   prependName p (PortName nm) = PortName (p ++ "_" ++ nm)
+
+  -- Returns True for
+  --   * type equality constraints (~)
+  --   * HasCallStack
+  shouldNotHavePortName :: Type -> Bool
+  shouldNotHavePortName (tyView -> TyConApp (nameUniq -> tcUniq) tcArgs)
+    | tcUniq == getKey eqTyConKey = True
+    | tcUniq == getKey ipClassKey
+    , [LitTy (SymTy "callStack"), _] <- tcArgs = True
+  shouldNotHavePortName _ = False
 
 splitTopAnn tcm sp (ForAllTy _tyVar typ) t = splitTopAnn tcm sp typ t
 splitTopAnn tcm sp (AnnType _anns typ) t = splitTopAnn tcm sp typ t
