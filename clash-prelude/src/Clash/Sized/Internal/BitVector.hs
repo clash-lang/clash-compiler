@@ -459,16 +459,16 @@ instance KnownNat n => Enum (BitVector n) where
 {-# NOINLINE enumFromThen# #-}
 {-# NOINLINE enumFromTo# #-}
 {-# NOINLINE enumFromThenTo# #-}
-enumFrom#       :: KnownNat n => BitVector n -> [BitVector n]
-enumFromThen#   :: KnownNat n => BitVector n -> BitVector n -> [BitVector n]
+enumFrom#       :: forall n. KnownNat n => BitVector n -> [BitVector n]
+enumFromThen#   :: forall n. KnownNat n => BitVector n -> BitVector n -> [BitVector n]
 enumFromTo#     :: KnownNat n => BitVector n -> BitVector n -> [BitVector n]
 enumFromThenTo# :: KnownNat n => BitVector n -> BitVector n -> BitVector n -> [BitVector n]
 
-enumFrom# (BV 0 x)                           = map (fromInteger_INLINE 0) [x ..]
+enumFrom# (BV 0 x)                           = map (fromInteger_INLINE 0) [x .. unsafeToInteger (maxBound :: BitVector n)]
 enumFrom# bv
   = undefErrorU "enumFrom" bv
 
-enumFromThen# (BV 0 x) (BV 0 y)              = map (fromInteger_INLINE 0) [x, y ..]
+enumFromThen# (BV 0 x) (BV 0 y)              = map (fromInteger_INLINE 0) [x, y .. unsafeToInteger (maxBound :: BitVector n)]
 enumFromThen# bv1 bv2
   = undefErrorP "enumFromThen" bv1 bv2
 
