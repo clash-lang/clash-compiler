@@ -9,6 +9,7 @@ The Product/Signal isomorphism
 -}
 
 {-# LANGUAGE CPP #-}
+{-# LANGUAGE PolyKinds #-}
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE TypeFamilyDependencies #-}
@@ -23,6 +24,9 @@ The Product/Signal isomorphism
 
 module Clash.Signal.Bundle
   ( Bundle (..)
+  -- ** Tools to emulate pre Clash 1.0 @Bundle ()@ instance
+  , TaggedUnit
+  , TaggedUnit'(..)
   -- ** Internal
   , vecBundle#
   )
@@ -166,3 +170,34 @@ instance Bundle ((f :*: g) a) where
    where
     getL (l :*: _) = l
     getR (_ :*: r) = r
+
+-- | Internal data type, see "TaggedUnit".
+data TaggedUnit' (dom :: k) = TaggedUnit
+
+-- | Helper type to emulate the "old" behavior of Bundle's unit instance. I.e.,
+-- the instance for @Bundle ()@ used to be defined as:
+--
+--     class Bundle () where
+--       bundle   :: () -> Signal domain ()
+--       unbundle :: Signal domain () -> ()
+--
+-- In order to have sensible type inference, the "Bundle" class specifies that
+-- the argument type of 'bundle' should uniquely identify the result type, and
+-- vice versa for 'unbundle'. The type signatures in the snippet above don't
+-- though, as @()@ doesn't uniquely map to a specific domain. In other words,
+-- 'domain' should occur in both the argument and result of both functions.
+--
+-- "TaggedUnit" fixes this by carrying the domain in its type. Use 'TaggedUnit'
+-- to construct a "TaggedUnit" or a "TaggedUnit'".
+type TaggedUnit (dom :: Domain) = TaggedUnit' '(dom, dom)
+
+-- | See https://github.com/clash-lang/clash-compiler/pull/539/commits/94b0bff5770aa4961e04ddce2515130df3fc7863
+-- and documentation for "TaggedUnit".
+instance Bundle (TaggedUnit' dom1) where
+  type Unbundled dom0 (TaggedUnit' dom1) = TaggedUnit' '(dom0, dom1)
+
+  bundle :: TaggedUnit' '(dom0, dom1) -> Signal dom0 (TaggedUnit' dom1)
+  bundle TaggedUnit = pure TaggedUnit
+
+  unbundle :: Signal dom0 (TaggedUnit' dom1) -> TaggedUnit' '(dom0, dom1)
+  unbundle s = seq s TaggedUnit
