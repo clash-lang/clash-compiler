@@ -212,6 +212,8 @@ module Clash.Signal
   , (.&&.), (.||.)
     -- * Product/Signal isomorphism
   , Bundle(..)
+  , EmptyTuple(..)
+  , TaggedEmptyTuple(..)
     -- * Simulation functions (not synthesizable)
   , simulate
   , simulateB
@@ -266,7 +268,8 @@ import qualified Clash.Explicit.Signal as S
 import           Clash.Hidden
 import           Clash.Promoted.Nat    (SNat (..), snatToNum)
 import           Clash.Promoted.Symbol (SSymbol (..))
-import           Clash.Signal.Bundle   (Bundle (..))
+import           Clash.Signal.Bundle
+  (Bundle (..), EmptyTuple(..), TaggedEmptyTuple(..))
 import           Clash.Signal.BiSignal --(BisignalIn, BisignalOut, )
 import           Clash.Signal.Internal hiding
   (sample, sample_lazy, sampleN, sampleN_lazy, simulate, simulate_lazy, testFor)

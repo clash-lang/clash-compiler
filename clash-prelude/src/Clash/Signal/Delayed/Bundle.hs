@@ -17,10 +17,9 @@
 #endif
 
 module Clash.Signal.Delayed.Bundle (
-  Bundle,
-  Unbundled,
-  bundle,
-  unbundle,
+    Bundle(..)
+  -- ** Tools to emulate pre Clash 1.0 @Bundle ()@ instance
+  , TaggedEmptyTuple
   ) where
 
 import           Control.Applicative           (liftA2)
@@ -219,3 +218,17 @@ instance KnownNat d => Bundle (RTree d a) where
   type Unbundled t delay (RTree d a) = RTree d (DSignal t delay a)
   bundle   = sequenceA
   unbundle = sequenceA . fmap lazyT
+
+-- | Same as "Clash.Signal.Bundle.TaggedEmptyTuple", but adapted for "DSignal".
+data TaggedEmptyTuple (dom :: Domain) (d :: Nat) = TaggedEmptyTuple
+
+-- | See https://github.com/clash-lang/clash-compiler/pull/539/commits/94b0bff5770aa4961e04ddce2515130df3fc7863
+-- and documentation for "TaggedEmptyTuple".
+instance Bundle B.EmptyTuple where
+  type Unbundled dom d B.EmptyTuple = TaggedEmptyTuple dom d
+
+  bundle :: TaggedEmptyTuple dom d -> DSignal dom d B.EmptyTuple
+  bundle TaggedEmptyTuple = pure B.EmptyTuple
+
+  unbundle :: DSignal dom d B.EmptyTuple -> TaggedEmptyTuple dom d
+  unbundle s = seq s TaggedEmptyTuple
