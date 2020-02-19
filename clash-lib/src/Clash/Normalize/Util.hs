@@ -25,6 +25,7 @@ module Clash.Normalize.Util
  , isNonRecursiveGlobalVar
  , constantSpecInfo
  , normalizeTopLvlBndr
+ , propagateLocalWorkFree
  , rewriteExpr
  , removedTm
  , mkInlineTick
@@ -65,7 +66,7 @@ import           Clash.Core.VarEnv
   (VarEnv, emptyInScopeSet, emptyVarEnv, extendVarEnv, extendVarEnvWith,
    lookupVarEnv, unionVarEnvWith, unitVarEnv, extendInScopeSetList)
 import           Clash.Driver.Types      (BindingMap, Binding(..), DebugLevel (..))
-import {-# SOURCE #-} Clash.Normalize.Strategy (normalization)
+import {-# SOURCE #-} Clash.Normalize.Strategy (normalization, transPropagateLocal)
 import           Clash.Normalize.Types
 import           Clash.Primitives.Util   (constantArgs)
 import           Clash.Rewrite.Types
@@ -413,6 +414,20 @@ normalizeTopLvlBndr isTop nm (Binding nm' sp inl tm) = makeCachedU nm (extra.nor
   curFun .= old
   let ty' = termType tcm tm3
   return (Binding nm'{varType = ty'} sp inl tm3)
+
+-- | Run local constant propagation (i.e. not specialization) on a work-free
+-- top-level binder.
+propagateLocalWorkFree
+  :: Binding
+  -> NormalizeSession Binding
+propagateLocalWorkFree (Binding nm sp inl tm) = makeCachedU nm (extra.workFreeCache) $ do
+  old <- Lens.use curFun
+  tm1 <- rewriteExpr ("propagateLocalWorkFree",transPropagateLocal)
+                     (showPpr (varName nm),tm)
+                     (nm,sp)
+  curFun .= old
+  return (Binding nm sp inl tm1)
+{-# SCC propagateLocalWorkFree #-}
 
 -- | Turn type equality constraints into substitutions and apply them.
 --

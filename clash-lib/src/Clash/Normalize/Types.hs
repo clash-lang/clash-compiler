@@ -68,6 +68,11 @@ data NormalizeState
   -- ^ High-effort normalization session, trading performance improvement for
   -- potentially much longer compile times. Follows the 'Clash.Driver.opt_ultra'
   -- flag.
+  , _workFreeCache :: BindingMap
+  -- ^ Cache of work-free top-level binders with a certain set of transformation
+  -- already applied to them
+  , _inlineWFCacheLimit :: !Word
+  -- ^ At what size do we cache apply transformed work-free top-level binders
   }
 
 makeLenses ''NormalizeState

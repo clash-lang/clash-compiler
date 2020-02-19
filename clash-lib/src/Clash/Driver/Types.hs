@@ -110,6 +110,9 @@ data ClashOpts = ClashOpts { opt_inlineLimit :: Int
                            -- ^ Enable aggressive X optimization, which may
                            -- remove undefineds from generated HDL by replaced
                            -- with defined alternatives.
+                           , opt_inlineWFCacheLimit :: Word
+                           -- ^ When do we start caching transformed work-free
+                           -- top-level binders.
                            }
 
 instance Hashable ClashOpts where
@@ -138,7 +141,8 @@ instance Hashable ClashOpts where
     opt_ultra `hashWithSalt`
     opt_forceUndefined `hashWithSalt`
     opt_checkIDir `hashWithSalt`
-    opt_aggressiveXOpt
+    opt_aggressiveXOpt `hashWithSalt`
+    opt_inlineWFCacheLimit
    where
     hashOverridingBool :: Int -> OverridingBool -> Int
     hashOverridingBool s1 Auto = hashWithSalt s1 (0 :: Int)
@@ -176,6 +180,7 @@ defClashOpts
   , opt_forceUndefined      = Nothing
   , opt_checkIDir           = True
   , opt_aggressiveXOpt      = False
+  , opt_inlineWFCacheLimit  = 10
   }
 
 -- | Information about the generated HDL between (sub)runs of the compiler

@@ -65,7 +65,8 @@ import           Clash.Core.FreeVars
 import           Clash.Core.Name
 import           Clash.Core.Pretty           (showPpr)
 import           Clash.Core.Subst
-  (aeqTerm, aeqType, deShadowTerm, extendIdSubst, mkSubst, substTm)
+  (aeqTerm, aeqType, deShadowTerm, extendIdSubst, mkSubst, substTm,
+   extendGblSubstList)
 import           Clash.Core.Term
   (LetBinding, Pat (..), Term (..), CoreContext (..), Context, PrimInfo (..),
    TmName, WorkInfo (..), TickInfo, collectArgs, collectArgsTicks)
@@ -83,7 +84,7 @@ import           Clash.Core.Var
   (Id, IdScope (..), TyVar, Var (..), isLocalId, mkGlobalId, mkLocalId, mkTyVar)
 import           Clash.Core.VarEnv
   (InScopeSet, VarEnv, elemVarSet, extendInScopeSetList, mkInScopeSet,
-   notElemVarEnv, uniqAway, uniqAway')
+   notElemVarEnv, uniqAway, uniqAway', emptyInScopeSet)
 import           Clash.Driver.Types
   (DebugLevel (..), BindingMap, Binding(..))
 import           Clash.Netlist.Util          (representableType)
@@ -626,7 +627,7 @@ liftBinding (var@Id {varName = idName} ,e) = do
       newBody = mkTyLams (mkLams e' boundFVs) boundFTVs
 
   -- Check if an alpha-equivalent global binder already exists
-  aeqExisting <- (eltsUniqMap . filterUniqMap ((`aeqTerm` newBody) . bindingTerm)) <$> Lens.use bindings
+  aeqExisting <- (eltsUniqMap . filterUniqMap (gblCompare newBodyId newBody)) <$> Lens.use bindings
   case aeqExisting of
     -- If it doesn't, create a new binder
     [] -> do -- Add the created function to the list of global bindings
@@ -657,6 +658,10 @@ liftBinding (var@Id {varName = idName} ,e) = do
                                 (map VarTy boundFTVs))
                       (map Var boundFVs)
       in  return (var, newExpr')
+ where
+  gblCompare nm eN (Binding nm1 _ _ e1)  =
+    let s = extendGblSubstList (mkSubst emptyInScopeSet) [(nm,Var nm1)]
+    in  aeqTerm (substTm "liftBinding.gblCompare" s eN) e1
 
 liftBinding _ = error $ $(curLoc) ++ "liftBinding: invalid core, expr bound to tyvar"
 

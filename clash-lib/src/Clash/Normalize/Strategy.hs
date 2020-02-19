@@ -107,6 +107,32 @@ constantPropagation = inlineAndPropagate >->
       , ("nonRepSpec"  , nonRepSpec)
       ]
 
+-- | Local propagation transformations, used by 'propagateLocalWorkFree
+transPropagateLocal :: NormRewrite
+transPropagateLocal =
+  topdownR (applyMany [ ("applicationPropagation", appPropFast)
+                      , ("bindConstantVar"       , bindConstantVar)
+                      , ("caseLet"               , caseLet)
+                      , ("caseCase"              , caseCase)
+                      , ("caseCon"               , caseCon)
+                      , ("elemExistentials"      , elemExistentials)
+                      , ("caseElemNonReachable"  , caseElemNonReachable)
+                      , ("removeUnusedExpr"      , removeUnusedExpr)
+                      , ("bindOrLiftNonRep"      , inlineOrLiftNonRep)
+                      , ("reduceNonRepPrim"      , reduceNonRepPrim)
+                      , ("caseCast"              , caseCast)
+                      , ("letCast"               , letCast)
+                      , ("splitCastWork"         , splitCastWork)
+                      , ("argCastSpec"           , argCastSpec)
+                      , ("inlineCast"            , inlineCast)
+                      , ("eliminateCastCast"     , eliminateCastCast)
+                      ])
+  >-> bottomupR (applyMany [ ("typeSpec"    , typeSpec)
+                           , ("nonRepSpec"  , nonRepSpec)
+                           ])
+  >-> apply "recToLetRec" recToLetRec
+
+
 {- [Note] bottom-up traversal for liftNonRep
 We used to say:
 

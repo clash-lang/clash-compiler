@@ -116,14 +116,14 @@ import           Clash.Core.Util
    isSignalType, isVar, mkApps, mkLams, mkVec, piResultTy, termSize, termType,
    tyNatSize, patVars, isAbsurdAlt, altEqs, substInExistentialsList,
    solveNonAbsurds, patIds, isLocalVar, undefinedTm, stripTicks, mkTicks,
-   shouldSplit, inverseTopSortLetBindings)
+   shouldSplit, inverseTopSortLetBindings, collectBndrs)
 import           Clash.Core.Var
   (Id, TyVar, Var (..), isGlobalId, isLocalId, mkLocalId)
 import           Clash.Core.VarEnv
   (InScopeSet, VarEnv, VarSet, elemVarSet,
    emptyVarEnv, emptyVarSet, extendInScopeSet, extendInScopeSetList, lookupVarEnv,
    notElemVarSet, unionVarEnvWith, unionVarSet, unionInScope, unitVarEnv,
-   unitVarSet, mkVarSet, mkInScopeSet, uniqAway)
+   unitVarSet, mkVarSet, mkInScopeSet, uniqAway, notElemInScopeSet)
 import           Clash.Driver.Types          (Binding(..), DebugLevel (..))
 import           Clash.Netlist.BlackBox.Types (Element(Err))
 import           Clash.Netlist.BlackBox.Util (getUsedArguments)
@@ -1106,8 +1106,9 @@ inlineWorkFree _ e@(Var f) = do
       closed   = not (isPolyFunCoreTy tcm fTy)
       isSignal = isSignalType tcm fTy
   untranslatable <- isUntranslatableType True fTy
+  topEnts <- Lens.view topEntities
   let gv = isGlobalId f
-  if closed && not untranslatable && not isSignal && gv
+  if closed && f `notElemVarSet` topEnts && not untranslatable && not isSignal && gv
     then do
       bndrs <- Lens.use bindings
       case lookupVarEnv f bndrs of
@@ -1117,9 +1118,15 @@ inlineWorkFree _ e@(Var f) = do
           if isRecBndr
              then return e
              else do
-              topEnts <- Lens.view topEntities
-              b <- normalizeTopLvlBndr (f `elemVarSet` topEnts) f top
-              changed (bindingTerm b)
+              let topB = bindingTerm top
+              sizeLimit <- Lens.use (extra.inlineWFCacheLimit)
+              -- caching only worth it from a certain size onwards, otherwise
+              -- the caching mechanism itself brings more of an overhead.
+              if termSize topB < sizeLimit then
+                changed (bindingTerm top)
+              else do
+                b <- propagateLocalWorkFree top
+                changed (bindingTerm b)
         _ -> return e
     else return e
 
@@ -1859,12 +1866,111 @@ isClassConstraint (tyView -> TyConApp nm0 _) =
 isClassConstraint _ = False
 
 
+
+recToLetRec :: HasCallStack => NormRewrite
+recToLetRec ctx@(TransformContext is0 []) e@(collectBndrs -> (bndrs,rest))
+  | (bndrs1,[]) <- Either.partitionEithers bndrs
+  = do
+  (fn,_) <- Lens.use curFun
+  tcm    <- Lens.view tcCache
+  let is1 = extendInScopeSetList is0 bndrs1
+  (v,isT,rest1,cont) <-
+    case rest of
+      Letrec _ (Var res)
+        | isLocalId res
+        , res `notElemInScopeSet` is1
+        -> return (res,is1,rest,id)
+      _ -> do
+        vN <- mkTmBinderFor is1 tcm (mkDerivedName ctx "recRes") rest
+        let is2 = extendInScopeSet is1 vN
+        return (vN,is2,deShadowTerm is2 rest,\eN -> Letrec [(vN,eN)] (Var vN))
+  (rest2, Monoid.getAny -> hasChanged) <-
+    listen (topdownR (replaceEqApp tcm v fn (map Var bndrs1))
+                     (TransformContext isT [])
+                     rest1)
+  if hasChanged
+     then return (mkLams (cont rest2) bndrs1)
+     else return e
+ where
+  replaceEqApp tcm vN v args _ (collectArgs . stripTicks -> (Var v',args'))
+    | isGlobalId v'
+    , v == v'
+    , let args2 = Either.lefts args'
+    , length args == length args2
+    , and (zipWith (eqArg tcm) args args2)
+    = changed (Var vN)
+  replaceEqApp _ _ _ _ _ e0 = return e0
+
+  eqArg _ v1 v2@(stripTicks -> Var {})
+    = v1 == v2
+  eqArg tcm v1 v2@(collectArgs . stripTicks -> (Data _, args'))
+    | let t1 = termType tcm v1
+    , let t2 = termType tcm v2
+    , t1 == t2
+    = if isClassConstraint t1 then
+        -- Class constraints are equal if their types are equal, so we can
+        -- take a shortcut here.
+        True
+      else
+        -- Check whether all arguments to the data constructor are projections
+        --
+        and (zipWith (eqDat v1) (map pure [0..]) (Either.lefts args'))
+  eqArg _ _ _
+    = False
+
+  -- Recursively check whether a term /e/ is semantically equal to some variable /v/.
+  -- Currently it can only assert equality when /e/ is  syntactically equal
+  -- to /v/, or is constructed out of projections of /v/, importantly:
+  --
+  -- [Note: Breaks on constants and predetermined equality]
+  -- This function currently breaks if:
+  --
+  --   * One or more subfields are constants. Constants might have been
+  --     inlined for the construction, instead of being a projection of the
+  --     target variable.
+  --
+  --   * One or more subfields are determined to be equal and one is simply
+  --     swapped / replaced by the other. For example, say we have
+  --     `x :: (a, a)`. If GHC determines that both elements of the tuple will
+  --     always be the same, it might replace the (semantically equal to 'x')
+  --     construction of `y` with `(fst x, fst x)`.
+  --
+  eqDat :: Term -> [Int] -> Term -> Bool
+  eqDat v fTrace (collectArgs . stripTicks -> (Data _, args)) =
+    and (zipWith (eqDat v) (map (:fTrace) [0..]) (Either.lefts args))
+  eqDat v1 fTrace v2 =
+    case stripProjection (reverse fTrace) v1 v2 of
+      Just [] -> True
+      _ -> False
+
+  stripProjection :: [Int] -> Term -> Term -> Maybe [Int]
+  stripProjection fTrace0 vTarget0 (Case v _ [(DataPat _ _ xs, r)]) = do
+    -- Get projection made in subject of case:
+    fTrace1 <- stripProjection fTrace0 vTarget0 v
+
+    -- Extract projection of this case statement. Subsequent calls to
+    -- 'stripProjection' will check if new target is actually used.
+    n <- headMaybe fTrace1
+    vTarget1 <- indexMaybe xs n
+    fTrace2 <- tailMaybe fTrace1
+
+    stripProjection fTrace2 (Var vTarget1) r
+
+  stripProjection fTrace (Var sTarget) (Var s) =
+    if sTarget == s then Just fTrace else Nothing
+
+  stripProjection _fTrace _vTarget _v =
+    Nothing
+
+recToLetRec _ e = return e
+{-# SCC recToLetRec #-}
+
 -- | Turn a  normalized recursive function, where the recursive calls only pass
 -- along the unchanged original arguments, into let-recursive function. This
 -- means that all recursive calls are replaced by the same variable reference as
 -- found in the body of the top-level let-expression.
-recToLetRec :: HasCallStack => NormRewrite
-recToLetRec (TransformContext is0 []) e = do
+recToLetRecOld :: HasCallStack => NormRewrite
+recToLetRecOld (TransformContext is0 []) e = do
   (fn,_) <- Lens.use curFun
   tcm    <- Lens.view tcCache
   case splitNormalized tcm e of
@@ -1968,8 +2074,7 @@ recToLetRec (TransformContext is0 []) e = do
     stripProjection _fTrace _vTarget _v =
       Nothing
 
-recToLetRec _ e = return e
-{-# SCC recToLetRec #-}
+recToLetRecOld _ e = return e
 
 -- | Inline a function with functional arguments
 inlineHO :: HasCallStack => NormRewrite

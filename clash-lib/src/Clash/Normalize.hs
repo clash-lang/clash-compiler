@@ -144,6 +144,8 @@ runNormalization opts supply globals typeTrans reprs tcm tupTcm eval primMap rcs
                   rcsMap
                   (opt_newInlineStrat opts)
                   (opt_ultra opts)
+                  emptyVarEnv
+                  (opt_inlineWFCacheLimit opts)
 
 
 normalize

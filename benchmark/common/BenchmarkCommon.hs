@@ -33,6 +33,7 @@ defaultTests =
   , "examples/Queens.hs"
   , "benchmark/tests/BundleMapRepeat.hs"
   , "benchmark/tests/PipelinesViaFolds.hs"
+  , "tests/shouldwork/Basic/AES.hs"
   ]
 
 typeTrans :: (CustomReprs -> TyConMap -> Type ->
