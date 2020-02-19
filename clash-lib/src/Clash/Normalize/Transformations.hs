@@ -1106,8 +1106,9 @@ inlineWorkFree _ e@(Var f) = do
       closed   = not (isPolyFunCoreTy tcm fTy)
       isSignal = isSignalType tcm fTy
   untranslatable <- isUntranslatableType True fTy
+  topEnts <- Lens.view topEntities
   let gv = isGlobalId f
-  if closed && not untranslatable && not isSignal && gv
+  if closed && f `notElemVarSet` topEnts && not untranslatable && not isSignal && gv
     then do
       bndrs <- Lens.use bindings
       case lookupVarEnv f bndrs of
@@ -1117,9 +1118,15 @@ inlineWorkFree _ e@(Var f) = do
           if isRecBndr
              then return e
              else do
-              topEnts <- Lens.view topEntities
-              b <- normalizeTopLvlBndr (f `elemVarSet` topEnts) f top
-              changed (bindingTerm b)
+              let topB = bindingTerm top
+              sizeLimit <- Lens.use (extra.inlineWFCacheLimit)
+              -- caching only worth it from a certain size onwards, otherwise
+              -- the caching mechanism itself brings more of an overhead.
+              if termSize topB < sizeLimit then
+                changed topB
+              else do
+                b <- normalizeTopLvlBndr False f top
+                changed (bindingTerm b)
         _ -> return e
     else return e
 

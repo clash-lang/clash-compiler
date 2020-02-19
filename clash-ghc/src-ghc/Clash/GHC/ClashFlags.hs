@@ -84,6 +84,7 @@ flagsClash r = [
   , defFlag "fclash-compile-ultra"               $ NoArg (liftEwM (setUltra r))
   , defFlag "fclash-force-undefined"             $ OptIntSuffix (setUndefined r)
   , defFlag "fclash-aggressive-x-optimization"   $ NoArg (liftEwM (setAggressiveXOpt r))
+  , defFlag "fclash-inline-workfree-limit"       $ IntSuffix (liftEwM . setInlineWFLimit r)
   ]
 
 -- | Print deprecated flag warning
@@ -118,6 +119,12 @@ setInlineConstantLimit
   -> Int
   -> IO ()
 setInlineConstantLimit r n = modifyIORef r (\c -> c {opt_inlineConstantLimit = toEnum n})
+
+setInlineWFLimit
+  :: IORef ClashOpts
+  -> Int
+  -> IO ()
+setInlineWFLimit r n = modifyIORef r (\c -> c {opt_inlineWFCacheLimit = toEnum n})
 
 setSpecLimit :: IORef ClashOpts
              -> Int

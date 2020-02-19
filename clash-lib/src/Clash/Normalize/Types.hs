@@ -68,6 +68,8 @@ data NormalizeState
   -- ^ High-effort normalization session, trading performance improvement for
   -- potentially much longer compile times. Follows the 'Clash.Driver.opt_ultra'
   -- flag.
+  , _inlineWFCacheLimit :: !Word
+  -- ^ At what size do we cache normalized work-free top-level binders.
   }
 
 makeLenses ''NormalizeState
