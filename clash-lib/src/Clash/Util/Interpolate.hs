@@ -42,7 +42,7 @@ OTHER DEALINGS IN THE SOFTWARE.
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE TemplateHaskell #-}
 
-module Clash.Util.Interpolate where
+module Clash.Util.Interpolate(i) where
 
 import           Language.Haskell.Meta.Parse (parseExp)
 import           Language.Haskell.TH.Lib     (appE, varE)
@@ -57,8 +57,8 @@ import           Text.Read              (readMaybe)
 
 data Line
   = EmptyLine
-  | ExprLine Int String
-  | Line Int [Node]
+  | ExprLine Indent String
+  | Line Indent [Node]
   deriving (Show)
 
 data Node
@@ -96,10 +96,10 @@ showLines ns = init (concatMap showLine ns)
   nodeToString (Literal s) = s
   nodeToString (Expression s) = s
 
-  commonIndent :: Int
+  commonIndent :: Indent
   commonIndent = foldl1 min (catMaybes (map indent ns))
 
-  indent :: Line -> Maybe Int
+  indent :: Line -> Maybe Indent
   indent EmptyLine = Nothing
   indent (ExprLine n _) = Just n
   indent (Line n _) = Just n
