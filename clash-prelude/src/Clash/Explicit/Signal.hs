@@ -230,6 +230,8 @@ module Clash.Explicit.Signal
   , (.&&.), (.||.)
     -- * Product/Signal isomorphism
   , Bundle(..)
+  , EmptyTuple(..)
+  , TaggedEmptyTuple(..)
     -- * Simulation functions (not synthesizable)
   , simulate
   , simulateB
@@ -270,7 +272,8 @@ import           GHC.TypeLits                   (type (+), type (<=))
 import           Clash.Annotations.Primitive    (hasBlackBox)
 import           Clash.Class.Num                (satSucc, SaturationMode(SatBound))
 import           Clash.Promoted.Nat             (SNat(..), snatToNum)
-import           Clash.Signal.Bundle            (Bundle (..), vecBundle#)
+import           Clash.Signal.Bundle
+  (Bundle (..), EmptyTuple(..), TaggedEmptyTuple(..), vecBundle#)
 import           Clash.Signal.BiSignal
 import           Clash.Signal.Internal
 import           Clash.Signal.Internal.Ambiguous

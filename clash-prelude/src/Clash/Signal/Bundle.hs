@@ -23,6 +23,9 @@ The Product/Signal isomorphism
 
 module Clash.Signal.Bundle
   ( Bundle (..)
+  -- ** Tools to emulate pre Clash 1.0 @Bundle ()@ instance
+  , EmptyTuple(..)
+  , TaggedEmptyTuple(..)
   -- ** Internal
   , vecBundle#
   )
@@ -166,3 +169,41 @@ instance Bundle ((f :*: g) a) where
    where
     getL (l :*: _) = l
     getR (_ :*: r) = r
+
+-- | See "TaggedEmptyTuple"
+data EmptyTuple = EmptyTuple
+
+-- | Helper type to emulate the "old" behavior of Bundle's unit instance. I.e.,
+-- the instance for @Bundle ()@ used to be defined as:
+--
+--     class Bundle () where
+--       bundle   :: () -> Signal domain ()
+--       unbundle :: Signal domain () -> ()
+--
+-- In order to have sensible type inference, the "Bundle" class specifies that
+-- the argument type of 'bundle' should uniquely identify the result type, and
+-- vice versa for 'unbundle'. The type signatures in the snippet above don't
+-- though, as @()@ doesn't uniquely map to a specific domain. In other words,
+-- 'domain' should occur in both the argument and result of both functions.
+--
+-- "TaggedEmptyTuple" tackles this by carrying the domain in its type. The
+-- 'bundle' and 'unbundle' instance now looks like:
+--
+--     class Bundle EmptyTuple where
+--       bundle   :: TaggedEmptyTuple domain -> Signal domain EmptyTuple
+--       unbundle :: Signal domain EmptyTuple -> TaggedEmptyTuple domain
+--
+-- @domain@ is now mentioned both the argument and result for both 'bundle' and
+-- 'unbundle'.
+data TaggedEmptyTuple (dom :: Domain) = TaggedEmptyTuple
+
+-- | See https://github.com/clash-lang/clash-compiler/pull/539/commits/94b0bff5770aa4961e04ddce2515130df3fc7863
+-- and documentation for "TaggedEmptyTuple".
+instance Bundle EmptyTuple where
+  type Unbundled dom EmptyTuple = TaggedEmptyTuple dom
+
+  bundle :: TaggedEmptyTuple dom -> Signal dom EmptyTuple
+  bundle TaggedEmptyTuple = pure EmptyTuple
+
+  unbundle :: Signal dom EmptyTuple -> TaggedEmptyTuple dom
+  unbundle s = seq s TaggedEmptyTuple
