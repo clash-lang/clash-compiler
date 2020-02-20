@@ -165,13 +165,48 @@ type KiName     = Name Kind
 -- representation of newtypes. So what are those additional 2 arguments compared to
 -- the "normal" function type? They're the kinds of argument and result type.
 tyView :: Type -> TypeView
-tyView ty@(AppTy _ _) = case splitTyAppM ty of
-  Just (ConstTy Arrow, [ty1,ty2]) -> FunTy ty1 ty2
-  Just (ConstTy Arrow, [_,_,ty1,ty2]) -> FunTy ty1 ty2 -- See Note [Arrow arguments]
-  Just (ConstTy (TyCon tc), args) -> TyConApp tc args
-  _ -> OtherType ty
-tyView (ConstTy (TyCon tc)) = TyConApp tc []
-tyView t = OtherType t
+-- XXX: this is a manually unrolled version of:
+--
+-- tyView tOrig = go [] tOrig
+--  where
+--   go args t = case t of
+--     ConstTy c -> case c of
+--       TyCon tc -> TyConApp tc args
+--       Arrow -> case args of
+--         (arg:res:rest) -> case rest of
+--           [] -> FunTy arg res
+--           [arg1,res1] -> FunTy arg1 res1
+--           _ -> OtherType tOrig
+--     AppTy l r -> go (r:args) l
+--     _ -> OtherType tOrig
+--
+-- To get a FunTy without recursive calls. Because it is called so often this
+-- saves us 5-10% runtime.
+tyView tOrig = case tOrig of
+  ConstTy c -> case c of
+    TyCon tc -> TyConApp tc []
+    _ -> OtherType tOrig
+  AppTy l0 res -> case l0 of
+    ConstTy (TyCon tc) -> TyConApp tc [res]
+    AppTy l1 arg -> case l1 of
+      ConstTy Arrow -> FunTy arg res
+      ConstTy (TyCon tc) -> TyConApp tc [arg,res]
+      AppTy l2 resK -> case l2 of
+        ConstTy (TyCon tc) -> TyConApp tc [resK,arg,res]
+        AppTy l3 argK -> case l3 of
+          ConstTy (TyCon tc) -> TyConApp tc [argK,resK,arg,res]
+          ConstTy Arrow -> FunTy arg res -- See Note [Arrow arguments]
+          _ -> case go [argK,resK,arg,res] l3 of
+            (ConstTy (TyCon tc),args)
+              -> TyConApp tc args
+            _ -> OtherType tOrig
+        _ -> OtherType tOrig
+      _ -> OtherType tOrig
+    _ -> OtherType tOrig
+  _ -> OtherType tOrig
+ where
+  go args (AppTy ty1 ty2) = go (ty2:args) ty1
+  go args t1              = (t1,args)
 
 -- | A view on types in which newtypes are transparent, the Signal type is
 -- transparent, and type functions are evaluated to WHNF (when possible).
@@ -361,17 +396,6 @@ applyFunTy :: TyConMap
 applyFunTy m (coreView1 m -> Just ty)   arg = applyFunTy m ty arg
 applyFunTy _ (tyView -> FunTy _ resTy) _    = resTy
 applyFunTy _ _ _ = error $ $(curLoc) ++ "Report as bug: not a FunTy"
-
--- | Split a type application in the applied type and the argument types
-splitTyAppM :: Type
-            -> Maybe (Type, [Type])
-splitTyAppM = fmap (second reverse) . go []
-  where
-    go args (AppTy ty1 ty2) =
-      case go args ty1 of
-        Nothing             -> Just (ty1,ty2:args)
-        Just (ty1',ty1args) -> Just (ty1',ty2:ty1args )
-    go _ _ = Nothing
 
 -- Type function substitutions
 
