@@ -3,11 +3,25 @@
 
 module Clash.Signal.Bundle.Internal where
 
-import           Clash.CPP             (maxTupleSize)
-import           Clash.Signal.Internal (Signal)
-import           Control.Monad         (replicateM)
-import           Data.List             (foldl')
+import           Control.Monad               (liftM)
+import           Clash.Annotations.Primitive (Primitive(InlinePrimitive))
+import           Clash.CPP                   (maxTupleSize)
+import           Clash.Signal.Internal       (Signal((:-)))
+import           Clash.XException            (seqX)
+import           Data.List                   (foldl')
+import qualified Language.Haskell.TH.Syntax  as TH
 import           Language.Haskell.TH
+
+idPrimitive :: TH.Name -> DecQ
+idPrimitive nm =
+  PragmaD . AnnP (ValueAnnotation nm) <$> TH.liftData ip
+ where
+  ipJson = "[{\"Primitive\": {\"name\": \"" ++ show nm ++ "\", \"primType\": \"Function\"}}]"
+  ip = InlinePrimitive [minBound..maxBound] ipJson
+
+-- | Monadic version of concatMap
+concatMapM :: Monad m => (a -> m [b]) -> [a] -> m [b]
+concatMapM f xs = liftM concat (mapM f xs)
 
 -- | Contruct all the tuple instances for Bundle.
 deriveBundleTuples
@@ -24,69 +38,130 @@ deriveBundleTuples bundleTyName unbundledTyName bundleName unbundleName = do
   let bundleTy = ConT bundleTyName
       signal   = ConT ''Signal
 
-  allNames <- replicateM maxTupleSize (newName "a")
-  tempNames <- replicateM maxTupleSize (newName "b")
-  t <- newName "t"
-  x <- newName "x"
-  tup <- newName "tup"
+      aNamesAll = map (\i -> mkName ('a':show i)) [1..maxTupleSize::Int]
+      aPrimeNamesAll = map (\i -> mkName ('a':show i++"'")) [1..maxTupleSize::Int]
+      asNamesAll = map (\i -> mkName ("as" <> show i)) [1..maxTupleSize::Int]
+      tNm = mkName "t"
+      sTailNm = mkName "sTail"
+      sNm = mkName "s"
 
-  pure $ flip map [2..maxTupleSize] $ \tupleNum ->
-    let names = take tupleNum allNames
-        temps = take tupleNum tempNames
-        vars  = fmap VarT names
-        tuple = foldl' AppT (TupleT tupleNum)
+  flip concatMapM [2..maxTupleSize] $ \tupleNum ->
+    let aNames = take tupleNum aNamesAll
+        aPrimeNames = take tupleNum aPrimeNamesAll
+        asNames = take tupleNum asNamesAll
+        vars  = fmap VarT aNames
+
+        bundlePrimName = mkName ("bundle" ++ show tupleNum ++ "#")
+        unbundlePrimName = mkName ("unbundle" ++ show tupleNum ++ "#")
+        qualBundleNm = mkName ("Clash.Signal.Bundle.bundle" ++ show tupleNum ++ "#")
+        qualUnbundlePrimName = mkName ("Clash.Signal.Bundle.unbundle" ++ show tupleNum ++ "#")
+
+        mkTupleT = foldl' AppT (TupleT tupleNum)
 
         -- Instance declaration
-        instTy = AppT bundleTy $ tuple vars
+        instTy = AppT bundleTy $ mkTupleT vars
 
         -- Associated type Unbundled
 #if MIN_VERSION_template_haskell(2,15,0)
         unbundledTypeEq =
           TySynEqn Nothing
             ((ConT unbundledTyName `AppT`
-                VarT t ) `AppT` tuple vars )
-            $ tuple $ map (AppT (signal `AppT` VarT t)) vars
+                VarT tNm ) `AppT` mkTupleT vars )
+            $ mkTupleT $ map (AppT (signal `AppT` VarT tNm)) vars
         unbundledType = TySynInstD unbundledTypeEq
 #else
         unbundledTypeEq =
           TySynEqn
-            [ VarT t, tuple vars ]
-            $ tuple $ map (AppT (signal `AppT` VarT t)) vars
+            [ VarT tNm, mkTupleT vars ]
+            $ mkTupleT $ map (AppT (signal `AppT` VarT tNm)) vars
         unbundledType = TySynInstD unbundledTyName unbundledTypeEq
 #endif
 
-        bundleLambda = LamE (map VarP temps) (TupE $ map VarE temps)
-        applicatives = VarE '(<$>) : repeat (VarE '(<*>))
-        bundle =
+        mkFunD nm alias = FunD nm [Clause [] (NormalB (VarE alias)) []]
+        bundleD = mkFunD bundleName bundlePrimName
+        unbundleD = mkFunD unbundleName unbundlePrimName
+
+        sigType t = ConT ''Signal `AppT` VarT (mkName "dom") `AppT` t
+
+        -- unbundle3# ~s@((a, b, c) :- abcs) =
+        --   let (as, bs, cs) = s `seq` unbundle3# abcs in
+        --   (a :- as, b :- bs, c :- cs)
+        unbundleNoInlineAnn = PragmaD (InlineP unbundlePrimName NoInline FunLike AllPhases)
+
+        unbundleSig = SigD unbundlePrimName (
+          mkFunTys
+            [mkTupleT (map sigType (map VarT aNames))]
+            (sigType (mkTupleT (map VarT aNames)))
+          )
+
+        seqE nm res = UInfixE (VarE nm) (VarE 'seq) res
+        seqXE nm res = UInfixE (VarE nm) (VarE 'seqX) res
+
+        unbundleFBody =
+          LetE
+            [ ValD
+                (TupP (map VarP asNames))
+                (NormalB (
+                  tNm `seqXE` (sNm `seqE` (VarE unbundlePrimName `AppE` VarE sTailNm)))) []]
+            (TupE
+              (zipWith
+                (\a as -> UInfixE (VarE a) (ConE '(:-)) (VarE as))
+                aNames
+                asNames))
+
+        unbundleF =
           FunD
-            bundleName
-            [ Clause
-                [ TupP $ map VarP names ]
-                ( NormalB
-                $ foldl'
-                    (\f (a, b) -> a `AppE` f `AppE` b)
-                    bundleLambda
-                    (zip applicatives $ map VarE names)
-                )
-                []
-            ]
+            unbundlePrimName
+            [Clause
+              [AsP sNm (TildeP (UInfixP
+                                 (AsP tNm (TildeP (TupP (map VarP aNames))))
+                                 '(:-)
+                                 (VarP sTailNm)))]
+              (NormalB unbundleFBody)
+              [] ]
 
-        unbundleLambda n =
-          LamE
-            [ TupP [ if i == n then VarP x else WildP | i <- [0..tupleNum-1] ] ]
-            (VarE x)
+        -- bundle2# (a1, a2) = (\ a1' a2' -> (a1', a2')) <$> a1 <*> a2
+        bundleNoInlineAnn = PragmaD (InlineP bundlePrimName NoInline FunLike AllPhases)
 
-        unbundle =
+        bundleSig = SigD bundlePrimName (
+          mkFunTys
+            [sigType (mkTupleT (map VarT aNames))]
+            (mkTupleT (map sigType (map VarT aNames)))
+          )
+
+        bundleFmap =
+          UInfixE
+            (LamE (map VarP aPrimeNames) (TupE (map VarE aPrimeNames)))
+            (VarE '(<$>))
+            (VarE (head aNames))
+
+        bundleFBody =
+          foldl'
+            (\e n -> UInfixE e (VarE '(<*>)) (VarE n))
+            bundleFmap
+            (tail aNames)
+
+        bundleF =
           FunD
-            unbundleName
-            [ Clause
-                [ VarP tup ]
-                ( NormalB . TupE $
-                    map
-                      (\n -> VarE 'fmap `AppE` unbundleLambda n `AppE` VarE tup)
-                      [0..tupleNum-1]
-                )
-                []
-            ]
+            bundlePrimName
+            [Clause
+              [TupP (map VarP aNames)]
+              (NormalB bundleFBody)
+              [] ]
+    in do
+      unbundlePrimAnn <- idPrimitive qualUnbundlePrimName
+      bundlePrimAnn <- idPrimitive qualBundleNm
+      pure [ -- Instance and its methods
+             InstanceD Nothing [] instTy [unbundledType, bundleD, unbundleD]
 
-    in InstanceD Nothing [] instTy [unbundledType, bundle, unbundle]
+             -- Bundle primitive
+           , bundleSig, bundleF, bundlePrimAnn, bundleNoInlineAnn
+
+             -- Unbundle primitive
+           , unbundleSig, unbundleF, unbundlePrimAnn, unbundleNoInlineAnn
+           ]
+
+mkFunTys :: Foldable t => t Type -> Type -> Type
+mkFunTys args res= foldl' go res args
+ where
+  go l r = AppT (AppT ArrowT l) r
