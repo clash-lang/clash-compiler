@@ -351,6 +351,14 @@ coreToTerm primMap unlocs = term
         go "Clash.Magic.noDeDup" args
           | [_aTy,f] <- args
           = C.Tick C.NoDeDup <$> term f
+        go nm args
+          | "Clash.Signal.Bundle.unbundle" `Text.isPrefixOf` nm
+          , "#" `Text.isSuffixOf` nm
+          = term (last args)
+        go nm args
+          | "Clash.Signal.Bundle.bundle" `Text.isPrefixOf` nm
+          , "#" `Text.isSuffixOf` nm
+          = term (last args)
 
         go _ _ = term' e
     term' (Var x)                 = var x
