@@ -881,26 +881,31 @@ removeUnusedExpr _ e@(collectArgsTicks -> (p@(Prim pInfo),args,ticks)) = do
       return e
     Just usedArgs1 -> do
       tcm <- Lens.view tcCache
-      args' <- go tcm 0 usedArgs1 args
-      if args == args' then
-        return e
+      (args1, Monoid.getAny -> hasChanged) <- listen (go tcm 0 usedArgs1 args)
+      if hasChanged then
+        return (mkApps (mkTicks p ticks) args1)
       else
-        changed (mkApps (mkTicks p ticks) args')
+        return e
 
   where
     arity = length . Either.rights . fst $ splitFunForallTy (primType pInfo)
 
     go _ _ _ [] = return []
-    go tcm n used (Right ty:args') = do
+    go tcm !n used (Right ty:args') = do
       args'' <- go tcm n used args'
       return (Right ty : args'')
-    go tcm n used (Left tm : args') = do
+    go tcm !n used (Left tm : args') = do
       args'' <- go tcm (n+1) used args'
-      let ty = termType tcm tm
-          p' = removedTm ty
-      if n < arity && n `notElem` used
-         then return (Left p' : args'')
-         else return (Left tm : args'')
+      case tm of
+        TyApp (Prim p0) _
+          | primName p0 == "Clash.Transformations.removedArg"
+          -> return (Left tm : args'')
+        _ -> do
+          let ty = termType tcm tm
+              p' = removedTm ty
+          if n < arity && n `notElem` used
+             then changed (Left p' : args'')
+             else return  (Left tm : args'')
 
 removeUnusedExpr _ e@(Case _ _ [(DataPat _ [] xs,altExpr)]) =
   if xs `localIdsDoNotOccurIn` altExpr
