@@ -7,6 +7,7 @@
 -}
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE PolyKinds #-}
 {-# LANGUAGE TypeFamilies #-}
@@ -20,7 +21,6 @@ module Clash.Signal.Delayed.Bundle (
     Bundle(..)
   -- ** Tools to emulate pre Clash 1.0 @Bundle ()@ instance
   , TaggedUnit
-  , TaggedUnit'(..)
   ) where
 
 import           Control.Applicative           (liftA2)
@@ -220,19 +220,20 @@ instance KnownNat d => Bundle (RTree d a) where
   bundle   = sequenceA
   unbundle = sequenceA . fmap lazyT
 
--- | Internal data type, see "TaggedUnit".
-data TaggedUnit' (d :: k) (dom :: i) = TaggedUnit
-
--- | Same as "Clash.Signal.Bundle", but adapted for "DSignal".
-type TaggedUnit (d :: Nat) (dom :: Domain) = TaggedUnit' '(d, d) '(dom, dom)
+-- | Same as "Clash.Signal.Bundle.TaggedUnit", but adapted for "DSignal".
+type TaggedUnit (d :: Nat) (dom :: Domain) = B.TaggedUnit' '(d, d, dom, dom)
 
 -- | See https://github.com/clash-lang/clash-compiler/pull/539/commits/94b0bff5770aa4961e04ddce2515130df3fc7863
 -- and documentation for "TaggedUnit".
-instance Bundle (TaggedUnit' d1 dom1) where
-  type Unbundled dom d0 (TaggedUnit' d1 dom1) = TaggedUnit' '(d0, d1) '(dom, dom1)
+instance Bundle (B.TaggedUnit' '(d1, dom1)) where
+  type Unbundled dom d0 (B.TaggedUnit' '(d1, dom1)) = B.TaggedUnit' '(d0, d1, dom, dom1)
 
-  bundle :: TaggedUnit' '(d0, d1) '(dom, dom1) -> DSignal dom d0 (TaggedUnit' d1 dom1)
-  bundle TaggedUnit = pure TaggedUnit
+  bundle
+    :: B.TaggedUnit' '(d0, d1, dom, dom1)
+    -> DSignal dom d0 (B.TaggedUnit' '(d1, dom1))
+  bundle B.TaggedUnit = pure B.TaggedUnit
 
-  unbundle :: DSignal dom d0 (TaggedUnit' d1 dom1) -> TaggedUnit' '(d0, d1) '(dom,dom1)
-  unbundle s = seq s TaggedUnit
+  unbundle
+    :: DSignal dom d0 (B.TaggedUnit' '(d1, dom1))
+    -> B.TaggedUnit' '(d0, d1, dom,dom1)
+  unbundle s = seq s B.TaggedUnit

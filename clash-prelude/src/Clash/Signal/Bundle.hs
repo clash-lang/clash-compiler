@@ -171,7 +171,7 @@ instance Bundle ((f :*: g) a) where
     getL (l :*: _) = l
     getR (_ :*: r) = r
 
--- | Internal data type, see "TaggedUnit".
+-- | See "TaggedUnit".
 data TaggedUnit' (dom :: k) = TaggedUnit
 
 -- | Helper type to emulate the "old" behavior of Bundle's unit instance. I.e.,
