@@ -36,7 +36,7 @@ elif [[ $1 == "l" || $1 == "lib" || $1 == "clash-lib" ]]; then
   target="cabal new-repl clash-lib"
   watch="clash-prelude clash-lib/clash-lib.cabal"
 elif [[ $1 == "g" || $1 == "ghc" || $1 == "clash-ghc" ]]; then
-  target="cabal new-repl clash-ghc --repl-options=-fobject-code"
+  target="cabal new-repl clash-ghc --repl-options=-fobject-code --repl-options=-fforce-recomp"
   watch="clash-prelude clash-lib clash-ghc/clash-ghc.cabal"
 elif [[ $1 == "dev" || $1 == "clash-dev" ]]; then
   target="./clash-dev"
