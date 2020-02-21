@@ -78,7 +78,7 @@ import           Clash.Core.Type             (KindOrType, Type (..),
 import           Clash.Core.Util
   (isPolyFun, mkAbstraction, mkApps, mkLams, mkTicks,
    mkTmApps, mkTyApps, mkTyLams, termType, dataConInstArgTysE, isClockOrReset,
-   isEnable)
+   isEnable, piResultTy)
 import           Clash.Core.Var
   (Id, IdScope (..), TyVar, Var (..), isLocalId, mkGlobalId, mkLocalId, mkTyVar)
 import           Clash.Core.VarEnv
@@ -813,14 +813,23 @@ specialise' :: Lens' extra (Map.Map (Id, Int, Either Term Type) Id) -- ^ Lens in
             -> RewriteMonad extra Term
 specialise' specMapLbl specHistLbl specLimitLbl (TransformContext is0 _) e (Var f, args, ticks) specArgIn = do
   lvl <- Lens.view dbgLevel
+  tcm <- Lens.view tcCache
 
   -- Don't specialise TopEntities
   topEnts <- Lens.view topEntities
   if f `elemVarSet` topEnts
-  then traceIf (lvl >= DebugNone) ("Not specialising TopEntity: " ++ showPpr (varName f)) (return e)
+  then do
+    case specArgIn of
+      Left _ -> traceIf (lvl >= DebugNone) ("Not specialising TopEntity: " ++ showPpr (varName f)) (return e)
+      Right tyArg -> traceIf (lvl >= DebugApplied) ("Dropping type application on TopEntity: " ++ showPpr (varName f) ++ "\ntype:\n" ++ showPpr tyArg) $
+        -- TopEntities aren't allowed to be semantically polymorphic.
+        -- But using type equality constraints they may be syntactically polymorphic.
+        -- > topEntity :: forall dom . (dom ~ "System") => Signal dom Bool -> Signal dom Bool
+        -- The TyLam's in the body will have been removed by 'Clash.Normalize.Util.substWithTyEq'.
+        -- So we drop the TyApp ("specialising" on it) and change the varType to match.
+        let newVarTy = piResultTy tcm (varType f) tyArg
+        in  changed (mkApps (mkTicks (Var f{varType = newVarTy}) ticks) args)
   else do -- NondecreasingIndentation
-
-  tcm <- Lens.view tcCache
 
   let specArg = bimap (normalizeTermTypes tcm) (normalizeType tcm) specArgIn
       -- Create binders and variable references for free variables in 'specArg'

@@ -19,7 +19,7 @@ import qualified Prelude as P
     }
   )#-}
 topEntity
-  :: ( dom ~ System       -- Check whether Clash skips eq constraints
+  :: ( dom ~ System        -- gets the 1st name, just like it would be ~ARG[0] in a blackbox
      , HiddenClock dom )   -- Hidden* consists of some construct and a
                            -- KnownDomain. We don't want them to split off.
   => (Enable dom, Signal dom Int)

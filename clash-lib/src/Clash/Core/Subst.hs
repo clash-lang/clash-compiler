@@ -40,6 +40,7 @@ module Clash.Core.Subst
     -- ** Applying substitutions
   , substTm
   , substAlt
+  , substId
     -- * Variable renaming
   , deShadowTerm
   , deShadowAlt
@@ -508,6 +509,13 @@ substAlt doc subst (pat,alt) = case pat of
     (subst1,tvs1) -> case List.mapAccumL substIdBndr subst1 ids of
       (subst2,ids1) -> (DataPat dc tvs1 ids1,substTm doc subst2 alt)
   _ -> (pat, substTm doc subst alt)
+
+substId
+  :: HasCallStack
+  => Subst
+  -> Id
+  -> Id
+substId subst oldId = snd $ substIdBndr subst oldId
 
 -- | Find the substitution for an 'Id' in the 'Subst'
 lookupIdSubst

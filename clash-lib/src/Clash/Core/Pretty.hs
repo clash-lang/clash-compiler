@@ -29,6 +29,7 @@ module Clash.Core.Pretty
 where
 
 import Data.Char                        (isSymbol, isUpper, ord)
+import Data.Default                     (Default(..))
 import Data.Text                        (Text)
 import Control.Monad.Identity
 import qualified Data.Text              as T
@@ -60,6 +61,12 @@ data PrettyOptions = PrettyOptions
   , displayQualifiers :: Bool
   -- ^ whether to display module qualifiers
   }
+instance Default PrettyOptions where
+  def = PrettyOptions
+    { displayUniques    = True
+    , displayTypes      = True
+    , displayQualifiers = True
+    }
 
 -- | Annotations carried on pretty-printed code.
 data ClashAnnotation

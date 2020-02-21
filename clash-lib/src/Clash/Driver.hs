@@ -55,9 +55,11 @@ import           System.IO.Temp
 import           Text.Trifecta.Result
   (Result(Success, Failure), _errDoc)
 import           Text.Read                        (readMaybe)
-import           PrelNames                        (eqTyConKey)
+
+import           PrelNames               (eqTyConKey, ipClassKey)
+import           Unique                  (getKey)
+
 import           SrcLoc                           (SrcSpan)
-import           Unique                           (getKey)
 import           Util                             (OverridingBool(Auto))
 import           GHC.BasicTypes.Extra             ()
 
@@ -74,7 +76,7 @@ import           Clash.Core.Name                  (Name (..))
 import           Clash.Core.Pretty                (PrettyOptions(..), showPpr')
 import           Clash.Core.Term                  (Term)
 import           Clash.Core.Type
-  (Type(VarTy, ForAllTy, AnnType), TypeView(TyConApp, FunTy), tyView, mkFunTy)
+  (Type(ForAllTy, LitTy, AnnType), TypeView(..), tyView, mkFunTy, LitTy(SymTy))
 import           Clash.Core.TyCon                 (TyConMap, TyConName)
 import           Clash.Core.Util                  (shouldSplit)
 import           Clash.Core.Var
@@ -91,7 +93,7 @@ import           Clash.Netlist.Types
    SomeBackend (..), TopEntityT(..))
 import           Clash.Normalize                  (checkNonRecursive, cleanupGraph,
                                                    normalize, runNormalization)
-import           Clash.Normalize.Util             (callGraph)
+import           Clash.Normalize.Util             (callGraph, tvSubstWithTyEq)
 import           Clash.Primitives.Types
 import           Clash.Primitives.Util            (hashCompiledPrimMap)
 import           Clash.Unique                     (keysUniqMap, lookupUniqMap')
@@ -112,17 +114,20 @@ splitTopAnn
   -- ^ Port annotations for top entity
   -> TopEntity
   -- ^ New top entity with split ports (or the old one if not applicable)
-splitTopAnn tcm sp (tyView -> FunTy a res) t
-  -- Skip eq dicts, see 'substWithTyEq'
-  | TyConApp (nameUniq -> tcUniq) [_,VarTy _, _] <- tyView a
-  , tcUniq == getKey eqTyConKey
-  = splitTopAnn tcm sp res t
 splitTopAnn tcm sp typ@(tyView -> FunTy {}) t@Synthesize{t_inputs} =
   t{t_inputs=go typ t_inputs}
  where
   go :: Type -> [PortName] -> [PortName]
   go _ [] = []
-  go (tyView -> FunTy a res) (p:ps) =
+  go (tyView -> FunTy a res) (p:ps)
+   | shouldNotHavePortName a
+     -- Insert dummy PortName for args for which the user shouldn't have
+     -- to provide a name.
+     -- Ideally this would be any (non Hidden{Clock,Reset,Enable}) constraint.
+     -- But because we can't properly detect constraints,
+     -- we only skip some specific one. see "shouldNotHavePortName"
+     = PortName "" : go res (p:ps)
+   | otherwise =
     case shouldSplit tcm a of
       Just (_,argTys@(_:_:_)) ->
         -- Port must be split up into 'n' pieces.. can it?
@@ -150,12 +155,23 @@ splitTopAnn tcm sp typ@(tyView -> FunTy {}) t@Synthesize{t_inputs} =
       _ ->
         -- No need to split the port, carrying on..
         p : go res ps
+  go (ForAllTy _tyVar ty) ps = go ty ps
   go _ty ps = ps
 
   prependName :: String -> PortName -> PortName
   prependName "" pn = pn
   prependName p (PortProduct nm ps) = PortProduct (p ++ "_" ++ nm) ps
   prependName p (PortName nm) = PortName (p ++ "_" ++ nm)
+
+  -- Returns True for
+  --   * type equality constraints (~)
+  --   * HasCallStack
+  shouldNotHavePortName :: Type -> Bool
+  shouldNotHavePortName (tyView -> TyConApp (nameUniq -> tcUniq) tcArgs)
+    | tcUniq == getKey eqTyConKey = True
+    | tcUniq == getKey ipClassKey
+    , [LitTy (SymTy "callStack"), _] <- tcArgs = True
+  shouldNotHavePortName _ = False
 
 splitTopAnn tcm sp (ForAllTy _tyVar typ) t = splitTopAnn tcm sp typ t
 splitTopAnn tcm sp (AnnType _anns typ) t = splitTopAnn tcm sp typ t
@@ -208,9 +224,11 @@ generateHDL
   -> IO ()
 generateHDL reprs bindingsMap hdlState primMap tcm tupTcm typeTrans eval
   topEntities0 opts (startTime,prepTime) =
-    go prepTime HashMap.empty (sortTop bindingsMap topEntities1)
+    go prepTime HashMap.empty (sortTop bindingsMap topEntities2)
  where
   topEntities1 = map (splitTopEntityT tcm bindingsMap) topEntities0
+  -- Remove forall's used in type equality constraints
+  topEntities2 = map (\(TopEntityT var annM tbM) -> TopEntityT var{varType=tvSubstWithTyEq (varType var)} annM tbM) topEntities1
 
   go prevTime _ [] = putStrLn $ "Clash: Total compilation took " ++
                                 reportTimeDiff prevTime startTime
@@ -347,7 +365,7 @@ generateHDL reprs bindingsMap hdlState primMap tcm tupTcm typeTrans eval
                     . snd
                     . Supply.freshId
                    <$> Supply.newSupply
-  let topEntityNames = map topId topEntities1
+  let topEntityNames = map topId topEntities2
 
   (topTime,manifest',seen') <- if useCacheTop
     then do
@@ -375,7 +393,7 @@ generateHDL reprs bindingsMap hdlState primMap tcm tupTcm typeTrans eval
       prepareDir (opt_cleanhdl opts) (extension hdlState') dir
       -- Now start the netlist generation
       (netlist,seen') <-
-        genNetlist False opts reprs transformedBindings topEntities1 primMap
+        genNetlist False opts reprs transformedBindings topEntities2 primMap
                    tcm typeTrans iw mkId extId ite (SomeBackend hdlState') seen hdlDir prefixM topEntity
 
       netlistTime <- netlist `deepseq` Clock.getCurrentTime
@@ -415,7 +433,7 @@ generateHDL reprs bindingsMap hdlState primMap tcm tupTcm typeTrans eval
       prepareDir (opt_cleanhdl opts) (extension hdlState2) dir
       -- Now start the netlist generation
       (netlist,seen'') <-
-        genNetlist True opts reprs transformedBindings topEntities1 primMap
+        genNetlist True opts reprs transformedBindings topEntities2 primMap
                    tcm typeTrans iw mkId extId ite (SomeBackend hdlState') seen' hdlDir prefixM tb
 
       netlistTime <- netlist `deepseq` Clock.getCurrentTime

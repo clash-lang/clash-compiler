@@ -90,8 +90,10 @@ runClashTest = defaultMain $ clashTestRoot
     ]
   , clashTestGroup "tests"
     [ clashTestGroup "shouldfail"
-      [ runFailingTest ("tests" </> "shouldfail") [VHDL] [] "RecursiveBoxed" (Just "Callgraph after normalisation contains following recursive components")
-      , runFailingTest ("tests" </> "shouldfail") [VHDL] [] "RecursiveDatatype" (Just "Not in normal form: no Letrec")
+      [ runFailingTest ("tests" </> "shouldfail") [VHDL] [] "RecursiveBoxed" (Just {- RecursiveBoxed.g... -} " already inlined 20 times in:RecursiveBoxed.topEntity")
+      , runFailingTest ("tests" </> "shouldfail") [VHDL] [] "RecursiveDatatype" (Just "This bndr has a non-representable return type and can't be normalized:")
+      , runFailingTest ("tests" </> "shouldfail") [VHDL] [] "Poly" (Just "Clash can only normalize monomorphic functions, but this is polymorphic:")
+      , runFailingTest ("tests" </> "shouldfail") [VHDL] ["-fclash-error-extra"] "Poly2" (Just "Even after applying type equality constraints it remained polymorphic:")
       , runFailingTest ("tests" </> "shouldfail" </> "InvalidPrimitive") [VHDL] ["-itests/shouldfail/InvalidPrimitive"] "InvalidPrimitive" (Just "InvalidPrimitive.json")
       -- Disabled, due to it eating gigabytes of memory:
       -- , runFailingTest ("tests" </> "shouldfail") allTargets [] "RecursivePoly" (Just "??")
@@ -137,7 +139,7 @@ runClashTest = defaultMain $ clashTestRoot
         , runTest "Replace" def
         , runTest "Shift" def{hdlSim=False}
         , runTest "SimpleConstructor" def{hdlSim=False}
-        , runTest "T347" def{hdlSim=False}
+        , runTest "TyEqConstraints" def{hdlSim=False, entities=Entities["top1"], topEntity = TopEntity "top1"}
         , runTest "T1012" def{hdlSim=False}
         , runTest "TagToEnum" def{hdlSim=False}
         , runTest "TestIndex" def{hdlSim=False}
@@ -386,6 +388,7 @@ runClashTest = defaultMain $ clashTestRoot
         , runTest "T1033" def {hdlSim=False,entities=Entities ["top", ""], topEntity=TopEntity "top"}
         , outputTest ("tests" </> "shouldwork" </> "TopEntity") allTargets [] [] "T1033" "main"
         , outputTest ("tests" </> "shouldwork" </> "TopEntity") allTargets [] [] "T1072" "main"
+        , outputTest ("tests" </> "shouldwork" </> "TopEntity") allTargets [] [] "T1074" "main"
         ]
       , clashTestGroup "Unit"
         [ runTest "Imap" def
