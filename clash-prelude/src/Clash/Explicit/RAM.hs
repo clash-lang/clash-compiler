@@ -29,7 +29,7 @@ module Clash.Explicit.RAM
   )
 where
 
-import Data.Maybe            (fromJust, isJust)
+import Data.Maybe            (isJust)
 import GHC.Stack             (HasCallStack, withFrozenCallStack)
 import GHC.TypeLits          (KnownNat)
 import qualified Data.Sequence as Seq
@@ -39,7 +39,7 @@ import Clash.Explicit.Signal
 import Clash.Promoted.Nat    (SNat (..), snatToNum, pow2SNat)
 import Clash.Signal.Internal (Clock (..), Signal (..), Enable, fromEnable)
 import Clash.Sized.Unsigned  (Unsigned)
-import Clash.XException      (errorX, maybeIsX)
+import Clash.XException      (errorX, maybeIsX, fromJustX)
 
 -- | Create a RAM with space for 2^@n@ elements
 --
@@ -103,7 +103,7 @@ asyncRam
    -- ^ Value of the @RAM@ at address @r@
 asyncRam = \wclk rclk gen sz rd wrM ->
   let en       = isJust <$> wrM
-      (wr,din) = unbundle (fromJust <$> wrM)
+      (wr,din) = unbundle (fromJustX <$> wrM)
   in  withFrozenCallStack
       (asyncRam# wclk rclk gen sz (fromEnum <$> rd) en (fromEnum <$> wr) din)
 {-# INLINE asyncRam #-}

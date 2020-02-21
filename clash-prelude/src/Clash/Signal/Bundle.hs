@@ -19,6 +19,7 @@ The Product/Signal isomorphism
 
 {-# LANGUAGE Trustworthy #-}
 
+--{-# OPTIONS_GHC -ddump-splices #-}
 {-# OPTIONS_HADDOCK show-extensions #-}
 
 module Clash.Signal.Bundle

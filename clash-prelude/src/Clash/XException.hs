@@ -21,6 +21,7 @@ CallStack (from HasCallStack):
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE TemplateHaskell #-}
 
@@ -30,7 +31,7 @@ CallStack (from HasCallStack):
 
 module Clash.XException
   ( -- * 'X': An exception for uninitialized values
-    XException(..), errorX, isX, hasX, maybeIsX, maybeHasX
+    XException(..), errorX, isX, hasX, maybeIsX, maybeHasX, fromJustX, undefined
     -- * Printing 'X' exceptions as \"X\"
   , ShowX (..), showsX, printX, showsPrecXWith
     -- * Strict evaluation
@@ -39,6 +40,8 @@ module Clash.XException
   , NFDataX (rnfX, deepErrorX, hasUndefined, ensureSpine)
   )
 where
+
+import           Prelude             hiding (undefined)
 
 import           Clash.Annotations.Primitive (hasBlackBox)
 import           Clash.CPP           (maxTupleSize)
@@ -836,3 +839,12 @@ instance GDeepErrorX (f :+: g) where
 
 mkShowXTupleInstances [2..maxTupleSize]
 mkNFDataXTupleInstances [2..maxTupleSize]
+
+undefined :: HasCallStack => a
+undefined = errorX "undefined"
+
+-- | Same as "Data.Maybe.fromJust", but returns a bottom/undefined value that
+-- other Clash constructs are aware of.
+fromJustX :: HasCallStack => Maybe a -> a
+fromJustX Nothing = errorX "isJustX: Nothing"
+fromJustX (Just a) = a

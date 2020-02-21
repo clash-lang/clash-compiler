@@ -90,7 +90,6 @@ module Clash.Explicit.Prelude.Safe
   , module Data.Bits
       -- ** Exceptions
   , module Clash.XException
-  , undefined
     -- ** Named types
   , module Clash.NamedTypes
     -- ** Haskell Prelude
@@ -102,7 +101,6 @@ where
 import Control.Applicative
 import Data.Bits
 import GHC.Generics (Generic, Generic1)
-import GHC.Stack
 import GHC.TypeLits
 import GHC.TypeLits.Extra
 import Clash.HaskellPrelude
@@ -250,5 +248,3 @@ oscillate clk rst en begin SNat =
       else (s+1, i)     -- hold current output
 {-# INLINEABLE oscillate #-}
 
-undefined :: HasCallStack => a
-undefined = errorX "undefined"

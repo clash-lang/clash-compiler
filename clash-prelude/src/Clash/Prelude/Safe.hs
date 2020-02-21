@@ -106,7 +106,6 @@ module Clash.Prelude.Safe
   , module Data.Bits
       -- ** Exceptions
   , module Clash.XException
-  , E.undefined
     -- ** Named types
   , module Clash.NamedTypes
     -- ** Hidden arguments

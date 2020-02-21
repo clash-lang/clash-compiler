@@ -145,7 +145,6 @@ module Clash.Prelude
   , module Data.Default.Class
     -- ** Exceptions
   , module Clash.XException
-  , undefined
     -- ** Named types
   , module Clash.NamedTypes
     -- ** Hidden arguments
