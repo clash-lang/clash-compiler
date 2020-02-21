@@ -119,7 +119,6 @@ module Clash.Explicit.Prelude
   , module Data.Default.Class
     -- ** Exceptions
   , module Clash.XException
-  , undefined
     -- ** Named types
   , module Clash.NamedTypes
     -- ** Magic

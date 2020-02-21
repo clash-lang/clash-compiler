@@ -45,6 +45,7 @@ import           Data.Text                   (Text, isInfixOf,pack)
 import qualified Data.Text                   as Text
 import           Data.Text.Encoding          (decodeUtf8)
 import qualified Data.Traversable            as T
+import qualified Text.Read                   as Text
 
 -- GHC API
 import CoAxiom    (CoAxiom (co_ax_branches), CoAxBranch (cab_lhs,cab_rhs),
@@ -352,15 +353,23 @@ coreToTerm primMap unlocs = term
           | [_aTy,f] <- args
           = C.Tick C.NoDeDup <$> term f
         go nm args
-          | "Clash.Signal.Bundle.unbundle" `Text.isPrefixOf` nm
-          , "#" `Text.isSuffixOf` nm
+          | Just n <- parseBundle "bundle" nm
+            -- length args = domain tyvar + signal arg + number of type vars
+          , length args == 2 + n
           = term (last args)
         go nm args
-          | "Clash.Signal.Bundle.bundle" `Text.isPrefixOf` nm
-          , "#" `Text.isSuffixOf` nm
+          | Just n <- parseBundle "unbundle" nm
+            -- length args = domain tyvar + signal arg + number of type vars
+          , length args == 2 + n
           = term (last args)
-
         go _ _ = term' e
+
+    parseBundle :: Text -> Text -> Maybe Int
+    parseBundle fNm nm0 = do
+      nm1 <- Text.stripPrefix ("Clash.Signal.Bundle." <> fNm) nm0
+      nm2 <- Text.stripSuffix "#" nm1
+      Text.readMaybe (Text.unpack nm2)
+
     term' (Var x)                 = var x
     term' (Lit l)                 = return $ C.Literal (coreToLiteral l)
     term' (App eFun (Type tyArg)) = C.TyApp <$> term eFun <*> coreToType tyArg
@@ -449,24 +458,27 @@ coreToTerm primMap unlocs = term
               else C.Data <$> coreToDataCon dc
           Nothing -> case lookupPrim xNameS of
             Just (Just (Primitive f wi _))
-              | f == pack "Clash.Signal.Internal.mapSignal#" -> return (mapSignalTerm xType)
-              | f == pack "Clash.Signal.Internal.signal#"    -> return (signalTerm xType)
-              | f == pack "Clash.Signal.Internal.appSignal#" -> return (appSignalTerm xType)
-              | f == pack "Clash.Signal.Internal.traverse#"  -> return (traverseTerm xType)
-              | f == pack "Clash.Signal.Internal.joinSignal#" -> return (joinTerm xType)
-              | f == pack "Clash.Signal.Bundle.vecBundle#"   -> return (vecUnwrapTerm xType)
-              | f == pack "GHC.Base.$"                       -> return (dollarTerm xType)
-              | f == pack "GHC.Stack.withFrozenCallStack"    -> return (withFrozenCallStackTerm xType)
-              | f == pack "GHC.Magic.noinline"               -> return (idTerm xType)
-              | f == pack "GHC.Magic.lazy"                   -> return (idTerm xType)
-              | f == pack "GHC.Magic.runRW#"                 -> return (runRWTerm xType)
-              | f == pack "Clash.Class.BitPack.packXWith"    -> return (packXWithTerm xType)
-              | f == pack "Clash.Sized.Internal.BitVector.checkUnpackUndef" -> return (checkUnpackUndefTerm xType)
-              | f == pack "Clash.Magic.prefixName"
+              | Just n <- parseBundle "bundle" f        -> return (bundleUnbundleTerm (n+1) xType)
+              | Just n <- parseBundle "unbundle" f      -> return (bundleUnbundleTerm (n+1) xType)
+              | f == "Clash.Signal.Internal.mapSignal#" -> return (mapSignalTerm xType)
+              | f == "Clash.Signal.Internal.mapSignal#" -> return (mapSignalTerm xType)
+              | f == "Clash.Signal.Internal.signal#"    -> return (signalTerm xType)
+              | f == "Clash.Signal.Internal.appSignal#" -> return (appSignalTerm xType)
+              | f == "Clash.Signal.Internal.traverse#"  -> return (traverseTerm xType)
+              | f == "Clash.Signal.Internal.joinSignal#" -> return (joinTerm xType)
+              | f == "Clash.Signal.Bundle.vecBundle#"   -> return (vecUnwrapTerm xType)
+              | f == "GHC.Base.$"                       -> return (dollarTerm xType)
+              | f == "GHC.Stack.withFrozenCallStack"    -> return (withFrozenCallStackTerm xType)
+              | f == "GHC.Magic.noinline"               -> return (idTerm xType)
+              | f == "GHC.Magic.lazy"                   -> return (idTerm xType)
+              | f == "GHC.Magic.runRW#"                 -> return (runRWTerm xType)
+              | f == "Clash.Class.BitPack.packXWith"    -> return (packXWithTerm xType)
+              | f == "Clash.Sized.Internal.BitVector.checkUnpackUndef" -> return (checkUnpackUndefTerm xType)
+              | f == "Clash.Magic.prefixName"
               -> return (nameModTerm C.PrefixName xType)
-              | f == pack "Clash.Magic.postfixName"
+              | f == "Clash.Magic.postfixName"
               -> return (nameModTerm C.SuffixName xType)
-              | f == pack "Clash.Magic.setName"
+              | f == "Clash.Magic.setName"
               -> return (nameModTerm C.SetName xType)
               | otherwise                                    -> return (C.Prim (C.PrimInfo xNameS xType wi))
             Just (Just (BlackBox {workInfo = wi})) ->
@@ -903,6 +915,44 @@ modNameM n = do
   module_ <- nameModule_maybe n
   let moduleNm = moduleName module_
   return (pack (moduleNameString moduleNm))
+
+-- | Given the type:
+--
+-- @
+--     forall dom a0 a1 .. aN
+--   . Signal dom (a0, a1, .., aN)
+--  -> (Signal dom a0, Signal dom a1, .., Signal dom aN)
+-- @
+--
+-- or the type
+--
+-- @
+--     forall dom a0 a1 .. aN
+--   . (Signal dom a0, Signal dom a1, .., Signal dom aN)
+--  -> Signal dom (a0, a1, .., aN)
+-- @
+--
+-- Generate the term:
+--
+-- @/\dom. /\a0. /\a1. .. /\aN. \x -> x@
+--
+-- In other words: treat "bundle" and "unbundle" primitives as id.
+--
+bundleUnbundleTerm :: Int -> C.Type -> C.Term
+bundleUnbundleTerm nTyVarsExpected = go []
+ where
+  go :: [C.TyVar] -> C.Type -> C.Term
+  go tvs (C.ForAllTy tv typ) = go (tv:tvs) typ
+  go tvs (C.tyView -> C.FunTy argTy _resTy) =
+    if length tvs /= nTyVarsExpected then
+      -- Internal error: should never happen unless we change the type of
+      -- bundle / unbundle.
+      error $ $(curLoc) ++ show (length tvs) ++ " vs " ++ show nTyVarsExpected
+    else
+      let sigName = C.mkLocalId argTy (C.mkUnsafeSystemName "c$s" 0) in
+      foldr C.TyLam (C.Lam sigName (C.Var sigName)) (reverse tvs)
+  go tvs ty = error $ $(curLoc) ++ show ty ++ " " ++ show tvs
+
 
 -- | Given the type:
 --

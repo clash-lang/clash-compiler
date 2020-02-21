@@ -418,7 +418,7 @@ import           Clash.Sized.Index      (Index)
 import           Clash.Sized.Vector     (Vec, replicate, toList, iterateI)
 import qualified Clash.Sized.Vector     as CV
 import           Clash.XException
-  (maybeIsX, seqX, NFDataX, deepErrorX, defaultSeqX, errorX)
+  (maybeIsX, seqX, NFDataX, deepErrorX, defaultSeqX, fromJustX)
 
 {- $setup
 >>> import Clash.Explicit.Prelude as C
@@ -685,10 +685,6 @@ prog2 = -- 0 := 4
 :}
 
 -}
-
-fromJustX :: HasCallStack => Maybe a -> a
-fromJustX Nothing  = errorX "fromJustX: Nothing"
-fromJustX (Just x) = x
 
 -- | Create a blockRAM with space for @n@ elements
 --

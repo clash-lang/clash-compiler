@@ -93,7 +93,7 @@ module Clash.Explicit.BlockRam.File
 where
 
 import Data.Char             (digitToInt)
-import Data.Maybe            (fromJust, isJust, listToMaybe)
+import Data.Maybe            (isJust, listToMaybe)
 import qualified Data.Sequence as Seq
 import GHC.Stack             (HasCallStack, withFrozenCallStack)
 import GHC.TypeLits          (KnownNat)
@@ -106,7 +106,7 @@ import Clash.Signal.Internal
   (Clock(..), Signal (..), Enable, KnownDomain, fromEnable, (.&&.))
 import Clash.Signal.Bundle   (unbundle)
 import Clash.Sized.Unsigned  (Unsigned)
-import Clash.XException      (errorX, maybeIsX, seqX)
+import Clash.XException      (errorX, maybeIsX, seqX, fromJustX)
 
 
 -- | Create a blockRAM with space for 2^@n@ elements
@@ -199,7 +199,7 @@ blockRamFile
   -- clock cycle
 blockRamFile = \clk gen sz file rd wrM ->
   let en       = isJust <$> wrM
-      (wr,din) = unbundle (fromJust <$> wrM)
+      (wr,din) = unbundle (fromJustX <$> wrM)
   in  withFrozenCallStack
       (blockRamFile# clk gen sz file (fromEnum <$> rd) en (fromEnum <$> wr) din)
 {-# INLINE blockRamFile #-}

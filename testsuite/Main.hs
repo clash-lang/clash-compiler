@@ -338,6 +338,8 @@ runClashTest = defaultMain $ clashTestRoot
         , runTest "Rom" def
         , runTest "RomFile" def
         , runTest "SigP" def{hdlSim=False}
+        , outputTest ("tests" </> "shouldwork" </> "Signal") [VHDL] [] [] "T1102A" "main"
+        , outputTest ("tests" </> "shouldwork" </> "Signal") [VHDL] [] [] "T1102B" "main"
 
         , clashTestGroup "BiSignal"
           [ runTest "Counter" def

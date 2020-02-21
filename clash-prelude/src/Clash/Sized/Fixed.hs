@@ -74,7 +74,6 @@ import Data.Either                (isLeft)
 import Data.Kind                  (Type)
 import Text.Read                  (Read(..))
 import Data.List                  (find)
-import Data.Maybe                 (fromJust)
 import Data.Proxy                 (Proxy (..))
 import Data.Ratio                 ((%), denominator, numerator)
 import Data.Typeable              (Typeable, TypeRep, typeRep)
@@ -97,7 +96,7 @@ import Clash.Sized.BitVector      (BitVector, (++#))
 import Clash.Sized.Signed         (Signed)
 import Clash.Sized.Unsigned       (Unsigned)
 import Clash.XException
-  (ShowX (..), NFDataX (..), isX, errorX, showsPrecXWith)
+  (ShowX (..), NFDataX (..), isX, errorX, showsPrecXWith, fromJustX)
 
 {- $setup
 >>> :set -XDataKinds
@@ -255,7 +254,7 @@ instance ( size ~ (int + frac), KnownNat frac, Integral (rep size)
          ) => Show (Fixed rep int frac) where
   show f@(Fixed fRep) =
       i ++ "." ++ (uncurry pad . second (show . numerator) .
-                   fromJust . find ((==1) . denominator . snd) .
+                   fromJustX . find ((==1) . denominator . snd) .
                    iterate (succ *** (*10)) . (,) 0 $ (nom % denom))
     where
       pad n str = replicate (n - length str) '0' ++ str
