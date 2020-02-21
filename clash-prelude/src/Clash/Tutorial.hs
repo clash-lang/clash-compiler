@@ -1926,7 +1926,6 @@ A list of often encountered errors and their solutions:
     A function could not be transformed into the expected normal form. This
     usually means one of the following:
 
-    * The @topEntity@ has residual polymorphism.
     * The @topEntity@ has higher-order arguments, or a higher-order result.
     * You are using types which cannot be represented in hardware.
 
@@ -1936,7 +1935,15 @@ A list of often encountered errors and their solutions:
     non-representable type; see <#limitations Limitations of Clash> to find
     out which types are not representable.
 
-* __Clash.Normalize(94): Expr belonging to bndr: \<FUNCTION\> remains__
+* __Clash.Normalize(..): Clash can only normalize monomorphic functions, but this is polymorphic__:
+
+    If this happens for a @topEntity@ or something with a @Synthesize@ annotation,
+    add a monomorphic type signature.
+    Non topEntites should be type-specialized by clash automatically, if not please report this as a bug.
+    But adding a monomorphic type signature should still help (when possible).
+
+
+* __Clash.Normalize(..): Expr belonging to bndr: \<FUNCTION\> remains__
   __recursive after normalization__:
 
     * If you actually wrote a recursive function, rewrite it to a non-recursive
@@ -1965,7 +1972,7 @@ A list of often encountered errors and their solutions:
         acc = 'register' 3 (acc + x * y)
     @
 
-* __Clash.Normalize.Transformations(155): InlineNonRep: \<FUNCTION\> already__
+* __Clash.Normalize.Transformations(..): InlineNonRep: \<FUNCTION\> already__
   __inlined 100 times in:\<FUNCTION\>, \<TYPE\>__:
 
     You left the @topEntity@ function polymorphic or higher-order: use

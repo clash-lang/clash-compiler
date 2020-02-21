@@ -10,6 +10,7 @@
 
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE QuasiQuotes #-}
 {-# LANGUAGE TemplateHaskell #-}
 
 {-# OPTIONS_GHC -Wno-unused-imports #-}
@@ -17,13 +18,16 @@
 module Clash.Normalize where
 
 import           Control.Concurrent.Supply        (Supply)
+import           Control.Exception                (throw)
 import           Control.Lens                     ((.=),(^.),_1,_4)
 import qualified Control.Lens                     as Lens
+import           Control.Monad                    (when)
 import           Control.Monad.State.Strict       (State)
 import           Data.Binary                      (encode)
 import qualified Data.ByteString                  as BS
 import qualified Data.ByteString.Lazy             as BL
-import           Data.Either                      (partitionEithers)
+import           Data.Default                     (def)
+import           Data.Either                      (lefts,partitionEithers)
 import qualified Data.IntMap                      as IntMap
 import           Data.IntMap.Strict               (IntMap)
 import           Data.List
@@ -45,13 +49,14 @@ import           Clash.Core.Evaluator.Types       (PrimStep, PrimUnwind)
 import           Clash.Core.FreeVars
   (freeLocalIds, globalIds, globalIdOccursIn, localIdDoesNotOccurIn)
 import           Clash.Core.Name (nameOcc) -- TODO
-import           Clash.Core.Pretty                (showPpr, ppr)
+import           Clash.Core.Pretty                (PrettyOptions(..), showPpr, showPpr', ppr)
 import           Clash.Core.Subst
   (extendGblSubstList, mkSubst, substTm)
 import           Clash.Core.Term                  (Term (..), collectArgsTicks)
 import           Clash.Core.Type                  (Type, splitCoreFunForallTy)
 import           Clash.Core.TyCon
   (TyConMap, TyConName)
+import           Clash.Core.Type                  (isPolyTy)
 import           Clash.Core.Util                  (mkApps, mkTicks, termType)
 import           Clash.Core.Var                   (Id, varName, varType)
 import           Clash.Core.VarEnv
@@ -79,6 +84,7 @@ import           Clash.Rewrite.Util
   (apply, isUntranslatableType, runRewrite, runRewriteSession)
 import           Clash.Signal.Internal            (ResetKind (..))
 import           Clash.Util
+import           Clash.Util.Interpolate           (i)
 
 -- | Run a NormalizeSession in a given environment
 runNormalization
@@ -163,12 +169,32 @@ normalize' nm = do
   case exprM of
     Just (Binding nm' sp inl tm) -> do
       tcm <- Lens.view tcCache
-      let (_,resTy) = splitCoreFunForallTy tcm (varType nm')
+      topEnts <- Lens.view topEntities
+      let isTop = nm `elemVarSet` topEnts
+          ty0 = varType nm'
+          ty1 = if isTop then tvSubstWithTyEq ty0 else ty0
+
+      -- check for polymorphic types
+      when (isPolyTy ty1) $
+        let msg = $curLoc ++ [i|
+              Clash can only normalize monomorphic functions, but this is polymorphic:
+              #{showPpr' def{displayUniques=False\} nm'}
+              |]
+            msgExtra | ty0 == ty1 = Nothing
+                     | otherwise = Just $ [i|
+              Even after applying type equality constraints it remained polymorphic:
+              #{showPpr' def{displayUniques=False\} nm'{varType=ty1\}}
+                         |]
+        in throw (ClashException sp msg msgExtra)
+
+      -- check for unrepresentable result type
+      let (args,resTy) = splitCoreFunForallTy tcm ty1
+          isTopEnt = nm `elemVarSet` topEnts
+          isFunction = not $ null $ lefts args
       resTyRep <- not <$> isUntranslatableType False resTy
       if resTyRep
          then do
-            topEnts <- Lens.view topEntities
-            tmNorm <- normalizeTopLvlBndr (nm `elemVarSet` topEnts) nm (Binding nm' sp inl tm)
+            tmNorm <- normalizeTopLvlBndr isTopEnt nm (Binding nm' sp inl tm)
             let usedBndrs = Lens.toListOf globalIds (bindingTerm tmNorm)
             traceIf (nm `elem` usedBndrs)
                     (concat [ $(curLoc),"Expr belonging to bndr: ",nmS ," (:: "
@@ -180,19 +206,30 @@ normalize' nm = do
             let toNormalize = filter (`notElemVarSet` topEnts)
                             $ filter (`notElemVarEnv` (extendVarEnv nm nm prevNorm)) usedBndrs
             return (toNormalize,(nm,tmNorm))
-         else do
-            let usedBndrs = Lens.toListOf globalIds tm
-            prevNorm <- mapVarEnv bindingId <$> Lens.use (extra.normalized)
-            topEnts  <- Lens.view topEntities
-            let toNormalize = filter (`notElemVarSet` topEnts)
-                            $ filter (`notElemVarEnv` (extendVarEnv nm nm prevNorm)) usedBndrs
+         else
+           do
+            -- Throw an error for unrepresentable topEntities and functions
+            when (isTopEnt || isFunction) $
+              let msg = $(curLoc) ++ [i|
+                    This bndr has a non-representable return type and can't be normalized:
+                    #{showPpr' def{displayUniques=False\} nm'}
+                    |]
+              in throw (ClashException sp msg Nothing)
+
+            -- But allow the compilation to proceed for nonrepresentable values.
+            -- This can happen for example when GHC decides to create a toplevel binder
+            -- for the ByteArray# inside of a Natural constant.
+            -- (GHC-8.4 does this with tests/shouldwork/Numbers/Exp.hs)
+            -- It will later be inlined by flattenCallTree.
             lvl <- Lens.view dbgLevel
-            traceIf (lvl >= DebugFinal)
+            traceIf (lvl > DebugNone)
                     (concat [$(curLoc), "Expr belonging to bndr: ", nmS, " (:: "
                             , showPpr (varType nm')
                             , ") has a non-representable return type."
                             , " Not normalising:\n", showPpr tm] )
-                    (return (toNormalize, (nm, (Binding nm' sp inl tm))))
+                    (return ([],(nm,(Binding nm' sp inl tm))))
+
+
     Nothing -> error $ $(curLoc) ++ "Expr belonging to bndr: " ++ nmS ++ " not found"
 
 -- | Check whether the normalized bindings are non-recursive. Errors when one

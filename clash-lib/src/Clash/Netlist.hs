@@ -28,7 +28,7 @@ import           Control.Monad.Reader             (runReaderT)
 import           Control.Monad.State.Strict       (State, runStateT)
 import           Data.Binary.IEEE754              (floatToWord, doubleToWord)
 import           Data.Char                        (ord)
-import           Data.Either                      (partitionEithers)
+import           Data.Either                      (partitionEithers, rights)
 import           Data.HashMap.Strict              (HashMap)
 import qualified Data.HashMap.Strict              as HashMapS
 import qualified Data.HashMap.Lazy                as HashMap
@@ -60,7 +60,7 @@ import           Clash.Core.Term
   (Alt, Pat (..), Term (..), TickInfo (..), PrimInfo(primName), collectArgs, collectArgsTicks, collectTicks)
 import qualified Clash.Core.Term                  as Core
 import           Clash.Core.Type
-  (Type (..), coreView1, splitFunTys, splitCoreFunForallTy)
+  (Type (..), coreView1, splitFunForallTy, splitCoreFunForallTy)
 import           Clash.Core.TyCon                 (TyConMap)
 import           Clash.Core.Util
   (mkApps, mkTicks, splitShouldSplit, stripTicks, termType)
@@ -244,7 +244,7 @@ genComponentT compName componentExpr = do
         let varType'   = fromMaybe (varType res) topEntityTypeM'
         mkUniqueNormalized emptyInScopeSet topEntMM ((args, binds, res{varType=varType'}))
       Left err ->
-        throw (ClashException sp err Nothing)
+        throw (ClashException sp ($curLoc ++ err) Nothing)
 
   netDecls <- fmap catMaybes . mapM mkNetDecl $ filter (maybe (const True) (/=) resultM . fst) binders
   decls    <- concat <$> mapM (uncurry mkDeclarations) binders
@@ -567,10 +567,10 @@ mkFunApp dstId fun args tickDecls = do
   case (isGlobalId fun, lookupVarEnv fun topAnns) of
     (True, Just topEntity)
       | let ty = varType (topId topEntity)
-      , let (fArgTys0,fResTy) = splitFunTys tcm ty
+      , let (fArgTys0,fResTy) = splitFunForallTy ty
       -- Take into account that clocks and stuff are split off from any product
       -- types containing them
-      , let fArgTys1 = splitShouldSplit tcm fArgTys0
+      , let fArgTys1 = splitShouldSplit tcm $ rights fArgTys0
       , length fArgTys1 == length args
       -> do
         let annM = topAnnotation topEntity
@@ -602,7 +602,7 @@ mkFunApp dstId fun args tickDecls = do
                        tickDecls
         return (argDecls ++ instDecls)
 
-      | otherwise -> error $ $(curLoc) ++ "under-applied TopEntity"
+      | otherwise -> error $ $(curLoc) ++ "under-applied TopEntity: " ++ showPpr fun
     (True, Nothing) -> do
       normalized <- Lens.use bindings
       case lookupVarEnv fun normalized of
