@@ -84,6 +84,13 @@ flag super-strict
   default: False
   manual: True
 
+flag strict-mapSignal
+  description:
+    Use `seqX` in 'mapSignal#'. This can help to eliminate space leaks in long
+    running simulations.
+  default: False
+  manual: True
+
 flag multiple-hidden
   description:
     Allow multiple hidden clocks, resets, and enables to be used. This is an
@@ -149,6 +156,9 @@ Library
 
   if flag(super-strict)
     CPP-Options: -DCLASH_SUPER_STRICT
+
+  if flag(strict-mapSignal)
+    CPP-Options: -DCLASH_STRICT_MAPSIGNAL
 
   if flag(multiple-hidden)
     CPP-Options: -DCLASH_MULTIPLE_HIDDEN

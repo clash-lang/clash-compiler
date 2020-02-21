@@ -18,7 +18,29 @@ Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
 
 module Clash.CPP
  ( maxTupleSize
+
+ -- ** Cabal flags
+ , fSuperStrict
+ , fStrictMapSignal
  ) where
 
 maxTupleSize :: Num a => a
 maxTupleSize = MAX_TUPLE_SIZE
+
+-- | Whether clash-prelude was compiled with -fsuper-strict
+fSuperStrict :: Bool
+#ifdef CLASH_SUPER_STRICT
+fSuperStrict = True
+#else
+fSuperStrict = False
+#endif
+{-# INLINE fSuperStrict #-}
+
+-- | Whether clash-prelude was compiled with -fstrict-mapSignal
+fStrictMapSignal :: Bool
+#ifdef CLASH_STRICT_MAPSIGNAL
+fStrictMapSignal = True
+#else
+fStrictMapSignal = False
+#endif
+{-# INLINE fStrictMapSignal #-}
