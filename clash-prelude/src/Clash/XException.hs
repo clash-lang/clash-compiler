@@ -44,7 +44,7 @@ where
 import           Prelude             hiding (undefined)
 
 import           Clash.Annotations.Primitive (hasBlackBox)
-import           Clash.CPP           (maxTupleSize)
+import           Clash.CPP           (maxTupleSize, fSuperStrict)
 import           Clash.XException.TH
 import           Control.Exception   (Exception, catch, evaluate, throw)
 import           Control.DeepSeq     (NFData, rnf)
@@ -87,11 +87,7 @@ instance Exception XException
 -- '-fsuper-strict'. If enabled, 'defaultSeqX' will be 'deepseqX', otherwise
 -- 'seqX'. Flag defaults to /false/ and thus 'seqX'.
 defaultSeqX :: NFDataX a => a -> b -> b
-#ifdef CLASH_SUPER_STRICT
-defaultSeqX = deepseqX
-#else
-defaultSeqX = seqX
-#endif
+defaultSeqX = if fSuperStrict then deepseqX else seqX
 {-# INLINE defaultSeqX #-}
 
 -- | Like 'error', but throwing an 'XException' instead of an 'ErrorCall'
