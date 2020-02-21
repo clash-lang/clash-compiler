@@ -123,7 +123,7 @@ import           Clash.Core.VarEnv
   (InScopeSet, VarEnv, VarSet, elemVarSet,
    emptyVarEnv, emptyVarSet, extendInScopeSet, extendInScopeSetList, lookupVarEnv,
    notElemVarSet, unionVarEnvWith, unionVarSet, unionInScope, unitVarEnv,
-   unitVarSet, mkVarSet, mkInScopeSet, uniqAway)
+   unitVarSet, mkVarSet, mkInScopeSet, uniqAway, elemInScopeSet)
 import           Clash.Driver.Types          (Binding(..), DebugLevel (..))
 import           Clash.Netlist.BlackBox.Types (Element(Err))
 import           Clash.Netlist.BlackBox.Util (getUsedArguments)
@@ -2564,49 +2564,64 @@ inlineCleanup _ e = return e
 --
 -- NB: must only be called in the cleaning up phase.
 flattenLet :: HasCallStack => NormRewrite
-flattenLet (TransformContext is0 _) letrec@(Letrec _ _) = do
-  let (is2, Letrec binds body) = freshenTm is0 letrec
+flattenLet (TransformContext is0 _) (Letrec binds body) = do
+  let is1 = extendInScopeSetList is0 (map fst binds)
       bodyOccs = Lens.foldMapByOf
                    freeLocalIds (unionVarEnvWith (+))
                    emptyVarEnv (`unitVarEnv` (1 :: Int))
                    body
-  binds' <- concat <$> mapM (go is2) binds
-  case binds' of
+  (is2,binds1) <- second concat <$> mapAccumLM go is1 binds
+  case binds1 of
     -- inline binders into the body when there's only a single binder, and only
     -- if that binder doesn't perform any work or is only used once in the body
-    [(id',e')] | Just occ <- lookupVarEnv id' bodyOccs, isWorkFree e' || occ < 2 ->
-      if id' `localIdOccursIn` e'
+    [(id1,e1)] | Just occ <- lookupVarEnv id1 bodyOccs, isWorkFree e1 || occ < 2 ->
+      if id1 `localIdOccursIn` e1
          -- Except when the binder is recursive!
-         then return (Letrec binds' body)
-         else let subst = extendIdSubst (mkSubst is2) id' e'
+         then return (Letrec binds1 body)
+         else let subst = extendIdSubst (mkSubst is2) id1 e1
               in changed (substTm "flattenLet" subst body)
-    _ -> return (Letrec binds' body)
+    _ -> return (Letrec binds1 body)
   where
-    go :: InScopeSet -> LetBinding -> NormalizeSession [LetBinding]
-    go isN (id_,collectTicks -> (Letrec binds' body',ticks)) = do
+    go :: InScopeSet -> LetBinding -> NormalizeSession (InScopeSet,[LetBinding])
+    go isN (id1,collectTicks -> (Letrec binds1 body1,ticks)) = do
+      let bs1 = map fst binds1
+      let (binds2,body2,isN1) =
+            -- We need to deshadow because we're merging nested let-expressions
+            -- into a single let-expression: and within a let-expression, the
+            -- bindings are not allowed to shadow each-other. Of course, we
+            -- only need to deshadow if any shadowing is happening in the
+            -- first place.
+            --
+            -- This is much better than blindly calling freshenTm, and saves
+            -- almost 30% run-time of the normalization phase on some examples.
+            if any (`elemInScopeSet` isN) bs1 then
+              let Letrec bindsN bodyN = deShadowTerm isN (Letrec binds1 body1)
+              in  (bindsN,bodyN,extendInScopeSetList isN (map fst bindsN))
+            else
+              (binds1,body1,extendInScopeSetList isN bs1)
       let bodyOccs = Lens.foldMapByOf
                        freeLocalIds (unionVarEnvWith (+))
                        emptyVarEnv (`unitVarEnv` (1 :: Int))
-                       body'
+                       body2
           (srcTicks,nmTicks) = partitionTicks ticks
       -- Distribute the name ticks of the let-expression over all the bindings
-      map (second (`mkTicks` nmTicks)) <$> case binds' of
+      (isN1,) . map (second (`mkTicks` nmTicks)) <$> case binds2 of
         -- inline binders into the body when there's only a single binder, and
         -- only if that binder doesn't perform any work or is only used once in
         -- the body
-        [(id',e')] | Just occ <- lookupVarEnv id' bodyOccs, isWorkFree e' || occ < 2 ->
-          if id' `localIdOccursIn` e'
+        [(id2,e2)] | Just occ <- lookupVarEnv id2 bodyOccs, isWorkFree e2 || occ < 2 ->
+          if id2 `localIdOccursIn` e2
              -- Except when the binder is recursive!
-             then changed [(id',e'),(id_, body')]
-             else let subst = extendIdSubst (mkSubst isN) id' e'
-                  in  changed [(id_
+             then changed ([(id2,e2),(id1, body2)])
+             else let subst = extendIdSubst (mkSubst isN1) id2 e2
+                  in  changed [(id1
                                -- Only apply srcTicks to the body
-                               ,mkTicks (substTm "flattenLetGo" subst body')
+                               ,mkTicks (substTm "flattenLetGo" subst body2)
                                         srcTicks)]
-        bs -> changed (bs ++ [(id_
+        bs -> changed (bs ++ [(id1
                                -- Only apply srcTicks to the body
-                              ,mkTicks body' srcTicks)])
-    go _ b = return [b]
+                              ,mkTicks body2 srcTicks)])
+    go isN b = return (isN,[b])
 
 flattenLet _ e = return e
 {-# SCC flattenLet #-}
