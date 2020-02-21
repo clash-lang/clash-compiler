@@ -151,10 +151,11 @@ import Numeric.Natural            (Natural)
 import Test.QuickCheck            (Arbitrary (..), CoArbitrary(..), Property,
                                    property)
 
+import Clash.CPP                  (fStrictMapSignal)
 import Clash.Promoted.Nat         (SNat (..), snatToNum, snatToNatural)
 import Clash.Promoted.Symbol      (SSymbol (..), ssymbolToString)
 import Clash.XException
-  (NFDataX, errorX, deepseqX, defaultSeqX, deepErrorX)
+  (NFDataX, errorX, deepseqX, defaultSeqX, deepErrorX, seqX)
 
 {- $setup
 >>> :set -XDataKinds
@@ -649,8 +650,12 @@ instance Default a => Default (Signal dom a) where
 instance Functor (Signal dom) where
   fmap = mapSignal#
 
-mapSignal# :: (a -> b) -> Signal dom a -> Signal dom b
-mapSignal# f (a :- as) = f a :- mapSignal# f as
+mapSignal# :: forall a b dom. (a -> b) -> Signal dom a -> Signal dom b
+mapSignal# f = go
+ where
+  -- See -fstrict-mapSignal documentation in clash-prelude.cabal
+  theSeq = if fStrictMapSignal then seqX else flip const
+  go (a :- as) = f a :- (a `theSeq` go as)
 {-# NOINLINE mapSignal# #-}
 {-# ANN mapSignal# hasBlackBox #-}
 

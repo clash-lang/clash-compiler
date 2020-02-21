@@ -6,7 +6,20 @@
 Control module instance, and register, names in generated HDL code.
 -}
 
-module Clash.Magic where
+module Clash.Magic
+  (
+  -- ** Functions to control names of identifiers in HDL
+    prefixName
+  , suffixName
+  , suffixNameP
+  , suffixNameFromNat
+  , suffixNameFromNatP
+  , setName
+
+  -- ** Functions to control Clash's (de)duplication mechanisms
+  , deDup
+  , noDeDup
+  ) where
 
 import Clash.NamedTypes ((:::))
 import GHC.TypeLits     (Nat,Symbol)
