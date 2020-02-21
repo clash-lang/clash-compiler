@@ -112,7 +112,7 @@ module Clash.Signal.BiSignal (
 
 import           Data.Kind                  (Type)
 import           Data.List                  (intercalate)
-import           Data.Maybe                 (fromMaybe,fromJust,isJust)
+import           Data.Maybe                 (fromMaybe,isJust)
 
 import           Clash.Class.HasDomain
 import           Clash.Class.BitPack        (BitPack (..))
@@ -120,7 +120,7 @@ import           Clash.Sized.BitVector      (BitVector)
 import qualified Clash.Sized.Vector         as V
 import           Clash.Sized.Vector         (Vec)
 import           Clash.Signal.Internal      (Signal(..), Domain, head#, tail#)
-import           Clash.XException           (errorX)
+import           Clash.XException           (errorX, fromJustX)
 
 import           GHC.TypeLits               (KnownNat, Nat)
 import           GHC.Stack                  (HasCallStack)
@@ -249,7 +249,7 @@ writeToBiSignal input writes =
     input
     (fmap pack <$> writes)
     (isJust <$> writes)
-    (pack . fromJust <$> writes)
+    (pack . fromJustX <$> writes)
 {-# INLINE writeToBiSignal #-}
 
 -- | Converts the 'out' part of a BiSignal to an 'in' part. In simulation it

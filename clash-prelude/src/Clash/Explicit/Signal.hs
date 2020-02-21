@@ -266,7 +266,7 @@ module Clash.Explicit.Signal
   )
 where
 
-import           Data.Maybe                     (isJust, fromJust)
+import           Data.Maybe                     (isJust)
 import           GHC.TypeLits                   (type (+), type (<=))
 
 import           Clash.Annotations.Primitive    (hasBlackBox)
@@ -280,7 +280,7 @@ import           Clash.Signal.Internal.Ambiguous
   (knownVDomain, clockPeriod, activeEdge, resetKind, initBehavior, resetPolarity)
 import           Clash.Sized.Index              (Index)
 import qualified Clash.Sized.Vector
-import           Clash.XException               (NFDataX, deepErrorX)
+import           Clash.XException               (NFDataX, deepErrorX, fromJustX)
 
 {- $setup
 >>> :set -XDataKinds -XTypeApplications -XFlexibleInstances -XMultiParamTypeClasses -XTypeFamilies
@@ -612,7 +612,7 @@ delayMaybe
   -> Signal dom (Maybe a)
   -> Signal dom a
 delayMaybe clk gen dflt i =
-  delayEn clk gen dflt (isJust <$> i) (fromJust <$> i)
+  delayEn clk gen dflt (isJust <$> i) (fromJustX <$> i)
 {-# INLINE delayMaybe #-}
 
 -- | Version of 'delay' that only updates when its third argument is asserted.
@@ -697,7 +697,7 @@ regMaybe
   -> Signal dom (Maybe a)
   -> Signal dom a
 regMaybe clk rst en initial iM =
-  register clk rst (enable en (fmap isJust iM)) initial (fmap fromJust iM)
+  register clk rst (enable en (fmap isJust iM)) initial (fmap fromJustX iM)
 {-# INLINE regMaybe #-}
 
 -- | Version of 'register' that only updates its content when its fourth
