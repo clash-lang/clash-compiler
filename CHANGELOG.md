@@ -94,6 +94,7 @@
   * [#1075](https://github.com/clash-lang/clash-compiler/issues/1075): Removed superfluous constraints on 'maybeX' and 'maybeIsX'
   * [#1085](https://github.com/clash-lang/clash-compiler/issues/1085): Suggest exporting topentities if they can't be found in a module
   * [#1065](https://github.com/clash-lang/clash-compiler/pull/1065): Report polymorphic topEntities as errors
+  * [#1089](https://github.com/clash-lang/clash-compiler/issues/1089): Respect maxBound in Enum instances for BitVector,Index,Signed,Unsigned
 
 * Fixes without issue reports:
   * Fix bug in `rnfX` defined for `Down` ([baef30e](https://github.com/clash-lang/clash-compiler/commit/baef30eae03dc02ba847ffbb8fae7f365c5287c2))
