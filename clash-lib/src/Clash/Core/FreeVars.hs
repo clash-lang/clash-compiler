@@ -28,6 +28,7 @@ module Clash.Core.FreeVars
   , localIdDoesNotOccurIn
   , localIdsDoNotOccurIn
   , localVarsDoNotOccurIn
+  , countFreeOccurances
   -- * Internal
   , typeFreeVars'
   , termFreeVars'
@@ -45,7 +46,8 @@ import Clash.Core.Term                  (Pat (..), Term (..), TickInfo (..))
 import Clash.Core.Type                  (Type (..))
 import Clash.Core.Var
   (Id, IdScope (..), TyVar, Var (..), isLocalId)
-import Clash.Core.VarEnv                (VarSet, unitVarSet)
+import Clash.Core.VarEnv
+  (VarEnv, VarSet, emptyVarEnv, unionVarEnvWith, unitVarSet, unitVarEnv)
 
 -- | Gives the free type-variables in a Type, implemented as a 'Fold'
 --
@@ -326,3 +328,11 @@ localFVsOfTerms
 localFVsOfTerms = foldMap go
  where
   go = Lens.foldMapOf freeLocalVars unitVarSet
+
+-- | Get the free variables of an expression and count the number of occurrences
+countFreeOccurances
+  :: Term
+  -> VarEnv Int
+countFreeOccurances =
+  Lens.foldMapByOf freeLocalIds (unionVarEnvWith (+)) emptyVarEnv
+                   (`unitVarEnv` (1 :: Int))
