@@ -13,6 +13,7 @@ module Clash.Core.VarEnv
     -- ** Indexing
   , lookupVarEnv
   , lookupVarEnv'
+  , lookupVarEnvDirectly
     -- ** Construction
   , emptyVarEnv
   , unitVarEnv
@@ -29,6 +30,8 @@ module Clash.Core.VarEnv
     -- *** Mapping
   , mapVarEnv
   , mapMaybeVarEnv
+    -- ** Folding
+  , foldlWithUniqueVarEnv'
     -- ** Working with predicates
     -- *** Searching
   , elemVarEnv
@@ -126,6 +129,13 @@ lookupVarEnv
   -> Maybe a
 lookupVarEnv = lookupUniqMap
 
+-- | Lookup a value based on the unique of a variable
+lookupVarEnvDirectly
+  :: Unique
+  -> VarEnv a
+  -> Maybe a
+lookupVarEnvDirectly = lookupUniqMap
+
 -- | Lookup a value based on the variable
 --
 -- Errors out when the variable is not present
@@ -218,6 +228,15 @@ mapMaybeVarEnv
   -> VarEnv a
   -> VarEnv b
 mapMaybeVarEnv = mapMaybeUniqMap
+
+-- | Strict left-fold over an environment using both the unique of the
+-- the variable and the value
+foldlWithUniqueVarEnv'
+  :: (a -> Unique -> b -> a)
+  -> a
+  -> VarEnv b
+  -> a
+foldlWithUniqueVarEnv' = foldlWithUnique'
 
 -- | Extract the elements
 eltsVarEnv

@@ -39,6 +39,7 @@ module Clash.Unique
   , elemUniqMapDirectly
     -- ** Folding
   , foldrWithUnique
+  , foldlWithUnique'
     -- ** Conversions
     -- *** Lists
   , eltsUniqMap
@@ -301,6 +302,14 @@ foldrWithUnique
   -> UniqMap a
   -> b
 foldrWithUnique f s (UniqMap m) = IntMap.foldrWithKey f s m
+
+-- | Strict left-fold over a map using both the key and the value
+foldlWithUnique'
+  :: (a -> Unique -> b -> a)
+  -> a
+  -> UniqMap b
+  -> a
+foldlWithUnique' f s (UniqMap m) = IntMap.foldlWithKey' f s m
 
 -- | Set of things that have a 'Unique'
 --
