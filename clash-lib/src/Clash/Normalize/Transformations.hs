@@ -91,7 +91,8 @@ import           Clash.Core.Name
   (Name (..), NameSort (..), mkUnsafeSystemName, nameOcc)
 import           Clash.Core.FreeVars
   (localIdOccursIn, localIdsDoNotOccurIn, freeLocalIds, termFreeTyVars,
-   typeFreeVars, localVarsDoNotOccurIn, localIdDoesNotOccurIn)
+   typeFreeVars, localVarsDoNotOccurIn, localIdDoesNotOccurIn,
+   countFreeOccurances)
 import           Clash.Core.Literal          (Literal (..))
 import           Clash.Core.Pretty           (showPpr)
 import           Clash.Core.Subst
@@ -145,8 +146,11 @@ import           Clash.Unique                (Unique, lookupUniqMap)
 import           Clash.Util
 
 inlineOrLiftNonRep :: HasCallStack => NormRewrite
-inlineOrLiftNonRep = inlineOrLiftBinders nonRepTest inlineTest
+inlineOrLiftNonRep ctx eLet@(Letrec _ body) =
+    inlineOrLiftBinders nonRepTest inlineTest ctx eLet
   where
+    bodyFreeOccs = countFreeOccurances body
+
     nonRepTest :: (Id, Term) -> RewriteMonad extra Bool
     nonRepTest (Id {varType = ty}, _)
       = not <$> (representableType <$> Lens.view typeTranslator
@@ -157,29 +161,21 @@ inlineOrLiftNonRep = inlineOrLiftBinders nonRepTest inlineTest
     nonRepTest _ = return False
 
     inlineTest :: Term -> (Id, Term) -> RewriteMonad extra Bool
-    inlineTest e (id_, e')
-      = not . or <$> sequence -- We do __NOT__ inline:
-              [ -- 1. recursive let-binders
-                pure (id_ `localIdOccursIn` e')
-                -- 2. join points (which are not void-wrappers)
-              , pure (isJoinPointIn id_ e && not (isVoidWrapper e'))
-                -- 3. binders that are used more than once in the body, because
-                --    it makes CSE a whole lot more difficult.
-              , pure (freeOccurances > 1)
-              ]
-      where
-        -- The number of free occurrences of the binder in the entire
-        -- let-expression
-        freeOccurances :: Int
-        freeOccurances = case e of
-          Letrec _ res -> do
-            Monoid.getSum
-              (Lens.foldMapOf freeLocalIds
-                              (\i -> if i == id_
-                                        then Monoid.Sum 1
-                                        else Monoid.Sum 0)
-                              res)
-          _ -> 0
+    inlineTest e (id_, e') = pure $
+      -- We do __NOT__ inline:
+      not $ or
+        [ -- 1. recursive let-binders
+          id_ `localIdOccursIn` e'
+          -- 2. join points (which are not void-wrappers)
+        , isJoinPointIn id_ e && not (isVoidWrapper e')
+          -- 3. binders that are used more than once in the body, because
+          --    it makes CSE a whole lot more difficult.
+          --
+          -- XXX: Check whether we can extend this to the binders as well
+        , maybe False (>1) (lookupVarEnv id_ bodyFreeOccs)
+        ]
+
+inlineOrLiftNonRep _ e = return e
 {-# SCC inlineOrLiftNonRep #-}
 
 {- [Note] join points and void wrappers
@@ -2466,19 +2462,15 @@ inlineCleanup (TransformContext is0 _) (Letrec binds body) = do
   -- For all let-bindings, count the number of times they are referenced.
   -- We only inline let-bindings which are referenced only once, otherwise
   -- we would lose sharing.
-  let is1 = extendInScopeSetList is0 (map fst binds)
-  let bindsFvs = map (\(v,e) -> (v,((v,e),Lens.foldMapByOf freeLocalIds
-                                                        (unionVarEnvWith (+))
-                                                        emptyVarEnv
-                                                        (`unitVarEnv` 1)
-                                                        e))) binds
-      allOccs       = List.foldl' (unionVarEnvWith (+)) emptyVarEnv
-                    $ map (snd.snd) bindsFvs
-      bodyFVs       = Lens.foldMapOf freeLocalIds unitVarSet body
-      (il,keep)     = List.partition (isInteresting allOccs prims bodyFVs)
-                                     bindsFvs
-      keep'         = inlineBndrsCleanup is1 (mkVarEnv il) emptyVarEnv
-                    $ map snd keep
+  let is1       = extendInScopeSetList is0 (map fst binds)
+      bindsFvs  = map (\(v,e) -> (v,((v,e),countFreeOccurances e))) binds
+      allOccs   = List.foldl' (unionVarEnvWith (+)) emptyVarEnv
+                $ map (snd.snd) bindsFvs
+      bodyFVs   = Lens.foldMapOf freeLocalIds unitVarSet body
+      (il,keep) = List.partition (isInteresting allOccs prims bodyFVs)
+                                 bindsFvs
+      keep'     = inlineBndrsCleanup is1 (mkVarEnv il) emptyVarEnv
+                $ map snd keep
 
   if | null il -> return  (Letrec binds body)
      | null keep' -> changed body
