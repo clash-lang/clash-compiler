@@ -122,11 +122,11 @@ import           Clash.Core.Var
   (Id, TyVar, Var (..), isGlobalId, isLocalId, mkLocalId)
 import           Clash.Core.VarEnv
   (InScopeSet, VarEnv, VarSet, elemVarSet,
-   emptyVarEnv, emptyVarSet, extendInScopeSet, extendInScopeSetList, lookupVarEnv,
-   notElemVarSet, unionVarEnvWith, unionVarSet, unionInScope, unitVarEnv,
+   emptyVarEnv, extendInScopeSet, extendInScopeSetList, lookupVarEnv,
+   notElemVarSet, unionVarEnvWith, unionInScope, unitVarEnv,
    unitVarSet, mkVarSet, mkInScopeSet, uniqAway, elemInScopeSet, elemVarEnv,
    foldlWithUniqueVarEnv', lookupVarEnvDirectly, extendVarEnv, unionVarEnv,
-   eltsVarEnv, mkVarEnv)
+   eltsVarEnv, mkVarEnv, eltsVarSet)
 import           Clash.Driver.Types          (Binding(..), DebugLevel (..))
 import           Clash.Netlist.BlackBox.Types (Element(Err))
 import           Clash.Netlist.BlackBox.Util (getUsedArguments)
@@ -828,26 +828,29 @@ topLet _ e = return e
 
 -- | Remove unused let-bindings
 deadCode :: HasCallStack => NormRewrite
-deadCode _ e@(Letrec xes body) = do
-    let bodyFVs = Lens.foldMapOf freeLocalIds unitVarSet body
-        (xesUsed,xesOther) = List.partition((`elemVarSet` bodyFVs) . fst) xes
-        xesUsed' = findUsedBndrs [] xesUsed xesOther
-    if length xesUsed' /= length xes
-      then case xesUsed' of
-              [] -> changed body
-              _  -> changed (Letrec xesUsed' body)
-      else return e
-  where
-    findUsedBndrs :: [(Id, Term)] -> [(Id, Term)]
-                  -> [(Id, Term)] -> [(Id, Term)]
-    findUsedBndrs used []      _     = used
-    findUsedBndrs used explore other =
-      let fvsUsed = List.foldl' unionVarSet
-                                emptyVarSet
-                                (map (Lens.foldMapOf freeLocalIds unitVarSet . snd) explore)
-          (explore',other') = List.partition
-                                ((`elemVarSet` fvsUsed) . fst) other
-      in findUsedBndrs (used ++ explore) explore' other'
+deadCode _ e@(Letrec binds body) = do
+  let bodyFVs = Lens.foldMapOf freeLocalIds unitVarSet body
+      used    = List.foldl' collectUsed emptyVarEnv (eltsVarSet bodyFVs)
+  case eltsVarEnv used of
+    [] -> changed body
+    qqL | neLength qqL binds
+        -> changed (Letrec qqL body)
+        | otherwise
+        -> return e
+ where
+  bindsEnv = mkVarEnv (map (\(x,e0) -> (x,(x,e0))) binds)
+
+  collectUsed env v =
+    if v `elemVarEnv` env then
+      env
+    else
+      case lookupVarEnv v bindsEnv of
+        Just (x,e0) ->
+          let eFVs = Lens.foldMapOf freeLocalIds unitVarSet e0
+          in  List.foldl' collectUsed
+                          (extendVarEnv x (x,e0) env)
+                          (eltsVarSet eFVs)
+        Nothing -> env
 
 deadCode _ e = return e
 {-# SCC deadCode #-}
