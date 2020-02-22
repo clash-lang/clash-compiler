@@ -131,8 +131,7 @@ data Parameter
   | BoolParameter String Bool
   | IntegerParameter String Integer
   | forall n. KnownNat n => BitVectorParameter String (C.BitVector n)
-  -- deriving Lift
-  --
+
 deriving instance Lift Parameter
 
 -- | A named port to an HDL blackbox
@@ -174,7 +173,6 @@ data ScaffoldDesc
   } deriving (Show, Lift)
 
 -- * Helper functions for translating between Haskell / Clash / TemplateHaskell
-
 
 toClashParameter :: Parameter -> (Expr,HWType,Expr)
 toClashParameter (StringParameter n v) =
@@ -267,7 +265,6 @@ scaffoldTemplate primitiveName parameters domains i o bbCtx = do
   result _ t = error $ "scaffoldTemplate: unexpected result type"
                      ++ show t
 
--- TODO: doc
 scaffoldTF
   :: [Int]
   -> String
@@ -283,9 +280,9 @@ scaffoldTF used primitiveName parameters domains i o = TemplateFunction
 
 -- | Annotations to associate our 'TemplateFunction's with our Haskell
 -- functions.
-scaffoldAnnotation :: Name -> Name -> HDL -> Q Exp
-scaffoldAnnotation n ntf hdl =
-  [|InlinePrimitive hdl j|]
+scaffoldAnnotation :: Name -> Name -> Q Exp
+scaffoldAnnotation n ntf =
+  [|InlinePrimitive [minBound .. maxBound] j|]
  where
   j = [I.i| [{ "BlackBox" :
               { "name" : "#{n}"
@@ -349,11 +346,9 @@ makeTemplate
   -> DecsQ
 makeTemplate desc parameters domains i o = do
   blackboxAnn <- do
-    annotations <-
-      traverse
-        (scaffoldAnnotation (qfunctionName# desc) (qtemplateName desc))
-        [minBound .. maxBound]
-    return $ PragmaD . AnnP (valueAnnotation $ qfunctionName# desc) <$> annotations
+    annotation <-
+      scaffoldAnnotation (qfunctionName# desc) (qtemplateName desc)
+    return $ PragmaD . AnnP (valueAnnotation $ qfunctionName# desc) <$> [annotation]
 
   blackboxExpr <-
     [| scaffoldTF
