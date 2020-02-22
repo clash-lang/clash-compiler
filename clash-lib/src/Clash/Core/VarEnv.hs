@@ -54,6 +54,7 @@ module Clash.Core.VarEnv
     -- ** Conversions
     -- *** Lists
   , mkVarSet
+  , eltsVarSet
     -- * In-scope sets
   , InScopeSet
     -- ** Accessors
@@ -330,6 +331,11 @@ mkVarSet
   :: [Var a]
   -> VarSet
 mkVarSet xs = mkUniqSet (coerce xs)
+
+eltsVarSet
+  :: VarSet
+  -> [Var Any]
+eltsVarSet = eltsUniqSet
 
 -- * InScopeSet
 
