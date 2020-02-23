@@ -53,7 +53,7 @@ assertNumPrimInsts (Component nm inps outs ds) =
                  <> "Expected 1.")
     _ -> error ("Unexpected component: " <> show nm)
  where
-  primInst = filter isPrimInst ds
+  primInsts = filter isPrimInst ds
   nPrimInsts = P.length primInsts
 
 getComponent :: (a, b, c, d) -> d
@@ -63,3 +63,14 @@ mainVHDL :: IO ()
 mainVHDL = do
   netlist <- runToNetlistStage SVHDL id testPath
   mapM_ (assertNumPrimInsts . getComponent) netlist
+
+mainVerilog :: IO ()
+mainVerilog = do
+  netlist <- runToNetlistStage SVerilog id testPath
+  mapM_ (assertNumPrimInsts . getComponent) netlist
+
+mainSystemVerilog :: IO ()
+mainSystemVerilog = do
+  netlist <- runToNetlistStage SSystemVerilog id testPath
+  mapM_ (assertNumPrimInsts . getComponent) netlist
+
