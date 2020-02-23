@@ -36,7 +36,7 @@ import           Data.Bool                   (bool)
 import           Data.Bifunctor              (bimap)
 import           Data.Coerce                 (coerce)
 import           Data.Functor.Const          (Const (..))
-import           Data.List                   (group, sort)
+import           Data.List                   (group, partition, sort)
 import qualified Data.Map                    as Map
 import           Data.Maybe                  (catMaybes,isJust,mapMaybe)
 import qualified Data.Monoid                 as Monoid
@@ -65,7 +65,7 @@ import           Clash.Core.FreeVars
 import           Clash.Core.Name
 import           Clash.Core.Pretty           (showPpr)
 import           Clash.Core.Subst
-  (aeqTerm, aeqType, deShadowTerm, extendIdSubst, mkSubst, substTm)
+  (substTmEnv, aeqTerm, aeqType, deShadowTerm, extendIdSubst, mkSubst, substTm)
 import           Clash.Core.Term
   (LetBinding, Pat (..), Term (..), CoreContext (..), Context, PrimInfo (..),
    TmName, WorkInfo (..), TickInfo, collectArgs, collectArgsTicks)
@@ -83,7 +83,7 @@ import           Clash.Core.Var
   (Id, IdScope (..), TyVar, Var (..), isLocalId, mkGlobalId, mkLocalId, mkTyVar)
 import           Clash.Core.VarEnv
   (InScopeSet, VarEnv, elemVarSet, extendInScopeSetList, mkInScopeSet,
-   notElemVarEnv, uniqAway, uniqAway')
+   notElemVarEnv, uniqAway, uniqAway', mapVarEnv)
 import           Clash.Driver.Types
   (DebugLevel (..), BindingMap, Binding(..))
 import           Clash.Netlist.Util          (representableType)
@@ -346,17 +346,16 @@ inlineBinders
   -- ^ Property test
   -> Rewrite extra
 inlineBinders condition (TransformContext inScope0 _) expr@(Letrec xes res) = do
-  (replace,others) <- partitionM (condition expr) xes
-  case replace of
+  (toInline,toKeep) <- partitionM (condition expr) xes
+  case toInline of
     [] -> return expr
     _  -> do
       let inScope1 = extendInScopeSetList inScope0 (map fst xes)
-          (others',res') = substituteBinders inScope1 replace others res
-          newExpr = case others' of
-                          [] -> res'
-                          _  -> Letrec others' res'
-
-      changed newExpr
+          (toInlRec,(toKeep1,res1)) =
+            substituteBinders inScope1 toInline toKeep res
+      case toInlRec ++ toKeep1 of
+        []   -> changed res1
+        xes1 -> changed (Letrec xes1 res1)
 
 inlineBinders _ _ e = return e
 
@@ -428,20 +427,29 @@ substituteBinders
   -> [LetBinding]
   -- ^ Let-binders where substitution takes place
   -> Term
-  -- ^ Expression where substitution takes place
-  -> ([LetBinding],Term)
-substituteBinders _ []    others res = (others,res)
-substituteBinders inScope ((bndr,val):rest) others res =
-  substituteBinders inScope rest' others' res'
+  -- ^ Body where substitution takes place
+  -> ([LetBinding],([LetBinding],Term))
+  -- ^
+  -- 1. Let-bindings that we wanted to substitute, but turned out to be recursive
+  -- 2.1 Let-binders where substitution took place
+  -- 2.2 Body where substitution took place
+substituteBinders inScope toInline toKeep body =
+  let (subst,toInlRec) = go (mkSubst inScope) [] toInline
+  in  ( map (second (substTm "substToInlRec" subst)) toInlRec
+      , ( map (second (substTm "substToKeep" subst)) toKeep
+        , substTm "substBody" subst body) )
  where
-  subst    = extendIdSubst (mkSubst inScope) bndr val
-  selfRef  = bndr `localIdOccursIn` val
-  (res',rest',others') = if selfRef
-    then (res,rest,(bndr,val):others)
-    else ( substTm "substituteBindersRes" subst res
-         , map (second (substTm "substituteBindersRest" subst)) rest
-         , map (second (substTm "substituteBindersOthers" subst)) others
-         )
+  go subst inlRec [] = (subst,inlRec)
+  go !subst !inlRec ((x,e):toInl) =
+    let substE  = extendIdSubst (mkSubst inScope) x e
+        subst1  = subst { substTmEnv = mapVarEnv (substTm "substSubst" substE)
+                                                 (substTmEnv subst)}
+        subst2  = extendIdSubst subst1 x e
+        selfRef = x `localIdOccursIn` e
+    in  if selfRef then
+          go subst ((x,e):inlRec) toInl
+        else
+          go subst2 inlRec (map (second (substTm "substToInl" substE)) toInl)
 
 -- | Determine whether a term does any work, i.e. adds to the size of the circuit
 isWorkFree
@@ -552,30 +560,39 @@ isWorkFreeIsh e = do
 inlineOrLiftBinders
   :: (LetBinding -> RewriteMonad extra Bool)
   -- ^ Property test
-  -> (Term -> LetBinding -> RewriteMonad extra Bool)
+  -> (Term -> LetBinding -> Bool)
   -- ^ Test whether to lift or inline
   --
   -- * True: inline
   -- * False: lift
   -> Rewrite extra
-inlineOrLiftBinders condition inlineOrLift (TransformContext inScope0 _) expr@(Letrec xes res) = do
-  (replace,others) <- partitionM condition xes
-  case replace of
-    [] -> return expr
+inlineOrLiftBinders condition inlineOrLift (TransformContext inScope0 _) e@(Letrec bndrs body) = do
+  (toReplace,toKeep) <- partitionM condition bndrs
+  case toReplace of
+    [] -> return e
     _  -> do
-      let inScope1 = extendInScopeSetList inScope0 (map fst xes)
-      (doInline,doLift) <- partitionM (inlineOrLift expr) replace
+      let inScope1 = extendInScopeSetList inScope0 (map fst bndrs)
+      let (toInline,toLift) = partition (inlineOrLift e) toReplace
       -- We first substitute the binders that we can inline both the binders
       -- that we intend to lift, the other binders, and the body
-      let (others',res')     = substituteBinders inScope1 doInline (doLift ++ others) res
-          (doLift',others'') = splitAt (length doLift) others'
-      doLift'' <- mapM liftBinding doLift'
+      let (toLiftExtra,(toReplace1,body1)) =
+            substituteBinders inScope1 toInline (toLift ++ toKeep) body
+          (toLift1,toKeep1) = splitAt (length toLift) toReplace1
+      toLift2 <- mapM liftBinding (toLiftExtra ++ toLift1)
       -- We then substitute the lifted binders in the other binders and the body
-      let (others3,res'') = substituteBinders inScope1 doLift'' others'' res'
-          newExpr = case others3 of
-                      [] -> res''
-                      _  -> Letrec others3 res''
-      changed newExpr
+      let (toInlRec,(toKeep2,body2)) =
+            substituteBinders inScope1 toLift2 toKeep1 body1
+      case toInlRec of
+        [] -> case toKeep2 of
+          [] -> changed body2
+          _  -> changed (Letrec toKeep2 body2)
+        _ -> do
+          -- This shouldn't happen, the substitutions for the lifted binders
+          -- should not be self-recursive.
+          (_,sp) <- Lens.use curFun
+          throw (ClashException sp
+                  ("Internal error: inlineOrLiftBinders failed:\n" ++ showPpr toInlRec)
+                  Nothing)
 
 inlineOrLiftBinders _ _ _ e = return e
 
