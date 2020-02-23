@@ -15,8 +15,6 @@ import Clash.Explicit.Testbench
 
 import           Clash.Primitives.Scaffold
 
-
-
 multiplyPrim
   :: Signal System (BitVector 8)
   -> Signal System (BitVector 8)

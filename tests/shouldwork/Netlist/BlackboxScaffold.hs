@@ -1,13 +1,14 @@
 {-# LANGUAGE ViewPatterns #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE PatternSynonmys #-}
 
-module NoDeDup where
+module BlackboxScaffold where
 
 import Prelude as P
 
 import Clash.Magic
 import Clash.Prelude
-import Clash.Netlist.Types
+import Clash.Netlist.Types hiding (pattern Clock)
 
 import Clash.Primitives.Scaffold
 
