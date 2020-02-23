@@ -160,14 +160,14 @@ inlineOrLiftNonRep ctx eLet@(Letrec _ body) =
                                    <*> pure ty)
     nonRepTest _ = return False
 
-    inlineTest :: Term -> (Id, Term) -> RewriteMonad extra Bool
-    inlineTest e (id_, e') = pure $
+    inlineTest :: Term -> (Id, Term) -> Bool
+    inlineTest e (id_, e') =
       -- We do __NOT__ inline:
       not $ or
         [ -- 1. recursive let-binders
-          id_ `localIdOccursIn` e'
+          -- id_ `localIdOccursIn` e' -- <= already checked in inlineOrLiftBinders
           -- 2. join points (which are not void-wrappers)
-        , isJoinPointIn id_ e && not (isVoidWrapper e')
+          isJoinPointIn id_ e && not (isVoidWrapper e')
           -- 3. binders that are used more than once in the body, because
           --    it makes CSE a whole lot more difficult.
           --
