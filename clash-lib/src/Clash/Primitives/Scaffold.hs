@@ -66,6 +66,7 @@ xilinxDiffClock (XilinxDiffClockI arg1 arg2 arg3 arg4)
 {-# LANGUAGE FlexibleInstances   #-}
 {-# LANGUAGE GADTs               #-}
 {-# LANGUAGE MagicHash           #-}
+{-# LANGUAGE PatternSynonyms     #-}
 {-# LANGUAGE QuasiQuotes         #-}
 {-# LANGUAGE RankNTypes          #-}
 {-# LANGUAGE ScopedTypeVariables #-}
@@ -84,6 +85,9 @@ module Clash.Primitives.Scaffold
   -- Data types for custom record naming
   , ScaffoldDesc(..)
   , ScaffoldPort(..)
+
+  -- Reexport
+  , PortDirection(..)
   )
   where
 
@@ -100,8 +104,7 @@ import           Control.Monad.State            ( State )
 import qualified Data.String.Interpolate       as I
 
 import           Clash.Netlist.Id               ( IdType(Basic) )
-import           Clash.Netlist.Types     hiding ( PortDirection(..) )
-import           Clash.Netlist.Types            ( PortDirection )
+import           Clash.Netlist.Types     hiding ( pattern Clock )
 import qualified Clash.Netlist.Types           as Netlist
 import           Data.Text.Prettyprint.Doc.Extra
                                                 ( Doc )
@@ -136,10 +139,8 @@ deriving instance Lift Parameter
 
 -- | A named port to an HDL blackbox
 data Port
-  = In String Width
-  | Out String Width
-  | ClkIn String
-  | ClkOut String
+  = Port String Width PortDirection
+  | Clock String PortDirection
 
 -- * Internal types
 
@@ -152,7 +153,7 @@ data ScaffoldPort
   , name       :: String
   , isClock    :: IsClock
   , ty         :: Type
-  , domain     :: Name
+  -- , domain     :: Name
   } deriving (Show, Lift)
 
 data ScaffoldDesc
@@ -188,26 +189,19 @@ toClashParameter (BitVectorParameter n v) =
    where
     s = natVal v
 
-toTemplateHaskellType :: IsClock -> Width -> Name -> Type
-toTemplateHaskellType True _ dom  = AppT (ConT ''C.Clock) (VarT dom)
-toTemplateHaskellType False w dom =
-  AppT
-    (AppT (ConT ''C.Signal) (VarT dom))
-    (AppT (ConT ''C.BitVector) (LitT $ NumTyLit w))
-
 toClashType :: ScaffoldPort -> HWType
-toClashType (ScaffoldPort _ _ _ True _ _) = Clock (T.pack "clk")
-toClashType (ScaffoldPort _ w _ False _ _) = BitVector (fromInteger w)
+toClashType (ScaffoldPort _ _ _ True _) = Netlist.Clock (T.pack "clk")
+toClashType (ScaffoldPort _ w _ False _) = BitVector (fromInteger w)
 
 scaffoldPort :: Name -> Port -> ScaffoldPort
-scaffoldPort d (In n w) =
-  ScaffoldPort Netlist.In w n False (toTemplateHaskellType False w d) d
-scaffoldPort d (Out n w) =
-  ScaffoldPort Netlist.Out w n False (toTemplateHaskellType False w d) d
-scaffoldPort d (ClkIn n) =
-  ScaffoldPort Netlist.In 1 n True (toTemplateHaskellType True 1 d) d
-scaffoldPort d (ClkOut n) =
-  ScaffoldPort Netlist.Out 1 n True (toTemplateHaskellType True 1 d) d
+scaffoldPort dom (Port n w dir) =
+  ScaffoldPort dir w n False (
+    AppT
+      (AppT (ConT ''C.Signal) (VarT dom))
+      (AppT (ConT ''C.BitVector) (LitT $ NumTyLit w))
+                             )
+scaffoldPort dom (Clock n dir) =
+  ScaffoldPort dir 1 n True (AppT (ConT ''C.Clock) (VarT dom))
 
 scaffoldDomain :: [Port] -> Q (Name, [ScaffoldPort])
 scaffoldDomain ps = do
@@ -218,7 +212,7 @@ instantiate
   :: ScaffoldPort
   -> Expr
   -> (Expr, PortDirection, HWType, Expr)
-instantiate p@(ScaffoldPort dir _ n _ _ _) e
+instantiate p@(ScaffoldPort dir _ n _ _) e
   = (Identifier (T.pack n) Nothing, dir, toClashType p, e)
 
 -- *
@@ -329,7 +323,7 @@ makeDatatypes desc (kinds,domains) (i,ni) (o,no) =
   iclks = filter isClock i
   argNames = zipWith (const (mkName . (<>) "clkArg" . show)) iclks [0::Int ..]
   retTy = applyDomains domains $ ConT $ datatypeNameI desc
-  mkRec (ScaffoldPort _ _ _ _ t _) n = (n, b, t)
+  mkRec (ScaffoldPort _ _ _ _ t) n = (n, b, t)
 #if MIN_VERSION_template_haskell(2,11,0)
   build nd fields = DataD [] nd kinds Nothing [(RecC nd fields)] deriveGeneric
 #else

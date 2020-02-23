@@ -33,9 +33,9 @@ multiplyPrim a b =
 
 makeScaffold "multiply" "mult_prim"
   [ ]
-  [ [ In "lhs" 8
-    , In "rhs" 8
-    , Out "result" 8
+  [ [ Port "lhs" 8 In
+    , Port "rhs" 8 In
+    , Port "result" 8 Out
     ]
   ]
 
