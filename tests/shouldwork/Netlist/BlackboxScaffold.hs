@@ -9,6 +9,8 @@ import Clash.Magic
 import Clash.Prelude
 import Clash.Netlist.Types
 
+import Clash.Primitives.Scaffold
+
 import Test.Tasty.Clash
 import Test.Tasty.Clash.NetlistTest
 
@@ -18,16 +20,16 @@ makeScaffold "testFunction" "testPrimitive"
   , BoolParameter "testBool" True
   , BitVectorParameter "testBitVector" (0 :: BitVector 8)
   ]
-  [ [ ClkOut "d1clk1"
-    , ClkIn  "d1clk2"
-    , In     "d1i1" 1
-    , Out    "d1o1" 2
+  [ [ Clock "d1clk1" Out
+    , Clock "d1clk2" In
+    , Port  "d1i1" 1 In
+    , Port  "d1o1" 2 Out
     ]
-  , [ ClkOut "d2clk1"
-    , ClkIn  "d2clk2"
-    , In     "d2i1" 1
-    , In     "d2i2" 1
-    , Out    "d2o1" 2
+  , [ Clock "d2clk1" Out
+    , Clock "d2clk2" In
+    , Port  "d2i1" 1 In
+    , Port  "d2i2" 1 In
+    , Port  "d2o1" 2 Out
   ] ]
 
 topEntity :: Int -> Int
