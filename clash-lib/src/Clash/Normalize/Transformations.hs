@@ -125,8 +125,7 @@ import           Clash.Core.VarEnv
    emptyVarEnv, extendInScopeSet, extendInScopeSetList, lookupVarEnv,
    notElemVarSet, unionVarEnvWith, unionInScope, unitVarEnv,
    unitVarSet, mkVarSet, mkInScopeSet, uniqAway, elemInScopeSet, elemVarEnv,
-   foldlWithUniqueVarEnv', lookupVarEnvDirectly, extendVarEnv, unionVarEnv,
-   eltsVarEnv, mkVarEnv, eltsVarSet)
+   foldlWithUniqueVarEnv', extendVarEnv, eltsVarEnv, mkVarEnv, eltsVarSet)
 import           Clash.Driver.Types          (Binding(..), DebugLevel (..))
 import           Clash.Netlist.BlackBox.Types (Element(Err))
 import           Clash.Netlist.BlackBox.Util (getUsedArguments)
@@ -142,15 +141,12 @@ import           Clash.Primitives.Types
 import           Clash.Rewrite.Combinators
 import           Clash.Rewrite.Types
 import           Clash.Rewrite.Util
-import           Clash.Unique                (Unique, lookupUniqMap)
+import           Clash.Unique                (lookupUniqMap)
 import           Clash.Util
 
 inlineOrLiftNonRep :: HasCallStack => NormRewrite
-inlineOrLiftNonRep ctx eLet@(Letrec _ body) =
-    inlineOrLiftBinders nonRepTest inlineTest ctx eLet
+inlineOrLiftNonRep = inlineOrLiftBinders nonRepTest inlineTest
   where
-    bodyFreeOccs = countFreeOccurances body
-
     nonRepTest :: (Id, Term) -> RewriteMonad extra Bool
     nonRepTest (Id {varType = ty}, _)
       = not <$> (representableType <$> Lens.view typeTranslator
@@ -160,22 +156,20 @@ inlineOrLiftNonRep ctx eLet@(Letrec _ body) =
                                    <*> pure ty)
     nonRepTest _ = return False
 
-    inlineTest :: Term -> (Id, Term) -> RewriteMonad extra Bool
-    inlineTest e (id_, e') = pure $
+    inlineTest :: Term -> VarEnv Int -> (Id, Term) -> RewriteMonad extra Bool
+    inlineTest e bodyFreeOccs (id_, e') = pure $
       -- We do __NOT__ inline:
       not $ or
         [ -- 1. recursive let-binders
-          id_ `localIdOccursIn` e'
+          -- id_ `localIdOccursIn` e' <= already checked by inlineOrLiftBinders
           -- 2. join points (which are not void-wrappers)
-        , isJoinPointIn id_ e && not (isVoidWrapper e')
+          isJoinPointIn id_ e && not (isVoidWrapper e')
           -- 3. binders that are used more than once in the body, because
           --    it makes CSE a whole lot more difficult.
           --
           -- XXX: Check whether we can extend this to the binders as well
         , maybe False (>1) (lookupVarEnv id_ bodyFreeOccs)
         ]
-
-inlineOrLiftNonRep _ e = return e
 {-# SCC inlineOrLiftNonRep #-}
 
 {- [Note] join points and void wrappers
@@ -2534,9 +2528,6 @@ inlineCleanup (TransformContext is0 _) (Letrec binds body) = do
 inlineCleanup _ e = return e
 {-# SCC inlineCleanup #-}
 
--- | Mark to track progress of 'reduceBindersCleanup'
-data Mark = Temp | Done | Rec
-
 -- | Used by 'inlineCleanup' to inline binders that we want to inline into the
 -- binders that we want to keep.
 inlineBndrsCleanup
@@ -2564,7 +2555,7 @@ inlineBndrsCleanup isN origInl = go
     [ (v,e) | ((v,e),_,Rec) <- eltsVarEnv doneInl ]
   go !doneInl (((v,e),eFVs):il) =
     let (sM,_,doneInl1) = foldlWithUniqueVarEnv'
-                            (reduceBindersCleanup isN origInl)
+                            (reduceInlineBinders isN origInl)
                             (Nothing, emptyVarEnv, doneInl)
                             eFVs
         e1 = case sM of
@@ -2572,95 +2563,6 @@ inlineBndrsCleanup isN origInl = go
                Just s  -> substTm "inlineBndrsCleanup" s e
     in  (v,e1):go doneInl1 il
 {-# SCC inlineBndrsCleanup #-}
-
--- | Used (transitively) by 'inlineCleanup' inline to-inline let-binders into
--- the other to-inline let-binders.
-reduceBindersCleanup
-  :: InScopeSet
-  -- ^ Current InScopeSet
-  -> VarEnv ((Id,Term),VarEnv Int)
-  -- ^ Original let-binders with their free variables (+ #occurrences)
-  -> (Maybe Subst,VarEnv Int,VarEnv ((Id,Term),VarEnv Int,Mark))
-  -- ^ Accumulated:
-  --
-  -- 1. (Maybe) the build up substitution so far
-  -- 2. The free variables of the range of the substitution
-  -- 3. Processed let-binders with their free variables and a tag to mark
-  --    the progress:
-  --    * Temp: Will eventually form a recursive cycle
-  --    * Done: Processed, non-recursive
-  --    * Rec:  Processed, recursive
-  -> Unique
-  -- ^ The unique of the let-binding that we want to simplify
-  -> Int
-  -- ^ Ignore, artifact of 'foldlWithUniqueVarEnv'
-  -> (Maybe Subst,VarEnv Int,VarEnv ((Id,Term),VarEnv Int,Mark))
-  -- ^ Same as the third argument
-reduceBindersCleanup isN origInl (!substM,!substFVs,!doneInl) u _ = case lookupVarEnvDirectly u doneInl of
-    Nothing -> case lookupVarEnvDirectly u origInl of
-      Nothing ->
-        -- let-binding not found, cannot extend the substitution
-        (substM,substFVs,doneInl)
-      Just ((v,e),eFVs) ->
-        -- Simplify the transitive dependencies
-        let (sM,substFVsE,doneInl1) =
-              foldlWithUniqueVarEnv'
-                (reduceBindersCleanup isN origInl)
-                ( Nothing
-                -- It's okay/needed to over-approximate the free variables of
-                -- the range of the new substitution by including the free
-                -- variables of the original let-binder, because this set of
-                -- free variables is only used to check whether let-binding will
-                -- become self-recursive after applying the substitution.
-                --
-                -- That is, it was already self-recursive, or becomes
-                -- self-recursive after applying the substitution because it was
-                -- part of a recursive group. And we do not want to inline
-                -- recursive binders.
-                , eFVs
-                -- Temporarily extend the processing environment with the
-                -- let-binding so we don't end up in a loop in case there is a
-                -- recursive group.
-                , extendVarEnv v ((v,e),eFVs,Temp) doneInl)
-                eFVs
-
-            e1 = case sM of
-                   Nothing -> e
-                   Just s  -> substTm "reduceBindersCleanup" s e
-        in  if v `elemVarEnv` substFVsE then
-              -- We cannot inline recursive let-bindings, so we do not extend
-              -- the substitution environment.
-              ( substM
-              , substFVs
-              -- And we explicitly mark the let-binding as recursive in the
-              -- processing environment. So that it will be kept around at the
-              -- end of 'inlineCleanup'
-              , extendVarEnv v ((v,e1),substFVsE,Rec) doneInl1
-              )
-            else
-              -- Extend the substitution
-              ( Just (extendIdSubst (Maybe.fromMaybe (mkSubst isN) substM) v e1)
-              , unionVarEnv substFVsE substFVs
-              -- Mark the let-binding a fully "reduced", so we don't repeat
-              -- this process when we encounter it again.
-              , extendVarEnv v ((v,e1),substFVsE,Done) doneInl1
-              )
-    -- It's already been process, just extend the substitution environment
-    Just ((v,e),eFVs,Done) ->
-      ( Just (extendIdSubst (Maybe.fromMaybe (mkSubst isN) substM) v e)
-      , unionVarEnv eFVs substFVs
-      , doneInl
-      )
-
-    -- It's either recursive (Rec), or part of a recursive group (Temp) where we
-    -- originally entered a different part of the cycle. Regardless, we do not
-    -- extend the substitution environment.
-    Just _ ->
-      ( substM
-      , substFVs
-      , doneInl
-      )
-{-# SCC reduceBindersCleanup #-}
 
 -- | Flatten's letrecs after `inlineCleanup`
 --

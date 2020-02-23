@@ -24,6 +24,7 @@ module Clash.Core.VarEnv
   , extendVarEnvWith
   , delVarEnv
   , delVarEnvList
+  , delVarEnvByKey
   , unionVarEnv
   , unionVarEnvWith
     -- ** Element-wise operations
@@ -55,6 +56,8 @@ module Clash.Core.VarEnv
     -- *** Lists
   , mkVarSet
   , eltsVarSet
+    -- *** VarEnv
+  , toVarEnv
     -- * In-scope sets
   , InScopeSet
     -- ** Accessors
@@ -152,6 +155,13 @@ delVarEnv
   -> Var b
   -> VarEnv a
 delVarEnv = delUniqMap
+
+-- | Remove a variable-value pair from the environment
+delVarEnvByKey
+  :: VarEnv a
+  -> Unique
+  -> VarEnv a
+delVarEnvByKey = delUniqMapDirectly
 
 -- | Remove a list of variable-value pairs from the environment
 delVarEnvList
@@ -336,6 +346,11 @@ eltsVarSet
   :: VarSet
   -> [Var Any]
 eltsVarSet = eltsUniqSet
+
+toVarEnv
+  :: VarSet
+  -> VarEnv (Var Any)
+toVarEnv = uniqSetToUniqMap
 
 -- * InScopeSet
 

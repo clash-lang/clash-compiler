@@ -36,9 +36,10 @@ import           Data.Bool                   (bool)
 import           Data.Bifunctor              (bimap)
 import           Data.Coerce                 (coerce)
 import           Data.Functor.Const          (Const (..))
-import           Data.List                   (group, sort)
+import           Data.List                   (group, mapAccumL, sort)
 import qualified Data.Map                    as Map
-import           Data.Maybe                  (catMaybes,isJust,mapMaybe)
+import           Data.Maybe
+  (catMaybes, fromMaybe, isJust, mapMaybe)
 import qualified Data.Monoid                 as Monoid
 import qualified Data.Set                    as Set
 import qualified Data.Set.Lens               as Lens
@@ -61,11 +62,12 @@ import           Clash.Core.Evaluator        (whnf')
 import           Clash.Core.Evaluator.Types  (PureHeap)
 import           Clash.Core.FreeVars
   (freeLocalVars, hasLocalFreeVars, localIdDoesNotOccurIn, localIdOccursIn,
-   typeFreeVars, termFreeVars', freeIds)
+   typeFreeVars, termFreeVars', freeLocalIds, countFreeOccurances)
 import           Clash.Core.Name
 import           Clash.Core.Pretty           (showPpr)
 import           Clash.Core.Subst
-  (aeqTerm, aeqType, deShadowTerm, extendIdSubst, mkSubst, substTm)
+  (Subst, aeqTerm, aeqType, deShadowTerm, extendIdSubst, mkSubst, substTm,
+    substTmEnv)
 import           Clash.Core.Term
   (LetBinding, Pat (..), Term (..), CoreContext (..), Context, PrimInfo (..),
    TmName, WorkInfo (..), TickInfo, collectArgs, collectArgsTicks)
@@ -83,7 +85,9 @@ import           Clash.Core.Var
   (Id, IdScope (..), TyVar, Var (..), isLocalId, mkGlobalId, mkLocalId, mkTyVar)
 import           Clash.Core.VarEnv
   (InScopeSet, VarEnv, elemVarSet, extendInScopeSetList, mkInScopeSet,
-   notElemVarEnv, uniqAway, uniqAway')
+   notElemVarEnv, uniqAway, uniqAway', unionVarEnv, extendVarEnv, elemVarEnv,
+   foldlWithUniqueVarEnv', lookupVarEnvDirectly, mkVarEnv, unitVarEnv,
+   emptyVarEnv, extendVarEnvList, delVarEnvByKey, eltsVarEnv, mapVarEnv)
 import           Clash.Driver.Types
   (DebugLevel (..), BindingMap, Binding(..))
 import           Clash.Netlist.Util          (representableType)
@@ -552,32 +556,79 @@ isWorkFreeIsh e = do
 inlineOrLiftBinders
   :: (LetBinding -> RewriteMonad extra Bool)
   -- ^ Property test
-  -> (Term -> LetBinding -> RewriteMonad extra Bool)
+  -> (Term -> VarEnv Int -> LetBinding -> RewriteMonad extra Bool)
   -- ^ Test whether to lift or inline
   --
   -- * True: inline
   -- * False: lift
   -> Rewrite extra
-inlineOrLiftBinders condition inlineOrLift (TransformContext inScope0 _) expr@(Letrec xes res) = do
-  (replace,others) <- partitionM condition xes
-  case replace of
-    [] -> return expr
+inlineOrLiftBinders condition inlineOrLift (TransformContext is0 _) e@(Letrec bndrs body) = do
+  (toInlineOrLift,toKeep) <- partitionM condition bndrs
+  case toInlineOrLift of
+    [] -> return e
     _  -> do
-      let inScope1 = extendInScopeSetList inScope0 (map fst xes)
-      (doInline,doLift) <- partitionM (inlineOrLift expr) replace
-      -- We first substitute the binders that we can inline both the binders
-      -- that we intend to lift, the other binders, and the body
-      let (others',res')     = substituteBinders inScope1 doInline (doLift ++ others) res
-          (doLift',others'') = splitAt (length doLift) others'
-      doLift'' <- mapM liftBinding doLift'
-      -- We then substitute the lifted binders in the other binders and the body
-      let (others3,res'') = substituteBinders inScope1 doLift'' others'' res'
-          newExpr = case others3 of
-                      [] -> res''
-                      _  -> Letrec others3 res''
-      changed newExpr
+      let is1 = extendInScopeSetList is0 (map fst bndrs)
+      let bodyFVs  = countFreeOccurances body
+          bodyFVsU = mapVarEnv (const ()) bodyFVs
+      (toInline,toLift) <- partitionM (inlineOrLift e bodyFVs) toInlineOrLift
+      let origInl = mkVarEnv (map (\b -> (fst b,bndrFVs b)) toInline)
+      -- We first first inline into the to-lift binders
+      let toLift1 = map bndrFVs toLift
+          (doneInl,toLift2) = mapAccumL (substBinderX is1 origInl) emptyVarEnv toLift1
+      -- We then start inlining into the let-binders we want to keep
+      let toKeep1 = map bndrFVs toKeep
+          (doneInl1,toKeep2) = mapAccumL (substBinderX is1 origInl) doneInl toKeep1
+      -- And finally inline into the body
+      let (sM,substFVsBody,doneInl2) =
+            foldlWithUniqueVarEnv' (reduceInlineBinders is1 origInl)
+                                   (Nothing,emptyVarEnv,doneInl1)
+                                   bodyFVsU
+          body1 = case sM of
+            Nothing -> body
+            Just s  -> substTm "inlineOrLiftBinders" s body
+
+          bodyFVs1 = case sM of
+            Nothing -> bodyFVsU
+            Just s  -> let delFV env u0 _ = delVarEnvByKey env u0
+                       in  unionVarEnv (foldlWithUniqueVarEnv' delFV bodyFVsU (substTmEnv s))
+                                       substFVsBody
+      -- We then lift the binders
+      toLift3     <- mapM (liftBinding . fst) toLift2
+      toLiftExtra <- mapM liftBinding [ (x,e0) | ((x,e0),_,Rec) <- eltsVarEnv doneInl2 ]
+      -- Then we substitute the lifted bindings
+      let doneInl3 = mkVarEnv [ (x,((x,e0),emptyVarEnv,Done))
+                              | (x,e0) <- toLift3 ++ toLiftExtra
+                              ]
+          toKeep3 = map (fst . snd . substBinderX is1 emptyVarEnv doneInl3) toKeep2
+          (sm1,_,_) =
+            foldlWithUniqueVarEnv' (reduceInlineBinders is1 emptyVarEnv)
+                                   (Nothing,emptyVarEnv,doneInl3)
+                                   bodyFVs1
+          body2 = case sm1 of
+            Nothing -> body1
+            Just s  -> substTm "inlineOrLiftBinders2" s body1
+      case toKeep3 of
+        [] -> changed body2
+        _  -> changed (Letrec toKeep3 body2)
+ where
+  bndrFVs (x,e0) = ((x,e0),Lens.foldMapOf freeLocalIds (`unitVarEnv` ()) e0)
 
 inlineOrLiftBinders _ _ _ e = return e
+
+substBinderX isN origInl !doneInl ((x,e),eFVs) =
+  let (sM,substFVsE,doneInl1) =
+        foldlWithUniqueVarEnv' (reduceInlineBinders isN origInl)
+                               (Nothing,emptyVarEnv,doneInl)
+                               eFVs
+      e1 = case sM of
+        Nothing -> e
+        Just s  -> substTm "substBinderX" s e
+      substFVsE1 = case sM of
+        Nothing -> eFVs
+        Just s  -> let delFV env u0 _ = delVarEnvByKey env u0
+                   in  unionVarEnv (foldlWithUniqueVarEnv' delFV eFVs (substTmEnv s))
+                                   substFVsE
+  in  (doneInl1,((x,e1),substFVsE1))
 
 -- | Create a global function for a Let-binding and return a Let-binding where
 -- the RHS is a reference to the new global function applied to the free
@@ -1057,3 +1108,92 @@ bindPureHeap tcm heap rw (TransformContext is0 hist) e = do
       where
         ty = termType tcm term
         nm = mkLocalId ty (mkUnsafeSystemName "x" uniq) -- See [Note: Name re-creation]
+
+-- | Mark to track progress of 'reduceBindersCleanup'
+data Mark = Temp | Done | Rec
+
+-- | Used (transitively) by 'inlineCleanup' inline to-inline let-binders into
+-- the other to-inline let-binders.
+reduceInlineBinders
+  :: InScopeSet
+  -- ^ Current InScopeSet
+  -> VarEnv ((Id,Term),VarEnv a)
+  -- ^ Original let-binders with their free variables (+ #occurrences)
+  -> (Maybe Subst,VarEnv a,VarEnv ((Id,Term),VarEnv a,Mark))
+  -- ^ Accumulated:
+  --
+  -- 1. (Maybe) the build up substitution so far
+  -- 2. The free variables of the range of the substitution
+  -- 3. Processed let-binders with their free variables and a tag to mark
+  --    the progress:
+  --    * Temp: Will eventually form a recursive cycle
+  --    * Done: Processed, non-recursive
+  --    * Rec:  Processed, recursive
+  -> Unique
+  -- ^ The unique of the let-binding that we want to simplify
+  -> a
+  -- ^ Ignore, artifact of 'foldlWithUniqueVarEnv'
+  -> (Maybe Subst,VarEnv a,VarEnv ((Id,Term),VarEnv a,Mark))
+  -- ^ Same as the third argument
+reduceInlineBinders isN origInl (!substM,!substFVs,!doneInl) u _ = case lookupVarEnvDirectly u doneInl of
+    Nothing -> case lookupVarEnvDirectly u origInl of
+      Nothing ->
+        -- let-binding not found, cannot extend the substitution
+        (substM,substFVs,doneInl)
+      Just ((v,e),eFVs) ->
+        -- Simplify the transitive dependencies
+        let (sM,substFVsE,doneInl1) =
+              foldlWithUniqueVarEnv'
+                (reduceInlineBinders isN origInl)
+                ( Nothing
+                , emptyVarEnv
+                -- Temporarily extend the processing environment with the
+                -- let-binding so we don't end up in a loop in case there is a
+                -- recursive group.
+                , extendVarEnv v ((v,e),eFVs,Temp) doneInl)
+                eFVs
+
+            e1 = case sM of
+                   Nothing -> e
+                   Just s  -> substTm "reduceInlineBinders" s e
+
+            substFVsE1 = case sM of
+              Nothing -> eFVs
+              Just s  ->
+                let delFV env u0 _ = delVarEnvByKey env u0
+                in  unionVarEnv (foldlWithUniqueVarEnv' delFV eFVs (substTmEnv s))
+                                substFVsE
+        in  if v `elemVarEnv` substFVsE1 then
+              -- We cannot inline recursive let-bindings, so we do not extend
+              -- the substitution environment.
+              ( substM
+              , substFVs
+              -- And we explicitly mark the let-binding as recursive in the
+              -- processing environment. So that it will be kept around at the
+              -- end of 'inlineCleanup'
+              , extendVarEnv v ((v,e1),substFVsE1,Rec) doneInl1
+              )
+            else
+              -- Extend the substitution
+              ( Just (extendIdSubst (fromMaybe (mkSubst isN) substM) v e1)
+              , unionVarEnv substFVsE1 substFVs
+              -- Mark the let-binding a fully "reduced", so we don't repeat
+              -- this process when we encounter it again.
+              , extendVarEnv v ((v,e1),substFVsE1,Done) doneInl1
+              )
+    -- It's already been process, just extend the substitution environment
+    Just ((v,e),substFVsE,Done) ->
+      ( Just (extendIdSubst (fromMaybe (mkSubst isN) substM) v e)
+      , unionVarEnv substFVsE substFVs
+      , doneInl
+      )
+
+    -- It's either recursive (Rec), or part of a recursive group (Temp) where we
+    -- originally entered a different part of the cycle. Regardless, we do not
+    -- extend the substitution environment.
+    Just _ ->
+      ( substM
+      , substFVs
+      , doneInl
+      )
+{-# SCC reduceInlineBinders #-}

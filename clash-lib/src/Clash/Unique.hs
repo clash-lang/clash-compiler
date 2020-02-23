@@ -23,6 +23,7 @@ module Clash.Unique
   , extendListUniqMap
   , delUniqMap
   , delListUniqMap
+  , delUniqMapDirectly
   , unionUniqMap
   , unionUniqMapWith
   , differenceUniqMap
@@ -71,6 +72,8 @@ module Clash.Unique
     -- *** Lists
   , mkUniqSet
   , eltsUniqSet
+    -- *** UniqMap
+  , uniqSetToUniqMap
   )
 where
 
@@ -221,6 +224,13 @@ delUniqMap
   -> a
   -> UniqMap b
 delUniqMap (UniqMap env) v = UniqMap (IntMap.delete (getUnique v) env)
+
+-- | Remove a key-value pair from the map
+delUniqMapDirectly
+  :: UniqMap b
+  -> Unique
+  -> UniqMap b
+delUniqMapDirectly (UniqMap env) u = UniqMap (IntMap.delete u env)
 
 -- | Remove a list of key-value pairs from the map
 delListUniqMap
@@ -405,6 +415,12 @@ uniqMapToUniqSet
   :: UniqMap a
   -> UniqSet a
 uniqMapToUniqSet (UniqMap m) = UniqSet m
+
+-- | Convert a 'UniqSet' to a 'UniqMap'
+uniqSetToUniqMap
+  :: UniqSet a
+  -> UniqMap a
+uniqSetToUniqMap (UniqSet m) = UniqMap m
 
 -- | Check whether a A is a subset of B
 subsetUniqSet
