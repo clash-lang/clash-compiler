@@ -1,6 +1,6 @@
 {-# LANGUAGE ViewPatterns #-}
 {-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE PatternSynonmys #-}
+{-# LANGUAGE PatternSynonyms #-}
 
 module BlackboxScaffold where
 
