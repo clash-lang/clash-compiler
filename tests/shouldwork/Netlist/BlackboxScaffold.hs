@@ -1,6 +1,7 @@
 {-# LANGUAGE ViewPatterns #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE PatternSynonyms #-}
+{-# LANGUAGE TypeApplications #-}
 
 module BlackboxScaffold where
 
@@ -33,8 +34,11 @@ makeScaffold "testFunction" "testPrimitive"
     , Port  "d2o1" 2 Out
   ] ]
 
-topEntity :: Int -> Int
-topEntity n abcd = testFunction
+topEntity :: BitVector 1 -> BitVector 1
+topEntity !n = _d2i2 o
+  where
+    i = (testPrimitiveI @System @System clockGen clockGen) { _d1i1 = n }
+    o = testFunction i
 
 testPath :: FilePath
 testPath = "tests/shouldwork/Netlist/BlackboxScaffold.hs"
