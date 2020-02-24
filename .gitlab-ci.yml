@@ -6,7 +6,6 @@ stages:
 .tests:
   image: clashlang/clash-ci:2020-01-28
   stage: build
-  interruptible: true
   variables:
     GIT_SUBMODULE_STRATEGY: recursive
     TERM: xterm-color
@@ -30,19 +29,53 @@ stages:
     - .ci/build.sh
     - .ci/test.sh
 
-ghc-8.4.4:
+.tests-interruptible:
   extends: .tests
+  interruptible: true
+  except: 
+    - master
+
+# Test jobs:
+ghc-8.4.4:
+  extends: .tests-interruptible
 #ghc-8.6.5:
 #  extends: .tests
 ghc-8.8.2:
-  extends: .tests
+  extends: .tests-interruptible
 ghc-8.6.5-singular-hidden:
-  extends: .tests
+  extends: .tests-interruptible
   variables:
     MULTIPLE_HIDDEN: "no"
     GHC: ghc-8.6.5
 #ghc-head:
-#  # extends: .tests
+#  # extends: .tests-interruptible
+#  stage: build
+#  allow_failure: true
+#  script:
+#    TODO test with HEAD
+
+# Same as test jobs, but non-interruptable
+ghc-8.4.4-master:
+  extends: .tests
+  only: 
+    - master
+#ghc-8.6.5:
+#  extends: .tests
+ghc-8.8.2-master:
+  extends: .tests
+  only: 
+    - master
+ghc-8.6.5-singular-hidden-master:
+  extends: .tests
+  only: 
+    - master
+  variables:
+    MULTIPLE_HIDDEN: "no"
+    GHC: ghc-8.6.5
+#ghc-head-master:
+#  # extends: .tests-non-interruptible
+#  only: 
+#    - master
 #  stage: build
 #  allow_failure: true
 #  script:
