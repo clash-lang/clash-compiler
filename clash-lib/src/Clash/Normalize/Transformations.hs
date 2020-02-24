@@ -18,8 +18,7 @@
 {-# LANGUAGE TemplateHaskell #-}
 
 module Clash.Normalize.Transformations
-  ( appProp
-  , caseLet
+  ( caseLet
   , caseCon
   , caseCase
   , caseElemNonReachable
@@ -245,8 +244,8 @@ nonRepSpec ctx e@(App e1 e2)
           Just b
             | nameSort (varName (bindingId b)) == Internal
             -> censor (const mempty)
-                      (bottomupR appProp ctx
-                                 (mkApps (mkTicks (bindingTerm b) ticks) fArgs))
+                      (topdownR appPropFast ctx
+                        (mkApps (mkTicks (bindingTerm b) ticks) fArgs))
           _ -> return app
       | otherwise = return app
 
@@ -1196,7 +1195,12 @@ constantSpec _ e = return e
 -- Experimental
 
 -- | Propagate arguments of application inwards; except for 'Lam' where the
--- argument becomes let-bound.
+-- argument becomes let-bound. 'appPropFast' tries to propagate as many arguments
+-- as possible, down as many levels as possible; and should be called in a
+-- top-down traversal.
+--
+-- The idea is that this reduces the number of traversals, which hopefully leads
+-- to shorter compile times.
 --
 -- Note [AppProp no shadowing]
 --
@@ -1271,69 +1275,6 @@ constantSpec _ e = return e
 -- of the application w.r.t. the free variables in the argument part of the
 -- application. It is okay to over-approximate in this case and deshadow w.r.t
 -- the current InScopeSet.
-appProp :: HasCallStack => NormRewrite
-appProp (TransformContext is0 _) (App (collectTicks -> (Lam v e,ticks)) arg) =
-  if isWorkFree arg || isVar arg
-    then do
-      let subst = extendIdSubst (mkSubst is0) v arg
-      changed $ mkTicks (substTm "appProp.AppLam" subst e) ticks
-    else do
-      let vNew = uniqAway is0 v
-      -- See Note [AppProp no shadowing]
-      -- 'uniqAway' only picks a new unique if the unique of the identifier is
-      -- in the given in-scope set
-      if v == vNew then
-        changed $ Letrec [(v, arg)] (mkTicks e ticks)
-      else do
-        let subst = extendIdSubst (mkSubst is0) v (Var vNew)
-            e1    = substTm "appProp.AppLam_to_LetApp" subst e
-        changed $ Letrec [(vNew, arg)] (mkTicks e1 ticks)
-
-
-appProp (TransformContext is0 _) (App (collectTicks -> (Letrec v e, ticks)) arg) = do
-  -- Note [AppProp no shadowing]
-  let Letrec v1 e1 = deShadowTerm is0 (Letrec v e)
-  changed (Letrec v1 (App (mkTicks e1 ticks) arg))
-
-appProp ctx@(TransformContext is0 _) (App (collectTicks -> (Case scrut ty alts,ticks)) arg) = do
-  tcm <- Lens.view tcCache
-  let argTy = termType tcm arg
-      ty' = applyFunTy tcm ty argTy
-  if isWorkFree arg || isVar arg
-    then do
-      -- Note [AppProp no shadowing]
-      let alts1 = map (second (`App` arg) . deShadowAlt is0) alts
-      changed $ mkTicks (Case scrut ty' alts1) ticks
-    else do
-      -- See Note [AppProp no shadowing]
-      let is2 = unionInScope is0 ((mkInScopeSet . mkVarSet . concatMap (patVars . fst)) alts)
-      boundArg <- mkTmBinderFor is2 tcm (mkDerivedName ctx "app_arg") arg
-      let alts' = map (second (`App` (Var boundArg))) alts
-      changed (Letrec [(boundArg, arg)] (mkTicks (Case scrut ty' alts') ticks))
-
-appProp (TransformContext is0 _) (TyApp (collectTicks -> (TyLam tv e,ticks)) t) = do
-  let subst = extendTvSubst (mkSubst is0) tv t
-  changed $ mkTicks (substTm "appProp.TyAppTyLam" subst e) ticks
-
-appProp _ (TyApp (collectTicks -> (Letrec v e,ticks)) t) = do
-  changed (Letrec v (mkTicks (TyApp e t) ticks))
-
-appProp _ (TyApp (collectTicks -> (Case scrut altsTy alts,ticks)) ty) = do
-  let alts' = map (second (`TyApp` ty)) alts
-  tcm <- Lens.view tcCache
-  let ty' = piResultTy tcm altsTy ty
-  changed (mkTicks (Case scrut ty' alts') ticks)
-
-appProp _ e = return e
-{-# SCC appProp #-}
-
--- | Unlike 'appProp', which propagates a single argument in an application one
--- level down (and should be called in an innermost traversal), 'appPropFast'
--- tries to propagate as many arguments as possible, down as many levels as
--- possible; and should be called in a top-down traversal.
---
--- The idea is that this reduces the number of traversals, which hopefully leads
--- to shorter compile times.
 appPropFast :: HasCallStack => NormRewrite
 appPropFast ctx@(TransformContext is _) = \case
   e@App {}
