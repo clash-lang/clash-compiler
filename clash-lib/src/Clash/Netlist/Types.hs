@@ -333,7 +333,7 @@ pattern NetDecl note d ty <- NetDecl' note Wire d (Right ty) _
     NetDecl note d ty = NetDecl' note Wire d (Right ty) Nothing
 
 data PortDirection = In | Out
-  deriving (Eq,Ord,Show,Generic,NFData,Hashable)
+  deriving (Eq,Ord,Show,Generic,NFData,Hashable,Lift)
 
 instance NFData Declaration where
   rnf a = a `seq` ()

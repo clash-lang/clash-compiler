@@ -226,6 +226,7 @@ Library
                       Clash.Normalize.Types
                       Clash.Normalize.Util
 
+                      Clash.Primitives.Scaffold
                       Clash.Primitives.Types
                       Clash.Primitives.Util
 
@@ -289,3 +290,4 @@ test-suite unittests
   Other-Modules: Clash.Tests.Core.FreeVars
                  Clash.Tests.Core.Subst
                  Clash.Tests.Util.Interpolate
+                 Clash.Tests.Scaffold

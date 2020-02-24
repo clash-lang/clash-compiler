@@ -40,6 +40,7 @@ runClashTest = defaultMain $ clashTestRoot
   [ clashTestGroup "netlist"
     [ netlistTest ("tests" </> "shouldwork" </> "Netlist") allTargets [] "Identity" "main"
     , netlistTest ("tests" </> "shouldwork" </> "Netlist") [VHDL] [] "NoDeDup" "main"
+    , netlistTest ("tests" </> "shouldwork" </> "Netlist") [Verilog] [] "BlackboxScaffold" "main"
     ]
   , clashTestGroup "examples"
     [ runTest "ALU" def{hdlSim=False}
@@ -163,6 +164,8 @@ runClashTest = defaultMain $ clashTestRoot
         , runTest "BlackBoxFunctionHO" def{hdlTargets=[VHDL]}
         , outputTest ("tests" </> "shouldwork" </> "Signal")   allTargets [] [] "BlockRamLazy"       "main"
         , outputTest ("tests" </> "shouldwork" </> "BlackBox") [VHDL]   [] [] "ZeroWidth"          "main"
+        -- as per group "TopEntity" VHDL tests disabled for for Scaffold
+        , runTest "Scaffold" def{hdlTargets=[Verilog],entities=Entities["", "testBench", "mult_prim"]}
         , runFailingTest ("tests" </> "shouldfail" </> "BlackBox") [VHDL] [] "WrongReference" (Just "Function WrongReference.myMultiply was annotated with an inline primitive for WrongReference.myMultiplyX. These names should be the same.")
         , runTest "T919" def{hdlSim=False}
         ]
