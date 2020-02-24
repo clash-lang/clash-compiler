@@ -21,7 +21,9 @@ stages:
   script:
     - unset SNAPCRAFT_LOGIN_FILE
     - unset HACKAGE_PASSWORD
-    - export GHC="${GHC:-$CI_JOB_NAME}"
+    # Use either ${GHC} or if that's not set, try to detect GHC version by analyzing
+    # $CI_JOB_NAME.
+    - export GHC="${GHC:-$(echo $CI_JOB_NAME | egrep -o 'ghc-[0-9]+.[0-9]+.[0-9]+')}"
     - export THREADS=$(nproc)
     - export CABAL_JOBS=$(nproc)
     - export
@@ -46,7 +48,6 @@ ghc-8.6.5-singular-hidden:
   extends: .tests-interruptible
   variables:
     MULTIPLE_HIDDEN: "no"
-    GHC: ghc-8.6.5
 #ghc-head:
 #  # extends: .tests-interruptible
 #  stage: build
@@ -71,7 +72,6 @@ ghc-8.6.5-singular-hidden-master:
     - master
   variables:
     MULTIPLE_HIDDEN: "no"
-    GHC: ghc-8.6.5
 #ghc-head-master:
 #  # extends: .tests-non-interruptible
 #  only: 
