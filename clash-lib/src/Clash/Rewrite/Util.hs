@@ -591,7 +591,10 @@ inlineOrLiftBinders condition inlineOrLift (TransformContext inScope0 _) e@(Letr
           -- should not be self-recursive.
           (_,sp) <- Lens.use curFun
           throw (ClashException sp
-                  ("Internal error: inlineOrLiftBinders failed:\n" ++ showPpr toInlRec)
+                  ("Internal error: inlineOrLiftBinders failed:\n" ++
+                   showPpr toInlRec ++ "\n\nfrom:\n" ++
+                   showPpr toLift1 ++ "\n\nand:\n" ++ showPpr toLiftExtra ++
+                   "\n\nin:\n" ++ showPpr e)
                   Nothing)
 
 inlineOrLiftBinders _ _ _ e = return e
