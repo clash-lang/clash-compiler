@@ -214,8 +214,10 @@ testFailingProgram
   -> Maybe FilePath
   -- ^ Optional working directory
   -> TestTree
-testFailingProgram testExitCode testName program opts glob stdO stdF errCode expectedOutput workDir =
-  singleTest testName (TestFailingProgram testExitCode program opts glob stdO stdF errCode expectedOutput workDir)
+testFailingProgram testExitCode testName program opts glob stdO stdF errCode expectedOutput0 workDir =
+  -- TODO: We should probably do this at the output side too, as to be "truly" newline independent
+  let expectedOutput1 = fmap (T.replace "  " " " . T.replace "\n" " ") expectedOutput0 in
+  singleTest testName (TestFailingProgram testExitCode program opts glob stdO stdF errCode expectedOutput1 workDir)
 
 instance IsTest TestProgram where
   run opts (TestProgram program args glob stdO stdF workDir) _ = do
