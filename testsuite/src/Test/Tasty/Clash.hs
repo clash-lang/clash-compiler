@@ -2,6 +2,8 @@
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE KindSignatures #-}
 {-# LANGUAGE NamedFieldPuns #-}
+{-# LANGUAGE RecordWildCards #-}
+{-# LANGUAGE TupleSections #-}
 
 module Test.Tasty.Clash where
 
@@ -9,6 +11,7 @@ import           Data.Char                 (toLower)
 import           Data.Default              (Default, def)
 import qualified Data.List                 as List
 import           Data.List                 (intercalate)
+import           Data.Maybe                (isJust)
 import qualified Data.Text                 as T
 import qualified System.Directory          as Directory
 import           System.Environment        (getEnv)
@@ -50,6 +53,23 @@ data TopEntity
   = AutoTopEntity
   | TopEntity String
 
+data TestExitCode
+  = TestExitCode
+  | TestSpecificExitCode Int
+  | NoTestExitCode
+
+instance Default TestExitCode where
+  def = TestExitCode
+
+testExitCode :: TestExitCode -> Bool
+testExitCode TestExitCode = True
+testExitCode (TestSpecificExitCode _) = True
+testExitCode NoTestExitCode = False
+
+specificExitCode :: TestExitCode -> Maybe Int
+specificExitCode (TestSpecificExitCode n) = Just n
+specificExitCode _ = Nothing
+
 stringTopEntity :: TestOptions -> String
 stringTopEntity TestOptions{topEntity,hdlSim} =
   case (topEntity, hdlSim) of
@@ -61,6 +81,13 @@ data TestOptions =
   TestOptions
     { hdlSim :: Bool
     -- ^ Run hdl simulators (GHDL, ModelSim, etc.)
+    , expectSimFail :: Maybe (TestExitCode, T.Text)
+    -- ^ Expect simulation to fail: Nothing if simulation is expected to run
+    -- without errors, or Just (part of) the error message the simulation is
+    -- expected to throw.
+    , expectClashFail :: Maybe (TestExitCode, T.Text)
+    -- ^ Expect Clash to fail: Nothing if Clash is expected to compile without
+    -- errors, or Just (part of) the error message Clash is expected to throw.
     , hdlTargets :: [BuildTarget]
     -- ^ Run tests for these targets
     , clashFlags :: [String]
@@ -70,10 +97,9 @@ data TestOptions =
     -- on 'hdlSim'.
     , topEntity :: TopEntity
     -- ^ Top entity to compile. Default is to autodeduce based on 'hdlSim'.
-    , stdErrEmptyFail :: Bool
-    -- ^ Whether an empty stderr means test failure
+    , vvpStderrEmptyFail :: Bool
+    -- ^ Whether an empty stderr means test failure when running VVP
     }
-
 
 allTargets :: [BuildTarget]
 allTargets = [VHDL, Verilog, SystemVerilog]
@@ -82,11 +108,13 @@ instance Default TestOptions where
   def =
     TestOptions
       { hdlSim=True
+      , expectClashFail=Nothing
+      , expectSimFail=Nothing
       , hdlTargets=allTargets
       , clashFlags=[]
       , entities=AutoEntities
       , topEntity=AutoTopEntity
-      , stdErrEmptyFail=True
+      , vvpStderrEmptyFail=True
       }
 
 -- | Single directory for this test run. All tests are run relative to this
@@ -210,7 +238,9 @@ clashCmd target sourceDir extraArgs modName oDir =
           SystemVerilog -> "--systemverilog"
 
 clashHDL
-  :: BuildTarget
+  :: Maybe (TestExitCode, T.Text)
+  -- ^ Expect failure / test exit code. See "TestOptions".
+  -> BuildTarget
   -- ^ Build target
   -> FilePath
   -- ^ Source directory
@@ -221,11 +251,16 @@ clashHDL
   -> FilePath
   -- ^ Output directory
   -> (TestName, TestTree)
-clashHDL t sourceDir extraArgs modName oDir =
+clashHDL Nothing t sourceDir extraArgs modName oDir =
   let (cmd, args) = clashCmd t sourceDir extraArgs modName oDir in
---   let testName = List.intercalate " " $ "clash" : extraArgs in
-  let testName = "clash" in
-  (testName, testProgram testName cmd args NoGlob PrintStdErr False Nothing)
+  ("clash", testProgram "clash" cmd args NoGlob PrintStdErr False Nothing)
+clashHDL (Just (testExit, expectedErr)) t sourceDir extraArgs modName oDir =
+  let (cmd, args) = clashCmd t sourceDir extraArgs modName oDir in
+  ( "clash"
+  , testFailingProgram
+      (testExitCode testExit) "clash" cmd args NoGlob PrintNeither False
+      (specificExitCode testExit) (Just expectedErr) Nothing
+  )
 
 -- | Given a number of test trees, make sure each one of them is executed
 -- one after the other. To prevent naming collisions, parent group names can
@@ -342,20 +377,29 @@ ghdlMake path modName subdirs libs entName =
     emptyToDot k  = k
 
 ghdlSim
-  :: [TestName]
+  :: Maybe (TestExitCode, T.Text)
+  -- ^ Expect failure / test exit code. See "TestOptions".
+  -> [TestName]
   -- ^ Path to test
   -> String
   -- ^ Module name
   -> String
   -- ^ Name of the testbench executable
   -> (TestName, TestTree)
-ghdlSim path modName tbName =
+ghdlSim expectedErr0 path modName tbName =
   (testName, test)
   where
     workDir = testDirectory path </> "vhdl" </> modName
     testName = "GHDL (sim)"
     args = ["-r","--workdir=work",tbName,"--assert-level=error"]
-    test = testProgram testName "ghdl" args NoGlob PrintStdErr False (Just workDir)
+    test =
+      case expectedErr0 of
+        Just (testExit, expectedErr1) ->
+          testFailingProgram
+            (testExitCode testExit) testName "ghdl" args NoGlob PrintStdErr False
+            (specificExitCode testExit) (Just expectedErr1) (Just workDir)
+        Nothing ->
+          testProgram testName "ghdl" args NoGlob PrintStdErr False (Just workDir)
 
 iverilog
   :: [TestName]
@@ -385,7 +429,9 @@ noConflict nm seen
       | otherwise                  = (nm ++ show n)
 
 vvp
-  :: Bool
+  :: Maybe (TestExitCode, T.Text)
+  -- ^ Expect failure / test exit code. See "TestOptions".
+  -> Bool
   -- ^ Whether an empty stderr means test failure
   -> [TestName]
   -- ^ Path to test
@@ -394,10 +440,16 @@ vvp
   -> String
   -- ^ Name of the testbench object
   -> (TestName, TestTree)
-vvp stdF path modName entName =
-  ("vvp", testProgram "vvp" "vvp" [entName] NoGlob PrintStdErr stdF (Just workDir))
-    where
-      workDir = testDirectory path </> "verilog" </> modName
+vvp expectedErr0 stdF path modName entName =
+  let workDir = testDirectory path </> "verilog" </> modName in
+  ("vvp",) $
+  case expectedErr0 of
+    Just (testExit, expectedErr1) ->
+      testFailingProgram
+        (testExitCode testExit) "vvp" "vvp" [entName] NoGlob PrintStdErr False
+        (specificExitCode testExit) (Just expectedErr1) (Just workDir)
+    Nothing ->
+      testProgram "vvp" "vvp" [entName] NoGlob PrintStdErr stdF (Just workDir)
 
 vlog
   :: [TestName]
@@ -417,15 +469,24 @@ vlog path modName subdirs =
     allFiles = map (</> "*.sv") subdirs
 
 vsim
-  :: [TestName]
+  :: Maybe (TestExitCode, T.Text)
+  -- ^ Expect failure / test exit code. See "TestOptions".
+  -> [TestName]
   -- ^ Path to test
   -> String
   -- ^ Module name
   -> String
   -- ^ Name of testbench
   -> (TestName, TestTree)
-vsim path modName entName =
-  ("vsim", testProgram "vsim" "vsim" args NoGlob PrintStdErr False (Just workDir))
+vsim expectedErr0 path modName entName =
+  ("vsim",) $
+  case expectedErr0 of
+    Just (testExit, expectedErr1) ->
+      testFailingProgram
+        (testExitCode testExit) "vsim" "vsim" [entName] NoGlob PrintStdErr False
+        (specificExitCode testExit) (Just expectedErr1) (Just workDir)
+    Nothing ->
+      testProgram "vsim" "vsim" args NoGlob PrintStdErr False (Just workDir)
   where
     workDir = testDirectory path </> "systemverilog" </> modName
 
@@ -448,7 +509,7 @@ runTest1
   -> [String]
   -> BuildTarget
   -> TestTree
-runTest1 modName testOptions@TestOptions{hdlSim,clashFlags} path VHDL =
+runTest1 modName testOptions@TestOptions{..} path VHDL =
   withResource acquire tastyRelease (const seqTests)
  where
    subdirs = stringEntities testOptions
@@ -465,17 +526,23 @@ runTest1 modName testOptions@TestOptions{hdlSim,clashFlags} path VHDL =
      | hdlSim              = subdirs List.\\ [entName]
      | otherwise           = subdirs List.\\ [entName,""]
 
-   seqTests :: TestTree
-   seqTests = testGroup "VHDL" (sequenceTests path' tests)
-
-   tests = concat $ [
-       [ clashHDL VHDL env clashFlags modName (testDirectory path') ]
-     , map (ghdlLibrary path' modName) libs
+   clashTest = clashHDL expectClashFail VHDL env clashFlags modName (testDirectory path')
+   makeTests = concat
+     [ map (ghdlLibrary path' modName) libs
      , [ghdlImport path' modName (subdirs List.\\ libs)]
      , [ghdlMake path' modName subdirs libs entName]
-     ] ++ [if hdlSim then [ghdlSim path' modName (noConflict entName subdirs)] else []]
+     ]
+   simTest = ghdlSim expectSimFail path' modName (noConflict entName subdirs)
 
-runTest1 modName testOptions@TestOptions{hdlSim,clashFlags,stdErrEmptyFail} path Verilog =
+   seqTests =
+     testGroup "VHDL" $ sequenceTests path' $
+      clashTest :
+        case (isJust expectClashFail, hdlSim) of
+          (True, _) -> []
+          (_, False) -> makeTests
+          _ -> makeTests ++ [simTest]
+
+runTest1 modName testOptions@TestOptions{..} path Verilog =
   withResource acquire tastyRelease (const seqTests)
  where
    subdirs = stringEntities testOptions
@@ -486,13 +553,19 @@ runTest1 modName testOptions@TestOptions{hdlSim,clashFlags,stdErrEmptyFail} path
    acquire    = tastyAcquire path' [verilogDir, modDir]
    path'      = "Verilog":path
 
-   seqTests = testGroup "Verilog" $ sequenceTests path' $
-     [ clashHDL Verilog env clashFlags modName (testDirectory path')
-     , iverilog path' modName subdirs entName
-     ] ++ if hdlSim then [vvp stdErrEmptyFail path' modName (noConflict entName subdirs)] else []
---           ++ map (\f -> f (cwDir </> env) Verilog verilogDir modDir modName entName)
+   clashTest = clashHDL expectClashFail Verilog env clashFlags modName (testDirectory path')
+   makeTest = iverilog path' modName subdirs entName
+   simTest = vvp expectSimFail vvpStderrEmptyFail path' modName (noConflict entName subdirs)
 
-runTest1 modName testOptions@TestOptions{hdlSim,clashFlags} path SystemVerilog =
+   seqTests =
+     testGroup "Verilog" $ sequenceTests path' $
+      clashTest :
+        case (isJust expectClashFail, hdlSim) of
+          (True, _) -> []
+          (_, False) -> [makeTest]
+          _ -> [makeTest, simTest]
+
+runTest1 modName testOptions@TestOptions{..} path SystemVerilog =
   withResource acquire tastyRelease (const seqTests)
  where
    subdirs = stringEntities testOptions
@@ -503,11 +576,17 @@ runTest1 modName testOptions@TestOptions{hdlSim,clashFlags} path SystemVerilog =
    acquire = tastyAcquire path' [svDir, modDir]
    path'   = "SystemVerilog":path
 
-   seqTests = testGroup "SystemVerilog" $ sequenceTests path' $ concat $
-     [ [ clashHDL SystemVerilog env clashFlags modName (testDirectory path') ]
-       , vlog path' modName subdirs
-       ] ++ [if hdlSim then [vsim path' modName entName] else []]
-         -- ++ [map (\f -> f (cwDir </> env) SystemVerilog svDir modDir modName entName) ]
+   clashTest = clashHDL expectClashFail SystemVerilog env clashFlags modName (testDirectory path')
+   makeTest = vlog path' modName subdirs
+   simTest = vsim expectSimFail path' modName entName
+
+   seqTests =
+     testGroup "SystemVerilog" $ sequenceTests path' $
+      clashTest :
+        case (isJust expectClashFail, hdlSim) of
+          (True, _) -> []
+          (_, False) -> makeTest
+          _ -> makeTest ++ [simTest]
 
 runTest
   :: String
@@ -523,88 +602,6 @@ runTest modName testOptions path =
   testGroup modName (map runTest2 (hdlTargets testOptions))
  where
   runTest2 = runTest1 modName testOptions (modName:path)
-
-runFailingTest'
-  :: Bool
-  -- ^ Test exit code?
-  -> FilePath
-  -- ^ Work directory
-  -> BuildTarget
-  -- ^ Build target
-  -> [String]
-  -- ^ Extra arguments
-  -> String
-  -- ^ Module name
-  -> Maybe T.Text
-  -- ^ Expected stderr
-  -> [TestName]
-  -- ^ Parent test names in order of distance to the test. That is, the last
-  -- item in the list will be the root node, while the first one will be the
-  -- one closest to the test.
-  -> TestTree
-runFailingTest' testExitCode env target extraArgs modName expectedStderr path =
-  let args0 = "-fclash-no-cache" : extraArgs in
-  let (cmd, args1) = clashCmd target (sourceDirectory </> env) args0 modName (testDirectory path) in
-  let testName    = "clash" in
-  testFailingProgram
-    testExitCode
-    testName
-    cmd
-    args1
-    NoGlob
-    PrintNeither
-    False
-    Nothing
-    expectedStderr
-    Nothing
-
-runFailingTest
-  :: FilePath
-  -- ^ Work directory
-  -> [BuildTarget]
-  -- ^ Build targets
-  -> [String]
-  -- ^ Extra arguments
-  -> String
-  -- ^ Module name
-  -> Maybe T.Text
-  -- ^ Expected stderr
-  -> [TestName]
-  -- ^ Parent test names in order of distance to the test. That is, the last
-  -- item in the list will be the root node, while the first one will be the
-  -- one closest to the test.
-  -> TestTree
-runFailingTest env targets extraArgs modName expectedStderr path =
-  testGroup modName [ rft target (modName : path) | target <- targets ]
-  where
-    rft target path' =
-      testGroup (show target) $
-        return $
-          runFailingTest' True env target extraArgs modName expectedStderr (show target : path')
-
-runWarningTest
-  :: FilePath
-  -- ^ Work directory
-  -> [BuildTarget]
-  -- ^ Build targets
-  -> [String]
-  -- ^ Extra arguments
-  -> String
-  -- ^ Module name
-  -> Maybe T.Text
-  -- ^ Expected stderr
-  -> [TestName]
-  -- ^ Parent test names in order of distance to the test. That is, the last
-  -- item in the list will be the root node, while the first one will be the
-  -- one closest to the test.
-  -> TestTree
-runWarningTest env targets extraArgs modName expectedStderr path =
-  testGroup modName [ rft target (modName : path) | target <- targets ]
-  where
-    rft target path' =
-      testGroup (show target) $
-        return $
-          runFailingTest' False env target extraArgs modName expectedStderr (show target : path')
 
 outputTest'
   :: FilePath
@@ -662,7 +659,7 @@ outputTest' env target extraClashArgs extraGhcArgs modName funcName path =
       workDir = testDirectory path'
 
       seqTests = testGroup (show target) $ sequenceTests path' $
-        [ clashHDL target (sourceDirectory </> env) extraClashArgs modName workDir
+        [ clashHDL Nothing target (sourceDirectory </> env) extraClashArgs modName workDir
         , ("runghc", testProgram "runghc" "cabal" args NoGlob PrintStdErr False Nothing)
         ]
 

@@ -1,7 +1,11 @@
 {-# LANGUAGE CPP #-}
+{-# LANGUAGE QuasiQuotes #-}
 module Main (main) where
 
+import qualified Clash.Util.Interpolate    as I
+
 import           Control.Exception         (finally)
+import qualified Data.Text                 as Text
 import           Data.Default              (def)
 import           Data.List                 (isSuffixOf)
 import           System.Directory
@@ -84,20 +88,103 @@ runClashTest = defaultMain $ clashTestRoot
         , topEntity=TopEntity "system"
         , hdlTargets=[Verilog]
         , hdlSim=True
-        , stdErrEmptyFail=False
+        , vvpStderrEmptyFail=False
         }
       ]
     ]
   , clashTestGroup "tests"
     [ clashTestGroup "shouldfail"
-      [ runFailingTest ("tests" </> "shouldfail") [VHDL] [] "RecursiveBoxed" (Just {- RecursiveBoxed.g... -} " already inlined 20 times in:RecursiveBoxed.topEntity")
-      , runFailingTest ("tests" </> "shouldfail") [VHDL] [] "RecursiveDatatype" (Just "This bndr has a non-representable return type and can't be normalized:")
-      , runFailingTest ("tests" </> "shouldfail") [VHDL] [] "Poly" (Just "Clash can only normalize monomorphic functions, but this is polymorphic:")
-      , runFailingTest ("tests" </> "shouldfail") [VHDL] ["-fclash-error-extra"] "Poly2" (Just "Even after applying type equality constraints it remained polymorphic:")
-      , runFailingTest ("tests" </> "shouldfail" </> "InvalidPrimitive") [VHDL] ["-itests/shouldfail/InvalidPrimitive"] "InvalidPrimitive" (Just "InvalidPrimitive.json")
-      -- Disabled, due to it eating gigabytes of memory:
-      -- , runFailingTest ("tests" </> "shouldfail") allTargets [] "RecursivePoly" (Just "??")
-      , runFailingTest ("tests" </> "shouldfail" </> "TopEntity") allTargets [] "T1033" (Just "PortProduct \"wrong\" []")
+      [ clashTestGroup "BlackBox"
+        [ runTest "WrongReference" def{
+            hdlTargets=[VHDL]
+          , expectClashFail=Just (def, Text.pack [I.i|
+              Function WrongReference.myMultiply was annotated with an inline
+              primitive for WrongReference.myMultiplyX. These names should be
+              the same. |])
+          }
+        ]
+      , clashTestGroup "InvalidPrimitive"
+        [ runTest "InvalidPrimitive" def{
+            hdlTargets=[VHDL]
+          , clashFlags=["-itests/shouldfail/InvalidPrimitive"]
+          , expectClashFail=Just (def, "InvalidPrimitive.json")
+          }
+        ]
+      , clashTestGroup "PrimitiveGuards"
+        [ runTest "DontTranslate" def{
+            hdlTargets=[VHDL]
+          , expectClashFail=Just (def, Text.pack [I.i|
+              Clash was forced to translate 'DontTranslate.primitive', but this
+              value was marked with DontTranslate. Did you forget to include a
+              blackbox for one of the constructs using this?
+            |])
+          }
+        , runTest "HasBlackBox" def{
+            hdlTargets=[VHDL]
+          , expectClashFail=Just (def, Text.pack [I.i|
+              No BlackBox definition for 'HasBlackBox.primitive' even though
+              this value was annotated with 'HasBlackBox'.
+            |])
+          }
+        ]
+      , clashTestGroup "Signal"
+        [ runTest "MAC" def{
+            hdlTargets=[VHDL]
+          , expectClashFail=Just (def, "Couldn't instantiate blackbox for Clash.Signal.Internal.register#")
+          }
+        ]
+      , clashTestGroup "SynthesisAttributes"
+        [ runTest "ProductInArgs" def{
+            hdlTargets=[VHDL]
+          , expectClashFail=Just (def, "Attempted to split Product into a number of HDL ports.")
+          }
+        , runTest "ProductInResult" def{
+            hdlTargets=[VHDL]
+          , expectClashFail=Just (def, "Attempted to split Product into a number of HDL ports.")
+          }
+        ]
+      , clashTestGroup "TopEntity"
+        [ runTest "T1033" def{
+            hdlTargets=[VHDL]
+          , expectClashFail=Just (def, "PortProduct \"wrong\" []")
+          }
+        ]
+      , clashTestGroup "ZeroWidth"
+        [ runTest "FailGracefully1" def{
+            hdlTargets=[VHDL]
+          , expectClashFail=Just (def, "Unexpected projection of zero-width type")
+          }
+        , runTest "FailGracefully2" def{
+            hdlTargets=[VHDL]
+          , expectClashFail=Just (def, "Unexpected projection of zero-width type")
+          }
+        , runTest "FailGracefully3" def{
+            hdlTargets=[VHDL]
+          , expectClashFail=Just (def, "Unexpected projection of zero-width type")
+          }
+        ]
+      , runTest "Poly" def{
+          hdlTargets=[VHDL]
+        , expectClashFail=Just (def, "Clash can only normalize monomorphic functions, but this is polymorphic:")
+        }
+      , runTest "Poly2" def{
+          hdlTargets=[VHDL]
+        , clashFlags=["-fclash-error-extra"]
+        , expectClashFail=Just (def, "Even after applying type equality constraints it remained polymorphic:")
+        }
+      , runTest "RecursiveBoxed" def{
+          hdlTargets=[VHDL]
+        , expectClashFail=Just (def, " already inlined 20 times in:RecursiveBoxed.topEntity")
+        }
+      , runTest "RecursiveDatatype" def{
+          hdlTargets=[VHDL]
+        , expectClashFail=Just (def, "This bndr has a non-representable return type and can't be normalized:")
+        }
+--        Disabled, due to it eating gigabytes of memory:
+--      , runTest "RecursivePoly" def{
+--          hdlTargets=[VHDL]
+--        , expectClashFail=Just (def, "??")
+--        }
       ]
     , clashTestGroup "shouldwork"
       [ clashTestGroup "AutoReg"
@@ -162,7 +249,6 @@ runClashTest = defaultMain $ clashTestRoot
         , runTest "BlackBoxFunctionHO" def{hdlTargets=[VHDL]}
         , outputTest ("tests" </> "shouldwork" </> "Signal")   allTargets [] [] "BlockRamLazy"       "main"
         , outputTest ("tests" </> "shouldwork" </> "BlackBox") [VHDL]   [] [] "ZeroWidth"          "main"
-        , runFailingTest ("tests" </> "shouldfail" </> "BlackBox") [VHDL] [] "WrongReference" (Just "Function WrongReference.myMultiply was annotated with an inline primitive for WrongReference.myMultiplyX. These names should be the same.")
         , runTest "T919" def{hdlSim=False}
         ]
       , clashTestGroup "BoxedFunctions"
@@ -195,9 +281,6 @@ runClashTest = defaultMain $ clashTestRoot
 
         , clashTestGroup "ZeroWidth"
           [ runTest "ZeroWidth" def{hdlSim=False}
-          , runFailingTest ("tests" </> "shouldwork" </> "CustomReprs" </> "ZeroWidth") allTargets [] "FailGracefully1" (Just "Unexpected projection of zero-width type")
-          , runFailingTest ("tests" </> "shouldwork" </> "CustomReprs" </> "ZeroWidth") allTargets [] "FailGracefully2" (Just "Unexpected projection of zero-width type")
-          , runFailingTest ("tests" </> "shouldwork" </> "CustomReprs" </> "ZeroWidth") allTargets [] "FailGracefully3" (Just "Unexpected projection of zero-width type")
           ]
         , runTest "T694" def{hdlSim=False,hdlTargets=[VHDL]}
         ]
@@ -294,11 +377,11 @@ runClashTest = defaultMain $ clashTestRoot
         , runTest "LocalPoly" def{hdlSim=False}
         ]
       , clashTestGroup "PrimitiveGuards"
-        [ runFailingTest ("tests" </> "shouldfail" </> "PrimitiveGuards") allTargets [] "HasBlackBox" (Just "No BlackBox definition for 'HasBlackBox.primitive' even though this value was annotated with 'HasBlackBox'.")
-        , runFailingTest ("tests" </> "shouldfail" </> "PrimitiveGuards") allTargets [] "DontTranslate" (Just "Clash was forced to translate 'DontTranslate.primitive', but this value was marked with DontTranslate. Did you forget to include a blackbox for one of the constructs using this?")
-        , runWarningTest ("tests" </> "shouldwork" </> "PrimitiveGuards") [VHDL] [] "WarnAlways" (Just "You shouldn't use 'primitive'!")
+        [ runTest "WarnAlways" def{
+            hdlTargets=[VHDL]
+          , expectClashFail=Just (NoTestExitCode, "You shouldn't use 'primitive'!")
+          }
         ]
-
       , clashTestGroup "PrimitiveReductions"
         [ runTest "Lambda" def
         , runTest "ReplaceInt" def
@@ -345,20 +428,15 @@ runClashTest = defaultMain $ clashTestRoot
           , runTest "CounterHalfTupleRev" def
           ]
 
-        , runFailingTest ("tests" </> "shouldfail" </> "Signal") allTargets [] "MAC" (Just "Couldn't instantiate blackbox for Clash.Signal.Internal.register#")
         , runTest "T1007" def{hdlSim=False}
         ]
       , clashTestGroup "SimIO"
-        [ runTest "Test00" def {hdlTargets=[Verilog], stdErrEmptyFail=False, topEntity=TopEntity "topEntity"}
+        [ runTest "Test00" def {hdlTargets=[Verilog], vvpStderrEmptyFail=False, topEntity=TopEntity "topEntity"}
         ]
       , clashTestGroup "SynthesisAttributes"
         [ outputTest ("tests" </> "shouldwork" </> "SynthesisAttributes") allTargets [] [] "Simple"  "main"
         , outputTest ("tests" </> "shouldwork" </> "SynthesisAttributes") allTargets [] [] "Product" "main"
         , runTest "Product" def
-        , clashTestGroup "ShouldFail" [
-            runFailingTest ("tests" </> "shouldfail" </> "SynthesisAttributes") allTargets [] "ProductInArgs"   (Just "Attempted to split Product into a number of HDL ports.")
-          , runFailingTest ("tests" </> "shouldfail" </> "SynthesisAttributes") allTargets [] "ProductInResult" (Just "Attempted to split Product into a number of HDL ports.")
-          ]
         ]
       , clashTestGroup "Testbench"
         [ runTest "TB" def{clashFlags=["-fclash-inline-limit=0"]}
