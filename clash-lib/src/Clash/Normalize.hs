@@ -240,7 +240,7 @@ checkNonRecursive
   -> BindingMap
 checkNonRecursive norm = case mapMaybeVarEnv go norm of
   rcs | nullVarEnv rcs  -> norm
-  rcs -> error $ $(curLoc) ++ "Callgraph after normalisation contains following recursive components: "
+  rcs -> error $ $(curLoc) ++ "Callgraph after normalization contains following recursive components: "
                    ++ show (vcat [ ppr a <> ppr b
                                  | (a,b) <- eltsVarEnv rcs
                                  ])
