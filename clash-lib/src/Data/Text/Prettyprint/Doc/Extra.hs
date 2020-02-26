@@ -178,3 +178,8 @@ flatAlt = liftA2 PP.flatAlt
 
 instance Applicative f => IsString (f Doc) where
   fromString = string . fromString
+
+comment :: Applicative f => T.Text -> T.Text -> f Doc
+comment prefix comm =
+  let go s = PP.pretty prefix PP.<+> PP.pretty s in
+  pure (PP.vsep (Prelude.map go (T.lines comm)))

@@ -1333,7 +1333,7 @@ patLitCustom _ x y = error $ $(curLoc) ++ unwords
 
 insts :: [Declaration] -> VHDLM Doc
 insts [] = emptyDoc
-insts (TickDecl id_:ds) = "--" <+> stringS id_ <> line <> insts ds
+insts (TickDecl id_:ds) = comment "--" id_ <> line <> insts ds
 insts (d:ds) = do
   d' <- inst_ d
   case d' of
