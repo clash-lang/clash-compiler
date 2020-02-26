@@ -12,6 +12,7 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE NondecreasingIndentation #-}
+{-# LANGUAGE QuasiQuotes #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE TemplateHaskell #-}
@@ -85,9 +86,11 @@ import           Clash.Core.VarEnv
 import           Clash.Driver.Types
   (DebugLevel (..), BindingMap, Binding(..))
 import           Clash.Netlist.Util          (representableType)
+import           Clash.Pretty                (clashPretty, showDoc)
 import           Clash.Rewrite.Types
 import           Clash.Unique
 import           Clash.Util
+import qualified Clash.Util.Interpolate as I
 
 -- | Lift an action working in the '_extra' state to the 'RewriteMonad'
 zoomExtra :: State.State extra a
@@ -415,9 +418,8 @@ isVoidWrapper (Lam bndr e@(collectArgs -> (Var _,_))) =
   bndr `localIdDoesNotOccurIn` e
 isVoidWrapper _ = False
 
--- | Substitute the RHS of the first set of Let-binders for references to the
--- first set of Let-binders in: the second set of Let-binders and the additional
--- term
+-- | Inline the first set of binder into the second set of binders and into the
+-- body of the original let expression.
 substituteBinders
   :: InScopeSet
   -> [LetBinding]
@@ -439,13 +441,13 @@ substituteBinders inScope toInline toKeep body =
  where
   go subst inlRec [] = (subst,inlRec)
   go !subst !inlRec ((x,e):toInl) =
-    let substE  = extendIdSubst (mkSubst inScope) x e
+    let e1      = substTm "substInl" subst e
+        substE  = extendIdSubst (mkSubst inScope) x e1
         subst1  = subst { substTmEnv = mapVarEnv (substTm "substSubst" substE)
                                                  (substTmEnv subst)}
-        subst2  = extendIdSubst subst1 x e
-        selfRef = x `localIdOccursIn` e
-    in  if selfRef then
-          go subst ((x,e):inlRec) toInl
+        subst2  = extendIdSubst subst1 x e1
+    in  if x `localIdOccursIn` e1 then
+          go subst ((x,e1):inlRec) toInl
         else
           go subst2 inlRec (map (second (substTm "substToInl" substE)) toInl)
 
