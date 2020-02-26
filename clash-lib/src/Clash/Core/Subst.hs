@@ -739,6 +739,12 @@ acmpType' = go
   go env (AppTy s1 t1) (AppTy s2 t2) =
     go env s1 s2 `thenCompare` go env t1 t2
   go _ (LitTy l1) (LitTy l2) = compare l1 l2
+  go env (AnnType _ t1) (AnnType _ t2) =
+    -- XXX: maybe ignore annotations, like we ignore ticks, i.e.
+    --
+    -- go env (AnnType t1) t2 = go env t1 t2
+    -- go env t1 (AnnType t2) = go env t1 t2
+    go env t1 t2
   go _ t1 t2 = compare (getRank t1) (getRank t2)
 
   getRank :: Type -> Word
