@@ -2,14 +2,14 @@
 -- root directory (i.e. patched copies, or forks) and will automatically be
 -- preferred by the solver over other versions.
 packages:
-  ./clash-ghc/*.cabal,
-  ./clash-lib/*.cabal,
-  ./clash-prelude/*.cabal,
-  ./testsuite/*.cabal,
-  ./benchmark/*.cabal
-  ./benchmark/profiling/prepare/*.cabal
-  ./benchmark/profiling/run/*.cabal
-  ./clash-term/*.cabal
+  ./clash-ghc
+  ./clash-lib
+  ./clash-prelude
+  ./testsuite
+  ./benchmark
+  ./benchmark/profiling/prepare
+  ./benchmark/profiling/run
+  ./clash-term
 
 -- index state, to go along with the cabal.project.freeze file. update the index
 -- state by running `cabal update` twice and looking at the index state it

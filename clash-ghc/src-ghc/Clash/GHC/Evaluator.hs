@@ -4203,7 +4203,33 @@ vecZipWithPrim
   -- ^ Vec TyCon name
   -> Term
 vecZipWithPrim vecNm =
-  Prim (PrimInfo "Clash.Sized.Vector.zipWith" (vecAppendTy vecNm) WorkNever)
+  Prim (PrimInfo "Clash.Sized.Vector.zipWith" (vecZipWithTy vecNm) WorkNever)
+
+vecZipWithTy
+  :: TyConName
+  -- ^ Vec TyCon name
+  -> Type
+vecZipWithTy vecNm =
+  ForAllTy aTV (
+  ForAllTy bTV (
+  ForAllTy cTV (
+  ForAllTy nTV (
+  mkFunTy
+    (mkFunTy aTy (mkFunTy bTy cTy))
+    (mkFunTy
+      (mkTyConApp vecNm [nTy,aTy])
+      (mkFunTy
+        (mkTyConApp vecNm [nTy,bTy])
+        (mkTyConApp vecNm [nTy,cTy])))))))
+  where
+    aTV = mkTyVar liftedTypeKind (mkUnsafeSystemName "a" 0)
+    bTV = mkTyVar liftedTypeKind (mkUnsafeSystemName "b" 1)
+    cTV = mkTyVar liftedTypeKind (mkUnsafeSystemName "c" 2)
+    nTV = mkTyVar typeNatKind (mkUnsafeSystemName "n" 3)
+    aTy = VarTy aTV
+    bTy = VarTy bTV
+    cTy = VarTy cTV
+    nTy = VarTy nTV
 
 vecImapGoTy
   :: TyConName

@@ -19,7 +19,8 @@
 module Clash.Signal.Delayed.Bundle (
     Bundle(..)
   -- ** Tools to emulate pre Clash 1.0 @Bundle ()@ instance
-  , TaggedEmptyTuple
+  , B.EmptyTuple(..)
+  , TaggedEmptyTuple(..)
   ) where
 
 import           Control.Applicative           (liftA2)

@@ -183,3 +183,6 @@ comment :: Applicative f => T.Text -> T.Text -> f Doc
 comment prefix comm =
   let go s = PP.pretty prefix PP.<+> PP.pretty s in
   pure (PP.vsep (Prelude.map go (T.lines comm)))
+
+squote :: Applicative f => f Doc
+squote = string (LT.pack "'")

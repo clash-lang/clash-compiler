@@ -232,7 +232,7 @@ genComponentT compName componentExpr = do
   tcm <- Lens.use tcCache
 
   -- HACK: Determine resulttype of this function by looking at its definition
-  -- in topEntityAnns, instead of looking at its last binder (which obscure
+  -- in topEntityAnns, instead of looking at its last binder (which obscures
   -- any attributes [see: Clash.Annotations.SynthesisAttributes]).
   topEntityTypeM <- lookupVarEnv compName <$> Lens.use topEntityAnns
   let topEntityTypeM' = snd . splitCoreFunForallTy tcm . varType . topId <$> topEntityTypeM

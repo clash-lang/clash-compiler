@@ -33,6 +33,9 @@ import           Data.Text.Prettyprint.Doc     (line)
 import           Data.Semigroup
 #endif
 
+import           PrelNames               (ipClassKey)
+import           Unique                  (getKey)
+
 import Clash.Core.DataCon
   (DataCon (MkData), dcType, dcUnivTyVars, dcExtTyVars, dcArgTys)
 import Clash.Core.FreeVars
@@ -1075,7 +1078,7 @@ splitShouldSplit tcm = foldr go []
 -- | Strip implicit parameter wrappers (IP)
 stripIP :: Type -> Type
 stripIP t@(tyView -> TyConApp tcNm [_a1, a2]) =
-  if nameOcc tcNm == "GHC.Classes.IP" then a2 else t
+  if nameUniq tcNm == getKey ipClassKey then a2 else t
 stripIP t = t
 
 -- | Do an inverse topological sorting of the let-bindings in a let-expression

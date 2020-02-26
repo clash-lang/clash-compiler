@@ -16,15 +16,13 @@
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE TemplateHaskell #-}
 
-{-# OPTIONS_GHC -Wno-unused-imports #-}
-
 module Clash.Rewrite.Util where
 
 import           Control.Concurrent.Supply   (splitSupply)
 import           Control.DeepSeq
 import           Control.Exception           (throw)
 import           Control.Lens
-  (Lens', (%=), (+=), (^.), _3, _4, _Left)
+  (Lens', (%=), (+=), (^.), _Left)
 import qualified Control.Lens                as Lens
 import qualified Control.Monad               as Monad
 #if !MIN_VERSION_base(4,13,0)
@@ -61,11 +59,11 @@ import           Clash.Core.Evaluator        (whnf')
 import           Clash.Core.Evaluator.Types  (PureHeap)
 import           Clash.Core.FreeVars
   (freeLocalVars, hasLocalFreeVars, localIdDoesNotOccurIn, localIdOccursIn,
-   typeFreeVars, termFreeVars', freeIds)
+   typeFreeVars, termFreeVars')
 import           Clash.Core.Name
 import           Clash.Core.Pretty           (showPpr)
 import           Clash.Core.Subst
-  (substTmEnv, aeqTerm, aeqType, deShadowTerm, extendIdSubst, mkSubst, substTm)
+  (substTmEnv, aeqTerm, aeqType, extendIdSubst, mkSubst, substTm)
 import           Clash.Core.Term
   (LetBinding, Pat (..), Term (..), CoreContext (..), Context, PrimInfo (..),
    TmName, WorkInfo (..), TickInfo, collectArgs, collectArgsTicks)
@@ -83,7 +81,7 @@ import           Clash.Core.Var
   (Id, IdScope (..), TyVar, Var (..), isLocalId, mkGlobalId, mkLocalId, mkTyVar)
 import           Clash.Core.VarEnv
   (InScopeSet, VarEnv, elemVarSet, extendInScopeSetList, mkInScopeSet,
-   notElemVarEnv, uniqAway, uniqAway', mapVarEnv)
+   uniqAway, uniqAway', mapVarEnv)
 import           Clash.Driver.Types
   (DebugLevel (..), BindingMap, Binding(..))
 import           Clash.Netlist.Util          (representableType)

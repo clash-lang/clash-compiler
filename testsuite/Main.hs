@@ -104,8 +104,7 @@ runClashTest = defaultMain $ clashTestRoot
         [ outputTest ("tests" </> "shouldwork" </> "AutoReg") allTargets [] [] "AutoReg" "main"
         ]
       , clashTestGroup "Basic"
-        [ -- TODO: Enable AES test on SystemVerilog. See issue #569.
-          runTest "AES" def{hdlSim=False}
+        [ runTest "AES" def{hdlSim=False}
         , runTest "BangData" def{hdlSim=False}
         , runTest "Trace" def{hdlSim=False}
         , runTest "ByteSwap32" def
@@ -267,7 +266,6 @@ runClashTest = defaultMain $ clashTestRoot
         , outputTest ("tests" </> "shouldwork" </> "Numbers") allTargets ["-itests/shouldwork/Numbers"] ["-itests/shouldwork/Numbers"] "ExpWithClashCF"  "main"
         , runTest "HalfAsBlackboxArg" def{hdlTargets=[VHDL], hdlSim=False}
         , runTest "IntegralTB" def{clashFlags=["-itests/shouldwork/Numbers"]}
-        -- TODO: re-enable for Verilog
         , runTest "NumConstantFoldingTB_1" def{clashFlags=["-itests/shouldwork/Numbers"]}
         , outputTest ("tests" </> "shouldwork" </> "Numbers") allTargets ["-fconstraint-solver-iterations=15"] ["-itests/shouldwork/Numbers"] "NumConstantFolding_1"  "main"
         , runTest "NumConstantFoldingTB_2" def{clashFlags=["-itests/shouldwork/Numbers"]}
