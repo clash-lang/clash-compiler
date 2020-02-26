@@ -34,6 +34,7 @@
   Maintainer  :  Christiaan Baaij <christiaan.baaij@gmail.com>
 -}
 
+{-# LANGUAGE DeriveFunctor #-}
 {-# LANGUAGE QuasiQuotes #-}
 {-# OPTIONS_GHC -fno-warn-unused-top-binds #-}
 {-# OPTIONS_GHC -fno-warn-unused-matches #-}
@@ -67,6 +68,7 @@ module Test.Tasty.Program (
  , testFailingProgram
  , PrintOutput(..)
  , GlobArgs(..)
+ , ExpectOutput(..)
  ) where
 
 import Data.Typeable           ( Typeable                                 )
@@ -81,6 +83,12 @@ import Test.Tasty.Providers    ( IsTest (..), Result, TestName, TestTree,
 import NeatInterpolation    ( text )
 
 import qualified Data.Text    as T
+
+data ExpectOutput a
+  = ExpectStdOut a
+  | ExpectStdErr a
+  | ExpectNothing
+  deriving Functor
 
 
 data GlobArgs
@@ -129,7 +137,7 @@ data TestFailingProgram =
     -- ^ Whether an empty stderr means test failure
     (Maybe Int)
     -- ^ Expected return code
-    (Maybe T.Text)
+    (ExpectOutput T.Text)
     -- ^ Expected string in stderr
     (Maybe FilePath)
     -- ^ Work directory
@@ -189,6 +197,9 @@ testProgram
 testProgram testName program opts glob stdO stdF workDir =
   singleTest testName (TestProgram program opts glob stdO stdF workDir)
 
+cleanNewlines :: T.Text -> T.Text
+cleanNewlines = T.replace "  " " " . T.replace "\n" " "
+
 -- | Create test that runs a program with given options. Test succeeds
 -- if program terminates with error
 testFailingProgram
@@ -209,15 +220,13 @@ testFailingProgram
   -> Maybe Int
   -- ^ Expected error code. Test will *only* succeed if program fails and the
   -- returned error code is equal to the given one.
-  -> (Maybe T.Text)
+  -> ExpectOutput T.Text
   -- ^ Expected string in stderr
   -> Maybe FilePath
   -- ^ Optional working directory
   -> TestTree
-testFailingProgram testExitCode testName program opts glob stdO stdF errCode expectedOutput0 workDir =
-  -- TODO: We should probably do this at the output side too, as to be "truly" newline independent
-  let expectedOutput1 = fmap (T.replace "  " " " . T.replace "\n" " ") expectedOutput0 in
-  singleTest testName (TestFailingProgram testExitCode program opts glob stdO stdF errCode expectedOutput1 workDir)
+testFailingProgram testExitCode testName program opts glob stdO stdF errCode expectedOutput workDir =
+  singleTest testName (TestFailingProgram testExitCode program opts glob stdO stdF errCode expectedOutput workDir)
 
 instance IsTest TestProgram where
   run opts (TestProgram program args glob stdO stdF workDir) _ = do
@@ -295,7 +304,7 @@ runFailingProgram
   -> Maybe Int
   -- ^ Expected error code. Test will *only* succeed if program fails and the
   -- returned error code is equal to the given one.
-  -> Maybe T.Text
+  -> ExpectOutput T.Text
   -- ^ Expected string in stderr
   -> Maybe FilePath
   -- ^ Optional working directory
@@ -329,8 +338,10 @@ runFailingProgram testExitCode program args stdO errOnEmptyStderr expectedCode e
             unexpectedEmptyStderr program code stdoutT
           else
             case expectedStderr of
-              Just r | not (r `T.isInfixOf` stderrT) ->
-                unexpectedStderr program code stderrT stdoutT r
+              ExpectStdErr r | not (cleanNewlines r `T.isInfixOf` cleanNewlines stderrT) ->
+                unexpectedStd "stderr" program code stderrT stdoutT r
+              ExpectStdOut r | not (cleanNewlines r `T.isInfixOf` cleanNewlines stdoutT) ->
+                unexpectedStd "stdout" program code stderrT stdoutT r
               _ ->
                 if testExitCode then
                   passed
@@ -359,8 +370,10 @@ exitFailure (T.pack -> file) (showT -> code) stderr stdout =
     $stdout
   |]
 
-unexpectedStderr
-  :: String
+unexpectedStd
+  :: T.Text
+  -- ^ Expected output name
+  -> String
   -- ^ Program name
   -> Int
   -- ^ Code returned by program
@@ -371,11 +384,11 @@ unexpectedStderr
   -> T.Text
   -- ^ Expected stderr
   -> Result
-unexpectedStderr (T.pack -> file) (showT -> code) stderr stdout expectedStderr =
+unexpectedStd expectedOut (T.pack -> file) (showT -> code) stderr stdout expected =
   testFailed $ T.unpack $ [text|
-    Program $file did not print expected output to stderr. We expected:
+    Program $file did not print expected output to $expectedOut. We expected:
 
-       $expectedStderr
+       $expected
 
     Stderr was:
     $stderr

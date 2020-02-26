@@ -50,8 +50,8 @@ runClashTest = defaultMain $ clashTestRoot
     , runTest "Blinker" def{
         hdlSim=False
       , hdlTargets=[VHDL]
-      , entities=Entities ["blinker"]
-      , topEntity=TopEntity "blinker"
+      , entities=Entities [["blinker"]]
+      , topEntities=TopEntities ["blinker"]
       }
     , runTest "BlockRamTest" def{hdlSim=False}
     , runTest "Calculator" def
@@ -59,8 +59,8 @@ runClashTest = defaultMain $ clashTestRoot
     , runTest "CochleaPlus" def{hdlSim=False}
     , runTest "FIR" def{
         clashFlags=["-fclash-component-prefix", "test"]
-      , entities=Entities ["","test_testBench"]
-      , topEntity=TopEntity "test_testBench"
+      , entities=Entities [["","test_testBench"]]
+      , topEntities=TopEntities ["test_testBench"]
       }
     , runTest "Fifo" def{hdlSim=False}
     , runTest "MAC" def
@@ -73,19 +73,19 @@ runClashTest = defaultMain $ clashTestRoot
     , clashTestGroup "i2c"
       [ runTest "I2C" def{
           clashFlags=["-O2","-fclash-component-prefix","test"]
-        , entities=Entities ["test_i2c","test_bitmaster","test_bytemaster"]
-        , topEntity=TopEntity "test_i2c"
+        , entities=Entities [["test_i2c","test_bitmaster","test_bytemaster"]]
+        , topEntities=TopEntities ["test_i2c"]
         , hdlSim=False
         }
       , runTest "I2Ctest" def {
-          entities=Entities [ ".." </> "I2C" </> "i2c"
-                            , ".." </> "I2C" </> "bitmaster"
-                            , ".." </> "I2C" </> "bytemaster"
-                            , "configi2c"
-                            , "slave"
-                            , "system"
-                            ]
-        , topEntity=TopEntity "system"
+          entities=Entities [[ ".." </> "I2C" </> "i2c"
+                             , ".." </> "I2C" </> "bitmaster"
+                             , ".." </> "I2C" </> "bytemaster"
+                             , "configi2c"
+                             , "slave"
+                             , "system"
+                             ]]
+        , topEntities=TopEntities ["system"]
         , hdlTargets=[Verilog]
         , hdlSim=True
         , vvpStderrEmptyFail=False
@@ -211,8 +211,8 @@ runClashTest = defaultMain $ clashTestRoot
         , outputTest ("tests" </> "shouldwork" </> "Basic") allTargets [] [] "NameInstance" "main"
         , outputTest ("tests" </> "shouldwork" </> "Basic") [VHDL] [] [] "SetName" "main"
         , runTest "NameOverlap" def{
-            entities=Entities ["nameoverlap"]
-          , topEntity=TopEntity "nameoverlap"
+            entities=Entities [["nameoverlap"]]
+          , topEntities=TopEntities ["nameoverlap"]
           , hdlSim=False
           }
         , runTest "NestedPrimitives" def{hdlSim=False}
@@ -225,7 +225,11 @@ runClashTest = defaultMain $ clashTestRoot
         , runTest "Replace" def
         , runTest "Shift" def{hdlSim=False}
         , runTest "SimpleConstructor" def{hdlSim=False}
-        , runTest "TyEqConstraints" def{hdlSim=False, entities=Entities["top1"], topEntity = TopEntity "top1"}
+        , runTest "TyEqConstraints" def{
+            hdlSim=False
+          , entities=Entities [["top1"]]
+          , topEntities=TopEntities ["top1"]
+          }
         , runTest "T1012" def{hdlSim=False}
         , runTest "TagToEnum" def{hdlSim=False}
         , runTest "TestIndex" def{hdlSim=False}
@@ -404,8 +408,8 @@ runClashTest = defaultMain $ clashTestRoot
         , runTest "Compression" def
         , runTest "DelayedReset" def
         , runTest "NoCPR" def{
-            entities=Entities ["example"]
-          , topEntity=TopEntity "example"
+            entities=Entities [["example"]]
+          , topEntities=TopEntities ["example"]
           , hdlSim=False
           }
         , runTest "Oversample" def
@@ -431,7 +435,11 @@ runClashTest = defaultMain $ clashTestRoot
         , runTest "T1007" def{hdlSim=False}
         ]
       , clashTestGroup "SimIO"
-        [ runTest "Test00" def {hdlTargets=[Verilog], vvpStderrEmptyFail=False, topEntity=TopEntity "topEntity"}
+        [ runTest "Test00" def {
+            hdlTargets=[Verilog]
+          , vvpStderrEmptyFail=False
+          , topEntities=TopEntities ["topEntity"]
+          }
         ]
       , clashTestGroup "SynthesisAttributes"
         [ outputTest ("tests" </> "shouldwork" </> "SynthesisAttributes") allTargets [] [] "Simple"  "main"
@@ -448,22 +456,22 @@ runClashTest = defaultMain $ clashTestRoot
         ]
       , clashTestGroup "TopEntity"
         -- VHDL tests disabled for now: I can't figure out how to generate a static name whilst retaining the ability to actually test..
-        [ runTest "PortNames" def{hdlTargets=[Verilog],entities=Entities ["", "PortNames_topEntity", "PortNames_testBench"], topEntity=TopEntity "PortNames_testBench"}
+        [ runTest "PortNames" def{hdlTargets=[Verilog],entities=Entities [["", "PortNames_topEntity", "PortNames_testBench"]], topEntities=TopEntities ["PortNames_testBench"]}
         , outputTest ("tests" </> "shouldwork" </> "TopEntity") [Verilog] [] [] "PortNames" "main"
-        , runTest "PortProducts" def{hdlTargets=[Verilog],entities=Entities ["", "PortProducts_topEntity", "PortProducts_testBench"], topEntity=TopEntity "PortProducts_testBench"}
+        , runTest "PortProducts" def{hdlTargets=[Verilog],entities=Entities [["", "PortProducts_topEntity", "PortProducts_testBench"]], topEntities=TopEntities ["PortProducts_testBench"]}
         , outputTest ("tests" </> "shouldwork" </> "TopEntity") [Verilog] [] [] "PortProducts" "main"
-        , runTest "PortProductsSum" def{hdlTargets=[Verilog],entities=Entities ["", "PortProductsSum_topEntity", "PortProductsSum_testBench"], topEntity=TopEntity "PortProductsSum_testBench"}
+        , runTest "PortProductsSum" def{hdlTargets=[Verilog],entities=Entities [["", "PortProductsSum_topEntity", "PortProductsSum_testBench"]], topEntities=TopEntities ["PortProductsSum_testBench"]}
         , outputTest ("tests" </> "shouldwork" </> "TopEntity") [Verilog] [] [] "PortProductsSum" "main"
-        , runTest "PortNamesWithUnit" def{hdlTargets=[Verilog],entities=Entities ["", "PortNamesWithUnit_topEntity", "PortNamesWithUnit_testBench"], topEntity=TopEntity "PortNamesWithUnit_testBench"}
+        , runTest "PortNamesWithUnit" def{hdlTargets=[Verilog],entities=Entities [["", "PortNamesWithUnit_topEntity", "PortNamesWithUnit_testBench"]], topEntities=TopEntities ["PortNamesWithUnit_testBench"]}
         , outputTest ("tests" </> "shouldwork" </> "TopEntity") [Verilog] [] [] "PortNamesWithUnit" "main"
         , outputTest ("tests" </> "shouldwork" </> "TopEntity") [Verilog] [] [] "PortNamesWithSingletonVector" "main"
-        , runTest "PortNamesWithVector" def{hdlTargets=[Verilog],entities=Entities ["", "PortNamesWithVector_topEntity", "PortNamesWithVector_testBench"], topEntity=TopEntity "PortNamesWithVector_testBench"}
+        , runTest "PortNamesWithVector" def{hdlTargets=[Verilog],entities=Entities [["", "PortNamesWithVector_topEntity", "PortNamesWithVector_testBench"]], topEntities=TopEntities ["PortNamesWithVector_testBench"]}
         , outputTest ("tests" </> "shouldwork" </> "TopEntity") [Verilog] [] [] "PortNamesWithVector" "main"
-        , runTest "PortNamesWithRTree" def{hdlTargets=[Verilog],entities=Entities ["", "PortNamesWithRTree_topEntity", "PortNamesWithRTree_testBench"], topEntity=TopEntity "PortNamesWithRTree_testBench"}
+        , runTest "PortNamesWithRTree" def{hdlTargets=[Verilog],entities=Entities [["", "PortNamesWithRTree_topEntity", "PortNamesWithRTree_testBench"]], topEntities=TopEntities ["PortNamesWithRTree_testBench"]}
         , outputTest ("tests" </> "shouldwork" </> "TopEntity") [Verilog] [] [] "PortNamesWithRTree" "main"
-        , runTest "TopEntHOArg" def{entities=Entities ["f", "g"], topEntity=TopEntity "f", hdlSim=False}
-        , runTest "T701" def {hdlSim=False,entities=Entities ["mynot", ""]}
-        , runTest "T1033" def {hdlSim=False,entities=Entities ["top", ""], topEntity=TopEntity "top"}
+        , runTest "TopEntHOArg" def{entities=Entities [["f", "g"]], topEntities=TopEntities ["f"], hdlSim=False}
+        , runTest "T701" def {hdlSim=False,entities=Entities [["mynot", ""]]}
+        , runTest "T1033" def {hdlSim=False,entities=Entities [["top", ""]], topEntities=TopEntities ["top"]}
         , outputTest ("tests" </> "shouldwork" </> "TopEntity") allTargets [] [] "T1033" "main"
         , outputTest ("tests" </> "shouldwork" </> "TopEntity") allTargets [] [] "T1072" "main"
         , outputTest ("tests" </> "shouldwork" </> "TopEntity") allTargets [] [] "T1074" "main"

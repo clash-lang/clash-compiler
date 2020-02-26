@@ -25,7 +25,8 @@ import Test.Tasty
 
 import Test.Tasty.Program
   ( testProgram, testFailingProgram
-  , PrintOutput (PrintStdErr, PrintNeither), GlobArgs(..))
+  , PrintOutput (PrintStdErr, PrintNeither), GlobArgs(..)
+  , ExpectOutput(..))
 
 data BuildTarget
   = VHDL
@@ -40,18 +41,18 @@ data SBuildTarget (target :: BuildTarget) where
 
 data Entities
   = AutoEntities
-  | Entities [String]
+  | Entities [[String]]
 
-stringEntities :: TestOptions -> [String]
+stringEntities :: TestOptions -> [[String]]
 stringEntities TestOptions{entities,hdlSim} =
   case (entities, hdlSim) of
     (Entities es, _) -> es
-    (AutoEntities, True) -> ["", "testBench"]
-    (AutoEntities, False) -> [""]
+    (AutoEntities, True) -> [["", "testBench"]]
+    (AutoEntities, False) -> [[""]]
 
-data TopEntity
-  = AutoTopEntity
-  | TopEntity String
+data TopEntities
+  = AutoTopEntities
+  | TopEntities [String]
 
 data TestExitCode
   = TestExitCode
@@ -70,12 +71,12 @@ specificExitCode :: TestExitCode -> Maybe Int
 specificExitCode (TestSpecificExitCode n) = Just n
 specificExitCode _ = Nothing
 
-stringTopEntity :: TestOptions -> String
-stringTopEntity TestOptions{topEntity,hdlSim} =
-  case (topEntity, hdlSim) of
-    (TopEntity e, _) -> e
-    (AutoTopEntity, True) -> "testBench"
-    (AutoTopEntity, False) -> "topEntity"
+stringTopEntity :: TestOptions -> [String]
+stringTopEntity TestOptions{topEntities,hdlSim} =
+  case (topEntities, hdlSim) of
+    (TopEntities e, _) -> e
+    (AutoTopEntities, True) -> ["testBench"]
+    (AutoTopEntities, False) -> ["topEntity"]
 
 data TestOptions =
   TestOptions
@@ -95,7 +96,7 @@ data TestOptions =
     , entities :: Entities
     -- ^ Entities to compile in simulator. Default is to autodeduce based
     -- on 'hdlSim'.
-    , topEntity :: TopEntity
+    , topEntities :: TopEntities
     -- ^ Top entity to compile. Default is to autodeduce based on 'hdlSim'.
     , vvpStderrEmptyFail :: Bool
     -- ^ Whether an empty stderr means test failure when running VVP
@@ -113,7 +114,7 @@ instance Default TestOptions where
       , hdlTargets=allTargets
       , clashFlags=[]
       , entities=AutoEntities
-      , topEntity=AutoTopEntity
+      , topEntities=AutoTopEntities
       , vvpStderrEmptyFail=True
       }
 
@@ -259,7 +260,7 @@ clashHDL (Just (testExit, expectedErr)) t sourceDir extraArgs modName oDir =
   ( "clash"
   , testFailingProgram
       (testExitCode testExit) "clash" cmd args NoGlob PrintNeither False
-      (specificExitCode testExit) (Just expectedErr) Nothing
+      (specificExitCode testExit) (ExpectStdErr expectedErr) Nothing
   )
 
 -- | Given a number of test trees, make sure each one of them is executed
@@ -288,20 +289,21 @@ sequenceTests path (unzip -> (testNames, testTrees)) =
 
 
 ghdlLibrary
-  :: [TestName]
+  :: String
+  -> [TestName]
   -- ^ Path to test
   -> String
   -- ^ Module name
   -> FilePath
   -- ^ Directory with the VHDL files
   -> (TestName, TestTree)
-ghdlLibrary path modName lib =
+ghdlLibrary entName path modName lib =
   (testName, testProgram testName "ghdl" args GlobStar PrintStdErr False (Just workDir))
       where
         testName =
           case lib of
             "" -> "GHDL (library)"
-            _  -> "GHDL (library) [" ++ lib ++ "]"
+            _  -> "GHDL (ent="++ entName ++ ") [" ++ lib ++ "]"
 
         workDir = testDirectory path </> "vhdl" </> modName
 
@@ -331,18 +333,19 @@ ghdlLibrary path modName lib =
             k -> k
 
 ghdlImport
-  :: [TestName]
+  :: String
+  -> [TestName]
   -- ^ Path to test
   -> String
   -- ^ Module name
   -> [FilePath]
   -- ^ Directories with the VHDL files
   -> (TestName, TestTree)
-ghdlImport path modName subdirs =
+ghdlImport entName path modName subdirs =
   (testName, test)
     where
       subdirs' = (map.map) toLower subdirs
-      testName = "GHDL (import)"
+      testName = "GHDL (import " ++ entName ++ ")"
       test = testProgram testName "ghdl" args GlobStar PrintStdErr False (Just workDir)
       workDir = testDirectory path </> "vhdl" </> modName
       args = "-i":"--workdir=work":"--std=93":[workDir </> subdir </> "*.vhdl" | subdir <- subdirs']
@@ -370,7 +373,7 @@ ghdlMake path modName subdirs libs entName =
                   , map (\l -> "-P" ++ emptyToDot (map toLower l)) libs
                   , ["-o", map toLower (noConflict entName subdirs) ]
                   , [entName] ]
-    testName = "GHDL (make)"
+    testName = "GHDL (make " ++ entName ++ ")"
     test = testProgram testName "ghdl" args NoGlob PrintStdErr False (Just workDir)
     workDir = testDirectory path </> "vhdl" </> modName
     emptyToDot [] = "."
@@ -390,14 +393,14 @@ ghdlSim expectedErr0 path modName tbName =
   (testName, test)
   where
     workDir = testDirectory path </> "vhdl" </> modName
-    testName = "GHDL (sim)"
+    testName = "GHDL (sim " ++ tbName ++ ")"
     args = ["-r","--workdir=work",tbName,"--assert-level=error"]
     test =
       case expectedErr0 of
         Just (testExit, expectedErr1) ->
           testFailingProgram
             (testExitCode testExit) testName "ghdl" args NoGlob PrintStdErr False
-            (specificExitCode testExit) (Just expectedErr1) (Just workDir)
+            (specificExitCode testExit) (ExpectStdOut expectedErr1) (Just workDir)
         Nothing ->
           testProgram testName "ghdl" args NoGlob PrintStdErr False (Just workDir)
 
@@ -416,7 +419,7 @@ iverilog path modName subdirs entName =
     where
       workDir = testDirectory path </> "verilog" </> modName
       test = testProgram testName "iverilog" args GlobStar PrintStdErr False (Just workDir)
-      testName = "iverilog"
+      testName = "iverilog (" ++ entName ++ ")"
       args = ("-g2":"-s":entName:"-o":noConflict entName subdirs:[workDir </> subdir </> "*.v" | subdir <- subdirs])
 
 noConflict :: String -> [String] -> String
@@ -441,29 +444,42 @@ vvp
   -- ^ Name of the testbench object
   -> (TestName, TestTree)
 vvp expectedErr0 stdF path modName entName =
-  let workDir = testDirectory path </> "verilog" </> modName in
-  ("vvp",) $
-  case expectedErr0 of
-    Just (testExit, expectedErr1) ->
-      testFailingProgram
-        (testExitCode testExit) "vvp" "vvp" [entName] NoGlob PrintStdErr False
-        (specificExitCode testExit) (Just expectedErr1) (Just workDir)
-    Nothing ->
-      testProgram "vvp" "vvp" [entName] NoGlob PrintStdErr stdF (Just workDir)
+  let
+    workDir = testDirectory path </> "verilog" </> modName
+    testName = "vvp (" ++ entName ++ ")"
+  in
+    (testName,) $
+    case expectedErr0 of
+      Just (testExit, expectedErr1) ->
+        testFailingProgram
+          (testExitCode testExit) testName "vvp" [entName] NoGlob PrintStdErr False
+          (specificExitCode testExit) (ExpectStdErr expectedErr1) (Just workDir)
+      Nothing ->
+        testProgram testName "vvp" [entName] NoGlob PrintStdErr stdF (Just workDir)
 
 vlog
-  :: [TestName]
+  :: String
+  -- ^ Component name
+  -> [TestName]
   -- ^ Path to test
   -> String
   -- ^ Module name
   -> [FilePath]
   -- ^ Directory with the SystemVerilog files
   -> [(TestName, TestTree)]
-vlog path modName subdirs =
-  [ ("vlib", testProgram "vlib" "vlib" ["work"] NoGlob PrintStdErr False (Just workDir))
-  , ("vlog", testProgram "vlog" "vlog" ("-sv":"-work":"work":typFiles++allFiles) GlobStar PrintStdErr False (Just workDir))
+vlog entName path modName subdirs =
+  [ ( vlibTestName
+    , testProgram vlibTestName "vlib" ["work"] NoGlob PrintStdErr False (Just workDir)
+    )
+  , ( vlogTestName
+    , testProgram
+        vlogTestName "vlog" ("-sv":"-work":"work":typFiles++allFiles)
+        GlobStar PrintStdErr False (Just workDir)
+    )
   ]
   where
+    vlibTestName = "vlib (" ++ entName ++ ")"
+    vlogTestName = "vlog (" ++ entName ++ ")"
     workDir = testDirectory path </> "systemverilog" </> modName
     typFiles = map (</> "*_types.sv") subdirs
     allFiles = map (</> "*.sv") subdirs
@@ -479,15 +495,16 @@ vsim
   -- ^ Name of testbench
   -> (TestName, TestTree)
 vsim expectedErr0 path modName entName =
-  ("vsim",) $
+  (testName,) $
   case expectedErr0 of
     Just (testExit, expectedErr1) ->
       testFailingProgram
-        (testExitCode testExit) "vsim" "vsim" [entName] NoGlob PrintStdErr False
-        (specificExitCode testExit) (Just expectedErr1) (Just workDir)
+        (testExitCode testExit) testName "vsim" [entName] NoGlob PrintStdErr False
+        (specificExitCode testExit) (ExpectStdErr expectedErr1) (Just workDir)
     Nothing ->
-      testProgram "vsim" "vsim" args NoGlob PrintStdErr False (Just workDir)
+      testProgram testName "vsim" args NoGlob PrintStdErr False (Just workDir)
   where
+    testName = "vsim (" ++ entName ++ ")"
     workDir = testDirectory path </> "systemverilog" </> modName
 
     args = ["-batch", "-do", doScript, entName]
@@ -512,8 +529,9 @@ runTest1
 runTest1 modName testOptions@TestOptions{..} path VHDL =
   withResource acquire tastyRelease (const seqTests)
  where
-   subdirs = stringEntities testOptions
-   entName = stringTopEntity testOptions
+   entNames = stringTopEntity testOptions
+   subdirss = stringEntities testOptions
+
    env     = foldl (</>) sourceDirectory (reverse (tail path))
    vhdlDir = "vhdl"
    modDir  = vhdlDir </> modName
@@ -521,72 +539,91 @@ runTest1 modName testOptions@TestOptions{..} path VHDL =
    acquire = tastyAcquire path' [vhdlDir, modDir, workDir]
    path'   = "VHDL":path
 
-   libs
+   mkLibs entName subdirs
      | length subdirs == 1 = []
      | hdlSim              = subdirs List.\\ [entName]
      | otherwise           = subdirs List.\\ [entName,""]
 
-   clashTest = clashHDL expectClashFail VHDL env clashFlags modName (testDirectory path')
-   makeTests = concat
-     [ map (ghdlLibrary path' modName) libs
-     , [ghdlImport path' modName (subdirs List.\\ libs)]
+   clashTest =
+     clashHDL expectClashFail VHDL env clashFlags modName (testDirectory path')
+
+   makeTests entName subdirs =
+     let libs = mkLibs entName subdirs in concat
+     [ map (ghdlLibrary entName path' modName) libs
+     , [ghdlImport entName path' modName (subdirs List.\\ libs)]
      , [ghdlMake path' modName subdirs libs entName]
      ]
-   simTest = ghdlSim expectSimFail path' modName (noConflict entName subdirs)
+
+   simTest entName subdirs =
+     ghdlSim expectSimFail path' modName (noConflict entName subdirs)
 
    seqTests =
      testGroup "VHDL" $ sequenceTests path' $
-      clashTest :
-        case (isJust expectClashFail, hdlSim) of
-          (True, _) -> []
-          (_, False) -> makeTests
-          _ -> makeTests ++ [simTest]
+       clashTest : concat (zipWith mkTests entNames subdirss)
+
+   mkTests entName subdirs =
+     case (isJust expectClashFail, hdlSim) of
+       (True, _) -> []
+       (_, False) -> makeTests entName subdirs
+       _ -> makeTests entName subdirs ++ [simTest entName subdirs]
 
 runTest1 modName testOptions@TestOptions{..} path Verilog =
   withResource acquire tastyRelease (const seqTests)
  where
-   subdirs = stringEntities testOptions
-   entName = stringTopEntity testOptions
-   env     = foldl (</>) sourceDirectory (reverse (tail path))
+   entNames   = stringTopEntity testOptions
+   subdirss   = stringEntities testOptions
+   env        = foldl (</>) sourceDirectory (reverse (tail path))
    verilogDir = "verilog"
    modDir     = verilogDir </> modName
    acquire    = tastyAcquire path' [verilogDir, modDir]
    path'      = "Verilog":path
 
-   clashTest = clashHDL expectClashFail Verilog env clashFlags modName (testDirectory path')
-   makeTest = iverilog path' modName subdirs entName
-   simTest = vvp expectSimFail vvpStderrEmptyFail path' modName (noConflict entName subdirs)
+   clashTest =
+     clashHDL expectClashFail Verilog env clashFlags modName (testDirectory path')
+
+   makeTest entName subdirs =
+     iverilog path' modName subdirs entName
+
+   simTest entName subdirs =
+     vvp expectSimFail vvpStderrEmptyFail path' modName (noConflict entName subdirs)
 
    seqTests =
      testGroup "Verilog" $ sequenceTests path' $
-      clashTest :
-        case (isJust expectClashFail, hdlSim) of
-          (True, _) -> []
-          (_, False) -> [makeTest]
-          _ -> [makeTest, simTest]
+      clashTest : concat (zipWith mkTests entNames subdirss)
+
+   mkTests entName subdirs =
+     case (isJust expectClashFail, hdlSim) of
+       (True, _) -> []
+       (_, False) -> [makeTest entName subdirs]
+       _ -> [makeTest entName subdirs, simTest entName subdirs]
 
 runTest1 modName testOptions@TestOptions{..} path SystemVerilog =
   withResource acquire tastyRelease (const seqTests)
  where
-   subdirs = stringEntities testOptions
-   entName = stringTopEntity testOptions
+   subdirss = stringEntities testOptions
+   entNames = stringTopEntity testOptions
+
    env     = foldl (</>) sourceDirectory (reverse (tail path))
    svDir   = "systemverilog"
    modDir  = svDir </> modName
    acquire = tastyAcquire path' [svDir, modDir]
    path'   = "SystemVerilog":path
 
-   clashTest = clashHDL expectClashFail SystemVerilog env clashFlags modName (testDirectory path')
-   makeTest = vlog path' modName subdirs
-   simTest = vsim expectSimFail path' modName entName
+   clashTest =
+    clashHDL expectClashFail SystemVerilog env clashFlags modName (testDirectory path')
+
+   makeTest entName subdirs = vlog entName path' modName subdirs
+   simTest entName = vsim expectSimFail path' modName entName
 
    seqTests =
      testGroup "SystemVerilog" $ sequenceTests path' $
-      clashTest :
-        case (isJust expectClashFail, hdlSim) of
-          (True, _) -> []
-          (_, False) -> makeTest
-          _ -> makeTest ++ [simTest]
+      clashTest : concat (zipWith mkTests entNames subdirss)
+
+   mkTests entName subdirs =
+     case (isJust expectClashFail, hdlSim) of
+       (True, _) -> []
+       (_, False) -> makeTest entName subdirs
+       _ -> makeTest entName subdirs ++ [simTest entName]
 
 runTest
   :: String
