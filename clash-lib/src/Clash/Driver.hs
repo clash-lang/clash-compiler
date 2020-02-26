@@ -11,6 +11,7 @@
 {-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE NondecreasingIndentation #-}
 {-# LANGUAGE QuasiQuotes #-}
+{-# LANGUAGE TemplateHaskellQuotes #-}
 
 module Clash.Driver where
 
@@ -18,6 +19,7 @@ import qualified Control.Concurrent.Supply        as Supply
 import           Control.DeepSeq
 import           Control.Exception                (tryJust, bracket, throw)
 import           Control.Lens                     (view, _4)
+import qualified Control.Monad                    as Monad
 import           Control.Monad                    (guard, when, unless, foldM)
 import           Control.Monad.Catch              (MonadMask)
 import           Control.Monad.IO.Class           (MonadIO)
@@ -94,13 +96,17 @@ import           Clash.Netlist.Types
 import           Clash.Normalize                  (checkNonRecursive, cleanupGraph,
                                                    normalize, runNormalization)
 import           Clash.Normalize.Util             (callGraph, tvSubstWithTyEq)
+import qualified Clash.Primitives.Sized.ToInteger as P
+import qualified Clash.Primitives.Sized.Vector    as P
+import qualified Clash.Primitives.GHC.Int         as P
+import qualified Clash.Primitives.GHC.Word        as P
 import           Clash.Primitives.Types
 import           Clash.Primitives.Util            (hashCompiledPrimMap)
 import           Clash.Unique                     (keysUniqMap, lookupUniqMap')
 import           Clash.Util.Interpolate           (i)
 import           Clash.Util
   (ClashException(..), HasCallStack, first, reportTimeDiff,
-   wantedLanguageExtensions, unwantedLanguageExtensions)
+   wantedLanguageExtensions, unwantedLanguageExtensions, debugIsOn)
 import           Clash.Util.Graph                 (reverseTopSort)
 
 -- | Worker function of 'splitTopEntityT'
@@ -514,6 +520,25 @@ loadImportAndInterpret iPaths0 interpreterArgs topDir qualMod funcName typ = do
                 map show wantedLanguageExtensions ++
                 map ("No" ++ ) (map show unwantedLanguageExtensions)
 
+-- | List of know primitives used to prevent Hint from firing. This improves
+-- Clash startup times for designs using them.
+knownPrimitives :: HashMap String BlackBoxFunction
+knownPrimitives =
+  HashMap.fromList $ map (first show) $
+    [ ('P.bvToIntegerVHDL, P.bvToIntegerVHDL)
+    , ('P.bvToIntegerVerilog, P.bvToIntegerVerilog)
+    , ('P.foldBBF, P.foldBBF)
+    , ('P.indexIntVerilog, P.indexIntVerilog)
+    , ('P.indexToIntegerVerilog, P.indexToIntegerVerilog)
+    , ('P.indexToIntegerVHDL, P.indexToIntegerVHDL)
+    , ('P.intTF, P.intTF)
+    , ('P.signedToIntegerVerilog, P.signedToIntegerVerilog)
+    , ('P.signedToIntegerVHDL, P.signedToIntegerVHDL)
+    , ('P.unsignedToIntegerVerilog, P.unsignedToIntegerVerilog)
+    , ('P.unsignedToIntegerVHDL, P.unsignedToIntegerVHDL)
+    , ('P.wordTF, P.wordTF)
+    ]
+
 -- | Compiles blackbox functions and parses blackbox templates.
 compilePrimitive
   :: [FilePath]
@@ -527,15 +552,25 @@ compilePrimitive
   -- ^ Primitive to compile
   -> IO CompiledPrimitive
 compilePrimitive idirs pkgDbs topDir (BlackBoxHaskell bbName wf usedArgs bbGenName source) = do
-  let interpreterArgs = concatMap (("-package-db":) . (:[])) pkgDbs
-  -- Compile a blackbox template function or fetch it from an already compiled file.
-  r <- go interpreterArgs source
-  processHintError
-    (show bbGenName)
-    bbName
-    (\bbFunc -> BlackBoxHaskell bbName wf usedArgs bbGenName (hash source, bbFunc))
-    r
-  where
+  bbFunc <-
+    -- TODO: Use cache for hint targets. Right now Hint will fire multiple times
+    -- TODO: if multiple functions use the same blackbox haskell function.
+    case HashMap.lookup fullName knownPrimitives of
+      Just f -> pure f
+      Nothing -> do
+        Monad.when debugIsOn (putStr "Hint: interpreting " >> putStrLn (show fullName))
+        let interpreterArgs = concatMap (("-package-db":) . (:[])) pkgDbs
+        -- Compile a blackbox template function or fetch it from an already compiled file.
+        r <- go interpreterArgs source
+        processHintError
+          (show bbGenName)
+          bbName
+          id
+          r
+
+  pure (BlackBoxHaskell bbName wf usedArgs bbGenName (hash source, bbFunc))
+ where
+    fullName = qualMod ++ "." ++ funcName
     qualMod = intercalate "." modNames
     BlackBoxFunctionName modNames funcName = bbGenName
 
