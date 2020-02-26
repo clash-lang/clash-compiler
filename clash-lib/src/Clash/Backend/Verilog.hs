@@ -407,7 +407,7 @@ noEmptyInit d = do
 
 insts :: [Declaration] -> VerilogM Doc
 insts [] = emptyDoc
-insts (TickDecl id_:ds) = "//" <+> stringS id_ <> line <> insts ds
+insts (TickDecl id_:ds) = comment "//" id_ <> line <> insts ds
 insts (d:ds) = do
   docM <- inst_ d
   case docM of
