@@ -449,7 +449,51 @@ substituteBinders inScope toInline toKeep body =
     in  if x `localIdOccursIn` e1 then
           go subst ((x,e1):inlRec) toInl
         else
-          go subst2 inlRec (map (second (substTm "substToInl" substE)) toInl)
+          go subst2 inlRec toInl
+
+-- | Lift the first set of binders to the level of global bindings, and substitute
+-- these lifted bindings into the second set of binders and the body of the
+-- original let expression.
+liftAndSubsituteBinders
+  :: InScopeSet
+  -> [LetBinding]
+  -- ^ Let-binders to lift, and substitute the lifted result
+  -> [LetBinding]
+  -- ^ Lef-binders where substitution takes place
+  -> Term
+  -- ^ Body where substitution takes place
+  -> RewriteMonad extra ([LetBinding],Term)
+liftAndSubsituteBinders inScope toLift toKeep body = do
+  subst <- go (mkSubst inScope) toLift
+  pure ( map (second (substTm "liftToKeep" subst)) toKeep
+       , substTm "keepBody" subst body
+       )
+ where
+  go subst [] = pure subst
+  go !subst ((x,e):inl) = do
+    let e1 = substTm "liftInl" subst e
+    (_,e2) <- liftBinding (x,e1)
+    let substE = extendIdSubst (mkSubst inScope) x e2
+        subst1 = subst { substTmEnv = mapVarEnv (substTm "liftSubst" substE)
+                                                (substTmEnv subst) }
+        subst2 = extendIdSubst subst1 x e2
+    if x `localIdOccursIn` e2 then do
+      (_,sp) <- Lens.use curFun
+      throw (ClashException sp [I.i|
+        Internal error: inlineOrLiftBInders failed on:
+
+        #{showPpr (x,e)}
+
+        creating a self-recursive let-binding:
+
+        #{showPpr (x,e2)}
+
+        given the already built subtitution:
+
+        #{showDoc (clashPretty (substTmEnv subst))}
+      |] Nothing)
+    else
+      go subst2 inl
 
 -- | Determine whether a term does any work, i.e. adds to the size of the circuit
 isWorkFree
@@ -578,21 +622,13 @@ inlineOrLiftBinders condition inlineOrLift (TransformContext inScope0 _) e@(Letr
       let (toLiftExtra,(toReplace1,body1)) =
             substituteBinders inScope1 toInline (toLift ++ toKeep) body
           (toLift1,toKeep1) = splitAt (length toLift) toReplace1
-      toLift2 <- mapM liftBinding (toLiftExtra ++ toLift1)
       -- We then substitute the lifted binders in the other binders and the body
-      let (toInlRec,(toKeep2,body2)) =
-            substituteBinders inScope1 toLift2 toKeep1 body1
-      case toInlRec of
-        [] -> case toKeep2 of
-          [] -> changed body2
-          _  -> changed (Letrec toKeep2 body2)
-        _ -> do
-          -- This shouldn't happen, the substitutions for the lifted binders
-          -- should not be self-recursive.
-          (_,sp) <- Lens.use curFun
-          throw (ClashException sp
-                  ("Internal error: inlineOrLiftBinders failed:\n" ++ showPpr toInlRec)
-                  Nothing)
+      (toKeep2,body2) <- liftAndSubsituteBinders inScope1
+                           (toLiftExtra ++ toLift1)
+                           toKeep1 body1
+      case toKeep2 of
+        [] -> changed body2
+        _  -> changed (Letrec toKeep2 body2)
 
 inlineOrLiftBinders _ _ _ e = return e
 

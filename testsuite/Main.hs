@@ -163,6 +163,10 @@ runClashTest = defaultMain $ clashTestRoot
           , expectClashFail=Just (def, "Unexpected projection of zero-width type")
           }
         ]
+      , runTest "LiftRecursiveGroup" def{
+          hdlTargets=[VHDL]
+        , expectClashFail=Just (def,"Callgraph after normalization contains following recursive components:")
+        }
       , runTest "Poly" def{
           hdlTargets=[VHDL]
         , expectClashFail=Just (def, "Clash can only normalize monomorphic functions, but this is polymorphic:")
