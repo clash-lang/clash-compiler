@@ -22,23 +22,27 @@ aliases:
     run:
       name: Calculate cache key
       command: |
-        if [ -n "$CIRCLE_PR_NUMBER" ]; then
-          md5sum .circleci/config.yml cabal.project .ci/cabal.project.local */*.cabal > .circleci_cachekey
-        else
-          echo not running > .circleci_cachekey
-        fi
+        date +%Y-%m > /.circleci_cachekey
+        if [ -e /usr/bin/gcc ]; then /usr/bin/gcc --version >> /.circleci_cachekey; fi
+        cat /.circleci_cachekey
   - &cache_restore
     restore_cache:
       keys:
-        - cache-{{ .Environment.CIRCLE_JOB }}-{{ checksum ".ci/docker/Dockerfile" }}-{{ checksum ".circleci_cachekey" }}
-        - cache-{{ .Environment.CIRCLE_JOB }}-{{ checksum ".ci/docker/Dockerfile" }}-
+        - cache-{{ checksum "/.circleci_cachekey" }}-{{ .Environment.CIRCLE_JOB }}-{{ .Branch }}-{{ .Revision }}
+        - cache-{{ checksum "/.circleci_cachekey" }}-{{ .Environment.CIRCLE_JOB }}-{{ .Branch }}-
+        - cache-{{ checksum "/.circleci_cachekey" }}-{{ .Environment.CIRCLE_JOB }}-
   - &cache_save
     save_cache:
-      key: cache-{{ .Environment.CIRCLE_JOB }}-{{ checksum ".ci/docker/Dockerfile" }}-{{ checksum ".circleci_cachekey" }}
+      key: cache-{{ checksum "/.circleci_cachekey" }}-{{ .Environment.CIRCLE_JOB }}-{{ .Branch }}-{{ .Revision }}
       paths:
+        # Don't hit Ubuntu servers for same packages over and over
+        - /var/cache/apt/
+        # Don't hit cache.nixos.org for same packages over and over
+        - /nix
+        # Cache Clash dependencies
         - cabal-store
+        # Cache dependencies and ghc binaries
         - ~/.stack
-        - /nix/store
 
   - &build
     run:
@@ -118,15 +122,14 @@ aliases:
     docker:
       - image: nixos/nix
     steps:
-      # I can't get caching to work on Nix due to missing certificates. Doesn't
-      # seem too bad though, thanks to nix binary caching of 99% of Clash's
-      # dependencies. cachix has been suggested to fix this (and! to improve
-      # the user experience for people building Clash with Nix).
+      - *cache_calc_key
+      - *cache_restore
       - *nix_setup
       - checkout
       - *merge_pullrequest
       - *submodules
       - *nix_build
+      - *cache_save
 
 workflows:
   version: 2
