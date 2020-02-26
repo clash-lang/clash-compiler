@@ -424,7 +424,7 @@ generateHDL reprs bindingsMap hdlState primMap tcm tupTcm typeTrans eval
                                   typeTrans eval topEntityNames opts supplyTB tb
       normTime <- transformedBindings `deepseq` Clock.getCurrentTime
       let prepNormDiff = reportTimeDiff normTime topTime
-      putStrLn $ "Clash: Testbench normalisation took " ++ prepNormDiff
+      putStrLn $ "Clash: Testbench normalization took " ++ prepNormDiff
 
       -- 2. Generate netlist for topEntity
 

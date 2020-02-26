@@ -837,7 +837,7 @@ specialise' specMapLbl specHistLbl specLimitLbl (TransformContext is0 _) e (Var 
   if f `elemVarSet` topEnts
   then do
     case specArgIn of
-      Left _ -> traceIf (lvl >= DebugNone) ("Not specialising TopEntity: " ++ showPpr (varName f)) (return e)
+      Left _ -> traceIf (lvl >= DebugNone) ("Not specializing TopEntity: " ++ showPpr (varName f)) (return e)
       Right tyArg -> traceIf (lvl >= DebugApplied) ("Dropping type application on TopEntity: " ++ showPpr (varName f) ++ "\ntype:\n" ++ showPpr tyArg) $
         -- TopEntities aren't allowed to be semantically polymorphic.
         -- But using type equality constraints they may be syntactically polymorphic.
