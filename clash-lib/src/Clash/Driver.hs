@@ -92,7 +92,7 @@ import           Clash.Netlist.BlackBox.Parser    (runParse)
 import           Clash.Netlist.BlackBox.Types     (BlackBoxTemplate, BlackBoxFunction)
 import           Clash.Netlist.Types
   (BlackBox (..), Component (..), Identifier, FilteredHWType, HWMap,
-   SomeBackend (..), TopEntityT(..))
+   SomeBackend (..), TopEntityT(..), TemplateFunction)
 import           Clash.Normalize                  (checkNonRecursive, cleanupGraph,
                                                    normalize, runNormalization)
 import           Clash.Normalize.Util             (callGraph, tvSubstWithTyEq)
@@ -100,6 +100,7 @@ import qualified Clash.Primitives.Sized.ToInteger as P
 import qualified Clash.Primitives.Sized.Vector    as P
 import qualified Clash.Primitives.GHC.Int         as P
 import qualified Clash.Primitives.GHC.Word        as P
+import qualified Clash.Primitives.Intel.ClockGen  as P
 import           Clash.Primitives.Types
 import           Clash.Primitives.Util            (hashCompiledPrimMap)
 import           Clash.Unique                     (keysUniqMap, lookupUniqMap')
@@ -493,6 +494,7 @@ loadImportAndInterpret
   -- ^ Type name ("BlackBoxFunction" or "TemplateFunction")
   -> m (Either Hint.InterpreterError a)
 loadImportAndInterpret iPaths0 interpreterArgs topDir qualMod funcName typ = do
+  Hint.liftIO $ putStr "Hint: Interpreting " >> putStrLn (qualMod ++ "." ++ funcName)
   -- Try to interpret function *without* loading module explicitly. If this
   -- succeeds, the module was already in the global package database(s).
   bbfE <- Hint.unsafeRunInterpreterWithArgsLibdir interpreterArgs topDir $ do
@@ -520,10 +522,10 @@ loadImportAndInterpret iPaths0 interpreterArgs topDir qualMod funcName typ = do
                 map show wantedLanguageExtensions ++
                 map ("No" ++ ) (map show unwantedLanguageExtensions)
 
--- | List of know primitives used to prevent Hint from firing. This improves
--- Clash startup times for designs using them.
-knownPrimitives :: HashMap String BlackBoxFunction
-knownPrimitives =
+-- | List of known BlackBoxFunctions used to prevent Hint from firing. This
+--  improves Clash startup times.
+knownBlackBoxFunctions :: HashMap String BlackBoxFunction
+knownBlackBoxFunctions =
   HashMap.fromList $ map (first show) $
     [ ('P.bvToIntegerVHDL, P.bvToIntegerVHDL)
     , ('P.bvToIntegerVerilog, P.bvToIntegerVerilog)
@@ -537,6 +539,17 @@ knownPrimitives =
     , ('P.unsignedToIntegerVerilog, P.unsignedToIntegerVerilog)
     , ('P.unsignedToIntegerVHDL, P.unsignedToIntegerVHDL)
     , ('P.wordTF, P.wordTF)
+    ]
+
+-- | List of known TemplateFunctions used to prevent Hint from firing. This
+--  improves Clash startup times.
+knownTemplateFunctions :: HashMap String TemplateFunction
+knownTemplateFunctions =
+  HashMap.fromList $ map (first show) $
+    [ ('P.altpllQsysTF, P.altpllQsysTF)
+    , ('P.alteraPllQsysTF, P.alteraPllQsysTF)
+    , ('P.alteraPllTF, P.alteraPllTF)
+    , ('P.altpllTF, P.altpllTF)
     ]
 
 -- | Compiles blackbox functions and parses blackbox templates.
@@ -555,7 +568,7 @@ compilePrimitive idirs pkgDbs topDir (BlackBoxHaskell bbName wf usedArgs bbGenNa
   bbFunc <-
     -- TODO: Use cache for hint targets. Right now Hint will fire multiple times
     -- TODO: if multiple functions use the same blackbox haskell function.
-    case HashMap.lookup fullName knownPrimitives of
+    case HashMap.lookup fullName knownBlackBoxFunctions of
       Just f -> pure f
       Nothing -> do
         Monad.when debugIsOn (putStr "Hint: interpreting " >> putStrLn (show fullName))
@@ -645,11 +658,18 @@ compilePrimitive idirs pkgDbs topDir
     let BlackBoxFunctionName modNames funcName = bbGenName
         qualMod = intercalate "." modNames
         hsh     = hash qualMod
-    r <- loadImportAndInterpret idirs iArgs topDir qualMod funcName "TemplateFunction"
-    processHintError (show bbGenName) pNm (BBFunction (Data.Text.unpack pNm) hsh) r
+        fullName = qualMod ++ "." ++ funcName
+    tf <-
+      case HashMap.lookup fullName knownTemplateFunctions of
+        Just f -> pure f
+        Nothing -> do
+          r <- loadImportAndInterpret idirs iArgs topDir qualMod funcName "TemplateFunction"
+          processHintError (show bbGenName) pNm id r
+    pure (BBFunction (Data.Text.unpack pNm) hsh tf)
 
 compilePrimitive _ _ _ (Primitive pNm wf typ) =
   return (Primitive pNm wf typ)
+{-# SCC compilePrimitive #-}
 
 processHintError
   :: Monad m

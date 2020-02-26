@@ -177,6 +177,7 @@ generatePrimMap unresolvedPrims primGuards filePaths = do
   primitives1 <- sequence $ zipWith resolvePrimitive' metapaths unresolvedPrims
   let primMap = HashMap.fromList (primitives0 ++ primitives1)
   return (force (addGuards primMap primGuards))
+{-# SCC generatePrimMap #-}
 
 -- | Determine what argument should be constant / literal
 constantArgs :: TS.Text -> CompiledPrimitive -> Set.Set Int
