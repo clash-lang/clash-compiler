@@ -271,7 +271,7 @@ runRewriteSession :: RewriteEnv
                   -> RewriteMonad extra a
                   -> a
 runRewriteSession r s m =
-  traceIf (_dbgLevel r > DebugNone)
+  traceIf (_dbgLevel r > DebugSilent)
     ("Clash: Applied " ++ show (s' ^. transformCounter) ++ " transformations")
     a
   where
