@@ -613,7 +613,7 @@ modifier offset (Indexed (ty@(Vector _ argTy),1,0)) = Just (start+offset,end+off
     start   = typeSize ty - 1
     end     = start - argSize + 1
 
-modifier offset (Indexed (ty@(Vector _ argTy),1,1)) = Just (start+offset,offset, argTy)
+modifier offset (Indexed (ty@(Vector n argTy),1,1)) = Just (start+offset,offset,Vector (n-1) argTy)
   where
     argSize = typeSize argTy
     start   = typeSize ty - argSize - 1
@@ -622,12 +622,12 @@ modifier offset (Indexed (ty@(RTree 0 argTy),0,0)) = Just (start+offset,offset, 
   where
     start   = typeSize ty - 1
 
-modifier offset (Indexed (ty@(RTree _ argTy),1,0)) = Just (start+offset,end+offset, argTy)
+modifier offset (Indexed (ty@(RTree d argTy),1,0)) = Just (start+offset,end+offset,RTree (d-1) argTy)
   where
     start   = typeSize ty - 1
     end     = typeSize ty `div` 2
 
-modifier offset (Indexed (ty@(RTree _ argTy),1,1)) = Just (start+offset,offset, argTy)
+modifier offset (Indexed (ty@(RTree d argTy),1,1)) = Just (start+offset,offset, RTree (d-1) argTy)
   where
     start   = (typeSize ty `div` 2) - 1
 
