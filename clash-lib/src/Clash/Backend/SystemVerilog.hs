@@ -1100,40 +1100,31 @@ expr_ _ (Identifier id_ (Just (DC (ty@(SP _ _),_)))) = stringS id_ <> brackets (
     start = typeSize ty - 1
     end   = typeSize ty - conSize ty
 
-expr_ b (Identifier id_ (Just (Nested m1 m2))) = case nestM m1 m2 of
-  Just m3 -> expr_ b (Identifier id_ (Just m3))
-  _ -> case nestSP 0 m1 m2 of
-    Just (argTy,start,end) -> fromSLV argTy id_ start end
-    _ -> do
-      k <- expr_ b (Identifier id_ (Just m1))
-      expr_ b (Identifier (Text.toStrict (renderOneLine k)) (Just m2))
+expr_ _ (Identifier id_ (Just m@Nested {})) = case modifier 0 [] m of
+  Nothing -> stringS id_
+  Just (mods,resTy) -> do
+    nm <- Mon $ use modNm
+    pkgCtx <- Mon $ use tyPkgCtx
+    let prefix = if pkgCtx then emptyDoc else stringS nm <> "_types::"
+    let e = stringS id_ <> hcat (mapM (either bracketNMod bracketNMod) (reverse mods))
+    case resTy of
+      Signed _ -> "$signed" <> parens e
+      Vector {}
+        | Left (NRange {}):_ <- mods
+        -> e
+        | otherwise  -> do
+        Mon (tyCache %= HashSet.insert resTy)
+        prefix <> tyName resTy <> "_from_lv" <> parens e
+      RTree {}
+        | Left (NRange {}):_ <- mods
+        -> e
+        | otherwise -> do
+        Mon (tyCache %= HashSet.insert resTy)
+        prefix <> tyName resTy <> "_from_lv" <> parens e
+      _ -> e
  where
-  nestSP offset k1 k2 = case goSP offset k1 of
-    Just (_,_,e) -> goSP e k2
-    _ -> Nothing
-
-  goSP offset (Indexed (ty@(SP _ args),dcI,fI)) = Just (argTy,start+offset,end+offset)
-   where
-    argTys   = snd $ args !! dcI
-    argTy    = argTys !! fI
-    argSize  = typeSize argTy
-    other    = otherSize argTys (fI-1)
-    start    = typeSize ty - 1 - conSize ty - other
-    end      = start - argSize + 1
-
-
-  goSP offset (Indexed (CustomSP _id _dataRepr _size args,dcI,fI)) =
-    case bitRanges (anns !! fI) of
-      [(start,end)] -> Just (argTy,start+offset,end+offset)
-      _ -> Nothing
-
-   where
-    (ConstrRepr' _name _n _mask _value anns, _, argTys) = args !! dcI
-    argTy = argTys !! fI
-
-  goSP offset (Nested k1 k2) = nestSP offset k1 k2
-
-  goSP _ _ = Nothing
+  bracketNMod (NElem i)    = brackets (int i)
+  bracketNMod (NRange s e) = brackets (int s <> colon <> int e)
 
 -- See [Note] integer projection
 expr_ _ (Identifier id_ (Just (Indexed ((Signed w),_,_))))  = do
@@ -1275,7 +1266,7 @@ expr_ _ (DataTag (RTree _ _) (Right _)) = do
 expr_ b (ConvBV topM t True e) = do
   nm <- Mon $ use modNm
   pkgCtx <- Mon $ use tyPkgCtx
-  let prefix = if pkgCtx then stringS nm <> "_types::" else emptyDoc
+  let prefix = if pkgCtx then emptyDoc else stringS nm <> "_types::"
   case t of
     Vector {} -> do
       Mon (tyCache %= HashSet.insert t)
@@ -1290,7 +1281,7 @@ expr_ b (ConvBV topM t True e) = do
 expr_ b (ConvBV topM t False e) = do
   nm <- Mon $ use modNm
   pkgCtx <- Mon $ use tyPkgCtx
-  let prefix = if pkgCtx then stringS nm <> "_types::" else emptyDoc
+  let prefix = if pkgCtx then emptyDoc else stringS nm <> "_types::"
   case t of
     Vector {} -> do
       Mon (tyCache %= HashSet.insert t)
@@ -1363,3 +1354,172 @@ parenIf False = id
 
 punctuate' :: Monad m => Mon m Doc -> Mon m [Doc] -> Mon m Doc
 punctuate' s d = vcat (punctuate s d) <> s
+
+
+data NMod
+  = NRange Int Int
+  | NElem Int
+
+-- | Calculate the beginning and end index into a variable, to get the
+-- desired field. Also returns the HWType of the result.
+--
+-- NB: returns a list of slices and indices when selections are into vectors and
+-- rtrees. Left -> index/slice from an unpacked array; Right -> slice from a
+-- packed type
+modifier
+  :: Int
+  -- ^ Offset, only used when we have nested modifiers
+  -> [Either NMod NMod]
+  -- ^ Ranges selected so far
+  -> Modifier
+  -> Maybe ([Either NMod NMod],HWType)
+modifier offset mods (Sliced (BitVector _,start,end)) =
+  let m = Right (NRange (start+offset) (end+offset)) in
+  case mods of
+    Right {}:rest -> Just (m:rest, BitVector (start-end+1))
+    _ -> Just (m:mods, BitVector (start-end+1))
+
+modifier offset mods (Indexed (ty@(SP _ args),dcI,fI)) =
+  Just (Right (NRange (start+offset) (end+offset)):mods, argTy)
+  where
+    argTys   = snd $ args !! dcI
+    argTy    = argTys !! fI
+    argSize  = typeSize argTy
+    other    = otherSize argTys (fI-1)
+    start    = typeSize ty - 1 - conSize ty - other
+    end      = start - argSize + 1
+
+modifier offset mods (Indexed (ty@(Product _ _ argTys),_,fI)) =
+  let m = Right (NRange (start+offset) (end+offset)) in
+  case mods of
+    Right {}:rest -> Just (m:rest, argTy)
+    _ -> Just (m:mods,argTy)
+  where
+    argTy   = argTys !! fI
+    argSize = typeSize argTy
+    otherSz = otherSize argTys (fI - 1)
+    start   = typeSize ty - 1 - otherSz
+    end     = start - argSize + 1
+
+modifier offset mods (Indexed (ty@(Vector _ argTy),1,0)) = case mods of
+    Right {}:rest -> Just (Right (NRange (start+offset) (end+offset)):rest, argTy)
+    Left (NRange b _):rest -> Just (Left (NElem b):rest,argTy)
+    _ -> Just (Left (NElem 0):mods,argTy)
+  where
+    argSize = typeSize argTy
+    start   = typeSize ty - 1
+    end     = start - argSize + 1
+
+modifier offset mods (Indexed (ty@(Vector n argTy),1,1)) = case mods of
+    Right {}:rest -> Just (Right (NRange (start+offset) offset):rest, Vector (n-1) argTy)
+    Left (NRange b e):rest -> Just (Left (NRange (b+1) e):rest, Vector (n-1) argTy)
+    _ -> Just (Left (NRange 1 (n-1)):mods, Vector (n-1) argTy)
+  where
+    argSize = typeSize argTy
+    start   = typeSize ty - argSize - 1
+
+modifier offset mods (Indexed (ty@(RTree 0 argTy),0,0)) = case mods of
+    Right {}:rest -> Just (Right (NRange (start+offset) offset):rest, argTy)
+    Left (NRange b _):rest -> Just (Left (NElem b):rest,argTy)
+    _ -> Just (Left (NElem 0):mods,argTy)
+  where
+    start   = typeSize ty - 1
+
+modifier offset mods (Indexed (ty@(RTree d argTy),1,0)) = case mods of
+    Right {}:rest -> Just (Right (NRange (start+offset) (end+offset)):rest, RTree (d-1) argTy)
+    Left (NRange b _):rest -> Just (Left (NRange b (b+lhsSz-1)):rest,RTree (d-1) argTy)
+    _ -> Just (Left (NRange 0 (lhsSz-1)):mods,RTree (d-1) argTy)
+  where
+    start   = typeSize ty - 1
+    end     = typeSize ty `div` 2
+    lhsSz   = (d-1)^(2 :: Int)
+
+modifier offset mods (Indexed (ty@(RTree d argTy),1,1)) = case mods of
+    Right {}:rest -> Just (Right (NRange (start+offset) offset):rest, RTree  (d-1) argTy)
+    Left (NRange _ e):rest -> Just (Left (NRange (e+1-rhsS) e):rest,RTree (d-1) argTy)
+    _ -> Just (Left (NRange rhsS rhsE):mods,RTree (d-1) argTy)
+  where
+    start   = (typeSize ty `div` 2) - 1
+    rhsS    = (d-1)^(2 :: Int)
+    rhsE    = d^(2 :: Int)-1
+
+-- This is a HACK for Clash.Driver.TopWrapper.mkOutput
+-- Vector's don't have a 10'th constructor, this is just so that we can
+-- recognize the particular case
+modifier offset mods (Indexed (ty@(Vector _ argTy),10,fI)) = case mods of
+    Right {}:rest -> Just (Right (NRange (start+offset) (end+offset)):rest, argTy)
+    Left (NRange b _):rest -> Just (Left (NElem (fI+b)):rest, argTy)
+    _ -> Just (Left (NElem fI):mods,argTy)
+  where
+    argSize = typeSize argTy
+    start   = typeSize ty - (fI * argSize) - 1
+    end     = start - argSize + 1
+
+-- This is a HACK for Clash.Driver.TopWrapper.mkOutput
+-- RTree's don't have a 10'th constructor, this is just so that we can
+-- recognize the particular case
+modifier offset mods (Indexed (ty@(RTree _ argTy),10,fI)) = case mods of
+    Right {}:rest -> Just (Right (NRange (start+offset) (end+offset)):rest, argTy)
+    Left (NRange b _):rest -> Just (Left (NElem (b+fI)):rest, argTy)
+    _ -> Just (Left (NElem fI):mods, argTy)
+  where
+    argSize = typeSize argTy
+    start   = typeSize ty - (fI * argSize) - 1
+    end     = start - argSize + 1
+
+modifier offset mods (Indexed (CustomSP typName _dataRepr _size args,dcI,fI)) =
+  case bitRanges (anns !! fI) of
+    [(start,end)] ->
+      let m = Right (NRange (start+offset) (end+offset)) in
+      case mods of
+        Right {}:rest -> Just (m:rest, argTy)
+        _ -> Just (m:mods, argTy)
+    _ ->
+      error $ $(curLoc) ++ "Cannot handle projection out of a "
+           ++ "non-contiguously or zero-width encoded field. Tried to project "
+           ++ "field " ++ show fI ++ " of constructor " ++ show dcI ++ " of "
+           ++ "data type " ++ show typName ++  "."
+ where
+  (ConstrRepr' _name _n _mask _value anns, _, argTys) = args !! dcI
+  argTy = argTys !! fI
+
+modifier offset mods (Indexed (CustomProduct typName dataRepr _size _maybeFieldNames args,dcI,fI))
+  | DataRepr' _typ _size [cRepr] <- dataRepr
+  , ConstrRepr' _cName _pos _mask _val fieldAnns <- cRepr =
+  case bitRanges (fieldAnns !! fI) of
+    [(start,end)] ->
+      let m = Right (NRange (start+offset) (end+offset)) in
+      case mods of
+        Right {}:rest -> Just (m:rest, argTy)
+        _ -> Just (m:mods,argTy)
+    _ ->
+      error $ $(curLoc) ++ "Cannot handle projection out of a "
+           ++ "non-contiguously or zero-width encoded field. Tried to project "
+           ++ "field " ++ show fI ++ " of constructor " ++ show dcI ++ " of "
+           ++ "data type " ++ show typName ++ "."
+ where
+  argTy = map snd args !! fI
+
+modifier offset mods (DC (ty@(SP _ _),_)) =
+    let m = Right (NRange (start+offset) (end+offset)) in
+    case mods of
+      Right {}:rest -> Just (m:rest, ty)
+      _ -> Just (m:mods,ty)
+  where
+    start = typeSize ty - 1
+    end   = typeSize ty - conSize ty
+
+modifier offset mods (Nested m1 m2) = do
+  case modifier offset mods m1 of
+    Nothing -> modifier offset mods m2
+    Just (mods1,argTy) ->
+      let m3 = case mods1 of
+                 Right (NRange _ e):_ -> modifier e mods1 m2
+                 _ -> modifier 0 mods1 m2
+      in case m3 of
+        -- In case the second modifier is `Nothing` that means we want the entire
+        -- thing calculated by the first modifier
+        Nothing -> Just (mods1,argTy)
+        m       -> m
+
+modifier _ _ _ = Nothing
