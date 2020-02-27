@@ -235,6 +235,7 @@ Library
                       Clash.Primitives.Intel.ClockGen
                       Clash.Primitives.Sized.ToInteger
                       Clash.Primitives.Sized.Vector
+                      Clash.Primitives.Verification
 
                       Clash.Rewrite.Combinators
                       Clash.Rewrite.Types

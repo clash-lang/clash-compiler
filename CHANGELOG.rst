@@ -4,7 +4,7 @@ Changelog for the Clash project
 -----
 -  New features (API):
 
-   -  No new features yet!
+   -  Added basic support for writing PSL/SVA assertions in `Clash.Verification`
 
 -  New features (Compiler):
 

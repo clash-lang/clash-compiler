@@ -1,6 +1,7 @@
 {-# LANGUAGE TemplateHaskellQuotes #-}
+{-# LANGUAGE ViewPatterns          #-}
 
-module Clash.Core.TermLiteral.TH
+module Clash.Util.TermLiteral.TH
   (  deriveTermToData
   ) where
 
@@ -22,7 +23,7 @@ dcName' :: DataCon -> String
 dcName' = Text.unpack . nameOcc . dcName
 
 termToDataName :: Name
-termToDataName = mkName "Clash.Core.TermLiteral.termToData"
+termToDataName = mkName "Clash.Util.TermLiteral.termToData"
 
 deriveTermToData :: Name -> Q Exp
 deriveTermToData typName = do
@@ -34,11 +35,9 @@ deriveTermToData typName = do
 
 deriveTermToData1 :: [(Name, Int)] -> Exp
 deriveTermToData1 constrs =
-  LamCaseE
-    [ Match pat (NormalB (if null args then theCase else LetE args theCase)) []
-    , Match (VarP termName) (NormalB ((ConE 'Left `AppE` VarE termName))) []
-
-    ]
+  LamE
+    [pat]
+    (if null args then theCase else LetE args theCase)
  where
   nArgs = maximum (map snd constrs)
 

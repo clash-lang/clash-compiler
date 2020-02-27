@@ -101,6 +101,7 @@ import qualified Clash.Primitives.Sized.Vector    as P
 import qualified Clash.Primitives.GHC.Int         as P
 import qualified Clash.Primitives.GHC.Word        as P
 import qualified Clash.Primitives.Intel.ClockGen  as P
+import qualified Clash.Primitives.Verification    as P
 import           Clash.Primitives.Types
 import           Clash.Primitives.Util            (hashCompiledPrimMap)
 import           Clash.Unique                     (keysUniqMap, lookupUniqMap')
@@ -528,7 +529,8 @@ loadImportAndInterpret iPaths0 interpreterArgs topDir qualMod funcName typ = do
 knownBlackBoxFunctions :: HashMap String BlackBoxFunction
 knownBlackBoxFunctions =
   HashMap.fromList $ map (first show) $
-    [ ('P.bvToIntegerVHDL, P.bvToIntegerVHDL)
+    [ ('P.checkBBF, P.checkBBF)
+    , ('P.bvToIntegerVHDL, P.bvToIntegerVHDL)
     , ('P.bvToIntegerVerilog, P.bvToIntegerVerilog)
     , ('P.foldBBF, P.foldBBF)
     , ('P.indexIntVerilog, P.indexIntVerilog)

@@ -7,7 +7,7 @@ import qualified Clash.Util.Interpolate    as I
 import           Control.Exception         (finally)
 import qualified Data.Text                 as Text
 import           Data.Default              (def)
-import           Data.List                 (isSuffixOf)
+import           Data.List                 (isSuffixOf, (\\))
 import           System.Directory
   (createDirectoryIfMissing, removeDirectoryRecursive)
 import           System.Environment        (setEnv)
@@ -147,6 +147,33 @@ runClashTest = defaultMain $ clashTestRoot
         [ runTest "T1033" def{
             hdlTargets=[VHDL]
           , expectClashFail=Just (def, "PortProduct \"wrong\" []")
+          }
+        ]
+      , clashTestGroup "Verification"
+        [ let n = 9 in -- GHDL only has VERY basic PSL support
+          runTest "NonTemporalPSL" def{
+            hdlTargets=[VHDL]
+          , entities=Entities [["fails" ++ show i] | i <- [(1::Int)..n]]
+          , topEntities=TopEntities ["fails" ++ show i | i <- [(1::Int)..n]]
+          , expectSimFail=Just (def, "psl assertion failed")
+          }
+        , let n = 13 in
+          runTest "NonTemporalPSL" def{
+            hdlTargets=[SystemVerilog]
+          , entities=Entities [["fails" ++ show i] | i <- [(1::Int)..n]]
+          , topEntities=TopEntities ["fails" ++ show i | i <- [(1::Int)..n]]
+          -- Only QuestaSim supports simulating SVA/PSL, but ModelSim does check
+          -- for syntax errors.
+          , hdlSim=False
+          }
+        , let is = [(1::Int)..13] \\ [4, 6, 7, 8, 10, 11, 12] in
+          runTest "NonTemporalSVA" def{
+            hdlTargets=[SystemVerilog]
+          , entities=Entities [["fails" ++ show i] | i <- is]
+          , topEntities=TopEntities ["fails" ++ show i | i <- is]
+          -- Only QuestaSim supports simulating SVA/PSL, but ModelSim does check
+          -- for syntax errors.
+          , hdlSim=False
           }
         ]
       , clashTestGroup "ZeroWidth"
