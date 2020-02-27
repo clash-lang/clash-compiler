@@ -494,7 +494,8 @@ loadImportAndInterpret
   -- ^ Type name ("BlackBoxFunction" or "TemplateFunction")
   -> m (Either Hint.InterpreterError a)
 loadImportAndInterpret iPaths0 interpreterArgs topDir qualMod funcName typ = do
-  Hint.liftIO $ putStr "Hint: Interpreting " >> putStrLn (qualMod ++ "." ++ funcName)
+  Hint.liftIO $ Monad.when debugIsOn $
+    putStr "Hint: Interpreting " >> putStrLn (qualMod ++ "." ++ funcName)
   -- Try to interpret function *without* loading module explicitly. If this
   -- succeeds, the module was already in the global package database(s).
   bbfE <- Hint.unsafeRunInterpreterWithArgsLibdir interpreterArgs topDir $ do
