@@ -207,6 +207,7 @@ Library
                       Clash.Explicit.Signal.Delayed
                       Clash.Explicit.Synchronizer
                       Clash.Explicit.Testbench
+                      Clash.Explicit.Verification
 
                       Clash.HaskellPrelude
 
@@ -261,6 +262,11 @@ Library
                       Clash.Sized.Internal.Index
                       Clash.Sized.Internal.Signed
                       Clash.Sized.Internal.Unsigned
+
+                      Clash.Verification
+                      Clash.Verification.DSL
+                      Clash.Verification.PrettyPrinters
+                      Clash.Verification.Internal
 
                       Clash.XException
                       Clash.XException.TH
