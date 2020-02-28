@@ -104,16 +104,16 @@ rom#
   -- ^ Read address @rd@
   -> Signal dom a
   -- ^ The value of the ROM at address @rd@ from the previous clock cycle
-rom# _ en content rd =
+rom# _ en content =
   go
     (withFrozenCallStack (deepErrorX "rom: initial value undefined"))
     (fromEnable en)
-    ((arr !) <$> rd)
  where
   szI = length content
   arr = listArray (0,szI-1) (toList content)
 
-  go o (e :- es) as@(~(x :- xs)) =
+  go o (e :- es) rd@(~(r :- rs)) =
+    let o1 = if e then arr ! r else o
     -- See [Note: register strictness annotations]
-    o `seqX` o :- (as `seq` if e then go x es xs else go o es xs)
+    in  o `seqX` o :- (rd `seq` go o1 es rs)
 {-# NOINLINE rom# #-}
