@@ -88,7 +88,7 @@ asyncRom#
   -- ^ Read address @rd@
   -> a
   -- ^ The value of the ROM at address @rd@
-asyncRom# content rd = arr ! rd
+asyncRom# content = \rd -> arr ! rd
   where
     szI = length content
     arr = listArray (0,szI-1) (toList content)
