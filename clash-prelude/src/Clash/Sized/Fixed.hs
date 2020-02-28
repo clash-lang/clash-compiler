@@ -17,10 +17,51 @@ Fixed point numbers
 * Use <#constraintsynonyms Constraint synonyms> when writing type signatures
   for polymorphic functions that use 'Fixed' point numbers.
 
+BEWARE: rounding by truncation can introduce errors larger than naively assumed;
+e.g. for /Fixed 16 1/, rounding by truncation turns the real number 4.99 to 4.5,
+not 5.0, i.e. an error or 0.49 instead of 0.01
+
 BEWARE: rounding by truncation introduces a sign bias!
 
 * Truncation for positive numbers effectively results in: round towards zero.
 * Truncation for negative numbers effectively results in: round towards -infinity.
+
+== Reasoning about precision
+Givens the real numbers /A/ and /B/, and the corresponding fixed point numbers
+/FA+-da/ and /FB+db/, where /da/ and /db/ denote the (potential) error introduced
+by truncation w.r.t. the original /A/ and /B/, the arithmetic operators on fixed
+point numbers have the following error propagation properties:
+
+* Addition: /da + db/
+* Subtraction: /da - db/
+* Multiplication: /FA*db + FB*da + da*db/
+* Division: /(FA+da)\/(FB+db) - FA\/FB/
+
+=== Additional error from truncation
+
+Given:
+
+>>> 4.13 :: UFixed 16 3
+4.125
+>>> 20.9 :: UFixed 16 3
+20.875
+
+The expected error that we would get from multiplication is:
+/20.875*0.005 + 4.125*0.025 + 0.025*0.005 = 0.207625/
+
+>>> 4.13 * 20.9 :: Double
+86.317
+>>> (4.13 :: UFixed 16 3) `mul` (20.9 :: UFixed 16 3) :: UFixed 32 6
+86.109375
+>>> 86.109375 + 0.207625 :: Double
+86.317
+
+However the /0.109375/ is smaller than /2^-3/, so the regular multiplication
+operator that uses truncation introduces an additional error of /0.109375/:
+
+>>> (4.13 :: UFixed 16 3) * (20.9 :: UFixed 16 3) :: UFixed 16 3
+86.0
+
 -}
 
 {-# LANGUAGE ConstraintKinds #-}
