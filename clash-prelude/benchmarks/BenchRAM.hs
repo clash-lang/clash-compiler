@@ -1,7 +1,7 @@
 {-# LANGUAGE MagicHash, TypeApplications #-}
-module BenchRAM where
+module BenchRAM (ramBench) where
 
-import Criterion (Benchmark, env, bench, nf)
+import Criterion (Benchmark, env, bench, nf, bgroup)
 
 import Clash.Explicit.BlockRam
 import Clash.Explicit.RAM
@@ -10,6 +10,15 @@ import Clash.Explicit.Signal
 import Clash.Prelude.ROM
 import Clash.Promoted.Nat.Literals
 import qualified Clash.Sized.Vector as V
+
+ramBench :: Benchmark
+ramBench = bgroup "RAMs"
+  [ asyncRamBench
+  , asyncRomBench
+  , blockRamBench
+  , blockRamROBench
+  , romBench
+  ]
 
 asyncRamBench :: Benchmark
 asyncRamBench = env setup $ \m ->
