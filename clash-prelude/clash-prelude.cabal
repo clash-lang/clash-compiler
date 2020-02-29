@@ -399,6 +399,8 @@ benchmark benchmark-clash-prelude
       template-haskell
 
   Other-Modules:    BenchBitVector
+                    BenchCommon
                     BenchFixed
                     BenchRAM
                     BenchSigned
+                    BenchUnsigned

@@ -4,13 +4,22 @@
 
 #define WORD_SIZE_IN_BITS 64
 
-module BenchFixed where
+module BenchFixed (fixedBench) where
 
 import Clash.Class.Num
 import Clash.Sized.Fixed
 import Clash.Sized.Unsigned
-import Criterion                   (Benchmark, env, bench, nf)
+import Criterion                   (Benchmark, env, bench, nf, bgroup)
 import Language.Haskell.TH.Syntax  (lift)
+
+fixedBench :: Benchmark
+fixedBench = bgroup "Fixed"
+  [ fromRationalBench
+  , addBench
+  , subBench
+  , multBench
+  , multBench_wrap
+  ]
 
 smallValueR_pos :: Rational
 smallValueR_pos = $(lift (5126.889117 :: Rational))

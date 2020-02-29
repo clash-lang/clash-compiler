@@ -7,20 +7,21 @@
 
 #define WORD_SIZE_IN_BITS 64
 
-module BenchBitVector where
+module BenchUnsigned (unsignedBench) where
 
 import Data.Bits
-import Clash.Sized.BitVector
 import Clash.Class.Num
-import Clash.Prelude.BitIndex
-import GHC.TypeLits                   (type (*))
-import Criterion                      (Benchmark, env, bench, nf, bgroup)
-import Language.Haskell.TH.Syntax     (lift)
+import Clash.Class.BitPack
+import Clash.Sized.BitVector
+import Clash.Sized.Unsigned
+import Criterion                   (Benchmark, env, bench, nf, bgroup)
+import Language.Haskell.TH.Syntax  (lift)
+import GHC.TypeLits                (type (*))
 
 import BenchCommon
 
-bitVectorBench :: Benchmark
-bitVectorBench = bgroup "BitVector"
+unsignedBench :: Benchmark
+unsignedBench = bgroup "Unsigned"
   [ fromIntegerBench
   , addBench
   , addBenchL
@@ -36,12 +37,8 @@ bitVectorBench = bgroup "BitVector"
   , boundedAddBench
   , boundedSubBench
   , boundedMulBench
-  , msbBench
-  , msbBenchL
-  , appendBench
-  , appendBenchL
-  , splitBench
-  , splitBenchL
+  , packBench
+  , unpackBench
   , xorBench
   , xorBenchL
   , andBench
@@ -56,26 +53,30 @@ smallValueI :: Integer
 smallValueI = $(lift (2^(16::Int)-10 :: Integer))
 {-# INLINE smallValueI #-}
 
-smallValue1 :: BitVector WORD_SIZE_IN_BITS
-smallValue1 = $(lift (2^(16::Int)-10 :: BitVector WORD_SIZE_IN_BITS))
+smallValue1 :: Unsigned WORD_SIZE_IN_BITS
+smallValue1 = $(lift (2^(16::Int)-10 :: Unsigned WORD_SIZE_IN_BITS))
 {-# INLINE smallValue1 #-}
 
-smallValue2 :: BitVector WORD_SIZE_IN_BITS
-smallValue2 = $(lift (2^(16::Int)-100 :: BitVector WORD_SIZE_IN_BITS))
+smallValue2 :: Unsigned WORD_SIZE_IN_BITS
+smallValue2 = $(lift (2^(16::Int)-100 :: Unsigned WORD_SIZE_IN_BITS))
 {-# INLINE smallValue2 #-}
 
-largeValue1 :: BitVector (3*WORD_SIZE_IN_BITS)
-largeValue1 = $(lift (2^(2*WORD_SIZE_IN_BITS :: Int)-10 :: BitVector (3*WORD_SIZE_IN_BITS)))
+smallValueBV :: BitVector WORD_SIZE_IN_BITS
+smallValueBV = $(lift (2^(16::Int)-10 :: BitVector WORD_SIZE_IN_BITS))
+{-# INLINE smallValueBV #-}
+
+largeValue1 :: Unsigned (3*WORD_SIZE_IN_BITS)
+largeValue1 = $(lift (2^(2*WORD_SIZE_IN_BITS :: Int)-10 :: Unsigned (3*WORD_SIZE_IN_BITS)))
 {-# INLINE largeValue1 #-}
 
-largeValue2 :: BitVector (3*WORD_SIZE_IN_BITS)
-largeValue2 = $(lift (2^(2*WORD_SIZE_IN_BITS :: Int)-100 :: BitVector (3*WORD_SIZE_IN_BITS)))
+largeValue2 :: Unsigned (3*WORD_SIZE_IN_BITS)
+largeValue2 = $(lift (2^(2*WORD_SIZE_IN_BITS :: Int)-100 :: Unsigned (3*WORD_SIZE_IN_BITS)))
 {-# INLINE largeValue2 #-}
 
 fromIntegerBench :: Benchmark
 fromIntegerBench = env setup $ \m ->
   bench "fromInteger WORD_SIZE_IN_BITS" $
-  nf (fromInteger :: Integer -> BitVector WORD_SIZE_IN_BITS) m
+  nf (fromInteger :: Integer -> Unsigned WORD_SIZE_IN_BITS) m
   where
     setup = return smallValueI
 
@@ -163,41 +164,18 @@ boundedMulBench = env setup $ \m ->
   where
     setup = return (smallValue1,smallValue2)
 
-msbBench :: Benchmark
-msbBench = env setup $ \m ->
-  bench "msb# WORD_SIZE_IN_BITS" $ nf msb m
+packBench :: Benchmark
+packBench = env setup $ \m ->
+  bench "pack WORD_SIZE_IN_BITS" $ nf pack m
   where
     setup = return smallValue1
 
-msbBenchL :: Benchmark
-msbBenchL = env setup $ \m ->
-  bench "msb# (3*WORD_SIZE_IN_BITS)" $ nf msb m
+unpackBench :: Benchmark
+unpackBench = env setup $ \m ->
+  bench "unpack WORD_SIZE_IN_BITS" $
+  nf (unpack :: BitVector WORD_SIZE_IN_BITS -> Unsigned WORD_SIZE_IN_BITS) m
   where
-    setup = return largeValue1
-
-appendBench :: Benchmark
-appendBench = env setup $ \m ->
-  bench "++# WORD_SIZE_IN_BITS" $ nf (apSwapAp2 (++#) (++#)) m
-  where
-    setup = return (smallValue1,smallValue2)
-
-appendBenchL :: Benchmark
-appendBenchL = env setup $ \m ->
-  bench "++# (3*WORD_SIZE_IN_BITS)" $ nf (apSwapAp2 (++#) (++#)) m
-  where
-    setup = return (largeValue1,largeValue2)
-
-splitBench :: Benchmark
-splitBench = env setup $ \m ->
-  bench "split# WORD_SIZE_IN_BITS" $ nf (split :: BitVector WORD_SIZE_IN_BITS -> (BitVector 18, BitVector 46)) m
-  where
-    setup = return smallValue1
-
-splitBenchL :: Benchmark
-splitBenchL = env setup $ \m ->
-  bench "split# (3*WORD_SIZE_IN_BITS)" $ nf (split :: BitVector (3*WORD_SIZE_IN_BITS) -> (BitVector 18, BitVector 174)) m
-  where
-    setup = return largeValue1
+    setup = return smallValueBV
 
 xorBench :: Benchmark
 xorBench = env setup $ \m ->
