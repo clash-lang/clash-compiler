@@ -92,7 +92,7 @@ import           Clash.Netlist.BlackBox.Parser    (runParse)
 import           Clash.Netlist.BlackBox.Types     (BlackBoxTemplate, BlackBoxFunction)
 import           Clash.Netlist.Types
   (BlackBox (..), Component (..), Identifier, FilteredHWType, HWMap,
-   SomeBackend (..), TopEntityT(..), TemplateFunction)
+   SomeBackend (..), TopEntityT(..), TemplateFunction, ComponentPrefix(..))
 import           Clash.Normalize                  (checkNonRecursive, cleanupGraph,
                                                    normalize, runNormalization)
 import           Clash.Normalize.Util             (callGraph, tvSubstWithTyEq)
@@ -254,19 +254,19 @@ generateHDL reprs bindingsMap hdlState primMap tcm tupTcm typeTrans eval
             -- Prefix top names with 'p', prefix other with 'p_tname'
             Just ann ->
               let nm = p ++ ('_':t_name ann)
-              in  (nm,(Just (Data.Text.pack p),Just (Data.Text.pack nm)))
+              in  (nm,ComponentPrefix (Just (Data.Text.pack p)) (Just (Data.Text.pack nm)))
             -- Prefix top names with 'p', prefix other with 'p'
-            _ ->  (p ++ '_':modName1,(Just (Data.Text.pack p),Just (Data.Text.pack p)))
+            _ ->  (p ++ '_':modName1,ComponentPrefix (Just (Data.Text.pack p)) (Just (Data.Text.pack p)))
           | Just ann <- annM -> case hdlKind (undefined :: backend) of
               -- Prefix other with 't_name'
-              VHDL -> (t_name ann,(Nothing,Just (Data.Text.pack (t_name ann))))
-              _    -> (t_name ann,(Nothing,Nothing))
+              VHDL -> (t_name ann,ComponentPrefix Nothing (Just (Data.Text.pack (t_name ann))))
+              _    -> (t_name ann,ComponentPrefix Nothing Nothing)
         _ -> case annM of
           Just ann -> case hdlKind (undefined :: backend) of
-            VHDL -> (t_name ann, (Nothing,Nothing))
+            VHDL -> (t_name ann, ComponentPrefix Nothing Nothing)
             -- Prefix other with 't_name'
-            _    -> (t_name ann, (Nothing,Just (Data.Text.pack (t_name ann))))
-          _ -> (modName1, (Nothing,Nothing))
+            _    -> (t_name ann, ComponentPrefix Nothing (Just (Data.Text.pack (t_name ann))))
+          _ -> (modName1, ComponentPrefix Nothing Nothing)
       iw        = opt_intWidth opts
       hdlsyn    = opt_hdlSyn opts
       escpIds   = opt_escapedIds opts

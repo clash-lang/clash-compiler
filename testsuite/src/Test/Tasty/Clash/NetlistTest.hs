@@ -116,10 +116,9 @@ runToNetlistStage target f src = do
     hdlSt   = setModName (Text.pack modN) backend
     mkId1   = State.evalState mkIdentifier hdlSt
     extId   = State.evalState extendIdentifier hdlSt
-    prefixM = (Nothing, Nothing)
+    prefixM = ComponentPrefix Nothing Nothing
     ite     = ifThenElseExpr hdlSt
     seen    = HashMap.empty
     hdlDir  = fromMaybe "." (opt_hdlDir opts)
       </> Backend.name hdlSt
       </> takeWhile (/= '.') teS
-
