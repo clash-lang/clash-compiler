@@ -15,19 +15,14 @@ Basic Questions
 
 - **Q**: Is the name "Clash", "CLaSH", or "CλaSH"?
 
-  **A**: The original name "Clash" comes from the acronym "CLaSH" (prounounced:
-  "clash"), the **C**\ AES **La**\ nguage for **S**\ ynchronous **H**\ ardware
-  -- developed and maintained by the lead developer, Christiaan Baaij, at the
-  University of Twente.
+  **A**: It's **Clash**.
 
-  The acronym "CLaSH" was originally used in the libraries and source code, but
-  since the 1.0 release has moved more towards the simple name "Clash" for
-  user-facing code and documentation. See the :ref:`relnotes` for more
-  information.
-
-  The stylization "CλaSH" is an homage to Haskell_, whose official logo has
-  long been the venerable Greek *lambda* character, and graphically the name
-  "CLaSH" has often been stylized this way.
+  In its research stages Clash was called "CλaSH", an acronym for the **C**\ AES
+  **La**\ nguage for **S**\ ynchronous **H**\ ardware. CAES is a group of the
+  Faculty of Electrical Engineering, Mathematics and Computer Science at the
+  University of Twente. Clash was originally developed by Christaan Baaij and
+  supervisor Jan Kuper. The stylization "CλaSH" is an homage to Haskell_,
+  whose official logo has long been the venerable Greek *lambda* character.
 
 .. _Haskell: https://haskell.org
 
@@ -35,26 +30,23 @@ Basic Questions
 
 - **Q**: Is Clash a "high level synthesis" tool?
 
-  **A**: While clash provides a high level language, it is arguably quite low
-  level in comparison with other HDL tools. Programs written in Clash
-  correspond closely to a structural view of circuits (as opposed to
-  behavioural or higher level views). Consequently, elements of circuits like
-  clocks, routing and register usage are expressed fairly explicitly.
-
-  In contrast, many alternative HDL tools offer a behavioural view of hardware,
-  which is then used to infer a structural design of a circuit. This layer of
-  indirection allows these tools to have a greater deal of abstraction --
-  something that Clash can provide by virtue of being a functional language.
-  This arguably makes Clash a lower level HDL with a higher level of
-  abstraction.
+  **A**: While clash provides a high level language features, hardware
+  descriptions written in Clash are not decoupled from clock-level
+  timing. Clash does therefore not offer what is generally understood as
+  "high level synthesis". Compared to the big three hardware description
+  languages, *VHDL*, *Verilog*, and *SystemVerilog*, Clash arguably *is*
+  high-level. It offers many of the powerful abstractions that modern
+  software programming languages offer. In fact, it inherits many of
+  the software's industry bleeding-edge features by virtue of basing its
+  implemenation on Haskell.
 
 Clash Support
 -------------
 
 - **Q**: Is Clash production ready?
 
-  **A**: Clash is constantly evolving, although since the 1.0 release there is
-  a focus on maintaining API backwards compatibility. Clash is already used
+  **A**: Clash is constantly evolving, and since the 1.0 release there is
+  a focus on maintaining API backwards compatibility. Clash is used
   successfully in real-world scenarios, and `QBayLogic Clash support`_ can help
   with education and implementation of Clash projects.
 
@@ -110,9 +102,10 @@ Clash and Haskell
   developing hardware. While the surface syntax and typing rules are the same,
   the semantics change as code progresses through the compilation pipeline.
 
-  Do to the shared behaviour in the early stages of the compiler, components
+  Do to the shared behavior in the early stages of the compiler, components
   from GHC (the most common Haskell compiler) are reused in the Clash compiler.
-  This is how Clash achieves such high interoperability with existing Haskell.
+  This is how Clash achieves such high interoperability with existing Haskell
+  projects.
 
 ----
 
@@ -152,36 +145,40 @@ Clash and other HDL Tools
 
 - **Q**: Do I need to know existing RTL/HDL languages in order to use Clash?
 
-  .. todo:: Answer
+  **A**: Clash currently outputs VHDL, Verilog, and SystemVerilog. While it's
+  not necessary to understand these descriptions, you will need to some
+  understanding of vendor tools to actually deploy it.
 
 ----
 
 - **Q**: What's the difference between Clash and "Lava"?
 
-  .. todo:: Answer
+  **A**: Lava dialects (including the modern variant Blarney) use deep-embedding
+  (in other words, are EDSLs) instead of Clash's static analysis approach. The
+  latter has a number of advantages:
 
-----
-
-- **Q**: What's the difference between Clash and `Bluespec Verilog
-  <http://bluespec.com>`_?
-
-  .. todo:: Answer
+    1. Clash can reliably detect sharing, while observable sharing within EDSLs
+       is of a stochastic nature.
+    2. Clash allows the use normal haskell operations such as (==) on both the
+       meta-level (how the program is structured/generated), and the object-level
+       (the functionality of the program).
+    3. Clash allows the use of regular haskell syntax to model the concept of
+       'choice' at the object-level (the functionality of the program):
+       if-expressions, guards, case, etc.
+    4. Clash allows programmers to use native Haskell pattern matching.
 
 ----
 
 - **Q**: What's the difference between Clash and Chisel/Spinal, or Hardcaml?
 
-  .. todo:: Update
-
-  **A**: The most obvious difference between these two toolchains is that Clash
+  **A**: The biggest difference between these two toolchains is that Clash
   exists as a Haskell derivative, with a full synthesizing compiler to RTL --
-  while Chisel exists as an embedding of hardware semantics inside Scala. The
-  Chisel compiler does not synthesize RTL from Scala -- it synthesizes RTL from
-  an embedded DSL, constructed by a Scala program at runtime.
-
-  Aside from the "host language" differences, this means that Chisel is
-  conceptually closer to something like *Kansas Lava* than Clash -- and this
-  difference manifests in most of the same ways (other design points, aside).
+  while Chisel exists as an embedding of hardware semantics inside Scala. Aside
+  from the "host language" differences, this means that Chisel is conceptually
+  closer to something like *Lava* than Clash. Hardware descriptions in both
+  Chisel and *Lava* describe how to generate a hardware description instead of
+  describing hardware directly. As a consequence these languages do not offer
+  simulation in their host languages.
 
   Another fair point worth mentioning is that while Clash and Chisel have both
   been around for numerous years, Chisel has quite a lot more infrastructure and

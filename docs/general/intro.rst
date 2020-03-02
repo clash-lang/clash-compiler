@@ -6,7 +6,7 @@ Introduction to Clash
 Functional Hardware
 -------------------
 
-Clash_ (stylised as *Cλash*) is an open-source functional hardware description
+Clash_ is an open-source functional hardware description
 language (HDL) that closely mirrors the syntax and semantics of the Haskell_
 programming language. It is used for creating hardware designs, typically for
 running on *field programmable gate arrays* (FPGAs) or *application-specific
@@ -25,9 +25,9 @@ blurs the line between strictly behavioral or structural synthesis approaches.
 .. _Verilog: https://en.wikipedia.org/wiki/Verilog
 .. _SystemVerilog: https://en.wikipedia.org/wiki/SystemVerilog
 
-Clash aims to modernise the hardware development experience, making it easier
+Clash aims to modernize the hardware development experience, making it easier
 to quickly and correctly develop complex circuit designs. This is achieved
-by making Clash
+by making Clash:
 
 Expressive
   Clash uses the Haskell type system to its full potential -- including modern
