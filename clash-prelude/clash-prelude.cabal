@@ -55,8 +55,8 @@ Category:             Hardware
 Build-type:           Simple
 
 Extra-source-files:   README.md
-                      CHANGELOG.md
-                      AUTHORS.md
+                      CHANGELOG.rst
+                      AUTHORS.rst
 
 extra-doc-files:      doc/*.svg
 
