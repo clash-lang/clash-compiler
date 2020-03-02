@@ -130,8 +130,7 @@ data NetlistState
   , _hdlDir         :: FilePath
   , _curBBlvl       :: Int
   -- ^ The current scoping level assigned to black box contexts
-  , _componentPrefix :: (Maybe Identifier,Maybe Identifier)
-  -- ^ Prefix for top-level components, and prefix for all other components
+  , _componentPrefix :: ComponentPrefix
   , _customReprs    :: CustomReprs
   , _clashOpts      :: ClashOpts
   -- ^ Settings Clash was called with
@@ -143,6 +142,12 @@ data NetlistState
   -- ^ The current HDL backend
   , _htyCache :: HWMap
   }
+
+data ComponentPrefix
+  = ComponentPrefix
+  { componentPrefixTop :: Maybe Identifier   -- ^ Prefix for top-level components
+  , componentPrefixOther :: Maybe Identifier -- ^ Prefix for all other components
+  } deriving Show
 
 -- | Existentially quantified backend
 data SomeBackend where

@@ -1173,14 +1173,14 @@ genComponentName
   :: Bool
   -> HashMap Identifier Word
   -> (IdType -> Identifier -> Identifier)
-  -> (Maybe Identifier,Maybe Identifier)
+  -> ComponentPrefix
   -> Id
   -> Identifier
 genComponentName newInlineStrat seen mkIdFn prefixM nm =
   let nm' = Text.splitOn (Text.pack ".") (nameOcc (varName nm))
       fn  = mkIdFn Basic (stripDollarPrefixes (last nm'))
       fn' = if Text.null fn then Text.pack "Component" else fn
-      prefix = maybe id (:) (snd prefixM) (if newInlineStrat then [] else init nm')
+      prefix = maybe id (:) (componentPrefixOther prefixM) (if newInlineStrat then [] else init nm')
       nm2 = Text.concat (intersperse (Text.pack "_") (prefix ++ [fn']))
       nm3 = mkIdFn Basic nm2
   in  case HashMap.lookup nm3 seen of
@@ -1197,16 +1197,16 @@ genComponentName newInlineStrat seen mkIdFn prefixM nm =
 genTopComponentName
   :: Bool
   -> (IdType -> Identifier -> Identifier)
-  -> (Maybe Identifier,Maybe Identifier)
+  -> ComponentPrefix
   -> Maybe TopEntity
   -> Id
   -> Identifier
-genTopComponentName _oldInlineStrat _mkIdFn prefixM (Just ann) _nm =
-  case prefixM of
-    (Just p,_) -> p `Text.append` Text.pack ('_':t_name ann)
-    _          -> Text.pack (t_name ann)
-genTopComponentName oldInlineStrat mkIdFn prefixM Nothing nm =
-  genComponentName oldInlineStrat HashMap.empty mkIdFn prefixM nm
+genTopComponentName _newInlineStrat _mkIdFn prefixM (Just ann) _nm =
+  case componentPrefixTop prefixM of
+    Just p -> p `Text.append` Text.pack ('_':t_name ann)
+    _      -> Text.pack (t_name ann)
+genTopComponentName newInlineStrat mkIdFn prefixM Nothing nm =
+  genComponentName newInlineStrat HashMap.empty mkIdFn prefixM nm
 
 
 -- | Strips one or more layers of attributes from a HWType; stops at first
