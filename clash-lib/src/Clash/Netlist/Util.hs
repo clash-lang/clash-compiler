@@ -1206,7 +1206,10 @@ genTopComponentName _newInlineStrat _mkIdFn prefixM (Just ann) _nm =
     Just p -> p `Text.append` Text.pack ('_':t_name ann)
     _      -> Text.pack (t_name ann)
 genTopComponentName newInlineStrat mkIdFn prefixM Nothing nm =
-  genComponentName newInlineStrat HashMap.empty mkIdFn prefixM nm
+  genComponentName newInlineStrat HashMap.empty mkIdFn prefixM' nm
+ where
+   -- use the prefix for top-level components
+   prefixM' = prefixM{componentPrefixOther = componentPrefixTop prefixM}
 
 
 -- | Strips one or more layers of attributes from a HWType; stops at first
