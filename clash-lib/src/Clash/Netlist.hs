@@ -111,7 +111,7 @@ genNetlist
   -- ^ Seen components
   -> FilePath
   -- ^ HDL dir
-  -> (Maybe Identifier,Maybe Identifier)
+  -> ComponentPrefix
   -- ^ Component name prefix
   -> Id
   -- ^ Name of the @topEntity@
@@ -160,7 +160,7 @@ runNetlistMonad
   -- ^ Seen components
   -> FilePath
   -- ^ HDL dir
-  -> (Maybe Identifier,Maybe Identifier)
+  -> ComponentPrefix
   -- ^ Component name prefix
   -> NetlistMonad a
   -- ^ Action to run
@@ -181,7 +181,7 @@ runNetlistMonad isTb opts reprs s tops p tcm typeTrans iw mkId extId ite be seen
 
 genNames :: Bool
          -> (IdType -> Identifier -> Identifier)
-         -> (Maybe Identifier,Maybe Identifier)
+         -> ComponentPrefix
          -> HashMap Identifier Word
          -> VarEnv Identifier
          -> BindingMap
@@ -222,8 +222,8 @@ genComponentT compName componentExpr = do
   componentName1 <- (`lookupVarEnv'` compName) <$> Lens.use componentNames
   topEntMM <- fmap topAnnotation . lookupVarEnv compName <$> Lens.use topEntityAnns
   prefixM <- Lens.use componentPrefix
-  let componentName2 = case (prefixM,join topEntMM) of
-                         ((Just p,_),Just ann) -> p `StrictText.append` StrictText.pack ('_':t_name ann)
+  let componentName2 = case (componentPrefixTop prefixM, join topEntMM) of
+                         (Just p, Just ann) -> p `StrictText.append` StrictText.pack ('_':t_name ann)
                          (_,Just ann) -> StrictText.pack (t_name ann)
                          _ -> componentName1
   sp <- (bindingLoc . (`lookupVarEnv'` compName)) <$> Lens.use bindings
