@@ -1,27 +1,7 @@
 .. _refs:
 
-=============================
-References, tools, and links
-=============================
-
-The following lists include useful tools, papers, and 3rd party material for
-Clash developers and users.
-
-Useful tools
-------------
-
-- **yosys**: TODO FIXME
-
-- **iverilog**: TODO FIXME
-
-- **GHDL**: TODO FIXME
-
-- **verilator**: TODO FIXME
-
-- **arachne-pnr, icestorm**: TODO FIXME
-
-Papers
-------
+References
+==========
 
 - Appel, R.N. and Folmer, H.H. (2016) `Analysis, optimization, and design of a
   SLAM solution for an implementation on reconfigurable hardware (FPGA) using

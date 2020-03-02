@@ -1,3 +1,4 @@
 # Needed as an awkward work around to
 # https://github.com/rtfd/readthedocs.org/issues/2398
 Sphinx==2.3.0
+sphinx_rtd_theme==0.4.3
