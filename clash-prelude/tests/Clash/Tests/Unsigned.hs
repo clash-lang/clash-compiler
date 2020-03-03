@@ -27,7 +27,7 @@ tests = localOption (QuickCheckMaxRatio 2) $ testGroup "All"
   ]
 
 fromIntegerProp :: forall m. KnownNat m => Proxy m -> Integer -> Property
-fromIntegerProp p n = unsafeToInteger m === fromInteger (n `mod` (2 ^ toInteger (natVal p)))
+fromIntegerProp p n = unsafeToNatural m === fromInteger (n `mod` (2 ^ toInteger (natVal p)))
   where
     m :: Unsigned m
     m = fromInteger n

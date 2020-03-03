@@ -113,6 +113,7 @@ import           Data.Maybe            (fromMaybe, catMaybes)
 import qualified Data.Text             as Text
 import           Data.Time.Clock       (UTCTime, getCurrentTime)
 import           Data.Time.Format      (formatTime, defaultTimeLocale)
+import           GHC.Natural           (Natural)
 import           GHC.Stack             (HasCallStack)
 import           GHC.TypeLits          (KnownNat, type (+))
 import           System.IO.Unsafe      (unsafePerformIO)
@@ -125,7 +126,7 @@ import qualified Paths_clash_prelude
 
 type Period   = Int
 type Changed  = Bool
-type Value    = (Integer, Integer) -- (Mask, Value)
+type Value    = (Natural, Natural) -- (Mask, Value)
 type Width    = Int
 
 -- | Serialized TypeRep we need to store for dumpReplayable / replay

@@ -301,18 +301,19 @@ end block; ~ELSE
     , "workInfo" : "Never"
     , "kind" : "Declaration"
     , "type" :
-"setSlice# :: BitVector (m + 1 + i) -- ARG[0]
-           -> SNat m                -- ARG[1]
-           -> SNat n                -- ARG[2]
-           -> BitVector (m + 1 - n) -- ARG[3]
+"setSlice# :: SNat (m + 1 + i)
+           => BitVector (m + 1 + i) -- ARG[1]
+           -> SNat m                -- ARG[2]
+           -> SNat n                -- ARG[3]
+           -> BitVector (m + 1 - n) -- ARG[4]
            -> BitVector (m + 1 + i)"
     , "template" :
 "-- setSlice begin
-~GENSYM[setSlice][0] : process(~VAR[bv][0]~VARS[3])
+~GENSYM[setSlice][0] : process(~VAR[bv][0]~VARS[4])
   variable ~GENSYM[ivec][1] : ~TYP[0];
 begin
-  ~SYM[1] := ~ARG[0];
-  ~SYM[1](~LIT[1] downto ~LIT[2]) := ~VAR[bv][3];
+  ~SYM[1] := ~ARG[1];
+  ~SYM[1](~LIT[2] downto ~LIT[3]) := ~VAR[bv][4];
   ~RESULT <= ~SYM[1];
 end process;
 -- setSlice end"
@@ -500,22 +501,22 @@ end process;
 , { "BlackBox" :
     { "name"      : "Clash.Sized.Internal.BitVector.and#"
     , "kind"      : "Expression"
-    , "type"      : "and# :: BitVector n -> BitVector n -> BitVector n"
-    , "template"  : "~ARG[0] and ~ARG[1]"
+    , "type"      : "and# :: KnownNat n => BitVector n -> BitVector n -> BitVector n"
+    , "template"  : "~ARG[1] and ~ARG[2]"
     }
   }
 , { "BlackBox" :
     { "name"      : "Clash.Sized.Internal.BitVector.or#"
     , "kind"      : "Expression"
-    , "type"      : "or# :: BitVector n -> BitVector n -> BitVector n"
-    , "template"  : "~ARG[0] or ~ARG[1]"
+    , "type"      : "or# :: KnownNat n => BitVector n -> BitVector n -> BitVector n"
+    , "template"  : "~ARG[1] or ~ARG[2]"
     }
   }
 , { "BlackBox" :
     { "name"      : "Clash.Sized.Internal.BitVector.xor#"
     , "kind"      : "Expression"
-    , "type"      : "xor# :: BitVector n -> BitVector n -> BitVector n"
-    , "template"  : "~ARG[0] xor ~ARG[1]"
+    , "type"      : "xor# :: KnownNat n => BitVector n -> BitVector n -> BitVector n"
+    , "template"  : "~ARG[1] xor ~ARG[2]"
     }
   }
 , { "BlackBox" :
