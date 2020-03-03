@@ -285,6 +285,10 @@ import           Clash.XException               (NFDataX, deepErrorX, fromJustX)
 {- $setup
 >>> :set -XDataKinds -XTypeApplications -XFlexibleInstances -XMultiParamTypeClasses -XTypeFamilies
 >>> :set -fno-warn-deprecations
+>>> :m -Clash.Prelude
+>>> :m -Clash.Prelude.Safe
+>>> :m -Clash.Explicit.Prelude.Safe
+>>> :m -Clash.Signal
 >>> import Clash.Explicit.Prelude
 >>> import Clash.Promoted.Nat (SNat(..))
 >>> import qualified Data.List as L

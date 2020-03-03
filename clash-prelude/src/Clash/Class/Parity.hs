@@ -31,6 +31,7 @@ import Clash.Promoted.Nat             (SNat(..), snatToNum)
 
 {- $setup
 >>> import Clash.Prelude
+>>> import Clash.Class.Parity
 -}
 
 -- | Determine whether value is odd or even

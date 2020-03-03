@@ -111,8 +111,10 @@ mergeOrigins []     = []
 -- Output is ordered from least to most significant bit.
 -- Only outputs bits until the highest set bit.
 --
--- >>> map bitsToBools [0..2]
+-- @
+-- > map bitsToBools [0..2]
 -- [[],[True],[False,True]])
+-- @
 --
 -- This also works for variable sized number like Integer.
 -- But not for negative numbers, because negative Integers have infinite bits set.
