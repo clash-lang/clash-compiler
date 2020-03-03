@@ -2294,6 +2294,43 @@ reduceConstant tcm isSubj pInfo tys args mach = case primName pInfo of
            val = i .&. bitsKeep
     in reduce (mkUnsignedLit ty mTy km val)
 
+-- Conversions
+  "Clash.Sized.Internal.Unsigned.unsignedToWord"
+    | isSubj
+    , [a] <- unsignedLiterals' args
+    -> let b = Unsigned.unsignedToWord (U (fromInteger a))
+           (_,tyView -> TyConApp wordTcNm []) = splitFunForallTy ty
+           (Just wordTc) = lookupUniqMap wordTcNm tcm
+           [wordDc] = tyConDataCons wordTc
+       in  reduce (mkApps (Data wordDc) [Left (Literal (WordLiteral (toInteger b)))])
+
+  "Clash.Sized.Internal.Unsigned.unsigned8toWord8"
+    | isSubj
+    , [a] <- unsignedLiterals' args
+    -> let b = Unsigned.unsigned8toWord8 (U (fromInteger a))
+           (_,tyView -> TyConApp wordTcNm []) = splitFunForallTy ty
+           (Just wordTc) = lookupUniqMap wordTcNm tcm
+           [wordDc] = tyConDataCons wordTc
+       in  reduce (mkApps (Data wordDc) [Left (Literal (WordLiteral (toInteger b)))])
+
+  "Clash.Sized.Internal.Unsigned.unsigned16toWord16"
+    | isSubj
+    , [a] <- unsignedLiterals' args
+    -> let b = Unsigned.unsigned16toWord16 (U (fromInteger a))
+           (_,tyView -> TyConApp wordTcNm []) = splitFunForallTy ty
+           (Just wordTc) = lookupUniqMap wordTcNm tcm
+           [wordDc] = tyConDataCons wordTc
+       in  reduce (mkApps (Data wordDc) [Left (Literal (WordLiteral (toInteger b)))])
+
+  "Clash.Sized.Internal.Unsigned.unsigned32toWord32"
+    | isSubj
+    , [a] <- unsignedLiterals' args
+    -> let b = Unsigned.unsigned32toWord32 (U (fromInteger a))
+           (_,tyView -> TyConApp wordTcNm []) = splitFunForallTy ty
+           (Just wordTc) = lookupUniqMap wordTcNm tcm
+           [wordDc] = tyConDataCons wordTc
+       in  reduce (mkApps (Data wordDc) [Left (Literal (WordLiteral (toInteger b)))])
+
   "Clash.Annotations.BitRepresentation.Deriving.dontApplyInHDL"
     | isSubj
     , f : a : _ <- args
