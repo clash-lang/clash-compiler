@@ -158,9 +158,11 @@ module Clash.Signal
   , HiddenClock
   , hideClock
   , exposeClock
-  , exposeSpecificClock
   , withClock
+#ifdef CLASH_MULTIPLE_HIDDEN
+  , exposeSpecificClock
   , withSpecificClock
+#endif
   , hasClock
     -- ** Hidden reset
   , HiddenReset
