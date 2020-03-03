@@ -16,7 +16,7 @@ module Clash.Prelude.BitIndex where
 import GHC.TypeLits                   (KnownNat, type (+), type (-))
 
 import Clash.Class.BitPack            (BitPack (..))
-import Clash.Promoted.Nat             (SNat)
+import Clash.Promoted.Nat             (SNat (..))
 import Clash.Sized.Internal.BitVector (BitVector, Bit, index#, lsb#, msb#,
                                        replaceBit#, setSlice#, slice#, split#)
 
@@ -117,7 +117,7 @@ replaceBit i b v = unpack (replaceBit# (pack v) (fromEnum i) b)
 --       In an equation for ‘it’: it = setSlice d6 d5 0 (- 5 :: Signed 6)
 setSlice :: (BitPack a, BitSize a ~ ((m + 1) + i)) => SNat m -> SNat n
          -> BitVector (m + 1 - n) -> a -> a
-setSlice m n w v = unpack (setSlice# (pack v) m n w)
+setSlice m n w v = unpack (setSlice# SNat (pack v) m n w)
 
 {-# INLINE msb #-}
 -- | Get the most significant bit.

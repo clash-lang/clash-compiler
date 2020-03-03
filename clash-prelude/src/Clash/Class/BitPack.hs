@@ -55,7 +55,7 @@ import Clash.Class.BitPack.Internal   (deriveBitPackTuples)
 import Clash.Class.Resize             (zeroExtend, resize)
 import Clash.Sized.BitVector          (Bit, BitVector, (++#))
 import Clash.Sized.Internal.BitVector
-  (pack#, split#, checkUnpackUndef, undefined#, unpack#, unsafeToInteger)
+  (pack#, split#, checkUnpackUndef, undefined#, unpack#, unsafeToNatural)
 import Clash.XException
 
 {- $setup
@@ -239,7 +239,7 @@ packFloat# = fromIntegral . floatToWord
 {-# NOINLINE packFloat# #-}
 
 unpackFloat# :: BitVector 32 -> Float
-unpackFloat# = wordToFloat . fromInteger . unsafeToInteger
+unpackFloat# (unsafeToNatural -> w) = wordToFloat (fromIntegral w)
 {-# NOINLINE unpackFloat# #-}
 
 instance BitPack Double where
@@ -252,7 +252,7 @@ packDouble# = fromIntegral . doubleToWord
 {-# NOINLINE packDouble# #-}
 
 unpackDouble# :: BitVector 64 -> Double
-unpackDouble# = wordToDouble . fromInteger . unsafeToInteger
+unpackDouble# (unsafeToNatural -> w) = wordToDouble (fromIntegral w)
 {-# NOINLINE unpackDouble# #-}
 
 instance BitPack CUShort where
