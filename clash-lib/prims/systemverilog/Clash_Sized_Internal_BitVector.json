@@ -21,16 +21,17 @@ end
     , "workInfo" : "Never"
     , "kind" : "Declaration"
     , "type" :
-"setSlice# :: BitVector (m + 1 + i) -- ARG[0]
-           -> SNat m                -- ARG[1]
-           -> SNat n                -- ARG[2]
-           -> BitVector (m + 1 - n) -- ARG[3]
+"setSlice# :: SNat (m + 1 + i)
+           -> BitVector (m + 1 + i) -- ARG[1]
+           -> SNat m                -- ARG[2]
+           -> SNat n                -- ARG[3]
+           -> BitVector (m + 1 - n) -- ARG[4]
            -> BitVector (m + 1 + i)"
     , "template" :
 "// setSlice begin
 always_comb begin
-  ~RESULT = ~ARG[0];
-  ~RESULT[~LIT[1] : ~LIT[2]] = ~ARG[3];
+  ~RESULT = ~ARG[1];
+  ~RESULT[~LIT[2] : ~LIT[3]] = ~ARG[4];
 end
 // setSlice end"
     }

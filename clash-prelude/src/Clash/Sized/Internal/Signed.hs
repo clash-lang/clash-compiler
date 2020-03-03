@@ -5,6 +5,7 @@ License    :  BSD2 (see the file LICENSE)
 Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
 -}
 
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE DeriveAnyClass #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE TemplateHaskell #-}
@@ -87,6 +88,13 @@ import Data.Default.Class             (Default (..))
 import Data.Proxy                     (Proxy (..))
 import Text.Read                      (Read (..), ReadPrec)
 import GHC.Generics                   (Generic)
+import GHC.Natural                    (naturalFromInteger)
+#if MIN_VERSION_base(4,12,0)
+import GHC.Natural                    (naturalToInteger)
+#else
+import Clash.Sized.Internal.Mod       (naturalToInteger)
+#endif
+
 import GHC.TypeLits                   (KnownNat, Nat, type (+), natVal)
 import GHC.TypeLits.Extra             (Max)
 import Language.Haskell.TH            (TypeQ, appT, conT, litT, numTyLit, sigE)
@@ -181,13 +189,14 @@ instance KnownNat n => BitPack (Signed n) where
 {-# NOINLINE pack# #-}
 pack# :: forall n . KnownNat n => Signed n -> BitVector n
 pack# (S i) = let m = 1 `shiftL` fromInteger (natVal (Proxy @n))
-              in  if i < 0 then BV 0 (m + i) else BV 0 i
+              in  if i < 0 then BV 0 (naturalFromInteger (m + i)) else BV 0 (naturalFromInteger i)
 
 {-# NOINLINE unpack# #-}
 unpack# :: forall n . KnownNat n => BitVector n -> Signed n
 unpack# (BV 0 i) =
   let m = 1 `shiftL` fromInteger (natVal (Proxy @n) - 1)
-  in  if i >= m then S (i-2*m) else S i
+      n = naturalToInteger i
+  in  if n >= m then S (n-2*m) else S n
 unpack# bv = undefError "Signed.unpack" [bv]
 
 instance Eq (Signed n) where
@@ -236,12 +245,27 @@ instance KnownNat n => Enum (Signed n) where
 {-# NOINLINE enumFromThenTo# #-}
 enumFrom#       :: forall n. KnownNat n => Signed n -> [Signed n]
 enumFromThen#   :: forall n. KnownNat n => Signed n -> Signed n -> [Signed n]
-enumFromTo#     :: Signed n -> Signed n -> [Signed n]
-enumFromThenTo# :: Signed n -> Signed n -> Signed n -> [Signed n]
-enumFrom# x             = map fromInteger_INLINE [unsafeToInteger x .. unsafeToInteger (maxBound :: Signed n)]
-enumFromThen# x y       = map fromInteger_INLINE [unsafeToInteger x, unsafeToInteger y .. unsafeToInteger (maxBound :: Signed n)]
-enumFromTo# x y         = map S [unsafeToInteger x .. unsafeToInteger y]
-enumFromThenTo# x1 x2 y = map S [unsafeToInteger x1, unsafeToInteger x2 .. unsafeToInteger y]
+enumFromTo#     :: forall n. KnownNat n => Signed n -> Signed n -> [Signed n]
+enumFromThenTo# :: forall n. KnownNat n => Signed n -> Signed n -> Signed n -> [Signed n]
+enumFrom# x = map (fromInteger_INLINE sz mB mask) [unsafeToInteger x .. unsafeToInteger (maxBound :: Signed n)]
+  where sz   = fromInteger (natVal (Proxy @n)) - 1
+        mB   = 1 `shiftL` sz
+        mask = mB - 1
+
+enumFromThen# x y = map (fromInteger_INLINE sz mB mask) [unsafeToInteger x, unsafeToInteger y .. unsafeToInteger (maxBound :: Signed n)]
+  where sz   = fromInteger (natVal (Proxy @n)) - 1
+        mB   = 1 `shiftL` sz
+        mask = mB - 1
+
+enumFromTo# x y = map (fromInteger_INLINE sz mB mask) [unsafeToInteger x .. unsafeToInteger y]
+  where sz   = fromInteger (natVal (Proxy @n)) - 1
+        mB   = 1 `shiftL` sz
+        mask = mB - 1
+
+enumFromThenTo# x1 x2 y = map (fromInteger_INLINE sz mB mask) [unsafeToInteger x1, unsafeToInteger x2 .. unsafeToInteger y]
+  where sz   = fromInteger (natVal (Proxy @n)) - 1
+        mB   = 1 `shiftL` sz
+        mask = mB - 1
 
 
 instance KnownNat n => Bounded (Signed n) where
@@ -267,43 +291,69 @@ instance KnownNat n => Num (Signed n) where
 
 (+#), (-#), (*#) :: forall n . KnownNat n => Signed n -> Signed n -> Signed n
 {-# NOINLINE (+#) #-}
-(S a) +# (S b) = let m  = 1 `shiftL` fromInteger (natVal (Proxy @n) -1)
-                     z  = a + b
-                 in  if z >= m then S (z - 2*m) else
-                        if z < negate m then S (z + 2*m) else S z
+(+#) =
+  \(S a) (S b) ->
+    let z = a + b
+    in  if z >= m then
+          S (z - 2*m)
+        else if z < negate m then
+          S (z + 2*m)
+        else
+          S z
+ where
+  m = 1 `shiftL` fromInteger (natVal (Proxy @n) -1)
 
 {-# NOINLINE (-#) #-}
-(S a) -# (S b) = let m  = 1 `shiftL` fromInteger (natVal (Proxy @n) -1)
-                     z  = a - b
-                 in  if z < negate m then S (z + 2*m) else
-                        if z >= m then S (z - 2*m) else S z
+(-#) =
+  \(S a) (S b) ->
+    let z = a - b
+    in  if z < negate m then
+          S (z + 2*m)
+        else if z >= m then
+          S (z - 2*m)
+        else
+          S z
+ where
+  m  = 1 `shiftL` fromInteger (natVal (Proxy @n) -1)
 
 {-# NOINLINE (*#) #-}
-(S a) *# (S b) = fromInteger_INLINE (a * b)
+(*#) = \(S a) (S b) -> fromInteger_INLINE sz mB mask (a * b)
+  where sz   = fromInteger (natVal (Proxy @n)) - 1
+        mB   = 1 `shiftL` sz
+        mask = mB - 1
 
 negate#,abs# :: forall n . KnownNat n => Signed n -> Signed n
 {-# NOINLINE negate# #-}
-negate# (S n) = let m = 1 `shiftL` fromInteger (natVal (Proxy @n) -1)
-                    z = negate n
-                in  if z == m then S n else S z
+negate# =
+  \(S n) ->
+    let z = negate n
+    in  if z == m then S n else S z
+ where
+  m = 1 `shiftL` fromInteger (natVal (Proxy @n) -1)
 
 {-# NOINLINE abs# #-}
-abs# (S n) = let m = 1 `shiftL` fromInteger (natVal (Proxy @n) -1)
-                 z = abs n
-             in  if z == m then S n else S z
+abs# =
+  \(S n) ->
+    let z = abs n
+    in  if z == m then S n else S z
+ where
+  m = 1 `shiftL` fromInteger (natVal (Proxy @n) -1)
 
 {-# NOINLINE fromInteger# #-}
-fromInteger# :: KnownNat n => Integer -> Signed (n :: Nat)
-fromInteger# = fromInteger_INLINE
+fromInteger# :: forall n . KnownNat n => Integer -> Signed (n :: Nat)
+fromInteger# = fromInteger_INLINE sz mB mask
+  where sz   = fromInteger (natVal (Proxy @n)) - 1
+        mB   = 1 `shiftL` sz
+        mask = mB - 1
 
 {-# INLINE fromInteger_INLINE #-}
-fromInteger_INLINE :: forall n . KnownNat n => Integer -> Signed n
-fromInteger_INLINE i = if mask == 0 then S 0 else S res
-  where
-    mask = 1 `shiftL` fromInteger (natVal (Proxy @n) -1)
-    res  = case divMod i mask of
-             (s,i') | even s    -> i'
-                    | otherwise -> i' - mask
+fromInteger_INLINE :: Int -> Integer -> Integer -> Integer -> Signed n
+fromInteger_INLINE sz mb mask =
+  \i -> let i1 = i .&. mask
+            i2 = case i `shiftR` sz of
+                   q | q .&. 1 == 0 -> i1
+                     | otherwise    -> i1 - mb
+        in  if mb == 0 then S 0 else S i2
 
 instance ExtendingNum (Signed m) (Signed n) where
   type AResult (Signed m) (Signed n) = Signed (Max m n + 1)
@@ -375,48 +425,94 @@ instance KnownNat n => Bits (Signed n) where
   rotateR v i       = rotateR# v i
   popCount s        = popCount (pack# s)
 
-and#,or#,xor# :: KnownNat n => Signed n -> Signed n -> Signed n
+and#,or#,xor# :: forall n . KnownNat n => Signed n -> Signed n -> Signed n
 {-# NOINLINE and# #-}
-and# (S a) (S b) = fromInteger_INLINE (a .&. b)
+and# = \(S a) (S b) -> fromInteger_INLINE sz mB mask (a .&. b)
+  where sz   = fromInteger (natVal (Proxy @n)) - 1
+        mB   = 1 `shiftL` sz
+        mask = mB - 1
+
 {-# NOINLINE or# #-}
-or# (S a) (S b)  = fromInteger_INLINE (a .|. b)
+or# = \(S a) (S b) -> fromInteger_INLINE sz mB mask (a .|. b)
+  where sz   = fromInteger (natVal (Proxy @n)) - 1
+        mB   = 1 `shiftL` sz
+        mask = mB - 1
+
 {-# NOINLINE xor# #-}
-xor# (S a) (S b) = fromInteger_INLINE (xor a b)
+xor# = \(S a) (S b) -> fromInteger_INLINE sz mB mask (xor a b)
+  where sz   = fromInteger (natVal (Proxy @n)) - 1
+        mB   = 1 `shiftL` sz
+        mask = mB - 1
 
 {-# NOINLINE complement# #-}
-complement# :: KnownNat n => Signed n -> Signed n
-complement# (S a) = fromInteger_INLINE (complement a)
+complement# :: forall n . KnownNat n => Signed n -> Signed n
+complement# = \(S a) -> fromInteger_INLINE sz mB mask (complement a)
+  where sz   = fromInteger (natVal (Proxy @n)) - 1
+        mB   = 1 `shiftL` sz
+        mask = mB - 1
 
-shiftL#,shiftR#,rotateL#,rotateR# :: KnownNat n => Signed n -> Int -> Signed n
+shiftL#,shiftR#,rotateL#,rotateR# :: forall n . KnownNat n => Signed n -> Int -> Signed n
 {-# NOINLINE shiftL# #-}
-shiftL# _ b | b < 0  = error "'shiftL undefined for negative numbers"
-shiftL# (S n) b      = fromInteger_INLINE (shiftL n b)
-{-# NOINLINE shiftR# #-}
-shiftR# _ b | b < 0  = error "'shiftR undefined for negative numbers"
-shiftR# (S n) b      = fromInteger_INLINE (shiftR n b)
-{-# NOINLINE rotateL# #-}
-rotateL# _ b | b < 0 = error "'shiftL undefined for negative numbers"
-rotateL# s@(S n) b   = fromInteger_INLINE (l .|. r)
-  where
-    l    = shiftL n b'
-    r    = shiftR n b'' .&. mask
-    mask = 2 ^ b' - 1
+shiftL# =
+  \(S n) b ->
+    if b >= 0 then
+      fromInteger_INLINE sz mB mask (shiftL n b)
+    else
+      error "'shiftL' undefined for negative numbers"
+ where
+  sz   = fromInteger (natVal (Proxy @n)) - 1
+  mB   = 1 `shiftL` sz
+  mask = mB - 1
 
-    b'   = b `mod` sz
-    b''  = sz - b'
-    sz   = fromInteger (natVal s)
+{-# NOINLINE shiftR# #-}
+shiftR# =
+  \(S n) b ->
+    if b >= 0 then
+      fromInteger_INLINE sz mB mask (shiftR n b)
+    else
+      error "'shiftR' undefined for negative numbers"
+ where
+  sz   = fromInteger (natVal (Proxy @n)) - 1
+  mB   = 1 `shiftL` sz
+  mask = mB - 1
+
+{-# NOINLINE rotateL# #-}
+rotateL# =
+  \(S n) b ->
+    if b >= 0 then
+      let l    = shiftL n b'
+          r    = shiftR n b'' .&. mask
+          mask = 2 ^ b' - 1
+
+          b'   = b `mod` sz
+          b''  = sz - b'
+      in  fromInteger_INLINE sz1 mB maskM (l .|. r)
+    else
+      error "'rotateL undefined for negative numbers"
+ where
+  sz    = fromInteger (natVal (Proxy @n))
+  sz1   = sz-1
+  mB    = 1 `shiftL` sz1
+  maskM = mB - 1
 
 {-# NOINLINE rotateR# #-}
-rotateR# _ b | b < 0 = error "'shiftR undefined for negative numbers"
-rotateR# s@(S n) b   = fromInteger_INLINE (l .|. r)
-  where
-    l    = shiftR n b' .&. mask
-    r    = shiftL n b''
-    mask = 2 ^ b'' - 1
+rotateR# =
+  \(S n) b ->
+    if b >= 0 then
+      let l    = shiftR n b' .&. mask
+          r    = shiftL n b''
+          mask = 2 ^ b'' - 1
 
-    b'  = b `mod` sz
-    b'' = sz - b'
-    sz  = fromInteger (natVal s)
+          b'  = b `mod` sz
+          b'' = sz - b'
+      in  fromInteger_INLINE sz1 mB maskM (l .|. r)
+    else
+      error "'rotateR' undefined for negative numbers"
+ where
+  sz    = fromInteger (natVal (Proxy @n))
+  sz1   = sz - 1
+  mB    = 1 `shiftL` sz1
+  maskM = mB - 1
 
 instance KnownNat n => FiniteBits (Signed n) where
   finiteBitSize        = size#
@@ -445,8 +541,11 @@ resize# s@(S i) | n' <= m'  = extended
                    else S i'
 
 {-# NOINLINE truncateB# #-}
-truncateB# :: KnownNat m => Signed (m + n) -> Signed m
-truncateB# (S n) = fromInteger_INLINE n
+truncateB# :: forall m n . KnownNat m => Signed (m + n) -> Signed m
+truncateB# = \(S n) -> fromInteger_INLINE sz mB mask n
+  where sz   = fromInteger (natVal (Proxy @m)) - 1
+        mB   = 1 `shiftL` sz
+        mask = mB - 1
 
 instance KnownNat n => Default (Signed n) where
   def = fromInteger# 0

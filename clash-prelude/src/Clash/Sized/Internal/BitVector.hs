@@ -6,7 +6,9 @@ License    :  BSD2 (see the file LICENSE)
 Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
 -}
 
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE DeriveAnyClass #-}
+{-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE TypeFamilies #-}
@@ -131,7 +133,15 @@ import Data.Proxy                 (Proxy (..))
 import Data.Typeable              (Typeable, typeOf)
 import GHC.Generics               (Generic)
 import Data.Maybe                 (fromMaybe)
-import GHC.Integer                (smallInteger)
+import GHC.Exts
+  (Word#, Word (W#), eqWord#, int2Word#, uncheckedShiftRL#)
+import qualified GHC.Exts
+import GHC.Integer.GMP.Internals  (Integer (..), bigNatToWord, shiftRBigNat)
+import GHC.Natural
+  (Natural (..), naturalFromInteger, wordToNatural)
+#if MIN_VERSION_base(4,12,0)
+import GHC.Natural                (naturalToInteger)
+#endif
 import GHC.Prim                   (dataToTag#)
 import GHC.Stack                  (HasCallStack, withFrozenCallStack)
 import GHC.TypeLits               (KnownNat, Nat, type (+), type (-), natVal)
@@ -149,6 +159,8 @@ import Clash.Promoted.Nat
   (SNat (..), SNatLE (..), compareSNat, snatToInteger, snatToNum)
 import Clash.XException
   (ShowX (..), NFDataX (..), errorX, isX, showsPrecXWith, rwhnfX)
+
+import Clash.Sized.Internal.Mod
 
 import {-# SOURCE #-} qualified Clash.Sized.Vector         as V
 import {-# SOURCE #-} qualified Clash.Sized.Internal.Index as I
@@ -169,8 +181,8 @@ import                qualified Data.List                  as L
 data BitVector (n :: Nat) =
     -- | The constructor, 'BV', and  the field, 'unsafeToInteger', are not
     -- synthesizable.
-    BV { unsafeMask      :: !Integer
-       , unsafeToInteger :: !Integer
+    BV { unsafeMask      :: !Natural
+       , unsafeToNatural :: !Natural
        }
   deriving (Data, Generic)
 
@@ -180,8 +192,8 @@ data BitVector (n :: Nat) =
 data Bit =
   -- | The constructor, 'Bit', and  the field, 'unsafeToInteger#', are not
   -- synthesizable.
-  Bit { unsafeMask#      :: !Integer
-      , unsafeToInteger# :: !Integer
+  Bit { unsafeMask#      :: {-# unpack #-} !Word
+      , unsafeToInteger# :: {-# unpack #-} !Word
       }
   deriving (Data, Generic)
 
@@ -218,7 +230,7 @@ instance NFDataX Bit where
   hasUndefined bv = isLeft (isX bv) || unsafeMask# bv /= 0
 
 instance Lift Bit where
-  lift (Bit m i) = [| fromInteger## m i |]
+  lift (Bit m i) = [| fromInteger## $(litE (WordPrimL (toInteger m))) i |]
   {-# NOINLINE lift #-}
 
 instance Eq Bit where
@@ -250,7 +262,7 @@ le## b1 b2 = le# (pack# b1) (pack# b2)
 {-# NOINLINE le## #-}
 
 instance Enum Bit where
-  toEnum     = fromInteger## 0 . toInteger
+  toEnum     = fromInteger## 0## . toInteger
   fromEnum b = if eq## b low then 0 else 1
 
 instance Bounded Bit where
@@ -267,10 +279,10 @@ instance Num Bit where
   negate      = complement##
   abs         = id
   signum b    = b
-  fromInteger = fromInteger## 0
+  fromInteger = fromInteger## 0##
 
-fromInteger## :: Integer -> Integer -> Bit
-fromInteger## m i = Bit (m `mod` 2) (i `mod` 2)
+fromInteger## :: Word# -> Integer -> Bit
+fromInteger## m# i = Bit ((W# m#) `mod` 2) (fromInteger i `mod` 2)
 {-# NOINLINE fromInteger## #-}
 
 instance Real Bit where
@@ -311,26 +323,33 @@ instance FiniteBits Bit where
   countTrailingZeros b = if eq## b low then 1 else 0
 
 and##, or##, xor## :: Bit -> Bit -> Bit
-and## b1 b2 = unpack# $ and# (pack# b1) (pack# b2)
+and## (Bit m1 v1) (Bit m2 v2) = Bit mask (v1 .&. v2 .&. complement mask)
+  where mask = (m1.&.v2 .|. m1.&.m2 .|. m2.&.v1)
 {-# NOINLINE and## #-}
 
-or## b1 b2 = unpack# $ or# (pack# b1) (pack# b2)
+or## (Bit m1 v1) (Bit m2 v2) = Bit mask ((v1 .|. v2) .&. complement mask)
+  where mask = m1 .&. complement v2 .|.  m1.&.m2  .|.  m2 .&. complement v1
 {-# NOINLINE or## #-}
 
-xor## b1 b2 = unpack# $ xor# (pack# b1) (pack# b2)
+xor## (Bit m1 v1) (Bit m2 v2) = Bit mask ((v1 `xor` v2) .&. complement mask)
+  where mask = m1 .|. m2
 {-# NOINLINE xor## #-}
 
 complement## :: Bit -> Bit
-complement## = unpack# . complement# . pack#
+complement## (Bit m v) = Bit m (complementB v .&. complementB m)
+  where complementB (W# b#) = W# (int2Word# (eqWord# b# 0##))
 {-# NOINLINE complement## #-}
 
 -- *** BitPack
 pack# :: Bit -> BitVector 1
-pack# (Bit m b) = BV m b
+pack# (Bit (W# m) (W# b)) = BV (NatS# m) (NatS# b)
 {-# NOINLINE pack# #-}
 
 unpack# :: BitVector 1 -> Bit
-unpack# (BV m b) = Bit m b
+unpack# (BV m b) = Bit (go m) (go b)
+ where
+  go (NatS# w) = W# w
+  go (NatJ# w) = W# (bigNatToWord w)
 {-# NOINLINE unpack# #-}
 
 -- * Instances
@@ -388,13 +407,16 @@ instance NFDataX (BitVector n) where
 -- >>> $$(bLit "1.0.") :: BitVector 4
 -- 1.0.
 bLit :: forall n. KnownNat n => String -> Q (TExp (BitVector n))
-bLit s = [|| fromInteger# m i ||]
+bLit s = [|| fromInteger# m i1 ||]
   where
     bv :: BitVector n
     bv = read# s
 
-    m,i :: Integer
+    m,i :: Natural
     BV m i = bv
+
+    i1 :: Integer
+    i1 = toInteger i
 
 read# :: KnownNat n => String -> BitVector n
 read# cs = BV m v
@@ -462,24 +484,24 @@ instance KnownNat n => Enum (BitVector n) where
 {-# NOINLINE enumFromThenTo# #-}
 enumFrom#       :: forall n. KnownNat n => BitVector n -> [BitVector n]
 enumFromThen#   :: forall n. KnownNat n => BitVector n -> BitVector n -> [BitVector n]
-enumFromTo#     :: KnownNat n => BitVector n -> BitVector n -> [BitVector n]
-enumFromThenTo# :: KnownNat n => BitVector n -> BitVector n -> BitVector n -> [BitVector n]
+enumFromTo#     :: forall n. KnownNat n => BitVector n -> BitVector n -> [BitVector n]
+enumFromThenTo# :: forall n. KnownNat n => BitVector n -> BitVector n -> BitVector n -> [BitVector n]
 
-enumFrom# (BV 0 x)                           = map (fromInteger_INLINE 0) [x .. unsafeToInteger (maxBound :: BitVector n)]
-enumFrom# bv
-  = undefErrorU "enumFrom" bv
+enumFrom# (BV 0 x) = map (BV 0 . (`mod` m)) [x .. unsafeToNatural (maxBound :: BitVector n)]
+  where m = 1 `shiftL` fromInteger (natVal (Proxy @n))
+enumFrom# bv = undefErrorU "enumFrom" bv
 
-enumFromThen# (BV 0 x) (BV 0 y)              = map (fromInteger_INLINE 0) [x, y .. unsafeToInteger (maxBound :: BitVector n)]
-enumFromThen# bv1 bv2
-  = undefErrorP "enumFromThen" bv1 bv2
+enumFromThen# (BV 0 x) (BV 0 y) = map (BV 0 . (`mod` m)) [x, y .. unsafeToNatural (maxBound :: BitVector n)]
+  where m = 1 `shiftL` fromInteger (natVal (Proxy @n))
+enumFromThen# bv1 bv2 = undefErrorP "enumFromThen" bv1 bv2
 
-enumFromTo# (BV 0 x) (BV 0 y)                = map (BV 0) [x .. y]
-enumFromTo# bv1 bv2
-  = undefErrorP "enumFromTo" bv1 bv2
+enumFromTo# (BV 0 x) (BV 0 y) = map (BV 0 . (`mod` m)) [x .. y]
+  where m = 1 `shiftL` fromInteger (natVal (Proxy @n))
+enumFromTo# bv1 bv2 = undefErrorP "enumFromTo" bv1 bv2
 
-enumFromThenTo# (BV 0 x1) (BV 0 x2) (BV 0 y) = map (BV 0) [x1, x2 .. y]
-enumFromThenTo# bv1 bv2 bv3
-  = undefErrorP3 "enumFromTo" bv1 bv2 bv3
+enumFromThenTo# (BV 0 x1) (BV 0 x2) (BV 0 y) = map (BV 0 . (`mod` m)) [x1, x2 .. y]
+  where m = 1 `shiftL` fromInteger (natVal (Proxy @n))
+enumFromThenTo# bv1 bv2 bv3 = undefErrorP3 "enumFromTo" bv1 bv2 bv3
 
 
 instance KnownNat n => Bounded (BitVector n) where
@@ -506,40 +528,45 @@ instance KnownNat n => Num (BitVector n) where
 
 (+#),(-#),(*#) :: forall n . KnownNat n => BitVector n -> BitVector n -> BitVector n
 {-# NOINLINE (+#) #-}
-(+#) (BV 0 i) (BV 0 j) =
-  let m = 1 `shiftL` fromInteger (natVal (Proxy @n))
-      z = i + j
-  in  if z >= m then BV 0 (z - m) else BV 0 z
-(+#) bv1 bv2 = undefErrorI "+" bv1 bv2
+(+#) = go
+  where
+    go (BV 0 i) (BV 0 j) = BV 0 (addMod m i j)
+    go bv1 bv2 = undefErrorI "+" bv1 bv2
+
+    m = 1 `shiftL` fromInteger (natVal (Proxy @n))
 
 {-# NOINLINE (-#) #-}
-(-#) (BV 0 i) (BV 0 j) =
-  let m = 1 `shiftL` fromInteger (natVal (Proxy @n))
-      z = i - j
-  in  if z < 0 then BV 0 (m + z) else BV 0 z
-(-#) bv1 bv2 = undefErrorI "-" bv1 bv2
+(-#) = go
+  where
+    go (BV 0 i) (BV 0 j) = BV 0 (subMod m i j)
+    go bv1 bv2 = undefErrorI "-" bv1 bv2
+
+    m = 1 `shiftL` fromInteger (natVal (Proxy @n))
 
 {-# NOINLINE (*#) #-}
-(*#) (BV 0 i) (BV 0 j) = fromInteger_INLINE 0 (i * j)
-(*#) bv1 bv2 = undefErrorI "*" bv1 bv2
+(*#) = go
+ where
+  go (BV 0 i) (BV 0 j) = BV 0 (mulMod2 m i j)
+  go bv1 bv2 = undefErrorI "*" bv1 bv2
+
+  m = (1 `shiftL` fromInteger (natVal (Proxy @n))) - 1
 
 {-# NOINLINE negate# #-}
 negate# :: forall n . KnownNat n => BitVector n -> BitVector n
-negate# (BV 0 0) = BV 0 0
-negate# (BV 0 i) = BV 0 (sz - i)
-  where
-    sz = 1 `shiftL` fromInteger (natVal (Proxy @n))
-negate# bv = undefErrorU "negate" bv
+negate# = go
+ where
+  go (BV 0 i) = BV 0 (negateMod m i)
+  go bv = undefErrorU "negate" bv
+
+  m = 1 `shiftL` fromInteger (natVal (Proxy @n))
 
 {-# NOINLINE fromInteger# #-}
-fromInteger# :: KnownNat n => Integer -> Integer -> BitVector n
-fromInteger# = fromInteger_INLINE
-
-{-# INLINE fromInteger_INLINE #-}
-fromInteger_INLINE :: forall n . KnownNat n => Integer -> Integer -> BitVector n
-fromInteger_INLINE m i = sz `seq` BV (m `mod` sz) (i `mod` sz)
+fromInteger# :: KnownNat n => Natural -> Integer -> BitVector n
+fromInteger# m i = sz `seq` mx
   where
-    sz = 1 `shiftL` fromInteger (natVal (Proxy @n))
+    mx = BV (m `mod` naturalFromInteger sz)
+            (naturalFromInteger (i `mod` sz))
+    sz  = 1 `shiftL` fromInteger (natVal mx) :: Integer
 
 instance (KnownNat m, KnownNat n) => ExtendingNum (BitVector m) (BitVector n) where
   type AResult (BitVector m) (BitVector n) = BitVector (Max m n + 1)
@@ -551,22 +578,22 @@ instance (KnownNat m, KnownNat n) => ExtendingNum (BitVector m) (BitVector n) wh
 {-# NOINLINE plus# #-}
 plus# :: (KnownNat m, KnownNat n) => BitVector m -> BitVector n -> BitVector (Max m n + 1)
 plus# (BV 0 a) (BV 0 b) = BV 0 (a + b)
-plus# bv1 bv2 = undefErrorP "plus" bv1 bv2
+plus# bv1 bv2 = undefErrorP "add" bv1 bv2
 
 {-# NOINLINE minus# #-}
 minus# :: forall m n . (KnownNat m, KnownNat n) => BitVector m -> BitVector n
                                                 -> BitVector (Max m n + 1)
-minus# (BV 0 a) (BV 0 b) =
-  let sz   = fromInteger (natVal (Proxy @(Max m n + 1)))
-      mask = 1 `shiftL` sz
-      z    = a - b
-  in  if z < 0 then BV 0 (mask + z) else BV 0 z
-minus# bv1 bv2 = undefErrorP "minus" bv1 bv2
+minus# = go
+ where
+  go (BV 0 a) (BV 0 b) = BV 0 (subMod m a b)
+  go bv1 bv2 = undefErrorP "sub" bv1 bv2
+
+  m = 1 `shiftL` fromInteger (natVal (Proxy @(Max m n + 1)))
 
 {-# NOINLINE times# #-}
 times# :: (KnownNat m, KnownNat n) => BitVector m -> BitVector n -> BitVector (m + n)
 times# (BV 0 a) (BV 0 b) = BV 0 (a * b)
-times# bv1 bv2 = undefErrorP "times" bv1 bv2
+times# bv1 bv2 = undefErrorP "mul" bv1 bv2
 
 instance KnownNat n => Real (BitVector n) where
   toRational = toRational . toInteger#
@@ -590,7 +617,7 @@ rem# bv1 bv2 = undefErrorP "rem" bv1 bv2
 
 {-# NOINLINE toInteger# #-}
 toInteger# :: KnownNat n => BitVector n -> Integer
-toInteger# (BV 0 i) = i
+toInteger# (BV 0 i) = naturalToInteger i
 toInteger# bv = undefErrorU "toInteger" bv
 
 instance KnownNat n => Bits (BitVector n) where
@@ -628,7 +655,7 @@ countTrailingZerosBV = V.foldl (\l r -> if eq## r low then 1 + l else 0) 0 . V.b
 
 {-# NOINLINE reduceAnd# #-}
 reduceAnd# :: KnownNat n => BitVector n -> Bit
-reduceAnd# bv@(BV 0 i) = Bit 0 (smallInteger (dataToTag# check))
+reduceAnd# bv@(BV 0 i) = Bit 0 (W# (int2Word# (dataToTag# check)))
   where
     check = i == maxI
 
@@ -638,14 +665,14 @@ reduceAnd# bv = V.foldl (.&.) 1 (V.bv2v bv)
 
 {-# NOINLINE reduceOr# #-}
 reduceOr# :: KnownNat n => BitVector n -> Bit
-reduceOr# (BV 0 i) = Bit 0 (smallInteger (dataToTag# check))
+reduceOr# (BV 0 i) = Bit 0 (W# (int2Word# (dataToTag# check)))
   where
     check = i /= 0
 reduceOr# bv = V.foldl (.|.) 0 (V.bv2v bv)
 
 {-# NOINLINE reduceXor# #-}
 reduceXor# :: KnownNat n => BitVector n -> Bit
-reduceXor# (BV 0 i) = Bit 0 (toInteger (popCount i `mod` 2))
+reduceXor# (BV 0 i) = Bit 0 (fromIntegral (popCount i `mod` 2))
 reduceXor# bv = undefErrorU "reduceXor" bv
 
 instance Default (BitVector n) where
@@ -665,8 +692,8 @@ maxIndex# bv = fromInteger (natVal bv) - 1
 {-# NOINLINE index# #-}
 index# :: KnownNat n => BitVector n -> Int -> Bit
 index# bv@(BV m v) i
-    | i >= 0 && i < sz = Bit (smallInteger (dataToTag# (testBit m i)))
-                             (smallInteger (dataToTag# (testBit v i)))
+    | i >= 0 && i < sz = Bit (W# (int2Word# (dataToTag# (testBit m i))))
+                             (W# (int2Word# (dataToTag# (testBit v i))))
     | otherwise        = err
   where
     sz  = fromInteger (natVal bv)
@@ -681,15 +708,18 @@ index# bv@(BV m v) i
 -- | MSB
 msb# :: forall n . KnownNat n => BitVector n -> Bit
 msb# (BV m v)
-  = let i = fromInteger (natVal (Proxy @n) - 1)
-    in  Bit (smallInteger (dataToTag# (testBit m i)))
-            (smallInteger (dataToTag# (testBit v i)))
+  = Bit (msbN m)
+        (msbN v)
+ where
+  !(S# i#) = natVal (Proxy @n)
+  msbN (NatS# w)  = W# (w `uncheckedShiftRL#` (i# GHC.Exts.-# 1#))
+  msbN (NatJ# bn) = W# (bigNatToWord (shiftRBigNat bn (i# GHC.Exts.-# 1#)))
 
 {-# NOINLINE lsb# #-}
 -- | LSB
 lsb# :: BitVector n -> Bit
-lsb# (BV m v) = Bit (smallInteger (dataToTag# (testBit m 0)))
-                    (smallInteger (dataToTag# (testBit v 0)))
+lsb# (BV m v) = Bit (W# (int2Word# (dataToTag# (testBit m 0))))
+                    (W# (int2Word# (dataToTag# (testBit v 0))))
 
 {-# NOINLINE slice# #-}
 slice# :: BitVector (m + 1 + i) -> SNat m -> SNat n -> BitVector (m + 1 - n)
@@ -717,7 +747,7 @@ slice# (BV msk i) m n = BV (shiftR (msk .&. mask) n')
 {-# NOINLINE replaceBit# #-}
 replaceBit# :: KnownNat n => BitVector n -> Int -> Bit -> BitVector n
 replaceBit# bv@(BV m v) i (Bit mb b)
-    | i >= 0 && i < sz = BV (clearBit m i  .|. (mb `shiftL` i))
+    | i >= 0 && i < sz = BV (clearBit m i  .|. (wordToNatural mb `shiftL` i))
                             (if testBit b 0 && mb == 0 then setBit v i else clearBit v i)
     | otherwise        = err
   where
@@ -731,20 +761,24 @@ replaceBit# bv@(BV m v) i (Bit mb b)
 
 {-# NOINLINE setSlice# #-}
 setSlice#
-  :: BitVector (m + 1 + i)
+  :: forall m i n
+   . SNat (m + 1 + i)
+  -> BitVector (m + 1 + i)
   -> SNat m
   -> SNat n
   -> BitVector (m + 1 - n)
   -> BitVector (m + 1 + i)
-setSlice# (BV iMask i) m n (BV jMask j) = BV ((iMask .&. mask) .|. jMask')
-                                             ((i     .&. mask) .|. j')
-  where
-    m' = snatToInteger m
-    n' = snatToInteger n
+setSlice# SNat =
+  \(BV iMask i) m@SNat n (BV jMask j) ->
+    let m' = snatToInteger m
+        n' = snatToInteger n
 
-    j'     = shiftL j     (fromInteger n')
-    jMask' = shiftL jMask (fromInteger n')
-    mask = complement ((2 ^ (m' + 1) - 1) `xor` (2 ^ n' - 1))
+        j'     = shiftL j     (fromInteger n')
+        jMask' = shiftL jMask (fromInteger n')
+        mask   = complementN ((2 ^ (m' + 1) - 1) `xor` (2 ^ n' - 1))
+    in  BV ((iMask .&. mask) .|. jMask') ((i .&. mask) .|. j')
+ where
+  complementN = complementMod (natVal (Proxy @(m + 1 + i)))
 
 {-# NOINLINE split# #-}
 split#
@@ -764,35 +798,48 @@ split# (BV m i) = (BV lMask l, BV rMask r)
     lMask = m `shiftR` n
 
 
-and#, or#, xor# :: BitVector n -> BitVector n -> BitVector n
+and#, or#, xor# :: forall n . KnownNat n => BitVector n -> BitVector n -> BitVector n
 {-# NOINLINE and# #-}
-and# (BV m1 v1) (BV m2 v2) = BV mask (v1 .&. v2  .&. complement mask)
+and# =
+  \(BV m1 v1) (BV m2 v2) ->
+    let mask = (m1.&.v2 .|. m1.&.m2 .|. m2.&.v1)
+    in  BV mask (v1 .&. v2  .&. complementN mask)
   where
-    mask = (m1.&.v2 .|. m1.&.m2 .|. m2.&.v1)
+    complementN = complementMod (natVal (Proxy @n))
 
 {-# NOINLINE or# #-}
-or# (BV m1 v1) (BV m2 v2) = BV mask ((v1.|.v2) .&. complement mask)
+or# =
+  \(BV m1 v1) (BV m2 v2) ->
+    let mask = m1 .&. complementN v2  .|.  m1.&.m2  .|.  m2 .&. complementN v1
+    in  BV mask ((v1.|.v2) .&. complementN mask)
   where
-    mask = m1 .&. complement v2  .|.  m1.&.m2  .|.  m2 .&. complement v1
+    complementN = complementMod (natVal (Proxy @n))
 
 {-# NOINLINE xor# #-}
-xor# (BV m1 v1) (BV m2 v2) = BV mask ((v1 `xor` v2) .&. complement mask)
+xor# =
+  \(BV m1 v1) (BV m2 v2) ->
+    let mask  = m1 .|. m2
+    in  BV mask ((v1 `xor` v2) .&. complementN mask)
   where
-    mask = m1 .|. m2
-
+    complementN = complementMod (natVal (Proxy @n))
 
 {-# NOINLINE complement# #-}
-complement# :: KnownNat n => BitVector n -> BitVector n
-complement# (BV m v) = fromInteger_INLINE m (complement v .&. complement m)
+complement# :: forall n . KnownNat n => BitVector n -> BitVector n
+complement# = \(BV m v) -> BV m (complementN v .&. complementN m)
+  where complementN = complementMod (natVal (Proxy @n))
 
 shiftL#, shiftR#, rotateL#, rotateR#
-  :: KnownNat n => BitVector n -> Int -> BitVector n
+  :: forall n . KnownNat n => BitVector n -> Int -> BitVector n
 
 {-# NOINLINE shiftL# #-}
-shiftL# (BV m v) i
-  | i < 0     = error
-              $ "'shiftL undefined for negative number: " ++ show i
-  | otherwise = fromInteger_INLINE (shiftL m i) (shiftL v i)
+shiftL# =
+  \(BV msk v) i ->
+    if i >= 0 then
+      BV ((shiftL msk i) `mod` m) ((shiftL v i) `mod` m)
+    else
+      error ("'shiftL' undefined for negative number: " ++ show i)
+ where
+  m = 1 `shiftL` fromInteger (natVal (Proxy @n))
 
 {-# NOINLINE shiftR# #-}
 shiftR# (BV m v) i
@@ -801,31 +848,40 @@ shiftR# (BV m v) i
   | otherwise = BV (shiftR m i) (shiftR v i)
 
 {-# NOINLINE rotateL# #-}
-rotateL# _ b | b < 0   = error "'shiftL undefined for negative numbers"
-rotateL# bv@(BV m v) b = fromInteger_INLINE (ml .|. mr) (vl .|. vr)
-  where
-    vl    = shiftL v b'
-    vr    = shiftR v b''
+rotateL# =
+  \(BV msk v) b ->
+    if b >= 0 then
+      let vl    = shiftL v b'
+          vr    = shiftR v b''
 
-    ml    = shiftL m b'
-    mr    = shiftR m b''
+          ml    = shiftL msk b'
+          mr    = shiftR msk b''
 
-    b'   = b `mod` sz
-    b''  = sz - b'
-    sz   = fromInteger (natVal bv)
+          b'   = b `mod` sz
+          b''  = sz - b'
+      in  BV ((ml .|. mr) `mod` m) ((vl .|. vr) `mod` m)
+    else
+      error "'rotateL' undefined for negative numbers"
+ where
+  sz = fromInteger (natVal (Proxy @n)) :: Int
+  m  = 1 `shiftL` sz
 
 {-# NOINLINE rotateR# #-}
-rotateR# _ b | b < 0   = error "'shiftR undefined for negative numbers"
-rotateR# bv@(BV m v) b = fromInteger_INLINE (ml .|. mr) (vl .|. vr)
-  where
-    vl   = shiftR v b'
-    vr   = shiftL v b''
-    ml   = shiftR m b'
-    mr   = shiftL m b''
-
-    b'  = b `mod` sz
-    b'' = sz - b'
-    sz  = fromInteger (natVal bv)
+rotateR# =
+  \(BV msk v) b ->
+    if b >= 0 then
+      let vl   = shiftR v b'
+          vr   = shiftL v b''
+          ml   = shiftR msk b'
+          mr   = shiftL msk b''
+          b'   = b `mod` sz
+          b''  = sz - b'
+      in  BV ((ml .|. mr) `mod` m) ((vl .|. vr) `mod` m)
+    else
+      error "'rotateR' undefined for negative numbers"
+ where
+  sz = fromInteger (natVal (Proxy @n)) :: Int
+  m  = 1 `shiftL` sz
 
 popCountBV :: forall n . KnownNat n => BitVector (n+1) -> I.Index (n+2)
 popCountBV bv =
@@ -846,11 +902,12 @@ resizeBV = case compareSNat @n @m (SNat @n) (SNat @m) of
 {-# INLINE resizeBV #-}
 
 truncateB# :: forall a b . KnownNat a => BitVector (a + b) -> BitVector a
-truncateB# (BV msk i) = fromInteger_INLINE msk i
+truncateB# = \(BV msk i) -> BV (msk `mod` m) (i `mod` m)
+  where m = 1 `shiftL` fromInteger (natVal (Proxy @a))
 {-# NOINLINE truncateB# #-}
 
 instance KnownNat n => Lift (BitVector n) where
-  lift bv@(BV m i) = sigE [| fromInteger# m i |] (decBitVector (natVal bv))
+  lift bv@(BV m i) = sigE [| fromInteger# m $(litE (IntegerL (toInteger i))) |] (decBitVector (natVal bv))
   {-# NOINLINE lift #-}
 
 decBitVector :: Integer -> TypeQ
@@ -980,16 +1037,18 @@ undefined# =
 -- False
 --
 -- __NB__: Not synthesizable
-isLike :: BitVector n -> BitVector n -> Bool
-isLike (BV cMask c) (BV eMask e) = e' == c' && e' == c''
-  where
-    -- | set don't care bits to 0
-    e' = e .&. complement eMask
-
-    -- | checked with undefined bits set to 0
-    c' = (c .&. complement cMask) .&. complement eMask
-    -- | checked with undefined bits set to 1
-    c'' = (c .|. cMask) .&. complement eMask
+isLike :: forall n . KnownNat n => BitVector n -> BitVector n -> Bool
+isLike =
+  \(BV cMask c) (BV eMask e) ->
+        -- set don't care bits to 0
+    let e' = e .&. complementN eMask
+        -- checked with undefined bits set to 0
+        c' = (c .&. complementN cMask) .&. complementN eMask
+        -- checked with undefined bits set to 1
+        c'' = (c .|. cMask) .&. complementN eMask
+    in  e' == c' && e' == c''
+ where
+  complementN = complementMod (natVal (Proxy @n))
 {-# NOINLINE isLike #-}
 
 fromBits :: [Bit] -> Integer

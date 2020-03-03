@@ -270,6 +270,7 @@ Library
 
                       Clash.Sized.Internal.BitVector
                       Clash.Sized.Internal.Index
+                      Clash.Sized.Internal.Mod
                       Clash.Sized.Internal.Signed
                       Clash.Sized.Internal.Unsigned
 
