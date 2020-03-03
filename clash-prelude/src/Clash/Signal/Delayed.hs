@@ -58,6 +58,8 @@ import           Clash.XException              (NFDataX)
 
 {- $setup
 >>> :set -XDataKinds -XTypeOperators -XTypeApplications -XFlexibleContexts
+>>> :m -Clash.Explicit.Prelude
+>>> :m -Clash.Explicit.Prelude.Safe
 >>> import Clash.Prelude
 >>> let delay3 = delayed (-1 :> -1 :> -1 :> Nil)
 >>> let delay2 = delayedI :: HiddenClockResetEnable dom  => Int -> DSignal dom n Int -> DSignal dom (n + 2) Int

@@ -63,6 +63,9 @@ import Clash.XException      (ShowX (..), XException)
 
 {- $setup
 >>> :set -XTemplateHaskell -XDataKinds -XTypeFamilies
+>>> :m -Clash.Prelude
+>>> :m -Clash.Prelude.Safe
+>>> :m -Clash.Prelude.Testbench
 >>> import Clash.Explicit.Prelude
 >>> let testInput clk rst = stimuliGenerator clk rst $(listToVecTH [(1::Int),3..21])
 >>> let expectedOutput clk rst = outputVerifier' clk rst $(listToVecTH ([70,99,2,3,4,5,7,8,9,10]::[Int]))

@@ -157,6 +157,7 @@ import                qualified Data.List                  as L
 {- $setup
 >>> :set -XTemplateHaskell
 >>> :set -XBinaryLiterals
+>>> import Clash.Sized.Internal.BitVector
 -}
 
 -- * Type definitions

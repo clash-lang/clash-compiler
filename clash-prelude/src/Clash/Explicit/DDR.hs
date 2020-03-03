@@ -37,14 +37,25 @@ import Clash.Annotations.Primitive    (hasBlackBox)
 import Clash.Explicit.Prelude
 import Clash.Signal.Internal
 
+{- $setup
+>>> :set -XNoImplicitPrelude -XTypeFamilies -XFlexibleInstances
+>>> import Clash.Explicit.Prelude
+>>> import Clash.Explicit.DDR
+>>> :{
+instance KnownDomain "Fast" where
+  type KnownConf "Fast" = 'DomainConfiguration "Fast" 5000 'Rising 'Asynchronous 'Defined 'ActiveHigh
+  knownDomain = SDomainConfiguration SSymbol SNat SRising SAsynchronous SDefined SActiveHigh
+:}
+
+-}
 
 -- | DDR input primitive
 --
 -- Consumes a DDR input signal and produces a regular signal containing a pair
 -- of values.
 --
--- >>> printX $ sampleN 5 $ ddrIn systemClockGen resetGen enableGen (-1,-2,-3) (fromList [0..10])
--- [(X,X),((-1),(-2)),((-3),2),(3,4),(5,6)]
+-- >>> printX $ sampleN 5 $ ddrIn systemClockGen systemResetGen enableGen (-1,-2,-3) (fromList [0..10] :: Signal "Fast" Int)
+-- [(-1,-2),(-1,-2),(-3,2),(3,4),(5,6)]
 ddrIn
   :: ( HasCallStack
      , NFDataX a
@@ -129,7 +140,7 @@ ddrIn# (Clock _) (unsafeToHighPolarity -> hRst) (fromEnable -> ena) i0 i1 i2 =
 --
 -- Produces a DDR output signal from a normal signal of pairs of input.
 --
--- >>> sampleN 7 $ ddrOut systemClockGen asyncResetGen (-1) (fromList [(0,1),(2,3),(4,5)])
+-- >>> sampleN 7 (ddrOut systemClockGen systemResetGen enableGen (-1) (fromList [(0,1),(2,3),(4,5)]) :: Signal "Fast" Int)
 -- [-1,-1,-1,2,3,4,5]
 ddrOut
   :: ( HasCallStack
