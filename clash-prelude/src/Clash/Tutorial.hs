@@ -89,6 +89,9 @@ import Data.Default.Class
 
 {- $setup
 >>> :set -XTemplateHaskell -XDataKinds -XConstraintKinds -XTypeApplications
+>>> :m -Clash.Explicit.Prelude
+>>> import Clash.Prelude
+>>> import Clash.Explicit.Testbench
 >>> :{
 let ma :: Num a => a -> (a, a) -> a
     ma acc (x,y) = acc + x * y
@@ -123,13 +126,13 @@ let sortVL xs = map fst sorted :< (snd (last sorted))
 
 >>> let mac = mealy macT 0
 >>> :{
-topEntity
-  :: Clock System
-  -> Reset System
-  -> Enable System
-  -> Signal System (Signed 9, Signed 9)
-  -> Signal System (Signed 9)
-topEntity = exposeClockResetEnable mac
+let topEntity
+      :: Clock System
+      -> Reset System
+      -> Enable System
+      -> Signal System (Signed 9, Signed 9)
+      -> Signal System (Signed 9)
+    topEntity = exposeClockResetEnable mac
 :}
 
 >>> :{

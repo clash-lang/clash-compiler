@@ -31,6 +31,8 @@ import           Clash.XException                     (NFDataX)
 
 {- $setup
 >>> :set -XDataKinds -XTypeApplications
+>>> :m -Clash.Explicit.Prelude
+>>> :m -Clash.Explicit.Prelude.Safe
 >>> import Clash.Prelude
 >>> :{
 let macT s (x,y) = x * y + s
