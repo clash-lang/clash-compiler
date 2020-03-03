@@ -3,7 +3,7 @@
 FROM ubuntu:18.04
 
 ENV \
-  NIX_VERSION=2.3.1 \
+  NIX_VERSION=2.3.3 \
   PREFIX=/usr \
   ROOT=/usr/nix \
   STORE=/usr/nix/store \
@@ -32,9 +32,8 @@ RUN apt update \
          --home /var/empty$i \
          --gecos "Nix build user $i" \
          --uid $((30000 + i)) \
-         nixbld$i; \
+         nixbld$i && adduser nixbld$i nixbld; \
      done \
-  && adduser nixbld$i nixbld \
   && mkdir -p -m 0755 $PREFIX/etc/nix \
   && mkdir -m 0755 $ROOT  \
   && cd nix-$NIX_VERSION \
