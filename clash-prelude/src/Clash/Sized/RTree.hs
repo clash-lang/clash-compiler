@@ -82,6 +82,8 @@ import Clash.XException
 >>> :set -XUndecidableInstances
 >>> import Clash.Prelude
 >>> import Data.Kind
+>>> import Data.Singletons.Prelude (Apply, TyFun)
+>>> import Data.Proxy
 >>> data IIndex (f :: TyFun Nat Type) :: Type
 >>> type instance Apply IIndex l = Index ((2^l)+1)
 >>> :{

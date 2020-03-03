@@ -97,6 +97,10 @@ import Clash.Promoted.Nat         (SNat(..), snatToNum, leToPlusKN)
 import Clash.XException
   (ShowX (..), NFDataX (..), errorX, showsPrecXWith, rwhnfX)
 
+{- $setup
+>>> import Clash.Sized.Internal.Index
+-}
+
 -- | Arbitrary-bounded unsigned integer represented by @ceil(log_2(n))@ bits.
 --
 -- Given an upper bound @n@, an 'Index' @n@ number has a range of: [0 .. @n@-1]

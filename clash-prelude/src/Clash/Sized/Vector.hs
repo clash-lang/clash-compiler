@@ -145,6 +145,7 @@ import Clash.XException
 >>> :set -fplugin GHC.TypeLits.Normalise
 >>> import Clash.Prelude
 >>> import Data.Kind
+>>> import Data.Proxy
 >>> let compareSwapL a b = if a < b then (a,b) else (b,a)
 >>> :{
 let sortV xs = map fst sorted :< (snd (last sorted))
