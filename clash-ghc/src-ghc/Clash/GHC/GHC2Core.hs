@@ -78,7 +78,7 @@ import Literal    (LitNumType (..))
 import Module     (moduleName, moduleNameString)
 import Name       (Name, nameModule_maybe,
                    nameOccName, nameUnique, getSrcSpan)
-import PrelNames  (tYPETyConKey)
+import PrelNames  (tYPETyConKey, integerTyConKey, naturalTyConKey)
 import OccName    (occNameString)
 import Outputable (showPpr)
 import Pair       (Pair (..))
@@ -417,10 +417,9 @@ coreToTerm primMap unlocs = term
     term' (Cast e co) = do
       let (Pair ty1 ty2) = coercionKind co
       hasPrimCoM <- hasPrimCo co
-      ty1_I <- isIntegerTy ty1
-      ty2_I <- isIntegerTy ty2
+      sizedCast <- isSizedCast ty1 ty2
       case hasPrimCoM of
-        Just _ | ty1_I || ty2_I
+        Just _ | sizedCast
           -> C.Cast <$> term e <*> coreToType ty1 <*> coreToType ty2
         _ -> term e
     term' (Tick (SourceNote rsp _) e) =
@@ -565,11 +564,23 @@ addUsefullR x m =
   then RWS.local (const x) m
   else m
 
-isIntegerTy :: Type -> C2C Bool
-isIntegerTy (TyConApp tc []) = do
-  tcNm <- qualifiedNameString (tyConName tc)
-  return (tcNm == "GHC.Integer.Type.Integer")
-isIntegerTy _ = return False
+isSizedCast :: Type -> Type -> C2C Bool
+isSizedCast (TyConApp tc1 _) (TyConApp tc2 _) = do
+  tc1Nm <- qualifiedNameString (tyConName tc1)
+  tc2Nm <- qualifiedNameString (tyConName tc2)
+  return
+    (or [tc1 `hasKey` integerTyConKey &&
+          or [tc2Nm == "Clash.Sized.Internal.Signed.Signed"
+             ,tc2Nm == "Clash.Sized.Internal.Index.Index"]
+        ,tc2 `hasKey` integerTyConKey &&
+          or [tc1Nm == "Clash.Sized.Internal.Signed.Signed"
+             ,tc1Nm == "Clash.Sized.Internal.Index.Index"]
+        ,tc1 `hasKey` naturalTyConKey &&
+          tc2Nm == "Clash.Sized.Internal.Unsigned.Unsigned"
+        ,tc2 `hasKey` naturalTyConKey &&
+          tc1Nm == "Clash.Sized.Internal.Unsigned.Unsigned"
+        ])
+isSizedCast _ _ = return False
 
 hasPrimCo :: Coercion -> C2C (Maybe Type)
 hasPrimCo (TyConAppCo _ _ coers) = do

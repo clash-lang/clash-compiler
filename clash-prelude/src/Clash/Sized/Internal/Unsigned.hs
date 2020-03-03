@@ -5,6 +5,7 @@ License    :  BSD2 (see the file LICENSE)
 Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
 -}
 
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE DeriveAnyClass #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE TemplateHaskell #-}
@@ -80,11 +81,14 @@ import Data.Default.Class             (Default (..))
 import Data.Proxy                     (Proxy (..))
 import Text.Read                      (Read (..), ReadPrec)
 import GHC.Generics                   (Generic)
+import GHC.Natural                    (Natural (..), naturalFromInteger)
+#if MIN_VERSION_base(4,12,0)
+import GHC.Natural                    (naturalToInteger)
+#endif
 import GHC.TypeLits                   (KnownNat, Nat, type (+), natVal)
 import GHC.TypeLits.Extra             (Max)
 import Language.Haskell.TH            (TypeQ, appT, conT, litT, numTyLit, sigE)
 import Language.Haskell.TH.Syntax     (Lift(..))
-import Numeric.Natural                (Natural)
 import Test.QuickCheck.Arbitrary      (Arbitrary (..), CoArbitrary (..),
                                        arbitraryBoundedIntegral,
                                        coarbitraryIntegral)
@@ -98,6 +102,7 @@ import Clash.Prelude.BitIndex         ((!), msb, replaceBit, split)
 import Clash.Prelude.BitReduction     (reduceOr)
 import Clash.Sized.Internal.BitVector (BitVector (BV), Bit, high, low, undefError)
 import qualified Clash.Sized.Internal.BitVector as BV
+import Clash.Sized.Internal.Mod
 import Clash.XException
   (ShowX (..), NFDataX (..), errorX, showsPrecXWith, rwhnfX)
 
@@ -135,7 +140,7 @@ import Clash.XException
 newtype Unsigned (n :: Nat) =
     -- | The constructor, 'U', and the field, 'unsafeToInteger', are not
     -- synthesizable.
-    U { unsafeToInteger :: Integer }
+    U { unsafeToNatural :: Natural }
   deriving (Data, Generic)
 
 {-# NOINLINE size# #-}
@@ -145,7 +150,7 @@ size# u = fromInteger (natVal u)
 instance NFData (Unsigned n) where
   rnf (U i) = rnf i `seq` ()
   {-# NOINLINE rnf #-}
-  -- NOINLINE is needed so that Clash doesn't trip on the "Unsigned ~# Integer"
+  -- NOINLINE is needed so that Clash doesn't trip on the "Unsigned ~# Natural"
   -- coercion
 
 instance Show (Unsigned n) where
@@ -223,12 +228,16 @@ instance KnownNat n => Enum (Unsigned n) where
 {-# NOINLINE enumFromThenTo# #-}
 enumFrom#       :: forall n. KnownNat n => Unsigned n -> [Unsigned n]
 enumFromThen#   :: forall n. KnownNat n => Unsigned n -> Unsigned n -> [Unsigned n]
-enumFromTo#     :: Unsigned n -> Unsigned n -> [Unsigned n]
-enumFromThenTo# :: Unsigned n -> Unsigned n -> Unsigned n -> [Unsigned n]
-enumFrom# x             = map fromInteger_INLINE [unsafeToInteger x .. unsafeToInteger (maxBound :: Unsigned n)]
-enumFromThen# x y       = map fromInteger_INLINE [unsafeToInteger x, unsafeToInteger y .. unsafeToInteger (maxBound :: Unsigned n)]
-enumFromTo# x y         = map U [unsafeToInteger x .. unsafeToInteger y]
-enumFromThenTo# x1 x2 y = map U [unsafeToInteger x1, unsafeToInteger x2 .. unsafeToInteger y]
+enumFromTo#     :: forall n. KnownNat n => Unsigned n -> Unsigned n -> [Unsigned n]
+enumFromThenTo# :: forall n. KnownNat n => Unsigned n -> Unsigned n -> Unsigned n -> [Unsigned n]
+enumFrom# = \x -> map (U . (`mod` m)) [unsafeToNatural x .. unsafeToNatural (maxBound :: Unsigned n)]
+  where m = 1 `shiftL` fromInteger (natVal (Proxy @n))
+enumFromThen# = \x y -> map (U . (`mod` m)) [unsafeToNatural x, unsafeToNatural y .. unsafeToNatural (maxBound :: Unsigned n)]
+  where m = 1 `shiftL` fromInteger (natVal (Proxy @n))
+enumFromTo# = \x y -> map (U . (`mod` m)) [unsafeToNatural x .. unsafeToNatural y]
+  where m = 1 `shiftL` fromInteger (natVal (Proxy @n))
+enumFromThenTo# = \x1 x2 y -> map (U . (`mod` m)) [unsafeToNatural x1, unsafeToNatural x2 .. unsafeToNatural y]
+  where m = 1 `shiftL` fromInteger (natVal (Proxy @n))
 
 instance KnownNat n => Bounded (Unsigned n) where
   minBound = minBound#
@@ -254,34 +263,27 @@ instance KnownNat n => Num (Unsigned n) where
 
 (+#),(-#),(*#) :: forall n . KnownNat n => Unsigned n -> Unsigned n -> Unsigned n
 {-# NOINLINE (+#) #-}
-(+#) (U i) (U j) = let m = 1 `shiftL` fromInteger (natVal (Proxy @n))
-                       z = i + j
-                   in  if z >= m then U (z - m) else U z
+(+#) = \(U i) (U j) -> U (addMod m i j)
+  where m = 1 `shiftL` fromInteger (natVal (Proxy @n))
 
 {-# NOINLINE (-#) #-}
-(-#) (U i) (U j) = let m = 1 `shiftL` fromInteger (natVal (Proxy @n))
-                       z = i - j
-                   in  if z < 0 then U (m + z) else U z
+(-#) = \(U i) (U j) -> U (subMod m i j)
+  where m = 1 `shiftL` fromInteger (natVal (Proxy @n))
 
 {-# NOINLINE (*#) #-}
-(*#) (U i) (U j) = fromInteger_INLINE (i * j)
+(*#) = \(U i) (U j) -> U (mulMod2 m i j)
+  where m = (1 `shiftL` fromInteger (natVal (Proxy @n))) - 1
 
 {-# NOINLINE negate# #-}
 negate# :: forall n . KnownNat n => Unsigned n -> Unsigned n
-negate# (U 0) = U 0
-negate# (U i) = sz `seq` U (sz - i)
-  where
-    sz = 1 `shiftL` fromInteger (natVal (Proxy @n))
+negate# = \(U i) -> U (negateMod m i)
+  where m = 1 `shiftL` fromInteger (natVal (Proxy @n))
 
 {-# NOINLINE fromInteger# #-}
-fromInteger# :: KnownNat n => Integer -> Unsigned n
-fromInteger# = fromInteger_INLINE
-
-{-# INLINE fromInteger_INLINE #-}
-fromInteger_INLINE :: forall n . KnownNat n => Integer -> Unsigned n
-fromInteger_INLINE i = U (i `mod` sz)
-  where
-    sz = 1 `shiftL` fromInteger (natVal (Proxy @n))
+fromInteger# :: forall n . KnownNat n => Integer -> Unsigned n
+fromInteger# = \x -> U (naturalFromInteger (x `mod` m))
+ where
+  m = 1 `shiftL` fromInteger (natVal (Proxy @n))
 
 instance (KnownNat m, KnownNat n) => ExtendingNum (Unsigned m) (Unsigned n) where
   type AResult (Unsigned m) (Unsigned n) = Unsigned (Max m n + 1)
@@ -297,11 +299,10 @@ plus# (U a) (U b) = U (a + b)
 {-# NOINLINE minus# #-}
 minus# :: forall m n . (KnownNat m, KnownNat n) => Unsigned m -> Unsigned n
                                                 -> Unsigned (Max m n + 1)
-minus# (U a) (U b) =
-  let sz   = fromInteger (natVal (Proxy @(Max m n + 1)))
-      mask = 1 `shiftL` sz
-      z    = a - b
-  in  if z < 0 then U (mask + z) else U z
+minus# = \(U a) (U b) -> U (subMod mask a b)
+ where
+  sz   = fromInteger (natVal (Proxy @(Max m n + 1)))
+  mask = 1 `shiftL` sz
 
 {-# NOINLINE times# #-}
 times# :: Unsigned m -> Unsigned n -> Unsigned (m + n)
@@ -327,7 +328,7 @@ rem# (U i) (U j) = U (i `rem` j)
 
 {-# NOINLINE toInteger# #-}
 toInteger# :: Unsigned n -> Integer
-toInteger# (U i) = i
+toInteger# (U i) = naturalToInteger i
 
 instance KnownNat n => Parity (Unsigned n) where
   even = even . pack
@@ -366,15 +367,20 @@ xor# :: Unsigned n -> Unsigned n -> Unsigned n
 xor# (U v1) (U v2) = U (v1 `xor` v2)
 
 {-# NOINLINE complement# #-}
-complement# :: KnownNat n => Unsigned n -> Unsigned n
-complement# (U i) = fromInteger_INLINE (complement i)
+complement# :: forall n . KnownNat n => Unsigned n -> Unsigned n
+complement# = \(U i) -> U (complementN i)
+  where complementN = complementMod (natVal (Proxy @n))
 
-shiftL#, shiftR#, rotateL#, rotateR# :: KnownNat n => Unsigned n -> Int -> Unsigned n
+shiftL#, shiftR#, rotateL#, rotateR# :: forall n .KnownNat n => Unsigned n -> Int -> Unsigned n
 {-# NOINLINE shiftL# #-}
-shiftL# (U v) i
-  | i < 0     = error
-              $ "'shiftL undefined for negative number: " ++ show i
-  | otherwise = fromInteger_INLINE (shiftL v i)
+shiftL# =
+  \(U v) i ->
+    if i >= 0 then
+      U ((shiftL v i) `mod` m)
+    else
+      error ("'shiftL undefined for negative number: " ++ show i)
+ where
+  m = 1 `shiftL` fromInteger (natVal (Proxy @n))
 
 {-# NOINLINE shiftR# #-}
 -- shiftR# doesn't need the KnownNat constraint
@@ -386,26 +392,34 @@ shiftR# (U v) i
   | otherwise = U (shiftR v i)
 
 {-# NOINLINE rotateL# #-}
-rotateL# _ b | b < 0 = error "'shiftL undefined for negative numbers"
-rotateL# bv@(U n) b   = fromInteger_INLINE (l .|. r)
+rotateL# =
+  \(U n) b ->
+    if b >= 0 then
+      let l   = shiftL n b'
+          r   = shiftR n b''
+          b'  = b `mod` sz
+          b'' = sz - b'
+      in  U ((l .|. r) `mod` m)
+    else
+      error "'rotateL undefined for negative numbers"
   where
-    l    = shiftL n b'
-    r    = shiftR n b''
-
-    b'   = b `mod` sz
-    b''  = sz - b'
-    sz   = fromInteger (natVal bv)
+    sz = fromInteger (natVal (Proxy @n)) :: Int
+    m  = 1 `shiftL` sz
 
 {-# NOINLINE rotateR# #-}
-rotateR# _ b | b < 0 = error "'shiftR undefined for negative numbers"
-rotateR# bv@(U n) b   = fromInteger_INLINE (l .|. r)
+rotateR# =
+  \(U n) b ->
+    if b >= 0 then
+      let l   = shiftR n b'
+          r   = shiftL n b''
+          b'  = b `mod` sz
+          b'' = sz - b'
+      in  U ((l .|. r) `mod` m)
+    else
+      error "'rotateR undefined for negative numbers"
   where
-    l   = shiftR n b'
-    r   = shiftL n b''
-
-    b'  = b `mod` sz
-    b'' = sz - b'
-    sz  = fromInteger (natVal bv)
+    sz = fromInteger (natVal (Proxy @n)) :: Int
+    m  = 1 `shiftL` sz
 
 instance KnownNat n => FiniteBits (Unsigned n) where
   finiteBitSize        = size#
@@ -419,8 +433,8 @@ instance Resize Unsigned where
 
 {-# NOINLINE resize# #-}
 resize# :: forall n m . KnownNat m => Unsigned n -> Unsigned m
-resize# (U i) = let m = 1 `shiftL` fromInteger (natVal (Proxy @m))
-                in  if i >= m then fromInteger_INLINE i else U i
+resize# = \(U i) -> if i >= m then U (i `mod` m) else U i
+  where m = 1 `shiftL` fromInteger (natVal (Proxy @m))
 
 instance Default (Unsigned n) where
   def = minBound#

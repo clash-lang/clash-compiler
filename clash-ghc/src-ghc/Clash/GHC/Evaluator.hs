@@ -1334,7 +1334,7 @@ reduceConstant tcm isSubj pInfo tys args mach = case primName pInfo of
     -> let resTyInfo = extractTySizeInfo tcm ty tys
         in Just $ mach2
              { mStack = mStack mach
-             , mTerm = mkBitVectorLit' resTyInfo 0 (BitVector.unsafeToInteger $ (pack :: Double -> BitVector 64) $ fromRational i)
+             , mTerm = mkBitVectorLit' resTyInfo 0 (toInteger $ (pack :: Double -> BitVector 64) $ fromRational i)
              }
 
   "Clash.Class.BitPack.packFloat#" -- :: Float -> BitVector 32
@@ -1343,7 +1343,7 @@ reduceConstant tcm isSubj pInfo tys args mach = case primName pInfo of
     -> let resTyInfo = extractTySizeInfo tcm ty tys
         in Just $ mach2
              { mStack = mStack mach
-             , mTerm = mkBitVectorLit' resTyInfo 0 (BitVector.unsafeToInteger $ (pack :: Float -> BitVector 32) $ fromRational i)
+             , mTerm = mkBitVectorLit' resTyInfo 0 (toInteger $ (pack :: Float -> BitVector 32) $ fromRational i)
              }
 
   "Clash.Class.BitPack.unpackFloat#"
@@ -1489,20 +1489,20 @@ reduceConstant tcm isSubj pInfo tys args mach = case primName pInfo of
   "Clash.Sized.Internal.BitVector.and##"
     | [i,j] <- bitLiterals args
     -> let Bit msk val = BitVector.and## (toBit i) (toBit j)
-       in reduce (mkBitLit ty msk val)
+       in reduce (mkBitLit ty (toInteger msk) (toInteger val))
   "Clash.Sized.Internal.BitVector.or##"
     | [i,j] <- bitLiterals args
     -> let Bit msk val = BitVector.or## (toBit i) (toBit j)
-       in reduce (mkBitLit ty msk val)
+       in reduce (mkBitLit ty (toInteger msk) (toInteger val))
   "Clash.Sized.Internal.BitVector.xor##"
     | [i,j] <- bitLiterals args
     -> let Bit msk val = BitVector.xor## (toBit i) (toBit j)
-       in reduce (mkBitLit ty msk val)
+       in reduce (mkBitLit ty (toInteger msk) (toInteger val))
 
   "Clash.Sized.Internal.BitVector.complement##"
     | [i] <- bitLiterals args
     -> let Bit msk val = BitVector.complement## (toBit i)
-       in reduce (mkBitLit ty msk val)
+       in reduce (mkBitLit ty (toInteger msk) (toInteger val))
 
 -- Pack
   "Clash.Sized.Internal.BitVector.pack#"
@@ -1561,33 +1561,36 @@ reduceConstant tcm isSubj pInfo tys args mach = case primName pInfo of
          in reduce (mkBitLit resTy msk val)
       where
         op :: KnownNat n => BitVector n -> Int -> Proxy n -> (Integer,Integer)
-        op u i _ = (m, v)
+        op u i _ = (toInteger m, toInteger v)
           where Bit m v = (BitVector.index# u i)
   "Clash.Sized.Internal.BitVector.replaceBit#" -- :: :: KnownNat n => BitVector n -> Int -> Bit -> BitVector n
     | Just (_, n) <- extractKnownNat tcm tys
     , [ _
-      , PrimVal bvP _ [_, Lit (IntegerLiteral mskBv), Lit (IntegerLiteral bv)]
+      , PrimVal bvP _ [_, Lit (NaturalLiteral mskBv), Lit (IntegerLiteral bv)]
       , valArgs -> Just [Literal (IntLiteral i)]
-      , PrimVal bP _ [Lit (IntegerLiteral mskB), Lit (IntegerLiteral b)]
+      , PrimVal bP _ [Lit (WordLiteral mskB), Lit (IntegerLiteral b)]
       ] <- args
     , primName bvP == "Clash.Sized.Internal.BitVector.fromInteger#"
     , primName bP  == "Clash.Sized.Internal.BitVector.fromInteger##"
       -> let resTyInfo = extractTySizeInfo tcm ty tys
-             (mskVal,val) = reifyNat n (op (BV mskBv bv) (fromInteger i) (Bit mskB b))
+             (mskVal,val) = reifyNat n (op (BV (fromInteger mskBv) (fromInteger bv))
+                                           (fromInteger i)
+                                           (Bit (fromInteger mskB) (fromInteger b)))
       in reduce (mkBitVectorLit' resTyInfo mskVal val)
       where
         op :: KnownNat n => BitVector n -> Int -> Bit -> Proxy n -> (Integer,Integer)
         -- op bv i b _ = (BitVector.unsafeMask res, BitVector.unsafeToInteger res)
         op bv i b _ = splitBV (BitVector.replaceBit# bv i b)
   "Clash.Sized.Internal.BitVector.setSlice#"
-  -- :: BitVector (m + 1 + i) -> SNat m -> SNat n -> BitVector (m + 1 - n) -> BitVector (m + 1 + i)
-    | mTy : _ : nTy : _ <- tys
+  -- :: SNat (m+1+i) -> BitVector (m + 1 + i) -> SNat m -> SNat n -> BitVector (m + 1 - n) -> BitVector (m + 1 + i)
+    | mTy : iTy : nTy : _ <- tys
     , Right m <- runExcept (tyNatSize tcm mTy)
+    , Right iN <- runExcept (tyNatSize tcm iTy)
     , Right n <- runExcept (tyNatSize tcm nTy)
     , [i,j] <- bitVectorLiterals' args
-    -> let BV msk val = BitVector.setSlice# (toBV i) (unsafeSNat m) (unsafeSNat n) (toBV j)
+    -> let BV msk val = BitVector.setSlice# (unsafeSNat (m+1+iN)) (toBV i) (unsafeSNat m) (unsafeSNat n) (toBV j)
            resTyInfo = extractTySizeInfo tcm ty tys
-       in  reduce (mkBitVectorLit' resTyInfo msk val)
+       in  reduce (mkBitVectorLit' resTyInfo (toInteger msk) (toInteger val))
   "Clash.Sized.Internal.BitVector.slice#"
   -- :: BitVector (m + 1 + i) -> SNat m -> SNat n -> BitVector (m + 1 - n)
     | mTy : _ : nTy : _ <- tys
@@ -1596,7 +1599,7 @@ reduceConstant tcm isSubj pInfo tys args mach = case primName pInfo of
     , [i] <- bitVectorLiterals' args
     -> let BV msk val = BitVector.slice# (toBV i) (unsafeSNat m) (unsafeSNat n)
            resTyInfo = extractTySizeInfo tcm ty tys
-       in  reduce (mkBitVectorLit' resTyInfo msk val)
+       in  reduce (mkBitVectorLit' resTyInfo (toInteger msk) (toInteger val))
   "Clash.Sized.Internal.BitVector.split#" -- :: forall n m. KnownNat n => BitVector (m + n) -> (BitVector m, BitVector n)
     | nTy : mTy : _ <- tys
     , Right n <-  runExcept (tyNatSize tcm nTy)
@@ -1622,9 +1625,9 @@ reduceConstant tcm isSubj pInfo tys args mach = case primName pInfo of
     , Just (_, kn) <- extractKnownNat tcm tys
     -> let resTy = getResultTy tcm ty tys
            (msk,val) = reifyNat kn (op (toBV i))
-       in reduce (mkBitLit resTy msk val)
+       in reduce (mkBitLit resTy (toInteger msk) (toInteger val))
     where
-      op :: KnownNat n => BitVector n -> Proxy n -> (Integer,Integer)
+      op :: KnownNat n => BitVector n -> Proxy n -> (Word,Word)
       op u _ = (unsafeMask# res, BitVector.unsafeToInteger# res)
         where
           res = BitVector.msb# u
@@ -1632,7 +1635,7 @@ reduceConstant tcm isSubj pInfo tys args mach = case primName pInfo of
     | [i] <- bitVectorLiterals' args
     -> let resTy = getResultTy tcm ty tys
            Bit msk val = BitVector.lsb# (toBV i)
-    in reduce (mkBitLit resTy msk val)
+    in reduce (mkBitLit resTy (toInteger msk) (toInteger val))
 
 
 -- Eq
@@ -1761,20 +1764,17 @@ reduceConstant tcm isSubj pInfo tys args mach = case primName pInfo of
 
 -- Bits
   "Clash.Sized.Internal.BitVector.and#"
-    | Just (i,j) <- bitVectorLiterals args
-    , Just (nTy, kn) <- extractKnownNat tcm tys
-    -> let BV msk val = BitVector.and# (toBV i) (toBV j)
-    in reduce (mkBitVectorLit ty nTy kn msk val)
+    | Just (_, kn) <- extractKnownNat tcm tys
+    , Just val <- reifyNat kn (liftBitVector2 (BitVector.and#) ty tcm tys args)
+    -> reduce val
   "Clash.Sized.Internal.BitVector.or#"
-    | Just (i,j) <- bitVectorLiterals args
-    , Just (nTy, kn) <- extractKnownNat tcm tys
-    -> let BV msk val = BitVector.or# (toBV i) (toBV j)
-    in reduce (mkBitVectorLit ty nTy kn msk val)
+    | Just (_, kn) <- extractKnownNat tcm tys
+    , Just val <- reifyNat kn (liftBitVector2 (BitVector.or#) ty tcm tys args)
+    -> reduce val
   "Clash.Sized.Internal.BitVector.xor#"
-    | Just (i,j) <- bitVectorLiterals args
-    , Just (nTy, kn) <- extractKnownNat tcm tys
-    -> let BV msk val = BitVector.xor# (toBV i) (toBV j)
-    in reduce (mkBitVectorLit ty nTy kn msk val)
+    | Just (_, kn) <- extractKnownNat tcm tys
+    , Just val <- reifyNat kn (liftBitVector2 (BitVector.xor#) ty tcm tys args)
+    -> reduce val
 
   "Clash.Sized.Internal.BitVector.complement#"
     | [i] <- bitVectorLiterals' args
@@ -3543,7 +3543,7 @@ bitLiterals = map normalizeBit . mapMaybe go
  where
   normalizeBit (msk,v) = (msk .&. 1, v .&. 1)
   go val = case val of
-    PrimVal p _ [Lit (IntegerLiteral m), Lit (IntegerLiteral i)]
+    PrimVal p _ [Lit (WordLiteral m), Lit (IntegerLiteral i)]
       | primName p == "Clash.Sized.Internal.BitVector.fromInteger##"
       -> Just (m,i)
     _ -> Nothing
@@ -3560,28 +3560,24 @@ indexLiterals'     = sizedLiterals' "Clash.Sized.Internal.Index.fromInteger#"
 signedLiterals'    = sizedLiterals' "Clash.Sized.Internal.Signed.fromInteger#"
 unsignedLiterals'  = sizedLiterals' "Clash.Sized.Internal.Unsigned.fromInteger#"
 
-bitVectorLiterals
-  :: [Value] -> Maybe ((Integer,Integer),(Integer,Integer))
-bitVectorLiterals = pairOf bitVectorLiteral
-
 bitVectorLiterals'
   :: [Value] -> [(Integer,Integer)]
 bitVectorLiterals' = listOf bitVectorLiteral
 
 bitVectorLiteral :: Value -> Maybe (Integer, Integer)
 bitVectorLiteral val = case val of
-  (PrimVal p _ [_, Lit (IntegerLiteral m), Lit (IntegerLiteral i)])
+  (PrimVal p _ [_, Lit (NaturalLiteral m), Lit (IntegerLiteral i)])
     | primName p == "Clash.Sized.Internal.BitVector.fromInteger#" -> Just (m, i)
   _ -> Nothing
 
 toBV :: (Integer,Integer) -> BitVector n
-toBV = uncurry BV
+toBV (mask,val) = BV (fromInteger mask) (fromInteger val)
 
 splitBV :: BitVector n -> (Integer,Integer)
-splitBV (BV msk val) = (msk,val)
+splitBV (BV msk val) = (toInteger msk, toInteger val)
 
 toBit :: (Integer,Integer) -> Bit
-toBit = uncurry Bit
+toBit (mask,val) = Bit (fromInteger mask) (fromInteger val)
 
 valArgs
   :: Value
@@ -3620,7 +3616,7 @@ bitVectorLitIntLit
 bitVectorLitIntLit tcm tys args
   | Just (nTy,kn) <- extractKnownNat tcm tys
   , [_
-    ,PrimVal p _ [_,Lit (IntegerLiteral m),Lit (IntegerLiteral i)]
+    ,PrimVal p _ [_,Lit (NaturalLiteral m),Lit (IntegerLiteral i)]
     ,valArgs -> Just [Literal (IntLiteral j)]
     ] <- args
   , primName p == "Clash.Sized.Internal.BitVector.fromInteger#"
@@ -3679,7 +3675,7 @@ mkBitLit
   -- ^ Value
   -> Term
 mkBitLit ty msk val =
-  mkApps (bConPrim sTy) [ Left (Literal (IntegerLiteral (msk .&. 1)))
+  mkApps (bConPrim sTy) [ Left (Literal (WordLiteral (msk .&. 1)))
                         , Left (Literal (IntegerLiteral (val .&. 1)))]
   where
     (_,sTy) = splitFunForallTy ty
@@ -3713,7 +3709,7 @@ mkBitVectorLit ty nTy kn mask val
   = mkApps (bvConPrim sTy)
            [Right nTy
            ,Left (Literal (NaturalLiteral kn))
-           ,Left (Literal (IntegerLiteral mask))
+           ,Left (Literal (NaturalLiteral mask))
            ,Left (Literal (IntegerLiteral val))]
   where
     (_,sTy) = splitFunForallTy ty
@@ -3841,14 +3837,14 @@ bConPrim :: Type -> Term
 bConPrim (tyView -> TyConApp bTcNm _)
   = Prim (PrimInfo "Clash.Sized.Internal.BitVector.fromInteger##" funTy WorkNever)
   where
-    funTy      = foldr1 mkFunTy [integerPrimTy,integerPrimTy,mkTyConApp bTcNm []]
+    funTy      = foldr1 mkFunTy [wordPrimTy,integerPrimTy,mkTyConApp bTcNm []]
 bConPrim _ = error $ $(curLoc) ++ "called with incorrect type"
 
 bvConPrim :: Type -> Term
 bvConPrim (tyView -> TyConApp bvTcNm _)
   = Prim (PrimInfo "Clash.Sized.Internal.BitVector.fromInteger#" (ForAllTy nTV funTy) WorkNever)
   where
-    funTy = foldr1 mkFunTy [naturalPrimTy,integerPrimTy,integerPrimTy,mkTyConApp bvTcNm [nVar]]
+    funTy = foldr1 mkFunTy [naturalPrimTy,naturalPrimTy,integerPrimTy,mkTyConApp bvTcNm [nVar]]
     nName = mkUnsafeSystemName "n" 0
     nVar  = VarTy nTV
     nTV   = mkTyVar typeNatKind nName
@@ -3917,7 +3913,7 @@ liftBitVector2  f ty tcm tys args _p
   | Just (nTy, kn) <- extractKnownNat tcm tys
   , [i,j] <- bitVectorLiterals' args
   = let BV mask val = f (toBV i) (toBV j)
-    in Just $ mkBitVectorLit ty nTy kn mask val
+    in Just $ mkBitVectorLit ty nTy kn (toInteger mask) (toInteger val)
   | otherwise = Nothing
 
 liftBitVector2Bool :: KnownNat n
