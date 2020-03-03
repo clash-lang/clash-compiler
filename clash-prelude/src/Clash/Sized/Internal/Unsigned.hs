@@ -68,6 +68,11 @@ module Clash.Sized.Internal.Unsigned
   , rotateR#
     -- ** Resize
   , resize#
+    -- ** Conversions
+  , unsignedToWord
+  , unsigned8toWord8
+  , unsigned16toWord16
+  , unsigned32toWord32
   )
 where
 
@@ -80,20 +85,23 @@ import Data.Data                      (Data)
 import Data.Default.Class             (Default (..))
 import Data.Proxy                     (Proxy (..))
 import Text.Read                      (Read (..), ReadPrec)
+import GHC.Exts                       (narrow8Word#, narrow16Word#, narrow32Word#)
 import GHC.Generics                   (Generic)
+import GHC.Integer.GMP.Internals      (bigNatToWord)
 import GHC.Natural                    (Natural (..), naturalFromInteger)
 #if MIN_VERSION_base(4,12,0)
 import GHC.Natural                    (naturalToInteger)
 #endif
 import GHC.TypeLits                   (KnownNat, Nat, type (+), natVal)
 import GHC.TypeLits.Extra             (Max)
+import GHC.Word                       (Word (..), Word8 (..), Word16 (..), Word32 (..))
 import Language.Haskell.TH            (TypeQ, appT, conT, litT, numTyLit, sigE)
 import Language.Haskell.TH.Syntax     (Lift(..))
 import Test.QuickCheck.Arbitrary      (Arbitrary (..), CoArbitrary (..),
                                        arbitraryBoundedIntegral,
                                        coarbitraryIntegral)
 
-import Clash.Class.BitPack            (BitPack (..), packXWith)
+import Clash.Class.BitPack            (BitPack (..), packXWith, bitCoerce)
 import Clash.Class.Num                (ExtendingNum (..), SaturatingNum (..),
                                        SaturationMode (..))
 import Clash.Class.Parity             (Parity (..))
@@ -105,6 +113,8 @@ import qualified Clash.Sized.Internal.BitVector as BV
 import Clash.Sized.Internal.Mod
 import Clash.XException
   (ShowX (..), NFDataX (..), errorX, showsPrecXWith, rwhnfX)
+
+#include "MachDeps.h"
 
 -- | Arbitrary-width unsigned integer represented by @n@ bits
 --
@@ -492,3 +502,30 @@ type instance IxValue (Unsigned n) = Bit
 instance KnownNat n => Ixed (Unsigned n) where
   ix i f s = unpack# <$> BV.replaceBit# (pack# s) i
                      <$> f (BV.index# (pack# s) i)
+
+unsignedToWord :: Unsigned WORD_SIZE_IN_BITS -> Word
+unsignedToWord (U (NatS# u#)) = W# u#
+unsignedToWord (U (NatJ# u#)) = W# (bigNatToWord u#)
+{-# NOINLINE unsignedToWord #-}
+
+unsigned8toWord8 :: Unsigned 8 -> Word8
+unsigned8toWord8 (U (NatS# u#)) = W8# (narrow8Word# u#)
+unsigned8toWord8 (U (NatJ# u#)) = W8# (narrow8Word# (bigNatToWord u#))
+{-# NOINLINE unsigned8toWord8 #-}
+
+unsigned16toWord16 :: Unsigned 16 -> Word16
+unsigned16toWord16 (U (NatS# u#)) = W16# (narrow16Word# u#)
+unsigned16toWord16 (U (NatJ# u#)) = W16# (narrow16Word# (bigNatToWord u#))
+{-# NOINLINE unsigned16toWord16 #-}
+
+unsigned32toWord32 :: Unsigned 32 -> Word32
+unsigned32toWord32 (U (NatS# u#)) = W32# (narrow32Word# u#)
+unsigned32toWord32 (U (NatJ# u#)) = W32# (narrow32Word# (bigNatToWord u#))
+{-# NOINLINE unsigned32toWord32 #-}
+
+{-# RULES
+"bitCoerce/Unsigned WORD_SIZE_IN_BITS -> Word" bitCoerce = unsignedToWord
+"bitCoerce/Unsigned 8 -> Word8" bitCoerce = unsigned8toWord8
+"bitCoerce/Unsigned 16 -> Word16" bitCoerce = unsigned16toWord16
+"bitCoerce/Unsigned 32 -> Word32" bitCoerce = unsigned32toWord32
+ #-}
