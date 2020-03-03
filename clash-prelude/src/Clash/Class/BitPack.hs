@@ -134,7 +134,7 @@ packXWith f x =
                                 (\(XException _) -> return undefined#))
 {-# NOINLINE packXWith #-}
 
-{-# INLINE bitCoerce #-}
+{-# INLINE[1] bitCoerce #-}
 -- | Coerce a value from one type to another through its bit representation.
 --
 -- >>> pack (-5 :: Signed 6)

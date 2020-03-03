@@ -10,6 +10,7 @@
 module BenchUnsigned (unsignedBench) where
 
 import Data.Bits
+import Data.Word
 import Clash.Class.Num
 import Clash.Class.BitPack
 import Clash.Sized.BitVector
@@ -47,6 +48,10 @@ unsignedBench = bgroup "Unsigned"
   , orBenchL
   , complementBench
   , complementBenchL
+  , unsigned8toWord8Bench
+  , unsigned16toWord16Bench
+  , unsigned32toWord32Bench
+  , unsignedToWordBench
   ]
 
 smallValueI :: Integer
@@ -60,6 +65,18 @@ smallValue1 = $(lift (2^(16::Int)-10 :: Unsigned WORD_SIZE_IN_BITS))
 smallValue2 :: Unsigned WORD_SIZE_IN_BITS
 smallValue2 = $(lift (2^(16::Int)-100 :: Unsigned WORD_SIZE_IN_BITS))
 {-# INLINE smallValue2 #-}
+
+smallValueW8 :: Unsigned 8
+smallValueW8 = $(lift (2^(4::Int)-10 :: Unsigned 8))
+{-# INLINE smallValueW8 #-}
+
+smallValueW16 :: Unsigned 16
+smallValueW16 = $(lift (2^(8::Int)-10 :: Unsigned 16))
+{-# INLINE smallValueW16 #-}
+
+smallValueW32 :: Unsigned 32
+smallValueW32 = $(lift (2^(16::Int)-10 :: Unsigned 32))
+{-# INLINE smallValueW32 #-}
 
 smallValueBV :: BitVector WORD_SIZE_IN_BITS
 smallValueBV = $(lift (2^(16::Int)-10 :: BitVector WORD_SIZE_IN_BITS))
@@ -224,3 +241,27 @@ complementBenchL = env setup $ \m ->
   bench "complement 3*WORD_SIZE_IN_BITS" $ nf complement m
   where
     setup = return largeValue1
+
+unsigned8toWord8Bench :: Benchmark
+unsigned8toWord8Bench = env setup $ \m ->
+  bench "unsigned8toWord8 WORD_SIZE_IN_BITS" $ nf (bitCoerce :: Unsigned 8 -> Word8) m
+  where
+    setup = return smallValueW8
+
+unsigned16toWord16Bench :: Benchmark
+unsigned16toWord16Bench = env setup $ \m ->
+  bench "unsigned16toWord16 WORD_SIZE_IN_BITS" $ nf (bitCoerce :: Unsigned 16 -> Word16) m
+  where
+    setup = return smallValueW16
+
+unsigned32toWord32Bench :: Benchmark
+unsigned32toWord32Bench = env setup $ \m ->
+  bench "unsigned32toWord32 WORD_SIZE_IN_BITS" $ nf (bitCoerce :: Unsigned 32 -> Word32) m
+  where
+    setup = return smallValueW32
+
+unsignedToWordBench :: Benchmark
+unsignedToWordBench = env setup $ \m ->
+  bench "unsignedToWord WORD_SIZE_IN_BITS" $ nf (bitCoerce :: Unsigned WORD_SIZE_IN_BITS -> Word) m
+  where
+    setup = return smallValue1
