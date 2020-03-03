@@ -1,6 +1,9 @@
 #!/bin/bash
 set -xeo pipefail
 
+# TODO: make sdist work on all, it currently fails for clash-cosim
+cabal new-sdist clash-prelude clash-lib clash-ghc
+
 cabal new-build all
 
 # Build with installed constraints for packages in global-db
