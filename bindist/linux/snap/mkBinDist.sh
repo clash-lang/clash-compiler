@@ -2,12 +2,15 @@
 set -e
 set -x
 
+export XZ_DEFAULTS="${XZ_DEFAULTS:-"-T 0 -3"}"
+export THREADS="${THREADS:-$(nproc)}"
+
 # Path to thhe nix file containing the derivation we want to package
 NIXFILE=$(dirname $0)/bindist.nix
 
 # "drv" will be set to the path inside /nix/store which contains the resulting
 # the derivation
-drv=$(nix-build $NIXFILE)
+drv=$(nix-build $NIXFILE -j${THREADS})
 
 # output filename
 tarball=$(pwd)/clash-snap-bindist.tar.xz
@@ -47,4 +50,4 @@ find . -lname '/*' -exec ksh -c '
 # Package it for snapcraft. Snapcraft will later recompress it more
 # thorougly. Not using /no compression/ as these files will be used
 # in GitLab artifacts.
-XZ_DEFAULT="-T 0 -3" tar cJf $tarball --owner 0 --group 0 *
+tar cJf $tarball --owner 0 --group 0 *

@@ -1,11 +1,14 @@
 #!/usr/bin/env bash
 set -e
 
+export XZ_DEFAULTS="${XZ_DEFAULTS:-"-T 0 -3"}"
+export THREADS="${THREADS:-$(nproc)}"
+
 # Path to the nix file containing the derivation we want to package
 NIXFILE=$(dirname $0)/bindist.nix
 
 # "drv" will be set to the path inside /nix/store which contains the resulting the derivation
-drv=$(nix-build $NIXFILE)
+drv=$(nix-build $NIXFILE -j${THREADS})
 
 # output filename
 tarball=$(pwd)/clash-bindist.tar.xz
@@ -35,4 +38,4 @@ cp $user_chroot ./nix-user-chroot/
 
 # finally, pack the full closure of the derivation with the symlinks
 # we just created
-XZ_DEFAULTS="-T 0" tar cJf $tarball --owner 0 --group 0 bin clash clashi nix-user-chroot $(nix-store -qR $drv)
+tar cJf $tarball --owner 0 --group 0 bin clash clashi nix-user-chroot $(nix-store -qR $drv)

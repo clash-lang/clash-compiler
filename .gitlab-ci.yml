@@ -34,7 +34,7 @@ stages:
 .tests-interruptible:
   extends: .tests
   interruptible: true
-  except: 
+  except:
     - master
 
 # Test jobs:
@@ -58,23 +58,23 @@ ghc-8.6.5-singular-hidden:
 # Same as test jobs, but non-interruptable
 ghc-8.4.4-master:
   extends: .tests
-  only: 
+  only:
     - master
 #ghc-8.6.5:
 #  extends: .tests
 ghc-8.8.2-master:
   extends: .tests
-  only: 
+  only:
     - master
 ghc-8.6.5-singular-hidden-master:
   extends: .tests
-  only: 
+  only:
     - master
   variables:
     MULTIPLE_HIDDEN: "no"
 #ghc-head-master:
 #  # extends: .tests-non-interruptible
-#  only: 
+#  only:
 #    - master
 #  stage: build
 #  allow_failure: true
@@ -152,7 +152,7 @@ hackage-release:
 #
 # If this limitation is ever annulled, we can use a "proper" nix distribution.
 snap-bindist:
-  image: clashlang/nixbuntu:2.3.1
+  image: clashlang/nixbuntu:2.3.3
   stage: build
   cache:
     key: usr-nix-$CI_JOB_NAME
@@ -168,12 +168,13 @@ snap-bindist:
     expire_in: 1 week
   script:
     # TODO: Clean up nix-store after building
-    - export XZ_DEFAULTS="-T 0 -3"
+    - export THREADS=$(nproc)
+    - export XZ_DEFAULTS="-T ${THREADS} -3"
     - export ROOT=$(pwd)
     - tar xf usr_nix.tar.xz -C / || true
     - apt update
     - apt install ksh -y  # TODO: Remove need for ksh in mkBinDist.sh
-    - cd bindist/linux/snap && ./mkBinDist.sh &> $ROOT/nix_build.log
+    - cd bindist/linux/snap && ./mkBinDist.sh |& tee $ROOT/nix_build.log | egrep -i '^(building|copying)'
     - tar cJf $ROOT/usr_nix.tar.xz /usr/nix
 
   # Run every night, when explicitly triggered, or when tagged (release)
@@ -196,6 +197,8 @@ snap-bindist:
       - bindist/linux/snap/*.snap
     expire_in: 1 week
   script:
+    - export SNAPCRAFT_BUILD_ENVIRONMENT_CPU=$(nproc)
+    - export SNAPCRAFT_BUILD_ENVIRONMENT_MEMORY=16G
     - apt update
     - apt install git -y
     - touch snap-last-run-hash
