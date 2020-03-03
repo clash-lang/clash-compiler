@@ -325,22 +325,22 @@
 , { "BlackBox" :
     { "name"      : "Clash.Sized.Internal.BitVector.and#"
     , "kind"      : "Expression"
-    , "type"      : "and# :: BitVector n -> BitVector n -> BitVector n"
-    , "template"  : "~ARG[0] & ~ARG[1]"
+    , "type"      : "and# :: KnownNat n => BitVector n -> BitVector n -> BitVector n"
+    , "template"  : "~ARG[1] & ~ARG[2]"
     }
   }
 , { "BlackBox" :
     { "name"      : "Clash.Sized.Internal.BitVector.or#"
     , "kind"      : "Expression"
-    , "type"      : "or# :: BitVector n -> BitVector n -> BitVector n"
-    , "template"  : "~ARG[0] | ~ARG[1]"
+    , "type"      : "or# :: KnownNat n => BitVector n -> BitVector n -> BitVector n"
+    , "template"  : "~ARG[1] | ~ARG[2]"
     }
   }
 , { "BlackBox" :
     { "name"      : "Clash.Sized.Internal.BitVector.xor#"
     , "kind"      : "Expression"
-    , "type"      : "xor# :: BitVector n -> BitVector n -> BitVector n"
-    , "template"  : "~ARG[0] ^ ~ARG[1]"
+    , "type"      : "xor# :: KnownNat => BitVector n -> BitVector n -> BitVector n"
+    , "template"  : "~ARG[1] ^ ~ARG[2]"
     }
   }
 , { "BlackBox" :

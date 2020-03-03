@@ -75,8 +75,13 @@ import Data.Proxy                 (Proxy (..))
 import Text.Read                  (Read (..), ReadPrec)
 import Language.Haskell.TH        (TypeQ, appT, conT, litT, numTyLit, sigE)
 import Language.Haskell.TH.Syntax (Lift(..))
-import Numeric.Natural            (Natural)
 import GHC.Generics               (Generic)
+import GHC.Natural                (Natural, naturalFromInteger)
+#if MIN_VERSION_base(4,12,0)
+import GHC.Natural                (naturalToInteger)
+#else
+import Clash.Sized.Internal.Mod   (naturalToInteger)
+#endif
 import GHC.Stack                  (HasCallStack)
 import GHC.TypeLits               (KnownNat, Nat, type (+), type (-),
                                    type (*), type (<=), natVal)
@@ -151,11 +156,11 @@ fromSNat = snatToNum
 
 {-# NOINLINE pack# #-}
 pack# :: Index n -> BitVector (CLog 2 n)
-pack# (I i) = BV 0 i
+pack# (I i) = BV 0 (naturalFromInteger i)
 
 {-# NOINLINE unpack# #-}
 unpack# :: (KnownNat n, 1 <= n) => BitVector (CLog 2 n) -> Index n
-unpack# (BV 0 i) = fromInteger_INLINE i
+unpack# (BV 0 i) = fromInteger_INLINE (naturalToInteger i)
 unpack# bv = undefError "Index.unpack" [bv]
 
 instance Eq (Index n) where
