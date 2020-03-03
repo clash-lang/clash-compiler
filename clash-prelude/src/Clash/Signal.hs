@@ -276,22 +276,25 @@ import           Clash.XException      (NFDataX)
 
 {- $setup
 >>> :set -XFlexibleContexts -XTypeApplications
+>>> :m -Clash.Explicit.Prelude
+>>> :m -Clash.Explicit.Prelude.Safe
+>>> import Clash.Prelude
 >>> import Clash.Promoted.Nat (SNat(..))
 >>> import Clash.XException (printX)
 >>> import Control.Applicative (liftA2)
 >>> let oscillate = register False (not <$> oscillate)
 >>> let count = regEn 0 oscillate (count + 1)
 >>> :{
-sometimes1 = s where
-  s = register Nothing (switch <$> s)
-  switch Nothing = Just 1
-  switch _       = Nothing
+let sometimes1 = s where
+      s = register Nothing (switch <$> s)
+      switch Nothing = Just 1
+      switch _       = Nothing
 :}
 
 >>> :{
-countSometimes = s where
-  s     = regMaybe 0 (plusM (pure <$> s) sometimes1)
-  plusM = liftA2 (liftA2 (+))
+let countSometimes = s where
+      s     = regMaybe 0 (plusM (pure <$> s) sometimes1)
+      plusM = liftA2 (liftA2 (+))
 :}
 
 -}
@@ -714,6 +717,7 @@ exposeReset = \f rst -> exposeSpecificReset (const f) rst (Proxy @dom)
 --
 -- <Clash-Signal.html#hiddenclockandreset Click here to read more about hidden clocks, resets, and enables>
 --
+#ifdef CLASH_MULTIPLE_HIDDEN
 -- === __Example__
 -- 'exposeSpecificReset' can only be used when it can find the specified domain
 -- in /r/:
@@ -729,6 +733,7 @@ exposeReset = \f rst -> exposeSpecificReset (const f) rst (Proxy @dom)
 -- reg = 'register' @@dom 5 (reg + 1)
 -- sig = exposeSpecificReset @@dom reg 'resetGen'
 -- @
+#endif
 --
 exposeSpecificReset
   :: forall dom r
@@ -908,6 +913,7 @@ exposeEnable = \f gen -> exposeSpecificEnable (const f) gen (Proxy @dom)
 --
 -- <Clash-Signal.html#hiddenclockandreset Click here to read more about hidden clocks, resets, and enables>
 --
+#ifdef CLASH_MULTIPLE_HIDDEN
 -- === __Example__
 -- 'exposeSpecificEnable' can only be used when it can find the specified domain
 -- in /r/:
@@ -923,6 +929,7 @@ exposeEnable = \f gen -> exposeSpecificEnable (const f) gen (Proxy @dom)
 -- reg = 'register' @@dom 5 (reg + 1)
 -- sig = exposeSpecificEnable @@dom reg 'enableGen'
 -- @
+#endif
 --
 exposeSpecificEnable
   :: forall dom r

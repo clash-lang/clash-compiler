@@ -52,10 +52,10 @@ Copyright:            Copyright © 2013-2016, University of Twente,
                                   2016-2017, Myrtle Software Ltd,
                                   2017-2019, QBayLogic B.V., Google Inc.
 Category:             Hardware
-Build-type:           Simple
+Build-type:           Custom
 
 Extra-source-files:   README.md
-                      CHANGELOG.md
+                      CHANGELOG.rst
                       AUTHORS.md
 
 extra-doc-files:      doc/*.svg
@@ -143,6 +143,12 @@ common common-options
 
   if impl(ghc >= 8.6)
       default-extensions: NoStarIsType
+
+custom-setup
+  setup-depends:
+    base          >= 4.9 && <5,
+    Cabal         >= 1.10,
+    cabal-doctest >= 1.0.1 && <1.1
 
 Library
   import:             common-options
@@ -276,6 +282,7 @@ Library
                       Clash.Class.AutoReg.Internal
                       Clash.Class.BitPack.Internal
                       Clash.CPP
+                      Clash.Examples.Internal
                       Clash.Signal.Bundle.Internal
                       Language.Haskell.TH.Compat
                       Paths_clash_prelude
@@ -332,6 +339,8 @@ test-suite doctests
   main-is:          doctests.hs
   ghc-options:      -Wall -threaded
   hs-source-dirs:   tests
+
+  x-doctest-options: -fobject-code
 
   if !flag(doctests)
     buildable: False

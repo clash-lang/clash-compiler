@@ -404,6 +404,9 @@ import           Clash.Sized.Vector      (Vec)
 import           Clash.XException        (NFDataX)
 
 {- $setup
+>>> :m -Clash.Explicit.Prelude
+>>> :m -Clash.Explicit.Prelude.Safe
+>>> :m -Clash.Prelude.Safe
 >>> import Clash.Prelude as C
 >>> import qualified Data.List as L
 >>> :set -XDataKinds -XRecordWildCards -XTupleSections -XTypeApplications -XFlexibleContexts
@@ -469,65 +472,65 @@ alu CmpGt x y = if x > y then 1 else 0
 :}
 
 >>> :{
-cpu :: Vec 7 Value          -- ^ Register bank
-    -> (Value,Instruction)  -- ^ (Memory output, Current instruction)
-    -> ( Vec 7 Value
-       , (MemAddr,Maybe (MemAddr,Value),InstrAddr)
-       )
-cpu regbank (memOut,instr) = (regbank',(rdAddr,(,aluOut) <$> wrAddrM,fromIntegral ipntr))
-  where
-    -- Current instruction pointer
-    ipntr = regbank C.!! PC
-    -- Decoder
-    (MachCode {..}) = case instr of
-      Compute op rx ry res -> nullCode {inputX=rx,inputY=ry,result=res,aluCode=op}
-      Branch cr a          -> nullCode {inputX=cr,jmpM=Just a}
-      Jump a               -> nullCode {aluCode=Incr,jmpM=Just a}
-      Load a r             -> nullCode {ldReg=r,rdAddr=a}
-      Store r a            -> nullCode {inputX=r,wrAddrM=Just a}
-      Nop                  -> nullCode
-    -- ALU
-    regX   = regbank C.!! inputX
-    regY   = regbank C.!! inputY
-    aluOut = alu aluCode regX regY
-    -- next instruction
-    nextPC = case jmpM of
-               Just a | aluOut /= 0 -> ipntr + a
-               _                    -> ipntr + 1
-    -- update registers
-    regbank' = replace Zero   0
-             $ replace PC     nextPC
-             $ replace result aluOut
-             $ replace ldReg  memOut
-             $ regbank
-:}
-
->>> :{
-dataMem
-  :: HiddenClockResetEnable dom
-  => Signal dom MemAddr
-  -> Signal dom (Maybe (MemAddr,Value))
-  -> Signal dom Value
-dataMem rd wrM = mealy dataMemT (C.replicate d32 0) (bundle (rd,wrM))
-  where
-    dataMemT mem (rd,wrM) = (mem',dout)
+let cpu :: Vec 7 Value          -- ^ Register bank
+        -> (Value,Instruction)  -- ^ (Memory output, Current instruction)
+        -> ( Vec 7 Value
+           , (MemAddr,Maybe (MemAddr,Value),InstrAddr)
+           )
+    cpu regbank (memOut,instr) = (regbank',(rdAddr,(,aluOut) <$> wrAddrM,fromIntegral ipntr))
       where
-        dout = mem C.!! rd
-        mem' = case wrM of
-                 Just (wr,din) -> replace wr din mem
-                 Nothing       -> mem
+        -- Current instruction pointer
+        ipntr = regbank C.!! PC
+        -- Decoder
+        (MachCode {..}) = case instr of
+          Compute op rx ry res -> nullCode {inputX=rx,inputY=ry,result=res,aluCode=op}
+          Branch cr a          -> nullCode {inputX=cr,jmpM=Just a}
+          Jump a               -> nullCode {aluCode=Incr,jmpM=Just a}
+          Load a r             -> nullCode {ldReg=r,rdAddr=a}
+          Store r a            -> nullCode {inputX=r,wrAddrM=Just a}
+          Nop                  -> nullCode
+        -- ALU
+        regX   = regbank C.!! inputX
+        regY   = regbank C.!! inputY
+        aluOut = alu aluCode regX regY
+        -- next instruction
+        nextPC = case jmpM of
+                   Just a | aluOut /= 0 -> ipntr + a
+                   _                    -> ipntr + 1
+        -- update registers
+        regbank' = replace Zero   0
+                 $ replace PC     nextPC
+                 $ replace result aluOut
+                 $ replace ldReg  memOut
+                 $ regbank
 :}
 
 >>> :{
-system
-  :: (KnownNat n, HiddenClockResetEnable dom )
-  => Vec n Instruction
-  -> Signal dom Value
-system instrs = memOut
-  where
-    memOut = dataMem rdAddr dout
-    (rdAddr,dout,ipntr) = mealyB cpu (C.replicate d7 0) (memOut,instr)
-    instr  = asyncRom instrs <$> ipntr
+let dataMem
+      :: HiddenClockResetEnable dom
+      => Signal dom MemAddr
+      -> Signal dom (Maybe (MemAddr,Value))
+      -> Signal dom Value
+    dataMem rd wrM = mealy dataMemT (C.replicate d32 0) (bundle (rd,wrM))
+      where
+        dataMemT mem (rd,wrM) = (mem',dout)
+          where
+            dout = mem C.!! rd
+            mem' = case wrM of
+                     Just (wr,din) -> replace wr din mem
+                     Nothing       -> mem
+:}
+
+>>> :{
+let system
+      :: (KnownNat n, HiddenClockResetEnable dom )
+      => Vec n Instruction
+      -> Signal dom Value
+    system instrs = memOut
+      where
+        memOut = dataMem rdAddr dout
+        (rdAddr,dout,ipntr) = mealyB cpu (C.replicate d7 0) (memOut,instr)
+        instr  = asyncRom instrs <$> ipntr
 :}
 
 >>> :{
@@ -563,69 +566,69 @@ prog = -- 0 := 4
 :}
 
 >>> :{
-system2
-  :: ( KnownNat n
-     , HiddenClockResetEnable dom  )
-  => Vec n Instruction
-  -> Signal dom Value
-system2 instrs = memOut
-  where
-    memOut = asyncRam d32 rdAddr dout
-    (rdAddr,dout,ipntr) = mealyB cpu (C.replicate d7 0) (memOut,instr)
-    instr  = asyncRom instrs <$> ipntr
+let system2
+      :: ( KnownNat n
+         , HiddenClockResetEnable dom  )
+      => Vec n Instruction
+      -> Signal dom Value
+    system2 instrs = memOut
+      where
+        memOut = asyncRam d32 rdAddr dout
+        (rdAddr,dout,ipntr) = mealyB cpu (C.replicate d7 0) (memOut,instr)
+        instr  = asyncRom instrs <$> ipntr
 :}
 
 >>> :{
-cpu2
-  :: (Vec 7 Value,Reg)
-  -- ^ (Register bank, Load reg addr)
-  -> (Value,Instruction)
-  -- ^ (Memory output, Current instruction)
-  -> ( (Vec 7 Value,Reg)
-     , (MemAddr, Maybe (MemAddr, Value), InstrAddr)
-     )
-cpu2 (regbank,ldRegD) (memOut,instr) =
-  ((regbank', ldRegD'), (rdAddr, (,aluOut) <$> wrAddrM, fromIntegral ipntr))
- where
-  -- Current instruction pointer
-  ipntr = regbank C.!! PC
-  -- Decoder
-  (MachCode {..}) = case instr of
-    Compute op rx ry res -> nullCode {inputX=rx,inputY=ry,result=res,aluCode=op}
-    Branch cr a          -> nullCode {inputX=cr,jmpM=Just a}
-    Jump a               -> nullCode {aluCode=Incr,jmpM=Just a}
-    Load a r             -> nullCode {ldReg=r,rdAddr=a}
-    Store r a            -> nullCode {inputX=r,wrAddrM=Just a}
-    Nop                  -> nullCode
-  -- ALU
-  regX   = regbank C.!! inputX
-  regY   = regbank C.!! inputY
-  aluOut = alu aluCode regX regY
-  -- next instruction
-  nextPC =
-    case jmpM of
-      Just a | aluOut /= 0 -> ipntr + a
-      _                    -> ipntr + 1
-  -- update registers
-  ldRegD'  = ldReg -- Delay the ldReg by 1 cycle
-  regbank' = replace Zero   0
-           $ replace PC     nextPC
-           $ replace result aluOut
-           $ replace ldRegD memOut
-           $ regbank
+let cpu2
+      :: (Vec 7 Value,Reg)
+      -- ^ (Register bank, Load reg addr)
+      -> (Value,Instruction)
+      -- ^ (Memory output, Current instruction)
+      -> ( (Vec 7 Value,Reg)
+         , (MemAddr, Maybe (MemAddr, Value), InstrAddr)
+         )
+    cpu2 (regbank,ldRegD) (memOut,instr) =
+      ((regbank', ldRegD'), (rdAddr, (,aluOut) <$> wrAddrM, fromIntegral ipntr))
+     where
+      -- Current instruction pointer
+      ipntr = regbank C.!! PC
+      -- Decoder
+      (MachCode {..}) = case instr of
+        Compute op rx ry res -> nullCode {inputX=rx,inputY=ry,result=res,aluCode=op}
+        Branch cr a          -> nullCode {inputX=cr,jmpM=Just a}
+        Jump a               -> nullCode {aluCode=Incr,jmpM=Just a}
+        Load a r             -> nullCode {ldReg=r,rdAddr=a}
+        Store r a            -> nullCode {inputX=r,wrAddrM=Just a}
+        Nop                  -> nullCode
+      -- ALU
+      regX   = regbank C.!! inputX
+      regY   = regbank C.!! inputY
+      aluOut = alu aluCode regX regY
+      -- next instruction
+      nextPC =
+        case jmpM of
+          Just a | aluOut /= 0 -> ipntr + a
+          _                    -> ipntr + 1
+      -- update registers
+      ldRegD'  = ldReg -- Delay the ldReg by 1 cycle
+      regbank' = replace Zero   0
+               $ replace PC     nextPC
+               $ replace result aluOut
+               $ replace ldRegD memOut
+               $ regbank
 :}
 
 >>> :{
-system3
-  :: ( KnownNat n
-     , HiddenClockResetEnable dom  )
-  => Vec n Instruction
-  -> Signal dom Value
-system3 instrs = memOut
-  where
-    memOut = blockRam (C.replicate d32 0) rdAddr dout
-    (rdAddr,dout,ipntr) = mealyB cpu2 ((C.replicate d7 0),Zero) (memOut,instr)
-    instr  = asyncRom instrs <$> ipntr
+let system3
+      :: ( KnownNat n
+         , HiddenClockResetEnable dom  )
+      => Vec n Instruction
+      -> Signal dom Value
+    system3 instrs = memOut
+      where
+        memOut = blockRam (C.replicate d32 0) rdAddr dout
+        (rdAddr,dout,ipntr) = mealyB cpu2 ((C.replicate d7 0),Zero) (memOut,instr)
+        instr  = asyncRom instrs <$> ipntr
 :}
 
 >>> :{

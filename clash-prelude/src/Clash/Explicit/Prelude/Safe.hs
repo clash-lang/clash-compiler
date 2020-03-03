@@ -140,7 +140,9 @@ import Clash.XException
 
 {- $setup
 >>> :set -XDataKinds
->>> import Clash.Explicit.Prelude
+>>> :m -Clash.Prelude
+>>> :m -Clash.Prelude.Safe
+>>> import Clash.Explicit.Prelude.Safe
 >>> let rP clk rst en = registerB clk rst en (8::Int,8::Int)
 -}
 
