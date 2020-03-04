@@ -140,8 +140,8 @@ Clash and Haskell
   mistakes with designs will be identified and reported due to the strong type
   system identifying mistakes at compile-time.
 
-Clash and other HDL Tools
--------------------------
+Clash and other HDLs
+--------------------
 
 - **Q**: Do I need to know existing RTL/HDL languages in order to use Clash?
 
@@ -153,42 +153,72 @@ Clash and other HDL Tools
 
 - **Q**: What's the difference between Clash and "Lava"?
 
-  **A**: Lava dialects (including the modern variant Blarney) use deep-embedding
-  (in other words, are EDSLs) instead of Clash's static analysis approach. The
-  latter has a number of advantages:
+  **A**: Lava dialects (including the modern variant
+  `Blarney <https://github.com/mn416/blarney>`_) are all embedded domain specific
+  languages (EDSLs) inside Haskell. On top of that they use a so-called
+  *deep* embedding to be able to transform a circuit description into a netlist
+  (to subsequently output that as a VHDL/Verilog file). Clash on the other hand
+  uses "standard" compiler techniques to create a netlist from the Haskell
+  abstract syntax tree (AST). This "standard" compiler technique enables the
+  following features not available in (Haskell-based) EDSLs:
 
-    1. Clash can reliably detect sharing, while observable sharing within EDSLs
-       is of a stochastic nature.
-    2. Clash allows the use normal haskell operations such as (==) on both the
+    1. Clash allows the use of normal Haskell operations such as (==) on both the
        meta-level (how the program is structured/generated), and the object-level
        (the functionality of the program).
-    3. Clash allows the use of regular haskell syntax to model the concept of
+    2. Clash allows the use of regular Haskell syntax to model the concept of
        'choice' at the object-level (the functionality of the program):
        if-expressions, guards, case, etc.
-    4. Clash allows programmers to use native Haskell pattern matching.
+    3. Clash allows programmers to use native Haskell pattern matching.
+
+Basically, with Clash you can use regular Haskell to describe the behavior of
+the circuit, most importantly all of it's choice-constructs (case-expressions,
+guards, etc.). With an EDSL you are "limited" by the constructs of the DSL,
+making your circuit descriptions look less like regular Haskell functions.
 
 ----
 
-- **Q**: What's the difference between Clash and Chisel/Spinal, or Hardcaml?
+- **Q**: What's the difference between Clash and Chisel/Spinal/Migen/Hardcaml?
 
-  **A**: The biggest difference between these two toolchains is that Clash
+  **A**: The biggest difference between these toolchains and Clash is that Clash
   exists as a Haskell derivative, with a full synthesizing compiler to RTL --
-  while Chisel exists as an embedding of hardware semantics inside Scala. Aside
-  from the "host language" differences, this means that Chisel is conceptually
-  closer to something like *Lava* than Clash. Hardware descriptions in both
-  Chisel and *Lava* describe how to generate a hardware description instead of
-  describing hardware directly. As a consequence these languages do not offer
-  simulation in their host languages.
+  while Chisel/Spinal/Migen/Hardcaml exists as an embedding of hardware semantics
+  inside Scala/Scala/Python/OCaml. Aside from the "host language" differences,
+  this means that Chisel/Spinal/Migen/Hardcaml are conceptually closer to
+  something like *Lava/Blarney* than Clash. So within these languages you can
+  only use the host language constructs to structure and compose the constructs
+  of the EDSL, and you can't use host language constructs to describe the
+  behavior of the circuit; i.e. you cannot use the host language's regular
+  if-expression to model the concept of choice, but you have to use e.g. Chisel's
+  *when*-function.
 
-  Another fair point worth mentioning is that while Clash and Chisel have both
-  been around for numerous years, Chisel has quite a lot more infrastructure and
-  has public, taped out production cores (in the form of e.g. `Rocket
-  <https://github.com/freechipsproject/rocket-chip>`_ and `BOOM
-  <https://github.com/ucb-bar/riscv-boom>`_). Chisel also has accompanying add-on
-  tools, such as `Spatial <https://github.com/stanford-ppl/spatial-lang>`_,
-  which allow the clean co-development of hardware and software, all within
-  Scala.
+  Aside from the above, there is also a varying degree of *native* simulation
+  and interactivity. In Clash you can evaluate/simulate any (sub-)component in
+  the interactive interpreter for an immediate and localized design feedback loop.
+  The only EDSLs that have a similar interactive interpreter for fast design
+  feedback are the older variants of Lava. They used a so-called dual-embedding,
+  where the EDSL primitives also contained a normal Haskell function which
+  described their behavior, and so the composition of these primitives could be
+  evaluated as a regular Haskell function.
 
-  Similarly, Hardcaml is an embedded DSL for RTL semantics, using `OCaml
-  <https://ocaml.org>`_ as the host language.
+  The other EDSLs all offer simulation, but there is a higher latency to get
+  from a design to a simulation of a design, and they are not as interactive.
+  Blarney emits Verilog, and you can then use a Verilog simulator to simulate
+  the Blarney design. Spinal also emits Verilog, but it then uses Verilator to
+  compile it to an object-file which is loaded back into Scala, allowing you
+  to interact with your Spinal design from within Scala. Chisel is also not
+  interpreted directly, instead, a Chisel description is "lowered" to FIRRTL
+  where that FIRRTL description is then executed inside Scala by the FIRRTL
+  interpreter. Migen works similarly to Chisel as far as the approach to
+  simulation goes, although perhaps more direct: it directly interprets its own
+  deep embedding data structure (its *IR*) to enable native simulation.
 
+  All of this influences the style in which you write circuits and the creative
+  process by which you come to a solution; the effects of this on the
+  quality of results (QoR) and development time are, however, both hard to
+  qualify and hard to quantify. That is, although all of these languages, both
+  the EDSLs and Clash, enable full control over the QoR (i.e. you can get as
+  many registers and as much logic as you intended), the way in which you get
+  there can vary from problem domain to problem domain and person to person.
+  If you have enough time, we encourage to try several of them and see which
+  style is the most natural fit for you; if you're limited on time, we of course
+  recommend that you just go with Clash ;-)
