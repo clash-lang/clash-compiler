@@ -1,0 +1,113 @@
+set origin_dir "../.."
+set _xil_proj_name_ "{{project}}"
+
+set orig_proj_dir "[file normalize "$origin_dir/"]"
+
+# Create project
+create_project ${_xil_proj_name_} ./${_xil_proj_name_} -force -part {{part}}
+
+# Set the directory path for the new project
+set proj_dir [get_property directory [current_project]]
+
+# Set project properties
+set obj [current_project]
+set_property -name "board_part" -value "{{board}}" -objects $obj
+set_property -name "default_lib" -value "xil_defaultlib" -objects $obj
+
+
+# Create 'sources_1' fileset (if not found)
+if {[string equal [get_filesets -quiet sources_1] ""]} {
+  create_fileset -srcset sources_1
+}
+set obj [get_filesets sources_1]
+
+set files [list \
+ {{#srcs}}
+ [file normalize "${origin_dir}/{{fileName}}" ]\
+ {{/srcs}}
+]
+add_files -norecurse -fileset $obj $files
+set_property -name "top" -value "{{top}}" -objects $obj
+
+{{#coreSrcs.nonempty}}
+set files [list \
+ {{#coreSrcs.items}}
+ [file normalize "${origin_dir}/{{fileName}}" ]\
+ {{/coreSrcs.items}}
+]
+set imported_files [import_files -fileset sources_1 $files]
+{{/coreSrcs.nonempty}}
+
+{{#ipcores}}
+set file "{{name}}/{{name}}.xci"
+set file_obj [get_files -of_objects [get_filesets sources_1] [list "*$file"]]
+set_property -name "generate_files_for_reference" -value "0" -objects $file_obj
+set_property -name "registered_with_manager" -value "1" -objects $file_obj
+if { ![get_property "is_locked" $file_obj] } {
+  set_property -name "synth_checkpoint_mode" -value "Singular" -objects $file_obj
+}
+{{/ipcores}}
+
+
+# Create 'constrs_1' fileset (if not found)
+if {[string equal [get_filesets -quiet constrs_1] ""]} {
+  create_fileset -constrset constrs_1
+}
+set obj [get_filesets constrs_1]
+
+{{#constraintSrcs}}
+set file [file normalize "${origin_dir}/{{fileName}}"]
+set file_imported [add_files -norecurse -fileset $obj $file]
+set file_obj [get_files -of_objects [get_filesets constrs_1] [list "*$file"]]
+set_property -name "file_type" -value "XDC" -objects $file_obj
+{{/constraintSrcs}}
+
+# Create 'sim_1' fileset (if not found)
+if {[string equal [get_filesets -quiet sim_1] ""]} {
+  create_fileset -simset sim_1
+}
+set obj [get_filesets sim_1]
+set_property -name "top" -value "{{top}}" -objects $obj
+set_property -name "top_lib" -value "xil_defaultlib" -objects $obj
+
+# Create 'synth_1' run (if not found)
+if {[string equal [get_runs -quiet synth_1] ""]} {
+    create_run -name synth_1 -part {{part}} -flow {Vivado Synthesis 2019} -strategy "Vivado Synthesis Defaults" -report_strategy {No Reports} -constrset constrs_1
+} else {
+  set_property strategy "Vivado Synthesis Defaults" [get_runs synth_1]
+  set_property flow "Vivado Synthesis 2019" [get_runs synth_1]
+}
+set obj [get_runs synth_1]
+set_property set_report_strategy_name 1 $obj
+set_property report_strategy {Vivado Synthesis Default Reports} $obj
+set_property set_report_strategy_name 0 $obj
+# Create 'synth_1_synth_report_utilization_0' report (if not found)
+if { [ string equal [get_report_configs -of_objects [get_runs synth_1] synth_1_synth_report_utilization_0] "" ] } {
+  create_report_config -report_name synth_1_synth_report_utilization_0 -report_type report_utilization:1.0 -steps synth_design -runs synth_1
+}
+set obj [get_report_configs -of_objects [get_runs synth_1] synth_1_synth_report_utilization_0]
+if { $obj != "" } {
+
+}
+set obj [get_runs synth_1]
+set_property -name "strategy" -value "Vivado Synthesis Defaults" -objects $obj
+
+# set the current synth run
+current_run -synthesis [get_runs synth_1]
+
+# Create 'impl_1' run (if not found)
+if {[string equal [get_runs -quiet impl_1] ""]} {
+    create_run -name impl_1 -part {{part}} -flow {Vivado Implementation 2019} -strategy "Vivado Implementation Defaults" -report_strategy {No Reports} -constrset constrs_1 -parent_run synth_1
+} else {
+  set_property strategy "Vivado Implementation Defaults" [get_runs impl_1]
+  set_property flow "Vivado Implementation 2019" [get_runs impl_1]
+}
+set obj [get_runs impl_1]
+set_property set_report_strategy_name 1 $obj
+set_property report_strategy {Vivado Implementation Default Reports} $obj
+set_property set_report_strategy_name 0 $obj
+
+# set the current impl run
+current_run -implementation [get_runs impl_1]
+
+puts "INFO: Project created:${_xil_proj_name_}"

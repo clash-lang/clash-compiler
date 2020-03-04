@@ -1,0 +1,258 @@
+set myProject "{{project}}"
+set myScript "{{project}}.tcl"
+set myTop "{{top}}"
+
+proc run_process {} {
+
+   global myScript
+   global myProject
+
+   ## put out a 'heartbeat' - so we know something's happening.
+   puts "\n$myScript: running ($myProject)...\n"
+
+   if { ! [ open_project ] } {
+      return false
+   }
+
+   set_process_props
+   #
+   # Remove the comment characters (#'s) to enable the following commands
+   # process run "Synthesize"
+   # process run "Translate"
+   # process run "Map"
+   # process run "Place & Route"
+   #
+   set task "Implement Design"
+   if { ! [run_task $task] } {
+      puts "$myScript: $task run failed, check run output for details."
+      project close
+      return
+   }
+
+   set task "Generate Programming File"
+   if { ! [run_task $task] } {
+      puts "$myScript: $task run failed, check run output for details."
+      project close
+      return
+   }
+
+   puts "Run completed (successfully)."
+   project close
+
+}
+
+proc rebuild_project {} {
+
+   global myScript
+   global myProject
+
+   project close
+   ## put out a 'heartbeat' - so we know something's happening.
+   puts "\n$myScript: Rebuilding ($myProject)...\n"
+
+   set proj_exts [ list ise xise gise ]
+   foreach ext $proj_exts {
+      set proj_name "${myProject}.$ext"
+      if { [ file exists $proj_name ] } {
+         file delete $proj_name
+      }
+   }
+
+   project new $myProject
+   set_project_props
+   add_source_files
+   create_libraries
+   puts "$myScript: project rebuild completed."
+
+   run_process
+
+}
+
+proc run_task { task } {
+
+   # helper proc for run_process
+
+   puts "Running '$task'"
+   set result [ process run "$task" ]
+   #
+   # check process status (and result)
+   set status [ process get $task status ]
+   if { ( ( $status != "up_to_date" ) && \
+            ( $status != "warnings" ) ) || \
+         ! $result } {
+      return false
+   }
+   return true
+}
+
+proc show_help {} {
+
+   global myScript
+
+   puts ""
+   puts "usage: xtclsh $myScript <options>"
+   puts "       or you can run xtclsh and then enter 'source $myScript'."
+   puts ""
+   puts "options:"
+   puts "   run_process       - set properties and run processes."
+   puts "   rebuild_project   - rebuild the project from scratch and run processes."
+   puts "   set_project_props - set project properties (device, speed, etc.)"
+   puts "   add_source_files  - add source files"
+   puts "   create_libraries  - create vhdl libraries"
+   puts "   set_process_props - set process property values"
+   puts "   show_help         - print this message"
+   puts ""
+}
+
+proc open_project {} {
+
+   global myScript
+   global myProject
+
+   if { ! [ file exists ${myProject}.xise ] } {
+      ## project file isn't there, rebuild it.
+      puts "Project $myProject not found. Use project_rebuild to recreate it."
+      return false
+   }
+
+   project open $myProject
+
+   return true
+
+}
+
+proc set_project_props {} {
+
+   global myScript
+
+   if { ! [ open_project ] } {
+      return false
+   }
+
+   puts "$myScript: Setting project properties..."
+
+   project set family "{{targetFamily}}"
+   project set device "{{targetDevice}}"
+   project set package "{{targetPackage}}"
+   project set speed "{{targetSpeed}}"
+   project set top_level_module_type "HDL"
+   project set synthesis_tool "XST (VHDL/Verilog)"
+   project set simulator "ISim (VHDL/Verilog)"
+   project set "Preferred Language" "VHDL"
+}
+
+
+proc findRtfPath { relativePath } {
+   set xilenv ""
+   if { [info exists ::env(XILINX) ] } {
+      if { [info exists ::env(MYXILINX)] } {
+         set xilenv [join [list $::env(MYXILINX) $::env(XILINX)] $::xilinx::path_sep ]
+      } else {
+         set xilenv $::env(XILINX)
+      }
+   }
+   foreach path [ split $xilenv $::xilinx::path_sep ] {
+      set fullPath [ file join $path $relativePath ]
+      if { [ file exists $fullPath ] } {
+         return $fullPath
+      }
+   }
+   return ""
+}
+
+proc add_source_files {} {
+
+   global myProject
+   global myScript
+   global myTop
+
+   if { ! [ open_project ] } {
+      return false
+   }
+
+   source [ findRtfPath "data/projnav/scripts/dpm_cgUtils.tcl" ]
+
+   {{#ipcores}}
+   if { ! [ file exists "ipcore_dir/{{name}}.vhd" ] } {
+       puts "$myScript: Regenerating {{name}}"
+       cd ipcore_dir
+       run_cg_regen "{{name}}" {{targetDevice}}{{targetSpeed}}{{targetPackage}} VHDL CURRENT
+       cd ..
+   }
+   {{/ipcores}}
+
+
+   puts "$myScript: Adding sources to project..."
+
+   {{#srcs}}
+   xfile add "{{fileName}}"
+   {{/srcs}}
+
+   # Set the Top Module as well...
+   project set top "rtl" $myTop
+
+   puts "$myScript: project sources reloaded."
+
+} ; # end add_source_files
+
+proc create_libraries {} {
+
+   global myScript
+
+   if { ! [ open_project ] } {
+      return false
+   }
+
+   puts "$myScript: Creating libraries..."
+
+
+   # must close the project or library definitions aren't saved.
+   project save
+
+} ; # end create_libraries
+
+proc set_process_props {} {
+
+   global myScript
+
+   if { ! [ open_project ] } {
+      return false
+   }
+
+   puts "$myScript: setting process properties..."
+
+   project set "Compiled Library Directory" "\$XILINX/<language>/<simulator>"
+   project set "Functional Model Target Language" "VHDL" -process "View HDL Source"
+
+   puts "$myScript: project property values set."
+
+} ; # end set_process_props
+
+proc main {} {
+
+   if { [llength $::argv] == 0 } {
+      show_help
+      return true
+   }
+
+   foreach option $::argv {
+      switch $option {
+         "show_help"           { show_help }
+         "run_process"         { run_process }
+         "rebuild_project"     { rebuild_project }
+         "set_project_props"   { set_project_props }
+         "add_source_files"    { add_source_files }
+         "create_libraries"    { create_libraries }
+         "set_process_props"   { set_process_props }
+         default               { puts "unrecognized option: $option"; show_help }
+      }
+   }
+}
+
+if { $tcl_interactive } {
+   show_help
+} else {
+   if {[catch {main} result]} {
+      puts "$myScript failed: $result."
+   }
+}

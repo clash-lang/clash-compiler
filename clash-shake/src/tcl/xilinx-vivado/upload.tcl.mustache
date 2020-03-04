@@ -1,0 +1,14 @@
+open_hw
+connect_hw_server
+open_hw_target
+
+set devs [get_hw_devices {{targetDevice}}_0]
+set dev [lindex $devs 0]
+
+current_hw_device $devs
+refresh_hw_device -update_hw_probes false $dev
+set_property PROGRAM.FILE {{project}}/{{project}}.runs/impl_1/{{top}}.bit $dev
+
+program_hw_devices $dev
+refresh_hw_device $dev
+
