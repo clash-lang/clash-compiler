@@ -174,7 +174,7 @@ snap-bindist:
     - tar xf usr_nix.tar.xz -C / || true
     - apt update
     - apt install ksh -y  # TODO: Remove need for ksh in mkBinDist.sh
-    - cd bindist/linux/snap && ./mkBinDist.sh |& tee $ROOT/nix_build.log | egrep -i '^(building|copying)'
+    - cd bindist/linux/snap && ./mkBinDist.sh |& tee $ROOT/nix_build.log | (egrep -i '^(building|copying)' || true)
     - tar cJf $ROOT/usr_nix.tar.xz /usr/nix
 
   # Run every night, when explicitly triggered, or when tagged (release)
@@ -215,10 +215,10 @@ snap-bindist:
     - snapcraft
     - snapcraft push *.snap --release ${RELEASE_CHANNEL}
 
-snap-edge:
+snap-beta:
   extends: .snap
   variables:
-    RELEASE_CHANNEL: edge
+    RELEASE_CHANNEL: beta
   only:
     - schedules
     - triggers
