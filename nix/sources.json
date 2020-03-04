@@ -35,16 +35,28 @@
         "url": "https://github.com/NixOS/nixpkgs-channels/archive/84f47bfe9ae892042fcb04f319ffe208cd0dbfd9.tar.gz",
         "url_template": "https://github.com/<owner>/<repo>/archive/<rev>.tar.gz"
     },
+    "ghc-tcplugins-extra": {
+        "branch": "master",
+        "description": "",
+        "homepage": null,
+        "owner": "clash-lang",
+        "repo": "ghc-tcplugins-extra",
+        "rev": "380e4510ae94e6b6cfb1bcacf633437e2c7226a4",
+        "sha256": "0fwfjvqw4k9lk23xrysiw54khfcif2s2cg52zwkgd0wbhjg6rrmd",
+        "type": "tarball",
+        "url": "https://github.com/clash-lang/ghc-tcplugins-extra/archive/380e4510ae94e6b6cfb1bcacf633437e2c7226a4.tar.gz",
+        "url_template": "https://github.com/<owner>/<repo>/archive/<rev>.tar.gz"
+    },
     "ghc-typelits-knownnat": {
         "branch": "master",
         "description": "Derive KnownNat constraints from other KnownNat constraints",
         "homepage": null,
         "owner": "clash-lang",
         "repo": "ghc-typelits-knownnat",
-        "rev": "cc73e761086e2d48acdf134b06ad3af47e115166",
-        "sha256": "151pd1bi9ynln2dm1rijz7cjp4f6jlrmcj6s6kwvgjl22rqb9b2h",
+        "rev": "d659bcb565c924738a7aa9bbc9325c8cdcbfea25",
+        "sha256": "00fqzsfrd4iwrvyz4r6j9rng8x9xqsvblm65b4wgyvgifnxsj7i4",
         "type": "tarball",
-        "url": "https://github.com/clash-lang/ghc-typelits-knownnat/archive/cc73e761086e2d48acdf134b06ad3af47e115166.tar.gz",
+        "url": "https://github.com/clash-lang/ghc-typelits-knownnat/archive/d659bcb565c924738a7aa9bbc9325c8cdcbfea25.tar.gz",
         "url_template": "https://github.com/<owner>/<repo>/archive/<rev>.tar.gz"
     },
     "ghc-typelits-extra": {
@@ -53,10 +65,22 @@
         "homepage": null,
         "owner": "clash-lang",
         "repo": "ghc-typelits-extra",
-        "rev": "310d83b4dc2141b790ebdb0c19c34294854b2c93",
-        "sha256": "1fgla50kkg1za5p5m9sc56rnwyissfb4rwjhlfz4gnhi5nc1890p",
+        "rev": "4260319fc9242bac504b74d6e1b9592ae53a3609",
+        "sha256": "1gmvh3gv8zysgfi4xwhiz0xw5hn8wqpdi5dziqsj7knrh69fvp5d",
         "type": "tarball",
-        "url": "https://github.com/clash-lang/ghc-typelits-extra/archive/310d83b4dc2141b790ebdb0c19c34294854b2c93.tar.gz",
+        "url": "https://github.com/clash-lang/ghc-typelits-extra/archive/4260319fc9242bac504b74d6e1b9592ae53a3609.tar.gz",
+        "url_template": "https://github.com/<owner>/<repo>/archive/<rev>.tar.gz"
+    },
+    "ghc-typelits-natnormalise": {
+        "branch": "master",
+        "description": "GHC typechecker plugin for types of kind GHC.TypeLits.Nat",
+        "homepage": null,
+        "owner": "clash-lang",
+        "repo": "ghc-typelits-natnormalise",
+        "rev": "2ca55909cdbaa27abb225b17890171c1bf104cca",
+        "sha256": "1d000ky8yn64f0ygznf5fjhxq6rnvny0h097jz1a2rvagdggydy8",
+        "type": "tarball",
+        "url": "https://github.com/clash-lang/ghc-typelits-natnormalise/archive/2ca55909cdbaa27abb225b17890171c1bf104cca.tar.gz",
         "url_template": "https://github.com/<owner>/<repo>/archive/<rev>.tar.gz"
     }
 }
