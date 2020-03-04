@@ -57,7 +57,7 @@ Build-type:           Simple
 
 Extra-source-files:
   README.md,
-  CHANGELOG.rst
+  CHANGELOG.md,
   src/ClashDebug.h
 
 Data-files:

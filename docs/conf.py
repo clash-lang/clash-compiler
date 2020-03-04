@@ -14,13 +14,13 @@ sys.path.insert(0, os.path.abspath('.'))
 needs_sphinx = '1.6'
 
 extensions = [
+    'recommonmark',
     'sphinx.ext.todo',
     'sphinx.ext.mathjax',
-    'sphinx.ext.extlinks'
+    'sphinx.ext.extlinks',
 ]
 
 templates_path = ['_templates']
-source_suffix = '.rst'
 source_encoding = 'utf-8-sig'
 master_doc = 'index'
 
@@ -37,7 +37,7 @@ pygments_style = 'tango'
 
 # List of patterns, relative to source directory, that match files and
 # directories to ignore when looking for source files.
-exclude_patterns = ['_build']
+exclude_patterns = ['_build', 'README.md']
 
 # If true, `todo` and `todoList` produce output, else they produce nothing.
 todo_include_todos = True
