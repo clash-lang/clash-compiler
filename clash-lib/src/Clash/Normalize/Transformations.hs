@@ -78,7 +78,6 @@ import qualified Data.Maybe                  as Maybe
 import qualified Data.Monoid                 as Monoid
 import qualified Data.Primitive.ByteArray    as BA
 import qualified Data.Text                   as Text
-import qualified Data.Vector.Primitive       as PV
 import           Debug.Trace
 import           GHC.Integer.GMP.Internals   (Integer (..), BigNat (..))
 
@@ -685,10 +684,9 @@ matchLiteralContructor c (IntegerLiteral l) alts = go (reverse alts)
     , l >= 2^(63::Int)
     = let !(Jp# !(BN# ba)) = l
           ba'       = BA.ByteArray ba
-          bv        = PV.Vector 0 (BA.sizeofByteArray ba') ba'
           fvs       = Lens.foldMapOf freeLocalIds unitVarSet e
           (binds,_) = List.partition ((`elemVarSet` fvs) . fst)
-                    $ zip xs [Literal (ByteArrayLiteral bv)]
+                    $ zip xs [Literal (ByteArrayLiteral ba')]
           e' = case binds of
                  [] -> e
                  _  -> Letrec binds e
@@ -697,10 +695,9 @@ matchLiteralContructor c (IntegerLiteral l) alts = go (reverse alts)
     , l < ((-2)^(63::Int))
     = let !(Jn# !(BN# ba)) = l
           ba'       = BA.ByteArray ba
-          bv        = PV.Vector 0 (BA.sizeofByteArray ba') ba'
           fvs       = Lens.foldMapOf freeLocalIds unitVarSet e
           (binds,_) = List.partition ((`elemVarSet` fvs) . fst)
-                    $ zip xs [Literal (ByteArrayLiteral bv)]
+                    $ zip xs [Literal (ByteArrayLiteral ba')]
           e' = case binds of
                  [] -> e
                  _  -> Letrec binds e
@@ -731,10 +728,9 @@ matchLiteralContructor c (NaturalLiteral l) alts = go (reverse alts)
     , l >= 2^(64::Int)
     = let !(Jp# !(BN# ba)) = l
           ba'       = BA.ByteArray ba
-          bv        = PV.Vector 0 (BA.sizeofByteArray ba') ba'
           fvs       = Lens.foldMapOf freeLocalIds unitVarSet e
           (binds,_) = List.partition ((`elemVarSet` fvs) . fst)
-                    $ zip xs [Literal (ByteArrayLiteral bv)]
+                    $ zip xs [Literal (ByteArrayLiteral ba')]
           e' = case binds of
                  [] -> e
                  _  -> Letrec binds e

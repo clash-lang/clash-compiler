@@ -9,7 +9,7 @@
 * Fixes issues:
   * No fixes yet!
 * Fixes without issue reports:
-  * No fixes yet!
+  *  Use `ByteArray` instead of `Vector Word8` in the `ByteArrayLiteral` type. See [#1151](https://github.com/clash-lang/clash-compiler/pull/1151)
     
 
 ## 1.2.0 *March 5th 2020*

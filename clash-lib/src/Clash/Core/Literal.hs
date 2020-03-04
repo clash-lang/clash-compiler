@@ -20,10 +20,9 @@ where
 
 import Control.DeepSeq                        (NFData (..))
 import Data.Binary                            (Binary)
-import Data.Vector.Binary                     ()
 import Data.Hashable                          (Hashable)
-import Data.Vector.Primitive.Extra            (Vector)
-import Data.Word                              (Word8)
+import Data.Primitive.ByteArray               (ByteArray)
+import Data.Primitive.ByteArray.Extra         ()
 import GHC.Generics                           (Generic)
 
 import {-# SOURCE #-} Clash.Core.Type         (Type)
@@ -46,7 +45,7 @@ data Literal
   | DoubleLiteral   !Rational
   | CharLiteral     !Char
   | NaturalLiteral  !Integer
-  | ByteArrayLiteral !(Vector Word8)
+  | ByteArrayLiteral !ByteArray
   deriving (Eq,Ord,Show,Generic,NFData,Hashable,Binary)
 
 -- | Determines the Type of a Literal

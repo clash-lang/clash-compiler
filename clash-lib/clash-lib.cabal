@@ -251,9 +251,9 @@ Library
 
   Other-Modules:      Clash.Annotations.TopEntity.Extra
                       Data.Aeson.Extra
+                      Data.Primitive.ByteArray.Extra
                       Data.Semigroup.Monad.Extra
                       Data.Set.Ordered.Extra
-                      Data.Vector.Primitive.Extra
                       GHC.BasicTypes.Extra
                       GHC.SrcLoc.Extra
                       Paths_clash_lib
