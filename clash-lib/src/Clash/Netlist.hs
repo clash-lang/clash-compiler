@@ -38,7 +38,6 @@ import           Data.Maybe
 import qualified Data.Set                         as Set
 import           Data.Primitive.ByteArray         (ByteArray (..))
 import qualified Data.Text                        as StrictText
-import qualified Data.Vector.Primitive            as PV
 import           GHC.Integer.GMP.Internals        (Integer (..), BigNat (..))
 import           System.FilePath                  ((</>), (<.>))
 import           Text.Read                        (readMaybe)
@@ -724,7 +723,7 @@ mkExpr _ _ _ (stripTicks -> Core.Literal l) = do
                             i = toInteger (doubleToWord d)
                         in  return (HW.Literal (Just (BitVector 64,64)) (NumLit i), [])
     NaturalLiteral n -> return (HW.Literal (Just (Unsigned iw,iw)) $ NumLit n, [])
-    ByteArrayLiteral (PV.Vector _ _ (ByteArray ba)) -> return (HW.Literal Nothing (NumLit (Jp# (BN# ba))),[])
+    ByteArrayLiteral (ByteArray ba) -> return (HW.Literal Nothing (NumLit (Jp# (BN# ba))),[])
     _ -> error $ $(curLoc) ++ "not an integer or char literal"
 
 mkExpr bbEasD declType bndr app =

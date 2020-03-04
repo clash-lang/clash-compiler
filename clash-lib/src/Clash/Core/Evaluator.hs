@@ -25,7 +25,6 @@ import           Data.List                               (foldl',mapAccumL)
 import           Data.Maybe                              (fromMaybe)
 import qualified Data.Primitive.ByteArray                as BA
 import qualified Data.Text as Text
-import qualified Data.Vector.Primitive                   as PV
 import           Debug.Trace
 import           GHC.Integer.GMP.Internals
   (Integer (..), BigNat (..))
@@ -409,13 +408,11 @@ scrutinise (Lit l) alts m = case alts of
        2 | l1 >= (2^(63::Int)) ->
           let !(Jp# !(BN# ba0)) = l1
               ba1 = BA.ByteArray ba0
-              bv = PV.Vector 0 (BA.sizeofByteArray ba1) ba1
-          in  Just (ByteArrayLiteral bv)
+          in  Just (ByteArrayLiteral ba1)
        3 | l1 < ((-2)^(63::Int)) ->
           let !(Jn# !(BN# ba0)) = l1
               ba1 = BA.ByteArray ba0
-              bv = PV.Vector 0 (BA.sizeofByteArray ba1) ba1
-          in  Just (ByteArrayLiteral bv)
+          in  Just (ByteArrayLiteral ba1)
        _ -> Nothing
     = let inScope = localFVsOfTerms [altE]
           subst0  = mkSubst (mkInScopeSet inScope)
@@ -428,8 +425,7 @@ scrutinise (Lit l) alts m = case alts of
        2 | l1 >= (2^(64::Int)) ->
           let !(Jp# !(BN# ba0)) = l1
               ba1 = BA.ByteArray ba0
-              bv = PV.Vector 0 (BA.sizeofByteArray ba1) ba1
-          in  Just (ByteArrayLiteral bv)
+          in  Just (ByteArrayLiteral ba1)
        _ -> Nothing
     = let inScope = localFVsOfTerms [altE]
           subst0  = mkSubst (mkInScopeSet inScope)

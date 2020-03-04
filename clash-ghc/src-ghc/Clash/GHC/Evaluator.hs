@@ -29,13 +29,13 @@ import           Data.Char           (chr,ord)
 import qualified Data.Either         as Either
 import           Data.Maybe (fromMaybe, mapMaybe)
 import qualified Data.List           as List
-import qualified Data.Primitive.ByteArray as ByteArray
+import qualified Data.Primitive.ByteArray as BA
 import           Data.Proxy          (Proxy)
 import           Data.Reflection     (reifyNat)
 import           Data.Text           (Text)
 import qualified Data.Text           as Text
-import qualified Data.Vector.Primitive as Vector
 import           Debug.Trace         (trace)
+import           GHC.Exts (IsList(..))
 import           GHC.Float
 import           GHC.Int
 import           GHC.Integer
@@ -678,7 +678,7 @@ reduceConstant tcm isSubj pInfo tys args mach = case primName pInfo of
            (Just tupTc) = lookupUniqMap tupTcNm tcm
            [tupDc] = tyConDataCons tupTc
            p = primCount mach
-           lit = Literal (ByteArrayLiteral (Vector.replicate (fromInteger i) 0))
+           lit = Literal (ByteArrayLiteral (fromList (List.genericReplicate i 0)))
            mbaTy = mkFunTy intPrimTy (last tyArgs)
            newE = mkApps (Data tupDc) (map Right tyArgs ++
                     [Left (Prim rwTy)
@@ -693,16 +693,16 @@ reduceConstant tcm isSubj pInfo tys args mach = case primName pInfo of
       ,PrimVal rwTy _ _
       ] <- args
     , [ba,off,len,c] <- intLiterals' [baV,offV,lenV,cV]
-    -> let Just (Literal (ByteArrayLiteral (Vector.Vector voff vlen ba1))) =
+    -> let Just (Literal (ByteArrayLiteral ba1)) =
               primLookup (fromInteger ba) mach
            !(I# off') = fromInteger off
            !(I# len') = fromInteger len
            !(I# c')   = fromInteger c
            ba2 = unsafeDupablePerformIO $ do
-                  ByteArray.MutableByteArray mba <- ByteArray.unsafeThawByteArray ba1
+                  BA.MutableByteArray mba <- BA.unsafeThawByteArray ba1
                   svoid (setByteArray# mba off' len' c')
-                  ByteArray.unsafeFreezeByteArray (ByteArray.MutableByteArray mba)
-           ba3 = Literal (ByteArrayLiteral (Vector.Vector voff vlen ba2))
+                  BA.unsafeFreezeByteArray (BA.MutableByteArray mba)
+           ba3 = Literal (ByteArrayLiteral ba2)
        in Just . setTerm (Prim rwTy) $ primUpdate (fromInteger ba) ba3 mach
 
   "GHC.Prim.writeWordArray#"
@@ -712,15 +712,15 @@ reduceConstant tcm isSubj pInfo tys args mach = case primName pInfo of
       ] <- args
     , [ba,i] <- intLiterals' [baV,iV]
     , [w] <- wordLiterals' [wV]
-    -> let Just (Literal (ByteArrayLiteral (Vector.Vector off len ba1))) =
+    -> let Just (Literal (ByteArrayLiteral ba1)) =
               primLookup (fromInteger ba) mach
            !(I# i') = fromInteger i
            !(W# w') = fromIntegral w
            ba2 = unsafeDupablePerformIO $ do
-                  ByteArray.MutableByteArray mba <- ByteArray.unsafeThawByteArray ba1
+                  BA.MutableByteArray mba <- BA.unsafeThawByteArray ba1
                   svoid (writeWordArray# mba i' w')
-                  ByteArray.unsafeFreezeByteArray (ByteArray.MutableByteArray mba)
-           ba3 = Literal (ByteArrayLiteral (Vector.Vector off len ba2))
+                  BA.unsafeFreezeByteArray (BA.MutableByteArray mba)
+           ba3 = Literal (ByteArrayLiteral ba2)
        in Just . setTerm (Prim rwTy) $ primUpdate (fromInteger ba) ba3 mach
 
   "GHC.Prim.unsafeFreezeByteArray#"
@@ -738,10 +738,10 @@ reduceConstant tcm isSubj pInfo tys args mach = case primName pInfo of
 
   "GHC.Prim.sizeofByteArray#"
     | [Lit (ByteArrayLiteral ba)] <- args
-    -> reduce (Literal (IntLiteral (toInteger (Vector.length ba))))
+    -> reduce (Literal (IntLiteral (toInteger (BA.sizeofByteArray ba))))
 
   "GHC.Prim.indexWordArray#"
-    | [Lit (ByteArrayLiteral (Vector.Vector _ _ (ByteArray.ByteArray ba))),iV] <- args
+    | [Lit (ByteArrayLiteral (BA.ByteArray ba)),iV] <- args
     , [i] <- intLiterals' [iV]
     -> let !(I# i') = fromInteger i
            !w       = indexWordArray# ba i'
@@ -756,7 +756,7 @@ reduceConstant tcm isSubj pInfo tys args mach = case primName pInfo of
            (Just tupTc) = lookupUniqMap tupTcNm tcm
            [tupDc] = tyConDataCons tupTc
            Just (Literal (ByteArrayLiteral ba')) = primLookup (fromInteger ba) mach
-           lit = Literal (IntLiteral (toInteger (Vector.length ba')))
+           lit = Literal (IntLiteral (toInteger (BA.sizeofByteArray ba')))
        in  reduce $ mkApps (Data tupDc) (map Right tyArgs ++
                       [Left (Prim rwTy)
                       ,Left lit])
@@ -771,15 +771,15 @@ reduceConstant tcm isSubj pInfo tys args mach = case primName pInfo of
            (Just tupTc) = lookupUniqMap tupTcNm tcm
            [tupDc] = tyConDataCons tupTc
            p = primCount mach
-           Just (Literal (ByteArrayLiteral (Vector.Vector 0 _ ba1)))
+           Just (Literal (ByteArrayLiteral ba1))
             = primLookup (fromInteger ba) mach
            !(I# i') = fromInteger i
            ba2 = unsafeDupablePerformIO $ do
-                   ByteArray.MutableByteArray mba <- ByteArray.unsafeThawByteArray ba1
+                   BA.MutableByteArray mba <- BA.unsafeThawByteArray ba1
                    mba' <- IO (\s -> case resizeMutableByteArray# mba i' s of
-                                 (# s', mba' #) -> (# s', ByteArray.MutableByteArray mba' #))
-                   ByteArray.unsafeFreezeByteArray mba'
-           ba3 = Literal (ByteArrayLiteral (Vector.Vector 0 (I# i') ba2))
+                                 (# s', mba' #) -> (# s', BA.MutableByteArray mba' #))
+                   BA.unsafeFreezeByteArray mba'
+           ba3 = Literal (ByteArrayLiteral ba2)
            newE = mkApps (Data tupDc) (map Right tyArgs ++
                     [Left (Prim rwTy)
                     ,Left (mkApps (Prim mbaTy)
@@ -793,34 +793,34 @@ reduceConstant tcm isSubj pInfo tys args mach = case primName pInfo of
       ,PrimVal rwTy _ _
       ] <- args
     , [ba,len] <- intLiterals' [baV,lenV]
-    -> let Just (Literal (ByteArrayLiteral (Vector.Vector voff vlen ba1))) =
+    -> let Just (Literal (ByteArrayLiteral ba1)) =
               primLookup (fromInteger ba) mach
            !(I# len') = fromInteger len
            ba2 = unsafeDupablePerformIO $ do
-                  ByteArray.MutableByteArray mba <- ByteArray.unsafeThawByteArray ba1
+                  BA.MutableByteArray mba <- BA.unsafeThawByteArray ba1
                   svoid (shrinkMutableByteArray# mba len')
-                  ByteArray.unsafeFreezeByteArray (ByteArray.MutableByteArray mba)
-           ba3 = Literal (ByteArrayLiteral (Vector.Vector voff vlen ba2))
+                  BA.unsafeFreezeByteArray (BA.MutableByteArray mba)
+           ba3 = Literal (ByteArrayLiteral ba2)
        in Just . setTerm (Prim rwTy) $ primUpdate (fromInteger ba) ba3 mach
 
   "GHC.Prim.copyByteArray#"
-    | [Lit (ByteArrayLiteral (Vector.Vector _ _ (ByteArray.ByteArray src_ba)))
+    | [Lit (ByteArrayLiteral (BA.ByteArray src_ba))
       ,src_offV
       ,PrimVal _mbaTy _ [dst_mbaV]
       ,dst_offV, nV
       ,PrimVal rwTy _ _
       ] <- args
     , [src_off,dst_mba,dst_off,n] <- intLiterals' [src_offV,dst_mbaV,dst_offV,nV]
-    -> let Just (Literal (ByteArrayLiteral (Vector.Vector voff vlen dst_ba))) =
+    -> let Just (Literal (ByteArrayLiteral dst_ba)) =
               primLookup (fromInteger dst_mba) mach
            !(I# src_off') = fromInteger src_off
            !(I# dst_off') = fromInteger dst_off
            !(I# n')       = fromInteger n
            ba2 = unsafeDupablePerformIO $ do
-                  ByteArray.MutableByteArray dst_mba1 <- ByteArray.unsafeThawByteArray dst_ba
+                  BA.MutableByteArray dst_mba1 <- BA.unsafeThawByteArray dst_ba
                   svoid (copyByteArray# src_ba src_off' dst_mba1 dst_off' n')
-                  ByteArray.unsafeFreezeByteArray (ByteArray.MutableByteArray dst_mba1)
-           ba3 = Literal (ByteArrayLiteral (Vector.Vector voff vlen ba2))
+                  BA.unsafeFreezeByteArray (BA.MutableByteArray dst_mba1)
+           ba3 = Literal (ByteArrayLiteral ba2)
        in Just . setTerm (Prim rwTy) $ primUpdate (fromInteger dst_mba) ba3 mach
 
   "GHC.Prim.readWordArray#"
@@ -832,11 +832,11 @@ reduceConstant tcm isSubj pInfo tys args mach = case primName pInfo of
     -> let (_,tyView -> TyConApp tupTcNm tyArgs) = splitFunForallTy ty
            (Just tupTc) = lookupUniqMap tupTcNm tcm
            [tupDc] = tyConDataCons tupTc
-           Just (Literal (ByteArrayLiteral (Vector.Vector _ _ ba1))) =
+           Just (Literal (ByteArrayLiteral ba1)) =
               primLookup (fromInteger ba) mach
            !(I# off') = fromInteger off
            w = unsafeDupablePerformIO $ do
-                  ByteArray.MutableByteArray mba <- ByteArray.unsafeThawByteArray ba1
+                  BA.MutableByteArray mba <- BA.unsafeThawByteArray ba1
                   IO (\s -> case readWordArray# mba off' s of
                         (# s', w' #) -> (# s',  W# w' #))
            newE = mkApps (Data tupDc) (map Right tyArgs ++
@@ -3455,7 +3455,7 @@ integerLiteral v =
     DC dc [Left (Literal (IntLiteral i))]
       | dcTag dc == 1
       -> Just i
-    DC dc [Left (Literal (ByteArrayLiteral (Vector.Vector _ _ (ByteArray.ByteArray ba))))]
+    DC dc [Left (Literal (ByteArrayLiteral (BA.ByteArray ba)))]
       | dcTag dc == 2
       -> Just (Jp# (BN# ba))
       | dcTag dc == 3
@@ -3472,7 +3472,7 @@ naturalLiteral v =
     DC dc [Left (Literal (WordLiteral i))]
       | dcTag dc == 1
       -> Just i
-    DC dc [Left (Literal (ByteArrayLiteral (Vector.Vector _ _ (ByteArray.ByteArray ba))))]
+    DC dc [Left (Literal (ByteArrayLiteral (BA.ByteArray ba)))]
       | dcTag dc == 2
       -> Just (Jp# (BN# ba))
     _ -> Nothing
