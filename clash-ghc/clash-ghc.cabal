@@ -44,7 +44,7 @@ Category:             Hardware
 Build-type:           Simple
 
 Extra-source-files:   README.md,
-                      CHANGELOG.rst,
+                      CHANGELOG.md,
                       LICENSE_GHC,
                       cbits/PosixSource.h,
                       src-bin-841/Clash/GHCi/HsVersions.h

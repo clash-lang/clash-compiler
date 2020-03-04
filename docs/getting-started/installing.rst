@@ -3,7 +3,7 @@
 Installing Clash
 ================
 
-.. include:: ../../README.rst
+.. include:: ../../README.md
   :start-after: install_start
   :end-before: install_end
 
