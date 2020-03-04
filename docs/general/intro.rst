@@ -109,7 +109,7 @@ We encourage users to file issues, or contribute pull requests on our
 Meta-information: Web Sites, Mailing Lists, etc.
 ------------------------------------------------
 
-.. include:: ../../README.rst
+.. include:: ../../README.md
   :start-after: community_start
   :end-before: community_end
 
