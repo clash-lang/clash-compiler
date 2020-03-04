@@ -18,6 +18,7 @@
 #   * `p`, `prelude`, `clash-prelude`
 #   * `l`, `lib`, `clash-lib`
 #   * `g`, `ghc`, `clash-ghc`
+#   * `s`, `shake`, `clash-shake`
 #   * `dev`, `clash-dev`
 #
 # That means the following will start a repl-loop for clash-lib:
@@ -38,6 +39,9 @@ elif [[ $1 == "l" || $1 == "lib" || $1 == "clash-lib" ]]; then
 elif [[ $1 == "g" || $1 == "ghc" || $1 == "clash-ghc" ]]; then
   target="cabal new-repl clash-ghc --repl-options=-fobject-code --repl-options=-fforce-recomp"
   watch="clash-prelude clash-lib clash-ghc/clash-ghc.cabal"
+elif [[ $1 == "s" || $1 == "shake" || $1 == "clash-shake" ]]; then
+  target="cabal new-repl clash-shake"
+  watch="clash-prelude clash-lib clash-ghc clash-shake/clash-shake.cabal"
 elif [[ $1 == "dev" || $1 == "clash-dev" ]]; then
   target="./clash-dev"
   watch="clash-prelude clash-lib/clash-lib.cabal clash-ghc/clash-ghc.cabal"
@@ -46,6 +50,7 @@ else
   echo "  p, prelude, clash-prelude"       > /dev/stderr
   echo "  l, lib, clash-lib"               > /dev/stderr
   echo "  g, ghc, clash-ghc"               > /dev/stderr
+  echo "  s, shake, clash-shake"           > /dev/stderr
   echo "  dev, clash-dev"                  > /dev/stderr
   exit 1;
 fi
