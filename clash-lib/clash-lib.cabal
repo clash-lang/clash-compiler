@@ -136,7 +136,7 @@ Library
                       TemplateHaskell
 
   Build-depends:      aeson                   >= 0.6.2.0  && < 1.5,
-                      ansi-terminal           >= 0.8.0.0  && < 0.10,
+                      ansi-terminal           >= 0.8.0.0  && < 0.11,
                       attoparsec              >= 0.10.4.0 && < 0.14,
                       base                    >= 4.10     && < 5,
                       binary                  >= 0.8.5    && < 0.11,
