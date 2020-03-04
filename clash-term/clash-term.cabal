@@ -25,7 +25,7 @@ source-repository head
 executable clash-term
   Main-Is:            Main.hs
   Build-Depends:      base              >= 4.3.1.0  && < 5,
-                      clash-lib         >= 1.1      && < 1.2,
+                      clash-lib,
                       binary            >= 0.8.5    && < 0.11,
                       prettyprinter     >= 1.2.0.1  && < 2.0,
                       bytestring        >= 0.10.0.2 && < 0.11,

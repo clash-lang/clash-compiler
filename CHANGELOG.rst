@@ -1,251 +1,274 @@
 Changelog for the Clash project
 ===============================
+1.3.0
+-----
+-  New features (API):
 
-1.1.0
+   -  No new features yet!
+
+-  New features (Compiler):
+
+   -  No new features yet!
+
+-  Fixes issues:
+
+   -  No fixes yet!
+
+-  Fixes without issue reports:
+
+   -  No fixes yet!
+
+1.2.0
 -----
 
 -  New features (API):
--  ``Clash.Class.Parity`` type class replaces Prelude ``odd`` and
-   ``even`` functions due to assumptions that don't hold for Clash
-   specific numerical types, see
-   `#970 <https://github.com/clash-lang/clash-compiler/pull/970>`__.
--  ``NFDataX.ensureSpine``, see
-   `#748 <https://github.com/clash-lang/clash-compiler/pull/803>`__
--  ``makeTopEntity`` Template Haskell function for generating TopEntity
-   annotations intended to cover the majority of use cases. Generation
-   failures should either result in an explicit error, or a valid
-   annotation of an empty ``PortProduct``. Any discrepancy between the
-   *shape* of generated annotations and the *shape* of the Clash
-   compiler is a bug. See
-   `#795 <https://github.com/clash-lang/clash-compiler/pull/795>`__.
-   Known limitations:
 
-   -  Type application (excluding ``Signal``\ s and ``:::``) is best
-      effort:
-   -  Data types with type parameters will work if the generator can
-      discover a single relevant constructor after attempting type
-      application.
-   -  Arbitrary explicit clock/reset/enables are supported, but only a
-      single ``HiddenClockResetEnable`` constraint is supported.
-   -  Data/type family support is best effort.
+   -  ``Clash.Class.Parity`` type class replaces Prelude ``odd`` and
+      ``even`` functions due to assumptions that don't hold for Clash
+      specific numerical types, see
+      `#970 <https://github.com/clash-lang/clash-compiler/pull/970>`__.
+   -  ``NFDataX.ensureSpine``, see
+      `#748 <https://github.com/clash-lang/clash-compiler/pull/803>`__
+   -  ``makeTopEntity`` Template Haskell function for generating TopEntity
+      annotations intended to cover the majority of use cases. Generation
+      failures should either result in an explicit error, or a valid
+      annotation of an empty ``PortProduct``. Any discrepancy between the
+      *shape* of generated annotations and the *shape* of the Clash
+      compiler is a bug. See
+      `#795 <https://github.com/clash-lang/clash-compiler/pull/795>`__.
+      Known limitations:
 
--  Added ``Bundle ((f :*: g) a)`` instance
--  Added ``NFDataX CUShort`` instance
--  Clash's internal type family solver now recognizes ``AppendSymbol``
-   and ``CmpSymbol``
--  Added ``Clash.Magic.suffixNameFromNat``: can be used in cases where
-   ``suffixName`` is too slow
--  Added ``Clash.Class.AutoReg``. Improves the chances of synthesis
-   tools inferring clock-gated registers, when used. See
-   `#873 <https://github.com/clash-lang/clash-compiler/pull/873>`__.
--  ``Clash.Magic.suffixNameP``, ``Clash.Magic.suffixNameFromNatP``:
-   enable prefixing of name suffixes
--  Added ``Clash.Magic.noDeDup``: can be used to instruct Clash to /not/
-   share a function between multiple branches
--  A ``BitPack a`` constraint now implies a ``KnownNat (BitSize a)``
-   constraint, so you won't have to add it manually anymore. See
-   `#942 <https://github.com/clash-lang/clash-compiler/pull/942>`__.
--  ``Clash.Explicit.SimIO``: ((System)Verilog only) I/O actions that can
-   be translated to HDL I/O; useful for generated test benches.
--  Export ``Clash.Explicit.Testbench.assertBitVector``
-   `#888 <https://github.com/clash-lang/clash-compiler/pull/888/files>`__
--  Add ``Clash.Prelude.Testbench.assertBitVector`` to achieve feature
-   parity with ``Clash.Explicit.Testbench``.
-   `#891 <https://github.com/clash-lang/clash-compiler/pull/891/files>`__
--  Add ``Clash.XException.NFDataX.ensureSpine``
-   `#803 <https://github.com/clash-lang/clash-compiler/pull/803>`__
--  Add ``Clash.Class.BitPack.bitCoerceMap``
-   `#798 <https://github.com/clash-lang/clash-compiler/pull/798>`__
--  Add ``Clash.Magic.deDup``: instruct Clash to force sharing an
-   operator between multiple branches of a case-expression
--  ``InlinePrimitive`` can now support multiple backends simultaneously
-   `#425 <https://github.com/clash-lang/clash-compiler/issues/425>`__
--  Add ``Clash.XException.hwSeqX``: render declarations of an argument,
-   but don't assign it to a result signal
--  Add ``Clash.Signal.Bundle.TaggedEmptyTuple``: allows users to emulate
-   the pre-1.0 behavior of "Bundle ()". See
-   `#1100 <https://github.com/clash-lang/clash-compiler/pull/1100>`__
+      -  Type application (excluding ``Signal``\ s and ``:::``) is best
+         effort:
+      -  Data types with type parameters will work if the generator can
+         discover a single relevant constructor after attempting type
+         application.
+      -  Arbitrary explicit clock/reset/enables are supported, but only a
+         single ``HiddenClockResetEnable`` constraint is supported.
+      -  Data/type family support is best effort.
+
+   -  Added ``Bundle ((f :*: g) a)`` instance
+   -  Added ``NFDataX CUShort`` instance
+   -  Clash's internal type family solver now recognizes ``AppendSymbol``
+      and ``CmpSymbol``
+   -  Added ``Clash.Magic.suffixNameFromNat``: can be used in cases where
+      ``suffixName`` is too slow
+   -  Added ``Clash.Class.AutoReg``. Improves the chances of synthesis
+      tools inferring clock-gated registers, when used. See
+      `#873 <https://github.com/clash-lang/clash-compiler/pull/873>`__.
+   -  ``Clash.Magic.suffixNameP``, ``Clash.Magic.suffixNameFromNatP``:
+      enable prefixing of name suffixes
+   -  Added ``Clash.Magic.noDeDup``: can be used to instruct Clash to /not/
+      share a function between multiple branches
+   -  A ``BitPack a`` constraint now implies a ``KnownNat (BitSize a)``
+      constraint, so you won't have to add it manually anymore. See
+      `#942 <https://github.com/clash-lang/clash-compiler/pull/942>`__.
+   -  ``Clash.Explicit.SimIO``: ((System)Verilog only) I/O actions that can
+      be translated to HDL I/O; useful for generated test benches.
+   -  Export ``Clash.Explicit.Testbench.assertBitVector``
+      `#888 <https://github.com/clash-lang/clash-compiler/pull/888/files>`__
+   -  Add ``Clash.Prelude.Testbench.assertBitVector`` to achieve feature
+      parity with ``Clash.Explicit.Testbench``.
+      `#891 <https://github.com/clash-lang/clash-compiler/pull/891/files>`__
+   -  Add ``Clash.XException.NFDataX.ensureSpine``
+      `#803 <https://github.com/clash-lang/clash-compiler/pull/803>`__
+   -  Add ``Clash.Class.BitPack.bitCoerceMap``
+      `#798 <https://github.com/clash-lang/clash-compiler/pull/798>`__
+   -  Add ``Clash.Magic.deDup``: instruct Clash to force sharing an
+      operator between multiple branches of a case-expression
+   -  ``InlinePrimitive`` can now support multiple backends simultaneously
+      `#425 <https://github.com/clash-lang/clash-compiler/issues/425>`__
+   -  Add ``Clash.XException.hwSeqX``: render declarations of an argument,
+      but don't assign it to a result signal
+   -  Add ``Clash.Signal.Bundle.TaggedEmptyTuple``: allows users to emulate
+      the pre-1.0 behavior of "Bundle ()". See
+      `#1100 <https://github.com/clash-lang/clash-compiler/pull/1100>`__
 
 -  New features (Compiler):
--  `#961 <https://github.com/clash-lang/clash-compiler/pull/961>`__:
-   Show ``-fclash-*`` Options in ``clash --show-options``
+
+   -  `#961 <https://github.com/clash-lang/clash-compiler/pull/961>`__:
+      Show ``-fclash-*`` Options in ``clash   --show-options``
 
 -  New internal features:
--  `#918 <https://github.com/clash-lang/clash-compiler/pull/935>`__: Add
-   X-Optimization to normalization passes
-   (-fclash-aggressive-x-optimization)
--  `#821 <https://github.com/clash-lang/clash-compiler/pull/821>`__: Add
-   ``DebugTry``: print name of all tried transformations, even if they
-   didn't succeed
--  `#856 <https://github.com/clash-lang/clash-compiler/pull/856>`__: Add
-   ``-fclash-debug-transformations``: only print debug info for specific
-   transformations
--  `#911 <https://github.com/clash-lang/clash-compiler/pull/911>`__: Add
-   'RenderVoid' option to blackboxes
--  `#958 <https://github.com/clash-lang/clash-compiler/pull/958>`__:
-   Prefix names of inlined functions
--  `#947 <https://github.com/clash-lang/clash-compiler/pull/947>`__: Add
-   "Clash.Core.TermLiteral"
--  `#887 <https://github.com/clash-lang/clash-compiler/pull/887>`__:
-   Show nicer error messages when failing in TH code
--  `#884 <https://github.com/clash-lang/clash-compiler/pull/884>`__:
-   Teach reduceTypeFamily about AppendSymbol and CmpSymbol
--  `#784 <https://github.com/clash-lang/clash-compiler/pull/784>`__:
-   Print whether ``Id`` is global or local in ppr output
--  `#781 <https://github.com/clash-lang/clash-compiler/pull/781>`__: Use
-   naming contexts in register names
--  `#1061 <https://github.com/clash-lang/clash-compiler/pull/1061>`__:
-   Add 'usedArguments' to BlackBoxHaskell blackboxes
+
+   -  `#918 <https://github.com/clash-lang/clash-compiler/pull/935>`__: Add
+      X-Optimization to normalization passes
+      (-fclash-aggressive-x-optimization)
+   -  `#821 <https://github.com/clash-lang/clash-compiler/pull/821>`__: Add
+      ``DebugTry``: print name of all tried transformations, even if they
+      didn't succeed
+   -  `#856 <https://github.com/clash-lang/clash-compiler/pull/856>`__: Add
+      ``-fclash-debug-transformations``: only print debug info for specific
+      transformations
+   -  `#911 <https://github.com/clash-lang/clash-compiler/pull/911>`__: Add
+      'RenderVoid' option to blackboxes
+   -  `#958 <https://github.com/clash-lang/clash-compiler/pull/958>`__:
+      Prefix names of inlined functions
+   -  `#947 <https://github.com/clash-lang/clash-compiler/pull/947>`__: Add
+      "Clash.Core.TermLiteral"
+   -  `#887 <https://github.com/clash-lang/clash-compiler/pull/887>`__:
+      Show nicer error messages when failing in TH code
+   -  `#884 <https://github.com/clash-lang/clash-compiler/pull/884>`__:
+      Teach reduceTypeFamily about AppendSymbol and CmpSymbol
+   -  `#784 <https://github.com/clash-lang/clash-compiler/pull/784>`__:
+      Print whether ``Id`` is global or local in ppr output
+   -  `#781 <https://github.com/clash-lang/clash-compiler/pull/781>`__: Use
+      naming contexts in register names
+   -  `#1061 <https://github.com/clash-lang/clash-compiler/pull/1061>`__:
+      Add 'usedArguments' to BlackBoxHaskell blackboxes
 
 -  Fixes issues:
--  `#974 <https://github.com/clash-lang/clash-compiler/issues/974>`__:
-   Fix indirect shadowing in ``reduceNonRepPrim``
--  `#964 <https://github.com/clash-lang/clash-compiler/issues/964>`__:
-   SaturatingNum instance of ``Index`` now behaves correctly when the
-   size of the index overflows an ``Int``.
--  `#810 <https://github.com/clash-lang/clash-compiler/issues/810>`__:
-   Verilog backend now correctly specifies type of ``BitVector 1``
--  `#811 <https://github.com/clash-lang/clash-compiler/issues/811>`__:
-   Improve module load behavior in clashi
--  `#439 <https://github.com/clash-lang/clash-compiler/issues/439>`__:
-   Template Haskell splices and TopEntity annotations can now be used in
-   clashi
--  `#662 <https://github.com/clash-lang/clash-compiler/issues/662>`__:
-   Clash will now constant specialize partially constant constructs
--  `#700 <https://github.com/clash-lang/clash-compiler/issues/700>`__:
-   Check work content of expression in cast before warning users. Should
-   eliminate a lot of (superfluous) warnings about "specializing on non
-   work-free cast"s.
--  `#837 <https://github.com/clash-lang/clash-compiler/issues/837>`__:
-   Blackboxes will now report clearer error messages if they're given
-   unexpected arguments.
--  `#869 <https://github.com/clash-lang/clash-compiler/issues/869>`__:
-   PLL is no longer duplicated in Blinker.hs example
--  `#749 <https://github.com/clash-lang/clash-compiler/issues/749>`__:
-   Clash's dependencies now all work with GHC 8.8, allowing
-   ``clash-{prelude,lib,ghc}`` to be compiled from Hackage soon.
--  `#871 <https://github.com/clash-lang/clash-compiler/issues/871>`__:
-   RTree Bundle instance is now properly lazy
--  `#895 <https://github.com/clash-lang/clash-compiler/issues/895>`__:
-   VHDL type error when generating ``Maybe (Vec 2 (Signed 8), Index 1)``
--  `#880 <https://github.com/clash-lang/clash-compiler/issues/880>`__:
-   Custom bit representations can now be used on product types too
--  `#976 <https://github.com/clash-lang/clash-compiler/issues/976>`__:
-   Prevent shadowing in Clash's core evaluator
--  `#1007 <https://github.com/clash-lang/clash-compiler/issues/1007>`__:
-   Can't translate domain tagType.Errors.IfStuck...
--  `#967 <https://github.com/clash-lang/clash-compiler/issues/967>`__:
-   Naming registers disconnects their output
--  `#990 <https://github.com/clash-lang/clash-compiler/issues/990>`__:
-   Internal shadowing bug results in incorrect HDL
--  `#945 <https://github.com/clash-lang/clash-compiler/issues/945>`__:
-   Rewrite rules for Vec Applicative Functor
--  `#919 <https://github.com/clash-lang/clash-compiler/issues/919>`__:
-   Clash generating invalid Verilog after Vec operations #919
--  `#996 <https://github.com/clash-lang/clash-compiler/issues/996>`__:
-   Ambiguous clock when using ``ClearOnReset`` and ``resetGen`` together
--  `#701 <https://github.com/clash-lang/clash-compiler/issues/701>`__:
-   Unexpected behaviour with the ``Synthesize`` annotation
--  `#694 <https://github.com/clash-lang/clash-compiler/issues/694>`__:
-   Custom bit representation error only with VHDL
--  `#347 <https://github.com/clash-lang/clash-compiler/issues/347>`__:
-   topEntity synthesis fails due to insufficient type-level
-   normalisation
--  `#626 <https://github.com/clash-lang/clash-compiler/issues/626>`__:
-   Missing Clash.Explicit.Prelude definitions
--  `#960 <https://github.com/clash-lang/clash-compiler/issues/626>`__:
-   Blackbox Error Caused by Simple map
--  `#1012 <https://github.com/clash-lang/clash-compiler/issues/1012>`__:
-   Case-let doesn't look through ticks
--  `#430 <https://github.com/clash-lang/clash-compiler/issues/430>`__:
-   Issue warning when not compiled with ``executable-dynamic: True``
--  `#374 <https://github.com/clash-lang/clash-compiler/issues/1012>`__:
-   Clash.Sized.Fixed: fromInteger and fromRational don't saturate
-   correctly
--  `#836 <https://github.com/clash-lang/clash-compiler/issues/836>`__:
-   Generate warning when ``toInteger`` blackbox drops MSBs
--  `#1019 <https://github.com/clash-lang/clash-compiler/issues/1019>`__:
-   Clash breaks on constants defined in terms of
-   ``GHC.Natural.gcdNatural``
--  `#1025 <https://github.com/clash-lang/clash-compiler/issues/1025>`__:
-   ``inlineCleanup``\ will not produce empty letrecs anymore
--  `#1030 <https://github.com/clash-lang/clash-compiler/issues/1030>`__:
-   ``bindConstantVar`` will bind (workfree) constructs
--  `#1034 <https://github.com/clash-lang/clash-compiler/issues/1034>`__:
-   Error (10137): object "pllLock" on lhs must have a variable data type
--  `#1046 <https://github.com/clash-lang/clash-compiler/issues/1046>`__:
-   Don't confuse term/type namespaces in 'lookupIdSubst'
--  `#1041 <https://github.com/clash-lang/clash-compiler/issues/1041>`__:
-   Nested product types incorrectly decomposed into ports
--  `#1058 <https://github.com/clash-lang/clash-compiler/issues/1058>`__:
-   Prevent substitution warning when using type equalities in top
-   entities
--  `#1033 <https://github.com/clash-lang/clash-compiler/issues/1033>`__:
-   Fix issue where Clash breaks when using Clock/Reset/Enable in product
-   types in combination with Synthesize annotations
--  `#1075 <https://github.com/clash-lang/clash-compiler/issues/1075>`__:
-   Removed superfluous constraints on 'maybeX' and 'maybeIsX'
--  `#1085 <https://github.com/clash-lang/clash-compiler/issues/1085>`__:
-   Suggest exporting topentities if they can't be found in a module
--  `#1065 <https://github.com/clash-lang/clash-compiler/pull/1065>`__:
-   Report polymorphic topEntities as errors
--  `#1089 <https://github.com/clash-lang/clash-compiler/issues/1089>`__:
-   Respect maxBound in Enum instances for
-   BitVector,Index,Signed,Unsigned
+
+   -  `#974 <https://github.com/clash-lang/clash-compiler/issues/974>`__:
+      Fix indirect shadowing in ``reduceNonRepPrim``
+   -  `#964 <https://github.com/clash-lang/clash-compiler/issues/964>`__:
+      SaturatingNum instance of ``Index`` now behaves correctly when the
+      size of the index overflows an ``Int``.
+   -  `#810 <https://github.com/clash-lang/clash-compiler/issues/810>`__:
+      Verilog backend now correctly specifies type of ``BitVector 1``
+   -  `#811 <https://github.com/clash-lang/clash-compiler/issues/811>`__:
+      Improve module load behavior in clashi
+   -  `#439 <https://github.com/clash-lang/clash-compiler/issues/439>`__:
+      Template Haskell splices and TopEntity annotations can now be used in
+      clashi
+   -  `#662 <https://github.com/clash-lang/clash-compiler/issues/662>`__:
+      Clash will now constant specialize partially constant constructs
+   -  `#700 <https://github.com/clash-lang/clash-compiler/issues/700>`__:
+      Check work content of expression in cast before warning users. Should
+      eliminate a lot of (superfluous) warnings about "specializing on non
+      work-free cast"s.
+   -  `#837 <https://github.com/clash-lang/clash-compiler/issues/837>`__:
+      Blackboxes will now report clearer error messages if they're given
+      unexpected arguments.
+   -  `#869 <https://github.com/clash-lang/clash-compiler/issues/869>`__:
+      PLL is no longer duplicated in Blinker.hs example
+   -  `#749 <https://github.com/clash-lang/clash-compiler/issues/749>`__:
+      Clash's dependencies now all work with GHC 8.8, allowing
+      ``clash-{prelude,lib,ghc}`` to be compiled from Hackage soon.
+   -  `#871 <https://github.com/clash-lang/clash-compiler/issues/871>`__:
+      RTree Bundle instance is now properly lazy
+   -  `#895 <https://github.com/clash-lang/clash-compiler/issues/895>`__:
+      VHDL type error when generating ``Maybe (Vec 2 (Signed 8), Index 1)``
+   -  `#880 <https://github.com/clash-lang/clash-compiler/issues/880>`__:
+      Custom bit representations can now be used on product types too
+   -  `#976 <https://github.com/clash-lang/clash-compiler/issues/976>`__:
+      Prevent shadowing in Clash's core evaluator
+   -  `#1007 <https://github.com/clash-lang/clash-compiler/issues/1007>`__:
+      Can't translate domain tagType.Errors.IfStuck...
+   -  `#967 <https://github.com/clash-lang/clash-compiler/issues/967>`__:
+      Naming registers disconnects their output
+   -  `#990 <https://github.com/clash-lang/clash-compiler/issues/990>`__:
+      Internal shadowing bug results in incorrect HDL
+   -  `#945 <https://github.com/clash-lang/clash-compiler/issues/945>`__:
+      Rewrite rules for Vec Applicative Functor
+   -  `#919 <https://github.com/clash-lang/clash-compiler/issues/919>`__:
+      Clash generating invalid Verilog after Vec operations #919
+   -  `#996 <https://github.com/clash-lang/clash-compiler/issues/996>`__:
+      Ambiguous clock when using ``ClearOnReset`` and ``resetGen`` together
+   -  `#701 <https://github.com/clash-lang/clash-compiler/issues/701>`__:
+      Unexpected behaviour with the ``Synthesize`` annotation
+   -  `#694 <https://github.com/clash-lang/clash-compiler/issues/694>`__:
+      Custom bit representation error only with VHDL
+   -  `#347 <https://github.com/clash-lang/clash-compiler/issues/347>`__:
+      topEntity synthesis fails due to insufficient type-level
+      normalisation
+   -  `#626 <https://github.com/clash-lang/clash-compiler/issues/626>`__:
+      Missing Clash.Explicit.Prelude definitions
+   -  `#960 <https://github.com/clash-lang/clash-compiler/issues/626>`__:
+      Blackbox Error Caused by Simple map
+   -  `#1012 <https://github.com/clash-lang/clash-compiler/issues/1012>`__:
+      Case-let doesn't look through ticks
+   -  `#430 <https://github.com/clash-lang/clash-compiler/issues/430>`__:
+      Issue warning when not compiled with ``executable-dynamic: True``
+   -  `#374 <https://github.com/clash-lang/clash-compiler/issues/1012>`__:
+      Clash.Sized.Fixed: fromInteger and fromRational don't saturate
+      correctly
+   -  `#836 <https://github.com/clash-lang/clash-compiler/issues/836>`__:
+      Generate warning when ``toInteger`` blackbox drops MSBs
+   -  `#1019 <https://github.com/clash-lang/clash-compiler/issues/1019>`__:
+      Clash breaks on constants defined in terms of
+      ``GHC.Natural.gcdNatural``
+   -  `#1025 <https://github.com/clash-lang/clash-compiler/issues/1025>`__:
+      ``inlineCleanup``\ will not produce empty letrecs anymore
+   -  `#1030 <https://github.com/clash-lang/clash-compiler/issues/1030>`__:
+      ``bindConstantVar`` will bind (workfree) constructs
+   -  `#1034 <https://github.com/clash-lang/clash-compiler/issues/1034>`__:
+      Error (10137): object "pllLock" on lhs must have a variable data type
+   -  `#1046 <https://github.com/clash-lang/clash-compiler/issues/1046>`__:
+      Don't confuse term/type namespaces in 'lookupIdSubst'
+   -  `#1041 <https://github.com/clash-lang/clash-compiler/issues/1041>`__:
+      Nested product types incorrectly decomposed into ports
+   -  `#1058 <https://github.com/clash-lang/clash-compiler/issues/1058>`__:
+      Prevent substitution warning when using type equalities in top
+      entities
+   -  `#1033 <https://github.com/clash-lang/clash-compiler/issues/1033>`__:
+      Fix issue where Clash breaks when using Clock/Reset/Enable in product
+      types in combination with Synthesize annotations
+   -  `#1075 <https://github.com/clash-lang/clash-compiler/issues/1075>`__:
+      Removed superfluous constraints on 'maybeX' and 'maybeIsX'
+   -  `#1085 <https://github.com/clash-lang/clash-compiler/issues/1085>`__:
+      Suggest exporting topentities if they can't be found in a module
+   -  `#1065 <https://github.com/clash-lang/clash-compiler/pull/1065>`__:
+      Report polymorphic topEntities as errors
+   -  `#1089 <https://github.com/clash-lang/clash-compiler/issues/1089>`__:
+      Respect maxBound in Enum instances for
+      BitVector,Index,Signed,Unsigned
 
 -  Fixes without issue reports:
--  Fix bug in ``rnfX`` defined for ``Down``
-   (`baef30e <https://github.com/clash-lang/clash-compiler/commit/baef30eae03dc02ba847ffbb8fae7f365c5287c2>`__)
--  Render numbers inside gensym
-   (`bc76f0f <https://github.com/clash-lang/clash-compiler/commit/bc76f0f1934fd6e6ed9c33bcf950dae21e2f7903>`__)
--  Report blackbox name when encountering an error in 'setSym'
-   (`#858 <https://github.com/clash-lang/clash-compiler/pull/858>`__)
--  Fix blackbox issues causing Clash to generate invalid HDL
-   (`#865 <https://github.com/clash-lang/clash-compiler/pull/865>`__)
--  Treat types with a zero-width custom bit representation like other
-   zero-width constructs
-   (`#874 <https://github.com/clash-lang/clash-compiler/pull/874>`__)
--  TH code for auto deriving bit representations now produces nicer
-   error messages
-   (`7190793 <https://github.com/clash-lang/clash-compiler/commit/7190793928545f85157f9b8d4b8ec2edb2cd8a26>`__)
--  Adds '--enable-shared-executables' for nix builds; this should make
-   Clash run *much* faster
-   (`#894 <https://github.com/clash-lang/clash-compiler/pull/894>`__)
--  Custom bit representations can now mark fields as zero-width without
-   crashing the compiler
-   (`#898 <https://github.com/clash-lang/clash-compiler/pull/898>`__)
--  Throw an error if there's data left to parse after successfully
-   parsing a valid JSON construct
-   (`#904 <https://github.com/clash-lang/clash-compiler/pull/904>`__)
--  ``Data.gfoldl`` is now manually implemented, in turn fixing issues
-   with ``gshow``
-   (`#933 <https://github.com/clash-lang/clash-compiler/pull/933>`__)
--  Fix a number of issues with blackbox implementations
-   (`#934 <https://github.com/clash-lang/clash-compiler/pull/934>`__)
--  Don't inline registers with non-constant clock and reset
-   (`#998 <https://github.com/clash-lang/clash-compiler/pull/998>`__)
--  Inline let-binders called [dsN \| N <- [1..]]
-   (`#992 <https://github.com/clash-lang/clash-compiler/pull/992>`__)
--  ClockGens use their name at the Haskell level
-   `#827 <https://github.com/clash-lang/clash-compiler/pull/827>`__
--  Render numbers inside gensym
-   `#809 <https://github.com/clash-lang/clash-compiler/pull/809>`__
--  Don't overwrite existing binders when specializing
-   `#790 <https://github.com/clash-lang/clash-compiler/pull/790>`__
--  Deshadow in 'caseCase'
-   `#1067 <https://github.com/clash-lang/clash-compiler/pull/1067>`__
--  Deshadow in 'caseLet' and 'nonRepANF'
-   `#1071 <https://github.com/clash-lang/clash-compiler/pull/1071>`__
+
+   -  Fix bug in ``rnfX`` defined for ``Down``
+      (`baef30e <https://github.com/clash-lang/clash-compiler/commit/baef30eae03dc02ba847ffbb8fae7f365c5287c2>`__)
+   -  Render numbers inside gensym
+      (`bc76f0f <https://github.com/clash-lang/clash-compiler/commit/bc76f0f1934fd6e6ed9c33bcf950dae21e2f7903>`__)
+   -  Report blackbox name when encountering an error in 'setSym'
+      (`#858 <https://github.com/clash-lang/clash-compiler/pull/858>`__)
+   -  Fix blackbox issues causing Clash to generate invalid HDL
+      (`#865 <https://github.com/clash-lang/clash-compiler/pull/865>`__)
+   -  Treat types with a zero-width custom bit representation like other
+      zero-width constructs
+      (`#874 <https://github.com/clash-lang/clash-compiler/pull/874>`__)
+   -  TH code for auto deriving bit representations now produces nicer
+      error messages
+      (`7190793 <https://github.com/clash-lang/clash-compiler/commit/7190793928545f85157f9b8d4b8ec2edb2cd8a26>`__)
+   -  Adds '--enable-shared-executables' for nix builds; this should make
+      Clash run *much* faster
+      (`#894 <https://github.com/clash-lang/clash-compiler/pull/894>`__)
+   -  Custom bit representations can now mark fields as zero-width without
+      crashing the compiler
+      (`#898 <https://github.com/clash-lang/clash-compiler/pull/898>`__)
+   -  Throw an error if there's data left to parse after successfully
+      parsing a valid JSON construct
+      (`#904 <https://github.com/clash-lang/clash-compiler/pull/904>`__)
+   -  ``Data.gfoldl`` is now manually implemented, in turn fixing issues
+      with ``gshow``
+      (`#933 <https://github.com/clash-lang/clash-compiler/pull/933>`__)
+   -  Fix a number of issues with blackbox implementations
+      (`#934 <https://github.com/clash-lang/clash-compiler/pull/934>`__)
+   -  Don't inline registers with non-constant clock and reset
+      (`#998 <https://github.com/clash-lang/clash-compiler/pull/998>`__)
+   -  Inline let-binders called [dsN \| N <- [1..]]
+      (`#992 <https://github.com/clash-lang/clash-compiler/pull/992>`__)
+   -  ClockGens use their name at the Haskell level
+      `#827 <https://github.com/clash-lang/clash-compiler/pull/827>`__
+   -  Render numbers inside gensym
+      `#809 <https://github.com/clash-lang/clash-compiler/pull/809>`__
+   -  Don't overwrite existing binders when specializing
+      `#790 <https://github.com/clash-lang/clash-compiler/pull/790>`__
+   -  Deshadow in 'caseCase'
+      `#1067 <https://github.com/clash-lang/clash-compiler/pull/1067>`__
+   -  Deshadow in 'caseLet' and 'nonRepANF'
+      `#1071 <https://github.com/clash-lang/clash-compiler/pull/1071>`__
 
 -  Deprecations & removals:
--  Removed support for GHC 8.2
-   (`#842 <https://github.com/clash-lang/clash-compiler/pull/842>`__)
--  Removed support for older cabal versions, only Cabal >=2.2 supported
-   (`#851 <https://github.com/clash-lang/clash-compiler/pull/851>`__)
--  Reset and Enable constructors are now only exported from
-   Clash.Signal.Internal
--  `#986 <https://github.com/clash-lang/clash-compiler/issues/986>`__
-   Remove -fclash-allow-zero-width flag
+
+   -  Removed support for GHC 8.2
+      (`#842 <https://github.com/clash-lang/clash-compiler/pull/842>`__)
+   -  Removed support for older cabal versions, only Cabal >=2.2 supported
+      (`#851 <https://github.com/clash-lang/clash-compiler/pull/851>`__)
+   -  Reset and Enable constructors are now only exported from
+      Clash.Signal.Internal
+   -  `#986 <https://github.com/clash-lang/clash-compiler/issues/986>`__
+      Remove   -fclash-allow-zero-width flag
 
 1.0.0 *September 3rd 2019*
 --------------------------

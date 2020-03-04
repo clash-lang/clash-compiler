@@ -1,6 +1,6 @@
 Cabal-version:        2.2
 Name:                 clash-prelude
-Version:              1.1.0
+Version:              1.3.0
 Synopsis:             CAES Language for Synchronous Hardware - Prelude library
 Description:
   Clash is a functional hardware description language that borrows both its
