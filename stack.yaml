@@ -1,4 +1,4 @@
-resolver: lts-14.4
+resolver: lts-15.2
 
 packages:
 - clash-prelude
@@ -9,5 +9,4 @@ packages:
 
 extra-deps:
 - ./clash-cosim
-- ghc-typelits-knownnat-0.7.1@sha256:52a647119137e572a957b62fd7a747448670c8f91138c26c48e1828a6ca7b6da,4708
-- ghc-typelits-extra-0.3.2@sha256:e26b34488cb77f057441738c6cf4f521026d791f5c5770c32f3d406679f6ff31,4759
+- concurrent-supply-0.1.8@sha256:9373f4868ad28936a7b93781b214ef4afdeacf377ef4ac729583073491c9f9fb,1627
