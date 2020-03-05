@@ -156,6 +156,33 @@ complementMod (S# sz#) =
     in  go
 complementMod _ = error "size too large"
 
+-- | Keep all the bits up to a certain size
+maskMod
+  :: Integer
+  -> (Natural -> Natural)
+maskMod (S# sz#) =
+  if isTrue# (sz# <=# WORD_SIZE_IN_BITS#) then
+    if isTrue# (sz# ==# WORD_SIZE_IN_BITS#) then
+       -- Mask equal to the word size
+       let go (NatJ# x#) = NatS# (bigNatToWord x#)
+           go n          = n
+       in  go
+    else
+       let m# = (1## `uncheckedShiftL#` sz#) `minusWord#` 1##
+
+           go (NatS# x#) = NatS# (x# `and#` m#)
+           go (NatJ# x#) = NatS# (bigNatToWord x# `and#` m#)
+       in  go
+  else
+    let m# = bitBigNat sz#
+
+        -- faster than `andBigNat (m# `minuxBigNatWord` 1##)`
+        go (NatJ# x#) = bigNatToNat (remBigNat x# m#)
+        -- The mask is larger than the word size, so we can keep all the bits
+        go x = x
+    in  go
+maskMod _ = error "size too large"
+
 bigNatToNat :: BigNat -> Natural
 bigNatToNat r# =
   if isTrue# (sizeofBigNat# r# ==# 1#) then
