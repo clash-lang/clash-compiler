@@ -95,6 +95,7 @@ where
 
 import Control.DeepSeq            (NFData (..))
 import qualified Control.Lens     as Lens hiding (pattern (:>), pattern (:<))
+import Data.Bits                  ((.|.), shiftL)
 import Data.Constraint            ((:-)(..), Dict (..))
 import Data.Constraint.Nat        (leZero)
 import Data.Data
@@ -128,7 +129,7 @@ import Clash.Promoted.Nat
   (SNat (..), SNatLE (..), UNat (..), compareSNat, leToPlus, pow2SNat,
    snatProxy, snatToInteger, subSNat, withSNat, toUNat)
 import Clash.Promoted.Nat.Literals (d1)
-import Clash.Sized.Internal.BitVector (Bit, BitVector, (++#), split#)
+import Clash.Sized.Internal.BitVector (Bit, BitVector (..), split#)
 import Clash.Sized.Index          (Index)
 
 import Clash.Class.BitPack        (packXWith, BitPack (..))
@@ -2155,11 +2156,17 @@ instance (KnownNat n, BitPack a) => BitPack (Vec n a) where
   unpack = map unpack . unconcatBitVector#
 
 concatBitVector#
-  :: (KnownNat n, KnownNat m)
+  :: forall n m
+   . (KnownNat n, KnownNat m)
   => Vec n (BitVector m)
   -> BitVector (n * m)
-concatBitVector# Nil           = 0
-concatBitVector# (x `Cons` xs) = x ++# concatBitVector# xs
+concatBitVector# = go 0
+ where
+  go :: BitVector (n*m) -> Vec p (BitVector m) -> BitVector (n * m)
+  go acc Nil = acc
+  go (BV accMsk accVal) ((BV xMsk xVal) `Cons` xs) =
+    let sh = fromInteger (natVal (Proxy @m)) :: Int in
+    go (BV (shiftL accMsk sh .|. xMsk) (shiftL accVal sh .|. xVal)) xs
 {-# NOINLINE concatBitVector# #-}
 
 unconcatBitVector#

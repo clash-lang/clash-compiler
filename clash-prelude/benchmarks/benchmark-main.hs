@@ -7,6 +7,7 @@ import BenchBitVector
 import BenchFixed
 import BenchSigned
 import BenchUnsigned
+import BenchVector
 
 main :: IO ()
 main =
@@ -16,4 +17,5 @@ main =
   , fixedBench
   , signedBench
   , unsignedBench
+  , vectorBench
   ]
