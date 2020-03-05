@@ -630,10 +630,12 @@ filterVoidPorts
   -> PortName
 filterVoidPorts _hwty (PortName s) =
   PortName s
-filterVoidPorts (FilteredHWType _hwty [filtered]) (PortProduct s ps) =
-  PortProduct s [filterVoidPorts f p | (p, (void, f)) <- zip ps filtered, not void]
+filterVoidPorts (FilteredHWType _hwty [filtered]) (PortProduct s ps)
+  | length filtered > 1
+  = PortProduct s [filterVoidPorts f p | (p, (void, f)) <- zip ps filtered, not void]
 filterVoidPorts (FilteredHWType _hwty fs) (PortProduct s ps)
   | length (filter (not.fst) (concat fs)) == 1
+  , length fs > 1
   , length ps == 2
   = PortProduct s ps
 filterVoidPorts filtered pp@(PortProduct _s _ps) =

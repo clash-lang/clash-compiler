@@ -148,6 +148,10 @@ runClashTest = defaultMain $ clashTestRoot
             hdlTargets=[VHDL]
           , expectClashFail=Just (def, "PortProduct \"wrong\" []")
           }
+        , runTest "T1063" def{
+            hdlTargets=[VHDL]
+          , expectClashFail=Just (def, "Ports were annotated as product, but type wasn't one")
+          }
         ]
       , clashTestGroup "ZeroWidth"
         [ runTest "FailGracefully1" def{
