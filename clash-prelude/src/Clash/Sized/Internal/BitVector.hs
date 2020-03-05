@@ -786,17 +786,14 @@ split#
    . KnownNat n
   => BitVector (m + n)
   -> (BitVector m, BitVector n)
-split# (BV m i) = (BV lMask l, BV rMask r)
-  where
-    n     = fromInteger (natVal (Proxy @n))
-    mask  = 1 `shiftL` n
-    -- The code below is faster than:
-    -- > (l,r) = i `divMod` mask
-    r     = i `mod` mask
-    rMask = m `mod` mask
-    l     = i `shiftR` n
-    lMask = m `shiftR` n
-
+split# (BV m i) =
+  let n     = fromInteger (natVal (Proxy @n))
+      mask  = maskMod (natVal (Proxy @n))
+      r     = mask i
+      rMask = mask m
+      l     = i `shiftR` n
+      lMask = m `shiftR` n
+  in  (BV lMask l, BV rMask r)
 
 and#, or#, xor# :: forall n . KnownNat n => BitVector n -> BitVector n -> BitVector n
 {-# NOINLINE and# #-}
