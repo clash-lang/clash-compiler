@@ -20,11 +20,16 @@ import Prelude                     hiding (replicate)
 vectorBench :: Benchmark
 vectorBench = bgroup "Vector"
   [ vectorPackBench
+  , vectorUnpackBench
   ]
 
 smallValue1 :: Vec 8 (BitVector 24)
 smallValue1 = $(lift (replicate d8 (2^(16::Int)-10 :: BitVector 24)))
 {-# INLINE smallValue1 #-}
+
+smallValue2 :: BitVector 192
+smallValue2 = $(lift (maxBound :: BitVector 192))
+{-# INLINE smallValue2 #-}
 
 vectorPackBench :: Benchmark
 vectorPackBench = env setup $ \m ->
@@ -32,3 +37,10 @@ vectorPackBench = env setup $ \m ->
   nf (pack :: Vec 8 (BitVector 24) -> BitVector 192) m
   where
     setup = return smallValue1
+
+vectorUnpackBench :: Benchmark
+vectorUnpackBench = env setup $ \m ->
+  bench "unpack" $
+  nf (unpack :: BitVector 192 -> Vec 8 (BitVector 24)) m
+  where
+    setup = return smallValue2

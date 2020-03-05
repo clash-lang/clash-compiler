@@ -9,6 +9,8 @@ import Test.Tasty
 import Test.Tasty.HUnit
 
 import Clash.Class.BitPack
+import Clash.Sized.Vector
+import Clash.Sized.Signed
 
 import GHC.Generics (Generic)
 
@@ -44,6 +46,7 @@ tests =
         , testCase "SP2" (rtt (P 10))
         , testCase "Rec1" (rtt (Rec1 10))
         , testCase "Rec2" (rtt (Rec2 10 30))
+        , testCase "Vec" (rtt ((1 :: Signed 6) :> 2 :> (-5) :> 4 :> Nil))
         ]
     ]
 
