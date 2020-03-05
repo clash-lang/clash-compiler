@@ -110,6 +110,7 @@ import GHC.TypeLits               (CmpNat, KnownNat, Nat, type (+), type (-), ty
                                    type (^), type (<=), natVal)
 import GHC.Base                   (Int(I#),Int#,isTrue#)
 import GHC.Generics               hiding (Fixity (..))
+import qualified GHC.Magic
 import GHC.Prim                   ((==#),(<#),(-#))
 import Language.Haskell.TH        (ExpQ)
 import Language.Haskell.TH.Syntax (Lift(..))
@@ -2174,12 +2175,14 @@ unconcatBitVector#
    . (KnownNat n, KnownNat m)
   => BitVector (n * m)
   -> Vec n (BitVector m)
-unconcatBitVector# = go (toUNat (SNat @ n))
+unconcatBitVector# orig = snd (go (toUNat (SNat @ n)))
   where
-    go :: KnownNat x => UNat x -> BitVector (x * m) -> Vec x (BitVector m)
-    go UZero     _  = Nil
-    go (USucc n) bv = let (x :: BitVector m,bv') = split# bv
-                      in  x :> go n bv'
+    go :: forall p . (p <= n) => UNat p -> (BitVector ((n-p)*m), Vec p (BitVector m))
+    go UZero = (orig,Nil)
+    go (USucc (n :: UNat (p-1))) =
+      let (bv,xs) = go n
+          (l,x) = (GHC.Magic.noinline split#) bv
+      in  (l,x :> xs)
 {-# NOINLINE unconcatBitVector# #-}
 
 -- | Convert a 'BitVector' to a 'Vec' of 'Bit's.
