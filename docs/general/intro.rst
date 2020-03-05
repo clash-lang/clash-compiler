@@ -109,9 +109,11 @@ We encourage users to file issues, or contribute pull requests on our
 Meta-information: Web Sites, Mailing Lists, etc.
 ------------------------------------------------
 
-.. include:: ../../README.rst
-  :start-after: community_start
-  :end-before: community_end
+**Mailing list**: for updates and questions join the mailing list clash-language+subscribe@googlegroups.com or read the `forum <https://groups.google.com/d/forum/clash-language>`_
+
+**Slack**: Invite yourself at `fpchat-invite.herokuapp.com <https://fpchat-invite.herokuapp.com/>`_. To join #clash, click on "Channels" and search for "clash".
+
+**IRC**: `freenode#clash-lang <https://webchat.freenode.net/#clash-lang>`_
 
 Clash Version Numbering Policy
 ------------------------------

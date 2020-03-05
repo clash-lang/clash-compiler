@@ -57,7 +57,7 @@ Build-type:           Simple
 
 Extra-source-files:
   README.md,
-  CHANGELOG.rst
+  CHANGELOG.md,
   src/ClashDebug.h
 
 Data-files:
@@ -136,7 +136,7 @@ Library
                       TemplateHaskell
 
   Build-depends:      aeson                   >= 0.6.2.0  && < 1.5,
-                      ansi-terminal           >= 0.8.0.0  && < 0.10,
+                      ansi-terminal           >= 0.8.0.0  && < 0.11,
                       attoparsec              >= 0.10.4.0 && < 0.14,
                       base                    >= 4.10     && < 5,
                       binary                  >= 0.8.5    && < 0.11,
@@ -160,7 +160,7 @@ Library
                       hint                    >= 0.7      && < 0.10,
                       integer-gmp             >= 1.0      && < 1.1,
                       interpolate             >= 0.2.0    && < 1.0,
-                      lens                    >= 3.9.2    && < 4.19,
+                      lens                    >= 4.10     && < 4.20,
                       mtl                     >= 2.1.2    && < 2.3,
                       ordered-containers      >= 0.2      && < 0.3,
                       parsers                 >= 0.12.8   && < 1.0,

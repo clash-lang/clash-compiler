@@ -18,6 +18,12 @@ let
         ghc-typelits-extra =
          self.callCabal2nix "ghc-typelits-extra" sources.ghc-typelits-extra {};
 
+        ghc-typelits-natnormalise =
+         self.callCabal2nix "ghc-typelits-natnormalise" sources.ghc-typelits-natnormalise {};
+
+        ghc-tcplugins-extra =
+         self.callCabal2nix "ghc-tcplugins-extra" sources.ghc-tcplugins-extra {};
+
         # Internal overrides
         clash-lib = import ../clash-lib { inherit nixpkgs; };
         clash-ghc = import ../clash-ghc { inherit nixpkgs; };
