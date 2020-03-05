@@ -160,7 +160,7 @@ Library
                       hint                    >= 0.7      && < 0.10,
                       integer-gmp             >= 1.0      && < 1.1,
                       interpolate             >= 0.2.0    && < 1.0,
-                      lens                    >= 3.9.2    && < 4.19,
+                      lens                    >= 4.10     && < 4.20,
                       mtl                     >= 2.1.2    && < 2.3,
                       ordered-containers      >= 0.2      && < 0.3,
                       parsers                 >= 0.12.8   && < 1.0,

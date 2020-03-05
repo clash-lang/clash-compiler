@@ -314,7 +314,7 @@ Library
                       ghc-typelits-natnormalise >= 0.7.1   && < 0.8,
                       hashable                  >= 1.2.1.0  && < 1.4,
                       half                      >= 0.2.2.3 && < 1.0,
-                      lens                      >= 4.9     && < 4.19,
+                      lens                      >= 4.10    && < 4.20,
                       recursion-schemes         >= 5.1     && < 5.2,
                       QuickCheck                >= 2.7     && < 2.14,
                       reflection                >= 2       && < 2.2,
