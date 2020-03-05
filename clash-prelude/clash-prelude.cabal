@@ -72,6 +72,10 @@ flag large-tuples
     increases compile times for `clash-prelude` and therefore mostly impacts the
     Clash developers themselves. Hence its default is set to disabled on
     development versions and enabled on releases.
+  -- I have no idea to pass cabal flags to nix, so the comment below,
+  -- "-- large-tuples", is there to enable a call to 'sed' that replaces
+  -- True with False. This is done to prevent OOM on CircleCI.
+  -- large-tuples
   default: False
   manual: True
 
