@@ -21,9 +21,11 @@ index-state: 2020-03-04T14:59:53Z
 tests: True
 
 package clash-ghc
+  ghc-options: +RTS -qn4 -A128M -RTS -j4
   executable-dynamic: True
 
 package clash-prelude
+  ghc-options: +RTS -qn4 -A128M -RTS -j4
   -- workaround for plugins not loading in Haddock with GHC-8.6
   haddock-options: --optghc=-fdefer-type-errors
   -- Don't pollute docs with 1024 SNat literals
@@ -33,6 +35,7 @@ package clash-testsuite
   flags: cosim
 
 package clash-lib
+  ghc-options: +RTS -qn4 -A128M -RTS -j4
   flags: debug
 
 optional-packages:
