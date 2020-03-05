@@ -418,3 +418,4 @@ benchmark benchmark-clash-prelude
                     BenchRAM
                     BenchSigned
                     BenchUnsigned
+                    BenchVector
