@@ -5,7 +5,7 @@
 -}
 
 module Clash.Class.AutoReg
-  ( AutoReg (autoReg)
+  ( AutoReg (autoReg, autoDelay)
   , deriveAutoReg
   ) where
 

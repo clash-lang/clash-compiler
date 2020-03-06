@@ -62,11 +62,12 @@ import           Clash.Netlist.Util
 import           Clash.Normalize.Strategy
 import           Clash.Normalize.Transformations
   (appPropFast, bindConstantVar, caseCon, flattenLet, reduceConst, topLet,
-   reduceNonRepPrim, removeUnusedExpr)
+   reduceNonRepPrim, removeUnusedExpr, deadCode)
 import           Clash.Normalize.Types
 import           Clash.Normalize.Util
 import           Clash.Primitives.Types           (CompiledPrimMap)
-import           Clash.Rewrite.Combinators        ((>->),(!->),repeatR,topdownR)
+import           Clash.Rewrite.Combinators
+  ((>->),(!->),repeatR,topdownR,bottomupR)
 import           Clash.Rewrite.Types
   (RewriteEnv (..), RewriteState (..), bindings, dbgLevel, extra,
    tcCache, topEntities)
@@ -393,6 +394,7 @@ flattenCallTree (CBranch (nm,(Binding nm' sp inl tm)) used) = do
                  apply "reduceNonRepPrim" reduceNonRepPrim >->
                  apply "removeUnusedExpr" removeUnusedExpr >->
                  apply "flattenLet" flattenLet)) !->
+      bottomupR (apply "deadcode" deadCode) >->
       topdownSucR (apply "topLet" topLet)
 
     goCheap c@(CLeaf   (nm2,(Binding _ _ inl2 e)))
