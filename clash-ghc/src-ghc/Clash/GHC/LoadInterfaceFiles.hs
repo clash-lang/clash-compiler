@@ -11,7 +11,8 @@
 
 module Clash.GHC.LoadInterfaceFiles
   ( loadExternalExprs
-  , unresolvedPrimitives
+  , loadExternalBinders
+  , getUnresolvedPrimitives
   )
 where
 
@@ -90,6 +91,25 @@ loadIface foundMod = do
                                            ]
                          in traceIf True msg' (return Nothing)
 
+loadExternalBinders
+  :: GHC.GhcMonad m
+  => HDL
+  -> [CoreSyn.CoreBndr]
+  -> m ( [(CoreSyn.CoreBndr,CoreSyn.CoreExpr)] -- Binders
+       , [(CoreSyn.CoreBndr,Int)]              -- Class Ops
+       , [CoreSyn.CoreBndr]                    -- Unlocatable
+       , [Either UnresolvedPrimitive FilePath]
+       , [DataRepr']
+       )
+loadExternalBinders hdl bndrs = do
+  (locatedAndUnlocated, prims0, reprs0) <- unzip3 <$> mapM (loadExprFromIface hdl) bndrs
+  let (located0, unlocated0) = partitionEithers locatedAndUnlocated
+  (located1, classOps, unlocated1, prims1, reprs1, _seen) <-
+    loadExternalExprs'
+      hdl located0 [] unlocated0 (concat prims0) (concat reprs0)
+      (UniqSet.mkUniqSet (map fst located0)) (map snd located0)
+  pure (located1, classOps, unlocated1, prims1, reprs1)
+
 loadExternalExprs
   :: GHC.GhcMonad m
   => HDL
@@ -108,53 +128,72 @@ loadExternalExprs hdl = go [] [] [] [] []
 
     go locatedExprs clsOps unlocated pFP reprs visited (CoreSyn.NonRec _ e:bs) = do
       (locatedExprs',clsOps',unlocated',pFP',reprs',visited') <-
-        go' locatedExprs clsOps unlocated pFP reprs visited [e]
+        loadExternalExprs' hdl locatedExprs clsOps unlocated pFP reprs visited [e]
       go locatedExprs' clsOps' unlocated' pFP' reprs' visited' bs
 
     go locatedExprs clsOps unlocated pFP reprs visited (CoreSyn.Rec bs:bs') = do
       (locatedExprs',clsOps',unlocated',pFP',reprs',visited') <-
-        go' locatedExprs clsOps unlocated pFP reprs visited (map snd bs)
+        loadExternalExprs' hdl locatedExprs clsOps unlocated pFP reprs visited (map snd bs)
       go locatedExprs' clsOps' unlocated' pFP' reprs' visited' bs'
 
-    go' locatedExprs clsOps unlocated pFP reprs visited [] =
-      return (locatedExprs,clsOps,unlocated,pFP,reprs,visited)
+-- | Used by entry points: 'loadExternalExprs', 'loadExternalBinders'
+loadExternalExprs'
+  :: GHC.GhcMonad m
+  => HDL
+  -> [(CoreSyn.CoreBndr, CoreSyn.CoreExpr)]
+  -> [(Var.Id, Int)]
+  -> [CoreSyn.CoreBndr]
+  -> [Either UnresolvedPrimitive FilePath]
+  -> [DataRepr']
+  -> UniqSet.UniqSet CoreSyn.CoreBndr
+  -> [CoreSyn.CoreExpr]
+  -> m ( [(CoreSyn.CoreBndr, CoreSyn.CoreExpr)]
+       , [(Var.Id, Int)]
+       , [CoreSyn.CoreBndr]
+       , [Either UnresolvedPrimitive FilePath]
+       , [DataRepr']
+       , UniqSet.UniqSet CoreSyn.CoreBndr
+       )
+loadExternalExprs' _hdl locatedExprs clsOps unlocated pFP reprs visited [] =
+  return (locatedExprs, clsOps, unlocated, pFP, reprs, visited)
 
-    go' locatedExprs clsOps unlocated pFP reprs visited (e:es) = do
-      let fvs = CoreFVs.exprSomeFreeVarsList
-                  (\v -> Var.isId v &&
-                         isNothing (Id.isDataConId_maybe v) &&
-                         not (v `UniqSet.elementOfUniqSet` visited)
-                  ) e
+loadExternalExprs' hdl locatedExprs clsOps unlocated pFP reprs visited (e:es) = do
+  let fvs = CoreFVs.exprSomeFreeVarsList
+              (\v -> Var.isId v &&
+                     isNothing (Id.isDataConId_maybe v) &&
+                     not (v `UniqSet.elementOfUniqSet` visited)
+              ) e
 
-          (clsOps',fvs') = partition (isJust . Id.isClassOpId_maybe) fvs
+      (clsOps',fvs') = partition (isJust . Id.isClassOpId_maybe) fvs
 
-          clsOps'' = map
-            ( \v -> flip (maybe (error $ $(curLoc) ++ "Not a class op")) (Id.isClassOpId_maybe v) $ \c ->
-                let clsIds = Class.classAllSelIds c
-                in  maybe (error $ $(curLoc) ++ "Index not found")
-                          (v,)
-                          (elemIndex v clsIds)
-            ) clsOps'
+      clsOps'' = map
+        ( \v -> flip (maybe (error $ $(curLoc) ++ "Not a class op")) (Id.isClassOpId_maybe v) $ \c ->
+            let clsIds = Class.classAllSelIds c
+            in  maybe (error $ $(curLoc) ++ "Index not found")
+                      (v,)
+                      (elemIndex v clsIds)
+        ) clsOps'
 
-      (locatedAndUnlocated, pFP', reprs') <- unzip3 <$> mapM (loadExprFromIface hdl) fvs'
-      let (locatedExprs', unlocated') = partitionEithers locatedAndUnlocated
+  (locatedAndUnlocated, pFP', reprs') <- unzip3 <$> mapM (loadExprFromIface hdl) fvs'
+  let (locatedExprs', unlocated') = partitionEithers locatedAndUnlocated
 
-      let visited' = foldl' UniqSet.addListToUniqSet visited
-                       [ map fst locatedExprs'
-                       , unlocated'
-                       , clsOps'
-                       ]
+  let visited' = foldl' UniqSet.addListToUniqSet visited
+                   [ map fst locatedExprs'
+                   , unlocated'
+                   , clsOps'
+                   ]
 
-      go' (locatedExprs'++locatedExprs)
-          (clsOps''++clsOps)
-          (unlocated'++unlocated)
-          (concat pFP'++pFP)
-          (concat reprs'++reprs)
-          visited'
-          (es ++ map snd locatedExprs')
+  loadExternalExprs' hdl
+      (locatedExprs'++locatedExprs)
+      (clsOps''++clsOps)
+      (unlocated'++unlocated)
+      (concat pFP'++pFP)
+      (concat reprs'++reprs)
+      visited'
+      (es ++ map snd locatedExprs')
 
-loadExprFromIface ::
-  GHC.GhcMonad m
+loadExprFromIface
+  :: GHC.GhcMonad m
   => HDL
   -> CoreSyn.CoreBndr
   -> m (Either
@@ -219,7 +258,7 @@ loadPrimitiveAnnotations ::
   -> [Annotations.Annotation]
   -> m [Either UnresolvedPrimitive FilePath]
 loadPrimitiveAnnotations hdl anns =
-  concat <$> mapM (unresolvedPrimitives hdl) prims
+  concat <$> mapM (getUnresolvedPrimitives hdl) prims
   where
     prims = mapMaybe filterPrim anns
     filterPrim (Annotations.Annotation target value) =
@@ -228,12 +267,12 @@ loadPrimitiveAnnotations hdl anns =
       GhcPlugins.fromSerialized
         (GhcPlugins.deserializeWithData :: [Word8] -> Primitive)
 
-unresolvedPrimitives
+getUnresolvedPrimitives
   :: MonadIO m
   => HDL
   -> (Annotations.CoreAnnTarget, Primitive)
   -> m ([Either UnresolvedPrimitive FilePath])
-unresolvedPrimitives hdl targetPrim =
+getUnresolvedPrimitives hdl targetPrim =
   case targetPrim of
     (_, Primitive hdls fp) | hdl `elem` hdls -> pure [Right fp]
 
