@@ -180,7 +180,7 @@ snap-bindist:
   image: snapcore/snapcraft
   stage: publish
   cache:
-    key: snap-last-run-hash
+    key: snap-last-run-hash-$CI_COMMIT_REF_SLUG
     paths:
       - snap-last-run-hash
   artifacts:
