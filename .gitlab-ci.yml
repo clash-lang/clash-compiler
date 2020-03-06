@@ -173,15 +173,7 @@ snap-bindist:
       - bindist/linux/snap/clash-snap-bindist.tar.xz
     expire_in: 1 week
   script:
-    # TODO: Clean up nix-store after building
-    - export THREADS=$(nproc)
-    - export XZ_DEFAULTS="-T ${THREADS} -3"
-    - export ROOT=$(pwd)
-    - tar xf usr_nix.tar.xz -C / || true
-    - apt update
-    - apt install ksh -y  # TODO: Remove need for ksh in mkBinDist.sh
-    - cd bindist/linux/snap && ./mkBinDist.sh |& tee $ROOT/nix_build.log | (egrep -i '^(building|copying)' || true)
-    - tar cJf $ROOT/usr_nix.tar.xz /usr/nix
+    - .ci/snap_bindist.sh
 
   # Run every night, when explicitly triggered, or when tagged (release)
   only:
@@ -203,23 +195,7 @@ snap-bindist:
       - bindist/linux/snap/*.snap
     expire_in: 1 week
   script:
-    - export SNAPCRAFT_BUILD_ENVIRONMENT_CPU=$(nproc)
-    - export SNAPCRAFT_BUILD_ENVIRONMENT_MEMORY=16G
-    - apt update
-    - apt install git -y
-    - touch snap-last-run-hash
-    - |
-      if [ "$(cat snap-last-run-hash)" == "$(git rev-parse HEAD)-${RELEASE_CHANNEL}" ]; then
-        echo "Already built and published $(git rev-parse HEAD) on ${RELEASE_CHANNEL}. Nothing to do!";
-        exit 0;
-      fi
-    - git rev-parse HEAD > snap-last-run-hash
-    - echo "-${RELEASE_CHANNEL}" >> snap-last-run-hash
-    - cd bindist/linux/snap
-    - echo $SNAPCRAFT_LOGIN_FILE | base64 --decode --ignore-garbage > snapcraft.login
-    - snapcraft login --with snapcraft.login
-    - snapcraft
-    - snapcraft push *.snap --release ${RELEASE_CHANNEL}
+    - .ci/snap_publish.sh
 
 snap-beta:
   extends: .snap
