@@ -1,5 +1,17 @@
 # Changelog for the Clash project
 
+## 1.3.0
+See `changelog/README.md`
+
+* New features (API):
+  * Added basic support for writing PSL/SVA assertions in `Clash.Verification`
+* New features (Compiler):
+  * No new features yet!
+* Fixes issues:
+  * No fixes yet!
+* Fixes without issue reports:
+  *  Use `ByteArray` instead of `Vector Word8` in the `ByteArrayLiteral` type. See [#1151](https://github.com/clash-lang/clash-compiler/pull/1151)
+
 ## 1.2.0 *March 5th 2020*
 As promised when releasing 1.0, we've tried our best to keep the API stable. We
 think most designs will continue to compile with this new version, although special
