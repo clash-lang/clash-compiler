@@ -1,6 +1,6 @@
 # Changelog for the Clash project
-
 ## 1.3.0
+See `changelog/README.md`
 
 * New features (API):
   * Added basic support for writing PSL/SVA assertions in `Clash.Verification`
