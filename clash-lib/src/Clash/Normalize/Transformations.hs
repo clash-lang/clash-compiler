@@ -624,16 +624,16 @@ caseCon ctx@(TransformContext is0 _) e@(Case subj ty alts) = do
     -- that.
     caseCon ctx (Case (Literal (IntegerLiteral 0)) ty alts)
    where
-    isNum0 (tyView -> TyConApp (nameOcc -> tcNm) [arg])
+    isNum0 (tyView -> TyConApp (nameOcc -> tcNm) args)
       | tcNm `elem`
         ["Clash.Sized.Internal.BitVector.BitVector"
         ,"Clash.Sized.Internal.Unsigned.Unsigned"
         ,"Clash.Sized.Internal.Signed.Signed"
         ]
-      = isLitX 0 arg
+      = isLitX 0 (head args)
       | tcNm ==
-        "Clash.Sized.Internal.Index.Index"
-      = isLitX 1 arg
+        "Clash.Sized.Internal.Index.SatIndex"
+      = isLitX 1 (head (tail args))
     isNum0 (coreView1 tcm -> Just t) = isNum0 t
     isNum0 _ = False
 

@@ -109,7 +109,7 @@ import Data.Proxy                 (Proxy (..))
 import Data.Singletons.Prelude    (TyFun,Apply,type (@@))
 import GHC.TypeLits               (CmpNat, KnownNat, Nat, type (+), type (-), type (*),
                                    type (^), type (<=), natVal)
-import GHC.Base                   (Int(I#),Int#,isTrue#)
+import GHC.Base                   (coerce, Int(I#),Int#,isTrue#)
 import GHC.Generics               hiding (Fixity (..))
 import qualified GHC.Magic
 import GHC.Prim                   ((==#),(<#),(-#))

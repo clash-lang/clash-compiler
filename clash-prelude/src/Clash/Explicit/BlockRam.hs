@@ -401,20 +401,21 @@ where
 
 import           Data.Maybe             (isJust)
 import qualified Data.Sequence          as Seq
+import           GHC.Base               (coerce)
 import           GHC.Stack              (HasCallStack, withFrozenCallStack)
 import           GHC.TypeLits           (KnownNat, type (^), type (<=))
 import           Prelude                hiding (length, replicate)
 
 import           Clash.Annotations.Primitive
   (hasBlackBox)
-import           Clash.Class.Num        (SaturationMode(SatBound), satSucc)
+import           Clash.Class.Num        (SaturationMode(SatBound))
 import           Clash.Explicit.Signal  (KnownDomain, Enable, register, fromEnable)
 import           Clash.Signal.Internal
   (Clock(..), Reset, Signal (..), invertReset, (.&&.), mux)
 import           Clash.Promoted.Nat     (SNat(..))
 import           Clash.Signal.Bundle    (unbundle)
 import           Clash.Sized.Unsigned   (Unsigned)
-import           Clash.Sized.Index      (Index)
+import           Clash.Sized.Index      (SatIndex)
 import           Clash.Sized.Vector     (Vec, replicate, toList, iterateI)
 import qualified Clash.Sized.Vector     as CV
 import           Clash.XException
@@ -787,7 +788,7 @@ data ResetStrategy (r :: Bool) where
 -- | Version of blockram that has no default values set. May be cleared to a
 -- arbitrary state using a reset function.
 blockRamU
-   :: forall n dom a r addr
+   :: forall n sat dom a r addr
    . ( KnownDomain dom
      , HasCallStack
      , NFDataX a
@@ -806,7 +807,7 @@ blockRamU
   -- clear the BRAM.
   -> SNat n
   -- ^ Number of elements in BRAM
-  -> (Index n -> a)
+  -> (SatIndex sat n -> a)
   -- ^ If applicable (see first argument), reset BRAM using this function.
   -> Signal dom addr
   -- ^ Read address @r@
@@ -830,8 +831,8 @@ blockRamU clk rst0 en rstStrategy n@SNat initF rd0 mw0 =
   rstBool = register clk rst0 en True (pure False)
   rstInv = invertReset rst0
 
-  waCounter :: Signal dom (Index n)
-  waCounter = register clk rstInv en 0 (satSucc SatBound <$> waCounter)
+  waCounter :: Signal dom (SatIndex 'SatBound n)
+  waCounter = register clk rstInv en 0 (succ <$> waCounter)
 
   wa0 = fst . fromJustX <$> mw0
   w0  = snd . fromJustX <$> mw0
@@ -840,7 +841,7 @@ blockRamU clk rst0 en rstStrategy n@SNat initF rd0 mw0 =
   rd1 = mux rstBool 0 (fromEnum <$> rd0)
   we1 = mux rstBool (pure True) we0
   wa1 = mux rstBool (fromInteger . toInteger <$> waCounter) (fromEnum <$> wa0)
-  w1  = mux rstBool (initF <$> waCounter) w0
+  w1  = mux rstBool (initF <$> coerce <$> waCounter) w0
 
 -- | blockRAM1 primitive
 blockRamU#
@@ -921,8 +922,8 @@ blockRam1 clk rst0 en rstStrategy n@SNat a rd0 mw0 =
   rstBool = register clk rst0 en True (pure False)
   rstInv = invertReset rst0
 
-  waCounter :: Signal dom (SatIndex 'SatError n)
-  waCounter = register clk rstInv en 0 (satSucc SatBound <$> waCounter)
+  waCounter :: Signal dom (SatIndex 'SatBound n)
+  waCounter = register clk rstInv en 0 (succ <$> waCounter)
 
   wa0 = fst . fromJustX <$> mw0
   w0  = snd . fromJustX <$> mw0

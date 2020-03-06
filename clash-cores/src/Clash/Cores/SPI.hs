@@ -120,13 +120,13 @@ spiCommon
      , Signal dom (Maybe (BitVector n))
      )
 spiCommon mode ssI msI sckI dinI =
-  mooreB go cvt ( 0 :: Index n      -- cntR
-                , False             -- cntOldR
-                , undefined         -- sckOldR
+  mooreB go cvt ( 0 :: SatIndex 'SatWrap n -- cntR
+                , False                    -- cntOldR
+                , undefined                -- sckOldR
                 , deepErrorX "no initial dataInR"
                 , deepErrorX "no initial dataOutR"
-                , False             -- ackR
-                , False             -- doneR
+                , False                    -- ackR
+                , False                    -- doneR
                 )
                 (ssI,msI,sckI,dinI)
  where
@@ -143,7 +143,7 @@ spiCommon mode ssI msI sckI dinI =
    where
     cntD
       | ss        = 0
-      | sampleSck = if cntQ == maxBound then 0 else cntQ + 1
+      | sampleSck = succ cntQ
       | otherwise = cntQ
 
     dataInD
@@ -280,7 +280,7 @@ spiGen
      , Signal dom Bool
      )
 spiGen mode SNat SNat =
-  unbundle . moore go cvt (0 :: Index (2*n),False,Idle @halfPeriod @waitTime)
+  unbundle . moore go cvt (0 :: SatIndex 'SatWrap (2*n),False,Idle @halfPeriod @waitTime)
  where
   cvt (_, sck, st) =
     ( st == Idle
@@ -307,7 +307,7 @@ spiGen mode SNat SNat =
 
     cntD = case stQ of
       Transfer n
-        | n == maxBound -> if cntQ == maxBound then 0 else cntQ+1
+        | n == maxBound -> succ cntQ
         | otherwise -> cntQ
       _ -> 0
 
@@ -318,8 +318,8 @@ spiGen mode SNat SNat =
 
 data SPIMasterState halfPeriod waitTime
   = Idle
-  | Wait (Index waitTime)
-  | Transfer (Index halfPeriod)
+  | Wait (SatIndex 'SatError waitTime)
+  | Transfer (SatIndex 'SatError halfPeriod)
   | Finish
   deriving (Eq, Generic, NFDataX)
 

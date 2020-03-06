@@ -24,7 +24,7 @@ import           Clash.Sized.Internal.Signed   (Signed)
 import           Clash.Sized.Internal.Unsigned (Unsigned)
 
 import           GHC.TypeLits
-  (KnownNat, Nat, type (^), type (*))
+  (KnownNat, Nat, type (^), type (*), type (<=))
 import           GHC.TypeLits.Extra            (Max)
 
 -- | Type class implementing exponentiation with explicitly resizing results.

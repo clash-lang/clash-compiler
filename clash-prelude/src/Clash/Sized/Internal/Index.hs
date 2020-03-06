@@ -8,6 +8,7 @@ Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE DeriveAnyClass #-}
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE TypeFamilies #-}
@@ -89,7 +90,7 @@ import GHC.Natural                (naturalToInteger)
 import Clash.Sized.Internal.Mod   (naturalToInteger)
 #endif
 import GHC.Stack                  (HasCallStack)
-import GHC.TypeLits               (KnownNat, Nat, type (+), type (-),
+import GHC.TypeLits               (CmpNat, KnownNat, Nat, type (+), type (-),
                                    type (*), type (<=), natVal)
 import GHC.TypeLits.Extra         (CLog, Max)
 import Test.QuickCheck.Arbitrary  (Arbitrary (..), CoArbitrary (..),
@@ -98,7 +99,8 @@ import Test.QuickCheck.Arbitrary  (Arbitrary (..), CoArbitrary (..),
 
 import Clash.Class.BitPack        (BitPack (..), packXWith)
 import Clash.Class.Num            (ExtendingNum (..), KnownSatMode (..),
-                                   SaturatingNum (..), SaturationMode (..))
+                                   SaturatingNum (..), SaturationMode (..),
+                                   satSucc, satPred)
 import Clash.Class.Parity         (Parity (..))
 import Clash.Class.Resize         (Resize (..))
 import Clash.Prelude.BitIndex     (replaceBit)
@@ -172,11 +174,11 @@ fromSNat = snatToNum
 
 {-# NOINLINE pack# #-}
 pack# :: SatIndex sat n -> BitVector (CLog 2 n)
-pack# (I i) = BV 0 i
+pack# (I i) = BV 0 (naturalFromInteger i)
 
 {-# NOINLINE unpack# #-}
 unpack# :: (KnownNat n, 1 <= n) => BitVector (CLog 2 n) -> SatIndex sat n
-unpack# (BV 0 i) = fromInteger_INLINE i
+unpack# (BV 0 i) = fromInteger_INLINE (naturalToInteger i)
 unpack# bv = undefError "Index.unpack" [bv]
 
 instance Eq (SatIndex sat n) where
@@ -209,9 +211,9 @@ le# (I n) (I m) = n <= m
 
 -- | The functions: 'enumFrom', 'enumFromThen', 'enumFromTo', and
 -- 'enumFromThenTo', are not synthesizable.
-instance KnownNat n => Enum (SatIndex sat n) where
-  succ           = (+# fromInteger# 1)
-  pred           = (-# fromInteger# 1)
+instance forall sat n . (KnownSatMode sat, KnownNat n) => Enum (SatIndex sat n) where
+  succ           = satSucc $ satMode @sat
+  pred           = satPred $ satMode @sat
   toEnum         = fromInteger# . toInteger
   fromEnum       = fromEnum . toInteger#
   enumFrom       = enumFrom#
@@ -219,33 +221,30 @@ instance KnownNat n => Enum (SatIndex sat n) where
   enumFromTo     = enumFromTo#
   enumFromThenTo = enumFromThenTo#
 
-enumFrom# :: forall n. KnownNat n => Index n -> [Index n]
-enumFrom# x = [x .. maxBound]
+enumFrom# :: forall sat n. KnownNat n => SatIndex sat n -> [SatIndex sat n]
+enumFrom# x = map I [unsafeToInteger x .. unsafeToInteger $ maxBound @(SatIndex sat n)]
 {-# NOINLINE enumFrom# #-}
 
-enumFromThen# :: forall n. KnownNat n => Index n -> Index n -> [Index n]
-enumFromThen# x y = if x <= y then [x, y .. maxBound] else [x, y .. minBound]
+enumFromThen# :: forall sat n. KnownNat n => SatIndex sat n -> SatIndex sat n -> [SatIndex sat n]
+enumFromThen# x y = map I $ if x <= y
+                              then [unsafeToInteger x, unsafeToInteger y .. unsafeToInteger $ maxBound @(SatIndex sat n)]
+                              else [unsafeToInteger x, unsafeToInteger y .. unsafeToInteger $ minBound @(SatIndex sat n)]
 {-# NOINLINE enumFromThen# #-}
 
-enumFromTo# :: Index n -> Index n -> [Index n]
+enumFromTo# :: SatIndex sat n -> SatIndex sat n -> [SatIndex sat n]
 enumFromTo# x y = map I [unsafeToInteger x .. unsafeToInteger y]
 {-# NOINLINE enumFromTo# #-}
-{-# NOINLINE enumFromThenTo# #-}
-enumFrom#       :: SatIndex sat n -> [SatIndex sat n]
-enumFromThen#   :: SatIndex sat n -> SatIndex sat n -> [SatIndex sat n]
-enumFromTo#     :: SatIndex sat n -> SatIndex sat n -> [SatIndex sat n]
+
 enumFromThenTo# :: SatIndex sat n -> SatIndex sat n -> SatIndex sat n -> [SatIndex sat n]
-enumFrom# x             = map fromInteger_INLINE [unsafeToInteger x ..]
-enumFromThen# x y       = map fromInteger_INLINE [unsafeToInteger x, unsafeToInteger y ..]
-enumFromTo# x y         = map I [unsafeToInteger x .. unsafeToInteger y]
 enumFromThenTo# x1 x2 y = map I [unsafeToInteger x1, unsafeToInteger x2 .. unsafeToInteger y]
 {-# NOINLINE enumFromThenTo# #-}
+
 
 instance KnownNat n => Bounded (SatIndex sat n) where
   minBound = fromInteger# 0
   maxBound = maxBound#
 
-maxBound# :: forall n. KnownNat n => SatIndex sat n
+maxBound# :: forall sat n. KnownNat n => SatIndex sat n
 maxBound# =
   case natToInteger @n of
     0 -> errorX "maxBound of 'Index 0' is undefined"
@@ -299,25 +298,25 @@ times# (I a) (I b) = I (a * b)
 
 instance (KnownSatMode sat, KnownNat n) => SaturatingNum (SatIndex sat n) where
   satAdd SatWrap !a !b =
-    case snatToNum @Integer (SNat @n) of
+    case natToInteger @n of
       1 -> fromInteger# 0
       _ -> case plus# a b of
-        z | let m = fromInteger# (natVal (Proxy @ n))
+        z | let m = fromInteger# (natVal (Proxy @n))
           , z >= m -> resize# (z -# m)
         z -> resize# z
   satAdd SatZero !a !b =
-    case snatToNum @Int (SNat @n) of
+    case natToInteger @n of
       1 -> fromInteger# 0
       _ ->  case plus# a b of
-        z | let m = fromInteger# (natVal (Proxy @ n))
+        z | let m = fromInteger# (natVal (Proxy @n))
           , z >= m -> fromInteger# 0
         z -> resize# z
   satAdd SatError a b = a +# b
   satAdd _ !a !b =
-    case snatToNum @Int (SNat @n) of
+    case natToInteger @n of
       1 -> fromInteger# 0
       _ -> case plus# a b of
-        z | let m = fromInteger# (natVal (Proxy @ n))
+        z | let m = fromInteger# (natVal (Proxy @n))
           , z >= m -> maxBound#
         z -> resize# z
 
@@ -332,21 +331,21 @@ instance (KnownSatMode sat, KnownNat n) => SaturatingNum (SatIndex sat n) where
        else a -# b
 
   satMul SatWrap !a !b =
-    case snatToNum @Integer (SNat @n) of
+    case natToInteger @n of
       1 -> fromInteger# 0
       _ -> case times# a b of
-        z -> let m = fromInteger# (natVal (Proxy @ n))
+        z -> let m = fromInteger# (natVal (Proxy @n))
               in resize# (z `mod` m)
   satMul SatZero a b =
-    case snatToNum @Int (SNat @n) of
+    case natToInteger @n of
       1 -> fromInteger# 0
       _ -> case times# a b of
-          z | let m = fromInteger# (natVal (Proxy @ n))
+          z | let m = fromInteger# (natVal (Proxy @n))
             , z >= m -> fromInteger# 0
           z -> resize# z
   satMul SatError a b = a *# b
   satMul _ a b =
-    case snatToNum @Int (SNat @n) of
+    case natToInteger @n of
       1 -> fromInteger# 0
       _ ->  case times# a b of
         z | let m = fromInteger# (natVal (Proxy @ n))
