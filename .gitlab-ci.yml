@@ -191,10 +191,10 @@ snap-bindist:
   script:
     - .ci/snap_publish.sh
 
-snap-edge:
+snap-beta-or-edge:
   extends: .snap
   variables:
-    RELEASE_CHANNEL: edge
+    RELEASE_CHANNEL: beta_or_edge
   only:
     - schedules
     - triggers
