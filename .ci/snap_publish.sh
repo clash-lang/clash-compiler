@@ -6,16 +6,35 @@ export SNAPCRAFT_BUILD_ENVIRONMENT_CPU
 SNAPCRAFT_BUILD_ENVIRONMENT_MEMORY=16G
 export SNAPCRAFT_BUILD_ENVIRONMENT_MEMORY
 
-# Prevent running if we've already published this revision
+# Install git to detect branch names / revisions
 apt update
 apt install git -y
-touch snap-last-run-hash
-if [ "$(cat snap-last-run-hash)" == "$(git rev-parse HEAD)-${RELEASE_CHANNEL}" ]; then
-  echo "Already built and published $(git rev-parse HEAD) on ${RELEASE_CHANNEL}. Nothing to do!";
+
+# Set release channel based on branch:
+#
+# A build with RELEASE_CHANNEL=beta_or_edge only runs at night as a schedule
+# (or if a schedule is manually triggered). The schedules target either
+# master or a release branch (1.0, 1.2, ..). If it's run on master it should
+# go into Snap's 'edge' channel, otherwise it's a pre-release dot-version
+# (i.e., latest released version + fixes accumulated in release branch) thus
+# beta.
+branch_name=$(git rev-parse --symbolic-full-name --abbrev-ref HEAD)
+if [[ ${branch_name} == "master" && ${RELEASE_CHANNEL} == "beta_or_edge" ]]; then
+  RELEASE_CHANNEL="edge"
+else
+  RELEASE_CHANNEL="beta"
+fi
+
+# Prevent running if we've already published this revision
+hash_file=snap-last-run-hash
+revision=$(git rev-parse HEAD)
+
+touch ${hash_file}
+if [ "$(cat ${hash_file})" == "${revision}" ]; then
+  echo "Already built and published ${revision} on ${RELEASE_CHANNEL}. Nothing to do!";
   exit 0;
 fi
-git rev-parse HEAD > snap-last-run-hash
-echo "-${RELEASE_CHANNEL}" >> snap-last-run-hash
+echo "${revision}" > ${hash_file}
 
 cd bindist/linux/snap || exit
 
