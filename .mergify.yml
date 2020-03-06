@@ -1,0 +1,9 @@
+pull_request_rules:
+  - name: backport patches to 1.2
+    conditions:
+      - base=master
+      - label=backport 1.2
+    actions:
+      backport:
+        branches:
+          - "1.2"
