@@ -46,7 +46,7 @@ if [[ ${RELEASE_CHANNEL} == "stable" || ${RELEASE_CHANNEL} == "beta" ]]; then
   sed -i s/devel/stable/ snap/snapcraft.yaml
 fi
 
-echo $SNAPCRAFT_LOGIN_FILE | base64 --decode --ignore-garbage > snapcraft.login
+echo "$SNAPCRAFT_LOGIN_FILE" | base64 --decode --ignore-garbage > snapcraft.login
 snapcraft login --with snapcraft.login
 snapcraft
 snapcraft push ./*.snap --release ${RELEASE_CHANNEL}
