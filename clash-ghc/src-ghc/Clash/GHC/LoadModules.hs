@@ -8,9 +8,10 @@
 
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE QuasiQuotes #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE TemplateHaskell #-}
-{-# LANGUAGE QuasiQuotes #-}
 
 module Clash.GHC.LoadModules
   ( loadModules
@@ -33,7 +34,8 @@ import           Clash.Util                      (ClashException(..), pkgIdFromT
 import qualified Clash.Util.Interpolate          as I
 import           Control.Arrow                   (first, second)
 import           Control.DeepSeq                 (deepseq)
-import           Control.Exception               (throw)
+import           Control.Exception               (SomeException, throw)
+import           Control.Monad                   (forM)
 #if MIN_VERSION_ghc(8,6,0)
 import           Control.Exception               (throwIO)
 #endif
@@ -43,10 +45,11 @@ import           Data.Generics.Uniplate.DataOnly (transform)
 import           Data.Data                       (Data)
 import           Data.Typeable                   (Typeable)
 import           Data.List                       (foldl', nub)
-import           Data.Maybe                      (catMaybes, listToMaybe)
+import           Data.Maybe                      (catMaybes, listToMaybe, fromMaybe)
 import qualified Data.Text                       as Text
 import qualified Data.Time.Clock                 as Clock
 import           Language.Haskell.TH.Syntax      (lift)
+import           GHC.Stack                       (HasCallStack)
 
 #ifdef USE_GHC_PATHS
 import           GHC.Paths                       (libdir)
@@ -68,6 +71,7 @@ import qualified DynamicLoading
 #endif
 import           DynFlags                        (GeneralFlag (..))
 import qualified DynFlags
+import qualified Exception
 import qualified GHC
 import qualified HscMain
 import qualified HscTypes
@@ -92,7 +96,8 @@ import qualified Var
 
 -- Internal Modules
 import           Clash.GHC.GHC2Core                           (modNameM, qualifiedNameString')
-import           Clash.GHC.LoadInterfaceFiles                 (loadExternalExprs, unresolvedPrimitives)
+import           Clash.GHC.LoadInterfaceFiles
+  (loadExternalExprs, getUnresolvedPrimitives, loadExternalBinders)
 import           Clash.GHCi.Common                            (checkMonoLocalBindsMod)
 import           Clash.Util                                   (curLoc, noSrcSpan, reportTimeDiff
                                                               ,wantedLanguageExtensions, unwantedLanguageExtensions)
@@ -128,6 +133,203 @@ getProcessOutput command =
      return (output, exitCode)
 #endif
 
+-- | Search databases for given module
+loadExternalModule
+  :: (HasCallStack, GHC.GhcMonad m)
+  => HDL
+  -> String
+  -- ^ Module name. Can either be a filepath pointing to a .hs file, or a
+  -- qualified module name (example: "Data.List").
+  -> m (Either
+          SomeException
+          ( [CoreSyn.CoreBndr]                     -- Root binders
+          , FamInstEnv.FamInstEnv                  -- Local type family instances
+          , GHC.ModuleName                         -- Module name
+          , [CoreSyn.CoreBndr]                     -- All binders
+          , [(CoreSyn.CoreBndr, Int)]              -- Type class projection functions
+          , [CoreSyn.CoreBndr]                     -- Unlocatable binders
+          , [Either UnresolvedPrimitive FilePath]  -- Primitives
+          , [DataRepr']                            -- Custom data representations
+          , [CoreSyn.CoreBind]                     -- All bindings
+          ) )
+loadExternalModule hdl modName0 = Exception.gtry $ do
+  let modName1 = GHC.mkModuleName modName0
+  foundMod <- GHC.findModule modName1 Nothing
+  let errMsg = "Internal error: found  module, but could not load it"
+  modInfo <- fromMaybe (error errMsg) <$> (GHC.getModuleInfo foundMod)
+  tyThings <- catMaybes <$> mapM GHC.lookupGlobalName (GHC.modInfoExports modInfo)
+  let rootIds = [id_ | GHC.AnId id_ <- tyThings]
+  (allBinders, clsOps, unlocatable, prims, reprs) <- loadExternalBinders hdl rootIds
+  return $
+    ( rootIds
+    , FamInstEnv.emptyFamInstEnv
+    , modName1
+    , map fst allBinders
+    , clsOps
+    , unlocatable
+    , prims
+    , reprs
+    , makeRecursiveGroups allBinders
+    )
+
+setupGhc
+  :: GHC.GhcMonad m
+  => OverridingBool
+  -> Maybe GHC.DynFlags
+  -> [FilePath]
+  -> m ()
+setupGhc useColor dflagsM idirs = do
+  dflags <-
+    case dflagsM of
+      Just df -> return df
+      Nothing -> do
+#if MIN_VERSION_ghc(8,6,0)
+        -- Make sure we read the .ghc environment files
+        df <- do
+          df <- GHC.getSessionDynFlags
+          _ <- GHC.setSessionDynFlags df {DynFlags.pkgDatabase = Nothing}
+          GHC.getSessionDynFlags
+#else
+        df <- GHC.getSessionDynFlags
+#endif
+        let df1 = setWantedLanguageExtensions df
+            ghcTyLitNormPlugin = GHC.mkModuleName "GHC.TypeLits.Normalise"
+            ghcTyLitExtrPlugin = GHC.mkModuleName "GHC.TypeLits.Extra.Solver"
+            ghcTyLitKNPlugin   = GHC.mkModuleName "GHC.TypeLits.KnownNat.Solver"
+            dfPlug = df1 { DynFlags.pluginModNames = nub $
+                                ghcTyLitNormPlugin : ghcTyLitExtrPlugin :
+                                ghcTyLitKNPlugin : DynFlags.pluginModNames df1
+                           , DynFlags.useColor = useColor
+                           , DynFlags.importPaths = idirs
+                           }
+        return dfPlug
+
+  let dflags1 = dflags
+                  { DynFlags.optLevel = 2
+                  , DynFlags.ghcMode  = GHC.CompManager
+                  , DynFlags.ghcLink  = GHC.LinkInMemory
+                  , DynFlags.hscTarget
+                      = if DynFlags.rtsIsProfiled
+                           then DynFlags.HscNothing
+                           else DynFlags.defaultObjectTarget $
+#if !MIN_VERSION_ghc(8,10,0)
+                                  DynFlags.targetPlatform
+#endif
+                                    dflags
+                  , DynFlags.reductionDepth = 1000
+                  }
+  let dflags2 = unwantedOptimizationFlags dflags1
+      ghcDynamic = case lookup "GHC Dynamic" (DynFlags.compilerInfo dflags) of
+                    Just "YES" -> True
+                    _          -> False
+      dflags3 = if ghcDynamic then DynFlags.gopt_set dflags2 DynFlags.Opt_BuildDynamicToo
+                              else dflags2
+#if MIN_VERSION_ghc(8,6,0)
+  hscenv <- GHC.getSession
+  dflags4 <- MonadUtils.liftIO (DynamicLoading.initializePlugins hscenv dflags3)
+  _ <- GHC.setSessionDynFlags dflags4
+#else
+  _ <- GHC.setSessionDynFlags dflags3
+#endif
+
+  return ()
+
+-- | Load a module from a Haskell file. Function does NOT look in currently
+-- loaded modules.
+loadLocalModule
+  :: GHC.GhcMonad m
+  => HDL
+  -> String
+  -- ^ Module name. Can either be a filepath pointing to a .hs file, or a
+  -- qualified module name (example: "Data.List").
+  -> m ( [CoreSyn.CoreBndr]                     -- Root binders
+       , FamInstEnv.FamInstEnv                  -- Local type family instances
+       , GHC.ModuleName                         -- Module name
+       , [CoreSyn.CoreBndr]                     -- All binders
+       , [(CoreSyn.CoreBndr, Int)]              -- Type class projection functions
+       , [CoreSyn.CoreBndr]                     -- Unlocatable binders
+       , [Either UnresolvedPrimitive FilePath]  -- Primitives
+       , [DataRepr']                            -- Custom data representations
+       , [CoreSyn.CoreBind]                     -- All bindings
+       )
+loadLocalModule hdl modName = do
+  target <- GHC.guessTarget modName Nothing
+  GHC.setTargets [target]
+  modGraph <- GHC.depanal [] False
+#if MIN_VERSION_ghc(8,4,1)
+  let modGraph' = GHC.mapMG disableOptimizationsFlags modGraph
+#else
+  let modGraph' = map disableOptimizationsFlags modGraph
+#endif
+      -- 'topSortModuleGraph' ensures that modGraph2, and hence tidiedMods
+      -- are in topological order, i.e. the root module is last.
+      modGraph2 = Digraph.flattenSCCs (GHC.topSortModuleGraph True modGraph' Nothing)
+
+  liftIO $ mapM_ checkMonoLocalBindsMod modGraph2
+
+  tidiedMods <- forM modGraph2 $ \m -> do
+    oldDFlags <- GHC.getSessionDynFlags
+    pMod  <- parseModule m
+    _ <- GHC.setSessionDynFlags (GHC.ms_hspp_opts (GHC.pm_mod_summary pMod))
+    tcMod <- GHC.typecheckModule (removeStrictnessAnnotations pMod)
+
+    -- The purpose of the home package table (HPT) is to track
+    -- the already compiled modules, so subsequent modules can
+    -- rely/use those compilation results
+    --
+    -- We need to update the home package table (HPT) ourselves
+    -- as we can no longer depend on 'GHC.load' to create a
+    -- proper HPT.
+    --
+    -- The reason we have to cannot rely on 'GHC.load' is that
+    -- it runs the rename/type-checker, which we also run in
+    -- the code above. This would mean that the renamer/type-checker
+    -- is run twice, which in turn means that template haskell
+    -- splices are run twice.
+    --
+    -- Given that TH splices can do non-trivial computation and I/O,
+    -- running TH twice must be avoid.
+    tcMod' <- GHC.loadModule tcMod
+    dsMod <- fmap GHC.coreModule $ GHC.desugarModule tcMod'
+    hsc_env <- GHC.getSession
+#if MIN_VERSION_ghc(8,4,1)
+    simpl_guts <- MonadUtils.liftIO $ HscMain.hscSimplify hsc_env [] dsMod
+#else
+    simpl_guts <- MonadUtils.liftIO $ HscMain.hscSimplify hsc_env dsMod
+#endif
+    checkForInvalidPrelude simpl_guts
+    (tidy_guts,_) <- MonadUtils.liftIO $ TidyPgm.tidyProgram hsc_env simpl_guts
+    let pgm        = HscTypes.cg_binds tidy_guts
+    let modFamInstEnv = TcRnTypes.tcg_fam_inst_env $ fst $ GHC.tm_internals_ tcMod
+    _ <- GHC.setSessionDynFlags oldDFlags
+    return (pgm,modFamInstEnv)
+
+  let (binders,modFamInstEnvs) = unzip tidiedMods
+      binderIds                = map fst (CoreSyn.flattenBinds (concat binders))
+      plusFamInst f1 f2        = FamInstEnv.extendFamInstEnvList f1 (FamInstEnv.famInstEnvElts f2)
+      modFamInstEnvs'          = foldl' plusFamInst FamInstEnv.emptyFamInstEnv modFamInstEnvs
+      rootModule               = GHC.ms_mod_name . last $ modGraph2
+
+  -- Because tidiedMods is in topological order, binders is also, and hence
+  -- the binders belonging to the "root" module are the last binders
+  let rootIds = map fst . CoreSyn.flattenBinds $ last binders
+  (externalBndrs, clsOps, unlocatable, unresolvedPrimitives0, reprs) <-
+    loadExternalExprs hdl (UniqSet.mkUniqSet binderIds) (concat binders)
+
+  -- Find local primitive annotations
+  unresolvedPrimitives1 <- findPrimitiveAnnotations hdl binderIds
+
+  pure ( rootIds
+       , modFamInstEnvs'
+       , rootModule
+       , map fst externalBndrs ++ binderIds
+       , clsOps
+       , unlocatable
+       , unresolvedPrimitives0 ++ unresolvedPrimitives1
+       , reprs
+       , concat binders ++ makeRecursiveGroups externalBndrs
+       )
+
 loadModules
   :: OverridingBool
   -- ^ Use color
@@ -154,150 +356,41 @@ loadModules useColor hdl modName dflagsM idirs = do
   libDir <- MonadUtils.liftIO ghcLibDir
   startTime <- Clock.getCurrentTime
   GHC.runGhc (Just libDir) $ do
-    dflags <- case dflagsM of
-                Just df -> return df
-                Nothing -> do
-#if MIN_VERSION_ghc(8,6,0)
-                  -- Make sure we read the .ghc environment files
-                  df <- do { df <- GHC.getSessionDynFlags
-                           ; _ <- GHC.setSessionDynFlags df {DynFlags.pkgDatabase = Nothing}
-                           ; GHC.getSessionDynFlags
-                           }
-#else
-                  df <- GHC.getSessionDynFlags
-#endif
-                  let df1 = setWantedLanguageExtensions df
-                  let ghcTyLitNormPlugin = GHC.mkModuleName "GHC.TypeLits.Normalise"
-                      ghcTyLitExtrPlugin = GHC.mkModuleName "GHC.TypeLits.Extra.Solver"
-                      ghcTyLitKNPlugin   = GHC.mkModuleName "GHC.TypeLits.KnownNat.Solver"
-                  let dfPlug = df1 { DynFlags.pluginModNames = nub $
-                                          ghcTyLitNormPlugin : ghcTyLitExtrPlugin :
-                                          ghcTyLitKNPlugin : DynFlags.pluginModNames df1
-                                     , DynFlags.useColor = useColor
-                                     , DynFlags.importPaths = idirs
-                                     }
-                  return dfPlug
+    () <- setupGhc useColor dflagsM idirs
+    (rootIds, modFamInstEnvs, rootModule, allBinderIds, clsOps, unlocatable, unresolvedPrimitives, reprs, allBinders) <-
+      -- We need to try and load external modules first, because we can't
+      -- recover from errors in 'loadLocalModule'.
+      loadExternalModule hdl modName >>= \case
+        Left _loadExternalErr -> loadLocalModule hdl modName
+        Right res -> pure res
 
-    let dflags1 = dflags
-                    { DynFlags.optLevel = 2
-                    , DynFlags.ghcMode  = GHC.CompManager
-                    , DynFlags.ghcLink  = GHC.LinkInMemory
-                    , DynFlags.hscTarget
-                        = if DynFlags.rtsIsProfiled
-                             then DynFlags.HscNothing
-                             else DynFlags.defaultObjectTarget $
-#if !MIN_VERSION_ghc(8,10,0)
-                                    DynFlags.targetPlatform
-#endif
-                                      dflags
-                    , DynFlags.reductionDepth = 1000
-                    }
-    let dflags2 = unwantedOptimizationFlags dflags1
-    let ghcDynamic = case lookup "GHC Dynamic" (DynFlags.compilerInfo dflags) of
-                      Just "YES" -> True
-                      _          -> False
-    let dflags3 = if ghcDynamic then DynFlags.gopt_set dflags2 DynFlags.Opt_BuildDynamicToo
-                                else dflags2
-#if MIN_VERSION_ghc(8,6,0)
-    hscenv <- GHC.getSession
-    dflags4 <- MonadUtils.liftIO (DynamicLoading.initializePlugins hscenv dflags3)
-    _ <- GHC.setSessionDynFlags dflags4
-#else
-    _ <- GHC.setSessionDynFlags dflags3
-#endif
-    target <- GHC.guessTarget modName Nothing
-    GHC.setTargets [target]
-    modGraph <- GHC.depanal [] False
-#if MIN_VERSION_ghc(8,4,1)
-    let modGraph' = GHC.mapMG disableOptimizationsFlags modGraph
-#else
-    let modGraph' = map disableOptimizationsFlags modGraph
-#endif
-        -- 'topSortModuleGraph' ensures that modGraph2, and hence tidiedMods
-        -- are in topological order, i.e. the root module is last.
-        modGraph2 = Digraph.flattenSCCs (GHC.topSortModuleGraph True modGraph' Nothing)
-    tidiedMods <- mapM (\m -> do { oldDFlags <- GHC.getSessionDynFlags
-                                 ; pMod  <- parseModule m
-                                 ; _ <- GHC.setSessionDynFlags (GHC.ms_hspp_opts (GHC.pm_mod_summary pMod))
-                                 ; tcMod <- GHC.typecheckModule (removeStrictnessAnnotations pMod)
-                                 -- The purpose of the home package table (HPT) is to track
-                                 -- the already compiled modules, so subsequent modules can
-                                 -- rely/use those compilation results
-                                 --
-                                 -- We need to update the home package table (HPT) ourselves
-                                 -- as we can no longer depend on 'GHC.load' to create a
-                                 -- proper HPT.
-                                 --
-                                 -- The reason we have to cannot rely on 'GHC.load' is that
-                                 -- it runs the rename/type-checker, which we also run in
-                                 -- the code above. This would mean that the renamer/type-checker
-                                 -- is run twice, which in turn means that template haskell
-                                 -- splices are run twice.
-                                 --
-                                 -- Given that TH splices can do non-trivial computation and I/O,
-                                 -- running TH twice must be avoid.
-                                 ; tcMod' <- GHC.loadModule tcMod
-                                 ; dsMod <- fmap GHC.coreModule $ GHC.desugarModule tcMod'
-                                 ; hsc_env <- GHC.getSession
-#if MIN_VERSION_ghc(8,4,1)
-                                 ; simpl_guts <- MonadUtils.liftIO $ HscMain.hscSimplify hsc_env [] dsMod
-#else
-                                 ; simpl_guts <- MonadUtils.liftIO $ HscMain.hscSimplify hsc_env dsMod
-#endif
-                                 ; checkForInvalidPrelude simpl_guts
-                                 ; (tidy_guts,_) <- MonadUtils.liftIO $ TidyPgm.tidyProgram hsc_env simpl_guts
-                                 ; let pgm        = HscTypes.cg_binds tidy_guts
-                                 ; let modFamInstEnv = TcRnTypes.tcg_fam_inst_env $ fst $ GHC.tm_internals_ tcMod
-                                 ; _ <- GHC.setSessionDynFlags oldDFlags
-                                 ; return (pgm,modFamInstEnv)
-                                 }
-                         ) modGraph2
-
-    let (binders,modFamInstEnvs) = unzip tidiedMods
-        bindersC                 = concat binders
-        binderIds                = map fst (CoreSyn.flattenBinds bindersC)
-        plusFamInst f1 f2        = FamInstEnv.extendFamInstEnvList f1 (FamInstEnv.famInstEnvElts f2)
-        modFamInstEnvs'          = foldl' plusFamInst FamInstEnv.emptyFamInstEnv modFamInstEnvs
-
-    modTime <- startTime `deepseq` length binderIds `deepseq` MonadUtils.liftIO Clock.getCurrentTime
+    modTime <- startTime `deepseq` length allBinderIds `seq` MonadUtils.liftIO Clock.getCurrentTime
     let modStartDiff = reportTimeDiff modTime startTime
     MonadUtils.liftIO $ putStrLn $ "GHC: Parsing and optimising modules took: " ++ modStartDiff
-
-    (externalBndrs,clsOps,unlocatable,unresolvedPrimitives0,reprs) <-
-      loadExternalExprs hdl (UniqSet.mkUniqSet binderIds) bindersC
-
-    let externalBndrIds = map fst externalBndrs
-    let allBinderIds = externalBndrIds ++ binderIds
 
     extTime <- modTime `deepseq` length unlocatable `deepseq` MonadUtils.liftIO Clock.getCurrentTime
     let extModDiff = reportTimeDiff extTime modTime
     MonadUtils.liftIO $ putStrLn $ "GHC: Loading external modules from interface files took: " ++ extModDiff
 
-    -- Find local primitive annotations
-    unresolvedPrimitives1 <- findPrimitiveAnnotations hdl binderIds
-
+    -- Get type family instances: accumulated by GhcMonad during
+    -- 'loadExternalBinders' / 'loadExternalExprs'
     hscEnv <- GHC.getSession
 #if MIN_VERSION_ghc(8,6,0)
-    famInstEnvs <- do { (msgs,m) <- TcRnMonad.liftIO $ TcRnMonad.initTcInteractive hscEnv FamInst.tcGetFamInstEnvs
-                      ; case m of
-                          Nothing -> TcRnMonad.liftIO $ throwIO (HscTypes.mkSrcErr (snd msgs))
-                          Just x  -> return x
-                      }
+    famInstEnvs <- do
+      (msgs, m) <- TcRnMonad.liftIO $ TcRnMonad.initTcInteractive hscEnv FamInst.tcGetFamInstEnvs
+      case m of
+        Nothing -> TcRnMonad.liftIO $ throwIO (HscTypes.mkSrcErr (snd msgs))
+        Just x  -> return x
 #else
     famInstEnvs <- TcRnMonad.liftIO $ TcRnMonad.initTcForLookup hscEnv FamInst.tcGetFamInstEnvs
 #endif
 
     -- Because tidiedMods is in topological order, binders is also, and hence
-    -- the binders belonging to the "root" module are the last binders
-    let rootModule = GHC.ms_mod_name . last $ modGraph2
-        rootIds    = map fst . CoreSyn.flattenBinds $ last binders
-
-    -- Because tidiedMods is in topological order, binders is also, and hence
     -- allSyn is in topological order. This means that the "root" 'topEntity'
     -- will be compiled last.
-    allSyn     <- map (second Just) <$> findSynthesizeAnnotations binderIds
+    allSyn     <- map (second Just) <$> findSynthesizeAnnotations allBinderIds
     topSyn     <- map (second Just) <$> findSynthesizeAnnotations rootIds
-    benchAnn   <- findTestBenchAnnotations binderIds
+    benchAnn   <- findTestBenchAnnotations rootIds
     reprs'     <- findCustomReprAnnotations
     primGuards <- findPrimitiveGuardAnnotations allBinderIds
     let varNameString = OccName.occNameString . Name.nameOccName . Var.varName
@@ -331,27 +424,25 @@ loadModules useColor hdl modName dflagsM idirs = do
         (_, _) ->
           Panic.pgmError $ $(curLoc) ++ "Multiple 'topEntities' found."
 
-    let unresolvedPrimitives2 = unresolvedPrimitives0 ++ unresolvedPrimitives1
-        reprs1 = reprs ++ reprs'
+    let reprs1 = reprs ++ reprs'
 
     annTime <-
       extTime
         `deepseq` length topEntities'
-        `deepseq` unresolvedPrimitives2
+        `deepseq` unresolvedPrimitives
         `deepseq` reprs1
         `deepseq` primGuards
         `deepseq` MonadUtils.liftIO Clock.getCurrentTime
 
     let annExtDiff = reportTimeDiff annTime extTime
     MonadUtils.liftIO $ putStrLn $ "GHC: Parsing annotations took: " ++ annExtDiff
-    MonadUtils.liftIO $ mapM_ checkMonoLocalBindsMod modGraph2
 
-    return ( bindersC ++ makeRecursiveGroups externalBndrs
+    return ( allBinders
            , clsOps
            , unlocatable
-           , (fst famInstEnvs, modFamInstEnvs')
+           , (fst famInstEnvs, modFamInstEnvs)
            , topEntities'
-           , unresolvedPrimitives2
+           , unresolvedPrimitives
            , reprs1
            , primGuards
            )
@@ -528,7 +619,7 @@ findPrimitiveAnnotations hdl bndrs = do
   anns <- findAnnotationsByTargets targets
 
   concat <$>
-    mapM (unresolvedPrimitives hdl)
+    mapM (getUnresolvedPrimitives hdl)
     (concat $ zipWith (\t -> map ((,) t)) targets anns)
 
 parseModule :: GHC.GhcMonad m => GHC.ModSummary -> m GHC.ParsedModule
