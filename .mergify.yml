@@ -5,5 +5,6 @@ pull_request_rules:
       - label=backport 1.2
     actions:
       backport:
+        ignore_conflicts: True
         branches:
           - "1.2"
