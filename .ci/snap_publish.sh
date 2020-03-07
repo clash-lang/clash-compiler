@@ -1,5 +1,6 @@
 #!/bin/bash
 set -euo pipefail
+set -x
 
 SNAPCRAFT_BUILD_ENVIRONMENT_CPU=$(nproc)
 export SNAPCRAFT_BUILD_ENVIRONMENT_CPU
@@ -18,11 +19,13 @@ apt install git -y
 # go into Snap's 'edge' channel, otherwise it's a pre-release dot-version
 # (i.e., latest released version + fixes accumulated in release branch) thus
 # beta.
-branch_name=$(git rev-parse --symbolic-full-name --abbrev-ref HEAD)
-if [[ ${branch_name} == "master" && ${RELEASE_CHANNEL} == "beta_or_edge" ]]; then
-  RELEASE_CHANNEL="edge"
-else
-  RELEASE_CHANNEL="beta"
+branch_name=${CI_COMMIT_REF_SLUG}
+if [[ ${RELEASE_CHANNEL} == "beta_or_edge" ]]; then
+  if [[ ${branch_name} == "master" ]]; then
+    RELEASE_CHANNEL="edge"
+  else
+    RELEASE_CHANNEL="beta"
+  fi
 fi
 
 # Prevent running if we've already published this revision
@@ -46,6 +49,7 @@ if [[ ${RELEASE_CHANNEL} == "stable" || ${RELEASE_CHANNEL} == "beta" ]]; then
   sed -i s/devel/stable/ snap/snapcraft.yaml
 fi
 
+set +x
 echo "$SNAPCRAFT_LOGIN_FILE" | base64 --decode --ignore-garbage > snapcraft.login
 snapcraft login --with snapcraft.login
 snapcraft
