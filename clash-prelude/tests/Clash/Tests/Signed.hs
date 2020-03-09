@@ -3,6 +3,7 @@ module Clash.Tests.Signed (tests) where
 import Data.Proxy
 import GHC.TypeNats (KnownNat, SomeNat (..), natVal, someNatVal)
 import Test.Tasty
+import Test.Tasty.HUnit
 import Test.Tasty.QuickCheck
 
 import Clash.Sized.Internal.Signed
@@ -24,6 +25,13 @@ tests = localOption (QuickCheckMaxRatio 2) $ testGroup "All"
       map lawsToTest (laws (Proxy :: Proxy (Signed 83)))
   , testGroup "Random Signed"
     [ testProperty "fromInteger" fromIntegerRandomProp  ]
+  , testGroup "Enum"
+    [ testCase "[3,2..]" $ [3,2..] @?= [3,2,1,0,-1,-2,-3,-4 :: Signed 3]
+    , testCase "[3,1..]" $ [3,1..] @?= [3,1,-1,-3,-5,-7 :: Signed 4]
+    , testCase "take 5 [4,4..]" $ take 5 [4,4..] @?= [4,4,4,4,4 :: Signed 4]
+    , testCase "[2,4..]" $ [2,4..] @?= [2,4,6 :: Signed 4]
+    , testCase "[3,4..]" $ [3,4..] @?= [3,4,5,6,7 :: Signed 4]
+    ]
   ]
 
 

@@ -239,33 +239,38 @@ instance KnownNat n => Enum (Signed n) where
   enumFromTo     = enumFromTo#
   enumFromThenTo = enumFromThenTo#
 
-{-# NOINLINE enumFrom# #-}
-{-# NOINLINE enumFromThen# #-}
-{-# NOINLINE enumFromTo# #-}
-{-# NOINLINE enumFromThenTo# #-}
-enumFrom#       :: forall n. KnownNat n => Signed n -> [Signed n]
-enumFromThen#   :: forall n. KnownNat n => Signed n -> Signed n -> [Signed n]
-enumFromTo#     :: forall n. KnownNat n => Signed n -> Signed n -> [Signed n]
-enumFromThenTo# :: forall n. KnownNat n => Signed n -> Signed n -> Signed n -> [Signed n]
+
+enumFrom# :: forall n. KnownNat n => Signed n -> [Signed n]
 enumFrom# x = map (fromInteger_INLINE sz mB mask) [unsafeToInteger x .. unsafeToInteger (maxBound :: Signed n)]
   where sz   = fromInteger (natVal (Proxy @n)) - 1
         mB   = 1 `shiftL` sz
         mask = mB - 1
+{-# NOINLINE enumFrom# #-}
 
-enumFromThen# x y = map (fromInteger_INLINE sz mB mask) [unsafeToInteger x, unsafeToInteger y .. unsafeToInteger (maxBound :: Signed n)]
-  where sz   = fromInteger (natVal (Proxy @n)) - 1
-        mB   = 1 `shiftL` sz
-        mask = mB - 1
+enumFromThen# :: forall n. KnownNat n => Signed n -> Signed n -> [Signed n]
+enumFromThen# x y =
+  toSigneds [unsafeToInteger x, unsafeToInteger y .. unsafeToInteger bound]
+ where
+  bound = if x <= y then maxBound else minBound :: Signed n
+  toSigneds = map (fromInteger_INLINE sz mB mask)
+  sz = fromInteger (natVal (Proxy @n)) - 1
+  mB = 1 `shiftL` sz
+  mask = mB - 1
+{-# NOINLINE enumFromThen# #-}
 
+enumFromTo# :: forall n. KnownNat n => Signed n -> Signed n -> [Signed n]
 enumFromTo# x y = map (fromInteger_INLINE sz mB mask) [unsafeToInteger x .. unsafeToInteger y]
   where sz   = fromInteger (natVal (Proxy @n)) - 1
         mB   = 1 `shiftL` sz
         mask = mB - 1
+{-# NOINLINE enumFromTo# #-}
 
+enumFromThenTo# :: forall n. KnownNat n => Signed n -> Signed n -> Signed n -> [Signed n]
 enumFromThenTo# x1 x2 y = map (fromInteger_INLINE sz mB mask) [unsafeToInteger x1, unsafeToInteger x2 .. unsafeToInteger y]
   where sz   = fromInteger (natVal (Proxy @n)) - 1
         mB   = 1 `shiftL` sz
         mask = mB - 1
+{-# NOINLINE enumFromThenTo# #-}
 
 
 instance KnownNat n => Bounded (Signed n) where

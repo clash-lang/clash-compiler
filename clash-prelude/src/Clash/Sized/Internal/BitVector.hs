@@ -478,30 +478,49 @@ instance KnownNat n => Enum (BitVector n) where
   enumFromTo     = enumFromTo#
   enumFromThenTo = enumFromThenTo#
 
-{-# NOINLINE enumFrom# #-}
-{-# NOINLINE enumFromThen# #-}
-{-# NOINLINE enumFromTo# #-}
-{-# NOINLINE enumFromThenTo# #-}
-enumFrom#       :: forall n. KnownNat n => BitVector n -> [BitVector n]
-enumFromThen#   :: forall n. KnownNat n => BitVector n -> BitVector n -> [BitVector n]
-enumFromTo#     :: forall n. KnownNat n => BitVector n -> BitVector n -> [BitVector n]
-enumFromThenTo# :: forall n. KnownNat n => BitVector n -> BitVector n -> BitVector n -> [BitVector n]
-
+enumFrom# :: forall n. KnownNat n => BitVector n -> [BitVector n]
 enumFrom# (BV 0 x) = map (BV 0 . (`mod` m)) [x .. unsafeToNatural (maxBound :: BitVector n)]
   where m = 1 `shiftL` fromInteger (natVal (Proxy @n))
 enumFrom# bv = undefErrorU "enumFrom" bv
+{-# NOINLINE enumFrom# #-}
 
-enumFromThen# (BV 0 x) (BV 0 y) = map (BV 0 . (`mod` m)) [x, y .. unsafeToNatural (maxBound :: BitVector n)]
-  where m = 1 `shiftL` fromInteger (natVal (Proxy @n))
+enumFromThen#
+  :: forall n
+   . KnownNat n
+  => BitVector n
+  -> BitVector n
+  -> [BitVector n]
+enumFromThen# (BV 0 x) (BV 0 y) =
+  toBvs [x, y .. unsafeToNatural bound]
+ where
+  bound = if x <= y then maxBound else minBound :: BitVector n
+  toBvs = map (BV 0 . (`mod` m))
+  m = 1 `shiftL` fromInteger (natVal (Proxy @n))
 enumFromThen# bv1 bv2 = undefErrorP "enumFromThen" bv1 bv2
+{-# NOINLINE enumFromThen# #-}
 
+enumFromTo#
+  :: forall n
+   . KnownNat n
+  => BitVector n
+  -> BitVector n
+  -> [BitVector n]
 enumFromTo# (BV 0 x) (BV 0 y) = map (BV 0 . (`mod` m)) [x .. y]
   where m = 1 `shiftL` fromInteger (natVal (Proxy @n))
 enumFromTo# bv1 bv2 = undefErrorP "enumFromTo" bv1 bv2
+{-# NOINLINE enumFromTo# #-}
 
+enumFromThenTo#
+  :: forall n
+   . KnownNat n
+  => BitVector n
+  -> BitVector n
+  -> BitVector n
+  -> [BitVector n]
 enumFromThenTo# (BV 0 x1) (BV 0 x2) (BV 0 y) = map (BV 0 . (`mod` m)) [x1, x2 .. y]
   where m = 1 `shiftL` fromInteger (natVal (Proxy @n))
 enumFromThenTo# bv1 bv2 bv3 = undefErrorP3 "enumFromTo" bv1 bv2 bv3
+{-# NOINLINE enumFromThenTo# #-}
 
 
 instance KnownNat n => Bounded (BitVector n) where

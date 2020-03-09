@@ -203,18 +203,21 @@ instance KnownNat n => Enum (Index n) where
   enumFromTo     = enumFromTo#
   enumFromThenTo = enumFromThenTo#
 
+enumFrom# :: forall n. KnownNat n => Index n -> [Index n]
+enumFrom# x = [x .. maxBound]
 {-# NOINLINE enumFrom# #-}
+
+enumFromThen# :: forall n. KnownNat n => Index n -> Index n -> [Index n]
+enumFromThen# x y = if x <= y then [x, y .. maxBound] else [x, y .. minBound]
 {-# NOINLINE enumFromThen# #-}
+
+enumFromTo# :: Index n -> Index n -> [Index n]
+enumFromTo# x y = map I [unsafeToInteger x .. unsafeToInteger y]
 {-# NOINLINE enumFromTo# #-}
-{-# NOINLINE enumFromThenTo# #-}
-enumFrom#       :: forall n. KnownNat n => Index n -> [Index n]
-enumFromThen#   :: forall n. KnownNat n => Index n -> Index n -> [Index n]
-enumFromTo#     :: Index n -> Index n -> [Index n]
+
 enumFromThenTo# :: Index n -> Index n -> Index n -> [Index n]
-enumFrom# x             = map fromInteger_INLINE [unsafeToInteger x .. unsafeToInteger (maxBound :: Index n)]
-enumFromThen# x y       = map fromInteger_INLINE [unsafeToInteger x, unsafeToInteger y .. unsafeToInteger (maxBound :: Index n)]
-enumFromTo# x y         = map I [unsafeToInteger x .. unsafeToInteger y]
 enumFromThenTo# x1 x2 y = map I [unsafeToInteger x1, unsafeToInteger x2 .. unsafeToInteger y]
+{-# NOINLINE enumFromThenTo# #-}
 
 instance KnownNat n => Bounded (Index n) where
   minBound = fromInteger# 0

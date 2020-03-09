@@ -232,22 +232,28 @@ instance KnownNat n => Enum (Unsigned n) where
   enumFromTo     = enumFromTo#
   enumFromThenTo = enumFromThenTo#
 
-{-# NOINLINE enumFrom# #-}
-{-# NOINLINE enumFromThen# #-}
-{-# NOINLINE enumFromTo# #-}
-{-# NOINLINE enumFromThenTo# #-}
-enumFrom#       :: forall n. KnownNat n => Unsigned n -> [Unsigned n]
-enumFromThen#   :: forall n. KnownNat n => Unsigned n -> Unsigned n -> [Unsigned n]
-enumFromTo#     :: forall n. KnownNat n => Unsigned n -> Unsigned n -> [Unsigned n]
-enumFromThenTo# :: forall n. KnownNat n => Unsigned n -> Unsigned n -> Unsigned n -> [Unsigned n]
+enumFrom# :: forall n. KnownNat n => Unsigned n -> [Unsigned n]
 enumFrom# = \x -> map (U . (`mod` m)) [unsafeToNatural x .. unsafeToNatural (maxBound :: Unsigned n)]
   where m = 1 `shiftL` fromInteger (natVal (Proxy @n))
-enumFromThen# = \x y -> map (U . (`mod` m)) [unsafeToNatural x, unsafeToNatural y .. unsafeToNatural (maxBound :: Unsigned n)]
-  where m = 1 `shiftL` fromInteger (natVal (Proxy @n))
+{-# NOINLINE enumFrom# #-}
+
+enumFromThen# :: forall n. KnownNat n => Unsigned n -> Unsigned n -> [Unsigned n]
+enumFromThen# = \x y -> toUnsigneds [unsafeToNatural x, unsafeToNatural y .. bound x y]
+ where
+  toUnsigneds = map (U . (`mod` m))
+  bound x y = unsafeToNatural (if x <= y then maxBound else minBound :: Unsigned n)
+  m = 1 `shiftL` fromInteger (natVal (Proxy @n))
+{-# NOINLINE enumFromThen# #-}
+
+enumFromTo# :: forall n. KnownNat n => Unsigned n -> Unsigned n -> [Unsigned n]
 enumFromTo# = \x y -> map (U . (`mod` m)) [unsafeToNatural x .. unsafeToNatural y]
   where m = 1 `shiftL` fromInteger (natVal (Proxy @n))
+{-# NOINLINE enumFromTo# #-}
+
+enumFromThenTo# :: forall n. KnownNat n => Unsigned n -> Unsigned n -> Unsigned n -> [Unsigned n]
 enumFromThenTo# = \x1 x2 y -> map (U . (`mod` m)) [unsafeToNatural x1, unsafeToNatural x2 .. unsafeToNatural y]
   where m = 1 `shiftL` fromInteger (natVal (Proxy @n))
+{-# NOINLINE enumFromThenTo# #-}
 
 instance KnownNat n => Bounded (Unsigned n) where
   minBound = minBound#
