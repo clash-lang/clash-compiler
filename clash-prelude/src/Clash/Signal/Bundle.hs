@@ -171,7 +171,7 @@ instance Bundle ((f :*: g) a) where
     getL (l :*: _) = l
     getR (_ :*: r) = r
 
--- | See "TaggedEmptyTuple"
+-- | See 'TaggedEmptyTuple'
 data EmptyTuple = EmptyTuple
 
 -- | Helper type to emulate the "old" behavior of Bundle's unit instance. I.e.,
@@ -181,13 +181,13 @@ data EmptyTuple = EmptyTuple
 --       bundle   :: () -> Signal domain ()
 --       unbundle :: Signal domain () -> ()
 --
--- In order to have sensible type inference, the "Bundle" class specifies that
+-- In order to have sensible type inference, the 'Bundle' class specifies that
 -- the argument type of 'bundle' should uniquely identify the result type, and
 -- vice versa for 'unbundle'. The type signatures in the snippet above don't
 -- though, as @()@ doesn't uniquely map to a specific domain. In other words,
 -- @domain@ should occur in both the argument and result of both functions.
 --
--- "TaggedEmptyTuple" tackles this by carrying the domain in its type. The
+-- 'TaggedEmptyTuple' tackles this by carrying the domain in its type. The
 -- 'bundle' and 'unbundle' instance now looks like:
 --
 --     class Bundle EmptyTuple where
@@ -198,8 +198,8 @@ data EmptyTuple = EmptyTuple
 -- 'unbundle'.
 data TaggedEmptyTuple (dom :: Domain) = TaggedEmptyTuple
 
--- | See https://github.com/clash-lang/clash-compiler/pull/539/commits/94b0bff5770aa4961e04ddce2515130df3fc7863
--- and documentation for "TaggedEmptyTuple".
+-- | See [commit 94b0bff5](https://github.com/clash-lang/clash-compiler/pull/539/commits/94b0bff5770aa4961e04ddce2515130df3fc7863)
+-- and documentation for 'TaggedEmptyTuple'.
 instance Bundle EmptyTuple where
   type Unbundled dom EmptyTuple = TaggedEmptyTuple dom
 

@@ -86,8 +86,9 @@ splitOn (S.pack -> sep) (S.pack -> str) =
   map S.unpack $ S.splitOn sep str
 
 -- | Parses a string into a list of modules and a function name. I.e., it parses
--- the string "Clash.Primitives.Types.parseBBFN" to ["Clash", "Primitives",
--- "Types"] and "parseBBFN". The result is stored as a BlackBoxFunctionName.
+-- the string 'Clash.Primitives.Types.parseBBFN' to
+-- @["Clash", "Primitives",Types"]@ and @"parseBBFN"@.
+-- The result is stored as a BlackBoxFunctionName.
 parseBBFN
   :: HasCallStack
   => String

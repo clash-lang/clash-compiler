@@ -218,6 +218,7 @@ delayN d dflt ena clk = coerce . go (snatToInteger d) . coerce @_ @(Signal dom a
 -- [-1,-1,1,2,3,4]
 --
 -- You can also use type application to do the same:
+--
 -- >>> sampleN 6 (toSignal (delayI @2 (-1) enableGen systemClockGen (dfromList [1..])))
 -- [-1,-1,1,2,3,4]
 delayI

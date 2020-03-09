@@ -143,11 +143,12 @@ alreadyInlined f cf = do
     Nothing       -> return Nothing
     Just inlined' -> return (lookupVarEnv f inlined')
 
+-- | Record a new inlining in the `inlineHistory`
 addNewInline
   :: Id
-  -- ^ Function we want to inline
+  -- ^ Function we're inlining
   -> Id
-  -- ^ Function in which we want to perform the inlining
+  -- ^ Function in which we're inlining it
   -> NormalizeMonad ()
 addNewInline f cf =
   inlineHistory %= extendVarEnvWith
@@ -232,7 +233,7 @@ mergeCsrs
   -> [TickInfo]
   -- ^ Ticks to wrap around proposed new term
   -> Term
-  -- ^ "Old" term
+  -- ^ \"Old\" term
   -> ([Either Term Type] -> Term)
   -- ^ Proposed new term in case any constants were found
   -> [Either Term Type]

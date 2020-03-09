@@ -483,7 +483,7 @@ type XilinxSystem = ("XilinxSystem" :: Domain)
 --
 -- > createDomain (knownVDomain @System){vName="System10", vPeriod=10}
 --
--- This duplicates the settings in the "System" domain, replaces the name and
+-- This duplicates the settings in the 'System' domain, replaces the name and
 -- period, and creates an instance for it. As most users often want to update
 -- the system domain, a shortcut is available in the form:
 --

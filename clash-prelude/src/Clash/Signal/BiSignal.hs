@@ -216,6 +216,7 @@ newtype BiSignalOut (ds :: BiSignalDefault) (dom :: Domain) (n :: Nat)
 type instance HasDomain dom1 (BiSignalOut ds dom2 n) = DomEq dom1 dom2
 type instance TryDomain t (BiSignalOut ds dom n) = 'Found dom
 
+-- | __NB__ Not synthesizable
 instance Semigroup (BiSignalOut defaultState dom n) where
   (BiSignalOut b1) <> (BiSignalOut b2) = BiSignalOut (b1 ++ b2)
 

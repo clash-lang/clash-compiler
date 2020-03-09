@@ -408,7 +408,7 @@ biTbClockGen done = (testClk, circuitClk)
 -- -- Fast domain: twice as fast as \"Slow\"
 -- 'Clash.Explicit.Prelude.createDomain' 'Clash.Explicit.Prelude.vSystem'{vName=\"Fast\", vPeriod=10}
 --
--- -- Slow domain: twice as slow as "Fast"
+-- -- Slow domain: twice as slow as \"Fast\"
 -- 'Clash.Explicit.Prelude.createDomain' 'Clash.Explicit.Prelude.vSystem'{vName=\"Slow\", vPeriod=20}
 --
 -- topEntity

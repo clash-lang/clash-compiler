@@ -2,6 +2,8 @@
 Copyright  :  (C) 2019, Myrtle Software Ltd
 License    :  BSD2 (see the file LICENSE)
 Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
+
+Internals for "Clash.Class.HasDomain"
 -}
 
 {-# LANGUAGE ConstraintKinds #-}
@@ -18,6 +20,7 @@ Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
 #endif
 
 {-# OPTIONS_GHC -Wno-missing-methods #-}
+{-# OPTIONS_HADDOCK not-home #-}
 
 module Clash.Class.HasDomain.HasSpecificDomain where
 
@@ -85,7 +88,7 @@ type family DomEqWorker (n :: Domain) (m :: Domain) :: HasDomainWrapperResult wh
   DomEqWorker n n = 'Found
   DomEqWorker n m = 'NotFound
 
--- | Check domain for equality. Return 'Found if so, return 'NotFound if not.
+-- | Check domain for equality. Return @'Found@ if so, return @'NotFound@ if not.
 -- The reason d'etre for this type family is that _open_ type families don't
 -- allow overlapping types. We therefore defer equality checking to a closed
 -- type family.
@@ -111,7 +114,7 @@ type family ErrOnNotFound (dom :: Domain) (n :: HasDomainWrapperResult) (t :: Ty
   ErrOnNotFound dom  'NotFound t = DelayError (NotFoundError dom t)
   ErrOnNotFound dom  'Found    t = dom
 
--- | Wrapper that checks for stuckness and returns "NotFound" if so
+-- | Wrapper that checks for stuckness and returns @'NotFound@ if so
 type family HasDomainWrapper (dom :: Domain) (n :: Type) :: HasDomainWrapperResult where
   HasDomainWrapper dom n =
     IfStuck

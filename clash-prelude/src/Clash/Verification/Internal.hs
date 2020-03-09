@@ -51,7 +51,7 @@ data IsTemporal
   | IsTemporal
   deriving (Eq, Ord)
 
--- | Internal version of "Assertion".
+-- | Internal version of 'Assertion'.
 data Assertion' a
   = CvPure a
   -- ^ (Bootstrapping) signal of booleans
@@ -85,7 +85,7 @@ data Assertion' a
   -- ^ Assertion should _never_ hold (not supported by SVA)
   deriving (Show, Functor, Foldable, Traversable)
 
--- | Internal version of "Property". All user facing will instantiate @a@
+-- | Internal version of 'Property'. All user facing will instantiate @a@
 -- with @(Maybe Text, Signal dom Bool)@. Blackboxes will instantiate it with
 -- @(Maybe Text, Term)@ instead.
 data Property' a
@@ -149,4 +149,3 @@ instance AssertionValue dom (Signal dom Bool) where
 instance AssertionValue dom (Assertion dom) where
   toAssertionValue = id
   {-# INLINE toAssertionValue #-}
-

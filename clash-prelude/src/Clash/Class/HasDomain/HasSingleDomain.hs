@@ -2,6 +2,8 @@
 Copyright  :  (C) 2019, Myrtle Software Ltd
 License    :  BSD2 (see the file LICENSE)
 Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
+
+Internals for "Clash.Class.HasDomain"
 -}
 
 {-# LANGUAGE ConstraintKinds #-}
@@ -17,6 +19,7 @@ Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
 #endif
 
 {-# OPTIONS_GHC -Wno-missing-methods #-}
+{-# OPTIONS_HADDOCK not-home #-}
 
 module Clash.Class.HasDomain.HasSingleDomain where
 

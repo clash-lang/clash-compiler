@@ -188,7 +188,7 @@ instance GShowX UInt where
 instance GShowX UWord where
   gshowsPrecX _ _ (UWord w)   = showsPrec 0 (W# w) . showString "##"
 
--- | Hidden internal type-class. Adds a generic implementation for the "NFData"
+-- | Hidden internal type-class. Adds a generic implementation for the \"NFData\"
 -- part of 'NFDataX'
 class GNFDataX arity f where
   grnfX :: RnfArgs arity a -> f a -> ()
