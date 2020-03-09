@@ -52,6 +52,13 @@ tests = localOption (QuickCheckMaxRatio 2) $ testGroup "All"
       map lawsToTest (laws (Proxy :: Proxy (BitVector 83)))
   , testGroup "Random BitVector"
     [ testProperty "fromInteger" fromIntegerRandomProp ]
+  , testGroup "Enum"
+    [ testCase "[4,3..]" $ [4,3..] @?= [4,3,2,1,0 :: BitVector 8]
+    , testCase "[4,2..]" $ [4,2..] @?= [4,2,0 :: BitVector 8]
+    , testCase "take 5 [4,4..]" $ take 5 [4,4..] @?= [4,4,4,4,4 :: BitVector 8]
+    , testCase "[2,4..]" $ [2,4..] @?= [2,4,6 :: BitVector 3]
+    , testCase "[3,4..]" $ [3,4..] @?= [3,4,5,6,7 :: BitVector 3]
+    ]
   ]
 
 fromIntegerProp :: forall m. KnownNat m => Proxy m -> Integer -> Property
