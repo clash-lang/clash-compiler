@@ -77,10 +77,10 @@
         "homepage": null,
         "owner": "clash-lang",
         "repo": "ghc-typelits-natnormalise",
-        "rev": "2ca55909cdbaa27abb225b17890171c1bf104cca",
-        "sha256": "1d000ky8yn64f0ygznf5fjhxq6rnvny0h097jz1a2rvagdggydy8",
+        "rev": "bd9f99f301dd84ca72bd3f5d4f12e64807807bdc",
+        "sha256": "0x2330xa8igfx73akyhqd5k9ncwqgbylraq5anrdms26gafhjm1d",
         "type": "tarball",
-        "url": "https://github.com/clash-lang/ghc-typelits-natnormalise/archive/2ca55909cdbaa27abb225b17890171c1bf104cca.tar.gz",
+        "url": "https://github.com/clash-lang/ghc-typelits-natnormalise/archive/bd9f99f301dd84ca72bd3f5d4f12e64807807bdc.tar.gz",
         "url_template": "https://github.com/<owner>/<repo>/archive/<rev>.tar.gz"
     }
 }
