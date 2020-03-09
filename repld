@@ -30,7 +30,7 @@ inotifywait --help | grep -e "^inotifywait"
 ghcid --version
 
 if [[ $1 == "p" || $1 == "prelude" || $1 == "clash-prelude" ]]; then
-  target="cabal new-repl clash-prelude"
+  target="cabal new-repl clash-prelude --repl-options=-fobject-code --repl-options=-fforce-recomp"
   watch="clash-prelude/clash-prelude.cabal"
 elif [[ $1 == "l" || $1 == "lib" || $1 == "clash-lib" ]]; then
   target="cabal new-repl clash-lib"
@@ -67,9 +67,6 @@ while true; do
     sed -i '/clash-ghc/d' .ghc.environment.x86_64-linux-*
   fi
 
-  # Restart logic currently blocked by
-  # https://github.com/ndmitchell/ghcid/issues/273
-  # https://github.com/ndmitchell/ghcid/pull/300
   ghcid -c "${target}" ${restart_cmd} ${@:2}
 
   inotifywait -e modify,create,delete -r ${watch}
