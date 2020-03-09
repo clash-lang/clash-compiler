@@ -10,3 +10,4 @@ packages:
 extra-deps:
 - ./clash-cosim
 - concurrent-supply-0.1.8@sha256:9373f4868ad28936a7b93781b214ef4afdeacf377ef4ac729583073491c9f9fb,1627
+- ghc-typelits-natnormalise-0.7.2@sha256:0fc48a3744aa25e5e53a054a8bb1fe6410752e497f446d75db9bd67bb258d05e,3495
