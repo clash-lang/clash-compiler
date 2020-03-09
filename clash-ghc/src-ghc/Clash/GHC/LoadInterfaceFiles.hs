@@ -6,6 +6,7 @@
 -}
 
 {-# LANGUAGE CPP #-}
+{-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE TemplateHaskell #-}
 
@@ -13,6 +14,9 @@ module Clash.GHC.LoadInterfaceFiles
   ( loadExternalExprs
   , loadExternalBinders
   , getUnresolvedPrimitives
+  , LoadedBinders(..)
+  , mergeLoadedBinders
+  , emptyLb
   )
 where
 
@@ -20,7 +24,6 @@ where
 import           Control.Monad.IO.Class      (MonadIO (..))
 import qualified Data.ByteString.Lazy.UTF8   as BLU
 import qualified Data.ByteString.Lazy        as BL
-import           Data.Either                 (partitionEithers)
 import           Data.List                   (elemIndex, foldl', partition)
 import qualified Data.Text                   as Text
 import           Data.Maybe                  (isJust, isNothing,
@@ -64,6 +67,38 @@ import           Clash.Primitives.Util               (decodeOrErr)
 import           Clash.GHC.GHC2Core                  (qualifiedNameString')
 import           Clash.Util                          (curLoc, traceIf)
 
+-- | Data structure tracking loaded binders (and their related data)
+data LoadedBinders = LoadedBinders
+  { lbBinders :: [(CoreSyn.CoreBndr, CoreSyn.CoreExpr)]
+  -- ^ Binder + expression it's binding
+  , lbClassOps :: [(CoreSyn.CoreBndr, Int)]
+  -- ^ Type class dict projection functions
+  , lbUnlocatable :: [CoreSyn.CoreBndr]
+  -- ^ Binders with missing unfoldings
+  , lbPrims :: [Either UnresolvedPrimitive FilePath]
+  -- ^ Primitives; either an primitive data structure or a path to a directory
+  -- containing json files
+  , lbReprs :: [DataRepr']
+  -- ^ Custom data representations
+  }
+
+mergeLoadedBinders :: [LoadedBinders] -> LoadedBinders
+mergeLoadedBinders lbs =
+  LoadedBinders {
+    lbBinders=concat (map lbBinders lbs)
+  , lbClassOps=concat (map lbClassOps lbs)
+  , lbUnlocatable=concat (map lbUnlocatable lbs)
+  , lbPrims=concat (map lbPrims lbs)
+  , lbReprs=concat (map lbReprs lbs)
+  }
+
+emptyLb :: LoadedBinders
+emptyLb = LoadedBinders [] [] [] [] []
+
+collectLbBinders :: LoadedBinders -> [CoreSyn.CoreBndr]
+collectLbBinders LoadedBinders{lbBinders, lbUnlocatable, lbClassOps} =
+  concat [map fst lbBinders, lbUnlocatable, map fst lbClassOps]
+
 runIfl :: GHC.GhcMonad m => GHC.Module -> TcRnTypes.IfL a -> m a
 runIfl modName action = do
   hscEnv <- GHC.getSession
@@ -94,73 +129,48 @@ loadExternalBinders
   :: GHC.GhcMonad m
   => HDL
   -> [CoreSyn.CoreBndr]
-  -> m ( [(CoreSyn.CoreBndr,CoreSyn.CoreExpr)] -- Binders
-       , [(CoreSyn.CoreBndr,Int)]              -- Class Ops
-       , [CoreSyn.CoreBndr]                    -- Unlocatable
-       , [Either UnresolvedPrimitive FilePath]
-       , [DataRepr']
-       )
+  -> m LoadedBinders
 loadExternalBinders hdl bndrs = do
-  (locatedAndUnlocated, prims0, reprs0) <- unzip3 <$> mapM (loadExprFromIface hdl) bndrs
-  let (located0, unlocated0) = partitionEithers locatedAndUnlocated
-  (located1, classOps, unlocated1, prims1, reprs1, _seen) <-
+  loaded <- mergeLoadedBinders <$> mapM (loadExprFromIface hdl) bndrs
+  fst <$>
     loadExternalExprs'
-      hdl located0 [] unlocated0 (concat prims0) (concat reprs0)
-      (UniqSet.mkUniqSet (map fst located0)) (map snd located0)
-  pure (located1, classOps, unlocated1, prims1, reprs1)
+      hdl
+      loaded
+      (UniqSet.mkUniqSet (collectLbBinders loaded))
+      (map snd (lbBinders loaded))
 
 loadExternalExprs
   :: GHC.GhcMonad m
   => HDL
   -> UniqSet.UniqSet CoreSyn.CoreBndr
   -> [CoreSyn.CoreBind]
-  -> m ( [(CoreSyn.CoreBndr,CoreSyn.CoreExpr)] -- Binders
-       , [(CoreSyn.CoreBndr,Int)]              -- Class Ops
-       , [CoreSyn.CoreBndr]                    -- Unlocatable
-       , [Either UnresolvedPrimitive FilePath]
-       , [DataRepr']
-       )
-loadExternalExprs hdl = go [] [] [] [] []
+  -> m LoadedBinders
+loadExternalExprs hdl = go emptyLb
   where
-    go locatedExprs clsOps unlocated pFP reprs _ [] =
-      return (locatedExprs,clsOps,unlocated,pFP,reprs)
-
-    go locatedExprs clsOps unlocated pFP reprs visited (CoreSyn.NonRec _ e:bs) = do
-      (locatedExprs',clsOps',unlocated',pFP',reprs',visited') <-
-        loadExternalExprs' hdl locatedExprs clsOps unlocated pFP reprs visited [e]
-      go locatedExprs' clsOps' unlocated' pFP' reprs' visited' bs
-
-    go locatedExprs clsOps unlocated pFP reprs visited (CoreSyn.Rec bs:bs') = do
-      (locatedExprs',clsOps',unlocated',pFP',reprs',visited') <-
-        loadExternalExprs' hdl locatedExprs clsOps unlocated pFP reprs visited (map snd bs)
-      go locatedExprs' clsOps' unlocated' pFP' reprs' visited' bs'
+    go loaded _ [] =
+      return loaded
+    go loaded0 visited0 (CoreSyn.NonRec _ e:bs) = do
+      (loaded1, visited1) <- loadExternalExprs' hdl loaded0 visited0 [e]
+      go loaded1 visited1 bs
+    go loaded0 visited0 (CoreSyn.Rec bs:bs') = do
+      (loaded1, visited1) <- loadExternalExprs' hdl loaded0 visited0 (map snd bs)
+      go loaded1 visited1 bs'
 
 -- | Used by entry points: 'loadExternalExprs', 'loadExternalBinders'
 loadExternalExprs'
   :: GHC.GhcMonad m
   => HDL
-  -> [(CoreSyn.CoreBndr, CoreSyn.CoreExpr)]
-  -> [(Var.Id, Int)]
-  -> [CoreSyn.CoreBndr]
-  -> [Either UnresolvedPrimitive FilePath]
-  -> [DataRepr']
+  -> LoadedBinders
   -> UniqSet.UniqSet CoreSyn.CoreBndr
   -> [CoreSyn.CoreExpr]
-  -> m ( [(CoreSyn.CoreBndr, CoreSyn.CoreExpr)]
-       , [(Var.Id, Int)]
-       , [CoreSyn.CoreBndr]
-       , [Either UnresolvedPrimitive FilePath]
-       , [DataRepr']
-       , UniqSet.UniqSet CoreSyn.CoreBndr
-       )
-loadExternalExprs' _hdl locatedExprs clsOps unlocated pFP reprs visited [] =
-  return (locatedExprs, clsOps, unlocated, pFP, reprs, visited)
-
-loadExternalExprs' hdl locatedExprs clsOps unlocated pFP reprs visited (e:es) = do
+  -> m ( LoadedBinders, UniqSet.UniqSet CoreSyn.CoreBndr)
+loadExternalExprs' _hdl loaded visited [] =
+  return (loaded, visited)
+loadExternalExprs' hdl loaded0 visited0 (e:es) = do
   let fvs = CoreFVs.exprSomeFreeVarsList
               (\v -> Var.isId v &&
                      isNothing (Id.isDataConId_maybe v) &&
-                     not (v `UniqSet.elementOfUniqSet` visited)
+                     not (v `UniqSet.elementOfUniqSet` visited0)
               ) e
 
       (clsOps',fvs') = partition (isJust . Id.isClassOpId_maybe) fvs
@@ -173,41 +183,27 @@ loadExternalExprs' hdl locatedExprs clsOps unlocated pFP reprs visited (e:es) = 
                       (elemIndex v clsIds)
         ) clsOps'
 
-  (locatedAndUnlocated, pFP', reprs') <- unzip3 <$> mapM (loadExprFromIface hdl) fvs'
-  let (locatedExprs', unlocated') = partitionEithers locatedAndUnlocated
+  loaded1 <- mergeLoadedBinders <$> mapM (loadExprFromIface hdl) fvs'
 
-  let visited' = foldl' UniqSet.addListToUniqSet visited
-                   [ map fst locatedExprs'
-                   , unlocated'
-                   , clsOps'
-                   ]
-
-  loadExternalExprs' hdl
-      (locatedExprs'++locatedExprs)
-      (clsOps''++clsOps)
-      (unlocated'++unlocated)
-      (concat pFP'++pFP)
-      (concat reprs'++reprs)
-      visited'
-      (es ++ map snd locatedExprs')
+  loadExternalExprs'
+    hdl
+    (mergeLoadedBinders [loaded0, loaded1, emptyLb{lbClassOps=clsOps''}])
+    (foldl' UniqSet.addListToUniqSet visited0 [collectLbBinders loaded1, clsOps'])
+    (es ++ map snd (lbBinders loaded1))
 
 loadExprFromIface
   :: GHC.GhcMonad m
   => HDL
   -> CoreSyn.CoreBndr
-  -> m (Either
-          (CoreSyn.CoreBndr,CoreSyn.CoreExpr) -- Located
-          CoreSyn.CoreBndr                    -- Unlocated
-       ,[Either UnresolvedPrimitive FilePath]
-       ,[DataRepr']
-       )
+  -> m LoadedBinders
 loadExprFromIface hdl bndr = do
   let moduleM = Name.nameModule_maybe $ Var.varName bndr
   case moduleM of
     Just nameMod -> runIfl nameMod $ do
       ifaceM <- loadIface nameMod
       case ifaceM of
-        Nothing    -> return (Right bndr,[],[])
+        Nothing ->
+          return (emptyLb{lbUnlocatable=[bndr]})
         Just iface -> do
           let decls = map snd (GHC.mi_decls iface)
           let nameFun = GHC.getOccName $ Var.varName bndr
@@ -215,12 +211,16 @@ loadExprFromIface hdl bndr = do
           anns <- TcIface.tcIfaceAnnotations (GHC.mi_anns iface)
           primFPs   <- loadPrimitiveAnnotations hdl anns
           let reprs  = loadCustomReprAnnotations anns
+              lb     = emptyLb{lbPrims=primFPs, lbReprs=reprs}
           case declM of
             [namedDecl] -> do
               tyThing <- loadDecl namedDecl
-              return (loadExprFromTyThing bndr tyThing,primFPs,reprs)
-            _ -> return (Right bndr,primFPs,reprs)
-    Nothing -> return (Right bndr,[],[])
+              case loadExprFromTyThing bndr tyThing of
+                Left bndr1 -> return (lb{lbBinders=[bndr1]})
+                Right unloc -> return (lb{lbUnlocatable=[unloc]})
+            _ -> return (lb{lbUnlocatable=[bndr]})
+    Nothing ->
+      return (emptyLb{lbUnlocatable=[bndr]})
 
 
 loadCustomReprAnnotations

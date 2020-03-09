@@ -97,7 +97,8 @@ import qualified Var
 -- Internal Modules
 import           Clash.GHC.GHC2Core                           (modNameM, qualifiedNameString')
 import           Clash.GHC.LoadInterfaceFiles
-  (loadExternalExprs, getUnresolvedPrimitives, loadExternalBinders)
+  (loadExternalExprs, getUnresolvedPrimitives, loadExternalBinders,
+   LoadedBinders(..))
 import           Clash.GHCi.Common                            (checkMonoLocalBindsMod)
 import           Clash.Util                                   (curLoc, noSrcSpan, reportTimeDiff
                                                               ,wantedLanguageExtensions, unwantedLanguageExtensions)
@@ -145,11 +146,7 @@ loadExternalModule
           ( [CoreSyn.CoreBndr]                     -- Root binders
           , FamInstEnv.FamInstEnv                  -- Local type family instances
           , GHC.ModuleName                         -- Module name
-          , [CoreSyn.CoreBndr]                     -- All binders
-          , [(CoreSyn.CoreBndr, Int)]              -- Type class projection functions
-          , [CoreSyn.CoreBndr]                     -- Unlocatable binders
-          , [Either UnresolvedPrimitive FilePath]  -- Primitives
-          , [DataRepr']                            -- Custom data representations
+          , LoadedBinders
           , [CoreSyn.CoreBind]                     -- All bindings
           ) )
 loadExternalModule hdl modName0 = Exception.gtry $ do
@@ -159,18 +156,9 @@ loadExternalModule hdl modName0 = Exception.gtry $ do
   modInfo <- fromMaybe (error errMsg) <$> (GHC.getModuleInfo foundMod)
   tyThings <- catMaybes <$> mapM GHC.lookupGlobalName (GHC.modInfoExports modInfo)
   let rootIds = [id_ | GHC.AnId id_ <- tyThings]
-  (allBinders, clsOps, unlocatable, prims, reprs) <- loadExternalBinders hdl rootIds
-  return $
-    ( rootIds
-    , FamInstEnv.emptyFamInstEnv
-    , modName1
-    , map fst allBinders
-    , clsOps
-    , unlocatable
-    , prims
-    , reprs
-    , makeRecursiveGroups allBinders
-    )
+  loaded <- loadExternalBinders hdl rootIds
+  let allBinders = makeRecursiveGroups (lbBinders loaded)
+  return (rootIds, FamInstEnv.emptyFamInstEnv, modName1, loaded, allBinders)
 
 setupGhc
   :: GHC.GhcMonad m
@@ -242,11 +230,7 @@ loadLocalModule
   -> m ( [CoreSyn.CoreBndr]                     -- Root binders
        , FamInstEnv.FamInstEnv                  -- Local type family instances
        , GHC.ModuleName                         -- Module name
-       , [CoreSyn.CoreBndr]                     -- All binders
-       , [(CoreSyn.CoreBndr, Int)]              -- Type class projection functions
-       , [CoreSyn.CoreBndr]                     -- Unlocatable binders
-       , [Either UnresolvedPrimitive FilePath]  -- Primitives
-       , [DataRepr']                            -- Custom data representations
+       , LoadedBinders
        , [CoreSyn.CoreBind]                     -- All bindings
        )
 loadLocalModule hdl modName = do
@@ -310,22 +294,14 @@ loadLocalModule hdl modName = do
   -- Because tidiedMods is in topological order, binders is also, and hence
   -- the binders belonging to the "root" module are the last binders
   let rootIds = map fst . CoreSyn.flattenBinds $ last binders
-  (externalBndrs, clsOps, unlocatable, unresolvedPrimitives0, reprs) <-
-    loadExternalExprs hdl (UniqSet.mkUniqSet binderIds) (concat binders)
+  loaded0 <- loadExternalExprs hdl (UniqSet.mkUniqSet binderIds) (concat binders)
 
   -- Find local primitive annotations
-  unresolvedPrimitives1 <- findPrimitiveAnnotations hdl binderIds
+  localPrims <- findPrimitiveAnnotations hdl binderIds
+  let loaded1 = loaded0{lbPrims=lbPrims loaded0 ++ localPrims}
 
-  pure ( rootIds
-       , modFamInstEnvs'
-       , rootModule
-       , map fst externalBndrs ++ binderIds
-       , clsOps
-       , unlocatable
-       , unresolvedPrimitives0 ++ unresolvedPrimitives1
-       , reprs
-       , concat binders ++ makeRecursiveGroups externalBndrs
-       )
+  let allBinders = concat binders ++ makeRecursiveGroups (lbBinders loaded0)
+  pure (rootIds, modFamInstEnvs', rootModule, loaded1, allBinders)
 
 loadModules
   :: OverridingBool
@@ -353,19 +329,21 @@ loadModules useColor hdl modName dflagsM idirs = do
   libDir <- MonadUtils.liftIO ghcLibDir
   startTime <- Clock.getCurrentTime
   GHC.runGhc (Just libDir) $ do
-    () <- setupGhc useColor dflagsM idirs
-    (rootIds, modFamInstEnvs, rootModule, allBinderIds, clsOps, unlocatable, unresolvedPrimitives, reprs, allBinders) <-
+    setupGhc useColor dflagsM idirs
+    (rootIds, modFamInstEnvs, rootModule, LoadedBinders{..}, allBinders) <-
       -- We need to try and load external modules first, because we can't
       -- recover from errors in 'loadLocalModule'.
       loadExternalModule hdl modName >>= \case
         Left _loadExternalErr -> loadLocalModule hdl modName
         Right res -> pure res
 
+    let allBinderIds = map fst (CoreSyn.flattenBinds allBinders)
+
     modTime <- startTime `deepseq` length allBinderIds `seq` MonadUtils.liftIO Clock.getCurrentTime
     let modStartDiff = reportTimeDiff modTime startTime
     MonadUtils.liftIO $ putStrLn $ "GHC: Parsing and optimising modules took: " ++ modStartDiff
 
-    extTime <- modTime `deepseq` length unlocatable `deepseq` MonadUtils.liftIO Clock.getCurrentTime
+    extTime <- modTime `deepseq` length lbUnlocatable `deepseq` MonadUtils.liftIO Clock.getCurrentTime
     let extModDiff = reportTimeDiff extTime modTime
     MonadUtils.liftIO $ putStrLn $ "GHC: Loading external modules from interface files took: " ++ extModDiff
 
@@ -421,12 +399,12 @@ loadModules useColor hdl modName dflagsM idirs = do
         (_, _) ->
           Panic.pgmError $ $(curLoc) ++ "Multiple 'topEntities' found."
 
-    let reprs1 = reprs ++ reprs'
+    let reprs1 = lbReprs ++ reprs'
 
     annTime <-
       extTime
         `deepseq` length topEntities'
-        `deepseq` unresolvedPrimitives
+        `deepseq` lbPrims
         `deepseq` reprs1
         `deepseq` primGuards
         `deepseq` MonadUtils.liftIO Clock.getCurrentTime
@@ -435,11 +413,11 @@ loadModules useColor hdl modName dflagsM idirs = do
     MonadUtils.liftIO $ putStrLn $ "GHC: Parsing annotations took: " ++ annExtDiff
 
     return ( allBinders
-           , clsOps
-           , unlocatable
+           , lbClassOps
+           , lbUnlocatable
            , (fst famInstEnvs, modFamInstEnvs)
            , topEntities'
-           , unresolvedPrimitives
+           , lbPrims
            , reprs1
            , primGuards
            )
