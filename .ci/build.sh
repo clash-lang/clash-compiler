@@ -4,6 +4,11 @@ set -xeo pipefail
 # TODO: make sdist work on all, it currently fails for clash-cosim
 cabal new-sdist clash-prelude clash-lib clash-ghc
 
+# test that we can create a build plan with the index-state in cabal.project
+mv cabal.project.local cabal.project.local.disabled
+cabal new-build --dry-run all > /dev/null || (echo Maybe the index-state should be updated?; false)
+mv cabal.project.local.disabled cabal.project.local
+
 cabal new-build all
 
 # Build with installed constraints for packages in global-db
