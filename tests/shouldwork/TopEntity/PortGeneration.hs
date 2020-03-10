@@ -58,12 +58,6 @@ topEntity1 :: "in1" ::: Signal System Int
 topEntity1 = undefined
 makeTopEntity 'topEntity1
 
-expectedTopEntity1 :: TopEntity
-expectedTopEntity1 =
- Synthesize "topEntity1"
-    [PortName "in1", PortName "in2"]
-    (PortName "out")
-
 topEntity2 :: "int"      ::: Signal System Int
            -> "tuple"    ::: ( "tup1" ::: Signal System (BitVector 7)
                              , "tup2" ::: Signal System (BitVector 9))
@@ -73,21 +67,6 @@ topEntity2 :: "int"      ::: Signal System Int
            -> "out"      ::: Signal System Bool
 topEntity2 = undefined
 makeTopEntity 'topEntity2
-
-expectedTopEntity2 :: TopEntity
-expectedTopEntity2 =
-  Synthesize "topEntity2"
-    [ PortName "int"
-    , PortProduct "tuple" [PortName "tup1",PortName "tup2"]
-    , PortProduct "simple" [PortName "simple1",PortName "simple2"]
-    , PortProduct "named" [PortName "named1",PortName "named2"]
-    , PortProduct "embedded"
-      [ PortProduct "embedded1"
-        [ PortName "simple1"
-        , PortName "simple2"]
-      , PortName "embedded2"]
-    ]
-    (PortName "out")
 
 topEntity3 :: "clk" ::: Clock System
            -> "rst" ::: Reset System
@@ -101,20 +80,6 @@ topEntity3 :: "clk" ::: Clock System
 topEntity3 = undefined
 makeTopEntity 'topEntity3
 
-expectedTopEntity3 :: TopEntity
-expectedTopEntity3 =
-  Synthesize "topEntity3"
-    [ PortName "clk"
-    , PortName "rst"
-    , PortName "en"
-    , PortName "tup1"
-    , PortName "tup2"
-    , PortProduct "tup3" [PortName "int",PortName "bool"]
-    , PortProduct "tup4" [PortName "int",PortName "bool"]
-    , PortProduct "custom" [PortName "named1",PortName "named2"]
-    ]
-    (PortProduct "outTup" [PortName "outint",PortName "outbool"])
-
 topEntity4 :: Signal System (Gadt Int)
            -> Signal System Single
            -> Signal System (CF Int Int Int)
@@ -127,43 +92,11 @@ topEntity4 :: Signal System (Gadt Int)
 topEntity4 = undefined
 makeTopEntity 'topEntity4
 
-expectedTopEntity4 :: TopEntity
-expectedTopEntity4 =
-  Synthesize "topEntity4"
-    [ PortName "gadt"
-    , PortName "s"
-    , PortProduct "cfiii" [PortName "s"]
-    , PortProduct "cfbii" [PortName "s"]
-    , PortProduct "ofiii" [PortName "s"]
-    , PortProduct "ofbii" [PortName "s"]
-    , PortProduct "" [PortName "xiii", PortName "xiii2"]
-    , PortName "xbii"
-    ]
-    (PortName "s")
-
 topEntity5 :: "in1" ::: Signal System SuccessTy
            -> "ab"     ::: Signal System (Passthrough (Passthrough Simple Simple) Simple)
            -> "out" ::: Signal System Int
 topEntity5 = undefined
 makeTopEntity 'topEntity5
-
-expectedTopEntity5 :: TopEntity
-expectedTopEntity5 =
- Synthesize "topEntity5"
-    [ PortProduct "in1" [PortName "one", PortName "s"]
-    , PortProduct "ab" [PortProduct "" [PortProduct "" [PortName "simple1",PortName "simple2"]
-                                       ,PortProduct "" [PortName "simple1",PortName "simple2"]]
-                       ,PortProduct "" [PortName "simple1",PortName "simple2"]]
-    ]
-    (PortName "out")
-
-expectedTopEntity6 :: TopEntity
-expectedTopEntity6 =
- Synthesize "topEntity6"
-    [ PortProduct "" [ PortName "clk", PortName "rst", PortName "en"]
-    , PortProduct "in1" [PortName "one", PortName "s"]]
-    (PortName "out")
-
 
 topEntity7 :: (HiddenClockResetEnable System)
            => "in1" ::: Signal System (Vec 3 Int)
@@ -173,28 +106,9 @@ topEntity7 :: (HiddenClockResetEnable System)
 topEntity7 = undefined
 makeTopEntity 'topEntity7
 
-expectedTopEntity7 :: TopEntity
-expectedTopEntity7 =
- Synthesize "topEntity7"
-    [ PortProduct "" [PortName "clk", PortName "rst", PortName "en"]
-    , PortName "in1"
-    , PortName "in2"
-    , PortProduct "passthrough" [PortName "s", PortName "s"]
-    ]
-    (PortName "out")
-
 topEntity8 :: (HiddenClockResetEnable System)
            => "pair" ::: Signal System (Pair Bool)
            -> "pair" ::: Signal System (Pair Single)
            -> "out" ::: Signal System Int
 topEntity8 = undefined
 makeTopEntity 'topEntity8
-
-expectedTopEntity8 :: TopEntity
-expectedTopEntity8 =
- Synthesize "topEntity8"
-    [ PortProduct "" [PortName "clk", PortName "rst", PortName "en"]
-    , PortProduct "pair" [PortName "left", PortName "right"]
-    , PortProduct "pair" [PortProduct "left" [PortName "s"], PortProduct "right" [PortName "s"]]
-    ]
-    (PortName "out")
