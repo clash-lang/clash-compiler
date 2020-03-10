@@ -1,4 +1,5 @@
 pull_request_rules:
+  # For more information: https://doc.mergify.io/actions.html#backport
   - name: backport patches to 1.2
     conditions:
       - base=master
@@ -8,3 +9,33 @@ pull_request_rules:
         ignore_conflicts: True
         branches:
           - "1.2"
+
+  # For more information https://doc.mergify.io/actions.html#merge
+  - name: auto merge on green CI and auto-merge label
+    conditions:
+      - "status-success=ci/circleci: nix-build"
+      - "status-success=ci/circleci: stack-build"
+      - status-success=ci/gitlab/gitlab.com
+      - label=auto-merge
+    actions:
+      merge:
+        method: merge
+  - name: auto squash on green CI and auto-squash label
+    conditions:
+      - "status-success=ci/circleci: nix-build"
+      - "status-success=ci/circleci: stack-build"
+      - status-success=ci/gitlab/gitlab.com
+      - label=auto-squash
+    actions:
+      merge:
+        method: squash
+  - name: auto rebase on green CI and auto-rebase label
+    conditions:
+      - "status-success=ci/circleci: nix-build"
+      - "status-success=ci/circleci: stack-build"
+      - status-success=ci/gitlab/gitlab.com
+      - label=auto-rebase
+    actions:
+      merge:
+        method: rebase
+
