@@ -72,7 +72,7 @@ Library
   Build-Depends:    base                      >= 4.10    && < 5,
                     clash-prelude             >= 0.99,
                     deepseq                   >= 1.4.0,
-                    ghc-typelits-extra        >= 0.2.1   && < 0.4,
+                    ghc-typelits-extra        >= 0.2.1   && < 0.5,
                     ghc-typelits-knownnat     >= 0.2.2   && < 0.8,
                     ghc-typelits-natnormalise >= 0.4.2   && < 0.8,
                     neat-interpolation        >= 0.3.0,

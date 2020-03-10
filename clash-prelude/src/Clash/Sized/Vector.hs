@@ -1010,7 +1010,7 @@ foldl1 f xs = foldl f (head xs) (tail xs)
 -- \"'fold' @f xs@\" corresponds to the following circuit layout:
 --
 -- <<doc/fold.svg>>
-fold :: (a -> a -> a) -> Vec (n + 1) a -> a
+fold :: forall n a . (a -> a -> a) -> Vec (n + 1) a -> a
 fold f vs = fold' (toList vs)
   where
     fold' [x] = x

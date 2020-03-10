@@ -3032,7 +3032,7 @@ reduceConstant tcm isSubj pInfo tys args mach = case primName pInfo of
                      ]
   "Clash.Sized.Vector.fold" -- :: (a -> a -> a) -> Vec (n + 1) a -> a
     | isSubj
-    , aTy : nTy : _ <- tys
+    , nTy : aTy :  _ <- tys
     , f : vs : _ <- args
     , DC _ vArgs <- vs
     , Right n <- runExcept (tyNatSize tcm nTy)
@@ -3071,14 +3071,14 @@ reduceConstant tcm isSubj pInfo tys args mach = case primName pInfo of
               in  reduceWHNF $
                   mkApps (valToTerm f)
                          [Left (mkApps (Prim pInfo)
-                                       [Right aTy
-                                       ,Right m'ty
+                                       [Right m'ty
+                                       ,Right aTy
                                        ,Left (valToTerm f)
                                        ,Left (Case splitAtCall mVecTy [asAlt])
                                        ])
                          ,Left (mkApps (Prim pInfo)
-                                       [Right aTy
-                                       ,Right n1m'ty
+                                       [Right n1m'ty
+                                       ,Right aTy
                                        ,Left  (valToTerm f)
                                        ,Left  (Case splitAtCall n1mVecTy [bsAlt])
                                        ])

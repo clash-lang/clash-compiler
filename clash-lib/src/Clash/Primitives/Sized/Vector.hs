@@ -64,7 +64,7 @@ foldBBF _isD _primName args _resTy = do
   pure (Right (meta tcm, bb))
  where
   bb = BBFunction "Clash.Primitives.Sized.Vector.foldTF" 0 foldTF
-  [_, vecLengthMinusOne] = rights args
+  [vecLengthMinusOne, _] = rights args
   vecLength tcm =
     case coreView tcm vecLengthMinusOne of
       (LitTy (NumTy n)) -> n + 1

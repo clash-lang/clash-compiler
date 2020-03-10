@@ -65,10 +65,10 @@
         "homepage": null,
         "owner": "clash-lang",
         "repo": "ghc-typelits-extra",
-        "rev": "4260319fc9242bac504b74d6e1b9592ae53a3609",
-        "sha256": "1gmvh3gv8zysgfi4xwhiz0xw5hn8wqpdi5dziqsj7knrh69fvp5d",
+        "rev": "487ea1c54c75e49ae56f1f3ced5aabfb1337ac1e",
+        "sha256": "0dabhh3lkl24h2f30smnzyr3bqr7wnj050sk2asx8b30f3aswlbs",
         "type": "tarball",
-        "url": "https://github.com/clash-lang/ghc-typelits-extra/archive/4260319fc9242bac504b74d6e1b9592ae53a3609.tar.gz",
+        "url": "https://github.com/clash-lang/ghc-typelits-extra/archive/487ea1c54c75e49ae56f1f3ced5aabfb1337ac1e.tar.gz",
         "url_template": "https://github.com/<owner>/<repo>/archive/<rev>.tar.gz"
     },
     "ghc-typelits-natnormalise": {
