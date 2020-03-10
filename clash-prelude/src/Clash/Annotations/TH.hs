@@ -253,9 +253,10 @@ typeTreeToPorts (AppTF (AppT (ConT split) (LitT (StrTyLit name)), _) (_,c))
   -- - We only have no names from children: use split name as PortName
   -- - We have children reporting names: use split name as name to PortProduct
   = c >>= \case
-    Complete [] -> return $ Complete [PortName name]
-    Complete xs -> return $ Complete [PortProduct name xs]
-    x           -> return x
+    Complete []  -> return $ Complete [PortName name]
+    Complete [PortName n2] -> return $ Complete [PortName (name ++ "_" ++ n2)]
+    Complete xs  -> return $ Complete [PortProduct name xs]
+    x            -> return x
 
 typeTreeToPorts (ConTF name) = do
   -- Only attempt to resolve a subtree for names we haven't seen before
