@@ -27,6 +27,8 @@ module Clash.Promoted.Nat
   , withSNat
     -- ** Conversion
   , snatToInteger, snatToNatural, snatToNum
+    -- ** Conversion (ambiguous types)
+  , natToInteger, natToNatural, natToNum
     -- ** Arithmetic
   , addSNat, mulSNat, powSNat, minSNat, maxSNat, succSNat
     -- *** Partial
@@ -115,15 +117,39 @@ instance ShowX (SNat n) where
 withSNat :: KnownNat n => (SNat n -> a) -> a
 withSNat f = f SNat
 
+-- | Same as 'snatToInteger', but doesn't take term arguments. Example usage:
+--
+-- >>> natToInteger @5
+-- 5
+natToInteger :: forall n . KnownNat n => Integer
+natToInteger = snatToInteger (SNat @n)
+{-# INLINE natToInteger #-}
+
 -- | Reify the type-level 'Nat' @n@ to it's term-level 'Integer' representation.
 snatToInteger :: SNat n -> Integer
 snatToInteger p@SNat = natVal p
 {-# INLINE snatToInteger #-}
 
+-- | Same as 'snatToNatural', but doesn't take term arguments. Example usage:
+--
+-- >>> natToNatural @5
+-- 5
+natToNatural :: forall n . KnownNat n => Natural
+natToNatural = snatToNatural (SNat @n)
+{-# INLINE natToNatural #-}
+
+-- | Reify the type-level 'Nat' @n@ to it's term-level 'Natural'.
 snatToNatural :: SNat n -> Natural
 snatToNatural = naturalFromInteger . snatToInteger
 {-# INLINE snatToNatural #-}
 
+-- | Same as 'snatToNum', but doesn't take term arguments. Example usage:
+--
+-- >>> natToNum @5 @Int
+-- 5
+natToNum :: forall n a . (Num a, KnownNat n) => a
+natToNum = snatToNum (SNat @n)
+{-# INLINE natToNum #-}
 
 -- | Reify the type-level 'Nat' @n@ to it's term-level 'Num'ber.
 snatToNum :: forall a n . Num a => SNat n -> a
