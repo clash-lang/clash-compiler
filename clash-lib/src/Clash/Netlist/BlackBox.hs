@@ -12,13 +12,14 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE QuasiQuotes #-}
 
 module Clash.Netlist.BlackBox where
 
 import           Control.Exception             (throw)
 import           Control.Lens                  ((<<%=),(%=))
 import qualified Control.Lens                  as Lens
-import           Control.Monad                 (when, replicateM)
+import           Control.Monad                 (when, replicateM, zipWithM)
 import           Control.Monad.IO.Class        (liftIO)
 import           Data.Char                     (ord)
 import           Data.Either                   (lefts, partitionEithers)
@@ -82,6 +83,7 @@ import qualified Clash.Primitives.Util         as P
 import           Clash.Signal.Internal         (ActiveEdge (..))
 import           Clash.Unique                  (lookupUniqMap')
 import           Clash.Util
+import qualified Clash.Util.Interpolate        as I
 
 -- | Emits (colorized) warning to stderr
 warn
@@ -115,7 +117,7 @@ mkBlackBoxContext bbName resId args@(lefts -> termArgs) = do
     -- Make context inputs
     let resNm = nameOcc (varName resId)
     resTy <- unsafeCoreTypeToHWTypeM' $(curLoc) (V.varType resId)
-    (imps,impDecls) <- unzip <$> mapM (mkArgument resNm) termArgs
+    (imps,impDecls) <- unzip <$> zipWithM (mkArgument bbName resNm) [0..] termArgs
     (funs,funDecls) <-
       mapAccumLM
         (addFunction (V.varType resId))
@@ -191,13 +193,17 @@ isLiteral e = case collectArgs e of
   _                -> False
 
 mkArgument
-  :: Identifier
+  :: TextS.Text
+  -- ^ Blackbox function name
+  -> Identifier
   -- ^ LHS of the original let-binder
+  -> Int
+  -- ^ Argument n (zero-indexed). Used for error message.
   -> Term
   -> NetlistMonad ( (Expr,HWType,Bool)
                   , [Declaration]
                   )
-mkArgument bndr e = do
+mkArgument bbName bndr nArg e = do
     tcm   <- Lens.use tcCache
     let ty = termType tcm e
     iw    <- Lens.use intWidth
@@ -242,9 +248,17 @@ mkArgument bndr e = do
         (Letrec _bnds _term, [], _ticks) -> do
           (exprN, letDecls) <- mkExpr False Concurrent (NetlistId bndr ty) e
           return ((exprN,hwTy,False),letDecls)
-        _ ->
-          return ((Identifier (error ($(curLoc) ++ "Forced to evaluate unexpected function argument: " ++ eTyMsg)) Nothing
-                  ,hwTy,False),[])
+        _ -> do
+          let errMsg = [I.i|
+            Forced to evaluate unexpected function argument:
+
+              #{eTyMsg}
+
+            in 'mkArgument' for argument #{nArg} of blackbox #{show bbName}.
+          |]
+
+          return ((Identifier (error ($(curLoc) ++ errMsg)) Nothing, hwTy, False), [])
+
     return ((e',t,l),d)
 
 -- | Extract a compiled primitive from a guarded primitive. Emit a warning if
