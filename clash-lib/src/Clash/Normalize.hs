@@ -62,7 +62,7 @@ import           Clash.Netlist.Util
 import           Clash.Normalize.Strategy
 import           Clash.Normalize.Transformations
   (appPropFast, bindConstantVar, caseCon, flattenLet, reduceConst, topLet,
-   reduceNonRepPrim, removeUnusedExpr)
+   reduceNonRepPrim, removeUnusedExpr, deadCode)
 import           Clash.Normalize.Types
 import           Clash.Normalize.Util
 import           Clash.Primitives.Types           (CompiledPrimMap)
@@ -389,7 +389,7 @@ flattenCallTree (CBranch (nm,(Binding nm' sp inl tm)) used) = do
       repeatR (topdownR (apply "appPropFast" appPropFast >->
                  apply "bindConstantVar" bindConstantVar >->
                  apply "caseCon" caseCon >->
-                 apply "reduceConst" reduceConst >->
+                 (apply "reduceConst" reduceConst !-> apply "deadcode" deadCode) >->
                  apply "reduceNonRepPrim" reduceNonRepPrim >->
                  apply "removeUnusedExpr" removeUnusedExpr >->
                  apply "flattenLet" flattenLet)) !->
