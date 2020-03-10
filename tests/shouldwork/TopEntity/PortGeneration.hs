@@ -112,3 +112,14 @@ topEntity8 :: (HiddenClockResetEnable System)
            -> "out" ::: Signal System Int
 topEntity8 = undefined
 makeTopEntity 'topEntity8
+
+-- Only check for successful Clash compilation, not content
+
+mainVHDL :: IO ()
+mainVHDL = pure ()
+
+mainVerilog :: IO ()
+mainVerilog = pure ()
+
+mainSystemVerilog :: IO ()
+mainSystemVerilog = pure ()
