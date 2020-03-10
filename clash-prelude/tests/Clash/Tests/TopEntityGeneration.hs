@@ -138,10 +138,10 @@ expectedTopEntity4 =
   Synthesize "topEntity4"
     [ PortName "gadt"
     , PortName "s"
-    , PortProduct "cfiii" [PortName "s"]
-    , PortProduct "cfbii" [PortName "s"]
-    , PortProduct "ofiii" [PortName "s"]
-    , PortProduct "ofbii" [PortName "s"]
+    , PortName "cfiii_s"
+    , PortName "cfbii_s"
+    , PortName "ofiii_s"
+    , PortName "ofbii_s"
     , PortProduct "" [PortName "xiii", PortName "xiii2"]
     , PortName "xbii"
     ]
@@ -209,7 +209,7 @@ expectedTopEntity8 =
  Synthesize "topEntity8"
     [ PortProduct "" [PortName "clk", PortName "rst", PortName "en"]
     , PortProduct "pair" [PortName "left", PortName "right"]
-    , PortProduct "pair" [PortProduct "left" [PortName "s"], PortProduct "right" [PortName "s"]]
+    , PortProduct "pair" [PortName "left_s", PortName "right_s"]
     ]
     (PortName "out")
 
@@ -261,7 +261,7 @@ topEntityFailure7 = undefined
 #endif
 
 topEntityFailure8
-  :: "int"     ::: Signal System (Passthrough Int Simple )
+  :: "int"     ::: Signal System (Passthrough Int Simple)
   -> "out"     ::: Signal System Bool
 topEntityFailure8 = undefined
 
