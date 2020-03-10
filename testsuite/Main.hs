@@ -374,6 +374,9 @@ runClashTest = defaultMain $ clashTestRoot
         , runTest "Transpose" def
         , runTest "VecFun" def
       ]
+      , clashTestGroup "Issues"
+        [ runTest "T1187" def{hdlSim=False, hdlTargets=[Verilog]}
+        ]
       , clashTestGroup "Naming"
         [ runTest "T967a" def{hdlSim=False}
         , runTest "T967b" def{hdlSim=False}
