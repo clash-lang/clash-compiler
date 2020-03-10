@@ -2108,7 +2108,7 @@ reduceNonRepPrim c@(TransformContext is0 ctx) e@(App _ _) | (Prim p, args, ticks
             in  (`mkTicks` ticks) <$> reduceTraverse c n aTy fTy bTy dict fun arg
           _ -> return e
       "Clash.Sized.Vector.fold" | argLen == 4 -> do
-        let [aTy,nTy] = Either.rights args
+        let [nTy,aTy] = Either.rights args
         case runExcept (tyNatSize tcm nTy) of
           Right n -> do
             shouldReduce1 <- orM [ pure (ultra || n == 0)
