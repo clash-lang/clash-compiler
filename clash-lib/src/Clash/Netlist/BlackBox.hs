@@ -239,6 +239,9 @@ mkArgument bndr e = do
         (Case scrut ty' [alt],[],_) -> do
           (projection,decls) <- mkProjection False (NetlistId bndr ty) scrut ty' alt
           return ((projection,hwTy,False),decls)
+        (Letrec _bnds _term, [], _ticks) -> do
+          (exprN, letDecls) <- mkExpr False Concurrent (NetlistId bndr ty) e
+          return ((exprN,hwTy,False),letDecls)
         _ ->
           return ((Identifier (error ($(curLoc) ++ "Forced to evaluate unexpected function argument: " ++ eTyMsg)) Nothing
                   ,hwTy,False),[])
