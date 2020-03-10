@@ -479,6 +479,9 @@ runClashTest = defaultMain $ clashTestRoot
         , outputTest ("tests" </> "shouldwork" </> "TopEntity") [Verilog] [] [] "PortNamesWithVector" "main"
         , runTest "PortNamesWithRTree" def{hdlTargets=[Verilog],entities=Entities [["", "PortNamesWithRTree_topEntity", "PortNamesWithRTree_testBench"]], topEntities=TopEntities ["PortNamesWithRTree_testBench"]}
         , outputTest ("tests" </> "shouldwork" </> "TopEntity") [Verilog] [] [] "PortNamesWithRTree" "main"
+        , outputTest ("tests" </> "shouldwork" </> "TopEntity") allTargets [] [] "PortGeneration" "main"
+        , netlistTest ("tests" </> "shouldwork" </> "TopEntity") allTargets [] "T1182A" "main"
+        , netlistTest ("tests" </> "shouldwork" </> "TopEntity") allTargets [] "T1182B" "main"
         , runTest "TopEntHOArg" def{entities=Entities [["f", "g"]], topEntities=TopEntities ["f"], hdlSim=False}
         , runTest "T701" def {hdlSim=False,entities=Entities [["mynot", ""]]}
         , runTest "T1033" def {hdlSim=False,entities=Entities [["top", ""]], topEntities=TopEntities ["top"]}
