@@ -110,6 +110,7 @@ import Clash.Class.Parity             (Parity (..))
 import Clash.Class.Resize             (Resize (..))
 import Clash.Prelude.BitIndex         ((!), msb, replaceBit, split)
 import Clash.Prelude.BitReduction     (reduceAnd, reduceOr)
+import Clash.Promoted.Nat             (natToNatural)
 import Clash.Sized.Internal.BitVector (BitVector (BV), Bit, (++#), high, low, undefError)
 import qualified Clash.Sized.Internal.BitVector as BV
 import Clash.XException
@@ -119,7 +120,8 @@ import Clash.XException
 -- bit.
 --
 -- Uses standard 2-complements representation. Meaning that, given @n@ bits,
--- a 'Signed' @n@ number has a range of: [-(2^(@n@-1)) .. 2^(@n@-1)-1]
+-- a 'Signed' @n@ number has a range of: [-(2^(@n@-1)) .. 2^(@n@-1)-1] for
+-- @n > 0@. When @n = 0@, both the min and max bound are 0.
 --
 -- __NB__: The 'Num' operators perform @wrap-around@ on overflow. If you want
 -- saturation on overflow, check out the 'SaturatingNum' class.
@@ -277,11 +279,19 @@ instance KnownNat n => Bounded (Signed n) where
   minBound = minBound#
   maxBound = maxBound#
 
-minBound#,maxBound# :: KnownNat n => Signed n
+minBound# :: forall n. KnownNat n => Signed n
+minBound# =
+  case natToNatural @n of
+    0 -> 0
+    n -> S (negate $ 2 ^ (n - 1))
 {-# NOINLINE minBound# #-}
-minBound# = let res = S $ negate $ 2 ^ (natVal res - 1) in res
+
+maxBound# :: forall n. KnownNat n => Signed n
+maxBound# =
+  case natToNatural @n of
+    0 -> 0
+    n -> S (2 ^ (n - 1) - 1)
 {-# NOINLINE maxBound# #-}
-maxBound# = let res = S $ 2 ^ (natVal res - 1) - 1 in res
 
 -- | Operators do @wrap-around@ on overflow
 instance KnownNat n => Num (Signed n) where
