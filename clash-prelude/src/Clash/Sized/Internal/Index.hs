@@ -98,7 +98,7 @@ import Clash.Class.Resize         (Resize (..))
 import Clash.Prelude.BitIndex     (replaceBit)
 import {-# SOURCE #-} Clash.Sized.Internal.BitVector (BitVector (BV), high, low, undefError)
 import qualified Clash.Sized.Internal.BitVector as BV
-import Clash.Promoted.Nat         (SNat(..), snatToNum, leToPlusKN)
+import Clash.Promoted.Nat         (SNat(..), snatToNum, natToInteger, leToPlusKN)
 import Clash.XException
   (ShowX (..), NFDataX (..), errorX, showsPrecXWith, rwhnfX)
 
@@ -223,9 +223,12 @@ instance KnownNat n => Bounded (Index n) where
   minBound = fromInteger# 0
   maxBound = maxBound#
 
+maxBound# :: forall n. KnownNat n => Index n
+maxBound# =
+  case natToInteger @n of
+    0 -> errorX "maxBound of 'Index 0' is undefined"
+    n -> fromInteger_INLINE (n - 1)
 {-# NOINLINE maxBound# #-}
-maxBound# :: KnownNat n => Index n
-maxBound# = let res = fromInteger_INLINE (natVal res - 1) in res
 
 -- | Operators report an error on overflow and underflow
 instance KnownNat n => Num (Index n) where
