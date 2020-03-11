@@ -208,3 +208,7 @@ Clash Compiler Flags
 
   **Default:** False
 
+-main-is
+  When using one of ``--vhdl``, ``--verilog``, or ``--systemverilog``, this
+  flag refers to synthesis target. For example, running Clash with
+  ``clash My.Module -main-is top --vhdl`` would synthesize ``My.Module.top``.
