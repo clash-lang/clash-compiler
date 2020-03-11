@@ -20,6 +20,7 @@ module Clash.Normalize.Util
  , isRecursiveBndr
  , isClosed
  , callGraph
+ , collectCallGraphUniques
  , classifyFunction
  , isCheapFunction
  , isNonRecursiveGlobalVar
@@ -41,6 +42,7 @@ import qualified Data.List               as List
 import qualified Data.List.Extra         as List
 import qualified Data.Map                as Map
 import qualified Data.HashMap.Strict     as HashMapS
+import qualified Data.HashSet            as HashSet
 import           Data.Text               (Text)
 import qualified Data.Text as Text
 
@@ -343,6 +345,13 @@ constantSpecInfo ctx e = do
 -- | A call graph counts the number of occurrences that a functions 'g' is used
 -- in 'f'.
 type CallGraph = VarEnv (VarEnv Word)
+
+-- | Collect all binders mentioned in CallGraph into a HashSet
+collectCallGraphUniques :: CallGraph -> HashSet.HashSet Unique
+collectCallGraphUniques cg = HashSet.fromList (us0 ++ us1)
+ where
+  us0 = keysUniqMap cg
+  us1 = concatMap keysUniqMap (eltsUniqMap cg)
 
 -- | Create a call graph for a set of global binders, given a root
 callGraph

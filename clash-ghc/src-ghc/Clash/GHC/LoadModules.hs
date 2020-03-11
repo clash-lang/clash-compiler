@@ -333,6 +333,11 @@ loadModules useColor hdl modName dflagsM idirs = do
   startTime <- Clock.getCurrentTime
   GHC.runGhc (Just libDir) $ do
     setupGhc useColor dflagsM idirs
+    -- TODO: We currently load the transitive closure of _all_ bindings found
+    -- TODO: in the top module. This is wasteful if one or more binders don't
+    -- TODO: contribute to any top entities. This effect is worsened when using
+    -- TODO: -main-is, which only synthesizes a single top entity (and all its
+    -- TODO: dependencies).
     (rootIds, modFamInstEnvs, rootModule, LoadedBinders{..}, allBinders) <-
       -- We need to try and load external modules first, because we can't
       -- recover from errors in 'loadLocalModule'.
@@ -371,8 +376,9 @@ loadModules useColor hdl modName dflagsM idirs = do
     benchAnn   <- findTestBenchAnnotations rootIds
     reprs'     <- findCustomReprAnnotations
     primGuards <- findPrimitiveGuardAnnotations allBinderIds
-    let varNameString = OccName.occNameString . Name.nameOccName . Var.varName
-        topEntities = filter ((== "topEntity") . varNameString) rootIds
+    let topEntityNames = catMaybes [Just "topEntity", GHC.mainFunIs =<< dflagsM]
+        varNameString = OccName.occNameString . Name.nameOccName . Var.varName
+        topEntities = filter ((`elem` topEntityNames) . varNameString) rootIds
         benches     = filter ((== "testBench") . varNameString) rootIds
         mergeBench (x,y) = (x,y,lookup x benchAnn)
         allSyn'     = map mergeBench allSyn

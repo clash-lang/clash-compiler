@@ -55,7 +55,7 @@ doHDL b src = do
   putStrLn $ "Loading dependencies took " ++ prepStartDiff
 
   generateHDL (buildCustomReprs reprs) bindingsMap (Just b) primMap tcm tupTcm
-    (ghcTypeToHWType WORD_SIZE_IN_BITS True) primEvaluator topEntities
+    (ghcTypeToHWType WORD_SIZE_IN_BITS True) primEvaluator topEntities Nothing
     defClashOpts{opt_cachehdl = False, opt_dbgLevel = DebugSilent}
     (startTime,prepTime)
 
