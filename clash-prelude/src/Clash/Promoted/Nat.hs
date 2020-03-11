@@ -117,7 +117,8 @@ instance ShowX (SNat n) where
 withSNat :: KnownNat n => (SNat n -> a) -> a
 withSNat f = f SNat
 
--- | Same as 'snatToInteger', but doesn't take term arguments. Example usage:
+-- | Same as 'snatToInteger' and 'GHC.TypeLits.natVal', but doesn't take term
+-- arguments. Example usage:
 --
 -- >>> natToInteger @5
 -- 5
@@ -130,7 +131,8 @@ snatToInteger :: SNat n -> Integer
 snatToInteger p@SNat = natVal p
 {-# INLINE snatToInteger #-}
 
--- | Same as 'snatToNatural', but doesn't take term arguments. Example usage:
+-- | Same as 'snatToNatural' and 'GHC.TypeNats.natVal', but doesn't take term
+-- arguments. Example usage:
 --
 -- >>> natToNatural @5
 -- 5

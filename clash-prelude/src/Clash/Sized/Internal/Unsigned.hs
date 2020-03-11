@@ -108,6 +108,7 @@ import Clash.Class.Parity             (Parity (..))
 import Clash.Class.Resize             (Resize (..))
 import Clash.Prelude.BitIndex         ((!), msb, replaceBit, split)
 import Clash.Prelude.BitReduction     (reduceOr)
+import Clash.Promoted.Nat             (natToNum)
 import Clash.Sized.Internal.BitVector (BitVector (BV), Bit, high, low, undefError)
 import qualified Clash.Sized.Internal.BitVector as BV
 import Clash.Sized.Internal.Mod
@@ -259,14 +260,13 @@ instance KnownNat n => Bounded (Unsigned n) where
   minBound = minBound#
   maxBound = maxBound#
 
-{-# NOINLINE minBound# #-}
 minBound# :: Unsigned n
 minBound# = U 0
+{-# NOINLINE minBound# #-}
 
+maxBound# :: forall n. KnownNat n => Unsigned n
+maxBound# = let m = 1 `shiftL` (natToNum @n) in  U (m - 1)
 {-# NOINLINE maxBound# #-}
-maxBound# :: forall n .KnownNat n => Unsigned n
-maxBound# = let m = 1 `shiftL` fromInteger (natVal (Proxy @n))
-            in  U (m - 1)
 
 instance KnownNat n => Num (Unsigned n) where
   (+)         = (+#)

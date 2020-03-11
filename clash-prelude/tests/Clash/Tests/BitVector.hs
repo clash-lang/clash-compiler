@@ -59,6 +59,10 @@ tests = localOption (QuickCheckMaxRatio 2) $ testGroup "All"
     , testCase "[2,4..]" $ [2,4..] @?= [2,4,6 :: BitVector 3]
     , testCase "[3,4..]" $ [3,4..] @?= [3,4,5,6,7 :: BitVector 3]
     ]
+  , testGroup "Bounds"
+    [ testCase "maxBound :: BitVector 0" $ maxBound @(BitVector 0) @?= 0
+    , testCase "minBound :: BitVector 0" $ minBound @(BitVector 0) @?= 0
+    ]
   ]
 
 fromIntegerProp :: forall m. KnownNat m => Proxy m -> Integer -> Property
