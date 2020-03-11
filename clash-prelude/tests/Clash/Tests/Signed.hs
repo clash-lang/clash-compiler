@@ -32,6 +32,10 @@ tests = localOption (QuickCheckMaxRatio 2) $ testGroup "All"
     , testCase "[2,4..]" $ [2,4..] @?= [2,4,6 :: Signed 4]
     , testCase "[3,4..]" $ [3,4..] @?= [3,4,5,6,7 :: Signed 4]
     ]
+  , testGroup "Bounds"
+    [ testCase "maxBound :: Signed 0" $ maxBound @(Signed 0) @?= 0
+    , testCase "minBound :: Signed 0" $ minBound @(Signed 0) @?= 0
+    ]
   ]
 
 

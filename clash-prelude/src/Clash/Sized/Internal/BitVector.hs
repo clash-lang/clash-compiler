@@ -156,7 +156,7 @@ import Clash.Class.Num            (ExtendingNum (..), SaturatingNum (..),
                                    SaturationMode (..))
 import Clash.Class.Resize         (Resize (..))
 import Clash.Promoted.Nat
-  (SNat (..), SNatLE (..), compareSNat, snatToInteger, snatToNum)
+  (SNat (..), SNatLE (..), compareSNat, snatToInteger, snatToNum, natToNum)
 import Clash.XException
   (ShowX (..), NFDataX (..), errorX, isX, showsPrecXWith, rwhnfX)
 
@@ -527,14 +527,13 @@ instance KnownNat n => Bounded (BitVector n) where
   minBound = minBound#
   maxBound = maxBound#
 
-{-# NOINLINE minBound# #-}
 minBound# :: BitVector n
 minBound# = BV 0 0
+{-# NOINLINE minBound# #-}
 
+maxBound# :: forall n. KnownNat n => BitVector n
+maxBound# = let m = 1 `shiftL` natToNum @n in BV 0 (m-1)
 {-# NOINLINE maxBound# #-}
-maxBound# :: forall n . KnownNat n => BitVector n
-maxBound# = let m = 1 `shiftL` fromInteger (natVal (Proxy @n))
-            in  BV 0 (m-1)
 
 instance KnownNat n => Num (BitVector n) where
   (+)         = (+#)

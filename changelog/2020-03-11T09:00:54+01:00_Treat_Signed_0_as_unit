@@ -1,0 +1,1 @@
+CHANGED: Treat `Signed 0`, `Unsigned 0`, `Index 1`, `BitVector 0` as unit. In effect this means that 'minBound' and 'maxBound' return 0, whereas previously they might crash. https://github.com/clash-lang/clash-compiler/issues/1183
