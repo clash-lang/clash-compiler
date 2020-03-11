@@ -1,0 +1,1 @@
+ADDED: Clash now repects '-main-is' when used with '--vhdl', '--verilog', or '--systemverilog'
