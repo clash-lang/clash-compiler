@@ -10,8 +10,8 @@ if [[ -z $(command -v python3) ]]; then
 fi
 
 echo "$SCRIPT: Building HTML"
-python3 -msphinx -M html . _build
+/usr/bin/env python3 -msphinx -M html . _build
 
 echo "$SCRIPT: Building LaTeX"
-python3 -msphinx -M latexpdf . _build
+/usr/bin/env python3 -msphinx -M latexpdf . _build
 
