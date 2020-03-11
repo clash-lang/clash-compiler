@@ -2139,6 +2139,9 @@ makeHDL backend optsRef srcs = do
                 let dbs = reverse [p | PackageDB (PkgConfFile p) <- packageDBFlags dflags]
                 (bindingsMap,tcm,tupTcm,topEntities,primMap,reprs) <-
                   generateBindings color primDirs idirs dbs hdl src (Just dflags)
+
+                let getMain = getMainTopEntity src bindingsMap topEntities
+                mainTopEntity <- traverse getMain (GHC.mainFunIs dflags)
                 prepTime <- startTime `deepseq` bindingsMap `deepseq` tcm `deepseq` Clock.getCurrentTime
                 let prepStartDiff = reportTimeDiff prepTime startTime
                 putStrLn $ "GHC+Clash: Loading modules cumulatively took " ++ prepStartDiff
@@ -2154,6 +2157,7 @@ makeHDL backend optsRef srcs = do
                   (ghcTypeToHWType iw fp)
                   primEvaluator
                   topEntities
+                  mainTopEntity
                   opts2
                   (startTime,prepTime)
 

@@ -225,14 +225,18 @@ generateHDL
   -> (PrimStep, PrimUnwind)
   -- ^ Hardcoded evaluator (delta-reduction)
   -> [TopEntityT]
-  -- ^ Topentities and associated testbench
+  -- ^ All topentities and associated testbench
+  -> Maybe (TopEntityT, [TopEntityT])
+  -- ^ Main top entity to compile. If Nothing, all top entities in previous
+  -- argument will be compiled.
   -> ClashOpts
   -- ^ Debug information level for the normalization process
   -> (Clock.UTCTime,Clock.UTCTime)
   -> IO ()
 generateHDL reprs bindingsMap hdlState primMap tcm tupTcm typeTrans eval
-  topEntities0 opts (startTime,prepTime) =
-    go prepTime HashMap.empty (sortTop bindingsMap topEntities2)
+  topEntities0 mainTopEntity opts (startTime,prepTime) =
+    let todo = maybe topEntities2 (uncurry (:)) mainTopEntity in
+    go prepTime HashMap.empty (sortTop bindingsMap todo)
  where
   topEntities1 = map (splitTopEntityT tcm bindingsMap) topEntities0
   -- Remove forall's used in type equality constraints
