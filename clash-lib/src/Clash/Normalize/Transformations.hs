@@ -832,7 +832,7 @@ deadCode _ e@(Letrec binds body) = do
       used    = List.foldl' collectUsed emptyVarEnv (eltsVarSet bodyFVs)
   case eltsVarEnv used of
     [] -> changed body
-    qqL | neLength qqL binds
+    qqL | length qqL /= length binds
         -> changed (Letrec qqL body)
         | otherwise
         -> return e
@@ -1910,9 +1910,8 @@ recToLetRec (TransformContext is0 []) e = do
 
       -- Extract projection of this case statement. Subsequent calls to
       -- 'stripProjection' will check if new target is actually used.
-      n <- headMaybe fTrace1
+      (n, fTrace2) <- List.uncons fTrace1
       vTarget1 <- indexMaybe xs n
-      fTrace2 <- tailMaybe fTrace1
 
       stripProjection fTrace2 (Var vTarget1) r
 

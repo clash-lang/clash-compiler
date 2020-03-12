@@ -623,7 +623,7 @@ mkFunApp dstId fun args tickDecls = do
           -- Filter void arguments, but make sure to render their declarations:
           let
             argTypeExprs = zip argHWTys (zip argTys argExprs)
-            filteredTypeExprs = filterOnFst (not . isVoidMaybe True) argTypeExprs
+            filteredTypeExprs = fmap snd $ filter (not . isVoidMaybe True . fst) argTypeExprs
             (argTysFiltered, argsFiltered) = unzip filteredTypeExprs
 
           let compOutp = (\(_,x,_) -> x) <$> listToMaybe co
