@@ -54,7 +54,7 @@ common basic-config
       NoStarIsType
 
   ghc-options:
-    -Wall
+    -Wall -Wcompat
 
   if flag(haddock)
     ghc-options:

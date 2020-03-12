@@ -12,7 +12,7 @@ cabal-version:       >=1.10
 library
   HS-Source-Dirs:      instances
   default-language:    Haskell2010
-  ghc-options:         -Wall
+  ghc-options:         -Wall -Wcompat
   Exposed-Modules:     SerialiseInstances
   build-depends:       base                  >= 4.10     && < 5,
                        binary                >= 0.8.5    && < 0.11,
@@ -26,7 +26,7 @@ library
 executable clash-profile-normalization-prepare
   main-is:             profile-normalization-prepare.hs
   default-language:    Haskell2010
-  ghc-options:         -Wall
+  ghc-options:         -Wall -Wcompat
   build-depends:       base,
                        binary,
                        bytestring            >= 0.10.0.2 && < 0.11,
@@ -41,7 +41,7 @@ executable clash-profile-normalization-prepare
 executable clash-profile-netlist-prepare
   main-is:             profile-netlist-prepare.hs
   default-language:    Haskell2010
-  ghc-options:         -Wall
+  ghc-options:         -Wall -Wcompat
   build-depends:       base,
                        binary,
                        bytestring            >= 0.10.0.2 && < 0.11,
