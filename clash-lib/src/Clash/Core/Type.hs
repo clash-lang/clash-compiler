@@ -252,7 +252,7 @@ newTyConInstRhs (tvs,ty) tys
     | otherwise
     = Nothing
   where
-    (tys1, tys2) = splitAtList tvs tys
+    (tys1, tys2) = splitAt (length tvs) tys
 
 -- | Make a function type of an argument and result type
 mkFunTy :: Type -> Type -> Type
