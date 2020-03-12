@@ -1,0 +1,67 @@
+[ { "BlackBox" :
+    { "name"      : "Clash.Signal.Trace.traceSignal1"
+    , "workInfo"  : "Never"
+    , "kind"      : "Expression"
+    , "type"      :
+"traceSignal1
+  :: ( BitPack a    -- ARG[0]
+     , NFDataX a    -- ARG[1]
+     , Typeable a ) -- ARG[2]
+  => String         -- ARG[3]
+  -> Signal dom a   -- ARG[4]
+  -> Signal dom a"
+    , "template" : "~ARG[4]"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "Clash.Signal.Trace.traceVecSignal1"
+    , "workInfo"  : "Never"
+    , "kind"      : "Expression"
+    , "type"      :
+"traceVecSignal1
+  :: ( KnownNat n             -- ARG[0]
+     , BitPack a              -- ARG[1]
+     , NFDataX a              -- ARG[2]
+     , Typeable a )           -- ARG[3]
+  => String                   -- ARG[4]
+  -> Signal dom (Vec (n+1) a) -- ARG[5]
+  -> Signal dom (Vec (n+1) a)"
+    , "template" : "~ARG[5]"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "Clash.Signal.Trace.traceSignal"
+    , "workInfo"  : "Never"
+    , "kind"      : "Expression"
+    , "type"      :
+"traceSignal
+  :: forall dom a
+   . ( KnownDomain dom -- ARG[0]
+     , BitPack a       -- ARG[1]
+     , NFDataX a       -- ARG[2]
+     , Typeable a )    -- ARG[3]
+  => String            -- ARG[4]
+  -> Signal dom a      -- ARG[5]
+  -> Signal dom a"
+    , "template" : "~ARG[5]"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "Clash.Signal.Trace.traceVecSignal"
+    , "workInfo"  : "Never"
+    , "kind"      : "Expression"
+    , "type"      :
+"traceVecSignal
+  :: forall dom a n
+   . ( KnownDomain dom        -- ARG[0]
+     , KnownNat n             -- ARG[1]
+     , BitPack a              -- ARG[2]
+     , NFDataX a              -- ARG[3]
+     , Typeable a )           -- ARG[4]
+  => String                   -- ARG[5]
+  -> Signal dom (Vec (n+1) a) -- ARG[6]
+  -> Signal dom (Vec (n+1) a)"
+    , "template" : "~ARG[6]"
+    }
+  }
+]
