@@ -28,6 +28,8 @@
 
 set -e
 
+GHC=${GHC:-ghc}
+
 inotifywait --help | grep -e "^inotifywait"
 ghcid --version
 
@@ -77,7 +79,7 @@ while true; do
     sed -i '/clash-ghc/d' .ghc.environment.x86_64-linux-*
   fi
 
-  ghcid -c "${target}" ${restart_cmd} ${@:2}
+  ghcid -c "${target} -w ${GHC}" ${restart_cmd} ${@:2}
 
   inotifywait -e modify,create,delete -r ${watch}
   if [[ $? == 130 ]]; then
