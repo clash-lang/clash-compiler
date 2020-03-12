@@ -457,7 +457,7 @@ interestingToLift inScope eval e@(Prim pInfo) args ticks
     Just t | t || anyArgNotConstant -> pure (Just e)
     _ | DeDup `elem` ticks -> pure (Just e)
     _ -> do
-      let isInteresting = uncurry3 (interestingToLift inScope eval) . collectArgsTicks
+      let isInteresting = (\(x, y, z) -> interestingToLift inScope eval x y z) . collectArgsTicks
       if isHOTy (primType pInfo) then do
         anyInteresting <- anyM (fmap Maybe.isJust . isInteresting) lArgs
         if anyInteresting then pure (Just e) else pure Nothing

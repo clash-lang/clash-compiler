@@ -239,7 +239,7 @@ zipTvSubst
   -> Subst
 zipTvSubst tvs tys
   | debugIsOn
-  , neLength tvs tys
+  , length tvs /= length tys
   = pprTrace "zipTvSubst" (ppr tvs <> line <> ppr tys) emptySubst
   | otherwise
   = Subst (mkInScopeSet (tyFVsOfTypes tys)) emptyVarEnv tenv emptyVarEnv
@@ -610,7 +610,7 @@ substTyWith
   -> Type
   -> Type
 substTyWith tvs tys =
-  ASSERT( tvs `equalLength` tys )
+  ASSERT( length tvs == length tys )
   substTy (zipTvSubst tvs tys)
 
 -- | Ensure that non of the binders in an expression shadow each-other, nor
