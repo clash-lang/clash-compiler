@@ -57,14 +57,13 @@ import           Clash.Core.Subst
   (deShadowTerm, extendTvSubst, extendTvSubstList, mkSubst, substTm, substTy,
    substId, extendIdSubst)
 import           Clash.Core.Term
-  (Context, CoreContext(AppArg), PrimInfo (..), Term (..), WorkInfo (..),
-   TickInfo(NameMod), NameMod(PrefixName), collectArgs, collectArgsTicks)
+import           Clash.Core.TermInfo     (isPolyFun, termType)
 import           Clash.Core.TyCon        (TyConMap)
 import           Clash.Core.Type
   (Type(LitTy, VarTy), LitTy(SymTy), TypeView (..), tyView, undefinedTy,
    splitFunForallTy, splitTyConAppM, mkPolyFunTy)
 import           Clash.Core.Util
-  (isClockOrReset, isPolyFun, termType, mkApps, mkTicks)
+  (isClockOrReset)
 import           Clash.Core.Var          (Id, TyVar, Var (..), isGlobalId)
 import           Clash.Core.VarEnv
   (VarEnv, emptyInScopeSet, emptyVarEnv, extendVarEnv, extendVarEnvWith,

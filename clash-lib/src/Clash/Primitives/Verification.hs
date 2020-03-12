@@ -18,8 +18,8 @@ import qualified Clash.Backend
 import           Clash.Backend
   (Backend, blockDecl, hdlKind)
 import           Clash.Core.Term                 (Term(Var))
+import           Clash.Core.TermInfo             (termType)
 import           Clash.Core.TermLiteral          (termToDataError)
-import           Clash.Core.Util                 (termType)
 import           Clash.Util                      (indexNote)
 import           Clash.Netlist                   (mkExpr)
 import           Clash.Netlist.Util              (stripVoid)

@@ -42,12 +42,12 @@ import           Clash.Core.FreeVars
 import           Clash.Core.Pretty                (PrettyOptions(..), showPpr, showPpr', ppr)
 import           Clash.Core.Subst
   (extendGblSubstList, mkSubst, substTm)
-import           Clash.Core.Term                  (Term (..), collectArgsTicks)
+import           Clash.Core.Term                  (Term (..), collectArgsTicks
+                                                  ,mkApps, mkTicks)
 import           Clash.Core.Type                  (Type, splitCoreFunForallTy)
 import           Clash.Core.TyCon
   (TyConMap, TyConName)
 import           Clash.Core.Type                  (isPolyTy)
-import           Clash.Core.Util                  (mkApps, mkTicks)
 import           Clash.Core.Var                   (Id, varName, varType)
 import           Clash.Core.VarEnv
   (VarEnv, elemVarSet, eltsVarEnv, emptyInScopeSet, emptyVarEnv,

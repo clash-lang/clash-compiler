@@ -37,6 +37,7 @@ import           Clash.Core.Name
 import           Clash.Core.Pretty
 import           Clash.Core.Subst
 import           Clash.Core.Term
+import           Clash.Core.TermInfo
 import           Clash.Core.TyCon
 import           Clash.Core.Type
 import           Clash.Core.Util

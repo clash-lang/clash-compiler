@@ -59,10 +59,10 @@ import Clash.Core.FreeVars
 import Clash.Core.Literal    (Literal (..))
 import Clash.Core.Term
   (LetBinding, Pat (..), PrimInfo (..), Term (..), TickInfo (..), collectArgs,
-   collectArgsTicks)
+   collectArgsTicks, mkApps, mkTicks, patIds)
+import Clash.Core.TermInfo   (termType)
 import Clash.Core.TyCon      (tyConDataCons)
 import Clash.Core.Type       (Type, isPolyFunTy, mkTyConApp, splitFunForallTy)
-import Clash.Core.Util       (mkApps, mkTicks, patIds, termType)
 import Clash.Core.Var        (isGlobalId)
 import Clash.Core.VarEnv
   (InScopeSet, elemInScopeSet, notElemInScopeSet)
