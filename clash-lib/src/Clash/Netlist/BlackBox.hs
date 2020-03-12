@@ -57,12 +57,13 @@ import           Clash.Core.Name
 import           Clash.Core.Pretty             (showPpr)
 import           Clash.Core.Subst              (extendIdSubst, mkSubst, substTm)
 import           Clash.Core.Term               as C
-  (PrimInfo (..), Term (..), WorkInfo (..), collectArgs, collectArgsTicks)
+  (PrimInfo (..), Term (..), WorkInfo (..), collectArgs, collectArgsTicks, collectBndrs, mkApps)
+import           Clash.Core.TermInfo
 import           Clash.Core.Type               as C
   (Type (..), ConstTy (..), TypeView (..), mkFunTy, splitFunTys, splitFunTy, tyView)
 import           Clash.Core.TyCon              as C (TyConMap, tyConDataCons)
 import           Clash.Core.Util
-  (collectBndrs, inverseTopSortLetBindings, isFun, mkApps, splitShouldSplit, termType)
+  (inverseTopSortLetBindings, splitShouldSplit)
 import           Clash.Core.Var                as V
   (Id, Var (..), mkLocalId, modifyVarName)
 import           Clash.Core.VarEnv

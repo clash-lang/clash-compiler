@@ -49,7 +49,8 @@ import           Clash.Core.Name                  (nameOcc)
 import           Clash.Core.Pretty                (showPpr)
 import           Clash.Core.Term
   (CoreContext (..), PrimInfo (..), Term (..), WorkInfo (..), Pat (..),
-   collectTermIds)
+   collectTermIds, mkApps, idToVar)
+import           Clash.Core.TermInfo
 import           Clash.Core.Type                  (LitTy (..), Type (..),
                                                    TypeView (..), coreView1,
                                                    mkFunTy, mkTyConApp,
@@ -58,8 +59,8 @@ import           Clash.Core.TyCon
   (TyConMap, TyConName, tyConDataCons, tyConName)
 import           Clash.Core.TysPrim               (integerPrimTy, typeNatKind)
 import           Clash.Core.Util
-  (appendToVec, extractElems, extractTElems, idToVar, mkApps, mkRTree,
-   mkUniqInternalId, mkUniqSystemTyVar, mkVec, termType, dataConInstArgTys,
+  (appendToVec, extractElems, extractTElems, mkRTree,
+   mkUniqInternalId, mkUniqSystemTyVar, mkVec, dataConInstArgTys,
    primCo, undefinedTm)
 import           Clash.Core.Var                   (Var (..))
 import           Clash.Core.VarEnv
