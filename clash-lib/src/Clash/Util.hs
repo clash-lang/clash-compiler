@@ -24,11 +24,11 @@ module Clash.Util
   )
 where
 
-import Control.Applicative            as X (Applicative,(<$>),(<*>),pure)
+import Control.Applicative            (liftA2)
 import Control.Arrow                  as X ((***),(&&&),first,second)
 import qualified Control.Exception    as Exception
 import Control.Monad                  as X ((<=<),(>=>))
-import Control.Monad.State            (MonadState,State,StateT,runState)
+import Control.Monad.State            (MonadState,StateT)
 import qualified Control.Monad.State  as State
 import Data.Typeable                  (Typeable)
 import Data.Function                  as X (on)
@@ -117,7 +117,7 @@ pprTrace str = pprDebugAndThen trace (pretty str)
 pprTraceDebug
   :: String -> Doc ann -> a -> a
 pprTraceDebug str doc x
-  | debugIsOn = pprDebugAndThen trace (pretty str) doc x
+  | debugIsOn = pprTrace str doc x
   | otherwise = x
 
 pprDebugAndThen
@@ -179,31 +179,6 @@ makeCachedU key l create = do
       l %= extendUniqMap key value
       return value
 
--- | Run a State-action using the State that is stored in a higher-layer Monad
-liftState :: (MonadState s m)
-          => Lens' s s' -- ^ Lens to the State in the higher-layer monad
-          -> State s' a -- ^ The State-action to perform
-          -> m a
-liftState l m = do
-  s <- use l
-  let (a,s') = runState m s
-  l .= s'
-  return a
-
--- | Functorial version of 'Control.Arrow.first'
-firstM :: Functor f
-       => (a -> f c)
-       -> (a, b)
-       -> f (c, b)
-firstM f (x,y) = (,y) <$> f x
-
--- | Functorial version of 'Control.Arrow.second'
-secondM :: Functor f
-        => (b -> f c)
-        -> (a, b)
-        -> f (a, c)
-secondM f (x,y) = (x,) <$> f y
-
 combineM :: (Applicative f)
          => (a -> f b)
          -> (c -> f d)
@@ -216,11 +191,6 @@ traceIf :: Bool -> String -> a -> a
 traceIf True  msg = trace msg
 traceIf False _   = id
 {-# INLINE traceIf #-}
-
--- | A version of 'concatMap' that works with a monadic predicate.
-concatMapM :: Monad m => (a -> m [b]) -> [a] -> m [b]
-concatMapM f as = concat <$> sequence (map f as)
-{-# INLINE concatMapM #-}
 
 -- | Monadic version of 'Data.List.partition'
 partitionM :: Monad m
@@ -245,21 +215,10 @@ mapAccumLM f acc (x:xs) = do
   (acc'',ys) <- mapAccumLM f acc' xs
   return (acc'',y:ys)
 
--- | if-then-else as a function on an argument
-ifThenElse :: (a -> Bool)
-           -> (a -> b)
-           -> (a -> b)
-           -> a
-           -> b
-ifThenElse t f g a = if t a then f a else g a
-
 infixr 5 <:>
 -- | Applicative version of 'GHC.Types.(:)'
-(<:>) :: Applicative f
-      => f a
-      -> f [a]
-      -> f [a]
-x <:> xs = (:) <$> x <*> xs
+(<:>) :: Applicative f => f a -> f [a] -> f [a]
+(<:>) = liftA2 (:)
 
 -- | Safe indexing, returns a 'Nothing' if the index does not exist
 indexMaybe :: [a]
@@ -295,24 +254,6 @@ indexNote
   -- ^ Error or element /n/
 indexNote note = \xs i -> fromMaybe (error note) (indexMaybe xs i)
 
--- | Safe version of 'head'
-headMaybe :: [a] -> Maybe a
-headMaybe (a:_) = Just a
-headMaybe _ = Nothing
-
--- | Safe version of 'tail'
-tailMaybe :: [a] -> Maybe [a]
-tailMaybe (_:as) = Just as
-tailMaybe _ = Nothing
-
--- | Split the second list at the length of the first list
-splitAtList :: [b] -> [a] -> ([a], [a])
-splitAtList [] xs         = ([], xs)
-splitAtList _ xs@[]       = (xs, xs)
-splitAtList (_:xs) (y:ys) = (y:ys', ys'')
-    where
-      (ys', ys'') = splitAtList xs ys
-
 clashLibVersion :: Version
 #ifdef CABAL
 clashLibVersion = Paths_clash_lib.version
@@ -347,20 +288,6 @@ clogBase x y | x > 1 && y > 0 =
                 then Just (I# (z1 +# 1#))
                 else Just (I# z1)
 clogBase _ _ = Nothing
-
--- | Determine whether two lists are of equal length
-equalLength
-  :: [a] -> [b] -> Bool
-equalLength [] [] = True
-equalLength (_:as) (_:bs) = equalLength as bs
-equalLength _ _ = False
-
--- | Determine whether two lists are not of equal length
-neLength
-  :: [a] -> [b] -> Bool
-neLength [] [] = False
-neLength (_:as) (_:bs) = neLength as bs
-neLength _ _ = True
 
 -- | Zip two lists of equal length
 --
@@ -430,14 +357,6 @@ reportTimeDiff start end =
        | otherwise
        = "%-S%03Qs"
 
--- | Converts a curried function to a function on a triple
-uncurry3
-  :: (a -> b -> c -> d)
-  -> (a,b,c)
-  -> d
-uncurry3 = \f (a,b,c) -> f a b c
-{-# INLINE uncurry3 #-}
-
 allM :: (Monad m) => (a -> m Bool) -> [a] -> m Bool
 allM _ [] = return True
 allM p (x:xs) = do
@@ -446,12 +365,6 @@ allM p (x:xs) = do
     allM p xs
   else
     return False
-
-traceWith :: (a -> String) -> a -> a
-traceWith f a = trace (f a) a
-
-traceShowWith :: Show b => (a -> b) -> a -> a
-traceShowWith f a = trace (show (f a)) a
 
 -- | Left-biased choice on maybes
 orElse :: Maybe a -> Maybe a -> Maybe a
@@ -467,7 +380,7 @@ orElses = listToMaybe . catMaybes
 --  * compiling files with clash
 --  * running output tests with runghc
 --  * compiling (local) Template/Blackbox functions with Hint
-wantedLanguageExtensions, unwantedLanguageExtensions :: [LangExt.Extension]
+wantedLanguageExtensions :: [LangExt.Extension]
 wantedLanguageExtensions =
   [ LangExt.BinaryLiterals
   , LangExt.ConstraintKinds
@@ -495,6 +408,7 @@ wantedLanguageExtensions =
 #endif
   ]
 
+unwantedLanguageExtensions :: [LangExt.Extension]
 unwantedLanguageExtensions =
   [ LangExt.ImplicitPrelude
   , LangExt.MonomorphismRestriction
@@ -505,8 +419,3 @@ unwantedLanguageExtensions =
   , LangExt.StrictData
   ]
 
-filterOnFst :: (a -> Bool) -> [(a, b)] -> [b]
-filterOnFst f xs = map snd (filter (f . fst) xs)
-
-filterOnSnd :: (b -> Bool) -> [(a, b)] -> [a]
-filterOnSnd f xs = map fst (filter (f . snd) xs)
