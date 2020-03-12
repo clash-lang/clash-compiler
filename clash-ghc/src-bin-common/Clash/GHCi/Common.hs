@@ -1,4 +1,3 @@
-{-# LANGUAGE CPP #-}
 {-# LANGUAGE LambdaCase #-}
 
 module Clash.GHCi.Common
@@ -13,11 +12,7 @@ import           Clash.Driver.Types     (ClashOpts (..))
 
 -- The GHC interface
 import qualified DynFlags
-#if MIN_VERSION_base(4,11,0)
-import qualified EnumSet                as GHC (member) -- ghc84, ghc86
-#else
-import qualified Data.IntSet            as IntSet -- ghc82
-#endif
+import qualified EnumSet                as GHC (member)
 import qualified GHC                    (DynFlags, ModSummary (..), Module (..),
                                          extensionFlags, moduleNameString)
 import qualified GHC.LanguageExtensions as LangExt (Extension (..))
@@ -49,16 +44,7 @@ messageWith srcModule
     msgStem = "Warning: Extension MonoLocalBinds disabled. This might lead to unexpected logic duplication"
 
 active :: GHC.DynFlags -> Bool
-#if MIN_VERSION_base(4,11,0)
--- ghc84, ghc86
 active = GHC.member LangExt.MonoLocalBinds . GHC.extensionFlags
-#else
--- ghc82
-active = member LangExt.MonoLocalBinds . GHC.extensionFlags
-
-member :: Enum a => a -> IntSet.IntSet -> Bool
-member = IntSet.member . fromEnum
-#endif
 
 checkImportDirs :: Foldable t => ClashOpts -> t FilePath -> IO ()
 checkImportDirs opts idirs = when (opt_checkIDir opts) $
