@@ -27,6 +27,9 @@ module Clash.Core.Subst
   , substTy
   , substTyWith
   , substTyInVar
+  , substGlobalsInExistentials
+  , substInExistentials
+  , substInExistentialsList
     -- * Substitution into terms
     -- ** Substitution environments
   , Subst (..)
@@ -356,6 +359,63 @@ substTyUnchecked subst@(TvSubst _ tvS) ty
   = ty
   | otherwise
   = substTy' subst ty
+
+-- Safely substitute global type variables in a list of potentially
+-- shadowing type variables.
+substGlobalsInExistentials
+  :: HasCallStack
+  => InScopeSet
+  -- ^ Variables in scope
+  -> [TyVar]
+  -- ^ List of existentials to apply the substitution for
+  -> [(TyVar, Type)]
+  -- ^ Substitutions
+  -> [TyVar]
+substGlobalsInExistentials is exts substs0 = result
+  -- TODO: Is is actually possible that existentials shadow each other? If they
+  -- TODO: can't, we can remove this function
+  where
+    iss     = scanl extendInScopeSet is exts
+    substs1 = map (\is_ -> extendTvSubstList (mkSubst is_) substs0) iss
+    result  = zipWith substTyInVar substs1 exts
+
+-- | Safely substitute type variables in a list of existentials. This function
+-- will account for cases where existentials shadow each other.
+substInExistentialsList
+  :: HasCallStack
+  => InScopeSet
+  -- ^ Variables in scope
+  -> [TyVar]
+  -- ^ List of existentials to apply the substitution for
+  -> [(TyVar, Type)]
+  -- ^ Substitutions
+  -> [TyVar]
+substInExistentialsList is exts substs =
+  foldl (substInExistentials is) exts substs
+
+-- | Safely substitute a type variable in a list of existentials. This function
+-- will account for cases where existentials shadow each other.
+substInExistentials
+  :: HasCallStack
+  => InScopeSet
+  -- ^ Variables in scope
+  -> [TyVar]
+  -- ^ List of existentials to apply the substitution for
+  -> (TyVar, Type)
+  -- ^ Substitution
+  -> [TyVar]
+substInExistentials is exts subst@(typeVar, _type) =
+  -- TODO: Is is actually possible that existentials shadow each other? If they
+  -- TODO: can't, we can remove this function
+  case List.elemIndices typeVar exts of
+    [] ->
+      -- We're not replacing any of the existentials, but a global variable
+      substGlobalsInExistentials is exts [subst]
+    (last -> i) ->
+      -- We're replacing an existential. That means we're not touching any
+      -- variables that were introduced before it. For all variables after it,
+      -- it is as we would replace global variables in them.
+      take (i+1) exts ++ substGlobalsInExistentials is (drop (i+1) exts) [subst]
 
 -- | This checks if the substitution satisfies the invariant from 'TvSbust's
 -- Note [The substitution invariant].

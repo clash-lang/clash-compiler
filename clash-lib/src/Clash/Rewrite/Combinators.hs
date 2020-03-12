@@ -26,8 +26,7 @@ import           Control.Monad               ((>=>))
 import qualified Control.Monad.Writer        as Writer
 import qualified Data.Monoid                 as Monoid
 
-import           Clash.Core.Term             (Term (..), CoreContext (..), primArg)
-import           Clash.Core.Util             (patIds)
+import           Clash.Core.Term             (Term (..), CoreContext (..), primArg, patIds)
 import           Clash.Core.VarEnv
   (extendInScopeSet, extendInScopeSetList)
 import           Clash.Rewrite.Types

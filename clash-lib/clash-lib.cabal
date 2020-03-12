@@ -189,6 +189,7 @@ Library
                       Clash.Backend.VHDL
 
                       Clash.Core.DataCon
+                      Clash.Core.EqSolver
                       Clash.Core.Evaluator
                       Clash.Core.Evaluator.Types
                       Clash.Core.FreeVars
@@ -197,6 +198,7 @@ Library
                       Clash.Core.Pretty
                       Clash.Core.Subst
                       Clash.Core.Term
+                      Clash.Core.TermInfo
                       Clash.Core.TermLiteral
                       Clash.Core.TermLiteral.TH
                       Clash.Core.TyCon

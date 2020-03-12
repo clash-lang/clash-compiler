@@ -70,7 +70,8 @@ import           Clash.Core.Name
   (Name (..), NameSort (..), mkUnsafeSystemName)
 import           Clash.Core.Pretty   (showPpr)
 import           Clash.Core.Term
-  (Pat (..), PrimInfo (..), Term (..), WorkInfo (..))
+  (Pat (..), PrimInfo (..), Term (..), WorkInfo (..), mkApps)
+import           Clash.Core.TermInfo (piResultTys)
 import           Clash.Core.Type
   (Type (..), ConstTy (..), LitTy (..), TypeView (..), mkFunTy, mkTyConApp,
    splitFunForallTy, tyView)
@@ -78,7 +79,7 @@ import           Clash.Core.TyCon
   (TyConMap, TyConName, tyConDataCons)
 import           Clash.Core.TysPrim
 import           Clash.Core.Util
-  (mkApps,mkRTree,mkVec,piResultTys,tyNatSize,dataConInstArgTys,primCo,
+  (mkRTree,mkVec,tyNatSize,dataConInstArgTys,primCo,
    undefinedTm)
 import           Clash.Core.Var      (mkLocalId, mkTyVar)
 import           Clash.GHC.GHC2Core  (modNameM)

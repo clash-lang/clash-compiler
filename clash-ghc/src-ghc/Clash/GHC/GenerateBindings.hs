@@ -12,6 +12,7 @@ module Clash.GHC.GenerateBindings
   (generateBindings)
 where
 
+import           Control.Arrow           ((***), first)
 import           Control.DeepSeq         (deepseq)
 import           Control.Lens            ((%~),(&))
 import           Control.Monad           (unless)
@@ -44,11 +45,10 @@ import           Clash.Annotations.BitRepresentation.Internal (DataRepr')
 import           Clash.Annotations.Primitive (HDL, extractPrim)
 
 import           Clash.Core.Subst        (extendGblSubstList, mkSubst, substTm)
-import           Clash.Core.Term         (Term (..))
+import           Clash.Core.Term         (Term (..), mkLams, mkTyLams)
 import           Clash.Core.Type         (Type (..), TypeView (..), mkFunTy, splitFunForallTy, tyView)
 import           Clash.Core.TyCon        (TyConMap, TyConName, isNewTypeTc)
 import           Clash.Core.TysPrim      (tysPrimMap)
-import           Clash.Core.Util         (mkLams, mkTyLams)
 import           Clash.Core.Var          (Var (..), Id, IdScope (..), setIdScope)
 import           Clash.Core.VarEnv
   (InScopeSet, VarEnv, emptyInScopeSet, extendInScopeSet, mkInScopeSet, mkVarEnv, unionVarEnv)
@@ -67,7 +67,7 @@ import           Clash.Rewrite.Util      (mkInternalVar, mkSelectorCase)
 import           Clash.Unique
   (listToUniqMap, lookupUniqMap, mapUniqMap, unionUniqMap, uniqMapToUniqSet)
 import           Clash.Util
-  ((***),first,traceIf,indexMaybe,reportTimeDiff)
+  (traceIf,indexMaybe,reportTimeDiff)
 
 generateBindings
   :: GHC.OverridingBool
