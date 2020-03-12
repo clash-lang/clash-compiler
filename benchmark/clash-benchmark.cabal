@@ -12,7 +12,7 @@ cabal-version:       >=1.10
 library
   HS-Source-Dirs:      common
   default-language:    Haskell2010
-  ghc-options:         -O2 -Wall
+  ghc-options:         -O2 -Wall -Wcompat
   Exposed-Modules:     BenchmarkCommon
   build-depends:       base                 >= 4.10     && < 5,
                        concurrent-supply    >= 0.1.7    && < 0.2,
@@ -28,7 +28,7 @@ library
 executable clash-benchmark-normalization
   main-is:             benchmark-normalization.hs
   default-language:    Haskell2010
-  ghc-options:         -O2 -Wall
+  ghc-options:         -O2 -Wall -Wcompat
   build-depends:       base,
                        concurrent-supply,
                        containers,

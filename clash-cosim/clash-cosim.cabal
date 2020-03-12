@@ -64,7 +64,7 @@ Library
   C-sources:        src/cbits/cosim_clash.c
 -- TODO: Reintroduce this option, without breaking tests:
 --  LD-Options:       --fatal-warnings
-  ghc-options:      -Wall -fexpose-all-unfoldings -fno-worker-wrapper
+  ghc-options:      -Wall -Wcompat -fexpose-all-unfoldings -fno-worker-wrapper
   if flag(pedantic)
     ghc-options: -Werror
   CC-Options:       -fPIC -Wall -Werror
@@ -111,6 +111,6 @@ test-suite test
       tasty >= 1.0,
       tasty-hunit,
       tasty-quickcheck
-  ghc-options:   -Wall
+  ghc-options:   -Wall -Wcompat
   if flag(pedantic)
     ghc-options: -Werror

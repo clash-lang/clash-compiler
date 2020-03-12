@@ -13,7 +13,7 @@ ghci \
   -i${GHC_BIN_SRC} \
   -iclash-lib/src \
   -iclash-ghc/src-ghc \
-  -Wall -DTOOL_VERSION_ghc=\"${GHC_VERSION}\" \
+  -Wall -Wcompat -DTOOL_VERSION_ghc=\"${GHC_VERSION}\" \
   -XBangPatterns -XBinaryLiterals -XDataKinds -XDefaultSignatures \
   -XDeriveDataTypeable -XDeriveFoldable -XDeriveFunctor -XDeriveGeneric \
   -XDeriveLift -XDeriveTraversable -XDerivingStrategies -XInstanceSigs \

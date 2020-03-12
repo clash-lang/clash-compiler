@@ -22,7 +22,7 @@ flag cosim
 
 common basic-config
   default-language: Haskell2010
-  ghc-options: -Wall
+  ghc-options: -Wall -Wcompat
 
   default-extensions:
     DeriveDataTypeable
@@ -67,7 +67,7 @@ library
     Test.Tasty.Clash.NetlistTest
     Test.Tasty.Program
 
-  build-depends:       
+  build-depends:
     deepseq            >=1.4      && <1.5,
     concurrent-extra   >=0.7      && <0.8,
     generic-lens,
