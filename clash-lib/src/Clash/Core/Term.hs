@@ -15,27 +15,39 @@
 
 module Clash.Core.Term
   ( Term (..)
+  , mkAbstraction
+  , mkTyLams
+  , mkLams
+  , mkApps
+  , mkTyApps
+  , mkTmApps
+  , mkTicks
   , TmName
   , LetBinding
   , Pat (..)
+  , patIds
+  , patVars
   , Alt
   , TickInfo (..), NameMod (..)
   , PrimInfo (..)
   , WorkInfo (..)
-  , CoreContext (..), Context, isLambdaBodyCtx, isTickCtx, walkTerm
-  , collectArgs, collectArgsTicks, collectTicks, collectTermIds, primArg
+  , CoreContext (..), Context, isLambdaBodyCtx, isTickCtx, stripTicks, walkTerm
+  , collectArgs, collectArgsTicks, collectTicks, collectTermIds, collectBndrs, primArg
   , partitionTicks
-  )
-where
+  , idToVar
+  , varToId
+  ) where
 
 -- External Modules
 import Control.DeepSeq
 import Data.Binary                             (Binary)
+import Data.Coerce                             (coerce)
 import qualified Data.DList                    as DList
 import Data.Either                             (lefts, rights)
+import Data.Foldable                           (foldl')
 import Data.Maybe                              (catMaybes)
 import Data.Hashable                           (Hashable)
-import Data.List                               (partition)
+import Data.List                               (nub, partition)
 import Data.Text                               (Text)
 import GHC.Generics
 import SrcLoc                                  (SrcSpan)
@@ -45,8 +57,9 @@ import Clash.Core.DataCon                      (DataCon)
 import Clash.Core.Literal                      (Literal)
 import Clash.Core.Name                         (Name (..))
 import {-# SOURCE #-} Clash.Core.Subst         () -- instance Eq Type
-import {-# SOURCE #-} Clash.Core.Type          (Type)
-import Clash.Core.Var                          (Id, TyVar)
+import {-# SOURCE #-} Clash.Core.Type
+import Clash.Core.Var                          (Var(Id), Id)
+import Clash.Util                              (curLoc)
 
 -- | Term representation in the CoreHW language: System F + LetRec + Case
 data Term
@@ -126,6 +139,57 @@ data Pat
 
 type Alt = (Pat,Term)
 
+-- | Get the list of term-binders out of a DataType pattern
+patIds :: Pat -> ([TyVar],[Id])
+patIds (DataPat _  tvs ids) = (tvs,ids)
+patIds _                    = ([],[])
+
+patVars :: Pat -> [Var a]
+patVars (DataPat _ tvs ids) = coerce tvs ++ coerce ids
+patVars _ = []
+
+-- | Abstract a term over a list of term and type variables
+mkAbstraction :: Term
+              -> [Either Id TyVar]
+              -> Term
+mkAbstraction = foldr (either Lam TyLam)
+
+-- | Abstract a term over a list of term variables
+mkTyLams :: Term
+         -> [TyVar]
+         -> Term
+mkTyLams tm = mkAbstraction tm . map Right
+
+-- | Abstract a term over a list of type variables
+mkLams :: Term
+       -> [Id]
+       -> Term
+mkLams tm = mkAbstraction tm . map Left
+
+-- | Apply a list of types and terms to a term
+mkApps :: Term
+       -> [Either Term Type]
+       -> Term
+mkApps = foldl' (\e a -> either (App e) (TyApp e) a)
+
+-- | Apply a list of terms to a term
+mkTmApps :: Term
+         -> [Term]
+         -> Term
+mkTmApps = foldl' App
+
+-- | Apply a list of types to a term
+mkTyApps :: Term
+         -> [Type]
+         -> Term
+mkTyApps = foldl' TyApp
+
+mkTicks
+  :: Term
+  -> [TickInfo]
+  -> Term
+mkTicks tm ticks = foldl' (\e s -> Tick s e) tm (nub ticks)
+
 -- | Context in which a term appears
 data CoreContext
   = AppFun
@@ -194,6 +258,10 @@ isTickCtx :: CoreContext -> Bool
 isTickCtx (TickC _) = True
 isTickCtx _         = False
 
+stripTicks :: Term -> Term
+stripTicks (Tick _ e) = stripTicks e
+stripTicks e = e
+
 -- | Split a (Type)Application in the applied term and it arguments
 collectArgs :: Term
             -> (Term, [Either Term Type])
@@ -221,6 +289,14 @@ collectArgsTicks = go [] []
   go args ticks (TyApp e t) = go (Right t:args) ticks     e
   go args ticks (Tick s e)  = go args           (s:ticks) e
   go args ticks e           = (e, args, ticks)
+
+-- | Split a (Type)Abstraction in the bound variables and the abstracted term
+collectBndrs :: Term -> ([Either Id TyVar], Term)
+collectBndrs = go []
+ where
+  go bs (Lam v e')    = go (Left v:bs) e'
+  go bs (TyLam tv e') = go (Right tv:bs) e'
+  go bs e'            = (reverse bs,e')
 
 -- | Given a function application, find the primitive it's applied. Yields
 -- Nothing if given term is not an application or if it is not a primitive.
@@ -285,3 +361,16 @@ collectTermIds = concat . walkTerm (Just . go)
   pat (DataPat _ _ ids) = ids
   pat (LitPat _) = []
   pat DefaultPat = []
+
+-- | Make variable reference out of term variable
+idToVar :: Id
+        -> Term
+idToVar i@(Id {}) = Var i
+idToVar tv        = error $ $(curLoc) ++ "idToVar: tyVar: " ++ show tv
+
+-- | Make a term variable out of a variable reference
+varToId :: Term
+        -> Id
+varToId (Var i) = i
+varToId e       = error $ $(curLoc) ++ "varToId: not a var: " ++ show e
+

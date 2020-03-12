@@ -68,13 +68,14 @@ import           Clash.Core.Subst
    extendInScopeIdList, mkSubst, substTm)
 import           Clash.Core.Term
   (Alt, LetBinding, Pat (..), Term (..), TickInfo (..), NameMod (..),
-   collectArgsTicks, collectTicks, PrimInfo(primName))
+   collectArgsTicks, collectTicks, collectBndrs, PrimInfo(primName), mkTicks, stripTicks)
+import           Clash.Core.TermInfo
 import           Clash.Core.TyCon
   (TyConName, TyConMap, tyConDataCons)
 import           Clash.Core.Type         (Type (..), TypeView (..),
                                           coreView1, splitTyConAppM, tyView, TyVar)
 import           Clash.Core.Util
-  (collectBndrs, stripTicks, substArgTys, termType, tyLitShow, mkTicks)
+  (substArgTys, tyLitShow)
 import           Clash.Core.Var
   (Id, Var (..), mkLocalId, modifyVarName, Attr')
 import           Clash.Core.VarEnv

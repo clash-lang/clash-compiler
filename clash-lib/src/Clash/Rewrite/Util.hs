@@ -66,8 +66,7 @@ import           Clash.Core.Pretty           (showPpr)
 import           Clash.Core.Subst
   (substTmEnv, aeqTerm, aeqType, extendIdSubst, mkSubst, substTm)
 import           Clash.Core.Term
-  (LetBinding, Pat (..), Term (..), CoreContext (..), Context, PrimInfo (..),
-   TmName, WorkInfo (..), TickInfo, collectArgs, collectArgsTicks)
+import           Clash.Core.TermInfo
 import           Clash.Core.TyCon
   (TyConMap, tyConDataCons)
 import           Clash.Core.Type             (KindOrType, Type (..),
@@ -75,9 +74,7 @@ import           Clash.Core.Type             (KindOrType, Type (..),
                                               normalizeType,
                                               typeKind, tyView, isPolyFunTy)
 import           Clash.Core.Util
-  (isPolyFun, mkAbstraction, mkApps, mkLams, mkTicks,
-   mkTmApps, mkTyApps, mkTyLams, termType, dataConInstArgTysE, isClockOrReset,
-   isEnable, piResultTy)
+  (dataConInstArgTysE, isClockOrReset, isEnable)
 import           Clash.Core.Var
   (Id, IdScope (..), TyVar, Var (..), isLocalId, mkGlobalId, mkLocalId, mkTyVar)
 import           Clash.Core.VarEnv

@@ -57,13 +57,14 @@ import           Clash.Core.Literal               (Literal (..))
 import           Clash.Core.Name                  (Name(..))
 import           Clash.Core.Pretty                (showPpr)
 import           Clash.Core.Term
-  (Alt, Pat (..), Term (..), TickInfo (..), PrimInfo(primName), collectArgs, collectArgsTicks, collectTicks)
+  ( Alt, Pat (..), Term (..), TickInfo (..), PrimInfo(primName), collectArgs
+  , collectArgsTicks, collectTicks, mkApps, mkTicks, stripTicks)
 import qualified Clash.Core.Term                  as Core
+import           Clash.Core.TermInfo              (termType)
 import           Clash.Core.Type
   (Type (..), coreView1, splitFunForallTy, splitCoreFunForallTy)
 import           Clash.Core.TyCon                 (TyConMap)
-import           Clash.Core.Util
-  (mkApps, mkTicks, splitShouldSplit, stripTicks, termType)
+import           Clash.Core.Util                  (splitShouldSplit)
 import           Clash.Core.Var                   (Id, Var (..), isGlobalId)
 import           Clash.Core.VarEnv
   (VarEnv, eltsVarEnv, emptyInScopeSet, emptyVarEnv, extendVarEnv, lookupVarEnv,

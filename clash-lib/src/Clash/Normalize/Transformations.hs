@@ -86,6 +86,7 @@ import           BasicTypes                  (InlineSpec (..))
 
 import           Clash.Annotations.Primitive (extractPrim)
 import           Clash.Core.DataCon          (DataCon (..))
+import           Clash.Core.EqSolver
 import           Clash.Core.Name
   (Name (..), NameSort (..), mkUnsafeSystemName, nameOcc)
 import           Clash.Core.FreeVars
@@ -95,15 +96,8 @@ import           Clash.Core.FreeVars
 import           Clash.Core.Literal          (Literal (..))
 import           Clash.Core.Pretty           (showPpr)
 import           Clash.Core.Subst
-  (Subst, substTm, mkSubst, extendIdSubst, extendIdSubstList, extendTvSubst,
-   extendTvSubstList, freshenTm, substTyInVar, deShadowTerm, deShadowAlt,
-   deshadowLetExpr)
 import           Clash.Core.Term
-  ( LetBinding, Pat (..), Term (..), CoreContext (..), PrimInfo (..)
-  , TickInfo(..) , WorkInfo(WorkConstant), Alt, TickInfo
-  , isLambdaBodyCtx, isTickCtx, collectArgs
-  , collectArgsTicks, collectTicks , partitionTicks
-  )
+import           Clash.Core.TermInfo
 import           Clash.Core.Type             (Type (..), TypeView (..), applyFunTy,
                                               isPolyFunCoreTy, isClassTy,
                                               normalizeType, splitFunForallTy,
@@ -112,10 +106,7 @@ import           Clash.Core.Type             (Type (..), TypeView (..), applyFun
                                               LitTy (..), coreView1)
 import           Clash.Core.TyCon            (TyConMap, tyConDataCons)
 import           Clash.Core.Util
-  (isCon, isFun, isLet, isPolyFun, isPrim,
-   isSignalType, isVar, mkApps, mkLams, mkVec, piResultTy, termSize, termType,
-   tyNatSize, patVars, isAbsurdAlt, altEqs, substInExistentialsList,
-   solveNonAbsurds, patIds, isLocalVar, undefinedTm, stripTicks, mkTicks,
+  ( isSignalType, mkVec, tyNatSize, undefinedTm,
    shouldSplit, inverseTopSortLetBindings)
 import           Clash.Core.Var
   (Id, TyVar, Var (..), isGlobalId, isLocalId, mkLocalId)
