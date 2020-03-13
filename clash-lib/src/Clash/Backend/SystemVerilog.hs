@@ -1186,7 +1186,7 @@ expr_ _ (DataTag (RTree _ _) (Right _)) = do
   iw <- Mon $ use intWidth
   int iw <> "'sd1"
 
-expr_ b (ConvBV topM t True e) = do
+expr_ b (ToBv topM t e) = do
   nm <- Mon $ use modNm
   pkgCtx <- Mon $ use tyPkgCtx
   let prefix = if pkgCtx then emptyDoc else stringS nm <> "_types::"
@@ -1201,7 +1201,7 @@ expr_ b (ConvBV topM t True e) = do
         tyName t <> "_to_lv" <> parens (expr_ False e)
     _ -> expr b e
 
-expr_ b (ConvBV topM t False e) = do
+expr_ b (FromBv topM t e) = do
   nm <- Mon $ use modNm
   pkgCtx <- Mon $ use tyPkgCtx
   let prefix = if pkgCtx then emptyDoc else stringS nm <> "_types::"

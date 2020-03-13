@@ -1603,14 +1603,14 @@ expr_ _ (DataTag (RTree _ _) (Right _)) = do
   iw <- Mon $ use intWidth
   "to_signed" <> parens (int 1 <> "," <> int iw)
 
-expr_ _ (ConvBV topM hwty True e) = do
+expr_ _ (ToBv topM hwty e) = do
   nm <- Mon $ use modNm
   case topM of
     Nothing -> pretty nm <> "_types" <> dot <> "toSLV" <>
                parens (qualTyName hwty <> "'" <> parens (expr_ False e))
     Just t  -> pretty t <> dot <> pretty t <> "_types" <> dot <> "toSLV" <> parens (expr_ False e)
 
-expr_ _ (ConvBV topM _ False e) = do
+expr_ _ (FromBv topM _ e) = do
   nm <- Mon $ use modNm
   maybe (pretty nm <> "_types" ) (\t -> pretty t <> dot <> pretty t <> "_types") topM <> dot <>
     "fromSLV" <> parens (expr_ False e)

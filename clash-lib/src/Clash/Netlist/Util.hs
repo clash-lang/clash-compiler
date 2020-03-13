@@ -1102,7 +1102,7 @@ mkInput epp@(ExpandedPortProduct p hwty ps) = do
       case exprs of
         [conExpr, elExpr] -> do
           let dcExpr   = DataCon hwty (DC (BitVector (typeSize hwty), 0))
-                          [conExpr, ConvBV Nothing elTy True elExpr]
+                          [conExpr, ToBv Nothing elTy elExpr]
               netassgn = Assignment pN dcExpr
           return (concat ports, [netdecl, netassgn], dcExpr, pN)
         _ -> error $ $(curLoc) ++ "Internal error"
@@ -1237,7 +1237,7 @@ mkOutput epp@(ExpandedPortProduct p hwty ps) = do
                                , typeSize elTy - 1
                                , 0 )
               assigns = [ Assignment conId (Identifier pN (Just conIx))
-                        , Assignment elId  (ConvBV Nothing elTy False
+                        , Assignment elId  (FromBv Nothing elTy
                                             (Identifier pN (Just elIx)))
                         ]
           in  return (concat ports, netdecl:assigns ++ concat decls, pN)
@@ -1350,8 +1350,8 @@ argBV
   -> Declaration
 argBV _    (Left i)      e = Assignment i e
 argBV topM (Right (i,t)) e = Assignment i
-                           . doConv t (fmap Just topM)            False
-                           $ doConv t (fmap (const Nothing) topM) True  e
+                           . doConv t (fmap Just topM)            FromBv
+                           $ doConv t (fmap (const Nothing) topM) ToBv e
 
 -- | Convert between BitVector for the result
 resBV
@@ -1363,8 +1363,8 @@ resBV
   --   * A result with a @PortName@
   -> Expr
 resBV _    (Left i)      = Identifier i Nothing
-resBV topM (Right (i,t)) = doConv t (fmap (const Nothing) topM) False
-                         . doConv t (fmap Just topM)            True
+resBV topM (Right (i,t)) = doConv t (fmap (const Nothing) topM) FromBv
+                         . doConv t (fmap Just topM)            ToBv
                          $ Identifier i Nothing
 
 
@@ -1381,18 +1381,16 @@ doConv
   --                      internally defined types.
   --   * Just (Just top): Converting to/from a BitVector for one of the
   --                      types defined by @top@.
-  -> Bool
-  -- ^
-  --   * True:  convert to a BitVector
-  --   * False: convert from a BitVector
+  -> ((Maybe Identifier) -> HWType -> Expr -> Expr)
+  -- One of: 'ToBv' or 'FromBv'
   -> Expr
   -- ^ The expression on top of which we have to add conversion logic
   -> Expr
 doConv _    Nothing     _ e = e
-doConv hwty (Just topM) b e = case hwty of
-  Vector  {} -> ConvBV topM hwty b e
-  RTree   {} -> ConvBV topM hwty b e
-  Product {} -> ConvBV topM hwty b e
+doConv hwty (Just topM) toOrFromBv e = case hwty of
+  Vector  {} -> toOrFromBv topM hwty e
+  RTree   {} -> toOrFromBv topM hwty e
+  Product {} -> toOrFromBv topM hwty e
   _          -> e
 
 -- | Generate input port mappings for the TopEntity
@@ -1542,10 +1540,10 @@ mkTopInput topM inps pM = case pM of
                                     ,typeSize elTy - 1
                                     ,0
                                     )
-                  assigns = [argBV topM conId (Identifier pN' (Just conIx))
-                            ,argBV topM elId  (ConvBV Nothing elTy False
-                                                (Identifier pN' (Just elIx)))
-                            ]
+                  assigns =
+                    [ argBV topM conId (Identifier pN' (Just conIx))
+                    , argBV topM elId  (FromBv Nothing elTy (Identifier pN' (Just elIx))) ]
+
               return (inps'',(concat ports,pDecl:assigns ++ concat decls,Left pN'))
             _ -> error "Unexpected error for PortProduct"
 
@@ -1744,7 +1742,7 @@ mkTopOutput' topM outps pM = case pM of
           let (ports,decls,ids) = unzip3 results1
               ids1 = map (resBV topM) ids
               ids2 = case ids1 of
-                      [conId,elId] -> [conId,ConvBV Nothing elTy True elId]
+                      [conId, elId] -> [conId, ToBv Nothing elTy elId]
                       _ -> error "Unexpected error for PortProduct"
               netassgn = Assignment pN' (DataCon hwty (DC (BitVector (typeSize hwty),0)) ids2)
           return (outps'',(concat ports,pDecl:netassgn:concat decls,Left pN'))
