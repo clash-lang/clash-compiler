@@ -23,19 +23,30 @@ module Clash.Core.Term
   , mkTmApps
   , mkTicks
   , TmName
+  , idToVar
+  , varToId
   , LetBinding
   , Pat (..)
   , patIds
   , patVars
   , Alt
-  , TickInfo (..), NameMod (..)
+  , TickInfo (..)
+  , stripTicks
+  , partitionTicks
+  , NameMod (..)
   , PrimInfo (..)
   , WorkInfo (..)
-  , CoreContext (..), Context, isLambdaBodyCtx, isTickCtx, stripTicks, walkTerm
-  , collectArgs, collectArgsTicks, collectTicks, collectTermIds, collectBndrs, primArg
-  , partitionTicks
-  , idToVar
-  , varToId
+  , CoreContext (..)
+  , Context
+  , isLambdaBodyCtx
+  , isTickCtx
+  , walkTerm
+  , collectArgs
+  , collectArgsTicks
+  , collectTicks
+  , collectTermIds
+  , collectBndrs
+  , primArg
   ) where
 
 -- External Modules
@@ -149,45 +160,30 @@ patVars (DataPat _ tvs ids) = coerce tvs ++ coerce ids
 patVars _ = []
 
 -- | Abstract a term over a list of term and type variables
-mkAbstraction :: Term
-              -> [Either Id TyVar]
-              -> Term
+mkAbstraction :: Term -> [Either Id TyVar] -> Term
 mkAbstraction = foldr (either Lam TyLam)
 
 -- | Abstract a term over a list of term variables
-mkTyLams :: Term
-         -> [TyVar]
-         -> Term
+mkTyLams :: Term -> [TyVar] -> Term
 mkTyLams tm = mkAbstraction tm . map Right
 
 -- | Abstract a term over a list of type variables
-mkLams :: Term
-       -> [Id]
-       -> Term
+mkLams :: Term -> [Id] -> Term
 mkLams tm = mkAbstraction tm . map Left
 
 -- | Apply a list of types and terms to a term
-mkApps :: Term
-       -> [Either Term Type]
-       -> Term
+mkApps :: Term -> [Either Term Type] -> Term
 mkApps = foldl' (\e a -> either (App e) (TyApp e) a)
 
 -- | Apply a list of terms to a term
-mkTmApps :: Term
-         -> [Term]
-         -> Term
+mkTmApps :: Term -> [Term] -> Term
 mkTmApps = foldl' App
 
 -- | Apply a list of types to a term
-mkTyApps :: Term
-         -> [Type]
-         -> Term
+mkTyApps :: Term -> [Type] -> Term
 mkTyApps = foldl' TyApp
 
-mkTicks
-  :: Term
-  -> [TickInfo]
-  -> Term
+mkTicks :: Term -> [TickInfo] -> Term
 mkTicks tm ticks = foldl' (\e s -> Tick s e) tm (nub ticks)
 
 -- | Context in which a term appears
@@ -263,8 +259,7 @@ stripTicks (Tick _ e) = stripTicks e
 stripTicks e = e
 
 -- | Split a (Type)Application in the applied term and it arguments
-collectArgs :: Term
-            -> (Term, [Either Term Type])
+collectArgs :: Term -> (Term, [Either Term Type])
 collectArgs = go []
   where
     go args (App e1 e2) = go (Left e2:args) e1
@@ -272,17 +267,13 @@ collectArgs = go []
     go args (Tick _ e)  = go args e
     go args e           = (e, args)
 
-collectTicks
-  :: Term
-  -> (Term, [TickInfo])
+collectTicks :: Term -> (Term, [TickInfo])
 collectTicks = go []
  where
   go ticks (Tick s e) = go (s:ticks) e
   go ticks e          = (e,ticks)
 
-collectArgsTicks
-  :: Term
-  -> (Term, [Either Term Type], [TickInfo])
+collectArgsTicks :: Term -> (Term, [Either Term Type], [TickInfo])
 collectArgsTicks = go [] []
  where
   go args ticks (App e1 e2) = go (Left e2:args) ticks     e1
@@ -363,14 +354,12 @@ collectTermIds = concat . walkTerm (Just . go)
   pat DefaultPat = []
 
 -- | Make variable reference out of term variable
-idToVar :: Id
-        -> Term
+idToVar :: Id -> Term
 idToVar i@(Id {}) = Var i
 idToVar tv        = error $ $(curLoc) ++ "idToVar: tyVar: " ++ show tv
 
 -- | Make a term variable out of a variable reference
-varToId :: Term
-        -> Id
+varToId :: Term -> Id
 varToId (Var i) = i
 varToId e       = error $ $(curLoc) ++ "varToId: not a var: " ++ show e
 
