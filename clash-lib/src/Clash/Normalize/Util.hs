@@ -68,6 +68,7 @@ import           Clash.Core.Var          (Id, TyVar, Var (..), isGlobalId)
 import           Clash.Core.VarEnv
   (VarEnv, emptyInScopeSet, emptyVarEnv, extendVarEnv, extendVarEnvWith,
    lookupVarEnv, unionVarEnvWith, unitVarEnv, extendInScopeSetList)
+import           Clash.Debug             (traceIf)
 import           Clash.Driver.Types      (BindingMap, Binding(..), DebugLevel (..))
 import {-# SOURCE #-} Clash.Normalize.Strategy (normalization)
 import           Clash.Normalize.Types
@@ -79,7 +80,7 @@ import           Clash.Rewrite.Util
   (runRewrite, specialise, mkTmBinderFor, mkDerivedName)
 import           Clash.Unique
 import           Clash.Util
-  (SrcSpan, anyM, makeCachedU, traceIf, mapAccumLM)
+  (SrcSpan, anyM, makeCachedU, mapAccumLM)
 
 -- | Determine if argument should reduce to a constant given a primitive and
 -- an argument number. Caches results.

@@ -34,7 +34,6 @@ import           Data.Proxy          (Proxy)
 import           Data.Reflection     (reifyNat)
 import           Data.Text           (Text)
 import qualified Data.Text           as Text
-import           Debug.Trace         (trace)
 import           GHC.Exts (IsList(..))
 import           GHC.Float
 import           GHC.Int
@@ -82,6 +81,7 @@ import           Clash.Core.Util
   (mkRTree,mkVec,tyNatSize,dataConInstArgTys,primCo,
    undefinedTm)
 import           Clash.Core.Var      (mkLocalId, mkTyVar)
+import           Clash.Debug         (trace)
 import           Clash.GHC.GHC2Core  (modNameM)
 import           Clash.Rewrite.Util  (mkSelectorCase)
 import           Clash.Unique        (lookupUniqMap)

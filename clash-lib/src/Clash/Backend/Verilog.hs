@@ -58,6 +58,7 @@ import           Clash.Annotations.BitRepresentation.Util
   (BitOrigin(Lit, Field), bitOrigins, bitRanges, isContinuousMask)
 import           Clash.Core.Var                       (Attr'(..))
 import           Clash.Backend
+import           Clash.Debug                          (traceIf)
 import           Clash.Netlist.BlackBox.Types         (HdlSyn)
 import           Clash.Netlist.BlackBox.Util
   (extractLiterals, renderBlackBox, renderFilePath)
@@ -66,7 +67,7 @@ import           Clash.Netlist.Types                  hiding (_intWidth, intWidt
 import           Clash.Netlist.Util                   hiding (mkIdentifier, extendIdentifier)
 import           Clash.Signal.Internal                (ActiveEdge (..))
 import           Clash.Util
-  (SrcSpan, noSrcSpan, curLoc, traceIf, (<:>), on, first, indexNote)
+  (SrcSpan, noSrcSpan, curLoc, (<:>), on, first, indexNote)
 
 
 -- | State for the 'Clash.Backend.Verilog.VerilogM' monad:

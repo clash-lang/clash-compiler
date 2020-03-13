@@ -35,7 +35,6 @@ import Control.Monad.Identity
 import qualified Data.Text              as T
 import Data.Text.Prettyprint.Doc
 import Data.Text.Prettyprint.Doc.Internal
-import Debug.Trace                      (trace)
 import GHC.Show                         (showMultiLineString)
 import Numeric                          (fromRat)
 import qualified Outputable             as GHC
@@ -49,6 +48,7 @@ import Clash.Core.TyCon                 (TyCon (..), TyConName, isTupleTyConLike
 import Clash.Core.Type                  (ConstTy (..), Kind, LitTy (..),
                                          Type (..), TypeView (..), tyView)
 import Clash.Core.Var                   (Id, TyVar, Var (..), IdScope(..))
+import Clash.Debug                      (trace)
 import Clash.Util
 import Clash.Pretty
 

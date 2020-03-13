@@ -52,6 +52,7 @@ import           Clash.Core.TysPrim      (tysPrimMap)
 import           Clash.Core.Var          (Var (..), Id, IdScope (..), setIdScope)
 import           Clash.Core.VarEnv
   (InScopeSet, VarEnv, emptyInScopeSet, extendInScopeSet, mkInScopeSet, mkVarEnv, unionVarEnv)
+import           Clash.Debug             (traceIf)
 import           Clash.Driver            (compilePrimitive)
 import           Clash.Driver.Types      (BindingMap, Binding(..))
 import           Clash.GHC.GHC2Core
@@ -66,8 +67,7 @@ import           Clash.Primitives.Util   (generatePrimMap)
 import           Clash.Rewrite.Util      (mkInternalVar, mkSelectorCase)
 import           Clash.Unique
   (listToUniqMap, lookupUniqMap, mapUniqMap, unionUniqMap, uniqMapToUniqSet)
-import           Clash.Util
-  (traceIf,indexMaybe,reportTimeDiff)
+import           Clash.Util              (indexMaybe,reportTimeDiff)
 
 generateBindings
   :: GHC.OverridingBool

@@ -14,6 +14,7 @@ import Clash.Core.TyCon (TyConMap)
 import Clash.Core.Type
 import Clash.Core.Var
 import Clash.Core.VarEnv
+import Clash.Debug (debugIsOn)
 import Clash.Util
 import Clash.Util.Interpolate as I
 
