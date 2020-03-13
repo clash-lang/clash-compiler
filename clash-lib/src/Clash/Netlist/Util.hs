@@ -37,6 +37,7 @@ import qualified Data.HashMap.Strict     as HashMap
 import           Data.String             (fromString)
 import           Data.List               (intersperse, unzip4, intercalate)
 import qualified Data.List               as List
+import qualified Data.List.Extra         as List
 import           Data.Maybe              (catMaybes,fromMaybe,isNothing)
 import           Data.Monoid             (First (..))
 import           Text.Printf             (printf)
@@ -694,7 +695,7 @@ mkUniqueNormalized is0 topMM (args,binds,res) = do
       let resRead = any (localIdOccursIn res) exprs
       -- Rename some of the binders, see 'setBinderName' when this happens.
       ((res2,subst1,extraBndr),bndrs1) <-
-        mapAccumLM (setBinderName substRes res resRead) (res1,substRes,[]) binds
+        List.mapAccumLM (setBinderName substRes res resRead) (res1,substRes,[]) binds
       -- Make let-binders unique, the result binder is already unique, so we
       -- can skip it.
       let (bndrsL,r:bndrsR) = break ((== res2)) bndrs1
@@ -1388,7 +1389,7 @@ mkTopUnWrapper topEntity annM man dstId args tickDecls = do
                         (extendPorts . t_inputs)
                         annM
   arguments <- zipWithM appendIdentifier (map (\a -> ("input",snd a)) args) [0..]
-  (_,arguments1) <- mapAccumLM (\acc (p,i) -> mkTopInput topM acc p i)
+  (_,arguments1) <- List.mapAccumLM (\acc (p,i) -> mkTopInput topM acc p i)
                       (zip inNames inTys)
                       (zip iPortSupply arguments)
   let (iports,wrappers,idsI) = unzip3 arguments1
@@ -1509,7 +1510,7 @@ mkTopInput topM inps pM = case pM of
       case hwty' of
         Vector sz hwty'' -> do
           arguments <- mapM (appendIdentifier (i',hwty'')) [0..sz-1]
-          (inps'',arguments1) <- mapAccumLM go inps' arguments
+          (inps'',arguments1) <- List.mapAccumLM go inps' arguments
           let (ports,decls,ids) = unzip3 arguments1
               assigns = zipWith (argBV topM) ids
                           [ Identifier i' (Just (Indexed (hwty,10,n)))
@@ -1521,7 +1522,7 @@ mkTopInput topM inps pM = case pM of
 
         RTree d hwty'' -> do
           arguments <- mapM (appendIdentifier (i',hwty'')) [0..2^d-1]
-          (inps'',arguments1) <- mapAccumLM go inps' arguments
+          (inps'',arguments1) <- List.mapAccumLM go inps' arguments
           let (ports,decls,ids) = unzip3 arguments1
               assigns = zipWith (argBV topM) ids
                           [ Identifier i' (Just (Indexed (hwty,10,n)))
@@ -1533,7 +1534,7 @@ mkTopInput topM inps pM = case pM of
 
         Product _ _ hwtys -> do
           arguments <- zipWithM appendIdentifier (map (i,) hwtys) [0..]
-          (inps'',arguments1) <- mapAccumLM go inps' arguments
+          (inps'',arguments1) <- List.mapAccumLM go inps' arguments
           let (ports,decls,ids) = unzip3 arguments1
               assigns = zipWith (argBV topM) ids
                           [ Identifier i' (Just (Indexed (hwty,0,n)))
@@ -1565,7 +1566,7 @@ mkTopInput topM inps pM = case pM of
         Vector sz hwty'' -> do
           arguments <- mapM (appendIdentifier (pN',hwty'')) [0..sz-1]
           (inps'',arguments1) <-
-            mapAccumLM (\acc (p',o') -> mkTopInput topM acc p' o') inps'
+            List.mapAccumLM (\acc (p',o') -> mkTopInput topM acc p' o') inps'
                        (zip (extendPorts ps) arguments)
           let (ports,decls,ids) = unzip3 arguments1
               assigns = zipWith (argBV topM) ids
@@ -1579,7 +1580,7 @@ mkTopInput topM inps pM = case pM of
         RTree d hwty'' -> do
           arguments <- mapM (appendIdentifier (pN',hwty'')) [0..2^d-1]
           (inps'',arguments1) <-
-            mapAccumLM (\acc (p',o') -> mkTopInput topM acc p' o') inps'
+            List.mapAccumLM (\acc (p',o') -> mkTopInput topM acc p' o') inps'
                        (zip (extendPorts ps) arguments)
           let (ports,decls,ids) = unzip3 arguments1
               assigns = zipWith (argBV topM) ids
@@ -1593,7 +1594,7 @@ mkTopInput topM inps pM = case pM of
         Product _ _ hwtys -> do
           arguments <- zipWithM appendIdentifier (map (pN',) hwtys) [0..]
           (inps'',arguments1) <-
-            mapAccumLM (\acc (p',o') -> mkTopInput topM acc p' o') inps'
+            List.mapAccumLM (\acc (p',o') -> mkTopInput topM acc p' o') inps'
                        (zip (extendPorts ps) arguments)
           let (ports,decls,ids) = unzip3 arguments1
               assigns = zipWith (argBV topM) ids
@@ -1608,7 +1609,7 @@ mkTopInput topM inps pM = case pM of
           let hwtys = [BitVector (conSize hwty'),elTy]
           arguments <- zipWithM appendIdentifier (map (pN',) hwtys) [0..]
           (inps'',arguments1) <-
-            mapAccumLM (\acc (p',o') -> mkTopInput topM acc p' o') inps'
+            List.mapAccumLM (\acc (p',o') -> mkTopInput topM acc p' o') inps'
                        (zip (extendPorts ps) arguments)
           let (ports,decls,ids) = unzip3 arguments1
           case ids of
@@ -1703,7 +1704,7 @@ mkTopOutput' topM outps pM = case pM of
       case hwty' of
         Vector sz hwty'' -> do
           results <- mapM (appendIdentifier (o',hwty'')) [0..sz-1]
-          (outps'',results1) <- mapAccumLM go outps' results
+          (outps'',results1) <- List.mapAccumLM go outps' results
           let (ports,decls,ids) = unzip3 results1
               ids' = map (resBV topM) ids
               netassgn = Assignment o' (mkVectorChain sz hwty'' ids')
@@ -1714,7 +1715,7 @@ mkTopOutput' topM outps pM = case pM of
 
         RTree d hwty'' -> do
           results <- mapM (appendIdentifier (o',hwty'')) [0..2^d-1]
-          (outps'',results1) <- mapAccumLM go outps' results
+          (outps'',results1) <- List.mapAccumLM go outps' results
           let (ports,decls,ids) = unzip3 results1
               ids' = map (resBV topM) ids
               netassgn = Assignment o' (mkRTreeChain d hwty'' ids')
@@ -1725,7 +1726,7 @@ mkTopOutput' topM outps pM = case pM of
 
         Product _ _ hwtys -> do
           results <- zipWithM appendIdentifier (map (o',) hwtys) [0..]
-          (outps'',results1) <- mapAccumLM go outps' results
+          (outps'',results1) <- List.mapAccumLM go outps' results
           let (ports,decls,ids) = unzip3 results1
               ids' = map (resBV topM) ids
               netassgn = Assignment o' (DataCon hwty (DC (hwty,0)) ids')
@@ -1756,7 +1757,7 @@ mkTopOutput' topM outps pM = case pM of
         Vector sz hwty'' -> do
           results <- mapM (appendIdentifier (pN',hwty'')) [0..sz-1]
           (outps'',results1) <-
-            mapAccumLM (\acc (p',o') -> mkTopOutput' topM acc p' o') outps'
+            List.mapAccumLM (\acc (p',o') -> mkTopOutput' topM acc p' o') outps'
                        (zip (extendPorts ps) results)
           let (ports,decls,ids) = unzip3 results1
               ids' = map (resBV topM) ids
@@ -1769,7 +1770,7 @@ mkTopOutput' topM outps pM = case pM of
         RTree d hwty'' -> do
           results <- mapM (appendIdentifier (pN',hwty'')) [0..2^d-1]
           (outps'',results1) <-
-            mapAccumLM (\acc (p',o') -> mkTopOutput' topM acc p' o') outps'
+            List.mapAccumLM (\acc (p',o') -> mkTopOutput' topM acc p' o') outps'
                        (zip (extendPorts ps) results)
           let (ports,decls,ids) = unzip3 results1
               ids' = map (resBV topM) ids
@@ -1782,7 +1783,7 @@ mkTopOutput' topM outps pM = case pM of
         Product _ _ hwtys -> do
           results <- zipWithM appendIdentifier (map (pN',) hwtys) [0..]
           (outps'',results1) <-
-            mapAccumLM (\acc (p',o') -> mkTopOutput' topM acc p' o') outps'
+            List.mapAccumLM (\acc (p',o') -> mkTopOutput' topM acc p' o') outps'
                        (zip (extendPorts ps) results)
           let (ports,decls,ids) = unzip3 results1
               ids' = map (resBV topM) ids
@@ -1797,7 +1798,7 @@ mkTopOutput' topM outps pM = case pM of
           let hwtys = [BitVector (conSize elTy),elTy]
           results <- zipWithM appendIdentifier (map (pN',) hwtys) [0..]
           (outps'',results1) <-
-            mapAccumLM (\acc (p',o') -> mkTopOutput' topM acc p' o') outps'
+            List.mapAccumLM (\acc (p',o') -> mkTopOutput' topM acc p' o') outps'
                        (zip (extendPorts ps) results)
           let (ports,decls,ids) = unzip3 results1
               ids1 = map (resBV topM) ids

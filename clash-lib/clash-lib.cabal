@@ -250,6 +250,7 @@ Library
                       Clash.Util.Interpolate
                       Clash.Pretty
 
+                      Data.List.Extra
                       Data.Text.Prettyprint.Doc.Extra
 
   Other-Modules:      Clash.Annotations.TopEntity.Extra

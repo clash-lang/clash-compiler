@@ -27,6 +27,7 @@ import           Data.Foldable                   (foldrM)
 import           Data.Hashable                   (Hashable (..))
 import qualified Data.IntMap                     as IntMap
 import           Data.List                       (nub)
+import           Data.List.Extra                 (indexMaybe)
 #if !MIN_VERSION_base(4,11,0)
 import           Data.Monoid
 #endif

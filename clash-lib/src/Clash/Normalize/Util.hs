@@ -38,6 +38,7 @@ import qualified Control.Lens            as Lens
 import           Data.Bifunctor          (bimap)
 import           Data.Either             (lefts)
 import qualified Data.List               as List
+import qualified Data.List.Extra         as List
 import qualified Data.Map                as Map
 import qualified Data.HashMap.Strict     as HashMapS
 import           Data.Text               (Text)
@@ -77,8 +78,7 @@ import           Clash.Rewrite.Types
 import           Clash.Rewrite.Util
   (runRewrite, specialise, mkTmBinderFor, mkDerivedName)
 import           Clash.Unique
-import           Clash.Util
-  (SrcSpan, anyM, makeCachedU, mapAccumLM)
+import           Clash.Util              (SrcSpan, makeCachedU)
 
 -- | Determine if argument should reduce to a constant given a primitive and
 -- an argument number. Caches results.
@@ -117,7 +117,7 @@ shouldReduce
   :: Context
   -- ^ ..in the current transformcontext
   -> RewriteMonad NormalizeState Bool
-shouldReduce = anyM isConstantArg'
+shouldReduce = List.anyM isConstantArg'
   where
     isConstantArg' (AppArg (Just (nm, _, i))) = isConstantArg nm i
     isConstantArg' _ = pure False
@@ -231,7 +231,7 @@ mergeCsrs
   -- ^ Subterms
   -> RewriteMonad NormalizeState ConstantSpecInfo
 mergeCsrs ctx ticks oldTerm proposedTerm subTerms = do
-  subCsrs <- snd <$> mapAccumLM constantSpecInfoFolder ctx subTerms
+  subCsrs <- snd <$> List.mapAccumLM constantSpecInfoFolder ctx subTerms
 
   -- If any arguments are constant (and hence can be constant specced), a new
   -- term is created with these constants left in, but variable parts let-bound.

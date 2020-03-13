@@ -36,6 +36,7 @@ import           Data.Bifunctor              (bimap)
 import           Data.Coerce                 (coerce)
 import           Data.Functor.Const          (Const (..))
 import           Data.List                   (group, partition, sort)
+import           Data.List.Extra             (allM, partitionM)
 import qualified Data.Map                    as Map
 import           Data.Maybe                  (catMaybes,isJust,mapMaybe)
 import qualified Data.Monoid                 as Monoid
