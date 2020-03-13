@@ -33,6 +33,7 @@ import           Data.HashMap.Strict              (HashMap)
 import qualified Data.HashMap.Strict              as HashMapS
 import qualified Data.HashMap.Lazy                as HashMap
 import           Data.List                        (elemIndex, partition, sortOn)
+import           Data.List.Extra                  (zipEqual)
 import           Data.Maybe
   (catMaybes, listToMaybe, mapMaybe, fromMaybe)
 import qualified Data.Set                         as Set

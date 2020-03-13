@@ -31,6 +31,7 @@ import           Data.HashSet                         (HashSet)
 import qualified Data.HashSet                         as HashSet
 import           Data.List
   (mapAccumL, nub, nubBy, intersperse, group, sort)
+import           Data.List.Extra                      ((<:>))
 import           Data.Maybe                           (catMaybes,fromMaybe,mapMaybe)
 #if !MIN_VERSION_base(4,11,0)
 import           Data.Monoid                          hiding (Sum, Product)
@@ -62,8 +63,7 @@ import           Clash.Netlist.Id                     (IdType (..), mkBasicId')
 import           Clash.Netlist.Types                  hiding (_intWidth, intWidth)
 import           Clash.Netlist.Util                   hiding (mkIdentifier)
 import           Clash.Util
-  (SrcSpan, noSrcSpan, clogBase, curLoc, first, makeCached, on, (<:>),
-   indexNote)
+  (SrcSpan, noSrcSpan, clogBase, curLoc, first, makeCached, on, indexNote)
 import           Clash.Util.Graph                     (reverseTopSort)
 
 -- | State for the 'Clash.Netlist.VHDL.VHDLM' monad:
