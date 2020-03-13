@@ -37,6 +37,7 @@ import qualified Data.HashMap.Strict                  as HashMap
 import qualified Data.HashSet                         as HashSet
 import           Data.Maybe                           (catMaybes,fromMaybe,mapMaybe)
 import           Data.List                            (nub, nubBy)
+import           Data.List.Extra                      ((<:>))
 #if !MIN_VERSION_base(4,11,0)
 import           Data.Monoid                          hiding (Product, Sum)
 #endif
@@ -67,7 +68,7 @@ import           Clash.Netlist.Types                  hiding (_intWidth, intWidt
 import           Clash.Netlist.Util                   hiding (mkIdentifier, extendIdentifier)
 import           Clash.Signal.Internal                (ActiveEdge (..))
 import           Clash.Util
-  (SrcSpan, noSrcSpan, curLoc, (<:>), on, first, indexNote)
+  (SrcSpan, noSrcSpan, curLoc, on, first, indexNote)
 
 
 -- | State for the 'Clash.Backend.Verilog.VerilogM' monad:

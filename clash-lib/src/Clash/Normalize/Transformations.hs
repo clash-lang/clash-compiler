@@ -72,8 +72,9 @@ import           Data.Coerce                 (coerce)
 import qualified Data.Either                 as Either
 import qualified Data.HashMap.Lazy           as HashMap
 import qualified Data.HashMap.Strict         as HashMapS
-import qualified Data.List                   as List
 import           Data.List                   ((\\))
+import qualified Data.List                   as List
+import qualified Data.List.Extra             as List
 import qualified Data.Maybe                  as Maybe
 import qualified Data.Monoid                 as Monoid
 import qualified Data.Primitive.ByteArray    as BA
@@ -819,7 +820,7 @@ deadCode _ e@(Letrec binds body) = do
       used    = List.foldl' collectUsed emptyVarEnv (eltsVarSet bodyFVs)
   case eltsVarEnv used of
     [] -> changed body
-    qqL | length qqL /= length binds
+    qqL | not (List.equalLength qqL binds)
         -> changed (Letrec qqL body)
         | otherwise
         -> return e
@@ -1898,7 +1899,7 @@ recToLetRec (TransformContext is0 []) e = do
       -- Extract projection of this case statement. Subsequent calls to
       -- 'stripProjection' will check if new target is actually used.
       (n, fTrace2) <- List.uncons fTrace1
-      vTarget1 <- indexMaybe xs n
+      vTarget1 <- List.indexMaybe xs n
 
       stripProjection fTrace2 (Var vTarget1) r
 
@@ -2067,9 +2068,9 @@ reduceNonRepPrim c@(TransformContext is0 ctx) e@(App _ _) | (Prim p, args, ticks
         let [lhsElTy,rhsElty,resElTy,nTy] = Either.rights args
         case runExcept (tyNatSize tcm nTy) of
           Right n -> do
-            shouldReduce1 <- orM [ pure (ultra || n < 2)
+            shouldReduce1 <- List.orM [ pure (ultra || n < 2)
                                  , shouldReduce ctx
-                                 , anyM isUntranslatableType_not_poly
+                                 , List.anyM isUntranslatableType_not_poly
                                         [lhsElTy,rhsElty,resElTy] ]
             if shouldReduce1
                then let [fun,lhsArg,rhsArg] = Either.lefts args
@@ -2081,9 +2082,9 @@ reduceNonRepPrim c@(TransformContext is0 ctx) e@(App _ _) | (Prim p, args, ticks
         let [argElTy,resElTy,nTy] = Either.rights args
         case runExcept (tyNatSize tcm nTy) of
           Right n -> do
-            shouldReduce1 <- orM [ pure (ultra || n < 2 )
+            shouldReduce1 <- List.orM [ pure (ultra || n < 2 )
                                  , shouldReduce ctx
-                                 , anyM isUntranslatableType_not_poly
+                                 , List.anyM isUntranslatableType_not_poly
                                         [argElTy,resElTy] ]
             if shouldReduce1
                then let [fun,arg] = Either.lefts args
@@ -2101,7 +2102,7 @@ reduceNonRepPrim c@(TransformContext is0 ctx) e@(App _ _) | (Prim p, args, ticks
         let [nTy,aTy] = Either.rights args
         case runExcept (tyNatSize tcm nTy) of
           Right n -> do
-            shouldReduce1 <- orM [ pure (ultra || n == 0)
+            shouldReduce1 <- List.orM [ pure (ultra || n == 0)
                                  , shouldReduce ctx
                                  , isUntranslatableType_not_poly aTy ]
             if shouldReduce1 then
@@ -2113,9 +2114,9 @@ reduceNonRepPrim c@(TransformContext is0 ctx) e@(App _ _) | (Prim p, args, ticks
         let [aTy,bTy,nTy] = Either.rights args
         in  case runExcept (tyNatSize tcm nTy) of
           Right n -> do
-            shouldReduce1 <- orM [ pure ultra
+            shouldReduce1 <- List.orM [ pure ultra
                                  , shouldReduce ctx
-                                 , anyM isUntranslatableType_not_poly [aTy,bTy] ]
+                                 , List.anyM isUntranslatableType_not_poly [aTy,bTy] ]
             if shouldReduce1
               then let [fun,start,arg] = Either.lefts args
                    in  (`mkTicks` ticks) <$> reduceFoldr c n aTy fun start arg
@@ -2134,7 +2135,7 @@ reduceNonRepPrim c@(TransformContext is0 ctx) e@(App _ _) | (Prim p, args, ticks
                 | n == 0 -> changed rArg
                 | m == 0 -> changed lArg
                 | otherwise -> do
-                    shouldReduce1 <- orM [ shouldReduce ctx
+                    shouldReduce1 <- List.orM [ shouldReduce ctx
                                          , isUntranslatableType_not_poly aTy ]
                     if shouldReduce1
                        then (`mkTicks` ticks) <$> reduceAppend is0 n m aTy lArg rArg
@@ -2145,7 +2146,7 @@ reduceNonRepPrim c@(TransformContext is0 ctx) e@(App _ _) | (Prim p, args, ticks
             [vArg]    = Either.lefts args
         case runExcept (tyNatSize tcm nTy) of
           Right n -> do
-            shouldReduce1 <- orM [ shouldReduce ctx
+            shouldReduce1 <- List.orM [ shouldReduce ctx
                                  , isUntranslatableType_not_poly aTy ]
             if shouldReduce1
                then (`mkTicks` ticks) <$> reduceHead is0 (n+1) aTy vArg
@@ -2156,7 +2157,7 @@ reduceNonRepPrim c@(TransformContext is0 ctx) e@(App _ _) | (Prim p, args, ticks
             [vArg]    = Either.lefts args
         case runExcept (tyNatSize tcm nTy) of
           Right n -> do
-            shouldReduce1 <- orM [ shouldReduce ctx
+            shouldReduce1 <- List.orM [ shouldReduce ctx
                                  , isUntranslatableType_not_poly aTy ]
             if shouldReduce1
                then (`mkTicks` ticks) <$> reduceTail is0 (n+1) aTy vArg
@@ -2167,7 +2168,7 @@ reduceNonRepPrim c@(TransformContext is0 ctx) e@(App _ _) | (Prim p, args, ticks
             [vArg]    = Either.lefts args
         case runExcept (tyNatSize tcm nTy) of
           Right n -> do
-            shouldReduce1 <- orM [ shouldReduce ctx
+            shouldReduce1 <- List.orM [ shouldReduce ctx
                                  , isUntranslatableType_not_poly aTy
                                  ]
             if shouldReduce1
@@ -2179,7 +2180,7 @@ reduceNonRepPrim c@(TransformContext is0 ctx) e@(App _ _) | (Prim p, args, ticks
             [vArg]    = Either.lefts args
         case runExcept (tyNatSize tcm nTy) of
           Right n -> do
-            shouldReduce1 <- orM [ shouldReduce ctx
+            shouldReduce1 <- List.orM [ shouldReduce ctx
                                  , isUntranslatableType_not_poly aTy ]
             if shouldReduce1
                then (`mkTicks` ticks) <$> reduceInit is0 (n+1) aTy vArg
@@ -2199,7 +2200,7 @@ reduceNonRepPrim c@(TransformContext is0 ctx) e@(App _ _) | (Prim p, args, ticks
         let ([_sArg,vArg],[nTy,aTy]) = Either.partitionEithers args
         case runExcept (tyNatSize tcm nTy) of
           Right n -> do
-            shouldReduce1 <- orM [ shouldReduce ctx
+            shouldReduce1 <- List.orM [ shouldReduce ctx
                                  , isUntranslatableType_not_poly aTy
                                  ]
             if shouldReduce1
@@ -2211,7 +2212,7 @@ reduceNonRepPrim c@(TransformContext is0 ctx) e@(App _ _) | (Prim p, args, ticks
         let ([_knArg,vArg,iArg,aArg],[nTy,aTy]) = Either.partitionEithers args
         case runExcept (tyNatSize tcm nTy) of
           Right n -> do
-            shouldReduce1 <- orM [ pure ultra
+            shouldReduce1 <- List.orM [ pure ultra
                                  , shouldReduce ctx
                                  , isUntranslatableType_not_poly aTy
                                  ]
@@ -2224,7 +2225,7 @@ reduceNonRepPrim c@(TransformContext is0 ctx) e@(App _ _) | (Prim p, args, ticks
         let ([_knArg,vArg,iArg],[nTy,aTy]) = Either.partitionEithers args
         case runExcept (tyNatSize tcm nTy) of
           Right n -> do
-            shouldReduce1 <- orM [ pure ultra
+            shouldReduce1 <- List.orM [ pure ultra
                                  , shouldReduce ctx
                                  , isUntranslatableType_not_poly aTy ]
             if shouldReduce1
@@ -2236,9 +2237,9 @@ reduceNonRepPrim c@(TransformContext is0 ctx) e@(App _ _) | (Prim p, args, ticks
         let [nTy,argElTy,resElTy] = Either.rights args
         case runExcept (tyNatSize tcm nTy) of
           Right n -> do
-            shouldReduce1 <- orM [ pure (ultra || n < 2)
+            shouldReduce1 <- List.orM [ pure (ultra || n < 2)
                                  , shouldReduce ctx
-                                 , anyM isUntranslatableType_not_poly [argElTy,resElTy] ]
+                                 , List.anyM isUntranslatableType_not_poly [argElTy,resElTy] ]
             if shouldReduce1
                then let [_,fun,arg] = Either.lefts args
                     in  (`mkTicks` ticks) <$> reduceImap c n argElTy resElTy fun arg
@@ -2265,7 +2266,7 @@ reduceNonRepPrim c@(TransformContext is0 ctx) e@(App _ _) | (Prim p, args, ticks
         let ([_sArg,vArg],[nTy,aTy]) = Either.partitionEithers args
         case runExcept (tyNatSize tcm nTy) of
           Right n -> do
-            shouldReduce1 <- orM [ shouldReduce ctx
+            shouldReduce1 <- List.orM [ shouldReduce ctx
                                  , isUntranslatableType False aTy ]
             if shouldReduce1
                then (`mkTicks` ticks) <$> reduceTReplicate n aTy eTy vArg
@@ -2603,7 +2604,7 @@ flattenLet (TransformContext is0 _) (Letrec binds body) = do
                    freeLocalIds (unionVarEnvWith (+))
                    emptyVarEnv (`unitVarEnv` (1 :: Int))
                    body
-  (is2,binds1) <- second concat <$> mapAccumLM go is1 binds
+  (is2,binds1) <- second concat <$> List.mapAccumLM go is1 binds
   case binds1 of
     -- inline binders into the body when there's only a single binder, and only
     -- if that binder doesn't perform any work or is only used once in the body
@@ -2774,7 +2775,7 @@ xOptimize (TransformContext is0 _) e@(Case subj ty alts) = do
   runXOpt <- Lens.view aggressiveXOpt
 
   if runXOpt then do
-    defPart <- partitionM (isPrimError . snd) alts
+    defPart <- List.partitionM (isPrimError . snd) alts
 
     case defPart of
       ([], _)    -> return e

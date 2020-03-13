@@ -47,6 +47,7 @@ import qualified Data.Foldable                    as Foldable
 import qualified Data.IntMap.Strict               as IM
 import qualified Data.IntSet                      as IntSet
 import qualified Data.List                        as List
+import qualified Data.List.Extra                  as List
 import qualified Data.Map.Strict                  as Map
 import qualified Data.Maybe                       as Maybe
 import           Data.Monoid                      (All (..))
@@ -218,7 +219,7 @@ collectGlobalsArgs ::
                   ,[(Term,([Term],CaseTree [(Either Term Type)]))]
                   )
 collectGlobalsArgs inScope substitution seen args = do
-    (_,(args',collected)) <- second unzip <$> mapAccumLM go seen args
+    (_,(args',collected)) <- second unzip <$> List.mapAccumLM go seen args
     return (args',concat collected)
   where
     go s (Left tm) = do
@@ -265,7 +266,7 @@ collectGlobalsLbs ::
                   ,[(Term,([Term],CaseTree [(Either Term Type)]))]
                   )
 collectGlobalsLbs inScope substitution seen lbs = do
-    (_,(lbs',collected)) <- second unzip <$> mapAccumLM go seen lbs
+    (_,(lbs',collected)) <- second unzip <$> List.mapAccumLM go seen lbs
     return (lbs',concat collected)
   where
     go :: [Term] -> LetBinding
@@ -339,7 +340,7 @@ disJointSelProj _ _ (Leaf []) = return (Nothing,[])
 disJointSelProj inScope argTys cs = do
     let maxIndex = length argTys - 1
         css = map (\i -> fmap ((:[]) . (!!i)) cs) [0..maxIndex]
-    (untran,tran) <- partitionM (isUntranslatableType False . snd) (zip [0..] argTys)
+    (untran,tran) <- List.partitionM (isUntranslatableType False . snd) (zip [0..] argTys)
     let untranCs   = map (css!!) (map fst untran)
         untranSels = zipWith (\(_,ty) cs' -> genCase ty Nothing []  cs')
                              untran untranCs
@@ -459,7 +460,7 @@ interestingToLift inScope eval e@(Prim pInfo) args ticks
     _ -> do
       let isInteresting = (\(x, y, z) -> interestingToLift inScope eval x y z) . collectArgsTicks
       if isHOTy (primType pInfo) then do
-        anyInteresting <- anyM (fmap Maybe.isJust . isInteresting) lArgs
+        anyInteresting <- List.anyM (fmap Maybe.isJust . isInteresting) lArgs
         if anyInteresting then pure (Just e) else pure Nothing
       else
         pure Nothing

@@ -20,6 +20,7 @@ import Control.Monad.Trans.Except              (Except, throwE)
 import qualified Data.HashSet                  as HashSet
 import qualified Data.Graph                    as Graph
 import Data.List                               (foldl', mapAccumR)
+import Data.List.Extra                         (zipEqual)
 import Data.Maybe
   (fromJust, isJust, mapMaybe, catMaybes)
 import qualified Data.Set                      as Set

@@ -27,6 +27,7 @@ import qualified Data.HashMap.Strict                  as HashMapS
 import           Data.HashSet                         (HashSet)
 import qualified Data.HashSet                         as HashSet
 import           Data.List                            (nub, nubBy)
+import           Data.List.Extra                      ((<:>))
 import           Data.Maybe                           (catMaybes,fromMaybe,mapMaybe)
 #if !MIN_VERSION_base(4,11,0)
 import           Data.Monoid                          hiding (Sum, Product)
@@ -57,7 +58,7 @@ import           Clash.Netlist.Types                  hiding (_intWidth, intWidt
 import           Clash.Netlist.Util                   hiding (mkIdentifier, extendIdentifier)
 import           Clash.Signal.Internal                (ActiveEdge (..))
 import           Clash.Util
-  (SrcSpan, noSrcSpan, curLoc, makeCached, (<:>), first, on, indexNote)
+  (SrcSpan, noSrcSpan, curLoc, makeCached, first, on, indexNote)
 import           Clash.Util.Graph                     (reverseTopSort)
 
 -- | State for the 'Clash.Backend.SystemVerilog.SystemVerilogM' monad:

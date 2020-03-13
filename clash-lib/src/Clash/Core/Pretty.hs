@@ -32,6 +32,7 @@ import Data.Char                        (isSymbol, isUpper, ord)
 import Data.Default                     (Default(..))
 import Data.Text                        (Text)
 import Control.Monad.Identity
+import Data.List.Extra                  ((<:>))
 import qualified Data.Text              as T
 import Data.Text.Prettyprint.Doc
 import Data.Text.Prettyprint.Doc.Internal

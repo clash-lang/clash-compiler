@@ -63,6 +63,7 @@ import           Data.Binary            (Binary)
 import           Data.Coerce            (coerce)
 import           Data.Hashable          (Hashable)
 import           Data.List              (foldl')
+import           Data.List.Extra        (splitAtList)
 import           Data.Maybe             (isJust, mapMaybe)
 import           GHC.Base               (isTrue#,(==#))
 import           GHC.Generics           (Generic(..))
@@ -252,7 +253,7 @@ newTyConInstRhs (tvs,ty) tys
     | otherwise
     = Nothing
   where
-    (tys1, tys2) = splitAt (length tvs) tys
+    (tys1, tys2) = splitAtList tvs tys
 
 -- | Make a function type of an argument and result type
 mkFunTy :: Type -> Type -> Type

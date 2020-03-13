@@ -24,25 +24,25 @@ module Clash.Util
   )
 where
 
-import Control.Applicative            (liftA2)
 import Control.Arrow                  as X ((***),(&&&),first,second)
 import qualified Control.Exception    as Exception
+import Control.Lens
 import Control.Monad                  as X ((<=<),(>=>))
 import Control.Monad.State            (MonadState,StateT)
 import qualified Control.Monad.State  as State
-import Data.Typeable                  (Typeable)
 import Data.Function                  as X (on)
 import Data.Hashable                  (Hashable)
 import Data.HashMap.Lazy              (HashMap)
 import qualified Data.HashMap.Lazy    as HashMapL
+import qualified Data.List.Extra      as List
 import Data.Maybe                     (fromMaybe, listToMaybe, catMaybes)
 import Data.Text.Prettyprint.Doc
 import Data.Text.Prettyprint.Doc.Render.String
-import Data.Version                   (Version)
-import qualified Data.Time.Format     as Clock
-import qualified Data.Time.Clock      as Clock
 import Data.Time.Clock                (UTCTime)
-import Control.Lens
+import qualified Data.Time.Clock      as Clock
+import qualified Data.Time.Format     as Clock
+import Data.Typeable                  (Typeable)
+import Data.Version                   (Version)
 import GHC.Base                       (Int(..),isTrue#,(==#),(+#))
 import GHC.Integer.Logarithms         (integerLogBase#)
 import qualified GHC.LanguageExtensions.Type as LangExt
@@ -51,6 +51,7 @@ import Type.Reflection                (tyConPackage, typeRepTyCon, typeOf)
 import qualified Language.Haskell.TH  as TH
 
 import SrcLoc                         (SrcSpan, noSrcSpan)
+
 import Clash.Debug
 import Clash.Unique
 
@@ -186,42 +187,6 @@ combineM :: (Applicative f)
          -> f (b,d)
 combineM f g (x,y) = (,) <$> f x <*> g y
 
--- | Monadic version of 'Data.List.partition'
-partitionM :: Monad m
-           => (a -> m Bool)
-           -> [a]
-           -> m ([a], [a])
-partitionM _ []     = return ([], [])
-partitionM p (x:xs) = do
-  test      <- p x
-  (ys, ys') <- partitionM p xs
-  return $ if test then (x:ys, ys') else (ys, x:ys')
-
--- | Monadic version of 'Data.List.mapAccumL'
-mapAccumLM :: (Monad m)
-           => (acc -> x -> m (acc,y))
-           -> acc
-           -> [x]
-           -> m (acc,[y])
-mapAccumLM _ acc [] = return (acc,[])
-mapAccumLM f acc (x:xs) = do
-  (acc',y) <- f acc x
-  (acc'',ys) <- mapAccumLM f acc' xs
-  return (acc'',y:ys)
-
-infixr 5 <:>
--- | Applicative version of 'GHC.Types.(:)'
-(<:>) :: Applicative f => f a -> f [a] -> f [a]
-(<:>) = liftA2 (:)
-
--- | Safe indexing, returns a 'Nothing' if the index does not exist
-indexMaybe :: [a]
-           -> Int
-           -> Maybe a
-indexMaybe [] _     = Nothing
-indexMaybe (x:_)  0 = Just x
-indexMaybe (_:xs) n = indexMaybe xs (n-1)
-
 -- | Same as 'indexNote' with last two arguments swapped
 indexNote'
   :: HasCallStack
@@ -246,7 +211,7 @@ indexNote
   -- ^ Index /n/
   -> a
   -- ^ Error or element /n/
-indexNote note = \xs i -> fromMaybe (error note) (indexMaybe xs i)
+indexNote note = \xs i -> fromMaybe (error note) (List.indexMaybe xs i)
 
 clashLibVersion :: Version
 #ifdef CABAL
@@ -254,17 +219,6 @@ clashLibVersion = Paths_clash_lib.version
 #else
 clashLibVersion = error "development version"
 #endif
-
--- | Return number of occurrences of an item in a list
-countEq
-  :: Eq a
-  => a
-  --  ^ Needle
-  -> [a]
-  -- ^ Haystack
-  -> Int
-  -- ^ Times needle was found in haystack
-countEq a as = length (filter (== a) as)
 
 -- | \x y -> floor (logBase x y), x > 1 && y > 0
 flogBase :: Integer -> Integer -> Maybe Int
@@ -282,46 +236,6 @@ clogBase x y | x > 1 && y > 0 =
                 then Just (I# (z1 +# 1#))
                 else Just (I# z1)
 clogBase _ _ = Nothing
-
--- | Zip two lists of equal length
---
--- NB Errors out for a DEBUG compiler when the two lists are not of equal length
-zipEqual
-  :: [a] -> [b] -> [(a,b)]
-#if !defined(DEBUG)
-zipEqual = zip
-#else
-zipEqual [] [] = []
-zipEqual (a:as) (b:bs) = (a,b) : zipEqual as bs
-zipEqual _ _ = error "zipEqual"
-#endif
-
--- | Short-circuiting monadic version of 'any'
-anyM
-  :: (Monad m)
-  => (a -> m Bool)
-  -> [a]
-  -> m Bool
-anyM _ []     = return False
-anyM p (x:xs) = do
-  q <- p x
-  if q then
-    return True
-  else
-    anyM p xs
-
--- | short-circuiting monadic version of 'or'
-orM
-  :: (Monad m)
-  => [m Bool]
-  -> m Bool
-orM [] = pure False
-orM (x:xs) = do
-  p <- x
-  if p then
-    pure True
-  else
-    orM xs
 
 -- | Get the package id of the type of a value
 -- >>> pkgIdFromTypeable (undefined :: TopEntity)
@@ -341,15 +255,6 @@ reportTimeDiff start end =
        = "%-Mm%-S%03Qs"
        | otherwise
        = "%-S%03Qs"
-
-allM :: (Monad m) => (a -> m Bool) -> [a] -> m Bool
-allM _ [] = return True
-allM p (x:xs) = do
-  q <- p x
-  if q then
-    allM p xs
-  else
-    return False
 
 -- | Left-biased choice on maybes
 orElse :: Maybe a -> Maybe a -> Maybe a
