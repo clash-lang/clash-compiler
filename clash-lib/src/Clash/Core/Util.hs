@@ -43,9 +43,9 @@ import Clash.Core.Term
 import Clash.Core.TyCon                  (TyConMap, tyConDataCons)
 import Clash.Core.Type
 import Clash.Core.TysPrim                (typeNatKind)
-import Clash.Core.Var
-  (Id, Var(..), mkLocalId, mkTyVar)
+import Clash.Core.Var                    (Id, Var(..), mkLocalId, mkTyVar)
 import Clash.Core.VarEnv
+import Clash.Debug                       (traceIf)
 import Clash.Unique
 import Clash.Util
 

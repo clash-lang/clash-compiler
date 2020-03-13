@@ -68,6 +68,7 @@ import           Clash.Core.Term
 import           Clash.Core.Type           (Type (..))
 import           Clash.Core.VarEnv
 import           Clash.Core.Var            (Id, Var (..), TyVar, isGlobalId)
+import           Clash.Debug               (debugIsOn)
 import           Clash.Unique
 import           Clash.Util
 import           Clash.Pretty

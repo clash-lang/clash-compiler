@@ -54,6 +54,7 @@ import           Clash.Annotations.BitRepresentation.Util
   (BitOrigin(Lit, Field), bitOrigins, bitRanges)
 import           Clash.Backend
 import           Clash.Core.Var                       (Attr'(..),attrName)
+import           Clash.Debug                          (traceIf)
 import           Clash.Netlist.BlackBox.Types         (HdlSyn (..))
 import           Clash.Netlist.BlackBox.Util
   (extractLiterals, renderBlackBox, renderFilePath)
@@ -61,7 +62,7 @@ import           Clash.Netlist.Id                     (IdType (..), mkBasicId')
 import           Clash.Netlist.Types                  hiding (_intWidth, intWidth)
 import           Clash.Netlist.Util                   hiding (mkIdentifier)
 import           Clash.Util
-  (SrcSpan, noSrcSpan, clogBase, curLoc, first, makeCached, on, traceIf, (<:>),
+  (SrcSpan, noSrcSpan, clogBase, curLoc, first, makeCached, on, (<:>),
    indexNote)
 import           Clash.Util.Graph                     (reverseTopSort)
 

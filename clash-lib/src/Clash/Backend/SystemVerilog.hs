@@ -45,6 +45,7 @@ import           Clash.Annotations.BitRepresentation.ClashLib
 import           Clash.Annotations.BitRepresentation.Util
   (BitOrigin(Lit, Field), bitOrigins, bitRanges)
 import           Clash.Core.Var                       (Attr'(..))
+import           Clash.Debug                          (traceIf)
 import           Clash.Backend
 import           Clash.Backend.Verilog
   (bits, bit_char, encodingNote, exprLit, include, noEmptyInit, uselibs)
@@ -56,7 +57,7 @@ import           Clash.Netlist.Types                  hiding (_intWidth, intWidt
 import           Clash.Netlist.Util                   hiding (mkIdentifier, extendIdentifier)
 import           Clash.Signal.Internal                (ActiveEdge (..))
 import           Clash.Util
-  (SrcSpan, noSrcSpan, curLoc, makeCached, (<:>), first, on, traceIf, indexNote)
+  (SrcSpan, noSrcSpan, curLoc, makeCached, (<:>), first, on, indexNote)
 import           Clash.Util.Graph                     (reverseTopSort)
 
 -- | State for the 'Clash.Backend.SystemVerilog.SystemVerilogM' monad:

@@ -34,8 +34,12 @@ import           Data.Proxy          (Proxy)
 import           Data.Reflection     (reifyNat)
 import           Data.Text           (Text)
 import qualified Data.Text           as Text
+<<<<<<< HEAD
 import qualified Data.Vector.Primitive as Vector
 import           Debug.Trace         (trace)
+=======
+import           GHC.Exts (IsList(..))
+>>>>>>> 4285439c1... Add Clash.Debug module
 import           GHC.Float
 import           GHC.Int
 import           GHC.Integer
@@ -82,6 +86,7 @@ import           Clash.Core.Util
   (mkRTree,mkVec,tyNatSize,dataConInstArgTys,primCo,
    undefinedTm)
 import           Clash.Core.Var      (mkLocalId, mkTyVar)
+import           Clash.Debug         (trace)
 import           Clash.GHC.GHC2Core  (modNameM)
 import           Clash.Rewrite.Util  (mkSelectorCase)
 import           Clash.Unique        (lookupUniqMap)

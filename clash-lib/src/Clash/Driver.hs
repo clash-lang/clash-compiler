@@ -85,6 +85,7 @@ import           Clash.Core.Var
   (Id, varName, varUniq, varType)
 import           Clash.Core.VarEnv
   (elemVarEnv, emptyVarEnv, lookupVarEnv)
+import           Clash.Debug                      (debugIsOn)
 import           Clash.Driver.Types
 import           Clash.Netlist                    (genNetlist)
 import           Clash.Netlist.Util               (genComponentName, genTopComponentName)
@@ -107,7 +108,7 @@ import           Clash.Unique                     (keysUniqMap, lookupUniqMap')
 import           Clash.Util.Interpolate           (i)
 import           Clash.Util
   (ClashException(..), HasCallStack, first, reportTimeDiff,
-   wantedLanguageExtensions, unwantedLanguageExtensions, debugIsOn)
+   wantedLanguageExtensions, unwantedLanguageExtensions)
 import           Clash.Util.Graph                 (reverseTopSort)
 
 -- | Worker function of 'splitTopEntityT'
