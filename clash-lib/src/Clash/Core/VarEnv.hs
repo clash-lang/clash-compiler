@@ -102,6 +102,7 @@ import           GHC.Generics
 
 import           Clash.Core.Pretty         ()
 import           Clash.Core.Var
+import           Clash.Debug               (debugIsOn)
 import           Clash.Unique
 import           Clash.Util
 import           Clash.Pretty

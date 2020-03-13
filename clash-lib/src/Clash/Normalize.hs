@@ -53,6 +53,7 @@ import           Clash.Core.VarEnv
   (VarEnv, elemVarSet, eltsVarEnv, emptyInScopeSet, emptyVarEnv,
    extendVarEnv, lookupVarEnv, mapVarEnv, mapMaybeVarEnv,
    mkVarEnv, mkVarSet, notElemVarEnv, notElemVarSet, nullVarEnv, unionVarEnv)
+import           Clash.Debug                      (traceIf)
 import           Clash.Driver.Types
   (BindingMap, Binding(..), ClashOpts (..), DebugLevel (..))
 import           Clash.Netlist.Types

@@ -43,7 +43,6 @@ import qualified Data.Time.Format     as Clock
 import qualified Data.Time.Clock      as Clock
 import Data.Time.Clock                (UTCTime)
 import Control.Lens
-import Debug.Trace                    (trace)
 import GHC.Base                       (Int(..),isTrue#,(==#),(+#))
 import GHC.Integer.Logarithms         (integerLogBase#)
 import qualified GHC.LanguageExtensions.Type as LangExt
@@ -52,6 +51,7 @@ import Type.Reflection                (tyConPackage, typeRepTyCon, typeOf)
 import qualified Language.Haskell.TH  as TH
 
 import SrcLoc                         (SrcSpan, noSrcSpan)
+import Clash.Debug
 import Clash.Unique
 
 #ifdef CABAL
@@ -186,12 +186,6 @@ combineM :: (Applicative f)
          -> f (b,d)
 combineM f g (x,y) = (,) <$> f x <*> g y
 
--- | Performs trace when first argument evaluates to 'True'
-traceIf :: Bool -> String -> a -> a
-traceIf True  msg = trace msg
-traceIf False _   = id
-{-# INLINE traceIf #-}
-
 -- | Monadic version of 'Data.List.partition'
 partitionM :: Monad m
            => (a -> m Bool)
@@ -300,15 +294,6 @@ zipEqual = zip
 zipEqual [] [] = []
 zipEqual (a:as) (b:bs) = (a,b) : zipEqual as bs
 zipEqual _ _ = error "zipEqual"
-#endif
-
--- | Is this a DEBUG compiler?
-debugIsOn
-  :: Bool
-#if defined(DEBUG)
-debugIsOn = True
-#else
-debugIsOn = False
 #endif
 
 -- | Short-circuiting monadic version of 'any'

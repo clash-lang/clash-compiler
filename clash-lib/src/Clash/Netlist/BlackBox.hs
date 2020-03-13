@@ -72,6 +72,7 @@ import {-# SOURCE #-} Clash.Netlist
   (genComponent, mkDcApplication, mkDeclarations, mkExpr, mkNetDecl,
    mkProjection, mkSelection, mkFunApp, mkDeclarations')
 import qualified Clash.Backend                 as Backend
+import           Clash.Debug                   (debugIsOn)
 import           Clash.Driver.Types
   (opt_primWarn, opt_color, ClashOpts)
 import           Clash.Netlist.BlackBox.Types  as B
