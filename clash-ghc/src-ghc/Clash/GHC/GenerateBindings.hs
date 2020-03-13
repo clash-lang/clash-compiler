@@ -24,6 +24,7 @@ import           Data.IntMap.Strict      (IntMap)
 import qualified Data.IntMap.Strict      as IMS
 import qualified Data.HashMap.Strict     as HashMap
 import           Data.List               (isPrefixOf)
+import           Data.List.Extra         (indexMaybe)
 import qualified Data.Text               as Text
 import qualified Data.Time.Clock         as Clock
 
@@ -67,7 +68,7 @@ import           Clash.Primitives.Util   (generatePrimMap)
 import           Clash.Rewrite.Util      (mkInternalVar, mkSelectorCase)
 import           Clash.Unique
   (listToUniqMap, lookupUniqMap, mapUniqMap, unionUniqMap, uniqMapToUniqSet)
-import           Clash.Util              (indexMaybe,reportTimeDiff)
+import           Clash.Util              (reportTimeDiff)
 
 generateBindings
   :: GHC.OverridingBool

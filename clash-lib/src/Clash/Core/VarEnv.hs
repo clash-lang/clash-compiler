@@ -95,6 +95,7 @@ where
 import           Data.Binary               (Binary)
 import           Data.Coerce               (coerce)
 import qualified Data.List                 as List
+import qualified Data.List.Extra           as List
 import           Data.Maybe                (fromMaybe)
 import           Data.Text.Prettyprint.Doc
 import           GHC.Exts                  (Any)
@@ -555,7 +556,7 @@ i.e. if the new var is the same as the old var, the renaming is deleted by
 rnTyBndrs
   :: RnEnv -> [TyVar] -> [TyVar] -> RnEnv
 rnTyBndrs env tvs1 tvs2 =
-  List.foldl' (\s (l,r) -> rnTyBndr s l r) env (zipEqual tvs1 tvs2)
+  List.foldl' (\s (l,r) -> rnTyBndr s l r) env (List.zipEqual tvs1 tvs2)
 
 -- | Look up the renaming of an occurrence in the left term
 rnOccLId
@@ -586,4 +587,4 @@ rnTmBndr rv@(RnEnv {rn_envLTm = lenv, rn_envRTm = renv, rn_inScope = inScope}) b
 rnTmBndrs
   :: RnEnv -> [Id] -> [Id] -> RnEnv
 rnTmBndrs env ids1 ids2 =
-  List.foldl' (\s (l,r) -> rnTmBndr s l r) env (zipEqual ids1 ids2)
+  List.foldl' (\s (l,r) -> rnTmBndr s l r) env (List.zipEqual ids1 ids2)

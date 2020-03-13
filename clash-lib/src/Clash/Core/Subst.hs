@@ -58,6 +58,7 @@ where
 import           Data.Coerce               (coerce)
 import           Data.Text.Prettyprint.Doc
 import qualified Data.List                 as List
+import qualified Data.List.Extra           as List
 import           Data.Ord                  (comparing)
 
 import           Clash.Core.FreeVars
@@ -243,7 +244,7 @@ zipTvSubst
   -> Subst
 zipTvSubst tvs tys
   | debugIsOn
-  , length tvs /= length tys
+  , not (List.equalLength tvs tys)
   = pprTrace "zipTvSubst" (ppr tvs <> line <> ppr tys) emptySubst
   | otherwise
   = Subst (mkInScopeSet (tyFVsOfTypes tys)) emptyVarEnv tenv emptyVarEnv
@@ -254,7 +255,7 @@ zipTyEnv
   :: [TyVar]
   -> [Type]
   -> VarEnv Type
-zipTyEnv tvs tys = mkVarEnv (zipEqual tvs tys)
+zipTyEnv tvs tys = mkVarEnv (List.zipEqual tvs tys)
 
 -- | Extend the substitution environment with a new 'Id' substitution
 extendIdSubst
@@ -671,7 +672,7 @@ substTyWith
   -> Type
   -> Type
 substTyWith tvs tys =
-  ASSERT( length tvs == length tys )
+  ASSERT( List.equalLength tvs tys )
   substTy (zipTvSubst tvs tys)
 
 -- | Ensure that non of the binders in an expression shadow each-other, nor
