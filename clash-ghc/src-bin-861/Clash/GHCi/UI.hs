@@ -632,7 +632,9 @@ runGHCi paths maybe_exprs = do
         Nothing ->
           do
             -- Set different defaulting rules (See #280)
-            runGHCiExpressions ["default ((),[],Integer,Int,Double,String)"]
+            runGHCiExpressions
+              ["default ((), [], Prelude.Integer, Prelude.Int, Prelude.Double, Prelude.String)"]
+
             -- enter the interactive loop
             runGHCiInput $ runCommands $ nextInputLine show_prompt is_tty
         Just exprs -> do
