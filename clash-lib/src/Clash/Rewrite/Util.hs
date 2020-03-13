@@ -80,6 +80,7 @@ import           Clash.Core.Var
 import           Clash.Core.VarEnv
   (InScopeSet, VarEnv, elemVarSet, extendInScopeSetList, mkInScopeSet,
    uniqAway, uniqAway', mapVarEnv)
+import           Clash.Debug (traceIf)
 import           Clash.Driver.Types
   (DebugLevel (..), BindingMap, Binding(..))
 import           Clash.Netlist.Util          (representableType)

@@ -62,10 +62,11 @@ import           Clash.Annotations.BitRepresentation.Internal
   (DataRepr', dataReprAnnToDataRepr')
 import           Clash.Annotations.Primitive
 import           Clash.Annotations.BitRepresentation (DataReprAnn)
+import           Clash.Debug                         (traceIf)
 import           Clash.Primitives.Types              (UnresolvedPrimitive, name)
 import           Clash.Primitives.Util               (decodeOrErr)
 import           Clash.GHC.GHC2Core                  (qualifiedNameString')
-import           Clash.Util                          (curLoc, traceIf)
+import           Clash.Util                          (curLoc)
 
 -- | Data structure tracking loaded binders (and their related data)
 data LoadedBinders = LoadedBinders

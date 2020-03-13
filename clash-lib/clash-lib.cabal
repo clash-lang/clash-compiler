@@ -208,6 +208,8 @@ Library
                       Clash.Core.Var
                       Clash.Core.VarEnv
 
+                      Clash.Debug
+
                       Clash.Driver
                       Clash.Driver.Types
 
