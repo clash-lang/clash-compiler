@@ -79,11 +79,7 @@ import qualified Data.Maybe                  as Maybe
 import qualified Data.Monoid                 as Monoid
 import qualified Data.Primitive.ByteArray    as BA
 import qualified Data.Text                   as Text
-<<<<<<< HEAD
 import qualified Data.Vector.Primitive       as PV
-import           Debug.Trace
-=======
->>>>>>> 4285439c1... Add Clash.Debug module
 import           GHC.Integer.GMP.Internals   (Integer (..), BigNat (..))
 
 import           BasicTypes                  (InlineSpec (..))

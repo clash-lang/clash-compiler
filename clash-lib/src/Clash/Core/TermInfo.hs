@@ -18,8 +18,7 @@ import Clash.Debug (debugIsOn)
 import Clash.Util
 import Clash.Util.Interpolate as I
 
-termSize :: Term
-         -> Word
+termSize :: Term -> Word
 termSize (Var {})     = 1
 termSize (Data {})    = 1
 termSize (Literal {}) = 1
@@ -40,10 +39,7 @@ termSize (Case subj _ alts) = sum (subjSz:altSzs)
   altSzs = map (termSize . snd) alts
 
 -- | Determine the type of a term
-termType
-  :: TyConMap
-  -> Term
-  -> Type
+termType :: TyConMap -> Term -> Type
 termType m e = case e of
   Var t          -> varType t
   Data dc        -> dcType dc
@@ -196,50 +192,39 @@ piResultTys m ty origArgs@(arg:args)
     = pprPanic "piResultTys2" (ppr ty' <> line <> ppr origArgs <> line <> ppr allArgs)
 
 -- | Does a term have a function type?
-isFun :: TyConMap
-      -> Term
-      -> Bool
+isFun :: TyConMap -> Term -> Bool
 isFun m t = isFunTy m (termType m t)
 
 -- | Does a term have a function or polymorphic type?
-isPolyFun :: TyConMap
-          -> Term
-          -> Bool
+isPolyFun :: TyConMap -> Term -> Bool
 isPolyFun m t = isPolyFunCoreTy m (termType m t)
 
 -- | Is a term a term-abstraction?
-isLam :: Term
-      -> Bool
+isLam :: Term -> Bool
 isLam (Lam {}) = True
 isLam _        = False
 
 -- | Is a term a recursive let-binding?
-isLet :: Term
-      -> Bool
+isLet :: Term -> Bool
 isLet (Letrec {}) = True
 isLet _           = False
 
 -- | Is a term a variable reference?
-isVar :: Term
-      -> Bool
+isVar :: Term -> Bool
 isVar (Var {}) = True
 isVar _        = False
 
-isLocalVar
-  :: Term
-  -> Bool
+isLocalVar :: Term -> Bool
 isLocalVar (Var v) = isLocalId v
 isLocalVar _ = False
 
 -- | Is a term a datatype constructor?
-isCon :: Term
-      -> Bool
+isCon :: Term -> Bool
 isCon (Data {}) = True
 isCon _         = False
 
 -- | Is a term a primitive?
-isPrim :: Term
-       -> Bool
+isPrim :: Term -> Bool
 isPrim (Prim {}) = True
 isPrim _         = False
 
