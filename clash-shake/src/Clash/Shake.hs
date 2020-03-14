@@ -345,6 +345,7 @@ clashShake proj@ClashProject{..} rules =
 
 hexImage :: Maybe Int -> FilePath -> FilePath -> Shake.Action ()
 hexImage size src out = do
+    need [src]
     bs <- liftIO $ maybe id ensureSize size . BS.unpack <$> BS.readFile src
     let bvs = map (filter (/= '_') . show . pack) bs
     writeFileChanged out (unlines bvs)
