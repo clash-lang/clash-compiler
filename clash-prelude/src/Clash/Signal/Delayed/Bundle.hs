@@ -78,7 +78,7 @@ class Bundle a where
   -- | Example:
   --
   -- @
-  -- __bundle__ :: ('DSignal' dom d a, 'DSignal' dom d b) -> 'DSignal' clk d (a,b)
+  -- __bundle__ :: ('DSignal' dom d a, 'DSignal' dom d b) -> 'DSignal' dom d (a,b)
   -- @
   --
   -- However:
@@ -220,7 +220,7 @@ instance KnownNat d => Bundle (RTree d a) where
   bundle   = sequenceA
   unbundle = sequenceA . fmap lazyT
 
--- | Same as 'Clash.Signal.Bundle.TaggedEmptyTuple', but adapted for 'DSignal'.
+-- | Same as 'Clash.Signal.Bundle.TaggedEmptyTuple' in "Clash.Signal.Bundle", but adapted for 'DSignal'.
 data TaggedEmptyTuple (dom :: Domain) (d :: Nat) = TaggedEmptyTuple
 
 -- | See [commit 94b0bff5](https://github.com/clash-lang/clash-compiler/pull/539/commits/94b0bff5770aa4961e04ddce2515130df3fc7863)

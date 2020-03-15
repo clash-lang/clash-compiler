@@ -84,7 +84,7 @@ let mac :: Clock System
 type role DSignal nominal nominal representational
 newtype DSignal (dom :: Domain) (delay :: Nat) a =
     DSignal { toSignal :: Signal dom a
-              -- ^ Strip a 'DSignal' from its delay information.
+              -- ^ Strip a 'DSignal' of its delay information.
             }
   deriving ( Show, Default, Functor, Applicative, Num, Fractional
            , Foldable, Traversable, Arbitrary, CoArbitrary, Lift )
@@ -141,7 +141,7 @@ fromSignal = coerce
 
 -- | __EXPERIMENTAL__
 --
--- __Unsafely__ convert a 'Signal' to /any/ 'DSignal' clk'.
+-- __Unsafely__ convert a 'Signal' to a 'DSignal' with an arbitrary @delay@.
 --
 -- __NB__: Should only be used to interface with functions specified in terms of
 -- 'Signal'.
