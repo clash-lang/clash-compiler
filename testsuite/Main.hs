@@ -310,7 +310,7 @@ runClashTest = defaultMain $ clashTestRoot
           , runTest "ReprCompact" def
           , runTest "ReprCompactScrambled"   def
           , runTest "ReprLastBitConstructor" def
-          , runTest "ReprStrangeMasks" def{hdlTargets=[VHDL]}
+          , runTest "ReprStrangeMasks" def{hdlTargets=[VHDL,Verilog]}
           , runTest "ReprWide" def
           , runTest "RotateCScrambled" def
           ]
