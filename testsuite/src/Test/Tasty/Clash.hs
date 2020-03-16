@@ -420,7 +420,7 @@ iverilog path modName subdirs entName =
       workDir = testDirectory path </> "verilog" </> modName
       test = testProgram testName "iverilog" args GlobStar PrintStdErr False (Just workDir)
       testName = "iverilog (" ++ entName ++ ")"
-      args = ("-g2":"-s":entName:"-o":noConflict entName subdirs:[workDir </> subdir </> "*.v" | subdir <- subdirs])
+      args = concat  [["-I",workDir </> subdir] | subdir <- subdirs] ++ ("-g2":"-s":entName:"-o":noConflict entName subdirs:[workDir </> subdir </> "*.v" | subdir <- subdirs])
 
 noConflict :: String -> [String] -> String
 noConflict nm seen

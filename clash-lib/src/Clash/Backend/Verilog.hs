@@ -37,12 +37,13 @@ import qualified Data.HashMap.Strict                  as HashMap
 import           Data.HashSet                         (HashSet)
 import qualified Data.HashSet                         as HashSet
 import           Data.Maybe                           (catMaybes,fromMaybe,mapMaybe)
-import           Data.List                            (nub, nubBy)
+import           Data.List
+  (mapAccumL, mapAccumR, nubBy, foldl')
 import           Data.List.Extra                      ((<:>))
 #if !MIN_VERSION_base(4,11,0)
 import           Data.Monoid                          hiding (Product, Sum)
 #endif
-import           Data.Semigroup.Monad
+import           Data.Semigroup.Monad.Extra
 import           Data.Text.Lazy                       (pack)
 import qualified Data.Text.Lazy                       as Text
 import qualified Data.Text                            as TextS
@@ -51,13 +52,12 @@ import qualified System.FilePath
 import           GHC.Stack                            (HasCallStack)
 
 import           Clash.Annotations.Primitive          (HDL (..))
-import           Clash.Annotations.BitRepresentation  (BitMask)
 import           Clash.Annotations.BitRepresentation.ClashLib
   (bitsToBits)
 import           Clash.Annotations.BitRepresentation.Internal
   (ConstrRepr'(..), DataRepr'(..), ConstrRepr'(..))
 import           Clash.Annotations.BitRepresentation.Util
-  (BitOrigin(Lit, Field), bitOrigins, bitRanges, isContinuousMask)
+  (BitOrigin(Lit, Field), bitOrigins, bitRanges)
 import           Clash.Core.Var                       (Attr'(..))
 import           Clash.Backend
 import           Clash.Debug                          (traceIf)
@@ -69,8 +69,7 @@ import           Clash.Netlist.Types                  hiding (_intWidth, intWidt
 import           Clash.Netlist.Util                   hiding (mkIdentifier, extendIdentifier)
 import           Clash.Signal.Internal                (ActiveEdge (..))
 import           Clash.Util
-  (SrcSpan, noSrcSpan, curLoc, on, first, indexNote)
-
+  (SrcSpan, noSrcSpan, curLoc, on, first, indexNote, makeCached, second)
 
 -- | State for the 'Clash.Backend.Verilog.VerilogM' monad:
 data VerilogState =
@@ -86,6 +85,8 @@ data VerilogState =
     , _memoryDataFiles:: [(String,String)]
     -- ^ Files to be stored: (filename, contents). These files are generated
     -- during the execution of 'genNetlist'.
+    , _customConstrs :: HashMap Identifier Identifier
+    -- ^ Custom data constructor => Verilog function name
     , _intWidth  :: Int -- ^ Int/Word/Integer bit-width
     , _hdlsyn    :: HdlSyn
     , _escapedIds :: Bool
@@ -104,6 +105,7 @@ instance Backend VerilogState where
                       HashSet.empty
                       []
                       []
+                      HashMap.empty
   hdlKind         = const Verilog
   primDirs        = const $ do root <- primsRoot
                                return [ root System.FilePath.</> "common"
@@ -346,8 +348,8 @@ verilogRecSel
   :: HWType
   -> Int
   -> VerilogM Doc
-verilogRecSel ty i = case modifier 0 (Indexed (ty,0,i)) of
-  Just (start,end,_resTy) -> brackets (int start <> colon <> int end)
+verilogRecSel ty i = case modifier (Contiguous 0 0) (Indexed (ty,0,i)) of
+  Just (Contiguous start end,_resTy) -> brackets (int start <> colon <> int end)
   _ -> error "Can't make a record selector"
 
 decls :: [Declaration] -> VerilogM Doc
@@ -594,18 +596,166 @@ seqs [] = emptyDoc
 seqs (SeqDecl (TickDecl id_):ds) = "//" <+> stringS id_ <> line <> seqs ds
 seqs (d:ds) = seq_ d <> line <> line <> seqs ds
 
+-- | Range slice, can be contiguous, or split into multiple sub-ranges
+data Range
+  = Contiguous Int Int
+  | Split [(Int,Int,Provenance)]
+
+-- | Original index range of a split range element
+data Provenance
+  = Provenance Int Int
+
+-- | Slice ranges out of a split-range element
+inRange
+  :: [(Int,Int)]
+  -- ^ start and end indexes into the original data type
+  -> (Int,Int,Provenance)
+  -- ^ Element of a split range
+  -> ([(Int,Int)],[(Int,Int,Provenance)])
+  -- ^
+  -- 1. stand and end indexes to be sliced from the rest of the split range elements
+  -- 2. Subset of the current split range for the projected data type
+inRange [] _ = ([],[])
+inRange ((start,end):ses) orig@(_,endRange,Provenance _ endProvenance) =
+{-
+The following explains the index calculations
+
+== Start ==
+-----------------------------------
+|     2     | |    1   | |   0    |  <- split range element number
+|15|14|13|12| |10| 9| 8| | 4| 3| 2|  <- split range indexes
+-----------------------------------
+| 9| 8| 7| 6| | 5| 4| 3| | 2| 1| 0|  <- original indexes of the data type (provenance)
+-----------------------------------
+                   4          1      <- `start` and `end` index that we want to slice
+
+== split range element 2 ==
+startOffset: start(4) - endProvenance(6) = -2
+
+next start: 4
+next end:   1
+
+== split range element 1 ==
+startOffset: start(4) - endProvenance(3) = 1
+endOffSet  : end(1) - endProvenance(3) = -2
+
+startRangeNew: endRange(8) + startOffSet(1) = 9
+endRangeNew  : endRange(8)
+
+startProvenanceNew: start(4) - end(1)                    = 3
+endProvenanceNew  : startProvenanceNew(3)-startOffset(1) = 2
+
+newSplitRange:
+-------
+|  1  |
+| 9| 8| <- new split range element
+-------
+| 3| 2| <- index into the projected data type
+
+next start: endProvenance(3) - 1 = 2
+next end  : 1
+
+== split range element 0 ==
+startOffset: start(2) - endProvenance(0) = 2
+endOffset  : end(1) - endProvenance(0)   = 1
+
+startRangeNew: endRange(2) + startOffSet(2) = 4
+endRangeNew  : endRange(2) + endOffSet(1)   = 3
+
+startProvenanceNew: start(2) - end(1) = 1
+endProvenanceNew  :                   = 0
+
+newSplitRange:
+-------
+|  0  |
+| 4| 3| <- new split range element
+-------
+| 1| 0| <- index into the projected data type
+-}
+  let startOffset = start - endProvenance
+      endOffset   = end   - endProvenance
+  in
+  if startOffset >= 0 then
+    let startRangeNew = endRange + startOffset
+        endRangeNew =
+          if endOffset >= 0 then
+             endRange + endOffset
+          else
+            endRange
+
+        startProvenanceNew = start - end
+        endProvenanceNew =
+          if endOffset >= 0 then
+            0
+          else
+            startProvenanceNew - startOffset
+
+        newSplitRange =
+          ( startRangeNew
+          , endRangeNew
+          , Provenance startProvenanceNew endProvenanceNew)
+    in
+    if endOffset >= 0 then
+      -- try to slice the next start+end in the current split range element
+      second (newSplitRange:) (inRange ses orig)
+    else
+      -- continue the slice in the next split range element
+      ((endProvenance-1,end):ses,[newSplitRange])
+  else
+    -- start offset beyond last bit in the element of the split range
+    ((start,end):ses,[])
+
+-- | Create an Split range element
+buildSplitRange
+  :: Int
+  -- ^ Offset
+  -> Int
+  -- ^ End index into the original data type
+  -> (Int,Int)
+  -- ^ start and end index for this sub-range
+  -> (Int,(Int,Int,Provenance))
+buildSplitRange offset eP (s,e) =
+  let d = s-e in
+  (eP+d+1,(s + offset, e + offset, Provenance (eP+d) eP))
+
+-- | Select a sub-range from a range
+continueWithRange
+  :: [(Int,Int)]
+  -- ^ Starts and ends
+  -> HWType
+  -- ^ Type of the projection
+  -> Range
+  -- ^ Range selected so far
+  -> Maybe (Range, HWType)
+continueWithRange ses hty r = case r of
+  Contiguous _ offset -> case ses of
+    [(start,end)] ->
+      Just (Contiguous (start+offset) (end+offset), hty)
+    ses1 ->
+      let ses2 = snd (mapAccumR (buildSplitRange offset) 0 ses1) in
+      Just (Split ses2, hty)
+  Split rs -> case concat (snd (mapAccumL inRange ses rs)) of
+    [] -> error "internal error"
+    [(s1,e1,_)] -> Just (Contiguous s1 e1,hty)
+    rs1 -> Just (Split rs1,hty)
+
 -- | Calculate the beginning and end index into a variable, to get the
 -- desired field.
 -- Also returns the HWType of the result.
 modifier
   :: HasCallStack
-  => Int
-  -- ^ Offset, only used when we have nested modifiers
+  => Range
+  -- ^ Range selected so far
   -> Modifier
-  -> Maybe (Int,Int,HWType)
-modifier offset (Sliced (BitVector _,start,end)) = Just (start+offset,end+offset, BitVector (start-end+1))
+  -> Maybe (Range,HWType)
+modifier r (Sliced (BitVector _,start,end)) =
+  continueWithRange [(start,end)] hty r
+  where
+    hty = BitVector (start-end-1)
 
-modifier offset (Indexed (ty@(SP _ args),dcI,fI)) = Just (start+offset,end+offset, argTy)
+
+modifier r (Indexed (ty@(SP _ args),dcI,fI)) =
+  continueWithRange [(start,end)] argTy r
   where
     argTys   = snd $ args !! dcI
     argTy    = argTys !! fI
@@ -614,7 +764,8 @@ modifier offset (Indexed (ty@(SP _ args),dcI,fI)) = Just (start+offset,end+offse
     start    = typeSize ty - 1 - conSize ty - other
     end      = start - argSize + 1
 
-modifier offset (Indexed (ty@(Product _ _ argTys),_,fI)) = Just (start+offset,end+offset, argTy)
+modifier r (Indexed (ty@(Product _ _ argTys),_,fI)) =
+  continueWithRange [(start,end)] argTy r
   where
     argTy   = argTys !! fI
     argSize = typeSize argTy
@@ -622,34 +773,43 @@ modifier offset (Indexed (ty@(Product _ _ argTys),_,fI)) = Just (start+offset,en
     start   = typeSize ty - 1 - otherSz
     end     = start - argSize + 1
 
-modifier offset (Indexed (ty@(Vector _ argTy),1,0)) = Just (start+offset,end+offset, argTy)
+modifier r (Indexed (ty@(Vector _ argTy),1,0)) =
+  continueWithRange [(start,end)] argTy r
   where
     argSize = typeSize argTy
     start   = typeSize ty - 1
     end     = start - argSize + 1
 
-modifier offset (Indexed (ty@(Vector n argTy),1,1)) = Just (start+offset,offset,Vector (n-1) argTy)
+modifier r (Indexed (ty@(Vector n argTy),1,1)) =
+  continueWithRange [(start,0)] hty r
   where
     argSize = typeSize argTy
     start   = typeSize ty - argSize - 1
+    hty     = Vector (n-1) argTy
 
-modifier offset (Indexed (ty@(RTree 0 argTy),0,0)) = Just (start+offset,offset, argTy)
+modifier r (Indexed (ty@(RTree 0 argTy),0,0)) =
+  continueWithRange [(start,0)] argTy r
   where
     start   = typeSize ty - 1
 
-modifier offset (Indexed (ty@(RTree d argTy),1,0)) = Just (start+offset,end+offset,RTree (d-1) argTy)
+modifier r (Indexed (ty@(RTree d argTy),1,0)) =
+  continueWithRange [(start,end)] hty r
   where
     start   = typeSize ty - 1
     end     = typeSize ty `div` 2
+    hty     = RTree (d-1) argTy
 
-modifier offset (Indexed (ty@(RTree d argTy),1,1)) = Just (start+offset,offset, RTree (d-1) argTy)
+modifier r (Indexed (ty@(RTree d argTy),1,1)) =
+  continueWithRange [(start,0)] hty r
   where
     start   = (typeSize ty `div` 2) - 1
+    hty     = RTree (d-1) argTy
 
 -- This is a HACK for Clash.Driver.TopWrapper.mkOutput
 -- Vector's don't have a 10'th constructor, this is just so that we can
 -- recognize the particular case
-modifier offset (Indexed (ty@(Vector _ argTy),10,fI)) = Just (start+offset,end+offset, argTy)
+modifier r (Indexed (ty@(Vector _ argTy),10,fI)) =
+  continueWithRange [(start,end)] argTy r
   where
     argSize = typeSize argTy
     start   = typeSize ty - (fI * argSize) - 1
@@ -658,51 +818,40 @@ modifier offset (Indexed (ty@(Vector _ argTy),10,fI)) = Just (start+offset,end+o
 -- This is a HACK for Clash.Driver.TopWrapper.mkOutput
 -- RTree's don't have a 10'th constructor, this is just so that we can
 -- recognize the particular case
-modifier offset (Indexed (ty@(RTree _ argTy),10,fI)) = Just (start+offset,end+offset, argTy)
+modifier r (Indexed (ty@(RTree _ argTy),10,fI)) =
+  continueWithRange [(start,end)] argTy r
   where
     argSize = typeSize argTy
     start   = typeSize ty - (fI * argSize) - 1
     end     = start - argSize + 1
 
-modifier offset (Indexed (CustomSP typName _dataRepr _size args,dcI,fI)) =
-  case bitRanges (anns !! fI) of
-    [(start,end)] ->
-      Just (start+offset,end+offset, argTy)
-    _ ->
-      error $ $(curLoc) ++ "Cannot handle projection out of a "
-           ++ "non-contiguously or zero-width encoded field. Tried to project "
-           ++ "field " ++ show fI ++ " of constructor " ++ show dcI ++ " of "
-           ++ "data type " ++ show typName ++  "."
- where
-  (ConstrRepr' _name _n _mask _value anns, _, argTys) = args !! dcI
-  argTy = argTys !! fI
+modifier r (Indexed (CustomSP _typName _dataRepr _size args,dcI,fI)) =
+  continueWithRange ses argTy r
+  where
+    ses = bitRanges (anns !! fI)
+    (ConstrRepr' _name _n _mask _value anns, _, argTys) = args !! dcI
+    argTy = argTys !! fI
 
-modifier offset (Indexed (CustomProduct typName dataRepr _size _maybeFieldNames args,dcI,fI))
+modifier r (Indexed (CustomProduct _typName dataRepr _size _maybeFieldNames args,_,fI))
   | DataRepr' _typ _size [cRepr] <- dataRepr
-  , ConstrRepr' _cName _pos _mask _val fieldAnns <- cRepr =
-  case bitRanges (fieldAnns !! fI) of
-    [(start,end)] ->
-      Just (start+offset,end+offset, argTy)
-    _ ->
-      error $ $(curLoc) ++ "Cannot handle projection out of a "
-           ++ "non-contiguously or zero-width encoded field. Tried to project "
-           ++ "field " ++ show fI ++ " of constructor " ++ show dcI ++ " of "
-           ++ "data type " ++ show typName ++ "."
+  , ConstrRepr' _cName _pos _mask _val fieldAnns <- cRepr
+  = let ses = bitRanges (fieldAnns !! fI) in continueWithRange ses argTy r
  where
   argTy = map snd args !! fI
 
-modifier offset (DC (ty@(SP _ _),_)) = Just (start+offset,end+offset, ty)
+modifier r (DC (ty@(SP _ _),_)) =
+  continueWithRange [(start,end)] ty r
   where
     start = typeSize ty - 1
     end   = typeSize ty - conSize ty
 
-modifier offset (Nested m1 m2) = do
-  case modifier offset m1 of
-    Nothing    -> modifier offset m2
-    Just (s,e,argTy) -> case modifier e m2 of
+modifier r (Nested m1 m2) = do
+  case modifier r m1 of
+    Nothing -> modifier r m2
+    Just (r1,argTy) -> case modifier r1 m2 of
       -- In case the second modifier is `Nothing` that means we want the entire
       -- thing calculated by the first modifier
-      Nothing -> Just (s,e,argTy)
+      Nothing -> Just (r1,argTy)
       m       -> m
 
 modifier _ _ = Nothing
@@ -717,45 +866,67 @@ customReprDataCon
   -> [(HWType, Expr)]
   -- ^ Arguments applied to constructor
   -> VerilogM Doc
-customReprDataCon dataRepr constrRepr args =
-  (flip fromMaybe) (errOnNonContinuous 0 anns) $
-  braces $ hcat $ punctuate ", " $ mapM range' origins
-    where
-      anns = crFieldAnns constrRepr
-      size = drSize dataRepr
+customReprDataCon dataRepr constrRepr [] =
+  let origins = bitOrigins dataRepr constrRepr :: [BitOrigin] in
+  case origins of
+    [Lit (bitsToBits -> ns)] ->
+      int (length ns) <> squote <> "b" <> hcat (mapM (bit_char undefValue) ns)
+    _ -> error "internal error"
+customReprDataCon dataRepr constrRepr args = do
+  funId <- mkConstrFunction
+  Mon (imports %= HashSet.insert (Text.pack (TextS.unpack funId ++ ".inc")))
+  stringS funId <> tupled (mapM (expr_ False . snd) nzArgs)
+ where
+  nzArgs = filter ((/=0) . typeSize . fst) args
 
-      errOnNonContinuous :: Int -> [BitMask] -> Maybe a
-      errOnNonContinuous _ [] = Nothing
-      errOnNonContinuous fieldnr (ann:anns') =
-        if isContinuousMask ann then
-          errOnNonContinuous (fieldnr + 1) anns'
-        else
-          error $ $(curLoc) ++ unlines [
-              "Error while processing custom bit representation:\n"
-            , unwords ["Field", show fieldnr, "of constructor"
-            , show (crName constrRepr), "of type\n"]
-            , "  " ++ show (drType dataRepr) ++ "\n"
-            , "has a non-continuous fieldmask:\n"
-            , "  " ++ (map bit_char' $ toBits size ann) ++ "\n"
-            , unwords [ "This is not supported in Verilog. Change the mask to a"
-                      , "continuous one, or render using VHDL or SystemVerilog."
-                      ]
-            ]
+  mkConstrFunction = makeCached (crName constrRepr) customConstrs $ do
+    let size    = drSize dataRepr
+        aTys    = map fst args
+        origins = bitOrigins dataRepr constrRepr :: [BitOrigin]
+    mkId <- Mon mkIdentifier
+    let ids = [ mkId Basic (TextS.pack ('v':show n)) | n <- [1..length args] ]
+        fId = mkId Basic (crName constrRepr)
+    let fInps =
+          [ case typeSize t of
+              0 -> emptyDoc
+              1 -> "input" <+> stringS i <> semi <> line
+              n -> "input" <+> brackets (int (n-1) <> colon <> int 0) <+>
+                               stringS i <> semi <> line
+          | (i,t) <- zip ids aTys
+          ]
 
-      -- Build bit representations for all constructor arguments
-      argExprs = map (expr_ False) (map snd args) :: [VerilogM Doc]
+    let range' (Lit (bitsToBits -> ns)) =
+          int (length ns) <> squote <> "b" <> hcat (mapM (bit_char undefValue) ns)
+        range' (Field n start end) =
+          let v   = ids !! n
+              aTy = aTys !! n
+          in case typeSize aTy of
+               0 -> error "internal error"
+               1 -> if start == 0 && end == 0 then
+                      stringS v
+                    else
+                      error "internal error"
+               _ -> stringS v <> brackets (int start <> colon <> int end)
 
-      -- Spread bits of constructor arguments using masks
-      origins = bitOrigins dataRepr constrRepr :: [BitOrigin]
+    let val = case origins of
+                []  -> error "internal error"
+                [r] -> range' r
+                rs  -> listBraces (mapM range' rs)
 
-      range'
-        :: BitOrigin
-        -> VerilogM Doc
-      range' (Lit (bitsToBits -> ns)) =
-        int (length ns) <> squote <> "b" <> hcat (mapM (bit_char undefValue) ns)
-      range' (Field n _start _end) =
-        argExprs !! n
+    let oSz = case size of
+                0 -> error "internal error"
+                1 -> emptyDoc
+                n -> brackets (int (n-1) <> colon <> int 0)
 
+    funDoc <-
+      "function" <+> oSz <+> stringS fId <> semi <> line <>
+      hcat (sequence fInps) <>
+      "begin" <> line <>
+      indent 2 (stringS fId <+> "=" <+> val <> semi) <> line <>
+      "end" <> line <>
+      "endfunction"
+    Mon (includes %= ((TextS.unpack fId ++ ".inc",funDoc):))
+    return fId
 
 -- | Turn a Netlist expression into a Verilog expression
 expr_ :: Bool -- ^ Enclose in parentheses?
@@ -810,11 +981,19 @@ expr_ _ (Identifier id_ (Just (Indexed ((BitVector w),_,1)))) = do
   traceIf (iw < w) ($(curLoc) ++ "WARNING: result smaller than argument") $
     stringS id_
 
-expr_ _ (Identifier id_ (Just m)) = case modifier 0 m of
+expr_ _ (Identifier id_ (Just m)) = case modifier (Contiguous 0 0) m of
   Nothing          -> stringS id_
-  Just (start,end,resTy) -> case resTy of
-    Signed _ -> "$signed" <> parens (stringS id_ <> brackets (int start <> colon <> int end))
-    _        ->                      stringS id_ <> brackets (int start <> colon <> int end)
+  Just (Contiguous start end,resTy) -> case resTy of
+    Signed _ -> "$signed" <> parens (slice start end)
+    _        -> slice start end
+  Just (Split rs,resTy) ->
+    let rs1 = listBraces (mapM (\(start,end,_) -> slice start end) rs) in
+    case resTy of
+      Signed _ -> "$signed" <> parens rs1
+      _ -> rs1
+
+ where
+  slice s e = stringS id_ <> brackets (int s <> colon <> int e)
 
 expr_ b (DataCon _ (DC (Void {}, -1)) [e]) = expr_ b e
 
