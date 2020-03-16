@@ -34,6 +34,7 @@ import           Control.Monad.State                  (State)
 import           Data.Bits                            (Bits, testBit)
 import           Data.HashMap.Strict                  (HashMap)
 import qualified Data.HashMap.Strict                  as HashMap
+import           Data.HashSet                         (HashSet)
 import qualified Data.HashSet                         as HashSet
 import           Data.Maybe                           (catMaybes,fromMaybe,mapMaybe)
 import           Data.List                            (nub, nubBy)
@@ -78,8 +79,8 @@ data VerilogState =
     , _idSeen    :: HashMap Identifier Word
     , _srcSpan   :: SrcSpan
     , _includes  :: [(String,Doc)]
-    , _imports   :: [Text.Text]
-    , _libraries :: [Text.Text]
+    , _imports   :: HashSet Text.Text
+    , _libraries :: HashSet Text.Text
     , _dataFiles      :: [(String,FilePath)]
     -- ^ Files to be copied: (filename, old path)
     , _memoryDataFiles:: [(String,String)]
@@ -94,7 +95,15 @@ data VerilogState =
 makeLenses ''VerilogState
 
 instance Backend VerilogState where
-  initBackend     = VerilogState 0 HashMap.empty noSrcSpan [] [] [] [] []
+  initBackend     = VerilogState
+                      0
+                      HashMap.empty
+                      noSrcSpan
+                      []
+                      HashSet.empty
+                      HashSet.empty
+                      []
+                      []
   hdlKind         = const Verilog
   primDirs        = const $ do root <- primsRoot
                                return [ root System.FilePath.</> "common"
@@ -165,9 +174,9 @@ instance Backend VerilogState where
         pure decs <> line <>
         insts ds
   unextend = return rmSlash
-  addIncludes inc = includes %= (inc++)
-  addLibraries libs = libraries %= (libs ++)
-  addImports inps = imports %= (inps ++)
+  addIncludes inc = includes %= (inc ++)
+  addLibraries libs = libraries %= (\s -> foldl' (flip HashSet.insert) s libs)
+  addImports inps = imports %= (\s -> foldl' (flip HashSet.insert) s inps)
   addAndSetData f = do
     fs <- use dataFiles
     let (fs',f') = renderFilePath fs f
@@ -243,13 +252,17 @@ sigPort wor pName hwType iEM =
     iE = maybe emptyDoc (noEmptyInit . expr_ False) iEM
 
 module_ :: Component -> VerilogM Doc
-module_ c = addSeen c *> modVerilog <* Mon (imports .= [])
+module_ c =
+  addSeen c *> modVerilog <* Mon (imports .= HashSet.empty >> libraries .= HashSet.empty)
   where
     modVerilog = do
       body <- modBody
       imps <- Mon $ use imports
       libs <- Mon $ use libraries
-      modHeader <> line <> modPorts <> line <> include (nub imps) <> uselibs (nub libs) <> pure body <> line <> modEnding
+      modHeader <> line <> modPorts <> line <>
+        include (HashSet.toList imps) <>
+        uselibs (HashSet.toList libs) <>
+        pure body <> line <> modEnding
 
     modHeader  = "module" <+> stringS (componentName c)
     modPorts   = indent 4 (tupleInputs inPorts <> line <> tupleOutputs outPorts <> semi)
