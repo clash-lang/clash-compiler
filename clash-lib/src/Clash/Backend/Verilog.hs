@@ -490,10 +490,18 @@ inst_ (CondAssignment id_ _ scrut scrutTy es) = fmap Just $
     conds i ((Nothing,e):_)   = ("default" <+> colon <+> stringS i <+> equals <+> expr_ False e) <:> return []
     conds i ((Just c ,e):es') = (exprLitV (Just (scrutTy,conSize scrutTy)) c <+> colon <+> stringS i <+> equals <+> expr_ False e) <:> conds i es'
 
-inst_ (InstDecl _ _ attrs nm lbl ps pms) = fmap Just $
-    attrs' <> nest 2 (pretty nm <> params <> pretty lbl <> line <> pms' <> semi)
+inst_ (InstDecl _ _ attrs nm lbl ps pms0) = fmap Just $
+    attrs' <> nest 2 (pretty nm <> params <> pretty lbl <> line <> pms2 <> semi)
   where
-    pms' = tupled $ sequence [dot <> expr_ False i <+> parens (expr_ False e) | (i,_,_,e) <- pms]
+    pms2 = case pms0 of
+      NamedPortMap pms1 ->
+        -- ( .clk (clk_0), .arst (arst_0), ........ )
+        let pm i e = dot <> expr_ False i <+> parens (expr_ False e) in
+        tupled $ sequence [pm i e | (i,_,_,e) <- pms1]
+      IndexedPortMap pms1 ->
+         -- ( clk_0, arst_0, ..... )
+        tupled $ sequence [expr_ False e | (_,_,e) <- pms1]
+
     params
       | null ps   = space
       | otherwise = line <> "#" <> tupled (sequence [dot <> expr_ False i <+> parens (expr_ False e) | (i,_,e) <- ps]) <> line

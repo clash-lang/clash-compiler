@@ -1215,7 +1215,7 @@ decl l (NetDecl' noteM _ id_ ty iEM) = Just <$> (,fromIntegral (TextS.length (Id
     addNote n = mappend ("--" <+> pretty n <> line)
     iE = maybe emptyDoc (noEmptyInit . expr_ False) iEM
 
-decl _ (InstDecl Comp _ attrs nm _ gens pms) = fmap (Just . (,0)) $ do
+decl _ (InstDecl Comp _ attrs nm _ gens (NamedPortMap pms)) = fmap (Just . (,0)) $ do
   { rec (p,ls) <- fmap unzip $ sequence [ (,formalLength i) <$> fill (maximum ls) (expr_ False i) <+> colon <+> portDir dir <+> sizedQualTyName ty | (i,dir,ty,_) <- pms ]
   ; rec (g,lsg) <- fmap unzip $ sequence [ (,formalLength i) <$> fill (maximum lsg) (expr_ False i) <+> colon <+> tyName ty | (i,ty,_) <- gens]
   ; "component" <+> pretty nm <> line <>
@@ -1361,19 +1361,25 @@ inst_ (CondAssignment id_ _sig scrut scrutTy es) = fmap Just $
     conds ((Nothing,e):_)   = expr_ False e <+> "when" <+> "others" <:> return []
     conds ((Just c ,e):es') = expr_ False e <+> "when" <+> patLit scrutTy c <:> conds es'
 
-inst_ (InstDecl entOrComp libM _ nm lbl gens pms) = do
+inst_ (InstDecl entOrComp libM _ nm lbl gens pms0) = do
     maybe (return ()) (\lib -> Mon (libraries %= (T.fromStrict lib:))) libM
     fmap Just $
       nest 2 $ pretty lbl <+> colon <> entOrComp'
-                <+> maybe emptyDoc ((<> ".") . pretty) libM <> pretty nm <> line <> gms <> pms' <> semi
+                <+> maybe emptyDoc ((<> ".") . pretty) libM <> pretty nm <> line <> gms <> pms2 <> semi
   where
     gms | [] <- gens = emptyDoc
         | otherwise =  do
       rec (p,ls) <- fmap unzip $ sequence [ (,formalLength i) <$> fill (maximum ls) (expr_ False i) <+> "=>" <+> expr_ False e | (i,_,e) <- gens]
       nest 2 ("generic map" <> line <> tupled (pure p)) <> line
-    pms' = do
-      rec (p,ls) <- fmap unzip $ sequence [ (,formalLength i) <$> fill (maximum ls) (expr_ False i) <+> "=>" <+> expr_ False e | (i,_,_,e) <- pms]
+    pms2 = do
+      rec (p,ls) <- case pms0 of
+                      NamedPortMap pms1 -> fmap unzip $ sequence [pm ls i e | (i,_,_,e) <- pms1]
+                      IndexedPortMap pms1 -> fmap unzip $ sequence [pmi e | (_,_,e) <- pms1]
       nest 2 $ "port map" <> line <> tupled (pure p)
+
+    pm ls i e = (,formalLength i) <$> fill (maximum ls) (expr_ False i) <+> "=>" <+> expr_ False e
+    pmi e = (,0) <$> expr_ False e
+
     formalLength (Identifier i _) = fromIntegral (TextS.length (Id.toText i))
     formalLength _                = 0
     entOrComp' = case entOrComp of { Entity -> " entity"; Comp -> " component"; Empty -> ""}

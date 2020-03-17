@@ -46,13 +46,14 @@ bbTemplate bbCtx = do
     , InstDecl Comp Nothing [] compName bb_inst
       [
       ]
-      [ -- NOTE: Direction is set to 'In', but will be rendered as inout due to
-        -- its type packagePinTy
-        (instPort "B", In, packagePinTy, packagePin)
-      , (instPort "T", In,  Bool, outputEnable)
-      , (instPort "I", In,  Bit, dOut)
-      , (instPort "O", Out, Bit, Identifier dIn Nothing)
-      ]
+      (NamedPortMap
+        [ -- NOTE: Direction is set to 'In', but will be rendered as inout due to
+          -- its type packagePinTy
+          (instPort "B", In, packagePinTy, packagePin)
+        , (instPort "T", In,  Bool, outputEnable)
+        , (instPort "I", In,  Bit, dOut)
+        , (instPort "O", Out, Bit, Identifier dIn Nothing)
+        ])
     , Assignment result (Identifier dIn Nothing)
     ]
  where

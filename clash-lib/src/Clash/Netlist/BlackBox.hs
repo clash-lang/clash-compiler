@@ -1036,7 +1036,9 @@ mkFunInput resId e =
                                                 , snd compOutp
                                                 , Identifier (Id.unsafeMake "~RESULT") Nothing )
                       instLabel <- Id.next compName
-                      let instDecl      = InstDecl Entity Nothing [] compName instLabel [] (outpAssign:inpAssigns)
+                      let
+                        portMap = NamedPortMap (outpAssign:inpAssigns)
+                        instDecl = InstDecl Entity Nothing [] compName instLabel [] portMap
                       return (Right ((Id.unsafeMake "",tickDecls ++ [instDecl]),Wire))
                     Nothing -> error $ $(curLoc) ++ "Cannot make function input for: " ++ showPpr e
             C.Lam {} -> do

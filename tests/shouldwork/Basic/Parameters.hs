@@ -50,10 +50,11 @@ myAddTemplate bbCtx = do
     [ InstDecl Comp Nothing [] myAddId myAddInstId
         [ (Identifier sizeId Nothing, Integer, Literal Nothing (NumLit . fromIntegral $ typeSize xTy))
         ]
-        [ (Identifier xId Nothing, In, xTy, xExp)
-        , (Identifier yId Nothing, In, yTy, yExp)
-        , (Identifier resultId Nothing, Out, resTy, resExp)
-        ]
+        (NamedPortMap
+          [ (Identifier xId Nothing, In, xTy, xExp)
+          , (Identifier yId Nothing, In, yTy, yExp)
+          , (Identifier resultId Nothing, Out, resTy, resExp)
+          ])
     ]
 
 {-# ANN myAdd

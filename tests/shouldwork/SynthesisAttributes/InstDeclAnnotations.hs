@@ -41,7 +41,7 @@ myTemplate bbCtx = do
       , StringAttr'  "my_string_attr" "Hello World!"
       ]
   getMon
-    $ blockDecl blkName [InstDecl Comp Nothing attrs compName compInst [] [] ]
+    $ blockDecl blkName [InstDecl Comp Nothing attrs compName compInst [] (NamedPortMap []) ]
 
 
 myBlackBox

@@ -446,6 +446,30 @@ hwTypeAttrs :: HWType -> [Attr']
 hwTypeAttrs (Annotated attrs _type) = attrs
 hwTypeAttrs _                       = []
 
+-- | Specifies how to wire up a component instance
+data PortMap
+  = IndexedPortMap [(PortDirection, HWType, Expr)]
+  -- ^ Port map based on port positions (port direction, type, assignment)
+  --
+  -- HDL Example:
+  --
+  --     bytemaster bytemaster_ds
+  --       ( clk_1
+  --       , rst_1
+  --       , bitCtrl_0 );
+  --
+  | NamedPortMap [(Expr, PortDirection, HWType, Expr)]
+  -- ^ Port map based on port names (port name, port direction, type, assignment)
+  --
+  -- HDL Example:
+  --
+  --     bytemaster bytemaster_ds
+  --       ( .clk (clk_1)
+  --       , .rst (rst_1)
+  --       , .bitCtrl (bitCtrl_0) );
+  --
+  deriving (Show)
+
 -- | Internals of a Component
 data Declaration
   -- | Signal assignment
@@ -469,7 +493,7 @@ data Declaration
       !Identifier                        -- FIELD The component's (or entity's) name
       !Identifier                        -- FIELD Instance label
       [(Expr,HWType,Expr)]               -- FIELD List of parameters for this component (param name, param type, param value)
-      [(Expr,PortDirection,HWType,Expr)] -- FIELD Ports (port name, port direction, type, assignment)
+      PortMap
 
   -- | Instantiation of blackbox declaration
   | BlackBoxD

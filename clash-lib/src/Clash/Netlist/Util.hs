@@ -1266,7 +1266,7 @@ mkTopCompDecl
   -- ^ Output port assignments
   -> Declaration
 mkTopCompDecl lib attrs name instName params inputs outputs =
-  InstDecl Entity lib attrs name instName params ports
+  InstDecl Entity lib attrs name instName params (NamedPortMap ports)
  where
   ports = map (toPort In) inputs ++ map (toPort Out) outputs
   toExpr id_ = Identifier id_ Nothing
