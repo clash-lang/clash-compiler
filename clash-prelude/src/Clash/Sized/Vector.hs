@@ -45,6 +45,7 @@ module Clash.Sized.Vector
   , singleton
   , replicate, repeat
   , iterate, iterateI, generate, generateI
+  , unfoldr, unfoldrI
     -- *** Initialisation from a list
   , listToVecTH
     -- ** Concatenation
@@ -1494,6 +1495,36 @@ iterateI f a = xs
     xs = init (a `Cons` ws)
     ws = map f (lazyV xs)
 {-# INLINE iterateI #-}
+
+-- | \"'unfoldr @n f s@\" builds a vector of length @n@ from a seed value @s@,
+-- where every element @a@ is created by successive calls of @f@ on @s@. Unlike
+-- 'Data.List.unfoldr' from "Data.List" the generating function @f@ cannot
+-- dictate the length of the resulting vector, it must be statically known.
+--
+-- a simple use of 'unfoldr':
+--
+-- >>> unfoldr d10 (\s -> (s,s-1)) 10
+-- <10,9,8,7,6,5,4,3,2,1>
+unfoldr :: SNat n -> (s -> (a,s)) -> s -> Vec n a
+unfoldr SNat = unfoldrI
+{-# INLINE unfoldr #-}
+
+-- | \"'unfoldr @f s@\" builds a vector from a seed value @s@, where every
+-- element @a@ is created by successive calls of @f@ on @s@; the length of the
+-- vector is inferred from the context. Unlike 'Data.List.unfoldr' from
+-- "Data.List" the generating function @f@ cannot  dictate the length of the
+-- resulting vector, it must be statically known.
+--
+-- a simple use of 'unfoldrI':
+--
+-- >>> unfoldrI (\s -> (s,s-1)) 10 :: Vec 10 Int
+-- <10,9,8,7,6,5,4,3,2,1>
+unfoldrI :: KnownNat n => (s -> (a,s)) -> s -> Vec n a
+unfoldrI f s0 = map fst xs
+ where
+  xs = init (f s0 `Cons` ws)
+  ws = map (f . snd) (lazyV xs)
+{-# INLINE unfoldrI #-}
 
 -- | \"'generate' @n f x@\" returns a vector with @n@ repeated applications of
 -- @f@ to @x@.
