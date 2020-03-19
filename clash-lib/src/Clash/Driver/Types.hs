@@ -189,7 +189,7 @@ data Manifest
   { manifestHash :: (Int,Maybe Int)
     -- ^ Hash of the TopEntity and all its dependencies
     --   + (maybe) Hash of the TestBench and all its dependencies
-  , succesFlags  :: (Int,Int,Bool)
+  , successFlags  :: (Int,Int,Bool)
     -- ^ Compiler flags used to achieve successful compilation:
     --
     --   * opt_inlineLimit
