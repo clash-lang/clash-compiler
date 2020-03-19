@@ -181,6 +181,7 @@ library
 
                       -- exposed for use by the benchmarks
                       Clash.GHC.Evaluator
+                      Clash.GHC.Evaluator.Primitive
                       Clash.GHC.GenerateBindings
                       Clash.GHC.LoadModules
                       Clash.GHC.NetlistTypes

@@ -35,7 +35,7 @@ import Data.Monoid                           (Any)
 import qualified Data.Set                    as Set
 import GHC.Generics
 
-import Clash.Core.Evaluator.Types      (PrimHeap, PrimStep, PrimUnwind)
+import Clash.Core.Evaluator.Types            (Evaluator, PrimHeap)
 import Clash.Core.Term           (Term, Context)
 import Clash.Core.Type           (Type)
 import Clash.Core.TyCon          (TyConName, TyConMap)
@@ -100,8 +100,8 @@ data RewriteEnv
   -- ^ TyCon cache
   , _tupleTcCache   :: IntMap TyConName
   -- ^ Tuple TyCon cache
-  , _evaluator      :: (PrimStep, PrimUnwind)
-  -- ^ Hardcoded evaluator (delta-reduction)}
+  , _evaluator      :: Evaluator
+  -- ^ Hardcoded evaluator for partial evaluation
   , _topEntities    :: VarSet
   -- ^ Functions that are considered TopEntities
   , _customReprs    :: CustomReprs

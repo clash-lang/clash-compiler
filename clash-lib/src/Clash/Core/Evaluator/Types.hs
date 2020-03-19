@@ -13,43 +13,138 @@ import Control.Concurrent.Supply (Supply)
 import Data.IntMap.Strict (IntMap)
 import qualified Data.IntMap.Strict as IntMap (insert, lookup)
 import Data.List (foldl')
-import Data.Maybe (isJust)
+import Data.Maybe (fromMaybe, isJust)
 import Data.Text.Prettyprint.Doc (hsep)
 
 import Clash.Core.DataCon (DataCon)
 import Clash.Core.Literal (Literal(CharLiteral))
-import Clash.Core.Pretty (fromPpr)
+import Clash.Core.Pretty (fromPpr, ppr, showPpr)
 import Clash.Core.Term (Term(..), PrimInfo(..), TickInfo, Alt)
+import Clash.Core.TermInfo (termType)
 import Clash.Core.TyCon (TyConMap)
 import Clash.Core.Type (Type)
 import Clash.Core.Var (Id, IdScope(..), TyVar)
 import Clash.Core.VarEnv
-import Clash.Pretty (ClashPretty(..), fromPretty)
+import Clash.Driver.Types (BindingMap, bindingTerm)
+import Clash.Pretty (ClashPretty(..), fromPretty, showDoc)
 
-{- [Note: forcing special primitives]
-Clash uses the `whnf` function in two places (for now):
+whnf'
+  :: Evaluator
+  -> BindingMap
+  -> TyConMap
+  -> PrimHeap
+  -> Supply
+  -> InScopeSet
+  -> Bool
+  -> Term
+  -> (PrimHeap, PureHeap, Term)
+whnf' eval bm tcm ph ids is isSubj e =
+  toResult $ whnf eval tcm isSubj m
+ where
+  toResult x = (mHeapPrim x, mHeapLocal x, mTerm x)
 
-  1. The case-of-known-constructor transformation
-  2. The reduceConstant transformation
+  m  = Machine ph gh emptyVarEnv [] ids is e
+  gh = mapVarEnv bindingTerm bm
 
-The first transformation is needed to reach the required normal form. The
-second transformation is more of cleanup transformation, so non-essential.
+-- | Evaluate to WHNF given an existing Heap and Stack
+whnf
+  :: Evaluator
+  -> TyConMap
+  -> Bool
+  -> Machine
+  -> Machine
+whnf eval tcm isSubj m
+  | isSubj =
+      -- See [Note: empty case expressions]
+      let ty = termType tcm (mTerm m)
+       in go (stackPush (Scrutinise ty []) m)
+  | otherwise = go m
+  where
+    go s = case step eval s tcm of
+      Just s' -> go s'
+      Nothing -> fromMaybe (error . showDoc . ppr $ mTerm m) (unwindStack s)
 
-Normally, `whnf` would force the evaluation of all primitives, which is needed
-in the `case-of-known-constructor` transformation. However, there are some
-primitives which we want to leave unevaluated in the `reduceConstant`
-transformation. Such primitives are:
 
-  - Primitives such as `Clash.Sized.Vector.transpose`, `Clash.Sized.Vector.map`,
-    etc. that do not reduce to an expression in normal form. Where the
-    `reduceConstant` transformation is supposed to be normal-form preserving.
-  - Primitives such as `GHC.Int.I8#`, `GHC.Word.W32#`, etc. which seem like
-    wrappers around a 64-bit literal, but actually perform truncation to the
-    desired bit-size.
+-- | An evaluator is a collection of basic building blocks which are used to
+-- define partial evaluation. In this implementation, it consists of two types
+-- of function:
+--
+--   * steps, which applies the reduction realtion to the current term
+--   * unwindings, which pop the stack and evaluate the stack frame
+--
+-- Variants of these functions also exist for evalauting primitive operations.
+-- This is because there may be multiple frontends to the compiler which can
+-- reuse a common step and unwind, but have different primitives.
+--
+data Evaluator = Evaluator
+  { step        :: Step
+  , unwind      :: Unwind
+  , primStep    :: PrimStep
+  , primUnwind  :: PrimUnwind
+  }
 
-This is why the Primitive Evaluator gets a flag telling whether it should
-evaluate these special primitives.
--}
+-- | Completely unwind the stack to get back the complete term
+unwindStack :: Machine -> Maybe Machine
+unwindStack m
+  | stackNull m = Just m
+  | otherwise = do
+      (m', kf) <- stackPop m
+
+      case kf of
+        PrimApply p tys vs tms ->
+          let term = foldl' App
+                       (foldl' App
+                         (foldl' TyApp (Prim p) tys)
+                         (fmap valToTerm vs))
+                       (mTerm m' : tms)
+           in unwindStack (setTerm term m')
+
+        Instantiate ty ->
+          let term = TyApp (getTerm m') ty
+           in unwindStack (setTerm term m')
+
+        Apply n ->
+          case heapLookup LocalId n m' of
+            Just e ->
+              let term = App (getTerm m') e
+               in unwindStack (setTerm term m')
+
+            Nothing -> error $ unlines $
+              [ "Clash.Core.Evaluator.unwindStack:"
+              , "Stack:"
+              ] <>
+              [ "  " <> showDoc (clashPretty frame) | frame <- mStack m] <>
+              [ ""
+              , "Expression:"
+              , showPpr (mTerm m)
+              , ""
+              , "Heap:"
+              , showDoc (clashPretty $ mHeapLocal m)
+              ]
+
+        Scrutinise _ [] ->
+          unwindStack m'
+
+        Scrutinise ty alts ->
+          let term = Case (getTerm m') ty alts
+           in unwindStack (setTerm term m')
+
+        Update LocalId x ->
+          unwindStack (heapInsert LocalId x (mTerm m') m')
+
+        Update GlobalId _ ->
+          unwindStack m'
+
+        Tickish sp ->
+          let term = Tick sp (getTerm m')
+           in unwindStack (setTerm term m')
+
+-- | A single step in the partial evaluator. The result is the new heap and
+-- stack, and the next expression to be reduced.
+--
+type Step = Machine -> TyConMap -> Maybe Machine
+
+type Unwind = Value -> Step
 
 type PrimStep
   =  TyConMap
@@ -70,12 +165,19 @@ type PrimUnwind
   -> Machine
   -> Maybe Machine
 
-type PrimEvaluator = (PrimStep, PrimUnwind)
-
+-- | A machine represents the current state of the abstract machine used to
+-- evaluate terms. A machine has a term under evaluation, a stack, and three
+-- heaps:
+--
+--  * a primitive heap to store IO values from primitives (like ByteArrays)
+--  * a global heap to store top-level bindings in scope
+--  * a local heap to store local bindings in scope
+--
+-- Machines also include a unique supply and InScopeSet. These are needed when
+-- new heap bindings are created, and are just an implementation detail.
+--
 data Machine = Machine
-  { mPrimStep   :: PrimStep
-  , mPrimUnwind :: PrimUnwind
-  , mHeapPrim   :: PrimHeap
+  { mHeapPrim   :: PrimHeap
   , mHeapGlobal :: PureHeap
   , mHeapLocal  :: PureHeap
   , mStack      :: Stack
@@ -85,7 +187,7 @@ data Machine = Machine
   }
 
 instance Show Machine where
-  show (Machine _ _ ph gh lh s _ _ x) =
+  show (Machine ph gh lh s _ _ x) =
     unlines
       [ "Machine:"
       , ""

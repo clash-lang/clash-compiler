@@ -2156,7 +2156,7 @@ makeHDL backend optsRef srcs = do
                   tcm
                   tupTcm
                   (ghcTypeToHWType iw fp)
-                  primEvaluator
+                  evaluator
                   topEntities
                   mainTopEntity
                   opts2

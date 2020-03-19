@@ -57,8 +57,7 @@ import           System.IO.Unsafe            (unsafePerformIO)
 import           BasicTypes                  (InlineSpec (..))
 
 import           Clash.Core.DataCon          (dcExtTyVars)
-import           Clash.Core.Evaluator        (whnf')
-import           Clash.Core.Evaluator.Types  (PureHeap)
+import           Clash.Core.Evaluator.Types  (PureHeap, whnf')
 import           Clash.Core.FreeVars
   (freeLocalVars, hasLocalFreeVars, localIdDoesNotOccurIn, localIdOccursIn,
    typeFreeVars, termFreeVars')
@@ -1074,12 +1073,12 @@ whnfRW
 whnfRW isSubj ctx@(TransformContext is0 _) e rw = do
   tcm <- Lens.view tcCache
   bndrs <- Lens.use bindings
-  (primEval, primUnwind) <- Lens.view evaluator
+  eval <- Lens.view evaluator
   ids <- Lens.use uniqSupply
   let (ids1,ids2) = splitSupply ids
   uniqSupply Lens..= ids2
   gh <- Lens.use globalHeap
-  case whnf' primEval primUnwind bndrs tcm gh ids1 is0 isSubj e of
+  case whnf' eval bndrs tcm gh ids1 is0 isSubj e of
     (!gh1,ph,v) -> do
       globalHeap Lens..= gh1
       bindPureHeap tcm ph rw ctx v

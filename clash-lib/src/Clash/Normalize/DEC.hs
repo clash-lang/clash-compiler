@@ -54,7 +54,7 @@ import           Data.Monoid                      (All (..))
 
 -- internal
 import Clash.Core.DataCon    (DataCon, dcTag)
-import Clash.Core.Evaluator  (whnf')
+import Clash.Core.Evaluator.Types  (whnf')
 import Clash.Core.FreeVars
   (termFreeVars', typeFreeVars', localVarsDoNotOccurIn)
 import Clash.Core.Literal    (Literal (..))
@@ -140,12 +140,12 @@ collectGlobals' inScope substitution seen e@(collectArgsTicks -> (fun, args@(_:_
   | not eIsconstant = do
     tcm <- Lens.view tcCache
     bndrs <- Lens.use bindings
-    (primEval, primUnwind) <- Lens.view evaluator
+    evaluate <- Lens.view evaluator
     gh <- Lens.use globalHeap
     ids <- Lens.use uniqSupply
     let (ids1,ids2) = splitSupply ids
     uniqSupply Lens..= ids2
-    let eval = (Lens.view Lens._3) . whnf' primEval primUnwind bndrs tcm gh ids1 inScope False
+    let eval = (Lens.view Lens._3) . whnf' evaluate bndrs tcm gh ids1 inScope False
         eTy  = termType tcm e
     untran <- isUntranslatableType False eTy
     case untran of

@@ -36,7 +36,7 @@ import           BasicTypes                       (InlineSpec (..))
 
 import           Clash.Annotations.BitRepresentation.Internal
   (CustomReprs)
-import           Clash.Core.Evaluator.Types       (PrimStep, PrimUnwind)
+import           Clash.Core.Evaluator.Types       (Evaluator)
 import           Clash.Core.FreeVars
   (freeLocalIds, globalIds, globalIdOccursIn, localIdDoesNotOccurIn)
 import           Clash.Core.Pretty                (PrettyOptions(..), showPpr, showPpr', ppr)
@@ -102,8 +102,8 @@ runNormalization
   -- ^ TyCon cache
   -> IntMap TyConName
   -- ^ Tuple TyCon cache
-  -> (PrimStep, PrimUnwind)
-  -- ^ Hardcoded evaluator (delta-reduction)
+  -> Evaluator
+  -- ^ Hardcoded evaluator for partial evaluation
   -> CompiledPrimMap
   -- ^ Primitive Definitions
   -> VarEnv Bool
