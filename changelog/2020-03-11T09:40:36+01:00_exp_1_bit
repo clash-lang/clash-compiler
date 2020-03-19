@@ -1,1 +1,1 @@
-FIXED: result of `Clash.Class.Exp.(^)` is at least 1 bit in order to deal with `x^0`.
+FIXED: result of `Clash.Class.Exp.(^)` has enough bits in order to deal with `x^0`.

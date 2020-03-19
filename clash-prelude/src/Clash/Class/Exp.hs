@@ -45,7 +45,7 @@ instance KnownNat m => Exp (Index m) where
   {-# INLINE (^) #-}
 
 instance KnownNat m => Exp (Signed m) where
-  type ExpResult (Signed m) n = Signed (Max 1 (m * n))
+  type ExpResult (Signed m) n = Signed (Max 2 (m * n))
 
   (^) = expSigned#
   {-# INLINE (^) #-}
@@ -70,7 +70,7 @@ expSigned#
   :: KnownNat m
   => Signed m
   -> SNat n
-  -> Signed (Max 1 (m * n))
+  -> Signed (Max 2 (m * n))
 expSigned# b e@SNat =
   fromInteger (toInteger b P.^ snatToInteger e)
 {-# NOINLINE expSigned# #-}
