@@ -190,7 +190,6 @@ Library
 
                       Clash.Core.DataCon
                       Clash.Core.EqSolver
-                      Clash.Core.Evaluator
                       Clash.Core.Evaluator.Types
                       Clash.Core.FreeVars
                       Clash.Core.Literal

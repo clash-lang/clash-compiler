@@ -88,6 +88,6 @@ runNormalisationStage idirs src = do
     runInputStage idirs src
   let opts1 = opts idirs
       transformedBindings =
-        normalizeEntity reprs bindingsMap primMap tcm tupTcm typeTrans primEvaluator
+        normalizeEntity reprs bindingsMap primMap tcm tupTcm typeTrans evaluator
           topEntityNames opts1 supplyN topEntity
   return (transformedBindings,topEntities,primMap,tcm,reprs,topEntity)

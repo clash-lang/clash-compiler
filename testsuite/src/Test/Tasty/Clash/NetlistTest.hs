@@ -99,7 +99,7 @@ runToNetlistStage target f src = do
   supplyN <- Supply.newSupply
 
   let transformedBindings = normalizeEntity reprs bm pm tcm tupTcm typeTrans
-          primEvaluator teNames opts supplyN te
+          evaluator teNames opts supplyN te
 
   fmap (force . fst) $ netlistFrom (transformedBindings, tcm, tes, pm, reprs, te)
  where

@@ -45,7 +45,7 @@ benchFile idirs src =
     \ ~((bindingsMap,tcm,tupTcm,_topEntities,primMap,reprs,topEntityNames,topEntity),supplyN) -> do
       bench ("normalization of " ++ src)
             (nf (normalizeEntity reprs bindingsMap primMap tcm tupTcm typeTrans
-                                 primEvaluator topEntityNames
+                                 evaluator topEntityNames
                                  (opts idirs) supplyN :: _ -> BindingMap) topEntity)
 
 setupEnv
