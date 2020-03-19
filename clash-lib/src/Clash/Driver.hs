@@ -341,8 +341,8 @@ generateHDL reprs bindingsMap hdlState primMap tcm tupTcm typeTrans eval
             let terms = callGraphBindings bindingsMap bench in
             Just (hash (annM, primMapHash, show clashModDate, terms, optsHash))
 
-    let succesFlagsI = (opt_inlineLimit opts,opt_specLimit opts,opt_floatSupport opts)
-        manifestI    = Manifest (topHash,benchHashM) succesFlagsI [] [] [] [] []
+    let successFlagsI = (opt_inlineLimit opts,opt_specLimit opts,opt_floatSupport opts)
+        manifestI    = Manifest (topHash,benchHashM) successFlagsI [] [] [] [] []
 
     let
       manFile =
@@ -358,13 +358,13 @@ generateHDL reprs bindingsMap hdlState primMap tcm tupTcm typeTrans eval
                   (\man ->
                     let allowCache (inl0,spec0,fl0) (inl1,spec1,fl1) =
                           inl0 <= inl1 && spec0 <= spec1 && (not (fl0 && not fl1))
-                        flagsAllowCache = allowCache (succesFlags man) succesFlagsI
+                        flagsAllowCache = allowCache (successFlags man) successFlagsI
                     in  (flagsAllowCache && fst (manifestHash man) == topHash
                         ,flagsAllowCache && snd (manifestHash man) == benchHashM
                         ,man { manifestHash = (topHash,benchHashM)
-                             , succesFlags  = if flagsAllowCache
-                                                 then succesFlags man
-                                                 else succesFlagsI
+                             , successFlags  = if flagsAllowCache
+                                                 then successFlags man
+                                                 else successFlagsI
                              }
                         ))
                   manM)
