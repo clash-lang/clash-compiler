@@ -282,6 +282,8 @@ import           Clash.Sized.Index              (Index)
 import qualified Clash.Sized.Vector
 import           Clash.XException               (NFDataX, deepErrorX, fromJustX)
 
+import GHC.Magic (inline)
+
 {- $setup
 >>> :set -XDataKinds -XTypeApplications -XFlexibleInstances -XMultiParamTypeClasses -XTypeFamilies
 >>> :set -fno-warn-deprecations
@@ -661,8 +663,8 @@ register
   -- will also be the initial value.
   -> Signal dom a
   -> Signal dom a
-register clk rst gen initial i =
-  register# clk rst gen initial initial i
+register clk rst gen initial =
+  register# clk rst gen (inline initial) (inline initial)
 {-# INLINE register #-}
 
 -- | Version of 'register' that only updates its content when its fourth
