@@ -162,7 +162,7 @@ normalize top = do
   newNormalized <- normalize (concat new)
   return (unionVarEnv (mkVarEnv topNormalized) newNormalized)
 
-normalize' :: Id -> NormalizeSession ([Id], (Id, Binding))
+normalize' :: Id -> NormalizeSession ([Id], (Id, Binding Term))
 normalize' nm = do
   exprM <- lookupVarEnv nm <$> Lens.use bindings
   let nmS = showPpr (varName nm)
@@ -269,8 +269,8 @@ cleanupGraph _ norm = return norm
 -- additional bindings which are used. See "Clash.Driver.Types.Binding".
 --
 data CallTree
-  = CLeaf   (Id, Binding)
-  | CBranch (Id, Binding) [CallTree]
+  = CLeaf   (Id, Binding Term)
+  | CBranch (Id, Binding Term) [CallTree]
 
 mkCallTree
   :: [Id]
@@ -403,7 +403,7 @@ flattenCallTree (CBranch (nm,(Binding nm' sp inl tm)) used) = do
       | inl2 == NoInline = (Nothing, [c])
       | otherwise        = (Just (nm2,e),us)
 
-callTreeToList :: [Id] -> CallTree -> ([Id], [(Id, Binding)])
+callTreeToList :: [Id] -> CallTree -> ([Id], [(Id, Binding Term)])
 callTreeToList visited (CLeaf (nm,bndr))
   | nm `elem` visited = (visited,[])
   | otherwise         = (nm:visited,[(nm,bndr)])
