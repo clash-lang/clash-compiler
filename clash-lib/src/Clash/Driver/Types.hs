@@ -37,17 +37,17 @@ import           Clash.Netlist.BlackBox.Types   (HdlSyn (..))
 
 -- A function binder in the global environment.
 --
-data Binding = Binding
+data Binding a = Binding
   { bindingId :: Id
   , bindingLoc :: SrcSpan
   , bindingSpec :: InlineSpec
-  , bindingTerm :: Term
-  } deriving (Binary, Generic, NFData, Show)
+  , bindingTerm :: a
+  } deriving (Binary, Functor, Generic, NFData, Show)
 
 -- | Global function binders
 --
 -- Global functions cannot be mutually recursive, only self-recursive.
-type BindingMap = VarEnv Binding
+type BindingMap = VarEnv (Binding Term)
 
 -- | Debug Message Verbosity
 data DebugLevel

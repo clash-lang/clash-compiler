@@ -408,8 +408,8 @@ isCheapFunction tm = case classifyFunction tm of
 normalizeTopLvlBndr
   :: Bool
   -> Id
-  -> Binding
-  -> NormalizeSession Binding
+  -> Binding Term
+  -> NormalizeSession (Binding Term)
 normalizeTopLvlBndr isTop nm (Binding nm' sp inl tm) = makeCachedU nm (extra.normalized) $ do
   tcm <- Lens.view tcCache
   let nmS = showPpr (varName nm)
