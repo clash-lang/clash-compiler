@@ -453,10 +453,8 @@ funSubst tcm (Just s) = uncurry go
       Just ty' | ty' `aeqType` ty -> Just s
       _ -> Nothing
     go ty1 (reduceTypeFamily tcm -> Just ty2) = go ty1 ty2 -- See [Note: lazy type families]
-    go ty1@(LitTy _) ty2 = if ty1 `aeqType` ty2 then Just s else Nothing
-    go (tyView -> TyConApp tc argTys) (tyView -> TyConApp tc' argTys')
-      | tc == tc'
-      = foldl' (funSubst tcm) (Just s) (zip argTys argTys')
+    -- [Note] funSubst FunTy
+    --
     -- Whenever type classes have associated types whose instances 'map' to
     -- functions, we try to find substitutions in the LHS and RHS of these
     -- (type-level) functions. Because we use @funSubst@ recursively, we
@@ -473,9 +471,17 @@ funSubst tcm (Just s) = uncurry go
     -- matching against `Char -> Char` we'd find a duplicate `a -> Char`. We
     -- can't think of any (type-checking) cases where these mappings would map
     -- to different types, so this is OK for our purposes.
-    go (tyView -> FunTy a b) (tyView -> FunTy a' b') =
-      (++) <$> funSubst tcm (Just s) (a, a')
-           <*> funSubst tcm (Just s) (b, b')
+    go (AppTy a1 r1) (AppTy a2 r2) = do
+      s1 <- funSubst tcm (Just s) (a1, a2)
+      funSubst tcm (Just s1) (r1, r2)
+
+    go ty1@(ConstTy _) ty2 =
+      -- Looks through AnnType
+      if ty1 `aeqType` ty2 then Just s else Nothing
+
+    go ty1@(LitTy _) ty2 =
+      -- Looks through AnnType
+      if ty1 `aeqType` ty2 then Just s else Nothing
 
     go _ _ = Nothing
 
