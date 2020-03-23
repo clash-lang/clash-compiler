@@ -1,0 +1,1 @@
+FIXED: [#1242](https://github.com/clash-lang/clash-compiler/issues/1242) Synthesizing BitPack instances for type with phantom parameter fails
