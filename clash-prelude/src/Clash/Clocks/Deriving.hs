@@ -13,6 +13,7 @@ module Clash.Clocks.Deriving (deriveClocksInstances) where
 
 import Control.Monad               (foldM)
 import Clash.Signal.Internal
+import Language.Haskell.TH.Compat
 import Language.Haskell.TH.Syntax
 import Language.Haskell.TH.Lib
 import Unsafe.Coerce               (unsafeCoerce)
@@ -40,7 +41,7 @@ derive' n = do
   -- Implementation of 'clocks'
   let noInline  = PragmaD $ InlineP (mkName "clocks") NoInline FunLike AllPhases
   let clkImpls  = replicate n (clkImpl clk)
-  let instTuple = TupE $ clkImpls ++ [AppE (VarE 'unsafeCoerce) (VarE rst)]
+  let instTuple = mkTupE $ clkImpls ++ [AppE (VarE 'unsafeCoerce) (VarE rst)]
   let funcBody  = NormalB instTuple
   let instFunc  = FunD (mkName "clocks") [Clause [VarP clk, VarP rst] funcBody []]
 

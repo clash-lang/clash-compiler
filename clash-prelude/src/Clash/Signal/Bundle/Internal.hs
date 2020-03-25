@@ -11,6 +11,7 @@ import           Clash.XException            (seqX)
 import           Data.List                   (foldl')
 import qualified Language.Haskell.TH.Syntax  as TH
 import           Language.Haskell.TH
+import           Language.Haskell.TH.Compat
 
 idPrimitive :: TH.Name -> DecQ
 idPrimitive nm =
@@ -103,7 +104,7 @@ deriveBundleTuples bundleTyName unbundledTyName bundleName unbundleName = do
                 (TupP (map VarP asNames))
                 (NormalB (
                   tNm `seqXE` (sNm `seqE` (VarE unbundlePrimName `AppE` VarE sTailNm)))) []]
-            (TupE
+            (mkTupE
               (zipWith
                 (\a as -> UInfixE (VarE a) (ConE '(:-)) (VarE as))
                 aNames
@@ -131,7 +132,7 @@ deriveBundleTuples bundleTyName unbundledTyName bundleName unbundleName = do
 
         bundleFmap =
           UInfixE
-            (LamE (map VarP aPrimeNames) (TupE (map VarE aPrimeNames)))
+            (LamE (map VarP aPrimeNames) (mkTupE (map VarE aPrimeNames)))
             (VarE '(<$>))
             (VarE (head aNames))
 

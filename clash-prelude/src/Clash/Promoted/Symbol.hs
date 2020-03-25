@@ -4,6 +4,7 @@ License    :  BSD2 (see the file LICENSE)
 Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
 -}
 
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE TemplateHaskellQuotes #-}
 
@@ -29,6 +30,9 @@ instance KnownSymbol s => Lift (SSymbol (s :: Symbol)) where
     where
       tt = LitT (StrTyLit (ssymbolToString t))
 
+#if MIN_VERSION_template_haskell(2,16,0)
+  liftTyped = unsafeTExpCoerce . lift
+#endif
 
 instance Show (SSymbol s) where
   showsPrec d s@SSymbol = showParen (d > appPrec) $

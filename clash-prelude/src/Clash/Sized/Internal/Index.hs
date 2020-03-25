@@ -75,6 +75,9 @@ import Data.Proxy                 (Proxy (..))
 import Text.Read                  (Read (..), ReadPrec)
 import Language.Haskell.TH        (TypeQ, appT, conT, litT, numTyLit, sigE)
 import Language.Haskell.TH.Syntax (Lift(..))
+#if MIN_VERSION_template_haskell(2,16,0)
+import Language.Haskell.TH.Compat
+#endif
 import GHC.Generics               (Generic)
 import GHC.Natural                (Natural, naturalFromInteger)
 #if MIN_VERSION_base(4,12,0)
@@ -399,6 +402,9 @@ resize# (I i) = fromInteger_INLINE i
 instance KnownNat n => Lift (Index n) where
   lift u@(I i) = sigE [| fromInteger# i |] (decIndex (natVal u))
   {-# NOINLINE lift #-}
+#if MIN_VERSION_template_haskell(2,16,0)
+  liftTyped = liftTypedFromUntyped
+#endif
 
 decIndex :: Integer -> TypeQ
 decIndex n = appT (conT ''Index) (litT $ numTyLit n)
