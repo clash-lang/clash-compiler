@@ -17,7 +17,7 @@ library
   build-depends:       base                 >= 4.10     && < 5,
                        concurrent-supply    >= 0.1.7    && < 0.2,
                        containers           >= 0.5.4.0  && < 0.7,
-                       ghc                  >= 8.4.0    && < 8.9,
+                       ghc                  >= 8.4.0    && < 8.11,
                        mtl                  >= 2.1.2    && < 2.3,
                        unordered-containers >= 0.2.3.3  && < 0.3,
 
