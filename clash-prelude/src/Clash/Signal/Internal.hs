@@ -146,7 +146,7 @@ import GHC.Generics               (Generic)
 import GHC.Stack                  (HasCallStack)
 import GHC.TypeLits               (KnownSymbol, Nat, Symbol, type (<=))
 import Language.Haskell.TH.Syntax -- (Lift (..), Q, Dec)
-import Language.Haskell.TH.Compat (mkTySynInstD)
+import Language.Haskell.TH.Compat
 import Numeric.Natural            (Natural)
 import Test.QuickCheck            (Arbitrary (..), CoArbitrary(..), Property,
                                    property)
@@ -646,6 +646,9 @@ instance Show a => Show (Signal dom a) where
 
 instance Lift a => Lift (Signal dom a) where
   lift ~(x :- _) = [| signal# x |]
+#if MIN_VERSION_template_haskell(2,16,0)
+  liftTyped = liftTypedFromUntyped
+#endif
 
 instance Default a => Default (Signal dom a) where
   def = signal# def

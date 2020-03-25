@@ -9,7 +9,7 @@ Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
 module Clash.Class.BitPack.Internal (deriveBitPackTuples) where
 
 import           Clash.CPP             (maxTupleSize)
-import           Language.Haskell.TH.Compat (mkTySynInstD)
+import           Language.Haskell.TH.Compat (mkTySynInstD,mkTupE)
 import           Control.Monad         (replicateM)
 import           Data.List             (foldl')
 import           GHC.TypeLits          (KnownNat)
@@ -69,7 +69,7 @@ deriveBitPackTuples bitPackName bitSizeName packName unpackName = do
                     [ Clause
                         [ TupP $ map VarP names ]
                         ( let (e:es) = map VarE names
-                          in NormalB (TupE [e,TupE es])
+                          in NormalB (mkTupE [e,mkTupE es])
                         )
                         []
                     ]
@@ -94,7 +94,7 @@ deriveBitPackTuples bitPackName bitSizeName packName unpackName = do
                           ( NormalB $ VarE unpackName `AppE` VarE y )
                           []
                       ]
-                      ( TupE $ map VarE names )
+                      ( mkTupE $ map VarE names )
                 )
                 []
             ]

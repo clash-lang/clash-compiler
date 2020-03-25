@@ -13,6 +13,7 @@ module Clash.XException.TH
 
 import Data.Either (isLeft)
 import Data.List (intersperse)
+import Language.Haskell.TH.Compat
 import Language.Haskell.TH.Syntax
 
 -- Spliced in in XException, so these names should be in scope:
@@ -139,14 +140,14 @@ mkNFDataXTupleInstance n =
   ensureSpineDecl = FunD ensureSpineName  [
     Clause
       [TildeP (TupP (map VarP names))]
-      (NormalB (TupE (map (AppE (VarE ensureSpineName) . VarE) names)))
+      (NormalB (mkTupE (map (AppE (VarE ensureSpineName) . VarE) names)))
       []
     ]
 
   deepErrorXDecl = FunD deepErrorXName [
      Clause
        [VarP s]
-       (NormalB (TupE (replicate n (VarE deepErrorXName `AppE` VarE s))))
+       (NormalB (mkTupE (replicate n (VarE deepErrorXName `AppE` VarE s))))
        []
      ]
 
