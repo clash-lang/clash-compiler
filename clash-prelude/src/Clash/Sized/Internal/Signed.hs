@@ -99,6 +99,9 @@ import GHC.TypeLits                   (KnownNat, Nat, type (+), natVal)
 import GHC.TypeLits.Extra             (Max)
 import Language.Haskell.TH            (TypeQ, appT, conT, litT, numTyLit, sigE)
 import Language.Haskell.TH.Syntax     (Lift(..))
+#if MIN_VERSION_template_haskell(2,16,0)
+import Language.Haskell.TH.Compat
+#endif
 import Test.QuickCheck.Arbitrary      (Arbitrary (..), CoArbitrary (..),
                                        arbitraryBoundedIntegral,
                                        coarbitraryIntegral, shrinkIntegral)
@@ -568,6 +571,9 @@ instance KnownNat n => Default (Signed n) where
 instance KnownNat n => Lift (Signed n) where
   lift s@(S i) = sigE [| fromInteger# i |] (decSigned (natVal s))
   {-# NOINLINE lift #-}
+#if MIN_VERSION_template_haskell(2,16,0)
+  liftTyped = liftTypedFromUntyped
+#endif
 
 decSigned :: Integer -> TypeQ
 decSigned n = appT (conT ''Signed) (litT $ numTyLit n)
