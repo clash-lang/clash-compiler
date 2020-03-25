@@ -185,8 +185,11 @@ loadModules useColor hdl modName dflagsM idirs = do
                     , DynFlags.hscTarget
                         = if DynFlags.rtsIsProfiled
                              then DynFlags.HscNothing
-                             else DynFlags.defaultObjectTarget
-                                    (DynFlags.targetPlatform dflags)
+                             else DynFlags.defaultObjectTarget $
+#if !MIN_VERSION_ghc(8,10,0)
+                                    DynFlags.targetPlatform
+#endif
+                                      dflags
                     , DynFlags.reductionDepth = 1000
                     }
     let dflags2 = unwantedOptimizationFlags dflags1
