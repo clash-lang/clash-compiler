@@ -59,6 +59,9 @@ import Data.Singletons.Prelude     (Apply, TyFun, type (@@))
 import Data.Proxy                  (Proxy (..))
 import GHC.TypeLits                (KnownNat, Nat, type (+), type (^), type (*))
 import Language.Haskell.TH.Syntax  (Lift(..))
+#if MIN_VERSION_template_haskell(2,16,0)
+import Language.Haskell.TH.Compat
+#endif
 import Prelude                     hiding ((++), (!!))
 import Test.QuickCheck             (Arbitrary (..), CoArbitrary (..))
 
@@ -210,6 +213,9 @@ instance (KnownNat d, Default a) => Default (RTree d a) where
 instance Lift a => Lift (RTree d a) where
   lift (LR_ a)     = [| LR_ a |]
   lift (BR_ t1 t2) = [| BR_ $(lift t1) $(lift t2) |]
+#if MIN_VERSION_template_haskell(2,16,0)
+  liftTyped = liftTypedFromUntyped
+#endif
 
 instance (KnownNat d, Arbitrary a) => Arbitrary (RTree d a) where
   arbitrary = sequenceA (trepeat arbitrary)
