@@ -92,6 +92,7 @@ module Clash.Core.VarEnv
   )
 where
 
+import           Control.DeepSeq           (NFData)
 import           Data.Binary               (Binary)
 import           Data.Coerce               (coerce)
 import qualified Data.List                 as List
@@ -349,7 +350,7 @@ eltsVarSet = eltsUniqSet
 -- See "Secrets of the Glasgow Haskell Compiler inliner" Section 3.2 for the
 -- motivation
 data InScopeSet = InScopeSet VarSet {-# UNPACK #-} !Int
-  deriving (Generic, Binary)
+  deriving (Generic, NFData, Binary)
 
 instance ClashPretty InScopeSet where
   clashPretty (InScopeSet s _) = clashPretty s
