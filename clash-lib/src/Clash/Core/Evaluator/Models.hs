@@ -36,14 +36,14 @@ import Clash.Driver.Types (BindingMap, Binding(..))
 -- This consists of:
 --
 --   * evaluateWhnf, which evaluates terms to WHNF
---   * quote, which recursively evaluates sub-terms and eta-expands to NF
+--   * quoteNf, which recursively evaluates sub-terms and eta-expands to NF
 --
 -- Users of an evalautor can choose whether they convert terms to WHNF or NF,
 -- as the 'AsTerm' class (which converts back to Term) has instances for both.
 --
 data Evaluator = Evaluator
   { evaluateWhnf :: Term -> State Env Value
-  , quote        :: Value -> State Env Nf
+  , quoteNf      :: Value -> State Env Nf
   }
 
 -- | Evaluate a term to normal form without stopping at WHNF.
