@@ -315,7 +315,7 @@ foldlWithUnique' f s (UniqMap m) = IntMap.foldlWithKey' f s m
 --
 -- Invariant: they keys in the map are the uniques of the values
 newtype UniqSet a = UniqSet (IntMap a)
-  deriving (Foldable, Semigroup, Monoid, Binary)
+  deriving (Foldable, Semigroup, Monoid, NFData, Binary)
 
 instance ClashPretty a => ClashPretty (UniqSet a) where
   clashPretty (UniqSet env) =
