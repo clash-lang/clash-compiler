@@ -109,25 +109,73 @@ mkEnv bs = Env mempty mempty gs
  where
   gs = fmap Left <$> bs
 
+-- lookup
+
+lookupLocal :: Id -> Env -> Maybe (Either Term Value)
+lookupLocal i = Map.lookup i . envLocals
+
+lookupGlobal :: Id -> Env -> Maybe (Binding (Either Term Value))
+lookupGlobal i = lookupVarEnv i . envGlobals
+
+lookupPrim :: Int -> Env -> Maybe Value
+lookupPrim i = IntMap.lookup i . fst . envPrimsIO
+
+-- insert
+
+-- | Add a new type to the environment. The unique for the new
+-- element is guaranteed to be unique within the environment.
+--
+insertType :: TyVar -> Type -> Env -> Env
+insertType i ty env = env
+  { envTypes = Map.insert i' ty (envTypes env)
+  , envInScope = extendInScopeSet (envInScope env) i'
+  }
+ where
+  i' = uniqAway (envInScope env) i
+
+insertTypes :: [(TyVar, Type)] -> Env -> Env
+insertTypes xs env = foldl' (flip $ uncurry insertType) env xs
+
 -- | Add a new term / value to the local environment. The unique for the new
 -- element is guaranteed to be unique within the environment.
 --
-insertEnv :: Id -> Either Term Value -> Env -> Env
-insertEnv i etv env = env
+insertLocal :: Id -> Either Term Value -> Env -> Env
+insertLocal i etv env = env
   { envLocals  = Map.insert i' etv (envLocals env)
   , envInScope = extendInScopeSet (envInScope env) i'
   }
  where
   i' = uniqAway (envInScope env) i
 
-insertAllEnv :: [(Id, Either Term Value)] -> Env -> Env
-insertAllEnv xs env = foldl' (flip $ uncurry insertEnv) env xs
+insertLocals :: [(Id, Either Term Value)] -> Env -> Env
+insertLocals xs env = foldl' (flip $ uncurry insertLocal) env xs
 
--- | Update a local or global pure binding in the environment. If the Id is not
--- in the environment, the original environment is returned.
+-- | Add a new primitive to the environment. Primitives are keyed by an
+-- integer ID in the evaluator. If the prim already exists in the environment,
+-- you should call 'updateEnvPrim' instead.
 --
-updateEnv :: IdScope -> Id -> Either Term Value -> Env -> Env
-updateEnv scope i etv env =
+insertPrim :: Value -> Env -> Env
+insertPrim v env =
+  env { envPrimsIO = (IntMap.insert n v pm, n + 1) }
+ where
+  (pm, n) = envPrimsIO env
+
+-- update
+
+-- | Update a local binding in the environment. If the Id is not in the
+-- local environment, the original environment is returned.
+--
+updateLocal :: Id -> Either Term Value -> Env -> Env
+updateLocal = updatePure LocalId
+
+-- | Update a global binding in the environment. If the Id is not in the
+-- global environment, the original environment is returned.
+--
+updateGlobal :: Id -> Either Term Value -> Env -> Env
+updateGlobal = updatePure GlobalId
+
+updatePure :: IdScope -> Id -> Either Term Value -> Env -> Env
+updatePure scope i etv env =
   case scope of
     LocalId
       | Map.member i (envLocals env) ->
@@ -135,48 +183,30 @@ updateEnv scope i etv env =
 
     GlobalId
       | Just b <- lookupVarEnv i (envGlobals env) ->
-          let b' = b { bindingTerm = etv }
+          let b' = b { bindingTerm = etv}
            in env { envGlobals = extendVarEnv i b' (envGlobals env) }
 
     _ -> env
 
--- | Add a new type to the environment. The unique for the new
--- element is guaranteed to be unique within the environment.
---
-insertEnvTy :: TyVar -> Type -> Env -> Env
-insertEnvTy i ty env = env
-  { envTypes = Map.insert i' ty (envTypes env)
-  , envInScope = extendInScopeSet (envInScope env) i'
-  }
- where
-  i' = uniqAway (envInScope env) i
-
-insertAllEnvTys :: [(TyVar, Type)] -> Env -> Env
-insertAllEnvTys xs env = foldl' (flip $ uncurry insertEnvTy) env xs
-
--- | Add a new primitive to the environment. Primitives are keyed by an
--- integer ID in the evaluator. If the prim already exists in the environment,
--- you should call 'updateEnvPrim' instead.
---
-insertEnvPrim :: Value -> Env -> Env
-insertEnvPrim v env =
-  env { envPrimsIO = (IntMap.insert n v pm, n + 1) }
- where
-  (pm, n) = envPrimsIO env
-
--- | Delete the element with the speicified Id from the environment.
---
-deleteEnv :: IdScope -> Id -> Env -> Env
-deleteEnv scope i env =
-  case scope of
-    LocalId -> env { envLocals = Map.delete i (envLocals env) }
-    GlobalId -> env { envGlobals = delVarEnv (envGlobals env) i }
-
-updateEnvPrim :: Int -> Value -> Env -> Env
-updateEnvPrim i v env =
+updatePrim :: Int -> Value -> Env -> Env
+updatePrim i v env =
   env { envPrimsIO = (IntMap.insert i v pm, n) }
  where
   (pm, n) = envPrimsIO env
+
+-- delete
+
+deleteLocal :: Id -> Env -> Env
+deleteLocal = deletePure LocalId
+
+deleteGlobal :: Id -> Env -> Env
+deleteGlobal = deletePure GlobalId
+
+deletePure :: IdScope -> Id -> Env -> Env
+deletePure scope i env =
+  case scope of
+    LocalId -> env { envLocals = Map.delete i (envLocals env) }
+    GlobalId -> env { envGlobals = delVarEnv (envGlobals env) i }
 
 -- | Neutral terms cannot be reduced, as they represent things like variables
 -- which are unknown, partially applied functions, or case expressions where
