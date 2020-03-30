@@ -62,7 +62,13 @@ import           System.IO.Unsafe            (unsafePerformIO)
 import           BasicTypes                  (InlineSpec (..))
 
 import           Clash.Core.DataCon          (dcExtTyVars)
+
+#if EXPERIMENTAL_EVALUATOR
+import           Clash.Core.Evaluator.Models (partialEval, asTerm)
+#else
 import           Clash.Core.Evaluator.Types  (PureHeap, whnf')
+#endif
+
 import           Clash.Core.FreeVars
   (freeLocalVars, hasLocalFreeVars, localIdDoesNotOccurIn, localIdOccursIn,
    typeFreeVars, termFreeVars', freeLocalIds, globalIdOccursIn)
@@ -1117,7 +1123,7 @@ whnfRW
   -> Term
   -> Rewrite extra
   -> RewriteMonad extra Term
-whnfRW isSubj ctx@(TransformContext is0 _) e rw = do
+whnfRW _isSubj ctx@(TransformContext is0 _) e rw = do
   tcm <- Lens.view tcCache
   bndrs <- Lens.use bindings
   eval <- Lens.view evaluator
@@ -1125,12 +1131,21 @@ whnfRW isSubj ctx@(TransformContext is0 _) e rw = do
   let (ids1,ids2) = splitSupply ids
   uniqSupply Lens..= ids2
   gh <- Lens.use globalHeap
-  case whnf' eval bndrs tcm gh ids1 is0 isSubj e of
+
+#if EXPERIMENTAL_EVALUATOR
+  case partialEval eval bndrs gh tcm is0 ids1 e of
+    (!e', !gh') -> do
+      globalHeap Lens..= gh'
+      rw ctx (asTerm e')
+#else
+  case whnf' eval bndrs tcm gh ids1 is0 _isSubj e of
     (!gh1,ph,v) -> do
       globalHeap Lens..= gh1
       bindPureHeap tcm ph rw ctx v
+#endif
 {-# SCC whnfRW #-}
 
+#ifndef EXPERIMENTAL_EVALUATOR
 -- | Binds variables on the PureHeap over the result of the rewrite
 --
 -- To prevent unnecessary rewrites only do this when rewrite changed something.
@@ -1184,6 +1199,7 @@ bindPureHeap tcm heap rw ctx0@(TransformContext is0 hist) e = do
       where
         ty = termType tcm term
         nm = mkLocalId ty (mkUnsafeSystemName "x" uniq) -- See [Note: Name re-creation]
+#endif
 
     inlineTest _ (_, stripTicks -> e_) = isWorkFree e_
 
@@ -1216,3 +1232,4 @@ removeUnusedBinders binds body =
                           (extendVarEnv x (x,e0) env)
                           (eltsVarSet eFVs)
         Nothing -> env
+

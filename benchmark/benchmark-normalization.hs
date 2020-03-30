@@ -1,3 +1,4 @@
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE PartialTypeSignatures #-}
 
 {-# OPTIONS_GHC -Wno-orphans                 #-}
@@ -8,7 +9,13 @@ import           Clash.Core.TyCon
 import           Clash.Core.Var
 import           Clash.Driver
 import           Clash.Driver.Types
+
+#if EXPERIMENTAL_EVALUATOR
+import           Clash.GHC.PartialEval
+#else
 import           Clash.GHC.Evaluator
+#endif
+
 import           Clash.Netlist.Types          (TopEntityT)
 import           Clash.Primitives.Types
 
@@ -45,7 +52,12 @@ benchFile idirs src =
     \ ~((bindingsMap,tcm,tupTcm,_topEntities,primMap,reprs,topEntityNames,topEntity),supplyN) -> do
       bench ("normalization of " ++ src)
             (nf (normalizeEntity reprs bindingsMap primMap tcm tupTcm typeTrans
-                                 evaluator topEntityNames
+#if EXPERIMENTAL_EVALUATOR
+                                 ghcEvaluator
+#else
+                                 evaluator
+#endif
+                                 topEntityNames
                                  (opts idirs) supplyN :: _ -> BindingMap) topEntity)
 
 setupEnv

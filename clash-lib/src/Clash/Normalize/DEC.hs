@@ -26,6 +26,7 @@
   >       C -> h x
 -}
 
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecursiveDo #-}
 {-# LANGUAGE TemplateHaskell #-}
@@ -56,7 +57,13 @@ import           Data.Monoid                      (All (..))
 
 -- internal
 import Clash.Core.DataCon    (DataCon, dcTag)
+
+#if EXPERIMENTAL_EVALUATOR
+import Clash.Core.Evaluator.Models (partialEval, asTerm)
+#else
 import Clash.Core.Evaluator.Types  (whnf')
+#endif
+
 import Clash.Core.FreeVars
   (termFreeVars', typeFreeVars', localVarsDoNotOccurIn)
 import Clash.Core.Literal    (Literal (..))
@@ -150,8 +157,12 @@ collectGlobals' is0 substitution seen e@(collectArgsTicks -> (fun, args@(_:_), t
     ids <- Lens.use uniqSupply
     let (ids1,ids2) = splitSupply ids
     uniqSupply Lens..= ids2
+#if EXPERIMENTAL_EVALUATOR
+    let eval = asTerm . fst . partialEval evaluate bndrs gh tcm is0 ids1
+#else
     let eval = (Lens.view Lens._3) . whnf' evaluate bndrs tcm gh ids1 is0 False
-        eTy  = termType tcm e
+#endif
+    let eTy  = termType tcm e
     untran <- isUntranslatableType False eTy
     case untran of
       -- Don't lift out non-representable values, because they cannot be let-bound

@@ -20,6 +20,12 @@ flag cosim
    default: False
    manual: True
 
+flag experimental-evaluator
+  description:
+    Use the new partial evaluator (experimental; may break)
+  default: False
+  manual: True
+
 common basic-config
   default-language: Haskell2010
   ghc-options: -Wall -Wcompat
@@ -57,6 +63,9 @@ common basic-config
 
   if flag(cosim)
     cpp-options:       -DCOSIM
+
+  if flag(experimental-evaluator)
+    cpp-options:       -DEXPERIMENTAL_EVALUATOR
 
 library
   import: basic-config

@@ -90,6 +90,12 @@ flag unittests
   default: True
   manual: True
 
+flag experimental-evaluator
+  description:
+    Use the new partial evaluator (experimental; may break)
+  default: False
+  manual: True
+
 common common-options
   default-language:   Haskell2010
   default-extensions: BangPatterns
@@ -273,6 +279,9 @@ Library
 
   if flag(history)
     cpp-options:      -DHISTORY
+
+  if flag(experimental-evaluator)
+    cpp-options:      -DEXPERIMENTAL_EVALUATOR
 
 test-suite unittests
   import:           common-options

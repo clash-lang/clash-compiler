@@ -35,7 +35,12 @@ import Data.Monoid                           (Any)
 import qualified Data.Set                    as Set
 import GHC.Generics
 
+#if EXPERIMENTAL_EVALUATOR
+import Clash.Core.Evaluator.Models           (Evaluator, EnvPrimsIO)
+#else
 import Clash.Core.Evaluator.Types            (Evaluator, PrimHeap)
+#endif
+
 import Clash.Core.Term           (Term, Context)
 import Clash.Core.Type           (Type)
 import Clash.Core.TyCon          (TyConName, TyConMap)
@@ -75,7 +80,11 @@ data RewriteState extra
   -- ^ Function which is currently normalized
   , _nameCounter      :: {-# UNPACK #-} !Int
   -- ^ Used for 'Fresh'
+#if EXPERIMENTAL_EVALUATOR
+  , _globalHeap       :: EnvPrimsIO
+#else
   , _globalHeap       :: PrimHeap
+#endif
   -- ^ Used as a heap for compile-time evaluation of primitives that live in I/O
   , _workFreeBinders  :: VarEnv Bool
   -- ^ Map telling whether a binder's definition is work-free
