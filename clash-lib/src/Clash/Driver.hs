@@ -10,6 +10,7 @@
   Module that connects all the parts of the Clash compiler library
 -}
 
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE NondecreasingIndentation #-}
 {-# LANGUAGE QuasiQuotes #-}
@@ -76,7 +77,13 @@ import           Clash.Annotations.TopEntity
   (TopEntity (..), PortName(PortName, PortProduct))
 import           Clash.Annotations.TopEntity.Extra ()
 import           Clash.Backend
+
+#if EXPERIMENTAL_EVALUATOR
+import           Clash.Core.Evaluator.Models      (Evaluator)
+#else
 import           Clash.Core.Evaluator.Types       (Evaluator)
+#endif
+
 import           Clash.Core.Name                  (Name (..))
 import           Clash.Core.Pretty                (PrettyOptions(..), showPpr')
 import           Clash.Core.Term                  (Term)

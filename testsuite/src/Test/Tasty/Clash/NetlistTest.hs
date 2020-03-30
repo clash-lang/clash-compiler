@@ -32,7 +32,13 @@ import           Clash.Core.Type
 import           Clash.Core.Var
 import           Clash.Driver as Driver
 import           Clash.Driver.Types
+
+#if EXPERIMENTAL_EVALUATOR
+import           Clash.GHC.PartialEval
+#else
 import           Clash.GHC.Evaluator
+#endif
+
 import           Clash.GHC.GenerateBindings
 import           Clash.GHC.NetlistTypes
 import           Clash.Netlist
@@ -99,7 +105,12 @@ runToNetlistStage target f src = do
   supplyN <- Supply.newSupply
 
   let transformedBindings = normalizeEntity reprs bm pm tcm tupTcm typeTrans
-          evaluator teNames opts supplyN te
+#if EXPERIMENTAL_EVALUATOR
+          ghcEvaluator
+#else
+          evaluator
+#endif
+          teNames opts supplyN te
 
   fmap (force . fst) $ netlistFrom (transformedBindings, tcm, tes, pm, reprs, te)
  where

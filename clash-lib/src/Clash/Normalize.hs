@@ -36,7 +36,13 @@ import           BasicTypes                       (InlineSpec (..))
 
 import           Clash.Annotations.BitRepresentation.Internal
   (CustomReprs)
+
+#if EXPERIMENTAL_EVALUATOR
+import           Clash.Core.Evaluator.Models      (Evaluator)
+#else
 import           Clash.Core.Evaluator.Types       (Evaluator)
+#endif
+
 import           Clash.Core.FreeVars
   (freeLocalIds, globalIds, globalIdOccursIn, localIdDoesNotOccurIn)
 import           Clash.Core.Pretty                (PrettyOptions(..), showPpr, showPpr', ppr)

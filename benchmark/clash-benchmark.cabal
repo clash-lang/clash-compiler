@@ -9,6 +9,12 @@ category:            Testing
 build-type:          Simple
 cabal-version:       >=1.10
 
+flag experimental-evaluator
+  description:
+    Use the new partial evaluator (experimental; may break)
+  default: False
+  manual: True
+
 library
   HS-Source-Dirs:      common
   default-language:    Haskell2010
@@ -24,6 +30,9 @@ library
                        clash-ghc,
                        clash-lib,
                        clash-prelude
+
+  if flag(experimental-evaluator)
+    cpp-options: -DEXPERIMENTAL_EVALUATOR
 
 executable clash-benchmark-normalization
   main-is:             benchmark-normalization.hs
@@ -42,3 +51,6 @@ executable clash-benchmark-normalization
                        clash-ghc,
                        clash-lib,
                        clash-prelude
+
+  if flag(experimental-evaluator)
+    cpp-options: -DEXPERIMENTAL_EVALUATOR

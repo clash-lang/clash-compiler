@@ -7,6 +7,7 @@ module Clash.Core.Evaluator.Models where
 import Control.Concurrent.Supply (Supply)
 import Control.Monad ((>=>))
 import Control.Monad.State.Strict (State)
+import qualified Control.Monad.State.Strict as State (runState)
 import Control.DeepSeq (NFData(..))
 import Data.Bifunctor (first, second)
 import Data.Foldable (foldl')
@@ -31,6 +32,20 @@ import Clash.Core.VarEnv
   )
 
 import Clash.Driver.Types (BindingMap, Binding(..))
+
+partialEval
+  :: Evaluator
+  -> BindingMap
+  -> EnvPrimsIO
+  -> TyConMap
+  -> InScopeSet
+  -> Supply
+  -> Term
+  -> (Nf, EnvPrimsIO)
+partialEval eval bs ps tcm iss ids x =
+  envPrimsIO <$> State.runState (evaluateNf eval x) env
+ where
+  env = mkEnv bs ps tcm iss ids
 
 -- | An evaluator contains the basic functions that define partial evaluation.
 -- This consists of:

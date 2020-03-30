@@ -1,10 +1,17 @@
+{-# LANGUAGE CPP #-}
+
 import           Clash.Annotations.TopEntity
 import           Clash.Annotations.BitRepresentation.Internal (CustomReprs)
 import           Clash.Core.TyCon
 import           Clash.Core.Var
 import           Clash.Driver
 import           Clash.Driver.Types
+
+#if EXPERIMENTAL_EVALUATOR
+import           Clash.GHC.PartialEval
+#else
 import           Clash.GHC.Evaluator
+#endif
 
 import qualified Control.Concurrent.Supply    as Supply
 import           Control.DeepSeq              (deepseq)
@@ -37,7 +44,12 @@ benchFile idirs src = do
   let (bindingsMap,tcm,tupTcm,_topEntities,primMap,reprs,topEntityNames,topEntity) = env
       primMap' = fmap (fmap unremoveBBfunc) primMap
       res :: BindingMap
-      res = normalizeEntity reprs bindingsMap primMap' tcm tupTcm typeTrans evaluator
+      res = normalizeEntity reprs bindingsMap primMap' tcm tupTcm typeTrans
+#if EXPERIMENTAL_EVALUATOR
+                   ghcEvaluator
+#else
+                   evaluator
+#endif
                    topEntityNames (opts idirs) supplyN topEntity
   res `deepseq` putStrLn ".. done\n"
 
