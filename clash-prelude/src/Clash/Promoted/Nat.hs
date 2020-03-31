@@ -386,11 +386,11 @@ showBNat = go []
 toBNat :: SNat n -> BNat n
 toBNat s@SNat = toBNat' (snatToInteger s)
   where
-    toBNat' :: Integer -> BNat m
+    toBNat' :: forall m . Integer -> BNat m
     toBNat' 0 = unsafeCoerce BT
     toBNat' n = case n `divMod` 2 of
-      (n',1) -> unsafeCoerce (B1 (toBNat' n'))
-      (n',_) -> unsafeCoerce (B0 (toBNat' n'))
+      (n',1) -> unsafeCoerce (B1 (toBNat' @(Div (m-1) 2) n'))
+      (n',_) -> unsafeCoerce (B0 (toBNat' @(Div m 2) n'))
 
 -- | Convert a base-2 encoded natural number to its singleton representation
 --
