@@ -1,0 +1,1 @@
+FIXED: Synthesis of `fromBNat (toBNat d5)` failed due to `unsafeCoerce` coercing from `Any`
