@@ -330,7 +330,7 @@ Library
                       half                      >= 0.2.2.3 && < 1.0,
                       lens                      >= 4.10    && < 4.20,
                       recursion-schemes         >= 5.1     && < 5.2,
-                      QuickCheck                >= 2.7     && < 2.14,
+                      QuickCheck                >= 2.7     && < 2.15,
                       reflection                >= 2       && < 2.2,
                       singletons                >= 1.0     && < 3.0,
                       template-haskell          >= 2.12.0.0 && < 2.16,
