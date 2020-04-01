@@ -1,4 +1,5 @@
 {-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE MagicHash #-}
 
 module Clash.GHC.PartialEval
   ( ghcEvaluator
@@ -6,10 +7,12 @@ module Clash.GHC.PartialEval
 
 import Control.Monad.State.Strict (State)
 import qualified Control.Monad.State.Strict as State
+import GHC.Integer.GMP.Internals (Integer(..))
 
 import Clash.Core.DataCon
 import Clash.Core.Evaluator.Models
 import Clash.Core.Evaluator.Semantics
+import Clash.Core.Literal
 import Clash.Core.Term
 import Clash.Core.Type
 
@@ -27,36 +30,75 @@ ghcEvaluate = \case
   App x y -> evaluateAppWith ghcEvaluate ghcApply x y
   TyApp x ty -> evaluateTyAppWith ghcEvaluate ghcTyApply x ty
   Letrec bs x -> evaluateLetrecWith ghcEvaluate bs x
-  Case x ty xs -> evaluateCaseWith ghcEvaluate x ty xs
+  Case x ty xs -> evaluateCaseWith ghcEvaluate ghcIsLiteral ghcIsData x ty xs
   Cast x a b -> evaluateCastWith ghcEvaluate x a b
   Tick ti x -> evaluateTickWith ghcEvaluate ti x
 
+-- TODO Implement evaluation for primitives and call here.
+--
 ghcEvaluatePrim :: PrimInfo -> [Either Value Type] -> State Env Value
-ghcEvaluatePrim _p _args = undefined
+ghcEvaluatePrim p args = pure (VPrim p args)
+
+-- TODO
+ghcIsLiteral :: Literal -> Pat -> Bool
+ghcIsLiteral l = \case
+  DataPat c [] [_]
+    |  IntegerLiteral i <- l
+    -> case i of
+         S# _  -> dcTag c == 1
+         Jp# _ -> dcTag c == 2
+         Jn# _ -> dcTag c == 3
+
+    |  NaturalLiteral i <- l
+    -> case i of
+         S# _  -> dcTag c == 1 && i >= 0
+         Jp# _ -> dcTag c == 2
+         Jn# _ -> False
+
+    |  otherwise
+    -> False
+
+  LitPat m -> l == m
+  DefaultPat -> True
+  _ -> False
+
+ghcIsData :: DataCon -> Pat -> Bool
+ghcIsData dc = \case
+  DataPat c _ _ -> dc == c
+  LitPat _ -> False
+  DefaultPat -> True
 
 ghcApply :: Value -> Value -> State Env Value
-ghcApply x y =
-  case x of
+ghcApply x y = do
+  res <- case x' of
     VNeu (NeData dc args) -> applyToData dc (args <> [Left y])
     VNeu (NePrim p args) -> applyToPrim p (args <> [Left y])
     VNeu n -> pure (VNeu (NeApp n y))
-    VLam i x' env ->
+    VLam i x'' env ->
       let addBinder = insertLocal i (Right y)
-       in State.put env >> State.withState addBinder (ghcEvaluate x')
+       in State.put env >> State.withState addBinder (ghcEvaluate x'')
 
-    _ -> error ("ghcApply: Cannot apply value to " <> show x)
+    _ -> error ("ghcApply: Cannot apply value to " <> show x')
+
+  pure (addTicks res ts)
+ where
+  (x', ts) = collectValueTicks x
 
 ghcTyApply :: Value -> Type -> State Env Value
-ghcTyApply x ty =
-  case x of
+ghcTyApply x ty = do
+  res <- case x' of
     VNeu (NeData dc args) -> applyToData dc (args <> [Right ty])
     VNeu (NePrim p args) -> applyToPrim p (args <> [Right ty])
     VNeu n -> pure (VNeu (NeTyApp n ty))
-    VTyLam i x' env ->
+    VTyLam i x'' env ->
       let addBinder = insertType i ty
-       in State.put env >> State.withState addBinder (ghcEvaluate x')
+       in State.put env >> State.withState addBinder (ghcEvaluate x'')
 
-    _ -> error ("ghcTyApply: Cannot apply type to " <> show x)
+    _ -> error ("ghcTyApply: Cannot apply type to " <> show x')
+
+  pure (addTicks res ts)
+ where
+  (x', ts) = collectValueTicks x
 
 applyToData :: DataCon -> [Either Value Type] -> State Env Value
 applyToData dc args

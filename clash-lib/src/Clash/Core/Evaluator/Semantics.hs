@@ -55,12 +55,11 @@ evaluateVarWith eval i = do
      -> either (State.withState (deleteLocal i) . eval) pure etv
 
      |  Just b <- lookupGlobal i env
-     -> if canInline (bindingSpec b)
-           then either (State.withState (deleteGlobal i) . eval) pure (bindingTerm b)
-           else pure (VNeu (NeVar i))
+     ,  canInline (bindingSpec b)
+     -> either (State.withState (deleteGlobal i) . eval) pure (bindingTerm b)
 
      |  otherwise
-     -> error ("evaluateVarWith: Variable not in environment: " <> show i)
+     -> pure (VNeu (NeVar i))
  where
   canInline spec = spec == Inline || spec == Inlinable
 
@@ -167,13 +166,16 @@ evaluateLetrecWith eval bs x =
 --
 evaluateCaseWith
   :: (Term -> State Env Value)
+  -> (Literal -> Pat -> Bool)
+  -> (DataCon -> Pat -> Bool)
   -> Term
   -> Type
   -> [Alt]
   -> State Env Value
-evaluateCaseWith eval x ty ys = do
+evaluateCaseWith eval matchLit matchData x ty ys = do
   evalX <- eval x
 
+  -- TODO Strip ticks?
   case evalX of
     VLit l ->
       case findMatchingAlt (matchLit l) ys of
@@ -189,14 +191,6 @@ evaluateCaseWith eval x ty ys = do
       evalYs <- traverse (traverse eval) ys
       pure (VNeu (NeCase v ty evalYs))
  where
-  matchLit lit (LitPat l) = lit == l
-  matchLit _ DefaultPat = True
-  matchLit _ _ = False
-
-  matchData dc (DataPat c _ _) = dc == c
-  matchData _ DefaultPat = True
-  matchData _ _ = False
-    
   findMatchingAlt p as =
     case filter (p . fst) as of
       [] -> Nothing
@@ -297,10 +291,10 @@ quoteNeVar :: Id -> State Env (Neutral Nf)
 quoteNeVar = pure . NeVar
 
 quoteNeData :: DataCon -> [Either Value Type] -> State Env (Neutral Nf)
-quoteNeData = undefined
+quoteNeData dc = error ("quoteNeData: " <> show dc)
 
 quoteNePrim :: PrimInfo -> [Either Value Type] -> State Env (Neutral Nf)
-quoteNePrim = undefined
+quoteNePrim p = pure . NePrim p
 
 quoteNeAppWith
   :: (Value -> State Env Nf)
