@@ -724,7 +724,7 @@ outputTest env targets extraClashArgs extraGhcArgs modName funcName path =
   testGroup testName
     [outputTest' env target extraClashArgs extraGhcArgs modName funcName path' | target <- targets]
 
-netlistTest'
+clashLibTest'
   :: FilePath
   -- ^ Work directory
   -> BuildTarget
@@ -740,7 +740,7 @@ netlistTest'
   -- item in the list will be the root node, while the first one will be the
   -- one closest to the test.
   -> TestTree
-netlistTest' env target extraGhcArgs modName funcName path =
+clashLibTest' env target extraGhcArgs modName funcName path =
   withResource acquire tastyRelease (const seqTests)
     where
       path' = show target:path
@@ -754,7 +754,7 @@ netlistTest' env target extraGhcArgs modName funcName path =
              , "runghc"
              ]
              ++ langExts ++
-             [ "-DNETLISTTEST"
+             [ "-DCLASHLIBTEST"
              , "--ghc-arg=-package"
              , "--ghc-arg=clash-testsuite"
              , "--ghc-arg=-main-is"
@@ -770,7 +770,7 @@ netlistTest' env target extraGhcArgs modName funcName path =
         [ ("runghc", testProgram "runghc" "cabal" args NoGlob PrintStdErr False Nothing)
         ]
 
-netlistTest
+clashLibTest
   :: FilePath
   -- ^ Work directory
   -> [BuildTarget]
@@ -786,9 +786,9 @@ netlistTest
   -- item in the list will be the root node, while the first one will be the
   -- one closest to the test.
   -> TestTree
-netlistTest env targets extraGhcArgs modName funcName path =
-  let testName = modName ++ " [netlist test]" in
+clashLibTest env targets extraGhcArgs modName funcName path =
+  let testName = modName ++ " [clash-lib test]" in
   let path' = testName : path in
   testGroup testName
-    [netlistTest' env target extraGhcArgs modName funcName path' | target <- targets]
+    [clashLibTest' env target extraGhcArgs modName funcName path' | target <- targets]
 

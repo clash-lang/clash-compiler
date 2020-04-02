@@ -42,8 +42,8 @@ clashTestGroup testName testTrees =
 runClashTest :: IO ()
 runClashTest = defaultMain $ clashTestRoot
   [ clashTestGroup "netlist"
-    [ netlistTest ("tests" </> "shouldwork" </> "Netlist") allTargets [] "Identity" "main"
-    , netlistTest ("tests" </> "shouldwork" </> "Netlist") [VHDL] [] "NoDeDup" "main"
+    [ clashLibTest ("tests" </> "shouldwork" </> "Netlist") allTargets [] "Identity" "main"
+    , clashLibTest ("tests" </> "shouldwork" </> "Netlist") [VHDL] [] "NoDeDup" "main"
     ]
   , clashTestGroup "examples"
     [ runTest "ALU" def{hdlSim=False}
@@ -382,7 +382,7 @@ runClashTest = defaultMain $ clashTestRoot
         [ runTest "T967a" def{hdlSim=False}
         , runTest "T967b" def{hdlSim=False}
         , runTest "T967c" def{hdlSim=False}
-        , netlistTest ("tests" </> "shouldwork" </> "Naming") allTargets [] "T1041" "main"
+        , clashLibTest ("tests" </> "shouldwork" </> "Naming") allTargets [] "T1041" "main"
         ]
       , clashTestGroup "Numbers"
         [ runTest "BitInteger" def
@@ -511,8 +511,8 @@ runClashTest = defaultMain $ clashTestRoot
         , runTest "PortNamesWithRTree" def{hdlTargets=[Verilog],entities=Entities [["", "PortNamesWithRTree_topEntity", "PortNamesWithRTree_testBench"]], topEntities=TopEntities ["PortNamesWithRTree_testBench"]}
         , outputTest ("tests" </> "shouldwork" </> "TopEntity") [Verilog] [] [] "PortNamesWithRTree" "main"
         , outputTest ("tests" </> "shouldwork" </> "TopEntity") allTargets [] [] "PortGeneration" "main"
-        , netlistTest ("tests" </> "shouldwork" </> "TopEntity") allTargets [] "T1182A" "main"
-        , netlistTest ("tests" </> "shouldwork" </> "TopEntity") allTargets [] "T1182B" "main"
+        , clashLibTest ("tests" </> "shouldwork" </> "TopEntity") allTargets [] "T1182A" "main"
+        , clashLibTest ("tests" </> "shouldwork" </> "TopEntity") allTargets [] "T1182B" "main"
         , runTest "TopEntHOArg" def{entities=Entities [["f", "g"]], topEntities=TopEntities ["f"], hdlSim=False}
         , runTest "T701" def {hdlSim=False,entities=Entities [["mynot", ""]]}
         , runTest "T1033" def {hdlSim=False,entities=Entities [["top", ""]], topEntities=TopEntities ["top"]}
@@ -577,10 +577,10 @@ runClashTest = defaultMain $ clashTestRoot
       , clashTestGroup "XOptimization"
         [ outputTest  ("tests" </> "shouldwork" </> "XOptimization") allTargets [] [] "Conjunction"  "main"
         , outputTest  ("tests" </> "shouldwork" </> "XOptimization") allTargets [] [] "Disjunction"  "main"
-        , netlistTest ("tests" </> "shouldwork" </> "XOptimization") allTargets [] "OneDefinedDataPat" "main"
-        , netlistTest ("tests" </> "shouldwork" </> "XOptimization") allTargets [] "OneDefinedLitPat" "main"
-        , netlistTest ("tests" </> "shouldwork" </> "XOptimization") allTargets [] "OneDefinedDefaultPat" "main"
-        , netlistTest ("tests" </> "shouldwork" </> "XOptimization") allTargets [] "ManyDefined" "main"
+        , clashLibTest ("tests" </> "shouldwork" </> "XOptimization") allTargets [] "OneDefinedDataPat" "main"
+        , clashLibTest ("tests" </> "shouldwork" </> "XOptimization") allTargets [] "OneDefinedLitPat" "main"
+        , clashLibTest ("tests" </> "shouldwork" </> "XOptimization") allTargets [] "OneDefinedDefaultPat" "main"
+        , clashLibTest ("tests" </> "shouldwork" </> "XOptimization") allTargets [] "ManyDefined" "main"
         ]
       ] -- end shouldwork
     ] -- end tests
