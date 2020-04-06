@@ -68,7 +68,13 @@ import DataCon    (DataCon,
 import DynFlags   (unsafeGlobalDynFlags)
 import FamInstEnv (FamInst (..), FamInstEnvs,
                    familyInstances)
+
+#if MIN_VERSION_ghc(8,10,0)
+import FastString (unpackFS, bytesFS)
+#else
 import FastString (unpackFS, fastStringToByteString)
+#endif
+
 import Id         (isDataConId_maybe)
 import IdInfo     (IdDetails (..), unfoldingInfo)
 import Literal    (Literal (..))
@@ -268,7 +274,13 @@ makeAlgTyConRhs algTcRhs = case algTcRhs of
 #else
   SumTyCon dcs -> Just <$> C.DataTyCon <$> mapM coreToDataCon dcs
 #endif
-  NewTyCon dc _ (rhsTvs,rhsEtad) _ -> Just <$> (C.NewTyCon <$> coreToDataCon dc
+
+#if MIN_VERSION_ghc(8,10,0)
+  NewTyCon dc _ (rhsTvs,rhsEtad) _ _ ->
+#else
+  NewTyCon dc _ (rhsTvs,rhsEtad) _ ->
+#endif
+                                      Just <$> (C.NewTyCon <$> coreToDataCon dc
                                                            <*> ((,) <$> mapM coreToTyVar rhsTvs
                                                                     <*> coreToType rhsEtad
                                                                )
@@ -644,7 +656,11 @@ coreToDataCon dc = do
     mkDc dcTy repTys
   where
     mkDc dcTy repTys = do
+#if MIN_VERSION_ghc(8,10,0)
+      let decLabel = decodeUtf8 . bytesFS . flLabel
+#else
       let decLabel = decodeUtf8 . fastStringToByteString . flLabel
+#endif
       let fLabels  = map decLabel (dataConFieldLabels dc)
 
       nm   <- coreToName dataConName getUnique qualifiedNameString dc
@@ -843,7 +859,12 @@ coreToType' (ForAllTy (Bndr tv _) ty)   = C.ForAllTy <$> coreToTyVar tv <*> core
 #else
 coreToType' (ForAllTy (TvBndr tv _) ty) = C.ForAllTy <$> coreToTyVar tv <*> coreToType ty
 #endif
+#if MIN_VERSION_ghc(8,10,0)
+-- TODO after we drop 8.8: save the distinction between => and ->
+coreToType' (FunTy _ ty1 ty2)             = C.mkFunTy <$> coreToType ty1 <*> coreToType ty2
+#else
 coreToType' (FunTy ty1 ty2)             = C.mkFunTy <$> coreToType ty1 <*> coreToType ty2
+#endif
 coreToType' (LitTy tyLit)    = return $ C.LitTy (coreToTyLit tyLit)
 coreToType' (AppTy ty1 ty2)  = C.AppTy <$> coreToType ty1 <*> coreToType' ty2
 coreToType' t@(CastTy _ _)   = error ("Cannot handle CastTy " ++ showPpr unsafeGlobalDynFlags t)
