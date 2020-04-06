@@ -1,5 +1,6 @@
 {-# LANGUAGE CPP, FlexibleInstances, DeriveFunctor #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-}
+{-# OPTIONS_GHC -Wno-name-shadowing #-}
 
 -----------------------------------------------------------------------------
 --
@@ -9,7 +10,7 @@
 --
 -----------------------------------------------------------------------------
 
-module GHCi.UI.Monad (
+module Clash.GHCi.UI.Monad (
         GHCi(..), startGHCi,
         GHCiState(..), GhciMonad(..),
         GHCiOption(..), isOptionSet, setOption, unsetOption,
@@ -35,7 +36,7 @@ module GHCi.UI.Monad (
 
 #include "HsVersions.h"
 
-import GHCi.UI.Info (ModInfo)
+import Clash.GHCi.UI.Info (ModInfo)
 import qualified GHC
 import GhcMonad         hiding (liftIO)
 import Outputable       hiding (printForUser, printForUserPartWay)

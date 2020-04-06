@@ -3,9 +3,10 @@
 {-# LANGUAGE OverloadedStrings   #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE ViewPatterns        #-}
+{-# OPTIONS_GHC -Wno-name-shadowing #-}
 
 -- | Get information on modules, expressions, and identifiers
-module GHCi.UI.Info
+module Clash.GHCi.UI.Info
     ( ModInfo(..)
     , SpanInfo(..)
     , spanInfoFromRealSrcSpan
