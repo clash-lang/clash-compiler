@@ -112,7 +112,9 @@ common common-options
 library
   import:             common-options
   HS-Source-Dirs:     src-ghc, src-bin-common
-  if impl(ghc >= 8.7.0)
+  if impl(ghc >= 8.10.0)
+    HS-Source-Dirs: src-bin-8.10
+  elif impl(ghc >= 8.8.0)
     HS-Source-Dirs: src-bin-881
   elif impl(ghc >= 8.6.0)
     HS-Source-Dirs: src-bin-861
@@ -120,7 +122,10 @@ library
     HS-Source-Dirs: src-bin-841
 
   GHC-Options:        -Wall -Wcompat
-  CPP-Options:        -DGHCI
+  if impl(ghc >= 8.10.0)
+    CPP-Options:        -DHAVE_INTERNAL_INTERPRETER
+  else
+    CPP-Options:        -DGHCI
 
   other-extensions:   FlexibleContexts
                       OverloadedStrings
@@ -134,7 +139,7 @@ library
                       containers                >= 0.5.4.0  && < 0.7,
                       directory                 >= 1.2      && < 1.4,
                       filepath                  >= 1.3      && < 1.5,
-                      ghc                       >= 8.4.0    && < 8.9,
+                      ghc                       >= 8.4.0    && < 8.11,
                       process                   >= 1.2      && < 1.7,
                       hashable                  >= 1.1.2.3  && < 1.4,
                       haskeline                 >= 0.7.0.3  && < 0.9,
@@ -153,16 +158,19 @@ library
                       ghc-typelits-natnormalise >= 0.6      && < 0.8,
                       deepseq                   >= 1.3.0.2  && < 1.5,
                       time                      >= 1.4.0.1  && < 1.11,
-                      ghc-boot                  >= 8.4.0    && < 8.9,
+                      ghc-boot                  >= 8.4.0    && < 8.11,
                       ghc-prim                  >= 0.3.1.0  && < 0.6,
-                      ghci                      >= 8.4.0    && < 8.9,
+                      ghci                      >= 8.4.0    && < 8.11,
                       uniplate                  >= 1.6.12   && < 1.8,
                       reflection                >= 2.1.2    && < 3.0,
                       integer-gmp               >= 1.0.1.0  && < 2.0,
                       primitive                 >= 0.5.0.1  && < 1.0,
-                      template-haskell          >= 2.8.0.0  && < 2.16,
+                      template-haskell          >= 2.8.0.0  && < 2.17,
                       utf8-string               >= 1.0.0.0  && < 1.1.0.0,
                       vector                    >= 0.11     && < 1.0
+  if impl(ghc >= 8.10.0)
+    Build-Depends:    exceptions                >= 0.10.4   && < 0.11,
+
   if flag(use-ghc-paths)
     Build-Depends:    ghc-paths
     CPP-Options:      -DUSE_GHC_PATHS=1
