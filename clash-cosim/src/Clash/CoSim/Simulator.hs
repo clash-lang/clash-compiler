@@ -29,7 +29,7 @@ import Clash.CoSim.Paths_clash_cosim
 #endif
 
 -- Haskell
-import Data.List
+import Data.List (mapAccumL, mapAccumR, transpose)
 import Data.Maybe
 import Prelude
 import qualified Data.Text as T
