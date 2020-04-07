@@ -142,6 +142,7 @@ workflows:
       - ghc-8.6.5-singular-hidden
       # - ghc-8.6.5
       - ghc-8.8.3
+      - ghc-8.10.1
       - stack-build
       - nix-build
 
@@ -160,6 +161,11 @@ jobs:
     environment:
       <<: *env
       GHC: ghc-8.8.3
+    <<: *build_default
+  ghc-8.10.1:
+    environment:
+      <<: *env
+      GHC: ghc-8.10.1
     <<: *build_default
   ghc-8.6.5-singular-hidden:
     environment:

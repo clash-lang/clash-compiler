@@ -44,6 +44,8 @@ ghc-8.4.4:
 #  extends: .tests
 ghc-8.8.3:
   extends: .tests-interruptible
+ghc-8.10.1:
+  extends: .tests-interruptible
 ghc-8.6.5-singular-hidden:
   extends: .tests-interruptible
   variables:
@@ -63,6 +65,10 @@ ghc-8.4.4-master:
 #ghc-8.6.5:
 #  extends: .tests
 ghc-8.8.3-master:
+  extends: .tests
+  only:
+    - master
+ghc-8.10.1-master:
   extends: .tests
   only:
     - master
