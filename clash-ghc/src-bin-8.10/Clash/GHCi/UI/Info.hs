@@ -3,7 +3,7 @@
 {-# LANGUAGE OverloadedStrings   #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE ViewPatterns        #-}
-{-# OPTIONS_GHC -Wno-name-shadowing #-}
+{-# OPTIONS_GHC -Wno-name-shadowing -Wno-compat-unqualified-imports #-}
 
 -- | Get information on modules, expressions, and identifiers
 module Clash.GHCi.UI.Info

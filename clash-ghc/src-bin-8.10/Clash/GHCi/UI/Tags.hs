@@ -7,6 +7,7 @@
 -----------------------------------------------------------------------------
 
 {-# OPTIONS_GHC -fno-warn-name-shadowing #-}
+{-# OPTIONS_GHC -Wno-compat-unqualified-imports #-}
 
 module Clash.GHCi.UI.Tags (
   createCTagsWithLineNumbersCmd,

@@ -8,7 +8,7 @@ import Clash.Prelude
 import Clash.Prelude.Testbench
 import Clash.CoSim (verilog, verilogWithSettings, period, defaultSettings)
 
-import Data.List as L
+import qualified Data.List as L
 
 import Test.Tasty
 import Test.Tasty.HUnit
