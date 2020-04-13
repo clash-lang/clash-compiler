@@ -89,6 +89,7 @@ instance Exception XException
 defaultSeqX :: NFDataX a => a -> b -> b
 defaultSeqX = if fSuperStrict then deepseqX else seqX
 {-# INLINE defaultSeqX #-}
+infixr 0 `defaultSeqX`
 
 -- | Like 'error', but throwing an 'XException' instead of an 'ErrorCall'
 --
@@ -453,6 +454,7 @@ forceX x = x `deepseqX` x
 deepseqX :: NFDataX a => a -> b -> b
 deepseqX a b = rnfX a `seq` b
 {-# NOINLINE deepseqX #-}
+infixr 0 `deepseqX`
 
 -- | Reduce to weak head normal form
 --
