@@ -32,4 +32,25 @@ assign ~RESULT = ~SYM[1];
 // romFile end"
     }
   }
+, { "BlackBox" :
+    { "name" : "Clash.Explicit.ROM.File.asyncRomFile#"
+    , "kind" : "Declaration"
+    , "type" :
+"asyncRomFile :: KnownNat m -- ARG[0]
+              => SNat n     -- sz,   ARG[1]
+              -> FilePath   -- file, ARG[2]
+              -> Int        -- rd,   ARG[3]
+              -> BitVector m"
+    , "template" :
+"// asyncRomFile begin
+~SIGDO[~GENSYM[ROM][0]] [0:~LIT[1]-1];
+
+initial begin
+  $readmemb(~FILE[~LIT[2]],~SYM[0]);
+end
+
+assign ~RESULT = ~SYM[0][~ARG[3]];
+// asyncRomFile end"
+    }
+  }
 ]

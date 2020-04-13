@@ -81,6 +81,7 @@ module Clash.Explicit.ROM.File
   , romFilePow2
     -- * Internal
   , romFile#
+  , asyncRomFile#
   )
 where
 
@@ -92,6 +93,7 @@ import Clash.Explicit.BlockRam.File (initMem)
 import Clash.Promoted.Nat           (SNat (..), pow2SNat, snatToNum)
 import Clash.Sized.BitVector        (BitVector)
 import Clash.Explicit.Signal        (Clock, Enable, Signal, KnownDomain, delay)
+import Clash.Signal.Internal        (mapSignalStrict#)
 import Clash.Sized.Unsigned         (Unsigned)
 import Clash.XException             (NFDataX(deepErrorX))
 
@@ -192,9 +194,24 @@ romFile#
   -> Signal dom (BitVector m)
   -- ^ The value of the ROM at address @rd@ from the previous clock cycle
 romFile# clk en sz file rd =
-  delay clk en (deepErrorX "First value of romFile is undefined") ((content !) <$> rd)
- where
-  mem     = unsafePerformIO (initMem file)
-  content = listArray (0,szI-1) mem
-  szI     = snatToNum sz
+  asyncRomFile# sz file `mapSignalStrict#`
+  delay clk en (deepErrorX "First value of romFile is undefined") rd
 {-# NOINLINE romFile# #-}
+
+-- | asyncROMFile primitive
+asyncRomFile#
+  :: KnownNat m
+  => SNat n
+  -- ^ Size of the ROM
+  -> FilePath
+  -- ^ File describing the content of the ROM
+  -> Int
+  -- ^ Read address @rd@
+  -> BitVector m
+  -- ^ The value of the ROM at address @rd@
+asyncRomFile# sz file = (content !) -- Leave "(content !)" eta-reduced, see
+  where                             -- Note [Eta-reduction and unsafePerformIO initMem]
+    mem     = unsafePerformIO (initMem file)
+    content = listArray (0,szI-1) mem
+    szI     = snatToNum sz
+{-# NOINLINE asyncRomFile# #-}

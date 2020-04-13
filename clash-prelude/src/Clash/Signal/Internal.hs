@@ -119,6 +119,7 @@ module Clash.Signal.Internal
   , (.<.), (.<=.), (.>=.), (.>.)
     -- ** 'Functor'
   , mapSignal#
+  , mapSignalStrict#
     -- ** 'Applicative'
   , signal#
   , appSignal#
@@ -132,7 +133,7 @@ module Clash.Signal.Internal
 where
 
 import Type.Reflection            (Typeable)
-import Control.Applicative        (liftA2, liftA3)
+import Control.Applicative        (liftA2)
 import Control.DeepSeq            (NFData)
 import Clash.Annotations.Primitive (hasBlackBox)
 import Data.Binary                (Binary)
@@ -662,6 +663,13 @@ mapSignal# f = go
 {-# NOINLINE mapSignal# #-}
 {-# ANN mapSignal# hasBlackBox #-}
 
+mapSignalStrict# :: forall a b dom . (a -> b) -> Signal dom a -> Signal dom b
+mapSignalStrict# f = go
+  where
+    go (a :- as) = f a :- (a `seqX` go as)
+{-# NOINLINE mapSignalStrict# #-}
+{-# ANN mapSignalStrict# hasBlackBox #-}
+
 instance Applicative (Signal dom) where
   pure  = signal#
   (<*>) = appSignal#
@@ -1104,16 +1112,13 @@ register# (Clock dom) rst (fromEnable -> ena) powerUpVal0 resetVal =
 {-# NOINLINE register# #-}
 {-# ANN register# hasBlackBox #-}
 
--- | The above type is a generalization for:
---
--- @
--- __mux__ :: 'Clash.Signal.Signal' 'Bool' -> 'Clash.Signal.Signal' a -> 'Clash.Signal.Signal' a -> 'Clash.Signal.Signal' a
--- @
---
--- A multiplexer. Given "@'mux' b t f@", output @t@ when @b@ is 'True', and @f@
+-- | A multiplexer. Given "@'mux' b t f@", output @t@ when @b@ is 'True', and @f@
 -- when @b@ is 'False'.
-mux :: Applicative f => f Bool -> f a -> f a -> f a
-mux = liftA3 (\b t f -> if b then t else f)
+mux :: Signal dom Bool -> Signal dom a -> Signal dom a -> Signal dom a
+mux = \bs ts fs ->
+  (\b t f -> if b then t else f) `mapSignalStrict#` bs
+                                 `appSignal#` ts
+                                 `appSignal#` fs
 {-# INLINE mux #-}
 
 infix 4 .==.

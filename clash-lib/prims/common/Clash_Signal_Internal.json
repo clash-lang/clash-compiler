@@ -11,6 +11,12 @@
     }
   }
 , { "Primitive" :
+    { "name"      : "Clash.Signal.Internal.mapSignalStrict#"
+    , "workInfo"  : "Never"
+    , "primType"  : "Function"
+    }
+  }
+, { "Primitive" :
     { "name"      : "Clash.Signal.Internal.appSignal#"
     , "workInfo"  : "Never"
     , "primType"  : "Function"

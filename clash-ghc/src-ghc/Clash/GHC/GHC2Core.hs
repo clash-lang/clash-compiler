@@ -297,6 +297,9 @@ coreToTerm primMap unlocs = term
         go "Clash.Signal.Internal.mapSignal#"  args
           | length args == 5
           = term (App (args!!3) (args!!4))
+        go "Clash.Signal.Internal.mapSignalStrict#" args
+          | length args == 5
+          = term (App (args!!3) (args!!4))
         go "Clash.Signal.Internal.signal#"     args
           | length args == 3
           = term (args!!2)
@@ -460,7 +463,7 @@ coreToTerm primMap unlocs = term
               | Just n <- parseBundle "bundle" f        -> return (bundleUnbundleTerm (n+1) xType)
               | Just n <- parseBundle "unbundle" f      -> return (bundleUnbundleTerm (n+1) xType)
               | f == "Clash.Signal.Internal.mapSignal#" -> return (mapSignalTerm xType)
-              | f == "Clash.Signal.Internal.mapSignal#" -> return (mapSignalTerm xType)
+              | f == "Clash.Signal.Internal.mapSignalStrict#" -> return (mapSignalTerm xType)
               | f == "Clash.Signal.Internal.signal#"    -> return (signalTerm xType)
               | f == "Clash.Signal.Internal.appSignal#" -> return (appSignalTerm xType)
               | f == "Clash.Signal.Internal.traverse#"  -> return (traverseTerm xType)

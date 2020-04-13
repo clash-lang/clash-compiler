@@ -76,18 +76,13 @@ module Clash.Prelude.ROM.File
     -- * Synchronous ROM synchronized to an arbitrary clock
   , romFile
   , romFilePow2
-    -- * Internal
-  , asyncRomFile#
   )
 where
 
-import           Data.Array                   (listArray,(!))
 import           GHC.TypeLits                 (KnownNat)
-import           System.IO.Unsafe             (unsafePerformIO)
 
-import           Clash.Explicit.BlockRam.File (initMem)
 import qualified Clash.Explicit.ROM.File      as E
-import           Clash.Promoted.Nat           (SNat (..), pow2SNat, snatToNum)
+import           Clash.Promoted.Nat           (SNat (..), pow2SNat)
 import           Clash.Signal
 import           Clash.Sized.BitVector        (BitVector)
 import           Clash.Sized.Unsigned         (Unsigned)
@@ -144,7 +139,7 @@ asyncRomFile
   -- ^ Read address @rd@
   -> BitVector m
   -- ^ The value of the ROM at address @rd@
-asyncRomFile sz file = asyncRomFile# sz file . fromEnum
+asyncRomFile sz file = E.asyncRomFile# sz file . fromEnum
 -- Leave 'asyncRom' eta-reduced, see Note [Eta-reduction and unsafePerformIO initMem]
 {-# INLINE asyncRomFile #-}
 
@@ -222,24 +217,6 @@ asyncRomFilePow2
   -- ^ The value of the ROM at address @rd@
 asyncRomFilePow2 = asyncRomFile (pow2SNat (SNat @ n))
 {-# INLINE asyncRomFilePow2 #-}
-
--- | asyncROMFile primitive
-asyncRomFile#
-  :: KnownNat m
-  => SNat n
-  -- ^ Size of the ROM
-  -> FilePath
-  -- ^ File describing the content of the ROM
-  -> Int
-  -- ^ Read address @rd@
-  -> BitVector m
-  -- ^ The value of the ROM at address @rd@
-asyncRomFile# sz file = (content !) -- Leave "(content !)" eta-reduced, see
-  where                             -- Note [Eta-reduction and unsafePerformIO initMem]
-    mem     = unsafePerformIO (initMem file)
-    content = listArray (0,szI-1) mem
-    szI     = snatToNum sz
-{-# NOINLINE asyncRomFile# #-}
 
 -- | A ROM with a synchronous read port, with space for @n@ elements
 --
