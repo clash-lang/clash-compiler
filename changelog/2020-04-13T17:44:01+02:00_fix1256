@@ -1,0 +1,2 @@
+FIXED: Memory leak in register primitives [#1256](https://github.com/clash-lang/clash-compiler/issues/1256)
+CHANGED: Infix use of `deepseqX` is now right-associative
