@@ -66,6 +66,8 @@ import           Clash.Util
   (SrcSpan, noSrcSpan, clogBase, curLoc, first, makeCached, on, indexNote)
 import           Clash.Util.Graph                     (reverseTopSort)
 
+import           Clash.Backend.Verilog (Range (..), continueWithRange)
+
 -- | State for the 'Clash.Netlist.VHDL.VHDLM' monad:
 data VHDLState =
   VHDLState
@@ -1465,222 +1467,9 @@ expr_
   -> VHDLM Doc
 expr_ _ (Literal sizeM lit) = exprLit sizeM lit
 expr_ _ (Identifier id_ Nothing) = pretty id_
-expr_ _ (Identifier id_ (Just (Indexed (CustomSP _id dataRepr _size args,dcI,fI)))) =
-  case fieldTy of
-    Void {} ->
-      error (unexpectedProjectionErrorMsg dataRepr dcI fI)
-    _ -> do
-      nm <- Mon $ use modNm
-      let cast = qualTyName resultType <> squote
-      let fSLV = stringS (TextS.toLower nm) <> "_types.fromSLV"
-      cast <> parens (fSLV <> parens (hcat $ punctuate " & " $ ranges))
- where
-  resultType = fieldTypes !! fI
-  (ConstrRepr' _name _n _mask _value anns, _, fieldTypes) = args !! dcI
 
-  ranges =
-    mapM range $ bitRanges (anns !! fI)
-
-  range (start, end) =
-    pretty id_ <> parens (int start <+> "downto" <+> int end)
-
-  fieldTy = indexNote ($(curLoc) ++ "panic") fieldTypes fI
-
-expr_ b (Identifier id_ (Just (Indexed (ty@(SP _ args),dcI,fI)))) = do
-  nm <- Mon $ use modNm
-  case b of
-    True ->
-      (case normaliseType argTy of
-        BitVector {} -> id
-        _ -> (\x -> pretty (TextS.toLower nm) <> "_types.fromSLV" <> parens x))
-      (pretty id_ <> parens (int start <+> "downto" <+> int end))
-    _ -> fromSLV argTy id_ start end
- where
-   argTys   = snd $ args !! dcI
-   argTy    = argTys !! fI
-   argSize  = typeSize argTy
-   other    = otherSize argTys (fI-1)
-   start    = typeSize ty - 1 - conSize ty - other
-   end      = start - argSize + 1
-
-expr_ _ (Identifier id_ (Just (Indexed (CustomProduct _ dataRepr _ _ tys, dcI, fI)))) =
-  case fieldTy of
-    Void {} ->
-      error (unexpectedProjectionErrorMsg dataRepr dcI fI)
-    _ -> do
-      modNm' <- Mon (use modNm)
-      let cast = qualTyName fieldTy <> squote
-      let fSLV = stringS (TextS.toLower modNm') <> "_types.fromSLV"
-      cast <> parens (fSLV <> parens (hcat $ punctuate " & " $ ranges))
- where
-  (fieldAnn, fieldTy) = indexNote ($(curLoc) ++ "panic") tys fI
-  ranges = mapM range (bitRanges fieldAnn)
-  range (start, end) = pretty id_ <> parens (int start <+> "downto" <+> int end)
-
-expr_ _ (Identifier id_ (Just (Indexed (ty@(Product _ labels tys),_,fI)))) =
-  pretty id_ <> dot <> tyName ty <> selectProductField labels tys fI
-
-expr_ _ (Identifier id_ (Just (Indexed ((Vector _ elTy),1,0)))) = do
-  syn <- Mon hdlSyn
-  case syn of
-    Vivado -> do
-      id' <- fmap (T.toStrict . renderOneLine) (pretty id_ <> parens (int 0))
-      fromSLV elTy id' (typeSize elTy - 1) 0
-    _ -> pretty id_ <> parens (int 0)
-expr_ _ (Identifier id_ (Just (Indexed ((Vector n _),1,1)))) = pretty id_ <> parens (int 1 <+> "to" <+> int (n-1))
-
--- This is a "Hack", we cannot construct trees with a negative depth. This is
--- here so that we can recognise merged RTree modifiers. See the code in
--- @Clash.Backend.nestM@ which construct these tree modifiers.
-expr_ _ (Identifier id_ (Just (Indexed (RTree (-1) _,l,r)))) =
-  pretty id_ <> parens (int l <+> "to" <+> int (r-1))
-
-expr_ _ (Identifier id_ (Just (Indexed ((RTree 0 elTy),0,0)))) = do
-  syn <- Mon hdlSyn
-  case syn of
-    Vivado -> do
-      id' <- fmap (T.toStrict . renderOneLine) (pretty id_ <> parens (int 0))
-      fromSLV elTy id' (typeSize elTy - 1) 0
-    _ -> pretty id_ <> parens (int 0)
-expr_ _ (Identifier id_ (Just (Indexed ((RTree n _),1,0)))) =
-  let z = 2^(n-1)
-  in  pretty id_ <> parens (int 0 <+> "to" <+> int (z-1))
-expr_ _ (Identifier id_ (Just (Indexed ((RTree n _),1,1)))) =
-  let z  = 2^(n-1)
-      z' = 2^n
-  in  pretty id_ <> parens (int z <+> "to" <+> int (z'-1))
-
--- This is a HACK for Clash.Driver.TopWrapper.mkOutput
--- Vector's don't have a 10'th constructor, this is just so that we can
--- recognize the particular case
-expr_ _ (Identifier id_ (Just (Indexed ((Vector _ elTy),10,fI)))) = do
-  syn <- Mon hdlSyn
-  case syn of
-    Vivado -> do
-      id' <- fmap (T.toStrict . renderOneLine) (pretty id_ <> parens (int fI))
-      fromSLV elTy id' (typeSize elTy - 1) 0
-    _ -> pretty id_ <> parens (int fI)
-
--- This is a HACK for Clash.Driver.TopWrapper.mkOutput
--- RTree's don't have a 10'th constructor, this is just so that we can
--- recognize the particular case
-expr_ _ (Identifier id_ (Just (Indexed ((RTree _ elTy),10,fI)))) = do
-  syn <- Mon hdlSyn
-  case syn of
-    Vivado -> do
-      id' <- fmap (T.toStrict . renderOneLine) (pretty id_ <> parens (int fI))
-      fromSLV elTy id' (typeSize elTy - 1) 0
-    _ -> pretty id_ <> parens (int fI)
-
-expr_ _ (Identifier id_ (Just (DC (ty@(SP _ _),_)))) = pretty id_ <> parens (int start <+> "downto" <+> int end)
-  where
-    start = typeSize ty - 1
-    end   = typeSize ty - conSize ty
-
--- [Note] integer projection
---
--- The idea behind these expressions is to translate cases like:
---
--- > :: Int8 -> Int#
--- > \case I8# i -> i
---
--- Which is fine, because no bits are lost. However, these expression might
--- also be the result of the W/W transformation (or uses of unsafeToInteger)
--- for:
---
--- > :: Signed 128 -> Integer
--- > \case S i -> i
---
--- which is very bad because `Integer` is represented by 64 bits meaning we
--- we lose the top 64 bits in the above translation.
---
--- Just as bad is that
---
--- > :: Word8 -> Word#
--- > \case W8# w -> w
---
--- > :: Unsigned 8 -> Integer
--- > \case U i -> i
---
--- result in the same expression... even though their resulting types are
--- different. TODO: this needs  to be fixed!
-expr_ _ (Identifier id_ (Just (Indexed ((Signed w),_,_))))  = do
-  iw <- Mon $ use intWidth
-  traceIf (iw < w) ($(curLoc) ++ "WARNING: result smaller than argument") $
-    "resize" <> parens (pretty id_ <> "," <> int iw)
-expr_ _ (Identifier id_ (Just (Indexed ((Unsigned w),_,_)))) = do
-  iw <- Mon $ use intWidth
-  traceIf (iw < w) ($(curLoc) ++ "WARNING: result smaller than argument") $
-    "resize" <> parens (pretty id_ <> "," <> int iw)
-
--- [Note] mask projection
---
--- This covers the case of either:
---
--- `Clash.Sized.Internal.BitVector.unsafeToMask` or
---
--- > :: BitVector 8 -> Integer
--- > \case BV m wild -> m
---
--- introduced by the W/W transformation. Both of which we prefer not to see
--- but will allow. Since the mask is pretty much a simulation artifact we
--- emit don't cares so stuff gets optimised away.
-expr_ _ (Identifier _ (Just (Indexed ((BitVector _),_,0)))) = do
-  iw <- Mon $ use intWidth
-  traceIf True ($(curLoc) ++ "WARNING: synthesizing bitvector mask to dontcare") $
-    sizedQualTyNameErrValue (Signed iw)
-
--- [Note] bitvector projection
---
--- This covers the case of either:
---
--- `Clash.Sized.Internal.BitVector.unsafeToInteger` or
---
--- > :: BitVector 8 -> Integer
--- > \case BV wild i -> i
---
--- introduced by the
-expr_ _ (Identifier id_ (Just (Indexed ((BitVector w),_,1)))) = do
-  iw <- Mon $ use intWidth
-  traceIf (iw < w) ($(curLoc) ++ "WARNING: result smaller than argument") $
-    "signed" <> parens ("std_logic_vector" <> parens ("resize" <>
-      parens ("unsigned" <> parens (pretty id_) <> "," <> int iw)))
-
-expr_ _ (Identifier id_ (Just (Sliced (BitVector _,start,end)))) =
-  pretty id_ <> parens (int start <+> "downto" <+> int end)
-
-expr_ b (Identifier id_ (Just (Nested (Indexed ((Vector n elTy),1,1)) m0))) = go 1 m0
- where
-  go s (Nested (Indexed ((Vector {}),1,1)) m1) = go (s+1) m1
-  go s (Indexed (Vector {},1,1)) = pretty id_ <> parens (int (s+1) <+> "to" <+> int (n-1))
-  go s (Indexed (Vector {},1,0)) = do
-    syn <- Mon hdlSyn
-    case syn of
-      Vivado -> do
-        id' <- fmap (T.toStrict . renderOneLine) (pretty id_ <> parens (int s))
-        fromSLV elTy id' (typeSize elTy - 1) 0
-      _ -> pretty id_ <> parens (int s)
-  -- This is a HACK for Clash.Driver.TopWrapper.mkOutput
--- Vector's don't have a 10'th constructor, this is just so that we can
--- recognize the particular case
-  go s (Indexed (Vector {},10,fI)) = do
-    syn <- Mon hdlSyn
-    case syn of
-      Vivado -> do
-        id' <- fmap (T.toStrict . renderOneLine) (pretty id_ <> parens (int (s+fI)))
-        fromSLV elTy id' (typeSize elTy - 1) 0
-      _ -> pretty id_ <> parens (int (s+fI))
-  go s m1 = do
-    k <- pretty id_ <> parens (int s <+> "to" <+> int (n-1))
-    expr b (Identifier (T.toStrict $ renderOneLine k) (Just m1))
-
-expr_ b (Identifier id_ (Just (Nested m1 m2))) = case nestM m1 m2 of
-  Just m3 -> expr_ b (Identifier id_ (Just m3))
-  _ -> do
-    k <- expr_ True (Identifier id_ (Just m1))
-    expr_ b (Identifier (T.toStrict $ renderOneLine k) (Just m2))
-
-expr_ _ (Identifier id_ (Just _)) = pretty id_
+expr_ _ (Identifier id_ (Just m)) =
+  maybe (pretty id_) (foldr renderModifier (pretty id_)) (buildModifier [] m)
 
 expr_ b (DataCon _ (DC (Void {}, -1)) [e]) =  expr_ b e
 
@@ -2016,46 +1805,6 @@ toSLV (Vector _ _) e = do
   pretty (TextS.toLower nm) <> "_types.toSLV" <> parens (expr_ False e)
 toSLV hty e = error $ $(curLoc) ++  "toSLV:\n\nType: " ++ show hty ++ "\n\nExpression: " ++ show e
 
-fromSLV :: HasCallStack => HWType -> Identifier -> Int -> Int -> VHDLM Doc
-fromSLV Bool              id_ start _   = do
-  nm <- Mon $ use modNm
-  pretty (TextS.toLower nm) <> "_types.fromSLV" <> parens (pretty id_ <> parens (int start <+> "downto" <+> int start))
-fromSLV Bit                 id_ start _   = pretty id_ <> parens (int start)
-fromSLV (BitVector _)       id_ start end = pretty id_ <> parens (int start <+> "downto" <+> int end)
-fromSLV (Index _)           id_ start end = "unsigned" <> parens (pretty id_ <> parens (int start <+> "downto" <+> int end))
-fromSLV (Signed _)          id_ start end = "signed" <> parens (pretty id_ <> parens (int start <+> "downto" <+> int end))
-fromSLV (Unsigned _)        id_ start end = "unsigned" <> parens (pretty id_ <> parens (int start <+> "downto" <+> int end))
-fromSLV (Sum _ _)           id_ start end = pretty id_ <> parens (int start <+> "downto" <+> int end)
-fromSLV (CustomSum _ _ _ _) id_ start end = pretty id_ <> parens (int start <+> "downto" <+> int end)
-fromSLV t@(Product _ labels tys) id_ start _ = do
-    tupled $ zipWithM (\s e -> s <+> rarrow <+> e) selNames args
-  where
-    tName      = tyName t
-    selNames   = [tName <> selectProductField labels tys i | i <- [0..]]
-    argLengths = map typeSize tys
-    starts     = start : snd (mapAccumL ((join (,) .) . (-)) start argLengths)
-    ends       = map (+1) (tail starts)
-    args       = zipWith3 (`fromSLV` id_) tys starts ends
-
-fromSLV (CustomSP _ _ _ _)  id_ start end = pretty id_ <> parens (int start <+> "downto" <+> int end)
-fromSLV (CustomProduct {})  id_ start end = pretty id_ <> parens (int start <+> "downto" <+> int end)
-fromSLV (SP _ _)            id_ start end = pretty id_ <> parens (int start <+> "downto" <+> int end)
-fromSLV (Vector n elTy)     id_ start _   =
-    if n > 1 then tupled args
-             else parens (int 0 <+> rarrow <+> fmap head args)
-  where
-    argLength = typeSize elTy
-    starts    = take (n + 1) $ iterate (subtract argLength) start
-    ends      = map (+1) (tail starts)
-    args      = do syn <- Mon hdlSyn
-                   let elTy' = case syn of
-                                 Vivado -> BitVector (argLength - 1)
-                                 _ -> elTy
-                   zipWithM (fromSLV elTy' id_) starts ends
-fromSLV (Clock {})        id_ start _   = pretty id_ <> parens (int start)
-fromSLV (Reset {})        id_ start _   = pretty id_ <> parens (int start)
-fromSLV hty               _   _     _   = error $ $(curLoc) ++ "fromSLV: " ++ show hty
-
 dcToExpr :: HWType -> Int -> Expr
 dcToExpr ty i = Literal (Just (ty,conSize ty)) (NumLit (toInteger i))
 
@@ -2081,3 +1830,339 @@ tupledSemi :: Applicative f => f [Doc] -> f Doc
 tupledSemi = align . encloseSep (flatAlt (lparen <+> emptyDoc) lparen)
                                 (flatAlt (emptyDoc <+> rparen) rparen)
                                 (semi <+> emptyDoc)
+
+-- | VHDL name modifiers
+data VHDLModifier
+  -- | SLV slice (descending index)
+  = Range    Range
+  -- | Element selection
+  | Idx      Int
+  -- | Array slice (ascending index)
+  | Slice    Int Int
+  -- | Selected names
+  | Select   (VHDLM Doc)
+  -- | Projecting a 'Word#' out of a 'Word8', or 'Int#' ouf of an 'Int8', see
+  -- [Note] integer projection
+  | Resize
+  -- | Projecting a 'Natural' out of a 'BitVector', see [Note] bitvector projection
+  | ResizeAndConvert
+  -- | Projecting the mask out of a 'BitVector', see [Note] mask projection
+  | DontCare
+
+-- | Create a sequence of VHDL name modifiers from our internal 'Modifier'
+-- data type. Note that the modifiers are in "reverse" order, so build a
+-- complete modified name using 'foldr' over the list by this function.
+--
+-- [Note] Continuing from an SLV slice
+-- SOP and custom products are represented as std_logic_vector, this means that
+-- their elements are also std_logic_vector. So when we project an element out
+-- of an SOP or custom project, and want to do a further projection on that,
+-- we have to do further SLV slicing; instead of e.g. creating a 'selected'
+-- modifier. Finally, when we render the modified name, we have to check
+-- whether the ultimately projected type needs to be converted from this SLV
+-- slice, to the proper type.
+buildModifier
+  :: HasCallStack
+  => [(VHDLModifier,HWType)]
+  -- ^ The list of modifiers so far, note that this list is in reverse order
+  -- in which they should eventually be applied to the name we want to modify
+  -> Modifier
+  -> Maybe [(VHDLModifier,HWType)]
+  -- ^ 'Nothing' indicates that the 'Modifier' does not result into a VHDL name
+  -- modifier. i.e. we can use the identifier as is; this happens when we get
+  -- projections out of product types with only one non-zero field.
+buildModifier prevM (Sliced (_,start,end)) = case prevM of
+  (prev:rest)
+    | (Range r,_) <- prev -> -- See [Note] Continuing from an SLV slice
+      Just (first Range (continueWithRange [(start,end)] hty r) : rest)
+  _ ->
+      Just ((Range (Contiguous start end),hty) : prevM)
+ where
+  hty = BitVector (start-end+1)
+
+buildModifier prevM (Indexed (ty@(SP _ args),dcI,fI)) = case prevM of
+  (prev:rest)
+    | (Range r,_) <- prev -> -- See [Note] Continuing from an SLV slice
+      Just (first Range (continueWithRange [(start,end)] argTy r) : rest)
+  _ ->
+      Just ((Range (Contiguous start end),argTy) : prevM)
+ where
+  argTys   = snd (indexNote "SOP type: invalid constructor index" args dcI)
+  argTy    = indexNote "SOP type: invalid field index" argTys fI
+  argSize  = typeSize argTy
+  other    = otherSize argTys (fI-1)
+  start    = typeSize ty - 1 - conSize ty - other
+  end      = start - argSize + 1
+
+buildModifier prevM (Indexed (ty@(Product _ labels tys),_,fI)) = case prevM of
+  (prev:rest)
+    | (Range r,_) <- prev -> -- See [Note] Continuing from an SLV slice
+      let argSize = typeSize argTy
+          otherSz = otherSize tys (fI - 1)
+          start   = typeSize ty - 1 - otherSz
+          end     = start - argSize + 1
+      in  Just (first Range (continueWithRange [(start,end)] argTy r) : rest)
+  _ ->
+      let d = dot <> tyName ty <> selectProductField labels tys fI
+      in  Just ((Select d,argTy):prevM)
+ where
+  argTy = indexNote "Product type: invalid field index" tys fI
+
+buildModifier prevM (Indexed (ty@(Vector _ argTy),1,0)) = case prevM of
+  (prev:rest)
+    | (Range r,_) <- prev -> -- See [Note] Continuing from an SLV slice
+      let argSize = typeSize argTy
+          start   = typeSize ty - 1
+          end     = start - argSize + 1
+      in  Just (first Range (continueWithRange [(start,end)] argTy r) : rest)
+    | (Slice start _,Vector _ argTyP) <- prev
+    , argTy == argTyP ->
+      -- If the last modifier was an array slice, we just pick its first element
+      Just ((Idx start,argTy):rest)
+  _ ->
+      Just ((Idx 0,argTy):prevM)
+
+buildModifier prevM (Indexed (ty@(Vector n argTy),1,1)) = case prevM of
+  (prev:rest)
+    | (Range r,_) <- prev -> -- See [Note] Continuing from an SLV slice
+      let argSize = typeSize argTy
+          start   = typeSize ty - argSize - 1
+      in  Just (first Range (continueWithRange [(start,0)] tyN r) : rest)
+    | (Slice start end,Vector _ argTyP) <- prev
+    , argTy == argTyP ->
+      -- If the last modifier was an array slice, we just pick the tail of that slice
+      Just ((Slice (start + 1) end,tyN) : rest)
+  _ ->
+      Just ((Slice 1 (n-1),tyN) : prevM)
+ where
+  tyN = Vector (n-1) argTy
+
+buildModifier prevM (Indexed (ty@(RTree _ argTy),0,0)) = case prevM of
+  (prev:rest)
+    | (Range r,_) <- prev -> -- See [Note] Continuing from an SLV slice
+      let start = typeSize ty - 1
+      in  Just (first Range (continueWithRange [(start,0)] argTy r) : rest)
+    | (Slice start _,RTree _ argTyP) <- prev
+    , argTy == argTyP ->
+      -- If the last modifier was an array slice, we just pick its first element
+      Just ((Idx start,argTy):rest)
+  _ ->
+      Just ((Idx 0,argTy):prevM)
+
+buildModifier prevM (Indexed (ty@(RTree d argTy),1,0)) = case prevM of
+  (prev:rest)
+    | (Range r,_) <- prev -> -- See [Note] Continuing from an SLV slice
+      let start = typeSize ty - 1
+          end   = typeSize ty `div` 2
+      in  Just (first Range (continueWithRange [(start,end)] tyN r) : rest)
+    | (Slice start _,RTree _ argTyP) <- prev
+    , argTy == argTyP ->
+      -- If the last modifier was an array slice, we just pick the left half
+      Just ((Slice start (start+z-1),tyN) : rest)
+  _ ->
+      Just ((Slice 0 (z-1),tyN) : prevM)
+ where
+  tyN = RTree (d-1) argTy
+  z   = 2^(d - 1)
+
+buildModifier prevM (Indexed (ty@(RTree d argTy),1,1)) = case prevM of
+  (prev:rest)
+    | (Range r,_) <- prev -> -- See [Note] Continuing from an SLV slice
+      let start = typeSize ty `div` 2 - 1
+      in  Just (first Range (continueWithRange [(start,0)] tyN r) : rest)
+    | (Slice _ end,RTree _ argTyP) <- prev
+    , argTy == argTyP ->
+      -- If the last modifier was an array slice, we just pick the right half
+      Just ((Slice (end - z + 1) end,tyN) : rest)
+  _ ->
+      Just ((Slice z (z'-1),tyN) : prevM)
+ where
+  tyN = RTree (d-1) argTy
+  z   = 2^(d - 1)
+  z'  = 2^d
+
+-- This is a HACK for Clash.Driver.TopWrapper.mkOutput
+-- Vector's don't have a 10'th constructor, this is just so that we can
+-- recognize the particular case
+buildModifier prevM (Indexed (ty@(Vector _ argTy),10,fI)) = case prevM of
+  (prev:rest)
+    | (Range r,_) <- prev -> -- See [Note] Continuing from an SLV slice
+      let argSize = typeSize argTy
+          start   = typeSize ty - (fI * argSize) - 1
+          end     = start - argSize + 1
+      in  Just (first Range (continueWithRange [(start,end)] argTy r) : rest)
+    | (Slice start _,Vector _ argTyP) <- prev
+    , argTy == argTyP ->
+      -- If the last modifier was an array slice, we offset from its starting element
+      Just ((Idx (start+fI),argTy):rest)
+  _ ->
+      Just ((Idx fI,argTy):prevM)
+
+-- This is a HACK for Clash.Driver.TopWrapper.mkOutput
+-- RTree's don't have a 10'th constructor, this is just so that we can
+-- recognize the particular case
+buildModifier prevM (Indexed (ty@(RTree _ argTy),10,fI)) = case prevM of
+  (prev:rest)
+    | (Range r,_) <- prev -> -- See [Note] Continuing from an SLV slice
+      let argSize = typeSize argTy
+          start   = typeSize ty - (fI * argSize) - 1
+          end     = start - argSize + 1
+      in  Just (first Range (continueWithRange [(start,end)] argTy r) : rest)
+    | (Slice start _,RTree 1 argTyP) <- prev
+    , argTy == argTyP ->
+      -- If the last modifier was an array slice, we offset from its starting element
+      Just ((Idx (start+fI),argTy):rest)
+  _ ->
+      Just ((Idx fI,argTy):prevM)
+
+buildModifier prevM (Indexed (CustomSP _ dataRepr size args,dcI,fI))
+  | Void {} <- argTy
+  = error (unexpectedProjectionErrorMsg dataRepr dcI fI)
+  | otherwise
+  = case prevM of
+    (prev:rest)
+      | (Range r,_) <- prev -> -- See [Note] Continuing from an SLV slice
+        Just (first Range (continueWithRange ses argTy r) : rest)
+    _ ->
+        Just (first Range (continueWithRange ses argTy (Contiguous (size-1) 0)) : prevM)
+ where
+  (ConstrRepr' _name _n _mask _value anns, _, argTys) =
+    indexNote "Custom SOP type: invalid constructor index" args dcI
+  ses = bitRanges (indexNote "Custom SOP type: invalid annotation index" anns fI)
+  argTy = indexNote "Custom SOP type: invalid field index" argTys fI
+
+buildModifier prevM (Indexed (CustomProduct _ dataRepr size _ args,dcI,fI))
+  | Void {} <- argTy
+  = error (unexpectedProjectionErrorMsg dataRepr dcI fI)
+  | DataRepr' _typ _size [cRepr] <- dataRepr
+  , ConstrRepr' _cName _pos _mask _val fieldAnns <- cRepr
+  , let ses = bitRanges (indexNote "Custom product type: invalid annotation index"
+                         fieldAnns fI)
+  = case prevM of
+      (prev:rest)
+        | (Range r,_) <- prev -> -- See [Note] Continuing from an SLV slice
+          Just (first Range (continueWithRange ses argTy r) : rest)
+      _ ->
+          Just (first Range (continueWithRange ses argTy (Contiguous (size-1) 0)):prevM)
+ where
+  argTy = snd (indexNote "Custom product type: invalid field index" args fI)
+
+buildModifier prevM (DC (ty@(SP _ _),_)) = case prevM of
+  (prev:rest)
+    | (Range r,_) <- prev -> -- See [Note] Continuing from an SLV slice
+      Just (first Range (continueWithRange [(start,end)] tyN r) : rest)
+  _ ->
+      Just ((Range (Contiguous start end),tyN):prevM)
+ where
+  start = typeSize ty - 1
+  end   = typeSize ty - conSize ty
+  tyN   = BitVector (start - end + 1)
+
+buildModifier prevM (Nested m1 m2) = case buildModifier prevM m1 of
+  Nothing -> buildModifier prevM m2
+  Just prevM1 -> case buildModifier prevM1 m2 of
+      -- In case the second modifier is `Nothing` that means we want the entire
+      -- thing calculated by the first modifier
+      Nothing -> Just prevM1
+      m       -> m
+
+-- [Note] integer projection
+--
+-- The idea behind these expressions is to translate cases like:
+--
+-- > :: Int8 -> Int#
+-- > \case I8# i -> i
+--
+-- Which is fine, because no bits are lost. However, these expression might
+-- also be the result of the W/W transformation (or uses of unsafeToInteger)
+-- for:
+--
+-- > :: Signed 128 -> Integer
+-- > \case S i -> i
+--
+-- which is very bad because `Integer` is represented by 64 bits meaning we
+-- we lose the top 64 bits in the above translation.
+--
+-- Just as bad is that
+--
+-- > :: Word8 -> Word#
+-- > \case W8# w -> w
+--
+-- > :: Unsigned 8 -> Integer
+-- > \case U i -> i
+--
+-- result in the same expression... even though their resulting types are
+-- different. TODO: this needs  to be fixed!
+buildModifier prevM (Indexed (ty@(Signed _),_,_)) = Just ((Resize,ty):prevM)
+buildModifier prevM (Indexed (ty@(Unsigned _),_,_)) = Just ((Resize,ty):prevM)
+
+-- [Note] mask projection
+--
+-- This covers the case of either:
+--
+-- `Clash.Sized.Internal.BitVector.unsafeToMask` or
+--
+-- > :: BitVector 8 -> Integer
+-- > \case BV m wild -> m
+--
+-- introduced by the W/W transformation. Both of which we prefer not to see
+-- but will allow. Since the mask is pretty much a simulation artifact we
+-- emit don't cares so stuff gets optimised away.
+buildModifier prevM (Indexed (ty@(BitVector _),_,0)) = Just ((DontCare,ty):prevM)
+
+-- [Note] bitvector projection
+--
+-- This covers the case of either:
+--
+-- `Clash.Sized.Internal.BitVector.unsafeToNatural` or
+--
+-- > :: BitVector 8 -> Integer
+-- > \case BV wild i -> i
+--
+-- introduced by the W/W transformation. Both of which we prefer not to see
+-- but will allow.
+buildModifier prevM (Indexed (ty@(BitVector _),_,1)) = Just ((ResizeAndConvert,ty):prevM)
+
+buildModifier _ _ = Nothing
+
+-- | Render a VHDL modifier on to of a (potentially modified) VHDL name
+renderModifier
+  :: (VHDLModifier,HWType)
+  -> VHDLM Doc
+  -- ^ (Potentially modified) VHDL name
+  -> VHDLM Doc
+  -- ^ Modified VHDL name
+renderModifier (Idx n,_) doc = doc <> parens (int n)
+renderModifier (Slice start end,_) doc = doc <> parens (int start <+> "to" <+> int end)
+renderModifier (Select sel,_) doc = doc <> sel
+-- See [Note] integer projection
+renderModifier (Resize,ty) doc = do
+  iw <- Mon (use intWidth)
+  -- These integer projections always come last, so it's safe not to return a
+  -- modified name, but an expression instead.
+  traceIf (iw < typeSize ty) ($(curLoc) ++ "WARNING: result smaller than argument") $
+    "resize" <> parens (doc <> "," <> int iw)
+renderModifier (ResizeAndConvert,ty) doc = do
+  iw <- Mon (use intWidth)
+  -- These natural projections always come last, so it's safe not to return a
+  -- modified name, but an expression instead.
+  traceIf (iw < typeSize ty) ($(curLoc) ++ "WARNING: result smaller than argument") $
+    "resize" <> parens ("unsigned" <> parens doc <> "," <> int iw)
+-- See [Note] mask projection
+renderModifier (DontCare,_) _ = do
+  iw <- Mon (use intWidth)
+  -- These mask projections always come last, so it's safe not to return a
+  -- modified name, but an expression instead.
+  traceIf True ($(curLoc) ++ "WARNING: rendering bitvector mask as dontcare") $
+    sizedQualTyNameErrValue (Signed iw)
+renderModifier (Range r,t) doc = do
+  nm <- Mon (use modNm)
+  let doc1 = case r of
+        Contiguous start end -> slice start end
+        Split rs -> parens (hcat (punctuate " & " (mapM (\(s,e,_) -> slice s e) rs)))
+  case normaliseType t of
+    BitVector _ -> doc1
+    -- See [Note] Continuing from an SLV slice
+    _ -> pretty (TextS.toLower nm) <> "_types.fromSLV" <> parens doc1
+ where
+  slice s e = doc <> parens (int s <+> "downto" <+> int e)
