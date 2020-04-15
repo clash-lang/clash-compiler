@@ -106,6 +106,8 @@ module Clash.Signal.Internal
   , simulate
     -- ** lazy version
   , simulate_lazy
+    -- ** Automaton
+  , signalAutomaton
     -- * List \<-\> Signal conversion (not synthesizable)
   , sample
   , sampleN
@@ -135,7 +137,9 @@ module Clash.Signal.Internal
   )
 where
 
+import Data.IORef                 (IORef, atomicModifyIORef, newIORef, readIORef)
 import Type.Reflection            (Typeable)
+import Control.Arrow.Transformer.Automaton
 import Control.Applicative        (liftA2, liftA3)
 import Control.DeepSeq            (NFData)
 import Clash.Annotations.Primitive (hasBlackBox, dontTranslate)
@@ -152,6 +156,7 @@ import GHC.TypeLits               (KnownSymbol, Nat, Symbol, type (<=), sameSymb
 import Language.Haskell.TH.Syntax -- (Lift (..), Q, Dec)
 import Language.Haskell.TH.Compat
 import Numeric.Natural            (Natural)
+import System.IO.Unsafe           (unsafeInterleaveIO, unsafePerformIO)
 import Test.QuickCheck            (Arbitrary (..), CoArbitrary(..), Property,
                                    property)
 
@@ -1416,3 +1421,41 @@ hzToPeriod freq | freq <= 0.0 = error "Frequency must be strictly positive"
 -- __NB__: This function is lossy. I.e., hzToPeriod . periodToHz /= id.
 periodToHz :: Natural -> Double
 periodToHz period = 1.0 / (1.0e-12 * fromIntegral period)
+
+-- | Build an 'Automaton' from a function over 'Signal's.
+--
+-- __NB__: Consumption of continuation of the 'Automaton' must be affine; that
+-- is, you can only apply the continuation associated with a particular element
+-- at most once.
+signalAutomaton ::
+  forall dom a b .
+  (Signal dom a -> Signal dom b) -> Automaton (->) a b
+signalAutomaton dut = Automaton $ \input0 -> unsafePerformIO $ do
+  inputRefs <- infiniteRefList Nothing
+  let inputs = input0 :- fmap readInput inputRefs
+      readInput ref = unsafePerformIO $ do
+        val <- readIORef ref
+        case val of
+          Nothing -> fail "signalAutomaton: non-affine use of continuation"
+          Just x  -> return x
+
+  let go (inRef :- inRefs) (out :- rest) = do
+        let next :: Automaton (->) a b
+            next = Automaton $ \i -> unsafePerformIO $ do
+              old <- atomicModifyIORef inRef (\old -> (Just i,old))
+              case old of
+                Nothing -> return ()
+                Just _  -> fail "signalAutomaton: non-affine use of continuation"
+              unsafeInterleaveIO (go inRefs rest)
+        return (out, next)
+
+  go inputRefs (dut inputs)
+{-# NOINLINE signalAutomaton #-}
+
+infiniteRefList :: a -> IO (Signal dom (IORef a))
+infiniteRefList val = go
+ where
+  go = do
+    rest <- unsafeInterleaveIO go
+    ref  <- newIORef val
+    return (ref :- rest)
