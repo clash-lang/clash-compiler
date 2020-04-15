@@ -224,6 +224,8 @@ module Clash.Signal
     -- ** lazy versions
   , simulate_lazy
   , simulateB_lazy
+    -- ** Automaton
+  , signalAutomaton
     -- * List \<-\> Signal conversion (not synthesizable)
   , sample
   , sampleN
@@ -249,6 +251,8 @@ module Clash.Signal
   , mergeBiSignalOuts
   )
 where
+
+import           Control.Arrow.Transformer.Automaton (Automaton)
 import           GHC.TypeLits          (type (<=))
 import           Data.Proxy            (Proxy(..))
 import           Prelude
@@ -271,7 +275,8 @@ import           Clash.Signal.Bundle
   (Bundle (..), EmptyTuple(..), TaggedEmptyTuple(..))
 import           Clash.Signal.BiSignal --(BisignalIn, BisignalOut, )
 import           Clash.Signal.Internal hiding
-  (sample, sample_lazy, sampleN, sampleN_lazy, simulate, simulate_lazy, testFor)
+  (sample, sample_lazy, sampleN, sampleN_lazy, simulate, simulate_lazy, testFor,
+   signalAutomaton)
 import           Clash.Signal.Internal.Ambiguous
   (knownVDomain, clockPeriod, activeEdge, resetKind, initBehavior, resetPolarity)
 import           Clash.XException      (NFDataX)
@@ -1879,3 +1884,18 @@ convertReset
 convertReset =
   E.convertReset hasClock hasClock
 #endif
+
+-- | Build an 'Automaton' from a function over 'Signal's.
+--
+-- __NB__: Consumption of continuation of the 'Automaton' must be affine; that
+-- is, you can only apply the continuation associated with a particular element
+-- at most once.
+signalAutomaton
+  :: forall dom a b
+   . KnownDomain dom
+  => (HiddenClockResetEnable dom => Signal dom a -> Signal dom b)
+  -> Automaton (->) a b
+signalAutomaton f0 =
+  let f1 = exposeClockResetEnable @dom f0 clockGen resetGen enableGen in
+  E.signalAutomaton f1
+{-# NOINLINE signalAutomaton #-}

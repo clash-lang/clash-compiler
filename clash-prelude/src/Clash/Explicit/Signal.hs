@@ -2,6 +2,7 @@
 Copyright  :  (C) 2013-2016, University of Twente,
                   2016-2019, Myrtle Software,
                   2017     , Google Inc.
+                  2020     , Ben Gamari
 License    :  BSD2 (see the file LICENSE)
 Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
 
@@ -240,6 +241,8 @@ module Clash.Explicit.Signal
     -- ** lazy versions
   , simulate_lazy
   , simulateB_lazy
+    -- ** Automaton
+  , signalAutomaton
     -- * List \<-\> Signal conversion (not synthesizable)
   , sample
   , sampleN
