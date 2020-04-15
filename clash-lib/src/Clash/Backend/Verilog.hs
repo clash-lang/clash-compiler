@@ -24,6 +24,9 @@ module Clash.Backend.Verilog
   , bits
   , bit_char
   , noEmptyInit
+  -- * split ranges
+  , Range (..)
+  , continueWithRange
   )
 where
 
@@ -726,18 +729,18 @@ continueWithRange
   -- ^ Type of the projection
   -> Range
   -- ^ Range selected so far
-  -> Maybe (Range, HWType)
+  -> (Range, HWType)
 continueWithRange ses hty r = case r of
   Contiguous _ offset -> case ses of
     [(start,end)] ->
-      Just (Contiguous (start+offset) (end+offset), hty)
+      (Contiguous (start+offset) (end+offset), hty)
     ses1 ->
       let ses2 = snd (mapAccumR (buildSplitRange offset) 0 ses1) in
-      Just (Split ses2, hty)
+      (Split ses2, hty)
   Split rs -> case concat (snd (mapAccumL inRange ses rs)) of
     [] -> error "internal error"
-    [(s1,e1,_)] -> Just (Contiguous s1 e1,hty)
-    rs1 -> Just (Split rs1,hty)
+    [(s1,e1,_)] -> (Contiguous s1 e1,hty)
+    rs1 -> (Split rs1,hty)
 
 -- | Calculate the beginning and end index into a variable, to get the
 -- desired field.
@@ -749,13 +752,13 @@ modifier
   -> Modifier
   -> Maybe (Range,HWType)
 modifier r (Sliced (BitVector _,start,end)) =
-  continueWithRange [(start,end)] hty r
+  Just (continueWithRange [(start,end)] hty r)
   where
     hty = BitVector (start-end-1)
 
 
 modifier r (Indexed (ty@(SP _ args),dcI,fI)) =
-  continueWithRange [(start,end)] argTy r
+  Just (continueWithRange [(start,end)] argTy r)
   where
     argTys   = snd $ args !! dcI
     argTy    = argTys !! fI
@@ -765,7 +768,7 @@ modifier r (Indexed (ty@(SP _ args),dcI,fI)) =
     end      = start - argSize + 1
 
 modifier r (Indexed (ty@(Product _ _ argTys),_,fI)) =
-  continueWithRange [(start,end)] argTy r
+  Just (continueWithRange [(start,end)] argTy r)
   where
     argTy   = argTys !! fI
     argSize = typeSize argTy
@@ -774,33 +777,33 @@ modifier r (Indexed (ty@(Product _ _ argTys),_,fI)) =
     end     = start - argSize + 1
 
 modifier r (Indexed (ty@(Vector _ argTy),1,0)) =
-  continueWithRange [(start,end)] argTy r
+  Just (continueWithRange [(start,end)] argTy r)
   where
     argSize = typeSize argTy
     start   = typeSize ty - 1
     end     = start - argSize + 1
 
 modifier r (Indexed (ty@(Vector n argTy),1,1)) =
-  continueWithRange [(start,0)] hty r
+  Just (continueWithRange [(start,0)] hty r)
   where
     argSize = typeSize argTy
     start   = typeSize ty - argSize - 1
     hty     = Vector (n-1) argTy
 
 modifier r (Indexed (ty@(RTree 0 argTy),0,0)) =
-  continueWithRange [(start,0)] argTy r
+  Just (continueWithRange [(start,0)] argTy r)
   where
     start   = typeSize ty - 1
 
 modifier r (Indexed (ty@(RTree d argTy),1,0)) =
-  continueWithRange [(start,end)] hty r
+  Just (continueWithRange [(start,end)] hty r)
   where
     start   = typeSize ty - 1
     end     = typeSize ty `div` 2
     hty     = RTree (d-1) argTy
 
 modifier r (Indexed (ty@(RTree d argTy),1,1)) =
-  continueWithRange [(start,0)] hty r
+  Just (continueWithRange [(start,0)] hty r)
   where
     start   = (typeSize ty `div` 2) - 1
     hty     = RTree (d-1) argTy
@@ -809,7 +812,7 @@ modifier r (Indexed (ty@(RTree d argTy),1,1)) =
 -- Vector's don't have a 10'th constructor, this is just so that we can
 -- recognize the particular case
 modifier r (Indexed (ty@(Vector _ argTy),10,fI)) =
-  continueWithRange [(start,end)] argTy r
+  Just (continueWithRange [(start,end)] argTy r)
   where
     argSize = typeSize argTy
     start   = typeSize ty - (fI * argSize) - 1
@@ -819,14 +822,14 @@ modifier r (Indexed (ty@(Vector _ argTy),10,fI)) =
 -- RTree's don't have a 10'th constructor, this is just so that we can
 -- recognize the particular case
 modifier r (Indexed (ty@(RTree _ argTy),10,fI)) =
-  continueWithRange [(start,end)] argTy r
+  Just (continueWithRange [(start,end)] argTy r)
   where
     argSize = typeSize argTy
     start   = typeSize ty - (fI * argSize) - 1
     end     = start - argSize + 1
 
 modifier r (Indexed (CustomSP _typName _dataRepr _size args,dcI,fI)) =
-  continueWithRange ses argTy r
+  Just (continueWithRange ses argTy r)
   where
     ses = bitRanges (anns !! fI)
     (ConstrRepr' _name _n _mask _value anns, _, argTys) = args !! dcI
@@ -835,12 +838,12 @@ modifier r (Indexed (CustomSP _typName _dataRepr _size args,dcI,fI)) =
 modifier r (Indexed (CustomProduct _typName dataRepr _size _maybeFieldNames args,_,fI))
   | DataRepr' _typ _size [cRepr] <- dataRepr
   , ConstrRepr' _cName _pos _mask _val fieldAnns <- cRepr
-  = let ses = bitRanges (fieldAnns !! fI) in continueWithRange ses argTy r
+  = let ses = bitRanges (fieldAnns !! fI) in Just (continueWithRange ses argTy r)
  where
   argTy = map snd args !! fI
 
 modifier r (DC (ty@(SP _ _),_)) =
-  continueWithRange [(start,end)] ty r
+  Just (continueWithRange [(start,end)] ty r)
   where
     start = typeSize ty - 1
     end   = typeSize ty - conSize ty
