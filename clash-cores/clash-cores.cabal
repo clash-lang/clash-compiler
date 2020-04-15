@@ -14,11 +14,6 @@ category:            Hardware
 build-type:          Simple
 extra-source-files:  CHANGELOG.md
 
-tested-with:
-  GHC == 8.4.4,
-  GHC == 8.6.5,
-  GHC == 8.8.2
-
 flag unittests
   description:
     You can disable testing with unittests using `-f-unittests`.
