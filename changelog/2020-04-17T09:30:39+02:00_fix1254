@@ -1,0 +1,1 @@
+FIXED: Illegal VHDL slice when projecting nested SOP type [#1254](https://github.com/clash-lang/clash-compiler/issues/1254)
