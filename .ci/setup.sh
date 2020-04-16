@@ -7,9 +7,11 @@ if [[ "$GHC" = ghc-head ]]; then
   CABAL="cabal-install-head"
 elif [[ "$GHC" = ghc-8.4.* ]]; then
   CABAL="cabal-install-2.4"
-else
-  # GHC >= 8.6
+elif [[ "$GHC" = ghc-8.6.* || "$GHC" = ghc-8.8.* ]]; then
   CABAL="cabal-install-3.0"
+else
+  # GHC >= 8.10
+  CABAL="cabal-install-3.2"
 fi
 
 apt-get install -yq $CABAL $GHC
