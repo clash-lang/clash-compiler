@@ -99,7 +99,7 @@ aliases:
 
   - &build_default
     docker:
-      - image: clashlang/clash-ci:2020-01-28
+      - image: clashlang/clash-ci:2020-04-15
     steps:
       - checkout
       - *merge_pullrequest
@@ -112,7 +112,7 @@ aliases:
       - *run_tests
   - &build_with_stack
     docker:
-      - image: clashlang/clash-ci:2020-01-28
+      - image: clashlang/clash-ci:2020-04-15
     steps:
       - checkout
       - *merge_pullrequest
@@ -141,7 +141,7 @@ workflows:
       - ghc-8.4.4
       - ghc-8.6.5-singular-hidden
       # - ghc-8.6.5
-      - ghc-8.8.2
+      - ghc-8.8.3
       - stack-build
       - nix-build
 
@@ -156,10 +156,10 @@ jobs:
       <<: *env
       GHC: ghc-8.6.5
     <<: *build_default
-  ghc-8.8.2:
+  ghc-8.8.3:
     environment:
       <<: *env
-      GHC: ghc-8.8.2
+      GHC: ghc-8.8.3
     <<: *build_default
   ghc-8.6.5-singular-hidden:
     environment:

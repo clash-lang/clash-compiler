@@ -49,6 +49,8 @@ RUN apt-get remove -y $DEPS_IVERILOG \
  && apt-get install -y --download-only \
       cabal-install-2.4 \
       cabal-install-3.0 \
+      cabal-install-3.2 \
       ghc-8.4.4 \
       ghc-8.6.5 \
-      ghc-8.8.2
+      ghc-8.8.3 \
+      ghc-8.10.1
