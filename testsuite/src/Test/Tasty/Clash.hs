@@ -7,6 +7,7 @@
 
 module Test.Tasty.Clash where
 
+import           Clash.Annotations.Primitive (HDL(..))
 import           Data.Char                 (toLower)
 import           Data.Default              (Default, def)
 import qualified Data.List                 as List
@@ -28,16 +29,15 @@ import Test.Tasty.Program
   , PrintOutput (PrintStdErr, PrintNeither), GlobArgs(..)
   , ExpectOutput(..))
 
-data BuildTarget
-  = VHDL
-  | SystemVerilog
-  | Verilog
-  deriving (Eq, Ord, Show)
-
-data SBuildTarget (target :: BuildTarget) where
+data SBuildTarget (target :: HDL) where
   SVHDL          :: SBuildTarget 'VHDL
   SVerilog       :: SBuildTarget 'Verilog
   SSystemVerilog :: SBuildTarget 'SystemVerilog
+
+buildTargetToHdl :: SBuildTarget target -> HDL
+buildTargetToHdl SVHDL = VHDL
+buildTargetToHdl SVerilog = Verilog
+buildTargetToHdl SSystemVerilog = SystemVerilog
 
 data Entities
   = AutoEntities
@@ -92,7 +92,7 @@ data TestOptions =
     , expectClashFail :: Maybe (TestExitCode, T.Text)
     -- ^ Expect Clash to fail: Nothing if Clash is expected to compile without
     -- errors, or Just (part of) the error message Clash is expected to throw.
-    , hdlTargets :: [BuildTarget]
+    , hdlTargets :: [HDL]
     -- ^ Run tests for these targets
     , clashFlags :: [String]
     -- ^ Extra flags to pass to Clash
@@ -105,7 +105,7 @@ data TestOptions =
     -- ^ Whether an empty stderr means test failure when running VVP
     }
 
-allTargets :: [BuildTarget]
+allTargets :: [HDL]
 allTargets = [VHDL, Verilog, SystemVerilog]
 
 instance Default TestOptions where
@@ -209,7 +209,7 @@ createDirs path subdirs =
 -- | Generate command to run clash to compile a file and place the resulting
 -- hdl files in a specific directory
 clashCmd
-  :: BuildTarget
+  :: HDL
   -- ^ Build target
   -> FilePath
   -- ^ Source directory
@@ -245,7 +245,7 @@ clashCmd target sourceDir extraArgs modName oDir =
 clashHDL
   :: Maybe (TestExitCode, T.Text)
   -- ^ Expect failure / test exit code. See "TestOptions".
-  -> BuildTarget
+  -> HDL
   -- ^ Build target
   -> FilePath
   -- ^ Source directory
@@ -316,23 +316,21 @@ ghdlLibrary entName path modName lib =
                , ("--work=" ++ workName)
                , ("--workdir=" ++ relWorkdir)
                , ("--std=93")
-               , (workDir </> lib' </> "*.vhdl")
+               , (workDir </> lib </> "*.vhdl")
                ]
-
-        lib' = map toLower lib
 
         -- Special case for FIR?
         workName =
-          case lib' of
+          case lib of
             [] ->
               case modName of
-                "FIR" -> "test_topentity"
-                _     -> "topentity"
+                "FIR" -> "test_topEntity"
+                _     -> "topEntity"
             k ->
               k
 
         relWorkdir =
-          case lib' of
+          case lib of
             [] -> "."
             k -> k
 
@@ -348,11 +346,10 @@ ghdlImport
 ghdlImport entName path modName subdirs =
   (testName, test)
     where
-      subdirs' = (map.map) toLower subdirs
       testName = "GHDL (import " ++ entName ++ ")"
       test = testProgram testName "ghdl" args GlobStar PrintStdErr False (Just workDir)
       workDir = testDirectory path </> "vhdl" </> modName
-      args = "-i":"--workdir=work":"--std=93":[workDir </> subdir </> "*.vhdl" | subdir <- subdirs']
+      args = "-i":"--workdir=work":"--std=93":[workDir </> subdir </> "*.vhdl" | subdir <- subdirs]
 
 ghdlMake
   :: [TestName]
@@ -374,8 +371,8 @@ ghdlMake path modName subdirs libs entName =
                -- Enable flags when running newer versions of the (GCC) linker.
                -- , ["-Wl,-no-pie"]
                   , ["--workdir=work"]
-                  , map (\l -> "-P" ++ emptyToDot (map toLower l)) libs
-                  , ["-o", map toLower (noConflict entName subdirs) ]
+                  , map (\l -> "-P" ++ emptyToDot l) libs
+                  , ["-o", map toLower (noConflict entName subdirs)]
                   , [entName] ]
     testName = "GHDL (make " ++ entName ++ ")"
     test = testProgram testName "ghdl" args NoGlob PrintStdErr False (Just workDir)
@@ -528,7 +525,7 @@ runTest1
   :: String
   -> TestOptions
   -> [String]
-  -> BuildTarget
+  -> HDL
   -> TestTree
 runTest1 modName testOptions@TestOptions{..} path VHDL =
   withResource acquire tastyRelease (const seqTests)
@@ -650,7 +647,7 @@ runTest modName testOptions path =
 outputTest'
   :: FilePath
   -- ^ Work directory
-  -> BuildTarget
+  -> HDL
   -- ^ Build target
   -> [String]
   -- ^ Extra Clash arguments
@@ -671,7 +668,7 @@ outputTest' env target extraClashArgs extraGhcArgs modName funcName path =
       path' = show target:path
       acquire = tastyAcquire path' [modDir]
 
-      modDir = (map (toLower) (show target)) </> modName
+      modDir = show target </> modName
 
       args = [ "new-exec"
              , "--write-ghc-environment-files=never"
@@ -694,7 +691,7 @@ outputTest' env target extraClashArgs extraGhcArgs modName funcName path =
       topFile =
         case target of
           VHDL ->
-            "vhdl" </> modName </> "topentity.vhdl"
+            "vhdl" </> modName </> "topEntity.vhdl"
           Verilog ->
             "verilog" </> modName </> "topEntity.v"
           SystemVerilog ->
@@ -710,7 +707,7 @@ outputTest' env target extraClashArgs extraGhcArgs modName funcName path =
 outputTest
   :: FilePath
   -- ^ Work directory
-  -> [BuildTarget]
+  -> [HDL]
   -- ^ Build targets
   -> [String]
   -- ^ Extra clash arguments
@@ -734,7 +731,7 @@ outputTest env targets extraClashArgs extraGhcArgs modName funcName path =
 clashLibTest'
   :: FilePath
   -- ^ Work directory
-  -> BuildTarget
+  -> HDL
   -- ^ Build target
   -> [String]
   -- ^ Extra GHC arguments
@@ -753,7 +750,7 @@ clashLibTest' env target extraGhcArgs modName funcName path =
       path' = show target:path
       acquire = tastyAcquire path' [modDir]
 
-      modDir = (map (toLower) (show target)) </> modName
+      modDir = show target </> modName
 
       args = [ "new-exec"
              , "--write-ghc-environment-files=never"
@@ -782,7 +779,7 @@ clashLibTest' env target extraGhcArgs modName funcName path =
 clashLibTest
   :: FilePath
   -- ^ Work directory
-  -> [BuildTarget]
+  -> [HDL]
   -- ^ Build targets
   -> [String]
   -- ^ Extra GHC arguments

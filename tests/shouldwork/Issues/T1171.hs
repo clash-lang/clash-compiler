@@ -41,7 +41,7 @@ mainVHDL = do
   [topDir] <- getArgs
   content  <- readFile (takeDirectory topDir </> "f" </> "f.vhdl")
 
-  assertIn "en  : in f_types.en_system;" content
+  assertIn "en  : in f_types.en_System;" content
 
 mainVerilog :: IO ()
 mainVerilog = do
@@ -56,4 +56,3 @@ mainSystemVerilog = do
   content  <- readFile (takeDirectory topDir </> "f" </> "f.sv")
 
   assertIn "input logic en  // enable" content
-

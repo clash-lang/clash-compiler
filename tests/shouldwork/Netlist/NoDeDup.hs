@@ -8,6 +8,7 @@ import Prelude as P
 import Clash.Magic
 import Clash.Prelude
 import Clash.Netlist.Types
+import qualified Clash.Netlist.Id as Id
 
 import Test.Tasty.Clash
 import Test.Tasty.Clash.NetlistTest
@@ -44,12 +45,12 @@ topEntity n abcd = (f n abcd) - (g n abcd)
 testPath :: FilePath
 testPath = "tests/shouldwork/Netlist/NoDeDup.hs"
 
-isTwiceInst (InstDecl Entity Nothing [] "twice" _ _ _) = True
+isTwiceInst (InstDecl Entity Nothing [] (Id.toText -> "twice") _ _ _) = True
 isTwiceInst _ = False
 
 assertNumTwiceInsts :: Component -> IO ()
 assertNumTwiceInsts (Component nm inps outs ds) =
-  case nm of
+  case Id.toText nm of
     "f" | nTwiceInsts == 1 -> pure ()
         | otherwise ->
             error ( "Found " <> show nTwiceInsts <> " instances of twice in f. "
@@ -59,7 +60,7 @@ assertNumTwiceInsts (Component nm inps outs ds) =
             error ( "Found " <> show nTwiceInsts <> " instances of twice in g. "
                  <> "Expected 2.")
     "twice" -> pure ()
-    "topentity" -> pure ()
+    "topEntity" -> pure ()
     _ -> error ("Unexpected component: " <> show nm)
  where
   twiceInsts = filter isTwiceInst ds

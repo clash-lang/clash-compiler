@@ -5,6 +5,7 @@
 
 module BenchmarkCommon where
 
+import Clash.Annotations.Primitive (HDL(VHDL))
 import Clash.Annotations.BitRepresentation.Internal (CustomReprs, buildCustomReprs)
 import Clash.Backend
 import Clash.Backend.VHDL
@@ -56,6 +57,9 @@ opts idirs =
     , opt_importPaths=idirs
     , opt_specLimit=40 -- For "PipelinesViaFolds"
     }
+
+hdl :: HDL
+hdl = VHDL
 
 backend :: VHDLState
 backend = initBackend WORD_SIZE_IN_BITS HDLSYN True Nothing (AggressiveXOptBB False)

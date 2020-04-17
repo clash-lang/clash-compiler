@@ -9,6 +9,7 @@ import qualified Prelude as P
 
 import Clash.Prelude
 import Clash.Netlist.Types
+import qualified Clash.Netlist.Id as Id
 import Clash.Annotations.TH
 
 import Clash.Class.HasDomain
@@ -42,10 +43,10 @@ assertInputs (Component _ [(clk,Clock _)]
   , (Wire,(ssseg,Vector 7 Bool),Nothing)
   , (Wire,(ssdp,Bool),Nothing)
   ] ds)
-  | clk == T.pack "CLK"
-  && ssan == T.pack "SS_AN"
-  && ssseg == T.pack "SS_SEG"
-  && ssdp == T.pack "SS_DP"
+  | Id.toText clk == T.pack "CLK"
+  , Id.toText ssan == T.pack "SS_AN"
+  , Id.toText ssseg == T.pack "SS_SEG"
+  , Id.toText ssdp == T.pack "SS_DP"
   = pure ()
 assertInputs c = error $ "Component mismatch: " P.++ show c
 

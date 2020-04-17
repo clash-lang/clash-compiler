@@ -24,6 +24,7 @@ import           Data.IORef
 import           Data.List                      (dropWhileEnd)
 import           Data.List.Split                (splitOn)
 import qualified Data.Set                       as Set
+import qualified Data.Text                      as Text
 import           Text.Read                      (readMaybe)
 
 import           Clash.Driver.Types
@@ -215,7 +216,8 @@ setComponentPrefix
   :: IORef ClashOpts
   -> String
   -> IO ()
-setComponentPrefix r s = modifyIORef r (\c -> c {opt_componentPrefix = Just s})
+setComponentPrefix r s =
+  modifyIORef r (\c -> c {opt_componentPrefix = Just (Text.pack s)})
 
 setOldInlineStrategy :: IORef ClashOpts -> IO ()
 setOldInlineStrategy r = modifyIORef r (\c -> c {opt_newInlineStrat = False})

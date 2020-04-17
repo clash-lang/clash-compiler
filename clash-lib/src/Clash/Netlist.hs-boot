@@ -16,20 +16,19 @@ module Clash.Netlist
   ,mkFunApp
   ) where
 
-import Data.HashMap.Strict  (HashMap)
 import Clash.Core.DataCon   (DataCon)
 import Clash.Core.Term      (Alt,LetBinding,Term)
 import Clash.Core.Type      (Type)
 import Clash.Core.Var       (Id)
 import Clash.Netlist.Types  (Expr, HWType, Identifier, NetlistMonad, Component,
-                             Declaration, NetlistId, DeclarationType)
+                             Declaration, NetlistId, DeclarationType, IdentifierSet)
 import SrcLoc               (SrcSpan)
 
 import GHC.Stack (HasCallStack)
 
 genComponent :: HasCallStack
              => Id
-             -> NetlistMonad ([Bool],SrcSpan,HashMap Identifier Word,Component)
+             -> NetlistMonad ([Bool],SrcSpan,IdentifierSet,Component)
 
 mkExpr :: HasCallStack
        => Bool

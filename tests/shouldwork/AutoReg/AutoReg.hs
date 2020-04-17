@@ -120,4 +120,4 @@ mainHDL topFile = do
 mainSystemVerilog, mainVerilog, mainVHDL :: IO ()
 mainSystemVerilog = mainHDL "topEntity.sv"
 mainVerilog       = mainHDL "topEntity.v"
-mainVHDL          = mainHDL "topentity.vhdl"
+mainVHDL          = mainHDL "topEntity.vhdl"

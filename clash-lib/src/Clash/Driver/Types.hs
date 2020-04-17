@@ -163,7 +163,7 @@ data ClashOpts = ClashOpts
   -- not supported, use vendor primitives instead.
   , opt_importPaths :: [FilePath]
   -- ^ Paths where Clash should look for modules
-  , opt_componentPrefix :: Maybe String
+  , opt_componentPrefix :: Maybe Text
   -- ^ Prefix components with given string
   , opt_newInlineStrat :: Bool
   -- ^ Use new inline strategy. Functions marked NOINLINE will get their own

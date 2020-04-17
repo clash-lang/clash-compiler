@@ -4,6 +4,7 @@ module Main (main) where
 
 import qualified Clash.Util.Interpolate    as I
 
+import           Clash.Annotations.Primitive (HDL(..))
 import           Control.Exception         (finally)
 import qualified Data.Text                 as Text
 import           Data.Default              (def)

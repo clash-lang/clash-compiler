@@ -40,10 +40,10 @@ wordTF' False [Left (Literal (WordLiteral n))] wordSize =
 wordTF' True [Left (Literal (WordLiteral n))] wordSize =
   -- Literal as declaration:
   ( emptyBlackBoxMeta
-  , BBTemplate (assign (Result False) [unsignedLiteral wordSize n]))
+  , BBTemplate (assign Result [unsignedLiteral wordSize n]))
 
 wordTF' _isDecl _args _wordSize =
   -- Not a literal. We need an assignment as Verilog does not support truncating
   -- arbitrary expression.
   ( emptyBlackBoxMeta {bbKind = TDecl }
-  , BBTemplate (assign (Result False) (unsigned (Arg False 0))))
+  , BBTemplate (assign Result (unsigned (Arg 0))))

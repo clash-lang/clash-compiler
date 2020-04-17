@@ -12,8 +12,8 @@ import Data.Text.Prettyprint.Doc.Extra (Doc)
 import System.Environment (getArgs)
 import System.FilePath ((</>))
 
-import Clash.Backend (mkUniqueIdentifier, blockDecl)
-import Clash.Netlist.Id (IdType(Basic))
+import Clash.Backend (blockDecl)
+import qualified Clash.Netlist.Id as Id
 import Clash.Netlist.Types
 
 import Clash.Prelude
@@ -31,8 +31,8 @@ myMultiplyTemplate
   => BlackBoxContext
   -> State s Doc
 myMultiplyTemplate bbCtx = do
-  x <- mkUniqueIdentifier Basic "x123456"
-  y <- mkUniqueIdentifier Basic "y123456"
+  x <- Id.make "x123456"
+  y <- Id.make "y123456"
   getMon $ blockDecl x [NetDecl Nothing y Bool]
 
 

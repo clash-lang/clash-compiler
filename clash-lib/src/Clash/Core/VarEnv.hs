@@ -145,7 +145,8 @@ lookupVarEnvDirectly = lookupUniqMap
 --
 -- Errors out when the variable is not present
 lookupVarEnv'
-  :: VarEnv a
+  :: HasCallStack
+  => VarEnv a
   -> Var b
   -> a
 lookupVarEnv' = lookupUniqMap'

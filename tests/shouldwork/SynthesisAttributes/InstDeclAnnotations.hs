@@ -5,7 +5,7 @@ module InstDeclAnnotations where
 import           Clash.Annotations.Primitive     (HDL (..), Primitive (..))
 import           Clash.Backend
 import           Clash.Core.Var                  (Attr' (..))
-import           Clash.Netlist.Id
+import qualified Clash.Netlist.Id                as Id
 import           Clash.Netlist.Types
 import           Clash.Prelude
 import           Control.Monad.State
@@ -32,10 +32,10 @@ myTemplate
   => BlackBoxContext
   -> State s Doc
 myTemplate bbCtx = do
-  blkName  <- mkUniqueIdentifier Basic "blkName"
-  compInst <- mkUniqueIdentifier Basic "test_inst"
+  blkName  <- Id.makeBasic "blkName"
+  compInst <- Id.makeBasic "test_inst"
+  compName <- Id.makeBasic "TEST"
   let
-    compName = "TEST"
     attrs =
       [ IntegerAttr' "my_int_attr"    7
       , StringAttr'  "my_string_attr" "Hello World!"
@@ -97,4 +97,3 @@ mainVerilog = do
 
 -- Verilog and SystemVerilog should share annotation syntax
 mainSystemVerilog = mainVerilog
-

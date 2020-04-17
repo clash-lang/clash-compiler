@@ -13,7 +13,7 @@ module Clash.Cores.LatticeSemi.ECP5.Blackboxes.IO (bbTF) where
 
 import           Clash.Backend
 import           Clash.Netlist.BlackBox.Util
-import           Clash.Netlist.Id
+import qualified Clash.Netlist.Id                as Id
 import           Clash.Netlist.Types
 import           Control.Monad.State             (State())
 import           Data.Semigroup.Monad            (getMon)
@@ -35,11 +35,11 @@ bbTemplate
   => BlackBoxContext
   -> State s Doc
 bbTemplate bbCtx = do
-  let mkId = mkUniqueIdentifier Basic
+  bb      <- Id.makeBasic "bb"
+  bb_inst <- Id.makeBasic "bb_inst"
+  dIn     <- Id.makeBasic "dIn"
 
-  bb      <- mkId "bb"
-  bb_inst <- mkId "bb_inst"
-  dIn     <- mkId "dIn"
+  compName <- Id.addRaw (TextS.pack compName')
 
   getMon $ blockDecl bb $
     [ NetDecl Nothing dIn Bit
@@ -48,10 +48,10 @@ bbTemplate bbCtx = do
       ]
       [ -- NOTE: Direction is set to 'In', but will be rendered as inout due to
         -- its type packagePinTy
-        (Identifier "B" Nothing, In, packagePinTy, packagePin)
-      , (Identifier "T" Nothing, In,  Bool, outputEnable)
-      , (Identifier "I" Nothing, In,  Bit, dOut)
-      , (Identifier "O" Nothing, Out, Bit, Identifier dIn Nothing)
+        (instPort "B", In, packagePinTy, packagePin)
+      , (instPort "T", In,  Bool, outputEnable)
+      , (instPort "I", In,  Bit, dOut)
+      , (instPort "O", Out, Bit, Identifier dIn Nothing)
       ]
     , Assignment result (Identifier dIn Nothing)
     ]
@@ -66,6 +66,6 @@ bbTemplate bbCtx = do
    ] = bbInputs bbCtx
 
   Just compName' = exprToString intrinsicName
-  compName = TextS.pack compName'
+  instPort pn = Identifier (Id.unsafeMake pn) Nothing
 
   [(Identifier result Nothing,_)] = bbResults bbCtx

@@ -3,14 +3,13 @@ import           Clash.Backend
 import           Clash.Core.Name
 import           Clash.Core.TyCon
 import           Clash.Core.Var
+import           Clash.Core.VarEnv (mkVarEnv)
 import           Clash.Driver.Types
 import           Clash.Netlist
 import           Clash.Netlist.Types          hiding (backend, hdlDir)
 
 import           Control.DeepSeq              (deepseq)
-import           Control.Monad.State          (evalState)
 import           Data.Binary                  (decode)
-import qualified Data.HashMap.Strict          as HashMap
 import           Data.List                    (partition)
 import           Data.Maybe                   (fromMaybe)
 import qualified Data.Text                    as Text
@@ -44,17 +43,16 @@ benchFile idirs src = do
       topEntityS = Text.unpack (nameOcc (varName topEntity))
       modName    = takeWhile (/= '.') topEntityS
       hdlState'  = setModName (Text.pack modName) backend
-      mkId1      = evalState mkIdentifier hdlState'
-      extId      = evalState extendIdentifier hdlState'
-      prefixM    = ComponentPrefix Nothing Nothing
+      (compNames, seen) = genTopNames Nothing True hdl topEntities
+      topEntityMap = mkVarEnv (zip (map topId topEntities) topEntities)
+      prefixM    = Nothing
       ite        = ifThenElseExpr hdlState'
-      seen       = HashMap.empty
       hdlDir     = fromMaybe "." (opt_hdlDir opts1) </>
                          Clash.Backend.name hdlState' </>
                          takeWhile (/= '.') topEntityS
-  (netlist,_) <-
-    genNetlist False opts1 reprs transformedBindings topEntities primMap'
-               tcm typeTrans iw mkId1 extId ite (SomeBackend hdlState') seen hdlDir prefixM topEntity
+  (netlist,_,_) <-
+    genNetlist False opts1 reprs transformedBindings topEntityMap compNames primMap'
+               tcm typeTrans iw ite (SomeBackend hdlState') seen hdlDir prefixM topEntity
   netlist `deepseq` putStrLn ".. done\n"
 
 setupEnv
