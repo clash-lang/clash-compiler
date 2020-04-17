@@ -17,6 +17,8 @@
 #
 #   * `p`, `prelude`, `clash-prelude`
 #   * `l`, `lib`, `clash-lib`
+#   * `l:tests`, `lib:tests`, `clash-lib:tests`
+#   * `c`, `cores`, `clash-cores`
 #   * `g`, `ghc`, `clash-ghc`
 #   * `dev`, `clash-dev`
 #
@@ -37,6 +39,12 @@ if [[ $1 == "p" || $1 == "prelude" || $1 == "clash-prelude" ]]; then
 elif [[ $1 == "l" || $1 == "lib" || $1 == "clash-lib" ]]; then
   target="cabal new-repl clash-lib"
   watch="clash-prelude clash-lib/clash-lib.cabal"
+elif [[ $1 == "l:tests" || $1 == "lib:tests" || $1 == "clash-lib:tests" ]]; then
+  target="cabal new-repl clash-lib:unittests"
+  watch="clash-prelude clash-lib clash-cores/clash-cores.cabal"
+elif [[ $1 == "c" || $1 == "cores" || $1 == "clash-cores" ]]; then
+  target="cabal new-repl clash-cores"
+  watch="clash-prelude clash-lib clash-cores/clash-cores.cabal"
 elif [[ $1 == "g" || $1 == "ghc" || $1 == "clash-ghc" ]]; then
   target="cabal new-repl clash-ghc --repl-options=-fobject-code --repl-options=-fforce-recomp"
   watch="clash-prelude clash-lib clash-ghc/clash-ghc.cabal"
@@ -44,11 +52,13 @@ elif [[ $1 == "dev" || $1 == "clash-dev" ]]; then
   target="./clash-dev"
   watch="clash-prelude clash-lib/clash-lib.cabal clash-ghc/clash-ghc.cabal"
 else
-  echo "Unrecognized target. Use one of:"  > /dev/stderr
-  echo "  p, prelude, clash-prelude"       > /dev/stderr
-  echo "  l, lib, clash-lib"               > /dev/stderr
-  echo "  g, ghc, clash-ghc"               > /dev/stderr
-  echo "  dev, clash-dev"                  > /dev/stderr
+  echo "Unrecognized target. Use one of:"                    > /dev/stderr
+  echo "  p, prelude, clash-prelude"                         > /dev/stderr
+  echo "  l, lib, clash-lib"                                 > /dev/stderr
+  echo "  l:tests, lib:tests, clash-lib:tests"               > /dev/stderr
+  echo "  g, ghc, clash-ghc"                                 > /dev/stderr
+  echo "  c, cores, clash-cores"                             > /dev/stderr
+  echo "  dev, clash-dev"                                    > /dev/stderr
   exit 1;
 fi
 
