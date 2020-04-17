@@ -31,7 +31,7 @@ import           Data.HashSet                         (HashSet)
 import qualified Data.HashSet                         as HashSet
 import           Data.List
   (mapAccumL, nub, nubBy, intersperse, group, sort)
-import           Data.List.Extra                      ((<:>))
+import           Data.List.Extra                      ((<:>), equalLength)
 import           Data.Maybe                           (catMaybes,fromMaybe,mapMaybe)
 #if !MIN_VERSION_base(4,11,0)
 import           Data.Monoid                          hiding (Sum, Product)
@@ -134,9 +134,9 @@ instance Backend VHDLState where
   toBV _ id_      = do
     nm <- Mon $ use modNm
     pretty (TextS.toLower nm) <> "_types.toSLV" <> parens (pretty id_)
-  fromBV _ id_  = do
+  fromBV t id_  = do
     nm <- Mon $ use modNm
-    pretty (TextS.toLower nm) <> "_types.fromSLV" <> parens (pretty id_)
+    qualTyName t <> "'" <> parens (pretty (TextS.toLower nm) <> "_types.fromSLV" <> parens (pretty id_))
   hdlSyn          = use hdlsyn
   mkIdentifier    = do
       allowExtended <- use extendedIds
@@ -1468,8 +1468,9 @@ expr_
 expr_ _ (Literal sizeM lit) = exprLit sizeM lit
 expr_ _ (Identifier id_ Nothing) = pretty id_
 
-expr_ _ (Identifier id_ (Just m)) =
-  maybe (pretty id_) (foldr renderModifier (pretty id_)) (buildModifier [] m)
+expr_ _ (Identifier id_ (Just m)) = do
+  syn <- Mon hdlSyn
+  maybe (pretty id_) (foldr renderModifier (pretty id_)) (buildModifier syn [] m)
 
 expr_ b (DataCon _ (DC (Void {}, -1)) [e]) =  expr_ b e
 
@@ -1770,15 +1771,16 @@ toSLV t@(Product _ labels tys) (Identifier id_ Nothing) = do
     tName    = tyName t
     selNames = map (fmap (T.toStrict . renderOneLine) ) [pretty id_ <> dot <> tName <> selectProductField labels tys i | i <- [0..(length tys)-1]]
     selIds   = map (fmap (\n -> Identifier n Nothing)) selNames
-toSLV (Product _ _ tys) (DataCon _ _ es) = do
+toSLV (Product _ _ tys) (DataCon _ _ es) | equalLength tys es =
+  -- Need equalLenght for code seen in ZipWithUnitVector
   encloseSep lparen rparen " & " (zipWithM toSLV tys es)
 toSLV (CustomProduct _ _ _ _ _) e = do
   -- Custom representations are represented as bitvectors in HDL, so we don't
   -- need to do anything.
   expr_ False e
-toSLV (Product _ _ _) e = do
+toSLV t@(Product _ _ _) e = do
   nm <- Mon $ use modNm
-  pretty (TextS.toLower nm) <> "_types.toSLV" <> parens (expr_ False e)
+  pretty (TextS.toLower nm) <> "_types.toSLV" <> parens (qualTyName t <> "'" <> parens (expr_ False e))
 toSLV (SP _ _) e       = expr_ False e
 toSLV (CustomSP _ _ _ _) e =
   -- Custom representations are represented as bitvectors in HDL, so we don't
@@ -1802,6 +1804,9 @@ toSLV (Vector n elTy) (DataCon _ _ es) =
   "std_logic_vector'" <> (parens $ vcat $ punctuate " & " (zipWithM toSLV [elTy,Vector (n-1) elTy] es))
 toSLV (Vector _ _) e = do
   nm <- Mon $ use modNm
+  pretty (TextS.toLower nm) <> "_types.toSLV" <> parens (expr_ False e)
+toSLV (RTree _ _) e = do
+  nm <- Mon (use modNm)
   pretty (TextS.toLower nm) <> "_types.toSLV" <> parens (expr_ False e)
 toSLV hty e = error $ $(curLoc) ++  "toSLV:\n\nType: " ++ show hty ++ "\n\nExpression: " ++ show e
 
@@ -1863,7 +1868,8 @@ data VHDLModifier
 -- slice, to the proper type.
 buildModifier
   :: HasCallStack
-  => [(VHDLModifier,HWType)]
+  => HdlSyn
+  -> [(VHDLModifier,HWType)]
   -- ^ The list of modifiers so far, note that this list is in reverse order
   -- in which they should eventually be applied to the name we want to modify
   -> Modifier
@@ -1871,7 +1877,7 @@ buildModifier
   -- ^ 'Nothing' indicates that the 'Modifier' does not result into a VHDL name
   -- modifier. i.e. we can use the identifier as is; this happens when we get
   -- projections out of product types with only one non-zero field.
-buildModifier prevM (Sliced (_,start,end)) = case prevM of
+buildModifier _ prevM (Sliced (_,start,end)) = case prevM of
   (prev:rest)
     | (Range r,_) <- prev -> -- See [Note] Continuing from an SLV slice
       Just (first Range (continueWithRange [(start,end)] hty r) : rest)
@@ -1880,7 +1886,7 @@ buildModifier prevM (Sliced (_,start,end)) = case prevM of
  where
   hty = BitVector (start-end+1)
 
-buildModifier prevM (Indexed (ty@(SP _ args),dcI,fI)) = case prevM of
+buildModifier _ prevM (Indexed (ty@(SP _ args),dcI,fI)) = case prevM of
   (prev:rest)
     | (Range r,_) <- prev -> -- See [Note] Continuing from an SLV slice
       Just (first Range (continueWithRange [(start,end)] argTy r) : rest)
@@ -1894,7 +1900,7 @@ buildModifier prevM (Indexed (ty@(SP _ args),dcI,fI)) = case prevM of
   start    = typeSize ty - 1 - conSize ty - other
   end      = start - argSize + 1
 
-buildModifier prevM (Indexed (ty@(Product _ labels tys),_,fI)) = case prevM of
+buildModifier _ prevM (Indexed (ty@(Product _ labels tys),_,fI)) = case prevM of
   (prev:rest)
     | (Range r,_) <- prev -> -- See [Note] Continuing from an SLV slice
       let argSize = typeSize argTy
@@ -1908,7 +1914,7 @@ buildModifier prevM (Indexed (ty@(Product _ labels tys),_,fI)) = case prevM of
  where
   argTy = indexNote "Product type: invalid field index" tys fI
 
-buildModifier prevM (Indexed (ty@(Vector _ argTy),1,0)) = case prevM of
+buildModifier syn prevM (Indexed (ty@(Vector _ argTy),1,0)) = case prevM of
   (prev:rest)
     | (Range r,_) <- prev -> -- See [Note] Continuing from an SLV slice
       let argSize = typeSize argTy
@@ -1918,11 +1924,11 @@ buildModifier prevM (Indexed (ty@(Vector _ argTy),1,0)) = case prevM of
     | (Slice start _,Vector _ argTyP) <- prev
     , argTy == argTyP ->
       -- If the last modifier was an array slice, we just pick its first element
-      Just ((Idx start,argTy):rest)
+      Just (vivadoRange syn argTy ((Idx start,argTy):rest))
   _ ->
-      Just ((Idx 0,argTy):prevM)
+      Just (vivadoRange syn argTy ((Idx 0,argTy):prevM))
 
-buildModifier prevM (Indexed (ty@(Vector n argTy),1,1)) = case prevM of
+buildModifier _ prevM (Indexed (ty@(Vector n argTy),1,1)) = case prevM of
   (prev:rest)
     | (Range r,_) <- prev -> -- See [Note] Continuing from an SLV slice
       let argSize = typeSize argTy
@@ -1937,7 +1943,7 @@ buildModifier prevM (Indexed (ty@(Vector n argTy),1,1)) = case prevM of
  where
   tyN = Vector (n-1) argTy
 
-buildModifier prevM (Indexed (ty@(RTree _ argTy),0,0)) = case prevM of
+buildModifier syn prevM (Indexed (ty@(RTree _ argTy),0,0)) = case prevM of
   (prev:rest)
     | (Range r,_) <- prev -> -- See [Note] Continuing from an SLV slice
       let start = typeSize ty - 1
@@ -1945,11 +1951,11 @@ buildModifier prevM (Indexed (ty@(RTree _ argTy),0,0)) = case prevM of
     | (Slice start _,RTree _ argTyP) <- prev
     , argTy == argTyP ->
       -- If the last modifier was an array slice, we just pick its first element
-      Just ((Idx start,argTy):rest)
+      Just (vivadoRange syn argTy ((Idx start,argTy):rest))
   _ ->
-      Just ((Idx 0,argTy):prevM)
+      Just (vivadoRange syn argTy ((Idx 0,argTy):prevM))
 
-buildModifier prevM (Indexed (ty@(RTree d argTy),1,0)) = case prevM of
+buildModifier _ prevM (Indexed (ty@(RTree d argTy),1,0)) = case prevM of
   (prev:rest)
     | (Range r,_) <- prev -> -- See [Note] Continuing from an SLV slice
       let start = typeSize ty - 1
@@ -1965,7 +1971,7 @@ buildModifier prevM (Indexed (ty@(RTree d argTy),1,0)) = case prevM of
   tyN = RTree (d-1) argTy
   z   = 2^(d - 1)
 
-buildModifier prevM (Indexed (ty@(RTree d argTy),1,1)) = case prevM of
+buildModifier _ prevM (Indexed (ty@(RTree d argTy),1,1)) = case prevM of
   (prev:rest)
     | (Range r,_) <- prev -> -- See [Note] Continuing from an SLV slice
       let start = typeSize ty `div` 2 - 1
@@ -1984,7 +1990,7 @@ buildModifier prevM (Indexed (ty@(RTree d argTy),1,1)) = case prevM of
 -- This is a HACK for Clash.Driver.TopWrapper.mkOutput
 -- Vector's don't have a 10'th constructor, this is just so that we can
 -- recognize the particular case
-buildModifier prevM (Indexed (ty@(Vector _ argTy),10,fI)) = case prevM of
+buildModifier syn prevM (Indexed (ty@(Vector _ argTy),10,fI)) = case prevM of
   (prev:rest)
     | (Range r,_) <- prev -> -- See [Note] Continuing from an SLV slice
       let argSize = typeSize argTy
@@ -1994,14 +2000,14 @@ buildModifier prevM (Indexed (ty@(Vector _ argTy),10,fI)) = case prevM of
     | (Slice start _,Vector _ argTyP) <- prev
     , argTy == argTyP ->
       -- If the last modifier was an array slice, we offset from its starting element
-      Just ((Idx (start+fI),argTy):rest)
+      Just (vivadoRange syn argTy ((Idx (start+fI),argTy):rest))
   _ ->
-      Just ((Idx fI,argTy):prevM)
+      Just (vivadoRange syn argTy (((Idx fI,argTy):prevM)))
 
 -- This is a HACK for Clash.Driver.TopWrapper.mkOutput
 -- RTree's don't have a 10'th constructor, this is just so that we can
 -- recognize the particular case
-buildModifier prevM (Indexed (ty@(RTree _ argTy),10,fI)) = case prevM of
+buildModifier syn prevM (Indexed (ty@(RTree _ argTy),10,fI)) = case prevM of
   (prev:rest)
     | (Range r,_) <- prev -> -- See [Note] Continuing from an SLV slice
       let argSize = typeSize argTy
@@ -2011,11 +2017,11 @@ buildModifier prevM (Indexed (ty@(RTree _ argTy),10,fI)) = case prevM of
     | (Slice start _,RTree 1 argTyP) <- prev
     , argTy == argTyP ->
       -- If the last modifier was an array slice, we offset from its starting element
-      Just ((Idx (start+fI),argTy):rest)
+      Just (vivadoRange syn argTy ((Idx (start+fI),argTy):rest))
   _ ->
-      Just ((Idx fI,argTy):prevM)
+      Just (vivadoRange syn argTy ((Idx fI,argTy):prevM))
 
-buildModifier prevM (Indexed (CustomSP _ dataRepr size args,dcI,fI))
+buildModifier _ prevM (Indexed (CustomSP _ dataRepr size args,dcI,fI))
   | Void {} <- argTy
   = error (unexpectedProjectionErrorMsg dataRepr dcI fI)
   | otherwise
@@ -2031,7 +2037,7 @@ buildModifier prevM (Indexed (CustomSP _ dataRepr size args,dcI,fI))
   ses = bitRanges (indexNote "Custom SOP type: invalid annotation index" anns fI)
   argTy = indexNote "Custom SOP type: invalid field index" argTys fI
 
-buildModifier prevM (Indexed (CustomProduct _ dataRepr size _ args,dcI,fI))
+buildModifier _ prevM (Indexed (CustomProduct _ dataRepr size _ args,dcI,fI))
   | Void {} <- argTy
   = error (unexpectedProjectionErrorMsg dataRepr dcI fI)
   | DataRepr' _typ _size [cRepr] <- dataRepr
@@ -2047,7 +2053,7 @@ buildModifier prevM (Indexed (CustomProduct _ dataRepr size _ args,dcI,fI))
  where
   argTy = snd (indexNote "Custom product type: invalid field index" args fI)
 
-buildModifier prevM (DC (ty@(SP _ _),_)) = case prevM of
+buildModifier _ prevM (DC (ty@(SP _ _),_)) = case prevM of
   (prev:rest)
     | (Range r,_) <- prev -> -- See [Note] Continuing from an SLV slice
       Just (first Range (continueWithRange [(start,end)] tyN r) : rest)
@@ -2058,9 +2064,9 @@ buildModifier prevM (DC (ty@(SP _ _),_)) = case prevM of
   end   = typeSize ty - conSize ty
   tyN   = BitVector (start - end + 1)
 
-buildModifier prevM (Nested m1 m2) = case buildModifier prevM m1 of
-  Nothing -> buildModifier prevM m2
-  Just prevM1 -> case buildModifier prevM1 m2 of
+buildModifier syn prevM (Nested m1 m2) = case buildModifier syn prevM m1 of
+  Nothing -> buildModifier syn prevM m2
+  Just prevM1 -> case buildModifier syn prevM1 m2 of
       -- In case the second modifier is `Nothing` that means we want the entire
       -- thing calculated by the first modifier
       Nothing -> Just prevM1
@@ -2093,8 +2099,8 @@ buildModifier prevM (Nested m1 m2) = case buildModifier prevM m1 of
 --
 -- result in the same expression... even though their resulting types are
 -- different. TODO: this needs  to be fixed!
-buildModifier prevM (Indexed (ty@(Signed _),_,_)) = Just ((Resize,ty):prevM)
-buildModifier prevM (Indexed (ty@(Unsigned _),_,_)) = Just ((Resize,ty):prevM)
+buildModifier _ prevM (Indexed (ty@(Signed _),_,_)) = Just ((Resize,ty):prevM)
+buildModifier _ prevM (Indexed (ty@(Unsigned _),_,_)) = Just ((Resize,ty):prevM)
 
 -- [Note] mask projection
 --
@@ -2108,7 +2114,7 @@ buildModifier prevM (Indexed (ty@(Unsigned _),_,_)) = Just ((Resize,ty):prevM)
 -- introduced by the W/W transformation. Both of which we prefer not to see
 -- but will allow. Since the mask is pretty much a simulation artifact we
 -- emit don't cares so stuff gets optimised away.
-buildModifier prevM (Indexed (ty@(BitVector _),_,0)) = Just ((DontCare,ty):prevM)
+buildModifier _ prevM (Indexed (ty@(BitVector _),_,0)) = Just ((DontCare,ty):prevM)
 
 -- [Note] bitvector projection
 --
@@ -2121,9 +2127,25 @@ buildModifier prevM (Indexed (ty@(BitVector _),_,0)) = Just ((DontCare,ty):prevM
 --
 -- introduced by the W/W transformation. Both of which we prefer not to see
 -- but will allow.
-buildModifier prevM (Indexed (ty@(BitVector _),_,1)) = Just ((ResizeAndConvert,ty):prevM)
+buildModifier _ prevM (Indexed (ty@(BitVector _),_,1)) = Just ((ResizeAndConvert,ty):prevM)
 
-buildModifier _ _ = Nothing
+buildModifier _ _ _ = Nothing
+
+-- | Add an SLV slice for the entire element when we're in the Vivado code-path.
+-- This is needed after an element projection from an array (Vec or RTree), as
+-- elements are stored as SLVs in the Vivado code-path. This enabled two things:
+--
+-- 1. Nested modifiers treat the projected element as an SLV, and adjust their
+--    projection behavior accordingly.
+-- 2. Projected elements are converted from SLV to the proper VHDL type.
+vivadoRange
+  :: HdlSyn
+  -> HWType
+  -> [(VHDLModifier, HWType)]
+  -> [(VHDLModifier, HWType)]
+vivadoRange syn ty mods = case syn of
+  Vivado -> (Range (Contiguous (typeSize ty - 1) 0),ty):mods
+  _ -> mods
 
 -- | Render a VHDL modifier on to of a (potentially modified) VHDL name
 renderModifier
@@ -2163,6 +2185,8 @@ renderModifier (Range r,t) doc = do
   case normaliseType t of
     BitVector _ -> doc1
     -- See [Note] Continuing from an SLV slice
-    _ -> pretty (TextS.toLower nm) <> "_types.fromSLV" <> parens doc1
+    _ ->
+      qualTyName t <> "'" <>
+      parens (pretty (TextS.toLower nm) <> "_types.fromSLV" <> parens doc1)
  where
   slice s e = doc <> parens (int s <+> "downto" <+> int e)
