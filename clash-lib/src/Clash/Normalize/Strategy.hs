@@ -6,6 +6,8 @@
   Transformation process for normalization
 -}
 
+{-# LANGUAGE CPP #-}
+
 module Clash.Normalize.Strategy where
 
 import Clash.Normalize.Transformations
@@ -54,15 +56,26 @@ normalization = rmDeadcode >-> constantPropagation >-> rmUnusedExpr >-!-> anf >-
 
 
 constantPropagation :: NormRewrite
-constantPropagation = inlineAndPropagate >->
-                     caseFlattening >-> etaTL >-> dec >-> spec >-> dec >->
-                     conSpec
+constantPropagation =
+  inlineAndPropagate >->
+  caseFlattening >->
+  etaTL >->
+#if !EXPERIMENTAL_EVALUATOR
+  dec >->
+#endif
+  spec >->
+#if !EXPERIMENTAL_EVALUATOR
+  dec >->
+#endif
+  conSpec
   where
     etaTL              = apply "etaTL" etaExpansionTL !-> topdownR (apply "applicationPropagation" appPropFast)
     inlineAndPropagate = repeatR (topdownR (applyMany transPropagateAndInline) >-> inlineNR)
     spec               = bottomupR (applyMany specTransformations)
     caseFlattening     = repeatR (topdownR (apply "caseFlat" caseFlat))
+#if !EXPERIMENTAL_EVALUATOR
     dec                = repeatR (topdownR (apply "DEC" disjointExpressionConsolidation))
+#endif
     conSpec            = bottomupR  ((apply "appPropCS" appPropFast !->
                                      bottomupR (apply "constantSpec" constantSpec)) >-!
                                      apply "constantSpec" constantSpec)

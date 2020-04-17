@@ -17,13 +17,15 @@ import Data.Map.Strict (Map)
 import qualified Data.Map.Strict as Map
 import GHC.Generics (Generic)
 
-import Clash.Core.DataCon (DataCon)
+import Debug.Trace -- TODO
+
+import Clash.Core.DataCon
 import Clash.Core.FreeVars (localFVsOfTerms, tyFVsOfTypes)
 import Clash.Core.Literal (Literal)
 import Clash.Core.Subst (extendTvSubstList, mkSubst, substTm)
 import Clash.Core.Term (Term(..), Pat, PrimInfo, TickInfo, mkApps)
 import Clash.Core.TyCon (TyConMap)
-import Clash.Core.Type (Type)
+import Clash.Core.Type
 import Clash.Core.Var (Id, IdScope(..), TyVar)
 import Clash.Core.VarEnv
   ( InScopeSet, extendInScopeSet, mkInScopeSet
@@ -33,7 +35,7 @@ import Clash.Core.VarEnv
 
 import Clash.Driver.Types (BindingMap, Binding(..))
 
-partialEval
+nf
   :: Evaluator
   -> BindingMap
   -> EnvPrimsIO
@@ -41,10 +43,35 @@ partialEval
   -> InScopeSet
   -> Supply
   -> Term
-  -> (Nf, EnvPrimsIO)
-partialEval eval bs ps tcm iss ids x =
-  envPrimsIO <$> State.runState (evaluateNf eval x) env
+  -> (Nf, EnvPrimsIO, EnvTmMap)
+nf = partialEval evaluateNf
+
+whnf
+  :: Evaluator
+  -> BindingMap
+  -> EnvPrimsIO
+  -> TyConMap
+  -> InScopeSet
+  -> Supply
+  -> Term
+  -> (Value, EnvPrimsIO, EnvTmMap)
+whnf = partialEval evaluateWhnf
+
+partialEval
+  :: (AsTerm a)
+  => (Evaluator -> Term -> State Env a)
+  -> Evaluator
+  -> BindingMap
+  -> EnvPrimsIO
+  -> TyConMap
+  -> InScopeSet
+  -> Supply
+  -> Term
+  -> (a, EnvPrimsIO, EnvTmMap)
+partialEval f eval bs ps tcm iss ids x =
+    (x', envPrimsIO env', envLocals env')
  where
+  (x', env') = State.runState (f eval x) env
   env = mkEnv bs ps tcm iss ids
 
 -- | An evaluator contains the basic functions that define partial evaluation.
@@ -299,7 +326,10 @@ instance AsTerm Term where
 instance (AsTerm a) => AsTerm (Neutral a) where
   asTerm = \case
     NeVar v -> Var v
-    NeData dc args -> mkApps (Data dc) (first asTerm <$> args)
+    NeData dc args -> traceShow binders $ mkApps (Data dc) (first asTerm <$> args)
+      where
+       binders = drop (length args) . fst $ splitFunForallTy (dcType dc)
+
     NePrim p args -> mkApps (Prim p) (first asTerm <$> args)
     NeApp x y -> App (asTerm x) (asTerm y)
     NeTyApp x ty -> TyApp (asTerm x) ty

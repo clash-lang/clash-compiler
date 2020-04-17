@@ -6,7 +6,8 @@
 #include "MachDeps.h"
 
 module Test.Tasty.Clash.CoreTest
-  ( runToCoreStage
+  ( TargetToState
+  , runToCoreStage
   ) where
 
 import Clash.Backend

@@ -41,6 +41,7 @@ import Clash.Core.Literal
 import Clash.Core.Term
 import Clash.Core.Type
 import Clash.Core.Var
+import Clash.Debug (traceM) -- TODO Remove when primitives are implemented
 import Clash.Driver.Types (Binding(..))
 
 -- | Default implementation for looking up a variable in the environment.
@@ -89,7 +90,7 @@ evaluatePrimWith
   -> PrimInfo
   -> State Env Value
 evaluatePrimWith eval p
-  | null argTys = eval p []
+  | null argTys = traceM ("evaluatePrimWith: " <> show (primName p)) >> eval p []
   | otherwise = pure (VNeu (NePrim p []))
  where
   argTys = fst $ splitFunForallTy (primType p)

@@ -43,7 +43,9 @@ runClashTest :: IO ()
 runClashTest = defaultMain $ clashTestRoot
   [ clashTestGroup "netlist"
     [ clashLibTest ("tests" </> "shouldwork" </> "Netlist") allTargets [] "Identity" "main"
+#if !EXPERIMENTAL_EVALUATOR
     , clashLibTest ("tests" </> "shouldwork" </> "Netlist") [VHDL] [] "NoDeDup" "main"
+#endif
     ]
   , clashTestGroup "examples"
     [ runTest "ALU" def{hdlSim=False}
@@ -57,11 +59,13 @@ runClashTest = defaultMain $ clashTestRoot
     , runTest "Calculator" def
     , runTest "CHIP8" def{hdlSim=False}
     , runTest "CochleaPlus" def{hdlSim=False}
+#if !EXPERIMENTAL_EVALUATOR
     , runTest "FIR" def{
         clashFlags=["-fclash-component-prefix", "test"]
       , entities=Entities [["","test_testBench"]]
       , topEntities=TopEntities ["test_testBench"]
       }
+#endif
     , runTest "Fifo" def{hdlSim=False}
     , runTest "MAC" def
     , runTest "MatrixVect" def
@@ -77,6 +81,7 @@ runClashTest = defaultMain $ clashTestRoot
         , topEntities=TopEntities ["test_i2c"]
         , hdlSim=False
         }
+#if !EXPERIMENTAL_EVALUATOR
       , runTest "I2Ctest" def {
           entities=Entities [[ ".." </> "I2C" </> "i2c"
                              , ".." </> "I2C" </> "bitmaster"
@@ -90,6 +95,7 @@ runClashTest = defaultMain $ clashTestRoot
         , hdlSim=True
         , vvpStderrEmptyFail=False
         }
+#endif
       ]
     ]
   , clashTestGroup "tests"
@@ -229,21 +235,34 @@ runClashTest = defaultMain $ clashTestRoot
 --        }
       ]
     , clashTestGroup "shouldwork"
+#if !EXPERIMENTAL_EVALUATOR
       [ clashTestGroup "AutoReg"
         [ outputTest ("tests" </> "shouldwork" </> "AutoReg") allTargets [] [] "AutoReg" "main"
         ]
       , clashTestGroup "Basic"
+#else
+      [ clashTestGroup "Basic"
+#endif
+
+#if !EXPERIMENTAL_EVALUATOR
         [ runTest "AES" def{hdlSim=False}
         , runTest "BangData" def{hdlSim=False}
+#else
+        [ runTest "BangData" def{hdlSim=False}
+#endif
         , runTest "Trace" def{hdlSim=False}
         , runTest "ByteSwap32" def
         , runTest "CharTest" def
         , runTest "ClassOps" def
         , runTest "CountTrailingZeros" def
         , runTest "DeepseqX" def
+#if !EXPERIMENTAL_EVALUATOR
         , runTest "DivMod" def{hdlSim=False}
+#endif
         , runTest "IrrefError" def{hdlSim=False}
+#if !EXPERIMENTAL_EVALUATOR
         , runTest "LambdaDrop" def{hdlSim=False}
+#endif
         , runTest "LotOfStates" def
 #ifdef CLASH_MULTIPLE_HIDDEN
         , runTest "MultipleHidden" def
@@ -272,8 +291,10 @@ runClashTest = defaultMain $ clashTestRoot
           , entities=Entities [["top1"]]
           , topEntities=TopEntities ["top1"]
           }
+#if !EXPERIMENTAL_EVALUATOR
         , runTest "T1012" def{hdlSim=False}
         , runTest "T1240" def{hdlSim=False}
+#endif
         , runTest "T1242" def{hdlSim=False}
         , runTest "T1254" def{hdlTargets=[VHDL,SystemVerilog],hdlSim=False}
         , runTest "T1292" def{hdlTargets=[VHDL]}
@@ -320,9 +341,13 @@ runClashTest = defaultMain $ clashTestRoot
         , runTest "ReduceZero" def
         , runTest "ReduceOne" def
         , runTest "ExtendingNumZero" def
+#if !EXPERIMENTAL_EVALUATOR
         , runTest "GenericBitPack" def{clashFlags=["-fconstraint-solver-iterations=15"]}
+#endif
         , runTest "AppendZero" def
+#if !EXPERIMENTAL_EVALUATOR
         , runTest "UnpackUndefined" def{hdlSim=False}
+#endif
         ]
       , clashTestGroup "BlackBox"
         [ outputTest ("tests" </> "shouldwork" </> "BlackBox") [VHDL]   [] [] "TemplateFunction"   "main"
@@ -330,7 +355,9 @@ runClashTest = defaultMain $ clashTestRoot
         , runTest "BlackBoxFunctionHO" def{hdlTargets=[VHDL]}
         , outputTest ("tests" </> "shouldwork" </> "Signal")   allTargets [] [] "BlockRamLazy"       "main"
         , outputTest ("tests" </> "shouldwork" </> "BlackBox") [VHDL]   [] [] "ZeroWidth"          "main"
+#if !EXPERIMENTAL_EVALUATOR
         , runTest "T919" def{hdlSim=False}
+#endif
         ]
       , clashTestGroup "BoxedFunctions"
         [ runTest "DeadRecursiveBoxed" def{hdlSim=False}
@@ -365,6 +392,7 @@ runClashTest = defaultMain $ clashTestRoot
           ]
         , runTest "T694" def{hdlSim=False,hdlTargets=[VHDL]}
         ]
+#if !EXPERIMENTAL_EVALUATOR
       , clashTestGroup "DDR"
         [ runTest "DDRinGA" def
         , runTest "DDRinGS" def
@@ -380,6 +408,7 @@ runClashTest = defaultMain $ clashTestRoot
         , runTest "DelayI" def
         , runTest "DelayN" def
         ]
+#endif
       , clashTestGroup "Feedback"
         [ runTest "Fib" def
 #ifdef CLASH_MULTIPLE_HIDDEN
@@ -387,14 +416,20 @@ runClashTest = defaultMain $ clashTestRoot
 #endif
         ]
       , clashTestGroup "Fixed"
+#if !EXPERIMENTAL_EVALUATOR
         [ runTest "Mixer" def
         , runTest "SFixedTest" def
         , runTest "SatWrap" def{hdlSim=False}
         , runTest "ZeroInt" def
+#else
+        [ runTest "SatWrap" def{hdlSim=False}
+#endif
         ]
       , clashTestGroup "Floating"
         [ runTest "FloatPack" def{hdlSim=False, clashFlags=["-fclash-float-support"]}
+#if !EXPERIMENTAL_EVALUATOR
         , runTest "FloatConstFolding" def{clashFlags=["-fclash-float-support"]}
+#endif
         ]
       , clashTestGroup "GADTs"
         [ runTest "Constrained" def
@@ -416,11 +451,13 @@ runClashTest = defaultMain $ clashTestRoot
         , runTest "Transpose" def
         , runTest "VecFun" def
       ]
+#if !EXPERIMENTAL_EVALUATOR
       , clashTestGroup "Issues"
         [ runTest "T1187" def{hdlSim=False, hdlTargets=[Verilog]}
         , clashLibTest ("tests" </> "shouldwork" </> "Issues") [VHDL] [] "T1388" "main"
         , outputTest ("tests" </> "shouldwork" </> "Issues") allTargets [] [] "T1171" "main"
         ]
+#endif
       , clashTestGroup "Naming"
         [ runTest "T967a" def{hdlSim=False}
         , runTest "T967b" def{hdlSim=False}
@@ -432,17 +469,23 @@ runClashTest = defaultMain $ clashTestRoot
 #if MIN_VERSION_base(4,14,0)
         , runTest "BitReverse" def
 #endif
+#if !EXPERIMENTAL_EVALUATOR
         , runTest "Bounds" def
         , runTest "DivideByZero" def
+#endif
         , runTest "ExpWithGhcCF" def{clashFlags=["-itests/shouldwork/Numbers", "-fconstraint-solver-iterations=15"]}
         , runTest "ExpWithClashCF" def{clashFlags=["-itests/shouldwork/Numbers", "-fconstraint-solver-iterations=15"]}
+#if !EXPERIMENTAL_EVALUATOR
         , outputTest ("tests" </> "shouldwork" </> "Numbers") allTargets ["-itests/shouldwork/Numbers"] ["-itests/shouldwork/Numbers"] "ExpWithClashCF"  "main"
+#endif
         , runTest "HalfAsBlackboxArg" def{hdlTargets=[VHDL], hdlSim=False}
         , runTest "IntegralTB" def{clashFlags=["-itests/shouldwork/Numbers"]}
+#if !EXPERIMENTAL_EVALUATOR
         , runTest "NumConstantFoldingTB_1" def{clashFlags=["-itests/shouldwork/Numbers"]}
         , outputTest ("tests" </> "shouldwork" </> "Numbers") allTargets ["-fconstraint-solver-iterations=15"] ["-itests/shouldwork/Numbers"] "NumConstantFolding_1"  "main"
         , runTest "NumConstantFoldingTB_2" def{clashFlags=["-itests/shouldwork/Numbers"]}
         , outputTest ("tests" </> "shouldwork" </> "Numbers") allTargets ["-fconstraint-solver-iterations=15"] ["-itests/shouldwork/Numbers"] "NumConstantFolding_2"  "main"
+#endif
 #if MIN_VERSION_base(4,12,0)
         -- Naturals are broken on GHC <= 8.4. See https://github.com/clash-lang/clash-compiler/pull/473
         , runTest "Naturals" def
@@ -457,9 +500,11 @@ runClashTest = defaultMain $ clashTestRoot
         , runTest "SignedZero" def
         , runTest "Signum" def
         , runTest "Strict" def
+#if !EXPERIMENTAL_EVALUATOR
         , runTest "T1019" def{hdlSim=False}
         , runTest "T1351" def
         , outputTest ("tests" </> "shouldwork" </> "Numbers") allTargets [] ["-itests/shouldwork/Numbers"] "UndefinedConstantFolding"  "main"
+#endif
         , runTest "UnsignedZero" def
         ]
       , clashTestGroup "Polymorphism"
@@ -474,10 +519,12 @@ runClashTest = defaultMain $ clashTestRoot
           , expectClashFail=Just (NoTestExitCode, "You shouldn't use 'primitive'!")
           }
         ]
+#if !EXPERIMENTAL_EVALUATOR
       , clashTestGroup "PrimitiveReductions"
         [ runTest "Lambda" def
         , runTest "ReplaceInt" def
         ]
+#endif
       , clashTestGroup "RTree"
         [ runTest "TFold" def{hdlSim=False}
         , runTest "TRepeat" def
@@ -489,9 +536,11 @@ runClashTest = defaultMain $ clashTestRoot
       , clashTestGroup "Signal"
         [ runTest "AlwaysHigh" def{hdlSim=False}
         , outputTest ("tests" </> "shouldwork" </> "Signal") allTargets [] [] "BlockRamLazy"    "main"
+#if !EXPERIMENTAL_EVALUATOR
         , runTest "BlockRamFile" def
         , runTest "BlockRam0" def
         , runTest "BlockRam1" def
+#endif
         , runTest "BlockRamTest" def{hdlSim=False}
         , runTest "Compression" def
         , runTest "DelayedReset" def
@@ -501,15 +550,21 @@ runClashTest = defaultMain $ clashTestRoot
           , hdlSim=False
           }
         , runTest "Oversample" def
+#if !EXPERIMENTAL_EVALUATOR
         , runTest "Ram" def
+#endif
         , runTest "RegisterAR" def
         , runTest "RegisterSR" def
         , runTest "RegisterAE" def
         , runTest "RegisterSE" def
+#if !EXPERIMENTAL_EVALUATOR
         , runTest "ResetGen" def
+#endif
         , runTest "ResetLow" def
         , runTest "Rom" def
+#if !EXPERIMENTAL_EVALUATOR
         , runTest "RomFile" def
+#endif
         , runTest "SigP" def{hdlSim=False}
         , outputTest ("tests" </> "shouldwork" </> "Signal") [VHDL] [] [] "T1102A" "main"
         , outputTest ("tests" </> "shouldwork" </> "Signal") [VHDL] [] [] "T1102B" "main"
@@ -540,7 +595,9 @@ runClashTest = defaultMain $ clashTestRoot
         ]
       , clashTestGroup "Types"
         [ runTest "TypeFamilyReduction" def{hdlSim=False}
+#if !EXPERIMENTAL_EVALUATOR
         , runTest "NatExp" def{hdlSim=False}
+#endif
         ]
       , clashTestGroup "TopEntity"
         -- VHDL tests disabled for now: I can't figure out how to generate a static name whilst retaining the ability to actually test..
@@ -586,7 +643,9 @@ runClashTest = defaultMain $ clashTestRoot
         , runTest "DTFold" def
         , runTest "EnumTypes" def{hdlSim=False}
         , runTest "FindIndex" def
+#if !EXPERIMENTAL_EVALUATOR
         , runTest "FirOddSize" def
+#endif
         , runTest "Fold" def
         , runTest "FoldlFuns" def{hdlSim=False}
         , runTest "Foldr" def
@@ -594,7 +653,9 @@ runClashTest = defaultMain $ clashTestRoot
         , runTest "HOClock" def{hdlSim=False}
         , runTest "HOCon" def{hdlSim=False}
         , runTest "HOPrim" def{hdlSim=False}
+#if !EXPERIMENTAL_EVALUATOR
         , runTest "IndexInt" def
+#endif
         , runTest "Indices" def
         , runTest "Iterate" def
         , outputTest ("tests" </> "shouldwork" </> "Vector") [VHDL] [] [] "IterateCF" "main"
@@ -625,9 +686,13 @@ runClashTest = defaultMain $ clashTestRoot
         , runTest "T1360" def{hdlSim=False, hdlTargets=[VHDL], clashFlags=["-fclash-hdlsyn", "Vivado"]}
         ] -- end vector
       , clashTestGroup "XOptimization"
+#if !EXPERIMENTAL_EVALUATOR
         [ outputTest  ("tests" </> "shouldwork" </> "XOptimization") allTargets [] [] "Conjunction"  "main"
         , outputTest  ("tests" </> "shouldwork" </> "XOptimization") allTargets [] [] "Disjunction"  "main"
         , clashLibTest ("tests" </> "shouldwork" </> "XOptimization") allTargets [] "OneDefinedDataPat" "main"
+#else
+        [ clashLibTest ("tests" </> "shouldwork" </> "XOptimization") allTargets [] "OneDefinedDataPat" "main"
+#endif
         , clashLibTest ("tests" </> "shouldwork" </> "XOptimization") allTargets [] "OneDefinedLitPat" "main"
         , clashLibTest ("tests" </> "shouldwork" </> "XOptimization") allTargets [] "OneDefinedDefaultPat" "main"
         , clashLibTest ("tests" </> "shouldwork" </> "XOptimization") allTargets [] "ManyDefined" "main"

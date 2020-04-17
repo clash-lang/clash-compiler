@@ -74,6 +74,7 @@ ghcApply x y = do
     VNeu (NeData dc args) -> applyToData dc (args <> [Left y])
     VNeu (NePrim p args) -> applyToPrim p (args <> [Left y])
     VNeu n -> pure (VNeu (NeApp n y))
+    VPrim p args -> pure (VNeu (NeApp (NePrim p args) y))
     VLam i x'' env ->
       let addBinder = insertLocal i (Right y)
        in State.put env >> State.withState addBinder (ghcEvaluate x'')
@@ -90,6 +91,7 @@ ghcTyApply x ty = do
     VNeu (NeData dc args) -> applyToData dc (args <> [Right ty])
     VNeu (NePrim p args) -> applyToPrim p (args <> [Right ty])
     VNeu n -> pure (VNeu (NeTyApp n ty))
+    VPrim p args -> pure (VNeu (NeTyApp (NePrim p args) ty))
     VTyLam i x'' env ->
       let addBinder = insertType i ty
        in State.put env >> State.withState addBinder (ghcEvaluate x'')
