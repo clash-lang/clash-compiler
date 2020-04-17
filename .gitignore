@@ -51,3 +51,6 @@ result*
 
 # Sphinx output
 _build/
+
+# Python env
+docs/env
