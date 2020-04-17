@@ -73,8 +73,9 @@ end block;
   -> Signal dom a"
     , "template" :
 "-- blockRamU begin
-~GENSYM[~RESULT_blockRam][1] : block
-  type ~GENSYM[ram_t][8] is array (0 to integer'(~LIT[5])-1) of ~TYP[9];
+~GENSYM[~RESULT_blockRam][1] : block~IF~VIVADO~THEN
+  type ~GENSYM[ram_t][8] is array (0 to integer'(~LIT[5])-1) of std_logic_vector(~SIZE[~TYP[9]]-1 downto 0);~ELSE
+  type ~SYM[8] is array (0 to integer'(~LIT[5])-1) of ~TYP[9];~FI
   signal ~GENSYM[~RESULT_RAM][2] : ~SYM[8];
   signal ~GENSYM[rd][4]  : integer range 0 to ~LIT[5] - 1;
   signal ~GENSYM[wr][5]  : integer range 0 to ~LIT[5] - 1;
@@ -132,9 +133,10 @@ end block;
   -> Signal dom a"
     , "template" :
 "-- blockRam1 begin
-~GENSYM[~RESULT_blockRam][1] : block
-  type ~GENSYM[ram_t][8] is array (0 to integer'(~LIT[5])-1) of ~TYP[6];
-  signal ~GENSYM[~RESULT_RAM][2] : ~SYM[8] := (others => ~CONST[6]);
+~GENSYM[~RESULT_blockRam][1] : block~IF~VIVADO~THEN
+  type ~GENSYM[ram_t][8] is array (0 to integer'(~LIT[5])-1) of std_logic_vector(~SIZE[~TYP[6]]-1 downto 0);~ELSE
+  type ~SYM[8] is array (0 to integer'(~LIT[5])-1) of ~TYP[6];~FI
+  signal ~GENSYM[~RESULT_RAM][2] : ~SYM[8] := (others => ~IF~VIVADO~THEN~TOBV[~CONST[6]][~TYP[6]]~ELSE~CONST[6]~FI);
   signal ~GENSYM[rd][4]  : integer range 0 to ~LIT[5] - 1;
   signal ~GENSYM[wr][5]  : integer range 0 to ~LIT[5] - 1;
 begin
