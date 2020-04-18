@@ -55,6 +55,7 @@ import           Data.Int            (Int8, Int16, Int32, Int64)
 import           Data.Ord            (Down (Down))
 import           Data.Ratio          (Ratio, numerator, denominator)
 import qualified Data.Semigroup      as SG
+import qualified Data.Monoid         as M
 import           Data.Sequence       (Seq(Empty, (:<|)))
 import           Data.Word           (Word8, Word16, Word32, Word64)
 import           Foreign.C.Types     (CUShort)
@@ -813,6 +814,8 @@ instance NFDataX a => NFDataX (SG.Min a)
 instance NFDataX a => NFDataX (SG.Option a)
 instance NFDataX a => NFDataX (SG.Product a)
 instance NFDataX a => NFDataX (SG.Sum a)
+instance NFDataX a => NFDataX (M.First a)
+instance NFDataX a => NFDataX (M.Last a)
 
 class GDeepErrorX f where
   gDeepErrorX :: HasCallStack => String -> f a
