@@ -216,7 +216,6 @@ runClashTest = defaultMain $ clashTestRoot
       , clashTestGroup "InvalidPrimitive"
         [ runTest "InvalidPrimitive" def{
             hdlTargets=[VHDL]
-          , clashFlags=["-itests/shouldfail/InvalidPrimitive"]
           , expectClashFail=Just (def, "InvalidPrimitive.json")
           }
         ]
@@ -583,14 +582,14 @@ runClashTest = defaultMain $ clashTestRoot
 #endif
         , NEEDS_PRIMS(runTest "Bounds" def)
         , NEEDS_PRIMS(runTest "DivideByZero" def)
-        , let _opts = def { clashFlags=["-itests/shouldwork/Numbers", "-fconstraint-solver-iterations=15"] }
+        , let _opts = def { clashFlags=["-fconstraint-solver-iterations=15"] }
            in NEEDS_PRIMS_GHC(runTest "ExpWithGhcCF" _opts)
-        , let _opts = def { clashFlags=["-itests/shouldwork/Numbers", "-fconstraint-solver-iterations=15"] }
+        , let _opts = def { clashFlags=["-fconstraint-solver-iterations=15"] }
            in NEEDS_PRIMS_GHC(runTest "ExpWithClashCF" _opts)
-        , NEEDS_PRIMS(outputTest ("tests" </> "shouldwork" </> "Numbers") allTargets ["-itests/shouldwork/Numbers"] ["-itests/shouldwork/Numbers"] "ExpWithClashCF" "main")
+        , NEEDS_PRIMS(outputTest ("tests" </> "shouldwork" </> "Numbers") allTargets [] ["-itests/shouldwork/Numbers"] "ExpWithClashCF" "main")
         , let _opts = def { hdlTargets = [VHDL], hdlSim = False }
            in NEEDS_PRIMS_GHC(runTest "HalfAsBlackboxArg" _opts)
-        , NEEDS_PRIMS_GHC(runTest "IntegralTB" def{clashFlags=["-itests/shouldwork/Numbers"]})
+        , NEEDS_PRIMS_GHC(runTest "IntegralTB" def)
         , NEEDS_PRIMS(runTest "NumConstantFoldingTB_1" def{clashFlags=["-itests/shouldwork/Numbers"]})
         , NEEDS_PRIMS(outputTest ("tests" </> "shouldwork" </> "Numbers") allTargets ["-fconstraint-solver-iterations=15"] ["-itests/shouldwork/Numbers"] "NumConstantFolding_1" "main")
         , NEEDS_PRIMS(runTest "NumConstantFoldingTB_2" def{clashFlags=["-itests/shouldwork/Numbers"]})
@@ -605,7 +604,7 @@ runClashTest = defaultMain $ clashTestRoot
         , NEEDS_PRIMS_GHC(runTest "Resize2" def)
         , NEEDS_PRIMS_GHC(runTest "Resize3" def)
         , NEEDS_PRIMS_GHC(runTest "SatMult" def{hdlSim=False})
-        , NEEDS_PRIMS_GHC(runTest "ShiftRotate" def{clashFlags=["-itests/shouldwork/Numbers"]})
+        , NEEDS_PRIMS_GHC(runTest "ShiftRotate" def)
         , NEEDS_PRIMS_GHC(runTest "SignedProjectionTB" def)
         , NEEDS_PRIMS_GHC(runTest "SignedZero" def)
         , NEEDS_PRIMS_GHC(runTest "Signum" def)
