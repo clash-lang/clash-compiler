@@ -43,7 +43,10 @@ read the current value from the /bus/, increment it, and write it on the next
 cycle.
 
 @
--- | Alternatively read / increment+write
+import Clash.Explicit.Prelude
+import Clash.Signal.BiSignal
+
+-- | Alternatingly read / increment+write
 counter
   :: (Bool, Int)
   -- ^ Internal flip + previous read
@@ -59,26 +62,29 @@ counter (write, prevread) i = ((write', prevread'), output)
 -- | Write on odd cyles
 f :: Clock System
   -> Reset System
-  -> BiSignalIn  Floating System (BitSize Int)
-  -> BiSignalOut Floating System (BitSize Int)
-f clk rst s = writeToBiSignal s (mealy clk rst counter (False, 0) (readFromBiSignal s))
+  -> Enable System
+  -> BiSignalIn  'Floating System (BitSize Int)
+  -> BiSignalOut 'Floating System (BitSize Int)
+f clk rst en s = writeToBiSignal s (mealy clk rst en counter (False, 0) (readFromBiSignal s))
 
 -- | Write on even cyles
 g :: Clock System
   -> Reset System
-  -> BiSignalIn  Floating System (BitSize Int)
-  -> BiSignalOut Floating System (BitSize Int)
-g clk rst s = writeToBiSignal s (mealy clk rst counter (True, 0) (readFromBiSignal s))
+  -> Enable System
+  -> BiSignalIn  'Floating System (BitSize Int)
+  -> BiSignalOut 'Floating System (BitSize Int)
+g clk rst en s = writeToBiSignal s (mealy clk rst en counter (True, 0) (readFromBiSignal s))
 
 
 -- | Connect the /f/ and /g/ circuits to the same bus
 topEntity
   :: Clock System
   -> Reset System
+  -> Enable System
   -> Signal System Int
-topEntity clk rst = readFromBiSignal bus'
+topEntity clk rst en = readFromBiSignal bus'
   where
-    bus  = mergeBiSignalOuts $ f clk rst bus' :> g clk rst bus' :> Nil
+    bus  = mergeBiSignalOuts $ f clk rst en bus' :> g clk rst en bus' :> Nil
     bus' = veryUnsafeToBiSignalIn bus
 @
 -}

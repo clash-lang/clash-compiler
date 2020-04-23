@@ -1293,8 +1293,8 @@ dflipflop =
   E.dflipflop (fromLabel @(HiddenClockName dom))
 {-# INLINE dflipflop #-}
 
--- | 'delay' @s@ delays the values in 'Signal' @s@ for once cycle, the value
--- at time 0 is /dflt/.
+-- | 'delay' @dflt@ @s@ delays the values in 'Signal' @s@ for once cycle, the
+-- value at time 0 is /dflt/.
 --
 -- >>> sampleN @System 3 (delay 0 (fromList [1,2,3,4]))
 -- [0,1,2]
@@ -1375,9 +1375,9 @@ register
    . ( HiddenClockResetEnable dom
      , NFDataX a )
   => a
-  -- ^ Reset value
-  --
-  -- 'register' outputs the reset value when the reset value is active
+  -- ^ Reset value. 'register' outputs the reset value when the reset is active.
+  -- If the domain has initial values enabled, the reset value will also be the
+  -- initial value.
   -> Signal dom a
   -> Signal dom a
 register i s =
@@ -1417,6 +1417,8 @@ regMaybe
      , NFDataX a )
   => a
   -- ^ Reset value. 'regMaybe' outputs the reset value when the reset is active.
+  -- If the domain has initial values enabled, the reset value will also be the
+  -- initial value.
   -> Signal dom (Maybe a)
   -> Signal dom a
 regMaybe initial iM =
@@ -1448,9 +1450,9 @@ regEn
    . ( HiddenClockResetEnable dom
      , NFDataX a )
   => a
-  -- ^ Reset value
-  --
-  -- 'regEn' outputs the reset value when the reset value is active
+  -- ^ Reset value. 'regEn' outputs the reset value when the reset is active.
+  -- If the domain has initial values enabled, the reset value will also be the
+  -- initial value.
   -> Signal dom Bool
   -> Signal dom a
   -> Signal dom a
@@ -1466,7 +1468,7 @@ regEn initial en i =
 
 -- * Signal -> List conversion
 
--- | Get an infinite list of samples from a 'Clash.Signal.Signal'
+-- | Get an infinite list of samples from a 'Signal'
 --
 -- The elements in the list correspond to the values of the 'Signal'
 -- at consecutive clock cycles
@@ -1521,9 +1523,9 @@ sampleN n s0 =
   S.sampleN n s1
 {-# NOINLINE sampleN #-}
 
--- | Get a list of samples from a 'Signal', while asserting the reset line
--- for /n/ clock cycles. 'sampleWithReset' does not return the first /n/ cycles,
--- i.e., when the reset is asserted.
+-- | Get an infinite list of samples from a 'Signal', while asserting the reset
+-- line for /m/ clock cycles. 'sampleWithReset' does not return the first /m/
+-- cycles, i.e., when the reset is asserted.
 --
 -- __NB__: This function is not synthesizable
 sampleWithReset
@@ -1542,8 +1544,8 @@ sampleWithReset nReset f0 =
   drop (snatToNum nReset) (S.sample f1)
 {-# NOINLINE sampleWithReset #-}
 
--- | Get a fine list of /m/ samples from a 'Signal', while asserting the reset line
--- for /n/ clock cycles. 'sampleWithReset' does not return the first /n/ cycles,
+-- | Get a list of /n/ samples from a 'Signal', while asserting the reset line
+-- for /m/ clock cycles. 'sampleWithReset' does not return the first /m/ cycles,
 -- i.e., while the reset is asserted.
 --
 -- __NB__: This function is not synthesizable
@@ -1563,7 +1565,7 @@ sampleWithResetN
 sampleWithResetN nReset nSamples f =
   take nSamples (sampleWithReset nReset f)
 
--- | /Lazily/ get an infinite list of samples from a 'Clash.Signal.Signal'
+-- | /Lazily/ get an infinite list of samples from a 'Signal'
 --
 -- The elements in the list correspond to the values of the 'Signal'
 -- at consecutive clock cycles
