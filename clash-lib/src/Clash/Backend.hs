@@ -10,7 +10,6 @@
 
 module Clash.Backend where
 
-import qualified  Control.Lens              as Lens
 import Data.HashSet                         (HashSet)
 import Data.Semigroup.Monad                 (Mon (..))
 import Data.Text                            (Text)
@@ -132,13 +131,3 @@ class HasIdentifierSet state => Backend state where
   ifThenElseExpr :: state -> Bool
   -- | Whether -fclash-aggressive-x-optimization-blackboxes was set
   aggressiveXOptBB :: State state AggressiveXOptBB
-
-preserveSeen
-  :: Backend s
-  => Mon (State s) a
-  -> Mon (State s) a
-preserveSeen m = do
-  s <- Mon (Lens.use identifierSet)
-  a <- m
-  Mon (identifierSet Lens..= s)
-  return a
