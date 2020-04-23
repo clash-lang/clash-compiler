@@ -555,7 +555,8 @@ veryUnsafeSynchronizer t1 t2
 
 -- * Basic circuit functions
 
--- | Merge enable signal with signal of bools
+-- | Merge enable signal with signal of bools by applying the boolean AND
+-- operation.
 enable
   :: Enable dom
   -> Signal dom Bool

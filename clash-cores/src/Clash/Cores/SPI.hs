@@ -103,7 +103,7 @@ data SPISlaveConfig ds dom
   -- output when the enable is high
   }
 
--- | SPI capture a shift logic that is shared between slave and master
+-- | SPI capture and shift logic that is shared between slave and master
 spiCommon
   :: forall n dom
    . (HiddenClockResetEnable dom, KnownNat n, 1 <= n)
