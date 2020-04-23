@@ -320,12 +320,15 @@ maybeConvertToCustomRepr
   -> Type
   -- ^ Custom reprs are index on type, so we need the clash core type to look
   -- it up.
-  -> HWType
+  -> FilteredHWType
   -- ^ Type of previous argument represented as a HWType
-  -> HWType
-maybeConvertToCustomRepr reprs (coreToType' -> Right tyName) hwTy
+  -> FilteredHWType
+maybeConvertToCustomRepr reprs (coreToType' -> Right tyName) (FilteredHWType hwTy filtered)
   | Just dRepr <- getDataRepr tyName reprs =
-    convertToCustomRepr reprs dRepr hwTy
+    FilteredHWType
+      (convertToCustomRepr reprs dRepr hwTy)
+      [ [ (fieldAnn == 0, hwty) | ((_, hwty), fieldAnn) <- zip fields (crFieldAnns constr) ]
+                                | (fields, constr) <- zip filtered (drConstrs dRepr)]
 maybeConvertToCustomRepr _reprs _ty hwTy = hwTy
 
 -- | Same as @coreTypeToHWType@, but discards void filter information
@@ -367,16 +370,14 @@ coreTypeToHWType builtInTranslation reprs m ty = do
      -> Type
      -> State (HashMap Type (Either String FilteredHWType))
               (Either String FilteredHWType)
-  go (Just hwtyE) _ = pure $
-    (\(FilteredHWType hwty filtered) ->
-      (FilteredHWType (maybeConvertToCustomRepr reprs ty hwty) filtered)) <$> hwtyE
+  go (Just hwtyE) _ = pure $ maybeConvertToCustomRepr reprs ty <$> hwtyE
   -- Strip transparant types:
   go _ (coreView1 m -> Just ty') =
     coreTypeToHWType builtInTranslation reprs m ty'
   -- Try to create hwtype based on AST:
   go _ (tyView -> TyConApp tc args) = runExceptT $ do
-    FilteredHWType hwty filtered <- mkADT builtInTranslation reprs m (showPpr ty) tc args
-    return (FilteredHWType (maybeConvertToCustomRepr reprs ty hwty) filtered)
+    hwty <- mkADT builtInTranslation reprs m (showPpr ty) tc args
+    return (maybeConvertToCustomRepr reprs ty hwty)
   -- All methods failed:
   go _ _ = return $ Left $ "Can't translate non-tycon type: " ++ showPpr ty
 
