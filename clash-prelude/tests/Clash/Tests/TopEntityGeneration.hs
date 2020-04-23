@@ -43,6 +43,11 @@ data Gadt x where
 type family CF x y z where
   CF Int Int Int = ("cfiii" ::: Single)
   CF Bool Int Int = ("cfbii" ::: Single)
+
+type family OrderedCF b f a where
+    OrderedCF 'True f a = f a
+    OrderedCF b f a = ()
+
 type family OF x y z
 type instance OF Int Int Int = ("ofiii" ::: Single)
 type instance OF Bool Int Int = ("ofbii" ::: Single)
@@ -57,6 +62,12 @@ data FailureTy1 = TwoF1 ("one" ::: Int) Int
 data SuccessTy = TwoS ("one" ::: Int) Single
 
 data Passthrough a b = Passthrough a b
+
+data HKD f = HKD
+    { fd1 :: OrderedCF 'True f  ("fd1" ::: Int)
+    , fd2 :: OrderedCF 'True f  ("fd2" ::: Bool)
+    }
+
 
 topEntity1 :: "in1" ::: Signal System Int
            -> "in2" ::: Signal System Bool
@@ -129,6 +140,7 @@ topEntity4 :: Signal System (Gadt Int)
            -> Signal System (OF Bool Int Int)
            -> Signal System (X Int Int Int)
            -> Signal System (X Bool Int Int)
+           -> "hkd" ::: HKD (Signal System)
            -> Signal System Single
 topEntity4 = undefined
 makeTopEntity 'topEntity4
@@ -144,6 +156,7 @@ expectedTopEntity4 =
     , PortName "ofbii_s"
     , PortProduct "" [PortName "xiii", PortName "xiii2"]
     , PortName "xbii"
+    , PortProduct "hkd" [PortName "fd1", PortName "fd2"]
     ]
     (PortName "s")
 
