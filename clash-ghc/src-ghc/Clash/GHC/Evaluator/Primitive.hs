@@ -444,6 +444,18 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
   "GHC.Prim.byteSwap#" | [i] <- wordLiterals' args -- assume 64bits
     -> reduce . integerToWordLiteral . toInteger . byteSwap64 . (fromInteger :: Integer -> Word64) $ i
 
+#if MIN_VERSION_base(4,14,0)
+  "GHC.Prim.bitReverse#" | [i] <- wordLiterals' args
+    -> reduce . integerToWordLiteral . toInteger . bitReverse64 . fromInteger $ i -- assume 64bits
+  "GHC.Prim.bitReverse8#" | [i] <- wordLiterals' args
+    -> reduce . integerToWordLiteral . toInteger . bitReverse8 . fromInteger $ i
+  "GHC.Prim.bitReverse16#" | [i] <- wordLiterals' args
+    -> reduce . integerToWordLiteral . toInteger . bitReverse16 . fromInteger $ i
+  "GHC.Prim.bitReverse32#" | [i] <- wordLiterals' args
+    -> reduce . integerToWordLiteral . toInteger . bitReverse32 . fromInteger $ i
+  "GHC.Prim.bitReverse64#" | [i] <- wordLiterals' args
+    -> reduce . integerToWordLiteral . toInteger . bitReverse64 . fromInteger $ i
+#endif
 ------------
 -- Narrowing
 ------------

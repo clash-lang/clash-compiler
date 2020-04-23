@@ -395,4 +395,84 @@ assign ~RESULT = $unsigned(~VAR[w][0][31:0]);
 // narrow32Word end"
     }
   }
+, { "BlackBox" :
+    { "name"      : "GHC.Prim.bitReverse#"
+    , "workInfo"  : "Never"
+    , "kind"      : "Declaration"
+    , "type"      : "bitReverse# :: Word# -> Word#"
+    , "template"  :
+"// bitReverse begin
+genvar ~GENSYM[i][0];
+~GENERATE
+for (~SYM[0] = 0; ~SYM[0] < ~IF ~IW64 ~THEN 64 ~ELSE 32 ~FI; ~SYM[0]=~SYM[0]+1) begin : ~GENSYM[bitReverse][2]
+  assign ~RESULT[~SYM[0]] = ~VAR[x][0][~IF ~IW64 ~THEN 63 ~ELSE 31 ~FI-~SYM[0]];
+end
+~ENDGENERATE
+// bitReverse end"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "GHC.Prim.bitReverse8#"
+    , "workInfo"  : "Never"
+    , "kind"      : "Declaration"
+    , "type"      : "bitReverse8# :: Word# -> Word#"
+    , "template"  :
+"// bitReverse8 begin
+genvar ~GENSYM[i][0];
+~GENERATE
+for (~SYM[0] = 0; ~SYM[0] < 8; ~SYM[0]=~SYM[0]+1) begin : ~GENSYM[bitReverse8][2]
+  assign ~RESULT[~SYM[0]] = ~VAR[x][0][7-~SYM[0]];
+end
+~ENDGENERATE
+// bitReverse8 end"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "GHC.Prim.bitReverse16#"
+    , "workInfo"  : "Never"
+    , "kind"      : "Declaration"
+    , "type"      : "bitReverse16# :: Word# -> Word#"
+    , "template"  :
+"// bitReverse16 begin
+genvar ~GENSYM[i][0];
+~GENERATE
+for (~SYM[0] = 0; ~SYM[0] < 16; ~SYM[0]=~SYM[0]+1) begin : ~GENSYM[bitReverse16][2]
+  assign ~RESULT[~SYM[0]] = ~VAR[x][0][15-~SYM[0]];
+end
+~ENDGENERATE
+// bitReverse16 end"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "GHC.Prim.bitReverse32#"
+    , "workInfo"  : "Never"
+    , "kind"      : "Declaration"
+    , "type"      : "bitReverse32# :: Word# -> Word#"
+    , "template"  :
+"// bitReverse32 begin
+genvar ~GENSYM[i][0];
+~GENERATE
+for (~SYM[0] = 0; ~SYM[0] < 32; ~SYM[0]=~SYM[0]+1) begin : ~GENSYM[bitReverse32][2]
+  assign ~RESULT[~SYM[0]] = ~VAR[x][0][31-~SYM[0]];
+end
+~ENDGENERATE
+// bitReverse32 end"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "GHC.Prim.bitReverse64#"
+    , "workInfo"  : "Never"
+    , "kind"      : "Declaration"
+    , "type"      : "bitReverse64# :: Word# -> Word#"
+    , "template"  :
+"// bitReverse64 begin
+genvar ~GENSYM[i][0];
+~GENERATE
+for (~SYM[0] = 0; ~SYM[0] < 64; ~SYM[0]=~SYM[0]+1) begin : ~GENSYM[bitReverse64][2]
+  assign ~RESULT[~SYM[0]] = ~VAR[x][0][63-~SYM[0]];
+end
+~ENDGENERATE
+// bitReverse64 end"
+    }
+  }
 ]
