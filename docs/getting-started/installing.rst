@@ -43,9 +43,7 @@ available versions of the compiler.
 Installing via Source (Windows)
 -------------------------------
 
-1. Install `GHC
-   Platform <https://www.haskell.org/platform/windows.html>`__. Make
-   sure to install Stack along with it.
+1. Install `Stack <https://get.haskellstack.org/stable/windows-x86_64-installer.exe>`__
 2. Download the source code of `Clash
    1.2 <https://github.com/clash-lang/clash-compiler/archive/1.2.tar.gz>`__
 3. Unpack the archive
@@ -54,7 +52,18 @@ Installing via Source (Windows)
 
 See the `releases
 page <https://github.com/clash-lang/clash-compiler/releases>`__ for all
-available versions of the compiler.
+available versions of the compiler. To run clashi, execute:
+
+.. code:: bash
+
+   stack run clashi
+   
+To compile a file (to VHDL) with Clash, run:
+
+
+.. code:: bash
+
+   stack run clash -- path/to/your/file.hs --vhdl
 
 Installing via Source (HEAD)
 ----------------------------
