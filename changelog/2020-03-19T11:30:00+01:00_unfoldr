@@ -1,1 +1,0 @@
-ADDED: `Clash.Sized.Vector.unfoldr` and `Clash.Sized.Vector.unfoldrI` to construct vectors from a seed value

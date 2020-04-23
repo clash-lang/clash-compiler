@@ -1,1 +1,0 @@
-FIXED: The Verilog backend can now deal with non-contiguous ranges in custom bit-representations.
