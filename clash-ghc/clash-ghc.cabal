@@ -1,6 +1,6 @@
 Cabal-version:        2.2
 Name:                 clash-ghc
-Version:              1.2.0
+Version:              1.2.1
 Synopsis:             CAES Language for Synchronous Hardware
 Description:
   Clash is a functional hardware description language that borrows both its
@@ -145,8 +145,8 @@ library
                       transformers              >= 0.5.2.0  && < 0.6,
                       unordered-containers      >= 0.2.1.0  && < 0.3,
 
-                      clash-lib                 == 1.2.0,
-                      clash-prelude             == 1.2.0,
+                      clash-lib                 == 1.2.1,
+                      clash-prelude             == 1.2.1,
                       concurrent-supply         >= 0.1.7    && < 0.2,
                       ghc-typelits-extra        >= 0.3.2    && < 0.4,
                       ghc-typelits-knownnat     >= 0.6      && < 0.8,
