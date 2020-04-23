@@ -1209,8 +1209,8 @@ a general listing of the available template holes:
 * @~LIT[N]@: @(N+1)@'th argument to the function. An extra condition that must
   hold is that this @(N+1)@'th argument is an (integer) literal.
 * @~CONST[N]@: @(N+1)@'th argument to the function. Clash will try to reduce
-* this to a literal, even if it would otherwise consider it too expensive. As
-* opposed to ~LIT, ~CONST will render a valid HDL expression.
+  this to a literal, even if it would otherwise consider it too expensive. As
+  opposed to @~LIT@, @~CONST@ will render a valid HDL expression.
 * @~TYP[N]@: VHDL type of the @(N+1)@'th argument.
 * @~TYPO@: VHDL type of the result.
 * @~TYPM[N]@: VHDL type/name/ of the @(N+1)@'th argument; used in /type/
@@ -1234,13 +1234,13 @@ a general listing of the available template holes:
   The content of @\<HOLE\>@ must either be: @TYP[N]@, @TYPO@, or @TYPELEM[\<HOLE\>]@.
 * @~SIZE[\<HOLE\>]@: The number of bits needed to encode the type represented by @\<HOLE\>@.
   The content of @\<HOLE\>@ must either be: @TYP[N]@, @TYPO@, or @TYPELEM[\<HOLE\>]@.
-* @~IF \<CONDITION\> ~THEN \<THEN\> ~ELSE \<ELSE\> ~FI@: renders the \<ELSE\>
-  part when \<CONDITION\> evaluates to /0/, and renders the \<THEN\> in all
+* @~IF \<CONDITION\> ~THEN \<THEN\> ~ELSE \<ELSE\> ~FI@: renders the @\<ELSE\>@
+  part when @\<CONDITION\>@ evaluates to /0/, and renders the @\<THEN\>@ in all
   other cases. Valid @\<CONDITION\>@s are @~LENGTH[\<HOLE\>]@, @~SIZE[\<HOLE\>]@,
   @~DEPTH[\<HOLE\>]@, @~VIVADO@, @~IW64@, @~ISLIT[N]@, @~ISVAR[N]@, @~ISACTIVEENABLE[N]@,
   @~ISSYNC[N]@, and @~AND[\<HOLE1\>,\<HOLE2\>,..]@.
 * @~VIVADO@: /1/ when Clash compiler is invoked with the @-fclash-xilinx@ or
-  @-fclash-vivado@ flag. To be used with in an @~IF .. ~THEN .. ~ElSE .. ~FI@
+  @-fclash-vivado@ flag. To be used with in an @~IF .. ~THEN .. ~ELSE .. ~FI@
   statement.
 * @~TOBV[\<HOLE\>][\<TYPE\>]@: create conversion code that so that the
   expression in @\<HOLE\>@ is converted to a bit vector (@std_logic_vector@).
@@ -1259,14 +1259,14 @@ a general listing of the available template holes:
   in a /generate/ context.
 * @~ISLIT[N]@: Is the @(N+1)@'th argument to the function a literal.
 * @~ISVAR[N]@: Is the @(N+1)@'th argument to the function explicitly not a
-  literal
+  literal.
 * @~TAG[N]@: Name of given domain. Errors when called on an argument which is not
   a 'KnownDomain', 'Reset', or 'Clock'.
 * @~PERIOD[N]@: Clock period of given domain. Errors when called on an argument
   which is not a 'KnownDomain' or 'KnownConf'.
 * @~ISACTIVEENABLE[N]@: Is the @(N+1)@'th argument a an Enable line NOT set to a
   constant True. Can be used instead of deprecated (and removed) template tag
-  ~ISGATED. Errors when called on an argument which is not a signal of bools.
+  @~ISGATED@. Errors when called on an argument which is not a signal of bools.
 * @~ISSYNC[N]@: Does synthesis domain at the @(N+1)@'th argument have synchronous resets. Errors
   when called on an argument which is not a 'KnownDomain' or 'KnownConf'.
 * @~ISINITDEFINED[N]@: Does synthesis domain at the @(N+1)@'th argument have defined initial
@@ -1280,7 +1280,7 @@ a general listing of the available template holes:
 * @~NAME[N]@: Render the @(N+1)@'th string literal argument as an identifier
   instead of a string literal. Fails when the @(N+1)@'th argument is not a
   string literal.
-* @~DEVNULL[\<HOLE\>]@: Render all dependencies of @\<HOLE\>@, but disregard direct output
+* @~DEVNULL[\<HOLE\>]@: Render all dependencies of @\<HOLE\>@, but disregard direct output.
 * @~REPEAT[\<HOLE\>][N]@: Repeat literal value of @\<HOLE\>@ a total of @N@ times.
 * @~TEMPLATE[\<HOLE1\>][\<HOLE2\>]@: Render a file @\<HOLE1\>@ with contents @\<HOLE2\>@.
 

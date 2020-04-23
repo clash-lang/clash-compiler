@@ -241,27 +241,27 @@ data Primitive
 
 -- | Guard primitive functions. This will help Clash generate better error
 -- messages. You can annotate a function like:
-
+--
 -- @
--- {-# ANN f dontTranslate #-}
+-- {\-\# ANN f dontTranslate \#-\}
 -- @
 --
 -- or
 --
 -- @
--- {-# ANN f hasBlackBox #-}
+-- {\-\# ANN f hasBlackBox \#-\}
 -- @
 --
 -- or
 --
 -- @
--- {-# ANN f (warnNonSynthesizable "Tread carefully, user!") #-}
+-- {\-\# ANN f (warnNonSynthesizable "Tread carefully, user!") \#-\}
 -- @
 --
 -- or
 --
 -- @
--- {-# ANN f (warnAlways "Tread carefully, user!") #-}
+-- {\-\# ANN f (warnAlways "Tread carefully, user!") \#-\}
 -- @
 data PrimitiveGuard a
   = DontTranslate

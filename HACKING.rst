@@ -5,7 +5,7 @@ Prerequisites
 -------------
 
 Hacking on Clash requires more dependencies than simply running Clash. The
-test suite requires having a tool available to syntthesize any backend being
+test suite requires having a tool available to synthesize any backend being
 tested. This means you need
 
 - ghdl_ installed to test *VHDL*
