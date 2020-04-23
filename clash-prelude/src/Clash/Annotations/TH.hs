@@ -73,6 +73,7 @@ import qualified Data.Map                      as Map
 #if !(MIN_VERSION_base(4,11,0))
 import           Data.Semigroup                as Semigroup
 #endif
+import           Data.Maybe                     ( catMaybes )
 import           Language.Haskell.TH
 
 import           Data.Functor.Foldable          ( para )
@@ -80,11 +81,13 @@ import           Data.Functor.Foldable.TH
 import           Control.Lens                   ( (%~), (&), (.~)
                                                 , _1, _2, _3, view
                                                 )
-import           Control.Monad                  (mfilter, liftM2)
+import           Control.Monad                  (mfilter, liftM2, forM, zipWithM)
 import           Control.Monad.Trans.Reader     (ReaderT(..), asks, local)
 import           Control.Monad.Trans.Class      (lift)
 import           Language.Haskell.TH.Instances  ( )
 import           Language.Haskell.TH.Datatype
+import           Language.Haskell.TH.Syntax     (qRecover)
+import           Data.Generics.Uniplate.Data    (rewrite)
 
 import           Clash.Annotations.TopEntity    ( PortName(..)
                                                 , TopEntity(..)
@@ -241,6 +244,20 @@ datatypeNameToPorts name = do
         xs -> BackTrack xs
     _ -> return names
 
+type family Stuck where
+
+-- Replace (:::) annotations with a stuck type family, to inhibit unifyTypes to reduce it
+guardPort :: Type -> Type
+guardPort = rewrite $ \case
+    AppT (ConT split) name@(LitT (StrTyLit _)) | split == ''(:::) -> Just $ AppT (ConT ''Stuck) name
+    _ -> Nothing
+
+-- Turn back Stuck applications into (:::) annotations
+unguardPort :: Type -> Type
+unguardPort = rewrite $ \case
+    ConT stuck | stuck == ''Stuck -> Just $ ConT ''(:::)
+    _ -> Nothing
+
 -- | Recursively walking a 'Type' tree and building a list of 'PortName's.
 typeTreeToPorts
   :: TypeF (Type, Tracked Q (Naming [PortName]))
@@ -295,18 +312,15 @@ typeTreeToPorts f@(AppTF (a,a') (b,b')) = do
         -- 2. Match argument lengths, substitute types, and then insert the port
         -- tree
         FamilyI (ClosedTypeFamilyD (TypeFamilyHead _ bds _ _) eqs) _
-          | length bds == length xs ->
-            case filter ((==) xs . applyFamilyBindings xs info . tySynArgs) eqs of
-#if MIN_VERSION_template_haskell(2,15,0)
-              [TySynEqn _ _ r] ->
-#else
-              [TySynEqn _ r]   ->
-#endif
-                gatherNames (applyFamilyBindings xs info r)
-
-              -- We didn't find a (single) matching instance so give up. Is this
-              -- impossible?
-              _ -> return $ Complete []
+          | length bds == length xs -> do
+              matches <- lift $ forM eqs $ \eq -> qRecover (return Nothing) . fmap Just $ do
+                  sub <- mconcat <$> zipWithM (\l r -> unifyTypes [guardPort l, r]) xs (tySynArgs eq)
+                  return $ applySubstitution sub $ tySynRHS eq
+              case catMaybes matches of
+                  (r:_) -> gatherNames (unguardPort r)
+                  -- We didn't find any matching instances (i.e. the
+                  -- type family application is stuck) so give up.
+                  [] -> return $ Complete []
 
         -- 3. Match argument lengths then:
         --   - Substitute port tree for type family
@@ -371,6 +385,12 @@ typeTreeToPorts f@(AppTF (a,a') (b,b')) = do
   tySynArgs (TySynEqn _ args _) = tail (unapp args)
 #else
   tySynArgs (TySynEqn args _) = args
+#endif
+
+#if MIN_VERSION_template_haskell(2,15,0)
+  tySynRHS (TySynEqn _ _ r) = r
+#else
+  tySynRHS (TySynEqn _ r) = r
 #endif
 
   familyBindings (FamilyI (ClosedTypeFamilyD (TypeFamilyHead _ xs _ _) _) _) = Just xs
