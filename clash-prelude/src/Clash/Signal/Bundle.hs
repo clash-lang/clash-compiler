@@ -48,7 +48,7 @@ import Clash.Sized.Vector           (Vec, traverse#, lazyV)
 import Clash.Sized.RTree            (RTree, lazyT)
 
 -- | Isomorphism between a 'Clash.Signal.Signal' of a product type (e.g. a tuple) and a
--- product type of 'Clash.Signal.Signal''s.
+-- product type of 'Clash.Signal.Signal's.
 --
 -- Instances of 'Bundle' must satisfy the following laws:
 --

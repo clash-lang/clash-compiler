@@ -44,7 +44,7 @@ type Annotate (a :: Type) (attrs :: k) = a
 --     -> (Signal System Int4 \`Annotate\` 'StringAttr "chip_pin" "D1, D2, D3, D4")
 --     -> ...
 -- myFunc sel data = ...
--- {-# NOINLINE myFunc #-}
+-- {\-\# NOINLINE myFunc \#-\}
 -- @
 --
 -- To ensure this function will be rendered as its own module, do not forget a
