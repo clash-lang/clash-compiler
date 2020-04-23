@@ -360,6 +360,9 @@ runClashTest = defaultMain $ clashTestRoot
         ]
       , clashTestGroup "Numbers"
         [ runTest "BitInteger" def
+#if MIN_VERSION_base(4,14,0)
+        , runTest "BitReverse" def
+#endif
         , runTest "Bounds" def
         , runTest "DivideByZero" def
         , runTest "ExpWithGhcCF" def{clashFlags=["-itests/shouldwork/Numbers", "-fconstraint-solver-iterations=15"]}

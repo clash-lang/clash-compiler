@@ -1145,4 +1145,74 @@ end block;
     , "template"  : "resize(~VAR[w][0](31 downto 0),~SIZE[~TYPO])"
     }
   }
+, { "BlackBox" :
+    { "name"      : "GHC.Prim.bitReverse#"
+    , "workInfo"  : "Never"
+    , "kind"      : "Declaration"
+    , "type"      : "bitReverse# :: Word# -> Word#"
+    , "template"  :
+"-- bitReverse begin
+~GENSYM[bitReverse][0] : for ~GENSYM[i][1] in 0 to ~IF ~IW64 ~THEN 63 ~ELSE 31 ~FI generate
+begin
+~RESULT(~SYM[1]) <= ~VAR[x][0](~IF ~IW64 ~THEN 63 ~ELSE 31 ~FI-~SYM[1]);
+end generate;
+-- bitReverse end"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "GHC.Prim.bitReverse8#"
+    , "workInfo"  : "Never"
+    , "kind"      : "Declaration"
+    , "type"      : "bitReverse8# :: Word# -> Word#"
+    , "template"  :
+"-- bitReverse8 begin
+~GENSYM[bitReverse8][0] : for ~GENSYM[i][1] in 0 to 7 generate
+begin
+~RESULT(~SYM[1]) <= ~VAR[x][0](7-~SYM[1]);
+end generate;
+-- bitReverse8 end"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "GHC.Prim.bitReverse16#"
+    , "workInfo"  : "Never"
+    , "kind"      : "Declaration"
+    , "type"      : "bitReverse16# :: Word# -> Word#"
+    , "template"  :
+"-- bitReverse16 begin
+~GENSYM[bitReverse16][0] : for ~GENSYM[i][1] in 0 to 15 generate
+begin
+~RESULT(~SYM[1]) <= ~VAR[x][0](15-~SYM[1]);
+end generate;
+-- bitReverse16 end"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "GHC.Prim.bitReverse32#"
+    , "workInfo"  : "Never"
+    , "kind"      : "Declaration"
+    , "type"      : "bitReverse32# :: Word# -> Word#"
+    , "template"  :
+"-- bitReverse32 begin
+~GENSYM[bitReverse32][0] : for ~GENSYM[i][1] in 0 to 31 generate
+begin
+~RESULT(~SYM[1]) <= ~VAR[x][0](31-~SYM[1]);
+end generate;
+-- bitReverse32 end"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "GHC.Prim.bitReverse64#"
+    , "workInfo"  : "Never"
+    , "kind"      : "Declaration"
+    , "type"      : "bitReverse64# :: Word# -> Word#"
+    , "template"  :
+"-- bitReverse64 begin
+~GENSYM[bitReverse64][0] : for ~GENSYM[i][1] in 0 to 63 generate
+begin
+~RESULT(~SYM[1]) <= ~VAR[x][0](63-~SYM[1]);
+end generate;
+-- bitReverse64 end"
+    }
+  }
 ]
