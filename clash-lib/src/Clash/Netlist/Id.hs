@@ -120,11 +120,18 @@ makeSet esc hdl ids = IdentifierSet esc hdl fresh store
 toList :: IdentifierSet -> [Identifier]
 toList (IdentifierSet _ _ _ idStore) = HashSet.toList idStore
 
+-- | Return identifier with highest extension for given identifier. See
+-- 'is_freshCache' for more information.
+--
+-- For example, if the FreshCache contains "foo_12_25" and the given identifier
+-- is "foo_12_13" this function would return "Just 25". In this case, "foo_12_26"
+-- is guaranteed to be a fresh identifier.
 lookupFreshCache# :: FreshCache -> Identifier -> Maybe Word
 lookupFreshCache# fresh0 id0 = do
   fresh1 <- HashMap.lookup (i_baseNameCaseFold id0) fresh0
   IntMap.lookup (length (i_extensionsRev id0)) fresh1
 
+-- | Add new identifier to FreshCache, see 'is_freshCache' for more information.
 updateFreshCache# :: HasCallStack => FreshCache -> Identifier -> FreshCache
 updateFreshCache# _fresh (RawIdentifier _s Nothing) =
   error "Internal error: updateFreshCache# called with unsafely made identifier"
@@ -160,6 +167,7 @@ mkUnique# is id0 = (is{is_freshCache=freshCache, is_store=isStore}, id1)
       -- Identifier doesn't exist in set yet, so just return it.
       id0
 
+-- | Non-monadic, internal version of 'addRaw'
 addRaw# :: IdentifierSet -> Text -> (IdentifierSet, Identifier)
 addRaw# is0 id0 = second (RawIdentifier id0 . Just) (make# is0 (unextend id0))
  where
@@ -168,6 +176,7 @@ addRaw# is0 id0 = second (RawIdentifier id0 . Just) (make# is0 (unextend id0))
     Verilog -> Verilog.unextend
     SystemVerilog -> SystemVerilog.unextend
 
+-- | Non-monadic, internal version of 'make'
 make# :: IdentifierSet -> Text -> (IdentifierSet, Identifier)
 make# is0@(IdentifierSet esc hdl fresh0 ids0) (Common.prettyName -> id0) =
   if id1 `HashSet.member` ids0 then
@@ -182,39 +191,47 @@ make# is0@(IdentifierSet esc hdl fresh0 ids0) (Common.prettyName -> id0) =
   fresh1 = updateFreshCache# fresh0 id1
   id1 = make## (is_hdl is0) (if esc then id0 else toBasicId# hdl id0)
 
+-- | Non-monadic, internal version of 'makeBasic'
 makeBasic# :: IdentifierSet -> Text -> (IdentifierSet, Identifier)
 makeBasic# is0 = make# is0 . toBasicId# (is_hdl is0)
 
+-- | Non-monadic, internal version of 'makeBasicOr'
 makeBasicOr# :: IdentifierSet -> Text -> Text -> (IdentifierSet, Identifier)
 makeBasicOr# is0 hint altHint = make# is0 id1
  where
   id0 = toBasicId# (is_hdl is0) hint
   id1 = if Text.null id0 then toBasicId# (is_hdl is0) altHint else id0
 
+-- | Non-monadic, internal version of 'next'
 next# :: IdentifierSet -> Identifier ->  (IdentifierSet, Identifier)
 next# is0 (RawIdentifier t Nothing) = uncurry next# (make# is0 t)
 next# is0 (RawIdentifier _ (Just id_)) = next# is0 id_
 next# is0 id_@(i_extensionsRev -> []) = deepen# is0 id_
 next# is0 id_ = mkUnique# is0 id_
 
+-- | Non-monadic, internal version of 'nextN'
 nextN# :: Int -> IdentifierSet -> Identifier ->  (IdentifierSet, [Identifier])
 nextN# n is0 id0 = List.mapAccumL (\is1 _n -> next# is1 id0) is0 [1..n]
 -- TODO: ^ More efficient implementation.
 
+-- | Non-monadic, internal version of 'deepenN'
 deepenN# :: Int -> IdentifierSet -> Identifier ->  (IdentifierSet, [Identifier])
 deepenN# n is0 id0 = List.mapAccumL (\is1 _n -> deepen# is1 id0) is0 [1..n]
 -- TODO: ^ More efficient implementation.
 
+-- | Non-monadic, internal version of 'deepen'
 deepen# :: IdentifierSet -> Identifier ->  (IdentifierSet, Identifier)
 deepen# is0 (RawIdentifier t Nothing) = uncurry deepen# (make# is0 t)
 deepen# is0 (RawIdentifier _ (Just id_)) = deepen# is0 id_
 deepen# is0 id_ = mkUnique# is0 (id_{i_extensionsRev=0:i_extensionsRev id_})
 
+-- | Non-monadic, internal version of 'suffix'
 suffix# :: IdentifierSet -> Identifier -> Text -> (IdentifierSet, Identifier)
 suffix# is0 (RawIdentifier t Nothing) suffix_ = (uncurry suffix# (make# is0 t)) suffix_
 suffix# is0 (RawIdentifier _ (Just id_)) suffix_ = suffix# is0 id_ suffix_
 suffix# is0 id0 suffix_ = make# is0 (i_baseName id0 <> "_" <> suffix_)
 
+-- | Non-monadic, internal version of 'prefix'
 prefix# :: IdentifierSet -> Identifier -> Text -> (IdentifierSet, Identifier)
 prefix# is0 (RawIdentifier t Nothing) prefix_ = (uncurry prefix# (make# is0 t)) prefix_
 prefix# is0 (RawIdentifier _ (Just id_)) prefix_ = prefix# is0 id_ prefix_
