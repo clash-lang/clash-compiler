@@ -164,11 +164,11 @@ runClashTest = defaultMain $ clashTestRoot
       , clashTestGroup "SynthesisAttributes"
         [ runTest "ProductInArgs" def{
             hdlTargets=[VHDL]
-          , expectClashFail=Just (def, "Attempted to split Product into a number of HDL ports.")
+          , expectClashFail=Just (def, "Cannot use attribute annotations on product types of top entities")
           }
         , runTest "ProductInResult" def{
             hdlTargets=[VHDL]
-          , expectClashFail=Just (def, "Attempted to split Product into a number of HDL ports.")
+          , expectClashFail=Just (def, "Cannot use attribute annotations on product types of top entities")
           }
         ]
       , clashTestGroup "TopEntity"
@@ -178,7 +178,7 @@ runClashTest = defaultMain $ clashTestRoot
           }
         , runTest "T1063" def{
             hdlTargets=[VHDL]
-          , expectClashFail=Just (def, "Ports were annotated as product, but type wasn't one")
+          , expectClashFail=Just (def, "Saw a PortProduct in a Synthesize annotation")
           }
         ]
       , clashTestGroup "Verification"

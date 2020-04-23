@@ -92,6 +92,30 @@ data TopEntityT = TopEntityT
   -- ^ (Maybe) a test bench associated with the topentity
   } deriving (Generic, Show)
 
+-- | Same as "TopEntity", but with all port names that end up in HDL specified
+data ExpandedTopEntity a = ExpandedTopEntity
+  { et_inputs :: [Maybe (ExpandedPortName a)]
+  -- ^ Inputs with fully expanded port names. /Nothing/ if port is void.
+  , et_output :: Maybe (ExpandedPortName a)
+  -- ^ Output with fully expanded port names. /Nothing/ if port is void or
+  -- BiDirectionalOut.
+  } deriving (Show, Functor, Foldable, Traversable)
+
+-- | See "ExpandedTopEntity"
+data ExpandedPortName a
+  -- | Same as "PortName", but fully expanded
+  = ExpandedPortName HWType a
+
+  -- | Same as "PortProduct", but fully expanded
+  | ExpandedPortProduct
+      Text
+      -- FIELD Name hint. Can be used to create intermediate signal names.
+      HWType
+      -- FIELD Type of product
+      [ExpandedPortName a]
+      -- FIELD Product fields
+  deriving (Show, Functor, Foldable, Traversable)
+
 -- | Monad that caches generated components (StateT) and remembers hidden inputs
 -- of components that are being generated (WriterT)
 newtype NetlistMonad a =
