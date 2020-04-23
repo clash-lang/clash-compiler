@@ -152,7 +152,7 @@ library
                       ghc-typelits-knownnat     >= 0.6      && < 0.8,
                       ghc-typelits-natnormalise >= 0.6      && < 0.8,
                       deepseq                   >= 1.3.0.2  && < 1.5,
-                      time                      >= 1.4.0.1  && < 1.10,
+                      time                      >= 1.4.0.1  && < 1.11,
                       ghc-boot                  >= 8.4.0    && < 8.9,
                       ghc-prim                  >= 0.3.1.0  && < 0.6,
                       ghci                      >= 8.4.0    && < 8.9,
