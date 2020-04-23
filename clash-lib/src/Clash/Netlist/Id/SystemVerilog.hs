@@ -47,16 +47,17 @@ keywords = HashSet.fromList
   ,"var","vectored","virtual","void","wait","wait_order","wand","weak","weak0"
   ,"weak1","while","wildcard","wire","with","within","wor","xnor","xor"]
 
+isKeyword :: Text -> Bool
+isKeyword t = HashSet.member (Text.toLower t) keywords
+
 parseBasic :: Text -> Bool
-parseBasic id0 =
-  Verilog.parseBasic' id0 && not (HashSet.member (Text.toLower id0) keywords)
+parseBasic id0 = Verilog.parseBasic' id0 && not (isKeyword id0)
 
 parseExtended :: Text -> Bool
 parseExtended = Verilog.parseExtended
 
 toBasic :: Text -> Text
-toBasic (Verilog.toBasic' -> t) =
-  if HashSet.member (Text.toLower t) keywords then "r_" <> t else t
+toBasic (Verilog.toBasic' -> t) = if isKeyword t then "r_" <> t else t
 
 unextend :: Text -> Text
 unextend = Verilog.unextend

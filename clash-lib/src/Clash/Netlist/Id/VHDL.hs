@@ -41,9 +41,11 @@ keywords = HashSet.fromList $
   ,"integer", "boolean", "std_logic", "std_logic_vector", "signed", "unsigned"
   ,"to_integer", "to_signed", "to_unsigned", "string","log"] <> timeUnits
 
+isKeyword :: Text -> Bool
+isKeyword t = HashSet.member (Text.toLower t) keywords
+
 parseBasic :: Text -> Bool
-parseBasic id0 =
-  parseBasic' id0 && not (HashSet.member (Text.toLower id0) keywords)
+parseBasic id0 = parseBasic' id0 && not (isKeyword id0)
 
 parseBasic' :: Text -> Bool
 parseBasic' id0 = isJust $ do
@@ -79,7 +81,7 @@ toBasic =
 --  . Text.toLower
  where
   replaceKeywords i
-    | HashSet.member (Text.toLower i) keywords = "r_" <> i
+    | isKeyword i = "r_" <> i
     | otherwise = i
 
   stripMultiscore =

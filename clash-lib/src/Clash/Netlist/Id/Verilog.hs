@@ -33,9 +33,11 @@ keywords = HashSet.fromList
   ,"tri0","tri1","triand","trior","trireg","unsigned","use","uwire","vectored"
   ,"wait","wand","weak0","weak1","while","wire","wor","xnor","xor"]
 
+isKeyword :: Text -> Bool
+isKeyword t = HashSet.member (Text.toLower t) keywords
+
 parseBasic :: Text -> Bool
-parseBasic id0 =
-  parseBasic' id0 && not (HashSet.member (Text.toLower id0) keywords)
+parseBasic id0 = parseBasic' id0 && not (isKeyword id0)
 
 parseBasic' :: Text -> Bool
 parseBasic' id0 = isJust $ do
