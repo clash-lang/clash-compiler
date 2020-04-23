@@ -49,6 +49,7 @@ runClashTest = defaultMain $ clashTestRoot
     ]
   , clashTestGroup "examples"
     [ runTest "ALU" def{hdlSim=False}
+#if !EXPERIMENTAL_EVALUATOR || __GLASGOW_HASKELL__ >= 865
     , runTest "Blinker" def{
         hdlSim=False
       , hdlTargets=[VHDL]
@@ -59,6 +60,7 @@ runClashTest = defaultMain $ clashTestRoot
     , runTest "Calculator" def
     , runTest "CHIP8" def{hdlSim=False}
     , runTest "CochleaPlus" def{hdlSim=False}
+#endif
 #if !EXPERIMENTAL_EVALUATOR
     , runTest "FIR" def{
         clashFlags=["-fclash-component-prefix", "test"]
@@ -66,6 +68,7 @@ runClashTest = defaultMain $ clashTestRoot
       , topEntities=TopEntities ["test_testBench"]
       }
 #endif
+#if !EXPERIMENTAL_EVALUATOR || __GLASGOW_HASKELL__ >= 865
     , runTest "Fifo" def{hdlSim=False}
     , runTest "MAC" def
     , runTest "MatrixVect" def
@@ -81,6 +84,7 @@ runClashTest = defaultMain $ clashTestRoot
         , topEntities=TopEntities ["test_i2c"]
         , hdlSim=False
         }
+#endif
 #if !EXPERIMENTAL_EVALUATOR
       , runTest "I2Ctest" def {
           entities=Entities [[ ".." </> "I2C" </> "i2c"
@@ -96,7 +100,9 @@ runClashTest = defaultMain $ clashTestRoot
         , vvpStderrEmptyFail=False
         }
 #endif
+#if !EXPERIMENTAL_EVALUATOR || __GLASGOW_HASKELL__ >= 865
       ]
+#endif
     ]
   , clashTestGroup "tests"
     [ clashTestGroup "shouldfail"
@@ -167,6 +173,7 @@ runClashTest = defaultMain $ clashTestRoot
           }
         ]
       , clashTestGroup "Verification"
+#if !EXPERIMENTAL_EVALUATOR || __GLASGOW_HASKELL__ >= 865
         [ let n = 9 in -- GHDL only has VERY basic PSL support
           runTest "NonTemporalPSL" def{
             hdlTargets=[VHDL]
@@ -183,6 +190,17 @@ runClashTest = defaultMain $ clashTestRoot
           -- for syntax errors.
           , hdlSim=False
           }
+#else
+        [ let n = 13 in
+          runTest "NonTemporalPSL" def{
+            hdlTargets=[SystemVerilog]
+          , entities=Entities [["fails" ++ show i] | i <- [(1::Int)..n]]
+          , topEntities=TopEntities ["fails" ++ show i | i <- [(1::Int)..n]]
+          -- Only QuestaSim supports simulating SVA/PSL, but ModelSim does check
+          -- for syntax errors.
+          , hdlSim=False
+          }
+#endif
         , let is = [(1::Int)..13] \\ [4, 6, 7, 8, 10, 11, 12] in
           runTest "NonTemporalSVA" def{
             hdlTargets=[SystemVerilog]
@@ -247,23 +265,18 @@ runClashTest = defaultMain $ clashTestRoot
 #if !EXPERIMENTAL_EVALUATOR
         [ runTest "AES" def{hdlSim=False}
         , runTest "BangData" def{hdlSim=False}
-#else
-        [ runTest "BangData" def{hdlSim=False}
-#endif
         , runTest "Trace" def{hdlSim=False}
-        , runTest "ByteSwap32" def
-        , runTest "CharTest" def
-        , runTest "ClassOps" def
-        , runTest "CountTrailingZeros" def
-        , runTest "DeepseqX" def
+#elif __GLASGOW_HASKELL__ >= 865
+        [ runTest "BangData" def{hdlSim=False}
+        , runTest "Trace" def{hdlSim=False}
+#else
+        [ runTest "Trace" def{hdlSim=False}
+#endif
 #if !EXPERIMENTAL_EVALUATOR
         , runTest "DivMod" def{hdlSim=False}
-#endif
-        , runTest "IrrefError" def{hdlSim=False}
-#if !EXPERIMENTAL_EVALUATOR
         , runTest "LambdaDrop" def{hdlSim=False}
 #endif
-        , runTest "LotOfStates" def
+        , runTest "IrrefError" def{hdlSim=False}
 #ifdef CLASH_MULTIPLE_HIDDEN
         , runTest "MultipleHidden" def
 #endif
@@ -271,6 +284,14 @@ runClashTest = defaultMain $ clashTestRoot
         , runTest "NameInstance" def{hdlSim=False}
         , outputTest ("tests" </> "shouldwork" </> "Basic") allTargets [] [] "NameInstance" "main"
         , outputTest ("tests" </> "shouldwork" </> "Basic") [VHDL] [] [] "SetName" "main"
+        , runTest "PatError" def{hdlSim=False}
+#if !EXPERIMENTAL_EVALUATOR || __GLASGOW_HASKELL__ >= 865
+        , runTest "ByteSwap32" def
+        , runTest "CharTest" def
+        , runTest "ClassOps" def
+        , runTest "CountTrailingZeros" def
+        , runTest "DeepseqX" def
+        , runTest "LotOfStates" def
         , runTest "NameOverlap" def{
             entities=Entities [["nameoverlap"]]
           , topEntities=TopEntities ["nameoverlap"]
@@ -280,10 +301,13 @@ runClashTest = defaultMain $ clashTestRoot
         , runTest "NestedPrimitives2" def{hdlSim=False}
         , runTest "NORX" def
         , runTest "Parameters" def{hdlTargets=[VHDL]}
-        , runTest "PatError" def{hdlSim=False}
         , runTest "PopCount" def
         , runTest "RecordSumOfProducts" def{hdlSim=False}
         , runTest "Replace" def
+        , runTest "T1242" def{hdlSim=False}
+        , runTest "TestIndex" def{hdlSim=False}
+        , runTest "Time" def
+#endif
         , runTest "Shift" def{hdlSim=False}
         , runTest "SimpleConstructor" def{hdlSim=False}
         , runTest "TyEqConstraints" def{
@@ -329,10 +353,9 @@ runClashTest = defaultMain $ clashTestRoot
         , runTest "T1402" def{clashFlags=["-O"]}
         , runTest "T1402b" def{hdlTargets=[VHDL], hdlSim=False}
         , runTest "TagToEnum" def{hdlSim=False}
-        , runTest "TestIndex" def{hdlSim=False}
-        , runTest "Time" def
         , runTest "TwoFunctions" def{hdlSim=False}
         ]
+#if !EXPERIMENTAL_EVALUATOR
       , clashTestGroup "BitVector"
         [ runTest "Box" def
         , runTest "BoxGrow" def
@@ -341,19 +364,31 @@ runClashTest = defaultMain $ clashTestRoot
         , runTest "ReduceZero" def
         , runTest "ReduceOne" def
         , runTest "ExtendingNumZero" def
-#if !EXPERIMENTAL_EVALUATOR
-        , runTest "GenericBitPack" def{clashFlags=["-fconstraint-solver-iterations=15"]}
-#endif
         , runTest "AppendZero" def
-#if !EXPERIMENTAL_EVALUATOR
+        , runTest "GenericBitPack" def{clashFlags=["-fconstraint-solver-iterations=15"]}
         , runTest "UnpackUndefined" def{hdlSim=False}
-#endif
         ]
+#else
+#if __GLASGOW_HASKELL__ >= 865
+      , clashTestGroup "BitVector"
+        [ runTest "Box" def
+        , runTest "BoxGrow" def
+        , runTest "CLZ" def
+        , runTest "RePack" def{hdlSim=False}
+        , runTest "ReduceZero" def
+        , runTest "ReduceOne" def
+        , runTest "ExtendingNumZero" def
+        , runTest "AppendZero" def
+        ]
+#endif
+#endif
       , clashTestGroup "BlackBox"
         [ outputTest ("tests" </> "shouldwork" </> "BlackBox") [VHDL]   [] [] "TemplateFunction"   "main"
         , outputTest ("tests" </> "shouldwork" </> "BlackBox") [VHDL]   [] [] "BlackBoxFunction"   "main"
+#if !EXPERIMENTAL_EVALUATOR || __GLASGOW_HASKELL__ >= 865
         , runTest "BlackBoxFunctionHO" def{hdlTargets=[VHDL]}
         , outputTest ("tests" </> "shouldwork" </> "Signal")   allTargets [] [] "BlockRamLazy"       "main"
+#endif
         , outputTest ("tests" </> "shouldwork" </> "BlackBox") [VHDL]   [] [] "ZeroWidth"          "main"
 #if !EXPERIMENTAL_EVALUATOR
         , runTest "T919" def{hdlSim=False}
@@ -362,16 +397,21 @@ runClashTest = defaultMain $ clashTestRoot
       , clashTestGroup "BoxedFunctions"
         [ runTest "DeadRecursiveBoxed" def{hdlSim=False}
         ]
+#if !EXPERIMENTAL_EVALUATOR || __GLASGOW_HASKELL__ >= 865
       , clashTestGroup "CSignal"
-        [ runTest "CBlockRamTest" def{hdlSim=False}
-        , runTest "MAC" def{hdlSim=False}
+        [ runTest "MAC" def{hdlSim=False}
+        , runTest "CBlockRamTest" def{hdlSim=False}
         ]
+#endif
 #ifdef COSIM
+#if !EXPERIMENTAL_EVALUATOR || __GLASGOW_HASKELL__ >= 865
       , clashTestGroup "CoSim"
         [ runTest "Multiply" def{hdlTargets=[Verilog]}
         , runTest "Register" def{hdlTargets=[Verilog]}
         ]
 #endif
+#endif
+#if !EXPERIMENTAL_EVALUATOR || __GLASGOW_HASKELL__ >= 865
       , clashTestGroup "CustomReprs"
         [ clashTestGroup "RotateC"
           [ runTest "RotateC" def
@@ -392,6 +432,14 @@ runClashTest = defaultMain $ clashTestRoot
           ]
         , runTest "T694" def{hdlSim=False,hdlTargets=[VHDL]}
         ]
+#else
+      , clashTestGroup "CustomReprs"
+        [ clashTestGroup "ZeroWidth"
+          [ runTest "ZeroWidth" def{hdlSim=False}
+          ]
+        , runTest "T694" def{hdlSim=False,hdlTargets=[VHDL]}
+        ]
+#endif
 #if !EXPERIMENTAL_EVALUATOR
       , clashTestGroup "DDR"
         [ runTest "DDRinGA" def
@@ -410,7 +458,10 @@ runClashTest = defaultMain $ clashTestRoot
         ]
 #endif
       , clashTestGroup "Feedback"
-        [ runTest "Fib" def
+        [
+#if !EXPERIMENTAL_EVALUATOR || __GLASGOW_HASKELL__ >= 865
+          runTest "Fib" def
+#endif
 #ifdef CLASH_MULTIPLE_HIDDEN
         , runTest "MutuallyRecursive" def
 #endif
@@ -431,6 +482,7 @@ runClashTest = defaultMain $ clashTestRoot
         , runTest "FloatConstFolding" def{clashFlags=["-fclash-float-support"]}
 #endif
         ]
+#if !EXPERIMENTAL_EVALUATOR || __GLASGOW_HASKELL__ >= 865
       , clashTestGroup "GADTs"
         [ runTest "Constrained" def
         , runTest "Head" def
@@ -451,6 +503,7 @@ runClashTest = defaultMain $ clashTestRoot
         , runTest "Transpose" def
         , runTest "VecFun" def
       ]
+#endif
 #if !EXPERIMENTAL_EVALUATOR
       , clashTestGroup "Issues"
         [ runTest "T1187" def{hdlSim=False, hdlTargets=[Verilog]}
@@ -462,35 +515,48 @@ runClashTest = defaultMain $ clashTestRoot
         [ runTest "T967a" def{hdlSim=False}
         , runTest "T967b" def{hdlSim=False}
         , runTest "T967c" def{hdlSim=False}
+#if !EXPERIMENTAL_EVALUATOR || __GLASGOW_HASKELL__ >= 865
         , clashLibTest ("tests" </> "shouldwork" </> "Naming") allTargets [] "T1041" "main"
+#endif
         ]
+#if !EXPERIMENTAL_EVALUATOR
       , clashTestGroup "Numbers"
-        [ runTest "BitInteger" def
+        [ runTest "NegativeLits" def
 #if MIN_VERSION_base(4,14,0)
         , runTest "BitReverse" def
 #endif
-#if !EXPERIMENTAL_EVALUATOR
-        , runTest "Bounds" def
-        , runTest "DivideByZero" def
-#endif
+        , runTest "Resize" def
+        , runTest "Resize2" def
+        , runTest "Resize3" def
+        , runTest "SatMult" def{hdlSim=False}
+        , runTest "ShiftRotate" def{clashFlags=["-itests/shouldwork/Numbers"]}
+        , runTest "SignedProjectionTB" def
+        , runTest "SignedZero" def
+        , runTest "Signum" def
+        , runTest "Strict" def
+        , runTest "UnsignedZero" def
+        , runTest "IntegralTB" def{clashFlags=["-itests/shouldwork/Numbers"]}
+        , runTest "HalfAsBlackboxArg" def{hdlTargets=[VHDL], hdlSim=False}
+        , runTest "BitInteger" def
         , runTest "ExpWithGhcCF" def{clashFlags=["-itests/shouldwork/Numbers", "-fconstraint-solver-iterations=15"]}
         , runTest "ExpWithClashCF" def{clashFlags=["-itests/shouldwork/Numbers", "-fconstraint-solver-iterations=15"]}
-#if !EXPERIMENTAL_EVALUATOR
+        , runTest "Bounds" def
+        , runTest "DivideByZero" def
         , outputTest ("tests" </> "shouldwork" </> "Numbers") allTargets ["-itests/shouldwork/Numbers"] ["-itests/shouldwork/Numbers"] "ExpWithClashCF"  "main"
-#endif
-        , runTest "HalfAsBlackboxArg" def{hdlTargets=[VHDL], hdlSim=False}
-        , runTest "IntegralTB" def{clashFlags=["-itests/shouldwork/Numbers"]}
-#if !EXPERIMENTAL_EVALUATOR
         , runTest "NumConstantFoldingTB_1" def{clashFlags=["-itests/shouldwork/Numbers"]}
         , outputTest ("tests" </> "shouldwork" </> "Numbers") allTargets ["-fconstraint-solver-iterations=15"] ["-itests/shouldwork/Numbers"] "NumConstantFolding_1"  "main"
         , runTest "NumConstantFoldingTB_2" def{clashFlags=["-itests/shouldwork/Numbers"]}
         , outputTest ("tests" </> "shouldwork" </> "Numbers") allTargets ["-fconstraint-solver-iterations=15"] ["-itests/shouldwork/Numbers"] "NumConstantFolding_2"  "main"
-#endif
 #if MIN_VERSION_base(4,12,0)
         -- Naturals are broken on GHC <= 8.4. See https://github.com/clash-lang/clash-compiler/pull/473
         , runTest "Naturals" def
 #endif
-        , runTest "NegativeLits" def
+        ]
+#else
+      , clashTestGroup "Numbers"
+        [
+#if __GLASGOW_HASKELL__ >= 865
+          runTest "NegativeLits" def
         , runTest "Resize" def
         , runTest "Resize2" def
         , runTest "Resize3" def
@@ -506,10 +572,21 @@ runClashTest = defaultMain $ clashTestRoot
         , outputTest ("tests" </> "shouldwork" </> "Numbers") allTargets [] ["-itests/shouldwork/Numbers"] "UndefinedConstantFolding"  "main"
 #endif
         , runTest "UnsignedZero" def
+        , runTest "IntegralTB" def{clashFlags=["-itests/shouldwork/Numbers"]}
+        , runTest "HalfAsBlackboxArg" def{hdlTargets=[VHDL], hdlSim=False}
+        , runTest "BitInteger" def
+        , runTest "ExpWithGhcCF" def{clashFlags=["-itests/shouldwork/Numbers", "-fconstraint-solver-iterations=15"]}
+        , runTest "ExpWithClashCF" def{clashFlags=["-itests/shouldwork/Numbers", "-fconstraint-solver-iterations=15"]}
+        -- Naturals are broken on GHC <= 8.4. See https://github.com/clash-lang/clash-compiler/pull/473
+        , runTest "Naturals" def
+#endif
         ]
+#endif
       , clashTestGroup "Polymorphism"
         [ runTest "ExistentialBoxed" def{hdlSim=False}
+#if !EXPERIMENTAL_EVALUATOR || __GLASGOW_HASKELL__ >= 865
         , runTest "FunctionInstances" def
+#endif
         , runTest "GADTExistential" def{hdlSim=False}
         , runTest "LocalPoly" def{hdlSim=False}
         ]
@@ -526,21 +603,30 @@ runClashTest = defaultMain $ clashTestRoot
         ]
 #endif
       , clashTestGroup "RTree"
-        [ runTest "TFold" def{hdlSim=False}
+        [ runTest "TZip" def{hdlSim=False}
+#if !EXPERIMENTAL_EVALUATOR || __GLASGOW_HASKELL__ >= 865
+        , runTest "TFold" def{hdlSim=False}
         , runTest "TRepeat" def
         , runTest "TRepeat2" def
-        , runTest "TZip" def{hdlSim=False}
-      ]
+#endif
+        ]
+#if !EXPERIMENTAL_EVALUATOR || __GLASGOW_HASKELL__ >= 865
       , clashTestGroup "Shadowing"
-        [ runTest "T990" def ]
+        [ runTest "T990" def
+        ]
+#endif
       , clashTestGroup "Signal"
         [ runTest "AlwaysHigh" def{hdlSim=False}
-        , outputTest ("tests" </> "shouldwork" </> "Signal") allTargets [] [] "BlockRamLazy"    "main"
 #if !EXPERIMENTAL_EVALUATOR
         , runTest "BlockRamFile" def
         , runTest "BlockRam0" def
         , runTest "BlockRam1" def
+        , runTest "Ram" def
+        , runTest "ResetGen" def
+        , runTest "RomFile" def
 #endif
+#if !EXPERIMENTAL_EVALUATOR || __GLASGOW_HASKELL__ >= 865
+        , outputTest ("tests" </> "shouldwork" </> "Signal") allTargets [] [] "BlockRamLazy"    "main"
         , runTest "BlockRamTest" def{hdlSim=False}
         , runTest "Compression" def
         , runTest "DelayedReset" def
@@ -550,33 +636,27 @@ runClashTest = defaultMain $ clashTestRoot
           , hdlSim=False
           }
         , runTest "Oversample" def
-#if !EXPERIMENTAL_EVALUATOR
-        , runTest "Ram" def
-#endif
         , runTest "RegisterAR" def
         , runTest "RegisterSR" def
         , runTest "RegisterAE" def
         , runTest "RegisterSE" def
-#if !EXPERIMENTAL_EVALUATOR
-        , runTest "ResetGen" def
-#endif
         , runTest "ResetLow" def
         , runTest "Rom" def
-#if !EXPERIMENTAL_EVALUATOR
-        , runTest "RomFile" def
 #endif
         , runTest "SigP" def{hdlSim=False}
         , outputTest ("tests" </> "shouldwork" </> "Signal") [VHDL] [] [] "T1102A" "main"
         , outputTest ("tests" </> "shouldwork" </> "Signal") [VHDL] [] [] "T1102B" "main"
 
+#if !EXPERIMENTAL_EVALUATOR || __GLASGOW_HASKELL__ >= 865
         , clashTestGroup "BiSignal"
           [ runTest "Counter" def
           , runTest "CounterHalfTuple" def
           , runTest "CounterHalfTupleRev" def
           ]
-
+#endif
         , runTest "T1007" def{hdlSim=False}
         ]
+#if !EXPERIMENTAL_EVALUATOR || __GLASGOW_HASKELL__ >= 865
       , clashTestGroup "SimIO"
         [ runTest "Test00" def {
             hdlTargets=[Verilog]
@@ -593,6 +673,7 @@ runClashTest = defaultMain $ clashTestRoot
         [ runTest "TB" def{clashFlags=["-fclash-inline-limit=0"]}
         , runTest "SyncTB" def
         ]
+#endif
       , clashTestGroup "Types"
         [ runTest "TypeFamilyReduction" def{hdlSim=False}
 #if !EXPERIMENTAL_EVALUATOR
@@ -601,22 +682,8 @@ runClashTest = defaultMain $ clashTestRoot
         ]
       , clashTestGroup "TopEntity"
         -- VHDL tests disabled for now: I can't figure out how to generate a static name whilst retaining the ability to actually test..
-        [ runTest "PortNames" def{hdlTargets=[Verilog],entities=Entities [["", "PortNames_topEntity", "PortNames_testBench"]], topEntities=TopEntities ["PortNames_testBench"]}
-        , outputTest ("tests" </> "shouldwork" </> "TopEntity") [Verilog] [] [] "PortNames" "main"
-        , runTest "PortProducts" def{hdlTargets=[Verilog],entities=Entities [["", "PortProducts_topEntity", "PortProducts_testBench"]], topEntities=TopEntities ["PortProducts_testBench"]}
-        , outputTest ("tests" </> "shouldwork" </> "TopEntity") [Verilog] [] [] "PortProducts" "main"
-        , runTest "PortProductsSum" def{hdlTargets=[Verilog],entities=Entities [["", "PortProductsSum_topEntity", "PortProductsSum_testBench"]], topEntities=TopEntities ["PortProductsSum_testBench"]}
-        , outputTest ("tests" </> "shouldwork" </> "TopEntity") [Verilog] [] [] "PortProductsSum" "main"
-        , runTest "PortNamesWithUnit" def{hdlTargets=[Verilog],entities=Entities [["", "PortNamesWithUnit_topEntity", "PortNamesWithUnit_testBench"]], topEntities=TopEntities ["PortNamesWithUnit_testBench"]}
-        , outputTest ("tests" </> "shouldwork" </> "TopEntity") [Verilog] [] [] "PortNamesWithUnit" "main"
+        [ outputTest ("tests" </> "shouldwork" </> "TopEntity") allTargets [] [] "PortGeneration" "main"
         , outputTest ("tests" </> "shouldwork" </> "TopEntity") [Verilog] [] [] "PortNamesWithSingletonVector" "main"
-        , runTest "PortNamesWithVector" def{hdlTargets=[Verilog],entities=Entities [["", "PortNamesWithVector_topEntity", "PortNamesWithVector_testBench"]], topEntities=TopEntities ["PortNamesWithVector_testBench"]}
-        , outputTest ("tests" </> "shouldwork" </> "TopEntity") [Verilog] [] [] "PortNamesWithVector" "main"
-        , runTest "PortNamesWithRTree" def{hdlTargets=[Verilog],entities=Entities [["", "PortNamesWithRTree_topEntity", "PortNamesWithRTree_testBench"]], topEntities=TopEntities ["PortNamesWithRTree_testBench"]}
-        , outputTest ("tests" </> "shouldwork" </> "TopEntity") [Verilog] [] [] "PortNamesWithRTree" "main"
-        , outputTest ("tests" </> "shouldwork" </> "TopEntity") allTargets [] [] "PortGeneration" "main"
-        , clashLibTest ("tests" </> "shouldwork" </> "TopEntity") allTargets [] "T1182A" "main"
-        , clashLibTest ("tests" </> "shouldwork" </> "TopEntity") allTargets [] "T1182B" "main"
         , runTest "TopEntHOArg" def{entities=Entities [["f", "g"]], topEntities=TopEntities ["f"], hdlSim=False}
         , runTest "T701" def {hdlSim=False,entities=Entities [["mynot", ""]]}
         , runTest "T1033" def {hdlSim=False,entities=Entities [["top", ""]], topEntities=TopEntities ["top"]}
@@ -626,7 +693,24 @@ runClashTest = defaultMain $ clashTestRoot
         , outputTest ("tests" </> "shouldwork" </> "TopEntity") [SystemVerilog] ["-main-is", "topEntity1"] [] "Multiple" "main1"
         , outputTest ("tests" </> "shouldwork" </> "TopEntity") [VHDL] ["-main-is", "topEntity3"] [] "Multiple" "main3"
         , runTest "T1139" def{hdlSim=False}
+#if !EXPERIMENTAL_EVALUATOR || __GLASGOW_HASKELL__ >= 865
+        , runTest "PortNames" def{hdlTargets=[Verilog],entities=Entities [["", "PortNames_topEntity", "PortNames_testBench"]], topEntities=TopEntities ["PortNames_testBench"]}
+        , outputTest ("tests" </> "shouldwork" </> "TopEntity") [Verilog] [] [] "PortNames" "main"
+        , runTest "PortProducts" def{hdlTargets=[Verilog],entities=Entities [["", "PortProducts_topEntity", "PortProducts_testBench"]], topEntities=TopEntities ["PortProducts_testBench"]}
+        , outputTest ("tests" </> "shouldwork" </> "TopEntity") [Verilog] [] [] "PortProducts" "main"
+        , runTest "PortProductsSum" def{hdlTargets=[Verilog],entities=Entities [["", "PortProductsSum_topEntity", "PortProductsSum_testBench"]], topEntities=TopEntities ["PortProductsSum_testBench"]}
+        , outputTest ("tests" </> "shouldwork" </> "TopEntity") [Verilog] [] [] "PortProductsSum" "main"
+        , runTest "PortNamesWithUnit" def{hdlTargets=[Verilog],entities=Entities [["", "PortNamesWithUnit_topEntity", "PortNamesWithUnit_testBench"]], topEntities=TopEntities ["PortNamesWithUnit_testBench"]}
+        , outputTest ("tests" </> "shouldwork" </> "TopEntity") [Verilog] [] [] "PortNamesWithUnit" "main"
+        , runTest "PortNamesWithVector" def{hdlTargets=[Verilog],entities=Entities [["", "PortNamesWithVector_topEntity", "PortNamesWithVector_testBench"]], topEntities=TopEntities ["PortNamesWithVector_testBench"]}
+        , outputTest ("tests" </> "shouldwork" </> "TopEntity") [Verilog] [] [] "PortNamesWithVector" "main"
+        , runTest "PortNamesWithRTree" def{hdlTargets=[Verilog],entities=Entities [["", "PortNamesWithRTree_topEntity", "PortNamesWithRTree_testBench"]], topEntities=TopEntities ["PortNamesWithRTree_testBench"]}
+        , outputTest ("tests" </> "shouldwork" </> "TopEntity") [Verilog] [] [] "PortNamesWithRTree" "main"
+        , clashLibTest ("tests" </> "shouldwork" </> "TopEntity") allTargets [] "T1182A" "main"
+        , clashLibTest ("tests" </> "shouldwork" </> "TopEntity") allTargets [] "T1182B" "main"
+#endif
         ]
+#if !EXPERIMENTAL_EVALUATOR || __GLASGOW_HASKELL__ >= 865
       , clashTestGroup "Unit"
         [ runTest "Imap" def
         , runTest "ZipWithUnitVector" def
@@ -636,26 +720,30 @@ runClashTest = defaultMain $ clashTestRoot
         , runTest "ZipWithUnitSP" def
         , runTest "ZipWithUnitSP2" def
         ]
+#endif
       , clashTestGroup "Vector"
-        [ runTest "Concat" def
+        [ runTest "EnumTypes" def{hdlSim=False}
+        , runTest "HOCon" def{hdlSim=False}
+        , runTest "VMapAccum" def{hdlSim=False}
+        , runTest "VScan" def{hdlSim=False}
+        , runTest "VZip" def{hdlSim=False}
+        , runTest "VecConst" def{hdlSim=False}
+#if !EXPERIMENTAL_EVALUATOR
+        , runTest "FirOddSize" def
+        , runTest "IndexInt" def
+#endif
+#if !EXPERIMENTAL_EVALUATOR || __GLASGOW_HASKELL__ >= 865
+        , runTest "Concat" def
         , runTest "DFold" def
         , runTest "DFold2" def
         , runTest "DTFold" def
-        , runTest "EnumTypes" def{hdlSim=False}
         , runTest "FindIndex" def
-#if !EXPERIMENTAL_EVALUATOR
-        , runTest "FirOddSize" def
-#endif
         , runTest "Fold" def
         , runTest "FoldlFuns" def{hdlSim=False}
         , runTest "Foldr" def
         , runTest "FoldrEmpty" def
         , runTest "HOClock" def{hdlSim=False}
-        , runTest "HOCon" def{hdlSim=False}
         , runTest "HOPrim" def{hdlSim=False}
-#if !EXPERIMENTAL_EVALUATOR
-        , runTest "IndexInt" def
-#endif
         , runTest "Indices" def
         , runTest "Iterate" def
         , outputTest ("tests" </> "shouldwork" </> "Vector") [VHDL] [] [] "IterateCF" "main"
@@ -671,19 +759,16 @@ runClashTest = defaultMain $ clashTestRoot
         , runTest "VIndex" def{hdlSim=False}
         , runTest "VIndicesI" def
         , runTest "VFold" def
-        , runTest "VMapAccum" def{hdlSim=False}
         , runTest "VMerge" def
         , runTest "VReplace" def
         , runTest "VReverse" def
         , runTest "VRotate" def
-        , runTest "VScan" def{hdlSim=False}
         , runTest "VSelect" def
-        , runTest "VZip" def{hdlSim=False}
-        , runTest "VecConst" def{hdlSim=False}
         , runTest "VecOfSum" def{hdlSim=False}
         , runTest "T452" def{hdlSim=False}
         , runTest "T895" def{hdlSim=False,hdlTargets=[VHDL]}
         , runTest "T1360" def{hdlSim=False, hdlTargets=[VHDL], clashFlags=["-fclash-hdlsyn", "Vivado"]}
+#endif
         ] -- end vector
       , clashTestGroup "XOptimization"
 #if !EXPERIMENTAL_EVALUATOR

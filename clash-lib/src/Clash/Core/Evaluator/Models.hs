@@ -26,7 +26,7 @@ import Clash.Core.Subst (extendTvSubstList, mkSubst, substTm)
 import Clash.Core.Term (Term(..), Pat, PrimInfo, TickInfo, mkApps)
 import Clash.Core.TyCon (TyConMap)
 import Clash.Core.Type
-import Clash.Core.Var (Id, IdScope(..), TyVar)
+import Clash.Core.Var (Id, IdScope(..))
 import Clash.Core.VarEnv
   ( InScopeSet, extendInScopeSet, mkInScopeSet
   , VarEnv, delVarEnv, extendVarEnv, lookupVarEnv
