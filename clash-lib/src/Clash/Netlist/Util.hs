@@ -1233,8 +1233,8 @@ mkOutput epp@(ExpandedPortProduct p hwty ps) = do
     Assignment i (Identifier p_ (Just (Indexed (hwty_, con, n))))
 
 mkTopCompDecl
-  :: Maybe Comment
-  -- ^ Comment to add to the generated code
+  :: Maybe Text
+  -- ^ Library entity is defined in
   -> [Attr']
   -- ^ Attributes to add to generate code
   -> Identifier
@@ -1248,8 +1248,8 @@ mkTopCompDecl
   -> [(Identifier, Identifier, HWType)]
   -- ^ Output port assignments
   -> Declaration
-mkTopCompDecl comment attrs name instName params inputs outputs =
-  InstDecl Entity comment attrs name instName params ports
+mkTopCompDecl lib attrs name instName params inputs outputs =
+  InstDecl Entity lib attrs name instName params ports
  where
   ports = map (toPort In) inputs ++ map (toPort Out) outputs
   toExpr id_ = Identifier id_ Nothing
