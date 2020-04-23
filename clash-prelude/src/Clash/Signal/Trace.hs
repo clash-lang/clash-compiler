@@ -15,7 +15,7 @@ subCounter :: SystemClockResetEnable => Signal System (SatIndex 'SatWrap 3)
 subCounter = traceSignal1 "sub" counter
   where
     counter =
-      register 0 (fmap (+1) counter)
+      register 0 (fmap succ counter)
 
 -- | Count, but only when my subcounter is wrapping around
 mainCounter :: SystemClockResetEnable => Signal System (Signed 64)

@@ -41,7 +41,7 @@ import Prelude               hiding ((!!), length)
 import System.IO.Unsafe      (unsafeDupablePerformIO)
 
 import Clash.Annotations.Primitive (hasBlackBox)
-import Clash.Class.Num       (satSucc, SaturationMode(SatBound, SatError))
+import Clash.Class.Num       (SaturationMode(SatBound, SatError))
 import Clash.Promoted.Nat    (SNat(..), snatToNum)
 import Clash.Promoted.Symbol (SSymbol (..))
 import Clash.Explicit.Signal
@@ -376,8 +376,8 @@ ignoreFor
 ignoreFor clk rst en SNat a i =
   mux ((==) <$> counter <*> (pure maxBound)) i (pure a)
  where
-  counter :: Signal dom (SatIndex 'SatError (n+1))
-  counter = register clk rst en 0 (satSucc SatBound <$> counter)
+  counter :: Signal dom (SatIndex 'SatBound (n+1))
+  counter = register clk rst en 0 (succ <$> counter)
 
 -- | Same as 'tbClockGen', but returns two clocks on potentially different
 -- domains. To be used in situations where the circuit under test runs

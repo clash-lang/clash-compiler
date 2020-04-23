@@ -85,15 +85,6 @@ import Clash.XException
 >>> import Data.Kind
 >>> import Data.Singletons.Prelude (Apply, TyFun)
 >>> import Data.Proxy
->>> data IIndex (f :: TyFun Nat Type) :: Type
->>> type instance Apply IIndex l = SatIndex 'SatError ((2^l)+1)
->>> :{
-let populationCount' :: (KnownNat k, KnownNat (2^k)) => BitVector (2^k) -> Index ((2^k)+1)
-    populationCount' bv = tdfold (Proxy @IIndex)
-                                 fromIntegral
-                                 (\_ x y -> add x y)
-                                 (v2t (bv2v bv))
-:}
 -}
 
 -- | Perfect depth binary tree.
@@ -281,22 +272,23 @@ instance (KnownNat d, NFDataX a) => NFDataX (RTree d a) where
 -- :}
 -- <BLANKLINE>
 --  <interactive>:...
---     • Couldn't match type ‘(((2 ^ d) + 1) + ((2 ^ d) + 1)) - 1’
---                      with ‘(2 ^ d) + 1’
---       Expected type: SatIndex 'SatError ((2 ^ d) + 1)
---                      -> SatIndex 'SatError ((2 ^ d) + 1)
---                      -> SatIndex 'SatError ((2 ^ d) + 1)
---         Actual type: SatIndex 'SatError ((2 ^ d) + 1)
---                      -> SatIndex 'SatError ((2 ^ d) + 1)
---                      -> AResult
---                           (SatIndex 'SatError ((2 ^ d) + 1))
---                           (SatIndex 'SatError ((2 ^ d) + 1))
---     • In the second argument of ‘tfold’, namely ‘add’
---       In the first argument of ‘(.)’, namely ‘tfold fromIntegral add’
---       In the expression: tfold fromIntegral add . v2t . bv2v
---     • Relevant bindings include
---         populationCount' :: BitVector (2 ^ d)
---                             -> SatIndex 'SatError ((2 ^ d) + 1)
+--  ^
+--      • Couldn't match type ‘Max (((2 ^ d) + 1) + ((2 ^ d) + 1)) 1’
+--                       with ‘2 + (2 ^ d)’
+--        Expected type: SatIndex 'SatError ((2 ^ d) + 1)
+--                       -> SatIndex 'SatError ((2 ^ d) + 1)
+--                       -> SatIndex 'SatError ((2 ^ d) + 1)
+--          Actual type: SatIndex 'SatError ((2 ^ d) + 1)
+--                       -> SatIndex 'SatError ((2 ^ d) + 1)
+--                       -> AResult
+--                            (SatIndex 'SatError ((2 ^ d) + 1))
+--                            (SatIndex 'SatError ((2 ^ d) + 1))
+--      • In the second argument of ‘tfold’, namely ‘add’
+--        In the first argument of ‘(.)’, namely ‘tfold fromIntegral add’
+--        In the expression: tfold fromIntegral add . v2t . bv2v
+--      • Relevant bindings include
+--          populationCount' :: BitVector (2 ^ d)
+--                              -> SatIndex 'SatError ((2 ^ d) + 1)
 --           (bound at ...)
 --
 -- because 'tfold' expects a function of type \"@b -> b -> b@\", i.e. a function
@@ -306,28 +298,6 @@ instance (KnownNat d, NFDataX a) => NFDataX (RTree d a) where
 -- result is larger than the arguments, we must use a dependently typed fold in
 -- the form of 'dtfold':
 --
--- @
--- {\-\# LANGUAGE UndecidableInstances \#-\}
--- import Data.Singletons.Prelude
--- import Data.Proxy
---
--- data IIndex (f :: 'TyFun' Nat *) :: *
--- type instance 'Apply' IIndex l = 'SatIndex' 'SatError ((2^l)+1)
---
--- populationCount' :: (KnownNat k, KnownNat (2^k))
---                  => BitVector (2^k) -> SatIndex 'SatError ((2^k)+1)
--- populationCount' bv = 'tdfold' (Proxy @IIndex)
---                              fromIntegral
---                              (\\_ x y -> 'Clash.Class.Num.add' x y)
---                              ('v2t' ('Clash.Sized.Vector.bv2v' bv))
--- @
---
--- And we can test that it works:
---
--- >>> :t populationCount' (7 :: BitVector 16)
--- populationCount' (7 :: BitVector 16) :: SatIndex 'SatError 17
--- >>> populationCount' (7 :: BitVector 16)
--- 3
 tdfold :: forall p k a . KnownNat k
        => Proxy (p :: TyFun Nat Type -> Type) -- ^ The /motive/
        -> (a -> (p @@ 0)) -- ^ Function to apply to the elements on the leafs

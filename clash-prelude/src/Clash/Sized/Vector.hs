@@ -184,14 +184,6 @@ let sortV_flip xs = map fst sorted :< (snd (last sorted))
 >>> data IIndex (f :: TyFun Nat Type) :: Type
 >>> :set -XUndecidableInstances
 >>> type instance Apply IIndex l = SatIndex 'SatError ((2^l)+1)
->>> :{
-let populationCount' :: (KnownNat k, KnownNat (2^k)) => BitVector (2^k) -> Index ((2^k)+1)
-    populationCount' bv = dtfold (Proxy @IIndex)
-                                 fromIntegral
-                                 (\_ x y -> add x y)
-                                 (bv2v bv)
-:}
-
 -}
 
 infixr 5 `Cons`
@@ -689,7 +681,7 @@ map f (x `Cons` xs) = f x `Cons` map f xs
 --
 -- >>> :t imap (+) (2 :> 2 :> 2 :> 2 :> Nil)
 -- imap (+) (2 :> 2 :> 2 :> 2 :> Nil)
---   :: KnownSatMode sat => Vec 4 (SatIndex sat 4)
+--   :: Vec 4 (SatIndex 'SatError 4)
 -- >>> imap (+) (2 :> 2 :> 2 :> 2 :> Nil)
 -- <2,3,*** Exception: X: Clash.Sized.Index: result 4 is out of bounds: [0..3]
 -- ...
@@ -700,8 +692,8 @@ map f (x `Cons` xs) = f x `Cons` map f xs
 --
 -- <<doc/imap.svg>>
 imap
-  :: forall sat n a b . KnownNat n
-  => (SatIndex sat n -> a -> b) -> Vec n a -> Vec n b
+  :: forall n a b . KnownNat n
+  => (SatIndex 'SatError n -> a -> b) -> Vec n a -> Vec n b
 imap f = go 0
   where
     go :: SatIndex 'SatError n -> Vec m a -> Vec m b
@@ -711,7 +703,7 @@ imap f = go 0
 
 -- | Zip two vectors with a functions that also takes the elements' indices.
 --
--- >>> izipWith (\i a b -> i + a + b) (2 :> 2 :> Nil)  (3 :> 3:> Nil) @'SatError
+-- >>> izipWith (\i a b -> i + a + b) (2 :> 2 :> Nil)  (3 :> 3:> Nil)
 -- <*** Exception: X: Clash.Sized.Index: result 3 is out of bounds: [0..1]
 -- ...
 -- >>> izipWith (\(i a b -> fromIntegral i + a + b) (2 :> 2 :> Nil) (3 :> 3 :> Nil) :: Vec 2 (Unsigned 8)
@@ -725,7 +717,7 @@ imap f = go 0
 -- third. This matters when 'izipWith' is used in a recursive setting. See
 -- 'lazyV' for more information.
 izipWith :: KnownNat n
-         => (SatIndex sat n -> a -> b -> c) -> Vec n a -> Vec n b
+         => (SatIndex 'SatError n -> a -> b -> c) -> Vec n a -> Vec n b
          -> Vec n c
 izipWith f xs ys = imap (\i -> uncurry (f i)) (zip xs ys)
 {-# INLINE izipWith #-}
@@ -743,7 +735,7 @@ izipWith f xs ys = imap (\i -> uncurry (f i)) (zip xs ys)
 -- <<doc/ifoldr.svg>>
 ifoldr
   :: KnownNat n
-  => (SatIndex sat n -> a -> b -> b) -> b -> Vec n a -> b
+  => (SatIndex 'SatError n -> a -> b -> b) -> b -> Vec n a -> b
 ifoldr f z xs = head ws
   where
     ws = izipWith f xs ((tail ws)) :< z
@@ -762,7 +754,7 @@ ifoldr f z xs = head ws
 -- <<doc/ifoldl.svg>>
 ifoldl
   :: KnownNat n
-  => (a -> SatIndex sat n -> b -> a) -> a -> Vec n b -> a
+  => (a -> SatIndex 'SatError n -> b -> a) -> a -> Vec n b -> a
 ifoldl f z xs = last ws
   where
     ws = z `Cons` izipWith (\i b a -> f a i b) xs (init ws)
@@ -794,7 +786,7 @@ indicesI = imap const (repeat ())
 -- Nothing
 findIndex
   :: KnownNat n
-  => (a -> Bool) -> Vec n a -> Maybe (SatIndex sat n)
+  => (a -> Bool) -> Vec n a -> Maybe (SatIndex 'SatError n)
 findIndex f = ifoldr (\i a b -> if f a then Just i else b) Nothing
 {-# INLINE findIndex #-}
 
@@ -2063,12 +2055,13 @@ dfold _ f z xs = go (snatProxy (asNatProxy xs)) xs
 -- :}
 -- <BLANKLINE>
 -- <interactive>:...
---     • Couldn't match type ‘((n + 2) + (n + 2)) - 1’ with ‘n + 2’
+--     • Couldn't match type ‘Max ((n + 2) + (n + 2)) 1’ with ‘3 + n’
+--                            ^
 --       Expected type: SatIndex 'SatError (n + 2)
---                       -> SatIndex 'SatError (n + 2) -> SatIndex 'SatError (n + 2)
+--                      -> SatIndex 'SatError (n + 2) -> SatIndex 'SatError (n + 2)
 --         Actual type: SatIndex 'SatError (n + 2)
---                       -> SatIndex 'SatError (n + 2)
---                       -> AResult
+--                      -> SatIndex 'SatError (n + 2)
+--                      -> AResult
 --                           (SatIndex 'SatError (n + 2)) (SatIndex 'SatError (n + 2))
 --     • In the first argument of ‘fold’, namely ‘add’
 --       In the first argument of ‘(.)’, namely ‘fold add’
@@ -2084,28 +2077,6 @@ dfold _ f z xs = go (snatProxy (asNatProxy xs)) xs
 -- result is larger than the arguments, we must use a dependently typed fold in
 -- the form of 'dtfold':
 --
--- @
--- {\-\# LANGUAGE UndecidableInstances \#-\}
--- import Data.Singletons.Prelude
--- import Data.Proxy
---
--- data IIndex (f :: 'TyFun' Nat *) :: *
--- type instance 'Apply' IIndex l = 'SatIndex' 'SatError ((2^l)+1)
---
--- populationCount' :: (KnownNat k, KnownNat (2^k))
---                  => BitVector (2^k) -> SatIndex 'SatError ((2^k)+1)
--- populationCount' bv = 'dtfold' (Proxy @IIndex)
---                              fromIntegral
---                              (\\_ x y -> 'Clash.Class.Num.add' x y)
---                              ('bv2v' bv)
--- @
---
--- And we can test that it works:
---
--- >>> :t populationCount' (7 :: BitVector 16)
--- populationCount' (7 :: BitVector 16) :: SatIndex 'SatError 17
--- >>> populationCount' (7 :: BitVector 16)
--- 3
 --
 -- Some final remarks:
 --

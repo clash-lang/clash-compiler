@@ -270,7 +270,7 @@ import           Data.Maybe                     (isJust)
 import           GHC.TypeLits                   (type (+), type (<=))
 
 import           Clash.Annotations.Primitive    (hasBlackBox)
-import           Clash.Class.Num                (satSucc, SaturationMode(SatBound, SatError))
+import           Clash.Class.Num                (SaturationMode(SatBound))
 import           Clash.Promoted.Nat             (SNat(..), snatToNum)
 import           Clash.Signal.Bundle
   (Bundle (..), EmptyTuple(..), TaggedEmptyTuple(..), vecBundle#)
@@ -865,8 +865,8 @@ holdReset
 holdReset clk en SNat rst =
   unsafeFromHighPolarity ((/=maxBound) <$> counter)
  where
-  counter :: Signal dom (SatIndex 'SatError (n+1))
-  counter = register clk rst en 0 (satSucc SatBound <$> counter)
+  counter :: Signal dom (SatIndex 'SatBound (n+1))
+  counter = register clk rst en 0 (succ <$> counter)
 
 -- | Like 'fromList', but resets on reset and has a defined reset value.
 --
