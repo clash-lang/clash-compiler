@@ -24,7 +24,6 @@ import           Data.IntMap.Strict      (IntMap)
 import qualified Data.IntMap.Strict      as IMS
 import qualified Data.HashMap.Strict     as HashMap
 import           Data.List               (isPrefixOf)
-import           Data.List.Extra         (indexMaybe)
 import qualified Data.Text               as Text
 import qualified Data.Time.Clock         as Clock
 
@@ -69,6 +68,12 @@ import           Clash.Rewrite.Util      (mkInternalVar, mkSelectorCase)
 import           Clash.Unique
   (listToUniqMap, lookupUniqMap, mapUniqMap, unionUniqMap, uniqMapToUniqSet)
 import           Clash.Util              (reportTimeDiff)
+
+-- | Safe indexing, returns a 'Nothing' if the index does not exist
+indexMaybe :: [a] -> Int -> Maybe a
+indexMaybe [] _     = Nothing
+indexMaybe (x:_)  0 = Just x
+indexMaybe (_:xs) n = indexMaybe xs (n-1)
 
 generateBindings
   :: GHC.OverridingBool
