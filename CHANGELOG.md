@@ -2,8 +2,8 @@
 
 ## 1.2.1 *April 23rd 2020*
 * Changed:
- * Treat `Signed 0`, `Unsigned 0`, `Index 1`, `BitVector 0` as unit. In effect this means that 'minBound' and 'maxBound' return 0, whereas previously they might crash [#1183](https://github.com/clash-lang/clash-compiler/issues/1183)
- * Infix use of `deepseqX` is now right-associative
+  * Treat `Signed 0`, `Unsigned 0`, `Index 1`, `BitVector 0` as unit. In effect this means that 'minBound' and 'maxBound' return 0, whereas previously they might crash [#1183](https://github.com/clash-lang/clash-compiler/issues/1183)
+  * Infix use of `deepseqX` is now right-associative
 
 * Added:
   * Add 'natToInteger', 'natToNatural', and 'natToNum'. Similar to 'snatTo*', but works solely on a type argument instead of an SNat.
@@ -11,12 +11,12 @@
   * Added NFDataX instances for `Data.Monoid.{First,Last}`
 
 * Fixed:
- * The Verilog backend can now deal with non-contiguous ranges in custom bit-representations.
- * Synthesizing BitPack instances for type with phantom parameter fails [#1242](https://github.com/clash-lang/clash-compiler/issues/1242)
- * Synthesis of `fromBNat (toBNat d5)` failed due to `unsafeCoerce` coercing from `Any`
- * Memory leak in register primitives [#1256](https://github.com/clash-lang/clash-compiler/issues/1256)
- * Illegal VHDL slice when projecting nested SOP type [#1254](https://github.com/clash-lang/clash-compiler/issues/1254)
- * Vivado VHDL code path (`-fclash-hdlsyn Vivado`) generates illegal VHDL [#1264](https://github.com/clash-lang/clash-compiler/issues/1264)
+  * The Verilog backend can now deal with non-contiguous ranges in custom bit-representations.
+  * Synthesizing BitPack instances for type with phantom parameter fails [#1242](https://github.com/clash-lang/clash-compiler/issues/1242)
+  * Synthesis of `fromBNat (toBNat d5)` failed due to `unsafeCoerce` coercing from `Any`
+  * Memory leak in register primitives [#1256](https://github.com/clash-lang/clash-compiler/issues/1256)
+  * Illegal VHDL slice when projecting nested SOP type [#1254](https://github.com/clash-lang/clash-compiler/issues/1254)
+  * Vivado VHDL code path (`-fclash-hdlsyn Vivado`) generates illegal VHDL [#1264](https://github.com/clash-lang/clash-compiler/issues/1264)
 
 ## 1.2.0 *March 5th 2020*
 As promised when releasing 1.0, we've tried our best to keep the API stable. We
