@@ -244,18 +244,13 @@ datatypeNameToPorts name = do
         xs -> BackTrack xs
     _ -> return names
 
-type family Stuck where
+-- This shouldn't reduce
+type family PortLabel where
 
 -- Replace (:::) annotations with a stuck type family, to inhibit unifyTypes to reduce it
-guardPort :: Type -> Type
-guardPort = rewrite $ \case
-    AppT (ConT split) name@(LitT (StrTyLit _)) | split == ''(:::) -> Just $ AppT (ConT ''Stuck) name
-    _ -> Nothing
-
--- Turn back Stuck applications into (:::) annotations
-unguardPort :: Type -> Type
-unguardPort = rewrite $ \case
-    ConT stuck | stuck == ''Stuck -> Just $ ConT ''(:::)
+guardPorts :: Type -> Type
+guardPorts = rewrite $ \case
+    AppT (ConT split) name@(LitT (StrTyLit _)) | split == ''(:::) -> Just $ AppT (ConT ''PortLabel) name
     _ -> Nothing
 
 -- | Recursively walking a 'Type' tree and building a list of 'PortName's.
@@ -265,7 +260,7 @@ typeTreeToPorts
   -> Tracked Q (Naming [PortName])
 typeTreeToPorts (AppTF (AppT (ConT split) (LitT (StrTyLit name)), _) (_,c))
   -- Is there a '<String> ::: <something>' annotation?
-  | split == ''(:::)
+  | split == ''PortLabel
   -- We found our split. If:
   -- - We only have no names from children: use split name as PortName
   -- - We have children reporting names: use split name as name to PortProduct
@@ -314,10 +309,10 @@ typeTreeToPorts f@(AppTF (a,a') (b,b')) = do
         FamilyI (ClosedTypeFamilyD (TypeFamilyHead _ bds _ _) eqs) _
           | length bds == length xs -> do
               matches <- lift $ forM eqs $ \eq -> qRecover (return Nothing) . fmap Just $ do
-                  sub <- mconcat <$> zipWithM (\l r -> unifyTypes [guardPort l, r]) xs (tySynArgs eq)
+                  sub <- mconcat <$> zipWithM (\l r -> unifyTypes [l, r]) xs (tySynArgs eq)
                   return $ applySubstitution sub $ tySynRHS eq
               case catMaybes matches of
-                  (r:_) -> gatherNames (unguardPort r)
+                  (r:_) -> gatherNames r
                   -- We didn't find any matching instances (i.e. the
                   -- type family application is stuck) so give up.
                   [] -> return $ Complete []
@@ -410,7 +405,7 @@ gatherNames
   -- ^ Type to investigate
   -> Tracked Q (Naming [PortName])
 gatherNames =
-  para typeTreeToPorts
+  para typeTreeToPorts . guardPorts
 
 -- | Build a possible failing 'PortName' tree and unwrap the 'Naming' result.
 buildPorts
