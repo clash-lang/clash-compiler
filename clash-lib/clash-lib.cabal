@@ -250,11 +250,11 @@ Library
                       Clash.Util.Interpolate
                       Clash.Pretty
 
-                      Data.List.Extra
                       Data.Text.Prettyprint.Doc.Extra
 
   Other-Modules:      Clash.Annotations.TopEntity.Extra
                       Data.Aeson.Extra
+                      Data.List.Extra
                       Data.Semigroup.Monad.Extra
                       Data.Set.Ordered.Extra
                       Data.Vector.Primitive.Extra
