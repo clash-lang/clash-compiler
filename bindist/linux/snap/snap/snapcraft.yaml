@@ -24,6 +24,10 @@ apps:
     command: bin/clashi
     plugs: [home]
 
+  cabal:
+    command: bin/cabal
+    plugs: [home]
+
 layout:
   /usr/nix:
     bind: $SNAP/usr/nix
