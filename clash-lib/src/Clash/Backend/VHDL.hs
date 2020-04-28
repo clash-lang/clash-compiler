@@ -601,8 +601,9 @@ funDec _ (Signed _) = Just
       indent 2 ("return" <+> "std_logic_vector" <> parens ("s") <> semi) <> line <>
     "end" <> semi <> line <>
     "function" <+> "fromSLV" <+> parens ("slv" <+> colon <+> "in" <+> "std_logic_vector") <+> "return" <+> "signed" <+> "is" <> line <>
+      indent 2 ("alias islv : std_logic_vector(0 to slv'length - 1) is slv;") <> line <>
     "begin" <> line <>
-      indent 2 ("return" <+> "signed" <> parens ("slv") <> semi) <> line <>
+      indent 2 ("return" <+> "signed" <> parens ("islv") <> semi) <> line <>
     "end" <> semi
   )
 
@@ -614,8 +615,9 @@ funDec _ (Unsigned _) = Just
       indent 2 ("return" <+> "std_logic_vector" <> parens ("u") <> semi) <> line <>
     "end" <> semi <> line <>
     "function" <+> "fromSLV" <+> parens ("slv" <+> colon <+> "in" <+> "std_logic_vector") <+> "return" <+> "unsigned" <+> "is"  <> line <>
+      indent 2 "alias islv : std_logic_vector(0 to slv'length - 1) is slv;" <> line <>
     "begin" <> line <>
-      indent 2 ("return" <+> "unsigned" <> parens ("slv") <> semi) <> line <>
+      indent 2 ("return" <+> "unsigned" <> parens ("islv") <> semi) <> line <>
     "end" <> semi
 
   )

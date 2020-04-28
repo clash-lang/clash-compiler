@@ -1,0 +1,1 @@
+FIXED: Missing re-indexing in (Un)Signed fromSLV conversion [#1292](https://github.com/clash-lang/clash-compiler/issues/1292)
