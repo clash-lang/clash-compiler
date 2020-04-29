@@ -3,8 +3,6 @@
 module Clash.Core.Evaluator.Semantics
   ( evaluateVarWith
   , evaluateLiteral
-  , evaluateData
-  , evaluatePrimWith
   , evaluateLam
   , evaluateTyLam
   , evaluateAppWith
@@ -21,8 +19,7 @@ module Clash.Core.Evaluator.Semantics
   , quoteCastWith
   , quoteTickWith
   , quoteNeVar
-  , quoteNeData
-  , quoteNePrim
+  , quoteNePrimWith
   , quoteNeAppWith
   , quoteNeTyAppWith
   , quoteNeCaseWith
@@ -41,7 +38,6 @@ import Clash.Core.Literal
 import Clash.Core.Term
 import Clash.Core.Type
 import Clash.Core.Var
-import Clash.Debug (traceM) -- TODO Remove when primitives are implemented
 import Clash.Driver.Types (Binding(..))
 
 -- | Default implementation for looking up a variable in the environment.
@@ -69,31 +65,6 @@ evaluateVarWith eval i = do
 --
 evaluateLiteral :: Literal -> State Env Value
 evaluateLiteral = pure . VLit
-
--- | Default implementation for evaluating a data constructor. This checks the
--- arity of the constructor, and returns VData if it is nullary, or NeData if
--- it takes arguments.
---
-evaluateData :: DataCon -> State Env Value
-evaluateData dc
-  | null argTys = pure (VData dc [])
-  | otherwise = pure (VNeu (NeData dc []))
- where
-  argTys = fst $ splitFunForallTy (dcType dc)
-
--- | Default implementation for evaluating a primitive operation. This checks
--- the arity of the operation, and attempts delta reduction if it is nullary,
--- or returns NePrim if it takes arguments.
---
-evaluatePrimWith
-  :: (PrimInfo -> [Either Value Type] -> State Env Value)
-  -> PrimInfo
-  -> State Env Value
-evaluatePrimWith eval p
-  | null argTys = traceM ("evaluatePrimWith: " <> show (primName p)) >> eval p []
-  | otherwise = pure (VNeu (NePrim p []))
- where
-  argTys = fst $ splitFunForallTy (primType p)
 
 -- | Default implementation for evaluating lambdas. As a term with a lambda
 -- at the head is already in WHNF, this simply returns the term under the
@@ -291,11 +262,14 @@ quoteTickWith quote x t = do
 quoteNeVar :: Id -> State Env (Neutral Nf)
 quoteNeVar = pure . NeVar
 
-quoteNeData :: DataCon -> [Either Value Type] -> State Env (Neutral Nf)
-quoteNeData dc = error ("quoteNeData: " <> show dc)
-
-quoteNePrim :: PrimInfo -> [Either Value Type] -> State Env (Neutral Nf)
-quoteNePrim p = pure . NePrim p
+quoteNePrimWith
+  :: (Value -> State Env Nf)
+  -> PrimInfo
+  -> [Either Value Type]
+  -> State Env (Neutral Nf)
+quoteNePrimWith quote p args = do
+  quoteArgs <- traverse (bitraverse quote pure) args
+  pure (NePrim p quoteArgs)
 
 quoteNeAppWith
   :: (Value -> State Env Nf)
