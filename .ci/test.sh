@@ -13,9 +13,13 @@ set -e
 # On cabal>=2.4.1.0 and ghc<8.4.4 this isn't done automaticly
 cabal --write-ghc-environment-files=always new-build all
 
-# Check that clash-dev compiles
-sed "s/^ghci/ghc -fno-code/" clash-dev > clash-dev-test
-sh clash-dev-test
+# Check that clash-dev works
+echo "" > clash-dev.result
+echo 'genVHDL "./examples/FIR.hs" >> writeFile "clash-dev.result" "success"' | ./clash-dev
+if [[ "$(cat clash-dev.result)" != "success" ]]; then
+  echo "clash-dev test failed"
+  exit 1
+fi
 
 # Check whether version numbers in snap / clash-{prelude,lib,ghc} are the same
 cabal_files="clash-prelude/clash-prelude.cabal clash-lib/clash-lib.cabal clash-ghc/clash-ghc.cabal clash-cores/clash-cores.cabal"

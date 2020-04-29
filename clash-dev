@@ -1,7 +1,6 @@
 #!/bin/sh
 GHC_VERSION=$(ghc --numeric-version)
 GHC_MAJOR_VERSION=$(echo ${GHC_VERSION} | tr -d '.' | head -c2)
-GHC_BIN_SRC=$(ls -d clash-ghc/src-bin-${GHC_MAJOR_VERSION}*)
 
 if [ ${GHC_MAJOR_VERSION} != 84 ]; then
   XNoStarIsType="-XNoStarIsType"
@@ -10,7 +9,6 @@ fi
 ghci \
   -fobject-code \
   -iclash-ghc/src-bin-common/ \
-  -i${GHC_BIN_SRC} \
   -iclash-lib/src \
   -iclash-ghc/src-ghc \
   -Wall -Wcompat -DTOOL_VERSION_ghc=\"${GHC_VERSION}\" \
