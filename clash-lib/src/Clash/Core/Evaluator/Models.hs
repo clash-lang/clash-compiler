@@ -17,15 +17,15 @@ import Data.Map.Strict (Map)
 import qualified Data.Map.Strict as Map
 import GHC.Generics (Generic)
 
-import Debug.Trace -- TODO
-
 import Clash.Core.DataCon
 import Clash.Core.FreeVars (localFVsOfTerms, tyFVsOfTypes)
 import Clash.Core.Literal (Literal)
+import Clash.Core.Name (OccName)
 import Clash.Core.Subst (extendTvSubstList, mkSubst, substTm)
 import Clash.Core.Term (Term(..), Pat, PrimInfo, TickInfo, mkApps)
 import Clash.Core.TyCon (TyConMap)
 import Clash.Core.Type
+import Clash.Core.Util (mkUniqSystemTyVar, mkUniqSystemId)
 import Clash.Core.Var (Id, IdScope(..))
 import Clash.Core.VarEnv
   ( InScopeSet, extendInScopeSet, mkInScopeSet
@@ -35,6 +35,9 @@ import Clash.Core.VarEnv
 
 import Clash.Driver.Types (BindingMap, Binding(..))
 
+-- | Evaluate a term to NF using the specified evaluator. See 'partialEval'
+-- for more details about arguments to this function.
+--
 nf
   :: Evaluator
   -> BindingMap
@@ -46,6 +49,8 @@ nf
   -> (Nf, EnvPrimsIO, EnvTmMap)
 nf = partialEval evaluateNf
 
+-- | Evaluate a term to WHNF using the specified evaluator. See 'partialEval'
+-- for more details about arguments to this function.
 whnf
   :: Evaluator
   -> BindingMap
@@ -57,6 +62,15 @@ whnf
   -> (Value, EnvPrimsIO, EnvTmMap)
 whnf = partialEval evaluateWhnf
 
+-- | Evaluate a term to obtain some result, using the specified evaluator.
+-- While this is typically used to obtain the WHNF or NF representation of a
+-- term, it can be used to collect any result obtainable by partial evaluation.
+--
+-- To be able to partially evaluate a term, some extra arguments are needed to
+-- construct the initial environment. These are the map of global bindings,
+-- an initial heap of values from IO primitives, a TyConMap for type resolution
+-- and an InScopeSet and Supply for fresh name generation.
+--
 partialEval
   :: (AsTerm a)
   => (Evaluator -> Term -> State Env a)
@@ -108,6 +122,23 @@ type EnvGlobals = VarEnv (Binding (Either Term Value))
 -- during evalaution e.g. creating a new ByteArray in the GHC frontend.
 --
 type EnvPrimsIO = (IntMap Value, Int)
+
+{-
+Note [environment machines]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Evaluating in a big-step style with an environment machine allows terms to be
+evaluated with fewer traversals of the term. Consider a small-step reduction
+machine: on finding a redex it would apply beta-reduction, and then have to
+re-traverse the resulting term from the point where it changed in case there
+are new redexes to reduce.
+
+In contrast, a big-step machine allows fewer traversals. Constructors of the
+Value type do not contain redexes that need removing to obtain a WHNF term.
+This means when it is possible to create a value (by evaluating a term and all
+subterms to values), the resulting term does not need traversing again. Further
+evaluation to NF is achieved by introducting another function, quote, which
+recursively evaluates subterms to remove the remaining redexes.
+-}
 
 -- | An Environment contains all in scope terms and types while evaluating.
 -- This consists of
@@ -250,21 +281,33 @@ deletePure scope i env =
     LocalId -> env { envLocals = Map.delete i (envLocals env) }
     GlobalId -> env { envGlobals = delVarEnv (envGlobals env) i }
 
+mkUniqueTyVar :: OccName -> Kind -> Env -> (TyVar, Env)
+mkUniqueTyVar n kn env =
+  (tv, env { envSupply = ids, envInScope = iss })
+ where
+  ((ids, iss), tv) = mkUniqSystemTyVar st (n, kn)
+  st = (envSupply env, envInScope env)
+
+mkUniqueId :: OccName -> Type -> Env -> (Id, Env)
+mkUniqueId n ty env =
+  (i, env { envSupply = ids, envInScope = iss })
+ where
+  ((ids, iss), i) = mkUniqSystemId st (n, ty)
+  st = (envSupply env, envInScope env)
+
 -- | Neutral terms cannot be reduced, as they represent things like variables
 -- which are unknown, partially applied functions, or case expressions where
 -- the scrutinee is not yet an inspectable value. Consider:
 --
 -- v              Stuck if "v" is a free variable
--- c x1 ... xn    Stuck if constructor "c" is not fully applied
--- p x1 ... xn    Stuck if primitive "p" is not fully applied
+-- p x1 ... xn    Stuck if "p" is a primitive that cannot be reduced
 -- x $ y          Stuck if "x" is not known to be a lambda
 -- x @ A          Stuck if "x" is not known to be a type lambda
 -- case x of ...  Stuck if "x" is neutral (cannot choose an alternative)
 --
 data Neutral a
   = NeVar   Id
-  | NeData  DataCon [Either Value Type]
-  | NePrim  PrimInfo [Either Value Type]
+  | NePrim  PrimInfo [Either a Type]
   | NeApp   (Neutral a) a
   | NeTyApp (Neutral a) Type
   | NeCase  a Type [(Pat, a)]
@@ -278,8 +321,22 @@ data Neutral a
 -- stuck function application (as data constructors and primitives have the
 -- same types as normal functions).
 --
--- TODO: Document why Env is only in VLam and VTyLam. Needs semantics to
--- reference for clarity.
+-- Lambdas / type lambdas include the environment used by the evaluator when it
+-- was encountered, This is needed when
+--
+--   * embedding a Value back into a Term.
+--
+--     When we embed a Value into a Term, applied types and terms must be
+--     substituted (or otherwise bound) into the resulting Term. When turning
+--     a lambda back to a term, the unevaluated body of the lambda must have
+--     these substitutions applied to it.
+--
+--   * evaluating to NF.
+--
+--     Recursively evaluating a term can introduce scope issues if the
+--     recursive traversals do not use the same local enviroment. By storing
+--     the environment in lambdas / type lambdas, recursive evaluation always
+--     respects lexical scoping.
 --
 data Value
   = VNeu    (Neutral Value)
@@ -326,10 +383,6 @@ instance AsTerm Term where
 instance (AsTerm a) => AsTerm (Neutral a) where
   asTerm = \case
     NeVar v -> Var v
-    NeData dc args -> traceShow binders $ mkApps (Data dc) (first asTerm <$> args)
-      where
-       binders = drop (length args) . fst $ splitFunForallTy (dcType dc)
-
     NePrim p args -> mkApps (Prim p) (first asTerm <$> args)
     NeApp x y -> App (asTerm x) (asTerm y)
     NeTyApp x ty -> TyApp (asTerm x) ty
@@ -380,3 +433,4 @@ instance AsTerm Nf where
 
 instance (AsTerm a, AsTerm b) => AsTerm (Either a b) where
   asTerm = either asTerm asTerm
+
