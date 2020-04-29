@@ -2,6 +2,8 @@
 
 {-# OPTIONS_GHC -Wno-unused-top-binds #-}
 
+module Main where
+
 #include "MachDeps.h"
 #define HDLSYN Other
 
