@@ -12,6 +12,7 @@
 
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE MagicHash #-}
+{-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TemplateHaskell #-}
 
@@ -187,7 +188,8 @@ stepTyApp x ty m tcm =
       let tys = fst $ splitFunForallTy (primType p)
        in case compare (length args) (length tys) of
             EQ -> case lefts args of
-                    [] | primName p == "Clash.Transformations.removedArg" ->
+                    [] | primName p `elem` [ "Clash.Transformations.removedArg"
+                                           , "Clash.Transformations.undefined" ] ->
                             ghcUnwind (PrimVal p (rights args) []) m tcm
 
                        | otherwise ->
@@ -283,10 +285,10 @@ ghcUnwind v m tcm = do
   go kf m'
  where
   go (Update s x)             = return . update s x v
-  go (Apply x)                = return . apply v x
-  go (Instantiate ty)         = return . instantiate v ty
+  go (Apply x)                = return . apply tcm v x
+  go (Instantiate ty)         = return . instantiate tcm v ty
   go (PrimApply p tys vs tms) = ghcPrimUnwind tcm p tys vs v tms
-  go (Scrutinise _ as)        = return . scrutinise v as
+  go (Scrutinise altTy as)    = return . scrutinise v altTy as
   go (Tickish _)              = return . setTerm (valToTerm v)
 
 -- | Update the Heap with the evaluated term
@@ -295,36 +297,42 @@ update s x (valToTerm -> term) =
   setTerm term . heapInsert s x term
 
 -- | Apply a value to a function
-apply :: Value -> Id -> Machine -> Machine
-apply (Lambda x' e) x m =
+apply :: TyConMap -> Value -> Id -> Machine -> Machine
+apply _tcm (Lambda x' e) x m =
   setTerm (substTm "Evaluator.apply" subst e) m
  where
   subst  = extendIdSubst subst0 x' (Var x)
   subst0 = mkSubst $ extendInScopeSet (mScopeNames m) x
+apply tcm pVal@(PrimVal (PrimInfo{primType}) tys []) x m
+  | isUndefinedPrimVal pVal
+  = setTerm (undefinedTm (piResultTys tcm primType (tys++[varType x]))) m
 
-apply _ _ _ = error "Evaluator.apply: Not a lambda"
+apply _ _ _ m = error $ "Evaluator.apply: Not a lambda: " ++ show m
 
 -- | Instantiate a type-abstraction
-instantiate :: Value -> Type -> Machine -> Machine
-instantiate (TyLambda x e) ty =
-  setTerm (substTm "Evaluator.instantiate" subst e)
+instantiate :: TyConMap -> Value -> Type -> Machine -> Machine
+instantiate _tcm (TyLambda x e) ty m =
+  setTerm (substTm "Evaluator.instantiate1" subst e) m
  where
   subst  = extendTvSubst subst0 x ty
   subst0 = mkSubst iss0
   iss0   = mkInScopeSet (localFVsOfTerms [e] `unionUniqSet` tyFVsOfTypes [ty])
+instantiate tcm pVal@(PrimVal (PrimInfo{primType}) tys []) ty m
+  | isUndefinedPrimVal pVal
+  = setTerm (undefinedTm (piResultTys tcm primType (tys ++ [ty]))) m
 
-instantiate _ _ = error "Evaluator.instantiate: Not a tylambda"
+instantiate _ p _ _ = error $ "Evaluator.instantiate: Not a tylambda: " ++ show p
 
 -- | Evaluate a case-expression
-scrutinise :: Value -> [Alt] -> Machine -> Machine
-scrutinise v [] m = setTerm (valToTerm v) m
+scrutinise :: Value -> Type -> [Alt] -> Machine -> Machine
+scrutinise v _altTy [] m = setTerm (valToTerm v) m
 -- [Note: empty case expressions]
 --
 -- Clash does not have empty case-expressions; instead, empty case-expressions
 -- are used to indicate that the `whnf` function was called the context of a
 -- case-expression, which means certain special primitives must be forced.
 -- See also [Note: forcing special primitives]
-scrutinise (Lit l) alts m = case alts of
+scrutinise (Lit l) _altTy alts m = case alts of
   (DefaultPat, altE):alts1 -> setTerm (go altE alts1) m
   _ -> let term = go (error $ "Evaluator.scrutinise: no match "
                     <> showPpr (Case (valToTerm (Lit l)) (ConstTy Arrow) alts)) alts
@@ -365,13 +373,16 @@ scrutinise (Lit l) alts m = case alts of
       in  substTm "Evaluator.scrutinise" subst1 altE
   go def (_:alts1) = go def alts1
 
-scrutinise (DC dc xs) alts m
+scrutinise (DC dc xs) _altTy alts m
   | altE:_ <- [substInAlt altDc tvs pxs xs altE
               | (DataPat altDc tvs pxs,altE) <- alts, altDc == dc ] ++
               [altE | (DefaultPat,altE) <- alts ]
   = setTerm altE m
 
-scrutinise v@(PrimVal p _ vs) alts m
+scrutinise v@(PrimVal p _ vs) altTy alts m
+  | isUndefinedPrimVal v
+  = setTerm (undefinedTm altTy) m
+
   | any (\case {(LitPat {},_) -> True; _ -> False}) alts
   = case alts of
       ((DefaultPat,altE):alts1) -> setTerm (go altE alts1) m
@@ -396,7 +407,8 @@ scrutinise v@(PrimVal p _ vs) alts m
           | [_,Lit l0] <- vs -> l0
         _ -> error ("scrutinise: " ++ showPpr (Case (valToTerm v) (ConstTy Arrow) alts))
 
-scrutinise v alts _ = error ("scrutinise: " ++ showPpr (Case (valToTerm v) (ConstTy Arrow) alts))
+scrutinise v _altTy alts _ =
+  error ("scrutinise: " ++ showPpr (Case (valToTerm v) (ConstTy Arrow) alts))
 
 substInAlt :: DataCon -> [TyVar] -> [Id] -> [Either Term Type] -> Term -> Term
 substInAlt dc tvs xs args e = substTm "Evaluator.substInAlt" subst e

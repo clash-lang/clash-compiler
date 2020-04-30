@@ -124,7 +124,7 @@ piResultTyMaybe m ty arg
   | otherwise
   = Nothing
 
--- | @(piResultTys f_ty [ty1, ..., tyn])@ give sthe type of @(f ty1 .. tyn)@
+-- | @(piResultTys f_ty [ty1, ..., tyn])@ gives the type of @(f ty1 .. tyn)@
 -- where @f :: f_ty@
 --
 -- 'piResultTys' is interesting because:

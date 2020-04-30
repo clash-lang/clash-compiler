@@ -9,6 +9,7 @@
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE MagicHash #-}
+{-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE TemplateHaskell #-}
@@ -17,6 +18,7 @@
 module Clash.GHC.Evaluator.Primitive
   ( ghcPrimStep
   , ghcPrimUnwind
+  , isUndefinedPrimVal
   ) where
 
 import           Control.Concurrent.Supply  (Supply,freshId)
@@ -70,7 +72,7 @@ import           Clash.Core.Name
 import           Clash.Core.Pretty   (showPpr)
 import           Clash.Core.Term
   (Pat (..), PrimInfo (..), Term (..), WorkInfo (..), mkApps)
-import           Clash.Core.TermInfo (piResultTys)
+import           Clash.Core.TermInfo (piResultTys, applyTypeToArgs)
 import           Clash.Core.Type
   (Type (..), ConstTy (..), LitTy (..), TypeView (..), mkFunTy, mkTyConApp,
    splitFunForallTy, tyView)
@@ -81,7 +83,7 @@ import           Clash.Core.Util
   (mkRTree,mkVec,tyNatSize,dataConInstArgTys,primCo,
    undefinedTm)
 import           Clash.Core.Var      (mkLocalId, mkTyVar)
-import           Clash.Debug         (trace)
+import           Clash.Debug
 import           Clash.GHC.GHC2Core  (modNameM)
 import           Clash.Rewrite.Util  (mkSelectorCase)
 import           Clash.Unique        (lookupUniqMap)
@@ -99,51 +101,79 @@ import Clash.XException (isX)
 
 import {-# SOURCE #-} Clash.GHC.Evaluator
 
+isUndefinedPrimVal :: Value -> Bool
+isUndefinedPrimVal (PrimVal (PrimInfo{primName}) _ _) =
+  primName == "Clash.Transformations.undefined"
+isUndefinedPrimVal _ = False
+
 -- | Evaluation of primitive operations.
 ghcPrimUnwind :: PrimUnwind
-ghcPrimUnwind tcm ty tys vs v [] m
-  | primName ty `elem` [ "Clash.Sized.Internal.Index.fromInteger#"
+ghcPrimUnwind tcm p tys vs v [] m
+  | primName p `elem` [ "Clash.Sized.Internal.Index.fromInteger#"
                        , "GHC.CString.unpackCString#"
                        , "Clash.Transformations.removedArg"
                        , "GHC.Prim.MutableByteArray#"
+                       , "Clash.Transformations.undefined"
                        ]
               -- The above primitives are actually values, and not operations.
-  = ghcUnwind (PrimVal ty tys (vs ++ [v])) m tcm
-  | primName ty == "Clash.Sized.Internal.BitVector.fromInteger#"
+  = ghcUnwind (PrimVal p tys (vs ++ [v])) m tcm
+  | primName p == "Clash.Sized.Internal.BitVector.fromInteger#"
   = case (vs,v) of
     ([naturalLiteral -> Just n,mask], integerLiteral -> Just i) ->
-      ghcUnwind (PrimVal ty tys [Lit (NaturalLiteral n), mask, Lit (IntegerLiteral (wrapUnsigned n i))]) m tcm
+      ghcUnwind (PrimVal p tys [Lit (NaturalLiteral n), mask, Lit (IntegerLiteral (wrapUnsigned n i))]) m tcm
     _ -> error ($(curLoc) ++ "Internal error"  ++ show (vs,v))
-  | primName ty == "Clash.Sized.Internal.BitVector.fromInteger##"
+  | primName p == "Clash.Sized.Internal.BitVector.fromInteger##"
   = case (vs,v) of
     ([mask], integerLiteral -> Just i) ->
-      ghcUnwind (PrimVal ty tys [mask, Lit (IntegerLiteral (wrapUnsigned 1 i))]) m tcm
+      ghcUnwind (PrimVal p tys [mask, Lit (IntegerLiteral (wrapUnsigned 1 i))]) m tcm
     _ -> error ($(curLoc) ++ "Internal error"  ++ show (vs,v))
-  | primName ty == "Clash.Sized.Internal.Signed.fromInteger#"
+  | primName p == "Clash.Sized.Internal.Signed.fromInteger#"
   = case (vs,v) of
     ([naturalLiteral -> Just n],integerLiteral -> Just i) ->
-      ghcUnwind (PrimVal ty tys [Lit (NaturalLiteral n), Lit (IntegerLiteral (wrapSigned n i))]) m tcm
+      ghcUnwind (PrimVal p tys [Lit (NaturalLiteral n), Lit (IntegerLiteral (wrapSigned n i))]) m tcm
     _ -> error ($(curLoc) ++ "Internal error"  ++ show (vs,v))
-  | primName ty == "Clash.Sized.Internal.Unsigned.fromInteger#"
+  | primName p == "Clash.Sized.Internal.Unsigned.fromInteger#"
   = case (vs,v) of
     ([naturalLiteral -> Just n],integerLiteral -> Just i) ->
-      ghcUnwind (PrimVal ty tys [Lit (NaturalLiteral n), Lit (IntegerLiteral (wrapUnsigned n i))]) m tcm
+      ghcUnwind (PrimVal p tys [Lit (NaturalLiteral n), Lit (IntegerLiteral (wrapUnsigned n i))]) m tcm
     _ -> error ($(curLoc) ++ "Internal error"  ++ show (vs,v))
-  | otherwise = ghcPrimStep tcm (forcePrims m) ty tys (vs ++ [v]) m
+  | isUndefinedPrimVal v
+  = let tyArgs = map Right tys
+        tmArgs = map (Left . valToTerm) (vs ++ [v])
+    in  Just $ flip setTerm m $ undefinedTm $
+          applyTypeToArgs (Prim p) tcm (primType p) (tyArgs ++ tmArgs)
+  | otherwise
+  = ghcPrimStep tcm (forcePrims m) p tys (vs ++ [v]) m
 
-ghcPrimUnwind tcm ty tys vs v [e] m0
-  | primName ty `elem` [ "Clash.Sized.Vector.lazyV"
+ghcPrimUnwind tcm p tys vs v [e] m0
+  -- Primitives are usually considered undefined when one of their arguments is
+  -- (unless they're unused). _Some_ primitives can still yield a result even
+  -- though one of their arguments is undefined. It turns out that all primitives
+  -- exhibiting this property happen to be "lazy" in their last argument. Thus,
+  -- all the cases can be covered by a match on [e] and their names:
+  | primName p `elem` [ "Clash.Sized.Vector.lazyV"
                        , "Clash.Sized.Vector.replicate"
                        , "Clash.Sized.Vector.replace_int"
                        , "GHC.Classes.&&"
                        , "GHC.Classes.||"
                        ]
-  = let (m1,i) = newLetBinding tcm m0 e
-    in  ghcPrimStep tcm (forcePrims m0) ty tys (vs ++ [v,Suspend (Var i)]) m1
+  = if isUndefinedPrimVal v then
+      let tyArgs = map Right tys
+          tmArgs = map (Left . valToTerm) (vs ++ [v]) ++ [Left e]
+      in  Just $ flip setTerm m0 $ undefinedTm $
+            applyTypeToArgs (Prim p) tcm (primType p) (tyArgs ++ tmArgs)
+    else
+      let (m1,i) = newLetBinding tcm m0 e
+      in  ghcPrimStep tcm (forcePrims m0) p tys (vs ++ [v,Suspend (Var i)]) m1
 
-ghcPrimUnwind _ ty tys vs (collectValueTicks -> (v, ts)) (e:es) m =
-  Just . setTerm e $ stackPush (PrimApply ty tys (vs ++ [foldr TickValue v ts]) es) m
-
+ghcPrimUnwind tcm p tys vs (collectValueTicks -> (v, ts)) (e:es) m
+  | isUndefinedPrimVal v
+  = let tyArgs = map Right tys
+        tmArgs = map (Left . valToTerm) (vs ++ [v]) ++ map Left (e:es)
+    in  Just $ flip setTerm m $ undefinedTm $
+          applyTypeToArgs (Prim p) tcm (primType p) (tyArgs ++ tmArgs)
+  | otherwise
+  = Just . setTerm e $ stackPush (PrimApply p tys (vs ++ [foldr TickValue v ts]) es) m
 
 newtype PrimEvalMonad a = PEM (State Supply a)
   deriving (Functor, Applicative, Monad, MonadState Supply)
