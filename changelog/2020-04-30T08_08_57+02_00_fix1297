@@ -1,0 +1,1 @@
+FIXED: Prim evaluation fails on undefined arguments [#1297](https://github.com/clash-lang/clash-compiler/issues/1297)

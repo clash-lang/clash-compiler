@@ -60,6 +60,7 @@ whnf eval tcm isSubj m
        in go (stackPush (Scrutinise ty []) m)
   | otherwise = go m
   where
+    go :: Machine -> Machine
     go s = case step eval s tcm of
       Just s' -> go s'
       Nothing -> fromMaybe (error . showDoc . ppr $ mTerm m) (unwindStack s)
