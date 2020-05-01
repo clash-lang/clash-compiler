@@ -14,7 +14,7 @@ packages:
 -- index state, to go along with the cabal.project.freeze file. update the index
 -- state by running `cabal update` twice and looking at the index state it
 -- displays to you (as the second update will be a no-op)
-index-state: 2020-04-21T14:12:21Z
+index-state: 2020-05-01T13:24:54Z
 
 -- For some reason the `clash-testsuite` executable fails to run without
 -- this, as it cannot find the related library...
@@ -41,12 +41,6 @@ package clash-lib
 optional-packages:
   ./clash-cosim
   ./clash-cores
-
--- no hint release yet that supports ghc-8.10
-source-repository-package
-    type: git
-    location: https://github.com/haskell-hint/hint.git
-    tag: dbb878955528d9125a601773b25a3c45b9fcef06
 
 -- upstream doctest fails with ghc-8.10: https://github.com/sol/doctest/issues/264
 source-repository-package
