@@ -86,17 +86,17 @@ alteraPllTemplate bbCtx = do
   -- TODO: bbQsysIncName into account when generating fresh ids
  let compName = Id.unsafeMake (head (bbQsysIncName bbCtx))
 
- let outclkPorts = map (\n -> toPort ("outclk_" <> showt n)) [(0 :: Int)..length clocks-1]
+ let outclkPorts = map (\n -> instPort ("outclk_" <> showt n)) [(0 :: Int)..length clocks-1]
 
  getMon $ blockDecl alteraPll $ concat
   [[ NetDecl Nothing locked  rstTy
    , NetDecl' Nothing Reg pllLock (Right Bool) Nothing]
   ,[ NetDecl Nothing clkNm ty | (clkNm,ty) <- zip clocks tys]
   ,[ InstDecl Comp Nothing [] compName alteraPll_inst [] $ concat
-      [ [ (toPort "refclk", In, clkTy, clk)
-        , (toPort "rst", In, rstTy, rst)]
+      [ [ (instPort "refclk", In, clkTy, clk)
+        , (instPort "rst", In, rstTy, rst)]
       , [ (p, Out, ty, Identifier k Nothing) | (k, ty, p) <- zip3 clocks tys outclkPorts ]
-      , [(toPort "locked", Out, rstTy, Identifier locked Nothing)]]
+      , [(instPort "locked", Out, rstTy, Identifier locked Nothing)]]
    , CondAssignment pllLock Bool (Identifier locked Nothing) rstTy
       [(Just (BitLit H),Literal Nothing (BoolLit True))
       ,(Nothing        ,Literal Nothing (BoolLit False))]
@@ -111,9 +111,6 @@ alteraPllTemplate bbCtx = do
   [(nm,_,_),(clk,clkTy,_),(rst,rstTy,_)] = drop 3 (bbInputs bbCtx)
   Just nm' = exprToString nm
   instname0 = TextS.pack nm'
-
-  -- unsafeMake is safe here: it's just port names predefined by the PLL IP
-  toPort p = Identifier (Id.unsafeMake p) Nothing
 
 altpllTemplate
   :: Backend s
@@ -135,10 +132,10 @@ altpllTemplate bbCtx = do
   , NetDecl' Nothing Reg pllLock (Right Bool) Nothing
   , NetDecl Nothing pllOut clkOutTy
   , InstDecl Comp Nothing [] compName alteraPll_inst []
-      [ (toPort "clk", In, clkTy, clk)
-      , (toPort "areset", In, rstTy, rst)
-      , (toPort "c0", Out, clkOutTy, Identifier pllOut Nothing)
-      , (toPort "locked", Out, Bit, Identifier locked Nothing)]
+      [ (instPort "clk", In, clkTy, clk)
+      , (instPort "areset", In, rstTy, rst)
+      , (instPort "c0", Out, clkOutTy, Identifier pllOut Nothing)
+      , (instPort "locked", Out, Bit, Identifier locked Nothing)]
   , CondAssignment pllLock Bool (Identifier locked Nothing) rstTy
       [(Just (BitLit H),Literal Nothing (BoolLit True))
       ,(Nothing        ,Literal Nothing (BoolLit False))]
@@ -152,10 +149,6 @@ altpllTemplate bbCtx = do
   [(Identifier result Nothing,resTy@(Product _ _ [clkOutTy,_]))] = bbResults bbCtx
   Just nm' = exprToString nm
   instname0 = TextS.pack nm'
-
-  -- unsafeMake is safe here: it's just port names predefined by the PLL IP
-  toPort p = Identifier (Id.unsafeMake p) Nothing
-
 
 altpllQsysTemplate
   :: Backend s

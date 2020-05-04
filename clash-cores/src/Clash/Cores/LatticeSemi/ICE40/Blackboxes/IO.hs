@@ -21,6 +21,7 @@ import           GHC.Stack
 import           Clash.Backend
 import qualified Clash.Netlist.Id as Id
 import           Clash.Netlist.Types
+import           Clash.Netlist.Util (instPort)
 
 pinConfigLiteral
   :: HasCallStack
@@ -59,8 +60,6 @@ sbioTemplate bbCtx = do
   dIn0 <- Id.makeBasic "dIn0"
   dIn1 <- Id.makeBasic "dIn1"
 
-  let u = Id.unsafeMake
-
   let
     resultTuple =
       DataCon
@@ -74,22 +73,22 @@ sbioTemplate bbCtx = do
     [ NetDecl Nothing dIn0 Bit
     , NetDecl Nothing dIn1 Bit
     , InstDecl Comp Nothing [] compName sbio_inst
-      [ (Identifier (u "PIN_TYPE") Nothing, BitVector 6, pinConfig)
+      [ (instPort "PIN_TYPE", BitVector 6, pinConfig)
       ]
       [ -- NOTE: Direction is set to 'In', but will be rendered as inout due to
         -- its the type packackagePinTy
-        (Identifier (u "PACKAGE_PIN") Nothing, In, packagePinTy, packagePin)
-      , (Identifier (u "LATCH_INPUT_VALUE") Nothing, In, Bit, latchInput)
+        (instPort "PACKAGE_PIN", In, packagePinTy, packagePin)
+      , (instPort "LATCH_INPUT_VALUE", In, Bit, latchInput)
       -- TODO: If clock is constantly enabled, docs recommend  not connecting
       -- TODO: CLOCK_ENABLE at all.
-      , (Identifier (u "CLOCK_ENABLE") Nothing, In, Bool, en)
-      , (Identifier (u "INPUT_CLK") Nothing, In, clkTy, clk)
-      , (Identifier (u "OUTPUT_CLK") Nothing, In, clkTy, clk)
-      , (Identifier (u "OUTPUT_ENABLE") Nothing, In, Bool, outputEnable)
-      , (Identifier (u "D_OUT_0") Nothing, In, Bit, dOut0)
-      , (Identifier (u "D_OUT_1") Nothing, In, Bit, dOut1)
-      , (Identifier (u "D_IN_0") Nothing, Out, Bit, Identifier dIn0 Nothing)
-      , (Identifier (u "D_IN_1") Nothing, Out, Bit, Identifier dIn1 Nothing)
+      , (instPort "CLOCK_ENABLE", In, Bool, en)
+      , (instPort "INPUT_CLK", In, clkTy, clk)
+      , (instPort "OUTPUT_CLK", In, clkTy, clk)
+      , (instPort "OUTPUT_ENABLE", In, Bool, outputEnable)
+      , (instPort "D_OUT_0", In, Bit, dOut0)
+      , (instPort "D_OUT_1", In, Bit, dOut1)
+      , (instPort "D_IN_0", Out, Bit, Identifier dIn0 Nothing)
+      , (instPort "D_IN_1", Out, Bit, Identifier dIn1 Nothing)
       ]
     , Assignment result resultTuple
     ]

@@ -112,6 +112,23 @@ hmFindWithDefault = HashMap.findWithDefault
 hmFindWithDefault = HashMap.lookupDefault
 #endif
 
+-- | Generate a simple port_name expression. See:
+--
+--   https://www.hdlworks.com/hdl_corner/vhdl_ref/VHDLContents/PortMap.htm
+--
+-- This function will simply make the left part of a single port map, e.g. "Rst"
+-- in:
+--
+--  Rst => Reset
+--
+-- If you need more complex constructions, e.g.
+--
+--  Q(3 downto 1)
+--
+-- you can build an Expr manually.
+instPort :: Text -> Expr
+instPort pn = Identifier (Id.unsafeMake pn) Nothing
+
 -- | Throw away information indicating which constructor fields were filtered
 -- due to being void.
 stripFiltered :: FilteredHWType -> HWType
