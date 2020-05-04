@@ -288,33 +288,33 @@ generateHDL reprs domainConfs bindingsMap hdlState primMap tcm tupTcm typeTrans 
   putStrLn $ "Clash: Compiling " ++ topEntityS
 
   -- Some initial setup
-  let modName1 = Data.Text.pack (takeWhile (/= '.') topEntityS)
+  let modName1 = takeWhile (/= '.') topEntityS
       topNm = lookupVarEnv' compNames topEntity
-      (modName, prefixM) = case topPrefixM of
-        Just p
-          | not (Data.Text.null p) -> case annM of
+      (modNameS, fmap Data.Text.pack -> prefixM) = case topPrefixM of
+        Just (Data.Text.unpack -> p)
+          | not (null p) -> case annM of
             -- Prefix top names with 'p', prefix other with 'p_tname'
             Just ann ->
-              let nm = p <> "_" <> Data.Text.pack (t_name ann) in
+              let nm = p <> "_" <> t_name ann in
               (nm, Just nm)
             -- Prefix top names with 'p', prefix other with 'p'
             _ -> (p <> "_" <> modName1, Just p)
           | Just ann <- annM -> case hdl of
               -- Prefix other with 't_name'
-              VHDL -> (Data.Text.pack (t_name ann), Just modName)
-              _    -> (Data.Text.pack (t_name ann), Nothing)
+              VHDL -> (t_name ann, Just modNameS)
+              _    -> (t_name ann, Nothing)
         _ -> case annM of
           Just ann -> case hdlKind (undefined :: backend) of
-            VHDL -> (Data.Text.pack (t_name ann), Nothing)
+            VHDL -> (t_name ann, Nothing)
             -- Prefix other with 't_name'
-            _ -> (Data.Text.pack (t_name ann), Just modName)
+            _ -> (t_name ann, Just modNameS)
           _ -> (modName1, Nothing)
-      modNameS  = Data.Text.unpack modName
+      modNameT  = Data.Text.pack modNameS
       iw        = opt_intWidth opts
       hdlsyn    = opt_hdlSyn opts
       forceUnd  = opt_forceUndefined opts
       xOpt      = coerce (opt_aggressiveXOptBB opts)
-      hdlState' = setModName modName
+      hdlState' = setModName modNameT
                 $ fromMaybe (initBackend iw hdlsyn escpIds forceUnd xOpt :: backend) hdlState
       hdlDir    = fromMaybe "." (opt_hdlDir opts) </>
                         Clash.Backend.name hdlState' </>
@@ -454,7 +454,7 @@ generateHDL reprs domainConfs bindingsMap hdlState primMap tcm tupTcm typeTrans 
 
       -- 3. Generate topEntity wrapper
       let (hdlDocs, manifest', dfiles, mfiles) =
-             createHDL hdlState' modName seen2 netlist domainConfs (Just topComponent) (topNmT, Right manifest)
+             createHDL hdlState' modNameT seen2 netlist domainConfs (Just topComponent) (topNmT, Right manifest)
       mapM_ (writeHDL dir) hdlDocs
       copyDataFiles (opt_importPaths opts) dir dfiles
       writeMemoryDataFiles dir mfiles
