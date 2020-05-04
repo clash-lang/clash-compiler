@@ -42,7 +42,7 @@ instance Arbitrary NonEmptyText where
   shrink = coerce shrinkValidUtf81
 
 eval :: Bool -> HDL -> State Id.IdentifierSet a -> a
-eval esc hdl a = evalState a (Id.emptyIdentifierSet esc hdl)
+eval esc hdl a = evalState a (Id.emptyIdentifierSet esc False hdl)
 
 eval' :: State Id.IdentifierSet a -> a
 eval' = eval True VHDL

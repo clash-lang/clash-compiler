@@ -103,7 +103,7 @@ instance HasIdentifierSet VHDLState where
   identifierSet = idSeen
 
 instance Backend VHDLState where
-  initBackend w hdlsyn_ esc undefVal xOpt = VHDLState
+  initBackend w hdlsyn_ esc lw undefVal xOpt = VHDLState
     { _tyCache=mempty
     , _nameCache=mempty
     , _modNm=""
@@ -113,7 +113,7 @@ instance Backend VHDLState where
     , _includes=[]
     , _dataFiles=[]
     , _memoryDataFiles=[]
-    , _idSeen=Id.emptyIdentifierSet esc VHDL
+    , _idSeen=Id.emptyIdentifierSet esc lw VHDL
     , _intWidth=w
     , _hdlsyn=hdlsyn_
     , _undefValue=undefVal

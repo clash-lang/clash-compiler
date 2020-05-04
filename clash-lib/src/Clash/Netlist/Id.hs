@@ -90,35 +90,40 @@ import qualified Clash.Netlist.Id.Common as Common
 emptyIdentifierSet
   :: Bool
   -- ^ Allow escaped identifiers?
+  -> Bool
+  -- ^ Should all basic identifiers be lower case?
   -> HDL
   -- ^ HDL to generate names for
   -> IdentifierSet
-emptyIdentifierSet esc hdl = makeSet esc hdl []
+emptyIdentifierSet esc lw hdl = makeSet esc lw hdl []
 
 -- | Union of two identifier sets. Errors if given sets have been made with
 -- different options enabled.
 union :: HasCallStack => IdentifierSet -> IdentifierSet -> IdentifierSet
-union is1@(IdentifierSet esc1 hdl1 _ _) is2@(IdentifierSet esc2 hdl2 _ _)
+union is1@(IdentifierSet esc1 lw1 hdl1 _ _) is2@(IdentifierSet esc2 lw2 hdl2 _ _)
   | esc1 /= esc2 = error $ "Internal error: esc1 /= esc2, " <> show (esc1, esc2)
   | hdl1 /= hdl2 = error $ "Internal error: hdl1 /= hdl2, " <> show (hdl1, hdl2)
-  | otherwise = makeSet esc1 hdl1 (toList is1 ++ toList is2)
+  | lw1 /= lw2 = error $ "Internal error: lw1 /= lw2 , " <> show (lw1, lw2)
+  | otherwise = makeSet esc1 lw1 hdl1 (toList is1 ++ toList is2)
 
 -- | Make a identifier set filled with given identifiers
 makeSet
   :: Bool
   -- ^ Allow escaped identifiers?
+  -> Bool
+  -- ^ Should all basic identifiers be lower case?
   -> HDL
   -- ^ HDL to generate names for
   -> [Identifier]
   -- ^ Identifiers to add to set
   -> IdentifierSet
-makeSet esc hdl ids = IdentifierSet esc hdl fresh store
+makeSet esc lw hdl ids = IdentifierSet esc lw hdl fresh store
  where
   fresh = List.foldl' updateFreshCache# mempty ids
   store = HashSet.fromList ids
 
 toList :: IdentifierSet -> [Identifier]
-toList (IdentifierSet _ _ _ idStore) = HashSet.toList idStore
+toList (IdentifierSet _ _ _ _ idStore) = HashSet.toList idStore
 
 -- | Return identifier with highest extension for given identifier. See
 -- 'is_freshCache' for more information.
@@ -178,7 +183,7 @@ addRaw# is0 id0 = second (RawIdentifier id0 . Just) (make# is0 (unextend id0))
 
 -- | Non-monadic, internal version of 'make'
 make# :: IdentifierSet -> Text -> (IdentifierSet, Identifier)
-make# is0@(IdentifierSet esc hdl fresh0 ids0) (Common.prettyName -> id0) =
+make# is0@(IdentifierSet esc lw hdl fresh0 ids0) (Common.prettyName -> id0) =
   if id1 `HashSet.member` ids0 then
     -- Ideally we'd like to continue with the id from the HashSet so all the old
     -- strings can be garbage collected, but I haven't found an efficient way of
@@ -189,18 +194,20 @@ make# is0@(IdentifierSet esc hdl fresh0 ids0) (Common.prettyName -> id0) =
  where
   ids1 = HashSet.insert id1 ids0
   fresh1 = updateFreshCache# fresh0 id1
-  id1 = make## (is_hdl is0) (if esc then id0 else toBasicId# hdl id0)
+  id1 = make## (is_hdl is0) (if esc then id0 else toBasicId# hdl lw id0)
 
 -- | Non-monadic, internal version of 'makeBasic'
 makeBasic# :: IdentifierSet -> Text -> (IdentifierSet, Identifier)
-makeBasic# is0 = make# is0 . toBasicId# (is_hdl is0)
+makeBasic# is0 = make# is0 . toBasicId# (is_hdl is0) (is_lowerCaseBasicIds is0)
 
 -- | Non-monadic, internal version of 'makeBasicOr'
 makeBasicOr# :: IdentifierSet -> Text -> Text -> (IdentifierSet, Identifier)
 makeBasicOr# is0 hint altHint = make# is0 id1
  where
-  id0 = toBasicId# (is_hdl is0) hint
-  id1 = if Text.null id0 then toBasicId# (is_hdl is0) altHint else id0
+  id0 = toBasicId# (is_hdl is0) (is_lowerCaseBasicIds is0) hint
+  id1 = if Text.null id0
+        then toBasicId# (is_hdl is0) (is_lowerCaseBasicIds is0) altHint
+        else id0
 
 -- | Non-monadic, internal version of 'next'
 next# :: IdentifierSet -> Identifier ->  (IdentifierSet, Identifier)
@@ -431,7 +438,11 @@ make## hdl =
           in
             UniqueIdentifier baseName baseNameCaseFold extensions idType hdl
 
-toBasicId# :: HDL -> Text -> Text
-toBasicId# VHDL          = VHDL.toBasic
-toBasicId# Verilog       = Verilog.toBasic
-toBasicId# SystemVerilog = SystemVerilog.toBasic
+toBasicId# :: HDL -> Bool -> Text -> Text
+toBasicId# hdl lw id0 =
+  case hdl of
+    VHDL -> VHDL.toBasic id1
+    Verilog -> Verilog.toBasic id1
+    SystemVerilog -> SystemVerilog.toBasic id1
+ where
+  id1 = if lw then Text.toLower id0 else id0

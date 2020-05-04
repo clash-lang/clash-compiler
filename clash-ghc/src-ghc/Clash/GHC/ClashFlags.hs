@@ -85,6 +85,7 @@ flagsClash r = [
   , defFlag "fclash-component-prefix"            $ SepArg (liftEwM . setComponentPrefix r)
   , defFlag "fclash-old-inline-strategy"         $ NoArg (liftEwM (setOldInlineStrategy r))
   , defFlag "fclash-no-escaped-identifiers"      $ NoArg (liftEwM (setNoEscapedIds r))
+  , defFlag "fclash-lower-case-basic-identifiers"$ NoArg (liftEwM (setLowerCaseBasicIds r))
   , defFlag "fclash-compile-ultra"               $ NoArg (liftEwM (setUltra r))
   , defFlag "fclash-force-undefined"             $ OptIntSuffix (setUndefined r)
   , defFlag "fclash-aggressive-x-optimization"   $ NoArg (liftEwM (setAggressiveXOpt r))
@@ -224,6 +225,9 @@ setOldInlineStrategy r = modifyIORef r (\c -> c {opt_newInlineStrat = False})
 
 setNoEscapedIds :: IORef ClashOpts -> IO ()
 setNoEscapedIds r = modifyIORef r (\c -> c {opt_escapedIds = False})
+
+setLowerCaseBasicIds :: IORef ClashOpts -> IO ()
+setLowerCaseBasicIds r = modifyIORef r (\c -> c {opt_lowerCaseBasicIds = True})
 
 setUltra :: IORef ClashOpts -> IO ()
 setUltra r = modifyIORef r (\c -> c {opt_ultra = True})

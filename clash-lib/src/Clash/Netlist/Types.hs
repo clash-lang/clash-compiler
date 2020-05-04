@@ -150,6 +150,8 @@ data IdentifierSet
       is_allowEscaped :: !Bool
       -- ^ Allow escaped ids? If set to False, "make" will always behave like
       -- "makeBasic".
+    , is_lowerCaseBasicIds :: !Bool
+      -- ^ Force all generated basic identifiers to lowercase.
     , is_hdl :: !HDL
       -- ^ HDL to generate fresh identifiers for
     , is_freshCache :: !FreshCache

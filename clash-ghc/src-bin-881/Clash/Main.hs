@@ -980,7 +980,7 @@ abiHash strs = do
 
 makeHDL'
   :: Clash.Backend.Backend backend
-  => (Int -> HdlSyn -> Bool -> Maybe (Maybe Int) -> AggressiveXOptBB -> backend)
+  => (Int -> HdlSyn -> Bool -> Bool -> Maybe (Maybe Int) -> AggressiveXOptBB -> backend)
   -> IORef ClashOpts -> [(String,Maybe Phase)] -> Ghc ()
 makeHDL' _       _ []   = throwGhcException (CmdLineError "No input files")
 makeHDL' backend r srcs = makeHDL backend r $ fmap fst srcs

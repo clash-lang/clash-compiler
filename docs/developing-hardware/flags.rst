@@ -188,10 +188,17 @@ Clash Compiler Flags
 
 -fclash-no-escaped-identifiers
   Disable extended identifiers, as used in some HDLs like VHDL to allow more
-  flexibility with names. Clash will only generate normal idenfiers if this
+  flexibility with names. Clash will only generate basic identifiers if this
   is used.
 
   **Default:** Escaped identifiers are allowed
+
+-fclash-lower-case-basic-identifiers
+  Clash will only generate lower case basic identifiers if this is used. This
+  affects places where the various HDLs only allow basic identifiers to be used,
+  most notably module and file names.
+
+  **Default:** Disabled
 
 -fclash-compile-ultra
   Aggressively run the normalizer, potentially gaining much better runtime

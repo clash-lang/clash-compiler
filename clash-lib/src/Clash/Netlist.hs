@@ -188,7 +188,7 @@ runNetlistMonad isTb opts reprs s tops p tcm typeTrans iw
         , _htyCache=HashMapS.empty
         }
 
--- | Generate names for all binders in "BindingMap", execpt for the ones already
+-- | Generate names for all binders in "BindingMap", except for the ones already
 -- present in given identifier varenv.
 genNames
   :: Bool
@@ -218,13 +218,15 @@ genTopNames
   -- ^ Prefix
   -> Bool
   -- ^ Allow escaped identifiers?
+  -> Bool
+  -- ^ Lower case basic ids?
   -> HDL
   -- ^ HDL to generate identifiers for
   -> [TopEntityT]
   -> (VarEnv Identifier, IdentifierSet)
-genTopNames prefixM esc hdl tops =
+genTopNames prefixM esc lw hdl tops =
   -- TODO: Report error if fixed top entities have conflicting names
-  flip runState (Id.emptyIdentifierSet esc hdl) $ do
+  flip runState (Id.emptyIdentifierSet esc lw hdl) $ do
     env0 <- foldlM goFixed emptyVarEnv fixedTops
     env1 <- foldlM goNonFixed env0 (nonFixedTops ++ tests)
     pure env1

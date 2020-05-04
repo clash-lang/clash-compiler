@@ -28,17 +28,17 @@ import Util (OverridingBool(..))
 genSystemVerilog
   :: String
   -> IO ()
-genSystemVerilog = doHDL (initBackend WORD_SIZE_IN_BITS HDLSYN True Nothing (AggressiveXOptBB False) :: SystemVerilogState)
+genSystemVerilog = doHDL (initBackend WORD_SIZE_IN_BITS HDLSYN True False Nothing (AggressiveXOptBB False) :: SystemVerilogState)
 
 genVHDL
   :: String
   -> IO ()
-genVHDL = doHDL (initBackend WORD_SIZE_IN_BITS HDLSYN True Nothing (AggressiveXOptBB False):: VHDLState)
+genVHDL = doHDL (initBackend WORD_SIZE_IN_BITS HDLSYN True False Nothing (AggressiveXOptBB False):: VHDLState)
 
 genVerilog
   :: String
   -> IO ()
-genVerilog = doHDL (initBackend WORD_SIZE_IN_BITS HDLSYN True Nothing (AggressiveXOptBB False):: VerilogState)
+genVerilog = doHDL (initBackend WORD_SIZE_IN_BITS HDLSYN True False Nothing (AggressiveXOptBB False):: VerilogState)
 
 doHDL
   :: HasCallStack

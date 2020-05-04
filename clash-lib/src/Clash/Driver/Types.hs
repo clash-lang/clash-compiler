@@ -173,6 +173,9 @@ data ClashOpts = ClashOpts
   --
   --  * http://vhdl.renerta.com/mobile/source/vhd00037.htm
   --  * http://verilog.renerta.com/source/vrg00018.htm
+  , opt_lowerCaseBasicIds :: Bool
+  -- ^ Force all generated basic identifiers to lowercase. Among others, this
+  -- affects module and file names.
   , opt_ultra :: Bool
   -- ^ Perform a high-effort compile, trading improved performance for
   -- potentially much longer compile times.
@@ -227,6 +230,7 @@ instance Hashable ClashOpts where
     opt_componentPrefix `hashWithSalt`
     opt_newInlineStrat `hashWithSalt`
     opt_escapedIds `hashWithSalt`
+    opt_lowerCaseBasicIds `hashWithSalt`
     opt_ultra `hashWithSalt`
     opt_forceUndefined `hashWithSalt`
     opt_checkIDir `hashWithSalt`
@@ -270,6 +274,7 @@ defClashOpts
   , opt_componentPrefix     = Nothing
   , opt_newInlineStrat      = True
   , opt_escapedIds          = True
+  , opt_lowerCaseBasicIds   = False
   , opt_ultra               = False
   , opt_forceUndefined      = Nothing
   , opt_checkIDir           = True

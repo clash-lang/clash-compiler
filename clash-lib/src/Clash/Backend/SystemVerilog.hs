@@ -93,12 +93,12 @@ instance HasIdentifierSet SystemVerilogState where
   identifierSet = idSeen
 
 instance Backend SystemVerilogState where
-  initBackend w hdlsyn_ esc undefVal xOpt = SystemVerilogState {
+  initBackend w hdlsyn_ esc lw undefVal xOpt = SystemVerilogState {
       _tyCache=HashSet.empty
     , _nameCache=HashMap.empty
     , _genDepth=0
     , _modNm=""
-    , _idSeen=Id.emptyIdentifierSet esc SystemVerilog
+    , _idSeen=Id.emptyIdentifierSet esc lw SystemVerilog
     , _oports=[]
     , _srcSpan=noSrcSpan
     , _includes=[]
