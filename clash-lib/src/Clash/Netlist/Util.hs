@@ -20,6 +20,7 @@
 
 module Clash.Netlist.Util where
 
+import           Data.Coerce             (coerce)
 import           Control.Error           (hush)
 import           Control.Exception       (throw)
 import           Control.Lens            ((.=),(%=))
@@ -34,11 +35,12 @@ import           Control.Monad.Trans.Except
 import           Data.Either             (partitionEithers)
 import           Data.HashMap.Strict     (HashMap)
 import qualified Data.HashMap.Strict     as HashMap
+import qualified Data.IntSet             as IntSet
 import           Data.String             (fromString)
 import           Data.List               (intersperse, unzip4, intercalate)
 import qualified Data.List               as List
 import qualified Data.List.Extra         as List
-import           Data.Maybe              (catMaybes,fromMaybe,isNothing)
+import           Data.Maybe              (catMaybes,fromMaybe,isNothing,mapMaybe)
 import           Data.Monoid             (First (..))
 import           Text.Printf             (printf)
 #if !(MIN_VERSION_base(4,11,0))
@@ -59,7 +61,8 @@ import           Clash.Annotations.BitRepresentation.Internal
 import           Clash.Annotations.TopEntity (PortName (..), TopEntity (..))
 import           Clash.Driver.Types      (Manifest (..), ClashOpts (..))
 import           Clash.Core.DataCon      (DataCon (..))
-import           Clash.Core.FreeVars     (localIdOccursIn, typeFreeVars)
+import           Clash.Core.EqSolver     (typeEq)
+import           Clash.Core.FreeVars     (localIdOccursIn, typeFreeVars, typeFreeVars')
 import qualified Clash.Core.Literal      as C
 import           Clash.Core.Name
   (Name (..), appendToName, nameOcc)
@@ -72,7 +75,7 @@ import           Clash.Core.Term
    collectArgsTicks, collectTicks, collectBndrs, PrimInfo(primName), mkTicks, stripTicks)
 import           Clash.Core.TermInfo
 import           Clash.Core.TyCon
-  (TyConName, TyConMap, tyConDataCons)
+  (TyCon (FunTyCon), TyConName, TyConMap, tyConDataCons)
 import           Clash.Core.Type         (Type (..), TypeView (..),
                                           coreView1, splitTyConAppM, tyView, TyVar)
 import           Clash.Core.Util
@@ -405,7 +408,7 @@ mkADT _ _ m tyString tc _
   | isRecursiveTy m tc
   = throwE $ $(curLoc) ++ "Can't translate recursive type: " ++ tyString
 
-mkADT builtInTranslation reprs m _tyString tc args = case tyConDataCons (m `lookupUniqMap'` tc) of
+mkADT builtInTranslation reprs m tyString tc args = case tyConDataCons (m `lookupUniqMap'` tc) of
   []  -> return (FilteredHWType (Void Nothing) [])
   dcs -> do
     let tcName           = nameOcc tc
@@ -417,6 +420,10 @@ mkADT builtInTranslation reprs m _tyString tc args = case tyConDataCons (m `look
 
     -- Every alternative is annotated with some examples. Be sure to read them.
     case (dcs, filteredArgHTyss) of
+      _ | any (hasUnconstrainedExistential m) dcs ->
+        throwE $ $(curLoc) ++
+                 "Can't translate data types with unconstrained existentials: " ++
+                 tyString
       -- Type has one constructor and that constructor has a single field,
       -- modulo empty fields if keepVoid is False. Examples of such fields
       -- are:
@@ -485,6 +492,96 @@ mkADT builtInTranslation reprs m _tyString tc args = case tyConDataCons (m `look
         return $ FilteredHWType (SP tcName $ zipWith
           (\dc tys ->  ( nameOcc (dcName dc), tys))
           dcs (map stripFiltered <$> elemHTys)) argHTyss1
+
+-- | Determine whether a data constructor has unconstrained existential type
+-- variables, i.e. those that cannot be inferred by the (potential) constraints
+-- between the existential type variables and universal type variables.
+--
+-- So here we have an example of a constrained existential:
+--
+-- data Vec :: Nat -> Type -> Type
+--  where
+--   Nil  :: Vec 0 a
+--   Cons :: forall m . (n ~ m + 1) => a -> Vec m a -> Vec n a
+--
+-- where we can generate a type for `m` when we know `n` (by doing `n-1`).
+--
+-- And here is an example of an unconstrained existential:
+--
+-- data SomeSNat where
+--  where
+--   SomeSNat :: forall m . SNat m -> SomeSNat
+--
+-- where there is no way to generate a type for `m` from any context.
+--
+-- So why do we care? Because terms need to be completely monomorphic in order
+-- to be translated to circuits. And having a topEntity lambda-bound variable
+-- with an unconstrained existential type prevents us from achieving a fully
+-- monomorphic term.
+hasUnconstrainedExistential
+  :: TyConMap
+  -> DataCon
+  -> Bool
+hasUnconstrainedExistential tcm dc =
+  let eTVs        = dcExtTyVars dc
+      uTVs        = dcUnivTyVars dc
+      constraints = mapMaybe (typeEq tcm) (dcArgTys dc)
+
+      -- Is the existential `eTV` constrained by the constraint `(ty1,ty2)`
+      isConstrainedBy eTV (ty1,ty2) =
+        let -- Free FVs in the LHS and RHS of the constraint that are not the
+            -- in the set of universal type variables of the constructor.
+            ty1FEVs = Lens.toListOf (typeFreeVars' ((`notElem` uTVs) . coerce)
+                                                   IntSet.empty)
+                                    ty1
+            ty2FEVs = Lens.toListOf (typeFreeVars' ((`notElem` uTVs) . coerce)
+                                                   IntSet.empty)
+                                    ty2
+
+            -- Determine whether `eTV` can be generated from one side of a
+            -- constraint, under the assumption that the other side of the
+            -- constraint mentions no existential type variables.
+            isGenerative ::
+              -- Side (LHS or RHS) of a constraint
+              Type ->
+              -- Its free type variables (that are no in the set of universal
+              -- type variables)
+              [TyVar] ->
+              Bool
+            isGenerative t efvs = case tyView t of
+              TyConApp tcNm _
+                | Just (FunTyCon {}) <- lookupUniqMap tcNm tcm
+                -- For type families we can only "calculate" the `eTV` if it is
+                -- the only free variable. e.g. we can work out from `n + 1 ~ 4`
+                -- that `n ~ 3`, but can't do anything for `n + m ~ 4`.
+                -> [eTV] == efvs
+                | otherwise
+                -- Normal type constructors are fully generative, e.g. given:
+                -- DomainConfiguration a b ~ DomainConfiguration "System" 10000
+                --
+                -- we can infer both `a ~ "System"` and `b ~ 10000`
+                -> eTV `elem` efvs
+              FunTy {}
+                -- Functions are also fully generative
+                -> eTV `elem` efvs
+              OtherType other -> case other of
+                VarTy v -> v == eTV
+                LitTy _ -> False
+                -- Anything else, like some higher-kinded quantified type we
+                -- just give up for now. TODO: implement this
+                _ -> False
+
+            onlyTy1 = isGenerative ty1 ty1FEVs && null ty2FEVs
+            onlyTy2 = isGenerative ty2 ty2FEVs && null ty1FEVs
+        in  onlyTy1 || onlyTy2
+
+      -- The existential type variables that are not constrained by any of the
+      -- constraints.
+      unconstrainedETVs =
+        filter (\v -> not (any (isConstrainedBy v) constraints)) eTVs
+
+  in  not (null unconstrainedETVs)
+
 
 -- | Simple check if a TyCon is recursively defined.
 isRecursiveTy :: TyConMap -> TyConName -> Bool
