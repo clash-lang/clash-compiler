@@ -110,6 +110,13 @@ runClashTest = defaultMain $ clashTestRoot
           , expectClashFail=Just (def, "InvalidPrimitive.json")
           }
         ]
+      , clashTestGroup "GADTs"
+        [ runTest "T1311" def {
+            hdlTargets=[VHDL]
+          , expectClashFail=Just (def, Text.pack [I.i|
+            Can't translate data types with unconstrained existentials|])
+          }
+        ]
       , clashTestGroup "PrimitiveGuards"
         [ runTest "DontTranslate" def{
             hdlTargets=[VHDL]
@@ -341,6 +348,7 @@ runClashTest = defaultMain $ clashTestRoot
         , runTest "Tail" def
         , runTest "TailM" def
         , runTest "TailOfTail" def
+        , runTest "T1310" def{hdlSim=False}
         ]
       , clashTestGroup "HOPrim"
         [ runTest "HOIdx" def
