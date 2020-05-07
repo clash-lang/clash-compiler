@@ -102,7 +102,7 @@ import           Clash.Core.Type             (Type (..), TypeView (..), applyFun
                                               normalizeType, splitFunForallTy,
                                               splitFunTy,
                                               tyView, mkPolyFunTy, coreView,
-                                              LitTy (..), coreView1)
+                                              LitTy (..), coreView1, isPolyFunTy)
 import           Clash.Core.TyCon            (TyConMap, tyConDataCons)
 import           Clash.Core.Util
   ( isSignalType, mkVec, tyNatSize, undefinedTm,
@@ -152,8 +152,45 @@ inlineOrLiftNonRep ctx eLet@(Letrec _ body) =
 
     inlineTest :: Term -> (Id, Term) -> Bool
     inlineTest e (id_, e') =
+      -- Over-approximate whether we gain anything by lifting a binder to the
+      -- top-level, as opposed to inlining into the let-expression, in terms of
+      -- whether the compile-effort can be shared between the use-sites of the
+      -- let-binding.
+      --
+      -- i.e. a let-binder of type `Bit -> Bit` can normalized on its own, so
+      -- if it has 10 use sites, lifting to the top-level as opposed to inlining,
+      -- would give us a 10x compile-effort improvement.
+      --
+      -- However, let-binders of e.g. type `Maybe (Bit -> Bit)` can not be
+      -- normalized on their own, since the return type is "non-representable".
+      -- And any let-binders of such types that we would lift to the top-level,
+      -- would simply be inlined by `inlineNonRep` again at a later time. The
+      -- same holds for e.g. let-binders of type `Bit -> Maybe (Bit -> Bit)`.
+      --
+      -- Now, you could say, to differentiate between `Bit -> Bit` and
+      -- `Bit -> Maybe (Bit -> Bit)`, we should only look at the result type of
+      -- function types to determine whether their compile-effort can be shared.
+      -- The issue is that things get tricky when we get polymorphic let-bindings,
+      -- because e.g. let-bindings of type `forall n . BitVector n -> BitVector n`
+      -- that are type-applied with `@10` 5 times and `@20` five times, can give
+      -- us a 5x compile-effort improvement if we lift (and later specialize) instead
+      -- of inline. However, the type of `BitVector n` itself is non-representable,
+      -- so simply looking at the the return type of a function and determining
+      -- based on the "representability" of that type whether compile-effort can
+      -- be shared is not going to work.
+      --
+      -- So that's why for now, we over-approximate whether compile-effort can
+      -- be shared. Meaning we fifting both binders of type
+      -- `forall n . BitVector n -> BitVector n` and `Bit -> Maybe (Bit -> Bit)`.
+      -- This is an improvement over the old situation though, where a
+      -- let-binder would be lifted to the top-level if it was used more than
+      -- once, regardless of whether the compile-effort could actually be shared.
+      -- Given that lifting followed by inlining is more expensive, compile-effort
+      -- wise, than inlining right away.
+      let compileSharable = isPolyFunTy (varType id_) in
       -- We do __NOT__ inline:
-      not $ or
+      -- 0. Something of which Clash' compile work can be shared AND which are
+      not $ compileSharable && or
         [ -- 1. recursive let-binders
           -- id_ `localIdOccursIn` e' -- <= already checked in inlineOrLiftBinders
           -- 2. join points (which are not void-wrappers)
