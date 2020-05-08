@@ -61,7 +61,7 @@ module Clash.Normalize.Transformations
 where
 
 import           Control.Exception           (throw)
-import           Control.Lens                (_2)
+import           Control.Lens                (_1, _2, (^.))
 import qualified Control.Lens                as Lens
 import qualified Control.Monad               as Monad
 import           Control.Monad.State         (StateT (..), modify)
@@ -2341,10 +2341,10 @@ reduceNonRepPrim _ e = return e
 --       C -> h x
 -- @
 disjointExpressionConsolidation :: HasCallStack => NormRewrite
-disjointExpressionConsolidation ctx@(TransformContext is0 _) e@(Case _scrut _ty _alts@(_:_:_)) = do
+disjointExpressionConsolidation ctx@(TransformContext isCtx _) e@(Case _scrut _ty _alts@(_:_:_)) = do
     -- Collect all (the applications of) global binders (and certain primitives)
     -- that would be interesting to share out of the case-alternatives.
-    (_,collected) <- collectGlobals is0 [] [] e
+    (_,isCollected,collected) <- collectGlobals isCtx [] [] e
     -- Filter those that are used at most once in every (nested) branch.
     let disJoint = filter (isDisjoint . snd . snd) collected
     if null disJoint
@@ -2357,18 +2357,31 @@ disjointExpressionConsolidation ctx@(TransformContext is0 _) e@(Case _scrut _ty 
          --
          -- the let-expression is not created when `f` has only one (selectable)
          -- argument
-         lifted <- mapM (mkDisjointGroup is0) disJoint
+         --
+         -- NB: mkDisJointGroup needs the context InScopeSet, isCtx, to determine
+         -- whether expressions reference variables from the context, or
+         -- variables inside a let-expression inside one of the alternatives.
+         lifted <- mapM (mkDisjointGroup isCtx) disJoint
          tcm    <- Lens.view tcCache
          -- Create let-binders for all of the lifted expressions
-         (is1,funOutIds) <- List.mapAccumLM (mkFunOut tcm) is0 (zip disJoint lifted)
+         --
+         -- NB: Because we will be substituting under binders we use the collected
+         -- inScopeSet, isCollected, which also contains all the binders
+         -- created inside all of the alternatives. With this inScopeSet, we
+         -- ensure that the let-bindings we create here won't be accidentally
+         -- captured by binders inside the case-alternatives.
+         (_,funOutIds) <- List.mapAccumLM (mkFunOut tcm)
+                                          isCollected
+                                          (zip disJoint lifted)
          -- Create "substitutions" of the form [f X Y := f_out]
          let substitution = zip (map fst disJoint) (map Var funOutIds)
          -- For all of the lifted expression: substitute occurrences of the
          -- disjoint expressions (f X Y) by a variable reference to the lifted
          -- expression (f_out)
-         lifted1 <- mapM (substLifted is1 substitution) lifted
+         let isCtx1 = extendInScopeSetList isCtx funOutIds
+         lifted1 <- mapM (substLifted isCtx1 substitution) lifted
          -- Do the same for the actual case expression
-         (e1,_) <- collectGlobals is1 substitution [] e
+         (e1,_,_) <- collectGlobals isCtx1 substitution [] e
          -- Let-bind all the lifted function
          let lb = Letrec (zip funOutIds lifted1) e1
          -- Do an initial dead-code elimination pass, as `mkDisJoint` doesn't
@@ -2429,12 +2442,12 @@ disjointExpressionConsolidation ctx@(TransformContext is0 _) e@(Case _scrut _ty 
         , isGlobalId f
         -> do
            let isN1 = extendInScopeSet isN lbV
-           (lbE1,_) <- collectGlobals isN1 substitution seen lbE
+           (lbE1,_,_) <- collectGlobals isN1 substitution seen lbE
            Letrec [(lbV,lbE1)] <$> go isN1 fun args
         | Prim  {} <- fun
         -> do
            let isN1 = extendInScopeSet isN lbV
-           (lbE1,_) <- collectGlobals isN1 substitution seen lbE
+           (lbE1,_,_) <- collectGlobals isN1 substitution seen lbE
            Letrec [(lbV,lbE1)] <$> go isN1 fun args
       (collectArgs -> (fun,args))
         | Var f <- fun
@@ -2450,7 +2463,7 @@ disjointExpressionConsolidation ctx@(TransformContext is0 _) e@(Case _scrut _ty 
       where
         go isX fun args = do
           args1 <-
-            mapM (either (fmap (Left . fst) . collectGlobals isX substitution seen)
+            mapM (either (fmap (Left . (^. _1)) . collectGlobals isX substitution seen)
                          (return . Right))
                  args
           return (mkApps fun args1)
