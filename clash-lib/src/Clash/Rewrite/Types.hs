@@ -89,6 +89,11 @@ data RewriteEnv
   { _dbgLevel       :: DebugLevel
   -- ^ Level at which we print debugging messages
   , _dbgTransformations :: Set.Set String
+  -- ^ See ClashOpts.dbgTransformations
+  , _dbgTransformationsFrom :: Int
+  -- ^ See ClashOpts.opt_dbgTransformationsFrom
+  , _dbgTransformationsLimit :: Int
+  -- ^ See ClashOpts.opt_dbgTransformationsLimit
   , _aggressiveXOpt :: Bool
   -- ^ Transformations to print debugging info for
   , _typeTranslator :: CustomReprs

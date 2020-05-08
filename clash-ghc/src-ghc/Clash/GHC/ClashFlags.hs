@@ -63,6 +63,8 @@ flagsClash :: IORef ClashOpts -> [Flag IO]
 flagsClash r = [
     defFlag "fclash-debug"                       $ SepArg (setDebugLevel r)
   , defFlag "fclash-debug-transformations"       $ SepArg (setDebugTransformations r)
+  , defFlag "fclash-debug-transformations-from"  $ OptIntSuffix (setDebugTransformationsFrom r)
+  , defFlag "fclash-debug-transformations-limit" $ OptIntSuffix (setDebugTransformationsLimit r)
   , defFlag "fclash-hdldir"                      $ SepArg (setHdlDir r)
   , defFlag "fclash-hdlsyn"                      $ SepArg (setHdlSyn r)
   , defFlag "fclash-nocache"                     $ NoArg (deprecated "nocache" "no-cache" setNoCache r)
@@ -137,6 +139,16 @@ setDebugTransformations r s =
  where
   transformations = Set.fromList (filter (not . null) (map trim (splitOn "," s)))
   trim = dropWhileEnd isSpace . dropWhile isSpace
+
+setDebugTransformationsFrom :: IORef ClashOpts -> Maybe Int -> EwM IO ()
+setDebugTransformationsFrom r (Just n) =
+  liftEwM (modifyIORef r (\c -> c {opt_dbgTransformationsFrom = n}))
+setDebugTransformationsFrom _r Nothing = pure ()
+
+setDebugTransformationsLimit :: IORef ClashOpts -> Maybe Int -> EwM IO ()
+setDebugTransformationsLimit r (Just n) =
+  liftEwM (modifyIORef r (\c -> c {opt_dbgTransformationsLimit = n}))
+setDebugTransformationsLimit _r Nothing = pure ()
 
 setDebugLevel :: IORef ClashOpts
               -> String
