@@ -43,6 +43,24 @@ Clash Compiler Flags
 
   **Default:** []
 
+-fclash-debug-transformations-from
+  Only print debug output from applied transformation ``n`` and onwards.
+
+  .. code-block:: bash
+
+    clash -fclash-debug-transformations-from=21570
+
+  **Default:** 0
+
+-fclash-debug-transformations-limit
+  Only print debug output for ``n`` applied transformations.
+
+  .. code-block:: bash
+
+    clash -fclash-debug-transformations-limit=12
+
+  **Default:** MAX_INT
+
 -fclash-hdldir
   Specify the directory that generated HDL is written into. Generated code
   is still put into a directory named according to the output language within
