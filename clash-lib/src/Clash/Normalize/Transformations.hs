@@ -2342,38 +2342,118 @@ reduceNonRepPrim _ e = return e
 -- @
 disjointExpressionConsolidation :: HasCallStack => NormRewrite
 disjointExpressionConsolidation ctx@(TransformContext is0 _) e@(Case _scrut _ty _alts@(_:_:_)) = do
+    -- Collect all (the applications of) global binders (and certain primitives)
+    -- that would be interesting to share out of the case-alternatives.
     (_,collected) <- collectGlobals is0 [] [] e
+    -- Filter those that are used at most once in every (nested) branch.
     let disJoint = filter (isDisjoint . snd . snd) collected
     if null disJoint
        then return e
        else do
-         exprs <- mapM (mkDisjointGroup is0) disJoint
-         tcm   <- Lens.view tcCache
-         lids  <- Monad.zipWithM (mkFunOut is0 tcm) disJoint exprs
-         let substitution = zip (map fst disJoint) (map Var lids)
-             subsMatrix   = l2m substitution
-         (exprs',_) <- unzip <$> Monad.zipWithM
-                        (\s (e',seen) -> collectGlobals is0 s seen e')
-                        subsMatrix
-                        exprs
-         (e',_) <- collectGlobals is0 substitution [] e
-         let lb = Letrec (zip lids exprs') e'
-         lb' <- bottomupR deadCode ctx lb
-         changed lb'
+         -- For every to-lift expression create (the generalization of):
+         --
+         -- let fargs = case x of {A -> (3,y); B -> (x,x)}
+         -- in  f (fst fargs) (snd fargs)
+         --
+         -- the let-expression is not created when `f` has only one (selectable)
+         -- argument
+         lifted <- mapM (mkDisjointGroup is0) disJoint
+         tcm    <- Lens.view tcCache
+         -- Create let-binders for all of the lifted expressions
+         (is1,funOutIds) <- List.mapAccumLM (mkFunOut tcm) is0 (zip disJoint lifted)
+         -- Create "substitutions" of the form [f X Y := f_out]
+         let substitution = zip (map fst disJoint) (map Var funOutIds)
+         -- For all of the lifted expression: substitute occurrences of the
+         -- disjoint expressions (f X Y) by a variable reference to the lifted
+         -- expression (f_out)
+         lifted1 <- mapM (substLifted is1 substitution) lifted
+         -- Do the same for the actual case expression
+         (e1,_) <- collectGlobals is1 substitution [] e
+         -- Let-bind all the lifted function
+         let lb = Letrec (zip funOutIds lifted1) e1
+         -- Do an initial dead-code elimination pass, as `mkDisJoint` doesn't
+         -- clean-up unused let-binders.
+         lb1 <- bottomupR deadCode ctx lb
+         changed lb1
   where
-    mkFunOut isN tcm (fun,_) (e',_) = do
-      let ty  = termType tcm e'
+    -- Make the let-binder for the lifted expressions
+    mkFunOut tcm isN ((fun,_),(eLifted,_)) = do
+      let ty  = termType tcm eLifted
           nm  = case collectArgs fun of
-                   (Var v,_)      -> nameOcc (varName v)
+                   (Var v,_)  -> nameOcc (varName v)
                    (Prim p,_) -> primName p
-                   _             -> "complex_expression_"
-          nm'' = last (Text.splitOn "." nm) `Text.append` "Out"
-      mkInternalVar isN nm'' ty
+                   _          -> "complex_expression_"
+          nm1 = last (Text.splitOn "." nm) `Text.append` "Out"
+      nm2 <- mkInternalVar isN nm1 ty
+      return (extendInScopeSet isN nm2,nm2)
 
-    l2m = go []
+    -- Substitute inside the lifted expressions
+    --
+    -- In case you are wondering why this function isn't simply
+    --
+    -- > collectGlobal isN substitution seen eLifted
+    --
+    -- then that's because we have e.g. the list of "substitutions":
+    --
+    -- [foo _ _ := foo_out; bar _ _ := bar_out]
+    --
+    -- and if we were to apply that to a lifted expression, which is going
+    -- to be of the form `foo (case ...) (case ...)` then we would end up
+    -- with let-bindings that are simply:
+    --
+    -- > let foo_out = foo_out ; bar_out = bar_out
+    --
+    -- instead of the desired
+    --
+    -- > let foo_out = foo ((case ...)[foo _ _ := foo_out; bar _ _ := bar_out])
+    -- >                   ((case ...)[foo _ _ := foo_out; bar _ _ := bar_out])
+    -- >     bar_out = bar ((case ...)[foo _ _ := foo_out; bar _ _ := bar_out])
+    -- >                   ((case ...)[foo _ _ := foo_out; bar _ _ := bar_out])
+    --
+    -- Now, before this current implementation, we actually did simply do:
+    --
+    -- > collecGlobal isN substitution seen lifted
+    --
+    -- But for every lifted-expression we made sure that the 'substitution' never
+    -- contained the self-substitution, so we would always end up with:
+    --
+    -- > let foo_out = (foo (case ...) (case ...))[bar _ _ := bar_out]
+    --       bar_out = (bar (case ...) (case ...))[foo _ _ := foo_out]
+    --
+    -- However, this "old way" of doing it could throw DEC into a loop! when
+    -- the case-arguments of e.g. 'foo' contained application of 'foo' again.
+    -- This is what was happening in issue #1316
+    substLifted isN substitution (eLifted,seen) = case eLifted of
+      Letrec [(lbV,lbE)] (collectArgs -> (fun,args))
+        | Var f <- fun
+        , isGlobalId f
+        -> do
+           let isN1 = extendInScopeSet isN lbV
+           (lbE1,_) <- collectGlobals isN1 substitution seen lbE
+           Letrec [(lbV,lbE1)] <$> go isN1 fun args
+        | Prim  {} <- fun
+        -> do
+           let isN1 = extendInScopeSet isN lbV
+           (lbE1,_) <- collectGlobals isN1 substitution seen lbE
+           Letrec [(lbV,lbE1)] <$> go isN1 fun args
+      (collectArgs -> (fun,args))
+        | Var f <- fun
+        , isGlobalId f
+        -> go isN fun args
+        | Prim {} <- fun
+        -> go isN fun args
+      _ -> error (unwords [$(curLoc)
+                          ,"Internal error: Expecting (potentially let-bound)"
+                          ,"application of a primitive or global function,"
+                          ,"but got:\n" ++ showPpr eLifted
+                          ])
       where
-        go _  []     = []
-        go xs (y:ys) = (xs ++ ys) : go (xs ++ [y]) ys
+        go isX fun args = do
+          args1 <-
+            mapM (either (fmap (Left . fst) . collectGlobals isX substitution seen)
+                         (return . Right))
+                 args
+          return (mkApps fun args1)
 
 disjointExpressionConsolidation _ e = return e
 {-# SCC disjointExpressionConsolidation #-}
