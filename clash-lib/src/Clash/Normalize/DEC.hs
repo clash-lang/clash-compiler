@@ -66,7 +66,7 @@ import Clash.Core.TyCon      (tyConDataCons)
 import Clash.Core.Type       (Type, isPolyFunTy, mkTyConApp, splitFunForallTy)
 import Clash.Core.Var        (isGlobalId)
 import Clash.Core.VarEnv
-  (InScopeSet, elemInScopeSet, notElemInScopeSet)
+  (InScopeSet, elemInScopeSet, extendInScopeSetList, notElemInScopeSet, unionInScope)
 import Clash.Normalize.Types (NormalizeState)
 import Clash.Rewrite.Types
   (RewriteMonad, bindings, evaluator, globalHeap, tcCache, tupleTcCache, uniqSupply)
@@ -128,15 +128,17 @@ collectGlobals'
   -- ^ Whether expression is constant
   -> RewriteMonad
       NormalizeState
-      (Term, [(Term, ([Term], CaseTree [Either Term Type]))])
-collectGlobals' inScope substitution seen (Case scrut ty alts) _eIsConstant = do
-  rec (alts' ,collected)  <- collectGlobalsAlts inScope substitution seen scrut'
-                                                alts
-      (scrut',collected') <- collectGlobals inScope substitution
-                                            (map fst collected ++ seen) scrut
-  return (Case scrut' ty alts',collected ++ collected')
+      (Term, InScopeSet, [(Term, ([Term], CaseTree [Either Term Type]))])
+collectGlobals' is0 substitution seen (Case scrut ty alts) _eIsConstant = do
+  rec (alts1, isAlts, collectedAlts) <-
+        collectGlobalsAlts is0 substitution seen scrut1 alts
+      (scrut1, isScrut, collectedScrut) <-
+        collectGlobals is0 substitution (map fst collectedAlts ++ seen) scrut
+  return ( Case scrut1 ty alts1
+         , unionInScope isAlts isScrut
+         , collectedAlts ++ collectedScrut )
 
-collectGlobals' inScope substitution seen e@(collectArgsTicks -> (fun, args@(_:_), ticks)) eIsconstant
+collectGlobals' is0 substitution seen e@(collectArgsTicks -> (fun, args@(_:_), ticks)) eIsconstant
   | not eIsconstant = do
     tcm <- Lens.view tcCache
     bndrs <- Lens.use bindings
@@ -145,47 +147,49 @@ collectGlobals' inScope substitution seen e@(collectArgsTicks -> (fun, args@(_:_
     ids <- Lens.use uniqSupply
     let (ids1,ids2) = splitSupply ids
     uniqSupply Lens..= ids2
-    let eval = (Lens.view Lens._3) . whnf' evaluate bndrs tcm gh ids1 inScope False
+    let eval = (Lens.view Lens._3) . whnf' evaluate bndrs tcm gh ids1 is0 False
         eTy  = termType tcm e
     untran <- isUntranslatableType False eTy
     case untran of
       -- Don't lift out non-representable values, because they cannot be let-bound
       -- in our desired normal form.
       False -> do
-        isInteresting <- interestingToLift inScope eval fun args ticks
+        isInteresting <- interestingToLift is0 eval fun args ticks
         case isInteresting of
-          Just fun' | fun' `notElem` seen -> do
-            (args',collected) <- collectGlobalsArgs inScope substitution
-                                                    (fun':seen) args
-            let e' = Maybe.fromMaybe (mkApps fun' args') (List.lookup fun' substitution)
+          Just fun1 | fun1 `notElem` seen -> do
+            (args1,isArgs,collected) <-
+              collectGlobalsArgs is0 substitution (fun1:seen) args
+            let e1 = Maybe.fromMaybe (mkApps fun1 args1) (List.lookup fun1 substitution)
             -- This function is lifted out an environment with the currently 'seen'
             -- binders. When we later apply substitution, we need to start with this
             -- environment, otherwise we perform incorrect substitutions in the
             -- arguments.
-            return (e',(fun',(seen,Leaf args')):collected)
-          _ -> do (args',collected) <- collectGlobalsArgs inScope substitution
-                                                          seen args
-                  return (mkApps (mkTicks fun ticks) args',collected)
-      _ -> return (e,[])
+            return (e1,isArgs,(fun1,(seen,Leaf args1)):collected)
+          _ -> do (args1,isArgs,collected) <-
+                    collectGlobalsArgs is0 substitution seen args
+                  return (mkApps (mkTicks fun ticks) args1, isArgs, collected)
+      _ -> return (e,is0,[])
 
 -- FIXME: This duplicates A LOT of let-bindings, where I just pray that after
 -- the ANF, CSE, and DeadCodeRemoval pass all duplicates are removed.
 --
 -- I think we should be able to do better, but perhaps we cannot fix it here.
-collectGlobals' inScope substitution seen (Letrec lbs body) _eIsConstant = do
-  (body',collected)   <- collectGlobals    inScope substitution seen body
-  (lbs',collected')   <- collectGlobalsLbs inScope substitution
-                                           (map fst collected ++ seen)
-                                           lbs
-  return (Letrec lbs' body'
-         ,map (second (second (LB lbs'))) (collected ++ collected')
+collectGlobals' is0 substitution seen (Letrec lbs body) _eIsConstant = do
+  let is1 = extendInScopeSetList is0 (map fst lbs)
+  (body1,isBody,collectedBody) <-
+    collectGlobals is1 substitution seen body
+  (lbs1,isBndrs,collectedBndrs) <-
+    collectGlobalsLbs is1 substitution (map fst collectedBody ++ seen) lbs
+  return ( Letrec lbs1 body1
+         , unionInScope isBody isBndrs
+         , map (second (second (LB lbs1))) (collectedBody ++ collectedBndrs)
          )
 
-collectGlobals' inScope substitution seen (Tick t e) eIsConstant = do
-  (e',collected) <- collectGlobals' inScope substitution seen e eIsConstant
-  return (Tick t e',collected)
+collectGlobals' is0 substitution seen (Tick t e) eIsConstant = do
+  (e1,is1,collected) <- collectGlobals' is0 substitution seen e eIsConstant
+  return (Tick t e1, is1, collected)
 
-collectGlobals' _ _ _ e _ = return (e,[])
+collectGlobals' is0 _ _ e _ = return (e,is0,[])
 
 -- | Collect 'CaseTree's for (potentially) disjoint applications of globals out
 -- of an expression. Also substitute truly disjoint applications of globals by a
@@ -201,7 +205,7 @@ collectGlobals
   -- ^ The expression
   -> RewriteMonad
       NormalizeState
-      (Term, [(Term, ([Term], CaseTree [Either Term Type]))])
+      (Term, InScopeSet, [(Term, ([Term], CaseTree [Either Term Type]))])
 collectGlobals inScope substitution seen e =
   collectGlobals' inScope substitution seen e (isConstant e)
 
@@ -216,16 +220,17 @@ collectGlobalsArgs ::
   -> [Either Term Type] -- ^ The list of arguments
   -> RewriteMonad NormalizeState
                   ([Either Term Type]
+                  ,InScopeSet
                   ,[(Term,([Term],CaseTree [(Either Term Type)]))]
                   )
-collectGlobalsArgs inScope substitution seen args = do
-    (_,(args',collected)) <- second unzip <$> List.mapAccumLM go seen args
-    return (args',concat collected)
+collectGlobalsArgs is0 substitution seen args = do
+    ((is1,_),(args',collected)) <- second unzip <$> List.mapAccumLM go (is0,seen) args
+    return (args',is1,concat collected)
   where
-    go s (Left tm) = do
-      (tm',collected) <- collectGlobals inScope substitution s tm
-      return (map fst collected ++ s,(Left tm',collected))
-    go s (Right ty) = return (s,(Right ty,[]))
+    go (isN0,s) (Left tm) = do
+      (tm',isN1,collected) <- collectGlobals isN0 substitution s tm
+      return ((isN1,map fst collected ++ s),(Left tm',collected))
+    go (isN,s) (Right ty) = return ((isN,s),(Right ty,[]))
 
 -- | Collect 'CaseTree's for (potentially) disjoint applications of globals out
 -- of a list of alternatives. Also substitute truly disjoint applications of
@@ -239,18 +244,20 @@ collectGlobalsAlts ::
   -> [(Pat,Term)] -- ^ The list of alternatives
   -> RewriteMonad NormalizeState
                   ([(Pat,Term)]
+                  ,InScopeSet
                   ,[(Term,([Term],CaseTree [(Either Term Type)]))]
                   )
-collectGlobalsAlts inScope substitution seen scrut alts = do
-    (alts',collected) <- unzip <$> mapM go alts
+collectGlobalsAlts is0 substitution seen scrut alts = do
+    (is1,(alts',collected)) <- second unzip <$> List.mapAccumLM go is0 alts
     let collectedM  = map (Map.fromList . map (second (second (:[])))) collected
         collectedUN = Map.unionsWith (\(l1,r1) (l2,r2) -> (List.nub (l1 ++ l2),r1 ++ r2)) collectedM
         collected'  = map (second (second (Branch scrut))) (Map.toList collectedUN)
-    return (alts',collected')
+    return (alts',is1,collected')
   where
-    go (p,e) = do
-      (e',collected) <- collectGlobals inScope substitution seen e
-      return ((p,e'),map (second (second (p,))) collected)
+    go isN0 (p,e) = do
+      let isN1 = extendInScopeSetList isN0 (snd (patIds p))
+      (e',isN2,collected) <- collectGlobals isN1 substitution seen e
+      return (isN2,((p,e'),map (second (second (p,))) collected))
 
 -- | Collect 'CaseTree's for (potentially) disjoint applications of globals out
 -- of a list of let-bindings. Also substitute truly disjoint applications of
@@ -263,22 +270,23 @@ collectGlobalsLbs ::
   -> [LetBinding] -- ^ The list let-bindings
   -> RewriteMonad NormalizeState
                   ([LetBinding]
+                  ,InScopeSet
                   ,[(Term,([Term],CaseTree [(Either Term Type)]))]
                   )
-collectGlobalsLbs inScope substitution seen lbs = do
-    (_,(lbs',collected)) <- second unzip <$> List.mapAccumLM go seen lbs
-    return (lbs',concat collected)
+collectGlobalsLbs is0 substitution seen lbs = do
+    ((is1,_),(lbs',collected)) <- second unzip <$> List.mapAccumLM go (is0,seen) lbs
+    return (lbs',is1,concat collected)
   where
-    go :: [Term] -> LetBinding
+    go :: (InScopeSet,[Term]) -> LetBinding
        -> RewriteMonad NormalizeState
-                  ([Term]
+                  ((InScopeSet, [Term])
                   ,(LetBinding
                    ,[(Term,([Term],CaseTree [(Either Term Type)]))]
                    )
                   )
-    go s (id_, e) = do
-      (e',collected) <- collectGlobals inScope substitution s e
-      return (map fst collected ++ s,((id_,e'),collected))
+    go (isN0,s) (id_, e) = do
+      (e',isN1,collected) <- collectGlobals isN0 substitution s e
+      return ((isN1,map fst collected ++ s),((id_,e'),collected))
 
 -- | Given a case-tree corresponding to a disjoint interesting \"term-in-a-
 -- function-position\", return a let-expression: where the let-binding holds
