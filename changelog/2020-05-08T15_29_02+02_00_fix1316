@@ -1,0 +1,1 @@
+FIXES: Certain recursive let-expressions in side a alternatives of a case-expression throw the Clash compiler into an infinite loop [#1316](https://github.com/clash-lang/clash-compiler/issues/1316)
