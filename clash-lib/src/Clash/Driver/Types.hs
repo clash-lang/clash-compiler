@@ -73,6 +73,13 @@ data ClashOpts = ClashOpts { opt_inlineLimit :: Int
                            , opt_inlineConstantLimit :: Word
                            , opt_dbgLevel    :: DebugLevel
                            , opt_dbgTransformations :: Set.Set String
+                           , opt_dbgTransformationsFrom :: Int
+                           -- ^ Only output debug information from (applied)
+                           -- transformation n
+                           , opt_dbgTransformationsLimit :: Int
+                           -- ^ Only output debug information for n (applied)
+                           -- transformations. If this limit is exceeded, Clash
+                           -- will stop normalizing.
                            , opt_cachehdl    :: Bool
                            , opt_cleanhdl    :: Bool
                            , opt_primWarn    :: Bool
@@ -124,6 +131,8 @@ instance Hashable ClashOpts where
     opt_inlineConstantLimit `hashWithSalt`
     opt_dbgLevel `hashSet`
     opt_dbgTransformations `hashWithSalt`
+    opt_dbgTransformationsFrom `hashWithSalt`
+    opt_dbgTransformationsLimit `hashWithSalt`
     opt_cachehdl `hashWithSalt`
     opt_cleanhdl `hashWithSalt`
     opt_primWarn `hashWithSalt`
@@ -159,6 +168,8 @@ defClashOpts
   = ClashOpts
   { opt_dbgLevel            = DebugNone
   , opt_dbgTransformations  = Set.empty
+  , opt_dbgTransformationsFrom = 0
+  , opt_dbgTransformationsLimit = maxBound
   , opt_inlineLimit         = 20
   , opt_specLimit           = 20
   , opt_inlineFunctionLimit = 15

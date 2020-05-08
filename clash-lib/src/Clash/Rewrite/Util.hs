@@ -11,6 +11,7 @@
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE MultiWayIf #-}
 {-# LANGUAGE NondecreasingIndentation #-}
 {-# LANGUAGE QuasiQuotes #-}
 {-# LANGUAGE OverloadedStrings #-}
@@ -170,9 +171,16 @@ apply = \s rewrite ctx expr0 -> do
     return ()
 #endif
 
+  dbgFrom <- Lens.view dbgTransformationsFrom
+  dbgLimit <- Lens.view dbgTransformationsLimit
+  let fromLimit =
+        if (dbgFrom, dbgLimit) == (0, maxBound)
+        then Nothing
+        else Just (dbgFrom, dbgLimit)
+
   if lvl == DebugNone
     then return expr2
-    else applyDebug lvl dbgTranss s expr0 hasChanged expr2
+    else applyDebug lvl dbgTranss fromLimit s expr0 hasChanged expr2
 {-# INLINE apply #-}
 
 applyDebug
@@ -180,6 +188,10 @@ applyDebug
   -- ^ The current debugging level
   -> Set.Set String
   -- ^ Transformations to debug
+  -> Maybe (Int, Int)
+  -- ^ Only print debug information for transformations [n, n+limit]. See flag
+  -- documentation of "-fclash-debug-transformations-from" and
+  -- "-fclash-debug-transformations-limit"
   -> String
   -- ^ Name of the transformation
   -> Term
@@ -189,13 +201,24 @@ applyDebug
   -> Term
   -- ^ New expression
   -> RewriteMonad extra Term
-applyDebug lvl transformations name exprOld hasChanged exprNew
+applyDebug lvl transformations fromLimit name exprOld hasChanged exprNew
+  | Just (from, limit) <- fromLimit = do
+    nTrans <- Lens.use transformCounter
+    if | nTrans - from > limit ->
+          error "-fclash-debug-transformations-limit exceeded"
+       | nTrans > from ->
+          applyDebug lvl transformations Nothing name exprOld hasChanged exprNew
+       | otherwise ->
+          pure exprNew
+
+applyDebug lvl transformations fromLimit name exprOld hasChanged exprNew
   | not (Set.null transformations) =
     let newLvl = bool DebugNone lvl (name `Set.member` transformations) in
-    applyDebug newLvl Set.empty name exprOld hasChanged exprNew
+    applyDebug newLvl Set.empty fromLimit name exprOld hasChanged exprNew
 
-applyDebug lvl _transformations name exprOld hasChanged exprNew =
+applyDebug lvl _transformations _fromLimit name exprOld hasChanged exprNew =
  traceIf (lvl >= DebugAll) ("Tried: " ++ name ++ " on:\n" ++ before) $ do
+  nTrans <- pred <$> Lens.use transformCounter
   Monad.when (lvl > DebugNone && hasChanged) $ do
     tcm                  <- Lens.view tcCache
     let beforeTy          = termType tcm exprOld
@@ -241,7 +264,7 @@ applyDebug lvl _transformations name exprOld hasChanged exprNew =
     error $ $(curLoc) ++ "Expression changed without notice(" ++ name ++  "): before"
                       ++ before ++ "\nafter:\n" ++ after
 
-  traceIf (lvl >= DebugName && hasChanged) name $
+  traceIf (lvl >= DebugName && hasChanged) (name <> " {" <> show nTrans <> "}") $
     traceIf (lvl >= DebugApplied && hasChanged) ("Changes when applying rewrite to:\n"
                       ++ before ++ "\nResult:\n" ++ after ++ "\n") $
       traceIf (lvl >= DebugAll && not hasChanged) ("No changes when applying rewrite "
