@@ -115,7 +115,7 @@ import           Clash.Core.VarEnv
    notElemVarSet, unionVarEnvWith, unionInScope, unitVarEnv,
    unitVarSet, mkVarSet, mkInScopeSet, uniqAway, elemInScopeSet, elemVarEnv,
    foldlWithUniqueVarEnv', lookupVarEnvDirectly, extendVarEnv, unionVarEnv,
-   eltsVarEnv, mkVarEnv, eltsVarSet)
+   eltsVarEnv, mkVarEnv)
 import           Clash.Debug
 import           Clash.Driver.Types          (Binding(..), DebugLevel (..))
 import           Clash.Netlist.BlackBox.Types (Element(Err))
@@ -815,30 +815,10 @@ topLet _ e = return e
 
 -- | Remove unused let-bindings
 deadCode :: HasCallStack => NormRewrite
-deadCode _ e@(Letrec binds body) = do
-  let bodyFVs = Lens.foldMapOf freeLocalIds unitVarSet body
-      used    = List.foldl' collectUsed emptyVarEnv (eltsVarSet bodyFVs)
-  case eltsVarEnv used of
-    [] -> changed body
-    qqL | not (List.equalLength qqL binds)
-        -> changed (Letrec qqL body)
-        | otherwise
-        -> return e
- where
-  bindsEnv = mkVarEnv (map (\(x,e0) -> (x,(x,e0))) binds)
-
-  collectUsed env v =
-    if v `elemVarEnv` env then
-      env
-    else
-      case lookupVarEnv v bindsEnv of
-        Just (x,e0) ->
-          let eFVs = Lens.foldMapOf freeLocalIds unitVarSet e0
-          in  List.foldl' collectUsed
-                          (extendVarEnv x (x,e0) env)
-                          (eltsVarSet eFVs)
-        Nothing -> env
-
+deadCode _ e@(Letrec binds body) =
+  case removeUnusedBinders binds body of
+    Just t -> changed t
+    Nothing -> return e
 deadCode _ e = return e
 {-# SCC deadCode #-}
 

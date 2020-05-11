@@ -1,0 +1,1 @@
+FIXES: Certain case-expressions throw the Clash compiler into an infinite loop [#1320](https://github.com/clash-lang/clash-compiler/issues/1320)
