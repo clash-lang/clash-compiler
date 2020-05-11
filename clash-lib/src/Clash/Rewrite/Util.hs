@@ -37,9 +37,12 @@ import           Data.Bifunctor              (bimap)
 import           Data.Coerce                 (coerce)
 import           Data.Functor.Const          (Const (..))
 import           Data.List                   (group, partition, sort)
+import qualified Data.List                   as List
+import qualified Data.List.Extra             as List
 import           Data.List.Extra             (allM, partitionM)
 import qualified Data.Map                    as Map
-import           Data.Maybe                  (catMaybes,isJust,mapMaybe)
+import           Data.Maybe
+  (catMaybes, isJust, mapMaybe, fromMaybe)
 import qualified Data.Monoid                 as Monoid
 import qualified Data.Set                    as Set
 import qualified Data.Set.Lens               as Lens
@@ -62,7 +65,7 @@ import           Clash.Core.Evaluator        (whnf')
 import           Clash.Core.Evaluator.Types  (PureHeap)
 import           Clash.Core.FreeVars
   (freeLocalVars, hasLocalFreeVars, localIdDoesNotOccurIn, localIdOccursIn,
-   typeFreeVars, termFreeVars')
+   typeFreeVars, termFreeVars', freeLocalIds)
 import           Clash.Core.Name
 import           Clash.Core.Pretty           (showPpr)
 import           Clash.Core.Subst
@@ -81,7 +84,8 @@ import           Clash.Core.Var
   (Id, IdScope (..), TyVar, Var (..), isLocalId, mkGlobalId, mkLocalId, mkTyVar)
 import           Clash.Core.VarEnv
   (InScopeSet, VarEnv, elemVarSet, extendInScopeSetList, mkInScopeSet,
-   uniqAway, uniqAway', mapVarEnv)
+   uniqAway, uniqAway', mapVarEnv, eltsVarEnv, unitVarSet, emptyVarEnv,
+   mkVarEnv, eltsVarSet, elemVarEnv, lookupVarEnv, extendVarEnv)
 import           Clash.Debug (traceIf)
 import           Clash.Driver.Types
   (DebugLevel (..), BindingMap, Binding(..))
@@ -1119,7 +1123,7 @@ bindPureHeap
 bindPureHeap tcm heap rw (TransformContext is0 hist) e = do
   (e1, Monoid.getAny -> hasChanged) <- Writer.listen $ rw ctx e
   if hasChanged && not (null bndrs)
-    then return $ Letrec bndrs e1
+    then return $ fromMaybe (Letrec bndrs e1) (removeUnusedBinders bndrs e1)
     else return e1
   where
     bndrs = map toLetBinding $ toListUniqMap heap
@@ -1132,3 +1136,33 @@ bindPureHeap tcm heap rw (TransformContext is0 hist) e = do
       where
         ty = termType tcm term
         nm = mkLocalId ty (mkUnsafeSystemName "x" uniq) -- See [Note: Name re-creation]
+
+-- | Remove unused binders in given let-binding. Returns /Nothing/ if no unused
+-- binders were found.
+removeUnusedBinders
+  :: [LetBinding]
+  -> Term
+  -> Maybe Term
+removeUnusedBinders binds body =
+  case eltsVarEnv used of
+    [] -> Just body
+    qqL | not (List.equalLength qqL binds)
+        -> Just (Letrec qqL body)
+        | otherwise
+        -> Nothing
+ where
+  bodyFVs = Lens.foldMapOf freeLocalIds unitVarSet body
+  used = List.foldl' collectUsed emptyVarEnv (eltsVarSet bodyFVs)
+  bindsEnv = mkVarEnv (map (\(x,e0) -> (x,(x,e0))) binds)
+
+  collectUsed env v =
+    if v `elemVarEnv` env then
+      env
+    else
+      case lookupVarEnv v bindsEnv of
+        Just (x,e0) ->
+          let eFVs = Lens.foldMapOf freeLocalIds unitVarSet e0
+          in  List.foldl' collectUsed
+                          (extendVarEnv x (x,e0) env)
+                          (eltsVarSet eFVs)
+        Nothing -> env
