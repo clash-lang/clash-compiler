@@ -61,7 +61,7 @@ module Clash.Normalize.Transformations
 where
 
 import           Control.Exception           (throw)
-import           Control.Lens                (_1, _2, (^.))
+import           Control.Lens                (_2)
 import qualified Control.Lens                as Lens
 import qualified Control.Monad               as Monad
 import           Control.Monad.State         (StateT (..), modify)
@@ -2466,10 +2466,7 @@ disjointExpressionConsolidation ctx@(TransformContext isCtx _) e@(Case _scrut _t
                           ])
       where
         go isX fun args = do
-          args1 <-
-            mapM (either (fmap (Left . (^. _1)) . collectGlobals isX substitution seen)
-                         (return . Right))
-                 args
+          (args1,_,_) <- collectGlobalsArgs isX substitution seen args
           return (mkApps fun args1)
 
 disjointExpressionConsolidation _ e = return e
