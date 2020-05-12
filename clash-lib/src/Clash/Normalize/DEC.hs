@@ -32,6 +32,7 @@
 
 module Clash.Normalize.DEC
   (collectGlobals
+  ,collectGlobalsArgs
   ,isDisjoint
   ,mkDisjointGroup
   )
@@ -154,20 +155,23 @@ collectGlobals' is0 substitution seen e@(collectArgsTicks -> (fun, args@(_:_), t
       -- Don't lift out non-representable values, because they cannot be let-bound
       -- in our desired normal form.
       False -> do
+        -- Look for, and substitute by, disjoint applications of globals in
+        -- the arguments first before considering the current term in function
+        -- position. Doing it in the other order (this term in function position
+        -- first, followed by arguments) resulted in issue #1322
+        (args1,isArgs,collectedArgs) <-
+          collectGlobalsArgs is0 substitution seen args
+        let seenInArgs = map fst collectedArgs ++ seen
         isInteresting <- interestingToLift is0 eval fun args ticks
         case isInteresting of
-          Just fun1 | fun1 `notElem` seen -> do
-            (args1,isArgs,collected) <-
-              collectGlobalsArgs is0 substitution (fun1:seen) args
+          Just fun1 | fun1 `notElem` seenInArgs -> do
             let e1 = Maybe.fromMaybe (mkApps fun1 args1) (List.lookup fun1 substitution)
             -- This function is lifted out an environment with the currently 'seen'
             -- binders. When we later apply substitution, we need to start with this
             -- environment, otherwise we perform incorrect substitutions in the
             -- arguments.
-            return (e1,isArgs,(fun1,(seen,Leaf args1)):collected)
-          _ -> do (args1,isArgs,collected) <-
-                    collectGlobalsArgs is0 substitution seen args
-                  return (mkApps (mkTicks fun ticks) args1, isArgs, collected)
+            return (e1,isArgs,(fun1,(seen,Leaf args1)):collectedArgs)
+          _ -> return (mkApps (mkTicks fun ticks) args1, isArgs, collectedArgs)
       _ -> return (e,is0,[])
 
 -- FIXME: This duplicates A LOT of let-bindings, where I just pray that after
