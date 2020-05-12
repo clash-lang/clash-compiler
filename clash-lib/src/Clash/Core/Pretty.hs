@@ -10,6 +10,7 @@
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE QuasiQuotes #-}
 {-# LANGUAGE TemplateHaskell #-}
 
 {-# OPTIONS_GHC -fno-warn-orphans #-}
@@ -34,11 +35,15 @@ import Data.Text                        (Text)
 import Control.Monad.Identity
 import Data.List.Extra                  ((<:>))
 import qualified Data.Text              as T
+import Data.Maybe                       (fromMaybe)
 import Data.Text.Prettyprint.Doc
 import Data.Text.Prettyprint.Doc.Internal
 import GHC.Show                         (showMultiLineString)
 import Numeric                          (fromRat)
 import qualified Outputable             as GHC
+import System.Environment               (lookupEnv)
+import System.IO.Unsafe                 (unsafePerformIO)
+import Text.Read                        (readMaybe)
 
 import Clash.Core.DataCon               (DataCon (..))
 import Clash.Core.Literal               (Literal (..))
@@ -51,7 +56,20 @@ import Clash.Core.Type                  (ConstTy (..), Kind, LitTy (..),
 import Clash.Core.Var                   (Id, TyVar, Var (..), IdScope(..))
 import Clash.Debug                      (trace)
 import Clash.Util
+import qualified Clash.Util.Interpolate as I
 import Clash.Pretty
+
+unsafeLookupEnvBool :: HasCallStack =>  String -> Bool -> Bool
+unsafeLookupEnvBool key dflt =
+  case unsafePerformIO (lookupEnv key) of
+    Nothing -> dflt
+    Just a -> flip fromMaybe (readMaybe a) $ error [I.i|
+      'unsafeLookupEnvBool' tried to lookup #{key} in the environment. It found
+      it, but couldn't interpret it to as a Bool. Expected one of: True, False.
+      But found:
+
+        #{a}
+    |]
 
 -- | Options for the pretty-printer, controlling which elements to hide.
 data PrettyOptions = PrettyOptions
@@ -64,9 +82,9 @@ data PrettyOptions = PrettyOptions
   }
 instance Default PrettyOptions where
   def = PrettyOptions
-    { displayUniques    = True
-    , displayTypes      = True
-    , displayQualifiers = True
+    { displayUniques    = unsafeLookupEnvBool "CLASH_PPR_UNIQUES" True
+    , displayTypes      = unsafeLookupEnvBool "CLASH_PPR_TYPES" True
+    , displayQualifiers = unsafeLookupEnvBool "CLASH_PPR_QUALIFIERS" True
     }
 
 -- | Annotations carried on pretty-printed code.
@@ -133,7 +151,7 @@ appPrec = 2
 
 -- | Print a PrettyPrec thing to a String
 showPpr :: PrettyPrec p => p -> String
-showPpr = showDoc . ppr
+showPpr = showPpr' def
 
 showPpr' :: PrettyPrec p => PrettyOptions -> p -> String
 showPpr' opts = showDoc . ppr' opts
