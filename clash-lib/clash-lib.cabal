@@ -170,6 +170,7 @@ Library
                       reducers                >= 3.12.2   && < 4.0,
                       template-haskell        >= 2.8.0.0  && < 2.17,
                       temporary               >= 1.2.1    && < 1.4,
+                      terminal-size           >= 0.3      && < 0.4,
                       text                    >= 1.2.2    && < 1.3,
                       text-show               >= 3.7      && < 3.9,
                       time                    >= 1.4.0.1  && < 1.11,
