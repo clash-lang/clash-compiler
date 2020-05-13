@@ -759,6 +759,8 @@ netlistTest' env target extraGhcArgs modName funcName path =
              , "--ghc-arg=clash-testsuite"
              , "--ghc-arg=-main-is"
              , "--ghc-arg=" ++ modName ++ "." ++ funcName ++ show target
+             , "--ghc-arg=-outputdir"
+             , "--ghc-arg=" <> env </> show target
              ] ++ map ("--ghc-arg="++) extraGhcArgs ++
              [ env </> modName <.> "hs"
              ]
