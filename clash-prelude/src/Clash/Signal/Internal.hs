@@ -155,7 +155,7 @@ import Clash.CPP                  (fStrictMapSignal)
 import Clash.Promoted.Nat         (SNat (..), snatToNum, snatToNatural)
 import Clash.Promoted.Symbol      (SSymbol (..), ssymbolToString)
 import Clash.XException
-  (NFDataX, errorX, deepseqX, defaultSeqX, deepErrorX, seqX)
+  (NFDataX(..), errorX, isX, deepseqX, defaultSeqX, seqX)
 
 {- $setup
 >>> :set -XDataKinds
@@ -678,6 +678,14 @@ appSignal# :: Signal dom (a -> b) -> Signal dom a -> Signal dom b
 appSignal# (f :- fs) xs@(~(a :- as)) = f a :- (xs `seq` appSignal# fs as) -- See [NOTE: Lazy ap]
 {-# NOINLINE appSignal# #-}
 {-# ANN appSignal# hasBlackBox #-}
+
+instance NFDataX a => NFDataX (Signal domain a) where
+  deepErrorX = pure . deepErrorX
+  ensureSpine s = case isX s of
+    Left e -> deepErrorX e
+    Right (a :- s') -> ensureSpine a :- ensureSpine s'
+  hasUndefined = error "hasUndefined on (Signal domain a): No sensible implementation exists"
+  rnfX = error "rnfX on (Signal domain a): No sensible implementation exists"
 
 {- NOTE: Lazy ap
 Signal's ap, i.e (Applicative.<*>), must be lazy in it's second argument:
