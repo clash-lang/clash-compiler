@@ -279,6 +279,7 @@ runClashTest = defaultMain $ clashTestRoot
         , runTest "T1297" def{hdlTargets=[VHDL], hdlSim=False}
         , runTest "T1316" def{hdlTargets=[VHDL], hdlSim=False}
         , runTest "T1322" def{hdlTargets=[VHDL]}
+        , runTest "T1340" def{hdlTargets=[VHDL], hdlSim=False}
         , runTest "TagToEnum" def{hdlSim=False}
         , runTest "TestIndex" def{hdlSim=False}
         , runTest "Time" def
