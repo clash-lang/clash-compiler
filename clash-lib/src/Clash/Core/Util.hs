@@ -581,3 +581,15 @@ inverseTopSortLetBindings (Letrec bndrs0 res) =
 
 inverseTopSortLetBindings e = e
 {-# SCC inverseTopSortLetBindings #-}
+
+-- | Group let-bindings into cyclic groups and acyclic individual bindings
+sccLetBindings
+  :: HasCallStack
+  => [LetBinding]
+  -> [Graph.SCC LetBinding]
+sccLetBindings =
+  Graph.stronglyConnComp .
+  (map (\(i,e) -> let fvs = fmap varUniq
+                            (Set.elems (Lens.setOf freeLocalIds e) )
+                  in  ((i,e),varUniq i,fvs)))
+{-# SCC sccLetBindings #-}
