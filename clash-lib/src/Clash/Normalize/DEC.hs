@@ -45,6 +45,7 @@ import           Data.Bits                        ((.&.),complement)
 import           Data.Coerce                      (coerce)
 import qualified Data.Either                      as Either
 import qualified Data.Foldable                    as Foldable
+import qualified Data.Graph                       as Graph
 import qualified Data.IntMap.Strict               as IM
 import qualified Data.IntSet                      as IntSet
 import qualified Data.List                        as List
@@ -65,6 +66,7 @@ import Clash.Core.Term
 import Clash.Core.TermInfo   (termType)
 import Clash.Core.TyCon      (tyConDataCons)
 import Clash.Core.Type       (Type, isPolyFunTy, mkTyConApp, splitFunForallTy)
+import Clash.Core.Util       (sccLetBindings)
 import Clash.Core.Var        (isGlobalId)
 import Clash.Core.VarEnv
   (InScopeSet, elemInScopeSet, extendInScopeSetList, notElemInScopeSet, unionInScope)
@@ -278,19 +280,36 @@ collectGlobalsLbs ::
                   ,[(Term,([Term],CaseTree [(Either Term Type)]))]
                   )
 collectGlobalsLbs is0 substitution seen lbs = do
-    ((is1,_),(lbs',collected)) <- second unzip <$> List.mapAccumLM go (is0,seen) lbs
-    return (lbs',is1,concat collected)
+    let lbsSCCs = sccLetBindings lbs
+    ((is1,_),(lbsSCCs1,collected)) <-
+      second unzip <$> List.mapAccumLM go (is0,seen) lbsSCCs
+    return (Graph.flattenSCCs lbsSCCs1,is1,concat collected)
   where
-    go :: (InScopeSet,[Term]) -> LetBinding
+    go :: (InScopeSet,[Term]) -> Graph.SCC LetBinding
        -> RewriteMonad NormalizeState
                   ((InScopeSet, [Term])
-                  ,(LetBinding
+                  ,(Graph.SCC LetBinding
                    ,[(Term,([Term],CaseTree [(Either Term Type)]))]
                    )
                   )
-    go (isN0,s) (id_, e) = do
+    go (isN0,s) (Graph.AcyclicSCC (id_, e)) = do
       (e',isN1,collected) <- collectGlobals isN0 substitution s e
-      return ((isN1,map fst collected ++ s),((id_,e'),collected))
+      return ((isN1,map fst collected ++ s),(Graph.AcyclicSCC (id_,e'),collected))
+    -- TODO: This completely skips recursive let-bindings in the collection of
+    -- potentially disjoint applications of globals; and skips substituting truly
+    -- disjoint applications of globals by a reference to a lifted out application.
+    --
+    -- This is to prevent the creation of combinational loops that have occurred
+    -- "in the wild", but for which we have not been able to a create small
+    -- unit test that triggers this creation-of-combinational-loops bug.
+    -- Completely skipping recursive let-bindings is taking the hammer to
+    -- solving this bug, without knowing whether a scalpel even existed and what
+    -- it might look like. We should at some point think hard how traversing
+    -- recursive let-bindings can introduce combinational loops, and whether
+    -- there exists a solution that can traverse recursive let-bindings,
+    -- finding more opportunities for DEC, while not introducing combinational
+    -- loops.
+    go acc scc@(Graph.CyclicSCC {}) = return (acc,(scc,[]))
 
 -- | Given a case-tree corresponding to a disjoint interesting \"term-in-a-
 -- function-position\", return a let-expression: where the let-binding holds
