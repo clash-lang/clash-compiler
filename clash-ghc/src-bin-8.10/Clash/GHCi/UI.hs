@@ -150,7 +150,13 @@ import           Clash.Backend.VHDL (VHDLState)
 import           Clash.Backend.Verilog (VerilogState)
 import qualified Clash.Driver
 import           Clash.Driver.Types (ClashOpts(..))
+
+#if EXPERIMENTAL_EVALUATOR
+import           Clash.GHC.PartialEval
+#else
 import           Clash.GHC.Evaluator
+#endif
+
 import           Clash.GHC.GenerateBindings
 import           Clash.GHC.NetlistTypes
 import           Clash.GHCi.Common
@@ -2235,7 +2241,11 @@ makeHDL backend optsRef srcs = do
                   tcm
                   tupTcm
                   (ghcTypeToHWType iw fp)
+#if EXPERIMENTAL_EVALUATOR
+                  ghcEvaluator
+#else
                   evaluator
+#endif
                   topEntities
                   mainTopEntity
                   opts2
