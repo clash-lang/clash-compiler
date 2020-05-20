@@ -61,6 +61,13 @@ data NameSort
   | Internal
   deriving (Eq,Ord,Show,Generic,NFData,Hashable,Binary)
 
+mkUnsafeName
+  :: NameSort
+  -> Text
+  -> Unique
+  -> Name a
+mkUnsafeName ns s i = Name ns s i noSrcSpan
+
 mkUnsafeSystemName
   :: Text
   -> Unique
