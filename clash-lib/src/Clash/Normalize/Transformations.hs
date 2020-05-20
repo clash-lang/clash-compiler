@@ -61,7 +61,7 @@ module Clash.Normalize.Transformations
 where
 
 import           Control.Exception           (throw)
-import           Control.Lens                (_2)
+import           Control.Lens                ((^.),_1,_2)
 import qualified Control.Lens                as Lens
 import qualified Control.Monad               as Monad
 import           Control.Monad.State         (StateT (..), modify)
@@ -2376,7 +2376,7 @@ disjointExpressionConsolidation ctx@(TransformContext isCtx _) e@(Case _scrut _t
          -- disjoint expressions (f X Y) by a variable reference to the lifted
          -- expression (f_out)
          let isCtx1 = extendInScopeSetList isCtx funOutIds
-         lifted1 <- mapM (substLifted isCtx1 substitution) lifted
+         lifted1 <- substLifted isCtx1 substitution lifted
          -- Do the same for the actual case expression
          (e1,_,_) <- collectGlobals isCtx1 substitution [] e
          -- Let-bind all the lifted function
@@ -2401,7 +2401,7 @@ disjointExpressionConsolidation ctx@(TransformContext isCtx _) e@(Case _scrut _t
     --
     -- In case you are wondering why this function isn't simply
     --
-    -- > collectGlobal isN substitution seen eLifted
+    -- > mapM (\s (eL,seen) -> collectGlobal isN s seen eL) substitution lifted
     --
     -- then that's because we have e.g. the list of "substitutions":
     --
@@ -2420,47 +2420,30 @@ disjointExpressionConsolidation ctx@(TransformContext isCtx _) e@(Case _scrut _t
     -- >     bar_out = bar ((case ...)[foo _ _ := foo_out; bar _ _ := bar_out])
     -- >                   ((case ...)[foo _ _ := foo_out; bar _ _ := bar_out])
     --
-    -- Now, before this current implementation, we actually did simply do:
-    --
-    -- > collecGlobal isN substitution seen lifted
-    --
-    -- But for every lifted-expression we made sure that the 'substitution' never
-    -- contained the self-substitution, so we would always end up with:
+    -- So what we do is that for every lifted-expression we make sure that the
+    -- 'substitution' never contains the self-substitution, so we end up with:
     --
     -- > let foo_out = (foo (case ...) (case ...))[bar _ _ := bar_out]
     --       bar_out = (bar (case ...) (case ...))[foo _ _ := foo_out]
     --
-    -- However, this "old way" of doing it could throw DEC into a loop! when
-    -- the case-arguments of e.g. 'foo' contained application of 'foo' again.
-    -- This is what was happening in issue #1316
-    substLifted isN substitution (eLifted,seen) = case eLifted of
-      Letrec [(lbV,lbE)] (collectArgs -> (fun,args))
-        | Var f <- fun
-        , isGlobalId f
-        -> do
-           let isN1 = extendInScopeSet isN lbV
-           (lbE1,_,_) <- collectGlobals isN1 substitution seen lbE
-           Letrec [(lbV,lbE1)] <$> go isN1 fun args
-        | Prim  {} <- fun
-        -> do
-           let isN1 = extendInScopeSet isN lbV
-           (lbE1,_,_) <- collectGlobals isN1 substitution seen lbE
-           Letrec [(lbV,lbE1)] <$> go isN1 fun args
-      (collectArgs -> (fun,args))
-        | Var f <- fun
-        , isGlobalId f
-        -> go isN fun args
-        | Prim {} <- fun
-        -> go isN fun args
-      _ -> error (unwords [$(curLoc)
-                          ,"Internal error: Expecting (potentially let-bound)"
-                          ,"application of a primitive or global function,"
-                          ,"but got:\n" ++ showPpr eLifted
-                          ])
-      where
-        go isX fun args = do
-          (args1,_,_) <- collectGlobalsArgs isX substitution seen args
-          return (mkApps fun args1)
+    -- We used to have a different approach, see commit
+    -- 73d237017c4a5fff0c49bb72c9c4d5f6c68faf69
+    --
+    -- But that lead to the generation of combinational loops. Now that we no
+    -- longer traverse into recursive groups of let-bindings, the issue #1316
+    -- that the above commit tried to solve, no longer shows up.
+    substLifted isN substitution lifted = do
+      -- remove the self-substitutions for the respective lifted expressions
+      let subsMatrix = l2m substitution
+      lifted1 <- Monad.zipWithM (\s (eL,seen) -> collectGlobals isN s seen eL)
+                                 subsMatrix
+                                 lifted
+      return (map (^. _1) lifted1)
+
+    l2m = go []
+     where
+      go _  []     = []
+      go xs (y:ys) = (xs ++ ys) : go (xs ++ [y]) ys
 
 disjointExpressionConsolidation _ e = return e
 {-# SCC disjointExpressionConsolidation #-}
