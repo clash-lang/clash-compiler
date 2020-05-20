@@ -287,11 +287,21 @@ test-suite unittests
       ghc-typelits-knownnat,
 
       base,
+      containers,
+      concurrent-supply,
+      data-default,
+      deepseq,
+      haskell-src-exts,
       ghc,
       lens,
       tasty         >= 1.2      && < 1.3,
-      tasty-hunit
+      tasty-hunit,
+      template-haskell,
+      text,
+      transformers,
+      unordered-containers
 
   Other-Modules: Clash.Tests.Core.FreeVars
                  Clash.Tests.Core.Subst
                  Clash.Tests.Util.Interpolate
+                 Test.Clash.Rewrite
