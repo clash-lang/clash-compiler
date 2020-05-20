@@ -30,10 +30,15 @@ import Clash.Rewrite.Util
 
 -- | Normalisation transformation
 normalization :: NormRewrite
-normalization = rmDeadcode >-> constantPropagation >-> rmUnusedExpr >-!-> anf >-!-> rmDeadcode >->
-                bindConst >-> letTL >-> evalConst >-!-> cse >-!-> cleanup >->
-                xOptim >-> rmDeadcode >->
-                cleanup >-> recLetRec >-> splitArgs
+normalization =
+  rmDeadcode >-> constantPropagation >-> rmUnusedExpr >-!-> anf >-!-> rmDeadcode >->
+  bindConst >-> letTL >-!->
+#if !EXPERIMENTAL_EVALUATOR
+  evalConst >->
+#endif
+  cse >-!-> cleanup >->
+  xOptim >-> rmDeadcode >->
+  cleanup >-> recLetRec >-> splitArgs
   where
     anf        = topdownR (apply "nonRepANF" nonRepANF) >-> apply "ANF" makeANF >-> topdownR (apply "caseCon" caseCon)
     letTL      = topdownSucR (apply "topLet" topLet)
@@ -42,7 +47,9 @@ normalization = rmDeadcode >-> constantPropagation >-> rmUnusedExpr >-!-> anf >-
     rmDeadcode = bottomupR (apply "deadcode" deadCode)
     bindConst  = topdownR (apply "bindConstantVar" bindConstantVar)
     -- See [Note] bottomup traversal evalConst:
+#if !EXPERIMENTAL_EVALUATOR
     evalConst  = bottomupR (apply "evalConst" reduceConst)
+#endif
     cse        = topdownR (apply "CSE" simpleCSE)
     xOptim     = bottomupR (apply "xOptimize" xOptimize)
     cleanup    = topdownR (apply "etaExpandSyn" etaExpandSyn) >->
@@ -60,22 +67,16 @@ constantPropagation =
   inlineAndPropagate >->
   caseFlattening >->
   etaTL >->
-#if !EXPERIMENTAL_EVALUATOR
   dec >->
-#endif
   spec >->
-#if !EXPERIMENTAL_EVALUATOR
   dec >->
-#endif
   conSpec
   where
     etaTL              = apply "etaTL" etaExpansionTL !-> topdownR (apply "applicationPropagation" appPropFast)
     inlineAndPropagate = repeatR (topdownR (applyMany transPropagateAndInline) >-> inlineNR)
     spec               = bottomupR (applyMany specTransformations)
     caseFlattening     = repeatR (topdownR (apply "caseFlat" caseFlat))
-#if !EXPERIMENTAL_EVALUATOR
     dec                = repeatR (topdownR (apply "DEC" disjointExpressionConsolidation))
-#endif
     conSpec            = bottomupR  ((apply "appPropCS" appPropFast !->
                                      bottomupR (apply "constantSpec" constantSpec)) >-!
                                      apply "constantSpec" constantSpec)

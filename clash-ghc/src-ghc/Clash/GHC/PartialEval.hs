@@ -196,7 +196,7 @@ etaExpand x =
 
     pure $ mkAbstraction
       (mkApps x (fmap (bimap Var VarTy) missingArgs))
-      (reverse missingArgs)
+      missingArgs
 
   etaNameOf :: Either TyVar Type -> State Env (Either Id TyVar)
   etaNameOf = \case
