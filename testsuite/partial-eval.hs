@@ -12,7 +12,7 @@ module Main where
 
 import Control.Concurrent.Supply
 import Control.Monad
-import Data.List
+import Data.List (sortBy)
 import Data.Ord
 import System.Environment
 import System.IO

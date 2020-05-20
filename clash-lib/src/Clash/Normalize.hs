@@ -399,7 +399,11 @@ flattenCallTree (CBranch (nm,(Binding nm' sp inl tm)) used) = do
       repeatR (topdownR (apply "appPropFast" appPropFast >->
                  apply "bindConstantVar" bindConstantVar >->
                  apply "caseCon" caseCon >->
+#if EXPERIMENTAL_EVALUATOR
+                 apply "deadcode" deadCode >->
+#else
                  (apply "reduceConst" reduceConst !-> apply "deadcode" deadCode) >->
+#endif
                  apply "reduceNonRepPrim" reduceNonRepPrim >->
                  apply "removeUnusedExpr" removeUnusedExpr >->
                  apply "flattenLet" flattenLet)) !->
