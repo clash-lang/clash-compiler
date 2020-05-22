@@ -68,8 +68,6 @@ import           Clash.Netlist.Util
   (splitNormalized)
 import           Clash.Normalize.Strategy
 import           Clash.Normalize.Transformations
-  (appPropFast, bindConstantVar, caseCon, flattenLet, reduceConst, topLet,
-   reduceNonRepPrim, removeUnusedExpr, deadCode)
 import           Clash.Normalize.Types
 import           Clash.Normalize.Util
 import           Clash.Primitives.Types           (CompiledPrimMap)
