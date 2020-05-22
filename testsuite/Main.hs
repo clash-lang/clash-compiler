@@ -318,11 +318,11 @@ runClashTest = defaultMain $ clashTestRoot
 #if !EXPERIMENTAL_EVALUATOR
         , runTest "T1012" def{hdlSim=False}
         , runTest "T1240" def{hdlSim=False}
+        , runTest "T1297" def{hdlTargets=[VHDL], hdlSim=False}
 #endif
         , runTest "T1242" def{hdlSim=False}
         , runTest "T1254" def{hdlTargets=[VHDL,SystemVerilog],hdlSim=False}
         , runTest "T1292" def{hdlTargets=[VHDL]}
-        , runTest "T1297" def{hdlTargets=[VHDL], hdlSim=False}
         , runTest "T1304" def{
             hdlTargets=[VHDL]
           , hdlLoad=False
@@ -782,6 +782,11 @@ runClashTest = defaultMain $ clashTestRoot
         , clashLibTest ("tests" </> "shouldwork" </> "XOptimization") allTargets [] "OneDefinedDefaultPat" "main"
         , clashLibTest ("tests" </> "shouldwork" </> "XOptimization") allTargets [] "ManyDefined" "main"
         ]
+#if EXPERIMENTAL_EVALUATOR
+      , clashTestGroup "PartialEvaluation"
+        [ clashLibTest ("tests" </> "shouldwork" </> "PartialEvaluation") allTargets [] "EtaExpansion" "main"
+        ]
+#endif
       ] -- end shouldwork
     ] -- end tests
   ] -- end .

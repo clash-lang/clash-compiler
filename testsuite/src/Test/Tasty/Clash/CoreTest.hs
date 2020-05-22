@@ -10,6 +10,8 @@ module Test.Tasty.Clash.CoreTest
   , runToCoreStage
   ) where
 
+import Control.Concurrent.Supply
+
 import Clash.Backend
 import Clash.Backend.SystemVerilog
 import Clash.Backend.Verilog
@@ -53,13 +55,14 @@ runToCoreStage
   => SBuildTarget target
   -> (ClashOpts -> ClashOpts)
   -> FilePath
-  -> IO (BindingMap, TyConMap)
+  -> IO (BindingMap, TyConMap, Supply)
 runToCoreStage target f src = do
+  ids <- newSupply
   pds <- primDirs backend
   (bm, tcm, _, _, _, _, _) <- generateBindings
     Auto pds (opt_importPaths opts) [] (hdlKind backend) src Nothing
 
-  return (bm, tcm)
+  return (bm, tcm, ids)
  where
   backend = mkBackend target
   opts = f mkClashOpts
