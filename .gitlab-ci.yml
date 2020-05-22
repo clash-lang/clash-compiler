@@ -6,6 +6,7 @@ stages:
 .tests:
   image: clashlang/clash-ci:2020-04-15
   stage: build
+  timeout: 2 hours
   variables:
     GIT_SUBMODULE_STRATEGY: recursive
     TERM: xterm-color
