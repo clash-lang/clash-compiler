@@ -1,12 +1,15 @@
+{-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE MultiWayIf #-}
+{-# LANGUAGE OverloadedStrings #-}
 
 module Clash.Core.Evaluator.Semantics
   ( evaluateVarWith
   , evaluateLiteral
+  , evaluateDataWith
+  , evaluatePrimWith
   , evaluateLam
   , evaluateTyLam
   , evaluateAppWith
-  , evaluateTyAppWith
   , evaluateLetrecWith
   , evaluateCaseWith
   , evaluateCastWith
@@ -15,7 +18,6 @@ module Clash.Core.Evaluator.Semantics
   , quoteDataWith
   , quotePrimWith
   , quoteLamWith
-  , quoteTyLamWith
   , quoteCastWith
   , quoteTickWith
   , quoteNeVar
@@ -25,8 +27,10 @@ module Clash.Core.Evaluator.Semantics
   , quoteNeCaseWith
   ) where
 
+import Control.Monad (foldM)
 import Control.Monad.State.Strict (State)
 import qualified Control.Monad.State.Strict as State
+import Data.Bifunctor (bimap)
 import Data.Bitraversable (bitraverse)
 import Data.Foldable (foldl')
 
@@ -36,9 +40,42 @@ import Clash.Core.DataCon
 import Clash.Core.Evaluator.Models
 import Clash.Core.Literal
 import Clash.Core.Term
+import Clash.Core.TermInfo
+import Clash.Core.TyCon
 import Clash.Core.Type
 import Clash.Core.Var
 import Clash.Driver.Types (Binding(..))
+
+isFullyApplied :: Type -> [Either Term Type] -> Bool
+isFullyApplied ty args =
+  length args == length (fst $ splitFunForallTy ty)
+
+etaExpand :: Term -> State Env Term
+etaExpand x =
+  case collectArgs x of
+    y@(Data dc, _) -> do
+      tcm <- State.gets envTcMap
+      expand tcm (dcType dc) y
+
+    y@(Prim p, _) -> do
+      tcm <- State.gets envTcMap
+      expand tcm (primType p) y
+
+    _ -> pure x
+ where
+  expand :: TyConMap -> Type -> (Term, [Either Term Type]) -> State Env Term
+  expand tcm ty (tm, args) = do
+    let missingArgTys = fst $ splitFunForallTy (applyTypeToArgs tm tcm ty args)
+    missingArgs <- traverse etaNameOf missingArgTys
+
+    pure $ mkAbstraction
+      (mkApps x (fmap (bimap Var VarTy) missingArgs))
+      missingArgs
+
+  etaNameOf :: Either TyVar Type -> State Env (Either Id TyVar)
+  etaNameOf = \case
+    Left tv  -> pure (Right tv)
+    Right ty -> Left <$> State.state (mkUniqueId "eta" ty)
 
 -- | Default implementation for looking up a variable in the environment.
 -- This checks both the local and global environments, and inlines global
@@ -66,6 +103,31 @@ evaluateVarWith eval i = do
 evaluateLiteral :: Literal -> State Env Value
 evaluateLiteral = pure . VLit
 
+-- | Default implementaion for evaluating data constructors. If the constructor
+-- is not fully applied, then it is eta-expanded and its eta-expanded form is
+-- evaluated to obtain a result.
+--
+evaluateDataWith
+  :: (Term -> State Env Value)
+  -> DataCon
+  -> State Env Value
+evaluateDataWith eval dc
+  | isFullyApplied (dcType dc) [] = pure (VData dc [])
+  | otherwise = etaExpand (Data dc) >>= eval
+
+-- | Default implementation for evaluating primitive operations. If the primop
+-- is not fully applied, then it is eta-expanded and its eta-expanded form is
+-- delta-reduced to obtain a result.
+--
+evaluatePrimWith
+  :: (Term -> State Env Value)
+  -> (PrimInfo -> [Either Value Type] -> State Env Value)
+  -> PrimInfo
+  -> State Env Value
+evaluatePrimWith eval evalPrim p
+  | isFullyApplied (primType p) [] = evalPrim p []
+  | otherwise = etaExpand (Prim p) >>= eval
+
 -- | Default implementation for evaluating lambdas. As a term with a lambda
 -- at the head is already in WHNF, this simply returns the term under the
 -- lambda with the current environment.
@@ -80,33 +142,44 @@ evaluateLam i x = State.gets (VLam i x)
 evaluateTyLam :: TyVar -> Term -> State Env Value
 evaluateTyLam i x = State.gets (VTyLam i x)
 
--- | Default implementation for evalating an application. This evalautes both
--- the function and it's applied argument, applying them using the supplied
--- apply function.
+-- | Default implementation for evalating a term / type application. This
+-- checks if the arguments are applied to a data constructor or primitive, and
+-- creates a value if it is fully applied. If the arguments are applied to a
+-- function, the first argument is applied.
 --
 evaluateAppWith
   :: (Term -> State Env Value)
-  -> (Value -> Value -> State Env Value)
+  -> (PrimInfo -> [Either Value Type] -> State Env Value)
+  -> (Value -> Either Value Type -> State Env Value)
   -> Term
-  -> Term
+  -> Either Term Type
   -> State Env Value
-evaluateAppWith eval apply x y = do
-  evalX <- eval x
-  evalY <- eval y
-  apply evalX evalY
+evaluateAppWith eval evalPrim apply x y
+  | Data dc <- f
+  = if isFullyApplied (dcType dc) args
+       then VData dc <$> evalArgs args
+       else etaExpand term >>= eval
 
--- | Default implementation for evaluating a type application. This evaluates
--- the function, and applies a type to it using the supplied apply function.
---
-evaluateTyAppWith
-  :: (Term -> State Env Value)
-  -> (Value -> Type -> State Env Value)
-  -> Term
-  -> Type
-  -> State Env Value
-evaluateTyAppWith eval apply x ty = do
-  evalX <- eval x
-  apply evalX ty
+  | Prim p <- f
+  , nArgs  <- length . fst $ splitFunForallTy (primType p)
+  = case compare (length args) nArgs of
+      LT -> etaExpand term >>= eval
+      EQ -> evalArgs args >>= evalPrim p
+      GT -> do
+        (pArgs, rArgs) <- splitAt nArgs <$> evalArgs args
+        primRes <- evalPrim p pArgs
+        foldM apply primRes rArgs
+
+  | otherwise
+  = do
+       evalX <- eval x
+       evalY <- evalArg y
+       apply evalX evalY
+ where
+  term      = either (App x) (TyApp x) y
+  (f, args) = collectArgs term
+  evalArg   = bitraverse eval pure
+  evalArgs  = traverse evalArg
 
 -- | Default implementation for evaluating a letrec expression. This adds all
 -- bindings to the heap without eagerly evaluating them, then evaluates the
@@ -218,27 +291,22 @@ quotePrimWith quote p args = do
 
 quoteLamWith
   :: (Value -> State Env Nf)
-  -> (Value -> Value -> State Env Value)
-  -> Id
+  -> (Value -> Either Value Type -> State Env Value)
+  -> Either Id TyVar
   -> Term
   -> Env
   -> State Env Nf
-quoteLamWith quote apply i x env = do
-  evalX  <- apply (VLam i x env) (VNeu (NeVar i))
-  quoteX <- quote evalX
-  pure (NLam i quoteX)
+quoteLamWith quote apply i x env =
+  case i of
+    Left iId  -> do
+      evalX  <- apply (VLam iId x env) (Left $ VNeu (NeVar iId))
+      quoteX <- quote evalX
+      pure (NLam iId quoteX)
 
-quoteTyLamWith
-  :: (Value -> State Env Nf)
-  -> (Value -> Type -> State Env Value)
-  -> TyVar
-  -> Term
-  -> Env
-  -> State Env Nf
-quoteTyLamWith quote apply i x env = do
-  evalX  <- apply (VTyLam i x env) (VarTy i)
-  quoteX <- quote evalX
-  pure (NTyLam i quoteX)
+    Right iTv -> do
+      evalX  <- apply (VTyLam iTv x env) (Right (VarTy iTv))
+      quoteX <- quote evalX
+      pure (NTyLam iTv quoteX)
 
 quoteCastWith
   :: (Value -> State Env Nf)
