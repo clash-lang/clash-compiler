@@ -71,6 +71,7 @@ module Clash.Core.VarEnv
     -- ** Working with predicates
     -- *** Searching
   , elemInScopeSet
+  , elemUniqInScopeSet
   , notElemInScopeSet
   , varSetInScope
     -- ** Unique generation
@@ -401,6 +402,14 @@ elemInScopeSet
   -> InScopeSet
   -> Bool
 elemInScopeSet v (InScopeSet s _) = elemVarSet v s
+
+-- | Check whether an element exists in the set based on the `Unique` contained
+-- in that element
+elemUniqInScopeSet
+  :: Unique
+  -> InScopeSet
+  -> Bool
+elemUniqInScopeSet u (InScopeSet s _) = u `elemUniqSetDirectly` s
 
 -- | Is the variable not in scope
 notElemInScopeSet
