@@ -301,11 +301,9 @@ wantedLanguageExtensions =
 unwantedLanguageExtensions :: [LangExt.Extension]
 unwantedLanguageExtensions =
   [ LangExt.ImplicitPrelude
-  , LangExt.MonomorphismRestriction
 #if MIN_VERSION_ghc(8,6,0)
   , LangExt.StarIsType
 #endif
   , LangExt.Strict
   , LangExt.StrictData
   ]
-

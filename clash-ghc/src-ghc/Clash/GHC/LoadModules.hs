@@ -689,8 +689,11 @@ setWantedLanguageExtensions :: GHC.DynFlags -> GHC.DynFlags
 setWantedLanguageExtensions df =
    foldl' DynFlags.gopt_set
     (foldl' DynFlags.xopt_unset
-      (foldl' DynFlags.xopt_set df wantedLanguageExtensions) unwantedLanguageExtensions)
-      wantedOptimizations
+      (foldl' DynFlags.xopt_set
+        (DynFlags.wopt_set df DynFlags.Opt_WarnMonomorphism)
+        wantedLanguageExtensions)
+      unwantedLanguageExtensions)
+    wantedOptimizations
  where
   wantedOptimizations =
     [ Opt_CSE -- CSE

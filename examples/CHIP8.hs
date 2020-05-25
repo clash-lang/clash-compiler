@@ -18,11 +18,11 @@ topEntity
     -> Enable System
     -> ( Signal System Bit
        )
-topEntity = exposeClockResetEnable output
-  where
-    cpuIn = pure CPUIn{ cpuInMem = 0x00 }
+topEntity = exposeClockResetEnable $ let
+    cpuIn  = pure CPUIn{ cpuInMem = 0x00 } :: Signal System CPUIn
     cpuOut = mealyState (runCPU defaultOut cpu) initState cpuIn
     output = boolToBit . (== 0x00) . cpuOutMemAddr <$> cpuOut
+ in output
 
 mealyState
   :: ( HiddenClockResetEnable tag

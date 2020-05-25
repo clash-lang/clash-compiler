@@ -3,7 +3,7 @@ module TRepeat2 where
 import Clash.Prelude
 import Clash.Explicit.Testbench
 
-topEntity = register @System (trepeat @2 True)
+topEntity x = register @System (trepeat @2 True) x
 {-# NOINLINE topEntity #-}
 
 testBench :: Signal System Bool
