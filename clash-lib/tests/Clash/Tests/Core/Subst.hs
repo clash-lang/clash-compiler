@@ -34,13 +34,6 @@ termVar = Id {
   , idScope = LocalId
   }
 
-typeVar :: Var Type
-typeVar = TyVar {
-    varName = fakeName {nameUniq=unique, nameOcc="type"}
-  , varUniq = unique
-  , varType = ConstTy (TyCon fakeName)
-  }
-
 term1 :: Term
 term1 = Var termVar
 
@@ -49,5 +42,5 @@ tests =
   testGroup
     "Clash.Tests.Core.Subst"
     [ testCase "deShadow type/term" $
-        term1 @=? deShadowTerm (extendInScopeSet emptyInScopeSet typeVar) term1
+        term1 @=? deShadowTerm (extendInScopeSet emptyInScopeSet termVar) term1
     ]
