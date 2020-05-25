@@ -1,0 +1,1 @@
+FIXES: Fixes issue with one of Clash's transformations, `inlineCleanup`, introducing free variables [#1337](https://github.com/clash-lang/clash-compiler/issues/1337)
