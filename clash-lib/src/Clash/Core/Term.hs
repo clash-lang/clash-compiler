@@ -324,11 +324,11 @@ walkTerm f = catMaybes . DList.toList . go
     Lam _ t1 -> go t1
     TyLam _ t1 -> go t1
     App t1 t2 -> go t1 <> go t2
-    TyApp t1 _ -> pure (f t1)
-    Letrec bndrs t1 -> pure (f t1) <> mconcat (map (go . snd) bndrs)
-    Case t1 _ alts -> pure (f t1) <> mconcat (map (go . snd) alts)
+    TyApp t1 _ -> go t1
+    Letrec bndrs t1 -> go t1 <> mconcat (map (go . snd) bndrs)
+    Case t1 _ alts -> go t1 <> mconcat (map (go . snd) alts)
     Cast t1 _ _ -> go t1
-    Tick _ t1 -> pure (f t1)
+    Tick _ t1 -> go t1
 
 -- Collect all term ids mentioned in a term
 collectTermIds :: Term -> [Id]
