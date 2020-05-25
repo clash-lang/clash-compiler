@@ -71,29 +71,36 @@ getMainTopEntity modName bindingMap topEnts nm =
     let topIdNm = Text.unpack (nameOcc (varName topId)) in
     topIdNm == nm || ('.':nm) `isSuffixOf` topIdNm
 
--- | Checks whether MonoLocalBinds language extension is enabled or not in
--- modules.
+-- | Checks whether MonoLocalBinds and MonomorphismRestricton language extensions
+-- are enabled or not in modules.
 checkMonoLocalBindsMod :: GHC.ModSummary -> IO ()
-checkMonoLocalBindsMod x =
-  unless (active . GHC.ms_hspp_opts $ x) (hPutStrLn stderr $ msg x)
+checkMonoLocalBindsMod x = do
+  unless (active LangExt.MonoLocalBinds . GHC.ms_hspp_opts $ x)
+         (hPutStrLn stderr $ msg LangExt.MonoLocalBinds x)
+  unless (active LangExt.MonomorphismRestriction . GHC.ms_hspp_opts $ x)
+         (hPutStrLn stderr $ msg LangExt.MonomorphismRestriction x)
   where
-    msg = messageWith . GHC.moduleNameString . GHC.moduleName . GHC.ms_mod
+    msg ext = messageWith ext . GHC.moduleNameString . GHC.moduleName . GHC.ms_mod
 
--- | Checks whether MonoLocalBinds language extension is enabled when generating
--- the HDL directly e.g. in GHCi. modules.
+-- | Checks whether MonoLocalBinds and MonomorphismRestriction language extensions
+-- are enabled when generating the HDL directly e.g. in GHCi. modules.
 checkMonoLocalBinds :: GHC.DynFlags -> IO ()
-checkMonoLocalBinds dflags =
-  unless (active dflags) (hPutStrLn stderr $ messageWith "")
+checkMonoLocalBinds dflags = do
+  unless (active LangExt.MonoLocalBinds dflags)
+         (hPutStrLn stderr $ messageWith LangExt.MonoLocalBinds "")
+  unless (active LangExt.MonomorphismRestriction dflags)
+         (hPutStrLn stderr $ messageWith LangExt.MonomorphismRestriction "")
 
-messageWith :: String -> String
-messageWith srcModule
+messageWith :: LangExt.Extension -> String -> String
+messageWith ext srcModule
   | srcModule == []  = msgStem ++ "."
   | otherwise = msgStem ++ " in module: " ++ srcModule
   where
-    msgStem = "Warning: Extension MonoLocalBinds disabled. This might lead to unexpected logic duplication"
+    msgStem = "Warning: Extension " <> show ext <>
+              " is disabled. This might lead to unexpected logic duplication"
 
-active :: GHC.DynFlags -> Bool
-active = GHC.member LangExt.MonoLocalBinds . GHC.extensionFlags
+active :: LangExt.Extension -> GHC.DynFlags -> Bool
+active ext = GHC.member ext . GHC.extensionFlags
 
 checkImportDirs :: Foldable t => ClashOpts -> t FilePath -> IO ()
 checkImportDirs opts idirs = when (opt_checkIDir opts) $

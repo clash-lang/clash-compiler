@@ -55,11 +55,14 @@ operations
   . (/ f)
   . recip
 
+twiddle :: Floating a => a -> a
 twiddle = (+ 1e-5) -- prevent any optimiser from doing: asin . sin <=> id
 
+pi_noinline :: Floating a => a
 pi_noinline = pi
 {-# NOINLINE pi_noinline #-}
 
+a,b,c,d,e,f :: Floating a => a
 a = 1.0
 b = a + pi_noinline
 c = b + pi_noinline
@@ -67,6 +70,7 @@ d = c + pi_noinline
 e = d + pi_noinline
 f = e + pi_noinline
 
+expectedOutput :: Vec 1 (Float, Double, Signed 8, Signed 9)
 expectedOutput = (unpack 0x3F45628A, unpack 0x3FED4161686C9EEE, 1, 1) :> Nil
 
 testBench :: Signal System Bool

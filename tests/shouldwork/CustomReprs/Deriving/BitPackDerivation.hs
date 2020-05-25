@@ -1,3 +1,5 @@
+{-# LANGUAGE PartialTypeSignatures #-}
+{-# OPTIONS_GHC -Wno-partial-type-signatures #-}
 module BitPackDerivation where
 
 import Clash.Prelude
@@ -32,6 +34,7 @@ testBench
   :: Signal System Bool
 testBench = done'
   where
+    testInput :: _ => _
     testInput = stimuliGenerator $ Toy
                                 :> Maintenance
                                 :> Freight (2, 3)
@@ -45,6 +48,7 @@ testBench = done'
                                             :> ($$(bLit "00101011") :: BitVector 8)
                                             :> ($$(bLit "000101..") :: BitVector 8)
                                             :> Nil
+    done :: _ => _
     done  = expectedOutput (topEntity testInput)
     done' =
       withClockResetEnable

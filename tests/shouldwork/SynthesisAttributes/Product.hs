@@ -1,3 +1,5 @@
+{-# LANGUAGE PartialTypeSignatures #-}
+{-# OPTIONS_GHC -Wno-partial-type-signatures #-}
 module Product where
 
 import qualified Prelude as P
@@ -87,17 +89,19 @@ mainSystemVerilog = do
 testBench :: Signal System Bool
 testBench = done'
   where
+    testInput :: _ => _
     testInput      = stimuliGenerator $(listToVecTH [ (1, 1) :: (Signed 9, Signed 9)
                                                     , (2, 2)
                                                     , (3, 3)
                                                     , (4, 4)
                                                     ])
 
-    expectedOutput = outputVerifier' $(listToVecTH [ (0, 0) :: (Signed 9, Signed 9)
+    expectedOutput a = outputVerifier' $(listToVecTH [ (0, 0) :: (Signed 9, Signed 9)
                                                   , (1, 1)
                                                   , (5, 5)
                                                   , (14, 14)
-                                                  ])
+                                                  ]) a
 
+    done :: _ => _
     done           = expectedOutput (topEntity testInput)
     done'          = withClockResetEnable (tbSystemClockGen (not <$> done')) systemResetGen enableGen done

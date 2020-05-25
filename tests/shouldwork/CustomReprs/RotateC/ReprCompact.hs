@@ -50,5 +50,5 @@ import Clash.Annotations.BitRepresentation
         [0b11] -- Masks
     ]) #-}
 
-topEntity = RotateC.topEntity
+topEntity a = RotateC.topEntity a
 testBench = RotateC.testBench

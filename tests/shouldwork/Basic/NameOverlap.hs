@@ -18,7 +18,8 @@ topEntity
     -> Reset System
     -> Enable System
     -> Signal System Bit
-topEntity = exposeClockResetEnable board
-  where
+topEntity = exposeClockResetEnable $ let
     board = boolToBit <$> led
+    led :: Signal System Bool
     led = register True $ complement <$> led
+  in board

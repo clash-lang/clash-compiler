@@ -1,3 +1,6 @@
+{-# LANGUAGE PartialTypeSignatures #-}
+{-# OPTIONS_GHC -Wno-partial-type-signatures #-}
+
 module RotateCNested where
 
 import Clash.Prelude.Testbench
@@ -82,6 +85,7 @@ topEntity = fmap f
 testBench :: Signal System Bool
 testBench = done'
   where
+    testInput :: _ => _
     testInput = stimuliGenerator $ Nothing
                                :> Just (NothingC)
                                :> Just (JustC Red)
@@ -89,6 +93,7 @@ testBench = done'
                                :> Just (JustC Blue)
                                :> Nil
 
+    expectedOutput :: _ => _
     expectedOutput = outputVerifier' $ Red
                                    :> Blue
                                    :> Green
@@ -96,6 +101,7 @@ testBench = done'
                                    :> Red
                                    :> Nil
 
+    done :: _ => _
     done  = expectedOutput (topEntity testInput)
     done' =
       withClockResetEnable

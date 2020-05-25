@@ -28,9 +28,10 @@ topEntity clk rst =
 testBench :: Signal System Bool
 testBench = done
   where
-    n              = 22
+    n              = 22 :: Signed 17
+    n1             = 22 :: Signed 16
     expectedOutput = outputVerifier' clk rst ((n, n, n, -n, 0, 0) :> Nil)
-    done           = expectedOutput (topEntity clk rst (pure n))
+    done           = expectedOutput (topEntity clk rst (pure n1))
     clk            = tbSystemClockGen (not <$> done)
     rst            = systemResetGen
 {-# NOINLINE testBench #-}
