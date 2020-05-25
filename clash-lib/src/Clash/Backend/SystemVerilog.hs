@@ -1382,7 +1382,9 @@ modifier offset mods (Sliced (BitVector _,start,end)) =
     _ -> Just (m:mods, BitVector (start-end+1))
 
 modifier offset mods (Indexed (ty@(SP _ args),dcI,fI)) =
-  Just (Right (NRange (start+offset) (end+offset)):mods, argTy)
+  case mods of
+    Right {}:rest -> Just (m:rest, argTy)
+    _ -> Just (m:mods,argTy)
   where
     argTys   = snd $ args !! dcI
     argTy    = argTys !! fI
@@ -1390,6 +1392,7 @@ modifier offset mods (Indexed (ty@(SP _ args),dcI,fI)) =
     other    = otherSize argTys (fI-1)
     start    = typeSize ty - 1 - conSize ty - other
     end      = start - argSize + 1
+    m        = Right (NRange (start+offset) (end+offset))
 
 modifier offset mods (Indexed (ty@(Product _ _ argTys),_,fI)) =
   let m = Right (NRange (start+offset) (end+offset)) in
