@@ -124,6 +124,11 @@ runSingleTransformation rwEnv rwState is trans term = t
 -- | Run a single transformation with an empty environment and empty
 -- InScopeSet. See Default instances ^ to inspect the precise definition of
 -- "empty".
+--
+-- Note that at the time of writing (May 2020) the default environment does not
+-- include a type translator, evaluator, current function, or global heap. Maps,
+-- like the primitive and tycon map, are also empty. If the transformation under
+-- test needs these definitions, you should add them manually.
 runSingleTransformationDef :: Default extra => Rewrite extra -> C.Term -> C.Term
 runSingleTransformationDef = runSingleTransformation def def def
 
