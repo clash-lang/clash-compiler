@@ -42,6 +42,7 @@ module Clash.Core.Subst
   , extendGblSubstList
     -- ** Applying substitutions
   , substTm
+  , maybeSubstTm
   , substAlt
   , substId
     -- * Variable renaming
@@ -523,7 +524,18 @@ substTyVarBndr subst@(TvSubst inScope tenv) oldVar =
          | otherwise    = uniqAway inScope
                             (oldVar {varType = substTyUnchecked subst oldKi})
 
--- | Substitute within a 'Type'
+-- | Substitute within a 'Term'. Just return original term if given
+-- substitution is "Nothing".
+maybeSubstTm
+  :: HasCallStack
+  => Doc ()
+  -> Maybe Subst
+  -> Term
+  -> Term
+maybeSubstTm _doc Nothing = id
+maybeSubstTm doc (Just s) = substTm doc s
+
+-- | Substitute within a 'Term'
 substTm
   :: HasCallStack
   => Doc ()
