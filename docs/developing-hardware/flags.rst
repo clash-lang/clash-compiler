@@ -143,6 +143,12 @@ Clash Compiler Flags
 
   **Default:** 0
 
+-fclash-evaluator-fuel-limit
+  Set the threshold for unfolding potentially non-terminating bindings in the
+  evaluator. A value of 0 only unfolds terminating bindings.
+
+  **Default:** 20
+
 -fclash-intwidth
   Set the bit width for the ``Int/Word/Integer`` types. The only allowed values
   are 32 or 64.

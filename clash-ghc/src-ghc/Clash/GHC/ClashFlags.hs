@@ -77,6 +77,7 @@ flagsClash r = [
   , defFlag "fclash-inline-limit"                $ IntSuffix (liftEwM . setInlineLimit r)
   , defFlag "fclash-inline-function-limit"       $ IntSuffix (liftEwM . setInlineFunctionLimit r)
   , defFlag "fclash-inline-constant-limit"       $ IntSuffix (liftEwM . setInlineConstantLimit r)
+  , defFlag "fclash-evaluator-fuel-limit"        $ IntSuffix (liftEwM . setEvaluatorFuelLimit r)
   , defFlag "fclash-intwidth"                    $ IntSuffix (setIntWidth r)
   , defFlag "fclash-error-extra"                 $ NoArg (liftEwM (setErrorExtra r))
   , defFlag "fclash-float-support"               $ NoArg (liftEwM (setFloatSupport r))
@@ -122,6 +123,12 @@ setInlineConstantLimit
   -> Int
   -> IO ()
 setInlineConstantLimit r n = modifyIORef r (\c -> c {opt_inlineConstantLimit = toEnum n})
+
+setEvaluatorFuelLimit
+  :: IORef ClashOpts
+  -> Int
+  -> IO ()
+setEvaluatorFuelLimit r n = modifyIORef r (\c -> c {opt_evaluatorFuelLimit = toEnum n})
 
 setInlineWFLimit
   :: IORef ClashOpts

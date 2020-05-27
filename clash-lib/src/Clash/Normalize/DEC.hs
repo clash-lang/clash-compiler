@@ -79,7 +79,6 @@ import Clash.Core.VarEnv
   (InScopeSet, elemInScopeSet, extendInScopeSetList, notElemInScopeSet, unionInScope)
 import Clash.Normalize.Types (NormalizeState)
 import Clash.Rewrite.Types
-  (RewriteMonad, bindings, evaluator, globalHeap, tcCache, tupleTcCache, uniqSupply)
 import Clash.Rewrite.Util    (mkInternalVar, mkSelectorCase,
                               isUntranslatableType, isConstant)
 import Clash.Unique          (lookupUniqMap)
@@ -158,7 +157,10 @@ collectGlobals' is0 substitution seen e@(collectArgsTicks -> (fun, args@(_:_), t
     let (ids1,ids2) = splitSupply ids
     uniqSupply Lens..= ids2
 #if EXPERIMENTAL_EVALUATOR
-    let env = mkGlobalEnv bndrs gh tcm is0 ids1
+    ri <- Lens.view recInfo
+    fuel <- Lens.view fuelLimit
+
+    let env = mkGlobalEnv bndrs ri fuel gh tcm is0 ids1
     let eval = asTerm . fst . runEval env . evaluateNf evaluate
 #else
     let eval = (Lens.view Lens._3) . whnf' evaluate bndrs tcm gh ids1 is0 False

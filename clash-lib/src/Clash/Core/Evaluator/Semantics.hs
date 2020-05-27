@@ -26,6 +26,7 @@ import Clash.Core.DataCon
 import Clash.Core.Evaluator.Models
 import Clash.Core.Literal
 import Clash.Core.Term
+import Clash.Core.Termination
 import Clash.Core.TermInfo
 import Clash.Core.TyCon
 import Clash.Core.Type
@@ -170,17 +171,36 @@ evaluateVarWith eval i
     forceLocal = either (withoutLocal i . eval) pure
 
   goGlobal :: Eval Value
-  goGlobal = getGlobal i >>= \case
-    Just b
-      | bindingSpec b /= NoInline -> do
-          v <- forceGlobal (bindingTerm b)
+  goGlobal = do
+    gRecInfo <- getRecInfo
+    gFuel <- getFuel
 
-          updateGlobal i v
-          pure v
+    getGlobal i >>= \case
+      Just b
+        -- The binding can't be inlined.
+        |  bindingSpec b == NoInline
+        -> pure (VNeu (NeVar i))
 
-    _ -> pure (VNeu (NeVar i))
+        -- The binding can be inlined if there is enough fuel.
+        |  isRecursive i gRecInfo
+        -> if gFuel == 0
+             then pure (VNeu (NeVar i))
+             else do
+               v <- forceGlobal (bindingTerm b)
+               putFuel (gFuel - 1)
+               updateGlobal i v
+               pure v
+
+        -- The binding can be inlined without using fuel.
+        |  otherwise
+        -> do v <- forceGlobal (bindingTerm b)
+              updateGlobal i v
+              pure v
+
+      Nothing
+        -> pure (VNeu (NeVar i))
    where
-    forceGlobal = either (withoutGlobal i . eval) pure
+    forceGlobal = either eval pure
 
 -- | Default implementation for evaluating a literal.
 -- This simply wraps the literal up into a Value.
@@ -255,16 +275,16 @@ evaluateAppWith eval evalPrim apply x y
         primRes <- evalPrim p pArgs
         foldM apply primRes (first Left <$> rArgs)
 
-  -- Evaluating a function application may changes the ignore list (e.g. if the
-  -- LHS of the application is a recursive function.) If we do not remove this
-  -- from the ignore list after calling apply, it will not be inlined if it
-  -- appears in any other subterms.
+  -- Evaluating a function application may change the amount of fuel (e.g. if
+  -- the LHS of the application is a recursive function.) If we do not add fuel
+  -- back after calling apply, other subterms may not be unfolded as much as
+  -- they should be.
   --
   -- This is not needed for data and prim, as they do not evaluate their
-  -- arguments, so the ignore list will not change.
+  -- arguments, so the fuel will not change.
   --
   | otherwise
-  = preserveIgnored $ do
+  = preserveFuel $ do
       evalF <- eval f
       foldM apply evalF (first Left <$> args)
   where

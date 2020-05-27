@@ -42,6 +42,7 @@ import Clash.Core.Evaluator.Types            (Evaluator, PrimHeap)
 #endif
 
 import Clash.Core.Term           (Term, Context)
+import Clash.Core.Termination    (RecInfo)
 import Clash.Core.Type           (Type)
 import Clash.Core.TyCon          (TyConName, TyConMap)
 import Clash.Core.Var            (Id)
@@ -122,6 +123,10 @@ data RewriteEnv
   -- ^ Functions that are considered TopEntities
   , _customReprs    :: CustomReprs
   -- ^ Custom bit representations
+  , _recInfo        :: RecInfo
+  -- ^ Information about recursive global bindings
+  , _fuelLimit      :: Word
+  -- ^ Maximum amount of fuel for the evaluator
   }
 
 makeLenses ''RewriteEnv

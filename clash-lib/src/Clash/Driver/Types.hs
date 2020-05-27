@@ -94,6 +94,11 @@ data ClashOpts = ClashOpts
   -- always inlined. A value of 0 inlines all constants.
   --
   -- Command line flag: -fclash-inline-constant-limit
+  , opt_evaluatorFuelLimit :: Word
+  -- ^ Set the threshold for maximum unfolding depth in the evaluator. A value
+  -- of zero means no potentially non-terminating binding is unfolded.
+  --
+  -- Command line flag: -fclash-evaluator-fuel-limit
   , opt_dbgLevel :: DebugLevel
   -- ^ Set the debugging mode for the compiler, exposing additional output. See
   -- "DebugLevel" for the available options.
@@ -184,6 +189,7 @@ instance Hashable ClashOpts where
     opt_specLimit `hashWithSalt`
     opt_inlineFunctionLimit `hashWithSalt`
     opt_inlineConstantLimit `hashWithSalt`
+    opt_evaluatorFuelLimit `hashWithSalt`
     opt_dbgLevel `hashSet`
     opt_dbgTransformations `hashWithSalt`
     opt_dbgTransformationsFrom `hashWithSalt`
@@ -230,6 +236,7 @@ defClashOpts
   , opt_specLimit           = 20
   , opt_inlineFunctionLimit = 15
   , opt_inlineConstantLimit = 0
+  , opt_evaluatorFuelLimit  = 20
   , opt_cachehdl            = True
   , opt_cleanhdl            = True
   , opt_primWarn            = True
