@@ -35,6 +35,7 @@ module Clash.Primitives.DSL
   , pattern High
   , pattern Low
   , tuple
+  , vec
 
   -- ** Extraction
   , tInputs
@@ -44,6 +45,7 @@ module Clash.Primitives.DSL
   , exprToInteger
   , tExprToInteger
   , untuple
+  , unvec
 
   -- ** Conversion
   , toBV
@@ -181,6 +183,23 @@ assign aName (TExpr ty aExpr) = do
   texp@(~(TExpr _ (Identifier uniqueName Nothing))) <- declare aName ty
   addDeclaration (Assignment uniqueName aExpr)
   pure texp
+
+-- | Extract the elements of a vector expression and return expressions
+-- to them. If given expression is not an identifier, an intermediate variable
+-- will be used to assign the given expression to which is subsequently indexed.
+unvec
+  :: Backend backend
+  => Identifier
+  -- ^ Name hint for intermediate signal
+  -> TExpr
+  -- ^ Vector expression
+  -> State (BlockState backend) [TExpr]
+  -- ^ Vector elements
+unvec vName v@(ety -> Vector vSize eType) = do
+  ~(TExpr _ (Identifier vUniqueName Nothing)) <- toIdentifier vName v
+  let vIndex i = Identifier vUniqueName (Just (Indexed (ety v, 10, i)))
+  pure (map (TExpr eType . vIndex) [0..vSize-1])
+unvec _ e = error $ "unvec: cannot be called on non-vector: " <> show (ety e)
 
 -- | Extract the elements of a tuple expression and return expressions
 --   to them. These new expressions are given unique names and get
@@ -351,6 +370,22 @@ outputFn fromTypes toType exprFn inNames (TExpr outType (Identifier outName Noth
 outputFn _ outType _ _ texpr =
   error $ "outputFn: the expression " <> show texpr
   <> " must be an Identifier with type " <> show outType
+
+-- | Create a vector of 'TExpr's
+vec
+  :: (HasCallStack, Backend backend)
+  => [TExpr]
+  -- ^ Elements of vector
+  -> State (BlockState backend) TExpr
+  -- ^ Vector elements
+vec els@(el:_)
+  | all (\e -> ety e == ety el) els
+  = pure (TExpr (Vector (length els) (ety el)) theVec)
+  | otherwise
+  = error $ "vec: elements not of same type: " ++ show els
+ where
+  theVec = mkVectorChain (length els) (ety el) (map eex els)
+vec [] = error "vec: can't be used on empty lists"
 
 -- | Create a tuple of 'TExpr'
 tuple :: TExpr -> TExpr -> TExpr
