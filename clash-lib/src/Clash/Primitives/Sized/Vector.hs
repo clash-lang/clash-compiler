@@ -1,3 +1,10 @@
+{-|
+  Copyright   :  (C) 2020 QBayLogic
+  License     :  BSD2 (see the file LICENSE)
+  Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
+
+  Blackbox implementations for functions in "Clash.Sized.Vector".
+-}
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE QuasiQuotes #-}
