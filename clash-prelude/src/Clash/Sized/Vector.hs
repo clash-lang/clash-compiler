@@ -13,6 +13,7 @@ Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE UndecidableInstances #-}
+{-# LANGUAGE QuasiQuotes #-}
 
 {-# LANGUAGE Trustworthy #-}
 
@@ -124,6 +125,7 @@ import Prelude                    hiding ((++), (!!), concat, concatMap, drop,
                                           repeat, replicate, reverse, scanl,
                                           scanr, splitAt, tail, take, unzip,
                                           unzip3, zip, zip3, zipWith, zipWith3)
+import qualified Data.String.Interpolate as I
 import qualified Prelude          as P
 import Test.QuickCheck            (Arbitrary (..), CoArbitrary (..))
 import Unsafe.Coerce              (unsafeCoerce)
@@ -1497,7 +1499,12 @@ iterateI f a = xs
   where
     xs = init (a `Cons` ws)
     ws = map f (lazyV xs)
-{-# INLINE iterateI #-}
+{-# NOINLINE iterateI #-}
+{-# ANN iterateI (InlinePrimitive [VHDL,Verilog,SystemVerilog] [I.i| [{
+    "BlackBoxHaskell": {
+        "name": "Clash.Sized.Vector.iterateI"
+      , "templateFunction": "Clash.Primitives.Sized.Vector.iterateBBF"
+    }}] |]) #-}
 
 -- | \"'unfoldr @n f s@\" builds a vector of length @n@ from a seed value @s@,
 -- where every element @a@ is created by successive calls of @f@ on @s@. Unlike
