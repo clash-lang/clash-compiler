@@ -20,6 +20,7 @@ import Clash.Backend.Verilog
 import Clash.Backend.VHDL
 import Clash.Core.Evaluator.Models
 import Clash.Core.Name
+import Clash.Core.Termination
 import Clash.Core.TyCon
 import Clash.Core.Var
 import Clash.Core.VarEnv
@@ -81,10 +82,11 @@ findBinding
 findBinding nm (bm, tcm, ids) =
   case List.find byName (eltsVarEnv bm) of
     Just bd ->
-      let env = mkGlobalEnv bm (mempty, 0) tcm emptyInScopeSet ids
+      let env = mkGlobalEnv bm ri 20 (mempty, 0) tcm emptyInScopeSet ids
        in fst . runEval env $ evaluateNf ghcEvaluator (bindingTerm bd)
 
     Nothing -> error ("Not in binding map: " <> show nm)
  where
+  ri = mkRecInfo bm
   byName b = nm == nameOcc (varName $ bindingId b)
 

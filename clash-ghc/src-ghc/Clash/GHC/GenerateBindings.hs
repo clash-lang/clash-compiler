@@ -151,6 +151,11 @@ generateBindings useColor primDirs importDirs dbs hdl modName dflagsM = do
          , domainConfs
          )
 
+-- TODO This function should be changed to provide the information that
+-- Clash.Core.Termination.mkRecInfo provides. To achieve this, it should also
+-- be changed to no longer flatten recursive groups (see the documentation for
+-- mkRecInfo for an explanation of these).
+--
 mkBindings
   :: CompiledPrimMap
   -> [GHC.CoreBind]

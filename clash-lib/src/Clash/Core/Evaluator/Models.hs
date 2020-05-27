@@ -22,8 +22,6 @@ import Data.Bifunctor (first, second)
 import Data.IntMap.Strict (IntMap)
 import Data.Map.Strict (Map)
 import qualified Data.Map.Strict as Map
-import Data.Set (Set)
-import qualified Data.Set as Set
 import qualified Data.Set.Lens as Set
 
 import Clash.Core.DataCon
@@ -32,6 +30,7 @@ import Clash.Core.Literal
 import Clash.Core.Name (OccName)
 import Clash.Core.Subst (extendTvSubstList, mkSubst, substTm)
 import Clash.Core.Term
+import Clash.Core.Termination
 import Clash.Core.TyCon (TyConMap)
 import Clash.Core.Type
 import Clash.Core.Util (mkUniqSystemId, mkUniqSystemTyVar)
@@ -69,7 +68,7 @@ newtype Eval a = Eval { unEval :: RWS LocalEnv () GlobalEnv a }
 --
 runEval :: GlobalEnv -> Eval a -> (a, GlobalEnv)
 runEval genv x =
-  let lenv = LocalEnv mempty mempty mempty
+  let lenv = LocalEnv mempty mempty
       (x', genv', _) = RWS.runRWS (unEval x) lenv genv
    in (x', genv')
 
@@ -103,23 +102,10 @@ data LocalEnv = LocalEnv
   , lenvTerms  :: Map Id TermOrValue
     -- ^ Local term environment. These are the terms that are introduced while
     -- evaluating the current term (e.g. by applications).
-  , lenvIgnore :: Set Id
-    -- ^ Local ignore list. These are global identifiers which are not inlined
-    -- while evaluating. This holds the global ignore list that exsted when
-    -- evaluation reaches a head (Lam / TyLam / Data / Prim) so quote can
-    -- "remember" what was ignored at that point in evaluation.
   } deriving (Show)
 
 getLocalEnv :: Eval LocalEnv
-getLocalEnv = do
-  -- Save changes to the ignored list when getting the local env. This means
-  -- when we resume execution from this local environment, we don't lose any
-  -- of the bindings that were ignored at the time.
-  gIs <- RWS.gets genvIgnore
-  lIs <- RWS.asks lenvIgnore
-  env <- RWS.ask
-
-  pure (env { lenvIgnore = gIs <> lIs })
+getLocalEnv = RWS.ask
 
 withLocalEnv :: LocalEnv -> Eval a -> Eval a
 withLocalEnv env = RWS.local (const env)
@@ -135,7 +121,7 @@ getLocal i = Map.lookup i <$> RWS.asks lenvTerms
 withLocal :: (Id, TermOrValue) -> Eval a -> Eval a
 withLocal (i, tm) = RWS.local addBinding
  where
-  addBinding env@(LocalEnv _ tms _) =
+  addBinding env@(LocalEnv _ tms) =
     env { lenvTerms = Map.insert i tm tms }
 
 -- | Remove a local term binding from the environment, then evaluate the given
@@ -144,7 +130,7 @@ withLocal (i, tm) = RWS.local addBinding
 withoutLocal :: Id -> Eval a -> Eval a
 withoutLocal i = RWS.local deleteBinding
  where
-  deleteBinding env@(LocalEnv _ tms _) =
+  deleteBinding env@(LocalEnv _ tms) =
     env { lenvTerms = Map.delete i tms }
 
 withLocals :: [(Id, TermOrValue)] -> Eval a -> Eval a
@@ -161,7 +147,7 @@ getType i = Map.lookup i <$> RWS.asks lenvTypes
 withType :: (TyVar, Type) -> Eval a -> Eval a
 withType (i, ty) = RWS.local addBinding
  where
-  addBinding env@(LocalEnv tys _ _) =
+  addBinding env@(LocalEnv tys _) =
     env { lenvTypes = Map.insert i ty tys }
 
 withTypes :: [(TyVar, Type)] -> Eval a -> Eval a
@@ -173,10 +159,12 @@ data GlobalEnv = GlobalEnv
   { genvGlobals :: VarEnv (Binding TermOrValue)
     -- ^ Global term environment. These are functions in global scope which
     -- are evaluated on lookup, and updated after evaluation.
-  , genvIgnore  :: Set Id
-    -- ^ Global ignore list. These are global identifiers which are not
-    -- inlined while evaluating. Items are added / removed during sections
-    -- where inlining would lead to non-termination.
+  , genvRecInfo :: RecInfo
+    -- ^ Information about which global bindings are recursive, used to decide
+    -- whether or not to inline a global binding.
+  , genvFuel :: Word
+    -- ^ Remaining fuel for inlining. This decreases when a potentially
+    -- non-terminating binder is inlined and increases when moving up the AST.
   , genvPrimsIO :: GlobalIO
     -- ^ The results of IO actions performed while evaluating primitives. This
     -- allows primtives in IO to be potentially evaluated at compile-time.
@@ -197,27 +185,20 @@ type GlobalIO = (IntMap Value, Int)
 
 mkGlobalEnv
   :: BindingMap
+  -> RecInfo
+  -> Word
   -> GlobalIO
   -> TyConMap
   -> InScopeSet
   -> Supply
   -> GlobalEnv
 mkGlobalEnv bs =
-  GlobalEnv (fmap Left <$> bs) mempty
+  GlobalEnv (fmap Left <$> bs)
 
 getGlobal :: Id -> Eval (Maybe (Binding TermOrValue))
-getGlobal i = do
-  lIgnore <- RWS.asks lenvIgnore
-  gIgnore <- RWS.gets genvIgnore
-
-  -- Any identifier in an ignore list is treated as though it doesn't exist.
-  -- This is used to prevent inlining a recursive definition indefinitely.
-  if Set.member i (lIgnore <> gIgnore)
-    then pure Nothing
-    else lookupVarEnv i <$> RWS.gets genvGlobals
+getGlobal i = lookupVarEnv i <$> RWS.gets genvGlobals
 
 -- | Update a global binding, replacing it with a WHNF representation.
--- This should only be called between 'startUpdate' and 'endUpdate'.
 --
 updateGlobal :: Id -> Value -> Eval ()
 updateGlobal i x =
@@ -232,27 +213,26 @@ updateGlobal i x =
     Nothing ->
       pure ()
 
--- | Remove a global term binding from the environment, then evaluate the given
--- action. The removed binding is restored after evaluating the action.
---
-withoutGlobal :: Id -> Eval a -> Eval a
-withoutGlobal i x = RWS.modify' ignoreBinding >> x
- where
-  ignoreBinding env =
-    let is = genvIgnore env
-     in env { genvIgnore = Set.insert i is }
+getRecInfo :: Eval RecInfo
+getRecInfo = RWS.gets genvRecInfo
 
--- | Run the given action, preserving the state of the global ignore list
--- before the action was run. This means any global identifiers which are
--- ignored can be seen again when continuing evaluation.
---
-preserveIgnored :: Eval a -> Eval a
-preserveIgnored x = do
-  is  <- RWS.gets genvIgnore
-  res <- x
-  env <- RWS.get
+getFuel :: Eval Word
+getFuel = RWS.gets genvFuel
 
-  RWS.put (env { genvIgnore = is })
+putFuel :: Word -> Eval ()
+putFuel x = RWS.modify' (\env -> env { genvFuel = x })
+
+-- | Run the given action, preserving the amount of fuel before the action was
+-- run. This allows branching computations to use the same amount of fuel for
+-- each branch.
+--
+preserveFuel :: Eval a -> Eval a
+preserveFuel x = do
+  fuel <- RWS.gets genvFuel
+  res  <- x
+  env  <- RWS.get
+
+  RWS.put (env { genvFuel = fuel })
   pure res
 
 getTyConMap :: Eval TyConMap

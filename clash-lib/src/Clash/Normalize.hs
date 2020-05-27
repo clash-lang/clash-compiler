@@ -50,6 +50,7 @@ import           Clash.Core.Subst
   (extendGblSubstList, mkSubst, substTm)
 import           Clash.Core.Term                  (Term (..), collectArgsTicks
                                                   ,mkApps, mkTicks)
+import           Clash.Core.Termination           (mkRecInfo)
 import           Clash.Core.Type                  (Type, splitCoreFunForallTy)
 import           Clash.Core.TyCon
   (TyConMap, TyConName)
@@ -132,6 +133,8 @@ runNormalization opts supply globals typeTrans reprs tcm tupTcm eval primMap rcs
                   eval
                   (mkVarSet topEnts)
                   reprs
+                  (mkRecInfo globals)
+                  (opt_evaluatorFuelLimit opts)
 
     rwState   = RewriteState
                   0

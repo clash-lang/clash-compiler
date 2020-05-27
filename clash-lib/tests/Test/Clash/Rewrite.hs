@@ -71,6 +71,8 @@ instance Default RewriteEnv where
     , _evaluator=error "_evaluator: NYI"
     , _topEntities=emptyVarSet
     , _customReprs=buildCustomReprs []
+    , _recInfo=mempty
+    , _fuelLimit=10
     }
 
 instance Default extra => Default (RewriteState extra) where
