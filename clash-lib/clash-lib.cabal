@@ -231,6 +231,7 @@ Library
                       Clash.Normalize.Types
                       Clash.Normalize.Util
 
+                      Clash.Primitives.DSL
                       Clash.Primitives.Types
                       Clash.Primitives.Util
 

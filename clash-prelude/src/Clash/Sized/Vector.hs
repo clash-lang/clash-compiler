@@ -1492,7 +1492,7 @@ iterate SNat = iterateI
 -- \"'iterateI' @f z@\" corresponds to the following circuit layout:
 --
 -- <<doc/iterate.svg>>
-iterateI :: KnownNat n => (a -> a) -> a -> Vec n a
+iterateI :: forall n a. KnownNat n => (a -> a) -> a -> Vec n a
 iterateI f a = xs
   where
     xs = init (a `Cons` ws)

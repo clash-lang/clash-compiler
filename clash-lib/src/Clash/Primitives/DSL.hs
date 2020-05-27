@@ -67,7 +67,7 @@ module Clash.Primitives.DSL
   , clog2
   ) where
 
-import           Clash.Util                      (clogBase)
+import           Clash.Util                      (HasCallStack, clogBase)
 import           Control.Lens                    hiding (Indexed, assign)
 import           Control.Monad.State
 import           Data.List                       (intersperse)
@@ -172,7 +172,7 @@ declare decName ty = do
 assign
   :: Backend backend
   => Text
-  -- ^ guide name to be assigned
+  -- ^ Name hint for assignment
   -> TExpr
   -- ^ expression to be assigned to
   -> State (BlockState backend) TExpr
@@ -186,11 +186,11 @@ assign aName (TExpr ty aExpr) = do
 --   to them. These new expressions are given unique names and get
 --   declared the block scope.
 untuple
-  :: Backend backend
+  :: (HasCallStack, Backend backend)
   => TExpr
   -- ^ Tuple expression
   -> [Identifier]
-  -- ^ desired names to assign the tuple elements to
+  -- ^ Name hints for element assignments
   -> State (BlockState backend) [TExpr]
 untuple (TExpr ty@(Product _ _ tys) (Identifier resName _)) vals = do
   newNames <- zipWithM declare vals tys
@@ -232,8 +232,9 @@ bvLit sz n =
 
 -- | Convert a bool to a bit.
 boolToBit
-  :: Backend backend
+  :: (HasCallStack, Backend backend)
   => Identifier
+  -- ^ Name hint for intermediate signal
   -> TExpr
   -> State (BlockState backend) TExpr
 boolToBit bitName = \case
@@ -256,6 +257,7 @@ boolToBit bitName = \case
 boolFromBit
   :: Backend backend
   => Identifier
+  -- ^ Name hint for intermediate signal
   -> TExpr
   -> State (BlockState backend) TExpr
 boolFromBit = outputCoerce Bit Bool (<> " = '1'")
@@ -266,6 +268,7 @@ boolFromBitVector
   :: Backend backend
   => Size
   -> Identifier
+  -- ^ Name hint for intermediate signal
   -> TExpr
   -> State (BlockState backend) TExpr
 boolFromBitVector n =
@@ -278,6 +281,7 @@ boolFromBitVector n =
 unsignedFromBitVector
   :: Size
   -> Identifier
+  -- ^ Name hint for intermediate signal
   -> TExpr
   -> State (BlockState VHDLState) TExpr
 unsignedFromBitVector n =
@@ -303,7 +307,7 @@ boolFromBits inNames = outputFn (map (const Bit) inNames) Bool
 -- of the input type that should get assigned by something (usually
 -- the output port of an entity).
 outputCoerce
-  :: Backend backend
+  :: (HasCallStack, Backend backend)
   => HWType
   -> HWType
   -> (Identifier -> Identifier)
@@ -328,7 +332,7 @@ outputCoerce _ toType _ _ texpr = error $ "outputCoerce: the expression " <> sho
 -- (the inputs to the function) which should get assigned by
 -- something---usually output ports of an entity.
 outputFn
-  :: Backend backend
+  :: (HasCallStack, Backend backend)
   => [HWType]
   -> HWType
   -> ([Identifier] -> Identifier)
@@ -391,7 +395,7 @@ toBV bvName a = case a of
 -- | Assign an output bitvector to an expression. Declares a new
 --   bitvector if the expression is not already a bitvector.
 fromBV
-  :: Backend backend
+  :: (HasCallStack, Backend backend)
   => Identifier
   -- ^ BitVector name
   -> TExpr
@@ -480,7 +484,7 @@ instDecl entOrComp compName instLbl attrs inPorts outPorts = do
 -- signal with (exactly) the given name `sigNm`. The new signal has an
 -- annotated type, using the given attributes.
 viaAnnotatedSignal
-  :: Backend backend
+  :: (HasCallStack, Backend backend)
   => Text
   -- ^ Name given to signal
   -> TExpr
@@ -515,7 +519,7 @@ tResult = (\(x,t) -> TExpr t x) . bbResult
 toIdentifier'
   :: Backend backend
   => Identifier
-  -- ^ desired new identifier name
+  -- ^ desired new identifier name, will be made unique
   -> TExpr
   -- ^ expression to get identifier of
   -> State (BlockState backend) Identifier
@@ -530,7 +534,7 @@ toIdentifier' nm texp = do
 toIdentifier
   :: Backend backend
   => Identifier
-  -- ^ desired new identifier name
+  -- ^ desired new identifier name, will be made unique
   -> TExpr
   -- ^ expression to get identifier of
   -> State (BlockState backend) TExpr
@@ -543,7 +547,7 @@ toIdentifier nm texp = do
 andExpr
   :: Backend backend
   => Identifier
-  -- ^ desired name
+  -- ^ name hint
   -> TExpr
   -- ^ a
   -> TExpr
@@ -573,7 +577,7 @@ andExpr nm a b = do
 notExpr
   :: Backend backend
   => Identifier
-  -- ^ desired name
+  -- ^ name hint
   -> TExpr
   -- ^ a
   -> State (BlockState backend) TExpr
@@ -598,7 +602,7 @@ notExpr nm aExpr = do
 -- TODO: Implement for (System)Verilog
 pureToBV
   :: Identifier
-  -- ^ desired name
+  -- ^ name hint
   -> Int
   -- ^ Size (n)
   -> TExpr
@@ -620,7 +624,7 @@ pureToBV nm n arg = do
 -- TODO: Implement for (System)Verilog
 pureToBVResized
   :: Identifier
-  -- ^ desired name
+  -- ^ name hint
   -> Int
   -- ^ Size (n)
   -> TExpr
