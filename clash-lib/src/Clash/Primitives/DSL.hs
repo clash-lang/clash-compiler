@@ -387,12 +387,17 @@ vec els@(el:_)
   theVec = mkVectorChain (length els) (ety el) (map eex els)
 vec [] = error "vec: can't be used on empty lists"
 
--- | Create a tuple of 'TExpr'
-tuple :: TExpr -> TExpr -> TExpr
-tuple a b =
-  let
-    ty = Product "GHC.Tuple.(,)" Nothing [ety a, ety b]
-  in TExpr ty (DataCon ty (DC (ty,0)) [eex a, eex b])
+-- | Create an n-tuple of 'TExpr'
+tuple :: [TExpr] -> TExpr
+tuple [] = error $ "nTuple: Cannot create empty tuple"
+tuple [_] =
+  -- If we don't put this in: tuple . untuple /= id
+  error $ "nTuple: Cannot create 1-tuple"
+tuple els =
+  TExpr tupTy (DataCon tupTy (DC (tupTy,0)) (map eex els))
+ where
+  commas = Text.replicate (length els - 1) ","
+  tupTy = Product ("GHC.Tuple.(" <> commas <> ")") Nothing (map ety els)
 
 -- | Try to get the literal string value of an expression.
 getStr :: TExpr -> Maybe String
