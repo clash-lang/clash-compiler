@@ -540,6 +540,7 @@ knownBlackBoxFunctions =
     , ('P.indexToIntegerVerilog, P.indexToIntegerVerilog)
     , ('P.indexToIntegerVHDL, P.indexToIntegerVHDL)
     , ('P.intTF, P.intTF)
+    , ('P.iterateBBF, P.iterateBBF)
     , ('P.signedToIntegerVerilog, P.signedToIntegerVerilog)
     , ('P.signedToIntegerVHDL, P.signedToIntegerVHDL)
     , ('P.unsignedToIntegerVerilog, P.unsignedToIntegerVerilog)
