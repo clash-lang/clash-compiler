@@ -1,5 +1,6 @@
 {-|
   Copyright   :  (C) 2019, Myrtle Software Ltd.
+                     2020, QBayLogic B.V.
   License     :  BSD2 (see the file LICENSE)
   Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
 
@@ -81,6 +82,7 @@ import           TextShow                        (showt)
 
 import           Clash.Annotations.Primitive     (HDL (..), Primitive (..))
 import           Clash.Backend                   hiding (fromBV, toBV)
+import           Clash.Backend.VHDL              (VHDLState)
 import           Clash.Core.Var                  (Attr')
 import           Clash.Netlist.BlackBox.Util     (exprToString)
 import           Clash.Netlist.Id
@@ -179,7 +181,6 @@ assign aName (TExpr ty aExpr) = do
   texp@(~(TExpr _ (Identifier uniqueName Nothing))) <- declare aName ty
   addDeclaration (Assignment uniqueName aExpr)
   pure texp
-{-# ANN assign ("HLint: ignore Redundant bracket" :: String) #-} -- it's not redundant
 
 -- | Extract the elements of a tuple expression and return expressions
 --   to them. These new expressions are given unique names and get
@@ -247,7 +248,6 @@ boolToBit bitName = \case
         ]
     pure texp
   tExpr -> error $ "boolToBit: Got \"" <> show tExpr <> "\" expected Bool"
-{-# ANN boolToBit ("HLint: ignore Redundant bracket" :: String) #-} -- it's not redundant
 
 -- | Use to create an output `Bool` from a `Bit`. The expression given
 --   must be the identifier of the bool you wish to get assigned.
@@ -268,28 +268,32 @@ boolFromBitVector
   -> Identifier
   -> TExpr
   -> State (BlockState backend) TExpr
-boolFromBitVector n = outputCoerce (BitVector n) Bool (\i -> "unsigned(" <> i <> ") > 0")
+boolFromBitVector n =
+  outputCoerce (BitVector n) Bool (\i -> "unsigned(" <> i <> ") > 0")
 
 -- | Used to create an output `Unsigned` from a `BitVector` of given
 -- size. Works in a similar way to `boolFromBit` above.
+--
+-- TODO: Implement for (System)Verilog
 unsignedFromBitVector
-  :: Backend backend
-  => Size
+  :: Size
   -> Identifier
   -> TExpr
-  -> State (BlockState backend) TExpr
-unsignedFromBitVector n = outputCoerce (BitVector n) (Unsigned n) (\i -> "unsigned(" <> i <> ")")
+  -> State (BlockState VHDLState) TExpr
+unsignedFromBitVector n =
+  outputCoerce (BitVector n) (Unsigned n) (\i -> "unsigned(" <> i <> ")")
 
 -- | Used to create an output `Bool` from a number of `Bit`s, using
 -- conjunction. Similarly to `untuple`, it returns a list of
 -- references to declared values (the inputs to the function) which
 -- should get assigned by something---usually output ports of an
 -- entity.
+--
+-- TODO: Implement for (System)Verilog
 boolFromBits
-  :: Backend backend
-  => [Identifier]
+  :: [Identifier]
   -> TExpr
-  -> State (BlockState backend) [TExpr]
+  -> State (BlockState VHDLState) [TExpr]
 boolFromBits inNames = outputFn (map (const Bit) inNames) Bool
   (foldl (<>) "" . intersperse " and " . map (\i -> "(" <> i <> " = '1')")) inNames
 
@@ -306,8 +310,9 @@ outputCoerce
   -> Identifier
   -> TExpr
   -> State (BlockState backend) TExpr
-outputCoerce fromType toType exprStringFn inName (TExpr outType (Identifier outName Nothing))
-  | outType == toType = do
+outputCoerce fromType toType exprStringFn inName expr_
+  | TExpr outType (Identifier outName Nothing) <- expr_
+  , outType == toType = do
       inName' <- newName inName
       let exprIdent = Identifier (exprStringFn inName') Nothing
       addDeclaration (NetDecl Nothing inName' fromType)
@@ -340,7 +345,7 @@ outputFn fromTypes toType exprFn inNames (TExpr outType (Identifier outName Noth
       pure [ TExpr t (Identifier nm Nothing)
            | (nm,t) <- zip inNames' fromTypes ]
 outputFn _ outType _ _ texpr =
-  error $ "outputBinaryFn: the expression " <> show texpr
+  error $ "outputFn: the expression " <> show texpr
   <> " must be an Identifier with type " <> show outType
 
 -- | Create a tuple of 'TExpr'
@@ -401,7 +406,8 @@ fromBV bvName (TExpr aTy (Identifier aName Nothing)) = do
   addDeclaration (NetDecl Nothing bvName' bvTy)
   addDeclaration (Assignment aName bvExpr)
   pure (TExpr bvTy (Identifier bvName' Nothing))
-fromBV _ texpr = error $ "fromBV: the expression " <> show texpr <> "must be an Indentifier"
+fromBV _ texpr = error $
+  "fromBV: the expression " <> show texpr <> "must be an Indentifier"
 
 clog2 :: Num i => Integer -> i
 clog2 = fromIntegral . fromMaybe 0 . clogBase 2
@@ -588,15 +594,16 @@ notExpr nm aExpr = do
 -- @
 --    (0 to n => ARG)
 -- @
+--
+-- TODO: Implement for (System)Verilog
 pureToBV
-  :: Backend backend
-  => Identifier
+  :: Identifier
   -- ^ desired name
   -> Int
   -- ^ Size (n)
   -> TExpr
   -- ^ ARG
-  -> State (BlockState backend) TExpr
+  -> State (BlockState VHDLState) TExpr
   -- ^ (0 to n => ARG)
 pureToBV nm n arg = do
   arg' <- toIdentifier' nm arg
@@ -609,15 +616,16 @@ pureToBV nm n arg = do
 -- @
 --    std_logic_vector(resize(ARG, Size))
 -- @
+--
+-- TODO: Implement for (System)Verilog
 pureToBVResized
-  :: Backend backend
-  => Identifier
+  :: Identifier
   -- ^ desired name
   -> Int
   -- ^ Size (n)
   -> TExpr
   -- ^ ARG
-  -> State (BlockState backend) TExpr
+  -> State (BlockState VHDLState) TExpr
   -- ^ std_logic_vector(resize(ARG, Size))
 pureToBVResized nm n arg = do
   arg' <- toIdentifier' nm arg
