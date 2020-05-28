@@ -3,7 +3,7 @@
     , "workInfo"  : "Never"
     , "kind"      : "Expression"
     , "type"      : "head :: Vec (n + 1) a -> a"
-    , "template"  : "~VAR[vec][0][~SIZE[~TYP[0]]-1 -: ~SIZE[~TYPO]]"
+    , "template"  : "~FROMBV[~VAR[vec][0][\\~SIZE[~TYP[0]]-1 -: ~SIZE[~TYPO]\\]][~TYPO]"
     }
   }
 , { "BlackBox" :
@@ -19,7 +19,7 @@
     , "workInfo"  : "Never"
     , "kind"      : "Expression"
     , "type"      : "Vec (n + 1) a -> a"
-    , "template"  : "~VAR[vec][0][~SIZE[~TYPO]-1:0]"
+    , "template"  : "~FROMBV[~VAR[vec][0][\\~SIZE[~TYPO]-1:0\\]][~TYPO]"
     }
   }
 , { "BlackBox" :

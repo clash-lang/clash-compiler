@@ -402,6 +402,7 @@ runClashTest = defaultMain $ clashTestRoot
         , runTest "Signum" def
         , runTest "Strict" def
         , runTest "T1019" def{hdlSim=False}
+        , runTest "T1351" def
         , outputTest ("tests" </> "shouldwork" </> "Numbers") allTargets [] ["-itests/shouldwork/Numbers"] "UndefinedConstantFolding"  "main"
         , runTest "UnsignedZero" def
         ]
