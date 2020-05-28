@@ -246,6 +246,7 @@ runClashTest = defaultMain $ clashTestRoot
           , topEntities=TopEntities ["top1"]
           }
         , runTest "T1012" def{hdlSim=False}
+        , runTest "T1240" def{hdlSim=False}
         , runTest "T1242" def{hdlSim=False}
         , runTest "T1254" def{hdlTargets=[VHDL,SystemVerilog],hdlSim=False}
         , runTest "T1292" def{hdlTargets=[VHDL]}
