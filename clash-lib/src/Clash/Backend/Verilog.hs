@@ -139,8 +139,12 @@ instance Backend VerilogState where
   inst            = inst_
   expr            = expr_
   iwWidth         = use intWidth
-  toBV _          = string
-  fromBV _        = string
+  toBV ty e       = case ty of
+    Signed _ -> "$unsigned" <> parens (string e)
+    _ -> string e
+  fromBV ty e     = case ty of
+    Signed _ -> "$signed" <> parens (string e)
+    _ -> string e
   hdlSyn          = use hdlsyn
   mkIdentifier    = do
       allowEscaped <- use escapedIds
