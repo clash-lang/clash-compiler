@@ -1848,8 +1848,8 @@ recToLetRec (TransformContext is0 []) e = do
     eqArg _ v1 v2@(stripTicks -> Var {})
       = v1 == v2
     eqArg tcm v1 v2@(collectArgs . stripTicks -> (Data _, args'))
-      | let t1 = termType tcm v1
-      , let t2 = termType tcm v2
+      | let t1 = normalizeType tcm (termType tcm v1)
+      , let t2 = normalizeType tcm (termType tcm v2)
       , t1 == t2
       = if isClassConstraint t1 then
           -- Class constraints are equal if their types are equal, so we can
