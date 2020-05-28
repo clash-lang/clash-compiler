@@ -3016,6 +3016,31 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
                          ,Left (Either.lefts vArgs !! 2)
                          ])
 
+  -- :: forall n a. KnownNat n => (a -> a) -> a -> Vec n a
+  "Clash.Sized.Vector.iterateI"
+    | isSubj
+    , [nTy, aTy] <- tys
+    , [_n, f, a] <- args
+    , Right n <- runExcept (tyNatSize tcm nTy)
+    ->
+      let
+        TyConApp vecTcNm _ = tyView (getResultTy tcm ty tys)
+        Just vecTc = lookupUniqMap vecTcNm tcm
+        [nilCon, consCon] = tyConDataCons vecTc
+      in case n of
+         0 -> reduce (mkVecNil nilCon aTy)
+         _ -> reduce $
+          mkVecCons consCon aTy n
+            (valToTerm a)
+            (mkApps
+              (Prim pInfo)
+              [ Right (LitTy (NumTy (n - 1)))
+              , Right aTy
+              , Left (valToTerm (Lit (NaturalLiteral (n - 1))))
+              , Left (valToTerm f)
+              , Left (mkApps (valToTerm f) [Left (valToTerm a)])
+              ])
+
 -- - Zipping
   "Clash.Sized.Vector.zipWith" -- :: (a -> b -> c) -> Vec n a -> Vec n b -> Vec n c
     | isSubj

@@ -578,6 +578,7 @@ runClashTest = defaultMain $ clashTestRoot
         , runTest "IndexInt" def
         , runTest "Indices" def
         , runTest "Iterate" def
+        , outputTest ("tests" </> "shouldwork" </> "Vector") [VHDL] [] [] "IterateCF" "main"
         , runTest "Minimum" def
         , runTest "MovingAvg" def{hdlSim=False}
         , runTest "PatHOCon" def{hdlSim=False}

@@ -10,8 +10,9 @@ topEntity = iterateI succ
 testBench :: Signal System Bool
 testBench = done
  where
-  testInput      = stimuliGenerator clk rst (3 :> 5 :> Nil)
-  expectedOutput = outputVerifier' clk rst ((3 :> 4 :> Nil) :> (5 :> 6 :> Nil) :> Nil)
+  output         = $(lift (map (iterate d2 (succ @Int)) (333 :> 444 :> Nil)))
+  testInput      = stimuliGenerator clk rst (333 :> 444 :> Nil)
+  expectedOutput = outputVerifier' clk rst output
   done           = expectedOutput (topEntity <$> testInput)
   clk            = tbSystemClockGen (not <$> done)
   rst            = systemResetGen
