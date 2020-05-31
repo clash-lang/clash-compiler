@@ -154,6 +154,7 @@ loadModules useColor hdl modName dflagsM idirs = do
   libDir <- MonadUtils.liftIO ghcLibDir
   startTime <- Clock.getCurrentTime
   GHC.runGhc (Just libDir) $ do
+<<<<<<< HEAD
     dflags <- case dflagsM of
                 Just df -> return df
                 Nothing -> do
@@ -260,6 +261,26 @@ loadModules useColor hdl modName dflagsM idirs = do
         modFamInstEnvs'          = foldl' plusFamInst FamInstEnv.emptyFamInstEnv modFamInstEnvs
 
     modTime <- startTime `deepseq` length binderIds `deepseq` MonadUtils.liftIO Clock.getCurrentTime
+=======
+    -- 'mainFunIs' is set to Nothing due to issue #1304:
+    -- https://github.com/clash-lang/clash-compiler/issues/1304
+    setupGhc useColor ((\d -> d{GHC.mainFunIs=Nothing}) <$> dflagsM) idirs
+    -- TODO: We currently load the transitive closure of _all_ bindings found
+    -- TODO: in the top module. This is wasteful if one or more binders don't
+    -- TODO: contribute to any top entities. This effect is worsened when using
+    -- TODO: -main-is, which only synthesizes a single top entity (and all its
+    -- TODO: dependencies).
+    (rootIds, modFamInstEnvs, rootModule, LoadedBinders{..}, allBinders) <-
+      -- We need to try and load external modules first, because we can't
+      -- recover from errors in 'loadLocalModule'.
+      loadExternalModule hdl modName >>= \case
+        Left _loadExternalErr -> loadLocalModule hdl modName
+        Right res -> pure res
+
+    let allBinderIds = map fst (CoreSyn.flattenBinds allBinders)
+
+    modTime <- startTime `deepseq` length allBinderIds `seq` MonadUtils.liftIO Clock.getCurrentTime
+>>>>>>> e3da1bc5f... Set '-main-is' to Nothing when compiling local modules
     let modStartDiff = reportTimeDiff modTime startTime
     MonadUtils.liftIO $ putStrLn $ "GHC: Parsing and optimising modules took: " ++ modStartDiff
 
