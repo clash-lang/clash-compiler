@@ -316,14 +316,20 @@ loadModules useColor hdl modName dflagsM idirs = do
       case (topEntities, topSyn) of
         ([], []) ->
           let modName1 = Outputable.showSDocUnsafe (ppr rootModule) in
-          Panic.pgmError [I.i|
-            No top-level function called 'topEntity' found, nor a function with
-            a 'Synthesize' annotation in module #{modName1}. Did you forget to
-            export them?
+          if topEntityName /= "topEntity" then
+            Panic.pgmError [I.i|
+              No top-level function called '#{topEntityName}' found. Did you
+              forget to export it?
+            |]
+          else
+            Panic.pgmError [I.i|
+              No top-level function called 'topEntity' found, nor a function with
+              a 'Synthesize' annotation in module #{modName1}. Did you forget to
+              export them?
 
-            For more information on 'Synthesize' annotations, check out the
-            documentation of "Clash.Annotations.TopEntity".
-          |]
+              For more information on 'Synthesize' annotations, check out the
+              documentation of "Clash.Annotations.TopEntity".
+            |]
         ([], _) ->
           return allSyn'
         ([x], _) ->
