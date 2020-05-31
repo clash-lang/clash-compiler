@@ -277,6 +277,10 @@ runClashTest = defaultMain $ clashTestRoot
         , runTest "T1254" def{hdlTargets=[VHDL,SystemVerilog],hdlSim=False}
         , runTest "T1292" def{hdlTargets=[VHDL]}
         , runTest "T1297" def{hdlTargets=[VHDL], hdlSim=False}
+        , runTest "T1304" def{
+            hdlTargets=[VHDL]
+          , hdlLoad=False
+          }
         , runTest "T1305" def{
             hdlTargets=[VHDL]
           , hdlSim=False
