@@ -82,6 +82,9 @@ data TestOptions =
   TestOptions
     { hdlSim :: Bool
     -- ^ Run hdl simulators (GHDL, ModelSim, etc.)
+    , hdlLoad :: Bool
+    -- ^ Load hdl into simulator (GHDL, ModelSim, etc.). Disabling this will
+    -- disable 'hdlSim' too.
     , expectSimFail :: Maybe (TestExitCode, T.Text)
     -- ^ Expect simulation to fail: Nothing if simulation is expected to run
     -- without errors, or Just (part of) the error message the simulation is
@@ -109,6 +112,7 @@ instance Default TestOptions where
   def =
     TestOptions
       { hdlSim=True
+      , hdlLoad=True
       , expectClashFail=Nothing
       , expectSimFail=Nothing
       , hdlTargets=allTargets
@@ -562,9 +566,10 @@ runTest1 modName testOptions@TestOptions{..} path VHDL =
        clashTest : concat (zipWith mkTests entNames subdirss)
 
    mkTests entName subdirs =
-     case (isJust expectClashFail, hdlSim) of
-       (True, _) -> []
-       (_, False) -> makeTests entName subdirs
+     case (isJust expectClashFail, hdlLoad, hdlSim) of
+       (True, _, _) -> []
+       (_, False, _) -> []
+       (_, _, False) -> makeTests entName subdirs
        _ -> makeTests entName subdirs ++ [simTest entName subdirs]
 
 runTest1 modName testOptions@TestOptions{..} path Verilog =
@@ -592,9 +597,10 @@ runTest1 modName testOptions@TestOptions{..} path Verilog =
       clashTest : concat (zipWith mkTests entNames subdirss)
 
    mkTests entName subdirs =
-     case (isJust expectClashFail, hdlSim) of
-       (True, _) -> []
-       (_, False) -> [makeTest entName subdirs]
+     case (isJust expectClashFail, hdlLoad, hdlSim) of
+       (True, _, _) -> []
+       (_, False, _) -> []
+       (_, _, False) -> [makeTest entName subdirs]
        _ -> [makeTest entName subdirs, simTest entName subdirs]
 
 runTest1 modName testOptions@TestOptions{..} path SystemVerilog =
@@ -620,9 +626,10 @@ runTest1 modName testOptions@TestOptions{..} path SystemVerilog =
       clashTest : concat (zipWith mkTests entNames subdirss)
 
    mkTests entName subdirs =
-     case (isJust expectClashFail, hdlSim) of
-       (True, _) -> []
-       (_, False) -> makeTest entName subdirs
+     case (isJust expectClashFail, hdlLoad, hdlSim) of
+       (True, _, _) -> []
+       (_, False, _) -> []
+       (_, _, False) -> makeTest entName subdirs
        _ -> makeTest entName subdirs ++ [simTest entName]
 
 runTest
