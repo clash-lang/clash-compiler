@@ -250,6 +250,12 @@ runClashTest = defaultMain $ clashTestRoot
         , runTest "T1254" def{hdlTargets=[VHDL,SystemVerilog],hdlSim=False}
         , runTest "T1292" def{hdlTargets=[VHDL]}
         , runTest "T1297" def{hdlTargets=[VHDL], hdlSim=False}
+        , runTest "T1305" def{
+            hdlTargets=[VHDL]
+          , hdlSim=False
+          , clashFlags=["-main-is", "plus"]
+          , topEntities=TopEntities ["plus"]
+          }
         , runTest "T1316" def{hdlTargets=[VHDL], hdlSim=False}
         , runTest "T1322" def{hdlTargets=[VHDL]}
         , runTest "T1340" def{hdlTargets=[VHDL], hdlSim=False}

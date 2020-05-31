@@ -300,8 +300,14 @@ loadModules useColor hdl modName dflagsM idirs = do
     benchAnn   <- findTestBenchAnnotations binderIds
     reprs'     <- findCustomReprAnnotations
     primGuards <- findPrimitiveGuardAnnotations allBinderIds
+<<<<<<< HEAD
     let varNameString = OccName.occNameString . Name.nameOccName . Var.varName
         topEntities = filter ((== "topEntity") . varNameString) rootIds
+=======
+    let topEntityName = fromMaybe "topEntity" (GHC.mainFunIs =<< dflagsM)
+        varNameString = OccName.occNameString . Name.nameOccName . Var.varName
+        topEntities = filter ((==topEntityName) . varNameString) rootIds
+>>>>>>> 9bbef72ba... Ignore topEntity when -main-is is used
         benches     = filter ((== "testBench") . varNameString) rootIds
         mergeBench (x,y) = (x,y,lookup x benchAnn)
         allSyn'     = map mergeBench allSyn
