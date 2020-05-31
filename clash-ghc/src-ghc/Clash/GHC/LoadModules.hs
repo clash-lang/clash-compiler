@@ -332,7 +332,9 @@ loadModules useColor hdl modName dflagsM idirs = do
   libDir <- MonadUtils.liftIO ghcLibDir
   startTime <- Clock.getCurrentTime
   GHC.runGhc (Just libDir) $ do
-    setupGhc useColor dflagsM idirs
+    -- 'mainFunIs' is set to Nothing due to issue #1304:
+    -- https://github.com/clash-lang/clash-compiler/issues/1304
+    setupGhc useColor ((\d -> d{GHC.mainFunIs=Nothing}) <$> dflagsM) idirs
     -- TODO: We currently load the transitive closure of _all_ bindings found
     -- TODO: in the top module. This is wasteful if one or more binders don't
     -- TODO: contribute to any top entities. This effect is worsened when using
