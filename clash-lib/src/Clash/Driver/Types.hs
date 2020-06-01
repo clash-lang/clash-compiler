@@ -67,60 +67,107 @@ data DebugLevel
   -- ^ Show all sub-expressions on which a rewrite is attempted
   deriving (Eq,Ord,Read,Enum,Generic,Hashable)
 
-data ClashOpts = ClashOpts { opt_inlineLimit :: Int
-                           , opt_specLimit   :: Int
-                           , opt_inlineFunctionLimit :: Word
-                           , opt_inlineConstantLimit :: Word
-                           , opt_dbgLevel    :: DebugLevel
-                           , opt_dbgTransformations :: Set.Set String
-                           , opt_dbgTransformationsFrom :: Int
-                           -- ^ Only output debug information from (applied)
-                           -- transformation n
-                           , opt_dbgTransformationsLimit :: Int
-                           -- ^ Only output debug information for n (applied)
-                           -- transformations. If this limit is exceeded, Clash
-                           -- will stop normalizing.
-                           , opt_cachehdl    :: Bool
-                           , opt_cleanhdl    :: Bool
-                           , opt_primWarn    :: Bool
-                           , opt_color       :: OverridingBool
-                           , opt_intWidth    :: Int
-                           , opt_hdlDir      :: Maybe String
-                           -- ^ Directory to store temporary files in. Will be
-                           -- cleaned after Clash has finished executing.
-                           , opt_hdlSyn      :: HdlSyn
-                           , opt_errorExtra  :: Bool
-                           , opt_floatSupport :: Bool
-                           , opt_importPaths :: [FilePath]
-                           , opt_componentPrefix :: Maybe String
-                           , opt_newInlineStrat :: Bool
-                           , opt_escapedIds :: Bool
-                           , opt_ultra :: Bool
-                           -- ^ Perform a high-effort compile, trading improved
-                           -- performance for potentially much longer compile
-                           -- times.
-                           --
-                           -- Name inspired by Design Compiler's /compile_ultra/
-                           -- flag.
-                           , opt_forceUndefined :: Maybe (Maybe Int)
-                           -- ^
-                           -- * /Nothing/: generate undefined's in the HDL
-                           --
-                           -- * /Just Nothing/: replace undefined's by a
-                           -- constant in the HDL; the compiler decides what's
-                           -- best
-                           --
-                           -- * /Just (Just x)/: replace undefined's by /x/ in
-                           -- the HDL
-                           , opt_checkIDir   :: Bool
-                           , opt_aggressiveXOpt :: Bool
-                           -- ^ Enable aggressive X optimization, which may
-                           -- remove undefineds from generated HDL by replaced
-                           -- with defined alternatives.
-                           , opt_inlineWFCacheLimit :: Word
-                           -- ^ At what size do we cache normalized work-free
-                           -- top-level binders.
-                           }
+-- | Options passed to Clash compiler
+data ClashOpts = ClashOpts
+  { opt_inlineLimit :: Int
+  -- ^ Change the number of times a function f can undergo inlining inside
+  -- some other function g. This prevents the size of g growing dramatically.
+  --
+  -- Command line flag: -fclash-inline-limit
+  , opt_specLimit :: Int
+  -- ^ Change the number of times a function can undergo specialization.
+  --
+  -- Command line flag: -fclash-spec-limit
+  , opt_inlineFunctionLimit :: Word
+  -- ^ Set the threshold for function size. Below this threshold functions are
+  -- always inlined (if it is not recursive).
+  --
+  -- Command line flag: -fclash-inline-function-limit
+  , opt_inlineConstantLimit :: Word
+  -- ^ Set the threshold for constant size. Below this threshold constants are
+  -- always inlined. A value of 0 inlines all constants.
+  --
+  -- Command line flag: -fclash-inline-constant-limit
+  , opt_dbgLevel :: DebugLevel
+  -- ^ Set the debugging mode for the compiler, exposing additional output. See
+  -- "DebugLevel" for the available options.
+  --
+  -- Command line flag: -fclash-debug
+  , opt_dbgTransformations :: Set.Set String
+  -- ^ List the transformations that are to be debugged.
+  --
+  -- Command line flag: -fclash-debug-transformations
+  , opt_dbgTransformationsFrom :: Int
+  -- ^ Only output debug information from (applied) transformation n
+  --
+  -- Command line flag: -fclash-debug-transformations-from
+  , opt_dbgTransformationsLimit :: Int
+  -- ^ Only output debug information for n (applied) transformations. If this
+  -- limit is exceeded, Clash will stop normalizing.
+  --
+  -- Command line flag: -fclash-debug-transformations-limit
+  , opt_cachehdl :: Bool
+  -- ^ Reuse previously generated output from Clash. Only caches topentities.
+  --
+  -- Command line flag: -fclash-no-cache
+  , opt_cleanhdl :: Bool
+  -- ^ Remove previously rendered HDL, before writing new files.
+  --
+  -- Command line flag: -fclash-no-clean
+  , opt_primWarn :: Bool
+  -- ^ Disable warnings for primitives
+  --
+  -- Command line flag: -fclash-no-prim-warn
+  , opt_color :: OverridingBool
+  -- ^ Show colors in debug output
+  --
+  -- Command line flag: -fclash-no-prim-warn
+  , opt_intWidth :: Int
+  -- ^ Set the bit width for the Int/Word/Integer types. The only allowed values
+  -- are 32 or 64.
+  , opt_hdlDir :: Maybe String
+  -- ^ Directory to save HDL files to
+  , opt_hdlSyn :: HdlSyn
+  -- ^ Synthesis target. See "HdlSyn" for available options.
+  , opt_errorExtra :: Bool
+  -- ^ Show additional information in error messages
+  , opt_floatSupport :: Bool
+  -- ^ Treat floats as a BitVector. Note that operations on floating are still
+  -- not supported, use vendor primitives instead.
+  , opt_importPaths :: [FilePath]
+  -- ^ Paths where Clash should look for modules
+  , opt_componentPrefix :: Maybe String
+  -- ^ Prefix components with given string
+  , opt_newInlineStrat :: Bool
+  -- ^ Use new inline strategy. Functions marked NOINLINE will get their own
+  -- HDL module.
+  , opt_escapedIds :: Bool
+  -- ^ Use escaped identifiers in HDL. See:
+  --
+  --  * http://vhdl.renerta.com/mobile/source/vhd00037.htm
+  --  * http://verilog.renerta.com/source/vrg00018.htm
+  , opt_ultra :: Bool
+  -- ^ Perform a high-effort compile, trading improved performance for
+  -- potentially much longer compile times.
+  --
+  -- Name inspired by Design Compiler's /compile_ultra/ flag.
+  , opt_forceUndefined :: Maybe (Maybe Int)
+  -- ^
+  -- * /Nothing/: generate undefined's in the HDL
+  --
+  -- * /Just Nothing/: replace undefined's by a constant in the HDL; the
+  -- compiler decides what's best
+  --
+  -- * /Just (Just x)/: replace undefined's by /x/ in the HDL
+  , opt_checkIDir :: Bool
+  -- ^ Check whether paths specified in 'opt_importPaths' exists on the
+  -- filesystem.
+  , opt_aggressiveXOpt :: Bool
+  -- ^ Enable aggressive X optimization, which may remove undefineds from
+  -- generated HDL by replaced with defined alternatives.
+  , opt_inlineWFCacheLimit :: Word
+  -- ^ At what size do we cache normalized work-free top-level binders.
+  }
 
 instance Hashable ClashOpts where
   hashWithSalt s ClashOpts {..} =
