@@ -44,7 +44,11 @@ import           Data.List.Extra             (allM, partitionM)
 import qualified Data.Map                    as Map
 import           Data.Maybe
   (catMaybes, isJust, mapMaybe, fromMaybe)
+
+#if EXPERIMENTAL_EVALUATOR
 import qualified Data.Map.Strict             as StrictMap
+#endif
+
 import qualified Data.Monoid                 as Monoid
 import qualified Data.Set                    as Set
 import qualified Data.Set.Lens               as Lens
