@@ -254,7 +254,7 @@ applyDebug lvl _transformations _fromLimit name exprOld hasChanged exprNew =
                      , "substitution."
                      ])
 
-    traceIf (lvl >= DebugApplied && (not (beforeTy `aeqType` afterTy)))
+    traceIf (lvl >= DebugApplied && (not (normalizeType tcm beforeTy `aeqType` normalizeType tcm afterTy)))
             ( concat [ $(curLoc)
                      , "Error when applying rewrite ", name
                      , " to:\n" , before
