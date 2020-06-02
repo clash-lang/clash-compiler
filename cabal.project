@@ -2,6 +2,7 @@
 -- root directory (i.e. patched copies, or forks) and will automatically be
 -- preferred by the solver over other versions.
 packages:
+  ./clash-shake
   ./clash-ghc
   ./clash-lib
   ./clash-prelude
