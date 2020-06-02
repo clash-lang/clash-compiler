@@ -320,8 +320,9 @@ runClashTest = defaultMain $ clashTestRoot
         , runTest "T1240" def{hdlSim=False}
         , runTest "T1297" def{hdlTargets=[VHDL], hdlSim=False}
 #endif
-        , runTest "T1242" def{hdlSim=False}
         , runTest "T1254" def{hdlTargets=[VHDL,SystemVerilog],hdlSim=False}
+#if !EXPERIMENTAL_EVALUATOR || __GLASGOW_HASKELL__ >= 865
+        , runTest "T1242" def{hdlSim=False}
         , runTest "T1292" def{hdlTargets=[VHDL]}
         , runTest "T1304" def{
             hdlTargets=[VHDL]
@@ -352,6 +353,7 @@ runClashTest = defaultMain $ clashTestRoot
         , runTest "T1354B" def{hdlTargets=[VHDL], hdlSim=False}
         , runTest "T1402" def{clashFlags=["-O"]}
         , runTest "T1402b" def{hdlTargets=[VHDL], hdlSim=False}
+#endif
         , runTest "TagToEnum" def{hdlSim=False}
         , runTest "TwoFunctions" def{hdlSim=False}
         ]
@@ -785,6 +787,9 @@ runClashTest = defaultMain $ clashTestRoot
 #if EXPERIMENTAL_EVALUATOR
       , clashTestGroup "PartialEvaluation"
         [ clashLibTest ("tests" </> "shouldwork" </> "PartialEvaluation") allTargets [] "EtaExpansion" "main"
+        , clashLibTest ("tests" </> "shouldwork" </> "PartialEvaluation") allTargets [] "KnownCase" "main"
+        , clashLibTest ("tests" </> "shouldwork" </> "PartialEvaluation") allTargets [] "CaseOfCase" "main"
+        , clashLibTest ("tests" </> "shouldwork" </> "PartialEvaluation") allTargets [] "LazyEvaluation" "main"
         ]
 #endif
       ] -- end shouldwork

@@ -10,6 +10,7 @@ import Control.Monad.State.Strict (State)
 import qualified Control.Monad.State.Strict as State (runState)
 import Control.DeepSeq (NFData(..))
 import Data.Bifunctor (first, second)
+import Data.Either (isRight)
 import Data.Foldable (foldl')
 import Data.IntMap.Strict (IntMap)
 import qualified Data.IntMap.Strict as IntMap
@@ -358,8 +359,8 @@ collectValueTicks = go []
 addTicks :: Value -> [TickInfo] -> Value
 addTicks = foldl' VTick
 
--- | A term which is in beta-long eta-normal (NF). This has no redexes, and all
--- partially applied functions in subterms are eta-expanded.
+-- | A term which is in beta-normal eta-long form (NF). This has no redexes,
+-- and all partially applied functions in subterms are eta-expanded.
 --
 data Nf
   = NNeu    (Neutral Nf)
@@ -418,7 +419,7 @@ instance AsTerm Value where
       | null bs = x
       | otherwise = Letrec bs x
      where
-      bs = Map.toList $ fmap asTerm (envLocals env)
+      bs = Map.toList . fmap asTerm $ Map.filter isRight (envLocals env)
 
 instance AsTerm Nf where
   asTerm = \case
