@@ -26,6 +26,7 @@ import Test.Tasty.Clash.CoreTest
 topEntity :: Integer -> Integer
 topEntity = flip const nats
  where
+  nats :: [Integer]
   nats = 0 : fmap succ nats
 
 testPath :: FilePath
@@ -45,18 +46,6 @@ mainCommon hdl = do
 
      |  otherwise
      -> error ("Evaluation was not lazy: " <> show te)
- where
-  findBinding name (bm, tcm, ids) =
-    case List.find byName (eltsVarEnv bm) of
-      Just bd ->
-        fst3 $ nf ghcEvaluator bm (mempty, 0)
-          tcm emptyInScopeSet ids (bindingTerm bd)
-
-      Nothing ->
-        error ("No entity in module: " <> show name)
-   where
-    fst3 (x, _, _) = x
-    byName b = name == nameOcc (varName $ bindingId b)
 
 mainVHDL :: IO ()
 mainVHDL = mainCommon SVHDL

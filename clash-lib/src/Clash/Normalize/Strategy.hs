@@ -32,11 +32,11 @@ import Clash.Rewrite.Util
 normalization :: NormRewrite
 normalization =
   rmDeadcode >-> constantPropagation >-> rmUnusedExpr >-!-> anf >-!-> rmDeadcode >->
-  bindConst >-> letTL >-!->
+  bindConst >-> letTL
 #if !EXPERIMENTAL_EVALUATOR
-  evalConst >->
+  >-> evalConst
 #endif
-  cse >-!-> cleanup >->
+  >-!-> cse >-!-> cleanup >->
   xOptim >-> rmDeadcode >->
   cleanup >-> recLetRec >-> splitArgs
   where

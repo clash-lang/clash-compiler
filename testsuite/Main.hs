@@ -304,7 +304,6 @@ runClashTest = defaultMain $ clashTestRoot
         , runTest "PopCount" def
         , runTest "RecordSumOfProducts" def{hdlSim=False}
         , runTest "Replace" def
-        , runTest "T1242" def{hdlSim=False}
         , runTest "TestIndex" def{hdlSim=False}
         , runTest "Time" def
 #endif
@@ -790,6 +789,7 @@ runClashTest = defaultMain $ clashTestRoot
         , clashLibTest ("tests" </> "shouldwork" </> "PartialEvaluation") allTargets [] "KnownCase" "main"
         , clashLibTest ("tests" </> "shouldwork" </> "PartialEvaluation") allTargets [] "CaseOfCase" "main"
         , clashLibTest ("tests" </> "shouldwork" </> "PartialEvaluation") allTargets [] "LazyEvaluation" "main"
+        , clashLibTest ("tests" </> "shouldwork" </> "PartialEvaluation") allTargets [] "MutualRecursion" "main"
         ]
 #endif
       ] -- end shouldwork

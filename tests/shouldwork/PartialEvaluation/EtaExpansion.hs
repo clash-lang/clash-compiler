@@ -25,14 +25,12 @@
 --
 module EtaExpansion where
 
-import qualified Data.List as List (find)
-import qualified Data.Text (Text)
+import Control.Monad (unless)
 
 import Clash.Prelude
 
 import Clash.Backend
 import Clash.Core.Evaluator.Models
-import Clash.Core.Name
 import Clash.Core.Subst
 import Clash.Core.Term
 import Clash.Core.TyCon
@@ -109,30 +107,16 @@ mainCommon hdl = do
   let data1 = findBinding "EtaExpansion.etaReducedData" entities
       data2 = findBinding "EtaExpansion.etaExpandedData" entities
 
-  if aeqTerm (asTerm data1) (asTerm data2)
-     then pure ()
-     else error ("Not alpha equivalent: " <> show data1 <> "\n\n" <> show data2)
+  unless (aeqTerm (asTerm data1) (asTerm data2)) $
+    error ("Not alpha equivalent: " <> show data1 <> "\n\n" <> show data2)
 
   -- Eta Expansion of Primitive Operations
   let prim1 = findBinding "EtaExpansion.etaReducedPrim1" entities
       prim2 = findBinding "EtaExpansion.etaReducedPrim2" entities
       prim3 = findBinding "EtaExpansion.etaExpandedPrim" entities
 
-  if aeqTerm (asTerm prim1) (asTerm prim2) && aeqTerm (asTerm prim1) (asTerm prim3)
-     then pure ()
-     else error ("Not alpha equivalent: " <> show prim1 <> "\n\n" <> show prim2 <> "\n\n" <> show prim3)
- where
-  findBinding name (bm, tcm, ids) =
-    case List.find byName (eltsVarEnv bm) of
-      Just bd ->
-        fst3 $ nf ghcEvaluator bm (mempty, 0)
-          tcm emptyInScopeSet ids (bindingTerm bd)
-
-      Nothing -> error ("No entity in module: " <> show name)
-   where
-    fst3 (x, _, _) = x
-    byName b = name == nameOcc (varName $ bindingId b)
-
+  unless (aeqTerm (asTerm prim1) (asTerm prim2) && aeqTerm (asTerm prim1) (asTerm prim3)) $
+    error ("Not alpha equivalent: " <> show prim1 <> "\n\n" <> show prim2 <> "\n\n" <> show prim3)
 
 mainVHDL :: IO ()
 mainVHDL = mainCommon SVHDL
