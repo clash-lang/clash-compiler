@@ -1,3 +1,5 @@
+{-# OPTIONS_GHC -Wno-orphans #-}
+
 {-# LANGUAGE DeriveAnyClass #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE OverloadedStrings #-}
@@ -5,10 +7,9 @@
 module Clash.Core.Evaluator.Models where
 
 import Control.Concurrent.Supply (Supply)
-import Control.Monad ((>=>))
 import Control.Monad.State.Strict (State)
 import qualified Control.Monad.State.Strict as State (runState)
-import Control.DeepSeq (NFData(..))
+import Control.DeepSeq (NFData(..), rwhnf)
 import Data.Bifunctor (first, second)
 import Data.Either (isRight)
 import Data.Foldable (foldl')
@@ -31,10 +32,12 @@ import Clash.Core.Var (Id, IdScope(..))
 import Clash.Core.VarEnv
   ( InScopeSet, extendInScopeSet, mkInScopeSet
   , VarEnv, delVarEnv, extendVarEnv, lookupVarEnv
-  , unionVarSet, uniqAway
+  , unionVarSet
   )
 
 import Clash.Driver.Types (BindingMap, Binding(..))
+
+type Eval a = State Env a
 
 -- | Evaluate a term to NF using the specified evaluator. See 'partialEval'
 -- for more details about arguments to this function.
@@ -52,6 +55,7 @@ nf = partialEval evaluateNf
 
 -- | Evaluate a term to WHNF using the specified evaluator. See 'partialEval'
 -- for more details about arguments to this function.
+--
 whnf
   :: Evaluator
   -> BindingMap
@@ -74,7 +78,7 @@ whnf = partialEval evaluateWhnf
 --
 partialEval
   :: (AsTerm a)
-  => (Evaluator -> Term -> State Env a)
+  => (Evaluator -> Term -> Eval a)
   -> Evaluator
   -> BindingMap
   -> EnvPrimsIO
@@ -99,14 +103,14 @@ partialEval f eval bs ps tcm iss ids x =
 -- as the 'AsTerm' class (which converts back to Term) has instances for both.
 --
 data Evaluator = Evaluator
-  { evaluateWhnf :: Term -> State Env Value
-  , quoteNf      :: Value -> State Env Nf
+  { evaluateWhnf :: Term -> Eval Value
+  , quoteNf      :: Value -> Eval Nf
   }
 
 -- | Evaluate a term to normal form without stopping at WHNF.
 --
-evaluateNf :: Evaluator -> Term -> State Env Nf
-evaluateNf (Evaluator e q) = e >=> q
+evaluateNf :: Evaluator -> Term -> Eval Nf
+evaluateNf (Evaluator e q) x = e x >>= q
 
 -- Local bindings are not stored in a VarEnv, as we still want to be
 -- able to access the keys (VarEnv simply indexes by unique).
@@ -124,21 +128,32 @@ type EnvGlobals = VarEnv (Binding (Either Term Value))
 --
 type EnvPrimsIO = (IntMap Value, Int)
 
+-- Orphan instance, so NFData can be derived for Env.
+--
+instance NFData Supply where
+  rnf = rwhnf
+
 {-
 Note [environment machines]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Evaluating in a big-step style with an environment machine allows terms to be
 evaluated with fewer traversals of the term. Consider a small-step reduction
-machine: on finding a redex it would apply beta-reduction, and then have to
-re-traverse the resulting term from the point where it changed in case there
-are new redexes to reduce.
+machine: on finding a redex it would apply beta-reduction, which traverses the
+term, and would then re-traverse from where the term changed to be able to
+reduce newly exposed redexes [1].
 
 In contrast, a big-step machine allows fewer traversals. Constructors of the
 Value type do not contain redexes that need removing to obtain a WHNF term.
 This means when it is possible to create a value (by evaluating a term and all
 subterms to values), the resulting term does not need traversing again. Further
-evaluation to NF is achieved by introducting another function, quote, which
+evaluation to NF is achieved by introducting another function, quoteNf, which
 recursively evaluates subterms to remove the remaining redexes.
+
+[1] It is possible to amortize this cost in Haskell by taking advantage of the
+call-by-need semantics of the language, although care must be taken to ensure
+that evaluation is not too strict. As this implementation uses different types
+for terms in different forms (unevaluated, WHNF, NF), it is inherently too
+strict for this approach.
 -}
 
 -- | An Environment contains all in scope terms and types while evaluating.
@@ -160,30 +175,16 @@ data Env = Env
   , envPrimsIO :: !EnvPrimsIO
   , envTcMap   :: !TyConMap
   , envInScope :: !InScopeSet
-  , envSupply  :: Supply
-  }
+  , envSupply  :: !Supply
+  } deriving (Generic, NFData)
 
 instance Show Env where
   show env = show (envTypes env, envLocals env, envPrimsIO env)
-
--- This instance cannot be derived with Generic, as Supply does not have an
--- NFData instance. Instead, we use this instance which forces all fields
--- which can be forced.
---
-instance NFData Env where
-  rnf env = rnf (envTypes env)
-    `seq` rnf (envLocals env)
-    `seq` rnf (envGlobals env)
-    `seq` rnf (envPrimsIO env)
-    `seq` rnf (envTcMap env)
-    `seq` rnf (envInScope env)
 
 mkEnv :: BindingMap -> EnvPrimsIO -> TyConMap -> InScopeSet -> Supply -> Env
 mkEnv bs = Env mempty mempty gs
  where
   gs = fmap Left <$> bs
-
--- lookup
 
 lookupLocal :: Id -> Env -> Maybe (Either Term Value)
 lookupLocal i = Map.lookup i . envLocals
@@ -191,50 +192,37 @@ lookupLocal i = Map.lookup i . envLocals
 lookupGlobal :: Id -> Env -> Maybe (Binding (Either Term Value))
 lookupGlobal i = lookupVarEnv i . envGlobals
 
-lookupPrim :: Int -> Env -> Maybe Value
-lookupPrim i = IntMap.lookup i . fst . envPrimsIO
+lookupPrimIO :: Int -> Env -> Maybe Value
+lookupPrimIO i = IntMap.lookup i . fst . envPrimsIO
 
--- insert
-
--- | Add a new type to the environment. The unique for the new
--- element is guaranteed to be unique within the environment.
---
 insertType :: TyVar -> Type -> Env -> Env
 insertType i ty env = env
-  { envTypes = Map.insert i' ty (envTypes env)
-  , envInScope = extendInScopeSet (envInScope env) i'
+  { envTypes = Map.insert i ty (envTypes env)
+  , envInScope = extendInScopeSet (envInScope env) i
   }
- where
-  i' = uniqAway (envInScope env) i
 
 insertTypes :: [(TyVar, Type)] -> Env -> Env
 insertTypes xs env = foldl' (flip $ uncurry insertType) env xs
 
--- | Add a new term / value to the local environment. The unique for the new
--- element is guaranteed to be unique within the environment.
---
 insertLocal :: Id -> Either Term Value -> Env -> Env
 insertLocal i etv env = env
-  { envLocals  = Map.insert i' etv (envLocals env)
-  , envInScope = extendInScopeSet (envInScope env) i'
+  { envLocals  = Map.insert i etv (envLocals env)
+  , envInScope = extendInScopeSet (envInScope env) i
   }
- where
-  i' = uniqAway (envInScope env) i
 
 insertLocals :: [(Id, Either Term Value)] -> Env -> Env
 insertLocals xs env = foldl' (flip $ uncurry insertLocal) env xs
 
--- | Add a new primitive to the environment. Primitives are keyed by an
+-- | Add a new value to the environment representing the result of an IO
+-- primitive which is evaluated at compile time. Primitives are keyed by an
 -- integer ID in the evaluator. If the prim already exists in the environment,
 -- you should call 'updateEnvPrim' instead.
 --
-insertPrim :: Value -> Env -> Env
-insertPrim v env =
+insertPrimIO :: Value -> Env -> Env
+insertPrimIO v env =
   env { envPrimsIO = (IntMap.insert n v pm, n + 1) }
  where
   (pm, n) = envPrimsIO env
-
--- update
 
 -- | Update a local binding in the environment. If the Id is not in the
 -- local environment, the original environment is returned.
@@ -262,13 +250,11 @@ updatePure scope i etv env =
 
     _ -> env
 
-updatePrim :: Int -> Value -> Env -> Env
-updatePrim i v env =
+updatePrimIO :: Int -> Value -> Env -> Env
+updatePrimIO i v env =
   env { envPrimsIO = (IntMap.insert i v pm, n) }
  where
   (pm, n) = envPrimsIO env
-
--- delete
 
 deleteLocal :: Id -> Env -> Env
 deleteLocal = deletePure LocalId
@@ -419,6 +405,9 @@ instance AsTerm Value where
       | null bs = x
       | otherwise = Letrec bs x
      where
+      -- We only keep local bindings which have been forced to WHNF, bindings
+      -- which have not been forced are unused.
+      --
       bs = Map.toList . fmap asTerm $ Map.filter isRight (envLocals env)
 
 instance AsTerm Nf where

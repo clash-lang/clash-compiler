@@ -14,7 +14,7 @@
 --
 module KnownCase where
 
-import qualified Data.List as List (find)
+import Control.Monad (unless)
 
 import Clash.Prelude
 
@@ -88,29 +88,14 @@ mainCommon hdl = do
       lit  = findBinding "KnownCase.caseOfLit" entities
       def  = findBinding "KnownCase.caseOfDefault" entities
 
-  if aeqTerm (asTerm just) (asTerm alt)
-     then pure ()
-     else error ("Not alpha equivalent: " <> show just <> "\n\n" <> show alt)
+  unless (aeqTerm (asTerm just) (asTerm alt)) $
+    error ("Not alpha equivalent: " <> show just <> "\n\n" <> show alt)
 
-  if aeqTerm (asTerm lit) (asTerm alt)
-     then pure ()
-     else error ("Not alpha equivalent: " <> show lit <> "\n\n" <> show alt)
+  unless (aeqTerm (asTerm lit) (asTerm alt)) $
+    error ("Not alpha equivalent: " <> show lit <> "\n\n" <> show alt)
 
-  if aeqTerm (asTerm def) (asTerm alt)
-     then pure ()
-     else error ("Not alpha equivalent: " <> show def <> "\n\n" <> show alt)
- where
-  findBinding name (bm, tcm, ids) =
-    case List.find byName (eltsVarEnv bm) of
-      Just bd ->
-        fst3 $ nf ghcEvaluator bm (mempty, 0)
-          tcm emptyInScopeSet ids (bindingTerm bd)
-
-      Nothing ->
-        error ("No entity in module: " <> show name)
-   where
-    fst3 (x, _, _) = x
-    byName b = name == nameOcc (varName $ bindingId b)
+  unless (aeqTerm (asTerm def) (asTerm alt)) $
+    error ("Not alpha equivalent: " <> show def <> "\n\n" <> show alt)
 
 mainVHDL :: IO ()
 mainVHDL = mainCommon SVHDL
