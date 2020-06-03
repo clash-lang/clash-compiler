@@ -601,6 +601,8 @@ mkTravVec vecTc nilCon consCon pureTm apTm fmapTm bTy = go
 -- of @Clash.Sized.Vector.foldr@
 reduceFoldr
   :: TransformContext
+  -> PrimInfo
+  -- ^ Primitive info for foldr blackbox
   -> Integer
   -- ^ Length of the vector
   -> Type
@@ -612,28 +614,34 @@ reduceFoldr
   -> Term
   -- ^ The argument vector
   -> NormalizeSession Term
-reduceFoldr _ 0 _ _ start _ = changed start
-reduceFoldr (TransformContext is0 ctx) n aTy fun start arg = do
+reduceFoldr _ _ 0 _ _ start _ = changed start
+reduceFoldr _ctx foldrPrimInfo n aTy fun start arg = do
     tcm <- Lens.view tcCache
     let ty = termType tcm arg
-    go tcm ty
+    changed (go tcm ty)
   where
     go tcm (coreView1 tcm -> Just ty') = go tcm ty'
     go tcm (tyView -> TyConApp vecTcNm _)
-      | (Just vecTc) <- lookupUniqMap vecTcNm tcm
-      , nameOcc vecTcNm == "Clash.Sized.Vector.Vec"
-      , [_,consCon] <- tyConDataCons vecTc
-      = do
-        uniqs0 <- Lens.use uniqSupply
-        fun1 <- constantPropagation (TransformContext is0 (AppArg Nothing:ctx)) fun
-        let is1 = extendInScopeSetList is0 (collectTermIds fun1)
-            (uniqs1,(vars,elems)) = second (second concat . unzip)
-                                  $ extractElems uniqs0 is1 consCon aTy 'G' n arg
-            lbody            = foldr (\l r -> mkApps fun1 [Left l,Left r]) start vars
-            lb               = Letrec (init elems) lbody
-        uniqSupply Lens..= uniqs1
-        changed lb
-    go _ ty = error $ $(curLoc) ++ "reduceFoldr: argument does not have a vector type: " ++ showPpr ty
+      | nameOcc vecTcNm == "Clash.Sized.Vector.Vec"
+      , Just vecTc <- lookupUniqMap vecTcNm tcm
+      , [_nilCon, consCon] <- tyConDataCons vecTc
+      = let
+          (a, as) = extractHeadTail consCon aTy n arg
+          b = mkApps (Prim foldrPrimInfo) [ Right aTy
+                                          , Right (termType tcm start)
+                                          , Right (LitTy (NumTy (n - 1)))
+                                          , Left fun
+                                          , Left start
+                                          , Left as ]
+        in
+          mkApps fun [Left a, Left b]
+
+    go _ ty =
+      error $ $(curLoc) ++ [I.i|
+        reduceFoldr: argument does not have a vector type:
+
+          #{showPpr ty}
+      |]
 
 -- | Replace an application of the @Clash.Sized.Vector.fold@ primitive on
 -- vectors of a known length @n@, by the fully unrolled recursive "definition"

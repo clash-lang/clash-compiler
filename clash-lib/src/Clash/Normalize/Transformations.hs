@@ -2119,7 +2119,7 @@ reduceNonRepPrim c@(TransformContext is0 ctx) e@(App _ _) | (Prim p, args, ticks
                                  , List.anyM isUntranslatableType_not_poly [aTy,bTy] ]
             if shouldReduce1
               then let [fun,start,arg] = Either.lefts args
-                   in  (`mkTicks` ticks) <$> reduceFoldr c n aTy fun start arg
+                   in  (`mkTicks` ticks) <$> reduceFoldr c p n aTy fun start arg
               else return e
           _ -> return e
       "Clash.Sized.Vector.dfold" | argLen == 8 ->
