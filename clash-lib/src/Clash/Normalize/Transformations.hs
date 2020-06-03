@@ -2179,7 +2179,7 @@ reduceNonRepPrim c@(TransformContext is0 ctx) e@(App _ _) | (Prim p, args, ticks
             shouldReduce1 <- List.orM [ shouldReduce ctx
                                  , isUntranslatableType_not_poly aTy ]
             if shouldReduce1
-               then (`mkTicks` ticks) <$> reduceInit is0 (n+1) aTy vArg
+               then (`mkTicks` ticks) <$> reduceInit is0 p n aTy vArg
                else return e
           _ -> return e
       "Clash.Sized.Vector.unconcat" | argLen == 6 -> do
