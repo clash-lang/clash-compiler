@@ -2088,7 +2088,7 @@ reduceNonRepPrim c@(TransformContext is0 ctx) e@(App _ _) | (Prim p, args, ticks
                                         [argElTy,resElTy] ]
             if shouldReduce1
                then let [fun,arg] = Either.lefts args
-                    in  (`mkTicks` ticks) <$> reduceMap c n argElTy resElTy fun arg
+                    in  (`mkTicks` ticks) <$> reduceMap c p n argElTy resElTy fun arg
                else return e
           _ -> return e
       "Clash.Sized.Vector.traverse#" | argLen == 7 ->
