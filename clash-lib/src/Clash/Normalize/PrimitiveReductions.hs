@@ -330,34 +330,43 @@ reduceZipWith _ctx zipWithPrimInfo n lhsElTy rhsElTy resElTy fun lhsArg rhsArg =
 -- @Clash.Sized.Vector.map@
 reduceMap
   :: TransformContext
+  -> PrimInfo -- ^ map primitive info
   -> Integer  -- ^ Length of the vector
   -> Type -- ^ Argument type of the function
   -> Type -- ^ Result type of the function
   -> Term -- ^ The map'd function
   -> Term -- ^ The map'd over vector
   -> NormalizeSession Term
-reduceMap (TransformContext is0 ctx) n argElTy resElTy fun arg = do
+reduceMap _ctx mapPrimInfo n argElTy resElTy fun arg = do
     tcm <- Lens.view tcCache
     let ty = termType tcm arg
-    go tcm ty
+    changed (go tcm ty)
   where
     go tcm (coreView1 tcm -> Just ty') = go tcm ty'
     go tcm (tyView -> TyConApp vecTcNm _)
       | (Just vecTc)     <- lookupUniqMap vecTcNm tcm
       , nameOcc vecTcNm == "Clash.Sized.Vector.Vec"
       , [nilCon,consCon] <- tyConDataCons vecTc
-      = do
-        uniqs0 <- Lens.use uniqSupply
-        fun1 <- constantPropagation (TransformContext is0 (AppArg Nothing:ctx)) fun
-        let is1 = extendInScopeSetList is0 (collectTermIds fun1)
-            (uniqs1,(vars,elems)) = second (second concat . unzip)
-                                  $ extractElems uniqs0 is1 consCon argElTy 'A' n arg
-            funApps          = map (fun1 `App`) vars
-            lbody            = mkVec nilCon consCon resElTy n funApps
-            lb               = Letrec (init elems) lbody
-        uniqSupply Lens..= uniqs1
-        changed lb
-    go _ ty = error $ $(curLoc) ++ "reduceMap: argument does not have a vector type: " ++ showPpr ty
+      = case n of
+          0 -> mkVecNil nilCon argElTy
+          _ ->
+           let
+             nPredTy = Right (LitTy (NumTy (n - 1)))
+             (a, as) = extractHeadTail consCon argElTy n arg
+             b = mkApps fun [Left a]
+             bs = mkApps (Prim mapPrimInfo) [ Right argElTy
+                                            , Right resElTy
+                                            , nPredTy
+                                            , Left fun
+                                            , Left as ]
+           in
+             mkVecCons consCon resElTy n b bs
+    go _ ty =
+      error $ $(curLoc) ++ [I.i|
+        reduceMap: argument does not have a vector type:
+
+          #{showPpr ty}
+      |]
 
 -- | Replace an application of the @Clash.Sized.Vector.imap@ primitive on vectors
 -- of a known length @n@, by the fully unrolled recursive "definition" of
