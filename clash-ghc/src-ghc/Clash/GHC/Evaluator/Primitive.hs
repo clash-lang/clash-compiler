@@ -55,10 +55,7 @@ import           System.IO.Unsafe    (unsafeDupablePerformIO)
 
 import           BasicTypes          (Boxity (..))
 import           Name                (getSrcSpan, nameOccName, occNameString)
-import           PrelNames
-  (typeNatAddTyFamNameKey, typeNatMulTyFamNameKey, typeNatSubTyFamNameKey,
-   trueDataConKey, falseDataConKey)
-import           SrcLoc              (wiredInSrcSpan)
+import           PrelNames           (trueDataConKey, falseDataConKey)
 import qualified TyCon
 import           TysWiredIn          (tupleTyCon)
 import           Unique              (getKey)
@@ -89,6 +86,9 @@ import           Clash.Rewrite.Util  (mkSelectorCase)
 import           Clash.Unique        (lookupUniqMap)
 import           Clash.Util
   (MonadUnique (..), clogBase, flogBase, curLoc)
+import           Clash.Normalize.PrimitiveReductions
+  (typeNatMul, typeNatSub, typeNatAdd, vecLastPrim, vecInitPrim, vecHeadPrim,
+   vecTailPrim, mkVecCons, mkVecNil)
 
 import Clash.Promoted.Nat.Unsafe (unsafeSNat)
 import qualified Clash.Sized.Internal.BitVector as BitVector
@@ -3869,47 +3869,6 @@ mkIndexLit'
   -> Term
 mkIndexLit' (rTy,nTy,kn) = mkIndexLit rTy nTy kn
 
--- | Create a vector of supplied elements
-mkVecCons
-  :: DataCon
-  -- ^ The Cons (:>) constructor
-  -> Type
-  -- ^ Element type
-  -> Integer
-  -- ^ Length of the vector
-  -> Term
-  -- ^ head of the vector
-  -> Term
-  -- ^ tail of the vector
-  -> Term
-mkVecCons consCon resTy n h t =
-  mkApps (Data consCon) [Right (LitTy (NumTy n))
-                        ,Right resTy
-                        ,Right (LitTy (NumTy (n-1)))
-                        ,Left (primCo consCoTy)
-                        ,Left h
-                        ,Left t]
-
-  where
-    args = dataConInstArgTys consCon [LitTy (NumTy n),resTy,LitTy (NumTy (n-1))]
-    Just (consCoTy : _) = args
-
--- | Create an empty vector
-mkVecNil
-  :: DataCon
-  -- ^ The Nil constructor
-  -> Type
-  -- ^ The element type
-  -> Term
-mkVecNil nilCon resTy =
-  mkApps (Data nilCon) [Right (LitTy (NumTy 0))
-                       ,Right resTy
-                       ,Left  (primCo nilCoTy)
-                       ]
-  where
-    args = dataConInstArgTys nilCon [LitTy (NumTy 0),resTy]
-    Just (nilCoTy : _ ) = args
-
 boolToIntLiteral :: Bool -> Term
 boolToIntLiteral b = if b then Literal (IntLiteral 1) else Literal (IntLiteral 0)
 
@@ -4142,72 +4101,6 @@ runFF f i
         r = f a
     in  Literal . FloatLiteral . toRational $ F# r
 
-vecHeadPrim
-  :: TyConName
-  -- ^ Vec TyCon name
-  -> Term
-vecHeadPrim vecTcNm =
-  Prim (PrimInfo "Clash.Sized.Vector.head" (vecHeadTy vecTcNm) WorkNever)
-
-vecLastPrim
-  :: TyConName
-  -- ^ Vec TyCon name
-  -> Term
-vecLastPrim vecTcNm =
-  Prim (PrimInfo "Clash.Sized.Vector.last" (vecHeadTy vecTcNm) WorkNever)
-
-vecHeadTy
-  :: TyConName
-  -- ^ Vec TyCon name
-  -> Type
-vecHeadTy vecNm =
-    ForAllTy nTV (
-    ForAllTy aTV (
-    mkFunTy
-      (mkTyConApp vecNm [mkTyConApp typeNatAdd
-                           [VarTy nTV
-                           ,LitTy (NumTy 1)]
-                        ,VarTy aTV
-                        ])
-      (VarTy aTV)))
-  where
-    aTV = mkTyVar liftedTypeKind (mkUnsafeSystemName "a" 0)
-    nTV = mkTyVar typeNatKind (mkUnsafeSystemName "n" 1)
-
-vecTailPrim
-  :: TyConName
-  -- ^ Vec TyCon name
-  -> Term
-vecTailPrim vecTcNm =
-  Prim (PrimInfo "Clash.Sized.Vector.tail" (vecTailTy vecTcNm) WorkNever)
-
-vecInitPrim
-  :: TyConName
-  -- ^ Vec TyCon name
-  -> Term
-vecInitPrim vecTcNm =
-  Prim (PrimInfo "Clash.Sized.Vector.init" (vecTailTy vecTcNm) WorkNever)
-
-vecTailTy
-  :: TyConName
-  -- ^ Vec TyCon name
-  -> Type
-vecTailTy vecNm =
-    ForAllTy nTV (
-    ForAllTy aTV (
-    mkFunTy
-      (mkTyConApp vecNm [mkTyConApp typeNatAdd
-                           [VarTy nTV
-                           ,LitTy (NumTy 1)]
-                        ,VarTy aTV
-                        ])
-      (mkTyConApp vecNm [VarTy nTV
-                        ,VarTy aTV
-                        ])))
-  where
-    nTV = mkTyVar typeNatKind (mkUnsafeSystemName "n" 0)
-    aTV = mkTyVar liftedTypeKind (mkUnsafeSystemName "a" 1)
-
 splitAtPrim
   :: TyConName
   -- ^ SNat TyCon name
@@ -4431,25 +4324,6 @@ bvSplitTy bvNm =
     nTV   = mkTyVar typeNatKind (mkUnsafeSystemName "n" 0)
     mTV   = mkTyVar typeNatKind (mkUnsafeSystemName "m" 1)
     tupNm = ghcTyconToTyConName (tupleTyCon Boxed 2)
-
-typeNatAdd :: TyConName
-typeNatAdd = Name User
-                  "GHC.TypeNats.+"
-                  (getKey typeNatAddTyFamNameKey)
-                  wiredInSrcSpan
-
-
-typeNatMul :: TyConName
-typeNatMul = Name User
-                  "GHC.TypeNats.*"
-                  (getKey typeNatMulTyFamNameKey)
-                  wiredInSrcSpan
-
-typeNatSub :: TyConName
-typeNatSub = Name User
-                  "GHC.TypeNats.-"
-                  (getKey typeNatSubTyFamNameKey)
-                  wiredInSrcSpan
 
 ghcTyconToTyConName
   :: TyCon.TyCon

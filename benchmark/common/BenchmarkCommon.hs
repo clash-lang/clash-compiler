@@ -47,6 +47,7 @@ opts idirs =
     , opt_errorExtra = True
     , opt_floatSupport = True
     , opt_importPaths=idirs
+    , opt_specLimit=40 -- For "PipelinesViaFolds"
     }
 
 backend :: VHDLState

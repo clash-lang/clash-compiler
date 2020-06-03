@@ -33,6 +33,7 @@
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE QuasiQuotes #-}
 
 module Clash.Normalize.PrimitiveReductions where
 
@@ -42,12 +43,16 @@ import           Data.List                        (mapAccumR)
 import qualified Data.Maybe                       as Maybe
 import           TextShow                         (showt)
 
-import           PrelNames                        (boolTyConKey)
+import           PrelNames
+  (boolTyConKey, typeNatAddTyFamNameKey, typeNatMulTyFamNameKey,
+   typeNatSubTyFamNameKey)
 import           Unique                           (getKey)
+import           SrcLoc                           (wiredInSrcSpan)
 
 import           Clash.Core.DataCon               (DataCon)
 import           Clash.Core.Literal               (Literal (..))
-import           Clash.Core.Name                  (nameOcc)
+import           Clash.Core.Name
+  (nameOcc, Name(..), NameSort(User), mkUnsafeSystemName)
 import           Clash.Core.Pretty                (showPpr)
 import           Clash.Core.Term
   (CoreContext (..), PrimInfo (..), Term (..), WorkInfo (..), Pat (..),
@@ -59,12 +64,13 @@ import           Clash.Core.Type                  (LitTy (..), Type (..),
                                                    splitFunForallTy, tyView)
 import           Clash.Core.TyCon
   (TyConMap, TyConName, tyConDataCons, tyConName)
-import           Clash.Core.TysPrim               (integerPrimTy, typeNatKind)
+import           Clash.Core.TysPrim
+  (integerPrimTy, typeNatKind, liftedTypeKind)
 import           Clash.Core.Util
   (appendToVec, extractElems, extractTElems, mkRTree,
    mkUniqInternalId, mkUniqSystemTyVar, mkVec, dataConInstArgTys,
    primCo, undefinedTm)
-import           Clash.Core.Var                   (Var (..))
+import           Clash.Core.Var                   (Var (..), mkTyVar, mkLocalId)
 import           Clash.Core.VarEnv
   (InScopeSet, extendInScopeSetList)
 import {-# SOURCE #-} Clash.Normalize.Strategy
@@ -73,6 +79,172 @@ import           Clash.Rewrite.Types
 import           Clash.Rewrite.Util
 import           Clash.Unique
 import           Clash.Util
+import qualified Clash.Util.Interpolate           as I
+
+typeNatAdd :: TyConName
+typeNatAdd =
+  Name User "GHC.TypeNats.+" (getKey typeNatAddTyFamNameKey) wiredInSrcSpan
+
+typeNatMul :: TyConName
+typeNatMul =
+  Name User "GHC.TypeNats.*" (getKey typeNatMulTyFamNameKey) wiredInSrcSpan
+
+typeNatSub :: TyConName
+typeNatSub =
+  Name User "GHC.TypeNats.-" (getKey typeNatSubTyFamNameKey) wiredInSrcSpan
+
+vecHeadPrim
+  :: TyConName
+  -- ^ Vec TyCon name
+  -> Term
+vecHeadPrim vecTcNm =
+  Prim (PrimInfo "Clash.Sized.Vector.head" (vecHeadTy vecTcNm) WorkNever)
+
+vecLastPrim
+  :: TyConName
+  -- ^ Vec TyCon name
+  -> Term
+vecLastPrim vecTcNm =
+  Prim (PrimInfo "Clash.Sized.Vector.last" (vecHeadTy vecTcNm) WorkNever)
+
+vecHeadTy
+  :: TyConName
+  -- ^ Vec TyCon name
+  -> Type
+vecHeadTy vecNm =
+  ForAllTy nTV $
+  ForAllTy aTV $
+  mkFunTy
+    (mkTyConApp vecNm [mkTyConApp typeNatAdd [VarTy nTV, LitTy (NumTy 1)], VarTy aTV])
+    (VarTy aTV)
+ where
+  aTV = mkTyVar liftedTypeKind (mkUnsafeSystemName "a" 0)
+  nTV = mkTyVar typeNatKind (mkUnsafeSystemName "n" 1)
+
+vecTailPrim
+  :: TyConName
+  -- ^ Vec TyCon name
+  -> Term
+vecTailPrim vecTcNm =
+  Prim (PrimInfo "Clash.Sized.Vector.tail" (vecTailTy vecTcNm) WorkNever)
+
+vecInitPrim
+  :: TyConName
+  -- ^ Vec TyCon name
+  -> Term
+vecInitPrim vecTcNm =
+  Prim (PrimInfo "Clash.Sized.Vector.init" (vecTailTy vecTcNm) WorkNever)
+
+vecTailTy
+  :: TyConName
+  -- ^ Vec TyCon name
+  -> Type
+vecTailTy vecNm =
+  ForAllTy nTV $
+  ForAllTy aTV $
+  mkFunTy
+    (mkTyConApp vecNm [mkTyConApp typeNatAdd [VarTy nTV, LitTy (NumTy 1)], VarTy aTV])
+    (mkTyConApp vecNm [VarTy nTV, VarTy aTV])
+ where
+  nTV = mkTyVar typeNatKind (mkUnsafeSystemName "n" 0)
+  aTV = mkTyVar liftedTypeKind (mkUnsafeSystemName "a" 1)
+
+-- | Makes two case statements: the first one extract the _head_ from the given
+-- vector, the latter the tail.
+extractHeadTail
+  :: DataCon
+  -- ^ The Cons (:>) constructor
+  -> Type
+  -- ^ Element type
+  -> Integer
+  -- ^ Length of the vector
+  -> Term
+  -- ^ Vector to extract head from
+  -> (Term, Term)
+  -- ^ (head of vector, tail of vector)
+extractHeadTail consCon elTy n vec =
+  ( Case vec elTy [(pat, Var el)]
+  , Case vec restTy [(pat, Var rest)] )
+ where
+  tys = [(LitTy (NumTy n)), elTy, (LitTy (NumTy (n-1)))]
+  Just [coTy, _elTy, restTy] = dataConInstArgTys consCon tys
+
+  mTV = mkTyVar typeNatKind (mkUnsafeSystemName "m" 0)
+  co = mkLocalId coTy (mkUnsafeSystemName "_co_" 1)
+  el = mkLocalId elTy (mkUnsafeSystemName "el" 2)
+  rest = mkLocalId restTy (mkUnsafeSystemName "res" 3)
+
+  pat = DataPat consCon [mTV] [co, el, rest]
+
+-- Make case statement that projects the _head_ from a given vector
+extractHead
+  :: DataCon
+  -- ^ The Cons (:>) constructor
+  -> Type
+  -- ^ Element type
+  -> Integer
+  -- ^ Length of the vector
+  -> Term
+  -- ^ Vector to extract head from
+  -> Term
+  -- ^ Head of vector
+extractHead consCon elTy vLength vec =
+  fst (extractHeadTail consCon elTy vLength vec)
+
+-- Make case statement that projects the _tail_ from a given vector
+extractTail
+  :: DataCon
+  -- ^ The Cons (:>) constructor
+  -> Type
+  -- ^ Element type
+  -> Integer
+  -- ^ Length of the vector
+  -> Term
+  -- ^ Vector to extract head from
+  -> Term
+  -- ^ Tail of vector
+extractTail consCon elTy vLength vec =
+  snd (extractHeadTail consCon elTy vLength vec)
+
+-- | Create a vector of supplied elements
+mkVecCons
+  :: DataCon
+  -- ^ The Cons (:>) constructor
+  -> Type
+  -- ^ Element type
+  -> Integer
+  -- ^ Length of the vector
+  -> Term
+  -- ^ head of the vector
+  -> Term
+  -- ^ tail of the vector
+  -> Term
+mkVecCons consCon resTy n h t =
+  mkApps (Data consCon) [ Right (LitTy (NumTy n))
+                        , Right resTy
+                        , Right (LitTy (NumTy (n-1)))
+                        , Left (primCo consCoTy)
+                        , Left h
+                        , Left t ]
+
+ where
+  args = dataConInstArgTys consCon [LitTy (NumTy n), resTy, LitTy (NumTy (n-1))]
+  Just (consCoTy : _) = args
+
+-- | Create an empty vector
+mkVecNil
+  :: DataCon
+  -- ^ The Nil constructor
+  -> Type
+  -- ^ The element type
+  -> Term
+mkVecNil nilCon resTy =
+  mkApps (Data nilCon) [ Right (LitTy (NumTy 0))
+                       , Right resTy
+                       , Left  (primCo nilCoTy) ]
+ where
+  args = dataConInstArgTys nilCon [LitTy (NumTy 0), resTy]
+  Just (nilCoTy : _ ) = args
 
 -- | Replace an application of the @Clash.Sized.Vector.reverse@ primitive on
 -- vectors of a known length @n@, by the fully unrolled recursive "definition"
@@ -111,39 +283,47 @@ reduceReverse inScope0 n elTy vArg = do
 -- of @Clash.Sized.Vector.zipWith@
 reduceZipWith
   :: TransformContext
+  -> PrimInfo -- ^ zipWith primitive info
   -> Integer  -- ^ Length of the vector(s)
-  -> Type -- ^ Type of the lhs of the function
-  -> Type -- ^ Type of the rhs of the function
-  -> Type -- ^ Type of the result of the function
+  -> Type -- ^ Element type of the lhs of the function
+  -> Type -- ^ Element type of the rhs of the function
+  -> Type -- ^ Element type of the result of the function
   -> Term -- ^ The zipWith'd functions
   -> Term -- ^ The 1st vector argument
   -> Term -- ^ The 2nd vector argument
   -> NormalizeSession Term
-reduceZipWith (TransformContext is0 ctx) n lhsElTy rhsElTy resElTy fun lhsArg rhsArg = do
-    tcm <- Lens.view tcCache
-    let ty = termType tcm lhsArg
-    go tcm ty
-  where
-    go tcm (coreView1 tcm -> Just ty') = go tcm ty'
-    go tcm (tyView -> TyConApp vecTcNm _)
-      | (Just vecTc) <- lookupUniqMap vecTcNm tcm
-      , nameOcc vecTcNm == "Clash.Sized.Vector.Vec"
-      , [nilCon,consCon] <- tyConDataCons vecTc
-      = do
-        uniqs0 <- Lens.use uniqSupply
-        fun1   <- constantPropagation (TransformContext is0 (AppArg Nothing:ctx)) fun
-        let is1 = extendInScopeSetList is0 (collectTermIds fun1)
-            (uniqs1,(varsL,elemsL)) = second (second concat . unzip)
-                                    $ extractElems uniqs0 is1 consCon lhsElTy 'L' n lhsArg
-            is2 = extendInScopeSetList is0 (map fst elemsL)
-            (uniqs2,(varsR,elemsR)) = second (second concat . unzip)
-                                    $ extractElems uniqs1 is2 consCon rhsElTy 'R' n rhsArg
-            funApps          = zipWith (\l r -> mkApps fun1 [Left l,Left r]) varsL varsR
-            lbody            = mkVec nilCon consCon resElTy n funApps
-            lb               = Letrec (init elemsL ++ init elemsR) lbody
-        uniqSupply Lens..= uniqs2
-        changed lb
-    go _ ty = error $ $(curLoc) ++ "reduceZipWith: argument does not have a vector type: " ++ showPpr ty
+reduceZipWith _ctx zipWithPrimInfo n lhsElTy rhsElTy resElTy fun lhsArg rhsArg = do
+  tcm <- Lens.view tcCache
+  changed (go tcm (termType tcm lhsArg))
+ where
+  go tcm (coreView1 tcm -> Just ty) = go tcm ty
+  go tcm (tyView -> TyConApp vecTcNm _)
+    | (Just vecTc) <- lookupUniqMap vecTcNm tcm
+    , nameOcc vecTcNm == "Clash.Sized.Vector.Vec"
+    , [nilCon, consCon] <- tyConDataCons vecTc
+    = do
+      case n of
+        0 -> mkVecNil nilCon resElTy
+        _ ->
+          let
+            (a, as) = extractHeadTail consCon lhsElTy n lhsArg
+            (b, bs) = extractHeadTail consCon rhsElTy n rhsArg
+            c = mkApps fun [Left a, Left b]
+            cs = mkApps (Prim zipWithPrimInfo) [ Right lhsElTy
+                                               , Right rhsElTy
+                                               , Right resElTy
+                                               , Right (LitTy (NumTy (n - 1)))
+                                               , Left fun
+                                               , Left as
+                                               , Left bs ]
+          in
+            mkVecCons consCon resElTy n c cs
+  go _ ty =
+    error $ $(curLoc) ++ [I.i|
+      reduceZipWith: argument does not have a vector type:
+
+        #{showPpr ty}
+    |]
 
 -- | Replace an application of the @Clash.Sized.Vector.map@ primitive on vectors
 -- of a known length @n@, by the fully unrolled recursive "definition" of
