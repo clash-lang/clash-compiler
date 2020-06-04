@@ -136,6 +136,7 @@ runNormalization opts supply globals typeTrans reprs tcm tupTcm eval primMap rcs
                   (error $ $(curLoc) ++ "Report as bug: no curFun",noSrcSpan)
                   0
                   (IntMap.empty, 0)
+                  emptyVarEnv
                   normState
 
     normState = NormalizeState

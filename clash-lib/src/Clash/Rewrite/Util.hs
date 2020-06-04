@@ -20,6 +20,7 @@
 
 module Clash.Rewrite.Util where
 
+import           Control.Monad.Extra         (andM, eitherM)
 import           Control.Concurrent.Supply   (splitSupply)
 import           Control.DeepSeq
 import           Control.Exception           (throw)
@@ -521,31 +522,50 @@ liftAndSubsituteBinders inScope toLift toKeep body = do
     else
       go subst2 inl
 
+-- | Determines whether a global binder is work free. Errors if binder does
+-- not exist.
+isWorkFreeBinder :: HasCallStack => Id -> RewriteMonad extra Bool
+isWorkFreeBinder bndr =
+  makeCachedU bndr workFreeBinders $ do
+    bExprM <- lookupVarEnv bndr <$> Lens.use bindings
+    case bExprM of
+      Nothing -> error ("isWorkFreeBinder: couldn't find binder: " ++ showPpr bndr)
+      Just (bindingTerm -> t) ->
+        if bndr `globalIdOccursIn` t
+        then pure False
+        else isWorkFree t
+
 -- | Determine whether a term does any work, i.e. adds to the size of the circuit
 isWorkFree
   :: Term
-  -> Bool
+  -> RewriteMonad extra Bool
 isWorkFree (collectArgs -> (fun,args)) = case fun of
-  Var i            -> isLocalId i && not (isPolyFunTy (varType i))
-  Data {}          -> all isWorkFreeArg args
-  Literal {}       -> True
+  Var i ->
+    if | isPolyFunTy (varType i) -> pure False
+       | isLocalId i -> pure True
+       | otherwise -> isWorkFreeBinder i
+  Data {} -> allM isWorkFreeArg args
+  Literal {} -> pure True
   Prim pInfo -> case primWorkInfo pInfo of
-    WorkConstant   -> True -- We can ignore the arguments, because this
-                           -- primitive outputs a constant regardless of its
-                           -- arguments
-    WorkNever      -> all isWorkFreeArg args
-    WorkVariable   -> all isConstantArg args
-    WorkAlways     -> False -- Things like clock or reset generator always
-                            -- perform work
-  Lam _ e          -> isWorkFree e && all isWorkFreeArg args
-  TyLam _ e        -> isWorkFree e && all isWorkFreeArg args
+    -- We can ignore the arguments, because this primitive outputs a constant
+    -- regardless of its arguments
+    WorkConstant -> pure True
+    WorkNever -> allM isWorkFreeArg args
+    WorkVariable -> pure (all isConstantArg args)
+    -- Things like clock or reset generator always perform work
+    WorkAlways -> pure False
+  Lam _ e -> andM [isWorkFree e, allM isWorkFreeArg args]
+  TyLam _ e -> andM [isWorkFree e, allM isWorkFreeArg args]
   Letrec bs e ->
-    isWorkFree e && all (isWorkFree . snd) bs && all isWorkFreeArg args
-  Case s _ [(_,a)] -> isWorkFree s && isWorkFree a && all isWorkFreeArg args
-  Cast e _ _       -> isWorkFree e && all isWorkFreeArg args
-  _                -> False
+    andM [isWorkFree e, allM (isWorkFree . snd) bs, allM isWorkFreeArg args]
+  Case s _ [(_,a)] ->
+    andM [isWorkFree s, isWorkFree a, allM isWorkFreeArg args]
+  Cast e _ _ ->
+    andM [isWorkFree e, allM isWorkFreeArg args]
+  _ ->
+    pure False
  where
-  isWorkFreeArg = either isWorkFree (const True)
+  isWorkFreeArg e = eitherM isWorkFree (pure . const True) (pure e)
   isConstantArg = either isConstant (const True)
 
 isFromInt :: Text -> Bool
