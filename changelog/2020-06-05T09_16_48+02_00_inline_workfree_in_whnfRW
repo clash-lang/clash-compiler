@@ -1,0 +1,1 @@
+CHANGED: Clash's evaluator now inlines work free definitions, preventing [situations where it would otherwise get stuck in an infinite loop](https://github.com/clash-lang/clash-compiler/pull/1354#issuecomment-635430374).
