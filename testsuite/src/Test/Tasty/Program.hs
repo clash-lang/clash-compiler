@@ -32,36 +32,36 @@
     (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
     OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
   Maintainer  :  Christiaan Baaij <christiaan.baaij@gmail.com>
+
+  This module provides a function that tests whether a program can
+  be run successfully. For example if you have 'foo.hs' source file:
+
+  > module Foo where
+  >
+  > foo :: Int
+  > foo = 5
+
+  you can test whether GHC can compile it:
+
+  > module Main (
+  >   main
+  >  ) where
+  >
+  > import Test.Tasty
+  > import Test.Tasty.Program
+  >
+  > main :: IO ()
+  > main = defaultMain $ testGroup "Compilation with GHC" $ [
+  >     testProgram "Foo" "ghc" ["-fforce-recomp", "foo.hs"] Nothing
+  >   ]
+
+  Program's output and error streams are ignored.
 -}
 
 {-# LANGUAGE DeriveFunctor #-}
 {-# LANGUAGE QuasiQuotes #-}
 {-# OPTIONS_GHC -fno-warn-unused-top-binds #-}
 {-# OPTIONS_GHC -fno-warn-unused-matches #-}
-
--- | This module provides a function that tests whether a program can
--- be run successfully. For example if you have 'foo.hs' source file:
---
--- > module Foo where
--- >
--- > foo :: Int
--- > foo = 5
---
--- you can test whether GHC can compile it:
---
--- > module Main (
--- >   main
--- >  ) where
--- >
--- > import Test.Tasty
--- > import Test.Tasty.Program
--- >
--- > main :: IO ()
--- > main = defaultMain $ testGroup "Compilation with GHC" $ [
--- >     testProgram "Foo" "ghc" ["-fforce-recomp", "foo.hs"] Nothing
--- >   ]
---
--- Program's output and error streams are ignored.
 
 module Test.Tasty.Program (
    testProgram

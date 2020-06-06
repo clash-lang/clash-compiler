@@ -107,10 +107,14 @@ test-suite test
       base >= 4 && < 5,
       clash-cosim,
       clash-prelude >= 0.99,
+      ghc-typelits-extra,
+      ghc-typelits-knownnat,
+      ghc-typelits-natnormalise,
       deepseq,
       tasty >= 1.0,
       tasty-hunit,
-      tasty-quickcheck
+      tasty-quickcheck,
+      template-haskell
   ghc-options:   -Wall -Wcompat
   if flag(pedantic)
     ghc-options: -Werror

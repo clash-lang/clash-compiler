@@ -2,6 +2,9 @@
 
 module Clash.Core.TermLiteral.TH
   (  deriveTermToData
+     -- Stop exporting @dcName'@  once `ghcide` stops type-checking expanded
+     -- TH splices
+  ,  dcName'
   ) where
 
 import           Data.Either

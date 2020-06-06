@@ -1,0 +1,42 @@
+cradle:
+  multi:
+    # Skip benchmark and profiling code for now
+    - path: "./benchmark"
+      config: { cradle: {none: }}
+    - path: "./clash-cores"
+      config: { cradle: {cabal: [{path: "./clash-cores/src", component: "lib:clash-cores"}
+                                ,{path: "./clash-cores/test", component: "clash-cores:unittests"}]}}
+    - path: "./clash-cosim"
+      config: { cradle: {cabal: [{path: "./clash-cosim/src", component: "lib:clash-cosim"}
+                                ,{path: "./clash-cosim/test", component: "clash-cosim:test"}]}}
+    - path: "./clash-ghc"
+      config: { cradle: {cabal: [{path: "./clash-ghc/src-ghc", component: "lib:clash-ghc"}
+                                ,{path: "./clash-ghc/src-ghc-common", component: "lib:clash-ghc"}]}}
+    # The src-bin directories are GHC version dependant, so don't load them
+    - path: "./clash-ghc/src-bin-8.10"
+      config: { cradle: {none: }}
+    - path: "./clash-ghc/src-bin-841"
+      config: { cradle: {none: }}
+    - path: "./clash-ghc/src-bin-861"
+      config: { cradle: {none: }}
+    - path: "./clash-ghc/src-bin-881"
+      config: { cradle: {none: }}
+    - path: "./clash-lib"
+      config: { cradle: {cabal: [{path: "./clash-lib/src", component: "lib:clash-lib"}
+                                ,{path: "./clash-lib/test", component: "clash-lib:unittests"} ] } }
+    # Clash prelude is broken for now because ghcide won't use -fobject-code
+    # when loading ./clash-prelude/src/Clash/Sized/Internal/Mod.hs transitively
+    # as a dependency of another module
+    - path: "./clash-prelude"
+      config: { cradle: {none: }}
+    - path: "./clash-term"
+      config: { cradle: {cabal: {component: "exe:clash-term"}}}
+    # Skip examples for now
+    - path: "./examples"
+      config: { cradle: {none: }}
+    # Skip tests for now
+    - path: "./tests"
+      config: { cradle: {none: }}
+    - path: "./testsuite"
+      config: { cradle: {cabal: [{path: "./testsuite/src", component: "lib:clash-testsuite"}
+                                ,{path: "./testsuite/Main.hs", component: "exe:clash-testsuite"}]}}

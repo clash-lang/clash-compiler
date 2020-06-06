@@ -68,8 +68,8 @@ import Clash.Core.DataCon                      (DataCon)
 import Clash.Core.Literal                      (Literal)
 import Clash.Core.Name                         (Name (..))
 import {-# SOURCE #-} Clash.Core.Subst         () -- instance Eq Type
-import {-# SOURCE #-} Clash.Core.Type
-import Clash.Core.Var                          (Var(Id), Id)
+import {-# SOURCE #-} Clash.Core.Type          (Type)
+import Clash.Core.Var                          (Var(Id), Id, TyVar)
 import Clash.Util                              (curLoc)
 
 -- | Term representation in the CoreHW language: System F + LetRec + Case
