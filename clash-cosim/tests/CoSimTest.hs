@@ -36,34 +36,36 @@ dotp
   => Vec (n + 1) a
   -> Vec (n + 1) a
   -> a
-dotp as bs = fold boundedPlus (zipWith boundedMult as bs)
+dotp as bs = fold boundedAdd (zipWith boundedMul as bs)
 
 fir
   :: ( Default a
      , KnownNat n
      , SaturatingNum a
+     , KnownDomain d
+     , NFDataX a
      )
-  => Clock d Source
-  -> Reset d Asynchronous
+  => Clock d
+  -> Reset d
   -> Vec (n + 1) a
   -> Signal d a
   -> Signal d a
 fir clk rst coeffs x_t = y_t
   where
     y_t = dotp coeffs <$> bundle xs
-    xs = window clk rst x_t
+    xs = window clk rst enableGen x_t
 
 topEntity
-  :: Clock System Source
-  -> Reset System Asynchronous
+  :: Clock System
+  -> Reset System
   -> Signal System (Signed 64)
   -> Signal System (Signed 64)
 topEntity clk rst s = verilog_mult s s
 
 
 testInput
-    :: Clock System Source
-    -> Reset System Asynchronous
+    :: Clock System
+    -> Reset System
     -> Signal System (Signed 64)
 testInput clk rst = stimuliGenerator clk rst (2:>3:>4:>8:>9:>10:>Nil)
 
@@ -106,7 +108,7 @@ verilog_fir x = [verilog|
 -}
 
 verilog_mult
-  :: t ~ Signed 64
+  :: (t ~ Signed 64, KnownDomain d)
   => Signal d t
   -> Signal d t
   -> Signal d t

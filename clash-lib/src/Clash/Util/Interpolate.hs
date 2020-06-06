@@ -42,7 +42,9 @@ OTHER DEALINGS IN THE SOFTWARE.
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE TemplateHaskell #-}
 
-module Clash.Util.Interpolate(i) where
+-- TODO: only export the @i@ quasiquotor when `ghcide` stop type-checking
+-- exanded quasiquote splices
+module Clash.Util.Interpolate (i, format, toString) where
 
 import           Language.Haskell.Meta.Parse (parseExp)
 import           Language.Haskell.TH.Lib     (appE, varE)
