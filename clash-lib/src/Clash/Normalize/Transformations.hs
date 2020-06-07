@@ -66,6 +66,7 @@ import           Control.Exception           (throw)
 import           Control.Lens                ((^.),_1,_2)
 import qualified Control.Lens                as Lens
 import qualified Control.Monad               as Monad
+import           Control.Monad.Extra         (orM)
 import           Control.Monad.State         (StateT (..), modify)
 import           Control.Monad.State.Strict  (evalState)
 import           Control.Monad.Writer        (lift, listen)
@@ -495,7 +496,8 @@ caseCon ctx@(TransformContext is0 _) e@(Case subj ty alts) = do
  case collectArgsTicks subj of
   -- The subject is an applied data constructor
   (Data dc, args, ticks) -> case List.find (equalCon . fst) alts of
-    Just (DataPat _ tvs xs, altE) -> let
+    Just (DataPat _ tvs xs, altE) -> do
+     let
       -- Create the substitution environment for all the existential
       -- type variables.
       exTysList = zip tvs (drop (length (dcUnivTyVars dc)) (Either.rights args))
@@ -511,27 +513,28 @@ caseCon ctx@(TransformContext is0 _) e@(Case subj ty alts) = do
       (binds,_) = List.partition ((`elemVarSet` fvs) . fst)
                 $ zip xs1 (Either.lefts args)
       binds1 = map (second (`mkTicks` ticks)) binds
-      altE1 = case binds1 of
+     altE1 <-
+       case binds1 of
         [] ->
           -- Apply the type-substitution for the existential type variables
-          substTm "caseCon1" exTySubst altE
-        _  ->
+          pure (substTm "caseCon1" exTySubst altE)
+        _  -> do
           -- See Note [CaseCon deshadow]
           let
             -- Only let-bind expression that perform work.
             is1 = extendInScopeSetList (extendInScopeSetList is0 tvs) xs1
-            ((is3,substIds),binds2) = List.mapAccumL newBinder (is1,[]) binds1
+          ((is3,substIds),binds2) <- List.mapAccumLM newBinder (is1,[]) binds1
+          let
             -- Create a substitution for all the existential type variables
             -- and the work-free expressions
             subst = extendIdSubstList
                       (extendTvSubstList (mkSubst is3) exTysList)
                       substIds
             body  = substTm "caseCon1" subst altE
-          in
-            case Maybe.catMaybes binds2 of
-              []     -> body
-              binds3 -> Letrec binds3 body
-      in changed altE1
+          case Maybe.catMaybes binds2 of
+            []     -> pure body
+            binds3 -> pure (Letrec binds3 body)
+     changed altE1
     _ -> case alts of
            -- In Core, default patterns always come first, so we match against
            -- that if there is one, and we couldn't match with any of the data
@@ -547,13 +550,15 @@ caseCon ctx@(TransformContext is0 _) e@(Case subj ty alts) = do
       -- be let-bound, or substituted into the alternative. We decide this
       -- based on the fact on whether the argument has the potential to make
       -- the circuit larger than needed if we were to duplicate that argument.
-      newBinder (isN0,substN) (x,arg)
-        | isWorkFree arg
-        = ((isN0,(x,arg):substN),Nothing)
-        | otherwise
-        = let x'   = uniqAway isN0 x
+      newBinder (isN0, substN) (x, arg) = do
+        isWorkFree arg >>= \case
+          True -> pure ((isN0, (x, arg):substN), Nothing)
+          False ->
+            let
+              x' = uniqAway isN0 x
               isN1 = extendInScopeSet isN0 x'
-          in  ((isN1,(x,Var x'):substN),Just (x',arg))
+            in
+              pure ((isN1, (x, Var x'):substN), Just (x', arg))
 
 
   -- The subject is a literal
@@ -968,10 +973,9 @@ letCast _ e = return e
 -- eliminate them in 'eliminateCastCast'.
 argCastSpec :: HasCallStack => NormRewrite
 argCastSpec ctx e@(App _ (stripTicks -> Cast e' _ _)) =
-  if isWorkFree e' then
-    go
-  else
-    warn go
+  isWorkFree e' >>= \case
+    True -> go
+    False -> warn go
  where
   go = specializeNorm ctx e
   warn = trace (unwords
@@ -1276,12 +1280,12 @@ appPropFast ctx@(TransformContext is _) = \case
 
   go is0 (Lam v e) (Left arg:args) ticks = do
     setChanged
-    if isWorkFree arg || isVar arg
-      then do
-        let subst = extendIdSubst (mkSubst is0) v arg
+    orM [pure (isVar arg), isWorkFree arg] >>= \case
+      True ->
+        let subst = extendIdSubst (mkSubst is0) v arg in
         (`mkTicks` ticks) <$> go is0 (substTm "appPropFast.AppLam" subst e) args []
-      else do
-        let is1 = extendInScopeSet is0 v
+      False ->
+        let is1 = extendInScopeSet is0 v in
         Letrec [(v, arg)] <$> go is1 (deShadowTerm is1 e) args ticks
 
   go is0 (Letrec vs e) args@(_:_) ticks = do
@@ -1331,7 +1335,7 @@ appPropFast ctx@(TransformContext is _) = \case
     tcm <- Lens.view tcCache
     let argTy = termType tcm arg
         ty1   = applyFunTy tcm ty0 argTy
-    case isWorkFree arg || isVar arg of
+    orM [pure (isVar arg), isWorkFree arg] >>= \case
       True -> do
         (ty2,ls1,args1) <- goCaseArg isA0 ty1 ls0 args0
         return (ty2,ls1,Left arg:args1)
@@ -2071,7 +2075,7 @@ reduceNonRepPrim c@(TransformContext is0 ctx) e@(App _ _) | (Prim p, args, ticks
             if shouldReduce1
                then let [fun,lhsArg,rhsArg] = Either.lefts args
                     in  (`mkTicks` ticks) <$>
-                        reduceZipWith c n lhsElTy rhsElty resElTy fun lhsArg rhsArg
+                        reduceZipWith c p n lhsElTy rhsElty resElTy fun lhsArg rhsArg
                else return e
           _ -> return e
       "Clash.Sized.Vector.map" | argLen == 5 -> do
@@ -2084,7 +2088,7 @@ reduceNonRepPrim c@(TransformContext is0 ctx) e@(App _ _) | (Prim p, args, ticks
                                         [argElTy,resElTy] ]
             if shouldReduce1
                then let [fun,arg] = Either.lefts args
-                    in  (`mkTicks` ticks) <$> reduceMap c n argElTy resElTy fun arg
+                    in  (`mkTicks` ticks) <$> reduceMap c p n argElTy resElTy fun arg
                else return e
           _ -> return e
       "Clash.Sized.Vector.traverse#" | argLen == 7 ->
@@ -2115,7 +2119,7 @@ reduceNonRepPrim c@(TransformContext is0 ctx) e@(App _ _) | (Prim p, args, ticks
                                  , List.anyM isUntranslatableType_not_poly [aTy,bTy] ]
             if shouldReduce1
               then let [fun,start,arg] = Either.lefts args
-                   in  (`mkTicks` ticks) <$> reduceFoldr c n aTy fun start arg
+                   in  (`mkTicks` ticks) <$> reduceFoldr c p n aTy fun start arg
               else return e
           _ -> return e
       "Clash.Sized.Vector.dfold" | argLen == 8 ->
@@ -2179,7 +2183,7 @@ reduceNonRepPrim c@(TransformContext is0 ctx) e@(App _ _) | (Prim p, args, ticks
             shouldReduce1 <- List.orM [ shouldReduce ctx
                                  , isUntranslatableType_not_poly aTy ]
             if shouldReduce1
-               then (`mkTicks` ticks) <$> reduceInit is0 (n+1) aTy vArg
+               then (`mkTicks` ticks) <$> reduceInit is0 p n aTy vArg
                else return e
           _ -> return e
       "Clash.Sized.Vector.unconcat" | argLen == 6 -> do
@@ -2240,6 +2244,20 @@ reduceNonRepPrim c@(TransformContext is0 ctx) e@(App _ _) | (Prim p, args, ticks
                then let [_,fun,arg] = Either.lefts args
                     in  (`mkTicks` ticks) <$> reduceImap c n argElTy resElTy fun arg
                else return e
+          _ -> return e
+      "Clash.Sized.Vector.iterateI" | argLen == 5 ->
+        let ([_kn,f,a],[nTy,aTy]) = Either.partitionEithers args in
+        case runExcept (tyNatSize tcm nTy) of
+          Right n -> do
+            shouldReduce1 <- List.orM
+              [ pure (ultra || n < 2)
+              , shouldReduce ctx
+              , isUntranslatableType_not_poly aTy ]
+
+            if shouldReduce1 then
+              (`mkTicks` ticks) <$> reduceIterateI c n aTy eTy f a
+            else
+              return e
           _ -> return e
       "Clash.Sized.Vector.dtfold" | argLen == 8 ->
         let ([_kn,_motive,lrFun,brFun,arg],[_mTy,nTy,aTy]) = Either.partitionEithers args
@@ -2702,10 +2720,14 @@ flattenLet (TransformContext is0 _) (Letrec binds body) = do
                    emptyVarEnv (`unitVarEnv` (1 :: Int))
                    body
   (is2,binds1) <- second concat <$> List.mapAccumLM go is1 binds
+  e1WorkFree <-
+    case binds1 of
+      [(_,e1)] -> isWorkFree e1
+      _ -> pure (error "flattenLet: unreachable")
   case binds1 of
     -- inline binders into the body when there's only a single binder, and only
     -- if that binder doesn't perform any work or is only used once in the body
-    [(id1,e1)] | Just occ <- lookupVarEnv id1 bodyOccs, isWorkFree e1 || occ < 2 ->
+    [(id1,e1)] | Just occ <- lookupVarEnv id1 bodyOccs, e1WorkFree || occ < 2 ->
       if id1 `localIdOccursIn` e1
          -- Except when the binder is recursive!
          then return (Letrec binds1 body)
@@ -2735,12 +2757,16 @@ flattenLet (TransformContext is0 _) (Letrec binds body) = do
                        emptyVarEnv (`unitVarEnv` (1 :: Int))
                        body2
           (srcTicks,nmTicks) = partitionTicks ticks
+      e2WorkFree <-
+        case binds2 of
+          [(_,e2)] -> isWorkFree e2
+          _ -> pure (error "flattenLet: unreachable")
       -- Distribute the name ticks of the let-expression over all the bindings
       (isN1,) . map (second (`mkTicks` nmTicks)) <$> case binds2 of
         -- inline binders into the body when there's only a single binder, and
         -- only if that binder doesn't perform any work or is only used once in
         -- the body
-        [(id2,e2)] | Just occ <- lookupVarEnv id2 bodyOccs, isWorkFree e2 || occ < 2 ->
+        [(id2,e2)] | Just occ <- lookupVarEnv id2 bodyOccs, e2WorkFree || occ < 2 ->
           if id2 `localIdOccursIn` e2
              -- Except when the binder is recursive!
              then changed ([(id2,e2),(id1, body2)])

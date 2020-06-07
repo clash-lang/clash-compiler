@@ -20,6 +20,7 @@
 
 module Clash.Rewrite.Util where
 
+import           Control.Monad.Extra         (andM, eitherM)
 import           Control.Concurrent.Supply   (splitSupply)
 import           Control.DeepSeq
 import           Control.Exception           (throw)
@@ -64,7 +65,7 @@ import           Clash.Core.DataCon          (dcExtTyVars)
 import           Clash.Core.Evaluator.Types  (PureHeap, whnf')
 import           Clash.Core.FreeVars
   (freeLocalVars, hasLocalFreeVars, localIdDoesNotOccurIn, localIdOccursIn,
-   typeFreeVars, termFreeVars', freeLocalIds)
+   typeFreeVars, termFreeVars', freeLocalIds, globalIdOccursIn)
 import           Clash.Core.Name
 import           Clash.Core.Pretty           (showPpr)
 import           Clash.Core.Subst
@@ -85,7 +86,7 @@ import           Clash.Core.VarEnv
   (InScopeSet, VarEnv, elemVarSet, extendInScopeSetList, mkInScopeSet,
    uniqAway, uniqAway', mapVarEnv, eltsVarEnv, unitVarSet, emptyVarEnv,
    mkVarEnv, eltsVarSet, elemVarEnv, lookupVarEnv, extendVarEnv)
-import           Clash.Debug (traceIf)
+import           Clash.Debug
 import           Clash.Driver.Types
   (DebugLevel (..), BindingMap, Binding(..))
 import           Clash.Netlist.Util          (representableType)
@@ -520,31 +521,50 @@ liftAndSubsituteBinders inScope toLift toKeep body = do
     else
       go subst2 inl
 
+-- | Determines whether a global binder is work free. Errors if binder does
+-- not exist.
+isWorkFreeBinder :: HasCallStack => Id -> RewriteMonad extra Bool
+isWorkFreeBinder bndr =
+  makeCachedU bndr workFreeBinders $ do
+    bExprM <- lookupVarEnv bndr <$> Lens.use bindings
+    case bExprM of
+      Nothing -> error ("isWorkFreeBinder: couldn't find binder: " ++ showPpr bndr)
+      Just (bindingTerm -> t) ->
+        if bndr `globalIdOccursIn` t
+        then pure False
+        else isWorkFree t
+
 -- | Determine whether a term does any work, i.e. adds to the size of the circuit
 isWorkFree
   :: Term
-  -> Bool
+  -> RewriteMonad extra Bool
 isWorkFree (collectArgs -> (fun,args)) = case fun of
-  Var i            -> isLocalId i && not (isPolyFunTy (varType i))
-  Data {}          -> all isWorkFreeArg args
-  Literal {}       -> True
+  Var i ->
+    if | isPolyFunTy (varType i) -> pure False
+       | isLocalId i -> pure True
+       | otherwise -> andM [isWorkFreeBinder i, allM isWorkFreeArg args]
+  Data {} -> allM isWorkFreeArg args
+  Literal {} -> pure True
   Prim pInfo -> case primWorkInfo pInfo of
-    WorkConstant   -> True -- We can ignore the arguments, because this
-                           -- primitive outputs a constant regardless of its
-                           -- arguments
-    WorkNever      -> all isWorkFreeArg args
-    WorkVariable   -> all isConstantArg args
-    WorkAlways     -> False -- Things like clock or reset generator always
-                            -- perform work
-  Lam _ e          -> isWorkFree e && all isWorkFreeArg args
-  TyLam _ e        -> isWorkFree e && all isWorkFreeArg args
+    -- We can ignore the arguments, because this primitive outputs a constant
+    -- regardless of its arguments
+    WorkConstant -> pure True
+    WorkNever -> allM isWorkFreeArg args
+    WorkVariable -> pure (all isConstantArg args)
+    -- Things like clock or reset generator always perform work
+    WorkAlways -> pure False
+  Lam _ e -> andM [isWorkFree e, allM isWorkFreeArg args]
+  TyLam _ e -> andM [isWorkFree e, allM isWorkFreeArg args]
   Letrec bs e ->
-    isWorkFree e && all (isWorkFree . snd) bs && all isWorkFreeArg args
-  Case s _ [(_,a)] -> isWorkFree s && isWorkFree a && all isWorkFreeArg args
-  Cast e _ _       -> isWorkFree e && all isWorkFreeArg args
-  _                -> False
+    andM [isWorkFree e, allM (isWorkFree . snd) bs, allM isWorkFreeArg args]
+  Case s _ [(_,a)] ->
+    andM [isWorkFree s, isWorkFree a, allM isWorkFreeArg args]
+  Cast e _ _ ->
+    andM [isWorkFree e, allM isWorkFreeArg args]
+  _ ->
+    pure False
  where
-  isWorkFreeArg = either isWorkFree (const True)
+  isWorkFreeArg e = eitherM isWorkFree (pure . const True) (pure e)
   isConstantArg = either isConstant (const True)
 
 isFromInt :: Text -> Bool
@@ -1119,11 +1139,40 @@ bindPureHeap
   -> PureHeap
   -> Rewrite extra
   -> Rewrite extra
-bindPureHeap tcm heap rw (TransformContext is0 hist) e = do
+bindPureHeap tcm heap rw ctx0@(TransformContext is0 hist) e = do
   (e1, Monoid.getAny -> hasChanged) <- Writer.listen $ rw ctx e
-  if hasChanged && not (null bndrs)
-    then return $ fromMaybe (Letrec bndrs e1) (removeUnusedBinders bndrs e1)
-    else return e1
+  if hasChanged && not (null bndrs) then do
+    -- The evaluator results are post-processed with two operations:
+    --
+    --   1. Inline work free binders. We've seen cases in the wild† where the
+    --      evaluator (or rather, 'bindPureHeap') would let-bind work-free
+    --      binders that were crucial for eliminating case constructs. If these
+    --      case constructs were used in a self-referential (but terminating)
+    --      manner, Clash would get stuck in an infinite loop. The proper
+    --      solution would be to use 'isWorkFree', instead of 'isWorkFreeIsh',
+    --      in 'bindConstantVar' such that these work free constructs would get
+    --      inlined again. However, this incurs a great performance penalty so
+    --      we opt to prevent the evaluator from introducing this situation in
+    --      the first place.
+    --
+    --      I'd like to stress that this is not a proper solution though, as GHC
+    --      might produce a similar situation. We plan on properly solving this
+    --      by eliminating the current lift/bind/eval strategy, instead replacing
+    --      it by a partial evaluator‡.
+    --
+    --   2. Remove any unused let-bindings. Similar to (1), we risk Clash getting
+    --      stuck in an infinite loop if we don't remove unused (eliminated by
+    --      evaluation!) binders.
+    --
+    -- † https://github.com/clash-lang/clash-compiler/pull/1354#issuecomment-635430374
+    -- ‡ https://www.microsoft.com/en-us/research/wp-content/uploads/2016/07/supercomp-by-eval.pdf
+    inlineBinders inlineTest ctx0 (Letrec bndrs e1) >>= \case
+      e2@(Letrec bnders1 e3) ->
+        pure (fromMaybe e2 (removeUnusedBinders bnders1 e3))
+      e2 ->
+        pure e2
+  else
+    return e1
   where
     bndrs = map toLetBinding $ toListUniqMap heap
     heapIds = map fst bndrs
@@ -1135,6 +1184,8 @@ bindPureHeap tcm heap rw (TransformContext is0 hist) e = do
       where
         ty = termType tcm term
         nm = mkLocalId ty (mkUnsafeSystemName "x" uniq) -- See [Note: Name re-creation]
+
+    inlineTest _ (_, stripTicks -> e_) = isWorkFree e_
 
 -- | Remove unused binders in given let-binding. Returns /Nothing/ if no unused
 -- binders were found.

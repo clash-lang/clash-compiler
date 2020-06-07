@@ -273,6 +273,7 @@ runClashTest = defaultMain $ clashTestRoot
           , topEntities=TopEntities ["top1"]
           }
         , runTest "T1012" def{hdlSim=False}
+        , runTest "T1240" def{hdlSim=False}
         , runTest "T1242" def{hdlSim=False}
         , runTest "T1254" def{hdlTargets=[VHDL,SystemVerilog],hdlSim=False}
         , runTest "T1292" def{hdlTargets=[VHDL]}
@@ -290,6 +291,20 @@ runClashTest = defaultMain $ clashTestRoot
         , runTest "T1316" def{hdlTargets=[VHDL], hdlSim=False}
         , runTest "T1322" def{hdlTargets=[VHDL]}
         , runTest "T1340" def{hdlTargets=[VHDL], hdlSim=False}
+#if MIN_VERSION_ghc(8,6,1)
+          -- GHC 8.4 doesn't constant fold constructs on naturals. This tricks
+          -- Clash into thinking binders variables aren't constant, while in
+          -- reality the are. A proper solution would be to:
+          --
+          --   1. Normalize any global binders applied to constant-only arguments
+          --      before finishing normalizing binders they're used in.
+          --   2. Implement a proper partial evaluator.
+          --
+          -- As (2) is in the works, we've decided to not persue (1) for now and
+          -- simply advice users encountering this bug to use >8.4.
+        , runTest "T1354A" def{hdlTargets=[VHDL], hdlSim=False}
+#endif
+        , runTest "T1354B" def{hdlTargets=[VHDL], hdlSim=False}
         , runTest "TagToEnum" def{hdlSim=False}
         , runTest "TestIndex" def{hdlSim=False}
         , runTest "Time" def
@@ -577,6 +592,8 @@ runClashTest = defaultMain $ clashTestRoot
         , runTest "HOPrim" def{hdlSim=False}
         , runTest "IndexInt" def
         , runTest "Indices" def
+        , runTest "Iterate" def
+        , outputTest ("tests" </> "shouldwork" </> "Vector") [VHDL] [] [] "IterateCF" "main"
         , runTest "Minimum" def
         , runTest "MovingAvg" def{hdlSim=False}
         , runTest "PatHOCon" def{hdlSim=False}
