@@ -590,6 +590,7 @@ runClashTest = defaultMain $ clashTestRoot
         , runTest "VecOfSum" def{hdlSim=False}
         , runTest "T452" def{hdlSim=False}
         , runTest "T895" def{hdlSim=False,hdlTargets=[VHDL]}
+        , runTest "T1360" def{hdlSim=False, hdlTargets=[VHDL], clashFlags=["-fclash-hdlsyn", "Vivado"]}
         ] -- end vector
       , clashTestGroup "XOptimization"
         [ outputTest  ("tests" </> "shouldwork" </> "XOptimization") allTargets [] [] "Conjunction"  "main"

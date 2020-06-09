@@ -1,0 +1,1 @@
+FIXED: VHDL: automatically generate a type qualification inside ~TOBV, fixes [#1360](https://github.com/clash-lang/clash-compiler/issues/1360)
