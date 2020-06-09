@@ -9,6 +9,8 @@ import           Clash.Core.Var
 import           Clash.Driver
 import           Clash.Driver.Types
 
+import           Clash.Core.Evaluator.Models ()
+
 #if EXPERIMENTAL_EVALUATOR
 import           Clash.GHC.PartialEval
 #else
