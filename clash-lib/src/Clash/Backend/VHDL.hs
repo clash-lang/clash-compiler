@@ -131,12 +131,17 @@ instance Backend VHDLState where
   inst            = inst_
   expr            = expr_
   iwWidth         = use intWidth
-  toBV _ id_      = do
-    nm <- Mon $ use modNm
-    pretty (TextS.toLower nm) <> "_types.toSLV" <> parens (pretty id_)
-  fromBV t id_  = do
-    nm <- Mon $ use modNm
-    qualTyName t <> "'" <> parens (pretty (TextS.toLower nm) <> "_types.fromSLV" <> parens (pretty id_))
+  toBV t id_
+    | isBV t = pretty id_
+    | otherwise = do
+      nm <- Mon $ use modNm
+      -- TODO It would be nice to leave out the type qualification if we know id_ is a var
+      pretty (TextS.toLower nm) <> "_types.toSLV" <> parens (hdlTypeMark t <> squote <> parens (pretty id_))
+  fromBV t id_
+    | isBV t = pretty id_
+    | otherwise = do
+      nm <- Mon $ use modNm
+      qualTyName t <> "'" <> parens (pretty (TextS.toLower nm) <> "_types.fromSLV" <> parens (pretty id_))
   hdlSyn          = use hdlsyn
   mkIdentifier    = do
       allowExtended <- use extendedIds
@@ -206,6 +211,11 @@ rmSlash nm = fromMaybe nm $ do
   pure (TextS.filter (not . (== '\\')) nm1)
 
 type VHDLM a = Mon (State VHDLState) a
+
+-- Check if the underlying type is a BitVector
+isBV :: HWType -> Bool
+isBV (normaliseType -> BitVector _) = True
+isBV _ = False
 
 -- | Time units: are added to 'reservedWords' as simulators trip over signals
 -- named after them.
@@ -816,7 +826,7 @@ entity c = do
           -- See: [Note] Hack entity attributes in architecture
           Other -> indent 2 (rports p <> if null attrs then emptyDoc else
                               line <> line <> rattrs) <> line <> "end" <> semi
-          _     -> indent 2 (rports p) <> "end" <> semi
+          _     -> indent 2 (rports p) <> line <> "end" <> semi
       )
   where
     ports l = sequence $ [port iName hwType "in" l Nothing | (iName, hwType) <- inputs c]
