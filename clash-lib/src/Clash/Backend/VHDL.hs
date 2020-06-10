@@ -135,8 +135,13 @@ instance Backend VHDLState where
     | isBV t = pretty id_
     | otherwise = do
       nm <- Mon $ use modNm
-      -- TODO It would be nice to leave out the type qualification if we know id_ is a var
-      pretty (TextS.toLower nm) <> "_types.toSLV" <> parens (hdlTypeMark t <> squote <> parens (pretty id_))
+      seen <- use seenIdentifiers
+      -- This is a bit hacky, as id_ is just a rendered expression.
+      -- But if it's a bare identifier that we've seen before,
+      -- then this identifier has a defined type and we can skip the explicit type qualification.
+      let e | T.toStrict id_ `HashMapS.member` seen = pretty id_
+            | otherwise = hdlTypeMark t <> squote <> parens (pretty id_)
+      pretty (TextS.toLower nm) <> "_types.toSLV" <> parens e
   fromBV t id_
     | isBV t = pretty id_
     | otherwise = do
