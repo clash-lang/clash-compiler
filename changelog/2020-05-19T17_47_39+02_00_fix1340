@@ -1,1 +1,0 @@
-FIXED: `caseCon` doesn't apply type-substitution correctly [#1340](https://github.com/clash-lang/clash-compiler/issues/1340)

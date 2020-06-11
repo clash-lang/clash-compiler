@@ -1,1 +1,0 @@
-FIXED: Clash generates illegal SystemVerilog slice [#1313](https://github.com/clash-lang/clash-compiler/issues/1313)
