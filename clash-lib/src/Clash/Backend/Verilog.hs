@@ -330,6 +330,7 @@ verilogType t = case t of
   Signed n -> "signed" <+> brackets (int (n-1) <> colon <> int 0)
   Clock {} -> emptyDoc
   Reset {} -> emptyDoc
+  Enable {} -> emptyDoc
   Bit      -> emptyDoc
   Bool     -> emptyDoc
   FileType -> emptyDoc
@@ -1211,4 +1212,5 @@ punctuate' s d = vcat (punctuate s d) <> s
 encodingNote :: Applicative m => HWType -> m Doc
 encodingNote (Clock _) = string " // clock"
 encodingNote (Reset _) = string " // reset"
+encodingNote (Enable _) = string " // enable"
 encodingNote _         = emptyDoc
