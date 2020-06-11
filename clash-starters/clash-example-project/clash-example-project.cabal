@@ -1,0 +1,103 @@
+cabal-version:       2.4
+name:                clash-example-project
+version:             0.1
+license-file:        LICENSE
+author:              Example User
+maintainer:          user@example.com
+
+common common-options
+  default-extensions:
+    BangPatterns
+    BinaryLiterals
+    ConstraintKinds
+    DataKinds
+    DefaultSignatures
+    DeriveAnyClass
+    DeriveDataTypeable
+    DeriveFoldable
+    DeriveFunctor
+    DeriveGeneric
+    DeriveLift
+    DeriveTraversable
+    DerivingStrategies
+    InstanceSigs
+    KindSignatures
+    LambdaCase
+    NoStarIsType
+    PolyKinds
+    RankNTypes
+    ScopedTypeVariables
+    StandaloneDeriving
+    TupleSections
+    TypeApplications
+    TypeFamilies
+    TypeOperators
+    ViewPatterns
+
+    -- TemplateHaskell is used to support convenience functions such as
+    -- 'listToVecTH' and 'bLit'.
+    TemplateHaskell
+    QuasiQuotes
+
+    -- Prelude isn't imported by default as Clash offers Clash.Prelude
+    NoImplicitPrelude
+  ghc-options:
+    -Wall
+
+    -- Plugins to support type-level constraint solving on naturals
+    -fplugin GHC.TypeLits.Extra.Solver
+    -fplugin GHC.TypeLits.Normalise
+    -fplugin GHC.TypeLits.KnownNat.Solver
+
+    -- Clash needs access to the source code in compiled modules
+    -fexpose-all-unfoldings
+
+    -- Worker wrappers introduce unstable names for functions that might have
+    -- blackboxes attached for them. You can disable this, but be sure to add
+    -- a no-specialize pragma to every function with a blackbox.
+    -fno-worker-wrapper
+  default-language: Haskell2010
+  build-depends:
+    base,
+    Cabal,
+
+    -- clash-prelude will set suitable version bounds for the plugins
+    clash-prelude >= 1.2 && < 1.4,
+    ghc-typelits-natnormalise,
+    ghc-typelits-extra,
+    ghc-typelits-knownnat
+
+library
+  import: common-options
+  hs-source-dirs: src
+  exposed-modules:
+    Example.Project
+  default-language: Haskell2010
+
+-- Builds the executable 'clash', with clash-example-project in scope
+executable clash
+  Main-Is: bin/Clash.hs
+  Build-Depends: base, clash-ghc, clash-example-project
+  ghc-options: -dynamic
+  default-language: Haskell2010
+
+-- Builds the executable 'clashi', with clash-example-project in scope
+executable clashi
+  Main-Is: bin/Clashi.hs
+  default-language: Haskell2010
+  ghc-options: -dynamic
+  Build-Depends: base, clash-ghc, clash-example-project
+
+test-suite test-library
+  import: common-options
+  hs-source-dirs: tests
+  type: exitcode-stdio-1.0
+  ghc-options: -threaded
+  main-is: tests.hs
+  other-modules:
+    Tests.Example.Project
+  build-depends:
+    clash-example-project,
+    QuickCheck,
+    tasty >= 1.2 && < 1.3,
+    tasty-quickcheck

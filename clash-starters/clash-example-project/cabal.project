@@ -1,0 +1,5 @@
+packages:
+  clash-example-project.cabal
+
+package clash-prelude
+  flags: -large-tuples
