@@ -80,6 +80,7 @@ instance Default extra => Default (RewriteState extra) where
     , _uniqSupply=unsafePerformIO newSupply
     , _curFun=error "_curFun: NYI"
     , _nameCounter=2
+    , _workFreeBinders=emptyVarEnv
     , _globalHeap=error "_globalHeap: NYI"
     , _extra=def
     }

@@ -34,6 +34,7 @@ defaultTests =
   , "benchmark/tests/BundleMapRepeat.hs"
   , "benchmark/tests/PipelinesViaFolds.hs"
   , "tests/shouldwork/Basic/AES.hs"
+  , "tests/shouldwork/Basic/T1354B.hs"
   ]
 
 typeTrans :: (CustomReprs -> TyConMap -> Type ->
@@ -47,6 +48,7 @@ opts idirs =
     , opt_errorExtra = True
     , opt_floatSupport = True
     , opt_importPaths=idirs
+    , opt_specLimit=40 -- For "PipelinesViaFolds"
     }
 
 backend :: VHDLState
