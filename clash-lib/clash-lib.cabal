@@ -295,7 +295,7 @@ test-suite unittests
       haskell-src-exts,
       ghc,
       lens,
-      tasty         >= 1.2      && < 1.3,
+      tasty         >= 1.2      && < 1.4,
       tasty-hunit,
       template-haskell,
       text,
