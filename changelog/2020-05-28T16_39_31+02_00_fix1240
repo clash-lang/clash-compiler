@@ -1,1 +1,0 @@
-FIXES: Added blackbox implementation for 'Clash.Sized.Vector.iterateI', hence making it usable as a register reset value [#1240](https://github.com/clash-lang/clash-compiler/issues/1240)

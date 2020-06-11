@@ -1,1 +1,0 @@
-FIXED: `iterate` and `iterateI` can now be used in reset values [#1240](https://github.com/clash-lang/clash-compiler/issues/1240)

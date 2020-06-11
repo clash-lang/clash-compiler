@@ -1,5 +1,32 @@
 # Changelog for the Clash project
 
+## 1.2.2 *June 12th 2020*
+
+
+* Changed:
+  * The hardwired functions to unroll primitive definitions for 'zipWith', 'map', 'foldr', and 'init' have been changed to only unroll a single step, whereas they would previously unroll the whole definition in one step. This allows Clash to take advantage of the lazy nature of these functions, in turn speeding up compilation speeds significantly in some cases. Part of [PR 1354](https://github.com/clash-lang/clash-compiler/pull/1354).
+
+* Added:
+  * Support for GHC 8.10
+  * Ability to load designs from precompiled modules (i.e., stored in a package database). See [#1172](https://github.com/clash-lang/clash-compiler/pull/1172)
+  * Support for '-main-is' when used with `--vhdl`, `--verilog`, or `--systemverilog`
+  * A partial instance for `NFDataX (Signal domain a)`
+
+* Fixed:
+  * Clash's evaluator now inlines work free definitions, preventing [situations where it would otherwise get stuck in an infinite loop](https://github.com/clash-lang/clash-compiler/pull/1354#issuecomment-635430374)
+  * `caseCon` doesn't apply type-substitution correctly [#1340](https://github.com/clash-lang/clash-compiler/issues/1340)
+  * Clash generates illegal SystemVerilog slice [#1313](https://github.com/clash-lang/clash-compiler/issues/1313)
+  * Fix result type of head and tail Verilog blackboxes [#1351](https://github.com/clash-lang/clash-compiler/issues/1351)
+  * Certain recursive let-expressions in side a alternatives of a case-expression throw the Clash compiler into an infinite loop [#1316](https://github.com/clash-lang/clash-compiler/issues/1316)
+  * Fixes issue with one of Clash's transformations, `inlineCleanup`, introducing free variables [#1337](https://github.com/clash-lang/clash-compiler/issues/1337)
+  * Fails to propagate type information of existential type [#1310](https://github.com/clash-lang/clash-compiler/issues/1310)
+  * Certain case-expressions throw the Clash compiler into an infinite loop [#1320](https://github.com/clash-lang/clash-compiler/issues/1320)
+  * Added blackbox implementation for 'Clash.Sized.Vector.iterateI', hence making it usable as a register reset value [#1240](https://github.com/clash-lang/clash-compiler/issues/1240)
+  * `iterate` and `iterateI` can now be used in reset values [#1240](https://github.com/clash-lang/clash-compiler/issues/1240)
+  * Prim evaluation fails on undefined arguments [#1297](https://github.com/clash-lang/clash-compiler/issues/1297)
+  * Missing re-indexing in (Un)Signed fromSLV conversion [#1292](https://github.com/clash-lang/clash-compiler/issues/1292)
+  * VHDL: generate a type qualification inside ~TOBV, fixes [#1360](https://github.com/clash-lang/clash-compiler/issues/1360)
+
 ## 1.2.1 *April 23rd 2020*
 * Changed:
   * Treat `Signed 0`, `Unsigned 0`, `Index 1`, `BitVector 0` as unit. In effect this means that 'minBound' and 'maxBound' return 0, whereas previously they might crash [#1183](https://github.com/clash-lang/clash-compiler/issues/1183)
