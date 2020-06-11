@@ -1,1 +1,0 @@
-FIXES: Fails to propagate type information of existential type [#1310](https://github.com/clash-lang/clash-compiler/issues/1310)

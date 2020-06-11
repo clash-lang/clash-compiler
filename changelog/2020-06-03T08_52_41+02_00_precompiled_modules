@@ -1,1 +1,0 @@
-ADDED: Clash can now load designs from precompiled modules (i.e., stored in a package database). See [#1172](https://github.com/clash-lang/clash-compiler/pull/1172)
