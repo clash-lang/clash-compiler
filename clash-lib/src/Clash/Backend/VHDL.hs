@@ -520,6 +520,7 @@ tyDec hwty = do
     -- Type aliases:
     Clock _           -> typAliasDec hwty
     Reset _           -> typAliasDec hwty
+    Enable _          -> typAliasDec hwty
     Index _           -> typAliasDec hwty
     CustomSP _ _ _ _  -> typAliasDec hwty
     SP _ _            -> typAliasDec hwty
@@ -1075,6 +1076,9 @@ tyName' rec0 (filterTransparent -> t) = do
     Reset nm0 ->
       let nm1 = "rst_" `TextS.append` nm0 in
       Mon $ makeCached (t, False) nameCache (userTyName "rst" nm1 t)
+    Enable nm0 ->
+      let nm1 = "en_" `TextS.append` nm0 in
+      Mon $ makeCached (t, False) nameCache (userTyName "en" nm1 t)
     Sum nm _  ->
       Mon $ makeCached (t, False) nameCache (userTyName "sum" nm t)
     CustomSum nm _ _ _ ->
@@ -1118,6 +1122,7 @@ normaliseType hwty = case hwty of
   -- Simple types, for which a subtype (without qualifiers) will be made in VHDL:
   Clock _           -> Bit
   Reset _           -> Bit
+  Enable _          -> Bool
   Index _           -> Unsigned (typeSize hwty)
   CustomSP _ _ _ _  -> BitVector (typeSize hwty)
   SP _ _            -> BitVector (typeSize hwty)
@@ -1141,6 +1146,7 @@ filterTransparent hwty = case hwty of
   Bit               -> hwty
   Clock _           -> hwty
   Reset _           -> hwty
+  Enable _          -> hwty
   Index _           -> hwty
   Sum _ _           -> hwty
   CustomSum _ _ _ _ -> hwty
@@ -1222,8 +1228,9 @@ sizedQualTyNameErrValue t@(RTree n elTy)    = do
     _ -> qualTyName t <> "'" <>  parens (int 0 <+> "to" <+> int (2^n - 1) <+> rarrow <+> sizedQualTyNameErrValue elTy)
 sizedQualTyNameErrValue t@(Product _ _ elTys) =
   qualTyName t <> "'" <> tupled (mapM sizedQualTyNameErrValue elTys)
-sizedQualTyNameErrValue (Reset {}) = singularErrValue
 sizedQualTyNameErrValue (Clock _)  = singularErrValue
+sizedQualTyNameErrValue (Reset _)  = singularErrValue
+sizedQualTyNameErrValue (Enable _) = singularErrValue
 sizedQualTyNameErrValue (Void {})  =
   return (error ($(curLoc) ++ "[CLASH BUG] Forced to print Void error value"))
 sizedQualTyNameErrValue String              = "\"ERROR\""
@@ -1771,6 +1778,9 @@ toSLV (Clock {})    e = do
 toSLV (Reset {})    e = do
   nm <- Mon $ use modNm
   pretty (TextS.toLower nm) <> "_types.toSLV" <> parens (expr_ False e)
+toSLV (Enable _)    e = do
+  nm <- Mon $ use modNm
+  pretty (TextS.toLower nm) <> "_types.toSLV" <> parens (expr_ False e)
 toSLV (BitVector _) e = expr_ True e
 toSLV (Signed _)   e = "std_logic_vector" <> parens (expr_ False e)
 toSLV (Unsigned _) e = "std_logic_vector" <> parens (expr_ False e)
@@ -1845,7 +1855,8 @@ punctuate' s d = vcat (punctuate s d) <> s
 
 encodingNote :: HWType -> VHDLM Doc
 encodingNote (Clock _)  = "-- clock" <> line
-encodingNote (Reset _ ) = "-- reset" <> line
+encodingNote (Reset _)  = "-- reset" <> line
+encodingNote (Enable _) = "-- enable" <> line
 encodingNote _          = emptyDoc
 
 tupledSemi :: Applicative f => f [Doc] -> f Doc

@@ -393,9 +393,11 @@ renderElem b (Tag n) = do
   case stripVoid ty of
     KnownDomain dom _ _ _ _ _ ->
       return (const (Text.pack (Data.Text.unpack dom)))
+    Clock dom ->
+      return (const (Text.pack (Data.Text.unpack dom)))
     Reset dom ->
       return (const (Text.pack (Data.Text.unpack dom)))
-    Clock dom ->
+    Enable dom ->
       return (const (Text.pack (Data.Text.unpack dom)))
     _ ->
       error $ $(curLoc) ++ "Tag: Expected `KnownDomain` or `KnownConfiguration`, not: " ++ show ty
@@ -455,6 +457,7 @@ renderElem b (IF c t f) = do
           -- TODO: user's intention.
           (Literal Nothing (BoolLit False), Bool) -> 1
           (_, Bool)                               -> 1
+          (_, Enable _)                           -> 1
           _ ->
             error $ $(curLoc) ++ "IsActiveEnable: Expected Bool, not: " ++ show ty
 

@@ -176,6 +176,12 @@ ghcTypeToHWType iw floatSupport = go
             tag1 <- domTag m tag0
             returnN (Reset (pack tag1))
 
+        "Clash.Signal.Internal.Enable"
+          | [tag0] <- args
+          -> do
+            tag1 <- domTag m tag0
+            returnN (Enable (pack tag1))
+
         "Clash.Sized.Internal.BitVector.Bit" -> returnN Bit
 
         "Clash.Sized.Internal.BitVector.BitVector" -> do

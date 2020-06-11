@@ -946,6 +946,10 @@ mkDcApplication [dstHType] bndr dc args = do
 
       CustomSum _ _ _ _ ->
         return (HW.DataCon dstHType (DC (dstHType, dcTag dc - 1)) [])
+      Enable _ ->
+        case argExprsFiltered of
+          [x] -> return x
+          _   -> error $ $(curLoc) ++ "unexpected arguments to Enable: " ++ show argExprsFiltered
       Bool ->
         let dc' = case dcTag dc of
                    1  -> HW.Literal Nothing (BoolLit False)

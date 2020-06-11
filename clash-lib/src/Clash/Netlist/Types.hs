@@ -222,6 +222,8 @@ data HWType
   -- ^ Clock type corresponding to domain /Identifier/
   | Reset !Identifier
   -- ^ Reset type corresponding to domain /Identifier/
+  | Enable !Identifier
+  -- ^ Enable type corresponding to domain /Identifier/
   | BiDirectional !PortDirection !HWType
   -- ^ Tagging type indicating a bidirectional (inout) port
   | CustomSP !Identifier !DataRepr' !Size [(ConstrRepr', Identifier, [HWType])]

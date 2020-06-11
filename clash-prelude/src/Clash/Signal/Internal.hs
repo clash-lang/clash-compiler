@@ -137,7 +137,6 @@ import Control.DeepSeq            (NFData)
 import Clash.Annotations.Primitive (hasBlackBox)
 import Data.Binary                (Binary)
 import Data.Char                  (isAsciiUpper, isAlphaNum, isAscii)
-import Data.Coerce                (coerce)
 import Data.Data                  (Data)
 import Data.Default.Class         (Default (..))
 import Data.Hashable              (Hashable)
@@ -762,17 +761,17 @@ traverse# f (a :- s) = (:-) <$> f a <*> traverse# f s
 -- | A signal of booleans, indicating whether a component is enabled. No special
 -- meaning is implied, it's up to the component itself to decide how to respond
 -- to its enable line. It is used throughout Clash as a global enable signal.
-newtype Enable dom = Enable (Signal dom Bool)
+data Enable dom = Enable (Signal dom Bool)
 
 -- | Convert 'Enable' construct to its underlying representation: a signal of
 -- bools.
 fromEnable :: Enable dom -> Signal dom Bool
-fromEnable = coerce
+fromEnable (Enable x) = x
 {-# INLINE fromEnable #-}
 
 -- | Convert a signal of bools to an 'Enable' construct
 toEnable :: Signal dom Bool -> Enable dom
-toEnable = coerce
+toEnable = Enable
 {-# INLINE toEnable #-}
 
 -- | Enable generator for some domain. Is simply always True.
