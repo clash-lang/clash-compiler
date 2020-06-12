@@ -42,7 +42,7 @@ common common-options
     -- Prelude isn't imported by default as Clash offers Clash.Prelude
     NoImplicitPrelude
   ghc-options:
-    -Wall
+    -Wall -Wcompat
 
     -- Plugins to support type-level constraint solving on naturals
     -fplugin GHC.TypeLits.Extra.Solver
@@ -76,17 +76,15 @@ library
 
 -- Builds the executable 'clash', with clash-example-project in scope
 executable clash
-  Main-Is: bin/Clash.hs
+  main-is: bin/Clash.hs
   Build-Depends: base, clash-ghc, clash-example-project
   ghc-options: -dynamic
-  default-language: Haskell2010
 
 -- Builds the executable 'clashi', with clash-example-project in scope
 executable clashi
-  Main-Is: bin/Clashi.hs
-  default-language: Haskell2010
+  main-is: bin/Clashi.hs
   ghc-options: -dynamic
-  Build-Depends: base, clash-ghc, clash-example-project
+  build-depends: base, clash-ghc, clash-example-project
 
 test-suite test-library
   import: common-options
