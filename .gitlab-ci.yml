@@ -92,7 +92,7 @@ hackage-sdist:
   extends: .tests
   interruptible: false
   variables:
-    GHC: ghc-8.6.5
+    GHC: ghc-8.10.1
   script:
     - export GHC="${GHC:-$CI_JOB_NAME}"
     - export THREADS=$(nproc)
