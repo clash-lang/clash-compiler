@@ -1,0 +1,9 @@
+packages:
+  clash-example-project.cabal
+
+package clash-prelude
+  -- 'large-tuples' generates tuple instances for various classes up to the
+  -- GHC imposed maximum of 62 elements. This severely slows down compiling
+  -- Clash, and triggers Template Haskell bugs on Windows. Hence, we disable
+  -- it by default. This will be the default for Clash >=1.4.
+  flags: -large-tuples
