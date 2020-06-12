@@ -62,7 +62,7 @@ common common-options
     Cabal,
 
     -- clash-prelude will set suitable version bounds for the plugins
-    clash-prelude >= 1.2 && < 1.4,
+    clash-prelude >= 1.2.2 && < 1.4,
     ghc-typelits-natnormalise,
     ghc-typelits-extra,
     ghc-typelits-knownnat
