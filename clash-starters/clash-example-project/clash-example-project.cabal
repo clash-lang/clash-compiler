@@ -78,12 +78,14 @@ library
 executable clash
   main-is: bin/Clash.hs
   Build-Depends: base, clash-ghc, clash-example-project
-  ghc-options: -dynamic
+  if !os(Windows)
+    ghc-options: -dynamic
 
 -- Builds the executable 'clashi', with clash-example-project in scope
 executable clashi
   main-is: bin/Clashi.hs
-  ghc-options: -dynamic
+  if !os(Windows)
+    ghc-options: -dynamic
   build-depends: base, clash-ghc, clash-example-project
 
 test-suite test-library
