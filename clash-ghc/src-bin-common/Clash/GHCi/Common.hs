@@ -33,6 +33,7 @@ import qualified GHC.LanguageExtensions as LangExt (Extension (..))
 import           Panic                  (GhcException (..), throwGhcException)
 
 import           Control.Monad          (forM_, unless, when)
+import           Distribution.System    (OS(Windows), buildOS)
 import           System.Directory       (doesDirectoryExist)
 import           System.IO              (hPutStrLn, stderr)
 
@@ -114,7 +115,7 @@ checkClashDynamic dflags = do
   let isStatic = case lookup "GHC Dynamic" (DynFlags.compilerInfo dflags) of
         Just "YES" -> False
         _          -> True
-  when isStatic
+  when (isStatic && buildOS /= Windows)
     (hPutStrLn stderr (unlines
       ["WARNING: Clash is linked statically, which can lead to long startup times."
       ,"See https://gitlab.haskell.org/ghc/ghc/issues/15524"
