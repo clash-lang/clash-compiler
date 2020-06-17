@@ -80,11 +80,11 @@ findBinding
   -> Nf
 findBinding nm (bm, tcm, ids) =
   case List.find byName (eltsVarEnv bm) of
-    Just bd -> get $ nf ghcEvaluator bm (mempty, 0)
-      tcm emptyInScopeSet ids (bindingTerm bd)
+    Just bd ->
+      let env = mkGlobalEnv bm (mempty, 0) tcm emptyInScopeSet ids
+       in fst . runEval env $ evaluateNf ghcEvaluator (bindingTerm bd)
 
     Nothing -> error ("Not in binding map: " <> show nm)
  where
-  get (x, _, _) = x
   byName b = nm == nameOcc (varName $ bindingId b)
 

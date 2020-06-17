@@ -59,7 +59,7 @@ import           Data.Monoid                      (All (..))
 import Clash.Core.DataCon    (DataCon, dcTag)
 
 #if EXPERIMENTAL_EVALUATOR
-import Clash.Core.Evaluator.Models (nf, asTerm)
+import Clash.Core.Evaluator.Models
 #else
 import Clash.Core.Evaluator.Types  (whnf')
 #endif
@@ -158,7 +158,8 @@ collectGlobals' is0 substitution seen e@(collectArgsTicks -> (fun, args@(_:_), t
     let (ids1,ids2) = splitSupply ids
     uniqSupply Lens..= ids2
 #if EXPERIMENTAL_EVALUATOR
-    let eval = asTerm . Lens.view Lens._1 . nf evaluate bndrs gh tcm is0 ids1
+    let env = mkGlobalEnv bndrs gh tcm is0 ids1
+    let eval = asTerm . fst . runEval env . evaluateNf evaluate
 #else
     let eval = (Lens.view Lens._3) . whnf' evaluate bndrs tcm gh ids1 is0 False
 #endif

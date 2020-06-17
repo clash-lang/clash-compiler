@@ -43,12 +43,6 @@ import qualified Data.List.Extra             as List
 import           Data.List.Extra             (allM, partitionM)
 import qualified Data.Map                    as Map
 import           Data.Maybe
-  (catMaybes, isJust, mapMaybe, fromMaybe)
-
-#if EXPERIMENTAL_EVALUATOR
-import qualified Data.Map.Strict             as StrictMap
-#endif
-
 import qualified Data.Monoid                 as Monoid
 import qualified Data.Set                    as Set
 import qualified Data.Set.Lens               as Lens
@@ -1138,10 +1132,10 @@ whnfRW _isSubj ctx@(TransformContext is0 _) e rw = do
   gh <- Lens.use globalHeap
 
 #if EXPERIMENTAL_EVALUATOR
-  case nf eval bndrs gh tcm is0 ids1 e of
-    (!e', !gh', !ph') -> do
-      globalHeap Lens..= gh'
-      bindPureHeap tcm ph' rw ctx (asTerm e')
+  case runEval (mkGlobalEnv bndrs gh tcm is0 ids1) (evaluateNf eval e) of
+    (!e', !env') -> do
+      globalHeap Lens..= genvPrimsIO env'
+      rw ctx (asTerm e')
 #else
   case whnf' eval bndrs tcm gh ids1 is0 _isSubj e of
     (!gh1,ph,v) -> do
@@ -1150,16 +1144,13 @@ whnfRW _isSubj ctx@(TransformContext is0 _) e rw = do
 #endif
 {-# SCC whnfRW #-}
 
+#if !EXPERIMENTAL_EVALUATOR
 -- | Binds variables on the PureHeap over the result of the rewrite
 --
 -- To prevent unnecessary rewrites only do this when rewrite changed something.
 bindPureHeap
   :: TyConMap
-#if EXPERIMENTAL_EVALUATOR
-  -> EnvTmMap
-#else
   -> PureHeap
-#endif
   -> Rewrite extra
   -> Rewrite extra
 bindPureHeap tcm heap rw ctx0@(TransformContext is0 hist) e = do
@@ -1201,9 +1192,6 @@ bindPureHeap tcm heap rw ctx0@(TransformContext is0 hist) e = do
     is1 = extendInScopeSetList is0 heapIds
     ctx = TransformContext is1 (LetBody heapIds : hist)
 
-#if EXPERIMENTAL_EVALUATOR
-    bndrs = StrictMap.toList (fmap asTerm heap)
-#else
     bndrs = map toLetBinding $ toListUniqMap heap
 
     toLetBinding :: (Unique,Term) -> LetBinding
@@ -1211,9 +1199,9 @@ bindPureHeap tcm heap rw ctx0@(TransformContext is0 hist) e = do
       where
         ty = termType tcm term
         nm = mkLocalId ty (mkUnsafeSystemName "x" uniq) -- See [Note: Name re-creation]
-#endif
 
     inlineTest _ (_, stripTicks -> e_) = isWorkFree e_
+#endif
 
 -- | Remove unused binders in given let-binding. Returns /Nothing/ if no unused
 -- binders were found.

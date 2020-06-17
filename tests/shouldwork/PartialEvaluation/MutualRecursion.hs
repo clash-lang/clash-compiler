@@ -52,7 +52,7 @@ mainCommon hdl = do
   let fNf = findBinding "MutualRecursion.f" entities
       mNf = findBinding "MutualRecursion.m" entities
 
-  fNf `deepseq` mNf `deepseq` pure ()
+  fNf `seq` mNf `seq` pure ()
 
 mainVHDL :: IO ()
 mainVHDL = mainCommon SVHDL

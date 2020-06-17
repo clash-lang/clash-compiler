@@ -1,3 +1,12 @@
+{-|
+  Copyright     : (C) 2020, QBayLogic B.V.
+  License       : BSD2 (see the file LICENSE)
+  Maintainer    : QBayLogic B.V. <devops@qbaylogic.com>
+
+This module contains the implementation of partial evaluation that is
+used by the GHC frontend.
+-}
+
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE MagicHash #-}
 
@@ -5,8 +14,8 @@ module Clash.GHC.PartialEval
   ( ghcEvaluator
   ) where
 
-import qualified Control.Monad.State.Strict as State
 import Data.Bifunctor
+import Data.Bitraversable
 import Data.Either (partitionEithers)
 import GHC.Integer.GMP.Internals (BigNat(..), Integer(..))
 import Unsafe.Coerce
@@ -22,7 +31,7 @@ import Clash.Core.Type
 import Clash.Core.Var
 import Clash.Unique
 
--- An evaluator for partial evaluation that uses GHC specific details. This
+-- | An evaluator for partial evaluation that uses GHC specific details. This
 -- allows the evaluator to be implemented with an understanding of built-in
 -- GHC types and primitives which can appear in Clash core when using GHC as a
 -- compiler front-end.
@@ -32,8 +41,15 @@ ghcEvaluator = evaluatorWith ghcMatchLiteral ghcMatchData ghcEvaluatePrim
 
 -- TODO Implement evaluation for primitives and call here.
 --
-ghcEvaluatePrim :: PrimInfo -> [Either Value Type] -> Eval Value
-ghcEvaluatePrim p args = pure (VNeu $ NePrim p args)
+-- If a primitive can't be reduced, we do the next best thing and force all
+-- it's arguments to WHNF. This is done to simplify the definition of the
+-- NePrim constructor in Neutral.
+--
+ghcEvaluatePrim :: PrimInfo -> [Either Term Type] -> Eval Value
+ghcEvaluatePrim p args =
+  VNeu . NePrim p <$> forceArgs args
+ where
+  forceArgs = traverse (bitraverse (evaluateWhnf ghcEvaluator) pure)
 
 -- | Attempt to match a literal against a pattern. If the pattern matches
 -- the literal, any identifiers bound in the pattern are added to the
@@ -43,7 +59,7 @@ ghcEvaluatePrim p args = pure (VNeu $ NePrim p args)
 -- expressions by using literal patterns or data patterns (from modules like
 -- GHC.Integer.GMP.Internals and GHC.Natural).
 --
-ghcMatchLiteral :: Literal -> Pat -> Eval Bool
+ghcMatchLiteral :: Literal -> Pat -> Eval PatResult
 ghcMatchLiteral l = \case
   DataPat c [] [i]
     |  IntegerLiteral n <- l
@@ -57,7 +73,7 @@ ghcMatchLiteral l = \case
          Jn# bn
            | dcTag c == 3 -> insertBigNat i bn
 
-         _ -> pure False
+         _ -> pure NoMatch
 
     |  NaturalLiteral n <- l
     -> case n of
@@ -67,23 +83,26 @@ ghcMatchLiteral l = \case
          Jp# bn
            | dcTag c == 2 -> insertBigNat i bn
 
-         _ -> pure False
+         _ -> pure NoMatch
 
     |  otherwise
-    -> pure False
+    -> pure NoMatch
 
-  DataPat _ _ _ -> pure False
-  LitPat m -> pure (l == m)
-  DefaultPat -> pure True
+  LitPat m
+    |  l == m
+    -> pure (Match [] [])
+
+  DefaultPat
+    -> pure (Match [] [])
+
+  _ -> pure NoMatch
  where
-  insertInt :: Id -> Integer -> Eval Bool
-  insertInt i n =
-    let val = VLit (IntLiteral n)
-     in State.withState (insertLocal i (Right val)) (pure True)
+  insertInt :: Id -> Integer -> Eval PatResult
+  insertInt i n = pure (Match [] [(i, Literal (IntLiteral n))])
 
-  insertBigNat :: Id -> BigNat -> Eval Bool
+  insertBigNat :: Id -> BigNat -> Eval PatResult
   insertBigNat i bn = do
-    tcm <- State.gets envTcMap
+    tcm <- getTyConMap
 
     -- Add the mapping i |-> VData "BigNat" [byteArray] to the environment.
     let Just integerTcName = fmap fst (splitTyConAppM integerPrimTy)
@@ -94,10 +113,10 @@ ghcMatchLiteral l = \case
 
         -- unsafeCoerce should be safe: BigNat and ByteArray are both newtype
         -- wrappers around ByteArray#.
-        ba = VLit (ByteArrayLiteral (unsafeCoerce bn))
-        val = VData bnDc [Left ba]
+        ba = Literal (ByteArrayLiteral (unsafeCoerce bn))
+        val = Data bnDc `App` ba
 
-     in State.withState (insertLocal i (Right val)) (pure True)
+     in pure (Match [] [(i, val)])
 
 -- | Determine whether a given pattern is matched by a data constructor. If
 -- the match is successful, add any bound identifiers from the pattern to
@@ -105,15 +124,15 @@ ghcMatchLiteral l = \case
 --
 -- See evaluateCaseWith in Clash.Core.Evaluator.Semantics for more information.
 --
-ghcMatchData :: DataCon -> [Either Value Type] -> Pat -> Eval Bool
+ghcMatchData :: DataCon -> [Either Term Type] -> Pat -> Eval PatResult
 ghcMatchData dc args = \case
-  DataPat c tvs ids ->
-    if dc /= c then pure False else
-      -- Insert bindings from pattern into the environment
-      let sepArgs = partitionEithers args
-          (tms, tys) = bimap (zip ids . fmap Right) (zip tvs) sepArgs
-       in State.withState (insertTypes tys . insertLocals tms) (pure True)
+  DataPat c tvs ids
+    |  dc == c
+    ,  (tms, tys) <- bimap (zip ids) (zip tvs) (partitionEithers args)
+    -> pure (Match tys tms)
 
-  LitPat _   -> pure False
-  DefaultPat -> pure True
+  DefaultPat
+    -> pure (Match [] [])
+
+  _ -> pure NoMatch
 

@@ -36,7 +36,7 @@ import qualified Data.Set                    as Set
 import GHC.Generics
 
 #if EXPERIMENTAL_EVALUATOR
-import Clash.Core.Evaluator.Models           (Evaluator, EnvPrimsIO)
+import Clash.Core.Evaluator.Models           (Evaluator, GlobalIO)
 #else
 import Clash.Core.Evaluator.Types            (Evaluator, PrimHeap)
 #endif
@@ -81,7 +81,7 @@ data RewriteState extra
   , _nameCounter      :: {-# UNPACK #-} !Int
   -- ^ Used for 'Fresh'
 #if EXPERIMENTAL_EVALUATOR
-  , _globalHeap       :: EnvPrimsIO
+  , _globalHeap       :: GlobalIO
 #else
   , _globalHeap       :: PrimHeap
 #endif

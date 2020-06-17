@@ -1,31 +1,25 @@
+{-|
+  Copyright     : (C) 2020, QBayLogic B.V.
+  License       : BSD2 (see the file LICENSE)
+  Maintainer    : QBayLogic B.V. <devops@qbaylogic.com>
+
+This module defines semantics for the partial evaluator that are common
+to all compiler frontends, and exposes utility functions to create
+new evaluator implementaions.
+-}
+
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE MultiWayIf #-}
 {-# LANGUAGE OverloadedStrings #-}
 
-module Clash.Core.Evaluator.Semantics
-  ( evaluatorWith
-  , evaluateVarWith
-  , evaluateLiteral
-  , evaluateDataWith
-  , evaluatePrimWith
-  , evaluateLam
-  , evaluateTyLam
-  , evaluateAppWith
-  , evaluateLetrecWith
-  , evaluateCaseWith
-  , evaluateCastWith
-  , evaluateTickWith
-  , applyWith
-  , quoteWith
-  ) where
+module Clash.Core.Evaluator.Semantics where
 
-import Control.Monad (foldM)
-import qualified Control.Monad.State.Strict as State
-import Data.Bifunctor (bimap)
+import Control.Monad ((>=>), foldM)
+import Data.Bifunctor (bimap, first)
 import Data.Bitraversable (bitraverse)
-import Data.Foldable (foldl')
-import qualified Data.List.Extra as List (equalLength)
+import Data.List.Extra (equalLength)
 
+-- TODO: This is GHC specific, but is already used in BindingMap.
 import BasicTypes (InlineSpec(..))
 
 import Clash.Core.DataCon
@@ -46,9 +40,9 @@ import Clash.Driver.Types (Binding(..))
 --   * evalPrim, which evaluates primitive operations
 --
 evaluatorWith
-  :: (Literal -> Pat -> Eval Bool)
-  -> (DataCon -> [Either Value Type] -> Pat -> Eval Bool)
-  -> (PrimInfo -> [Either Value Type] -> Eval Value)
+  :: (Literal -> Pat -> Eval PatResult)
+  -> (DataCon -> [Either Term Type] -> Pat -> Eval PatResult)
+  -> (PrimInfo -> [Either Term Type] -> Eval Value)
   -> Evaluator
 evaluatorWith matchLit matchData evalPrim =
   let eval  = evaluateWith matchLit matchData evalPrim
@@ -59,9 +53,9 @@ evaluatorWith matchLit matchData evalPrim =
 -- given functions. See 'evaluatorWith' for more information.
 --
 evaluateWith
-  :: (Literal -> Pat -> Eval Bool)
-  -> (DataCon -> [Either Value Type] -> Pat -> Eval Bool)
-  -> (PrimInfo -> [Either Value Type] -> Eval Value)
+  :: (Literal -> Pat -> Eval PatResult)
+  -> (DataCon -> [Either Term Type] -> Pat -> Eval PatResult)
+  -> (PrimInfo -> [Either Term Type] -> Eval Value)
   -> Term
   -> Eval Value
 evaluateWith matchLit matchData evalPrim = go
@@ -111,23 +105,23 @@ There is one more consideration which applies to primitives only: the result
 of a primitive may potentially be a function (e.g. primtives that return an
 action in IO). This is handled in evaluateAppWith, by checking if more
 arguments are given than the primitive requires, and partitioning the
-arguments. The arguments for the primitive are applied and the primtive is
+arguments. The arguments for the primitive are applied and the primitive is
 evaluated, then the remaining arguments are applied.
 -}
 
 isFullyApplied :: Type -> [Either Term Type] -> Bool
 isFullyApplied ty args =
-  List.equalLength args (fst $ splitFunForallTy ty)
+  equalLength args (fst $ splitFunForallTy ty)
 
 etaExpand :: Term -> Eval Term
 etaExpand x =
   case collectArgs x of
     y@(Data dc, _) -> do
-      tcm <- State.gets envTcMap
+      tcm <- getTyConMap
       expand tcm (dcType dc) y
 
     y@(Prim p, _) -> do
-      tcm <- State.gets envTcMap
+      tcm <- getTyConMap
       expand tcm (primType p) y
 
     _ -> pure x
@@ -142,9 +136,7 @@ etaExpand x =
       missingArgs
 
   etaNameOf :: Either TyVar Type -> Eval (Either Id TyVar)
-  etaNameOf = \case
-    Left tv  -> pure (Right tv)
-    Right ty -> Left <$> State.state (mkUniqueId "eta" ty)
+  etaNameOf = either (pure . Right) (fmap Left . mkUniqueId "eta")
 
 -- | Default implementation for looking up a variable in the environment.
 -- This checks both the local and global environments, and inlines global
@@ -166,20 +158,29 @@ etaExpand x =
 -- unrolled where possible.
 --
 evaluateVarWith :: (Term -> Eval Value) -> Id -> Eval Value
-evaluateVarWith eval i = do
-  env <- State.get
-
-  if |  Just etv <- lookupLocal i env
-     -> either (State.withState (deleteLocal i) . eval) pure etv
-
-     |  Just b <- lookupGlobal i env
-     ,  canInline (bindingSpec b)
-     -> either (State.withState (deleteGlobal i) . eval) pure (bindingTerm b)
-
-     |  otherwise
-     -> pure (VNeu (NeVar i))
+evaluateVarWith eval i
+  | isLocalId i = goLocal
+  | otherwise   = goGlobal
  where
-  canInline spec = spec /= NoInline
+  goLocal :: Eval Value
+  goLocal = getLocal i >>= \case
+    Just x  -> forceLocal x
+    Nothing -> pure (VNeu (NeVar i))
+   where
+    forceLocal = either (withoutLocal i . eval) pure
+
+  goGlobal :: Eval Value
+  goGlobal = getGlobal i >>= \case
+    Just b
+      | bindingSpec b /= NoInline -> do
+          v <- forceGlobal (bindingTerm b)
+
+          updateGlobal i v
+          pure v
+
+    _ -> pure (VNeu (NeVar i))
+   where
+    forceGlobal = either (withoutGlobal i . eval) pure
 
 -- | Default implementation for evaluating a literal.
 -- This simply wraps the literal up into a Value.
@@ -187,16 +188,16 @@ evaluateVarWith eval i = do
 evaluateLiteral :: Literal -> Eval Value
 evaluateLiteral = pure . VLit
 
--- | Default implementaion for evaluating data constructors. If the constructor
--- is not nullary, then it is eta-expanded and its eta-expanded form is
--- evaluated to obtain a result.
+-- | Default implementation for evaluating data constructors. If the
+-- constructor is not nullary, then it is eta-expanded and its eta-expanded
+-- form is evaluated to obtain a result.
 --
 evaluateDataWith
   :: (Term -> Eval Value)
   -> DataCon
   -> Eval Value
 evaluateDataWith eval dc
-  | isFullyApplied (dcType dc) [] = pure (VData dc [])
+  | isFullyApplied (dcType dc) [] = VData dc [] <$> getLocalEnv
   | otherwise = etaExpand (Data dc) >>= eval
 
 -- | Default implementation for evaluating primitive operations. If the primop
@@ -205,7 +206,7 @@ evaluateDataWith eval dc
 --
 evaluatePrimWith
   :: (Term -> Eval Value)
-  -> (PrimInfo -> [Either Value Type] -> Eval Value)
+  -> (PrimInfo -> [Either Term Type] -> Eval Value)
   -> PrimInfo
   -> Eval Value
 evaluatePrimWith eval evalPrim p
@@ -214,17 +215,17 @@ evaluatePrimWith eval evalPrim p
 
 -- | Default implementation for evaluating lambdas. As a term with a lambda
 -- at the head is already in WHNF, this simply returns the term under the
--- lambda with the current environment.
+-- lambda with the current local environment.
 --
 evaluateLam :: Id -> Term -> Eval Value
-evaluateLam i x = State.gets (VLam i x)
+evaluateLam i x = VLam i x <$> getLocalEnv
 
 -- | Default implementation for evaluating type lambdas. As a term with a type
 -- lambda at the head is already in WHNF, this simply returns the term under
--- the type lambda with the current environment.
+-- the type lambda with the current local environment.
 --
 evaluateTyLam :: TyVar -> Term -> Eval Value
-evaluateTyLam i x = State.gets (VTyLam i x)
+evaluateTyLam i x = VTyLam i x <$> getLocalEnv
 
 -- | Default implementation for evalating a term / type application. This
 -- checks if the arguments are applied to a data constructor or primitive, and
@@ -233,37 +234,42 @@ evaluateTyLam i x = State.gets (VTyLam i x)
 --
 evaluateAppWith
   :: (Term -> Eval Value)
-  -> (PrimInfo -> [Either Value Type] -> Eval Value)
-  -> (Value -> Either Value Type -> Eval Value)
+  -> (PrimInfo -> [Either Term Type] -> Eval Value)
+  -> (Value -> Either TermOrValue Type -> Eval Value)
   -> Term
   -> Either Term Type
   -> Eval Value
 evaluateAppWith eval evalPrim apply x y
   | Data dc <- f
   = if isFullyApplied (dcType dc) args
-       then VData dc <$> evalArgs args
-       else etaExpand term >>= eval
+      then VData dc args <$> getLocalEnv
+      else etaExpand term >>= eval
 
   | Prim p <- f
   , nArgs  <- length . fst $ splitFunForallTy (primType p)
   = case compare (length args) nArgs of
       LT -> etaExpand term >>= eval
-      EQ -> evalArgs args >>= evalPrim p
+      EQ -> evalPrim p args
       GT -> do
-        (pArgs, rArgs) <- splitAt nArgs <$> evalArgs args
+        let (pArgs, rArgs) = splitAt nArgs args
         primRes <- evalPrim p pArgs
-        foldM apply primRes rArgs
+        foldM apply primRes (first Left <$> rArgs)
 
+  -- Evaluating a function application may changes the ignore list (e.g. if the
+  -- LHS of the application is a recursive function.) If we do not remove this
+  -- from the ignore list after calling apply, it will not be inlined if it
+  -- appears in any other subterms.
+  --
+  -- This is not needed for data and prim, as they do not evaluate their
+  -- arguments, so the ignore list will not change.
+  --
   | otherwise
-  = do
-       evalF  <- eval f
-       evalAs <- evalArgs args
-       foldM apply evalF evalAs
- where
+  = preserveIgnored $ do
+      evalF <- eval f
+      foldM apply evalF (first Left <$> args)
+  where
   term      = either (App x) (TyApp x) y
   (f, args) = collectArgs term
-  evalArg   = bitraverse eval pure
-  evalArgs  = traverse evalArg
 
 -- | Default implementation for evaluating a letrec expression. This adds all
 -- bindings to the heap without eagerly evaluating them, then evaluates the
@@ -279,11 +285,8 @@ evaluateLetrecWith
   -> Term
   -> Eval Value
 evaluateLetrecWith eval bs x =
-  State.withState addTerms (eval x)
- where
-  addTerms env =
-    let terms = fmap (fmap Left) bs
-     in foldl' (flip $ uncurry insertLocal) env terms
+  let terms = fmap (fmap Left) bs
+   in withLocals terms (eval x)
 
 -- | Default implementation for evaluating a case expression. This replaces the
 -- entire expression with the chosen alternative if it can be statically
@@ -306,10 +309,13 @@ evaluateLetrecWith eval bs x =
 -- to check if a literal is matched would have to check both literal patterns
 -- and data patterns for the constructors of Integer.
 --
+-- TODO: Handle undefined scrutinees in case expressions. These should result
+-- in the entire expression being replaced with undefined.
+--
 evaluateCaseWith
   :: (Term -> Eval Value)
-  -> (Literal -> Pat -> Eval Bool)
-  -> (DataCon -> [Either Value Type] -> Pat -> Eval Bool)
+  -> (Literal -> Pat -> Eval PatResult)
+  -> (DataCon -> [Either Term Type] -> Pat -> Eval PatResult)
   -> Term
   -> Type
   -> [Alt]
@@ -324,24 +330,26 @@ evaluateCaseWith eval matchLit matchData x ty alts
       evalX <- fst . collectValueTicks <$> eval x
 
       case evalX of
-        VLit l -> findMatchingAlt (matchLit l) alts >>= eval
-        VData dc args -> findMatchingAlt (matchData dc args) alts >>= eval
+        VLit l -> evalMatchingAlt (matchLit l) alts
+        VData dc args _env -> evalMatchingAlt (matchData dc args) alts
 
         v -> do
           evalAlts <- traverse (traverse eval) alts
           pure (VNeu (NeCase v ty evalAlts))
  where
-  findMatchingAlt p =
+  evalMatchingAlt p =
+    -- If the scrutinee is a non-neutral value, and there are no matching
+    -- patterns, the case expression must not cover all patterns.
     go (error "findMatchingAlt: No matching pattern in case expression")
    where
-    go best []     = pure best
-    go best (a:as) = do
-      matches <- p (fst a)
-      if matches
-        then if (fst a) == DefaultPat
-          then go (snd a) as
-          else pure (snd a)
-        else go best as
+    go best []     = eval best
+    go best (a:as) =
+      p (fst a) >>= \case
+        NoMatch -> go best as
+
+        Match tys ids
+          | fst a == DefaultPat -> go (snd a) as
+          | otherwise -> withTypes tys $ withLocals (fmap Left <$> ids) (eval (snd a))
 
 -- | Default implementation for evaluating a cast expression. This simply
 -- evalautes the expression under the cast, keeping the original cast in place.
@@ -383,18 +391,35 @@ evaluateTickWith eval t x = do
 -- See the note "environment machines" in Clash.Core.Evaluator.Models for more
 -- information about this style of reduction.
 --
-applyWith :: (Term -> Eval Value) -> Value -> Either Value Type -> Eval Value
+applyWith
+  :: (Term -> Eval Value)
+  -> Value
+  -> Either TermOrValue Type
+  -> Eval Value
 applyWith eval val arg
+  -- Apply an argument to a stuck term, yielding a new stuck term which
+  -- represents an application / type application.
   | VNeu n <- f
-  = pure $ VNeu (either (NeApp n) (NeTyApp n) arg)
+  = case arg of
+      -- The applied argument is unevaluated, so create a thunk and stop.
+      Left (Left t) ->
+        VNeu . NeApp n . VThunk t <$> getLocalEnv
+
+      -- The applied argument has been evalauted, so apply the WHNF value
+      -- directly to the neutral value.
+      Left (Right v) ->
+        pure $ VNeu (NeApp n v)
+
+      -- The applied argument is a type, and doesn't need evaluation.
+      Right ty ->
+        pure $ VNeu (NeTyApp n ty)
 
   -- Add the new value to the environment and continue. This is analagous to
   -- lazily performing the substitution (actual substitution occurs in
   -- 'evaluateVarWith' when evaluating subterms).
   | VLam i x env <- f
   , Left argV <- arg
-  , addBinder <- insertLocal i (Right argV)
-  = State.put (addBinder env) >> eval x
+  = withLocalEnv env $ withLocal (i, argV) (eval x)
 
   -- Add the new type to the environment and continue. This is to prevent
   -- losing type information when evaluating to WHNF, e.g.
@@ -407,9 +432,10 @@ applyWith eval val arg
   --
   | VTyLam i x env <- f
   , Right argTy <- arg
-  , addBinder <- insertType i argTy
-  = State.put (addBinder env) >> eval x
+  = withLocalEnv env $ withType (i, argTy) (eval x)
 
+  -- The term is neither stuck, nor a lambda. That means it does not support
+  -- beta reduction, and something has gone horribly wrong.
   | otherwise
   = error ("applyWith: Cannot apply " <> show arg <> " to " <> show val)
  where
@@ -430,12 +456,13 @@ quoteWith eval = go
   go = \case
     VNeu n -> fmap NNeu (goNe n)
     VLit l -> pure (NLit l)
-    VData dc args -> quoteDataWith go dc args
-    VPrim p args -> quotePrimWith go p args
+    VData dc args env -> quoteDataWith (eval >=> go) dc args env
+    VPrim p args env -> quotePrimWith (eval >=> go) p args env
     VLam i x env -> quoteLamWith go apply (Left i) x env
     VTyLam i x env -> quoteLamWith go apply (Right i) x env
     VCast x a b -> quoteCastWith go x a b
     VTick x t -> quoteTickWith go x t
+    VThunk x env -> quoteThunkWith (eval >=> go) x env
 
   goNe = \case
     NeVar v -> quoteNeVar v
@@ -448,41 +475,47 @@ quoteWith eval = go
 -- implement quote, so only quoteWith needs to be exported.
 
 quoteDataWith
-  :: (Value -> Eval Nf)
+  :: (Term -> Eval Nf)
   -> DataCon
-  -> [Either Value Type]
+  -> [Either Term Type]
+  -> LocalEnv
   -> Eval Nf
-quoteDataWith quote dc args = do
-  quoteArgs <- traverse (bitraverse quote pure) args
-  pure (NData dc quoteArgs)
+quoteDataWith quote dc args env =
+  withLocalEnv env $ do
+    quoteArgs <- traverse (bitraverse quote pure) args
+    pure (NData dc quoteArgs)
 
 quotePrimWith
-  :: (Value -> Eval Nf)
+  :: (Term -> Eval Nf)
   -> PrimInfo
-  -> [Either Value Type]
+  -> [Either Term Type]
+  -> LocalEnv
   -> Eval Nf
-quotePrimWith quote p args = do
-  quoteArgs <- traverse (bitraverse quote pure) args
-  pure (NPrim p quoteArgs)
+quotePrimWith quote p args env =
+  withLocalEnv env $ do
+    quoteArgs <- traverse (bitraverse quote pure) args
+    pure (NPrim p quoteArgs)
 
 quoteLamWith
   :: (Value -> Eval Nf)
-  -> (Value -> Either Value Type -> Eval Value)
+  -> (Value -> Either TermOrValue Type -> Eval Value)
   -> Either Id TyVar
   -> Term
-  -> Env
+  -> LocalEnv
   -> Eval Nf
 quoteLamWith quote apply i x env =
   case i of
-    Left iId  -> do
-      evalX  <- apply (VLam iId x env) (Left $ VNeu (NeVar iId))
-      quoteX <- quote evalX
-      pure (NLam iId quoteX)
+    Left iId ->
+      withLocalEnv env $ do
+        evalX  <- apply (VLam iId x env) (Left . Right $ VNeu (NeVar iId))
+        quoteX <- quote evalX
+        pure (NLam iId quoteX)
 
-    Right iTv -> do
-      evalX  <- apply (VTyLam iTv x env) (Right (VarTy iTv))
-      quoteX <- quote evalX
-      pure (NTyLam iTv quoteX)
+    Right iTv ->
+      withLocalEnv env $ do
+        evalX  <- apply (VTyLam iTv x env) (Right (VarTy iTv))
+        quoteX <- quote evalX
+        pure (NTyLam iTv quoteX)
 
 quoteCastWith
   :: (Value -> Eval Nf)
@@ -502,6 +535,14 @@ quoteTickWith
 quoteTickWith quote x t = do
   quoteX <- quote x
   pure (NTick quoteX t)
+
+quoteThunkWith
+  :: (Term -> Eval Nf)
+  -> Term
+  -> LocalEnv
+  -> Eval Nf
+quoteThunkWith eval x env =
+  withLocalEnv env (eval x)
 
 quoteNeVar :: Id -> Eval (Neutral Nf)
 quoteNeVar = pure . NeVar
