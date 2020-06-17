@@ -96,8 +96,3 @@ executable clash-testsuite
   build-depends:
     clash-testsuite
 
-executable partial-eval
-  import: basic-config
-  main-is: partial-eval.hs
-  build-depends: concurrent-supply
-

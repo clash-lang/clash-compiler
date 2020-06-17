@@ -1,6 +1,7 @@
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE PartialTypeSignatures #-}
 
+{-# OPTIONS_GHC -Wno-orphans #-}
 {-# OPTIONS_GHC -Wno-partial-type-signatures #-}
 
 import           Clash.Annotations.BitRepresentation.Internal (CustomReprs)
@@ -23,6 +24,7 @@ import           Clash.Primitives.Types
 import           Criterion.Main
 
 import qualified Control.Concurrent.Supply    as Supply
+import           Control.DeepSeq              (NFData(..), rwhnf)
 import           Data.IntMap.Strict           (IntMap)
 import           Data.List                    (isPrefixOf, partition)
 import           System.Environment           (getArgs, withArgs)
@@ -73,4 +75,7 @@ setupEnv idirs src = do
   inp <- runInputStage idirs src
   supplyN <- Supply.newSupply
   return (inp,supplyN)
+
+instance NFData Supply.Supply where
+  rnf = rwhnf
 

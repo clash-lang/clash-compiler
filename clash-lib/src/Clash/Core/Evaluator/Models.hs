@@ -1,97 +1,77 @@
-{-# OPTIONS_GHC -Wno-orphans #-}
+{-|
+Copyright     : (C) 2020, QBayLogic B.V.
+License       : BSD2 (see the file LICENSE)
+Maintainer    : QBayLogic B.V. <devops@qbaylogic.com>
 
-{-# LANGUAGE DeriveAnyClass #-}
+Data types and main API for the partial evaluator. This defines the type of
+evaluation, Eval, and specifies the basic operations that are used to define
+evaluation operations. This module also provides the types for WHNF terms
+(Value), beta-normal eta-long form terms (NF) and stuck terms (Neutral).
+-}
+
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE OverloadedStrings #-}
 
 module Clash.Core.Evaluator.Models where
 
 import Control.Concurrent.Supply (Supply)
-import Control.Monad.State.Strict (State)
-import qualified Control.Monad.State.Strict as State (runState)
-import Control.DeepSeq (NFData(..), rwhnf)
+import Control.Monad.RWS.Strict (MonadReader, MonadState, RWS)
+import qualified Control.Monad.RWS.Strict as RWS
 import Data.Bifunctor (first, second)
-import Data.Either (isRight)
-import Data.Foldable (foldl')
 import Data.IntMap.Strict (IntMap)
-import qualified Data.IntMap.Strict as IntMap
 import Data.Map.Strict (Map)
 import qualified Data.Map.Strict as Map
-import GHC.Generics (Generic)
+import Data.Set (Set)
+import qualified Data.Set as Set
+import qualified Data.Set.Lens as Set
 
 import Clash.Core.DataCon
-import Clash.Core.FreeVars (localFVsOfTerms, tyFVsOfTypes)
-import Clash.Core.Literal (Literal)
+import Clash.Core.FreeVars (localFVsOfTerms, tyFVsOfTypes, freeLocalIds)
+import Clash.Core.Literal
 import Clash.Core.Name (OccName)
 import Clash.Core.Subst (extendTvSubstList, mkSubst, substTm)
-import Clash.Core.Term (Term(..), Pat, PrimInfo, TickInfo, mkApps)
+import Clash.Core.Term
 import Clash.Core.TyCon (TyConMap)
 import Clash.Core.Type
-import Clash.Core.Util (mkUniqSystemTyVar, mkUniqSystemId)
-import Clash.Core.Var (Id, IdScope(..))
+import Clash.Core.Util (mkUniqSystemId, mkUniqSystemTyVar)
+import Clash.Core.Var (Id, Var)
 import Clash.Core.VarEnv
-  ( InScopeSet, extendInScopeSet, mkInScopeSet
-  , VarEnv, delVarEnv, extendVarEnv, lookupVarEnv
-  , unionVarSet
-  )
+import Clash.Driver.Types (Binding(..), BindingMap)
 
-import Clash.Driver.Types (BindingMap, Binding(..))
-
-type Eval a = State Env a
-
--- | Evaluate a term to NF using the specified evaluator. See 'partialEval'
--- for more details about arguments to this function.
+-- | The type of partial evaluation. This keeps local bindings in a Reader and
+-- global bindings in State to preserve scoping. This allows changes to global
+-- state to bubble up, while preventing the same in local bindings (to avoid
+-- bindings escaping their scope). For example, consider the term
 --
-nf
-  :: Evaluator
-  -> BindingMap
-  -> EnvPrimsIO
-  -> TyConMap
-  -> InScopeSet
-  -> Supply
-  -> Term
-  -> (Nf, EnvPrimsIO, EnvTmMap)
-nf = partialEval evaluateNf
+--   (let ... in f) (let ... in x)
+--
+-- We want any global bindings evaluated in the subterms to be evaluated only
+-- once, otherwise there is potentially a lot of redundant work performed.
+-- However, if State is used for all parts of the environment, the local state
+-- would have to be saved before evaluating (let ... in f), restored before
+-- evaluating (let ... in x), and restored yet again before returning the
+-- result. If this is not done let-bound definitions would float upwards,
+-- potentially changing the result of evaluation.
+--
+newtype Eval a = Eval { unEval :: RWS LocalEnv () GlobalEnv a }
+  deriving
+    ( Functor
+    , Applicative
+    , Monad
+    , MonadReader LocalEnv
+    , MonadState GlobalEnv
+    )
 
--- | Evaluate a term to WHNF using the specified evaluator. See 'partialEval'
--- for more details about arguments to this function.
+-- | Run a computation with the partial evaluator, starting from the given
+-- global environment. The local environment is discarded at the end of
+-- computation, and the new global environment is returned with the result.
 --
-whnf
-  :: Evaluator
-  -> BindingMap
-  -> EnvPrimsIO
-  -> TyConMap
-  -> InScopeSet
-  -> Supply
-  -> Term
-  -> (Value, EnvPrimsIO, EnvTmMap)
-whnf = partialEval evaluateWhnf
-
--- | Evaluate a term to obtain some result, using the specified evaluator.
--- While this is typically used to obtain the WHNF or NF representation of a
--- term, it can be used to collect any result obtainable by partial evaluation.
---
--- To be able to partially evaluate a term, some extra arguments are needed to
--- construct the initial environment. These are the map of global bindings,
--- an initial heap of values from IO primitives, a TyConMap for type resolution
--- and an InScopeSet and Supply for fresh name generation.
---
-partialEval
-  :: (AsTerm a)
-  => (Evaluator -> Term -> Eval a)
-  -> Evaluator
-  -> BindingMap
-  -> EnvPrimsIO
-  -> TyConMap
-  -> InScopeSet
-  -> Supply
-  -> Term
-  -> (a, EnvPrimsIO, EnvTmMap)
-partialEval f eval bs ps tcm iss ids x =
-    (x', envPrimsIO env', envLocals env')
- where
-  (x', env') = State.runState (f eval x) env
-  env = mkEnv bs ps tcm iss ids
+runEval :: GlobalEnv -> Eval a -> (a, GlobalEnv)
+runEval genv x =
+  let lenv = LocalEnv mempty mempty mempty
+      (x', genv', _) = RWS.runRWS (unEval x) lenv genv
+   in (x', genv')
 
 -- | An evaluator contains the basic functions that define partial evaluation.
 -- This consists of:
@@ -112,175 +92,201 @@ data Evaluator = Evaluator
 evaluateNf :: Evaluator -> Term -> Eval Nf
 evaluateNf (Evaluator e q) x = e x >>= q
 
--- Local bindings are not stored in a VarEnv, as we still want to be
--- able to access the keys (VarEnv simply indexes by unique).
+type TermOrValue = Either Term Value
 
-type EnvTyMap = Map TyVar Type
-type EnvTmMap = Map Id (Either Term Value)
-
--- | EnvGlobals refers to global bindings in scope during evalaution, i.e.
--- other top-level functions used in a program.
+-- | Local Environment
 --
-type EnvGlobals = VarEnv (Binding (Either Term Value))
+data LocalEnv = LocalEnv
+  { lenvTypes  :: Map TyVar Type
+    -- ^ Local type environment. These are types that are introduced while
+    -- evaluating the current term (e.g. by type applications).
+  , lenvTerms  :: Map Id TermOrValue
+    -- ^ Local term environment. These are the terms that are introduced while
+    -- evaluating the current term (e.g. by applications).
+  , lenvIgnore :: Set Id
+    -- ^ Local ignore list. These are global identifiers which are not inlined
+    -- while evaluating. This holds the global ignore list that exsted when
+    -- evaluation reaches a head (Lam / TyLam / Data / Prim) so quote can
+    -- "remember" what was ignored at that point in evaluation.
+  } deriving (Show)
 
--- | EnvPrimsIO refers to the result of IO operations performed in primitives
--- during evalaution e.g. creating a new ByteArray in the GHC frontend.
+getLocalEnv :: Eval LocalEnv
+getLocalEnv = do
+  -- Save changes to the ignored list when getting the local env. This means
+  -- when we resume execution from this local environment, we don't lose any
+  -- of the bindings that were ignored at the time.
+  gIs <- RWS.gets genvIgnore
+  lIs <- RWS.asks lenvIgnore
+  env <- RWS.ask
+
+  pure (env { lenvIgnore = gIs <> lIs })
+
+withLocalEnv :: LocalEnv -> Eval a -> Eval a
+withLocalEnv env = RWS.local (const env)
+
+-- | Lookup a local term binding in the environment.
 --
-type EnvPrimsIO = (IntMap Value, Int)
+getLocal :: Id -> Eval (Maybe TermOrValue)
+getLocal i = Map.lookup i <$> RWS.asks lenvTerms
 
--- Orphan instance, so NFData can be derived for Env.
+-- | Add a local term binding to the environment, then evaluate the given
+-- action. The new binding only exists when evaluating the given action.
 --
-instance NFData Supply where
-  rnf = rwhnf
-
-{-
-Note [environment machines]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Evaluating in a big-step style with an environment machine allows terms to be
-evaluated with fewer traversals of the term. Consider a small-step reduction
-machine: on finding a redex it would apply beta-reduction, which traverses the
-term, and would then re-traverse from where the term changed to be able to
-reduce newly exposed redexes [1].
-
-In contrast, a big-step machine allows fewer traversals. Constructors of the
-Value type do not contain redexes that need removing to obtain a WHNF term.
-This means when it is possible to create a value (by evaluating a term and all
-subterms to values), the resulting term does not need traversing again. Further
-evaluation to NF is achieved by introducting another function, quoteNf, which
-recursively evaluates subterms to remove the remaining redexes.
-
-[1] It is possible to amortize this cost in Haskell by taking advantage of the
-call-by-need semantics of the language, although care must be taken to ensure
-that evaluation is not too strict. As this implementation uses different types
-for terms in different forms (unevaluated, WHNF, NF), it is inherently too
-strict for this approach.
--}
-
--- | An Environment contains all in scope terms and types while evaluating.
--- This consists of
---
---   * local types and terms from the term being evaluated
---   * top-level definitions in scope (i.e. global bindings)
---   * IO results of primitive operations
---   * in scope uniques and a means of generating uniques
---
--- When running the partial evaluator at different times, it may be desirable
--- to keep the globals (some of which may have been partially evaluated) and
--- the results of primitives in IO for future runs.
---
-data Env = Env
-  { envTypes   :: !EnvTyMap
-  , envLocals  :: !EnvTmMap
-  , envGlobals :: !EnvGlobals
-  , envPrimsIO :: !EnvPrimsIO
-  , envTcMap   :: !TyConMap
-  , envInScope :: !InScopeSet
-  , envSupply  :: !Supply
-  } deriving (Generic, NFData)
-
-instance Show Env where
-  show env = show (envTypes env, envLocals env, envPrimsIO env)
-
-mkEnv :: BindingMap -> EnvPrimsIO -> TyConMap -> InScopeSet -> Supply -> Env
-mkEnv bs = Env mempty mempty gs
+withLocal :: (Id, TermOrValue) -> Eval a -> Eval a
+withLocal (i, tm) = RWS.local addBinding
  where
-  gs = fmap Left <$> bs
+  addBinding env@(LocalEnv _ tms _) =
+    env { lenvTerms = Map.insert i tm tms }
 
-lookupLocal :: Id -> Env -> Maybe (Either Term Value)
-lookupLocal i = Map.lookup i . envLocals
+-- | Remove a local term binding from the environment, then evaluate the given
+-- action. The binding is only removed when evaluating the given action.
+--
+withoutLocal :: Id -> Eval a -> Eval a
+withoutLocal i = RWS.local deleteBinding
+ where
+  deleteBinding env@(LocalEnv _ tms _) =
+    env { lenvTerms = Map.delete i tms }
 
-lookupGlobal :: Id -> Env -> Maybe (Binding (Either Term Value))
-lookupGlobal i = lookupVarEnv i . envGlobals
+withLocals :: [(Id, TermOrValue)] -> Eval a -> Eval a
+withLocals bs x = foldr withLocal x bs
 
-lookupPrimIO :: Int -> Env -> Maybe Value
-lookupPrimIO i = IntMap.lookup i . fst . envPrimsIO
+-- | Lookup a local type binding in the environment.
+--
+getType :: TyVar -> Eval (Maybe Type)
+getType i = Map.lookup i <$> RWS.asks lenvTypes
 
-insertType :: TyVar -> Type -> Env -> Env
-insertType i ty env = env
-  { envTypes = Map.insert i ty (envTypes env)
-  , envInScope = extendInScopeSet (envInScope env) i
+-- | Add a local type binding to the environment, then evaluate the given
+-- action. The new binding only exists when evaluating the given action.
+--
+withType :: (TyVar, Type) -> Eval a -> Eval a
+withType (i, ty) = RWS.local addBinding
+ where
+  addBinding env@(LocalEnv tys _ _) =
+    env { lenvTypes = Map.insert i ty tys }
+
+withTypes :: [(TyVar, Type)] -> Eval a -> Eval a
+withTypes bs x = foldr withType x bs
+
+-- | Global Environment
+--
+data GlobalEnv = GlobalEnv
+  { genvGlobals :: VarEnv (Binding TermOrValue)
+    -- ^ Global term environment. These are functions in global scope which
+    -- are evaluated on lookup, and updated after evaluation.
+  , genvIgnore  :: Set Id
+    -- ^ Global ignore list. These are global identifiers which are not
+    -- inlined while evaluating. Items are added / removed during sections
+    -- where inlining would lead to non-termination.
+  , genvPrimsIO :: GlobalIO
+    -- ^ The results of IO actions performed while evaluating primitives. This
+    -- allows primtives in IO to be potentially evaluated at compile-time.
+  , genvTyCons  :: TyConMap
+    -- ^ The type constructors known about by Clash.
+  , genvInScope :: InScopeSet
+    -- ^ The set of in scope variables. This is used to prevent collisions
+    -- when generating new identifiers during evaluation.
+  , genvSupply  :: Supply
+    -- ^ The supply of fresh names for generating identifiers.
   }
 
-insertTypes :: [(TyVar, Type)] -> Env -> Env
-insertTypes xs env = foldl' (flip $ uncurry insertType) env xs
-
-insertLocal :: Id -> Either Term Value -> Env -> Env
-insertLocal i etv env = env
-  { envLocals  = Map.insert i etv (envLocals env)
-  , envInScope = extendInScopeSet (envInScope env) i
-  }
-
-insertLocals :: [(Id, Either Term Value)] -> Env -> Env
-insertLocals xs env = foldl' (flip $ uncurry insertLocal) env xs
-
--- | Add a new value to the environment representing the result of an IO
--- primitive which is evaluated at compile time. Primitives are keyed by an
--- integer ID in the evaluator. If the prim already exists in the environment,
--- you should call 'updateEnvPrim' instead.
+-- | The result of IO actions performed during evaluation are stored in the
+-- global environment. This allows IO actions to be evaluated at compile time
+-- where possible.
 --
-insertPrimIO :: Value -> Env -> Env
-insertPrimIO v env =
-  env { envPrimsIO = (IntMap.insert n v pm, n + 1) }
- where
-  (pm, n) = envPrimsIO env
+type GlobalIO = (IntMap Value, Int)
 
--- | Update a local binding in the environment. If the Id is not in the
--- local environment, the original environment is returned.
+mkGlobalEnv
+  :: BindingMap
+  -> GlobalIO
+  -> TyConMap
+  -> InScopeSet
+  -> Supply
+  -> GlobalEnv
+mkGlobalEnv bs =
+  GlobalEnv (fmap Left <$> bs) mempty
+
+getGlobal :: Id -> Eval (Maybe (Binding TermOrValue))
+getGlobal i = do
+  lIgnore <- RWS.asks lenvIgnore
+  gIgnore <- RWS.gets genvIgnore
+
+  -- Any identifier in an ignore list is treated as though it doesn't exist.
+  -- This is used to prevent inlining a recursive definition indefinitely.
+  if Set.member i (lIgnore <> gIgnore)
+    then pure Nothing
+    else lookupVarEnv i <$> RWS.gets genvGlobals
+
+-- | Update a global binding, replacing it with a WHNF representation.
+-- This should only be called between 'startUpdate' and 'endUpdate'.
 --
-updateLocal :: Id -> Either Term Value -> Env -> Env
-updateLocal = updatePure LocalId
+updateGlobal :: Id -> Value -> Eval ()
+updateGlobal i x =
+  getGlobal i >>= \case
+    Just b -> do
+      env <- RWS.get
+      let bs = genvGlobals env
+      let b' = b { bindingTerm = Right x }
 
--- | Update a global binding in the environment. If the Id is not in the
--- global environment, the original environment is returned.
+      RWS.put (env { genvGlobals = extendVarEnv i b' bs })
+
+    Nothing ->
+      pure ()
+
+-- | Remove a global term binding from the environment, then evaluate the given
+-- action. The removed binding is restored after evaluating the action.
 --
-updateGlobal :: Id -> Either Term Value -> Env -> Env
-updateGlobal = updatePure GlobalId
-
-updatePure :: IdScope -> Id -> Either Term Value -> Env -> Env
-updatePure scope i etv env =
-  case scope of
-    LocalId
-      | Map.member i (envLocals env) ->
-          env { envLocals = Map.insert i etv (envLocals env) }
-
-    GlobalId
-      | Just b <- lookupVarEnv i (envGlobals env) ->
-          let b' = b { bindingTerm = etv}
-           in env { envGlobals = extendVarEnv i b' (envGlobals env) }
-
-    _ -> env
-
-updatePrimIO :: Int -> Value -> Env -> Env
-updatePrimIO i v env =
-  env { envPrimsIO = (IntMap.insert i v pm, n) }
+withoutGlobal :: Id -> Eval a -> Eval a
+withoutGlobal i x = RWS.modify' ignoreBinding >> x
  where
-  (pm, n) = envPrimsIO env
+  ignoreBinding env =
+    let is = genvIgnore env
+     in env { genvIgnore = Set.insert i is }
 
-deleteLocal :: Id -> Env -> Env
-deleteLocal = deletePure LocalId
+-- | Run the given action, preserving the state of the global ignore list
+-- before the action was run. This means any global identifiers which are
+-- ignored can be seen again when continuing evaluation.
+--
+preserveIgnored :: Eval a -> Eval a
+preserveIgnored x = do
+  is  <- RWS.gets genvIgnore
+  res <- x
+  env <- RWS.get
 
-deleteGlobal :: Id -> Env -> Env
-deleteGlobal = deletePure GlobalId
+  RWS.put (env { genvIgnore = is })
+  pure res
 
-deletePure :: IdScope -> Id -> Env -> Env
-deletePure scope i env =
-  case scope of
-    LocalId -> env { envLocals = Map.delete i (envLocals env) }
-    GlobalId -> env { envGlobals = delVarEnv (envGlobals env) i }
+getTyConMap :: Eval TyConMap
+getTyConMap = RWS.gets genvTyCons
 
-mkUniqueTyVar :: OccName -> Kind -> Env -> (TyVar, Env)
-mkUniqueTyVar n kn env =
-  (tv, env { envSupply = ids, envInScope = iss })
- where
-  ((ids, iss), tv) = mkUniqSystemTyVar st (n, kn)
-  st = (envSupply env, envInScope env)
+mkUniqueVar
+  :: ((Supply, InScopeSet)
+        -> (OccName, KindOrType)
+        -> ((Supply, InScopeSet), Var a))
+  -> OccName
+  -> KindOrType
+  -> Eval (Var a)
+mkUniqueVar f n x = do
+  env <- RWS.get
+  let iss = genvInScope env
+      ids = genvSupply env
+      ((ids', iss'), i) = f (ids, iss) (n, x)
 
-mkUniqueId :: OccName -> Type -> Env -> (Id, Env)
-mkUniqueId n ty env =
-  (i, env { envSupply = ids, envInScope = iss })
- where
-  ((ids, iss), i) = mkUniqSystemId st (n, ty)
-  st = (envSupply env, envInScope env)
+  RWS.put (env { genvInScope = iss', genvSupply = ids' })
+  pure i
+
+mkUniqueId :: OccName -> Type -> Eval Id
+mkUniqueId = mkUniqueVar mkUniqSystemId
+
+mkUniqueTyVar :: OccName -> Kind -> Eval TyVar
+mkUniqueTyVar = mkUniqueVar mkUniqSystemTyVar
+
+-- | The result of evaluating the pattern in a case expression. This identifies
+-- whether the pattern matched, and contains any identifiers that the pattern
+-- brings into scope.
+--
+data PatResult
+  = NoMatch
+  | Match ![(TyVar, Type)] ![(Id, Term)]
 
 -- | Neutral terms cannot be reduced, as they represent things like variables
 -- which are unknown, partially applied functions, or case expressions where
@@ -293,12 +299,12 @@ mkUniqueId n ty env =
 -- case x of ...  Stuck if "x" is neutral (cannot choose an alternative)
 --
 data Neutral a
-  = NeVar   Id
-  | NePrim  PrimInfo [Either a Type]
-  | NeApp   (Neutral a) a
-  | NeTyApp (Neutral a) Type
-  | NeCase  a Type [(Pat, a)]
-  deriving (Show, Generic, NFData)
+  = NeVar   !Id
+  | NePrim  !PrimInfo ![Either a Type]
+  | NeApp   !(Neutral a) !a
+  | NeTyApp !(Neutral a) !Type
+  | NeCase  !a !Type ![(Pat, a)]
+  deriving (Show)
 
 -- | A term which has been normalised to weak head normal form (WHNF). This has
 -- no redexes at the head of the term, but subterms may still contain redexes.
@@ -326,15 +332,16 @@ data Neutral a
 --     respects lexical scoping.
 --
 data Value
-  = VNeu    (Neutral Value)
-  | VLit    Literal
-  | VData   DataCon [Either Value Type]
-  | VPrim   PrimInfo [Either Value Type]
-  | VLam    Id Term Env
-  | VTyLam  TyVar Term Env
-  | VCast   Value Type Type
-  | VTick   Value TickInfo
-  deriving (Show, Generic, NFData)
+  = VNeu    !(Neutral Value)
+  | VLit    !Literal
+  | VData   !DataCon ![Either Term Type] !LocalEnv
+  | VPrim   !PrimInfo ![Either Term Type] !LocalEnv
+  | VLam    !Id !Term !LocalEnv
+  | VTyLam  !TyVar !Term !LocalEnv
+  | VCast   !Value !Type !Type
+  | VTick   !Value !TickInfo
+  | VThunk  !Term !LocalEnv
+  deriving (Show)
 
 collectValueTicks :: Value -> (Value, [TickInfo])
 collectValueTicks = go []
@@ -343,21 +350,21 @@ collectValueTicks = go []
   go acc v = (v, acc)
 
 addTicks :: Value -> [TickInfo] -> Value
-addTicks = foldl' VTick
+addTicks = foldr (flip VTick)
 
 -- | A term which is in beta-normal eta-long form (NF). This has no redexes,
 -- and all partially applied functions in subterms are eta-expanded.
 --
 data Nf
-  = NNeu    (Neutral Nf)
-  | NLit    Literal
-  | NData   DataCon [Either Nf Type]
-  | NPrim   PrimInfo [Either Nf Type]
-  | NLam    Id Nf
-  | NTyLam  TyVar Nf
-  | NCast   Nf Type Type
-  | NTick   Nf TickInfo
-  deriving (Show, Generic, NFData)
+  = NNeu    !(Neutral Nf)
+  | NLit    !Literal
+  | NData   !DataCon ![Either Nf Type]
+  | NPrim   !PrimInfo ![Either Nf Type]
+  | NLam    !Id !Nf
+  | NTyLam  !TyVar !Nf
+  | NCast   !Nf !Type !Type
+  | NTick   !Nf !TickInfo
+  deriving (Show)
 
 -- Embedding WHNF and HNF values back into Term.
 --
@@ -379,12 +386,13 @@ instance AsTerm Value where
   asTerm = \case
     VNeu n -> asTerm n
     VLit l -> Literal l
-    VData dc args -> mkApps (Data dc) (first asTerm <$> args)
-    VPrim p args -> mkApps (Prim p) (first asTerm <$> args)
+    VData dc args env -> instHeap env . bindHeap env $ mkApps (Data dc) args
+    VPrim p args env -> instHeap env . bindHeap env $ mkApps (Prim p) args
     VLam x e env -> instHeap env $ bindHeap env (Lam x e)
     VTyLam x e env -> instHeap env $ bindHeap env (TyLam x e)
     VCast x a b -> Cast (asTerm x) a b
     VTick x ti -> Tick ti (asTerm x)
+    VThunk x env -> instHeap env $ bindHeap env x
    where
     -- Instantiate types which have been bound in the environment. This
     -- performs all type substitutions from the environment at once.
@@ -392,9 +400,9 @@ instance AsTerm Value where
     instHeap env x = substTm "instHeap" subst x
      where
       termIds = localFVsOfTerms [x]
-      termTvs = tyFVsOfTypes (envTypes env)
+      termTvs = tyFVsOfTypes (lenvTypes env)
       inScope = mkInScopeSet (unionVarSet termIds termTvs)
-      subst   = extendTvSubstList (mkSubst inScope) (Map.toList $ envTypes env)
+      subst   = extendTvSubstList (mkSubst inScope) (Map.toList $ lenvTypes env)
 
     -- To prevent a potential explosion of common subexpressions, the term
     -- is turned to a letrec if the local environment is not empty. It is
@@ -405,10 +413,9 @@ instance AsTerm Value where
       | null bs = x
       | otherwise = Letrec bs x
      where
-      -- We only keep local bindings which have been forced to WHNF, bindings
-      -- which have not been forced are unused.
-      --
-      bs = Map.toList . fmap asTerm $ Map.filter isRight (envLocals env)
+      -- Only bind things which are used in the term
+      free = Set.setOf freeLocalIds x
+      bs   = Map.toList . fmap asTerm $ Map.restrictKeys (lenvTerms env) free
 
 instance AsTerm Nf where
   asTerm = \case
