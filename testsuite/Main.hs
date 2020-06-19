@@ -416,6 +416,7 @@ runClashTest = defaultMain $ clashTestRoot
       ]
       , clashTestGroup "Issues"
         [ runTest "T1187" def{hdlSim=False, hdlTargets=[Verilog]}
+        , clashLibTest ("tests" </> "shouldwork" </> "Issues") [VHDL] [] "T1388" "main"
         ]
       , clashTestGroup "Naming"
         [ runTest "T967a" def{hdlSim=False}
