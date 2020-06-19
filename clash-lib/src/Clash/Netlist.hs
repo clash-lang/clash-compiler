@@ -691,7 +691,7 @@ mkFunApp dstId fun args tickDecls = do
 toSimpleVar :: Identifier
             -> (Expr,Type)
             -> NetlistMonad (Expr,[Declaration])
-toSimpleVar _ (e@(Identifier _ _),_) = return (e,[])
+toSimpleVar _ (e@(Identifier _ Nothing),_) = return (e,[])
 toSimpleVar dstId (e,ty) = do
   argNm <- extendIdentifier Extended
              dstId
