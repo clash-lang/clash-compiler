@@ -40,3 +40,6 @@ cradle:
     - path: "./testsuite"
       config: { cradle: {cabal: [{path: "./testsuite/src", component: "lib:clash-testsuite"}
                                 ,{path: "./testsuite/Main.hs", component: "exe:clash-testsuite"}]}}
+    # Skip clash starters
+    - path: "./clash-starters"
+      config: { cradle: {none: }}
