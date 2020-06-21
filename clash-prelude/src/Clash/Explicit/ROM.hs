@@ -8,6 +8,7 @@ Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
 ROMs
 -}
 
+{-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE RankNTypes #-}
 
@@ -104,7 +105,7 @@ rom#
   -- ^ Read address @rd@
   -> Signal dom a
   -- ^ The value of the ROM at address @rd@ from the previous clock cycle
-rom# _ en content =
+rom# !_ en content =
   go
     (withFrozenCallStack (deepErrorX "rom: initial value undefined"))
     (fromEnable en)
