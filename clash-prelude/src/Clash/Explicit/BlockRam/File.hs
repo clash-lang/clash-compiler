@@ -71,6 +71,7 @@ __>>> L.tail $ sampleN 4 $ g systemClockGen (fromList [3..5])__
 
 -}
 
+{-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE GADTs #-}
 
 {-# LANGUAGE Unsafe #-}
@@ -226,7 +227,7 @@ blockRamFile#
   -- ^ Value to write (at address @w@)
   -> Signal dom (BitVector m)
   -- ^ Value of the @blockRAM@ at address @r@ from the previous clock cycle
-blockRamFile# (Clock _) ena _sz file rd wen =
+blockRamFile# (Clock _) ena !_sz file rd wen =
   go
     ramI
     (withFrozenCallStack (errorX "blockRamFile#: intial value undefined"))
