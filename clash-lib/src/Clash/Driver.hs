@@ -2,8 +2,10 @@
   Copyright   :  (C) 2012-2016, University of Twente,
                      2016-2017, Myrtle Software Ltd,
                      2017     , QBayLogic, Google Inc.
+                     2020       QBayLogic
+
   License     :  BSD2 (see the file LICENSE)
-  Maintainer  :  Christiaan Baaij <christiaan.baaij@gmail.com>
+  Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
 
   Module that connects all the parts of the Clash compiler library
 -}
@@ -11,7 +13,7 @@
 {-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE NondecreasingIndentation #-}
 {-# LANGUAGE QuasiQuotes #-}
-{-# LANGUAGE TemplateHaskellQuotes #-}
+{-# LANGUAGE TemplateHaskell #-}
 
 module Clash.Driver where
 
@@ -93,7 +95,8 @@ import           Clash.Netlist.BlackBox.Parser    (runParse)
 import           Clash.Netlist.BlackBox.Types     (BlackBoxTemplate, BlackBoxFunction)
 import           Clash.Netlist.Types
   (BlackBox (..), Component (..), Identifier, FilteredHWType, HWMap,
-   SomeBackend (..), TopEntityT(..), TemplateFunction, ComponentPrefix(..))
+   SomeBackend (..), TopEntityT(..), TemplateFunction, ComponentPrefix(..),
+   findClocks)
 import           Clash.Normalize                  (checkNonRecursive, cleanupGraph,
                                                    normalize, runNormalization)
 import           Clash.Normalize.Util             (callGraph, tvSubstWithTyEq)
@@ -110,7 +113,7 @@ import           Clash.Unique                     (keysUniqMap, lookupUniqMap')
 import           Clash.Util.Interpolate           (i)
 import           Clash.Util
   (ClashException(..), HasCallStack, first, reportTimeDiff,
-   wantedLanguageExtensions, unwantedLanguageExtensions)
+   wantedLanguageExtensions, unwantedLanguageExtensions, curLoc)
 import           Clash.Util.Graph                 (reverseTopSort)
 
 -- | Worker function of 'splitTopEntityT'
@@ -418,7 +421,7 @@ generateHDL reprs domainConfs bindingsMap hdlState primMap tcm tupTcm typeTrans 
 
       -- 3. Generate topEntity wrapper
       let topComponent = view _4 . head $ filter (Data.Text.isSuffixOf topNm . componentName . view _4) netlist
-          (hdlDocs,manifest',dfiles,mfiles)  = createHDL hdlState' (Data.Text.pack modName) seen' netlist domainConfs topComponent
+          (hdlDocs,manifest',dfiles,mfiles)  = createHDL hdlState' (Data.Text.pack modName) seen' netlist domainConfs (Just topComponent)
                                    (topNm, Right manifest)
       mapM_ (writeHDL dir) hdlDocs
       copyDataFiles (opt_importPaths opts) dir dfiles
@@ -457,7 +460,7 @@ generateHDL reprs domainConfs bindingsMap hdlState primMap tcm tupTcm typeTrans 
       putStrLn $ "Clash: Testbench netlist generation took " ++ normNetDiff
 
       -- 3. Write HDL
-      let (hdlDocs,_,dfiles,mfiles) = createHDL hdlState2 modName' seen'' netlist domainConfs undefined
+      let (hdlDocs,_,dfiles,mfiles) = createHDL hdlState2 modName' seen'' netlist domainConfs Nothing
                            (topNm, Left manifest')
       writeHDL (hdlDir </> maybe "" t_name annM) (head hdlDocs)
       mapM_ (writeHDL dir) (tail hdlDocs)
@@ -720,7 +723,7 @@ createHDL
   -- ^ List of components
   -> HashMap Data.Text.Text VDomainConfiguration
   -- ^ Known domains to configurations
-  -> Component
+  -> Maybe Component
   -- ^ Top component
   -> (Identifier, Either Manifest Manifest)
   -- ^ Name of the manifest file
@@ -731,7 +734,7 @@ createHDL
   -- ^ The pretty-printed HDL documents
   -- + The update manifest file
   -- + The data files that need to be copied
-createHDL backend modName seen components _domainConfs top (topName,manifestE) = flip evalState backend $ getMon $ do
+createHDL backend modName seen components domainConfs mtop (topName,manifestE) = flip evalState backend $ getMon $ do
   (hdlNmDocs,incs) <- unzip <$> mapM (\(_wereVoids,sp,ids,comp) -> genHDL modName sp (HashMap.unionWith max seen ids) comp) components
   hwtys <- HashSet.toList <$> extractTypes <$> Mon get
   typesPkg <- mkTyPackage modName hwtys
@@ -741,6 +744,7 @@ createHDL backend modName seen components _domainConfs top (topName,manifestE) =
       qincs = concat incs
       topFiles = hdl ++ qincs
   manifest <- either return (\m -> do
+      let top = fromMaybe (error "Top entity needed to update manifest") mtop
       let topInNames = map fst (inputs top)
       topInTypes  <- mapM (fmap (Text.toStrict . renderOneLine) .
                            hdlType (External topName) . snd) (inputs top)
@@ -757,7 +761,26 @@ createHDL backend modName seen components _domainConfs top (topName,manifestE) =
     ) manifestE
   let manDoc = ( Data.Text.unpack topName <.> "manifest"
                , pretty (Text.pack (show manifest)))
-  return (manDoc:topFiles,manifest,dataFiles,memFiles)
+
+  let genDocs = case mtop of
+                  Just top ->
+                    let topClks = findClocks top
+                        sdcInfo = fmap findDomainConfig <$> topClks
+                        sdcFile = Data.Text.unpack topName <.> "sdc"
+                        sdcDoc  = (sdcFile, pprSDC (SdcInfo sdcInfo))
+                     in if null sdcInfo
+                          then manDoc : topFiles
+                          else sdcDoc : manDoc : topFiles
+
+                  Nothing -> manDoc : topFiles
+
+  return (genDocs,manifest,dataFiles,memFiles)
+ where
+  findDomainConfig dom =
+    HashMap.lookupDefault
+      (error $ $(curLoc) ++ "Unknown synthesis domain: " ++ show dom)
+      dom
+      domainConfs
 
 -- | Prepares the directory for writing HDL files. This means creating the
 --   dir if it does not exist and removing all existing .hdl files from it.

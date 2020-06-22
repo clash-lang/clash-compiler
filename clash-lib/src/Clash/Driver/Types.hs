@@ -2,8 +2,9 @@
   Copyright  :  (C) 2013-2016, University of Twente,
                     2016-2017, Myrtle Software Ltd,
                     2017     , QBayLogic, Google Inc.
+                    2020     , QBayLogic
   License    :  BSD2 (see the file LICENSE)
-  Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
+  Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 
   Type definitions used by the Driver module
 -}
@@ -11,6 +12,7 @@
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE DeriveAnyClass #-}
 {-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecordWildCards #-}
 
 module Clash.Driver.Types where
@@ -20,14 +22,18 @@ module Clash.Driver.Types where
 
 import           Control.DeepSeq                (NFData)
 import           Data.Binary                    (Binary)
+import           Data.Fixed
 import           Data.Hashable
 import qualified Data.Set                       as Set
 import           Data.Text                      (Text)
+import           Data.Text.Prettyprint.Doc
 import           GHC.Generics                   (Generic)
 
 import           BasicTypes                     (InlineSpec)
 import           SrcLoc                         (SrcSpan)
 import           Util                           (OverridingBool(..))
+
+import           Clash.Signal.Internal
 
 import           Clash.Core.Term                (Term)
 import           Clash.Core.Var                 (Id)
@@ -269,5 +275,33 @@ data Manifest
     -- ^ Names of all the generated components for the @TopEntity@ (does not
     -- include the names of the components of the @TestBench@ accompanying
     -- the @TopEntity@).
+  } deriving (Show,Read)
+
+-- | Synopsys Design Constraint (SDC) information for a component.
+-- Currently this limited to the names and periods of clocks for create_clock.
+--
+newtype SdcInfo = SdcInfo
+  { sdcClock :: [(Text, VDomainConfiguration)]
   }
-  deriving (Show,Read)
+
+-- | Render an SDC file from an SdcInfo.
+-- The clock periods, waveforms, and targets are all hardcoded.
+--
+pprSDC :: SdcInfo -> Doc ()
+pprSDC = vcat . fmap go . sdcClock
+ where
+  go (i, dom) =
+        -- VDomainConfiguration stores period in ps, SDC expects it in ns.
+    let p        = MkFixed (toInteger $ vPeriod dom) :: Fixed E3
+        name     = braces (pretty i)
+        period   = viaShow p
+        waveform = braces ("0.000" <+> viaShow (p / 2))
+        targets  = brackets ("get_port" <+> name)
+     in hsep
+          [ "create_clock"
+          , "-name" <+> name
+          , "-period" <+> period
+          , "-waveform" <+> waveform
+          , targets
+          ]
+

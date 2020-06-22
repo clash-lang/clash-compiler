@@ -2,8 +2,9 @@
   Copyright  :  (C) 2012-2016, University of Twente,
                     2017     , Myrtle Software Ltd,
                     2017-2018, Google Inc.
+                    2020     , QBayLogic
   License    :  BSD2 (see the file LICENSE)
-  Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
+  Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 
   Type and instance definitions for Netlist modules
 -}
@@ -41,6 +42,7 @@ import Data.Binary                          (Binary(..))
 import Data.Hashable                        (Hashable)
 import Data.HashMap.Strict                  (HashMap)
 import Data.IntMap                          (IntMap, empty)
+import Data.Maybe                           (mapMaybe)
 import qualified Data.Set                   as Set
 import Data.Text                            (Text, pack)
 import Data.Typeable                        (Typeable)
@@ -172,6 +174,15 @@ instance NFData Component where
   rnf c = case c of
     Component nm inps outps decls -> rnf nm    `seq` rnf inps `seq`
                                      rnf outps `seq` rnf decls
+
+-- | Find the name and domain name of each clock argument of a component.
+--
+findClocks :: Component -> [(Identifier, Identifier)]
+findClocks (Component _ is _ _) =
+  mapMaybe isClock is
+ where
+  isClock (i, Clock d) = Just (i, d)
+  isClock _ = Nothing
 
 -- | Size indication of a type (e.g. bit-size or number of elements)
 type Size = Int
