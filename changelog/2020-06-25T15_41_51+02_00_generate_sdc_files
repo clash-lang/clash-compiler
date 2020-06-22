@@ -1,0 +1,2 @@
+CHANGED: Clash now generates SDC files for each topentity with clock inputs
+See github.com/clash-lang/clash-compiler/issues/1387.
