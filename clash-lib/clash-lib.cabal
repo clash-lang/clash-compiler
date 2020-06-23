@@ -214,6 +214,8 @@ Library
                       Clash.Driver
                       Clash.Driver.Types
 
+                      Clash.Edalize.Edam
+
                       Clash.Netlist
                       Clash.Netlist.BlackBox
                       Clash.Netlist.BlackBox.Parser
