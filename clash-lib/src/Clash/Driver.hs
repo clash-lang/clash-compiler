@@ -89,6 +89,7 @@ import           Clash.Core.VarEnv
   (elemVarEnv, emptyVarEnv, lookupVarEnv)
 import           Clash.Debug                      (debugIsOn)
 import           Clash.Driver.Types
+import           Clash.Edalize.Edam
 import           Clash.Netlist                    (genNetlist)
 import           Clash.Netlist.Util               (genComponentName, genTopComponentName)
 import           Clash.Netlist.BlackBox.Parser    (runParse)
