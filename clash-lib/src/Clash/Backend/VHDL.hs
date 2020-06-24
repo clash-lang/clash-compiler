@@ -2204,7 +2204,7 @@ renderModifier (DontCare,_) _ = do
   -- These mask projections always come last, so it's safe not to return a
   -- modified name, but an expression instead.
   traceIf True ($(curLoc) ++ "WARNING: rendering bitvector mask as dontcare") $
-    sizedQualTyNameErrValue (Signed iw)
+    sizedQualTyNameErrValue (Unsigned iw)
 renderModifier (Range r,t) doc = do
   nm <- Mon (use modNm)
   let doc1 = case r of
