@@ -305,7 +305,8 @@ runClashTest = defaultMain $ clashTestRoot
         , runTest "T1354A" def{hdlTargets=[VHDL], hdlSim=False}
 #endif
         , runTest "T1354B" def{hdlTargets=[VHDL], hdlSim=False}
-        , runTest "T1402" def{hdlTargets=[VHDL], hdlSim=False}
+        , runTest "T1402" def{clashFlags=["-O"]}
+        , runTest "T1402b" def{hdlTargets=[VHDL], hdlSim=False}
         , runTest "TagToEnum" def{hdlSim=False}
         , runTest "TestIndex" def{hdlSim=False}
         , runTest "Time" def

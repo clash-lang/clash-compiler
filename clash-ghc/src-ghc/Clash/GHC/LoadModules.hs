@@ -35,7 +35,7 @@ import qualified Clash.Util.Interpolate          as I
 import           Control.Arrow                   (first, second)
 import           Control.DeepSeq                 (deepseq)
 import           Control.Exception               (SomeException, throw)
-import           Control.Monad                   (forM)
+import           Control.Monad                   (forM, when)
 #if MIN_VERSION_ghc(8,6,0)
 import           Control.Exception               (throwIO)
 #endif
@@ -48,6 +48,7 @@ import           Data.List                       (foldl', nub)
 import           Data.Maybe                      (catMaybes, listToMaybe, fromMaybe)
 import qualified Data.Text                       as Text
 import qualified Data.Time.Clock                 as Clock
+import           Debug.Trace
 import           Language.Haskell.TH.Syntax      (lift)
 import           GHC.Stack                       (HasCallStack)
 
@@ -212,6 +213,18 @@ setupGhc useColor dflagsM idirs = do
                     _          -> False
       dflags3 = if ghcDynamic then DynFlags.gopt_set dflags2 DynFlags.Opt_BuildDynamicToo
                               else dflags2
+
+  when (DynFlags.gopt DynFlags.Opt_WorkerWrapper dflags3) $
+    trace
+      (unlines ["WARNING:"
+               ,"`-fworker-wrapper` option is globally enabled, this can result in incorrect code."
+               ,"Are you compiling with `-O` or `-O2`? Consider adding `-fno-worker-wrapper`."
+               ,"`-fworker-wrapper` can be use in a diligent manner on a file-by-file basis"
+               ,"by using a `{-# OPTIONS_GHC -fworker-wrapper` #-} pragma."
+               ])
+      (return ())
+
+
 #if MIN_VERSION_ghc(8,6,0)
   hscenv <- GHC.getSession
   dflags4 <- MonadUtils.liftIO (DynamicLoading.initializePlugins hscenv dflags3)
