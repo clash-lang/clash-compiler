@@ -55,7 +55,7 @@ runToCoreStage
   -> IO (BindingMap, TyConMap)
 runToCoreStage target f src = do
   pds <- primDirs backend
-  (bm, tcm, _, _, _, _) <- generateBindings
+  (bm, tcm, _, _, _, _, _) <- generateBindings
     Auto pds (opt_importPaths opts) [] (hdlKind backend) src Nothing
 
   return (bm, tcm)

@@ -1,0 +1,3 @@
+CHANGED: Clash now creates a mapping from domain names to configurations in LoadModules.
+See https://github.com/clash-lang/issues/968 for more information.
+

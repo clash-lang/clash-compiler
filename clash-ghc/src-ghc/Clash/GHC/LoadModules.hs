@@ -43,13 +43,17 @@ import           Control.Monad.IO.Class          (liftIO)
 import           Data.Char                       (isDigit)
 import           Data.Generics.Uniplate.DataOnly (transform)
 import           Data.Data                       (Data)
+import           Data.HashMap.Strict             (HashMap)
+import qualified Data.HashMap.Strict             as HashMap
 import           Data.Typeable                   (Typeable)
 import           Data.List                       (foldl', nub)
 import           Data.Maybe                      (catMaybes, listToMaybe, fromMaybe)
 import qualified Data.Text                       as Text
+import qualified Data.Text.Encoding              as Text
 import qualified Data.Time.Clock                 as Clock
 import           Debug.Trace
 import           Language.Haskell.TH.Syntax      (lift)
+import           GHC.Natural                     (naturalFromInteger)
 import           GHC.Stack                       (HasCallStack)
 
 #ifdef USE_GHC_PATHS
@@ -66,6 +70,7 @@ import           System.Process                  (runInteractiveCommand,
 import qualified Annotations
 import qualified CoreFVs
 import qualified CoreSyn
+import qualified DataCon
 import qualified Digraph
 #if MIN_VERSION_ghc(8,6,0)
 import qualified DynamicLoading
@@ -73,6 +78,7 @@ import qualified DynamicLoading
 import           DynFlags                        (GeneralFlag (..))
 import qualified DynFlags
 import qualified Exception
+import qualified FastString
 import qualified GHC
 import qualified HscMain
 import qualified HscTypes
@@ -82,6 +88,8 @@ import qualified GhcPlugins                      (deserializeWithData, installed
 import qualified TcRnMonad
 import qualified TcRnTypes
 import qualified TidyPgm
+import qualified TyCon
+import qualified Type
 import qualified Unique
 import qualified UniqFM
 import qualified FamInst
@@ -105,6 +113,8 @@ import           Clash.Util                                   (curLoc, noSrcSpan
                                                               ,wantedLanguageExtensions, unwantedLanguageExtensions)
 import           Clash.Annotations.BitRepresentation.Internal
   (DataRepr', dataReprAnnToDataRepr')
+
+import           Clash.Signal.Internal
 
 ghcLibDir :: IO FilePath
 #ifdef USE_GHC_PATHS
@@ -340,6 +350,7 @@ loadModules
         , [Either UnresolvedPrimitive FilePath]
         , [DataRepr']
         , [(Text.Text, PrimitiveGuard ())]
+        , HashMap Text.Text VDomainConfiguration -- domain names to configuration
         )
 loadModules useColor hdl modName dflagsM idirs = do
   libDir <- MonadUtils.liftIO ghcLibDir
@@ -392,7 +403,8 @@ loadModules useColor hdl modName dflagsM idirs = do
     reprs'     <- findCustomReprAnnotations
     primGuards <- findPrimitiveGuardAnnotations allBinderIds
     let topEntityName = fromMaybe "topEntity" (GHC.mainFunIs =<< dflagsM)
-        varNameString = OccName.occNameString . Name.nameOccName . Var.varName
+        nameString    = OccName.occNameString . Name.nameOccName
+        varNameString = nameString . Var.varName
         topEntities = filter ((==topEntityName) . varNameString) rootIds
         benches     = filter ((== "testBench") . varNameString) rootIds
         mergeBench (x,y) = (x,y,lookup x benchAnn)
@@ -442,15 +454,88 @@ loadModules useColor hdl modName dflagsM idirs = do
     let annExtDiff = reportTimeDiff annTime extTime
     MonadUtils.liftIO $ putStrLn $ "GHC: Parsing annotations took: " ++ annExtDiff
 
+    let famInstEnvs' = (fst famInstEnvs, modFamInstEnvs)
+        allTCInsts   = FamInstEnv.famInstEnvElts (fst famInstEnvs')
+                         ++ FamInstEnv.famInstEnvElts (snd famInstEnvs')
+
+        knownConfs   = filter (\x -> "KnownConf" == nameString (FamInstEnv.fi_fam x)) allTCInsts
+
+#if MIN_VERSION_ghc(8,10,0)
+        fsToText     = Text.decodeUtf8 . FastString.bytesFS
+#else
+        fsToText     = Text.decodeUtf8 . FastString.fastStringToByteString
+#endif
+
+        famToDomain  = fromMaybe (error "KnownConf: Expected Symbol at LHS of type family")
+                         . fmap fsToText . Type.isStrLitTy . head . FamInstEnv.fi_tys
+        famToConf    = unpackKnownConf . FamInstEnv.fi_rhs
+
+        knownConfNms = fmap famToDomain knownConfs
+        knownConfDs  = fmap famToConf knownConfs
+
+        knownConfMap = HashMap.fromList (zip knownConfNms knownConfDs)
+
     return ( allBinders
            , lbClassOps
            , lbUnlocatable
-           , (fst famInstEnvs, modFamInstEnvs)
+           , famInstEnvs'
            , topEntities'
            , lbPrims
            , reprs1
            , primGuards
+           , knownConfMap
            )
+
+-- | Given a type that represents the RHS of a KnownConf type family instance,
+-- unpack the fields of the DomainConfguration and make a VDomainConfiguration.
+--
+unpackKnownConf :: Type.Type -> VDomainConfiguration
+unpackKnownConf ty
+  | [d,p,ae,rk,ib,rp] <- Type.tyConAppArgs ty
+    -- Domain name
+  , Just dom <- fmap FastString.unpackFS (Type.isStrLitTy d)
+    -- Period
+  , Just period <- fmap naturalFromInteger (Type.isNumLitTy p)
+    -- Active Edge
+  , aeTc <- Type.tyConAppTyCon ae
+  , Just aeDc <- TyCon.isPromotedDataCon_maybe aeTc
+  , aeNm <- OccName.occNameString $ Name.nameOccName (DataCon.dataConName aeDc)
+    -- Reset Kind
+  , rkTc <- Type.tyConAppTyCon rk
+  , Just rkDc <- TyCon.isPromotedDataCon_maybe rkTc
+  , rkNm <- OccName.occNameString $ Name.nameOccName (DataCon.dataConName rkDc)
+    -- Init Behaviour
+  , ibTc <- Type.tyConAppTyCon ib
+  , Just ibDc <- TyCon.isPromotedDataCon_maybe ibTc
+  , ibNm <- OccName.occNameString $ Name.nameOccName (DataCon.dataConName ibDc)
+    -- Reset Polarity
+  , rpTc <- Type.tyConAppTyCon rp
+  , Just rpDc <- TyCon.isPromotedDataCon_maybe rpTc
+  , rpNm <- OccName.occNameString $ Name.nameOccName (DataCon.dataConName rpDc)
+  = VDomainConfiguration dom period
+      (asActiveEdge aeNm)
+      (asResetKind rkNm)
+      (asInitBehaviour ibNm)
+      (asResetPolarity rpNm)
+
+  | otherwise
+  = error $ $(curLoc) ++ "Could not unpack domain configuration."
+ where
+  asActiveEdge "Rising"  = Rising
+  asActiveEdge "Falling" = Falling
+  asActiveEdge x = error $ $(curLoc) ++ "Unknown active edge: " ++ show x
+
+  asResetKind "Synchronous"  = Synchronous
+  asResetKind "Asynchronous" = Asynchronous
+  asResetKind x = error $ $(curLoc) ++ "Unknown reset kind: " ++ show x
+
+  asInitBehaviour "Unknown" = Unknown
+  asInitBehaviour "Defined" = Defined
+  asInitBehaviour x = error $ $(curLoc) ++ "Unknown init behaviour: " ++ show x
+
+  asResetPolarity "ActiveHigh" = ActiveHigh
+  asResetPolarity "ActiveLow"  = ActiveLow
+  asResetPolarity x = error $ $(curLoc) ++ "Unknown reset polarity: " ++ show x
 
 -- | Given a set of bindings, make explicit non-recursive bindings and
 -- recursive binding groups.

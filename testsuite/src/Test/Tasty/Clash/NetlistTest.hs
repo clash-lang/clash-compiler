@@ -89,7 +89,7 @@ runToNetlistStage
   -> IO [([Bool], SrcSpan, HashMap Identifier Word, Component)]
 runToNetlistStage target f src = do
   pds <- primDirs backend
-  (bm, tcm, tupTcm, tes, pm, rs)
+  (bm, tcm, tupTcm, tes, pm, rs, _)
     <- generateBindings Auto pds (opt_importPaths opts) [] (hdlKind backend) src Nothing
 
   let teNames = fmap topId tes
