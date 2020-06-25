@@ -105,6 +105,7 @@ import qualified Clash.Primitives.Intel.ClockGen  as P
 import qualified Clash.Primitives.Verification    as P
 import           Clash.Primitives.Types
 import           Clash.Primitives.Util            (hashCompiledPrimMap)
+import           Clash.Signal.Internal
 import           Clash.Unique                     (keysUniqMap, lookupUniqMap')
 import           Clash.Util.Interpolate           (i)
 import           Clash.Util
@@ -211,6 +212,8 @@ getClashModificationDate = Directory.getModificationTime =<< getExecutablePath
 generateHDL
   :: forall backend . Backend backend
   => CustomReprs
+  -> HashMap Data.Text.Text VDomainConfiguration
+  -- ^ Known domains to configurations
   -> BindingMap
   -- ^ Set of functions
   -> Maybe backend
@@ -234,7 +237,7 @@ generateHDL
   -- ^ Debug information level for the normalization process
   -> (Clock.UTCTime,Clock.UTCTime)
   -> IO ()
-generateHDL reprs bindingsMap hdlState primMap tcm tupTcm typeTrans eval
+generateHDL reprs domainConfs bindingsMap hdlState primMap tcm tupTcm typeTrans eval
   topEntities0 mainTopEntity opts (startTime,prepTime) =
     let todo = maybe topEntities2 (uncurry (:)) mainTopEntity in
     go prepTime HashMap.empty (sortTop bindingsMap todo)
@@ -415,7 +418,7 @@ generateHDL reprs bindingsMap hdlState primMap tcm tupTcm typeTrans eval
 
       -- 3. Generate topEntity wrapper
       let topComponent = view _4 . head $ filter (Data.Text.isSuffixOf topNm . componentName . view _4) netlist
-          (hdlDocs,manifest',dfiles,mfiles)  = createHDL hdlState' (Data.Text.pack modName) seen' netlist topComponent
+          (hdlDocs,manifest',dfiles,mfiles)  = createHDL hdlState' (Data.Text.pack modName) seen' netlist domainConfs topComponent
                                    (topNm, Right manifest)
       mapM_ (writeHDL dir) hdlDocs
       copyDataFiles (opt_importPaths opts) dir dfiles
@@ -454,7 +457,7 @@ generateHDL reprs bindingsMap hdlState primMap tcm tupTcm typeTrans eval
       putStrLn $ "Clash: Testbench netlist generation took " ++ normNetDiff
 
       -- 3. Write HDL
-      let (hdlDocs,_,dfiles,mfiles) = createHDL hdlState2 modName' seen'' netlist undefined
+      let (hdlDocs,_,dfiles,mfiles) = createHDL hdlState2 modName' seen'' netlist domainConfs undefined
                            (topNm, Left manifest')
       writeHDL (hdlDir </> maybe "" t_name annM) (head hdlDocs)
       mapM_ (writeHDL dir) (tail hdlDocs)
@@ -715,6 +718,8 @@ createHDL
   -- ^ Component names
   -> [([Bool],SrcSpan,HashMap Identifier Word,Component)]
   -- ^ List of components
+  -> HashMap Data.Text.Text VDomainConfiguration
+  -- ^ Known domains to configurations
   -> Component
   -- ^ Top component
   -> (Identifier, Either Manifest Manifest)
@@ -726,7 +731,7 @@ createHDL
   -- ^ The pretty-printed HDL documents
   -- + The update manifest file
   -- + The data files that need to be copied
-createHDL backend modName seen components top (topName,manifestE) = flip evalState backend $ getMon $ do
+createHDL backend modName seen components _domainConfs top (topName,manifestE) = flip evalState backend $ getMon $ do
   (hdlNmDocs,incs) <- unzip <$> mapM (\(_wereVoids,sp,ids,comp) -> genHDL modName sp (HashMap.unionWith max seen ids) comp) components
   hwtys <- HashSet.toList <$> extractTypes <$> Mon get
   typesPkg <- mkTyPackage modName hwtys

@@ -69,7 +69,7 @@ runInputStage
         )
 runInputStage idirs src = do
   pds <- primDirs backend
-  (bindingsMap,tcm,tupTcm,topEntities,primMap,reprs) <- generateBindings Auto pds idirs [] (hdlKind backend) src Nothing
+  (bindingsMap,tcm,tupTcm,topEntities,primMap,reprs,_domainConfs) <- generateBindings Auto pds idirs [] (hdlKind backend) src Nothing
   let topEntityNames = map topId topEntities
       tm = head topEntityNames
   return (bindingsMap,tcm,tupTcm,topEntities, primMap, buildCustomReprs reprs, topEntityNames,tm)

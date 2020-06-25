@@ -43,6 +43,7 @@ import qualified SrcLoc                  as GHC
 
 import           Clash.Annotations.BitRepresentation.Internal (DataRepr')
 import           Clash.Annotations.Primitive (HDL, extractPrim)
+import           Clash.Signal.Internal
 
 import           Clash.Core.Subst        (extendGblSubstList, mkSubst, substTm)
 import           Clash.Core.Term         (Term (..), mkLams, mkTyLams)
@@ -94,6 +95,7 @@ generateBindings
         , [TopEntityT]
         , CompiledPrimMap  -- The primitives found in '.' and 'primDir'
         , [DataRepr']
+        , HashMap.HashMap Text.Text VDomainConfiguration
         )
 generateBindings useColor primDirs importDirs dbs hdl modName dflagsM = do
   (  bindings
@@ -103,7 +105,8 @@ generateBindings useColor primDirs importDirs dbs hdl modName dflagsM = do
    , topEntities
    , partitionEithers -> (unresolvedPrims, pFP)
    , customBitRepresentations
-   , primGuards ) <- loadModules useColor hdl modName dflagsM importDirs
+   , primGuards
+   , domainConfs ) <- loadModules useColor hdl modName dflagsM importDirs
   primMapR <- generatePrimMap unresolvedPrims primGuards (concat [pFP, primDirs, importDirs])
   tdir <- maybe ghcLibDir (pure . GHC.topDir) dflagsM
   startTime <- Clock.getCurrentTime
@@ -145,6 +148,7 @@ generateBindings useColor primDirs importDirs dbs hdl modName dflagsM = do
          , topEntities''
          , primMapC
          , customBitRepresentations
+         , domainConfs
          )
 
 mkBindings

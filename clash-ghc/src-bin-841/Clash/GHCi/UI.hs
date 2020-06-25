@@ -1998,7 +1998,7 @@ makeHDL backend optsRef srcs = do
               forM_ srcs $ \src -> do
                 -- Generate bindings:
                 let dbs = reverse [p | PackageDB (PkgConfFile p) <- packageDBFlags dflags]
-                (bindingsMap,tcm,tupTcm,topEntities,primMap,reprs) <-
+                (bindingsMap,tcm,tupTcm,topEntities,primMap,reprs,domainConfs) <-
                   generateBindings color primDirs idirs dbs hdl src (Just dflags)
                 let getMain = getMainTopEntity src bindingsMap topEntities
                 mainTopEntity <- traverse getMain (GHC.mainFunIs dflags)
@@ -2009,6 +2009,7 @@ makeHDL backend optsRef srcs = do
                 -- Generate HDL:
                 Clash.Driver.generateHDL
                   (buildCustomReprs reprs)
+                  domainConfs
                   bindingsMap
                   (Just backend')
                   primMap
