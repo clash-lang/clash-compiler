@@ -55,6 +55,7 @@ import           Debug.Trace
 import           Language.Haskell.TH.Syntax      (lift)
 import           GHC.Natural                     (naturalFromInteger)
 import           GHC.Stack                       (HasCallStack)
+import           Text.Read                       (readMaybe)
 
 #ifdef USE_GHC_PATHS
 import           GHC.Paths                       (libdir)
@@ -504,7 +505,7 @@ unpackKnownConf ty
   , rkTc <- Type.tyConAppTyCon rk
   , Just rkDc <- TyCon.isPromotedDataCon_maybe rkTc
   , rkNm <- OccName.occNameString $ Name.nameOccName (DataCon.dataConName rkDc)
-    -- Init Behaviour
+    -- Init Behavior
   , ibTc <- Type.tyConAppTyCon ib
   , Just ibDc <- TyCon.isPromotedDataCon_maybe ibTc
   , ibNm <- OccName.occNameString $ Name.nameOccName (DataCon.dataConName ibDc)
@@ -515,27 +516,23 @@ unpackKnownConf ty
   = VDomainConfiguration dom period
       (asActiveEdge aeNm)
       (asResetKind rkNm)
-      (asInitBehaviour ibNm)
+      (asInitBehavior ibNm)
       (asResetPolarity rpNm)
 
   | otherwise
   = error $ $(curLoc) ++ "Could not unpack domain configuration."
  where
-  asActiveEdge "Rising"  = Rising
-  asActiveEdge "Falling" = Falling
-  asActiveEdge x = error $ $(curLoc) ++ "Unknown active edge: " ++ show x
+  asActiveEdge :: HasCallStack => String -> ActiveEdge
+  asActiveEdge x = fromMaybe (error $ $(curLoc) ++ "Unknown active edge: " ++ show x) (readMaybe x)
 
-  asResetKind "Synchronous"  = Synchronous
-  asResetKind "Asynchronous" = Asynchronous
-  asResetKind x = error $ $(curLoc) ++ "Unknown reset kind: " ++ show x
+  asResetKind :: HasCallStack => String -> ResetKind
+  asResetKind x = fromMaybe (error $ $(curLoc) ++ "Unknown reset kind: " ++ show x) (readMaybe x)
 
-  asInitBehaviour "Unknown" = Unknown
-  asInitBehaviour "Defined" = Defined
-  asInitBehaviour x = error $ $(curLoc) ++ "Unknown init behaviour: " ++ show x
+  asInitBehavior :: HasCallStack => String -> InitBehavior
+  asInitBehavior x = fromMaybe (error $ $(curLoc) ++ "Unknown init behavior: " ++ show x) (readMaybe x)
 
-  asResetPolarity "ActiveHigh" = ActiveHigh
-  asResetPolarity "ActiveLow"  = ActiveLow
-  asResetPolarity x = error $ $(curLoc) ++ "Unknown reset polarity: " ++ show x
+  asResetPolarity :: HasCallStack => String -> ResetPolarity
+  asResetPolarity x = fromMaybe (error $ $(curLoc) ++ "Unknown reset polarity: " ++ show x) (readMaybe x)
 
 -- | Given a set of bindings, make explicit non-recursive bindings and
 -- recursive binding groups.

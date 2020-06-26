@@ -184,7 +184,7 @@ data ActiveEdge
   -- ^ Elements are sensitive to the rising edge (low-to-high) of the clock.
   | Falling
   -- ^ Elements are sensitive to the falling edge (high-to-low) of the clock.
-  deriving (Show, Eq, Ord, Generic, NFData, Data, Hashable, Binary)
+  deriving (Show, Read, Eq, Ord, Generic, NFData, Data, Hashable, Binary)
 
 -- | Singleton version of 'ActiveEdge'
 data SActiveEdge (edge :: ActiveEdge) where
@@ -204,7 +204,7 @@ data ResetKind
   -- ^ Elements respond /synchronously/ to changes in their reset input. This
   -- means that changes in their reset input won't take effect until the next
   -- active clock edge. Common on Xilinx FPGA platforms.
-  deriving (Show, Eq, Ord, Generic, NFData, Data, Hashable)
+  deriving (Show, Read, Eq, Ord, Generic, NFData, Data, Hashable)
 
 -- | Singleton version of 'ResetKind'
 data SResetKind (resetKind :: ResetKind) where
@@ -224,7 +224,7 @@ data ResetPolarity
   -- ^ Reset is considered active if underlying signal is 'True'.
   | ActiveLow
   -- ^ Reset is considered active if underlying signal is 'False'.
-  deriving (Eq, Ord, Show, Generic, NFData, Data, Hashable)
+  deriving (Eq, Ord, Show, Read, Generic, NFData, Data, Hashable)
 
 -- | Singleton version of 'ResetPolarity'
 data SResetPolarity (polarity :: ResetPolarity) where
@@ -244,7 +244,7 @@ data InitBehavior
   | Defined
   -- ^ If applicable, power up value of a memory element is defined. Applies to
   -- 'register's for example, but not to 'blockRam'.
-  deriving (Show, Eq, Ord, Generic, NFData, Data, Hashable)
+  deriving (Show, Read, Eq, Ord, Generic, NFData, Data, Hashable)
 
 data SInitBehavior (init :: InitBehavior) where
   SUnknown :: SInitBehavior 'Unknown
