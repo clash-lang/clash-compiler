@@ -1,6 +1,15 @@
 #!/bin/bash
 set -xeou pipefail
 
+# Here to test whether all these variables are set
+echo "RUN_HADDOCK=${RUN_HADDOCK}"
+echo "RUN_LIBTESTS=${RUN_LIBTESTS}"
+echo "RUN_TESTSUITE=${RUN_TESTSUITE}"
+echo "RUN_CLASHDEV=${RUN_CLASHDEV}"
+echo "RUN_BUILD_ALL=${RUN_BUILD_ALL}"
+
+apt-get update -q
+
 if [[ "$GHC" = ghc-head ]]; then
   CABAL="cabal-head"
 elif [[ "$GHC" = ghc-8.4.* ]]; then

@@ -7,15 +7,29 @@ stages:
   # TODO: add test stage to prevent cache throwouts if test failed?
   - publish
 
-# Test jobs:
-ghc-8.4.4:
+# Haddock, doctests, unittests, clash-dev testing. These are single threaded
+# tests and therefore suitable for public runners.
+tests-8.4.4:
   extends: .tests-interruptible
-ghc-8.8.3:
+tests-8.8.3:
   extends: .tests-interruptible
-ghc-8.10.1:
+tests-8.10.1:
   extends: .tests-interruptible
-ghc-8.6.5-singular-hidden:
+tests-8.6.5-singular-hidden:
   extends: .tests-interruptible
+  variables:
+    MULTIPLE_HIDDEN: "no"
+
+# Testsuite (HDL generation and simulation). Highly parallel and memory
+# intensive, should only picked up by beefy (local) runners.
+testsuite-8.4.4:
+  extends: .testsuite-interruptible
+testsuite-8.8.3:
+  extends: .testsuite-interruptible
+testsuite-8.10.1:
+  extends: .testsuite-interruptible
+testsuite-8.6.5-singular-hidden:
+  extends: .testsuite-interruptible
   variables:
     MULTIPLE_HIDDEN: "no"
 
