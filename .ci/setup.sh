@@ -1,5 +1,5 @@
 #!/bin/bash
-set -xeo pipefail
+set -xeou pipefail
 
 if [[ "$GHC" = ghc-head ]]; then
   CABAL="cabal-head"

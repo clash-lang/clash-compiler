@@ -1,5 +1,5 @@
 #!/bin/bash
-set -xeo pipefail
+set -xueo pipefail
 
 # TODO: make sdist work on all, it currently fails for clash-cosim
 cabal new-sdist clash-prelude clash-lib clash-ghc
