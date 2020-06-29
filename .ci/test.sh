@@ -11,6 +11,7 @@ set -e
 
 # Check that clash-dev works
 if [ "$RUN_CLASHDEV" = "yes" ]; then
+  cabal --write-ghc-environment-files=always new-build clash-prelude
   echo "" > clash-dev.result
   echo 'genVHDL "./examples/FIR.hs" >> writeFile "clash-dev.result" "success"' | ./clash-dev
   if [[ "$(cat clash-dev.result)" != "success" ]]; then
