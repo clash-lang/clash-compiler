@@ -1,5 +1,5 @@
 .tests:
-  image: clashlang/clash-ci:2020-04-15
+  image: clashlang/clash-ci:2020-06-29
   stage: build
   timeout: 2 hours
   variables:
