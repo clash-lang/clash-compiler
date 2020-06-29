@@ -35,8 +35,8 @@ stages:
 .tests-interruptible:
   extends: .tests
   interruptible: true
-  except:
-    - master
+  rules:
+    - if: '$CI_COMMIT_BRANCH != "master"'
 
 # Test jobs:
 ghc-8.4.4:
@@ -61,22 +61,22 @@ ghc-8.6.5-singular-hidden:
 # Same as test jobs, but non-interruptable
 ghc-8.4.4-master:
   extends: .tests
-  only:
-    - master
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "master"'
 #ghc-8.6.5:
 #  extends: .tests
 ghc-8.8.3-master:
   extends: .tests
-  only:
-    - master
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "master"'
 ghc-8.10.1-master:
   extends: .tests
-  only:
-    - master
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "master"'
 ghc-8.6.5-singular-hidden-master:
   extends: .tests
-  only:
-    - master
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "master"'
   variables:
     MULTIPLE_HIDDEN: "no"
 #ghc-head-master:
@@ -105,10 +105,10 @@ hackage-sdist:
     paths:
       - clash-*.tar.gz  # clash-{prelude,lib,ghc}-$version{-docs,}.tar.gz
     expire_in: 1 week
-  only:
-    - tags
-    - schedules
-    - triggers
+  rules:
+    - if: '$CI_COMMIT_TAG != null' # tags
+    - if: $CI_PIPELINE_SOURCE == "schedule"
+    - if: $CI_PIPELINE_SOURCE == "trigger"
 
 .hackage:
   extends: .tests
@@ -134,9 +134,9 @@ hackage-release-candidate:
   variables:
     HACKAGE_RELEASE: "no"
 
-  only:
-    - schedules
-    - triggers
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "schedule"
+    - if: $CI_PIPELINE_SOURCE == "trigger"
 
 # Release new version of Clash to Hackage
 hackage-release:
@@ -145,8 +145,8 @@ hackage-release:
   variables:
     HACKAGE_RELEASE: "yes"
 
-  only:
-    - tags
+  rules:
+    - if: '$CI_COMMIT_TAG != null' # tags
 
 # Create a binary distribution using nix, and store it in a tarball. A special
 # nix distribution is used that has its store installed on /usr/nix/store,
@@ -177,10 +177,10 @@ snap-bindist:
     - .ci/snap_bindist.sh
 
   # Run every night, when explicitly triggered, or when tagged (release)
-  only:
-    - schedules
-    - triggers
-    - tags
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "schedule"
+    - if: $CI_PIPELINE_SOURCE == "trigger"
+    - if: '$CI_COMMIT_TAG != null' # tags
 
 # Use binary distribution built in `snap-bindist` to build a snap pacakge.
 .snap:
@@ -202,13 +202,13 @@ snap-beta-or-edge:
   extends: .snap
   variables:
     RELEASE_CHANNEL: beta_or_edge
-  only:
-    - schedules
-    - triggers
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "schedule"
+    - if: $CI_PIPELINE_SOURCE == "trigger"
 
 snap-stable:
   extends: .snap
   variables:
     RELEASE_CHANNEL: stable
-  only:
-    - tags
+  rules:
+    - if: '$CI_COMMIT_TAG != null' # tags
