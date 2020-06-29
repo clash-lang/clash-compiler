@@ -1,20 +1,20 @@
 #!/bin/bash
 set -xeo pipefail
 
-apt-get update -q
-
 if [[ "$GHC" = ghc-head ]]; then
-  CABAL="cabal-install-head"
+  CABAL="cabal-head"
 elif [[ "$GHC" = ghc-8.4.* ]]; then
-  CABAL="cabal-install-2.4"
+  CABAL="cabal-2.4"
 elif [[ "$GHC" = ghc-8.6.* || "$GHC" = ghc-8.8.* ]]; then
-  CABAL="cabal-install-3.0"
+  CABAL="cabal-3.0"
 else
   # GHC >= 8.10
-  CABAL="cabal-install-3.2"
+  CABAL="cabal-3.2"
 fi
 
-apt-get install -yq $CABAL $GHC
+update-alternatives --set opt-ghc /opt/ghc/bin/${GHC}
+update-alternatives --set opt-cabal /opt/cabal/bin/${CABAL}
+
 cabal --version
 ghc --version
 cp .ci/cabal.project.local .

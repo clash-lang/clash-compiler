@@ -10,7 +10,7 @@ fi
 set -e
 
 # Create a ghc environment file needed for the doctests
-# On cabal>=2.4.1.0 and ghc<8.4.4 this isn't done automaticly
+# On cabal>=2.4.1.0 and ghc<8.4.4 this isn't done automatically
 cabal --write-ghc-environment-files=always new-build all
 
 # Check that clash-dev works

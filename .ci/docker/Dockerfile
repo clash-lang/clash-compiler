@@ -44,13 +44,13 @@ WORKDIR /
 RUN apt-get remove -y $DEPS_IVERILOG \
  && rm -Rf ghdl-0.36 iverilog-10_3 \
  && apt-get autoremove -y --purge \
- && apt-get clean \
- && rm /etc/apt/apt.conf.d/docker-clean \
- && apt-get install -y --download-only \
+ && apt-get install -y \
       cabal-install-2.4 \
       cabal-install-3.0 \
       cabal-install-3.2 \
       ghc-8.4.4 \
       ghc-8.6.5 \
       ghc-8.8.3 \
-      ghc-8.10.1
+      ghc-8.10.1 \
+ && apt-get clean \
+ && rm -rf /var/lib/apt/lists/*
