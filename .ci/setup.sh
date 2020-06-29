@@ -49,13 +49,17 @@ fi
 
 cat cabal.project.local
 
+cabal user-config init
+sed -i "s/-- ghc-options:/ghc-options: -j$THREADS/g" ${HOME}/.cabal/config
+sed -i "s/^[- ]*jobs:.*/jobs: $CABAL_JOBS/g" ${HOME}/.cabal/config
+echo "store-dir: ${PWD}/cabal-store" >> ${HOME}/.cabal/config
+sed -i "/remote-repo-cache:.*/d" ${HOME}/.cabal/config
+echo "remote-repo-cache: ${PWD}/cabal-packages" >> ${HOME}/.cabal/config
+cat ${HOME}/.cabal/config
+
 # run new-update first to generate the cabal config file that we can then modify
 # retry 5 times, as hackage servers are not perfectly reliable
 NEXT_WAIT_TIME=0
 until cabal new-update || [ $NEXT_WAIT_TIME -eq 5 ]; do
    sleep $(( NEXT_WAIT_TIME++ ))
 done
-
-sed -i "s/-- ghc-options:/ghc-options: -j$THREADS/g" ${HOME}/.cabal/config
-sed -i "s/^[- ]*jobs:.*/jobs: $CABAL_JOBS/g" ${HOME}/.cabal/config
-echo "store-dir: ${PWD}/cabal-store" >> ${HOME}/.cabal/config
