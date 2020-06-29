@@ -208,6 +208,13 @@ Clash Compiler Flags
 
   **Default:** False
 
+-fclash-edalize
+  Generate metadata for use with Edalize_
+
+  **Default:** False
+
+.. _`Edalize`: https://github.com/olofk/edalize
+
 -main-is
   When using one of ``--vhdl``, ``--verilog``, or ``--systemverilog``, this
   flag refers to synthesis target. For example, running Clash with

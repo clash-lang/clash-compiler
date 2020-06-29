@@ -173,6 +173,8 @@ data ClashOpts = ClashOpts
   -- generated HDL by replaced with defined alternatives.
   , opt_inlineWFCacheLimit :: Word
   -- ^ At what size do we cache normalized work-free top-level binders.
+  , opt_edalize :: Bool
+  -- ^ Generate an EDAM file for use with Edalize.
   }
 
 instance Hashable ClashOpts where
@@ -204,7 +206,8 @@ instance Hashable ClashOpts where
     opt_forceUndefined `hashWithSalt`
     opt_checkIDir `hashWithSalt`
     opt_aggressiveXOpt `hashWithSalt`
-    opt_inlineWFCacheLimit
+    opt_inlineWFCacheLimit `hashWithSalt`
+    opt_edalize
    where
     hashOverridingBool :: Int -> OverridingBool -> Int
     hashOverridingBool s1 Auto = hashWithSalt s1 (0 :: Int)
@@ -245,6 +248,7 @@ defClashOpts
   , opt_checkIDir           = True
   , opt_aggressiveXOpt      = False
   , opt_inlineWFCacheLimit  = 10 -- TODO: find "optimal" value
+  , opt_edalize             = False
   }
 
 -- | Information about the generated HDL between (sub)runs of the compiler
