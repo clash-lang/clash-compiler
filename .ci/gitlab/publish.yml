@@ -1,0 +1,88 @@
+hackage-sdist:
+  extends: .tests
+  interruptible: false
+  variables:
+    GHC: ghc-8.10.1
+  script:
+    - export GHC="${GHC:-$CI_JOB_NAME}"
+    - export THREADS=$(nproc)
+    - export CABAL_JOBS=$(nproc)
+    - .ci/setup.sh
+    - .ci/build_sdist.sh clash-prelude
+    - .ci/build_sdist.sh clash-lib
+    - .ci/build_sdist.sh clash-ghc
+  artifacts:
+    paths:
+      - clash-*.tar.gz  # clash-{prelude,lib,ghc}-$version{-docs,}.tar.gz
+    expire_in: 1 week
+  rules:
+    - if: '$CI_COMMIT_TAG != null' # tags
+    - if: $CI_PIPELINE_SOURCE == "schedule"
+    - if: $CI_PIPELINE_SOURCE == "trigger"
+
+.hackage:
+  extends: .tests
+  interruptible: false
+  stage: publish
+  cache:
+    key: hackage
+  variables:
+    GHC: ghc-8.10.1
+  script:
+    - export GHC="${GHC:-$CI_JOB_NAME}"
+    - export THREADS=$(nproc)
+    - export CABAL_JOBS=$(nproc)
+    - .ci/setup.sh
+    - .ci/publish_sdist.sh clash-prelude
+    - .ci/publish_sdist.sh clash-lib
+    - .ci/publish_sdist.sh clash-ghc
+
+# Create a binary distribution using nix, and store it in a tarball. A special
+# nix distribution is used that has its store installed on /usr/nix/store,
+# instead of the default /nix. This is used to work around a know limitation
+# of snap layouts. As of August 2019 the snapcraft docs mention:
+#
+#  > Layouts cannot currently create new top-level files or directories.
+#  >
+#  >  - https://snapcraft.io/docs/snap-layouts
+#
+# If this limitation is ever annulled, we can use a "proper" nix distribution.
+snap-bindist:
+  image: clashlang/nixbuntu:2.3.3
+  stage: build
+  cache:
+    key: usr-nix-$CI_JOB_NAME
+    paths:
+      # GitLab CI uses zip as a cache archive. For some reason, nix can't
+      # handle this (wrong permissions, missing symlinks?), so we pre-tar it.
+      - usr_nix.tar.xz
+  artifacts:
+    when: always
+    paths:
+      - nix_build.log
+      - bindist/linux/snap/clash-snap-bindist.tar.xz
+    expire_in: 1 week
+  script:
+    - .ci/snap_bindist.sh
+
+  # Run every night, when explicitly triggered, or when tagged (release)
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "schedule"
+    - if: $CI_PIPELINE_SOURCE == "trigger"
+    - if: '$CI_COMMIT_TAG != null' # tags
+
+# Use binary distribution built in `snap-bindist` to build a snap pacakge.
+.snap:
+  image: snapcore/snapcraft
+  stage: publish
+  cache:
+    key: snap-last-run-hash-$CI_COMMIT_REF_SLUG
+    paths:
+      - snap-last-run-hash
+  artifacts:
+    when: always
+    paths:
+      - bindist/linux/snap/*.snap
+    expire_in: 1 week
+  script:
+    - .ci/snap_publish.sh
