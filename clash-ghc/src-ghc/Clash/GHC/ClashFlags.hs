@@ -87,6 +87,7 @@ flagsClash r = [
   , defFlag "fclash-force-undefined"             $ OptIntSuffix (setUndefined r)
   , defFlag "fclash-aggressive-x-optimization"   $ NoArg (liftEwM (setAggressiveXOpt r))
   , defFlag "fclash-inline-workfree-limit"       $ IntSuffix (liftEwM . setInlineWFLimit r)
+  , defFlag "fclash-edalize"                     $ NoArg (liftEwM (setEdalize r))
   ]
 
 -- | Print deprecated flag warning
@@ -226,4 +227,7 @@ setUndefined r iM =
 
 setAggressiveXOpt :: IORef ClashOpts -> IO ()
 setAggressiveXOpt r = modifyIORef r (\c -> c { opt_aggressiveXOpt = True })
+
+setEdalize :: IORef ClashOpts -> IO ()
+setEdalize r = modifyIORef r (\c -> c { opt_edalize = True })
 

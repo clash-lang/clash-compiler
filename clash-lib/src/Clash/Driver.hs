@@ -27,6 +27,7 @@ import           Control.Monad.Catch              (MonadMask)
 import           Control.Monad.IO.Class           (MonadIO)
 import           Control.Monad.State              (evalState, get)
 import           Control.Monad.State.Strict       (State)
+import           Data.Default
 import           Data.Hashable                    (hash)
 import           Data.HashMap.Strict              (HashMap)
 import qualified Data.HashMap.Strict              as HashMap
@@ -315,6 +316,8 @@ generateHDL reprs domainConfs bindingsMap hdlState primMap tcm tupTcm typeTrans 
                              , opt_color              = Auto
                              , opt_errorExtra         = False
                              , opt_checkIDir          = True
+                               -- 4. Optional output
+                             , opt_edalize            = False
                                -- Ignore the following settings, they don't
                                -- affect the generated HDL. However, they do
                                -- influence whether HDL can be generated at all.
@@ -423,7 +426,7 @@ generateHDL reprs domainConfs bindingsMap hdlState primMap tcm tupTcm typeTrans 
       -- 3. Generate topEntity wrapper
       let topComponent = view _4 . head $ filter (Data.Text.isSuffixOf topNm . componentName . view _4) netlist
           (hdlDocs,manifest',dfiles,mfiles)  = createHDL hdlState' (Data.Text.pack modName) seen' netlist domainConfs (Just topComponent)
-                                   (topNm, Right manifest)
+                                   (topNm, Right manifest) (opt_edalize opts)
       mapM_ (writeHDL dir) hdlDocs
       copyDataFiles (opt_importPaths opts) dir dfiles
       writeMemoryDataFiles dir mfiles
@@ -462,7 +465,7 @@ generateHDL reprs domainConfs bindingsMap hdlState primMap tcm tupTcm typeTrans 
 
       -- 3. Write HDL
       let (hdlDocs,_,dfiles,mfiles) = createHDL hdlState2 modName' seen'' netlist domainConfs Nothing
-                           (topNm, Left manifest')
+                           (topNm, Left manifest') (opt_edalize opts)
       writeHDL (hdlDir </> maybe "" t_name annM) (head hdlDocs)
       mapM_ (writeHDL dir) (tail hdlDocs)
       copyDataFiles (opt_importPaths opts) dir dfiles
@@ -731,11 +734,13 @@ createHDL
   -- + Either:
   --   * Left manifest:  Only write/update the hashes of the @manifest@
   --   * Right manifest: Update all fields of the @manifest@
+  -> Bool
+  -- ^ Whether to produce EDAM metadata for Edalize
   -> ([(String,Doc)],Manifest,[(String,FilePath)],[(String,String)])
   -- ^ The pretty-printed HDL documents
   -- + The update manifest file
   -- + The data files that need to be copied
-createHDL backend modName seen components domainConfs mtop (topName,manifestE) = flip evalState backend $ getMon $ do
+createHDL backend modName seen components domainConfs mtop (topName,manifestE) edam = flip evalState backend $ getMon $ do
   (hdlNmDocs,incs) <- unzip <$> mapM (\(_wereVoids,sp,ids,comp) -> genHDL modName sp (HashMap.unionWith max seen ids) comp) components
   hwtys <- HashSet.toList <$> extractTypes <$> Mon get
   typesPkg <- mkTyPackage modName hwtys
@@ -763,17 +768,23 @@ createHDL backend modName seen components domainConfs mtop (topName,manifestE) =
   let manDoc = ( Data.Text.unpack topName <.> "manifest"
                , pretty (Text.pack (show manifest)))
 
-  let genDocs = case mtop of
+  let topDocs = case mtop of
                   Just top ->
                     let topClks = findClocks top
                         sdcInfo = fmap findDomainConfig <$> topClks
                         sdcFile = Data.Text.unpack topName <.> "sdc"
                         sdcDoc  = (sdcFile, pprSDC (SdcInfo sdcInfo))
                      in if null sdcInfo
-                          then manDoc : topFiles
-                          else sdcDoc : manDoc : topFiles
+                          then topFiles
+                          else sdcDoc : topFiles
 
-                  Nothing -> manDoc : topFiles
+                  Nothing -> topFiles
+
+  let genDocs = if edam
+                  then let edamInfo = createEDAM topName (fmap fst topDocs)
+                           edamDoc  = ("edam.py", pprEdam edamInfo)
+                        in edamDoc : manDoc : topDocs
+                  else manDoc : topDocs
 
   return (genDocs,manifest,dataFiles,memFiles)
  where
@@ -782,6 +793,24 @@ createHDL backend modName seen components domainConfs mtop (topName,manifestE) =
       (error $ $(curLoc) ++ "Unknown synthesis domain: " ++ show dom)
       dom
       domainConfs
+
+createEDAM :: Data.Text.Text -> [FilePath] -> Edam
+createEDAM topName files = Edam
+  { edamProjectName = topName
+  , edamTopEntity   = topName
+  , edamFiles       = fmap (\f -> EdamFile f (asEdamFileType f)) files
+  , edamToolOptions = def
+  }
+ where
+  asEdamFileType f =
+    case FilePath.takeExtension f of
+      ".vhdl" -> VhdlSource
+      ".v" -> VerilogSource
+      ".sv" -> SystemVerilogSource
+      ".tcl" -> TclSource
+      ".qsys" -> QSYS
+      ".sdc" -> SDC
+      _ -> Clash.Edalize.Edam.Unknown
 
 -- | Prepares the directory for writing HDL files. This means creating the
 --   dir if it does not exist and removing all existing .hdl files from it.
