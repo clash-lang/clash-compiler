@@ -1,5 +1,5 @@
 #!/bin/bash
-set -xo pipefail
+set -xou pipefail
 
 egrep ' $' -n -r . --include=*.{hs,hs-boot,sh} --exclude-dir=dist-newstyle
 if [[ $? == 0 ]]; then
@@ -38,6 +38,7 @@ fi
 
 # You'd think comparing v${version} with ${CI_COMMIT_TAG} would do the
 # trick, but no..
+CI_COMMIT_TAG=${CI_COMMIT_TAG:-}
 version=$(echo $versions | tr ' ' '\n' | head -n 1)
 tag_version=${CI_COMMIT_TAG:1:${#CI_COMMIT_TAG}-1}  # Strip first character (v0.99 -> 0.99)
 

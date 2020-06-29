@@ -3,6 +3,7 @@
   stage: build
   timeout: 2 hours
   variables:
+    MULTIPLE_HIDDEN: "no"
     GIT_SUBMODULE_STRATEGY: recursive
     TERM: xterm-color
   retry:
