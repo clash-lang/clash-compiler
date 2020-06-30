@@ -1,0 +1,9 @@
+CHANGED: Clash now generates EDAM for using Edalize
+
+This generates edam.py files in all top entities with the configuration for
+building that entity. Users still need to edit this file to specify the EDA
+tool to use, and if necessary the device to target (for Quartus, Vivado etc.)
+These sections are marked with TODO.
+
+See: https://github.com/clash-lang/clash-compiler/issues/1386
+

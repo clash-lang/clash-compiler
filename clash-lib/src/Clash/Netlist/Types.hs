@@ -79,7 +79,7 @@ data TopEntityT = TopEntityT
   -- ^ (Maybe) a topentity annotation
   , associatedTestbench :: Maybe Id
   -- ^ (Maybe) a test bench associated with the topentity
-  } deriving (Generic)
+  } deriving (Generic, Show)
 
 -- | Monad that caches generated components (StateT) and remembers hidden inputs
 -- of components that are being generated (WriterT)

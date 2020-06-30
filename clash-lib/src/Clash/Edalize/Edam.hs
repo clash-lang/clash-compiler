@@ -40,8 +40,11 @@ data Edam = Edam
   }
 
 pprEdam :: Edam -> Doc ann
-pprEdam (Edam n te fs ts) =
-  hsep ["edam", equals, manifest]
+pprEdam (Edam n te fs ts) = vsep
+  [ pyPre
+  , hsep ["edam", equals, manifest]
+  , pyPost
+  ]
  where
   manifest = pyRecord
     [ pyField "name" $ squotes (pretty n)
@@ -50,19 +53,21 @@ pprEdam (Edam n te fs ts) =
     , pyField "tool_options" $ pprEdamTools ts
     ]
 
--- | Information about each file in the project.
--- The is_include_file, include_path and logical_name fields are omitted.
+-- | Information about each file in the project. This does not include
+-- is_include_file or include_path, as these are not currently used by Clash.
 --
 data EdamFile = EdamFile
-  { efName :: FilePath
-  , efType :: EdamFileType
+  { efName        :: FilePath
+  , efType        :: EdamFileType
+  , efLogicalName :: Text
   }
 
 pprFile :: EdamFile -> Doc ann
-pprFile (EdamFile n ty) =
+pprFile (EdamFile n ty ln) =
   pyRecord
-    [ pyField "name" $ squotes (pretty n)
+    [ pyField "name" $ relPath n
     , pyField "file_type" $ squotes (pprFileType ty)
+    , pyField "logical_name" $ squotes (pretty ln)
     ]
 
 -- | A subset of the file types recognized by Edalize. The supported formats
@@ -202,7 +207,7 @@ pprModelsimOptions (ModelsimOptions vlog vsim) =
     ]
 
 data QuartusOptions = QuartusOptions
-  { quartusBoardDevIndex :: [Text]
+  { quartusBoardDevIndex :: Int
   , quartusFamily        :: Text
   , quartusDevice        :: Text
   , quartusOpts          :: [Text]
@@ -210,7 +215,7 @@ data QuartusOptions = QuartusOptions
   }
 
 instance Default QuartusOptions where
-  def = QuartusOptions [] "" "" [] []
+  def = QuartusOptions 1 "" "" [] []
 
 pprQuartusOptions :: QuartusOptions -> Doc ann
 pprQuartusOptions (QuartusOptions bdi fam dev opts dse) =
@@ -218,7 +223,7 @@ pprQuartusOptions (QuartusOptions bdi fam dev opts dse) =
     [ pyDocField
         "board_device_index"
         "Specify the FPGA's device number in the JTAG chain"
-        (pyList (fmap pretty bdi))
+        (squotes (pretty bdi))
 
     , pyDocField
         "family"
@@ -259,6 +264,30 @@ pprVivadoOptions (VivadoOptions part) =
 
 -- Helpers; don't export
 
+pyPre :: Doc ann
+pyPre = vsep
+  [ "import os"
+  , ""
+  , "work_root = os.path.dirname(os.path.realpath(__file__))"
+  , ""
+  , "# TODO Specify the EDA tool to use"
+  , "tool = ''"
+  , ""
+  ]
+
+pyPost :: Doc ann
+pyPost = vsep
+  [ ""
+  , "if __name__ == '__main__':"
+  , indent 4 $ vsep
+      [ "from edalize import *"
+      , ""
+      , "tool = get_edatool(tool)(edam=edam, work_root=work_root)"
+      , "tool.configure()"
+      , "tool.build()"
+      ]
+  ]
+
 pyList :: [Doc ann] -> Doc ann
 pyList xs = vsep [lbracket, indent 4 (commaList xs), rbracket]
 
@@ -273,6 +302,12 @@ pyField n x = hcat [squotes (pretty n), colon, space, x]
 
 pyDocField :: Text -> Text -> Doc ann -> Doc ann
 pyDocField n d x = vsep [pyComment d, pyField n x]
+
+relPath :: FilePath -> Doc ann
+relPath x = hcat
+  [ "os.path.relpath"
+  , parens (hsep $ punctuate comma [squotes (pretty x), "work_root"])
+  ]
 
 flagList :: [Doc ann] -> Doc ann
 flagList = squotes . hsep

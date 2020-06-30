@@ -209,7 +209,10 @@ Clash Compiler Flags
   **Default:** False
 
 -fclash-edalize
-  Generate metadata for use with Edalize_
+  Generate metadata for use with Edalize_. This generates edam.py files in
+  all top entities with the configuration for building that entity. Users still
+  need to edit this file to specify the EDA tool to use, and if necessary the
+  device to target (for Quartus, Vivado etc.)
 
   **Default:** False
 
