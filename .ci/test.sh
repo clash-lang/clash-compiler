@@ -1,14 +1,6 @@
 #!/bin/bash
 set -xou pipefail
 
-egrep ' $' -n -r . --include=*.{hs,hs-boot,sh} --exclude-dir=dist-newstyle
-if [[ $? == 0 ]]; then
-    echo "EOL whitespace detected. See ^"
-    exit 1;
-fi
-
-set -e
-
 # Check that clash-dev works
 if [ "$RUN_CLASHDEV" = "yes" ]; then
   cabal --write-ghc-environment-files=always new-build clash-prelude
@@ -18,21 +10,6 @@ if [ "$RUN_CLASHDEV" = "yes" ]; then
     echo "clash-dev test failed"
     exit 1
   fi
-fi
-
-# Check whether version numbers in snap / clash-{prelude,lib,ghc} are the same
-cabal_files="clash-prelude/clash-prelude.cabal clash-lib/clash-lib.cabal clash-ghc/clash-ghc.cabal clash-cores/clash-cores.cabal"
-snapcraft_file="bindist/linux/snap/snap/snapcraft.yaml"
-versions=$(grep "^[vV]ersion" $cabal_files $snapcraft_file | grep -Eo '[0-9]+(\.[0-9]+)+')
-
-if [[ $(echo $versions | tr ' ' '\n' | wc -l) == 5 ]]; then
-    if [[ $(echo $versions | tr ' ' '\n' | uniq | wc -l) != 1 ]]; then
-        echo "Expected all distributions to have the same version number. Found: $versions"
-        exit 1;
-    fi
-else
-    echo "Expected to find version number in all distributions. Found: $versions";
-    exit 1;
 fi
 
 # You'd think comparing v${version} with ${CI_COMMIT_TAG} would do the
