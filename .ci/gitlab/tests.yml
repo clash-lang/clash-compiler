@@ -53,9 +53,13 @@
     RUN_BUILD_ALL: "no"
   rules:
     - if: '$CI_COMMIT_BRANCH != "master"'
+  tags:
+    - local
 
 .tests-non-interruptible:
   extends: .tests
   interruptible: true
   rules:
     - if: '$CI_COMMIT_BRANCH == "master"'
+  tags:
+    - local
