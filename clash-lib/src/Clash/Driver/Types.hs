@@ -279,6 +279,8 @@ data Manifest
     -- ^ Names of all the generated components for the @TopEntity@ (does not
     -- include the names of the components of the @TestBench@ accompanying
     -- the @TopEntity@).
+  , fileNames :: [FilePath]
+    -- ^ Names of all the generated files for the @TopEntity@
   } deriving (Show,Read)
 
 -- | Synopsys Design Constraint (SDC) information for a component.
@@ -300,7 +302,7 @@ pprSDC = vcat . fmap go . sdcClock
         name     = braces (pretty i)
         period   = viaShow p
         waveform = braces ("0.000" <+> viaShow (p / 2))
-        targets  = brackets ("get_port" <+> name)
+        targets  = brackets ("get_ports" <+> name)
      in hsep
           [ "create_clock"
           , "-name" <+> name
