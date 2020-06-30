@@ -6,6 +6,11 @@ aliases:
     THREADS: 1
     CABAL_JOBS: 1
 
+    RUN_HADDOCK: "yes"
+    RUN_LIBTESTS: "yes"
+    RUN_CLASHDEV: "yes"
+    RUN_TESTSUITE: "yes"
+    RUN_BUILD_ALL: "yes"
   - &submodules
     run:
       name: "Checkout submodules"
