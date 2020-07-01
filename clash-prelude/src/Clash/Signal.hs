@@ -194,6 +194,16 @@ module Clash.Signal
   , withSpecificClockResetEnable
 #endif
   , SystemClockResetEnable
+    -- ** Hidden clock, reset, and enable
+  , HiddenClockEnable
+  , hideClockEnable
+  , exposeClockEnable
+  , withClockEnable
+#ifdef CLASH_MULTIPLE_HIDDEN
+  , exposeSpecificClockEnable
+  , withSpecificClockEnable
+#endif
+  , SystemClockEnable
     -- * Basic circuit functions
   , dflipflop
   , delay
@@ -455,6 +465,15 @@ type HiddenClockResetEnable dom  =
   , HiddenEnable dom
   )
 
+-- | A /constraint/ that indicates the component needs a 'Clock' and an 'Enable'
+-- belonging to the same dom.
+--
+-- <Clash-Signal.html#hiddenclockandreset Click here to read more about hidden clocks and enables>
+type HiddenClockEnable dom =
+  ( HiddenClock dom
+  , HiddenEnable dom
+  )
+
 -- | A /constraint/ that indicates the component needs a 'Clock', a 'Reset',
 -- and an 'Enable' belonging to the 'System' dom.
 --
@@ -462,6 +481,15 @@ type HiddenClockResetEnable dom  =
 type SystemClockResetEnable =
   ( Hidden (HiddenClockName System) (Clock System)
   , Hidden (HiddenResetName System) (Reset System)
+  , Hidden (HiddenEnableName System) (Enable System)
+  )
+
+-- | A /constraint/ that indicates the component needs a 'Clock' and an 'Enable'
+-- belonging to the 'System' dom.
+--
+-- <Clash-Signal.html#hiddenclockandreset Click here to read more about hidden clocks and enables>
+type SystemClockEnable =
+  ( Hidden (HiddenClockName System) (Clock System)
   , Hidden (HiddenEnableName System) (Enable System)
   )
 
@@ -1278,6 +1306,81 @@ withSpecificClockResetEnable
 withSpecificClockResetEnable =
   \clk rst en f -> withSpecificClock clk (withSpecificReset rst (withSpecificEnable en f))
 {-# INLINE withSpecificClockResetEnable #-}
+
+
+exposeClockEnable
+  :: forall dom r .
+#ifdef CLASH_MULTIPLE_HIDDEN
+     WithSingleDomain dom r =>
+#endif
+     (HiddenClockEnable dom => r)
+  -- ^ The component with hidden clock and enable arguments
+  -> (KnownDomain dom => Clock dom -> Enable dom -> r)
+  -- ^ The component with its clock and enable arguments exposed
+exposeClockEnable =
+  \f clk en ->
+    exposeSpecificClock (exposeEnable f) clk en
+{-# INLINE exposeClockEnable #-}
+
+#ifdef CLASH_MULTIPLE_HIDDEN
+exposeSpecificClockEnable
+  :: forall dom r
+   . WithSpecificDomain dom r
+  => (HiddenClockEnable dom => r)
+  -- ^ The component with hidden clock, reset, and enable arguments
+  -> (KnownDomain dom => Clock dom -> Enable dom -> r)
+  -- ^ The component with its clock, reset, and enable arguments exposed
+exposeSpecificClockEnable =
+  \f clk en ->
+    exposeSpecificClock (exposeSpecificEnable f) clk en
+{-# INLINE exposeSpecificClockEnable #-}
+#endif
+
+hideClockEnable
+  :: forall dom r
+   . HiddenClockEnable dom
+  => (KnownDomain dom => Clock dom -> Enable dom -> r)
+  -- ^ Component whose clock, reset, and enable argument you want to hide
+  -> r
+hideClockEnable =
+  \f ->
+    f
+      (fromLabel @(HiddenClockName dom))
+      (fromLabel @(HiddenEnableName dom))
+{-# INLINE hideClockEnable #-}
+
+withClockEnable
+  :: forall dom r
+   . KnownDomain dom
+#ifdef CLASH_MULTIPLE_HIDDEN
+  => WithSingleDomain dom r
+#endif
+  => Clock dom
+  -- ^ The 'Clock' we want to connect
+  -> Enable dom
+  -- ^ The 'Enable' we want to connect
+  -> (HiddenClockEnable dom => r)
+  -- ^ The function with a hidden 'Clock', hidden 'Reset', and hidden
+  -- 'Enable' argument
+  -> r
+withClockEnable =
+  \clk en f -> withSpecificClockEnable clk en (const f) (Proxy @dom)
+{-# INLINE withClockEnable #-}
+
+withSpecificClockEnable
+  :: forall dom r
+   . (KnownDomain dom, WithSpecificDomain dom r)
+  => Clock dom
+  -- ^ The 'Clock' we want to connect
+  -> Enable dom
+  -- ^ The 'Enable' we want to connect
+  -> (HiddenClockEnable dom => r)
+  -- ^ The function with a hidden 'Clock', hidden 'Reset', and hidden
+  -- 'Enable' argument
+  -> r
+withSpecificClockEnable =
+  \clk en f -> withSpecificClock clk (withSpecificEnable en f)
+{-# INLINE withSpecificClockEnable #-}
 
 -- * Basic circuit functions
 

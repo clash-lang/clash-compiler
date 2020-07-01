@@ -112,6 +112,14 @@ class NFDataX a => AutoReg a where
     -> Signal dom a
   autoReg = register
 
+  autoDelay
+    :: (HasCallStack, KnownDomain dom)
+    => Clock dom -> Enable dom
+    -> a -- ^ Initial value (not available on all technologies)
+    -> Signal dom a
+    -> Signal dom a
+  autoDelay = delay
+
 instance AutoReg ()
 instance AutoReg Bool
 
@@ -150,9 +158,26 @@ instance AutoReg a => AutoReg (Maybe a) where
      tagR = register clk rst en tagInit tag
 
      val = fromMaybe (deepErrorX "autoReg'.val") <$> input
+
+     valR = case initVal of
+       Nothing -> autoDelay clk (enable en tag) (deepErrorX "autoReg'.valInit") val
+       Just valInit -> autoReg clk rst (enable en tag) valInit val
+
+     createMaybe t v = case t of
+       True -> Just v
+       False -> Nothing
+
+  autoDelay clk en initVal input =
+    createMaybe <$> tagR <*> valR
+   where
+     tag = isJust <$> input
+     tagInit = isJust initVal
+     tagR = delay clk en tagInit tag
+
+     val = fromMaybe (deepErrorX "autoReg'.val") <$> input
      valInit = fromMaybe (deepErrorX "autoReg'.valInit") initVal
 
-     valR = autoReg clk rst (enable en tag) valInit val
+     valR = autoDelay clk (enable en tag) valInit val
 
      createMaybe t v = case t of
        True -> Just v
@@ -171,10 +196,24 @@ instance (KnownNat n, AutoReg a) => AutoReg (Vec n a) where
     go :: forall (i :: Nat). SNat i -> a  -> Signal dom a -> Signal dom a
     go SNat = suffixNameFromNatP @i . autoReg clk rst en
 
+  autoDelay
+    :: forall dom. (HasCallStack, KnownDomain dom)
+    => Clock dom -> Enable dom
+    -> Vec n a -- ^ Reset value
+    -> Signal dom (Vec n a)
+    -> Signal dom (Vec n a)
+  autoDelay clk en initVal xs =
+    bundle $ smap go (lazyV initVal) <*> unbundle xs
+   where
+    go :: forall (i :: Nat). SNat i -> a  -> Signal dom a -> Signal dom a
+    go SNat = suffixNameFromNatP @i . autoDelay clk en
+
 instance (KnownNat d, AutoReg a) => AutoReg (RTree d a) where
   autoReg clk rst en initVal xs =
     bundle $ (autoReg clk rst en) <$> lazyT initVal <*> unbundle xs
 
+  autoDelay clk en initVal xs =
+    bundle $ (autoDelay clk en) <$> lazyT initVal <*> unbundle xs
 
 -- | Decompose an applied type into its individual components. For example, this:
 --
@@ -273,6 +312,9 @@ deriveAutoRegProduct tyInfo conInfo = go (constructorName conInfo) fieldInfos
         RecordConstructor nms -> map Just nms
         _ -> repeat Nothing
 
+  dropRst (a:_:rest) = a:rest
+  dropRst _ = error "internal error"
+
   go :: Name -> [(Maybe Name,Type)] -> Q [Dec]
   go dcNm fields = do
     args <- mapM newName ["clk", "rst", "en", "initVal", "input"]
@@ -308,15 +350,35 @@ deriveAutoRegProduct tyInfo conInfo = go (constructorName conInfo) fieldInfos
           Just nm -> let nmSym = litT $ strTyLit (nameBase nm)
                      in [| suffixNameP @($nmSym) |]
 
+      genAutoDelayDecl :: PatQ -> ExpQ -> ExpQ -> Maybe Name -> DecsQ
+      genAutoDelayDecl s v i nameM =
+        [d| $s = $nameMe autoDelay $clkE $enE $i $v |]
+       where
+        nameMe = case nameM of
+          Nothing -> [| id |]
+          Just nm -> let nmSym = litT $ strTyLit (nameBase nm)
+                     in [| suffixNameP @($nmSym) |]
+
     partDecls <- concat <$> (sequence $ zipWith4 genAutoRegDecl
                                                  (varP <$> sigs)
                                                  (varE <$> parts)
                                                  (varE <$> initVals)
                                                  (fieldNames)
                             )
+
+    partDeclsD <- concat <$> (sequence $ zipWith4 genAutoDelayDecl
+                                                 (varP <$> sigs)
+                                                 (varE <$> parts)
+                                                 (varE <$> initVals)
+                                                 (fieldNames)
+                            )
+
     let
         decls :: [DecQ]
         decls = map pure (initDecl : fieldDecls ++ partDecls)
+
+        declsD :: [DecQ]
+        declsD = map pure (initDecl : fieldDecls ++ partDeclsD)
         tyConE = conE dcNm
         body =
           case map varE sigs of
@@ -327,8 +389,9 @@ deriveAutoRegProduct tyInfo conInfo = go (constructorName conInfo) fieldInfos
             [] -> [| $tyConE |]
 
     autoRegDec <- funD 'autoReg [clause argsP (normalB body) decls]
+    autoDelayDec <- funD 'autoDelay [clause (dropRst argsP) (normalB body) declsD]
     ctx <- calculateRequiredContext conInfo
-    return [InstanceD Nothing ctx (AppT (ConT ''AutoReg) ty) [autoRegDec]]
+    return [InstanceD Nothing ctx (AppT (ConT ''AutoReg) ty) [autoRegDec,autoDelayDec]]
 
 -- Calculate the required constraint to call autoReg on all the fields of a
 -- given constructor

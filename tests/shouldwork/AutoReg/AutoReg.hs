@@ -91,15 +91,31 @@ expectedRegCount = sum
   , 1   -- Bool
   , 2   -- Tup2
   , 3   -- Tup3
-  , 2   -- Maybe Bool
-  , 3   -- Maybe (Maybe Bool)
+  , 1   -- Maybe Bool
+  , 1   -- Maybe (Maybe Bool)
   , 2   -- OtherPair Int8 Int16
   , 2   -- Concrete
   , 2   -- InfixDataCon Bool Bool
   , 1   -- ((),Bool)
   , 2   -- Vec 2 Bool
-  , 2*2 -- Vec 2 (Maybe Bool)
-  , 1+2*2 -- Maybe (Vec 2 (Maybe Bool))
+  , 2*1 -- Vec 2 (Maybe Bool)
+  , 1   -- Maybe (Vec 2 (Maybe Bool))
+  ]
+
+expectedDelayCount = sum
+  [ 0   -- Unsigned
+  , 0   -- Bool
+  , 0   -- Tup2
+  , 0   -- Tup3
+  , 1   -- Maybe Bool
+  , 2   -- Maybe (Maybe Bool)
+  , 0   -- OtherPair Int8 Int16
+  , 0   -- Concrete
+  , 0   -- InfixDataCon Bool Bool
+  , 0   -- ((),Bool)
+  , 0   -- Vec 2 Bool
+  , 2*1 -- Vec 2 (Maybe Bool)
+  , 2*2 -- Maybe (Vec 2 (Maybe Bool))
   ]
 
 countLinesContaining :: String -> String -> Int
@@ -110,6 +126,13 @@ mainHDL topFile = do
   [topDir] <- getArgs
   content <- readFile (takeDirectory topDir </> topFile)
   let regCount = countLinesContaining "register begin" content
+      delayCount = countLinesContaining "delay begin" content
+  when (expectedDelayCount /= delayCount)
+    (error $ unlines
+      [ ""
+      , "Error: Found " <> show delayCount <> " delays in " <> topFile
+      , "But expected " <> show expectedDelayCount
+      ])
   when (expectedRegCount /= regCount)
     (error $ unlines
       [ ""

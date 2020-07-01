@@ -133,7 +133,7 @@ module Clash.Prelude
     -- ** Type classes
     -- *** Clash
   -- , module Clash.Class.AutoReg
-  , autoReg, deriveAutoReg
+  , autoReg, autoDelay, deriveAutoReg
   , module Clash.Class.BitPack
   , module Clash.Class.Exp
   , module Clash.Class.Num
@@ -272,3 +272,11 @@ autoReg
   -> Signal dom a
   -> Signal dom a
 autoReg = hideClockResetEnable E.autoReg
+
+-- | Implicit version of 'Clash.Class.AutoReg.autoDelay'
+autoDelay
+  :: (HasCallStack, HiddenClockEnable dom, AutoReg a)
+  => a
+  -> Signal dom a
+  -> Signal dom a
+autoDelay = hideClockEnable E.autoDelay
