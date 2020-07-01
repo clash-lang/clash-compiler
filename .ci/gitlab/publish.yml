@@ -2,10 +2,11 @@ hackage-sdist:
   extends: .tests
   interruptible: false
   variables:
-    GHC: 8.10.1
+    GHC_VERSION: 8.10.1
   script:
     - export THREADS=$(nproc)
     - export CABAL_JOBS=$(nproc)
+    - export GHC=ghc-${GHC_VERSION}
     - .ci/setup.sh
     - .ci/build_sdist.sh clash-prelude
     - .ci/build_sdist.sh clash-lib
@@ -26,10 +27,11 @@ hackage-sdist:
   cache:
     key: hackage
   variables:
-    GHC: 8.10.1
+    GHC_VERSION: 8.10.1
   script:
     - export THREADS=$(nproc)
     - export CABAL_JOBS=$(nproc)
+    - export GHC=ghc-${GHC_VERSION}
     - .ci/setup.sh
     - .ci/publish_sdist.sh clash-prelude
     - .ci/publish_sdist.sh clash-lib
