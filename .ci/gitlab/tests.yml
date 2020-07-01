@@ -27,7 +27,7 @@
     - unset HACKAGE_PASSWORD
     # Use either ${GHC} or if that's not set, try to detect GHC version by analyzing
     # $CI_JOB_NAME.
-    - export GHC=ghc-"${GHC:-$(echo $CI_JOB_NAME | egrep -o '[0-9]+.[0-9]+.[0-9]+')}"
+    - export GHC=ghc-"${GHC_VERSION:-$(echo $CI_JOB_NAME | egrep -o '[0-9]+.[0-9]+.[0-9]+')}"
     - export THREADS=$(nproc)
     - export CABAL_JOBS=$(nproc)
     - export
