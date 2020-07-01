@@ -6,6 +6,11 @@ aliases:
     THREADS: 1
     CABAL_JOBS: 1
 
+    RUN_HADDOCK: "yes"
+    RUN_LIBTESTS: "yes"
+    RUN_CLASHDEV: "yes"
+    RUN_TESTSUITE: "yes"
+    RUN_BUILD_ALL: "yes"
   - &submodules
     run:
       name: "Checkout submodules"
@@ -99,7 +104,7 @@ aliases:
 
   - &build_default
     docker:
-      - image: clashlang/clash-ci:2020-04-15
+      - image: clashlang/clash-ci:2020-06-29
     steps:
       - checkout
       - *merge_pullrequest
@@ -112,7 +117,7 @@ aliases:
       - *run_tests
   - &build_with_stack
     docker:
-      - image: clashlang/clash-ci:2020-04-15
+      - image: clashlang/clash-ci:2020-06-29
     steps:
       - checkout
       - *merge_pullrequest

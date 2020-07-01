@@ -1,20 +1,52 @@
 #!/bin/bash
-set -xeo pipefail
+set -xou pipefail
+
+egrep ' $' -n -r . --include=*.{hs,hs-boot,sh} --exclude-dir=dist-newstyle
+if [[ $? == 0 ]]; then
+    echo "EOL whitespace detected. See ^"
+    exit 1;
+fi
+
+set -e
+
+# Check whether version numbers in snap / clash-{prelude,lib,ghc} are the same
+cabal_files="clash-prelude/clash-prelude.cabal clash-lib/clash-lib.cabal clash-ghc/clash-ghc.cabal clash-cores/clash-cores.cabal"
+snapcraft_file="bindist/linux/snap/snap/snapcraft.yaml"
+versions=$(grep "^[vV]ersion" $cabal_files $snapcraft_file | grep -Eo '[0-9]+(\.[0-9]+)+')
+
+if [[ $(echo $versions | tr ' ' '\n' | wc -l) == 5 ]]; then
+    if [[ $(echo $versions | tr ' ' '\n' | uniq | wc -l) != 1 ]]; then
+        echo "Expected all distributions to have the same version number. Found: $versions"
+        exit 1;
+    fi
+else
+    echo "Expected to find version number in all distributions. Found: $versions";
+    exit 1;
+fi
+
+# Here to test whether all these variables are set
+echo "RUN_HADDOCK=${RUN_HADDOCK}"
+echo "RUN_LIBTESTS=${RUN_LIBTESTS}"
+echo "RUN_TESTSUITE=${RUN_TESTSUITE}"
+echo "RUN_CLASHDEV=${RUN_CLASHDEV}"
+echo "RUN_BUILD_ALL=${RUN_BUILD_ALL}"
 
 apt-get update -q
 
 if [[ "$GHC" = ghc-head ]]; then
-  CABAL="cabal-install-head"
+  CABAL="cabal-head"
 elif [[ "$GHC" = ghc-8.4.* ]]; then
-  CABAL="cabal-install-2.4"
+  CABAL="cabal-2.4"
 elif [[ "$GHC" = ghc-8.6.* || "$GHC" = ghc-8.8.* ]]; then
-  CABAL="cabal-install-3.0"
+  CABAL="cabal-3.0"
 else
   # GHC >= 8.10
-  CABAL="cabal-install-3.2"
+  CABAL="cabal-3.2"
 fi
 
-apt-get install -yq $CABAL $GHC
+update-alternatives --set opt-ghc /opt/ghc/bin/${GHC}
+update-alternatives --set opt-cabal /opt/cabal/bin/${CABAL}
+
 cabal --version
 ghc --version
 cp .ci/cabal.project.local .
@@ -40,13 +72,17 @@ fi
 
 cat cabal.project.local
 
+cabal user-config init
+sed -i "s/-- ghc-options:/ghc-options: -j$THREADS/g" ${HOME}/.cabal/config
+sed -i "s/^[- ]*jobs:.*/jobs: $CABAL_JOBS/g" ${HOME}/.cabal/config
+echo "store-dir: ${PWD}/cabal-store" >> ${HOME}/.cabal/config
+sed -i "/remote-repo-cache:.*/d" ${HOME}/.cabal/config
+echo "remote-repo-cache: ${PWD}/cabal-packages" >> ${HOME}/.cabal/config
+cat ${HOME}/.cabal/config
+
 # run new-update first to generate the cabal config file that we can then modify
 # retry 5 times, as hackage servers are not perfectly reliable
 NEXT_WAIT_TIME=0
 until cabal new-update || [ $NEXT_WAIT_TIME -eq 5 ]; do
    sleep $(( NEXT_WAIT_TIME++ ))
 done
-
-sed -i "s/-- ghc-options:/ghc-options: -j$THREADS/g" ${HOME}/.cabal/config
-sed -i "s/^[- ]*jobs:.*/jobs: $CABAL_JOBS/g" ${HOME}/.cabal/config
-echo "store-dir: ${PWD}/cabal-store" >> ${HOME}/.cabal/config

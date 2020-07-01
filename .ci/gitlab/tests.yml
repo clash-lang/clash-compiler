@@ -1,0 +1,65 @@
+.tests:
+  image: clashlang/clash-ci:2020-06-29
+  stage: build
+  timeout: 2 hours
+  variables:
+    MULTIPLE_HIDDEN: "no"
+    GIT_SUBMODULE_STRATEGY: recursive
+    TERM: xterm-color
+
+    RUN_HADDOCK: "yes"
+    RUN_LIBTESTS: "yes"
+    RUN_CLASHDEV: "yes"
+    RUN_TESTSUITE: "yes"
+    RUN_BUILD_ALL: "yes"
+  retry:
+    max: 2
+    when:
+      - runner_system_failure
+      - stuck_or_timeout_failure
+  cache:
+    key: cabal-store-$CI_JOB_NAME
+    paths:
+      - cabal-store/
+      - cabal-packages/
+  script:
+    - unset SNAPCRAFT_LOGIN_FILE
+    - unset HACKAGE_PASSWORD
+    # Use either ${GHC} or if that's not set, try to detect GHC version by analyzing
+    # $CI_JOB_NAME.
+    - export GHC=ghc-"${GHC_VERSION:-$(echo $CI_JOB_NAME | egrep -o '[0-9]+.[0-9]+.[0-9]+')}"
+    - export THREADS=$(nproc)
+    - export CABAL_JOBS=$(nproc)
+    - export
+    - .ci/setup.sh
+    - .ci/build.sh
+    - .ci/test.sh
+
+.tests-interruptible:
+  extends: .tests
+  interruptible: true
+  variables:
+    RUN_TESTSUITE: "no"
+  rules:
+    - if: '$CI_COMMIT_BRANCH != "master"'
+
+.testsuite-interruptible:
+  extends: .tests
+  interruptible: true
+  variables:
+    RUN_HADDOCK: "no"
+    RUN_LIBTESTS: "no"
+    RUN_CLASHDEV: "no"
+    RUN_BUILD_ALL: "no"
+  rules:
+    - if: '$CI_COMMIT_BRANCH != "master"'
+  tags:
+    - local
+
+.tests-non-interruptible:
+  extends: .tests
+  interruptible: true
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "master"'
+  tags:
+    - local
