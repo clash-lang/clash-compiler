@@ -11,7 +11,7 @@ package clash-lib
   flags: +debug
 package clash-prelude
   ghc-options: -Werror
-  flags: +doctests
+  flags: +doctests -large-tuples
   tests: True
   benchmarks: True
 package clash-cosim
