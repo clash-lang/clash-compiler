@@ -36,6 +36,8 @@ hackage-sdist:
     - .ci/publish_sdist.sh clash-prelude
     - .ci/publish_sdist.sh clash-lib
     - .ci/publish_sdist.sh clash-ghc
+  retry:
+    max: 2
 
 # Create a binary distribution using nix, and store it in a tarball. A special
 # nix distribution is used that has its store installed on /usr/nix/store,
@@ -92,3 +94,5 @@ snap-bindist:
     expire_in: 1 week
   script:
     - .ci/snap_publish.sh
+  retry:
+    max: 2
