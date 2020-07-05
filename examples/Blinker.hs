@@ -2,6 +2,7 @@ module Blinker where
 
 import Clash.Prelude
 import Clash.Intel.ClockGen
+import Clash.Annotations.SynthesisAttributes
 
 data LedMode
   = Rotate
@@ -27,12 +28,20 @@ createDomain vSystem{vName="Dom50", vPeriod=50000}
     }) #-}
 topEntity
   :: Clock Input
+      `Annotate` 'StringAttr "chip_pin" "R8"
+      `Annotate` 'StringAttr "altera_attribute" "-name IO_STANDARD \"3.3-V LVTTL\""
   -- ^ Incoming clock
   -> Signal Input Bool
+      `Annotate` 'StringAttr "chip_pin" "J15"
+      `Annotate` 'StringAttr "altera_attribute" "-name IO_STANDARD \"3.3-V LVTTL\""
   -- ^ Reset signal, straight from KEY0
   -> Signal Dom50 Bit
+      `Annotate` 'StringAttr "chip_pin" "E1"
+      `Annotate` 'StringAttr "altera_attribute" "-name IO_STANDARD \"3.3-V LVTTL\""
   -- ^ Mode choice, straight from KEY1. See 'LedMode'.
   -> Signal Dom50 (BitVector 8)
+      `Annotate` 'StringAttr "chip_pin" "L3, B1, F3, D1, A11, B13, A13, A15"
+      `Annotate` 'StringAttr "altera_attribute" "-name IO_STANDARD \"3.3-V LVTTL\""
   -- ^ Output containing 8 bits, corresponding to 8 LEDs
 topEntity clk20 rstBtn modeBtn =
   exposeClockResetEnable
