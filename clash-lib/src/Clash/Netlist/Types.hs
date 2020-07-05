@@ -182,6 +182,7 @@ findClocks (Component _ is _ _) =
   mapMaybe isClock is
  where
   isClock (i, Clock d) = Just (i, d)
+  isClock (i, Annotated _ t) = isClock (i,t)
   isClock _ = Nothing
 
 -- | Size indication of a type (e.g. bit-size or number of elements)
