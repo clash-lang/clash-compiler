@@ -334,6 +334,7 @@ verilogType t = case t of
   Bit      -> emptyDoc
   Bool     -> emptyDoc
   FileType -> emptyDoc
+  Annotated _ ty -> verilogType ty
   _        -> brackets (int (typeSize t -1) <> colon <> int 0)
 
 sigDecl :: VerilogM Doc -> HWType -> VerilogM Doc
@@ -1213,4 +1214,5 @@ encodingNote :: Applicative m => HWType -> m Doc
 encodingNote (Clock _) = string " // clock"
 encodingNote (Reset _) = string " // reset"
 encodingNote (Enable _) = string " // enable"
+encodingNote (Annotated _ t) = encodingNote t
 encodingNote _         = emptyDoc

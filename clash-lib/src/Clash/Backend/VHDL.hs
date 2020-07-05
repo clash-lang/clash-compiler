@@ -977,6 +977,7 @@ appendSize baseType sizedType = case sizedType of
   Unsigned n  -> baseType <> parens (int (n-1) <+> "downto 0")
   Vector n _  -> baseType <> parens ("0 to" <+> int (n-1))
   RTree d _   -> baseType <> parens ("0 to" <+> int ((2^d)-1))
+  Annotated _ elTy -> appendSize baseType elTy
   _           -> baseType
 
 -- | Same as @qualTyName@, but instantiate generic types with their size.
@@ -1857,6 +1858,7 @@ encodingNote :: HWType -> VHDLM Doc
 encodingNote (Clock _)  = "-- clock" <> line
 encodingNote (Reset _)  = "-- reset" <> line
 encodingNote (Enable _) = "-- enable" <> line
+encodingNote (Annotated _ t) = encodingNote t
 encodingNote _          = emptyDoc
 
 tupledSemi :: Applicative f => f [Doc] -> f Doc
