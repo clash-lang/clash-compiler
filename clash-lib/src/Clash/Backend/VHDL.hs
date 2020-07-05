@@ -960,7 +960,7 @@ assocs m = zip keys (map (m HashMap.!) keys)
 
 -- | Convert single attribute to VHDL syntax
 renderAttr :: Attr' -> T.Text
-renderAttr (StringAttr'  _key value) = T.pack $ show value
+renderAttr (StringAttr'  _key value) = T.replace "\\\"" "\"\"" $ T.pack $ show value
 renderAttr (IntegerAttr' _key value) = T.pack $ show value
 renderAttr (BoolAttr'    _key True ) = T.pack $ "true"
 renderAttr (BoolAttr'    _key False) = T.pack $ "false"
