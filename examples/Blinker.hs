@@ -31,6 +31,9 @@ topEntity
       `Annotate` 'StringAttr "chip_pin" "R8"
       `Annotate` 'StringAttr "altera_attribute" "-name IO_STANDARD \"3.3-V LVTTL\""
   -- ^ Incoming clock
+  --
+  -- Annotate with attributes to map the argument to the correct pin, with the
+  -- correct voltage settings, on the DE0-Nano development kit.
   -> Signal Input Bool
       `Annotate` 'StringAttr "chip_pin" "J15"
       `Annotate` 'StringAttr "altera_attribute" "-name IO_STANDARD \"3.3-V LVTTL\""
@@ -43,6 +46,9 @@ topEntity
       `Annotate` 'StringAttr "chip_pin" "L3, B1, F3, D1, A11, B13, A13, A15"
       `Annotate` 'StringAttr "altera_attribute" "-name IO_STANDARD \"3.3-V LVTTL\""
   -- ^ Output containing 8 bits, corresponding to 8 LEDs
+  --
+  -- Use comma-seperated list in the "chip_pin" attribute to maps the individual
+  -- bits of the result to the correct pins on the DE0-Nano development kit
 topEntity clk20 rstBtn modeBtn =
   exposeClockResetEnable
     (mealy blinkerT initialStateBlinkerT . isRising 1)
