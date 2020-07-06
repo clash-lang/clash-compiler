@@ -281,7 +281,7 @@ sequenceTests path (unzip -> (testNames, testTrees)) =
     where
       -- Make pattern for a single test
       pat :: TestName -> String
-      pat nm = "$0 == \"" ++ intercalate "." (reverse (nm:path)) ++ "\""
+      pat nm = "$0 ~ /" ++ intercalate "." (reverse (nm:path)) ++ "/"
 
       -- Test patterns for all given tests such that each executes sequentially
       testPatterns = init (map (fmap pat) (Nothing : map Just testNames))
@@ -796,8 +796,11 @@ clashLibTest
   -- one closest to the test.
   -> TestTree
 clashLibTest env targets extraGhcArgs modName funcName path =
-  let testName = modName ++ " [clash-lib test]" in
-  let path' = testName : path in
-  testGroup testName
-    [clashLibTest' env target extraGhcArgs modName funcName path' | target <- targets]
-
+  -- HACK: clashLibTests are run sequentially to prevent race issues. See:
+  -- HACK: https://github.com/clash-lang/clash-compiler/pull/1416
+  testGroup testName $ sequenceTests path'
+    [(show target, runLibTest target) | target <- targets]
+ where
+  runLibTest target = clashLibTest' env target extraGhcArgs modName funcName path'
+  testName = modName ++ " [clash-lib test]"
+  path' = testName : path
