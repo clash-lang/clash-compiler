@@ -1,0 +1,1 @@
+FIX: Cabal installed through Snap (`clash.cabal`) can now access the internet to fetch pacakges.  https://github.com/clash-lang/clash-compiler/issues/1411
