@@ -26,7 +26,7 @@ apps:
 
   cabal:
     command: bin/cabal
-    plugs: [home]
+    plugs: [home, network]
 
 layout:
   /usr/nix:
