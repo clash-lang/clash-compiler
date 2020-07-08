@@ -185,7 +185,54 @@ altpllQsysTemplate bbCtx = pure bbText
   <parameter name="PORT_LOCKED" value="PORT_USED" />
   <parameter name="PORT_clk0" value="PORT_USED" />
   <parameter name="HIDDEN_IS_FIRST_EDIT" value="0" />
-  <parameter name="HIDDEN_PRIVATES">PT#EFF_OUTPUT_FREQ_VALUE0 #{clkOutFreq}</parameter>
+  <parameter name="HIDDEN_CONSTANTS">
+    CT#PORT_clk0 PORT_USED
+    CT#CLK0_MULTIPLY_BY #{clkmult}
+    CT#WIDTH_CLOCK 5
+    CT#LPM_TYPE altpll
+    CT#PLL_TYPE AUTO
+    CT#CLK0_PHASE_SHIFT 0
+    CT#OPERATION_MODE NORMAL
+    CT#COMPENSATE_CLOCK CLK0
+    CT#INCLK0_INPUT_FREQUENCY #{clkInPeriod}
+    CT#PORT_INCLK0 PORT_USED
+    CT#PORT_ARESET PORT_USED
+    CT#BANDWIDTH_TYPE AUTO
+    CT#CLK0_DUTY_CYCLE 50
+    CT#CLK0_DIVIDE_BY #{clkdiv}
+    CT#PORT_LOCKED PORT_USED</parameter>
+  <parameter name="HIDDEN_IF_PORTS">
+    IF#phasecounterselect {input 4}
+    IF#locked {output 0}
+    IF#reset {input 0}
+    IF#clk {input 0}
+    IF#phaseupdown {input 0}
+    IF#scandone {output 0}
+    IF#readdata {output 32}
+    IF#write {input 0}
+    IF#scanclk {input 0}
+    IF#phasedone {output 0}
+    IF#address {input 2}
+    IF#c0 {output 0}
+    IF#writedata {input 32}
+    IF#read {input 0}
+    IF#areset {input 0}
+    IF#scanclkena {input 0}
+    IF#scandataout {output 0}
+    IF#configupdate {input 0}
+    IF#phasestep {input 0}
+    IF#scandata {input 0}</parameter>
+  <parameter name="HIDDEN_MF_PORTS">
+    MF#areset 1
+    MF#clk 1
+    MF#locked 1
+    MF#inclk 1</parameter>
+  <parameter name="HIDDEN_PRIVATES">
+    PT#PHASE_SHIFT0 0.00000000
+    PT#DIV_FACTOR0 #{clkdiv}
+    PT#EFF_OUTPUT_FREQ_VALUE0 #{clkOutFreq}
+    PT#MULT_FACTOR0 #{clkmult}
+    PT#DUTY_CYCLE0 50.00000000</parameter>
   </module>
 </system>|]
 
