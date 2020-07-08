@@ -1,0 +1,1 @@
+FIXED: Generated QSys file for `altpll` incompatible with Quartus CLI (did work in Quartus GUI)
