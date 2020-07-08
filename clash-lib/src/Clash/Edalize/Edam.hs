@@ -65,7 +65,7 @@ data EdamFile = EdamFile
 pprFile :: EdamFile -> Doc ann
 pprFile (EdamFile n ty ln) =
   pyRecord
-    [ pyField "name" $ relPath n
+    [ pyField "name" $ joinPath n
     , pyField "file_type" $ squotes (pprFileType ty)
     , pyField "logical_name" $ squotes (pretty ln)
     ]
@@ -268,7 +268,8 @@ pyPre :: Doc ann
 pyPre = vsep
   [ "import os"
   , ""
-  , "work_root = os.path.dirname(os.path.realpath(__file__))"
+  , "edam_root = os.path.dirname(os.path.realpath(__file__))"
+  , "work_root = 'build'"
   , ""
   , "# TODO Specify the EDA tool to use"
   , "tool = ''"
@@ -283,6 +284,7 @@ pyPost = vsep
       [ "from edalize import *"
       , ""
       , "tool = get_edatool(tool)(edam=edam, work_root=work_root)"
+      , "os.makedirs(work_root)"
       , "tool.configure()"
       , "tool.build()"
       ]
@@ -303,10 +305,10 @@ pyField n x = hcat [squotes (pretty n), colon, space, x]
 pyDocField :: Text -> Text -> Doc ann -> Doc ann
 pyDocField n d x = vsep [pyComment d, pyField n x]
 
-relPath :: FilePath -> Doc ann
-relPath x = hcat
-  [ "os.path.relpath"
-  , parens (hsep $ punctuate comma [squotes (pretty x), "work_root"])
+joinPath :: FilePath -> Doc ann
+joinPath x = hcat
+  [ "os.path.join"
+  , parens (hsep $ punctuate comma ["edam_root", squotes (pretty x)])
   ]
 
 flagList :: [Doc ann] -> Doc ann
