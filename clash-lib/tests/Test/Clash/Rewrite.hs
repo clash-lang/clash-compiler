@@ -71,14 +71,13 @@ instance Default RewriteEnv where
     , _evaluator=error "_evaluator: NYI"
     , _topEntities=emptyVarSet
     , _customReprs=buildCustomReprs []
-    , _recInfo=mempty
     , _fuelLimit=10
     }
 
 instance Default extra => Default (RewriteState extra) where
   def = RewriteState
     { _transformCounter=0
-    , _bindings=emptyVarEnv
+    , _bindings=mempty
     , _uniqSupply=unsafePerformIO newSupply
     , _curFun=error "_curFun: NYI"
     , _nameCounter=2
@@ -89,7 +88,7 @@ instance Default extra => Default (RewriteState extra) where
 
 instance Default NormalizeState where
   def = NormalizeState
-    { _normalized=emptyVarEnv
+    { _normalized=mempty
     , _specialisationCache=Map.empty
     , _specialisationHistory=emptyVarEnv
     , _specialisationLimit=20
@@ -99,7 +98,6 @@ instance Default NormalizeState where
     , _inlineConstantLimit=0
     , _primitives=HashMap.empty
     , _primitiveArgs=Map.empty
-    , _recursiveComponents=emptyVarEnv
     , _newInlineStrategy=True
     , _normalizeUltra=False
     , _inlineWFCacheLimit=10

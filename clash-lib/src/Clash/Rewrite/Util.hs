@@ -58,8 +58,7 @@ import qualified Data.ByteString.Lazy        as BL
 import           System.IO.Unsafe            (unsafePerformIO)
 #endif
 
-import           BasicTypes                  (InlineSpec (..))
-
+import           Clash.Core.Binding
 import           Clash.Core.DataCon          (dcExtTyVars)
 
 #if EXPERIMENTAL_EVALUATOR
@@ -69,8 +68,6 @@ import           Clash.Core.Evaluator.Types  (PureHeap, whnf')
 #endif
 
 import           Clash.Core.FreeVars
-  (freeLocalVars, hasLocalFreeVars, localIdDoesNotOccurIn, localIdOccursIn,
-   typeFreeVars, termFreeVars', freeLocalIds, globalIdOccursIn)
 import           Clash.Core.Name
 import           Clash.Core.Pretty           (showPpr)
 import           Clash.Core.Subst
@@ -92,8 +89,7 @@ import           Clash.Core.VarEnv
    uniqAway, uniqAway', mapVarEnv, eltsVarEnv, unitVarSet, emptyVarEnv,
    mkVarEnv, eltsVarSet, elemVarEnv, lookupVarEnv, extendVarEnv)
 import           Clash.Debug
-import           Clash.Driver.Types
-  (DebugLevel (..), BindingMap, Binding(..))
+import           Clash.Driver.Types          (DebugLevel (..))
 import           Clash.Netlist.Util          (representableType)
 import           Clash.Pretty                (clashPretty, showDoc)
 import           Clash.Rewrite.Types
@@ -531,10 +527,10 @@ liftAndSubsituteBinders inScope toLift toKeep body = do
 isWorkFreeBinder :: HasCallStack => Id -> RewriteMonad extra Bool
 isWorkFreeBinder bndr =
   makeCachedU bndr workFreeBinders $ do
-    bExprM <- lookupVarEnv bndr <$> Lens.use bindings
+    bExprM <- lookupBinding bndr <$> Lens.use bindings
     case bExprM of
       Nothing -> error ("isWorkFreeBinder: couldn't find binder: " ++ showPpr bndr)
-      Just (bindingTerm -> t) ->
+      Just (bindingBody -> t) ->
         if bndr `globalIdOccursIn` t
         then pure False
         else isWorkFree t
@@ -729,30 +725,19 @@ liftBinding (var@Id {varName = idName} ,e) = do
       newBody = mkTyLams (mkLams e' boundFVs) boundFTVs
 
   -- Check if an alpha-equivalent global binder already exists
-  aeqExisting <- (eltsUniqMap . filterUniqMap ((`aeqTerm` newBody) . bindingTerm)) <$> Lens.use bindings
-  case aeqExisting of
+  aeqExisting <- filterBindings (`aeqTerm` newBody) <$> Lens.use bindings
+  case eltsBindingMap aeqExisting of
     -- If it doesn't, create a new binder
-    [] -> do -- Add the created function to the list of global bindings
-             bindings %= extendUniqMap newBodyNm
-                                    -- We mark this function as internal so that
-                                    -- it can be inlined at the very end of
-                                    -- the normalisation pipeline as part of the
-                                    -- flattening pass. We don't inline
-                                    -- right away because we are lifting this
-                                    -- function at this moment for a reason!
-                                    -- (termination, CSE and DEC oppertunities,
-                                    -- ,etc.)
-                                    (Binding
-                                      newBodyId
-                                      sp
-#if MIN_VERSION_ghc(8,4,1)
-                                      NoUserInline
-#else
-                                      EmptyInlineSpec
-#endif
-                                      newBody)
-             -- Return the new binder
-             return (var, newExpr)
+    [] -> do
+      -- Add the created function to the list of global bindings
+      --
+      -- We mark this function as internal so that it can be inlined at
+      -- the very end of the normalization pipeline as part of the
+      -- flattening pass. We don't inline right away beacuse we are
+      -- lifting this function at the moment for a reason! (termination,
+      -- CSE and DEC opportunities, etc.)
+      addGlobalBind newBodyNm{nameSort = Internal} newBodyTy sp Default newBody
+      return (var, newExpr)
     -- If it does, use the existing binder
     (b:_) ->
       let newExpr' = mkTmApps
@@ -765,18 +750,18 @@ liftBinding _ = error $ $(curLoc) ++ "liftBinding: invalid core, expr bound to t
 
 -- | Ensure that the 'Unique' of a variable does not occur in the 'BindingMap'
 uniqAwayBinder
-  :: BindingMap
+  :: BindingMap a
   -> Name a
   -> Name a
 uniqAwayBinder binders nm =
-  uniqAway' (`elemUniqMapDirectly` binders) (nameUniq nm) nm
+  uniqAway' (`elemBindingMap` binders) (nameUniq nm) nm
 
 -- | Make a global function for a name-term tuple
 mkFunction
   :: TmName
   -- ^ Name of the function
   -> SrcSpan
-  -> InlineSpec
+  -> Inlining
   -> Term
   -- ^ Term bound to the function
   -> RewriteMonad extra Id
@@ -794,12 +779,16 @@ addGlobalBind
   :: TmName
   -> Type
   -> SrcSpan
-  -> InlineSpec
+  -> Inlining
   -> Term
   -> RewriteMonad extra ()
-addGlobalBind vNm ty sp inl body = do
+addGlobalBind vNm ty sp inl body =
   let vId = mkGlobalId ty vNm
-  (ty,body) `deepseq` bindings %= extendUniqMap vNm (Binding vId sp inl body)
+      -- This assumes a single new binding cannot be indirectly recursive,
+      -- which may or may not be reasonable.
+      fvs = Lens.foldMapOf globalIds unitVarSet body
+      rcs = if elemVarSet vId fvs then unitVarSet vId else mempty
+   in (ty,body) `deepseq` bindings %= insertBinding (Binding vId sp inl body rcs)
 
 -- | Create a new name out of the given name, but with another unique. Resulting
 -- unique is guaranteed to not be in the given InScopeSet.
@@ -816,12 +805,12 @@ cloneNameWithInScopeSet is nm = do
 -- unique is guaranteed to not be in the given BindingMap.
 cloneNameWithBindingMap
   :: (MonadUnique m)
-  => BindingMap
+  => BindingMap a
   -> Name a
   -> m (Name a)
 cloneNameWithBindingMap binders nm = do
   i <- getUniqueM
-  return (uniqAway' (`elemUniqMapDirectly` binders) i (setUnique nm i))
+  return (uniqAway' (`elemBindingMap` binders) i (setUnique nm i))
 
 {-# INLINE isUntranslatable #-}
 -- | Determine if a term cannot be represented in hardware
@@ -955,9 +944,9 @@ specialise' specMapLbl specHistLbl specLimitLbl (TransformContext is0 _) e (Var 
     -- Create new specialized function
     Nothing -> do
       -- Determine if we can specialize f
-      bodyMaybe <- fmap (lookupUniqMap (varName f)) $ Lens.use bindings
+      bodyMaybe <- lookupBinding f <$> Lens.use bindings
       case bodyMaybe of
-        Just (Binding _ sp inl bodyTm) -> do
+        Just (Binding _ sp inl bodyTm _) -> do
           -- Determine if we see a sequence of specialisations on a growing argument
           specHistM <- lookupUniqMap f <$> Lens.use (extra.specHistLbl)
           specLim   <- Lens.use (extra . specLimitLbl)
@@ -998,8 +987,8 @@ specialise' specMapLbl specHistLbl specLimitLbl (TransformContext is0 _) e (Var 
                       -- binding @g'@ where both the body of @mealy@ and @g@
                       -- are inlined, meaning the state-transition-function
                       -- and the memory element will be in a single function.
-                      gTmM <- fmap (lookupUniqMap (varName g)) $ Lens.use bindings
-                      return (g,maybe inl bindingSpec gTmM, maybe specArg (Left . (`mkApps` gArgs) . bindingTerm) gTmM)
+                      gTmM <- lookupBinding g <$> Lens.use bindings
+                      return (g,maybe inl bindingInline gTmM, maybe specArg (Left . (`mkApps` gArgs) . bindingBody) gTmM)
                     else return (f,inl,specArg)
                 _ -> return (f,inl,specArg)
               -- Create specialized functions
@@ -1033,17 +1022,13 @@ specialise' _ _ _ _ctx _ (appE,args,ticks) (Left specArg) = do
       newBody = mkAbstraction specArg specBndrs
   -- See if there's an existing binder that's alpha-equivalent to the
   -- specialized function
-  existing <- filterUniqMap ((`aeqTerm` newBody) . bindingTerm) <$> Lens.use bindings
+  existing <- filterBindings (`aeqTerm` newBody) <$> Lens.use bindings
   -- Create a new function if an alpha-equivalent binder doesn't exist
-  newf <- case eltsUniqMap existing of
+  newf <- case eltsBindingMap existing of
     [] -> do (cf,sp) <- Lens.use curFun
              mkFunction (appendToName (varName cf) "_specF")
                         sp
-#if MIN_VERSION_ghc(8,4,1)
-                        NoUserInline
-#else
-                        EmptyInlineSpec
-#endif
+                        Default
                         newBody
     (b:_) -> return (bindingId b)
   -- Create specialized argument
@@ -1132,10 +1117,9 @@ whnfRW _isSubj ctx@(TransformContext is0 _) e rw = do
   gh <- Lens.use globalHeap
 
 #if EXPERIMENTAL_EVALUATOR
-  ri <- Lens.view recInfo
   fuel <- Lens.view fuelLimit
 
-  case runEval (mkGlobalEnv bndrs ri fuel gh tcm is0 ids1) (evaluateNf eval e) of
+  case runEval (mkGlobalEnv bndrs fuel gh tcm is0 ids1) (evaluateNf eval e) of
     (!e', !env') -> do
       globalHeap Lens..= genvPrimsIO env'
       rw ctx (asTerm e')

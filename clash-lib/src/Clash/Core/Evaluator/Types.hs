@@ -16,6 +16,7 @@ import Data.List (foldl')
 import Data.Maybe (fromMaybe, isJust)
 import Data.Text.Prettyprint.Doc (hsep)
 
+import Clash.Core.Binding
 import Clash.Core.DataCon (DataCon)
 import Clash.Core.Literal (Literal(CharLiteral))
 import Clash.Core.Pretty (fromPpr, ppr, showPpr)
@@ -25,12 +26,11 @@ import Clash.Core.TyCon (TyConMap)
 import Clash.Core.Type (Type)
 import Clash.Core.Var (Id, IdScope(..), TyVar)
 import Clash.Core.VarEnv
-import Clash.Driver.Types (BindingMap, bindingTerm)
 import Clash.Pretty (ClashPretty(..), fromPretty, showDoc)
 
 whnf'
   :: Evaluator
-  -> BindingMap
+  -> BindingMap Term
   -> TyConMap
   -> PrimHeap
   -> Supply
@@ -44,7 +44,7 @@ whnf' eval bm tcm ph ids is isSubj e =
   toResult x = (mHeapPrim x, mHeapLocal x, mTerm x)
 
   m  = Machine ph gh emptyVarEnv [] ids is e
-  gh = mapVarEnv bindingTerm bm
+  gh = mapVarEnv bindingBody (getBindings bm)
 
 -- | Evaluate to WHNF given an existing Heap and Stack
 whnf

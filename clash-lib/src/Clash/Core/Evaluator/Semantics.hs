@@ -19,19 +19,15 @@ import Data.Bifunctor (bimap, first)
 import Data.Bitraversable (bitraverse)
 import Data.List.Extra (equalLength)
 
--- TODO: This is GHC specific, but is already used in BindingMap.
-import BasicTypes (InlineSpec(..))
-
+import Clash.Core.Binding
 import Clash.Core.DataCon
 import Clash.Core.Evaluator.Models
 import Clash.Core.Literal
 import Clash.Core.Term
-import Clash.Core.Termination
 import Clash.Core.TermInfo
 import Clash.Core.TyCon
 import Clash.Core.Type
 import Clash.Core.Var
-import Clash.Driver.Types (Binding(..))
 
 -- | Construct an evaluator given the three functions which are potentially
 -- specific to different compiler front-ends:
@@ -172,28 +168,27 @@ evaluateVarWith eval i
 
   goGlobal :: Eval Value
   goGlobal = do
-    gRecInfo <- getRecInfo
     gFuel <- getFuel
 
     getGlobal i >>= \case
       Just b
         -- The binding can't be inlined.
-        |  bindingSpec b == NoInline
+        |  bindingInline b == NoInline
         -> pure (VNeu (NeVar i))
 
         -- The binding can be inlined if there is enough fuel.
-        |  isRecursive i gRecInfo
+        |  isRecursive b
         -> if gFuel == 0
              then pure (VNeu (NeVar i))
              else do
-               v <- forceGlobal (bindingTerm b)
+               v <- forceGlobal (bindingBody b)
                putFuel (gFuel - 1)
                updateGlobal i v
                pure v
 
         -- The binding can be inlined without using fuel.
         |  otherwise
-        -> do v <- forceGlobal (bindingTerm b)
+        -> do v <- forceGlobal (bindingBody b)
               updateGlobal i v
               pure v
 

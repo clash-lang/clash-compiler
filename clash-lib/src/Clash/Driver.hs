@@ -78,6 +78,8 @@ import           Clash.Annotations.TopEntity
 import           Clash.Annotations.TopEntity.Extra ()
 import           Clash.Backend
 
+import           Clash.Core.Binding
+
 #if EXPERIMENTAL_EVALUATOR
 import           Clash.Core.Evaluator.Models      (Evaluator)
 #else
@@ -93,8 +95,7 @@ import           Clash.Core.TyCon                 (TyConMap, TyConName)
 import           Clash.Core.Util                  (shouldSplit)
 import           Clash.Core.Var
   (Id, varName, varUniq, varType)
-import           Clash.Core.VarEnv
-  (elemVarEnv, emptyVarEnv, lookupVarEnv)
+import           Clash.Core.VarEnv                (elemVarEnv)
 import           Clash.Debug                      (debugIsOn)
 import           Clash.Driver.Types
 import           Clash.Edalize.Edam
@@ -118,8 +119,7 @@ import qualified Clash.Primitives.Verification    as P
 import           Clash.Primitives.Types
 import           Clash.Primitives.Util            (hashCompiledPrimMap)
 import           Clash.Signal.Internal
-import           Clash.Unique
-  (Unique, keysUniqMap, lookupUniqMap')
+import           Clash.Unique                     (Unique, keysUniqMap)
 import           Clash.Util.Interpolate           (i)
 import           Clash.Util
   (ClashException(..), HasCallStack, first, reportTimeDiff,
@@ -206,12 +206,12 @@ splitTopAnn _tcm _sp _typ t = t
 splitTopEntityT
   :: HasCallStack
   => TyConMap
-  -> BindingMap
+  -> BindingMap Term
   -> TopEntityT
   -> TopEntityT
 splitTopEntityT tcm bindingsMap tt@(TopEntityT id_ (Just t@(Synthesize {})) _) =
-  case lookupVarEnv id_ bindingsMap of
-    Just (Binding _id sp _ _) ->
+  case lookupBinding id_ bindingsMap of
+    Just (Binding _id sp _ _ _) ->
       tt{topAnnotation=Just (splitTopAnn tcm sp (varType id_) t)}
     Nothing ->
       error "Internal error in 'splitTopEntityT'. Please report as a bug."
@@ -227,7 +227,7 @@ generateHDL
   => CustomReprs
   -> HashMap Data.Text.Text VDomainConfiguration
   -- ^ Known domains to configurations
-  -> BindingMap
+  -> BindingMap Term
   -- ^ Set of functions
   -> Maybe backend
   -> CompiledPrimMap
@@ -406,6 +406,8 @@ generateHDL reprs domainConfs bindingsMap hdlState primMap tcm tupTcm typeTrans 
       let edamFiles' = HashMap.insert (varUniq topEntity) (asEdamFile topNm <$> fileNames manifest) edamFiles
       return (topTime,manifest,HashMap.unionWith max (HashMap.fromList (map (,0) (componentNames manifest))) seen, edamFiles')
     else do
+      putStrLn ("bindings map:\n" <> show bindingsMap)
+
       -- 1. Normalise topEntity
       let transformedBindings = normalizeEntity reprs bindingsMap primMap tcm tupTcm
                                   typeTrans eval topEntityNames opts supplyN
@@ -907,20 +909,22 @@ copyDataFiles idirs dir = mapM_ (copyFile' idirs)
 
 -- | Get all the terms corresponding to a call graph
 callGraphBindings
-  :: BindingMap
+  :: BindingMap Term
   -- ^ All bindings
   -> Id
   -- ^ Root of the call graph
   -> [Term]
 callGraphBindings bindingsMap tm =
-  map (bindingTerm . (bindingsMap `lookupUniqMap'`)) (keysUniqMap cg)
+  fmap
+    (maybe (error $ $(curLoc) <> "No binding for key") bindingBody . flip lookupBinding bindingsMap)
+    (keysUniqMap cg)
   where
     cg = callGraph bindingsMap tm
 
 -- | Normalize a complete hierarchy
 normalizeEntity
   :: CustomReprs
-  -> BindingMap
+  -> BindingMap Term
   -- ^ All bindings
   -> CompiledPrimMap
   -- ^ BlackBox HDL templates
@@ -941,7 +945,7 @@ normalizeEntity
   -- ^ Unique supply
   -> Id
   -- ^ root of the hierarchy
-  -> BindingMap
+  -> BindingMap Term
 normalizeEntity reprs bindingsMap primMap tcm tupTcm typeTrans eval topEntities
   opts supply tm = transformedBindings
   where
@@ -950,12 +954,12 @@ normalizeEntity reprs bindingsMap primMap tcm tupTcm typeTrans eval topEntities
                 cleaned <- cleanupGraph tm normChecked
                 return cleaned
     transformedBindings = runNormalization opts supply bindingsMap
-                            typeTrans reprs tcm tupTcm eval primMap emptyVarEnv
+                            typeTrans reprs tcm tupTcm eval primMap
                             topEntities doNorm
 
 -- | topologically sort the top entities
 sortTop
-  :: BindingMap
+  :: BindingMap Term
   -> [TopEntityT]
   -> ([TopEntityT], HashMap Unique [Unique])
 sortTop bindingsMap topEntities =

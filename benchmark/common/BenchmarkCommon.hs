@@ -8,6 +8,8 @@ module BenchmarkCommon where
 import Clash.Annotations.BitRepresentation.Internal (CustomReprs, buildCustomReprs)
 import Clash.Backend
 import Clash.Backend.VHDL
+import Clash.Core.Binding
+import Clash.Core.Term
 import Clash.Core.TyCon
 import Clash.Core.Type
 import Clash.Core.Var
@@ -64,7 +66,7 @@ runInputStage
   :: [FilePath]
   -- ^ Import dirs
   -> FilePath
-  -> IO (BindingMap
+  -> IO (BindingMap Term
         ,TyConMap
         ,IntMap TyConName
         ,[TopEntityT]
@@ -83,7 +85,7 @@ runInputStage idirs src = do
 runNormalisationStage
   :: [FilePath]
   -> String
-  -> IO (BindingMap
+  -> IO (BindingMap Term
         ,[TopEntityT]
         ,CompiledPrimMap
         ,TyConMap

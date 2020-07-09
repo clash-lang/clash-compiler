@@ -16,11 +16,11 @@ import Data.Map                   (Map)
 import Data.Set                   (Set)
 import Data.Text                  (Text)
 
+import Clash.Core.Binding     (BindingMap)
 import Clash.Core.Term        (Term)
 import Clash.Core.Type        (Type)
 import Clash.Core.Var         (Id)
 import Clash.Core.VarEnv      (VarEnv)
-import Clash.Driver.Types     (BindingMap)
 import Clash.Primitives.Types (CompiledPrimMap)
 import Clash.Rewrite.Types    (Rewrite, RewriteMonad)
 import Clash.Util
@@ -28,7 +28,7 @@ import Clash.Util
 -- | State of the 'NormalizeMonad'
 data NormalizeState
   = NormalizeState
-  { _normalized          :: BindingMap
+  { _normalized          :: BindingMap Term
   -- ^ Global binders
   , _specialisationCache :: Map (Id,Int,Either Term Type) Id
   -- ^ Cache of previously specialized functions:
@@ -57,11 +57,6 @@ data NormalizeState
   -- ^ Primitive Definitions
   , _primitiveArgs :: Map Text (Set Int)
   -- ^ Cache for looking up constantness of blackbox arguments
-  , _recursiveComponents :: VarEnv Bool
-  -- ^ Map telling whether a components is recursively defined.
-  --
-  -- NB: there are only no mutually-recursive component, only self-recursive
-  -- ones.
   , _newInlineStrategy :: Bool
   -- ^ Flattening stage should use the new (no-)inlining strategy
   , _normalizeUltra :: Bool

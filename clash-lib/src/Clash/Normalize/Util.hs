@@ -8,6 +8,7 @@
 
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE RecordWildCards #-}
 
 module Clash.Normalize.Util
@@ -17,7 +18,6 @@ module Clash.Normalize.Util
  , alreadyInlined
  , addNewInline
  , specializeNorm
- , isRecursiveBndr
  , isClosed
  , callGraph
  , collectCallGraphUniques
@@ -36,6 +36,7 @@ module Clash.Normalize.Util
 
 import           Control.Lens            ((&),(+~),(%=),(.=))
 import qualified Control.Lens            as Lens
+import           Control.Monad.State     (MonadState)
 import           Data.Bifunctor          (bimap)
 import           Data.Either             (lefts)
 import qualified Data.List               as List
@@ -50,8 +51,8 @@ import           PrelNames               (eqTyConKey)
 import           Unique                  (getKey)
 
 import           Clash.Annotations.Primitive (extractPrim)
-import           Clash.Core.FreeVars
-  (globalIds, hasLocalFreeVars, globalIdOccursIn)
+import           Clash.Core.Binding
+import           Clash.Core.FreeVars     (globalIds, hasLocalFreeVars)
 import           Clash.Core.Name         (Name(nameOcc,nameUniq))
 import           Clash.Core.Pretty       (showPpr)
 import           Clash.Core.Subst
@@ -67,10 +68,10 @@ import           Clash.Core.Util
   (isClockOrReset)
 import           Clash.Core.Var          (Id, TyVar, Var (..), isGlobalId)
 import           Clash.Core.VarEnv
-  (VarEnv, emptyInScopeSet, emptyVarEnv, extendVarEnv, extendVarEnvWith,
+  (VarEnv, emptyInScopeSet, emptyVarEnv, extendVarEnvWith,
    lookupVarEnv, unionVarEnvWith, unitVarEnv, extendInScopeSetList)
 import           Clash.Debug             (traceIf)
-import           Clash.Driver.Types      (BindingMap, Binding(..), DebugLevel (..))
+import           Clash.Driver.Types      (DebugLevel (..))
 import {-# SOURCE #-} Clash.Normalize.Strategy (normalization)
 import           Clash.Normalize.Types
 import           Clash.Primitives.Util   (constantArgs)
@@ -80,7 +81,7 @@ import           Clash.Rewrite.Types
 import           Clash.Rewrite.Util
   (runRewrite, specialise, mkTmBinderFor, mkDerivedName)
 import           Clash.Unique
-import           Clash.Util              (SrcSpan, makeCachedU)
+import           Clash.Util              (SrcSpan)
 
 -- | Determine if argument should reduce to a constant given a primitive and
 -- an argument number. Caches results.
@@ -163,31 +164,12 @@ isClosed tcm = not . isPolyFun tcm
 isNonRecursiveGlobalVar
   :: Term
   -> NormalizeSession Bool
-isNonRecursiveGlobalVar (collectArgs -> (Var i, _args)) = do
-  let eIsGlobal = isGlobalId i
-  eIsRec    <- isRecursiveBndr i
-  return (eIsGlobal && not eIsRec)
-isNonRecursiveGlobalVar _ = return False
+isNonRecursiveGlobalVar (collectArgs -> (Var i, _args)) =
+  checkNonRec . lookupBinding i <$> Lens.use bindings
+ where
+  checkNonRec = maybe False (\b -> isGlobalId i && isNonRecursive b)
 
--- | Assert whether a name is a reference to a recursive binder.
-isRecursiveBndr
-  :: Id
-  -> NormalizeSession Bool
-isRecursiveBndr f = do
-  cg <- Lens.use (extra.recursiveComponents)
-  case lookupVarEnv f cg of
-    Just isR -> return isR
-    Nothing -> do
-      fBodyM <- lookupVarEnv f <$> Lens.use bindings
-      case fBodyM of
-        Nothing -> return False
-        Just b -> do
-          -- There are no global mutually-recursive functions, only self-recursive
-          -- ones, so checking whether 'f' is part of the free variables of the
-          -- body of 'f' is sufficient.
-          let isR = f `globalIdOccursIn` bindingTerm b
-          (extra.recursiveComponents) %= extendVarEnv f isR
-          return isR
+isNonRecursiveGlobalVar _ = return False
 
 data ConstantSpecInfo =
   ConstantSpecInfo
@@ -355,16 +337,16 @@ collectCallGraphUniques cg = HashSet.fromList (us0 ++ us1)
 
 -- | Create a call graph for a set of global binders, given a root
 callGraph
-  :: BindingMap
+  :: BindingMap Term
   -> Id
   -> CallGraph
 callGraph bndrs rt = go emptyVarEnv (varUniq rt)
   where
     go cg root
       | Nothing     <- lookupUniqMap root cg
-      , Just rootTm <- lookupUniqMap root bndrs =
+      , Just rootTm <- lookupBinding root bndrs =
       let used = Lens.foldMapByOf globalIds (unionVarEnvWith (+))
-                  emptyVarEnv (`unitUniqMap` 1) (bindingTerm rootTm)
+                  emptyVarEnv (`unitUniqMap` 1) (bindingBody rootTm)
           cg'  = extendUniqMap root used cg
       in  List.foldl' go cg' (keysUniqMap used)
     go cg _ = cg
@@ -410,21 +392,38 @@ normalizeTopLvlBndr
   -> Id
   -> Binding Term
   -> NormalizeSession (Binding Term)
-normalizeTopLvlBndr isTop nm (Binding nm' sp inl tm) = makeCachedU nm (extra.normalized) $ do
-  tcm <- Lens.view tcCache
-  let nmS = showPpr (varName nm)
-  -- We deshadow the term because sometimes GHC gives us
-  -- code where a local binder has the same unique as a
-  -- global binder, sometimes causing the inliner to go
-  -- into a loop. Deshadowing freshens all the bindings
-  -- to avoid this.
-  let tm1 = deShadowTerm emptyInScopeSet tm
-      tm2 = if isTop then substWithTyEq tm1 else tm1
-  old <- Lens.use curFun
-  tm3 <- rewriteExpr ("normalization",normalization) (nmS,tm2) (nm',sp)
-  curFun .= old
-  let ty' = termType tcm tm3
-  return (Binding nm'{varType = ty'} sp inl tm3)
+normalizeTopLvlBndr isTop nm (Binding nm' sp inl tm rs) =
+  makeCachedBM nm (extra.normalized) $ do
+    tcm <- Lens.view tcCache
+    let nmS = showPpr (varName nm)
+    -- We deshadow the term because sometimes GHC gives us
+    -- code where a local binder has the same unique as a
+    -- global binder, sometimes causing the inliner to go
+    -- into a loop. Deshadowing freshens all the bindings
+    -- to avoid this.
+    let tm1 = deShadowTerm emptyInScopeSet tm
+        tm2 = if isTop then substWithTyEq tm1 else tm1
+    old <- Lens.use curFun
+    tm3 <- rewriteExpr ("normalization",normalization) (nmS,tm2) (nm',sp)
+    curFun .= old
+    let ty' = termType tcm tm3
+    -- TODO Is it correct to re-use rs here?
+    return (Binding nm'{varType = ty'} sp inl tm3 rs)
+
+makeCachedBM
+  :: (MonadState s m, Uniquable k)
+  => k
+  -> Lens.Lens' s (BindingMap v)
+  -> m (Binding v)
+  -> m (Binding v)
+makeCachedBM key l create = do
+  cache <- Lens.use l
+  case lookupBinding key cache of
+    Just value -> return value
+    Nothing -> do
+      value <- create
+      l %= insertBinding value
+      return value
 
 -- | Turn type equality constraints into substitutions and apply them.
 --

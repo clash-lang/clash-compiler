@@ -52,6 +52,7 @@ import           Clash.Annotations.BitRepresentation.ClashLib
 import           Clash.Annotations.BitRepresentation.Internal
   (CustomReprs, DataRepr'(..), ConstrRepr'(..), getDataRepr, getConstrRepr)
 import           Clash.Annotations.TopEntity      (TopEntity (..))
+import           Clash.Core.Binding
 import           Clash.Core.DataCon               (DataCon (..))
 import           Clash.Core.Literal               (Literal (..))
 import           Clash.Core.Name                  (Name(..))
@@ -69,7 +70,7 @@ import           Clash.Core.Var                   (Id, Var (..), isGlobalId)
 import           Clash.Core.VarEnv
   (VarEnv, eltsVarEnv, emptyInScopeSet, emptyVarEnv, extendVarEnv, lookupVarEnv,
    lookupVarEnv', mkVarEnv)
-import           Clash.Driver.Types               (BindingMap, Binding(..), ClashOpts (..))
+import           Clash.Driver.Types               (ClashOpts (..))
 import           Clash.Netlist.BlackBox
 import           Clash.Netlist.Id
 import           Clash.Netlist.Types              as HW
@@ -77,6 +78,9 @@ import           Clash.Netlist.Util
 import           Clash.Primitives.Types           as P
 import           Clash.Util
 import qualified Clash.Util.Interpolate           as I
+
+-- TODO Remove
+import Clash.Debug
 
 -- | Generate a hierarchical netlist out of a set of global binders with
 -- @topEntity@ at the top.
@@ -87,7 +91,7 @@ genNetlist
   -- ^ Options Clash was called with
   -> CustomReprs
   -- ^ Custom bit representations for certain types
-  -> BindingMap
+  -> BindingMap Term
   -- ^ Global binders
   -> [TopEntityT]
   -- ^ All the TopEntities
@@ -136,7 +140,7 @@ runNetlistMonad
   -- ^ Options Clash was called with
   -> CustomReprs
   -- ^ Custom bit representations for certain types
-  -> BindingMap
+  -> BindingMap Term
   -- ^ Global binders
   -> VarEnv TopEntityT
   -- ^ TopEntity annotations
@@ -185,9 +189,9 @@ genNames :: Bool
          -> ComponentPrefix
          -> HashMap Identifier Word
          -> VarEnv Identifier
-         -> BindingMap
+         -> BindingMap Term
          -> (HashMap Identifier Word, VarEnv Identifier)
-genNames newInlineStrat mkId prefixM s0 m0 = foldr go (s0,m0)
+genNames newInlineStrat mkId prefixM s0 m0 = foldr go (s0, m0) . getBindings
   where
     go b (s,m) =
       let nm' = genComponentName newInlineStrat s mkId prefixM (bindingId b)
@@ -202,13 +206,14 @@ genComponent
   -- ^ Name of the function
   -> NetlistMonad ([Bool],SrcSpan,HashMap Identifier Word,Component)
 genComponent compName = do
-  compExprM <- lookupVarEnv compName <$> Lens.use bindings
+  traceM ("genComponent: " <> show (nameOcc $ varName compName))
+  compExprM <- lookupBinding compName <$> Lens.use bindings
   case compExprM of
     Nothing -> do
       (_,sp) <- Lens.use curCompNm
       throw (ClashException sp ($(curLoc) ++ "No normalized expression found for: " ++ show compName) Nothing)
     Just b -> do
-      makeCachedU compName components $ genComponentT compName (bindingTerm b)
+      makeCachedU compName components $ genComponentT compName (bindingBody b)
 
 -- | Generate a component for a given function
 genComponentT
@@ -227,7 +232,7 @@ genComponentT compName componentExpr = do
                          (Just p, Just ann) -> p `StrictText.append` StrictText.pack ('_':t_name ann)
                          (_,Just ann) -> StrictText.pack (t_name ann)
                          _ -> componentName1
-  sp <- (bindingLoc . (`lookupVarEnv'` compName)) <$> Lens.use bindings
+  sp <- maybe (error $ $(curLoc) <> "genComponentT: Could not find binding for " <> show compName) bindingLoc . lookupBinding compName <$> Lens.use bindings
   curCompNm .= (componentName2,sp)
 
   tcm <- Lens.use tcCache
@@ -247,8 +252,12 @@ genComponentT compName componentExpr = do
       Left err ->
         throw (ClashException sp ($curLoc ++ err) Nothing)
 
+  traceM "genComponentT: 1"
+
   netDecls <- fmap catMaybes . mapM mkNetDecl $ filter (maybe (const True) (/=) resultM . fst) binders
   decls    <- concat <$> mapM (uncurry mkDeclarations) binders
+
+  traceM "genComponentT: 2"
 
   case resultM of
     Just result -> do
@@ -606,13 +615,13 @@ mkFunApp dstId fun args tickDecls = do
       | otherwise -> error $ $(curLoc) ++ "under-applied TopEntity: " ++ showPpr fun
     (True, Nothing) -> do
       normalized <- Lens.use bindings
-      case lookupVarEnv fun normalized of
+      case lookupBinding fun normalized of
         Nothing -> error [I.i|
           Internal error: unknown normalized binder:
 
             #{showPpr fun}
         |]
-        Just (Binding{bindingTerm}) -> do
+        Just (Binding{bindingBody}) -> do
           (_,_,_,Component compName compInps co _) <- preserveVarEnv $ genComponent fun
           let argTys = map (termType tcm) args
           argHWTys <- mapM coreTypeToHWTypeM' argTys
@@ -648,7 +657,7 @@ mkFunApp dstId fun args tickDecls = do
 
               Core:
 
-              #{showPpr bindingTerm}
+              #{showPpr bindingBody}
 
               Applied to arguments:
               #{showPpr args}

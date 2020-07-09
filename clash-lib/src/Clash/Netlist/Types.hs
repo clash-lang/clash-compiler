@@ -55,11 +55,13 @@ import SrcLoc                               (SrcSpan)
 import Clash.Annotations.BitRepresentation  (FieldAnn)
 import Clash.Annotations.TopEntity          (TopEntity)
 import Clash.Backend                        (Backend)
+import Clash.Core.Binding                   (BindingMap)
+import Clash.Core.Term                      (Term)
 import Clash.Core.Type                      (Type)
 import Clash.Core.Var                       (Attr', Id, varType)
 import Clash.Core.TyCon                     (TyConMap)
 import Clash.Core.VarEnv                    (VarEnv)
-import Clash.Driver.Types                   (BindingMap, ClashOpts)
+import Clash.Driver.Types                   (ClashOpts)
 import Clash.Netlist.BlackBox.Types         (BlackBoxTemplate)
 import Clash.Netlist.Id                     (IdType)
 import Clash.Primitives.Types               (CompiledPrimMap)
@@ -104,7 +106,7 @@ data NetlistEnv
 -- | State of the NetlistMonad
 data NetlistState
   = NetlistState
-  { _bindings       :: BindingMap
+  { _bindings       :: BindingMap Term
   -- ^ Global binders
   , _varCount       :: !Int
   -- ^ Number of signal declarations

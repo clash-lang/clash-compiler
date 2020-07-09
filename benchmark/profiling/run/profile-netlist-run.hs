@@ -1,6 +1,8 @@
 import           Clash.Annotations.BitRepresentation.Internal (CustomReprs)
 import           Clash.Backend
+import           Clash.Core.Binding
 import           Clash.Core.Name
+import           Clash.Core.Term
 import           Clash.Core.TyCon
 import           Clash.Core.Var
 import           Clash.Driver.Types
@@ -59,7 +61,7 @@ benchFile idirs src = do
 
 setupEnv
   :: FilePath
-  -> IO (BindingMap
+  -> IO (BindingMap Term
         ,[TopEntityT]
         ,CompiledPrimMap'
         ,TyConMap

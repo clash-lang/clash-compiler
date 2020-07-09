@@ -32,10 +32,10 @@ import qualified Data.Set                         as Set
 import qualified Data.Set.Lens                    as Lens
 import           Data.Text.Prettyprint.Doc        (vcat)
 
-import           BasicTypes                       (InlineSpec (..))
-
 import           Clash.Annotations.BitRepresentation.Internal
   (CustomReprs)
+
+import           Clash.Core.Binding
 
 #if EXPERIMENTAL_EVALUATOR
 import           Clash.Core.Evaluator.Models      (Evaluator)
@@ -44,25 +44,23 @@ import           Clash.Core.Evaluator.Types       (Evaluator)
 #endif
 
 import           Clash.Core.FreeVars
-  (freeLocalIds, globalIds, globalIdOccursIn, localIdDoesNotOccurIn)
+  (freeLocalIds, globalIds, localIdDoesNotOccurIn)
 import           Clash.Core.Pretty                (PrettyOptions(..), showPpr, showPpr', ppr)
 import           Clash.Core.Subst
   (extendGblSubstList, mkSubst, substTm)
 import           Clash.Core.Term                  (Term (..), collectArgsTicks
                                                   ,mkApps, mkTicks)
-import           Clash.Core.Termination           (mkRecInfo)
 import           Clash.Core.Type                  (Type, splitCoreFunForallTy)
 import           Clash.Core.TyCon
   (TyConMap, TyConName)
 import           Clash.Core.Type                  (isPolyTy)
 import           Clash.Core.Var                   (Id, varName, varType)
 import           Clash.Core.VarEnv
-  (VarEnv, elemVarSet, eltsVarEnv, emptyInScopeSet, emptyVarEnv,
-   extendVarEnv, lookupVarEnv, mapVarEnv, mapMaybeVarEnv,
-   mkVarEnv, mkVarSet, notElemVarEnv, notElemVarSet, nullVarEnv, unionVarEnv)
+  (elemVarSet, eltsVarEnv, emptyInScopeSet, emptyVarEnv,
+   extendVarEnv, mapVarEnv, mapMaybeVarEnv,
+   mkVarEnv, mkVarSet, notElemVarEnv, notElemVarSet, nullVarEnv)
 import           Clash.Debug                      (traceIf)
-import           Clash.Driver.Types
-  (BindingMap, Binding(..), ClashOpts (..), DebugLevel (..))
+import           Clash.Driver.Types               (ClashOpts (..), DebugLevel (..))
 import           Clash.Netlist.Types
   (HWMap, FilteredHWType(..))
 import           Clash.Netlist.Util
@@ -97,7 +95,7 @@ runNormalization
   -- ^ Level of debug messages to print
   -> Supply
   -- ^ UniqueSupply
-  -> BindingMap
+  -> BindingMap Term
   -- ^ Global Binders
   -> (CustomReprs -> TyConMap -> Type ->
       State HWMap (Maybe (Either String FilteredHWType)))
@@ -111,14 +109,12 @@ runNormalization
   -- ^ Hardcoded evaluator for partial evaluation
   -> CompiledPrimMap
   -- ^ Primitive Definitions
-  -> VarEnv Bool
-  -- ^ Map telling whether a components is part of a recursive group
   -> [Id]
   -- ^ topEntities
   -> NormalizeSession a
   -- ^ NormalizeSession to run
   -> a
-runNormalization opts supply globals typeTrans reprs tcm tupTcm eval primMap rcsMap topEnts
+runNormalization opts supply globals typeTrans reprs tcm tupTcm eval primMap topEnts
   = runRewriteSession rwEnv rwState
   where
     rwEnv     = RewriteEnv
@@ -133,7 +129,6 @@ runNormalization opts supply globals typeTrans reprs tcm tupTcm eval primMap rcs
                   eval
                   (mkVarSet topEnts)
                   reprs
-                  (mkRecInfo globals)
                   (opt_evaluatorFuelLimit opts)
 
     rwState   = RewriteState
@@ -147,7 +142,7 @@ runNormalization opts supply globals typeTrans reprs tcm tupTcm eval primMap rcs
                   normState
 
     normState = NormalizeState
-                  emptyVarEnv
+                  mempty
                   Map.empty
                   emptyVarEnv
                   (opt_specLimit opts)
@@ -157,7 +152,6 @@ runNormalization opts supply globals typeTrans reprs tcm tupTcm eval primMap rcs
                   (opt_inlineConstantLimit opts)
                   primMap
                   Map.empty
-                  rcsMap
                   (opt_newInlineStrat opts)
                   (opt_ultra opts)
                   (opt_inlineWFCacheLimit opts)
@@ -165,19 +159,19 @@ runNormalization opts supply globals typeTrans reprs tcm tupTcm eval primMap rcs
 
 normalize
   :: [Id]
-  -> NormalizeSession BindingMap
-normalize []  = return emptyVarEnv
+  -> NormalizeSession (BindingMap Term)
+normalize []  = return mempty
 normalize top = do
   (new,topNormalized) <- unzip <$> mapM normalize' top
   newNormalized <- normalize (concat new)
-  return (unionVarEnv (mkVarEnv topNormalized) newNormalized)
+  return (BindingMap (mkVarEnv topNormalized) <> newNormalized)
 
 normalize' :: Id -> NormalizeSession ([Id], (Id, Binding Term))
 normalize' nm = do
-  exprM <- lookupVarEnv nm <$> Lens.use bindings
+  exprM <- lookupBinding nm <$> Lens.use bindings
   let nmS = showPpr (varName nm)
   case exprM of
-    Just (Binding nm' sp inl tm) -> do
+    Just bd@(Binding nm' sp inl tm rs) -> do
       tcm <- Lens.view tcCache
       topEnts <- Lens.view topEntities
       let isTop = nm `elemVarSet` topEnts
@@ -204,15 +198,15 @@ normalize' nm = do
       resTyRep <- not <$> isUntranslatableType False resTy
       if resTyRep
          then do
-            tmNorm <- normalizeTopLvlBndr isTopEnt nm (Binding nm' sp inl tm)
-            let usedBndrs = Lens.toListOf globalIds (bindingTerm tmNorm)
+            tmNorm <- normalizeTopLvlBndr isTopEnt nm bd
+            let usedBndrs = Lens.toListOf globalIds (bindingBody tmNorm)
             traceIf (nm `elem` usedBndrs)
                     (concat [ $(curLoc),"Expr belonging to bndr: ",nmS ," (:: "
                             , showPpr (varType (bindingId tmNorm))
                             , ") remains recursive after normalization:\n"
-                            , showPpr (bindingTerm tmNorm) ])
+                            , showPpr (bindingBody tmNorm) ])
                     (return ())
-            prevNorm <- mapVarEnv bindingId <$> Lens.use (extra.normalized)
+            prevNorm <- mapVarEnv bindingId . getBindings <$> Lens.use (extra.normalized)
             let toNormalize = filter (`notElemVarSet` topEnts)
                             $ filter (`notElemVarEnv` (extendVarEnv nm nm prevNorm)) usedBndrs
             return (toNormalize,(nm,tmNorm))
@@ -237,7 +231,7 @@ normalize' nm = do
                             , showPpr (varType nm')
                             , ") has a non-representable return type."
                             , " Not normalising:\n", showPpr tm] )
-                    (return ([],(nm,(Binding nm' sp inl tm))))
+                    (return ([],(nm,(Binding nm' sp inl tm rs))))
 
 
     Nothing -> error $ $(curLoc) ++ "Expr belonging to bndr: " ++ nmS ++ " not found"
@@ -245,21 +239,19 @@ normalize' nm = do
 -- | Check whether the normalized bindings are non-recursive. Errors when one
 -- of the components is recursive.
 checkNonRecursive
-  :: BindingMap
+  :: BindingMap Term
   -- ^ List of normalized binders
-  -> BindingMap
-checkNonRecursive norm = case mapMaybeVarEnv go norm of
-  rcs | nullVarEnv rcs  -> norm
-  rcs -> error $ $(curLoc) ++ "Callgraph after normalization contains following recursive components: "
+  -> BindingMap Term
+checkNonRecursive norm =
+  case mapMaybeVarEnv go (getBindings norm) of
+    rcs | nullVarEnv rcs  -> norm
+    rcs -> error $ $(curLoc) ++ "Callgraph after normalization contains following recursive components: "
                    ++ show (vcat [ ppr a <> ppr b
                                  | (a,b) <- eltsVarEnv rcs
                                  ])
  where
-  go (Binding nm _ _ tm) =
-    if nm `globalIdOccursIn` tm
-       then Just (nm,tm)
-       else Nothing
-
+  go b@(Binding nm _ _ tm _) =
+    if isRecursive b then Just (nm, tm) else Nothing
 
 -- | Perform general \"clean up\" of the normalized (non-recursive) function
 -- hierarchy. This includes:
@@ -267,12 +259,12 @@ checkNonRecursive norm = case mapMaybeVarEnv go norm of
 --   * Inlining functions that simply \"wrap\" another function
 cleanupGraph
   :: Id
-  -> BindingMap
-  -> NormalizeSession BindingMap
+  -> BindingMap Term
+  -> NormalizeSession (BindingMap Term)
 cleanupGraph topEntity norm
   | Just ct <- mkCallTree [] norm topEntity
   = do ctFlat <- flattenCallTree ct
-       return (mkVarEnv $ snd $ callTreeToList [] ctFlat)
+       return (BindingMap . mkVarEnv . snd $ callTreeToList [] ctFlat)
 cleanupGraph _ norm = return norm
 
 -- | A tree of identifiers and their bindings, with branches containing
@@ -285,14 +277,14 @@ data CallTree
 mkCallTree
   :: [Id]
   -- ^ Visited
-  -> BindingMap
+  -> BindingMap Term
   -- ^ Global binders
   -> Id
   -- ^ Root of the call graph
   -> Maybe CallTree
 mkCallTree visited bindingMap root
-  | Just rootTm <- lookupVarEnv root bindingMap
-  = let used   = Set.toList $ Lens.setOf globalIds $ (bindingTerm rootTm)
+  | Just rootTm <- lookupBinding root bindingMap
+  = let used   = Set.toList $ Lens.setOf globalIds $ (bindingBody rootTm)
         other  = Maybe.mapMaybe (mkCallTree (root:visited) bindingMap) (filter (`notElem` visited) used)
     in  case used of
           [] -> Just (CLeaf   (root,rootTm))
@@ -321,8 +313,8 @@ stripArgs _ _ _ = Nothing
 flattenNode
   :: CallTree
   -> NormalizeSession (Either CallTree ((Id,Term),[CallTree]))
-flattenNode c@(CLeaf (_,(Binding _ _ NoInline _))) = return (Left c)
-flattenNode c@(CLeaf (nm,(Binding _ _ _ e))) = do
+flattenNode c@(CLeaf (_,(Binding _ _ NoInline _ _))) = return (Left c)
+flattenNode c@(CLeaf (nm,(Binding _ _ _ e _))) = do
   isTopEntity <- elemVarSet nm <$> Lens.view topEntities
   if isTopEntity then return (Left c) else do
     tcm  <- Lens.view tcCache
@@ -335,9 +327,9 @@ flattenNode c@(CLeaf (nm,(Binding _ _ _ e))) = do
                return (Right ((nm,mkApps (mkTicks fun ticks) (reverse remainder)),[]))
           _ -> return (Right ((nm,e),[]))
       _ -> return (Right ((nm,e),[]))
-flattenNode b@(CBranch (_,(Binding _ _ NoInline _)) _) =
+flattenNode b@(CBranch (_,(Binding _ _ NoInline _ _)) _) =
   return (Left b)
-flattenNode b@(CBranch (nm,(Binding _ _ _ e)) us) = do
+flattenNode b@(CBranch (nm,(Binding _ _ _ e _)) us) = do
   isTopEntity <- elemVarSet nm <$> Lens.view topEntities
   if isTopEntity then return (Left b) else do
     tcm  <- Lens.view tcCache
@@ -359,7 +351,7 @@ flattenCallTree
   :: CallTree
   -> NormalizeSession CallTree
 flattenCallTree c@(CLeaf _) = return c
-flattenCallTree (CBranch (nm,(Binding nm' sp inl tm)) used) = do
+flattenCallTree (CBranch (nm,(Binding nm' sp inl tm rs)) used) = do
   flattenedUsed   <- mapM flattenCallTree used
   (newUsed,il_ct) <- partitionEithers <$> mapM flattenNode flattenedUsed
   let (toInline,il_used) = unzip il_ct
@@ -393,8 +385,10 @@ flattenCallTree (CBranch (nm,(Binding nm' sp inl tm)) used) = do
                                         (Maybe.catMaybes toInline')
         let tm1 = substTm "flattenCallTree.flattenCheap" subst' newExpr
         newExpr' <- rewriteExpr ("flattenCheap",flatten) (showPpr nm, tm1) (nm', sp)
-        return (CBranch (nm,(Binding nm' sp inl newExpr')) (concat allUsed'))
-     else return (CBranch (nm,(Binding nm' sp inl newExpr)) allUsed)
+        -- TODO Is using rs correct here?
+        return (CBranch (nm,(Binding nm' sp inl newExpr' rs)) (concat allUsed'))
+     -- TODO Is using rs correct here?
+     else return (CBranch (nm,(Binding nm' sp inl newExpr rs)) allUsed)
   where
     flatten =
       repeatR (topdownR (apply "appPropFast" appPropFast >->
@@ -410,10 +404,10 @@ flattenCallTree (CBranch (nm,(Binding nm' sp inl tm)) used) = do
                  apply "flattenLet" flattenLet)) !->
       topdownSucR (apply "topLet" topLet)
 
-    goCheap c@(CLeaf   (nm2,(Binding _ _ inl2 e)))
+    goCheap c@(CLeaf   (nm2,(Binding _ _ inl2 e _)))
       | inl2 == NoInline = (Nothing     ,[c])
       | otherwise        = (Just (nm2,e),[])
-    goCheap c@(CBranch (nm2,(Binding _ _ inl2 e)) us)
+    goCheap c@(CBranch (nm2,(Binding _ _ inl2 e _)) us)
       | inl2 == NoInline = (Nothing, [c])
       | otherwise        = (Just (nm2,e),us)
 

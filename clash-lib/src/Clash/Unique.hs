@@ -61,6 +61,7 @@ module Clash.Unique
   , unionUniqSet
   , delUniqSetDirectly
     -- ** Working with predicates
+  , nullUniqSet
     -- *** Searching
   , elemUniqSet
   , notElemUniqSet
@@ -347,6 +348,12 @@ unionUniqSet
   -> UniqSet a
   -> UniqSet a
 unionUniqSet (UniqSet env1) (UniqSet env2) = UniqSet (IntMap.union env1 env2)
+
+-- | Check whether the set is empty
+nullUniqSet
+  :: UniqSet a
+  -> Bool
+nullUniqSet (UniqSet env) = IntMap.null env
 
 -- | Check whether an element exists in the set
 elemUniqSet

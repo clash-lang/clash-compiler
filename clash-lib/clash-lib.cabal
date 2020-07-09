@@ -196,6 +196,7 @@ Library
                       Clash.Backend.Verilog
                       Clash.Backend.VHDL
 
+                      Clash.Core.Binding
                       Clash.Core.DataCon
                       Clash.Core.EqSolver
                       Clash.Core.Evaluator.Models
@@ -210,7 +211,6 @@ Library
                       Clash.Core.TermInfo
                       Clash.Core.TermLiteral
                       Clash.Core.TermLiteral.TH
-                      Clash.Core.Termination
                       Clash.Core.TyCon
                       Clash.Core.Type
                       Clash.Core.TysPrim

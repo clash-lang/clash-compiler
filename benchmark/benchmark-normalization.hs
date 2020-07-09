@@ -8,9 +8,10 @@ import           Clash.Annotations.BitRepresentation.Internal (CustomReprs)
 import           Clash.Core.TyCon
 import           Clash.Core.Var
 import           Clash.Driver
-import           Clash.Driver.Types
 
+import           Clash.Core.Binding
 import           Clash.Core.Evaluator.Models ()
+import           Clash.Core.Term (Term)
 
 #if EXPERIMENTAL_EVALUATOR
 import           Clash.GHC.PartialEval
@@ -60,12 +61,12 @@ benchFile idirs src =
                                  evaluator
 #endif
                                  topEntityNames
-                                 (opts idirs) supplyN :: _ -> BindingMap) topEntity)
+                                 (opts idirs) supplyN :: _ -> BindingMap Term) topEntity)
 
 setupEnv
   :: [FilePath]
   -> FilePath
-  -> IO ((BindingMap, TyConMap, IntMap TyConName
+  -> IO ((BindingMap Term, TyConMap, IntMap TyConName
          ,[TopEntityT]
          ,CompiledPrimMap, CustomReprs, [Id], Id
          )

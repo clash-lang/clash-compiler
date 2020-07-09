@@ -50,6 +50,7 @@ import           Clash.Annotations.Primitive
    extractPrim)
 import           Clash.Annotations.TopEntity
   (TopEntity(Synthesize), PortName(PortName))
+import           Clash.Core.Binding
 import           Clash.Core.DataCon            as D (dcTag)
 import           Clash.Core.FreeVars           (freeIds)
 import           Clash.Core.Literal            as L (Literal (..))
@@ -978,7 +979,7 @@ mkFunInput resId e =
                   error $ $(curLoc) ++ "Cannot make function input for partially applied Synthesize-annotated: " ++ showPpr e
                 _ -> do
                   normalized <- Lens.use bindings
-                  case lookupVarEnv fun normalized of
+                  case lookupBinding fun normalized of
                     Just _ -> do
                       (wereVoids,_,_,N.Component compName compInps [(_,compOutp,_)] _) <-
                         preserveVarEnv $ genComponent fun

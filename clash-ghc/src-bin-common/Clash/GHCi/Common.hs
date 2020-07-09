@@ -11,7 +11,9 @@ module Clash.GHCi.Common
   ) where
 
 -- Clash
-import           Clash.Driver.Types     (ClashOpts (..), BindingMap)
+import           Clash.Core.Binding     (BindingMap)
+import           Clash.Core.Term        (Term)
+import           Clash.Driver.Types     (ClashOpts (..))
 import           Clash.Netlist.Types    (TopEntityT(..))
 
 -- The GHC interface
@@ -41,7 +43,7 @@ getMainTopEntity
   :: HasCallStack
   => String
   -- ^ Module name
-  -> BindingMap
+  -> BindingMap Term
   -- ^ Map of global binders
   -> [TopEntityT]
   -- ^ List of top entities loaded by LoadModules

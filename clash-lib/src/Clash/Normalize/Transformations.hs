@@ -84,9 +84,8 @@ import qualified Data.Primitive.ByteArray    as BA
 import qualified Data.Text                   as Text
 import           GHC.Integer.GMP.Internals   (Integer (..), BigNat (..))
 
-import           BasicTypes                  (InlineSpec (..))
-
 import           Clash.Annotations.Primitive (extractPrim)
+import           Clash.Core.Binding
 import           Clash.Core.DataCon          (DataCon (..))
 import           Clash.Core.EqSolver
 import           Clash.Core.Name
@@ -120,7 +119,7 @@ import           Clash.Core.VarEnv
    foldlWithUniqueVarEnv', lookupVarEnvDirectly, extendVarEnv, unionVarEnv,
    eltsVarEnv, mkVarEnv, elemUniqInScopeSet)
 import           Clash.Debug
-import           Clash.Driver.Types          (Binding(..), DebugLevel (..))
+import           Clash.Driver.Types          (DebugLevel (..))
 import           Clash.Netlist.BlackBox.Types (Element(Err))
 import           Clash.Netlist.BlackBox.Util (getUsedArguments)
 import           Clash.Netlist.Types         (BlackBox(..), HWType (..), FilteredHWType(..))
@@ -234,13 +233,13 @@ nonRepSpec ctx e@(App e1 e2)
     inlineInternalSpecialisationArgument app
       | (Var f,fArgs,ticks) <- collectArgsTicks app
       = do
-        fTmM <- lookupVarEnv f <$> Lens.use bindings
+        fTmM <- lookupBinding f <$> Lens.use bindings
         case fTmM of
           Just b
             | nameSort (varName (bindingId b)) == Internal
             -> censor (const mempty)
                       (topdownR appPropFast ctx
-                        (mkApps (mkTicks (bindingTerm b) ticks) fArgs))
+                        (mkApps (mkTicks (bindingBody b) ticks) fArgs))
           _ -> return app
       | otherwise = return app
 
@@ -439,7 +438,7 @@ inlineNonRep _ e@(Case scrut altsTy alts)
                       ])
               (return e)
       else do
-        bodyMaybe   <- lookupVarEnv f <$> Lens.use bindings
+        bodyMaybe   <- lookupBinding f <$> Lens.use bindings
         nonRepScrut <- not <$> (representableType <$> Lens.view typeTranslator
                                                   <*> Lens.view customReprs
                                                   <*> pure False
@@ -449,7 +448,7 @@ inlineNonRep _ e@(Case scrut altsTy alts)
           (True,Just b) -> do
             Monad.when noException (zoomExtra (addNewInline f cf))
 
-            let scrutBody0 = mkTicks (bindingTerm b) (mkInlineTick f : ticks)
+            let scrutBody0 = mkTicks (bindingBody b) (mkInlineTick f : ticks)
             let scrutBody1 = mkApps scrutBody0 args
 
             changed $ Case scrutBody1 altsTy alts
@@ -1071,15 +1070,12 @@ inlineWorkFree _ e@(collectArgsTicks -> (Var f,args@(_:_),ticks))
       then return e
       else do
         bndrs <- Lens.use bindings
-        case lookupVarEnv f bndrs of
+        case lookupBinding f bndrs of
           -- Don't inline recursive expressions
-          Just b -> do
-            isRecBndr <- isRecursiveBndr f
-            if isRecBndr
-               then return e
-               else do
-                 let tm = mkTicks (bindingTerm b) (mkInlineTick f : ticks)
-                 changed $ mkApps tm args
+          Just b
+            |  isNonRecursive b
+            -> let tm = mkTicks (bindingBody b) (mkInlineTick f : ticks)
+                in changed (mkApps tm args)
 
           _ -> return e
   where
@@ -1104,22 +1100,18 @@ inlineWorkFree _ e@(Var f) = do
   if closed && f `notElemVarSet` topEnts && not untranslatable && not isSignal && gv
     then do
       bndrs <- Lens.use bindings
-      case lookupVarEnv f bndrs of
+      sizeLimit <- Lens.use (extra.inlineWFCacheLimit)
+      case lookupBinding f bndrs of
         -- Don't inline recursive expressions
-        Just top -> do
-          isRecBndr <- isRecursiveBndr f
-          if isRecBndr
-             then return e
-             else do
-              let topB = bindingTerm top
-              sizeLimit <- Lens.use (extra.inlineWFCacheLimit)
+        Just top
+          |  isNonRecursive top
+          -> let topB = bindingBody top
               -- caching only worth it from a certain size onwards, otherwise
               -- the caching mechanism itself brings more of an overhead.
-              if termSize topB < sizeLimit then
-                changed topB
-              else do
-                b <- normalizeTopLvlBndr False f top
-                changed (bindingTerm b)
+              in if termSize topB < sizeLimit
+                    then changed topB
+                    else changed . bindingBody =<< normalizeTopLvlBndr False f top
+
         _ -> return e
     else return e
 
@@ -1137,15 +1129,14 @@ inlineSmall _ e@(collectArgsTicks -> (Var f,args,ticks)) = do
     else do
       bndrs <- Lens.use bindings
       sizeLimit <- Lens.use (extra.inlineFunctionLimit)
-      case lookupVarEnv f bndrs of
+      case lookupBinding f bndrs of
         -- Don't inline recursive expressions
-        Just b -> do
-          isRecBndr <- isRecursiveBndr f
-          if not isRecBndr && bindingSpec b /= NoInline && termSize (bindingTerm b) < sizeLimit
-             then do
-               let tm = mkTicks (bindingTerm b) (mkInlineTick f : ticks)
-               changed $ mkApps tm args
-             else return e
+        Just b
+          |  isNonRecursive b
+          ,  bindingInline b /= NoInline
+          ,  termSize (bindingBody b) < sizeLimit
+          -> let tm = mkTicks (bindingBody b) (mkInlineTick f : ticks)
+              in changed (mkApps tm args)
 
         _ -> return e
 
@@ -1928,11 +1919,11 @@ inlineHO _ e@(App _ _)
                   lvl <- Lens.view dbgLevel
                   traceIf (lvl > DebugNone) ($(curLoc) ++ "InlineHO: " ++ show f ++ " already inlined " ++ show limit ++ " times in:" ++ show cf) (return e)
                 else do
-                  bodyMaybe <- lookupVarEnv f <$> Lens.use bindings
+                  bodyMaybe <- lookupBinding f <$> Lens.use bindings
                   case bodyMaybe of
                     Just b -> do
                       zoomExtra (addNewInline f cf)
-                      changed (mkApps (mkTicks (bindingTerm b) ticks) args)
+                      changed (mkApps (mkTicks (bindingBody b) ticks) args)
                     _ -> return e
       else return e
 

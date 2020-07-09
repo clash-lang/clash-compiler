@@ -20,8 +20,6 @@ module Clash.Driver.Types where
 -- For Int/Word size
 #include "MachDeps.h"
 
-import           Control.DeepSeq                (NFData)
-import           Data.Binary                    (Binary)
 import           Data.Fixed
 import           Data.Hashable
 import qualified Data.Set                       as Set
@@ -29,31 +27,11 @@ import           Data.Text                      (Text)
 import           Data.Text.Prettyprint.Doc
 import           GHC.Generics                   (Generic)
 
-import           BasicTypes                     (InlineSpec)
-import           SrcLoc                         (SrcSpan)
 import           Util                           (OverridingBool(..))
 
 import           Clash.Signal.Internal
 
-import           Clash.Core.Term                (Term)
-import           Clash.Core.Var                 (Id)
-import           Clash.Core.VarEnv              (VarEnv)
 import           Clash.Netlist.BlackBox.Types   (HdlSyn (..))
-
-
--- A function binder in the global environment.
---
-data Binding a = Binding
-  { bindingId :: Id
-  , bindingLoc :: SrcSpan
-  , bindingSpec :: InlineSpec
-  , bindingTerm :: a
-  } deriving (Binary, Functor, Generic, NFData, Show)
-
--- | Global function binders
---
--- Global functions cannot be mutually recursive, only self-recursive.
-type BindingMap = VarEnv (Binding Term)
 
 -- | Debug Message Verbosity
 data DebugLevel

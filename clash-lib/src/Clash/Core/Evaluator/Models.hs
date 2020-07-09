@@ -24,19 +24,18 @@ import Data.Map.Strict (Map)
 import qualified Data.Map.Strict as Map
 import qualified Data.Set.Lens as Set
 
+import Clash.Core.Binding
 import Clash.Core.DataCon
 import Clash.Core.FreeVars (localFVsOfTerms, tyFVsOfTypes, freeLocalIds)
 import Clash.Core.Literal
 import Clash.Core.Name (OccName)
 import Clash.Core.Subst (extendTvSubstList, mkSubst, substTm)
 import Clash.Core.Term
-import Clash.Core.Termination
 import Clash.Core.TyCon (TyConMap)
 import Clash.Core.Type
 import Clash.Core.Util (mkUniqSystemId, mkUniqSystemTyVar)
 import Clash.Core.Var (Id, Var)
 import Clash.Core.VarEnv
-import Clash.Driver.Types (Binding(..), BindingMap)
 
 -- | The type of partial evaluation. This keeps local bindings in a Reader and
 -- global bindings in State to preserve scoping. This allows changes to global
@@ -128,9 +127,9 @@ withLocal (i, tm) = RWS.local addBinding
 -- action. The binding is only removed when evaluating the given action.
 --
 withoutLocal :: Id -> Eval a -> Eval a
-withoutLocal i = RWS.local deleteBinding
+withoutLocal i = RWS.local delete
  where
-  deleteBinding env@(LocalEnv _ tms) =
+  delete env@(LocalEnv _ tms) =
     env { lenvTerms = Map.delete i tms }
 
 withLocals :: [(Id, TermOrValue)] -> Eval a -> Eval a
@@ -156,12 +155,9 @@ withTypes bs x = foldr withType x bs
 -- | Global Environment
 --
 data GlobalEnv = GlobalEnv
-  { genvGlobals :: VarEnv (Binding TermOrValue)
+  { genvGlobals :: BindingMap TermOrValue
     -- ^ Global term environment. These are functions in global scope which
     -- are evaluated on lookup, and updated after evaluation.
-  , genvRecInfo :: RecInfo
-    -- ^ Information about which global bindings are recursive, used to decide
-    -- whether or not to inline a global binding.
   , genvFuel :: Word
     -- ^ Remaining fuel for inlining. This decreases when a potentially
     -- non-terminating binder is inlined and increases when moving up the AST.
@@ -184,8 +180,7 @@ data GlobalEnv = GlobalEnv
 type GlobalIO = (IntMap Value, Int)
 
 mkGlobalEnv
-  :: BindingMap
-  -> RecInfo
+  :: BindingMap Term
   -> Word
   -> GlobalIO
   -> TyConMap
@@ -193,10 +188,10 @@ mkGlobalEnv
   -> Supply
   -> GlobalEnv
 mkGlobalEnv bs =
-  GlobalEnv (fmap Left <$> bs)
+  GlobalEnv (fmap Left bs)
 
 getGlobal :: Id -> Eval (Maybe (Binding TermOrValue))
-getGlobal i = lookupVarEnv i <$> RWS.gets genvGlobals
+getGlobal i = lookupBinding i <$> RWS.gets genvGlobals
 
 -- | Update a global binding, replacing it with a WHNF representation.
 --
@@ -206,15 +201,12 @@ updateGlobal i x =
     Just b -> do
       env <- RWS.get
       let bs = genvGlobals env
-      let b' = b { bindingTerm = Right x }
+      let b' = b { bindingBody = Right x }
 
-      RWS.put (env { genvGlobals = extendVarEnv i b' bs })
+      RWS.put (env { genvGlobals = updateBinding b' bs })
 
     Nothing ->
       pure ()
-
-getRecInfo :: Eval RecInfo
-getRecInfo = RWS.gets genvRecInfo
 
 getFuel :: Eval Word
 getFuel = RWS.gets genvFuel

@@ -44,10 +44,12 @@ module Clash.Core.VarEnv
     -- ** Construction
   , emptyVarSet
   , unitVarSet
+  , extendVarSet
     -- ** Modification
   , delVarSetByKey
   , unionVarSet
     -- ** Working with predicates
+  , nullVarSet
     -- *** Searching
   , elemVarSet
   , notElemVarSet
@@ -292,6 +294,12 @@ unionVarSet
   -> VarSet
   -> VarSet
 unionVarSet = unionUniqSet
+
+-- | Is the set empty
+nullVarSet
+  :: VarSet
+  -> Bool
+nullVarSet = nullUniqSet
 
 -- | Is the variable an element in the set
 elemVarSet

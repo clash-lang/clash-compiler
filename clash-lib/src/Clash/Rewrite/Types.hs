@@ -35,6 +35,8 @@ import Data.Monoid                           (Any)
 import qualified Data.Set                    as Set
 import GHC.Generics
 
+import Clash.Core.Binding                    (BindingMap)
+
 #if EXPERIMENTAL_EVALUATOR
 import Clash.Core.Evaluator.Models           (Evaluator, GlobalIO)
 #else
@@ -42,12 +44,11 @@ import Clash.Core.Evaluator.Types            (Evaluator, PrimHeap)
 #endif
 
 import Clash.Core.Term           (Term, Context)
-import Clash.Core.Termination    (RecInfo)
 import Clash.Core.Type           (Type)
 import Clash.Core.TyCon          (TyConName, TyConMap)
 import Clash.Core.Var            (Id)
 import Clash.Core.VarEnv         (InScopeSet, VarSet, VarEnv)
-import Clash.Driver.Types        (BindingMap, DebugLevel)
+import Clash.Driver.Types        (DebugLevel)
 import Clash.Netlist.Types       (FilteredHWType, HWMap)
 import Clash.Util
 
@@ -73,7 +74,7 @@ data RewriteState extra
   = RewriteState
   { _transformCounter :: {-# UNPACK #-} !Int
   -- ^ Number of applied transformations
-  , _bindings         :: !BindingMap
+  , _bindings         :: !(BindingMap Term)
   -- ^ Global binders
   , _uniqSupply       :: !Supply
   -- ^ Supply of unique numbers
@@ -123,8 +124,6 @@ data RewriteEnv
   -- ^ Functions that are considered TopEntities
   , _customReprs    :: CustomReprs
   -- ^ Custom bit representations
-  , _recInfo        :: RecInfo
-  -- ^ Information about recursive global bindings
   , _fuelLimit      :: Word
   -- ^ Maximum amount of fuel for the evaluator
   }

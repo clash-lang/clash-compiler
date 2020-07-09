@@ -2,6 +2,8 @@
 
 import           Clash.Annotations.TopEntity
 import           Clash.Annotations.BitRepresentation.Internal (CustomReprs)
+import           Clash.Core.Binding
+import           Clash.Core.Term (Term)
 import           Clash.Core.TyCon
 import           Clash.Core.Var
 import           Clash.Driver
@@ -43,7 +45,7 @@ benchFile idirs src = do
   putStrLn $ "Doing normalization of " ++ src
   let (bindingsMap,tcm,tupTcm,_topEntities,primMap,reprs,topEntityNames,topEntity) = env
       primMap' = fmap (fmap unremoveBBfunc) primMap
-      res :: BindingMap
+      res :: BindingMap Term
       res = normalizeEntity reprs bindingsMap primMap' tcm tupTcm typeTrans
 #if EXPERIMENTAL_EVALUATOR
                    ghcEvaluator
@@ -53,7 +55,7 @@ benchFile idirs src = do
                    topEntityNames (opts idirs) supplyN topEntity
   res `deepseq` putStrLn ".. done\n"
 
-setupEnv :: FilePath -> IO (BindingMap,TyConMap,IntMap TyConName
+setupEnv :: FilePath -> IO (BindingMap Term,TyConMap,IntMap TyConName
                            ,[(Id, Maybe TopEntity, Maybe Id)],CompiledPrimMap'
                            ,CustomReprs,[Id],Id)
 setupEnv src = do

@@ -45,17 +45,15 @@ import           Clash.Annotations.BitRepresentation.Internal (DataRepr')
 import           Clash.Annotations.Primitive (HDL, extractPrim)
 import           Clash.Signal.Internal
 
-import           Clash.Core.Subst        (extendGblSubstList, mkSubst, substTm)
+import           Clash.Core.Binding
 import           Clash.Core.Term         (Term (..), mkLams, mkTyLams)
 import           Clash.Core.Type         (Type (..), TypeView (..), mkFunTy, splitFunForallTy, tyView)
 import           Clash.Core.TyCon        (TyConMap, TyConName, isNewTypeTc)
 import           Clash.Core.TysPrim      (tysPrimMap)
-import           Clash.Core.Var          (Var (..), Id, IdScope (..), setIdScope)
+import           Clash.Core.Var          (Var (..), Id)
 import           Clash.Core.VarEnv
-  (InScopeSet, VarEnv, emptyInScopeSet, extendInScopeSet, mkInScopeSet, mkVarEnv, unionVarEnv)
 import           Clash.Debug             (traceIf)
 import           Clash.Driver            (compilePrimitive)
-import           Clash.Driver.Types      (BindingMap, Binding(..))
 import           Clash.GHC.GHC2Core
   (C2C, GHC2CoreState, tyConMap, coreToId, coreToName, coreToTerm,
    makeAllTyCons, qualifiedNameString, emptyGHC2CoreState)
@@ -89,7 +87,7 @@ generateBindings
   -- ^ HDL target
   -> String
   -> Maybe GHC.DynFlags
-  -> IO ( BindingMap
+  -> IO ( BindingMap Term
         , TyConMap
         , IntMap TyConName
         , [TopEntityT]
@@ -122,10 +120,11 @@ generateBindings useColor primDirs importDirs dbs hdl modName dflagsM = do
       tcCache                       = makeAllTyCons tcMap' fiEnvs
       allTcCache                    = tysPrimMap `unionUniqMap` tcCache
       inScope0 = mkInScopeSet (uniqMapToUniqSet
-                      ((mapUniqMap (coerce . bindingId) bindingsMap) `unionUniqMap`
-                       (mapUniqMap (coerce . bindingId) clsMap)))
-      clsMap                        = mapUniqMap (\(v,i) -> (Binding v GHC.noSrcSpan GHC.Inline (mkClassSelector inScope0 allTcCache (varType v) i))) clsVMap
-      allBindings                   = bindingsMap `unionVarEnv` clsMap
+                      ((mapUniqMap (coerce . bindingId) $ getBindings bindingsMap) `unionUniqMap`
+                       (mapUniqMap (coerce . bindingId) $ clsMap)))
+      -- TODO should bindingRecs be mempty in clsMap?
+      clsMap                        = fmap (\(v,i) -> (Binding v GHC.noSrcSpan Inline (mkClassSelector inScope0 allTcCache (varType v) i) mempty)) clsVMap
+      allBindings                   = bindingsMap <> BindingMap clsMap
       topEntities'                  =
         (\m -> fst (RWS.evalRWS m GHC.noSrcSpan tcMap')) $ mapM (\(topEnt,annM,benchM) -> do
           topEnt' <- coreToName GHC.varName GHC.varUnique qualifiedNameString topEnt
@@ -133,7 +132,7 @@ generateBindings useColor primDirs importDirs dbs hdl modName dflagsM = do
           return (topEnt', annM, benchM')) topEntities
       topEntities'' =
         map (\(topEnt, annM, benchM) ->
-                case lookupUniqMap topEnt allBindings of
+                case lookupBinding topEnt allBindings of
                   Just b -> TopEntityT (bindingId b) annM benchM
                   Nothing -> error "This shouldn't happen"
             ) topEntities'
@@ -164,42 +163,44 @@ mkBindings
   -- Class operations
   -> [GHC.CoreBndr]
   -- Unlocatable Expressions
-  -> C2C ( BindingMap
+  -> C2C ( BindingMap Term
          , VarEnv (Id,Int)
          )
 mkBindings primMap bindings clsOps unlocatable = do
-  bindingsList <- mapM (\case
-    GHC.NonRec v e -> do
-      let sp = GHC.getSrcSpan v
-          inl = GHC.inlinePragmaSpec . GHC.inlinePragInfo $ GHC.idInfo v
-      tm <- RWS.local (const sp) (coreToTerm primMap unlocatable e)
-      v' <- coreToId v
-      checkPrimitive primMap v
-      return [(v', (Binding v' sp inl tm))]
-    GHC.Rec bs -> do
-      tms <- mapM (\(v,e) -> do
-                    let sp  = GHC.getSrcSpan v
-                        inl = GHC.inlinePragmaSpec . GHC.inlinePragInfo $ GHC.idInfo v
-                    tm <- RWS.local (const sp) (coreToTerm primMap unlocatable e)
-                    v' <- coreToId v
-                    checkPrimitive primMap v
-                    return (Binding v' sp inl tm)
-                  ) bs
-      case tms of
-        [Binding v sp inl tm] -> return [(v, Binding v sp inl tm)]
-        _ -> let vsL   = map (setIdScope LocalId . bindingId) tms
-                 vsV   = map Var vsL
-                 subst = extendGblSubstList (mkSubst emptyInScopeSet) (zip vsL vsV)
-                 lbs   = zipWith (\b vL -> (vL,substTm "mkBindings" subst (bindingTerm b))) tms vsL
-                 tms1  = zipWith (\b (_, e) -> (bindingId b, b { bindingTerm = Letrec lbs e })) tms lbs
-             in  return tms1
-    ) bindings
-  clsOpList    <- mapM (\(v,i) -> do
-                          v' <- coreToId v
-                          return (v', (v',i))
-                       ) clsOps
+  bindingsList <- BindingMap . mkVarEnv . concat <$> traverse goBinding bindings
+  clsOpList    <- mkVarEnv <$> traverse goClassOp clsOps
 
-  return (mkVarEnv (concat bindingsList), mkVarEnv clsOpList)
+  return (bindingsList, clsOpList)
+ where
+  goClassOp (v, i) = do
+    v' <- coreToId v
+    return (v', (v', i))
+
+  goBinding = \case
+    GHC.NonRec v e -> do
+      b <- asClashBinding mempty v e
+      return [(bindingId b, b)]
+
+    GHC.Rec ves -> do
+      rs <- mkVarSet <$> traverse (coreToId . fst) ves
+      bs <- traverse (uncurry (asClashBinding rs)) ves
+
+      return (fmap (\b -> (bindingId b, b)) bs)
+
+  asClashBinding rs v e = do
+    let sp  = GHC.getSrcSpan v
+        inl = mkInlining . GHC.inlinePragmaSpec $ GHC.inlinePragInfo (GHC.idInfo v)
+
+    v' <- coreToId v
+    e' <- RWS.local (const sp) (coreToTerm primMap unlocatable e)
+
+    checkPrimitive primMap v
+    return (Binding v' sp inl e' rs)
+
+  mkInlining = \case
+    GHC.NoInline -> NoInline
+    GHC.Inline -> Inline
+    _ -> Default
 
 -- | If this CoreBndr is a primitive, check it's Haskell definition
 --   for potential problems.
