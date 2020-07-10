@@ -73,6 +73,7 @@ import Data.Data                  (Data)
 import Data.Default.Class         (Default (..))
 import Data.Proxy                 (Proxy (..))
 import Text.Read                  (Read (..), ReadPrec)
+import Text.Printf                (PrintfArg (..))
 import Language.Haskell.TH        (TypeQ, appT, conT, litT, numTyLit, sigE)
 import Language.Haskell.TH.Syntax (Lift(..))
 #if MIN_VERSION_template_haskell(2,16,0)
@@ -360,6 +361,9 @@ quot#,rem# :: Index n -> Index n -> Index n
 {-# NOINLINE toInteger# #-}
 toInteger# :: Index n -> Integer
 toInteger# (I n) = n
+
+instance KnownNat n => PrintfArg (Index n) where
+  formatArg = formatArg . toInteger
 
 instance (KnownNat n, 1 <= n) => Parity (Index n) where
   even = even . pack
