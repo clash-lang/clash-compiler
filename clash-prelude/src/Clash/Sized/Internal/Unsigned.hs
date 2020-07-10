@@ -85,6 +85,7 @@ import Data.Data                      (Data)
 import Data.Default.Class             (Default (..))
 import Data.Proxy                     (Proxy (..))
 import Text.Read                      (Read (..), ReadPrec)
+import Text.Printf                    (PrintfArg (..))
 import GHC.Exts                       (narrow8Word#, narrow16Word#, narrow32Word#)
 import GHC.Generics                   (Generic)
 import GHC.Integer.GMP.Internals      (bigNatToWord)
@@ -348,6 +349,9 @@ rem# (U i) (U j) = U (i `rem` j)
 {-# NOINLINE toInteger# #-}
 toInteger# :: Unsigned n -> Integer
 toInteger# (U i) = naturalToInteger i
+
+instance KnownNat n => PrintfArg (Unsigned n) where
+  formatArg = formatArg . toInteger
 
 instance KnownNat n => Parity (Unsigned n) where
   even = even . pack
