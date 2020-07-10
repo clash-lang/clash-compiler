@@ -327,6 +327,13 @@ instance (KnownNat n, Ord a) => Ord (Vec n a) where
     where f EQ   keepGoing = keepGoing
           f done _         = done
 
+instance (KnownNat n, Semigroup a) => Semigroup (Vec n a) where
+  (<>) = zipWith (<>)
+
+instance (KnownNat n, Monoid a) => Monoid (Vec n a) where
+  mempty = repeat mempty
+  mappend = (<>)
+
 instance KnownNat n => Applicative (Vec n) where
   pure      = repeat
   fs <*> xs = zipWith ($) fs xs
