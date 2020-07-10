@@ -87,6 +87,7 @@ import Data.Data                      (Data)
 import Data.Default.Class             (Default (..))
 import Data.Proxy                     (Proxy (..))
 import Text.Read                      (Read (..), ReadPrec)
+import Text.Printf                    (PrintfArg (..))
 import GHC.Generics                   (Generic)
 import GHC.Natural                    (naturalFromInteger)
 #if MIN_VERSION_base(4,12,0)
@@ -418,6 +419,9 @@ mod# (S a) (S b) = S (a `mod` b)
 {-# NOINLINE toInteger# #-}
 toInteger# :: Signed n -> Integer
 toInteger# (S n) = n
+
+instance KnownNat n => PrintfArg (Signed n) where
+  formatArg = formatArg . toInteger
 
 instance KnownNat n => Parity (Signed n) where
   even = even . pack
