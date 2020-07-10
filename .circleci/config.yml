@@ -11,6 +11,11 @@ aliases:
     RUN_CLASHDEV: "yes"
     RUN_TESTSUITE: "yes"
     RUN_BUILD_ALL: "yes"
+
+    MULTIPLE_HIDDEN: "yes"
+
+    # Used to detect partial evaluator branches on Gitlab CI
+    CI_COMMIT_BRANCH: "xxxx"
   - &submodules
     run:
       name: "Checkout submodules"
