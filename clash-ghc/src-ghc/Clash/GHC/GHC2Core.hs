@@ -583,10 +583,10 @@ isSizedCast (TyConApp tc1 _) (TyConApp tc2 _) = do
   return
     (or [tc1 `hasKey` integerTyConKey &&
           or [tc2Nm == "Clash.Sized.Internal.Signed.Signed"
-             ,tc2Nm == "Clash.Sized.Internal.Index.Index"]
+             ,tc2Nm == "Clash.Sized.Internal.Index.SatIndex"]
         ,tc2 `hasKey` integerTyConKey &&
           or [tc1Nm == "Clash.Sized.Internal.Signed.Signed"
-             ,tc1Nm == "Clash.Sized.Internal.Index.Index"]
+             ,tc1Nm == "Clash.Sized.Internal.Index.SatIndex"]
         ,tc1 `hasKey` naturalTyConKey &&
           tc2Nm == "Clash.Sized.Internal.Unsigned.Unsigned"
         ,tc2 `hasKey` naturalTyConKey &&
@@ -619,7 +619,7 @@ hasPrimCo co@(AxiomInstCo _ _ coers) = do
       tcNm <- qualifiedNameString (tyConName tc)
       return (tcNm `elem` ["Clash.Sized.Internal.BitVector.Bit"
                           ,"Clash.Sized.Internal.BitVector.BitVector"
-                          ,"Clash.Sized.Internal.Index.Index"
+                          ,"Clash.Sized.Internal.Index.SatIndex"
                           ,"Clash.Sized.Internal.Signed.Signed"
                           ,"Clash.Sized.Internal.Unsigned.Unsigned"
                           ])

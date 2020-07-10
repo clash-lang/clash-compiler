@@ -6,15 +6,17 @@ Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
 
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE KindSignatures #-}
+{-# LANGUAGE MonoLocalBinds #-}
 {-# LANGUAGE MagicHash #-}
 {-# LANGUAGE RoleAnnotations #-}
 module Clash.Sized.Internal.Index where
 
 import Data.Kind (Type)
 import GHC.TypeLits (KnownNat, Nat)
+import Clash.Class.Num (SaturationMode, KnownSatMode)
 
-type role Index phantom
-data Index :: Nat -> Type
+type role SatIndex phantom phantom
+data SatIndex :: SaturationMode -> Nat -> Type
 
-instance KnownNat n => Num (Index n)
-toInteger# :: Index n -> Integer
+instance (KnownSatMode sat, KnownNat n) => Num (SatIndex sat n)
+toInteger# :: SatIndex sat n -> Integer

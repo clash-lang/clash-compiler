@@ -7,7 +7,7 @@ data YZA = Y Int | Z () | A deriving (Eq, Show, Generic, ShowX)
 
 topEntity
   :: Vec 2 YZA
-  -> Vec 2 (Index 2, YZA)
+  -> Vec 2 (SatIndex 'SatError 2, YZA)
 topEntity xs = zipWith (,) indicesI xs
 {-# NOINLINE topEntity #-}
 

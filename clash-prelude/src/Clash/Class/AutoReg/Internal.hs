@@ -138,7 +138,7 @@ instance AutoReg Bit
 instance AutoReg (BitVector n)
 instance AutoReg (Signed n)
 instance AutoReg (Unsigned n)
-instance AutoReg (Index n)
+instance AutoReg (SatIndex sat n)
 instance NFDataX (rep (int + frac)) => AutoReg (Fixed rep int frac)
 
 instance AutoReg a => AutoReg (Maybe a) where

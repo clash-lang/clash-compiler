@@ -398,7 +398,7 @@ import           GHC.Stack               (HasCallStack, withFrozenCallStack)
 import qualified Clash.Explicit.BlockRam as E
 import           Clash.Promoted.Nat      (SNat)
 import           Clash.Signal
-import           Clash.Sized.Index       (Index)
+import           Clash.Sized.Index       (SatIndex)
 import           Clash.Sized.Unsigned    (Unsigned)
 import           Clash.Sized.Vector      (Vec)
 import           Clash.XException        (NFDataX)
@@ -709,7 +709,7 @@ blockRam = \cnt rd wrM -> withFrozenCallStack
 -- | Version of blockram that has no default values set. May be cleared to a
 -- arbitrary state using a reset function.
 blockRamU
-   :: forall n dom a r addr
+   :: forall sat n dom a r addr
    . ( HasCallStack
      , HiddenClockResetEnable dom
      , NFDataX a
@@ -721,7 +721,7 @@ blockRamU
   -- clear the BRAM.
   -> SNat n
   -- ^ Number of elements in BRAM
-  -> (Index n -> a)
+  -> (SatIndex sat n -> a)
   -- ^ If applicable (see first argument), reset BRAM using this function.
   -> Signal dom addr
   -- ^ Read address @r@

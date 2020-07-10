@@ -49,17 +49,17 @@ tBitVector16
     )
 
 tIndex
-  = ( cNum            @(Index 50000)
-    , cEq             @(Index 50000)
-    , cOrd            @(Index 50000)
-    , cIntegral       @(Index 50000)
-    , cParity         @(Index 50000)
-    , cParityBS0      @(Index 1    )
-    , cBits           @(Index 65536)
+  = ( cNum            @(SatIndex 'SatError 50000)
+    , cEq             @(SatIndex 'SatError 50000)
+    , cOrd            @(SatIndex 'SatError 50000)
+    , cIntegral       @(SatIndex 'SatError 50000)
+    , cParity         @(SatIndex 'SatError 50000)
+    , cParityBS0      @(SatIndex 'SatError 1    )
+    , cBits           @(SatIndex 'SatError 65536)
     -- , cFiniteBits     @(Index 50000) -- broken
     , cIndex1 -- ensure special case for index 1 is verified
-    , csClashSpecific @(Index 50000)
-    , cResize         @(Index 50000)
+    , csClashSpecific @(SatIndex 'SatError 50000)
+    , cResize         @(SatIndex 'SatError 50000)
     )
 
 tSFixed

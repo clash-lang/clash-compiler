@@ -65,11 +65,12 @@ import Language.Haskell.TH.Compat
 import Prelude                     hiding ((++), (!!))
 import Test.QuickCheck             (Arbitrary (..), CoArbitrary (..))
 
+import Clash.Class.Num             (SaturationMode(SatError))
 import Clash.Class.BitPack         (BitPack (..), packXWith)
 import Clash.Promoted.Nat          (SNat (..), UNat (..), pow2SNat, snatToNum,
                                     subSNat, toUNat)
 import Clash.Promoted.Nat.Literals (d1)
-import Clash.Sized.Index           (Index)
+import Clash.Sized.Index           (SatIndex)
 import Clash.Sized.Vector          (Vec (..), (!!), (++), dtfold, replace)
 import Clash.XException
   (ShowX (..), NFDataX (..), isX, showsX, showsPrecXWith)
@@ -87,15 +88,6 @@ import Clash.XException
 >>> import Data.Kind
 >>> import Data.Singletons.Prelude (Apply, TyFun)
 >>> import Data.Proxy
->>> data IIndex (f :: TyFun Nat Type) :: Type
->>> type instance Apply IIndex l = Index ((2^l)+1)
->>> :{
-let populationCount' :: (KnownNat k, KnownNat (2^k)) => BitVector (2^k) -> Index ((2^k)+1)
-    populationCount' bv = tdfold (Proxy @IIndex)
-                                 fromIntegral
-                                 (\_ x y -> add x y)
-                                 (v2t (bv2v bv))
-:}
 -}
 
 -- | Perfect depth binary tree.
@@ -247,14 +239,14 @@ instance (KnownNat d, NFDataX a) => NFDataX (RTree d a) where
 -- As an example of when you might want to use 'dtfold' we will build a
 -- population counter: a circuit that counts the number of bits set to '1' in
 -- a 'BitVector'. Given a vector of /n/ bits, we only need we need a data type
--- that can represent the number /n/: 'Index' @(n+1)@. 'Index' @k@ has a range
--- of @[0 .. k-1]@ (using @ceil(log2(k))@ bits), hence we need 'Index' @n+1@.
+-- that can represent the number /n/: 'SatIndex' @'SatError@ @(n+1)@. 'SatIndex' @sat@ @k@ has a range
+-- of @[0 .. k-1]@ (using @ceil(log2(k))@ bits), hence we need 'SatIndex' @'SatError@ @n+1@.
 -- As an initial attempt we will use 'tfold', because it gives a nice (@log2(n)@)
 -- tree-structure of adders:
 --
 -- @
 -- populationCount :: (KnownNat (2^d), KnownNat d, KnownNat (2^d+1))
---                 => BitVector (2^d) -> Index (2^d+1)
+--                 => BitVector (2^d) -> SatIndex 'SatError (2^d+1)
 -- populationCount = tfold fromIntegral (+) . v2t . bv2v
 -- @
 --
@@ -262,7 +254,7 @@ instance (KnownNat d, NFDataX a) => NFDataX (RTree d a) where
 -- bit-width, i.e. all adders are of the type:
 --
 -- @
--- (+) :: 'Index' (2^d+1) -> 'Index' (2^d+1) -> 'Index' (2^d+1).
+-- (+) :: 'SatIndex' sat (2^d+1) -> 'SatIndex' sat (2^d+1) -> 'SatIndex' sat (2^d+1).
 -- @
 --
 -- This is a \"problem\" because we could have a more efficient structure:
@@ -271,7 +263,7 @@ instance (KnownNat d, NFDataX a) => NFDataX (RTree d a) where
 -- type:
 --
 -- @
--- 'Index' ((2^d)+1) -> 'Index' ((2^d)+1) -> 'Index' ((2^(d+1))+1)
+-- 'SatIndex' sat ((2^d)+1) -> 'SatIndex' sat ((2^d)+1) ->'SatIndex' sat ((2^(d+1))+1)
 -- @
 --
 -- We have such an adder in the form of the 'Clash.Class.Num.add' function, as
@@ -281,23 +273,28 @@ instance (KnownNat d, NFDataX a) => NFDataX (RTree d a) where
 --
 -- >>> :{
 -- let populationCount' :: (KnownNat (2^d), KnownNat d, KnownNat (2^d+1))
---                      => BitVector (2^d) -> Index (2^d+1)
+--                      => BitVector (2^d) -> SatIndex 'SatError (2^d+1)
 --     populationCount' = tfold fromIntegral add . v2t . bv2v
 -- :}
 -- <BLANKLINE>
--- <interactive>:...
---     • Couldn't match type ‘(((2 ^ d) + 1) + ((2 ^ d) + 1)) - 1’
---                      with ‘(2 ^ d) + 1’
---       Expected type: Index ((2 ^ d) + 1)
---                      -> Index ((2 ^ d) + 1) -> Index ((2 ^ d) + 1)
---         Actual type: Index ((2 ^ d) + 1)
---                      -> Index ((2 ^ d) + 1)
---                      -> AResult (Index ((2 ^ d) + 1)) (Index ((2 ^ d) + 1))
---     • In the second argument of ‘tfold’, namely ‘add’
---       In the first argument of ‘(.)’, namely ‘tfold fromIntegral add’
---       In the expression: tfold fromIntegral add . v2t . bv2v
---     • Relevant bindings include
---         populationCount' :: BitVector (2 ^ d) -> Index ((2 ^ d) + 1)
+--  <interactive>:...
+--  ^
+--      • Couldn't match type ‘Max (((2 ^ d) + 1) + ((2 ^ d) + 1)) 1’
+--                       with ‘2 + (2 ^ d)’
+--        Expected type: SatIndex 'SatError ((2 ^ d) + 1)
+--                       -> SatIndex 'SatError ((2 ^ d) + 1)
+--                       -> SatIndex 'SatError ((2 ^ d) + 1)
+--          Actual type: SatIndex 'SatError ((2 ^ d) + 1)
+--                       -> SatIndex 'SatError ((2 ^ d) + 1)
+--                       -> AResult
+--                            (SatIndex 'SatError ((2 ^ d) + 1))
+--                            (SatIndex 'SatError ((2 ^ d) + 1))
+--      • In the second argument of ‘tfold’, namely ‘add’
+--        In the first argument of ‘(.)’, namely ‘tfold fromIntegral add’
+--        In the expression: tfold fromIntegral add . v2t . bv2v
+--      • Relevant bindings include
+--          populationCount' :: BitVector (2 ^ d)
+--                              -> SatIndex 'SatError ((2 ^ d) + 1)
 --           (bound at ...)
 --
 -- because 'tfold' expects a function of type \"@b -> b -> b@\", i.e. a function
@@ -307,28 +304,6 @@ instance (KnownNat d, NFDataX a) => NFDataX (RTree d a) where
 -- result is larger than the arguments, we must use a dependently typed fold in
 -- the form of 'dtfold':
 --
--- @
--- {\-\# LANGUAGE UndecidableInstances \#-\}
--- import Data.Singletons.Prelude
--- import Data.Proxy
---
--- data IIndex (f :: 'TyFun' Nat *) :: *
--- type instance 'Apply' IIndex l = 'Index' ((2^l)+1)
---
--- populationCount' :: (KnownNat k, KnownNat (2^k))
---                  => BitVector (2^k) -> Index ((2^k)+1)
--- populationCount' bv = 'tdfold' (Proxy @IIndex)
---                              fromIntegral
---                              (\\_ x y -> 'Clash.Class.Num.add' x y)
---                              ('v2t' ('Clash.Sized.Vector.bv2v' bv))
--- @
---
--- And we can test that it works:
---
--- >>> :t populationCount' (7 :: BitVector 16)
--- populationCount' (7 :: BitVector 16) :: Index 17
--- >>> populationCount' (7 :: BitVector 16)
--- 3
 tdfold :: forall p k a . KnownNat k
        => Proxy (p :: TyFun Nat Type -> Type) -- ^ The /motive/
        -> (a -> (p @@ 0)) -- ^ Function to apply to the elements on the leafs
@@ -395,11 +370,11 @@ tmap f = tdfold (Proxy @(MapTree b)) (LR . f) (\_ l r -> BR l r)
 -- | Generate a tree of indices, where the depth of the tree is determined by
 -- the context.
 --
--- >>> tindices :: RTree 3 (Index 8)
+-- >>> tindices :: RTree 3 (SatIndex 'SatError 8)
 -- <<<0,1>,<2,3>>,<<4,5>,<6,7>>>
-tindices :: forall d . KnownNat d => RTree d (Index (2^d))
+tindices :: forall d. (KnownNat d) => RTree d (SatIndex 'SatError (2^d))
 tindices =
-  tdfold (Proxy @(MapTree (Index (2^d)))) LR
+  tdfold (Proxy @(MapTree (SatIndex 'SatError (2^d)))) LR
          (\s@SNat l r -> BR l (tmap (+(snatToNum (pow2SNat s))) r))
          (treplicate SNat 0)
 

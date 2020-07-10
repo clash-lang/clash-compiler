@@ -1,7 +1,7 @@
 module TestIndex where
 import Clash.Prelude
 
-type NrI = Index 8
+type NrI = SatIndex 'SatError 8
 
 topEntity = c1
 

@@ -1,7 +1,7 @@
 [ { "BlackBox" :
     { "name"      : "Clash.Sized.Internal.Index.quot#"
     , "kind"      : "Expression"
-    , "type"      : "quot# :: Index n -> Index n -> Index n"
+    , "type"      : "quot# :: SatIndex sat n -> SatIndex sat n -> SatIndex sat n"
     , "template"  : "~ARG[0] / ~ARG[1]"
     }
   }

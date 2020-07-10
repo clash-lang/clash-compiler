@@ -890,6 +890,8 @@ instance NumFixedC rep int frac => SaturatingNum (Fixed rep int frac) where
         res' = shiftR res sh
     in  Fixed (resize res')
 
+  satMul SatError a b = satMul SatWrap a b
+
   satMul SatBound (Fixed a) (Fixed b) =
     let res     = a `mul` b
         sh      = fromInteger (natVal (Proxy @frac))

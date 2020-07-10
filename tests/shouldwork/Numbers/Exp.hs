@@ -31,7 +31,7 @@ topEntity b =
     -- check constant folding.
     resize ((fromInteger b :: Signed 64) ^ d2) :: Signed 64
   , resize ((fromInteger b :: Unsigned 64) ^ d2) :: Unsigned 64
-  , resize ((fromInteger b :: Index (2^64)) ^ d2) :: Index (2^64)
+  , resize ((fromInteger b :: SatIndex 'SatError (2^64)) ^ d2) :: SatIndex 'SatError (2^64)
   )
 {-# NOINLINE topEntity #-}
 

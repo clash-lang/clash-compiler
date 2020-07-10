@@ -632,7 +632,7 @@ normalizeType tcMap = go
       -- We need to keep these newtypes because they define the width of the numbers.
       | nameOcc tcNm == "Clash.Sized.Internal.BitVector.Bit" ||
         nameOcc tcNm == "Clash.Sized.Internal.BitVector.BitVector" ||
-        nameOcc tcNm == "Clash.Sized.Internal.Index.Index"         ||
+        nameOcc tcNm == "Clash.Sized.Internal.Index.SatIndex"      ||
         nameOcc tcNm == "Clash.Sized.Internal.Signed.Signed"       ||
         nameOcc tcNm == "Clash.Sized.Internal.Unsigned.Unsigned"
       -> mkTyConApp tcNm (map go args)

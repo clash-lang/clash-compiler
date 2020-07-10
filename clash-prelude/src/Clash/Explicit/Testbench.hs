@@ -41,7 +41,7 @@ import Prelude               hiding ((!!), length)
 import System.IO.Unsafe      (unsafeDupablePerformIO)
 
 import Clash.Annotations.Primitive (hasBlackBox)
-import Clash.Class.Num       (satSucc, SaturationMode(SatBound))
+import Clash.Class.Num       (SaturationMode(SatBound, SatError))
 import Clash.Promoted.Nat    (SNat(..), snatToNum)
 import Clash.Promoted.Symbol (SSymbol (..))
 import Clash.Explicit.Signal
@@ -51,7 +51,7 @@ import Clash.Signal.Internal (Clock (..), Reset (..))
 import Clash.Signal
   (mux, DomainResetKind, ResetKind(Asynchronous), KnownDomain,
   Enable)
-import Clash.Sized.Index     (Index)
+import Clash.Sized.Index     (SatIndex)
 import Clash.Sized.Internal.BitVector
   (BitVector, isLike)
 import Clash.Sized.Vector    (Vec, (!!), length)
@@ -177,7 +177,7 @@ stimuliGenerator clk rst samples =
     let (r,o) = unbundle (genT <$> register clk rst (toEnable (pure True)) 0 r)
     in  o
   where
-    genT :: Index l -> (Index l,a)
+    genT :: SatIndex 'SatError l -> (SatIndex 'SatError l,a)
     genT s = (s',samples !! s)
       where
         maxI = toEnum (length samples - 1)
@@ -281,7 +281,7 @@ outputVerifier clk rst samples i0 =
         -- Only assert while not finished
     in  mux f' f' $ assert clk rst "outputVerifier" i1 e f'
   where
-    genT :: Index l -> (Index l,(a,Bool))
+    genT :: SatIndex 'SatError l -> (SatIndex 'SatError l,(a,Bool))
     genT s = (s',(samples !! s,finished))
       where
         maxI = toEnum (length samples - 1)
@@ -345,7 +345,7 @@ outputVerifierBitVector clk rst samples i0 =
         -- Only assert while not finished
     in  mux f' f' $ assertBitVector clk rst "outputVerifierBitVector'" i1 e f'
   where
-    genT :: Index l -> (Index l,(BitVector n,Bool))
+    genT :: SatIndex 'SatError l -> (SatIndex 'SatError l,(BitVector n,Bool))
     genT s = (s',(samples !! s,finished))
       where
         maxI = toEnum (length samples - 1)
@@ -376,8 +376,8 @@ ignoreFor
 ignoreFor clk rst en SNat a i =
   mux ((==) <$> counter <*> (pure maxBound)) i (pure a)
  where
-  counter :: Signal dom (Index (n+1))
-  counter = register clk rst en 0 (satSucc SatBound <$> counter)
+  counter :: Signal dom (SatIndex 'SatBound (n+1))
+  counter = register clk rst en 0 (succ <$> counter)
 
 -- | Same as 'tbClockGen', but returns two clocks on potentially different
 -- domains. To be used in situations where the circuit under test runs

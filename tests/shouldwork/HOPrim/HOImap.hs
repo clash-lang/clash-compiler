@@ -12,7 +12,7 @@ busSwitch2
   :: forall n dom a b
    . KnownNat n
   => Vec n (Signal dom (Maybe a) -> Signal dom b ) -- vector of functions
-  -> Signal dom (Index n)               -- address as index of vectors
+  -> Signal dom (SatIndex 'SatError n)             -- address as index of vectors
   -> Signal dom (Maybe a)               -- input
   -> Vec n (Signal dom b)                      -- output
 busSwitch2 vec addr inp = zipWith ($) vec r where
@@ -27,19 +27,19 @@ busSwitch1
   :: forall n dom a b
    . KnownNat n
   => Vec n (Signal dom (Maybe a) -> Signal dom b ) -- vector of functions
-  -> Signal dom (Index n)                      -- address as index of vectors
+  -> Signal dom (SatIndex 'SatError n)                      -- address as index of vectors
   -> Signal dom (Maybe a)                      -- input
   -> Vec n (Signal dom b)                      -- output
 busSwitch1 vec addr inp = r where
     r = imap f vec
-    f :: Index n
+    f :: SatIndex 'SatError n
       -> (Signal dom (Maybe a) -> Signal dom b)
       -> Signal dom b
     f n x = x s where
        s :: Signal dom (Maybe a)
        s = liftA2 fa inp addr
        fa :: Maybe a
-          -> Index n
+          -> SatIndex 'SatError n
           -> Maybe a
        fa i a | n == a    = i
               | otherwise = Nothing
@@ -49,7 +49,7 @@ topEntity
   :: Clock System
   -> Reset System
   -> Enable System
-  -> (Signal System (Index 4)
+  -> (Signal System (SatIndex 'SatError 4)
      ,Signal System (Maybe (Signed 5)))
   -> Signal System (Vec 4 (Maybe (Signed 5)))
 topEntity = exposeClockResetEnable go where

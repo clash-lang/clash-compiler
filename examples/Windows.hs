@@ -36,7 +36,7 @@ windowsV m n xs = map (take m) (rotated m n xs)
 transpose :: forall r c a . (KnownNat c, KnownNat r) => Vec r (Vec c a) -> Vec c (Vec r a)
 transpose m = map (\i -> map (!!i) m) indices
  where
-   indices = iterateI (+ 1) 0 :: Vec c (Index r)
+   indices = iterateI (+ 1) 0 :: Vec c (SatIndex 'SatError r)
 
 
 (+>>>) :: KnownNat n => Vec m a -> Vec (n + m) a -> Vec (m + n) a

@@ -3,7 +3,7 @@ module VIndicesI where
 import Clash.Prelude
 import Clash.Explicit.Testbench
 
-topEntity :: Signal System (Vec 4 (Index 4))
+topEntity :: Signal System (Vec 4 (SatIndex 'SatError 4))
 topEntity = pure indicesI
 {-# NOINLINE topEntity #-}
 

@@ -29,12 +29,12 @@ slaveAddressRotate clk rst =
   E.mealyB clk rst enableGen
     (\(cntQ, bQ) (ss, b) ->
         let bF = bQ && not b
-            cntD | bF = if cntQ == maxBound then 0 else cntQ + 1
+            cntD | bF = succ cntQ
                  | otherwise = cntQ
 
             oH = (ss ||) <$> (unpack . complement $ bin2onehot cntQ)
         in  ((cntD, b), oH))
-    (0 :: Index n, False)
+    (0 :: SatIndex 'SatWrap n, False)
  where
   bin2onehot = setBit 0 . fromEnum
 

@@ -2,7 +2,7 @@
     { "name"      : "Clash.Sized.Internal.Index.pack#"
     , "workInfo"  : "Never"
     , "kind"      : "Expression"
-    , "type"      : "pack# :: Index n -> BitVector (CLog 2 n)"
+    , "type"      : "pack# :: SatIndex sat n -> BitVector (CLog 2 n)"
     , "template"  : "std_logic_vector(~ARG[0])"
     }
   }
@@ -10,49 +10,49 @@
     { "name"      : "Clash.Sized.Internal.Index.unpack#"
     , "workInfo"  : "Never"
     , "kind"      : "Expression"
-    , "type"      : "unpack# :: (KnownNat n, 1 <= n) => BitVector (CLog 2 n) -> Index n"
+    , "type"      : "unpack# :: (KnownNat n, 1 <= n) => BitVector (CLog 2 n) -> SatIndex sat n"
     , "template"  : "unsigned(~ARG[2])"
     }
   }
 , { "BlackBox" :
     { "name"      : "Clash.Sized.Internal.Index.eq#"
     , "kind"      : "Expression"
-    , "type"      : "eq# :: Index n -> Index n -> Bool"
+    , "type"      : "eq# :: SatIndex sat1 n -> SatIndex sat2 n -> Bool"
     , "template"  : "~IF~SIZE[~TYP[0]]~THEN~ARG[0] = ~ARG[1]~ELSEtrue~FI"
     }
   }
 , { "BlackBox" :
     { "name"      : "Clash.Sized.Internal.Index.neq#"
     , "kind"      : "Expression"
-    , "type"      : "neq# :: Index n -> Index n -> Bool"
+    , "type"      : "neq# :: SatIndex sat1 n -> SatIndex sat2 n -> Bool"
     , "template"  : "~IF~SIZE[~TYP[0]]~THEN~ARG[0] /= ~ARG[1]~ELSEfalse~FI"
     }
   }
 , { "BlackBox" :
     { "name"      : "Clash.Sized.Internal.Index.lt#"
     , "kind"      : "Expression"
-    , "type"      : "lt# :: Index n -> Index n -> Bool"
+    , "type"      : "lt# :: SatIndex sat1 n -> SatIndex sat2 n -> Bool"
     , "template"  : "~IF~SIZE[~TYP[0]]~THEN~ARG[0] < ~ARG[1]~ELSEfalse~FI"
     }
   }
 , { "BlackBox" :
     { "name"      : "Clash.Sized.Internal.Index.ge#"
     , "kind"      : "Expression"
-    , "type"      : "ge# :: Index n -> Index n -> Bool"
+    , "type"      : "ge# :: SatIndex sat1 n -> SatIndex sat2 n -> Bool"
     , "template"  : "~IF~SIZE[~TYP[0]]~THEN~ARG[0] >= ~ARG[1]~ELSEtrue~FI"
     }
   }
 , { "BlackBox" :
     { "name"      : "Clash.Sized.Internal.Index.gt#"
     , "kind"      : "Expression"
-    , "type"      : "gt# :: Index n -> Index n -> Bool"
+    , "type"      : "gt# :: SatIndex sat1 n -> SatIndex sat2 n -> Bool"
     , "template"  : "~IF~SIZE[~TYP[0]]~THEN~ARG[0] > ~ARG[1]~ELSEfalse~FI"
     }
   }
 , { "BlackBox" :
     { "name"      : "Clash.Sized.Internal.Index.le#"
     , "kind"      : "Expression"
-    , "type"      : "le# :: Index n -> Index n -> Bool"
+    , "type"      : "le# :: :: SatIndex sat1 n -> SatIndex sat2 n -> Bool"
     , "template"  : "~IF~SIZE[~TYP[0]]~THEN~ARG[0] <= ~ARG[1]~ELSEtrue~FI"
     }
   }
@@ -60,28 +60,28 @@
     { "name"      : "Clash.Sized.Internal.Index.maxBound#"
     , "workInfo"  : "Constant"
     , "kind"      : "Expression"
-    , "type"      : "maxBound# :: KnownNat n => Index n"
+    , "type"      : "maxBound# :: KnownNat n => SatIndex sat n"
     , "template"  : "to_unsigned(~LIT[0]-1,~SIZE[~TYPO])"
     }
   }
 , { "BlackBox" :
     { "name"      : "Clash.Sized.Internal.Index.+#"
     , "kind"      : "Expression"
-    , "type"      : "(+#) :: KnownNat n => Index n -> Index n -> Index n"
+    , "type"      : "(+#) :: KnownNat n => SatIndex sat n -> SatIndex sat n -> SatIndex sat n"
     , "template"  : "~ARG[1] + ~ARG[2]"
     }
   }
 , { "BlackBox" :
     { "name"      : "Clash.Sized.Internal.Index.-#"
     , "kind"      : "Expression"
-    , "type"      : "(-#) :: KnownNat n => Index n -> Index n -> Index n"
+    , "type"      : "(-#) :: KnownNat n => SatIndex sat n -> SatIndex sat n -> SatIndex sat n"
     , "template"  : "~ARG[1] - ~ARG[2]"
     }
   }
 , { "BlackBox" :
     { "name"      : "Clash.Sized.Internal.Index.*#"
     , "kind"      : "Expression"
-    , "type"      : "(*#) :: KnownNat n => Index n -> Index n -> Index n"
+    , "type"      : "(*#) :: KnownNat n => SatIndex sat n -> SatIndex sat n -> SatIndex sat n"
     , "template"  : "resize(~ARG[1] * ~ARG[2], ~SIZE[~TYPO])"
     }
   }
@@ -89,35 +89,35 @@
     { "name"      : "Clash.Sized.Internal.Index.fromInteger#"
     , "workInfo"  : "Never"
     , "kind"      : "Expression"
-    , "type"      : "fromInteger# :: KnownNat n => Integer -> Index n"
+    , "type"      : "fromInteger# :: KnownNat n => Integer -> SatIndex sat n"
     , "template"  : "resize(unsigned(std_logic_vector(~ARG[1])),~SIZE[~TYPO])"
     }
   }
 , { "BlackBox" :
     { "name"      : "Clash.Sized.Internal.Index.plus#"
     , "kind"      : "Expression"
-    , "type"      : "Index m -> Index n -> Index (m + n - 1)"
+    , "type"      : "plus# :: :: SatIndex sat m -> SatIndex sat n -> SatIndex sat (m + n - 1)"
     , "template"  : "resize(~ARG[0],~SIZE[~TYPO]) + resize(~ARG[1],~SIZE[~TYPO])"
     }
   }
 , { "BlackBox" :
     { "name"      : "Clash.Sized.Internal.Index.minus#"
     , "kind"      : "Expression"
-    , "type"      : "Index m -> Index n -> Index (m + n - 1)"
+    , "type"      : "minus# :: SatIndex sat m -> SatIndex sat n -> SatIndex sat (m + n - 1)"
     , "template"  : "resize(~ARG[0],~SIZE[~TYPO]) - resize(~ARG[1],~SIZE[~TYPO])"
     }
   }
 , { "BlackBox" :
     { "name"      : "Clash.Sized.Internal.Index.times#"
     , "kind"      : "Expression"
-    , "type"      : "Index m -> Index n -> Index (((m-1) * (n-1)) + 1)"
+    , "type"      : "times# :: SatIndex sat m -> SatIndex sat n -> SatIndex sat (((m - 1) * (n - 1)) + 1)"
     , "template"  : "resize(~ARG[0] * ~ARG[1],~SIZE[~TYPO])"
     }
   }
 , { "BlackBox" :
     { "name"      : "Clash.Sized.Internal.Index.rem#"
     , "kind"      : "Expression"
-    , "type"      : "rem# :: Index n -> Index n -> Index n"
+    , "type"      : "rem# :: SatIndex sat n -> SatIndex sat n -> SatIndex sat n"
     , "template"  : "~ARG[0] rem ~ARG[1]"
     }
   }
@@ -131,7 +131,7 @@
     { "name"      : "Clash.Sized.Internal.Index.resize#"
     , "workInfo"  : "Never"
     , "kind"      : "Expression"
-    , "type"      : "resize# :: KnownNat m => Index n -> Index m"
+    , "type"      : "resize# :: KnownNat m => SatIndex sat n -> SatIndex sat m"
     , "template"  : "~IF~SIZE[~TYP[1]]~THENresize(~ARG[1],~SIZE[~TYPO])~ELSEunsigned'(~SIZE[~TYPO]-1 downto 0 => '0')~FI"
     }
   }

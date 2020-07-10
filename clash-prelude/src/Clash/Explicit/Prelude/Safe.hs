@@ -223,11 +223,11 @@ riseEvery
   -> Signal dom Bool
 riseEvery clk rst en SNat = moore clk rst en transfer output 0 (pure ())
   where
-    output :: Index n -> Bool
+    output :: SatIndex 'SatWrap n -> Bool
     output = (== maxBound)
 
-    transfer :: Index n -> () -> Index n
-    transfer s _ = if (s == maxBound) then 0 else s+1
+    transfer :: SatIndex 'SatWrap n -> () -> SatIndex 'SatWrap n
+    transfer s _ = s+1
 {-# INLINEABLE riseEvery #-}
 
 -- | Oscillate a @'Bool'@ for a given number of cycles, given the starting state.
@@ -243,7 +243,7 @@ oscillate
 oscillate clk rst en begin SNat =
   moore clk rst en transfer snd (0, begin) (pure ())
  where
-  transfer :: (Index n, Bool) -> () -> (Index n, Bool)
+  transfer :: (SatIndex 'SatError n, Bool) -> () -> (SatIndex 'SatError n, Bool)
   transfer (s, i) _ =
     if s == maxBound
       then (0,   not i) -- reset state and oscillate output
