@@ -227,6 +227,45 @@ isBV _ = False
 timeUnits :: [Identifier]
 timeUnits = ["fs", "ps", "ns", "us", "ms", "sec", "min", "hr"]
 
+-- | Identifiers which are imported from the following:
+--
+-- use IEEE.STD_LOGIC_1164.ALL;
+-- use IEEE.NUMERIC_STD.ALL;
+-- use IEEE.MATH_REAL.ALL;
+-- use std.textio.all;
+--
+-- Clash should not use these identifiers, as it can lead to errors when
+-- interfacing with an EDA tool.
+--
+-- See https://github.com/clash-lang/clash-compiler/issues/1439.
+--
+importedNames :: [Identifier]
+importedNames =
+  [ -- ieee.std_logic_1164.all
+    "std_ulogic", "std_ulogic_vector", "resolved", "std_logic", "std_logic_vector"
+  , "x01", "x01z", "ux01", "ux01z", "to_bit", "to_bitvector", "to_stdulogic"
+  , "to_stdlogicvector", "to_stdulogicvector", "to_01", "to_x01", "to_x01z"
+  , "to_ux01", "rising_edge", "falling_edge", "is_x"
+    -- ieee.numeric_std.all
+  , "unresolved_unsigned", "unresolved_signed", "u_unsigned", "u_signed"
+  , "unsigned", "signed", "find_leftmost", "find_rightmost", "minimum"
+  , "maximum", "shift_left", "shift_right", "rotate_left", "rotate_right"
+  , "resize", "to_integer", "to_unsigned", "to_signed", "std_match"
+    -- ieee.math_real.all
+  , "math_e", "math_1_over_e", "math_pi", "math_2_pi", "math_1_over_pi"
+  , "math_pi_over_2", "math_pi_over_3", "path_pi_over_4", "path_3_pi_over_2"
+  , "math_log_of_2", "math_log_of_10", "math_log10_of_e", "math_sqrt_2"
+  , "math_1_over_sqrt_2", "math_sqrt_pi", "math_deg_to_rad", "math_rad_to_deg"
+  , "sign", "ceil", "floor", "round", "trunc", "realmax", "realmin", "uniform"
+  , "sqrt", "cbrt", "exp", "log", "log2", "log10", "sin", "cos", "tan", "arcsin"
+  , "arccos", "arctan", "sinh", "cosh", "tanh", "arcsinh", "arccosh", "arctanh"
+    -- std.textio.all
+  , "line", "text", "side", "width", "justify", "input", "output", "readline"
+  , "read", "sread", "string_read", "bread", "binary_read", "oread", "octal_read"
+  , "hread", "hex_read", "writeline", "tee", "write", "swrite", "string_write"
+  , "bwrite", "binary_write", "owrite", "octal_write", "hwrite", "hex_write"
+  ]
+
 -- List of reserved VHDL-2008 keywords
 -- + used internal names: toslv, fromslv, tagtoenum, datatotag
 -- + used IEEE library names: integer, boolean, std_logic, std_logic_vector,
@@ -247,7 +286,7 @@ reservedWords = ["abs","access","after","alias","all","and","architecture"
   ,"unaffected","units","until","use","variable","vmode","vprop","vunit","wait"
   ,"when","while","with","xnor","xor","toslv","fromslv","tagtoenum","datatotag"
   ,"integer", "boolean", "std_logic", "std_logic_vector", "signed", "unsigned"
-  ,"to_integer", "to_signed", "to_unsigned", "string","log"] ++ timeUnits
+  ,"to_integer", "to_signed", "to_unsigned", "string","log"] ++ timeUnits ++ importedNames
 
 filterReserved :: Identifier -> Identifier
 filterReserved s = if s `elem` reservedWords

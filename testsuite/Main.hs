@@ -390,8 +390,16 @@ runClashTest = defaultMain $ clashTestRoot
         , runTest "VecFun" def
       ]
       , clashTestGroup "Issues"
+<<<<<<< HEAD
         [ runTest "T1187" def{hdlSim=False, hdlTargets=[Verilog]}
         , netlistTest ("tests" </> "shouldwork" </> "Issues") [VHDL] [] "T1388" "main"
+=======
+        [ let _opts = def { hdlSim = False, hdlTargets = [Verilog] }
+           in NEEDS_PRIMS(runTest "T1187" _opts)
+        , clashLibTest ("tests" </> "shouldwork" </> "Issues") [VHDL] [] "T1388" "main"
+        , outputTest ("tests" </> "shouldwork" </> "Issues") allTargets [] [] "T1171" "main"
+        , clashLibTest ("tests" </> "shouldwork" </> "Issues") [VHDL] [] "T1439" "main"
+>>>>>>> 7d6516a28... Prevent name clashes with VHDL imports
         ]
       , clashTestGroup "Naming"
         [ runTest "T967a" def{hdlSim=False}
