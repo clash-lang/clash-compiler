@@ -454,6 +454,7 @@ runClashTest = defaultMain $ clashTestRoot
            in NEEDS_PRIMS(runTest "T1187" _opts)
         , clashLibTest ("tests" </> "shouldwork" </> "Issues") [VHDL] [] "T1388" "main"
         , outputTest ("tests" </> "shouldwork" </> "Issues") allTargets [] [] "T1171" "main"
+        , clashLibTest ("tests" </> "shouldwork" </> "Issues") [VHDL] [] "T1439" "main"
         ]
       , clashTestGroup "Naming"
         [ runTest "T967a" def{hdlSim=False}
