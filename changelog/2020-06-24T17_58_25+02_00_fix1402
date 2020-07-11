@@ -1,1 +1,0 @@
-FIXED: Clash renders incorrect VHDL when GHCs Worker/Wrapper transformation is enabled

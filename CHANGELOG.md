@@ -1,8 +1,30 @@
 # Changelog for the Clash project
 
+## 1.2.3 *July 11th 2020*
+* Changed:
+  * Upgrade to nixos 20.03. Nix and snap users will now use packages present in 20.03.
+
+* Added:
+  * `instance Monoid a => Monoid (Vec n a)`
+  * `instance Text.Printf(Index)`
+  * `instance Text.Printf(Signed)`
+  * `instance Text.Printf(Unsigned)`
+
+* Fixed:
+  * Clash renders incorrect VHDL when GHCs Worker/Wrapper transformation is enabled [#1402](https://github.com/clash-lang/clash-compiler/issues/14020)
+  * Minor faults in generated HDL when using annotations from `Clash.Annotations.SynthesisAttributes`
+  * Cabal installed through Snap (`clash.cabal`) can now access the internet to fetch pacakges. [#1411]https://github.com/clash-lang/clash-compiler/issues/1411
+  * Generated QSys file for `altpll` incompatible with Quartus CLI (did work in Quartus GUI)
+  * Clash no longer uses component names that clash with identifiers imported
+    from:
+    * IEEE.STD_LOGIC_1164.all
+    * IEEE.NUMERIC_STD.all
+    * IEEE.MATH_REAL.all
+    * std.textio.all
+    when generating VHDL.
+    See https://github.com/clash-lang/clash-compiler/issues/1439.
+
 ## 1.2.2 *June 12th 2020*
-
-
 * Changed:
   * The hardwired functions to unroll primitive definitions for 'zipWith', 'map', 'foldr', and 'init' have been changed to only unroll a single step, whereas they would previously unroll the whole definition in one step. This allows Clash to take advantage of the lazy nature of these functions, in turn speeding up compilation speeds significantly in some cases. Part of [PR 1354](https://github.com/clash-lang/clash-compiler/pull/1354).
 
