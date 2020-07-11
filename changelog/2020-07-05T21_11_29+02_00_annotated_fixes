@@ -1,1 +1,0 @@
-FIXED: Minor faults in generated HDL when using annotations from `Clash.Annotations.SynthesisAttributes`
