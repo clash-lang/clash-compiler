@@ -24,6 +24,24 @@ else
     exit 1;
 fi
 
+# You'd think comparing v${version} with ${CI_COMMIT_TAG} would do the
+# trick, but no..
+CI_COMMIT_TAG=${CI_COMMIT_TAG:-}
+version=$(echo $versions | tr ' ' '\n' | head -n 1)
+tag_version=${CI_COMMIT_TAG:1:${#CI_COMMIT_TAG}-1}  # Strip first character (v0.99 -> 0.99)
+
+if [[ ${tag_version} != "" && ${version} != ${tag_version} ]]; then
+    if [[ "${CI_COMMIT_TAG:0:1}" == "v" ]]; then
+        echo "Tag name and distribution's release number should match:"
+        echo "  Tag version:          ${CI_COMMIT_TAG}"
+        echo "  Distribution version: v${version}"
+        exit 1;
+    else
+        echo "\$CI_COMMIT_TAG should start with a 'v'. Found: ${CI_COMMIT_TAG}"
+        exit 1;
+    fi
+fi
+
 # Here to test whether all these variables are set
 echo "RUN_HADDOCK=${RUN_HADDOCK}"
 echo "RUN_LIBTESTS=${RUN_LIBTESTS}"
