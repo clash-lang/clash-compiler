@@ -1,0 +1,42 @@
+.benchmark:
+  image: clashlang/clash-ci:2020-06-29
+  stage: build
+  timeout: 2 hours
+  variables:
+    MULTIPLE_HIDDEN: "no"
+    GIT_SUBMODULE_STRATEGY: recursive
+    TERM: xterm-color
+
+    # setup.sh checks whether these variables exist so it can fail early
+    RUN_HADDOCK: "no"
+    RUN_LIBTESTS: "no"
+    RUN_CLASHDEV: "no"
+    RUN_TESTSUITE: "no"
+    RUN_BUILD_ALL: "no"
+  retry:
+    max: 2
+    when:
+      - runner_system_failure
+      - stuck_or_timeout_failure
+  cache:
+    key: cabal-store-$CI_JOB_NAME
+    paths:
+      - cabal-store/
+      - cabal-packages/
+  script:
+    - unset SNAPCRAFT_LOGIN_FILE
+    - unset HACKAGE_PASSWORD
+    # Use either ${GHC} or if that's not set, try to detect GHC version by analyzing
+    # $CI_JOB_NAME.
+    - export GHC=ghc-"${GHC_VERSION:-$(echo $CI_JOB_NAME | egrep -o '[0-9]+.[0-9]+.[0-9]+')}"
+    - export THREADS=2
+    - export CABAL_JOBS=2
+    - export
+    - .ci/setup.sh
+    - cabal new-run --write-ghc-environment-files=always benchmark -- --csv benchmark.csv
+  tags:
+    - benchmarks
+  artifacts:
+    paths:
+      - benchmark.csv
+    expire_in: 1 week
