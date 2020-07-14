@@ -1,5 +1,6 @@
 include:
   - '/.ci/gitlab/publish.yml'
+  - '/.ci/gitlab/benchmark.yml'
   - '/.ci/gitlab/tests.yml'
 
 stages:
@@ -45,6 +46,10 @@ ghc-8.6.5-singular-hidden-master:
   extends: .tests-non-interruptible
   variables:
     MULTIPLE_HIDDEN: "no"
+
+# Run benchmarks for isclashfastyet.com
+benchmark-8.8.3:
+  extends: .benchmark
 
 # "Publish" a release candidate
 hackage-release-candidate:
