@@ -31,14 +31,23 @@ import Clash.Rewrite.Util
 -- | Normalisation transformation
 normalization :: NormRewrite
 normalization =
-  rmDeadcode >-> constantPropagation >-> rmUnusedExpr >-!-> anf >-!-> rmDeadcode >->
-  bindConst >-> letTL
-#if !EXPERIMENTAL_EVALUATOR
-  >-> evalConst
-#endif
-  >-!-> cse >-!-> cleanup >->
-  xOptim >-> rmDeadcode >->
-  cleanup >-> recLetRec >-> splitArgs
+  rmDeadcode >->
+  constantPropagation >->
+  rmUnusedExpr >-!->
+  anf >-!->
+  rmDeadcode >->
+  bindConst >->
+  letTL >->
+-- #if !EXPERIMENTAL_EVALUATOR
+  evalConst >-!->
+-- #endif
+  cse >-!->
+  cleanup >->
+  xOptim >->
+  rmDeadcode >->
+  cleanup >->
+  recLetRec >->
+  splitArgs
   where
     anf        = topdownR (apply "nonRepANF" nonRepANF) >-> apply "ANF" makeANF >-> topdownR (apply "caseCon" caseCon)
     letTL      = topdownSucR (apply "topLet" topLet)
@@ -47,17 +56,17 @@ normalization =
     rmDeadcode = bottomupR (apply "deadcode" deadCode)
     bindConst  = topdownR (apply "bindConstantVar" bindConstantVar)
     -- See [Note] bottomup traversal evalConst:
-#if !EXPERIMENTAL_EVALUATOR
+-- #if !EXPERIMENTAL_EVALUATOR
     evalConst  = bottomupR (apply "evalConst" reduceConst)
-#endif
+-- #endif
     cse        = topdownR (apply "CSE" simpleCSE)
     xOptim     = bottomupR (apply "xOptimize" xOptimize)
     cleanup    = topdownR (apply "etaExpandSyn" etaExpandSyn) >->
-                 topdownSucR (apply "inlineCleanup" inlineCleanup) !->
+                 -- topdownSucR (apply "inlineCleanup" inlineCleanup) !->
                  innerMost (applyMany [("caseCon"        , caseCon)
                                       ,("bindConstantVar", bindConstantVar)
                                       ,("letFlat"        , flattenLet)])
-                 >-> rmDeadcode >-> letTL
+                 >-> rmUnusedExpr >-> rmDeadcode >-> letTL
     splitArgs  = topdownR (apply "separateArguments" separateArguments) !->
                  topdownR (apply "caseCon" caseCon)
 
@@ -86,9 +95,7 @@ constantPropagation =
       [ ("applicationPropagation", appPropFast          )
       , ("bindConstantVar"       , bindConstantVar      )
       , ("caseLet"               , caseLet              )
-#if !EXPERIMENTAL_EVALUATOR
       , ("caseCase"              , caseCase             )
-#endif
       , ("caseCon"               , caseCon              )
       , ("elemExistentials"      , elemExistentials     )
       , ("caseElemNonReachable"  , caseElemNonReachable )

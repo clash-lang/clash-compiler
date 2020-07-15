@@ -99,7 +99,7 @@ vecHeadPrim
   -> Term
 vecHeadPrim vecTcNm =
  -- head :: Vec (n+1) a -> a
-  Prim (PrimInfo "Clash.Sized.Vector.head" (vecHeadTy vecTcNm) WorkNever)
+  Prim (PrimInfo "Clash.Sized.Vector.head" (vecHeadTy vecTcNm) WorkNever Nothing)
 
 vecLastPrim
   :: TyConName
@@ -109,7 +109,7 @@ vecLastPrim vecTcNm =
   -- last :: Vec (n+1) a -> a
   -- has the same type signature as head, hence we're reusing its type
   -- definition here.
-  Prim (PrimInfo "Clash.Sized.Vector.last" (vecHeadTy vecTcNm) WorkNever)
+  Prim (PrimInfo "Clash.Sized.Vector.last" (vecHeadTy vecTcNm) WorkNever Nothing)
 
 vecHeadTy
   :: TyConName
@@ -131,7 +131,7 @@ vecTailPrim
   -> Term
 vecTailPrim vecTcNm =
   -- tail :: Vec (n + 1) a -> Vec n a
-  Prim (PrimInfo "Clash.Sized.Vector.tail" (vecTailTy vecTcNm) WorkNever)
+  Prim (PrimInfo "Clash.Sized.Vector.tail" (vecTailTy vecTcNm) WorkNever Nothing)
 
 vecInitPrim
   :: TyConName
@@ -141,7 +141,7 @@ vecInitPrim vecTcNm =
   -- init :: Vec (n + 1) a -> Vec n a
   -- has the same type signature as tail, hence we're reusing its type
   -- definition here.
-  Prim (PrimInfo "Clash.Sized.Vector.init" (vecTailTy vecTcNm) WorkNever)
+  Prim (PrimInfo "Clash.Sized.Vector.init" (vecTailTy vecTcNm) WorkNever Nothing)
 
 vecTailTy
   :: TyConName
@@ -414,7 +414,7 @@ reduceImap (TransformContext is0 ctx) n argElTy resElTy fun arg = do
                                                (mkTyConApp idxTcNm
                                                            [VarTy nTv])
                                                [integerPrimTy,integerPrimTy])
-            idxFromInteger   = Prim (PrimInfo "Clash.Sized.Internal.Index.fromInteger#" idxFromIntegerTy WorkNever)
+            idxFromInteger   = Prim (PrimInfo "Clash.Sized.Internal.Index.fromInteger#" idxFromIntegerTy WorkNever Nothing)
             idxs             = map (App (App (TyApp idxFromInteger (LitTy (NumTy n)))
                                              (Literal (IntegerLiteral (toInteger n))))
                                    . Literal . IntegerLiteral . toInteger) [0..(n-1)]
@@ -1040,7 +1040,7 @@ reduceReplace_int is0 n aTy vTy v i newA = do
     -> Type
     -> Term
   eqIntPrim intTy boolTy =
-    Prim (PrimInfo "Clash.Transformations.eqInt" (mkFunTy intTy (mkFunTy intTy boolTy)) WorkVariable)
+    Prim (PrimInfo "Clash.Transformations.eqInt" (mkFunTy intTy (mkFunTy intTy boolTy)) WorkVariable Nothing)
 
   go tcm (coreView1 tcm -> Just ty') = go tcm ty'
   go tcm (tyView -> TyConApp vecTcNm _)
@@ -1140,7 +1140,7 @@ reduceIndex_int is0 n aTy v i = do
     -> Type
     -> Term
   eqIntPrim intTy boolTy =
-    Prim (PrimInfo "Clash.Transformations.eqInt" (mkFunTy intTy (mkFunTy intTy boolTy)) WorkVariable)
+    Prim (PrimInfo "Clash.Transformations.eqInt" (mkFunTy intTy (mkFunTy intTy boolTy)) WorkVariable Nothing)
 
   go tcm (coreView1 tcm -> Just ty') = go tcm ty'
   go tcm (tyView -> TyConApp vecTcNm _)

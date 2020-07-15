@@ -417,13 +417,13 @@ dataConInstArgTys (MkData { dcArgTys, dcUnivTyVars, dcExtTyVars }) inst_tys =
 primCo
   :: Type
   -> Term
-primCo ty = Prim (PrimInfo "_CO_" ty WorkNever)
+primCo ty = Prim (PrimInfo "_CO_" ty WorkNever Nothing)
 
 -- | Make an undefined term
 undefinedTm
   :: Type
   -> Term
-undefinedTm = TyApp (Prim (PrimInfo "Clash.Transformations.undefined" undefinedTy WorkNever))
+undefinedTm = TyApp (Prim (PrimInfo "Clash.Transformations.undefined" undefinedTy WorkNever Nothing))
 
 substArgTys
   :: DataCon

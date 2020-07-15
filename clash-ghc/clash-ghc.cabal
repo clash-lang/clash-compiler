@@ -205,6 +205,28 @@ library
                       Clash.GHC.NetlistTypes
 
                       Clash.GHC.PartialEval
+                      Clash.GHC.PartialEval.Bit
+                      Clash.GHC.PartialEval.BitVector
+                      Clash.GHC.PartialEval.ByteArray
+                      Clash.GHC.PartialEval.Char
+                      Clash.GHC.PartialEval.Double
+                      Clash.GHC.PartialEval.Enum
+                      Clash.GHC.PartialEval.Float
+                      Clash.GHC.PartialEval.GhcMisc
+                      Clash.GHC.PartialEval.Index
+                      Clash.GHC.PartialEval.Int
+                      Clash.GHC.PartialEval.Integer
+                      Clash.GHC.PartialEval.Internal
+                      Clash.GHC.PartialEval.Internal.Sized
+                      Clash.GHC.PartialEval.Narrowing
+                      Clash.GHC.PartialEval.Natural
+                      -- Clash.GHC.PartialEval.RTree
+                      Clash.GHC.PartialEval.Promoted
+                      Clash.GHC.PartialEval.Signed
+                      Clash.GHC.PartialEval.Transformations
+                      Clash.GHC.PartialEval.Unsigned
+                      Clash.GHC.PartialEval.Vector
+                      Clash.GHC.PartialEval.Word
 
                       Clash.GHCi.Common
 

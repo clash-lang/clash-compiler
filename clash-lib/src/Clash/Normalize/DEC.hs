@@ -159,8 +159,9 @@ collectGlobals' is0 substitution seen e@(collectArgsTicks -> (fun, args@(_:_), t
 #if EXPERIMENTAL_EVALUATOR
     ri <- Lens.view recInfo
     fuel <- Lens.view fuelLimit
+    (fn, _) <- Lens.use curFun
 
-    let env = mkGlobalEnv bndrs ri fuel gh tcm is0 ids1
+    let env = mkGlobalEnv fn bndrs ri fuel gh tcm is0 ids1
     let eval = asTerm . fst . runEval env . evaluateNf evaluate
 #else
     let eval = (Lens.view Lens._3) . whnf' evaluate bndrs tcm gh ids1 is0 False

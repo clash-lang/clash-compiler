@@ -1,3 +1,4 @@
+{-# LANGUAGE DeriveAnyClass #-}
 {-# LANGUAGE LambdaCase #-}
 
 module Clash.Core.Termination
@@ -7,10 +8,12 @@ module Clash.Core.Termination
   , recursiveGroup
   ) where
 
+import Control.DeepSeq (NFData)
 import Control.Lens.Fold
 import Data.Graph (SCC(..))
 import qualified Data.Graph as Graph
 import qualified Data.List as List
+import GHC.Generics (Generic)
 
 import Clash.Core.FreeVars
 import Clash.Core.Var
@@ -27,7 +30,7 @@ data RecInfo = RecInfo
     -- components.
   , nonRecBindings :: VarSet
     -- ^ Non-recursive bindings
-  }
+  } deriving (Generic, NFData)
 
 instance Show RecInfo where
   show (RecInfo rs ns) =

@@ -96,3 +96,15 @@ executable clash-testsuite
   build-depends:
     clash-testsuite
 
+executable partial-eval
+  import: basic-config
+  main-is: partial-eval.hs
+  ghc-options: -threaded -with-rtsopts=-N
+
+  build-depends:
+    concurrent-supply,
+    ghc-typelits-extra        >= 0.3.2    && < 0.5,
+    ghc-typelits-knownnat     >= 0.6      && < 0.8,
+    ghc-typelits-natnormalise >= 0.6      && < 0.8,
+    text,
+

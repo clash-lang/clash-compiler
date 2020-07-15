@@ -414,7 +414,7 @@ coreToTerm primMap unlocs = term
         x' <- coreToIdSP sp x
         return (x',b')
 
-    term' (Case _ _ ty [])  = C.TyApp (C.Prim (C.PrimInfo (pack "EmptyCase") C.undefinedTy C.WorkNever))
+    term' (Case _ _ ty [])  = C.TyApp (C.Prim (C.PrimInfo (pack "EmptyCase") C.undefinedTy C.WorkNever Nothing))
                                 <$> coreToType ty
     term' (Case e b ty alts) = do
      let usesBndr = any ( not . isEmptyVarSet . exprSomeFreeVars (== b))
@@ -441,9 +441,9 @@ coreToTerm primMap unlocs = term
     term' (Tick (SourceNote rsp _) e) =
       C.Tick (C.SrcSpan (RealSrcSpan rsp)) <$> addUsefull (RealSrcSpan rsp) (term e)
     term' (Tick _ e)        = term e
-    term' (Type t)          = C.TyApp (C.Prim (C.PrimInfo (pack "_TY_") C.undefinedTy C.WorkNever)) <$>
+    term' (Type t)          = C.TyApp (C.Prim (C.PrimInfo (pack "_TY_") C.undefinedTy C.WorkNever Nothing)) <$>
                                 coreToType t
-    term' (Coercion co)     = C.TyApp (C.Prim (C.PrimInfo (pack "_CO_") C.undefinedTy C.WorkNever)) <$>
+    term' (Coercion co)     = C.TyApp (C.Prim (C.PrimInfo (pack "_CO_") C.undefinedTy C.WorkNever Nothing)) <$>
                                 coreToType (coercionType co)
 
 
@@ -460,7 +460,7 @@ coreToTerm primMap unlocs = term
         xType  <- coreToType (varType x)
         case isDataConId_maybe x of
           Just dc -> case lookupPrim xNameS of
-            Just p  -> return $ C.Prim (C.PrimInfo xNameS xType (maybe C.WorkVariable workInfo p))
+            Just p  -> return $ C.Prim (C.PrimInfo xNameS xType (maybe C.WorkVariable workInfo p) Nothing)
             Nothing -> if isDataConWrapId x && not (isNewTyCon (dataConTyCon dc))
               then let xInfo = idInfo x
                        unfolding = unfoldingInfo xInfo
@@ -497,20 +497,32 @@ coreToTerm primMap unlocs = term
               -> return (nameModTerm C.SetName xType)
               | f == "Clash.XException.xToErrorCtx"
               -> return (xToErrorCtxTerm xType)
-              | otherwise                                    -> return (C.Prim (C.PrimInfo xNameS xType wi))
-            Just (Just (BlackBox {workInfo = wi})) ->
-              return $ C.Prim (C.PrimInfo xNameS xType wi)
-            Just (Just (BlackBoxHaskell {workInfo = wi})) ->
-              return $ C.Prim (C.PrimInfo xNameS xType wi)
+              | x `elem` unlocs
+              -> return (C.Prim (C.PrimInfo xNameS xType wi Nothing))
+              | otherwise
+              -> do bndr <- coreToId x
+                    return (C.Prim (C.PrimInfo xNameS xType wi (Just bndr)))
+            Just (Just (BlackBox {workInfo = wi}))
+              | x `elem` unlocs
+              -> return $ C.Prim (C.PrimInfo xNameS xType wi Nothing)
+              | otherwise
+              -> do bndr <- coreToId x
+                    return (C.Prim (C.PrimInfo xNameS xType wi (Just bndr)))
+            Just (Just (BlackBoxHaskell {workInfo = wi}))
+              | x `elem` unlocs
+              -> return $ C.Prim (C.PrimInfo xNameS xType wi Nothing)
+              | otherwise
+              -> do bndr <- coreToId x
+                    return $ C.Prim (C.PrimInfo xNameS xType wi (Just bndr))
             Just Nothing ->
               -- Was guarded by "DontTranslate". We don't know yet if Clash will
               -- actually use it later on, so we don't err here.
-              return $ C.Prim (C.PrimInfo xNameS xType C.WorkVariable)
+              return $ C.Prim (C.PrimInfo xNameS xType C.WorkVariable Nothing)
             Nothing
               | x `elem` unlocs
-              -> return (C.Prim (C.PrimInfo xNameS xType C.WorkVariable))
+              -> return (C.Prim (C.PrimInfo xNameS xType C.WorkVariable Nothing))
               | pack "$cshow" `isInfixOf` xNameS
-              -> return (C.Prim (C.PrimInfo xNameS xType C.WorkVariable))
+              -> return (C.Prim (C.PrimInfo xNameS xType C.WorkVariable Nothing))
               | otherwise
               -> C.Var <$> coreToId x
 
@@ -1243,7 +1255,7 @@ runRWTerm (C.ForAllTy rTV (C.ForAllTy oTV funTy)) =
   C.TyLam rTV (
   C.TyLam oTV (
   C.Lam   fId (
-  (C.App (C.Var fId) (C.Prim (C.PrimInfo rwNm rwTy C.WorkNever))))))
+  (C.App (C.Var fId) (C.Prim (C.PrimInfo rwNm rwTy C.WorkNever Nothing))))))
   where
     (C.FunTy fTy _)  = C.tyView funTy
     (C.FunTy rwTy _) = C.tyView fTy

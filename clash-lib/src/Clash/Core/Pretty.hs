@@ -25,6 +25,7 @@ module Clash.Core.Pretty
   , showPpr, showPpr'
   , tracePprId
   , tracePpr
+  , tracePprM
   , fromPpr
   )
 where
@@ -54,7 +55,7 @@ import Clash.Core.TyCon                 (TyCon (..), TyConName, isTupleTyConLike
 import Clash.Core.Type                  (ConstTy (..), Kind, LitTy (..),
                                          Type (..), TypeView (..), tyView)
 import Clash.Core.Var                   (Id, TyVar, Var (..), IdScope(..))
-import Clash.Debug                      (trace)
+import Clash.Debug                      (trace, traceM)
 import Clash.Util
 import qualified Clash.Util.Interpolate as I
 import Clash.Pretty
@@ -161,6 +162,9 @@ tracePprId p = trace (showPpr p) p
 
 tracePpr :: PrettyPrec p => p -> a -> a
 tracePpr p a = trace (showPpr p) a
+
+tracePprM :: (Monad m, PrettyPrec p) => p -> m ()
+tracePprM p = traceM (showPpr p)
 
 parensIf :: Bool -> ClashDoc -> ClashDoc
 parensIf False = id

@@ -118,7 +118,8 @@ data PrimInfo = PrimInfo
   { primName     :: !Text
   , primType     :: !Type
   , primWorkInfo :: !WorkInfo
-  } deriving (Show,Generic,NFData,Hashable,Binary)
+  , primCoreId   :: !(Maybe Id)
+  } deriving (Eq,Show,Generic,NFData,Hashable,Binary)
 
 data WorkInfo
   = WorkConstant
@@ -130,7 +131,7 @@ data WorkInfo
   | WorkAlways
   -- ^ Performs work regardless of whether the variables are constant or
   -- variable; these are things like clock or reset generators
-  deriving (Show,Generic,NFData,Hashable,Binary)
+  deriving (Eq,Show,Generic,NFData,Hashable,Binary)
 
 -- | Term reference
 type TmName     = Name Term
