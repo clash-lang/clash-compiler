@@ -19,10 +19,13 @@ import Control.Concurrent.Supply (Supply)
 import Control.Monad.RWS.Strict (MonadReader, MonadState, RWS)
 import qualified Control.Monad.RWS.Strict as RWS
 import Data.Bifunctor (first, second)
+import Data.HashMap.Strict (HashMap)
+import qualified Data.HashMap.Strict as HashMap
 import Data.IntMap.Strict (IntMap)
 import Data.Map.Strict (Map)
 import qualified Data.Map.Strict as Map
 import qualified Data.Set.Lens as Set
+import Data.Text (Text)
 
 import Clash.Core.DataCon
 import Clash.Core.FreeVars (localFVsOfTerms, tyFVsOfTypes, freeLocalIds)
@@ -162,6 +165,8 @@ data GlobalEnv = GlobalEnv
   , genvRecInfo :: RecInfo
     -- ^ Information about which global bindings are recursive, used to decide
     -- whether or not to inline a global binding.
+  , genvPrimInfos :: HashMap Text PrimInfo
+    -- ^ The PrimInfo for each primtiive used in the design.
   , genvFuel :: Word
     -- ^ Remaining fuel for inlining. This decreases when a potentially
     -- non-terminating binder is inlined and increases when moving up the AST.
@@ -186,6 +191,7 @@ type GlobalIO = (IntMap Value, Int)
 mkGlobalEnv
   :: BindingMap
   -> RecInfo
+  -> HashMap Text PrimInfo
   -> Word
   -> GlobalIO
   -> TyConMap
@@ -215,6 +221,9 @@ updateGlobal i x =
 
 getRecInfo :: Eval RecInfo
 getRecInfo = RWS.gets genvRecInfo
+
+getPrimInfo :: Text -> Eval (Maybe PrimInfo)
+getPrimInfo x = HashMap.lookup x <$> RWS.gets genvPrimInfos
 
 getFuel :: Eval Word
 getFuel = RWS.gets genvFuel

@@ -22,6 +22,7 @@ import           Control.Monad                    (when)
 import           Control.Monad.State.Strict       (State)
 import           Data.Default                     (def)
 import           Data.Either                      (lefts,partitionEithers)
+import           Data.HashMap.Strict              (HashMap)
 import qualified Data.IntMap                      as IntMap
 import           Data.IntMap.Strict               (IntMap)
 import           Data.List
@@ -30,6 +31,7 @@ import qualified Data.Map                         as Map
 import qualified Data.Maybe                       as Maybe
 import qualified Data.Set                         as Set
 import qualified Data.Set.Lens                    as Lens
+import           Data.Text                        (Text)
 import           Data.Text.Prettyprint.Doc        (vcat)
 
 import           BasicTypes                       (InlineSpec (..))
@@ -49,7 +51,7 @@ import           Clash.Core.Pretty                (PrettyOptions(..), showPpr, s
 import           Clash.Core.Subst
   (extendGblSubstList, mkSubst, substTm)
 import           Clash.Core.Term                  (Term (..), collectArgsTicks
-                                                  ,mkApps, mkTicks)
+                                                  ,mkApps, mkTicks,PrimInfo)
 import           Clash.Core.Termination           (mkRecInfo)
 import           Clash.Core.Type                  (Type, splitCoreFunForallTy)
 import           Clash.Core.TyCon
@@ -97,6 +99,8 @@ runNormalization
   -- ^ Level of debug messages to print
   -> Supply
   -- ^ UniqueSupply
+  -> HashMap Text PrimInfo
+  -- ^ Primitives used in design
   -> BindingMap
   -- ^ Global Binders
   -> (CustomReprs -> TyConMap -> Type ->
@@ -118,7 +122,7 @@ runNormalization
   -> NormalizeSession a
   -- ^ NormalizeSession to run
   -> a
-runNormalization opts supply globals typeTrans reprs tcm tupTcm eval primMap rcsMap topEnts
+runNormalization opts supply primInfos globals typeTrans reprs tcm tupTcm eval primMap rcsMap topEnts
   = runRewriteSession rwEnv rwState
   where
     rwEnv     = RewriteEnv
@@ -134,6 +138,7 @@ runNormalization opts supply globals typeTrans reprs tcm tupTcm eval primMap rcs
                   (mkVarSet topEnts)
                   reprs
                   (mkRecInfo globals)
+                  primInfos
                   (opt_evaluatorFuelLimit opts)
 
     rwState   = RewriteState

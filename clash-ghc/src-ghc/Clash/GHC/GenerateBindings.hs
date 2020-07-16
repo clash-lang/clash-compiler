@@ -14,7 +14,7 @@ where
 
 import           Control.Arrow           ((***), first)
 import           Control.DeepSeq         (deepseq)
-import           Control.Lens            ((%~),(&))
+import           Control.Lens            ((%~),(&),(^.))
 import           Control.Monad           (unless)
 import qualified Control.Monad.State     as State
 import qualified Control.Monad.RWS.Strict as RWS
@@ -46,7 +46,7 @@ import           Clash.Annotations.Primitive (HDL, extractPrim)
 import           Clash.Signal.Internal
 
 import           Clash.Core.Subst        (extendGblSubstList, mkSubst, substTm)
-import           Clash.Core.Term         (Term (..), mkLams, mkTyLams)
+import           Clash.Core.Term         (Term (..), PrimInfo, mkLams, mkTyLams)
 import           Clash.Core.Type         (Type (..), TypeView (..), mkFunTy, splitFunForallTy, tyView)
 import           Clash.Core.TyCon        (TyConMap, TyConName, isNewTypeTc)
 import           Clash.Core.TysPrim      (tysPrimMap)
@@ -58,7 +58,7 @@ import           Clash.Driver            (compilePrimitive)
 import           Clash.Driver.Types      (BindingMap, Binding(..))
 import           Clash.GHC.GHC2Core
   (C2C, GHC2CoreState, tyConMap, coreToId, coreToName, coreToTerm,
-   makeAllTyCons, qualifiedNameString, emptyGHC2CoreState)
+   makeAllTyCons, qualifiedNameString, emptyGHC2CoreState, primInfoMap)
 import           Clash.GHC.LoadModules   (ghcLibDir, loadModules)
 import           Clash.Netlist.BlackBox.Util (getUsedArguments)
 import           Clash.Netlist.Types     (TopEntityT(..))
@@ -96,6 +96,7 @@ generateBindings
         , CompiledPrimMap  -- The primitives found in '.' and 'primDir'
         , [DataRepr']
         , HashMap.HashMap Text.Text VDomainConfiguration
+        , HashMap.HashMap Text.Text PrimInfo
         )
 generateBindings useColor primDirs importDirs dbs hdl modName dflagsM = do
   (  bindings
@@ -119,6 +120,7 @@ generateBindings useColor primDirs importDirs dbs hdl modName dflagsM = do
                    GHC.noSrcSpan
                    emptyGHC2CoreState
       (tcMap',tupTcCache)           = mkTupTyCons tcMap
+      primInfos                     = tcMap ^. primInfoMap
       tcCache                       = makeAllTyCons tcMap' fiEnvs
       allTcCache                    = tysPrimMap `unionUniqMap` tcCache
       inScope0 = mkInScopeSet (uniqMapToUniqSet
@@ -149,6 +151,7 @@ generateBindings useColor primDirs importDirs dbs hdl modName dflagsM = do
          , primMapC
          , customBitRepresentations
          , domainConfs
+         , primInfos
          )
 
 -- TODO This function should be changed to provide the information that

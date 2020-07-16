@@ -86,7 +86,7 @@ import           Clash.Core.Evaluator.Types       (Evaluator)
 
 import           Clash.Core.Name                  (Name (..))
 import           Clash.Core.Pretty                (PrettyOptions(..), showPpr')
-import           Clash.Core.Term                  (Term)
+import           Clash.Core.Term                  (Term, PrimInfo)
 import           Clash.Core.Type
   (Type(ForAllTy, LitTy, AnnType), TypeView(..), tyView, mkFunTy, LitTy(SymTy))
 import           Clash.Core.TyCon                 (TyConMap, TyConName)
@@ -227,6 +227,8 @@ generateHDL
   => CustomReprs
   -> HashMap Data.Text.Text VDomainConfiguration
   -- ^ Known domains to configurations
+  -> HashMap Data.Text.Text PrimInfo
+  -- ^ Primitives used in the design
   -> BindingMap
   -- ^ Set of functions
   -> Maybe backend
@@ -250,7 +252,7 @@ generateHDL
   -- ^ Debug information level for the normalization process
   -> (Clock.UTCTime,Clock.UTCTime)
   -> IO ()
-generateHDL reprs domainConfs bindingsMap hdlState primMap tcm tupTcm typeTrans eval
+generateHDL reprs domainConfs primInfos bindingsMap hdlState primMap tcm tupTcm typeTrans eval
   topEntities0 mainTopEntity opts (startTime,prepTime) =
     let todo = maybe topEntities2 (uncurry (:)) mainTopEntity
         (tes, deps) = sortTop bindingsMap todo
@@ -407,7 +409,7 @@ generateHDL reprs domainConfs bindingsMap hdlState primMap tcm tupTcm typeTrans 
       return (topTime,manifest,HashMap.unionWith max (HashMap.fromList (map (,0) (componentNames manifest))) seen, edamFiles')
     else do
       -- 1. Normalise topEntity
-      let transformedBindings = normalizeEntity reprs bindingsMap primMap tcm tupTcm
+      let transformedBindings = normalizeEntity reprs bindingsMap primInfos primMap tcm tupTcm
                                   typeTrans eval topEntityNames opts supplyN
                                   topEntity
 
@@ -464,7 +466,7 @@ generateHDL reprs domainConfs bindingsMap hdlState primMap tcm tupTcm typeTrans 
           hdlState2 = setModName modName' hdlState'
 
       -- 1. Normalise testBench
-      let transformedBindings = normalizeEntity reprs bindingsMap primMap tcm tupTcm
+      let transformedBindings = normalizeEntity reprs bindingsMap primInfos primMap tcm tupTcm
                                   typeTrans eval topEntityNames opts supplyTB tb
       normTime <- transformedBindings `deepseq` Clock.getCurrentTime
       let prepNormDiff = reportTimeDiff normTime topTime
@@ -922,6 +924,8 @@ normalizeEntity
   :: CustomReprs
   -> BindingMap
   -- ^ All bindings
+  -> HashMap Data.Text.Text PrimInfo
+  -- ^ Primitives used in design
   -> CompiledPrimMap
   -- ^ BlackBox HDL templates
   -> TyConMap
@@ -942,14 +946,14 @@ normalizeEntity
   -> Id
   -- ^ root of the hierarchy
   -> BindingMap
-normalizeEntity reprs bindingsMap primMap tcm tupTcm typeTrans eval topEntities
+normalizeEntity reprs bindingsMap primInfos primMap tcm tupTcm typeTrans eval topEntities
   opts supply tm = transformedBindings
   where
     doNorm = do norm <- normalize [tm]
                 let normChecked = checkNonRecursive norm
                 cleaned <- cleanupGraph tm normChecked
                 return cleaned
-    transformedBindings = runNormalization opts supply bindingsMap
+    transformedBindings = runNormalization opts supply primInfos bindingsMap
                             typeTrans reprs tcm tupTcm eval primMap emptyVarEnv
                             topEntities doNorm
 

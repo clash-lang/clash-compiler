@@ -2,6 +2,7 @@
 
 import           Clash.Annotations.TopEntity
 import           Clash.Annotations.BitRepresentation.Internal (CustomReprs)
+import           Clash.Core.Term (PrimInfo)
 import           Clash.Core.TyCon
 import           Clash.Core.Var
 import           Clash.Driver
@@ -16,8 +17,10 @@ import           Clash.GHC.Evaluator
 import qualified Control.Concurrent.Supply    as Supply
 import           Control.DeepSeq              (deepseq)
 import           Data.Binary                  (decode)
+import           Data.HashMap.Strict          (HashMap)
 import           Data.IntMap.Strict           (IntMap)
 import           Data.List                    (partition)
+import           Data.Text                    (Text)
 import           System.Environment           (getArgs)
 
 import qualified Data.ByteString.Lazy as B
@@ -41,10 +44,10 @@ benchFile idirs src = do
   supplyN <- Supply.newSupply
   env <- setupEnv src
   putStrLn $ "Doing normalization of " ++ src
-  let (bindingsMap,tcm,tupTcm,_topEntities,primMap,reprs,topEntityNames,topEntity) = env
+  let (bindingsMap,tcm,tupTcm,_topEntities,primInfos,primMap,reprs,topEntityNames,topEntity) = env
       primMap' = fmap (fmap unremoveBBfunc) primMap
       res :: BindingMap
-      res = normalizeEntity reprs bindingsMap primMap' tcm tupTcm typeTrans
+      res = normalizeEntity reprs bindingsMap primInfos primMap' tcm tupTcm typeTrans
 #if EXPERIMENTAL_EVALUATOR
                    ghcEvaluator
 #else
@@ -54,7 +57,8 @@ benchFile idirs src = do
   res `deepseq` putStrLn ".. done\n"
 
 setupEnv :: FilePath -> IO (BindingMap,TyConMap,IntMap TyConName
-                           ,[(Id, Maybe TopEntity, Maybe Id)],CompiledPrimMap'
+                           ,[(Id, Maybe TopEntity, Maybe Id)]
+                           ,HashMap Text PrimInfo,CompiledPrimMap'
                            ,CustomReprs,[Id],Id)
 setupEnv src = do
   let bin = src ++ ".bin"

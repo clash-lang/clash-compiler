@@ -8,6 +8,7 @@ module BenchmarkCommon where
 import Clash.Annotations.BitRepresentation.Internal (CustomReprs, buildCustomReprs)
 import Clash.Backend
 import Clash.Backend.VHDL
+import Clash.Core.Term (PrimInfo)
 import Clash.Core.TyCon
 import Clash.Core.Type
 import Clash.Core.Var
@@ -30,7 +31,9 @@ import Util (OverridingBool(..))
 
 import qualified Control.Concurrent.Supply as Supply
 import Control.Monad.State.Strict   (State)
+import Data.HashMap.Strict          (HashMap)
 import Data.IntMap.Strict           (IntMap)
+import Data.Text                    (Text)
 
 defaultTests :: [FilePath]
 defaultTests =
@@ -68,6 +71,7 @@ runInputStage
         ,TyConMap
         ,IntMap TyConName
         ,[TopEntityT]
+        ,HashMap Text PrimInfo
         ,CompiledPrimMap
         ,CustomReprs
         ,[Id]
@@ -75,10 +79,10 @@ runInputStage
         )
 runInputStage idirs src = do
   pds <- primDirs backend
-  (bindingsMap,tcm,tupTcm,topEntities,primMap,reprs,_domainConfs) <- generateBindings Auto pds idirs [] (hdlKind backend) src Nothing
+  (bindingsMap,tcm,tupTcm,topEntities,primMap,reprs,_domainConfs,primInfos) <- generateBindings Auto pds idirs [] (hdlKind backend) src Nothing
   let topEntityNames = map topId topEntities
       tm = head topEntityNames
-  return (bindingsMap,tcm,tupTcm,topEntities, primMap, buildCustomReprs reprs, topEntityNames,tm)
+  return (bindingsMap,tcm,tupTcm,topEntities, primInfos, primMap, buildCustomReprs reprs, topEntityNames,tm)
 
 runNormalisationStage
   :: [FilePath]
@@ -92,11 +96,11 @@ runNormalisationStage
         )
 runNormalisationStage idirs src = do
   supplyN <- Supply.newSupply
-  (bindingsMap,tcm,tupTcm,topEntities,primMap,reprs,topEntityNames,topEntity) <-
+  (bindingsMap,tcm,tupTcm,topEntities,primInfos,primMap,reprs,topEntityNames,topEntity) <-
     runInputStage idirs src
   let opts1 = opts idirs
       transformedBindings =
-        normalizeEntity reprs bindingsMap primMap tcm tupTcm typeTrans
+        normalizeEntity reprs bindingsMap primInfos primMap tcm tupTcm typeTrans
 #if EXPERIMENTAL_EVALUATOR
           ghcEvaluator
 #else

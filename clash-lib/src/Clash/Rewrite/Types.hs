@@ -29,10 +29,12 @@ import Control.Monad.State                   (MonadState (..))
 import Control.Monad.State.Strict            (State)
 import Control.Monad.Writer                  (MonadWriter (..))
 import Data.Binary                           (Binary)
+import Data.HashMap.Strict                   (HashMap)
 import Data.Hashable                         (Hashable)
 import Data.IntMap.Strict                    (IntMap)
 import Data.Monoid                           (Any)
 import qualified Data.Set                    as Set
+import Data.Text                             (Text)
 import GHC.Generics
 
 #if EXPERIMENTAL_EVALUATOR
@@ -41,7 +43,7 @@ import Clash.Core.Evaluator.Models           (Evaluator, GlobalIO)
 import Clash.Core.Evaluator.Types            (Evaluator, PrimHeap)
 #endif
 
-import Clash.Core.Term           (Term, Context)
+import Clash.Core.Term           (Term, PrimInfo, Context)
 import Clash.Core.Termination    (RecInfo)
 import Clash.Core.Type           (Type)
 import Clash.Core.TyCon          (TyConName, TyConMap)
@@ -125,6 +127,8 @@ data RewriteEnv
   -- ^ Custom bit representations
   , _recInfo        :: RecInfo
   -- ^ Information about recursive global bindings
+  , _primInfos      :: HashMap Text PrimInfo
+  -- ^ Information about primitives in the design
   , _fuelLimit      :: Word
   -- ^ Maximum amount of fuel for the evaluator
   }

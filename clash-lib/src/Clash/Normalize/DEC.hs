@@ -158,9 +158,10 @@ collectGlobals' is0 substitution seen e@(collectArgsTicks -> (fun, args@(_:_), t
     uniqSupply Lens..= ids2
 #if EXPERIMENTAL_EVALUATOR
     ri <- Lens.view recInfo
+    pis <- Lens.view primInfos
     fuel <- Lens.view fuelLimit
 
-    let env = mkGlobalEnv bndrs ri fuel gh tcm is0 ids1
+    let env = mkGlobalEnv bndrs ri pis fuel gh tcm is0 ids1
     let eval = asTerm . fst . runEval env . evaluateNf evaluate
 #else
     let eval = (Lens.view Lens._3) . whnf' evaluate bndrs tcm gh ids1 is0 False

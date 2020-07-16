@@ -25,6 +25,7 @@ module Clash.GHC.GHC2Core
   , qualifiedNameString'
   , makeAllTyCons
   , emptyGHC2CoreState
+  , primInfoMap
   )
 where
 
@@ -131,12 +132,13 @@ data GHC2CoreState
   = GHC2CoreState
   { _tyConMap :: C.UniqMap TyCon
   , _nameMap  :: HashMap Name Text
+  , _primInfoMap :: HashMap Text C.PrimInfo
   }
 
 makeLenses ''GHC2CoreState
 
 emptyGHC2CoreState :: GHC2CoreState
-emptyGHC2CoreState = GHC2CoreState C.emptyUniqMap HashMap.empty
+emptyGHC2CoreState = GHC2CoreState C.emptyUniqMap HashMap.empty HashMap.empty
 
 newtype SrcSpanRB = SrcSpanRB {unSrcSpanRB :: SrcSpan}
 
@@ -410,8 +412,10 @@ coreToTerm primMap unlocs = term
         x' <- coreToIdSP sp x
         return (x',b')
 
-    term' (Case _ _ ty [])  = C.TyApp (C.Prim (C.PrimInfo (pack "EmptyCase") C.undefinedTy C.WorkNever))
-                                <$> coreToType ty
+    term' (Case _ _ ty [])  = do
+      let p = C.PrimInfo (pack "EmptyCase") C.undefinedTy C.WorkNever
+      primInfoMap %= HashMap.insert (C.primName p) p
+      C.TyApp (C.Prim p) <$> coreToType ty
     term' (Case e b ty alts) = do
      let usesBndr = any ( not . isEmptyVarSet . exprSomeFreeVars (== b))
                   $ rhssOfAlts alts
@@ -437,10 +441,15 @@ coreToTerm primMap unlocs = term
     term' (Tick (SourceNote rsp _) e) =
       C.Tick (C.SrcSpan (RealSrcSpan rsp)) <$> addUsefull (RealSrcSpan rsp) (term e)
     term' (Tick _ e)        = term e
-    term' (Type t)          = C.TyApp (C.Prim (C.PrimInfo (pack "_TY_") C.undefinedTy C.WorkNever)) <$>
-                                coreToType t
-    term' (Coercion co)     = C.TyApp (C.Prim (C.PrimInfo (pack "_CO_") C.undefinedTy C.WorkNever)) <$>
-                                coreToType (coercionType co)
+    term' (Type t)          = do
+      let p = C.PrimInfo (pack "_TY_") C.undefinedTy C.WorkNever
+      primInfoMap %= HashMap.insert (C.primName p) p
+      C.TyApp (C.Prim p) <$> coreToType t
+
+    term' (Coercion co)     = do
+      let p = C.PrimInfo (pack "_CO_") C.undefinedTy C.WorkNever
+      primInfoMap %= HashMap.insert (C.primName p) p
+      C.TyApp (C.Prim p) <$> coreToType (coercionType co)
 
 
     termSP sp = fmap (second unSrcSpanRB) . RWS.listen . addUsefullR sp . term
@@ -456,7 +465,11 @@ coreToTerm primMap unlocs = term
         xType  <- coreToType (varType x)
         case isDataConId_maybe x of
           Just dc -> case lookupPrim xNameS of
-            Just p  -> return $ C.Prim (C.PrimInfo xNameS xType (maybe C.WorkVariable workInfo p))
+            Just p  -> do
+              let info = C.PrimInfo xNameS xType (maybe C.WorkVariable workInfo p)
+              primInfoMap %= HashMap.insert xNameS info
+              return (C.Prim info)
+
             Nothing -> if isDataConWrapId x && not (isNewTyCon (dataConTyCon dc))
               then let xInfo = idInfo x
                        unfolding = unfoldingInfo xInfo
@@ -482,7 +495,7 @@ coreToTerm primMap unlocs = term
               | f == "GHC.Stack.withFrozenCallStack"    -> return (withFrozenCallStackTerm xType)
               | f == "GHC.Magic.noinline"               -> return (idTerm xType)
               | f == "GHC.Magic.lazy"                   -> return (idTerm xType)
-              | f == "GHC.Magic.runRW#"                 -> return (runRWTerm xType)
+              | f == "GHC.Magic.runRW#"                 -> runRWTerm xType
               | f == "Clash.Class.BitPack.packXWith"    -> return (packXWithTerm xType)
               | f == "Clash.Sized.Internal.BitVector.checkUnpackUndef" -> return (checkUnpackUndefTerm xType)
               | f == "Clash.Magic.prefixName"
@@ -491,20 +504,29 @@ coreToTerm primMap unlocs = term
               -> return (nameModTerm C.SuffixName xType)
               | f == "Clash.Magic.setName"
               -> return (nameModTerm C.SetName xType)
-              | otherwise                                    -> return (C.Prim (C.PrimInfo xNameS xType wi))
-            Just (Just (BlackBox {workInfo = wi})) ->
-              return $ C.Prim (C.PrimInfo xNameS xType wi)
-            Just (Just (BlackBoxHaskell {workInfo = wi})) ->
-              return $ C.Prim (C.PrimInfo xNameS xType wi)
-            Just Nothing ->
+              | otherwise
+              -> do let p = C.PrimInfo xNameS xType wi
+                    primInfoMap %= HashMap.insert xNameS p
+                    return (C.Prim p)
+            Just (Just (BlackBox {workInfo = wi})) -> do
+              let p = C.PrimInfo xNameS xType wi
+              primInfoMap %= HashMap.insert xNameS p
+              return (C.Prim p)
+            Just (Just (BlackBoxHaskell {workInfo = wi})) -> do
+              let p = C.PrimInfo xNameS xType wi
+              primInfoMap %= HashMap.insert xNameS p
+              return (C.Prim p)
+            Just Nothing -> do
               -- Was guarded by "DontTranslate". We don't know yet if Clash will
               -- actually use it later on, so we don't err here.
-              return $ C.Prim (C.PrimInfo xNameS xType C.WorkVariable)
+              let p = C.PrimInfo xNameS xType C.WorkVariable
+              primInfoMap %= HashMap.insert xNameS p
+              return (C.Prim p)
             Nothing
-              | x `elem` unlocs
-              -> return (C.Prim (C.PrimInfo xNameS xType C.WorkVariable))
-              | pack "$cshow" `isInfixOf` xNameS
-              -> return (C.Prim (C.PrimInfo xNameS xType C.WorkVariable))
+              | x `elem` unlocs || pack "$cshow" `isInfixOf` xNameS
+              -> do let p = C.PrimInfo xNameS xType C.WorkVariable
+                    primInfoMap %= HashMap.insert xNameS p
+                    return (C.Prim p)
               | otherwise
               -> C.Var <$> coreToId x
 
@@ -1232,12 +1254,13 @@ idTerm ty = error $ $(curLoc) ++ show ty
 -- @/\(r:RuntimeRep)./\(o:TYPE r).\(f:State# RealWord -> o) -> f realWorld#@
 runRWTerm
   :: C.Type
-  -> C.Term
-runRWTerm (C.ForAllTy rTV (C.ForAllTy oTV funTy)) =
-  C.TyLam rTV (
-  C.TyLam oTV (
-  C.Lam   fId (
-  (C.App (C.Var fId) (C.Prim (C.PrimInfo rwNm rwTy C.WorkNever))))))
+  -> C2C C.Term
+runRWTerm (C.ForAllTy rTV (C.ForAllTy oTV funTy)) = do
+  let p = C.PrimInfo rwNm rwTy C.WorkNever
+  primInfoMap %= HashMap.insert rwNm p
+
+  return $
+    C.TyLam rTV (C.TyLam oTV (C.Lam fId ((C.App (C.Var fId) (C.Prim p)))))
   where
     (C.FunTy fTy _)  = C.tyView funTy
     (C.FunTy rwTy _) = C.tyView fTy

@@ -13,6 +13,8 @@ module Test.Tasty.Clash.CoreTest
 
 import Control.Concurrent.Supply
 import qualified Data.List as List (find)
+import Data.HashMap.Strict (HashMap)
+import Data.Text (Text)
 
 import Clash.Backend
 import Clash.Backend.SystemVerilog
@@ -20,6 +22,7 @@ import Clash.Backend.Verilog
 import Clash.Backend.VHDL
 import Clash.Core.Evaluator.Models
 import Clash.Core.Name
+import Clash.Core.Term (PrimInfo)
 import Clash.Core.Termination
 import Clash.Core.TyCon
 import Clash.Core.Var
@@ -63,26 +66,26 @@ runToCoreStage
   => SBuildTarget target
   -> (ClashOpts -> ClashOpts)
   -> FilePath
-  -> IO (BindingMap, TyConMap, Supply)
+  -> IO (BindingMap, TyConMap, Supply, HashMap Text PrimInfo)
 runToCoreStage target f src = do
   ids <- newSupply
   pds <- primDirs backend
-  (bm, tcm, _, _, _, _, _) <- generateBindings
+  (bm, tcm, _, _, _, _, _, ps) <- generateBindings
     Auto pds (opt_importPaths opts) [] (hdlKind backend) src Nothing
 
-  return (bm, tcm, ids)
+  return (bm, tcm, ids, ps)
  where
   backend = mkBackend target
   opts = f mkClashOpts
 
 findBinding
   :: OccName
-  -> (BindingMap, TyConMap, Supply)
+  -> (BindingMap, TyConMap, Supply, HashMap Text PrimInfo)
   -> Nf
-findBinding nm (bm, tcm, ids) =
+findBinding nm (bm, tcm, ids, ps) =
   case List.find byName (eltsVarEnv bm) of
     Just bd ->
-      let env = mkGlobalEnv bm ri 20 (mempty, 0) tcm emptyInScopeSet ids
+      let env = mkGlobalEnv bm ri ps 20 (mempty, 0) tcm emptyInScopeSet ids
        in fst . runEval env $ evaluateNf ghcEvaluator (bindingTerm bd)
 
     Nothing -> error ("Not in binding map: " <> show nm)

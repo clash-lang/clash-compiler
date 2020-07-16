@@ -25,6 +25,7 @@ library
                        containers           >= 0.5.4.0  && < 0.7,
                        ghc                  >= 8.4.0    && < 8.11,
                        mtl                  >= 2.1.2    && < 2.3,
+                       text,
                        unordered-containers >= 0.2.3.3  && < 0.3,
 
                        clash-ghc,
@@ -45,6 +46,7 @@ executable clash-benchmark-normalization
                        deepseq              >= 1.4      && < 1.5,
                        directory            >= 1.3.0.0  && < 1.4,
                        filepath             >= 1.4      && < 1.5,
+                       text,
                        unordered-containers,
 
                        clash-benchmark,

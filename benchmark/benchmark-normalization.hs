@@ -5,12 +5,12 @@
 {-# OPTIONS_GHC -Wno-partial-type-signatures #-}
 
 import           Clash.Annotations.BitRepresentation.Internal (CustomReprs)
+import           Clash.Core.Evaluator.Models ()
+import           Clash.Core.Term (PrimInfo)
 import           Clash.Core.TyCon
 import           Clash.Core.Var
 import           Clash.Driver
 import           Clash.Driver.Types
-
-import           Clash.Core.Evaluator.Models ()
 
 #if EXPERIMENTAL_EVALUATOR
 import           Clash.GHC.PartialEval
@@ -25,8 +25,10 @@ import           Criterion.Main
 
 import qualified Control.Concurrent.Supply    as Supply
 import           Control.DeepSeq              (NFData(..), rwhnf)
+import           Data.HashMap.Strict          (HashMap)
 import           Data.IntMap.Strict           (IntMap)
 import           Data.List                    (isPrefixOf, partition)
+import           Data.Text                    (Text)
 import           System.Environment           (getArgs, withArgs)
 
 import BenchmarkCommon
@@ -51,9 +53,9 @@ main = do
 benchFile :: [FilePath] -> FilePath -> Benchmark
 benchFile idirs src =
   env (setupEnv idirs src) $
-    \ ~((bindingsMap,tcm,tupTcm,_topEntities,primMap,reprs,topEntityNames,topEntity),supplyN) -> do
+    \ ~((bindingsMap,tcm,tupTcm,_topEntities,primInfos,primMap,reprs,topEntityNames,topEntity),supplyN) -> do
       bench ("normalization of " ++ src)
-            (nf (normalizeEntity reprs bindingsMap primMap tcm tupTcm typeTrans
+            (nf (normalizeEntity reprs bindingsMap primInfos primMap tcm tupTcm typeTrans
 #if EXPERIMENTAL_EVALUATOR
                                  ghcEvaluator
 #else
@@ -66,7 +68,7 @@ setupEnv
   :: [FilePath]
   -> FilePath
   -> IO ((BindingMap, TyConMap, IntMap TyConName
-         ,[TopEntityT]
+         ,[TopEntityT],HashMap Text PrimInfo
          ,CompiledPrimMap, CustomReprs, [Id], Id
          )
         ,Supply.Supply

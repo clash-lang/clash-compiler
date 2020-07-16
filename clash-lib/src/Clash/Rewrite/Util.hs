@@ -1133,9 +1133,10 @@ whnfRW _isSubj ctx@(TransformContext is0 _) e rw = do
 
 #if EXPERIMENTAL_EVALUATOR
   ri <- Lens.view recInfo
+  pis <- Lens.view primInfos
   fuel <- Lens.view fuelLimit
 
-  case runEval (mkGlobalEnv bndrs ri fuel gh tcm is0 ids1) (evaluateNf eval e) of
+  case runEval (mkGlobalEnv bndrs ri pis fuel gh tcm is0 ids1) (evaluateNf eval e) of
     (!e', !env') -> do
       globalHeap Lens..= genvPrimsIO env'
       rw ctx (asTerm e')

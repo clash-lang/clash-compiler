@@ -95,7 +95,7 @@ runToNetlistStage
   -> IO [([Bool], SrcSpan, HashMap Identifier Word, Component)]
 runToNetlistStage target f src = do
   pds <- primDirs backend
-  (bm, tcm, tupTcm, tes, pm, rs, _)
+  (bm, tcm, tupTcm, tes, pm, rs, _, ps)
     <- generateBindings Auto pds (opt_importPaths opts) [] (hdlKind backend) src Nothing
 
   let teNames = fmap topId tes
@@ -104,7 +104,7 @@ runToNetlistStage target f src = do
 
   supplyN <- Supply.newSupply
 
-  let transformedBindings = normalizeEntity reprs bm pm tcm tupTcm typeTrans
+  let transformedBindings = normalizeEntity reprs bm ps pm tcm tupTcm typeTrans
 #if EXPERIMENTAL_EVALUATOR
           ghcEvaluator
 #else

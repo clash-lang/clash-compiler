@@ -72,6 +72,7 @@ instance Default RewriteEnv where
     , _topEntities=emptyVarSet
     , _customReprs=buildCustomReprs []
     , _recInfo=mempty
+    , _primInfos=mempty
     , _fuelLimit=10
     }
 
