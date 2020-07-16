@@ -1186,7 +1186,12 @@ bindPureHeap tcm heap rw ctx0@(TransformContext is0 hist) e = do
         ty = termType tcm term
         nm = mkLocalId ty (mkUnsafeSystemName "x" uniq) -- See [Note: Name re-creation]
 
-    inlineTest _ (_, stripTicks -> e_) = isWorkFree e_
+    inlineTest _ (i, stripTicks -> e_) =
+      if isLocalVar e_ then
+        -- Don't inline `let x = x in x`, it throws  us in an infinite loop
+        pure (i `localIdDoesNotOccurIn` e_)
+      else
+        isWorkFree e_
 
 -- | Remove unused binders in given let-binding. Returns /Nothing/ if no unused
 -- binders were found.

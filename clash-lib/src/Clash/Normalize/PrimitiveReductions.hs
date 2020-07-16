@@ -98,7 +98,6 @@ vecHeadPrim
   -- ^ Vec TyCon name
   -> Term
 vecHeadPrim vecTcNm =
- -- head :: Vec (n+1) a -> a
   Prim (PrimInfo "Clash.Sized.Vector.head" (vecHeadTy vecTcNm) WorkNever)
 
 vecLastPrim
@@ -106,9 +105,6 @@ vecLastPrim
   -- ^ Vec TyCon name
   -> Term
 vecLastPrim vecTcNm =
-  -- last :: Vec (n+1) a -> a
-  -- has the same type signature as head, hence we're reusing its type
-  -- definition here.
   Prim (PrimInfo "Clash.Sized.Vector.last" (vecHeadTy vecTcNm) WorkNever)
 
 vecHeadTy
@@ -130,7 +126,6 @@ vecTailPrim
   -- ^ Vec TyCon name
   -> Term
 vecTailPrim vecTcNm =
-  -- tail :: Vec (n + 1) a -> Vec n a
   Prim (PrimInfo "Clash.Sized.Vector.tail" (vecTailTy vecTcNm) WorkNever)
 
 vecInitPrim
@@ -138,9 +133,6 @@ vecInitPrim
   -- ^ Vec TyCon name
   -> Term
 vecInitPrim vecTcNm =
-  -- init :: Vec (n + 1) a -> Vec n a
-  -- has the same type signature as tail, hence we're reusing its type
-  -- definition here.
   Prim (PrimInfo "Clash.Sized.Vector.init" (vecTailTy vecTcNm) WorkNever)
 
 vecTailTy
@@ -216,8 +208,7 @@ extractTail consCon elTy vLength vec =
 
 -- | Create a vector of supplied elements
 mkVecCons
-  :: HasCallStack
-  => DataCon
+  :: DataCon
   -- ^ The Cons (:>) constructor
   -> Type
   -- ^ Element type
@@ -228,15 +219,13 @@ mkVecCons
   -> Term
   -- ^ tail of the vector
   -> Term
-mkVecCons consCon resTy n h t
-  | n <= 0 = error "mkVecCons: n <= 0"
-  | otherwise =
-    mkApps (Data consCon) [ Right (LitTy (NumTy n))
-                          , Right resTy
-                          , Right (LitTy (NumTy (n-1)))
-                          , Left (primCo consCoTy)
-                          , Left h
-                          , Left t ]
+mkVecCons consCon resTy n h t =
+  mkApps (Data consCon) [ Right (LitTy (NumTy n))
+                        , Right resTy
+                        , Right (LitTy (NumTy (n-1)))
+                        , Left (primCo consCoTy)
+                        , Left h
+                        , Left t ]
 
  where
   args = dataConInstArgTys consCon [LitTy (NumTy n), resTy, LitTy (NumTy (n-1))]
@@ -312,22 +301,23 @@ reduceZipWith _ctx zipWithPrimInfo n lhsElTy rhsElTy resElTy fun lhsArg rhsArg =
     | (Just vecTc) <- lookupUniqMap vecTcNm tcm
     , nameOcc vecTcNm == "Clash.Sized.Vector.Vec"
     , [nilCon, consCon] <- tyConDataCons vecTc
-    = if n == 0 then
-        mkVecNil nilCon resElTy
-      else
-        let
-          (a, as) = extractHeadTail consCon lhsElTy n lhsArg
-          (b, bs) = extractHeadTail consCon rhsElTy n rhsArg
-          c = mkApps fun [Left a, Left b]
-          cs = mkApps (Prim zipWithPrimInfo) [ Right lhsElTy
-                                             , Right rhsElTy
-                                             , Right resElTy
-                                             , Right (LitTy (NumTy (n - 1)))
-                                             , Left fun
-                                             , Left as
-                                             , Left bs ]
-        in
-          mkVecCons consCon resElTy n c cs
+    = do
+      case n of
+        0 -> mkVecNil nilCon resElTy
+        _ ->
+          let
+            (a, as) = extractHeadTail consCon lhsElTy n lhsArg
+            (b, bs) = extractHeadTail consCon rhsElTy n rhsArg
+            c = mkApps fun [Left a, Left b]
+            cs = mkApps (Prim zipWithPrimInfo) [ Right lhsElTy
+                                               , Right rhsElTy
+                                               , Right resElTy
+                                               , Right (LitTy (NumTy (n - 1)))
+                                               , Left fun
+                                               , Left as
+                                               , Left bs ]
+          in
+            mkVecCons consCon resElTy n c cs
   go _ ty =
     error $ $(curLoc) ++ [I.i|
       reduceZipWith: argument does not have a vector type:
@@ -357,20 +347,20 @@ reduceMap _ctx mapPrimInfo n argElTy resElTy fun arg = do
       | (Just vecTc)     <- lookupUniqMap vecTcNm tcm
       , nameOcc vecTcNm == "Clash.Sized.Vector.Vec"
       , [nilCon,consCon] <- tyConDataCons vecTc
-      = if n == 0 then
-          mkVecNil nilCon argElTy
-        else
-          let
-            nPredTy = Right (LitTy (NumTy (n - 1)))
-            (a, as) = extractHeadTail consCon argElTy n arg
-            b = mkApps fun [Left a]
-            bs = mkApps (Prim mapPrimInfo) [ Right argElTy
-                                           , Right resElTy
-                                           , nPredTy
-                                           , Left fun
-                                           , Left as ]
-          in
-            mkVecCons consCon resElTy n b bs
+      = case n of
+          0 -> mkVecNil nilCon argElTy
+          _ ->
+           let
+             nPredTy = Right (LitTy (NumTy (n - 1)))
+             (a, as) = extractHeadTail consCon argElTy n arg
+             b = mkApps fun [Left a]
+             bs = mkApps (Prim mapPrimInfo) [ Right argElTy
+                                            , Right resElTy
+                                            , nPredTy
+                                            , Left fun
+                                            , Left as ]
+           in
+             mkVecCons consCon resElTy n b bs
     go _ ty =
       error $ $(curLoc) ++ [I.i|
         reduceMap: argument does not have a vector type:
@@ -854,15 +844,15 @@ reduceInit _inScope initPrimInfo n aTy vArg = do
     | (Just vecTc) <- lookupUniqMap vecTcNm tcm
     , nameOcc vecTcNm == "Clash.Sized.Vector.Vec"
     , [nilCon, consCon]  <- tyConDataCons vecTc
-    = if n == 0 then
-        mkVecNil nilCon aTy
-      else
-        let
-          nPredTy = Right (LitTy (NumTy (n - 1)))
-          (a, as0) = extractHeadTail consCon aTy (n+1) vArg
-          as1 = mkApps (Prim initPrimInfo) [nPredTy, Right aTy, Left as0]
-        in
-          mkVecCons consCon aTy n a as1
+    = case n of
+        0 -> mkVecNil nilCon aTy
+        _ ->
+          let
+            nPredTy = Right (LitTy (NumTy (n - 1)))
+            (a, as0) = extractHeadTail consCon aTy (n+1) vArg
+            as1 = mkApps (Prim initPrimInfo) [nPredTy, Right aTy, Left as0]
+          in
+            mkVecCons consCon aTy n a as1
 
   go _ ty =
     error $ $(curLoc) ++ [I.i|
