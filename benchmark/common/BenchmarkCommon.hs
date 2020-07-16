@@ -34,7 +34,15 @@ defaultTests =
   , "benchmark/tests/BundleMapRepeat.hs"
   , "benchmark/tests/PipelinesViaFolds.hs"
   , "tests/shouldwork/Basic/AES.hs"
-  , "tests/shouldwork/Basic/T1354B.hs"
+-- Following fails after reverting:
+--
+--   https://github.com/clash-lang/clash-compiler/pull/1354
+--
+-- See:
+--
+--   https://github.com/clash-lang/clash-compiler/pull/XXXX
+--
+--  , "tests/shouldwork/Basic/T1354B.hs"
   ]
 
 typeTrans :: (CustomReprs -> TyConMap -> Type ->
