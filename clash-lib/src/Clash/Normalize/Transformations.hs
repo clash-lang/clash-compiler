@@ -2079,7 +2079,7 @@ reduceNonRepPrim c@(TransformContext is0 ctx) e@(App _ _) | (Prim p, args, ticks
             if shouldReduce1
                then let [fun,lhsArg,rhsArg] = Either.lefts args
                     in  (`mkTicks` ticks) <$>
-                        reduceZipWith c p n lhsElTy rhsElty resElTy fun lhsArg rhsArg
+                        reduceZipWith c n lhsElTy rhsElty resElTy fun lhsArg rhsArg
                else return e
           _ -> return e
       "Clash.Sized.Vector.map" | argLen == 5 -> do
