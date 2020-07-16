@@ -26,9 +26,7 @@ module Clash.Primitives.DSL
   , BlockState (..)
   , TExpr
   , declaration
-  , declarationReturn
   , instDecl
-  , instHO
   , viaAnnotatedSignal
 
   -- ** Literals
@@ -74,8 +72,6 @@ module Clash.Primitives.DSL
 import           Clash.Util                      (HasCallStack, clogBase)
 import           Control.Lens                    hiding (Indexed, assign)
 import           Control.Monad.State
-import           Data.IntMap                     (IntMap)
-import qualified Data.IntMap                     as IntMap
 import           Data.List                       (intersperse)
 import           Data.Maybe                      (fromMaybe)
 import           Data.Semigroup                  hiding (Product)
@@ -83,7 +79,6 @@ import           Data.Semigroup.Monad
 import           Data.String
 import           Data.Text                       (Text)
 import qualified Data.Text                       as Text
-import qualified Data.Text.Lazy                  as LText
 import           Data.Text.Prettyprint.Doc.Extra
 import           TextShow                        (showt)
 
@@ -91,11 +86,9 @@ import           Clash.Annotations.Primitive     (HDL (..), Primitive (..))
 import           Clash.Backend                   hiding (fromBV, toBV)
 import           Clash.Backend.VHDL              (VHDLState)
 import           Clash.Core.Var                  (Attr')
-import           Clash.Netlist.BlackBox.Util     (exprToString, renderElem)
-import           Clash.Netlist.BlackBox.Types
-  (BlackBoxTemplate, Element(Component, Text), Decl(..))
+import           Clash.Netlist.BlackBox.Util     (exprToString)
 import           Clash.Netlist.Id
-import           Clash.Netlist.Types             hiding (Component, toBit)
+import           Clash.Netlist.Types             hiding (toBit)
 import           Clash.Netlist.Util              hiding (mkUniqueIdentifier)
 import qualified Data.String.Interpolate         as I
 import           Data.String.Interpolate.Util    (unindent)
@@ -132,40 +125,17 @@ blackBoxHaskell (show -> ign) hdl bb tf =
 --   backend state.
 data BlockState backend = BlockState
   { _bsDeclarations :: [Declaration]
-    -- ^ Declarations store
-  , _bsHigherOrderCalls :: IntMap Int
-    -- ^ Tracks how many times a higher order function has been instantiated.
-    -- Needed to fill in the second field of "Clash.Netlist.BlackBox.Types.Decl"
-  , _bsBackend :: backend
-    -- ^ Backend state
+  , _bsBackend      :: backend
   }
-makeLenses ''BlockState
 
 -- | A typed expression.
 data TExpr = TExpr
   { ety :: HWType
   , eex :: Expr
   } deriving Show
-makeLenses ''TExpr
 
--- | Run a block declaration. Assign the result of the block builder to the
--- result variable in the given blackbox context.
-declarationReturn
-  :: Backend backend
-  => BlackBoxContext
-  -> Text.Text
-  -- ^ block name
-  -> State (BlockState backend) TExpr
-  -- ^ block builder yielding an expression that should be assigned to the
-  -- result variable in the blackbox context
-  -> State backend Doc
-  -- ^ pretty printed block
-declarationReturn bbCtx blockName blockBuilder =
-  declaration blockName $ do
-    res <- blockBuilder
-    let (Identifier resultNm Nothing, _) = bbResult bbCtx
-    addDeclaration (Assignment resultNm (eex res))
-    pure ()
+makeLenses ''BlockState
+makeLenses ''TExpr
 
 -- | Run a block declaration.
 declaration
@@ -178,8 +148,8 @@ declaration
   -- ^ pretty printed block
 declaration blockName s = do
   backend0 <- get
-  let initState = BlockState [] IntMap.empty backend0
-      BlockState decs _hoCalls backend1 = execState s initState
+  let initState = BlockState [] backend0
+      BlockState decs backend1 = execState s initState
   put backend1
   blockNameUnique <- mkUniqueIdentifier Basic blockName
   getMon $ blockDecl blockNameUnique (reverse decs)
@@ -193,34 +163,10 @@ newName :: Backend backend => Text -> State (BlockState backend) Identifier
 newName nm = zoom bsBackend $ mkUniqueIdentifier Basic nm
 
 -- | Declare a new signal with the given name and type.
-declare'
-  :: Backend backend
-  => Identifier
-  -- ^ Name hint
-  -> WireOrReg
-  -- ^ Should signal be declared as a wire or a reg
-  -> HWType
-  -- ^ Type of new signal
-  -> State (BlockState backend) Identifier
-  -- ^ Expression pointing the the new signal
-declare' decName wireOrReg ty = do
+declare :: Backend backend => Identifier -> HWType -> State (BlockState backend) TExpr
+declare decName ty = do
   uniqueName <- newName decName
-  addDeclaration (NetDecl' Nothing wireOrReg uniqueName (Right ty) Nothing)
-  pure uniqueName
-
--- | Declare a new signal with the given name and type.
-declare
-  :: Backend backend
-  => Identifier
-  -- ^ Name hint
-  -> WireOrReg
-  -- ^ Should signal be declared as a wire or a reg
-  -> HWType
-  -- ^ Type of new signal
-  -> State (BlockState backend) TExpr
-  -- ^ Expression pointing the the new signal
-declare decName wireOrReg ty = do
-  uniqueName <- declare' decName wireOrReg ty
+  addDeclaration (NetDecl Nothing uniqueName ty)
   pure (TExpr ty (Identifier uniqueName Nothing))
 
 -- | Assign an expression to an identifier, returns the new typed
@@ -234,7 +180,7 @@ assign
   -> State (BlockState backend) TExpr
   -- ^ the identifier of the expression that actually got assigned
 assign aName (TExpr ty aExpr) = do
-  texp@(~(TExpr _ (Identifier uniqueName Nothing))) <- declare aName Wire ty
+  texp@(~(TExpr _ (Identifier uniqueName Nothing))) <- declare aName ty
   addDeclaration (Assignment uniqueName aExpr)
   pure texp
 
@@ -266,7 +212,7 @@ untuple
   -- ^ Name hints for element assignments
   -> State (BlockState backend) [TExpr]
 untuple (TExpr ty@(Product _ _ tys) (Identifier resName _)) vals = do
-  newNames <- zipWithM (flip declare Wire) vals tys
+  newNames <- zipWithM declare vals tys
   addDeclaration $ Assignment resName $ DataCon ty (DC (ty, 0)) (fmap eex newNames)
   pure newNames
 untuple e i = error $ "untuple: " <> show e <> " " <> show i
@@ -314,7 +260,7 @@ boolToBit bitName = \case
   T -> pure High
   F -> pure Low
   TExpr Bool boolExpr -> do
-    texp@(~(TExpr _ (Identifier uniqueBitName Nothing))) <- declare bitName Wire Bit
+    texp@(~(TExpr _ (Identifier uniqueBitName Nothing))) <- declare bitName Bit
     addDeclaration $
       CondAssignment uniqueBitName Bit boolExpr Bool
         [ (Just (BoolLit True), Literal Nothing (BitLit H))
@@ -531,71 +477,6 @@ instance Num LitHDL where
 
 instance IsString LitHDL where
   fromString = S
-
--- | Instantiate/call a higher-order function.
-instHO
-  :: Backend backend
-  => BlackBoxContext
-  -- ^ BlackBoxContext, used for rendering higher-order function and error
-  -- reporting
-  -> Int
-  -- ^ Position of HO-argument. For example:
-  --
-  --   fold :: forall n a . (a -> a -> a) -> Vec (n + 1) a -> a
-  --
-  -- would have its HO-argument at position 0, while
-  --
-  --  iterateI :: forall n a. KnownNat n => (a -> a) -> a -> Vec n a
-  --
-  -- would have it at position 1.
-  -> (HWType, BlackBoxTemplate)
-  -- ^ Result type of HO function
-  -> [(TExpr, BlackBoxTemplate)]
-  -- ^ Arguments and their types
-  -> State (BlockState backend) TExpr
-  -- ^ Result of the function
-instHO bbCtx fPos (resTy, bbResTy) argsWithTypes = do
-  let (args0, argTypes) = unzip argsWithTypes
-  fSubPos <- fromMaybe 0 . IntMap.lookup fPos <$> use bsHigherOrderCalls
-  bsHigherOrderCalls %= IntMap.insert fPos (succ fSubPos)
-
-  -- Create argument identifiers, example: fold_ho3_0_arg0
-  let
-    ctxName = last (Text.split (=='.') (bbName bbCtx))
-    baseArgName = ctxName <> "_" <> "ho" <> showt fPos <> "_" <> showt fSubPos
-    argName n = baseArgName <> "_arg" <> showt n
-  args1 <- zipWithM (\argN -> toIdentifier' (argName argN)) [(0 :: Int)..] args0
-  let
-    args2 = map (pure . Text . LText.fromStrict) args1
-    args3 = zip args2 argTypes
-
-  -- Create result identifier
-  -- See https://github.com/clash-lang/clash-compiler/issues/919 for info on
-  -- logic of 'resWireOrReg'
-    resWireOrReg =
-      case IntMap.lookup fPos (bbFunctions bbCtx) of
-        Just ((_,rw,_,_,_,_):_) -> rw
-        _ -> error "internal error"
-  resName <- declare' (ctxName <> "_" <> "ho" <> showt fPos <> "_"
-                               <> showt fSubPos <> "_res") resWireOrReg resTy
-  let res = ([Text (LText.fromStrict resName)], bbResTy)
-
-  -- Render HO argument to plain text
-  let component = Component (Decl fPos fSubPos (res:args3))
-  rendered0 <-
-    zoom bsBackend (string =<< (renderElem bbCtx component <*> pure 0))
-
-  let
-    layout = LayoutOptions (AvailablePerLine 120 0.4)
-    rendered1 = renderLazy (layoutPretty layout rendered0)
-
-  addDeclaration $
-    BlackBoxD
-      ("__INST_" <> bbName bbCtx <> "_BB_INTERNAL__") [] [] []
-      (BBTemplate [Text rendered1])
-      (emptyBBContext ("__INST_" <> bbName bbCtx <> "_BB_INTERNAL__"))
-
-  pure (TExpr resTy (Identifier resName Nothing))
 
 -- | Instantiate a component/entity in a block state.
 instDecl

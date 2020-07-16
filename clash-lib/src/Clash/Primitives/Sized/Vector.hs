@@ -16,8 +16,6 @@ import           Control.Monad.State                (State, zipWithM)
 import qualified Control.Lens                       as Lens
 import           Data.Either                        (rights)
 import qualified Data.IntMap                        as IntMap
-import           Data.List.Extra                    (iterateNM)
-import           Data.Maybe                         (fromMaybe)
 import           Data.Semigroup.Monad               (getMon)
 import qualified Data.Text                          as Text
 import qualified Data.Text.Lazy                     as LText
@@ -47,51 +45,8 @@ import           Clash.Netlist.Types
    bbFunctions)
 import           Clash.Netlist.Id                   (IdType(Basic))
 import           Clash.Netlist.Util                 (typeSize)
-import qualified Clash.Primitives.DSL               as Prim
-import           Clash.Primitives.DSL
-  (declarationReturn, instHO, tInputs, tExprToInteger)
 
 import           Clash.Util                         (HasCallStack, curLoc)
-
--- | Blackbox function for 'Clash.Sized.Vector.iterateI'
-iterateBBF :: HasCallStack => BlackBoxFunction
-iterateBBF _isD _primName args _resTy = do
-  tcm <- Lens.use tcCache
-  pure (Right (meta tcm, bb))
- where
-  bb = BBFunction "Clash.Primitives.Sized.Vector.iterateBBF" 0 iterateTF
-  vecLength tcm =
-    case coreView tcm (head (rights args)) of
-      (LitTy (NumTy 0)) -> error "Unexpected empty vector in 'iterateBBF'"
-      (LitTy (NumTy n)) -> fromInteger (n - 1)
-      vl -> error $ "Unexpected vector length: " ++ show vl
-  meta tcm = emptyBlackBoxMeta {
-      bbKind=TDecl
-    , bbFunctionPlurality=[(1, vecLength tcm)]
-    }
-
--- | Type signature of function we're generating netlist for:
---
---   iterateI :: KnownNat n => (a -> a) -> a -> Vec n a
---
-iterateTF :: TemplateFunction
-iterateTF = TemplateFunction [] (const True) iterateTF'
-
-iterateTF'
-  :: forall s
-   . (HasCallStack, Backend s)
-  => BlackBoxContext
-  -> State s Doc
-iterateTF' bbCtx
-  | [ (fromMaybe (error "n") . tExprToInteger -> n, _)
-    , _hoFunction
-    , (a, aType)
-    ] <- tInputs bbCtx
-  , let aTemplateType = [TypElem (Typ (Just 2))]
-  , let inst arg = instHO bbCtx 1 (aType, aTemplateType) [(arg, aTemplateType)]
-  = declarationReturn bbCtx "iterateI" (Prim.vec =<< iterateNM (fromInteger n) inst a)
-  | otherwise
-  =  error $ "Unexpected number of arguments: " ++ show (length (bbInputs bbCtx))
 
 data FCall =
   FCall
@@ -110,7 +65,6 @@ foldFunctionPlurality n
       let (d, r) = n `divMod` 2 in
       1 + foldFunctionPlurality d + foldFunctionPlurality (d+r)
 
--- | Blackbox function for 'Clash.Sized.Vector.fold'
 foldBBF :: HasCallStack => BlackBoxFunction
 foldBBF _isD _primName args _resTy = do
   tcm <- Lens.use tcCache

@@ -25,26 +25,6 @@ mapAccumLM f acc (x:xs) = do
   (acc'',ys) <- mapAccumLM f acc' xs
   return (acc'',y:ys)
 
--- | Monadic version of 'iterate'. A carbon copy ('iterateM') would not
--- terminate, hence the first argument.
-iterateNM
-  :: Monad m
-  => Word
-  -- ^ Only iterate /n/ times. Note that /n/ is the length of the resulting
-  -- list, _not_ the number of times the iteration function has been invoked
-  -> (a -> m a)
-  -- ^ Iteration function
-  -> a
-  -- ^ Start value
-  -> m [a]
-iterateNM 0 _f _a = pure []
-iterateNM limit f a = fmap (a:) (go (limit - 1) a)
- where
-  go 0 _a0 = pure []
-  go n a0 = do
-    a1 <- f a0
-    fmap (a1:) (go (n - 1) a1)
-
 infixr 5 <:>
 -- | Applicative version of 'GHC.Types.(:)'
 (<:>) :: Applicative f => f a -> f [a] -> f [a]

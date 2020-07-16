@@ -2079,7 +2079,7 @@ reduceNonRepPrim c@(TransformContext is0 ctx) e@(App _ _) | (Prim p, args, ticks
             if shouldReduce1
                then let [fun,lhsArg,rhsArg] = Either.lefts args
                     in  (`mkTicks` ticks) <$>
-                        reduceZipWith c p n lhsElTy rhsElty resElTy fun lhsArg rhsArg
+                        reduceZipWith c n lhsElTy rhsElty resElTy fun lhsArg rhsArg
                else return e
           _ -> return e
       "Clash.Sized.Vector.map" | argLen == 5 -> do
@@ -2092,7 +2092,7 @@ reduceNonRepPrim c@(TransformContext is0 ctx) e@(App _ _) | (Prim p, args, ticks
                                         [argElTy,resElTy] ]
             if shouldReduce1
                then let [fun,arg] = Either.lefts args
-                    in  (`mkTicks` ticks) <$> reduceMap c p n argElTy resElTy fun arg
+                    in  (`mkTicks` ticks) <$> reduceMap c n argElTy resElTy fun arg
                else return e
           _ -> return e
       "Clash.Sized.Vector.traverse#" | argLen == 7 ->
@@ -2123,7 +2123,7 @@ reduceNonRepPrim c@(TransformContext is0 ctx) e@(App _ _) | (Prim p, args, ticks
                                  , List.anyM isUntranslatableType_not_poly [aTy,bTy] ]
             if shouldReduce1
               then let [fun,start,arg] = Either.lefts args
-                   in  (`mkTicks` ticks) <$> reduceFoldr c p n aTy fun start arg
+                   in  (`mkTicks` ticks) <$> reduceFoldr c n aTy fun start arg
               else return e
           _ -> return e
       "Clash.Sized.Vector.dfold" | argLen == 8 ->
@@ -2187,7 +2187,7 @@ reduceNonRepPrim c@(TransformContext is0 ctx) e@(App _ _) | (Prim p, args, ticks
             shouldReduce1 <- List.orM [ shouldReduce ctx
                                  , isUntranslatableType_not_poly aTy ]
             if shouldReduce1
-               then (`mkTicks` ticks) <$> reduceInit is0 p n aTy vArg
+               then (`mkTicks` ticks) <$> reduceInit is0 (n+1) aTy vArg
                else return e
           _ -> return e
       "Clash.Sized.Vector.unconcat" | argLen == 6 -> do
@@ -2248,19 +2248,6 @@ reduceNonRepPrim c@(TransformContext is0 ctx) e@(App _ _) | (Prim p, args, ticks
                then let [_,fun,arg] = Either.lefts args
                     in  (`mkTicks` ticks) <$> reduceImap c n argElTy resElTy fun arg
                else return e
-          _ -> return e
-      "Clash.Sized.Vector.iterateI" | argLen == 5 -> do
-        let ([_kn,f,a],[nTy,aTy]) = Either.partitionEithers args
-        case runExcept (tyNatSize tcm nTy) of
-          Right n -> do
-            shouldReduce1 <- List.orM [
-                pure (ultra || n < 2)
-              , shouldReduce ctx
-              , isUntranslatableType_not_poly aTy ]
-
-            if shouldReduce1
-            then (`mkTicks` ticks) <$> reduceIterateI c n aTy eTy f a
-            else return e
           _ -> return e
       "Clash.Sized.Vector.dtfold" | argLen == 8 ->
         let ([_kn,_motive,lrFun,brFun,arg],[_mTy,nTy,aTy]) = Either.partitionEithers args
