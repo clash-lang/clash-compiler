@@ -56,7 +56,7 @@ import           Clash.Core.Name
 import           Clash.Core.Pretty                (showPpr)
 import           Clash.Core.Term
   (CoreContext (..), PrimInfo (..), Term (..), WorkInfo (..), Pat (..),
-   collectTermIds, mkApps)
+   collectTermIds, mkApps, idToVar)
 import           Clash.Core.TermInfo
 import           Clash.Core.Type                  (LitTy (..), Type (..),
                                                    TypeView (..), coreView1,
@@ -829,37 +829,34 @@ reduceLast inScope n aTy vArg = do
 -- vector.
 reduceInit
   :: InScopeSet
-  -> PrimInfo -- ^ Primitive info for 'init'
   -> Integer  -- ^ Length of the vector
   -> Type -- ^ Element type of the vector
   -> Term -- ^ The argument vector
   -> NormalizeSession Term
-reduceInit _inScope initPrimInfo n aTy vArg = do
-  tcm <- Lens.view tcCache
-  let ty = termType tcm vArg
-  changed (go tcm ty)
- where
-  go tcm (coreView1 tcm -> Just ty') = go tcm ty'
-  go tcm (tyView -> TyConApp vecTcNm _)
-    | (Just vecTc) <- lookupUniqMap vecTcNm tcm
-    , nameOcc vecTcNm == "Clash.Sized.Vector.Vec"
-    , [nilCon, consCon]  <- tyConDataCons vecTc
-    = case n of
-        0 -> mkVecNil nilCon aTy
-        _ ->
-          let
-            nPredTy = Right (LitTy (NumTy (n - 1)))
-            (a, as0) = extractHeadTail consCon aTy (n+1) vArg
-            as1 = mkApps (Prim initPrimInfo) [nPredTy, Right aTy, Left as0]
-          in
-            mkVecCons consCon aTy n a as1
+reduceInit inScope n aTy vArg = do
+    tcm <- Lens.view tcCache
+    let ty = termType tcm vArg
+    go tcm ty
+  where
+    go tcm (coreView1 tcm -> Just ty') = go tcm ty'
+    go tcm (tyView -> TyConApp vecTcNm _)
+      | (Just vecTc) <- lookupUniqMap vecTcNm tcm
+      , nameOcc vecTcNm == "Clash.Sized.Vector.Vec"
+      , [nilCon,consCon]  <- tyConDataCons vecTc
+      = do
+        uniqs0 <- Lens.use uniqSupply
+        let (uniqs1,(_,elems)) = second unzip
+                               $ extractElems uniqs0 inScope consCon aTy 'L' n vArg
+        uniqSupply Lens..= uniqs1
+        case n of
+         0 -> changed (undefinedTm aTy)
+         1 -> changed (mkVec nilCon consCon aTy 0 [])
+         _ -> let el = init elems
+                  iv = mkVec nilCon consCon aTy (n-1) (map (idToVar . fst . head) el)
+                  lb = init (concat el)
+              in  changed (Letrec lb iv)
 
-  go _ ty =
-    error $ $(curLoc) ++ [I.i|
-      reduceInit: argument does not have a vector type:
-
-        #{showPpr ty}
-    |]
+    go _ ty = error $ $(curLoc) ++ "reduceInit: argument does not have a vector type: " ++ showPpr ty
 
 -- | Replace an application of the @Clash.Sized.Vector.(++)@ primitive on
 -- vectors of a known length @n@, by the fully unrolled recursive "definition"
