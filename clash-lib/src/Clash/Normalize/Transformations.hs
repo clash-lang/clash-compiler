@@ -2249,19 +2249,6 @@ reduceNonRepPrim c@(TransformContext is0 ctx) e@(App _ _) | (Prim p, args, ticks
                     in  (`mkTicks` ticks) <$> reduceImap c n argElTy resElTy fun arg
                else return e
           _ -> return e
-      "Clash.Sized.Vector.iterateI" | argLen == 5 -> do
-        let ([_kn,f,a],[nTy,aTy]) = Either.partitionEithers args
-        case runExcept (tyNatSize tcm nTy) of
-          Right n -> do
-            shouldReduce1 <- List.orM [
-                pure (ultra || n < 2)
-              , shouldReduce ctx
-              , isUntranslatableType_not_poly aTy ]
-
-            if shouldReduce1
-            then (`mkTicks` ticks) <$> reduceIterateI c n aTy eTy f a
-            else return e
-          _ -> return e
       "Clash.Sized.Vector.dtfold" | argLen == 8 ->
         let ([_kn,_motive,lrFun,brFun,arg],[_mTy,nTy,aTy]) = Either.partitionEithers args
         in  case runExcept (tyNatSize tcm nTy) of

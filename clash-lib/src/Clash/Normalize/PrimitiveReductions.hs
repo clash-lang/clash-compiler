@@ -37,10 +37,8 @@
 module Clash.Normalize.PrimitiveReductions where
 
 import qualified Control.Lens                     as Lens
-import           Control.Lens                     ((.=))
 import           Data.List                        (mapAccumR)
 import qualified Data.Maybe                       as Maybe
-import           TextShow                         (showt)
 
 import           PrelNames                        (boolTyConKey)
 import           Unique                           (getKey)
@@ -225,56 +223,6 @@ reduceImap (TransformContext is0 ctx) n argElTy resElTy fun arg = do
         uniqSupply Lens..= uniqs2
         changed lb
     go _ ty = error $ $(curLoc) ++ "reduceImap: argument does not have a vector type: " ++ showPpr ty
-
--- | Replace an application of the @Clash.Sized.Vector.iterateI@ primitive on
--- vectors of a known length @n@, by the fully unrolled recursive "definition"
--- of @Clash.Sized.Vector.iterateI@
-reduceIterateI
-  :: TransformContext
-  -> Integer
-  -- ^ Length of vector
-  -> Type
-  -- ^ Vector's element type
-  -> Type
-  -- ^ Vector's type
-  -> Term
-  -- ^ iterateI's HO-function argument
-  -> Term
-  -- ^ iterateI's start value
-  -> RewriteMonad NormalizeState Term
-  -- ^ Fully unrolled definition
-reduceIterateI (TransformContext is0 ctx) n aTy vTy f0 a = do
-  tcm <- Lens.view tcCache
-  f1 <- constantPropagation (TransformContext is0 (AppArg Nothing:ctx)) f0
-
-  -- Generate uniq ids for element assignments.
-  uniqs0 <- Lens.use uniqSupply
-  let
-    is1 = extendInScopeSetList is0 (collectTermIds f1)
-    ((uniqs1, _is2), elementIds) =
-      mapAccumR
-        mkUniqInternalId
-        (uniqs0, is1)
-        (zip (map (("el" <>) . showt) [1..n-1]) (repeat aTy))
-  uniqSupply .= uniqs1
-
-  let
-    TyConApp vecTcNm _ = tyView vTy
-    Just vecTc = lookupUniqMap vecTcNm tcm
-    [nilCon, consCon] = tyConDataCons vecTc
-    elems = map (App f1) (a:map Var elementIds)
-    vec = mkVec nilCon consCon aTy n (take (fromInteger n) (a:map Var elementIds))
-
-  -- Result:
-  --   let
-  --     el1 = f a
-  --     el2 = f el1
-  --     el3 = f el2
-  --     ..
-  --   in
-  --     (a :> el1 :> el2 :> el3 :> ..)
-  --
-  pure (Letrec (zip elementIds elems) vec)
 
 -- | Replace an application of the @Clash.Sized.Vector.traverse#@ primitive on
 -- vectors of a known length @n@, by the fully unrolled recursive "definition"
