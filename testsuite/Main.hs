@@ -569,7 +569,6 @@ runClashTest = defaultMain $ clashTestRoot
         , runTest "HOPrim" def{hdlSim=False}
         , runTest "IndexInt" def
         , runTest "Indices" def
-        , runTest "Iterate" def
         , runTest "Minimum" def
         , runTest "MovingAvg" def{hdlSim=False}
         , runTest "PatHOCon" def{hdlSim=False}
