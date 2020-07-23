@@ -30,4 +30,9 @@
      , "template"  : "~DEVNULL[~VAR[x][0]]~ARG[1]"
      }
   }
+, { "Primitive" :
+    { "name"      : "Clash.XException.xToErrorCtx"
+    , "primType"  : "Function"
+    }
+  }
 ]
