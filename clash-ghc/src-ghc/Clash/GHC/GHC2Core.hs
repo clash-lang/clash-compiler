@@ -364,6 +364,10 @@ coreToTerm primMap unlocs = term
         go "Clash.Magic.noDeDup" args
           | [_aTy,f] <- args
           = C.Tick C.NoDeDup <$> term f
+        go "Clash.XException.xToErrorCtx" args
+          -- xToErrorCtx :: forall a. String -> a -> a
+          | [_ty, _msg, x] <- args
+          = term x
         go nm args
           | Just n <- parseBundle "bundle" nm
             -- length args = domain tyvar + signal arg + number of type vars
@@ -491,6 +495,8 @@ coreToTerm primMap unlocs = term
               -> return (nameModTerm C.SuffixName xType)
               | f == "Clash.Magic.setName"
               -> return (nameModTerm C.SetName xType)
+              | f == "Clash.XException.xToErrorCtx"
+              -> return (xToErrorCtxTerm xType)
               | otherwise                                    -> return (C.Prim (C.PrimInfo xNameS xType wi))
             Just (Just (BlackBox {workInfo = wi})) ->
               return $ C.Prim (C.PrimInfo xNameS xType wi)
@@ -1327,6 +1333,34 @@ nameModTerm sa (C.ForAllTy nmTV (C.ForAllTy aTV funTy)) =
     xId              = C.mkLocalId xTy xName
 
 nameModTerm _ ty = error $ $(curLoc) ++ show ty
+
+
+-- | Given the type:
+--
+-- @forall (a :: Type) . String -> a -> a@
+--
+-- Generate the term:
+--
+-- @/\(a:Type).\(ctx:String).\(x:a) -> x@
+xToErrorCtxTerm
+  :: C.Type
+  -> C.Term
+xToErrorCtxTerm (C.ForAllTy aTV funTy) =
+  C.TyLam aTV (
+  C.Lam ctxId (
+  C.Lam xId (
+  C.Var xId)))
+  where
+    (C.FunTy ctxTy rTy) = C.tyView funTy
+    (C.FunTy xTy _)     = C.tyView rTy
+    -- Safe to use `mkUnsafeSystemName` here, because we're building the
+    -- identity \_ x.x, so any shadowing of 'x' would be the desired behavior.
+    ctxName = C.mkUnsafeSystemName "ctx" 0
+    ctxId   = C.mkLocalId ctxTy ctxName
+    xName   = C.mkUnsafeSystemName "x" 1
+    xId     = C.mkLocalId xTy xName
+
+xToErrorCtxTerm ty = error $ $(curLoc) ++ show ty
 
 isDataConWrapId :: Id -> Bool
 isDataConWrapId v = case idDetails v of

@@ -1,0 +1,1 @@
+FEATURE: Added `xToErrorCtx`, to make it easier to track the origin of `XException` where `pack` would hide them [#1461](https://github.com/clash-lang/clash-compiler/pull/1461)

@@ -31,7 +31,8 @@ CallStack (from HasCallStack):
 
 module Clash.XException
   ( -- * 'X': An exception for uninitialized values
-    XException(..), errorX, isX, hasX, maybeIsX, maybeHasX, fromJustX, undefined
+    XException(..), errorX, isX, hasX, maybeIsX, maybeHasX, fromJustX, undefined,
+    xToErrorCtx, xToError
     -- * Printing 'X' exceptions as \"X\"
   , ShowX (..), showsX, printX, showsPrecXWith
     -- * Strict evaluation
@@ -46,7 +47,8 @@ import           Prelude             hiding (undefined)
 import           Clash.Annotations.Primitive (hasBlackBox)
 import           Clash.CPP           (maxTupleSize, fSuperStrict)
 import           Clash.XException.TH
-import           Control.Exception   (Exception, catch, evaluate, throw)
+import           Control.Exception
+  (ErrorCall (..), Exception, catch, evaluate, throw)
 import           Control.DeepSeq     (NFData, rnf)
 import           Data.Complex        (Complex)
 import           Data.Either         (isLeft)
@@ -98,6 +100,115 @@ infixr 0 `defaultSeqX`
 -- out with an exception.
 errorX :: HasCallStack => String -> a
 errorX msg = throw (XException ("X: " ++ msg ++ "\n" ++ prettyCallStack callStack))
+
+-- | Convert 'XException' to 'ErrorCall'
+--
+-- This is useful when tracking the source of 'XException' that gets eaten up by
+-- 'Clash.Classes.BitPack.pack' inside of your circuit; since
+-- 'Clash.Classes.BitPack.pack' translates 'XException' into undefined bits.
+--
+-- So for example if you have some large function f:
+--
+-- > f a b = ... pack a ... pack b ...
+--
+-- Where it is basically an error if either /a/ or /b/ ever throws an 'XException',
+-- and so you want that to be reported the moment /a/ or /b/ is used, instead of
+-- it being thrown when evaluating the result of /f/, then do:
+--
+-- > {-# LANGUAGE ViewPatterns #-}
+-- > f (xToErrorCtx "a is X" -> a) (xToErrorCtx "b is X" -> b) = ...
+--
+-- Where we pass an extra string, for context, to know which argument evaluated
+-- to an 'XException'. We can also use BangPatterns to report the potential
+-- 'XException' being thrown by /a/ or /b/ even earlier, i.e. when /f/ is applied:
+--
+-- > {-# LANGUAGE ViewPatterns, BangPatterns #-}
+-- > f (xToErrorCtx "a is X" -> !a) (xToErrorCtx "b is X" -> !b) = ...
+--
+-- __NB:__ Fully synthesizable, so doesn't have to be removed before synthesis
+--
+-- === __Example__
+--
+-- >>> :set -XViewPatterns -XDataKinds
+-- >>> import Clash.Sized.BitVector
+-- >>> import GHC.Stack
+-- >>> :{
+-- h, h' :: Bit -> BitVector 8 -> BitVector 8
+-- h (xToErrorCtx "a is X" -> a) (xToErrorCtx "b is X" -> b) = slice d7 d0 (pack a ++# b)
+-- h' a b = slice d7 d0 (pack a ++# b)
+-- :}
+--
+-- >>> h' (errorX "QQ") 3
+-- 0000_0011
+-- >>> h (errorX "QQ") 3
+-- *** Exception: a is X
+-- X: QQ
+-- CallStack (from HasCallStack):
+--   errorX, called at ...
+-- <BLANKLINE>
+xToErrorCtx :: String -> a -> a
+xToErrorCtx ctx a = unsafeDupablePerformIO
+  (catch (evaluate a >> return a)
+         (\(XException msg) ->
+           throw (ErrorCall (unlines [ctx,msg]))))
+{-# NOINLINE xToErrorCtx #-}
+
+-- | Convert 'XException' to 'ErrorCall'
+--
+-- This is useful when tracking the source of 'XException' that gets eaten up by
+-- 'Clash.Classes.BitPack.pack' inside of your circuit; since
+-- 'Clash.Classes.BitPack.pack' translates 'XException' into undefined bits.
+--
+-- So for example if you have some large function f:
+--
+-- > f a b = ... pack a ... pack b ...
+--
+-- Where it is basically an error if either /a/ or /b/ ever throws an 'XException',
+-- and so you want that to be reported the moment /a/ or /b/ is used, instead of
+-- it being thrown when evaluating the result of /f/, then do:
+--
+-- > {-# LANGUAGE ViewPatterns #-}
+-- > f (xToError -> a) (xToError -> b) = ...
+--
+-- Unlike 'xToErrorCtx', where we have an extra String argument to distinguish
+-- one call to 'xoToError' to the other, 'xToError' will use the 'GHC.CallStack'
+-- mechanism to aid the user in distinquishing different call to 'xToError'.
+-- We can also use BangPatterns to report the potential 'XException' being
+-- thrown by /a/ or /b/ even earlier, i.e. when /f/ is applied:
+--
+-- > {-# LANGUAGE ViewPatterns, BangPatterns #-}
+-- > f (xToError -> !a) (xToError -> !b) = ...
+--
+-- __NB:__ Fully synthesizable, so doesn't have to be removed before synthesis
+--
+-- === __Example__
+--
+-- >>> :set -XViewPatterns -XDataKinds
+-- >>> import Clash.Sized.BitVector
+-- >>> import GHC.Stack
+-- >>> :{
+-- f, g, h, h' :: HasCallStack => Bit -> BitVector 8 -> BitVector 8
+-- f = g
+-- g = h
+-- h (xToError -> a) (xToError -> b) = slice d7 d0 (pack a ++# b)
+-- h' a b = slice d7 d0 (pack a ++# b)
+-- :}
+--
+-- >>> h' (errorX "QQ") 3
+-- 0000_0011
+-- >>> f (errorX "QQ") 3
+-- *** Exception: CallStack (from HasCallStack):
+--   xToError, called at ...
+--   h, called at ...
+--   g, called at ...
+--   f, called at ...
+-- X: QQ
+-- CallStack (from HasCallStack):
+--   errorX, called at ...
+-- <BLANKLINE>
+xToError :: HasCallStack => a -> a
+xToError = xToErrorCtx (prettyCallStack callStack)
+{-# INLINE xToError #-}
 
 -- | Like 'seq', however, whereas 'seq' will always do:
 --

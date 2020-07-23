@@ -334,6 +334,7 @@ runClashTest = defaultMain $ clashTestRoot
         , runTest "T1402b" def{hdlTargets=[VHDL], hdlSim=False}
         , runTest "TagToEnum" def{hdlSim=False}
         , runTest "TwoFunctions" def{hdlSim=False}
+        , runTest "XToError" def{hdlSim=False}
         ]
       , clashTestGroup "BitVector"
         [ NEEDS_PRIMS_GHC(runTest "Box" def)
