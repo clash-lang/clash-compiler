@@ -1,11 +1,14 @@
 pull_request_rules:
-  # For more information: https://doc.mergify.io/actions.html#backport
+  # For more information: https://doc.mergify.io/actions.html#copy
+  # We used to use the 'backport' action, but:
+  # https://github.com/Mergifyio/mergify-engine/issues/789
   - name: backport patches to 1.2
     conditions:
       - base=master
       - label=backport 1.2
+      - merged
     actions:
-      backport:
+      copy:
         ignore_conflicts: True
         branches:
           - "1.2"
