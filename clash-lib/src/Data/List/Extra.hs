@@ -1,16 +1,29 @@
 {-# LANGUAGE CPP #-}
+{-# LANGUAGE PackageImports #-}
 
-module Data.List.Extra where
+module Data.List.Extra
+  ( partitionM
+  , mapAccumLM
+  , (<:>)
+  , indexMaybe
+  , splitAtList
+  , equalLength
+  , countEq
+  , zipEqual
+
+  -- * From Control.Monad.Extra
+  , anyM
+  , allM
+  , orM
+
+  -- * From "extra"
+  , module NeilsExtra
+  ) where
+
+import "extra" Data.List.Extra as NeilsExtra
+import "extra" Control.Monad.Extra (anyM, allM, orM, partitionM)
 
 import Control.Applicative (liftA2)
-
--- | Monadic version of 'Data.List.partition'
-partitionM :: (Monad m) => (a -> m Bool) -> [a] -> m ([a], [a])
-partitionM _ []     = return ([], [])
-partitionM p (x:xs) = do
-  test      <- p x
-  (ys, ys') <- partitionM p xs
-  return $ if test then (x:ys, ys') else (ys, x:ys')
 
 -- | Monadic version of 'Data.List.mapAccumL'
 mapAccumLM
@@ -71,40 +84,3 @@ zipEqual [] [] = []
 zipEqual (a:as) (b:bs) = (a,b) : zipEqual as bs
 zipEqual _ _ = error "zipEqual"
 #endif
-
--- | Short-circuiting monadic version of 'any'
-anyM
-  :: (Monad m)
-  => (a -> m Bool)
-  -> [a]
-  -> m Bool
-anyM _ []     = return False
-anyM p (x:xs) = do
-  q <- p x
-  if q then
-    return True
-  else
-    anyM p xs
-
-allM :: (Monad m) => (a -> m Bool) -> [a] -> m Bool
-allM _ [] = return True
-allM p (x:xs) = do
-  q <- p x
-  if q then
-    allM p xs
-  else
-    return False
-
--- | short-circuiting monadic version of 'or'
-orM
-  :: (Monad m)
-  => [m Bool]
-  -> m Bool
-orM [] = pure False
-orM (x:xs) = do
-  p <- x
-  if p then
-    pure True
-  else
-    orM xs
-
