@@ -1,5 +1,10 @@
 # Changelog for the Clash project
 
+## 1.2.4 *July 28th 2020*
+* Changed:
+  * Relaxed upper bound versions of `aeson` and `dlist`, in preparation for the new Stack LTS.
+  * Reverted changes to primitive definitions for 'zipWith', 'map', 'foldr', and 'init' introduced in 1.2.2. They have shown to cause problems in very specific circumstances.
+
 ## 1.2.3 *July 11th 2020*
 * Changed:
   * Upgrade to nixos 20.03. Nix and snap users will now use packages present in 20.03.
