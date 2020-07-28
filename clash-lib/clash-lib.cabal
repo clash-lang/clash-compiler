@@ -1,6 +1,6 @@
 Cabal-version:        2.2
 Name:                 clash-lib
-Version:              1.2.3
+Version:              1.2.4
 Synopsis:             CAES Language for Synchronous Hardware - As a Library
 Description:
   Clash is a functional hardware description language that borrows both its
@@ -141,7 +141,7 @@ Library
                       base                    >= 4.11     && < 5,
                       binary                  >= 0.8.5    && < 0.11,
                       bytestring              >= 0.10.0.2 && < 0.11,
-                      clash-prelude           == 1.2.3,
+                      clash-prelude           == 1.2.4,
                       concurrent-supply       >= 0.1.7    && < 0.2,
                       containers              >= 0.5.0.0  && < 0.7,
                       data-binary-ieee754     >= 0.4.4    && < 0.6,
