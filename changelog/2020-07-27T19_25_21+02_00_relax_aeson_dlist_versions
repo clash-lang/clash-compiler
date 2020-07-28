@@ -1,1 +1,0 @@
-CHANGED: Relaxed upper bound versions of `aeson` and `dlist`, in preparation for the new Stack LTS.
