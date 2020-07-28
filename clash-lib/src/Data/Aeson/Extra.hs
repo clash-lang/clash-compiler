@@ -18,8 +18,9 @@ import           Data.Text            (Text,pack,unpack)
 import qualified Data.Text.Lazy       as LT
 import qualified Data.Text.Lazy.Encoding as LT
 import           Data.Text.Encoding.Error (UnicodeException(..))
-import           Data.List            (intercalate, groupBy)
-import           Data.Tuple.Extra     (second)
+import           Data.List            (intercalate)
+import           Data.List.Extra      (groupOn)
+import           Data.Tuple.Extra     (second, first)
 import           Data.Aeson           (FromJSON, Result (..), fromJSON, json)
 import           Data.Attoparsec.Lazy (Result (..), parse)
 import           Data.ByteString.Lazy (ByteString)
@@ -92,8 +93,8 @@ toSpecNewlines bs = do
   toLineMap virtuals =
       IntMap.fromList
     $ map (second (\reals -> (minimum reals, maximum reals)))
-    $ map (\(unzip -> (virts, reals)) -> (head virts, reals))
-    $ groupBy (\a b -> fst a == fst b)
+    $ map (first head . unzip)
+    $ groupOn fst
     $ zip virtuals [(0::Int)..]
 
 genLineErr' :: [Text] -> (Int, Int) -> [Int] -> Text
