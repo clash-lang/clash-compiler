@@ -598,6 +598,23 @@ caseCon ctx@(TransformContext is0 _) e@(Case subj ty alts) = do
         let e1 = mkApps (mkTicks (Prim pInfo) ticks)
                         [repTy,Right ty,msgOrCallStack]
         in  changed e1
+        | primName pInfo == "Clash.Sized.Internal.Unsigned.fromInteger#"
+        -> case List.find (equalLit . fst) alts of
+             Just (LitPat _,altE) -> changed altE
+             _ -> case alts of
+              ((DefaultPat,altE):_) -> changed altE
+              _ -> error ($curLoc <> "Malformed case: " <> showPpr e)
+
+          where
+            wrap (Right t)
+              | LitTy (NumTy n) <- normalizeType tcm t
+              = 2 ^ n
+            wrap _ = error ($curLoc <> "Malformed case: " <> showPpr e)
+
+            equalLit (LitPat (IntegerLiteral l')) =
+              msgOrCallStack == (Left (Literal (IntegerLiteral (l' `mod` wrap repTy))))
+            equalLit _ = False
+
       -- WHNF of subject is _|_, in the form of our internal _|_-values: that
       -- means the entire case-expression is _|_
       (Prim pInfo,[_],ticks)
