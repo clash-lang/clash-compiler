@@ -646,7 +646,14 @@ normalizeType tcMap = go
              let args' = map go args
                  ty' = mkTyConApp tcNm args'
              in case reduceTypeFamily tcMap ty' of
-               Just ty'' -> ty''
+               -- TODO Instead of recursing here, reduceTypeFamily should
+               -- ensure that if the result is a reducible type family it is
+               -- also reduced. This would reduce traversals over a type.
+               --
+               -- It may be a good idea to keep reduceTypeFamily only reducing
+               -- one family, and definiing reduceTypeFamilies to reduce all
+               -- it encounters in one traversal.
+               Just ty'' -> go ty''
                Nothing  -> ty'
     FunTy ty1 ty2 -> mkFunTy (go ty1) (go ty2)
     OtherType (ForAllTy tyvar ty')
