@@ -11,7 +11,7 @@ stages:
 # tests and therefore suitable for public runners.
 tests-8.4.4:
   extends: .tests-interruptible
-tests-8.8.3:
+tests-8.8.4:
   extends: .tests-interruptible
 tests-8.10.2:
   extends: .tests-interruptible
@@ -24,7 +24,7 @@ tests-8.6.5-singular-hidden:
 # intensive, should only picked up by beefy (local) runners.
 testsuite-8.4.4:
   extends: .testsuite-interruptible
-testsuite-8.8.3:
+testsuite-8.8.4:
   extends: .testsuite-interruptible
 testsuite-8.10.2:
   extends: .testsuite-interruptible
@@ -37,7 +37,7 @@ testsuite-8.6.5-singular-hidden:
 # on failed jobs, without receiving false negatives.
 ghc-8.4.4-master:
   extends: .tests-non-interruptible
-ghc-8.8.3-master:
+ghc-8.8.4-master:
   extends: .tests-non-interruptible
 ghc-8.10.2-master:
   extends: .tests-non-interruptible
