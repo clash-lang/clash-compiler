@@ -429,6 +429,7 @@ runClashTest = defaultMain $ clashTestRoot
 #if MIN_VERSION_base(4,12,0)
         -- Naturals are broken on GHC <= 8.4. See https://github.com/clash-lang/clash-compiler/pull/473
         , runTest "Naturals" def
+        , runTest "NaturalToInteger" def{hdlSim=False}
 #endif
         , runTest "NegativeLits" def
         , runTest "Resize" def

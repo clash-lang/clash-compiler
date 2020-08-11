@@ -7,6 +7,14 @@
     }
   },
   {
+    "Primitive": {
+      "name": "GHC.Natural.naturalToInteger",
+      "workInfo": "Never",
+      "primType": "Function",
+      "warning": "GHC.Natural.naturalToInteger: No blackbox available without size inference for Natural and Integer"
+    }
+  },
+  {
     "BlackBox": {
       "name": "GHC.Natural.underflowError",
       "workInfo" : "Constant",
