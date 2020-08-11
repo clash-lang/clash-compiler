@@ -2,7 +2,7 @@ hackage-sdist:
   extends: .tests
   interruptible: false
   variables:
-    GHC_VERSION: 8.10.1
+    GHC_VERSION: 8.10.2
   script:
     - export THREADS=$(nproc)
     - export CABAL_JOBS=$(nproc)
@@ -27,7 +27,7 @@ hackage-sdist:
   cache:
     key: hackage
   variables:
-    GHC_VERSION: 8.10.1
+    GHC_VERSION: 8.10.2
   script:
     - export THREADS=$(nproc)
     - export CABAL_JOBS=$(nproc)
