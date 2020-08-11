@@ -30,7 +30,7 @@
     # $CI_JOB_NAME.
     - export GHC=ghc-"${GHC_VERSION:-$(echo $CI_JOB_NAME | egrep -o '[0-9]+.[0-9]+.[0-9]+')}"
     - export THREADS=2
-    - export CABAL_JOBS=2
+    - export CABAL_JOBS=1
     - export
     - .ci/setup.sh
     - cabal new-run --write-ghc-environment-files=always benchmark -- --csv benchmark.csv
