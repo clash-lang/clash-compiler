@@ -42,13 +42,5 @@ optional-packages:
   ./clash-cosim
   ./clash-cores
 
--- upstream doctest fails with ghc-8.10: https://github.com/sol/doctest/issues/264
-source-repository-package
-    type: git
-    location: https://github.com/leonschoorl/doctest.git
-    tag: 8aeee0a89b077d7dcb401fa1b380d9a51f94e634
-package doctest
-  tests: False
-
 allow-newer:
   brick:base

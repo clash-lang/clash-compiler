@@ -14,7 +14,7 @@ tests-8.4.4:
   extends: .tests-interruptible
 tests-8.8.3:
   extends: .tests-interruptible
-tests-8.10.1:
+tests-8.10.2:
   extends: .tests-interruptible
 tests-8.6.5-singular-hidden:
   extends: .tests-interruptible
@@ -27,7 +27,7 @@ testsuite-8.4.4:
   extends: .testsuite-interruptible
 testsuite-8.8.3:
   extends: .testsuite-interruptible
-testsuite-8.10.1:
+testsuite-8.10.2:
   extends: .testsuite-interruptible
 testsuite-8.6.5-singular-hidden:
   extends: .testsuite-interruptible
@@ -40,7 +40,7 @@ ghc-8.4.4-master:
   extends: .tests-non-interruptible
 ghc-8.8.3-master:
   extends: .tests-non-interruptible
-ghc-8.10.1-master:
+ghc-8.10.2-master:
   extends: .tests-non-interruptible
 ghc-8.6.5-singular-hidden-master:
   extends: .tests-non-interruptible
@@ -48,7 +48,7 @@ ghc-8.6.5-singular-hidden-master:
     MULTIPLE_HIDDEN: "no"
 
 # Run benchmarks for isclashfastyet.com
-benchmark-8.8.3:
+benchmark-8.10.2:
   extends: .benchmark
 
 # "Publish" a release candidate
