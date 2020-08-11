@@ -1434,7 +1434,7 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
                                 , Left (Literal (NaturalLiteral c))]
 
   "Clash.Promoted.Nat.flogBaseSNat"
-    | [_,_,Right a, Right b] <- map (runExcept . tyNatSize tcm) tys
+    | [Right a, Right b] <- map (runExcept . tyNatSize tcm) tys
     , Just c <- flogBase a b
     , let c' = toInteger c
     -> let (_,tyView -> TyConApp snatTcNm _) = splitFunForallTy ty
@@ -1445,7 +1445,7 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
                                 , Left (Literal (NaturalLiteral c'))]
 
   "Clash.Promoted.Nat.clogBaseSNat"
-    | [_,_,Right a, Right b] <- map (runExcept . tyNatSize tcm) tys
+    | [Right a, Right b] <- map (runExcept . tyNatSize tcm) tys
     , Just c <- clogBase a b
     , let c' = toInteger c
     -> let (_,tyView -> TyConApp snatTcNm _) = splitFunForallTy ty
@@ -1454,9 +1454,11 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
        in  reduce $
            mkApps (Data snatDc) [ Right (LitTy (NumTy c'))
                                 , Left (Literal (NaturalLiteral c'))]
+    | otherwise
+    -> error ("clogBaseSNat: args = " <> show args <> ", tys = " <> show tys)
 
   "Clash.Promoted.Nat.logBaseSNat"
-    | [_,Right a, Right b] <- map (runExcept . tyNatSize tcm) tys
+    | [Right a, Right b] <- map (runExcept . tyNatSize tcm) tys
     , Just c <- flogBase a b
     , let c' = toInteger c
     -> let (_,tyView -> TyConApp snatTcNm _) = splitFunForallTy ty
