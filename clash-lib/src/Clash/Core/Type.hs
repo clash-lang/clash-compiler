@@ -625,9 +625,6 @@ normalizeType tcMap = go
   where
   go ty = case tyView ty of
     TyConApp tcNm args
-      | nameOcc tcNm == "Clash.Signal.Internal.Signal"
-      , [_,elTy] <- args
-      -> go elTy
       -- These Clash types are implemented with newtypes.
       -- We need to keep these newtypes because they define the width of the numbers.
       | nameOcc tcNm == "Clash.Sized.Internal.BitVector.Bit" ||
