@@ -1,0 +1,1 @@
+FEATURE: Added `Data.Ix.Ix` instances for `Signed` and `Unsigned` [#1481](https://github.com/clash-lang/clash-compiler/pull/1481)
