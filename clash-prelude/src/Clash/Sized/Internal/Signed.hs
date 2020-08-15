@@ -98,6 +98,7 @@ import Clash.Sized.Internal.Mod       (naturalToInteger)
 
 import GHC.TypeLits                   (KnownNat, Nat, type (+), natVal)
 import GHC.TypeLits.Extra             (Max)
+import GHC.Arr                        (Ix(..), indexError)
 import Language.Haskell.TH            (TypeQ, appT, conT, litT, numTyLit, sigE)
 import Language.Haskell.TH.Syntax     (Lift(..))
 #if MIN_VERSION_template_haskell(2,16,0)
@@ -687,3 +688,10 @@ type instance IxValue (Signed n) = Bit
 instance KnownNat n => Ixed (Signed n) where
   ix i f s = unpack# <$> BV.replaceBit# (pack# s) i
                      <$> f (BV.index# (pack# s) i)
+
+instance (KnownNat n) => Ix (Signed n) where
+  range (a, b) = [a..b]
+  index ab@(a, _b) x
+    | inRange ab x = fromIntegral $ x - a
+    | otherwise = indexError ab x ("Signed " <> show (natVal (Proxy @n)))
+  inRange (a, b) x = a <= x && x <= b
