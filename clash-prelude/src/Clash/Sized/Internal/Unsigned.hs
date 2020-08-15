@@ -85,7 +85,7 @@ import Data.Data                      (Data)
 import Data.Default.Class             (Default (..))
 import Data.Proxy                     (Proxy (..))
 import Text.Read                      (Read (..), ReadPrec)
-import Text.Printf                    (PrintfArg (..))
+import Text.Printf                    (PrintfArg (..), printf)
 import GHC.Exts                       (narrow8Word#, narrow16Word#, narrow32Word#)
 import GHC.Generics                   (Generic)
 import GHC.Integer.GMP.Internals      (bigNatToWord)
@@ -96,7 +96,7 @@ import GHC.Natural                    (naturalToInteger)
 import GHC.TypeLits                   (KnownNat, Nat, type (+), natVal)
 import GHC.TypeLits.Extra             (Max)
 import GHC.Word                       (Word (..), Word8 (..), Word16 (..), Word32 (..))
-import GHC.Arr                        (Ix(..), indexError)
+import Data.Ix                        (Ix(..))
 import Language.Haskell.TH            (TypeQ, appT, conT, litT, numTyLit, sigE)
 import Language.Haskell.TH.Syntax     (Lift(..))
 #if MIN_VERSION_template_haskell(2,16,0)
@@ -522,9 +522,9 @@ instance KnownNat n => Ixed (Unsigned n) where
 
 instance (KnownNat n) => Ix (Unsigned n) where
   range (a, b) = [a..b]
-  index ab@(a, _b) x
+  index ab@(a, b) x
     | inRange ab x = fromIntegral $ x - a
-    | otherwise = indexError ab x ("Unsigned " <> show (natVal (Proxy @n)))
+    | otherwise = error $ printf "Index %d out of bounds (%d, %d) ab" x a b
   inRange (a, b) x = a <= x && x <= b
 
 unsignedToWord :: Unsigned WORD_SIZE_IN_BITS -> Word

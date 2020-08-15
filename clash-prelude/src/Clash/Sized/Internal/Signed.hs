@@ -87,7 +87,7 @@ import Data.Data                      (Data)
 import Data.Default.Class             (Default (..))
 import Data.Proxy                     (Proxy (..))
 import Text.Read                      (Read (..), ReadPrec)
-import Text.Printf                    (PrintfArg (..))
+import Text.Printf                    (PrintfArg (..), printf)
 import GHC.Generics                   (Generic)
 import GHC.Natural                    (naturalFromInteger)
 #if MIN_VERSION_base(4,12,0)
@@ -98,7 +98,7 @@ import Clash.Sized.Internal.Mod       (naturalToInteger)
 
 import GHC.TypeLits                   (KnownNat, Nat, type (+), natVal)
 import GHC.TypeLits.Extra             (Max)
-import GHC.Arr                        (Ix(..), indexError)
+import Data.Ix                        (Ix(..))
 import Language.Haskell.TH            (TypeQ, appT, conT, litT, numTyLit, sigE)
 import Language.Haskell.TH.Syntax     (Lift(..))
 #if MIN_VERSION_template_haskell(2,16,0)
@@ -691,7 +691,7 @@ instance KnownNat n => Ixed (Signed n) where
 
 instance (KnownNat n) => Ix (Signed n) where
   range (a, b) = [a..b]
-  index ab@(a, _b) x
+  index ab@(a, b) x
     | inRange ab x = fromIntegral $ x - a
-    | otherwise = indexError ab x ("Signed " <> show (natVal (Proxy @n)))
+    | otherwise = error $ printf "Index %d out of bounds (%d, %d) ab" x a b
   inRange (a, b) x = a <= x && x <= b
