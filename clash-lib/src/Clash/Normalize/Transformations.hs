@@ -61,6 +61,7 @@ module Clash.Normalize.Transformations
   , separateArguments
   , separateLambda
   , xOptimize
+  , lamCast
   )
 where
 
@@ -115,7 +116,7 @@ import           Clash.Core.Util
   ( isSignalType, mkVec, tyNatSize, undefinedTm,
    shouldSplit, inverseTopSortLetBindings)
 import           Clash.Core.Var
-  (Id, TyVar, Var (..), isGlobalId, isLocalId, mkLocalId)
+  (Id, TyVar, Var (..), isGlobalId, isLocalId, mkLocalId, modifyVarName)
 import           Clash.Core.VarEnv
   (InScopeSet, VarEnv, VarSet, elemVarSet,
    emptyVarEnv, extendInScopeSet, extendInScopeSetList, lookupVarEnv,
@@ -498,6 +499,7 @@ caseCon :: HasCallStack => NormRewrite
 caseCon ctx@(TransformContext is0 _) e@(Case subj ty alts) = do
  tcm <- Lens.view tcCache
  case collectArgsTicks subj of
+  (Cast (collectArgsTicks -> (Data _,_,_)) _ _,_,_) -> error "KPush"
   -- The subject is an applied data constructor
   (Data dc, args, ticks) -> case List.find (equalCon . fst) alts of
     Just (DataPat _ tvs xs, altE) -> do
@@ -799,6 +801,7 @@ nonRepANF ctx@(TransformContext is0 _) e@(App appConPrim arg)
       (True,Case {})  -> specializeNorm ctx e
       (True,Lam {})   -> specializeNorm ctx e
       (True,TyLam {}) -> specializeNorm ctx e
+      (True,Cast {})  -> error "QQ"
       _               -> return e
 
 nonRepANF _ e = return e
@@ -959,6 +962,26 @@ letCast _ (Cast (stripTicks -> Letrec binds body) ty1 ty2) =
 letCast _ e = return e
 {-# SCC letCast #-}
 
+-- | Transforms:
+--
+-- > (\x:a1 -> e) |> (a1 -> b1) ~ (a2 -> b2)
+--
+-- to
+--
+-- > (\x1:a2 -> (e[x:=x1 |> a2 ~ a1]) |> b1 ~ b2)
+--
+lamCast :: HasCallStack => NormRewrite
+lamCast (TransformContext is0 _) (Cast (stripTicks -> Lam bndr body) ty1 ty2) = do
+  bndrName <- cloneNameWithInScopeSet is0 (varName bndr)
+  let FunTy tyA1 tyB1 = tyView ty1
+      FunTy tyA2 tyB2 = tyView ty2
+      bndr1 = modifyVarName (const bndrName) bndr
+      is1   = extendInScopeSet is0 bndr1
+      subst = extendIdSubst (mkSubst is1) bndr (Cast (Var bndr1) tyA2 tyA1)
+      body1 = Cast (substTm "lamCast" subst body) tyB1 tyB2
+  changed (Lam bndr1 body1)
+
+lamCast _ e = return e
 
 -- | Push cast over an argument to a function into that function
 --

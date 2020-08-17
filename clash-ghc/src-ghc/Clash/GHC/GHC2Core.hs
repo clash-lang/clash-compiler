@@ -54,7 +54,7 @@ import Coercion   (coercionType,coercionKind)
 import CoreFVs    (exprSomeFreeVars)
 import CoreSyn
   (AltCon (..), Bind (..), CoreExpr, Expr (..), Unfolding (..), Tickish (..),
-   collectArgs, rhssOfAlts, unfoldingTemplate)
+   collectArgs, rhssOfAlts, unfoldingTemplate, exprToType)
 import DataCon    (DataCon,
 #if MIN_VERSION_ghc(8,8,0)
                    dataConExTyCoVars,
@@ -382,21 +382,15 @@ coreToTerm primMap unlocs = term
       = term' e
       where
         -- See Note [Casting signals]
-        go "Clash.Signal.Internal.mapSignal#"  pTy args
+        go "Clash.Signal.Internal.mapSignal#" pTy args
           | [Type aTy, Type bTy, Type domTy, fTm, aSigTm] <- args
-          = do
-            let aSigTy = piResultTys pTy [bTy,aTy,domTy,aTy,aTy]
-                bSigTy = piResultTys pTy [aTy,bTy,domTy,bTy,bTy]
-            aTyC <- coreToType aTy
-            bTyC <- coreToType bTy
-            aSigTyC <- coreToType aSigTy
-            bSigTyC  <- coreToType bSigTy
-            C.Cast <$> (C.App <$> term fTm
-                              <*> (C.Cast <$> term aSigTm
-                                          <*> pure aSigTyC
-                                          <*> pure aTyC))
-                   <*> pure bTyC
-                   <*> pure bSigTyC
+          = let FunTy _ (FunTy aSigTy bSigTy) = piResultTys pTy [aTy,bTy,domTy]
+            in  C.Cast <$> (C.App <$> term fTm
+                                  <*> (C.Cast <$> term aSigTm
+                                              <*> coreToType aSigTy
+                                              <*> coreToType aTy))
+                       <*> coreToType bTy
+                       <*> coreToType bSigTy
 
         -- See Note [Casting signals]
         go "Clash.Signal.Internal.signal#" pty args
@@ -407,34 +401,28 @@ coreToTerm primMap unlocs = term
         -- See Note [Casting signals]
         go "Clash.Signal.Internal.appSignal#" pTy args
           | [Type domTy, Type aTy, Type bTy, fSigTm, aSigTm] <- args
-          = do
-            let aSigTy = piResultTys pTy [domTy,bTy,aTy,aTy,aTy]
-                bSigTy = piResultTys pTy [domTy,aTy,bTy,bTy,bTy]
-                fSigTy = piResultTys pTy [domTy,aTy,FunTy (error "TODO") aTy bTy,aTy,aTy]
-            aTyC     <- coreToType aTy
-            bTyC     <- coreToType bTy
-            aSigTyC  <- coreToType aSigTy
-            bSigTyC  <- coreToType bSigTy
-            fSigTyC  <- coreToType fSigTy
-            let fTyC = C.mkFunTy aTyC bTyC
-            C.Cast <$> (C.App <$> (C.Cast <$> term fSigTm
-                                          <*> pure fSigTyC
-                                          <*> pure fTyC)
-                              <*> (C.Cast <$> term aSigTm
-                                          <*> pure aSigTyC
-                                          <*> pure aTyC))
-                   <*> pure bTyC
-                   <*> pure bSigTyC
-        -- TODO: Implement casts / remove
+          = let FunTy fSigTy (FunTy aSigTy bSigTy) = piResultTys pTy [domTy,aTy,bTy]
+                fTy = FunTy aTy bTy
+            in  C.Cast <$> (C.App <$> (C.Cast <$> term fSigTm
+                                              <*> coreToType fSigTy
+                                              <*> coreToType fTy)
+                                  <*> (C.Cast <$> term aSigTm
+                                              <*> coreToType aSigTy
+                                              <*> coreToType aTy))
+                       <*> coreToType bTy
+                       <*> coreToType bSigTy
+
         -- See Note [Casting signals]
-        go "Clash.Signal.Internal.joinSignal#" _ args
-          | length args == 3
-          = term (args!!2)
-        -- TODO: Implement casts
+        go "Clash.Signal.Internal.joinSignal#" pTy args
+          | [Type domTy, Type aTy, aTm] <- args
+          = let FunTy aSigSigTy aSigTy = piResultTys pTy [domTy,aTy]
+            in  C.Cast <$> term aTm <*> coreToType aSigSigTy <*> coreToType aSigTy
+
         -- See Note [Casting signals]
-        go "Clash.Signal.Bundle.vecBundle#"    _ args
-          | length args == 4
-          = term (args!!3)
+        go "Clash.Signal.Bundle.vecBundle#" pTy args
+          | [Type nTy, Type domTy, Type aTy, vTm] <- args
+          = let FunTy vecSigTy sigVecTy = piResultTys pTy [nTy,domTy,aTy]
+            in  C.Cast <$> term vTm <*> coreToType vecSigTy <*> coreToType sigVecTy
         --- Remove `$`
         go "GHC.Base.$"                        _ args
           | length args == 5
@@ -482,22 +470,22 @@ coreToTerm primMap unlocs = term
           -- xToErrorCtx :: forall a. String -> a -> a
           | [_ty, _msg, x] <- args
           = term x
-        go nm _ args
-          -- TODO: Implement casts
+        go nm pTy args
           -- TODO: Evaluate performance of using casts vs leaving them out
           -- See Note [Casting signals]
           | Just n <- parseBundle "bundle" nm
             -- length args = domain tyvar + signal arg + number of type vars
           , length args == 2 + n
-          = term (last args)
-        go nm _ args
-          -- TODO: Implement casts
+          = let FunTy unSigTy sigTy = piResultTys pTy (map exprToType (init args))
+            in  C.Cast <$> term (last args) <*> coreToType unSigTy <*> coreToType sigTy
+        go nm pTy args
           -- TODO: Evaluate performance of using casts vs leaving them out
           -- See Note [Casting signals]
           | Just n <- parseBundle "unbundle" nm
             -- length args = domain tyvar + signal arg + number of type vars
           , length args == 2 + n
-          = term (last args)
+          = let FunTy sigTy unSigTy = piResultTys pTy (map exprToType (init args))
+            in  C.Cast <$> term (last args) <*> coreToType sigTy <*> coreToType unSigTy
         go _ _ _ = term' e
 
     parseBundle :: Text -> Text -> Maybe Int
@@ -505,6 +493,7 @@ coreToTerm primMap unlocs = term
       nm1 <- Text.stripPrefix ("Clash.Signal.Bundle." <> fNm) nm0
       nm2 <- Text.stripSuffix "#" nm1
       Text.readMaybe (Text.unpack nm2)
+
     term' (Var x)                 = var x
     term' (Lit l)                 = return $ C.Literal (coreToLiteral l)
     term' (App eFun (Type tyArg)) = C.TyApp <$> term eFun <*> coreToType tyArg
@@ -594,7 +583,6 @@ coreToTerm primMap unlocs = term
             Just (Just (Primitive f wi _))
               | Just n <- parseBundle "bundle" f        -> return (bundleUnbundleTerm (n+1) xType)
               | Just n <- parseBundle "unbundle" f      -> return (bundleUnbundleTerm (n+1) xType)
-              | f == "Clash.Signal.Internal.mapSignal#" -> return (mapSignalTerm xType)
               | f == "Clash.Signal.Internal.mapSignal#" -> return (mapSignalTerm xType)
               | f == "Clash.Signal.Internal.signal#"    -> return (signalTerm xType)
               | f == "Clash.Signal.Internal.appSignal#" -> return (appSignalTerm xType)
@@ -1113,13 +1101,13 @@ bundleUnbundleTerm nTyVarsExpected = go []
 
 -- | Given the type:
 --
--- @forall a. forall b. forall clk. (a -> b) -> Signal clk a -> Signal clk b@
+-- @forall a. forall b. forall dom. (a -> b) -> Signal dom a -> Signal dom b@
 --
 -- Generate the term:
 --
 -- @
--- /\(a:*)./\(b:*)./\(clk:Clock).\(f : (Signal clk a -> Signal clk b)).
--- \(x : Signal clk a).f x
+-- /\(a:*)./\(b:*)./\(dom:Symbol).\(f : a -> b).
+-- \(x : Signal clk a).(f (x |> Signal dom a ~ a)) |> b ~ Signal dom b
 -- @
 mapSignalTerm :: C.Type
               -> C.Term
@@ -1129,15 +1117,15 @@ mapSignalTerm (C.ForAllTy aTV (C.ForAllTy bTV (C.ForAllTy clkTV funTy))) =
     C.TyLam clkTV (
     C.Lam   fId (
     C.Lam   xId (
-    C.App (C.Var fId) (C.Var xId))))))
+    C.Cast (C.App (C.Var fId) (C.Cast (C.Var xId) aSTy aTy)) bTy bSTy)))))
   where
-    (C.FunTy _ funTy'') = C.tyView funTy
-    (C.FunTy aTy bTy)   = C.tyView funTy''
+    C.FunTy fTy funTy1 = C.tyView funTy
+    C.FunTy aTy bTy = C.tyView fTy
+    C.FunTy aSTy bSTy = C.tyView funTy1
     fName = C.mkUnsafeSystemName "f" 0
     xName = C.mkUnsafeSystemName "x" 1
-    fTy   = C.mkFunTy aTy bTy
     fId   = C.mkLocalId fTy fName
-    xId   = C.mkLocalId aTy xName
+    xId   = C.mkLocalId aSTy xName
 
 mapSignalTerm ty = error $ $(curLoc) ++ show ty
 
@@ -1147,18 +1135,18 @@ mapSignalTerm ty = error $ $(curLoc) ++ show ty
 --
 -- Generate the term
 --
--- @/\(a:*)./\(dom:Domain).\(x:Signal dom a).x@
+-- @/\(a:*)./\(dom:Domain).\(x:a).x |> a ~ Signal dom a@
 signalTerm :: C.Type
            -> C.Term
 signalTerm (C.ForAllTy aTV (C.ForAllTy domTV funTy)) =
     C.TyLam aTV (
     C.TyLam domTV (
-    C.Lam   xId (
-    C.Var   xId)))
+    C.Lam xId (
+    (C.Cast (C.Var xId) aTy saTy))))
   where
-    (C.FunTy _ saTy) = C.tyView funTy
+    C.FunTy aTy saTy = C.tyView funTy
     xName = C.mkUnsafeSystemName "x" 0
-    xId   = C.mkLocalId saTy xName
+    xId   = C.mkLocalId aTy xName
 
 signalTerm ty = error $ $(curLoc) ++ show ty
 
@@ -1172,8 +1160,10 @@ signalTerm ty = error $ $(curLoc) ++ show ty
 -- Generate the term:
 --
 -- @
--- /\(dom:Domain)./\(a:*)./\(b:*).\(f : (Signal dom a -> Signal dom b)).
--- \(x : Signal dom a).f x
+-- /\(dom:Domain)./\(a:*)./\(b:*).
+-- \(f : Signal dom (a -> b)).
+-- \(x : Signal dom a).
+-- ((f |> Signal dom (a -> b) ~ a -> b) (x |> Signal dom a ~ a)) |> b ~ Signal dom b
 -- @
 appSignalTerm :: C.Type
               -> C.Term
@@ -1183,42 +1173,48 @@ appSignalTerm (C.ForAllTy domTV (C.ForAllTy aTV (C.ForAllTy bTV funTy))) =
     C.TyLam bTV (
     C.Lam   fId (
     C.Lam   xId (
-    C.App (C.Var fId) (C.Var xId))))))
+    C.Cast (C.App (C.Cast (C.Var fId) fSTy fTy)
+                  (C.Cast (C.Var xId) aSTy aTy))
+           bTy
+           bSTy)))))
   where
-    (C.FunTy _ funTy'') = C.tyView funTy
-    (C.FunTy saTy sbTy)   = C.tyView funTy''
+    C.FunTy fSTy funTy1 = C.tyView funTy
+    C.FunTy aSTy bSTy = C.tyView funTy1
+    C.TyConApp _ [_,fTy] = C.tyView fSTy
+    C.FunTy aTy bTy = C.tyView fTy
+
     fName = C.mkUnsafeSystemName "f" 0
     xName = C.mkUnsafeSystemName "x" 1
-    fTy   = C.mkFunTy saTy sbTy
-    fId   = C.mkLocalId fTy fName
-    xId   = C.mkLocalId saTy xName
+    fId   = C.mkLocalId fSTy fName
+    xId   = C.mkLocalId aSTy xName
 
 appSignalTerm ty = error $ $(curLoc) ++ show ty
 
 -- | Given the type:
 --
 -- @
--- forall t.forall n.forall a.Vec n (Signal t a) ->
--- Signal t (Vec n a)
+-- forall n.forall dom.forall a.Vec n (Signal dom a) ->
+-- Signal dom (Vec n a)
 -- @
 --
 -- Generate the term:
 --
 -- @
--- /\(t:Domain)./\(n:Nat)./\(a:*).\(vs:Signal t (Vec n a)).vs
+-- /\(dom:Domain)./\(n:Nat)./\(a:*).\(vs:Vec n (Signal dom a)).
+-- vs |> Vec n (Signal dom a) ~ Signal dom (Vec n a)
 -- @
 vecUnwrapTerm :: C.Type
               -> C.Term
-vecUnwrapTerm (C.ForAllTy tTV (C.ForAllTy nTV (C.ForAllTy aTV funTy))) =
-    C.TyLam tTV (
+vecUnwrapTerm (C.ForAllTy nTV (C.ForAllTy domTV (C.ForAllTy aTV funTy))) =
     C.TyLam nTV (
+    C.TyLam domTV (
     C.TyLam aTV (
-    C.Lam   vsId (
-    C.Var vsId))))
+    C.Lam vsId (
+    C.Cast (C.Var vsId) unbundledTy bundledTy))))
   where
-    (C.FunTy _ vsTy) = C.tyView funTy
-    vsName           = C.mkUnsafeSystemName "vs" 0
-    vsId             = C.mkLocalId vsTy vsName
+    C.FunTy unbundledTy bundledTy = C.tyView funTy
+    vsName = C.mkUnsafeSystemName "vs" 0
+    vsId = C.mkLocalId unbundledTy vsName
 
 vecUnwrapTerm ty = error $ $(curLoc) ++ show ty
 
@@ -1232,8 +1228,9 @@ vecUnwrapTerm ty = error $ $(curLoc) ++ show ty
 -- Generate the term:
 --
 -- @
--- /\(f:* -> *)./\(a:*)./\(b:*)./\(dom:Clock).\(dict:Applicative f).
--- \(g:a -> f b).\(x:Signal dom a).g x
+-- /\(f:* -> *)./\(a:*)./\(b:*)./\(dom:Domain).\(dict:Applicative f).
+-- \(g:a -> f b).\(x:Signal dom a).
+-- (g (x |> Signal dom a ~ a)) |> f b -> f (Signal dom b)
 -- @
 traverseTerm :: C.Type
              -> C.Term
@@ -1242,20 +1239,22 @@ traverseTerm (C.ForAllTy fTV (C.ForAllTy aTV (C.ForAllTy bTV (C.ForAllTy domTV f
     C.TyLam aTV (
     C.TyLam bTV (
     C.TyLam domTV (
-    C.Lam   dictId (
-    C.Lam   gId (
-    C.Lam   xId (
-    C.App (C.Var gId) (C.Var xId))))))))
+    C.Lam dictId (
+    C.Lam gId (
+    C.Lam xId (
+    C.Cast (C.App (C.Var gId) (C.Cast (C.Var xId) aSTy aTy)) fBTy fBSTy)))))))
   where
-    (C.FunTy dictTy funTy1) = C.tyView funTy
-    (C.FunTy gTy    funTy2) = C.tyView funTy1
-    (C.FunTy xTy    _)      = C.tyView funTy2
+    C.FunTy dictTy funTy1 = C.tyView funTy
+    C.FunTy gTy    funTy2 = C.tyView funTy1
+    C.FunTy aSTy   fBSTy  = C.tyView funTy2
+    C.FunTy aTy    fBTy   = C.tyView gTy
+
     dictName = C.mkUnsafeSystemName "dict" 0
     gName    = C.mkUnsafeSystemName "g" 1
     xName    = C.mkUnsafeSystemName "x" 2
     dictId   = C.mkLocalId dictTy dictName
     gId      = C.mkLocalId gTy gName
-    xId      = C.mkLocalId xTy xName
+    xId      = C.mkLocalId aSTy xName
 
 traverseTerm ty = error $ $(curLoc) ++ show ty
 
@@ -1300,7 +1299,15 @@ dollarTerm ty = error $ $(curLoc) ++ show ty
 -- @/\(a:*)./\(dom:Domain).\(x:Signal dom a).x@
 joinTerm :: C.Type
          -> C.Term
-joinTerm ty@(C.ForAllTy {}) = signalTerm ty
+joinTerm (C.ForAllTy domTV (C.ForAllTy aTV funTy)) =
+  C.TyLam domTV (
+  C.TyLam aTV (
+  C.Lam xId (C.Cast (C.Var xId) sigSigTy sigTy)))
+ where
+  (C.FunTy sigSigTy sigTy) = C.tyView funTy
+  xName = C.mkUnsafeSystemName "x" 0
+  xId = C.mkLocalId sigSigTy xName
+
 joinTerm ty = error $ $(curLoc) ++ show ty
 
 -- | Given the type:

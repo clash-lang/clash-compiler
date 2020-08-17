@@ -141,6 +141,7 @@ splitNormalized tcm expr = case collectBndrs expr of
   (args, collectTicks -> (Letrec xes e, ticks))
     | (tmArgs,[]) <- partitionEithers args -> case stripTicks e of
         Var v -> Right (tmArgs, fmap (second (`mkTicks` ticks)) xes,v)
+        Cast (Var v) _ ty2 -> Right (tmArgs, fmap (second (`mkTicks` ticks)) xes,v {varType = ty2})
         _     -> Left ($(curLoc) ++ "Not in normal form: res not simple var")
     | otherwise -> Left ($(curLoc) ++ "Not in normal form: tyArgs")
   _ ->

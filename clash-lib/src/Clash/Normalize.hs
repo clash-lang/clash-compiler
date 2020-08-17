@@ -397,7 +397,7 @@ flattenCallTree (CBranch (nm,(Binding nm' sp inl tm)) used) = do
      else return (CBranch (nm,(Binding nm' sp inl newExpr)) allUsed)
   where
     flatten =
-      repeatR (topdownR (apply "appPropFast" appPropFast >->
+      (repeatR (topdownR (apply "appPropFast" appPropFast >->
                  apply "bindConstantVar" bindConstantVar >->
                  apply "caseCon" caseCon >->
 #if EXPERIMENTAL_EVALUATOR
@@ -408,7 +408,8 @@ flattenCallTree (CBranch (nm,(Binding nm' sp inl tm)) used) = do
                  apply "reduceNonRepPrim" reduceNonRepPrim >->
                  apply "removeUnusedExpr" removeUnusedExpr >->
                  apply "flattenLet" flattenLet)) !->
-      topdownSucR (apply "topLet" topLet)
+      topdownSucR (apply "topLet" topLet)) >->
+      topdownSucR (apply "letCast" letCast)
 
     goCheap c@(CLeaf   (nm2,(Binding _ _ inl2 e)))
       | inl2 == NoInline = (Nothing     ,[c])

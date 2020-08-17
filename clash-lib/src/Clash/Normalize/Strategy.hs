@@ -40,7 +40,10 @@ normalization =
   xOptim >-> rmDeadcode >->
   cleanup >-> recLetRec >-> splitArgs
   where
-    anf        = topdownR (apply "nonRepANF" nonRepANF) >-> apply "ANF" makeANF >-> topdownR (apply "caseCon" caseCon)
+    anf        = topdownR (apply "lamCast" lamCast) >->
+                 topdownR (apply "nonRepANF" nonRepANF) >->
+                 apply "ANF" makeANF >->
+                 topdownR (apply "caseCon" caseCon)
     letTL      = topdownSucR (apply "topLet" topLet)
     recLetRec  = apply "recToLetRec" recToLetRec
     rmUnusedExpr = bottomupR (apply "removeUnusedExpr" removeUnusedExpr)

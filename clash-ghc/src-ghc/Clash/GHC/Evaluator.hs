@@ -290,7 +290,8 @@ ghcUnwind v m tcm = do
   go (PrimApply p tys vs tms) = ghcPrimUnwind tcm p tys vs v tms
   go (Scrutinise altTy as)    = return . scrutinise v altTy as
   go (Tickish _)              = return . setTerm (valToTerm v)
-  go (Castish ty1 ty2)        = error "TODO"
+  -- A cast of a value is a value
+  go (Castish ty1 ty2)        = \mN -> ghcUnwind (CastValue v ty1 ty2) mN tcm
 
 -- | Update the Heap with the evaluated term
 update :: IdScope -> Id -> Value -> Machine -> Machine
