@@ -28,6 +28,7 @@ module Clash.Core.Subst
   , extendTvSubstList
     -- ** Applying substitutions
   , substTy
+  , substTyVar
   , substTyTvSubst
   , substTyWith
   , substTyInVar

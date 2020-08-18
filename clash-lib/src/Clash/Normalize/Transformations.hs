@@ -10,6 +10,7 @@
 
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE ImplicitParams #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE MagicHash #-}
 {-# LANGUAGE MultiWayIf #-}
@@ -112,7 +113,7 @@ import           Clash.Core.Type             (Type (..), TypeView (..), applyFun
                                               splitFunTy,
                                               tyView, mkPolyFunTy, coreView,
                                               LitTy (..), coreView1,
-                                              normalizeType)
+                                              normalizeType, mkFunTy, mkTyConApp)
 import           Clash.Core.TyCon
   (TyConMap, tyConDataCons, tyConKind, tyConArity)
 import           Clash.Core.Util
@@ -514,28 +515,50 @@ caseCon ctx@(TransformContext is0 _) e@(Case subj ty alts) = do
        let nonUnivArgs      = List.dropList (dcUnivTyVars dc) args
            (exArgs,valArgs) = List.splitAtList (dcExtTyVars dc) nonUnivArgs
 
-       tcm <- Lens.view tcCache
        let tc = tcm `lookupUniqMap'` toTc
 
        let omegas = decomposeCo (tyConArity tc) (fromTy,toTy)
 
-           (phiSubst,toExArgs) = liftCoSubstWithEx
-                                   (dcUnivTyVars dc)
-                                   omegas
-                                   (dcExtTyVars dc)
-                                   (Either.fromRight (error "Not a Type") <$> exArgs)
+           (phiSubst,toExArgs) =
+             let ?tcm = tcm
+             in  liftCoSubstWithEx
+                   (dcUnivTyVars dc)
+                   omegas
+                   (dcExtTyVars dc)
+                   (Either.fromRight (error "Not a Type") <$> exArgs)
 
-           newValArgs = error "newValArgs"
+           newValArgs =
+             zipWith castArg
+                     (dcArgTys dc)
+                     (Either.fromLeft (error "Not a Term") <$> valArgs)
+
+           castArg argTy arg = mkCast arg (phiSubst argTy)
+           mkCast arg (ty1,ty2)
+             | ty1 == ty2
+             = arg
+
+           mkCast (Cast arg ty1 _) (_,ty2)
+             = Cast arg ty1 ty2
+
+           mkCast (Tick t arg) co
+             = Tick t (mkCast arg co)
+
+           mkCast arg (ty1,ty2)
+             -- TODO: error out when `termType tcm arg /= ty1`
+             = Cast arg ty1 ty2
+
            newD = mkApps (mkTicks (Data dc) ticksInner)
                          (map Right toTcArgTys ++
                           map Right toExArgs ++
                           map Left  newValArgs)
+
        setChanged
        caseCon ctx (Case (mkTicks newD ticksOuter) ty alts)
     | otherwise
     -> error ("KPush expected TyCon:\n" <> showPpr e)
    where
         liftCoSubstWithEx ::
+          (?tcm :: TyConMap) =>
           -- Universally quantified tyvars
           [TyVar] ->
           -- Coercions
@@ -573,9 +596,13 @@ caseCon ctx@(TransformContext is0 _) e@(Case subj ty alts) = do
 
         mkLiftingContext :: [(TyVar,(Type,Type))] -> (TvSubst, VarEnv (Type,Type))
         mkLiftingContext pairs =
-          ( error "mkLiftingContext"
+          ( mkEmptyTvSubst (mkInScopeSet (Lens.foldMapOf (tupOf typeFreeVars)
+                                                         unitVarSet
+                                                         (map snd pairs)))
           , mkVarEnv pairs
           )
+         where
+          tupOf fld = \f -> traverse (\(a,b) -> (,) <$> fld f a <*> fld f b)
 
         lcSubstRight :: (TvSubst, VarEnv (Type,Type)) -> TvSubst
         lcSubstRight (subst,lcEnv) =
@@ -583,10 +610,62 @@ caseCon ctx@(TransformContext is0 _) e@(Case subj ty alts) = do
          where
           tEnv = mapVarEnv snd lcEnv
 
-        tyCoSubst :: (TvSubst, VarEnv (Type,Type)) -> Type -> (Type,Type)
-        tyCoSubst = error "tyCoSubst"
+        tyCoSubst :: (?tcm :: TyConMap) => (TvSubst, VarEnv (Type,Type)) -> Type -> (Type,Type)
+        tyCoSubst !lc = go
+         where
+          go tyC | Just tyN <- coreView1 ?tcm tyC
+                 = go tyN
+          -- go (AnnType _ annTy) = go annTy
+          go tyC = case tyView tyC of
+            OtherType oTy -> case oTy of
+              AnnType _ tyA -> go tyA
+              VarTy tv -> case liftCoSubstTyVar lc tv of
+                Nothing -> error "tyCoSubst bad roles"
+                Just co -> co
+              LitTy {} -> (oTy,oTy) -- Refl
+              AppTy lTy rTy ->
+                let (lTyL,lTyR) = go lTy
+                    (rTyL,rTyR) = go rTy
+                in  (AppTy lTyL rTyL,AppTy lTyR rTyR)
+              ForAllTy tv tyBody ->
+                let (lcN, tvN, h) = liftCoSubstVarBndr lc tv
+                    bodyCo = tyCoSubst lcN tyBody
+                in  mkForallCo tvN h bodyCo
+              ConstTy {} -> error "impossible"
+            FunTy lTy rTy ->
+              let (lTyL,lTyR) = go lTy
+                  (rTyL,rTyR) = go rTy
+              in  (mkFunTy lTyL rTyL,mkFunTy lTyR rTyR)
+            TyConApp tcNm tyArgs ->
+              let (lArgs,rArgs) = unzip (map go tyArgs)
+              in  (mkTyConApp tcNm lArgs, mkTyConApp tcNm rArgs)
+
+        liftCoSubstTyVar :: (TvSubst, VarEnv (Type,Type)) -> TyVar -> Maybe (Type,Type)
+        liftCoSubstTyVar (subst,env) v
+          | Just coArg <- lookupVarEnv v env
+          = -- TODO:
+            -- downgradeRoleMaybe role (coercionRole coArg) coArg
+            Just coArg
+
+          | otherwise
+          = let coTy = substTyVar subst v
+            in  Just (coTy,coTy) -- Refl
+
+        liftCoSubstVarBndr ::
+          (TvSubst, VarEnv (Type,Type)) ->
+          TyVar ->
+          ((TvSubst, VarEnv (Type,Type)), TyVar, (Type,Type))
+        liftCoSubstVarBndr = error "liftCoSubstVarBndr"
+
+        mkForallCo :: TyVar -> (Type,Type) -> (Type,Type) -> (Type,Type)
+        mkForallCo tvN (kL,kR) (bodyL,bodyR)
+          | kL == kR
+          = (ForAllTy tvN bodyL, ForAllTy tvN bodyR)
+          | otherwise
+          = error (unlines ["Kind coercions not supported",showPpr kL,showPpr kR])
 
         extendLiftingContextEx ::
+          (?tcm :: TyConMap) =>
           -- Original lifting context
           (TvSubst, VarEnv (Type,Type)) ->
           -- ex. var / value pairs
@@ -604,7 +683,12 @@ caseCon ctx@(TransformContext is0 _) e@(Case subj ty alts) = do
             in  extendLiftingContextEx lcN rest
 
         mkGReflRightCo :: Type -> (Type,Type) -> (Type,Type)
-        mkGReflRightCo _ _ = error "mkGReflRightCo"
+        mkGReflRightCo t (l,r)
+          | l == r
+          = (t,t) -- Refl
+          | otherwise
+          = error (unlines ["Kind coercions not supported:",showPpr l, showPpr r])
+
 
   -- The subject is an applied data constructor
   (Data dc, args, ticks) -> case List.find (equalCon . fst) alts of
