@@ -20,11 +20,15 @@ module Clash.Core.Subst
     -- ** Substitution environments
     TvSubst (..)
   , TvSubstEnv
+  , mkEmptyTvSubst
+  , composeTvSubst
   -- , mkTvSubst
+  , extendTvInScopeSet
   , extendTvSubst
   , extendTvSubstList
     -- ** Applying substitutions
   , substTy
+  , substTyTvSubst
   , substTyWith
   , substTyInVar
   , substGlobalsInExistentials
@@ -234,6 +238,39 @@ mkTvSubst
   -> Subst
 mkTvSubst is env = Subst is emptyVarEnv env emptyVarEnv
 
+mkEmptyTvSubst
+  :: InScopeSet
+  -> TvSubst
+mkEmptyTvSubst is = TvSubst is emptyVarEnv
+
+-- | Composes two substitutions, applying the second one provided first,
+-- like in function composition.
+composeTvSubst :: TvSubst -> TvSubst -> TvSubst
+composeTvSubst (TvSubst is1 tenv1) (TvSubst is2 tenv2) = TvSubst is3 tenv3
+ where
+  is3 = is1 `unionInScope` is2
+  tenv3 = composeTvSubstEnv is3 tenv1 tenv2
+
+extendTvInScopeSet :: TvSubst -> VarSet -> TvSubst
+extendTvInScopeSet (TvSubst is tenv) vars =
+  TvSubst (extendInScopeSetSet is vars) tenv
+
+composeTvSubstEnv ::
+  InScopeSet -> TvSubstEnv -> TvSubstEnv
+  -> TvSubstEnv
+  -- ^ @(compose env1 env2)(x)@ is @env1(env2(x))@; i.e. apply @env2@ then @env1@.
+  -- It assumes that both are idempotent.
+  -- Typically, @env1@ is the refinement to a base substitution @env2@
+composeTvSubstEnv inScope tenv1 tenv2 =
+  tenv1 `plusVarEnv` (mapVarEnv (substTyTvSubst subst1) tenv2)
+  -- First apply env1 to the range of env2
+  -- Then combine the two, making sure that env1 loses if
+  -- both bind the same variable; that's why env1 is the
+  --  *left* argument to plusVarEnv, because the right arg wins
+ where
+  subst1 = TvSubst inScope tenv1
+
+
 -- | Generates the in-scope set for the 'Subst' from the types in the incoming
 -- environment.
 --
@@ -362,6 +399,19 @@ substTyUnchecked subst@(TvSubst _ tvS) ty
   = ty
   | otherwise
   = substTy' subst ty
+
+-- | Like substTy, but takes a 'TvSubst'
+substTyTvSubst
+  :: HasCallStack
+  => TvSubst
+  -> Type
+  -> Type
+substTyTvSubst s@(TvSubst _ tvS) ty
+  | nullVarEnv tvS
+  = ty
+  | otherwise
+  = checkValidSubst s [ty] (substTy' s ty)
+
 
 -- Safely substitute global type variables in a list of potentially
 -- shadowing type variables.

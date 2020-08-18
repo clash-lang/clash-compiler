@@ -11,6 +11,7 @@ module Data.List.Extra
   , equalLength
   , countEq
   , zipEqual
+  , dropList
 
   -- * From Control.Monad.Extra
   , anyM
@@ -105,3 +106,8 @@ zipEqual [] [] = []
 zipEqual (a:as) (b:bs) = (a,b) : zipEqual as bs
 zipEqual _ _ = error "zipEqual"
 #endif
+
+dropList :: [a] -> [b] -> [b]
+dropList []     bs     = bs
+dropList _      []     = []
+dropList (_:as) (_:bs) = dropList as bs

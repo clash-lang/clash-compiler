@@ -113,7 +113,8 @@ import           Clash.Core.Type             (Type (..), TypeView (..), applyFun
                                               tyView, mkPolyFunTy, coreView,
                                               LitTy (..), coreView1,
                                               normalizeType)
-import           Clash.Core.TyCon            (TyConMap, tyConDataCons)
+import           Clash.Core.TyCon
+  (TyConMap, tyConDataCons, tyConKind, tyConArity)
 import           Clash.Core.Util
   ( isSignalType, mkVec, tyNatSize, undefinedTm,
    shouldSplit, inverseTopSortLetBindings)
@@ -125,7 +126,7 @@ import           Clash.Core.VarEnv
    notElemVarSet, unionVarEnvWith, unionInScope, unitVarEnv,
    unitVarSet, mkVarSet, mkInScopeSet, uniqAway, elemInScopeSet, elemVarEnv,
    foldlWithUniqueVarEnv', lookupVarEnvDirectly, extendVarEnv, unionVarEnv,
-   eltsVarEnv, mkVarEnv, elemUniqInScopeSet)
+   eltsVarEnv, mkVarEnv, elemUniqInScopeSet, mapVarEnv, emptyInScopeSet)
 import           Clash.Debug
 import           Clash.Driver.Types          (Binding(..), DebugLevel (..))
 import           Clash.Netlist.BlackBox.Types (Element(Err))
@@ -501,7 +502,110 @@ caseCon :: HasCallStack => NormRewrite
 caseCon ctx@(TransformContext is0 _) e@(Case subj ty alts) = do
  tcm <- Lens.view tcCache
  case collectArgsTicks subj of
-  (Cast (collectArgsTicks -> (Data _,_,_)) _ _,_,_) -> error "KPush"
+  (Cast d@(collectArgsTicks -> (Data dc,args,ticksInner)) fromTy toTy,[],ticksOuter)
+    | fromTy == toTy
+    -> do
+       setChanged
+       caseCon ctx (Case (mkTicks d ticksOuter) ty alts)
+    | TyConApp toTc toTcArgTys <- tyView toTy
+    , TyConApp dTc _ <- tyView (snd (splitFunForallTy (dcType dc)))
+    , dTc == toTc
+    -> do
+       let nonUnivArgs      = List.dropList (dcUnivTyVars dc) args
+           (exArgs,valArgs) = List.splitAtList (dcExtTyVars dc) nonUnivArgs
+
+       tcm <- Lens.view tcCache
+       let tc = tcm `lookupUniqMap'` toTc
+
+       let omegas = decomposeCo (tyConArity tc) (fromTy,toTy)
+
+           (phiSubst,toExArgs) = liftCoSubstWithEx
+                                   (dcUnivTyVars dc)
+                                   omegas
+                                   (dcExtTyVars dc)
+                                   (Either.fromRight (error "Not a Type") <$> exArgs)
+
+           newValArgs = error "newValArgs"
+           newD = mkApps (mkTicks (Data dc) ticksInner)
+                         (map Right toTcArgTys ++
+                          map Right toExArgs ++
+                          map Left  newValArgs)
+       setChanged
+       caseCon ctx (Case (mkTicks newD ticksOuter) ty alts)
+    | otherwise
+    -> error ("KPush expected TyCon:\n" <> showPpr e)
+   where
+        liftCoSubstWithEx ::
+          -- Universally quantified tyvars
+          [TyVar] ->
+          -- Coercions
+          [(Type,Type)] ->
+          -- Existentially quantified tycovars
+          [TyVar] ->
+          -- types and coercions bound to the ex vars
+          [Type] ->
+          -- (Lifting function, converted ex args)
+          (Type -> (Type,Type), [Type])
+        liftCoSubstWithEx univs omegas exs rhos =
+          let theta = mkLiftingContext (List.zipEqual univs omegas)
+              psi   = extendLiftingContextEx theta (List.zipEqual exs rhos)
+          in  (tyCoSubst psi, substTyTvSubst (lcSubstRight psi) <$> (VarTy <$> exs))
+
+        decomposeCo ::
+          -- Arity
+          Int ->
+          -- Coercion
+          (Type,Type) ->
+          -- decomposed coercions
+          [(Type,Type)]
+        decomposeCo n (tyView -> TyConApp _ args1,tyView -> TyConApp _ args2) =
+          go n args1 args2
+         where
+          go 0 _ _ = []
+          go m (t1:rest1) (t2:rest2) = (t1,t2):go (m-1) rest1 rest2
+          go _ _ _ = error "unequal length"
+
+        decomposeCo _ (ty1,ty2) =
+          error (unlines ["Expected TyConApp:"
+                         ,showPpr ty1
+                         ," ~ "
+                         ,showPpr ty2])
+
+        mkLiftingContext :: [(TyVar,(Type,Type))] -> (TvSubst, VarEnv (Type,Type))
+        mkLiftingContext pairs =
+          ( error "mkLiftingContext"
+          , mkVarEnv pairs
+          )
+
+        lcSubstRight :: (TvSubst, VarEnv (Type,Type)) -> TvSubst
+        lcSubstRight (subst,lcEnv) =
+          composeTvSubst (TvSubst emptyInScopeSet tEnv) subst
+         where
+          tEnv = mapVarEnv snd lcEnv
+
+        tyCoSubst :: (TvSubst, VarEnv (Type,Type)) -> Type -> (Type,Type)
+        tyCoSubst = error "tyCoSubst"
+
+        extendLiftingContextEx ::
+          -- Original lifting context
+          (TvSubst, VarEnv (Type,Type)) ->
+          -- ex. var / value pairs
+          [(TyVar,Type)] ->
+          (TvSubst, VarEnv (Type,Type))
+        extendLiftingContextEx lc [] = lc
+        extendLiftingContextEx lc@(subst, env) ((v,exTy):rest)
+          = let lcN = ( subst `extendTvInScopeSet` (Lens.foldMapOf typeFreeVars unitVarSet ty)
+                      , extendVarEnv
+                          v
+                          (mkGReflRightCo exTy
+                                          (tyCoSubst lc (varType v)))
+                          env
+                      )
+            in  extendLiftingContextEx lcN rest
+
+        mkGReflRightCo :: Type -> (Type,Type) -> (Type,Type)
+        mkGReflRightCo _ _ = error "mkGReflRightCo"
+
   -- The subject is an applied data constructor
   (Data dc, args, ticks) -> case List.find (equalCon . fst) alts of
     Just (DataPat _ tvs xs, altE) -> do

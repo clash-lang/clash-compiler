@@ -26,6 +26,7 @@ module Clash.Core.VarEnv
   , delVarEnvList
   , unionVarEnv
   , unionVarEnvWith
+  , plusVarEnv
     -- ** Element-wise operations
     -- *** Mapping
   , mapVarEnv
@@ -66,6 +67,7 @@ module Clash.Core.VarEnv
   , mkInScopeSet
     -- ** Modification
   , extendInScopeSet
+  , extendInScopeSetSet
   , extendInScopeSetList
   , unionInScope
     -- ** Working with predicates
@@ -203,6 +205,13 @@ unionVarEnv
   -> VarEnv a
   -> VarEnv a
 unionVarEnv = unionUniqMap
+
+-- | Get the (right-biased) union of two environments
+plusVarEnv
+  :: VarEnv a
+  -> VarEnv a
+  -> VarEnv a
+plusVarEnv = flip unionUniqMap
 
 -- | Get the union of two environments, mapped values existing in both
 -- environments will be merged with the given function.
@@ -363,6 +372,14 @@ extendInScopeSet
   -> InScopeSet
 extendInScopeSet (InScopeSet inScope n) v =
   InScopeSet (extendVarSet inScope v) (n + 1)
+
+-- | Add a list of variables in scope
+extendInScopeSetSet
+  :: InScopeSet
+  -> VarSet
+  -> InScopeSet
+extendInScopeSetSet (InScopeSet inScope n) vs =
+  InScopeSet (inScope `unionVarSet` vs) (n + length vs)
 
 -- | Add a list of variables in scope
 extendInScopeSetList

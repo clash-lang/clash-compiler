@@ -990,8 +990,10 @@ coreToTyLit (StrTyLit s) = C.SymTy (unpackFS s)
 
 coreToTyVar :: TyVar
             -> C2C C.TyVar
-coreToTyVar tv =
+coreToTyVar tv | isTyVar tv =
   C.mkTyVar <$> coreToType (varType tv) <*> coreToVar tv
+
+coreToTyVar _ = error "Coercion TyVars not supported"
 
 coreToId :: Id
          -> C2C C.Id
