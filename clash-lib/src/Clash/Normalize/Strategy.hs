@@ -111,6 +111,7 @@ constantPropagation =
       , ("argCastSpec"     , argCastSpec)
       , ("inlineCast"      , inlineCast)
       , ("eliminateCastCast",eliminateCastCast)
+      , ("castSpec"        , castSpec)
       ]
 
     -- InlineNonRep cannot be applied in a top-down traversal, as the non-representable

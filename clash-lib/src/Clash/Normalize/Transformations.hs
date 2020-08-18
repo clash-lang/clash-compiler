@@ -62,9 +62,11 @@ module Clash.Normalize.Transformations
   , separateLambda
   , xOptimize
   , lamCast
+  , castSpec
   )
 where
 
+import           Control.DeepSeq             (deepseq)
 import           Control.Exception           (throw)
 import           Control.Lens                ((^.),_1,_2)
 import qualified Control.Lens                as Lens
@@ -94,7 +96,7 @@ import           Clash.Annotations.Primitive (extractPrim)
 import           Clash.Core.DataCon          (DataCon (..))
 import           Clash.Core.EqSolver
 import           Clash.Core.Name
-  (Name (..), NameSort (..), mkUnsafeSystemName, nameOcc)
+  (Name (..), NameSort (..), mkUnsafeSystemName, nameOcc, mkUnsafeInternalName)
 import           Clash.Core.FreeVars
   (localIdOccursIn, localIdsDoNotOccurIn, freeLocalIds, termFreeTyVars,
    typeFreeVars, localVarsDoNotOccurIn, localIdDoesNotOccurIn,
@@ -801,8 +803,15 @@ nonRepANF ctx@(TransformContext is0 _) e@(App appConPrim arg)
       (True,Case {})  -> specializeNorm ctx e
       (True,Lam {})   -> specializeNorm ctx e
       (True,TyLam {}) -> specializeNorm ctx e
-      (True,Cast {})  -> error "QQ"
+      (True,Cast cTm _ _) -> goCast (stripTicks cTm)
       _               -> return e
+ where
+  goCast (Cast cTm _ _) = goCast (stripTicks cTm)
+  goCast (Letrec {}) = error ("NonRepANF: Cast of LetRec: " <> showPpr e)
+  goCast (Case {}) = error ("NonRepANF: Cast of Case: " <> showPpr e)
+  goCast (Lam {}) = error ("NonRepANF: Cast of Lam: " <> showPpr e)
+  goCast (TyLam {}) = error ("NonRepANF: Cast of TyLam: " <> showPpr e)
+  goCast _ = return e
 
 nonRepANF _ e = return e
 {-# SCC nonRepANF #-}
@@ -982,6 +991,7 @@ lamCast (TransformContext is0 _) (Cast (stripTicks -> Lam bndr body) ty1 ty2) = 
   changed (Lam bndr1 body1)
 
 lamCast _ e = return e
+{-# SCC lamCast #-}
 
 -- | Push cast over an argument to a function into that function
 --
@@ -1358,33 +1368,83 @@ appPropFast ctx@(TransformContext is _) = \case
       setChanged
       case (tyView tyA,tyView tyB) of
         (FunTy aa ar,FunTy ba br)
-          -> Cast <$> go is0 e (Left (Cast arg ba aa):args1) ticks
-                  <*> pure ar
-                  <*> pure br
+          -- From: (e |> (aa -> ar) ~ (ba -> br)) arg
+          --
+          -- to: (e (arg |> ba ~ aa)) |> ar ~ br
+          -> do
+             tcm <- Lens.view tcCache
+             Cast <$> go is0 e (Left (Cast arg ba aa):args1) ticks
+                  <*> pure (applyTypeToArgs (App c arg) tcm ar args1)
+                  <*> pure (applyTypeToArgs (App c arg) tcm br args1)
+
         (TyConApp sigTc [_domTy,fTy],FunTy ba br)
           | nameOcc sigTc == "Clash.Signal.Internal.Signal"
           , FunTy aa ar <- tyView fTy
           , aa == ba
           , ar == br
-          -> go is0 e (Left arg:args1) ticks
+          , (Cast e1 tyC _,ticks1) <- collectTicks e
+          , FunTy ca cr <- tyView tyC
+          , ca == ba
+          , cr == br
+          -- From: ((e |> (a -> b) ~ Signal dom (a -> b) ) |> Signal dom (a -> b) ~ (a -> b)) arg
+          --
+          -- To: e arg
+          -> go is0 e1 (Left arg:args1) (ticks1 ++ ticks)
         (FunTy aa ar,TyConApp sigTc [_domTy,fTy])
           | nameOcc sigTc == "Clash.Signal.Internal.Signal"
           , FunTy ba br <- tyView fTy
           , aa == ba
           , ar == br
-          -> go is0 e (Left arg:args1) ticks
+          -- From (e |> (a -> b) ~ Signal dom (a -> b)) arg
+          --
+          -- To: e arg
+          -> error ("Push FunSignal:\n" <> showPpr (App c arg)) -- go is0 e (Left arg:args1) ticks
         _ -> do
           (nm,sp) <- Lens.use curFun
           throw (ClashException sp ($(curLoc) ++ showPpr nm
                   ++ ": AppPropFast FunTy expected:\n"
                   ++ showPpr (App c arg))
                 Nothing)
-    _ -> do
-      (nm,sp) <- Lens.use curFun
-      throw (ClashException sp ($(curLoc) ++ showPpr nm
-              ++ ": AppPropFast TPush unimplemented:\n"
-              ++ showPpr c)
-            Nothing)
+    (Right arg:args1) -> do
+      setChanged
+      case (tyA, tyB) of
+        -- This is what we do here
+        --
+        -- From: (e |> (forall (tvA:k) . tBodyA) ~ (forall (tvB:k) . tBodyB)) @arg
+        --
+        -- to: (e @arg) |> tBodyA [tvA := arg] ~ tBodyB [tvB := arg]
+        --
+        -- We error out when the kinds of `tvA` and `tvB` are not equal, as we
+        -- would then need Casts at the type level, and we would need to do:
+        --
+        -- From: (e |> (forall (tvA:kA) . tBodyA) ~ (forall (tvB:kB) . tBodyB)) @arg
+        --
+        -- to: (e @(CastTy arg kB kA)) |> tBodyA [tvA := CastTy arg kB kA] ~ tBodyB [tvB := arg]
+        (ForAllTy tvA tBodyA, ForAllTy tvB tBodyB)
+          | varType tvA == varType tvB
+          -> do
+             setChanged
+             tcm <- Lens.view tcCache
+             let substA = extendTvSubst (mkSubst is0) tvA arg
+                 substB = extendTvSubst (mkSubst is0) tvB arg
+                 tyBodyA1 = substTy substA tBodyA
+                 tyBodyB1 = substTy substB tBodyB
+             Cast <$> go is0 e (Right arg:args1) ticks
+                  <*> pure (applyTypeToArgs (TyApp c arg) tcm tyBodyA1 args1)
+                  <*> pure (applyTypeToArgs (TyApp c arg) tcm tyBodyB1 args1)
+          | otherwise
+          -> do
+             (nm,sp) <- Lens.use curFun
+             throw (ClashException sp ($(curLoc) ++ showPpr nm
+                     ++ ": AppPropFast TPush unimplemented for kind-equalities:\n"
+                     ++ showPpr (TyApp c arg))
+                   Nothing)
+        _ -> do
+          (nm,sp) <- Lens.use curFun
+          throw (ClashException sp ($(curLoc) ++ showPpr nm
+                  ++ ": AppPropFast ForallTy expected:\n"
+                  ++ showPpr (TyApp c arg))
+                Nothing)
 
   go _ fun args ticks = return (mkApps (mkTicks fun ticks) args)
 
@@ -2359,24 +2419,36 @@ reduceNonRepPrim c@(TransformContext is0 ctx) e@(App _ _) | (Prim p, args, ticks
         case (runExcept (tyNatSize tcm nTy), runExcept (tyNatSize tcm mTy), tv) of
           (Right n, Right m, TyConApp tupTcNm [lTy,rTy])
             | n == 0 -> do
-              let (Just tupTc) = lookupUniqMap tupTcNm tcm
+              let lArgTy = termType tcm bvArg
+                  bvArg1 = if lArgTy /= lTy then
+                             Cast bvArg lArgTy lTy
+                           else
+                             bvArg
+
+                  (Just tupTc) = lookupUniqMap tupTcNm tcm
                   [tupDc]      = tyConDataCons tupTc
                   tup          = mkApps (Data tupDc)
                                     [Right lTy
                                     ,Right rTy
-                                    ,Left  bvArg
+                                    ,Left  bvArg1
                                     ,Left  (removedTm rTy)
                                     ]
 
               changed (mkTicks tup ticks)
             | m == 0 -> do
+              let rArgTy = termType tcm bvArg
+                  bvArg1 = if rArgTy /= rTy then
+                             Cast bvArg rArgTy rTy
+                           else
+                             bvArg
+
               let (Just tupTc) = lookupUniqMap tupTcNm tcm
                   [tupDc]      = tyConDataCons tupTc
                   tup          = mkApps (Data tupDc)
                                     [Right lTy
                                     ,Right rTy
                                     ,Left  (removedTm lTy)
-                                    ,Left  bvArg
+                                    ,Left  bvArg1
                                     ]
 
               changed (mkTicks tup ticks)
@@ -3049,3 +3121,44 @@ isPrimError (collectArgs -> (Prim pInfo, _)) = do
   isErr _ = False
 
 isPrimError _ = return False
+
+castSpec :: HasCallStack => NormRewrite
+castSpec (TransformContext is0 _) e@(Cast (collectArgsTicks -> (Var f,args,ticks)) tyA tyB)
+  | isGlobalId f
+  = do
+    topEnts <- Lens.view topEntities
+    if f `elemVarSet` topEnts then do
+      lvl <- Lens.view dbgLevel
+      traceIf (lvl >= DebugNone)
+              ("Not cast-specializing TopEntity: " ++ showPpr (varName f))
+              (return e)
+    else do
+      bodyMaybe <- fmap (lookupUniqMap (varName f)) $ Lens.use bindings
+      case bodyMaybe of
+        Just (Binding _ sp inl bodyTm) -> do
+          let existingNames = collectBndrsMinusApps bodyTm
+              newNames      = [ mkUnsafeInternalName
+                                  ("pCS" `Text.append` Text.pack (show n))
+                                  n
+                              | n <- [(0::Int)..]
+                              ]
+          -- Make new binders for existing arguments
+          tcm <- Lens.view tcCache
+          (boundArgs,argVars) <-
+            fmap (unzip . map (either (Left &&& Left . Var) (Right &&& Right . VarTy))) $
+                 Monad.zipWithM
+                   (mkBinderFor is0 tcm)
+                   (existingNames ++ newNames)
+                   args
+          -- Create specialized functions
+          -- TODO: use a cache
+          let newBody = mkAbstraction (Cast (mkApps bodyTm argVars) tyA tyB)
+                                      boundArgs
+          newf <- mkFunction (varName f) sp inl newBody
+          -- use specialized function
+          let newExpr = mkApps (mkTicks (Var newf) ticks) args
+          newf `deepseq` changed newExpr
+        Nothing -> return e
+
+castSpec _ e = return e
+{-# SCC castSpec #-}

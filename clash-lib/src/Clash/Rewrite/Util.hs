@@ -1018,19 +1018,6 @@ specialise' specMapLbl specHistLbl specLimitLbl (TransformContext is0 _) e (Var 
               let newExpr = mkApps (mkTicks (Var newf) ticks) (args ++ specVars)
               newf `deepseq` changed newExpr
         Nothing -> return e
-  where
-    collectBndrsMinusApps :: Term -> [Name a]
-    collectBndrsMinusApps = reverse . go []
-      where
-        go bs (Lam v e')    = go (coerce (varName v):bs)  e'
-        go bs (TyLam tv e') = go (coerce (varName tv):bs) e'
-        go bs (App e' _) = case go [] e' of
-          []  -> bs
-          bs' -> init bs' ++ bs
-        go bs (TyApp e' _) = case go [] e' of
-          []  -> bs
-          bs' -> init bs' ++ bs
-        go bs _ = bs
 
 specialise' _ _ _ _ctx _ (appE,args,ticks) (Left specArg) = do
   -- Create binders and variable references for free variables in 'specArg'
@@ -1242,3 +1229,16 @@ removeUnusedBinders binds body =
                           (eltsVarSet eFVs)
         Nothing -> env
 
+
+collectBndrsMinusApps :: Term -> [Name a]
+collectBndrsMinusApps = reverse . go []
+  where
+    go bs (Lam v e')    = go (coerce (varName v):bs)  e'
+    go bs (TyLam tv e') = go (coerce (varName tv):bs) e'
+    go bs (App e' _) = case go [] e' of
+      []  -> bs
+      bs' -> init bs' ++ bs
+    go bs (TyApp e' _) = case go [] e' of
+      []  -> bs
+      bs' -> init bs' ++ bs
+    go bs _ = bs
