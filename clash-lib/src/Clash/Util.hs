@@ -176,6 +176,7 @@ makeCachedU key l create = do
   case lookupUniqMap key cache of
     Just value -> return value
     Nothing -> do
+      l %= extendUniqMap key (error "Loop")
       value <- create
       l %= extendUniqMap key value
       return value

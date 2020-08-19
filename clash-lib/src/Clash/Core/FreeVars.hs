@@ -47,8 +47,7 @@ import Clash.Core.Type                  (Type (..))
 import Clash.Core.Var
   (Id, IdScope (..), TyVar, Var (..), isLocalId)
 import Clash.Core.VarEnv
-  (VarEnv, VarSet, emptyVarEnv, unionVarEnvWith, unitVarSet, unitVarEnv,
-   plusVarEnv, mapVarEnv)
+  (VarEnv, VarSet, emptyVarEnv, unionVarEnvWith, unitVarSet, unitVarEnv)
 
 -- | Gives the free type-variables in a Type, implemented as a 'Fold'
 --

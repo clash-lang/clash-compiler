@@ -648,9 +648,12 @@ caseCon ctx@(TransformContext is0 _) e@(Case subj ty alts) = do
               let subjIsConst = isConstant subj
               -- In debug mode we always report missing evaluation rules for the
               -- primitive evaluator
-              traceIf (lvl > DebugNone && subjIsConst)
-                      ("Irreducible constant as case subject: " ++ showPpr subj ++
-                       "\nCan be reduced to: " ++ showPpr subj1) ret
+              {- traceIf (lvl > DebugNone && subjIsConst) -}
+              if subjIsConst then
+                error ("Irreducible constant as case subject: " ++ showPpr subj ++
+                       "\nCan be reduced to: " ++ showPpr subj1) {- ret -}
+              else
+                ret
             else
               ret
 

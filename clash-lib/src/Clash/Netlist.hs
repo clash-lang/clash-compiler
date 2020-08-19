@@ -78,6 +78,8 @@ import           Clash.Primitives.Types           as P
 import           Clash.Util
 import qualified Clash.Util.Interpolate           as I
 
+import Debug.Trace
+
 -- | Generate a hierarchical netlist out of a set of global binders with
 -- @topEntity@ at the top.
 genNetlist
@@ -218,7 +220,7 @@ genComponentT
   -> Term
   -- ^ Corresponding term
   -> NetlistMonad ([Bool],SrcSpan,HashMap Identifier Word,Component)
-genComponentT compName componentExpr = do
+genComponentT compName componentExpr = trace ("genComponentT:" <> show compName) $ do
   varCount .= 0
   componentName1 <- (`lookupVarEnv'` compName) <$> Lens.use componentNames
   topEntMM <- fmap topAnnotation . lookupVarEnv compName <$> Lens.use topEntityAnns
