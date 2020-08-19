@@ -573,6 +573,7 @@ runClashTest = defaultMain $ clashTestRoot
       , clashTestGroup "SynthesisAttributes"
         [ NEEDS_PRIMS_GHC(outputTest ("tests" </> "shouldwork" </> "SynthesisAttributes") allTargets [] [] "Simple" "main")
         , NEEDS_PRIMS_GHC(outputTest ("tests" </> "shouldwork" </> "SynthesisAttributes") allTargets [] [] "Product" "main")
+        ,                 outputTest ("tests" </> "shouldwork" </> "SynthesisAttributes") allTargets [] [] "InstDeclAnnotations" "main"
         , NEEDS_PRIMS_GHC(runTest "Product" def)
         ]
       , clashTestGroup "Testbench"

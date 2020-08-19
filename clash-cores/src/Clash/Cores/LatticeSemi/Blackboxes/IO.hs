@@ -72,7 +72,7 @@ sbioTemplate bbCtx = do
   getMon $ blockDecl sbio $
     [ NetDecl Nothing dIn0 Bit
     , NetDecl Nothing dIn1 Bit
-    , InstDecl Comp Nothing compName sbio_inst
+    , InstDecl Comp Nothing [] compName sbio_inst
       [ (Identifier "PIN_TYPE" Nothing, BitVector 6, pinConfig)
       ]
       [ -- NOTE: Direction is set to 'In', but will be rendered as inout due to

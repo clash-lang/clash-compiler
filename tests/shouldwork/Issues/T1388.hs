@@ -53,7 +53,7 @@ assertNoSLVInPortMap =
   mapM_ goDecl . declarations
  where
   goDecl :: Declaration -> IO ()
-  goDecl (InstDecl _ _ _ _ _ ps)
+  goDecl (InstDecl _ _ _ _ _ _ ps)
     | all goPort ps = pure ()
     | otherwise = error ("Not all ports have simple modifiers: " <> show ps)
   goDecl _ = pure ()

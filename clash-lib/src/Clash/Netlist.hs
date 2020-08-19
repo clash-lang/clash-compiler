@@ -639,7 +639,7 @@ mkFunApp dstId fun args tickDecls = do
               instLabel1 <- fromMaybe instLabel0 <$> Lens.view setName
               instLabel2 <- affixName instLabel1
               instLabel3 <- mkUniqueIdentifier Basic instLabel2
-              let instDecl = InstDecl Entity Nothing compName instLabel3 [] (outpAssign ++ inpAssigns)
+              let instDecl = InstDecl Entity Nothing [] compName instLabel3 [] (outpAssign ++ inpAssigns)
               return (argDecls ++ argDecls' ++ tickDecls ++ [instDecl])
             else error [I.i|
               Under-applied normalized function at component #{compName}:

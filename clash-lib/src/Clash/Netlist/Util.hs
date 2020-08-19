@@ -1513,6 +1513,7 @@ mkTopUnWrapper topEntity annM man dstId args tickDecls = do
       InstDecl
         Entity
         (Just topName)
+        []
         topName
         instLabel3
         []

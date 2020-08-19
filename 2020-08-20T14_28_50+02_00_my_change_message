@@ -1,0 +1,2 @@
+* New features (API):
+  * [#1482](https://github.com/clash-lang/clash-compiler/pull/1482): Additional field with synthesis attributes added to `InstDecl` in `Clash.Netlist.Types`
