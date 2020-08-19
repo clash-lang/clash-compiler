@@ -43,7 +43,7 @@ import Clash.Core.Subst
 import Clash.Core.Term
 import Clash.Core.TyCon                  (TyConMap, TyConName,  tyConDataCons)
 import Clash.Core.Type
-import Clash.Core.TysPrim                (typeNatKind)
+import Clash.Core.TysPrim                (typeNatKind, typeNatSubTyFamName)
 import Clash.Core.Var                    (Id, Var(..), mkLocalId, mkTyVar)
 import Clash.Core.VarEnv
 import Clash.Debug                       (traceIf)
@@ -128,7 +128,10 @@ extractElems supply inScope consCon resTy s maxN vec =
   go n uniqs0 e =
     (uniqs3,(elNVar,[(elNId, lhs),(restNId, rhs)]):restVs)
    where
-    tys = [(LitTy (NumTy n)),resTy,(LitTy (NumTy (n-1)))]
+    tys = [LitTy (NumTy n)
+          ,resTy
+          ,mkTyConApp typeNatSubTyFamName
+                      [LitTy (NumTy n), LitTy (NumTy 1)]]
     (Just idTys) = dataConInstArgTys consCon tys
     restTy       = last idTys
 

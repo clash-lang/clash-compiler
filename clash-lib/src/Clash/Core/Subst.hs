@@ -21,8 +21,11 @@ module Clash.Core.Subst
     TvSubst (..)
   , TvSubstEnv
   , mkEmptyTvSubst
+  , getTvInScope
   , composeTvSubst
+  , isValidSubst
   -- , mkTvSubst
+  , extendTvInScope
   , extendTvInScopeSet
   , extendTvSubst
   , extendTvSubstList
@@ -252,6 +255,13 @@ composeTvSubst (TvSubst is1 tenv1) (TvSubst is2 tenv2) = TvSubst is3 tenv3
   is3 = is1 `unionInScope` is2
   tenv3 = composeTvSubstEnv is3 tenv1 tenv2
 
+getTvInScope :: TvSubst -> InScopeSet
+getTvInScope (TvSubst is _) = is
+
+extendTvInScope :: TvSubst -> TyVar -> TvSubst
+extendTvInScope (TvSubst is tenv) var =
+  TvSubst (extendInScopeSet is var) tenv
+
 extendTvInScopeSet :: TvSubst -> VarSet -> TvSubst
 extendTvInScopeSet (TvSubst is tenv) vars =
   TvSubst (extendInScopeSetSet is vars) tenv
@@ -270,7 +280,6 @@ composeTvSubstEnv inScope tenv1 tenv2 =
   --  *left* argument to plusVarEnv, because the right arg wins
  where
   subst1 = TvSubst inScope tenv1
-
 
 -- | Generates the in-scope set for the 'Subst' from the types in the incoming
 -- environment.

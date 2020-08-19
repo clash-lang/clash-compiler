@@ -26,6 +26,7 @@ module Clash.Core.TysPrim
   , doublePrimTy
   , naturalPrimTy
   , byteArrayPrimTy
+  , typeNatSubTyFamName
   , tysPrimMap
   )
 where
@@ -46,6 +47,9 @@ tySuperKindTyConName      = mkUnsafeSystemName "tYPE" (getKey tYPETyConKey)
 liftedTypeKindTyConName   = mkUnsafeSystemName "*" (getKey liftedTypeKindTyConKey)
 typeNatKindTyConName      = mkUnsafeSystemName "Nat" (getKey typeNatKindConNameKey)
 typeSymbolKindTyConName   = mkUnsafeSystemName "Symbol" (getKey typeSymbolKindConNameKey)
+
+typeNatSubTyFamName :: TyConName
+typeNatSubTyFamName = mkUnsafeSystemName "GHC.TypeNats.-" (getKey typeNatSubTyFamNameKey)
 
 -- | Builtin Kind
 liftedTypeKindTc, tySuperKindTc, typeNatKindTc, typeSymbolKindTc :: TyCon

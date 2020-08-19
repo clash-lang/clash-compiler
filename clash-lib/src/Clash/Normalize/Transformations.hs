@@ -10,7 +10,6 @@
 
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE ImplicitParams #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE MagicHash #-}
 {-# LANGUAGE MultiWayIf #-}
@@ -88,7 +87,7 @@ import qualified Data.Maybe                  as Maybe
 import qualified Data.Monoid                 as Monoid
 import qualified Data.Primitive.ByteArray    as BA
 import qualified Data.Text                   as Text
-import           Data.Text.Prettyprint.Doc   ((<+>))
+import           Data.Text.Prettyprint.Doc   ((<+>), line)
 import           GHC.Integer.GMP.Internals   (Integer (..), BigNat (..))
 
 import           BasicTypes                  (InlineSpec (..))
@@ -115,12 +114,12 @@ import           Clash.Core.Type             (Type (..), TypeView (..), applyFun
                                               LitTy (..), coreView1,
                                               normalizeType, mkFunTy, mkTyConApp)
 import           Clash.Core.TyCon
-  (TyConMap, tyConDataCons, tyConKind, tyConArity)
+  (TyConMap, tyConDataCons, tyConArity)
 import           Clash.Core.Util
   ( isSignalType, mkVec, tyNatSize, undefinedTm,
    shouldSplit, inverseTopSortLetBindings)
 import           Clash.Core.Var
-  (Id, TyVar, Var (..), isGlobalId, isLocalId, mkLocalId, modifyVarName)
+  (Id, TyVar, Var (..), isGlobalId, isLocalId, mkLocalId, modifyVarName, setVarType)
 import           Clash.Core.VarEnv
   (InScopeSet, VarEnv, VarSet, elemVarSet,
    emptyVarEnv, extendInScopeSet, extendInScopeSetList, lookupVarEnv,
@@ -520,12 +519,11 @@ caseCon ctx@(TransformContext is0 _) e@(Case subj ty alts) = do
        let omegas = decomposeCo (tyConArity tc) (fromTy,toTy)
 
            (phiSubst,toExArgs) =
-             let ?tcm = tcm
-             in  liftCoSubstWithEx
-                   (dcUnivTyVars dc)
-                   omegas
-                   (dcExtTyVars dc)
-                   (Either.fromRight (error "Not a Type") <$> exArgs)
+             liftCoSubstWithEx
+               (dcUnivTyVars dc)
+               omegas
+               (dcExtTyVars dc)
+               (Either.fromRight (error "Not a Type") <$> exArgs)
 
            newValArgs =
              zipWith castArg
@@ -543,6 +541,17 @@ caseCon ctx@(TransformContext is0 _) e@(Case subj ty alts) = do
            mkCast (Tick t arg) co
              = Tick t (mkCast arg co)
 
+           mkCast (TyApp p@(Prim (PrimInfo {primName = "_CO_"})) pTy) (lCo,rCo)
+             | TyConApp (nameOcc -> "GHC.Prim.~#") _ <- tyView pTy
+             -- (co :: s1 ~# t1) |> (s1 ~# t1) ~ (s2 ~# t2)  ::  (s2 ~# t2)
+             = case coList of
+                 (_g2:_g1:_) -> TyApp p rCo
+                 _ -> error ("mkCoCast" <> unlines [showPpr pTy, showPpr lCo, showPpr rCo])
+             where
+               TyConApp lCoTcNm _ = tyView lCo
+               tcCo = tcm `lookupUniqMap'` lCoTcNm
+               coList = decomposeCo (tyConArity tcCo) (lCo,rCo)
+
            mkCast arg (ty1,ty2)
              -- TODO: error out when `termType tcm arg /= ty1`
              = Cast arg ty1 ty2
@@ -558,7 +567,6 @@ caseCon ctx@(TransformContext is0 _) e@(Case subj ty alts) = do
     -> error ("KPush expected TyCon:\n" <> showPpr e)
    where
         liftCoSubstWithEx ::
-          (?tcm :: TyConMap) =>
           -- Universally quantified tyvars
           [TyVar] ->
           -- Coercions
@@ -610,12 +618,9 @@ caseCon ctx@(TransformContext is0 _) e@(Case subj ty alts) = do
          where
           tEnv = mapVarEnv snd lcEnv
 
-        tyCoSubst :: (?tcm :: TyConMap) => (TvSubst, VarEnv (Type,Type)) -> Type -> (Type,Type)
+        tyCoSubst :: (TvSubst, VarEnv (Type,Type)) -> Type -> (Type,Type)
         tyCoSubst !lc = go
          where
-          go tyC | Just tyN <- coreView1 ?tcm tyC
-                 = go tyN
-          -- go (AnnType _ annTy) = go annTy
           go tyC = case tyView tyC of
             OtherType oTy -> case oTy of
               AnnType _ tyA -> go tyA
@@ -655,7 +660,28 @@ caseCon ctx@(TransformContext is0 _) e@(Case subj ty alts) = do
           (TvSubst, VarEnv (Type,Type)) ->
           TyVar ->
           ((TvSubst, VarEnv (Type,Type)), TyVar, (Type,Type))
-        liftCoSubstVarBndr = error "liftCoSubstVarBndr"
+        liftCoSubstVarBndr lc tv =
+          let (lcN, tvN, h, _) = liftCoSubstVarBndrUsing callback lc tv
+          in  (lcN, tvN, h)
+         where
+          callback lcN tyN = (tyCoSubst lcN tyN, ())
+
+        liftCoSubstVarBndrUsing ::
+          ((TvSubst, VarEnv (Type,Type)) -> Type -> ((Type,Type), a)) ->
+          (TvSubst, VarEnv (Type,Type)) ->
+          TyVar ->
+          ((TvSubst, VarEnv (Type,Type)), TyVar, (Type,Type), a)
+        liftCoSubstVarBndrUsing fun lc@(subst,env) oldVar =
+          ( (subst `extendTvInScope` newVar, newEnv)
+          , newVar, eta, stuff )
+         where
+          oldKind = varType oldVar
+          (eta,stuff) = fun lc oldKind
+          ki = fst eta
+          newVar = uniqAway (getTvInScope subst) (setVarType oldVar ki)
+          lifted = mkGReflRightCo (VarTy newVar) eta
+          newEnv = extendVarEnv oldVar lifted env
+
 
         mkForallCo :: TyVar -> (Type,Type) -> (Type,Type) -> (Type,Type)
         mkForallCo tvN (kL,kR) (bodyL,bodyR)
@@ -665,7 +691,6 @@ caseCon ctx@(TransformContext is0 _) e@(Case subj ty alts) = do
           = error (unlines ["Kind coercions not supported",showPpr kL,showPpr kR])
 
         extendLiftingContextEx ::
-          (?tcm :: TyConMap) =>
           -- Original lifting context
           (TvSubst, VarEnv (Type,Type)) ->
           -- ex. var / value pairs
@@ -673,7 +698,8 @@ caseCon ctx@(TransformContext is0 _) e@(Case subj ty alts) = do
           (TvSubst, VarEnv (Type,Type))
         extendLiftingContextEx lc [] = lc
         extendLiftingContextEx lc@(subst, env) ((v,exTy):rest)
-          = let lcN = ( subst `extendTvInScopeSet` (Lens.foldMapOf typeFreeVars unitVarSet ty)
+          = let lcN = ( subst `extendTvInScopeSet`
+                              (Lens.foldMapOf typeFreeVars unitVarSet exTy)
                       , extendVarEnv
                           v
                           (mkGReflRightCo exTy
@@ -1145,7 +1171,7 @@ bindConstantVar = inlineBinders test
 -- | Push a cast over a case into it's alternatives.
 caseCast :: HasCallStack => NormRewrite
 caseCast _ e0@(Cast (collectTicks -> (Case subj tyA alts,ticks)) ty1 ty2) =
-  WARN( tyA /= ty1, "Bad Cast of Case:" <+> ppr e0 ) do
+  WARN( tyA /= ty1, "Bad Cast of Case:" <+> ppr e0 <> line <> ppr tyA <> line <> ppr ty1) do
     let alts' = map (\(p,e) -> (p, Cast e ty1 ty2)) alts
     changed (mkTicks (Case subj ty2 alts') ticks)
 caseCast _ e = return e
@@ -1198,25 +1224,39 @@ lamCast _ e = return e
 -- The reason d'etre for this transformation is that we hope to end up with
 -- and expression where two casts are "back-to-back" after which we can
 -- eliminate them in 'eliminateCastCast'.
-argCastSpec :: HasCallStack => NormRewrite
-argCastSpec ctx@(TransformContext is0 ctx0) e@(App e0 (collectTicks -> (Cast eA t1 t2,ticks)))
-  | (Var {}, _) <- collectArgs e0 = do
-  tcm <- Lens.view tcCache
-  eARep <- representableType <$> Lens.view typeTranslator
-                             <*> Lens.view customReprs
-                             <*> pure False
-                             <*> pure tcm
-                             <*> pure t1
-  iwf <- isWorkFree eA
-  if iwf || not eARep then
-    specializeNorm ctx e
-  else do
-    specId <- mkTmBinderFor is0 tcm (mkUnsafeSystemName "argCastSpec" 0) eA
-    let is1 = extendInScopeSet is0 specId
-    e1 <- specializeNorm (TransformContext is1 (LetBody [specId]:ctx0))
-                         (App e0 (Cast (Var specId) t1 t2))
-    changed (Letrec [(specId,mkTicks eA ticks)] e1)
+-- argCastSpec :: HasCallStack => NormRewrite
+-- argCastSpec ctx@(TransformContext is0 ctx0) e@(App e0 (collectTicks -> (Cast eA t1 t2,ticks)))
+--   | (Var {}, _) <- collectArgs e0 = do
+--   tcm <- Lens.view tcCache
+--   eARep <- representableType <$> Lens.view typeTranslator
+--                              <*> Lens.view customReprs
+--                              <*> pure False
+--                              <*> pure tcm
+--                              <*> pure t1
+--   iwf <- isWorkFree eA
+--   if iwf || not eARep then
+--     specializeNorm ctx e
+--   else do
+--     specId <- mkTmBinderFor is0 tcm (mkUnsafeSystemName "argCastSpec" 0) eA
+--     let is1 = extendInScopeSet is0 specId
+--     e1 <- specializeNorm (TransformContext is1 (LetBody [specId]:ctx0))
+--                          (App e0 (Cast (Var specId) t1 t2))
+--     changed (Letrec [(specId,mkTicks eA ticks)] e1)
 
+-- argCastSpec _ e = return e
+argCastSpec :: HasCallStack => NormRewrite
+argCastSpec ctx e@(App (collectArgs -> (Var f,_)) (stripTicks -> Cast e' _ _)) | isGlobalId f =
+  isWorkFree e' >>= \case
+    True -> go
+    False -> warn go
+ where
+  go = specializeNorm ctx e
+  warn = trace (unwords
+    [ "WARNING:", $(curLoc), "specializing a function on a non work-free"
+    , "cast. Generated HDL implementation might contain duplicate work."
+    , "Please report this as a bug.", "\n\nExpression where this occurred:"
+    , "\n\n" ++ showPpr e
+    ])
 argCastSpec _ e = return e
 {-# SCC argCastSpec #-}
 

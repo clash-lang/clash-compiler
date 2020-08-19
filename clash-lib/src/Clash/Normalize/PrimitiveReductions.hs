@@ -44,8 +44,7 @@ import qualified Data.Maybe                       as Maybe
 import           TextShow                         (showt)
 
 import           PrelNames
-  (boolTyConKey, typeNatAddTyFamNameKey, typeNatMulTyFamNameKey,
-   typeNatSubTyFamNameKey)
+  (boolTyConKey, typeNatAddTyFamNameKey, typeNatMulTyFamNameKey)
 import           Unique                           (getKey)
 import           SrcLoc                           (wiredInSrcSpan)
 
@@ -65,7 +64,7 @@ import           Clash.Core.Type                  (LitTy (..), Type (..),
 import           Clash.Core.TyCon
   (TyConMap, TyConName, tyConDataCons, tyConName)
 import           Clash.Core.TysPrim
-  (integerPrimTy, typeNatKind, liftedTypeKind)
+  (integerPrimTy, typeNatKind, liftedTypeKind, typeNatSubTyFamName)
 import           Clash.Core.Util
   (appendToVec, extractElems, extractTElems, mkRTree,
    mkUniqInternalId, mkUniqSystemTyVar, mkVec, dataConInstArgTys,
@@ -88,10 +87,6 @@ typeNatAdd =
 typeNatMul :: TyConName
 typeNatMul =
   Name User "GHC.TypeNats.*" (getKey typeNatMulTyFamNameKey) wiredInSrcSpan
-
-typeNatSub :: TyConName
-typeNatSub =
-  Name User "GHC.TypeNats.-" (getKey typeNatSubTyFamNameKey) wiredInSrcSpan
 
 vecHeadPrim
   :: TyConName
@@ -174,7 +169,8 @@ extractHeadTail consCon elTy n vec =
   ( Case vec elTy [(pat, Var el)]
   , Case vec restTy [(pat, Var rest)] )
  where
-  tys = [(LitTy (NumTy n)), elTy, (LitTy (NumTy (n-1)))]
+  tys = [LitTy (NumTy n), elTy, mkTyConApp typeNatSubTyFamName
+                                           [LitTy (NumTy n),LitTy (NumTy 1)]]
   Just [coTy, _elTy, restTy] = dataConInstArgTys consCon tys
 
   mTV = mkTyVar typeNatKind (mkUnsafeSystemName "m" 0)

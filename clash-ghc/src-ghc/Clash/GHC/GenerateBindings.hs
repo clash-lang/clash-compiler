@@ -40,6 +40,7 @@ import qualified TysWiredIn              as GHC
 import qualified Util                    as GHC
 import qualified Var                     as GHC
 import qualified SrcLoc                  as GHC
+import qualified TcTypeNats              as GHC
 
 import           Clash.Annotations.BitRepresentation.Internal (DataRepr')
 import           Clash.Annotations.Primitive (HDL, extractPrim)
@@ -289,6 +290,7 @@ mkTupTyCons :: GHC2CoreState -> (GHC2CoreState,IntMap TyConName)
 mkTupTyCons tcMap = (tcMap'',tupTcCache)
   where
     tupTyCons        = GHC.boolTyCon : GHC.promotedTrueDataCon : GHC.promotedFalseDataCon
+                     : GHC.typeNatSubTyCon
                      : map (GHC.tupleTyCon GHC.Boxed) [2..62]
     (tcNames,tcMap',_) =
       RWS.runRWS (mapM (\tc -> coreToName GHC.tyConName GHC.tyConUnique

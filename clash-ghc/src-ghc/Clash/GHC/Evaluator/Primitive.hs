@@ -87,7 +87,7 @@ import           Clash.Unique        (lookupUniqMap)
 import           Clash.Util
   (MonadUnique (..), clogBase, flogBase, curLoc)
 import           Clash.Normalize.PrimitiveReductions
-  (typeNatMul, typeNatSub, typeNatAdd, vecLastPrim, vecInitPrim, vecHeadPrim,
+  (typeNatMul, typeNatAdd, vecLastPrim, vecInitPrim, vecHeadPrim,
    vecTailPrim, mkVecCons, mkVecNil)
 
 import Clash.Promoted.Nat.Unsafe (unsafeSNat)
@@ -2695,7 +2695,7 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
            [tupDc]            = tyConDataCons tupTc
            TyConApp snatTcNm _ = tyView (argTys !! 1)
            n1mTy  = mkTyConApp typeNatMul
-                        [mkTyConApp typeNatSub [nTy,LitTy (NumTy 1)]
+                        [mkTyConApp typeNatSubTyFamName [nTy,LitTy (NumTy 1)]
                         ,mTy]
            splitAtCall =
             mkApps (splitAtPrim snatTcNm vecTcNm)
@@ -2777,7 +2777,7 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
                     [Right mTy
                     ,Right aTy
                     ,Right $ mkTyConApp typeNatMul
-                      [mkTyConApp typeNatSub [nTy,LitTy (NumTy 1)], mTy]
+                      [mkTyConApp typeNatSubTyFamName [nTy,LitTy (NumTy 1)], mTy]
                     ,Left h'
                     ,Left $ mkApps (Prim pInfo)
                       [ Right (LitTy (NumTy (n-1)))
@@ -3639,10 +3639,14 @@ sizedLiterals' :: Text -> [Value] -> [Integer]
 sizedLiterals' szCon = listOf (sizedLiteral szCon)
 
 sizedLiteral :: Text -> Value -> Maybe Integer
-sizedLiteral szCon val = case val of
-  PrimVal p _ [_, Lit (IntegerLiteral i)]
-    | primName p == szCon -> Just i
-  _ -> Nothing
+sizedLiteral szCon = go
+ where
+   go v = case v of
+    CastValue cv _ _ -> go cv
+    TickValue _ tv -> go tv
+    PrimVal p _ [_, Lit (IntegerLiteral i)]
+      | primName p == szCon -> Just i
+    _ -> Nothing
 
 bitLiterals
   :: [Value]

@@ -868,7 +868,7 @@ mkFunInput resId e =
   -- TODO: Rewrite this function to use blackbox functions. Right now it
   -- TODO: generates strings that are later parsed/interpreted again. Silly!
   (bbCtx,dcls) <- mkBlackBoxContext "__INTERNAL__" resId args
-  templ <- case appE of
+  templ <- case stripCasts appE of
             Prim p -> do
               bb  <- extractPrimWarnOrFail (primName p)
               case bb of
@@ -1036,6 +1036,9 @@ mkFunInput resId e =
     Right (decl,wr) ->
       return ((Right decl,wr,[],[],[],bbCtx),dcls)
   where
+    stripCasts (Cast c _ _) = stripCasts c
+    stripCasts c = c
+
     goExpr app@(collectArgsTicks -> (C.Var fun,args@(_:_),ticks)) = do
       let (tmArgs,tyArgs) = partitionEithers args
       if null tyArgs
