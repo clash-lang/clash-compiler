@@ -47,6 +47,11 @@ module Clash.Core.Term
   , collectTermIds
   , collectBndrs
   , primArg
+  , AppArg (..)
+  , collectAppArgs
+  , mkArgApps
+  , typeArgs
+  , setNthTmArg
   ) where
 
 -- External Modules
@@ -363,3 +368,37 @@ varToId :: Term -> Id
 varToId (Var i) = i
 varToId e       = error $ $(curLoc) ++ "varToId: not a var: " ++ show e
 
+data AppArg
+  = CastCtx Type Type
+  | TickCtx TickInfo
+  | TypeArg Type
+  | TermArg Term
+
+collectAppArgs :: Term -> (Term, [AppArg])
+collectAppArgs = go []
+ where
+  go args (App e1 e2)    = go (TermArg e2:args) e1
+  go args (TyApp e t)    = go (TypeArg t:args) e
+  go args (Tick s e)     = go (TickCtx s:args) e
+  go args (Cast e t1 t2) = go (CastCtx t1 t2:args) e
+  go args e              = (e, args)
+
+mkArgApps :: Term -> [AppArg] -> Term
+mkArgApps = foldl' (\e a -> go e a)
+ where
+  go e (TermArg tm)    = App e tm
+  go e (TypeArg ty)    = TyApp e ty
+  go e (TickCtx info)  = Tick info e
+  go e (CastCtx t1 t2) = Cast e t1 t2
+
+typeArgs :: [AppArg] -> [Type]
+typeArgs [] = []
+typeArgs (TypeArg ty:rest) = ty : typeArgs rest
+typeArgs (_:rest) = typeArgs rest
+
+setNthTmArg :: Int -> Term -> [AppArg] -> Maybe [AppArg]
+setNthTmArg _ _ [] = Nothing
+setNthTmArg 1 tm (TermArg _:rest) = Just (TermArg tm:rest)
+setNthTmArg 1 tm (other:rest) = (other:) <$> setNthTmArg 1 tm rest
+setNthTmArg n tm (t@(TermArg _):rest) = (t:) <$> setNthTmArg (n-1) tm rest
+setNthTmArg n tm (other:rest) = (other:) <$> setNthTmArg n tm rest

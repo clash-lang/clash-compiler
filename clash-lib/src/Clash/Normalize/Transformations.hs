@@ -873,7 +873,7 @@ deadCode _ e = return e
 {-# SCC deadCode #-}
 
 removeUnusedExpr :: HasCallStack => NormRewrite
-removeUnusedExpr _ e@(collectArgsTicks -> (p@(Prim pInfo),args,ticks)) = do
+removeUnusedExpr _ e@(collectAppArgs -> (p@(Prim pInfo),args)) = do
   bbM <- HashMap.lookup (primName pInfo) <$> Lens.use (extra.primitives)
   let
     usedArgs0 =
@@ -901,7 +901,7 @@ removeUnusedExpr _ e@(collectArgsTicks -> (p@(Prim pInfo),args,ticks)) = do
       tcm <- Lens.view tcCache
       (args1, Monoid.getAny -> hasChanged) <- listen (go tcm 0 usedArgs1 args)
       if hasChanged then
-        return (mkApps (mkTicks p ticks) args1)
+        return (mkArgApps p args1)
       else
         return e
 
@@ -909,21 +909,27 @@ removeUnusedExpr _ e@(collectArgsTicks -> (p@(Prim pInfo),args,ticks)) = do
     arity = length . Either.rights . fst $ splitFunForallTy (primType pInfo)
 
     go _ _ _ [] = return []
-    go tcm !n used (Right ty:args') = do
+    go tcm !n used (CastCtx tyFrom tyTo:args') = do
       args'' <- go tcm n used args'
-      return (Right ty : args'')
-    go tcm !n used (Left tm : args') = do
+      return (CastCtx tyFrom tyTo:args'')
+    go tcm !n used (TickCtx tickInfo:args') = do
+      args'' <- go tcm n used args'
+      return (TickCtx tickInfo:args'')
+    go tcm !n used (TypeArg ty:args') = do
+      args'' <- go tcm n used args'
+      return (TypeArg ty : args'')
+    go tcm !n used (TermArg tm : args') = do
       args'' <- go tcm (n+1) used args'
       case tm of
         TyApp (Prim p0) _
           | primName p0 == "Clash.Transformations.removedArg"
-          -> return (Left tm : args'')
+          -> return (TermArg tm : args'')
         _ -> do
           let ty = termType tcm tm
               p' = removedTm ty
           if n < arity && n `notElem` used
-             then changed (Left p' : args'')
-             else return  (Left tm : args'')
+             then changed (TermArg p' : args'')
+             else return  (TermArg tm : args'')
 
 removeUnusedExpr _ e@(Case _ _ [(DataPat _ [] xs,altExpr)]) =
   if xs `localIdsDoNotOccurIn` altExpr
@@ -932,20 +938,21 @@ removeUnusedExpr _ e@(Case _ _ [(DataPat _ [] xs,altExpr)]) =
 
 -- Replace any expression that creates a Vector of size 0 within the application
 -- of the Cons constructor, by the Nil constructor.
-removeUnusedExpr _ e@(collectArgsTicks -> (Data dc, [_,Right aTy,Right nTy,_,Left a,Left nil],ticks))
+removeUnusedExpr _ e@(collectAppArgs -> (Data dc,args))
   | nameOcc (dcName dc) == "Clash.Sized.Vector.Cons"
+  , [_,aTy,nTy] <- typeArgs args
   = do
     tcm <- Lens.view tcCache
     case runExcept (tyNatSize tcm nTy) of
       Right 0
-        | (con, _) <- collectArgs nil
-        , not (isCon con)
-        -> let eTy = termType tcm e
-               (TyConApp vecTcNm _) = tyView eTy
+        -> let dTy = dcType dc
+               (TyConApp vecTcNm _) = tyView (snd (splitFunForallTy dTy))
                (Just vecTc) = lookupUniqMap vecTcNm tcm
                [nilCon,consCon] = tyConDataCons vecTc
-               v = mkTicks (mkVec nilCon consCon aTy 1 [a]) ticks
-           in  changed v
+               nil = mkVec nilCon consCon aTy 0 []
+           in  case setNthTmArg 3 nil args of
+                 Just argsN -> changed (mkArgApps (Data dc) argsN)
+                 _ -> return e
       _ -> return e
 
 removeUnusedExpr _ e = return e
