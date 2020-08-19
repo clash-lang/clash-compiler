@@ -29,6 +29,7 @@ import           GHC.Integer.GMP.Internals
   (Integer (..), BigNat (..))
 
 import           Clash.Core.DataCon
+import           Clash.Core.Evaluator.KPush
 import           Clash.Core.Evaluator.Types
 import           Clash.Core.FreeVars
 import           Clash.Core.Literal
@@ -213,7 +214,6 @@ stepLetRec :: [LetBinding] -> Term -> Step
 stepLetRec bs x m _ = Just (allocate bs x m)
 
 stepCase :: Term -> Type -> [Alt] -> Step
-stepCase (Cast {}) _ty _alts _m _ = error "stepCase QQ"
 stepCase scrut ty alts m _ =
   Just . setTerm scrut $ stackPush (Scrutinise ty alts) m
 
@@ -288,7 +288,7 @@ ghcUnwind v m tcm = do
   go (Apply x)                = return . apply tcm v x
   go (Instantiate ty)         = return . instantiate tcm v ty
   go (PrimApply p tys vs tms) = ghcPrimUnwind tcm p tys vs v tms
-  go (Scrutinise altTy as)    = return . scrutinise v altTy as
+  go (Scrutinise altTy as)    = return . scrutinise tcm v altTy as
   go (Tickish _)              = return . setTerm (valToTerm v)
   -- A cast of a value is a value
   go (Castish ty1 ty2)        = \mN -> ghcUnwind (CastValue v ty1 ty2) mN tcm
@@ -326,15 +326,15 @@ instantiate tcm pVal@(PrimVal (PrimInfo{primType}) tys []) ty m
 instantiate _ p _ _ = error $ "Evaluator.instantiate: Not a tylambda: " ++ show p
 
 -- | Evaluate a case-expression
-scrutinise :: Value -> Type -> [Alt] -> Machine -> Machine
-scrutinise v _altTy [] m = setTerm (valToTerm v) m
+scrutinise :: TyConMap -> Value -> Type -> [Alt] -> Machine -> Machine
+scrutinise _ v _altTy [] m = setTerm (valToTerm v) m
 -- [Note: empty case expressions]
 --
 -- Clash does not have empty case-expressions; instead, empty case-expressions
 -- are used to indicate that the `whnf` function was called the context of a
 -- case-expression, which means certain special primitives must be forced.
 -- See also [Note: forcing special primitives]
-scrutinise (Lit l) _altTy alts m = case alts of
+scrutinise _ (Lit l) _altTy alts m = case alts of
   (DefaultPat, altE):alts1 -> setTerm (go altE alts1) m
   _ -> let term = go (error $ "Evaluator.scrutinise: no match "
                     <> showPpr (Case (valToTerm (Lit l)) (ConstTy Arrow) alts)) alts
@@ -375,13 +375,17 @@ scrutinise (Lit l) _altTy alts m = case alts of
       in  substTm "Evaluator.scrutinise" subst1 altE
   go def (_:alts1) = go def alts1
 
-scrutinise (DC dc xs) _altTy alts m
+scrutinise tcm (CastValue (DC dc xs) fromTy toTy) altTy alts m
+  | Just (dcN,xsN) <- kpush tcm dc xs (fromTy,toTy)
+  = scrutinise tcm (DC dcN xsN) altTy alts m
+
+scrutinise _ (DC dc xs) _altTy alts m
   | altE:_ <- [substInAlt altDc tvs pxs xs altE
               | (DataPat altDc tvs pxs,altE) <- alts, altDc == dc ] ++
               [altE | (DefaultPat,altE) <- alts ]
   = setTerm altE m
 
-scrutinise v@(PrimVal p _ vs) altTy alts m
+scrutinise _ v@(PrimVal p _ vs) altTy alts m
   | isUndefinedPrimVal v
   = setTerm (undefinedTm altTy) m
 
@@ -409,7 +413,7 @@ scrutinise v@(PrimVal p _ vs) altTy alts m
           | [_,Lit l0] <- vs -> l0
         _ -> error ("scrutinise: " ++ showPpr (Case (valToTerm v) (ConstTy Arrow) alts))
 
-scrutinise v _altTy alts _ =
+scrutinise _ v _altTy alts _ =
   error ("scrutinise: " ++ showPpr (Case (valToTerm v) (ConstTy Arrow) alts))
 
 substInAlt :: DataCon -> [TyVar] -> [Id] -> [Either Term Type] -> Term -> Term

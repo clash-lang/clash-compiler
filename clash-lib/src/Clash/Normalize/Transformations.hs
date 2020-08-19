@@ -95,6 +95,7 @@ import           BasicTypes                  (InlineSpec (..))
 import           Clash.Annotations.Primitive (extractPrim)
 import           Clash.Core.DataCon          (DataCon (..))
 import           Clash.Core.EqSolver
+import           Clash.Core.Evaluator.KPush  (kpush)
 import           Clash.Core.Name
   (Name (..), NameSort (..), mkUnsafeSystemName, nameOcc, mkUnsafeInternalName)
 import           Clash.Core.FreeVars
@@ -112,21 +113,21 @@ import           Clash.Core.Type             (Type (..), TypeView (..), applyFun
                                               splitFunTy,
                                               tyView, mkPolyFunTy, coreView,
                                               LitTy (..), coreView1,
-                                              normalizeType, mkFunTy, mkTyConApp)
+                                              normalizeType)
 import           Clash.Core.TyCon
-  (TyConMap, tyConDataCons, tyConArity)
+  (TyConMap, tyConDataCons)
 import           Clash.Core.Util
   ( isSignalType, mkVec, tyNatSize, undefinedTm,
    shouldSplit, inverseTopSortLetBindings)
 import           Clash.Core.Var
-  (Id, TyVar, Var (..), isGlobalId, isLocalId, mkLocalId, modifyVarName, setVarType)
+  (Id, TyVar, Var (..), isGlobalId, isLocalId, mkLocalId, modifyVarName)
 import           Clash.Core.VarEnv
   (InScopeSet, VarEnv, VarSet, elemVarSet,
    emptyVarEnv, extendInScopeSet, extendInScopeSetList, lookupVarEnv,
    notElemVarSet, unionVarEnvWith, unionInScope, unitVarEnv,
    unitVarSet, mkVarSet, mkInScopeSet, uniqAway, elemInScopeSet, elemVarEnv,
    foldlWithUniqueVarEnv', lookupVarEnvDirectly, extendVarEnv, unionVarEnv,
-   eltsVarEnv, mkVarEnv, elemUniqInScopeSet, mapVarEnv, emptyInScopeSet)
+   eltsVarEnv, mkVarEnv, elemUniqInScopeSet)
 import           Clash.Debug
 import           Clash.Driver.Types          (Binding(..), DebugLevel (..))
 import           Clash.Netlist.BlackBox.Types (Element(Err))
@@ -502,219 +503,14 @@ caseCon :: HasCallStack => NormRewrite
 caseCon ctx@(TransformContext is0 _) e@(Case subj ty alts) = do
  tcm <- Lens.view tcCache
  case collectArgsTicks subj of
-  (Cast d@(collectArgsTicks -> (Data dc,args,ticksInner)) fromTy toTy,[],ticksOuter)
-    | fromTy == toTy
+  (Cast (collectArgsTicks -> (Data dc,args,ticksInner)) fromTy toTy,[],ticksOuter)
+    | Just (dcN,argsN) <- kpush tcm dc args (fromTy,toTy)
     -> do
-       setChanged
-       caseCon ctx (Case (mkTicks d ticksOuter) ty alts)
-    | TyConApp toTc toTcArgTys <- tyView toTy
-    , TyConApp dTc _ <- tyView (snd (splitFunForallTy (dcType dc)))
-    , dTc == toTc
-    -> do
-       let nonUnivArgs      = List.dropList (dcUnivTyVars dc) args
-           (exArgs,valArgs) = List.splitAtList (dcExtTyVars dc) nonUnivArgs
-
-       let tc = tcm `lookupUniqMap'` toTc
-
-       let omegas = decomposeCo (tyConArity tc) (fromTy,toTy)
-
-           (phiSubst,toExArgs) =
-             liftCoSubstWithEx
-               (dcUnivTyVars dc)
-               omegas
-               (dcExtTyVars dc)
-               (Either.fromRight (error "Not a Type") <$> exArgs)
-
-           newValArgs =
-             zipWith castArg
-                     (dcArgTys dc)
-                     (Either.fromLeft (error "Not a Term") <$> valArgs)
-
-           castArg argTy arg = mkCast arg (phiSubst argTy)
-           mkCast arg (ty1,ty2)
-             | ty1 == ty2
-             = arg
-
-           mkCast (Cast arg ty1 _) (_,ty2)
-             = Cast arg ty1 ty2
-
-           mkCast (Tick t arg) co
-             = Tick t (mkCast arg co)
-
-           mkCast (TyApp p@(Prim (PrimInfo {primName = "_CO_"})) pTy) (lCo,rCo)
-             | TyConApp (nameOcc -> "GHC.Prim.~#") _ <- tyView pTy
-             -- (co :: s1 ~# t1) |> (s1 ~# t1) ~ (s2 ~# t2)  ::  (s2 ~# t2)
-             = case coList of
-                 (_g2:_g1:_) -> TyApp p rCo
-                 _ -> error ("mkCoCast" <> unlines [showPpr pTy, showPpr lCo, showPpr rCo])
-             where
-               TyConApp lCoTcNm _ = tyView lCo
-               tcCo = tcm `lookupUniqMap'` lCoTcNm
-               coList = decomposeCo (tyConArity tcCo) (lCo,rCo)
-
-           mkCast arg (ty1,ty2)
-             -- TODO: error out when `termType tcm arg /= ty1`
-             = Cast arg ty1 ty2
-
-           newD = mkApps (mkTicks (Data dc) ticksInner)
-                         (map Right toTcArgTys ++
-                          map Right toExArgs ++
-                          map Left  newValArgs)
-
+       let newD = mkApps (mkTicks (Data dcN) ticksInner) argsN
        setChanged
        caseCon ctx (Case (mkTicks newD ticksOuter) ty alts)
     | otherwise
     -> error ("KPush expected TyCon:\n" <> showPpr e)
-   where
-        liftCoSubstWithEx ::
-          -- Universally quantified tyvars
-          [TyVar] ->
-          -- Coercions
-          [(Type,Type)] ->
-          -- Existentially quantified tycovars
-          [TyVar] ->
-          -- types and coercions bound to the ex vars
-          [Type] ->
-          -- (Lifting function, converted ex args)
-          (Type -> (Type,Type), [Type])
-        liftCoSubstWithEx univs omegas exs rhos =
-          let theta = mkLiftingContext (List.zipEqual univs omegas)
-              psi   = extendLiftingContextEx theta (List.zipEqual exs rhos)
-          in  (tyCoSubst psi, substTyTvSubst (lcSubstRight psi) <$> (VarTy <$> exs))
-
-        decomposeCo ::
-          -- Arity
-          Int ->
-          -- Coercion
-          (Type,Type) ->
-          -- decomposed coercions
-          [(Type,Type)]
-        decomposeCo n (tyView -> TyConApp _ args1,tyView -> TyConApp _ args2) =
-          go n args1 args2
-         where
-          go 0 _ _ = []
-          go m (t1:rest1) (t2:rest2) = (t1,t2):go (m-1) rest1 rest2
-          go _ _ _ = error "unequal length"
-
-        decomposeCo _ (ty1,ty2) =
-          error (unlines ["Expected TyConApp:"
-                         ,showPpr ty1
-                         ," ~ "
-                         ,showPpr ty2])
-
-        mkLiftingContext :: [(TyVar,(Type,Type))] -> (TvSubst, VarEnv (Type,Type))
-        mkLiftingContext pairs =
-          ( mkEmptyTvSubst (mkInScopeSet (Lens.foldMapOf (tupOf typeFreeVars)
-                                                         unitVarSet
-                                                         (map snd pairs)))
-          , mkVarEnv pairs
-          )
-         where
-          tupOf fld = \f -> traverse (\(a,b) -> (,) <$> fld f a <*> fld f b)
-
-        lcSubstRight :: (TvSubst, VarEnv (Type,Type)) -> TvSubst
-        lcSubstRight (subst,lcEnv) =
-          composeTvSubst (TvSubst emptyInScopeSet tEnv) subst
-         where
-          tEnv = mapVarEnv snd lcEnv
-
-        tyCoSubst :: (TvSubst, VarEnv (Type,Type)) -> Type -> (Type,Type)
-        tyCoSubst !lc = go
-         where
-          go tyC = case tyView tyC of
-            OtherType oTy -> case oTy of
-              AnnType _ tyA -> go tyA
-              VarTy tv -> case liftCoSubstTyVar lc tv of
-                Nothing -> error "tyCoSubst bad roles"
-                Just co -> co
-              LitTy {} -> (oTy,oTy) -- Refl
-              AppTy lTy rTy ->
-                let (lTyL,lTyR) = go lTy
-                    (rTyL,rTyR) = go rTy
-                in  (AppTy lTyL rTyL,AppTy lTyR rTyR)
-              ForAllTy tv tyBody ->
-                let (lcN, tvN, h) = liftCoSubstVarBndr lc tv
-                    bodyCo = tyCoSubst lcN tyBody
-                in  mkForallCo tvN h bodyCo
-              ConstTy {} -> error "impossible"
-            FunTy lTy rTy ->
-              let (lTyL,lTyR) = go lTy
-                  (rTyL,rTyR) = go rTy
-              in  (mkFunTy lTyL rTyL,mkFunTy lTyR rTyR)
-            TyConApp tcNm tyArgs ->
-              let (lArgs,rArgs) = unzip (map go tyArgs)
-              in  (mkTyConApp tcNm lArgs, mkTyConApp tcNm rArgs)
-
-        liftCoSubstTyVar :: (TvSubst, VarEnv (Type,Type)) -> TyVar -> Maybe (Type,Type)
-        liftCoSubstTyVar (subst,env) v
-          | Just coArg <- lookupVarEnv v env
-          = -- TODO:
-            -- downgradeRoleMaybe role (coercionRole coArg) coArg
-            Just coArg
-
-          | otherwise
-          = let coTy = substTyVar subst v
-            in  Just (coTy,coTy) -- Refl
-
-        liftCoSubstVarBndr ::
-          (TvSubst, VarEnv (Type,Type)) ->
-          TyVar ->
-          ((TvSubst, VarEnv (Type,Type)), TyVar, (Type,Type))
-        liftCoSubstVarBndr lc tv =
-          let (lcN, tvN, h, _) = liftCoSubstVarBndrUsing callback lc tv
-          in  (lcN, tvN, h)
-         where
-          callback lcN tyN = (tyCoSubst lcN tyN, ())
-
-        liftCoSubstVarBndrUsing ::
-          ((TvSubst, VarEnv (Type,Type)) -> Type -> ((Type,Type), a)) ->
-          (TvSubst, VarEnv (Type,Type)) ->
-          TyVar ->
-          ((TvSubst, VarEnv (Type,Type)), TyVar, (Type,Type), a)
-        liftCoSubstVarBndrUsing fun lc@(subst,env) oldVar =
-          ( (subst `extendTvInScope` newVar, newEnv)
-          , newVar, eta, stuff )
-         where
-          oldKind = varType oldVar
-          (eta,stuff) = fun lc oldKind
-          ki = fst eta
-          newVar = uniqAway (getTvInScope subst) (setVarType oldVar ki)
-          lifted = mkGReflRightCo (VarTy newVar) eta
-          newEnv = extendVarEnv oldVar lifted env
-
-
-        mkForallCo :: TyVar -> (Type,Type) -> (Type,Type) -> (Type,Type)
-        mkForallCo tvN (kL,kR) (bodyL,bodyR)
-          | kL == kR
-          = (ForAllTy tvN bodyL, ForAllTy tvN bodyR)
-          | otherwise
-          = error (unlines ["Kind coercions not supported",showPpr kL,showPpr kR])
-
-        extendLiftingContextEx ::
-          -- Original lifting context
-          (TvSubst, VarEnv (Type,Type)) ->
-          -- ex. var / value pairs
-          [(TyVar,Type)] ->
-          (TvSubst, VarEnv (Type,Type))
-        extendLiftingContextEx lc [] = lc
-        extendLiftingContextEx lc@(subst, env) ((v,exTy):rest)
-          = let lcN = ( subst `extendTvInScopeSet`
-                              (Lens.foldMapOf typeFreeVars unitVarSet exTy)
-                      , extendVarEnv
-                          v
-                          (mkGReflRightCo exTy
-                                          (tyCoSubst lc (varType v)))
-                          env
-                      )
-            in  extendLiftingContextEx lcN rest
-
-        mkGReflRightCo :: Type -> (Type,Type) -> (Type,Type)
-        mkGReflRightCo t (l,r)
-          | l == r
-          = (t,t) -- Refl
-          | otherwise
-          = error (unlines ["Kind coercions not supported:",showPpr l, showPpr r])
-
 
   -- The subject is an applied data constructor
   (Data dc, args, ticks) -> case List.find (equalCon . fst) alts of

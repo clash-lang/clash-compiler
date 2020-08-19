@@ -199,6 +199,7 @@ Library
 
                       Clash.Core.DataCon
                       Clash.Core.EqSolver
+                      Clash.Core.Evaluator.KPush
                       Clash.Core.Evaluator.Models
                       Clash.Core.Evaluator.Semantics
                       Clash.Core.Evaluator.Types
