@@ -618,7 +618,7 @@ instDecl entOrComp compName instLbl attrs inPorts outPorts = do
   inPorts' <- mapM (mkPort In) inPorts
   outPorts' <- mapM (mkPort Out) outPorts
 
-  addDeclaration $ InstDecl entOrComp Nothing compName instLbl (mkAttrs attrs) (inPorts' ++ outPorts')
+  addDeclaration $ InstDecl entOrComp Nothing [] compName instLbl (mkAttrs attrs) (inPorts' ++ outPorts')
     where
     mkPort inOrOut (nm, pExpr) = do
       TExpr ty pExpr' <- toIdentifier (nm <> "_port")  pExpr

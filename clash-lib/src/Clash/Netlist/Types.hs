@@ -280,6 +280,7 @@ data Declaration
   | InstDecl
       EntityOrComponent                  -- FIELD Whether it's an entity or a component
       (Maybe Comment)                    -- FIELD Comment to add to the generated code
+      [Attr']                            -- FIELD Attributes to add to the generated code
       !Identifier                        -- FIELD The component's (or entity's) name
       !Identifier                        -- FIELD Instance label
       [(Expr,HWType,Expr)]               -- FIELD List of parameters for this component (param name, param type, param value)

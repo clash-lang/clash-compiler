@@ -40,7 +40,7 @@ myAddTemplate bbCtx = do
   let [_, (xExp, xTy, _), (yExp, yTy, _)] = bbInputs bbCtx
       (resExp, resTy) = bbResult bbCtx
   getMon $ blockDecl "my_add_block"
-    [ InstDecl Comp Nothing "my_add" "my_add_inst"
+    [ InstDecl Comp Nothing [] "my_add" "my_add_inst"
         [ (Identifier "size" Nothing, Integer, Literal Nothing (NumLit . fromIntegral $ typeSize xTy))
         ]
         [ (Identifier "x" Nothing, In, xTy, xExp)

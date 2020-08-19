@@ -44,7 +44,7 @@ topEntity n abcd = (f n abcd) - (g n abcd)
 testPath :: FilePath
 testPath = "tests/shouldwork/Netlist/NoDeDup.hs"
 
-isTwiceInst (InstDecl Entity Nothing "twice" _ _ _) = True
+isTwiceInst (InstDecl Entity Nothing [] "twice" _ _ _) = True
 isTwiceInst _ = False
 
 assertNumTwiceInsts :: Component -> IO ()

@@ -85,7 +85,7 @@ alteraPllTemplate bbCtx = do
   [[ NetDecl Nothing locked  rstTy
    , NetDecl' Nothing Reg pllLock (Right Bool) Nothing]
   ,[ NetDecl Nothing clkNm ty | (clkNm,ty) <- zip clocks tys]
-  ,[ InstDecl Comp Nothing compName alteraPll_inst [] $ concat
+  ,[ InstDecl Comp Nothing [] compName alteraPll_inst [] $ concat
       [[(Identifier "refclk" Nothing,In,clkTy,clk)
        ,(Identifier "rst" Nothing,In,rstTy,rst)]
       ,[(Identifier (TextS.pack ("outclk_" ++ show n)) Nothing,Out,ty,Identifier k Nothing)
@@ -122,7 +122,7 @@ altpllTemplate bbCtx = do
   [ NetDecl Nothing locked  Bit
   , NetDecl' Nothing Reg pllLock (Right Bool) Nothing
   , NetDecl Nothing pllOut clkOutTy
-  , InstDecl Comp Nothing compName alteraPll_inst []
+  , InstDecl Comp Nothing [] compName alteraPll_inst []
       [(Identifier "clk" Nothing,In,clkTy,clk)
       ,(Identifier "areset" Nothing,In,rstTy,rst)
       ,(Identifier "c0" Nothing,Out,clkOutTy,Identifier pllOut Nothing)

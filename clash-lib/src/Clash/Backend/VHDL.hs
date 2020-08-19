@@ -190,7 +190,7 @@ instance Backend VHDLState where
                pure decs <>
                if null attrs
                 then emptyDoc
-                else line <> line <> renderAttrs attrs) <> line <>
+                else line <> line <> renderAttrs (TextS.pack "signal") attrs) <> line <>
             nest 2
               ("begin" <> line <>
                 insts ds) <> line <>
@@ -879,7 +879,7 @@ entity c = do
 
     rports p = "port" <> (parens (align (vcat (punctuate semi (pure p))))) <> semi
 
-    rattrs      = renderAttrs attrs
+    rattrs      = renderAttrs (TextS.pack "signal") attrs
     attrs       = inputAttrs ++ outputAttrs
     inputAttrs  = [(id_, attr) | (id_, hwtype) <- inputs c, attr <- hwTypeAttrs hwtype]
     outputAttrs = [(id_, attr) | (_wireOrReg, (id_, hwtype), _) <- outputs c, attr <- hwTypeAttrs hwtype]
@@ -895,7 +895,7 @@ architecture c = do {
   ; nest 2
       (("architecture structural of" <+> pretty (componentName c) <+> "is" <> line <>
        decls (declarations c)) <> line <>
-       if null attrs then emptyDoc else line <> line <> renderAttrs attrs) <> line <>
+       if null attrs then emptyDoc else line <> line <> renderAttrs (TextS.pack "signal") attrs) <> line <>
     nest 2
       ("begin" <> line <>
        insts (declarations c)) <> line <>
@@ -964,9 +964,10 @@ attrMap attrs = foldl go empty' attrs
     (typ, (signalName, renderAttr attr) : elems)
 
 renderAttrs
-  :: [(TextS.Text, Attr')]
+  :: TextS.Text
+  -> [(TextS.Text, Attr')]
   -> VHDLM Doc
-renderAttrs (attrMap -> attrs) =
+renderAttrs what (attrMap -> attrs) =
   vcat $ sequence $ intersperse " " $ map renderAttrGroup (assocs attrs)
  where
   renderAttrGroup
@@ -985,9 +986,9 @@ renderAttrs (attrMap -> attrs) =
         "attribute"
     <+> string attrname
     <+> "of"
-    <+> stringS signalName
+    <+> stringS signalName -- or component name
     <+> colon
-    <+> "signal is"
+    <+> stringS what <+> "is" -- "signal is" or "component is"
     <+> string value
     <> semi
 
@@ -1300,16 +1301,16 @@ decls ds = do
     rec (dsDoc,ls) <- fmap (unzip . catMaybes) $ mapM (decl (maximum ls)) ds
     case dsDoc of
       [] -> emptyDoc
-      _  -> punctuate' semi (pure dsDoc)
+      _  -> vcat (pure dsDoc)
 
 decl :: Int ->  Declaration -> VHDLM (Maybe (Doc,Int))
 decl l (NetDecl' noteM _ id_ ty iEM) = Just <$> (,fromIntegral (TextS.length id_)) <$>
-  maybe id addNote noteM ("signal" <+> fill l (pretty id_) <+> colon <+> either pretty sizedQualTyName ty <> iE)
+  maybe id addNote noteM ("signal" <+> fill l (pretty id_) <+> colon <+> either pretty sizedQualTyName ty <> iE <> semi)
   where
     addNote n = mappend ("--" <+> pretty n <> line)
     iE = maybe emptyDoc (noEmptyInit . expr_ False) iEM
 
-decl _ (InstDecl Comp _ nm _ gens pms) = fmap (Just . (,0)) $ do
+decl _ (InstDecl Comp _ attrs nm _ gens pms) = fmap (Just . (,0)) $ do
   { rec (p,ls) <- fmap unzip $ sequence [ (,formalLength i) <$> fill (maximum ls) (expr_ False i) <+> colon <+> portDir dir <+> sizedQualTyName ty | (i,dir,ty,_) <- pms ]
   ; rec (g,lsg) <- fmap unzip $ sequence [ (,formalLength i) <$> fill (maximum lsg) (expr_ False i) <+> colon <+> tyName ty | (i,ty,_) <- gens]
   ; "component" <+> pretty nm <> line <>
@@ -1317,7 +1318,8 @@ decl _ (InstDecl Comp _ nm _ gens pms) = fmap (Just . (,0)) $ do
         else indent 2 ("generic" <> line <> tupledSemi (pure g) <> semi) <> line
     )
     <> indent 2 ("port" <+> tupledSemi (pure p) <> semi) <> line <>
-    "end component"
+    "end component" <> semi <> line
+    <> attrs'
   }
  where
     formalLength (Identifier i _) = fromIntegral (TextS.length i)
@@ -1325,6 +1327,8 @@ decl _ (InstDecl Comp _ nm _ gens pms) = fmap (Just . (,0)) $ do
 
     portDir In  = "in"
     portDir Out = "out"
+
+    attrs' = if null attrs then emptyDoc else renderAttrs (TextS.pack "component") [(nm, a) | a <- attrs]
 
 decl _ _ = return Nothing
 
@@ -1447,7 +1451,7 @@ inst_ (CondAssignment id_ _sig scrut scrutTy es) = fmap Just $
     conds ((Nothing,e):_)   = expr_ False e <+> "when" <+> "others" <:> return []
     conds ((Just c ,e):es') = expr_ False e <+> "when" <+> patLit scrutTy c <:> conds es'
 
-inst_ (InstDecl entOrComp libM nm lbl gens pms) = do
+inst_ (InstDecl entOrComp libM _ nm lbl gens pms) = do
     maybe (return ()) (\lib -> Mon (libraries %= (T.fromStrict lib:))) libM
     fmap Just $
       nest 2 $ pretty lbl <+> colon <> entOrComp'
