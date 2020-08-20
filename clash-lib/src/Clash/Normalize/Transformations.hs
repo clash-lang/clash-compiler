@@ -218,7 +218,7 @@ nonRepSpec ctx e@(App e1 e2)
   , null $ Lens.toListOf termFreeTyVars e2
   = do tcm <- Lens.view tcCache
        let e2Ty = termType tcm e2
-       let localVar = isLocalVar e2
+       let localVar = isCoreLocalVar e2
        nonRepE2 <- not <$> (representableType <$> Lens.view typeTranslator
                                               <*> Lens.view customReprs
                                               <*> pure False
@@ -848,7 +848,7 @@ topLet (TransformContext is0 ctx) e
 topLet (TransformContext is0 ctx) e@(Letrec binds body)
   | all (\c -> isLambdaBodyCtx c || isTickCtx c) ctx
   = do
-    let localVar = isLocalVar body
+    let localVar = isCoreLocalVar body
     untranslatable <- isUntranslatable False body
     if localVar || untranslatable
       then return e
@@ -963,8 +963,7 @@ removeUnusedExpr _ e = return e
 bindConstantVar :: HasCallStack => NormRewrite
 bindConstantVar = inlineBinders test
   where
-    test b (i,stripTicks -> (Cast e _ _)) = test b (i,e)
-    test _ (i,stripTicks -> e) = case isLocalVar e of
+    test _ (i,e) = case isCoreLocalVar e of
       -- Don't inline `let x = x in x`, it throws  us in an infinite loop
       True -> return (i `localIdDoesNotOccurIn` e)
       _    -> isWorkFreeIsh e >>= \case
@@ -1206,7 +1205,7 @@ inlineWorkFree _ e = return e
 
 -- | Inline small functions
 inlineSmall :: HasCallStack => NormRewrite
-inlineSmall _ e@(collectArgsTicks -> (Var f,args,ticks)) = do
+inlineSmall _ e@(collectAppArgs -> (Var f,args)) = do
   untranslatable <- isUntranslatable True e
   topEnts <- Lens.view topEntities
   let lv = isLocalId f
@@ -1219,11 +1218,15 @@ inlineSmall _ e@(collectArgsTicks -> (Var f,args,ticks)) = do
         -- Don't inline recursive expressions
         Just b -> do
           isRecBndr <- isRecursiveBndr f
-          if not isRecBndr && bindingSpec b /= NoInline && termSize (bindingTerm b) < sizeLimit
-             then do
-               let tm = mkTicks (bindingTerm b) (mkInlineTick f : ticks)
-               changed $ mkApps tm args
-             else return e
+          let tm       = bindingTerm b
+              doInline = and [ bindingSpec b /= NoInline
+                             , not isRecBndr
+                             , termSize tm < sizeLimit
+                             ]
+          if doInline then
+            changed (mkArgApps (Tick (mkInlineTick f) tm) args)
+          else
+            return e
 
         _ -> return e
 
@@ -1736,11 +1739,11 @@ makeANF ctx@(TransformContext is0 _) e0
 --    depends on IO actions to be propagated down as far as possible.
 collectANF :: HasCallStack => NormRewriteW
 collectANF ctx e@(App appf arg)
-  | (conVarPrim, _) <- collectArgs e
+  | (conVarPrim, _) <- collectAppArgs e
   , isCon conVarPrim || isPrim conVarPrim || isVar conVarPrim
   = do
     untranslatable <- lift (isUntranslatable False arg)
-    let localVar   = isLocalVar arg
+    let localVar   = isCoreLocalVar arg
     constantNoCR   <- lift (isConstantNotClockReset arg)
     -- See Note [ANF no let-bind]
     case (untranslatable,localVar || constantNoCR, isSimBind conVarPrim,arg) of
@@ -1764,7 +1767,7 @@ collectANF _ (Letrec binds body) = do
   tcm <- Lens.view tcCache
   let isSimIO = isSimIOTy tcm (termType tcm body)
   untranslatable <- lift (isUntranslatable False body)
-  let localVar = isLocalVar body
+  let localVar = isCoreLocalVar body
   -- See Note [ANF no let-bind]
   if localVar || untranslatable || isSimIO
     then do
@@ -1799,7 +1802,7 @@ collectANF _ e@(Case _ _ [(DataPat dc _ _,_)])
   | nameOcc (dcName dc) == "Clash.Signal.Internal.:-" = return e
 
 collectANF ctx (Case subj ty alts) = do
-    let localVar = isLocalVar subj
+    let localVar = isCoreLocalVar subj
     let isConstantSubj = isConstant subj
 
     (subj',subjBinders) <- if localVar || isConstantSubj
@@ -1830,7 +1833,7 @@ collectANF ctx (Case subj ty alts) = do
       -> StateT ([LetBinding],InScopeSet) (RewriteMonad NormalizeState)
                 (Pat,Term)
     doAlt isSimIOAlt subj' alt@(DataPat dc exts xs,altExpr) | not (bindsExistentials exts xs) = do
-      let lv = isLocalVar altExpr
+      let lv = isCoreLocalVar altExpr
       patSels <- Monad.zipWithM (doPatBndr subj' dc) xs [0..]
       let altExprIsConstant = isConstant altExpr
       let usesXs (Var n) = any (== n) xs
@@ -1851,7 +1854,7 @@ collectANF ctx (Case subj ty alts) = do
           return (DataPat dc exts xs,Var altId)
     doAlt _ _ alt@(DataPat {}, _) = return alt
     doAlt isSimIOAlt _ alt@(pat,altExpr) = do
-      let lv = isLocalVar altExpr
+      let lv = isCoreLocalVar altExpr
       let altExprIsConstant = isConstant altExpr
       -- See [ANF no let-bind]
       if isSimIOAlt || lv || altExprIsConstant

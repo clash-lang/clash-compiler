@@ -300,30 +300,28 @@ isEnable
   :: TyConMap
   -> Type
   -> Bool
-isEnable m ty0
-  | TyConApp (nameOcc -> "Clash.Signal.Internal.Enable") _ <- tyView ty0 = True
-  | Just ty1 <- coreView1 m ty0 = isEnable m ty1
-isEnable _ _ = False
+isEnable m ty = case tyView (normalizeType m ty) of
+  TyConApp (nameOcc -> "Clash.Signal.Internal.Enable") _ -> True
+  _ -> False
 
 -- | Determines whether given type is an (alias of en) Clock or Reset line
 isClockOrReset
   :: TyConMap
   -> Type
   -> Bool
-isClockOrReset m (coreView1 m -> Just ty)    = isClockOrReset m ty
-isClockOrReset _ (tyView -> TyConApp tcNm _) = case nameOcc tcNm of
-  "Clash.Signal.Internal.Clock" -> True
-  "Clash.Signal.Internal.Reset" -> True
+isClockOrReset m ty = case tyView (normalizeType m ty) of
+  TyConApp tcNm _ -> case nameOcc tcNm of
+    "Clash.Signal.Internal.Clock" -> True
+    "Clash.Signal.Internal.Reset" -> True
+    _ -> False
   _ -> False
-isClockOrReset _ _ = False
 
 tyNatSize :: TyConMap
           -> Type
           -> Except String Integer
-tyNatSize m (coreView1 m -> Just ty) = tyNatSize m ty
-tyNatSize _ (LitTy (NumTy i))        = return i
-tyNatSize _ ty = throwE $ $(curLoc) ++ "Cannot reduce to an integer:\n" ++ showPpr ty
-
+tyNatSize m ty = case normalizeType m ty of
+  LitTy (NumTy i) -> return i
+  _ -> throwE $ $(curLoc) ++ "Cannot reduce to an integer:\n" ++ showPpr ty
 
 mkUniqSystemTyVar
   :: (Supply, InScopeSet)
@@ -448,10 +446,10 @@ tyLitShow
   :: TyConMap
   -> Type
   -> Except String String
-tyLitShow m (coreView1 m -> Just ty) = tyLitShow m ty
-tyLitShow _ (LitTy (SymTy s))        = return s
-tyLitShow _ (LitTy (NumTy s))        = return (show s)
-tyLitShow _ ty = throwE $ $(curLoc) ++ "Cannot reduce to a string:\n" ++ showPpr ty
+tyLitShow m ty = case normalizeType m ty of
+  LitTy (SymTy s) -> return s
+  LitTy (NumTy s) -> return (show s)
+  _ -> throwE $ $(curLoc) ++ "Cannot reduce to a string:\n" ++ showPpr ty
 
 -- | Determine whether we should split away types from a product type, i.e.
 -- clocks should always be separate arguments, and not part of a product.
@@ -476,7 +474,7 @@ shouldSplit
 shouldSplit tcm (tyView ->  TyConApp (nameOcc -> "Clash.Explicit.SimIO.SimIO") [tyArg]) =
   -- We also look through `SimIO` to find things like Files
   shouldSplit tcm tyArg
-shouldSplit tcm ty = shouldSplit0 emptyUniqSet tcm (tyView (coreView tcm ty))
+shouldSplit tcm ty = shouldSplit0 emptyUniqSet tcm (tyView (normalizeType tcm ty))
 
 -- | Worker of 'shouldSplit', works on 'TypeView' instead of 'Type'
 shouldSplit0
@@ -489,7 +487,7 @@ shouldSplit0 seen tcm (TyConApp tcNm tyArgs)
   , Just tc <- lookupUniqMap tcNm tcm
   , [dc] <- tyConDataCons tc
   , let dcArgs  = substArgTys dc tyArgs
-  , let dcArgVs = map (tyView . coreView tcm) dcArgs
+  , let dcArgVs = map (tyView . normalizeType tcm) dcArgs
   = if any shouldSplitTy dcArgVs && not (isHidden tcNm tyArgs) then
       Just (mkApps (Data dc) (map Right tyArgs), dcArgs)
     else

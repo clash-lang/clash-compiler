@@ -31,7 +31,6 @@ module Clash.Core.Term
   , patVars
   , Alt
   , TickInfo (..)
-  , stripTicks
   , partitionTicks
   , NameMod (..)
   , PrimInfo (..)
@@ -41,9 +40,6 @@ module Clash.Core.Term
   , isLambdaBodyCtx
   , isTickCtx
   , walkTerm
-  , collectArgs
-  , collectArgsTicks
-  , collectTicks
   , collectTermIds
   , collectBndrs
   , primArg
@@ -51,7 +47,13 @@ module Clash.Core.Term
   , collectAppArgs
   , mkArgApps
   , typeArgs
+  , termArgs
   , setNthTmArg
+  , collectCastsTicks
+  , collectArgsX
+  , stripTickX
+  , typeAndTermArgs
+  , tickArgs
   ) where
 
 -- External Modules
@@ -59,7 +61,6 @@ import Control.DeepSeq
 import Data.Binary                             (Binary)
 import Data.Coerce                             (coerce)
 import qualified Data.DList                    as DList
-import Data.Either                             (lefts, rights)
 import Data.Foldable                           (foldl')
 import Data.Maybe                              (catMaybes)
 import Data.Hashable                           (Hashable)
@@ -259,33 +260,6 @@ isTickCtx :: CoreContext -> Bool
 isTickCtx (TickC _) = True
 isTickCtx _         = False
 
-stripTicks :: Term -> Term
-stripTicks (Tick _ e) = stripTicks e
-stripTicks e = e
-
--- | Split a (Type)Application in the applied term and it arguments
-collectArgs :: Term -> (Term, [Either Term Type])
-collectArgs = go []
-  where
-    go args (App e1 e2) = go (Left e2:args) e1
-    go args (TyApp e t) = go (Right t:args) e
-    go args (Tick _ e)  = go args e
-    go args e           = (e, args)
-
-collectTicks :: Term -> (Term, [TickInfo])
-collectTicks = go []
- where
-  go ticks (Tick s e) = go (s:ticks) e
-  go ticks e          = (e,ticks)
-
-collectArgsTicks :: Term -> (Term, [Either Term Type], [TickInfo])
-collectArgsTicks = go [] []
- where
-  go args ticks (App e1 e2) = go (Left e2:args) ticks     e1
-  go args ticks (TyApp e t) = go (Right t:args) ticks     e
-  go args ticks (Tick s e)  = go args           (s:ticks) e
-  go args ticks e           = (e, args, ticks)
-
 -- | Split a (Type)Abstraction in the bound variables and the abstracted term
 collectBndrs :: Term -> ([Either Id TyVar], Term)
 collectBndrs = go []
@@ -301,10 +275,10 @@ primArg
   -- ^ Function application
   -> Maybe (Text, Int, Int)
   -- ^ If @Term@ was a primitive: (name of primitive, #type args, #term args)
-primArg (collectArgs -> t) =
+primArg (collectAppArgs -> t) =
   case t of
     (Prim p, args) ->
-      Just (primName p, length (rights args), length (lefts args))
+      Just (primName p, length (typeArgs args), length (termArgs args))
     _ ->
       Nothing
 
@@ -396,9 +370,49 @@ typeArgs [] = []
 typeArgs (TypeArg ty:rest) = ty : typeArgs rest
 typeArgs (_:rest) = typeArgs rest
 
+termArgs :: [AppArg] -> [Term]
+termArgs [] = []
+termArgs (TermArg tm:rest) = tm : termArgs rest
+termArgs (_:rest) = termArgs rest
+
+typeAndTermArgs :: [AppArg] -> [Either Term Type]
+typeAndTermArgs [] = []
+typeAndTermArgs (TermArg tm:rest) = Left tm : typeAndTermArgs rest
+typeAndTermArgs (TypeArg ty:rest) = Right ty : typeAndTermArgs rest
+typeAndTermArgs (_:rest) = typeAndTermArgs rest
+
+tickArgs :: [AppArg] -> [TickInfo]
+tickArgs [] = []
+tickArgs (TickCtx p:rest) = p:tickArgs rest
+tickArgs (_:rest) = tickArgs rest
+
+stripTickX :: [AppArg] -> [AppArg]
+stripTickX [] = []
+stripTickX (TickCtx {}:rest) = stripTickX rest
+stripTickX (other:rest) = other : stripTickX rest
+
 setNthTmArg :: Int -> Term -> [AppArg] -> Maybe [AppArg]
 setNthTmArg _ _ [] = Nothing
 setNthTmArg 1 tm (TermArg _:rest) = Just (TermArg tm:rest)
 setNthTmArg 1 tm (other:rest) = (other:) <$> setNthTmArg 1 tm rest
 setNthTmArg n tm (t@(TermArg _):rest) = (t:) <$> setNthTmArg (n-1) tm rest
 setNthTmArg n tm (other:rest) = (other:) <$> setNthTmArg n tm rest
+
+collectCastsTicks :: Term -> (Term, [AppArg])
+collectCastsTicks = go []
+ where
+  go args (Tick s e)     = go (TickCtx s:args) e
+  go args (Cast e t1 t2) = go (CastCtx t1 t2:args) e
+  go args e              = (e,args)
+
+-- | Collect the applied type and term arguments, but not the casts and ticks.
+--
+-- You usually want 'collectAppArgs' to collect *all* the applied constructions,
+-- i.e. look through casts and ticks as well. Only use this function if you
+-- explicitly do not want to look through casts and ticks
+collectArgsX :: Term -> (Term, [Either Term Type])
+collectArgsX = go []
+ where
+  go args (App e1 e2) = go (Left e2:args) e1
+  go args (TyApp e t) = go (Right t:args) e
+  go args e           = (e, args)

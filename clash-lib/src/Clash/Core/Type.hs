@@ -28,25 +28,26 @@ module Clash.Core.Type
   , TyName
   , TyVar
   , tyView
-  , coreView
-  , coreView1
+  -- , coreView
+  -- , coreView1
   , typeKind
   , mkTyConTy
   , mkFunTy
   , mkPolyFunTy
   , mkTyConApp
-  , splitFunTy
-  , splitFunTys
+  -- , splitFunTy
+  -- , splitFunTys
+  , splitFunTysX
   , splitFunForallTy
-  , splitCoreFunForallTy
+  -- , splitCoreFunForallTy
   , splitTyConAppM
   , isPolyFunTy
-  , isPolyFunCoreTy
+  -- , isPolyFunCoreTy
   , isPolyTy
   , isTypeFamilyApplication
-  , isFunTy
+  -- , isFunTy
   , isClassTy
-  , applyFunTy
+  , applyFunTyX
   , findFunSubst
   , reduceTypeFamily
   , undefinedTy
@@ -213,34 +214,34 @@ tyView tOrig = case tOrig of
 -- transparent, and type functions are evaluated to WHNF (when possible).
 --
 -- Strips away ALL layers. If no layers are found it returns the given type.
-coreView :: TyConMap -> Type -> Type
-coreView tcm ty =
-  case coreView1 tcm ty of
-    Nothing  -> ty
-    Just ty' -> coreView tcm ty'
+-- coreView :: TyConMap -> Type -> Type
+-- coreView tcm ty =
+--   case coreView1 tcm ty of
+--     Nothing  -> ty
+--     Just ty' -> coreView tcm ty'
 
 -- | A view on types in which newtypes are transparent, the Signal type is
 -- transparent, and type functions are evaluated to WHNF (when possible).
 --
 -- Only strips away one "layer".
-coreView1 :: TyConMap -> Type -> Maybe Type
-coreView1 tcMap ty = case tyView ty of
-  TyConApp tcNm args
-    | nameOcc tcNm == "Clash.Signal.BiSignal.BiSignalIn"
-    , [_,_,_,elTy] <- args
-    -> Just elTy
-    | nameOcc tcNm == "Clash.Signal.BiSignal.BiSignalOut"
-    , [_,_,_,elTy] <- args
-    -> Just elTy
-    -- | nameOcc tcNm == "Clash.Signal.Internal.Signal"
-    -- , [_,elTy] <- args
-    -- -> Just elTy
-    | otherwise
-    -> case tcMap `lookupUniqMap'` tcNm of
-         AlgTyCon {algTcRhs = (NewTyCon _ nt)}
-           -> newTyConInstRhs nt args
-         _ -> reduceTypeFamily tcMap ty
-  _ -> Nothing
+-- coreView1 :: TyConMap -> Type -> Maybe Type
+-- coreView1 tcMap ty = case tyView ty of
+--   TyConApp tcNm args
+--     | nameOcc tcNm == "Clash.Signal.BiSignal.BiSignalIn"
+--     , [_,_,_,elTy] <- args
+--     -> Just elTy
+--     | nameOcc tcNm == "Clash.Signal.BiSignal.BiSignalOut"
+--     , [_,_,_,elTy] <- args
+--     -> Just elTy
+--     -- | nameOcc tcNm == "Clash.Signal.Internal.Signal"
+--     -- , [_,elTy] <- args
+--     -- -> Just elTy
+--     | otherwise
+--     -> case tcMap `lookupUniqMap'` tcNm of
+--          AlgTyCon {algTcRhs = (NewTyCon _ nt)}
+--            -> newTyConInstRhs nt args
+--          _ -> reduceTypeFamily tcMap ty
+--   _ -> Nothing
 
 -- | Instantiate and Apply the RHS/Original of a NewType with the given
 -- list of argument types
@@ -312,19 +313,24 @@ isPolyTy (tyView -> FunTy _ res) = isPolyTy res
 isPolyTy _                       = False
 
 -- | Split a function type in an argument and result type
-splitFunTy :: TyConMap
-           -> Type
-           -> Maybe (Type, Type)
-splitFunTy m (coreView1 m -> Just ty)  = splitFunTy m ty
-splitFunTy _ (tyView -> FunTy arg res) = Just (arg,res)
-splitFunTy _ _ = Nothing
+-- splitFunTy :: TyConMap
+--            -> Type
+--            -> Maybe (Type, Type)
+-- splitFunTy m (coreView1 m -> Just ty)  = splitFunTy m ty
+-- splitFunTy _ (tyView -> FunTy arg res) = Just (arg,res)
+-- splitFunTy _ _ = Nothing
 
-splitFunTys :: TyConMap
-            -> Type
-            -> ([Type],Type)
-splitFunTys m ty = go [] ty ty
+-- splitFunTys :: TyConMap
+--             -> Type
+--             -> ([Type],Type)
+-- splitFunTys m ty = go [] ty ty
+--   where
+--     go args orig_ty (coreView1 m -> Just ty') = go args orig_ty ty'
+--     go args _       (tyView -> FunTy arg res) = go (arg:args) res res
+--     go args orig_ty _                         = (reverse args, orig_ty)
+splitFunTysX :: Type -> ([Type],Type)
+splitFunTysX ty = go [] ty ty
   where
-    go args orig_ty (coreView1 m -> Just ty') = go args orig_ty ty'
     go args _       (tyView -> FunTy arg res) = go (arg:args) res res
     go args orig_ty _                         = (reverse args, orig_ty)
 
@@ -350,15 +356,15 @@ mkPolyFunTy = foldr (either ForAllTy mkFunTy)
 
 -- | Split a poly-function type in a: list of type-binders and argument types,
 -- and the result type. Looks through 'Signal' and type functions.
-splitCoreFunForallTy :: TyConMap
-                     -> Type
-                     -> ([Either TyVar Type], Type)
-splitCoreFunForallTy tcm ty = go [] ty ty
-  where
-    go args orig_ty (coreView1 tcm -> Just ty') = go args orig_ty ty'
-    go args _       (ForAllTy tv res)           = go (Left tv:args) res res
-    go args _       (tyView -> FunTy arg res)   = go (Right arg:args) res res
-    go args orig_ty _                           = (reverse args,orig_ty)
+-- splitCoreFunForallTy :: TyConMap
+--                      -> Type
+--                      -> ([Either TyVar Type], Type)
+-- splitCoreFunForallTy tcm ty = go [] ty ty
+--   where
+--     go args orig_ty (coreView1 tcm -> Just ty') = go args orig_ty ty'
+--     go args _       (ForAllTy tv res)           = go (Left tv:args) res res
+--     go args _       (tyView -> FunTy arg res)   = go (Right arg:args) res res
+--     go args orig_ty _                           = (reverse args,orig_ty)
 
 -- | Is a type a polymorphic or function type?
 isPolyFunTy :: Type
@@ -366,14 +372,14 @@ isPolyFunTy :: Type
 isPolyFunTy = not . null . fst . splitFunForallTy
 
 -- | Is a type a polymorphic or function type under 'coreView1'?
-isPolyFunCoreTy :: TyConMap
-                -> Type
-                -> Bool
-isPolyFunCoreTy m (coreView1 m -> Just ty) = isPolyFunCoreTy m ty
-isPolyFunCoreTy _ ty = case tyView ty of
-  FunTy _ _ -> True
-  OtherType (ForAllTy _ _) -> True
-  _ -> False
+-- isPolyFunCoreTy :: TyConMap
+--                 -> Type
+--                 -> Bool
+-- isPolyFunCoreTy m (coreView1 m -> Just ty) = isPolyFunCoreTy m ty
+-- isPolyFunCoreTy _ ty = case tyView ty of
+--   FunTy _ _ -> True
+--   OtherType (ForAllTy _ _) -> True
+--   _ -> False
 
 -- | Extract attributes from type. Will return an empty list if this is an
 -- AnnType with an empty list AND if this is not an AnnType at all.
@@ -384,19 +390,22 @@ typeAttrs (AnnType attrs _typ) = attrs
 typeAttrs _                    = []
 
 -- | Is a type a function type?
-isFunTy :: TyConMap
-        -> Type
-        -> Bool
-isFunTy m = isJust . splitFunTy m
+-- isFunTy :: TyConMap
+--         -> Type
+--         -> Bool
+-- isFunTy m = isJust . splitFunTy m
 
 -- | Apply a function type to an argument type and get the result type
-applyFunTy :: TyConMap
-           -> Type
-           -> Type
-           -> Type
-applyFunTy m (coreView1 m -> Just ty)   arg = applyFunTy m ty arg
-applyFunTy _ (tyView -> FunTy _ resTy) _    = resTy
-applyFunTy _ _ _ = error $ $(curLoc) ++ "Report as bug: not a FunTy"
+-- applyFunTy :: TyConMap
+--            -> Type
+--            -> Type
+--            -> Type
+-- applyFunTy m (coreView1 m -> Just ty)   arg = applyFunTy m ty arg
+-- applyFunTy _ (tyView -> FunTy _ resTy) _    = resTy
+-- applyFunTy _ _ _ = error $ $(curLoc) ++ "Report as bug: not a FunTy"
+applyFunTyX :: Type -> Type -> Type
+applyFunTyX (tyView -> FunTy _ resTy) _ = resTy
+applyFunTyX _ _ = error $ $(curLoc) ++ "Report as bug: not a FunTy"
 
 -- Type function substitutions
 
@@ -517,7 +526,7 @@ reduceTypeFamily tcm (tyView -> TyConApp tc tys)
   | nameUniq tc == getKey typeNatLeqTyFamNameKey
   , [i1, i2] <- mapMaybe (litView tcm) tys
   , Just (FunTyCon {tyConKind = tck}) <- lookupUniqMap tc tcm
-  , (_,tyView -> TyConApp boolTcNm []) <- splitFunTys tcm tck
+  , (_,tyView -> TyConApp boolTcNm []) <- splitFunTysX tck
   , Just boolTc <- lookupUniqMap boolTcNm tcm
   = let [falseTc,trueTc] = map (coerce . dcName) (tyConDataCons boolTc)
     in  if i1 <= i2 then Just (mkTyConApp trueTc [] )

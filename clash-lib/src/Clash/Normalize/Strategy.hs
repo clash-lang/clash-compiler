@@ -108,7 +108,7 @@ constantPropagation =
       , ("caseCast"        , caseCast)
       , ("letCast"         , letCast)
       , ("splitCastWork"   , splitCastWork)
-      , ("argCastSpec"     , argCastSpec)
+      -- , ("argCastSpec"     , argCastSpec)
       , ("inlineCast"      , inlineCast)
       , ("eliminateCastCast",eliminateCastCast)
       , ("castSpec"        , castSpec)

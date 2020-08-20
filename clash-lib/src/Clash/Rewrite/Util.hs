@@ -80,7 +80,7 @@ import           Clash.Core.TermInfo
 import           Clash.Core.TyCon
   (TyConMap, tyConDataCons)
 import           Clash.Core.Type             (KindOrType, Type (..),
-                                              TypeView (..), coreView1,
+                                              TypeView (..),
                                               normalizeType,
                                               typeKind, tyView, isPolyFunTy)
 import           Clash.Core.Util
@@ -545,7 +545,7 @@ isWorkFreeBinder bndr =
 isWorkFree
   :: Term
   -> RewriteMonad extra Bool
-isWorkFree (collectArgs -> (fun,args)) = case fun of
+isWorkFree (collectAppArgs -> (fun,args)) = case fun of
   Var i ->
     if | isPolyFunTy (varType i) -> pure False
        | isLocalId i -> pure True
@@ -991,7 +991,7 @@ specialise' specMapLbl specHistLbl specLimitLbl (TransformContext is0 _) e (Var 
               -- Determine name the resulting specialized function, and the
               -- form of the specialized-on argument
               (fId,inl',specArg') <- case specArg of
-                Left a@(collectArgsTicks -> (Var g,gArgs,_gTicks)) -> if isPolyFun tcm a
+                Left a@(collectAppArgs -> (Var g,gArgs)) -> if isPolyFun tcm a
                     then do
                       -- In case we are specialising on an argument that is a
                       -- global function then we use that function's name as the
@@ -1193,10 +1193,10 @@ bindPureHeap tcm heap rw ctx0@(TransformContext is0 hist) e = do
     toLetBinding :: (Unique,Term) -> LetBinding
     toLetBinding (uniq,term) = (nm, term)
       where
-        ty = termType tcm term
+        ty = termType term
         nm = mkLocalId ty (mkUnsafeSystemName "x" uniq) -- See [Note: Name re-creation]
 
-    inlineTest _ (_, stripTicks -> e_) = isWorkFree e_
+    inlineTest _ (_, e_) = isWorkFree e_
 #endif
 
 -- | Remove unused binders in given let-binding. Returns /Nothing/ if no unused

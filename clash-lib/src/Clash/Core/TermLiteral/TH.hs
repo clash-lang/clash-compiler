@@ -12,7 +12,8 @@ import qualified Data.Text                       as Text
 import           Language.Haskell.TH.Syntax
 
 import           Clash.Core.DataCon
-import           Clash.Core.Term                 (collectArgs, Term(Data))
+import           Clash.Core.Term
+  (collectAppArgs, termArgs, Term(Data))
 import           Clash.Core.Name                 (nameOcc)
 
 -- Workaround for a strange GHC bug, where it complains about Subst only
@@ -85,10 +86,10 @@ deriveTermToData1 constrs =
     AsP
       termName
       (ViewP
-        (VarE 'collectArgs)
+        (VarE 'collectAppArgs)
         (TupP [ ConP 'Data [ViewP (VarE 'dcName') (VarP nameName)]
               , ViewP
-                 (VarE 'lefts)
+                 (VarE 'termArgs)
                  (if nArgs == 0 then WildP else VarP argsName)]))
 
   termName = mkName "term"

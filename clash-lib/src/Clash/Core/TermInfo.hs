@@ -41,36 +41,35 @@ termSize (Case subj _ alts) = sum (subjSz:altSzs)
   altSzs = map (termSize . snd) alts
 
 -- | Determine the type of a term
-termType :: TyConMap -> Term -> Type
-termType m e = case e of
+termType :: Term -> Type
+termType e = case e of
   Var t          -> varType t
   Data dc        -> dcType dc
   Literal l      -> literalType l
   Prim t         -> primType t
-  Lam v e'       -> mkFunTy (varType v) (termType m e')
-  TyLam tv e'    -> ForAllTy tv (termType m e')
-  App _ _        -> case collectArgs e of
-                      (fun, args) -> applyTypeToArgs e m (termType m fun) args
-  TyApp _ _      -> case collectArgs e of
-                      (fun, args) -> applyTypeToArgs e m (termType m fun) args
-  Letrec _ e'    -> termType m e'
+  Lam v e'       -> mkFunTy (varType v) (termType e')
+  TyLam tv e'    -> ForAllTy tv (termType e')
+  App _ _        -> case collectArgsX e of
+                      (fun, args) -> applyTypeToArgs e (termType fun) args
+  TyApp _ _      -> case collectArgsX e of
+                      (fun, args) -> applyTypeToArgs e (termType fun) args
+  Letrec _ e'    -> termType e'
   Case _ ty _    -> ty
   Cast _ _ ty2   -> ty2
-  Tick _ e'      -> termType m e'
+  Tick _ e'      -> termType e'
 
 -- | Get the result type of a polymorphic function given a list of arguments
 applyTypeToArgs
   :: Term
-  -> TyConMap
   -> Type
   -> [Either Term Type]
   -> Type
-applyTypeToArgs e m opTy args = go opTy args
+applyTypeToArgs e opTy args = go opTy args
  where
   go opTy' []               = opTy'
   go opTy' (Right ty:args') = goTyArgs opTy' [ty] args'
-  go opTy' (Left _:args')   = case splitFunTy m opTy' of
-    Just (_,resTy) -> go resTy args'
+  go opTy' (Left _:args')   = case tyView opTy' of
+    FunTy _ resTy -> go resTy args'
     _ -> error $ unlines ["applyTypeToArgs:"
                          ,"Expression: " ++ showPpr e
                          ,"Type: " ++ showPpr opTy
@@ -78,7 +77,7 @@ applyTypeToArgs e m opTy args = go opTy args
                          ]
 
   goTyArgs opTy' revTys (Right ty:args') = goTyArgs opTy' (ty:revTys) args'
-  goTyArgs opTy' revTys args'            = go (piResultTys m opTy' (reverse revTys)) args'
+  goTyArgs opTy' revTys args'            = go (piResultTys opTy' (reverse revTys)) args'
 
 -- | Like 'piResultTyMaybe', but errors out when a type application is not
 -- valid.
@@ -87,11 +86,10 @@ applyTypeToArgs e m opTy args = go opTy args
 -- variable at a time; instead use 'piResultTys'
 piResultTy
   :: HasCallStack
-  => TyConMap
+  => Type
   -> Type
   -> Type
-  -> Type
-piResultTy m ty arg = case piResultTyMaybe m ty arg of
+piResultTy ty arg = case piResultTyMaybe ty arg of
   Just res -> res
   Nothing  -> pprPanic "piResultTy" (ppr ty <> line <> ppr arg)
 
@@ -101,13 +99,10 @@ piResultTy m ty arg = case piResultTyMaybe m ty arg of
 -- variable at a time; instead use 'piResultTys'
 piResultTyMaybe
   :: HasCallStack
-  => TyConMap
-  -> Type
+  => Type
   -> Type
   -> Maybe Type
-piResultTyMaybe m ty arg
-  | Just ty' <- coreView1 m ty
-  = piResultTyMaybe m ty' arg
+piResultTyMaybe ty arg
   | FunTy a res <- tyView ty
   = if debugIsOn && not (aeqType a arg) then error [I.i|
       Unexpected application. A function with type:
@@ -151,14 +146,11 @@ piResultTyMaybe m ty arg
 -- a function type/kind.
 piResultTys
   :: HasCallStack
-  => TyConMap
-  -> Type
+  => Type
   -> [Type]
   -> Type
-piResultTys _ ty [] = ty
-piResultTys m ty origArgs@(arg:args)
-  | Just ty' <- coreView1 m ty
-  = piResultTys m ty' origArgs
+piResultTys ty [] = ty
+piResultTys ty origArgs@(arg:args)
   | FunTy a res <- tyView ty
   = if debugIsOn && not (aeqType a arg) then error [I.i|
       Unexpected application. A function with type:
@@ -170,7 +162,7 @@ piResultTys m ty origArgs@(arg:args)
         #{showPpr arg}
     |]
     else
-      piResultTys m res args
+      piResultTys res args
   | ForAllTy tv res <- ty
   = go (extendVarEnv tv arg emptyVarEnv) res args
   | otherwise
@@ -180,8 +172,6 @@ piResultTys m ty origArgs@(arg:args)
 
   go env ty' [] = substTy (mkTvSubst inScope env) ty'
   go env ty' allArgs@(arg':args')
-    | Just ty'' <- coreView1 m ty'
-    = go env ty'' allArgs
     | FunTy _ res <- tyView ty'
     = go env res args'
     | ForAllTy tv res <- ty'
@@ -189,17 +179,17 @@ piResultTys m ty origArgs@(arg:args)
     | VarTy tv <- ty'
     , Just ty'' <- lookupVarEnv tv env
       -- Deals with (piResultTys  (forall a.a) [forall b.b, Int])
-    = piResultTys m ty'' allArgs
+    = piResultTys ty'' allArgs
     | otherwise
     = pprPanic "piResultTys2" (ppr ty' <> line <> ppr origArgs <> line <> ppr allArgs)
 
 -- | Does a term have a function type?
-isFun :: TyConMap -> Term -> Bool
-isFun m t = isFunTy m (termType m t)
+-- isFun :: TyConMap -> Term -> Bool
+-- isFun m t = isFunTy m (termType m t)
 
 -- | Does a term have a function or polymorphic type?
-isPolyFun :: TyConMap -> Term -> Bool
-isPolyFun m t = isPolyFunCoreTy m (termType m t)
+-- isPolyFun :: TyConMap -> Term -> Bool
+-- isPolyFun m t = isPolyFunTy m (termType m t)
 
 -- | Is a term a term-abstraction?
 isLam :: Term -> Bool
@@ -219,6 +209,13 @@ isVar _        = False
 isLocalVar :: Term -> Bool
 isLocalVar (Var v) = isLocalId v
 isLocalVar _ = False
+
+-- | Is this a (ticked and/or casted) local variable reference?
+isCoreLocalVar :: Term -> Bool
+isCoreLocalVar (Tick _ e)   = isCoreLocalVar e
+isCoreLocalVar (Cast e _ _) = isCoreLocalVar e
+isCoreLocalVar (Var v) = isLocalId v
+isCoreLocalVar _ = False
 
 -- | Is a term a datatype constructor?
 isCon :: Term -> Bool

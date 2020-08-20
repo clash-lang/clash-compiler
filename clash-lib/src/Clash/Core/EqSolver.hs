@@ -44,7 +44,7 @@ solveNonAbsurds tcm (eq:eqs) =
 --   * SomeType a 5 ~ SomeType 3 b
 --
 solveEq :: TyConMap -> (Type, Type) -> [TypeEqSolution]
-solveEq tcm (coreView tcm -> left, coreView tcm -> right) =
+solveEq tcm (left, right) =
   case (left, right) of
     (VarTy tyVar, ConstTy {}) ->
       -- a ~ 3
@@ -133,7 +133,7 @@ isAbsurdEq
   -> (Type, Type)
   -> Bool
 isAbsurdEq tcm ((left0, right0)) =
-  case (coreView tcm left0, coreView tcm right0) of
+  case (left0, right0) of
     (solveAdd -> AbsurdSolution) -> True
     lr -> any (==AbsurdSolution) (solveEq tcm lr)
 
@@ -151,9 +151,9 @@ typeEq
   -> Type
   -> Maybe (Type, Type)
 typeEq tcm ty =
- case tyView (coreView tcm ty) of
+ case tyView ty of
   TyConApp (nameOcc -> "GHC.Prim.~#") [_, _, left, right] ->
-    Just (coreView tcm left, coreView tcm right)
+    Just (normalizeType tcm left, normalizeType tcm right)
   _ ->
     Nothing
 

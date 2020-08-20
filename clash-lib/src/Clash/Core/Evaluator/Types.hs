@@ -56,7 +56,7 @@ whnf
 whnf eval tcm isSubj m
   | isSubj =
       -- See [Note: empty case expressions]
-      let ty = termType tcm (mTerm m)
+      let ty = termType (mTerm m)
        in go (stackPush (Scrutinise ty []) m)
   | otherwise = go m
   where

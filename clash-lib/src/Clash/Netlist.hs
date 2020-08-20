@@ -58,7 +58,7 @@ import           Clash.Core.Name                  (Name(..))
 import           Clash.Core.Pretty                (showPpr)
 import           Clash.Core.Term
   ( Alt, Pat (..), Term (..), TickInfo (..), PrimInfo(primName), collectArgs
-  , collectArgsTicks, collectTicks, mkApps, mkTicks, stripTicks)
+  , collectArgsTicks, collectTicks, mkApps, mkTicks, stripTicks, collectCastsTicks)
 import qualified Clash.Core.Term                  as Core
 import           Clash.Core.TermInfo              (termType)
 import           Clash.Core.Type
@@ -810,8 +810,8 @@ mkProjection mkDec bndr scrut altTy alt@(pat,v) = do
   let scrutTy = termType tcm scrut
       e = Case scrut scrutTy [alt]
   (_,sp) <- Lens.use curCompNm
-  varTm <- case v of
-    (Var n) -> return n
+  varTm <- case collectCastsTicks v of
+    (Var n,_) -> return n
     _ -> throw (ClashException sp ($(curLoc) ++
                 "Not in normal form: RHS of case-projection is not a variable:\n\n"
                  ++ showPpr e) Nothing)

@@ -72,12 +72,13 @@ import           Clash.Core.Subst
    extendInScopeIdList, mkSubst, substTm)
 import           Clash.Core.Term
   (Alt, LetBinding, Pat (..), Term (..), TickInfo (..), NameMod (..),
-   collectArgsTicks, collectTicks, collectBndrs, PrimInfo(primName), mkTicks, stripTicks)
+   collectBndrs, PrimInfo(primName), mkTicks, collectAppArgs, tickArgs,
+   typeAndTermArgs, collectCastsTicks)
 import           Clash.Core.TermInfo
 import           Clash.Core.TyCon
   (TyCon (FunTyCon), TyConName, TyConMap, tyConDataCons)
-import           Clash.Core.Type         (Type (..), TypeView (..),
-                                          coreView1, splitTyConAppM, tyView, TyVar)
+import           Clash.Core.Type
+  (Type (..), TypeView (..), splitTyConAppM, tyView, TyVar, normalizeType)
 import           Clash.Core.Util
   (substArgTys, tyLitShow)
 import           Clash.Core.Var
@@ -134,21 +135,41 @@ extendIdentifier typ nm ext =
 -- and a variable reference that is the body of the let-binding. Returns a
 -- String containing the error if the term was not in a normalized form.
 splitNormalized
-  :: TyConMap
-  -> Term
-  -> (Either String ([Id],[LetBinding],Id))
-splitNormalized tcm expr = case collectBndrs expr of
-  (args, collectTicks -> (Letrec xes e, ticks))
-    | (tmArgs,[]) <- partitionEithers args -> case stripTicks e of
-        Var v -> Right (tmArgs, fmap (second (`mkTicks` ticks)) xes,v)
-        Cast (Var v) _ ty2 -> Right (tmArgs, fmap (second (`mkTicks` ticks)) xes,v {varType = ty2})
-        _     -> Left ($(curLoc) ++ "Not in normal form: res not simple var")
-    | otherwise -> Left ($(curLoc) ++ "Not in normal form: tyArgs")
-  _ ->
-    Left ($(curLoc) ++ "Not in normal form: no Letrec:\n\n" ++ showPpr expr ++
-          "\n\nWhich has type:\n\n" ++ showPpr ty)
+  :: Term
+  -> (Either String ([Id],([LetBinding],[TickInfo]),(Id,[TickInfo])))
+splitNormalized expr = case collectBndrs expr of
+  (bndrs,body)
+    | (lamBndrs,[]) <- partitionEithers bndrs
+    -> case collectCastsTicks body of
+         (Letrec letBndrs letBody,castsAndTicks) -> case collectCastsTicks letBody of
+           (Var v,bodyArgs) ->
+             let ticks = tickArgs castsAndTicks
+                 bodyTy = termType letBody
+             in  Right ( lamBndrs
+                       , (letBndrs, ticks)
+                       , (v {varType = bodyTy}, tickArgs bodyArgs) )
+           _ ->
+             normalizationFailed "body of LetRec is not a variable reference"
+         _ ->
+           normalizationFailed "body is not a LetRec"
+
+    | otherwise
+    -> normalizationFailed "term has TyLambdas"
  where
-  ty = termType tcm expr
+  normalizationFailed reason =
+    Left ($(curLoc) <> unlines [concat ["Normalization failed, ",reason, ":"]
+                               ,showPpr expr])
+-- splitNormalized expr = case collectBndrs expr of
+--   (args, collectCastsTicks -> (Letrec xes e, ticks))
+--     | (tmArgs,[]) <- partitionEithers args -> case collectCastsTicks e of
+--         Var v -> Right (tmArgs, fmap (second (`mkTicks` ticks)) xes,v)
+--         Cast (Var v) _ ty2 -> Right (tmArgs, fmap (second (`mkTicks` ticks)) xes,v {varType = ty2})
+--         _     -> Left ($(curLoc) ++ "Not in normal form: res not simple var")
+--     | otherwise -> Left ($(curLoc) ++ "Not in normal form: tyArgs")
+--   _ ->
+--     Left ($(curLoc) ++ "Not in normal form: no Letrec:\n\n" ++ showPpr expr ++
+--           "\n\nWhich has type:\n\n" ++ showPpr ty)
+
 
 -- | Same as @unsafeCoreTypeToHWType@, but discards void filter information
 unsafeCoreTypeToHWType'
@@ -365,11 +386,8 @@ coreTypeToHWType builtInTranslation reprs m ty = do
   go (Just hwtyE) _ = pure $
     (\(FilteredHWType hwty filtered) ->
       (FilteredHWType (maybeConvertToCustomRepr reprs ty hwty) filtered)) <$> hwtyE
-  -- Strip transparant types:
-  go _ (coreView1 m -> Just ty') =
-    coreTypeToHWType builtInTranslation reprs m ty'
   -- Try to create hwtype based on AST:
-  go _ (tyView -> TyConApp tc args) = runExceptT $ do
+  go _ (tyView . normalizeType m -> TyConApp tc args) = runExceptT $ do
     FilteredHWType hwty filtered <- mkADT builtInTranslation reprs m (showPpr ty) tc args
     return (FilteredHWType (maybeConvertToCustomRepr reprs ty hwty) filtered)
   -- All methods failed:
@@ -668,10 +686,7 @@ typeLength _            = 0
 termHWType :: String
            -> Term
            -> NetlistMonad HWType
-termHWType loc e = do
-  m <- Lens.use tcCache
-  let ty = termType m e
-  stripFiltered <$> unsafeCoreTypeToHWTypeM loc ty
+termHWType loc e = stripFiltered <$> unsafeCoreTypeToHWTypeM loc (termType e)
 
 -- | Gives the HWType corresponding to a term. Returns 'Nothing' if the term has
 -- a Core type that is not translatable to a HWType.
@@ -679,10 +694,7 @@ termHWTypeM
   :: Term
   -- ^ Term to convert to HWType
   -> NetlistMonad (Maybe FilteredHWType)
-termHWTypeM e = do
-  m  <- Lens.use tcCache
-  let ty = termType m e
-  coreTypeToHWTypeM ty
+termHWTypeM e = coreTypeToHWTypeM (termType e)
 
 isBiSignalIn :: HWType -> Bool
 isBiSignalIn (BiDirectional In _) = True
@@ -846,12 +858,12 @@ setBinderName
   -> (Id,Term)
   -- ^ The binding
   -> NetlistMonad ((Id, Subst, [(Id,Term)]),Id)
-setBinderName subst res resRead m@(resN,_,_) (i,collectArgsTicks -> (k,args,ticks)) = case k of
+setBinderName subst res resRead m@(resN,_,_) (i,collectAppArgs -> (k,args)) = case k of
   Prim p -> let nm = primName p in extractPrimWarnOrFail nm >>= go nm
   _ -> goDef
  where
-  go nm (BlackBox {resultName = Just (BBTemplate nmD)}) = withTicks ticks $ \_ -> do
-    (bbCtx,_) <- preserveVarEnv (mkBlackBoxContext nm i args)
+  go nm (BlackBox {resultName = Just (BBTemplate nmD)}) = withTicks (tickArgs args) $ \_ -> do
+    (bbCtx,_) <- preserveVarEnv (mkBlackBoxContext nm i (typeAndTermArgs args))
     be <- Lens.use backend
     let bbRetValName = case be of
           SomeBackend s -> toStrict ((State.evalState (renderTemplate bbCtx nmD) s) 0)
