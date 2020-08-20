@@ -107,13 +107,9 @@ import           Clash.Core.Pretty           (ppr, showPpr)
 import           Clash.Core.Subst
 import           Clash.Core.Term
 import           Clash.Core.TermInfo
-import           Clash.Core.Type             (Type (..), TypeView (..), applyFunTy,
-                                              isPolyFunCoreTy, isClassTy,
-                                              splitFunForallTy,
-                                              splitFunTy,
-                                              tyView, mkPolyFunTy, coreView,
-                                              LitTy (..), coreView1,
-                                              normalizeType)
+import           Clash.Core.Type
+  (Type (..), TypeView (..), isClassTy, splitFunForallTy, tyView,
+   mkPolyFunTy, LitTy (..),  normalizeType)
 import           Clash.Core.TyCon
   (TyConMap, tyConDataCons)
 import           Clash.Core.Util

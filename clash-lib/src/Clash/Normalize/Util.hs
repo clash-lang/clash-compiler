@@ -36,7 +36,6 @@ module Clash.Normalize.Util
 
 import           Control.Lens            ((&),(+~),(%=),(.=))
 import qualified Control.Lens            as Lens
-import           Data.Bifunctor          (bimap)
 import           Data.Either             (lefts)
 import qualified Data.List               as List
 import qualified Data.List.Extra         as List
@@ -58,8 +57,7 @@ import           Clash.Core.Subst
   (deShadowTerm, extendTvSubst, extendTvSubstList, mkSubst, substTm, substTy,
    substId, extendIdSubst)
 import           Clash.Core.Term
-import           Clash.Core.TermInfo     (isPolyFun, termType)
-import           Clash.Core.TyCon        (TyConMap)
+import           Clash.Core.TermInfo     (isPolyFunX, termType)
 import           Clash.Core.Type
   (Type(LitTy, VarTy), LitTy(SymTy), TypeView (..), tyView, undefinedTy,
    splitFunForallTy, splitTyConAppM, mkPolyFunTy)
@@ -154,16 +152,15 @@ specializeNorm :: NormRewrite
 specializeNorm = specialise specialisationCache specialisationHistory specialisationLimit
 
 -- | Determine if a term is closed
-isClosed :: TyConMap
-         -> Term
+isClosed :: Term
          -> Bool
-isClosed tcm = not . isPolyFun tcm
+isClosed = not . isPolyFunX
 
 -- | Test whether a given term represents a non-recursive global variable
 isNonRecursiveGlobalVar
   :: Term
   -> NormalizeSession Bool
-isNonRecursiveGlobalVar (collectArgs -> (Var i, _args)) = do
+isNonRecursiveGlobalVar (collectAppArgs -> (Var i, _args)) = do
   let eIsGlobal = isGlobalId i
   eIsRec    <- isRecursiveBndr i
   return (eIsGlobal && not eIsRec)
@@ -223,16 +220,14 @@ bindCsr ctx@(TransformContext is0 _) oldTerm = do
 
 mergeCsrs
   :: TransformContext
-  -> [TickInfo]
-  -- ^ Ticks to wrap around proposed new term
   -> Term
   -- ^ "Old" term
-  -> ([Either Term Type] -> Term)
+  -> ([AppArg] -> Term)
   -- ^ Proposed new term in case any constants were found
-  -> [Either Term Type]
+  -> [AppArg]
   -- ^ Subterms
   -> RewriteMonad NormalizeState ConstantSpecInfo
-mergeCsrs ctx ticks oldTerm proposedTerm subTerms = do
+mergeCsrs ctx oldTerm proposedTerm subTerms = do
   subCsrs <- snd <$> List.mapAccumLM constantSpecInfoFolder ctx subTerms
 
   -- If any arguments are constant (and hence can be constant specced), a new
@@ -246,10 +241,10 @@ mergeCsrs ctx ticks oldTerm proposedTerm subTerms = do
       null (lefts subCsrs) || any csrFoundConstant (lefts subCsrs)
 
   if anyArgsOrResultConstant then
-    let newTerm = proposedTerm (bimap csrNewTerm id <$> subCsrs)  in
+    let newTerm = proposedTerm ((either (TermArg . csrNewTerm)  id) <$> subCsrs) in
     pure (ConstantSpecInfo
       { csrNewBindings = concatMap csrNewBindings (lefts subCsrs)
-      , csrNewTerm = mkTicks newTerm ticks
+      , csrNewTerm = newTerm
       , csrFoundConstant = True
       })
   else do
@@ -261,15 +256,15 @@ mergeCsrs ctx ticks oldTerm proposedTerm subTerms = do
  where
   constantSpecInfoFolder
     :: TransformContext
-    -> Either Term Type
-    -> RewriteMonad NormalizeState (TransformContext, Either ConstantSpecInfo Type)
-  constantSpecInfoFolder localCtx (Right typ) =
-    pure (localCtx, Right typ)
-  constantSpecInfoFolder localCtx@(TransformContext is0 tfCtx) (Left term) = do
+    -> AppArg
+    -> RewriteMonad NormalizeState (TransformContext, Either ConstantSpecInfo AppArg)
+  constantSpecInfoFolder localCtx@(TransformContext is0 tfCtx) (TermArg term) = do
     specInfo <- constantSpecInfo localCtx term
     let newIds = map fst (csrNewBindings specInfo)
     let is1 = extendInScopeSetList is0 newIds
     pure (TransformContext is1 tfCtx, Left specInfo)
+  constantSpecInfoFolder localCtx other =
+    pure (localCtx, Right other)
 
 
 -- | Calculate constant spec info. The goal of this function is to analyze a
@@ -299,36 +294,36 @@ constantSpecInfo ctx e = do
   --
   -- I believe we can remove this special case in the future by looking at the
   -- primitive's workinfo.
-  if isClockOrReset tcm (termType tcm e) then
-    case collectArgs e of
+  if isClockOrReset tcm (termType e) then
+    case collectAppArgs e of
       (Prim p, _)
         | primName p == "Clash.Transformations.removedArg" ->
           pure (constantCsr e)
       _ -> bindCsr ctx e
   else
-    case collectArgsTicks e of
-      (dc@(Data _), args, ticks) ->
-        mergeCsrs ctx ticks e (mkApps dc) args
+    case collectAppArgs e of
+      (dc@(Data _), args) ->
+        mergeCsrs ctx e (mkArgApps dc) args
 
       -- TODO: Work with prim's WorkInfo?
-      (prim@(Prim _), args, ticks) -> do
-        csr <- mergeCsrs ctx ticks e (mkApps prim) args
+      (prim@(Prim _), args) -> do
+        csr <- mergeCsrs ctx e (mkArgApps prim) args
         if null (csrNewBindings csr) then
           pure csr
         else
           bindCsr ctx e
 
-      (Lam _ _, _, _ticks) ->
+      (Lam _ _, _) ->
         if hasLocalFreeVars e then
           bindCsr ctx e
         else
           pure (constantCsr e)
 
-      (var@(Var f), args, ticks) -> do
+      (var@(Var f), args) -> do
         (curF, _) <- Lens.use curFun
         isNonRecGlobVar <- isNonRecursiveGlobalVar e
         if isNonRecGlobVar && f /= curF then do
-          csr <- mergeCsrs ctx ticks e (mkApps var) args
+          csr <- mergeCsrs ctx e (mkArgApps var) args
           if null (csrNewBindings csr) then
             pure csr
           else
@@ -336,7 +331,7 @@ constantSpecInfo ctx e = do
         else
           bindCsr ctx e
 
-      (Literal _,_, _ticks) ->
+      (Literal _,_) ->
         pure (constantCsr e)
 
       _ ->
@@ -378,7 +373,11 @@ classifyFunction = go (TermClassification 0 0 0)
     go !c (Lam _ e)     = go c e
     go !c (TyLam _ e)   = go c e
     go !c (Letrec bs _) = List.foldl' go c (map snd bs)
-    go !c e@(App {}) = case fst (collectArgs e) of
+    go !c e@(TyApp {}) = case fst (collectAppArgs e) of
+      Prim {} -> c & primitive +~ 1
+      Var {}  -> c & function +~ 1
+      _ -> c
+    go !c e@(App {}) = case fst (collectAppArgs e) of
       Prim {} -> c & primitive +~ 1
       Var {}  -> c & function +~ 1
       _ -> c
@@ -412,7 +411,6 @@ normalizeTopLvlBndr
   -> Binding Term
   -> NormalizeSession (Binding Term)
 normalizeTopLvlBndr isTop nm (Binding nm' sp inl tm) = makeCachedU nm (extra.normalized) $ do
-  tcm <- Lens.view tcCache
   let nmS = showPpr (varName nm)
   -- We deshadow the term because sometimes GHC gives us
   -- code where a local binder has the same unique as a
@@ -424,7 +422,7 @@ normalizeTopLvlBndr isTop nm (Binding nm' sp inl tm) = makeCachedU nm (extra.nor
   old <- Lens.use curFun
   tm3 <- rewriteExpr ("normalization",normalization) (nmS,tm2) (nm',sp)
   curFun .= old
-  let ty' = termType tcm tm3
+  let ty' = termType tm3
   return (Binding nm'{varType = ty'} sp inl tm3)
 
 -- | Turn type equality constraints into substitutions and apply them.

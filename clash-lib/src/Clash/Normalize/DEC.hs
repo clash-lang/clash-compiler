@@ -68,8 +68,9 @@ import Clash.Core.FreeVars
   (termFreeVars', typeFreeVars', localVarsDoNotOccurIn)
 import Clash.Core.Literal    (Literal (..))
 import Clash.Core.Term
-  (LetBinding, Pat (..), PrimInfo (..), Term (..), TickInfo (..), collectArgs,
-   collectArgsTicks, mkApps, mkTicks, patIds)
+  (LetBinding, Pat (..), PrimInfo (..), Term (..), TickInfo (..), AppArg (..),
+   patIds, collectAppArgs, termArgs, tickArgs, mkArgApps,
+   typeAndCastArgs)
 import Clash.Core.TermInfo   (termType)
 import Clash.Core.TyCon      (tyConDataCons)
 import Clash.Core.Type       (Type, isPolyFunTy, mkTyConApp, splitFunForallTy)
@@ -93,7 +94,7 @@ data CaseTree a
 -- | Test if a 'CaseTree' collected from an expression indicates that
 -- application of a global binder is disjoint: occur in separate branches of a
 -- case-expression.
-isDisjoint :: CaseTree ([Either Term Type])
+isDisjoint :: CaseTree ([AppArg])
            -> Bool
 isDisjoint (Branch _ [_]) = False
 isDisjoint ct = go ct
@@ -102,7 +103,7 @@ isDisjoint ct = go ct
     go (LB _ ct')           = go ct'
     go (Branch _ [])        = False
     go (Branch _ [(_,x)])   = go x
-    go b@(Branch _ (_:_:_)) = allEqual (map Either.rights (Foldable.toList b))
+    go b@(Branch _ (_:_:_)) = allEqual (map typeAndCastArgs (Foldable.toList b))
 
 -- Remove empty branches from a 'CaseTree'
 removeEmpty :: Eq a => CaseTree [a] -> CaseTree [a]
@@ -137,7 +138,7 @@ collectGlobals'
   -- ^ Whether expression is constant
   -> RewriteMonad
       NormalizeState
-      (Term, InScopeSet, [(Term, ([Term], CaseTree [Either Term Type]))])
+      (Term, InScopeSet, [(Term, ([Term], CaseTree [AppArg]))])
 collectGlobals' is0 substitution seen (Case scrut ty alts) _eIsConstant = do
   rec (alts1, isAlts, collectedAlts) <-
         collectGlobalsAlts is0 substitution seen scrut1 alts
@@ -147,7 +148,7 @@ collectGlobals' is0 substitution seen (Case scrut ty alts) _eIsConstant = do
          , unionInScope isAlts isScrut
          , collectedAlts ++ collectedScrut )
 
-collectGlobals' is0 substitution seen e@(collectArgsTicks -> (fun, args@(_:_), ticks)) eIsconstant
+collectGlobals' is0 substitution seen e@(collectAppArgs -> (fun, args@(termArgs -> (_:_)))) eIsconstant
   | not eIsconstant = do
     tcm <- Lens.view tcCache
     bndrs <- Lens.use bindings
@@ -165,7 +166,7 @@ collectGlobals' is0 substitution seen e@(collectArgsTicks -> (fun, args@(_:_), t
 #else
     let eval = (Lens.view Lens._3) . whnf' evaluate bndrs tcm gh ids1 is0 False
 #endif
-    let eTy  = termType tcm e
+    let eTy  = termType e
     untran <- isUntranslatableType False eTy
     case untran of
       -- Don't lift out non-representable values, because they cannot be let-bound
@@ -178,16 +179,16 @@ collectGlobals' is0 substitution seen e@(collectArgsTicks -> (fun, args@(_:_), t
         (args1,isArgs,collectedArgs) <-
           collectGlobalsArgs is0 substitution seen args
         let seenInArgs = map fst collectedArgs ++ seen
-        isInteresting <- interestingToLift is0 eval fun args ticks
+        isInteresting <- interestingToLift is0 eval fun args
         case isInteresting of
           Just fun1 | fun1 `notElem` seenInArgs -> do
-            let e1 = Maybe.fromMaybe (mkApps fun1 args1) (List.lookup fun1 substitution)
+            let e1 = Maybe.fromMaybe (mkArgApps fun1 args1) (List.lookup fun1 substitution)
             -- This function is lifted out an environment with the currently 'seen'
             -- binders. When we later apply substitution, we need to start with this
             -- environment, otherwise we perform incorrect substitutions in the
             -- arguments.
             return (e1,isArgs,(fun1,(seen,Leaf args1)):collectedArgs)
-          _ -> return (mkApps (mkTicks fun ticks) args1, isArgs, collectedArgs)
+          _ -> return (mkArgApps fun args1, isArgs, collectedArgs)
       _ -> return (e,is0,[])
 
 -- FIXME: This duplicates A LOT of let-bindings, where I just pray that after
@@ -205,10 +206,6 @@ collectGlobals' is0 substitution seen (Letrec lbs body) _eIsConstant = do
          , map (second (second (LB lbs1))) (collectedBody ++ collectedBndrs)
          )
 
-collectGlobals' is0 substitution seen (Tick t e) eIsConstant = do
-  (e1,is1,collected) <- collectGlobals' is0 substitution seen e eIsConstant
-  return (Tick t e1, is1, collected)
-
 collectGlobals' is0 _ _ e _ = return (e,is0,[])
 
 -- | Collect 'CaseTree's for (potentially) disjoint applications of globals out
@@ -225,7 +222,7 @@ collectGlobals
   -- ^ The expression
   -> RewriteMonad
       NormalizeState
-      (Term, InScopeSet, [(Term, ([Term], CaseTree [Either Term Type]))])
+      (Term, InScopeSet, [(Term, ([Term], CaseTree [AppArg]))])
 collectGlobals inScope substitution seen e =
   collectGlobals' inScope substitution seen e (isConstant e)
 
@@ -237,20 +234,20 @@ collectGlobalsArgs ::
   -> [(Term,Term)] -- ^ Substitution of (applications of) a global
                    -- binder by a reference to a lifted term.
   -> [Term] -- ^ List of already seen global binders
-  -> [Either Term Type] -- ^ The list of arguments
+  -> [AppArg] -- ^ The list of arguments
   -> RewriteMonad NormalizeState
-                  ([Either Term Type]
+                  ([AppArg]
                   ,InScopeSet
-                  ,[(Term,([Term],CaseTree [(Either Term Type)]))]
+                  ,[(Term,([Term],CaseTree [AppArg]))]
                   )
 collectGlobalsArgs is0 substitution seen args = do
     ((is1,_),(args',collected)) <- second unzip <$> List.mapAccumLM go (is0,seen) args
     return (args',is1,concat collected)
   where
-    go (isN0,s) (Left tm) = do
+    go (isN0,s) (TermArg tm) = do
       (tm',isN1,collected) <- collectGlobals isN0 substitution s tm
-      return ((isN1,map fst collected ++ s),(Left tm',collected))
-    go (isN,s) (Right ty) = return ((isN,s),(Right ty,[]))
+      return ((isN1,map fst collected ++ s),(TermArg tm',collected))
+    go (isN,s) other = return ((isN,s),(other,[]))
 
 -- | Collect 'CaseTree's for (potentially) disjoint applications of globals out
 -- of a list of alternatives. Also substitute truly disjoint applications of
@@ -265,7 +262,7 @@ collectGlobalsAlts ::
   -> RewriteMonad NormalizeState
                   ([(Pat,Term)]
                   ,InScopeSet
-                  ,[(Term,([Term],CaseTree [(Either Term Type)]))]
+                  ,[(Term,([Term],CaseTree [AppArg]))]
                   )
 collectGlobalsAlts is0 substitution seen scrut alts = do
     (is1,(alts',collected)) <- second unzip <$> List.mapAccumLM go is0 alts
@@ -291,7 +288,7 @@ collectGlobalsLbs ::
   -> RewriteMonad NormalizeState
                   ([LetBinding]
                   ,InScopeSet
-                  ,[(Term,([Term],CaseTree [(Either Term Type)]))]
+                  ,[(Term,([Term],CaseTree [AppArg]))]
                   )
 collectGlobalsLbs is0 substitution seen lbs = do
     let lbsSCCs = sccLetBindings lbs
@@ -303,7 +300,7 @@ collectGlobalsLbs is0 substitution seen lbs = do
        -> RewriteMonad NormalizeState
                   ((InScopeSet, [Term])
                   ,(Graph.SCC LetBinding
-                   ,[(Term,([Term],CaseTree [(Either Term Type)]))]
+                   ,[(Term,([Term],CaseTree [AppArg]))]
                    )
                   )
     go (isN0,s) (Graph.AcyclicSCC (id_, e)) = do
@@ -335,33 +332,32 @@ mkDisjointGroup
   :: InScopeSet
   -- ^ Variables in scope at the very top of the case-tree, i.e., the original
   -- expression
-  -> (Term,([Term],CaseTree [(Either Term Type)]))
+  -> (Term,([Term],CaseTree [AppArg]))
   -- ^ Case-tree of arguments belonging to the applied term.
   -> RewriteMonad NormalizeState (Term,[Term])
 mkDisjointGroup inScope (fun,(seen,cs)) = do
-    let argss    = Foldable.toList cs
+    let argss    = Foldable.toList ( cs)
         argssT   = zip [0..] (List.transpose argss)
         (sharedT,distinctT) = List.partition (areShared inScope . snd) argssT
         shared   = map (second head) sharedT
-        distinct = map (Either.lefts) (List.transpose (map snd distinctT))
+        distinct = map termArgs (List.transpose (map snd distinctT))
         cs'      = fmap (zip [0..]) cs
         cs''     = removeEmpty
-                 $ fmap (Either.lefts . map snd)
+                 $ fmap (termArgs . map snd)
                         (if null shared
                            then cs'
                            else fmap (filter (`notElem` shared)) cs')
-    tcm <- Lens.view tcCache
     (distinctCaseM,distinctProjections) <- case distinct of
       -- only shared arguments: do nothing.
       [] -> return (Nothing,[])
       -- Create selectors and projections
       (uc:_) -> do
-        let argTys = map (termType tcm) uc
+        let argTys = map termType uc
         disJointSelProj inScope argTys cs''
     let newArgs = mkDJArgs 0 shared distinctProjections
     case distinctCaseM of
-      Just lb -> return (Letrec [lb] (mkApps fun newArgs), seen)
-      Nothing -> return (mkApps fun newArgs, seen)
+      Just lb -> return (Letrec [lb] (mkArgApps fun newArgs), seen)
+      Nothing -> return (mkArgApps fun newArgs, seen)
 
 -- | Create a single selector for all the representable distinct arguments by
 -- selecting between tuples. This selector is only ('Just') created when the
@@ -421,29 +417,35 @@ disJointSelProj inScope argTys cs = do
 --
 -- * They contain _no_ references to locally-bound variables
 -- * Are all equal
-areShared :: InScopeSet -> [Either Term Type] -> Bool
+areShared :: InScopeSet -> [AppArg] -> Bool
 areShared _       []       = True
 areShared inScope xs@(x:_) = noFV1 && allEqual xs
  where
   noFV1 = case x of
-    Right ty -> getAll (Lens.foldMapOf (typeFreeVars' isLocallyBound IntSet.empty)
-                                       (const (All False)) ty)
-    Left tm  -> getAll (Lens.foldMapOf (termFreeVars' isLocallyBound)
-                                       (const (All False)) tm)
+    TypeArg ty -> getAll (Lens.foldMapOf (typeFreeVars' isLocallyBound IntSet.empty)
+                                         (const (All False)) ty)
+    TermArg tm -> getAll (Lens.foldMapOf (termFreeVars' isLocallyBound)
+                                         (const (All False)) tm)
+    TickCtx {} -> True
+    CastCtx t1 t2 -> getAll (Lens.foldMapOf (typeFreeVars' isLocallyBound IntSet.empty)
+                                            (const (All False)) t1)
+                     ||
+                     getAll (Lens.foldMapOf (typeFreeVars' isLocallyBound IntSet.empty)
+                                            (const (All False)) t2)
 
   isLocallyBound v = v `notElemInScopeSet` inScope
 
 -- | Create a list of arguments given a map of positions to common arguments,
 -- and a list of arguments
 mkDJArgs :: Int -- ^ Current position
-         -> [(Int,Either Term Type)] -- ^ map from position to common argument
+         -> [(Int,AppArg)] -- ^ map from position to common argument
          -> [Term] -- ^ (projections for) distinct arguments
-         -> [Either Term Type]
+         -> [AppArg]
 mkDJArgs _ cms []   = map snd cms
-mkDJArgs _ [] uncms = map Left uncms
+mkDJArgs _ [] uncms = map TermArg uncms
 mkDJArgs n ((m,x):cms) (y:uncms)
-  | n == m    = x       : mkDJArgs (n+1) cms (y:uncms)
-  | otherwise = Left y  : mkDJArgs (n+1) ((m,x):cms) uncms
+  | n == m    = x         : mkDJArgs (n+1) cms (y:uncms)
+  | otherwise = TermArg y : mkDJArgs (n+1) ((m,x):cms) uncms
 
 -- | Create a case-expression that selects between the distinct arguments given
 -- a case-tree
@@ -456,7 +458,7 @@ genCase ty dcM argTys = go
   where
     go (Leaf tms) =
       case dcM of
-        Just dc -> mkApps (Data dc) (map Right argTys ++ map Left tms)
+        Just dc -> mkArgApps (Data dc) (map TypeArg argTys ++ map TermArg tms)
         _ -> head tms
 
     go (LB lb ct) =
@@ -487,23 +489,21 @@ interestingToLift
   -- ^ Evaluator
   -> Term
   -- ^ Term in function position
-  -> [Either Term Type]
+  -> [AppArg]
   -- ^ Arguments
-  -> [TickInfo]
-  -- ^ Tick annoations
   -> RewriteMonad extra (Maybe Term)
-interestingToLift inScope _ e@(Var v) _ ticks =
-  if NoDeDup `notElem` ticks && (isGlobalId v ||  v `elemInScopeSet` inScope)
+interestingToLift inScope _ e@(Var v) args =
+  if NoDeDup `notElem` tickArgs args && (isGlobalId v ||  v `elemInScopeSet` inScope)
      then pure (Just e)
      else pure Nothing
-interestingToLift inScope eval e@(Prim pInfo) args ticks
-  | NoDeDup `notElem` ticks = do
+interestingToLift inScope eval e@(Prim pInfo) args
+  | NoDeDup `notElem` tickArgs args = do
   let anyArgNotConstant = any (not . isConstant) lArgs
   case List.lookup (primName pInfo) interestingPrims of
     Just t | t || anyArgNotConstant -> pure (Just e)
-    _ | DeDup `elem` ticks -> pure (Just e)
+    _ | DeDup `elem` tickArgs args -> pure (Just e)
     _ -> do
-      let isInteresting = (\(x, y, z) -> interestingToLift inScope eval x y z) . collectArgsTicks
+      let isInteresting = uncurry (interestingToLift inScope eval) . collectAppArgs
       if isHOTy (primType pInfo) then do
         anyInteresting <- List.anyM (fmap Maybe.isJust . isInteresting) lArgs
         if anyInteresting then pure (Just e) else pure Nothing
@@ -545,7 +545,7 @@ interestingToLift inScope eval e@(Prim pInfo) args ticks
       ,("GHC.Prim.remInt#",lastNotPow2)
       ]
 
-    lArgs       = Either.lefts args
+    lArgs       = termArgs args
 
     allNonPow2  = all (not . termIsPow2) lArgs
     tailNonPow2 = case lArgs of
@@ -557,12 +557,12 @@ interestingToLift inScope eval e@(Prim pInfo) args ticks
 
     termIsPow2 e' = case eval e' of
       Literal (IntegerLiteral n) -> isPow2 n
-      a -> case collectArgs a of
-        (Prim p,[Right _,Left _,Left (Literal (IntegerLiteral n))])
+      a -> case collectAppArgs a of
+        (Prim p,termArgs -> [   _, (Literal (IntegerLiteral n))])
           | isFromInteger (primName p) -> isPow2 n
-        (Prim p,[Right _,Left _,Left _,Left (Literal (IntegerLiteral n))])
+        (Prim p,termArgs -> [_, _, (Literal (IntegerLiteral n))])
           | primName p == "Clash.Sized.Internal.BitVector.fromInteger#"  -> isPow2 n
-        (Prim p,[Right _,       Left _,Left (Literal (IntegerLiteral n))])
+        (Prim p,termArgs -> [   _, (Literal (IntegerLiteral n))])
           | primName p == "Clash.Sized.Internal.BitVector.fromInteger##" -> isPow2 n
 
         _ -> False
@@ -578,4 +578,4 @@ interestingToLift inScope eval e@(Prim pInfo) args ticks
     isHOTy t = case splitFunForallTy t of
       (args',_) -> any isPolyFunTy (Either.rights args')
 
-interestingToLift _ _ _ _ _ = pure Nothing
+interestingToLift _ _ _ _ = pure Nothing

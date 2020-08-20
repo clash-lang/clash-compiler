@@ -68,7 +68,7 @@ import           Clash.Core.Name
   (Name (..), NameSort (..), mkUnsafeSystemName)
 import           Clash.Core.Pretty   (showPpr)
 import           Clash.Core.Term
-  (Pat (..), PrimInfo (..), Term (..), WorkInfo (..), mkApps)
+  (Pat (..), PrimInfo (..), Term (..), WorkInfo (..), AppArg (..), mkArgApps)
 import           Clash.Core.TermInfo (piResultTys, applyTypeToArgs)
 import           Clash.Core.Type
   (Type (..), ConstTy (..), LitTy (..), TypeView (..), mkFunTy, mkTyConApp,
@@ -141,7 +141,7 @@ ghcPrimUnwind tcm p tys vs v [] m
   = let tyArgs = map Right tys
         tmArgs = map (Left . valToTerm) (vs ++ [v])
     in  Just $ flip setTerm m $ undefinedTm $
-          applyTypeToArgs (Prim p) tcm (primType p) (tyArgs ++ tmArgs)
+          applyTypeToArgs (Prim p) (primType p) (tyArgs ++ tmArgs)
   | otherwise
   = ghcPrimStep tcm (forcePrims m) p tys (vs ++ [v]) m
 
@@ -161,17 +161,17 @@ ghcPrimUnwind tcm p tys vs v [e] m0
       let tyArgs = map Right tys
           tmArgs = map (Left . valToTerm) (vs ++ [v]) ++ [Left e]
       in  Just $ flip setTerm m0 $ undefinedTm $
-            applyTypeToArgs (Prim p) tcm (primType p) (tyArgs ++ tmArgs)
+            applyTypeToArgs (Prim p) (primType p) (tyArgs ++ tmArgs)
     else
-      let (m1,i) = newLetBinding tcm m0 e
+      let (m1,i) = newLetBinding m0 e
       in  ghcPrimStep tcm (forcePrims m0) p tys (vs ++ [v,Suspend (Var i)]) m1
 
-ghcPrimUnwind tcm p tys vs (collectValueTicks -> (v, ts)) (e:es) m
+ghcPrimUnwind _tcm p tys vs (collectValueTicks -> (v, ts)) (e:es) m
   | isUndefinedPrimVal v
   = let tyArgs = map Right tys
         tmArgs = map (Left . valToTerm) (vs ++ [v]) ++ map Left (e:es)
     in  Just $ flip setTerm m $ undefinedTm $
-          applyTypeToArgs (Prim p) tcm (primType p) (tyArgs ++ tmArgs)
+          applyTypeToArgs (Prim p) (primType p) (tyArgs ++ tmArgs)
   | otherwise
   = Just . setTerm e $ stackPush (PrimApply p tys (vs ++ [foldr TickValue v ts]) es) m
 
@@ -230,9 +230,9 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
            (Just tupTc) = lookupUniqMap tupTcNm tcm
            [tupDc] = tyConDataCons tupTc
            (q,r)   = quotRem i j
-           ret     = mkApps (Data tupDc) (map Right tyArgs ++
-                    [Left $ catchDivByZero (integerToIntLiteral q)
-                    ,Left $ catchDivByZero (integerToIntLiteral r)])
+           ret     = mkArgApps (Data tupDc) (map TypeArg tyArgs ++
+                    [TermArg $ catchDivByZero (integerToIntLiteral q)
+                    ,TermArg $ catchDivByZero (integerToIntLiteral r)])
        in  reduce ret
 
   "GHC.Prim.andI#" | Just (i,j) <- intLiterals args
@@ -256,9 +256,9 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
            !(I# b)  = fromInteger j
            !(# d, c #) = addIntC# a b
        in  reduce $
-           mkApps (Data tupDc) (map Right tyArgs ++
-                   [ Left (Literal . IntLiteral . toInteger $ I# d)
-                   , Left (Literal . IntLiteral . toInteger $ I# c)])
+           mkArgApps (Data tupDc) (map TypeArg tyArgs ++
+                   [ TermArg (Literal . IntLiteral . toInteger $ I# d)
+                   , TermArg (Literal . IntLiteral . toInteger $ I# c)])
   "GHC.Prim.subIntC#" | Just (i,j) <- intLiterals args
     -> let (_,tyView -> TyConApp tupTcNm tyArgs) = splitFunForallTy ty
            (Just tupTc) = lookupUniqMap tupTcNm tcm
@@ -267,9 +267,9 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
            !(I# b)  = fromInteger j
            !(# d, c #) = subIntC# a b
        in  reduce $
-           mkApps (Data tupDc) (map Right tyArgs ++
-                   [ Left (Literal . IntLiteral . toInteger $ I# d)
-                   , Left (Literal . IntLiteral . toInteger $ I# c)])
+           mkArgApps (Data tupDc) (map TypeArg tyArgs ++
+                   [ TermArg (Literal . IntLiteral . toInteger $ I# d)
+                   , TermArg (Literal . IntLiteral . toInteger $ I# c)])
 
   "GHC.Prim.>#" | Just (i,j) <- intLiterals args
     -> reduce (boolToIntLiteral (i > j))
@@ -336,9 +336,9 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
            !(W# b)  = fromInteger j
            !(# d, c #) = subWordC# a b
        in  reduce $
-           mkApps (Data tupDc) (map Right tyArgs ++
-                   [ Left (Literal . WordLiteral . toInteger $ W# d)
-                   , Left (Literal . IntLiteral . toInteger $ I# c)])
+           mkArgApps (Data tupDc) (map TypeArg tyArgs ++
+                   [ TermArg (Literal . WordLiteral . toInteger $ W# d)
+                   , TermArg (Literal . IntLiteral . toInteger $ I# c)])
 
   "GHC.Prim.plusWord2#" | Just (i,j) <- wordLiterals args
     -> let (_,tyView -> TyConApp tupTcNm tyArgs) = splitFunForallTy ty
@@ -348,9 +348,9 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
            !(W# b)  = fromInteger j
            !(# h', l #) = plusWord2# a b
        in  reduce $
-           mkApps (Data tupDc) (map Right tyArgs ++
-                   [ Left (Literal . WordLiteral . toInteger $ W# h')
-                   , Left (Literal . WordLiteral . toInteger $ W# l)])
+           mkArgApps (Data tupDc) (map TypeArg tyArgs ++
+                   [ TermArg (Literal . WordLiteral . toInteger $ W# h')
+                   , TermArg (Literal . WordLiteral . toInteger $ W# l)])
 
   "GHC.Prim.minusWord#" | Just (i,j) <- wordLiterals args
     -> reduce (integerToWordLiteral (i-j))
@@ -365,9 +365,9 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
            !(W# b)  = fromInteger j
            !(# h', l #) = timesWord2# a b
        in  reduce $
-           mkApps (Data tupDc) (map Right tyArgs ++
-                   [ Left (Literal . WordLiteral . toInteger $ W# h')
-                   , Left (Literal . WordLiteral . toInteger $ W# l)])
+           mkArgApps (Data tupDc) (map TypeArg tyArgs ++
+                   [ TermArg (Literal . WordLiteral . toInteger $ W# h')
+                   , TermArg (Literal . WordLiteral . toInteger $ W# l)])
 
   "GHC.Prim.quotWord#" | Just (i,j) <- wordLiterals args
     -> reduce $ catchDivByZero (integerToWordLiteral (i `quot` j))
@@ -378,9 +378,9 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
            (Just tupTc) = lookupUniqMap tupTcNm tcm
            [tupDc] = tyConDataCons tupTc
            (q,r)   = quotRem i j
-           ret     = mkApps (Data tupDc) (map Right tyArgs ++
-                    [Left $ catchDivByZero (integerToWordLiteral q)
-                    ,Left $ catchDivByZero (integerToWordLiteral r)])
+           ret     = mkArgApps (Data tupDc) (map TypeArg tyArgs ++
+                    [TermArg $ catchDivByZero (integerToWordLiteral q)
+                    ,TermArg $ catchDivByZero (integerToWordLiteral r)])
        in  reduce ret
   "GHC.Prim.quotRemWord2#" | [i,j,k'] <- wordLiterals' args
     -> let (_,tyView -> TyConApp tupTcNm tyArgs) = splitFunForallTy ty
@@ -391,9 +391,9 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
            !(W# c)  = fromInteger k'
            !(# x, y #) = quotRemWord2# a b c
        in  reduce $
-           mkApps (Data tupDc) (map Right tyArgs ++
-                   [ Left $ catchDivByZero (Literal . WordLiteral . toInteger $ W# x)
-                   , Left $ catchDivByZero (Literal . WordLiteral . toInteger $ W# y)])
+           mkArgApps (Data tupDc) (map TypeArg tyArgs ++
+                   [ TermArg $ catchDivByZero (Literal . WordLiteral . toInteger $ W# x)
+                   , TermArg $ catchDivByZero (Literal . WordLiteral . toInteger $ W# y)])
 
   "GHC.Prim.and#" | Just (i,j) <- wordLiterals args
     -> reduce (integerToWordLiteral (i .&. j))
@@ -596,11 +596,11 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
            !(D# a) = fromRational i
            !(# p, q, r, s #) = decodeDouble_2Int# a
        in reduce $
-          mkApps (Data tupDc) (map Right tyArgs ++
-                   [ Left (Literal . IntLiteral  . toInteger $ I# p)
-                   , Left (Literal . WordLiteral . toInteger $ W# q)
-                   , Left (Literal . WordLiteral . toInteger $ W# r)
-                   , Left (Literal . IntLiteral  . toInteger $ I# s)])
+          mkArgApps (Data tupDc) (map TypeArg tyArgs ++
+                   [ TermArg (Literal . IntLiteral  . toInteger $ I# p)
+                   , TermArg (Literal . WordLiteral . toInteger $ W# q)
+                   , TermArg (Literal . WordLiteral . toInteger $ W# r)
+                   , TermArg (Literal . IntLiteral  . toInteger $ I# s)])
 -- decodeDouble_Int64# :: Double# -> (# Int64#, Int# #)
   "GHC.Prim.decodeDouble_Int64#" | [i] <- doubleLiterals' args
     -> let (_,tyView -> TyConApp tupTcNm tyArgs) = splitFunForallTy ty
@@ -609,9 +609,9 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
            !(D# a) = fromRational i
            !(# p, q #) = decodeDouble_Int64# a
        in reduce $
-          mkApps (Data tupDc) (map Right tyArgs ++
-                   [ Left (Literal . IntLiteral  . toInteger $ I64# p)
-                   , Left (Literal . IntLiteral  . toInteger $ I# q)])
+          mkArgApps (Data tupDc) (map TypeArg tyArgs ++
+                   [ TermArg (Literal . IntLiteral  . toInteger $ I64# p)
+                   , TermArg (Literal . IntLiteral  . toInteger $ I# q)])
 
 --------
 -- Float
@@ -713,10 +713,10 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
            p = primCount mach
            lit = Literal (ByteArrayLiteral (fromList (List.genericReplicate i 0)))
            mbaTy = mkFunTy intPrimTy (last tyArgs)
-           newE = mkApps (Data tupDc) (map Right tyArgs ++
-                    [Left (Prim rwTy)
-                    ,Left (mkApps (Prim (PrimInfo "GHC.Prim.MutableByteArray#" mbaTy WorkNever))
-                                  [Left (Literal . IntLiteral $ toInteger p)])
+           newE = mkArgApps (Data tupDc) (map TypeArg tyArgs ++
+                    [TermArg (Prim rwTy)
+                    ,TermArg (mkArgApps (Prim (PrimInfo "GHC.Prim.MutableByteArray#" mbaTy WorkNever))
+                                  [TermArg (Literal . IntLiteral $ toInteger p)])
                     ])
        in Just . setTerm newE $ primInsert p lit mach
 
@@ -765,9 +765,9 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
            (Just tupTc) = lookupUniqMap tupTcNm tcm
            [tupDc] = tyConDataCons tupTc
            Just ba' = primLookup (fromInteger ba) mach
-       in  reduce $ mkApps (Data tupDc) (map Right tyArgs ++
-                      [Left (Prim rwTy)
-                      ,Left ba'])
+       in  reduce $ mkArgApps (Data tupDc) (map TypeArg tyArgs ++
+                      [TermArg (Prim rwTy)
+                      ,TermArg ba'])
 
   "GHC.Prim.sizeofByteArray#"
     | [Lit (ByteArrayLiteral ba)] <- args
@@ -790,9 +790,9 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
            [tupDc] = tyConDataCons tupTc
            Just (Literal (ByteArrayLiteral ba')) = primLookup (fromInteger ba) mach
            lit = Literal (IntLiteral (toInteger (BA.sizeofByteArray ba')))
-       in  reduce $ mkApps (Data tupDc) (map Right tyArgs ++
-                      [Left (Prim rwTy)
-                      ,Left lit])
+       in  reduce $ mkArgApps (Data tupDc) (map TypeArg tyArgs ++
+                      [TermArg (Prim rwTy)
+                      ,TermArg lit])
 
   "GHC.Prim.resizeMutableByteArray#"
     | [PrimVal mbaTy _ [baV]
@@ -813,10 +813,10 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
                                  (# s', mba' #) -> (# s', BA.MutableByteArray mba' #))
                    BA.unsafeFreezeByteArray mba'
            ba3 = Literal (ByteArrayLiteral ba2)
-           newE = mkApps (Data tupDc) (map Right tyArgs ++
-                    [Left (Prim rwTy)
-                    ,Left (mkApps (Prim mbaTy)
-                                  [Left (Literal . IntLiteral $ toInteger p)])
+           newE = mkArgApps (Data tupDc) (map TypeArg tyArgs ++
+                    [TermArg (Prim rwTy)
+                    ,TermArg (mkArgApps (Prim mbaTy)
+                                  [TermArg (Literal . IntLiteral $ toInteger p)])
                     ])
        in Just . setTerm newE $ primInsert p ba3 mach
 
@@ -872,9 +872,9 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
                   BA.MutableByteArray mba <- BA.unsafeThawByteArray ba1
                   IO (\s -> case readWordArray# mba off' s of
                         (# s', w' #) -> (# s',  W# w' #))
-           newE = mkApps (Data tupDc) (map Right tyArgs ++
-                    [Left (Prim rwTy)
-                    ,Left (Literal (WordLiteral (toInteger w)))
+           newE = mkArgApps (Data tupDc) (map TypeArg tyArgs ++
+                    [TermArg (Prim rwTy)
+                    ,TermArg (Literal (WordLiteral (toInteger w)))
                     ])
        in reduce newE
 
@@ -886,9 +886,9 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
            !(F# a) = fromRational i
            !(# p, q #) = decodeFloat_Int# a
        in reduce $
-          mkApps (Data tupDc) (map Right tyArgs ++
-                   [ Left (Literal . IntLiteral  . toInteger $ I# p)
-                   , Left (Literal . IntLiteral  . toInteger $ I# q)])
+          mkArgApps (Data tupDc) (map TypeArg tyArgs ++
+                   [ TermArg (Literal . IntLiteral  . toInteger $ I# p)
+                   , TermArg (Literal . IntLiteral  . toInteger $ I# q)])
 
   "GHC.Prim.tagToEnum#"
     | [ConstTy (TyCon tcN)] <- tys
@@ -989,9 +989,9 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
            !(D# a)  = fromRational i
            !(# b, c #) = decodeDoubleInteger a
     in reduce $
-       mkApps (Data tupDc) (map Right tyArgs ++
-                [ Left (integerToIntegerLiteral b)
-                , Left (integerToIntLiteral . toInteger $ I# c)])
+       mkArgApps (Data tupDc) (map TypeArg tyArgs ++
+                [ TermArg (integerToIntegerLiteral b)
+                , TermArg (integerToIntLiteral . toInteger $ I# c)])
 
   "GHC.Integer.Type.encodeDoubleInteger" -- :: Integer -> Int# -> Double#
     | [iV, Lit (IntLiteral j)] <- args
@@ -1007,9 +1007,9 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
            [tupDc] = tyConDataCons tupTc
            (q,r) = quotRem i j
     in reduce $
-         mkApps (Data tupDc) (map Right tyArgs ++
-                [ Left $ catchDivByZero (integerToIntegerLiteral q)
-                , Left $ catchDivByZero (integerToIntegerLiteral r)])
+         mkArgApps (Data tupDc) (map TypeArg tyArgs ++
+                [ TermArg $ catchDivByZero (integerToIntegerLiteral q)
+                , TermArg $ catchDivByZero (integerToIntegerLiteral r)])
 
   "GHC.Integer.Type.plusInteger" | Just (i,j) <- integerLiterals args
     -> reduce (integerToIntegerLiteral (i+j))
@@ -1042,10 +1042,10 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
            [ubTupDc] = tyConDataCons ubTupTc
            (d,m) = divMod i j
        in  reduce $
-           mkApps (Data ubTupDc) [ Right liftedKi, Right liftedKi
-                                 , Right intTy,    Right intTy
-                                 , Left $ catchDivByZero (Literal (IntegerLiteral d))
-                                 , Left $ catchDivByZero (Literal (IntegerLiteral m))
+           mkArgApps (Data ubTupDc) [ TypeArg liftedKi, TypeArg liftedKi
+                                 , TypeArg intTy,    TypeArg intTy
+                                 , TermArg $ catchDivByZero (Literal (IntegerLiteral d))
+                                 , TermArg $ catchDivByZero (Literal (IntegerLiteral m))
                                  ]
 
   "GHC.Integer.Type.gtInteger" | Just (i,j) <- integerLiterals args
@@ -1217,7 +1217,7 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
     ->  let (_,tyView -> TyConApp charTcNm []) = splitFunForallTy ty
             (Just charTc) = lookupUniqMap charTcNm tcm
             [charDc] = tyConDataCons charTc
-        in  reduce (mkApps (Data charDc) [Left (Literal (CharLiteral c))])
+        in  reduce (mkArgApps (Data charDc) [TermArg (Literal (CharLiteral c))])
 
   "GHC.Types.I#"
     | isSubj
@@ -1225,35 +1225,35 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
     ->  let (_,tyView -> TyConApp intTcNm []) = splitFunForallTy ty
             (Just intTc) = lookupUniqMap intTcNm tcm
             [intDc] = tyConDataCons intTc
-        in  reduce (mkApps (Data intDc) [Left (Literal (IntLiteral i))])
+        in  reduce (mkArgApps (Data intDc) [TermArg (Literal (IntLiteral i))])
   "GHC.Int.I8#"
     | isSubj
     , [Lit (IntLiteral i)] <- args
     ->  let (_,tyView -> TyConApp intTcNm []) = splitFunForallTy ty
             (Just intTc) = lookupUniqMap intTcNm tcm
             [intDc] = tyConDataCons intTc
-        in  reduce (mkApps (Data intDc) [Left (Literal (IntLiteral i))])
+        in  reduce (mkArgApps (Data intDc) [TermArg (Literal (IntLiteral i))])
   "GHC.Int.I16#"
     | isSubj
     , [Lit (IntLiteral i)] <- args
     ->  let (_,tyView -> TyConApp intTcNm []) = splitFunForallTy ty
             (Just intTc) = lookupUniqMap intTcNm tcm
             [intDc] = tyConDataCons intTc
-        in  reduce (mkApps (Data intDc) [Left (Literal (IntLiteral i))])
+        in  reduce (mkArgApps (Data intDc) [TermArg (Literal (IntLiteral i))])
   "GHC.Int.I32#"
     | isSubj
     , [Lit (IntLiteral i)] <- args
     ->  let (_,tyView -> TyConApp intTcNm []) = splitFunForallTy ty
             (Just intTc) = lookupUniqMap intTcNm tcm
             [intDc] = tyConDataCons intTc
-        in  reduce (mkApps (Data intDc) [Left (Literal (IntLiteral i))])
+        in  reduce (mkArgApps (Data intDc) [TermArg (Literal (IntLiteral i))])
   "GHC.Int.I64#"
     | isSubj
     , [Lit (IntLiteral i)] <- args
     ->  let (_,tyView -> TyConApp intTcNm []) = splitFunForallTy ty
             (Just intTc) = lookupUniqMap intTcNm tcm
             [intDc] = tyConDataCons intTc
-        in  reduce (mkApps (Data intDc) [Left (Literal (IntLiteral i))])
+        in  reduce (mkArgApps (Data intDc) [TermArg (Literal (IntLiteral i))])
 
   "GHC.Types.W#"
     | isSubj
@@ -1261,34 +1261,34 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
     ->  let (_,tyView -> TyConApp wordTcNm []) = splitFunForallTy ty
             (Just wordTc) = lookupUniqMap wordTcNm tcm
             [wordDc] = tyConDataCons wordTc
-        in  reduce (mkApps (Data wordDc) [Left (Literal (WordLiteral c))])
+        in  reduce (mkArgApps (Data wordDc) [TermArg (Literal (WordLiteral c))])
   "GHC.Word.W8#"
     | isSubj
     , [Lit (WordLiteral c)] <- args
     ->  let (_,tyView -> TyConApp wordTcNm []) = splitFunForallTy ty
             (Just wordTc) = lookupUniqMap wordTcNm tcm
             [wordDc] = tyConDataCons wordTc
-        in  reduce (mkApps (Data wordDc) [Left (Literal (WordLiteral c))])
+        in  reduce (mkArgApps (Data wordDc) [TermArg (Literal (WordLiteral c))])
   "GHC.Word.W16#"
     | isSubj
     , [Lit (WordLiteral c)] <- args
     ->  let (_,tyView -> TyConApp wordTcNm []) = splitFunForallTy ty
             (Just wordTc) = lookupUniqMap wordTcNm tcm
             [wordDc] = tyConDataCons wordTc
-        in  reduce (mkApps (Data wordDc) [Left (Literal (WordLiteral c))])
+        in  reduce (mkArgApps (Data wordDc) [TermArg (Literal (WordLiteral c))])
   "GHC.Word.W32#"
     | isSubj
     , [Lit (WordLiteral c)] <- args
     ->  let (_,tyView -> TyConApp wordTcNm []) = splitFunForallTy ty
             (Just wordTc) = lookupUniqMap wordTcNm tcm
             [wordDc] = tyConDataCons wordTc
-        in  reduce (mkApps (Data wordDc) [Left (Literal (WordLiteral c))])
+        in  reduce (mkArgApps (Data wordDc) [TermArg (Literal (WordLiteral c))])
   "GHC.Word.W64#"
     | [Lit (WordLiteral c)] <- args
     ->  let (_,tyView -> TyConApp wordTcNm []) = splitFunForallTy ty
             (Just wordTc) = lookupUniqMap wordTcNm tcm
             [wordDc] = tyConDataCons wordTc
-        in  reduce (mkApps (Data wordDc) [Left (Literal (WordLiteral c))])
+        in  reduce (mkArgApps (Data wordDc) [TermArg (Literal (WordLiteral c))])
 
   "GHC.Float.$w$sfromRat''" -- XXX: Very fragile
     | [Lit (IntLiteral _minEx)
@@ -1430,8 +1430,8 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
            (Just snatTc) = lookupUniqMap snatTcNm tcm
            [snatDc] = tyConDataCons snatTc
        in  reduce $
-           mkApps (Data snatDc) [ Right (LitTy (NumTy c))
-                                , Left (Literal (NaturalLiteral c))]
+           mkArgApps (Data snatDc) [ TypeArg (LitTy (NumTy c))
+                                , TermArg (Literal (NaturalLiteral c))]
 
   "Clash.Promoted.Nat.flogBaseSNat"
     | [Right a, Right b] <- map (runExcept . tyNatSize tcm) tys
@@ -1441,8 +1441,8 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
            (Just snatTc) = lookupUniqMap snatTcNm tcm
            [snatDc] = tyConDataCons snatTc
        in  reduce $
-           mkApps (Data snatDc) [ Right (LitTy (NumTy c'))
-                                , Left (Literal (NaturalLiteral c'))]
+           mkArgApps (Data snatDc) [ TypeArg (LitTy (NumTy c'))
+                                , TermArg (Literal (NaturalLiteral c'))]
 
   "Clash.Promoted.Nat.clogBaseSNat"
     | [Right a, Right b] <- map (runExcept . tyNatSize tcm) tys
@@ -1452,8 +1452,8 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
            (Just snatTc) = lookupUniqMap snatTcNm tcm
            [snatDc] = tyConDataCons snatTc
        in  reduce $
-           mkApps (Data snatDc) [ Right (LitTy (NumTy c'))
-                                , Left (Literal (NaturalLiteral c'))]
+           mkArgApps (Data snatDc) [ TypeArg (LitTy (NumTy c'))
+                                , TermArg (Literal (NaturalLiteral c'))]
     | otherwise
     -> error ("clogBaseSNat: args = " <> show args <> ", tys = " <> show tys)
 
@@ -1465,8 +1465,8 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
            (Just snatTc) = lookupUniqMap snatTcNm tcm
            [snatDc] = tyConDataCons snatTc
        in  reduce $
-           mkApps (Data snatDc) [ Right (LitTy (NumTy c'))
-                                , Left (Literal (NaturalLiteral c'))]
+           mkArgApps (Data snatDc) [ TypeArg (LitTy (NumTy c'))
+                                , TermArg (Literal (NaturalLiteral c'))]
 
 ------------
 -- BitVector
@@ -1488,13 +1488,13 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
     -> let (_,tyView -> TyConApp intTcNm _) = splitFunForallTy ty
            (Just intTc) = lookupUniqMap intTcNm tcm
            [intCon] = tyConDataCons intTc
-       in  reduce (mkApps (Data intCon) [Left (Literal (IntLiteral kn))])
+       in  reduce (mkArgApps (Data intCon) [TermArg (Literal (IntLiteral kn))])
   "Clash.Sized.Internal.BitVector.maxIndex#"
     | Just (_, kn) <- extractKnownNat tcm tys
     -> let (_,tyView -> TyConApp intTcNm _) = splitFunForallTy ty
            (Just intTc) = lookupUniqMap intTcNm tcm
            [intCon] = tyConDataCons intTc
-       in  reduce (mkApps (Data intCon) [Left (Literal (IntLiteral (kn-1)))])
+       in  reduce (mkArgApps (Data intCon) [TermArg (Literal (IntLiteral (kn-1)))])
 
 -- Construction
   "Clash.Sized.Internal.BitVector.high"
@@ -1566,7 +1566,7 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
   "Clash.Sized.Internal.BitVector.reduceAnd#" -- :: KnownNat n => BitVector n -> Bit
     | [i] <- bitVectorLiterals' args
     , Just (_, kn) <- extractKnownNat tcm tys
-    -> let resTy = getResultTy tcm ty tys
+    -> let resTy = getResultTy ty tys
            val = reifyNat kn (op (toBV i))
        in reduce (mkBitLit resTy 0 val)
     where
@@ -1575,7 +1575,7 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
   "Clash.Sized.Internal.BitVector.reduceOr#" -- :: KnownNat n => BitVector n -> Bit
     | [i] <- bitVectorLiterals' args
     , Just (_, kn) <- extractKnownNat tcm tys
-    -> let resTy = getResultTy tcm ty tys
+    -> let resTy = getResultTy ty tys
            val = reifyNat kn (op (toBV i))
        in reduce (mkBitLit resTy 0 val)
     where
@@ -1584,7 +1584,7 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
   "Clash.Sized.Internal.BitVector.reduceXor#" -- :: KnownNat n => BitVector n -> Bit
     | [i] <- bitVectorLiterals' args
     , Just (_, kn) <- extractKnownNat tcm tys
-    -> let resTy = getResultTy tcm ty tys
+    -> let resTy = getResultTy ty tys
            val = reifyNat kn (op (toBV i))
        in reduce (mkBitLit resTy 0 val)
     where
@@ -1595,7 +1595,7 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
 -- Indexing
   "Clash.Sized.Internal.BitVector.index#" -- :: KnownNat n => BitVector n -> Int -> Bit
     | Just (_,kn,i,j) <- bitVectorLitIntLit tcm tys args
-      -> let resTy = getResultTy tcm ty tys
+      -> let resTy = getResultTy ty tys
              (msk,val) = reifyNat kn (op (toBV i) (fromInteger j))
          in reduce (mkBitLit resTy msk val)
       where
@@ -1644,7 +1644,7 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
     , Right n <-  runExcept (tyNatSize tcm nTy)
     , Right m <-  runExcept (tyNatSize tcm mTy)
     , [(mski,i)] <- bitVectorLiterals' args
-    -> let ty' = piResultTys tcm ty tys
+    -> let ty' = piResultTys ty tys
            (_,tyView -> TyConApp tupTcNm tyArgs) = splitFunForallTy ty'
            (Just tupTc) = lookupUniqMap tupTcNm tcm
            [tupDc] = tyConDataCons tupTc
@@ -1655,14 +1655,14 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
            mskN = mski .&. mask
            mask = bit (fromInteger n) - 1
     in reduce $
-       mkApps (Data tupDc) (map Right tyArgs ++
-                [ Left (mkBitVectorLit bvTy mTy m mskM valM)
-                , Left (mkBitVectorLit bvTy nTy n mskN valN)])
+       mkArgApps (Data tupDc) (map TypeArg tyArgs ++
+                [ TermArg (mkBitVectorLit bvTy mTy m mskM valM)
+                , TermArg (mkBitVectorLit bvTy nTy n mskN valN)])
 
   "Clash.Sized.Internal.BitVector.msb#" -- :: forall n. KnownNat n => BitVector n -> Bit
     | [i] <- bitVectorLiterals' args
     , Just (_, kn) <- extractKnownNat tcm tys
-    -> let resTy = getResultTy tcm ty tys
+    -> let resTy = getResultTy ty tys
            (msk,val) = reifyNat kn (op (toBV i))
        in reduce (mkBitLit resTy (toInteger msk) (toInteger val))
     where
@@ -1672,7 +1672,7 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
           res = BitVector.msb# u
   "Clash.Sized.Internal.BitVector.lsb#" -- :: BitVector n -> Bit
     | [i] <- bitVectorLiterals' args
-    -> let resTy = getResultTy tcm ty tys
+    -> let resTy = getResultTy ty tys
            Bit msk val = BitVector.lsb# (toBV i)
     in reduce (mkBitLit resTy (toInteger msk) (toInteger val))
 
@@ -1760,7 +1760,7 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
 -- ExtendingNum
   "Clash.Sized.Internal.BitVector.plus#" -- :: (KnownNat n, KnownNat m) => BitVector m -> BitVector n -> BitVector (Max m n + 1)
     | [(0,i),(0,j)] <- bitVectorLiterals' args
-    -> let ty' = piResultTys tcm ty tys
+    -> let ty' = piResultTys ty tys
            (_,resTy) = splitFunForallTy ty'
            (TyConApp _ [resSizeTy]) = tyView resTy
            Right resSizeInt = runExcept (tyNatSize tcm resSizeTy)
@@ -1768,7 +1768,7 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
 
   "Clash.Sized.Internal.BitVector.minus#"
     | [(0,i),(0,j)] <- bitVectorLiterals' args
-    -> let ty' = piResultTys tcm ty tys
+    -> let ty' = piResultTys ty tys
            (_,resTy) = splitFunForallTy ty'
            (TyConApp _ [resSizeTy]) = tyView resTy
            Right resSizeInt = runExcept (tyNatSize tcm resSizeTy)
@@ -1777,7 +1777,7 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
 
   "Clash.Sized.Internal.BitVector.times#"
     | [(0,i),(0,j)] <- bitVectorLiterals' args
-    -> let ty' = piResultTys tcm ty tys
+    -> let ty' = piResultTys ty tys
            (_,resTy) = splitFunForallTy ty'
            (TyConApp _ [resSizeTy]) = tyView resTy
            Right resSizeInt = runExcept (tyNatSize tcm resSizeTy)
@@ -1968,7 +1968,7 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
     -> let (_,tyView -> TyConApp intTcNm _) = splitFunForallTy ty
            (Just intTc) = lookupUniqMap intTcNm tcm
            [intCon] = tyConDataCons intTc
-       in  reduce (mkApps (Data intCon) [Left (Literal (IntLiteral kn))])
+       in  reduce (mkArgApps (Data intCon) [TermArg (Literal (IntLiteral kn))])
 
 -- BitPack
   "Clash.Sized.Internal.Signed.pack#"
@@ -2047,7 +2047,7 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
 -- ExtendingNum
   "Clash.Sized.Internal.Signed.plus#"
     | Just (i,j) <- signedLiterals args
-    -> let ty' = piResultTys tcm ty tys
+    -> let ty' = piResultTys ty tys
            (_,resTy) = splitFunForallTy ty'
            (TyConApp _ [resSizeTy]) = tyView resTy
            Right resSizeInt = runExcept (tyNatSize tcm resSizeTy)
@@ -2055,7 +2055,7 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
 
   "Clash.Sized.Internal.Signed.minus#"
     | Just (i,j) <- signedLiterals args
-    -> let ty' = piResultTys tcm ty tys
+    -> let ty' = piResultTys ty tys
            (_,resTy) = splitFunForallTy ty'
            (TyConApp _ [resSizeTy]) = tyView resTy
            Right resSizeInt = runExcept (tyNatSize tcm resSizeTy)
@@ -2063,7 +2063,7 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
 
   "Clash.Sized.Internal.Signed.times#"
     | Just (i,j) <- signedLiterals args
-    -> let ty' = piResultTys tcm ty tys
+    -> let ty' = piResultTys ty tys
            (_,resTy) = splitFunForallTy ty'
            (TyConApp _ [resSizeTy]) = tyView resTy
            Right resSizeInt = runExcept (tyNatSize tcm resSizeTy)
@@ -2179,7 +2179,7 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
            (TyConApp intTcNm _) = tyView ty'
            (Just intTc) = lookupUniqMap intTcNm tcm
            [intCon] = tyConDataCons intTc
-       in  reduce (mkApps (Data intCon) [Left (Literal (IntLiteral kn))])
+       in  reduce (mkArgApps (Data intCon) [TermArg (Literal (IntLiteral kn))])
 
 -- BitPack
   "Clash.Sized.Internal.Unsigned.pack#"
@@ -2245,7 +2245,7 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
 -- ExtendingNum
   "Clash.Sized.Internal.Unsigned.plus#" -- :: Unsigned m -> Unsigned n -> Unsigned (Max m n + 1)
     | Just (i,j) <- unsignedLiterals args
-    -> let ty' = piResultTys tcm ty tys
+    -> let ty' = piResultTys ty tys
            (_,resTy) = splitFunForallTy ty'
            (TyConApp _ [resSizeTy]) = tyView resTy
            Right resSizeInt = runExcept (tyNatSize tcm resSizeTy)
@@ -2253,7 +2253,7 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
 
   "Clash.Sized.Internal.Unsigned.minus#"
     | [i,j] <- unsignedLiterals' args
-    -> let ty' = piResultTys tcm ty tys
+    -> let ty' = piResultTys ty tys
            (_,resTy) = splitFunForallTy ty'
            (TyConApp _ [resSizeTy]) = tyView resTy
            Right resSizeInt = runExcept (tyNatSize tcm resSizeTy)
@@ -2262,7 +2262,7 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
 
   "Clash.Sized.Internal.Unsigned.times#"
     | Just (i,j) <- unsignedLiterals args
-    -> let ty' = piResultTys tcm ty tys
+    -> let ty' = piResultTys ty tys
            (_,resTy) = splitFunForallTy ty'
            (TyConApp _ [resSizeTy]) = tyView resTy
            Right resSizeInt = runExcept (tyNatSize tcm resSizeTy)
@@ -2351,7 +2351,7 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
            (_,tyView -> TyConApp wordTcNm []) = splitFunForallTy ty
            (Just wordTc) = lookupUniqMap wordTcNm tcm
            [wordDc] = tyConDataCons wordTc
-       in  reduce (mkApps (Data wordDc) [Left (Literal (WordLiteral (toInteger b)))])
+       in  reduce (mkArgApps (Data wordDc) [TermArg (Literal (WordLiteral (toInteger b)))])
 
   "Clash.Sized.Internal.Unsigned.unsigned8toWord8"
     | isSubj
@@ -2360,7 +2360,7 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
            (_,tyView -> TyConApp wordTcNm []) = splitFunForallTy ty
            (Just wordTc) = lookupUniqMap wordTcNm tcm
            [wordDc] = tyConDataCons wordTc
-       in  reduce (mkApps (Data wordDc) [Left (Literal (WordLiteral (toInteger b)))])
+       in  reduce (mkArgApps (Data wordDc) [TermArg (Literal (WordLiteral (toInteger b)))])
 
   "Clash.Sized.Internal.Unsigned.unsigned16toWord16"
     | isSubj
@@ -2369,7 +2369,7 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
            (_,tyView -> TyConApp wordTcNm []) = splitFunForallTy ty
            (Just wordTc) = lookupUniqMap wordTcNm tcm
            [wordDc] = tyConDataCons wordTc
-       in  reduce (mkApps (Data wordDc) [Left (Literal (WordLiteral (toInteger b)))])
+       in  reduce (mkArgApps (Data wordDc) [TermArg (Literal (WordLiteral (toInteger b)))])
 
   "Clash.Sized.Internal.Unsigned.unsigned32toWord32"
     | isSubj
@@ -2378,12 +2378,12 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
            (_,tyView -> TyConApp wordTcNm []) = splitFunForallTy ty
            (Just wordTc) = lookupUniqMap wordTcNm tcm
            [wordDc] = tyConDataCons wordTc
-       in  reduce (mkApps (Data wordDc) [Left (Literal (WordLiteral (toInteger b)))])
+       in  reduce (mkArgApps (Data wordDc) [TermArg (Literal (WordLiteral (toInteger b)))])
 
   "Clash.Annotations.BitRepresentation.Deriving.dontApplyInHDL"
     | isSubj
     , f : a : _ <- args
-    -> reduceWHNF (mkApps (valToTerm f) [Left (valToTerm a)])
+    -> reduceWHNF (mkArgApps (valToTerm f) [TermArg (valToTerm a)])
 
 --------
 -- RTree
@@ -2402,11 +2402,11 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
     -> let (Just tupTc) = lookupUniqMap tupTcNm tcm
            [tupDc]      = tyConDataCons tupTc
        in  reduce $
-           mkApps (Data tupDc)
-                  [Right (mkTyConApp treeTcNm [dTy,aTy])
-                  ,Right (mkTyConApp treeTcNm [dTy,aTy])
-                  ,Left (Either.lefts tArgs !! 1)
-                  ,Left (Either.lefts tArgs !! 2)
+           mkArgApps (Data tupDc)
+                  [TypeArg (mkTyConApp treeTcNm [dTy,aTy])
+                  ,TypeArg (mkTyConApp treeTcNm [dTy,aTy])
+                  ,TermArg (Either.lefts tArgs !! 1)
+                  ,TermArg (Either.lefts tArgs !! 2)
                   ]
 
   "Clash.Sized.RTree.tdfold"
@@ -2416,7 +2416,7 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
     , DC _ tArgs <- ts
     , Right k' <- runExcept (tyNatSize tcm kTy)
     -> case k' of
-         0 -> reduceWHNF (mkApps (valToTerm f) [Left (Either.lefts tArgs !! 1)])
+         0 -> reduceWHNF (mkArgApps (valToTerm f) [TermArg (Either.lefts tArgs !! 1)])
          _ -> let k'ty = LitTy (NumTy (k'-1))
                   (tyArgs,_)  = splitFunForallTy ty
                   (tyArgs',_) = splitFunForallTy (Either.rights tyArgs !! 3)
@@ -2424,36 +2424,36 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
                   Just snatTc = lookupUniqMap snatTcNm tcm
                   [snatDc]    = tyConDataCons snatTc
               in  reduceWHNF $
-                  mkApps (valToTerm g)
-                         [Right k'ty
-                         ,Left (mkApps (Data snatDc)
-                                       [Right k'ty
-                                       ,Left (Literal (NaturalLiteral (k'-1)))])
-                         ,Left (mkApps (Prim pInfo)
-                                       [Right pTy
-                                       ,Right k'ty
-                                       ,Right aTy
-                                       ,Left (Literal (NaturalLiteral (k'-1)))
-                                       ,Left (valToTerm p)
-                                       ,Left (valToTerm f)
-                                       ,Left (valToTerm g)
-                                       ,Left (Either.lefts tArgs !! 1)
+                  mkArgApps (valToTerm g)
+                         [TypeArg k'ty
+                         ,TermArg (mkArgApps (Data snatDc)
+                                       [TypeArg k'ty
+                                       ,TermArg (Literal (NaturalLiteral (k'-1)))])
+                         ,TermArg (mkArgApps (Prim pInfo)
+                                       [TypeArg pTy
+                                       ,TypeArg k'ty
+                                       ,TypeArg aTy
+                                       ,TermArg (Literal (NaturalLiteral (k'-1)))
+                                       ,TermArg (valToTerm p)
+                                       ,TermArg (valToTerm f)
+                                       ,TermArg (valToTerm g)
+                                       ,TermArg (Either.lefts tArgs !! 1)
                                        ])
-                         ,Left (mkApps (Prim pInfo)
-                                       [Right pTy
-                                       ,Right k'ty
-                                       ,Right aTy
-                                       ,Left (Literal (NaturalLiteral (k'-1)))
-                                       ,Left (valToTerm p)
-                                       ,Left (valToTerm f)
-                                       ,Left (valToTerm g)
-                                       ,Left (Either.lefts tArgs !! 2)
+                         ,TermArg (mkArgApps (Prim pInfo)
+                                       [TypeArg pTy
+                                       ,TypeArg k'ty
+                                       ,TypeArg aTy
+                                       ,TermArg (Literal (NaturalLiteral (k'-1)))
+                                       ,TermArg (valToTerm p)
+                                       ,TermArg (valToTerm f)
+                                       ,TermArg (valToTerm g)
+                                       ,TermArg (Either.lefts tArgs !! 2)
                                        ])
                          ]
 
   "Clash.Sized.RTree.treplicate"
     | isSubj
-    , let ty' = piResultTys tcm ty tys
+    , let ty' = piResultTys ty tys
     , (_,tyView -> TyConApp treeTcNm [lenTy,argTy]) <- splitFunForallTy ty'
     , Right len <- runExcept (tyNatSize tcm lenTy)
     -> let (Just treeTc) = lookupUniqMap treeTcNm tcm
@@ -2470,7 +2470,7 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
     -> let (_, tyView -> TyConApp intTcNm _) = splitFunForallTy ty
            (Just intTc) = lookupUniqMap intTcNm tcm
            [intCon] = tyConDataCons intTc
-       in  reduce (mkApps (Data intCon) [Left (Literal (IntLiteral (toInteger n)))])
+       in  reduce (mkArgApps (Data intCon) [TermArg (Literal (IntLiteral (toInteger n)))])
 
   "Clash.Sized.Vector.maxIndex"
     | isSubj
@@ -2479,7 +2479,7 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
     -> let (_, tyView -> TyConApp intTcNm _) = splitFunForallTy ty
            (Just intTc) = lookupUniqMap intTcNm tcm
            [intCon] = tyConDataCons intTc
-       in  reduce (mkApps (Data intCon) [Left (Literal (IntLiteral (toInteger (n - 1))))])
+       in  reduce (mkArgApps (Data intCon) [TermArg (Literal (IntLiteral (toInteger (n - 1))))])
 
 -- Indexing
   "Clash.Sized.Vector.index_int" -- :: KnownNat n => Vec n a -> Int
@@ -2495,13 +2495,13 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
                       if i' == 0
                          then reduceWHNF (Either.lefts vArgs !! 1)
                          else reduceWHNF $
-                              mkApps (Prim pInfo)
-                                     [Right (LitTy (NumTy (n'-1)))
-                                     ,Right aTy
-                                     ,Left (Literal (NaturalLiteral (n'-1)))
-                                     ,Left (Either.lefts vArgs !! 2)
-                                     ,Left (mkApps (Data intDc)
-                                                   [Left (Literal (IntLiteral (i'-1)))])
+                              mkArgApps (Prim pInfo)
+                                     [TypeArg (LitTy (NumTy (n'-1)))
+                                     ,TypeArg aTy
+                                     ,TermArg (Literal (NaturalLiteral (n'-1)))
+                                     ,TermArg (Either.lefts vArgs !! 2)
+                                     ,TermArg (mkArgApps (Data intDc)
+                                                   [TermArg (Literal (IntLiteral (i'-1)))])
                                      ]
                     _ -> Nothing
                  _ -> Nothing
@@ -2517,10 +2517,10 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
     -> if n == 0
           then reduceWHNF (Either.lefts vArgs !! 1)
           else reduceWHNF
-                (mkApps (Prim pInfo)
-                                     [Right (LitTy (NumTy (n-1)))
-                                     ,Right aTy
-                                     ,Left (Either.lefts vArgs !! 2)
+                (mkArgApps (Prim pInfo)
+                                     [TypeArg (LitTy (NumTy (n-1)))
+                                     ,TypeArg aTy
+                                     ,TermArg (Either.lefts vArgs !! 2)
                                      ])
 -- - Sub-vectors
   "Clash.Sized.Vector.tail" -- :: Vec (n+1) a -> Vec n a
@@ -2537,10 +2537,10 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
           else reduce $
                mkVecCons consCon aTy n
                   (Either.lefts vArgs !! 1)
-                  (mkApps (Prim pInfo)
-                                       [Right (LitTy (NumTy (n-1)))
-                                       ,Right aTy
-                                       ,Left (Either.lefts vArgs !! 2)])
+                  (mkArgApps (Prim pInfo)
+                                       [TypeArg (LitTy (NumTy (n-1)))
+                                       ,TypeArg aTy
+                                       ,TermArg (Either.lefts vArgs !! 2)])
   "Clash.Sized.Vector.select" -- :: (CmpNat (i+s) (s*n) ~ GT) => SNat f -> SNat s -> SNat n -> Vec (f + i) a -> Vec n a
     | isSubj
     , iTy : sTy : nTy : fTy : aTy : _ <- tys
@@ -2554,12 +2554,12 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
          0 -> reduce (mkVecNil nilCon aTy)
          _ -> case f' of
           0 -> let splitAtCall =
-                    mkApps (splitAtPrim snatTcNm vecTcNm)
-                           [Right sTy
-                           ,Right (LitTy (NumTy (i'-s')))
-                           ,Right aTy
-                           ,Left (valToTerm s)
-                           ,Left (valToTerm xs)
+                    mkArgApps (splitAtPrim snatTcNm vecTcNm)
+                           [TypeArg sTy
+                           ,TypeArg (LitTy (NumTy (i'-s')))
+                           ,TypeArg aTy
+                           ,TermArg (valToTerm s)
+                           ,TermArg (valToTerm xs)
                            ]
                    fVecTy = mkTyConApp vecTcNm [sTy,aTy]
                    iVecTy = mkTyConApp vecTcNm [LitTy (NumTy (i'-s')),aTy]
@@ -2572,25 +2572,25 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
                    iAlt   = (tupPat, (Var iId))
                in  reduce $
                    mkVecCons consCon aTy n' (Either.lefts vArgs !! 1) $
-                   mkApps (Prim pInfo)
-                          [Right (LitTy (NumTy (i'-s')))
-                          ,Right sTy
-                          ,Right (LitTy (NumTy (n'-1)))
-                          ,Right (LitTy (NumTy 0))
-                          ,Right aTy
-                          ,Left (valToTerm eq)
-                          ,Left (Literal (NaturalLiteral 0))
-                          ,Left (valToTerm s)
-                          ,Left (Literal (NaturalLiteral (n'-1)))
-                          ,Left (Case splitAtCall iVecTy [iAlt])
+                   mkArgApps (Prim pInfo)
+                          [TypeArg (LitTy (NumTy (i'-s')))
+                          ,TypeArg sTy
+                          ,TypeArg (LitTy (NumTy (n'-1)))
+                          ,TypeArg (LitTy (NumTy 0))
+                          ,TypeArg aTy
+                          ,TermArg (valToTerm eq)
+                          ,TermArg (Literal (NaturalLiteral 0))
+                          ,TermArg (valToTerm s)
+                          ,TermArg (Literal (NaturalLiteral (n'-1)))
+                          ,TermArg (Case splitAtCall iVecTy [iAlt])
                           ]
           _ -> let splitAtCall =
-                    mkApps (splitAtPrim snatTcNm vecTcNm)
-                           [Right fTy
-                           ,Right iTy
-                           ,Right aTy
-                           ,Left (valToTerm f)
-                           ,Left (valToTerm xs)
+                    mkArgApps (splitAtPrim snatTcNm vecTcNm)
+                           [TypeArg fTy
+                           ,TypeArg iTy
+                           ,TypeArg aTy
+                           ,TermArg (valToTerm f)
+                           ,TermArg (valToTerm xs)
                            ]
                    fVecTy = mkTyConApp vecTcNm [fTy,aTy]
                    iVecTy = mkTyConApp vecTcNm [iTy,aTy]
@@ -2602,17 +2602,17 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
                    tupPat = DataPat tupDc [] [fId,iId]
                    iAlt   = (tupPat, (Var iId))
                in  reduceWHNF $
-                   mkApps (Prim pInfo)
-                     [Right iTy
-                     ,Right sTy
-                     ,Right nTy
-                     ,Right (LitTy (NumTy 0))
-                     ,Right aTy
-                     ,Left (valToTerm eq)
-                     ,Left (Literal (NaturalLiteral 0))
-                     ,Left (valToTerm s)
-                     ,Left (valToTerm n)
-                     ,Left (Case splitAtCall iVecTy [iAlt])
+                   mkArgApps (Prim pInfo)
+                     [TypeArg iTy
+                     ,TypeArg sTy
+                     ,TypeArg nTy
+                     ,TypeArg (LitTy (NumTy 0))
+                     ,TypeArg aTy
+                     ,TermArg (valToTerm eq)
+                     ,TermArg (Literal (NaturalLiteral 0))
+                     ,TermArg (valToTerm s)
+                     ,TermArg (valToTerm n)
+                     ,TermArg (Case splitAtCall iVecTy [iAlt])
                      ]
     where
       (tyArgs,tyView -> TyConApp vecTcNm _) = splitFunForallTy ty
@@ -2629,7 +2629,7 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
     , Right m <- runExcept (tyNatSize tcm mTy)
     -> let _:nTy:aTy:_ = tys
            -- Get the tuple data-constructor
-           ty1 = piResultTys tcm ty tys
+           ty1 = piResultTys ty tys
            (_,tyView -> TyConApp tupTcNm tyArgs) = splitFunForallTy ty1
            (Just tupTc)       = lookupUniqMap tupTcNm tcm
            [tupDc]            = tyConDataCons tupTc
@@ -2639,14 +2639,14 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
            [nilCon,consCon]   = tyConDataCons vecTc
            -- Recursive call to @splitAt@
            splitAtRec v =
-            mkApps (Prim pInfo)
-                   [Right (LitTy (NumTy (m-1)))
-                   ,Right nTy
-                   ,Right aTy
-                   ,Left (mkApps (Data snatDc)
-                                 [ Right (LitTy (NumTy (m-1)))
-                                 , Left  (Literal (NaturalLiteral (m-1)))])
-                   ,Left v
+            mkArgApps (Prim pInfo)
+                   [TypeArg (LitTy (NumTy (m-1)))
+                   ,TypeArg nTy
+                   ,TypeArg aTy
+                   ,TermArg (mkArgApps (Data snatDc)
+                                 [ TypeArg (LitTy (NumTy (m-1)))
+                                 , TermArg  (Literal (NaturalLiteral (m-1)))])
+                   ,TermArg v
                    ]
            -- Projection either the first or second field of the recursive
            -- call to @splitAt@
@@ -2665,18 +2665,18 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
        in case m of
          -- (Nil,v)
          0 -> reduce $
-              mkApps (Data tupDc) $ (map Right tyArgs) ++
-                [ Left (mkVecNil nilCon aTy)
-                , Left (valToTerm (last args))
+              mkArgApps (Data tupDc) $ (map TypeArg tyArgs) ++
+                [ TermArg (mkVecNil nilCon aTy)
+                , TermArg (valToTerm (last args))
                 ]
          -- (x:xs) <- v
          m' | DC _ vArgs <- last args
             -- (x:fst (splitAt (m-1) xs),snd (splitAt (m-1) xs))
             -> reduce $
-               mkApps (Data tupDc) $ (map Right tyArgs) ++
-                 [ Left (mkVecCons consCon aTy m' (Either.lefts vArgs !! 1)
+               mkArgApps (Data tupDc) $ (map TypeArg tyArgs) ++
+                 [ TermArg (mkVecCons consCon aTy m' (Either.lefts vArgs !! 1)
                            (splitAtSelR (Either.lefts vArgs !! 2) m1VecTy [lAlt]))
-                 , Left (splitAtSelR (Either.lefts vArgs !! 2) nVecTy [rAlt])
+                 , TermArg (splitAtSelR (Either.lefts vArgs !! 2) nVecTy [rAlt])
                  ]
          -- v doesn't reduce to a data-constructor
          _  -> Nothing
@@ -2698,12 +2698,12 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
                         [mkTyConApp typeNatSubTyFamName [nTy,LitTy (NumTy 1)]
                         ,mTy]
            splitAtCall =
-            mkApps (splitAtPrim snatTcNm vecTcNm)
-                   [Right mTy
-                   ,Right n1mTy
-                   ,Right aTy
-                   ,Left (valToTerm snat)
-                   ,Left (valToTerm v)
+            mkArgApps (splitAtPrim snatTcNm vecTcNm)
+                   [TypeArg mTy
+                   ,TypeArg n1mTy
+                   ,TypeArg aTy
+                   ,TermArg (valToTerm snat)
+                   ,TermArg (valToTerm v)
                    ]
            mVecTy   = mkTyConApp vecTcNm [mTy,aTy]
            n1mVecTy = mkTyConApp vecTcNm [n1mTy,aTy]
@@ -2721,18 +2721,18 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
          _ -> reduce $
               mkVecCons consCon mVecTy n
                 (Case splitAtCall mVecTy [asAlt])
-                (mkApps (Prim pInfo)
-                    [Right (LitTy (NumTy (n-1)))
-                    ,Right mTy
-                    ,Right aTy
-                    ,Left (Literal (NaturalLiteral (n-1)))
-                    ,Left (valToTerm snat)
-                    ,Left (Case splitAtCall n1mVecTy [bsAlt])])
+                (mkArgApps (Prim pInfo)
+                    [TypeArg (LitTy (NumTy (n-1)))
+                    ,TypeArg mTy
+                    ,TypeArg aTy
+                    ,TermArg (Literal (NaturalLiteral (n-1)))
+                    ,TermArg (valToTerm snat)
+                    ,TermArg (Case splitAtCall n1mVecTy [bsAlt])])
 -- Construction
 -- - initialisation
   "Clash.Sized.Vector.replicate" -- :: SNat n -> a -> Vec n a
     | isSubj
-    , let ty' = piResultTys tcm ty tys
+    , let ty' = piResultTys ty tys
     , let (_,resTy) = splitFunForallTy ty'
     , (TyConApp vecTcNm [lenTy,argTy]) <- tyView resTy
     , Right len <- runExcept (tyNatSize tcm lenTy)
@@ -2754,12 +2754,12 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
             -> -- x : (xs ++ ys)
                reduce $
                mkVecCons dc aTy (n' + m) (Either.lefts vArgs !! 1)
-                 (mkApps (Prim pInfo)
-                                      [Right (LitTy (NumTy (n'-1)))
-                                      ,Right aTy
-                                      ,Right mTy
-                                      ,Left (Either.lefts vArgs !! 2)
-                                      ,Left (valToTerm (last args))
+                 (mkArgApps (Prim pInfo)
+                                      [TypeArg (LitTy (NumTy (n'-1)))
+                                      ,TypeArg aTy
+                                      ,TypeArg mTy
+                                      ,TermArg (Either.lefts vArgs !! 2)
+                                      ,TermArg (valToTerm (last args))
                                       ])
          _ -> Nothing
   "Clash.Sized.Vector.concat" -- :: Vec n (Vec m a) -> Vec (n * m) a
@@ -2773,17 +2773,17 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
         _ | _ : h' : t : _ <- Either.lefts  vArgs
           , (_,tyView -> TyConApp vecTcNm _) <- splitFunForallTy ty
           -> reduceWHNF $
-             mkApps (vecAppendPrim vecTcNm)
-                    [Right mTy
-                    ,Right aTy
-                    ,Right $ mkTyConApp typeNatMul
+             mkArgApps (vecAppendPrim vecTcNm)
+                    [TypeArg mTy
+                    ,TypeArg aTy
+                    ,TypeArg $ mkTyConApp typeNatMul
                       [mkTyConApp typeNatSubTyFamName [nTy,LitTy (NumTy 1)], mTy]
-                    ,Left h'
-                    ,Left $ mkApps (Prim pInfo)
-                      [ Right (LitTy (NumTy (n-1)))
-                      , Right mTy
-                      , Right aTy
-                      , Left t
+                    ,TermArg h'
+                    ,TermArg $ mkArgApps (Prim pInfo)
+                      [ TypeArg (LitTy (NumTy (n-1)))
+                      , TypeArg mTy
+                      , TypeArg aTy
+                      , TermArg t
                       ]
                     ]
         _ -> Nothing
@@ -2803,14 +2803,14 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
                          then reduce (mkVecCons vecTcNm aTy n' (valToTerm a) (Either.lefts vArgs !! 2))
                          else reduce $
                               mkVecCons vecTcNm aTy n' (Either.lefts vArgs !! 1)
-                                (mkApps (Prim pInfo)
-                                        [Right (LitTy (NumTy (n'-1)))
-                                        ,Right aTy
-                                        ,Left (Literal (NaturalLiteral (n'-1)))
-                                        ,Left (Either.lefts vArgs !! 2)
-                                        ,Left (mkApps (Data intDc)
-                                                      [Left (Literal (IntLiteral (i'-1)))])
-                                        ,Left (valToTerm a)
+                                (mkArgApps (Prim pInfo)
+                                        [TypeArg (LitTy (NumTy (n'-1)))
+                                        ,TypeArg aTy
+                                        ,TermArg (Literal (NaturalLiteral (n'-1)))
+                                        ,TermArg (Either.lefts vArgs !! 2)
+                                        ,TermArg (mkArgApps (Data intDc)
+                                                      [TermArg (Literal (IntLiteral (i'-1)))])
+                                        ,TermArg (valToTerm a)
                                         ])
                     _ -> Nothing
                  _ -> Nothing
@@ -2833,16 +2833,16 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
            , let (Just vecTc) = lookupUniqMap vecTcNm tcm
            , let [nilCon,consCon] = tyConDataCons vecTc
            -> reduceWHNF $
-              mkApps (vecAppendPrim vecTcNm)
-                [Right (LitTy (NumTy (n-1)))
-                ,Right aTy
-                ,Right (LitTy (NumTy 1))
-                ,Left (mkApps (Prim pInfo)
-                              [Right (LitTy (NumTy (n-1)))
-                              ,Right aTy
-                              ,Left (Either.lefts vArgs !! 2)
+              mkArgApps (vecAppendPrim vecTcNm)
+                [TypeArg (LitTy (NumTy (n-1)))
+                ,TypeArg aTy
+                ,TypeArg (LitTy (NumTy 1))
+                ,TermArg (mkArgApps (Prim pInfo)
+                              [TypeArg (LitTy (NumTy (n-1)))
+                              ,TypeArg aTy
+                              ,TermArg (Either.lefts vArgs !! 2)
                               ])
-                ,Left (mkVec nilCon consCon aTy 1 [Either.lefts vArgs !! 1])
+                ,TermArg (mkVec nilCon consCon aTy 1 [Either.lefts vArgs !! 1])
                 ]
          _ -> Nothing
   "Clash.Sized.Vector.transpose" -- :: KnownNat n => Vec m (Vec n a) -> Vec n (Vec m a)
@@ -2864,24 +2864,24 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
                 Just (consCoTy : _) = dataConInstArgTys consCon
                                         [mTy,aTy,LitTy (NumTy (m'-1))]
             in  reduceWHNF $
-                mkApps (vecZipWithPrim vecTcNm)
-                       [ Right aTy
-                       , Right (mkTyConApp vecTcNm [LitTy (NumTy (m'-1)),aTy])
-                       , Right (mkTyConApp vecTcNm [mTy,aTy])
-                       , Right nTy
-                       , Left  (mkApps (Data consCon)
-                                       [Right mTy
-                                       ,Right aTy
-                                       ,Right (LitTy (NumTy (m'-1)))
-                                       ,Left (primCo consCoTy)
+                mkArgApps (vecZipWithPrim vecTcNm)
+                       [ TypeArg aTy
+                       , TypeArg (mkTyConApp vecTcNm [LitTy (NumTy (m'-1)),aTy])
+                       , TypeArg (mkTyConApp vecTcNm [mTy,aTy])
+                       , TypeArg nTy
+                       , TermArg  (mkArgApps (Data consCon)
+                                       [TypeArg mTy
+                                       ,TypeArg aTy
+                                       ,TypeArg (LitTy (NumTy (m'-1)))
+                                       ,TermArg (primCo consCoTy)
                                        ])
-                       , Left  (Either.lefts vArgs !! 1)
-                       , Left  (mkApps (Prim pInfo)
-                                       [ Right nTy
-                                       , Right (LitTy (NumTy (m'-1)))
-                                       , Right aTy
-                                       , Left  (valToTerm kn)
-                                       , Left  (Either.lefts vArgs !! 2)
+                       , TermArg  (Either.lefts vArgs !! 1)
+                       , TermArg  (mkArgApps (Prim pInfo)
+                                       [ TypeArg nTy
+                                       , TypeArg (LitTy (NumTy (m'-1)))
+                                       , TypeArg aTy
+                                       , TermArg  (valToTerm kn)
+                                       , TermArg  (Either.lefts vArgs !! 2)
                                        ])
                        ]
 
@@ -2901,20 +2901,20 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
                            (Just vecTc)     = lookupUniqMap vecTcNm tcm
                            [nilCon,consCon] = tyConDataCons vecTc
                        in  reduceWHNF' mach2 $
-                           mkApps (Prim pInfo)
-                                  [Right nTy
-                                  ,Right aTy
-                                  ,Right (LitTy (NumTy (d3-1)))
-                                  ,Left (valToTerm kn)
-                                  ,Left (mkApps (vecAppendPrim vecTcNm)
-                                                [Right (LitTy (NumTy (n'-1)))
-                                                ,Right aTy
-                                                ,Right (LitTy (NumTy 1))
-                                                ,Left  (Either.lefts vArgs !! 2)
-                                                ,Left  (mkVec nilCon consCon aTy 1 [Either.lefts vArgs !! 1])])
-                                  ,Left (mkApps (Data snatDc)
-                                                [Right (LitTy (NumTy (d3-1)))
-                                                ,Left  (Literal (NaturalLiteral (d3-1)))])
+                           mkArgApps (Prim pInfo)
+                                  [TypeArg nTy
+                                  ,TypeArg aTy
+                                  ,TypeArg (LitTy (NumTy (d3-1)))
+                                  ,TermArg (valToTerm kn)
+                                  ,TermArg (mkArgApps (vecAppendPrim vecTcNm)
+                                                [TypeArg (LitTy (NumTy (n'-1)))
+                                                ,TypeArg aTy
+                                                ,TypeArg (LitTy (NumTy 1))
+                                                ,TermArg  (Either.lefts vArgs !! 2)
+                                                ,TermArg  (mkVec nilCon consCon aTy 1 [Either.lefts vArgs !! 1])])
+                                  ,TermArg (mkArgApps (Data snatDc)
+                                                [TypeArg (LitTy (NumTy (d3-1)))
+                                                ,TermArg  (Literal (NaturalLiteral (d3-1)))])
                                   ]
          _  -> Nothing
 
@@ -2933,23 +2933,23 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
                  0  -> reduce (valToTerm xs)
                  d3 -> let (_,tyView -> TyConApp vecTcNm _) = splitFunForallTy ty
                        in  reduceWHNF' mach2 $
-                           mkApps (Prim pInfo)
-                                  [Right nTy
-                                  ,Right aTy
-                                  ,Right (LitTy (NumTy (d3-1)))
-                                  ,Left (valToTerm kn)
-                                  ,Left (mkVecCons dc aTy n
-                                          (mkApps (vecLastPrim vecTcNm)
-                                                  [Right (LitTy (NumTy (n'-1)))
-                                                  ,Right aTy
-                                                  ,Left  (valToTerm xs)])
-                                          (mkApps (vecInitPrim vecTcNm)
-                                                  [Right (LitTy (NumTy (n'-1)))
-                                                  ,Right aTy
-                                                  ,Left (valToTerm xs)]))
-                                  ,Left (mkApps (Data snatDc)
-                                                [Right (LitTy (NumTy (d3-1)))
-                                                ,Left  (Literal (NaturalLiteral (d3-1)))])
+                           mkArgApps (Prim pInfo)
+                                  [TypeArg nTy
+                                  ,TypeArg aTy
+                                  ,TypeArg (LitTy (NumTy (d3-1)))
+                                  ,TermArg (valToTerm kn)
+                                  ,TermArg (mkVecCons dc aTy n
+                                          (mkArgApps (vecLastPrim vecTcNm)
+                                                  [TypeArg (LitTy (NumTy (n'-1)))
+                                                  ,TypeArg aTy
+                                                  ,TermArg  (valToTerm xs)])
+                                          (mkArgApps (vecInitPrim vecTcNm)
+                                                  [TypeArg (LitTy (NumTy (n'-1)))
+                                                  ,TypeArg aTy
+                                                  ,TermArg (valToTerm xs)]))
+                                  ,TermArg (mkArgApps (Data snatDc)
+                                                [TypeArg (LitTy (NumTy (d3-1)))
+                                                ,TermArg  (Literal (NaturalLiteral (d3-1)))])
                                   ]
          _  -> Nothing
 -- Element-wise operations
@@ -2963,13 +2963,13 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
          0  -> reduce (mkVecNil dc bTy)
          n' -> reduce $
                mkVecCons dc bTy n'
-                 (mkApps (valToTerm (args !! 0)) [Left (Either.lefts vArgs !! 1)])
-                 (mkApps (Prim pInfo)
-                                      [Right aTy
-                                      ,Right bTy
-                                      ,Right (LitTy (NumTy (n' - 1)))
-                                      ,Left (valToTerm (args !! 0))
-                                      ,Left (Either.lefts vArgs !! 2)])
+                 (mkArgApps (valToTerm (args !! 0)) [TermArg (Either.lefts vArgs !! 1)])
+                 (mkArgApps (Prim pInfo)
+                                      [TypeArg aTy
+                                      ,TypeArg bTy
+                                      ,TypeArg (LitTy (NumTy (n' - 1)))
+                                      ,TermArg (valToTerm (args !! 0))
+                                      ,TermArg (Either.lefts vArgs !! 2)])
   "Clash.Sized.Vector.imap" -- :: forall n a b . KnownNat n => (Index n -> a -> b) -> Vec n a -> Vec n b
     | isSubj
     , nTy : aTy : bTy : _ <- tys
@@ -2979,14 +2979,14 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
     , Right n <- runExcept (tyNatSize tcm nTy)
     , let iLit = mkIndexLit (Either.rights tyArgs' !! 0) nTy n 0
     -> reduceWHNF $
-       mkApps (Prim (PrimInfo "Clash.Sized.Vector.imap_go" (vecImapGoTy vecTcNm indexTcNm) WorkNever))
-              [Right nTy
-              ,Right nTy
-              ,Right aTy
-              ,Right bTy
-              ,Left iLit
-              ,Left (valToTerm (args !! 1))
-              ,Left (valToTerm (args !! 2))
+       mkArgApps (Prim (PrimInfo "Clash.Sized.Vector.imap_go" (vecImapGoTy vecTcNm indexTcNm) WorkNever))
+              [TypeArg nTy
+              ,TypeArg nTy
+              ,TypeArg aTy
+              ,TypeArg bTy
+              ,TermArg iLit
+              ,TermArg (valToTerm (args !! 1))
+              ,TermArg (valToTerm (args !! 2))
               ]
 
   "Clash.Sized.Vector.imap_go"
@@ -3002,20 +3002,20 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
                    TyConApp indexTcNm _ = tyView (Either.rights tyArgs !! 0)
                    iLit = mkIndexLit (Either.rights tyArgs !! 0) nTy n' 1
                in reduce $ mkVecCons dc bTy m'
-                 (mkApps (valToTerm f) [Left (valToTerm n),Left (Either.lefts vArgs !! 1)])
-                 (mkApps (Prim pInfo)
-                         [Right nTy
-                         ,Right (LitTy (NumTy (m'-1)))
-                         ,Right aTy
-                         ,Right bTy
-                         ,Left (mkApps (Prim (PrimInfo "Clash.Sized.Internal.Index.+#" (indexAddTy indexTcNm) WorkVariable))
-                                       [Right nTy
-                                       ,Left (Literal (NaturalLiteral n'))
-                                       ,Left (valToTerm n)
-                                       ,Left iLit
+                 (mkArgApps (valToTerm f) [TermArg (valToTerm n),TermArg (Either.lefts vArgs !! 1)])
+                 (mkArgApps (Prim pInfo)
+                         [TypeArg nTy
+                         ,TypeArg (LitTy (NumTy (m'-1)))
+                         ,TypeArg aTy
+                         ,TypeArg bTy
+                         ,TermArg (mkArgApps (Prim (PrimInfo "Clash.Sized.Internal.Index.+#" (indexAddTy indexTcNm) WorkVariable))
+                                       [TypeArg nTy
+                                       ,TermArg (Literal (NaturalLiteral n'))
+                                       ,TermArg (valToTerm n)
+                                       ,TermArg iLit
                                        ])
-                         ,Left (valToTerm f)
-                         ,Left (Either.lefts vArgs !! 2)
+                         ,TermArg (valToTerm f)
+                         ,TermArg (Either.lefts vArgs !! 2)
                          ])
 
   -- :: forall n a. KnownNat n => (a -> a) -> a -> Vec n a
@@ -3026,7 +3026,7 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
     , Right n <- runExcept (tyNatSize tcm nTy)
     ->
       let
-        TyConApp vecTcNm _ = tyView (getResultTy tcm ty tys)
+        TyConApp vecTcNm _ = tyView (getResultTy ty tys)
         Just vecTc = lookupUniqMap vecTcNm tcm
         [nilCon, consCon] = tyConDataCons vecTc
       in case n of
@@ -3034,13 +3034,13 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
          _ -> reduce $
           mkVecCons consCon aTy n
             (valToTerm a)
-            (mkApps
+            (mkArgApps
               (Prim pInfo)
-              [ Right (LitTy (NumTy (n - 1)))
-              , Right aTy
-              , Left (valToTerm (Lit (NaturalLiteral (n - 1))))
-              , Left (valToTerm f)
-              , Left (mkApps (valToTerm f) [Left (valToTerm a)])
+              [ TypeArg (LitTy (NumTy (n - 1)))
+              , TypeArg aTy
+              , TermArg (valToTerm (Lit (NaturalLiteral (n - 1))))
+              , TermArg (valToTerm f)
+              , TermArg (mkArgApps (valToTerm f) [TermArg (valToTerm a)])
               ])
 
 -- - Zipping
@@ -3054,25 +3054,25 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
     -> case n of
          0  -> reduce (mkVecNil dc cTy)
          n' -> reduce $ mkVecCons dc cTy n'
-                 (mkApps (valToTerm f)
-                            [Left (Either.lefts vArgs !! 1)
-                            ,Left (mkApps (vecHeadPrim vecTcNm)
-                                    [Right (LitTy (NumTy (n'-1)))
-                                    ,Right bTy
-                                    ,Left  (valToTerm ys)
+                 (mkArgApps (valToTerm f)
+                            [TermArg (Either.lefts vArgs !! 1)
+                            ,TermArg (mkArgApps (vecHeadPrim vecTcNm)
+                                    [TypeArg (LitTy (NumTy (n'-1)))
+                                    ,TypeArg bTy
+                                    ,TermArg  (valToTerm ys)
                                     ])
                             ])
-                 (mkApps (Prim pInfo)
-                                      [Right aTy
-                                      ,Right bTy
-                                      ,Right cTy
-                                      ,Right (LitTy (NumTy (n' - 1)))
-                                      ,Left (valToTerm f)
-                                      ,Left (Either.lefts vArgs !! 2)
-                                      ,Left (mkApps (vecTailPrim vecTcNm)
-                                                    [Right (LitTy (NumTy (n'-1)))
-                                                    ,Right bTy
-                                                    ,Left (valToTerm ys)
+                 (mkArgApps (Prim pInfo)
+                                      [TypeArg aTy
+                                      ,TypeArg bTy
+                                      ,TypeArg cTy
+                                      ,TypeArg (LitTy (NumTy (n' - 1)))
+                                      ,TermArg (valToTerm f)
+                                      ,TermArg (Either.lefts vArgs !! 2)
+                                      ,TermArg (mkArgApps (vecTailPrim vecTcNm)
+                                                    [TypeArg (LitTy (NumTy (n'-1)))
+                                                    ,TypeArg bTy
+                                                    ,TermArg (valToTerm ys)
                                                     ])])
 
 -- Folding
@@ -3085,15 +3085,15 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
     -> case n of
          0 -> reduce (valToTerm z)
          _ -> reduceWHNF $
-              mkApps (valToTerm f)
-                     [Left (Either.lefts vArgs !! 1)
-                     ,Left (mkApps (Prim pInfo)
-                                   [Right aTy
-                                   ,Right bTy
-                                   ,Right (LitTy (NumTy (n-1)))
-                                   ,Left  (valToTerm f)
-                                   ,Left  (valToTerm z)
-                                   ,Left  (Either.lefts vArgs !! 2)
+              mkArgApps (valToTerm f)
+                     [TermArg (Either.lefts vArgs !! 1)
+                     ,TermArg (mkArgApps (Prim pInfo)
+                                   [TypeArg aTy
+                                   ,TypeArg bTy
+                                   ,TypeArg (LitTy (NumTy (n-1)))
+                                   ,TermArg  (valToTerm f)
+                                   ,TermArg  (valToTerm z)
+                                   ,TermArg  (Either.lefts vArgs !! 2)
                                    ])
                      ]
   "Clash.Sized.Vector.fold" -- :: (a -> a -> a) -> Vec (n + 1) a -> a
@@ -3117,12 +3117,12 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
                   n1mTy  = LitTy (NumTy n1)
                   n1m'ty = LitTy (NumTy (n1-1))
                   splitAtCall =
-                   mkApps (Prim (PrimInfo "Clash.Sized.Vector.fold_split" (foldSplitAtTy vecTcNm) WorkNever))
-                          [Right mTy
-                          ,Right n1mTy
-                          ,Right aTy
-                          ,Left (Literal (NaturalLiteral m))
-                          ,Left (valToTerm vs)
+                   mkArgApps (Prim (PrimInfo "Clash.Sized.Vector.fold_split" (foldSplitAtTy vecTcNm) WorkNever))
+                          [TypeArg mTy
+                          ,TypeArg n1mTy
+                          ,TypeArg aTy
+                          ,TermArg (Literal (NaturalLiteral m))
+                          ,TermArg (valToTerm vs)
                           ]
                   mVecTy   = mkTyConApp vecTcNm [mTy,aTy]
                   n1mVecTy = mkTyConApp vecTcNm [n1mTy,aTy]
@@ -3135,18 +3135,18 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
                   asAlt    = (tupPat, (Var asId))
                   bsAlt    = (tupPat, (Var bsId))
               in  reduceWHNF $
-                  mkApps (valToTerm f)
-                         [Left (mkApps (Prim pInfo)
-                                       [Right m'ty
-                                       ,Right aTy
-                                       ,Left (valToTerm f)
-                                       ,Left (Case splitAtCall mVecTy [asAlt])
+                  mkArgApps (valToTerm f)
+                         [TermArg (mkArgApps (Prim pInfo)
+                                       [TypeArg m'ty
+                                       ,TypeArg aTy
+                                       ,TermArg (valToTerm f)
+                                       ,TermArg (Case splitAtCall mVecTy [asAlt])
                                        ])
-                         ,Left (mkApps (Prim pInfo)
-                                       [Right n1m'ty
-                                       ,Right aTy
-                                       ,Left  (valToTerm f)
-                                       ,Left  (Case splitAtCall n1mVecTy [bsAlt])
+                         ,TermArg (mkArgApps (Prim pInfo)
+                                       [TypeArg n1m'ty
+                                       ,TypeArg aTy
+                                       ,TermArg  (valToTerm f)
+                                       ,TermArg  (Case splitAtCall n1mVecTy [bsAlt])
                                        ])
                          ]
 
@@ -3156,7 +3156,7 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
     , mTy : nTy : aTy : _ <- tys
     , Right m <- runExcept (tyNatSize tcm mTy)
     -> let -- Get the tuple data-constructor
-           ty1 = piResultTys tcm ty tys
+           ty1 = piResultTys ty tys
            (_,tyView -> TyConApp tupTcNm tyArgs) = splitFunForallTy ty1
            (Just tupTc)       = lookupUniqMap tupTcNm tcm
            [tupDc]            = tyConDataCons tupTc
@@ -3166,12 +3166,12 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
            [nilCon,consCon]   = tyConDataCons vecTc
            -- Recursive call to @splitAt@
            splitAtRec v =
-            mkApps (Prim pInfo)
-                   [Right (LitTy (NumTy (m-1)))
-                   ,Right nTy
-                   ,Right aTy
-                   ,Left (Literal (NaturalLiteral (m-1)))
-                   ,Left v
+            mkArgApps (Prim pInfo)
+                   [TypeArg (LitTy (NumTy (m-1)))
+                   ,TypeArg nTy
+                   ,TypeArg aTy
+                   ,TermArg (Literal (NaturalLiteral (m-1)))
+                   ,TermArg v
                    ]
            -- Projection either the first or second field of the recursive
            -- call to @splitAt@
@@ -3189,18 +3189,18 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
        in case m of
          -- (Nil,v)
          0 -> reduce $
-              mkApps (Data tupDc) $ (map Right tyArgs) ++
-                [ Left (mkVecNil nilCon aTy)
-                , Left (valToTerm (last args))
+              mkArgApps (Data tupDc) $ (map TypeArg tyArgs) ++
+                [ TermArg (mkVecNil nilCon aTy)
+                , TermArg (valToTerm (last args))
                 ]
          -- (x:xs) <- v
          m' | DC _ vArgs <- last args
             -- (x:fst (splitAt (m-1) xs),snd (splitAt (m-1) xs))
             -> reduce $
-               mkApps (Data tupDc) $ (map Right tyArgs) ++
-                 [ Left (mkVecCons consCon aTy m' (Either.lefts vArgs !! 1)
+               mkArgApps (Data tupDc) $ (map TypeArg tyArgs) ++
+                 [ TermArg (mkVecCons consCon aTy m' (Either.lefts vArgs !! 1)
                            (splitAtSelR (Either.lefts vArgs !! 2) m1VecTy [lAlt]))
-                 , Left (splitAtSelR (Either.lefts vArgs !! 2) nVecTy [rAlt])
+                 , TermArg (splitAtSelR (Either.lefts vArgs !! 2) nVecTy [rAlt])
                  ]
          -- v doesn't reduce to a data-constructor
          _  -> Nothing
@@ -3220,21 +3220,21 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
                   [snatDc]    = tyConDataCons snatTc
                   k'ty        = LitTy (NumTy (k'-1))
               in  reduceWHNF $
-                  mkApps (valToTerm f)
-                         [Right k'ty
-                         ,Left (mkApps (Data snatDc)
-                                       [Right k'ty
-                                       ,Left (Literal (NaturalLiteral (k'-1)))])
-                         ,Left (Either.lefts vArgs !! 1)
-                         ,Left (mkApps (Prim pInfo)
-                                       [Right pTy
-                                       ,Right k'ty
-                                       ,Right aTy
-                                       ,Left (Literal (NaturalLiteral (k'-1)))
-                                       ,Left (valToTerm p)
-                                       ,Left (valToTerm f)
-                                       ,Left (valToTerm z)
-                                       ,Left (Either.lefts vArgs !! 2)
+                  mkArgApps (valToTerm f)
+                         [TypeArg k'ty
+                         ,TermArg (mkArgApps (Data snatDc)
+                                       [TypeArg k'ty
+                                       ,TermArg (Literal (NaturalLiteral (k'-1)))])
+                         ,TermArg (Either.lefts vArgs !! 1)
+                         ,TermArg (mkArgApps (Prim pInfo)
+                                       [TypeArg pTy
+                                       ,TypeArg k'ty
+                                       ,TypeArg aTy
+                                       ,TermArg (Literal (NaturalLiteral (k'-1)))
+                                       ,TermArg (valToTerm p)
+                                       ,TermArg (valToTerm f)
+                                       ,TermArg (valToTerm z)
+                                       ,TermArg (Either.lefts vArgs !! 2)
                                        ])
                          ]
   "Clash.Sized.Vector.dtfold"
@@ -3244,7 +3244,7 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
     , DC _ vArgs <- xs
     , Right k' <- runExcept (tyNatSize tcm kTy)
     -> case k' of
-         0 -> reduceWHNF (mkApps (valToTerm f) [Left (Either.lefts vArgs !! 1)])
+         0 -> reduceWHNF (mkArgApps (valToTerm f) [TermArg (Either.lefts vArgs !! 1)])
          _ -> let (tyArgs,_)  = splitFunForallTy ty
                   TyConApp vecTcNm _ = tyView (Either.rights tyArgs !! 4)
                   (tyArgs',_) = splitFunForallTy (Either.rights tyArgs !! 3)
@@ -3257,14 +3257,14 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
                   k'ty        = LitTy (NumTy (k'-1))
                   k2ty        = LitTy (NumTy (2^(k'-1)))
                   splitAtCall =
-                   mkApps (splitAtPrim snatTcNm vecTcNm)
-                          [Right k2ty
-                          ,Right k2ty
-                          ,Right aTy
-                          ,Left (mkApps (Data snatDc)
-                                        [Right k2ty
-                                        ,Left (Literal (NaturalLiteral (2^(k'-1))))])
-                          ,Left (valToTerm xs)
+                   mkArgApps (splitAtPrim snatTcNm vecTcNm)
+                          [TypeArg k2ty
+                          ,TypeArg k2ty
+                          ,TypeArg aTy
+                          ,TermArg (mkArgApps (Data snatDc)
+                                        [TypeArg k2ty
+                                        ,TermArg (Literal (NaturalLiteral (2^(k'-1))))])
+                          ,TermArg (valToTerm xs)
                           ]
                   xsSVecTy = mkTyConApp vecTcNm [k2ty,aTy]
                   -- Guaranteed no capture, so okay to use unsafe name generation
@@ -3276,29 +3276,29 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
                   asAlt    = (tupPat, (Var xsLId))
                   bsAlt    = (tupPat, (Var xsRId))
               in  reduceWHNF $
-                  mkApps (valToTerm g)
-                         [Right k'ty
-                         ,Left (mkApps (Data snatDc)
-                                       [Right k'ty
-                                       ,Left (Literal (NaturalLiteral (k'-1)))])
-                         ,Left (mkApps (Prim pInfo)
-                                       [Right pTy
-                                       ,Right k'ty
-                                       ,Right aTy
-                                       ,Left (Literal (NaturalLiteral (k'-1)))
-                                       ,Left (valToTerm p)
-                                       ,Left (valToTerm f)
-                                       ,Left (valToTerm g)
-                                       ,Left (Case splitAtCall xsSVecTy [asAlt])])
-                         ,Left (mkApps (Prim pInfo)
-                                       [Right pTy
-                                       ,Right k'ty
-                                       ,Right aTy
-                                       ,Left (Literal (NaturalLiteral (k'-1)))
-                                       ,Left (valToTerm p)
-                                       ,Left (valToTerm f)
-                                       ,Left (valToTerm g)
-                                       ,Left (Case splitAtCall xsSVecTy [bsAlt])])
+                  mkArgApps (valToTerm g)
+                         [TypeArg k'ty
+                         ,TermArg (mkArgApps (Data snatDc)
+                                       [TypeArg k'ty
+                                       ,TermArg (Literal (NaturalLiteral (k'-1)))])
+                         ,TermArg (mkArgApps (Prim pInfo)
+                                       [TypeArg pTy
+                                       ,TypeArg k'ty
+                                       ,TypeArg aTy
+                                       ,TermArg (Literal (NaturalLiteral (k'-1)))
+                                       ,TermArg (valToTerm p)
+                                       ,TermArg (valToTerm f)
+                                       ,TermArg (valToTerm g)
+                                       ,TermArg (Case splitAtCall xsSVecTy [asAlt])])
+                         ,TermArg (mkArgApps (Prim pInfo)
+                                       [TypeArg pTy
+                                       ,TypeArg k'ty
+                                       ,TypeArg aTy
+                                       ,TermArg (Literal (NaturalLiteral (k'-1)))
+                                       ,TermArg (valToTerm p)
+                                       ,TermArg (valToTerm f)
+                                       ,TermArg (valToTerm g)
+                                       ,TermArg (Case splitAtCall xsSVecTy [bsAlt])])
                          ]
 -- Misc
   "Clash.Sized.Vector.lazyV"
@@ -3314,19 +3314,19 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
          n' -> let (Just vecTc) = lookupUniqMap vecTcNm tcm
                    [_,consCon]  = tyConDataCons vecTc
                in  reduce $ mkVecCons consCon aTy n'
-                     (mkApps (vecHeadPrim vecTcNm)
-                             [ Right (LitTy (NumTy (n' - 1)))
-                             , Right aTy
-                             , Left  (valToTerm xs)
+                     (mkArgApps (vecHeadPrim vecTcNm)
+                             [ TypeArg (LitTy (NumTy (n' - 1)))
+                             , TypeArg aTy
+                             , TermArg  (valToTerm xs)
                              ])
-                     (mkApps (Prim pInfo)
-                             [ Right (LitTy (NumTy (n' - 1)))
-                             , Right aTy
-                             , Left  (Literal (NaturalLiteral (n'-1)))
-                             , Left  (mkApps (vecTailPrim vecTcNm)
-                                             [ Right (LitTy (NumTy (n'-1)))
-                                             , Right aTy
-                                             , Left  (valToTerm xs)
+                     (mkArgApps (Prim pInfo)
+                             [ TypeArg (LitTy (NumTy (n' - 1)))
+                             , TypeArg aTy
+                             , TermArg  (Literal (NaturalLiteral (n'-1)))
+                             , TermArg  (mkArgApps (vecTailPrim vecTcNm)
+                                             [ TypeArg (LitTy (NumTy (n'-1)))
+                                             , TypeArg aTy
+                                             , TermArg  (valToTerm xs)
                                              ])
                              ])
 -- Traversable
@@ -3339,9 +3339,9 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
     -> case n of
          0 -> let (pureF,ids') = runPEM (mkSelectorCase $(curLoc) is0 tcm (valToTerm apDict) 1 1) ids
               in  reduceWHNF' (mach { mSupply = ids' }) $
-                  mkApps pureF
-                         [Right (mkTyConApp (vecTcNm) [nTy,bTy])
-                         ,Left  (mkVecNil dc bTy)]
+                  mkArgApps pureF
+                         [TypeArg (mkTyConApp (vecTcNm) [nTy,bTy])
+                         ,TermArg  (mkVecNil dc bTy)]
          _ -> let ((fmapF,apF),ids') = flip runPEM ids $ do
                     fDict  <- mkSelectorCase $(curLoc) is0 tcm (valToTerm apDict) 1 0
                     fmapF' <- mkSelectorCase $(curLoc) is0 tcm fDict 1 0
@@ -3350,29 +3350,29 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
                   n'ty = LitTy (NumTy (n-1))
                   Just (consCoTy : _) = dataConInstArgTys dc [nTy,bTy,n'ty]
               in  reduceWHNF' (mach { mSupply = ids' }) $
-                  mkApps apF
-                         [Right (mkTyConApp vecTcNm [n'ty,bTy])
-                         ,Right (mkTyConApp vecTcNm [nTy,bTy])
-                         ,Left (mkApps fmapF
-                                       [Right bTy
-                                       ,Right (mkFunTy (mkTyConApp vecTcNm [n'ty,bTy])
+                  mkArgApps apF
+                         [TypeArg (mkTyConApp vecTcNm [n'ty,bTy])
+                         ,TypeArg (mkTyConApp vecTcNm [nTy,bTy])
+                         ,TermArg (mkArgApps fmapF
+                                       [TypeArg bTy
+                                       ,TypeArg (mkFunTy (mkTyConApp vecTcNm [n'ty,bTy])
                                                        (mkTyConApp vecTcNm [nTy,bTy]))
-                                       ,Left (mkApps (Data dc)
-                                                     [Right nTy
-                                                     ,Right bTy
-                                                     ,Right n'ty
-                                                     ,Left (primCo consCoTy)])
-                                       ,Left (mkApps (valToTerm f)
-                                                     [Left (Either.lefts vArgs !! 1)])
+                                       ,TermArg (mkArgApps (Data dc)
+                                                     [TypeArg nTy
+                                                     ,TypeArg bTy
+                                                     ,TypeArg n'ty
+                                                     ,TermArg (primCo consCoTy)])
+                                       ,TermArg (mkArgApps (valToTerm f)
+                                                     [TermArg (Either.lefts vArgs !! 1)])
                                        ])
-                         ,Left (mkApps (Prim pInfo)
-                                       [Right aTy
-                                       ,Right fTy
-                                       ,Right bTy
-                                       ,Right n'ty
-                                       ,Left (valToTerm apDict)
-                                       ,Left (valToTerm f)
-                                       ,Left (Either.lefts vArgs !! 2)
+                         ,TermArg (mkArgApps (Prim pInfo)
+                                       [TypeArg aTy
+                                       ,TypeArg fTy
+                                       ,TypeArg bTy
+                                       ,TypeArg n'ty
+                                       ,TermArg (valToTerm apDict)
+                                       ,TermArg (valToTerm f)
+                                       ,TermArg (Either.lefts vArgs !! 2)
                                        ])
                          ]
     where
@@ -3393,17 +3393,17 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
          n' | Right m <- runExcept (tyNatSize tcm mTy)
             , (_,tyView -> TyConApp bvTcNm _) <- splitFunForallTy ty
             -> reduceWHNF $
-               mkApps (bvAppendPrim bvTcNm)
-                 [ Right (mkTyConApp typeNatMul [LitTy (NumTy (n'-1)),mTy])
-                 , Right mTy
-                 , Left (Literal (NaturalLiteral ((n'-1)*m)))
-                 , Left (Either.lefts vArgs !! 1)
-                 , Left (mkApps (Prim pInfo)
-                                [ Right (LitTy (NumTy (n'-1)))
-                                , Right mTy
-                                , Left (Literal (NaturalLiteral (n'-1)))
-                                , Left (valToTerm km)
-                                , Left (Either.lefts vArgs !! 2)
+               mkArgApps (bvAppendPrim bvTcNm)
+                 [ TypeArg (mkTyConApp typeNatMul [LitTy (NumTy (n'-1)),mTy])
+                 , TypeArg mTy
+                 , TermArg (Literal (NaturalLiteral ((n'-1)*m)))
+                 , TermArg (Either.lefts vArgs !! 1)
+                 , TermArg (mkArgApps (Prim pInfo)
+                                [ TypeArg (LitTy (NumTy (n'-1)))
+                                , TypeArg mTy
+                                , TermArg (Literal (NaturalLiteral (n'-1)))
+                                , TermArg (valToTerm km)
+                                , TermArg (Either.lefts vArgs !! 2)
                                 ])
                  ]
          _ -> Nothing
@@ -3426,11 +3426,11 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
               Just tupTc  = lookupUniqMap tupTcNm tcm
               [tupDc]     = tyConDataCons tupTc
               splitCall   =
-                mkApps (bvSplitPrim bvTcNm)
-                       [ Right (mkTyConApp typeNatMul [LitTy (NumTy (n'-1)),mTy])
-                       , Right mTy
-                       , Left (Literal (NaturalLiteral ((n'-1)*m)))
-                       , Left (valToTerm bv)
+                mkArgApps (bvSplitPrim bvTcNm)
+                       [ TypeArg (mkTyConApp typeNatMul [LitTy (NumTy (n'-1)),mTy])
+                       , TypeArg mTy
+                       , TermArg (Literal (NaturalLiteral ((n'-1)*m)))
+                       , TermArg (valToTerm bv)
                        ]
               mBVTy       = mkTyConApp bvTcNm [mTy]
               n1BVTy      = mkTyConApp bvTcNm
@@ -3448,12 +3448,12 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
 
           in  reduce $ mkVecCons consCon (mkTyConApp bvTcNm [mTy]) n'
                 (Case splitCall mBVTy [xAlt])
-                (mkApps (Prim pInfo)
-                        [ Right (LitTy (NumTy (n'-1)))
-                        , Right mTy
-                        , Left (Literal (NaturalLiteral (n'-1)))
-                        , Left (valToTerm km)
-                        , Left (Case splitCall n1BVTy [bvAlt])
+                (mkArgApps (Prim pInfo)
+                        [ TypeArg (LitTy (NumTy (n'-1)))
+                        , TypeArg mTy
+                        , TermArg (Literal (NaturalLiteral (n'-1)))
+                        , TermArg (valToTerm km)
+                        , TermArg (Case splitCall n1BVTy [bvAlt])
                         ])
          _ -> Nothing
   _ -> Nothing
@@ -3503,11 +3503,11 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
         Right b -> b
         Left e -> trace (msg e) (undefinedTm resTy)
       where
-        resTy = getResultTy tcm ty tys
+        resTy = getResultTy ty tys
         selectException e | wantToHandle e = Just e
                           | otherwise = Nothing
         msg e = unlines ["Warning: caught exception: \"" ++ show e ++ "\" while trying to evaluate: "
-                        , showPpr (mkApps (Prim pInfo) (map (Left . valToTerm) args))
+                        , showPpr (mkArgApps (Prim pInfo) (map (TermArg . valToTerm) args))
                         ]
 
     catchDivByZero = makeUndefinedIf (==DivideByZero)
@@ -3770,11 +3770,11 @@ mkSizedLit
   -- ^ Value to construct
   -> Term
 mkSizedLit conPrim ty nTy kn val =
-  mkApps
+  mkArgApps
     (conPrim sTy)
-    [ Right nTy
-    , Left (Literal (NaturalLiteral kn))
-    , Left (Literal (IntegerLiteral val)) ]
+    [ TypeArg nTy
+    , TermArg (Literal (NaturalLiteral kn))
+    , TermArg (Literal (IntegerLiteral val)) ]
  where
     (_,sTy) = splitFunForallTy ty
 
@@ -3787,8 +3787,8 @@ mkBitLit
   -- ^ Value
   -> Term
 mkBitLit ty msk val =
-  mkApps (bConPrim sTy) [ Left (Literal (WordLiteral (msk .&. 1)))
-                        , Left (Literal (IntegerLiteral (val .&. 1)))]
+  mkArgApps (bConPrim sTy) [ TermArg (Literal (WordLiteral (msk .&. 1)))
+                        , TermArg (Literal (IntegerLiteral (val .&. 1)))]
   where
     (_,sTy) = splitFunForallTy ty
 
@@ -3818,11 +3818,11 @@ mkBitVectorLit
   -- ^ Value to construct
   -> Term
 mkBitVectorLit ty nTy kn mask val
-  = mkApps (bvConPrim sTy)
-           [Right nTy
-           ,Left (Literal (NaturalLiteral kn))
-           ,Left (Literal (NaturalLiteral mask))
-           ,Left (Literal (IntegerLiteral val))]
+  = mkArgApps (bvConPrim sTy)
+           [TypeArg nTy
+           ,TermArg (Literal (NaturalLiteral kn))
+           ,TermArg (Literal (NaturalLiteral mask))
+           ,TermArg (Literal (IntegerLiteral val))]
   where
     (_,sTy) = splitFunForallTy ty
 
@@ -4035,19 +4035,18 @@ runSizedF f i j _ = toInteger $ f (fromInteger i) (fromInteger j)
 extractTySizeInfo :: TyConMap -> Type -> [Type] -> (Type, Type, Integer)
 extractTySizeInfo tcm ty tys = (resTy,resSizeTy,resSize)
   where
-    ty' = piResultTys tcm ty tys
+    ty' = piResultTys ty tys
     (_,resTy) = splitFunForallTy ty'
     TyConApp _ [resSizeTy] = tyView resTy
     Right resSize = runExcept (tyNatSize tcm resSizeTy)
 
 getResultTy
-  :: TyConMap
-  -> Type
+  :: Type
   -> [Type]
   -> Type
-getResultTy tcm ty tys = resTy
+getResultTy ty tys = resTy
  where
-  ty' = piResultTys tcm ty tys
+  ty' = piResultTys ty tys
   (_,resTy) = splitFunForallTy ty'
 
 liftDDI :: (Double# -> Double# -> Int#) -> [Value] -> Maybe Term

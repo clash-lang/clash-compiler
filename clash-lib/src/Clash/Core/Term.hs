@@ -18,7 +18,7 @@ module Clash.Core.Term
   , mkAbstraction
   , mkTyLams
   , mkLams
-  , mkApps
+  -- , mkApps
   , mkTyApps
   , mkTmApps
   , mkTicks
@@ -54,6 +54,8 @@ module Clash.Core.Term
   , stripTickX
   , typeAndTermArgs
   , tickArgs
+  , typeAndCastArgs
+  , collectTicks
   ) where
 
 -- External Modules
@@ -178,8 +180,8 @@ mkLams :: Term -> [Id] -> Term
 mkLams tm = mkAbstraction tm . map Left
 
 -- | Apply a list of types and terms to a term
-mkApps :: Term -> [Either Term Type] -> Term
-mkApps = foldl' (\e a -> either (App e) (TyApp e) a)
+-- mkApps :: Term -> [Either Term Type] -> Term
+-- mkApps = foldl' (\e a -> either (App e) (TyApp e) a)
 
 -- | Apply a list of terms to a term
 mkTmApps :: Term -> [Term] -> Term
@@ -416,3 +418,15 @@ collectArgsX = go []
   go args (App e1 e2) = go (Left e2:args) e1
   go args (TyApp e t) = go (Right t:args) e
   go args e           = (e, args)
+
+typeAndCastArgs :: [AppArg] -> [AppArg]
+typeAndCastArgs [] = []
+typeAndCastArgs (TermArg {}:rest) = typeAndCastArgs rest
+typeAndCastArgs (TickCtx {}:rest) = typeAndCastArgs rest
+typeAndCastArgs (arg:rest) = arg : typeAndCastArgs rest
+
+collectTicks :: Term -> (Term, [TickInfo])
+collectTicks = go []
+ where
+  go args (Tick i e) = go (i:args) e
+  go args e          = (e,args)

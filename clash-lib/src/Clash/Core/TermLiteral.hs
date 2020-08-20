@@ -19,7 +19,6 @@ module Clash.Core.TermLiteral
   ) where
 
 import           Data.Bifunctor                  (bimap)
-import           Data.Either                     (lefts)
 import           Data.Proxy                      (Proxy(..))
 import           Data.Text                       (Text)
 import qualified Data.Text                       as Text
@@ -27,8 +26,7 @@ import           Data.Typeable                   (Typeable, typeRep)
 import           GHC.Natural
 import           GHC.Stack
 
-import           Clash.Core.Term
-  (AppArg (TermArg), Term(Literal), collectAppArgs, termArgs, stripTickX)
+import           Clash.Core.Term                 (Term(Literal), collectAppArgs, termArgs)
 import           Clash.Core.Literal
 import           Clash.Core.Pretty               (showPpr)
 import qualified Clash.Util.Interpolate          as I
@@ -52,32 +50,32 @@ instance TermLiteral Term where
   termToData = pure
 
 instance TermLiteral String where
-  termToData (collectAppArgs -> (_, stripTickX -> [TermArg (Literal (StringLiteral s))])) = Right s
+  termToData (collectAppArgs -> (_, termArgs -> [Literal (StringLiteral s)])) = Right s
   termToData t = Left t
 
 instance TermLiteral Text where
   termToData t = Text.pack <$> termToData t
 
 instance TermLiteral Int where
-  termToData (collectAppArgs -> (_, stripTickX -> [TermArg (Literal (IntLiteral n))])) =
+  termToData (collectAppArgs -> (_, termArgs -> [Literal (IntLiteral n)])) =
     Right (fromInteger n)
   termToData t = Left t
 
 instance TermLiteral Word where
-  termToData (collectAppArgs -> (_, stripTickX -> [TermArg (Literal (WordLiteral n))])) =
+  termToData (collectAppArgs -> (_, termArgs -> [Literal (WordLiteral n)])) =
     Right (fromInteger n)
   termToData t = Left t
 
 instance TermLiteral Integer where
-  termToData (collectAppArgs -> (_, stripTickX -> [TermArg (Literal (IntegerLiteral n))])) = Right n
+  termToData (collectAppArgs -> (_, termArgs -> [Literal (IntegerLiteral n)])) = Right n
   termToData t = Left t
 
 instance TermLiteral Char where
-  termToData (collectAppArgs -> (_, stripTickX -> [TermArg (Literal (CharLiteral c))])) = Right c
+  termToData (collectAppArgs -> (_, termArgs -> [Literal (CharLiteral c)])) = Right c
   termToData t = Left t
 
 instance TermLiteral Natural where
-  termToData (collectAppArgs -> (_, stripTickX -> [TermArg (Literal (NaturalLiteral n))])) =
+  termToData (collectAppArgs -> (_, termArgs -> [Literal (NaturalLiteral n)])) =
     Right (fromInteger n)
   termToData t = Left t
 

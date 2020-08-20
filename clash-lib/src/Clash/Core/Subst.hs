@@ -74,7 +74,7 @@ import           Clash.Core.FreeVars
   (noFreeVarsOfType, localFVsOfTerms, tyFVsOfTypes)
 import           Clash.Core.Pretty         (ppr, fromPpr)
 import           Clash.Core.Term
-  (LetBinding, Pat (..), Term (..), TickInfo (..), PrimInfo(primName))
+  (LetBinding, Pat (..), Term (..), TickInfo (..), PrimInfo(primName), AppArg (..))
 import           Clash.Core.Type           (Type (..))
 import           Clash.Core.VarEnv
 import           Clash.Core.Var            (Id, Var (..), TyVar, isGlobalId)
@@ -1003,3 +1003,5 @@ instance Eq Term where
 
 instance Ord Term where
   compare = acmpTerm
+
+deriving instance Eq AppArg

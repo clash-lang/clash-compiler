@@ -7,7 +7,6 @@ module Clash.Core.TermLiteral.TH
   ,  dcName'
   ) where
 
-import           Data.Either
 import qualified Data.Text                       as Text
 import           Language.Haskell.TH.Syntax
 

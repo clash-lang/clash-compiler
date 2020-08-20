@@ -54,13 +54,11 @@ import           Clash.Core.Name
   (nameOcc, Name(..), NameSort(User), mkUnsafeSystemName)
 import           Clash.Core.Pretty                (showPpr)
 import           Clash.Core.Term
-  (CoreContext (..), PrimInfo (..), Term (..), WorkInfo (..), Pat (..),
-   collectTermIds, mkApps)
+  (CoreContext (..), PrimInfo (..), Term (..), WorkInfo (..), Pat (..), AppArg (..),
+   collectTermIds, mkArgApps)
 import           Clash.Core.TermInfo
-import           Clash.Core.Type                  (LitTy (..), Type (..),
-                                                   TypeView (..), coreView1,
-                                                   mkFunTy, mkTyConApp,
-                                                   splitFunForallTy, tyView)
+import           Clash.Core.Type
+  (LitTy (..), Type (..), TypeView (..), mkFunTy, mkTyConApp, splitFunForallTy, tyView)
 import           Clash.Core.TyCon
   (TyConMap, TyConName, tyConDataCons, tyConName)
 import           Clash.Core.TysPrim
@@ -227,12 +225,12 @@ mkVecCons
 mkVecCons consCon resTy n h t
   | n <= 0 = error "mkVecCons: n <= 0"
   | otherwise =
-    mkApps (Data consCon) [ Right (LitTy (NumTy n))
-                          , Right resTy
-                          , Right (LitTy (NumTy (n-1)))
-                          , Left (primCo consCoTy)
-                          , Left h
-                          , Left t ]
+    mkArgApps (Data consCon) [ TypeArg (LitTy (NumTy n))
+                             , TypeArg resTy
+                             , TypeArg (LitTy (NumTy (n-1)))
+                             , TermArg (primCo consCoTy)
+                             , TermArg h
+                             , TermArg t ]
 
  where
   args = dataConInstArgTys consCon [LitTy (NumTy n), resTy, LitTy (NumTy (n-1))]
@@ -246,9 +244,9 @@ mkVecNil
   -- ^ The element type
   -> Term
 mkVecNil nilCon resTy =
-  mkApps (Data nilCon) [ Right (LitTy (NumTy 0))
-                       , Right resTy
-                       , Left  (primCo nilCoTy) ]
+  mkArgApps (Data nilCon) [ TypeArg (LitTy (NumTy 0))
+                          , TypeArg resTy
+                          , TermArg (primCo nilCoTy) ]
  where
   args = dataConInstArgTys nilCon [LitTy (NumTy 0), resTy]
   Just (nilCoTy : _ ) = args
@@ -267,10 +265,9 @@ reduceReverse
   -> NormalizeSession Term
 reduceReverse inScope0 n elTy vArg = do
   tcm <- Lens.view tcCache
-  let ty = termType tcm vArg
+  let ty = termType vArg
   go tcm ty
  where
-  go tcm (coreView1 tcm -> Just ty') = go tcm ty'
   go tcm (tyView -> TyConApp vecTcNm _)
     | Just vecTc <- lookupUniqMap vecTcNm tcm
       , nameOcc vecTcNm == "Clash.Sized.Vector.Vec"
@@ -301,9 +298,8 @@ reduceZipWith
   -> NormalizeSession Term
 reduceZipWith _ctx zipWithPrimInfo n lhsElTy rhsElTy resElTy fun lhsArg rhsArg = do
   tcm <- Lens.view tcCache
-  changed (go tcm (termType tcm lhsArg))
+  changed (go tcm (termType lhsArg))
  where
-  go tcm (coreView1 tcm -> Just ty) = go tcm ty
   go tcm (tyView -> TyConApp vecTcNm _)
     | (Just vecTc) <- lookupUniqMap vecTcNm tcm
     , nameOcc vecTcNm == "Clash.Sized.Vector.Vec"
@@ -314,14 +310,14 @@ reduceZipWith _ctx zipWithPrimInfo n lhsElTy rhsElTy resElTy fun lhsArg rhsArg =
         let
           (a, as) = extractHeadTail consCon lhsElTy n lhsArg
           (b, bs) = extractHeadTail consCon rhsElTy n rhsArg
-          c = mkApps fun [Left a, Left b]
-          cs = mkApps (Prim zipWithPrimInfo) [ Right lhsElTy
-                                             , Right rhsElTy
-                                             , Right resElTy
-                                             , Right (LitTy (NumTy (n - 1)))
-                                             , Left fun
-                                             , Left as
-                                             , Left bs ]
+          c = mkArgApps fun [TermArg a, TermArg b]
+          cs = mkArgApps (Prim zipWithPrimInfo) [ TypeArg lhsElTy
+                                                , TypeArg rhsElTy
+                                                , TypeArg resElTy
+                                                , TypeArg (LitTy (NumTy (n - 1)))
+                                                , TermArg fun
+                                                , TermArg as
+                                                , TermArg bs ]
         in
           mkVecCons consCon resElTy n c cs
   go _ ty =
@@ -345,10 +341,9 @@ reduceMap
   -> NormalizeSession Term
 reduceMap _ctx mapPrimInfo n argElTy resElTy fun arg = do
     tcm <- Lens.view tcCache
-    let ty = termType tcm arg
+    let ty = termType arg
     changed (go tcm ty)
   where
-    go tcm (coreView1 tcm -> Just ty') = go tcm ty'
     go tcm (tyView -> TyConApp vecTcNm _)
       | (Just vecTc)     <- lookupUniqMap vecTcNm tcm
       , nameOcc vecTcNm == "Clash.Sized.Vector.Vec"
@@ -357,14 +352,14 @@ reduceMap _ctx mapPrimInfo n argElTy resElTy fun arg = do
           mkVecNil nilCon argElTy
         else
           let
-            nPredTy = Right (LitTy (NumTy (n - 1)))
+            nPredTy = LitTy (NumTy (n - 1))
             (a, as) = extractHeadTail consCon argElTy n arg
-            b = mkApps fun [Left a]
-            bs = mkApps (Prim mapPrimInfo) [ Right argElTy
-                                           , Right resElTy
-                                           , nPredTy
-                                           , Left fun
-                                           , Left as ]
+            b = mkArgApps fun [TermArg a]
+            bs = mkArgApps (Prim mapPrimInfo) [ TypeArg argElTy
+                                              , TypeArg resElTy
+                                              , TypeArg nPredTy
+                                              , TermArg fun
+                                              , TermArg as ]
           in
             mkVecCons consCon resElTy n b bs
     go _ ty =
@@ -387,10 +382,9 @@ reduceImap
   -> NormalizeSession Term
 reduceImap (TransformContext is0 ctx) n argElTy resElTy fun arg = do
     tcm <- Lens.view tcCache
-    let ty = termType tcm arg
+    let ty = termType arg
     go tcm ty
   where
-    go tcm (coreView1 tcm -> Just ty') = go tcm ty'
     go tcm (tyView -> TyConApp vecTcNm _)
       | (Just vecTc)     <- lookupUniqMap vecTcNm tcm
       , nameOcc vecTcNm == "Clash.Sized.Vector.Vec"
@@ -402,7 +396,7 @@ reduceImap (TransformContext is0 ctx) n argElTy resElTy fun arg = do
             (uniqs1,nTv) = mkUniqSystemTyVar (uniqs0,is1) ("n",typeNatKind)
             (uniqs2,(vars,elems)) = second (second concat . unzip)
                                   $ uncurry extractElems uniqs1 consCon argElTy 'I' n arg
-            (Right idxTy:_,_) = splitFunForallTy (termType tcm fun)
+            (Right idxTy:_,_) = splitFunForallTy (termType fun)
             (TyConApp idxTcNm _) = tyView idxTy
             -- fromInteger# :: KnownNat n => Integer -> Index n
             idxFromIntegerTy = ForAllTy nTv
@@ -486,11 +480,10 @@ reduceTraverse
   -> NormalizeSession Term
 reduceTraverse (TransformContext is0 ctx) n aTy fTy bTy dict fun arg = do
     tcm <- Lens.view tcCache
-    let (TyConApp apDictTcNm _) = tyView (termType tcm dict)
-        ty = termType tcm arg
+    let (TyConApp apDictTcNm _) = tyView (termType dict)
+        ty = termType arg
     go tcm apDictTcNm ty
   where
-    go tcm apDictTcNm (coreView1 tcm -> Just ty') = go tcm apDictTcNm ty'
     go tcm apDictTcNm (tyView -> TyConApp vecTcNm _)
       | (Just vecTc) <- lookupUniqMap vecTcNm tcm
       , nameOcc vecTcNm == "Clash.Sized.Vector.Vec"
@@ -573,26 +566,27 @@ mkTravVec :: TyConName -- ^ Vec tcon
 mkTravVec vecTc nilCon consCon pureTm apTm fmapTm bTy = go
   where
     go :: Integer -> [Term] -> Term
-    go _ [] = mkApps pureTm [Right (mkTyConApp vecTc [LitTy (NumTy 0),bTy])
-                            ,Left  (mkApps (Data nilCon)
-                                           [Right (LitTy (NumTy 0))
-                                           ,Right bTy
-                                           ,Left  (primCo nilCoTy)])]
+    go _ [] = mkArgApps pureTm [TypeArg (mkTyConApp vecTc [LitTy (NumTy 0),bTy])
+                               ,TermArg (mkArgApps (Data nilCon)
+                                           [TypeArg (LitTy (NumTy 0))
+                                           ,TypeArg bTy
+                                           ,TermArg  (primCo nilCoTy)])]
 
-    go n (x:xs) = mkApps apTm
-      [Right (mkTyConApp vecTc [LitTy (NumTy (n-1)),bTy])
-      ,Right (mkTyConApp vecTc [LitTy (NumTy n),bTy])
-      ,Left (mkApps fmapTm [Right bTy
-                           ,Right (mkFunTy (mkTyConApp vecTc [LitTy (NumTy (n-1)),bTy])
-                                           (mkTyConApp vecTc [LitTy (NumTy n),bTy]))
-                           ,Left  (mkApps (Data consCon)
-                                          [Right (LitTy (NumTy n))
-                                          ,Right bTy
-                                          ,Right (LitTy (NumTy (n-1)))
-                                          ,Left  (primCo (consCoTy n))
-                                          ])
-                           ,Left  x])
-      ,Left (go (n-1) xs)]
+    go n (x:xs) = mkArgApps apTm
+      [TypeArg (mkTyConApp vecTc [LitTy (NumTy (n-1)),bTy])
+      ,TypeArg (mkTyConApp vecTc [LitTy (NumTy n),bTy])
+      ,TermArg (mkArgApps fmapTm
+                          [TypeArg bTy
+                          ,TypeArg (mkFunTy (mkTyConApp vecTc [LitTy (NumTy (n-1)),bTy])
+                                            (mkTyConApp vecTc [LitTy (NumTy n),bTy]))
+                          ,TermArg  (mkArgApps (Data consCon)
+                                               [TypeArg (LitTy (NumTy n))
+                                               ,TypeArg bTy
+                                               ,TypeArg (LitTy (NumTy (n-1)))
+                                               ,TermArg (primCo (consCoTy n))
+                                               ])
+                          ,TermArg  x])
+      ,TermArg (go (n-1) xs)]
 
     nilCoTy = head (Maybe.fromJust (dataConInstArgTys nilCon [(LitTy (NumTy 0))
                                                              ,bTy]))
@@ -623,24 +617,23 @@ reduceFoldr
 reduceFoldr _ _ 0 _ _ start _ = changed start
 reduceFoldr _ctx foldrPrimInfo n aTy fun start arg = do
     tcm <- Lens.view tcCache
-    let ty = termType tcm arg
+    let ty = termType arg
     changed (go tcm ty)
   where
-    go tcm (coreView1 tcm -> Just ty') = go tcm ty'
     go tcm (tyView -> TyConApp vecTcNm _)
       | nameOcc vecTcNm == "Clash.Sized.Vector.Vec"
       , Just vecTc <- lookupUniqMap vecTcNm tcm
       , [_nilCon, consCon] <- tyConDataCons vecTc
       = let
           (a, as) = extractHeadTail consCon aTy n arg
-          b = mkApps (Prim foldrPrimInfo) [ Right aTy
-                                          , Right (termType tcm start)
-                                          , Right (LitTy (NumTy (n - 1)))
-                                          , Left fun
-                                          , Left start
-                                          , Left as ]
+          b = mkArgApps (Prim foldrPrimInfo) [ TypeArg aTy
+                                             , TypeArg (termType start)
+                                             , TypeArg (LitTy (NumTy (n - 1)))
+                                             , TermArg fun
+                                             , TermArg start
+                                             , TermArg as ]
         in
-          mkApps fun [Left a, Left b]
+          mkArgApps fun [TermArg a, TermArg b]
 
     go _ ty =
       error $ $(curLoc) ++ [I.i|
@@ -665,10 +658,9 @@ reduceFold
   -> NormalizeSession Term
 reduceFold (TransformContext is0 ctx) n aTy fun arg = do
     tcm <- Lens.view tcCache
-    let ty = termType tcm arg
+    let ty = termType arg
     go tcm ty
   where
-    go tcm (coreView1 tcm -> Just ty') = go tcm ty'
     go tcm (tyView -> TyConApp vecTcNm _)
       | (Just vecTc) <- lookupUniqMap vecTcNm tcm
       , nameOcc vecTcNm == "Clash.Sized.Vector.Vec"
@@ -689,7 +681,7 @@ reduceFold (TransformContext is0 ctx) n aTy fun arg = do
     foldV f as  = let (l,r) = splitAt (length as `div` 2) as
                       lF    = foldV f l
                       rF    = foldV f r
-                  in  mkApps f [Left lF, Left rF]
+                  in  mkArgApps f [TermArg lF, TermArg rF]
 
 -- | Replace an application of the @Clash.Sized.Vector.dfold@ primitive on
 -- vectors of a known length @n@, by the fully unrolled recursive "definition"
@@ -710,10 +702,9 @@ reduceDFold
 reduceDFold _ 0 _ _ start _ = changed start
 reduceDFold is0 n aTy fun start arg = do
     tcm <- Lens.view tcCache
-    let ty = termType tcm arg
+    let ty = termType arg
     go tcm ty
   where
-    go tcm (coreView1 tcm -> Just ty') = go tcm ty'
     go tcm (tyView -> TyConApp vecTcNm _)
       | (Just vecTc) <- lookupUniqMap vecTcNm tcm
       , nameOcc vecTcNm == "Clash.Sized.Vector.Vec"
@@ -725,7 +716,7 @@ reduceDFold is0 n aTy fun start arg = do
             -- TOOD: be used for every other function in this module.
             (uniqs1,(vars,elems)) = second (second concat . unzip)
                                   $ extractElems uniqs0 is1 consCon aTy 'D' n arg
-            (_ltv:Right snTy:_,_) = splitFunForallTy (termType tcm fun)
+            (_ltv:Right snTy:_,_) = splitFunForallTy (termType fun)
             (TyConApp snatTcNm _) = tyView snTy
             (Just snatTc)         = lookupUniqMap snatTcNm tcm
             [snatDc]              = tyConDataCons snatTc
@@ -736,12 +727,12 @@ reduceDFold is0 n aTy fun start arg = do
     go _ ty = error $ $(curLoc) ++ "reduceDFold: argument does not have a vector type: " ++ showPpr ty
 
     doFold _    _ []     = start
-    doFold snDc k (x:xs) = mkApps fun
-                                 [Right (LitTy (NumTy k))
-                                 ,Left (snDc k)
-                                 ,Left x
-                                 ,Left (doFold snDc (k-1) xs)
-                                 ]
+    doFold snDc k (x:xs) = mkArgApps fun
+                                     [TypeArg (LitTy (NumTy k))
+                                     ,TermArg (snDc k)
+                                     ,TermArg x
+                                     ,TermArg (doFold snDc (k-1) xs)
+                                     ]
 
 -- | Replace an application of the @Clash.Sized.Vector.head@ primitive on
 -- vectors of a known length @n@, by a projection of the first element of a
@@ -754,10 +745,9 @@ reduceHead
   -> NormalizeSession Term
 reduceHead inScope n aTy vArg = do
     tcm <- Lens.view tcCache
-    let ty = termType tcm vArg
+    let ty = termType vArg
     go tcm ty
   where
-    go tcm (coreView1 tcm -> Just ty') = go tcm ty'
     go tcm (tyView -> TyConApp vecTcNm _)
       | (Just vecTc) <- lookupUniqMap vecTcNm tcm
       , nameOcc vecTcNm == "Clash.Sized.Vector.Vec"
@@ -782,10 +772,9 @@ reduceTail
   -> NormalizeSession Term
 reduceTail inScope n aTy vArg = do
     tcm <- Lens.view tcCache
-    let ty = termType tcm vArg
+    let ty = termType vArg
     go tcm ty
   where
-    go tcm (coreView1 tcm -> Just ty') = go tcm ty'
     go tcm (tyView -> TyConApp vecTcNm _)
       | (Just vecTc) <- lookupUniqMap vecTcNm tcm
       , nameOcc vecTcNm == "Clash.Sized.Vector.Vec"
@@ -811,10 +800,9 @@ reduceLast
   -> NormalizeSession Term
 reduceLast inScope n aTy vArg = do
     tcm <- Lens.view tcCache
-    let ty = termType tcm vArg
+    let ty = termType vArg
     go tcm ty
   where
-    go tcm (coreView1 tcm -> Just ty') = go tcm ty'
     go tcm (tyView -> TyConApp vecTcNm _)
       | (Just vecTc) <- lookupUniqMap vecTcNm tcm
       , nameOcc vecTcNm == "Clash.Sized.Vector.Vec"
@@ -842,10 +830,9 @@ reduceInit
   -> NormalizeSession Term
 reduceInit _inScope initPrimInfo n aTy vArg = do
   tcm <- Lens.view tcCache
-  let ty = termType tcm vArg
+  let ty = termType vArg
   changed (go tcm ty)
  where
-  go tcm (coreView1 tcm -> Just ty') = go tcm ty'
   go tcm (tyView -> TyConApp vecTcNm _)
     | (Just vecTc) <- lookupUniqMap vecTcNm tcm
     , nameOcc vecTcNm == "Clash.Sized.Vector.Vec"
@@ -854,9 +841,9 @@ reduceInit _inScope initPrimInfo n aTy vArg = do
         mkVecNil nilCon aTy
       else
         let
-          nPredTy = Right (LitTy (NumTy (n - 1)))
+          nPredTy = TypeArg (LitTy (NumTy (n - 1)))
           (a, as0) = extractHeadTail consCon aTy (n+1) vArg
-          as1 = mkApps (Prim initPrimInfo) [nPredTy, Right aTy, Left as0]
+          as1 = mkArgApps (Prim initPrimInfo) [nPredTy, TypeArg aTy, TermArg as0]
         in
           mkVecCons consCon aTy n a as1
 
@@ -880,10 +867,9 @@ reduceAppend
   -> NormalizeSession Term
 reduceAppend inScope n m aTy lArg rArg = do
     tcm <- Lens.view tcCache
-    let ty = termType tcm lArg
+    let ty = termType lArg
     go tcm ty
   where
-    go tcm (coreView1 tcm -> Just ty') = go tcm ty'
     go tcm (tyView -> TyConApp vecTcNm _)
       | (Just vecTc) <- lookupUniqMap vecTcNm tcm
       , nameOcc vecTcNm == "Clash.Sized.Vector.Vec"
@@ -908,10 +894,9 @@ reduceUnconcat :: Integer  -- ^ Length of the result vector
                -> NormalizeSession Term
 reduceUnconcat n 0 aTy arg = do
     tcm <- Lens.view tcCache
-    let ty = termType tcm arg
+    let ty = termType arg
     go tcm ty
   where
-    go tcm (coreView1 tcm -> Just ty') = go tcm ty'
     go tcm (tyView -> TyConApp vecTcNm _)
       | (Just vecTc)     <- lookupUniqMap vecTcNm tcm
       , nameOcc vecTcNm == "Clash.Sized.Vector.Vec"
@@ -934,10 +919,9 @@ reduceTranspose :: Integer  -- ^ Length of the result vector
                 -> NormalizeSession Term
 reduceTranspose n 0 aTy arg = do
     tcm <- Lens.view tcCache
-    let ty = termType tcm arg
+    let ty = termType arg
     go tcm ty
   where
-    go tcm (coreView1 tcm -> Just ty') = go tcm ty'
     go tcm (tyView -> TyConApp vecTcNm _)
       | (Just vecTc)     <- lookupUniqMap vecTcNm tcm
       , nameOcc vecTcNm == "Clash.Sized.Vector.Vec"
@@ -959,7 +943,6 @@ reduceReplicate n aTy eTy arg = do
     tcm <- Lens.view tcCache
     go tcm eTy
   where
-    go tcm (coreView1 tcm -> Just ty') = go tcm ty'
     go tcm (tyView -> TyConApp vecTcNm _)
       | (Just vecTc)     <- lookupUniqMap vecTcNm tcm
       , nameOcc vecTcNm == "Clash.Sized.Vector.Vec"
@@ -1021,10 +1004,12 @@ reduceReplace_int is0 n aTy vTy v i newA = do
     (Just boolTc) = lookupUniqMap (getKey boolTyConKey) tcm
     [_,trueDc]    = tyConDataCons boolTc
     eqInt         = eqIntPrim iTy (mkTyConApp (tyConName boolTc) [])
-    case0         = Case (mkApps eqInt [Left i
-                                       ,Left (mkApps (Data iDc)
-                                             [Left (Literal (IntLiteral elIndex))])
-                                       ])
+    case0         = Case (mkArgApps eqInt
+                                    [TermArg i
+                                    ,TermArg (mkArgApps
+                                                (Data iDc)
+                                                [TermArg (Literal (IntLiteral elIndex))])
+                                    ])
                          aTy
                          [(DefaultPat, oldA)
                          ,(DataPat trueDc [] [], newA)
@@ -1038,7 +1023,6 @@ reduceReplace_int is0 n aTy vTy v i newA = do
   eqIntPrim intTy boolTy =
     Prim (PrimInfo "Clash.Transformations.eqInt" (mkFunTy intTy (mkFunTy intTy boolTy)) WorkVariable)
 
-  go tcm (coreView1 tcm -> Just ty') = go tcm ty'
   go tcm (tyView -> TyConApp vecTcNm _)
     | (Just vecTc)     <- lookupUniqMap vecTcNm tcm
       , nameOcc vecTcNm == "Clash.Sized.Vector.Vec"
@@ -1046,7 +1030,7 @@ reduceReplace_int is0 n aTy vTy v i newA = do
     = do
       -- Get data constructors of 'Int'
       uniqs0                   <- Lens.use uniqSupply
-      let iTy                   = termType tcm i
+      let iTy                   = termType i
           (TyConApp iTcNm _)    = tyView iTy
           (Just iTc)            = lookupUniqMap iTcNm tcm
           [iDc]                 = tyConDataCons iTc
@@ -1088,7 +1072,7 @@ reduceIndex_int
   -> NormalizeSession Term
 reduceIndex_int is0 n aTy v i = do
   tcm <- Lens.view tcCache
-  let vTy = termType tcm v
+  let vTy = termType v
   go tcm vTy
  where
   -- Basically creates:
@@ -1121,10 +1105,11 @@ reduceIndex_int is0 n aTy v i = do
     (Just boolTc) = lookupUniqMap (getKey boolTyConKey) tcm
     [_,trueDc]    = tyConDataCons boolTc
     eqInt         = eqIntPrim iTy (mkTyConApp (tyConName boolTc) [])
-    case0         = Case (mkApps eqInt [Left i
-                                       ,Left (mkApps (Data iDc)
-                                             [Left (Literal (IntLiteral elIndex))])
-                                       ])
+    case0         = Case (mkArgApps eqInt
+                                    [TermArg i
+                                    ,TermArg (mkArgApps (Data iDc)
+                                             [TermArg (Literal (IntLiteral elIndex))])
+                                    ])
                          aTy
                          [(DefaultPat, next)
                          ,(DataPat trueDc [] [], cur)
@@ -1138,7 +1123,6 @@ reduceIndex_int is0 n aTy v i = do
   eqIntPrim intTy boolTy =
     Prim (PrimInfo "Clash.Transformations.eqInt" (mkFunTy intTy (mkFunTy intTy boolTy)) WorkVariable)
 
-  go tcm (coreView1 tcm -> Just ty') = go tcm ty'
   go tcm (tyView -> TyConApp vecTcNm _)
     | (Just vecTc)     <- lookupUniqMap vecTcNm tcm
     , nameOcc vecTcNm == "Clash.Sized.Vector.Vec"
@@ -1146,7 +1130,7 @@ reduceIndex_int is0 n aTy v i = do
     = do
       -- Get data constructors of 'Int'
       uniqs0                   <- Lens.use uniqSupply
-      let iTy                   = termType tcm i
+      let iTy                   = termType i
           (TyConApp iTcNm _)    = tyView iTy
           (Just iTc)            = lookupUniqMap iTcNm tcm
           [iDc]                 = tyConDataCons iTc
@@ -1185,10 +1169,9 @@ reduceDTFold
   -> NormalizeSession Term
 reduceDTFold inScope n aTy lrFun brFun arg = do
     tcm <- Lens.view tcCache
-    let ty = termType tcm arg
+    let ty = termType arg
     go tcm ty
   where
-    go tcm (coreView1 tcm -> Just ty') = go tcm ty'
     go tcm (tyView -> TyConApp vecTcNm _)
       | (Just vecTc) <- lookupUniqMap vecTcNm tcm
       , nameOcc vecTcNm == "Clash.Sized.Vector.Vec"
@@ -1197,7 +1180,7 @@ reduceDTFold inScope n aTy lrFun brFun arg = do
            let (uniqs1,(vars,elems)) = second (second concat . unzip)
                                      $ extractElems uniqs0 inScope consCon aTy
                                          'T' (2^n) arg
-               (_ltv:Right snTy:_,_) = splitFunForallTy (termType tcm brFun)
+               (_ltv:Right snTy:_,_) = splitFunForallTy (termType brFun)
                (TyConApp snatTcNm _) = tyView snTy
                (Just snatTc)         = lookupUniqMap snatTcNm tcm
                [snatDc]              = tyConDataCons snatTc
@@ -1208,17 +1191,17 @@ reduceDTFold inScope n aTy lrFun brFun arg = do
     go _ ty = error $ $(curLoc) ++ "reduceDTFold: argument does not have a vector type: " ++ showPpr ty
 
     doFold :: (Integer -> Term) -> Integer -> [Term] -> Term
-    doFold _    _ [x] = mkApps lrFun [Left x]
+    doFold _    _ [x] = mkArgApps lrFun [TermArg x]
     doFold snDc k xs  =
       let (xsL,xsR) = splitAt (2^k) xs
           k'        = k-1
           eL        = doFold snDc k' xsL
           eR        = doFold snDc k' xsR
-      in  mkApps brFun [Right (LitTy (NumTy k))
-                       ,Left  (snDc k)
-                       ,Left  eL
-                       ,Left  eR
-                       ]
+      in  mkArgApps brFun [TypeArg (LitTy (NumTy k))
+                          ,TermArg (snDc k)
+                          ,TermArg eL
+                          ,TermArg eR
+                          ]
 
 -- | Replace an application of the @Clash.Sized.RTree.tdfold@ primitive on
 -- trees of a known depth @n@, by the fully unrolled recursive "definition"
@@ -1233,17 +1216,16 @@ reduceTFold
   -> NormalizeSession Term
 reduceTFold inScope n aTy lrFun brFun arg = do
     tcm <- Lens.view tcCache
-    let ty = termType tcm arg
+    let ty = termType arg
     go tcm ty
   where
-    go tcm (coreView1 tcm -> Just ty') = go tcm ty'
     go tcm (tyView -> TyConApp treeTcNm _)
       | (Just treeTc) <- lookupUniqMap treeTcNm tcm
       , nameOcc treeTcNm == "Clash.Sized.RTree.RTree"
       , [lrCon,brCon] <- tyConDataCons treeTc
       = do uniqs0 <- Lens.use uniqSupply
            let (uniqs1,(vars,elems)) = extractTElems uniqs0 inScope lrCon brCon aTy 'T' n arg
-               (_ltv:Right snTy:_,_) = splitFunForallTy (termType tcm brFun)
+               (_ltv:Right snTy:_,_) = splitFunForallTy (termType brFun)
                (TyConApp snatTcNm _) = tyView snTy
                (Just snatTc)         = lookupUniqMap snatTcNm tcm
                [snatDc]              = tyConDataCons snatTc
@@ -1253,17 +1235,17 @@ reduceTFold inScope n aTy lrFun brFun arg = do
            changed lb
     go _ ty = error $ $(curLoc) ++ "reduceTFold: argument does not have a tree type: " ++ showPpr ty
 
-    doFold _    _ [x] = mkApps lrFun [Left x]
+    doFold _    _ [x] = mkArgApps lrFun [TermArg x]
     doFold snDc k xs  =
       let (xsL,xsR) = splitAt (length xs `div` 2) xs
           k'        = k-1
           eL        = doFold snDc k' xsL
           eR        = doFold snDc k' xsR
-      in  mkApps brFun [Right (LitTy (NumTy k))
-                       ,Left (snDc k)
-                       ,Left eL
-                       ,Left eR
-                       ]
+      in  mkArgApps brFun [TypeArg (LitTy (NumTy k))
+                          ,TermArg (snDc k)
+                          ,TermArg eL
+                          ,TermArg eR
+                          ]
 
 reduceTReplicate :: Integer -- ^ Depth of the tree
                  -> Type    -- ^ Element type
@@ -1274,7 +1256,6 @@ reduceTReplicate n aTy eTy arg = do
     tcm <- Lens.view tcCache
     go tcm eTy
   where
-    go tcm (coreView1 tcm -> Just ty') = go tcm ty'
     go tcm (tyView -> TyConApp treeTcNm _)
       | (Just treeTc) <- lookupUniqMap treeTcNm tcm
       , nameOcc treeTcNm == "Clash.Sized.RTree.RTree"
@@ -1285,7 +1266,7 @@ reduceTReplicate n aTy eTy arg = do
 
 buildSNat :: DataCon -> Integer -> Term
 buildSNat snatDc i =
-  mkApps (Data snatDc)
-         [Right (LitTy (NumTy i))
-         ,Left (Literal (NaturalLiteral (toInteger i)))
-         ]
+  mkArgApps (Data snatDc)
+            [TypeArg (LitTy (NumTy i))
+            ,TermArg (Literal (NaturalLiteral (toInteger i)))
+            ]

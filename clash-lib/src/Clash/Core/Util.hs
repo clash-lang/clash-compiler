@@ -59,17 +59,19 @@ mkVec :: DataCon -- ^ The Nil constructor
       -> Term
 mkVec nilCon consCon resTy = go
   where
-    go _ [] = mkApps (Data nilCon) [Right (LitTy (NumTy 0))
-                                   ,Right resTy
-                                   ,Left  (primCo nilCoTy)
-                                   ]
+    go _ [] = mkArgApps (Data nilCon)
+                        [TypeArg (LitTy (NumTy 0))
+                        ,TypeArg resTy
+                        ,TermArg (primCo nilCoTy)
+                        ]
 
-    go n (x:xs) = mkApps (Data consCon) [Right (LitTy (NumTy n))
-                                        ,Right resTy
-                                        ,Right (LitTy (NumTy (n-1)))
-                                        ,Left (primCo (consCoTy n))
-                                        ,Left x
-                                        ,Left (go (n-1) xs)]
+    go n (x:xs) = mkArgApps (Data consCon)
+                            [TypeArg (LitTy (NumTy n))
+                            ,TypeArg resTy
+                            ,TypeArg (LitTy (NumTy (n-1)))
+                            ,TermArg (primCo (consCoTy n))
+                            ,TermArg x
+                            ,TermArg (go (n-1) xs)]
 
     nilCoTy    = head (fromJust $! dataConInstArgTys nilCon  [(LitTy (NumTy 0))
                                                              ,resTy])
@@ -88,12 +90,13 @@ appendToVec :: DataCon -- ^ The Cons (:>) constructor
 appendToVec consCon resTy vec = go
   where
     go _ []     = vec
-    go n (x:xs) = mkApps (Data consCon) [Right (LitTy (NumTy n))
-                                        ,Right resTy
-                                        ,Right (LitTy (NumTy (n-1)))
-                                        ,Left (primCo (consCoTy n))
-                                        ,Left x
-                                        ,Left (go (n-1) xs)]
+    go n (x:xs) = mkArgApps (Data consCon)
+                            [TypeArg (LitTy (NumTy n))
+                            ,TypeArg resTy
+                            ,TypeArg (LitTy (NumTy (n-1)))
+                            ,TermArg (primCo (consCoTy n))
+                            ,TermArg x
+                            ,TermArg (go (n-1) xs)]
 
     consCoTy n = head (fromJust $! dataConInstArgTys consCon
                                                    [(LitTy (NumTy n))
@@ -239,20 +242,22 @@ mkRTree :: DataCon -- ^ The LR constructor
         -> Term
 mkRTree lrCon brCon resTy = go
   where
-    go _ [x] = mkApps (Data lrCon) [Right (LitTy (NumTy 0))
-                                    ,Right resTy
-                                    ,Left  (primCo lrCoTy)
-                                    ,Left  x
-                                    ]
+    go _ [x] = mkArgApps (Data lrCon)
+                         [TypeArg (LitTy (NumTy 0))
+                         ,TypeArg resTy
+                         ,TermArg (primCo lrCoTy)
+                         ,TermArg x
+                         ]
 
     go n xs =
       let (xsL,xsR) = splitAt (length xs `div` 2) xs
-      in  mkApps (Data brCon) [Right (LitTy (NumTy n))
-                              ,Right resTy
-                              ,Right (LitTy (NumTy (n-1)))
-                              ,Left (primCo (brCoTy n))
-                              ,Left (go (n-1) xsL)
-                              ,Left (go (n-1) xsR)]
+      in  mkArgApps (Data brCon)
+                    [TypeArg (LitTy (NumTy n))
+                    ,TypeArg resTy
+                    ,TypeArg (LitTy (NumTy (n-1)))
+                    ,TermArg (primCo (brCoTy n))
+                    ,TermArg (go (n-1) xsL)
+                    ,TermArg (go (n-1) xsR)]
 
     lrCoTy   = head (fromJust $! dataConInstArgTys lrCon  [(LitTy (NumTy 0))
                                                          ,resTy])
@@ -489,7 +494,7 @@ shouldSplit0 seen tcm (TyConApp tcNm tyArgs)
   , let dcArgs  = substArgTys dc tyArgs
   , let dcArgVs = map (tyView . normalizeType tcm) dcArgs
   = if any shouldSplitTy dcArgVs && not (isHidden tcNm tyArgs) then
-      Just (mkApps (Data dc) (map Right tyArgs), dcArgs)
+      Just (mkArgApps (Data dc) (map TypeArg tyArgs), dcArgs)
     else
       Nothing
  where

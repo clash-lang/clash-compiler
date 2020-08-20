@@ -20,7 +20,7 @@
 
 module Clash.Rewrite.Util where
 
-import           Control.Monad.Extra         (andM, eitherM)
+import           Control.Monad.Extra         (andM)
 import           Control.Concurrent.Supply   (splitSupply)
 import           Control.DeepSeq
 import           Control.Exception           (throw)
@@ -231,9 +231,9 @@ applyDebug lvl _transformations _fromLimit name exprOld hasChanged exprNew =
   nTrans <- pred <$> Lens.use transformCounter
   Monad.when (lvl > DebugNone && hasChanged) $ do
     tcm                  <- Lens.view tcCache
-    let beforeTy          = termType tcm exprOld
+    let beforeTy          = termType exprOld
         beforeFV          = Lens.setOf freeLocalVars exprOld
-        afterTy           = termType tcm exprNew
+        afterTy           = termType exprNew
         afterFV           = Lens.setOf freeLocalVars exprNew
         newFV             = not (afterFV `Set.isSubsetOf` beforeFV)
         accidentalShadows = findAccidentialShadows exprNew
@@ -349,9 +349,9 @@ mkBinderFor
   -> Name a -- ^ Name of the new binder
   -> Either Term Type -- ^ Type or Term to bind
   -> m (Either Id TyVar)
-mkBinderFor is tcm name (Left term) = do
+mkBinderFor is _ name (Left term) = do
   name' <- cloneNameWithInScopeSet is name
-  let ty = termType tcm term
+  let ty = termType term
   return (Left (mkLocalId ty (coerce name')))
 
 mkBinderFor is tcm name (Right ty) = do
@@ -447,7 +447,7 @@ tailCalls id_ = \case
 -- i.e. is a wrapper around a (partially) applied function 'f', where the
 -- introduced argument 'w' is not used by 'f'
 isVoidWrapper :: Term -> Bool
-isVoidWrapper (Lam bndr e@(collectArgs -> (Var _,_))) =
+isVoidWrapper (Lam bndr e@(collectAppArgs -> (Var _,_))) =
   bndr `localIdDoesNotOccurIn` e
 isVoidWrapper _ = False
 
@@ -566,13 +566,14 @@ isWorkFree (collectAppArgs -> (fun,args)) = case fun of
     andM [isWorkFree e, allM (isWorkFree . snd) bs, allM isWorkFreeArg args]
   Case s _ [(_,a)] ->
     andM [isWorkFree s, isWorkFree a, allM isWorkFreeArg args]
-  Cast e _ _ ->
-    isWorkFree (mkApps e args)
   _ ->
     pure False
  where
-  isWorkFreeArg e = eitherM isWorkFree (pure . const True) (pure e)
-  isConstantArg = either isConstant (const True)
+  isWorkFreeArg (TermArg tm) = isWorkFree tm
+  isWorkFreeArg _ = pure True
+
+  isConstantArg (TermArg tm) = isConstant tm
+  isConstantArg _ = True
 
 isFromInt :: Text -> Bool
 isFromInt nm = nm == "Clash.Sized.Internal.BitVector.fromInteger##" ||
@@ -583,22 +584,24 @@ isFromInt nm = nm == "Clash.Sized.Internal.BitVector.fromInteger##" ||
 
 -- | Determine if a term represents a constant
 isConstant :: Term -> Bool
-isConstant e = case collectArgs e of
-  (Data _, args)   -> all (either isConstant (const True)) args
-  (Prim _, args) -> all (either isConstant (const True)) args
-  (Lam _ _, _)     -> not (hasLocalFreeVars e)
-  (Literal _,_)    -> True
-  (Cast e0 _ _,args) -> all (either isConstant (const True)) (Left e0:args)
-  _                -> False
+isConstant e = case collectAppArgs e of
+  (Data _, args) -> all isConstantArg args
+  (Prim _, args) -> all isConstantArg args
+  (Lam _ _, _)   -> not (hasLocalFreeVars e)
+  (Literal _,_)  -> True
+  _              -> False
+ where
+  isConstantArg (TermArg tm) = isConstant tm
+  isConstantArg _ = True
 
 isConstantNotClockReset
   :: Term
   -> RewriteMonad extra Bool
 isConstantNotClockReset e = do
   tcm <- Lens.view tcCache
-  let eTy = termType tcm e
+  let eTy = termType e
   if isClockOrReset tcm eTy
-     then case collectArgs e of
+     then case collectAppArgs e of
         (Prim p,_) -> return (primName p == "Clash.Transformations.removedArg")
         _ -> return False
      else pure (isConstant e)
@@ -609,14 +612,13 @@ isWorkFreeClockOrResetOrEnable
   -> Term
   -> Maybe Bool
 isWorkFreeClockOrResetOrEnable tcm e =
-  let eTy = termType tcm e in
+  let eTy = termType e in
   if isClockOrReset tcm eTy || isEnable tcm eTy then
-    case collectArgs e of
+    case collectAppArgs e of
       (Prim p,_) -> Just (primName p == "Clash.Transformations.removedArg")
       (Var _, []) -> Just True
       (Data _, []) -> Just True -- For Enable True/False
       (Literal _,_) -> Just True
-      (Cast e0 _ _,[]) -> isWorkFreeClockOrResetOrEnable tcm e0
       _ -> Just False
   else
     Nothing
@@ -642,7 +644,7 @@ isWorkFreeIsh e = do
     Just b  -> pure b
     Nothing -> go e
  where
-  go e0 = case collectArgs e0 of
+  go e0 = case collectAppArgs e0 of
     (Data _, args)   -> allM isWorkFreeIshArg args
     (Prim pInfo, args) -> case primWorkInfo pInfo of
       WorkAlways     -> pure False -- Things like clock or reset generator always
@@ -651,11 +653,13 @@ isWorkFreeIsh e = do
       _              -> allM isWorkFreeIshArg args
     (Lam _ _, _)     -> pure (not (hasLocalFreeVars e))
     (Literal _,_)    -> pure True
-    (Cast e1 _ _,args) -> go (mkApps e1 args)
     _                -> pure False
 
-  isWorkFreeIshArg = either isWorkFreeIsh (pure . const True)
-  isConstantArg    = either isConstant (const True)
+  isWorkFreeIshArg (TermArg tm) = isWorkFreeIsh tm
+  isWorkFreeIshArg _ = pure True
+
+  isConstantArg (TermArg tm) = isConstant tm
+  isConstantArg _ = True
 
 inlineOrLiftBinders
   :: (LetBinding -> RewriteMonad extra Bool)
@@ -710,8 +714,7 @@ liftBinding (var@Id {varName = idName} ,e) = do
       boundFVs  = eltsUniqSet boundFVsSet
 
   -- Make a new global ID
-  tcm       <- Lens.view tcCache
-  let newBodyTy = termType tcm $ mkTyLams (mkLams e boundFVs) boundFTVs
+  let newBodyTy = termType (mkTyLams (mkLams e boundFVs) boundFTVs)
   (cf,sp)   <- Lens.use curFun
   binders <- Lens.use bindings
   newBodyNm <-
@@ -788,8 +791,7 @@ mkFunction
   -> RewriteMonad extra Id
   -- ^ Name with a proper unique and the type of the function
 mkFunction bndrNm sp inl body = do
-  tcm <- Lens.view tcCache
-  let bodyTy = termType tcm body
+  let bodyTy = termType body
   binders <- Lens.use bindings
   bodyNm <- cloneNameWithBindingMap binders bndrNm
   addGlobalBind bodyNm bodyTy sp inl body
@@ -842,7 +844,7 @@ isUntranslatable stringRepresentable tm = do
                              <*> Lens.view customReprs
                              <*> pure stringRepresentable
                              <*> pure tcm
-                             <*> pure (termType tcm tm))
+                             <*> pure (termType tm))
 
 {-# INLINE isUntranslatableType #-}
 -- | Determine if a type cannot be represented in hardware
@@ -877,9 +879,8 @@ mkSelectorCase
   -> Int -- n'th DataCon
   -> Int -- n'th field
   -> m Term
-mkSelectorCase caller inScope tcm scrut dcI fieldI = go (termType tcm scrut)
+mkSelectorCase caller inScope tcm scrut dcI fieldI = go (termType scrut)
   where
-    go (coreView1 tcm -> Just ty') = go ty'
     go scrutTy@(tyView -> TyConApp tc args) =
       case tyConDataCons (lookupUniqMap' tcm tc) of
         [] -> cantCreate $(curLoc) ("TyCon has no DataCons: " ++ show tc ++ " " ++ showPpr tc) scrutTy
@@ -907,8 +908,8 @@ specialise :: Lens' extra (Map.Map (Id, Int, Either Term Type) Id) -- ^ Lens int
            -> Lens' extra Int -- ^ Lens into the specialisation limit
            -> Rewrite extra
 specialise specMapLbl specHistLbl specLimitLbl ctx e = case e of
-  (TyApp e1 ty) -> specialise' specMapLbl specHistLbl specLimitLbl ctx e (collectArgsTicks e1) (Right ty)
-  (App e1 e2)   -> specialise' specMapLbl specHistLbl specLimitLbl ctx e (collectArgsTicks e1) (Left  e2)
+  (TyApp e1 ty) -> specialise' specMapLbl specHistLbl specLimitLbl ctx e (collectAppArgs e1) (Right ty)
+  (App e1 e2)   -> specialise' specMapLbl specHistLbl specLimitLbl ctx e (collectAppArgs e1) (Left  e2)
   _             -> return e
 
 -- | Specialise an application on its argument
@@ -917,10 +918,10 @@ specialise' :: Lens' extra (Map.Map (Id, Int, Either Term Type) Id) -- ^ Lens in
             -> Lens' extra Int -- ^ Lens into the specialisation limit
             -> TransformContext -- Transformation context
             -> Term -- ^ Original term
-            -> (Term, [Either Term Type], [TickInfo]) -- ^ Function part of the term, split into root and applied arguments
+            -> (Term, [AppArg]) -- ^ Function part of the term, split into root and applied arguments
             -> Either Term Type -- ^ Argument to specialize on
             -> RewriteMonad extra Term
-specialise' specMapLbl specHistLbl specLimitLbl (TransformContext is0 _) e (Var f, args, ticks) specArgIn = do
+specialise' specMapLbl specHistLbl specLimitLbl (TransformContext is0 _) e (Var f, args) specArgIn = do
   lvl <- Lens.view dbgLevel
   tcm <- Lens.view tcCache
 
@@ -936,8 +937,8 @@ specialise' specMapLbl specHistLbl specLimitLbl (TransformContext is0 _) e (Var 
         -- > topEntity :: forall dom . (dom ~ "System") => Signal dom Bool -> Signal dom Bool
         -- The TyLam's in the body will have been removed by 'Clash.Normalize.Util.substWithTyEq'.
         -- So we drop the TyApp ("specialising" on it) and change the varType to match.
-        let newVarTy = piResultTy tcm (varType f) tyArg
-        in  changed (mkApps (mkTicks (Var f{varType = newVarTy}) ticks) args)
+        let newVarTy = piResultTy (varType f) tyArg
+        in  changed (mkArgApps (Var f{varType = newVarTy}) args)
   else do -- NondecreasingIndentation
 
   let specArg = bimap (normalizeTermTypes tcm) (normalizeType tcm) specArgIn
@@ -957,7 +958,7 @@ specialise' specMapLbl specHistLbl specLimitLbl (TransformContext is0 _) e (Var 
       traceIf (lvl >= DebugApplied)
         ("Using previous specialization of " ++ showPpr (varName f) ++ " on " ++
           (either showPpr showPpr) specAbs ++ ": " ++ showPpr (varName f')) $
-        changed $ mkApps (mkTicks (Var f') ticks) (args ++ specVars)
+        changed $ mkArgApps (Var f') (args ++ specVars)
     -- Create new specialized function
     Nothing -> do
       -- Determine if we can specialize f
@@ -983,15 +984,16 @@ specialise' specMapLbl specHistLbl specLimitLbl (TransformContext is0 _) e (Var 
                                   | n <- [(0::Int)..]
                                   ]
               -- Make new binders for existing arguments
-              (boundArgs,argVars) <- fmap (unzip . map (either (Left &&& Left . Var) (Right &&& Right . VarTy))) $
+              (boundArgs,argVars) <- fmap (unzip . map (either (Left &&& TermArg . Var) (Right &&& TypeArg . VarTy))) $
                                      Monad.zipWithM
                                        (mkBinderFor is0 tcm)
                                        (existingNames ++ newNames)
-                                       args
+                                       (typeAndTermArgs args)
               -- Determine name the resulting specialized function, and the
               -- form of the specialized-on argument
+              let specArgInArg = either TermArg TypeArg specArgIn
               (fId,inl',specArg') <- case specArg of
-                Left a@(collectAppArgs -> (Var g,gArgs)) -> if isPolyFun tcm a
+                Left a@(collectAppArgs -> (Var g,gArgs)) -> if isPolyFunX a
                     then do
                       -- In case we are specialising on an argument that is a
                       -- global function then we use that function's name as the
@@ -1005,21 +1007,25 @@ specialise' specMapLbl specHistLbl specLimitLbl (TransformContext is0 _) e (Var 
                       -- are inlined, meaning the state-transition-function
                       -- and the memory element will be in a single function.
                       gTmM <- fmap (lookupUniqMap (varName g)) $ Lens.use bindings
-                      return (g,maybe inl bindingSpec gTmM, maybe specArgIn (Left . (`mkApps` gArgs) . bindingTerm) gTmM)
-                    else return (f,inl,specArgIn)
-                _ -> return (f,inl,specArgIn)
+                      return ( g
+                             , maybe inl bindingSpec gTmM
+                             , maybe specArgInArg
+                                     (TermArg . (`mkArgApps` gArgs) . bindingTerm)
+                                     gTmM )
+                    else return (f,inl,specArgInArg)
+                _ -> return (f,inl,specArgInArg)
               -- Create specialized functions
-              let newBody = mkAbstraction (mkApps bodyTm (argVars ++ [specArg'])) (boundArgs ++ specBndrs)
+              let newBody = mkAbstraction (mkArgApps bodyTm (argVars ++ [specArg'])) (boundArgs ++ specBndrs)
               newf <- mkFunction (varName fId) sp inl' newBody
               -- Remember specialization
               (extra.specHistLbl) %= extendUniqMapWith f 1 (+)
               (extra.specMapLbl)  %= Map.insert (f,argLen,specAbs) newf
               -- use specialized function
-              let newExpr = mkApps (mkTicks (Var newf) ticks) (args ++ specVars)
+              let newExpr = mkArgApps (Var newf) (args ++ specVars)
               newf `deepseq` changed newExpr
         Nothing -> return e
 
-specialise' _ _ _ _ctx _ (appE,args,ticks) (Left specArg) = do
+specialise' _ _ _ _ctx _ (appE,args) (Left specArg) = do
   -- Create binders and variable references for free variables in 'specArg'
   let (specBndrs,specVars) = specArgBndrsAndVars (Left specArg)
   -- Create specialized function
@@ -1040,9 +1046,9 @@ specialise' _ _ _ _ctx _ (appE,args,ticks) (Left specArg) = do
                         newBody
     (b:_) -> return (bindingId b)
   -- Create specialized argument
-  let newArg  = Left $ mkApps (Var newf) specVars
+  let newArg  = TermArg (mkArgApps (Var newf) specVars)
   -- Use specialized argument
-  let newExpr = mkApps (mkTicks appE ticks) (args ++ [newArg])
+  let newExpr = mkArgApps appE (args ++ [newArg])
   changed newExpr
 
 specialise' _ _ _ _ e _ _ = return e
@@ -1085,7 +1091,7 @@ normalizeId _   tyvar     = tyvar
 -- | Create binders and variable references for free variables in 'specArg'
 specArgBndrsAndVars
   :: Either Term Type
-  -> ([Either Id TyVar], [Either Term Type])
+  -> ([Either Id TyVar], [AppArg])
 specArgBndrsAndVars specArg =
   -- See Note [Collect free-variables in an insertion-ordered set]
   let unitFV :: Var a -> Const (OSet.OLSet TyVar, OSet.OLSet Id) (Var a)
@@ -1100,8 +1106,8 @@ specArgBndrsAndVars specArg =
       specTyBndrs = map Right specFTVs
       specTmBndrs = map Left  specFVs
 
-      specTyVars  = map (Right . VarTy) specFTVs
-      specTmVars  = map (Left . Var) specFVs
+      specTyVars  = map (TypeArg . VarTy) specFTVs
+      specTmVars  = map (TermArg . Var) specFVs
 
   in  (specTyBndrs ++ specTmBndrs,specTyVars ++ specTmVars)
 
@@ -1136,7 +1142,7 @@ whnfRW _isSubj ctx@(TransformContext is0 _) e rw = do
   case whnf' eval bndrs tcm gh ids1 is0 _isSubj e of
     (!gh1,ph,v) -> do
       globalHeap Lens..= gh1
-      bindPureHeap tcm ph rw ctx v
+      bindPureHeap ph rw ctx v
 #endif
 {-# SCC whnfRW #-}
 
@@ -1145,11 +1151,10 @@ whnfRW _isSubj ctx@(TransformContext is0 _) e rw = do
 --
 -- To prevent unnecessary rewrites only do this when rewrite changed something.
 bindPureHeap
-  :: TyConMap
-  -> PureHeap
+  :: PureHeap
   -> Rewrite extra
   -> Rewrite extra
-bindPureHeap tcm heap rw ctx0@(TransformContext is0 hist) e = do
+bindPureHeap heap rw ctx0@(TransformContext is0 hist) e = do
   (e1, Monoid.getAny -> hasChanged) <- Writer.listen $ rw ctx e
   if hasChanged && not (null bndrs) then do
     -- The evaluator results are post-processed with two operations:

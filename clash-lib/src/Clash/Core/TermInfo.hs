@@ -12,7 +12,6 @@ import Clash.Core.Literal
 import Clash.Core.Pretty
 import Clash.Core.Subst
 import Clash.Core.Term
-import Clash.Core.TyCon (TyConMap)
 import Clash.Core.Type
 import Clash.Core.Var
 import Clash.Core.VarEnv
@@ -189,7 +188,9 @@ piResultTys ty origArgs@(arg:args)
 
 -- | Does a term have a function or polymorphic type?
 -- isPolyFun :: TyConMap -> Term -> Bool
--- isPolyFun m t = isPolyFunTy m (termType m t)
+-- isPolyFun m t = isPolyFunCoreTy m (termType m t)
+isPolyFunX :: Term -> Bool
+isPolyFunX e = isPolyFunTy (termType e)
 
 -- | Is a term a term-abstraction?
 isLam :: Term -> Bool

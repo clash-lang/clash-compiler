@@ -72,7 +72,7 @@ import           Clash.Core.Subst
    extendInScopeIdList, mkSubst, substTm)
 import           Clash.Core.Term
   (Alt, LetBinding, Pat (..), Term (..), TickInfo (..), NameMod (..),
-   collectBndrs, PrimInfo(primName), mkTicks, collectAppArgs, tickArgs,
+   collectBndrs, PrimInfo(primName), collectAppArgs, tickArgs,
    typeAndTermArgs, collectCastsTicks)
 import           Clash.Core.TermInfo
 import           Clash.Core.TyCon

@@ -43,7 +43,7 @@ import           Clash.Core.Type
 import           Clash.Core.Util
 import           Clash.Core.Var
 import           Clash.Core.VarEnv
-import           Clash.Debug
+-- import           Clash.Debug
 import           Clash.Unique
 
 import           Clash.GHC.Evaluator.Primitive
@@ -126,89 +126,124 @@ stepTyLam :: TyVar -> Term -> Step
 stepTyLam x e = ghcUnwind (TyLambda x e)
 
 stepApp :: Term -> Term -> Step
-stepApp x y m tcm =
-  case term of
-    Cast {} -> error "stepApp QQ"
+stepApp c@(Cast x fromTy toTy) y m _tcm = case (tyView fromTy, tyView toTy) of
+  (FunTy argFrom resFrom, FunTy argTo resTo)
+    -> let cast = Cast (App x (Cast y argTo argFrom)) resFrom resTo
+       in  Just (setTerm cast m)
+  (TyConApp sigTc [_domTy,fTy],FunTy arg res)
+    | nameOcc sigTc == "Clash.Signal.Internal.Signal"
+    , FunTy fArg fRes <- tyView fTy
+    , fArg == arg
+    , fRes == res
+    , (Cast x1 tyC _,ticks) <- collectTicks x
+    , FunTy cArg cRes <- tyView tyC
+    , cArg == arg
+    , cRes == res
+    -> Just (setTerm (mkTicks x1 ticks) m)
 
-    Data dc ->
-      let tys = fst $ splitFunForallTy (dcType dc)
-       in case compare (length args) (length tys) of
-            EQ -> ghcUnwind (DC dc args) m tcm
-            LT -> newBinder tys' (App x y) m tcm
-            GT -> error "Overapplied DC"
+  _ -> error ("Push expects FunTy: " <> showPpr (App c y))
 
-    Prim p ->
-      let tys = fst $ splitFunForallTy (primType p)
-       in case compare (length args) (length tys) of
-            EQ -> case lefts args of
-              -- We make boolean conjunction and disjunction extra lazy by
-              -- deferring the evaluation of the arguments during the evaluation
-              -- of the primop rule.
-              --
-              -- This allows us to implement:
-              --
-              -- x && True  --> x
-              -- x && False --> False
-              -- x || True  --> True
-              -- x || False --> x
-              --
-              -- even when that 'x' is _|_. This makes the evaluation
-              -- rule lazier than the actual Haskel implementations which
-              -- are strict in the first argument and lazy in the second.
-              [a0, a1] | primName p `elem` ["GHC.Classes.&&","GHC.Classes.||"] ->
-                    let (m0,i) = newLetBinding tcm m  a0
-                        (m1,j) = newLetBinding tcm m0 a1
-                    in  ghcPrimStep tcm (forcePrims m) p [] [Suspend (Var i), Suspend (Var j)] m1
+stepApp x y m _tcm =
+  let (mN,n) = newLetBinding m y
+  in  Just (setTerm x (stackPush (Apply n) mN))
 
-              (e':es) ->
-                Just . setTerm e' $ stackPush (PrimApply p (rights args) [] es) m
+-- stepApp x y m tcm =
+--   case term of
+--     Data dc ->
+--       let tys = fst $ splitFunForallTy (dcType dc)
+--        in case compare (length args) (length tys) of
+--             EQ -> ghcUnwind (DC dc args) m tcm
+--             LT -> newBinder tys' (App x y) m tcm
+--             GT -> error "Overapplied DC"
 
-              _ -> error "internal error"
+--     Prim p ->
+--       let tys = fst $ splitFunForallTy (primType p)
+--        in case compare (length args) (length tys) of
+--             EQ -> case lefts args of
+--               -- We make boolean conjunction and disjunction extra lazy by
+--               -- deferring the evaluation of the arguments during the evaluation
+--               -- of the primop rule.
+--               --
+--               -- This allows us to implement:
+--               --
+--               -- x && True  --> x
+--               -- x && False --> False
+--               -- x || True  --> True
+--               -- x || False --> x
+--               --
+--               -- even when that 'x' is _|_. This makes the evaluation
+--               -- rule lazier than the actual Haskel implementations which
+--               -- are strict in the first argument and lazy in the second.
+--               [a0, a1] | primName p `elem` ["GHC.Classes.&&","GHC.Classes.||"] ->
+--                     let (m0,i) = newLetBinding tcm m  a0
+--                         (m1,j) = newLetBinding tcm m0 a1
+--                     in  ghcPrimStep tcm (forcePrims m) p [] [Suspend (Var i), Suspend (Var j)] m1
 
-            LT -> newBinder tys' (App x y) m tcm
+--               (e':es) ->
+--                 Just . setTerm e' $ stackPush (PrimApply p (rights args) [] es) m
 
-            GT -> let (m0, n) = newLetBinding tcm m y
-                   in Just . setTerm x $ stackPush (Apply n) m0
+--               _ -> error "internal error"
 
-    _ -> let (m0, n) = newLetBinding tcm m y
-          in Just . setTerm x $ stackPush (Apply n) m0
- where
-  (term, args, _) = collectArgsTicks (App x y)
-  tys' = fst . splitFunForallTy . termType tcm $ App x y
+--             LT -> newBinder tys' (App x y) m tcm
+
+--             GT -> let (m0, n) = newLetBinding tcm m y
+--                    in Just . setTerm x $ stackPush (Apply n) m0
+
+--     _ -> let (m0, n) = newLetBinding tcm m y
+--           in Just . setTerm x $ stackPush (Apply n) m0
+--  where
+--   (term, args) = collectAppArgs (App x y)
+--   tys' = fst . splitFunForallTy . termType $ App x y
 
 stepTyApp :: Term -> Type -> Step
-stepTyApp x ty m tcm =
-  case term of
-    Cast {} -> error "stepTyApp QQ"
+stepTyApp c@(Cast x fromTy toTy) ty m _tcm = case (fromTy,toTy) of
+  (ForAllTy tvFrom bodyFrom, ForAllTy tvTo bodyTo)
+    | varType tvFrom == varType tvTo
+    -> let inscope   = mScopeNames m
+           substFrom = extendTvSubst (mkSubst inscope) tvFrom ty
+           substTo   = extendTvSubst (mkSubst inscope) tvTo   ty
 
-    Data dc ->
-      let tys = fst $ splitFunForallTy (dcType dc)
-       in case compare (length args) (length tys) of
-            EQ -> ghcUnwind (DC dc args) m tcm
-            LT -> newBinder tys' (TyApp x ty) m tcm
-            GT -> error "Overapplied DC"
+           bodyFrom1 = substTy substFrom bodyFrom
+           bodyTo1   = substTy substTo   bodyTo
 
-    Prim p ->
-      let tys = fst $ splitFunForallTy (primType p)
-       in case compare (length args) (length tys) of
-            EQ -> case lefts args of
-                    [] | primName p `elem` [ "Clash.Transformations.removedArg"
-                                           , "Clash.Transformations.undefined" ] ->
-                            ghcUnwind (PrimVal p (rights args) []) m tcm
+           cast = Cast x bodyFrom1 bodyTo1
+       in  Just (setTerm cast m)
 
-                       | otherwise ->
-                            ghcPrimStep tcm (forcePrims m) p (rights args) [] m
+    | otherwise
+    -> error ("TPush unimplemented for kind equalities:\n" <> showPpr (TyApp c ty))
 
-                    (e':es) ->
-                      Just . setTerm e' $ stackPush (PrimApply p (rights args) [] es) m
+  _ -> error ("TPush expects ForallTy:\n" <> showPpr (TyApp c ty))
 
-            LT -> newBinder tys' (TyApp x ty) m tcm
-            GT -> Just . setTerm x $ stackPush (Instantiate ty) m
+stepTyApp x ty m _tcm = Just (setTerm x (stackPush (Instantiate ty) m))
+--   case term of
+--     Data dc ->
+--       let tys = fst $ splitFunForallTy (dcType dc)
+--        in case compare (length args) (length tys) of
+--             EQ -> ghcUnwind (DC dc args) m tcm
+--             LT -> newBinder tys' (TyApp x ty) m tcm
+--             GT -> error "Overapplied DC"
 
-    _ -> Just . setTerm x $ stackPush (Instantiate ty) m
- where
-  (term, args, _) = collectArgsTicks (TyApp x ty)
-  tys' = fst . splitFunForallTy . termType tcm $ TyApp x ty
+--     Prim p ->
+--       let tys = fst $ splitFunForallTy (primType p)
+--        in case compare (length args) (length tys) of
+--             EQ -> case lefts args of
+--                     [] | primName p `elem` [ "Clash.Transformations.removedArg"
+--                                            , "Clash.Transformations.undefined" ] ->
+--                             ghcUnwind (PrimVal p (rights args) []) m tcm
+
+--                        | otherwise ->
+--                             ghcPrimStep tcm (forcePrims m) p (rights args) [] m
+
+--                     (e':es) ->
+--                       Just . setTerm e' $ stackPush (PrimApply p (rights args) [] es) m
+
+--             LT -> newBinder tys' (TyApp x ty) m tcm
+--             GT -> Just . setTerm x $ stackPush (Instantiate ty) m
+
+--     _ -> Just . setTerm x $ stackPush (Instantiate ty) m
+--  where
+--   (term, args) = collectAppArgs (TyApp x ty)
+--   tys' = fst . splitFunForallTy . termType $ TyApp x ty
 
 stepLetRec :: [LetBinding] -> Term -> Step
 stepLetRec bs x m _ = Just (allocate bs x m)
@@ -262,11 +297,10 @@ newBinder tys x m tcm =
         in  (s'', iss' ,Lam n (App e' (Var n)))
 
 newLetBinding
-  :: TyConMap
-  -> Machine
+  :: Machine
   -> Term
   -> (Machine, Id)
-newLetBinding tcm m e
+newLetBinding m e
   | Var v <- e
   , heapContains LocalId v m
   = (m, v)
@@ -275,7 +309,7 @@ newLetBinding tcm m e
   = let m' = heapInsert LocalId id_ e m
      in (m' { mSupply = ids', mScopeNames = is1 }, id_)
  where
-  ty = termType tcm e
+  ty = termType e
   ((ids', is1), id_) = mkUniqSystemId (mSupply m, mScopeNames m) ("x", ty)
 
 -- | Unwind the stack by 1
@@ -285,8 +319,8 @@ ghcUnwind v m tcm = do
   go kf m'
  where
   go (Update s x)             = return . update s x v
-  go (Apply x)                = return . apply tcm v x
-  go (Instantiate ty)         = return . instantiate tcm v ty
+  go (Apply x)                = return . apply v x
+  go (Instantiate ty)         = return . instantiate v ty
   go (PrimApply p tys vs tms) = ghcPrimUnwind tcm p tys vs v tms
   go (Scrutinise altTy as)    = return . scrutinise tcm v altTy as
   go (Tickish _)              = return . setTerm (valToTerm v)
@@ -299,31 +333,31 @@ update s x (valToTerm -> term) =
   setTerm term . heapInsert s x term
 
 -- | Apply a value to a function
-apply :: TyConMap -> Value -> Id -> Machine -> Machine
-apply _tcm (Lambda x' e) x m =
+apply :: Value -> Id -> Machine -> Machine
+apply (Lambda x' e) x m =
   setTerm (substTm "Evaluator.apply" subst e) m
  where
   subst  = extendIdSubst subst0 x' (Var x)
   subst0 = mkSubst $ extendInScopeSet (mScopeNames m) x
-apply tcm pVal@(PrimVal (PrimInfo{primType}) tys []) x m
+apply pVal@(PrimVal (PrimInfo{primType}) tys []) x m
   | isUndefinedPrimVal pVal
-  = setTerm (undefinedTm (piResultTys tcm primType (tys++[varType x]))) m
+  = setTerm (undefinedTm (piResultTys primType (tys++[varType x]))) m
 
-apply _ _ _ m = error $ "Evaluator.apply: Not a lambda: " ++ show m
+apply _ _ m = error $ "Evaluator.apply: Not a lambda: " ++ show m
 
 -- | Instantiate a type-abstraction
-instantiate :: TyConMap -> Value -> Type -> Machine -> Machine
-instantiate _tcm (TyLambda x e) ty m =
+instantiate :: Value -> Type -> Machine -> Machine
+instantiate (TyLambda x e) ty m =
   setTerm (substTm "Evaluator.instantiate1" subst e) m
  where
   subst  = extendTvSubst subst0 x ty
   subst0 = mkSubst iss0
   iss0   = mkInScopeSet (localFVsOfTerms [e] `unionUniqSet` tyFVsOfTypes [ty])
-instantiate tcm pVal@(PrimVal (PrimInfo{primType}) tys []) ty m
+instantiate pVal@(PrimVal (PrimInfo{primType}) tys []) ty m
   | isUndefinedPrimVal pVal
-  = setTerm (undefinedTm (piResultTys tcm primType (tys ++ [ty]))) m
+  = setTerm (undefinedTm (piResultTys primType (tys ++ [ty]))) m
 
-instantiate _ p _ _ = error $ "Evaluator.instantiate: Not a tylambda: " ++ show p
+instantiate p _ _ = error $ "Evaluator.instantiate: Not a tylambda: " ++ show p
 
 -- | Evaluate a case-expression
 scrutinise :: TyConMap -> Value -> Type -> [Alt] -> Machine -> Machine
