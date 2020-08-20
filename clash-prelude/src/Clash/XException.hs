@@ -133,9 +133,9 @@ errorX msg = throw (XException ("X: " ++ msg ++ "\n" ++ prettyCallStack callStac
 -- >>> import Clash.Sized.BitVector
 -- >>> import GHC.Stack
 -- >>> :{
--- h, h' :: Bit -> BitVector 8 -> BitVector 8
--- h (xToErrorCtx "a is X" -> a) (xToErrorCtx "b is X" -> b) = slice d7 d0 (pack a ++# b)
--- h' a b = slice d7 d0 (pack a ++# b)
+-- let h, h' :: Bit -> BitVector 8 -> BitVector 8
+--     h (xToErrorCtx "a is X" -> a) (xToErrorCtx "b is X" -> b) = slice d7 d0 (pack a ++# b)
+--     h' a b = slice d7 d0 (pack a ++# b)
 -- :}
 --
 -- >>> h' (errorX "QQ") 3
@@ -172,7 +172,7 @@ xToErrorCtx ctx a = unsafeDupablePerformIO
 --
 -- Unlike 'xToErrorCtx', where we have an extra String argument to distinguish
 -- one call to 'xoToError' to the other, 'xToError' will use the 'GHC.CallStack'
--- mechanism to aid the user in distinquishing different call to 'xToError'.
+-- mechanism to aid the user in distinguishing different call to 'xToError'.
 -- We can also use BangPatterns to report the potential 'XException' being
 -- thrown by /a/ or /b/ even earlier, i.e. when /f/ is applied:
 --
@@ -187,11 +187,11 @@ xToErrorCtx ctx a = unsafeDupablePerformIO
 -- >>> import Clash.Sized.BitVector
 -- >>> import GHC.Stack
 -- >>> :{
--- f, g, h, h' :: HasCallStack => Bit -> BitVector 8 -> BitVector 8
--- f = g
--- g = h
--- h (xToError -> a) (xToError -> b) = slice d7 d0 (pack a ++# b)
--- h' a b = slice d7 d0 (pack a ++# b)
+-- let f, g, h, h' :: HasCallStack => Bit -> BitVector 8 -> BitVector 8
+--     f = g
+--     g = h
+--     h (xToError -> a) (xToError -> b) = slice d7 d0 (pack a ++# b)
+--     h' a b = slice d7 d0 (pack a ++# b)
 -- :}
 --
 -- >>> h' (errorX "QQ") 3
