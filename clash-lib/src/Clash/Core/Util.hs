@@ -603,3 +603,53 @@ sccLetBindings =
                             (Set.elems (Lens.setOf freeLocalIds e) )
                   in  ((i,e),varUniq i,fvs)))
 {-# SCC sccLetBindings #-}
+
+moveTickCastOutward :: HasCallStack => InScopeSet -> [AppArg] -> [AppArg]
+moveTickCastOutward is0 = go []
+ where
+  go ticks [] = reverse ticks
+  go ticks (t@TickCtx {}:rest) = go (t:ticks) rest
+  go ticks [CastCtx fromTy toTy]
+    = if fromTy == toTy then
+        reverse ticks
+      else
+        CastCtx fromTy toTy : reverse ticks
+
+  go ticks (ty@TypeArg {}:rest) = ty : go ticks rest
+  go ticks (tm@TermArg {}:rest) = tm : go ticks rest
+
+  go ticks (CastCtx fromTyA toTyA:CastCtx fromTyB toTyB:rest)
+    | toTyA == fromTyB
+    = if fromTyA == toTyB then
+        go ticks rest
+      else
+        go ticks ((CastCtx fromTyA toTyB):rest)
+    | otherwise
+    = error (unlines ["Casts don't line up:",showPpr toTyA, showPpr fromTyB])
+  go ticks (c@CastCtx {}:t@TickCtx{}:rest) = go (t:ticks) (c:rest)
+  go ticks (CastCtx fromTy toTy:TypeArg ty:rest)
+    | ForAllTy fromTv fromBody <- fromTy
+    , ForAllTy toTv toBody <- toTy
+    = if varType fromTv == varType toTv then
+        let substFrom = extendTvSubst (mkSubst is0) fromTv ty
+            substTo = extendTvSubst (mkSubst is0) toTv ty
+            fromBody1 = substTy substFrom fromBody
+            toBody1 = substTy substTo toBody
+        in  TypeArg ty : go ticks (CastCtx fromBody1 toBody1:rest)
+      else
+        error (unlines [ "TPush unimplemented for kind-equalities"
+                       , showPpr fromTy
+                       , showPpr toTy])
+    | otherwise
+    = error (unlines [ "TPush expects ForAllTy"
+                     , showPpr fromTy
+                     , showPpr toTy
+                     ])
+  go ticks (CastCtx fromTy toTy:TermArg tm:rest)
+    | FunTy argFrom resFrom <- tyView fromTy
+    , FunTy argTo resTo <- tyView  toTy
+    = TermArg (Cast tm argTo argFrom) : go ticks (CastCtx resFrom resTo:rest)
+    | otherwise
+    = error (unlines [ "Push expects FunTy"
+                     , showPpr fromTy
+                     , showPpr toTy ])

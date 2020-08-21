@@ -73,7 +73,7 @@ import           Clash.Core.Subst
 import           Clash.Core.Term
   (Alt, LetBinding, Pat (..), Term (..), TickInfo (..), NameMod (..),
    collectBndrs, PrimInfo(primName), collectAppArgs, tickArgs,
-   typeAndTermArgs, collectCastsTicks)
+   splitTypeAndTermArgs, collectCastsTicks)
 import           Clash.Core.TermInfo
 import           Clash.Core.TyCon
   (TyCon (FunTyCon), TyConName, TyConMap, tyConDataCons)
@@ -862,8 +862,10 @@ setBinderName subst res resRead m@(resN,_,_) (i,collectAppArgs -> (k,args)) = ca
   Prim p -> let nm = primName p in extractPrimWarnOrFail nm >>= go nm
   _ -> goDef
  where
-  go nm (BlackBox {resultName = Just (BBTemplate nmD)}) = withTicks (tickArgs args) $ \_ -> do
-    (bbCtx,_) <- preserveVarEnv (mkBlackBoxContext nm i (typeAndTermArgs args))
+  (typeAndTermArgs,otherArgs) = splitTypeAndTermArgs args
+
+  go nm (BlackBox {resultName = Just (BBTemplate nmD)}) = withTicks (tickArgs otherArgs) $ \_ -> do
+    (bbCtx,_) <- preserveVarEnv (mkBlackBoxContext nm i typeAndTermArgs)
     be <- Lens.use backend
     let bbRetValName = case be of
           SomeBackend s -> toStrict ((State.evalState (renderTemplate bbCtx nmD) s) 0)

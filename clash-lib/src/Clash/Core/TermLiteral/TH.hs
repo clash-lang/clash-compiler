@@ -12,7 +12,7 @@ import           Language.Haskell.TH.Syntax
 
 import           Clash.Core.DataCon
 import           Clash.Core.Term
-  (collectAppArgs, termArgs, Term(Data))
+  (collectAppArgs, termArgsX, Term(Data))
 import           Clash.Core.Name                 (nameOcc)
 
 -- Workaround for a strange GHC bug, where it complains about Subst only
@@ -88,11 +88,10 @@ deriveTermToData1 constrs =
         (VarE 'collectAppArgs)
         (TupP [ ConP 'Data [ViewP (VarE 'dcName') (VarP nameName)]
               , ViewP
-                 (VarE 'termArgs)
+                 (VarE 'termArgsX)
                  (if nArgs == 0 then WildP else VarP argsName)]))
 
   termName = mkName "term"
   argsName = mkName "args"
   argNames = [mkName ("arg" ++ show n) | n <- [0..nArgs-1]]
   nameName = mkName "nm"
-

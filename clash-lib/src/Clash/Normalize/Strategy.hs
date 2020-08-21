@@ -40,7 +40,7 @@ normalization =
   xOptim >-> rmDeadcode >->
   cleanup >-> recLetRec >-> splitArgs
   where
-    anf        = topdownR (apply "lamCast" lamCast) >->
+    anf        = {- topdownR (apply "lamCast" lamCast) >-> -}
                  topdownR (apply "nonRepANF" nonRepANF) >->
                  apply "ANF" makeANF >->
                  topdownR (apply "caseCon" caseCon)
@@ -105,12 +105,12 @@ constantPropagation =
       , ("reduceNonRepPrim", reduceNonRepPrim)
 
 
-      , ("caseCast"        , caseCast)
-      , ("letCast"         , letCast)
-      , ("splitCastWork"   , splitCastWork)
+      -- , ("caseCast"        , caseCast)
+      -- , ("letCast"         , letCast)
+      -- , ("splitCastWork"   , splitCastWork)
       -- , ("argCastSpec"     , argCastSpec)
-      , ("inlineCast"      , inlineCast)
-      , ("eliminateCastCast",eliminateCastCast)
+      -- , ("inlineCast"      , inlineCast)
+      -- , ("eliminateCastCast",eliminateCastCast)
       , ("castSpec"        , castSpec)
       ]
 

@@ -7,6 +7,7 @@
   Term representation in the CoreHW language: System F + LetRec + Case
 -}
 
+{-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE DeriveAnyClass #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE LambdaCase #-}
@@ -46,16 +47,17 @@ module Clash.Core.Term
   , AppArg (..)
   , collectAppArgs
   , mkArgApps
-  , typeArgs
-  , termArgs
+  , typeArgsX
+  , termArgsX
   , setNthTmArg
   , collectCastsTicks
   , collectArgsX
   , stripTickX
-  , typeAndTermArgs
+  , splitTypeAndTermArgs
   , tickArgs
   , typeAndCastArgs
   , collectTicks
+  , hasTermOrTypeArgs
   ) where
 
 -- External Modules
@@ -78,7 +80,7 @@ import Clash.Core.Name                         (Name (..))
 import {-# SOURCE #-} Clash.Core.Subst         () -- instance Eq Type
 import {-# SOURCE #-} Clash.Core.Type          (Type)
 import Clash.Core.Var                          (Var(Id), Id, TyVar)
-import Clash.Util                              (curLoc)
+import Clash.Util                              (HasCallStack, curLoc)
 
 -- | Term representation in the CoreHW language: System F + LetRec + Case
 data Term
@@ -277,12 +279,21 @@ primArg
   -- ^ Function application
   -> Maybe (Text, Int, Int)
   -- ^ If @Term@ was a primitive: (name of primitive, #type args, #term args)
-primArg (collectAppArgs -> t) =
-  case t of
+primArg t = case collectAppArgs t of
     (Prim p, args) ->
-      Just (primName p, length (typeArgs args), length (termArgs args))
+      let (!tyLen,!tmLen) = argLen args in
+      Just (primName p, tyLen, tmLen)
     _ ->
       Nothing
+ where
+  argLen =
+    let go len [] = len
+        go !len (TickCtx {}:rest) = go len rest
+        go !len (CastCtx {}:rest) = go len rest
+        go (!tyLen,tmLen) (TypeArg {}:rest) = go (tyLen+1,tmLen) rest
+        go (tyLen,!tmLen) (TermArg {}:rest) = go (tyLen,tmLen+1) rest
+    in  go (0,0)
+
 
 -- | Partition ticks in source ticks and nameMod ticks
 partitionTicks
@@ -367,26 +378,39 @@ mkArgApps = foldl' (\e a -> go e a)
   go e (TickCtx info)  = Tick info e
   go e (CastCtx t1 t2) = Cast e t1 t2
 
-typeArgs :: [AppArg] -> [Type]
-typeArgs [] = []
-typeArgs (TypeArg ty:rest) = ty : typeArgs rest
-typeArgs (_:rest) = typeArgs rest
+typeArgsX :: [AppArg] -> [Type]
+typeArgsX [] = []
+typeArgsX (TypeArg ty:rest) = ty : typeArgsX rest
+typeArgsX (_:rest) = typeArgsX rest
 
-termArgs :: [AppArg] -> [Term]
-termArgs [] = []
-termArgs (TermArg tm:rest) = tm : termArgs rest
-termArgs (_:rest) = termArgs rest
+termArgsX :: [AppArg] -> [Term]
+termArgsX [] = []
+termArgsX (TermArg tm:rest) = tm : termArgsX rest
+termArgsX (_:rest) = termArgsX rest
 
-typeAndTermArgs :: [AppArg] -> [Either Term Type]
-typeAndTermArgs [] = []
-typeAndTermArgs (TermArg tm:rest) = Left tm : typeAndTermArgs rest
-typeAndTermArgs (TypeArg ty:rest) = Right ty : typeAndTermArgs rest
-typeAndTermArgs (_:rest) = typeAndTermArgs rest
+-- | Splits type and term arguments from the Argument stack, errors out if any
+-- type or term arguments follow a cast or tick
+splitTypeAndTermArgs :: HasCallStack => [AppArg] -> ([Either Term Type],[AppArg])
+splitTypeAndTermArgs [] = ([],[])
+splitTypeAndTermArgs (TermArg tm:rest) =
+  let !(args1,args2) = splitTypeAndTermArgs rest
+  in  (Left tm:args1,args2)
+splitTypeAndTermArgs (TypeArg ty:rest) =
+  let !(args1,arg2) = splitTypeAndTermArgs rest
+  in  (Right ty:args1,arg2)
+splitTypeAndTermArgs (other:rest) = noTypeOrTerm (other:rest)
+ where
+  noTypeOrTerm [] = ([],[])
+  noTypeOrTerm (TermArg {}:_) = error "TermArg follows cast or tick"
+  noTypeOrTerm (TypeArg {}:_) = error "TypeArg follows cast or tick"
+  noTypeOrTerm (other1:rest1)   =
+    let !(args1,args2) = noTypeOrTerm rest1
+    in  (args1,other1:args2)
 
-tickArgs :: [AppArg] -> [TickInfo]
+tickArgs :: HasCallStack => [AppArg] -> [TickInfo]
 tickArgs [] = []
 tickArgs (TickCtx p:rest) = p:tickArgs rest
-tickArgs (_:rest) = tickArgs rest
+tickArgs _ = error "Not a tick"
 
 stripTickX :: [AppArg] -> [AppArg]
 stripTickX [] = []
@@ -430,3 +454,9 @@ collectTicks = go []
  where
   go args (Tick i e) = go (i:args) e
   go args e          = (e,args)
+
+hasTermOrTypeArgs :: [AppArg] -> Bool
+hasTermOrTypeArgs [] = False
+hasTermOrTypeArgs (TermArg{}:_) = True
+hasTermOrTypeArgs (TypeArg{}:_) = True
+hasTermOrTypeArgs (_:rest) = hasTermOrTypeArgs rest

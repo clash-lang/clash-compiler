@@ -18,7 +18,7 @@ module Clash.Normalize.Util
  , addNewInline
  , specializeNorm
  , isRecursiveBndr
- , isClosed
+ , isClosedX
  , callGraph
  , collectCallGraphUniques
  , classifyFunction
@@ -152,9 +152,9 @@ specializeNorm :: NormRewrite
 specializeNorm = specialise specialisationCache specialisationHistory specialisationLimit
 
 -- | Determine if a term is closed
-isClosed :: Term
+isClosedX :: Term
          -> Bool
-isClosed = not . isPolyFunX
+isClosedX = not . isPolyFunX
 
 -- | Test whether a given term represents a non-recursive global variable
 isNonRecursiveGlobalVar

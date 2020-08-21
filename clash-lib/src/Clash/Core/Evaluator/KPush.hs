@@ -52,10 +52,10 @@ data LiftingContext = LC TvSubst LiftCoEnv
 -- That's the whole point of this function!
 type LiftCoEnv = VarEnv Coercion
 
-kpush :: TyConMap -> DataCon -> [Either Term Type] -> Coercion -> Maybe (DataCon, [Either Term Type])
+kpush :: TyConMap -> DataCon -> [Either Term Type] -> Coercion -> Maybe [Either Term Type]
 kpush tcm dc args (fromTy,toTy)
   | fromTy == toTy -- Refl
-  = Just (dc,args)
+  = Just args
 
   | TyConApp toTc toTcArgTys <- tyView toTy
   , TyConApp dTc _ <- tyView (snd (splitFunForallTy (dcType dc)))
@@ -110,7 +110,7 @@ kpush tcm dc args (fromTy,toTy)
           -- TODO: error out when `termType tcm arg /= ty1`
           = Cast arg ty1 ty2
 
-    in  Just (dc, map Right toTcArgTys ++ map Right toExArgs ++ map Left newValArgs)
+    in  Just (map Right toTcArgTys ++ map Right toExArgs ++ map Left newValArgs)
   | otherwise
   = Nothing
 

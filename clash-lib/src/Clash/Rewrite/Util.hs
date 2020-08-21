@@ -84,7 +84,7 @@ import           Clash.Core.Type             (KindOrType, Type (..),
                                               normalizeType,
                                               typeKind, tyView, isPolyFunTy)
 import           Clash.Core.Util
-  (dataConInstArgTysE, isClockOrReset, isEnable)
+  (dataConInstArgTysE, isClockOrReset, isEnable, moveTickCastOutward)
 import           Clash.Core.Var
   (Id, IdScope (..), TyVar, Var (..), isLocalId, mkGlobalId, mkLocalId, mkTyVar)
 import           Clash.Core.VarEnv
@@ -983,12 +983,15 @@ specialise' specMapLbl specHistLbl specLimitLbl (TransformContext is0 _) e (Var 
                   newNames      = [ mkUnsafeInternalName ("pTS" `Text.append` Text.pack (show n)) n
                                   | n <- [(0::Int)..]
                                   ]
+              -- Ensure that casts (and ticks) are pushed all the way outward
+              let argsCastOutward = moveTickCastOutward is0 args
+                  (typeAndTermArgs,_otherArgs) = splitTypeAndTermArgs argsCastOutward
               -- Make new binders for existing arguments
               (boundArgs,argVars) <- fmap (unzip . map (either (Left &&& TermArg . Var) (Right &&& TypeArg . VarTy))) $
                                      Monad.zipWithM
                                        (mkBinderFor is0 tcm)
                                        (existingNames ++ newNames)
-                                       (typeAndTermArgs args)
+                                       typeAndTermArgs
               -- Determine name the resulting specialized function, and the
               -- form of the specialized-on argument
               let specArgInArg = either TermArg TypeArg specArgIn
@@ -1021,7 +1024,7 @@ specialise' specMapLbl specHistLbl specLimitLbl (TransformContext is0 _) e (Var 
               (extra.specHistLbl) %= extendUniqMapWith f 1 (+)
               (extra.specMapLbl)  %= Map.insert (f,argLen,specAbs) newf
               -- use specialized function
-              let newExpr = mkArgApps (Var newf) (args ++ specVars)
+              let newExpr = mkArgApps (Var newf) (argsCastOutward ++ specVars)
               newf `deepseq` changed newExpr
         Nothing -> return e
 

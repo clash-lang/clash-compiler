@@ -69,7 +69,7 @@ import Clash.Core.FreeVars
 import Clash.Core.Literal    (Literal (..))
 import Clash.Core.Term
   (LetBinding, Pat (..), PrimInfo (..), Term (..), TickInfo (..), AppArg (..),
-   patIds, collectAppArgs, termArgs, tickArgs, mkArgApps,
+   patIds, collectAppArgs, termArgsX, tickArgs, mkArgApps,
    typeAndCastArgs)
 import Clash.Core.TermInfo   (termType)
 import Clash.Core.TyCon      (tyConDataCons)
@@ -148,7 +148,7 @@ collectGlobals' is0 substitution seen (Case scrut ty alts) _eIsConstant = do
          , unionInScope isAlts isScrut
          , collectedAlts ++ collectedScrut )
 
-collectGlobals' is0 substitution seen e@(collectAppArgs -> (fun, args@(termArgs -> (_:_)))) eIsconstant
+collectGlobals' is0 substitution seen e@(collectAppArgs -> (fun, args@(termArgsX -> (_:_)))) eIsconstant
   | not eIsconstant = do
     tcm <- Lens.view tcCache
     bndrs <- Lens.use bindings
@@ -340,10 +340,10 @@ mkDisjointGroup inScope (fun,(seen,cs)) = do
         argssT   = zip [0..] (List.transpose argss)
         (sharedT,distinctT) = List.partition (areShared inScope . snd) argssT
         shared   = map (second head) sharedT
-        distinct = map termArgs (List.transpose (map snd distinctT))
+        distinct = map termArgsX (List.transpose (map snd distinctT))
         cs'      = fmap (zip [0..]) cs
         cs''     = removeEmpty
-                 $ fmap (termArgs . map snd)
+                 $ fmap (termArgsX . map snd)
                         (if null shared
                            then cs'
                            else fmap (filter (`notElem` shared)) cs')
@@ -545,7 +545,7 @@ interestingToLift inScope eval e@(Prim pInfo) args
       ,("GHC.Prim.remInt#",lastNotPow2)
       ]
 
-    lArgs       = termArgs args
+    lArgs       = termArgsX args
 
     allNonPow2  = all (not . termIsPow2) lArgs
     tailNonPow2 = case lArgs of
@@ -558,11 +558,11 @@ interestingToLift inScope eval e@(Prim pInfo) args
     termIsPow2 e' = case eval e' of
       Literal (IntegerLiteral n) -> isPow2 n
       a -> case collectAppArgs a of
-        (Prim p,termArgs -> [   _, (Literal (IntegerLiteral n))])
+        (Prim p,termArgsX -> [   _, (Literal (IntegerLiteral n))])
           | isFromInteger (primName p) -> isPow2 n
-        (Prim p,termArgs -> [_, _, (Literal (IntegerLiteral n))])
+        (Prim p,termArgsX -> [_, _, (Literal (IntegerLiteral n))])
           | primName p == "Clash.Sized.Internal.BitVector.fromInteger#"  -> isPow2 n
-        (Prim p,termArgs -> [   _, (Literal (IntegerLiteral n))])
+        (Prim p,termArgsX -> [   _, (Literal (IntegerLiteral n))])
           | primName p == "Clash.Sized.Internal.BitVector.fromInteger##" -> isPow2 n
 
         _ -> False

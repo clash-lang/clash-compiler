@@ -410,8 +410,8 @@ scrutinise _ (Lit l) _altTy alts m = case alts of
   go def (_:alts1) = go def alts1
 
 scrutinise tcm (CastValue (DC dc xs) fromTy toTy) altTy alts m
-  | Just (dcN,xsN) <- kpush tcm dc xs (fromTy,toTy)
-  = scrutinise tcm (DC dcN xsN) altTy alts m
+  | Just xsN <- kpush tcm dc xs (fromTy,toTy)
+  = scrutinise tcm (DC dc xsN) altTy alts m
 
 scrutinise _ (DC dc xs) _altTy alts m
   | altE:_ <- [substInAlt altDc tvs pxs xs altE

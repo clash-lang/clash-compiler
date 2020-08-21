@@ -39,7 +39,7 @@ module Clash.Normalize.Transformations
   , topLet
   , recToLetRec
   , inlineWorkFree
-  , inlineHO
+  -- , inlineHO
   , inlineSmall
   , simpleCSE
   , reduceConst
@@ -50,24 +50,23 @@ module Clash.Normalize.Transformations
   , inlineCleanup
   , inlineBndrsCleanup
   , flattenLet
-  , splitCastWork
-  , inlineCast
-  , caseCast
-  , letCast
-  , eliminateCastCast
-  , argCastSpec
+  -- , splitCastWork
+  -- , inlineCast
+  -- , caseCast
+  -- , letCast
+  -- , eliminateCastCast
+  -- , argCastSpec
   , etaExpandSyn
   , appPropFast
   , separateArguments
   , separateLambda
   , xOptimize
-  , lamCast
+  -- , lamCast
   , castSpec
   )
 where
 
 import           Control.DeepSeq             (deepseq)
-import           Control.Exception           (throw)
 import           Control.Lens                ((^.),_1,_2)
 import qualified Control.Lens                as Lens
 import qualified Control.Monad               as Monad
@@ -87,7 +86,6 @@ import qualified Data.Maybe                  as Maybe
 import qualified Data.Monoid                 as Monoid
 import qualified Data.Primitive.ByteArray    as BA
 import qualified Data.Text                   as Text
-import           Data.Text.Prettyprint.Doc   ((<+>), line)
 import           GHC.Integer.GMP.Internals   (Integer (..), BigNat (..))
 
 import           BasicTypes                  (InlineSpec (..))
@@ -103,20 +101,21 @@ import           Clash.Core.FreeVars
    typeFreeVars, localVarsDoNotOccurIn, localIdDoesNotOccurIn,
    countFreeOccurances)
 import           Clash.Core.Literal          (Literal (..))
-import           Clash.Core.Pretty           (ppr, showPpr)
+import           Clash.Core.Pretty           (showPpr)
 import           Clash.Core.Subst
 import           Clash.Core.Term
 import           Clash.Core.TermInfo
 import           Clash.Core.Type
   (Type (..), TypeView (..), isClassTy, splitFunForallTy, tyView,
-   mkPolyFunTy, LitTy (..),  normalizeType)
+   mkPolyFunTy, LitTy (..),  normalizeType, splitFunTyX, applyFunTyX,
+   isPolyFunTy)
 import           Clash.Core.TyCon
   (TyConMap, tyConDataCons)
 import           Clash.Core.Util
   ( isSignalType, mkVec, tyNatSize, undefinedTm,
-   shouldSplit, inverseTopSortLetBindings)
+   shouldSplit, inverseTopSortLetBindings, moveTickCastOutward)
 import           Clash.Core.Var
-  (Id, TyVar, Var (..), isGlobalId, isLocalId, mkLocalId, modifyVarName)
+  (Id, TyVar, Var (..), isGlobalId, isLocalId, mkLocalId)
 import           Clash.Core.VarEnv
   (InScopeSet, VarEnv, VarSet, elemVarSet,
    emptyVarEnv, extendInScopeSet, extendInScopeSetList, lookupVarEnv,
@@ -198,9 +197,9 @@ as they'd need to be.
 -- | Specialize functions on their type
 typeSpec :: HasCallStack => NormRewrite
 typeSpec ctx e@(TyApp e1 ty)
-  | (Var {},  args) <- collectArgs e1
+  | (Var {},  args) <- collectAppArgs e1
   , null $ Lens.toListOf typeFreeVars ty
-  , (_, []) <- Either.partitionEithers args
+  , [] <- typeArgsX args
   = specializeNorm ctx e
 
 typeSpec _ e = return e
@@ -209,11 +208,10 @@ typeSpec _ e = return e
 -- | Specialize functions on their non-representable argument
 nonRepSpec :: HasCallStack => NormRewrite
 nonRepSpec ctx e@(App e1 e2)
-  | (Var {}, args) <- collectArgs e1
-  , (_, [])     <- Either.partitionEithers args
+  | (Var {}, args) <- collectAppArgs e1
+  , [] <- typeArgsX args
   , null $ Lens.toListOf termFreeTyVars e2
-  = do tcm <- Lens.view tcCache
-       let e2Ty = termType tcm e2
+  = do let e2Ty = termType e2
        let localVar = isCoreLocalVar e2
        nonRepE2 <- not <$> (representableType <$> Lens.view typeTranslator
                                               <*> Lens.view customReprs
@@ -237,7 +235,7 @@ nonRepSpec ctx e@(App e1 e2)
       :: Term
       -> NormalizeSession Term
     inlineInternalSpecialisationArgument app
-      | (Var f,fArgs,ticks) <- collectArgsTicks app
+      | (Var f,fArgs) <- collectAppArgs app
       = do
         fTmM <- lookupVarEnv f <$> Lens.use bindings
         case fTmM of
@@ -245,7 +243,7 @@ nonRepSpec ctx e@(App e1 e2)
             | nameSort (varName (bindingId b)) == Internal
             -> censor (const mempty)
                       (topdownR appPropFast ctx
-                        (mkApps (mkTicks (bindingTerm b) ticks) fArgs))
+                        (mkArgApps (bindingTerm b) fArgs))
           _ -> return app
       | otherwise = return app
 
@@ -380,14 +378,16 @@ elemExistentials _ e = return e
 
 -- | Move a Case-decomposition from the subject of a Case-decomposition to the alternatives
 caseCase :: HasCallStack => NormRewrite
-caseCase (TransformContext is0 _) e@(Case (stripTicks -> Case scrut alts1Ty alts1) alts2Ty alts2)
+caseCase (TransformContext is0 _) e@(Case outerSubj outerSubjTy outerAlts)
+  | (Case innerSubj innerAltsTy innerAlts,args) <- collectAppArgs outerSubj
+  , ([],otherArgs) <- splitTypeAndTermArgs args
   = do
-    ty1Rep <- representableType <$> Lens.view typeTranslator
+    innerAltsTyRep <- representableType <$> Lens.view typeTranslator
                                 <*> Lens.view customReprs
                                 <*> pure False
                                 <*> Lens.view tcCache
-                                <*> pure alts1Ty
-    if not ty1Rep
+                                <*> pure innerAltsTy
+    if not innerAltsTyRep
       -- Deshadow to prevent accidental capture of free variables of inner
       -- case. Imagine:
       --
@@ -408,10 +408,12 @@ caseCase (TransformContext is0 _) e@(Case (stripTicks -> Case scrut alts1Ty alts
       --
       --   case a of {x1 -> case x1 of {_ -> x}}
       --
-      then let newAlts = map
-                           (second (\altE -> Case altE alts2Ty alts2))
-                           (map (deShadowAlt is0) alts1)
-           in  changed $ Case scrut alts2Ty newAlts
+      then let newOuterAlts
+                 = map (second (\altE -> Case (mkArgApps altE otherArgs)
+                                              outerSubjTy
+                                              outerAlts))
+                       (map (deShadowAlt is0) innerAlts)
+           in  changed $ Case innerSubj outerSubjTy newOuterAlts
       else return e
 
 caseCase _ e = return e
@@ -421,14 +423,14 @@ caseCase _ e = return e
 -- of a Case-decomposition
 inlineNonRep :: HasCallStack => NormRewrite
 inlineNonRep _ e@(Case scrut altsTy alts)
-  | (Var f, args,ticks) <- collectArgsTicks scrut
+  | (Var f, args) <- collectAppArgs scrut
   , isGlobalId f
   = do
     (cf,_)    <- Lens.use curFun
     isInlined <- zoomExtra (alreadyInlined f cf)
     limit     <- Lens.use (extra.inlineLimit)
     tcm       <- Lens.view tcCache
-    let scrutTy = termType tcm scrut
+    let scrutTy = termType scrut
         noException = not (exception tcm scrutTy)
     if noException && (Maybe.fromMaybe 0 isInlined) > limit
       then
@@ -454,10 +456,9 @@ inlineNonRep _ e@(Case scrut altsTy alts)
           (True,Just b) -> do
             Monad.when noException (zoomExtra (addNewInline f cf))
 
-            let scrutBody0 = mkTicks (bindingTerm b) (mkInlineTick f : ticks)
-            let scrutBody1 = mkApps scrutBody0 args
+            let scrut1 = mkArgApps (bindingTerm b) (args ++ [TickCtx (mkInlineTick f)])
 
-            changed $ Case scrutBody1 altsTy alts
+            changed $ Case scrut1 altsTy alts
 
           _ -> return e
   where
@@ -497,191 +498,194 @@ inlineNonRep _ e = return e
 -- @
 caseCon :: HasCallStack => NormRewrite
 caseCon ctx@(TransformContext is0 _) e@(Case subj ty alts) = do
- tcm <- Lens.view tcCache
- case collectArgsTicks subj of
-  (Cast (collectArgsTicks -> (Data dc,args,ticksInner)) fromTy toTy,[],ticksOuter)
-    | Just (dcN,argsN) <- kpush tcm dc args (fromTy,toTy)
-    -> do
-       let newD = mkApps (mkTicks (Data dcN) ticksInner) argsN
-       setChanged
-       caseCon ctx (Case (mkTicks newD ticksOuter) ty alts)
-    | otherwise
-    -> error ("KPush expected TyCon:\n" <> showPpr e)
+  tcm <- Lens.view tcCache
+  case collectAppArgs subj of
+    (Data dc, args0) -> do
+      let args1 = moveTickCastOutward is0 args0
+          (typeAndTermArgs0,otherArgs) = splitTypeAndTermArgs args1
 
-  -- The subject is an applied data constructor
-  (Data dc, args, ticks) -> case List.find (equalCon . fst) alts of
-    Just (DataPat _ tvs xs, altE) -> do
-     let
-      -- Create the substitution environment for all the existential
-      -- type variables.
-      exTysList = zip tvs (drop (length (dcUnivTyVars dc)) (Either.rights args))
-      exTySubst = extendTvSubstList (mkSubst is0) exTysList
-      -- Apply the type-substitution in all the pattern variables, we need
-      -- to do this because we might use them as let-bindings later on,
-      -- and they should have the correct type.
-      xs1 = map (substTyInVar exTySubst) xs
-      -- Create an initial set of let-binders for all variables used in the
-      -- RHS of the alternative. We might later decide to substitute instead
-      -- of let-bind in case the RHS of the let-binder is work-free.
-      fvs = Lens.foldMapOf freeLocalIds unitVarSet altE
-      (binds,_) = List.partition ((`elemVarSet` fvs) . fst)
-                $ zip xs1 (Either.lefts args)
-      binds1 = map (second (`mkTicks` ticks)) binds
-     altE1 <-
-       case binds1 of
-        [] ->
-          -- Apply the type-substitution for the existential type variables
-          pure (substTm "caseCon1" exTySubst altE)
-        _  -> do
-          -- See Note [CaseCon deshadow]
-          let
-            -- Only let-bind expression that perform work.
-            is1 = extendInScopeSetList (extendInScopeSetList is0 tvs) xs1
-          ((is3,substIds),binds2) <- List.mapAccumLM newBinder (is1,[]) binds1
-          let
-            -- Create a substitution for all the existential type variables
-            -- and the work-free expressions
-            subst = extendIdSubstList
-                      (extendTvSubstList (mkSubst is3) exTysList)
-                      substIds
-            body  = substTm "caseCon1" subst altE
-          case Maybe.catMaybes binds2 of
-            []     -> pure body
-            binds3 -> pure (Letrec binds3 body)
-     changed altE1
-    _ -> case alts of
-           -- In Core, default patterns always come first, so we match against
-           -- that if there is one, and we couldn't match with any of the data
-           -- patterns.
-           ((DefaultPat,altE):_) -> changed altE
-           _ -> changed (undefinedTm ty)
-    where
-      -- Check whether the pattern matches the data constructor
-      equalCon (DataPat dcPat _ _) = dcTag dc == dcTag dcPat
-      equalCon _                   = False
+          (typeAndTermArgs1,ticks) = case otherArgs of
+            CastCtx {} : CastCtx {} : _
+              -> error (unlines ["moveTickCastOutward failed",showPpr subj])
+            CastCtx from to : rest
+              -> case kpush tcm dc typeAndTermArgs0 (from,to) of
+                   Just newArgs -> (newArgs,rest)
+                   Nothing -> error (unlines ["KPush expected TyCon:",showPpr e])
+            rest
+              -> (typeAndTermArgs0, rest)
+      case List.find (equalCon . fst) alts of
+        Just (DataPat _ tvs xs, altE) -> do
+         let
+          -- Create the substitution environment for all the existential
+          -- type variables.
+          exTysList = zip tvs (drop (length (dcUnivTyVars dc))
+                                    (Either.rights typeAndTermArgs1))
+          exTySubst = extendTvSubstList (mkSubst is0) exTysList
+          -- Apply the type-substitution in all the pattern variables, we need
+          -- to do this because we might use them as let-bindings later on,
+          -- and they should have the correct type.
+          xs1 = map (substTyInVar exTySubst) xs
+          -- Create an initial set of let-binders for all variables used in the
+          -- RHS of the alternative. We might later decide to substitute instead
+          -- of let-bind in case the RHS of the let-binder is work-free.
+          fvs = Lens.foldMapOf freeLocalIds unitVarSet altE
+          (binds,_) = List.partition ((`elemVarSet` fvs) . fst)
+                    $ zip xs1 (Either.lefts typeAndTermArgs1)
+          binds1 = map (second (`mkTicks` (tickArgs ticks))) binds
+         altE1 <-
+           case binds1 of
+            [] ->
+              -- Apply the type-substitution for the existential type variables
+              pure (substTm "caseCon1" exTySubst altE)
+            _  -> do
+              -- See Note [CaseCon deshadow]
+              let
+                -- Only let-bind expression that perform work.
+                is1 = extendInScopeSetList (extendInScopeSetList is0 tvs) xs1
+              ((is3,substIds),binds2) <- List.mapAccumLM newBinder (is1,[]) binds1
+              let
+                -- Create a substitution for all the existential type variables
+                -- and the work-free expressions
+                subst = extendIdSubstList
+                          (extendTvSubstList (mkSubst is3) exTysList)
+                          substIds
+                body  = substTm "caseCon1" subst altE
+              case Maybe.catMaybes binds2 of
+                []     -> pure body
+                binds3 -> pure (Letrec binds3 body)
+         changed altE1
+        _ -> case alts of
+               -- In Core, default patterns always come first, so we match against
+               -- that if there is one, and we couldn't match with any of the data
+               -- patterns.
+               ((DefaultPat,altE):_) -> changed altE
+               _ -> changed (undefinedTm ty)
+        where
+          -- Check whether the pattern matches the data constructor
+          equalCon (DataPat dcPat _ _) = dcTag dc == dcTag dcPat
+          equalCon _                   = False
 
-      -- Decide whether the applied arguments of the data constructor should
-      -- be let-bound, or substituted into the alternative. We decide this
-      -- based on the fact on whether the argument has the potential to make
-      -- the circuit larger than needed if we were to duplicate that argument.
-      newBinder (isN0, substN) (x, arg) = do
-        isWorkFree arg >>= \case
-          True -> pure ((isN0, (x, arg):substN), Nothing)
-          False ->
-            let
-              x' = uniqAway isN0 x
-              isN1 = extendInScopeSet isN0 x'
-            in
-              pure ((isN1, (x, Var x'):substN), Just (x', arg))
+          -- Decide whether the applied arguments of the data constructor should
+          -- be let-bound, or substituted into the alternative. We decide this
+          -- based on the fact on whether the argument has the potential to make
+          -- the circuit larger than needed if we were to duplicate that argument.
+          newBinder (isN0, substN) (x, arg) = do
+            isWorkFree arg >>= \case
+              True -> pure ((isN0, (x, arg):substN), Nothing)
+              False ->
+                let
+                  x' = uniqAway isN0 x
+                  isN1 = extendInScopeSet isN0 x'
+                in
+                  pure ((isN1, (x, Var x'):substN), Just (x', arg))
+
+    -- The subject is a literal
+    (Literal l,_) -> case List.find (equalLit . fst) alts of
+      Just (LitPat _,altE) -> changed altE
+      _ -> matchLiteralContructor e l alts
+      where
+        equalLit (LitPat l')     = l == l'
+        equalLit _               = False
 
 
-  -- The subject is a literal
-  (Literal l,_,_) -> case List.find (equalLit . fst) alts of
-    Just (LitPat _,altE) -> changed altE
-    _ -> matchLiteralContructor e l alts
-    where
-      equalLit (LitPat l')     = l == l'
-      equalLit _               = False
-
-
-  -- The subject is an applied primitive
-  (Prim _,_,_) ->
-    -- We try to reduce the applied primitive to WHNF
-    whnfRW True ctx subj $ \ctx1 subj1 -> case collectArgsTicks subj1 of
-      -- WHNF of subject is a literal, try `caseCon` with that
-      (Literal l,_,_) -> caseCon ctx1 (Case (Literal l) ty alts)
-      -- WHNF of subject is a data-constructor, try `caseCon` with that
-      (Data _,_,_) -> caseCon ctx1 (Case subj1 ty alts)
-#if MIN_VERSION_ghc(8,2,2)
-      -- WHNF of subject is _|_, in the form of `absentError`: that means that
-      -- the entire case-expression is evaluates to _|_
-      (Prim pInfo,_:msgOrCallStack:_,ticks)
-        | primName pInfo == "Control.Exception.Base.absentError" ->
-        let e1 = mkApps (mkTicks (Prim pInfo) ticks)
-                        [Right ty,msgOrCallStack]
-        in  changed e1
-#endif
-      -- WHNF of subject is _|_, in the form of `absentError`, `patError`,
-      -- or `undefined`: that means the entire case-expression is _|_
-      (Prim pInfo,repTy:_:msgOrCallStack:_,ticks)
-        | primName pInfo `elem` ["Control.Exception.Base.patError"
-#if !MIN_VERSION_ghc(8,2,2)
-                                ,"Control.Exception.Base.absentError"
-#endif
-                                ,"GHC.Err.undefined"] ->
-        let e1 = mkApps (mkTicks (Prim pInfo) ticks)
-                        [repTy,Right ty,msgOrCallStack]
-        in  changed e1
-      -- WHNF of subject is _|_, in the form of our internal _|_-values: that
-      -- means the entire case-expression is _|_
-      (Prim pInfo,[_],ticks)
-        | primName pInfo `elem` [ "Clash.Transformations.undefined"
-                                , "Clash.GHC.Evaluator.undefined"
-                                , "EmptyCase"] ->
-        let e1 = mkApps (mkTicks (Prim pInfo) ticks) [Right ty]
-        in changed e1
-      -- WHNF of subject is non of the above, so either a variable reference,
-      -- or a primitive for which the evaluator doesn't have any evaluation
-      -- rules.
-      _ -> do
-        let subjTy = termType tcm subj
-        tran <- Lens.view typeTranslator
-        reprs <- Lens.view customReprs
-        case (`evalState` HashMapS.empty) (coreTypeToHWType tran reprs tcm subjTy) of
-          Right (FilteredHWType (Void (Just hty)) _areVoids)
-            | hty `elem` [BitVector 0, Unsigned 0, Signed 0, Index 1]
-            -- If we know that the type of the subject is zero-bits wide and
-            -- one of the Clash number types. Then the only valid alternative is
-            -- the one that can match on the literal "0", so try 'caseCon' with
-            -- that.
-            -> caseCon ctx1 (Case (Literal (IntegerLiteral 0)) ty alts)
-          _ -> do
-            let ret = caseOneAlt e
-            -- Otherwise check whether the entire case-expression has a single
-            -- alternative, and pick that one.
-            lvl <- Lens.view dbgLevel
-            if lvl > DebugNone then do
-              let subjIsConst = isConstant subj
-              -- In debug mode we always report missing evaluation rules for the
-              -- primitive evaluator
-              {- traceIf (lvl > DebugNone && subjIsConst) -}
-              if subjIsConst then
-                error ("Irreducible constant as case subject: " ++ showPpr subj ++
-                       "\nCan be reduced to: " ++ showPpr subj1) {- ret -}
+    -- The subject is an applied primitive
+    (Prim _,_) ->
+      -- We try to reduce the applied primitive to WHNF
+      whnfRW True ctx subj $ \ctx1 subj1 -> case collectAppArgs subj1 of
+        -- WHNF of subject is a literal, try `caseCon` with that
+        (Literal l,_) -> caseCon ctx1 (Case (Literal l) ty alts)
+        -- WHNF of subject is a data-constructor, try `caseCon` with that
+        (Data _,_) -> caseCon ctx1 (Case subj1 ty alts)
+        -- WHNF of subject is _|_, in the form of `absentError`: that means that
+        -- the entire case-expression is evaluates to _|_
+        (Prim pInfo,args)
+          | primName pInfo == "Control.Exception.Base.absentError" ->
+          let (_:Left msgOrCallStack:_,otherArgs) = splitTypeAndTermArgs args
+              e1 = mkArgApps (Prim pInfo)
+                             ([TypeArg ty, TermArg msgOrCallStack] ++ otherArgs)
+          in  changed e1
+        -- WHNF of subject is _|_, in the form of `absentError`, `patError`,
+        -- or `undefined`: that means the entire case-expression is _|_
+        (Prim pInfo,args)
+          | primName pInfo `elem` ["Control.Exception.Base.patError"
+                                  ,"GHC.Err.undefined"] ->
+          let (Right repTy:_:Left msgOrCallStack:_,otherArgs) = splitTypeAndTermArgs args
+              e1 = mkArgApps (Prim pInfo)
+                             ([TypeArg repTy,TypeArg ty,TermArg msgOrCallStack] ++
+                              otherArgs)
+          in  changed e1
+        -- WHNF of subject is _|_, in the form of our internal _|_-values: that
+        -- means the entire case-expression is _|_
+        (Prim pInfo,args)
+          | primName pInfo `elem` [ "Clash.Transformations.undefined"
+                                  , "Clash.GHC.Evaluator.undefined"
+                                  , "EmptyCase"] ->
+          let (_,otherArgs) = splitTypeAndTermArgs args
+              e1 = mkArgApps (Prim pInfo) ([TypeArg ty] ++ otherArgs)
+          in changed e1
+        -- WHNF of subject is non of the above, so either a variable reference,
+        -- or a primitive for which the evaluator doesn't have any evaluation
+        -- rules.
+        _ -> do
+          let subjTy = termType subj
+          tran <- Lens.view typeTranslator
+          reprs <- Lens.view customReprs
+          case (`evalState` HashMapS.empty) (coreTypeToHWType tran reprs tcm subjTy) of
+            Right (FilteredHWType (Void (Just hty)) _areVoids)
+              | hty `elem` [BitVector 0, Unsigned 0, Signed 0, Index 1]
+              -- If we know that the type of the subject is zero-bits wide and
+              -- one of the Clash number types. Then the only valid alternative is
+              -- the one that can match on the literal "0", so try 'caseCon' with
+              -- that.
+              -> caseCon ctx1 (Case (Literal (IntegerLiteral 0)) ty alts)
+            _ -> do
+              let ret = caseOneAlt e
+              -- Otherwise check whether the entire case-expression has a single
+              -- alternative, and pick that one.
+              lvl <- Lens.view dbgLevel
+              if lvl > DebugNone then do
+                let subjIsConst = isConstant subj
+                -- In debug mode we always report missing evaluation rules for the
+                -- primitive evaluator
+                {- traceIf (lvl > DebugNone && subjIsConst) -}
+                if subjIsConst then
+                  error ("Irreducible constant as case subject: " ++ showPpr subj ++
+                        "\nCan be reduced to: " ++ showPpr subj1) {- ret -}
+                else
+                  ret
               else
                 ret
-            else
-              ret
 
+    -- The subject is a variable
+    (Var v, args0)
+      | let args1 = moveTickCastOutward is0 args0
+      , ([],_) <- splitTypeAndTermArgs args1
+      , isNum0 (varType v)
+      ->
+        -- If we know that the type of the subject is zero-bits wide and
+        -- one of the Clash number types. Then the only valid alternative is
+        -- the one that can match on the literal "0", so try 'caseCon' with
+        -- that.
+        caseCon ctx (Case (Literal (IntegerLiteral 0)) ty alts)
+      where
+        isNum0 (tyView . normalizeType tcm -> TyConApp (nameOcc -> tcNm) [arg])
+          | tcNm `elem`
+            ["Clash.Sized.Internal.BitVector.BitVector"
+            ,"Clash.Sized.Internal.Unsigned.Unsigned"
+            ,"Clash.Sized.Internal.Signed.Signed"
+            ]
+          = isLitX 0 arg
+          | tcNm ==
+            "Clash.Sized.Internal.Index.Index"
+          = isLitX 1 arg
+        isNum0 _ = False
 
-  -- The subject is a variable
-  (Var v, [], _) | isNum0 (varType v) ->
-    -- If we know that the type of the subject is zero-bits wide and
-    -- one of the Clash number types. Then the only valid alternative is
-    -- the one that can match on the literal "0", so try 'caseCon' with
-    -- that.
-    caseCon ctx (Case (Literal (IntegerLiteral 0)) ty alts)
-   where
-    isNum0 (tyView -> TyConApp (nameOcc -> tcNm) [arg])
-      | tcNm `elem`
-        ["Clash.Sized.Internal.BitVector.BitVector"
-        ,"Clash.Sized.Internal.Unsigned.Unsigned"
-        ,"Clash.Sized.Internal.Signed.Signed"
-        ]
-      = isLitX 0 arg
-      | tcNm ==
-        "Clash.Sized.Internal.Index.Index"
-      = isLitX 1 arg
-    isNum0 (coreView1 tcm -> Just t) = isNum0 t
-    isNum0 _ = False
+        isLitX n (normalizeType tcm -> LitTy (NumTy m)) = n == m
+        isLitX _ _ = False
 
-    isLitX n (LitTy (NumTy m)) = n == m
-    isLitX n (coreView1 tcm -> Just t) = isLitX n t
-    isLitX _ _ = False
-
-  -- Otherwise check whether the entire case-expression has a single
-  -- alternative, and pick that one.
-  _ -> caseOneAlt e
+    -- Otherwise check whether the entire case-expression has a single
+    -- alternative, and pick that one.
+    _ -> caseOneAlt e
 
 caseCon _ e = return e
 {-# SCC caseCon #-}
@@ -800,27 +804,25 @@ caseOneAlt e = return e
 -- is considered non-representable
 nonRepANF :: HasCallStack => NormRewrite
 nonRepANF ctx@(TransformContext is0 _) e@(App appConPrim arg)
-  | (conPrim, _) <- collectArgs e
+  | (conPrim, _) <- collectAppArgs e
   , isCon conPrim || isPrim conPrim
   = do
     untranslatable <- isUntranslatable False arg
-    case (untranslatable,stripTicks arg) of
-      (True,Letrec binds body) ->
-        -- This is a situation similar to Note [CaseLet deshadow]
-        let (binds1,body1) = deshadowLetExpr is0 binds body
-        in  changed (Letrec binds1 (App appConPrim body1))
-      (True,Case {})  -> specializeNorm ctx e
-      (True,Lam {})   -> specializeNorm ctx e
-      (True,TyLam {}) -> specializeNorm ctx e
-      (True,Cast cTm _ _) -> goCast (stripTicks cTm)
-      _               -> return e
+    if untranslatable then
+      go [] arg
+    else
+      return e
  where
-  goCast (Cast cTm _ _) = goCast (stripTicks cTm)
-  goCast (Letrec {}) = error ("NonRepANF: Cast of LetRec: " <> showPpr e)
-  goCast (Case {}) = error ("NonRepANF: Cast of Case: " <> showPpr e)
-  goCast (Lam {}) = error ("NonRepANF: Cast of Lam: " <> showPpr e)
-  goCast (TyLam {}) = error ("NonRepANF: Cast of TyLam: " <> showPpr e)
-  goCast _ = return e
+  go cs (Tick t e0) = go (TickCtx t:cs) e0
+  go cs (Cast e0 from to) = go (CastCtx from to:cs) e0
+  go cs (Letrec binds body) =
+    -- This is a situation similar to Note [CaseLet deshadow]
+    let (binds1,body1) = deshadowLetExpr is0 binds body
+    in  changed (Letrec binds1 (App appConPrim (mkArgApps body1 cs)))
+  go _ Lam {} = specializeNorm ctx e
+  go _ TyLam {} = specializeNorm ctx e
+  go _ Case {} = specializeNorm ctx e
+  go _ _ = return e
 
 nonRepANF _ e = return e
 {-# SCC nonRepANF #-}
@@ -921,7 +923,7 @@ removeUnusedExpr _ e@(collectAppArgs -> (p@(Prim pInfo),args)) = do
           | primName p0 == "Clash.Transformations.removedArg"
           -> return (TermArg tm : args'')
         _ -> do
-          let ty = termType tcm tm
+          let ty = termType tm
               p' = removedTm ty
           if n < arity && n `notElem` used
              then changed (TermArg p' : args'')
@@ -936,7 +938,7 @@ removeUnusedExpr _ e@(Case _ _ [(DataPat _ [] xs,altExpr)]) =
 -- of the Cons constructor, by the Nil constructor.
 removeUnusedExpr _ e@(collectAppArgs -> (Data dc,args))
   | nameOcc (dcName dc) == "Clash.Sized.Vector.Cons"
-  , [_,aTy,nTy] <- typeArgs args
+  , [_,aTy,nTy] <- typeArgsX args
   = do
     tcm <- Lens.view tcCache
     case runExcept (tyNatSize tcm nTy) of
@@ -970,21 +972,21 @@ bindConstantVar = inlineBinders test
 {-# SCC bindConstantVar #-}
 
 -- | Push a cast over a case into it's alternatives.
-caseCast :: HasCallStack => NormRewrite
-caseCast _ e0@(Cast (collectTicks -> (Case subj tyA alts,ticks)) ty1 ty2) =
-  WARN( tyA /= ty1, "Bad Cast of Case:" <+> ppr e0 <> line <> ppr tyA <> line <> ppr ty1) do
-    let alts' = map (\(p,e) -> (p, Cast e ty1 ty2)) alts
-    changed (mkTicks (Case subj ty2 alts') ticks)
-caseCast _ e = return e
-{-# SCC caseCast #-}
+-- caseCast :: HasCallStack => NormRewrite
+-- caseCast _ e0@(Cast (collectTicks -> (Case subj tyA alts,ticks)) ty1 ty2) =
+--   WARN( tyA /= ty1, "Bad Cast of Case:" <+> ppr e0 <> line <> ppr tyA <> line <> ppr ty1) do
+--     let alts' = map (\(p,e) -> (p, Cast e ty1 ty2)) alts
+--     changed (mkTicks (Case subj ty2 alts') ticks)
+-- caseCast _ e = return e
+-- {-# SCC caseCast #-}
 
 
 -- | Push a cast over a Letrec into it's body
-letCast :: HasCallStack => NormRewrite
-letCast _ (Cast (stripTicks -> Letrec binds body) ty1 ty2) =
-  changed $ Letrec binds (Cast body ty1 ty2)
-letCast _ e = return e
-{-# SCC letCast #-}
+-- letCast :: HasCallStack => NormRewrite
+-- letCast _ (Cast (stripTicks -> Letrec binds body) ty1 ty2) =
+--   changed $ Letrec binds (Cast body ty1 ty2)
+-- letCast _ e = return e
+-- {-# SCC letCast #-}
 
 -- | Transforms:
 --
@@ -994,19 +996,19 @@ letCast _ e = return e
 --
 -- > (\x1:a2 -> (e[x:=x1 |> a2 ~ a1]) |> b1 ~ b2)
 --
-lamCast :: HasCallStack => NormRewrite
-lamCast (TransformContext is0 _) (Cast (stripTicks -> Lam bndr body) ty1 ty2) = do
-  bndrName <- cloneNameWithInScopeSet is0 (varName bndr)
-  let FunTy tyA1 tyB1 = tyView ty1
-      FunTy tyA2 tyB2 = tyView ty2
-      bndr1 = modifyVarName (const bndrName) bndr
-      is1   = extendInScopeSet is0 bndr1
-      subst = extendIdSubst (mkSubst is1) bndr (Cast (Var bndr1) tyA2 tyA1)
-      body1 = Cast (substTm "lamCast" subst body) tyB1 tyB2
-  changed (Lam bndr1 body1)
+-- lamCast :: HasCallStack => NormRewrite
+-- lamCast (TransformContext is0 _) (Cast (stripTicks -> Lam bndr body) ty1 ty2) = do
+--   bndrName <- cloneNameWithInScopeSet is0 (varName bndr)
+--   let FunTy tyA1 tyB1 = tyView ty1
+--       FunTy tyA2 tyB2 = tyView ty2
+--       bndr1 = modifyVarName (const bndrName) bndr
+--       is1   = extendInScopeSet is0 bndr1
+--       subst = extendIdSubst (mkSubst is1) bndr (Cast (Var bndr1) tyA2 tyA1)
+--       body1 = Cast (substTm "lamCast" subst body) tyB1 tyB2
+--   changed (Lam bndr1 body1)
 
-lamCast _ e = return e
-{-# SCC lamCast #-}
+-- lamCast _ e = return e
+-- {-# SCC lamCast #-}
 
 -- | Push cast over an argument to a function into that function
 --
@@ -1045,53 +1047,53 @@ lamCast _ e = return e
 --     changed (Letrec [(specId,mkTicks eA ticks)] e1)
 
 -- argCastSpec _ e = return e
-argCastSpec :: HasCallStack => NormRewrite
-argCastSpec ctx e@(App (collectArgs -> (Var f,_)) (stripTicks -> Cast e' _ _)) | isGlobalId f =
-  isWorkFree e' >>= \case
-    True -> go
-    False -> warn go
- where
-  go = specializeNorm ctx e
-  warn = trace (unwords
-    [ "WARNING:", $(curLoc), "specializing a function on a non work-free"
-    , "cast. Generated HDL implementation might contain duplicate work."
-    , "Please report this as a bug.", "\n\nExpression where this occurred:"
-    , "\n\n" ++ showPpr e
-    ])
-argCastSpec _ e = return e
-{-# SCC argCastSpec #-}
+-- argCastSpec :: HasCallStack => NormRewrite
+-- argCastSpec ctx e@(App (collectArgs -> (Var f,_)) (stripTicks -> Cast e' _ _)) | isGlobalId f =
+--   isWorkFree e' >>= \case
+--     True -> go
+--     False -> warn go
+--  where
+--   go = specializeNorm ctx e
+--   warn = trace (unwords
+--     [ "WARNING:", $(curLoc), "specializing a function on a non work-free"
+--     , "cast. Generated HDL implementation might contain duplicate work."
+--     , "Please report this as a bug.", "\n\nExpression where this occurred:"
+--     , "\n\n" ++ showPpr e
+--     ])
+-- argCastSpec _ e = return e
+-- {-# SCC argCastSpec #-}
 
 -- | Only inline casts that just contain a 'Var', because these are guaranteed work-free.
 -- These are the result of the 'splitCastWork' transformation.
-inlineCast :: HasCallStack => NormRewrite
-inlineCast = inlineBinders test
-  where
-    test _ (_, (Cast (stripTicks -> Var {}) _ _)) = return True
-    test _ _ = return False
-{-# SCC inlineCast #-}
+-- inlineCast :: HasCallStack => NormRewrite
+-- inlineCast = inlineBinders test
+--   where
+--     test _ (_, (Cast (stripTicks -> Var {}) _ _)) = return True
+--     test _ _ = return False
+-- {-# SCC inlineCast #-}
 
 -- | Eliminate two back to back casts where the type going in and coming out are the same
 --
 -- @
 --   (cast :: b -> a) $ (cast :: a -> b) x   ==> x
 -- @
-eliminateCastCast :: HasCallStack => NormRewrite
-eliminateCastCast _ c@(Cast (collectTicks -> (Cast e tyA tyB, ticks)) tyB' tyC)
-  | tyB == tyB'
-  = if tyA == tyC then
-      changed (mkTicks e ticks)
-    else
-      changed (Cast (mkTicks e ticks) tyA tyC)
-  | otherwise
-  = do
-    (nm,sp) <- Lens.use curFun
-    throw (ClashException sp ($(curLoc) ++ showPpr nm
-            ++ ": Found 2 nested casts whose types don't line up:\n"
-            ++ showPpr c)
-          Nothing)
+-- eliminateCastCast :: HasCallStack => NormRewrite
+-- eliminateCastCast _ c@(Cast (collectTicks -> (Cast e tyA tyB, ticks)) tyB' tyC)
+--   | tyB == tyB'
+--   = if tyA == tyC then
+--       changed (mkTicks e ticks)
+--     else
+--       changed (Cast (mkTicks e ticks) tyA tyC)
+--   | otherwise
+--   = do
+--     (nm,sp) <- Lens.use curFun
+--     throw (ClashException sp ($(curLoc) ++ showPpr nm
+--             ++ ": Found 2 nested casts whose types don't line up:\n"
+--             ++ showPpr c)
+--           Nothing)
 
-eliminateCastCast _ e = return e
-{-# SCC eliminateCastCast #-}
+-- eliminateCastCast _ e = return e
+-- {-# SCC eliminateCastCast #-}
 
 -- | Make a cast work-free by splitting the work of to a separate binding
 --
@@ -1101,42 +1103,44 @@ eliminateCastCast _ e = return e
 -- let x  = cast x'
 --     x' = f a b
 -- @
-splitCastWork :: HasCallStack => NormRewrite
-splitCastWork ctx@(TransformContext is0 _) unchanged@(Letrec vs e') = do
-  (vss', Monoid.getAny -> hasChanged) <- listen (mapM (splitCastLetBinding is0) vs)
-  let vs' = concat vss'
-  if hasChanged then changed (Letrec vs' e')
-                else return unchanged
-  where
-    splitCastLetBinding
-      :: InScopeSet
-      -> LetBinding
-      -> RewriteMonad extra [LetBinding]
-    splitCastLetBinding isN x@(nm, e) = case stripTicks e of
-      Cast (Var {}) _ _  -> return [x]  -- already work-free
-      Cast (Cast {}) _ _ -> return [x]  -- casts will be eliminated
-      Cast e0 ty1 ty2 -> do
-        tcm <- Lens.view tcCache
-        nm' <- mkTmBinderFor isN tcm (mkDerivedName ctx (nameOcc $ varName nm)) e0
-        changed [(nm',e0)
-                ,(nm, Cast (Var nm') ty1 ty2)
-                ]
-      _ -> return [x]
+-- splitCastWork :: HasCallStack => NormRewrite
+-- splitCastWork ctx@(TransformContext is0 _) unchanged@(Letrec vs e') = do
+--   (vss', Monoid.getAny -> hasChanged) <- listen (mapM (splitCastLetBinding is0) vs)
+--   let vs' = concat vss'
+--   if hasChanged then changed (Letrec vs' e')
+--                 else return unchanged
+--   where
+--     splitCastLetBinding
+--       :: InScopeSet
+--       -> LetBinding
+--       -> RewriteMonad extra [LetBinding]
+--     splitCastLetBinding isN x@(nm, e) = case stripTicks e of
+--       Cast (Var {}) _ _  -> return [x]  -- already work-free
+--       Cast (Cast {}) _ _ -> return [x]  -- casts will be eliminated
+--       Cast e0 ty1 ty2 -> do
+--         tcm <- Lens.view tcCache
+--         nm' <- mkTmBinderFor isN tcm (mkDerivedName ctx (nameOcc $ varName nm)) e0
+--         changed [(nm',e0)
+--                 ,(nm, Cast (Var nm') ty1 ty2)
+--                 ]
+--       _ -> return [x]
 
-splitCastWork _ e = return e
-{-# SCC splitCastWork #-}
+-- splitCastWork _ e = return e
+-- {-# SCC splitCastWork #-}
 
 
 -- | Inline work-free functions, i.e. fully applied functions that evaluate to
 -- a constant
 inlineWorkFree :: HasCallStack => NormRewrite
-inlineWorkFree _ e@(collectArgsTicks -> (Var f,args@(_:_),ticks))
+inlineWorkFree _ e@(collectAppArgs -> (Var f,args))
+  | hasTermOrTypeArgs args
   = do
     tcm <- Lens.view tcCache
-    let eTy = termType tcm e
+    let eTy = termType e
+        (typeAndTermArgs,_otherArgs) = splitTypeAndTermArgs args
     argsHaveWork <- or <$> mapM (either expressionHasWork
                                         (const (pure False)))
-                                args
+                                typeAndTermArgs
     untranslatable <- isUntranslatableType True eTy
     let isSignal = isSignalType tcm eTy
     let lv = isLocalId f
@@ -1151,8 +1155,7 @@ inlineWorkFree _ e@(collectArgsTicks -> (Var f,args@(_:_),ticks))
             if isRecBndr
                then return e
                else do
-                 let tm = mkTicks (bindingTerm b) (mkInlineTick f : ticks)
-                 changed $ mkApps tm args
+                 changed $ mkArgApps (bindingTerm b) (args ++ [TickCtx (mkInlineTick f)])
 
           _ -> return e
   where
@@ -1162,14 +1165,14 @@ inlineWorkFree _ e@(collectArgsTicks -> (Var f,args@(_:_),ticks))
     expressionHasWork e' = do
       let fvIds = Lens.toListOf freeLocalIds e'
       tcm   <- Lens.view tcCache
-      let e'Ty     = termType tcm e'
+      let e'Ty     = termType e'
           isSignal = isSignalType tcm e'Ty
       return (not (null fvIds) || isSignal)
 
 inlineWorkFree _ e@(Var f) = do
   tcm <- Lens.view tcCache
   let fTy      = varType f
-      closed   = not (isPolyFunCoreTy tcm fTy)
+      closed   = not (isPolyFunTy (normalizeType tcm fTy))
       isSignal = isSignalType tcm fTy
   untranslatable <- isUntranslatableType True fTy
   topEnts <- Lens.view topEntities
@@ -1233,8 +1236,9 @@ inlineSmall _ e = return e
 -- are clock, reset generators.
 constantSpec :: HasCallStack => NormRewrite
 constantSpec ctx@(TransformContext is0 tfCtx) e@(App e1 e2)
-  | (Var {}, args) <- collectArgs e1
-  , (_, []) <- Either.partitionEithers args
+  | (Var {}, args) <- collectAppArgs e1
+  , (typeAndTermArgs,_otherArgs) <- splitTypeAndTermArgs args
+  , (_, []) <- Either.partitionEithers typeAndTermArgs
   , null $ Lens.toListOf termFreeTyVars e2
   = do specInfo<- constantSpecInfo ctx e2
        if csrFoundConstant specInfo then
@@ -1343,168 +1347,183 @@ constantSpec _ e = return e
 appPropFast :: HasCallStack => NormRewrite
 appPropFast ctx@(TransformContext is _) = \case
   e@App {}
-    | let (fun,args,ticks) = collectArgsTicks e
-    -> go is (deShadowTerm is fun) args ticks
+    | let (fun,args) = collectAppArgs e
+    , let args1 = moveTickCastOutward is args
+    -> go is (deShadowTerm is fun) args1
   e@TyApp {}
-    | let (fun,args,ticks) = collectArgsTicks e
-    -> go is (deShadowTerm is fun) args ticks
-  e          -> return e
+    | let (fun,args) = collectAppArgs e
+    , let args1 = moveTickCastOutward is args
+    -> go is (deShadowTerm is fun) args1
+  e -> return e
  where
-  go :: InScopeSet -> Term -> [Either Term Type] -> [TickInfo]
+  go :: InScopeSet -> Term -> [AppArg]
      -> NormalizeSession Term
-  go is0 (collectArgsTicks -> (fun,args0@(_:_),ticks0)) args1 ticks1 =
-    go is0 fun (args0 ++ args1) (ticks0 ++ ticks1)
+  go is0 (collectAppArgs -> (fun,args0@(_:_))) args1 =
+    let args2 = moveTickCastOutward is0 (args0 ++ args1) in
+    go is0 fun args2
 
-  go is0 (Lam v e) (Left arg:args) ticks = do
+  go is0 (Lam v e) (TermArg arg:args) = do
     setChanged
     orM [pure (isVar arg), isWorkFree arg] >>= \case
       True ->
         let subst = extendIdSubst (mkSubst is0) v arg in
-        (`mkTicks` ticks) <$> go is0 (substTm "appPropFast.AppLam" subst e) args []
+        go is0 (substTm "appPropFast.AppLam" subst e) args
       False ->
         let is1 = extendInScopeSet is0 v in
-        Letrec [(v, arg)] <$> go is1 (deShadowTerm is1 e) args ticks
+        Letrec [(v, arg)] <$> go is1 (deShadowTerm is1 e) args
 
-  go is0 (Letrec vs e) args@(_:_) ticks = do
+  go is0 (Letrec vs e) args@(_:_) = do
     setChanged
     let vbs  = map fst vs
         is1  = extendInScopeSetList is0 vbs
     -- XXX: 'vs' should already be deshadowed w.r.t. 'is0'
-    Letrec vs <$> go is1 e args ticks
+    Letrec vs <$> go is1 e args
 
-  go is0 (TyLam tv e) (Right t:args) ticks = do
+  go is0 (TyLam tv e) (TypeArg t:args) = do
     setChanged
     let subst = extendTvSubst (mkSubst is0) tv t
-    (`mkTicks` ticks) <$> go is0 (substTm "appPropFast.TyAppTyLam" subst e) args []
+    go is0 (substTm "appPropFast.TyAppTyLam" subst e) args
 
-  go is0 (Case scrut ty0 alts) args0@(_:_) ticks = do
+  go is0 (Case scrut ty0 alts) args0@(_:_) = do
     setChanged
     let isA1 = unionInScope
                  is0
                  ((mkInScopeSet . mkVarSet . concatMap (patVars . fst)) alts)
     (ty1,vs,args1) <- goCaseArg isA1 ty0 [] args0
     case vs of
-      [] -> (`mkTicks` ticks) . Case scrut ty1 <$> mapM (goAlt is0 args1) alts
+      [] -> Case (mkTicks scrut (tickArgs args0)) ty1 <$> mapM (goAlt is0 args1) alts
       _  -> do
         let vbs   = map fst vs
             is1   = extendInScopeSetList is0 vbs
             alts1 = map (deShadowAlt is1) alts
-        Letrec vs . (`mkTicks` ticks) . Case scrut ty1 <$> mapM (goAlt is1 args1) alts1
+        Letrec vs . Case (mkTicks scrut (tickArgs args0)) ty1 <$> mapM (goAlt is1 args1) alts1
 
-  go is0 (Tick sp e) args ticks = do
-    setChanged
-    go is0 e args (sp:ticks)
+  go _ e@(Tick {}) _ = error (unlines ["Tick not collected?",showPpr e])
+  go _ e@(Cast {}) _ = error (unlines ["Cast not collected?",showPpr e])
+  -- go is0 (Tick sp e) args ticks = do
+  --   setChanged
+  --   go is0 e args (sp:ticks)
 
-  go is0 c@(Cast e tyA tyB) args0 ticks = case args0 of
-    [] -> Cast <$> go is0 e args0 ticks <*> pure tyA <*> pure tyB
-    (Left arg:args1) -> do
-      setChanged
-      case (tyView tyA,tyView tyB) of
-        (FunTy aa ar,FunTy ba br)
-          -- From: (e |> (aa -> ar) ~ (ba -> br)) arg
-          --
-          -- to: (e (arg |> ba ~ aa)) |> ar ~ br
-          -> do
-             tcm <- Lens.view tcCache
-             Cast <$> go is0 e (Left (Cast arg ba aa):args1) ticks
-                  <*> pure (applyTypeToArgs (App c arg) tcm ar args1)
-                  <*> pure (applyTypeToArgs (App c arg) tcm br args1)
+  -- go is0 c@(Cast e tyA tyB) args0 ticks = case args0 of
+  --   [] -> Cast <$> go is0 e args0 ticks <*> pure tyA <*> pure tyB
+  --   (Left arg:args1) -> do
+  --     setChanged
+  --     case (tyView tyA,tyView tyB) of
+  --       (FunTy aa ar,FunTy ba br)
+  --         -- From: (e |> (aa -> ar) ~ (ba -> br)) arg
+  --         --
+  --         -- to: (e (arg |> ba ~ aa)) |> ar ~ br
+  --         -> do
+  --            tcm <- Lens.view tcCache
+  --            Cast <$> go is0 e (Left (Cast arg ba aa):args1) ticks
+  --                 <*> pure (applyTypeToArgs (App c arg) tcm ar args1)
+  --                 <*> pure (applyTypeToArgs (App c arg) tcm br args1)
 
-        (TyConApp sigTc [_domTy,fTy],FunTy ba br)
-          | nameOcc sigTc == "Clash.Signal.Internal.Signal"
-          , FunTy aa ar <- tyView fTy
-          , aa == ba
-          , ar == br
-          , (Cast e1 tyC _,ticks1) <- collectTicks e
-          , FunTy ca cr <- tyView tyC
-          , ca == ba
-          , cr == br
-          -- From: ((e |> (a -> b) ~ Signal dom (a -> b) ) |> Signal dom (a -> b) ~ (a -> b)) arg
-          --
-          -- To: e arg
-          -> go is0 e1 (Left arg:args1) (ticks1 ++ ticks)
-        (FunTy aa ar,TyConApp sigTc [_domTy,fTy])
-          | nameOcc sigTc == "Clash.Signal.Internal.Signal"
-          , FunTy ba br <- tyView fTy
-          , aa == ba
-          , ar == br
-          -- From (e |> (a -> b) ~ Signal dom (a -> b)) arg
-          --
-          -- To: e arg
-          -> error ("Push FunSignal:\n" <> showPpr (App c arg)) -- go is0 e (Left arg:args1) ticks
-        _ -> do
-          (nm,sp) <- Lens.use curFun
-          throw (ClashException sp ($(curLoc) ++ showPpr nm
-                  ++ ": AppPropFast FunTy expected:\n"
-                  ++ showPpr (App c arg))
-                Nothing)
-    (Right arg:args1) -> do
-      setChanged
-      case (tyA, tyB) of
-        -- This is what we do here
-        --
-        -- From: (e |> (forall (tvA:k) . tBodyA) ~ (forall (tvB:k) . tBodyB)) @arg
-        --
-        -- to: (e @arg) |> tBodyA [tvA := arg] ~ tBodyB [tvB := arg]
-        --
-        -- We error out when the kinds of `tvA` and `tvB` are not equal, as we
-        -- would then need Casts at the type level, and we would need to do:
-        --
-        -- From: (e |> (forall (tvA:kA) . tBodyA) ~ (forall (tvB:kB) . tBodyB)) @arg
-        --
-        -- to: (e @(CastTy arg kB kA)) |> tBodyA [tvA := CastTy arg kB kA] ~ tBodyB [tvB := arg]
-        (ForAllTy tvA tBodyA, ForAllTy tvB tBodyB)
-          | varType tvA == varType tvB
-          -> do
-             setChanged
-             tcm <- Lens.view tcCache
-             let substA = extendTvSubst (mkSubst is0) tvA arg
-                 substB = extendTvSubst (mkSubst is0) tvB arg
-                 tyBodyA1 = substTy substA tBodyA
-                 tyBodyB1 = substTy substB tBodyB
-             Cast <$> go is0 e (Right arg:args1) ticks
-                  <*> pure (applyTypeToArgs (TyApp c arg) tcm tyBodyA1 args1)
-                  <*> pure (applyTypeToArgs (TyApp c arg) tcm tyBodyB1 args1)
-          | otherwise
-          -> do
-             (nm,sp) <- Lens.use curFun
-             throw (ClashException sp ($(curLoc) ++ showPpr nm
-                     ++ ": AppPropFast TPush unimplemented for kind-equalities:\n"
-                     ++ showPpr (TyApp c arg))
-                   Nothing)
-        _ -> do
-          (nm,sp) <- Lens.use curFun
-          throw (ClashException sp ($(curLoc) ++ showPpr nm
-                  ++ ": AppPropFast ForallTy expected:\n"
-                  ++ showPpr (TyApp c arg))
-                Nothing)
+  --       (TyConApp sigTc [_domTy,fTy],FunTy ba br)
+  --         | nameOcc sigTc == "Clash.Signal.Internal.Signal"
+  --         , FunTy aa ar <- tyView fTy
+  --         , aa == ba
+  --         , ar == br
+  --         , (Cast e1 tyC _,ticks1) <- collectTicks e
+  --         , FunTy ca cr <- tyView tyC
+  --         , ca == ba
+  --         , cr == br
+  --         -- From: ((e |> (a -> b) ~ Signal dom (a -> b) ) |> Signal dom (a -> b) ~ (a -> b)) arg
+  --         --
+  --         -- To: e arg
+  --         -> go is0 e1 (Left arg:args1) (ticks1 ++ ticks)
+  --       (FunTy aa ar,TyConApp sigTc [_domTy,fTy])
+  --         | nameOcc sigTc == "Clash.Signal.Internal.Signal"
+  --         , FunTy ba br <- tyView fTy
+  --         , aa == ba
+  --         , ar == br
+  --         -- From (e |> (a -> b) ~ Signal dom (a -> b)) arg
+  --         --
+  --         -- To: e arg
+  --         -> error ("Push FunSignal:\n" <> showPpr (App c arg)) -- go is0 e (Left arg:args1) ticks
+  --       _ -> do
+  --         (nm,sp) <- Lens.use curFun
+  --         throw (ClashException sp ($(curLoc) ++ showPpr nm
+  --                 ++ ": AppPropFast FunTy expected:\n"
+  --                 ++ showPpr (App c arg))
+  --               Nothing)
+  --   (Right arg:args1) -> do
+  --     setChanged
+  --     case (tyA, tyB) of
+  --       -- This is what we do here
+  --       --
+  --       -- From: (e |> (forall (tvA:k) . tBodyA) ~ (forall (tvB:k) . tBodyB)) @arg
+  --       --
+  --       -- to: (e @arg) |> tBodyA [tvA := arg] ~ tBodyB [tvB := arg]
+  --       --
+  --       -- We error out when the kinds of `tvA` and `tvB` are not equal, as we
+  --       -- would then need Casts at the type level, and we would need to do:
+  --       --
+  --       -- From: (e |> (forall (tvA:kA) . tBodyA) ~ (forall (tvB:kB) . tBodyB)) @arg
+  --       --
+  --       -- to: (e @(CastTy arg kB kA)) |> tBodyA [tvA := CastTy arg kB kA] ~ tBodyB [tvB := arg]
+  --       (ForAllTy tvA tBodyA, ForAllTy tvB tBodyB)
+  --         | varType tvA == varType tvB
+  --         -> do
+  --            setChanged
+  --            tcm <- Lens.view tcCache
+  --            let substA = extendTvSubst (mkSubst is0) tvA arg
+  --                substB = extendTvSubst (mkSubst is0) tvB arg
+  --                tyBodyA1 = substTy substA tBodyA
+  --                tyBodyB1 = substTy substB tBodyB
+  --            Cast <$> go is0 e (Right arg:args1) ticks
+  --                 <*> pure (applyTypeToArgs (TyApp c arg) tcm tyBodyA1 args1)
+  --                 <*> pure (applyTypeToArgs (TyApp c arg) tcm tyBodyB1 args1)
+  --         | otherwise
+  --         -> do
+  --            (nm,sp) <- Lens.use curFun
+  --            throw (ClashException sp ($(curLoc) ++ showPpr nm
+  --                    ++ ": AppPropFast TPush unimplemented for kind-equalities:\n"
+  --                    ++ showPpr (TyApp c arg))
+  --                  Nothing)
+  --       _ -> do
+  --         (nm,sp) <- Lens.use curFun
+  --         throw (ClashException sp ($(curLoc) ++ showPpr nm
+  --                 ++ ": AppPropFast ForallTy expected:\n"
+  --                 ++ showPpr (TyApp c arg))
+  --               Nothing)
 
-  go _ fun args ticks = return (mkApps (mkTicks fun ticks) args)
+  go _ fun args = return (mkArgApps fun args)
 
   goAlt is0 args0 (p,e) = do
     let (tvs,ids) = patIds p
         is1       = extendInScopeSetList (extendInScopeSetList is0 tvs) ids
-    (p,) <$> go is1 e args0 []
+    (p,) <$> go is1 e args0
 
-  goCaseArg isA ty0 ls0 (Right t:args0) = do
-    tcm <- Lens.view tcCache
-    let ty1 = piResultTy tcm ty0 t
+  goCaseArg isA ty0 ls0 (TypeArg t:args0) = do
+    let ty1 = piResultTy ty0 t
     (ty2,ls1,args1) <- goCaseArg isA ty1 ls0 args0
-    return (ty2,ls1,Right t:args1)
+    return (ty2,ls1,TypeArg t:args1)
 
-  goCaseArg isA0 ty0 ls0 (Left arg:args0) = do
+  goCaseArg isA0 ty0 ls0 (TermArg arg:args0) = do
     tcm <- Lens.view tcCache
-    let argTy = termType tcm arg
-        ty1   = applyFunTy tcm ty0 argTy
+    let argTy = termType arg
+        ty1   = applyFunTyX ty0 argTy
     orM [pure (isVar arg), isWorkFree arg] >>= \case
       True -> do
         (ty2,ls1,args1) <- goCaseArg isA0 ty1 ls0 args0
-        return (ty2,ls1,Left arg:args1)
+        return (ty2,ls1,TermArg arg:args1)
       False -> do
         boundArg <- mkTmBinderFor isA0 tcm (mkDerivedName ctx "app_arg") arg
         let isA1 = extendInScopeSet isA0 boundArg
         (ty2,ls1,args1) <- goCaseArg isA1 ty1 ls0 args0
-        return (ty2,(boundArg,arg):ls1,Left (Var boundArg):args1)
+        return (ty2,(boundArg,arg):ls1,TermArg (Var boundArg):args1)
+
+  goCaseArg isA ty0 ls0 (CastCtx from to:args0) =
+    if ty0 == from then do
+      (ty1,ls1,args1) <- goCaseArg isA to ls0 args0
+      return (ty1,ls1,CastCtx from to:args1)
+    else
+      error (unlines ["Types don't match",showPpr ty0,showPpr from])
+
+  goCaseArg isA ty0 ls0 (TickCtx t:args0) = do
+    (ty1,ls1,args1) <- goCaseArg isA ty0 ls0 args0
+    return (ty1,ls1,TickCtx t:args1)
 
   goCaseArg _ ty ls [] = return (ty,ls,[])
 {-# SCC appPropFast #-}
@@ -1562,11 +1581,13 @@ caseFlat _ e = return e
 collectFlat :: Term -> Term -> Maybe [(Pat,Term)]
 collectFlat scrut (Case (collectEqArgs -> Just (scrut', val)) _ty [lAlt,rAlt])
   | scrut' == scrut
-  = case collectArgs val of
+  = case collectAppArgs val of
       (Prim p,args') | isFromInt (primName p) ->
-        go (last args')
+        let (typeAndTermArgs,_otherArgs) = splitTypeAndTermArgs args' in
+        go (last typeAndTermArgs)
       (Data dc,args')    | nameOcc (dcName dc) == "GHC.Types.I#" ->
-        go (last args')
+        let (typeAndTermArgs,_otherArgs) = splitTypeAndTermArgs args' in
+        go (last typeAndTermArgs)
       _ -> Nothing
   where
     go (Left (Literal i)) = case (lAlt,rAlt) of
@@ -1597,20 +1618,21 @@ collectFlat _ _ = Nothing
 {-# SCC collectFlat #-}
 
 collectEqArgs :: Term -> Maybe (Term,Term)
-collectEqArgs (collectArgsTicks -> (Prim p, args, ticks))
+collectEqArgs (collectAppArgs -> (Prim p, args))
   | nm == "Clash.Sized.Internal.BitVector.eq#"
-    = let [_,_,Left scrut,Left val] = args
-      in Just (mkTicks scrut ticks,val)
+    = let [_,_,Left scrut,Left val] = typeAndTermArgs
+      in Just (mkArgApps scrut otherArgs,val)
   | nm == "Clash.Sized.Internal.Index.eq#"  ||
     nm == "Clash.Sized.Internal.Signed.eq#" ||
     nm == "Clash.Sized.Internal.Unsigned.eq#"
-    = let [_,Left scrut,Left val] = args
-      in Just (mkTicks scrut ticks,val)
+    = let [_,Left scrut,Left val] = typeAndTermArgs
+      in Just (mkArgApps scrut otherArgs,val)
   | nm == "Clash.Transformations.eqInt"
-    = let [Left scrut,Left val] = args
-      in  Just (mkTicks scrut ticks,val)
+    = let [Left scrut,Left val] = typeAndTermArgs
+      in  Just (mkArgApps scrut otherArgs,val)
  where
   nm = primName p
+  (typeAndTermArgs,otherArgs) = splitTypeAndTermArgs args
 
 collectEqArgs _ = Nothing
 
@@ -1630,7 +1652,7 @@ isSimIOTy
   -> Type
   -- ^ Type to check for IO-likeness
   -> Bool
-isSimIOTy tcm ty = case tyView (coreView tcm ty) of
+isSimIOTy tcm ty = case tyView (normalizeType tcm ty) of
   TyConApp tcNm args
     | nameOcc tcNm == "Clash.Explicit.SimIO.SimIO"
     -> True
@@ -1646,7 +1668,7 @@ isStateTokenTy
   -> Type
   -- ^ Type to check for state tokenness
   -> Bool
-isStateTokenTy tcm ty = case tyView (coreView tcm ty) of
+isStateTokenTy tcm ty = case tyView (normalizeType tcm ty) of
   TyConApp tcNm _ -> nameOcc tcNm == "GHC.Prim.State#"
   _ -> False
 
@@ -1761,7 +1783,7 @@ collectANF ctx e@(App appf arg)
 
 collectANF _ (Letrec binds body) = do
   tcm <- Lens.view tcCache
-  let isSimIO = isSimIOTy tcm (termType tcm body)
+  let isSimIO = isSimIOTy tcm (termType body)
   untranslatable <- lift (isUntranslatable False body)
   let localVar = isCoreLocalVar body
   -- See Note [ANF no let-bind]
@@ -1911,25 +1933,27 @@ etaExpansionTL (TransformContext is0 ctx) (Letrec xes e) = do
 etaExpansionTL (TransformContext is0 ctx) e
   = do
     tcm <- Lens.view tcCache
-    if isFun tcm e
-      then do
-        let argTy = ( fst
-                    . Maybe.fromMaybe (error $ $(curLoc) ++ "etaExpansion splitFunTy")
-                    . splitFunTy tcm
-                    . termType tcm
-                    ) e
+    let eTy = termType e
+        eTyNorm = normalizeType tcm eTy
+    case tyView eTyNorm of
+      FunTy argTy _resTy -> do
         newId <- mkInternalVar is0 "arg" argTy
-        e' <- etaExpansionTL (TransformContext (extendInScopeSet is0 newId)
+        let e1 = if eTy == eTyNorm then
+                   e
+                 else
+                   Cast e eTy eTyNorm
+        e2 <- etaExpansionTL (TransformContext (extendInScopeSet is0 newId)
                                                (LamBody newId:ctx))
-                             (App e (Var newId))
-        changed (Lam newId e')
-      else return e
+                             (App e1 (Var newId))
+        changed (Lam newId e2)
+      _ ->
+        return e
 {-# SCC etaExpansionTL #-}
 
 -- | Eta-expand functions with a Synthesize annotation, needed to allow such
 -- functions to appear as arguments to higher-order primitives.
 etaExpandSyn :: HasCallStack => NormRewrite
-etaExpandSyn (TransformContext is0 ctx) e@(collectArgs -> (Var f, _)) = do
+etaExpandSyn (TransformContext is0 ctx) e@(collectAppArgs -> (Var f, _)) = do
   topEnts <- Lens.view topEntities
   tcm <- Lens.view tcCache
   let isTopEnt = f `elemVarSet` topEnts
@@ -1938,7 +1962,7 @@ etaExpandSyn (TransformContext is0 ctx) e@(collectArgs -> (Var f, _)) = do
           AppFun:_ -> True
           TickC _:c -> isAppFunCtx c
           _ -> False
-      argTyM = fmap fst (splitFunTy tcm (termType tcm e))
+      argTyM = fmap fst (splitFunTyX (normalizeType tcm (termType e)))
   case argTyM of
     Just argTy | isTopEnt && not (isAppFunCtx ctx) -> do
       newId <- mkInternalVar is0 "arg" argTy
@@ -1970,8 +1994,8 @@ recToLetRec :: HasCallStack => NormRewrite
 recToLetRec (TransformContext is0 []) e = do
   (fn,_) <- Lens.use curFun
   tcm    <- Lens.view tcCache
-  case splitNormalized tcm e of
-    Right (args,bndrs,res) -> do
+  case splitNormalized e of
+    Right (args,(bndrs,_),(res,_)) -> do
       let args'             = map Var args
           (toInline,others) = List.partition (eqApp tcm fn args' . snd) bndrs
           resV              = Var res
@@ -2002,19 +2026,20 @@ recToLetRec (TransformContext is0 []) e = do
     -- corresponding (sub)field from the target variable.
     --
     -- TODO: See [Note: Breaks on constants and predetermined equality]
-    eqApp tcm v args (collectArgs . stripTicks -> (Var v',args'))
+    eqApp tcm v args (collectAppArgs -> (Var v',args'))
       | isGlobalId v'
       , v == v'
-      , let args2 = Either.lefts args'
+      , let (typeAndTermArgs,_otherArgs) = splitTypeAndTermArgs args'
+      , let args2 = Either.lefts typeAndTermArgs
       , length args == length args2
       = and (zipWith (eqArg tcm) args args2)
     eqApp _ _ _ _ = False
 
-    eqArg _ v1 v2@(stripTicks -> Var {})
+    eqArg _ v1 (collectCastsTicks -> (v2@Var {},_))
       = v1 == v2
-    eqArg tcm v1 v2@(collectArgs . stripTicks -> (Data _, args'))
-      | let t1 = normalizeType tcm (termType tcm v1)
-      , let t2 = normalizeType tcm (termType tcm v2)
+    eqArg tcm v1 v2@(collectAppArgs -> (Data _, args'))
+      | let t1 = normalizeType tcm (termType v1)
+      , let t2 = normalizeType tcm (termType v2)
       , t1 == t2
       = if isClassConstraint t1 then
           -- Class constraints are equal if their types are equal, so we can
@@ -2023,7 +2048,8 @@ recToLetRec (TransformContext is0 []) e = do
         else
           -- Check whether all arguments to the data constructor are projections
           --
-          and (zipWith (eqDat v1) (map pure [0..]) (Either.lefts args'))
+          let (typeAndTermArgs,_otherArgs) = splitTypeAndTermArgs args' in
+          and (zipWith (eqDat v1) (map pure [0..]) (Either.lefts typeAndTermArgs))
     eqArg _ _ _
       = False
 
@@ -2045,8 +2071,9 @@ recToLetRec (TransformContext is0 []) e = do
     --     construction of `y` with `(fst x, fst x)`.
     --
     eqDat :: Term -> [Int] -> Term -> Bool
-    eqDat v fTrace (collectArgs . stripTicks -> (Data _, args)) =
-      and (zipWith (eqDat v) (map (:fTrace) [0..]) (Either.lefts args))
+    eqDat v fTrace (collectAppArgs -> (Data _, args)) =
+      let (typeAndTermArgs,_otherArgs) = splitTypeAndTermArgs args in
+      and (zipWith (eqDat v) (map (:fTrace) [0..]) (Either.lefts typeAndTermArgs))
     eqDat v1 fTrace v2 =
       case stripProjection (reverse fTrace) v1 v2 of
         Just [] -> True
@@ -2074,31 +2101,31 @@ recToLetRec _ e = return e
 {-# SCC recToLetRec #-}
 
 -- | Inline a function with functional arguments
-inlineHO :: HasCallStack => NormRewrite
-inlineHO _ e@(App _ _)
-  | (Var f, args, ticks) <- collectArgsTicks e
-  = do
-    tcm <- Lens.view tcCache
-    let hasPolyFunArgs = or (map (either (isPolyFun tcm) (const False)) args)
-    if hasPolyFunArgs
-      then do (cf,_)    <- Lens.use curFun
-              isInlined <- zoomExtra (alreadyInlined f cf)
-              limit     <- Lens.use (extra.inlineLimit)
-              if (Maybe.fromMaybe 0 isInlined) > limit
-                then do
-                  lvl <- Lens.view dbgLevel
-                  traceIf (lvl > DebugNone) ($(curLoc) ++ "InlineHO: " ++ show f ++ " already inlined " ++ show limit ++ " times in:" ++ show cf) (return e)
-                else do
-                  bodyMaybe <- lookupVarEnv f <$> Lens.use bindings
-                  case bodyMaybe of
-                    Just b -> do
-                      zoomExtra (addNewInline f cf)
-                      changed (mkApps (mkTicks (bindingTerm b) ticks) args)
-                    _ -> return e
-      else return e
+-- inlineHO :: HasCallStack => NormRewrite
+-- inlineHO _ e@(App _ _)
+--   | (Var f, args, ticks) <- collectArgsTicks e
+--   = do
+--     tcm <- Lens.view tcCache
+--     let hasPolyFunArgs = or (map (either (isPolyFun tcm) (const False)) args)
+--     if hasPolyFunArgs
+--       then do (cf,_)    <- Lens.use curFun
+--               isInlined <- zoomExtra (alreadyInlined f cf)
+--               limit     <- Lens.use (extra.inlineLimit)
+--               if (Maybe.fromMaybe 0 isInlined) > limit
+--                 then do
+--                   lvl <- Lens.view dbgLevel
+--                   traceIf (lvl > DebugNone) ($(curLoc) ++ "InlineHO: " ++ show f ++ " already inlined " ++ show limit ++ " times in:" ++ show cf) (return e)
+--                 else do
+--                   bodyMaybe <- lookupVarEnv f <$> Lens.use bindings
+--                   case bodyMaybe of
+--                     Just b -> do
+--                       zoomExtra (addNewInline f cf)
+--                       changed (mkArgApps (mkTicks (bindingTerm b) ticks) args)
+--                     _ -> return e
+--       else return e
 
-inlineHO _ e = return e
-{-# SCC inlineHO #-}
+-- inlineHO _ e = return e
+-- {-# SCC inlineHO #-}
 
 -- | Simplified CSE, only works on let-bindings, does an inverse topological
 -- sort of the let-bindings and then works from top to bottom
@@ -2148,8 +2175,8 @@ reduceBinders
   -> RewriteMonad NormalizeState (Subst, [LetBinding])
 reduceBinders !subst processed [] = return (subst,processed)
 reduceBinders !subst processed ((i,substTm "reduceBinders" subst -> e):rest)
-  | (_,_,ticks) <- collectArgsTicks e
-  , NoDeDup `notElem` ticks
+  | (_,args) <- collectAppArgs e
+  , NoDeDup `notElem` tickArgs args
   , Just (i1,_) <- List.find ((== e) . snd) processed
   = do
     let subst1 = extendIdSubst subst i (Var i1)
@@ -2161,9 +2188,9 @@ reduceBinders !subst processed ((i,substTm "reduceBinders" subst -> e):rest)
 
 reduceConst :: HasCallStack => NormRewrite
 reduceConst ctx e@(App _ _)
-  | (Prim p0, _) <- collectArgs e
+  | (Prim p0, _) <- collectAppArgs e
   = whnfRW False ctx e $ \_ctx1 e1 -> case e1 of
-      (collectArgs -> (Prim p1, _)) | primName p0 == primName p1 -> return e
+      (collectAppArgs -> (Prim p1, _)) | primName p0 == primName p1 -> return e
       _ -> changed e1
 
 reduceConst _ e = return e
@@ -2213,84 +2240,82 @@ reduceConst _ e = return e
 -- * Clash.Sized.Internal.BitVector.split#
 -- * Clash.Sized.Internal.BitVector.eq#
 reduceNonRepPrim :: HasCallStack => NormRewrite
-reduceNonRepPrim c@(TransformContext is0 ctx) e@(App _ _) | (Prim p, args, ticks) <- collectArgsTicks e = do
+reduceNonRepPrim c@(TransformContext is0 ctx) e@(App _ _) | (Prim p, args) <- collectAppArgs e = do
   tcm <- Lens.view tcCache
   ultra <- Lens.use (extra.normalizeUltra)
-  let eTy = termType tcm e
+  let eTy = termType e
+      (typeAndTermArgs,otherArgs) = splitTypeAndTermArgs args
   case tyView eTy of
     (TyConApp vecTcNm@(nameOcc -> "Clash.Sized.Vector.Vec")
               [runExcept . tyNatSize tcm -> Right 0, aTy]) -> do
       let (Just vecTc) = lookupUniqMap vecTcNm tcm
           [nilCon,consCon] = tyConDataCons vecTc
           nilE = mkVec nilCon consCon aTy 0 []
-      changed (mkTicks nilE ticks)
+      changed (mkArgApps nilE otherArgs)
     tv -> let argLen = length args in case primName p of
       "Clash.Sized.Vector.zipWith" | argLen == 7 -> do
-        let [lhsElTy,rhsElty,resElTy,nTy] = Either.rights args
+        let ([fun,lhsArg,rhsArg],[lhsElTy,rhsElty,resElTy,nTy])
+              = Either.partitionEithers typeAndTermArgs
         case runExcept (tyNatSize tcm nTy) of
           Right n -> do
             shouldReduce1 <- List.orM [ pure (ultra || n < 2)
                                  , shouldReduce ctx
                                  , List.anyM isUntranslatableType_not_poly
                                         [lhsElTy,rhsElty,resElTy] ]
-            if shouldReduce1
-               then let [fun,lhsArg,rhsArg] = Either.lefts args
-                    in  (`mkTicks` ticks) <$>
-                        reduceZipWith c p n lhsElTy rhsElty resElTy fun lhsArg rhsArg
-               else return e
+            if shouldReduce1 then
+              (`mkArgApps` otherArgs) <$>
+              reduceZipWith c p n lhsElTy rhsElty resElTy fun lhsArg rhsArg
+            else return e
           _ -> return e
       "Clash.Sized.Vector.map" | argLen == 5 -> do
-        let [argElTy,resElTy,nTy] = Either.rights args
+        let ([fun,arg],[argElTy,resElTy,nTy]) = Either.partitionEithers typeAndTermArgs
         case runExcept (tyNatSize tcm nTy) of
           Right n -> do
             shouldReduce1 <- List.orM [ pure (ultra || n < 2 )
                                  , shouldReduce ctx
                                  , List.anyM isUntranslatableType_not_poly
                                         [argElTy,resElTy] ]
-            if shouldReduce1
-               then let [fun,arg] = Either.lefts args
-                    in  (`mkTicks` ticks) <$> reduceMap c p n argElTy resElTy fun arg
-               else return e
+            if shouldReduce1 then
+              (`mkArgApps` otherArgs) <$> reduceMap c p n argElTy resElTy fun arg
+            else
+              return e
           _ -> return e
       "Clash.Sized.Vector.traverse#" | argLen == 7 ->
-        let [aTy,fTy,bTy,nTy] = Either.rights args
+        let ([dict,fun,arg],[aTy,fTy,bTy,nTy]) = Either.partitionEithers typeAndTermArgs
         in  case runExcept (tyNatSize tcm nTy) of
           Right n ->
-            let [dict,fun,arg] = Either.lefts args
-            in  (`mkTicks` ticks) <$> reduceTraverse c n aTy fTy bTy dict fun arg
+            (`mkArgApps` otherArgs) <$> reduceTraverse c n aTy fTy bTy dict fun arg
           _ -> return e
       "Clash.Sized.Vector.fold" | argLen == 4 -> do
-        let [nTy,aTy] = Either.rights args
+        let ([fun,arg],[nTy,aTy]) = Either.partitionEithers typeAndTermArgs
         case runExcept (tyNatSize tcm nTy) of
           Right n -> do
             shouldReduce1 <- List.orM [ pure (ultra || n == 0)
                                  , shouldReduce ctx
                                  , isUntranslatableType_not_poly aTy ]
             if shouldReduce1 then
-              let [fun,arg] = Either.lefts args
-              in  (`mkTicks` ticks) <$> reduceFold c (n + 1) aTy fun arg
+              (`mkArgApps` otherArgs) <$> reduceFold c (n + 1) aTy fun arg
             else return e
           _ -> return e
       "Clash.Sized.Vector.foldr" | argLen == 6 ->
-        let [aTy,bTy,nTy] = Either.rights args
+        let ([fun,start,arg],[aTy,bTy,nTy]) = Either.partitionEithers typeAndTermArgs
         in  case runExcept (tyNatSize tcm nTy) of
           Right n -> do
             shouldReduce1 <- List.orM [ pure ultra
                                  , shouldReduce ctx
                                  , List.anyM isUntranslatableType_not_poly [aTy,bTy] ]
             if shouldReduce1
-              then let [fun,start,arg] = Either.lefts args
-                   in  (`mkTicks` ticks) <$> reduceFoldr c p n aTy fun start arg
+              then (`mkArgApps` otherArgs) <$> reduceFoldr c p n aTy fun start arg
               else return e
           _ -> return e
       "Clash.Sized.Vector.dfold" | argLen == 8 ->
-        let ([_kn,_motive,fun,start,arg],[_mTy,nTy,aTy]) = Either.partitionEithers args
+        let ([_kn,_motive,fun,start,arg],[_mTy,nTy,aTy])
+              = Either.partitionEithers typeAndTermArgs
         in  case runExcept (tyNatSize tcm nTy) of
-          Right n -> (`mkTicks` ticks) <$> reduceDFold is0 n aTy fun start arg
+          Right n -> (`mkArgApps` otherArgs) <$> reduceDFold is0 n aTy fun start arg
           _ -> return e
       "Clash.Sized.Vector.++" | argLen == 5 ->
-        let [nTy,aTy,mTy] = Either.rights args
-            [lArg,rArg]   = Either.lefts args
+        let ([lArg,rArg],[nTy,aTy,mTy]) = Either.partitionEithers typeAndTermArgs
         in case (runExcept (tyNatSize tcm nTy), runExcept (tyNatSize tcm mTy)) of
               (Right n, Right m)
                 | n == 0 -> changed rArg
@@ -2299,78 +2324,74 @@ reduceNonRepPrim c@(TransformContext is0 ctx) e@(App _ _) | (Prim p, args, ticks
                     shouldReduce1 <- List.orM [ shouldReduce ctx
                                          , isUntranslatableType_not_poly aTy ]
                     if shouldReduce1
-                       then (`mkTicks` ticks) <$> reduceAppend is0 n m aTy lArg rArg
+                       then (`mkArgApps` otherArgs) <$> reduceAppend is0 n m aTy lArg rArg
                        else return e
               _ -> return e
       "Clash.Sized.Vector.head" | argLen == 3 -> do
-        let [nTy,aTy] = Either.rights args
-            [vArg]    = Either.lefts args
+        let ([vArg],[nTy,aTy]) = Either.partitionEithers typeAndTermArgs
         case runExcept (tyNatSize tcm nTy) of
           Right n -> do
             shouldReduce1 <- List.orM [ shouldReduce ctx
                                  , isUntranslatableType_not_poly aTy ]
             if shouldReduce1
-               then (`mkTicks` ticks) <$> reduceHead is0 (n+1) aTy vArg
+               then (`mkArgApps` otherArgs) <$> reduceHead is0 (n+1) aTy vArg
                else return e
           _ -> return e
       "Clash.Sized.Vector.tail" | argLen == 3 -> do
-        let [nTy,aTy] = Either.rights args
-            [vArg]    = Either.lefts args
+        let ([vArg],[nTy,aTy]) = Either.partitionEithers typeAndTermArgs
         case runExcept (tyNatSize tcm nTy) of
           Right n -> do
             shouldReduce1 <- List.orM [ shouldReduce ctx
                                  , isUntranslatableType_not_poly aTy ]
             if shouldReduce1
-               then (`mkTicks` ticks) <$> reduceTail is0 (n+1) aTy vArg
+               then (`mkArgApps` otherArgs) <$> reduceTail is0 (n+1) aTy vArg
                else return e
           _ -> return e
       "Clash.Sized.Vector.last" | argLen == 3 -> do
-        let [nTy,aTy] = Either.rights args
-            [vArg]    = Either.lefts args
+        let ([vArg],[nTy,aTy]) = Either.partitionEithers typeAndTermArgs
         case runExcept (tyNatSize tcm nTy) of
           Right n -> do
             shouldReduce1 <- List.orM [ shouldReduce ctx
                                  , isUntranslatableType_not_poly aTy
                                  ]
             if shouldReduce1
-               then (`mkTicks` ticks) <$> reduceLast is0 (n+1) aTy vArg
+               then (`mkArgApps` otherArgs) <$> reduceLast is0 (n+1) aTy vArg
                else return e
           _ -> return e
       "Clash.Sized.Vector.init" | argLen == 3 -> do
-        let [nTy,aTy] = Either.rights args
-            [vArg]    = Either.lefts args
+        let ([vArg],[nTy,aTy]) = Either.partitionEithers typeAndTermArgs
         case runExcept (tyNatSize tcm nTy) of
           Right n -> do
             shouldReduce1 <- List.orM [ shouldReduce ctx
                                  , isUntranslatableType_not_poly aTy ]
             if shouldReduce1
-               then (`mkTicks` ticks) <$> reduceInit is0 p n aTy vArg
+               then (`mkArgApps` otherArgs) <$> reduceInit is0 p n aTy vArg
                else return e
           _ -> return e
       "Clash.Sized.Vector.unconcat" | argLen == 6 -> do
-        let ([_knN,_sm,arg],[mTy,nTy,aTy]) = Either.partitionEithers args
+        let ([_knN,_sm,arg],[mTy,nTy,aTy]) = Either.partitionEithers typeAndTermArgs
         case (runExcept (tyNatSize tcm nTy), runExcept (tyNatSize tcm mTy)) of
-          (Right n, Right 0) -> (`mkTicks` ticks) <$> reduceUnconcat n 0 aTy arg
+          (Right n, Right 0) -> (`mkArgApps` otherArgs) <$> reduceUnconcat n 0 aTy arg
           _ -> return e
       "Clash.Sized.Vector.transpose" | argLen == 5 -> do
-        let ([_knN,arg],[mTy,nTy,aTy]) = Either.partitionEithers args
+        let ([_knN,arg],[mTy,nTy,aTy]) = Either.partitionEithers typeAndTermArgs
         case (runExcept (tyNatSize tcm nTy), runExcept (tyNatSize tcm mTy)) of
-          (Right n, Right 0) -> (`mkTicks` ticks) <$> reduceTranspose n 0 aTy arg
+          (Right n, Right 0) -> (`mkArgApps` otherArgs) <$> reduceTranspose n 0 aTy arg
           _ -> return e
       "Clash.Sized.Vector.replicate" | argLen == 4 -> do
-        let ([_sArg,vArg],[nTy,aTy]) = Either.partitionEithers args
+        let ([_sArg,vArg],[nTy,aTy]) = Either.partitionEithers typeAndTermArgs
         case runExcept (tyNatSize tcm nTy) of
           Right n -> do
             shouldReduce1 <- List.orM [ shouldReduce ctx
                                  , isUntranslatableType_not_poly aTy
                                  ]
             if shouldReduce1
-               then (`mkTicks` ticks) <$> reduceReplicate n aTy eTy vArg
+               then (`mkArgApps` otherArgs) <$> reduceReplicate n aTy eTy vArg
                else return e
           _ -> return e
        -- replace_int :: KnownNat n => Vec n a -> Int -> a -> Vec n a
       "Clash.Sized.Vector.replace_int" | argLen == 6 -> do
-        let ([_knArg,vArg,iArg,aArg],[nTy,aTy]) = Either.partitionEithers args
+        let ([_knArg,vArg,iArg,aArg],[nTy,aTy]) = Either.partitionEithers typeAndTermArgs
         case runExcept (tyNatSize tcm nTy) of
           Right n -> do
             shouldReduce1 <- List.orM [ pure ultra
@@ -2378,36 +2399,37 @@ reduceNonRepPrim c@(TransformContext is0 ctx) e@(App _ _) | (Prim p, args, ticks
                                  , isUntranslatableType_not_poly aTy
                                  ]
             if shouldReduce1
-               then (`mkTicks` ticks) <$> reduceReplace_int is0 n aTy eTy vArg iArg aArg
+               then (`mkArgApps` otherArgs) <$>
+                    reduceReplace_int is0 n aTy eTy vArg iArg aArg
                else return e
           _ -> return e
 
       "Clash.Sized.Vector.index_int" | argLen == 5 -> do
-        let ([_knArg,vArg,iArg],[nTy,aTy]) = Either.partitionEithers args
+        let ([_knArg,vArg,iArg],[nTy,aTy]) = Either.partitionEithers typeAndTermArgs
         case runExcept (tyNatSize tcm nTy) of
           Right n -> do
             shouldReduce1 <- List.orM [ pure ultra
                                  , shouldReduce ctx
                                  , isUntranslatableType_not_poly aTy ]
             if shouldReduce1
-               then (`mkTicks` ticks) <$> reduceIndex_int is0 n aTy vArg iArg
+               then (`mkArgApps` otherArgs) <$>
+                    reduceIndex_int is0 n aTy vArg iArg
                else return e
           _ -> return e
 
       "Clash.Sized.Vector.imap" | argLen == 6 -> do
-        let [nTy,argElTy,resElTy] = Either.rights args
+        let ([_,fun,arg],[nTy,argElTy,resElTy]) = Either.partitionEithers typeAndTermArgs
         case runExcept (tyNatSize tcm nTy) of
           Right n -> do
             shouldReduce1 <- List.orM [ pure (ultra || n < 2)
                                  , shouldReduce ctx
                                  , List.anyM isUntranslatableType_not_poly [argElTy,resElTy] ]
             if shouldReduce1
-               then let [_,fun,arg] = Either.lefts args
-                    in  (`mkTicks` ticks) <$> reduceImap c n argElTy resElTy fun arg
+               then (`mkArgApps` otherArgs) <$> reduceImap c n argElTy resElTy fun arg
                else return e
           _ -> return e
-      "Clash.Sized.Vector.iterateI" | argLen == 5 ->
-        let ([_kn,f,a],[nTy,aTy]) = Either.partitionEithers args in
+      "Clash.Sized.Vector.iterateI" | argLen == 5 -> do
+        let ([_kn,f,a],[nTy,aTy]) = Either.partitionEithers typeAndTermArgs
         case runExcept (tyNatSize tcm nTy) of
           Right n -> do
             shouldReduce1 <- List.orM
@@ -2416,43 +2438,45 @@ reduceNonRepPrim c@(TransformContext is0 ctx) e@(App _ _) | (Prim p, args, ticks
               , isUntranslatableType_not_poly aTy ]
 
             if shouldReduce1 then
-              (`mkTicks` ticks) <$> reduceIterateI c n aTy eTy f a
+              (`mkArgApps` otherArgs) <$> reduceIterateI c n aTy eTy f a
             else
               return e
           _ -> return e
       "Clash.Sized.Vector.dtfold" | argLen == 8 ->
-        let ([_kn,_motive,lrFun,brFun,arg],[_mTy,nTy,aTy]) = Either.partitionEithers args
+        let ([_kn,_motive,lrFun,brFun,arg],[_mTy,nTy,aTy])
+              = Either.partitionEithers typeAndTermArgs
         in  case runExcept (tyNatSize tcm nTy) of
-          Right n -> (`mkTicks` ticks) <$> reduceDTFold is0 n aTy lrFun brFun arg
+          Right n -> (`mkArgApps` otherArgs) <$> reduceDTFold is0 n aTy lrFun brFun arg
           _ -> return e
 
       "Clash.Sized.Vector.reverse"
         | ultra
-        , ([vArg],[nTy,aTy]) <- Either.partitionEithers args
+        , ([vArg],[nTy,aTy]) <- Either.partitionEithers typeAndTermArgs
         , Right n <- runExcept (tyNatSize tcm nTy)
-        -> (`mkTicks` ticks) <$> reduceReverse is0 n aTy vArg
+        -> (`mkArgApps` otherArgs) <$> reduceReverse is0 n aTy vArg
 
       "Clash.Sized.RTree.tdfold" | argLen == 8 ->
-        let ([_kn,_motive,lrFun,brFun,arg],[_mTy,nTy,aTy]) = Either.partitionEithers args
+        let ([_kn,_motive,lrFun,brFun,arg],[_mTy,nTy,aTy])
+              = Either.partitionEithers typeAndTermArgs
         in  case runExcept (tyNatSize tcm nTy) of
-          Right n -> (`mkTicks` ticks) <$> reduceTFold is0 n aTy lrFun brFun arg
+          Right n -> (`mkArgApps` otherArgs) <$> reduceTFold is0 n aTy lrFun brFun arg
           _ -> return e
       "Clash.Sized.RTree.treplicate" | argLen == 4 -> do
-        let ([_sArg,vArg],[nTy,aTy]) = Either.partitionEithers args
+        let ([_sArg,vArg],[nTy,aTy]) = Either.partitionEithers typeAndTermArgs
         case runExcept (tyNatSize tcm nTy) of
           Right n -> do
             shouldReduce1 <- List.orM [ shouldReduce ctx
                                  , isUntranslatableType False aTy ]
             if shouldReduce1
-               then (`mkTicks` ticks) <$> reduceTReplicate n aTy eTy vArg
+               then (`mkArgApps` otherArgs) <$> reduceTReplicate n aTy eTy vArg
                else return e
           _ -> return e
       "Clash.Sized.Internal.BitVector.split#" | argLen == 4 -> do
-        let ([_knArg,bvArg],[nTy,mTy]) = Either.partitionEithers args
+        let ([_knArg,bvArg],[nTy,mTy]) = Either.partitionEithers typeAndTermArgs
         case (runExcept (tyNatSize tcm nTy), runExcept (tyNatSize tcm mTy), tv) of
           (Right n, Right m, TyConApp tupTcNm [lTy,rTy])
             | n == 0 -> do
-              let lArgTy = termType tcm bvArg
+              let lArgTy = termType bvArg
                   bvArg1 = if lArgTy /= lTy then
                              Cast bvArg lArgTy lTy
                            else
@@ -2460,16 +2484,16 @@ reduceNonRepPrim c@(TransformContext is0 ctx) e@(App _ _) | (Prim p, args, ticks
 
                   (Just tupTc) = lookupUniqMap tupTcNm tcm
                   [tupDc]      = tyConDataCons tupTc
-                  tup          = mkApps (Data tupDc)
-                                    [Right lTy
-                                    ,Right rTy
-                                    ,Left  bvArg1
-                                    ,Left  (removedTm rTy)
+                  tup          = mkArgApps (Data tupDc)
+                                    [TypeArg lTy
+                                    ,TypeArg rTy
+                                    ,TermArg bvArg1
+                                    ,TermArg (removedTm rTy)
                                     ]
 
-              changed (mkTicks tup ticks)
+              changed (mkArgApps tup otherArgs)
             | m == 0 -> do
-              let rArgTy = termType tcm bvArg
+              let rArgTy = termType bvArg
                   bvArg1 = if rArgTy /= rTy then
                              Cast bvArg rArgTy rTy
                            else
@@ -2477,22 +2501,22 @@ reduceNonRepPrim c@(TransformContext is0 ctx) e@(App _ _) | (Prim p, args, ticks
 
               let (Just tupTc) = lookupUniqMap tupTcNm tcm
                   [tupDc]      = tyConDataCons tupTc
-                  tup          = mkApps (Data tupDc)
-                                    [Right lTy
-                                    ,Right rTy
-                                    ,Left  (removedTm lTy)
-                                    ,Left  bvArg1
+                  tup          = mkArgApps (Data tupDc)
+                                    [TypeArg lTy
+                                    ,TypeArg rTy
+                                    ,TermArg (removedTm lTy)
+                                    ,TermArg bvArg1
                                     ]
 
-              changed (mkTicks tup ticks)
+              changed (mkArgApps tup otherArgs)
           _ -> return e
       "Clash.Sized.Internal.BitVector.eq#"
-        | ([_,_],[nTy]) <- Either.partitionEithers args
+        | ([_,_],[nTy]) <- Either.partitionEithers typeAndTermArgs
         , Right 0 <- runExcept (tyNatSize tcm nTy)
         , TyConApp boolTcNm [] <- tv
         -> let (Just boolTc) = lookupUniqMap boolTcNm tcm
                [_falseDc,trueDc] = tyConDataCons boolTc
-           in  changed (mkTicks (Data trueDc) ticks)
+           in  changed (mkArgApps (Data trueDc) otherArgs)
       _ -> return e
   where
     isUntranslatableType_not_poly t = do
@@ -2549,7 +2573,6 @@ disjointExpressionConsolidation ctx@(TransformContext isCtx _) e@(Case _scrut _t
          -- whether expressions reference variables from the context, or
          -- variables inside a let-expression inside one of the alternatives.
          lifted <- mapM (mkDisjointGroup isCtx) disJoint
-         tcm    <- Lens.view tcCache
          -- Create let-binders for all of the lifted expressions
          --
          -- NB: Because we will be substituting under binders we use the collected
@@ -2557,7 +2580,7 @@ disjointExpressionConsolidation ctx@(TransformContext isCtx _) e@(Case _scrut _t
          -- created inside all of the alternatives. With this inScopeSet, we
          -- ensure that the let-bindings we create here won't be accidentally
          -- captured by binders inside the case-alternatives.
-         (_,funOutIds) <- List.mapAccumLM (mkFunOut tcm)
+         (_,funOutIds) <- List.mapAccumLM mkFunOut
                                           isCollected
                                           (zip disJoint lifted)
          -- Create "substitutions" of the form [f X Y := f_out]
@@ -2577,9 +2600,9 @@ disjointExpressionConsolidation ctx@(TransformContext isCtx _) e@(Case _scrut _t
          changed lb1
   where
     -- Make the let-binder for the lifted expressions
-    mkFunOut tcm isN ((fun,_),(eLifted,_)) = do
-      let ty  = termType tcm eLifted
-          nm  = case collectArgs fun of
+    mkFunOut isN ((fun,_),(eLifted,_)) = do
+      let ty  = termType eLifted
+          nm  = case collectAppArgs fun of
                    (Var v,_)  -> nameOcc (varName v)
                    (Prim p,_) -> primName p
                    _          -> "complex_expression_"
@@ -2674,7 +2697,7 @@ inlineCleanup (TransformContext is0 _) (Letrec binds body) = do
       -> VarSet
       -> (Id,((Id, Term), VarEnv Int))
       -> Bool
-    isInteresting allOccs prims bodyFVs (id_,((_,(fst.collectArgs) -> tm),_))
+    isInteresting allOccs prims bodyFVs (id_,((_,(fst.collectAppArgs) -> tm),_))
       -- Try to keep user defined names, but inline names generated by GHC or
       -- Clash. For example, if a user were to write:
       --
@@ -2973,7 +2996,7 @@ separateLambda tcm ctx@(TransformContext is0 _) b eb0 =
         nm = mkDerivedName ctx (nameOcc (varName b))
         bs0 = map (`mkLocalId` nm) argTys
         (is1, bs1) = List.mapAccumL newBinder is0 bs0
-        subst = extendIdSubst (mkSubst is1) b (mkApps dc (map (Left . Var) bs1))
+        subst = extendIdSubst (mkSubst is1) b (mkArgApps dc (map (TermArg . Var) bs1))
         eb1 = substTm "separateArguments" subst eb0
       in
         Just (mkLams eb1 bs1)
@@ -3005,18 +3028,20 @@ separateArguments ctx e0@(Lam b eb) = do
     Just e1 -> changed e1
     Nothing -> return e0
 
-separateArguments (TransformContext is0 _) e@(collectArgsTicks -> (Var g, args, ticks))
+separateArguments (TransformContext is0 _) e@(collectAppArgs -> (Var g, args))
   | isGlobalId g = do
   -- We ensure that both the type of the global variable reference is updated
   -- to take into account the changed arguments, and that we apply the global
   -- function with the split apart arguments.
   let (argTys0,resTy) = splitFunForallTy (varType g)
+      (typeAndTermArgs,otherArgs) = splitTypeAndTermArgs args
   (concat -> args1, Monoid.getAny -> hasChanged)
-    <- listen (mapM (uncurry splitArg) (zip argTys0 args))
+    <- listen (mapM (uncurry splitArg) (zip argTys0 typeAndTermArgs))
   if hasChanged then
     let (argTys1,args2) = unzip args1
         gTy = mkPolyFunTy resTy argTys1
-    in  return (mkApps (mkTicks (Var g {varType = gTy}) ticks) args2)
+        args3 = map (either TermArg TypeArg) args2
+    in  return (mkArgApps (Var g {varType = gTy}) (args3 ++ otherArgs))
   else
     return e
 
@@ -3031,7 +3056,7 @@ separateArguments (TransformContext is0 _) e@(collectArgsTicks -> (Var g, args, 
   splitArg tv arg@(Right _)    = return [(tv,arg)]
   splitArg ty arg@(Left tmArg) = do
     tcm <- Lens.view tcCache
-    let argTy = termType tcm tmArg
+    let argTy = termType tmArg
     case shouldSplit tcm argTy of
       Just (_,argTys@(_:_:_)) -> do
         tmArgs <- mapM (mkSelectorCase ($(curLoc) ++ "splitArg") is0 tcm tmArg 1)
@@ -3090,8 +3115,7 @@ xOptimize _ e = return e
 --
 xOptimizeSingle :: InScopeSet -> Term -> Alt -> NormalizeSession Term
 xOptimizeSingle is subj (DataPat dc tvs vars, expr) = do
-  tcm    <- Lens.view tcCache
-  subjId <- mkInternalVar is "subj" (termType tcm subj)
+  subjId <- mkInternalVar is "subj" (termType subj)
 
   let fieldTys = fmap varType vars
   lets <- Monad.zipWithM (mkFieldSelector is subjId dc tvs fieldTys) vars [0..]
@@ -3143,7 +3167,7 @@ mkFieldSelector is0 subj dc tvs fieldTys nm index = do
 -- Such values are undefined and are removed in X Optimization.
 --
 isPrimError :: Term -> NormalizeSession Bool
-isPrimError (collectArgs -> (Prim pInfo, _)) = do
+isPrimError (collectAppArgs -> (Prim pInfo, _)) = do
   prim <- Lens.use (extra . primitives . Lens.at (primName pInfo))
 
   case prim >>= extractPrim of
@@ -3156,7 +3180,7 @@ isPrimError (collectArgs -> (Prim pInfo, _)) = do
 isPrimError _ = return False
 
 castSpec :: HasCallStack => NormRewrite
-castSpec (TransformContext is0 _) e@(Cast (collectArgsTicks -> (Var f,args,ticks)) tyA tyB)
+castSpec (TransformContext is0 _) e@(Cast (collectAppArgs -> (Var f,args)) tyA tyB)
   | isGlobalId f
   = do
     topEnts <- Lens.view topEntities
@@ -3175,21 +3199,24 @@ castSpec (TransformContext is0 _) e@(Cast (collectArgsTicks -> (Var f,args,ticks
                                   n
                               | n <- [(0::Int)..]
                               ]
+          -- Ensure that casts (and ticks) are pushed all the way outward
+          let argsCastOutward = moveTickCastOutward is0 args
+              (typeAndTermArgs,_otherArgs) = splitTypeAndTermArgs argsCastOutward
           -- Make new binders for existing arguments
           tcm <- Lens.view tcCache
           (boundArgs,argVars) <-
-            fmap (unzip . map (either (Left &&& Left . Var) (Right &&& Right . VarTy))) $
+            fmap (unzip . map (either (Left &&& TermArg . Var) (Right &&& TypeArg . VarTy))) $
                  Monad.zipWithM
                    (mkBinderFor is0 tcm)
                    (existingNames ++ newNames)
-                   args
+                   typeAndTermArgs
           -- Create specialized functions
           -- TODO: use a cache
-          let newBody = mkAbstraction (Cast (mkApps bodyTm argVars) tyA tyB)
+          let newBody = mkAbstraction (Cast (mkArgApps bodyTm argVars) tyA tyB)
                                       boundArgs
           newf <- mkFunction (varName f) sp inl newBody
           -- use specialized function
-          let newExpr = mkApps (mkTicks (Var newf) ticks) args
+          let newExpr = mkArgApps (Var newf) argsCastOutward
           newf `deepseq` changed newExpr
         Nothing -> return e
 

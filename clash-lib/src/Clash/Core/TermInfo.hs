@@ -12,6 +12,7 @@ import Clash.Core.Literal
 import Clash.Core.Pretty
 import Clash.Core.Subst
 import Clash.Core.Term
+import Clash.Core.TyCon
 import Clash.Core.Type
 import Clash.Core.Var
 import Clash.Core.VarEnv
@@ -185,6 +186,8 @@ piResultTys ty origArgs@(arg:args)
 -- | Does a term have a function type?
 -- isFun :: TyConMap -> Term -> Bool
 -- isFun m t = isFunTy m (termType m t)
+isFunLike :: TyConMap -> Term -> Bool
+isFunLike tcm e = isFunTyX (normalizeType tcm (termType e))
 
 -- | Does a term have a function or polymorphic type?
 -- isPolyFun :: TyConMap -> Term -> Bool
@@ -227,4 +230,3 @@ isCon _         = False
 isPrim :: Term -> Bool
 isPrim (Prim {}) = True
 isPrim _         = False
-

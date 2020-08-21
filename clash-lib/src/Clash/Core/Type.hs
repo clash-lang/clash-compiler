@@ -37,6 +37,7 @@ module Clash.Core.Type
   , mkTyConApp
   -- , splitFunTy
   -- , splitFunTys
+  , splitFunTyX
   , splitFunTysX
   , splitFunForallTy
   -- , splitCoreFunForallTy
@@ -45,7 +46,7 @@ module Clash.Core.Type
   -- , isPolyFunCoreTy
   , isPolyTy
   , isTypeFamilyApplication
-  -- , isFunTy
+  , isFunTyX
   , isClassTy
   , applyFunTyX
   , findFunSubst
@@ -65,7 +66,7 @@ import           Data.Coerce            (coerce)
 import           Data.Hashable          (Hashable)
 import           Data.List              (foldl')
 import           Data.List.Extra        (splitAtList)
-import           Data.Maybe             (mapMaybe)
+import           Data.Maybe             (isJust, mapMaybe)
 import           GHC.Base               (isTrue#,(==#))
 import           GHC.Generics           (Generic(..))
 import           GHC.Integer            (smallInteger)
@@ -313,12 +314,10 @@ isPolyTy (tyView -> FunTy _ res) = isPolyTy res
 isPolyTy _                       = False
 
 -- | Split a function type in an argument and result type
--- splitFunTy :: TyConMap
---            -> Type
---            -> Maybe (Type, Type)
--- splitFunTy m (coreView1 m -> Just ty)  = splitFunTy m ty
--- splitFunTy _ (tyView -> FunTy arg res) = Just (arg,res)
--- splitFunTy _ _ = Nothing
+splitFunTyX :: Type
+            -> Maybe (Type, Type)
+splitFunTyX (tyView -> FunTy arg res) = Just (arg,res)
+splitFunTyX _ = Nothing
 
 -- splitFunTys :: TyConMap
 --             -> Type
@@ -390,10 +389,9 @@ typeAttrs (AnnType attrs _typ) = attrs
 typeAttrs _                    = []
 
 -- | Is a type a function type?
--- isFunTy :: TyConMap
---         -> Type
---         -> Bool
--- isFunTy m = isJust . splitFunTy m
+isFunTyX :: Type
+         -> Bool
+isFunTyX = isJust . splitFunTyX
 
 -- | Apply a function type to an argument type and get the result type
 -- applyFunTy :: TyConMap
