@@ -1,0 +1,1 @@
+FEATURE: Added `nameHint` to allow explicitly naming terms, e.g. `Signal`s.
