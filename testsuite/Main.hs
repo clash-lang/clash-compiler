@@ -463,6 +463,7 @@ runClashTest = defaultMain $ clashTestRoot
         , runTest "T967b" def{hdlSim=False}
         , runTest "T967c" def{hdlSim=False}
         , NEEDS_PRIMS_GHC(clashLibTest ("tests" </> "shouldwork" </> "Naming") allTargets [] "T1041" "main")
+        , clashLibTest ("tests" </> "shouldwork" </> "Naming") [VHDL,Verilog] [] "NameHint" "main"
         ]
       , clashTestGroup "Numbers"
         [ NEEDS_PRIMS_GHC(runTest "BitInteger" def)

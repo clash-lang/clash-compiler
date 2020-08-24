@@ -3,7 +3,17 @@
   License     :  BSD2 (see the file LICENSE)
   Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
 
-Control module instance, and register, names in generated HDL code.
+Control naming and deduplication in the generated HDL code. Explicitly nameable
+things include:
+
+* Component (VHDL) / module ((System)Verilog) instances
+
+* Registers
+
+* Terms
+
+Refer to "Clash.Annotations.TopEntity" for controlling naming of entities
+(VHDL) / modules ((System)Verilog) and their ports.
 -}
 
 module Clash.Magic
@@ -15,14 +25,17 @@ module Clash.Magic
   , suffixNameFromNat
   , suffixNameFromNatP
   , setName
+  , nameHint
 
   -- ** Functions to control Clash's (de)duplication mechanisms
   , deDup
   , noDeDup
   ) where
 
-import Clash.NamedTypes ((:::))
-import GHC.TypeLits     (Nat,Symbol)
+import Clash.NamedTypes            ((:::))
+import GHC.TypeLits                (Nat,Symbol)
+import Clash.Promoted.Symbol       (SSymbol)
+import Clash.Annotations.Primitive (hasBlackBox)
 
 -- | Prefix instance and register names with the given 'Symbol'
 prefixName
@@ -96,6 +109,26 @@ setName
   :: forall (name :: Symbol) a . a -> name ::: a
 setName = id
 {-# NOINLINE setName #-}
+
+-- | Name a given term, such as one of type 'Clash.Signal.Signal', using the
+-- given 'SSymbol'. Results in a declaration with the name used as the
+-- identifier in the generated HDL code.
+--
+-- Example usage:
+--
+-- @
+-- nameHint (SSymbol @"identifier") term
+-- @
+--
+-- __NB__: The given name should be considered a hint as it may be expanded,
+-- e.g. if it collides with existing identifiers.
+nameHint
+  :: SSymbol sym
+  -- ^ A hint for a name
+  -> a -> a
+nameHint = seq
+{-# NOINLINE nameHint #-}
+{-# ANN nameHint hasBlackBox #-}
 
 -- | Force deduplication, i.e. share a function or operator between multiple
 -- branches.
