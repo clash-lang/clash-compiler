@@ -769,8 +769,8 @@ mkUniqueNormalized
   --     * Just Nothing: term is a top entity, but has no explicit annotation
   --     * Just (Just ..): term is a top entity, and has an explicit annotation
   -> ( [Id]
-     , [LetBinding]
-     , Id
+     , ([LetBinding], [TickInfo])
+     , (Id, [TickInfo])
      )
   -> NetlistMonad
       ([Bool]
@@ -780,7 +780,7 @@ mkUniqueNormalized
       ,[Declaration]
       ,[LetBinding]
       ,Maybe Id)
-mkUniqueNormalized is0 topMM (args,binds,res) = do
+mkUniqueNormalized is0 topMM (args,(binds,_bindTicks),(res,_resTicks)) = do
   -- Add user define port names to list of seen ids to prevent name collisions.
   let
     portNames =

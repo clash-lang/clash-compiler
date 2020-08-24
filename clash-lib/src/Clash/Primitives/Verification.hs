@@ -6,7 +6,6 @@ module Clash.Primitives.Verification (checkBBF) where
 import Data.Either
 
 
-import qualified Control.Lens                    as Lens
 import           Control.Monad.State             (State)
 import           Data.Text.Prettyprint.Doc.Extra (Doc)
 import qualified Data.Text                       as Text
@@ -30,7 +29,7 @@ import           Clash.Netlist.Types
   (BlackBox(BBFunction), TemplateFunction(..), BlackBoxContext, Identifier,
    NetlistMonad, Declaration(Assignment, NetDecl', TickDecl),
    HWType(Bool, KnownDomain), WireOrReg(Wire), NetlistId(..),
-   DeclarationType(Concurrent), tcCache, bbInputs)
+   DeclarationType(Concurrent), bbInputs)
 import           Clash.Netlist.BlackBox.Types
   (BlackBoxFunction, BlackBoxMeta(..), TemplateKind(TDecl), RenderVoid(..),
    emptyBlackBoxMeta)
@@ -73,9 +72,8 @@ checkBBF _isD _primName args _ty =
   bindMaybe _ (Var vId) = pure (id2identifier vId, [])
   bindMaybe Nothing t = bindMaybe (Just "s") t
   bindMaybe (Just nm) t = do
-    tcm <- Lens.use tcCache
     newId <- mkId nm
-    (expr0, decls) <- mkExpr False Concurrent (NetlistId newId (termType tcm t)) t
+    (expr0, decls) <- mkExpr False Concurrent (NetlistId newId (termType t)) t
     pure
       ( newId
       , decls ++ [sigDecl Bool newId, Assignment newId expr0] )

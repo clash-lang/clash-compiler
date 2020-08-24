@@ -50,10 +50,10 @@ module Clash.Normalize.Transformations
   , inlineCleanup
   , inlineBndrsCleanup
   , flattenLet
-  -- , splitCastWork
-  -- , inlineCast
-  -- , caseCast
-  -- , letCast
+  , splitCastWork
+  , inlineCast
+  , caseCast
+  , letCast
   -- , eliminateCastCast
   -- , argCastSpec
   , etaExpandSyn
@@ -113,7 +113,8 @@ import           Clash.Core.TyCon
   (TyConMap, tyConDataCons)
 import           Clash.Core.Util
   ( isSignalType, mkVec, tyNatSize, undefinedTm,
-   shouldSplit, inverseTopSortLetBindings, moveTickCastOutward)
+   shouldSplit, inverseTopSortLetBindings, moveTickCastOutward, squashArgs,
+   squashCollectApp)
 import           Clash.Core.Var
   (Id, TyVar, Var (..), isGlobalId, isLocalId, mkLocalId)
 import           Clash.Core.VarEnv
@@ -972,21 +973,25 @@ bindConstantVar = inlineBinders test
 {-# SCC bindConstantVar #-}
 
 -- | Push a cast over a case into it's alternatives.
--- caseCast :: HasCallStack => NormRewrite
--- caseCast _ e0@(Cast (collectTicks -> (Case subj tyA alts,ticks)) ty1 ty2) =
---   WARN( tyA /= ty1, "Bad Cast of Case:" <+> ppr e0 <> line <> ppr tyA <> line <> ppr ty1) do
---     let alts' = map (\(p,e) -> (p, Cast e ty1 ty2)) alts
---     changed (mkTicks (Case subj ty2 alts') ticks)
--- caseCast _ e = return e
--- {-# SCC caseCast #-}
+caseCast :: HasCallStack => NormRewrite
+caseCast (TransformContext is _) e@(collectAppArgs -> (Case subj tyA alts,args))
+  | ([],Just (from,to),ticks) <- squashArgs is args
+  = if tyA == from then
+      let alts1 = map (\(p,eA) -> (p, Cast eA from to)) alts in
+      changed (mkTicks (Case subj to alts1) ticks)
+    else
+      error (unlines ["Bad Cast of Case:",showPpr e,showPpr tyA,showPpr from])
+caseCast _ e = return e
+{-# SCC caseCast #-}
 
 
 -- | Push a cast over a Letrec into it's body
--- letCast :: HasCallStack => NormRewrite
--- letCast _ (Cast (stripTicks -> Letrec binds body) ty1 ty2) =
---   changed $ Letrec binds (Cast body ty1 ty2)
--- letCast _ e = return e
--- {-# SCC letCast #-}
+letCast :: HasCallStack => NormRewrite
+letCast (TransformContext is _) (collectAppArgs -> (Letrec binds body,args))
+  | ([],Just (from,to),ticks) <- squashArgs is args
+  = changed (mkTicks (Letrec binds (Cast body from to)) ticks)
+letCast _ e = return e
+{-# SCC letCast #-}
 
 -- | Transforms:
 --
@@ -1065,12 +1070,14 @@ bindConstantVar = inlineBinders test
 
 -- | Only inline casts that just contain a 'Var', because these are guaranteed work-free.
 -- These are the result of the 'splitCastWork' transformation.
--- inlineCast :: HasCallStack => NormRewrite
--- inlineCast = inlineBinders test
---   where
---     test _ (_, (Cast (stripTicks -> Var {}) _ _)) = return True
---     test _ _ = return False
--- {-# SCC inlineCast #-}
+inlineCast :: HasCallStack => NormRewrite
+inlineCast ctx@(TransformContext is _) = inlineBinders test ctx
+  where
+    test _ (_,collectAppArgs -> (Var {},args))
+      | ([],Just {},_) <- squashArgs is args
+      = return True
+    test _ _ = return False
+{-# SCC inlineCast #-}
 
 -- | Eliminate two back to back casts where the type going in and coming out are the same
 --
@@ -1103,30 +1110,38 @@ bindConstantVar = inlineBinders test
 -- let x  = cast x'
 --     x' = f a b
 -- @
--- splitCastWork :: HasCallStack => NormRewrite
--- splitCastWork ctx@(TransformContext is0 _) unchanged@(Letrec vs e') = do
---   (vss', Monoid.getAny -> hasChanged) <- listen (mapM (splitCastLetBinding is0) vs)
---   let vs' = concat vss'
---   if hasChanged then changed (Letrec vs' e')
---                 else return unchanged
---   where
---     splitCastLetBinding
---       :: InScopeSet
---       -> LetBinding
---       -> RewriteMonad extra [LetBinding]
---     splitCastLetBinding isN x@(nm, e) = case stripTicks e of
---       Cast (Var {}) _ _  -> return [x]  -- already work-free
---       Cast (Cast {}) _ _ -> return [x]  -- casts will be eliminated
---       Cast e0 ty1 ty2 -> do
---         tcm <- Lens.view tcCache
---         nm' <- mkTmBinderFor isN tcm (mkDerivedName ctx (nameOcc $ varName nm)) e0
---         changed [(nm',e0)
---                 ,(nm, Cast (Var nm') ty1 ty2)
---                 ]
---       _ -> return [x]
+splitCastWork :: HasCallStack => NormRewrite
+splitCastWork ctx@(TransformContext is0 _) unchanged@(Letrec vs e') = do
+  (vss', Monoid.getAny -> hasChanged) <- listen (mapM (splitCastLetBinding is0) vs)
+  let vs' = concat vss'
+  if hasChanged then changed (Letrec vs' e')
+                else return unchanged
+  where
+    splitCastLetBinding
+      :: InScopeSet
+      -> LetBinding
+      -> RewriteMonad extra [LetBinding]
+    splitCastLetBinding isN x@(nm,e) = do
+      tcm <- Lens.view tcCache
+      case squashCollectApp isN tcm e of
+        (e1,typesAndTerms,Just (from,to),ticks)
+          | Var {} <- e1
+          , [] <- typesAndTerms
+          -- already work-free
+          -> return [x]
+          | otherwise
+          -> do
+             let e2 = mkTicks
+                        (mkArgApps e1 (map (either TermArg TypeArg) typesAndTerms))
+                        ticks
+             nm1 <- mkTmBinderFor isN tcm (mkDerivedName ctx (nameOcc $ varName nm)) e2
+             changed [(nm1,e2)
+                     ,(nm,Cast (Var nm1) from to)
+                     ]
+        _ -> return [x]
 
--- splitCastWork _ e = return e
--- {-# SCC splitCastWork #-}
+splitCastWork _ e = return e
+{-# SCC splitCastWork #-}
 
 
 -- | Inline work-free functions, i.e. fully applied functions that evaluate to

@@ -105,11 +105,11 @@ constantPropagation =
       , ("reduceNonRepPrim", reduceNonRepPrim)
 
 
-      -- , ("caseCast"        , caseCast)
-      -- , ("letCast"         , letCast)
-      -- , ("splitCastWork"   , splitCastWork)
+      , ("caseCast"        , caseCast)
+      , ("letCast"         , letCast)
+      , ("splitCastWork"   , splitCastWork)
       -- , ("argCastSpec"     , argCastSpec)
-      -- , ("inlineCast"      , inlineCast)
+      , ("inlineCast"      , inlineCast)
       -- , ("eliminateCastCast",eliminateCastCast)
       , ("castSpec"        , castSpec)
       ]

@@ -32,7 +32,7 @@ import qualified Data.String.Interpolate.Util       as I
 import           Clash.Backend
   (Backend, hdlTypeErrValue, expr, mkUniqueIdentifier, blockDecl)
 import           Clash.Core.Type
-  (Type(LitTy), LitTy(NumTy), coreView)
+  (Type(LitTy), LitTy(NumTy), normalizeType)
 import           Clash.Netlist.BlackBox             (isLiteral)
 import           Clash.Netlist.BlackBox.Util        (renderElem)
 import           Clash.Netlist.BlackBox.Parser      (runParse)
@@ -61,7 +61,7 @@ iterateBBF _isD _primName args _resTy = do
  where
   bb = BBFunction "Clash.Primitives.Sized.Vector.iterateBBF" 0 iterateTF
   vecLength tcm =
-    case coreView tcm (head (rights args)) of
+    case normalizeType tcm (head (rights args)) of
       (LitTy (NumTy 0)) -> error "Unexpected empty vector in 'iterateBBF'"
       (LitTy (NumTy n)) -> fromInteger (n - 1)
       vl -> error $ "Unexpected vector length: " ++ show vl
@@ -119,7 +119,7 @@ foldBBF _isD _primName args _resTy = do
   bb = BBFunction "Clash.Primitives.Sized.Vector.foldTF" 0 foldTF
   [vecLengthMinusOne, _] = rights args
   vecLength tcm =
-    case coreView tcm vecLengthMinusOne of
+    case normalizeType tcm vecLengthMinusOne of
       (LitTy (NumTy n)) -> n + 1
       vl -> error $ "Unexpected vector length: " ++ show vl
   funcPlural tcm = foldFunctionPlurality (fromInteger (vecLength tcm))

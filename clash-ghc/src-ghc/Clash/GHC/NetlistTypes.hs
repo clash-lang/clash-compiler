@@ -26,7 +26,7 @@ import Clash.Core.Name                  (Name (..))
 import Clash.Core.Pretty                (showPpr)
 import Clash.Core.TyCon                 (TyConMap, tyConDataCons)
 import Clash.Core.Type
-  (LitTy (..), Type (..), TypeView (..), coreView, coreView1, tyView)
+  (LitTy (..), Type (..), TypeView (..), tyView, normalizeType)
 import Clash.Core.Util                  (tyNatSize, substArgTys)
 import Clash.Netlist.Util               (coreTypeToHWType, stripFiltered)
 import Clash.Netlist.Types
@@ -150,7 +150,7 @@ ghcTypeToHWType iw floatSupport = go
         "Clash.Signal.Internal.KnownDomain"
           -> case tyConDataCons (m `lookupUniqMap'` tc) of
                [dc] -> case substArgTys dc args of
-                 [_,tyView -> TyConApp _ [_,dom]] -> case tyView (coreView m dom) of
+                 [_,tyView -> TyConApp _ [_,dom]] -> case tyView (normalizeType m dom) of
                    TyConApp _ [tag0, period0, edge0, rstKind0, init0, polarity0] -> do
                      tag1      <- domTag m tag0
                      period1   <- domPeriod m period0
@@ -280,13 +280,11 @@ liftE
 liftE = mapExceptT (MaybeT . pure . Just . coerce)
 
 domTag :: Monad m => TyConMap -> Type -> ExceptT String (MaybeT m) String
-domTag m (coreView1 m -> Just ty) = domTag m ty
-domTag _ (LitTy (SymTy tag)) = pure tag
+domTag m (normalizeType m -> LitTy (SymTy tag)) = pure tag
 domTag _ ty = throwE $ "Internal error. Cannot translate domain tag:\n" ++ showPpr ty
 
 domPeriod :: Monad m => TyConMap -> Type -> ExceptT String (MaybeT m) Integer
-domPeriod m (coreView1 m -> Just ty) = domPeriod m ty
-domPeriod _ (LitTy (NumTy period)) = pure period
+domPeriod m (normalizeType m -> LitTy (NumTy period)) = pure period
 domPeriod _ ty = throwE $ "Internal error. Cannot translate domain period:\n" ++ showPpr ty
 
 fromType
@@ -301,7 +299,7 @@ fromType
   -- ^ Type representing some constructor
   -> ExceptT String (MaybeT m) a
 fromType tyNm constrs m ty =
-  case tyView (coreView m ty) of
+  case tyView (normalizeType m ty) of
     TyConApp tcNm [] ->
       go constrs (nameOcc tcNm)
     _ ->

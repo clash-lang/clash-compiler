@@ -58,18 +58,18 @@ import           Clash.Core.Name
 import           Clash.Core.Pretty             (showPpr)
 import           Clash.Core.Subst              (extendIdSubst, mkSubst, substTm)
 import           Clash.Core.Term               as C
-  (PrimInfo (..), Term (..), WorkInfo (..), collectArgs, collectArgsTicks,
-   collectBndrs, mkApps, mkTicks)
+  (PrimInfo (..), Term (..), WorkInfo (..), collectBndrs, collectAppArgs,
+   mkArgApps, AppArg (..))
 import           Clash.Core.TermInfo
 import           Clash.Core.Type               as C
-  (Type (..), ConstTy (..), TypeView (..), mkFunTy, splitFunTys, splitFunTy, tyView)
+  (Type (..), ConstTy (..), TypeView (..), mkFunTy, tyView, splitFunTyX, splitFunTysX)
 import           Clash.Core.TyCon              as C (TyConMap, tyConDataCons)
 import           Clash.Core.Util
-  (inverseTopSortLetBindings, splitShouldSplit)
+  (inverseTopSortLetBindings, splitShouldSplit, squashArgs, squashCollectApp)
 import           Clash.Core.Var                as V
   (Id, Var (..), mkLocalId, modifyVarName)
 import           Clash.Core.VarEnv
-  (extendInScopeSet, mkInScopeSet, lookupVarEnv, uniqAway, unitVarSet)
+  (extendInScopeSet, mkInScopeSet, lookupVarEnv, uniqAway, unitVarSet, emptyInScopeSet)
 import {-# SOURCE #-} Clash.Netlist
   (genComponent, mkDcApplication, mkDeclarations, mkExpr, mkNetDecl,
    mkProjection, mkSelection, mkFunApp, mkDeclarations')
@@ -147,7 +147,7 @@ mkBlackBoxContext bbName resId args@(lefts -> termArgs) = do
   where
     addFunction resTy im (arg,i) = do
       tcm <- Lens.use tcCache
-      if isFun tcm arg then do
+      if isFunLike tcm arg then do
         -- Only try to calculate function plurality when primitive actually
         -- exists. Here to prevent crashes on __INTERNAL__ primitives.
         prim <- HashMap.lookup bbName <$> Lens.use primitives
@@ -190,11 +190,14 @@ prepareBlackBox _pNm templ bbCtx =
 
 -- | Determine if a term represents a literal
 isLiteral :: Term -> Bool
-isLiteral e = case collectArgs e of
-  (Data _, args)   -> all (either isLiteral (const True)) args
-  (Prim _, args) -> all (either isLiteral (const True)) args
+isLiteral e = case collectAppArgs e of
+  (Data _, args) ->
+    let (typesAndTerms,_,_) = squashArgs emptyInScopeSet args
+    in  all (either isLiteral (const True)) typesAndTerms
+  (Prim _, args) ->
+    let (typesAndTerms,_,_) = squashArgs emptyInScopeSet args
+    in  all (either isLiteral (const True)) typesAndTerms
   (C.Literal _,_)  -> True
-  (Cast e0 _ _, args) -> all (either isLiteral (const True)) (Left e0:args)
   _                -> False
 
 mkArgument
@@ -210,48 +213,47 @@ mkArgument
                   )
 mkArgument bbName bndr nArg e = do
     tcm   <- Lens.use tcCache
-    let ty = termType tcm e
+    let ty = termType e
     iw    <- Lens.use intWidth
     hwTyM <- fmap stripFiltered <$> N.termHWTypeM e
     let eTyMsg = "(" ++ showPpr e ++ " :: " ++ showPpr ty ++ ")"
     ((e',t,l),d) <- case hwTyM of
       Nothing
-        | (Prim p,_) <- collectArgs e
+        | (Prim p,_) <- collectAppArgs e
         , primName p == "Clash.Transformations.removedArg"
         -> return ((Identifier (primName p) Nothing, Void Nothing, False),[])
         | otherwise
         -> return ((error ($(curLoc) ++ "Forced to evaluate untranslatable type: " ++ eTyMsg), Void Nothing, False), [])
-      Just hwTy -> case collectArgsTicks e of
-        (C.Var v,[],_) -> return ((Identifier (nameOcc (varName v)) Nothing,hwTy,False),[])
-        (C.Literal (IntegerLiteral i),[],_) ->
+      Just hwTy -> case squashCollectApp emptyInScopeSet tcm e of
+        (C.Var v,[],_,_) -> return ((Identifier (nameOcc (varName v)) Nothing,hwTy,False),[])
+        (C.Literal (IntegerLiteral i),[],_,_) ->
           return ((N.Literal (Just (Signed iw,iw)) (N.NumLit i),hwTy,True),[])
-        (C.Literal (IntLiteral i), [],_) ->
+        (C.Literal (IntLiteral i), [],_,_) ->
           return ((N.Literal (Just (Signed iw,iw)) (N.NumLit i),hwTy,True),[])
-        (C.Literal (WordLiteral w), [],_) ->
+        (C.Literal (WordLiteral w), [],_,_) ->
           return ((N.Literal (Just (Unsigned iw,iw)) (N.NumLit w),hwTy,True),[])
-        (C.Literal (CharLiteral c), [],_) ->
+        (C.Literal (CharLiteral c), [],_,_) ->
           return ((N.Literal (Just (Unsigned 21,21)) (N.NumLit . toInteger $ ord c),hwTy,True),[])
-        (C.Literal (StringLiteral s),[],_) ->
+        (C.Literal (StringLiteral s),[],_,_) ->
           return ((N.Literal Nothing (N.StringLit s),hwTy,True),[])
-        (C.Literal (Int64Literal i), [],_) ->
+        (C.Literal (Int64Literal i), [],_,_) ->
           return ((N.Literal (Just (Signed 64,64)) (N.NumLit i),hwTy,True),[])
-        (C.Literal (Word64Literal i), [],_) ->
+        (C.Literal (Word64Literal i), [],_,_) ->
           return ((N.Literal (Just (Unsigned 64,64)) (N.NumLit i),hwTy,True),[])
-        (C.Literal (NaturalLiteral n), [],_) ->
+        (C.Literal (NaturalLiteral n), [],_,_) ->
           return ((N.Literal (Just (Unsigned iw,iw)) (N.NumLit n),hwTy,True),[])
-        (Prim pinfo,args,ticks) -> withTicks ticks $ \tickDecls -> do
+        (Prim pinfo,args,_,ticks) -> withTicks ticks $ \tickDecls -> do
           (e',d) <- mkPrimitive True False (NetlistId bndr ty) pinfo args tickDecls
           case e' of
             (Identifier _ _) -> return ((e',hwTy,False), d)
             _                -> return ((e',hwTy,isLiteral e), d)
-        (Data dc, args,_) -> do
+        (Data dc, args,_,_) -> do
           (exprN,dcDecls) <- mkDcApplication [hwTy] (NetlistId bndr ty) dc (lefts args)
           return ((exprN,hwTy,isLiteral e),dcDecls)
-        (Case scrut ty' [alt],[],_) -> do
+        (Case scrut ty' [alt],[],_,_) -> do
           (projection,decls) <- mkProjection False (NetlistId bndr ty) scrut ty' alt
           return ((projection,hwTy,False),decls)
-        (Cast e0 _ _,[],ticks) -> mkArgument bbName bndr nArg (mkTicks e0 ticks)
-        (Letrec _bnds _term, [], _ticks) -> do
+        (Letrec _bnds _term, [], _, _ticks) -> do
           (exprN, letDecls) <- mkExpr False Concurrent (NetlistId bndr ty) e
           return ((exprN,hwTy,False),letDecls)
         _ -> do
@@ -461,8 +463,7 @@ mkPrimitive bbEParen bbEasD dst pInfo args tickDecls =
                   (exprN,dcDecls) <- mkDcApplication [hwTy] dst dc []
                   return (exprN,dcDecls)
                 [Right _, Left scrut] -> do
-                  tcm     <- Lens.use tcCache
-                  let scrutTy = termType tcm scrut
+                  let scrutTy = termType scrut
                   (scrutExpr,scrutDecls) <-
                     mkExpr False Concurrent (NetlistId "c$tte_rhs" scrutTy) scrut
                   case scrutExpr of
@@ -479,8 +480,7 @@ mkPrimitive bbEParen bbEasD dst pInfo args tickDecls =
                 iw <- Lens.use intWidth
                 return (N.Literal (Just (Signed iw,iw)) (NumLit $ toInteger $ dcTag dc - 1),[])
               [Right _,Left scrut] -> do
-                tcm      <- Lens.use tcCache
-                let scrutTy = termType tcm scrut
+                let scrutTy = termType scrut
                 scrutHTy <- unsafeCoreTypeToHWTypeM' $(curLoc) scrutTy
                 (scrutExpr,scrutDecls) <-
                   mkExpr False Concurrent (NetlistId "c$dtt_rhs" scrutTy) scrut
@@ -512,15 +512,14 @@ mkPrimitive bbEParen bbEasD dst pInfo args tickDecls =
               resM <- resBndr1 True dst
               case resM of
                 Just (_,dstNm,dstDecl) -> do
-                  tcm <- Lens.use tcCache
                   let (fun0:arg0:_) = lefts args
-                      arg1 = unSimIO tcm arg0
+                      arg1 = unSimIO arg0
                       fun1 = case fun0 of
                         Lam b bE ->
                           let is0 = mkInScopeSet (Lens.foldMapOf freeIds unitVarSet fun0)
                               subst = extendIdSubst (mkSubst is0) b arg1
                           in  substTm "mkPrimitive.fmapSimIO" subst bE
-                        _ -> mkApps fun0 [Left arg1]
+                        _ -> mkArgApps fun0 [TermArg arg1]
                   (expr,bindDecls) <- mkExpr False Sequential dst fun1
                   let assn = case expr of
                                Noop -> []
@@ -600,7 +599,8 @@ mkPrimitive bbEParen bbEasD dst pInfo args tickDecls =
               -- TODO: check that it's okay to use `mkUnsafeInternalName`
               let nm3 = mkUnsafeSystemName nm2 0
                   id_ = mkLocalId ty nm3
-              idDeclM <- mkNetDecl (id_,mkApps (Prim pInfo) args)
+              idDeclM <- mkNetDecl (id_,mkArgApps (Prim pInfo)
+                                                  (map (either TermArg TypeArg) args))
               case idDeclM of
                 Nothing     -> return Nothing
                 Just idDecl -> return (Just ([id_],[nm2],[idDecl]))
@@ -643,14 +643,14 @@ collectMealy dstNm dst tcm (kd:clk:mealyFun:mealyInit:mealyIn:_) = do
           let u = case dst of
                     CoreId u0 -> u0
                     _ -> uniqAway is0
-                           (mkLocalId (termType tcm e)
+                           (mkLocalId (termType e)
                                       (mkUnsafeSystemName "mealyres" 0))
           in  (bsN ++ [(u,e)], u)
         e ->
           let u = case dst of
                     CoreId u0 -> u0
                     _ -> uniqAway is0
-                           (mkLocalId (termType tcm e)
+                           (mkLocalId (termType e)
                                       (mkUnsafeSystemName "mealyres" 0))
           in  ([(u,e)], u)
       -- Drop the 'State# World' argument
@@ -658,12 +658,12 @@ collectMealy dstNm dst tcm (kd:clk:mealyFun:mealyInit:mealyIn:_) = do
       -- Take into account that the state argument is split over multiple
       -- binders because it contained types that are not allowed to occur in
       -- a HDL aggregate type
-      mealyInitLength = length (splitShouldSplit tcm [termType tcm mealyInit])
+      mealyInitLength = length (splitShouldSplit tcm [termType mealyInit])
       (sArgs,iArgs) = splitAt mealyInitLength args1
   -- Give all binders a unique name
   normE <- mkUniqueNormalized is0
              (Just (Just (Synthesize "" [] (PortName ""))))
-             ([],map (,mealyInit) sArgs ++ map (,mealyIn) iArgs ++ bs,res)
+             ([],(map (,mealyInit) sArgs ++ map (,mealyIn) iArgs ++ bs,[]),(res,[]))
   case normE of
     -- We're not expecting any input or output wrappers
     (_,[],[],_,[],binders0,Just result) -> do
@@ -739,13 +739,13 @@ collectMealy dstNm dst tcm (kd:clk:mealyFun:mealyInit:mealyIn:_) = do
       -- because we're basically clocked logic; so we need to have our outputs
       -- ready before the ambient system starts sampling them. The clockGen code
       -- ensures that the "opposite" edge always comes first.
-      kdTy <- unsafeCoreTypeToHWTypeM $(curLoc) (termType tcm kd)
+      kdTy <- unsafeCoreTypeToHWTypeM $(curLoc) (termType kd)
       let edge = case stripVoid (stripFiltered kdTy) of
                    KnownDomain _ _ Rising _ _ _  -> Falling
                    KnownDomain _ _ Falling _ _ _ -> Rising
                    _ -> error "internal error"
       (clkExpr,clkDecls) <-
-        mkExpr False Concurrent (NetlistId "__MEALY_CLK__" (termType tcm clk)) clk
+        mkExpr False Concurrent (NetlistId "__MEALY_CLK__" (termType clk)) clk
 
       -- collect the declarations related to the input
       let netDeclsInp1 = netDeclsInp ++ inpDeclsMisc
@@ -770,12 +770,12 @@ collectMealy _ _ _ _ = error "internal error"
 collectBindIO :: NetlistId -> [Term] -> NetlistMonad (Expr,[Declaration])
 collectBindIO dst (m:Lam x q@(Lam _ e):_) = do
   tcm <- Lens.use tcCache
-  ds0 <- collectAction tcm
-  case splitNormalized tcm q of
-    Right (args,bs0,res) -> do
+  ds0 <- collectAction
+  case splitNormalized q of
+    Right (args,(bs0,ticks),(res,bodyTicks)) -> do
       let Letrec bs _ = inverseTopSortLetBindings (Letrec bs0 (C.Var res))
       let is0 = mkInScopeSet (Lens.foldMapOf freeIds unitVarSet q)
-      normE <- mkUniqueNormalized is0 Nothing (args,bs,res)
+      normE <- mkUniqueNormalized is0 Nothing (args,(bs,ticks),(res,bodyTicks))
       case normE of
         (_,_,[],_,[],binders,Just result) -> do
           ds1 <- concat <$> mapM (uncurry (mkDeclarations' Sequential)) binders
@@ -786,7 +786,7 @@ collectBindIO dst (m:Lam x q@(Lam _ e):_) = do
         _ -> error "internal error"
     _ -> case e of
       Letrec {} -> error "internal error"
-      (collectArgs -> (Prim p,args))
+      (squashCollectApp emptyInScopeSet tcm -> (Prim p,args,_,_))
         | primName p == "Clash.Explicit.SimIO.bindSimIO#" -> do
             (expr,ds1) <- collectBindIO dst (lefts args)
             return (expr, ds0 ++ ds1)
@@ -794,11 +794,11 @@ collectBindIO dst (m:Lam x q@(Lam _ e):_) = do
         (expr,ds1) <- mkExpr False Sequential dst e
         return (expr, ds0 ++ ds1)
  where
-  collectAction tcm = case splitNormalized tcm m of
-    Right (args,bs0,res) -> do
+  collectAction = case splitNormalized m of
+    Right (args,(bs0,ticksX),(res,ticksY)) -> do
       let Letrec bs _ = inverseTopSortLetBindings (Letrec bs0 (C.Var res))
       let is0 = mkInScopeSet (Lens.foldMapOf freeIds unitVarSet m)
-      normE <- mkUniqueNormalized is0 Nothing (args,(x,m):bs,res)
+      normE <- mkUniqueNormalized is0 Nothing (args,((x,m):bs,ticksX),(res,ticksY))
       case normE of
         (_,_,[],_,[],binders,Just result) -> do
           let binders1 = tail binders ++ [(fst (head binders), C.Var result)]
@@ -815,14 +815,15 @@ collectBindIO _ es = error ("internal error:\n" ++ showPpr es)
 
 -- | Collect the sequential declarations for 'appIO'
 collectAppIO :: NetlistId -> [Term] -> [Term] -> NetlistMonad (Expr,[Declaration])
-collectAppIO dst (fun1:arg1:_) rest = case collectArgs fun1 of
-  (Prim (PrimInfo "Clash.Explicit.SimIO.fmapSimIO#" _ _),(lefts -> (fun0:arg0:_))) -> do
-    tcm <- Lens.use tcCache
-    let argN = map (Left . unSimIO tcm) (arg0:arg1:rest)
-    mkExpr False Sequential dst (mkApps fun0 argN)
-  (Prim (PrimInfo "Clash.Explicit.SimIO.apSimIO#" _ _),(lefts -> args)) -> do
-    collectAppIO dst args (arg1:rest)
-  _ -> error ("internal error:\n" ++ showPpr (fun1:arg1:rest))
+collectAppIO dst (fun1:arg1:_) rest = do
+  tcm <- Lens.use tcCache
+  case squashCollectApp emptyInScopeSet tcm fun1 of
+    (Prim (PrimInfo "Clash.Explicit.SimIO.fmapSimIO#" _ _),(lefts -> (fun0:arg0:_)),_,_) -> do
+      let argN = map (Left . unSimIO) (arg0:arg1:rest)
+      mkExpr False Sequential dst (mkArgApps fun0 (map (either TermArg TypeArg) argN))
+    (Prim (PrimInfo "Clash.Explicit.SimIO.apSimIO#" _ _),(lefts -> args),_,_) -> do
+      collectAppIO dst args (arg1:rest)
+    _ -> error ("internal error:\n" ++ showPpr (fun1:arg1:rest))
 
 
 collectAppIO _ es _ = error ("internal error:\n" ++ showPpr es)
@@ -833,15 +834,14 @@ collectAppIO _ es _ = error ("internal error:\n" ++ showPpr es)
 -- XXX: this is most likely needed because Ghc2Core that threw away the cast
 -- that this unwrapping; we should really start to support casts.
 unSimIO
-  :: TyConMap
+  :: Term
   -> Term
-  -> Term
-unSimIO tcm arg =
-  let argTy = termType tcm arg
+unSimIO arg =
+  let argTy = termType arg
   in  case tyView argTy of
         TyConApp _ [tcArg] ->
-          mkApps (Prim (PrimInfo "Clash.Explicit.SimIO.unSimIO#" (mkFunTy argTy tcArg) WorkNever))
-                 [Left arg]
+          mkArgApps (Prim (PrimInfo "Clash.Explicit.SimIO.unSimIO#" (mkFunTy argTy tcArg) WorkNever))
+                    [TermArg arg]
         _ -> error ("internal error:\n" ++ showPpr arg)
 
 -- | Create an template instantiation text and a partial blackbox content for an
@@ -861,10 +861,10 @@ mkFunInput
        ,[((TextS.Text,TextS.Text),BlackBox)]
        ,BlackBoxContext)
       ,[Declaration])
-mkFunInput resId e =
- let (appE,args,ticks) = collectArgsTicks e
- in  withTicks ticks $ \tickDecls -> do
-  tcm <- Lens.use tcCache
+mkFunInput resId e = do
+ tcm <- Lens.use tcCache
+ let (appE,args,_,ticks) = squashCollectApp emptyInScopeSet tcm e
+ withTicks ticks $ \tickDecls -> do
   -- TODO: Rewrite this function to use blackbox functions. Right now it
   -- TODO: generates strings that are later parsed/interpreted again. Silly!
   (bbCtx,dcls) <- mkBlackBoxContext "__INTERNAL__" resId args
@@ -882,9 +882,9 @@ mkFunInput resId e =
                   -- Determine result type of this blackbox. If it's not a
                   -- function, simply use its term type.
                   let
-                    resTy0 = termType tcm e
+                    resTy0 = termType e
                     resTy1 =
-                      case splitFunTy tcm resTy0 of
+                      case splitFunTyX resTy0 of
                         Just (_, t) -> t
                         Nothing -> resTy0
 
@@ -898,8 +898,8 @@ mkFunInput resId e =
                         Left ( bbKind, bbOutputReg, bbLibrary, bbImports
                              , bbIncludes, pName, template)
             Data dc -> do
-              let eTy = termType tcm e
-                  (_,resTy) = splitFunTys tcm eTy
+              let eTy = termType e
+                  (_,resTy) = splitFunTysX eTy
 
               resHTyM0 <- coreTypeToHWTypeM resTy
               let resHTyM1 = (\fHwty -> (stripFiltered fHwty, flattenFiltered fHwty)) <$> resHTyM0
@@ -1039,26 +1039,28 @@ mkFunInput resId e =
     stripCasts (Cast c _ _) = stripCasts c
     stripCasts c = c
 
-    goExpr app@(collectArgsTicks -> (C.Var fun,args@(_:_),ticks)) = do
-      let (tmArgs,tyArgs) = partitionEithers args
-      if null tyArgs
-        then
-          withTicks ticks $ \tickDecls -> do
-            appDecls <- mkFunApp "~RESULT" fun tmArgs tickDecls
-            nm <- mkUniqueIdentifier Basic "block"
-            return (Right ((nm,appDecls),Wire))
-        else do
-          (_,sp) <- Lens.use curCompNm
-          throw (ClashException sp ($(curLoc) ++ "Not in normal form: Var-application with Type arguments:\n\n" ++ showPpr app) Nothing)
     goExpr e' = do
       tcm <- Lens.use tcCache
-      let eType = termType tcm e'
-      (appExpr,appDecls) <- mkExpr False Concurrent (NetlistId "c$bb_res" eType) e'
-      let assn = Assignment "~RESULT" appExpr
-      nm <- if null appDecls
-               then return ""
-               else mkUniqueIdentifier Basic "block"
-      return (Right ((nm,appDecls ++ [assn]),Wire))
+      case squashCollectApp emptyInScopeSet tcm e' of
+        (C.Var fun,args@(_:_),_,ticks) -> do
+          let (tmArgs,tyArgs) = partitionEithers args
+          if null tyArgs
+            then
+              withTicks ticks $ \tickDecls -> do
+                appDecls <- mkFunApp "~RESULT" fun tmArgs tickDecls
+                nm <- mkUniqueIdentifier Basic "block"
+                return (Right ((nm,appDecls),Wire))
+            else do
+              (_,sp) <- Lens.use curCompNm
+              throw (ClashException sp ($(curLoc) ++ "Not in normal form: Var-application with Type arguments:\n\n" ++ showPpr e') Nothing)
+        _ -> do
+          let eType = termType e'
+          (appExpr,appDecls) <- mkExpr False Concurrent (NetlistId "c$bb_res" eType) e'
+          let assn = Assignment "~RESULT" appExpr
+          nm <- if null appDecls
+                   then return ""
+                   else mkUniqueIdentifier Basic "block"
+          return (Right ((nm,appDecls ++ [assn]),Wire))
 
     go is0 n (Lam id_ e') = do
       lvl <- Lens.use curBBlvl
@@ -1075,8 +1077,7 @@ mkFunInput resId e =
       return (Right (("",[assn]),Wire))
 
     go _ _ (Case scrut ty [alt]) = do
-      tcm <- Lens.use tcCache
-      let sTy = termType tcm scrut
+      let sTy = termType scrut
       (projection,decls) <- mkProjection False (NetlistId "c$bb_res" sTy) scrut ty alt
       let assn = Assignment "~RESULT" projection
       nm <- if null decls
@@ -1089,8 +1090,7 @@ mkFunInput resId e =
       let resId'  = resId {varName = mkUnsafeSystemName "~RESULT" 0}
       selectionDecls <- mkSelection Concurrent (CoreId resId') scrut ty alts []
       nm <- mkUniqueIdentifier Basic "selection"
-      tcm <- Lens.use tcCache
-      let scrutTy = termType tcm scrut
+      let scrutTy = termType scrut
       scrutHTy <- unsafeCoreTypeToHWTypeM' $(curLoc) scrutTy
       ite <- Lens.use backEndITE
       let wr = case iteAlts scrutHTy alts of
@@ -1099,8 +1099,7 @@ mkFunInput resId e =
       return (Right ((nm,selectionDecls),wr))
 
     go is0 _ e'@(Letrec {}) = do
-      tcm <- Lens.use tcCache
-      let normE = splitNormalized tcm e'
+      let normE = splitNormalized e'
       (_,[],[],_,[],binders,resultM) <- case normE of
         Right norm -> mkUniqueNormalized is0 Nothing norm
         Left err -> error err

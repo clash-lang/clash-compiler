@@ -35,6 +35,7 @@ import           Unique                  (getKey)
 
 import Clash.Core.DataCon
 import Clash.Core.EqSolver
+import Clash.Core.Evaluator.KPush
 import Clash.Core.FreeVars               (tyFVsOfTypes, typeFreeVars, freeLocalIds)
 import Clash.Core.Name
   (Name (..), OccName, mkUnsafeInternalName, mkUnsafeSystemName)
@@ -653,3 +654,40 @@ moveTickCastOutward is0 = go []
     = error (unlines [ "Push expects FunTy"
                      , showPpr fromTy
                      , showPpr toTy ])
+
+squashArgs :: HasCallStack => InScopeSet -> [AppArg] -> ([Either Term Type],Maybe (Type,Type),[TickInfo])
+squashArgs is args = case splitTypeAndTermArgs (moveTickCastOutward is args) of
+  (typesAndTerm,rest) -> case splitCastTicks rest of
+    (castM,ticks) -> (typesAndTerm,castM,ticks)
+ where
+  splitCastTicks [] = (Nothing,[])
+  splitCastTicks (CastCtx from to:other) =
+    let !ticks = noCasts other
+    in  (Just (from,to),ticks)
+  splitCastTicks (TickCtx info:other) =
+    let !ticks = noCasts other
+    in  (Nothing, info:ticks)
+  splitCastTicks _ = error "impossible"
+
+  noCasts [] = []
+  noCasts (TickCtx info:other) =
+    let !ticks = noCasts other
+    in  info:ticks
+  noCasts (CastCtx {}:_) = error "Cast follows tick"
+  noCasts _ = error "impossible"
+
+squashCollectApp  ::
+  HasCallStack =>
+  InScopeSet ->
+  TyConMap ->
+  Term ->
+  (Term,[Either Term Type],Maybe (Type,Type),[TickInfo])
+squashCollectApp is tcm e = case collectAppArgs e of
+  (e1,args) -> case squashArgs is args of
+    (typesAndTerms,castM,ticks)
+      | Data dc <- e1
+      , Just (from, to) <- castM
+      , Just typesAndTerms1 <- kpush tcm dc typesAndTerms (from,to)
+      -> (Data dc,typesAndTerms1,Nothing,ticks)
+      | otherwise
+      -> (e1,typesAndTerms,castM,ticks)

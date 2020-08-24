@@ -48,13 +48,13 @@ import           Clash.Core.FreeVars
 import           Clash.Core.Pretty                (PrettyOptions(..), showPpr, showPpr', ppr)
 import           Clash.Core.Subst
   (extendGblSubstList, mkSubst, substTm)
-import           Clash.Core.Term                  (Term (..), collectArgsTicks
-                                                  ,mkApps, mkTicks)
+import           Clash.Core.Term                  (Term (..), AppArg (..), mkArgApps, mkTicks)
 import           Clash.Core.Termination           (mkRecInfo)
-import           Clash.Core.Type                  (Type, splitCoreFunForallTy)
+import           Clash.Core.Type                  (Type)
 import           Clash.Core.TyCon
   (TyConMap, TyConName)
-import           Clash.Core.Type                  (isPolyTy)
+import           Clash.Core.Type                  (isPolyTy, splitFunForallTy)
+import           Clash.Core.Util                  (squashCollectApp)
 import           Clash.Core.Var                   (Id, varName, varType)
 import           Clash.Core.VarEnv
   (VarEnv, elemVarSet, eltsVarEnv, emptyInScopeSet, emptyVarEnv,
@@ -178,7 +178,6 @@ normalize' nm = do
   let nmS = showPpr (varName nm)
   case exprM of
     Just (Binding nm' sp inl tm) -> do
-      tcm <- Lens.view tcCache
       topEnts <- Lens.view topEntities
       let isTop = nm `elemVarSet` topEnts
           ty0 = varType nm'
@@ -198,7 +197,7 @@ normalize' nm = do
         in throw (ClashException sp msg msgExtra)
 
       -- check for unrepresentable result type
-      let (args,resTy) = splitCoreFunForallTy tcm ty1
+      let (args,resTy) = splitFunForallTy ty1
           isTopEnt = nm `elemVarSet` topEnts
           isFunction = not $ null $ lefts args
       resTyRep <- not <$> isUntranslatableType False resTy
@@ -326,13 +325,16 @@ flattenNode c@(CLeaf (nm,(Binding _ _ _ e))) = do
   isTopEntity <- elemVarSet nm <$> Lens.view topEntities
   if isTopEntity then return (Left c) else do
     tcm  <- Lens.view tcCache
-    let norm = splitNormalized tcm e
+    let norm = splitNormalized e
     case norm of
-      Right (ids,[(bId,bExpr)],_) -> do
-        let (fun,args,ticks) = collectArgsTicks bExpr
+      Right (ids,([(bId,bExpr)],lTicks),_) -> do
+        let (fun,args,castM,ticks) = squashCollectApp emptyInScopeSet tcm bExpr
         case stripArgs ids (reverse ids) (reverse args) of
-          Just remainder | bId `localIdDoesNotOccurIn` bExpr ->
-               return (Right ((nm,mkApps (mkTicks fun ticks) (reverse remainder)),[]))
+          Just remainder | bId `localIdDoesNotOccurIn` bExpr -> do
+              let e1 = mkArgApps fun (map (either TermArg TypeArg) (reverse remainder))
+                  e2 = maybe e1 (uncurry (Cast e1)) castM
+                  e3 = mkTicks e2 (ticks ++ lTicks)
+              return (Right ((nm,e3),[]))
           _ -> return (Right ((nm,e),[]))
       _ -> return (Right ((nm,e),[]))
 flattenNode b@(CBranch (_,(Binding _ _ NoInline _)) _) =
@@ -341,13 +343,16 @@ flattenNode b@(CBranch (nm,(Binding _ _ _ e)) us) = do
   isTopEntity <- elemVarSet nm <$> Lens.view topEntities
   if isTopEntity then return (Left b) else do
     tcm  <- Lens.view tcCache
-    let norm = splitNormalized tcm e
+    let norm = splitNormalized e
     case norm of
-      Right (ids,[(bId,bExpr)],_) -> do
-        let (fun,args,ticks) = collectArgsTicks bExpr
+      Right (ids,([(bId,bExpr)],lTicks),_) -> do
+        let (fun,args,castM,ticks) = squashCollectApp emptyInScopeSet tcm bExpr
         case stripArgs ids (reverse ids) (reverse args) of
-          Just remainder | bId `localIdDoesNotOccurIn` bExpr ->
-               return (Right ((nm,mkApps (mkTicks fun ticks) (reverse remainder)),us))
+          Just remainder | bId `localIdDoesNotOccurIn` bExpr -> do
+            let e1 = mkArgApps fun (map (either TermArg TypeArg) (reverse remainder))
+                e2 = maybe e1 (uncurry (Cast e1)) castM
+                e3 = mkTicks e2 (ticks ++ lTicks)
+            return (Right ((nm,e3),us))
           _ -> return (Right ((nm,e),us))
       _ -> do
         newInlineStrat <- Lens.use (extra.newInlineStrategy)
