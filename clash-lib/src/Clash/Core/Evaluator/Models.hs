@@ -357,7 +357,7 @@ instance AsTerm Term where
 instance (AsTerm a) => AsTerm (Neutral a) where
   asTerm = \case
     NeVar v -> Var v
-    NePrim p args -> mkApps (Prim p) (first asTerm <$> args)
+    NePrim p args -> mkArgApps (Prim p) (either TermArg TypeArg . first asTerm <$> args)
     NeApp x y -> App (asTerm x) (asTerm y)
     NeTyApp x ty -> TyApp (asTerm x) ty
     NeCase x ty alts -> Case (asTerm x) ty (second asTerm <$> alts)
@@ -366,8 +366,8 @@ instance AsTerm Value where
   asTerm = \case
     VNeu n -> asTerm n
     VLit l -> Literal l
-    VData dc args env -> instHeap env . bindHeap env $ mkApps (Data dc) args
-    VPrim p args env -> instHeap env . bindHeap env $ mkApps (Prim p) args
+    VData dc args env -> instHeap env . bindHeap env $ mkArgApps (Data dc) (either TermArg TypeArg <$> args)
+    VPrim p args env -> instHeap env . bindHeap env $ mkArgApps (Prim p) (either TermArg TypeArg <$> args)
     VLam x e env -> instHeap env $ bindHeap env (Lam x e)
     VTyLam x e env -> instHeap env $ bindHeap env (TyLam x e)
     VCast x a b -> Cast (asTerm x) a b
@@ -401,8 +401,8 @@ instance AsTerm Nf where
   asTerm = \case
     NNeu n -> asTerm n
     NLit l -> Literal l
-    NData dc args -> mkApps (Data dc) (first asTerm <$> args)
-    NPrim p args -> mkApps (Prim p) (first asTerm <$> args)
+    NData dc args -> mkArgApps (Data dc) (either TermArg TypeArg . first asTerm <$> args)
+    NPrim p args -> mkArgApps (Prim p) (either TermArg TypeArg . first asTerm <$> args)
     NLam x e -> Lam x (asTerm e)
     NTyLam x e -> TyLam x (asTerm e)
     NCast x a b -> Cast (asTerm x) a b
@@ -410,4 +410,3 @@ instance AsTerm Nf where
 
 instance (AsTerm a, AsTerm b) => AsTerm (Either a b) where
   asTerm = either asTerm asTerm
-

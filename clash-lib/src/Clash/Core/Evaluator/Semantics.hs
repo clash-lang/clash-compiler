@@ -15,7 +15,7 @@ new evaluator implementaions.
 module Clash.Core.Evaluator.Semantics where
 
 import Control.Monad ((>=>), foldM)
-import Data.Bifunctor (bimap, first)
+import Data.Bifunctor (first)
 import Data.Bitraversable (bitraverse)
 import Data.List.Extra (equalLength)
 
@@ -28,9 +28,10 @@ import Clash.Core.Literal
 import Clash.Core.Term
 import Clash.Core.Termination
 import Clash.Core.TermInfo
-import Clash.Core.TyCon
 import Clash.Core.Type
+import Clash.Core.Util
 import Clash.Core.Var
+import Clash.Core.VarEnv
 import Clash.Driver.Types (Binding(..))
 
 -- | Construct an evaluator given the three functions which are potentially
@@ -115,25 +116,24 @@ isFullyApplied ty args =
   equalLength args (fst $ splitFunForallTy ty)
 
 etaExpand :: Term -> Eval Term
-etaExpand x =
-  case collectArgs x of
-    y@(Data dc, _) -> do
-      tcm <- getTyConMap
-      expand tcm (dcType dc) y
+etaExpand x = do
+  tcm <- getTyConMap
+  case squashCollectApp emptyInScopeSet tcm x of
+    y@(Data dc, _, _, _) ->
+      expand (dcType dc) y
 
-    y@(Prim p, _) -> do
-      tcm <- getTyConMap
-      expand tcm (primType p) y
+    y@(Prim p, _, _, _) ->
+      expand (primType p) y
 
     _ -> pure x
  where
-  expand :: TyConMap -> Type -> (Term, [Either Term Type]) -> Eval Term
-  expand tcm ty (tm, args) = do
-    let missingArgTys = fst $ splitFunForallTy (applyTypeToArgs tm tcm ty args)
+  expand :: Type -> (Term, [Either Term Type],Maybe (Type,Type),[TickInfo]) -> Eval Term
+  expand ty (tm,args,castM,_ticks) = do
+    let missingArgTys = fst $ splitFunForallTy (maybe (applyTypeToArgs tm ty args) snd castM)
     missingArgs <- traverse etaNameOf missingArgTys
 
     pure $ mkAbstraction
-      (mkApps x (fmap (bimap Var VarTy) missingArgs))
+      (mkArgApps x (either (TermArg . Var) (TypeArg . VarTy) <$> missingArgs))
       missingArgs
 
   etaNameOf :: Either TyVar Type -> Eval (Either Id TyVar)
@@ -261,17 +261,17 @@ evaluateAppWith
   -> Eval Value
 evaluateAppWith eval evalPrim apply x y
   | Data dc <- f
-  = if isFullyApplied (dcType dc) args
-      then VData dc args <$> getLocalEnv
+  = if isFullyApplied (dcType dc) typesAndTerms
+      then VData dc typesAndTerms <$> getLocalEnv
       else etaExpand term >>= eval
 
   | Prim p <- f
   , nArgs  <- length . fst $ splitFunForallTy (primType p)
-  = case compare (length args) nArgs of
+  = case compare (length typesAndTerms) nArgs of
       LT -> etaExpand term >>= eval
-      EQ -> evalPrim p args
+      EQ -> evalPrim p typesAndTerms
       GT -> do
-        let (pArgs, rArgs) = splitAt nArgs args
+        let (pArgs, rArgs) = splitAt nArgs typesAndTerms
         primRes <- evalPrim p pArgs
         foldM apply primRes (first Left <$> rArgs)
 
@@ -286,10 +286,11 @@ evaluateAppWith eval evalPrim apply x y
   | otherwise
   = preserveFuel $ do
       evalF <- eval f
-      foldM apply evalF (first Left <$> args)
+      foldM apply evalF (first Left <$> typesAndTerms)
   where
-  term      = either (App x) (TyApp x) y
-  (f, args) = collectArgs term
+  term = either (App x) (TyApp x) y
+  (f, appArgs) = collectAppArgs term
+  (typesAndTerms,Nothing,_ticks) = squashArgs emptyInScopeSet appArgs
 
 -- | Default implementation for evaluating a letrec expression. This adds all
 -- bindings to the heap without eagerly evaluating them, then evaluates the
@@ -606,4 +607,3 @@ quoteNeCaseWith quote x ty xs = do
   quoteX  <- quote x
   quoteXs <- traverse (bitraverse pure quote) xs
   pure (NeCase quoteX ty quoteXs)
-

@@ -375,8 +375,8 @@ mkDeclarations' declType bndr app = do
                     , showPpr app
                     ])
           Nothing
-    (Case scrut altTy alts@(_:_:_),[],_,ticks) -> do
-      withTicks ticks $ \tickDecls -> do
+    (Case scrut altTy alts@(_:_:_),[],_,ticks) ->
+      withTicks ticks $ \tickDecls ->
       mkSelection declType (CoreId bndr) scrut altTy alts tickDecls
 
     (appF,args0,_,ticks) -> do

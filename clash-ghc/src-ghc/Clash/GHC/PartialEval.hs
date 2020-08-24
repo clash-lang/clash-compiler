@@ -107,7 +107,7 @@ ghcMatchLiteral l = \case
     -- Add the mapping i |-> VData "BigNat" [byteArray] to the environment.
     let Just integerTcName = fmap fst (splitTyConAppM integerPrimTy)
         [_, jpDc, _] = tyConDataCons (lookupUniqMap' tcm integerTcName)
-        ([bnTy], _) = splitFunTys tcm (dcType jpDc)
+        ([bnTy], _) = splitFunTysX (dcType jpDc)
         Just bnTcName = fmap fst (splitTyConAppM bnTy)
         [bnDc] = tyConDataCons (lookupUniqMap' tcm bnTcName)
 
@@ -135,4 +135,3 @@ ghcMatchData dc args = \case
     -> pure (Match [] [])
 
   _ -> pure NoMatch
-
