@@ -66,8 +66,6 @@ module Clash.Prelude.Safe
     -- ** Synchronous signals
   , module Clash.Signal
   , module Clash.Signal.Delayed
-    -- ** DataFlow interface
-  , module Clash.Prelude.DataFlow
     -- ** Datatypes
     -- *** Bit vectors
   , module Clash.Sized.BitVector
@@ -138,7 +136,6 @@ import           Clash.Prelude.Mealy         (mealy, mealyB, (<^>))
 import           Clash.Prelude.Moore         (moore, mooreB)
 import           Clash.Prelude.RAM           (asyncRam,asyncRamPow2)
 import           Clash.Prelude.ROM           (asyncRom,asyncRomPow2,rom,romPow2)
-import           Clash.Prelude.DataFlow
 import           Clash.Promoted.Nat
 import           Clash.Promoted.Nat.TH
 import           Clash.Promoted.Nat.Literals
