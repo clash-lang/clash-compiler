@@ -120,6 +120,10 @@ instance Diff Term where
           Case (go t) ty alts
         (Cast t ty ty', CastBody) ->
           Cast (go t) ty ty'
+        (Tick ti x, TickC ti') ->
+          if ti == ti'
+            then Tick ti (go x)
+            else error $ "Ctx.Tick: different ticks " ++ show (ti, ti')
         _ -> error "patch: context does not agree with term"
     where
       go :: Term -> Term
