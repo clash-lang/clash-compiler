@@ -84,7 +84,7 @@ import           Clash.Core.Type             (KindOrType, Type (..),
                                               normalizeType,
                                               typeKind, tyView, isPolyFunTy)
 import           Clash.Core.Util
-  (dataConInstArgTysE, isClockOrReset, isEnable, moveTickCastOutward)
+  (dataConInstArgTysE, isClockOrReset, isEnable, squashArgs)
 import           Clash.Core.Var
   (Id, IdScope (..), TyVar, Var (..), isLocalId, mkGlobalId, mkLocalId, mkTyVar)
 import           Clash.Core.VarEnv
@@ -984,8 +984,7 @@ specialise' specMapLbl specHistLbl specLimitLbl (TransformContext is0 _) e (Var 
                                   | n <- [(0::Int)..]
                                   ]
               -- Ensure that casts (and ticks) are pushed all the way outward
-              let argsCastOutward = moveTickCastOutward is0 args
-                  (typeAndTermArgs,_otherArgs) = splitTypeAndTermArgs argsCastOutward
+              let (typeAndTermArgs,castM,ticks) = squashArgs is0 args
               -- Make new binders for existing arguments
               (boundArgs,argVars) <- fmap (unzip . map (either (Left &&& TermArg . Var) (Right &&& TypeArg . VarTy))) $
                                      Monad.zipWithM
@@ -1024,7 +1023,11 @@ specialise' specMapLbl specHistLbl specLimitLbl (TransformContext is0 _) e (Var 
               (extra.specHistLbl) %= extendUniqMapWith f 1 (+)
               (extra.specMapLbl)  %= Map.insert (f,argLen,specAbs) newf
               -- use specialized function
-              let newExpr = mkArgApps (Var newf) (argsCastOutward ++ specVars)
+              let otherArgs1 = TickCtx <$> ticks
+                  otherArgs2 = maybe otherArgs1
+                                     (\(from,to) -> CastCtx from to:otherArgs1)
+                                     castM
+                  newExpr = mkArgApps (Var newf) (otherArgs2 ++ specVars)
               newf `deepseq` changed newExpr
         Nothing -> return e
 

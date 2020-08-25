@@ -656,25 +656,39 @@ moveTickCastOutward is0 = go []
                      , showPpr toTy ])
 
 squashArgs :: HasCallStack => InScopeSet -> [AppArg] -> ([Either Term Type],Maybe (Type,Type),[TickInfo])
-squashArgs is args = case splitTypeAndTermArgs (moveTickCastOutward is args) of
-  (typesAndTerm,rest) -> case splitCastTicks rest of
-    (castM,ticks) -> (typesAndTerm,castM,ticks)
+squashArgs is args = splitArgs (moveTickCastOutward is args)
  where
+  splitArgs :: [AppArg] -> ([Either Term Type],Maybe (Type,Type),[TickInfo])
+  splitArgs [] = ([],Nothing,[])
+  splitArgs (TermArg tm:rest) =
+    let !(args1,castM,ticks) = splitArgs rest
+    in  (Left tm:args1,castM,ticks)
+  splitArgs (TypeArg ty:rest) =
+    let !(args1,castM,ticks) = splitArgs rest
+    in  (Right ty:args1,castM,ticks)
+  splitArgs others =
+    let !(castM,ticks) = splitCastTicks others
+    in  ([],castM,ticks)
+
+  splitCastTicks :: [AppArg] -> (Maybe (Type,Type),[TickInfo])
   splitCastTicks [] = (Nothing,[])
   splitCastTicks (CastCtx from to:other) =
-    let !ticks = noCasts other
+    let !ticks = onlyTicks other
     in  (Just (from,to),ticks)
   splitCastTicks (TickCtx info:other) =
-    let !ticks = noCasts other
+    let !ticks = onlyTicks other
     in  (Nothing, info:ticks)
-  splitCastTicks _ = error "impossible"
+  splitCastTicks (TermArg {}:_) = error "Term Arg follows cast or tick"
+  splitCastTicks (TypeArg {}:_) = error "Term Arg follows cast or tick"
 
-  noCasts [] = []
-  noCasts (TickCtx info:other) =
-    let !ticks = noCasts other
+  onlyTicks :: [AppArg] -> [TickInfo]
+  onlyTicks [] = []
+  onlyTicks (TickCtx info:other) =
+    let !ticks = onlyTicks other
     in  info:ticks
-  noCasts (CastCtx {}:_) = error "Cast follows tick"
-  noCasts _ = error "impossible"
+  onlyTicks (CastCtx {}:_) = error "Cast follows tick"
+  onlyTicks (TermArg {}:_) = error "Term Arg follows tick"
+  onlyTicks (TypeArg {}:_) = error "Term Arg follows tick"
 
 squashCollectApp  ::
   HasCallStack =>

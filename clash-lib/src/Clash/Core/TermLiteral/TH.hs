@@ -7,13 +7,15 @@ module Clash.Core.TermLiteral.TH
   ,  dcName'
   ) where
 
+import           Data.Either                     (lefts)
 import qualified Data.Text                       as Text
 import           Language.Haskell.TH.Syntax
 
 import           Clash.Core.DataCon
-import           Clash.Core.Term
-  (collectAppArgs, termArgsX, Term(Data))
+import           Clash.Core.Term                 (collectAppArgs, Term(Data))
 import           Clash.Core.Name                 (nameOcc)
+import           Clash.Core.Util                 (squashArgs)
+import           Clash.Core.VarEnv               (emptyInScopeSet)
 
 -- Workaround for a strange GHC bug, where it complains about Subst only
 -- existing as a boot file:
@@ -88,8 +90,11 @@ deriveTermToData1 constrs =
         (VarE 'collectAppArgs)
         (TupP [ ConP 'Data [ViewP (VarE 'dcName') (VarP nameName)]
               , ViewP
-                 (VarE 'termArgsX)
-                 (if nArgs == 0 then WildP else VarP argsName)]))
+                 (AppE (VarE 'squashArgs) (VarE 'emptyInScopeSet))
+                 (if nArgs == 0 then
+                    WildP
+                  else
+                    TupP [ViewP (VarE 'lefts) (VarP argsName), WildP, WildP])]))
 
   termName = mkName "term"
   argsName = mkName "args"

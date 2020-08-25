@@ -47,17 +47,17 @@ module Clash.Core.Term
   , AppArg (..)
   , collectAppArgs
   , mkArgApps
-  , typeArgsX
-  , termArgsX
+  , typeArgsY
+  , termArgsY
   , setNthTmArg
-  , collectCastsTicks
-  , collectArgsX
-  , stripTickX
-  , splitTypeAndTermArgs
-  , tickArgs
-  , typeAndCastArgs
-  , collectTicks
-  , hasTermOrTypeArgs
+  -- , collectCastsTicks
+  , collectArgsY
+  -- , stripTickX
+  -- , splitTypeAndTermArgs
+  -- , tickArgs
+  -- , typeAndCastArgs
+  -- , collectTicks
+  -- , hasTermOrTypeArgs
   ) where
 
 -- External Modules
@@ -80,7 +80,7 @@ import Clash.Core.Name                         (Name (..))
 import {-# SOURCE #-} Clash.Core.Subst         () -- instance Eq Type
 import {-# SOURCE #-} Clash.Core.Type          (Type)
 import Clash.Core.Var                          (Var(Id), Id, TyVar)
-import Clash.Util                              (HasCallStack, curLoc)
+import Clash.Util                              (curLoc)
 
 -- | Term representation in the CoreHW language: System F + LetRec + Case
 data Term
@@ -378,44 +378,44 @@ mkArgApps = foldl' (\e a -> go e a)
   go e (TickCtx info)  = Tick info e
   go e (CastCtx t1 t2) = Cast e t1 t2
 
-typeArgsX :: [AppArg] -> [Type]
-typeArgsX [] = []
-typeArgsX (TypeArg ty:rest) = ty : typeArgsX rest
-typeArgsX (_:rest) = typeArgsX rest
+typeArgsY :: [AppArg] -> [Type]
+typeArgsY [] = []
+typeArgsY (TypeArg ty:rest) = ty : typeArgsY rest
+typeArgsY (_:rest) = typeArgsY rest
 
-termArgsX :: [AppArg] -> [Term]
-termArgsX [] = []
-termArgsX (TermArg tm:rest) = tm : termArgsX rest
-termArgsX (_:rest) = termArgsX rest
+termArgsY :: [AppArg] -> [Term]
+termArgsY [] = []
+termArgsY (TermArg tm:rest) = tm : termArgsY rest
+termArgsY (_:rest) = termArgsY rest
 
 -- | Splits type and term arguments from the Argument stack, errors out if any
 -- type or term arguments follow a cast or tick
-splitTypeAndTermArgs :: HasCallStack => [AppArg] -> ([Either Term Type],[AppArg])
-splitTypeAndTermArgs [] = ([],[])
-splitTypeAndTermArgs (TermArg tm:rest) =
-  let !(args1,args2) = splitTypeAndTermArgs rest
-  in  (Left tm:args1,args2)
-splitTypeAndTermArgs (TypeArg ty:rest) =
-  let !(args1,arg2) = splitTypeAndTermArgs rest
-  in  (Right ty:args1,arg2)
-splitTypeAndTermArgs (other:rest) = noTypeOrTerm (other:rest)
- where
-  noTypeOrTerm [] = ([],[])
-  noTypeOrTerm (TermArg {}:_) = error "TermArg follows cast or tick"
-  noTypeOrTerm (TypeArg {}:_) = error "TypeArg follows cast or tick"
-  noTypeOrTerm (other1:rest1)   =
-    let !(args1,args2) = noTypeOrTerm rest1
-    in  (args1,other1:args2)
+-- splitTypeAndTermArgs :: HasCallStack => [AppArg] -> ([Either Term Type],[AppArg])
+-- splitTypeAndTermArgs [] = ([],[])
+-- splitTypeAndTermArgs (TermArg tm:rest) =
+--   let !(args1,args2) = splitTypeAndTermArgs rest
+--   in  (Left tm:args1,args2)
+-- splitTypeAndTermArgs (TypeArg ty:rest) =
+--   let !(args1,arg2) = splitTypeAndTermArgs rest
+--   in  (Right ty:args1,arg2)
+-- splitTypeAndTermArgs (other:rest) = noTypeOrTerm (other:rest)
+--  where
+--   noTypeOrTerm [] = ([],[])
+--   noTypeOrTerm (TermArg {}:_) = error "TermArg follows cast or tick"
+--   noTypeOrTerm (TypeArg {}:_) = error "TypeArg follows cast or tick"
+--   noTypeOrTerm (other1:rest1)   =
+--     let !(args1,args2) = noTypeOrTerm rest1
+--     in  (args1,other1:args2)
 
-tickArgs :: HasCallStack => [AppArg] -> [TickInfo]
-tickArgs [] = []
-tickArgs (TickCtx p:rest) = p:tickArgs rest
-tickArgs _ = error "Not a tick"
+-- tickArgs :: HasCallStack => [AppArg] -> [TickInfo]
+-- tickArgs [] = []
+-- tickArgs (TickCtx p:rest) = p:tickArgs rest
+-- tickArgs _ = error "Not a tick"
 
-stripTickX :: [AppArg] -> [AppArg]
-stripTickX [] = []
-stripTickX (TickCtx {}:rest) = stripTickX rest
-stripTickX (other:rest) = other : stripTickX rest
+-- stripTickX :: [AppArg] -> [AppArg]
+-- stripTickX [] = []
+-- stripTickX (TickCtx {}:rest) = stripTickX rest
+-- stripTickX (other:rest) = other : stripTickX rest
 
 setNthTmArg :: Int -> Term -> [AppArg] -> Maybe [AppArg]
 setNthTmArg _ _ [] = Nothing
@@ -424,39 +424,39 @@ setNthTmArg 1 tm (other:rest) = (other:) <$> setNthTmArg 1 tm rest
 setNthTmArg n tm (t@(TermArg _):rest) = (t:) <$> setNthTmArg (n-1) tm rest
 setNthTmArg n tm (other:rest) = (other:) <$> setNthTmArg n tm rest
 
-collectCastsTicks :: Term -> (Term, [AppArg])
-collectCastsTicks = go []
- where
-  go args (Tick s e)     = go (TickCtx s:args) e
-  go args (Cast e t1 t2) = go (CastCtx t1 t2:args) e
-  go args e              = (e,args)
+-- collectCastsTicks :: Term -> (Term, [AppArg])
+-- collectCastsTicks = go []
+--  where
+--   go args (Tick s e)     = go (TickCtx s:args) e
+--   go args (Cast e t1 t2) = go (CastCtx t1 t2:args) e
+--   go args e              = (e,args)
 
 -- | Collect the applied type and term arguments, but not the casts and ticks.
 --
 -- You usually want 'collectAppArgs' to collect *all* the applied constructions,
 -- i.e. look through casts and ticks as well. Only use this function if you
 -- explicitly do not want to look through casts and ticks
-collectArgsX :: Term -> (Term, [Either Term Type])
-collectArgsX = go []
+collectArgsY :: Term -> (Term, [Either Term Type])
+collectArgsY = go []
  where
   go args (App e1 e2) = go (Left e2:args) e1
   go args (TyApp e t) = go (Right t:args) e
   go args e           = (e, args)
 
-typeAndCastArgs :: [AppArg] -> [AppArg]
-typeAndCastArgs [] = []
-typeAndCastArgs (TermArg {}:rest) = typeAndCastArgs rest
-typeAndCastArgs (TickCtx {}:rest) = typeAndCastArgs rest
-typeAndCastArgs (arg:rest) = arg : typeAndCastArgs rest
+-- typeAndCastArgs :: [AppArg] -> [AppArg]
+-- typeAndCastArgs [] = []
+-- typeAndCastArgs (TermArg {}:rest) = typeAndCastArgs rest
+-- typeAndCastArgs (TickCtx {}:rest) = typeAndCastArgs rest
+-- typeAndCastArgs (arg:rest) = arg : typeAndCastArgs rest
 
-collectTicks :: Term -> (Term, [TickInfo])
-collectTicks = go []
- where
-  go args (Tick i e) = go (i:args) e
-  go args e          = (e,args)
+-- collectTicks :: Term -> (Term, [TickInfo])
+-- collectTicks = go []
+--  where
+--   go args (Tick i e) = go (i:args) e
+--   go args e          = (e,args)
 
-hasTermOrTypeArgs :: [AppArg] -> Bool
-hasTermOrTypeArgs [] = False
-hasTermOrTypeArgs (TermArg{}:_) = True
-hasTermOrTypeArgs (TypeArg{}:_) = True
-hasTermOrTypeArgs (_:rest) = hasTermOrTypeArgs rest
+-- hasTermOrTypeArgs :: [AppArg] -> Bool
+-- hasTermOrTypeArgs [] = False
+-- hasTermOrTypeArgs (TermArg{}:_) = True
+-- hasTermOrTypeArgs (TypeArg{}:_) = True
+-- hasTermOrTypeArgs (_:rest) = hasTermOrTypeArgs rest

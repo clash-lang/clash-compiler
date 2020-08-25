@@ -41,6 +41,7 @@ where
 
 -- external
 import           Control.Concurrent.Supply        (splitSupply)
+import           Control.Lens                     ((^.), _1)
 import qualified Control.Lens                     as Lens
 import           Data.Bits                        ((.&.),complement)
 import           Data.Coerce                      (coerce)
@@ -69,12 +70,11 @@ import Clash.Core.FreeVars
 import Clash.Core.Literal    (Literal (..))
 import Clash.Core.Term
   (LetBinding, Pat (..), PrimInfo (..), Term (..), TickInfo (..), AppArg (..),
-   patIds, collectAppArgs, termArgsX, tickArgs, mkArgApps,
-   typeAndCastArgs)
+   patIds, collectAppArgs, mkArgApps)
 import Clash.Core.TermInfo   (termType)
 import Clash.Core.TyCon      (tyConDataCons)
 import Clash.Core.Type       (Type, isPolyFunTy, mkTyConApp, splitFunForallTy)
-import Clash.Core.Util       (sccLetBindings)
+import Clash.Core.Util       (sccLetBindings, squashArgs)
 import Clash.Core.Var        (isGlobalId)
 import Clash.Core.VarEnv
   (InScopeSet, elemInScopeSet, extendInScopeSetList, notElemInScopeSet, unionInScope)
@@ -103,7 +103,36 @@ isDisjoint ct = go ct
     go (LB _ ct')           = go ct'
     go (Branch _ [])        = False
     go (Branch _ [(_,x)])   = go x
-    go b@(Branch _ (_:_:_)) = allEqual (map typeAndCastArgs (Foldable.toList b))
+    go b@(Branch _ (_:_:_)) = allEqualTypesAndCasts (Foldable.toList b)
+
+    allEqualTypesAndCasts []  = True
+    allEqualTypesAndCasts [_] = True
+    allEqualTypesAndCasts (arg1:arg2:rest)
+      | equalTypesAndCasts arg1 arg2
+      = allEqualTypesAndCasts (arg2:rest)
+      | otherwise
+      = False
+
+    equalTypesAndCasts [] [] = True
+    equalTypesAndCasts (TickCtx {}:rest1) rest2
+      = equalTypesAndCasts rest1 rest2
+    equalTypesAndCasts rest1 (TickCtx {}:rest2)
+      = equalTypesAndCasts rest1 rest2
+    equalTypesAndCasts (TypeArg ty1:rest1) (TypeArg ty2:rest2)
+      | ty1 == ty2
+      = equalTypesAndCasts rest1 rest2
+      | otherwise
+      = False
+    equalTypesAndCasts (CastCtx from1 to1:rest1) (CastCtx from2 to2:rest2)
+      | from1 == from2
+      , to1 == to2
+      = equalTypesAndCasts rest1 rest2
+      | otherwise
+      = False
+    equalTypesAndCasts (TermArg _:rest1) (TermArg _:rest2)
+      = equalTypesAndCasts rest1 rest2
+    equalTypesAndCasts _ _
+      = False
 
 -- Remove empty branches from a 'CaseTree'
 removeEmpty :: Eq a => CaseTree [a] -> CaseTree [a]
@@ -148,7 +177,9 @@ collectGlobals' is0 substitution seen (Case scrut ty alts) _eIsConstant = do
          , unionInScope isAlts isScrut
          , collectedAlts ++ collectedScrut )
 
-collectGlobals' is0 substitution seen e@(collectAppArgs -> (fun, args@(termArgsX -> (_:_)))) eIsconstant
+collectGlobals' is0 substitution seen
+  e@(collectAppArgs -> (fun, args@(squashArgs is0 -> (Either.lefts -> (_:_),_,_))))
+  eIsconstant
   | not eIsconstant = do
     tcm <- Lens.view tcCache
     bndrs <- Lens.use bindings
@@ -182,7 +213,14 @@ collectGlobals' is0 substitution seen e@(collectAppArgs -> (fun, args@(termArgsX
         isInteresting <- interestingToLift is0 eval fun args
         case isInteresting of
           Just fun1 | fun1 `notElem` seenInArgs -> do
-            let e1 = Maybe.fromMaybe (mkArgApps fun1 args1) (List.lookup fun1 substitution)
+            let e1 = case List.lookup fun1 substitution of
+                       Just repFun ->
+                         let (_,castM,ticks) = squashArgs is0 args1
+                             repFun1 = case castM of
+                                         Just (from,to) -> Cast repFun from to
+                                         Nothing -> repFun
+                         in  mkArgApps repFun1 (map TickCtx ticks)
+                       Nothing -> mkArgApps fun1 args1
             -- This function is lifted out an environment with the currently 'seen'
             -- binders. When we later apply substitution, we need to start with this
             -- environment, otherwise we perform incorrect substitutions in the
@@ -336,28 +374,30 @@ mkDisjointGroup
   -- ^ Case-tree of arguments belonging to the applied term.
   -> RewriteMonad NormalizeState (Term,[Term])
 mkDisjointGroup inScope (fun,(seen,cs)) = do
-    let argss    = Foldable.toList ( cs)
-        argssT   = zip [0..] (List.transpose argss)
-        (sharedT,distinctT) = List.partition (areShared inScope . snd) argssT
-        shared   = map (second head) sharedT
-        distinct = map termArgsX (List.transpose (map snd distinctT))
-        cs'      = fmap (zip [0..]) cs
-        cs''     = removeEmpty
-                 $ fmap (termArgsX . map snd)
-                        (if null shared
-                           then cs'
-                           else fmap (filter (`notElem` shared)) cs')
-    (distinctCaseM,distinctProjections) <- case distinct of
-      -- only shared arguments: do nothing.
-      [] -> return (Nothing,[])
-      -- Create selectors and projections
-      (uc:_) -> do
-        let argTys = map termType uc
-        disJointSelProj inScope argTys cs''
-    let newArgs = mkDJArgs 0 shared distinctProjections
-    case distinctCaseM of
-      Just lb -> return (Letrec [lb] (mkArgApps fun newArgs), seen)
-      Nothing -> return (mkArgApps fun newArgs, seen)
+  let cs1 = ((^. _1) . squashArgs inScope) <$> cs
+      argss = Foldable.toList cs1
+      argssT = zip [0..] (List.transpose argss)
+      (sharedT,distinctT) = List.partition (areShared inScope . snd) argssT
+      shared   = map (second head) sharedT
+      distinct = map (Either.lefts) (List.transpose (map snd distinctT))
+      cs2      = fmap (zip [0..]) cs1
+      cs3     = removeEmpty
+                $ fmap (Either.lefts . map snd)
+                      (if null shared
+                          then cs2
+                          else fmap (filter (`notElem` shared)) cs2)
+
+  (distinctCaseM,distinctProjections) <- case distinct of
+    -- only shared arguments: do nothing.
+    [] -> return (Nothing,[])
+    -- Create selectors and projections
+    (uc:_) -> do
+      let argTys = map termType uc
+      disJointSelProj inScope argTys cs3
+  let newArgs = mkDJArgs 0 shared distinctProjections
+  case distinctCaseM of
+    Just lb -> return (Letrec [lb] (mkArgApps fun newArgs), seen)
+    Nothing -> return (mkArgApps fun newArgs, seen)
 
 -- | Create a single selector for all the representable distinct arguments by
 -- selecting between tuples. This selector is only ('Just') created when the
@@ -417,34 +457,28 @@ disJointSelProj inScope argTys cs = do
 --
 -- * They contain _no_ references to locally-bound variables
 -- * Are all equal
-areShared :: InScopeSet -> [AppArg] -> Bool
+areShared :: InScopeSet -> [Either Term Type] -> Bool
 areShared _       []       = True
 areShared inScope xs@(x:_) = noFV1 && allEqual xs
  where
   noFV1 = case x of
-    TypeArg ty -> getAll (Lens.foldMapOf (typeFreeVars' isLocallyBound IntSet.empty)
-                                         (const (All False)) ty)
-    TermArg tm -> getAll (Lens.foldMapOf (termFreeVars' isLocallyBound)
-                                         (const (All False)) tm)
-    TickCtx {} -> True
-    CastCtx t1 t2 -> getAll (Lens.foldMapOf (typeFreeVars' isLocallyBound IntSet.empty)
-                                            (const (All False)) t1)
-                     ||
-                     getAll (Lens.foldMapOf (typeFreeVars' isLocallyBound IntSet.empty)
-                                            (const (All False)) t2)
+    Right ty -> getAll (Lens.foldMapOf (typeFreeVars' isLocallyBound IntSet.empty)
+                                       (const (All False)) ty)
+    Left tm  -> getAll (Lens.foldMapOf (termFreeVars' isLocallyBound)
+                                       (const (All False)) tm)
 
   isLocallyBound v = v `notElemInScopeSet` inScope
 
 -- | Create a list of arguments given a map of positions to common arguments,
 -- and a list of arguments
 mkDJArgs :: Int -- ^ Current position
-         -> [(Int,AppArg)] -- ^ map from position to common argument
+         -> [(Int,Either Term Type)] -- ^ map from position to common argument
          -> [Term] -- ^ (projections for) distinct arguments
          -> [AppArg]
-mkDJArgs _ cms []   = map snd cms
+mkDJArgs _ cms []   = map (either TermArg TypeArg . snd) cms
 mkDJArgs _ [] uncms = map TermArg uncms
 mkDJArgs n ((m,x):cms) (y:uncms)
-  | n == m    = x         : mkDJArgs (n+1) cms (y:uncms)
+  | n == m    = either TermArg TypeArg x : mkDJArgs (n+1) cms (y:uncms)
   | otherwise = TermArg y : mkDJArgs (n+1) ((m,x):cms) uncms
 
 -- | Create a case-expression that selects between the distinct arguments given
@@ -493,15 +527,16 @@ interestingToLift
   -- ^ Arguments
   -> RewriteMonad extra (Maybe Term)
 interestingToLift inScope _ e@(Var v) args =
-  if NoDeDup `notElem` tickArgs args && (isGlobalId v ||  v `elemInScopeSet` inScope)
+  let (_,_,ticks) = squashArgs inScope args in
+  if NoDeDup `notElem` ticks && (isGlobalId v ||  v `elemInScopeSet` inScope)
      then pure (Just e)
      else pure Nothing
 interestingToLift inScope eval e@(Prim pInfo) args
-  | NoDeDup `notElem` tickArgs args = do
+  | NoDeDup `notElem` ticks = do
   let anyArgNotConstant = any (not . isConstant) lArgs
   case List.lookup (primName pInfo) interestingPrims of
     Just t | t || anyArgNotConstant -> pure (Just e)
-    _ | DeDup `elem` tickArgs args -> pure (Just e)
+    _ | DeDup `elem` ticks -> pure (Just e)
     _ -> do
       let isInteresting = uncurry (interestingToLift inScope eval) . collectAppArgs
       if isHOTy (primType pInfo) then do
@@ -545,7 +580,8 @@ interestingToLift inScope eval e@(Prim pInfo) args
       ,("GHC.Prim.remInt#",lastNotPow2)
       ]
 
-    lArgs       = termArgsX args
+
+    (Either.lefts -> lArgs,_,ticks) = squashArgs inScope args
 
     allNonPow2  = all (not . termIsPow2) lArgs
     tailNonPow2 = case lArgs of
@@ -558,12 +594,15 @@ interestingToLift inScope eval e@(Prim pInfo) args
     termIsPow2 e' = case eval e' of
       Literal (IntegerLiteral n) -> isPow2 n
       a -> case collectAppArgs a of
-        (Prim p,termArgsX -> [   _, (Literal (IntegerLiteral n))])
-          | isFromInteger (primName p) -> isPow2 n
-        (Prim p,termArgsX -> [_, _, (Literal (IntegerLiteral n))])
-          | primName p == "Clash.Sized.Internal.BitVector.fromInteger#"  -> isPow2 n
-        (Prim p,termArgsX -> [   _, (Literal (IntegerLiteral n))])
-          | primName p == "Clash.Sized.Internal.BitVector.fromInteger##" -> isPow2 n
+        (Prim p,squashArgs inScope -> (args1,_,_))
+          | [Right _, Left _, Left (Literal (IntegerLiteral n))] <- args1
+          , isFromInteger (primName p) -> isPow2 n
+        (Prim p,squashArgs inScope -> (args1,_,_))
+          | [Right _, Left _, Left _, Left (Literal (IntegerLiteral n))] <- args1
+          , primName p == "Clash.Sized.Internal.BitVector.fromInteger#"  -> isPow2 n
+        (Prim p,squashArgs inScope -> (args1,_,_))
+          | [Right _,         Left _, Left (Literal (IntegerLiteral n))] <- args1
+          , primName p == "Clash.Sized.Internal.BitVector.fromInteger##" -> isPow2 n
 
         _ -> False
 

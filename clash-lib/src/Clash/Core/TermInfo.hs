@@ -49,9 +49,9 @@ termType e = case e of
   Prim t         -> primType t
   Lam v e'       -> mkFunTy (varType v) (termType e')
   TyLam tv e'    -> ForAllTy tv (termType e')
-  App _ _        -> case collectArgsX e of
+  App _ _        -> case collectArgsY e of
                       (fun, args) -> applyTypeToArgs e (termType fun) args
-  TyApp _ _      -> case collectArgsX e of
+  TyApp _ _      -> case collectArgsY e of
                       (fun, args) -> applyTypeToArgs e (termType fun) args
   Letrec _ e'    -> termType e'
   Case _ ty _    -> ty
@@ -209,6 +209,12 @@ isLet _           = False
 isVar :: Term -> Bool
 isVar (Var {}) = True
 isVar _        = False
+
+isCoreVar :: Term -> Bool
+isCoreVar (Tick _ e) = isCoreVar e
+isCoreVar (Cast e _ _) = isCoreVar e
+isCoreVar (Var {}) = True
+isCoreVar _ = False
 
 isLocalVar :: Term -> Bool
 isLocalVar (Var v) = isLocalId v

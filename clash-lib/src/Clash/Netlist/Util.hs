@@ -72,19 +72,18 @@ import           Clash.Core.Subst
    extendInScopeIdList, mkSubst, substTm)
 import           Clash.Core.Term
   (Alt, LetBinding, Pat (..), Term (..), TickInfo (..), NameMod (..),
-   collectBndrs, PrimInfo(primName), collectAppArgs, tickArgs,
-   splitTypeAndTermArgs, collectCastsTicks)
+   collectBndrs, PrimInfo(primName), collectAppArgs)
 import           Clash.Core.TermInfo
 import           Clash.Core.TyCon
   (TyCon (FunTyCon), TyConName, TyConMap, tyConDataCons)
 import           Clash.Core.Type
   (Type (..), TypeView (..), splitTyConAppM, tyView, TyVar, normalizeType)
 import           Clash.Core.Util
-  (substArgTys, tyLitShow)
+  (substArgTys, tyLitShow, squashArgs)
 import           Clash.Core.Var
   (Id, Var (..), mkLocalId, modifyVarName, Attr')
 import           Clash.Core.VarEnv
-  (InScopeSet, extendInScopeSetList, uniqAway)
+  (InScopeSet, extendInScopeSetList, uniqAway, emptyInScopeSet)
 import {-# SOURCE #-} Clash.Netlist.BlackBox
 import {-# SOURCE #-} Clash.Netlist.BlackBox.Util
 import           Clash.Netlist.Id        (IdType (..), stripDollarPrefixes)
@@ -138,38 +137,21 @@ splitNormalized
   :: Term
   -> (Either String ([Id],([LetBinding],[TickInfo]),(Id,[TickInfo])))
 splitNormalized expr = case collectBndrs expr of
-  (bndrs,body)
+  (bndrs,lamBody)
     | (lamBndrs,[]) <- partitionEithers bndrs
-    -> case collectCastsTicks body of
-         (Letrec letBndrs letBody,castsAndTicks) -> case collectCastsTicks letBody of
-           (Var v,bodyArgs) ->
-             let ticks = tickArgs castsAndTicks
-                 bodyTy = termType letBody
-             in  Right ( lamBndrs
-                       , (letBndrs, ticks)
-                       , (v {varType = bodyTy}, tickArgs bodyArgs) )
-           _ ->
-             normalizationFailed "body of LetRec is not a variable reference"
-         _ ->
-           normalizationFailed "body is not a LetRec"
-
+    -> case second (squashArgs emptyInScopeSet) (collectAppArgs lamBody) of
+        (Letrec letBndrs letBody,([],_,lamBodyTicks))
+          -> case second (squashArgs emptyInScopeSet) (collectAppArgs letBody) of
+            (Var v,([],_,letBodyTicks))
+              -> Right (lamBndrs,(letBndrs,lamBodyTicks),(v,letBodyTicks))
+            _ -> normalizationFailed "LetBody is not a variable reference"
+        _ -> normalizationFailed "LamBody is not a LetRec"
     | otherwise
-    -> normalizationFailed "term has TyLambdas"
+    -> normalizationFailed "Term has TyLambdas"
  where
   normalizationFailed reason =
     Left ($(curLoc) <> unlines [concat ["Normalization failed, ",reason, ":"]
                                ,showPpr expr])
--- splitNormalized expr = case collectBndrs expr of
---   (args, collectCastsTicks -> (Letrec xes e, ticks))
---     | (tmArgs,[]) <- partitionEithers args -> case collectCastsTicks e of
---         Var v -> Right (tmArgs, fmap (second (`mkTicks` ticks)) xes,v)
---         Cast (Var v) _ ty2 -> Right (tmArgs, fmap (second (`mkTicks` ticks)) xes,v {varType = ty2})
---         _     -> Left ($(curLoc) ++ "Not in normal form: res not simple var")
---     | otherwise -> Left ($(curLoc) ++ "Not in normal form: tyArgs")
---   _ ->
---     Left ($(curLoc) ++ "Not in normal form: no Letrec:\n\n" ++ showPpr expr ++
---           "\n\nWhich has type:\n\n" ++ showPpr ty)
-
 
 -- | Same as @unsafeCoreTypeToHWType@, but discards void filter information
 unsafeCoreTypeToHWType'
@@ -862,9 +844,9 @@ setBinderName subst res resRead m@(resN,_,_) (i,collectAppArgs -> (k,args)) = ca
   Prim p -> let nm = primName p in extractPrimWarnOrFail nm >>= go nm
   _ -> goDef
  where
-  (typeAndTermArgs,otherArgs) = splitTypeAndTermArgs args
+  (typeAndTermArgs,_castM,ticks) = squashArgs emptyInScopeSet args
 
-  go nm (BlackBox {resultName = Just (BBTemplate nmD)}) = withTicks (tickArgs otherArgs) $ \_ -> do
+  go nm (BlackBox {resultName = Just (BBTemplate nmD)}) = withTicks ticks $ \_ -> do
     (bbCtx,_) <- preserveVarEnv (mkBlackBoxContext nm i typeAndTermArgs)
     be <- Lens.use backend
     let bbRetValName = case be of

@@ -19,6 +19,7 @@ module Clash.Core.TermLiteral
   ) where
 
 import           Data.Bifunctor                  (bimap)
+import           Data.Either                     (lefts)
 import           Data.Proxy                      (Proxy(..))
 import           Data.Text                       (Text)
 import qualified Data.Text                       as Text
@@ -26,7 +27,9 @@ import           Data.Typeable                   (Typeable, typeRep)
 import           GHC.Natural
 import           GHC.Stack
 
-import           Clash.Core.Term                 (Term(Literal), collectAppArgs, termArgsX)
+import           Clash.Core.Term                 (Term(Literal), collectAppArgs)
+import           Clash.Core.Util                 (squashArgs)
+import           Clash.Core.VarEnv               (emptyInScopeSet)
 import           Clash.Core.Literal
 import           Clash.Core.Pretty               (showPpr)
 import qualified Clash.Util.Interpolate          as I
@@ -50,37 +53,48 @@ instance TermLiteral Term where
   termToData = pure
 
 instance TermLiteral String where
-  termToData (collectAppArgs -> (_, termArgsX -> [Literal (StringLiteral s)])) = Right s
+  termToData (collectAppArgs -> (_, args))
+    | ([Left (Literal (StringLiteral s))],_,_) <- squashArgs emptyInScopeSet args
+    = Right s
   termToData t = Left t
 
 instance TermLiteral Text where
   termToData t = Text.pack <$> termToData t
 
 instance TermLiteral Int where
-  termToData (collectAppArgs -> (_, termArgsX -> [Literal (IntLiteral n)])) =
-    Right (fromInteger n)
+  termToData (collectAppArgs -> (_, args))
+    | ([Left (Literal (IntLiteral n))],_,_) <- squashArgs emptyInScopeSet args
+    = Right (fromInteger n)
   termToData t = Left t
 
 instance TermLiteral Word where
-  termToData (collectAppArgs -> (_, termArgsX -> [Literal (WordLiteral n)])) =
-    Right (fromInteger n)
+  termToData (collectAppArgs -> (_, args))
+    | ([Left (Literal (WordLiteral n))],_,_) <- squashArgs emptyInScopeSet args
+    = Right (fromInteger n)
   termToData t = Left t
 
 instance TermLiteral Integer where
-  termToData (collectAppArgs -> (_, termArgsX -> [Literal (IntegerLiteral n)])) = Right n
+  termToData (collectAppArgs -> (_, args))
+    | ([Left (Literal (IntegerLiteral n))],_,_) <- squashArgs emptyInScopeSet args
+    = Right n
   termToData t = Left t
 
 instance TermLiteral Char where
-  termToData (collectAppArgs -> (_, termArgsX -> [Literal (CharLiteral c)])) = Right c
+  termToData (collectAppArgs -> (_, args))
+    | ([Left (Literal (CharLiteral c))],_,_) <- squashArgs emptyInScopeSet args
+    = Right c
   termToData t = Left t
 
 instance TermLiteral Natural where
-  termToData (collectAppArgs -> (_, termArgsX -> [Literal (NaturalLiteral n)])) =
-    Right (fromInteger n)
+  termToData (collectAppArgs -> (_, args))
+    | ([Left (Literal (NaturalLiteral n))],_,_) <- squashArgs emptyInScopeSet args
+    = Right (fromInteger n)
   termToData t = Left t
 
 instance (TermLiteral a, TermLiteral b) => TermLiteral (a, b) where
-  termToData (collectAppArgs -> (_, termArgsX -> [a, b])) = do
+  termToData (collectAppArgs -> (_, args))
+    | (lefts -> [a ,b],_,_) <- squashArgs emptyInScopeSet args
+    = do
     a' <- termToData a
     b' <- termToData b
     pure (a', b')
