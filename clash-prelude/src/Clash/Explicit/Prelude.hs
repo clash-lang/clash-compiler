@@ -74,8 +74,6 @@ module Clash.Explicit.Prelude
     -- ** Synchronous signals
   , module Clash.Explicit.Signal
   , module Clash.Explicit.Signal.Delayed
-    -- ** DataFlow interface
-  , module Clash.Prelude.DataFlow
     -- ** Datatypes
     -- *** Bit vectors
   , module Clash.Sized.BitVector
@@ -158,7 +156,6 @@ import Clash.Explicit.Signal.Delayed
 import Clash.Explicit.Testbench
 import Clash.Prelude.BitIndex
 import Clash.Prelude.BitReduction
-import Clash.Prelude.DataFlow
 import Clash.Prelude.ROM.File       (asyncRomFile, asyncRomFilePow2)
 import Clash.Promoted.Nat
 import Clash.Promoted.Nat.TH

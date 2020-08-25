@@ -98,8 +98,6 @@ module Clash.Prelude
     -- ** Synchronous signals
   , module Clash.Signal
   , module Clash.Signal.Delayed
-    -- ** DataFlow interface
-  , module Clash.Prelude.DataFlow
     -- ** Datatypes
     -- *** Bit vectors
   , module Clash.Sized.BitVector
@@ -181,7 +179,6 @@ import           Clash.Prelude.BitIndex
 import           Clash.Prelude.BitReduction
 import           Clash.Prelude.BlockRam
 import           Clash.Prelude.BlockRam.File
-import           Clash.Prelude.DataFlow
 import           Clash.Prelude.ROM.File
 import           Clash.Prelude.Safe
 #ifdef CLASH_MULTIPLE_HIDDEN
