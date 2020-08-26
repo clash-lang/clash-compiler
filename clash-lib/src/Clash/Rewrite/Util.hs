@@ -148,7 +148,8 @@ findAccidentialShadows =
 
 -- | Record if a transformation is successfully applied
 apply
-  :: String
+  :: HasCallStack
+  => String
   -- ^ Name of the transformation
   -> Rewrite extra
   -- ^ Transformation to be applied
@@ -194,7 +195,8 @@ apply = \s rewrite ctx expr0 -> do
 {-# INLINE apply #-}
 
 applyDebug
-  :: DebugLevel
+  :: HasCallStack
+  => DebugLevel
   -- ^ The current debugging level
   -> Set.Set String
   -- ^ Transformations to debug
@@ -1017,17 +1019,20 @@ specialise' specMapLbl specHistLbl specLimitLbl (TransformContext is0 _) e (Var 
                     else return (f,inl,specArgInArg)
                 _ -> return (f,inl,specArgInArg)
               -- Create specialized functions
-              let newBody = mkAbstraction (mkArgApps bodyTm (argVars ++ [specArg'])) (boundArgs ++ specBndrs)
+              let newBody = mkAbstraction (mkArgApps bodyTm (argVars ++ [specArg'])) (specBndrs ++ boundArgs)
               newf <- mkFunction (varName fId) sp inl' newBody
               -- Remember specialization
               (extra.specHistLbl) %= extendUniqMapWith f 1 (+)
               (extra.specMapLbl)  %= Map.insert (f,argLen,specAbs) newf
               -- use specialized function
-              let otherArgs1 = TickCtx <$> ticks
-                  otherArgs2 = maybe otherArgs1
-                                     (\(from,to) -> CastCtx from to:otherArgs1)
-                                     castM
-                  newExpr = mkArgApps (Var newf) (otherArgs2 ++ specVars)
+              -- let otherArgs1 = TickCtx <$> ticks
+              --     otherArgs2 = maybe otherArgs1
+              --                        (\(from,to) -> CastCtx from to:otherArgs1)
+              --                        castM'
+              let newArgs1 = specVars ++ map (either TermArg TypeArg) typeAndTermArgs
+                  newArgs2 = maybe newArgs1 (\(from,to) -> CastCtx from to:newArgs1) castM
+                  newArgs3 = newArgs2 ++ map TickCtx ticks
+                  newExpr  = mkArgApps (Var newf) newArgs3
               newf `deepseq` changed newExpr
         Nothing -> return e
 

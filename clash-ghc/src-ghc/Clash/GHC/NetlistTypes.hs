@@ -63,7 +63,7 @@ ghcTypeToHWType iw floatSupport = go
       FilteredHWType typ' areVoids <- ExceptT $ coreTypeToHWType go reprs m typ
       return (FilteredHWType (Annotated attrs typ') areVoids)
 
-    go reprs m ty@(tyView -> TyConApp tc args) = runMaybeT . runExceptT $
+    go reprs m ty@(tyView . normalizeType m -> TyConApp tc args) = runMaybeT . runExceptT $
       case nameOcc tc of
         "GHC.Int.Int8"                  -> returnN (Signed 8)
         "GHC.Int.Int16"                 -> returnN (Signed 16)

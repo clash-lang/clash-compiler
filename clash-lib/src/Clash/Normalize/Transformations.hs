@@ -1349,7 +1349,8 @@ constantSpec _ e = return e
 -- application. It is okay to over-approximate in this case and deshadow w.r.t
 -- the current InScopeSet.
 appPropFast :: HasCallStack => NormRewrite
-appPropFast ctx@(TransformContext is _) e0 = do
+appPropFast ctx@(TransformContext is _) e0 = {- traceIf True ("Trying: " <> showPpr e0) $ -} do
+
   tcm <- Lens.view tcCache
   let (fun,args,castM,ticks) = squashCollectApp is tcm e0
   case args of
@@ -1358,65 +1359,77 @@ appPropFast ctx@(TransformContext is _) e0 = do
  where
   go :: InScopeSet -> Term -> [Either Term Type] -> Maybe (Type,Type) -> [TickInfo]
      -> NormalizeSession Term
-  go is0 e args0 castM ticks0 = do
+  go is0 e argsOuter castOuterM ticksOuter = do
     tcm <- Lens.view tcCache
-    let (fun,args1,castM1,ticks1) = squashCollectApp is tcm e
-        args2  = args0 ++ args1
-        ticks2 = ticks0 ++ ticks1
-    case castM1 of
-      Nothing -> case (fun,args2) of
-        (Lam v e1, Left arg:args) -> do
-          setChanged
-          orM [pure (isCoreVar arg), isWorkFree arg] >>= \case
-            True ->
-              let subst = extendIdSubst (mkSubst is0) v arg in
-              go is0 (substTm "appPropFast.AppLam" subst e1) args castM ticks2
-            False ->
-              let is1 = extendInScopeSet is0 v in
-              Letrec [(v, arg)] <$> go is1 (deShadowTerm is1 e1) args castM ticks2
+    let (fun,argsInner,castInnerM,ticksInner) = squashCollectApp is tcm e
+        (argsOuter1,castOuterM1,_) = case castInnerM of
+           Nothing -> (argsOuter,castOuterM,[])
+           Just (from,to) ->
+             let mergedArgsOuter = CastCtx from to
+                                 : map (either TermArg TypeArg) argsOuter
+                                 ++ maybe [] (\(f,t) -> [CastCtx f t]) castOuterM
+              in squashArgs is0 mergedArgsOuter
+        argsMerged  = argsInner ++ argsOuter1
+        ticksMerged = ticksInner ++ ticksOuter
+    case (fun,argsMerged) of
+      (Lam v e1, Left arg:args) -> do
+        setChanged
+        orM [pure (isCoreVar arg), isWorkFree arg] >>= \case
+          True ->
+            let subst = extendIdSubst (mkSubst is0) v arg in
+            go is0 (substTm "appPropFast.AppLam" subst e1) args castOuterM1 ticksMerged
+          False ->
+            let is1 = extendInScopeSet is0 v in
+            Letrec [(v, arg)] <$> go is1 (deShadowTerm is1 e1) args castOuterM1 ticksMerged
 
-        (TyLam tv e1, Right arg:args) -> do
-          setChanged
-          let subst = extendTvSubst (mkSubst is0) tv arg
-          go is0 (substTm "appPropFast.TyAppTyLam" subst e1) args castM ticks2
+      (TyLam tv e1, Right arg:args) -> do
+        setChanged
+        let subst = extendTvSubst (mkSubst is0) tv arg
+        go is0 (substTm "appPropFast.TyAppTyLam" subst e1) args castOuterM1 ticksMerged
 
-        (Letrec vs e1, args@(_:_)) -> do
-          setChanged
-          let vbs  = map fst vs
-              is1  = extendInScopeSetList is0 vbs
-          -- XXX: 'vs' should already be deshadowed w.r.t. 'is0'
-          Letrec vs <$> go is1 e1 args castM ticks2
+      (Letrec vs e1, args@(_:_)) -> do
+        setChanged
+        let vbs  = map fst vs
+            is1  = extendInScopeSetList is0 vbs
+        -- XXX: 'vs' should already be deshadowed w.r.t. 'is0'
+        Letrec vs <$> go is1 e1 args castOuterM1 ticksMerged
 
-        (Case scrut ty0 alts, args@(_:_)) -> do
-          setChanged
-          let isA1 = unionInScope
-                      is0
-                      ((mkInScopeSet . mkVarSet . concatMap (patVars . fst)) alts)
-          (ty1,vs,argsA) <- goCaseArg isA1 ty0 [] args
-          let ty2 = case castM of
-                      Just (from,to)
-                        | from == ty1 -> to
-                        | otherwise -> error (unlines ["Cast types don't line up"
-                                                      ,showPpr from
-                                                      ,showPpr ty1
-                                                      ])
-                      Nothing -> ty1
-              scrut1 = mkTicks scrut ticks2
-          case vs of
-            [] -> Case scrut1 ty2 <$> mapM (goAlt is0 argsA castM ticks2) alts
-            _  -> do
-              let vbs   = map fst vs
-                  is1   = extendInScopeSetList is0 vbs
-                  alts1 = map (deShadowAlt is1) alts
-              Letrec vs . Case scrut1 ty2 <$> mapM (goAlt is1 argsA castM ticks2) alts1
+      (Case scrut ty0 alts, args@(_:_)) -> do
+        setChanged
+        let isA1 = unionInScope
+                    is0
+                    ((mkInScopeSet . mkVarSet . concatMap (patVars . fst)) alts)
+        (ty1,vs,argsA) <- goCaseArg isA1 ty0 [] args
+        let ty2 = case castOuterM1 of
+                    Just (from,to)
+                      | from == ty1 -> to
+                      | otherwise -> error (unlines ["Cast types don't line up"
+                                                    ,showPpr from
+                                                    ,showPpr ty1
+                                                    ])
+                    Nothing -> ty1
+            scrut1 = mkTicks scrut ticksMerged
+        case vs of
+          [] -> Case scrut1 ty2 <$> mapM (goAlt is0 argsA castOuterM1 ticksMerged) alts
+          _  -> do
+            let vbs   = map fst vs
+                is1   = extendInScopeSetList is0 vbs
+                alts1 = map (deShadowAlt is1) alts
+            Letrec vs . Case scrut1 ty2 <$> mapM (goAlt is1 argsA castOuterM1 ticksMerged) alts1
 
-        _ -> do
-          let e1 = mkArgApps fun (map (either TermArg TypeArg) args2)
-              e2 = maybe e1 (\(from,to) -> Cast e1 from to) castM
-              e3 = mkTicks e2 ticks2
-          return e3
+      _ -> do
+        let e1 = mkArgApps fun (map (either TermArg TypeArg) argsMerged)
+            e2 = maybe e1 (\(from,to) -> Cast e1 from to) castOuterM1
+            e3 = mkTicks e2 ticksMerged
+        return e3
 
-      Just {} -> error "QQ"
+      -- Just (from,to) -> do
+      --   let newArgsOuter0 =
+      --         CastCtx from to :
+      --         map (either TermArg TypeArg) argsOuter ++
+      --         maybe [] (\(f,t) -> CastCtx f t:[]) castOuterM
+      --       (newArgsOuter1,newCastOuterM,[]) = squashArgs is0 newArgsOuter0
+      --   go is0 fun (argsInner++newArgsOuter1) newCastOuterM ticksMerged
 
 
 
