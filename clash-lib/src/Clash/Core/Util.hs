@@ -605,8 +605,8 @@ sccLetBindings =
                   in  ((i,e),varUniq i,fvs)))
 {-# SCC sccLetBindings #-}
 
-moveTickCastOutward :: HasCallStack => InScopeSet -> [AppArg] -> [AppArg]
-moveTickCastOutward is0 = go []
+moveTickCastOutward :: HasCallStack => String -> InScopeSet -> [AppArg] -> [AppArg]
+moveTickCastOutward doc is0 = go []
  where
   go ticks [] = reverse ticks
   go ticks (t@TickCtx {}:rest) = go (t:ticks) rest
@@ -626,7 +626,13 @@ moveTickCastOutward is0 = go []
       else
         go ticks ((CastCtx fromTyA toTyB):rest)
     | otherwise
-    = error (unlines ["Casts don't line up:",showPpr toTyA, showPpr fromTyB])
+    = error (unlines ["Casts don't line up:"
+                     ,"Inner TO type:"
+                     ,showPpr toTyA
+                     ,"Outer FROM type:"
+                     ,showPpr fromTyB
+                     ,"Context:"
+                     ,doc])
   go ticks (c@CastCtx {}:t@TickCtx{}:rest) = go (t:ticks) (c:rest)
   go ticks (CastCtx fromTy toTy:TypeArg ty:rest)
     | ForAllTy fromTv fromBody <- fromTy
@@ -656,7 +662,10 @@ moveTickCastOutward is0 = go []
                      , showPpr toTy ])
 
 squashArgs :: HasCallStack => InScopeSet -> [AppArg] -> ([Either Term Type],Maybe (Type,Type),[TickInfo])
-squashArgs is args = splitArgs (moveTickCastOutward is args)
+squashArgs = squashArgsX ""
+
+squashArgsX :: HasCallStack => String -> InScopeSet -> [AppArg] -> ([Either Term Type],Maybe (Type,Type),[TickInfo])
+squashArgsX doc is args = splitArgs (moveTickCastOutward doc is args)
  where
   splitArgs :: [AppArg] -> ([Either Term Type],Maybe (Type,Type),[TickInfo])
   splitArgs [] = ([],Nothing,[])
@@ -697,7 +706,7 @@ squashCollectApp  ::
   Term ->
   (Term,[Either Term Type],Maybe (Type,Type),[TickInfo])
 squashCollectApp is tcm e = case collectAppArgs e of
-  (e1,args) -> case squashArgs is args of
+  (e1,args) -> case squashArgsX (showPpr e) is args of
     (typesAndTerms,castM,ticks)
       | Data dc <- e1
       , Just (from, to) <- castM

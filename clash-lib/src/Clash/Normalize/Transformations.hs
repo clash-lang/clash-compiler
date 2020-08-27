@@ -969,7 +969,12 @@ caseCast (TransformContext is _) e@(collectAppArgs -> (Case subj tyA alts,args))
       let alts1 = map (\(p,eA) -> (p, Cast eA from to)) alts in
       changed (mkTicks (Case subj to alts1) ticks)
     else
-      error (unlines ["Bad Cast of Case:",showPpr e,showPpr tyA,showPpr from])
+      error (unlines ["Bad Cast of Case:"
+                     ,showPpr e
+                     ,"Alt type:"
+                     ,showPpr tyA
+                     ,"From type:"
+                     ,showPpr from])
 caseCast _ e = return e
 {-# SCC caseCast #-}
 
@@ -1955,19 +1960,22 @@ etaExpansionTL (TransformContext is0 ctx) e
     tcm <- Lens.view tcCache
     let eTy = termType e
         eTyNorm = normalizeType tcm eTy
-    case tyView eTyNorm of
+    case tyView eTy of
       FunTy argTy _resTy -> do
         newId <- mkInternalVar is0 "arg" argTy
-        let e1 = if eTy == eTyNorm then
-                   e
-                 else
-                   Cast e eTy eTyNorm
+        let e1 = e
+        -- let e1 = if eTy == eTyNorm then
+        --            e
+        --          else
+        --            error (unlines ["etaTL", showPpr eTy, showPpr eTyNorm])
+                   -- Cast e eTy eTyNorm
         e2 <- etaExpansionTL (TransformContext (extendInScopeSet is0 newId)
                                                (LamBody newId:ctx))
                              (App e1 (Var newId))
         changed (Lam newId e2)
-      _ ->
-        return e
+      _ -> case tyView eTyNorm of
+        FunTy {} -> error (unlines ["etaTL", showPpr eTy, showPpr eTyNorm])
+        _ -> return e
 {-# SCC etaExpansionTL #-}
 
 -- | Eta-expand functions with a Synthesize annotation, needed to allow such

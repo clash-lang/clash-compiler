@@ -290,7 +290,18 @@ ghcUnwind v m tcm = do
   go (Scrutinise altTy as)    = return . scrutinise tcm v altTy as
   go (Tickish _)              = return . setTerm (valToTerm v)
   -- A cast of a value is a value
-  go (Castish ty1 ty2)        = \mN -> ghcUnwind (CastValue v ty1 ty2) mN tcm
+  go (Castish fromOuter toOuter) =
+    let vN = case v of
+          CastValue v1 fromInnner toInner
+            | toInner == fromOuter
+            -> if fromInnner == toOuter then
+                 v1
+               else
+                 CastValue v1 fromInnner toOuter
+            | otherwise
+            -> error (unlines ["Cast mismatch:",showPpr toInner,showPpr fromOuter])
+          _ -> CastValue v fromOuter toOuter
+     in \mN -> ghcUnwind vN mN tcm
 
 -- | Update the Heap with the evaluated term
 update :: IdScope -> Id -> Value -> Machine -> Machine
@@ -299,16 +310,34 @@ update s x (valToTerm -> term) =
 
 -- | Apply a value to a function
 apply :: Value -> Id -> Machine -> Machine
-apply (Lambda x' e) x m =
-  setTerm (substTm "Evaluator.apply" subst e) m
+apply v x m = case collectValue v of
+  (Lambda b e, Nothing)
+    -> let subst1 = extendIdSubst subst0 b (Var x)
+        in setTerm (substTm "Evaluator.apply" subst1 e) m
+  (Lambda b e,Just (from,to))
+    | FunTy fromArg fromRes <- tyView from
+    , FunTy toArg toRes <- tyView to
+    -> if toArg == varType x then
+         let subst1 = extendIdSubst subst0 b (Cast (Var x) toArg fromArg)
+          in setTerm (substTm "Evaluator.applyC" subst1 e)
+                     (stackPush (Castish fromRes toRes) m)
+       else
+         error (unlines [ "Arg and ToArg type don't line up"
+                        , showPpr toArg,showPpr (varType x)])
+  (pVal@(PrimVal (PrimInfo{primType}) tys []),castM)
+    | isUndefinedPrimVal pVal
+    -> let ty = case castM of
+                  Just (_,to)
+                    | FunTy _ resTy <- tyView to
+                    -> resTy
+                    | otherwise
+                    -> error (unlines ["Expected a function:",showPpr to])
+                  Nothing
+                    -> piResultTys primType (tys++[varType x])
+        in setTerm (undefinedTm ty) m
+  _ -> error (unlines ["Evaluator.apply: Not a lambda", showPpr (valToTerm v)])
  where
-  subst  = extendIdSubst subst0 x' (Var x)
-  subst0 = mkSubst $ extendInScopeSet (mScopeNames m) x
-apply pVal@(PrimVal (PrimInfo{primType}) tys []) x m
-  | isUndefinedPrimVal pVal
-  = setTerm (undefinedTm (piResultTys primType (tys++[varType x]))) m
-
-apply _ _ m = error $ "Evaluator.apply: Not a lambda: " ++ show m
+   subst0 = mkSubst (extendInScopeSet (mScopeNames m) x)
 
 -- | Instantiate a type-abstraction
 instantiate :: Value -> Type -> Machine -> Machine
@@ -461,3 +490,25 @@ letSubst h acc id0 =
    where
     (i,ids') = freshId ids
     x'       = modifyVarName (`setUnique` i) x
+
+-- TODO: Keep ticks
+collectValue :: Value -> (Value,Maybe (Type,Type))
+collectValue = go
+ where
+  go :: Value -> (Value,Maybe (Type,Type))
+  go (CastValue v fromOuter toOuter) =
+    let (vN,castM) = go v
+     in case castM of
+          Nothing -> (vN,Just (fromOuter,toOuter))
+          Just (fromInner,toInner)
+            | toInner == fromOuter
+            -> if fromInner == toOuter then
+                 (vN,Nothing)
+               else
+                 (vN,Just (fromInner,toOuter))
+            | otherwise
+            -> error (unlines ["Cast: Types don't line up",showPpr toInner,showPpr fromOuter])
+
+  go (TickValue _tick v) = go v
+
+  go v = (v,Nothing)
