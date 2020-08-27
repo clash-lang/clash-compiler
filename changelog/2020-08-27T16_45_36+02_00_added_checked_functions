@@ -1,0 +1,11 @@
+ADDED: Checked versions of 'resize', 'truncateB', and 'fromIntegral'
+
+Depending on the type 'resize', 'truncateB', and 'fromIntegral' either
+yield an XException or silently perform wrap-around if its argument does
+not fit in the resulting type's bounds. The added functions check the
+bound condition and fail with an error call if the condition is
+violated. They do not affect HDL generation.
+
+Useful in cases where runtime behavior should ensure that an out of
+bound or wrap around should not occur and users want their code to fail
+hard if this invariant is ever violated.
