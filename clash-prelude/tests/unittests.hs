@@ -9,6 +9,7 @@ import qualified Clash.Tests.DerivingDataRepr
 import qualified Clash.Tests.Signal
 import qualified Clash.Tests.Signed
 import qualified Clash.Tests.NFDataX
+import qualified Clash.Tests.Resize
 import qualified Clash.Tests.TopEntityGeneration
 import qualified Clash.Tests.Unsigned
 
@@ -23,6 +24,7 @@ tests = testGroup "Unittests"
   , Clash.Tests.NFDataX.tests
   , Clash.Tests.TopEntityGeneration.tests
   , Clash.Tests.Unsigned.tests
+  , Clash.Tests.Resize.tests
   ]
 
 main :: IO ()
