@@ -339,6 +339,18 @@ instance (KnownNat n, 1 <= n) => SaturatingNum (Index n) where
           , z > m -> maxBound#
         z -> resize# z
 
+  satSucc satMode !a =
+    case natToInteger @n of
+      1 -> fromInteger# 0
+      _ -> satAdd satMode a $ fromInteger# 1
+  {-# INLINE satSucc #-}
+
+  satPred satMode !a =
+    case natToInteger @n of
+      1 -> fromInteger# 0
+      _ -> satSub satMode a $ fromInteger# 1
+  {-# INLINE satPred #-}
+
 instance KnownNat n => Real (Index n) where
   toRational = toRational . toInteger#
 
