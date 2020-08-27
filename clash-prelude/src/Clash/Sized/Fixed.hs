@@ -936,6 +936,34 @@ instance NumFixedC rep int frac => SaturatingNum (Fixed rep int frac) where
                      0 -> unpack (resize (shiftR rR sh))
                      _ -> maxBound
 
+  satSucc satMode f@(Fixed fRep) =
+    let sh    = natToNum @frac
+    in case natToInteger @int of
+         0 -> case satMode of
+                SatWrap -> f
+                SatZero -> 0
+                _       -> maxBound
+         _ -> if isSigned fRep
+              then satSub satMode f $ Fixed $ fromInteger $ (-1) `shiftL` sh
+              else satAdd satMode f $ Fixed $ fromInteger $ 1 `shiftL` sh
+  {-# INLINE satSucc #-}
+
+  satPred satMode f@(Fixed fRep) =
+    let sh       = natToNum @frac
+        symBound = if isSigned fRep
+                   then Fixed $ succ minBound
+                   else minBound
+    in case natVal (Proxy @int) of
+         0 -> case satMode of
+                SatWrap      -> f
+                SatBound     -> minBound
+                SatZero      -> 0
+                SatSymmetric -> symBound
+         _ -> if isSigned fRep
+              then satAdd satMode f $ Fixed $ fromInteger $ (-1) `shiftL` sh
+              else satSub satMode f $ Fixed $ fromInteger $ 1 `shiftL` sh
+  {-# INLINE satPred #-}
+
 -- | Constraint for the 'divide' function
 type DivideC rep int1 frac1 int2 frac2
   = ( Resize   rep
