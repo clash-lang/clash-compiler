@@ -36,12 +36,15 @@ ghcid --version
 if [[ $1 == "p" || $1 == "prelude" || $1 == "clash-prelude" ]]; then
   target="cabal new-repl clash-prelude --repl-options=-fobject-code --repl-options=-fforce-recomp"
   watch="clash-prelude/clash-prelude.cabal"
+elif [[ $1 == "p:tests" || $1 == "prelude:tests" || $1 == "clash-prelude:tests" ]]; then
+  target="cabal new-repl clash-prelude:unittests"
+  watch="clash-prelude/src clash-prelude/clash-prelude.cabal"
 elif [[ $1 == "l" || $1 == "lib" || $1 == "clash-lib" ]]; then
   target="cabal new-repl clash-lib"
   watch="clash-prelude clash-lib/clash-lib.cabal"
 elif [[ $1 == "l:tests" || $1 == "lib:tests" || $1 == "clash-lib:tests" ]]; then
   target="cabal new-repl clash-lib:unittests"
-  watch="clash-prelude clash-lib clash-cores/clash-cores.cabal"
+  watch="clash-prelude clash-lib/src clash-lib/clash-lib.cabal clash-cores/clash-cores.cabal"
 elif [[ $1 == "c" || $1 == "cores" || $1 == "clash-cores" ]]; then
   target="cabal new-repl clash-cores"
   watch="clash-prelude clash-lib clash-cores/clash-cores.cabal"
