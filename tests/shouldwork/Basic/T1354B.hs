@@ -10,7 +10,7 @@ import Clash.Prelude
 -- would cause a exponential increase in the number of transformations. Thus,
 -- a value of 10 would take ~100000 transformations and would exceed the default
 -- inline-limit.
-type Lanes = 2
+type Lanes = 10
 
 data SigFn a b = SigFn { runSigFn :: SigType a -> SigType b }
 

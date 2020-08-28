@@ -490,25 +490,3 @@ letSubst h acc id0 =
    where
     (i,ids') = freshId ids
     x'       = modifyVarName (`setUnique` i) x
-
--- TODO: Keep ticks
-collectValue :: Value -> (Value,Maybe (Type,Type))
-collectValue = go
- where
-  go :: Value -> (Value,Maybe (Type,Type))
-  go (CastValue v fromOuter toOuter) =
-    let (vN,castM) = go v
-     in case castM of
-          Nothing -> (vN,Just (fromOuter,toOuter))
-          Just (fromInner,toInner)
-            | toInner == fromOuter
-            -> if fromInner == toOuter then
-                 (vN,Nothing)
-               else
-                 (vN,Just (fromInner,toOuter))
-            | otherwise
-            -> error (unlines ["Cast: Types don't line up",showPpr toInner,showPpr fromOuter])
-
-  go (TickValue _tick v) = go v
-
-  go v = (v,Nothing)

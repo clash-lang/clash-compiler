@@ -289,6 +289,30 @@ collectValueTicks = go []
   go ticks (TickValue t v) = go (t:ticks) v
   go ticks v = (v, ticks)
 
+-- TODO: Keep ticks
+collectValue :: Value -> (Value,Maybe (Type,Type))
+collectValue = go
+ where
+  go :: Value -> (Value,Maybe (Type,Type))
+  go (CastValue v fromOuter toOuter) =
+    let (vN,castM) = go v
+     in case castM of
+          Nothing -> (vN,Just (fromOuter,toOuter))
+          Just (fromInner,toInner)
+            | toInner == fromOuter
+            -> if fromInner == toOuter then
+                 (vN,Nothing)
+               else
+                 (vN,Just (fromInner,toOuter))
+            | otherwise
+            -> error (unlines ["Cast: Types don't line up"
+                              ,showPpr toInner
+                              ,showPpr fromOuter])
+
+  go (TickValue _tick v) = go v
+
+  go v = (v,Nothing)
+
 -- | Are we in a context where special primitives must be forced.
 --
 -- See [Note: forcing special primitives]
@@ -298,6 +322,7 @@ forcePrims = go . mStack
   go (Scrutinise{}:_) = True
   go (PrimApply{}:_)  = True
   go (Tickish{}:xs)   = go xs
+  go (Castish{}:xs)   = go xs
   go _                = False
 
 primCount :: Machine -> Int
