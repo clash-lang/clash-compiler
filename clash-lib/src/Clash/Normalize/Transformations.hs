@@ -2347,10 +2347,20 @@ reduceNonRepPrim c@(TransformContext is0 ctx) e@(App _ _) | (Prim p, args) <- co
           _ -> return e
       "Clash.Sized.Vector.++" | argLen == 5 ->
         let ([lArg,rArg],[nTy,aTy,mTy]) = Either.partitionEithers typeAndTermArgs
-        in case (runExcept (tyNatSize tcm nTy), runExcept (tyNatSize tcm mTy)) of
-              (Right n, Right m)
-                | n == 0 -> changed rArg
-                | m == 0 -> changed lArg
+        in case (runExcept (tyNatSize tcm nTy), runExcept (tyNatSize tcm mTy), tv) of
+              (Right n, Right m, TyConApp (nameOcc -> "Clash.Sized.Vector.Vec") _)
+                | n == 0 -> let rArgTy = termType rArg
+                                rArg1  = if rArgTy == eTy then
+                                           rArg
+                                         else
+                                           Cast rArg rArgTy eTy
+                             in  changed rArg1
+                | m == 0 -> let lArgTy = termType lArg
+                                lArg1  = if lArgTy == eTy then
+                                           lArg
+                                         else
+                                           Cast lArg lArgTy eTy
+                             in changed lArg1
                 | otherwise -> do
                     shouldReduce1 <- List.orM [ shouldReduce ctx
                                          , isUntranslatableType_not_poly aTy ]
