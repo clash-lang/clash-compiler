@@ -134,7 +134,7 @@ import Clash.Class.Num            (ExtendingNum (..), SaturatingNum (..),
                                    SaturationMode (..), boundedAdd, boundedSub,
                                    boundedMul)
 import Clash.Class.Resize         (Resize (..))
-import Clash.Promoted.Nat         (SNat)
+import Clash.Promoted.Nat         (SNat, natToNum, natToInteger)
 import Clash.Prelude.BitIndex     (msb, split)
 import Clash.Prelude.BitReduction (reduceAnd, reduceOr)
 import Clash.Sized.BitVector      (BitVector, (++#))
@@ -453,15 +453,15 @@ instance ENumFixedC rep int1 frac1 int2 frac2 =>
   type AResult (Fixed rep int1 frac1) (Fixed rep int2 frac2) =
                Fixed rep (1 + Max int1 int2) (Max frac1 frac2)
   add (Fixed f1) (Fixed f2) =
-    let sh1 = fromInteger (natVal (Proxy @(Max frac1 frac2)) - natVal (Proxy @frac1)) :: Int
+    let sh1 = natToNum @(Max frac1 frac2) - natToNum @frac1 :: Int
         f1R = shiftL (resize f1) sh1 :: rep ((1 + Max int1 int2) + (Max frac1 frac2))
-        sh2 = fromInteger (natVal (Proxy @(Max frac1 frac2)) - natVal (Proxy @frac2)) :: Int
+        sh2 = natToNum @(Max frac1 frac2) - natToNum @frac2 :: Int
         f2R = shiftL (resize f2) sh2 :: rep ((1 + Max int1 int2) + (Max frac1 frac2))
     in  Fixed (f1R + f2R)
   sub (Fixed f1) (Fixed f2) =
-    let sh1 = fromInteger (natVal (Proxy @(Max frac1 frac2)) - natVal (Proxy @frac1)) :: Int
+    let sh1 = natToNum @(Max frac1 frac2) - natToNum @frac1 :: Int
         f1R = shiftL (resize f1) sh1 :: rep ((1 + Max int1 int2) + (Max frac1 frac2))
-        sh2 = fromInteger (natVal (Proxy @(Max frac1 frac2)) - natVal (Proxy @frac2)) :: Int
+        sh2 = natToNum @(Max frac1 frac2) - natToNum @frac2 :: Int
         f2R = shiftL (resize f2) sh2 :: rep ((1 + Max int1 int2) + (Max frac1 frac2))
     in  Fixed (f1R - f2R)
   type MResult (Fixed rep int1 frac1) (Fixed rep int2 frac2) =
@@ -522,7 +522,7 @@ instance (NumFixedC rep int frac) => Num (Fixed rep int frac) where
     | a == 0       = 0
     | a <  0       = -1
     | otherwise    = 1
-  fromInteger i    = let fSH = fromInteger (natVal (Proxy @frac))
+  fromInteger i    = let fSH = natToNum @frac
                          res = i `shiftL` fSH
                          rMax = toInteger (maxBound :: rep (int + frac))
                          rMin = toInteger (minBound :: rep (int + frac))
@@ -615,11 +615,11 @@ resizeF (Fixed fRep) = Fixed sat
   where
     fMin  = minBound :: rep (int2 + frac2)
     fMax  = maxBound :: rep (int2 + frac2)
-    argSZ = natVal (Proxy @(int1 + frac1))
-    resSZ = natVal (Proxy @(int2 + frac2))
+    argSZ = natToInteger @(int1 + frac1)
+    resSZ = natToInteger @(int2 + frac2)
 
-    argFracSZ = fromInteger (natVal (Proxy @frac1))
-    resFracSZ = fromInteger (natVal (Proxy @frac2))
+    argFracSZ = natToNum @frac1
+    resFracSZ = natToNum @frac2
 
     -- All size and frac comparisons and related if-then-else statements should
     -- be optimized away by the compiler
@@ -706,7 +706,7 @@ fLit a = [|| Fixed (fromInteger sat) ||]
                            then rMin
                            else truncated
     truncated = truncate shifted :: Integer
-    shifted   = a * (2 ^ (natVal (Proxy @frac)))
+    shifted   = a * (2 ^ (natToInteger @frac))
 
 -- | Convert, at run-time, a 'Double' to a 'Fixed'-point.
 --
@@ -878,7 +878,7 @@ fLitR a = Fixed (fromInteger sat)
                            then rMin
                            else truncated
     truncated = truncate shifted :: Integer
-    shifted   = a * (2 ^ (natVal (Proxy @frac)))
+    shifted   = a * (2 ^ (natToInteger @frac))
 
 instance NumFixedC rep int frac => SaturatingNum (Fixed rep int frac) where
   satAdd w (Fixed a) (Fixed b) = Fixed (satAdd w a b)
@@ -886,13 +886,13 @@ instance NumFixedC rep int frac => SaturatingNum (Fixed rep int frac) where
 
   satMul SatWrap (Fixed a) (Fixed b) =
     let res  = a `mul` b
-        sh   = fromInteger (natVal (Proxy @frac))
+        sh   = natToNum @frac
         res' = shiftR res sh
     in  Fixed (resize res')
 
   satMul SatBound (Fixed a) (Fixed b) =
     let res     = a `mul` b
-        sh      = fromInteger (natVal (Proxy @frac))
+        sh      = natToNum @frac
         (rL,rR) = split res :: (BitVector int, BitVector (int + frac + frac))
     in  case isSigned a of
           True  -> let overflow = complement (reduceOr (pack (msb rR) ++# pack rL)) .|.
@@ -908,7 +908,7 @@ instance NumFixedC rep int frac => SaturatingNum (Fixed rep int frac) where
 
   satMul SatZero (Fixed a) (Fixed b) =
     let res     = a `mul` b
-        sh      = fromInteger (natVal (Proxy @frac))
+        sh      = natToNum @frac
         (rL,rR) = split res :: (BitVector int, BitVector (int + frac + frac))
     in  case isSigned a of
           True  -> let overflow = complement (reduceOr (pack (msb rR) ++# pack rL)) .|.
@@ -922,7 +922,7 @@ instance NumFixedC rep int frac => SaturatingNum (Fixed rep int frac) where
 
   satMul SatSymmetric (Fixed a) (Fixed b) =
     let res     = a `mul` b
-        sh      = fromInteger (natVal (Proxy @frac))
+        sh      = natToNum @frac
         (rL,rR) = split res :: (BitVector int, BitVector (int + frac + frac))
     in  case isSigned a of
           True  -> let overflow = complement (reduceOr (pack (msb rR) ++# pack rL)) .|.

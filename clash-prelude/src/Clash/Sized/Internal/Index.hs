@@ -71,7 +71,6 @@ import Control.DeepSeq            (NFData (..))
 import Data.Bits                  (Bits (..), FiniteBits (..))
 import Data.Data                  (Data)
 import Data.Default.Class         (Default (..))
-import Data.Proxy                 (Proxy (..))
 import Text.Read                  (Read (..), ReadPrec)
 import Text.Printf                (PrintfArg (..))
 import Language.Haskell.TH        (TypeQ, appT, conT, litT, numTyLit, sigE)
@@ -261,7 +260,7 @@ fromInteger# = fromInteger_INLINE
 fromInteger_INLINE :: forall n . (HasCallStack, KnownNat n) => Integer -> Index n
 fromInteger_INLINE i = bound `seq` if i > (-1) && i < bound then I i else err
   where
-    bound = natVal (Proxy @n)
+    bound = natToInteger @n
     err   = errorX ("Clash.Sized.Index: result " ++ show i ++
                    " is out of bounds: [0.." ++ show (bound - 1) ++ "]")
 
@@ -290,23 +289,23 @@ times# (I a) (I b) = I (a * b)
 
 instance (KnownNat n, 1 <= n) => SaturatingNum (Index n) where
   satAdd SatWrap !a !b =
-    case snatToNum @Integer (SNat @n) of
+    case natToInteger @n of
       1 -> fromInteger# 0
       _ -> leToPlusKN @1 @n $
         case plus# a b of
-          z | let m = fromInteger# (natVal (Proxy @ n))
+          z | let m = fromInteger# (natToInteger @n)
             , z >= m -> resize# (z - m)
           z -> resize# z
   satAdd SatZero a b =
     leToPlusKN @1 @n $
       case plus# a b of
-        z | let m = fromInteger# (natVal (Proxy @ (n - 1)))
+        z | let m = fromInteger# (natToInteger @(n - 1))
           , z > m -> fromInteger# 0
         z -> resize# z
   satAdd _ a b =
     leToPlusKN @1 @n $
       case plus# a b of
-        z | let m = fromInteger# (natVal (Proxy @ (n - 1)))
+        z | let m = fromInteger# (natToInteger @(n - 1))
           , z > m -> maxBound#
         z -> resize# z
 
@@ -321,22 +320,22 @@ instance (KnownNat n, 1 <= n) => SaturatingNum (Index n) where
        else a -# b
 
   satMul SatWrap !a !b =
-    case snatToNum @Integer (SNat @n) of
+    case natToInteger @n of
       1 -> fromInteger# 0
       _ -> leToPlusKN @1 @n $
         case times# a b of
-          z -> let m = fromInteger# (natVal (Proxy @ n))
+          z -> let m = fromInteger# (natToInteger @n)
                in resize# (z `mod` m)
   satMul SatZero a b =
     leToPlusKN @1 @n $
       case times# a b of
-        z | let m = fromInteger# (natVal (Proxy @ (n - 1)))
+        z | let m = fromInteger# (natToInteger @(n - 1))
           , z > m -> fromInteger# 0
         z -> resize# z
   satMul _ a b =
     leToPlusKN @1 @n $
       case times# a b of
-        z | let m = fromInteger# (natVal (Proxy @ (n - 1)))
+        z | let m = fromInteger# (natToInteger @(n - 1))
           , z > m -> maxBound#
         z -> resize# z
 
