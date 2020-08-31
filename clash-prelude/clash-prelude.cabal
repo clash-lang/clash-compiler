@@ -410,6 +410,7 @@ test-suite unittests
                  Clash.Tests.Unsigned
 
                  Clash.Tests.Laws.Enum
+                 Clash.Tests.Laws.SaturatingNum
 
                  Test.Tasty.HUnit.Extra
                  Test.QuickCheck.Extra

@@ -15,6 +15,7 @@ import qualified Clash.Tests.TopEntityGeneration
 import qualified Clash.Tests.Unsigned
 
 import qualified Clash.Tests.Laws.Enum
+import qualified Clash.Tests.Laws.SaturatingNum
 
 tests :: TestTree
 tests = testGroup "Unittests"
@@ -31,6 +32,7 @@ tests = testGroup "Unittests"
   , Clash.Tests.Unsigned.tests
   , testGroup "Laws"
     [ Clash.Tests.Laws.Enum.tests
+    , Clash.Tests.Laws.SaturatingNum.tests
     ]
   ]
 

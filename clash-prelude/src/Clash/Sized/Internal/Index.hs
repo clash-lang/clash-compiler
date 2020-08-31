@@ -322,6 +322,7 @@ instance (KnownNat n, 1 <= n) => SaturatingNum (Index n) where
   satMul SatWrap !a !b =
     case natToInteger @n of
       1 -> fromInteger# 0
+      2 -> case a of {0 -> 0; _ -> b}
       _ -> leToPlusKN @1 @n $
         case times# a b of
           z -> let m = fromInteger# (natToInteger @n)
