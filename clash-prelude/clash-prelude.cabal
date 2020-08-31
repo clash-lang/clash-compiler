@@ -380,12 +380,16 @@ test-suite unittests
       clash-prelude,
 
       ghc-typelits-knownnat,
+      ghc-typelits-natnormalise,
+      ghc-typelits-extra,
 
       base,
       deepseq,
+      hedgehog,
       hint          >= 0.7      && < 0.10,
       quickcheck-classes-base >= 0.6 && < 1.0,
       tasty         >= 1.2      && < 1.4,
+      tasty-hedgehog,
       tasty-hunit,
       tasty-quickcheck,
       template-haskell
@@ -396,11 +400,12 @@ test-suite unittests
                  Clash.Tests.BitVector
                  Clash.Tests.DerivingDataRepr
                  Clash.Tests.DerivingDataReprTypes
+                 Clash.Tests.Fixed
+                 Clash.Tests.NFDataX
+                 Clash.Tests.Resize
                  Clash.Tests.Signal
                  Clash.Tests.Signed
                  Clash.Tests.SizedNum
-                 Clash.Tests.NFDataX
-                 Clash.Tests.Resize
                  Clash.Tests.TopEntityGeneration
                  Clash.Tests.Unsigned
 
