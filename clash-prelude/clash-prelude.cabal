@@ -409,6 +409,10 @@ test-suite unittests
                  Clash.Tests.TopEntityGeneration
                  Clash.Tests.Unsigned
 
+                 Clash.Tests.Laws.Enum
+
+                 Test.Tasty.HUnit.Extra
+                 Test.QuickCheck.Extra
 
 benchmark benchmark-clash-prelude
   type:             exitcode-stdio-1.0
