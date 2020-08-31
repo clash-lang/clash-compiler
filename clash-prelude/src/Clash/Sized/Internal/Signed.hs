@@ -563,8 +563,10 @@ instance Resize Signed where
 
 {-# NOINLINE resize# #-}
 resize# :: forall m n . (KnownNat n, KnownNat m) => Signed n -> Signed m
-resize# s@(S i) | n' <= m'  = extended
-                | otherwise = truncated
+resize# s@(S i)
+  | natToNatural @m == 0 = S 0
+  | n' <= m'  = extended
+  | otherwise = truncated
   where
     n  = fromInteger (natVal s)
     n' = shiftL 1 n

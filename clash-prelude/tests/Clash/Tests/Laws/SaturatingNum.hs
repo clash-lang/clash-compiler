@@ -173,7 +173,7 @@ tests = testGroup "SaturatingNum"
   , testSaturationLaws True "Signed 127" (genSigned @127)
   , testSaturationLaws True "Signed 128" (genSigned @128)
 
-  -- , testSaturationLaws False "SFixed 0 0" (genSFixed @0 @0)
+  , testSaturationLaws False "SFixed 0 0" (genSFixed @0 @0)
   , testSaturationLaws False "SFixed 0 1" (genSFixed @0 @1)
   , testSaturationLaws False "SFixed 1 0" (genSFixed @1 @0)
   , testSaturationLaws False "SFixed 1 1" (genSFixed @1 @1)
