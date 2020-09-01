@@ -290,7 +290,7 @@ mkTupTyCons :: GHC2CoreState -> (GHC2CoreState,IntMap TyConName)
 mkTupTyCons tcMap = (tcMap'',tupTcCache)
   where
     tupTyCons        = GHC.boolTyCon : GHC.promotedTrueDataCon : GHC.promotedFalseDataCon
-                     : GHC.typeNatSubTyCon
+                     : GHC.typeNatSubTyCon : GHC.typeNatAddTyCon
                      : map (GHC.tupleTyCon GHC.Boxed) [2..62]
     (tcNames,tcMap',_) =
       RWS.runRWS (mapM (\tc -> coreToName GHC.tyConName GHC.tyConUnique

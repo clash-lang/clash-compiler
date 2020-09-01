@@ -62,7 +62,7 @@ import           Clash.Core.Type
 import           Clash.Core.TyCon
   (TyConMap, TyConName, tyConDataCons, tyConName)
 import           Clash.Core.TysPrim
-  (integerPrimTy, typeNatKind, liftedTypeKind, typeNatSubTyFamName)
+  (integerPrimTy, typeNatKind, liftedTypeKind, typeNatSubTyFamName, typeNatAddTyFamName)
 import           Clash.Core.Util
   (appendToVec, extractElems, extractTElems, mkRTree,
    mkUniqInternalId, mkUniqSystemTyVar, mkVec, dataConInstArgTys,
@@ -688,6 +688,8 @@ reduceFold (TransformContext is0 ctx) n aTy fun arg = do
 -- of @Clash.Sized.Vector.dfold@
 reduceDFold
   :: InScopeSet
+  -> Type
+  -- ^ Expected type of the result
   -> Integer
   -- ^ Length of the vector
   -> Type
@@ -699,8 +701,13 @@ reduceDFold
   -> Term
   -- ^ The vector to fold
   -> NormalizeSession Term
-reduceDFold _ 0 _ _ start _ = changed start
-reduceDFold is0 n aTy fun start arg = do
+reduceDFold _ oldTy 0 _ _ start _ =
+  let newTy = termType start
+   in if oldTy == newTy then
+        changed start
+      else
+        changed (Cast start newTy oldTy)
+reduceDFold is0 oldTy n aTy fun start arg = do
     tcm <- Lens.view tcCache
     let ty = termType arg
     go tcm ty
@@ -721,18 +728,25 @@ reduceDFold is0 n aTy fun start arg = do
             (Just snatTc)         = lookupUniqMap snatTcNm tcm
             [snatDc]              = tyConDataCons snatTc
             lbody = doFold (buildSNat snatDc) (n-1) vars
-            lb    = Letrec (init elems) lbody
+            newTy = termType lbody
+            lbody1 = if newTy == oldTy then
+                       lbody
+                     else
+                       Cast lbody newTy oldTy
+            lb    = Letrec (init elems) lbody1
         uniqSupply Lens..= uniqs1
         changed lb
     go _ ty = error $ $(curLoc) ++ "reduceDFold: argument does not have a vector type: " ++ showPpr ty
 
     doFold _    _ []     = start
-    doFold snDc k (x:xs) = mkArgApps fun
-                                     [TypeArg (LitTy (NumTy k))
-                                     ,TermArg (snDc k)
-                                     ,TermArg x
-                                     ,TermArg (doFold snDc (k-1) xs)
-                                     ]
+    doFold snDc k (x:xs) = mkArgApps fun [TypeArg (mkKTy k)
+                                         ,TermArg (snDc k)
+                                         ,TermArg x
+                                         ,TermArg (doFold snDc (k-1) xs)
+                                         ]
+
+    mkKTy 0 = LitTy (NumTy 0)
+    mkKTy k = mkTyConApp typeNatAddTyFamName [ mkKTy (k-1), LitTy (NumTy 1) ]
 
 -- | Replace an application of the @Clash.Sized.Vector.head@ primitive on
 -- vectors of a known length @n@, by a projection of the first element of a

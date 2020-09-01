@@ -54,7 +54,7 @@ module Clash.Normalize.Transformations
   , inlineCast
   , caseCast
   , letCast
-  -- , eliminateCastCast
+  , eliminateCastCast
   -- , argCastSpec
   , etaExpandSyn
   , appPropFast
@@ -1078,23 +1078,28 @@ inlineCast ctx@(TransformContext is _) = inlineBinders test ctx
 -- @
 --   (cast :: b -> a) $ (cast :: a -> b) x   ==> x
 -- @
--- eliminateCastCast :: HasCallStack => NormRewrite
--- eliminateCastCast _ c@(Cast (collectTicks -> (Cast e tyA tyB, ticks)) tyB' tyC)
---   | tyB == tyB'
---   = if tyA == tyC then
---       changed (mkTicks e ticks)
---     else
---       changed (Cast (mkTicks e ticks) tyA tyC)
---   | otherwise
---   = do
---     (nm,sp) <- Lens.use curFun
---     throw (ClashException sp ($(curLoc) ++ showPpr nm
---             ++ ": Found 2 nested casts whose types don't line up:\n"
---             ++ showPpr c)
---           Nothing)
+eliminateCastCast :: HasCallStack => NormRewrite
+eliminateCastCast (TransformContext is0 _)
+  c@(Cast (collectAppArgs -> (e, args)) fromOuter toOuter)
+  | (typeAndTermArgs,Just (fromInner,toInner),ticks) <- squashArgs is0 args
+  = if toInner == fromOuter then
+      let eN = mkTicks (mkArgApps e (map (either TermArg TypeArg) typeAndTermArgs))
+                       ticks
+       in if fromInner == toOuter then
+            changed eN
+          else
+            changed (Cast eN fromInner toOuter)
+    else
+      error (unlines ["Cast mismatch:"
+                     ,showPpr toInner
+                     ,showPpr fromOuter
+                     ,"In expression:"
+                     ,showPpr c])
 
--- eliminateCastCast _ e = return e
--- {-# SCC eliminateCastCast #-}
+eliminateCastCast _ (Cast e from to) | from == to = changed e
+
+eliminateCastCast _ e = return e
+{-# SCC eliminateCastCast #-}
 
 -- | Make a cast work-free by splitting the work of to a separate binding
 --
@@ -2343,7 +2348,11 @@ reduceNonRepPrim c@(TransformContext is0 ctx) e@(App _ _) | (Prim p, args) <- co
         let ([_kn,_motive,fun,start,arg],[_mTy,nTy,aTy])
               = Either.partitionEithers typeAndTermArgs
         in  case runExcept (tyNatSize tcm nTy) of
-          Right n -> (`mkArgApps` otherArgs) <$> reduceDFold is0 n aTy fun start arg
+          Right n ->
+            let origTy = termType (mkArgApps
+                                     (Prim p)
+                                     (map (either TermArg TypeArg) typeAndTermArgs))
+             in (`mkArgApps` otherArgs) <$> reduceDFold is0 origTy n aTy fun start arg
           _ -> return e
       "Clash.Sized.Vector.++" | argLen == 5 ->
         let ([lArg,rArg],[nTy,aTy,mTy]) = Either.partitionEithers typeAndTermArgs
