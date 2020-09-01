@@ -253,8 +253,8 @@ runClashTest = defaultMain $ clashTestRoot
         [ NEEDS_PRIMS(outputTest ("tests" </> "shouldwork" </> "AutoReg") allTargets [] [] "AutoReg" "main")
         ] -}
       {- , -} clashTestGroup "Basic"
-        [ {- NEEDS_PRIMS(runTest "AES" def{hdlSim=False})
-        , -} NEEDS_PRIMS(runTest "BangData" def{hdlSim=False})
+        [ NEEDS_PRIMS(runTest "AES" def{hdlSim=False})
+        , NEEDS_PRIMS(runTest "BangData" def{hdlSim=False})
         , runTest "Trace" def{hdlSim=False}
         , NEEDS_PRIMS(runTest "DivMod" def{hdlSim=False})
         , NEEDS_PRIMS(runTest "LambdaDrop" def{hdlSim=False})
@@ -336,7 +336,7 @@ runClashTest = defaultMain $ clashTestRoot
         , runTest "TwoFunctions" def{hdlSim=False}
         , runTest "XToError" def{hdlSim=False}
         ]
-      {- }, clashTestGroup "BitVector"
+      , clashTestGroup "BitVector"
         [ NEEDS_PRIMS_GHC(runTest "Box" def)
         , NEEDS_PRIMS_GHC(runTest "BoxGrow" def)
         , NEEDS_PRIMS_GHC(runTest "CLZ" def)
@@ -348,7 +348,7 @@ runClashTest = defaultMain $ clashTestRoot
         , NEEDS_PRIMS(runTest "GenericBitPack" def{clashFlags=["-fconstraint-solver-iterations=15"]})
         , NEEDS_PRIMS(runTest "UnpackUndefined" def{hdlSim=False})
         ]
-      , clashTestGroup "BlackBox"
+      {- , clashTestGroup "BlackBox"
         [ outputTest ("tests" </> "shouldwork" </> "BlackBox") [VHDL]   [] [] "TemplateFunction"   "main"
         , outputTest ("tests" </> "shouldwork" </> "BlackBox") [VHDL]   [] [] "BlackBoxFunction"   "main"
         , NEEDS_PRIMS_GHC(runTest "BlackBoxFunctionHO" def{hdlTargets=[VHDL]})

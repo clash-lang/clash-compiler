@@ -3678,6 +3678,8 @@ bitVectorLiterals' = listOf bitVectorLiteral
 
 bitVectorLiteral :: Value -> Maybe (Integer, Integer)
 bitVectorLiteral val = case val of
+  CastValue cV _ _ -> bitVectorLiteral cV
+  TickValue _ tV -> bitVectorLiteral tV
   (PrimVal p _ [_, Lit (NaturalLiteral m), Lit (IntegerLiteral i)])
     | primName p == "Clash.Sized.Internal.BitVector.fromInteger#" -> Just (m, i)
   _ -> Nothing
