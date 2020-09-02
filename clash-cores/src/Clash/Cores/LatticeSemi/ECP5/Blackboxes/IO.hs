@@ -1,5 +1,5 @@
 {-|
-  Copyright   :  (C) 2020, Foamspace corp
+  Copyright   :  (C) 2020, Foamspace corp & Christoph Mayer
   License     :  BSD2 (see the file LICENSE)
   Maintainer  :  hcab14@gmail.com
 
