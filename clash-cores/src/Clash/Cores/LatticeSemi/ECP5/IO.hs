@@ -37,10 +37,8 @@ bidirectionalBuffer
   -- ^ PKG_PIN output BiSignal
   -> Signal dom Bit
   -- ^ output bit
-  -> ( BiSignalOut ds dom 1
-     -- ^ PKG_PIN input BiSignal
-     , Signal dom Bit
-     -- ^ input bit
+  -> ( BiSignalOut ds dom 1 -- PKG_PIN input BiSignal
+     , Signal dom Bit       -- input bit
      )
 bidirectionalBuffer en pkgPinOut output = (pkgPinIn, dIn)
   where
