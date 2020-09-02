@@ -1,0 +1,1 @@
+Fixed: `satMul` now correctly handles arguments of type `Index 2`

@@ -1,0 +1,1 @@
+CHANGED / FIXED: `Signed`, `Unsigned`, `SFixed`, and `UFixed` now correctly implement the `Enum` law specifying that the predecessor of `minBound` and the successor of `maxBound` should result in an error.
