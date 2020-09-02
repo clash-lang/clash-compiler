@@ -79,6 +79,7 @@ library
 
   ghc-options:
     -fexpose-all-unfoldings
+    -fno-worker-wrapper
 
   build-depends:
     clash-lib,
