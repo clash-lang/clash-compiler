@@ -30,10 +30,10 @@ package clash-prelude
   haddock-options: --optghc=-DHADDOCK_ONLY
 
 package clash-testsuite
-  flags: cosim
+  flags: +cosim
 
 package clash-lib
-  flags: debug
+  flags: +debug
 
 optional-packages:
   ./clash-cosim

@@ -24,7 +24,7 @@ package clash-cores
 package clash-testsuite
   ghc-options: -Werror
   -- enable cosim
-  flags: cosim
+  flags: +cosim
 
 package clash-ghc
   ghc-options: -Werror
