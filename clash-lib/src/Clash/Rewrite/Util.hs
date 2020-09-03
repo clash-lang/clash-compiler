@@ -93,7 +93,7 @@ import           Clash.Core.VarEnv
    mkVarEnv, eltsVarSet, elemVarEnv, lookupVarEnv, extendVarEnv)
 import           Clash.Debug
 import           Clash.Driver.Types
-  (DebugLevel (..), BindingMap, Binding(..))
+  (DebugLevel (..), BindingMap, Binding(..), IsPrim(..))
 import           Clash.Netlist.Util          (representableType)
 import           Clash.Pretty                (clashPretty, showDoc)
 import           Clash.Rewrite.Types
@@ -750,6 +750,7 @@ liftBinding (var@Id {varName = idName} ,e) = do
 #else
                                       EmptyInlineSpec
 #endif
+                                      IsFun
                                       newBody)
              -- Return the new binder
              return (var, newExpr)
@@ -799,7 +800,7 @@ addGlobalBind
   -> RewriteMonad extra ()
 addGlobalBind vNm ty sp inl body = do
   let vId = mkGlobalId ty vNm
-  (ty,body) `deepseq` bindings %= extendUniqMap vNm (Binding vId sp inl body)
+  (ty,body) `deepseq` bindings %= extendUniqMap vNm (Binding vId sp inl IsFun body)
 
 -- | Create a new name out of the given name, but with another unique. Resulting
 -- unique is guaranteed to not be in the given InScopeSet.
@@ -957,7 +958,7 @@ specialise' specMapLbl specHistLbl specLimitLbl (TransformContext is0 _) e (Var 
       -- Determine if we can specialize f
       bodyMaybe <- fmap (lookupUniqMap (varName f)) $ Lens.use bindings
       case bodyMaybe of
-        Just (Binding _ sp inl bodyTm) -> do
+        Just (Binding _ sp inl _ bodyTm) -> do
           -- Determine if we see a sequence of specialisations on a growing argument
           specHistM <- lookupUniqMap f <$> Lens.use (extra.specHistLbl)
           specLim   <- Lens.use (extra . specLimitLbl)

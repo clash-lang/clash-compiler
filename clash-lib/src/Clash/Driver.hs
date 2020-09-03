@@ -211,7 +211,7 @@ splitTopEntityT
   -> TopEntityT
 splitTopEntityT tcm bindingsMap tt@(TopEntityT id_ (Just t@(Synthesize {})) _) =
   case lookupVarEnv id_ bindingsMap of
-    Just (Binding _id sp _ _) ->
+    Just (Binding _id sp _ _ _) ->
       tt{topAnnotation=Just (splitTopAnn tcm sp (varType id_) t)}
     Nothing ->
       error "Internal error in 'splitTopEntityT'. Please report as a bug."

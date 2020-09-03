@@ -410,7 +410,7 @@ normalizeTopLvlBndr
   -> Id
   -> Binding Term
   -> NormalizeSession (Binding Term)
-normalizeTopLvlBndr isTop nm (Binding nm' sp inl tm) = makeCachedU nm (extra.normalized) $ do
+normalizeTopLvlBndr isTop nm (Binding nm' sp inl pr tm) = makeCachedU nm (extra.normalized) $ do
   tcm <- Lens.view tcCache
   let nmS = showPpr (varName nm)
   -- We deshadow the term because sometimes GHC gives us
@@ -424,7 +424,7 @@ normalizeTopLvlBndr isTop nm (Binding nm' sp inl tm) = makeCachedU nm (extra.nor
   tm3 <- rewriteExpr ("normalization",normalization) (nmS,tm2) (nm',sp)
   curFun .= old
   let ty' = termType tcm tm3
-  return (Binding nm'{varType = ty'} sp inl tm3)
+  return (Binding nm'{varType = ty'} sp inl pr tm3)
 
 -- | Turn type equality constraints into substitutions and apply them.
 --

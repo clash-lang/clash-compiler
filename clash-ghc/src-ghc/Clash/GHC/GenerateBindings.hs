@@ -55,7 +55,7 @@ import           Clash.Core.VarEnv
   (InScopeSet, VarEnv, emptyInScopeSet, extendInScopeSet, mkInScopeSet, mkVarEnv, unionVarEnv)
 import           Clash.Debug             (traceIf)
 import           Clash.Driver            (compilePrimitive)
-import           Clash.Driver.Types      (BindingMap, Binding(..))
+import           Clash.Driver.Types      (BindingMap, Binding(..), IsPrim(..))
 import           Clash.GHC.GHC2Core
   (C2C, GHC2CoreState, tyConMap, coreToId, coreToName, coreToTerm,
    makeAllTyCons, qualifiedNameString, emptyGHC2CoreState)
@@ -124,7 +124,7 @@ generateBindings useColor primDirs importDirs dbs hdl modName dflagsM = do
       inScope0 = mkInScopeSet (uniqMapToUniqSet
                       ((mapUniqMap (coerce . bindingId) bindingsMap) `unionUniqMap`
                        (mapUniqMap (coerce . bindingId) clsMap)))
-      clsMap                        = mapUniqMap (\(v,i) -> (Binding v GHC.noSrcSpan GHC.Inline (mkClassSelector inScope0 allTcCache (varType v) i))) clsVMap
+      clsMap                        = mapUniqMap (\(v,i) -> (Binding v GHC.noSrcSpan GHC.Inline IsFun (mkClassSelector inScope0 allTcCache (varType v) i))) clsVMap
       allBindings                   = bindingsMap `unionVarEnv` clsMap
       topEntities'                  =
         (\m -> fst (RWS.evalRWS m GHC.noSrcSpan tcMap')) $ mapM (\(topEnt,annM,benchM) -> do
@@ -174,19 +174,23 @@ mkBindings primMap bindings clsOps unlocatable = do
           inl = GHC.inlinePragmaSpec . GHC.inlinePragInfo $ GHC.idInfo v
       tm <- RWS.local (const sp) (coreToTerm primMap unlocatable e)
       v' <- coreToId v
+      nm <- qualifiedNameString (GHC.varName v)
+      let pr = if HashMap.member nm primMap then IsPrim else IsFun
       checkPrimitive primMap v
-      return [(v', (Binding v' sp inl tm))]
+      return [(v', (Binding v' sp inl pr tm))]
     GHC.Rec bs -> do
       tms <- mapM (\(v,e) -> do
                     let sp  = GHC.getSrcSpan v
                         inl = GHC.inlinePragmaSpec . GHC.inlinePragInfo $ GHC.idInfo v
                     tm <- RWS.local (const sp) (coreToTerm primMap unlocatable e)
                     v' <- coreToId v
+                    nm <- qualifiedNameString (GHC.varName v)
+                    let pr = if HashMap.member nm primMap then IsPrim else IsFun
                     checkPrimitive primMap v
-                    return (Binding v' sp inl tm)
+                    return (Binding v' sp inl pr tm)
                   ) bs
       case tms of
-        [Binding v sp inl tm] -> return [(v, Binding v sp inl tm)]
+        [Binding v sp inl pr tm] -> return [(v, Binding v sp inl pr tm)]
         _ -> let vsL   = map (setIdScope LocalId . bindingId) tms
                  vsV   = map Var vsL
                  subst = extendGblSubstList (mkSubst emptyInScopeSet) (zip vsL vsV)

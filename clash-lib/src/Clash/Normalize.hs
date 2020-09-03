@@ -177,7 +177,7 @@ normalize' nm = do
   exprM <- lookupVarEnv nm <$> Lens.use bindings
   let nmS = showPpr (varName nm)
   case exprM of
-    Just (Binding nm' sp inl tm) -> do
+    Just (Binding nm' sp inl pr tm) -> do
       tcm <- Lens.view tcCache
       topEnts <- Lens.view topEntities
       let isTop = nm `elemVarSet` topEnts
@@ -204,7 +204,7 @@ normalize' nm = do
       resTyRep <- not <$> isUntranslatableType False resTy
       if resTyRep
          then do
-            tmNorm <- normalizeTopLvlBndr isTopEnt nm (Binding nm' sp inl tm)
+            tmNorm <- normalizeTopLvlBndr isTopEnt nm (Binding nm' sp inl pr tm)
             let usedBndrs = Lens.toListOf globalIds (bindingTerm tmNorm)
             traceIf (nm `elem` usedBndrs)
                     (concat [ $(curLoc),"Expr belonging to bndr: ",nmS ," (:: "
@@ -237,7 +237,7 @@ normalize' nm = do
                             , showPpr (varType nm')
                             , ") has a non-representable return type."
                             , " Not normalising:\n", showPpr tm] )
-                    (return ([],(nm,(Binding nm' sp inl tm))))
+                    (return ([],(nm,(Binding nm' sp inl pr tm))))
 
 
     Nothing -> error $ $(curLoc) ++ "Expr belonging to bndr: " ++ nmS ++ " not found"
@@ -255,7 +255,7 @@ checkNonRecursive norm = case mapMaybeVarEnv go norm of
                                  | (a,b) <- eltsVarEnv rcs
                                  ])
  where
-  go (Binding nm _ _ tm) =
+  go (Binding nm _ _ _ tm) =
     if nm `globalIdOccursIn` tm
        then Just (nm,tm)
        else Nothing
@@ -321,8 +321,8 @@ stripArgs _ _ _ = Nothing
 flattenNode
   :: CallTree
   -> NormalizeSession (Either CallTree ((Id,Term),[CallTree]))
-flattenNode c@(CLeaf (_,(Binding _ _ NoInline _))) = return (Left c)
-flattenNode c@(CLeaf (nm,(Binding _ _ _ e))) = do
+flattenNode c@(CLeaf (_,(Binding _ _ NoInline _ _))) = return (Left c)
+flattenNode c@(CLeaf (nm,(Binding _ _ _ _ e))) = do
   isTopEntity <- elemVarSet nm <$> Lens.view topEntities
   if isTopEntity then return (Left c) else do
     tcm  <- Lens.view tcCache
@@ -335,9 +335,9 @@ flattenNode c@(CLeaf (nm,(Binding _ _ _ e))) = do
                return (Right ((nm,mkApps (mkTicks fun ticks) (reverse remainder)),[]))
           _ -> return (Right ((nm,e),[]))
       _ -> return (Right ((nm,e),[]))
-flattenNode b@(CBranch (_,(Binding _ _ NoInline _)) _) =
+flattenNode b@(CBranch (_,(Binding _ _ NoInline _ _)) _) =
   return (Left b)
-flattenNode b@(CBranch (nm,(Binding _ _ _ e)) us) = do
+flattenNode b@(CBranch (nm,(Binding _ _ _ _ e)) us) = do
   isTopEntity <- elemVarSet nm <$> Lens.view topEntities
   if isTopEntity then return (Left b) else do
     tcm  <- Lens.view tcCache
@@ -359,7 +359,7 @@ flattenCallTree
   :: CallTree
   -> NormalizeSession CallTree
 flattenCallTree c@(CLeaf _) = return c
-flattenCallTree (CBranch (nm,(Binding nm' sp inl tm)) used) = do
+flattenCallTree (CBranch (nm,(Binding nm' sp inl pr tm)) used) = do
   flattenedUsed   <- mapM flattenCallTree used
   (newUsed,il_ct) <- partitionEithers <$> mapM flattenNode flattenedUsed
   let (toInline,il_used) = unzip il_ct
@@ -393,8 +393,8 @@ flattenCallTree (CBranch (nm,(Binding nm' sp inl tm)) used) = do
                                         (Maybe.catMaybes toInline')
         let tm1 = substTm "flattenCallTree.flattenCheap" subst' newExpr
         newExpr' <- rewriteExpr ("flattenCheap",flatten) (showPpr nm, tm1) (nm', sp)
-        return (CBranch (nm,(Binding nm' sp inl newExpr')) (concat allUsed'))
-     else return (CBranch (nm,(Binding nm' sp inl newExpr)) allUsed)
+        return (CBranch (nm,(Binding nm' sp inl pr newExpr')) (concat allUsed'))
+     else return (CBranch (nm,(Binding nm' sp inl pr newExpr)) allUsed)
   where
     flatten =
       repeatR (topdownR (apply "appPropFast" appPropFast >->
@@ -410,10 +410,10 @@ flattenCallTree (CBranch (nm,(Binding nm' sp inl tm)) used) = do
                  apply "flattenLet" flattenLet)) !->
       topdownSucR (apply "topLet" topLet)
 
-    goCheap c@(CLeaf   (nm2,(Binding _ _ inl2 e)))
+    goCheap c@(CLeaf   (nm2,(Binding _ _ inl2 _ e)))
       | inl2 == NoInline = (Nothing     ,[c])
       | otherwise        = (Just (nm2,e),[])
-    goCheap c@(CBranch (nm2,(Binding _ _ inl2 e)) us)
+    goCheap c@(CBranch (nm2,(Binding _ _ inl2 _ e)) us)
       | inl2 == NoInline = (Nothing, [c])
       | otherwise        = (Just (nm2,e),us)
 
