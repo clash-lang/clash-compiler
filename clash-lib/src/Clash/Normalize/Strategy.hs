@@ -38,9 +38,9 @@ normalization =
   rmDeadcode >->
   bindConst >->
   letTL >->
--- #if !EXPERIMENTAL_EVALUATOR
+#if !EXPERIMENTAL_EVALUATOR
   evalConst >-!->
--- #endif
+#endif
   cse >-!->
   cleanup >->
   xOptim >->
@@ -56,9 +56,9 @@ normalization =
     rmDeadcode = bottomupR (apply "deadcode" deadCode)
     bindConst  = topdownR (apply "bindConstantVar" bindConstantVar)
     -- See [Note] bottomup traversal evalConst:
--- #if !EXPERIMENTAL_EVALUATOR
+#if !EXPERIMENTAL_EVALUATOR
     evalConst  = bottomupR (apply "evalConst" reduceConst)
--- #endif
+#endif
     cse        = topdownR (apply "CSE" simpleCSE)
     xOptim     = bottomupR (apply "xOptimize" xOptimize)
     cleanup    = topdownR (apply "etaExpandSyn" etaExpandSyn) >->

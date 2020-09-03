@@ -69,6 +69,7 @@ import           Clash.Rewrite.Util      (mkInternalVar, mkSelectorCase)
 import           Clash.Unique
   (listToUniqMap, lookupUniqMap, mapUniqMap, unionUniqMap, uniqMapToUniqSet)
 import           Clash.Util              (reportTimeDiff)
+import qualified Clash.Core.Pretty       as Clash
 
 -- | Safe indexing, returns a 'Nothing' if the index does not exist
 indexMaybe :: [a] -> Int -> Maybe a
@@ -175,7 +176,9 @@ mkBindings primMap bindings clsOps unlocatable = do
       tm <- RWS.local (const sp) (coreToTerm primMap unlocatable e)
       v' <- coreToId v
       checkPrimitive primMap v
-      return [(v', (Binding v' sp inl tm))]
+      traceIf (GHC.occNameString (GHC.nameOccName (GHC.varName v)) == "dfold")
+              (Clash.showPpr (v',tm))
+              (return [(v', (Binding v' sp inl tm))])
     GHC.Rec bs -> do
       tms <- mapM (\(v,e) -> do
                     let sp  = GHC.getSrcSpan v

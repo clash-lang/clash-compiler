@@ -30,6 +30,8 @@ import Clash.Driver.Types
 import Clash.GHC.GenerateBindings
 import Clash.Netlist.BlackBox.Types (HdlSyn(Other))
 import Clash.Unique
+import Clash.Core.Pretty
+import Debug.Trace
 
 #if EXPERIMENTAL_EVALUATOR
 import Clash.Core.Evaluator.Models
@@ -58,7 +60,7 @@ runPE src = do
   let srcEnts = Prelude.filter (isPrefixOf (pack srcEnt) . nameOcc . varName . fst) idsTerms
 
 --case List.find (isSuffixOf "topEntity" . nameOcc . varName . fst) idsTerms of
-  flip mapM_ srcEnts $
+  trace ("QQQQQ\n"<>showPpr idsTerms) $ flip mapM_ srcEnts $
     \(i, t) -> do
       putStrLn $ "Evaluating " <> show (nameOcc (varName i))
       tracePprM t

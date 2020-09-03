@@ -48,7 +48,7 @@ import qualified MkCore
 import qualified Module
 import qualified MonadUtils
 import qualified Name
-import           Outputable                  (showPpr, showSDoc, text)
+import           Outputable                  (showPpr, showSDoc, text, showSDocUnsafe)
 import qualified GhcPlugins                  (deserializeWithData, fromSerialized)
 import qualified TcIface
 import qualified TcRnMonad
@@ -56,6 +56,7 @@ import qualified TcRnTypes
 import qualified UniqFM
 import qualified UniqSet
 import qualified Var
+import           PprCore
 
 -- Internal Modules
 import           Clash.Annotations.BitRepresentation.Internal
@@ -217,7 +218,10 @@ loadExprFromIface hdl bndr = do
             [namedDecl] -> do
               tyThing <- loadDecl namedDecl
               case loadExprFromTyThing bndr tyThing of
-                Left bndr1 -> return (lb{lbBinders=[bndr1]})
+                Left bndr1 ->
+                  traceIf (Name.occNameString (Name.nameOccName (Var.varName bndr)) == "dfold")
+                    (showSDocUnsafe (pprCoreBinding (uncurry CoreSyn.NonRec bndr1)))
+                    (return (lb{lbBinders=[bndr1]}))
                 Right unloc -> return (lb{lbUnlocatable=[unloc]})
             _ -> return (lb{lbUnlocatable=[bndr]})
     Nothing ->
