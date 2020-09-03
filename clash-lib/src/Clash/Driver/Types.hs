@@ -40,14 +40,30 @@ import           Clash.Core.Var                 (Id)
 import           Clash.Core.VarEnv              (VarEnv)
 import           Clash.Netlist.BlackBox.Types   (HdlSyn (..))
 
+data IsPrim
+  = IsPrim
+    -- ^ The binding is the unfolding for a primitive.
+  | IsFun
+    -- ^ The binding is an ordinary function.
+  deriving (Binary, Eq, Generic, NFData, Show)
 
 -- A function binder in the global environment.
 --
 data Binding a = Binding
   { bindingId :: Id
+    -- ^ The core identifier for this binding.
   , bindingLoc :: SrcSpan
+    -- ^ The source location of this binding in the original source code.
   , bindingSpec :: InlineSpec
+    -- ^ the inline specification for this binding, in the original source code.
+  , bindingIsPrim :: IsPrim
+    -- ^ Is the binding a core term corresponding to a primitive with a known
+    -- implementation? If so, it can potentially be inlined despite being
+    -- marked as NOINLINE in source.
   , bindingTerm :: a
+    -- ^ The term representation for this binding. This is polymorphic so
+    -- alternate representations can be used if more appropriate (i.e. in the
+    -- evaluator this can be Value for evaluated bindings).
   } deriving (Binary, Functor, Generic, NFData, Show)
 
 -- | Global function binders
