@@ -1,0 +1,4 @@
+* New features (API):
+  * [#1498](https://github.com/clash-lang/clash-compiler/pull/1498): added a `HasBiSignalDefault` constraint to Clash.Signal.BiSignal, `pullUpMode` gives access to the pull-up mode, cortesy of @christiaanb
+* Clash-cores:
+  * [#1498](https://github.com/clash-lang/clash-compiler/pull/1498): moved ICE40 primitives to Clash.Cores.LatticeSemi.ICE40 and added an ECP5 bidirectional buffer primitive with tri-state in Clash.Cores.LatticeSemi.ECP5; when using SPI core on ECP5 FPGAs, use `Clash.Cores.SPI.spiSlaveLatticeBB`

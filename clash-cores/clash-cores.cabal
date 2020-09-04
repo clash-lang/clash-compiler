@@ -66,6 +66,7 @@ common basic-config
     ghc-typelits-natnormalise >= 0.6,
     ghc-typelits-extra        >= 0.3.2,
     ghc-typelits-knownnat     >= 0.6,
+    interpolate               >= 0.2,
     QuickCheck
 
 library
@@ -74,8 +75,10 @@ library
 
   exposed-modules:
     Clash.Cores.SPI
-    Clash.Cores.LatticeSemi.IO
-    Clash.Cores.LatticeSemi.Blackboxes.IO
+    Clash.Cores.LatticeSemi.ICE40.IO
+    Clash.Cores.LatticeSemi.ICE40.Blackboxes.IO
+    Clash.Cores.LatticeSemi.ECP5.IO
+    Clash.Cores.LatticeSemi.ECP5.Blackboxes.IO
 
   ghc-options:
     -fexpose-all-unfoldings

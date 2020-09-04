@@ -7,15 +7,13 @@
   <http://www.latticesemi.com/~/media/LatticeSemi/Documents/TechnicalBriefs/SBTICETechnologyLibrary201504.pdf LATTICE ICE Technology Library>,
   referred to as LITL.
 -}
-{-# LANGUAGE BinaryLiterals #-}
-{-# LANGUAGE DeriveAnyClass #-}
-{-# LANGUAGE DeriveGeneric #-}
-{-# LANGUAGE LambdaCase #-}
-{-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE ViewPatterns #-}
+{-# LANGUAGE BangPatterns #-}
+{-# LANGUAGE GADTs #-}
+{-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE QuasiQuotes #-}
 
-module Clash.Cores.LatticeSemi.IO
+module Clash.Cores.LatticeSemi.ICE40.IO
   ( sbio
   , spiConfig
   , PinOutputConfig(..)
@@ -23,10 +21,13 @@ module Clash.Cores.LatticeSemi.IO
   ) where
 
 import           Data.Functor                 ((<&>))
-import           GHC.Stack
+import           GHC.Stack                    (HasCallStack())
 
-import           Clash.Annotations.Primitive  (Primitive(..), HDL(..))
+import           Clash.Annotations.Primitive  (Primitive(..), HDL(..), hasBlackBox)
 import           Clash.Prelude
+
+import           Data.String.Interpolate      (i)
+import           Data.String.Interpolate.Util (unindent)
 
 toMaybe :: Bool -> a -> Maybe a
 toMaybe True a = Just a
@@ -199,7 +200,7 @@ sbio pinConf pkgPinIn latchInput dOut_0 _dOut_1 outputEnable0 =
   clockLessLatchErr =
     "Either LATCH_INPUT_VALUE was asserted or pin type was set to one of " <>
     "INPUT_REGISTERED_LATCH or PIN_INPUT_LATCH. This is currently not " <>
-    "supported by this 'Clash.Cores.LatticeSemi.IO.sbio', due to CLash not " <>
+    "supported by this 'Clash.Cores.LatticeSemi.ICE40.IO.sbio', due to CLash not " <>
     "supporting clockless latches."
 
   latch_dIn_0 =
@@ -230,4 +231,14 @@ sbio pinConf pkgPinIn latchInput dOut_0 _dOut_1 outputEnable0 =
       pkgPinIn
       (toMaybe <$> outputEnable1 <*> pkgPinWriteInput)
 {-# NOINLINE sbio #-}
-{-# ANN sbio (InlinePrimitive [VHDL,Verilog,SystemVerilog] "[ { \"BlackBox\" : { \"name\" : \"Clash.Cores.LatticeSemi.IO.sbio\", \"kind\": \"Declaration\", \"format\": \"Haskell\", \"templateFunction\": \"Clash.Cores.LatticeSemi.Blackboxes.IO.sbioTF\"}} ]") #-}
+{-# ANN sbio hasBlackBox #-}
+{-# ANN sbio (InlinePrimitive [VHDL,Verilog,SystemVerilog] $ unindent [i|
+   [ { "BlackBox" :
+        { "name" : "Clash.Cores.LatticeSemi.ICE40.IO.sbio",
+          "kind" : "Declaration",
+          "format": "Haskell",
+          "templateFunction": "Clash.Cores.LatticeSemi.ICE40.Blackboxes.IO.sbioTF"
+        }
+     }
+   ]
+   |]) #-}

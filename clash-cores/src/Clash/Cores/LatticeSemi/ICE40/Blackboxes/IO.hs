@@ -8,7 +8,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE ViewPatterns #-}
 
-module Clash.Cores.LatticeSemi.Blackboxes.IO (sbioTF) where
+module Clash.Cores.LatticeSemi.ICE40.Blackboxes.IO (sbioTF) where
 
 import           Prelude
 

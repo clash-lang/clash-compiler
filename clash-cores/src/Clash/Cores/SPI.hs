@@ -14,6 +14,7 @@ module Clash.Cores.SPI
   , spiSlave
     -- ** Vendor configured SPI slaves
   , spiSlaveLatticeSBIO
+  , spiSlaveLatticeBB
   ) where
 
 import Data.Maybe (fromMaybe, isJust)
@@ -22,7 +23,8 @@ import Test.QuickCheck as QC
 import Clash.Prelude
 import Clash.Sized.Internal.BitVector
 
-import Clash.Cores.LatticeSemi.IO
+import Clash.Cores.LatticeSemi.ICE40.IO
+import Clash.Cores.LatticeSemi.ECP5.IO
 
 -- | SPI mode
 --
@@ -324,7 +326,7 @@ data SPIMasterState halfPeriod waitTime
   deriving (Eq, Generic, NFDataX)
 
 -- | SPI slave configurable SPI mode, using the SB_IO tri-state buffer
--- found on Lattice Semiconductor FPGAs
+-- found on Lattice ICE40 Semiconductor FPGAs
 spiSlaveLatticeSBIO
   :: forall dom n
    . (HiddenClockResetEnable dom, 1 <= n, KnownNat n)
@@ -367,3 +369,49 @@ spiSlaveLatticeSBIO mode latchSPI =
   sbioX bin en dout = bout
    where
     (bout,_,_) = sbio 0b101001 bin (pure 0) dout (pure undefined) en
+
+
+-- | SPI slave configurable SPI mode, using the BB tri-state buffer
+-- found on Lattice ECP5 Semiconductor FPGAs
+spiSlaveLatticeBB
+  :: forall dom n
+   . (HiddenClockResetEnable dom, 1 <= n, KnownNat n)
+  => SPIMode
+  -- ^ SPI Mode
+  -> Bool
+  -- ^ Whether to latch the SPI pins
+  --
+  -- Recommended:
+  --
+  -- * Set to /True/ when core clock is /more/ than twice as fast as the SCK
+  --   Clock: 2*SCK < Core
+  --
+  -- * Set to /False/ when core clock is twice as fast, or as fast, as the SCK
+  -> Signal dom Bool
+  -- ^ Serial Clock (SCLK)
+  -> Signal dom Bit
+  -- ^ Master Output Slave Input (MOSI)
+  -> BiSignalIn 'Floating dom 1
+  -- ^ Master Input Slave Output (MISO)
+  --
+  -- Inout port connected to the tri-state buffer for the MISO
+  -> Signal dom Bool
+  -- ^ Slave select (SS)
+  -> Signal dom (BitVector n)
+  -- ^ Data to send from slave to master
+  --
+  -- Input is latched the moment slave select goes low
+  -> ( BiSignalOut 'Floating dom 1
+     , Signal dom Bool
+     , Signal dom (Maybe (BitVector n)))
+  -- ^ Parts of the tuple:
+  --
+  -- 1. The "out" part of the inout port of the MISO; used only for simulation.
+  --
+  -- 2. (Maybe) the word send by the master
+spiSlaveLatticeBB mode latchSPI =
+  spiSlave (SPISlaveConfig mode latchSPI bbX)
+ where
+    bbX bin en dout = bout
+      where
+        (bout,_) = bidirectionalBuffer (toEnable en) bin dout

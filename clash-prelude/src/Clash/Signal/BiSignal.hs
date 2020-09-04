@@ -110,6 +110,8 @@ module Clash.Signal.BiSignal (
     BiSignalIn()
   , BiSignalOut()
   , BiSignalDefault(..)
+  , SBiSignalDefault(..)
+  , HasBiSignalDefault(..)
   , mergeBiSignalOuts
   , readFromBiSignal
   , writeToBiSignal
@@ -158,6 +160,20 @@ instance Given (SBiSignalDefault 'PullDown) where
 
 instance Given (SBiSignalDefault 'Floating) where
   given = SFloating
+
+-- | Type class for 'BiSignalDefault':
+--   can be used as a constraint and for obtaining the pull-up mode
+class HasBiSignalDefault (ds :: BiSignalDefault) where
+  pullUpMode :: BiSignalIn ds dom n -> SBiSignalDefault ds
+
+instance HasBiSignalDefault 'PullUp where
+  pullUpMode _ = SPullUp
+
+instance HasBiSignalDefault 'PullDown where
+  pullUpMode _ = SPullDown
+
+instance HasBiSignalDefault 'Floating where
+  pullUpMode _ = SFloating
 
 -- | The /in/ part of an __inout__ port
 data BiSignalIn (ds :: BiSignalDefault) (dom :: Domain) (n :: Nat)
