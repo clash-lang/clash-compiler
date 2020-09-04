@@ -461,6 +461,10 @@ inlineNonRep _ e@(Case scrut altsTy alts)
 inlineNonRep _ e = return e
 {-# SCC inlineNonRep #-}
 
+
+caseCon :: HasCallStack => NormRewrite
+caseCon = apply "caseOneAlt" (const caseOneAlt) >-! caseCon'
+
 -- | Specialize a Case-decomposition (replace by the RHS of an alternative) if
 -- the subject is (an application of) a DataCon; or if there is only a single
 -- alternative that doesn't reference variables bound by the pattern.
@@ -490,8 +494,8 @@ inlineNonRep _ e = return e
 -- let a1 = f a b
 -- in  h a1
 -- @
-caseCon :: HasCallStack => NormRewrite
-caseCon ctx@(TransformContext is0 _) e@(Case subj ty alts) = do
+caseCon' :: HasCallStack => NormRewrite
+caseCon' ctx@(TransformContext is0 _) e@(Case subj ty alts) = do
  tcm <- Lens.view tcCache
  case collectArgsTicks subj of
   -- The subject is an applied data constructor
@@ -666,8 +670,8 @@ caseCon ctx@(TransformContext is0 _) e@(Case subj ty alts) = do
   -- alternative, and pick that one.
   _ -> caseOneAlt e
 
-caseCon _ e = return e
-{-# SCC caseCon #-}
+caseCon' _ e = return e
+{-# SCC caseCon' #-}
 
 {- [Note: Name re-creation]
 The names of heap bound variables are safely generate with mkUniqSystemId in Clash.Core.Evaluator.newLetBinding.
@@ -772,8 +776,10 @@ caseOneAlt e@(Case _ _ [(pat,altE)]) = case pat of
     | otherwise
     -> return e
 
-caseOneAlt (Case _ _ alts@((_,alt):_:_))
+caseOneAlt (Case _ _ alts@((pat,alt):_:_))
   | all ((== alt) . snd) (tail alts)
+  , (tvs,xs) <- patIds pat
+  , (coerce tvs ++ coerce xs) `localVarsDoNotOccurIn` alt
   = changed alt
 
 caseOneAlt e = return e
@@ -2981,4 +2987,3 @@ isPrimError (collectArgs -> (Prim pInfo, _)) = do
   isErr _ = False
 
 isPrimError _ = return False
-
