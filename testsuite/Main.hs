@@ -531,6 +531,7 @@ runClashTest = defaultMain $ clashTestRoot
         ]
       , clashTestGroup "Signal"
         [ runTest "AlwaysHigh" def{hdlSim=False}
+        , runTest "BangPatterns" def
         , NEEDS_PRIMS(runTest "BlockRamFile" def)
         , NEEDS_PRIMS(runTest "BlockRam0" def)
         , NEEDS_PRIMS(runTest "BlockRam1" def)
