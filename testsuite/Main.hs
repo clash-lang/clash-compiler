@@ -473,6 +473,7 @@ runClashTest = defaultMain $ clashTestRoot
       , clashTestGroup "Signal"
         [ runTest "AlwaysHigh" def{hdlSim=False}
         , outputTest ("tests" </> "shouldwork" </> "Signal") allTargets [] [] "BlockRamLazy"    "main"
+        , runTest "BangPatterns" def
         , runTest "BlockRamFile" def
         , runTest "BlockRam0" def
         , runTest "BlockRam1" def
