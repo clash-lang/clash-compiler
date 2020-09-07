@@ -41,7 +41,7 @@ import           Data.Maybe                  (catMaybes,fromMaybe,listToMaybe)
 #if !MIN_VERSION_base(4,11,0)
 import           Data.Semigroup
 #endif
-import           Data.Text                   (Text, isInfixOf,pack)
+import           Data.Text                   (Text, pack)
 import qualified Data.Text                   as Text
 import           Data.Text.Encoding          (decodeUtf8)
 import qualified Data.Traversable            as T
@@ -508,8 +508,6 @@ coreToTerm primMap unlocs = term
               return $ C.Prim (C.PrimInfo xNameS xType C.WorkVariable)
             Nothing
               | x `elem` unlocs
-              -> return (C.Prim (C.PrimInfo xNameS xType C.WorkVariable))
-              | pack "$cshow" `isInfixOf` xNameS
               -> return (C.Prim (C.PrimInfo xNameS xType C.WorkVariable))
               | otherwise
               -> C.Var <$> coreToId x
