@@ -956,7 +956,7 @@ instance NumFixedC rep int frac => SaturatingNum (Fixed rep int frac) where
                          1 -> unpack (resize (shiftR rR sh))
                          _ -> case msb rL of
                                 0 -> maxBound
-                                _ -> succ minBound
+                                _ -> Fixed $ succ minBound
           False -> case rL of
                      0 -> unpack (resize (shiftR rR sh))
                      _ -> maxBound
