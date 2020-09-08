@@ -20,8 +20,6 @@ module Clash.Class.Num
   , boundedAdd
   , boundedSub
   , boundedMul
-  , satSucc
-  , satPred
   )
 where
 
@@ -54,7 +52,7 @@ data SaturationMode
   | SatSymmetric -- ^ Become 'maxBound' on overflow, and (@'minBound' + 1@) on
                  -- underflow for signed numbers, and 'minBound' for unsigned
                  -- numbers.
-  deriving Eq
+  deriving (Show, Eq, Enum, Bounded)
 
 -- | 'Num' operators in which overflow and underflow behavior can be specified
 -- using 'SaturationMode'.
@@ -65,16 +63,16 @@ class (Bounded a, Num a) => SaturatingNum a where
   satSub  :: SaturationMode -> a -> a -> a
   -- | Multiplication with parameterizable over- and underflow behavior
   satMul :: SaturationMode -> a -> a -> a
-
--- | Get successor of (or in other words, add 1 to) given number
-satSucc :: SaturatingNum a => SaturationMode -> a -> a
-satSucc s n = satAdd s n 1
-{-# INLINE satSucc #-}
-
--- | Get predecessor of (or in other words, subtract 1 from) given number
-satPred :: SaturatingNum a => SaturationMode -> a -> a
-satPred s n = satSub s n 1
-{-# INLINE satPred #-}
+  -- | Get successor of (or in other words, add 1 to) given number
+  satSucc :: SaturationMode -> a -> a
+  -- Default method suitable for types that can represent the number 1
+  satSucc s n = satAdd s n 1
+  {-# INLINE satSucc #-}
+  -- | Get predecessor of (or in other words, subtract 1 from) given number
+  satPred :: SaturationMode -> a -> a
+  -- Default method suitable for types that can represent the number 1
+  satPred s n = satSub s n 1
+  {-# INLINE satPred #-}
 
 -- | Addition that clips to 'maxBound' on overflow, and 'minBound' on underflow
 boundedAdd :: SaturatingNum a => a -> a -> a
