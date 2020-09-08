@@ -1,0 +1,5 @@
+FIXED: Make `satSucc`, `satPred` work correctly for small instances.
+`satSucc` and `satPred` are moved to the class `SaturatingNum`. The default
+methods assure existing code keeps working. For types where small instances
+cannot express the number 1, i.e., `Index`, `Signed` and `Fixed`, an
+alternative implementation assures correct behavior nonetheless.
