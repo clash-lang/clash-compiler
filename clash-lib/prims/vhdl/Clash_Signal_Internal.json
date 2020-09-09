@@ -52,18 +52,18 @@ end process;~FI
 ~GENSYM[~RESULT_register][2] : process(~ARG[2])
 begin
   if ~IF~ACTIVEEDGE[Rising][0]~THENrising_edge~ELSEfalling_edge~FI(~ARG[2]) then
-    if ~ARG[3] = ~IF ~ISACTIVEHIGH[0] ~THEN '1' ~ELSE '0' ~FI then
+    ~IF ~ISUNDEFINED[6] ~THEN ~ELSEif ~ARG[3] = ~IF ~ISACTIVEHIGH[0] ~THEN '1' ~ELSE '0' ~FI then
       ~RESULT <= ~CONST[6];
-    elsif ~ARG[4] then
+    els~FIif ~ARG[4] then
       ~RESULT <= ~ARG[7];
     end if;
   end if;
 end process;~ELSE
-~SYM[2] : process(~ARG[2],~ARG[3])
+~SYM[2] : process(~ARG[2]~IF ~ISUNDEFINED[6] ~THEN ~ELSE,~ARG[3]~FI)
 begin
-  if ~ARG[3] = ~IF ~ISACTIVEHIGH[0] ~THEN '1' ~ELSE '0' ~FI then
+  ~IF ~ISUNDEFINED[6] ~THEN ~ELSEif ~ARG[3] = ~IF ~ISACTIVEHIGH[0] ~THEN '1' ~ELSE '0' ~FI then
     ~RESULT <= ~CONST[6];
-  elsif ~IF~ACTIVEEDGE[Rising][0]~THENrising_edge~ELSEfalling_edge~FI(~ARG[2]) then
+  els~FIif ~IF~ACTIVEEDGE[Rising][0]~THENrising_edge~ELSEfalling_edge~FI(~ARG[2]) then
     if ~ARG[4] then
       ~RESULT <= ~ARG[7];
     end if;
@@ -72,18 +72,18 @@ end process;~FI~ELSE ~IF ~ISSYNC[0] ~THEN
 ~SYM[2] : process(~ARG[2])
 begin
   if ~IF~ACTIVEEDGE[Rising][0]~THENrising_edge~ELSEfalling_edge~FI(~ARG[2]) then
-    if ~ARG[3] = ~IF ~ISACTIVEHIGH[0] ~THEN '1' ~ELSE '0' ~FI then
+    ~IF ~ISUNDEFINED[6] ~THEN ~ELSEif ~ARG[3] = ~IF ~ISACTIVEHIGH[0] ~THEN '1' ~ELSE '0' ~FI then
       ~RESULT <= ~CONST[6];
     else
-      ~RESULT <= ~ARG[7];
-    end if;
+      ~FI~RESULT <= ~ARG[7];
+    ~IF ~ISUNDEFINED[6] ~THEN ~ELSEend if;~FI
   end if;
 end process;~ELSE
-~SYM[2] : process(~ARG[2],~ARG[3])
+~SYM[2] : process(~ARG[2]~IF ~ISUNDEFINED[6] ~THEN ~ELSE,~ARG[3]~FI)
 begin
-  if ~ARG[3] = ~IF ~ISACTIVEHIGH[0] ~THEN '1' ~ELSE '0' ~FI then
+  ~IF ~ISUNDEFINED[6] ~THEN ~ELSEif ~ARG[3] = ~IF ~ISACTIVEHIGH[0] ~THEN '1' ~ELSE '0' ~FI then
     ~RESULT <= ~CONST[6];
-  elsif ~IF~ACTIVEEDGE[Rising][0]~THENrising_edge~ELSEfalling_edge~FI(~ARG[2]) then
+  els~FIif ~IF~ACTIVEEDGE[Rising][0]~THENrising_edge~ELSEfalling_edge~FI(~ARG[2]) then
     ~RESULT <= ~ARG[7];
   end if;
 end process;~FI~FI

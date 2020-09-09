@@ -466,7 +466,7 @@ data TemplateFunction where
     -> TemplateFunction
 
 instance Show BlackBox where
-  show (BBTemplate t)  = show t
+  show (BBTemplate t)  = "BBTemplate " <> show t
   show (BBFunction nm hsh _) =
     "<TemplateFunction(nm=" ++ show nm ++ ", hash=" ++ show hsh ++ ")>"
 

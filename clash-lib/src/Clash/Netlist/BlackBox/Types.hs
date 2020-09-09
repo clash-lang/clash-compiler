@@ -182,6 +182,11 @@ data Element
   | IsActiveEnable !Int
   -- ^ Whether given enable line is active. More specifically, whether the
   -- enable line is NOT set to a constant 'True'.
+  | IsUndefined !Int
+  -- ^ Whether argument is undefined. E.g., an XException, error call,
+  -- removed argument, or primitive that is undefined. This template tag will
+  -- always return 0 (False) if `-fclash-aggressive-x-optimization-blackboxes`
+  -- is NOT set.
   | StrCmp [Element] !Int
   | OutputWireReg !Int
   | Vars !Int

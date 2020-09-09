@@ -58,7 +58,7 @@ opts idirs =
     }
 
 backend :: VHDLState
-backend = initBackend WORD_SIZE_IN_BITS HDLSYN True Nothing
+backend = initBackend WORD_SIZE_IN_BITS HDLSYN True Nothing (AggressiveXOptBB False)
 
 runInputStage
   :: [FilePath]

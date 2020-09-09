@@ -43,10 +43,10 @@ end~FI
     , "resultInit" : { "template" : "~IF~ISINITDEFINED[0]~THEN~CONST[5]~ELSE~FI" }
     , "template" :
 "// register begin
-always_ff @(~IF~ACTIVEEDGE[Rising][0]~THENposedge~ELSEnegedge~FI ~ARG[2]~IF ~ISSYNC[0] ~THEN ~ELSE or ~IF ~ISACTIVEHIGH[0] ~THEN posedge ~ELSE negedge ~FI ~VAR[rst][3]~FI) begin : ~GENSYM[~RESULT_register][1]
-  if (~IF ~ISACTIVEHIGH[0] ~THEN ~ELSE ! ~FI~VAR[rst][3]) begin
+always_ff @(~IF~ACTIVEEDGE[Rising][0]~THENposedge~ELSEnegedge~FI ~ARG[2]~IF ~ISSYNC[0] ~THEN ~ELSE~IF ~ISUNDEFINED[6] ~THEN ~ELSE or ~IF ~ISACTIVEHIGH[0] ~THEN posedge ~ELSE negedge ~FI ~VAR[rst][3]~FI~FI) begin : ~GENSYM[~RESULT_register][1]
+  ~IF ~ISUNDEFINED[6] ~THEN ~ELSEif (~IF ~ISACTIVEHIGH[0] ~THEN ~ELSE ! ~FI~VAR[rst][3]) begin
     ~RESULT <= ~CONST[6];
-  end else ~IF ~ISACTIVEENABLE[4] ~THEN if (~ARG[4]) ~ELSE ~FI begin
+  end else ~FI~IF ~ISACTIVEENABLE[4] ~THEN if (~ARG[4]) ~ELSE ~FI begin
     ~RESULT <= ~ARG[7];
   end
 end

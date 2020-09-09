@@ -49,7 +49,7 @@ mkBackend
   :: (Backend (TargetToState target))
   => SBuildTarget target
   -> TargetToState target
-mkBackend _ = initBackend WORD_SIZE_IN_BITS Other True Nothing
+mkBackend _ = initBackend WORD_SIZE_IN_BITS Other True Nothing (AggressiveXOptBB False)
 
 -- Run clash as far as having access to core for all bindings. This is used
 -- to test operations on core, such as transformations and evaluation.
@@ -89,4 +89,3 @@ findBinding nm (bm, tcm, ids) =
  where
   ri = mkRecInfo bm
   byName b = nm == nameOcc (varName $ bindingId b)
-
