@@ -134,7 +134,7 @@ import Data.Typeable              (Typeable, typeOf)
 import GHC.Generics               (Generic)
 import Data.Maybe                 (fromMaybe)
 import GHC.Exts
-  (Word#, Word (W#), eqWord#, int2Word#, uncheckedShiftRL#)
+  ((>#), Word#, Word (W#), eqWord#, int2Word#, uncheckedShiftRL#)
 import qualified GHC.Exts
 import GHC.Integer.GMP.Internals  (Integer (..), bigNatToWord, shiftRBigNat)
 import GHC.Natural
@@ -736,7 +736,9 @@ msb# (BV m v)
         (msbN v)
  where
   !(S# i#) = natVal (Proxy @n)
-  msbN (NatS# w)  = W# (w `uncheckedShiftRL#` (i# GHC.Exts.-# 1#))
+  msbN (NatS# w) = case (i# ># 64#) of
+    1# -> W# 0##
+    _  -> W# (w `uncheckedShiftRL#` (i# GHC.Exts.-# 1#))
   msbN (NatJ# bn) = W# (bigNatToWord (shiftRBigNat bn (i# GHC.Exts.-# 1#)))
 
 {-# NOINLINE lsb# #-}
