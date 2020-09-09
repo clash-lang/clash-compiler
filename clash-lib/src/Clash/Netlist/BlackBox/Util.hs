@@ -451,13 +451,13 @@ renderElem b (IF c t f) = do
       (IsActiveEnable n) ->
         let (e, ty, _) = bbInputs b !! n in
         case (e, ty) of
-          (Literal Nothing (BoolLit True), Bool)  -> 0
+          (Literal Nothing (BoolLit True), Enable {})  -> 0
           -- TODO: Emit warning? If enable signal is inferred as always False,
           -- TODO: the component will never be enabled. This is probably not the
           -- TODO: user's intention.
-          (Literal Nothing (BoolLit False), Bool) -> 1
-          (_, Bool)                               -> 1
-          (_, Enable _)                           -> 1
+          (Literal Nothing (BoolLit False), Enable {}) -> 1
+          (_, Bool)                                    -> 1
+          (_, Enable _)                                -> 1
           _ ->
             error $ $(curLoc) ++ "IsActiveEnable: Expected Bool, not: " ++ show ty
 
