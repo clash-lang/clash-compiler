@@ -76,7 +76,7 @@ type family TargetToState (target :: BuildTarget) where
 mkBackend
   :: (Backend (TargetToState target))
   => SBuildTarget target -> TargetToState target
-mkBackend _ = initBackend WORD_SIZE_IN_BITS Other True Nothing
+mkBackend _ = initBackend WORD_SIZE_IN_BITS Other True Nothing (AggressiveXOptBB False)
 
 runToNetlistStage
   :: (Backend (TargetToState target))

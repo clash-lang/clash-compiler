@@ -61,9 +61,18 @@ data Usage
   | External Text
   -- ^ External use, field indicates the library name
 
+-- | Is '-fclash-aggresive-x-optimization-blackbox' set?
+newtype AggressiveXOptBB = AggressiveXOptBB Bool
+
 class Backend state where
   -- | Initial state for state monad
-  initBackend :: Int -> HdlSyn -> Bool -> Maybe (Maybe Int) -> state
+  initBackend
+    :: Int
+    -> HdlSyn
+    -> Bool
+    -> Maybe (Maybe Int)
+    -> AggressiveXOptBB
+    -> state
 
   -- | What HDL is the backend generating
   hdlKind :: state -> HDL
@@ -134,6 +143,8 @@ class Backend state where
   getMemoryDataFiles :: State state [(String,String)]
   seenIdentifiers  :: Lens' state (HashMap Identifier Word)
   ifThenElseExpr :: state -> Bool
+  -- | Whether -fclash-aggressive-x-optimization-blackboxes was set
+  aggressiveXOptBB :: State state AggressiveXOptBB
 
 -- | Replace a normal HDL template placeholder with an unescaped/unextended
 -- template placeholder.

@@ -94,6 +94,7 @@ data VerilogState =
     , _hdlsyn    :: HdlSyn
     , _escapedIds :: Bool
     , _undefValue :: Maybe (Maybe Int)
+    , _aggressiveXOptBB_ :: AggressiveXOptBB
     }
 
 makeLenses ''VerilogState
@@ -196,6 +197,7 @@ instance Backend VerilogState where
   getMemoryDataFiles = use memoryDataFiles
   seenIdentifiers = idSeen
   ifThenElseExpr _ = True
+  aggressiveXOptBB = use aggressiveXOptBB_
 
 rmSlash :: Identifier -> Identifier
 rmSlash nm = fromMaybe nm $ do

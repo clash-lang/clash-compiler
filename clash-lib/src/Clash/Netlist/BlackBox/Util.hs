@@ -23,6 +23,7 @@ import           Control.Lens
 import           Control.Monad                   (forM)
 import           Control.Monad.State             (State, StateT (..), lift)
 import           Data.Bool                       (bool)
+import           Data.Coerce                     (coerce)
 import           Data.Foldable                   (foldrM)
 import           Data.Hashable                   (Hashable (..))
 import qualified Data.IntMap                     as IntMap
@@ -404,10 +405,11 @@ renderElem b (Tag n) = do
 renderElem b (IF c t f) = do
   iw <- iwWidth
   syn <- hdlSyn
-  let c' = check iw syn c
+  xOpt <- aggressiveXOptBB
+  let c' = check (coerce xOpt) iw syn c
   if c' > 0 then renderTemplate b t else renderTemplate b f
   where
-    check iw syn c' = case c' of
+    check xOpt iw syn c' = case c' of
       (Size e)   -> typeSize (lineToType b [e])
       (Length e) -> case lineToType b [e] of
                        (Vector n _)             -> n
@@ -445,6 +447,12 @@ renderElem b (IF c t f) = do
                       Literal {}   -> 1
                       BlackBoxE {} -> 1
                       _            -> 0
+
+      (IsUndefined n) ->
+        let (e, _, _) = bbInputs b !! n in
+        case (xOpt, e) of
+          (True, BlackBoxE _ _ _ _ (N.BBTemplate [Err _]) _ _) -> 1
+          _ -> 0
 
       (IsActiveEnable n) ->
         let (e, ty, _) = bbInputs b !! n in
@@ -494,10 +502,10 @@ renderElem b (IF c t f) = do
                 | t1 == Text.pack t2 -> 1
                 | otherwise -> 0
               Nothing -> error $ $(curLoc) ++ "Expected a string literal: " ++ show e
-      (And es)   -> if all (/=0) (map (check iw syn) es)
+      (And es)   -> if all (/=0) (map (check xOpt iw syn) es)
                        then 1
                        else 0
-      CmpLE e1 e2 -> if check iw syn e1 <= check iw syn e2
+      CmpLE e1 e2 -> if check xOpt iw syn e1 <= check xOpt iw syn e2
                         then 1
                         else 0
       _ -> error $ $(curLoc) ++ "IF: condition must be: SIZE, LENGTH, IW64, LIT, ISLIT, or ISARG"
@@ -864,6 +872,7 @@ prettyElem (IsLit i) = renderOneLine <$> (string "~ISLIT" <> brackets (int i))
 prettyElem (IsVar i) = renderOneLine <$> (string "~ISVAR" <> brackets (int i))
 prettyElem (IsActiveHigh i) = renderOneLine <$> (string "~ISACTIVEHIGH" <> brackets (int i))
 prettyElem (IsActiveEnable i) = renderOneLine <$> (string "~ISACTIVEENABLE" <> brackets (int i))
+prettyElem (IsUndefined i) = renderOneLine <$> (string "~ISUNDEFINED" <> brackets (int i))
 
 -- Domain attributes:
 prettyElem (Tag i) = renderOneLine <$> (string "~TAG" <> brackets (int i))
@@ -973,6 +982,7 @@ walkElement f el = maybeToList (f el) ++ walked
         IsInitDefined _ -> []
         IsActiveHigh _ -> []
         IsActiveEnable _ -> []
+        IsUndefined _ -> []
         StrCmp es _ -> concatMap go es
         OutputWireReg _ -> []
         Vars _ -> []
@@ -1015,6 +1025,7 @@ getUsedArguments (N.BBTemplate t) = nub (concatMap (walkElement matchArg) t)
         Const i -> Just i
         IsLit i -> Just i
         IsActiveEnable i -> Just i
+        IsUndefined i -> Just i
         Lit i -> Just i
         Name i -> Just i
         ToVar _ i -> Just i

@@ -403,6 +403,8 @@ runClashTest = defaultMain $ clashTestRoot
         [ runTest "T1187" def{hdlSim=False, hdlTargets=[Verilog]}
         , netlistTest ("tests" </> "shouldwork" </> "Issues") [VHDL] [] "T1388" "main"
         , netlistTest ("tests" </> "shouldwork" </> "Issues") [VHDL] [] "T1439" "main"
+        , runTest "T1506A" def{hdlSim=False, clashFlags=["-fclash-aggressive-x-optimization-blackboxes"]}
+        , outputTest ("tests" </> "shouldwork" </> "Issues") allTargets ["-fclash-aggressive-x-optimization-blackboxes"] ["-itests/shouldwork/Issues"] "T1506B" "main"
         ]
       , clashTestGroup "Naming"
         [ runTest "T967a" def{hdlSim=False}

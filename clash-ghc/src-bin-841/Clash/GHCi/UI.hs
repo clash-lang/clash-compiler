@@ -91,6 +91,7 @@ import Control.Monad.Trans.Except
 import Data.Array
 import qualified Data.ByteString.Char8 as BS
 import Data.Char
+import Data.Coerce
 import Data.Function
 import Data.IORef ( IORef, modifyIORef, newIORef, readIORef, writeIORef )
 import Data.List ( find, group, intercalate, intersperse, isPrefixOf, nub,
@@ -134,6 +135,7 @@ import GHC.TopHandler ( topHandler )
 
 -- clash additions
 import qualified Clash.Backend
+import           Clash.Backend (AggressiveXOptBB)
 import           Clash.Backend.SystemVerilog (SystemVerilogState)
 import           Clash.Backend.VHDL (VHDLState)
 import           Clash.Backend.Verilog (VerilogState)
@@ -1919,7 +1921,7 @@ exceptT = ExceptT . pure
 
 makeHDL'
   :: Clash.Backend.Backend backend
-  => (Int -> HdlSyn -> Bool -> Maybe (Maybe Int) -> backend)
+  => (Int -> HdlSyn -> Bool -> Maybe (Maybe Int) -> AggressiveXOptBB -> backend)
   -> IORef ClashOpts
   -> [FilePath]
   -> InputT GHCi ()
@@ -1961,7 +1963,7 @@ makeHDL' backend opts lst = go =<< case lst of
 makeHDL
   :: GHC.GhcMonad m
   => Clash.Backend.Backend backend
-  => (Int -> HdlSyn -> Bool -> Maybe (Maybe Int) -> backend)
+  => (Int -> HdlSyn -> Bool -> Maybe (Maybe Int) -> AggressiveXOptBB -> backend)
   -> IORef ClashOpts
   -> [FilePath]
   -> m ()
@@ -1976,6 +1978,7 @@ makeHDL backend optsRef srcs = do
                   color  = opt_color opts1
                   esc    = opt_escapedIds opts1
                   frcUdf = opt_forceUndefined opts1
+                  xOptBB = opt_aggressiveXOptBB opts1
                   hdl    = Clash.Backend.hdlKind backend'
                   -- determine whether `-outputdir` was used
                   outputDir = do odir <- objectDir dflags
@@ -1988,7 +1991,7 @@ makeHDL backend optsRef srcs = do
                   idirs = importPaths dflags
                   opts2 = opts1 { opt_hdlDir = maybe outputDir Just (opt_hdlDir opts1)
                                 , opt_importPaths = idirs}
-                  backend' = backend iw syn esc frcUdf
+                  backend' = backend iw syn esc frcUdf (coerce xOptBB)
 
               checkMonoLocalBinds dflags
               checkImportDirs opts0 idirs
@@ -2022,13 +2025,13 @@ makeHDL backend optsRef srcs = do
                   (startTime,prepTime)
 
 makeVHDL :: IORef ClashOpts -> [FilePath] -> InputT GHCi ()
-makeVHDL = makeHDL' (Clash.Backend.initBackend :: Int -> HdlSyn -> Bool -> Maybe (Maybe Int) -> VHDLState)
+makeVHDL = makeHDL' (Clash.Backend.initBackend :: Int -> HdlSyn -> Bool -> Maybe (Maybe Int) -> AggressiveXOptBB -> VHDLState)
 
 makeVerilog :: IORef ClashOpts -> [FilePath] -> InputT GHCi ()
-makeVerilog = makeHDL' (Clash.Backend.initBackend :: Int -> HdlSyn -> Bool -> Maybe (Maybe Int) -> VerilogState)
+makeVerilog = makeHDL' (Clash.Backend.initBackend :: Int -> HdlSyn -> Bool -> Maybe (Maybe Int) -> AggressiveXOptBB -> VerilogState)
 
 makeSystemVerilog :: IORef ClashOpts -> [FilePath] -> InputT GHCi ()
-makeSystemVerilog = makeHDL' (Clash.Backend.initBackend :: Int -> HdlSyn -> Bool -> Maybe (Maybe Int) -> SystemVerilogState)
+makeSystemVerilog = makeHDL' (Clash.Backend.initBackend :: Int -> HdlSyn -> Bool -> Maybe (Maybe Int) -> AggressiveXOptBB -> SystemVerilogState)
 
 -----------------------------------------------------------------------------
 -- | @:type@ command. See also Note [TcRnExprMode] in TcRnDriver.

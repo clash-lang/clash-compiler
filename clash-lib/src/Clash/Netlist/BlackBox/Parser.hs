@@ -114,6 +114,7 @@ pTagE =  Result True       <$  string "~ERESULT"
      <|> IsVar             <$> (string "~ISVAR" *> brackets' natural')
      <|> IsActiveHigh      <$> (string "~ISACTIVEHIGH" *> brackets' natural')
      <|> IsActiveEnable    <$> (string "~ISACTIVEENABLE" *> brackets' natural')
+     <|> IsUndefined       <$> (string "~ISUNDEFINED" *> brackets' natural')
      <|> StrCmp            <$> (string "~STRCMP" *> brackets' pSigD) <*> brackets' natural'
      <|> OutputWireReg     <$> (string "~OUTPUTWIREREG" *> brackets' natural')
      <|> GenSym            <$> (string "~GENSYM" *> brackets' pSigD) <*> brackets' natural'

@@ -86,6 +86,7 @@ flagsClash r = [
   , defFlag "fclash-compile-ultra"               $ NoArg (liftEwM (setUltra r))
   , defFlag "fclash-force-undefined"             $ OptIntSuffix (setUndefined r)
   , defFlag "fclash-aggressive-x-optimization"   $ NoArg (liftEwM (setAggressiveXOpt r))
+  , defFlag "fclash-aggressive-x-optimization-blackboxes" $ NoArg (liftEwM (setAggressiveXOptBB r))
   , defFlag "fclash-inline-workfree-limit"       $ IntSuffix (liftEwM . setInlineWFLimit r)
   ]
 
@@ -225,5 +226,9 @@ setUndefined r iM =
   liftEwM (modifyIORef r (\c -> c {opt_forceUndefined = Just iM}))
 
 setAggressiveXOpt :: IORef ClashOpts -> IO ()
-setAggressiveXOpt r = modifyIORef r (\c -> c { opt_aggressiveXOpt = True })
+setAggressiveXOpt r = do
+  modifyIORef r (\c -> c { opt_aggressiveXOpt = True })
+  setAggressiveXOptBB r
 
+setAggressiveXOptBB :: IORef ClashOpts -> IO ()
+setAggressiveXOptBB r = modifyIORef r (\c -> c { opt_aggressiveXOptBB = True })
