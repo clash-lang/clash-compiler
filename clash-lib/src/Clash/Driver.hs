@@ -28,6 +28,7 @@ import           Control.Monad.Catch              (MonadMask)
 import           Control.Monad.IO.Class           (MonadIO)
 import           Control.Monad.State              (evalState, get)
 import           Control.Monad.State.Strict       (State)
+import           Data.Coerce                      (coerce)
 import           Data.Default
 import           Data.Hashable                    (hash)
 import           Data.HashMap.Strict              (HashMap)
@@ -293,8 +294,9 @@ generateHDL reprs domainConfs bindingsMap hdlState primMap tcm tupTcm typeTrans 
       hdlsyn    = opt_hdlSyn opts
       escpIds   = opt_escapedIds opts
       forceUnd  = opt_forceUndefined opts
+      aggrXOptBB = coerce (opt_aggressiveXOptBB opts)
       hdlState' = setModName (Data.Text.pack modName)
-                $ fromMaybe (initBackend iw hdlsyn escpIds forceUnd :: backend) hdlState
+                $ fromMaybe (initBackend iw hdlsyn escpIds forceUnd aggrXOptBB:: backend) hdlState
       hdlDir    = fromMaybe "." (opt_hdlDir opts) </>
                         Clash.Backend.name hdlState' </>
                         takeWhile (/= '.') topEntityS

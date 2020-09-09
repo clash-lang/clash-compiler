@@ -212,6 +212,16 @@ Clash Compiler Flags
   case expression is elided completely. If no branches are defined the entire
   expression is replaced with a call to ``errorX``.
 
+  **Implies:** ``-fclash-aggressive-x-optimization-blackboxes``
+
+  **Default:** False
+
+-fclash-aggressive-x-optimization-blackboxes
+  Allow blackboxes to detect undefined values and change their behavior
+  accordingly. For example, if ``register`` is used in combination with an
+  undefined reset value, it will leave out the reset logic entirely. This
+  flag is enabled when using ``-fclash-aggressive-x-optimization``.
+
   **Default:** False
 
 -fclash-edalize

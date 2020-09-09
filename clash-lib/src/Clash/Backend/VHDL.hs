@@ -95,6 +95,7 @@ data VHDLState =
   -- ^ For which HDL synthesis tool are we generating VHDL
   , _extendedIds :: Bool
   , _undefValue :: Maybe (Maybe Int)
+  , _aggressiveXOptBB_ :: AggressiveXOptBB
   }
 
 makeLenses ''VHDLState
@@ -209,6 +210,7 @@ instance Backend VHDLState where
   getMemoryDataFiles = use memoryDataFiles
   seenIdentifiers = idSeen
   ifThenElseExpr _ = False
+  aggressiveXOptBB = use aggressiveXOptBB_
 
 rmSlash :: Identifier -> Identifier
 rmSlash nm = fromMaybe nm $ do
