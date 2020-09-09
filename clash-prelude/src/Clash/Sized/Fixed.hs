@@ -69,6 +69,7 @@ operator that uses truncation introduces an additional error of /0.109375/:
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE NegativeLiterals #-}
 {-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE TypeFamilies #-}
@@ -382,7 +383,7 @@ Where 'NumSFixedC' refers to the @Constraints@ needed by the operators of
 the 'Num' class for the 'SFixed' datatype.
 
 Although the number of constraints for the @mac@ function defined earlier might
-be considered small, here is an \"this way lies madness\" example where you
+be considered small, here is a \"this way lies madness\" example where you
 really want to use constraint kinds:
 
 @
@@ -1094,10 +1095,10 @@ instance (NumFixedC rep int frac, Integral (rep (int + frac))) =>
      denom     = 1 `shiftL` nF
      nom       = toInteger fRep
 
-instance (FracFixedC rep int frac, NumFixedC rep int frac, Integral (rep (int + frac))) =>
-         RealFrac (Fixed rep int frac) where
+instance FracFixedC rep int frac => RealFrac (Fixed rep int frac) where
   properFraction f@(Fixed fRep) = (fromIntegral whole, fract)
     where
       whole = (fRep `shiftR` fracShift f) + offset
       fract = Fixed $ fRep - (whole `shiftL` fracShift f)
-      offset = if f < 0 then 1 else 0
+      frMask = fromInteger $ (1 `shiftL` fracShift f) - 1
+      offset = if f < 0 && fRep .&. frMask /= 0 then 1 else 0
