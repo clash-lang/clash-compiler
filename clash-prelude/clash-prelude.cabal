@@ -385,7 +385,7 @@ test-suite unittests
 
       base,
       deepseq,
-      hedgehog,
+      hedgehog      >= 1.0.3    && < 1.1,
       hint          >= 0.7      && < 0.10,
       quickcheck-classes-base >= 0.6 && < 1.0,
       tasty         >= 1.2      && < 1.4,

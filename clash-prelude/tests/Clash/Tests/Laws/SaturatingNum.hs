@@ -81,7 +81,9 @@ saturatingNumLaws ::
 saturatingNumLaws testWrap genA =
   (if testWrap then
     [ testCase "SatWrap: Wrap around on overflow" (satWrapOverflowLaw genA)
-    , testCase "SatWrap: Wrap around on underflow" (satWrapUnderflowLaw genA) ]
+    , testCase "SatWrap: Wrap around on underflow" (satWrapUnderflowLaw genA)
+    , testCase "SatSymmetric: Become maxBound on overflow" (satSymmetricOverflow genA)
+    , testCase "SatSymmetric: Become minBound or minBound+1 on underflow" (satSymmetricUnderflow genA) ]
   else
     []) <>
   [ testCase "SatBound: Become maxBound on overflow" (satBoundOverflowLaw genA)
@@ -89,9 +91,6 @@ saturatingNumLaws testWrap genA =
 
   , testCase "SatZero: Become 0 on overflow" (satZeroOverflowLaw genA)
   , testCase "SatZero: Become 0 on underflow" (satZeroUnderflowLaw genA)
-
-  , testCase "SatSymmetric: Become maxBound on overflow" (satSymmetricOverflow genA)
-  , testCase "SatSymmetric: Become minBound or minBound+1 on underflow" (satSymmetricUnderflow genA)
 
   , testProperty "satAddTotal" (isTotal satAdd genA)
   , testProperty "satSubTotal" (isTotal satSub genA)

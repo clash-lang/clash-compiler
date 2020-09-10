@@ -951,7 +951,7 @@ instance NumFixedC rep int frac => SaturatingNum (Fixed rep int frac) where
   satPred satMode f@(Fixed fRep) =
     let sh       = natToNum @frac
         symBound = if isSigned fRep
-                   then Fixed $ succ minBound
+                   then Fixed $ minBound + 1
                    else minBound
     in case natVal (Proxy @int) of
          0 -> case satMode of
