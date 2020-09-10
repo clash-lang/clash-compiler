@@ -204,6 +204,7 @@ runClashTest = defaultMain $ clashTestRoot
     , clashTestGroup "shouldwork"
       [ clashTestGroup "AutoReg"
         [ outputTest ("tests" </> "shouldwork" </> "AutoReg") allTargets [] [] "AutoReg" "main"
+        , runTest "T1507" def{hdlSim=False}
         ]
       , clashTestGroup "Basic"
         [ runTest "AES" def{hdlSim=False}
