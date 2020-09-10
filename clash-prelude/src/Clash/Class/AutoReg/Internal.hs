@@ -111,6 +111,7 @@ class NFDataX a => AutoReg a where
     -> Signal dom a
     -> Signal dom a
   autoReg = register
+  {-# INLINE autoReg #-}
 
 instance AutoReg ()
 instance AutoReg Bool
@@ -157,6 +158,7 @@ instance AutoReg a => AutoReg (Maybe a) where
      createMaybe t v = case t of
        True -> Just v
        False -> Nothing
+  {-# INLINE autoReg #-}
 
 instance (KnownNat n, AutoReg a) => AutoReg (Vec n a) where
   autoReg
@@ -170,10 +172,12 @@ instance (KnownNat n, AutoReg a) => AutoReg (Vec n a) where
    where
     go :: forall (i :: Nat). SNat i -> a  -> Signal dom a -> Signal dom a
     go SNat = suffixNameFromNatP @i . autoReg clk rst en
+  {-# INLINE autoReg #-}
 
 instance (KnownNat d, AutoReg a) => AutoReg (RTree d a) where
   autoReg clk rst en initVal xs =
     bundle $ (autoReg clk rst en) <$> lazyT initVal <*> unbundle xs
+  {-# INLINE autoReg #-}
 
 
 -- | Decompose an applied type into its individual components. For example, this:
@@ -328,7 +332,9 @@ deriveAutoRegProduct tyInfo conInfo = go (constructorName conInfo) fieldInfos
 
     autoRegDec <- funD 'autoReg [clause argsP (normalB body) decls]
     ctx <- calculateRequiredContext conInfo
-    return [InstanceD Nothing ctx (AppT (ConT ''AutoReg) ty) [autoRegDec]]
+    return [InstanceD Nothing ctx (AppT (ConT ''AutoReg) ty)
+              [ autoRegDec
+              , PragmaD (InlineP 'autoReg Inline FunLike AllPhases) ]]
 
 -- Calculate the required constraint to call autoReg on all the fields of a
 -- given constructor
