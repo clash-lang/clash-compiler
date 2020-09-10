@@ -113,7 +113,7 @@ import Clash.Class.Parity             (Parity (..))
 import Clash.Class.Resize             (Resize (..))
 import Clash.Prelude.BitIndex         ((!), msb, replaceBit, split)
 import Clash.Prelude.BitReduction     (reduceOr)
-import Clash.Promoted.Nat             (natToNum)
+import Clash.Promoted.Nat             (natToNum, natToNatural)
 import Clash.Sized.Internal.BitVector (BitVector (BV), Bit, high, low, undefError)
 import qualified Clash.Sized.Internal.BitVector as BV
 import Clash.Sized.Internal.Mod
@@ -229,8 +229,22 @@ le# (U n) (U m) = n <= m
 -- | The functions: 'enumFrom', 'enumFromThen', 'enumFromTo', and
 -- 'enumFromThenTo', are not synthesizable.
 instance KnownNat n => Enum (Unsigned n) where
-  succ           = (+# fromInteger# 1)
-  pred           = (-# fromInteger# 1)
+  succ n
+    | n == maxBound =
+        error $ "'succ' was called on (" <> show @(Unsigned n) maxBound <> " :: "
+             <> "Unsigned " <> show (natToNatural @n) <> ") and caused an "
+             <> "overflow. Use 'satSucc' and specify a SaturationMode if you "
+             <> "need other behavior."
+    | otherwise = n +# fromInteger# 1
+
+  pred n
+    | n == minBound =
+        error $ "'pred' was called on (" <> show @(Unsigned n) maxBound <> " :: "
+             <> "Unsigned " <> show (natToNatural @n) <> ") and caused an "
+             <> "underflow. Use 'satPred' and specify a SaturationMode if you "
+             <> "need other behavior."
+    | otherwise = n -# fromInteger# 1
+
   toEnum         = fromInteger# . toInteger
   fromEnum       = fromEnum . toInteger#
   enumFrom       = enumFrom#

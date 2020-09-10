@@ -237,8 +237,22 @@ le# (S n) (S m) = n <= m
 -- | The functions: 'enumFrom', 'enumFromThen', 'enumFromTo', and
 -- 'enumFromThenTo', are not synthesizable.
 instance KnownNat n => Enum (Signed n) where
-  succ           = (+# fromInteger# 1)
-  pred           = (-# fromInteger# 1)
+  succ n
+    | n == maxBound =
+        error $ "'succ' was called on (" <> show @(Signed n) maxBound <> " :: "
+             <> "Signed " <> show (natToNatural @n) <> ") and caused an "
+             <> "overflow. Use 'satSucc' and specify a SaturationMode if you "
+             <> "need other behavior."
+    | otherwise = n +# fromInteger# 1
+
+  pred n
+    | n == minBound =
+        error $ "'pred' was called on (" <> show @(Signed n) maxBound <> " :: "
+             <> "Signed " <> show (natToNatural @n) <> ") and caused an "
+             <> "underflow. Use 'satPred' and specify a SaturationMode if you "
+             <> "need other behavior."
+    | otherwise = n -# fromInteger# 1
+
   toEnum         = fromInteger# . toInteger
   fromEnum       = fromEnum . toInteger#
   enumFrom       = enumFrom#
@@ -549,8 +563,10 @@ instance Resize Signed where
 
 {-# NOINLINE resize# #-}
 resize# :: forall m n . (KnownNat n, KnownNat m) => Signed n -> Signed m
-resize# s@(S i) | n' <= m'  = extended
-                | otherwise = truncated
+resize# s@(S i)
+  | natToNatural @m == 0 = S 0
+  | n' <= m'  = extended
+  | otherwise = truncated
   where
     n  = fromInteger (natVal s)
     n' = shiftL 1 n

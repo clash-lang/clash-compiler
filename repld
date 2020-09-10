@@ -16,6 +16,7 @@
 # Shortcuts exist for all supported libraries:
 #
 #   * `p`, `prelude`, `clash-prelude`
+#   * `p:tests`, `prelude:tests`, `clash-prelude:tests`
 #   * `l`, `lib`, `clash-lib`
 #   * `l:tests`, `lib:tests`, `clash-lib:tests`
 #   * `c`, `cores`, `clash-cores`
@@ -57,6 +58,7 @@ elif [[ $1 == "dev" || $1 == "clash-dev" ]]; then
 else
   echo "Unrecognized target. Use one of:"                    > /dev/stderr
   echo "  p, prelude, clash-prelude"                         > /dev/stderr
+  echo "  p:tests, prelude:tests, clash-prelude:tests"       > /dev/stderr
   echo "  l, lib, clash-lib"                                 > /dev/stderr
   echo "  l:tests, lib:tests, clash-lib:tests"               > /dev/stderr
   echo "  g, ghc, clash-ghc"                                 > /dev/stderr
