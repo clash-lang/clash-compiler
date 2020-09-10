@@ -610,6 +610,10 @@ caseCon' ctx@(TransformContext is0 _) e@(Case subj ty alts) = do
                                 , "EmptyCase"] ->
         let e1 = mkApps (mkTicks (Prim pInfo) ticks) [Right ty]
         in changed e1
+      (Prim pInfo,_:callStack:msg:_,_)
+        | primName pInfo == "Clash.XException.errorX"
+        -> let e1 = mkApps (Prim pInfo) [Right ty,callStack,msg]
+            in changed e1
       -- WHNF of subject is non of the above, so either a variable reference,
       -- or a primitive for which the evaluator doesn't have any evaluation
       -- rules.
