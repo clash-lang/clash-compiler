@@ -78,21 +78,23 @@ saturatingNumLaws ::
   TestWrap ->
   Gen a ->
   [TestTree]
-saturatingNumLaws testWrap genA =
-  (if testWrap then
+saturatingNumLaws testEnum genA =
+  (if testEnum then
     [ testCase "SatWrap: Wrap around on overflow" (satWrapOverflowLaw genA)
     , testCase "SatWrap: Wrap around on underflow" (satWrapUnderflowLaw genA)
-    , testCase "SatSymmetric: Become maxBound on overflow" (satSymmetricOverflow genA)
-    , testCase "SatSymmetric: Become minBound or minBound+1 on underflow" (satSymmetricUnderflow genA) ]
+    , testCase "SatSymmetric: Become maxBound on overflow"
+               (satSymmetricOverflow genA)
+    , testCase "SatSymmetric: Become minBound or minBound+1 on underflow"
+               (satSymmetricUnderflow genA)
+    , testCase "SatBound: Become maxBound on overflow"
+               (satBoundOverflowLaw genA)
+    , testCase "SatBound: Become minBound on underflow"
+               (satBoundUnderflowLaw genA)
+    , testCase "SatZero: Become 0 on overflow" (satZeroOverflowLaw genA)
+    , testCase "SatZero: Become 0 on underflow" (satZeroUnderflowLaw genA) ]
   else
     []) <>
-  [ testCase "SatBound: Become maxBound on overflow" (satBoundOverflowLaw genA)
-  , testCase "SatBound: Become minBound on underflow" (satBoundUnderflowLaw genA)
-
-  , testCase "SatZero: Become 0 on overflow" (satZeroOverflowLaw genA)
-  , testCase "SatZero: Become 0 on underflow" (satZeroUnderflowLaw genA)
-
-  , testProperty "satAddTotal" (isTotal satAdd genA)
+  [ testProperty "satAddTotal" (isTotal satAdd genA)
   , testProperty "satSubTotal" (isTotal satSub genA)
   , testProperty "satMulTotal" (isTotal satMul genA)
   ]
@@ -103,8 +105,8 @@ testSaturationLaws ::
   String ->
   Gen a ->
   TestTree
-testSaturationLaws testWrap typeName genA =
-  testGroup typeName (saturatingNumLaws testWrap genA)
+testSaturationLaws testEnum typeName genA =
+  testGroup typeName (saturatingNumLaws testEnum genA)
 
 -- | Generates a bounded integral with a bias towards extreme values:
 --
@@ -175,18 +177,26 @@ tests = testGroup "SaturatingNum"
   , testSaturationLaws False "SFixed 0 0" (genSFixed @0 @0)
   , testSaturationLaws False "SFixed 0 1" (genSFixed @0 @1)
   , testSaturationLaws False "SFixed 1 0" (genSFixed @1 @0)
+  , testSaturationLaws False "SFixed 0 2" (genSFixed @0 @2)
   , testSaturationLaws False "SFixed 1 1" (genSFixed @1 @1)
+  , testSaturationLaws False "SFixed 2 0" (genSFixed @2 @0)
   , testSaturationLaws False "SFixed 1 2" (genSFixed @1 @2)
   , testSaturationLaws False "SFixed 2 1" (genSFixed @2 @1)
   , testSaturationLaws False "SFixed 2 2" (genSFixed @2 @2)
+  , testSaturationLaws False "SFixed 7 7" (genSFixed @7 @7)
+  , testSaturationLaws False "SFixed 121 121" (genSFixed @121 @121)
   , testSaturationLaws False "SFixed 128 128" (genSFixed @128 @128)
 
   , testSaturationLaws False "UFixed 0 0" (genUFixed @0 @0)
   , testSaturationLaws False "UFixed 0 1" (genUFixed @0 @1)
   , testSaturationLaws False "UFixed 1 0" (genUFixed @1 @0)
+  , testSaturationLaws False "UFixed 0 2" (genUFixed @0 @2)
   , testSaturationLaws False "UFixed 1 1" (genUFixed @1 @1)
+  , testSaturationLaws False "UFixed 2 0" (genUFixed @2 @0)
   , testSaturationLaws False "UFixed 1 2" (genUFixed @1 @2)
   , testSaturationLaws False "UFixed 2 1" (genUFixed @2 @1)
   , testSaturationLaws False "UFixed 2 2" (genUFixed @2 @2)
+  , testSaturationLaws False "UFixed 7 7" (genUFixed @7 @7)
+  , testSaturationLaws False "UFixed 121 121" (genUFixed @121 @121)
   , testSaturationLaws False "UFixed 128 128" (genUFixed @128 @128)
   ]
