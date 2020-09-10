@@ -251,6 +251,7 @@ runClashTest = defaultMain $ clashTestRoot
     , clashTestGroup "shouldwork"
       [ clashTestGroup "AutoReg"
         [ NEEDS_PRIMS(outputTest ("tests" </> "shouldwork" </> "AutoReg") allTargets [] [] "AutoReg" "main")
+        , NEEDS_PRIMS(runTest "T1507" def{hdlSim=False})
         ]
       , clashTestGroup "Basic"
         [ NEEDS_PRIMS(runTest "AES" def{hdlSim=False})

@@ -103,7 +103,8 @@ import {-# SOURCE #-} Clash.GHC.Evaluator
 
 isUndefinedPrimVal :: Value -> Bool
 isUndefinedPrimVal (PrimVal (PrimInfo{primName}) _ _) =
-  primName == "Clash.Transformations.undefined"
+  primName `elem` ["Clash.Transformations.undefined"
+                  ,"Clash.XException.errorX"]
 isUndefinedPrimVal _ = False
 
 -- | Evaluation of primitive operations.
