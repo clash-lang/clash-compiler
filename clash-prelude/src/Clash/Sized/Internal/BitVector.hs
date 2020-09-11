@@ -134,7 +134,7 @@ import Data.Typeable              (Typeable, typeOf)
 import GHC.Generics               (Generic)
 import Data.Maybe                 (fromMaybe)
 import GHC.Exts
-  ((>#), Word#, Word (W#), eqWord#, int2Word#, uncheckedShiftRL#)
+  ((>#), Word#, Word (W#), eqWord#, int2Word#, isTrue#, uncheckedShiftRL#)
 import qualified GHC.Exts
 import GHC.Integer.GMP.Internals  (Integer (..), bigNatToWord, shiftRBigNat)
 import GHC.Natural
@@ -168,6 +168,8 @@ import Clash.Sized.Internal.Mod
 import {-# SOURCE #-} qualified Clash.Sized.Vector         as V
 import {-# SOURCE #-} qualified Clash.Sized.Internal.Index as I
 import                qualified Data.List                  as L
+
+#include "MachDeps.h"
 
 {- $setup
 >>> :set -XTemplateHaskell
@@ -736,9 +738,10 @@ msb# (BV m v)
         (msbN v)
  where
   !(S# i#) = natVal (Proxy @n)
-  msbN (NatS# w) = case (i# ># 64#) of
-    1# -> W# 0##
-    _  -> W# (w `uncheckedShiftRL#` (i# GHC.Exts.-# 1#))
+  msbN (NatS# w) =
+    if isTrue# (i# ># WORD_SIZE_IN_BITS#)
+    then W# 0##
+    else W# (w `uncheckedShiftRL#` (i# GHC.Exts.-# 1#))
   msbN (NatJ# bn) = W# (bigNatToWord (shiftRBigNat bn (i# GHC.Exts.-# 1#)))
 
 {-# NOINLINE lsb# #-}
