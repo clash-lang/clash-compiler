@@ -920,7 +920,7 @@ instance NumFixedC rep int frac => SaturatingNum (Fixed rep int frac) where
         (rL,rR) = split res :: (BitVector int, BitVector (int + frac + frac))
     in  case isSigned a of
           True  -> let overflow = complement (reduceOr (pack (msb rR) ++# pack rL)) .|.
-                                             reduceAnd (pack (msb rR) ++# pack rL)
+                                  reduceAnd (pack (msb rR) ++# pack rL)
                    in  case overflow of
                          1 -> unpack (resize (shiftR rR sh))
                          _ -> case msb rL of
@@ -936,7 +936,7 @@ instance NumFixedC rep int frac => SaturatingNum (Fixed rep int frac) where
         (rL,rR) = split res :: (BitVector int, BitVector (int + frac + frac))
     in  case isSigned a of
           True  -> let overflow = complement (reduceOr (pack (msb rR) ++# pack rL)) .|.
-                                             reduceAnd (pack (msb rR) ++# pack rL)
+                                  reduceAnd (pack (msb rR) ++# pack rL)
                    in  case overflow of
                          1 -> unpack (resize (shiftR rR sh))
                          _ -> 0
@@ -950,7 +950,7 @@ instance NumFixedC rep int frac => SaturatingNum (Fixed rep int frac) where
         (rL,rR) = split res :: (BitVector int, BitVector (int + frac + frac))
     in  case isSigned a of
           True  -> let overflow = complement (reduceOr (pack (msb rR) ++# pack rL)) .|.
-                                             reduceAnd (pack (msb rR) ++# pack rL)
+                                  reduceAnd (pack (msb rR) ++# pack rL)
                    in  case overflow of
                          1 -> unpack (resize (shiftR rR sh))
                          _ -> case msb rL of
