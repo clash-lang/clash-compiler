@@ -24,7 +24,7 @@ import Clash.Annotations.Primitive (extractPrim)
 import Clash.Core.Name (mkUnsafeInternalName)
 import Clash.Core.Term
   ( IsMultiPrim(..), MultiPrimInfo(..), PrimInfo(..), Term(..), WorkInfo(..)
-  , mkAbstraction, mkApps, mkTmApps, mkTyApps)
+  , mkAbstraction, mkApps, mkTmApps, mkTyApps, PrimUnfolding(..))
 import Clash.Core.TermInfo (multiPrimInfo')
 import Clash.Core.TyCon (TyConMap)
 import Clash.Core.Type (Type(..), mkPolyFunTy, splitFunForallTy)
@@ -113,7 +113,9 @@ setupMultiResultPrim' tcm primInfo@PrimInfo{primType} =
     { primName = "c$multiPrimSelect"
     , primType = mkPolyFunTy pResTy [Right pResTy, Right t]
     , primWorkInfo = WorkAlways
-    , primMultiResult = SingleResult }
+    , primMultiResult = SingleResult
+    , primUnfolding = NoUnfolding
+    }
 
   letTerm =
     Letrec

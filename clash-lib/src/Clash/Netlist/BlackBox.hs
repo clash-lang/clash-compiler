@@ -69,7 +69,7 @@ import           Clash.Core.Pretty             (showPpr)
 import           Clash.Core.Subst              (extendIdSubst, mkSubst, substTm)
 import           Clash.Core.Term               as C
   (IsMultiPrim (..), PrimInfo (..), Term (..), WorkInfo (..), collectArgs,
-   collectArgsTicks, collectBndrs, mkApps)
+   collectArgsTicks, collectBndrs, mkApps, PrimUnfolding(..))
 import           Clash.Core.TermInfo
 import           Clash.Core.Type               as C
   (Type (..), ConstTy (..), TypeView (..), mkFunTy, splitFunTys, tyView)
@@ -926,11 +926,11 @@ collectBindIO _ es = error ("internal error:\n" ++ showPpr es)
 -- | Collect the sequential declarations for 'appIO'
 collectAppIO :: NetlistId -> [Term] -> [Term] -> NetlistMonad (Expr,[Declaration])
 collectAppIO dst (fun1:arg1:_) rest = case collectArgs fun1 of
-  (Prim (PrimInfo "Clash.Explicit.SimIO.fmapSimIO#" _ _ _),(lefts -> (fun0:arg0:_))) -> do
+  (Prim (PrimInfo "Clash.Explicit.SimIO.fmapSimIO#" _ _ _ _),(lefts -> (fun0:arg0:_))) -> do
     tcm <- Lens.use tcCache
     let argN = map (Left . unSimIO tcm) (arg0:arg1:rest)
     mkExpr False Sequential dst (mkApps fun0 argN)
-  (Prim (PrimInfo "Clash.Explicit.SimIO.apSimIO#" _ _ _),(lefts -> args)) -> do
+  (Prim (PrimInfo "Clash.Explicit.SimIO.apSimIO#" _ _ _ _),(lefts -> args)) -> do
     collectAppIO dst args (arg1:rest)
   _ -> error ("internal error:\n" ++ showPpr (fun1:arg1:rest))
 
@@ -950,11 +950,12 @@ unSimIO tcm arg =
   let argTy = termType tcm arg
   in  case tyView argTy of
         TyConApp _ [tcArg] ->
-          mkApps (Prim ( PrimInfo
-                           "Clash.Explicit.SimIO.unSimIO#"
-                           (mkFunTy argTy tcArg)
-                           WorkNever
-                           SingleResult ))
+          mkApps (Prim (PrimInfo
+                          "Clash.Explicit.SimIO.unSimIO#"
+                          (mkFunTy argTy tcArg)
+                          WorkNever
+                          SingleResult
+                          NoUnfolding))
                  [Left arg]
         _ -> error ("internal error:\n" ++ showPpr arg)
 

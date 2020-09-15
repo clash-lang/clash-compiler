@@ -28,7 +28,7 @@ import Clash.Annotations.Primitive (extractPrim)
 import Clash.Core.DataCon (DataCon)
 import Clash.Core.Term
   ( Alt, IsMultiPrim(..), LetBinding, Pat(..), PrimInfo(..), Term(..)
-  , WorkInfo(..), collectArgs)
+  , WorkInfo(..), collectArgs, PrimUnfolding(..))
 import Clash.Core.TermInfo (termType)
 import Clash.Core.Type (TyVar, Type)
 import Clash.Core.Util (mkInternalVar)
@@ -74,7 +74,7 @@ xOptimize (TransformContext is0 _) e@(Case subj ty alts) = do
 
     case defPart of
       ([], _)    -> return e
-      (_, [])    -> changed (Prim (PrimInfo (Text.showt 'errorX) ty WorkConstant SingleResult))
+      (_, [])    -> changed (Prim (PrimInfo (Text.showt 'errorX) ty WorkConstant SingleResult NoUnfolding))
       (_, [alt]) -> xOptimizeSingle is0 subj alt
       (_, defs)  -> xOptimizeMany is0 subj ty defs
   else
