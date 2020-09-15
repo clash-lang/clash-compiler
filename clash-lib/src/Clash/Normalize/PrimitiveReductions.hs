@@ -68,7 +68,7 @@ import           Clash.Core.Name
 import           Clash.Core.Pretty                (showPpr)
 import           Clash.Core.Term
   (IsMultiPrim (..), CoreContext (..), PrimInfo (..), Term (..), WorkInfo (..), Pat (..),
-   collectTermIds, mkApps)
+   collectTermIds, mkApps, PrimUnfolding(..))
 import           Clash.Core.TermInfo
 import           Clash.Core.Type                  (LitTy (..), Type (..),
                                                    TypeView (..), coreView1,
@@ -111,7 +111,7 @@ vecHeadPrim
   -> Term
 vecHeadPrim vecTcNm =
  -- head :: Vec (n+1) a -> a
-  Prim (PrimInfo "Clash.Sized.Vector.head" (vecHeadTy vecTcNm) WorkNever SingleResult)
+  Prim (PrimInfo "Clash.Sized.Vector.head" (vecHeadTy vecTcNm) WorkNever SingleResult NoUnfolding)
 
 vecLastPrim
   :: TyConName
@@ -121,7 +121,7 @@ vecLastPrim vecTcNm =
   -- last :: Vec (n+1) a -> a
   -- has the same type signature as head, hence we're reusing its type
   -- definition here.
-  Prim (PrimInfo "Clash.Sized.Vector.last" (vecHeadTy vecTcNm) WorkNever SingleResult)
+  Prim (PrimInfo "Clash.Sized.Vector.last" (vecHeadTy vecTcNm) WorkNever SingleResult NoUnfolding)
 
 vecHeadTy
   :: TyConName
@@ -143,7 +143,7 @@ vecTailPrim
   -> Term
 vecTailPrim vecTcNm =
   -- tail :: Vec (n + 1) a -> Vec n a
-  Prim (PrimInfo "Clash.Sized.Vector.tail" (vecTailTy vecTcNm) WorkNever SingleResult)
+  Prim (PrimInfo "Clash.Sized.Vector.tail" (vecTailTy vecTcNm) WorkNever SingleResult NoUnfolding)
 
 vecInitPrim
   :: TyConName
@@ -153,7 +153,7 @@ vecInitPrim vecTcNm =
   -- init :: Vec (n + 1) a -> Vec n a
   -- has the same type signature as tail, hence we're reusing its type
   -- definition here.
-  Prim (PrimInfo "Clash.Sized.Vector.init" (vecTailTy vecTcNm) WorkNever SingleResult)
+  Prim (PrimInfo "Clash.Sized.Vector.init" (vecTailTy vecTcNm) WorkNever SingleResult NoUnfolding)
 
 vecTailTy
   :: TyConName
@@ -426,7 +426,7 @@ reduceImap (TransformContext is0 ctx) n argElTy resElTy fun arg = do
                                                (mkTyConApp idxTcNm
                                                            [VarTy nTv])
                                                [integerPrimTy,integerPrimTy])
-            idxFromInteger   = Prim (PrimInfo "Clash.Sized.Internal.Index.fromInteger#" idxFromIntegerTy WorkNever SingleResult)
+            idxFromInteger   = Prim (PrimInfo "Clash.Sized.Internal.Index.fromInteger#" idxFromIntegerTy WorkNever SingleResult NoUnfolding)
             idxs             = map (App (App (TyApp idxFromInteger (LitTy (NumTy n)))
                                              (Literal (IntegerLiteral (toInteger n))))
                                    . Literal . IntegerLiteral . toInteger) [0..(n-1)]
@@ -1092,7 +1092,8 @@ reduceReplace_int is0 n aTy vTy v i newA = do
            "GHC.Classes.eqInt"
            (mkFunTy intTy (mkFunTy intTy boolTy))
            WorkVariable
-           SingleResult )
+           SingleResult
+           NoUnfolding)
 
   go tcm (coreView1 tcm -> Just ty') = go tcm ty'
   go tcm (tyView -> TyConApp vecTcNm _)
@@ -1196,7 +1197,8 @@ reduceIndex_int is0 n aTy v i = do
             "GHC.Classes.eqInt"
             (mkFunTy intTy (mkFunTy intTy boolTy))
             WorkVariable
-            SingleResult )
+            SingleResult
+            NoUnfolding)
 
   go tcm (coreView1 tcm -> Just ty') = go tcm ty'
   go tcm (tyView -> TyConApp vecTcNm _)

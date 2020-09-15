@@ -1,8 +1,9 @@
 {-|
   Copyright   :  (C) 2012-2016, University of Twente,
                           2017, Google Inc.
+                          2021, QBayLogic B.V.
   License     :  BSD2 (see the file LICENSE)
-  Maintainer  :  Christiaan Baaij <christiaan.baaij@gmail.com>
+  Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
 
   Term representation in the CoreHW language: System F + LetRec + Case
 -}
@@ -36,6 +37,7 @@ module Clash.Core.Term
   , partitionTicks
   , NameMod (..)
   , PrimInfo (..)
+  , PrimUnfolding (..)
   , IsMultiPrim (..)
   , MultiPrimInfo (..)
   , WorkInfo (..)
@@ -137,7 +139,13 @@ data PrimInfo = PrimInfo
   -- the variables it should assign its results to.
   --
   -- See: 'Clash.Normalize.Transformations.setupMultiResultPrim'
+  , primUnfolding :: !PrimUnfolding
   } deriving (Show,Generic,NFData,Hashable,Binary)
+
+data PrimUnfolding
+  = NoUnfolding
+  | Unfolding !Id
+  deriving (Show,Generic,NFData,Hashable,Binary)
 
 data MultiPrimInfo = MultiPrimInfo
   { mpi_primInfo :: PrimInfo

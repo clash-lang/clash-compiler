@@ -426,7 +426,7 @@ dataConInstArgTys (MkData { dcArgTys, dcUnivTyVars, dcExtTyVars }) inst_tys =
 primCo
   :: Type
   -> Term
-primCo ty = Prim (PrimInfo "_CO_" ty WorkNever SingleResult)
+primCo ty = Prim (PrimInfo "_CO_" ty WorkNever SingleResult NoUnfolding)
 
 -- | Make an unsafe coercion
 primUCo :: Term
@@ -434,7 +434,9 @@ primUCo =
   Prim PrimInfo { primName        = "GHC.Prim.unsafeCoerce#"
                 , primType        = unsafeCoerceTy
                 , primWorkInfo    = WorkNever
-                , primMultiResult = SingleResult }
+                , primMultiResult = SingleResult
+                , primUnfolding = NoUnfolding
+                }
 
 undefinedPrims :: [T.Text]
 undefinedPrims =

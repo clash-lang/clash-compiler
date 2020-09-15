@@ -67,7 +67,7 @@ import Clash.Core.Pretty (showPpr)
 import Clash.Core.Subst
 import Clash.Core.Term
   ( Term(..), TickInfo, collectArgs, collectArgsTicks, mkApps, mkTmApps, mkTicks, patIds
-  , patVars, mkAbstraction, PrimInfo(..), WorkInfo(..), IsMultiPrim(..))
+  , patVars, mkAbstraction, PrimInfo(..), WorkInfo(..), IsMultiPrim(..), PrimUnfolding(..))
 import Clash.Core.TermInfo (isLocalVar, isVar, piResultTy, termType, isPolyFun)
 import Clash.Core.TyCon (TyConMap, tyConDataCons)
 import Clash.Core.Type
@@ -621,7 +621,7 @@ zeroWidthTypeElem tcm ty = do
   mkBitVector tcNm =
     let prTy = mkPolyFunTy (mkTyConApp tcNm [VarTy nTv])
                  [Left nTv, Right naturalPrimTy, Right naturalPrimTy, Right integerPrimTy]
-     in PrimInfo (Text.showt 'BV.fromInteger#) prTy WorkNever SingleResult
+     in PrimInfo (Text.showt 'BV.fromInteger#) prTy WorkNever SingleResult NoUnfolding
 
   bitVectorZW tcNm tyArgs =
     let pr = mkBitVector tcNm
@@ -634,7 +634,7 @@ zeroWidthTypeElem tcm ty = do
   mkSizedNum tcNm n =
     let prTy = mkPolyFunTy (mkTyConApp tcNm [VarTy nTv])
                  [Left nTv, Right naturalPrimTy, Right integerPrimTy]
-     in PrimInfo n prTy WorkNever SingleResult
+     in PrimInfo n prTy WorkNever SingleResult NoUnfolding
 
   indexZW tcNm tyArgs =
     let pr = mkSizedNum tcNm (Text.showt 'I.fromInteger#)

@@ -17,7 +17,7 @@ import Prelude hiding (undefined)
 
 import qualified Data.Text.Extra as Text
 
-import Clash.Core.Term (IsMultiPrim(..), PrimInfo(..), WorkInfo(..))
+import Clash.Core.Term (IsMultiPrim(..), PrimInfo(..), PrimUnfolding(..), WorkInfo(..))
 import Clash.Core.Type (undefinedTy)
 
 -- | The removedArg primitive represents an argument which is computationally
@@ -31,6 +31,7 @@ removedArg = PrimInfo
   , primType = undefinedTy
   , primWorkInfo = WorkNever
   , primMultiResult = SingleResult
+  , primUnfolding = NoUnfolding
   }
 
 -- | The undefined primitive represents an undefined value that was identified
@@ -43,4 +44,5 @@ undefined = PrimInfo
   , primType = undefinedTy
   , primWorkInfo = WorkNever
   , primMultiResult = SingleResult
+  , primUnfolding = NoUnfolding
   }
