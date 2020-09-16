@@ -660,7 +660,7 @@ mapSignal# f = go
  where
   -- See -fstrict-mapSignal documentation in clash-prelude.cabal
   theSeq = if fStrictMapSignal then seqX else flip const
-  go (a :- as) = f a :- (a `theSeq` go as)
+  go ~(xs@(a :- as)) = f a :- (a `theSeq` (xs `seq` go as))
 {-# NOINLINE mapSignal# #-}
 {-# ANN mapSignal# hasBlackBox #-}
 

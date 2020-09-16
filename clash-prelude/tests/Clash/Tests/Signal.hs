@@ -13,8 +13,11 @@ Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
 
 module Clash.Tests.Signal where
 
-import           Clash.Signal
+import           Clash.Signal                   hiding (sample)
+import           Clash.Signal.Internal          (sample)
 
+import           Control.Applicative            (liftA2)
+import           Control.Exception              (evaluate)
 import           Data.List                      (isInfixOf)
 import           Test.Tasty
 import           Test.Tasty.HUnit
@@ -155,6 +158,13 @@ tests =
 
         , testCase "test5nok_0" (acte "withSpecificReset resetGen test5")
 #endif
+        , testCase "T1521" $
+            let
+              f (_, b) = (b, b)
+              s = f <$> liftA2 (,) (fst <$> s) (pure 'a')
+              ((a,_):_) = sample @(Signal System) s
+            in
+              evaluate a >> pure ()
         ]
     ]
 
