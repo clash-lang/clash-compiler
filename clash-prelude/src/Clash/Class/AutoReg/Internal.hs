@@ -113,6 +113,19 @@ class NFDataX a => AutoReg a where
   autoReg = register
   {-# INLINE autoReg #-}
 
+  -- | A "High-Speed" version of 'autoReg', that still splits product types
+  -- into multiple registers, but no longer uses the tag bit to control the
+  -- enable of the field bits. This reduces the potential logic depth, at the
+  -- cost of power due to toggling field bits.
+  autoRegHs
+    :: (HasCallStack, KnownDomain dom)
+    => Clock dom -> Reset dom -> Enable dom
+    -> a  -- ^ Reset value
+    -> Signal dom a
+    -> Signal dom a
+  autoRegHs = autoReg
+  {-# INLINE autoRegHs #-}
+
 instance AutoReg ()
 instance AutoReg Bool
 
@@ -148,10 +161,10 @@ instance AutoReg a => AutoReg (Maybe a) where
    where
      tag = isJust <$> input
      tagInit = isJust initVal
-     tagR = register clk rst en tagInit tag
+     tagR = suffixName @"tag" register clk rst en tagInit tag
 
-     val = fromMaybe (deepErrorX "autoReg'.val") <$> input
-     valInit = fromMaybe (deepErrorX "autoReg'.valInit") initVal
+     val = fromMaybe (deepErrorX "autoReg.val") <$> input
+     valInit = fromMaybe (deepErrorX "autoReg.valInit") initVal
 
      valR = autoReg clk rst (enable en tag) valInit val
 
@@ -160,19 +173,56 @@ instance AutoReg a => AutoReg (Maybe a) where
        False -> Nothing
   {-# INLINE autoReg #-}
 
-instance (KnownNat n, AutoReg a) => AutoReg (Vec n a) where
-  autoReg
-    :: forall dom. (HasCallStack, KnownDomain dom)
-    => Clock dom -> Reset dom -> Enable dom
-    -> Vec n a -- ^ Reset value
-    -> Signal dom (Vec n a)
-    -> Signal dom (Vec n a)
-  autoReg clk rst en initVal xs =
-    bundle $ smap go (lazyV initVal) <*> unbundle xs
+  autoRegHs clk rst en initVal input = createMaybe <$> tagR <*> valR
    where
-    go :: forall (i :: Nat). SNat i -> a  -> Signal dom a -> Signal dom a
-    go SNat = suffixNameFromNatP @i . autoReg clk rst en
+     tag = isJust <$> input
+     tagInit = isJust initVal
+     tagR = suffixName @"tag" register clk rst en tagInit tag
+
+     val = fromMaybe (deepErrorX "autoRegHs.val") <$> input
+     valInit = fromMaybe (deepErrorX "autoRegHs.valInit") initVal
+
+     valR = autoReg clk rst en valInit val
+
+     createMaybe t v = case t of
+       True -> Just v
+       False -> Nothing
+  {-# INLINE autoRegHs #-}
+
+instance (KnownNat n, AutoReg a) => AutoReg (Vec n a) where
+  autoReg = autoRegVec
   {-# INLINE autoReg #-}
+
+  autoRegHs = autoRegHsVec
+  {-# INLINE autoRegHs #-}
+
+autoRegVec
+  :: forall dom n a . (HasCallStack, KnownNat n, KnownDomain dom, AutoReg a)
+  => Clock dom -> Reset dom -> Enable dom
+  -> Vec n a -- ^ Reset value
+  -> Signal dom (Vec n a)
+  -> Signal dom (Vec n a)
+autoRegVec clk rst en initVal xs =
+  bundle $ smap go (lazyV initVal) <*> unbundle xs
+ where
+  go :: forall (i :: Nat). SNat i -> a  -> Signal dom a -> Signal dom a
+  go _ = suffixNameFromNatP @i . autoReg clk rst en
+  {-# INLINE go #-}
+{-# NOINLINE autoRegVec #-}
+
+autoRegHsVec
+  :: forall dom n a . (HasCallStack, KnownNat n, KnownDomain dom, AutoReg a)
+  => Clock dom -> Reset dom -> Enable dom
+  -> Vec n a -- ^ Reset value
+  -> Signal dom (Vec n a)
+  -> Signal dom (Vec n a)
+autoRegHsVec clk rst en initVal xs =
+  bundle $ smap go (lazyV initVal) <*> unbundle xs
+ where
+  go :: forall (i :: Nat). SNat i -> a  -> Signal dom a -> Signal dom a
+  go _ = suffixNameFromNatP @i . autoRegHs clk rst en
+  {-# INLINE go #-}
+{-# NOINLINE autoRegHsVec #-}
 
 instance (KnownNat d, AutoReg a) => AutoReg (RTree d a) where
   autoReg clk rst en initVal xs =
