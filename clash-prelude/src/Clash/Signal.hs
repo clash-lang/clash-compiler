@@ -1380,13 +1380,11 @@ register
   -- initial value.
   -> Signal dom a
   -> Signal dom a
-register i s =
+register =
   E.register
     (fromLabel @(HiddenClockName dom))
     (fromLabel @(HiddenResetName dom))
     (fromLabel @(HiddenEnableName dom))
-    i
-    s
 {-# INLINE register #-}
 infixr 3 `register`
 
