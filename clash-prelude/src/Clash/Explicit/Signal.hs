@@ -563,6 +563,7 @@ enable
   -> Enable dom
 enable e0 e1 =
   toEnable (fromEnable e0 .&&. e1)
+{-# INLINE enable #-}
 
 -- | Special version of 'delay' that doesn't take enable signals of any kind.
 -- Initial value will be undefined.
@@ -572,8 +573,8 @@ dflipflop
   => Clock dom
   -> Signal dom a
   -> Signal dom a
-dflipflop clk i =
-  delay
+dflipflop = \clk i ->
+  delay#
     clk
     (toEnable (pure True))
     (deepErrorX "First value of dflipflop undefined")
@@ -616,8 +617,8 @@ delayMaybe
   -- ^ Initial value
   -> Signal dom (Maybe a)
   -> Signal dom a
-delayMaybe clk gen dflt i =
-  delayEn clk gen dflt (isJust <$> i) (fromJustX <$> i)
+delayMaybe = \clk gen dflt i ->
+  delay# clk (enable gen (isJust <$> i)) dflt (fromJustX <$> i)
 {-# INLINE delayMaybe #-}
 
 -- | Version of 'delay' that only updates when its third argument is asserted.
@@ -639,8 +640,8 @@ delayEn
   -- ^ Enable
   -> Signal dom a
   -> Signal dom a
-delayEn clk gen dflt en i =
-  delay clk (enable gen en) dflt i
+delayEn = \clk gen dflt en i ->
+  delay# clk (enable gen en) dflt i
 {-# INLINE delayEn #-}
 
 -- | \"@'register' clk rst i s@\" delays the values in 'Signal' /s/ for one
@@ -662,7 +663,7 @@ register
   -- will also be the initial value.
   -> Signal dom a
   -> Signal dom a
-register clk rst gen initial i =
+register = \clk rst gen initial i ->
   register# clk rst gen initial initial i
 {-# INLINE register #-}
 
@@ -701,8 +702,8 @@ regMaybe
   -- will also be the initial value.
   -> Signal dom (Maybe a)
   -> Signal dom a
-regMaybe clk rst en initial iM =
-  register clk rst (enable en (fmap isJust iM)) initial (fmap fromJustX iM)
+regMaybe = \clk rst en initial iM ->
+  register# clk rst (enable en (fmap isJust iM)) initial initial (fmap fromJustX iM)
 {-# INLINE regMaybe #-}
 
 -- | Version of 'register' that only updates its content when its fourth
@@ -736,8 +737,8 @@ regEn
   -- ^ Enable signal
   -> Signal dom a
   -> Signal dom a
-regEn clk rst gen initial en i =
-  register clk rst (enable gen en) initial i
+regEn = \clk rst gen initial en i ->
+  register# clk rst (enable gen en) initial initial i
 {-# INLINE regEn #-}
 
 -- * Simulation functions
