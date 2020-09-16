@@ -1308,7 +1308,7 @@ delay
   -> Signal dom a
   -- ^ Signal to delay
   -> Signal dom a
-delay dflt i =
+delay = \dflt i ->
   delay#
     (fromLabel @(HiddenClockName dom))
     (fromLabel @(HiddenEnableName dom))
@@ -1331,7 +1331,7 @@ delayMaybe
   -- ^ Initial value
   -> Signal dom (Maybe a)
   -> Signal dom a
-delayMaybe dflt i =
+delayMaybe = \dflt i ->
   E.delayMaybe
     (fromLabel @(HiddenClockName dom))
     (fromLabel @(HiddenEnableName dom))
@@ -1356,7 +1356,7 @@ delayEn
   -- ^ Enable
   -> Signal dom a
   -> Signal dom a
-delayEn dflt en i =
+delayEn = \dflt en i ->
   E.delayEn
     (fromLabel @(HiddenClockName dom))
     (fromLabel @(HiddenEnableName dom))
@@ -1380,7 +1380,7 @@ register
   -- initial value.
   -> Signal dom a
   -> Signal dom a
-register i s =
+register = \i s ->
   E.register
     (fromLabel @(HiddenClockName dom))
     (fromLabel @(HiddenResetName dom))
@@ -1421,7 +1421,7 @@ regMaybe
   -- initial value.
   -> Signal dom (Maybe a)
   -> Signal dom a
-regMaybe initial iM =
+regMaybe = \initial iM ->
   E.regMaybe
     (fromLabel @(HiddenClockName dom))
     (fromLabel @(HiddenResetName dom))
@@ -1456,7 +1456,7 @@ regEn
   -> Signal dom Bool
   -> Signal dom a
   -> Signal dom a
-regEn initial en i =
+regEn = \initial en i ->
   E.regEn
     (fromLabel @(HiddenClockName dom))
     (fromLabel @(HiddenResetName dom))
