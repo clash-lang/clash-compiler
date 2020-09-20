@@ -24,9 +24,8 @@ import           Data.List                    (nub,zipWith4)
 import           Data.Maybe                   (fromMaybe,isJust)
 
 import           GHC.Stack                    (HasCallStack)
-import           GHC.TypeNats                 (KnownNat,Nat,type (+))
+import           GHC.TypeNats                 (KnownNat,type (+))
 import           Clash.Explicit.Signal
-import           Clash.Promoted.Nat
 import           Clash.Magic
 import           Clash.XException             (NFDataX, deepErrorX)
 
@@ -36,7 +35,7 @@ import           Clash.Sized.Index
 import           Clash.Sized.RTree
 import           Clash.Sized.Signed
 import           Clash.Sized.Unsigned
-import           Clash.Sized.Vector           (Vec, lazyV, smap)
+import           Clash.Sized.Vector           as V (Vec(..), lazyV, smap)
 
 import           Data.Int
 import           Data.Word
@@ -111,7 +110,6 @@ class NFDataX a => AutoReg a where
     -> Signal dom a
     -> Signal dom a
   autoReg = register
-  {-# INLINE autoReg #-}
 
 instance AutoReg ()
 instance AutoReg Bool
@@ -148,36 +146,37 @@ instance AutoReg a => AutoReg (Maybe a) where
    where
      tag = isJust <$> input
      tagInit = isJust initVal
-     tagR = register clk rst en tagInit tag
+     tagR = suffixNameP @"tag" register clk rst en tagInit tag
 
      val = fromMaybe (deepErrorX "autoReg'.val") <$> input
      valInit = fromMaybe (deepErrorX "autoReg'.valInit") initVal
 
-     valR = autoReg clk rst (enable en tag) valInit val
+     valR = suffixNameP @"val" autoReg clk rst (enable en tag) valInit val
 
      createMaybe t v = case t of
        True -> Just v
        False -> Nothing
-  {-# INLINE autoReg #-}
 
 instance (KnownNat n, AutoReg a) => AutoReg (Vec n a) where
-  autoReg
-    :: forall dom. (HasCallStack, KnownDomain dom)
-    => Clock dom -> Reset dom -> Enable dom
-    -> Vec n a -- ^ Reset value
-    -> Signal dom (Vec n a)
-    -> Signal dom (Vec n a)
-  autoReg clk rst en initVal xs =
+  autoReg = vecAutoReg
+
+vecAutoReg :: forall n a dom . (KnownNat n, AutoReg a, KnownDomain dom) =>
+                    Clock dom
+                    -> Reset dom
+                    -> Enable dom
+                    -> Vec n a
+                    -> Signal dom (Vec n a)
+                    -> Signal dom (Vec n a)
+vecAutoReg clk rst en initVal xs =
     bundle $ smap go (lazyV initVal) <*> unbundle xs
    where
-    go :: forall (i :: Nat). SNat i -> a  -> Signal dom a -> Signal dom a
-    go SNat = suffixNameFromNatP @i . autoReg clk rst en
-  {-# INLINE autoReg #-}
+    go :: forall proxy i . proxy i -> a  -> Signal dom a -> Signal dom a
+    go _ = suffixNameFromNatP @i . autoReg clk rst en
+{-# NOINLINE vecAutoReg #-}
 
 instance (KnownNat d, AutoReg a) => AutoReg (RTree d a) where
   autoReg clk rst en initVal xs =
     bundle $ (autoReg clk rst en) <$> lazyT initVal <*> unbundle xs
-  {-# INLINE autoReg #-}
 
 
 -- | Decompose an applied type into its individual components. For example, this:
@@ -333,8 +332,7 @@ deriveAutoRegProduct tyInfo conInfo = go (constructorName conInfo) fieldInfos
     autoRegDec <- funD 'autoReg [clause argsP (normalB body) decls]
     ctx <- calculateRequiredContext conInfo
     return [InstanceD Nothing ctx (AppT (ConT ''AutoReg) ty)
-              [ autoRegDec
-              , PragmaD (InlineP 'autoReg Inline FunLike AllPhases) ]]
+              [ autoRegDec ]]
 
 -- Calculate the required constraint to call autoReg on all the fields of a
 -- given constructor
