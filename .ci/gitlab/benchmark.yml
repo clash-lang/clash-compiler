@@ -34,8 +34,12 @@
     - export
     - .ci/setup.sh
     - cabal new-run --write-ghc-environment-files=always benchmark -- --csv benchmark.csv
-  tags:
-    - benchmarks
+  # Benchmarks should be stuck to one (or multiple identical) machine(s). We
+  # currently have just a single one, which goes down due to power outages :-(.
+  # As long as we haven't setup isclashfastyet.com it might as well can run on
+  # public runners.
+  #tags:
+  #  - benchmarks
   artifacts:
     paths:
       - benchmark.csv
