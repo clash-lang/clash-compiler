@@ -73,11 +73,8 @@ snap-bindist:
     - if: $CI_PIPELINE_SOURCE == "trigger"
     - if: '$CI_COMMIT_TAG != null' # tags
 
-  # Building the nix distribution crucially depends on the cache being
-  # available, so we limit it to a single machine to make sure the cache is
-  # shared.
   tags:
-    - diepenheim
+    - local
 
 # Use binary distribution built in `snap-bindist` to build a snap pacakge.
 .snap:
