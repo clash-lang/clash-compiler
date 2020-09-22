@@ -492,6 +492,8 @@ runClashTest = defaultMain $ clashTestRoot
         , runTest "RegisterSR" def
         , runTest "RegisterAE" def
         , runTest "RegisterSE" def
+        , runTest "ResetSynchronizer" def
+        , runTest "ResetSynchronizerSync" def
         , runTest "ResetGen" def
         , runTest "ResetLow" def
         , runTest "Rom" def
