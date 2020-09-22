@@ -1,0 +1,1 @@
+FIXED: The current API of `resetSynchronizer` makes it very hard to use correctly. As a workaround, it now always synchronizes resets - even when instantiated on synchronous domains. Future releases of Clash will change the API to properly fix the issues with it. See: [#1528](https://github.com/clash-lang/clash-compiler/issues/1528).
