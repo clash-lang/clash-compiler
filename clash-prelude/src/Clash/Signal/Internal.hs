@@ -326,7 +326,7 @@ type DomainActiveEdge (dom :: Domain) =
 -- domain. Example usage:
 --
 -- @
--- myFunc :: (KnownDomain dom, DomainResetKind dom ~ 'Asynchronous) => ...
+-- myFunc :: (KnownDomain dom, DomainResetKind dom ~ 'Synchronous) => ...
 -- @
 type DomainResetKind (dom :: Domain) =
   DomainConfigurationResetKind (KnownConf dom)
