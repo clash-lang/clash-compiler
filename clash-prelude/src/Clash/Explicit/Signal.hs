@@ -372,9 +372,33 @@ systemResetGen = resetGen
 -- reset, then asynchronous assertion of the reset of component \"B"\ can induce
 -- meta-stability in component \"A\". To prevent this from happening you need
 -- to use a proper synchronizer, for example one of the synchronizers in
--- "Clash.Explicit.Synchronizer"
+-- "Clash.Explicit.Synchronizer".
 --
--- === __Example__
+-- === __Example 1__
+-- The circuit below detects a rising bit (i.e., a transition from 0 to 1) in a
+-- given argument. It takes a reset that is not synchronized to any of the other
+-- incoming signals and synchronizes it using 'resetSynchronizer'.
+--
+-- @
+-- topEntity
+--   :: Clock  System
+--   -> Reset  System
+--   -> Enable System
+--   -> Signal System Bit
+--   -> Signal System (BitVector 8)
+-- topEntity clk asyncRst ena key1 =
+--   withClockResetEnable clk rst ena leds
+--  where
+--   rst   = 'resetSynchronizer' clk asyncRst
+--   key1R = isRising 1 key1
+--   leds  = mealy blinkerT (1, False, 0) key1R
+-- @
+--
+-- === __Example 2__
+-- Similar to /Example 1/ this circuit detects a rising bit (i.e., a transition
+-- from 0 to 1) in a given argument. It takes a clock that is not stable yet and
+-- a reset singal that is not synchronized to any other signals. It stabalizes
+-- the clock and then synchronizes the reset signal.
 --
 -- @
 -- topEntity
@@ -382,31 +406,49 @@ systemResetGen = resetGen
 --   -> Reset  System
 --   -> Signal System Bit
 --   -> Signal System (BitVector 8)
--- topEntity clk rst key1 =
+-- topEntity clk rst ena key1 =
 --     let  (pllOut,pllStable) = altpll (SSymbol @"altpll50") clk rst
 --          rstSync            = 'resetSynchronizer' pllOut (unsafeToHighPolarity pllStable)
---     in   exposeClockResetEnable leds pllOut rstSync
+--     in   exposeClockResetEnable leds pllOut rstSync enableGen
 --   where
 --     key1R  = isRising 1 key1
 --     leds   = mealy blinkerT (1, False, 0) key1R
 -- @
+--
+-- === __Implementation details__
+-- 'resetSynchronizer' implements the following circuit:
+--
+-- @
+--                                   rst
+--   --------------------------------------+
+--                       |                 |
+--                  +----v----+       +----v----+
+--     deasserted   |         |       |         |
+--   --------------->         +------->         +-------->
+--                  |         |       |         |
+--              +---|>        |   +---|>        |
+--              |   |         |   |   |         |
+--              |   +---------+   |   +---------+
+--      clk     |                 |
+--   -----------------------------+
+-- @
+--
+-- This corresponds to figure 3d at <https://www.embedded.com/asynchronous-reset-synchronization-and-distribution-challenges-and-solutions/>
+--
 resetSynchronizer
   :: forall dom
    . KnownDomain dom
   => Clock dom
   -> Reset dom
   -> Enable dom
+  -- ^ Warning: this argument will be removed in future versions of Clash.
   -> Reset dom
-resetSynchronizer clk rst en =
-  case resetKind @dom of
-    SAsynchronous ->
-      let isActiveHigh = case resetPolarity @dom of { SActiveHigh -> True; _ -> False }
-          r1 = register clk rst en isActiveHigh (pure (not isActiveHigh))
-          r2 = register clk rst en isActiveHigh r1
-       in unsafeToReset r2
-    SSynchronous ->
-      -- Reset is already synchronous, nothing to do!
-      rst
+resetSynchronizer clk rst ena =
+  unsafeToReset (asyncReg (asyncReg (pure (not isActiveHigh))))
+ where
+  isActiveHigh = case resetPolarity @dom of { SActiveHigh -> True; _ -> False }
+  asyncReg = asyncRegister# clk rst ena isActiveHigh isActiveHigh
+{-# NOINLINE resetSynchronizer #-} -- Give reset synchronizer its own HDL file
 
 -- | Calculate the period, in __ps__, given a frequency in __Hz__
 --
