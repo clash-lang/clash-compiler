@@ -145,6 +145,7 @@ module Clash.Signal
   , convertReset
 #endif
   , resetSynchronizer
+  , resetGlitchFilter
   , holdReset
     -- ** Enabling
   , Enable
@@ -262,8 +263,9 @@ import           Clash.Class.HasDomain (WithSingleDomain)
 
 import           Clash.Class.HasDomain (WithSpecificDomain)
 import qualified Clash.Explicit.Signal as E
-import           Clash.Explicit.Signal
-  (resetSynchronizer, systemClockGen, systemResetGen)
+import qualified Clash.Explicit.Reset  as E
+import           Clash.Explicit.Reset  (resetSynchronizer, resetGlitchFilter)
+import           Clash.Explicit.Signal (systemClockGen, systemResetGen)
 import qualified Clash.Explicit.Signal as S
 import           Clash.Hidden
 import           Clash.Promoted.Nat    (SNat (..), snatToNum)

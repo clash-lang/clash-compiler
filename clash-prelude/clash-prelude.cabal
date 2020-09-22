@@ -212,6 +212,7 @@ Library
                       Clash.Explicit.ROM.File
                       Clash.Explicit.Prelude
                       Clash.Explicit.Prelude.Safe
+                      Clash.Explicit.Reset
                       Clash.Explicit.SimIO
                       Clash.Explicit.Signal
                       Clash.Explicit.Signal.Delayed
@@ -391,6 +392,7 @@ test-suite unittests
       tasty         >= 1.2      && < 1.4,
       tasty-hedgehog,
       tasty-hunit,
+      tasty-th,
       tasty-quickcheck,
       template-haskell
 
@@ -402,6 +404,7 @@ test-suite unittests
                  Clash.Tests.DerivingDataReprTypes
                  Clash.Tests.Fixed
                  Clash.Tests.NFDataX
+                 Clash.Tests.Reset
                  Clash.Tests.Resize
                  Clash.Tests.Signal
                  Clash.Tests.Signed

@@ -8,6 +8,7 @@ import qualified Clash.Tests.BitVector
 import qualified Clash.Tests.DerivingDataRepr
 import qualified Clash.Tests.Fixed
 import qualified Clash.Tests.NFDataX
+import qualified Clash.Tests.Reset
 import qualified Clash.Tests.Resize
 import qualified Clash.Tests.Signal
 import qualified Clash.Tests.Signed
@@ -25,6 +26,7 @@ tests = testGroup "Unittests"
   , Clash.Tests.DerivingDataRepr.tests
   , Clash.Tests.Fixed.tests
   , Clash.Tests.NFDataX.tests
+  , Clash.Tests.Reset.tests
   , Clash.Tests.Resize.tests
   , Clash.Tests.Signal.tests
   , Clash.Tests.Signed.tests

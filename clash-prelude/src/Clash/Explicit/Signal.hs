@@ -207,9 +207,6 @@ module Clash.Explicit.Signal
   , unsafeToLowPolarity
   , unsafeFromHighPolarity
   , unsafeFromLowPolarity
-  , convertReset
-  , resetSynchronizer
-  , holdReset
     -- * Basic circuit functions
   , enable
   , dflipflop
@@ -267,10 +264,9 @@ module Clash.Explicit.Signal
 where
 
 import           Data.Maybe                     (isJust)
-import           GHC.TypeLits                   (type (+), type (<=))
+import           GHC.TypeLits                   (type (<=))
 
 import           Clash.Annotations.Primitive    (hasBlackBox)
-import           Clash.Class.Num                (satSucc, SaturationMode(SatBound))
 import           Clash.Promoted.Nat             (SNat(..), snatToNum)
 import           Clash.Signal.Bundle
   (Bundle (..), EmptyTuple(..), TaggedEmptyTuple(..), vecBundle#)
@@ -278,7 +274,6 @@ import           Clash.Signal.BiSignal
 import           Clash.Signal.Internal
 import           Clash.Signal.Internal.Ambiguous
   (knownVDomain, clockPeriod, activeEdge, resetKind, initBehavior, resetPolarity)
-import           Clash.Sized.Index              (Index)
 import qualified Clash.Sized.Vector
 import           Clash.XException               (NFDataX, deepErrorX, fromJustX)
 
@@ -359,96 +354,6 @@ systemClockGen = clockGen
 -- @
 systemResetGen ::Reset System
 systemResetGen = resetGen
-
--- | Normally, asynchronous resets can be both asynchronously asserted and
--- de-asserted. Asynchronous de-assertion can induce meta-stability in the
--- component which is being reset. To ensure this doesn't happen,
--- 'resetSynchronizer' ensures that de-assertion of a reset happens
--- synchronously. Assertion of the reset remains asynchronous.
---
--- Note that asynchronous assertion does not induce meta-stability in the
--- component whose reset is asserted. However, when a component \"A\" in another
--- clock or reset domain depends on the value of a component \"B\" being
--- reset, then asynchronous assertion of the reset of component \"B"\ can induce
--- meta-stability in component \"A\". To prevent this from happening you need
--- to use a proper synchronizer, for example one of the synchronizers in
--- "Clash.Explicit.Synchronizer".
---
--- === __Example 1__
--- The circuit below detects a rising bit (i.e., a transition from 0 to 1) in a
--- given argument. It takes a reset that is not synchronized to any of the other
--- incoming signals and synchronizes it using 'resetSynchronizer'.
---
--- @
--- topEntity
---   :: Clock  System
---   -> Reset  System
---   -> Enable System
---   -> Signal System Bit
---   -> Signal System (BitVector 8)
--- topEntity clk asyncRst ena key1 =
---   withClockResetEnable clk rst ena leds
---  where
---   rst   = 'resetSynchronizer' clk asyncRst
---   key1R = isRising 1 key1
---   leds  = mealy blinkerT (1, False, 0) key1R
--- @
---
--- === __Example 2__
--- Similar to /Example 1/ this circuit detects a rising bit (i.e., a transition
--- from 0 to 1) in a given argument. It takes a clock that is not stable yet and
--- a reset singal that is not synchronized to any other signals. It stabalizes
--- the clock and then synchronizes the reset signal.
---
--- @
--- topEntity
---   :: Clock  System
---   -> Reset  System
---   -> Signal System Bit
---   -> Signal System (BitVector 8)
--- topEntity clk rst ena key1 =
---     let  (pllOut,pllStable) = altpll (SSymbol @"altpll50") clk rst
---          rstSync            = 'resetSynchronizer' pllOut (unsafeToHighPolarity pllStable)
---     in   exposeClockResetEnable leds pllOut rstSync enableGen
---   where
---     key1R  = isRising 1 key1
---     leds   = mealy blinkerT (1, False, 0) key1R
--- @
---
--- === __Implementation details__
--- 'resetSynchronizer' implements the following circuit:
---
--- @
---                                   rst
---   --------------------------------------+
---                       |                 |
---                  +----v----+       +----v----+
---     deasserted   |         |       |         |
---   --------------->         +------->         +-------->
---                  |         |       |         |
---              +---|>        |   +---|>        |
---              |   |         |   |   |         |
---              |   +---------+   |   +---------+
---      clk     |                 |
---   -----------------------------+
--- @
---
--- This corresponds to figure 3d at <https://www.embedded.com/asynchronous-reset-synchronization-and-distribution-challenges-and-solutions/>
---
-resetSynchronizer
-  :: forall dom
-   . KnownDomain dom
-  => Clock dom
-  -> Reset dom
-  -> Enable dom
-  -- ^ Warning: this argument will be removed in future versions of Clash.
-  -> Reset dom
-resetSynchronizer clk rst ena =
-  unsafeToReset (asyncReg (asyncReg (pure (not isActiveHigh))))
- where
-  isActiveHigh = case resetPolarity @dom of { SActiveHigh -> True; _ -> False }
-  asyncReg = asyncRegister# clk rst ena isActiveHigh isActiveHigh
-{-# NOINLINE resetSynchronizer #-} -- Give reset synchronizer its own HDL file
 
 -- | Calculate the period, in __ps__, given a frequency in __Hz__
 --
@@ -878,40 +783,6 @@ simulateB_lazy
 simulateB_lazy f = simulate_lazy (bundle . f . unbundle)
 
 
--- | Hold reset for a number of cycles relative to an incoming reset signal.
---
--- Example:
---
--- >>> let sampleWithReset = sampleN 8 . unsafeToHighPolarity
--- >>> sampleWithReset (holdReset @System clockGen enableGen (SNat @2) (resetGenN (SNat @3)))
--- [True,True,True,True,True,False,False,False]
---
--- 'holdReset' holds the reset for an additional 2 clock cycles for a total
--- of 5 clock cycles where the reset is asserted. 'holdReset' also works on
--- intermediate assertions of the reset signal:
---
--- >>> let rst = fromList [True, False, False, False, True, False, False, False]
--- >>> sampleWithReset (holdReset @System clockGen enableGen (SNat @2) (unsafeFromHighPolarity rst))
--- [True,True,True,False,True,True,True,False]
---
-holdReset
-  :: forall dom n
-   . KnownDomain dom
-  => Clock dom
-  -> Enable dom
-  -- ^ Global enable
-  -> SNat n
-  -- ^ Hold for /n/ cycles, counting from the moment the incoming reset
-  -- signal becomes deasserted.
-  -> Reset dom
-  -- ^ Reset to extend
-  -> Reset dom
-holdReset clk en SNat rst =
-  unsafeFromHighPolarity ((/=maxBound) <$> counter)
- where
-  counter :: Signal dom (Index (n+1))
-  counter = register clk rst en 0 (satSucc SatBound <$> counter)
-
 -- | Like 'fromList', but resets on reset and has a defined reset value.
 --
 -- >>> let rst = unsafeFromHighPolarity (fromList [True, True, False, False, True, False])
@@ -933,30 +804,6 @@ fromListWithReset rst resetValue vals =
   go (r :- rs) _ | r = resetValue :- go rs vals
   go (_ :- rs) [] = deepErrorX "fromListWithReset: input ran out" :- go rs []
   go (_ :- rs) (a : as) = a :- go rs as
-
--- | Convert between different types of reset, adding a synchronizer in case
--- it needs to convert from an asynchronous to a synchronous reset.
-convertReset
-  :: forall domA domB
-   . ( KnownDomain domA
-     , KnownDomain domB
-     )
-  => Clock domA
-  -> Clock domB
-  -> Reset domA
-  -> Reset domB
-convertReset clkA clkB (unsafeToHighPolarity -> rstA0) =
-  unsafeFromHighPolarity rstA2
- where
-  rstA1 = unsafeSynchronizer clkA clkB rstA0
-  rstA2 =
-    case (resetKind @domA, resetKind @domB) of
-      (SSynchronous,  SSynchronous)  -> rstA1
-      (SAsynchronous, SAsynchronous) -> rstA1
-      (SSynchronous,  SAsynchronous) -> rstA1
-      (SAsynchronous, SSynchronous) ->
-        delay clkB enableGen True $
-          delay clkB enableGen True rstA1
 
 -- | Get a list of samples from a 'Signal', while asserting the reset line
 -- for /n/ clock cycles. 'sampleWithReset' does not return the first /n/ cycles,
