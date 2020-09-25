@@ -105,20 +105,22 @@ import           Prelude
 -- | Create a blackBoxHaskell primitive. To be used as part of an annotation:
 --
 -- @
--- {-# ANN myFunction (blackBoxHaskell [1,2,3] VHDL 'myFunction 'myBBF) #-}
+-- {-# ANN myFunction (blackBoxHaskell [2,3] VHDL 'myFunction 'myBBF) #-}
 -- @
+--
+-- [2,3] would mean this blackbox __ignores__ its second and third argument.
 blackBoxHaskell
   :: [Int]
   -- ^ Ignored arguments
-  -> HDL
-  -- ^ hdl the blackbox is for
+  -> [HDL]
+  -- ^ hdls the blackbox supports
   -> Name
   -- ^ blackbox name
   -> Name
   -- ^ template function name
   -> Primitive
-blackBoxHaskell (show -> ign) hdl bb tf =
-  InlinePrimitive [hdl] $ unindent [I.i|
+blackBoxHaskell (show -> ign) hdls bb tf =
+  InlinePrimitive hdls $ unindent [I.i|
   [ { "BlackBoxHaskell" :
        { "name" : "#{bb}"
        , "templateFunction" : "#{tf}"
