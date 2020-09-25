@@ -32,12 +32,47 @@ end process;~FI
     }
   }
 , { "BlackBox" :
+    { "name" : "Clash.Signal.Internal.asyncRegister#"
+    , "kind" : "Declaration"
+    , "type" :
+"asyncRegister#
+  :: ( KnownDomain dom        -- ARG[0]
+     , NFDataX a )            -- ARG[1]
+  => Clock dom                -- ARG[2]
+  -> Reset dom                -- ARG[3]
+  -> Enable dom               -- ARG[4]
+  -> a                        -- ARG[5] (powerup value)
+  -> a                        -- ARG[6] (reset value)
+  -> Signal clk a             -- ARG[7]
+  -> Signal clk a"
+    , "resultName" : { "template" : "~CTXNAME" }
+    , "resultInit" : { "template" : "~IF~ISINITDEFINED[0]~THEN~CONST[5]~ELSE~FI" }
+    , "template" :
+"-- async register begin
+~SYM[2] : process(~ARG[2]~IF ~ISUNDEFINED[6] ~THEN ~ELSE,~ARG[3]~FI)
+begin
+  ~IF ~ISUNDEFINED[6] ~THEN ~ELSEif ~ARG[3] = ~IF ~ISACTIVEHIGH[0] ~THEN '1' ~ELSE '0' ~FI then
+    ~RESULT <= ~CONST[6];
+  els~FIif ~IF~ACTIVEEDGE[Rising][0]~THENrising_edge~ELSEfalling_edge~FI(~ARG[2]) then
+    ~IF ~ISACTIVEENABLE[4] ~THEN
+    if ~ARG[4] then
+      ~RESULT <= ~ARG[7];
+    end if;
+    ~ELSE
+    ~RESULT <= ~ARG[7];
+    ~FI
+  end if;
+end process;
+-- async register end"
+    }
+  }
+, { "BlackBox" :
     { "name" : "Clash.Signal.Internal.register#"
     , "kind" : "Declaration"
     , "type" :
 "register#
   :: ( KnownDomain dom        -- ARG[0]
-     , Undefined a )          -- ARG[1]
+     , NFDataX a )            -- ARG[1]
   => Clock dom                -- ARG[2]
   -> Reset dom                -- ARG[3]
   -> Enable dom               -- ARG[4]

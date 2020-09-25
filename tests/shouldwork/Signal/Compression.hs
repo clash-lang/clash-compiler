@@ -59,7 +59,6 @@ outputVerifierR
    . ( KnownNat l
      , KnownDomain testDom
      , KnownDomain circuitDom
-     , DomainResetKind testDom ~ 'Asynchronous
      , Eq a
      , ShowX a )
   => Clock testDom

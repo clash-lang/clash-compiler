@@ -555,6 +555,8 @@ runClashTest = defaultMain $ clashTestRoot
         , NEEDS_PRIMS_GHC(runTest "RegisterSR" def)
         , NEEDS_PRIMS_GHC(runTest "RegisterAE" def)
         , NEEDS_PRIMS_GHC(runTest "RegisterSE" def)
+        , NEEDS_PRIMS_GHC(runTest "ResetSynchronizer" def)
+        , NEEDS_PRIMS_GHC(runTest "ResetSynchronizerSync" def)
         , NEEDS_PRIMS_GHC(runTest "ResetLow" def)
         , NEEDS_PRIMS_GHC(runTest "Rom" def)
         , runTest "SigP" def{hdlSim=False}
