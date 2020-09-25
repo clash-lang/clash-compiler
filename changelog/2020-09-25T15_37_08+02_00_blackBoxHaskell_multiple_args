@@ -1,0 +1,1 @@
+CHANGED: The convenience function `Clash.Primitives.DSL` in `clash-lib` now takes a list of HDLs, instead of just one.
