@@ -1,0 +1,1 @@
+FIXED: Clash generates manifest and sdc file for the wrong function [#1533](https://github.com/clash-lang/clash-compiler/issues/1533)

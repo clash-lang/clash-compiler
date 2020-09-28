@@ -30,6 +30,7 @@ import           Clash.Core.Name
 import           Clash.Core.TyCon
 import           Clash.Core.Type
 import           Clash.Core.Var
+import           Clash.Core.VarEnv
 import           Clash.Driver as Driver
 import           Clash.Driver.Types
 import           Clash.GHC.Evaluator
@@ -101,7 +102,7 @@ runToNetlistStage target f src = do
   let transformedBindings = normalizeEntity reprs bm pm tcm tupTcm typeTrans
           primEvaluator teNames opts supplyN te
 
-  fmap (force . fst) $ netlistFrom (transformedBindings, tcm, tes, pm, reprs, te)
+  fmap (force . eltsVarEnv . fst) $ netlistFrom (transformedBindings, tcm, tes, pm, reprs, te)
  where
   backend = mkBackend target
   opts = f mkClashOpts
