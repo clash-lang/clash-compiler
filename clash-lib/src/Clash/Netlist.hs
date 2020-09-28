@@ -67,7 +67,7 @@ import           Clash.Core.TyCon                 (TyConMap)
 import           Clash.Core.Util                  (splitShouldSplit)
 import           Clash.Core.Var                   (Id, Var (..), isGlobalId)
 import           Clash.Core.VarEnv
-  (VarEnv, eltsVarEnv, emptyInScopeSet, emptyVarEnv, extendVarEnv, lookupVarEnv,
+  (VarEnv, emptyInScopeSet, emptyVarEnv, extendVarEnv, lookupVarEnv,
    lookupVarEnv', mkVarEnv)
 import           Clash.Driver.Types               (BindingMap, Binding(..), ClashOpts (..))
 import           Clash.Netlist.BlackBox
@@ -116,12 +116,12 @@ genNetlist
   -- ^ Component name prefix
   -> Id
   -- ^ Name of the @topEntity@
-  -> IO ([([Bool],SrcSpan,HashMap Identifier Word,Component)],HashMap Identifier Word)
+  -> IO (VarEnv ([Bool],SrcSpan,HashMap Identifier Word,Component),HashMap Identifier Word)
 genNetlist isTb opts reprs globals tops primMap tcm typeTrans iw mkId extId ite be seen env prefixM topEntity = do
   (_,s) <- runNetlistMonad isTb opts reprs globals topEntityMap
              primMap tcm typeTrans iw mkId extId ite be seen env prefixM $
              genComponent topEntity
-  return ( eltsVarEnv $ _components s
+  return ( _components s
          , _seenComps s
          )
   where
