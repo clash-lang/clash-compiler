@@ -95,7 +95,7 @@ import           Clash.Core.Util                  (shouldSplit)
 import           Clash.Core.Var
   (Id, varName, varUniq, varType)
 import           Clash.Core.VarEnv
-  (elemVarEnv, emptyVarEnv, lookupVarEnv)
+  (VarEnv, elemVarEnv, eltsVarEnv, emptyVarEnv, lookupVarEnv, lookupVarEnv')
 import           Clash.Debug                      (debugIsOn)
 import           Clash.Driver.Types
 import           Clash.Edalize.Edam
@@ -436,7 +436,7 @@ generateHDL reprs domainConfs bindingsMap hdlState primMap tcm tupTcm typeTrans 
       putStrLn $ "Clash: Netlist generation took " ++ normNetDiff
 
       -- 3. Generate topEntity wrapper
-      let topComponent = view _4 . head $ filter (Data.Text.isSuffixOf topNm . componentName . view _4) netlist
+      let topComponent = view _4 (lookupVarEnv' netlist topEntity)
           (hdlDocs,manifest',dfiles,mfiles) = createHDL hdlState' (Data.Text.pack modName) seen' netlist domainConfs (Just topComponent)
                                    (topNm, Right manifest)
       mapM_ (writeHDL dir) hdlDocs
@@ -746,7 +746,7 @@ createHDL
   -- ^ Module hierarchy root
   -> HashMap Identifier Word
   -- ^ Component names
-  -> [([Bool],SrcSpan,HashMap Identifier Word,Component)]
+  -> VarEnv ([Bool],SrcSpan,HashMap Identifier Word,Component)
   -- ^ List of components
   -> HashMap Data.Text.Text VDomainConfiguration
   -- ^ Known domains to configurations
@@ -762,7 +762,11 @@ createHDL
   -- + The update manifest file
   -- + The data files that need to be copied
 createHDL backend modName seen components domainConfs mtop (topName,manifestE) = flip evalState backend $ getMon $ do
-  (hdlNmDocs,incs) <- unzip <$> mapM (\(_wereVoids,sp,ids,comp) -> genHDL modName sp (HashMap.unionWith max seen ids) comp) components
+  let componentsL = eltsVarEnv components
+  (hdlNmDocs,incs) <-
+    unzip <$> mapM (\(_wereVoids,sp,ids,comp) ->
+                      genHDL modName sp (HashMap.unionWith max seen ids) comp)
+              componentsL
   hwtys <- HashSet.toList <$> extractTypes <$> Mon get
   typesPkg <- mkTyPackage modName hwtys
   dataFiles <- Mon getDataFiles
@@ -789,7 +793,7 @@ createHDL backend modName seen components domainConfs mtop (topName,manifestE) =
       let topOutNames = map (fst . (\(_,x,_) -> x)) (outputs top)
       topOutTypes <- mapM (fmap (Text.toStrict . renderOneLine) .
                            hdlType (External topName) . snd . (\(_,x,_) -> x)) (outputs top)
-      let compNames = map (componentName . view _4) components
+      let compNames = map (componentName . view _4) componentsL
       return (m { portInNames    = topInNames
                 , portInTypes    = topInTypes
                 , portOutNames   = topOutNames
