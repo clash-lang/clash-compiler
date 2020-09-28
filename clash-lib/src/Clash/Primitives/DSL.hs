@@ -36,6 +36,7 @@ module Clash.Primitives.DSL
   , LitHDL (..)
   , pattern High
   , pattern Low
+  , constructProduct
   , tuple
   , vec
 
@@ -46,6 +47,7 @@ module Clash.Primitives.DSL
   , getBool
   , exprToInteger
   , tExprToInteger
+  , deconstructProduct
   , untuple
   , unvec
 
@@ -257,9 +259,26 @@ unvec vName v@(ety -> Vector vSize eType) = do
   pure (map (TExpr eType . vIndex) [0..vSize-1])
 unvec _ e = error $ "unvec: cannot be called on non-vector: " <> show (ety e)
 
+-- | Extract the fields of a product type and return expressions
+--   to them. These new expressions are given unique names and get
+--   declared in the block scope.
+deconstructProduct
+  :: (HasCallStack, Backend backend)
+  => TExpr
+  -- ^ Product expression
+  -> [Identifier]
+  -- ^ Name hints for element assignments
+  -> State (BlockState backend) [TExpr]
+deconstructProduct (TExpr ty@(Product _ _ tys) (Identifier resName _)) vals = do
+  newNames <- zipWithM (flip declare Wire) vals tys
+  addDeclaration $ Assignment resName $ DataCon ty (DC (ty, 0)) (fmap eex newNames)
+  pure newNames
+deconstructProduct e i =
+  error $ "deconstructProduct: " <> show e <> " " <> show i
+
 -- | Extract the elements of a tuple expression and return expressions
 --   to them. These new expressions are given unique names and get
---   declared the block scope.
+--   declared in the block scope.
 untuple
   :: (HasCallStack, Backend backend)
   => TExpr
@@ -267,11 +286,7 @@ untuple
   -> [Identifier]
   -- ^ Name hints for element assignments
   -> State (BlockState backend) [TExpr]
-untuple (TExpr ty@(Product _ _ tys) (Identifier resName _)) vals = do
-  newNames <- zipWithM (flip declare Wire) vals tys
-  addDeclaration $ Assignment resName $ DataCon ty (DC (ty, 0)) (fmap eex newNames)
-  pure newNames
-untuple e i = error $ "untuple: " <> show e <> " " <> show i
+untuple = deconstructProduct
 
 -- | The high literal bit.
 pattern High :: TExpr
@@ -443,14 +458,18 @@ vec els@(el:_)
   theVec = mkVectorChain (length els) (ety el) (map eex els)
 vec [] = error "vec: can't be used on empty lists"
 
+-- | Construct a product type given its type and fields
+constructProduct :: HWType -> [TExpr] -> TExpr
+constructProduct ty els =
+  TExpr ty (DataCon ty (DC (ty,0)) (map eex els))
+
 -- | Create an n-tuple of 'TExpr'
 tuple :: [TExpr] -> TExpr
 tuple [] = error $ "nTuple: Cannot create empty tuple"
 tuple [_] =
   -- If we don't put this in: tuple . untuple /= id
   error $ "nTuple: Cannot create 1-tuple"
-tuple els =
-  TExpr tupTy (DataCon tupTy (DC (tupTy,0)) (map eex els))
+tuple els = constructProduct tupTy els
  where
   commas = Text.replicate (length els - 1) ","
   tupTy = Product ("GHC.Tuple.(" <> commas <> ")") Nothing (map ety els)
