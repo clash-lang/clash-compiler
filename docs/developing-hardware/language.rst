@@ -30,7 +30,7 @@ exposed by GHC as language extensions. The extensions used by Clash are
 - ``MonoLocalBinds``
 - ``NoImplicitPrelude``
 - ``NoMonomorphismRestriction``
-- ``NoStarIsType``
+- ``NoStarIsType`` (since GHC 8.6)
 - ``NoStrictData``
 - ``NoStrict``
 - ``QuasiQuotes``
@@ -39,8 +39,18 @@ exposed by GHC as language extensions. The extensions used by Clash are
 - ``TemplateHaskell``
 - ``TypeApplications``
 - ``TypeFamilies``
-- ``TypeInType``
+- ``TypeInType`` (until GHC 8.6)
 - ``TypeOperators``
+
+.. warning::
+  Since GHC 8.6, ``TypeInType`` has been an alias for the ``DataKinds`` and
+  ``PolyKinds`` language extensions and is not a default extension in Clash. If
+  an existing design breaks on upgrade, try enabling ``PolyKinds``.
+
+.. warning::
+  Since GHC 8.6, the ``StarIsType`` extension is defined. This extension is
+  explicitly turned off by Clash, meaning ``Data.Kind.Type`` must be used to
+  refer to Haskell types.
 
 Clash also enables some GHC plugins by default which improve the type inference
 for type level numbers. The plugins enabled by default are
