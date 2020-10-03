@@ -1091,22 +1091,28 @@ fromBits = L.foldl (\v b -> v `shiftL` 1 .|. fromIntegral b) 0
 -- pattern. The scrutinee can be any type that is an instance of the
 -- 'Num', 'Bits' and 'Eq' typeclasses.
 --
--- The bit pattern is specified by a string which contains @\'0\'@ or
--- @\'1\'@ for matching a bit, or @\'.\'@ for bits which are not matched.
+-- The bit pattern is specified by a string which contains:
+-- 
+--   * @\'0\'@ or @\'1\'@ for matching a bit
+--
+--   * @\'.\'@ for bits which are not matched (wildcard)
+--
+--   * @\'_\'@ can be used as a separator similar to the NumericUnderscores
+--   language extension
 --
 -- The following example matches a byte against two bit patterns where
 -- some bits are relevant and others are not:
 --
 -- @
 --   decode :: Unsigned 8 -> Maybe Bool
---   decode $(bitPattern "00...110") = Just True
---   decode $(bitPattern "10..0001") = Just False
+--   decode $(bitPattern "00.._.110") = Just True
+--   decode $(bitPattern "10.._0001") = Just False
 --   decode _ = Nothing
 -- @
 bitPattern :: String -> Q Pat
 bitPattern s = [p| (($mask .&.) -> $target) |]
   where
-    bs = parse <$> s
+    bs = parse <$> filter (/= '_') s
 
     mask = litE . IntegerL . fromBits $ maybe 0 (const 1) <$> bs
     target = litP . IntegerL . fromBits $ fromMaybe 0 <$> bs
