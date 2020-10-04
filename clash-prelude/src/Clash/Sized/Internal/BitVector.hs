@@ -1140,8 +1140,8 @@ bitPattern s = [p| ((\_x -> $preprocess) -> $tuple) |]
       | C.isAlpha c && C.isLower c =
         ( succ i
         , Nothing:b
-        , M.alter (Just . maybe [i] (i:)) c n
+        , M.alter (Just . (i:) . fromMaybe []) c n
         )
       | otherwise = error $
         "Invalid bit pattern: " ++ show c ++
-        ", expecting one of '0', '1', '.', '_', or a lower case alphabetic character"
+        ", expecting one of '0', '1', '.', '_', or a lowercase alphabetic character"
