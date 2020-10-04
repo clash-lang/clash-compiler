@@ -1094,7 +1094,7 @@ fromBits = L.foldl (\v b -> v `shiftL` 1 .|. fromIntegral b) 0
 -- 'Num', 'Bits' and 'Eq' typeclasses.
 --
 -- The bit pattern is specified by a string which contains:
--- 
+--
 --   * @\'0\'@ or @\'1\'@ for matching a bit
 --
 --   * @\'.\'@ for bits which are not matched (wildcard)
