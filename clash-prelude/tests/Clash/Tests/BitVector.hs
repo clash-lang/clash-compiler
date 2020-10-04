@@ -49,12 +49,13 @@ msbTest = H.property $ do
 test1 :: BitVector 8 -> Int
 test1 =
   \case
-    $(bitPattern "0.......") -> 0
-    $(bitPattern "01......") -> 1
-    $(bitPattern "11....01") -> 2
-    $(bitPattern "11111110") -> 3
-    $(bitPattern "........") -> 4
-    _                        -> 5  -- To keep exhaustiveness checker happy
+    $(bitPattern "0..._....") -> 0
+    $(bitPattern "01.._....") -> 1
+    $(bitPattern "11.._..01") -> 2
+    $(bitPattern "1111_1110") -> 3
+    $(bitPattern "110a_babb") -> 4 + fromIntegral aa + fromIntegral bbb
+    $(bitPattern "...._....") -> 4
+    _                         -> 5  -- To keep exhaustiveness checker happy
 
 tests :: TestTree
 tests = localOption (Q.QuickCheckMaxRatio 2) $ testGroup "All"
@@ -68,7 +69,7 @@ tests = localOption (Q.QuickCheckMaxRatio 2) $ testGroup "All"
     , testCase "case2-1" $ test1 0b11100001 @?= 2
     , testCase "case3-0" $ test1 0b11111110 @?= 3
     , testCase "case3-1" $ test1 0b11111111 @?= 4
-    , testCase "case3-2" $ test1 0b11010110 @?= 4
+    , testCase "case3-2" $ test1 0b11010110 @?= 9
     ]
   , testGroup "BitVector 1" $
       Q.testProperty "fromInteger"
