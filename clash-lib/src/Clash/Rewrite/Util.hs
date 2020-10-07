@@ -21,6 +21,7 @@
 module Clash.Rewrite.Util where
 
 import           Control.Monad.Extra         (andM, eitherM)
+import           Control.Monad.State.Class   (MonadState)
 import           Control.Concurrent.Supply   (splitSupply)
 import           Control.DeepSeq
 import           Control.Exception           (throw)
@@ -528,26 +529,36 @@ liftAndSubsituteBinders inScope toLift toKeep body = do
 
 -- | Determines whether a global binder is work free. Errors if binder does
 -- not exist.
-isWorkFreeBinder :: HasCallStack => Id -> RewriteMonad extra Bool
-isWorkFreeBinder bndr =
-  makeCachedU bndr workFreeBinders $ do
-    bExprM <- lookupVarEnv bndr <$> Lens.use bindings
-    case bExprM of
+isWorkFreeBinder
+  :: (HasCallStack, MonadState s m)
+  => Lens' s (VarEnv Bool)
+  -> BindingMap
+  -> Id
+  -> m Bool
+isWorkFreeBinder cache bndrs bndr =
+  makeCachedU bndr cache $
+    case lookupVarEnv bndr bndrs of
       Nothing -> error ("isWorkFreeBinder: couldn't find binder: " ++ showPpr bndr)
       Just (bindingTerm -> t) ->
         if bndr `globalIdOccursIn` t
         then pure False
-        else isWorkFree t
+        else isWorkFree cache bndrs t
 
--- | Determine whether a term does any work, i.e. adds to the size of the circuit
+-- | Determine whether a term does any work, i.e. adds to the size of the
+-- circuit. This function requires a cache (specified as a lens) to store the
+-- result for querying work info of global binders.
+--
 isWorkFree
-  :: Term
-  -> RewriteMonad extra Bool
-isWorkFree (collectArgs -> (fun,args)) = case fun of
+  :: (MonadState s m)
+  => Lens' s (VarEnv Bool)
+  -> BindingMap
+  -> Term
+  -> m Bool
+isWorkFree cache bndrs (collectArgs -> (fun,args)) = case fun of
   Var i ->
     if | isPolyFunTy (varType i) -> pure False
        | isLocalId i -> pure True
-       | otherwise -> andM [isWorkFreeBinder i, allM isWorkFreeArg args]
+       | otherwise -> andM [isWorkFreeBinder cache bndrs i, allM isWorkFreeArg args]
   Data {} -> allM isWorkFreeArg args
   Literal {} -> pure True
   Prim pInfo -> case primWorkInfo pInfo of
@@ -558,18 +569,18 @@ isWorkFree (collectArgs -> (fun,args)) = case fun of
     WorkVariable -> pure (all isConstantArg args)
     -- Things like clock or reset generator always perform work
     WorkAlways -> pure False
-  Lam _ e -> andM [isWorkFree e, allM isWorkFreeArg args]
-  TyLam _ e -> andM [isWorkFree e, allM isWorkFreeArg args]
+  Lam _ e -> andM [isWorkFree cache bndrs e, allM isWorkFreeArg args]
+  TyLam _ e -> andM [isWorkFree cache bndrs e, allM isWorkFreeArg args]
   Letrec bs e ->
-    andM [isWorkFree e, allM (isWorkFree . snd) bs, allM isWorkFreeArg args]
+    andM [isWorkFree cache bndrs e, allM (isWorkFree cache bndrs . snd) bs, allM isWorkFreeArg args]
   Case s _ [(_,a)] ->
-    andM [isWorkFree s, isWorkFree a, allM isWorkFreeArg args]
+    andM [isWorkFree cache bndrs s, isWorkFree cache bndrs a, allM isWorkFreeArg args]
   Cast e _ _ ->
-    andM [isWorkFree e, allM isWorkFreeArg args]
+    andM [isWorkFree cache bndrs e, allM isWorkFreeArg args]
   _ ->
     pure False
  where
-  isWorkFreeArg e = eitherM isWorkFree (pure . const True) (pure e)
+  isWorkFreeArg e = eitherM (isWorkFree cache bndrs) (pure . const True) (pure e)
   isConstantArg = either isConstant (const True)
 
 isFromInt :: Text -> Bool
@@ -1184,7 +1195,8 @@ bindPureHeap tcm heap rw ctx0@(TransformContext is0 hist) e = do
     --
     -- † https://github.com/clash-lang/clash-compiler/pull/1354#issuecomment-635430374
     -- ‡ https://www.microsoft.com/en-us/research/wp-content/uploads/2016/07/supercomp-by-eval.pdf
-    inlineBinders inlineTest ctx0 (Letrec bndrs e1) >>= \case
+    bs <- Lens.use bindings
+    inlineBinders (inlineTest bs) ctx0 (Letrec bndrs e1) >>= \case
       e2@(Letrec bnders1 e3) ->
         pure (fromMaybe e2 (removeUnusedBinders bnders1 e3))
       e2 ->
@@ -1204,7 +1216,7 @@ bindPureHeap tcm heap rw ctx0@(TransformContext is0 hist) e = do
         ty = termType tcm term
         nm = mkLocalId ty (mkUnsafeSystemName "x" uniq) -- See [Note: Name re-creation]
 
-    inlineTest _ (_, stripTicks -> e_) = isWorkFree e_
+    inlineTest bs _ (_, stripTicks -> e_) = isWorkFree workFreeBinders bs e_
 #endif
 
 -- | Remove unused binders in given let-binding. Returns /Nothing/ if no unused

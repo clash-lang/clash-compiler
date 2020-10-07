@@ -555,7 +555,8 @@ caseCon' ctx@(TransformContext is0 _) e@(Case subj ty alts) = do
       -- based on the fact on whether the argument has the potential to make
       -- the circuit larger than needed if we were to duplicate that argument.
       newBinder (isN0, substN) (x, arg) = do
-        isWorkFree arg >>= \case
+        bndrs <- Lens.use bindings
+        isWorkFree workFreeBinders bndrs arg >>= \case
           True -> pure ((isN0, (x, arg):substN), Nothing)
           False ->
             let
@@ -982,8 +983,9 @@ letCast _ e = return e
 -- and expression where two casts are "back-to-back" after which we can
 -- eliminate them in 'eliminateCastCast'.
 argCastSpec :: HasCallStack => NormRewrite
-argCastSpec ctx e@(App _ (stripTicks -> Cast e' _ _)) =
-  isWorkFree e' >>= \case
+argCastSpec ctx e@(App _ (stripTicks -> Cast e' _ _)) = do
+  bndrs <- Lens.use bindings
+  isWorkFree workFreeBinders bndrs e' >>= \case
     True -> go
     False -> warn go
  where
@@ -1290,7 +1292,8 @@ appPropFast ctx@(TransformContext is _) = \case
 
   go is0 (Lam v e) (Left arg:args) ticks = do
     setChanged
-    orM [pure (isVar arg), isWorkFree arg] >>= \case
+    bndrs <- Lens.use bindings
+    orM [pure (isVar arg), isWorkFree workFreeBinders bndrs arg] >>= \case
       True ->
         let subst = extendIdSubst (mkSubst is0) v arg in
         (`mkTicks` ticks) <$> go is0 (substTm "appPropFast.AppLam" subst e) args []
@@ -1343,9 +1346,10 @@ appPropFast ctx@(TransformContext is _) = \case
 
   goCaseArg isA0 ty0 ls0 (Left arg:args0) = do
     tcm <- Lens.view tcCache
+    bndrs <- Lens.use bindings
     let argTy = termType tcm arg
         ty1   = applyFunTy tcm ty0 argTy
-    orM [pure (isVar arg), isWorkFree arg] >>= \case
+    orM [pure (isVar arg), isWorkFree workFreeBinders bndrs arg] >>= \case
       True -> do
         (ty2,ls1,args1) <- goCaseArg isA0 ty1 ls0 args0
         return (ty2,ls1,Left arg:args1)
@@ -2730,9 +2734,10 @@ flattenLet (TransformContext is0 _) (Letrec binds body) = do
                    emptyVarEnv (`unitVarEnv` (1 :: Int))
                    body
   (is2,binds1) <- second concat <$> List.mapAccumLM go is1 binds
+  bndrs <- Lens.use bindings
   e1WorkFree <-
     case binds1 of
-      [(_,e1)] -> isWorkFree e1
+      [(_,e1)] -> isWorkFree workFreeBinders bndrs e1
       _ -> pure (error "flattenLet: unreachable")
   case binds1 of
     -- inline binders into the body when there's only a single binder, and only
@@ -2767,9 +2772,10 @@ flattenLet (TransformContext is0 _) (Letrec binds body) = do
                        emptyVarEnv (`unitVarEnv` (1 :: Int))
                        body2
           (srcTicks,nmTicks) = partitionTicks ticks
+      bndrs <- Lens.use bindings
       e2WorkFree <-
         case binds2 of
-          [(_,e2)] -> isWorkFree e2
+          [(_,e2)] -> isWorkFree workFreeBinders bndrs e2
           _ -> pure (error "flattenLet: unreachable")
       -- Distribute the name ticks of the let-expression over all the bindings
       (isN1,) . map (second (`mkTicks` nmTicks)) <$> case binds2 of
