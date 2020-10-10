@@ -146,7 +146,7 @@ import GHC.Prim                   (dataToTag#)
 import GHC.Stack                  (HasCallStack, withFrozenCallStack)
 import GHC.TypeLits               (KnownNat, Nat, type (+), type (-), natVal)
 import GHC.TypeLits.Extra         (Max)
-import Language.Haskell.TH        (Q, TExp, TypeQ, appT, conT, litT, numTyLit, sigE, Lit(..), litE, Pat, litP)
+import Language.Haskell.TH        (Lit (..), Pat, Q, TExp, TypeQ, appT, conT, litE, litP, litT, mkName, numTyLit, sigE, tupE, tupP, varP)
 import Language.Haskell.TH.Syntax (Lift(..))
 #if MIN_VERSION_template_haskell(2,16,0)
 import Language.Haskell.TH.Compat
@@ -167,7 +167,9 @@ import Clash.Sized.Internal.Mod
 
 import {-# SOURCE #-} qualified Clash.Sized.Vector         as V
 import {-# SOURCE #-} qualified Clash.Sized.Internal.Index as I
+import                qualified Data.Char                  as C
 import                qualified Data.List                  as L
+import                qualified Data.Map.Strict            as M
 
 #include "MachDeps.h"
 
@@ -1091,27 +1093,55 @@ fromBits = L.foldl (\v b -> v `shiftL` 1 .|. fromIntegral b) 0
 -- pattern. The scrutinee can be any type that is an instance of the
 -- 'Num', 'Bits' and 'Eq' typeclasses.
 --
--- The bit pattern is specified by a string which contains @\'0\'@ or
--- @\'1\'@ for matching a bit, or @\'.\'@ for bits which are not matched.
+-- The bit pattern is specified by a string which contains:
+--
+--   * @\'0\'@ or @\'1\'@ for matching a bit
+--
+--   * @\'.\'@ for bits which are not matched (wildcard)
+--
+--   * @\'_\'@ can be used as a separator similar to the NumericUnderscores
+--   language extension
+--
+--   * lowercase alphabetical characters can be used to bind some bits to variables.
+--   For example @"0aab11bb"@ will bind two variables @aa :: BitVector 2@ and
+--   @bbb :: BitVector 3@ with their values set by the corresponding bits
 --
 -- The following example matches a byte against two bit patterns where
--- some bits are relevant and others are not:
+-- some bits are relevant and others are not while binding two variables @aa@
+-- and @bb@:
 --
 -- @
 --   decode :: Unsigned 8 -> Maybe Bool
---   decode $(bitPattern "00...110") = Just True
---   decode $(bitPattern "10..0001") = Just False
+--   decode $(bitPattern "00.._.110") = Just True
+--   decode $(bitPattern "10.._0001") = Just False
+--   decode $(bitPattern "aa.._b0b1") = Just (aa + bb > 1)
 --   decode _ = Nothing
 -- @
 bitPattern :: String -> Q Pat
-bitPattern s = [p| (($mask .&.) -> $target) |]
+bitPattern s = [p| ((\_x -> $preprocess) -> $tuple) |]
   where
-    bs = parse <$> s
+    (_, bs, M.toList -> ns) = L.foldr parse (0, [], M.empty) $ filter (/= '_') s
+
+    var c is = varP . mkName $ L.replicate (length is) c
+    bitSelect i = [e| if testBit _x $(litE $ IntegerL i) then pack# high else pack# low |]
+    varSelect is = L.foldr1 (\a b -> [e| $a ++# $b |]) (bitSelect <$> is)
 
     mask = litE . IntegerL . fromBits $ maybe 0 (const 1) <$> bs
+    maskE = [e| $mask .&. _x |]
     target = litP . IntegerL . fromBits $ fromMaybe 0 <$> bs
 
-    parse '.' = Nothing
-    parse '0' = Just 0
-    parse '1' = Just 1
-    parse c = error $ "Invalid bit pattern: " ++ show c
+    preprocess = tupE $ maskE : (varSelect . snd <$> ns)
+    tuple = tupP $ target : (uncurry var <$> ns)
+
+    parse '.' (i, b, n) = (succ i, Nothing:b, n)
+    parse '0' (i, b, n) = (succ i, Just 0:b, n)
+    parse '1' (i, b, n) = (succ i, Just 1:b, n)
+    parse c (i, b, n)
+      | C.isAlpha c && C.isLower c =
+        ( succ i
+        , Nothing:b
+        , M.alter (Just . (i:) . fromMaybe []) c n
+        )
+      | otherwise = error $
+        "Invalid bit pattern: " ++ show c ++
+        ", expecting one of '0', '1', '.', '_', or a lowercase alphabetic character"
