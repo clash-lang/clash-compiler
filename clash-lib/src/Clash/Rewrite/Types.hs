@@ -13,13 +13,14 @@
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE TemplateHaskell #-}
 
 module Clash.Rewrite.Types where
 
 import Control.Concurrent.Supply             (Supply, freshId)
 import Control.DeepSeq                       (NFData)
-import Control.Lens                          (use, (.=))
+import Control.Lens                          (Lens', use, (.=))
 #if !MIN_VERSION_base(4,13,0)
 import Control.Monad.Fail                    (MonadFail(fail))
 #endif
@@ -49,6 +50,7 @@ import Clash.Core.Var            (Id)
 import Clash.Core.VarEnv         (InScopeSet, VarSet, VarEnv)
 import Clash.Driver.Types        (BindingMap, DebugLevel)
 import Clash.Netlist.Types       (FilteredHWType, HWMap)
+import Clash.Rewrite.WorkFree    (isWorkFree)
 import Clash.Util
 
 import Clash.Annotations.BitRepresentation.Internal (CustomReprs)
@@ -224,3 +226,11 @@ type Transform m = TransformContext -> Term -> m Term
 
 -- | A 'Transform' action in the context of the 'RewriteMonad'
 type Rewrite extra = Transform (RewriteMonad extra)
+
+-- Moved into Clash.Rewrite.WorkFree
+{-# SPECIALIZE isWorkFree
+      :: Lens' (RewriteState extra) (VarEnv Bool)
+      -> BindingMap
+      -> Term
+      -> RewriteMonad extra Bool
+  #-}
