@@ -10,6 +10,7 @@ import Clash.Core.Term
 import Clash.Core.TyCon
 import Clash.Core.Type
 import Clash.Core.Var
+import Clash.Core.VarEnv (VarSet, elemVarSet, emptyVarSet, mkVarSet)
 
 -- | Data type that indicates what kind of solution (if any) was found
 data TypeEqSolution
@@ -28,12 +29,12 @@ catSolutions = mapMaybe getSol
   getSol _ = Nothing
 
 -- | Solve given equations and return all non-absurd solutions
-solveNonAbsurds :: TyConMap -> [(Type, Type)] -> [(TyVar, Type)]
-solveNonAbsurds _tcm [] = []
-solveNonAbsurds tcm (eq:eqs) =
-  solved ++ solveNonAbsurds tcm eqs
+solveNonAbsurds :: TyConMap -> VarSet -> [(Type, Type)] -> [(TyVar, Type)]
+solveNonAbsurds _tcm _ [] = []
+solveNonAbsurds tcm solveSet (eq:eqs) =
+  solved ++ solveNonAbsurds tcm solveSet eqs
  where
-  solvers = [pure . solveAdd, solveEq tcm]
+  solvers = [pure . solveAdd solveSet, solveEq tcm solveSet]
   solved = catSolutions (concat [s eq | s <- solvers])
 
 -- | Solve simple equalities such as:
@@ -44,13 +45,13 @@ solveNonAbsurds tcm (eq:eqs) =
 --   * SomeType 3 5 ~ SomeType a b
 --   * SomeType a 5 ~ SomeType 3 b
 --
-solveEq :: TyConMap -> (Type, Type) -> [TypeEqSolution]
-solveEq tcm (coreView tcm -> left, coreView tcm -> right) =
+solveEq :: TyConMap -> VarSet -> (Type, Type) -> [TypeEqSolution]
+solveEq tcm solveSet (coreView tcm -> left, coreView tcm -> right) =
   case (left, right) of
-    (VarTy tyVar, ConstTy {}) ->
+    (VarTy tyVar, ConstTy {}) | elemVarSet tyVar solveSet ->
       -- a ~ 3
       [Solution (tyVar, right)]
-    (ConstTy {}, VarTy tyVar) ->
+    (ConstTy {}, VarTy tyVar) | elemVarSet tyVar solveSet ->
       -- 3 ~ a
       [Solution (tyVar, left)]
     (ConstTy {}, ConstTy {}) ->
@@ -70,7 +71,7 @@ solveEq tcm (coreView tcm -> left, coreView tcm -> right) =
           (TyConApp leftNm leftTys, TyConApp rightNm rightTys) ->
             -- SomeType a b ~ SomeType 3 5 (or other way around)
             if leftNm == rightNm then
-              concat (map (solveEq tcm) (zipEqual leftTys rightTys))
+              concat (map (solveEq tcm solveSet) (zipEqual leftTys rightTys))
             else
               [AbsurdSolution]
           _ ->
@@ -79,11 +80,12 @@ solveEq tcm (coreView tcm -> left, coreView tcm -> right) =
 -- | Solve equations supported by @normalizeAdd@. See documentation of
 -- @TypeEqSolution@ to understand the return value.
 solveAdd
-  :: (Type, Type)
+  :: VarSet
+  -> (Type, Type)
   -> TypeEqSolution
-solveAdd ab =
+solveAdd solveSet ab =
   case normalizeAdd ab of
-    Just (n, m, VarTy tyVar) ->
+    Just (n, m, VarTy tyVar) | elemVarSet tyVar solveSet ->
       if n >= 0 && m >= 0 && n - m >= 0 then
         Solution (tyVar, (LitTy (NumTy (n - m))))
       else
@@ -123,7 +125,11 @@ isAbsurdAlt
   -> Alt
   -> Bool
 isAbsurdAlt tcm alt =
-  any (isAbsurdEq tcm) (altEqs tcm alt)
+  any (isAbsurdEq tcm exts) (altEqs tcm alt)
+ where
+  exts = case alt of
+    (DataPat _dc extNms _ids,_) -> mkVarSet extNms
+    _ -> emptyVarSet
 
 -- | Determines if an "equation" obtained through @altEqs@ or @typeEq@ is
 -- absurd. That is, it tests if two types that are definitely not equal are
@@ -131,12 +137,13 @@ isAbsurdAlt tcm alt =
 -- (intermediate) result such as -1.
 isAbsurdEq
   :: TyConMap
+  -> VarSet -- ^ existential tvs
   -> (Type, Type)
   -> Bool
-isAbsurdEq tcm ((left0, right0)) =
+isAbsurdEq tcm exts ((left0, right0)) =
   case (coreView tcm left0, coreView tcm right0) of
-    (solveAdd -> AbsurdSolution) -> True
-    lr -> any (==AbsurdSolution) (solveEq tcm lr)
+    (solveAdd exts -> AbsurdSolution) -> True
+    lr -> any (==AbsurdSolution) (solveEq tcm exts lr)
 
 -- | Get constraint equations
 altEqs

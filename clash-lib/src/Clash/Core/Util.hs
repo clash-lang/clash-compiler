@@ -377,6 +377,7 @@ dataConInstArgTysE is0 tcm (MkData { dcArgTys, dcExtTyVars, dcUnivTyVars }) inst
     (map (substTy subst) dcArgTys)
 
  where
+  exts = mkVarSet dcExtTyVars
   go
     :: [TyVar]
     -- ^ Existentials
@@ -386,7 +387,7 @@ dataConInstArgTysE is0 tcm (MkData { dcArgTys, dcExtTyVars, dcUnivTyVars }) inst
     -- ^ Maybe ([type of non-existential])
   go exts0 args0 =
     let eqs = catMaybes (map (typeEq tcm) args0) in
-    case solveNonAbsurds tcm eqs of
+    case solveNonAbsurds tcm exts eqs of
       [] ->
         Just args0
       sols ->

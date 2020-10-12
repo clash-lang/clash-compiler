@@ -441,6 +441,7 @@ runClashTest = defaultMain $ clashTestRoot
         , NEEDS_PRIMS_GHC(runTest "TailM" def)
         , NEEDS_PRIMS_GHC(runTest "TailOfTail" def)
         , NEEDS_PRIMS_GHC(runTest "T1310" def{hdlSim=False})
+        , NEEDS_PRIMS_GHC(runTest "T1536" def{hdlSim=False})
         ]
       , clashTestGroup "HOPrim"
         [ NEEDS_PRIMS_GHC(runTest "HOIdx" def)
