@@ -390,6 +390,7 @@ runClashTest = defaultMain $ clashTestRoot
         , runTest "TailM" def
         , runTest "TailOfTail" def
         , runTest "T1310" def{hdlSim=False}
+        , runTest "T1536" def{hdlSim=False}
         ]
       , clashTestGroup "HOPrim"
         [ runTest "HOIdx" def
