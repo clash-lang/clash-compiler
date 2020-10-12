@@ -1,0 +1,1 @@
+FIXED: Make sure elemExistentials only works on existentials, fixes [#1536](https://github.com/clash-lang/clash-compiler/issues/1536)
