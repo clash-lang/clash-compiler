@@ -258,6 +258,7 @@ Library
                       Clash.Rewrite.Combinators
                       Clash.Rewrite.Types
                       Clash.Rewrite.Util
+                      Clash.Rewrite.WorkFree
 
                       Clash.Unique
                       Clash.Util

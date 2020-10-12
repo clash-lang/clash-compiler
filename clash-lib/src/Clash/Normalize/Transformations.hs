@@ -941,11 +941,13 @@ bindConstantVar = inlineBinders test
     test _ (i,stripTicks -> e) = case isLocalVar e of
       -- Don't inline `let x = x in x`, it throws  us in an infinite loop
       True -> return (i `localIdDoesNotOccurIn` e)
-      _    -> isWorkFreeIsh e >>= \case
-        True -> Lens.use (extra.inlineConstantLimit) >>= \case
-          0 -> return True
-          n -> return (termSize e <= n)
-        _ -> return False
+      _    -> do
+        tcm <- Lens.view tcCache
+        case isWorkFreeIsh tcm e of
+          True -> Lens.use (extra.inlineConstantLimit) >>= \case
+            0 -> return True
+            n -> return (termSize e <= n)
+          _ -> return False
 {-# SCC bindConstantVar #-}
 
 -- | Push a cast over a case into it's alternatives.
@@ -1591,13 +1593,13 @@ collectANF ctx e@(App appf arg)
   | (conVarPrim, _) <- collectArgs e
   , isCon conVarPrim || isPrim conVarPrim || isVar conVarPrim
   = do
+    tcm <- Lens.view tcCache
     untranslatable <- lift (isUntranslatable False arg)
     let localVar   = isLocalVar arg
-    constantNoCR   <- lift (isConstantNotClockReset arg)
+        constantNoCR = isConstantNotClockReset tcm arg
     -- See Note [ANF no let-bind]
     case (untranslatable,localVar || constantNoCR, isSimBind conVarPrim,arg) of
       (False,False,False,_) -> do
-        tcm <- Lens.view tcCache
         -- See Note [ANF InScopeSet]
         is1   <- Lens.use _2
         argId <- lift (mkTmBinderFor is1 tcm (mkDerivedName ctx "app_arg") arg)

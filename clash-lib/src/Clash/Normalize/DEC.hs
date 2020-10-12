@@ -80,7 +80,8 @@ import Clash.Core.VarEnv
 import Clash.Normalize.Types (NormalizeState)
 import Clash.Rewrite.Types
 import Clash.Rewrite.Util    (mkInternalVar, mkSelectorCase,
-                              isUntranslatableType, isConstant)
+                              isUntranslatableType)
+import Clash.Rewrite.WorkFree (isConstant)
 import Clash.Unique          (lookupUniqMap)
 import Clash.Util
 
