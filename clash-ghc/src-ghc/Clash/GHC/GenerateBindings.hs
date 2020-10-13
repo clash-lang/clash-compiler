@@ -279,8 +279,8 @@ checkPrimitive primMap v = do
           warnArgs (x:xs) = do
             warnIf (maybe False GHC.isAbsDmd (indexMaybe dmdArgs x))
               ("The Haskell implementation of " ++ primStr ++ "isn't using argument #" ++
-               show (x+1) ++ ", but the corresponding primitive blackbox does.\n" ++
-               "This can lead to compile failures because GHC can replace these " ++
+               show x ++ ", but the corresponding primitive blackbox does.\n" ++
+               "This can lead to incorrect HDL output because GHC can replace these " ++
                "arguments by an undefined value.")
             warnArgs xs
 
