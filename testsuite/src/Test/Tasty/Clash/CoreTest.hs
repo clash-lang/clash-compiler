@@ -18,16 +18,17 @@ import Clash.Backend
 import Clash.Backend.SystemVerilog
 import Clash.Backend.Verilog
 import Clash.Backend.VHDL
-import Clash.Core.Evaluator.Models
+import Clash.Core.PartialEval
 import Clash.Core.Name
-import Clash.Core.Termination
+import Clash.Core.Term
 import Clash.Core.TyCon
 import Clash.Core.Var
 import Clash.Core.VarEnv
 import Clash.Driver.Types
+import Clash.Netlist.BlackBox.Types (HdlSyn(Other))
+
 import Clash.GHC.GenerateBindings
 import Clash.GHC.PartialEval
-import Clash.Netlist.BlackBox.Types (HdlSyn(Other))
 
 import Util
 
@@ -78,14 +79,13 @@ runToCoreStage target f src = do
 findBinding
   :: OccName
   -> (BindingMap, TyConMap, Supply)
-  -> Nf
+  -> IO Term
 findBinding nm (bm, tcm, ids) =
   case List.find byName (eltsVarEnv bm) of
     Just bd ->
-      let env = mkGlobalEnv bm ri 20 (mempty, 0) tcm emptyInScopeSet ids
-       in fst . runEval env $ evaluateNf ghcEvaluator (bindingTerm bd)
+      let env = mkGlobalEnv bm tcm emptyInScopeSet ids 20 mempty 0
+       in fst <$> nf ghcEvaluator env False (bindingId bd) (bindingTerm bd)
 
     Nothing -> error ("Not in binding map: " <> show nm)
  where
-  ri = mkRecInfo bm
   byName b = nm == nameOcc (varName $ bindingId b)

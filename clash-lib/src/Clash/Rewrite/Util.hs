@@ -53,11 +53,14 @@ import qualified Data.Set.Ordered.Extra      as OSet
 import           Data.Text                   (Text)
 import qualified Data.Text                   as Text
 
+#ifdef EXPERIMENTAL_EVALUATOR
+import           System.IO.Unsafe            (unsafePerformIO)
+#endif
+
 #ifdef HISTORY
 import           Data.Binary                 (encode)
 import qualified Data.ByteString             as BS
 import qualified Data.ByteString.Lazy        as BL
-import           System.IO.Unsafe            (unsafePerformIO)
 #endif
 
 import           BasicTypes                  (InlineSpec (..))
@@ -65,7 +68,8 @@ import           BasicTypes                  (InlineSpec (..))
 import           Clash.Core.DataCon          (dcExtTyVars)
 
 #if EXPERIMENTAL_EVALUATOR
-import           Clash.Core.Evaluator.Models
+import           Clash.Core.PartialEval
+import           Clash.Core.PartialEval.NormalForm
 #else
 import           Clash.Core.Evaluator.Types  (PureHeap, whnf')
 #endif
@@ -1008,25 +1012,32 @@ whnfRW
   -> Term
   -> Rewrite extra
   -> RewriteMonad extra Term
-whnfRW _isSubj ctx@(TransformContext is0 _) e rw = do
+whnfRW isSubj ctx@(TransformContext is0 _) e rw = do
   tcm <- Lens.view tcCache
   bndrs <- Lens.use bindings
   eval <- Lens.view evaluator
   ids <- Lens.use uniqSupply
   let (ids1,ids2) = splitSupply ids
   uniqSupply Lens..= ids2
-  gh <- Lens.use globalHeap
 
 #if EXPERIMENTAL_EVALUATOR
-  ri <- Lens.view recInfo
+  (i, _) <- Lens.use curFun
+  heap <- Lens.use ioHeap
+  addr <- Lens.use ioAddr
   fuel <- Lens.view fuelLimit
+  let genv = mkGlobalEnv bndrs tcm is0 ids1 fuel heap addr
 
-  case runEval (mkGlobalEnv bndrs ri fuel gh tcm is0 ids1) (evaluateNf eval e) of
-    (!e', !env') -> do
-      globalHeap Lens..= genvPrimsIO env'
-      rw ctx (asTerm e')
+  case unsafePerformIO (nf eval genv isSubj i e) of
+    (!e', !genv') -> do
+      ioHeap Lens..= genvHeap genv'
+      ioAddr Lens..= genvAddr genv'
+
+      -- TODO I remain unsure about this. Do I want to use bindPureHeap?
+      rw (ctx { tfInScope = genvInScope genv' }) e'
 #else
-  case whnf' eval bndrs tcm gh ids1 is0 _isSubj e of
+  gh <- Lens.use globalHeap
+
+  case whnf' eval bndrs tcm gh ids1 is0 isSubj e of
     (!gh1,ph,v) -> do
       globalHeap Lens..= gh1
       bindPureHeap tcm ph rw ctx v

@@ -130,7 +130,7 @@ data WorkInfo
   | WorkAlways
   -- ^ Performs work regardless of whether the variables are constant or
   -- variable; these are things like clock or reset generators
-  deriving (Show,Generic,NFData,Hashable,Binary)
+  deriving (Eq,Show,Generic,NFData,Hashable,Binary)
 
 -- | Term reference
 type TmName     = Name Term

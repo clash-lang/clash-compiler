@@ -30,7 +30,7 @@ import Control.Monad (unless)
 import Clash.Prelude
 
 import Clash.Backend
-import Clash.Core.Evaluator.Models
+import Clash.Core.PartialEval
 import Clash.Core.Subst
 import Clash.Core.Term
 import Clash.Core.TyCon
@@ -104,18 +104,18 @@ mainCommon hdl = do
   entities <- runToCoreStage hdl id testPath
 
   -- Eta Expansion of Data Constructors
-  let data1 = findBinding "EtaExpansion.etaReducedData" entities
-      data2 = findBinding "EtaExpansion.etaExpandedData" entities
+  data1 <- findBinding "EtaExpansion.etaReducedData" entities
+  data2 <- findBinding "EtaExpansion.etaExpandedData" entities
 
-  unless (aeqTerm (asTerm data1) (asTerm data2)) $
+  unless (aeqTerm data1 data2) $
     error ("Not alpha equivalent: " <> show data1 <> "\n\n" <> show data2)
 
   -- Eta Expansion of Primitive Operations
-  let prim1 = findBinding "EtaExpansion.etaReducedPrim1" entities
-      prim2 = findBinding "EtaExpansion.etaReducedPrim2" entities
-      prim3 = findBinding "EtaExpansion.etaExpandedPrim" entities
+  prim1 <- findBinding "EtaExpansion.etaReducedPrim1" entities
+  prim2 <- findBinding "EtaExpansion.etaReducedPrim2" entities
+  prim3 <- findBinding "EtaExpansion.etaExpandedPrim" entities
 
-  unless (aeqTerm (asTerm prim1) (asTerm prim2) && aeqTerm (asTerm prim1) (asTerm prim3)) $
+  unless (aeqTerm prim1 prim2 && aeqTerm prim1 prim3) $
     error ("Not alpha equivalent: " <> show prim1 <> "\n\n" <> show prim2 <> "\n\n" <> show prim3)
 
 mainVHDL :: IO ()

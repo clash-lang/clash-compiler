@@ -55,11 +55,15 @@ import qualified Data.Map.Strict                  as Map
 import qualified Data.Maybe                       as Maybe
 import           Data.Monoid                      (All (..))
 
+#if EXPERIMENTAL_EVALUATOR
+import           System.IO.Unsafe
+#endif
+
 -- internal
 import Clash.Core.DataCon    (DataCon, dcTag)
 
 #if EXPERIMENTAL_EVALUATOR
-import Clash.Core.Evaluator.Models
+import Clash.Core.PartialEval
 #else
 import Clash.Core.Evaluator.Types  (whnf')
 #endif
@@ -153,17 +157,18 @@ collectGlobals' is0 substitution seen e@(collectArgsTicks -> (fun, args@(_:_), t
     tcm <- Lens.view tcCache
     bndrs <- Lens.use bindings
     evaluate <- Lens.view evaluator
-    gh <- Lens.use globalHeap
     ids <- Lens.use uniqSupply
     let (ids1,ids2) = splitSupply ids
     uniqSupply Lens..= ids2
 #if EXPERIMENTAL_EVALUATOR
-    ri <- Lens.view recInfo
+    (i,_) <- Lens.use curFun
+    heap <- Lens.use ioHeap
+    addr <- Lens.use ioAddr
     fuel <- Lens.view fuelLimit
-
-    let env = mkGlobalEnv bndrs ri fuel gh tcm is0 ids1
-    let eval = asTerm . fst . runEval env . evaluateNf evaluate
+    let genv = mkGlobalEnv bndrs tcm is0 ids1 fuel heap addr
+    let eval = fst . unsafePerformIO . nf evaluate genv False i
 #else
+    gh <- Lens.use globalHeap
     let eval = (Lens.view Lens._3) . whnf' evaluate bndrs tcm gh ids1 is0 False
 #endif
     let eTy  = termType tcm e
