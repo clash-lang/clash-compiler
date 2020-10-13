@@ -8,7 +8,7 @@ import qualified Data.List as List (find)
 import Clash.Prelude
 
 import Clash.Backend
-import Clash.Core.Evaluator.Models
+import Clash.Core.PartialEval
 import Clash.Core.Name
 import Clash.Core.Subst
 import Clash.Core.Term
@@ -38,9 +38,9 @@ mainCommon
   -> IO ()
 mainCommon hdl = do
   entities <- runToCoreStage hdl id testPath
-  let te = findBinding "LazyEvaluation.topEntity" entities
+  te <- findBinding "LazyEvaluation.topEntity" entities
 
-  if |  NLam i (NNeu (NeVar j)) <- te
+  if |  Lam i (Var j) <- te
      ,  i == j
      -> pure ()
 

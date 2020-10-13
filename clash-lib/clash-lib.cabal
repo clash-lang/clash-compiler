@@ -199,12 +199,14 @@ Library
 
                       Clash.Core.DataCon
                       Clash.Core.EqSolver
-                      Clash.Core.Evaluator.Models
-                      Clash.Core.Evaluator.Semantics
                       Clash.Core.Evaluator.Types
                       Clash.Core.FreeVars
                       Clash.Core.Literal
                       Clash.Core.Name
+                      Clash.Core.PartialEval
+                      Clash.Core.PartialEval.AsTerm
+                      Clash.Core.PartialEval.Monad
+                      Clash.Core.PartialEval.NormalForm
                       Clash.Core.Pretty
                       Clash.Core.Subst
                       Clash.Core.Term
@@ -325,3 +327,7 @@ test-suite unittests
                  Clash.Tests.Normalize.Transformations
 
                  Test.Clash.Rewrite
+
+  if flag(experimental-evaluator)
+    cpp-options:      -DEXPERIMENTAL_EVALUATOR
+

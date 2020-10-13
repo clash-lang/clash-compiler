@@ -37,13 +37,13 @@ import qualified Data.Set                    as Set
 import GHC.Generics
 
 #if EXPERIMENTAL_EVALUATOR
-import Clash.Core.Evaluator.Models           (Evaluator, GlobalIO)
+import Clash.Core.PartialEval                (Evaluator)
+import Clash.Core.PartialEval.NormalForm     (Value)
 #else
 import Clash.Core.Evaluator.Types            (Evaluator, PrimHeap)
 #endif
 
 import Clash.Core.Term           (Term, Context)
-import Clash.Core.Termination    (RecInfo)
 import Clash.Core.Type           (Type)
 import Clash.Core.TyCon          (TyConName, TyConMap)
 import Clash.Core.Var            (Id)
@@ -84,11 +84,14 @@ data RewriteState extra
   , _nameCounter      :: {-# UNPACK #-} !Int
   -- ^ Used for 'Fresh'
 #if EXPERIMENTAL_EVALUATOR
-  , _globalHeap       :: GlobalIO
+  , _ioHeap           :: IntMap Value
+  -- ^ Used as a heap for compile-time evaluation of primitives that live in I/O
+  , _ioAddr           :: Int
+  -- ^ Next address to use for heap insertion.
 #else
   , _globalHeap       :: PrimHeap
-#endif
   -- ^ Used as a heap for compile-time evaluation of primitives that live in I/O
+#endif
   , _workFreeBinders  :: VarEnv Bool
   -- ^ Map telling whether a binder's definition is work-free
   , _extra            :: !extra
@@ -125,8 +128,6 @@ data RewriteEnv
   -- ^ Functions that are considered TopEntities
   , _customReprs    :: CustomReprs
   -- ^ Custom bit representations
-  , _recInfo        :: RecInfo
-  -- ^ Information about recursive global bindings
   , _fuelLimit      :: Word
   -- ^ Maximum amount of fuel for the evaluator
   }

@@ -19,7 +19,7 @@ import Control.Monad (unless)
 import Clash.Prelude
 
 import Clash.Backend
-import Clash.Core.Evaluator.Models
+import Clash.Core.PartialEval
 import Clash.Core.Name
 import Clash.Core.Subst
 import Clash.Core.Term
@@ -83,18 +83,18 @@ mainCommon
 mainCommon hdl = do
   entities <- runToCoreStage hdl id testPath
 
-  let alt  = findBinding "KnownCase.matchedAlt" entities
-      just = findBinding "KnownCase.caseOfData" entities
-      lit  = findBinding "KnownCase.caseOfLit" entities
-      def  = findBinding "KnownCase.caseOfDefault" entities
+  alt  <- findBinding "KnownCase.matchedAlt" entities
+  just <- findBinding "KnownCase.caseOfData" entities
+  lit  <- findBinding "KnownCase.caseOfLit" entities
+  def  <- findBinding "KnownCase.caseOfDefault" entities
 
-  unless (aeqTerm (asTerm just) (asTerm alt)) $
+  unless (aeqTerm just alt) $
     error ("Not alpha equivalent: " <> show just <> "\n\n" <> show alt)
 
-  unless (aeqTerm (asTerm lit) (asTerm alt)) $
+  unless (aeqTerm lit alt) $
     error ("Not alpha equivalent: " <> show lit <> "\n\n" <> show alt)
 
-  unless (aeqTerm (asTerm def) (asTerm alt)) $
+  unless (aeqTerm def alt) $
     error ("Not alpha equivalent: " <> show def <> "\n\n" <> show alt)
 
 mainVHDL :: IO ()

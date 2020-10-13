@@ -8,9 +8,10 @@
 
 {-# OPTIONS_GHC -Wno-orphans #-}
 
-{-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE QuasiQuotes #-}
+{-# LANGUAGE TemplateHaskell #-}
 
 module Test.Clash.Rewrite where
 
@@ -71,7 +72,6 @@ instance Default RewriteEnv where
     , _evaluator=error "_evaluator: NYI"
     , _topEntities=emptyVarSet
     , _customReprs=buildCustomReprs []
-    , _recInfo=mempty
     , _fuelLimit=10
     }
 
@@ -83,7 +83,12 @@ instance Default extra => Default (RewriteState extra) where
     , _curFun=error "_curFun: NYI"
     , _nameCounter=2
     , _workFreeBinders=emptyVarEnv
+#if EXPERIMENTAL_EVALUATOR
+    , _ioHeap=error "_ioHeap: NYI"
+    , _ioAddr=0
+#else
     , _globalHeap=error "_globalHeap: NYI"
+#endif
     , _extra=def
     }
 

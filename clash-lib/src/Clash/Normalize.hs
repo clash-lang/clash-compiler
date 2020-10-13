@@ -38,7 +38,7 @@ import           Clash.Annotations.BitRepresentation.Internal
   (CustomReprs)
 
 #if EXPERIMENTAL_EVALUATOR
-import           Clash.Core.Evaluator.Models      (Evaluator)
+import           Clash.Core.PartialEval           (Evaluator)
 #else
 import           Clash.Core.Evaluator.Types       (Evaluator)
 #endif
@@ -50,7 +50,6 @@ import           Clash.Core.Subst
   (extendGblSubstList, mkSubst, substTm)
 import           Clash.Core.Term                  (Term (..), collectArgsTicks
                                                   ,mkApps, mkTicks)
-import           Clash.Core.Termination           (mkRecInfo)
 import           Clash.Core.Type                  (Type, splitCoreFunForallTy)
 import           Clash.Core.TyCon
   (TyConMap, TyConName)
@@ -133,7 +132,6 @@ runNormalization opts supply globals typeTrans reprs tcm tupTcm eval primMap rcs
                   eval
                   (mkVarSet topEnts)
                   reprs
-                  (mkRecInfo globals)
                   (opt_evaluatorFuelLimit opts)
 
     rwState   = RewriteState
@@ -142,7 +140,12 @@ runNormalization opts supply globals typeTrans reprs tcm tupTcm eval primMap rcs
                   supply
                   (error $ $(curLoc) ++ "Report as bug: no curFun",noSrcSpan)
                   0
+#if EXPERIMENTAL_EVALUATOR
+                  IntMap.empty
+                  0
+#else
                   (IntMap.empty, 0)
+#endif
                   emptyVarEnv
                   normState
 

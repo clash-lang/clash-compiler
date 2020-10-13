@@ -13,7 +13,7 @@ import Numeric.Natural
 import Clash.Prelude
 
 import Clash.Backend
-import Clash.Core.Evaluator.Models
+import Clash.Core.PartialEval
 import Clash.Core.Literal
 import Clash.Core.Subst
 import Clash.Debug
@@ -49,8 +49,8 @@ mainCommon hdl = do
   -- normal forms can be obtained for f and m (meaning the evaluator doesn't
   -- attempt to unroll them indefinitely.
 
-  let fNf = findBinding "MutualRecursion.f" entities
-      mNf = findBinding "MutualRecursion.m" entities
+  fNf <- findBinding "MutualRecursion.f" entities
+  mNf <- findBinding "MutualRecursion.m" entities
 
   fNf `seq` mNf `seq` pure ()
 

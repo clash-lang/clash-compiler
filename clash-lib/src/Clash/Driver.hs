@@ -80,7 +80,7 @@ import           Clash.Annotations.TopEntity.Extra ()
 import           Clash.Backend
 
 #if EXPERIMENTAL_EVALUATOR
-import           Clash.Core.Evaluator.Models      (Evaluator)
+import           Clash.Core.PartialEval           (Evaluator)
 #else
 import           Clash.Core.Evaluator.Types       (Evaluator)
 #endif

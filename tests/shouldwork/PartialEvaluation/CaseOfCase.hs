@@ -22,7 +22,7 @@ module CaseOfCase where
 import Clash.Prelude
 
 import Clash.Backend
-import Clash.Core.Evaluator.Models
+import Clash.Core.PartialEval
 import Clash.Core.Name
 import Clash.Core.Subst
 import Clash.Core.Term
@@ -53,7 +53,7 @@ topEntity x a b =
 testPath :: FilePath
 testPath = "tests/shouldwork/PartialEvaluation/CaseOfCase.hs"
 
-checkAlts :: Id -> Id -> [(Pat, Nf)] -> IO ()
+checkAlts :: Id -> Id -> [(Pat, Term)] -> IO ()
 checkAlts a b alts
   | [(aP, aA), (bP, bA)] <- alts
   = checkAlt a aP aA >> checkAlt b bP bA
@@ -62,8 +62,8 @@ checkAlts a b alts
   = error ("Expected two patterns [A,B], got " <> show alts)
  where
   checkAlt var (DataPat dc [] []) alt
-    | NNeu (NeCase s _ as) <- alt
-    , NNeu (NeVar v) <- s
+    | Case s _ as <- alt
+    , Var v <- s
     , v == var
     = pure ()
 
@@ -76,11 +76,11 @@ mainCommon
   -> IO ()
 mainCommon hdl = do
   entities <- runToCoreStage hdl id testPath
-  let te = findBinding "CaseOfCase.topEntity" entities
+  te <- findBinding "CaseOfCase.topEntity" entities
 
-  if |  NLam x (NLam a (NLam b e)) <- te
-     ,  NNeu (NeCase s _ alts) <- e
-     ,  NNeu (NeVar v) <- s
+  if |  Lam x (Lam a (Lam b e)) <- te
+     ,  Case s _ alts <- e
+     ,  Var v <- s
      ,  v == x
      -> checkAlts a b alts
 
