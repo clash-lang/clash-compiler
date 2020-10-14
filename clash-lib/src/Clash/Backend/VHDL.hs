@@ -24,7 +24,6 @@ import           Control.Lens                         hiding (Indexed, Empty)
 import           Control.Monad                        (forM,join,zipWithM)
 import           Control.Monad.State                  (State, StateT)
 import           Data.Bits                            (testBit, Bits)
-import           Data.Hashable                        (Hashable)
 import           Data.HashMap.Lazy                    (HashMap)
 import qualified Data.HashMap.Lazy                    as HashMap
 import qualified Data.HashMap.Strict                  as HashMapS
@@ -926,7 +925,7 @@ renderAttrs
   -> [(Identifier, Attr')]
   -> VHDLM Doc
 renderAttrs what (attrMap -> attrs) =
-  vcat $ sequence $ intersperse " " $ map renderAttrGroup (assocs attrs)
+  vcat $ sequence $ intersperse " " $ map renderAttrGroup (HashMap.toList attrs)
  where
   renderAttrGroup
     :: (T.Text, (T.Text, [(TextS.Text, T.Text)]))
@@ -949,12 +948,6 @@ renderAttrs what (attrMap -> attrs) =
     <+> stringS what <+> "is" -- "signal is" or "component is"
     <+> string value
     <> semi
-
--- | Return all key/value pairs in the map in arbitrary key order.
-assocs :: Eq a => Hashable a => HashMap a b -> [(a,b)]
-assocs m = zip keys (map (m HashMap.!) keys)
- where
-  keys = (HashMap.keys m)
 
 -- | Convert single attribute to VHDL syntax
 renderAttr :: Attr' -> T.Text
