@@ -40,6 +40,7 @@ module Clash.Normalize.PrimitiveReductions where
 import qualified Control.Lens                     as Lens
 import           Control.Lens                     ((.=))
 import           Data.List                        (mapAccumR)
+import           Data.List.Extra                  (zipEqual)
 import qualified Data.Maybe                       as Maybe
 import           TextShow                         (showt)
 
@@ -506,9 +507,9 @@ reduceTraverse (TransformContext is0 ctx) n aTy fTy bTy dict fun arg = do
             (Just apDictTc)    = lookupUniqMap apDictTcNm tcm
             [apDictCon]        = tyConDataCons apDictTc
             (Just apDictIdTys) = dataConInstArgTys apDictCon [fTy]
-            (uniqs1,apDictIds@[functorDictId,pureId,apId,_,_]) =
+            (uniqs1,apDictIds@[functorDictId,pureId,apId,_,_,_]) =
               mapAccumR mkUniqInternalId (uniqs0,is1)
-                (zip ["functorDict","pure","ap","apConstL","apConstR"]
+                (zipEqual ["functorDict","pure","ap","liftA2","apConstL","apConstR"]
                      apDictIdTys)
 
             (TyConApp funcDictTcNm _) = tyView (head apDictIdTys)
@@ -517,7 +518,7 @@ reduceTraverse (TransformContext is0 ctx) n aTy fTy bTy dict fun arg = do
             (Just funcDictIdTys) = dataConInstArgTys funcDictCon [fTy]
             (uniqs2,funcDicIds@[fmapId,_]) =
               mapAccumR mkUniqInternalId uniqs1
-                (zip ["fmap","fmapConst"] funcDictIdTys)
+                (zipEqual ["fmap","fmapConst"] funcDictIdTys)
 
             apPat    = DataPat apDictCon   [] apDictIds
             fnPat    = DataPat funcDictCon [] funcDicIds
