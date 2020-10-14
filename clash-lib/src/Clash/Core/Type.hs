@@ -63,7 +63,7 @@ import           Data.Binary            (Binary)
 import           Data.Coerce            (coerce)
 import           Data.Hashable          (Hashable)
 import           Data.List              (foldl')
-import           Data.List.Extra        (splitAtList)
+import           Data.List.Extra        (splitAtList, zipEqual)
 import           Data.Maybe             (isJust, mapMaybe)
 import           GHC.Base               (isTrue#,(==#))
 import           GHC.Generics           (Generic(..))
@@ -413,7 +413,7 @@ findFunSubst tcm (tcSubst:rest) args = case funSubsts tcm tcSubst args of
 -- a substituted RHS
 funSubsts :: TyConMap -> ([Type],Type) -> [Type] -> Maybe Type
 funSubsts tcm (tcSubstLhs,tcSubstRhs) args = do
-  tySubts <- foldl' (funSubst tcm) (Just []) (zip tcSubstLhs args)
+  tySubts <- foldl' (funSubst tcm) (Just []) (zipEqual tcSubstLhs args)
   let tyRhs = uncurry substTyWith (unzip tySubts) tcSubstRhs
   -- Type functions can return higher-kinded types
   case drop (length tcSubstLhs) args of

@@ -505,7 +505,7 @@ caseCon' ctx@(TransformContext is0 _) e@(Case subj ty alts) = do
      let
       -- Create the substitution environment for all the existential
       -- type variables.
-      exTysList = zip tvs (drop (length (dcUnivTyVars dc)) (Either.rights args))
+      exTysList = List.zipEqual tvs (drop (length (dcUnivTyVars dc)) (Either.rights args))
       exTySubst = extendTvSubstList (mkSubst is0) exTysList
       -- Apply the type-substitution in all the pattern variables, we need
       -- to do this because we might use them as let-bindings later on,
@@ -516,7 +516,7 @@ caseCon' ctx@(TransformContext is0 _) e@(Case subj ty alts) = do
       -- of let-bind in case the RHS of the let-binder is work-free.
       fvs = Lens.foldMapOf freeLocalIds unitVarSet altE
       (binds,_) = List.partition ((`elemVarSet` fvs) . fst)
-                $ zip xs1 (Either.lefts args)
+                $ List.zipEqual xs1 (Either.lefts args)
       binds1 = map (second (`mkTicks` ticks)) binds
      altE1 <-
        case binds1 of
@@ -697,7 +697,7 @@ matchLiteralContructor c (IntegerLiteral l) alts = go (reverse alts)
     , l >= ((-2)^(63::Int)) &&  l < 2^(63::Int)
     = let fvs       = Lens.foldMapOf freeLocalIds unitVarSet e
           (binds,_) = List.partition ((`elemVarSet` fvs) . fst)
-                    $ zip xs [Literal (IntLiteral l)]
+                    $ List.zipEqual xs [Literal (IntLiteral l)]
           e' = case binds of
                  [] -> e
                  _  -> Letrec binds e
@@ -709,7 +709,7 @@ matchLiteralContructor c (IntegerLiteral l) alts = go (reverse alts)
           bv        = PV.Vector 0 (BA.sizeofByteArray ba') ba'
           fvs       = Lens.foldMapOf freeLocalIds unitVarSet e
           (binds,_) = List.partition ((`elemVarSet` fvs) . fst)
-                    $ zip xs [Literal (ByteArrayLiteral bv)]
+                    $ List.zipEqual xs [Literal (ByteArrayLiteral bv)]
           e' = case binds of
                  [] -> e
                  _  -> Letrec binds e
@@ -721,7 +721,7 @@ matchLiteralContructor c (IntegerLiteral l) alts = go (reverse alts)
           bv        = PV.Vector 0 (BA.sizeofByteArray ba') ba'
           fvs       = Lens.foldMapOf freeLocalIds unitVarSet e
           (binds,_) = List.partition ((`elemVarSet` fvs) . fst)
-                    $ zip xs [Literal (ByteArrayLiteral bv)]
+                    $ List.zipEqual xs [Literal (ByteArrayLiteral bv)]
           e' = case binds of
                  [] -> e
                  _  -> Letrec binds e
@@ -743,7 +743,7 @@ matchLiteralContructor c (NaturalLiteral l) alts = go (reverse alts)
     , l >= 0 && l < 2^(64::Int)
     = let fvs       = Lens.foldMapOf freeLocalIds unitVarSet e
           (binds,_) = List.partition ((`elemVarSet` fvs) . fst)
-                    $ zip xs [Literal (WordLiteral l)]
+                    $ List.zipEqual xs [Literal (WordLiteral l)]
           e' = case binds of
                  [] -> e
                  _  -> Letrec binds e
@@ -755,7 +755,7 @@ matchLiteralContructor c (NaturalLiteral l) alts = go (reverse alts)
           bv        = PV.Vector 0 (BA.sizeofByteArray ba') ba'
           fvs       = Lens.foldMapOf freeLocalIds unitVarSet e
           (binds,_) = List.partition ((`elemVarSet` fvs) . fst)
-                    $ zip xs [Literal (ByteArrayLiteral bv)]
+                    $ List.zipEqual xs [Literal (ByteArrayLiteral bv)]
           e' = case binds of
                  [] -> e
                  _  -> Letrec binds e
