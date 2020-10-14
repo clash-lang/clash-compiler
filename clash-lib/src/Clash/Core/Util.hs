@@ -134,7 +134,7 @@ extractElems supply inScope consCon resTy s maxN vec =
 
     (uniqs1,mTV) = mkUniqSystemTyVar uniqs0 ("m",typeNatKind)
     (uniqs2,[elNId,restNId,co,el,rest]) =
-      mapAccumR mkUniqSystemId uniqs1 $ zip
+      mapAccumR mkUniqSystemId uniqs1 $ zipEqual
         ["el" `T.append` (s `T.cons` T.pack (show (maxN-n)))
         ,"rest" `T.append` (s `T.cons` T.pack (show (maxN-n)))
         ,"_co_"
@@ -186,7 +186,7 @@ extractTElems supply inScope lrCon brCon resTy s maxN tree =
     (Just idTys) = dataConInstArgTys lrCon tys
 
     (uniqs1,[elNId,co,el]) =
-      mapAccumR mkUniqSystemId uniqs0 $ zip
+      mapAccumR mkUniqSystemId uniqs0 $ zipEqual
         [ "el" `T.append` (s `T.cons` T.pack (show (head ks)))
         , "_co_"
         , "el"
@@ -209,7 +209,7 @@ extractTElems supply inScope lrCon brCon resTy s maxN tree =
     (b0:bL,b1:bR) = splitAt (length bs `div` 2) bs
     brTy = last idTys
     (uniqs2,[ltNId,rtNId,co,lt,rt]) =
-      mapAccumR mkUniqSystemId uniqs1 $ zip
+      mapAccumR mkUniqSystemId uniqs1 $ zipEqual
         ["lt" `T.append` (s `T.cons` T.pack (show b0))
         ,"rt" `T.append` (s `T.cons` T.pack (show b1))
         ,"_co_"
@@ -371,9 +371,9 @@ dataConInstArgTysE is0 tcm (MkData { dcArgTys, dcExtTyVars, dcUnivTyVars }) inst
   -- TODO: been solved in the caseElemExistentials transformation)
   let is1   = extendInScopeSetList is0 dcExtTyVars
       is2   = unionInScope is1 (mkInScopeSet (tyFVsOfTypes inst_tys))
-      subst = extendTvSubstList (mkSubst is2) (zip dcUnivTyVars inst_tys)
+      subst = extendTvSubstList (mkSubst is2) (zipEqual dcUnivTyVars inst_tys)
   go
-    (substGlobalsInExistentials is0 dcExtTyVars (zip dcUnivTyVars inst_tys))
+    (substGlobalsInExistentials is0 dcExtTyVars (zipEqual dcUnivTyVars inst_tys))
     (map (substTy subst) dcArgTys)
 
  where

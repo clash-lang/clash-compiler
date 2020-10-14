@@ -697,7 +697,7 @@ matchLiteralContructor c (IntegerLiteral l) alts = go (reverse alts)
     , l >= ((-2)^(63::Int)) &&  l < 2^(63::Int)
     = let fvs       = Lens.foldMapOf freeLocalIds unitVarSet e
           (binds,_) = List.partition ((`elemVarSet` fvs) . fst)
-                    $ zip xs [Literal (IntLiteral l)]
+                    $ List.zipEqual xs [Literal (IntLiteral l)]
           e' = case binds of
                  [] -> e
                  _  -> Letrec binds e
@@ -708,7 +708,7 @@ matchLiteralContructor c (IntegerLiteral l) alts = go (reverse alts)
           ba'       = BA.ByteArray ba
           fvs       = Lens.foldMapOf freeLocalIds unitVarSet e
           (binds,_) = List.partition ((`elemVarSet` fvs) . fst)
-                    $ zip xs [Literal (ByteArrayLiteral ba')]
+                    $ List.zipEqual xs [Literal (ByteArrayLiteral ba')]
           e' = case binds of
                  [] -> e
                  _  -> Letrec binds e
@@ -719,7 +719,7 @@ matchLiteralContructor c (IntegerLiteral l) alts = go (reverse alts)
           ba'       = BA.ByteArray ba
           fvs       = Lens.foldMapOf freeLocalIds unitVarSet e
           (binds,_) = List.partition ((`elemVarSet` fvs) . fst)
-                    $ zip xs [Literal (ByteArrayLiteral ba')]
+                    $ List.zipEqual xs [Literal (ByteArrayLiteral ba')]
           e' = case binds of
                  [] -> e
                  _  -> Letrec binds e
@@ -741,7 +741,7 @@ matchLiteralContructor c (NaturalLiteral l) alts = go (reverse alts)
     , l >= 0 && l < 2^(64::Int)
     = let fvs       = Lens.foldMapOf freeLocalIds unitVarSet e
           (binds,_) = List.partition ((`elemVarSet` fvs) . fst)
-                    $ zip xs [Literal (WordLiteral l)]
+                    $ List.zipEqual xs [Literal (WordLiteral l)]
           e' = case binds of
                  [] -> e
                  _  -> Letrec binds e
@@ -752,7 +752,7 @@ matchLiteralContructor c (NaturalLiteral l) alts = go (reverse alts)
           ba'       = BA.ByteArray ba
           fvs       = Lens.foldMapOf freeLocalIds unitVarSet e
           (binds,_) = List.partition ((`elemVarSet` fvs) . fst)
-                    $ zip xs [Literal (ByteArrayLiteral ba')]
+                    $ List.zipEqual xs [Literal (ByteArrayLiteral ba')]
           e' = case binds of
                  [] -> e
                  _  -> Letrec binds e

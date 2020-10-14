@@ -2,6 +2,7 @@
 
 module Clash.Core.EqSolver where
 
+import Data.List.Extra (zipEqual)
 import Data.Maybe (catMaybes, mapMaybe)
 
 import Clash.Core.Name (Name(nameOcc))
@@ -69,7 +70,7 @@ solveEq tcm (coreView tcm -> left, coreView tcm -> right) =
           (TyConApp leftNm leftTys, TyConApp rightNm rightTys) ->
             -- SomeType a b ~ SomeType 3 5 (or other way around)
             if leftNm == rightNm then
-              concat (map (solveEq tcm) (zip leftTys rightTys))
+              concat (map (solveEq tcm) (zipEqual leftTys rightTys))
             else
               [AbsurdSolution]
           _ ->
@@ -156,4 +157,3 @@ typeEq tcm ty =
     Just (coreView tcm left, coreView tcm right)
   _ ->
     Nothing
-
