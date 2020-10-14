@@ -26,6 +26,10 @@ import "extra" Control.Monad.Extra (anyM, allM, orM, partitionM)
 
 import Control.Applicative (liftA2)
 
+#if defined(DEBUG)
+import GHC.Stack (HasCallStack)
+#endif
+
 -- | Monadic version of 'Data.List.mapAccumL'
 mapAccumLM
   :: (Monad m)
@@ -96,12 +100,19 @@ countEq a as = length (filter (== a) as)
 -- | Zip two lists of equal length
 --
 -- NB Errors out for a DEBUG compiler when the two lists are not of equal length
+#if !defined(DEBUG)
 zipEqual
   :: [a] -> [b] -> [(a,b)]
-#if !defined(DEBUG)
 zipEqual = zip
+{-# INLINE zipEqual #-}
 #else
-zipEqual [] [] = []
-zipEqual (a:as) (b:bs) = (a,b) : zipEqual as bs
-zipEqual _ _ = error "zipEqual"
+zipEqual ::
+  HasCallStack =>
+  [a] -> [b] -> [(a,b)]
+zipEqual = go
+  where
+    go [] [] = []
+    go (a:as) (b:bs) = (a,b) : go as bs
+    go (_:_) [] = error "zipEqual: left list is longer"
+    go [] (_:_) = error "zipEqual: right list is longer"
 #endif

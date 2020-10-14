@@ -31,7 +31,7 @@ import           Data.HashSet                         (HashSet)
 import qualified Data.HashSet                         as HashSet
 import           Data.List
   (mapAccumL, nub, nubBy, intersperse, group, sort)
-import           Data.List.Extra                      ((<:>), equalLength)
+import           Data.List.Extra                      ((<:>), equalLength, zipEqual)
 import           Data.Maybe                           (catMaybes,fromMaybe,mapMaybe)
 #if !MIN_VERSION_base(4,11,0)
 import           Data.Monoid                          hiding (Sum, Product)
@@ -1594,10 +1594,10 @@ expr_ _ (DataCon ty@(CustomSum _ _ _ tys) (DC (_,i)) []) =
   "std_logic_vector" <> parens ("to_unsigned" <> parens (int (fromIntegral value) <> comma <> int (typeSize ty)))
 expr_ _ (DataCon (CustomSP _ dataRepr _size args) (DC (_,i)) es) =
   let (cRepr, _, argTys) = args !! i in
-  customReprDataCon dataRepr cRepr (zip argTys es)
+  customReprDataCon dataRepr cRepr (zipEqual argTys es)
 expr_ _ (DataCon (CustomProduct _ dataRepr _size _labels tys) _ es) |
   DataRepr' _typ _size [cRepr] <- dataRepr =
-  customReprDataCon dataRepr cRepr (zip (map snd tys) es)
+  customReprDataCon dataRepr cRepr (zipEqual (map snd tys) es)
 
 expr_ _ (DataCon ty@(Product _ labels tys) _ es) =
     tupled $ zipWithM (\i e' -> tyName ty <> selectProductField labels tys i <+> rarrow <+> expr_ False e') [0..] es

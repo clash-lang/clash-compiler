@@ -1016,7 +1016,7 @@ mkDcApplication dstHTypes (MultiId argNms) _ args = do
                                             Identifier nm0 Nothing
                                               | nm == nm0 -> Nothing
                                             _ -> Just (Assignment nm e))
-                  (zip (map CoreId argNms) argExprs)
+                  (zipEqual (map CoreId argNms) argExprs)
     return (Noop,argDecls ++ assns)
   else
     error "internal error"
