@@ -73,6 +73,7 @@ import           Clash.Util                      (HasCallStack, clogBase)
 import           Control.Lens                    hiding (Indexed, assign)
 import           Control.Monad.State
 import           Data.List                       (intersperse)
+import           Data.List.Extra                 (zipEqual)
 import           Data.Maybe                      (fromMaybe)
 import           Data.Semigroup                  hiding (Product)
 import           Data.Semigroup.Monad
@@ -363,10 +364,10 @@ outputFn fromTypes toType exprFn inNames (TExpr outType (Identifier outName Noth
       inNames' <- mapM newName inNames
       let exprIdent = Identifier (exprFn inNames') Nothing
       sequenceOf_ each [ addDeclaration (NetDecl Nothing nm t)
-                       | (nm,t) <- zip inNames' fromTypes ]
+                       | (nm,t) <- zipEqual inNames' fromTypes ]
       addDeclaration (Assignment outName exprIdent)
       pure [ TExpr t (Identifier nm Nothing)
-           | (nm,t) <- zip inNames' fromTypes ]
+           | (nm,t) <- zipEqual inNames' fromTypes ]
 outputFn _ outType _ _ texpr =
   error $ "outputFn: the expression " <> show texpr
   <> " must be an Identifier with type " <> show outType
