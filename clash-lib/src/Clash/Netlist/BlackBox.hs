@@ -864,7 +864,6 @@ mkFunInput resId e =
   tcm <- Lens.use tcCache
   -- TODO: Rewrite this function to use blackbox functions. Right now it
   -- TODO: generates strings that are later parsed/interpreted again. Silly!
-  (bbCtx,dcls) <- mkBlackBoxContext "__INTERNAL__" resId args
   templ <- case appE of
             Prim p -> do
               bb  <- extractPrimWarnOrFail (primName p)
@@ -1000,6 +999,10 @@ mkFunInput resId e =
               let is0 = mkInScopeSet (Lens.foldMapOf freeIds unitVarSet appE)
               either Left (Right . first (second (tickDecls ++))) <$> go is0 0 appE
             _ -> error $ $(curLoc) ++ "Cannot make function input for: " ++ showPpr e
+  let pNm = case appE of
+              Prim p -> primName p
+              _ -> "__INTERNAL__"
+  (bbCtx,dcls) <- mkBlackBoxContext pNm resId args
   case templ of
     Left (TDecl,oreg,libs,imps,inc,_,templ') -> do
       (l',templDecl)

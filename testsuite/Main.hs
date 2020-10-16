@@ -356,6 +356,7 @@ runClashTest = defaultMain $ clashTestRoot
         , NEEDS_PRIMS_GHC(outputTest ("tests" </> "shouldwork" </> "Signal") allTargets [] [] "BlockRamLazy" "main")
         , outputTest ("tests" </> "shouldwork" </> "BlackBox") [VHDL]   [] [] "ZeroWidth"          "main"
         , NEEDS_PRIMS(runTest "T919" def{hdlSim=False})
+        , NEEDS_PRIMS(runTest "T1524" def)
         ]
       , clashTestGroup "BoxedFunctions"
         [ runTest "DeadRecursiveBoxed" def{hdlSim=False}
