@@ -197,7 +197,7 @@ data Element
   deriving (Show, Generic, NFData, Binary, Hashable)
 
 -- | Component instantiation hole. First argument indicates which function argument
--- to instantiate. Second argument corresponds to output and input assignments,
+-- to instantiate. Third argument corresponds to output and input assignments,
 -- where the first element is the output assignment, and the subsequent elements
 -- are the consecutive input assignments.
 --
