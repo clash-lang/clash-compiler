@@ -1054,6 +1054,9 @@ expr_ _ (DataCon (CustomProduct _ dataRepr _size _labels tys) _ es) |
   customReprDataCon dataRepr cRepr (zip (map snd tys) es)
 expr_ _ (DataCon (Product {}) _ es) = listBraces (mapM (expr_ False) es)
 
+expr_ _ (DataCon (Enable _) _ [e]) =
+  expr_ False e
+
 expr_ _ (BlackBoxE pNm _ _ _ _ bbCtx _)
   | pNm == "Clash.Sized.Internal.Signed.fromInteger#"
   , [Literal _ (NumLit n), Literal _ i] <- extractLiterals bbCtx

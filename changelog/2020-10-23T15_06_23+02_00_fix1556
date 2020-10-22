@@ -1,0 +1,1 @@
+FIXED: Circuit enable lines could under certain circumstances get disconnected, permanently disabling the circuit without warning. See [#1556](https://github.com/clash-lang/clash-compiler/issues/1556).

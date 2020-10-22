@@ -333,6 +333,7 @@ runClashTest = defaultMain $ clashTestRoot
            in NEEDS_PRIMS_GHC(runTest "T1354B" _opts)
         , runTest "T1402" def{clashFlags=["-O"]}
         , runTest "T1402b" def{hdlTargets=[VHDL], hdlSim=False}
+        , runTest "T1556" def
         , runTest "TagToEnum" def{hdlSim=False}
         , runTest "TwoFunctions" def{hdlSim=False}
         , runTest "XToError" def{hdlSim=False}
