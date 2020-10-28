@@ -194,7 +194,7 @@ import           Clash.Sized.Index
 import           Clash.Sized.RTree
 import           Clash.Sized.Signed
 import           Clash.Sized.Unsigned
-import           Clash.Sized.Vector
+import           Clash.Sized.Vector hiding (fromList, unsafeFromList)
 import           Clash.Signal
 import           Clash.Signal.Delayed
 import           Clash.Signal.Trace
