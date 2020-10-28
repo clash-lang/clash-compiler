@@ -132,7 +132,7 @@ import Clash.Sized.Index
 import Clash.Sized.RTree
 import Clash.Sized.Signed
 import Clash.Sized.Unsigned
-import Clash.Sized.Vector
+import Clash.Sized.Vector hiding (fromList, unsafeFromList)
 import Clash.XException
 
 {- $setup
@@ -246,4 +246,3 @@ oscillate clk rst en begin SNat =
       then (0,   not i) -- reset state and oscillate output
       else (s+1, i)     -- hold current output
 {-# INLINEABLE oscillate #-}
-

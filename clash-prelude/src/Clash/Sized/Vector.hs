@@ -82,6 +82,8 @@ module Clash.Sized.Vector
   , windows1d, windows2d
     -- * Conversions
   , toList
+  , fromList
+  , unsafeFromList
   , bv2v
   , v2bv
     -- * Misc
@@ -131,10 +133,10 @@ import Test.QuickCheck            (Arbitrary (..), CoArbitrary (..))
 import Unsafe.Coerce              (unsafeCoerce)
 
 import Clash.Annotations.Primitive
-  (Primitive(InlinePrimitive), HDL(..))
+  (Primitive(InlinePrimitive), HDL(..), dontTranslate)
 import Clash.Promoted.Nat
   (SNat (..), SNatLE (..), UNat (..), compareSNat, leToPlus, pow2SNat,
-   snatProxy, snatToInteger, subSNat, withSNat, toUNat)
+   snatProxy, snatToInteger, subSNat, withSNat, toUNat, natToInteger)
 import Clash.Promoted.Nat.Literals (d1)
 import Clash.Sized.Internal.BitVector (Bit, BitVector (..), split#)
 import Clash.Sized.Index          (Index)
@@ -154,6 +156,7 @@ import Clash.XException
 >>> import Clash.Prelude
 >>> import Data.Kind
 >>> import Data.Proxy
+>>> import qualified Clash.Sized.Vector as Vec
 >>> let compareSwapL a b = if a < b then (a,b) else (b,a)
 >>> :{
 let sortV xs = map fst sorted :< (snd (last sorted))
@@ -1850,6 +1853,59 @@ rotateRightS xs d = go (snatToInteger d `mod` natVal (asNatProxy xs)) xs
 toList :: Vec n a -> [a]
 toList = foldr (:) []
 {-# INLINE toList #-}
+
+-- | Convert a list to a vector. This function returns Nothing if the size of
+-- the list is not equal to the size of the resulting vector.
+--
+-- >>> Vec.fromList [1,2,3,4,5] :: Maybe (Vec 5 Int)
+-- Just <1,2,3,4,5>
+--
+-- >>> Vec.fromList [1,2,3,4,5] :: Maybe (Vec 3 Int)
+-- Nothing
+--
+-- >>> Vec.fromList [1,2,3,4,5] :: Maybe (Vec 10 Int)
+-- Nothing
+--
+-- __NB:__ use `listToVecTH` if you want to make a /statically known/ vector
+-- __NB:__ this function is not synthesizable
+--
+fromList :: forall n a. (KnownNat n) => [a] -> Maybe (Vec n a)
+fromList xs
+  | exactLength (natToInteger @n) xs = Just (unsafeFromList xs)
+  | otherwise = Nothing
+ where
+  exactLength 0 acc = null acc
+  exactLength _ []  = False
+  exactLength i (_:ys) = exactLength (i - 1) ys
+{-# NOINLINE fromList #-}
+{-# ANN fromList dontTranslate #-}
+
+-- | Convert a list to a vector. This function always returns a vector of the
+-- desired length, by either truncating the list or padding the vector with
+-- undefined elements.
+--
+-- >>> Vec.unsafeFromList [1,2,3,4,5] :: Vec 5 Int
+-- <1,2,3,4,5>
+--
+-- >>> Vec.unsafeFromList [1,2,3,4,5] :: Vec 3 Int
+-- <1,2,3>
+--
+-- >>> Vec.unsafeFromList [1,2,3,4,5] :: Vec 10 Int
+-- <1,2,3,4,5,*** Exception: Clash.Sized.Vector.unsafeFromList: vector larger than list
+--
+-- __NB:__ use `listToVecTH` if you want to make a /statically known/ vector
+-- __NB:__ this function is not synthesizable
+--
+unsafeFromList :: forall n a. (KnownNat n) => [a] -> Vec n a
+unsafeFromList = unfoldr SNat go
+ where
+  go :: [a] -> (a, [a])
+  go (x:xs) = (x, xs)
+  go [] =
+    let item = error "Clash.Sized.Vector.unsafeFromList: vector larger than list"
+     in (item, [])
+{-# NOINLINE unsafeFromList #-}
+{-# ANN unsafeFromList dontTranslate #-}
 
 -- | Create a vector literal from a list literal.
 --
