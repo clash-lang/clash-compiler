@@ -199,7 +199,8 @@ mkArgument
   :: TextS.Text
   -- ^ Blackbox function name
   -> Identifier
-  -- ^ LHS of the original let-binder
+  -- ^ LHS of the original let-binder. Is used as a name hint to generate new
+  -- names in case the argument is a declaration.
   -> Int
   -- ^ Argument n (zero-indexed). Used for error message.
   -> Term
@@ -847,7 +848,8 @@ unSimIO tcm arg =
 mkFunInput
   :: HasCallStack
   => Id
-  -- ^ Identifier binding the encompassing primitive/blackbox application
+  -- ^ Identifier binding the encompassing primitive/blackbox application. Used
+  -- as a name hint if 'mkFunInput' needs intermediate signals.
   -> Term
   -- ^ The function argument term
   -> NetlistMonad

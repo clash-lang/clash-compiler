@@ -160,7 +160,7 @@ data LocalEnv = LocalEnv
   , lenvKeepLifted :: Bool
     -- ^ When evaluating, keep data constructors for boxed data types (e.g. I#)
     -- instead of converting these back to their corresponding primitive. This
-    -- is used when evalauting terms where the result is subject of a case
+    -- is used when evaluating terms where the result is subject of a case
     -- expression (see note: lifted data types).
   } deriving (Show)
 

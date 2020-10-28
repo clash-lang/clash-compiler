@@ -163,11 +163,11 @@ patVars _ = []
 mkAbstraction :: Term -> [Either Id TyVar] -> Term
 mkAbstraction = foldr (either Lam TyLam)
 
--- | Abstract a term over a list of term variables
+-- | Abstract a term over a list of type variables
 mkTyLams :: Term -> [TyVar] -> Term
 mkTyLams tm = mkAbstraction tm . map Right
 
--- | Abstract a term over a list of type variables
+-- | Abstract a term over a list of variables
 mkLams :: Term -> [Id] -> Term
 mkLams tm = mkAbstraction tm . map Left
 

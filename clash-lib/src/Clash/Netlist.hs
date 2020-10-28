@@ -706,7 +706,7 @@ mkExpr :: HasCallStack
        => Bool -- ^ Treat BlackBox expression as declaration
        -> DeclarationType
        -- ^ Should the returned declarations be concurrent or sequential?
-       -> NetlistId -- ^ Id to assign the result to
+       -> NetlistId -- ^ Name hint for the id to (potentially) assign the result to
        -> Term -- ^ Term to convert to an expression
        -> NetlistMonad (Expr,[Declaration]) -- ^ Returned expression and a list of generate BlackBox declarations
 mkExpr _ _ _ (stripTicks -> Core.Literal l) = do
@@ -789,7 +789,7 @@ mkProjection
   :: Bool
   -- ^ Projection must bind to a simple variable
   -> NetlistId
-  -- ^ The signal to which the projection is (potentially) assigned
+  -- ^ Name hint for the signal to which the projection is (potentially) assigned
   -> Term
   -- ^ The subject/scrutinee of the projection
   -> Type
@@ -882,7 +882,7 @@ mkDcApplication
     -- ^ HWType of the LHS of the let-binder, can multiple types when we're
     -- creating a "split" product type (e.g. a tuple of a Clock and Reset)
     -> NetlistId
-    -- ^ Id to assign the result to
+    -- ^ Name hint for result id
     -> DataCon
     -- ^ Applied DataCon
     -> [Term]
