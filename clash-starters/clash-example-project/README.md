@@ -7,8 +7,8 @@ To the extent possible under law, QBayLogic B.V. has waived all copyright and re
 - [Downloading this example project](#downloading-this-example-project)
 - [Using this project](#using-this-project)
   - [Stack (Windows, Linux, MacOS) [recommended]](#stack-windows-linux-macos-recommended)
-  - [Snap (Linux)](#snap-linux)
   - [Cabal (Linux, MacOS)](#cabal-linux-macos)
+  - [Snap (Linux)](#snap-linux)
   - [Nix (Linux, MacOS)](#nix-linux-macos)
   - [There's so many! Which should I pick?](#theres-so-many-which-should-i-pick)
 - [Change the LICENSE](#change-the-license)
@@ -42,6 +42,33 @@ To compile the project to VHDL, run:
 stack run clash -- Example.Project --vhdl
 ```
 
+## Cabal (Linux, MacOS)
+**The following instructions only work for Cabal >=3.0, GHC >=8.4, and Clash >=1.2.2.**
+
+First, update your cabal package database:
+
+```bash
+cabal update
+```
+
+You only have to run the update command once. After that, you can keep rebuilding your project by running the build command:
+
+```bash
+cabal build
+```
+
+To run the tests defined in `tests/`, use:
+
+```bash
+cabal run test-library
+```
+
+To compile the project to VHDL, run:
+
+```bash
+cabal run clash --write-ghc-environment-files=always -- Example.Project --vhdl
+```
+
 
 ## Snap (Linux)
 Linux users can use _snap_ to install Clash on their machines. See [snapcraft.io/clash](https://snapcraft.io/clash) how to do so. After installing Clash through snap, you can compile this project using:
@@ -73,34 +100,6 @@ Clash will look for a function called `topEntity` in the module you specify and 
 
 1. By default, snaps will update to the latest stable release of Clash. This is a problem, because new (major) releases might break your design. To mitigate this, the next major Clash release (1.4) will introduce a [Snap channel](https://snapcraft.io/docs/channels) that will allow you to keep using 1.2.
 2. The version of `clash-{prelude,lib,ghc}` your project depends on must exactly match the one supplied in the snap. For this reason, we recommend specifying a range of Clash versions your project can work with. This way, cabal will automatically prefer the version installed int he snap.
-
-## Cabal (Linux, MacOS)
-**The following instructions only work for Cabal >=3.0, GHC >=8.4, and Clash >=1.2.2.**
-
-First, update your cabal package database:
-
-```bash
-cabal update
-```
-
-You only have to run the update command once. After that, you can keep rebuilding your project by running the build command:
-
-```bash
-cabal build
-```
-
-To run the tests defined in `tests/`, use:
-
-```bash
-cabal run test-library
-```
-
-To compile the project to VHDL, run:
-
-```bash
-cabal run clash -- Example.Project --vhdl
-```
-
 
 ## Nix (Linux, MacOS)
 To be done.
