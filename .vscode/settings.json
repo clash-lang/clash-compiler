@@ -1,0 +1,31 @@
+{
+  "cSpell.words": [
+    "NOINLINE",
+    "WHNF",
+    "fmap",
+    "frontends",
+    "inlines",
+    "scrutinee",
+    "subterms"
+  ],
+  "files.exclude": {
+    "**/*.dyn_hi": true,
+    "**/*.dyn_o": true,
+    "**/*.hi": true,
+    "**/*.o": true,
+    "**/*.o-boot": true,
+    "**/*.hi-boot": true,
+    "**/dist-newstyle": true,
+    "**/.stack-work": true,
+    "**/.ghc.environment.*": true,
+    ".clash-test-tmp": true
+  },
+  "files.insertFinalNewline": true,
+  "files.trimFinalNewlines": true,
+  "files.trimTrailingWhitespace": true,
+  "editor.rulers": [
+    80,
+    90
+  ],
+  "editor.tabSize": 2
+}
