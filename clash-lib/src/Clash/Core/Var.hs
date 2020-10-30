@@ -36,7 +36,7 @@ where
 import Control.DeepSeq                  (NFData (..))
 import Data.Binary                      (Binary)
 import Data.Function                    (on)
-import Data.Hashable                    (Hashable)
+import Data.Hashable                    (Hashable(hashWithSalt))
 import GHC.Generics                     (Generic)
 import Clash.Core.Name                  (Name (..))
 import {-# SOURCE #-} Clash.Core.Term   (Term, TmName)
@@ -78,13 +78,16 @@ data Var a
   , varType :: Type
   , idScope :: IdScope
   }
-  deriving (Show,Generic,NFData,Hashable,Binary)
+  deriving (Show,Generic,NFData,Binary)
 
 -- | Gets a _key_ in the DBMS sense: a value that uniquely identifies a
 -- Var. In case of a "Var" that is its unique and (if applicable) scope
 varKey :: Var a -> (Unique, Maybe IdScope)
 varKey TyVar{varUniq} = (varUniq, Nothing)
 varKey Id{varUniq,idScope} = (varUniq, Just idScope)
+
+instance Hashable (Var a) where
+  hashWithSalt salt a = hashWithSalt salt (varKey a)
 
 instance Eq (Var a) where
   (==) = (==) `on` varKey
