@@ -43,7 +43,7 @@ import           Clash.Netlist.Types
   (Identifier, TemplateFunction, BlackBoxContext, HWType(Vector),
    Declaration(..), Expr(BlackBoxE, Literal, Identifier), Literal(NumLit),
    BlackBox(BBTemplate, BBFunction), TemplateFunction(..), WireOrReg(Wire),
-   Modifier(Indexed, Nested), bbInputs, bbResult, emptyBBContext, tcCache,
+   Modifier(Indexed, Nested), bbInputs, bbResults, emptyBBContext, tcCache,
    bbFunctions)
 import           Clash.Netlist.Id                   (IdType(Basic))
 import           Clash.Netlist.Util                 (typeSize)
@@ -89,7 +89,7 @@ iterateTF' bbCtx
     ] <- tInputs bbCtx
   , let aTemplateType = [TypElem (Typ (Just 2))]
   , let inst arg = instHO bbCtx 1 (aType, aTemplateType) [(arg, aTemplateType)]
-  = declarationReturn bbCtx "iterateI" (Prim.vec =<< iterateNM (fromInteger n) inst a)
+  = declarationReturn bbCtx "iterateI" (fmap pure . Prim.vec =<< iterateNM (fromInteger n) inst a)
   | otherwise
   =  error $ "Unexpected number of arguments: " ++ show (length (bbInputs bbCtx))
 
@@ -143,8 +143,8 @@ foldTF' bbCtx@(bbInputs -> [_f, (vec, vecType@(Vector n aTy), _isLiteral)]) = do
       vecAssign = Assignment vecId vec
       elemAssigns = zipWith Assignment vecIds (map (iIndex vecId) [0..])
       resultId =
-        case bbResult bbCtx of
-          (Identifier t _, _) -> t
+        case bbResults bbCtx of
+          [(Identifier t _, _)] -> t
           _ -> error "Unexpected result identifier"
 
   -- Create a list of function calls to be made (creates identifiers for
@@ -295,7 +295,7 @@ indexIntVerilogTemplate bbCtx = getMon $ case typeSize vTy of
    , (ix, _, _)
    ] = bbInputs bbCtx
 
-  (_,rTy) = bbResult bbCtx
+  [(_,rTy)] = bbResults bbCtx
 
   ixI :: Expr ->  Int
   ixI ix0 = case ix0 of

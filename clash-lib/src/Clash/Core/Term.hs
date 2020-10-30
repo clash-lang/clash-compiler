@@ -35,6 +35,8 @@ module Clash.Core.Term
   , partitionTicks
   , NameMod (..)
   , PrimInfo (..)
+  , IsMultiPrim (..)
+  , MultiPrimInfo (..)
   , WorkInfo (..)
   , CoreContext (..)
   , Context
@@ -114,11 +116,29 @@ data NameMod
   -- ^ @Clash.Magic.setName@
   deriving (Eq,Show,Generic,NFData,Hashable,Binary)
 
+data IsMultiPrim
+  = SingleResult
+  | MultiResult
+  deriving (Show, Generic, NFData, Hashable, Binary)
+
 data PrimInfo = PrimInfo
-  { primName     :: !Text
-  , primType     :: !Type
+  { primName :: !Text
+  , primType :: !Type
   , primWorkInfo :: !WorkInfo
+  , primMultiResult :: !IsMultiPrim
+  -- ^ Primitive with multiple return values. Useful for primitives that cannot
+  -- return their results as a single product type, due to limitation of
+  -- synthesis tooling. It will be applied to its normal arguments, followed by
+  -- the variables it should assign its results to.
+  --
+  -- See: 'Clash.Normalize.Transformations.setupMultiResultPrim'
   } deriving (Show,Generic,NFData,Hashable,Binary)
+
+data MultiPrimInfo = MultiPrimInfo
+  { mpi_primInfo :: PrimInfo
+  , mpi_resultDc :: DataCon
+  , mpi_resultTypes :: [Type]
+  }
 
 data WorkInfo
   = WorkConstant
@@ -362,4 +382,3 @@ idToVar tv        = error $ $(curLoc) ++ "idToVar: tyVar: " ++ show tv
 varToId :: Term -> Id
 varToId (Var i) = i
 varToId e       = error $ $(curLoc) ++ "varToId: not a var: " ++ show e
-

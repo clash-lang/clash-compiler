@@ -356,6 +356,8 @@ runClashTest = defaultMain $ clashTestRoot
         , NEEDS_PRIMS_GHC(runTest "BlackBoxFunctionHO" def{hdlTargets=[VHDL]})
         , NEEDS_PRIMS_GHC(outputTest ("tests" </> "shouldwork" </> "Signal") allTargets [] [] "BlockRamLazy" "main")
         , outputTest ("tests" </> "shouldwork" </> "BlackBox") [VHDL]   [] [] "ZeroWidth"          "main"
+        , outputTest ("tests" </> "shouldwork" </> "BlackBox") [VHDL]   [] [] "MultiResult"        "main"
+        , NEEDS_PRIMS(runTest "MultiResult" def)
         , NEEDS_PRIMS(runTest "T919" def{hdlSim=False})
         , NEEDS_PRIMS(runTest "T1524" def)
         ]

@@ -6,6 +6,7 @@
 -}
 
 {-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE OverloadedStrings #-}
 
 module Clash.GHC.GenerateBindings
@@ -215,8 +216,8 @@ mkBindings primMap bindings clsOps unlocatable = do
 checkPrimitive :: CompiledPrimMap -> GHC.CoreBndr -> C2C ()
 checkPrimitive primMap v = do
   nm <- qualifiedNameString (GHC.varName v)
-  case HashMap.lookup nm primMap of
-    Just (extractPrim -> Just (BlackBox _ _ _ _ _ _ _ _ _ inc r ri templ)) -> do
+  case HashMap.lookup nm primMap >>= extractPrim of
+    Just (BlackBox{resultNames, resultInits, template, includes}) -> do
       let
         info = GHC.idInfo v
         inline = GHC.inlinePragmaSpec $ GHC.inlinePragInfo info
@@ -231,10 +232,10 @@ checkPrimitive primMap v = do
         warnIf cond msg = traceIf cond ("\n"++loc++"Warning: "++msg) return ()
       qName <- Text.unpack <$> qualifiedNameString (GHC.varName v)
       let primStr = "primitive " ++ qName ++ " "
-      let usedArgs = concat [ maybe [] getUsedArguments r
-                            , maybe [] getUsedArguments ri
-                            , getUsedArguments templ
-                            , concatMap (getUsedArguments . snd) inc
+      let usedArgs = concat [ concatMap getUsedArguments resultNames
+                            , concatMap getUsedArguments resultInits
+                            , getUsedArguments template
+                            , concatMap (getUsedArguments . snd) includes
                             ]
 
       let warnArgs [] = return ()

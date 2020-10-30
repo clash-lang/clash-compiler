@@ -149,6 +149,9 @@ data Primitive a b c d
   , renderVoid :: RenderVoid
     -- ^ Whether this primitive should be rendered when its result type is
     -- void. Defaults to 'NoRenderVoid'.
+  , multiResult :: Bool
+    -- ^ Wether this blackbox assigns its results to multiple variables. See
+    -- 'Clash.Normalize.Transformations.setupMultiResultPrim'
   , kind      :: TemplateKind
     -- ^ Whether this results in an expression or a declaration
   , warning  :: c
@@ -184,9 +187,9 @@ data Primitive a b c d
     -- ^ Create files to be included with the generated primitive. The fields
     -- are ((name, extension), content), where content is a template of the file
     -- Defaults to @[]@ when not specified in the /.json/ file
-  , resultName :: Maybe b
+  , resultNames :: [b]
     -- ^ (Maybe) Control the generated name of the result
-  , resultInit :: Maybe b
+  , resultInits :: [b]
     -- ^ (Maybe) Control the initial/power-up value of the result
   , template :: b
     -- ^ Used to indiciate type of template (declaration or expression). Will be
@@ -200,6 +203,9 @@ data Primitive a b c d
     -- ^ Whether the primitive does any work, i.e. takes chip area
   , usedArguments :: UsedArguments
   -- ^ Arguments used by blackbox. Used to remove arguments during normalization.
+  , multiResult :: Bool
+  -- ^ Wether this blackbox assigns its results to multiple variables. See
+  -- 'Clash.Normalize.Transformations.setupMultiResultPrim'
   , functionName :: BlackBoxFunctionName
   , function :: d
   -- ^ Holds blackbox function and its hash, (Int, BlackBoxFunction), in a
@@ -237,15 +243,17 @@ instance FromJSON UnresolvedPrimitive where
             name' <- conVal .: "name"
             wf    <- ((conVal .:? "workInfo" >>= maybe (pure Nothing) parseWorkInfo) .!= WorkVariable)
             fName <- conVal .: "templateFunction"
+            multiResult <- conVal .:? "multiResult" .!= False
             templ <- (Just . TInline <$> conVal .: "template")
                  <|> (Just . TFile   <$> conVal .: "file")
                  <|> (pure Nothing)
             fName' <- either fail return (parseBBFN fName)
-            return (BlackBoxHaskell name' wf args fName' templ)
+            return (BlackBoxHaskell name' wf args multiResult fName' templ)
           "BlackBox"  ->
             BlackBox <$> conVal .: "name"
                      <*> (conVal .:? "workInfo" >>= maybe (pure Nothing) parseWorkInfo) .!= WorkVariable
                      <*> conVal .:? "renderVoid" .!= NoRenderVoid
+                     <*> conVal .:? "multiResult" .!= False
                      <*> (conVal .: "kind" >>= parseTemplateKind)
                      <*> conVal .:? "warning"
                      <*> conVal .:? "outputReg" .!= False
@@ -253,8 +261,8 @@ instance FromJSON UnresolvedPrimitive where
                      <*> conVal .:? "imports" .!= []
                      <*> pure [] -- functionPlurality not supported in json
                      <*> (conVal .:? "includes" .!= [] >>= traverse parseInclude)
-                     <*> (conVal .:? "resultName" >>= maybe (pure Nothing) parseResult) .!= Nothing
-                     <*> (conVal .:? "resultInit" >>= maybe (pure Nothing) parseResult) .!= Nothing
+                     <*> (conVal .:? "resultName" >>= maybe (pure Nothing) parseResult) .!= []
+                     <*> (conVal .:? "resultInit" >>= maybe (pure Nothing) parseResult) .!= []
                      <*> parseTemplate conVal
           "Primitive" ->
             Primitive <$> conVal .: "name"
@@ -294,7 +302,7 @@ instance FromJSON UnresolvedPrimitive where
       defTemplateFunction = BlackBoxFunctionName ["Template"] "template"
 
       parseResult (Object c) =
-        Just . Just <$> parseTemplate c
+        Just . pure <$> parseTemplate c
       parseResult e = fail $ "[7] unexpected result: " ++ show e
 
   parseJSON unexpected =

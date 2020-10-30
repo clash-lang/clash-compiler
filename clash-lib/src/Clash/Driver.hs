@@ -606,7 +606,7 @@ compilePrimitive
   -> ResolvedPrimitive
   -- ^ Primitive to compile
   -> IO CompiledPrimitive
-compilePrimitive idirs pkgDbs topDir (BlackBoxHaskell bbName wf usedArgs bbGenName source) = do
+compilePrimitive idirs pkgDbs topDir (BlackBoxHaskell bbName wf usedArgs multiRes bbGenName source) = do
   bbFunc <-
     -- TODO: Use cache for hint targets. Right now Hint will fire multiple times
     -- TODO: if multiple functions use the same blackbox haskell function.
@@ -623,7 +623,7 @@ compilePrimitive idirs pkgDbs topDir (BlackBoxHaskell bbName wf usedArgs bbGenNa
           id
           r
 
-  pure (BlackBoxHaskell bbName wf usedArgs bbGenName (hash source, bbFunc))
+  pure (BlackBoxHaskell bbName wf usedArgs multiRes bbGenName (hash source, bbFunc))
  where
     fullName = qualMod ++ "." ++ funcName
     qualMod = intercalate "." modNames
@@ -657,14 +657,14 @@ compilePrimitive idirs pkgDbs topDir (BlackBoxHaskell bbName wf usedArgs bbGenNa
       loadImportAndInterpret idirs args topDir qualMod funcName "BlackBoxFunction"
 
 compilePrimitive idirs pkgDbs topDir
-  (BlackBox pNm wf rVoid tkind () oReg libM imps fPlural incs rM riM templ) = do
+  (BlackBox pNm wf rVoid multiRes tkind () oReg libM imps fPlural incs rM riM templ) = do
   libM'  <- mapM parseTempl libM
   imps'  <- mapM parseTempl imps
   incs'  <- mapM (traverse parseBB) incs
   templ' <- parseBB templ
   rM'    <- traverse parseBB rM
   riM'   <- traverse parseBB riM
-  return (BlackBox pNm wf rVoid tkind () oReg libM' imps' fPlural incs' rM' riM' templ')
+  return (BlackBox pNm wf rVoid multiRes tkind () oReg libM' imps' fPlural incs' rM' riM' templ')
  where
   iArgs = concatMap (("-package-db":) . (:[])) pkgDbs
 

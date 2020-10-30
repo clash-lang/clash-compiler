@@ -422,9 +422,14 @@ toBit m i = if testBit m 0
 -- | Context used to fill in the holes of a BlackBox template
 data BlackBoxContext
   = Context
-  { bbName      :: Text -- ^ Blackbox function name (for error reporting)
-  , bbResult    :: (Expr,HWType) -- ^ Result name and type
-  , bbInputs    :: [(Expr,HWType,Bool)] -- ^ Argument names, types, and whether it is a literal
+  { bbName :: Text
+  -- ^ Blackbox function name (for error reporting)
+  , bbResults :: [(Expr,HWType)]
+  -- ^ Result names and types. Will typically be a list with a single item.
+  -- Multiple result targets will be used for "multi result primitives". See
+  -- 'Clash.Normalize.Transformations.setupMultiResultPrim'.
+  , bbInputs :: [(Expr,HWType,Bool)]
+  -- ^ Argument names, types, and whether it is a literal
   , bbFunctions :: IntMap [(Either BlackBox (Identifier,[Declaration])
                           ,WireOrReg
                           ,[BlackBoxTemplate]
@@ -547,7 +552,7 @@ emptyBBContext :: Text -> BlackBoxContext
 emptyBBContext n
   = Context
   { bbName        = n
-  , bbResult      = (Identifier (pack "__EMPTY__") Nothing, Void Nothing)
+  , bbResults     = []
   , bbInputs      = []
   , bbFunctions   = empty
   , bbQsysIncName = []

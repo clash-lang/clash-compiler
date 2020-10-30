@@ -14,4 +14,11 @@
     , "template"  : "~ERRORO"
     }
   }
+, { "BlackBox" :
+    { "name"      : "c$multiPrimSelect"
+    , "workInfo"  : "Always"
+    , "kind"      : "Expression"
+    , "template"  : "!__SHOULD NOT BE RENDERED__! ~ARG[0]~ARG[1]"
+    }
+  }
 ]

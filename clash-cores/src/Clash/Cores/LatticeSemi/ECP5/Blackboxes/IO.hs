@@ -68,4 +68,4 @@ bbTemplate bbCtx = do
   Just compName' = exprToString intrinsicName
   compName = TextS.pack compName'
 
-  (Identifier result Nothing,_) = bbResult bbCtx
+  [(Identifier result Nothing,_)] = bbResults bbCtx

@@ -82,4 +82,3 @@ argsToTerms = fmap $ first asTerm
 
 altsToTerms :: (AsTerm a) => [(Pat, a)] -> [Alt]
 altsToTerms = fmap $ second asTerm
-

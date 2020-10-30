@@ -93,9 +93,9 @@ resolvePrimitive'
   -> IO (TS.Text, GuardedResolvedPrimitive)
 resolvePrimitive' _metaPath (Primitive name wf primType) =
   return (name, HasBlackBox (Primitive name wf primType))
-resolvePrimitive' metaPath BlackBox{template=t, includes=i, resultName=r, resultInit=ri, ..} = do
+resolvePrimitive' metaPath BlackBox{template=t, includes=i, resultNames=r, resultInits=ri, ..} = do
   let resolveSourceM = traverse (traverse (resolveTemplateSource metaPath))
-  bb <- BlackBox name workInfo renderVoid kind () outputReg libraries imports functionPlurality
+  bb <- BlackBox name workInfo renderVoid multiResult kind () outputReg libraries imports functionPlurality
           <$> mapM (traverse resolveSourceM) i
           <*> traverse resolveSourceM r
           <*> traverse resolveSourceM ri
@@ -103,8 +103,8 @@ resolvePrimitive' metaPath BlackBox{template=t, includes=i, resultName=r, result
   case warning of
     Just w  -> pure (name, WarnNonSynthesizable (TS.unpack w) bb)
     Nothing -> pure (name, HasBlackBox bb)
-resolvePrimitive' metaPath (BlackBoxHaskell bbName wf usedArgs funcName t) =
-  (bbName,) . HasBlackBox . BlackBoxHaskell bbName wf usedArgs funcName <$>
+resolvePrimitive' metaPath (BlackBoxHaskell bbName wf usedArgs multiRes funcName t) =
+  (bbName,) . HasBlackBox . BlackBoxHaskell bbName wf usedArgs multiRes funcName <$>
     (mapM (resolveTemplateSource metaPath) t)
 
 -- | Interprets contents of json file as list of @Primitive@s. Throws
@@ -181,9 +181,9 @@ generatePrimMap unresolvedPrims primGuards filePaths = do
 
 -- | Determine what argument should be constant / literal
 constantArgs :: TS.Text -> CompiledPrimitive -> Set.Set Int
-constantArgs nm BlackBox {template = templ@(BBTemplate _), resultInit = tRIM} =
+constantArgs nm BlackBox {template = templ@(BBTemplate _), resultInits = tRIM} =
   Set.fromList (concat [ fromIntForce
-                       , maybe [] walkTemplate tRIM
+                       , concatMap walkTemplate tRIM
                        , walkTemplate templ
                        ])
  where
@@ -234,16 +234,16 @@ getFunctionPlurality
   => CompiledPrimitive
   -> [Either Term Type]
   -- ^ Arguments passed to blackbox
-  -> Type
-  -- ^ Result type
+  -> [Type]
+  -- ^ Result types
   -> Int
   -- ^ Argument number holding the function of interest
   -> NetlistMonad Int
   -- ^ Plurality of function. Defaults to 1. Does not err if argument isn't
   -- a function in the first place. State of monad will not be modified.
-getFunctionPlurality (Primitive {}) _args _resTy _n = pure 1
-getFunctionPlurality (BlackBoxHaskell {name, function, functionName}) args resTy n = do
-  errOrMeta <- preserveState ((snd function) False name args resTy)
+getFunctionPlurality (Primitive {}) _args _resTys _n = pure 1
+getFunctionPlurality (BlackBoxHaskell {name, function, functionName}) args resTys n = do
+  errOrMeta <- preserveState ((snd function) False name args resTys)
   case errOrMeta of
     Left err ->
       error $ concat [ "Tried to determine function plurality for "

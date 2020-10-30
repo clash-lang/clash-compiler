@@ -62,7 +62,7 @@ mkSelection
   -> [Declaration]
   -> NetlistMonad [Declaration]
 
-mkNetDecl :: LetBinding -> NetlistMonad (Maybe Declaration)
+mkNetDecl :: LetBinding -> NetlistMonad [Declaration]
 
 mkDeclarations :: HasCallStack => Id -> Term -> NetlistMonad [Declaration]
 mkDeclarations' :: HasCallStack => DeclarationType -> Id -> Term -> NetlistMonad [Declaration]

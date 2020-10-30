@@ -65,12 +65,14 @@ data BlackBoxMeta =
                , bbFunctionPlurality :: [(Int, Int)]
                , bbIncludes :: [((S.Text, S.Text), BlackBox)]
                , bbRenderVoid :: RenderVoid
+               , bbResultNames :: [BlackBox]
+               , bbResultInits :: [BlackBox]
                }
 
 -- | Use this value in your blackbox template function if you do want to
 -- accept the defaults as documented in @Clash.Primitives.Types.BlackBox@.
 emptyBlackBoxMeta :: BlackBoxMeta
-emptyBlackBoxMeta = BlackBoxMeta False TExpr [] [] [] [] NoRenderVoid
+emptyBlackBoxMeta = BlackBoxMeta False TExpr [] [] [] [] NoRenderVoid [] []
 
 -- | A BlackBox function generates a blackbox template, given the inputs and
 -- result type of the function it should provide a blackbox for. This is useful
@@ -84,8 +86,8 @@ type BlackBoxFunction
   -- ^ Name of primitive
   -> [Either Term Type]
   -- ^ Arguments
-  -> Type
-  -- ^ Result type
+  -> [Type]
+  -- ^ Result types
   -> NetlistMonad (Either String (BlackBoxMeta, BlackBox))
 
 -- | A BlackBox Template is a List of Elements

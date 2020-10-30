@@ -20,10 +20,11 @@ extractPrimWarnOrFail
   -> NetlistMonad CompiledPrimitive
 
 mkBlackBoxContext
-  :: Text
+  :: HasCallStack
+  => Text
   -- ^ Blackbox function name
-  -> Id
-  -- ^ Identifier binding the primitive/blackbox application
+  -> [Id]
+  -- ^ Identifiers binding the primitive/blackbox application
   -> [Either Term Type]
   -- ^ Arguments of the primitive/blackbox application
   -> NetlistMonad (BlackBoxContext,[Declaration])

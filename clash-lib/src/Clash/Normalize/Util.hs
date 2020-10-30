@@ -517,7 +517,8 @@ removedTm
   :: Type
   -> Term
 removedTm =
-  TyApp (Prim (PrimInfo "Clash.Transformations.removedArg" undefinedTy WorkNever))
+  let removedNm = "Clash.Transformations.removedArg" in
+  TyApp (Prim (PrimInfo removedNm undefinedTy WorkNever SingleResult))
 
 -- | A tick to prefix an inlined expression with it's original name.
 -- For example, given

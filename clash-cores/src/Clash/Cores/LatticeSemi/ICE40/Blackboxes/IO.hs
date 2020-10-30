@@ -104,4 +104,4 @@ sbioTemplate bbCtx = do
    , (outputEnable, Bool, _)
    ] = bbInputs bbCtx
 
-  (Identifier result Nothing,resTy) = bbResult bbCtx
+  [(Identifier result Nothing,resTy)] = bbResults bbCtx

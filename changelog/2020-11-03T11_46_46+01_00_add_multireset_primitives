@@ -1,0 +1,1 @@
+ADDED: Support for multi result primitives. Primitives can now assign their results to multiple variables. This can help to work around synthesis tools limits in some cases. See [#1560](https://github.com/clash-lang/clash-compiler/pull/1560).

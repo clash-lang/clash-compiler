@@ -26,6 +26,7 @@ import           Control.Exception       (throw)
 import           Control.Lens            ((.=),(%=))
 import qualified Control.Lens            as Lens
 import           Control.Monad           (unless, when, zipWithM, join)
+import           Control.Monad.Extra     (concatMapM)
 import           Control.Monad.Reader    (ask, local)
 import qualified Control.Monad.State as State
 import           Control.Monad.State.Strict
@@ -33,14 +34,18 @@ import           Control.Monad.State.Strict
 import           Control.Monad.Trans.Except
   (ExceptT (..), runExcept, runExceptT, throwE)
 import           Data.Either             (partitionEithers)
+import           Data.Hashable           (Hashable)
 import           Data.HashMap.Strict     (HashMap)
 import qualified Data.HashMap.Strict     as HashMap
 import qualified Data.IntSet             as IntSet
 import           Data.String             (fromString)
-import           Data.List               (intersperse, unzip4, intercalate)
+import           Data.List
+  (intersperse, unzip4, intercalate, partition)
+import Control.Applicative (Alternative((<|>)))
 import qualified Data.List               as List
 import qualified Data.List.Extra         as List
-import           Data.Maybe              (catMaybes,fromMaybe,isNothing,mapMaybe)
+import           Data.Maybe
+  (catMaybes, fromMaybe, isNothing, mapMaybe, listToMaybe, maybeToList)
 import           Data.Monoid             (First (..))
 import           Text.Printf             (printf)
 #if !(MIN_VERSION_base(4,11,0))
@@ -49,7 +54,7 @@ import           Data.Semigroup          ((<>))
 import           Data.Text               (Text)
 import qualified Data.Text               as Text
 import           Data.Text.Lazy          (toStrict)
-import           Data.Text.Prettyprint.Doc (Doc)
+import           Data.Text.Prettyprint.Doc.Extra
 
 import           Outputable              (ppr, showSDocUnsafe)
 
@@ -71,8 +76,8 @@ import           Clash.Core.Subst
   (Subst (..), extendIdSubst, extendIdSubstList, extendInScopeId,
    extendInScopeIdList, mkSubst, substTm)
 import           Clash.Core.Term
-  (Alt, LetBinding, Pat (..), Term (..), TickInfo (..), NameMod (..),
-   collectArgsTicks, collectTicks, collectBndrs, PrimInfo(primName), mkTicks, stripTicks)
+  (primMultiResult, MultiPrimInfo(..), Alt, LetBinding, Pat (..), Term (..), TickInfo (..), NameMod (..),
+   IsMultiPrim (..), collectArgsTicks, collectTicks, collectBndrs, PrimInfo(primName), mkTicks, stripTicks)
 import           Clash.Core.TermInfo
 import           Clash.Core.TyCon
   (TyCon (FunTyCon), TyConName, TyConMap, tyConDataCons)
@@ -86,11 +91,20 @@ import           Clash.Core.VarEnv
   (InScopeSet, extendInScopeSetList, uniqAway)
 import {-# SOURCE #-} Clash.Netlist.BlackBox
 import {-# SOURCE #-} Clash.Netlist.BlackBox.Util
+import           Clash.Netlist.BlackBox.Types
+  (bbResultNames, BlackBoxMeta(BlackBoxMeta))
 import           Clash.Netlist.Id        (IdType (..), stripDollarPrefixes)
 import           Clash.Netlist.Types     as HW
 import           Clash.Primitives.Types
 import           Clash.Unique
 import           Clash.Util
+
+hmFindWithDefault :: (Eq k, Hashable k) => v -> k -> HashMap k v -> v
+#if MIN_VERSION_unordered_containers(0,2,11)
+hmFindWithDefault = HashMap.findWithDefault
+#else
+hmFindWithDefault = HashMap.lookupDefault
+#endif
 
 -- | Throw away information indicating which constructor fields were filtered
 -- due to being void.
@@ -788,90 +802,122 @@ mkUniqueNormalized is0 topMM (args,binds,res) = do
   -- will already contain a bidirectional signal complementing the BiSignalOut.
   resM <- mkUniqueResult substArgs topMM res
   case resM of
-    Just (oports,owrappers,res1,substRes) -> do
-      -- Check whether any of the binders reference the result
-      let resRead = any (localIdOccursIn res) exprs
-      -- Rename some of the binders, see 'setBinderName' when this happens.
-      ((res2,subst1,extraBndr),bndrs1) <-
-        List.mapAccumLM (setBinderName substRes res resRead) (res1,substRes,[]) binds
-      -- Make let-binders unique, the result binder is already unique, so we
-      -- can skip it.
-      let (bndrsL,r:bndrsR) = break ((== res2)) bndrs1
-      (bndrsL1,substL) <- mkUnique subst1 bndrsL
-      (bndrsR1,substR) <- mkUnique substL bndrsR
-      -- Replace old IDs by updated unique IDs in the RHSs of the let-binders
-      let exprs1 = map (substTm ("mkUniqueNormalized1" :: Doc ()) substR) exprs
+    Just (oports, owrappers, res1, subst0) -> do
+
+      -- Collect new names, see 'renameBinder' for more information
+      (listToMaybe -> resRenameM0, HashMap.fromList -> renames0) <-
+        partition ((== res) . fst) <$> concatMapM renameBinder binds
+
+      let
+        -- Is the result variable read by any of the other binders? In that case
+        -- we need to add a redirection as most synthesis tools don't allow reads
+        -- from output ports. Note that if the result is renamed anyway, we don't
+        -- have to do anything here.
+        resultRead = any (localIdOccursIn res) exprs
+        recResult = modifyVarName (`appendToName` "_rec") res
+        resRenameM1 = resRenameM0 <|> orNothing resultRead (res, recResult)
+
+      (resN, extraBind, subst1) <-
+        case resRenameM1 of
+          Nothing ->
+            -- Result binder was not renamed, so we can assign result expression
+            -- directly to new name given by 'res1'
+            pure (res1, Nothing, subst0)
+          Just (_, newName0) -> do
+            -- Result binder was renamed. We cannot rename 'res1', so we need
+            -- to create an indirection.
+            ([newName1], s) <- mkUnique subst0 [newName0]
+            pure (newName1, Just (res1, Var newName1), s)
+
+      let
+        -- Result binder is already unique, so don't rename that
+        renames1 = [(b, hmFindWithDefault b b renames0) | b <- bndrs]
+        (renamesL0, (_:renamesR0)) = break ((==res) . fst) renames1
+
+      (renamesL1, subst2) <- mkUnique subst1 (map snd renamesL0)
+      (renamesR1, subst3) <- mkUnique subst2 (map snd renamesR0)
+
+      let
+        exprs1 = map (substTm "mkUniqueNormalized1" subst3) exprs
+        binds0 = zip (renamesL1 <> [resN] <> renamesR1) exprs1
+        binds1 = binds0 <> maybeToList extraBind
+
       -- Return the uniquely named arguments, let-binders, and result
-      return ( wereVoids
-             , iports
-             , iwrappers
-             , oports
-             , owrappers
-             , zip (bndrsL1 ++ r:bndrsR1) exprs1 ++ extraBndr
-             , Just res1)
+      return (wereVoids, iports, iwrappers, oports, owrappers, binds1, Just res1)
+
     Nothing -> do
       (bndrs1, substArgs1) <- mkUnique substArgs bndrs
-      return ( wereVoids
-             , iports
-             , iwrappers
-             , []
-             , []
-             , zip bndrs1
-                   (map (substTm ("mkUniqueNormalized2" :: Doc ()) substArgs1) exprs)
-             ,Nothing)
+      let binds1 = zip bndrs1 (map (substTm "mkUniqueNormalized2" substArgs1) exprs)
+      return (wereVoids, iports, iwrappers, [], [], binds1, Nothing)
 
--- | Set the name of the binder
+-- | Produce a 'Just' when predicate is True, else Nothing
+orNothing :: Bool -> a -> Maybe a
+orNothing True a = Just a
+orNothing False _ = Nothing
+
+-- | Set the name of the binder if the given term is a blackbox requesting
+-- a specific name for the result binder. It might return multiple names in
+-- case of a multi result primitive.
 --
--- Normally, it just keeps the existing name, but there are two exceptions:
---
--- 1. It's the binding for the result which is also referenced by another binding;
---    in this case it's suffixed with `_rec`
--- 2. The binding binds a primitive that has a name control field
---
--- 2. takes priority over 1. Additionally, we create an additional binder when
--- the return value gets a new name.
-setBinderName
-  :: Subst
-  -- ^ Current substitution
-  -> Id
-  -- ^ The binder for the result
-  -> Bool
-  -- ^ Whether the result binder is referenced by another binder
-  -> (Id, Subst, [(Id,Term)])
-  -- ^ * The (renamed) binder for the result
-  --   * The updated substitution in case the result binder is renamed
-  --   * A new binding, to assign the result in case the original binder for
-  --     the result got renamed.
-  -> (Id,Term)
-  -- ^ The binding
-  -> NetlistMonad ((Id, Subst, [(Id,Term)]),Id)
-setBinderName subst res resRead m@(resN,_,_) (i,collectArgsTicks -> (k,args,ticks)) = case k of
-  Prim p -> let nm = primName p in extractPrimWarnOrFail nm >>= go nm
-  _ -> goDef
+renameBinder :: (Id, Term) -> NetlistMonad [(Id, Id)]
+renameBinder (i, collectArgsTicks -> (k, args, ticks)) = withTicks ticks $ \_ -> do
+  case k of
+    Prim p ->
+      case primMultiResult p of
+        SingleResult -> extractPrimWarnOrFail (primName p) >>= goSingle p
+        MultiResult -> extractPrimWarnOrFail (primName p) >>= goMulti p
+    _ -> pure []
  where
-  go nm (BlackBox {resultName = Just (BBTemplate nmD)}) = withTicks ticks $ \_ -> do
-    (bbCtx,_) <- preserveVarEnv (mkBlackBoxContext nm i args)
+  -- Routine for multi result primitives. For more info:
+  -- 'Clash.Normalize.Transformations.setupMultiResultPrim'.
+  goMulti :: PrimInfo -> CompiledPrimitive -> NetlistMonad [(Id, Id)]
+  goMulti pInfo (BlackBoxHaskell{function=(_, function)}) = do
+    tcm <- Lens.use tcCache
+    let mpInfo@MultiPrimInfo{mpi_resultTypes} = multiPrimInfo' tcm pInfo
+    let (args1, resIds) = splitMultiPrimArgs mpInfo args
+    funRes <- preserveVarEnv (function False (primName pInfo) args1 mpi_resultTypes)
+    let BlackBoxMeta{bbResultNames} = either error fst funRes
+    go (primName pInfo) resIds args1 bbResultNames
+  goMulti _ _ = pure []
+
+  -- Routine for single result primitives (the default kind of primitive)
+  goSingle :: PrimInfo -> CompiledPrimitive -> NetlistMonad [(Id, Id)]
+  goSingle pInfo (BlackBoxHaskell{function=(_, function)}) = do
+    funRes <- preserveVarEnv (function False (primName pInfo) args [varType i])
+    case either error fst funRes of
+      BlackBoxMeta{bbResultNames=[bbResultName]} ->
+        go (primName pInfo) [i] args [bbResultName]
+      _ -> pure []
+  goSingle pInfo (BlackBox{resultNames=[resultName]}) = do
+    go (primName pInfo) [i] args [resultName]
+  goSingle _ _ = pure []
+
+  go :: Text -> [Id] -> [Either Term Type] -> [BlackBox] -> NetlistMonad [(Id, Id)]
+  go nm is0 bbArgs bbResultTemplates = do
+    (bbCtx, _) <- preserveVarEnv (mkBlackBoxContext nm is0 bbArgs)
     be <- Lens.use backend
-    let bbRetValName = case be of
-          SomeBackend s -> toStrict ((State.evalState (renderTemplate bbCtx nmD) s) 0)
-        i1 = modifyVarName (\n -> n {nameOcc = bbRetValName}) i
-    if res == i1 then do
-      ([i2],subst1) <- mkUnique subst [i1]
-      return ((i2,subst1,[(resN,Var i2)]),i2)
-    else
-      return (m,i1)
+    let
+      _sameName i0 i1 = nameOcc (varName i0) == nameOcc (varName i1)
+      newNames = map (evalBlackBox be bbCtx) bbResultTemplates
+      modName newRetName = modifyVarName (\n -> n {nameOcc = newRetName})
+      is1 = zipWith modName newNames is0
 
-  go _ _ = goDef
+    -- TODO: _sameName check disabled due to
+    --       https://github.com/clash-lang/clash-compiler/issues/1566
+    -- Don't rename if we didn't change any names, it will cause superfluous
+    -- redirections in 'mkUniqueNormalized'.
+    -- pure (if and (zipWith sameName is0 is1) then [] else zip is0 is1)
+    pure (zip is0 is1)
 
-  goDef
-    | i == res && resRead
-    = do
-      ([i1],subst1) <- mkUnique subst [modifyVarName (`appendToName` "_rec") res]
-      return ((i1, subst1, [(resN,Var i1)]),i1)
-    | i == res
-    = return (m,resN)
-    | otherwise
-    = return (m,i)
+-- | Render a blackbox given its context. Renders _just_ the blackbox, not any
+-- corresponding includes, libraries, and so forth.
+evalBlackBox :: HasCallStack => SomeBackend -> BlackBoxContext -> BlackBox -> Text
+evalBlackBox (SomeBackend s) bbCtx bb
+  | BBFunction _bbName _bbHash (TemplateFunction _usedArgs _verifFunc func) <- bb =
+    let layout = LayoutOptions (AvailablePerLine 120 0.4) in
+    toStrict (renderLazy (layoutPretty layout (State.evalState (func bbCtx) s)))
+  | BBTemplate bbt <- bb =
+    toStrict ((State.evalState (renderTemplate bbCtx bbt) s) 0)
 
 mkUniqueArguments
   :: Subst
