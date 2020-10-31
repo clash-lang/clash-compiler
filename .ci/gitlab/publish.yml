@@ -54,6 +54,7 @@ snap-bindist:
   stage: build
   cache:
     key: usr-nix-$CI_JOB_NAME
+    when: always
     paths:
       # GitLab CI uses zip as a cache archive. For some reason, nix can't
       # handle this (wrong permissions, missing symlinks?), so we pre-tar it.

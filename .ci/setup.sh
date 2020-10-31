@@ -51,19 +51,19 @@ echo "RUN_BUILD_ALL=${RUN_BUILD_ALL}"
 
 apt-get update -q
 
-if [[ "$GHC" = ghc-head ]]; then
-  CABAL="cabal-head"
-elif [[ "$GHC" = ghc-8.4.* ]]; then
-  CABAL="cabal-2.4"
-elif [[ "$GHC" = ghc-8.6.* || "$GHC" = ghc-8.8.* ]]; then
-  CABAL="cabal-3.0"
+if [[ "$GHC_VERSION" = 8.4.* ]]; then
+  CABAL_VERSION="2.4.1.0"
+elif [[ "$GHC_VERSION" = 8.6.* || "$GHC_VERSION" = 8.8.* ]]; then
+  CABAL_VERSION="3.0.0.0"
+elif [[ "$GHC_VERSION" = 8.10.* ]]; then
+  CABAL_VERSION="3.2.0.0"
 else
-  # GHC >= 8.10
-  CABAL="cabal-3.2"
+  # GHC >= 9.0
+  CABAL_VERSION="3.4.0.0-rc4"
 fi
 
-update-alternatives --set opt-ghc /opt/ghc/bin/${GHC}
-update-alternatives --set opt-cabal /opt/cabal/bin/${CABAL}
+ghcup set ghc ${GHC_VERSION}
+ghcup set cabal ${CABAL_VERSION}
 
 cabal --version
 ghc --version
@@ -79,7 +79,7 @@ if [[ "$CI_COMMIT_BRANCH" =~ "^partial-evaluator-" ]]; then
   sed -i 's/-experimental-evaluator/+experimental-evaluator/g' cabal.project.local
 fi
 
-if [[ "$GHC" == "ghc-head" ]]; then
+if [[ "$GHC_VERSION" == 9.*.*.* ]]; then
   echo "
    repository head.hackage.ghc.haskell.org
    url: https://ghc.gitlab.haskell.org/head.hackage/
