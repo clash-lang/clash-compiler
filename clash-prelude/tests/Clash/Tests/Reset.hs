@@ -1,5 +1,7 @@
+{-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE TypeInType #-}
 
 {-# OPTIONS_GHC -Wno-orphans #-}
 
@@ -23,7 +25,7 @@ resetFromList = unsafeFromHighPolarity . fromList
 
 onePeriodGlitchReset :: KnownDomain dom => Reset dom
 onePeriodGlitchReset =
-  resetFromList [True,True,False,False,True,False,False,True,True,False]
+  resetFromList [True,True,False,False,True,False,False,True,True,False,False]
 
 -- | Introduce a glitch of one period, and see if it's filtered out
 case_onePeriodGlitch :: Assertion

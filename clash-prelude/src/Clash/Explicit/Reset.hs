@@ -34,20 +34,21 @@ module Clash.Explicit.Reset
   , unsafeFromLowPolarity
   ) where
 
-import           Control.Applicative (liftA2)
+import           Data.Bits (testBit, shiftL, (.|.))
 import           GHC.Generics (Generic)
 
+import           Clash.Class.BitPack (pack)
+import           Clash.Class.Resize (resize)
 import           Clash.Class.Num (satSucc, SaturationMode(SatBound))
 import           Clash.Explicit.Mealy
 import           Clash.Explicit.Signal
 import           Clash.Promoted.Nat
 import           Clash.Signal.Internal
+import           Clash.Sized.BitVector (BitVector)
 import           Clash.Sized.Index (Index)
-import           Clash.Sized.Vector (Vec, (<<+))
-import qualified Clash.Sized.Vector as V
 import           Clash.XException (NFDataX, ShowX)
 
-import           GHC.TypeLits (type (+))
+import           GHC.TypeLits (type (+), KnownNat)
 
 
 -- | Normally, asynchronous resets can be both asynchronously asserted and
@@ -172,22 +173,17 @@ resetGlitchFilter SNat clk rst =
   unsafeToReset (mealy clk noReset enableGen go Idle shiftReg)
  where
   shiftReg =
-    delay
-      clk enableGen
-      noGlitch
-      (liftA2 (<<+) shiftReg (unsafeFromReset rst))
+    delay clk enableGen noGlitch (shiftInLsb <$> shiftReg <*> unsafeFromReset rst)
 
-  -- TODO: Implement using BitVector instead. We can't currently, as
-  --       deepErrorX "X" /= undefined#. I.e., the spine is undefined so the
-  --       circuit would never recover in simulation. Using BitVector would
-  --       speed up simulation significantly.
   go gfs sreg
     | sreg == noGlitch = (InReset, asserted)
     | Idle <- gfs = (Idle, not asserted)
-    | otherwise = (if V.head sreg == asserted then InReset else Idle, V.head sreg)
+    | otherwise = (if msb == asserted then InReset else Idle, msb)
+   where
+    msb = testBit sreg (natToNum @n)
 
-  noGlitch :: Vec glitchlessPeriod Bool
-  noGlitch = V.repeat asserted
+  noGlitch :: BitVector glitchlessPeriod
+  noGlitch = if asserted then maxBound else minBound
 
   noReset :: Reset dom
   noReset = unsafeToReset (pure (not asserted))
@@ -197,6 +193,10 @@ resetGlitchFilter SNat clk rst =
     case resetPolarity @dom of
       SActiveHigh -> True
       SActiveLow -> False
+
+  shiftInLsb :: forall m. KnownNat m => BitVector (m + 1) -> Bool -> BitVector (m + 1)
+  shiftInLsb bv s = shiftL bv 1 .|. resize (pack s)
+{-# NOINLINE resetGlitchFilter #-} -- Give reset glitch filter its own HDL file
 
 -- | Hold reset for a number of cycles relative to an incoming reset signal.
 --
