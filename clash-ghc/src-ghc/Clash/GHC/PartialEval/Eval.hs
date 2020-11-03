@@ -302,7 +302,7 @@ caseCon subject ty alts = do
           match <- findBestAlt (matchData dc args) alts
           evalAlt def match
 
-        -- Neutral primtives may be clash primtives which are treated as
+        -- Neutral primitives may be clash primitives which are treated as
         -- values, like fromInteger# for various types in clash-prelude.
         VNeutral (NePrim pr args) -> do
           let def = VNeutral (NeCase forcedSubject ty alts)
@@ -312,8 +312,8 @@ caseCon subject ty alts = do
         -- We know nothing: attempt case-of-case / case-of-let.
         _ -> tryTransformCase forcedSubject ty alts
 
--- | Attempt to apply the a transformation to a case expression to expose
--- more oppoortunities for caseCon. If no transformations can be applied the
+-- | Attempt to apply a transformation to a case expression to expose more
+-- opportunities for caseCon. If no transformations can be applied the
 -- case expression can only be neutral.
 --
 tryTransformCase :: Value -> Type -> [(Pat, Value)] -> Eval Value
@@ -337,7 +337,7 @@ tryTransformCase subject ty alts =
       newCase <- caseCon innerSubject ty alts
       pure (VNeutral (NeLetrec bindings newCase))
 
-    -- There is no way to continue evalauting the case, do nothing.
+    -- There is no way to continue evaluating the case, do nothing.
     -- TODO elimExistentials here.
     _ -> pure (VNeutral (NeCase subject ty alts))
  where

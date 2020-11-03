@@ -1,3 +1,4 @@
+{-# LANGUAGE NamedFieldPuns #-}
 {-|
   Copyright  :  (C) 2012-2016, University of Twente,
                     2016-2017, Myrtle Software Ltd,
@@ -20,6 +21,7 @@ import           Control.Exception             (throw)
 import           Control.Lens                  ((<<%=),(%=))
 import qualified Control.Lens                  as Lens
 import           Control.Monad                 (when, replicateM, zipWithM)
+import           Control.Monad.Extra           (concatMapM)
 import           Control.Monad.IO.Class        (liftIO)
 import           Data.Char                     (ord)
 import           Data.Either                   (lefts, partitionEithers)
@@ -27,7 +29,7 @@ import qualified Data.HashMap.Lazy             as HashMap
 import qualified Data.IntMap                   as IntMap
 import           Data.List                     (elemIndex, partition)
 import           Data.List.Extra               (countEq, mapAccumLM)
-import           Data.Maybe                    (catMaybes, fromJust, fromMaybe)
+import           Data.Maybe                    (listToMaybe, fromJust, fromMaybe)
 import           Data.Semigroup.Monad
 import qualified Data.Set                      as Set
 import           Data.Text.Lazy                (fromStrict)
@@ -58,10 +60,11 @@ import           Clash.Core.Name
 import           Clash.Core.Pretty             (showPpr)
 import           Clash.Core.Subst              (extendIdSubst, mkSubst, substTm)
 import           Clash.Core.Term               as C
-  (PrimInfo (..), Term (..), WorkInfo (..), collectArgs, collectArgsTicks, collectBndrs, mkApps)
+  (IsMultiPrim (..), PrimInfo (..), Term (..), WorkInfo (..), collectArgs,
+   collectArgsTicks, collectBndrs, mkApps)
 import           Clash.Core.TermInfo
 import           Clash.Core.Type               as C
-  (Type (..), ConstTy (..), TypeView (..), mkFunTy, splitFunTys, splitFunTy, tyView)
+  (Type (..), ConstTy (..), TypeView (..), mkFunTy, splitFunTys, tyView)
 import           Clash.Core.TyCon              as C (TyConMap, tyConDataCons)
 import           Clash.Core.Util
   (inverseTopSortLetBindings, splitShouldSplit)
@@ -109,42 +112,45 @@ warn opts msg = do
 
 -- | Generate the context for a BlackBox instantiation.
 mkBlackBoxContext
-  :: TextS.Text
+  :: HasCallStack
+  => TextS.Text
   -- ^ Blackbox function name
-  -> Id
-  -- ^ Identifier binding the primitive/blackbox application
+  -> [Id]
+  -- ^ Identifiers binding the primitive/blackbox application
   -> [Either Term Type]
   -- ^ Arguments of the primitive/blackbox application
   -> NetlistMonad (BlackBoxContext,[Declaration])
-mkBlackBoxContext bbName resId args@(lefts -> termArgs) = do
+mkBlackBoxContext bbName resIds args@(lefts -> termArgs) = do
     -- Make context inputs
-    let resNm = nameOcc (varName resId)
-    resTy <- unsafeCoreTypeToHWTypeM' $(curLoc) (V.varType resId)
+    let
+      resNms = map (nameOcc . varName) resIds
+      resNm = fromMaybe (error "mkBlackBoxContext: head") (listToMaybe resNms)
+    resTys <- mapM (unsafeCoreTypeToHWTypeM' $(curLoc) . V.varType) resIds
     (imps,impDecls) <- unzip <$> zipWithM (mkArgument bbName resNm) [0..] termArgs
     (funs,funDecls) <-
       mapAccumLM
-        (addFunction (V.varType resId))
+        (addFunction (map V.varType resIds))
         IntMap.empty
         (zip termArgs [0..])
 
     -- Make context result
-    let res = Identifier resNm Nothing
+    let ress = map (flip Identifier Nothing) resNms
 
     lvl <- Lens.use curBBlvl
     (nm,_) <- Lens.use curCompNm
 
     -- Set "context name" to value set by `Clash.Magic.setName`, default to the
     -- name of the closest binder
-    ctxName1 <- fromMaybe resNm <$> Lens.view setName
+    ctxName1 <- fromMaybe resNms . fmap pure <$> Lens.view setName
     -- Update "context name" with prefixes and suffixes set by
     -- `Clash.Magic.prefixName` and `Clash.Magic.suffixName`
-    ctxName2 <- affixName ctxName1
+    ctxName2 <- mapM affixName ctxName1
 
-    return ( Context bbName (res,resTy) imps funs [] lvl nm (Just ctxName2)
+    return ( Context bbName (zip ress resTys) imps funs [] lvl nm (listToMaybe ctxName2)
            , concat impDecls ++ concat funDecls
            )
   where
-    addFunction resTy im (arg,i) = do
+    addFunction resTys im (arg,i) = do
       tcm <- Lens.use tcCache
       if isFun tcm arg then do
         -- Only try to calculate function plurality when primitive actually
@@ -153,12 +159,12 @@ mkBlackBoxContext bbName resId args@(lefts -> termArgs) = do
         funcPlurality <-
           case extractPrim <$> prim of
             Just (Just p) ->
-              P.getFunctionPlurality p args resTy i
+              P.getFunctionPlurality p args resTys i
             _ ->
               pure 1
 
         curBBlvl Lens.+= 1
-        (fs,ds) <- unzip <$> replicateM funcPlurality (mkFunInput resId arg)
+        (fs,ds) <- unzip <$> replicateM funcPlurality (mkFunInput (head resIds) arg)
         curBBlvl Lens.-= 1
 
         let im' = IntMap.insert i fs im
@@ -199,7 +205,8 @@ mkArgument
   :: TextS.Text
   -- ^ Blackbox function name
   -> Identifier
-  -- ^ LHS of the original let-binder
+  -- ^ LHS of the original let-binder. Is used as a name hint to generate new
+  -- names in case the argument is a declaration.
   -> Int
   -- ^ Argument n (zero-indexed). Used for error message.
   -> Term
@@ -341,15 +348,16 @@ mkPrimitive
 mkPrimitive bbEParen bbEasD dst pInfo args tickDecls =
   go =<< extractPrimWarnOrFail (primName pInfo)
   where
-    ty = head (netlistTypes dst)
+    tys = netlistTypes dst
+    ty = fromMaybe (error "mkPrimitive") (listToMaybe tys)
 
     go
       :: CompiledPrimitive
       -> NetlistMonad (Expr, [Declaration])
     go =
       \case
-        P.BlackBoxHaskell bbName wf _usedArgs funcName (_fHash, func) -> do
-          bbFunRes <- func bbEasD (primName pInfo) args ty
+        P.BlackBoxHaskell bbName wf _usedArgs multiResult funcName (_fHash, func) -> do
+          bbFunRes <- func bbEasD (primName pInfo) args tys
           case bbFunRes of
             Left err -> do
               -- Blackbox template function returned an error:
@@ -360,30 +368,43 @@ mkPrimitive bbEParen bbEasD dst pInfo args tickDecls =
               (_,sp) <- Lens.use curCompNm
               throw (ClashException sp err' Nothing)
             Right (BlackBoxMeta {..}, bbTemplate) ->
-              -- Blackbox template generation succesful. Rerun 'go', but this time
+              -- Blackbox template generation successful. Rerun 'go', but this time
               -- around with a 'normal' @BlackBox@
               go (P.BlackBox
-                    bbName wf bbRenderVoid bbKind () bbOutputReg bbLibrary bbImports
-                    bbFunctionPlurality bbIncludes Nothing Nothing bbTemplate)
-        p@P.BlackBox {} ->
-          case kind p of
+                    bbName wf bbRenderVoid multiResult bbKind () bbOutputReg
+                    bbLibrary bbImports bbFunctionPlurality bbIncludes
+                    bbResultNames bbResultInits bbTemplate)
+        -- See 'setupMultiResultPrim' in "Clash.Normalize.Transformations":
+        P.BlackBox {name="c$multiPrimSelect"} ->
+          pure (Noop, [])
+        p@P.BlackBox {multiResult=True, name, template} -> do
+          -- Multi result primitives assign their results to signals
+          -- provided as arguments. Hence, we ignore any declarations
+          -- from 'resBndr1'.
+          tcm <- Lens.use tcCache
+          let (args1, resArgs) = splitMultiPrimArgs (multiPrimInfo' tcm pInfo) args
+          (bbCtx, ctxDcls) <- mkBlackBoxContext (primName pInfo) resArgs args1
+          (templ, templDecl) <- prepareBlackBox name template bbCtx
+          let bbDecl = N.BlackBoxD name (libraries p) (imports p) (includes p) templ bbCtx
+          return (Noop, ctxDcls ++ templDecl ++ tickDecls ++ [bbDecl])
+        p@P.BlackBox {template, name=pNm, kind} ->
+          case kind of
             TDecl -> do
-              let tempD = template p
-                  pNm = name p
               resM <- resBndr1 True dst
               case resM of
                 Just (dst',dstNm,dstDecl) -> do
-                  (bbCtx,ctxDcls)   <- mkBlackBoxContext (primName pInfo) dst' args
-                  (templ,templDecl) <- prepareBlackBox pNm tempD bbCtx
+                  (bbCtx,ctxDcls)   <- mkBlackBoxContext (primName pInfo) [dst'] args
+                  (templ,templDecl) <- prepareBlackBox pNm template bbCtx
                   let bbDecl = N.BlackBoxD pNm (libraries p) (imports p)
                                            (includes p) templ bbCtx
                   return (Identifier dstNm Nothing,dstDecl ++ ctxDcls ++ templDecl ++ tickDecls ++ [bbDecl])
 
                 -- Render declarations as a Noop when requested
                 Nothing | RenderVoid <- renderVoid p -> do
+                  -- TODO: We should probably 'mkBlackBoxContext' to accept empty lists
                   let dst1 = mkLocalId ty (mkUnsafeSystemName "__VOID_TDECL_NOOP__" 0)
-                  (bbCtx,ctxDcls) <- mkBlackBoxContext (primName pInfo) dst1 args
-                  (templ,templDecl) <- prepareBlackBox pNm tempD bbCtx
+                  (bbCtx,ctxDcls) <- mkBlackBoxContext (primName pInfo) [dst1] args
+                  (templ,templDecl) <- prepareBlackBox pNm template bbCtx
                   let bbDecl = N.BlackBoxD pNm (libraries p) (imports p)
                                            (includes p) templ bbCtx
                   return (Noop, ctxDcls ++ templDecl ++ tickDecls ++ [bbDecl])
@@ -391,15 +412,13 @@ mkPrimitive bbEParen bbEasD dst pInfo args tickDecls =
                 -- Otherwise don't render them
                 Nothing -> return (Noop,[])
             TExpr -> do
-              let tempE = template p
-                  pNm = name p
               if bbEasD
                 then do
                   resM <- resBndr1 True dst
                   case resM of
                     Just (dst',dstNm,dstDecl) -> do
-                      (bbCtx,ctxDcls)     <- mkBlackBoxContext (primName pInfo) dst' args
-                      (bbTempl,templDecl) <- prepareBlackBox pNm tempE bbCtx
+                      (bbCtx,ctxDcls)     <- mkBlackBoxContext (primName pInfo) [dst'] args
+                      (bbTempl,templDecl) <- prepareBlackBox pNm template bbCtx
                       let tmpAssgn = Assignment dstNm
                                         (BlackBoxE pNm (libraries p) (imports p)
                                                    (includes p) bbTempl bbCtx
@@ -408,9 +427,10 @@ mkPrimitive bbEParen bbEasD dst pInfo args tickDecls =
 
                     -- Render expression as a Noop when requested
                     Nothing | RenderVoid <- renderVoid p -> do
+                      -- TODO: We should probably 'mkBlackBoxContext' to accept empty lists
                       let dst1 = mkLocalId ty (mkUnsafeSystemName "__VOID_TEXPRD_NOOP__" 0)
-                      (bbCtx,ctxDcls) <- mkBlackBoxContext (primName pInfo) dst1 args
-                      (templ,templDecl) <- prepareBlackBox pNm tempE bbCtx
+                      (bbCtx,ctxDcls) <- mkBlackBoxContext (primName pInfo) [dst1] args
+                      (templ,templDecl) <- prepareBlackBox pNm template bbCtx
                       let bbDecl = N.BlackBoxD pNm (libraries p) (imports p)
                                                (includes p) templ bbCtx
                       return (Noop, ctxDcls ++ templDecl ++ tickDecls ++ [bbDecl])
@@ -421,8 +441,8 @@ mkPrimitive bbEParen bbEasD dst pInfo args tickDecls =
                   resM <- resBndr1 False dst
                   case resM of
                     Just (dst',_,_) -> do
-                      (bbCtx,ctxDcls)      <- mkBlackBoxContext (primName pInfo) dst' args
-                      (bbTempl,templDecl0) <- prepareBlackBox pNm tempE bbCtx
+                      (bbCtx,ctxDcls)      <- mkBlackBoxContext (primName pInfo) [dst'] args
+                      (bbTempl,templDecl0) <- prepareBlackBox pNm template bbCtx
                       let templDecl1 = case primName pInfo of
                             "Clash.Sized.Internal.BitVector.fromInteger#"
                               | [N.Literal _ (NumLit _), N.Literal _ _, N.Literal _ _] <- extractLiterals bbCtx -> []
@@ -438,9 +458,10 @@ mkPrimitive bbEParen bbEasD dst pInfo args tickDecls =
                       return (BlackBoxE pNm (libraries p) (imports p) (includes p) bbTempl bbCtx bbEParen,ctxDcls ++ templDecl1)
                     -- Render expression as a Noop when requested
                     Nothing | RenderVoid <- renderVoid p -> do
+                      -- TODO: We should probably 'mkBlackBoxContext' to accept empty lists
                       let dst1 = mkLocalId ty (mkUnsafeSystemName "__VOID_TEXPRE_NOOP__" 0)
-                      (bbCtx,ctxDcls) <- mkBlackBoxContext (primName pInfo) dst1 args
-                      (templ,templDecl) <- prepareBlackBox pNm tempE bbCtx
+                      (bbCtx,ctxDcls) <- mkBlackBoxContext (primName pInfo) [dst1] args
+                      (templ,templDecl) <- prepareBlackBox pNm template bbCtx
                       let bbDecl = N.BlackBoxD pNm (libraries p) (imports p)
                                                (includes p) templ bbCtx
                       return (Noop, ctxDcls ++ templDecl ++ tickDecls ++ [bbDecl])
@@ -580,7 +601,7 @@ mkPrimitive bbEParen bbEasD dst pInfo args tickDecls =
       -> NetlistMonad (Maybe ([Id],[Identifier],[Declaration]))
       -- Nothing when the binder would have type `Void`
     resBndr mkDec dst' = do
-      resHwTy <- unsafeCoreTypeToHWTypeM' $(curLoc) ty
+      resHwTy <- unsafeCoreTypeToHWTypeM' $(curLoc) (head tys)
       if isVoid resHwTy then
         pure Nothing
       else
@@ -597,10 +618,18 @@ mkPrimitive bbEParen bbEasD dst pInfo args tickDecls =
               -- TODO: check that it's okay to use `mkUnsafeInternalName`
               let nm3 = mkUnsafeSystemName nm2 0
                   id_ = mkLocalId ty nm3
-              idDeclM <- mkNetDecl (id_,mkApps (Prim pInfo) args)
+              idDeclM <- mkNetDecl (id_, mkApps (Prim pInfo) args)
               case idDeclM of
-                Nothing     -> return Nothing
-                Just idDecl -> return (Just ([id_],[nm2],[idDecl]))
+                [] -> return Nothing
+                [idDecl] -> return (Just ([id_],[nm2],[idDecl]))
+                ids -> error [I.i|
+                  Unexpected nested use of multi result primitive. Ids:
+
+                    #{show ids}
+
+                  Multi primitive should only appear on the RHS of a
+                  let-binding. Please report this as a bug.
+                |]
           CoreId dstR -> return (Just ([dstR],[nameOcc . varName $ dstR],[]))
           MultiId ids -> return (Just (ids,map (nameOcc . varName) ids,[]))
 
@@ -677,10 +706,10 @@ collectMealy dstNm dst tcm (kd:clk:mealyFun:mealyInit:mealyIn:_) = do
       --
       -- The first set is only assigned in the always block, so they must be
       -- 'reg' in Verilog terminology
-      netDeclsSeq <- fmap catMaybes (mapM mkNetDecl (sBinders ++ bindersN))
+      netDeclsSeq <- concatMapM mkNetDecl (sBinders ++ bindersN)
       -- The second set is assigned using concurrent assignment, so don't need
       -- to be 'reg'
-      netDeclsInp <- fmap catMaybes (mapM mkNetDecl iBinders)
+      netDeclsInp <- concatMapM mkNetDecl iBinders
 
       -- If the 'mealyFun' was not a let-expression with a variable reference
       -- as a body then we used the LHS of the entire 'mealyIO' expression as
@@ -775,8 +804,8 @@ collectBindIO dst (m:Lam x q@(Lam _ e):_) = do
       normE <- mkUniqueNormalized is0 Nothing (args,bs,res)
       case normE of
         (_,_,[],_,[],binders,Just result) -> do
-          ds1 <- concat <$> mapM (uncurry (mkDeclarations' Sequential)) binders
-          netDecls <- fmap catMaybes (mapM mkNetDecl binders)
+          ds1 <- concatMapM (uncurry (mkDeclarations' Sequential)) binders
+          netDecls <- concatMapM mkNetDecl binders
           let assn = Assignment (netlistId1 id id2identifier dst)
                                 (Identifier (id2identifier result) Nothing)
           return (Noop, (netDecls ++ ds0 ++ ds1 ++ [assn]))
@@ -799,12 +828,12 @@ collectBindIO dst (m:Lam x q@(Lam _ e):_) = do
       case normE of
         (_,_,[],_,[],binders,Just result) -> do
           let binders1 = tail binders ++ [(fst (head binders), C.Var result)]
-          ds1 <- concat <$> mapM (uncurry (mkDeclarations' Sequential)) binders1
-          netDecls <- fmap catMaybes (mapM mkNetDecl binders)
+          ds1 <- concatMapM (uncurry (mkDeclarations' Sequential)) binders1
+          netDecls <- concatMapM mkNetDecl binders
           return (netDecls ++ ds1)
         _ -> error "internal error"
     _ -> do
-      netDecls <- fmap catMaybes (mapM mkNetDecl [(x,m)])
+      netDecls <- concatMapM mkNetDecl [(x,m)]
       ds1 <- mkDeclarations' Sequential x m
       return (netDecls ++ ds1)
 
@@ -813,11 +842,11 @@ collectBindIO _ es = error ("internal error:\n" ++ showPpr es)
 -- | Collect the sequential declarations for 'appIO'
 collectAppIO :: NetlistId -> [Term] -> [Term] -> NetlistMonad (Expr,[Declaration])
 collectAppIO dst (fun1:arg1:_) rest = case collectArgs fun1 of
-  (Prim (PrimInfo "Clash.Explicit.SimIO.fmapSimIO#" _ _),(lefts -> (fun0:arg0:_))) -> do
+  (Prim (PrimInfo "Clash.Explicit.SimIO.fmapSimIO#" _ _ _),(lefts -> (fun0:arg0:_))) -> do
     tcm <- Lens.use tcCache
     let argN = map (Left . unSimIO tcm) (arg0:arg1:rest)
     mkExpr False Sequential dst (mkApps fun0 argN)
-  (Prim (PrimInfo "Clash.Explicit.SimIO.apSimIO#" _ _),(lefts -> args)) -> do
+  (Prim (PrimInfo "Clash.Explicit.SimIO.apSimIO#" _ _ _),(lefts -> args)) -> do
     collectAppIO dst args (arg1:rest)
   _ -> error ("internal error:\n" ++ showPpr (fun1:arg1:rest))
 
@@ -837,7 +866,11 @@ unSimIO tcm arg =
   let argTy = termType tcm arg
   in  case tyView argTy of
         TyConApp _ [tcArg] ->
-          mkApps (Prim (PrimInfo "Clash.Explicit.SimIO.unSimIO#" (mkFunTy argTy tcArg) WorkNever))
+          mkApps (Prim ( PrimInfo
+                           "Clash.Explicit.SimIO.unSimIO#"
+                           (mkFunTy argTy tcArg)
+                           WorkNever
+                           SingleResult ))
                  [Left arg]
         _ -> error ("internal error:\n" ++ showPpr arg)
 
@@ -847,7 +880,8 @@ unSimIO tcm arg =
 mkFunInput
   :: HasCallStack
   => Id
-  -- ^ Identifier binding the encompassing primitive/blackbox application
+  -- ^ Identifier binding the encompassing primitive/blackbox application. Used
+  -- as a name hint if 'mkFunInput' needs intermediate signals.
   -> Term
   -- ^ The function argument term
   -> NetlistMonad
@@ -874,17 +908,21 @@ mkFunInput resId e =
                   error $ $(curLoc) ++ "Unexpected blackbox type: "
                                     ++ "Primitive " ++ show pn
                                     ++ " " ++ show pt
-                P.BlackBoxHaskell pName _workInfo _usedArgs fName (_, func) -> do
+                P.BlackBoxHaskell{name=pName, multiResult=True} ->
+                  -- TODO: dev pointers
+                  error [I.i|
+                    Encountered multiresult primitive as a direct argument to
+                    another primitive. This should not happen.
+
+                      Encountered: #{pName}
+
+                    Please report this as an issue.
+                  |]
+                P.BlackBoxHaskell{name=pName, functionName=fName, function=(_, func)} -> do
                   -- Determine result type of this blackbox. If it's not a
                   -- function, simply use its term type.
-                  let
-                    resTy0 = termType tcm e
-                    resTy1 =
-                      case splitFunTy tcm resTy0 of
-                        Just (_, t) -> t
-                        Nothing -> resTy0
-
-                  bbhRes <- func True pName args resTy1
+                  let (_, resTy) = splitFunTys tcm (termType tcm e)
+                  bbhRes <- func True pName args [resTy]
                   case bbhRes of
                     Left err ->
                       error $ $(curLoc) ++ show fName ++ " yielded an error: "
@@ -1002,7 +1040,7 @@ mkFunInput resId e =
   let pNm = case appE of
               Prim p -> primName p
               _ -> "__INTERNAL__"
-  (bbCtx,dcls) <- mkBlackBoxContext pNm resId args
+  (bbCtx,dcls) <- mkBlackBoxContext pNm [resId] args
   case templ of
     Left (TDecl,oreg,libs,imps,inc,_,templ') -> do
       (l',templDecl)
@@ -1103,10 +1141,11 @@ mkFunInput resId e =
         Left err -> error err
       case resultM of
         Just result -> do
+          -- TODO: figure out what to do with multires blackboxes here
           let binders' = map (\(id_,tm) -> (goR result id_,tm)) binders
-          netDecls <- fmap catMaybes . mapM mkNetDecl $ filter ((/= result) . fst) binders
+          netDecls <- concatMapM mkNetDecl $ filter ((/= result) . fst) binders
           decls    <- concat <$> mapM (uncurry mkDeclarations) binders'
-          Just (NetDecl' _ rw _ _ _) <- mkNetDecl . head $ filter ((==result) . fst) binders
+          [NetDecl' _ rw _ _ _] <- mkNetDecl . head $ filter ((==result) . fst) binders
           nm <- mkUniqueIdentifier Basic "fun"
           return (Right ((nm,netDecls ++ decls),rw))
         Nothing -> return (Right (("",[]),Wire))

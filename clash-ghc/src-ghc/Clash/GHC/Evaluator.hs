@@ -456,4 +456,3 @@ letSubst h acc id0 =
    where
     (i,ids') = freshId ids
     x'       = modifyVarName (`setUnique` i) x
-

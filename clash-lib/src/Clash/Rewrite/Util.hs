@@ -1133,4 +1133,3 @@ removeUnusedBinders binds body =
                           (extendVarEnv x (x,e0) env)
                           (eltsVarSet eFVs)
         Nothing -> env
-

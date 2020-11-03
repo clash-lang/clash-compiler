@@ -31,7 +31,7 @@ import Clash.Rewrite.Util
 -- | Normalisation transformation
 normalization :: NormRewrite
 normalization =
-  rmDeadcode >-> constantPropagation >-> rmUnusedExpr >-!-> anf >-!-> rmDeadcode >->
+  rmDeadcode >-> multPrim >-> constantPropagation >-> rmUnusedExpr >-!-> anf >-!-> rmDeadcode >->
   bindConst >-> letTL
 #if !EXPERIMENTAL_EVALUATOR
   >-> evalConst
@@ -40,6 +40,7 @@ normalization =
   xOptim >-> rmDeadcode >->
   cleanup >-> recLetRec >-> splitArgs
   where
+    multPrim   = topdownR (apply "setupMultiResultPrim" setupMultiResultPrim)
     anf        = topdownR (apply "nonRepANF" nonRepANF) >-> apply "ANF" makeANF >-> topdownR (apply "caseCon" caseCon)
     letTL      = topdownSucR (apply "topLet" topLet)
     recLetRec  = apply "recToLetRec" recToLetRec

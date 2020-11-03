@@ -28,4 +28,3 @@ traceWith f a = trace (f a) a
 
 traceShowWith :: Show b => (a -> b) -> a -> a
 traceShowWith f a = trace (show (f a)) a
-

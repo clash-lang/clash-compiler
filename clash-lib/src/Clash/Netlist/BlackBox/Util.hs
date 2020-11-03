@@ -12,6 +12,7 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE QuasiQuotes #-}
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE TemplateHaskell #-}
 
@@ -60,6 +61,7 @@ import           Clash.Netlist.Util              (typeSize, isVoid, stripVoid)
 import           Clash.Signal.Internal
   (ResetKind(..), ResetPolarity(..), InitBehavior(..))
 import           Clash.Util
+import qualified Clash.Util.Interpolate          as I
 
 inputHole :: Element -> Maybe Int
 inputHole = \case
@@ -224,12 +226,12 @@ setSym mkUniqueIdentifierM bbCtx l = do
               error $ $(curLoc) ++  "Could not convert ~LIT[" ++ show i ++ "]"
                    ++ " to string:" ++ msg ++ "\n\nError occured while "
                    ++ "processing blackbox for " ++ bbnm
-        Result _ | Identifier t _ <- fst (bbResult bbCtx) -> Text.fromStrict t
+        Result _ | [(Identifier t _, _)] <- bbResults bbCtx -> Text.fromStrict t
         CompName -> Text.fromStrict (bbCompName bbCtx)
         CtxName ->
           case bbCtxName bbCtx of
             Just nm -> Text.fromStrict nm
-            _ | Identifier t _ <- fst (bbResult bbCtx) -> Text.fromStrict t
+            _ | [(Identifier t _, _)] <- bbResults bbCtx -> Text.fromStrict t
             _ -> error $ $(curLoc) ++ "Internal error when processing blackbox "
                       ++ "for " ++ bbnm
         _ -> error $ $(curLoc) ++ "Unexpected element in GENSYM when processing "
@@ -332,7 +334,7 @@ renderElem b (Component (Decl n subN (l:ls))) = do
                     , show (subN +1 ), " got only ", show (length (fromJust func0)) ]
       func1 = indexNote' errr subN <$> func0
       Just (templ0,_,libs,imps,inc,pCtx) = func1
-      b' = pCtx { bbResult = (o,oTy), bbInputs = bbInputs pCtx ++ is }
+      b' = pCtx { bbResults = [(o,oTy)], bbInputs = bbInputs pCtx ++ is }
       layoutOptions = LayoutOptions (AvailablePerLine 120 0.4)
       render = N.BBTemplate . parseFail . renderLazy . layoutPretty layoutOptions
 
@@ -375,7 +377,7 @@ renderElem b (Component (Decl n subN (l:ls))) = do
 renderElem b (SigD e m) = do
   e' <- Text.concat <$> mapM (fmap ($ 0) . renderElem b) e
   let ty = case m of
-             Nothing -> snd $ bbResult b
+             Nothing -> snd $ bbResult "~SIGD" b
              Just n  -> let (_,ty',_) = bbInputs b !! n
                         in  ty'
   t  <- getMon (hdlSig e' ty)
@@ -526,6 +528,12 @@ idToExpr
   -> (Expr,HWType,Bool)
 idToExpr (t,ty) = (Identifier (Text.toStrict t) Nothing,ty,False)
 
+bbResult :: HasCallStack => String -> BlackBoxContext -> (Expr, HWType)
+bbResult _s (bbResults -> [r]) = r
+bbResult s ctx = error [I.i|
+  Multi result primitives not supported when using template tag #{s}. Tag used
+  in blackbox implementation of #{bbName ctx} |]
+
 -- | Fill out the template corresponding to an output/input assignment of a
 -- component instantiation, and turn it into a single identifier so it can
 -- be used for a new blackbox context.
@@ -541,7 +549,7 @@ lineToIdentifier b = foldrM (\e a -> do
 lineToType :: BlackBoxContext
            -> BlackBoxTemplate
            -> HWType
-lineToType b [(Typ Nothing)]  = snd $ bbResult b
+lineToType b [(Typ Nothing)]  = snd $ bbResult "~TYPO" b
 lineToType b [(Typ (Just n))] = let (_,ty,_) = bbInputs b !! n
                                 in  ty
 lineToType b [(TypElem t)]    = case lineToType b [t] of
@@ -563,7 +571,7 @@ renderTag :: Backend backend
 renderTag _ (Text t)        = return t
 renderTag b (Result esc)    = do
   escape <- if esc then unextend else pure id
-  fmap (Text.fromStrict . escape . Text.toStrict . renderOneLine) . getMon . expr False . fst $ bbResult b
+  fmap (Text.fromStrict . escape . Text.toStrict . renderOneLine) . getMon . expr False . fst $ bbResult "~RESULT" b
 renderTag b (Arg esc n)  = do
   let (e,_,_) = bbInputs b !! n
   escape <- if esc then unextend else pure id
@@ -613,13 +621,13 @@ renderTag b (Sel e n) =
   let ty = lineToType b [e]
   in  renderOneLine <$> getMon (hdlRecSel ty n)
 
-renderTag b (Typ Nothing)   = fmap renderOneLine . getMon . hdlType Internal . snd $ bbResult b
+renderTag b (Typ Nothing)   = fmap renderOneLine . getMon . hdlType Internal . snd $ bbResult "~TYPO" b
 renderTag b (Typ (Just n))  = let (_,ty,_) = bbInputs b !! n
                               in  renderOneLine <$> getMon (hdlType Internal ty)
-renderTag b (TypM Nothing)  = fmap renderOneLine . getMon . hdlTypeMark . snd $ bbResult b
+renderTag b (TypM Nothing)  = fmap renderOneLine . getMon . hdlTypeMark . snd $ bbResult "~TYPMO" b
 renderTag b (TypM (Just n)) = let (_,ty,_) = bbInputs b !! n
                               in  renderOneLine <$> getMon (hdlTypeMark ty)
-renderTag b (Err Nothing)   = fmap renderOneLine . getMon . hdlTypeErrValue . snd $ bbResult b
+renderTag b (Err Nothing)   = fmap renderOneLine . getMon . hdlTypeErrValue . snd $ bbResult "~ERRORO" b
 renderTag b (Err (Just n))  = let (_,ty,_) = bbInputs b !! n
                               in  renderOneLine <$> getMon (hdlTypeErrValue ty)
 renderTag b (Size e)        = return . Text.pack . show . typeSize $ lineToType b [e]
@@ -723,7 +731,7 @@ renderTag b CompName = pure (Text.fromStrict (bbCompName b))
 
 renderTag b CtxName = case bbCtxName b of
   Just nm -> return (Text.fromStrict nm)
-  _ | Identifier t _ <- fst (bbResult b)
+  _ | Identifier t _ <- fst (bbResult "~CTXNAME" b)
     -> return (Text.fromStrict t)
   _ -> error "internal error"
 

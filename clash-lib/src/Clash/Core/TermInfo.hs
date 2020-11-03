@@ -1,22 +1,27 @@
 {-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE QuasiQuotes #-}
 
 module Clash.Core.TermInfo where
 
+import Data.Maybe (fromMaybe)
 import Data.Text.Prettyprint.Doc (line)
+import Data.Text (isInfixOf)
 
 import Clash.Core.DataCon
 import Clash.Core.FreeVars
 import Clash.Core.Literal
+import Clash.Core.Name
 import Clash.Core.Pretty
 import Clash.Core.Subst
 import Clash.Core.Term
-import Clash.Core.TyCon (TyConMap)
+import Clash.Core.TyCon (tyConDataCons, TyConMap)
 import Clash.Core.Type
 import Clash.Core.Var
 import Clash.Core.VarEnv
 import Clash.Debug (debugIsOn)
+import Clash.Unique (lookupUniqMap)
 import Clash.Util
 import Clash.Util.Interpolate as I
 
@@ -46,7 +51,7 @@ termType m e = case e of
   Var t          -> varType t
   Data dc        -> dcType dc
   Literal l      -> literalType l
-  Prim t         -> primType t
+  Prim p         -> goPrimType p
   Lam v e'       -> mkFunTy (varType v) (termType m e')
   TyLam tv e'    -> ForAllTy tv (termType m e')
   App _ _        -> case collectArgs e of
@@ -57,6 +62,74 @@ termType m e = case e of
   Case _ ty _    -> ty
   Cast _ _ ty2   -> ty2
   Tick _ e'      -> termType m e'
+ where
+  goPrimType = \case
+    PrimInfo{primMultiResult=SingleResult, primType} -> primType
+    p@PrimInfo{primMultiResult=MultiResult} -> multiPrimType p
+
+-- | Type of multi prim primitive belonging to given primitive. See
+-- 'Clash.Normalize.Transformations.setupMultiResultPrim' for more information.
+--
+-- Example, given:
+--
+-- @
+--   /\v1 -> t1 -> t2 -> (t3, t4)
+-- @
+--
+-- produces:
+--
+-- @
+--   /\v1 -> t1 -> t2 -> t3 -> t4 -> (t3, t4)
+-- @
+--
+multiPrimType :: PrimInfo -> Type
+multiPrimType primInfo =
+  if "GHC.Tuple.(," `isInfixOf` nameOcc tupTcNm
+  then mkPolyFunTy primResTy (primArgs <> map Right tupEls)
+  else error (multPrimErr primInfo)
+ where
+  (primArgs, primResTy) = splitFunForallTy (primType primInfo)
+  TyConApp tupTcNm tupEls = tyView primResTy
+
+multPrimErr :: PrimInfo -> String
+multPrimErr primInfo =  [I.i|
+  Internal error in multiPrimInfo': could not produce MultiPrimInfo. This
+  probably means a multi result blackbox's result type was not a tuple.
+  PrimInfo:
+
+    #{primInfo}
+|]
+
+splitMultiPrimArgs ::
+  HasCallStack =>
+  MultiPrimInfo ->
+  [Either Term Type] ->
+  ([Either Term Type], [Id])
+splitMultiPrimArgs MultiPrimInfo{mpi_resultTypes} args0 = (args1, resArgs1)
+ where
+  resArgs1 = [id_ | Left (Var id_) <- resArgs0]
+  (args1, resArgs0) = splitAt (length args0 - length mpi_resultTypes) args0
+
+-- | Same as 'multiPrimInfo', but produced an error if it could not produce a
+-- 'MultiPrimInfo'.
+multiPrimInfo' :: HasCallStack => TyConMap -> PrimInfo -> MultiPrimInfo
+multiPrimInfo' tcm primInfo =
+  fromMaybe (error (multPrimErr primInfo)) (multiPrimInfo tcm primInfo)
+
+-- | Produce 'MutliPrimInfo' for given primitive
+multiPrimInfo :: TyConMap -> PrimInfo -> Maybe MultiPrimInfo
+multiPrimInfo tcm primInfo
+  | (_primArgs, primResTy) <- splitFunForallTy (primType primInfo)
+  , TyConApp tupTcNm tupEls <- tyView primResTy
+    -- XXX: Hardcoded for tuples
+  , "GHC.Tuple.(," `isInfixOf` nameOcc tupTcNm
+  , Just tupTc <- lookupUniqMap tupTcNm tcm
+  , [tupDc] <- tyConDataCons tupTc
+  = Just $ MultiPrimInfo
+    { mpi_primInfo = primInfo
+    , mpi_resultDc = tupDc
+    , mpi_resultTypes = tupEls }
+multiPrimInfo _ _ = Nothing
 
 -- | Get the result type of a polymorphic function given a list of arguments
 applyTypeToArgs
@@ -229,4 +302,3 @@ isCon _         = False
 isPrim :: Term -> Bool
 isPrim (Prim {}) = True
 isPrim _         = False
-

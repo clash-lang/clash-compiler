@@ -23,6 +23,7 @@ import           Control.Exception                (throw)
 import           Control.Lens                     ((.=))
 import qualified Control.Lens                     as Lens
 import           Control.Monad                    (join)
+import           Control.Monad.Extra              (concatMapM)
 import           Control.Monad.IO.Class           (liftIO)
 import           Control.Monad.Reader             (runReaderT)
 import           Control.Monad.State.Strict       (State, runStateT)
@@ -35,7 +36,7 @@ import qualified Data.HashMap.Lazy                as HashMap
 import           Data.List                        (elemIndex, partition, sortOn)
 import           Data.List.Extra                  (zipEqual)
 import           Data.Maybe
-  (catMaybes, listToMaybe, mapMaybe, fromMaybe)
+  (listToMaybe, mapMaybe, fromMaybe)
 import qualified Data.Set                         as Set
 import           Data.Primitive.ByteArray         (ByteArray (..))
 import qualified Data.Text                        as StrictText
@@ -57,10 +58,11 @@ import           Clash.Core.Literal               (Literal (..))
 import           Clash.Core.Name                  (Name(..))
 import           Clash.Core.Pretty                (showPpr)
 import           Clash.Core.Term
-  ( Alt, Pat (..), Term (..), TickInfo (..), PrimInfo(primName), collectArgs
-  , collectArgsTicks, collectTicks, mkApps, mkTicks, stripTicks)
+  (IsMultiPrim (..), PrimInfo (..), mpi_resultTypes,  Alt, Pat (..), Term (..),
+   TickInfo (..), collectArgs, collectArgsTicks,
+   collectTicks, mkApps, mkTicks, stripTicks)
 import qualified Clash.Core.Term                  as Core
-import           Clash.Core.TermInfo              (termType)
+import           Clash.Core.TermInfo              (multiPrimInfo', splitMultiPrimArgs, termType)
 import           Clash.Core.Type
   (Type (..), coreView1, splitFunForallTy, splitCoreFunForallTy)
 import           Clash.Core.TyCon                 (TyConMap)
@@ -247,12 +249,12 @@ genComponentT compName componentExpr = do
       Left err ->
         throw (ClashException sp ($curLoc ++ err) Nothing)
 
-  netDecls <- fmap catMaybes . mapM mkNetDecl $ filter (maybe (const True) (/=) resultM . fst) binders
+  netDecls <- concatMapM mkNetDecl (filter (maybe (const True) (/=) resultM . fst) binders)
   decls    <- concat <$> mapM (uncurry mkDeclarations) binders
 
   case resultM of
     Just result -> do
-      Just (NetDecl' _ rw _ _ rIM) <- mkNetDecl . head $ filter ((==result) . fst) binders
+      [NetDecl' _ rw _ _ rIM] <- mkNetDecl . head $ filter ((==result) . fst) binders
 
       let (compOutps',resUnwrappers') = case compOutps of
             [oport] -> ([(rw,oport,rIM)],resUnwrappers)
@@ -272,23 +274,55 @@ genComponentT compName componentExpr = do
       ids <- Lens.use seenIds
       return (wereVoids, sp, ids, component)
 
-mkNetDecl :: (Id, Term) -> NetlistMonad (Maybe Declaration)
+mkNetDecl :: (Id, Term) -> NetlistMonad [Declaration]
 mkNetDecl (id_,tm) = preserveVarEnv $ do
-  let typ             = varType id_
-  hwTy <- unsafeCoreTypeToHWTypeM' $(curLoc) typ
-  wr   <- termToWireOrReg tm
-  rIM  <- getResInit (id_,tm)
-  if isVoid hwTy
-     then return Nothing
-     else return . Just $ NetDecl' (addSrcNote sp)
-             wr
-             (id2identifier id_)
-             (Right hwTy)
-             rIM
+  hwTy <- unsafeCoreTypeToHWTypeM' $(curLoc) (varType id_)
+
+  if | not (shouldRenderDecl hwTy tm) -> return []
+     | (Prim pInfo@PrimInfo{primMultiResult=MultiResult}, args) <- collectArgs tm ->
+          multiDecls pInfo args
+     | otherwise -> pure <$> singleDecl hwTy
 
   where
-    nm = varName id_
-    sp = case tm of {Tick (SrcSpan s) _ -> s; _ -> nameLoc nm}
+    multiDecls pInfo args0 = do
+      tcm <- Lens.use tcCache
+      resInits0 <- getResInits (id_, tm)
+      let
+        resInits1 = map Just resInits0 <> repeat Nothing
+        mpInfo = multiPrimInfo' tcm pInfo
+        (_, res) = splitMultiPrimArgs mpInfo args0
+        netdecl i typ resInit =
+          -- TODO: Dehardcode Wire. Would entail changing 'outputReg' to a
+          -- list.
+          NetDecl' srcNote Wire (id2identifier i) (Right typ) resInit
+
+      hwTys <- mapM (unsafeCoreTypeToHWTypeM' $(curLoc)) (mpi_resultTypes mpInfo)
+      pure (zipWith3 netdecl res hwTys resInits1)
+
+
+    singleDecl hwTy = do
+      wr <- termToWireOrReg tm
+      rIM <- listToMaybe <$> getResInits (id_, tm)
+      return (NetDecl' srcNote wr (id2identifier id_) (Right hwTy) rIM)
+
+    addSrcNote loc
+      | isGoodSrcSpan loc = Just (StrictText.pack (showSDocUnsafe (ppr loc)))
+      | otherwise = Nothing
+
+    srcNote = addSrcNote $ case tm of
+      Tick (SrcSpan s) _ -> s
+      _ -> nameLoc (varName id_)
+
+    isMultiPrimSelect :: Term -> Bool
+    isMultiPrimSelect t = case collectArgs t of
+      (Prim (primName -> "c$multiPrimSelect"), _) -> True
+      _ -> False
+
+    shouldRenderDecl :: HWType -> Term -> Bool
+    shouldRenderDecl ty t
+      | isVoid ty = False
+      | isMultiPrimSelect t = False
+      | otherwise = True
 
     termToWireOrReg :: Term -> NetlistMonad WireOrReg
     termToWireOrReg (stripTicks -> Case scrut _ alts0@(_:_:_)) = do
@@ -307,31 +341,42 @@ mkNetDecl (id_,tm) = preserveVarEnv $ do
         _ -> return Wire
     termToWireOrReg _ = return Wire
 
-    addSrcNote loc = if isGoodSrcSpan loc
-                        then Just (StrictText.pack (showSDocUnsafe (ppr loc)))
-                        else Nothing
-
     -- Set the initialization value of a signal when a primitive wants to set it
-    getResInit
-      :: (Id,Term) -> NetlistMonad (Maybe Expr)
-    getResInit (i,collectArgsTicks -> (k,args,ticks)) = case k of
-      Prim p -> extractPrimWarnOrFail (primName p) >>= go (primName p)
-      _ -> return Nothing
+    getResInits :: (Id, Term) -> NetlistMonad [Expr]
+    getResInits (i,collectArgsTicks -> (k,args0,ticks)) = case k of
+      Prim p -> extractPrimWarnOrFail (primName p) >>= go p
+      _ -> return []
      where
-      go pNm (BlackBox {resultInit = Just nmD}) = withTicks ticks $ \_ -> do
-        (bbCtx,_) <- mkBlackBoxContext pNm i args
-        (bbTempl,templDecl) <- prepareBlackBox pNm nmD bbCtx
+      go pInfo (BlackBox {resultInits=nmDs, multiResult=True}) = withTicks ticks $ \_ -> do
+        tcm <- Lens.use tcCache
+        let (args1, res) = splitMultiPrimArgs (multiPrimInfo' tcm pInfo) args0
+        (bbCtx, _) <- mkBlackBoxContext (primName pInfo) res args1
+        mapM (go' (primName pInfo) bbCtx) nmDs
+      go pInfo (BlackBox {resultInits=nmDs}) = withTicks ticks $ \_ -> do
+        (bbCtx, _) <- mkBlackBoxContext (primName pInfo) [i] args0
+        mapM (go' (primName pInfo) bbCtx) nmDs
+      go _ _ = pure []
+
+      go' pNm bbCtx nmD = do
+        (bbTempl, templDecl) <- prepareBlackBox pNm nmD bbCtx
         case templDecl of
-          [] -> return (Just (BlackBoxE pNm [] [] [] bbTempl bbCtx False))
+          [] ->
+            return (BlackBoxE pNm [] [] [] bbTempl bbCtx False)
           _  -> do
             (_,sloc) <- Lens.use curCompNm
-            throw (ClashException sloc
-                    (unwords [ $(curLoc)
-                             , "signal initialization requires declarations:\n"
-                             , show templDecl
-                             ])
-                    Nothing)
-      go _ _ = return Nothing
+            throw (ClashException sloc [I.i|
+              Initial values cannot produce declarations, but saw:
+
+                #{templDecl}
+
+              after rendering initial values for blackbox:
+
+                #{pNm}
+
+              Given template:
+
+                #{nmD}
+            |] Nothing)
 
 -- | Generate a list of concurrent Declarations for a let-binder, return an
 -- empty list if the bound expression is represented by 0 bits
@@ -395,7 +440,7 @@ mkDeclarations' declType bndr app = do
               Noop ->
                 -- Rendered expression rendered a "noop" - a list of
                 -- declarations without a result. Used for things like
-                -- mealy IO / inline assertions.
+                -- mealy IO / inline assertions / multi result primitives.
                 []
               _ ->
                 -- Turn returned expression into declaration by assigning
@@ -706,7 +751,7 @@ mkExpr :: HasCallStack
        => Bool -- ^ Treat BlackBox expression as declaration
        -> DeclarationType
        -- ^ Should the returned declarations be concurrent or sequential?
-       -> NetlistId -- ^ Id to assign the result to
+       -> NetlistId -- ^ Name hint for the id to (potentially) assign the result to
        -> Term -- ^ Term to convert to an expression
        -> NetlistMonad (Expr,[Declaration]) -- ^ Returned expression and a list of generate BlackBox declarations
 mkExpr _ _ _ (stripTicks -> Core.Literal l) = do
@@ -776,8 +821,8 @@ mkExpr bbEasD declType bndr app =
         return ( Identifier argNm1 Nothing
                , NetDecl' Nothing wr argNm1 (Right hwTyA) Nothing:decls)
     Letrec binders body -> do
-      netDecls <- fmap catMaybes $ mapM mkNetDecl binders
-      decls    <- concat <$> mapM (uncurry mkDeclarations) binders
+      netDecls <- concatMapM mkNetDecl binders
+      decls    <- concatMapM (uncurry mkDeclarations) binders
       (bodyE,bodyDecls) <- mkExpr bbEasD declType bndr (mkApps (mkTicks body ticks) args)
       return (bodyE,netDecls ++ decls ++ bodyDecls)
     _ -> throw (ClashException sp ($(curLoc) ++ "Not in normal form: application of a Lambda-expression\n\n" ++ showPpr app) Nothing)
@@ -789,7 +834,7 @@ mkProjection
   :: Bool
   -- ^ Projection must bind to a simple variable
   -> NetlistId
-  -- ^ The signal to which the projection is (potentially) assigned
+  -- ^ Name hint for the signal to which the projection is (potentially) assigned
   -> Term
   -- ^ The subject/scrutinee of the projection
   -> Type
@@ -882,7 +927,7 @@ mkDcApplication
     -- ^ HWType of the LHS of the let-binder, can multiple types when we're
     -- creating a "split" product type (e.g. a tuple of a Clock and Reset)
     -> NetlistId
-    -- ^ Id to assign the result to
+    -- ^ Name hint for result id
     -> DataCon
     -- ^ Applied DataCon
     -> [Term]

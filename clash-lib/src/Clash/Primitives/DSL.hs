@@ -13,6 +13,7 @@ instantiations.
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE PatternSynonyms   #-}
 {-# LANGUAGE QuasiQuotes       #-}
+{-# LANGUAGE RecordWildCards   #-}
 {-# LANGUAGE TemplateHaskell   #-}
 {-# LANGUAGE TypeApplications  #-}
 {-# LANGUAGE ViewPatterns      #-}
@@ -20,7 +21,8 @@ instantiations.
 module Clash.Primitives.DSL
   (
   -- * Annotations
-    blackBoxHaskell
+    BlackBoxHaskellOpts(..)
+  , blackBoxHaskell
 
   -- * declarations
   , BlockState (..)
@@ -42,7 +44,7 @@ module Clash.Primitives.DSL
 
   -- ** Extraction
   , tInputs
-  , tResult
+  , tResults
   , getStr
   , getBool
   , exprToInteger
@@ -76,6 +78,7 @@ module Clash.Primitives.DSL
 import           Clash.Util                      (HasCallStack, clogBase)
 import           Control.Lens                    hiding (Indexed, assign)
 import           Control.Monad.State
+import           Data.Default                    (Default(def))
 import           Data.IntMap                     (IntMap)
 import qualified Data.IntMap                     as IntMap
 import           Data.List                       (intersperse)
@@ -105,33 +108,61 @@ import           Data.String.Interpolate.Util    (unindent)
 import           Language.Haskell.TH             (Name)
 import           Prelude
 
+-- | Options for 'blackBoxHaskell' function. Use 'def' from package
+-- 'data-default' for a set of default options.
+data BlackBoxHaskellOpts = BlackBoxHaskellOpts
+  { -- | Arguments to ignore (i.e., remove during normalization)
+    --
+    -- Default: []
+    bo_ignoredArguments :: [Int]
+
+    -- | HDLs to use the blackbox for
+    --
+    -- Default: all
+  , bo_supportedHdls :: [HDL]
+
+    -- | Does this blackbox assign its results to multiple binders?
+    --
+    -- Default: False.
+  , bo_multiResult :: Bool
+  }
+
+instance Default BlackBoxHaskellOpts where
+  def = BlackBoxHaskellOpts
+    { bo_ignoredArguments = []
+    , bo_supportedHdls = [minBound..maxBound]
+    , bo_multiResult = False
+    }
+
 -- | Create a blackBoxHaskell primitive. To be used as part of an annotation:
 --
 -- @
--- {-# ANN myFunction (blackBoxHaskell [2,3] VHDL 'myFunction 'myBBF) #-}
+-- {-# ANN myFunction (blackBoxHaskell 'myFunction 'myBBF def{_ignoredArguments=[2,3]}) #-}
 -- @
 --
 -- [2,3] would mean this blackbox __ignores__ its second and third argument.
 blackBoxHaskell
-  :: [Int]
-  -- ^ Ignored arguments
-  -> [HDL]
-  -- ^ hdls the blackbox supports
-  -> Name
+  :: Name
   -- ^ blackbox name
   -> Name
   -- ^ template function name
+  -> BlackBoxHaskellOpts
+  -- ^ Options, see data structure for more information
   -> Primitive
-blackBoxHaskell (show -> ign) hdls bb tf =
-  InlinePrimitive hdls $ unindent [I.i|
+blackBoxHaskell bb tf BlackBoxHaskellOpts{..} =
+  InlinePrimitive bo_supportedHdls $ unindent [I.i|
   [ { "BlackBoxHaskell" :
-       { "name" : "#{bb}"
-       , "templateFunction" : "#{tf}"
-       , "ignoredArguments" : #{ign}
-       }
+      { "name" : "#{bb}"
+      , "templateFunction" : "#{tf}"
+      , "ignoredArguments" : #{show bo_ignoredArguments}
+      , "multiResult" : #{toJsonBool bo_multiResult}
+      }
     }
-  ]
-|]
+  ] |]
+ where
+  toJsonBool :: Bool -> String
+  toJsonBool True = "true"
+  toJsonBool False = "false"
 
 -- | The state of a block. Contains a list of declarations and a the
 --   backend state.
@@ -160,7 +191,7 @@ declarationReturn
   => BlackBoxContext
   -> Text.Text
   -- ^ block name
-  -> State (BlockState backend) TExpr
+  -> State (BlockState backend) [TExpr]
   -- ^ block builder yielding an expression that should be assigned to the
   -- result variable in the blackbox context
   -> State backend Doc
@@ -168,9 +199,9 @@ declarationReturn
 declarationReturn bbCtx blockName blockBuilder =
   declaration blockName $ do
     res <- blockBuilder
-    let (Identifier resultNm Nothing, _) = bbResult bbCtx
-    addDeclaration (Assignment resultNm (eex res))
-    pure ()
+    forM_ (zip (bbResults bbCtx) res) $ \(rNm, r) -> do
+      let (Identifier resultNm Nothing, _) = rNm
+      addDeclaration (Assignment resultNm (eex r))
 
 -- | Run a block declaration.
 declaration
@@ -692,8 +723,8 @@ tInputs :: BlackBoxContext -> [(TExpr, HWType)]
 tInputs = map (\(x, t, _) -> (TExpr t x, t)) . bbInputs
 
 -- | The TExp result of a blackbox context.
-tResult :: BlackBoxContext -> TExpr
-tResult = (\(x,t) -> TExpr t x) . bbResult
+tResults :: BlackBoxContext -> [TExpr]
+tResults = map (\(x,t) -> TExpr t x) . bbResults
 
 -- | Get an identifier to an expression, creating a new assignment if
 --   necessary.

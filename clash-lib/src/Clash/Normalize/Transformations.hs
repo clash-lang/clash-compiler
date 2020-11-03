@@ -59,6 +59,7 @@ module Clash.Normalize.Transformations
   , separateArguments
   , separateLambda
   , xOptimize
+  , setupMultiResultPrim
   )
 where
 
@@ -83,6 +84,7 @@ import qualified Data.Monoid                 as Monoid
 import qualified Data.Primitive.ByteArray    as BA
 import qualified Data.Text                   as Text
 import           GHC.Integer.GMP.Internals   (Integer (..), BigNat (..))
+import           TextShow                    (TextShow(showt))
 
 import           BasicTypes                  (InlineSpec (..))
 
@@ -90,7 +92,7 @@ import           Clash.Annotations.Primitive (extractPrim)
 import           Clash.Core.DataCon          (DataCon (..))
 import           Clash.Core.EqSolver
 import           Clash.Core.Name
-  (Name (..), NameSort (..), mkUnsafeSystemName, nameOcc)
+  (mkUnsafeInternalName, Name (..), NameSort (..), mkUnsafeSystemName, nameOcc)
 import           Clash.Core.FreeVars
   (localIdOccursIn, localIdsDoNotOccurIn, freeLocalIds, termFreeTyVars,
    typeFreeVars, localVarsDoNotOccurIn, localIdDoesNotOccurIn,
@@ -864,13 +866,13 @@ removeUnusedExpr _ e@(collectArgsTicks -> (p@(Prim pInfo),args,ticks)) = do
           case usedArguments of
             UsedArguments used -> Just used
             IgnoredArguments ignored -> Just ([0..length args - 1] \\ ignored)
-        Just (BlackBox pNm _ _ _ _ _ _ _ _ inc r ri templ) -> Just $
+        Just (BlackBox pNm _ _ _ _ _ _ _ _ _ inc r ri templ) -> Just $
           if | isFromInt pNm -> [0,1,2]
              | primName pInfo `elem` [ "Clash.Annotations.BitRepresentation.Deriving.dontApplyInHDL"
                                      , "Clash.Sized.Vector.splitAt"
                                      ] -> [0,1]
-             | otherwise -> concat [ maybe [] getUsedArguments r
-                                   , maybe [] getUsedArguments ri
+             | otherwise -> concat [ concatMap getUsedArguments r
+                                   , concatMap getUsedArguments ri
                                    , getUsedArguments templ
                                    , concatMap (getUsedArguments . snd) inc ]
         _ ->
@@ -2920,7 +2922,7 @@ xOptimize (TransformContext is0 _) e@(Case subj ty alts) = do
 
     case defPart of
       ([], _)    -> return e
-      (_, [])    -> changed (Prim (PrimInfo "Clash.XException.errorX" ty WorkConstant))
+      (_, [])    -> changed (Prim (PrimInfo "Clash.XException.errorX" ty WorkConstant SingleResult))
       (_, [alt]) -> xOptimizeSingle is0 subj alt
       (_, defs)  -> xOptimizeMany is0 subj ty defs
   else
@@ -2999,3 +3001,89 @@ isPrimError (collectArgs -> (Prim pInfo, _)) = do
   isErr _ = False
 
 isPrimError _ = return False
+
+-- A multi result primitive assigns its results to multiple result variables
+-- instead of one. Besides producing nicer HDL it works around issues with
+-- synthesis tooling described in:
+--
+--   https://github.com/clash-lang/clash-compiler/issues/1555
+--
+-- This transformation rewrites primitives indicating they can assign their
+-- results to multiple signals, such that netlist can easily render it.
+--
+-- Example:
+--
+-- @
+-- prim :: forall a. a -> (a, a)
+-- @
+--
+-- will be rewritten to:
+--
+-- @
+--   \a0 -> let
+--            r  = prim @t0 a0 r0 r1     -- With 'Clash.Core.Term.MultiPrim'
+--            r0 = multiPrimSelect r0 r
+--            r1 = multiPrimSelect r1 r
+--          in
+--            (x, y)
+-- @
+--
+-- Netlist will not render any @multiPrimSelect@ primitives. Similar to
+-- primitives having a /void/ return type, /r/ is not rendered either.
+--
+-- This transformation is currently hardcoded to recognize tuples as return
+-- types, not any product type. It will error if it sees a multi result primitive
+-- with a non-tuple return type.
+--
+setupMultiResultPrim :: HasCallStack => NormRewrite
+setupMultiResultPrim _ctx e@(Prim pInfo@PrimInfo{primMultiResult=SingleResult}) = do
+  tcm <- Lens.view tcCache
+  prim <- Lens.use (extra . primitives . Lens.at (primName pInfo))
+
+  case prim >>= extractPrim of
+    Just (BlackBoxHaskell{multiResult=True}) ->
+      changed (setupMultiResultPrim' tcm pInfo)
+    Just (BlackBox{multiResult=True}) ->
+      changed (setupMultiResultPrim' tcm pInfo)
+    _ ->
+      return e
+
+setupMultiResultPrim _ e = return e
+
+setupMultiResultPrim' :: HasCallStack => TyConMap -> PrimInfo -> Term
+setupMultiResultPrim' tcm primInfo@PrimInfo{primType} =
+  mkAbstraction letTerm (map Right typeVars <> map Left argIds)
+ where
+  typeVars = Either.lefts pArgs
+
+  internalNm prefix n = mkUnsafeInternalName (prefix <> showt n) n
+  internalId prefix typ n = mkLocalId typ (internalNm prefix n)
+
+  nTermArgs = length (Either.rights pArgs)
+  argIds = zipWith (internalId "a") (Either.rights pArgs) [1..nTermArgs]
+  resIds = zipWith (internalId "r") resTypes [nTermArgs+1..nTermArgs+length resTypes]
+  resId = mkLocalId pResTy (mkUnsafeInternalName "r" (nTermArgs+length resTypes+1))
+
+  (pArgs, pResTy) = splitFunForallTy primType
+  MultiPrimInfo{mpi_resultDc=tupTc, mpi_resultTypes=resTypes} =
+    multiPrimInfo' tcm primInfo
+
+  multiPrimSelect r t = (r, mkTmApps (Prim (multiPrimSelectInfo t)) [Var r, Var resId])
+  multiPrimSelectBinds = zipWith multiPrimSelect  resIds resTypes
+  multiPrimTermArgs = map (Left . Var) (argIds <> resIds)
+  multiPrimTypeArgs = map (Right . VarTy) typeVars
+  multiPrimBind =
+    mkApps
+      (Prim primInfo{primMultiResult=MultiResult})
+      (multiPrimTypeArgs <> multiPrimTermArgs)
+
+  multiPrimSelectInfo t = PrimInfo
+    { primName = "c$multiPrimSelect"
+    , primType = mkPolyFunTy pResTy [Right pResTy, Right t]
+    , primWorkInfo = WorkAlways
+    , primMultiResult = SingleResult }
+
+  letTerm =
+    Letrec
+      ((resId,multiPrimBind):multiPrimSelectBinds)
+      (mkTmApps (mkTyApps (Data tupTc) resTypes) (map Var resIds))
