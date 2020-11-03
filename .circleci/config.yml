@@ -109,7 +109,7 @@ aliases:
 
   - &build_default
     docker:
-      - image: clashlang/clash-ci:2020-10-31
+      - image: clashlang/clash-ci:2020-11-03
     steps:
       - checkout
       - *merge_pullrequest
@@ -122,7 +122,7 @@ aliases:
       - *run_tests
   - &build_with_stack
     docker:
-      - image: clashlang/clash-ci:2020-10-31
+      - image: clashlang/clash-ci:2020-11-03
     steps:
       - checkout
       - *merge_pullrequest
