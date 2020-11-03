@@ -22,7 +22,8 @@ import           Clash.Prelude
 
 type GenMaster n =
      forall dom
-   . KnownDomain dom
+   . ( KnownDomain dom
+     , KnownNat n )
   => Clock dom
   -> Reset dom
   -> [BitVector n]
@@ -32,7 +33,8 @@ type GenMaster n =
 
 type GenSlave n =
      forall dom
-   . KnownDomain dom
+   . ( KnownDomain dom
+     , KnownNat n )
   => Clock dom
   -> Reset dom
   -> [BitVector n]
@@ -90,4 +92,3 @@ slaveLawlessSignal clk rst vals =
     (List.head vals, List.tail (List.cycle vals))
  where
   go (_, xs) _ = (List.head xs, List.tail xs)
-

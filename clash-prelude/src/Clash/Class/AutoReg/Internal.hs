@@ -136,7 +136,7 @@ instance AutoReg Word32
 instance AutoReg Word64
 
 instance AutoReg Bit
-instance AutoReg (BitVector n)
+instance KnownNat n => AutoReg (BitVector n)
 instance AutoReg (Signed n)
 instance AutoReg (Unsigned n)
 instance AutoReg (Index n)

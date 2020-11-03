@@ -1,6 +1,8 @@
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE DeriveAnyClass #-}
 
+{-# OPTIONS_GHC -fplugin=GHC.TypeLits.KnownNat.Solver #-}
+
 module Clash.Tests.NFDataX where
 
 import           Test.Tasty
@@ -172,4 +174,3 @@ tests =
         , testCase "ProductRec" $ case sundef @ProductRec of ProductRec (Rec1 _) (Unit, _) -> () @?= ()
         ]
     ]
-

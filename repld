@@ -20,6 +20,7 @@
 #   * `l`, `lib`, `clash-lib`
 #   * `l:tests`, `lib:tests`, `clash-lib:tests`
 #   * `c`, `cores`, `clash-cores`
+#   * `c:tests`, `cores:tests`, `clash-cores:tests`
 #   * `g`, `ghc`, `clash-ghc`
 #   * `dev`, `clash-dev`
 #
@@ -45,10 +46,13 @@ elif [[ $1 == "l" || $1 == "lib" || $1 == "clash-lib" ]]; then
   watch="clash-prelude clash-lib/clash-lib.cabal"
 elif [[ $1 == "l:tests" || $1 == "lib:tests" || $1 == "clash-lib:tests" ]]; then
   target="cabal new-repl clash-lib:unittests"
-  watch="clash-prelude clash-lib/src clash-lib/clash-lib.cabal clash-cores/clash-cores.cabal"
+  watch="clash-prelude clash-lib/src clash-lib/clash-lib.cabal"
 elif [[ $1 == "c" || $1 == "cores" || $1 == "clash-cores" ]]; then
   target="cabal new-repl clash-cores"
   watch="clash-prelude clash-lib clash-cores/clash-cores.cabal"
+elif [[ $1 == "c:tests" || $1 == "cores:tests" || $1 == "clash-cores:tests" ]]; then
+  target="cabal new-repl clash-cores:unittests"
+  watch="clash-prelude clash-lib clash-cores/src clash-cores/clash-cores.cabal"
 elif [[ $1 == "g" || $1 == "ghc" || $1 == "clash-ghc" ]]; then
   target="cabal new-repl clash-ghc --repl-options=-fobject-code --repl-options=-fforce-recomp"
   watch="clash-prelude clash-lib clash-ghc/clash-ghc.cabal"
@@ -63,6 +67,7 @@ else
   echo "  l:tests, lib:tests, clash-lib:tests"               > /dev/stderr
   echo "  g, ghc, clash-ghc"                                 > /dev/stderr
   echo "  c, cores, clash-cores"                             > /dev/stderr
+  echo "  c:tests, cores:tests, clash-cores:tests"           > /dev/stderr
   echo "  dev, clash-dev"                                    > /dev/stderr
   exit 1;
 fi
