@@ -19,7 +19,7 @@ fi
 
 if [[ "$RUN_HADDOCK" = "yes" ]]; then
   # Check that documentation was generated successfully
-  if [[ "$GHC" = "ghc-8.6.2" ]]; then
+  if [[ "$GHC_VERSION" = "8.6.2" ]]; then
     haddock_pkgs="clash-lib clash-cosim"
   else
     haddock_pkgs="clash-lib clash-cosim clash-prelude"
