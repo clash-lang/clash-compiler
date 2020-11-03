@@ -62,8 +62,13 @@ else
   CABAL_VERSION="3.4.0.0-rc4"
 fi
 
+# GHC files are compressed when building docker image to save space
+cd /root/.ghcup/ghc
+time pixz -d ../${GHC_VERSION}.tpxz
+time tar -xf ../${GHC_VERSION}.tar
 ghcup set ghc ${GHC_VERSION}
 ghcup set cabal ${CABAL_VERSION}
+cd -
 
 cabal --version
 ghc --version

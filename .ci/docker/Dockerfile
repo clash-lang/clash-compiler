@@ -1,6 +1,6 @@
 FROM ubuntu:focal
 
-ENV LANG=C.UTF-8 LC_ALL=C.UTF-8 PATH=/opt/bin:/root/.ghcup/bin:$PATH
+ENV DEBIAN_FRONTEND=noninteractive LANG=C.UTF-8 LC_ALL=C.UTF-8 PATH=/opt/bin:/root/.ghcup/bin:$PATH
 
 ARG DEPS_GHC="curl libc6-dev libgmp-dev pkg-config libnuma-dev"
 ARG DEPS_CABAL="zlib1g-dev"
@@ -18,7 +18,7 @@ RUN apt-get update \
       $DEPS_GHC $DEPS_CABAL \
       $DEPS_GHDL $DEPS_IVERILOG \
       $DEPS_CLASH $DEPS_CLASH_COSIM \
-      ca-certificates iverilog \
+      ca-certificates iverilog pixz \
       git ssh \
  && curl -L 'https://github.com/ghdl/ghdl/archive/v0.37.tar.gz' \
       | tar -xz \
@@ -45,4 +45,11 @@ RUN curl $GHCUP_URL --output $GHCUP_BIN \
  && ghcup install cabal 2.4.1.0 \
  && ghcup install cabal 3.0.0.0 \
  && ghcup install cabal 3.2.0.0 \
- && ghcup install cabal 3.4.0.0-rc4
+ && ghcup install cabal 3.4.0.0-rc4 \
+
+ && cd /root/.ghcup/ghc \
+ && tar --remove-files -Ipixz -cf ../8.4.4.tpxz 8.4.4/* \
+ && tar --remove-files -Ipixz -cf ../8.6.5.tpxz 8.6.5/* \
+ && tar --remove-files -Ipixz -cf ../8.8.4.tpxz 8.8.4/* \
+ && tar --remove-files -Ipixz -cf ../8.10.2.tpxz 8.10.2/* \
+ && tar --remove-files -Ipixz -cf ../9.0.0.20200925.tpxz 9.0.0.20200925/*
