@@ -28,23 +28,24 @@ testReset tbClk tbRst cClk =
   $ stimuliGenerator tbClk tbRst
     ( True
 
-      -- Reset synchronizer introduces a delay of two, but lets asynchronous
-      -- asserts through untouched. This means that for 'topEntity' we'll see
-      -- [R, R, R, R] for these cycles. Where the first two zeroes are caused by
-      -- 'resetSynchronizer's induced latency, the next zero by the first cycle
-      -- not in reset, and the last zero because we're in reset again (async
-      -- behavior).
+      -- Asynchronous resets:
       --
-      -- We should be able to see a difference between asynchronous and synchronous
-      -- resets here: the counter is driven by a register whose synchronicity
-      -- is imposed by the 'KnownDomain' constraint. Synchronous counters will
-      -- only see the reset asserted on the /next/ cycle, hence outputting
-      -- [R, R, R, 0] instead.
+      --   Resets are asserted asynchronously and deasserted synchronously with
+      --   a delay of two cycles. This means that for 'topEntity' we'll see
+      --   [R, R, R, R] for the first batch of reset cycles. The first two Rs
+      --   are caused by  'resetSynchronizer's induced latency, the next zero
+      --   by the first cycle not in reset, and the last zero because we're in
+      --   reset again (async assertion behavior).
+      --
+      --   The second batch of resets is similar to ^, but the reset is held
+      --   a cycle longer so we should be able to see a count output.
+      --
+      -- Synchronous resets:
+      --
+      --   Synchronous resets are simply delayed for two cycles. Hence, we
+      --   should count up to the number of deasserted cycles.
+      --
    :> False :> False :> False :> True
-
-      -- Similar to ^, but now we're out of of reset one cycle longer so we should
-      -- start seeing [R, R, R, 0, R] for asynchronous counters, and
-      -- [R, R, R, 0, 1] for synchronous ones.
    :> False :> False :> False :>  False :> True
    :> replicate d20 False )
 
@@ -75,11 +76,11 @@ polyTestBench ::
   (Signal System Bool, [ResetCount])
 polyTestBench Proxy = (done, sampleN 20 (polyTopEntity cClk cRst))
  where
-  rKind = resetKind @circuitDom
+  rOr' = flip rOr (resetKind @circuitDom)
   expectedOutput = outputVerifier tbClk tbRst
-    ( RRRRRRR :> RRRRRRR :> RRRRRRR :> RRRRRRR :> rOr 0 rKind
-   :> RRRRRRR :> RRRRRRR :> RRRRRRR :> Count 0 :> rOr 1 rKind
-   :> RRRRRRR :> RRRRRRR :> RRRRRRR :> Count 0 :> Count 1 :> Count 2
+    ( RRRRRRR :> RRRRRRR :> RRRRRRR :> RRRRRRR :> rOr' 0
+   :> rOr' 1  :> rOr' 2  :> RRRRRRR :> Count 0 :> rOr' 1
+   :> rOr' 2  :> rOr' 3  :> RRRRRRR :> Count 0 :> Count 1 :> Count 2
    :> Nil )
   done = expectedOutput (polyTopEntity cClk cRst)
   (tbClk, cClk) = biTbClockGen @System @circuitDom (not <$> done)

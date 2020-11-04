@@ -35,6 +35,7 @@ module Clash.Explicit.Reset
   ) where
 
 import           Data.Bits (testBit, shiftL, (.|.))
+import           Data.Type.Equality ((:~:)(Refl))
 import           GHC.Generics (Generic)
 
 import           Clash.Class.BitPack (pack)
@@ -51,7 +52,15 @@ import           Clash.XException (NFDataX, ShowX)
 import           GHC.TypeLits (type (+), KnownNat)
 
 
--- | Normally, asynchronous resets can be both asynchronously asserted and
+-- | The resetSynchronizer will synchronize an incoming reset according to
+-- whether the domain is synchronous or asynchronous.
+--
+-- For asynchronous resets this synchronizer ensures the reset will only
+-- be de-asserted synchronously but it can still be asserted asynchronously.
+-- The reset assert is immediate, but reset de-assertion is delayed by two
+-- cycles.
+
+-- Normally, asynchronous resets can be both asynchronously asserted and
 -- de-asserted. Asynchronous de-assertion can induce meta-stability in the
 -- component which is being reset. To ensure this doesn't happen,
 -- 'resetSynchronizer' ensures that de-assertion of a reset happens
@@ -64,6 +73,10 @@ import           GHC.TypeLits (type (+), KnownNat)
 -- meta-stability in component \"A\". To prevent this from happening you need
 -- to use a proper synchronizer, for example one of the synchronizers in
 -- "Clash.Explicit.Synchronizer".
+--
+-- For synchronous resets this function ensures that the reset is asserted and
+-- de-asserted synchronously. Both the assertion and de-assertion of the reset
+-- are delayed by two cycles.
 --
 -- === __Example 1__
 -- The circuit below detects a rising bit (i.e., a transition from 0 to 1) in a
@@ -107,7 +120,7 @@ import           GHC.TypeLits (type (+), KnownNat)
 -- @
 --
 -- === __Implementation details__
--- 'resetSynchronizer' implements the following circuit:
+-- 'resetSynchronizer' implements the following circuit for asynchronous domains:
 --
 -- @
 --                                   rst
@@ -126,6 +139,20 @@ import           GHC.TypeLits (type (+), KnownNat)
 --
 -- This corresponds to figure 3d at <https://www.embedded.com/asynchronous-reset-synchronization-and-distribution-challenges-and-solutions/>
 --
+-- For synchronous domains two sequential dflipflops are used:
+--
+-- @
+--                  +---------+       +---------+
+--     rst          |         |       |         |
+--   --------------->         +------->         +-------->
+--                  |         |       |         |
+--              +---|>        |   +---|>        |
+--              |   |         |   |   |         |
+--              |   +---------+   |   +---------+
+--      clk     |                 |
+--   -----------------------------+
+-- @
+--
 resetSynchronizer
   :: forall dom
    . KnownDomain dom
@@ -134,11 +161,19 @@ resetSynchronizer
   -> Enable dom
   -- ^ Warning: this argument will be removed in future versions of Clash.
   -> Reset dom
-resetSynchronizer clk rst ena =
-  unsafeToReset (asyncReg (asyncReg (pure (not isActiveHigh))))
+resetSynchronizer clk rst _ = rstOut
  where
   isActiveHigh = case resetPolarity @dom of { SActiveHigh -> True; _ -> False }
-  asyncReg = asyncRegister# clk rst ena isActiveHigh isActiveHigh
+  rstOut =
+    case (resetKind @dom) of
+      SAsynchronous -> unsafeToReset
+                         $ register clk rst enableGen isActiveHigh
+                         $ register clk rst enableGen isActiveHigh
+                         $ pure (not isActiveHigh)
+      SSynchronous  -> unsafeToReset
+                         $ delay clk enableGen isActiveHigh
+                         $ delay clk enableGen isActiveHigh
+                         $ unsafeFromReset rst
 {-# NOINLINE resetSynchronizer #-} -- Give reset synchronizer its own HDL file
 
 data GlitchFilterState = Idle | InReset
@@ -232,8 +267,9 @@ holdReset clk en SNat rst =
   counter :: Signal dom (Index (n+1))
   counter = register clk rst en 0 (satSucc SatBound <$> counter)
 
--- | Convert between different types of reset, adding a synchronizer in case
--- it needs to convert from an asynchronous to a synchronous reset.
+-- | Convert between different types of reset, adding a synchronizer when
+-- the domains are not the same. See 'resetSynchronizer' for further details
+-- about reset synchronization.
 convertReset
   :: forall domA domB
    . ( KnownDomain domA
@@ -243,15 +279,10 @@ convertReset
   -> Clock domB
   -> Reset domA
   -> Reset domB
-convertReset clkA clkB (unsafeToHighPolarity -> rstA0) =
-  unsafeFromHighPolarity rstA2
+convertReset clkA clkB rstA0 = rstA2
  where
-  rstA1 = unsafeSynchronizer clkA clkB rstA0
+  rstA1 = unsafeToReset (unsafeSynchronizer clkA clkB (unsafeFromReset rstA0))
   rstA2 =
-    case (resetKind @domA, resetKind @domB) of
-      (SSynchronous,  SSynchronous)  -> rstA1
-      (SAsynchronous, SAsynchronous) -> rstA1
-      (SSynchronous,  SAsynchronous) -> rstA1
-      (SAsynchronous, SSynchronous) ->
-        delay clkB enableGen True $
-          delay clkB enableGen True rstA1
+    case (sameDomain @domA @domB) of
+      Just Refl -> rstA0
+      Nothing   -> resetSynchronizer clkB rstA1 enableGen

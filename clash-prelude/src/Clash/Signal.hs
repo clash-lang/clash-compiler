@@ -90,6 +90,7 @@ module Clash.Signal
   , BiSignalDefault(..)
     -- * Domain
   , Domain
+  , sameDomain
   , KnownDomain(..)
   , KnownConfiguration
   , ActiveEdge(..)
