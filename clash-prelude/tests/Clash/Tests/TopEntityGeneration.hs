@@ -334,4 +334,3 @@ tests =
     ]
  where
   failed = Nothing :: Maybe TopEntity
-

@@ -388,8 +388,8 @@ instance KnownNat n => Show (BitVector n) where
 instance KnownNat n => ShowX (BitVector n) where
   showsPrecX = showsPrecXWith showsPrec
 
-instance NFDataX (BitVector n) where
-  deepErrorX = errorX
+instance KnownNat n => NFDataX (BitVector n) where
+  deepErrorX _ = undefined#
   rnfX = rwhnfX
   hasUndefined bv = isLeft (isX bv) || unsafeMask bv /= 0
 

@@ -72,6 +72,7 @@ module Clash.Explicit.Prelude
   , dumpVCD
     -- * Exported modules
     -- ** Synchronous signals
+  , module Clash.Explicit.Reset
   , module Clash.Explicit.Signal
   , module Clash.Explicit.Signal.Delayed
     -- ** Datatypes
@@ -151,6 +152,7 @@ import Clash.Explicit.RAM
 import Clash.Explicit.ROM
 import Clash.Explicit.ROM.File
 import Clash.Explicit.Prelude.Safe
+import Clash.Explicit.Reset
 import Clash.Explicit.Signal
 import Clash.Explicit.Signal.Delayed
 import Clash.Explicit.Testbench
