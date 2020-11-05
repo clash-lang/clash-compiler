@@ -1,3 +1,8 @@
+{-|
+  Copyright  :  (C) 2020, QBayLogic B.V.
+  License    :  BSD2 (see the file LICENSE)
+  Maintainer :  QBayLogic B.V. <devops@qbaylogic.com
+-}
 {-# LANGUAGE OverloadedStrings #-}
 
 module Clash.Netlist.Id.SystemVerilog where

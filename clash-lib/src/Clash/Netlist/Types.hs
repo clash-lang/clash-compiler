@@ -46,13 +46,16 @@ import qualified Control.Monad.State.Strict as Strict
   (State, MonadIO, MonadState, StateT)
 import Data.Bits                            (testBit)
 import Data.Binary                          (Binary(..))
-import Data.Hashable                        (Hashable)
+import Data.Function                        (on)
+import Data.Hashable                        (Hashable(hash,hashWithSalt))
 import Data.HashMap.Strict                  (HashMap)
 import Data.HashSet                         (HashSet)
+import qualified Data.List                  as List
 import Data.IntMap                          (IntMap, empty)
 import Data.Maybe                           (mapMaybe)
 import qualified Data.Set                   as Set
 import Data.Text                            (Text)
+
 import Data.Typeable                        (Typeable)
 import Data.Text.Prettyprint.Doc.Extra      (Doc)
 import Data.Semigroup.Monad                 (Mon(..))
@@ -225,6 +228,28 @@ data Identifier
     , i_hdl :: !HDL
     -- ^ HDL this identifier is generated for.
     } deriving (Show, Generic, NFData)
+
+identifierKey# :: Identifier -> ((Text, Bool), [Word])
+identifierKey# (RawIdentifier t _id) = ((t, True), [])
+identifierKey# id_ = ((i_baseNameCaseFold id_, False), i_extensionsRev id_)
+
+instance Hashable Identifier where
+  hashWithSalt salt = hashWithSalt salt . hash
+  hash = uncurry hash# . identifierKey#
+   where
+    hash# a extensions =
+      -- 'hash' has an identity around zero, e.g. `hash (0, 2) == 2`. Because a
+      -- lot of zeros can be expected, extensions are fuzzed in order to keep
+      -- efficient `HashMap`s.
+      let fuzz fuzzFactor ext = fuzzFactor * fuzzFactor * ext in
+      hash (a, List.foldl' fuzz 2 extensions)
+
+instance Eq Identifier where
+  i1 == i2 = identifierKey# i1 == identifierKey# i2
+  i1 /= i2 = identifierKey# i1 /= identifierKey# i2
+
+instance Ord Identifier where
+  compare = compare `on` identifierKey#
 
 -- | Environment of the NetlistMonad
 data NetlistEnv

@@ -235,6 +235,7 @@ Library
                       Clash.Netlist.BlackBox.Util
                       Clash.Netlist.Id
                       Clash.Netlist.Id.Common
+                      Clash.Netlist.Id.Internal
                       Clash.Netlist.Id.SystemVerilog
                       Clash.Netlist.Id.Verilog
                       Clash.Netlist.Id.VHDL
@@ -339,4 +340,3 @@ test-suite unittests
 
   if flag(experimental-evaluator)
     cpp-options:      -DEXPERIMENTAL_EVALUATOR
-

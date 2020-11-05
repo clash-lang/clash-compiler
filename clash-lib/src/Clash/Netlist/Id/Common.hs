@@ -1,3 +1,8 @@
+{-|
+  Copyright  :  (C) 2020, QBayLogic B.V.
+  License    :  BSD2 (see the file LICENSE)
+  Maintainer :  QBayLogic B.V. <devops@qbaylogic.com
+-}
 {-# LANGUAGE OverloadedStrings #-}
 
 module Clash.Netlist.Id.Common where
@@ -101,4 +106,3 @@ parseTuple t0 = do
   t4 <- parseMaybeSingle (=='#') t3
   t5 <- parseSingle (==')') t4
   pure (n+1, t5)
-
