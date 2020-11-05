@@ -60,6 +60,8 @@ import {-# SOURCE #-} Clash.Netlist.Types
   (HasIdentifierSet(..), IdentifierSet(..), Identifier(..), IdentifierType(..),
    IdentifierSetMonad(identifierSetM))
 import qualified Data.HashSet as HashSet
+import qualified Data.HashMap.Strict as HashMap
+import qualified Data.IntMap.Strict as IntMap
 import qualified Data.List as List
 import           Data.Text (Text)
 import qualified Data.Text.Lazy as LT
@@ -82,11 +84,14 @@ emptyIdentifierSet esc lw hdl = makeSet esc lw hdl []
 -- | Union of two identifier sets. Errors if given sets have been made with
 -- different options enabled.
 union :: HasCallStack => IdentifierSet -> IdentifierSet -> IdentifierSet
-union is1@(IdentifierSet esc1 lw1 hdl1 _ _) is2@(IdentifierSet esc2 lw2 hdl2 _ _)
-  | esc1 /= esc2 = error $ "Internal error: esc1 /= esc2, " <> show (esc1, esc2)
-  | hdl1 /= hdl2 = error $ "Internal error: hdl1 /= hdl2, " <> show (hdl1, hdl2)
-  | lw1 /= lw2 = error $ "Internal error: lw1 /= lw2 , " <> show (lw1, lw2)
-  | otherwise = makeSet esc1 lw1 hdl1 (toList is1 ++ toList is2)
+union (IdentifierSet escL lwL hdlL freshL idsL) (IdentifierSet escR lwR hdlR freshR idsR)
+  | escL /= escR = error $ "Internal error: escL /= escR, " <> show (escL, escR)
+  | hdlL /= hdlR = error $ "Internal error: hdlL /= hdlR, " <> show (hdlL, hdlR)
+  | lwL /= lwR = error $ "Internal error: lwL /= lwR , " <> show (lwL, lwR)
+  | otherwise = IdentifierSet escR lwR hdlR fresh ids
+ where
+  fresh = HashMap.unionWith (IntMap.unionWith max) freshL freshR
+  ids = HashSet.union idsL idsR
 
 -- | Make a identifier set filled with given identifiers
 makeSet
