@@ -107,7 +107,7 @@ import           Clash.Netlist.BlackBox.Parser    (runParse)
 import           Clash.Netlist.BlackBox.Types     (BlackBoxTemplate, BlackBoxFunction)
 import qualified Clash.Netlist.Id                 as Id
 import           Clash.Netlist.Types
-  (BlackBox (..), Component (..), FilteredHWType, HWMap, SomeBackend (..),
+  (IdentifierText, BlackBox (..), Component (..), FilteredHWType, HWMap, SomeBackend (..),
    TopEntityT(..), TemplateFunction, findClocks)
 import           Clash.Normalize                  (checkNonRecursive, cleanupGraph,
                                                    normalize, runNormalization)
@@ -759,7 +759,7 @@ createHDL
   :: Backend backend
   => backend
   -- ^ Backend
-  -> Data.Text.Text
+  -> IdentifierText
   -- ^ Module hierarchy root
   -> Id.IdentifierSet
   -- ^ Component names
@@ -769,7 +769,7 @@ createHDL
   -- ^ Known domains to configurations
   -> Maybe Component
   -- ^ Top component
-  -> (Data.Text.Text, Either Manifest Manifest)
+  -> (IdentifierText, Either Manifest Manifest)
   -- ^ Name of the manifest file
   -- + Either:
   --   * Left manifest:  Only write/update the hashes of the @manifest@

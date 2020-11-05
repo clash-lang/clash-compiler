@@ -1248,13 +1248,13 @@ toSLV t e = case t of
   RTree _ _ -> braces (verilogTypeMark t <> "_to_lv" <> parens (expr_ False e))
   _ -> expr_ False e
 
-fromSLV :: HWType -> TextS.Text -> Int -> Int -> SystemVerilogM Doc
+fromSLV :: HWType -> IdentifierText -> Int -> Int -> SystemVerilogM Doc
 fromSLV t@(Vector _ _) id_ start end = verilogTypeMark t <> "_from_lv" <> parens (pretty id_ <> brackets (int start <> colon <> int end))
 fromSLV t@(RTree _ _) id_ start end = verilogTypeMark t <> "_from_lv" <> parens (pretty id_ <> brackets (int start <> colon <> int end))
 fromSLV (Signed _) id_ start end = "$signed" <> parens (pretty id_ <> brackets (int start <> colon <> int end))
 fromSLV _ id_ start end = pretty id_ <> brackets (int start <> colon <> int end)
 
-simpleFromSLV :: HWType -> TextS.Text -> SystemVerilogM Doc
+simpleFromSLV :: HWType -> IdentifierText -> SystemVerilogM Doc
 simpleFromSLV t@(Vector _ _) id_ = verilogTypeMark t <> "_from_lv" <> parens (pretty id_)
 simpleFromSLV t@(RTree _ _) id_ = verilogTypeMark t <> "_from_lv" <> parens (pretty id_)
 simpleFromSLV (Signed _) id_ = "$signed" <> parens (pretty id_)

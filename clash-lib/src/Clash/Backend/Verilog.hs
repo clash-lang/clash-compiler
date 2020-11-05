@@ -485,7 +485,7 @@ inst_ (CondAssignment id_ _ scrut scrutTy es) = fmap Just $
               "endcase") <> line <>
     "end"
   where
-    conds :: TextS.Text -> [(Maybe Literal,Expr)] -> VerilogM [Doc]
+    conds :: IdentifierText -> [(Maybe Literal,Expr)] -> VerilogM [Doc]
     conds _ []                = return []
     conds i [(_,e)]           = ("default" <+> colon <+> stringS i <+> equals <+> expr_ False e) <:> return []
     conds i ((Nothing,e):_)   = ("default" <+> colon <+> stringS i <+> equals <+> expr_ False e) <:> return []

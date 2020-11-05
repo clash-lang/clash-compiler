@@ -373,6 +373,8 @@ data FilteredHWType =
   FilteredHWType HWType [[(IsVoid, FilteredHWType)]]
     deriving (Eq, Show)
 
+type DomainName = Text
+
 -- | Representable hardware types
 data HWType
   = Void (Maybe HWType)
@@ -406,12 +408,12 @@ data HWType
   -- populated when using records.
   | SP !Text [(Text, [HWType])]
   -- ^ Sum-of-Product type: Name and Constructor names + field types
-  | Clock !Text
-  -- ^ Clock type corresponding to domain /Identifier/
-  | Reset !Text
-  -- ^ Reset type corresponding to domain /Identifier/
-  | Enable !Text
-  -- ^ Enable type corresponding to domain /Identifier/
+  | Clock !DomainName
+  -- ^ Clock type corresponding to domain /DomainName/
+  | Reset !DomainName
+  -- ^ Reset type corresponding to domain /DomainName/
+  | Enable !DomainName
+  -- ^ Enable type corresponding to domain /DomainName/
   | BiDirectional !PortDirection !HWType
   -- ^ Tagging type indicating a bidirectional (inout) port
   | CustomSP !Text !DataRepr' !Size [(ConstrRepr', Text, [HWType])]
@@ -425,7 +427,7 @@ data HWType
   -- info, see: Clash.Annotations.BitRepresentations.
   | Annotated [Attr'] !HWType
   -- ^ Annotated with HDL attributes
-  | KnownDomain !Text !Integer !ActiveEdge !ResetKind !InitBehavior !ResetPolarity
+  | KnownDomain !DomainName !Integer !ActiveEdge !ResetKind !InitBehavior !ResetPolarity
   -- ^ Domain name, period, active edge, reset kind, initial value behavior
   | FileType
   -- ^ File type for simulation-level I/O
@@ -473,11 +475,11 @@ data Declaration
 
   -- | Signal declaration
   | NetDecl'
-      (Maybe Comment)            -- FIELD Note; will be inserted as a comment in target hdl
-      WireOrReg                  -- FIELD Wire or register
-      !Identifier                -- FIELD Name of signal
-      (Either Text HWType)       -- FIELD Pointer to type of signal or type of signal
-      (Maybe Expr)               -- FIELD Initial value
+      (Maybe Comment)                -- FIELD Note; will be inserted as a comment in target hdl
+      WireOrReg                      -- FIELD Wire or register
+      !Identifier                    -- FIELD Name of signal
+      (Either IdentifierText HWType) -- FIELD Pointer to type of signal or type of signal
+      (Maybe Expr)                   -- FIELD Initial value
       -- ^ Signal declaration
   | TickDecl Comment
   -- ^ HDL tick corresponding to a Core tick
@@ -618,14 +620,14 @@ data BlackBoxContext
   --   , Whether the result should be /reg/ or a /wire/ (Verilog only)
   --   , Partial Blackbox Context
   --   )
-  , bbQsysIncName :: [Text]
+  , bbQsysIncName :: [IdentifierText]
   , bbLevel :: Int
   -- ^ The scoping level this context is associated with, ensures that
   -- @~ARGN[k][n]@ holes are only filled with values from this context if @k@
   -- is equal to the scoping level of this context.
   , bbCompName :: Identifier
   -- ^ The component the BlackBox is instantiated in
-  , bbCtxName :: Maybe Text
+  , bbCtxName :: Maybe IdentifierText
   -- ^ The "context name", name set by `Clash.Magic.setName`, defaults to the
   -- name of the closest binder
   }

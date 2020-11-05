@@ -215,11 +215,11 @@ isBV _ = False
 -- ["unsigned6_0", "unsigned6_1", "bit", "boolean"]
 productFieldNames
   :: HasCallStack
-  => Maybe [TextS.Text]
+  => Maybe [IdentifierText]
   -- ^ Label hints. From user records, for example.
   -> [HWType]
   -- ^ Field types
-  -> VHDLM [TextS.Text]
+  -> VHDLM [IdentifierText]
 productFieldNames labels0 fields = do
   let labels1 = sequence labels0 ++ repeat Nothing
   hFields <- zipWithM hName labels1 fields
@@ -231,17 +231,17 @@ productFieldNames labels0 fields = do
   return names
  where
   hName
-    :: Maybe TextS.Text
+    :: Maybe IdentifierText
     -> HWType
-    -> VHDLM TextS.Text
+    -> VHDLM IdentifierText
   hName Nothing field = tyName' False field
   hName (Just label) _field = Id.toText <$> Id.makeBasic label
 
   name'
-    :: HashMap TextS.Text Int
-    -> HashMap TextS.Text Int
-    -> TextS.Text
-    -> (HashMap TextS.Text Int, TextS.Text)
+    :: HashMap IdentifierText Int
+    -> HashMap IdentifierText Int
+    -> IdentifierText
+    -> (HashMap IdentifierText Int, IdentifierText)
   name' counted countMap fieldName
     | counted HashMapS.! fieldName > 1 =
         -- Seen this fieldname more than once, so we need to add a number
@@ -258,7 +258,7 @@ productFieldNames labels0 fields = do
 
 productFieldName
   :: HasCallStack
-  => Maybe [TextS.Text]
+  => Maybe [IdentifierText]
   -- ^ Label hints. From user records, for example.
   -> [HWType]
   -- ^ Field types
@@ -275,7 +275,7 @@ productFieldName labels fields fieldIndex = do
 
 selectProductField
   :: HasCallStack
-  => Maybe [TextS.Text]
+  => Maybe [IdentifierText]
   -- ^ Label hints. From user records, for example.
   -> [HWType]
   -- ^ Field types
@@ -319,7 +319,7 @@ genVHDL nm sp seen c = do
        pure arch)
 
 -- | Generate a VHDL package containing type definitions for the given HWTypes
-mkTyPackage_ :: TextS.Text -> [HWType] -> VHDLM [(String,Doc)]
+mkTyPackage_ :: ModName -> [HWType] -> VHDLM [(String,Doc)]
 mkTyPackage_ modName (map filterTransparent -> hwtys) = do
     { syn <- Mon hdlSyn
     ; let usedTys     = concatMap mkUsedTys hwtys
@@ -730,7 +730,7 @@ funDec syn t@(RTree _ elTy) = Just
 
 funDec _ _ = Nothing
 
-tyImports :: TextS.Text -> VHDLM Doc
+tyImports :: ModName -> VHDLM Doc
 tyImports nm = do
   libs <- Mon $ use libraries
   packs <- Mon $ use packages
@@ -1140,13 +1140,13 @@ filterTransparent hwty = case hwty of
 
 -- | Create a unique type name for user defined types
 userTyName
-  :: TextS.Text
+  :: IdentifierText
   -- ^ Default name
-  -> TextS.Text
+  -> IdentifierText
   -- ^ Identifier stored in @hwTy@
   -> HWType
   -- ^ Type to give a (unique) name
-  -> StateT VHDLState Identity TextS.Text
+  -> StateT VHDLState Identity IdentifierText
 userTyName dflt nm0 hwTy = do
   tyCache %= HashSet.insert hwTy
   Id.toText <$> Id.makeBasicOr (last (TextS.splitOn "." nm0)) dflt

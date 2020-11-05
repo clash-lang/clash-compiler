@@ -1582,7 +1582,7 @@ throwAnnotatedSplitError loc typ = do
 mkTopOutput
   :: Maybe Identifier
   -- ^ (maybe) Name of the _TopEntity_
-  -> [(Identifier, Text)]
+  -> [(Identifier, IdentifierText)]
   -- ^ /Rendered/ output port names and types
   -> Maybe PortName
   -- ^ (maybe) The @PortName@ of a _TopEntity_ annotation for this output
@@ -1604,7 +1604,7 @@ mkTopOutput'
   :: HasCallStack
   => Maybe Identifier
   -- ^ (maybe) Name of the _TopEntity_
-  -> [(Identifier, Text)]
+  -> [(Identifier, IdentifierText)]
   -- ^ /Rendered/ output port names and types
   -> Maybe PortName
   -- ^ (maybe) The @PortName@ of a _TopEntity_ annotation for this output
@@ -1622,7 +1622,7 @@ mkTopOutput' topM outps pM = case pM of
     -- No @PortName@
     go
       :: HasCallStack
-      => [(Identifier, Text)]
+      => [(Identifier, IdentifierText)]
       -> (Identifier, HWType)
       -> NetlistMonad ( [(Identifier, Text)]
                       , ( [(Identifier,Identifier,HWType)]
@@ -1674,9 +1674,9 @@ mkTopOutput' topM outps pM = case pM of
     -- With a @PortName@
     go'
       :: PortName
-      -> [(Identifier, Text)]
+      -> [(Identifier, IdentifierText)]
       -> (Identifier, HWType)
-      -> NetlistMonad ( [(Identifier, Text)]
+      -> NetlistMonad ( [(Identifier, IdentifierText)]
                       , ( [(Identifier,Identifier,HWType)]
                         , [Declaration]
                         , Either Identifier (Identifier,HWType)
