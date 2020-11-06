@@ -1,0 +1,1 @@
+CHANGED: generateBindings now sets all topentities as NOINLINE [#1568](https://github.com/clash-lang/clash-compiler/issues/1568)

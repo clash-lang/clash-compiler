@@ -465,6 +465,7 @@ runClashTest = defaultMain $ clashTestRoot
         , runTest "T1477" def{hdlSim=False}
         , runTest "T1506A" def{hdlSim=False, clashFlags=["-fclash-aggressive-x-optimization-blackboxes"]}
         , outputTest ("tests" </> "shouldwork" </> "Issues") allTargets ["-fclash-aggressive-x-optimization-blackboxes"] ["-itests/shouldwork/Issues"] "T1506B" "main"
+        , clashLibTest ("tests" </> "shouldwork" </> "Issues") allTargets [] "T1568" "main"
         ]
       , clashTestGroup "Naming"
         [ runTest "T967a" def{hdlSim=False}
