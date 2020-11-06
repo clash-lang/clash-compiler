@@ -9,6 +9,7 @@
 module Clash.Netlist.Types where
 
 import Control.Lens (Lens')
+import Data.Hashable
 
 data IdentifierType
 data Identifier
@@ -27,3 +28,5 @@ class HasIdentifierSet s where
 
 type role NetlistMonad nominal
 data NetlistMonad a
+data PreserveCase = PreserveCase | ToLower
+instance Hashable PreserveCase

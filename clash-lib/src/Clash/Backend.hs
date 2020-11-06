@@ -63,7 +63,7 @@ class HasIdentifierSet state => Backend state where
     :: Int
     -> HdlSyn
     -> Bool
-    -> Bool
+    -> PreserveCase
     -> Maybe (Maybe Int)
     -> AggressiveXOptBB
     -> state

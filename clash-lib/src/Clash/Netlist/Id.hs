@@ -57,8 +57,8 @@ where
 import           Clash.Annotations.Primitive (HDL (..))
 import           Clash.Core.Var (Id)
 import {-# SOURCE #-} Clash.Netlist.Types
-  (HasIdentifierSet(..), IdentifierSet(..), Identifier(..), IdentifierType(..),
-   IdentifierSetMonad(identifierSetM))
+  (PreserveCase(..), HasIdentifierSet(..), IdentifierSet(..), Identifier(..),
+   IdentifierType(..), IdentifierSetMonad(identifierSetM))
 import qualified Data.HashSet as HashSet
 import qualified Data.HashMap.Strict as HashMap
 import qualified Data.IntMap.Strict as IntMap
@@ -74,12 +74,12 @@ import           Clash.Netlist.Id.Internal
 emptyIdentifierSet
   :: Bool
   -- ^ Allow escaped identifiers?
-  -> Bool
+  -> PreserveCase
   -- ^ Should all basic identifiers be lower case?
   -> HDL
   -- ^ HDL to generate names for
   -> IdentifierSet
-emptyIdentifierSet esc lw hdl = makeSet esc lw hdl []
+emptyIdentifierSet esc lw hdl = makeSet esc lw hdl mempty
 
 -- | Union of two identifier sets. Errors if given sets have been made with
 -- different options enabled.
@@ -97,17 +97,16 @@ union (IdentifierSet escL lwL hdlL freshL idsL) (IdentifierSet escR lwR hdlR fre
 makeSet
   :: Bool
   -- ^ Allow escaped identifiers?
-  -> Bool
+  -> PreserveCase
   -- ^ Should all basic identifiers be lower case?
   -> HDL
   -- ^ HDL to generate names for
-  -> [Identifier]
+  -> HashSet.HashSet Identifier
   -- ^ Identifiers to add to set
   -> IdentifierSet
-makeSet esc lw hdl ids = IdentifierSet esc lw hdl fresh store
+makeSet esc lw hdl ids = IdentifierSet esc lw hdl fresh ids
  where
   fresh = List.foldl' updateFreshCache# mempty ids
-  store = HashSet.fromList ids
 
 toList :: IdentifierSet -> [Identifier]
 toList (IdentifierSet _ _ _ _ idStore) = HashSet.toList idStore

@@ -82,7 +82,7 @@ type family TargetToState (target :: HDL) where
 mkBackend
   :: (Backend (TargetToState target))
   => SBuildTarget target -> TargetToState target
-mkBackend _ = initBackend WORD_SIZE_IN_BITS Other True False Nothing (AggressiveXOptBB False)
+mkBackend _ = initBackend WORD_SIZE_IN_BITS Other True PreserveCase Nothing (AggressiveXOptBB False)
 
 runToNetlistStage
   :: (Backend (TargetToState target))
@@ -98,7 +98,7 @@ runToNetlistStage target f src = do
   (bm, tcm, tupTcm, tes, pm, rs, _)
     <- generateBindings Auto pds (opt_importPaths opts) [] (hdlKind backend) src Nothing
 
-  let (compNames, initIs) = genTopNames Nothing True False hdl tes
+  let (compNames, initIs) = genTopNames Nothing True PreserveCase hdl tes
       teNames = fmap topId tes
       te      = topId (P.head tes)
       reprs   = buildCustomReprs rs

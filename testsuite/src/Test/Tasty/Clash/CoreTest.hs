@@ -27,6 +27,7 @@ import Clash.Core.Var
 import Clash.Core.VarEnv
 import Clash.Driver.Types
 import Clash.Netlist.BlackBox.Types (HdlSyn(Other))
+import Clash.Netlist.Types (PreserveCase(..))
 
 import Clash.GHC.GenerateBindings
 import Clash.GHC.PartialEval
@@ -51,7 +52,7 @@ mkBackend
   :: (Backend (TargetToState target))
   => SBuildTarget target
   -> TargetToState target
-mkBackend _ = initBackend WORD_SIZE_IN_BITS Other True False Nothing (AggressiveXOptBB False)
+mkBackend _ = initBackend WORD_SIZE_IN_BITS Other True PreserveCase Nothing (AggressiveXOptBB False)
 
 -- Run clash as far as having access to core for all bindings. This is used
 -- to test operations on core, such as transformations and evaluation.

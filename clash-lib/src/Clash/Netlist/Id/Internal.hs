@@ -10,7 +10,8 @@ import           Clash.Annotations.Primitive (HDL (..))
 import           Clash.Core.Name (Name(nameOcc))
 import           Clash.Core.Var (Id, varName)
 import {-# SOURCE #-} Clash.Netlist.Types
-  (IdentifierSet(..), Identifier(..), FreshCache, IdentifierType(..))
+  (PreserveCase(..), IdentifierSet(..), Identifier(..), FreshCache,
+   IdentifierType(..))
 import           Control.Arrow (second)
 import qualified Data.Char as Char
 import qualified Data.List as List
@@ -212,14 +213,14 @@ make## hdl =
           in
             UniqueIdentifier baseName baseNameCaseFold extensions idType hdl
 
-toBasicId# :: HDL -> Bool -> Text -> Text
+toBasicId# :: HDL -> PreserveCase -> Text -> Text
 toBasicId# hdl lw id0 =
   case hdl of
     VHDL -> VHDL.toBasic id1
     Verilog -> Verilog.toBasic id1
     SystemVerilog -> SystemVerilog.toBasic id1
  where
-  id1 = if lw then Text.toLower id0 else id0
+  id1 = case lw of {PreserveCase -> id0; ToLower -> Text.toLower id0}
 
 -- | Convert a Clash Core Id to an identifier. Makes sure returned identifier
 -- is unique.

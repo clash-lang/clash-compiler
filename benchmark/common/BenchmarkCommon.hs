@@ -24,7 +24,8 @@ import Clash.GHC.Evaluator
 import Clash.GHC.GenerateBindings
 import Clash.GHC.NetlistTypes
 import Clash.Netlist.BlackBox.Types (HdlSyn(Other))
-import Clash.Netlist.Types          (HWMap, FilteredHWType, TopEntityT, topId)
+import Clash.Netlist.Types
+  (PreserveCase(..), HWMap, FilteredHWType, TopEntityT, topId)
 import Clash.Primitives.Types
 
 import Util (OverridingBool(..))
@@ -62,7 +63,7 @@ hdl :: HDL
 hdl = VHDL
 
 backend :: VHDLState
-backend = initBackend WORD_SIZE_IN_BITS HDLSYN True False Nothing (AggressiveXOptBB False)
+backend = initBackend WORD_SIZE_IN_BITS HDLSYN True PreserveCase Nothing (AggressiveXOptBB False)
 
 runInputStage
   :: [FilePath]

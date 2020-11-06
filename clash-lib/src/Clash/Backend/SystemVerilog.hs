@@ -19,7 +19,7 @@ module Clash.Backend.SystemVerilog (SystemVerilogState) where
 import qualified Control.Applicative                  as A
 import           Control.Lens                         hiding (Indexed)
 import           Control.Monad                        (forM,liftM,zipWithM)
-import           Control.Monad.State                  (State, StateT)
+import           Control.Monad.State                  (State)
 import           Data.Bits                            (Bits, testBit)
 import           Data.HashMap.Lazy                    (HashMap)
 import qualified Data.HashMap.Lazy                    as HashMap
@@ -179,13 +179,12 @@ genSystemVerilog
   -> Component
   -> SystemVerilogM ((String, Doc), [(String, Doc)])
 genSystemVerilog _ sp seen c = do
-    -- Don't have type names conflict with module names
-    Mon $ idSeen .= seen
-
-    -- Don't have type names conflict with type names generated in previous
-    -- genVHDL
-    typNames <- HashMap.elems <$> use nameCache
-    mapM_ (Id.addRaw . Id.toText) typNames
+    -- Don't have type names conflict with module names or with previously
+    -- generated type names.
+    --
+    -- TODO: Collect all type names up front, to prevent relatively costly union.
+    -- TODO: Investigate whether type names / signal names collide in the first place
+    Mon $ idSeen %= Id.union seen
 
     Mon $ setSrcSpan sp
     v    <- verilog
@@ -593,7 +592,7 @@ tyName t@(Product nm _ _)      = do
   tN <- normaliseType t
   PP.pretty =<< Mon (makeCached tN nameCache prodName)
  where
-  prodName :: StateT SystemVerilogState Identity Identifier
+  prodName :: State SystemVerilogState Identifier
   prodName = Id.makeBasicOr (last (TextS.splitOn "." nm)) "product"
 
 tyName t@(SP _ _) = "logic_vector_" <> int (typeSize t)

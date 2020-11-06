@@ -43,7 +43,7 @@ benchFile idirs src = do
       topEntityS = Text.unpack (nameOcc (varName topEntity))
       modName    = takeWhile (/= '.') topEntityS
       hdlState'  = setModName (Text.pack modName) backend
-      (compNames, seen) = genTopNames Nothing True False hdl topEntities
+      (compNames, seen) = genTopNames Nothing True PreserveCase hdl topEntities
       topEntityMap = mkVarEnv (zip (map topId topEntities) topEntities)
       prefixM    = Nothing
       ite        = ifThenElseExpr hdlState'

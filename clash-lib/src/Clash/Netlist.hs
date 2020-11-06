@@ -218,7 +218,7 @@ genTopNames
   -- ^ Prefix
   -> Bool
   -- ^ Allow escaped identifiers?
-  -> Bool
+  -> PreserveCase
   -- ^ Lower case basic ids?
   -> HDL
   -- ^ HDL to generate identifiers for

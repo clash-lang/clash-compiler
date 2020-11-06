@@ -293,13 +293,12 @@ genVHDL
   -> Component
   -> VHDLM ((String, Doc), [(String, Doc)])
 genVHDL nm sp seen c = do
-    -- Don't have type names conflict with component names
-    Mon $ idSeen .= seen
-
-    -- Don't have type names conflict with type names generated in previous
-    -- genVHDL
-    typNames <- use nameCache
-    mapM_ Id.addRaw (HashMapS.elems typNames)
+    -- Don't have type names conflict with module names or with previously
+    -- generated type names.
+    --
+    -- TODO: Collect all type names up front, to prevent relatively costly union.
+    -- TODO: Investigate whether type names / signal names collide in the first place
+    Mon $ idSeen %= Id.union seen
 
     Mon $ setSrcSpan sp
     v <- vhdl

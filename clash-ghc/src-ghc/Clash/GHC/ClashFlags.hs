@@ -29,6 +29,7 @@ import           Text.Read                      (readMaybe)
 
 import           Clash.Driver.Types
 import           Clash.Netlist.BlackBox.Types   (HdlSyn (..))
+import           Clash.Netlist.Types            (PreserveCase (ToLower))
 
 parseClashFlags :: IORef ClashOpts -> [Located String]
                 -> IO ([Located String]
@@ -227,7 +228,7 @@ setNoEscapedIds :: IORef ClashOpts -> IO ()
 setNoEscapedIds r = modifyIORef r (\c -> c {opt_escapedIds = False})
 
 setLowerCaseBasicIds :: IORef ClashOpts -> IO ()
-setLowerCaseBasicIds r = modifyIORef r (\c -> c {opt_lowerCaseBasicIds = True})
+setLowerCaseBasicIds r = modifyIORef r (\c -> c {opt_lowerCaseBasicIds = ToLower})
 
 setUltra :: IORef ClashOpts -> IO ()
 setUltra r = modifyIORef r (\c -> c {opt_ultra = True})

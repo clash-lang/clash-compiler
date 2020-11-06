@@ -133,6 +133,13 @@ type FreshCache = HashMap Text (IntMap Word)
 
 type IdentifierText = Text
 
+-- | Whether to preserve casing in ids or converted everything to
+--  lowercase. Influenced by '-fclash-lower-case-basic-identifiers'
+data PreserveCase
+  = PreserveCase
+  | ToLower
+  deriving (Show, Generic, NFData, Eq, Binary, Hashable)
+
 -- See: http://vhdl.renerta.com/mobile/source/vhd00037.htm
 --      http://www.verilog.renerta.com/source/vrg00018.htm
 data IdentifierType
@@ -153,7 +160,7 @@ data IdentifierSet
       is_allowEscaped :: !Bool
       -- ^ Allow escaped ids? If set to False, "make" will always behave like
       -- "makeBasic".
-    , is_lowerCaseBasicIds :: !Bool
+    , is_lowerCaseBasicIds :: !PreserveCase
       -- ^ Force all generated basic identifiers to lowercase.
     , is_hdl :: !HDL
       -- ^ HDL to generate fresh identifiers for

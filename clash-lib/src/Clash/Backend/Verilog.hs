@@ -187,13 +187,12 @@ genVerilog
   -> Component
   -> VerilogM ((String, Doc), [(String, Doc)])
 genVerilog sp seen c = do
-  -- Don't have type names conflict with component names
-    Mon $ idSeen .= seen
-
-    -- Don't have type names conflict with type names generated in previous
-    -- genVHDL
-    constrNames <- HashMap.elems <$> use customConstrs
-    mapM_ (Id.addRaw . Id.toText) constrNames
+    -- Don't have type names conflict with module names or with previously
+    -- generated type names.
+    --
+    -- TODO: Collect all type names up front, to prevent relatively costly union.
+    -- TODO: Investigate whether type names / signal names collide in the first place
+    Mon $ idSeen %= Id.union seen
 
     Mon (setSrcSpan sp)
     v    <- commentHeader <> line <> timescale <> line <> module_ c

@@ -39,6 +39,7 @@ import           Clash.Core.Term                (Term)
 import           Clash.Core.Var                 (Id)
 import           Clash.Core.VarEnv              (VarEnv)
 import           Clash.Netlist.BlackBox.Types   (HdlSyn (..))
+import {-# SOURCE #-} Clash.Netlist.Types       (PreserveCase(..))
 
 data IsPrim
   = IsPrim
@@ -173,7 +174,7 @@ data ClashOpts = ClashOpts
   --
   --  * http://vhdl.renerta.com/mobile/source/vhd00037.htm
   --  * http://verilog.renerta.com/source/vrg00018.htm
-  , opt_lowerCaseBasicIds :: Bool
+  , opt_lowerCaseBasicIds :: PreserveCase
   -- ^ Force all generated basic identifiers to lowercase. Among others, this
   -- affects module and file names.
   , opt_ultra :: Bool
@@ -274,7 +275,7 @@ defClashOpts
   , opt_componentPrefix     = Nothing
   , opt_newInlineStrat      = True
   , opt_escapedIds          = True
-  , opt_lowerCaseBasicIds   = False
+  , opt_lowerCaseBasicIds   = PreserveCase
   , opt_ultra               = False
   , opt_forceUndefined      = Nothing
   , opt_checkIDir           = True
