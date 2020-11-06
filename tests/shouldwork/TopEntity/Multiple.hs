@@ -52,11 +52,11 @@ main3VHDL :: IO ()
 main3VHDL = do
   [(dir, _fname)] <- map splitFileName <$> getArgs
   files <- listDirectory dir
-  if sort files == sort [ "multiple_types.vhdl"
+  if sort files == sort [ "Multiple_types.vhdl"
                         , "topentity1"
                         , "topentity2"
-                        , "topentity3.manifest"
-                        , "topentity3.vhdl"
+                        , "topEntity3.manifest"
+                        , "topEntity3.vhdl"
                         ] then
     pure ()
   else

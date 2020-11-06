@@ -32,7 +32,7 @@ import qualified Data.HashSet                         as HashSet
 import           Data.List
   (mapAccumL, nub, nubBy, intersperse, group, sort)
 import           Data.List.Extra                      ((<:>), equalLength, zipEqual)
-import           Data.Maybe                           (catMaybes,fromMaybe,mapMaybe)
+import           Data.Maybe                           (catMaybes,mapMaybe)
 #if !MIN_VERSION_base(4,11,0)
 import           Data.Monoid                          hiding (Sum, Product)
 #endif
@@ -59,9 +59,9 @@ import           Clash.Debug                          (traceIf)
 import           Clash.Netlist.BlackBox.Types         (HdlSyn (..))
 import           Clash.Netlist.BlackBox.Util
   (extractLiterals, renderBlackBox, renderFilePath)
-import           Clash.Netlist.Id                     (IdType (..), mkBasicId')
+import qualified Clash.Netlist.Id                     as Id
 import           Clash.Netlist.Types                  hiding (_intWidth, intWidth)
-import           Clash.Netlist.Util                   hiding (mkIdentifier)
+import           Clash.Netlist.Util
 import           Clash.Util
   (SrcSpan, noSrcSpan, clogBase, curLoc, first, makeCached, on, indexNote)
 import           Clash.Util.Graph                     (reverseTopSort)
@@ -71,14 +71,12 @@ import           Clash.Backend.Verilog (Range (..), continueWithRange)
 -- | State for the 'Clash.Netlist.VHDL.VHDLM' monad:
 data VHDLState =
   VHDLState
-  { _tyCache   :: (HashSet HWType)
+  { _tyCache   :: HashSet HWType
   -- ^ Previously encountered HWTypes
-  , _tySeen    :: HashMap Identifier Word
-  -- ^ Generated product types
   , _nameCache :: (HashMap (HWType, Bool) TextS.Text)
   -- ^ Cache for type names. Bool indicates whether this name includes length
   -- information in its first "part". See `tyName'` for more information.
-  , _modNm     :: Identifier
+  , _modNm     :: ModName
   , _srcSpan   :: SrcSpan
   , _libraries :: [T.Text]
   , _packages  :: [T.Text]
@@ -88,21 +86,40 @@ data VHDLState =
   , _memoryDataFiles:: [(String,String)]
   -- ^ Files to be stored: (filename, contents). These files are generated
   -- during the execution of 'genNetlist'.
-  , _idSeen    :: HashMapS.HashMap Identifier Word
+  , _idSeen    :: IdentifierSet
   , _intWidth  :: Int
   -- ^ Int/Word/Integer bit-width
   , _hdlsyn    :: HdlSyn
   -- ^ For which HDL synthesis tool are we generating VHDL
-  , _extendedIds :: Bool
   , _undefValue :: Maybe (Maybe Int)
+  , _productFieldNameCache :: HashMap (Maybe [TextS.Text], [HWType]) [TextS.Text]
+  -- ^ Caches output of 'productFieldNames'.
   , _aggressiveXOptBB_ :: AggressiveXOptBB
   }
 
 makeLenses ''VHDLState
 
+instance HasIdentifierSet VHDLState where
+  identifierSet = idSeen
+
 instance Backend VHDLState where
-  initBackend     = VHDLState HashSet.empty HashMap.empty HashMap.empty ""
-                              noSrcSpan [] [] [] [] [] HashMapS.empty
+  initBackend w hdlsyn_ esc lw undefVal xOpt = VHDLState
+    { _tyCache=mempty
+    , _nameCache=mempty
+    , _modNm=""
+    , _srcSpan=noSrcSpan
+    , _libraries=[]
+    , _packages=[]
+    , _includes=[]
+    , _dataFiles=[]
+    , _memoryDataFiles=[]
+    , _idSeen=Id.emptyIdentifierSet esc lw VHDL
+    , _intWidth=w
+    , _hdlsyn=hdlsyn_
+    , _undefValue=undefVal
+    , _productFieldNameCache=mempty
+    , _aggressiveXOptBB_=xOpt
+    }
   hdlKind         = const VHDL
   primDirs        = const $ do root <- primsRoot
                                return [ root System.FilePath.</> "common"
@@ -136,46 +153,21 @@ instance Backend VHDLState where
     | isBV t = pretty id_
     | otherwise = do
       nm <- Mon $ use modNm
-      seen <- use seenIdentifiers
+      -- TODO: restore hack
+--      seen <- use seenIdentifiers
       -- This is a bit hacky, as id_ is just a rendered expression.
       -- But if it's a bare identifier that we've seen before,
       -- then this identifier has a defined type and we can skip the explicit type qualification.
-      let e | T.toStrict id_ `HashMapS.member` seen = pretty id_
-            | otherwise = hdlTypeMark t <> squote <> parens (pretty id_)
-      pretty (TextS.toLower nm) <> "_types.toSLV" <> parens e
+--      let e | T.toStrict id_ `HashMapS.member` seen = pretty id_
+--            | otherwise =
+      let e = hdlTypeMark t <> squote <> parens (pretty id_)
+      pretty nm <> "_types.toSLV" <> parens e
   fromBV t id_
     | isBV t = pretty id_
     | otherwise = do
       nm <- Mon $ use modNm
-      qualTyName t <> "'" <> parens (pretty (TextS.toLower nm) <> "_types.fromSLV" <> parens (pretty id_))
+      qualTyName t <> "'" <> parens (pretty nm <> "_types.fromSLV" <> parens (pretty id_))
   hdlSyn          = use hdlsyn
-  mkIdentifier    = do
-      allowExtended <- use extendedIds
-      return (go allowExtended)
-    where
-      go _ Basic nm =
-        case (stripTrailingUnderscore . filterReserved) (TextS.toLower (mkBasicId' VHDL True nm)) of
-          nm' | TextS.null nm' -> "clash_internal"
-              | otherwise -> nm'
-      go esc Extended (rmSlash -> nm) = case go esc Basic nm of
-        nm' | esc && nm /= nm' -> TextS.concat ["\\",nm,"\\"]
-            | otherwise -> nm'
-  extendIdentifier = do
-      allowExtended <- use extendedIds
-      return (go allowExtended)
-    where
-      go _ Basic nm ext =
-        case (stripTrailingUnderscore . filterReserved) (TextS.toLower (mkBasicId' VHDL True (nm `TextS.append` ext))) of
-          nm' | TextS.null nm' -> "clash_internal"
-              | otherwise -> nm'
-      go esc Extended ((rmSlash . escapeTemplate) -> nm) ext =
-        let nmExt = nm `TextS.append` ext
-        in  case go esc Basic nm ext of
-              nm' | esc && nm' /= nmExt -> case TextS.isPrefixOf "c$" nmExt of
-                      True -> TextS.concat ["\\",nmExt,"\\"]
-                      _    -> TextS.concat ["\\c$",nmExt,"\\"]
-                  | otherwise -> nm'
-
   setModName nm s = s {_modNm = nm}
   setSrcSpan      = (srcSpan .=)
   getSrcSpan      = use srcSpan
@@ -196,7 +188,6 @@ instance Backend VHDLState where
               ("begin" <> line <>
                 insts ds) <> line <>
             "end block" <> semi
-  unextend = return rmSlash
   addIncludes inc = includes %= (inc++)
   addLibraries libs = libraries %= (libs ++)
   addImports imps = packages %= (imps ++)
@@ -208,14 +199,8 @@ instance Backend VHDLState where
   getDataFiles = use dataFiles
   addMemoryDataFile f = memoryDataFiles %= (f:)
   getMemoryDataFiles = use memoryDataFiles
-  seenIdentifiers = idSeen
   ifThenElseExpr _ = False
   aggressiveXOptBB = use aggressiveXOptBB_
-
-rmSlash :: Identifier -> Identifier
-rmSlash nm = fromMaybe nm $ do
-  nm1 <- TextS.stripPrefix "\\" nm
-  pure (TextS.filter (not . (== '\\')) nm1)
 
 type VHDLM a = Mon (State VHDLState) a
 
@@ -224,91 +209,17 @@ isBV :: HWType -> Bool
 isBV (normaliseType -> BitVector _) = True
 isBV _ = False
 
--- | Time units: are added to 'reservedWords' as simulators trip over signals
--- named after them.
-timeUnits :: [Identifier]
-timeUnits = ["fs", "ps", "ns", "us", "ms", "sec", "min", "hr"]
-
--- | Identifiers which are imported from the following:
---
--- use IEEE.STD_LOGIC_1164.ALL;
--- use IEEE.NUMERIC_STD.ALL;
--- use IEEE.MATH_REAL.ALL;
--- use std.textio.all;
---
--- Clash should not use these identifiers, as it can lead to errors when
--- interfacing with an EDA tool.
---
--- See https://github.com/clash-lang/clash-compiler/issues/1439.
---
-importedNames :: [Identifier]
-importedNames =
-  [ -- ieee.std_logic_1164.all
-    "std_ulogic", "std_ulogic_vector", "resolved", "std_logic", "std_logic_vector"
-  , "x01", "x01z", "ux01", "ux01z", "to_bit", "to_bitvector", "to_stdulogic"
-  , "to_stdlogicvector", "to_stdulogicvector", "to_01", "to_x01", "to_x01z"
-  , "to_ux01", "rising_edge", "falling_edge", "is_x"
-    -- ieee.numeric_std.all
-  , "unresolved_unsigned", "unresolved_signed", "u_unsigned", "u_signed"
-  , "unsigned", "signed", "find_leftmost", "find_rightmost", "minimum"
-  , "maximum", "shift_left", "shift_right", "rotate_left", "rotate_right"
-  , "resize", "to_integer", "to_unsigned", "to_signed", "std_match"
-    -- ieee.math_real.all
-  , "math_e", "math_1_over_e", "math_pi", "math_2_pi", "math_1_over_pi"
-  , "math_pi_over_2", "math_pi_over_3", "path_pi_over_4", "path_3_pi_over_2"
-  , "math_log_of_2", "math_log_of_10", "math_log10_of_e", "math_sqrt_2"
-  , "math_1_over_sqrt_2", "math_sqrt_pi", "math_deg_to_rad", "math_rad_to_deg"
-  , "sign", "ceil", "floor", "round", "trunc", "realmax", "realmin", "uniform"
-  , "sqrt", "cbrt", "exp", "log", "log2", "log10", "sin", "cos", "tan", "arcsin"
-  , "arccos", "arctan", "sinh", "cosh", "tanh", "arcsinh", "arccosh", "arctanh"
-    -- std.textio.all
-  , "line", "text", "side", "width", "justify", "input", "output", "readline"
-  , "read", "sread", "string_read", "bread", "binary_read", "oread", "octal_read"
-  , "hread", "hex_read", "writeline", "tee", "write", "swrite", "string_write"
-  , "bwrite", "binary_write", "owrite", "octal_write", "hwrite", "hex_write"
-  ]
-
--- List of reserved VHDL-2008 keywords
--- + used internal names: toslv, fromslv, tagtoenum, datatotag
--- + used IEEE library names: integer, boolean, std_logic, std_logic_vector,
---   signed, unsigned, to_integer, to_signed, to_unsigned, string
-reservedWords :: [Identifier]
-reservedWords = ["abs","access","after","alias","all","and","architecture"
-  ,"array","assert","assume","assume_guarantee","attribute","begin","block"
-  ,"body","buffer","bus","case","component","configuration","constant","context"
-  ,"cover","default","disconnect","downto","else","elsif","end","entity","exit"
-  ,"fairness","file","for","force","function","generate","generic","group"
-  ,"guarded","if","impure","in","inertial","inout","is","label","library"
-  ,"linkage","literal","loop","map","mod","nand","new","next","nor","not","null"
-  ,"of","on","open","or","others","out","package","parameter","port","postponed"
-  ,"procedure","process","property","protected","pure","range","record"
-  ,"register","reject","release","rem","report","restrict","restrict_guarantee"
-  ,"return","rol","ror","select","sequence","severity","signal","shared","sla"
-  ,"sll","sra","srl","strong","subtype","then","to","transport","type"
-  ,"unaffected","units","until","use","variable","vmode","vprop","vunit","wait"
-  ,"when","while","with","xnor","xor","toslv","fromslv","tagtoenum","datatotag"
-  ,"integer", "boolean", "std_logic", "std_logic_vector", "signed", "unsigned"
-  ,"to_integer", "to_signed", "to_unsigned", "string","log"] ++ timeUnits ++ importedNames
-
-filterReserved :: Identifier -> Identifier
-filterReserved s = if s `elem` reservedWords
-  then s `TextS.append` "_r"
-  else s
-
-stripTrailingUnderscore :: Identifier -> Identifier
-stripTrailingUnderscore = TextS.dropWhileEnd (== '_')
-
 -- | Generate unique (partial) names for product fields. Example:
 --
 -- >>> productFieldNames [Unsigned 6, Unsigned 6, Bit, Bool]
 -- ["unsigned6_0", "unsigned6_1", "bit", "boolean"]
 productFieldNames
   :: HasCallStack
-  => Maybe [TextS.Text]
+  => Maybe [IdentifierText]
   -- ^ Label hints. From user records, for example.
   -> [HWType]
   -- ^ Field types
-  -> VHDLM [TextS.Text]
+  -> VHDLM [IdentifierText]
 productFieldNames labels0 fields = do
   let labels1 = sequence labels0 ++ repeat Nothing
   hFields <- zipWithM hName labels1 fields
@@ -320,19 +231,17 @@ productFieldNames labels0 fields = do
   return names
  where
   hName
-    :: Maybe Identifier
+    :: Maybe IdentifierText
     -> HWType
-    -> VHDLM Identifier
-  hName Nothing field  =
-    tyName' False field
-  hName (Just label) _field = do
-    Mon (mkIdentifier <*> pure Basic <*> pure label)
+    -> VHDLM IdentifierText
+  hName Nothing field = tyName' False field
+  hName (Just label) _field = Id.toText <$> Id.makeBasic label
 
   name'
-    :: HashMap TextS.Text Int
-    -> HashMap TextS.Text Int
-    -> TextS.Text
-    -> (HashMap TextS.Text Int, TextS.Text)
+    :: HashMap IdentifierText Int
+    -> HashMap IdentifierText Int
+    -> IdentifierText
+    -> (HashMap IdentifierText Int, IdentifierText)
   name' counted countMap fieldName
     | counted HashMapS.! fieldName > 1 =
         -- Seen this fieldname more than once, so we need to add a number
@@ -349,7 +258,7 @@ productFieldNames labels0 fields = do
 
 productFieldName
   :: HasCallStack
-  => Maybe [TextS.Text]
+  => Maybe [IdentifierText]
   -- ^ Label hints. From user records, for example.
   -> [HWType]
   -- ^ Field types
@@ -357,13 +266,16 @@ productFieldName
   -- ^ Index of field
   -> VHDLM Doc
 productFieldName labels fields fieldIndex = do
-  -- TODO: cache
-  names <- productFieldNames labels fields
+  names <-
+    makeCached
+      (labels, fields)
+      productFieldNameCache
+      (productFieldNames labels fields)
   return (PP.pretty (names !! fieldIndex))
 
 selectProductField
   :: HasCallStack
-  => Maybe [TextS.Text]
+  => Maybe [IdentifierText]
   -- ^ Label hints. From user records, for example.
   -> [HWType]
   -- ^ Field types
@@ -374,17 +286,26 @@ selectProductField fieldLabels fieldTypes fieldIndex =
   "_sel" <> int fieldIndex <> "_" <> productFieldName fieldLabels fieldTypes fieldIndex
 
 -- | Generate VHDL for a Netlist component
-genVHDL :: Identifier -> SrcSpan -> HashMapS.HashMap Identifier Word -> Component -> VHDLM ((String,Doc),[(String,Doc)])
-genVHDL nm sp seen c = preserveSeen $ do
-    Mon $ idSeen .= seen
-    -- Don't have type names conflict with component names
-    Mon $ tySeen %= HashMap.unionWith max seen
+genVHDL
+  :: ModName
+  -> SrcSpan
+  -> IdentifierSet
+  -> Component
+  -> VHDLM ((String, Doc), [(String, Doc)])
+genVHDL nm sp seen c = do
+    -- Don't have type names conflict with module names or with previously
+    -- generated type names.
+    --
+    -- TODO: Collect all type names up front, to prevent relatively costly union.
+    -- TODO: Investigate whether type names / signal names collide in the first place
+    Mon $ idSeen %= Id.union seen
+
     Mon $ setSrcSpan sp
     v <- vhdl
     i <- Mon $ use includes
     Mon $ libraries .= []
     Mon $ packages  .= []
-    return ((TextS.unpack cName,v),i)
+    return ((TextS.unpack (Id.toText cName), v), i)
   where
     cName   = componentName c
     vhdl    = do
@@ -397,23 +318,20 @@ genVHDL nm sp seen c = preserveSeen $ do
        pure arch)
 
 -- | Generate a VHDL package containing type definitions for the given HWTypes
-mkTyPackage_ :: Identifier
-             -> [HWType]
-             -> VHDLM [(String,Doc)]
+mkTyPackage_ :: ModName -> [HWType] -> VHDLM [(String,Doc)]
 mkTyPackage_ modName (map filterTransparent -> hwtys) = do
     { syn <- Mon hdlSyn
-    ; mkId <- Mon (mkIdentifier <*> pure Basic)
     ; let usedTys     = concatMap mkUsedTys hwtys
     ; let normTys0    = nub (map mkVecZ (hwtys ++ usedTys))
     ; let sortedTys0  = topSortHWTys normTys0
           packageDec  = vcat $ mapM tyDec (nubBy eqTypM sortedTys0)
           (funDecs,funBodies) = unzip . mapMaybe (funDec syn) $ nubBy eqTypM (map normaliseType sortedTys0)
 
-    ; (:[]) <$> (TextS.unpack $ mkId (modName `TextS.append` "_types"),) <$>
+    ; (:[]) <$> (TextS.unpack (modName `TextS.append` "_types"),) <$>
       "library IEEE;" <> line <>
       "use IEEE.STD_LOGIC_1164.ALL;" <> line <>
       "use IEEE.NUMERIC_STD.ALL;" <> line <> line <>
-      "package" <+> pretty (mkId (modName `TextS.append` "_types")) <+> "is" <> line <>
+      "package" <+> pretty (modName `TextS.append` "_types") <+> "is" <> line <>
          indent 2 ( packageDec <> line <>
                     vcat (sequence funDecs)
                   ) <> line <>
@@ -424,9 +342,8 @@ mkTyPackage_ modName (map filterTransparent -> hwtys) = do
     packageBodyDec funBodies = case funBodies of
       [] -> emptyDoc
       _  -> do
-        { mkId <- Mon (mkIdentifier <*> pure Basic)
-        ; line <> line <>
-         "package" <+> "body" <+> pretty (mkId (modName `TextS.append` "_types")) <+> "is" <> line <>
+        { line <> line <>
+         "package" <+> "body" <+> pretty (modName `TextS.append` "_types") <+> "is" <> line <>
            indent 2 (vcat (sequence funBodies)) <> line <>
          "end" <> semi
         }
@@ -812,9 +729,8 @@ funDec syn t@(RTree _ elTy) = Just
 
 funDec _ _ = Nothing
 
-tyImports :: Identifier -> VHDLM Doc
+tyImports :: ModName -> VHDLM Doc
 tyImports nm = do
-  mkId <- Mon (mkIdentifier <*> pure Basic)
   libs <- Mon $ use libraries
   packs <- Mon $ use packages
   punctuate' semi $ sequence
@@ -824,20 +740,20 @@ tyImports nm = do
      , "use IEEE.MATH_REAL.ALL"
      , "use std.textio.all"
      , "use work.all"
-     , "use work." <> pretty (mkId (nm `TextS.append` "_types")) <> ".all"
+     , "use work." <> pretty (nm `TextS.append` "_types") <> ".all"
      ] ++ (map (("library" <+>) . pretty) (nub libs))
        ++ (map (("use" <+>) . pretty) (nub packs)))
 
 
 -- TODO: Way too much happening on a single line
 port :: Num t
-     => TextS.Text
+     => Identifier
      -> HWType
      -> VHDLM Doc
      -> Int
      -> Maybe Expr
      -> VHDLM (Doc, t)
-port elName hwType portDirection fillToN iEM =
+port (Id.toText -> elName) hwType portDirection fillToN iEM =
   (,fromIntegral $ TextS.length elName) <$>
   (encodingNote hwType <> fill fillToN (pretty elName) <+> colon <+> direction
    <+> sizedQualTyName hwType <> iE)
@@ -944,13 +860,15 @@ attrTypes = foldl attrType HashMap.empty
 attrMap
   :: forall t
    . t ~ HashMap T.Text (T.Text, [(TextS.Text, T.Text)])
-  => [(TextS.Text, Attr')]
+  => [(Identifier, Attr')]
   -> t
-attrMap attrs = foldl go empty' attrs
+attrMap attrs0 = foldl go empty' attrs1
  where
+  attrs1 = map (first Id.toText) attrs0
+
   empty' = HashMap.fromList
            [(k, (types HashMap.! k, [])) | k <- HashMap.keys types]
-  types = attrTypes (map snd attrs)
+  types = attrTypes (map snd attrs1)
 
   go :: t -> (TextS.Text, Attr') -> t
   go map' attr = HashMap.adjust
@@ -967,7 +885,7 @@ attrMap attrs = foldl go empty' attrs
 
 renderAttrs
   :: TextS.Text
-  -> [(TextS.Text, Attr')]
+  -> [(Identifier, Attr')]
   -> VHDLM Doc
 renderAttrs what (attrMap -> attrs) =
   vcat $ sequence $ intersperse " " $ map renderAttrGroup (assocs attrs)
@@ -1047,7 +965,7 @@ qualTyName (filterTransparent -> hwty) = case hwty of
   -- Custom types:
   _ -> do
     modName <- Mon (use modNm)
-    pretty (TextS.toLower modName) <> "_types." <> tyName hwty
+    pretty modName <> "_types." <> tyName hwty
 
 -- | Generates a unique name for a given type. This action will cache its
 -- results, thus returning the same answer for the same @HWType@ argument.
@@ -1221,31 +1139,16 @@ filterTransparent hwty = case hwty of
 
 -- | Create a unique type name for user defined types
 userTyName
-  :: Identifier
+  :: IdentifierText
   -- ^ Default name
-  -> Identifier
+  -> IdentifierText
   -- ^ Identifier stored in @hwTy@
   -> HWType
   -- ^ Type to give a (unique) name
-  -> StateT VHDLState Identity TextS.Text
+  -> StateT VHDLState Identity IdentifierText
 userTyName dflt nm0 hwTy = do
   tyCache %= HashSet.insert hwTy
-  seen <- use tySeen
-  mkId <- mkIdentifier <*> pure Basic
-  let nm1 = (mkId . last . TextS.splitOn ".") nm0
-      nm2 = if TextS.null nm1 then dflt else nm1
-      (nm3,count) = case HashMap.lookup nm2 seen of
-                      Just cnt -> go mkId seen cnt nm2
-                      Nothing  -> (nm2,0)
-  tySeen %= HashMap.insert nm3 count
-  return nm3
-  where
-    go mkId seen count nm0' =
-      let nm1' = nm0' `TextS.append` TextS.pack ('_':show count) in
-      case HashMap.lookup nm1' seen of
-        Just _  -> go mkId seen (count+1) nm0'
-        Nothing -> (nm1',count+1)
-
+  Id.toText <$> Id.makeBasicOr (last (TextS.splitOn "." nm0)) dflt
 
 -- | Convert a Netlist HWType to an error VHDL value for that type
 sizedQualTyNameErrValue :: HWType -> VHDLM Doc
@@ -1306,7 +1209,7 @@ decls ds = do
       _  -> vcat (pure dsDoc)
 
 decl :: Int ->  Declaration -> VHDLM (Maybe (Doc,Int))
-decl l (NetDecl' noteM _ id_ ty iEM) = Just <$> (,fromIntegral (TextS.length id_)) <$>
+decl l (NetDecl' noteM _ id_ ty iEM) = Just <$> (,fromIntegral (TextS.length (Id.toText id_))) <$>
   maybe id addNote noteM ("signal" <+> fill l (pretty id_) <+> colon <+> either pretty sizedQualTyName ty <> iE <> semi)
   where
     addNote n = mappend ("--" <+> pretty n <> line)
@@ -1324,7 +1227,7 @@ decl _ (InstDecl Comp _ attrs nm _ gens pms) = fmap (Just . (,0)) $ do
     <> attrs'
   }
  where
-    formalLength (Identifier i _) = fromIntegral (TextS.length i)
+    formalLength (Identifier i _) = fromIntegral (TextS.length (Id.toText i))
     formalLength _                = 0
 
     portDir In  = "in"
@@ -1400,7 +1303,12 @@ insts (d:ds) = do
     _ -> insts ds
 
 -- | Helper function for inst_, handling CustomSP and CustomSum
-inst_' :: TextS.Text -> Expr -> HWType -> [(Maybe Literal, Expr)] -> VHDLM (Maybe Doc)
+inst_'
+  :: Identifier
+  -> Expr
+  -> HWType
+  -> [(Maybe Literal, Expr)]
+  -> VHDLM (Maybe Doc)
 inst_' id_ scrut scrutTy es = fmap Just $
   (pretty id_ <+> larrow <+> align (vcat (conds esNub) <> semi))
     where
@@ -1466,7 +1374,7 @@ inst_ (InstDecl entOrComp libM _ nm lbl gens pms) = do
     pms' = do
       rec (p,ls) <- fmap unzip $ sequence [ (,formalLength i) <$> fill (maximum ls) (expr_ False i) <+> "=>" <+> expr_ False e | (i,_,_,e) <- pms]
       nest 2 $ "port map" <> line <> tupled (pure p)
-    formalLength (Identifier i _) = fromIntegral (TextS.length i)
+    formalLength (Identifier i _) = fromIntegral (TextS.length (Id.toText i))
     formalLength _                = 0
     entOrComp' = case entOrComp of { Entity -> " entity"; Comp -> " component"; Empty -> ""}
 
@@ -1817,19 +1725,19 @@ bit_char Z = char 'Z'
 toSLV :: HasCallStack => HWType -> Expr -> VHDLM Doc
 toSLV Bool         e = do
   nm <- Mon $ use modNm
-  pretty (TextS.toLower nm) <> "_types.toSLV" <> parens (expr_ False e)
+  pretty nm <> "_types.toSLV" <> parens (expr_ False e)
 toSLV Bit          e = do
   nm <- Mon $ use modNm
-  pretty (TextS.toLower nm) <> "_types.toSLV" <> parens (expr_ False e)
+  pretty nm <> "_types.toSLV" <> parens (expr_ False e)
 toSLV (Clock {})    e = do
   nm <- Mon $ use modNm
-  pretty (TextS.toLower nm) <> "_types.toSLV" <> parens (expr_ False e)
+  pretty nm <> "_types.toSLV" <> parens (expr_ False e)
 toSLV (Reset {})    e = do
   nm <- Mon $ use modNm
   pretty (TextS.toLower nm) <> "_types.toSLV" <> parens (expr_ False e)
 toSLV (Enable _)    e = do
   nm <- Mon $ use modNm
-  pretty (TextS.toLower nm) <> "_types.toSLV" <> parens (expr_ False e)
+  pretty nm <> "_types.toSLV" <> parens (expr_ False e)
 toSLV (BitVector _) e = expr_ True e
 toSLV (Signed _)   e = "std_logic_vector" <> parens (expr_ False e)
 toSLV (Unsigned _) e = "std_logic_vector" <> parens (expr_ False e)
@@ -1845,7 +1753,7 @@ toSLV t@(Product _ labels tys) (Identifier id_ Nothing) = do
     encloseSep lparen rparen " & " (zipWithM toSLV tys selIds')
   where
     tName    = tyName t
-    selNames = map (fmap (T.toStrict . renderOneLine) ) [pretty id_ <> dot <> tName <> selectProductField labels tys i | i <- [0..(length tys)-1]]
+    selNames = map (fmap (Id.unsafeMake . T.toStrict . renderOneLine) ) [pretty id_ <> dot <> tName <> selectProductField labels tys i | i <- [0..(length tys)-1]]
     selIds   = map (fmap (\n -> Identifier n Nothing)) selNames
 toSLV (Product _ _ tys) (DataCon _ _ es) | equalLength tys es =
   -- Need equalLenght for code seen in ZipWithUnitVector
@@ -1856,7 +1764,7 @@ toSLV (CustomProduct _ _ _ _ _) e = do
   expr_ False e
 toSLV t@(Product _ _ _) e = do
   nm <- Mon $ use modNm
-  pretty (TextS.toLower nm) <> "_types.toSLV" <> parens (qualTyName t <> "'" <> parens (expr_ False e))
+  pretty nm <> "_types.toSLV" <> parens (qualTyName t <> "'" <> parens (expr_ False e))
 toSLV (SP _ _) e       = expr_ False e
 toSLV (CustomSP _ _ _ _) e =
   -- Custom representations are represented as bitvectors in HDL, so we don't
@@ -1870,17 +1778,17 @@ toSLV (Vector n elTy) (Identifier id_ Nothing) = do
         Vivado -> mapM (expr_ False) selIds'
         _ -> mapM (toSLV elTy) selIds'))
   where
-    selNames = map (fmap (T.toStrict . renderOneLine) ) $ [pretty id_ <> parens (int i) | i <- [0 .. (n-1)]]
+    selNames = map (fmap (Id.unsafeMake . T.toStrict . renderOneLine) ) $ [pretty id_ <> parens (int i) | i <- [0 .. (n-1)]]
     selIds   = map (fmap (`Identifier` Nothing)) selNames
 -- Don't split up newtype wrappers, or void-filtered types
 toSLV (Vector _ _) e@(DataCon _ (DC (Void Nothing, -1)) _) = do
   nm <- Mon $ use modNm
-  pretty (TextS.toLower nm) <> "_types.toSLV" <> parens (expr_ False e)
+  pretty nm <> "_types.toSLV" <> parens (expr_ False e)
 toSLV (Vector n elTy) (DataCon _ _ es) =
   "std_logic_vector'" <> (parens $ vcat $ punctuate " & " (zipWithM toSLV [elTy,Vector (n-1) elTy] es))
 toSLV (Vector _ _) e = do
   nm <- Mon $ use modNm
-  pretty (TextS.toLower nm) <> "_types.toSLV" <> parens (expr_ False e)
+  pretty nm <> "_types.toSLV" <> parens (expr_ False e)
 toSLV (RTree _ _) e = do
   nm <- Mon (use modNm)
   pretty (TextS.toLower nm) <> "_types.toSLV" <> parens (expr_ False e)

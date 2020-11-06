@@ -39,6 +39,7 @@ import           Clash.Core.Term                (Term)
 import           Clash.Core.Var                 (Id)
 import           Clash.Core.VarEnv              (VarEnv)
 import           Clash.Netlist.BlackBox.Types   (HdlSyn (..))
+import {-# SOURCE #-} Clash.Netlist.Types       (PreserveCase(..))
 
 data IsPrim
   = IsPrim
@@ -163,7 +164,7 @@ data ClashOpts = ClashOpts
   -- not supported, use vendor primitives instead.
   , opt_importPaths :: [FilePath]
   -- ^ Paths where Clash should look for modules
-  , opt_componentPrefix :: Maybe String
+  , opt_componentPrefix :: Maybe Text
   -- ^ Prefix components with given string
   , opt_newInlineStrat :: Bool
   -- ^ Use new inline strategy. Functions marked NOINLINE will get their own
@@ -173,6 +174,9 @@ data ClashOpts = ClashOpts
   --
   --  * http://vhdl.renerta.com/mobile/source/vhd00037.htm
   --  * http://verilog.renerta.com/source/vrg00018.htm
+  , opt_lowerCaseBasicIds :: PreserveCase
+  -- ^ Force all generated basic identifiers to lowercase. Among others, this
+  -- affects module and file names.
   , opt_ultra :: Bool
   -- ^ Perform a high-effort compile, trading improved performance for
   -- potentially much longer compile times.
@@ -227,6 +231,7 @@ instance Hashable ClashOpts where
     opt_componentPrefix `hashWithSalt`
     opt_newInlineStrat `hashWithSalt`
     opt_escapedIds `hashWithSalt`
+    opt_lowerCaseBasicIds `hashWithSalt`
     opt_ultra `hashWithSalt`
     opt_forceUndefined `hashWithSalt`
     opt_checkIDir `hashWithSalt`
@@ -270,6 +275,7 @@ defClashOpts
   , opt_componentPrefix     = Nothing
   , opt_newInlineStrat      = True
   , opt_escapedIds          = True
+  , opt_lowerCaseBasicIds   = PreserveCase
   , opt_ultra               = False
   , opt_forceUndefined      = Nothing
   , opt_checkIDir           = True

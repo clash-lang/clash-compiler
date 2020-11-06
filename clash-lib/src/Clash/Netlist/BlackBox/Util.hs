@@ -46,16 +46,14 @@ import           Text.Printf
 import           Text.Read                       (readEither)
 import           Text.Trifecta.Result            hiding (Err)
 
-import           Clash.Backend                   (Backend (..), Usage (..), mkUniqueIdentifier)
-import qualified Clash.Backend                   as Backend
+import           Clash.Backend
+  (Backend (..), Usage (..), AggressiveXOptBB(..))
 import           Clash.Netlist.BlackBox.Parser
 import           Clash.Netlist.BlackBox.Types
-import           Clash.Netlist.Id                (IdType (..))
-import           Clash.Netlist.Types             (BlackBoxContext (..),
-                                                  Expr (..), HWType (..),
-                                                  Identifier, Literal (..),
-                                                  Modifier (..),
-                                                  Declaration(BlackBoxD))
+import           Clash.Netlist.Types
+  (BlackBoxContext (..), Expr (..), HWType (..), Literal (..), Modifier (..),
+   Declaration(BlackBoxD))
+import qualified Clash.Netlist.Id                as Id
 import qualified Clash.Netlist.Types             as N
 import           Clash.Netlist.Util              (typeSize, isVoid, stripVoid)
 import           Clash.Signal.Internal
@@ -65,7 +63,7 @@ import qualified Clash.Util.Interpolate          as I
 
 inputHole :: Element -> Maybe Int
 inputHole = \case
-  Arg _ n       -> pure n
+  Arg n         -> pure n
   Lit n         -> pure n
   Const n       -> pure n
   Name n        -> pure n
@@ -147,12 +145,11 @@ extractLiterals = map (\case (e,_,_) -> e)
 -- counter for every newly encountered symbol.
 setSym
   :: forall m
-   . Monad m
-  => (IdType -> Identifier -> m Identifier)
-  -> BlackBoxContext
+   . Id.IdentifierSetMonad m
+  => BlackBoxContext
   -> BlackBoxTemplate
   -> m (BlackBoxTemplate,[N.Declaration])
-setSym mkUniqueIdentifierM bbCtx l = do
+setSym bbCtx l = do
     (a,(_,decls)) <- runStateT (mapM setSym' l) (IntMap.empty,IntMap.empty)
     return (a,concatMap snd (IntMap.elems decls))
   where
@@ -160,33 +157,34 @@ setSym mkUniqueIdentifierM bbCtx l = do
 
     setSym'
       :: Element
-      -> StateT ( IntMap.IntMap Identifier
-                , IntMap.IntMap (Identifier,[N.Declaration]))
+      -> StateT ( IntMap.IntMap N.IdentifierText
+                , IntMap.IntMap (N.IdentifierText, [N.Declaration]))
                 m
                 Element
     setSym' e = case e of
       ToVar nm i | i < length (bbInputs bbCtx) -> case bbInputs bbCtx !! i of
-        (Identifier nm' Nothing,_,_) ->
-          return (ToVar [Text (Text.fromStrict nm')] i)
+        (Identifier nm0 Nothing,_,_) ->
+          return (ToVar [Text (Id.toLazyText nm0)] i)
 
         (e',hwTy,_) -> do
           varM <- IntMap.lookup i <$> use _2
           case varM of
             Nothing -> do
-              nm' <- lift (mkUniqueIdentifierM Extended (Text.toStrict (concatT (Text "c$":nm))))
+              nm' <- lift (Id.make (Text.toStrict (concatT (Text "c$":nm))))
               let decls = case typeSize hwTy of
                     0 -> []
                     _ -> [N.NetDecl Nothing nm' hwTy
                          ,N.Assignment nm' e'
                          ]
-              _2 %= (IntMap.insert i (nm',decls))
+              _2 %= (IntMap.insert i (Id.toText nm',decls))
+              return (ToVar [Text (Id.toLazyText nm')] i)
+            Just (nm',_) ->
               return (ToVar [Text (Text.fromStrict nm')] i)
-            Just (nm',_) -> return (ToVar [Text (Text.fromStrict nm')] i)
       Sym _ i -> do
         symM <- IntMap.lookup i <$> use _1
         case symM of
           Nothing -> do
-            t <- lift (mkUniqueIdentifierM Extended "c$n")
+            t <- Id.toText <$> lift (Id.make "c$n")
             _1 %= (IntMap.insert i t)
             return (Sym (Text.fromStrict t) i)
           Just t -> return (Sym (Text.fromStrict t) i)
@@ -194,7 +192,7 @@ setSym mkUniqueIdentifierM bbCtx l = do
         symM <- IntMap.lookup i <$> use _1
         case symM of
           Nothing -> do
-            t' <- lift (mkUniqueIdentifierM Basic (Text.toStrict (concatT t)))
+            t' <- Id.toText <$> lift (Id.makeBasic (Text.toStrict (concatT t)))
             _1 %= (IntMap.insert i t')
             return (GenSym [Text (Text.fromStrict t')] i)
           Just _ ->
@@ -226,12 +224,12 @@ setSym mkUniqueIdentifierM bbCtx l = do
               error $ $(curLoc) ++  "Could not convert ~LIT[" ++ show i ++ "]"
                    ++ " to string:" ++ msg ++ "\n\nError occured while "
                    ++ "processing blackbox for " ++ bbnm
-        Result _ | [(Identifier t _, _)] <- bbResults bbCtx -> Text.fromStrict t
-        CompName -> Text.fromStrict (bbCompName bbCtx)
+        Result | [(Identifier t _, _)] <- bbResults bbCtx -> Id.toLazyText t
+        CompName -> Id.toLazyText (bbCompName bbCtx)
         CtxName ->
           case bbCtxName bbCtx of
             Just nm -> Text.fromStrict nm
-            _ | [(Identifier t _, _)] <- bbResults bbCtx -> Text.fromStrict t
+            _ | [(Identifier t _, _)] <- bbResults bbCtx -> Id.toLazyText t
             _ -> error $ $(curLoc) ++ "Internal error when processing blackbox "
                       ++ "for " ++ bbnm
         _ -> error $ $(curLoc) ++ "Unexpected element in GENSYM when processing "
@@ -343,7 +341,7 @@ renderElem b (Component (Decl n subN (l:ls))) = do
       Left t ->
         return t
       Right (nm0,ds) -> do
-        nm1 <- mkUniqueIdentifier Basic nm0
+        nm1 <- Id.next nm0
         block <- getMon (blockDecl nm1 ds)
         return (render block)
 
@@ -352,13 +350,13 @@ renderElem b (Component (Decl n subN (l:ls))) = do
       N.BBFunction {} ->
         return templ1
       N.BBTemplate templ2 -> do
-        (templ3, templDecls) <- setSym Backend.mkUniqueIdentifier b' templ2
+        (templ3, templDecls) <- setSym b' templ2
         case templDecls of
           [] ->
             return (N.BBTemplate templ3)
           _ -> do
-            nm1 <- Backend.mkUniqueIdentifier Basic "bb"
-            nm2 <- Backend.mkUniqueIdentifier Basic "bb"
+            nm1 <- Id.toText <$> Id.makeBasic "bb"
+            nm2 <- Id.makeBasic "bb"
             let bbD = BlackBoxD nm1 libs imps inc (N.BBTemplate templ3) b'
             block <- getMon (blockDecl nm2 (templDecls ++ [bbD]))
             return (render block)
@@ -413,6 +411,7 @@ renderElem b (IF c t f) = do
   let c' = check (coerce xOpt) iw syn c
   if c' > 0 then renderTemplate b t else renderTemplate b f
   where
+    check :: Bool -> Int -> HdlSyn -> Element -> Int
     check xOpt iw syn c' = case c' of
       (Size e)   -> typeSize (lineToType b [e])
       (Length e) -> case lineToType b [e] of
@@ -524,9 +523,10 @@ parseFail t = case runParse t of
   Success templ -> templ
 
 idToExpr
-  :: (Text,HWType)
-  -> (Expr,HWType,Bool)
-idToExpr (t,ty) = (Identifier (Text.toStrict t) Nothing,ty,False)
+  :: (Text, HWType)
+  -> (Expr, HWType, Bool)
+idToExpr (t, ty) =
+  (Identifier (Id.unsafeMake (Text.toStrict t)) Nothing, ty, False)
 
 bbResult :: HasCallStack => String -> BlackBoxContext -> (Expr, HWType)
 bbResult _s (bbResults -> [r]) = r
@@ -569,13 +569,11 @@ renderTag :: Backend backend
           -> Element
           -> State backend Text
 renderTag _ (Text t)        = return t
-renderTag b (Result esc)    = do
-  escape <- if esc then unextend else pure id
-  fmap (Text.fromStrict . escape . Text.toStrict . renderOneLine) . getMon . expr False . fst $ bbResult "~RESULT" b
-renderTag b (Arg esc n)  = do
+renderTag b (Result)    = do
+  fmap renderOneLine . getMon . expr False . fst $ bbResult "~RESULT" b
+renderTag b (Arg n)  = do
   let (e,_,_) = bbInputs b !! n
-  escape <- if esc then unextend else pure id
-  (Text.fromStrict . escape . Text.toStrict . renderOneLine) <$> getMon (expr False e)
+  renderOneLine <$> getMon (expr False e)
 
 renderTag b (Const n)  = do
   let (e,_,_) = bbInputs b !! n
@@ -727,12 +725,12 @@ renderTag b (Template filenameL sourceL) = case file of
           source   <- elementsToText b sourceL
           return (Text.unpack filename, Text.unpack source)
 
-renderTag b CompName = pure (Text.fromStrict (bbCompName b))
+renderTag b CompName = pure (Id.toLazyText (bbCompName b))
 
 renderTag b CtxName = case bbCtxName b of
   Just nm -> return (Text.fromStrict nm)
   _ | Identifier t _ <- fst (bbResult "~CTXNAME" b)
-    -> return (Text.fromStrict t)
+    -> return (Id.toLazyText t)
   _ -> error "internal error"
 
 
@@ -808,8 +806,8 @@ prettyElem (Component (Decl i 0 args)) = do
       <> line <> string "~INST")
 prettyElem (Component (Decl {})) =
   error $ $(curLoc) ++ "prettyElem can't (yet) render ~INST when subfuncion /= 0!"
-prettyElem (Result b) = if b then return "~ERESULT" else return "~RESULT"
-prettyElem (Arg b i) = renderOneLine <$> (if b then string "~EARG" else string "~ARG" <> brackets (int i))
+prettyElem Result = return "~RESULT"
+prettyElem (Arg i) = renderOneLine <$> ("~ARG" <> brackets (int i))
 prettyElem (Lit i) = renderOneLine <$> (string "~LIT" <> brackets (int i))
 prettyElem (Const i) = renderOneLine <$> (string "~CONST" <> brackets (int i))
 prettyElem (Name i) = renderOneLine <$> (string "~NAME" <> brackets (int i))
@@ -960,8 +958,8 @@ walkElement f el = maybeToList (f el) ++ walked
         GenSym es _ -> concatMap go es
         DevNull es -> concatMap go es
         Text _ -> []
-        Result _ -> []
-        Arg _ _ -> []
+        Result -> []
+        Arg _ -> []
         ArgGen _ _ -> []
         Const _ -> []
         Lit _ -> []
@@ -1003,17 +1001,17 @@ walkElement f el = maybeToList (f el) ++ walked
 
 -- | Determine variables used in an expression. Used for VHDL sensitivity list.
 -- Also see: https://github.com/clash-lang/clash-compiler/issues/365
-usedVariables :: Expr -> [Identifier]
+usedVariables :: Expr -> [N.IdentifierText]
 usedVariables Noop              = []
-usedVariables (Identifier i _)  = [i]
+usedVariables (Identifier i _)  = [Id.toText i]
 usedVariables (DataCon _ _ es)  = concatMap usedVariables es
-usedVariables (DataTag _ e')    = [either id id e']
+usedVariables (DataTag _ e')    = [Id.toText (either id id e')]
 usedVariables (Literal {})      = []
 usedVariables (ConvBV _ _ _ e') = usedVariables e'
 usedVariables (IfThenElse e1 e2 e3) = concatMap usedVariables [e1,e2,e3]
 usedVariables (BlackBoxE _ _ _ _ t bb _) = nub (sList ++ sList')
   where
-    matchArg (Arg _ i) = Just i
+    matchArg (Arg i) = Just i
     matchArg _         = Nothing
 
     matchVar (ToVar [Text v] _) = Just (Text.toStrict v)
@@ -1031,7 +1029,7 @@ getUsedArguments (N.BBTemplate t) = nub (concatMap (walkElement matchArg) t)
   where
     matchArg =
       \case
-        Arg _ i -> Just i
+        Arg i -> Just i
         Component (Decl i _ _) -> Just i
         Const i -> Just i
         IsLit i -> Just i
@@ -1072,7 +1070,7 @@ getUsedArguments (N.BBTemplate t) = nub (concatMap (walkElement matchArg) t)
         MaxIndex _ -> Nothing
         OutputWireReg _ -> Nothing
         Repeat _ _ -> Nothing
-        Result _ -> Nothing
+        Result -> Nothing
         Sel _ _ -> Nothing
         SigD _ _ -> Nothing
         Size _ -> Nothing

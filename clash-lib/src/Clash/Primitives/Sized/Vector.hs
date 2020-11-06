@@ -12,6 +12,7 @@
 
 module Clash.Primitives.Sized.Vector where
 
+import           Control.Monad                      (replicateM)
 import           Control.Monad.State                (State, zipWithM)
 import qualified Control.Lens                       as Lens
 import           Data.Either                        (rights)
@@ -19,8 +20,6 @@ import qualified Data.IntMap                        as IntMap
 import           Data.List.Extra                    (iterateNM)
 import           Data.Maybe                         (fromMaybe)
 import           Data.Semigroup.Monad               (getMon)
-import qualified Data.Text                          as Text
-import qualified Data.Text.Lazy                     as LText
 import           Data.Text.Lazy                     (pack)
 import           Data.Text.Prettyprint.Doc.Extra
   (Doc, string, renderLazy, layoutPretty, LayoutOptions(..),
@@ -28,9 +27,10 @@ import           Data.Text.Prettyprint.Doc.Extra
 import           Text.Trifecta.Result               (Result(Success))
 import qualified Data.String.Interpolate            as I
 import qualified Data.String.Interpolate.Util       as I
+import           TextShow                           (showt)
 
 import           Clash.Backend
-  (Backend, hdlTypeErrValue, expr, mkUniqueIdentifier, blockDecl)
+  (Backend, hdlTypeErrValue, expr, blockDecl)
 import           Clash.Core.Type
   (Type(LitTy), LitTy(NumTy), coreView)
 import           Clash.Netlist.BlackBox             (isLiteral)
@@ -45,7 +45,7 @@ import           Clash.Netlist.Types
    BlackBox(BBTemplate, BBFunction), TemplateFunction(..), WireOrReg(Wire),
    Modifier(Indexed, Nested), bbInputs, bbResults, emptyBBContext, tcCache,
    bbFunctions)
-import           Clash.Netlist.Id                   (IdType(Basic))
+import qualified Clash.Netlist.Id                   as Id
 import           Clash.Netlist.Util                 (typeSize)
 import qualified Clash.Primitives.DSL               as Prim
 import           Clash.Primitives.DSL
@@ -136,9 +136,10 @@ foldTF = TemplateFunction [] (const True) foldTF'
 foldTF' :: forall s . (HasCallStack, Backend s) => BlackBoxContext -> State s Doc
 foldTF' bbCtx@(bbInputs -> [_f, (vec, vecType@(Vector n aTy), _isLiteral)]) = do
   -- Create an id for every element in the vector
-  vecIds <- mapM (\i -> mkId ("acc_0_" <> show i)) [0..n-1]
+  baseId <- Id.make "acc_0"
+  vecIds <- replicateM n (Id.next baseId)
 
-  vecId <- mkId "vec"
+  vecId <- Id.make "vec"
   let vecDecl = sigDecl vecType Wire vecId
       vecAssign = Assignment vecId vec
       elemAssigns = zipWith Assignment vecIds (map (iIndex vecId) [0..])
@@ -160,7 +161,7 @@ foldTF' bbCtx@(bbInputs -> [_f, (vec, vecType@(Vector n aTy), _isLiteral)]) = do
       resultAssign = Assignment resultId (Identifier result Nothing)
 
   callDecls <- zipWithM callDecl [0..] fCalls
-  foldNm <- mkId "fold"
+  foldNm <- Id.make "fold"
 
   getMon $ blockDecl foldNm $
     resultAssign :
@@ -171,9 +172,6 @@ foldTF' bbCtx@(bbInputs -> [_f, (vec, vecType@(Vector n aTy), _isLiteral)]) = do
     callDecls
 
  where
-  mkId :: String -> State s Identifier
-  mkId = mkUniqueIdentifier Basic . Text.pack
-
   callDecl :: Int -> FCall -> State s Declaration
   callDecl fSubPos (FCall a b r) = do
     rendered0 <- string =<< (renderElem bbCtx call <*> pure 0)
@@ -189,9 +187,9 @@ foldTF' bbCtx@(bbInputs -> [_f, (vec, vecType@(Vector n aTy), _isLiteral)]) = do
    where
     call  = Component (Decl fPos fSubPos (resEl:aEl:[bEl]))
     elTyp = [TypElem (Typ (Just vecPos))]
-    resEl = ([Text (LText.fromStrict r)], elTyp)
-    aEl   = ([Text (LText.fromStrict a)], elTyp)
-    bEl   = ([Text (LText.fromStrict b)], elTyp)
+    resEl = ([Text (Id.toLazyText r)], elTyp)
+    aEl   = ([Text (Id.toLazyText a)], elTyp)
+    bEl   = ([Text (Id.toLazyText b)], elTyp)
 
   -- Argument no. of function
   fPos = 0
@@ -222,7 +220,7 @@ foldTF' bbCtx@(bbInputs -> [_f, (vec, vecType@(Vector n aTy), _isLiteral)]) = do
     -> [Identifier]
     -> State s ([FCall], [Identifier])
   mkLevel (!lvl, !offset) (a:b:rest) = do
-    c <- mkId ("acc_" <> show lvl <> "_" <> show offset)
+    c <- Id.makeBasic ("acc_" <> showt lvl <> "_" <> showt offset)
     (calls, results) <- mkLevel (lvl, offset+1) rest
     pure (FCall a b c:calls, c:results)
   mkLevel _lvl rest =

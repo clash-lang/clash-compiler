@@ -19,8 +19,9 @@ import           GHC.Stack
   (HasCallStack, prettyCallStack, callStack)
 
 import           Clash.Backend
-import           Clash.Netlist.Id
+import qualified Clash.Netlist.Id as Id
 import           Clash.Netlist.Types
+import           Clash.Netlist.Util (instPort)
 
 pinConfigLiteral
   :: HasCallStack
@@ -51,14 +52,13 @@ sbioTemplate
   => BlackBoxContext
   -> State s Doc
 sbioTemplate bbCtx = do
-  let mkId = mkUniqueIdentifier Basic
-      compName = "SB_IO"  -- Hardcoded for now
+  let compName = Id.unsafeMake "SB_IO"  -- Hardcoded for now
 
-  sbio <- mkId "sbio"
-  sbio_inst <- mkId "sbio_inst"
+  sbio <- Id.makeBasic "sbio"
+  sbio_inst <- Id.makeBasic "sbio_inst"
 
-  dIn0 <- mkId "dIn0"
-  dIn1 <- mkId "dIn1"
+  dIn0 <- Id.makeBasic "dIn0"
+  dIn1 <- Id.makeBasic "dIn1"
 
   let
     resultTuple =
@@ -73,22 +73,22 @@ sbioTemplate bbCtx = do
     [ NetDecl Nothing dIn0 Bit
     , NetDecl Nothing dIn1 Bit
     , InstDecl Comp Nothing [] compName sbio_inst
-      [ (Identifier "PIN_TYPE" Nothing, BitVector 6, pinConfig)
+      [ (instPort "PIN_TYPE", BitVector 6, pinConfig)
       ]
       [ -- NOTE: Direction is set to 'In', but will be rendered as inout due to
         -- its the type packackagePinTy
-        (Identifier "PACKAGE_PIN" Nothing, In, packagePinTy, packagePin)
-      , (Identifier "LATCH_INPUT_VALUE" Nothing, In, Bit, latchInput)
+        (instPort "PACKAGE_PIN", In, packagePinTy, packagePin)
+      , (instPort "LATCH_INPUT_VALUE", In, Bit, latchInput)
       -- TODO: If clock is constantly enabled, docs recommend  not connecting
       -- TODO: CLOCK_ENABLE at all.
-      , (Identifier "CLOCK_ENABLE" Nothing, In, Bool, en)
-      , (Identifier "INPUT_CLK" Nothing, In, clkTy, clk)
-      , (Identifier "OUTPUT_CLK" Nothing, In, clkTy, clk)
-      , (Identifier "OUTPUT_ENABLE" Nothing, In, Bool, outputEnable)
-      , (Identifier "D_OUT_0" Nothing, In, Bit, dOut0)
-      , (Identifier "D_OUT_1" Nothing, In, Bit, dOut1)
-      , (Identifier "D_IN_0" Nothing, Out, Bit, Identifier dIn0 Nothing)
-      , (Identifier "D_IN_1" Nothing, Out, Bit, Identifier dIn1 Nothing)
+      , (instPort "CLOCK_ENABLE", In, Bool, en)
+      , (instPort "INPUT_CLK", In, clkTy, clk)
+      , (instPort "OUTPUT_CLK", In, clkTy, clk)
+      , (instPort "OUTPUT_ENABLE", In, Bool, outputEnable)
+      , (instPort "D_OUT_0", In, Bit, dOut0)
+      , (instPort "D_OUT_1", In, Bit, dOut1)
+      , (instPort "D_IN_0", Out, Bit, Identifier dIn0 Nothing)
+      , (instPort "D_IN_1", Out, Bit, Identifier dIn1 Nothing)
       ]
     , Assignment result resultTuple
     ]

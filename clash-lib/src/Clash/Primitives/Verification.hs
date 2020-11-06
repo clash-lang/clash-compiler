@@ -14,7 +14,6 @@ import           Data.Semigroup.Monad            (getMon)
 import           GHC.Stack                       (HasCallStack)
 
 import           Clash.Annotations.Primitive     (HDL(..))
-import qualified Clash.Backend
 import           Clash.Backend
   (Backend, blockDecl, hdlKind)
 import           Clash.Core.Term                 (Term(Var))
@@ -23,9 +22,8 @@ import           Clash.Core.TermLiteral          (termToDataError)
 import           Clash.Util                      (indexNote)
 import           Clash.Netlist                   (mkExpr)
 import           Clash.Netlist.Util              (stripVoid)
-import qualified Clash.Netlist.Util
 import           Clash.Netlist.Util              (id2identifier)
-import           Clash.Netlist.Id                (IdType(Basic))
+import qualified Clash.Netlist.Id                as Id
 import           Clash.Netlist.Types
   (BlackBox(BBFunction), TemplateFunction(..), BlackBoxContext, Identifier,
    NetlistMonad, Declaration(Assignment, NetDecl', TickDecl),
@@ -61,7 +59,6 @@ checkBBF _isD _primName args _ty =
 
   bb = BBFunction "Clash.Primitives.Verification.checkTF" 0
   meta = emptyBlackBoxMeta {bbKind=TDecl, bbRenderVoid=RenderVoid}
-  mkId = Clash.Netlist.Util.mkUniqueIdentifier Basic . Text.pack
 
   bindMaybe
     :: Maybe String
@@ -74,7 +71,7 @@ checkBBF _isD _primName args _ty =
   bindMaybe Nothing t = bindMaybe (Just "s") t
   bindMaybe (Just nm) t = do
     tcm <- Lens.use tcCache
-    newId <- mkId nm
+    newId <- Id.make (Text.pack nm)
     (expr0, decls) <- mkExpr False Concurrent (NetlistId newId (termType tcm t)) t
     pure
       ( newId
@@ -108,7 +105,7 @@ checkTF'
   -> BlackBoxContext
   -> State s Doc
 checkTF' decls clkId propName renderAs prop bbCtx = do
-  blockName <- Clash.Backend.mkUniqueIdentifier Basic (propName <> "_block")
+  blockName <- Id.makeBasic (propName <> "_block")
   getMon (blockDecl blockName (TickDecl renderedPslProperty : decls))
 
  where
@@ -123,5 +120,5 @@ checkTF' decls clkId propName renderAs prop bbCtx = do
     | renderAs == SVA || hdl == SystemVerilog = sva
     | otherwise = psl
    where
-    sva = pprSvaProperty propName clkId edge prop
-    psl = pprPslProperty hdl propName clkId edge prop
+    sva = pprSvaProperty propName (Id.toText clkId) edge (fmap Id.toText prop)
+    psl = pprPslProperty hdl propName (Id.toText clkId) edge (fmap Id.toText prop)

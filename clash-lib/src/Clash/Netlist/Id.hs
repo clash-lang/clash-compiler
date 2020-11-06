@@ -1,117 +1,213 @@
 {-|
-  Copyright  :  (C) 2012-2016, University of Twente
+  Copyright  :  (C) 2020, QBayLogic B.V.
   License    :  BSD2 (see the file LICENSE)
-  Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
+  Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 
   Transform/format a Netlist Identifier so that it is acceptable as a HDL identifier
 -}
 
 {-# LANGUAGE CPP #-}
+{-# LANGUAGE DeriveAnyClass #-}
+{-# LANGUAGE MagicHash #-}
+{-# LANGUAGE MultiWayIf #-}
+{-# LANGUAGE NamedFieldPuns #-}
+{-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE QuasiQuotes #-}
 
 module Clash.Netlist.Id
-  ( IdType (..)
-  , mkBasicId'
-  , stripDollarPrefixes
+  ( -- * Utilities to use IdentifierSet
+    IdentifierSet
+  , IdentifierSetMonad(..)
+  , HasIdentifierSet(..)
+  , emptyIdentifierSet
+  , makeSet
+
+    -- * Unsafe creation and extracting identifiers
+  , Identifier
+  , IdentifierType (..)
+  , unsafeMake
+  , toText
+  , toLazyText
+  , toList
+  , union
+
+    -- * Creating and extending identifiers
+  , make
+  , makeBasic
+  , makeBasicOr
+  , makeAs
+  , addRaw
+  , deepen
+  , deepenN
+  , next
+  , nextN
+  , prefix
+  , suffix
+  , fromCoreId
+
+  -- * Misc. and internals
+  , VHDL.stripDollarPrefixes
+  , toBasicId#
+  , isBasic#
+  , isExtended#
   )
 where
 
-import Clash.Annotations.Primitive (HDL (..))
-import Data.Char (isAsciiLower,isAsciiUpper,isDigit)
-import Data.Text as Text
+import           Clash.Annotations.Primitive (HDL (..))
+import           Clash.Core.Var (Id)
+import {-# SOURCE #-} Clash.Netlist.Types
+  (PreserveCase(..), HasIdentifierSet(..), IdentifierSet(..), Identifier(..),
+   IdentifierType(..), IdentifierSetMonad(identifierSetM))
+import qualified Data.HashSet as HashSet
+import qualified Data.HashMap.Strict as HashMap
+import qualified Data.IntMap.Strict as IntMap
+import qualified Data.List as List
+import           Data.Text (Text)
+import qualified Data.Text.Lazy as LT
+import           GHC.Stack (HasCallStack)
 
-data IdType = Basic | Extended
+import qualified Clash.Netlist.Id.VHDL as VHDL
+import           Clash.Netlist.Id.Internal
 
-mkBasicId'
-  :: HDL
-  -> Bool
+-- | Identifier set without identifiers
+emptyIdentifierSet
+  :: Bool
+  -- ^ Allow escaped identifiers?
+  -> PreserveCase
+  -- ^ Should all basic identifiers be lower case?
+  -> HDL
+  -- ^ HDL to generate names for
+  -> IdentifierSet
+emptyIdentifierSet esc lw hdl = makeSet esc lw hdl mempty
+
+-- | Union of two identifier sets. Errors if given sets have been made with
+-- different options enabled.
+union :: HasCallStack => IdentifierSet -> IdentifierSet -> IdentifierSet
+union (IdentifierSet escL lwL hdlL freshL idsL) (IdentifierSet escR lwR hdlR freshR idsR)
+  | escL /= escR = error $ "Internal error: escL /= escR, " <> show (escL, escR)
+  | hdlL /= hdlR = error $ "Internal error: hdlL /= hdlR, " <> show (hdlL, hdlR)
+  | lwL /= lwR = error $ "Internal error: lwL /= lwR , " <> show (lwL, lwR)
+  | otherwise = IdentifierSet escR lwR hdlR fresh ids
+ where
+  fresh = HashMap.unionWith (IntMap.unionWith max) freshL freshR
+  ids = HashSet.union idsL idsR
+
+-- | Make a identifier set filled with given identifiers
+makeSet
+  :: Bool
+  -- ^ Allow escaped identifiers?
+  -> PreserveCase
+  -- ^ Should all basic identifiers be lower case?
+  -> HDL
+  -- ^ HDL to generate names for
+  -> HashSet.HashSet Identifier
+  -- ^ Identifiers to add to set
+  -> IdentifierSet
+makeSet esc lw hdl ids = IdentifierSet esc lw hdl fresh ids
+ where
+  fresh = List.foldl' updateFreshCache# mempty ids
+
+toList :: IdentifierSet -> [Identifier]
+toList (IdentifierSet _ _ _ _ idStore) = HashSet.toList idStore
+
+-- | Convert an identifier to string. Use 'unmake' if you need the
+-- "IdentifierType" too.
+toText :: Identifier -> Text
+toText = toText#
+
+-- | Convert an identifier to string. Use 'unmake' if you need the
+-- "IdentifierType" too.
+toLazyText :: Identifier -> LT.Text
+toLazyText = LT.fromStrict . toText
+
+-- | Helper function to define pure Id functions in terms of a IdentifierSetMonad
+withIdentifierSetM
+  :: IdentifierSetMonad m
+  => (IdentifierSet -> a -> (IdentifierSet, b))
+  -> a
+  -> m b
+withIdentifierSetM f a = do
+  is0 <- identifierSetM id
+  let (is1, b) = f is0 a
+  _ <- identifierSetM (const is1)
+  pure b
+
+-- | Like 'addRaw', 'unsafeMake' creates an identifier that will be spliced
+-- at verbatim in the HDL. As opposed to 'addRaw', the resulting Identifier
+-- might be generated at a later point as it is NOT added to an IdentifierSet.
+unsafeMake :: Text -> Identifier
+unsafeMake t = RawIdentifier t Nothing
+
+-- | Add a string as is to an IdentifierSet. Should only be used for identifiers
+-- that should be spliced at verbatim in HDL, such as port names. It's sanitized
+-- version will still be added to the identifier set, to prevent freshly
+-- generated variables clashing with the raw one.
+addRaw :: IdentifierSetMonad m => Text -> m Identifier
+addRaw = withIdentifierSetM addRaw#
+
+-- | Make unique identifier based on given string
+make :: IdentifierSetMonad m => Text -> m Identifier
+make = withIdentifierSetM make#
+
+-- | Make unique basic identifier based on given string
+makeBasic :: IdentifierSetMonad m => Text -> m Identifier
+makeBasic = withIdentifierSetM makeBasic#
+
+-- | Make unique basic identifier based on given string. If given string can't
+-- be converted to a basic identifier (i.e., it would yield an empty string) the
+-- alternative name is used.
+makeBasicOr
+  :: IdentifierSetMonad m
+  => Text
+  -- ^ Name hint
   -> Text
-  -> Text
-mkBasicId' hdl tupEncode = stripMultiscore hdl . stripLeading hdl . zEncode hdl tupEncode
-  where
-    stripLeading VHDL = Text.dropWhile (`elem` ('_':['0'..'9']))
-    stripLeading _    = Text.dropWhile (`elem` ('$':['0'..'9']))
-    stripMultiscore VHDL
-      = Text.concat
-      . Prelude.map (\cs -> case Text.head cs of
-                              '_' -> "_"
-                              _   -> cs
-                    )
-      . Text.group
-    stripMultiscore _ = id
+  -- ^ If name hint can't be converted to a sensible basic id, use this instead
+  -> m Identifier
+makeBasicOr hint altHint =
+  withIdentifierSetM
+    (\is0 -> uncurry (makeBasicOr# is0))
+    (hint, altHint)
 
-stripDollarPrefixes :: Text -> Text
-stripDollarPrefixes = stripWorkerPrefix . stripSpecPrefix . stripConPrefix
-                    . stripWorkerPrefix . stripDictFunPrefix
-  where
-    stripDictFunPrefix t = case Text.stripPrefix "$f" t of
-                             Just k  -> takeWhileEnd (/= '_') k
-                             Nothing -> t
+-- | Make unique identifier. Uses 'makeBasic' if first argument is 'Basic'
+makeAs :: IdentifierSetMonad m => IdentifierType -> Text -> m Identifier
+makeAs Basic = makeBasic
+makeAs Extended = make
 
-    stripWorkerPrefix t = case Text.stripPrefix "$w" t of
-                              Just k  -> k
-                              Nothing -> t
+-- | Given identifier "foo_1_2" return "foo_1_3". If "foo_1_3" is already a
+-- member of the given set, return "foo_1_4" instead, etc. Identifier returned
+-- is guaranteed to be unique.
+next :: IdentifierSetMonad m => Identifier -> m Identifier
+next = withIdentifierSetM next#
 
-    stripConPrefix t = case Text.stripPrefix "$c" t of
-                         Just k  -> k
-                         Nothing -> t
+-- | Same as 'nextM', but returns N fresh identifiers
+nextN :: IdentifierSetMonad m => Int -> Identifier -> m [Identifier]
+nextN n = withIdentifierSetM (nextN# n)
 
-    stripSpecPrefix t = case Text.stripPrefix "$s" t of
-                          Just k -> k
-                          Nothing -> t -- snd (Text.breakOnEnd "$s" t)
+-- | Given identifier "foo_1_2" return "foo_1_2_0". If "foo_1_2_0" is already a
+-- member of the given set, return "foo_1_2_1" instead, etc. Identifier returned
+-- is guaranteed to be unique.
+deepen :: IdentifierSetMonad m => Identifier -> m Identifier
+deepen = withIdentifierSetM deepen#
 
+-- | Same as 'deepenM', but returns N fresh identifiers. For example, given
+-- "foo_23" is would return "foo_23_0", "foo_23_1", ...
+deepenN :: IdentifierSetMonad m => Int -> Identifier -> m [Identifier]
+deepenN n = withIdentifierSetM (deepenN# n)
 
-type UserString    = Text -- As the user typed it
-type EncodedString = Text -- Encoded form
+-- | Given identifier "foo_1_2" and a suffix "bar", return an identifier called
+-- "foo_bar". Identifier returned is guaranteed to be unique according to the
+-- rules of 'nextIdentifier'.
+suffix :: IdentifierSetMonad m => Identifier -> Text -> m Identifier
+suffix id0 suffix_ = withIdentifierSetM (\is id1 -> suffix# is id1 suffix_) id0
 
-zEncode :: HDL -> Bool -> UserString -> EncodedString
-zEncode hdl False cs = go (uncons cs)
-  where
-    go Nothing         = empty
-    go (Just (c,cs'))  = append (encodeDigitCh hdl c) (go' $ uncons cs')
-    go' Nothing        = empty
-    go' (Just (c,cs')) = append (encodeCh hdl c) (go' $ uncons cs')
+-- | Given identifier "foo_1_2" and a prefix "bar", return an identifier called
+-- "bar_foo". Identifier returned is guaranteed to be unique according to the
+-- rules of 'nextIdentifier'.
+prefix :: IdentifierSetMonad m => Identifier -> Text -> m Identifier
+prefix id0 prefix_ = withIdentifierSetM (\is id1 -> prefix# is id1 prefix_) id0
 
-zEncode hdl True cs = case maybeTuple cs of
-                    Just (n,cs') -> append n (go' (uncons cs'))
-                    Nothing      -> go (uncons cs)
-  where
-    go Nothing         = empty
-    go (Just (c,cs'))  = append (encodeDigitCh hdl c) (go' $ uncons cs')
-    go' Nothing        = empty
-    go' (Just (c,cs')) = case maybeTuple (cons c cs') of
-                           Just (n,cs2) -> append n (go' $ uncons cs2)
-                           Nothing      -> append (encodeCh hdl c) (go' $ uncons cs')
-
-encodeDigitCh :: HDL -> Char -> EncodedString
-encodeDigitCh _   c | isDigit c = Text.empty -- encodeAsUnicodeChar c
-encodeDigitCh hdl c             = encodeCh hdl c
-
-encodeCh :: HDL -> Char -> EncodedString
-encodeCh hdl c | unencodedChar hdl c = singleton c     -- Common case first
-               | otherwise           = Text.empty
-
-unencodedChar :: HDL -> Char -> Bool   -- True for chars that don't need encoding
-unencodedChar hdl c  =
-  or [ isAsciiLower c
-     , isAsciiUpper c
-     , isDigit c
-     , if hdl == VHDL then c == '_' else c `elem` ['_','$']
-     ]
-
-maybeTuple :: UserString -> Maybe (EncodedString,UserString)
-maybeTuple "(# #)" = Just ("Unit",empty)
-maybeTuple "()"    = Just ("Unit",empty)
-maybeTuple (uncons -> Just ('(',uncons -> Just ('#',cs))) =
-  case countCommas 0 cs of
-    (n,uncons -> Just ('#',uncons -> Just (')',cs'))) -> Just (pack ("Tup" ++ show (n+1)),cs')
-    _ -> Nothing
-maybeTuple (uncons -> Just ('(',cs)) =
-  case countCommas 0 cs of
-    (n,uncons -> Just (')',cs')) -> Just (pack ("Tup" ++ show (n+1)),cs')
-    _ -> Nothing
-maybeTuple _  = Nothing
-
-countCommas :: Int -> UserString -> (Int,UserString)
-countCommas n (uncons -> Just (',',cs)) = countCommas (n+1) cs
-countCommas n cs                        = (n,cs)
+-- | Convert a Clash Core Id to an identifier. Makes sure returned identifier
+-- is unique.
+fromCoreId :: IdentifierSetMonad m => Id -> m Identifier
+fromCoreId = withIdentifierSetM fromCoreId#

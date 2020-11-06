@@ -17,6 +17,7 @@ import Clash.Backend.SystemVerilog
 import Clash.Backend.VHDL
 import Clash.Backend.Verilog
 import Clash.Netlist.BlackBox.Types
+import Clash.Netlist.Types (PreserveCase(..))
 import Clash.Annotations.BitRepresentation.Internal (buildCustomReprs)
 import Clash.Util
 
@@ -28,17 +29,17 @@ import Util (OverridingBool(..))
 genSystemVerilog
   :: String
   -> IO ()
-genSystemVerilog = doHDL (initBackend WORD_SIZE_IN_BITS HDLSYN True Nothing (AggressiveXOptBB False) :: SystemVerilogState)
+genSystemVerilog = doHDL (initBackend WORD_SIZE_IN_BITS HDLSYN True PreserveCase Nothing (AggressiveXOptBB False) :: SystemVerilogState)
 
 genVHDL
   :: String
   -> IO ()
-genVHDL = doHDL (initBackend WORD_SIZE_IN_BITS HDLSYN True Nothing (AggressiveXOptBB False):: VHDLState)
+genVHDL = doHDL (initBackend WORD_SIZE_IN_BITS HDLSYN True PreserveCase Nothing (AggressiveXOptBB False):: VHDLState)
 
 genVerilog
   :: String
   -> IO ()
-genVerilog = doHDL (initBackend WORD_SIZE_IN_BITS HDLSYN True Nothing (AggressiveXOptBB False):: VerilogState)
+genVerilog = doHDL (initBackend WORD_SIZE_IN_BITS HDLSYN True PreserveCase Nothing (AggressiveXOptBB False):: VerilogState)
 
 doHDL
   :: HasCallStack

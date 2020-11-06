@@ -1,9 +1,12 @@
+{-# LANGUAGE QuasiQuotes #-}
 module Identity where
 
 import Prelude as P
 
 import Clash.Prelude
 import Clash.Netlist.Types
+import qualified Clash.Util.Interpolate as I
+import qualified Clash.Netlist.Id as Id
 
 import Test.Tasty.Clash
 import Test.Tasty.Clash.NetlistTest
@@ -18,8 +21,20 @@ assertAssignsInOut :: Component -> IO ()
 assertAssignsInOut (Component _ [i] [o] ds) =
   case ds of
     [Assignment oName (Identifier iName Nothing)]
-      | iName == fst i && oName == fst ((\(_,x,_) -> x) o) -> return ()
-      | otherwise -> P.error "Incorrect input/output names"
+      | Id.toText iName == Id.toText (fst i)
+      , Id.toText oName == Id.toText (fst ((\(_,x,_) -> x) o))
+      -> return ()
+      | otherwise -> P.error [I.i|
+          Incorrect input/output names:
+
+           oName: #{oName}
+
+           o: #{o}
+
+           iName: #{iName}
+
+           i: #{i}
+        |]
 
     _ -> P.error "Identity circuit performs more than just one assignment"
 

@@ -9,6 +9,7 @@ module T1439 where
 import Clash.Prelude
 import Clash.Sized.Internal.BitVector
 import Clash.Netlist.Types
+import qualified Clash.Netlist.Id as Id
 
 import Test.Tasty.Clash
 import Test.Tasty.Clash.NetlistTest
@@ -47,7 +48,7 @@ testPath = "tests/shouldwork/Issues/T1439.hs"
 
 noRotateRight :: Component -> IO ()
 noRotateRight (Component nm _ _ _)
-  | nm == "rotate_right" = error ("No component should be called rotate_right")
+  | Id.toText nm == "rotate_right" = error ("No component should be called rotate_right")
   | otherwise = pure ()
 
 getComponent :: (a, b, c, d) -> d
@@ -57,4 +58,3 @@ mainVHDL :: IO ()
 mainVHDL = do
   netlist <- runToNetlistStage SVHDL id testPath
   mapM_ (noRotateRight . getComponent) netlist
-

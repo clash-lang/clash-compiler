@@ -110,10 +110,10 @@ data Element
   -- ^ Dumps given text without processing in HDL
   | Component !Decl
   -- ^ Component instantiation hole
-  | Result !Bool
-  -- ^ Output hole; @Bool@ asserts escape marker stripping
-  | Arg !Bool !Int
-  -- ^ Input hole; @Bool@ asserts escape marker stripping
+  | Result
+  -- ^ Output hole;
+  | Arg !Int
+  -- ^ Input hole
   | ArgGen !Int !Int
   -- ^ Like Arg, but its first argument is the scoping level. For use in
   -- in generated code only.

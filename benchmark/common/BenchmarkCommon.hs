@@ -5,6 +5,7 @@
 
 module BenchmarkCommon where
 
+import Clash.Annotations.Primitive (HDL(VHDL))
 import Clash.Annotations.BitRepresentation.Internal (CustomReprs, buildCustomReprs)
 import Clash.Backend
 import Clash.Backend.VHDL
@@ -23,7 +24,8 @@ import Clash.GHC.Evaluator
 import Clash.GHC.GenerateBindings
 import Clash.GHC.NetlistTypes
 import Clash.Netlist.BlackBox.Types (HdlSyn(Other))
-import Clash.Netlist.Types          (HWMap, FilteredHWType, TopEntityT, topId)
+import Clash.Netlist.Types
+  (PreserveCase(..), HWMap, FilteredHWType, TopEntityT, topId)
 import Clash.Primitives.Types
 
 import Util (OverridingBool(..))
@@ -57,8 +59,11 @@ opts idirs =
     , opt_specLimit=40 -- For "PipelinesViaFolds"
     }
 
+hdl :: HDL
+hdl = VHDL
+
 backend :: VHDLState
-backend = initBackend WORD_SIZE_IN_BITS HDLSYN True Nothing (AggressiveXOptBB False)
+backend = initBackend WORD_SIZE_IN_BITS HDLSYN True PreserveCase Nothing (AggressiveXOptBB False)
 
 runInputStage
   :: [FilePath]

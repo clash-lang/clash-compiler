@@ -10,14 +10,8 @@
 
 module Clash.Backend where
 
-import Control.Lens                         (Lens')
-import qualified  Control.Lens              as Lens
-import Data.HashMap.Strict                  (HashMap)
-import qualified Data.HashMap.Strict        as HashMap
 import Data.HashSet                         (HashSet)
-import Data.Maybe                           (fromMaybe)
 import Data.Semigroup.Monad                 (Mon (..))
-import qualified Data.Text                  as T
 import Data.Text                            (Text)
 import qualified Data.Text.Lazy             as LT
 import Control.Monad.State                  (State)
@@ -25,7 +19,6 @@ import Data.Text.Prettyprint.Doc.Extra      (Doc)
 
 import SrcLoc (SrcSpan)
 
-import Clash.Netlist.Id
 import {-# SOURCE #-} Clash.Netlist.Types
 import Clash.Netlist.BlackBox.Types
 
@@ -52,7 +45,7 @@ clashVer = Data.Version.showVersion Paths_clash_lib.version
 clashVer = "development"
 #endif
 
-type ModName = Identifier
+type ModName = Text
 
 -- | Is a type used for internal or external use
 data Usage
@@ -64,12 +57,13 @@ data Usage
 -- | Is '-fclash-aggresive-x-optimization-blackbox' set?
 newtype AggressiveXOptBB = AggressiveXOptBB Bool
 
-class Backend state where
+class HasIdentifierSet state => Backend state where
   -- | Initial state for state monad
   initBackend
     :: Int
     -> HdlSyn
     -> Bool
+    -> PreserveCase
     -> Maybe (Maybe Int)
     -> AggressiveXOptBB
     -> state
@@ -91,9 +85,9 @@ class Backend state where
   extractTypes     :: state -> HashSet HWType
 
   -- | Generate HDL for a Netlist component
-  genHDL           :: Identifier -> SrcSpan -> HashMap Identifier Word -> Component -> Mon (State state) ((String, Doc),[(String,Doc)])
+  genHDL           :: ModName -> SrcSpan -> IdentifierSet -> Component -> Mon (State state) ((String, Doc),[(String,Doc)])
   -- | Generate a HDL package containing type definitions for the given HWTypes
-  mkTyPackage      :: Identifier -> [HWType] -> Mon (State state) [(String, Doc)]
+  mkTyPackage      :: ModName -> [HWType] -> Mon (State state) [(String, Doc)]
   -- | Convert a Netlist HWType to a target HDL type
   hdlType          :: Usage -> HWType -> Mon (State state) Doc
   -- | Convert a Netlist HWType to an HDL error value for that type
@@ -120,10 +114,6 @@ class Backend state where
   fromBV           :: HWType -> LT.Text -> Mon (State state) Doc
   -- | Synthesis tool we're generating HDL for
   hdlSyn           :: State state HdlSyn
-  -- | mkIdentifier
-  mkIdentifier     :: State state (IdType -> Identifier -> Identifier)
-  -- | mkIdentifier
-  extendIdentifier :: State state (IdType -> Identifier -> Identifier -> Identifier)
   -- | setModName
   setModName       :: ModName -> state -> state
   -- | setSrcSpan
@@ -131,9 +121,7 @@ class Backend state where
   -- | getSrcSpan
   getSrcSpan       :: State state SrcSpan
   -- | Block of declarations
-  blockDecl        :: Text -> [Declaration] -> Mon (State state) Doc
-  -- | unextend/unescape identifier
-  unextend         :: State state (Identifier -> Identifier)
+  blockDecl        :: Identifier -> [Declaration] -> Mon (State state) Doc
   addIncludes      :: [(String, Doc)] -> State state ()
   addLibraries     :: [LT.Text] -> State state ()
   addImports       :: [LT.Text] -> State state ()
@@ -141,54 +129,6 @@ class Backend state where
   getDataFiles     :: State state [(String,FilePath)]
   addMemoryDataFile  :: (String,String) -> State state ()
   getMemoryDataFiles :: State state [(String,String)]
-  seenIdentifiers  :: Lens' state (HashMap Identifier Word)
   ifThenElseExpr :: state -> Bool
   -- | Whether -fclash-aggressive-x-optimization-blackboxes was set
   aggressiveXOptBB :: State state AggressiveXOptBB
-
--- | Replace a normal HDL template placeholder with an unescaped/unextended
--- template placeholder.
---
--- Needed when the the place-holder is filled with an escaped/extended identifier
--- inside an escaped/extended identifier and we want to strip the escape
--- /extension markers. Otherwise we end up with illegal identifiers.
-escapeTemplate :: Identifier -> Identifier
-escapeTemplate "~RESULT" = "~ERESULT"
-escapeTemplate t = fromMaybe t $ do
-  t1 <- T.stripPrefix "~ARG[" t
-  n  <- T.stripSuffix "]" t1
-  pure (T.concat ["~EARG[",n,"]"])
-
-mkUniqueIdentifier
-  :: Backend s
-  => IdType
-  -> Identifier
-  -> State s Identifier
-mkUniqueIdentifier typ nm = do
-  mkId     <- mkIdentifier
-  extendId <- extendIdentifier
-  seen     <- Lens.use seenIdentifiers
-  let i = mkId typ nm
-  case HashMap.lookup i seen of
-    Just n -> go extendId n seen i
-    Nothing -> do
-     seenIdentifiers Lens.%= (HashMap.insert i 0)
-     return i
- where
-  go extendId n seen i = do
-    let i' = extendId typ i (T.pack ('_':show n))
-    case HashMap.lookup i' seen of
-       Just _ -> go extendId (n+1) seen i
-       Nothing -> do
-        seenIdentifiers Lens.%= (HashMap.insert i' (n+1))
-        return i'
-
-preserveSeen
-  :: Backend s
-  => Mon (State s) a
-  -> Mon (State s) a
-preserveSeen m = do
-  s <- Mon (Lens.use seenIdentifiers)
-  a <- m
-  Mon (seenIdentifiers Lens..= s)
-  return a

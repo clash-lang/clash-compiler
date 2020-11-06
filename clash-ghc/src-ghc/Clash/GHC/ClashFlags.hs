@@ -24,10 +24,12 @@ import           Data.IORef
 import           Data.List                      (dropWhileEnd)
 import           Data.List.Split                (splitOn)
 import qualified Data.Set                       as Set
+import qualified Data.Text                      as Text
 import           Text.Read                      (readMaybe)
 
 import           Clash.Driver.Types
 import           Clash.Netlist.BlackBox.Types   (HdlSyn (..))
+import           Clash.Netlist.Types            (PreserveCase (ToLower))
 
 parseClashFlags :: IORef ClashOpts -> [Located String]
                 -> IO ([Located String]
@@ -84,6 +86,7 @@ flagsClash r = [
   , defFlag "fclash-component-prefix"            $ SepArg (liftEwM . setComponentPrefix r)
   , defFlag "fclash-old-inline-strategy"         $ NoArg (liftEwM (setOldInlineStrategy r))
   , defFlag "fclash-no-escaped-identifiers"      $ NoArg (liftEwM (setNoEscapedIds r))
+  , defFlag "fclash-lower-case-basic-identifiers"$ NoArg (liftEwM (setLowerCaseBasicIds r))
   , defFlag "fclash-compile-ultra"               $ NoArg (liftEwM (setUltra r))
   , defFlag "fclash-force-undefined"             $ OptIntSuffix (setUndefined r)
   , defFlag "fclash-aggressive-x-optimization"   $ NoArg (liftEwM (setAggressiveXOpt r))
@@ -215,13 +218,17 @@ setComponentPrefix
   :: IORef ClashOpts
   -> String
   -> IO ()
-setComponentPrefix r s = modifyIORef r (\c -> c {opt_componentPrefix = Just s})
+setComponentPrefix r s =
+  modifyIORef r (\c -> c {opt_componentPrefix = Just (Text.pack s)})
 
 setOldInlineStrategy :: IORef ClashOpts -> IO ()
 setOldInlineStrategy r = modifyIORef r (\c -> c {opt_newInlineStrat = False})
 
 setNoEscapedIds :: IORef ClashOpts -> IO ()
 setNoEscapedIds r = modifyIORef r (\c -> c {opt_escapedIds = False})
+
+setLowerCaseBasicIds :: IORef ClashOpts -> IO ()
+setLowerCaseBasicIds r = modifyIORef r (\c -> c {opt_lowerCaseBasicIds = ToLower})
 
 setUltra :: IORef ClashOpts -> IO ()
 setUltra r = modifyIORef r (\c -> c {opt_ultra = True})

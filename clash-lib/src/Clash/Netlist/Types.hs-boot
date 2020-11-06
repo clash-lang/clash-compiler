@@ -8,15 +8,25 @@
 
 module Clash.Netlist.Types where
 
-import Data.Text (Text)
+import Control.Lens (Lens')
+import Data.Hashable
 
-type Identifier = Text
-
+data IdentifierType
+data Identifier
+data IdentifierSet
 data HWType
 data Declaration
 data Component
 data Expr
 data BlackBox
 
+class Monad m => IdentifierSetMonad m where
+  identifierSetM :: (IdentifierSet -> IdentifierSet) -> m IdentifierSet
+
+class HasIdentifierSet s where
+  identifierSet :: Lens' s IdentifierSet
+
 type role NetlistMonad nominal
 data NetlistMonad a
+data PreserveCase = PreserveCase | ToLower
+instance Hashable PreserveCase

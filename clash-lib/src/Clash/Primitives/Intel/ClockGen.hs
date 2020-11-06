@@ -14,15 +14,16 @@ module Clash.Primitives.Intel.ClockGen where
 
 import Clash.Backend
 import Clash.Netlist.BlackBox.Util
-import Clash.Netlist.Id
+import qualified Clash.Netlist.Id as Id
 import Clash.Netlist.Types
-import Clash.Netlist.Util hiding (mkUniqueIdentifier)
+import Clash.Netlist.Util
 
 import Control.Monad.State
 
 import Data.Semigroup.Monad
 import qualified Data.String.Interpolate.IsString as I
 import Data.Text.Prettyprint.Doc.Extra
+import TextShow (showt)
 
 import qualified Data.Text as TextS
 
@@ -69,28 +70,33 @@ alteraPllQsysTF = TemplateFunction used valid alteraPllQsysTemplate
   valid _ = False
 
 alteraPllTemplate
-  :: Backend s
+  :: forall s
+   . Backend s
   => BlackBoxContext
   -> State s Doc
 alteraPllTemplate bbCtx = do
- let mkId = mkUniqueIdentifier Basic
- locked <- mkId "locked"
- pllLock <- mkId "pllLock"
- alteraPll <- mkId "altera_pll_block"
- alteraPll_inst <- mkId instname0
+ locked <- Id.makeBasic "locked"
+ pllLock <- Id.makeBasic "pllLock"
+ alteraPll <- Id.makeBasic "altera_pll_block"
+ alteraPll_inst <- Id.makeBasic instname0
 
- clocks <- traverse (mkUniqueIdentifier Extended)
-                    [TextS.pack ("pllOut" ++ show n) | n <- [0..length tys - 1]]
+ clocks <- Id.nextN (length tys - 1) =<< Id.make "pllOut"
+
+  -- TODO: unsafeMake is dubious here: I don't think we take names in
+  -- TODO: bbQsysIncName into account when generating fresh ids
+ let compName = Id.unsafeMake (head (bbQsysIncName bbCtx))
+
+ let outclkPorts = map (\n -> instPort ("outclk_" <> showt n)) [(0 :: Int)..length clocks-1]
+
  getMon $ blockDecl alteraPll $ concat
   [[ NetDecl Nothing locked  rstTy
    , NetDecl' Nothing Reg pllLock (Right Bool) Nothing]
   ,[ NetDecl Nothing clkNm ty | (clkNm,ty) <- zip clocks tys]
   ,[ InstDecl Comp Nothing [] compName alteraPll_inst [] $ concat
-      [[(Identifier "refclk" Nothing,In,clkTy,clk)
-       ,(Identifier "rst" Nothing,In,rstTy,rst)]
-      ,[(Identifier (TextS.pack ("outclk_" ++ show n)) Nothing,Out,ty,Identifier k Nothing)
-       |(k,ty,n) <- zip3 clocks tys [(0 :: Int)..]  ]
-      ,[(Identifier "locked" Nothing,Out,rstTy,Identifier locked Nothing)]]
+      [ [ (instPort "refclk", In, clkTy, clk)
+        , (instPort "rst", In, rstTy, rst)]
+      , [ (p, Out, ty, Identifier k Nothing) | (k, ty, p) <- zip3 clocks tys outclkPorts ]
+      , [(instPort "locked", Out, rstTy, Identifier locked Nothing)]]
    , CondAssignment pllLock Bool (Identifier locked Nothing) rstTy
       [(Just (BitLit H),Literal Nothing (BoolLit True))
       ,(Nothing        ,Literal Nothing (BoolLit False))]
@@ -105,28 +111,31 @@ alteraPllTemplate bbCtx = do
   [(nm,_,_),(clk,clkTy,_),(rst,rstTy,_)] = drop 3 (bbInputs bbCtx)
   Just nm' = exprToString nm
   instname0 = TextS.pack nm'
-  compName = head (bbQsysIncName bbCtx)
 
 altpllTemplate
   :: Backend s
   => BlackBoxContext
   -> State s Doc
 altpllTemplate bbCtx = do
- let mkId = mkUniqueIdentifier Basic
- pllOut <- mkId "pllOut"
- locked <- mkId "locked"
- pllLock <- mkId "pllLock"
- alteraPll <- mkId "altpll_block"
- alteraPll_inst <- mkId instname0
+ pllOut <- Id.make "pllOut"
+ locked <- Id.make "locked"
+ pllLock <- Id.make "pllLock"
+ alteraPll <- Id.make "altpll_block"
+ alteraPll_inst <- Id.make instname0
+
+ -- TODO: unsafeMake is dubious here: I don't think we take names in
+ -- TODO: bbQsysIncName into account when generating fresh ids
+ let compName = Id.unsafeMake (head (bbQsysIncName bbCtx))
+
  getMon $ blockDecl alteraPll
   [ NetDecl Nothing locked  Bit
   , NetDecl' Nothing Reg pllLock (Right Bool) Nothing
   , NetDecl Nothing pllOut clkOutTy
   , InstDecl Comp Nothing [] compName alteraPll_inst []
-      [(Identifier "clk" Nothing,In,clkTy,clk)
-      ,(Identifier "areset" Nothing,In,rstTy,rst)
-      ,(Identifier "c0" Nothing,Out,clkOutTy,Identifier pllOut Nothing)
-      ,(Identifier "locked" Nothing,Out,Bit,Identifier locked Nothing)]
+      [ (instPort "clk", In, clkTy, clk)
+      , (instPort "areset", In, rstTy, rst)
+      , (instPort "c0", Out, clkOutTy, Identifier pllOut Nothing)
+      , (instPort "locked", Out, Bit, Identifier locked Nothing)]
   , CondAssignment pllLock Bool (Identifier locked Nothing) rstTy
       [(Just (BitLit H),Literal Nothing (BoolLit True))
       ,(Nothing        ,Literal Nothing (BoolLit False))]
@@ -140,8 +149,6 @@ altpllTemplate bbCtx = do
   [(Identifier result Nothing,resTy@(Product _ _ [clkOutTy,_]))] = bbResults bbCtx
   Just nm' = exprToString nm
   instname0 = TextS.pack nm'
-  compName = head (bbQsysIncName bbCtx)
-
 
 altpllQsysTemplate
   :: Backend s

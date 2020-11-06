@@ -89,7 +89,6 @@ import           Data.Semigroup.Monad
 import           Data.String
 import           Data.Text                       (Text)
 import qualified Data.Text                       as Text
-import qualified Data.Text.Lazy                  as LText
 import           Data.Text.Prettyprint.Doc.Extra
 import           TextShow                        (showt)
 
@@ -100,9 +99,9 @@ import           Clash.Core.Var                  (Attr')
 import           Clash.Netlist.BlackBox.Util     (exprToString, renderElem)
 import           Clash.Netlist.BlackBox.Types
   (BlackBoxTemplate, Element(Component, Text), Decl(..))
-import           Clash.Netlist.Id
+import qualified Clash.Netlist.Id                as Id
 import           Clash.Netlist.Types             hiding (Component, toBit)
-import           Clash.Netlist.Util              hiding (mkUniqueIdentifier)
+import           Clash.Netlist.Util
 import qualified Data.String.Interpolate         as I
 import           Data.String.Interpolate.Util    (unindent)
 import           Language.Haskell.TH             (Name)
@@ -177,6 +176,10 @@ data BlockState backend = BlockState
   }
 makeLenses ''BlockState
 
+instance Backend backend => HasIdentifierSet (BlockState backend) where
+  identifierSet :: Lens' (BlockState backend) IdentifierSet
+  identifierSet = bsBackend . identifierSet
+
 -- | A typed expression.
 data TExpr = TExpr
   { ety :: HWType
@@ -217,21 +220,17 @@ declaration blockName s = do
   let initState = BlockState [] IntMap.empty backend0
       BlockState decs _hoCalls backend1 = execState s initState
   put backend1
-  blockNameUnique <- mkUniqueIdentifier Basic blockName
+  blockNameUnique <- Id.makeBasic blockName
   getMon $ blockDecl blockNameUnique (reverse decs)
 
 -- | Add a declaration to the state.
 addDeclaration :: Declaration -> State (BlockState backend) ()
 addDeclaration dec = bsDeclarations %= cons dec
 
--- | Create a new basic unique name using the given Text as a template.
-newName :: Backend backend => Text -> State (BlockState backend) Identifier
-newName nm = zoom bsBackend $ mkUniqueIdentifier Basic nm
-
 -- | Declare a new signal with the given name and type.
 declare'
   :: Backend backend
-  => Identifier
+  => Text
   -- ^ Name hint
   -> WireOrReg
   -- ^ Should signal be declared as a wire or a reg
@@ -240,14 +239,14 @@ declare'
   -> State (BlockState backend) Identifier
   -- ^ Expression pointing the the new signal
 declare' decName wireOrReg ty = do
-  uniqueName <- newName decName
+  uniqueName <- Id.makeBasic decName
   addDeclaration (NetDecl' Nothing wireOrReg uniqueName (Right ty) Nothing)
   pure uniqueName
 
 -- | Declare a new signal with the given name and type.
 declare
   :: Backend backend
-  => Identifier
+  => Text
   -- ^ Name hint
   -> WireOrReg
   -- ^ Should signal be declared as a wire or a reg
@@ -279,7 +278,7 @@ assign aName (TExpr ty aExpr) = do
 -- will be used to assign the given expression to which is subsequently indexed.
 unvec
   :: Backend backend
-  => Identifier
+  => Text
   -- ^ Name hint for intermediate signal
   -> TExpr
   -- ^ Vector expression
@@ -298,7 +297,7 @@ deconstructProduct
   :: (HasCallStack, Backend backend)
   => TExpr
   -- ^ Product expression
-  -> [Identifier]
+  -> [Text]
   -- ^ Name hints for element assignments
   -> State (BlockState backend) [TExpr]
 deconstructProduct (TExpr ty@(Product _ _ tys) (Identifier resName _)) vals = do
@@ -315,7 +314,7 @@ untuple
   :: (HasCallStack, Backend backend)
   => TExpr
   -- ^ Tuple expression
-  -> [Identifier]
+  -> [Text]
   -- ^ Name hints for element assignments
   -> State (BlockState backend) [TExpr]
 untuple = deconstructProduct
@@ -355,7 +354,7 @@ bvLit sz n =
 -- | Convert a bool to a bit.
 boolToBit
   :: (HasCallStack, Backend backend)
-  => Identifier
+  => Text
   -- ^ Name hint for intermediate signal
   -> TExpr
   -> State (BlockState backend) TExpr
@@ -377,22 +376,22 @@ boolToBit bitName = \case
 --   Returns a reference to a declared `Bit` that should get assigned
 --   by something (usually the output port of an entity).
 boolFromBit
-  :: Backend backend
-  => Identifier
+  :: Text
   -- ^ Name hint for intermediate signal
   -> TExpr
-  -> State (BlockState backend) TExpr
+  -> State (BlockState VHDLState) TExpr
 boolFromBit = outputCoerce Bit Bool (<> " = '1'")
 
 -- | Used to create an output `Bool` from a `BitVector` of given size.
 -- Works in a similar way to `boolFromBit` above.
+--
+-- TODO: Implement for (System)Verilog
 boolFromBitVector
-  :: Backend backend
-  => Size
-  -> Identifier
+  :: Size
+  -> Text
   -- ^ Name hint for intermediate signal
   -> TExpr
-  -> State (BlockState backend) TExpr
+  -> State (BlockState VHDLState) TExpr
 boolFromBitVector n =
   outputCoerce (BitVector n) Bool (\i -> "unsigned(" <> i <> ") > 0")
 
@@ -402,7 +401,7 @@ boolFromBitVector n =
 -- TODO: Implement for (System)Verilog
 unsignedFromBitVector
   :: Size
-  -> Identifier
+  -> Text
   -- ^ Name hint for intermediate signal
   -> TExpr
   -> State (BlockState VHDLState) TExpr
@@ -417,7 +416,7 @@ unsignedFromBitVector n =
 --
 -- TODO: Implement for (System)Verilog
 boolFromBits
-  :: [Identifier]
+  :: [Text]
   -> TExpr
   -> State (BlockState VHDLState) [TExpr]
 boolFromBits inNames = outputFn (map (const Bit) inNames) Bool
@@ -432,18 +431,19 @@ outputCoerce
   :: (HasCallStack, Backend backend)
   => HWType
   -> HWType
-  -> (Identifier -> Identifier)
-  -> Identifier
+  -> (Text -> Text)
+  -> Text
   -> TExpr
   -> State (BlockState backend) TExpr
-outputCoerce fromType toType exprStringFn inName expr_
+outputCoerce fromType toType exprStringFn inName0 expr_
   | TExpr outType (Identifier outName Nothing) <- expr_
   , outType == toType = do
-      inName' <- newName inName
-      let exprIdent = Identifier (exprStringFn inName') Nothing
-      addDeclaration (NetDecl Nothing inName' fromType)
+      inName1 <- Id.makeBasic inName0
+      let inName2 = Id.unsafeMake (exprStringFn (Id.toText inName1))
+          exprIdent = Identifier inName2 Nothing
+      addDeclaration (NetDecl Nothing inName1 fromType)
       addDeclaration (Assignment outName exprIdent)
-      pure (TExpr fromType (Identifier inName' Nothing))
+      pure (TExpr fromType (Identifier inName1 Nothing))
 outputCoerce _ toType _ _ texpr = error $ "outputCoerce: the expression " <> show texpr
                                   <> " must be an Identifier with type " <> show toType
 
@@ -457,19 +457,20 @@ outputFn
   :: (HasCallStack, Backend backend)
   => [HWType]
   -> HWType
-  -> ([Identifier] -> Identifier)
-  -> [Identifier]
+  -> ([Text] -> Text)
+  -> [Text]
   -> TExpr
   -> State (BlockState backend) [TExpr]
-outputFn fromTypes toType exprFn inNames (TExpr outType (Identifier outName Nothing))
+outputFn fromTypes toType exprFn inNames0 (TExpr outType (Identifier outName Nothing))
   | outType == toType = do
-      inNames' <- mapM newName inNames
-      let exprIdent = Identifier (exprFn inNames') Nothing
+      inNames1 <- mapM Id.makeBasic inNames0
+      let idExpr = Id.unsafeMake (exprFn (map Id.toText inNames1))
+          exprIdent = Identifier idExpr Nothing
       sequenceOf_ each [ addDeclaration (NetDecl Nothing nm t)
-                       | (nm,t) <- zipEqual inNames' fromTypes ]
+                       | (nm, t) <- zip inNames1 fromTypes ]
       addDeclaration (Assignment outName exprIdent)
       pure [ TExpr t (Identifier nm Nothing)
-           | (nm,t) <- zipEqual inNames' fromTypes ]
+           | (nm,t) <- zipEqual inNames1 fromTypes ]
 outputFn _ outType _ _ texpr =
   error $ "outputFn: the expression " <> show texpr
   <> " must be an Identifier with type " <> show outType
@@ -528,8 +529,8 @@ exprToInteger _ = Nothing
 --   bitvector if the expression is not already a bitvector.
 toBV
   :: Backend backend
-  => Identifier
-  -- ^ BitVector name
+  => Text
+  -- ^ BitVector name hint
   -> TExpr
   -- ^ expression
   -> State (BlockState backend) TExpr
@@ -543,22 +544,22 @@ toBV bvName a = case a of
 --   bitvector if the expression is not already a bitvector.
 fromBV
   :: (HasCallStack, Backend backend)
-  => Identifier
-  -- ^ BitVector name
+  => Text
+  -- ^ BitVector name hint
   -> TExpr
   -- ^ expression
   -> State (BlockState backend) TExpr
   -- ^ bv expression
 fromBV _ a@(TExpr BitVector{} _) = pure a
 fromBV bvName (TExpr aTy (Identifier aName Nothing)) = do
-  bvName' <- newName bvName
+  bvName' <- Id.makeBasic bvName
   let bvExpr = ConvBV Nothing aTy False (Identifier bvName' Nothing)
       bvTy   = BitVector (typeSize aTy)
   addDeclaration (NetDecl Nothing bvName' bvTy)
   addDeclaration (Assignment aName bvExpr)
   pure (TExpr bvTy (Identifier bvName' Nothing))
 fromBV _ texpr = error $
-  "fromBV: the expression " <> show texpr <> "must be an Indentifier"
+  "fromBV: the expression " <> show texpr <> "must be an Identifier"
 
 clog2 :: Num i => Integer -> i
 clog2 = fromIntegral . fromMaybe 0 . clogBase 2
@@ -617,24 +618,24 @@ instHO bbCtx fPos (resTy, bbResTy) argsWithTypes = do
     ctxName = last (Text.split (=='.') (bbName bbCtx))
     baseArgName = ctxName <> "_" <> "ho" <> showt fPos <> "_" <> showt fSubPos
     argName n = baseArgName <> "_arg" <> showt n
-  args1 <- zipWithM (\argN -> toIdentifier' (argName argN)) [(0 :: Int)..] args0
-  let
-    args2 = map (pure . Text . LText.fromStrict) args1
-    args3 = zip args2 argTypes
+  args1 <- zipWithM (\argN -> toIdentifier' (argName argN)) [(0::Int)..] args0
 
-  -- Create result identifier
-  -- See https://github.com/clash-lang/clash-compiler/issues/919 for info on
-  -- logic of 'resWireOrReg'
+  let
+    args2 = map (pure . Text . Id.toLazyText) args1
+
+    -- Create result identifier
+    -- See https://github.com/clash-lang/clash-compiler/issues/919 for info on
+    -- logic of 'resWireOrReg'
     resWireOrReg =
       case IntMap.lookup fPos (bbFunctions bbCtx) of
         Just ((_,rw,_,_,_,_):_) -> rw
         _ -> error "internal error"
   resName <- declare' (ctxName <> "_" <> "ho" <> showt fPos <> "_"
                                <> showt fSubPos <> "_res") resWireOrReg resTy
-  let res = ([Text (LText.fromStrict resName)], bbResTy)
+  let res = ([Text (Id.toLazyText resName)], bbResTy)
 
   -- Render HO argument to plain text
-  let component = Component (Decl fPos fSubPos (res:args3))
+  let component = Component (Decl fPos fSubPos (res:zip args2 argTypes))
   rendered0 <-
     zoom bsBackend (string =<< (renderElem bbCtx component <*> pure 0))
 
@@ -652,7 +653,8 @@ instHO bbCtx fPos (resTy, bbResTy) argsWithTypes = do
 
 -- | Instantiate a component/entity in a block state.
 instDecl
-  :: Backend backend
+  :: forall backend
+   . Backend backend
   => EntityOrComponent
   -- ^ Type of instantiation
   -> Identifier
@@ -673,13 +675,18 @@ instDecl entOrComp compName instLbl attrs inPorts outPorts = do
 
   addDeclaration $ InstDecl entOrComp Nothing [] compName instLbl (mkAttrs attrs) (inPorts' ++ outPorts')
     where
-    mkPort inOrOut (nm, pExpr) = do
-      TExpr ty pExpr' <- toIdentifier (nm <> "_port")  pExpr
-      pure (Identifier nm Nothing, inOrOut, ty, pExpr')
+    mkPort
+      :: PortDirection
+      -> (Text, TExpr)
+      -> StateT (BlockState backend) Identity (Expr, PortDirection, HWType, Expr)
+    mkPort inOrOut (nmText, pExpr) = do
+      TExpr ty pExpr' <- toIdentifier (nmText <> "_port")  pExpr
+      pure (Identifier (Id.unsafeMake nmText) Nothing, inOrOut, ty, pExpr')
 
     -- Convert a list of name attributes to the form clash wants
     mkAttrs :: [(Text.Text, LitHDL)] -> [(Expr, HWType, Expr)]
-    mkAttrs = map (\(s, ty) -> (Identifier s Nothing, hdlTy ty, litExpr ty))
+    mkAttrs = map (\(s, ty) -> ( Identifier (Id.unsafeMake s) Nothing
+                               , hdlTy ty, litExpr ty) )
 
     litExpr :: LitHDL -> Expr
     litExpr (B b) = Literal Nothing (BoolLit b)
@@ -697,7 +704,7 @@ instDecl entOrComp compName instLbl attrs inPorts outPorts = do
 -- annotated type, using the given attributes.
 viaAnnotatedSignal
   :: (HasCallStack, Backend backend)
-  => Text
+  => Identifier
   -- ^ Name given to signal
   -> TExpr
   -- ^ expression the signal is assigned to
@@ -730,7 +737,7 @@ tResults = map (\(x,t) -> TExpr t x) . bbResults
 --   necessary.
 toIdentifier'
   :: Backend backend
-  => Identifier
+  => Text
   -- ^ desired new identifier name, will be made unique
   -> TExpr
   -- ^ expression to get identifier of
@@ -745,7 +752,7 @@ toIdentifier' nm texp = do
 --   necessary.
 toIdentifier
   :: Backend backend
-  => Identifier
+  => Text
   -- ^ desired new identifier name, will be made unique
   -> TExpr
   -- ^ expression to get identifier of
@@ -758,7 +765,7 @@ toIdentifier nm texp = do
 -- | And together @(&&)@ two expressions, assigning it to a new identifier.
 andExpr
   :: Backend backend
-  => Identifier
+  => Text
   -- ^ name hint
   -> TExpr
   -- ^ a
@@ -771,8 +778,8 @@ andExpr _ F _     = pure F
 andExpr _ aExpr T = pure aExpr
 andExpr _ _ F     = pure F
 andExpr nm a b = do
-  aIdent <- toIdentifier' (nm <> "_a") a
-  bIdent <- toIdentifier' (nm <> "_b") b
+  aIdent <- Id.toText <$> toIdentifier' (nm <> "_a") a
+  bIdent <- Id.toText <$> toIdentifier' (nm <> "_b") b
   -- This is somewhat hacky and relies on the fact that clash doesn't
   -- postprocess the text in Identifier. The alternative is to run
   -- this as a fully fledged @BlackBoxE@ but that involves a lot of
@@ -783,12 +790,12 @@ andExpr nm a b = do
       VHDL          -> aIdent <> " and " <> bIdent
       Verilog       -> aIdent <> " && " <> bIdent
       SystemVerilog -> aIdent <> " && " <> bIdent
-  assign nm $ TExpr Bool (Identifier andTxt Nothing)
+  assign nm $ TExpr Bool (Identifier (Id.unsafeMake andTxt) Nothing)
 
 -- | Negate @(not)@ an expression, assigning it to a new identifier.
 notExpr
   :: Backend backend
-  => Identifier
+  => Text
   -- ^ name hint
   -> TExpr
   -- ^ a
@@ -797,13 +804,13 @@ notExpr
 notExpr _ T = pure F
 notExpr _ F = pure T
 notExpr nm aExpr = do
-  aIdent <- toIdentifier' (nm <> "_a") aExpr
+  aIdent <- Id.toText <$> toIdentifier' (nm <> "_a") aExpr
   -- See disclaimer in `andExpr` above.
   notTxt <- uses bsBackend hdlKind <&> \case
     VHDL          -> "not " <> aIdent
     Verilog       -> "! " <> aIdent
     SystemVerilog -> "! " <> aIdent
-  assign nm $ TExpr Bit (Identifier notTxt Nothing)
+  assign nm $ TExpr Bit (Identifier (Id.unsafeMake notTxt) Nothing)
 
 -- | Creates a BV that produces the following vhdl:
 --
@@ -813,7 +820,7 @@ notExpr nm aExpr = do
 --
 -- TODO: Implement for (System)Verilog
 pureToBV
-  :: Identifier
+  :: Text
   -- ^ name hint
   -> Int
   -- ^ Size (n)
@@ -822,10 +829,10 @@ pureToBV
   -> State (BlockState VHDLState) TExpr
   -- ^ (0 to n => ARG)
 pureToBV nm n arg = do
-  arg' <- toIdentifier' nm arg
+  arg' <- Id.toText <$> toIdentifier' nm arg
   -- This is very hard coded and hacky
   let text = "(0 to " <> showt n <> " => " <> arg' <> ")"
-  assign nm $ TExpr (BitVector (n+1)) (Identifier text Nothing)
+  assign nm $ TExpr (BitVector (n+1)) (Identifier (Id.unsafeMake text) Nothing)
 
 -- | Creates a BV that produces the following vhdl:
 --
@@ -835,7 +842,7 @@ pureToBV nm n arg = do
 --
 -- TODO: Implement for (System)Verilog
 pureToBVResized
-  :: Identifier
+  :: Text
   -- ^ name hint
   -> Int
   -- ^ Size (n)
@@ -844,14 +851,14 @@ pureToBVResized
   -> State (BlockState VHDLState) TExpr
   -- ^ std_logic_vector(resize(ARG, Size))
 pureToBVResized nm n arg = do
-  arg' <- toIdentifier' nm arg
+  arg' <- Id.toText <$> toIdentifier' nm arg
   -- This is very hard coded and hacky
   let text = "std_logic_vector(resize(" <> arg' <> ", " <> showt n <> "))"
-  assign nm $ TExpr (BitVector n) (Identifier text Nothing)
+  assign nm $ TExpr (BitVector n) (Identifier (Id.unsafeMake text) Nothing)
 
 -- | Allows assignment of a port to be "open"
 open
   :: Backend backend
   => HWType
   -> State (BlockState backend) TExpr
-open hwType = pure $ TExpr hwType (Identifier "open" Nothing)
+open hwType = pure $ TExpr hwType (Identifier (Id.unsafeMake "open") Nothing)

@@ -21,7 +21,7 @@ myMultiplyTF isD primName args ty = pure $
   Right ( emptyBlackBoxMeta
         , BBTemplate
            [ Text "resize("
-           , Arg False 0, Text " * ", Arg False 1
+           , Arg 0, Text " * ", Arg 1
            , Text ",64)"
            ]
         )

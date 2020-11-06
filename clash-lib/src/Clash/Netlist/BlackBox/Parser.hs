@@ -74,11 +74,9 @@ pInput = symbol "~INPUT" *> symbol "<=" *> ((,) <$> (pBlackBoxE <* symbol "~") <
 
 -- | Parse an Expression element
 pTagE :: Parser Element
-pTagE =  Result True       <$  string "~ERESULT"
-     <|> Result False      <$  string "~RESULT"
+pTagE =  Result            <$  string "~RESULT"
      <|> ArgGen            <$> (string "~ARGN" *> brackets' natural') <*> brackets' natural'
-     <|> Arg True          <$> (string "~EARG" *> brackets' natural')
-     <|> Arg False         <$> (string "~ARG" *> brackets' natural')
+     <|> Arg               <$> (string "~ARG" *> brackets' natural')
      <|> Const             <$> (string "~CONST" *> brackets' natural')
      <|> Lit               <$> (string "~LIT" *> brackets' natural')
      <|> Name              <$> (string "~NAME" *> brackets' natural')

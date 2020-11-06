@@ -51,10 +51,10 @@ intTF' False [Left (Literal (getIntLit -> Just n))] intSize =
 intTF' True [Left (Literal (getIntLit -> Just n))] intSize =
   -- Literal as declaration:
   ( emptyBlackBoxMeta
-  , BBTemplate (assign (Result False) [signedLiteral intSize n]))
+  , BBTemplate (assign Result [signedLiteral intSize n]))
 
 intTF' _isDecl _args _intSize =
   -- Not a literal. We need an assignment as Verilog does not support truncating
   -- arbitrary expression.
   ( emptyBlackBoxMeta {bbKind = TDecl }
-  , BBTemplate (assign (Result False) (signed (Arg False 0))))
+  , BBTemplate (assign Result (signed (Arg 0))))

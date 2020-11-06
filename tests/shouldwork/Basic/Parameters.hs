@@ -14,8 +14,8 @@ import Data.Text.Prettyprint.Doc.Extra (Doc)
 import System.Environment (getArgs)
 import System.FilePath ((</>))
 
-import Clash.Backend (mkUniqueIdentifier, blockDecl)
-import Clash.Netlist.Id (IdType(Basic))
+import Clash.Backend (blockDecl)
+import qualified Clash.Netlist.Id as Id
 import Clash.Netlist.Types
 import Clash.Netlist.Util (typeSize)
 
@@ -39,13 +39,20 @@ myAddTemplate
 myAddTemplate bbCtx = do
   let [_, (xExp, xTy, _), (yExp, yTy, _)] = bbInputs bbCtx
       [(resExp, resTy)] = bbResults bbCtx
-  getMon $ blockDecl "my_add_block"
-    [ InstDecl Comp Nothing [] "my_add" "my_add_inst"
-        [ (Identifier "size" Nothing, Integer, Literal Nothing (NumLit . fromIntegral $ typeSize xTy))
+  sizeId <- Id.make "size"
+  let xId = Id.unsafeMake "x"
+  let yId = Id.unsafeMake "y"
+  let resultId = Id.unsafeMake "result"
+  blockId <- Id.make "my_add_block"
+  myAddInstId <- Id.make "my_add_inst"
+  let myAddId = Id.unsafeMake "my_add"
+  getMon $ blockDecl blockId
+    [ InstDecl Comp Nothing [] myAddId myAddInstId
+        [ (Identifier sizeId Nothing, Integer, Literal Nothing (NumLit . fromIntegral $ typeSize xTy))
         ]
-        [ (Identifier "x" Nothing, In, xTy, xExp)
-        , (Identifier "y" Nothing, In, yTy, yExp)
-        , (Identifier "result" Nothing, Out, resTy, resExp)
+        [ (Identifier xId Nothing, In, xTy, xExp)
+        , (Identifier yId Nothing, In, yTy, yExp)
+        , (Identifier resultId Nothing, Out, resTy, resExp)
         ]
     ]
 

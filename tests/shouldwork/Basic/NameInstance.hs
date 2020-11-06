@@ -36,5 +36,5 @@ mainVerilog = do
 mainVHDL :: IO ()
 mainVHDL = do
   [topDir] <- getArgs
-  content <- readFile (takeDirectory topDir </> "topentity.vhdl")
+  content <- readFile (takeDirectory topDir </> "topEntity.vhdl")
   assertIn "before_foo_after" content

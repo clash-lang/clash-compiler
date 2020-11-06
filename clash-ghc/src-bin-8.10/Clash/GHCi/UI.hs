@@ -163,6 +163,7 @@ import           Clash.GHC.GenerateBindings
 import           Clash.GHC.NetlistTypes
 import           Clash.GHCi.Common
 import           Clash.Netlist.BlackBox.Types (HdlSyn)
+import           Clash.Netlist.Types (PreserveCase)
 import           Clash.Util (clashLibVersion, reportTimeDiff)
 import qualified Data.Time.Clock as Clock
 import qualified Paths_clash_ghc
@@ -2146,7 +2147,7 @@ exceptT :: Applicative m => Either e a -> ExceptT e m a
 exceptT = ExceptT . pure
 
 makeHDL' :: Clash.Backend.Backend backend
-         => (Int -> HdlSyn -> Bool -> Maybe (Maybe Int) -> AggressiveXOptBB -> backend)
+         => (Int -> HdlSyn -> Bool -> PreserveCase -> Maybe (Maybe Int) -> AggressiveXOptBB -> backend)
          -> IORef ClashOpts
          -> [FilePath]
          -> InputT GHCi ()
@@ -2187,7 +2188,7 @@ makeHDL' backend opts lst = go =<< case lst of
 
 makeHDL :: GHC.GhcMonad m
         => Clash.Backend.Backend backend
-        => (Int -> HdlSyn -> Bool -> Maybe (Maybe Int) -> AggressiveXOptBB -> backend)
+        => (Int -> HdlSyn -> Bool -> PreserveCase -> Maybe (Maybe Int) -> AggressiveXOptBB -> backend)
         -> IORef ClashOpts
         -> [FilePath]
         -> m ()
@@ -2201,6 +2202,7 @@ makeHDL backend optsRef srcs = do
                   syn    = opt_hdlSyn opts1
                   color  = opt_color opts1
                   esc    = opt_escapedIds opts1
+                  lw     = opt_lowerCaseBasicIds opts1
                   frcUdf = opt_forceUndefined opts1
                   xOptBB = opt_aggressiveXOptBB opts1
                   hdl    = Clash.Backend.hdlKind backend'
@@ -2215,7 +2217,7 @@ makeHDL backend optsRef srcs = do
                   idirs = importPaths dflags
                   opts2 = opts1 { opt_hdlDir = maybe outputDir Just (opt_hdlDir opts1)
                                 , opt_importPaths = idirs}
-                  backend' = backend iw syn esc frcUdf (coerce xOptBB)
+                  backend' = backend iw syn esc lw frcUdf (coerce xOptBB)
 
               checkMonoLocalBinds dflags
               checkImportDirs opts0 idirs

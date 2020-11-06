@@ -67,4 +67,4 @@ mainHDL topFile implFile = do
 mainSystemVerilog, mainVerilog, mainVHDL :: IO ()
 mainSystemVerilog = error "NYI"
 mainVerilog       = error "NYI"
-mainVHDL          = mainHDL "topentity.vhdl" "implicitcomment.vhdl"
+mainVHDL          = mainHDL "topEntity.vhdl" "implicitComment.vhdl"

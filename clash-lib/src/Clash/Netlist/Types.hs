@@ -11,14 +11,19 @@
 
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE DeriveAnyClass #-}
+{-# LANGUAGE FunctionalDependencies #-}
+{-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE MagicHash #-}
+{-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE PatternSynonyms #-}
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE TypeSynonymInstances #-}
 
--- since GHC 8.6 we can haddock individual contructor fields \o/
+-- since GHC 8.6 we can haddock individual constructor fields \o/
 #if __GLASGOW_HASKELL__ >= 806
 #define FIELD ^
 #endif
@@ -30,29 +35,37 @@ module Clash.Netlist.Types
 where
 
 import Control.DeepSeq
+import qualified Control.Lens               as Lens
+import Control.Lens                         (Lens', (.=))
 #if !MIN_VERSION_base(4,13,0)
 import Control.Monad.Fail                   (MonadFail)
 #endif
 import Control.Monad.Reader                 (ReaderT, MonadReader)
-import Control.Monad.State                  as Lazy (State)
-import Control.Monad.State.Strict           as Strict
-  (State,MonadIO, MonadState, StateT)
+import qualified Control.Monad.State        as Lazy (State)
+import qualified Control.Monad.State.Strict as Strict
+  (State, MonadIO, MonadState, StateT)
 import Data.Bits                            (testBit)
 import Data.Binary                          (Binary(..))
-import Data.Hashable                        (Hashable)
+import Data.Function                        (on)
+import Data.Hashable                        (Hashable(hash,hashWithSalt))
 import Data.HashMap.Strict                  (HashMap)
+import Data.HashSet                         (HashSet)
+import qualified Data.List                  as List
 import Data.IntMap                          (IntMap, empty)
 import Data.Maybe                           (mapMaybe)
 import qualified Data.Set                   as Set
-import Data.Text                            (Text, pack)
+import Data.Text                            (Text)
+
 import Data.Typeable                        (Typeable)
 import Data.Text.Prettyprint.Doc.Extra      (Doc)
+import Data.Semigroup.Monad                 (Mon(..))
 import GHC.Generics                         (Generic)
 import Language.Haskell.TH.Syntax           (Lift)
 
 import SrcLoc                               (SrcSpan)
 
 import Clash.Annotations.BitRepresentation  (FieldAnn)
+import Clash.Annotations.Primitive          (HDL(..))
 import Clash.Annotations.TopEntity          (TopEntity)
 import Clash.Backend                        (Backend)
 import Clash.Core.Type                      (Type)
@@ -61,7 +74,6 @@ import Clash.Core.TyCon                     (TyConMap)
 import Clash.Core.VarEnv                    (VarEnv)
 import Clash.Driver.Types                   (BindingMap, ClashOpts)
 import Clash.Netlist.BlackBox.Types         (BlackBoxTemplate)
-import Clash.Netlist.Id                     (IdType)
 import Clash.Primitives.Types               (CompiledPrimMap)
 import Clash.Signal.Internal
   (ResetPolarity, ActiveEdge, ResetKind, InitBehavior)
@@ -69,6 +81,8 @@ import Clash.Util                           (HasCallStack, makeLenses)
 
 import Clash.Annotations.BitRepresentation.Internal
   (CustomReprs, DataRepr', ConstrRepr')
+
+import {-# SOURCE #-} qualified Clash.Netlist.Id as Id
 
 -- | Structure describing a top entity: it's id, its port annotations, and
 -- associated testbench.
@@ -81,23 +95,177 @@ data TopEntityT = TopEntityT
   -- ^ (Maybe) a test bench associated with the topentity
   } deriving (Generic, Show)
 
+-- | Same as "TopEntity", but with all port names that end up in HDL specified
+data ExpandedTopEntity a = ExpandedTopEntity
+  { et_inputs :: [Maybe (ExpandedPortName a)]
+  -- ^ Inputs with fully expanded port names. /Nothing/ if port is void.
+  , et_output :: Maybe (ExpandedPortName a)
+  -- ^ Output with fully expanded port names. /Nothing/ if port is void or
+  -- BiDirectionalOut.
+  } deriving (Show, Functor, Foldable, Traversable)
+
+-- | See "ExpandedTopEntity"
+data ExpandedPortName a
+  -- | Same as "PortName", but fully expanded
+  = ExpandedPortName HWType a
+
+  -- | Same as "PortProduct", but fully expanded
+  | ExpandedPortProduct
+      Text
+      -- FIELD Name hint. Can be used to create intermediate signal names.
+      HWType
+      -- FIELD Type of product
+      [ExpandedPortName a]
+      -- FIELD Product fields
+  deriving (Show, Functor, Foldable, Traversable)
+
 -- | Monad that caches generated components (StateT) and remembers hidden inputs
 -- of components that are being generated (WriterT)
 newtype NetlistMonad a =
-  NetlistMonad { runNetlist :: StateT NetlistState (ReaderT NetlistEnv IO) a }
+  NetlistMonad { runNetlist :: Strict.StateT NetlistState (ReaderT NetlistEnv IO) a }
   deriving newtype (Functor, Monad, Applicative, MonadReader NetlistEnv,
-                    MonadState NetlistState, MonadIO, MonadFail)
+                    Strict.MonadState NetlistState, Strict.MonadIO, MonadFail)
 
 type HWMap = HashMap Type (Either String FilteredHWType)
+
+-- | See 'is_freshCache'
+type FreshCache = HashMap Text (IntMap Word)
+
+type IdentifierText = Text
+
+-- | Whether to preserve casing in ids or converted everything to
+--  lowercase. Influenced by '-fclash-lower-case-basic-identifiers'
+data PreserveCase
+  = PreserveCase
+  | ToLower
+  deriving (Show, Generic, NFData, Eq, Binary, Hashable)
+
+-- See: http://vhdl.renerta.com/mobile/source/vhd00037.htm
+--      http://www.verilog.renerta.com/source/vrg00018.htm
+data IdentifierType
+  = Basic
+  -- ^ A basic identifier: does not have to be escaped in order to be a valid
+  -- identifier in HDL.
+  | Extended
+  -- ^ An extended identifier: has to be escaped, wrapped, or otherwise
+  -- postprocessed before writhing it to HDL.
+  deriving (Show, Generic, NFData, Eq)
+
+-- | A collection of unique identifiers. Allows for fast fresh identifier
+-- generation.
+--
+-- __NB__: use the functions in Clash.Netlist.Id. Don't use the constructor directly.
+data IdentifierSet
+  = IdentifierSet {
+      is_allowEscaped :: !Bool
+      -- ^ Allow escaped ids? If set to False, "make" will always behave like
+      -- "makeBasic".
+    , is_lowerCaseBasicIds :: !PreserveCase
+      -- ^ Force all generated basic identifiers to lowercase.
+    , is_hdl :: !HDL
+      -- ^ HDL to generate fresh identifiers for
+    , is_freshCache :: !FreshCache
+      -- ^ Maps an 'i_baseNameCaseFold' to a map mapping the number of
+      -- extensions (in 'i_extensionsRev') to the maximum word at that
+      -- basename/level. For example, if a set would contain the identifiers:
+      --
+      --   [foo, foo_1, foo_2, bar_5, bar_7_8]
+      --
+      -- the map would look like:
+      --
+      --   [(foo, [(0, 0), (1, 2)]), (bar, [(1, 5), (2, 8)])]
+      --
+      -- This mapping makes sure we can quickly generate fresh identifiers. For
+      -- example, generating a new id for "foo_1" would be a matter of looking
+      -- up the base name in this map, concluding that the maximum identifier
+      -- with this basename and this number of extensions is "foo_2",
+      -- subsequently generating "foo_3".
+      --
+      -- Note that an identifier with no extensions is also stored in this map
+      -- for practical purposes, but the maximum ext is invalid.
+    , is_store :: !(HashSet Identifier)
+      -- ^ Identifier store
+    } deriving (Generic, NFData, Show)
+
+-- | HDL identifier. Consists of a base name and a number of extensions. An
+-- identifier with a base name of "foo" and a list of extensions [1, 2] will be
+-- rendered as "foo_1_2".
+--
+-- Note: The Eq instance of "Identifier" is case insensitive! E.g., two
+-- identifiers with base names 'fooBar' and 'FoObAR' are considered the same.
+-- However, identifiers are stored case preserving. This means Clash won't
+-- generate two identifiers with differing case, but it will try to keep
+-- capitalization.
+--
+-- The goal of this data structure is to greatly simplify how Clash deals with
+-- identifiers internally. Any Identifier should be trivially printable to any
+-- HDL.
+--
+-- __NB__: use the functions in Clash.Netlist.Id. Don't use these constructors
+-- directly.
+data Identifier
+  -- | Unparsed identifier. Used for things such as port names, which should
+  -- appear in the HDL exactly as the user specified.
+  = RawIdentifier
+      !Text
+      -- FIELD An identifier exactly as given by the user
+      (Maybe Identifier)
+      -- FIELD Parsed version of raw identifier. Will not be populated if this
+      -- identifier was created with an unsafe function.
+
+  -- | Parsed and sanitized identifier. See various fields for more information
+  -- on its invariants.
+  | UniqueIdentifier {
+      i_baseName :: !Text
+    -- ^ Base name of identifier. 'make' makes sure this field:
+    --
+    --    * does not end in '_num' where 'num' is a digit.
+    --    * is solely made up of printable ASCII characters
+    --    * has no leading or trailing whitespace
+    --
+    , i_baseNameCaseFold :: !Text
+    -- ^ Same as 'i_baseName', but can be used for equality testing that doesn't
+    -- depend on capitalization.
+    , i_extensionsRev :: [Word]
+    -- ^ Extensions applied to base identifier. E.g., an identifier with a base
+    -- name of 'foo' and an extension of [6, 5] would render as 'foo_5_6'. Note
+    -- that extensions are stored in reverse order for easier manipulation.
+    , i_idType :: !IdentifierType
+    -- ^ See "IdentifierType".
+    , i_hdl :: !HDL
+    -- ^ HDL this identifier is generated for.
+    } deriving (Show, Generic, NFData)
+
+identifierKey# :: Identifier -> ((Text, Bool), [Word])
+identifierKey# (RawIdentifier t _id) = ((t, True), [])
+identifierKey# id_ = ((i_baseNameCaseFold id_, False), i_extensionsRev id_)
+
+instance Hashable Identifier where
+  hashWithSalt salt = hashWithSalt salt . hash
+  hash = uncurry hash# . identifierKey#
+   where
+    hash# a extensions =
+      -- 'hash' has an identity around zero, e.g. `hash (0, 2) == 2`. Because a
+      -- lot of zeros can be expected, extensions are fuzzed in order to keep
+      -- efficient `HashMap`s.
+      let fuzz fuzzFactor ext = fuzzFactor * fuzzFactor * ext in
+      hash (a, List.foldl' fuzz 2 extensions)
+
+instance Eq Identifier where
+  i1 == i2 = identifierKey# i1 == identifierKey# i2
+  i1 /= i2 = identifierKey# i1 /= identifierKey# i2
+
+instance Ord Identifier where
+  compare = compare `on` identifierKey#
 
 -- | Environment of the NetlistMonad
 data NetlistEnv
   = NetlistEnv
-  { _prefixName  :: Identifier
+  { _prefixName  :: Text
   -- ^ Prefix for instance/register names
-  , _suffixName :: Identifier
+  , _suffixName :: Text
   -- ^ Postfix for instance/register names
-  , _setName     :: Maybe Identifier
+  , _setName :: Maybe Text
   -- ^ (Maybe) user given instance/register name
   }
 
@@ -106,9 +274,7 @@ data NetlistState
   = NetlistState
   { _bindings       :: BindingMap
   -- ^ Global binders
-  , _varCount       :: !Int
-  -- ^ Number of signal declarations
-  , _components     :: VarEnv ([Bool],SrcSpan,HashMap Identifier Word,Component)
+  , _components     :: VarEnv ([Bool],SrcSpan,IdentifierSet,Component)
   -- ^ Cached components
   , _primitives     :: CompiledPrimMap
   -- ^ Primitive Definitions
@@ -119,20 +285,38 @@ data NetlistState
   -- ^ TyCon cache
   , _curCompNm      :: !(Identifier,SrcSpan)
   , _intWidth       :: Int
-  , _mkIdentifierFn :: IdType -> Identifier -> Identifier
-  , _extendIdentifierFn :: IdType -> Identifier -> Identifier -> Identifier
-  , _seenIds        :: HashMap Identifier Word
-  , _seenComps      :: HashMap Identifier Word
+  , _seenIds        :: IdentifierSet
+  -- ^ All names currently in scope.
+  , _seenComps      :: IdentifierSet
+  -- ^ Components (to be) generated during this netlist run. This is always a
+  -- subset of 'seenIds'. Reason d'etre: we currently generate components in a
+  -- top down manner. E.g. given:
+  --
+  --   - A
+  --   -- B
+  --   -- C
+  --
+  -- we would generate component 'A' first. Before trying to generate 'B' and
+  -- 'C'. 'A' might introduce a number of signal declarations. The names of these
+  -- signals can't clash with the name of component 'B', hence we need to pick a
+  -- name for B unique w.r.t. all these signal names. If we would postpone
+  -- generating a unqiue name for 'B' til _after_ generating all the signal
+  -- names, the signal names would get all the "nice" names. E.g., a signal
+  -- would be called "foo", thereby forcing the component 'B' to be called
+  -- "foo_1". Ideally, we'd use the "nice" names for components, and the "ugly"
+  -- names for signals. To achieve this, we generate all the component names
+  -- up front and subsequently store them in '_seenComps'.
   , _seenPrimitives :: Set.Set Text
   -- ^ Keeps track of invocations of ´mkPrimitive´. It is currently used to
   -- filter duplicate warning invocations for dubious blackbox instantiations,
   -- see GitHub pull request #286.
   , _componentNames :: VarEnv Identifier
+  -- ^ Names of components (to be) generated during this netlist run. Includes
+  -- top entity names.
   , _topEntityAnns  :: VarEnv TopEntityT
   , _hdlDir         :: FilePath
   , _curBBlvl       :: Int
   -- ^ The current scoping level assigned to black box contexts
-  , _componentPrefix :: ComponentPrefix
   , _customReprs    :: CustomReprs
   , _clashOpts      :: ClashOpts
   -- ^ Settings Clash was called with
@@ -147,16 +331,15 @@ data NetlistState
 
 data ComponentPrefix
   = ComponentPrefix
-  { componentPrefixTop :: Maybe Identifier   -- ^ Prefix for top-level components
-  , componentPrefixOther :: Maybe Identifier -- ^ Prefix for all other components
+  { componentPrefixTop :: Maybe Text
+    -- ^ Prefix for top-level components
+  , componentPrefixOther :: Maybe Text
+    -- ^ Prefix for all other components
   } deriving Show
 
 -- | Existentially quantified backend
 data SomeBackend where
   SomeBackend :: Backend backend => backend -> SomeBackend
-
--- | Signal reference
-type Identifier = Text
 
 type Comment = Text
 
@@ -177,11 +360,11 @@ instance NFData Component where
 
 -- | Find the name and domain name of each clock argument of a component.
 --
-findClocks :: Component -> [(Identifier, Identifier)]
+findClocks :: Component -> [(Text, Text)]
 findClocks (Component _ is _ _) =
   mapMaybe isClock is
  where
-  isClock (i, Clock d) = Just (i, d)
+  isClock (i, Clock d) = Just (Id.toText i, d)
   isClock (i, Annotated _ t) = isClock (i,t)
   isClock _ = Nothing
 
@@ -196,6 +379,8 @@ type IsVoid = Bool
 data FilteredHWType =
   FilteredHWType HWType [[(IsVoid, FilteredHWType)]]
     deriving (Eq, Show)
+
+type DomainName = Text
 
 -- | Representable hardware types
 data HWType
@@ -223,33 +408,33 @@ data HWType
   -- ^ Vector type
   | RTree !Size !HWType
   -- ^ RTree type
-  | Sum !Identifier [Identifier]
+  | Sum !Text [Text]
   -- ^ Sum type: Name and Constructor names
-  | Product !Identifier (Maybe [Text]) [HWType]
+  | Product !Text (Maybe [Text]) [HWType]
   -- ^ Product type: Name, field names, and field types. Field names will be
   -- populated when using records.
-  | SP !Identifier [(Identifier,[HWType])]
+  | SP !Text [(Text, [HWType])]
   -- ^ Sum-of-Product type: Name and Constructor names + field types
-  | Clock !Identifier
-  -- ^ Clock type corresponding to domain /Identifier/
-  | Reset !Identifier
-  -- ^ Reset type corresponding to domain /Identifier/
-  | Enable !Identifier
-  -- ^ Enable type corresponding to domain /Identifier/
+  | Clock !DomainName
+  -- ^ Clock type corresponding to domain /DomainName/
+  | Reset !DomainName
+  -- ^ Reset type corresponding to domain /DomainName/
+  | Enable !DomainName
+  -- ^ Enable type corresponding to domain /DomainName/
   | BiDirectional !PortDirection !HWType
   -- ^ Tagging type indicating a bidirectional (inout) port
-  | CustomSP !Identifier !DataRepr' !Size [(ConstrRepr', Identifier, [HWType])]
+  | CustomSP !Text !DataRepr' !Size [(ConstrRepr', Text, [HWType])]
   -- ^ Same as Sum-Of-Product, but with a user specified bit representation. For
   -- more info, see: Clash.Annotations.BitRepresentations.
-  | CustomSum !Identifier !DataRepr' !Size [(ConstrRepr', Identifier)]
+  | CustomSum !Text !DataRepr' !Size [(ConstrRepr', Text)]
   -- ^ Same as Sum, but with a user specified bit representation. For more info,
   -- see: Clash.Annotations.BitRepresentations.
-  | CustomProduct !Identifier !DataRepr' !Size (Maybe [Text]) [(FieldAnn, HWType)]
+  | CustomProduct !Text !DataRepr' !Size (Maybe [Text]) [(FieldAnn, HWType)]
   -- ^ Same as Product, but with a user specified bit representation. For more
   -- info, see: Clash.Annotations.BitRepresentations.
   | Annotated [Attr'] !HWType
   -- ^ Annotated with HDL attributes
-  | KnownDomain !Identifier !Integer !ActiveEdge !ResetKind !InitBehavior !ResetPolarity
+  | KnownDomain !DomainName !Integer !ActiveEdge !ResetKind !InitBehavior !ResetPolarity
   -- ^ Domain name, period, active edge, reset kind, initial value behavior
   | FileType
   -- ^ File type for simulation-level I/O
@@ -279,7 +464,7 @@ data Declaration
   -- | Instantiation of another component:
   | InstDecl
       EntityOrComponent                  -- FIELD Whether it's an entity or a component
-      (Maybe Comment)                    -- FIELD Comment to add to the generated code
+      (Maybe Text)                       -- FIELD Library instance is defined in
       [Attr']                            -- FIELD Attributes to add to the generated code
       !Identifier                        -- FIELD The component's (or entity's) name
       !Identifier                        -- FIELD Instance label
@@ -297,11 +482,11 @@ data Declaration
 
   -- | Signal declaration
   | NetDecl'
-      (Maybe Comment)            -- FIELD Note; will be inserted as a comment in target hdl
-      WireOrReg                  -- FIELD Wire or register
-      !Identifier                -- FIELD Name of signal
-      (Either Identifier HWType) -- FIELD Pointer to type of signal or type of signal
-      (Maybe Expr)               -- FIELD Initial value
+      (Maybe Comment)                -- FIELD Note; will be inserted as a comment in target hdl
+      WireOrReg                      -- FIELD Wire or register
+      !Identifier                    -- FIELD Name of signal
+      (Either IdentifierText HWType) -- FIELD Pointer to type of signal or type of signal
+      (Maybe Expr)                   -- FIELD Initial value
       -- ^ Signal declaration
   | TickDecl Comment
   -- ^ HDL tick corresponding to a Core tick
@@ -383,7 +568,7 @@ data Expr
       [((Text,Text),BlackBox)] -- FIELD Intel/Quartus only: create a @.qsys@ file from given template.
       !BlackBox                -- FIELD Template tokens
       !BlackBoxContext         -- FIELD Context in which tokens should be rendered
-      !Bool                    -- FIELD Wrap in paretheses?
+      !Bool                    -- FIELD Wrap in parentheses?
   | ConvBV     (Maybe Identifier) HWType Bool Expr
   | IfThenElse Expr Expr Expr
   -- | Do nothing
@@ -442,14 +627,14 @@ data BlackBoxContext
   --   , Whether the result should be /reg/ or a /wire/ (Verilog only)
   --   , Partial Blackbox Context
   --   )
-  , bbQsysIncName :: [Identifier]
+  , bbQsysIncName :: [IdentifierText]
   , bbLevel :: Int
   -- ^ The scoping level this context is associated with, ensures that
   -- @~ARGN[k][n]@ holes are only filled with values from this context if @k@
   -- is equal to the scoping level of this context.
   , bbCompName :: Identifier
   -- ^ The component the BlackBox is instantiated in
-  , bbCtxName :: Maybe Identifier
+  , bbCtxName :: Maybe IdentifierText
   -- ^ The "context name", name set by `Clash.Magic.setName`, defaults to the
   -- name of the closest binder
   }
@@ -466,8 +651,12 @@ data BlackBox
 data TemplateFunction where
   TemplateFunction
     :: [Int]
+    -- FIELD Used arguments
     -> (BlackBoxContext -> Bool)
+    -- FIELD Validation function. Should return 'False' if function can't render
+    -- given a certain context.
     -> (forall s . Backend s => BlackBoxContext -> Lazy.State s Doc)
+    -- FIELD Render function
     -> TemplateFunction
 
 instance Show BlackBox where
@@ -549,17 +738,53 @@ data DeclarationType
   | Sequential
 
 emptyBBContext :: Text -> BlackBoxContext
-emptyBBContext n
+emptyBBContext name
   = Context
-  { bbName        = n
+  { bbName        = name
   , bbResults     = []
   , bbInputs      = []
   , bbFunctions   = empty
   , bbQsysIncName = []
   , bbLevel       = (-1)
-  , bbCompName    = pack "__NOCOMPNAME__"
+  , bbCompName    = UniqueIdentifier "__NOCOMPNAME__" "__NOCOMPNAME__" [] Basic VHDL
   , bbCtxName     = Nothing
   }
 
 makeLenses ''NetlistEnv
 makeLenses ''NetlistState
+
+-- | Structures that hold an 'IdentifierSet'
+class HasIdentifierSet s where
+  identifierSet :: Lens' s IdentifierSet
+
+instance HasIdentifierSet IdentifierSet where
+  identifierSet = ($)
+
+-- | An "IdentifierSetMonad" supports unique name generation for Clash Netlist
+class Monad m => IdentifierSetMonad m where
+  identifierSetM :: (IdentifierSet -> IdentifierSet) -> m IdentifierSet
+
+instance IdentifierSetMonad NetlistMonad where
+  identifierSetM f = do
+    is0 <- Lens.use seenIds
+    let is1 = f is0
+    seenIds .= is1
+    pure is1
+  {-# INLINE identifierSetM #-}
+
+instance HasIdentifierSet s => IdentifierSetMonad (Strict.State s) where
+  identifierSetM f = do
+    is0 <- Lens.use identifierSet
+    identifierSet .= f is0
+    Lens.use identifierSet
+  {-# INLINE identifierSetM #-}
+
+instance HasIdentifierSet s => IdentifierSetMonad (Lazy.State s) where
+  identifierSetM f = do
+    is0 <- Lens.use identifierSet
+    identifierSet .= f is0
+    Lens.use identifierSet
+  {-# INLINE identifierSetM #-}
+
+instance IdentifierSetMonad m => IdentifierSetMonad (Mon m) where
+  identifierSetM = Mon . identifierSetM

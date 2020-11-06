@@ -1,5 +1,6 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecordWildCards #-}
+{-# LANGUAGE ViewPatterns #-}
 
 module T1041 where
 
@@ -7,6 +8,7 @@ import Prelude as P
 
 import Clash.Prelude
 import Clash.Netlist.Types
+import qualified Clash.Netlist.Id as Id
 
 import Test.Tasty.Clash
 import Test.Tasty.Clash.NetlistTest
@@ -69,8 +71,8 @@ assertOneVGA (Component _ _ _ ds)
   -- Multiple cases as mkUniqueIdentifier Basic
   -- in VHDL changes names to be lowercase.
   --
-  isVGADecl (NetDecl' _ Wire "vga" _ _) = True
-  isVGADecl (NetDecl' _ Wire "VGA" _ _) = True
+  isVGADecl (NetDecl' _ Wire (Id.toText -> "vga") _ _) = True
+  isVGADecl (NetDecl' _ Wire (Id.toText -> "VGA") _ _) = True
   isVGADecl _ = False
 
 getComponent :: (a, b, c, d) -> d
