@@ -53,7 +53,8 @@ import           Clash.Core.TyCon        (TyConMap, TyConName, isNewTypeTc)
 import           Clash.Core.TysPrim      (tysPrimMap)
 import           Clash.Core.Var          (Var (..), Id, IdScope (..), setIdScope)
 import           Clash.Core.VarEnv
-  (InScopeSet, VarEnv, emptyInScopeSet, extendInScopeSet, mkInScopeSet, mkVarEnv, unionVarEnv)
+  (InScopeSet, VarEnv, emptyInScopeSet, extendInScopeSet, mkInScopeSet
+  ,mkVarEnv, unionVarEnv, elemVarSet, mkVarSet)
 import           Clash.Debug             (traceIf)
 import           Clash.Driver            (compilePrimitive)
 import           Clash.Driver.Types      (BindingMap, Binding(..), IsPrim(..))
@@ -143,7 +144,9 @@ generateBindings useColor primDirs importDirs dbs hdl modName dflagsM = do
   let prepStartDiff = reportTimeDiff prepTime startTime
   putStrLn $ "Clash: Parsing and compiling primitives took " ++ prepStartDiff
 
-  return ( allBindings
+  let allBindings' = setNoInlineTopEntities allBindings topEntities''
+
+  return ( allBindings'
          , allTcCache
          , tupTcCache
          , topEntities''
@@ -151,6 +154,19 @@ generateBindings useColor primDirs importDirs dbs hdl modName dflagsM = do
          , customBitRepresentations
          , domainConfs
          )
+
+setNoInlineTopEntities
+  :: BindingMap
+  -> [TopEntityT]
+  -> BindingMap
+setNoInlineTopEntities bm tes =
+  fmap go bm
+ where
+  ids = mkVarSet (fmap topId tes)
+
+  go b@Binding{bindingId}
+    | bindingId `elemVarSet` ids = b { bindingSpec = GHC.NoInline }
+    | otherwise = b
 
 -- TODO This function should be changed to provide the information that
 -- Clash.Core.Termination.mkRecInfo provides. To achieve this, it should also
