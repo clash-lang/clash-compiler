@@ -336,7 +336,7 @@ Library
                       reflection                >= 2       && < 2.2,
                       singletons                >= 1.0     && < 3.0,
                       template-haskell          >= 2.12.0.0 && < 2.17,
-                      th-abstraction            >= 0.2.10 && < 0.4.0,
+                      th-abstraction            >= 0.2.10 && < 0.5.0,
                       th-lift                   >= 0.7.0    && < 0.9,
                       th-orphans                >= 0.13.1   && < 1.0,
                       text                      >= 0.11.3.1 && < 1.3,
