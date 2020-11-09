@@ -39,6 +39,7 @@ module Clash.Signal.Internal
   , tail#
     -- * Domains
   , Domain
+  , sameDomain
   , KnownDomain(..)
   , KnownConfiguration
   , knownDomainByName
@@ -144,9 +145,10 @@ import Data.Data                  (Data)
 import Data.Default.Class         (Default (..))
 import Data.Hashable              (Hashable)
 import Data.Proxy                 (Proxy(..))
+import Data.Type.Equality         ((:~:))
 import GHC.Generics               (Generic)
 import GHC.Stack                  (HasCallStack)
-import GHC.TypeLits               (KnownSymbol, Nat, Symbol, type (<=))
+import GHC.TypeLits               (KnownSymbol, Nat, Symbol, type (<=), sameSymbol)
 import Language.Haskell.TH.Syntax -- (Lift (..), Q, Dec)
 import Language.Haskell.TH.Compat
 import Numeric.Natural            (Natural)
@@ -605,6 +607,14 @@ createDomain (VDomainConfiguration name period edge reset init_ polarity) =
 
 
 type Domain = Symbol
+
+-- | We either get evidence that this function was instantiated with the same
+-- domains, or Nothing.
+sameDomain
+  :: forall (domA :: Domain) (domB :: Domain)
+   . (KnownDomain domA, KnownDomain domB)
+  => Maybe (domA :~: domB)
+sameDomain = sameSymbol (Proxy @domA) (Proxy @domB)
 
 infixr 5 :-
 {- | Clash has synchronous 'Signal's in the form of:
