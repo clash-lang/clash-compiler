@@ -1892,6 +1892,7 @@ fromList xs
 --
 -- >>> Vec.unsafeFromList [1,2,3,4,5] :: Vec 10 Int
 -- <1,2,3,4,5,*** Exception: Clash.Sized.Vector.unsafeFromList: vector larger than list
+-- ...
 --
 -- __NB:__ use `listToVecTH` if you want to make a /statically known/ vector
 -- __NB:__ this function is not synthesizable

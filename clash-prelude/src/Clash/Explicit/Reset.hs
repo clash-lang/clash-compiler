@@ -50,6 +50,11 @@ import           Clash.XException (NFDataX, ShowX)
 
 import           GHC.TypeLits (type (+), KnownNat)
 
+{- $setup
+>>> :m -Clash.Prelude
+>>> :m -Clash.Prelude.Safe
+>>> import Clash.Explicit.Prelude
+-}
 
 -- | Normally, asynchronous resets can be both asynchronously asserted and
 -- de-asserted. Asynchronous de-assertion can induce meta-stability in the
@@ -156,7 +161,7 @@ data GlitchFilterState = Idle | InReset
 -- === __Example 1__
 -- >>> let sampleResetN n = sampleN n . unsafeToHighPolarity
 -- >>> let resetFromList = unsafeFromHighPolarity . fromList
--- >>> let rst = resetFromList [True, True, False, False, True, False, False, True, True, False]
+-- >>> let rst = resetFromList [True, True, False, False, True, False, False, True, True, False, True]
 -- >>> sampleResetN 12 (resetGlitchFilter d2 systemClockGen rst)
 -- [True,True,True,True,False,False,False,False,False,True,True,False]
 resetGlitchFilter
