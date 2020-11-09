@@ -33,7 +33,7 @@ import GHC.TypeLits                       (KnownNat)
 import qualified Clash.Explicit.Testbench as E
 import           Clash.Signal
   (HiddenClock, HiddenReset, HiddenClockResetEnable, Signal,
-  hideClock, hideReset, hideClockResetEnable)
+  DomainResetKind, ResetKind(Asynchronous), hideClock, hideReset, hideClockResetEnable)
 import Clash.Promoted.Nat                 (SNat)
 import Clash.Sized.BitVector              (BitVector)
 import Clash.Sized.Vector                 (Vec)
@@ -153,6 +153,7 @@ outputVerifier'
   :: ( KnownNat l
      , Eq a
      , ShowX a
+     , DomainResetKind dom ~ 'Asynchronous
      , HiddenClock dom
      , HiddenReset dom  )
   => Vec l a
@@ -170,6 +171,7 @@ outputVerifier' = hideReset (hideClock E.outputVerifier')
 outputVerifierBitVector'
   :: ( KnownNat l
      , KnownNat n
+     , DomainResetKind dom ~ 'Asynchronous
      , HiddenClock dom
      , HiddenReset dom  )
   => Vec l (BitVector n)

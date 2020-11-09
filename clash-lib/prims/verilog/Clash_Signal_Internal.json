@@ -27,35 +27,6 @@ end~FI
     }
   }
 , { "BlackBox" :
-    { "name" : "Clash.Signal.Internal.asyncRegister#"
-    , "kind" : "Declaration"
-    , "type" :
-"asyncRegister#
-  :: ( KnownDomain dom        -- ARG[0]
-     , NFDataX a )            -- ARG[1]
-  => Clock dom                -- ARG[2]
-  -> Reset dom                -- ARG[3]
-  -> Enable dom               -- ARG[4]
-  -> a                        -- ARG[5] (powerup value)
-  -> a                        -- ARG[6] (reset value)
-  -> Signal clk a             -- ARG[7]
-  -> Signal clk a"
-    , "outputReg" : true
-    , "resultName" : { "template" : "~CTXNAME" }
-    , "resultInit" : { "template" : "~IF~ISINITDEFINED[0]~THEN~CONST[5]~ELSE~FI" }
-    , "template" :
-"// async register begin
-always @(~IF~ACTIVEEDGE[Rising][0]~THENposedge~ELSEnegedge~FI ~ARG[2] or ~IF ~ISACTIVEHIGH[0] ~THEN posedge ~ELSE negedge ~FI ~VAR[rst][3]) begin : ~GENSYM[~RESULT_register][1]
-  if (~IF ~ISACTIVEHIGH[0] ~THEN ~ELSE ! ~FI~VAR[rst][3]) begin
-    ~RESULT <= ~CONST[6];
-  end else ~IF ~ISACTIVEENABLE[4] ~THENif (~ARG[4]) ~ELSE~FIbegin
-    ~RESULT <= ~ARG[7];
-  end
-end
-// async register end"
-    }
-  }
-, { "BlackBox" :
     { "name" : "Clash.Signal.Internal.register#"
     , "kind" : "Declaration"
     , "type" :
