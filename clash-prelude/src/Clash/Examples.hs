@@ -295,7 +295,7 @@ data RxReg
   , _rx_d1         :: Bit
   , _rx_d2         :: Bit
   , _rx_busy       :: Bool
-  }
+  } deriving (Generic, NFDataX)
 
 makeLenses ''RxReg
 
@@ -347,7 +347,7 @@ data TxReg
   , _tx_over_run :: Bool
   , _tx_out      :: Bit
   , _tx_cnt      :: Unsigned 4
-  }
+  } deriving (Generic, NFDataX)
 
 makeLenses ''TxReg
 
