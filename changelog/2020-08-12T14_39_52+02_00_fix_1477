@@ -1,1 +1,0 @@
-FIXED: Specializing on functions with type family arguments no longer fails [#1477](https://github.com/clash-lang/clash-compiler/issues/1477)
