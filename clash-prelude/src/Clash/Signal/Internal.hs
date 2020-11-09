@@ -91,9 +91,6 @@ module Clash.Signal.Internal
     -- * Basic circuits
   , delay#
   , register#
-  , asyncRegister#
-  , syncRegister#
-  , registerPowerup#
   , mux
     -- * Simulation and testbench functions
   , clockGen
@@ -137,7 +134,7 @@ where
 import Type.Reflection            (Typeable)
 import Control.Applicative        (liftA2, liftA3)
 import Control.DeepSeq            (NFData)
-import Clash.Annotations.Primitive (hasBlackBox, dontTranslate)
+import Clash.Annotations.Primitive (hasBlackBox)
 import Data.Binary                (Binary)
 import Data.Char                  (isAsciiUpper, isAlphaNum, isAscii)
 import Data.Coerce                (coerce)
@@ -1077,88 +1074,46 @@ register#
   -- ^ Reset value
   -> Signal dom a
   -> Signal dom a
-register# clk@(Clock dom) rst ena powerUpVal resetVal =
+register# (Clock dom) rst (fromEnable -> ena) powerUpVal0 resetVal =
   case knownDomainByName dom of
     SDomainConfiguration _name _period _edge SSynchronous _init _polarity ->
-      syncRegister# clk rst ena powerUpVal resetVal
+      goSync powerUpVal1 (unsafeToHighPolarity rst) ena
     SDomainConfiguration _name _period _edge SAsynchronous _init _polarity ->
-      asyncRegister# clk rst ena powerUpVal resetVal
-{-# NOINLINE register# #-}
-{-# ANN register# hasBlackBox #-}
-
--- | Acts like 'id' if given domain allows powerup values, but returns a
--- value constructed with 'deepErrorX' otherwise.
-registerPowerup#
-  :: forall dom a
-   . ( KnownDomain dom
-     , NFDataX a
-     , HasCallStack )
-  => Clock dom
-  -> a
-  -> a
-registerPowerup# (Clock dom) a =
-  case knownDomainByName dom of
-    SDomainConfiguration _dom _period _edge _sync SDefined _polarity -> a
-    SDomainConfiguration _dom _period _edge _sync SUnknown _polarity ->
-      deepErrorX ("First value of register undefined on domain " ++ show dom)
-
--- | Version of 'register#' that simulates a register on an asynchronous
--- domain. Is synthesizable.
-asyncRegister#
-  :: forall dom  a
-   . ( KnownDomain dom
-     , NFDataX a )
-  => Clock dom
-  -- ^ Clock signal
-  -> Reset dom
-  -- ^ Reset signal
-  -> Enable dom
-  -- ^ Enable signal
-  -> a
-  -- ^ Power up value
-  -> a
-  -- ^ Reset value
-  -> Signal dom a
-  -> Signal dom a
-asyncRegister# clk (unsafeToHighPolarity -> rst) (fromEnable -> ena) initVal resetVal =
-  go (registerPowerup# clk initVal) rst ena
+      goAsync powerUpVal1 (unsafeToHighPolarity rst) ena
  where
-  go o (r :- rs) enas@(~(e :- es)) as@(~(x :- xs)) =
-    let oR = if r then resetVal else o
-        oE = if r then resetVal else (if e then x else o)
-        -- [Note: register strictness annotations]
-    in  oR `defaultSeqX` oR :- (as `seq` enas `seq` go oE rs es xs)
-{-# NOINLINE asyncRegister# #-}
-{-# ANN asyncRegister# hasBlackBox #-}
+  powerUpVal1 :: a
+  powerUpVal1 =
+    case knownDomainByName dom of
+      SDomainConfiguration _dom _period _edge _sync SDefined _polarity ->
+        powerUpVal0
+      SDomainConfiguration _dom _period _edge _sync SUnknown _polarity ->
+        deepErrorX ("First value of register undefined on domain " ++ show dom)
 
--- | Version of 'register#' that simulates a register on a synchronous
--- domain. Not synthesizable.
-syncRegister#
-  :: forall dom  a
-   . ( KnownDomain dom
-     , NFDataX a )
-  => Clock dom
-  -- ^ Clock signal
-  -> Reset dom
-  -- ^ Reset signal
-  -> Enable dom
-  -- ^ Enable signal
-  -> a
-  -- ^ Power up value
-  -> a
-  -- ^ Reset value
-  -> Signal dom a
-  -> Signal dom a
-syncRegister# clk (unsafeToHighPolarity -> rst) (fromEnable -> ena) initVal resetVal =
-  go (registerPowerup# clk initVal) rst ena
- where
-  go o rt@(~(r :- rs)) enas@(~(e :- es)) as@(~(x :- xs)) =
+  goSync
+    :: a
+    -> Signal dom Bool
+    -> Signal dom Bool
+    -> Signal dom a
+    -> Signal dom a
+  goSync o rt@(~(r :- rs)) enas@(~(e :- es)) as@(~(x :- xs)) =
     let oE = if e then x else o
         oR = if r then resetVal else oE
         -- [Note: register strictness annotations]
-    in  o `defaultSeqX` o :- (rt `seq` enas `seq` as `seq` go oR rs es xs)
-{-# NOINLINE syncRegister# #-}
-{-# ANN syncRegister# dontTranslate #-}
+    in  o `defaultSeqX` o :- (rt `seq` enas `seq` as `seq` goSync oR rs es xs)
+
+  goAsync
+    :: a
+    -> Signal dom Bool
+    -> Signal dom Bool
+    -> Signal dom a
+    -> Signal dom a
+  goAsync o (r :- rs) enas@(~(e :- es)) as@(~(x :- xs)) =
+    let oR = if r then resetVal else o
+        oE = if r then resetVal else (if e then x else o)
+        -- [Note: register strictness annotations]
+    in  oR `defaultSeqX` oR :- (as `seq` enas `seq` goAsync oE rs es xs)
+{-# NOINLINE register# #-}
+{-# ANN register# hasBlackBox #-}
 
 -- | The above type is a generalization for:
 --
