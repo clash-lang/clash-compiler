@@ -1,5 +1,5 @@
 #!/bin/bash
-set -xou pipefail
+set -xeou pipefail
 
 # Check that clash-dev works
 if [[ "$RUN_CLASHDEV" = "yes" ]]; then
