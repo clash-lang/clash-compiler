@@ -28,7 +28,7 @@ master_doc = 'index'
 project = 'Clash'
 copyright = '2017-2019, The Clash Developers'
 author = 'The Clash Developers'
-version = '1.2.4'
+version = '1.2.5'
 release = version
 
 # Syntax highlighting
