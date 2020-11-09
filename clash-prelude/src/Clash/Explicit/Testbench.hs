@@ -48,7 +48,9 @@ import Clash.Explicit.Signal
   (Clock, Reset, System, Signal, clockPeriod, toEnable, fromList, register,
   unbundle, unsafeSynchronizer, veryUnsafeSynchronizer)
 import Clash.Signal.Internal (Clock (..), Reset (..))
-import Clash.Signal          (mux, KnownDomain, Enable)
+import Clash.Signal
+  (mux, DomainResetKind, ResetKind(Asynchronous), KnownDomain,
+  Enable)
 import Clash.Sized.Index     (Index)
 import Clash.Sized.Internal.BitVector
   (BitVector, isLike)
@@ -191,6 +193,7 @@ outputVerifier'
   :: forall l a dom
    . ( KnownNat l
      , KnownDomain dom
+     , DomainResetKind dom ~ 'Asynchronous
      , Eq a
      , ShowX a )
   => Clock dom
@@ -253,6 +256,7 @@ outputVerifier
    . ( KnownNat l
      , KnownDomain testDom
      , KnownDomain circuitDom
+     , DomainResetKind testDom ~ 'Asynchronous
      , Eq a
      , ShowX a )
   => Clock testDom
@@ -296,6 +300,7 @@ outputVerifierBitVector'
    . ( KnownNat l
      , KnownNat n
      , KnownDomain dom
+     , DomainResetKind dom ~ 'Asynchronous
      )
   => Clock dom
   -- ^ Clock to which the input signal is synchronized to
@@ -318,6 +323,7 @@ outputVerifierBitVector
      , KnownNat n
      , KnownDomain testDom
      , KnownDomain circuitDom
+     , DomainResetKind testDom ~ 'Asynchronous
      )
   => Clock testDom
   -- ^ Clock to which the input signal is synchronized to
@@ -381,6 +387,7 @@ biTbClockGen
   :: forall testDom circuitDom
    . ( KnownDomain testDom
      , KnownDomain circuitDom
+     , DomainResetKind testDom ~ 'Asynchronous
      )
   => Signal testDom Bool
   -> (Clock testDom, Clock circuitDom)
