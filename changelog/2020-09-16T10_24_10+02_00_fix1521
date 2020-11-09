@@ -1,1 +1,0 @@
-FIXED: Signal's `fmap` was too strict in on of its arguments causing an infinite loop in certain situations. See [#1521](https://github.com/clash-lang/clash-compiler/issues/1521).
