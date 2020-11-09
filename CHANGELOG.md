@@ -14,9 +14,6 @@ reduceTypeFamily [#1469](https://github.com/clash-lang/clash-compiler/issues/146
   * Clash no longer produces erroneous HDL in very specific cases [#1536](https://github.com/clash-lang/clash-compiler/issues/1536)
   * Usage of `fold` inside other HO primitives (e.g., `map`) no longer fails [#1524](https://github.com/clash-lang/clash-compiler/issues/1524)
 
-Changed:
-  * Due to difficulties using `resetSynchronizer` we've decided to make this function always insert a synchronizer. See: [#1528](https://github.com/clash-lang/clash-compiler/issues/1528).
-
 ## 1.2.4 *July 28th 2020*
 * Changed:
   * Relaxed upper bound versions of `aeson` and `dlist`, in preparation for the new Stack LTS.
