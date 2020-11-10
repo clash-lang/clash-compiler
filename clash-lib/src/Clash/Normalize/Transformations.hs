@@ -1081,9 +1081,11 @@ inlineWorkFree _ e@(collectArgsTicks -> (Var f,args@(_:_),ticks))
                                         (const (pure False)))
                                 args
     untranslatable <- isUntranslatableType True eTy
+    topEnts <- Lens.view topEntities
     let isSignal = isSignalType tcm eTy
     let lv = isLocalId f
-    if untranslatable || isSignal || argsHaveWork || lv
+    let isTopEnt = elemVarSet f topEnts
+    if untranslatable || isSignal || argsHaveWork || lv || isTopEnt
       then return e
       else do
         bndrs <- Lens.use bindings
