@@ -1,0 +1,422 @@
+{-# START_FILE {{name}}.cabal #-}
+cabal-version:       2.4
+name:                {{name}}
+version:             0.1
+license-file:        LICENSE
+author:              {{author-name}}{{^author-name}}Author name here{{/author-name}}
+maintainer:          {{author-name}}{{^author-name}}Author name here{{/author-name}}
+copyright:           {{copyright}}{{^copyright}}{{year}}{{^year}}2020{{/year}} {{author-name}}{{^author-name}}Author name here{{/author-name}}{{/copyright}}
+
+common common-options
+  default-extensions:
+    BangPatterns
+    BinaryLiterals
+    ConstraintKinds
+    DataKinds
+    DefaultSignatures
+    DeriveAnyClass
+    DeriveDataTypeable
+    DeriveFoldable
+    DeriveFunctor
+    DeriveGeneric
+    DeriveLift
+    DeriveTraversable
+    DerivingStrategies
+    InstanceSigs
+    KindSignatures
+    LambdaCase
+    NoStarIsType
+    PolyKinds
+    RankNTypes
+    ScopedTypeVariables
+    StandaloneDeriving
+    TupleSections
+    TypeApplications
+    TypeFamilies
+    TypeOperators
+    ViewPatterns
+
+    -- TemplateHaskell is used to support convenience functions such as
+    -- 'listToVecTH' and 'bLit'.
+    TemplateHaskell
+    QuasiQuotes
+
+    -- Prelude isn't imported by default as Clash offers Clash.Prelude
+    NoImplicitPrelude
+  ghc-options:
+    -Wall -Wcompat
+    -haddock
+
+    -- Plugins to support type-level constraint solving on naturals
+    -fplugin GHC.TypeLits.Extra.Solver
+    -fplugin GHC.TypeLits.Normalise
+    -fplugin GHC.TypeLits.KnownNat.Solver
+
+    -- Clash needs access to the source code in compiled modules
+    -fexpose-all-unfoldings
+
+    -- Worker wrappers introduce unstable names for functions that might have
+    -- blackboxes attached for them. You can disable this, but be sure to add
+    -- a no-specialize pragma to every function with a blackbox.
+    -fno-worker-wrapper
+  default-language: Haskell2010
+  build-depends:
+    base,
+    Cabal,
+
+    -- clash-prelude will set suitable version bounds for the plugins
+    clash-prelude >= 1.2.5 && < 1.4,
+    ghc-typelits-natnormalise,
+    ghc-typelits-extra,
+    ghc-typelits-knownnat
+
+library
+  import: common-options
+  hs-source-dirs: src
+  exposed-modules:
+    Example.Project
+  default-language: Haskell2010
+
+-- Builds the executable 'clash', with {{name}} project in scope
+executable clash
+  main-is: bin/Clash.hs
+  Build-Depends: base, clash-ghc, {{name}}
+  if !os(Windows)
+    ghc-options: -dynamic
+
+-- Builds the executable 'clashi', with {{name}} project in scope
+executable clashi
+  main-is: bin/Clashi.hs
+  if !os(Windows)
+    ghc-options: -dynamic
+  build-depends: base, clash-ghc, {{name}}
+
+test-suite test-library
+  import: common-options
+  hs-source-dirs: tests
+  type: exitcode-stdio-1.0
+  ghc-options: -threaded
+  main-is: tests.hs
+  other-modules:
+    Tests.Example.Project
+  build-depends:
+    {{name}},
+    QuickCheck,
+    tasty >= 1.2 && < 1.3,
+    tasty-quickcheck
+
+{-# START_FILE cabal.project #-}
+packages:
+  {{name}}.cabal
+
+package clash-prelude
+  -- 'large-tuples' generates tuple instances for various classes up to the
+  -- GHC imposed maximum of 62 elements. This severely slows down compiling
+  -- Clash, and triggers Template Haskell bugs on Windows. Hence, we disable
+  -- it by default. This will be the default for Clash >=1.4.
+  flags: -large-tuples
+
+{-# START_FILE stack.yaml #-}
+resolver: lts-15.10
+
+extra-deps:
+- concurrent-supply-0.1.8
+- ghc-typelits-extra-0.4
+- clash-prelude-1.2.5
+- clash-lib-1.2.5
+- clash-ghc-1.2.5
+
+flags:
+  clash-prelude:
+    # 'large-tuples' generates tuple instances for various classes up to the
+    # GHC imposed maximum of 62 elements. This severely slows down compiling
+    # Clash, and triggers Template Haskell bugs on Windows. Hence, we disable
+    # it by default. This will be the default for Clash >=1.4.
+    large-tuples: false
+
+{-# START_FILE hie.yaml #-}
+cradle:
+  multi:
+    - path: "./src"
+      config: {cradle: {cabal: {component: "lib:{{name}}"}}}
+    - path: "./tests"
+      config: {cradle: {cabal: {component: "test-suite:test-library"}}}
+    - path: "./bin/Clash.hs"
+      config: {cradle: {cabal: {component: "clash"}}}
+    - path: "./bin/Clashi.hs"
+      config: {cradle: {cabal: {component: "clashi"}}}
+    - path: "./Setup.hs"
+      config: {cradle: {none: }}
+
+{-# START_FILE setup.hs #-}
+import Prelude
+import Distribution.Simple
+
+main :: IO ()
+main = defaultMain
+
+{-# START_FILE bin/Clash.hs #-}
+import Prelude
+import System.Environment (getArgs)
+import Clash.Main (defaultMain)
+
+main :: IO ()
+main = getArgs >>= defaultMain
+
+{-# START_FILE bin/Clashi.hs #-}
+import Prelude
+import System.Environment (getArgs)
+import Clash.Main (defaultMain)
+
+main :: IO ()
+main = getArgs >>= defaultMain . ("--interactive":)
+
+{-# START_FILE src/Example/Project.hs #-}
+module Example.Project (topEntity, plus) where
+
+import Clash.Prelude
+
+plus :: Signed 8 -> Signed 8 -> Signed 8
+plus a b = a + b
+
+-- | 'topEntity' is Clash's equivalent of 'main' in other programming
+-- languages. Clash will look for it when compiling 'Example.Project'
+-- and translate it to HDL. While polymorphism can be used freely in
+-- Clash projects, a 'topEntity' must be monomorphic and must use non-
+-- recursive types. Or, to put it hand-wavily, a 'topEntity' must be
+-- translatable to a static number of wires.
+topEntity :: Signed 8 -> Signed 8 -> Signed 8
+topEntity = plus
+
+{-# START_FILE tests/tests.hs #-}
+import Prelude
+import qualified Tests.Example.Project
+
+main :: IO ()
+main = Tests.Example.Project.main
+
+{-# START_FILE tests/Tests/Example/Project.hs #-}
+module Tests.Example.Project where
+
+import Prelude
+import Test.Tasty
+import qualified Test.Tasty.QuickCheck as T
+
+import Example.Project (plus)
+
+main :: IO ()
+main = defaultMain tests
+
+aEqualsA :: Int -> Bool
+aEqualsA a = a == a
+
+
+tests :: TestTree
+tests = testGroup "Example"
+  [ testGroup "Project"
+    [ T.testProperty "plus a b == plus b a" (\a b -> plus a b == plus b a)
+    ]
+  ]
+
+{-# START_FILE .gitignore #-}
+dist/
+dist-newstyle/
+.stack-work/
+cabal-dev
+/cabal.project.local
+.ghc.environment.*
+*.o
+*.o-boot
+*.hi
+*.hi-boot
+*.po
+*.po-boot
+*.p_o
+*.p_o-boot
+*.chi
+*.chs.h
+*.dyn_o
+*.dyn_o-boot
+*.dyn_hi
+*.dyn_hi-boot
+.virtualenv
+.hpc
+.hsenv
+.cabal-sandbox/
+cabal.sandbox.config
+cabal.config
+*.prof
+*.aux
+*.hp
+*.bin
+*.log
+*.tar.gz
+
+*~
+*.DS_Store
+
+# IntelliJ
+/.idea
+*.iml
+
+# HDL directories often created during development cycle
+/vhdl
+/verilog
+/systemverilog
+
+{-# START_FILE README.md #-}
+# {{name}}
+[![CC0](https://licensebuttons.net/p/zero/1.0/88x31.png)](http://creativecommons.org/publicdomain/zero/1.0/)
+To the extent possible under law, QBayLogic B.V. has waived all copyright and related or neighboring rights to this "Clash Example Project".
+
+# Table of Contents
+- [Table of Contents](#table-of-contents)
+- [Downloading this example project](#downloading-this-example-project)
+- [Using this project](#using-this-project)
+  - [Stack (Windows, Linux, MacOS) [recommended]](#stack-windows-linux-macos-recommended)
+  - [Cabal (Linux, MacOS)](#cabal-linux-macos)
+  - [Snap (Linux)](#snap-linux)
+  - [Nix (Linux, MacOS)](#nix-linux-macos)
+  - [There's so many! Which should I pick?](#theres-so-many-which-should-i-pick)
+- [Change the LICENSE](#change-the-license)
+- [IDE support](#ide-support)
+
+# Based on Clash Example project
+This project is based on the Clash example project which is published with every Clash release.
+You can find a list of Clash releases at [github.com/clash-lang/clash-compiler/releases](https://github.com/clash-lang/clash-compiler/releases).
+Look for "starter project" under "Assets".
+
+# Using this project
+There's a number of ways to build this project on your machine. The recommended way of doing so is using _Stack_, whose instructions will follow directly after this section. Depending on your or your organization's needs, you might want to select another tool though. If you need help deciding, scroll down to [There's so many! Which should I pick?](#theres-so-many-which-should-i-pick).
+
+
+## Stack (Windows, Linux, MacOS) [recommended]
+Install Stack using your package manager or refer to the [How to install](https://docs.haskellstack.org/en/stable/README/#how-to-install) section of the [Stack manual](https://docs.haskellstack.org/en/stable/README/).
+
+Build the project with:
+
+```bash
+stack build
+```
+
+To run the tests defined in `tests/`, use:
+
+```bash
+stack test
+```
+
+To compile the project to VHDL, run:
+
+```bash
+stack run clash -- Example.Project --vhdl
+```
+
+## Cabal (Linux, MacOS)
+**The following instructions only work for Cabal >=3.0, GHC >=8.4, and Clash >=1.2.5.**
+
+First, update your cabal package database:
+
+```bash
+cabal update
+```
+
+You only have to run the update command once. After that, you can keep rebuilding your project by running the build command:
+
+```bash
+cabal build
+```
+
+To run the tests defined in `tests/`, use:
+
+```bash
+cabal run test-library
+```
+
+To compile the project to VHDL, run:
+
+```bash
+cabal run clash --write-ghc-environment-files=always -- Example.Project --vhdl
+```
+
+
+## Snap (Linux)
+Linux users can use _snap_ to install Clash on their machines. See [snapcraft.io/clash](https://snapcraft.io/clash) how to do so. After installing Clash through snap, you can compile this project using:
+
+```bash
+clash.cabal update
+clash.cabal build
+```
+
+You only have to run the update command once. After that, you can keep rebuilding your project by running the build command.
+
+To run the tests defined in `tests/`, use:
+
+```bash
+clash.cabal run test-library
+```
+
+To compile the project to VHDL, run:
+
+```bash
+clash.cabal build --write-ghc-environment-files=always
+clash Example.Project --vhdl
+```
+
+Clash will look for a function called `topEntity` in the module you specify and compile that to HDL.
+
+<!-- omit in toc -->
+### Notes on using snap for your project
+
+1. By default, snaps will update to the latest stable release of Clash. This is a problem, because new (major) releases might break your design. To mitigate this, the next major Clash release (1.4) will introduce a [Snap channel](https://snapcraft.io/docs/channels) that will allow you to keep using 1.2.
+2. The version of `clash-{prelude,lib,ghc}` your project depends on must exactly match the one supplied in the snap. For this reason, we recommend specifying a range of Clash versions your project can work with. This way, cabal will automatically prefer the version installed int he snap.
+
+## Nix (Linux, MacOS)
+To be done.
+
+## There's so many! Which should I pick?
+In general we recommend **Stack**. It offers a great balance between ease of use, flexibility, and reliability. On top of that, it's easy to install and use on Windows. Of course, it is not going to suit everyone. What follows is a comparison table between the different toolchains.
+
+|                     | Snap | Cabal     | Stack    | Nix      |
+|---------------------|------|-----------|----------|----------|
+| Windows             |      | ¹         | ✓        |          |
+| Linux               | ✓    | ✓         | ✓        | ✓        |
+| macOS               |      | ✓         | ✓        | ✓        |
+| Binary cache²       | ✓    |           |          | ✓        |
+| Ease of use         | Easy | Moderate³ | Easy     | Hard⁴    |
+| Flexibility⁵        | Low  | Moderate  | Moderate | High     |
+| Snapshots⁵          |      | ⁶         | ✓        | ✓        |
+| `ghcide` compatible |      | ✓         | ✓        | Probably |
+
+Notes in table:
+
+1. Although Cabal does run on Windows, as of the time of writing -May 2020- it doesn't offer an easy way to install itself.
+2. Binary caches store project dependencies in their binary form on some centralized system. This helps to greatly reduce build times. See [the NixOS page on binary caches](https://nixos.wiki/wiki/Binary_Cache) for more information.
+3. Ease of use is set to _moderate_ for now as it:
+   * ..does not manage GHC installations. Users are responsible for installing the right `ghc` and passing it to cabal.
+   * ..offers multiple ways of compiling a project ("old style" and "new style") which is reflected in the, scattered, cabal user documentation.
+   * ..is hard to install for Windows users
+4. Nix is notoriously hard to setup. However, many users claim that once it's setup it's a breeze to use. YMMV.
+5. TODO
+6. Cabal offers snapshots through "freeze files". Freeze files pin all (transitive) dependencies of a project to a specific version. In contrast, Stack and Nix offer snapshots of versions of Haskell packages known to work together. In other words, when using Cabal the burden of figuring out which dependency works with which is on the user.
+
+# Change the LICENSE
+This Clash Example Project is dedicated to the public domain by its authors.
+It is likely that you might _not_ want to do the same when using this Clash Example Project as a template for your projects.
+So before publishing your work, make sure to change the copyright and license statement in the LICENSE file.
+
+# IDE support
+We currently recommend Visual Studio Code in combination with `ghcide`. To use it, execute the following steps:
+
+1. Install Visual Studio Code. If your Linux distribution supports `snap`, it's as simple as executing `sudo snap install code`. If you're running another platform, head over to [code.visualstudio.com](https://code.visualstudio.com/) for more information.
+2. Launch Visual Studio Code, click on "Extensions" on the left, search for and install the extension `ghcide`.
+3. Install `ghcide` using the instructions [over here](https://github.com/digital-asset/ghcide#using-it).
+4. Open this folder in Visual Studio Code.
+5. [Wait a few minutes](https://imgs.xkcd.com/comics/compiling.png)
+6. Enjoy Clash!
+
+
+{-# START_FILE LICENSE #-}
+CC0 - http://creativecommons.org/publicdomain/zero/1.0/
+
+To the extent possible under law, QBayLogic B.V. has waived all copyright and
+related or neighboring rights to this "Clash Example Project".

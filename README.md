@@ -117,3 +117,18 @@ Or [use Nix](https://nixos.org/nix/download.html) to get a shell with the `clash
 nix-shell
 ```
 
+## Start projects
+
+### Example project
+An example project is available under `clash-starters/clash-example-project`. Refer
+to the readme in that project for further instruction.
+
+### Stack template
+It's also possible to create a Clash project from a [stack template](https://docs.haskellstack.org/en/stable/GUIDE/#templates). It will create all necessary files for you. You have to have installed [Stack](https://docs.haskellstack.org/en/stable/install_and_upgrade/). To create a new project from the template run the following command:
+
+```bash
+stack new my-clash-project https://raw.githubusercontent.com/clash-lang/clash-compiler/master/clash-starters/clash-starter.hsfiles
+```
+
+Now a new folder called `my-clash-project` is created with everything setup.
+Refer to the readme in that project on how to further use it.
