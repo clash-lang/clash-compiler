@@ -81,6 +81,19 @@ mkUnique# is id0 = (is{is_freshCache=freshCache, is_store=isStore}, id2)
       -- Identifier doesn't exist in set yet, so just return it.
       id0
 
+-- | Non-monadic, internal version of 'add'
+add# :: HasCallStack => IdentifierSet -> Identifier -> IdentifierSet
+add# is0@(IdentifierSet{..}) (RawIdentifier t Nothing _) = add# is0 (make## is_hdl t)
+add# is0 (RawIdentifier _ (Just id0) _) = add# is0 id0
+add# is0@(IdentifierSet{..}) id0 = is0{is_freshCache=fresh1, is_store=ids1}
+ where
+  ids1 = HashSet.insert id0 is_store
+  fresh1 = updateFreshCache# is_freshCache id0
+
+-- | Non-monadic, internal version of 'addMultiple'
+addMultiple# :: (HasCallStack, Foldable t) => IdentifierSet -> t Identifier -> IdentifierSet
+addMultiple# is ids = List.foldl' add# is ids
+
 -- | Non-monadic, internal version of 'addRaw'
 addRaw# :: HasCallStack => IdentifierSet -> Text -> (IdentifierSet, Identifier)
 addRaw# is0 id0 =

@@ -22,6 +22,7 @@ module Clash.Netlist.Id
   , HasIdentifierSet(..)
   , emptyIdentifierSet
   , makeSet
+  , clearSet
 
     -- * Unsafe creation and extracting identifiers
   , Identifier
@@ -37,6 +38,8 @@ module Clash.Netlist.Id
   , makeBasic
   , makeBasicOr
   , makeAs
+  , add
+  , addMultiple
   , addRaw
   , deepen
   , deepenN
@@ -109,6 +112,11 @@ makeSet esc lw hdl ids = IdentifierSet esc lw hdl fresh ids
  where
   fresh = List.foldl' updateFreshCache# mempty ids
 
+-- | Remove all identifiers from a set
+clearSet :: IdentifierSet -> IdentifierSet
+clearSet (IdentifierSet escL lwL hdlL _ _) =
+  IdentifierSet escL lwL hdlL mempty mempty
+
 toList :: IdentifierSet -> [Identifier]
 toList (IdentifierSet _ _ _ _ idStore) = HashSet.toList idStore
 
@@ -121,6 +129,16 @@ toText = toText#
 -- "IdentifierType" too.
 toLazyText :: Identifier -> LT.Text
 toLazyText = LT.fromStrict . toText
+
+-- | Helper function to define pure Id functions in terms of a IdentifierSetMonad
+withIdentifierSetM'
+  :: IdentifierSetMonad m
+  => (IdentifierSet -> a -> IdentifierSet)
+  -> a
+  -> m ()
+withIdentifierSetM' f a = do
+  is0 <- identifierSetM id
+  identifierSetM (const (f is0 a)) >> pure ()
 
 -- | Helper function to define pure Id functions in terms of a IdentifierSetMonad
 withIdentifierSetM
@@ -140,6 +158,14 @@ withIdentifierSetM f a = do
 unsafeMake :: HasCallStack => Text -> Identifier
 unsafeMake t =
   RawIdentifier t Nothing (if debugIsOn then callStack else emptyCallStack)
+
+-- | Add an identifier to an IdentifierSet
+add :: HasCallStack => IdentifierSetMonad m => Identifier -> m ()
+add = withIdentifierSetM' add#
+
+-- | Add identifiers to an IdentifierSet
+addMultiple :: (HasCallStack, IdentifierSetMonad m, Foldable t) => t Identifier -> m ()
+addMultiple = withIdentifierSetM' addMultiple#
 
 -- | Add a string as is to an IdentifierSet. Should only be used for identifiers
 -- that should be spliced at verbatim in HDL, such as port names. It's sanitized

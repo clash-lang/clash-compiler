@@ -24,6 +24,8 @@ import qualified Data.Text as Text
 import Data.Text (Text)
 import Data.Text.Encoding (decodeUtf8)
 import Test.QuickCheck.Utf8
+import Text.Show.Pretty (ppShow)
+import Debug.Trace
 
 newtype NonEmptyText = NonEmptyText Text deriving (Show)
 newtype ArbitraryText = ArbitraryText Text deriving (Show)
@@ -115,6 +117,15 @@ tests =
              , testCase "id2 == foo_38" $ id2 @?= "foo_38"
              , testCase "id3 == foo_3"  $ id3 @?= "foo_3"
              ]
+
+    , testGroup "Id.add" $ eval' $ do
+        old <- get
+        id0 <- Id.addRaw "LED"
+        put old
+        Id.add id0
+        traceM . ppShow =<< get
+        id1 <- Id.toText <$> Id.make "led"
+        pure [ testCase "id1 == led_0" $ id1 @?= "led_0" ]
 
     -- Some tools/hdls are case insensitive, so we should make sure we are too
     , testGroup "case sensitivity" $ eval' $ do
