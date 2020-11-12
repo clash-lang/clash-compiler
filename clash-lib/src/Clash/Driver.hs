@@ -220,6 +220,18 @@ splitTopEntityT tcm bindingsMap tt@(TopEntityT id_ (Just t@(Synthesize {})) _) =
       error "Internal error in 'splitTopEntityT'. Please report as a bug."
 splitTopEntityT _ _ t = t
 
+-- | Remove constraints such as 'a ~ 3'.
+removeForAll :: TopEntityT -> TopEntityT
+removeForAll (TopEntityT var annM tbM) =
+  TopEntityT var{varType=tvSubstWithTyEq (varType var)} annM tbM
+
+-- | Given a list of all found top entities and _maybe_ a top entity (+dependencies)
+-- passed in by '-main-is', return the list of top entities Clash needs to
+-- compile.
+selectTopEntities :: [TopEntityT] -> Maybe (TopEntityT, [TopEntityT]) -> [TopEntityT]
+selectTopEntities topEntities mainTopEntity =
+  maybe topEntities (uncurry (:)) mainTopEntity
+
 -- | Get modification data of current clash binary.
 getClashModificationDate :: IO Clock.UTCTime
 getClashModificationDate = Directory.getModificationTime =<< getExecutablePath
@@ -258,20 +270,19 @@ generateHDL
   -> IO ()
 generateHDL reprs domainConfs bindingsMap hdlState primMap tcm tupTcm typeTrans eval
   topEntities0 mainTopEntity opts (startTime,prepTime) =
-    let (tes, deps) = sortTop bindingsMap todo
+    let (tes, deps) = sortTop bindingsMap topEntities1
      in go prepTime initIs HashMap.empty deps tes
  where
-  todo = maybe topEntities2 (uncurry (:)) mainTopEntity
-  (compNames, initIs) = genTopNames topPrefixM escpIds lwIds hdl todo
-  topEntityMap = mkVarEnv (zip (map topId todo) todo)
+  (compNames, initIs) = genTopNames topPrefixM escpIds lwIds hdl topEntities1
+  topEntityMap = mkVarEnv (fmap (\x -> (topId x, x)) topEntities1)
   topPrefixM = opt_componentPrefix opts
   hdl = hdlFromBackend (Proxy @backend)
   escpIds = opt_escapedIds opts
   lwIds = opt_lowerCaseBasicIds opts
-
-  topEntities1 = map (splitTopEntityT tcm bindingsMap) topEntities0
-  -- Remove forall's used in type equality constraints
-  topEntities2 = map (\(TopEntityT var annM tbM) -> TopEntityT var{varType=tvSubstWithTyEq (varType var)} annM tbM) topEntities1
+  topEntities1 =
+    map
+      (removeForAll . splitTopEntityT tcm bindingsMap)
+      (selectTopEntities topEntities0 mainTopEntity)
 
   go
     :: Clock.UTCTime
@@ -416,7 +427,7 @@ generateHDL reprs domainConfs bindingsMap hdlState primMap tcm tupTcm typeTrans 
                     . snd
                     . Supply.freshId
                    <$> Supply.newSupply
-  let topEntityNames = map topId topEntities2
+  let topEntityNames = map topId topEntities1
 
   (topTime,manifest',seen2,edamFiles') <- if useCacheTop
     then do
