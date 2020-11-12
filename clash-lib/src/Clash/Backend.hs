@@ -57,6 +57,20 @@ data Usage
 -- | Is '-fclash-aggresive-x-optimization-blackbox' set?
 newtype AggressiveXOptBB = AggressiveXOptBB Bool
 
+
+-- | Kind of a HDL type. Used to determine whether types need conversions in
+-- order to cross top entity boundaries.
+data HWKind
+  = PrimitiveType
+  -- ^ A type defined in an HDL spec. Usually types such as: bool, bit, ..
+  | SynonymType
+  -- ^ A user defined type that's simply a synonym for another type, very much
+  -- like a type synonym in Haskell. As long as two synonym types refer to the
+  -- same type, they can be used interchangeably. E.g., a subtype in VHDL.
+  | UserType
+  -- ^ User defined type that's not interchangeable with any others, even if
+  -- the underlying structures are the same. Similar to an ADT in Haskell.
+
 class HasIdentifierSet state => Backend state where
   -- | Initial state for state monad
   initBackend
@@ -90,6 +104,8 @@ class HasIdentifierSet state => Backend state where
   mkTyPackage      :: ModName -> [HWType] -> Mon (State state) [(String, Doc)]
   -- | Convert a Netlist HWType to a target HDL type
   hdlType          :: Usage -> HWType -> Mon (State state) Doc
+  -- | Query what kind of type a given HDL type is
+  hdlHWTypeKind :: HWType -> State state HWKind
   -- | Convert a Netlist HWType to an HDL error value for that type
   hdlTypeErrValue  :: HWType       -> Mon (State state) Doc
   -- | Convert a Netlist HWType to the root of a target HDL type

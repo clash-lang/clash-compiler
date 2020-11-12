@@ -130,6 +130,7 @@ instance Backend VerilogState where
   genHDL          = const genVerilog
   mkTyPackage _ _ = return []
   hdlType _       = verilogType
+  hdlHWTypeKind _ = pure PrimitiveType -- Everything is a bitvector!
   hdlTypeErrValue = verilogTypeErrValue
   hdlTypeMark     = verilogTypeMark
   hdlRecSel       = verilogRecSel

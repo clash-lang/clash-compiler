@@ -13,6 +13,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecursiveDo #-}
 {-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE QuasiQuotes #-}
 {-# LANGUAGE TypeFamilies #-}
 
 module Clash.Backend.VHDL (VHDLState) where
@@ -64,6 +65,7 @@ import           Clash.Netlist.Types                  hiding (_intWidth, intWidt
 import           Clash.Netlist.Util
 import           Clash.Util
   (SrcSpan, noSrcSpan, clogBase, curLoc, first, makeCached, on, indexNote)
+import qualified Clash.Util.Interpolate               as I
 import           Clash.Util.Graph                     (reverseTopSort)
 
 import           Clash.Backend.Verilog (Range (..), continueWithRange)
@@ -131,6 +133,38 @@ instance Backend VHDLState where
 
   genHDL          = genVHDL
   mkTyPackage     = mkTyPackage_
+  hdlHWTypeKind = \case
+    Vector {} -> pure UserType
+    RTree {} -> pure UserType
+    Product {} -> pure UserType
+
+    Clock {} -> pure SynonymType
+    Reset {} -> pure SynonymType
+    Enable {} -> pure SynonymType
+    Index {} -> pure SynonymType
+    CustomSP {} -> pure SynonymType
+    SP {} -> pure SynonymType
+    Sum {} -> pure SynonymType
+    CustomSum {} -> pure SynonymType
+    CustomProduct {} -> pure SynonymType
+
+    BitVector _ -> pure PrimitiveType
+    Bool -> pure PrimitiveType
+    Bit -> pure PrimitiveType
+    Unsigned {} -> pure PrimitiveType
+    Signed {} -> pure PrimitiveType
+    String -> pure PrimitiveType
+    Integer -> pure PrimitiveType
+    FileType -> pure PrimitiveType
+
+    -- Transparent types:
+    BiDirectional _ ty -> hdlHWTypeKind ty
+    Annotated _ ty -> hdlHWTypeKind ty
+
+    -- Shouldn't be printed?
+    Void {} -> pure PrimitiveType
+    KnownDomain {} -> pure PrimitiveType
+
   hdlType Internal      (filterTransparent -> ty) = sizedQualTyName ty
   hdlType (External nm) (filterTransparent -> ty) =
     let sized = sizedQualTyName ty in
@@ -494,6 +528,7 @@ tyDec hwty = do
     Signed _    -> emptyDoc
     String      -> emptyDoc
     Integer     -> emptyDoc
+    FileType    -> emptyDoc
 
     -- Transparent types:
     BiDirectional _ ty -> tyDec ty
@@ -502,7 +537,10 @@ tyDec hwty = do
     Void {} -> emptyDoc
     KnownDomain {} -> emptyDoc
 
-    _ -> error $ $(curLoc) ++ show hwty
+    -- Unexpected arguments:
+    Product _ _ _ -> error $ $(curLoc) ++ [I.i|
+      Unexpected Product with fewer than 2 fields: #{hwty}
+    |]
 
 
 
