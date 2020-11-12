@@ -60,6 +60,7 @@ import Data.Typeable                        (Typeable)
 import Data.Text.Prettyprint.Doc.Extra      (Doc)
 import Data.Semigroup.Monad                 (Mon(..))
 import GHC.Generics                         (Generic)
+import GHC.Stack
 import Language.Haskell.TH.Syntax           (Lift)
 
 import SrcLoc                               (SrcSpan)
@@ -77,7 +78,7 @@ import Clash.Netlist.BlackBox.Types         (BlackBoxTemplate)
 import Clash.Primitives.Types               (CompiledPrimMap)
 import Clash.Signal.Internal
   (ResetPolarity, ActiveEdge, ResetKind, InitBehavior)
-import Clash.Util                           (HasCallStack, makeLenses)
+import Clash.Util                           (makeLenses)
 
 import Clash.Annotations.BitRepresentation.Internal
   (CustomReprs, DataRepr', ConstrRepr')
@@ -212,6 +213,10 @@ data Identifier
       (Maybe Identifier)
       -- FIELD Parsed version of raw identifier. Will not be populated if this
       -- identifier was created with an unsafe function.
+      !CallStack
+      -- ^ Stores where this identifier was generated. Tracking is only enabled
+      -- is 'debugIsOn', otherwise this field will be populated by an empty
+      -- callstack.
 
   -- | Parsed and sanitized identifier. See various fields for more information
   -- on its invariants.
@@ -234,10 +239,14 @@ data Identifier
     -- ^ See "IdentifierType".
     , i_hdl :: !HDL
     -- ^ HDL this identifier is generated for.
+    , i_provenance :: !CallStack
+    -- ^ Stores where this identifier was generated. Tracking is only enabled
+    -- is 'debugIsOn', otherwise this field will be populated by an empty
+    -- callstack.
     } deriving (Show, Generic, NFData)
 
 identifierKey# :: Identifier -> ((Text, Bool), [Word])
-identifierKey# (RawIdentifier t _id) = ((t, True), [])
+identifierKey# (RawIdentifier t _id _) = ((t, True), [])
 identifierKey# id_ = ((i_baseNameCaseFold id_, False), i_extensionsRev id_)
 
 instance Hashable Identifier where
@@ -782,7 +791,9 @@ emptyBBContext name
   , bbFunctions   = empty
   , bbQsysIncName = []
   , bbLevel       = (-1)
-  , bbCompName    = UniqueIdentifier "__NOCOMPNAME__" "__NOCOMPNAME__" [] Basic VHDL
+  , bbCompName    = UniqueIdentifier
+                      "__NOCOMPNAME__" "__NOCOMPNAME__" []
+                      Basic VHDL emptyCallStack
   , bbCtxName     = Nothing
   }
 
