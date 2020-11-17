@@ -2017,7 +2017,7 @@ buildModifier _ prevM (Indexed (ty@(RTree d argTy),1,1)) = case prevM of
   z   = 2^(d - 1)
   z'  = 2^d
 
--- This is a HACK for Clash.Driver.TopWrapper.mkOutput
+-- This is a HACK for Clash.Netlist.Util.mkTopOutput
 -- Vector's don't have a 10'th constructor, this is just so that we can
 -- recognize the particular case
 buildModifier syn prevM (Indexed (ty@(Vector _ argTy),10,fI)) = case prevM of
@@ -2034,7 +2034,7 @@ buildModifier syn prevM (Indexed (ty@(Vector _ argTy),10,fI)) = case prevM of
   _ ->
       Just (vivadoRange syn argTy (((Idx fI,argTy):prevM)))
 
--- This is a HACK for Clash.Driver.TopWrapper.mkOutput
+-- This is a HACK for Clash.Netlist.Util.mkTopOutput
 -- RTree's don't have a 10'th constructor, this is just so that we can
 -- recognize the particular case
 buildModifier syn prevM (Indexed (ty@(RTree _ argTy),10,fI)) = case prevM of

@@ -1014,14 +1014,14 @@ expr_ _ (Identifier id_ (Just (Indexed ((RTree n _),1,1)))) =
       z' = 2^n
   in pretty id_ <> brackets (int z <> colon <> int (z'-1))
 
--- This is a HACK for Clash.Driver.TopWrapper.mkOutput
+-- This is a HACK for Clash.Netlist.Util.mkTopOutput
 -- Vector's don't have a 10'th constructor, this is just so that we can
 -- recognize the particular case
 expr_ _ (Identifier id_ (Just (Indexed ((Vector _ elTy),10,fI)))) = do
   id' <- fmap (Text.toStrict . renderOneLine) (pretty id_ <> brackets (int fI))
   simpleFromSLV elTy id'
 
--- This is a HACK for Clash.Driver.TopWrapper.mkOutput
+-- This is a HACK for Clash.Netlist.Util.mkTopOutput
 -- RTree's don't have a 10'th constructor, this is just so that we can
 -- recognize the particular case
 expr_ _ (Identifier id_ (Just (Indexed ((RTree _ elTy),10,fI)))) = do
@@ -1382,7 +1382,7 @@ modifier offset mods (Indexed (ty@(RTree d argTy),1,1)) = case mods of
     rhsS    = (d-1)^(2 :: Int)
     rhsE    = d^(2 :: Int)-1
 
--- This is a HACK for Clash.Driver.TopWrapper.mkOutput
+-- This is a HACK for Clash.Netlist.Util.mkTopOutput
 -- Vector's don't have a 10'th constructor, this is just so that we can
 -- recognize the particular case
 modifier offset mods (Indexed (ty@(Vector _ argTy),10,fI)) = case mods of
@@ -1394,7 +1394,7 @@ modifier offset mods (Indexed (ty@(Vector _ argTy),10,fI)) = case mods of
     start   = typeSize ty - (fI * argSize) - 1
     end     = start - argSize + 1
 
--- This is a HACK for Clash.Driver.TopWrapper.mkOutput
+-- This is a HACK for Clash.Netlist.Util.mkTopOutput
 -- RTree's don't have a 10'th constructor, this is just so that we can
 -- recognize the particular case
 modifier offset mods (Indexed (ty@(RTree _ argTy),10,fI)) = case mods of

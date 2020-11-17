@@ -782,7 +782,7 @@ modifier r (Indexed (ty@(RTree d argTy),1,1)) =
     start   = (typeSize ty `div` 2) - 1
     hty     = RTree (d-1) argTy
 
--- This is a HACK for Clash.Driver.TopWrapper.mkOutput
+-- This is a HACK for Clash.Netlist.Util.mkTopOutput
 -- Vector's don't have a 10'th constructor, this is just so that we can
 -- recognize the particular case
 modifier r (Indexed (ty@(Vector _ argTy),10,fI)) =
@@ -792,7 +792,7 @@ modifier r (Indexed (ty@(Vector _ argTy),10,fI)) =
     start   = typeSize ty - (fI * argSize) - 1
     end     = start - argSize + 1
 
--- This is a HACK for Clash.Driver.TopWrapper.mkOutput
+-- This is a HACK for Clash.Netlist.Util.mkTopOutput
 -- RTree's don't have a 10'th constructor, this is just so that we can
 -- recognize the particular case
 modifier r (Indexed (ty@(RTree _ argTy),10,fI)) =

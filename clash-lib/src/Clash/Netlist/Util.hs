@@ -916,7 +916,7 @@ mkUniqueArguments subst0 (Just (ExpandedTopEntity{..})) args = do
     go Nothing _var =
       pure Nothing
     go (Just port) var = do
-      (ports, decls, _, portI) <- mkInput port
+      (ports, decls, _, portI) <- mkTopInput port
       let portName = Id.toText portI
           pId  = mkLocalId (varType var) (setRepName portName (varName var))
       return (Just (ports, decls, (pId, (var, Var pId))))
@@ -945,7 +945,7 @@ mkUniqueResult subst0 (Just (ExpandedTopEntity{et_output=Just iPort})) res = do
   (FilteredHWType hwty _) <- unsafeCoreTypeToHWTypeM $(curLoc) (varType res)
   when (containsBiSignalIn hwty)
     (throw (ClashException sp ($(curLoc) ++ "BiSignalIn cannot be part of a function's result. Use 'readFromBiSignal'.") Nothing))
-  (ports, decls, portI) <- mkOutput iPort
+  (ports, decls, portI) <- mkTopOutput iPort
   let pO = setRepName (Id.toText portI) (varName res)
       pOId = mkLocalId (varType res) pO
       subst1 = extendInScopeId (extendIdSubst subst0 res (Var pOId)) pOId
@@ -1061,6 +1061,7 @@ prefixParent parent (PortProduct p ps)  = PortProduct (parent <> "_" <> p) ps
 mkAssign :: Identifier -> HWType -> Expr -> [Declaration]
 mkAssign id_ hwty expr = [NetDecl Nothing id_ hwty, Assignment id_ expr]
 
+-- | See 'toPrimitiveType' / 'fromPrimitiveType'
 convPrimitiveType :: HWType -> a -> NetlistMonad a -> NetlistMonad a
 convPrimitiveType hwty a action = do
   b <- Lens.use backend
@@ -1070,6 +1071,11 @@ convPrimitiveType hwty a action = do
     SynonymType -> pure a
     PrimitiveType -> pure a
 
+-- | Top entities only expose primitive types or types that don't need explicit
+-- conversion to a primitive type (i.e., no types from the '_types' module). This
+-- function converts from a custom type to a primitive type if needed.
+--
+-- See 'HWKind' for more info on primitive type kinds.
 toPrimitiveType
   :: Identifier
   -> HWType
@@ -1082,6 +1088,11 @@ toPrimitiveType id0 hwty0 = convPrimitiveType hwty0 dflt $ do
   hwty1 = BitVector (typeSize hwty0)
   expr = ToBv Nothing hwty0 (Identifier id0 Nothing)
 
+-- | Top entities only expose primitive types or types that don't need explicit
+-- conversion to a primitive type (i.e., no types from the '_types' module). This
+-- function converts from a primitive type to a custom type if needed.
+--
+-- See 'HWKind' for more info on primitive type kinds.
 fromPrimitiveType
   :: Identifier
   -> HWType
@@ -1094,34 +1105,35 @@ fromPrimitiveType id0 hwty0 = convPrimitiveType hwty0 dflt $ do
   hwty1 = BitVector (typeSize hwty0)
   expr = FromBv Nothing hwty0 (Identifier id0 Nothing)
 
-mkInput
+-- | Create port names for the declaration of a top entity. For /instantiation/
+-- see 'mkTopInstInput'.
+mkTopInput
   :: ExpandedPortName Identifier
-  -> NetlistMonad ( [(Identifier, HWType)]
-                  , [Declaration]
-                  , Expr
-                  , Identifier )
-mkInput (ExpandedPortName hwty0 i0) = do
+  -- ^ Port name description
+  -> NetlistMonad ([(Identifier, HWType)], [Declaration], Expr, Identifier)
+  -- ^ (port names, signal decls for intermediate signals, argument expr, argument id)
+mkTopInput (ExpandedPortName hwty0 i0) = do
   (decls, i1, expr, hwty1) <- fromPrimitiveType i0 hwty0
   return ([(i0, hwty1)], decls, expr, i1)
 
-mkInput epp@(ExpandedPortProduct p hwty ps) = do
+mkTopInput epp@(ExpandedPortProduct p hwty ps) = do
   pN <- Id.make p
   let netdecl = NetDecl Nothing pN hwty
   case hwty of
     Vector sz eHwty -> do
-      (ports, _, exprs, _) <- unzip4 <$> mapM mkInput ps
+      (ports, _, exprs, _) <- unzip4 <$> mapM mkTopInput ps
       let vecExpr  = mkVectorChain sz eHwty exprs
           netassgn = Assignment pN vecExpr
       return (concat ports, [netdecl, netassgn], vecExpr, pN)
 
     RTree d eHwty -> do
-      (ports, _, exprs, _) <- unzip4 <$> mapM mkInput ps
+      (ports, _, exprs, _) <- unzip4 <$> mapM mkTopInput ps
       let trExpr   = mkRTreeChain d eHwty exprs
           netassgn = Assignment pN trExpr
       return (concat ports, [netdecl, netassgn], trExpr, pN)
 
     Product _ _ _ -> do
-      (ports, _, exprs, _) <- unzip4 <$> mapM mkInput ps
+      (ports, _, exprs, _) <- unzip4 <$> mapM mkTopInput ps
       case exprs of
         [expr] ->
           let netassgn = Assignment pN expr in
@@ -1134,7 +1146,7 @@ mkInput epp@(ExpandedPortProduct p hwty ps) = do
             return (concat ports, [netdecl, netassgn], dcExpr, pN)
 
     SP _ ((concat . map snd) -> [elTy]) -> do
-      (ports, _, exprs, _) <- unzip4 <$> mapM mkInput ps
+      (ports, _, exprs, _) <- unzip4 <$> mapM mkTopInput ps
       case exprs of
         [conExpr, elExpr] -> do
           let dcExpr   = DataCon hwty (DC (BitVector (typeSize hwty), 0))
@@ -1231,12 +1243,12 @@ stripAttributes (Annotated attrs typ) =
 -- Not an annotated type, so just return it:
 stripAttributes typ = ([], typ)
 
--- | Generate output port mappings. Will yield Nothing if the only output is
--- Void.
-mkOutput
+-- | Create output port names for the declaration of a top entity. For
+-- /instantiation/ see 'mkTopInstOutput'.
+mkTopOutput
   :: ExpandedPortName Identifier
   -> NetlistMonad ([(Identifier, HWType)], [Declaration], Identifier)
-mkOutput (ExpandedPortName hwty0 i0) = do
+mkTopOutput (ExpandedPortName hwty0 i0) = do
   i1 <- Id.next i0
   (_, _, bvExpr, hwty1) <- toPrimitiveType i1 hwty0
   if hwty0 == hwty1 then
@@ -1247,22 +1259,22 @@ mkOutput (ExpandedPortName hwty0 i0) = do
     -- Type conversion happened, so we must use intermediate variable.
     return ([(i0, hwty1)], [Assignment i0 bvExpr, NetDecl Nothing i1 hwty0], i1)
 
-mkOutput epp@(ExpandedPortProduct p hwty ps) = do
+mkTopOutput epp@(ExpandedPortProduct p hwty ps) = do
   pN <- Id.make p
   let netdecl = NetDecl Nothing pN hwty
   case hwty of
     Vector {} -> do
-      (ports, decls, ids) <- unzip3 <$> mapM mkOutput ps
+      (ports, decls, ids) <- unzip3 <$> mapM mkTopOutput ps
       let assigns = zipWith (assignId pN hwty 10) ids [0..]
       return (concat ports, netdecl:assigns ++ concat decls, pN)
 
     RTree {} -> do
-      (ports, decls, ids) <- unzip3 <$> mapM mkOutput ps
+      (ports, decls, ids) <- unzip3 <$> mapM mkTopOutput ps
       let assigns = zipWith (assignId pN hwty 10) ids [0..]
       return (concat ports, netdecl:assigns ++ concat decls, pN)
 
     Product {} -> do
-      (ports, decls, ids) <- unzip3 <$> mapM mkOutput ps
+      (ports, decls, ids) <- unzip3 <$> mapM mkTopOutput ps
       case ids of
         [i] -> let assign  = Assignment i (Identifier pN Nothing)
                in  return (concat ports, netdecl:assign:concat decls, pN)
@@ -1271,7 +1283,7 @@ mkOutput epp@(ExpandedPortProduct p hwty ps) = do
                in return (concat ports, netdecl:assigns ++ concat decls, pN)
 
     SP _ ((concat . map snd) -> [elTy]) -> do
-      (ports, decls, ids) <- unzip3 <$> mapM mkOutput ps
+      (ports, decls, ids) <- unzip3 <$> mapM mkTopOutput ps
       case ids of
         [conId, elId] ->
           let conIx   = Sliced ( BitVector (typeSize hwty)
@@ -1341,7 +1353,7 @@ mkTopUnWrapper topEntity annM dstId args tickDecls = do
      'genNames'. |])
 
   -- inputs
-  (iports, wrappers, idsI) <- unzip3 <$> mapM mkTopInput (catMaybes (et_inputs annM))
+  (iports, wrappers, idsI) <- unzip3 <$> mapM mkTopInstInput (catMaybes (et_inputs annM))
   let inpAssigns = zipWith Assignment idsI (map fst args)
 
   -- output
@@ -1352,7 +1364,7 @@ mkTopUnWrapper topEntity annM dstId args tickDecls = do
   instLabel1 <- fromMaybe instLabel0 <$> Lens.view setName
   instLabel2 <- affixName instLabel1
   instLabel3 <- Id.makeBasic instLabel2
-  topOutputM <- traverse mkTopOutput (et_output annM)
+  topOutputM <- traverse mkTopInstOutput (et_output annM)
 
   let topDecl = mkTopCompDecl (Just topName) [] topIdentifier instLabel3 [] (concat iports)
 
@@ -1365,24 +1377,28 @@ mkTopUnWrapper topEntity annM dstId args tickDecls = do
 
 data InstancePort = InstancePort
   { ip_id :: Identifier
-  -- ^ Identifier to assign to 'ip_port'.
+  -- ^ Identifier to assign. Top entities are instantiated using positional
+  -- arguments, so this doesn't hold a port name.
   , ip_type :: HWType
   -- ^ Type assigned to port
   }
 
--- | Generate input port mappings for the TopEntity
-mkTopInput
+-- | Generate input port(s) associated with a single argument for an
+-- instantiation of a top entity. This function composes the input ports into
+-- a single signal and returns its name.
+mkTopInstInput
   :: ExpandedPortName Identifier
   -- ^ The @PortName@ of a _TopEntity_ annotation for this input.
   -> NetlistMonad ([InstancePort], [Declaration], Identifier)
-mkTopInput (ExpandedPortName hwty0 pN) = do
+  -- ^ (ports to assign, declarations for intermediate signals, argument signal)
+mkTopInstInput (ExpandedPortName hwty0 pN) = do
   pN' <- Id.next pN
   (decls, pN'', _bvExpr, hwty1) <- toPrimitiveType pN' hwty0
   return ( [InstancePort pN'' hwty1]
           , NetDecl Nothing pN' hwty0 : decls
           , pN' )
 
-mkTopInput epp@(ExpandedPortProduct pNameHint hwty0 ps) = do
+mkTopInstInput epp@(ExpandedPortProduct pNameHint hwty0 ps) = do
   pName <- Id.make pNameHint
 
   let
@@ -1392,7 +1408,7 @@ mkTopInput epp@(ExpandedPortProduct pNameHint hwty0 ps) = do
 
   case hwty1 of
     Vector {} -> do
-      (ports, decls, ids) <- unzip3 <$> mapM mkTopInput ps
+      (ports, decls, ids) <- unzip3 <$> mapM mkTopInstInput ps
       let assigns = zipWith Assignment ids (map (indexPN 10) [0..])
       if null attrs then
         return (concat ports, pDecl:assigns ++ concat decls, pName)
@@ -1400,7 +1416,7 @@ mkTopInput epp@(ExpandedPortProduct pNameHint hwty0 ps) = do
         throwAnnotatedSplitError $(curLoc) "Vector"
 
     RTree {} -> do
-      (ports, decls, ids) <- unzip3 <$> mapM mkTopInput ps
+      (ports, decls, ids) <- unzip3 <$> mapM mkTopInstInput ps
       let assigns = zipWith Assignment ids (map (indexPN 10) [0..])
       if null attrs then
         return (concat ports, pDecl:assigns ++ concat decls, pName)
@@ -1408,7 +1424,7 @@ mkTopInput epp@(ExpandedPortProduct pNameHint hwty0 ps) = do
         throwAnnotatedSplitError $(curLoc) "RTree"
 
     Product {} -> do
-      (ports, decls, ids) <- unzip3 <$> mapM mkTopInput ps
+      (ports, decls, ids) <- unzip3 <$> mapM mkTopInstInput ps
       let assigns = zipWith Assignment ids (map (indexPN 0) [0..])
       if null attrs then
         return (concat ports, pDecl:assigns ++ concat decls, pName)
@@ -1416,7 +1432,7 @@ mkTopInput epp@(ExpandedPortProduct pNameHint hwty0 ps) = do
         throwAnnotatedSplitError $(curLoc) "Product"
 
     SP _ ((concat . map snd) -> [elTy]) -> do
-      (ports, decls, ids) <- unzip3 <$> mapM mkTopInput ps
+      (ports, decls, ids) <- unzip3 <$> mapM mkTopInstInput ps
       case ids of
         [conId,elId] -> do
           let
@@ -1464,26 +1480,28 @@ throwAnnotatedSplitError loc typ = do
                   , "You can annotate %s's components by splitting it up"
                   , "manually." ]
 
--- | Generate output port mappings for the TopEntity
-mkTopOutput
+-- | Generate output port(s) for an instantiation of a top entity. This function
+-- combines all output ports into a signal identifier and returns its name.
+mkTopInstOutput
   :: HasCallStack
   => ExpandedPortName Identifier
   -- ^ The @PortName@ of a _TopEntity_ annotation for this output
   -> NetlistMonad ([InstancePort], [Declaration], Identifier)
-mkTopOutput (ExpandedPortName hwty0 portName) = do
+  -- ^ (ports to assign, declarations for intermediate signals, result signal)
+mkTopInstOutput (ExpandedPortName hwty0 portName) = do
   assignName0 <- Id.next portName
   (decls, assignName1, _expr, hwty1) <- fromPrimitiveType assignName0 hwty0
   return ( [InstancePort assignName0 hwty1]
           , NetDecl Nothing assignName0 hwty1 : decls
           , assignName1 )
 
-mkTopOutput epp@(ExpandedPortProduct productNameHint hwty ps) = do
+mkTopInstOutput epp@(ExpandedPortProduct productNameHint hwty ps) = do
   pName <- Id.make productNameHint
   let pDecl = NetDecl Nothing pName hwty
       (attrs, hwty') = stripAttributes hwty
   case hwty' of
     Vector sz hwty'' -> do
-      (ports, decls, ids0) <- unzip3 <$> mapM mkTopOutput ps
+      (ports, decls, ids0) <- unzip3 <$> mapM mkTopInstOutput ps
       let ids1 = map (flip Identifier Nothing) ids0
           netassgn = Assignment pName (mkVectorChain sz hwty'' ids1)
       if null attrs then
@@ -1492,7 +1510,7 @@ mkTopOutput epp@(ExpandedPortProduct productNameHint hwty ps) = do
         throwAnnotatedSplitError $(curLoc) "Vector"
 
     RTree d hwty'' -> do
-      (ports, decls, ids0) <- unzip3 <$> mapM mkTopOutput ps
+      (ports, decls, ids0) <- unzip3 <$> mapM mkTopInstOutput ps
       let ids1 = map (flip Identifier Nothing) ids0
           netassgn = Assignment pName (mkRTreeChain d hwty'' ids1)
       if null attrs then
@@ -1501,7 +1519,7 @@ mkTopOutput epp@(ExpandedPortProduct productNameHint hwty ps) = do
         throwAnnotatedSplitError $(curLoc) "RTree"
 
     Product {} -> do
-      (ports, decls, ids0) <- unzip3 <$> mapM mkTopOutput ps
+      (ports, decls, ids0) <- unzip3 <$> mapM mkTopInstOutput ps
       let ids1 = map (flip Identifier Nothing) ids0
           netassgn = Assignment pName (DataCon hwty (DC (hwty,0)) ids1)
       if null attrs then
@@ -1510,7 +1528,7 @@ mkTopOutput epp@(ExpandedPortProduct productNameHint hwty ps) = do
         throwAnnotatedSplitError $(curLoc) "Product"
 
     SP _ ((concat . map snd) -> [elTy]) -> do
-      (ports, decls, ids0) <- unzip3 <$> mapM mkTopOutput ps
+      (ports, decls, ids0) <- unzip3 <$> mapM mkTopInstOutput ps
       let ids1 = map (flip Identifier Nothing) ids0
           ids2 = case ids1 of
                   [conId, elId] -> [conId, ToBv Nothing elTy elId]
@@ -1779,7 +1797,7 @@ expandTopEntity ihwtys (oId, ohwty) topEntityM = do
   -- /Vec 1 a/ or /RTree 0 a/ respectively.
   isProduct :: FilteredHWType -> Bool
   isProduct (FilteredHWType (CustomProduct {}) _) =
-    -- CustomProducts are not yet support in mkInput/mkOutput so we can't treat
+    -- CustomProducts are not yet support in mkTopInput/mkTopOutput so we can't treat
     -- them as product types.
     -- FIXME: Support CustomProduct in top entity annotations
     False
