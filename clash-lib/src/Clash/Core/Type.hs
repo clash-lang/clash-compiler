@@ -63,7 +63,7 @@ import           Data.Binary            (Binary)
 import           Data.Coerce            (coerce)
 import           Data.Hashable          (Hashable)
 import           Data.List              (foldl')
-import           Data.List.Extra        (splitAtList, zipEqual)
+import           Data.List.Extra        (splitAtList)
 import           Data.Maybe             (isJust, mapMaybe)
 import           GHC.Base               (isTrue#,(==#))
 import           GHC.Generics           (Generic(..))
@@ -413,16 +413,23 @@ findFunSubst tcm (tcSubst:rest) args = case funSubsts tcm tcSubst args of
 -- a substituted RHS
 funSubsts :: TyConMap -> ([Type],Type) -> [Type] -> Maybe Type
 funSubsts tcm (tcSubstLhs,tcSubstRhs) args = do
-  tySubts <- foldl' (funSubst tcm) (Just []) (zipEqual tcSubstLhs args)
+  let (funArgs,remainder) = zipAtLeast tcSubstLhs args
+  tySubts <- foldl' (funSubst tcm) (Just []) funArgs
   let tyRhs = uncurry substTyWith (unzip tySubts) tcSubstRhs
   -- Type functions can return higher-kinded types
-  case drop (length tcSubstLhs) args of
+  case remainder of
     []    -> return tyRhs
     -- So don't forget to apply the arguments not consumed by the type
     -- function application!
     --
     -- Forgetting leads to: #232
     args' -> return (foldl' AppTy tyRhs args')
+  where
+    zipAtLeast [] ys = ([],ys)
+    zipAtLeast _  [] = error "Under-applied type family"
+    zipAtLeast (x:xs) (y:ys) =
+      let (zs,remainder) = zipAtLeast xs ys
+       in ((x,y):zs,remainder)
 
 -- Given a LHS matching type, and a RHS to-match type, check if LHS and RHS
 -- are a match. If they do match, and the LHS is a variable, return a
@@ -452,7 +459,7 @@ funSubst tcm (Just s) = uncurry go
       -- and if so, the applied type, and the type in the substitution should match.
       Just ty' | ty' `aeqType` ty -> Just s
       _ -> Nothing
-    go ty1 (reduceTypeFamily tcm -> Just ty2) = go ty1 ty2 -- See [Note: lazy type families]
+
     -- [Note] funSubst FunTy
     --
     -- Whenever type classes have associated types whose instances 'map' to
@@ -485,108 +492,133 @@ funSubst tcm (Just s) = uncurry go
 
     go _ _ = Nothing
 
-{- [Note: lazy type families]
+{- [Note: Eager type families]
 
-I don't know whether type families are evaluated strictly or lazily, but this
-being Haskell, I assume type families are evaluated lazily.
-
-Clash hence follows the Haskell way, and only evaluates type family arguments
-to (WH)NF when the formal parameter is _not_ a type variable.
+I don't know whether type families are evaluated strictly or lazily, but since
+type families do not reduce on stuck argument, we assume strictly.
 -}
 
 reduceTypeFamily :: TyConMap -> Type -> Maybe Type
 reduceTypeFamily tcm (tyView -> TyConApp tc tys)
   | nameUniq tc == getKey typeNatAddTyFamNameKey
-  , [i1, i2] <- mapMaybe (litView tcm) tys
-  = Just (LitTy (NumTy (i1 + i2)))
+  = case mapMaybe (litView tcm) tys of
+      [i1,i2] -> Just (LitTy (NumTy (i1 + i2)))
+      _ -> Nothing
 
   | nameUniq tc == getKey typeNatMulTyFamNameKey
-  , [i1, i2] <- mapMaybe (litView tcm) tys
-  = Just (LitTy (NumTy (i1 * i2)))
+  = case mapMaybe (litView tcm) tys of
+      [i1, i2] -> Just (LitTy (NumTy (i1 * i2)))
+      _ -> Nothing
 
   | nameUniq tc == getKey typeNatExpTyFamNameKey
-  , [i1, i2] <- mapMaybe (litView tcm) tys
-  = Just (LitTy (NumTy (i1 ^ i2)))
+  = case mapMaybe (litView tcm) tys of
+      [i1, i2] -> Just (LitTy (NumTy (i1 ^ i2)))
+      _ -> Nothing
 
   | nameUniq tc == getKey typeNatSubTyFamNameKey
-  , [i1, i2] <- mapMaybe (litView tcm) tys
-  , let z = i1 - i2
-  , z >= 0
-  = Just (LitTy (NumTy z))
+  = case mapMaybe (litView tcm) tys of
+      [i1, i2]
+        | let z = i1 - i2
+        , z >= 0
+        -> Just (LitTy (NumTy z))
+      _ -> Nothing
 
   | nameUniq tc == getKey typeNatLeqTyFamNameKey
-  , [i1, i2] <- mapMaybe (litView tcm) tys
-  , Just (FunTyCon {tyConKind = tck}) <- lookupUniqMap tc tcm
-  , (_,tyView -> TyConApp boolTcNm []) <- splitFunTys tcm tck
-  , Just boolTc <- lookupUniqMap boolTcNm tcm
-  = let [falseTc,trueTc] = map (coerce . dcName) (tyConDataCons boolTc)
-    in  if i1 <= i2 then Just (mkTyConApp trueTc [] )
-                    else Just (mkTyConApp falseTc [])
+  = case mapMaybe (litView tcm) tys of
+      [i1, i2]
+        | Just (FunTyCon {tyConKind = tck}) <- lookupUniqMap tc tcm
+        , (_,tyView -> TyConApp boolTcNm []) <- splitFunTys tcm tck
+        , Just boolTc <- lookupUniqMap boolTcNm tcm
+        -> let [falseTc,trueTc] = map (coerce . dcName) (tyConDataCons boolTc)
+            in  if i1 <= i2 then Just (mkTyConApp trueTc [])
+                            else Just (mkTyConApp falseTc [])
+      _ -> Nothing
 
   | nameUniq tc == getKey typeNatCmpTyFamNameKey -- "GHC.TypeNats.CmpNat"
-  , [i1, i2] <- mapMaybe (litView tcm) tys
-  = Just $ ConstTy $ TyCon $
-      case compare i1 i2 of
-        LT -> Name User "GHC.Types.LT" (getKey ordLTDataConKey) wiredInSrcSpan
-        EQ -> Name User "GHC.Types.EQ" (getKey ordEQDataConKey) wiredInSrcSpan
-        GT -> Name User "GHC.Types.GT" (getKey ordGTDataConKey) wiredInSrcSpan
+  = case mapMaybe (litView tcm) tys of
+      [i1, i2] ->
+        Just $ ConstTy $ TyCon $
+          case compare i1 i2 of
+            LT -> Name User "GHC.Types.LT" (getKey ordLTDataConKey) wiredInSrcSpan
+            EQ -> Name User "GHC.Types.EQ" (getKey ordEQDataConKey) wiredInSrcSpan
+            GT -> Name User "GHC.Types.GT" (getKey ordGTDataConKey) wiredInSrcSpan
+      _ -> Nothing
 
   | nameUniq tc == getKey typeSymbolCmpTyFamNameKey -- "GHC.TypeNats.CmpSymbol"
-  , [s1, s2] <- mapMaybe (symLitView tcm) tys
-  = Just $ ConstTy $ TyCon $
-      case compare s1 s2 of
-        LT -> Name User "GHC.Types.LT" (getKey ordLTDataConKey) wiredInSrcSpan
-        EQ -> Name User "GHC.Types.EQ" (getKey ordEQDataConKey) wiredInSrcSpan
-        GT -> Name User "GHC.Types.GT" (getKey ordGTDataConKey) wiredInSrcSpan
+  = case mapMaybe (symLitView tcm) tys of
+      [s1, s2] ->
+        Just $ ConstTy $ TyCon $
+          case compare s1 s2 of
+            LT -> Name User "GHC.Types.LT" (getKey ordLTDataConKey) wiredInSrcSpan
+            EQ -> Name User "GHC.Types.EQ" (getKey ordEQDataConKey) wiredInSrcSpan
+            GT -> Name User "GHC.Types.GT" (getKey ordGTDataConKey) wiredInSrcSpan
+      _ -> Nothing
 
   | nameUniq tc == getKey typeSymbolAppendFamNameKey  -- GHC.TypeLits.AppendSymbol"
-  , [s1, s2] <- mapMaybe (symLitView tcm) tys
-  = Just (LitTy (SymTy (s1 ++ s2)))
+  = case mapMaybe (symLitView tcm) tys of
+      [s1, s2] ->
+        Just (LitTy (SymTy (s1 ++ s2)))
+      _ -> Nothing
 
   | nameOcc tc `elem` ["GHC.TypeLits.Extra.FLog", "GHC.TypeNats.FLog"]
-  , [i1, i2] <- mapMaybe (litView tcm) tys
-  , i1 > 1
-  , i2 > 0
-  = Just (LitTy (NumTy (smallInteger (integerLogBase# i1 i2))))
+  = case mapMaybe (litView tcm) tys of
+      [i1, i2]
+        | i1 > 1
+        , i2 > 0
+        -> Just (LitTy (NumTy (smallInteger (integerLogBase# i1 i2))))
+      _ -> Nothing
+
 
   | nameOcc tc `elem` ["GHC.TypeLits.Extra.CLog", "GHC.TypeNats.CLog"]
-  , [i1, i2] <- mapMaybe (litView tcm) tys
-  , Just k <- clogBase i1 i2
-  = Just (LitTy (NumTy (toInteger k)))
+  = case mapMaybe (litView tcm) tys of
+      [i1, i2]
+        | Just k <- clogBase i1 i2
+        -> Just (LitTy (NumTy (toInteger k)))
+      _ -> Nothing
 
   | nameOcc tc `elem` ["GHC.TypeLits.Extra.Log", "GHC.TypeNats.Log"]
-  , [i1, i2] <- mapMaybe (litView tcm) tys
-  , i1 > 1
-  , i2 > 0
-  = if i2 == 1
-       then Just (LitTy (NumTy 0))
-       else let z1 = integerLogBase# i1 i2
-                z2 = integerLogBase# i1 (i2-1)
-            in  if isTrue# (z1 ==# z2)
-                   then Nothing
-                   else Just (LitTy (NumTy (smallInteger z1)))
+  = case mapMaybe (litView tcm) tys of
+      [i1, i2]
+        | i1 > 1
+        , i2 > 0
+        -> if i2 == 1
+           then Just (LitTy (NumTy 0))
+           else let z1 = integerLogBase# i1 i2
+                    z2 = integerLogBase# i1 (i2-1)
+                in  if isTrue# (z1 ==# z2)
+                        then Nothing
+                        else Just (LitTy (NumTy (smallInteger z1)))
+      _ -> Nothing
 
 
   | nameOcc tc `elem` ["GHC.TypeLits.Extra.GCD", "GHC.TypeNats.GCD"]
-  , [i1, i2] <- mapMaybe (litView tcm) tys
-  = Just (LitTy (NumTy (i1 `gcd` i2)))
+  = case mapMaybe (litView tcm) tys of
+      [i1, i2] -> Just (LitTy (NumTy (i1 `gcd` i2)))
+      _ -> Nothing
 
   | nameOcc tc `elem` ["GHC.TypeLits.Extra.LCM", "GHC.TypeNats.LCM"]
-  , [i1, i2] <- mapMaybe (litView tcm) tys
-  = Just (LitTy (NumTy (i1 `lcm` i2)))
+  = case  mapMaybe (litView tcm) tys of
+      [i1, i2] -> Just (LitTy (NumTy (i1 `lcm` i2)))
+      _ -> Nothing
 
   | nameOcc tc `elem` ["GHC.TypeLits.Extra.Div", "GHC.TypeNats.Div"]
-  , [i1, i2] <- mapMaybe (litView tcm) tys
-  , i2 > 0
-  = Just (LitTy (NumTy (i1 `div` i2)))
+  = case mapMaybe (litView tcm) tys of
+      [i1, i2]
+        | i2 > 0
+        -> Just (LitTy (NumTy (i1 `div` i2)))
+      _ -> Nothing
 
   | nameOcc tc `elem` ["GHC.TypeLits.Extra.Mod", "GHC.TypeNats.Mod"]
-  , [i1, i2] <- mapMaybe (litView tcm) tys
-  , i2 > 0
-  = Just (LitTy (NumTy (i1 `mod` i2)))
+  = case mapMaybe (litView tcm) tys of
+      [i1, i2]
+        | i2 > 0
+        -> Just (LitTy (NumTy (i1 `mod` i2)))
+      _ -> Nothing
 
   | Just (FunTyCon {tyConSubst = tcSubst}) <- lookupUniqMap tc tcm
-  = findFunSubst tcm tcSubst tys
+  = let -- See [Note: Eager type families]
+        tysR = map (argView tcm) tys
+     in findFunSubst tcm tcSubst tysR
 
 reduceTypeFamily _ _ = Nothing
 
@@ -595,6 +627,11 @@ isTypeFamilyApplication ::  TyConMap -> Type -> Bool
 isTypeFamilyApplication tcm (tyView -> TyConApp tcNm _args)
   | Just (FunTyCon {}) <- lookupUniqMap tcNm tcm = True
 isTypeFamilyApplication _tcm _type = False
+
+argView :: TyConMap -> Type -> Type
+argView m t = case reduceTypeFamily m t of
+  Nothing -> t
+  Just tR -> argView m tR
 
 litView :: TyConMap -> Type -> Maybe Integer
 litView _ (LitTy (NumTy i))                = Just i
