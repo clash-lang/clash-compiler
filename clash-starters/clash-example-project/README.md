@@ -116,7 +116,6 @@ In general we recommend **Stack**. It offers a great balance between ease of use
 | Ease of use         | Easy | Moderate³ | Easy     | Hard⁴    |
 | Flexibility⁵        | Low  | Moderate  | Moderate | High     |
 | Snapshots⁵          |      | ⁶         | ✓        | ✓        |
-| `ghcide` compatible |      | ✓         | ✓        | Probably |
 
 Notes in table:
 
@@ -136,11 +135,4 @@ It is likely that you might _not_ want to do the same when using this Clash Exam
 So before publishing your work, make sure to change the copyright and license statement in the LICENSE file.
 
 # IDE support
-We currently recommend Visual Studio Code in combination with `ghcide`. To use it, execute the following steps:
-
-1. Install Visual Studio Code. If your Linux distribution supports `snap`, it's as simple as executing `sudo snap install code`. If you're running another platform, head over to [code.visualstudio.com](https://code.visualstudio.com/) for more information.
-2. Launch Visual Studio Code, click on "Extensions" on the left, search for and install the extension `ghcide`.
-3. Install `ghcide` using the instructions [over here](https://github.com/digital-asset/ghcide#using-it).
-4. Open this folder in Visual Studio Code.
-5. [Wait a few minutes](https://imgs.xkcd.com/comics/compiling.png)
-6. Enjoy Clash!
+We currently recommend Visual Studio Code in combination with the _Haskell_ plugin. All you need to do is open this folder in VSCode; it will prompt you to install the plugin.
