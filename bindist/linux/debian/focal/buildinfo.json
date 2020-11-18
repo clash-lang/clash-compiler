@@ -1,0 +1,60 @@
+{
+  "docker": "ubuntu:focal",
+  "build-dependencies": [
+    "devscripts",
+    "cabal-install",
+    "cabal-debian",
+    "haskell-devscripts",
+    "ghc",
+    "equivs"
+  ],
+  "packages": [
+    {
+      "name": "ghc-tcplugins-extra",
+      "src": {"type": "hackage"}
+    },
+    {
+      "name": "ghc-typelits-natnormalise",
+      "src": {"type": "hackage"}
+    },
+    {
+      "name": "ghc-typelits-knownnat",
+      "src": {"type": "hackage"}
+    },
+    {
+      "name": "ghc-typelits-extra",
+      "src": {"type": "hackage"}
+    },
+    {
+      "name": "bytestring-builder",
+      "src": {"type": "hackage", "version": "0.10.8.2.0"}
+    },
+    {
+      "name": "ordered-containers",
+      "src": {"type": "hackage", "version": "0.2.2"}
+    },
+    {
+      "name": "concurrent-supply",
+      "src": {"type": "hackage", "version": "0.1.8"}
+    },
+    {
+      "name": "clash-prelude",
+      "cabal_debian_options": [
+        "--disable-haddock", "--disable-tests",
+        "--build-dep", "doctest",
+        "--build-dep", "libghc-doctest-dev"
+      ],
+      "src": {"type": "local", "dir": "../../../../clash-prelude"}
+    },
+    {
+      "name": "clash-lib",
+      "cabal_debian_options": ["--disable-haddock", "--disable-tests"],
+      "src": {"type": "local", "dir": "../../../../clash-lib"}
+    },
+    {
+      "name": "clash-ghc",
+      "cabal_debian_options": ["--disable-haddock", "--disable-tests"],
+      "src": {"type": "local", "dir": "../../../../clash-ghc"}
+    }
+  ]
+}

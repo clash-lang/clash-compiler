@@ -1,2 +1,7 @@
-docker build . -t clashdeb 
-docker run -v ~/code/clash-compiler/:/clash-compiler clashdeb /clash-compiler/bindist/linux/debian/mkBinDist.sh
+# Create Debian packages
+
+```
+./go.sh focal
+```
+
+All packages should be in `focal/build`.
