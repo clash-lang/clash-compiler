@@ -1,1 +1,0 @@
-FIXED: Can't use `undefined` as reset value for `autoReg@Maybe` [#1507](https://github.com/clash-lang/clash-compiler/issues/1507)

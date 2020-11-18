@@ -1,4 +1,0 @@
-FIXED: Fix `msb` for large types
-When invoked on types larger than 64 bits it gave the wrong result when the
-value was smaller than 64 bits. Upon casual inspection, the result would seem
-to correctly be 0, but internally the resulting Bit was malformed.

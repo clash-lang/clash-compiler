@@ -1,1 +1,0 @@
-FIXED: Uses of `fold` inside of other HO prims(map,etc..) [#1524](https://github.com/clash-lang/clash-compiler/issues/1524)

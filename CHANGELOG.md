@@ -1,5 +1,22 @@
 # Changelog for the Clash project
 
+## 1.2.5 *November 9th 2020*
+Fixed:
+  * The normalizeType function now fully normalizes types which require calls to
+reduceTypeFamily [#1469](https://github.com/clash-lang/clash-compiler/issues/1469)
+  * `flogBaseSNat`, `clogBaseSNat` and `logBaseSNat` primitives are now implemented correctly.Previously these primitives would be left unevaluated causing issues as demonstrated in [#1479](https://github.com/clash-lang/clash-compiler/issues/1469)
+  * Specializing on functions with type family arguments no longer fails [#1477](https://github.com/clash-lang/clash-compiler/issues/1477)
+  * `satSucc`, `satPred` correctly handle "small types" such as `Index 1`.
+  * `msb` no longer fails on values larger than 64 bits
+  * `undefined` can now be used as a reset value of `autoReg@Maybe` [#1507](https://github.com/clash-lang/clash-compiler/issues/1507)
+  * Signal's `fmap` is now less strict, preventing infinite loops in very specific situations. See [#1521](https://github.com/clash-lang/clash-compiler/issues/1521)
+  * Clash now uses correct function names in manifest and sdc files [#1533](https://github.com/clash-lang/clash-compiler/issues/1533)
+  * Clash no longer produces erroneous HDL in very specific cases [#1536](https://github.com/clash-lang/clash-compiler/issues/1536)
+  * Usage of `fold` inside other HO primitives (e.g., `map`) no longer fails [#1524](https://github.com/clash-lang/clash-compiler/issues/1524)
+
+Changed:
+  * Due to difficulties using `resetSynchronizer` we've decided to make this function always insert a synchronizer. See: [#1528](https://github.com/clash-lang/clash-compiler/issues/1528).
+
 ## 1.2.4 *July 28th 2020*
 * Changed:
   * Relaxed upper bound versions of `aeson` and `dlist`, in preparation for the new Stack LTS.
@@ -16,7 +33,7 @@
   * `instance Text.Printf(Unsigned)`
 
 * Fixed:
-  * Clash renders incorrect VHDL when GHCs Worker/Wrapper transformation is enabled [#1402](https://github.com/clash-lang/clash-compiler/issues/14020)
+  * Clash renders incorrect VHDL when GHCs Worker/Wrapper transformation is enabled [#1402](https://github.com/clash-lang/clash-compiler/issues/1402)
   * Minor faults in generated HDL when using annotations from `Clash.Annotations.SynthesisAttributes`
   * Cabal installed through Snap (`clash.cabal`) can now access the internet to fetch pacakges. [#1411]https://github.com/clash-lang/clash-compiler/issues/1411
   * Generated QSys file for `altpll` incompatible with Quartus CLI (did work in Quartus GUI)
@@ -387,5 +404,3 @@ Check out:
  * https://github.com/clash-lang/clash-compiler/blob/3649a2962415ea8ca2d6f7f5e673b4c14de26b4f/clash-prelude/CHANGELOG.md
  * https://github.com/clash-lang/clash-compiler/blob/3649a2962415ea8ca2d6f7f5e673b4c14de26b4f/clash-lib/CHANGELOG.md
  * https://github.com/clash-lang/clash-compiler/blob/3649a2962415ea8ca2d6f7f5e673b4c14de26b4f/clash-ghc/CHANGELOG.md
-
-
