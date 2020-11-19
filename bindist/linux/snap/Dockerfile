@@ -1,61 +1,67 @@
-# This dockerfile installs nix on /usr/nix (instead of the default /nix/). This
-# is used to build snaps of Clash.
-FROM ubuntu:18.04
+# This Dockerfile is:
+#
+#   https://github.com/snapcore/snapcraft/pull/3384
+#   + xenial => focal
+#
+FROM ubuntu:focal as builder
 
-ENV \
-  NIX_VERSION=2.3.3 \
-  PREFIX=/usr \
-  ROOT=/usr/nix \
-  STORE=/usr/nix/store \
-  VAR=/usr/nix/var \
-  BUILD_DEPS='git apt-utils software-properties-common build-essential libbrotli-dev libbrotli1 liblzma-dev curl libcurl4-openssl-dev sqlite libsqlite3-dev pkg-config libcrypto++-dev libcrypto++6 openssl libssl-dev bzip2 libbz2-dev libeditline-dev libeditline0 libreadline-dev libreadline7 libseccomp-dev libgc-dev wget'
+# Grab dependencies
+RUN apt-get update
+RUN apt-get dist-upgrade --yes
+RUN apt-get install --yes \
+      curl \
+      jq \
+      squashfs-tools
 
-COPY edolstra.gpg edolstra.gpg
+# Grab the core snap (for backwards compatibility) from the stable channel and
+# unpack it in the proper place.
+RUN curl -L $(curl -H 'X-Ubuntu-Series: 16' 'https://api.snapcraft.io/api/v1/snaps/details/core' | jq '.download_url' -r) --output core.snap
+RUN mkdir -p /snap/core
+RUN unsquashfs -d /snap/core/current core.snap
 
-RUN apt update \
-  # Install deps
-  && apt install $BUILD_DEPS -y \
-  && add-apt-repository ppa:mhier/libboost-latest -y \
-  && apt install libboost1.70-dev -y \
-  # Download Nix and install it into the system.
-  && wget -q https://nixos.org/releases/nix/nix-$NIX_VERSION/nix-$NIX_VERSION.tar.xz \
-             https://nixos.org/releases/nix/nix-$NIX_VERSION/nix-$NIX_VERSION.tar.xz.asc \
-  && export keyfile=$(mktemp --suffix=.gpg) \
-  && gpg --yes -o "$keyfile" --dearmor edolstra.gpg \
-  && gpg --batch --no-default-keyring --keyring "$keyfile" --verify nix-$NIX_VERSION.tar.xz.asc nix-$NIX_VERSION.tar.xz \
-  && tar xf nix-$NIX_VERSION.tar.xz \
-  && addgroup --gid 30000 --system nixbld \
-  && for i in $(seq 1 30); do \
-       adduser \
-         --system \
-         --disabled-password \
-         --home /var/empty$i \
-         --gecos "Nix build user $i" \
-         --uid $((30000 + i)) \
-         nixbld$i && adduser nixbld$i nixbld; \
-     done \
-  && mkdir -p -m 0755 $PREFIX/etc/nix \
-  && mkdir -m 0755 $ROOT  \
-  && cd nix-$NIX_VERSION \
-  && EDITLINE_CFLAGS="-DREADLINE" \
-     EDITLINE_LIBS="/lib/x86_64-linux-gnu/libhistory.so.7 /lib/x86_64-linux-gnu/libreadline.so.7" \
-     ./configure \
-       --prefix=$PREFIX \
-       --with-store-dir=$STORE \
-       --localstatedir=$VAR \
-       --with-sandbox-shell=/bin/sh \
-       --enable-gc \
-  && make \
-  && make install \
-  && cd .. \
-  # Cleanup
-  && rm -r nix-$NIX_VERSION nix-$NIX_VERSION.tar.xz \
-  && apt autoremove -y \
-  && apt clean \
-  # Sandboxes not supported in docker containers
-  && echo 'sandbox = false' > $PREFIX/etc/nix/nix.conf
+# Grab the core18 snap (which snapcraft uses as a base) from the stable channel
+# and unpack it in the proper place.
+RUN curl -L $(curl -H 'X-Ubuntu-Series: 16' 'https://api.snapcraft.io/api/v1/snaps/details/core18' | jq '.download_url' -r) --output core18.snap
+RUN mkdir -p /snap/core18
+RUN unsquashfs -d /snap/core18/current core18.snap
 
-# Set environment for next docker image
-ONBUILD ENV \
-    ENV=$PREFIX/etc/profile.d/nix.sh \
-    USER=root
+# Grab the core20 snap (which snapcraft uses as a base) from the stable channel
+# and unpack it in the proper place.
+RUN curl -L $(curl -H 'X-Ubuntu-Series: 16' 'https://api.snapcraft.io/api/v1/snaps/details/core20' | jq '.download_url' -r) --output core20.snap
+RUN mkdir -p /snap/core20
+RUN unsquashfs -d /snap/core20/current core20.snap
+
+# Grab the snapcraft snap from the stable channel and unpack it in the proper
+# place.
+RUN curl -L $(curl -H 'X-Ubuntu-Series: 16' 'https://api.snapcraft.io/api/v1/snaps/details/snapcraft?channel=stable' | jq '.download_url' -r) --output snapcraft.snap
+RUN mkdir -p /snap/snapcraft
+RUN unsquashfs -d /snap/snapcraft/current snapcraft.snap
+
+# Create a snapcraft runner (TODO: move version detection to the core of
+# snapcraft).
+RUN mkdir -p /snap/bin
+RUN echo "#!/bin/sh" > /snap/bin/snapcraft
+RUN snap_version="$(awk '/^version:/{print $2}' /snap/snapcraft/current/meta/snap.yaml)" && echo "export SNAP_VERSION=\"$snap_version\"" >> /snap/bin/snapcraft
+RUN echo 'exec "$SNAP/usr/bin/python3" "$SNAP/bin/snapcraft" "$@"' >> /snap/bin/snapcraft
+RUN chmod +x /snap/bin/snapcraft
+
+# Multi-stage build, only need the snaps from the builder. Copy them one at a
+# time so they can be cached.
+FROM ubuntu:focal
+COPY --from=builder /snap/core /snap/core
+COPY --from=builder /snap/core18 /snap/core18
+COPY --from=builder /snap/core20 /snap/core20
+COPY --from=builder /snap/snapcraft /snap/snapcraft
+COPY --from=builder /snap/bin/snapcraft /snap/bin/snapcraft
+
+# Generate locale and install dependencies.
+RUN apt-get update && apt-get dist-upgrade --yes && apt-get install --yes snapd sudo locales && locale-gen en_US.UTF-8
+
+# Set the proper environment.
+ENV LANG="en_US.UTF-8"
+ENV LANGUAGE="en_US:en"
+ENV LC_ALL="en_US.UTF-8"
+ENV PATH="/snap/bin:$PATH"
+ENV SNAP="/snap/snapcraft/current"
+ENV SNAP_NAME="snapcraft"
+ENV SNAP_ARCH="amd64"

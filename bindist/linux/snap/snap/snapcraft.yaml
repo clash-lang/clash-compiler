@@ -8,26 +8,62 @@ description: |
   synthesizable VHDL, Verilog, or SystemVerilog.
 confinement: strict
 grade: devel
-base: core18
+base: core20
 
 parts:
-  clash:
+  prepare:
     plugin: dump
-    source: clash-snap-bindist.tar.xz
+    source: focal-build.tar
+    override-pull: |
+      # Pull in focal-build.tar
+      snapcraftctl pull
+
+      # Create local APT repository for stage-packages stage
+      mkdir /archives
+      mv * /archives
+      echo "deb [trusted=yes] file:/archives ./" | tee /etc/apt/sources.list.d/clash.list
+      apt-get update
+
+  clash:
+    plugin: nil
+    after:
+      - prepare
+    stage-packages:
+      - clash
+      - clash-prof
+      - haskell-stack
+      - cabal-install
+    override-prime: |
+      snapcraftctl prime
+      apt-get install -y ghc
+      ghc-pkg recache --package-db=var/lib/ghc/package.conf.d/
 
 apps:
   clash:
-    command: bin/clash
+    command: usr/bin/clash
     plugs: [home]
 
   clashi:
-    command: bin/clashi
+    command: usr/bin/clashi
     plugs: [home]
 
   cabal:
-    command: bin/cabal
+    command: usr/bin/cabal
+    plugs: [home, network]
+
+  stack:
+    command: usr/bin/stack
     plugs: [home, network]
 
 layout:
-  /usr/nix:
-    bind: $SNAP/usr/nix
+  # Primitive definitions
+  /usr/share/clash-lib:
+    symlink: $SNAP/usr/share/clash-lib
+
+  # Package databases and packages
+  /usr/lib/ghc:
+    symlink: $SNAP/usr/lib/ghc
+  /usr/lib/haskell-packages:
+    symlink: $SNAP/usr/lib/haskell-packages
+  /var/lib/ghc:
+    symlink: $SNAP/var/lib/ghc

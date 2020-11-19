@@ -2,11 +2,6 @@
 set -euo pipefail
 set -x
 
-SNAPCRAFT_BUILD_ENVIRONMENT_CPU=$(nproc)
-export SNAPCRAFT_BUILD_ENVIRONMENT_CPU
-SNAPCRAFT_BUILD_ENVIRONMENT_MEMORY=16G
-export SNAPCRAFT_BUILD_ENVIRONMENT_MEMORY
-
 # Install git to detect branch names / revisions
 apt update
 apt install git -y
@@ -52,5 +47,5 @@ fi
 set +x
 echo "$SNAPCRAFT_LOGIN_FILE" | base64 --decode --ignore-garbage > snapcraft.login
 snapcraft login --with snapcraft.login
-snapcraft
+./go.sh
 snapcraft push ./*.snap --release ${RELEASE_CHANNEL}
