@@ -1,5 +1,5 @@
 .benchmark:
-  image: clashlang/clash-ci:2020-11-03
+  image: docker.pkg.github.com/clash-lang/clash-compiler/clash-ci:2020-11-20
   stage: build
   timeout: 2 hours
   variables:
