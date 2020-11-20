@@ -1,6 +1,8 @@
 dist/
+build/
 dist-newstyle/
 .stack-work/
+stack.yaml.lock
 cabal-dev
 /cabal.project.local
 .ghc.environment.*

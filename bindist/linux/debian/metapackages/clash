@@ -1,0 +1,10 @@
+Section: Haskell
+Priority: optional
+Homepage: https://clash-lang.org
+Standards-Version: 3.9.2
+
+Package: clash
+Maintainer: QBayLogic B.V. <devops@qbaylogic.com>
+Depends: haskell-clash-lib-utils, haskell-clash-ghc-utils, clash-dev
+Recommends: haskell-stack, cabal-install
+Description: Clash metapackage
