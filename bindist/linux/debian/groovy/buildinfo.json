@@ -59,7 +59,8 @@
     },
     {
       "name": "clash-ghc",
-      "src": {"type": "local", "dir": "../../../../clash-ghc"}
+      "src": {"type": "local", "dir": "../../../../clash-ghc"},
+      "cabal_debian_options": ["--cabal-flag", "dynamic"]
     }
   ]
 }
