@@ -11,7 +11,7 @@ set -e
 
 # Check whether version numbers in snap / clash-{prelude,lib,ghc} are the same
 cabal_files="clash-prelude/clash-prelude.cabal clash-lib/clash-lib.cabal clash-ghc/clash-ghc.cabal clash-cores/clash-cores.cabal"
-snapcraft_file="bindist/linux/snap/snap/snapcraft.yaml"
+snapcraft_file=".ci/bindist/linux/snap/snap/snapcraft.yaml"
 versions=$(grep "^[vV]ersion" $cabal_files $snapcraft_file | grep -Eo '[0-9]+(\.[0-9]+)+')
 
 if [[ $(echo $versions | tr ' ' '\n' | wc -l) == 5 ]]; then

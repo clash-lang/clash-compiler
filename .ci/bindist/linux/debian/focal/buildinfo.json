@@ -44,12 +44,12 @@
         "--build-dep", "doctest",
         "--build-dep", "libghc-doctest-dev"
       ],
-      "src": {"type": "local", "dir": "../../../../clash-prelude"}
+      "src": {"type": "local", "dir": "../../../../../clash-prelude"}
     },
     {
       "name": "clash-lib",
       "cabal_debian_options": ["--disable-haddock", "--disable-tests"],
-      "src": {"type": "local", "dir": "../../../../clash-lib"}
+      "src": {"type": "local", "dir": "../../../../../clash-lib"}
     },
     {
       "name": "clash-ghc",
@@ -58,7 +58,7 @@
         "--disable-tests",
         "--cabal-flag", "dynamic"
       ],
-      "src": {"type": "local", "dir": "../../../../clash-ghc"}
+      "src": {"type": "local", "dir": "../../../../../clash-ghc"}
     }
   ]
 }

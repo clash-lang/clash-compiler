@@ -45,7 +45,7 @@
     },
     {
       "name": "clash-prelude",
-      "src": {"type": "local", "dir": "../../../../clash-prelude"},
+      "src": {"type": "local", "dir": "../../../../../clash-prelude"},
       "cabal_debian_options": [
         "--disable-tests",
         "--build-dep", "doctest",
@@ -55,11 +55,11 @@
     },
     {
       "name": "clash-lib",
-      "src": {"type": "local", "dir": "../../../../clash-lib"}
+      "src": {"type": "local", "dir": "../../../../../clash-lib"}
     },
     {
       "name": "clash-ghc",
-      "src": {"type": "local", "dir": "../../../../clash-ghc"},
+      "src": {"type": "local", "dir": "../../../../../clash-ghc"},
       "cabal_debian_options": ["--cabal-flag", "dynamic"]
     }
   ]

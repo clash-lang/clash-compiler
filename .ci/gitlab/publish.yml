@@ -46,10 +46,10 @@ snap-bindist:
   artifacts:
     when: always
     paths:
-      - bindist/linux/debian/focal/build
+      - .ci/bindist/linux/debian/focal/build
     expire_in: 1 week
   script:
-    - ./bindist/linux/debian/scripts/build.sh focal
+    - .ci/bindist/linux/debian/scripts/build.sh focal
 
   # Run every night, when explicitly triggered, or when tagged (release)
   rules:
@@ -71,7 +71,7 @@ snap-bindist:
   artifacts:
     when: always
     paths:
-      - bindist/linux/snap/*.snap
+      - .ci/bindist/linux/snap/*.snap
     expire_in: 1 week
   script:
     - .ci/snap_publish.sh
