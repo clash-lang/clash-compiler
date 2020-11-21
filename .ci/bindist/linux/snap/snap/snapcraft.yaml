@@ -14,6 +14,8 @@ parts:
   prepare:
     plugin: dump
     source: focal-build.tar
+    build-packages:
+      - software-properties-common
     override-pull: |
       # Pull in focal-build.tar
       snapcraftctl pull
@@ -24,6 +26,9 @@ parts:
       echo "deb [trusted=yes] file:/archives ./" | tee /etc/apt/sources.list.d/clash.list
       apt-get update
 
+      # Add HVR's ppa to pull in cabal-install 3.2
+      add-apt-repository ppa:hvr/ghc -u -y
+
   clash:
     plugin: nil
     after:
@@ -31,34 +36,47 @@ parts:
     stage-packages:
       - clash
       - clash-prof
-      - haskell-stack
-      - cabal-install
+      - cabal-install-3.2
     override-prime: |
       snapcraftctl prime
       apt-get install -y ghc
       ghc-pkg recache --package-db=var/lib/ghc/package.conf.d/
 
+  wrappers:
+    after:
+      - clash
+    plugin: dump
+    source: .
+    organize:
+      wrappers/clash.sh: bin/clash.sh
+      wrappers/clashi.sh: bin/clashi.sh
+      wrappers/cabal.sh: bin/cabal.sh
+
 apps:
   clash:
-    command: usr/bin/clash
+    command: bin/clash.sh
     plugs: [home]
 
   clashi:
-    command: usr/bin/clashi
+    command: bin/clashi.sh
     plugs: [home]
 
   cabal:
-    command: usr/bin/cabal
-    plugs: [home, network]
-
-  stack:
-    command: usr/bin/stack
+    command: bin/cabal.sh
     plugs: [home, network]
 
 layout:
+  # _Things_
+  /usr/lib/x86_64-linux-gnu/libc_nonshared.a:
+    symlink: $SNAP/usr/lib/x86_64-linux-gnu/libc_nonshared.a
+
   # Primitive definitions
   /usr/share/clash-lib:
     symlink: $SNAP/usr/share/clash-lib
+
+  # Cabal from HVR PPA
+  /opt/cabal:
+    symlink: $SNAP/opt/cabal
 
   # Package databases and packages
   /usr/lib/ghc:
