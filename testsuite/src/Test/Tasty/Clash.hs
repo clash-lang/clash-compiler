@@ -15,11 +15,9 @@ import           Data.List                 (intercalate)
 import           Data.Maybe                (isJust)
 import qualified Data.Text                 as T
 import qualified System.Directory          as Directory
-import           System.Environment        (getEnv)
 import           System.FilePath           ((</>),(<.>))
 import           System.IO.Unsafe          (unsafePerformIO)
 import           System.IO.Temp            (createTempDirectory)
-import           Clash.Util                (wantedLanguageExtensions, unwantedLanguageExtensions)
 
 import Test.Tasty
   (TestTree, TestName, DependencyType(AllSucceed), testGroup, withResource, after)
@@ -134,11 +132,6 @@ temporaryDirectory = unsafePerformIO $ do
   return tmpDir'
 {-# NOINLINE temporaryDirectory #-}
 
--- | Directory to install Clash binary in
-clashBin :: String
-clashBin = unsafePerformIO (getEnv "clash_bin")
-{-# NOINLINE clashBin #-}
-
 -- | Given the module name of test, provide the test directory it is running in
 testDirectory
   :: [TestName]
@@ -222,7 +215,7 @@ clashCmd
   -> (String, [String])
   -- ^ (command, arguments)
 clashCmd target sourceDir extraArgs modName oDir =
-  (clashBin, args)
+  ("clash", args)
     where
       args = concat [
           [target']
@@ -666,43 +659,31 @@ outputTest' env target extraClashArgs extraGhcArgs modName funcName path =
   withResource acquire tastyRelease (const seqTests)
     where
       path' = show target:path
-      acquire = tastyAcquire path' [modDir]
+      acquire = tastyAcquire path' [modName]
+      out = testDirectory path' </> modName </> "out"
 
-      modDir = show target </> modName
+      args =
+        [ "-DCLASHLIBTEST"
+        , "-package", "clash-testsuite"
+        , "-main-is", modName ++ "." ++ funcName ++ show target
+        , "-o", out
+        , "-outputdir", testDirectory path' </> modName
+        ] ++ extraGhcArgs ++ [env </> modName <.> "hs"]
 
-      args = [ "new-exec"
-             , "--write-ghc-environment-files=never"
-             , "--"
-             , "runghc"
-             ]
-             ++ langExts ++
-             [ "-DOUTPUTTEST"
-             , "--ghc-arg=-package"
-             , "--ghc-arg=clash-testsuite"
-             , "--ghc-arg=-main-is"
-             , "--ghc-arg=" ++ modName ++ "." ++ funcName ++ show target
-             ] ++ map ("--ghc-arg="++) extraGhcArgs ++
-             [ env </> modName <.> "hs"
-             , workDir </> topFile
-             ]
-      langExts = map ("-X" ++) $
-                      map show wantedLanguageExtensions ++
-                      map ("No" ++ ) (map show unwantedLanguageExtensions)
       topFile =
         case target of
-          VHDL ->
-            "vhdl" </> modName </> "topEntity.vhdl"
-          Verilog ->
-            "verilog" </> modName </> "topEntity.v"
-          SystemVerilog ->
-            "systemverilog" </> modName </> "topEntity.sv"
+          VHDL -> "vhdl" </> modName </> "topEntity.vhdl"
+          Verilog -> "verilog" </> modName </> "topEntity.v"
+          SystemVerilog -> "systemverilog" </> modName </> "topEntity.sv"
 
       workDir = testDirectory path'
 
       seqTests = testGroup (show target) $ sequenceTests path' $
         [ clashHDL Nothing target (sourceDirectory </> env) extraClashArgs modName workDir
-        , ("runghc", testProgram "runghc" "cabal" args NoGlob PrintStdErr False Nothing)
-        ]
+        , ( "[out] clash"
+          , testProgram "[out] clash" "clash" args NoGlob PrintStdErr False Nothing )
+        , ( "exec"
+          , testProgram "exec" out [workDir </> topFile] NoGlob PrintStdErr False Nothing ) ]
 
 outputTest
   :: FilePath
@@ -748,33 +729,21 @@ clashLibTest' env target extraGhcArgs modName funcName path =
   withResource acquire tastyRelease (const seqTests)
     where
       path' = show target:path
-      acquire = tastyAcquire path' [modDir]
+      acquire = tastyAcquire path' [modName]
+      out = testDirectory path' </> modName </> "out"
 
-      modDir = show target </> modName
-
-      args = [ "new-exec"
-             , "--write-ghc-environment-files=never"
-             , "--"
-             , "runghc"
-             ]
-             ++ langExts ++
-             [ "-DCLASHLIBTEST"
-             , "--ghc-arg=-package"
-             , "--ghc-arg=clash-testsuite"
-             , "--ghc-arg=-main-is"
-             , "--ghc-arg=" ++ modName ++ "." ++ funcName ++ show target
-             , "--ghc-arg=-outputdir"
-             , "--ghc-arg=" <> env </> show target
-             ] ++ map ("--ghc-arg="++) extraGhcArgs ++
-             [ env </> modName <.> "hs"
-             ]
-      langExts = map ("-X" ++) $
-                      map show wantedLanguageExtensions ++
-                      map ("No" ++ ) (map show unwantedLanguageExtensions)
+      args =
+        [ "-DCLASHLIBTEST"
+        , "-package", "clash-testsuite"
+        , "-main-is", modName ++ "." ++ funcName ++ show target
+        , "-o", out
+        , "-outputdir", testDirectory path' </> modName
+        ] ++ extraGhcArgs ++ [env </> modName <.> "hs"]
 
       seqTests = testGroup (show target) $ sequenceTests path' $
-        [ ("runghc", testProgram "runghc" "cabal" args NoGlob PrintStdErr False Nothing)
-        ]
+        [ ( "[lib] clash"
+          , testProgram "[lib] clash" "clash" args NoGlob PrintStdErr False Nothing )
+        , ("exec", testProgram "exec" out [] NoGlob PrintStdErr False Nothing) ]
 
 clashLibTest
   :: FilePath

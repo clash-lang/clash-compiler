@@ -3,7 +3,7 @@
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE TypeFamilies #-}
 
-module PortNames where
+module PortGeneration where
 
 import qualified Prelude as P
 
