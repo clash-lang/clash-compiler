@@ -1,6 +1,6 @@
 .tests:
-  image: clashlang/clash-ci:2020-11-03
-  stage: build
+  image: docker.pkg.github.com/clash-lang/clash-compiler/clash-ci:2020-11-20
+  stage: test
   timeout: 2 hours
   variables:
     MULTIPLE_HIDDEN: "no"

@@ -94,5 +94,5 @@ executable clash-testsuite
   ghc-options:         -threaded -with-rtsopts=-N
 
   build-depends:
+    containers,
     clash-testsuite
-

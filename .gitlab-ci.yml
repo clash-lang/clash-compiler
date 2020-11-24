@@ -5,7 +5,7 @@ include:
 
 stages:
   - build
-  # TODO: add test stage to prevent cache throwouts if test failed?
+  - test
   - publish
 
 # Haddock, doctests, unittests, clash-dev testing. These are single threaded

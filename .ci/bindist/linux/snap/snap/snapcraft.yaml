@@ -1,0 +1,87 @@
+name: clash
+version: '1.3.0'
+summary: 'Clash: from Haskell to hardware'
+description: |
+  Clash is a functional hardware description language that borrows both its
+  syntax and semantics from the functional programming language Haskell. The
+  Clash compiler transforms these high-level descriptions to low-level
+  synthesizable VHDL, Verilog, or SystemVerilog.
+confinement: strict
+grade: devel
+base: core20
+
+parts:
+  prepare:
+    plugin: dump
+    source: focal-build.tar
+    build-packages:
+      - software-properties-common
+    override-pull: |
+      # Pull in focal-build.tar
+      snapcraftctl pull
+
+      # Create local APT repository for stage-packages stage
+      mkdir /archives
+      mv * /archives
+      echo "deb [trusted=yes] file:/archives ./" | tee /etc/apt/sources.list.d/clash.list
+      apt-get update
+
+      # Add HVR's ppa to pull in cabal-install 3.2
+      add-apt-repository ppa:hvr/ghc -u -y
+
+  clash:
+    plugin: nil
+    after:
+      - prepare
+    stage-packages:
+      - clash
+      - clash-prof
+      - cabal-install-3.2
+    override-prime: |
+      snapcraftctl prime
+      apt-get install -y ghc
+      ghc-pkg recache --package-db=var/lib/ghc/package.conf.d/
+
+  wrappers:
+    after:
+      - clash
+    plugin: dump
+    source: .
+    organize:
+      wrappers/clash.sh: bin/clash.sh
+      wrappers/clashi.sh: bin/clashi.sh
+      wrappers/cabal.sh: bin/cabal.sh
+
+apps:
+  clash:
+    command: bin/clash.sh
+    plugs: [home]
+
+  clashi:
+    command: bin/clashi.sh
+    plugs: [home]
+
+  cabal:
+    command: bin/cabal.sh
+    plugs: [home, network]
+
+layout:
+  # _Things_
+  /usr/lib/x86_64-linux-gnu/libc_nonshared.a:
+    symlink: $SNAP/usr/lib/x86_64-linux-gnu/libc_nonshared.a
+
+  # Primitive definitions
+  /usr/share/clash-lib:
+    symlink: $SNAP/usr/share/clash-lib
+
+  # Cabal from HVR PPA
+  /opt/cabal:
+    symlink: $SNAP/opt/cabal
+
+  # Package databases and packages
+  /usr/lib/ghc:
+    symlink: $SNAP/usr/lib/ghc
+  /usr/lib/haskell-packages:
+    symlink: $SNAP/usr/lib/haskell-packages
+  /var/lib/ghc:
+    symlink: $SNAP/var/lib/ghc

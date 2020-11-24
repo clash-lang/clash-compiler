@@ -3,7 +3,8 @@
 set -xeo pipefail
 
 REPO="docker.pkg.github.com/clash-lang/clash-compiler"
-NAME="clash-ci"
+NAME="snapcraft"
+
 DIR=$(dirname "$0")
 now=$(date +%F)
 

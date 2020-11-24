@@ -2,11 +2,6 @@
 set -euo pipefail
 set -x
 
-SNAPCRAFT_BUILD_ENVIRONMENT_CPU=$(nproc)
-export SNAPCRAFT_BUILD_ENVIRONMENT_CPU
-SNAPCRAFT_BUILD_ENVIRONMENT_MEMORY=16G
-export SNAPCRAFT_BUILD_ENVIRONMENT_MEMORY
-
 # Install git to detect branch names / revisions
 apt update
 apt install git -y
@@ -39,7 +34,7 @@ if [ "$(cat ${hash_file})" == "${revision}" ]; then
 fi
 echo "${revision}" > ${hash_file}
 
-cd bindist/linux/snap || exit
+cd .ci/bindist/linux/snap || exit
 
 # Make sure devel is in snap/snapcraft.yaml before replacing it with 'stable'
 # (if applicable). sed doesn't fail if it doesn't replace anything.
@@ -50,7 +45,13 @@ if [[ ${RELEASE_CHANNEL} == "stable" || ${RELEASE_CHANNEL} == "beta" ]]; then
 fi
 
 set +x
-echo "$SNAPCRAFT_LOGIN_FILE" | base64 --decode --ignore-garbage > snapcraft.login
-snapcraft login --with snapcraft.login
-snapcraft
-snapcraft push ./*.snap --release ${RELEASE_CHANNEL}
+
+if [[ $1 == "build" ]]; then
+  ./go.sh
+fi
+
+if [[ $1 == "publish" ]]; then
+  echo "$SNAPCRAFT_LOGIN_FILE" | base64 --decode --ignore-garbage > snapcraft.login
+  snapcraft login --with snapcraft.login
+  snapcraft push ./*.snap --release ${RELEASE_CHANNEL}
+fi

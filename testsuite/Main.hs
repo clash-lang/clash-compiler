@@ -1,5 +1,6 @@
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE QuasiQuotes #-}
+{-# LANGUAGE OverloadedStrings #-}
 module Main (main) where
 
 import qualified Clash.Util.Interpolate    as I
@@ -8,15 +9,21 @@ import           Clash.Annotations.Primitive (HDL(..))
 import           Control.Exception         (finally)
 import qualified Data.Text                 as Text
 import           Data.Default              (def)
-import           Data.List                 (isSuffixOf, (\\))
+import           Data.List                 ((\\), intercalate)
+import           Data.Version              (versionBranch)
 import           System.Directory
-  (createDirectoryIfMissing, removeDirectoryRecursive)
-import           System.Environment        (setEnv)
+  (createDirectoryIfMissing, removeDirectoryRecursive, getCurrentDirectory,
+   doesDirectoryExist, makeAbsolute)
+import           System.Environment
 import           System.Exit
   (exitWith, ExitCode(ExitSuccess, ExitFailure))
 import           System.FilePath           ((</>))
+import           System.Info
 import           System.Process            (readCreateProcessWithExitCode, proc)
 import           GHC.Conc                  (numCapabilities)
+import           GHC.Stack
+import           GHC.IO.Unsafe             (unsafePerformIO)
+import           Text.Printf               (printf)
 
 import           Test.Tasty
 import           Test.Tasty.Clash
@@ -39,6 +46,82 @@ import           Test.Tasty.HUnit
 #else
 #define NEEDS_PRIMS_GHC(x) (x)
 #endif
+
+-- | GHC version as major.minor.patch1. For example: 8.10.2.
+ghcVersion3 :: String
+ghcVersion3 =
+  let ghc_p1 = __GLASGOW_HASKELL_PATCHLEVEL1__ in
+  intercalate "." (map show (versionBranch compilerVersion <> [ghc_p1]))
+
+-- Directory clash binary is expected to live in
+cabalClashBinDir :: IO String
+cabalClashBinDir = makeAbsolute rel_path
+ where
+  rel_path = printf templ platform ghcVersion3 (VERSION_clash_ghc :: String)
+  platform = "x86_64-linux" :: String -- XXX: Hardcoded
+  templ = "dist-newstyle/build/%s/ghc-%s/clash-ghc-%s/x/clash/build/clash/" :: String
+
+-- | Set GHC_PACKAGE_PATH for local Cabal install. Currently hardcoded for Unix.
+setCabalPackagePaths :: IO ()
+setCabalPackagePaths = do
+  home <- getEnv "HOME"
+  here <- getCurrentDirectory
+  setEnv "GHC_PACKAGE_PATH" $
+       home <> "/.cabal/store/ghc-" <> ghcVersion3 <> "/package.db"
+    <> ":"
+    <> here <> "/dist-newstyle/packagedb/ghc-" <> ghcVersion3
+    <> ":"
+
+-- | See 'compiledWith'
+data RunWith
+  = Stack
+  | Cabal
+  | Global
+  deriving (Show, Eq)
+
+-- | Detects Clash binary the testsuite should use (in order):
+--
+--     * If USE_GLOBAL_CLASH=1, use globally installed Clash
+--     * If STACK_EXE is present, use Stack's Clash
+--     * If dist-newstyle is present, use Cabal's Clash
+--     * Use globally installed Clash
+--
+compiledWith :: RunWith
+compiledWith = unsafePerformIO $ do
+  clash_global <- lookupEnv "USE_GLOBAL_CLASH"
+  stack_exe <- lookupEnv "STACK_EXE"
+  distNewstyleExists <- doesDirectoryExist "dist-newstyle"
+
+  pure $ case (clash_global, stack_exe, distNewstyleExists) of
+    (Just "1", Just _, _   ) -> error "Can't use global clash with 'stack run'"
+    (Just "1", _,      _   ) -> Global
+    (_,        Just _, _   ) -> Stack
+    (_,        _     , True) -> Cabal
+    (_,        _     , _   ) -> Global
+{-# NOINLINE compiledWith #-}
+
+-- | Set environment variables that allow Clash to be executed by simply calling
+-- 'clash' without extra arguments.
+setClashEnvs :: HasCallStack => RunWith -> IO ()
+setClashEnvs Global = setEnv "GHC_ENVIRONMENT" "-"
+setClashEnvs Stack = pure ()
+setClashEnvs Cabal = do
+  -- Make sure environment variable exists
+  let cp = proc "cabal" ["--write-ghc-environment-files=always", "v2-run", "--", "clash", "--help"]
+  (exitCode, stdout, stderr) <- readCreateProcessWithExitCode cp ""
+  case exitCode of
+    ExitSuccess -> do
+      binDir <- cabalClashBinDir
+      path <- getEnv "PATH"
+      setEnv "PATH" (binDir <> ":" <> path)
+      setCabalPackagePaths
+    ExitFailure _ -> do
+      putStrLn "'cabal run clash' failed"
+      putStrLn ">>> stdout:"
+      putStrLn stdout
+      putStrLn ">>> stderr:"
+      putStrLn stderr
+      exitWith exitCode
 
 clashTestRoot
   :: [[TestName] -> TestTree]
@@ -458,7 +541,7 @@ runClashTest = defaultMain $ clashTestRoot
         , NEEDS_PRIMS_GHC(runTest "Transpose" def)
         , NEEDS_PRIMS_GHC(runTest "VecFun" def)
       ]
-      , clashTestGroup "Issues"
+      , clashTestGroup "Issues" $
         [ let _opts = def { hdlSim = False, hdlTargets = [Verilog] }
            in NEEDS_PRIMS(runTest "T1187" _opts)
         , clashLibTest ("tests" </> "shouldwork" </> "Issues") [VHDL] [] "T1388" "main"
@@ -467,8 +550,15 @@ runClashTest = defaultMain $ clashTestRoot
         , runTest "T1477" def{hdlSim=False}
         , runTest "T1506A" def{hdlSim=False, clashFlags=["-fclash-aggressive-x-optimization-blackboxes"]}
         , outputTest ("tests" </> "shouldwork" </> "Issues") allTargets ["-fclash-aggressive-x-optimization-blackboxes"] ["-itests/shouldwork/Issues"] "T1506B" "main"
-        , clashLibTest ("tests" </> "shouldwork" </> "Issues") allTargets [] "T1568" "main"
-        ]
+        ] <>
+        if compiledWith == Cabal then
+          -- This tests fails without environment files present, which are only
+          -- generated by Cabal. It complains it is trying to import "BasicTypes"
+          -- which is a member of the hidden package 'ghc'. Passing
+          -- '-package ghc' doesn't seem to help though. TODO: Investigate.
+          [clashLibTest ("tests" </> "shouldwork" </> "Issues") allTargets [] "T1568" "main"]
+        else
+          []
       , clashTestGroup "Naming"
         [ runTest "T967a" def{hdlSim=False}
         , runTest "T967b" def{hdlSim=False}
@@ -730,41 +820,7 @@ runClashTest = defaultMain $ clashTestRoot
 
 main :: IO ()
 main = do
-  _ <- mapM (uncurry setEnv) [ ("clash_ghc_datadir", "./clash-ghc")
-                             , ("clash_lib_datadir", "./clash-lib")
-                             , ("clash_prelude_datadir", "./clash-prelude")
-                             , ("clash_testsuite_datadir", "./testsuite")
-                             ]
-
-  putStrLn $ "Running in " ++ temporaryDirectory
+  setEnv "TASTY_NUM_THREADS" (show numCapabilities)
   createDirectoryIfMissing True temporaryDirectory
-
-  putStrLn $ "Making sure Clash is compiled.. "
-  let flag = "--help"
-  let cp = proc "cabal" ["--write-ghc-environment-files=always", "-v2", "new-run", "--", "clash", flag]
-  (exitCode, stdout, stderr) <- readCreateProcessWithExitCode cp ""
-
-  case exitCode of
-    ExitSuccess -> do
-      -- Execute test with found clash binary
-      let cmd0 = head $ filter (isSuffixOf ("clash " ++ flag)) $ lines stdout
-      let cmd1 = take (length cmd0 - (length flag + 1)) cmd0
-      setEnv "clash_bin" cmd1
-
-      putStrLn $ "Default number of threads: " ++ show numCapabilities
-      setEnv "TASTY_NUM_THREADS" (show numCapabilities)
-
-      finally
-        runClashTest
-        (do
-          putStrLn $ "Cleaning up " ++ temporaryDirectory
-          removeDirectoryRecursive temporaryDirectory
-        )
-    ExitFailure _ -> do
-      -- Building clash failed
-      putStrLn "'cabal new-run clash' failed"
-      putStrLn ">>> stdout:"
-      putStrLn stdout
-      putStrLn ">>> stderr:"
-      putStrLn stderr
-      exitWith exitCode
+  setClashEnvs compiledWith
+  finally runClashTest (removeDirectoryRecursive temporaryDirectory)

@@ -31,7 +31,7 @@ triggered on any other branch a _beta_ release gets made.
   * `clash-lib/clash-lib.cabal`
   * `clash-ghc/clash-ghc.cabal`
   * `clash-ghc/clash-cores.cabal`
-  * `bindist/linux/snap/snap/snapcraft.yaml`
+  * `.ci/bindist/linux/snap/snap/snapcraft.yaml`
   * `docs/conf.py`
   * `README.md`
   * `content/install/index.md` @ `clash-lang/clash-lang.org`
@@ -59,7 +59,7 @@ triggered on any other branch a _beta_ release gets made.
   * `clash-lib/clash-lib.cabal`
   * `clash-ghc/clash-ghc.cabal`
   * `clash-ghc/clash-cores.cabal`
-  * `bindist/linux/snap/snap/snapcraft.yaml`
+  * `.ci/bindist/linux/snap/snap/snapcraft.yaml`
   * `docs/conf.py`
   * `README.md`
   * `content/install/index.md` @ `clash-lang/clash-lang.org`

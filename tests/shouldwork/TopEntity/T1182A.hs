@@ -3,7 +3,7 @@
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE TypeFamilies #-}
 
-module PortNames where
+module T1182A where
 
 import qualified Prelude as P
 
@@ -58,4 +58,3 @@ mainSystemVerilog :: IO ()
 mainSystemVerilog = do
   netlist <- runToNetlistStage SSystemVerilog id testPath
   mapM_ (assertInputs . getComponent) netlist
-
