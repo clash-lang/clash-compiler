@@ -9,6 +9,7 @@ module Clash.Netlist.Id.Internal where
 import           Clash.Annotations.Primitive (HDL (..))
 import           Clash.Core.Name (Name(nameOcc))
 import           Clash.Core.Var (Id, varName)
+import           Clash.Debug (debugIsOn)
 import {-# SOURCE #-} Clash.Netlist.Types
   (PreserveCase(..), IdentifierSet(..), Identifier(..), FreshCache,
    IdentifierType(..))
@@ -21,7 +22,7 @@ import           Data.Text (Text)
 import qualified Data.Maybe as Maybe
 import           Text.Read (readMaybe)
 import           TextShow (showt)
-import           GHC.Stack (HasCallStack)
+import           GHC.Stack
 
 import qualified Data.IntMap as IntMap
 import qualified Data.HashMap.Strict as HashMap
@@ -45,9 +46,9 @@ lookupFreshCache# fresh0 id0 = do
 
 -- | Add new identifier to FreshCache, see 'is_freshCache' for more information.
 updateFreshCache# :: HasCallStack => FreshCache -> Identifier -> FreshCache
-updateFreshCache# _fresh (RawIdentifier _s Nothing) =
+updateFreshCache# _fresh (RawIdentifier _s Nothing _) =
   error "Internal error: updateFreshCache# called with unsafely made identifier"
-updateFreshCache# fresh (RawIdentifier _s (Just id_)) =
+updateFreshCache# fresh (RawIdentifier _s (Just id_) _) =
   updateFreshCache# fresh id_
 updateFreshCache# fresh id_ =
   go0 (go1 (max (Maybe.fromMaybe 0 (Maybe.listToMaybe exts))))
@@ -68,10 +69,11 @@ mkUnique#
 mkUnique# _is0 (RawIdentifier {}) =
   error "Internal error: mkUnique# cannot be used on RawIdentifiers"
 mkUnique# is0 id_@(i_extensionsRev -> []) = deepen# is0 id_
-mkUnique# is id0 = (is{is_freshCache=freshCache, is_store=isStore}, id1)
+mkUnique# is id0 = (is{is_freshCache=freshCache, is_store=isStore}, id2)
  where
-  freshCache = updateFreshCache# (is_freshCache is) id1
-  isStore = HashSet.insert id1 (is_store is)
+  freshCache = updateFreshCache# (is_freshCache is) id2
+  isStore = HashSet.insert id2 (is_store is)
+  id2 = id1{i_provenance=if debugIsOn then callStack else emptyCallStack}
   id1 = case lookupFreshCache# (is_freshCache is) id0 of
     Just currentMax ->
       id0{i_extensionsRev=currentMax+1 : tail (i_extensionsRev id0)}
@@ -79,9 +81,25 @@ mkUnique# is id0 = (is{is_freshCache=freshCache, is_store=isStore}, id1)
       -- Identifier doesn't exist in set yet, so just return it.
       id0
 
+-- | Non-monadic, internal version of 'add'
+add# :: HasCallStack => IdentifierSet -> Identifier -> IdentifierSet
+add# is0@(IdentifierSet{..}) (RawIdentifier t Nothing _) = add# is0 (make## is_hdl t)
+add# is0 (RawIdentifier _ (Just id0) _) = add# is0 id0
+add# is0@(IdentifierSet{..}) id0 = is0{is_freshCache=fresh1, is_store=ids1}
+ where
+  ids1 = HashSet.insert id0 is_store
+  fresh1 = updateFreshCache# is_freshCache id0
+
+-- | Non-monadic, internal version of 'addMultiple'
+addMultiple# :: (HasCallStack, Foldable t) => IdentifierSet -> t Identifier -> IdentifierSet
+addMultiple# is ids = List.foldl' add# is ids
+
 -- | Non-monadic, internal version of 'addRaw'
-addRaw# :: IdentifierSet -> Text -> (IdentifierSet, Identifier)
-addRaw# is0 id0 = second (RawIdentifier id0 . Just) (make# is0 (unextend id0))
+addRaw# :: HasCallStack => IdentifierSet -> Text -> (IdentifierSet, Identifier)
+addRaw# is0 id0 =
+  second
+    (\i -> RawIdentifier id0 (Just i) (if debugIsOn then callStack else emptyCallStack))
+    (make# is0 (unextend id0))
  where
   unextend = case is_hdl is0 of
     VHDL -> VHDL.unextend
@@ -89,7 +107,7 @@ addRaw# is0 id0 = second (RawIdentifier id0 . Just) (make# is0 (unextend id0))
     SystemVerilog -> SystemVerilog.unextend
 
 -- | Non-monadic, internal version of 'make'
-make# :: IdentifierSet -> Text -> (IdentifierSet, Identifier)
+make# :: HasCallStack => IdentifierSet -> Text -> (IdentifierSet, Identifier)
 make# is0@(IdentifierSet esc lw hdl fresh0 ids0) (Common.prettyName -> id0) =
   if id1 `HashSet.member` ids0 then
     -- Ideally we'd like to continue with the id from the HashSet so all the old
@@ -104,11 +122,11 @@ make# is0@(IdentifierSet esc lw hdl fresh0 ids0) (Common.prettyName -> id0) =
   id1 = make## (is_hdl is0) (if esc then id0 else toBasicId# hdl lw id0)
 
 -- | Non-monadic, internal version of 'makeBasic'
-makeBasic# :: IdentifierSet -> Text -> (IdentifierSet, Identifier)
+makeBasic# :: HasCallStack => IdentifierSet -> Text -> (IdentifierSet, Identifier)
 makeBasic# is0 = make# is0 . toBasicId# (is_hdl is0) (is_lowerCaseBasicIds is0)
 
 -- | Non-monadic, internal version of 'makeBasicOr'
-makeBasicOr# :: IdentifierSet -> Text -> Text -> (IdentifierSet, Identifier)
+makeBasicOr# :: HasCallStack => IdentifierSet -> Text -> Text -> (IdentifierSet, Identifier)
 makeBasicOr# is0 hint altHint = make# is0 id1
  where
   id0 = toBasicId# (is_hdl is0) (is_lowerCaseBasicIds is0) hint
@@ -117,42 +135,42 @@ makeBasicOr# is0 hint altHint = make# is0 id1
         else id0
 
 -- | Non-monadic, internal version of 'next'
-next# :: IdentifierSet -> Identifier ->  (IdentifierSet, Identifier)
-next# is0 (RawIdentifier t Nothing) = uncurry next# (make# is0 t)
-next# is0 (RawIdentifier _ (Just id_)) = next# is0 id_
+next# :: HasCallStack => IdentifierSet -> Identifier ->  (IdentifierSet, Identifier)
+next# is0 (RawIdentifier t Nothing _) = uncurry next# (make# is0 t)
+next# is0 (RawIdentifier _ (Just id_) _) = next# is0 id_
 next# is0 id_@(i_extensionsRev -> []) = deepen# is0 id_
 next# is0 id_ = mkUnique# is0 id_
 
 -- | Non-monadic, internal version of 'nextN'
-nextN# :: Int -> IdentifierSet -> Identifier ->  (IdentifierSet, [Identifier])
+nextN# :: HasCallStack => Int -> IdentifierSet -> Identifier ->  (IdentifierSet, [Identifier])
 nextN# n is0 id0 = List.mapAccumL (\is1 _n -> next# is1 id0) is0 [1..n]
 -- TODO: ^ More efficient implementation.
 
 -- | Non-monadic, internal version of 'deepenN'
-deepenN# :: Int -> IdentifierSet -> Identifier ->  (IdentifierSet, [Identifier])
+deepenN# :: HasCallStack => Int -> IdentifierSet -> Identifier ->  (IdentifierSet, [Identifier])
 deepenN# n is0 id0 = List.mapAccumL (\is1 _n -> deepen# is1 id0) is0 [1..n]
 -- TODO: ^ More efficient implementation.
 
 -- | Non-monadic, internal version of 'deepen'
-deepen# :: IdentifierSet -> Identifier ->  (IdentifierSet, Identifier)
-deepen# is0 (RawIdentifier t Nothing) = uncurry deepen# (make# is0 t)
-deepen# is0 (RawIdentifier _ (Just id_)) = deepen# is0 id_
+deepen# :: HasCallStack => IdentifierSet -> Identifier ->  (IdentifierSet, Identifier)
+deepen# is0 (RawIdentifier t Nothing _) = uncurry deepen# (make# is0 t)
+deepen# is0 (RawIdentifier _ (Just id_) _) = deepen# is0 id_
 deepen# is0 id_ = mkUnique# is0 (id_{i_extensionsRev=0:i_extensionsRev id_})
 
 -- | Non-monadic, internal version of 'suffix'
-suffix# :: IdentifierSet -> Identifier -> Text -> (IdentifierSet, Identifier)
-suffix# is0 (RawIdentifier t Nothing) suffix_ = (uncurry suffix# (make# is0 t)) suffix_
-suffix# is0 (RawIdentifier _ (Just id_)) suffix_ = suffix# is0 id_ suffix_
+suffix# :: HasCallStack => IdentifierSet -> Identifier -> Text -> (IdentifierSet, Identifier)
+suffix# is0 (RawIdentifier t Nothing _) suffix_ = (uncurry suffix# (make# is0 t)) suffix_
+suffix# is0 (RawIdentifier _ (Just id_) _) suffix_ = suffix# is0 id_ suffix_
 suffix# is0 id0 suffix_ = make# is0 (i_baseName id0 <> "_" <> suffix_)
 
 -- | Non-monadic, internal version of 'prefix'
-prefix# :: IdentifierSet -> Identifier -> Text -> (IdentifierSet, Identifier)
-prefix# is0 (RawIdentifier t Nothing) prefix_ = (uncurry prefix# (make# is0 t)) prefix_
-prefix# is0 (RawIdentifier _ (Just id_)) prefix_ = prefix# is0 id_ prefix_
+prefix# :: HasCallStack => IdentifierSet -> Identifier -> Text -> (IdentifierSet, Identifier)
+prefix# is0 (RawIdentifier t Nothing _) prefix_ = (uncurry prefix# (make# is0 t)) prefix_
+prefix# is0 (RawIdentifier _ (Just id_) _) prefix_ = prefix# is0 id_ prefix_
 prefix# is0 id0 prefix_ = make# is0 (prefix_ <> "_" <> i_baseName id0)
 
 toText# :: Identifier -> Text
-toText# (RawIdentifier t _) = t
+toText# (RawIdentifier t _ _) = t
 toText# (UniqueIdentifier{..}) =
   case i_hdl of
     VHDL -> VHDL.toText i_idType basicId
@@ -191,7 +209,7 @@ parseIdentifier# t =
     Just w -> second (w:) (go is)
     Nothing -> (i:is, [])
 
-make## :: HDL -> Text -> Identifier
+make## :: HasCallStack => HDL -> Text -> Identifier
 make## hdl =
     go
   . Text.strip
@@ -211,7 +229,9 @@ make## hdl =
               VHDL -> Text.toCaseFold baseName
               _ -> baseName
           in
-            UniqueIdentifier baseName baseNameCaseFold extensions idType hdl
+            UniqueIdentifier
+              baseName baseNameCaseFold extensions idType hdl
+              (if debugIsOn then callStack else emptyCallStack)
 
 toBasicId# :: HDL -> PreserveCase -> Text -> Text
 toBasicId# hdl lw id0 =

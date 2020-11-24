@@ -51,8 +51,6 @@ import           Util                          (OverridingBool(..))
 import           Clash.Annotations.Primitive
   (PrimitiveGuard(HasBlackBox, WarnNonSynthesizable, WarnAlways, DontTranslate),
    extractPrim)
-import           Clash.Annotations.TopEntity
-  (TopEntity(Synthesize), PortName(PortName))
 import           Clash.Core.DataCon            as D (dcTag)
 import           Clash.Core.FreeVars           (freeIds)
 import           Clash.Core.Literal            as L (Literal (..))
@@ -690,9 +688,8 @@ collectMealy dstNm dst tcm (kd:clk:mealyFun:mealyInit:mealyIn:_) = do
       mealyInitLength = length (splitShouldSplit tcm [termType tcm mealyInit])
       (sArgs,iArgs) = splitAt mealyInitLength args1
   -- Give all binders a unique name
-  normE <- mkUniqueNormalized is0
-             (Just (Just (Synthesize "" [] (PortName ""))))
-             ([],map (,mealyInit) sArgs ++ map (,mealyIn) iArgs ++ bs,res)
+  let sBindings = map (,mealyInit) sArgs ++ map (,mealyIn) iArgs ++ bs
+  normE <- mkUniqueNormalized is0 Nothing ([], sBindings, res)
   case normE of
     -- We're not expecting any input or output wrappers
     (_,[],[],_,[],binders0,Just result) -> do
@@ -1036,7 +1033,9 @@ mkFunInput resId e =
                                                 , snd compOutp
                                                 , Identifier (Id.unsafeMake "~RESULT") Nothing )
                       instLabel <- Id.next compName
-                      let instDecl      = InstDecl Entity Nothing [] compName instLabel [] (outpAssign:inpAssigns)
+                      let
+                        portMap = NamedPortMap (outpAssign:inpAssigns)
+                        instDecl = InstDecl Entity Nothing [] compName instLabel [] portMap
                       return (Right ((Id.unsafeMake "",tickDecls ++ [instDecl]),Wire))
                     Nothing -> error $ $(curLoc) ++ "Cannot make function input for: " ++ showPpr e
             C.Lam {} -> do

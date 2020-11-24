@@ -23,4 +23,7 @@ mainVHDL :: IO ()
 mainVHDL = do
   [topDir] <- getArgs
   content <- readFile (takeDirectory topDir </> "top/top.vhdl")
-  assertIn "y <= x" content
+
+  -- TODO: Could we remove bitvector noise?
+  assertIn "x_0 <= top_types.fromSLV(x);" content
+  assertIn "y_0 <= x_0;" content

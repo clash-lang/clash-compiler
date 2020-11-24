@@ -13,6 +13,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecursiveDo #-}
 {-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE QuasiQuotes #-}
 {-# LANGUAGE TypeFamilies #-}
 
 module Clash.Backend.VHDL (VHDLState) where
@@ -64,6 +65,7 @@ import           Clash.Netlist.Types                  hiding (_intWidth, intWidt
 import           Clash.Netlist.Util
 import           Clash.Util
   (SrcSpan, noSrcSpan, clogBase, curLoc, first, makeCached, on, indexNote)
+import qualified Clash.Util.Interpolate               as I
 import           Clash.Util.Graph                     (reverseTopSort)
 
 import           Clash.Backend.Verilog (Range (..), continueWithRange)
@@ -131,6 +133,38 @@ instance Backend VHDLState where
 
   genHDL          = genVHDL
   mkTyPackage     = mkTyPackage_
+  hdlHWTypeKind = \case
+    Vector {} -> pure UserType
+    RTree {} -> pure UserType
+    Product {} -> pure UserType
+
+    Clock {} -> pure SynonymType
+    Reset {} -> pure SynonymType
+    Enable {} -> pure SynonymType
+    Index {} -> pure SynonymType
+    CustomSP {} -> pure SynonymType
+    SP {} -> pure SynonymType
+    Sum {} -> pure SynonymType
+    CustomSum {} -> pure SynonymType
+    CustomProduct {} -> pure SynonymType
+
+    BitVector _ -> pure PrimitiveType
+    Bool -> pure PrimitiveType
+    Bit -> pure PrimitiveType
+    Unsigned {} -> pure PrimitiveType
+    Signed {} -> pure PrimitiveType
+    String -> pure PrimitiveType
+    Integer -> pure PrimitiveType
+    FileType -> pure PrimitiveType
+
+    -- Transparent types:
+    BiDirectional _ ty -> hdlHWTypeKind ty
+    Annotated _ ty -> hdlHWTypeKind ty
+
+    -- Shouldn't be printed?
+    Void {} -> pure PrimitiveType
+    KnownDomain {} -> pure PrimitiveType
+
   hdlType Internal      (filterTransparent -> ty) = sizedQualTyName ty
   hdlType (External nm) (filterTransparent -> ty) =
     let sized = sizedQualTyName ty in
@@ -494,6 +528,7 @@ tyDec hwty = do
     Signed _    -> emptyDoc
     String      -> emptyDoc
     Integer     -> emptyDoc
+    FileType    -> emptyDoc
 
     -- Transparent types:
     BiDirectional _ ty -> tyDec ty
@@ -502,7 +537,10 @@ tyDec hwty = do
     Void {} -> emptyDoc
     KnownDomain {} -> emptyDoc
 
-    _ -> error $ $(curLoc) ++ show hwty
+    -- Unexpected arguments:
+    Product _ _ _ -> error $ $(curLoc) ++ [I.i|
+      Unexpected Product with fewer than 2 fields: #{hwty}
+    |]
 
 
 
@@ -1215,7 +1253,7 @@ decl l (NetDecl' noteM _ id_ ty iEM) = Just <$> (,fromIntegral (TextS.length (Id
     addNote n = mappend ("--" <+> pretty n <> line)
     iE = maybe emptyDoc (noEmptyInit . expr_ False) iEM
 
-decl _ (InstDecl Comp _ attrs nm _ gens pms) = fmap (Just . (,0)) $ do
+decl _ (InstDecl Comp _ attrs nm _ gens (NamedPortMap pms)) = fmap (Just . (,0)) $ do
   { rec (p,ls) <- fmap unzip $ sequence [ (,formalLength i) <$> fill (maximum ls) (expr_ False i) <+> colon <+> portDir dir <+> sizedQualTyName ty | (i,dir,ty,_) <- pms ]
   ; rec (g,lsg) <- fmap unzip $ sequence [ (,formalLength i) <$> fill (maximum lsg) (expr_ False i) <+> colon <+> tyName ty | (i,ty,_) <- gens]
   ; "component" <+> pretty nm <> line <>
@@ -1361,19 +1399,25 @@ inst_ (CondAssignment id_ _sig scrut scrutTy es) = fmap Just $
     conds ((Nothing,e):_)   = expr_ False e <+> "when" <+> "others" <:> return []
     conds ((Just c ,e):es') = expr_ False e <+> "when" <+> patLit scrutTy c <:> conds es'
 
-inst_ (InstDecl entOrComp libM _ nm lbl gens pms) = do
+inst_ (InstDecl entOrComp libM _ nm lbl gens pms0) = do
     maybe (return ()) (\lib -> Mon (libraries %= (T.fromStrict lib:))) libM
     fmap Just $
       nest 2 $ pretty lbl <+> colon <> entOrComp'
-                <+> maybe emptyDoc ((<> ".") . pretty) libM <> pretty nm <> line <> gms <> pms' <> semi
+                <+> maybe emptyDoc ((<> ".") . pretty) libM <> pretty nm <> line <> gms <> pms2 <> semi
   where
     gms | [] <- gens = emptyDoc
         | otherwise =  do
       rec (p,ls) <- fmap unzip $ sequence [ (,formalLength i) <$> fill (maximum ls) (expr_ False i) <+> "=>" <+> expr_ False e | (i,_,e) <- gens]
       nest 2 ("generic map" <> line <> tupled (pure p)) <> line
-    pms' = do
-      rec (p,ls) <- fmap unzip $ sequence [ (,formalLength i) <$> fill (maximum ls) (expr_ False i) <+> "=>" <+> expr_ False e | (i,_,_,e) <- pms]
+    pms2 = do
+      rec (p,ls) <- case pms0 of
+                      NamedPortMap pms1 -> fmap unzip $ sequence [pm ls i e | (i,_,_,e) <- pms1]
+                      IndexedPortMap pms1 -> fmap unzip $ sequence [pmi e | (_,_,e) <- pms1]
       nest 2 $ "port map" <> line <> tupled (pure p)
+
+    pm ls i e = (,formalLength i) <$> fill (maximum ls) (expr_ False i) <+> "=>" <+> expr_ False e
+    pmi e = (,0) <$> expr_ False e
+
     formalLength (Identifier i _) = fromIntegral (TextS.length (Id.toText i))
     formalLength _                = 0
     entOrComp' = case entOrComp of { Entity -> " entity"; Comp -> " component"; Empty -> ""}
@@ -1603,14 +1647,14 @@ expr_ _ (DataTag (RTree _ _) (Right _)) = do
   iw <- Mon $ use intWidth
   "to_signed" <> parens (int 1 <> "," <> int iw)
 
-expr_ _ (ConvBV topM hwty True e) = do
+expr_ _ (ToBv topM hwty e) = do
   nm <- Mon $ use modNm
   case topM of
     Nothing -> pretty nm <> "_types" <> dot <> "toSLV" <>
                parens (qualTyName hwty <> "'" <> parens (expr_ False e))
     Just t  -> pretty t <> dot <> pretty t <> "_types" <> dot <> "toSLV" <> parens (expr_ False e)
 
-expr_ _ (ConvBV topM _ False e) = do
+expr_ _ (FromBv topM _ e) = do
   nm <- Mon $ use modNm
   maybe (pretty nm <> "_types" ) (\t -> pretty t <> dot <> pretty t <> "_types") topM <> dot <>
     "fromSLV" <> parens (expr_ False e)
@@ -1973,7 +2017,7 @@ buildModifier _ prevM (Indexed (ty@(RTree d argTy),1,1)) = case prevM of
   z   = 2^(d - 1)
   z'  = 2^d
 
--- This is a HACK for Clash.Driver.TopWrapper.mkOutput
+-- This is a HACK for Clash.Netlist.Util.mkTopOutput
 -- Vector's don't have a 10'th constructor, this is just so that we can
 -- recognize the particular case
 buildModifier syn prevM (Indexed (ty@(Vector _ argTy),10,fI)) = case prevM of
@@ -1990,7 +2034,7 @@ buildModifier syn prevM (Indexed (ty@(Vector _ argTy),10,fI)) = case prevM of
   _ ->
       Just (vivadoRange syn argTy (((Idx fI,argTy):prevM)))
 
--- This is a HACK for Clash.Driver.TopWrapper.mkOutput
+-- This is a HACK for Clash.Netlist.Util.mkTopOutput
 -- RTree's don't have a 10'th constructor, this is just so that we can
 -- recognize the particular case
 buildModifier syn prevM (Indexed (ty@(RTree _ argTy),10,fI)) = case prevM of

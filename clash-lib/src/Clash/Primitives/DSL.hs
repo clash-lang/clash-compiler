@@ -538,7 +538,7 @@ toBV
 toBV bvName a = case a of
   TExpr BitVector{} _ -> pure a
   TExpr aTy aExpr     -> assign bvName $
-    TExpr (BitVector (typeSize aTy)) (ConvBV Nothing aTy True aExpr)
+    TExpr (BitVector (typeSize aTy)) (ToBv Nothing aTy aExpr)
 
 -- | Assign an output bitvector to an expression. Declares a new
 --   bitvector if the expression is not already a bitvector.
@@ -553,7 +553,7 @@ fromBV
 fromBV _ a@(TExpr BitVector{} _) = pure a
 fromBV bvName (TExpr aTy (Identifier aName Nothing)) = do
   bvName' <- Id.makeBasic bvName
-  let bvExpr = ConvBV Nothing aTy False (Identifier bvName' Nothing)
+  let bvExpr = FromBv Nothing aTy (Identifier bvName' Nothing)
       bvTy   = BitVector (typeSize aTy)
   addDeclaration (NetDecl Nothing bvName' bvTy)
   addDeclaration (Assignment aName bvExpr)
@@ -673,7 +673,10 @@ instDecl entOrComp compName instLbl attrs inPorts outPorts = do
   inPorts' <- mapM (mkPort In) inPorts
   outPorts' <- mapM (mkPort Out) outPorts
 
-  addDeclaration $ InstDecl entOrComp Nothing [] compName instLbl (mkAttrs attrs) (inPorts' ++ outPorts')
+  addDeclaration $
+    InstDecl
+      entOrComp Nothing [] compName instLbl (mkAttrs attrs)
+      (NamedPortMap (inPorts' ++ outPorts'))
     where
     mkPort
       :: PortDirection

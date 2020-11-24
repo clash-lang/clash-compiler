@@ -92,7 +92,7 @@ alteraPllTemplate bbCtx = do
   [[ NetDecl Nothing locked  rstTy
    , NetDecl' Nothing Reg pllLock (Right Bool) Nothing]
   ,[ NetDecl Nothing clkNm ty | (clkNm,ty) <- zip clocks tys]
-  ,[ InstDecl Comp Nothing [] compName alteraPll_inst [] $ concat
+  ,[ InstDecl Comp Nothing [] compName alteraPll_inst [] $ NamedPortMap $ concat
       [ [ (instPort "refclk", In, clkTy, clk)
         , (instPort "rst", In, rstTy, rst)]
       , [ (p, Out, ty, Identifier k Nothing) | (k, ty, p) <- zip3 clocks tys outclkPorts ]
@@ -131,7 +131,7 @@ altpllTemplate bbCtx = do
   [ NetDecl Nothing locked  Bit
   , NetDecl' Nothing Reg pllLock (Right Bool) Nothing
   , NetDecl Nothing pllOut clkOutTy
-  , InstDecl Comp Nothing [] compName alteraPll_inst []
+  , InstDecl Comp Nothing [] compName alteraPll_inst [] $ NamedPortMap $
       [ (instPort "clk", In, clkTy, clk)
       , (instPort "areset", In, rstTy, rst)
       , (instPort "c0", Out, clkOutTy, Identifier pllOut Nothing)

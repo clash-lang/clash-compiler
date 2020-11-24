@@ -23,7 +23,6 @@ import           Control.Exception                (throw)
 import           Control.Lens                     ((.=), (<~))
 import qualified Control.Lens                     as Lens
 import           Control.Monad.Extra              (concatMapM)
-import           Control.Monad.IO.Class           (liftIO)
 import           Control.Monad.Reader             (runReaderT)
 import           Control.Monad.State.Strict       (State, runStateT, runState)
 import           Data.Binary.IEEE754              (floatToWord, doubleToWord)
@@ -40,8 +39,6 @@ import qualified Data.Set                         as Set
 import           Data.Primitive.ByteArray         (ByteArray (..))
 import qualified Data.Text                        as StrictText
 import           GHC.Integer.GMP.Internals        (Integer (..), BigNat (..))
-import           System.FilePath                  ((</>), (<.>))
-import           Text.Read                        (readMaybe)
 
 import           Outputable                       (ppr, showSDocUnsafe)
 import           SrcLoc                           (isGoodSrcSpan)
@@ -659,9 +656,6 @@ mkFunApp dstId fun args tickDecls = do
       , let fArgTys1 = splitShouldSplit tcm $ rights fArgTys0
       , length fArgTys1 == length args
       -> do
-        let annM = topAnnotation topEntity
-        topNameI <- lookupVarEnv' <$> Lens.use componentNames <*> pure fun
-        let topName = StrictText.unpack (Id.toText topNameI)
         argHWTys <- mapM (unsafeCoreTypeToHWTypeM' $(curLoc)) fArgTys1
         (argExprs, concat -> argDecls) <- unzip <$>
           mapM (\(e,t) -> mkExpr False Concurrent (NetlistId dstId t) e)
@@ -673,16 +667,54 @@ mkFunApp dstId fun args tickDecls = do
           (hWTysFiltered, argExprsFiltered) = unzip filteredTypeExprs
 
         dstHWty  <- unsafeCoreTypeToHWTypeM' $(curLoc) fResTy
-        env  <- Lens.use hdlDir
-        let modName = takeWhile (/= '.') (StrictText.unpack (nameOcc (varName fun)))
 
-        manFile <- case annM of
-          Just _  -> return (env </> ".." </> modName </> topName </> topName <.> "manifest")
-          Nothing -> return (env </> topName <.> "manifest")
-        Just man <- readMaybe <$> liftIO (readFile manFile)
-        instDecls <- mkTopUnWrapper fun annM man (dstId,dstHWty)
-                       (zip argExprsFiltered hWTysFiltered)
-                       tickDecls
+        -- TODO: The commented code fetches the function definition from the
+        --       set of global bindings and uses it to replicate the port names
+        --       of it. However, this does rely on the binding actually being
+        --       present in the binding map. This isn't the case, as only
+        --       the current top entity (and its dependencies, stopping at other
+        --       top entities) are present. We can't add the non-normalized
+        --       version, as this logic relies on 'splitArguments' having
+        --       fired. Adding normalized versions would create a dependency
+        --       between two top entities, defeating the ability to compile in
+        --       parallel.
+        --
+        --       One option is to split the normalization process into two
+        --       chunks: preprocessing (e.g., 'splitArguments') and actually
+        --       normalizing. This would ensure only minimal work is being done
+        --       serially.
+        --
+        --       The current workaround is to not rely on named arguments, using
+        --       positional ones instead when instantiating a top entity.
+        --
+        -- funTerm <- fmap bindingTerm . lookupVarEnv fun <$> Lens.use bindings
+        --
+        -- expandedTopEntity <-
+        --   case splitNormalized tcm <$> funTerm of
+        --     Nothing -> error ("Internal error: could not find " <> show fun)
+        --     Just (Left err) -> error ("Internal error: " <> show err)
+        --     Just (Right (argIds, _binds, resId)) -> do
+        --       argTys <- mapM (unsafeCoreTypeToHWTypeM $(curLoc)) (map varType argIds)
+        --       resTy <- unsafeCoreTypeToHWTypeM $(curLoc) (varType resId)
+        --       is <- Lens.use seenIds
+        --       let topAnnM = topAnnotation topEntity
+        --       pure (expandTopEntityOrErr is (zip argIds argTys) (resId, resTy) topAnnM)
+
+        -- Generate ExpandedTopEntity, see TODO^
+        is <- Lens.use seenIds
+        argTys <- mapM (unsafeCoreTypeToHWTypeM $(curLoc) . termType tcm) args
+        resTy <- unsafeCoreTypeToHWTypeM $(curLoc) fResTy
+        let
+          ettArgs = (Nothing,) <$> argTys
+          ettRes = (Nothing, resTy)
+          expandedTopEntity =
+            expandTopEntityOrErr is ettArgs ettRes (topAnnotation topEntity)
+
+        instDecls <-
+          mkTopUnWrapper
+            fun expandedTopEntity (dstId, dstHWty)
+            (zip argExprsFiltered hWTysFiltered) tickDecls
+
         return (argDecls ++ instDecls)
 
       | otherwise -> error $ $(curLoc) ++ "under-applied TopEntity: " ++ showPpr fun
@@ -721,7 +753,8 @@ mkFunApp dstId fun args tickDecls = do
               instLabel1 <- fromMaybe instLabel0 <$> Lens.view setName
               instLabel2 <- affixName instLabel1
               instLabel3 <- Id.makeBasic instLabel2
-              let instDecl = InstDecl Entity Nothing [] compName instLabel3 [] (outpAssign ++ inpAssigns)
+              let portMap = NamedPortMap (outpAssign ++ inpAssigns)
+                  instDecl = InstDecl Entity Nothing [] compName instLabel3 [] portMap
               return (argDecls ++ argDecls' ++ tickDecls ++ [instDecl])
             else error [I.i|
               Under-applied normalized function at component #{compName}:

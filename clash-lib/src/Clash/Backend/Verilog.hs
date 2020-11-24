@@ -130,6 +130,7 @@ instance Backend VerilogState where
   genHDL          = const genVerilog
   mkTyPackage _ _ = return []
   hdlType _       = verilogType
+  hdlHWTypeKind _ = pure PrimitiveType -- Everything is a bitvector!
   hdlTypeErrValue = verilogTypeErrValue
   hdlTypeMark     = verilogTypeMark
   hdlRecSel       = verilogRecSel
@@ -490,10 +491,18 @@ inst_ (CondAssignment id_ _ scrut scrutTy es) = fmap Just $
     conds i ((Nothing,e):_)   = ("default" <+> colon <+> stringS i <+> equals <+> expr_ False e) <:> return []
     conds i ((Just c ,e):es') = (exprLitV (Just (scrutTy,conSize scrutTy)) c <+> colon <+> stringS i <+> equals <+> expr_ False e) <:> conds i es'
 
-inst_ (InstDecl _ _ attrs nm lbl ps pms) = fmap Just $
-    attrs' <> nest 2 (pretty nm <> params <> pretty lbl <> line <> pms' <> semi)
+inst_ (InstDecl _ _ attrs nm lbl ps pms0) = fmap Just $
+    attrs' <> nest 2 (pretty nm <> params <> pretty lbl <> line <> pms2 <> semi)
   where
-    pms' = tupled $ sequence [dot <> expr_ False i <+> parens (expr_ False e) | (i,_,_,e) <- pms]
+    pms2 = case pms0 of
+      NamedPortMap pms1 ->
+        -- ( .clk (clk_0), .arst (arst_0), ........ )
+        let pm i e = dot <> expr_ False i <+> parens (expr_ False e) in
+        tupled $ sequence [pm i e | (i,_,_,e) <- pms1]
+      IndexedPortMap pms1 ->
+         -- ( clk_0, arst_0, ..... )
+        tupled $ sequence [expr_ False e | (_,_,e) <- pms1]
+
     params
       | null ps   = space
       | otherwise = line <> "#" <> tupled (sequence [dot <> expr_ False i <+> parens (expr_ False e) | (i,_,e) <- ps]) <> line
@@ -773,7 +782,7 @@ modifier r (Indexed (ty@(RTree d argTy),1,1)) =
     start   = (typeSize ty `div` 2) - 1
     hty     = RTree (d-1) argTy
 
--- This is a HACK for Clash.Driver.TopWrapper.mkOutput
+-- This is a HACK for Clash.Netlist.Util.mkTopOutput
 -- Vector's don't have a 10'th constructor, this is just so that we can
 -- recognize the particular case
 modifier r (Indexed (ty@(Vector _ argTy),10,fI)) =
@@ -783,7 +792,7 @@ modifier r (Indexed (ty@(Vector _ argTy),10,fI)) =
     start   = typeSize ty - (fI * argSize) - 1
     end     = start - argSize + 1
 
--- This is a HACK for Clash.Driver.TopWrapper.mkOutput
+-- This is a HACK for Clash.Netlist.Util.mkTopOutput
 -- RTree's don't have a 10'th constructor, this is just so that we can
 -- recognize the particular case
 modifier r (Indexed (ty@(RTree _ argTy),10,fI)) =
@@ -1077,7 +1086,8 @@ expr_ _ (DataTag (RTree _ _) (Right _)) = do
   iw <- Mon $ use intWidth
   int iw <> "'sd1"
 
-expr_ b (ConvBV _ _ _ e) = expr_ b e
+expr_ b (ToBv _ _ e) = expr_ b e
+expr_ b (FromBv _ _ e) = expr_ b e
 
 expr_ b (IfThenElse c t e) =
   parenIf b (expr_ True c <+> "?" <+> expr_ True t <+> ":" <+> expr_ True e)

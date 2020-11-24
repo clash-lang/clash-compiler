@@ -22,6 +22,7 @@ module Clash.Netlist.Id
   , HasIdentifierSet(..)
   , emptyIdentifierSet
   , makeSet
+  , clearSet
 
     -- * Unsafe creation and extracting identifiers
   , Identifier
@@ -37,6 +38,8 @@ module Clash.Netlist.Id
   , makeBasic
   , makeBasicOr
   , makeAs
+  , add
+  , addMultiple
   , addRaw
   , deepen
   , deepenN
@@ -56,6 +59,7 @@ where
 
 import           Clash.Annotations.Primitive (HDL (..))
 import           Clash.Core.Var (Id)
+import           Clash.Debug (debugIsOn)
 import {-# SOURCE #-} Clash.Netlist.Types
   (PreserveCase(..), HasIdentifierSet(..), IdentifierSet(..), Identifier(..),
    IdentifierType(..), IdentifierSetMonad(identifierSetM))
@@ -65,7 +69,7 @@ import qualified Data.IntMap.Strict as IntMap
 import qualified Data.List as List
 import           Data.Text (Text)
 import qualified Data.Text.Lazy as LT
-import           GHC.Stack (HasCallStack)
+import           GHC.Stack
 
 import qualified Clash.Netlist.Id.VHDL as VHDL
 import           Clash.Netlist.Id.Internal
@@ -108,6 +112,11 @@ makeSet esc lw hdl ids = IdentifierSet esc lw hdl fresh ids
  where
   fresh = List.foldl' updateFreshCache# mempty ids
 
+-- | Remove all identifiers from a set
+clearSet :: IdentifierSet -> IdentifierSet
+clearSet (IdentifierSet escL lwL hdlL _ _) =
+  IdentifierSet escL lwL hdlL mempty mempty
+
 toList :: IdentifierSet -> [Identifier]
 toList (IdentifierSet _ _ _ _ idStore) = HashSet.toList idStore
 
@@ -120,6 +129,16 @@ toText = toText#
 -- "IdentifierType" too.
 toLazyText :: Identifier -> LT.Text
 toLazyText = LT.fromStrict . toText
+
+-- | Helper function to define pure Id functions in terms of a IdentifierSetMonad
+withIdentifierSetM'
+  :: IdentifierSetMonad m
+  => (IdentifierSet -> a -> IdentifierSet)
+  -> a
+  -> m ()
+withIdentifierSetM' f a = do
+  is0 <- identifierSetM id
+  identifierSetM (const (f is0 a)) >> pure ()
 
 -- | Helper function to define pure Id functions in terms of a IdentifierSetMonad
 withIdentifierSetM
@@ -136,29 +155,38 @@ withIdentifierSetM f a = do
 -- | Like 'addRaw', 'unsafeMake' creates an identifier that will be spliced
 -- at verbatim in the HDL. As opposed to 'addRaw', the resulting Identifier
 -- might be generated at a later point as it is NOT added to an IdentifierSet.
-unsafeMake :: Text -> Identifier
-unsafeMake t = RawIdentifier t Nothing
+unsafeMake :: HasCallStack => Text -> Identifier
+unsafeMake t =
+  RawIdentifier t Nothing (if debugIsOn then callStack else emptyCallStack)
+
+-- | Add an identifier to an IdentifierSet
+add :: HasCallStack => IdentifierSetMonad m => Identifier -> m ()
+add = withIdentifierSetM' add#
+
+-- | Add identifiers to an IdentifierSet
+addMultiple :: (HasCallStack, IdentifierSetMonad m, Foldable t) => t Identifier -> m ()
+addMultiple = withIdentifierSetM' addMultiple#
 
 -- | Add a string as is to an IdentifierSet. Should only be used for identifiers
 -- that should be spliced at verbatim in HDL, such as port names. It's sanitized
 -- version will still be added to the identifier set, to prevent freshly
 -- generated variables clashing with the raw one.
-addRaw :: IdentifierSetMonad m => Text -> m Identifier
+addRaw :: (HasCallStack, IdentifierSetMonad m) => Text -> m Identifier
 addRaw = withIdentifierSetM addRaw#
 
 -- | Make unique identifier based on given string
-make :: IdentifierSetMonad m => Text -> m Identifier
+make :: (HasCallStack, IdentifierSetMonad m) => Text -> m Identifier
 make = withIdentifierSetM make#
 
 -- | Make unique basic identifier based on given string
-makeBasic :: IdentifierSetMonad m => Text -> m Identifier
+makeBasic :: (HasCallStack, IdentifierSetMonad m) => Text -> m Identifier
 makeBasic = withIdentifierSetM makeBasic#
 
 -- | Make unique basic identifier based on given string. If given string can't
 -- be converted to a basic identifier (i.e., it would yield an empty string) the
 -- alternative name is used.
 makeBasicOr
-  :: IdentifierSetMonad m
+  :: (HasCallStack, IdentifierSetMonad m)
   => Text
   -- ^ Name hint
   -> Text
@@ -170,44 +198,44 @@ makeBasicOr hint altHint =
     (hint, altHint)
 
 -- | Make unique identifier. Uses 'makeBasic' if first argument is 'Basic'
-makeAs :: IdentifierSetMonad m => IdentifierType -> Text -> m Identifier
+makeAs :: (HasCallStack, IdentifierSetMonad m) => IdentifierType -> Text -> m Identifier
 makeAs Basic = makeBasic
 makeAs Extended = make
 
 -- | Given identifier "foo_1_2" return "foo_1_3". If "foo_1_3" is already a
 -- member of the given set, return "foo_1_4" instead, etc. Identifier returned
 -- is guaranteed to be unique.
-next :: IdentifierSetMonad m => Identifier -> m Identifier
+next :: (HasCallStack, IdentifierSetMonad m) => Identifier -> m Identifier
 next = withIdentifierSetM next#
 
 -- | Same as 'nextM', but returns N fresh identifiers
-nextN :: IdentifierSetMonad m => Int -> Identifier -> m [Identifier]
+nextN :: (HasCallStack, IdentifierSetMonad m) => Int -> Identifier -> m [Identifier]
 nextN n = withIdentifierSetM (nextN# n)
 
 -- | Given identifier "foo_1_2" return "foo_1_2_0". If "foo_1_2_0" is already a
 -- member of the given set, return "foo_1_2_1" instead, etc. Identifier returned
 -- is guaranteed to be unique.
-deepen :: IdentifierSetMonad m => Identifier -> m Identifier
+deepen :: (HasCallStack, IdentifierSetMonad m) => Identifier -> m Identifier
 deepen = withIdentifierSetM deepen#
 
 -- | Same as 'deepenM', but returns N fresh identifiers. For example, given
 -- "foo_23" is would return "foo_23_0", "foo_23_1", ...
-deepenN :: IdentifierSetMonad m => Int -> Identifier -> m [Identifier]
+deepenN :: (HasCallStack, IdentifierSetMonad m) => Int -> Identifier -> m [Identifier]
 deepenN n = withIdentifierSetM (deepenN# n)
 
 -- | Given identifier "foo_1_2" and a suffix "bar", return an identifier called
 -- "foo_bar". Identifier returned is guaranteed to be unique according to the
 -- rules of 'nextIdentifier'.
-suffix :: IdentifierSetMonad m => Identifier -> Text -> m Identifier
+suffix :: (HasCallStack, IdentifierSetMonad m) => Identifier -> Text -> m Identifier
 suffix id0 suffix_ = withIdentifierSetM (\is id1 -> suffix# is id1 suffix_) id0
 
 -- | Given identifier "foo_1_2" and a prefix "bar", return an identifier called
 -- "bar_foo". Identifier returned is guaranteed to be unique according to the
 -- rules of 'nextIdentifier'.
-prefix :: IdentifierSetMonad m => Identifier -> Text -> m Identifier
+prefix :: (HasCallStack, IdentifierSetMonad m) => Identifier -> Text -> m Identifier
 prefix id0 prefix_ = withIdentifierSetM (\is id1 -> prefix# is id1 prefix_) id0
 
 -- | Convert a Clash Core Id to an identifier. Makes sure returned identifier
 -- is unique.
-fromCoreId :: IdentifierSetMonad m => Id -> m Identifier
+fromCoreId :: (HasCallStack, IdentifierSetMonad m) => Id -> m Identifier
 fromCoreId = withIdentifierSetM fromCoreId#

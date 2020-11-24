@@ -8,7 +8,7 @@ module T1182A where
 import qualified Prelude as P
 
 import Clash.Prelude
-import Clash.Netlist.Types
+import qualified Clash.Netlist.Types as N
 import qualified Clash.Netlist.Id as Id
 import Clash.Annotations.TH
 
@@ -34,12 +34,12 @@ makeTopEntity 'topEntity
 testPath :: FilePath
 testPath = "tests/shouldwork/TopEntity/T1182A.hs"
 
-assertInputs :: Component -> IO ()
-assertInputs (Component _ [(clk,Clock _)] [(Wire,(ssan,Vector 8 Bool),Nothing)] ds)
+assertInputs :: N.HWType -> N.Component -> IO ()
+assertInputs expType (N.Component _ [(clk,N.Clock _)] [(N.Wire,(ssan,actType),Nothing)] ds)
   | Id.toText clk == T.pack "CLK"
   , Id.toText ssan == T.pack "SS_AN"
   = pure ()
-assertInputs c = error $ "Component mismatch: " P.++ show c
+assertInputs _ c = error $ "Component mismatch: " P.++ show c
 
 getComponent :: (a, b, c, d) -> d
 getComponent (_, _, _, x) = x
@@ -47,14 +47,14 @@ getComponent (_, _, _, x) = x
 mainVHDL :: IO ()
 mainVHDL = do
   netlist <- runToNetlistStage SVHDL id testPath
-  mapM_ (assertInputs . getComponent) netlist
+  mapM_ (assertInputs (N.BitVector 8) . getComponent) netlist
 
 mainVerilog :: IO ()
 mainVerilog = do
   netlist <- runToNetlistStage SVerilog id testPath
-  mapM_ (assertInputs . getComponent) netlist
+  mapM_ (assertInputs (N.Vector 8 N.Bool) . getComponent) netlist
 
 mainSystemVerilog :: IO ()
 mainSystemVerilog = do
   netlist <- runToNetlistStage SSystemVerilog id testPath
-  mapM_ (assertInputs . getComponent) netlist
+  mapM_ (assertInputs (N.BitVector 8) . getComponent) netlist
