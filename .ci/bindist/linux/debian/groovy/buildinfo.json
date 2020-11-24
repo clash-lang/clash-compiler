@@ -1,5 +1,5 @@
 {
-  "docker": "ubuntu:groovy",
+  "docker": "docker.pkg.github.com/clash-lang/clash-compiler/bindist-debian-groovy:2020-11-23",
   "build-dependencies": [
     "devscripts",
     "cabal-install",
@@ -9,6 +9,11 @@
     "equivs"
   ],
   "packages": [
+    {
+      "name": "concurrent-extra",
+      "src": {"type": "hackage", "version": "0.7.0.12"},
+      "cabal_debian_options": ["--disable-tests"]
+    },
     {
       "name": "ghc-tcplugins-extra",
       "src": {"type": "hackage"}
@@ -61,6 +66,20 @@
       "name": "clash-ghc",
       "src": {"type": "local", "dir": "../../../../../clash-ghc"},
       "cabal_debian_options": ["--cabal-flag", "dynamic"]
+    },
+    {
+      "name": "clash-testsuite",
+      "src": {"type": "local", "dir": "../../../../../testsuite"},
+      "cabal_debian_options": [
+        "--depends", "haskell-clash-testsuite-utils:iverilog",
+        "--depends", "haskell-clash-testsuite-utils:ghdl-llvm"
+      ],
+      "after_install": {
+        "cmd": ["clash-testsuite", "-p", "Calculator.Verilog"],
+        "env": {"USE_GLOBAL_CLASH": "1"},
+        "cwd": "../../../../..",
+        "comment": "Sanity check"
+      }
     }
   ]
 }

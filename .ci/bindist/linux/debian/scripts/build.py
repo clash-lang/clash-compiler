@@ -66,7 +66,7 @@ def local_get(name, unpack_to, dir):
     os.path.join(unpack_to, os.path.basename(dir))
   )
 
-def build_and_install(name, cabal_debian_options=()):
+def build_debs(name, cabal_debian_options=()):
   # Create debian/
   cmd = ["cabal-debian"]
   cmd += ["--native"]
@@ -84,8 +84,8 @@ def build_and_install(name, cabal_debian_options=()):
   # Build package
   run(["dpkg-buildpackage"])
 
-  with cd(".."):
-    apt_install("./" + p for p in os.listdir(".") if p.endswith(".deb"))
+def install_debs():
+  apt_install("./" + p for p in os.listdir(".") if p.endswith(".deb"))
 
 def main():
   # Install helpers
@@ -97,22 +97,43 @@ def main():
   for pkg in buildinfo.get("packages", []):
     unpack_dir = os.path.join(BUILD_DIR, pkg["name"])
 
-    src = pkg["src"]
-    src_type = src["type"]
-    del src["type"]
-
-    if src_type == "hackage":
-      cabal_get(pkg["name"], unpack_dir, **src)
-    elif src_type == "local":
-      local_get(pkg["name"], unpack_dir, **src)
+    # Don't do work if Debian packages are already built. See comment in
+    # if __name__ ==... section at the bottom of this file.
+    if os.path.exists(unpack_dir):
+      debs = [p for p in os.listdir(unpack_dir) if p.endswith(".deb")]
     else:
-      raise Exception("Unrecognized src type: {}".format(src_type))
+      debs = []
 
-    [pkg_dir] = os.listdir(unpack_dir)
-    pkg_dir = os.path.join(unpack_dir, pkg_dir)
-    with cd(pkg_dir):
-      build_and_install(pkg, pkg.get("cabal_debian_options", []))
-    shutil.rmtree(pkg_dir)
+    if not debs:
+      shutil.rmtree(unpack_dir, ignore_errors=True)
+
+      src = pkg["src"]
+      src_type = src["type"]
+      del src["type"]
+
+      if src_type == "hackage":
+        cabal_get(pkg["name"], unpack_dir, **src)
+      elif src_type == "local":
+        local_get(pkg["name"], unpack_dir, **src)
+      else:
+        raise Exception("Unrecognized src type: {}".format(src_type))
+
+      [pkg_dir] = os.listdir(unpack_dir)
+      pkg_dir = os.path.join(unpack_dir, pkg_dir)
+      with cd(pkg_dir):
+        build_debs(pkg, pkg.get("cabal_debian_options", []))
+      shutil.rmtree(pkg_dir)
+
+    with cd(unpack_dir):
+      install_debs()
+
+    # Post install script
+    after_install = pkg.get("after_install")
+    if after_install is not None:
+      wd = after_install.get("cwd", ".")
+      with cd(os.path.abspath(os.path.join(BUILDINFO_DIR, wd))):
+        env = after_install.get("env", {})
+        run(after_install["cmd"], env={**os.environ, **env})
 
   # Build metapackages
   with cd(METAPACKAGES_DIR):
@@ -126,8 +147,8 @@ def main():
   with cd(BUILD_DIR):
     run(["bash", "-c", "dpkg-scanpackages . > Packages"])
 
-
 if __name__ == '__main__':
+  # Commnet next line to enable caching (probably brittle)
   shutil.rmtree(BUILD_DIR, ignore_errors=True)
-  os.makedirs(BUILD_DIR)
+  os.makedirs(BUILD_DIR, exist_ok=True)
   main()
