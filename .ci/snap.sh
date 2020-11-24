@@ -45,7 +45,13 @@ if [[ ${RELEASE_CHANNEL} == "stable" || ${RELEASE_CHANNEL} == "beta" ]]; then
 fi
 
 set +x
-echo "$SNAPCRAFT_LOGIN_FILE" | base64 --decode --ignore-garbage > snapcraft.login
-snapcraft login --with snapcraft.login
-./go.sh
-snapcraft push ./*.snap --release ${RELEASE_CHANNEL}
+
+if [[ $1 == "build" ]]; then
+  ./go.sh
+fi
+
+if [[ $1 == "publish" ]]; then
+  echo "$SNAPCRAFT_LOGIN_FILE" | base64 --decode --ignore-garbage > snapcraft.login
+  snapcraft login --with snapcraft.login
+  snapcraft push ./*.snap --release ${RELEASE_CHANNEL}
+fi
