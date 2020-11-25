@@ -1,5 +1,6 @@
 hackage-sdist:
   extends: .tests
+  stage: pack
   interruptible: false
   variables:
     GHC_VERSION: 8.10.2
@@ -50,7 +51,7 @@ hackage-sdist:
 debian-bindist:
   extends: .run-nightly
   image: docker.pkg.github.com/clash-lang/clash-compiler/bindist-debian-focal:2020-11-20
-  stage: build
+  stage: pack
   artifacts:
     when: always
     paths:
@@ -63,7 +64,7 @@ debian-bindist:
 debian-bindist-test:
   extends: .run-nightly
   image: ubuntu:focal
-  stage: test
+  stage: pack-test
   script:
     - apt-get update
     - cd .ci/bindist/linux/debian/focal/build && apt-get -y install ./*/*.deb && cd -

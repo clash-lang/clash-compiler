@@ -4,8 +4,11 @@ include:
   - '/.ci/gitlab/tests.yml'
 
 stages:
-  - build
+  # TODO: separate 'test' into 'build' and 'test'.
+  # - build
   - test
+  - pack
+  - pack-test
   - publish
 
 # Haddock, doctests, unittests, clash-dev testing. These are single threaded
