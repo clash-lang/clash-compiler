@@ -41,15 +41,21 @@ hackage-sdist:
     max: 2
 
 # Run every night, when explicitly triggered, or when tagged (release)
-.run-nightly:
+.run-on-nightly-and-changes:
   rules:
     - if: $CI_PIPELINE_SOURCE == "schedule"
     - if: $CI_PIPELINE_SOURCE == "trigger"
     - if: '$CI_COMMIT_TAG != null' # tags
+    - if: '$CI_COMMIT_TAG == null'
+      changes:
+        - .gitlab.yml
+        - .ci/**/*
+        - .ci/*
+        - ./*/*.cabal
 
 # Create Debian packages.
 debian-bindist:
-  extends: .run-nightly
+  extends: .run-on-nightly-and-changes
   image: docker.pkg.github.com/clash-lang/clash-compiler/bindist-debian-focal:2020-11-20
   stage: pack
   artifacts:
@@ -62,7 +68,7 @@ debian-bindist:
 
 # Test debian distribution
 debian-bindist-test:
-  extends: .run-nightly
+  extends: .run-on-nightly-and-changes
   image: ubuntu:focal
   stage: pack-test
   script:
