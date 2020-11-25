@@ -172,7 +172,7 @@ Library
                       ordered-containers      >= 0.2      && < 0.3,
                       parsers                 >= 0.12.8   && < 1.0,
                       prettyprinter           >= 1.2.0.1  && < 2.0,
-                      pretty-show             >= 1.10     && < 2.0,
+                      pretty-show             >= 1.9      && < 2.0,
                       primitive               >= 0.5.0.1  && < 1.0,
                       process                 >= 1.1.0.2  && < 1.7,
                       reducers                >= 3.12.2   && < 4.0,
