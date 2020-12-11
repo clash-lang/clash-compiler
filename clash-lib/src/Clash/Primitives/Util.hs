@@ -2,8 +2,9 @@
   Copyright  :  (C) 2012-2016, University of Twente,
                     2017     , Myrtle Software Ltd
                     2018     , Google Inc.
+                    2021     , QBayLogic B.V.
   License    :  BSD2 (see the file LICENSE)
-  Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
+  Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 
   Utility functions to generate Primitives
 -}
@@ -195,7 +196,7 @@ constantArgs nm BlackBox {template = templ@(BBTemplate _), resultInits = tRIM} =
   getConstant _            = Nothing
 
   -- Ensure that if the 'Integer' arguments are constants, that they are reduced
-  -- to literals, so that the buildin rules can properly fire.
+  -- to literals, so that the builtin rules can properly fire.
   --
   -- Only in the the case that 'Integer' arguments are truly variables should
   -- the blackbox rules fire.
@@ -205,8 +206,13 @@ constantArgs nm BlackBox {template = templ@(BBTemplate _), resultInits = tRIM} =
     | nm == "Clash.Sized.Internal.Index.fromInteger#"      = [1]
     | nm == "Clash.Sized.Internal.Signed.fromInteger#"     = [1]
     | nm == "Clash.Sized.Internal.Unsigned.fromInteger#"   = [1]
+
+    | nm == "Clash.Sized.Vector.replace_int"               = [1,2]
+    | otherwise = []
+constantArgs nm (BlackBoxHaskell{}) = Set.fromList fromIntForce
+ where
     -- There is a special code-path for `index_int` in the Verilog backend in
-    -- case the index is a variable. But this code path only works when the
+    -- case the index is a constant. But this code path only works when the
     -- vector is (a projection of) a variable. By forcing the arguments of
     -- index_int we can be sure that arguments are either:
     --
@@ -216,8 +222,8 @@ constantArgs nm BlackBox {template = templ@(BBTemplate _), resultInits = tRIM} =
     --
     -- As all other cases would be reduced by the evaluator, and even expensive
     -- primitives under index_int are fully unrolled.
-    | nm == "Clash.Sized.Vector.index_int"                 = [1,2]
-    | nm == "Clash.Sized.Vector.replace_int"               = [1,2]
+  fromIntForce
+    | nm == "Clash.Sized.Vector.index_int"                 = [2]
     | otherwise = []
 constantArgs _ _ = Set.empty
 
