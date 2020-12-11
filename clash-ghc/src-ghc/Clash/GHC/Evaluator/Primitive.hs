@@ -3457,7 +3457,7 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
                         , Left (Case splitCall n1BVTy [bvAlt])
                         ])
          _ -> Nothing
-  _ -> Nothing
+  nm -> traceIf True ("No reduction rule for:\n" <> show nm <> " :: " <> showPpr (primType pInfo)) Nothing
   where
     ty = primType pInfo
 

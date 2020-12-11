@@ -124,6 +124,9 @@ import           Clash.Primitives.Types
 import qualified Clash.Unique                as C
 import           Clash.Util
 
+import           Clash.Debug
+import qualified Clash.Core.Pretty as C
+
 instance Hashable Name where
   hashWithSalt s = hashWithSalt s . getKey . nameUnique
 
@@ -514,7 +517,8 @@ coreToTerm primMap unlocs = term
               return $ C.Prim (C.PrimInfo xNameS xType C.WorkVariable C.SingleResult)
             Nothing
               | x `elem` unlocs
-              -> return (C.Prim (C.PrimInfo xNameS xType C.WorkVariable C.SingleResult))
+              -> traceIf True ("No unfolding/unknown primitive:\n" <> Text.unpack xNameS <> " :: " <> C.showPpr xType) $
+                 return (C.Prim (C.PrimInfo xNameS xType C.WorkVariable C.SingleResult))
               | otherwise
               -> C.Var <$> coreToId x
 
