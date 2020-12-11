@@ -252,7 +252,7 @@ indexIntVerilog _isD _primName args _ty = return ((meta,) <$> bb)
 
   bb = case args of
     [_nTy,_aTy,_kn,_v,Left ix] | isLiteral ix ->
-      Right (BBFunction "Clash.Primitives.Sized.Vector" 0 indexIntVerilogTF)
+      Right (BBFunction "Clash.Primitives.Sized.Vector.indexIntVerilogTF" 0 indexIntVerilogTF)
     _ ->
       BBTemplate <$> case runParse (pack (I.unindent bbText)) of
         Success t -> Right t
