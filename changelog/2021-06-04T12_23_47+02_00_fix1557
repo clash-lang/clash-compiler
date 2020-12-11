@@ -1,0 +1,1 @@
+FIXED: Clash incurs unnecessary compile-time complexity while compiling Vector indexing operator [#1557](https://github.com/clash-lang/clash-compiler/issues/1557)
