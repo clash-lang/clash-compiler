@@ -1131,13 +1131,21 @@ mkFunInput resId e =
       return (Right ((nm,decls ++ [assn]),Wire))
 
     go _ _ (Case scrut ty alts@(_:_:_)) = do
+      tcm <- Lens.use tcCache
+      let scrutTy = termType tcm scrut
+      scrutHTy <- unsafeCoreTypeToHWTypeM' $(curLoc) scrutTy
+      ite <- Lens.use backEndITE
+      let wr = case iteAlts scrutHTy alts of
+                 Just _ | ite -> Wire
+                 _ -> Reg
+
       resNm <- Id.make "result"
       -- It's safe to use 'mkUnsafeSystemName' here: only the name, not the
       -- unique, will be used
       let resId'  = NetlistId resNm ty
       selectionDecls <- mkSelection Concurrent resId' scrut ty alts []
       resTy <- unsafeCoreTypeToHWTypeM' $(curLoc) ty
-      let assn = [ NetDecl Nothing resNm resTy
+      let assn = [ NetDecl' Nothing wr resNm (Right resTy) Nothing
                  , Assignment (Id.unsafeMake "~RESULT") (Identifier resNm Nothing) ]
       nm <- Id.makeBasic "selection"
       return (Right ((nm,assn++selectionDecls),Wire))
