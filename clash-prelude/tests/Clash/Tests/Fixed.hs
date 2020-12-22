@@ -11,7 +11,7 @@ import Test.Tasty
 import Test.Tasty.Hedgehog
 
 import Clash.Class.Num
-import Clash.Sized.Fixed (SFixed, UFixed)
+import Clash.Sized.Fixed (Fixed(..), NumFixedC, SFixed, UFixed)
 
 import GHC.TypeLits (KnownNat)
 
@@ -108,58 +108,76 @@ testSaturationLaws
   -> TestTree
 testSaturationLaws typeName genA = testGroup typeName (saturatingNumLaws genA)
 
--- | Generates a bounded fractional with a bias towards extreme values:
+-- Generates a random Fixed number in the given [inclusive,inclusive] range.
+--
+-- When the generator tries to shrink, it will shrink towards the origin of the
+-- specified Range.
+genFixed
+  :: ( MonadGen m
+     , NumFixedC rep int frac
+     , f ~ Fixed rep int frac
+     )
+  => Range f
+  -> m f
+genFixed range = fmap Fixed $ Gen.integral $ fmap unFixed range
+
+-- Note that the ranges defined in Hedgehog.Range for Fractional do not interact
+-- correctly with a datatype that is also Bounded, hence these variants.
+rangeLinearFixed
+  :: ( NumFixedC rep int frac
+     , f ~ Fixed rep int frac
+     )
+  => f
+  -> f
+  -> Range f
+rangeLinearFixed x y = fmap Fixed $ Range.linear (unFixed x) (unFixed y)
+
+rangeLinearFixedBounded
+  :: NumFixedC rep int frac
+  => Range (Fixed rep int frac)
+rangeLinearFixedBounded = fmap Fixed Range.linearBounded
+
+-- | Generates a Fixed number with a bias towards extreme values:
 --
 --     10%: uniform [minBound, minBound + 1]
 --     10%: uniform [maxBound - 1, maxBound]
---      5%: 0.0
+--      5%: 0
 --     75%: uniform [minBound, maxBound]
---
-genBoundedFractional :: forall a. (Real a, Fractional a, Bounded a) => Gen a
-genBoundedFractional = Gen.frequency
-  [ (10,   fmap (fromRational . toRational)
-         $ Gen.double
-         $ fmap fromRational
-         $ Range.linearFrac
-             (toRational (minBound @a))
-             (toRational (minBound @a) + 1))
-  , (10,   fmap (fromRational . toRational)
-         $ Gen.double
-         $ fmap fromRational
-         $ Range.linearFrac
-             (toRational (maxBound @a) - 1)
-             (toRational (maxBound @a)))
-  , (5,  pure 0.0)
-  , (75,   fmap (fromRational . toRational)
-         $ Gen.double
-         $ fmap fromRational
-         $ Range.linearFrac
-             (toRational (minBound @a))
-             (toRational (maxBound @a))) ]
+genBoundBiased
+  :: forall f rep int frac
+   . ( NumFixedC rep int frac
+     , f ~ Fixed rep int frac
+     )
+   => Gen f
+genBoundBiased = Gen.frequency
+  [ (10, genFixed $ rangeLinearFixed (minBound + 1) minBound)
+  , (10, genFixed $ rangeLinearFixed (maxBound - 1) (maxBound))
+  , ( 5, pure 0)
+  , (75, genFixed $ rangeLinearFixedBounded)]
 
-genSFixed :: forall a b. (KnownNat a, KnownNat b) => Gen (SFixed a b)
-genSFixed = genBoundedFractional
+genBoundBiasedS :: forall a b. (KnownNat a, KnownNat b) => Gen (SFixed a b)
+genBoundBiasedS = genBoundBiased
 
-genUFixed :: forall a b. (KnownNat a, KnownNat b) => Gen (UFixed a b)
-genUFixed = genBoundedFractional
+genBoundBiasedU :: forall a b. (KnownNat a, KnownNat b) => Gen (UFixed a b)
+genBoundBiasedU = genBoundBiased
 
 tests :: TestTree
 tests = testGroup "SaturatingNum"
-  [ testSaturationLaws "SFixed 0 0" (genSFixed @0 @0)
-  , testSaturationLaws "SFixed 0 1" (genSFixed @0 @1)
-  , testSaturationLaws "SFixed 1 0" (genSFixed @1 @0)
-  , testSaturationLaws "SFixed 1 1" (genSFixed @1 @1)
-  , testSaturationLaws "SFixed 1 2" (genSFixed @1 @2)
-  , testSaturationLaws "SFixed 2 1" (genSFixed @2 @1)
-  , testSaturationLaws "SFixed 2 2" (genSFixed @2 @2)
-  , testSaturationLaws "SFixed 128 128" (genSFixed @128 @128)
+  [ testSaturationLaws "SFixed 0 0" (genBoundBiasedS @0 @0)
+  , testSaturationLaws "SFixed 0 1" (genBoundBiasedS @0 @1)
+  , testSaturationLaws "SFixed 1 0" (genBoundBiasedS @1 @0)
+  , testSaturationLaws "SFixed 1 1" (genBoundBiasedS @1 @1)
+  , testSaturationLaws "SFixed 1 2" (genBoundBiasedS @1 @2)
+  , testSaturationLaws "SFixed 2 1" (genBoundBiasedS @2 @1)
+  , testSaturationLaws "SFixed 2 2" (genBoundBiasedS @2 @2)
+  , testSaturationLaws "SFixed 128 128" (genBoundBiasedS @128 @128)
 
-  , testSaturationLaws "UFixed 0 0" (genUFixed @0 @0)
-  , testSaturationLaws "UFixed 0 1" (genUFixed @0 @1)
-  , testSaturationLaws "UFixed 1 0" (genUFixed @1 @0)
-  , testSaturationLaws "UFixed 1 1" (genUFixed @1 @1)
-  , testSaturationLaws "UFixed 1 2" (genUFixed @1 @2)
-  , testSaturationLaws "UFixed 2 1" (genUFixed @2 @1)
-  , testSaturationLaws "UFixed 2 2" (genUFixed @2 @2)
-  , testSaturationLaws "UFixed 128 128" (genUFixed @128 @128)
+  , testSaturationLaws "UFixed 0 0" (genBoundBiasedU @0 @0)
+  , testSaturationLaws "UFixed 0 1" (genBoundBiasedU @0 @1)
+  , testSaturationLaws "UFixed 1 0" (genBoundBiasedU @1 @0)
+  , testSaturationLaws "UFixed 1 1" (genBoundBiasedU @1 @1)
+  , testSaturationLaws "UFixed 1 2" (genBoundBiasedU @1 @2)
+  , testSaturationLaws "UFixed 2 1" (genBoundBiasedU @2 @1)
+  , testSaturationLaws "UFixed 2 2" (genBoundBiasedU @2 @2)
+  , testSaturationLaws "UFixed 128 128" (genBoundBiasedU @128 @128)
   ]
