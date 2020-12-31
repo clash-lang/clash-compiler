@@ -116,7 +116,7 @@ constantPropagation =
     -- non-representable binder is inlined once, we can get rid of the recursive
     -- aspect using the case-of-known-constructor
     inlineNR :: NormRewrite
-    inlineNR = bottomupR (apply "inlineNonRep" inlineNonRep)
+    inlineNR = topdownR (apply "inlineNonRep" inlineNonRep !-> repeatR (topdownR (apply "deadcode" deadCode >-> applyMany transPropagateAndInline)))
 
     specTransformations :: [(String,NormRewrite)]
     specTransformations =
