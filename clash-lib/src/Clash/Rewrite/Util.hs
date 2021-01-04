@@ -63,7 +63,11 @@ import qualified Data.ByteString             as BS
 import qualified Data.ByteString.Lazy        as BL
 #endif
 
+#if MIN_VERSION_ghc(9,0,0)
+import           GHC.Types.Basic             (InlineSpec (..))
+#else
 import           BasicTypes                  (InlineSpec (..))
+#endif
 
 import           Clash.Core.DataCon          (dcExtTyVars)
 

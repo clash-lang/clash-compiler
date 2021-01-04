@@ -321,7 +321,6 @@ Library
                       containers                >= 0.4.0   && < 0.7,
                       data-binary-ieee754       >= 0.4.4   && < 0.6,
                       data-default-class        >= 0.1.2   && < 0.2,
-                      integer-gmp               >= 0.5.1.0 && < 1.1,
                       deepseq                   >= 1.4.1.0 && < 1.5,
                       ghc-prim                  >= 0.5.1.0 && < 0.7,
                       ghc-typelits-extra        >= 0.4     && < 0.5,
@@ -346,6 +345,11 @@ Library
                       type-errors               >= 0.2.0.0 && < 0.3,
                       uniplate                  >= 1.6.12  && < 1.7,
                       vector                    >= 0.11    && < 1.0
+
+  if impl(ghc >= 9.0.0)
+    Build-Depends:    ghc-bignum                >= 1.0      && < 1.1
+  else
+    Build-Depends:    integer-gmp               >= 1.0.1.0  && < 2.0
 
 test-suite doctests
   type:             exitcode-stdio-1.0

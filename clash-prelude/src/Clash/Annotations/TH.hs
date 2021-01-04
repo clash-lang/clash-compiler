@@ -488,19 +488,30 @@ buildTopEntity topName (name, ty) = do
           Just name' -> name'          -- user specified name
           Nothing    -> nameBase name  -- auto-generated from Haskell name
 
-    [|| Synthesize
-        { t_name   = outName
-        , t_inputs = ins
-        , t_output = out
-        } ||]
+#if MIN_VERSION_template_haskell(2,17,0)
+    (examineCode
+#else
+    (
+#endif
+                  [|| Synthesize
+                     { t_name   = outName
+                     , t_inputs = ins
+                     , t_output = out
+                     } ||])
 
 -- | Return a typed 'Maybe TopEntity' expression given a 'Name'.
 -- This will return an 'TExp' of 'Nothing' if 'TopEntity' generation failed.
 maybeBuildTopEntity :: Maybe String -> Name -> Q (TExp (Maybe TopEntity))
 maybeBuildTopEntity topName name = do
+#if MIN_VERSION_template_haskell(2,17,0)
+  recover (examineCode [|| Nothing ||]) $ do
+    let expr = liftCode (getNameBinding name >>= buildTopEntity topName)
+    examineCode [|| Just ($$expr) ||]
+#else
   recover ([|| Nothing ||]) $ do
     let expr = getNameBinding name >>= buildTopEntity topName
     [|| Just ($$expr) ||]
+#endif
 
 -- | Turn the 'Name' of a value to a @('Name', 'Type')@
 getNameBinding :: Name -> Q (Name, Type)

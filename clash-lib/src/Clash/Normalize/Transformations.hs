@@ -60,6 +60,7 @@ module Clash.Normalize.Transformations
   , separateLambda
   , xOptimize
   , setupMultiResultPrim
+  , inlineSimIO
   )
 where
 
@@ -83,10 +84,18 @@ import qualified Data.Maybe                  as Maybe
 import qualified Data.Monoid                 as Monoid
 import qualified Data.Primitive.ByteArray    as BA
 import qualified Data.Text                   as Text
+#if MIN_VERSION_base(4,15,0)
+import           GHC.Num.Integer             (Integer (..))
+#else
 import           GHC.Integer.GMP.Internals   (Integer (..), BigNat (..))
+#endif
 import           TextShow                    (TextShow(showt))
 
+#if MIN_VERSION_ghc(9,0,0)
+import           GHC.Types.Basic             (InlineSpec (..))
+#else
 import           BasicTypes                  (InlineSpec (..))
+#endif
 
 import           Clash.Annotations.Primitive (extractPrim)
 import           Clash.Core.DataCon          (DataCon (..))
@@ -706,7 +715,11 @@ matchLiteralContructor c (IntegerLiteral l) alts = go (reverse alts)
       in changed e'
     | dcTag dc == 2
     , l >= 2^(63::Int)
+#if MIN_VERSION_base(4,15,0)
+    = let !(IP ba) = l
+#else
     = let !(Jp# !(BN# ba)) = l
+#endif
           ba'       = BA.ByteArray ba
           fvs       = Lens.foldMapOf freeLocalIds unitVarSet e
           (binds,_) = List.partition ((`elemVarSet` fvs) . fst)
@@ -717,7 +730,11 @@ matchLiteralContructor c (IntegerLiteral l) alts = go (reverse alts)
       in changed e'
     | dcTag dc == 3
     , l < ((-2)^(63::Int))
+#if MIN_VERSION_base(4,15,0)
+    = let !(IN ba) = l
+#else
     = let !(Jn# !(BN# ba)) = l
+#endif
           ba'       = BA.ByteArray ba
           fvs       = Lens.foldMapOf freeLocalIds unitVarSet e
           (binds,_) = List.partition ((`elemVarSet` fvs) . fst)
@@ -750,7 +767,11 @@ matchLiteralContructor c (NaturalLiteral l) alts = go (reverse alts)
       in changed e'
     | dcTag dc == 2
     , l >= 2^(64::Int)
+#if MIN_VERSION_base(4,15,0)
+    = let !(IP ba) = l
+#else
     = let !(Jp# !(BN# ba)) = l
+#endif
           ba'       = BA.ByteArray ba
           fvs       = Lens.foldMapOf freeLocalIds unitVarSet e
           (binds,_) = List.partition ((`elemVarSet` fvs) . fst)
@@ -3089,3 +3110,12 @@ setupMultiResultPrim' tcm primInfo@PrimInfo{primType} =
     Letrec
       ((resId,multiPrimBind):multiPrimSelectBinds)
       (mkTmApps (mkTyApps (Data tupTc) resTypes) (map Var resIds))
+
+-- | Inline anything of type `SimIO`: IO actions cannot be shared
+inlineSimIO :: HasCallStack => NormRewrite
+inlineSimIO = inlineBinders test
+  where
+    test _ (i,_) = case tyView (varType i) of
+      TyConApp tc _ -> return $! nameOcc tc == "Clash.Explicit.SimIO.SimIO"
+      _ -> return False
+{-# SCC inlineSimIO #-}

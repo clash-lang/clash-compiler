@@ -159,9 +159,15 @@ integerLog2Ceil n =
 bitsNeeded :: Integer -> Int
 bitsNeeded = integerLog2Ceil
 
+#if MIN_VERSION_template_haskell(2,17,0)
+tyVarBndrName :: TyVarBndr f -> Name
+tyVarBndrName (PlainTV n _f) = n
+tyVarBndrName (KindedTV n _f _k) = n
+#else
 tyVarBndrName :: TyVarBndr -> Name
 tyVarBndrName (PlainTV n) = n
 tyVarBndrName (KindedTV n _k) = n
+#endif
 
 -- | Replace Vars types given in mapping
 resolve :: NameMap -> Type -> Type

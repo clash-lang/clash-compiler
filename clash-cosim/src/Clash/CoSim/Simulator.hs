@@ -419,5 +419,5 @@ class CoSimType t where
     fromSignalStream :: SignalStream -> t
 
 instance (ClashType a, CS.KnownDomain dom) => CoSimType (CP.Signal dom a) where
-    toSignalStream   = map (wordPack . CP.pack) . CP.sample
+    toSignalStream   = \s -> map (wordPack . CP.pack) (CP.sample s)
     fromSignalStream = CP.fromList . map (CP.unpack . wordUnpack)

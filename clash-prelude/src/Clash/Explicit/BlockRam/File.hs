@@ -152,7 +152,7 @@ blockRamFilePow2
   -> Signal dom (BitVector m)
   -- ^ Value of the @blockRAM@ at address @r@ from the previous clock cycle
 blockRamFilePow2 = \clk en file rd wrM -> withFrozenCallStack
-  (blockRamFile clk en (pow2SNat (SNat @ n)) file rd wrM)
+  (blockRamFile clk en (pow2SNat (SNat @n)) file rd wrM)
 {-# INLINE blockRamFilePow2 #-}
 
 -- | Create a blockRAM with space for @n@ elements

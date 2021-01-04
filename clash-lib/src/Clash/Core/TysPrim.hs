@@ -32,8 +32,13 @@ where
 
 import qualified Data.List            as List
 
+#if MIN_VERSION_ghc(9,0,0)
+import           GHC.Builtin.Names
+import           GHC.Types.Unique     (getKey)
+#else
 import           PrelNames
 import           Unique               (getKey)
+#endif
 
 import           Clash.Core.Name
 import           Clash.Core.TyCon
@@ -66,8 +71,13 @@ intPrimTyConName, integerPrimTyConName, charPrimTyConName, stringPrimTyConName,
   naturalPrimTyConName, byteArrayPrimTyConName :: TyConName
 intPrimTyConName     = mkUnsafeSystemName "GHC.Prim.Int#"
                                 (getKey intPrimTyConKey)
+#if MIN_VERSION_base(4,15,0)
+integerPrimTyConName = mkUnsafeSystemName "GHC.Num.Integer.Integer"
+                                (getKey integerTyConKey)
+#else
 integerPrimTyConName = mkUnsafeSystemName "GHC.Integer.Type.Integer"
                                 (getKey integerTyConKey)
+#endif
 stringPrimTyConName  = mkUnsafeSystemName "GHC.Prim.Addr#" (getKey addrPrimTyConKey)
 charPrimTyConName    = mkUnsafeSystemName "GHC.Prim.Char#"
                                 (getKey charPrimTyConKey)
@@ -82,8 +92,13 @@ floatPrimTyConName   = mkUnsafeSystemName "GHC.Prim.Float#"
                                 (getKey floatPrimTyConKey)
 doublePrimTyConName  = mkUnsafeSystemName "GHC.Prim.Double#"
                                 (getKey doublePrimTyConKey)
+#if MIN_VERSION_base(4,15,0)
+naturalPrimTyConName = mkUnsafeSystemName "GHC.Num.Natural.Natural"
+                                (getKey naturalTyConKey)
+#else
 naturalPrimTyConName = mkUnsafeSystemName "GHC.Natural.Natural"
                                 (getKey naturalTyConKey)
+#endif
 byteArrayPrimTyConName = mkUnsafeSystemName "GHC.Prim.ByteArray#"
                           (getKey byteArrayPrimTyConKey)
 

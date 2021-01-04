@@ -133,7 +133,7 @@ romFilePow2
   -- ^ Read address @rd@
   -> Signal dom (BitVector m)
   -- ^ The value of the ROM at address @rd@ from the previous clock cycle
-romFilePow2 = \clk en -> romFile clk en (pow2SNat (SNat @ n))
+romFilePow2 = \clk en -> romFile clk en (pow2SNat (SNat @n))
 {-# INLINE romFilePow2 #-}
 
 -- | A ROM with a synchronous read port, with space for @n@ elements

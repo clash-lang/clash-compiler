@@ -1,0 +1,28 @@
+[
+  {
+    "BlackBox": {
+      "name": "GHC.Num.Natural.naturalMul",
+      "kind": "Expression",
+      "type": "naturalMul :: Natural -> Natural -> Natural",
+      "template": "~ARG[0] * ~ARG[1]",
+      "warning": "GHC.Num.Natural.naturalMul: Naturals are dynamically sized in simulation, but fixed-length after synthesis. Use carefully."
+    }
+  },
+  {
+    "BlackBox": {
+      "name": "GHC.Num.Natural.naturalFromWord#",
+      "workInfo" : "Never",
+      "kind": "Declaration",
+      "type": "naturalFromWord# :: Word# -> Natural",
+      "template": "assign ~RESULT = $unsigned(~ARG[0]);",
+      "warning": "GHC.Num.Natural.naturalFromWord#: Naturals are dynamically sized in simulation, but fixed-length after synthesis. Use carefully."
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "GHC.Num.Natural.naturalRem"
+    , "kind"      : "Expression"
+    , "type"      : "naturalRem :: Natural -> Natural -> Natural"
+    , "template"  : "~ARG[0] % ~ARG[1]"
+    }
+  }
+]

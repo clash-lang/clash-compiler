@@ -220,7 +220,7 @@ asyncRomFilePow2
   -- ^ Read address @rd@
   -> BitVector m
   -- ^ The value of the ROM at address @rd@
-asyncRomFilePow2 = asyncRomFile (pow2SNat (SNat @ n))
+asyncRomFilePow2 = asyncRomFile (pow2SNat (SNat @n))
 {-# INLINE asyncRomFilePow2 #-}
 
 -- | asyncROMFile primitive

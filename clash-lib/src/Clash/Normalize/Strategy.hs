@@ -38,7 +38,7 @@ normalization =
 #endif
   >-!-> cse >-!-> cleanup >->
   xOptim >-> rmDeadcode >->
-  cleanup >-> recLetRec >-> splitArgs
+  cleanup >-> bindSimIO >-> recLetRec >-> splitArgs
   where
     multPrim   = topdownR (apply "setupMultiResultPrim" setupMultiResultPrim)
     anf        = topdownR (apply "nonRepANF" nonRepANF) >-> apply "ANF" makeANF >-> topdownR (apply "caseCon" caseCon)
@@ -61,6 +61,7 @@ normalization =
                  >-> rmDeadcode >-> letTL
     splitArgs  = topdownR (apply "separateArguments" separateArguments) !->
                  topdownR (apply "caseCon" caseCon)
+    bindSimIO  = topdownR (apply "bindSimIO" inlineSimIO)
 
 
 constantPropagation :: NormRewrite

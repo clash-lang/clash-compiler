@@ -50,7 +50,11 @@ import GHC.Stack                      (HasCallStack, callStack, prettyCallStack)
 import Type.Reflection                (tyConPackage, typeRepTyCon, typeOf)
 import qualified Language.Haskell.TH  as TH
 
+#if MIN_VERSION_ghc(9,0,0)
+import GHC.Types.SrcLoc               (SrcSpan, noSrcSpan)
+#else
 import SrcLoc                         (SrcSpan, noSrcSpan)
+#endif
 
 import Clash.Debug
 import Clash.Unique

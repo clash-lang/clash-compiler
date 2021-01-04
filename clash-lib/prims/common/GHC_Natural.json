@@ -3,7 +3,8 @@
     "Primitive": {
       "name": "GHC.Natural.NatS#",
       "workInfo" : "Never",
-      "primType": "Constructor"
+      "primType": "Constructor",
+      "comment": "Needed to make the evaluator handle this constructor strictly"
     }
   },
   {

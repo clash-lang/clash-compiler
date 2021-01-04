@@ -401,71 +401,135 @@ singleton :: a -> Vec 1 a
 singleton = (`Cons` Nil)
 
 {-# NOINLINE head #-}
--- | Extract the first element of a vector
---
--- >>> head (1:>2:>3:>Nil)
--- 1
--- >>> head Nil
--- <BLANKLINE>
--- <interactive>:...
---     • Couldn't match type ‘1’ with ‘0’
---       Expected type: Vec (0 + 1) a
---         Actual type: Vec 0 a
---     • In the first argument of ‘head’, namely ‘Nil’
---       In the expression: head Nil
---       In an equation for ‘it’: it = head Nil
+{- | Extract the first element of a vector
+
+>>> head (1:>2:>3:>Nil)
+1
+
+#if __GLASGOW_HASKELL__ >= 900
+>>> head Nil
+<BLANKLINE>
+<interactive>:...
+    • Couldn't match type ‘1’ with ‘0’
+      Expected: Vec (0 + 1) a
+        Actual: Vec 0 a
+    • In the first argument of ‘head’, namely ‘Nil’
+      In the expression: head Nil
+      In an equation for ‘it’: it = head Nil
+
+#else
+>>> head Nil
+<BLANKLINE>
+<interactive>:...
+    • Couldn't match type ‘1’ with ‘0’
+      Expected type: Vec (0 + 1) a
+        Actual type: Vec 0 a
+    • In the first argument of ‘head’, namely ‘Nil’
+      In the expression: head Nil
+      In an equation for ‘it’: it = head Nil
+
+#endif
+-}
 head :: Vec (n + 1) a -> a
 head (x `Cons` _) = x
 
 {-# NOINLINE tail #-}
--- | Extract the elements after the head of a vector
---
--- >>> tail (1:>2:>3:>Nil)
--- <2,3>
--- >>> tail Nil
--- <BLANKLINE>
--- <interactive>:...
---     • Couldn't match type ‘1’ with ‘0’
---       Expected type: Vec (0 + 1) a
---         Actual type: Vec 0 a
---     • In the first argument of ‘tail’, namely ‘Nil’
---       In the expression: tail Nil
---       In an equation for ‘it’: it = tail Nil
+{- | Extract the elements after the head of a vector
+
+>>> tail (1:>2:>3:>Nil)
+<2,3>
+
+#if __GLASGOW_HASKELL__ >= 900
+>>> tail Nil
+<BLANKLINE>
+<interactive>:...
+    • Couldn't match type ‘1’ with ‘0’
+      Expected: Vec (0 + 1) a
+        Actual: Vec 0 a
+    • In the first argument of ‘tail’, namely ‘Nil’
+      In the expression: tail Nil
+      In an equation for ‘it’: it = tail Nil
+
+#else
+>>> tail Nil
+<BLANKLINE>
+<interactive>:...
+    • Couldn't match type ‘1’ with ‘0’
+      Expected type: Vec (0 + 1) a
+        Actual type: Vec 0 a
+    • In the first argument of ‘tail’, namely ‘Nil’
+      In the expression: tail Nil
+      In an equation for ‘it’: it = tail Nil
+
+#endif
+-}
 tail :: Vec (n + 1) a -> Vec n a
 tail (_ `Cons` xs) = xs
 
 {-# NOINLINE last #-}
--- | Extract the last element of a vector
---
--- >>> last (1:>2:>3:>Nil)
--- 3
--- >>> last Nil
--- <BLANKLINE>
--- <interactive>:...
---     • Couldn't match type ‘1’ with ‘0’
---       Expected type: Vec (0 + 1) a
---         Actual type: Vec 0 a
---     • In the first argument of ‘last’, namely ‘Nil’
---       In the expression: last Nil
---       In an equation for ‘it’: it = last Nil
+{- | Extract the last element of a vector
+
+>>> last (1:>2:>3:>Nil)
+3
+
+#if __GLASGOW_HASKELL__ >= 900
+>>> last Nil
+<BLANKLINE>
+<interactive>:...
+    • Couldn't match type ‘1’ with ‘0’
+      Expected: Vec (0 + 1) a
+        Actual: Vec 0 a
+    • In the first argument of ‘last’, namely ‘Nil’
+      In the expression: last Nil
+      In an equation for ‘it’: it = last Nil
+
+#else
+>>> last Nil
+<BLANKLINE>
+<interactive>:...
+    • Couldn't match type ‘1’ with ‘0’
+      Expected type: Vec (0 + 1) a
+        Actual type: Vec 0 a
+    • In the first argument of ‘last’, namely ‘Nil’
+      In the expression: last Nil
+      In an equation for ‘it’: it = last Nil
+
+#endif
+-}
 last :: Vec (n + 1) a -> a
 last (x `Cons` Nil)         = x
 last (_ `Cons` y `Cons` ys) = last (y `Cons` ys)
 
 {-# NOINLINE init #-}
--- | Extract all the elements of a vector except the last element
---
--- >>> init (1:>2:>3:>Nil)
--- <1,2>
--- >>> init Nil
--- <BLANKLINE>
--- <interactive>:...
---     • Couldn't match type ‘1’ with ‘0’
---       Expected type: Vec (0 + 1) a
---         Actual type: Vec 0 a
---     • In the first argument of ‘init’, namely ‘Nil’
---       In the expression: init Nil
---       In an equation for ‘it’: it = init Nil
+{- | Extract all the elements of a vector except the last element
+
+>>> init (1:>2:>3:>Nil)
+<1,2>
+
+#if __GLASGOW_HASKELL__ >= 900
+>>> init Nil
+<BLANKLINE>
+<interactive>:...
+    • Couldn't match type ‘1’ with ‘0’
+      Expected: Vec (0 + 1) a
+        Actual: Vec 0 a
+    • In the first argument of ‘init’, namely ‘Nil’
+      In the expression: init Nil
+      In an equation for ‘it’: it = init Nil
+
+#else
+>>> init Nil
+<BLANKLINE>
+<interactive>:...
+    • Couldn't match type ‘1’ with ‘0’
+      Expected type: Vec (0 + 1) a
+        Actual type: Vec 0 a
+    • In the first argument of ‘init’, namely ‘Nil’
+      In the expression: init Nil
+      In an equation for ‘it’: it = init Nil
+
+#endif
+-}
 init :: Vec (n + 1) a -> Vec n a
 init (_ `Cons` Nil)         = Nil
 init (x `Cons` y `Cons` ys) = x `Cons` init (y `Cons` ys)
@@ -1350,24 +1414,41 @@ replace :: (KnownNat n, Enum i) => i -> a -> Vec n a -> Vec n a
 replace i y xs = replace_int xs (fromEnum i) y
 {-# INLINE replace #-}
 
--- | \"'take' @n xs@\" returns the /n/-length prefix of /xs/.
---
--- >>> take (SNat :: SNat 3) (1:>2:>3:>4:>5:>Nil)
--- <1,2,3>
--- >>> take d3               (1:>2:>3:>4:>5:>Nil)
--- <1,2,3>
--- >>> take d0               (1:>2:>Nil)
--- <>
--- >>> take d4               (1:>2:>Nil)
--- <BLANKLINE>
--- <interactive>:...
---     • Couldn't match type ‘4 + n0’ with ‘2’
---       Expected type: Vec (4 + n0) a
---         Actual type: Vec (1 + 1) a
---       The type variable ‘n0’ is ambiguous
---     • In the second argument of ‘take’, namely ‘(1 :> 2 :> Nil)’
---       In the expression: take d4 (1 :> 2 :> Nil)
---       In an equation for ‘it’: it = take d4 (1 :> 2 :> Nil)
+{- | \"'take' @n xs@\" returns the /n/-length prefix of /xs/.
+
+>>> take (SNat :: SNat 3) (1:>2:>3:>4:>5:>Nil)
+<1,2,3>
+>>> take d3               (1:>2:>3:>4:>5:>Nil)
+<1,2,3>
+>>> take d0               (1:>2:>Nil)
+<>
+
+#if __GLASGOW_HASKELL__ >= 900
+>>> take d4               (1:>2:>Nil)
+<BLANKLINE>
+<interactive>:...
+    • Couldn't match type ‘4 + n0’ with ‘2’
+      Expected: Vec (4 + n0) a
+        Actual: Vec (1 + 1) a
+      The type variable ‘n0’ is ambiguous
+    • In the second argument of ‘take’, namely ‘(1 :> 2 :> Nil)’
+      In the expression: take d4 (1 :> 2 :> Nil)
+      In an equation for ‘it’: it = take d4 (1 :> 2 :> Nil)
+
+#else
+>>> take d4               (1:>2:>Nil)
+<BLANKLINE>
+<interactive>:...
+    • Couldn't match type ‘4 + n0’ with ‘2’
+      Expected type: Vec (4 + n0) a
+        Actual type: Vec (1 + 1) a
+      The type variable ‘n0’ is ambiguous
+    • In the second argument of ‘take’, namely ‘(1 :> 2 :> Nil)’
+      In the expression: take d4 (1 :> 2 :> Nil)
+      In an equation for ‘it’: it = take d4 (1 :> 2 :> Nil)
+
+#endif
+-}
 take :: SNat m -> Vec (m + n) a -> Vec m a
 take n = fst . splitAt n
 {-# INLINE take #-}
@@ -2081,104 +2162,128 @@ dfold _ f z xs = go (snatProxy (asNatProxy xs)) xs
       in  f s' y (go s' ys)
 {-# NOINLINE dfold #-}
 
--- | A combination of 'dfold' and 'fold': a /dependently/ typed fold that
--- reduces a vector in a tree-like structure.
---
--- As an example of when you might want to use 'dtfold' we will build a
--- population counter: a circuit that counts the number of bits set to '1' in
--- a 'BitVector'. Given a vector of /n/ bits, we only need we need a data type
--- that can represent the number /n/: 'Index' @(n+1)@. 'Index' @k@ has a range
--- of @[0 .. k-1]@ (using @ceil(log2(k))@ bits), hence we need 'Index' @n+1@.
--- As an initial attempt we will use 'sum', because it gives a nice (@log2(n)@)
--- tree-structure of adders:
---
--- @
--- populationCount :: (KnownNat (n+1), KnownNat (n+2))
---                 => 'BitVector' (n+1) -> 'Index' (n+2)
--- populationCount = sum . map fromIntegral . 'bv2v'
--- @
---
--- The \"problem\" with this description is that all adders have the same
--- bit-width, i.e. all adders are of the type:
---
--- @
--- (+) :: 'Index' (n+2) -> 'Index' (n+2) -> 'Index' (n+2).
--- @
---
--- This is a \"problem\" because we could have a more efficient structure:
--- one where each layer of adders is /precisely/ wide enough to count the number
--- of bits at that layer. That is, at height /d/ we want the adder to be of
--- type:
---
--- @
--- 'Index' ((2^d)+1) -> 'Index' ((2^d)+1) -> 'Index' ((2^(d+1))+1)
--- @
---
--- We have such an adder in the form of the 'Clash.Class.Num.add' function, as
--- defined in the instance 'Clash.Class.Num.ExtendingNum' instance of 'Index'.
--- However, we cannot simply use 'fold' to create a tree-structure of
--- 'Clash.Class.Num.add'es:
---
--- >>> :{
--- let populationCount' :: (KnownNat (n+1), KnownNat (n+2))
---                      => BitVector (n+1) -> Index (n+2)
---     populationCount' = fold add . map fromIntegral . bv2v
--- :}
--- <BLANKLINE>
--- <interactive>:...
---     • Couldn't match type ‘((n + 2) + (n + 2)) - 1’ with ‘n + 2’
---       Expected type: Index (n + 2) -> Index (n + 2) -> Index (n + 2)
---         Actual type: Index (n + 2)
---                      -> Index (n + 2) -> AResult (Index (n + 2)) (Index (n + 2))
---     • In the first argument of ‘fold’, namely ‘add’
---       In the first argument of ‘(.)’, namely ‘fold add’
---       In the expression: fold add . map fromIntegral . bv2v
---     • Relevant bindings include
---         populationCount' :: BitVector (n + 1) -> Index (n + 2)
---           (bound at ...)
---
--- because 'fold' expects a function of type \"@a -> a -> a@\", i.e. a function
--- where the arguments and result all have exactly the same type.
---
--- In order to accommodate the type of our 'Clash.Class.Num.add', where the
--- result is larger than the arguments, we must use a dependently typed fold in
--- the form of 'dtfold':
---
--- @
--- {\-\# LANGUAGE UndecidableInstances \#-\}
--- import Data.Singletons.Prelude
--- import Data.Proxy
---
--- data IIndex (f :: 'TyFun' Nat *) :: *
--- type instance 'Apply' IIndex l = 'Index' ((2^l)+1)
---
--- populationCount' :: (KnownNat k, KnownNat (2^k))
---                  => BitVector (2^k) -> Index ((2^k)+1)
--- populationCount' bv = 'dtfold' (Proxy @IIndex)
---                              fromIntegral
---                              (\\_ x y -> 'Clash.Class.Num.add' x y)
---                              ('bv2v' bv)
--- @
---
--- And we can test that it works:
---
--- >>> :t populationCount' (7 :: BitVector 16)
--- populationCount' (7 :: BitVector 16) :: Index 17
--- >>> populationCount' (7 :: BitVector 16)
--- 3
---
--- Some final remarks:
---
---   * By using 'dtfold' instead of 'fold', we had to restrict our 'BitVector'
---     argument to have bit-width that is a power of 2.
---   * Even though our original /populationCount/ function specified a structure
---     where all adders had the same width. Most VHDL/(System)Verilog synthesis
---     tools will create a more efficient circuit, i.e. one where the adders
---     have an increasing bit-width for every layer, from the
---     VHDL/(System)Verilog produced by the Clash compiler.
---
--- __NB__: The depth, or delay, of the structure produced by
--- \"@'dtfold' m f g xs@\" is O(log_2(@'length' xs@)).
+{- | A combination of 'dfold' and 'fold': a /dependently/ typed fold that
+reduces a vector in a tree-like structure.
+
+As an example of when you might want to use 'dtfold' we will build a
+population counter: a circuit that counts the number of bits set to '1' in
+a 'BitVector'. Given a vector of /n/ bits, we only need we need a data type
+that can represent the number /n/: 'Index' @(n+1)@. 'Index' @k@ has a range
+of @[0 .. k-1]@ (using @ceil(log2(k))@ bits), hence we need 'Index' @n+1@.
+As an initial attempt we will use 'sum', because it gives a nice (@log2(n)@)
+tree-structure of adders:
+
+@
+populationCount :: (KnownNat (n+1), KnownNat (n+2))
+                => 'BitVector' (n+1) -> 'Index' (n+2)
+populationCount = sum . map fromIntegral . 'bv2v'
+@
+
+The \"problem\" with this description is that all adders have the same
+bit-width, i.e. all adders are of the type:
+
+@
+(+) :: 'Index' (n+2) -> 'Index' (n+2) -> 'Index' (n+2).
+@
+
+This is a \"problem\" because we could have a more efficient structure:
+one where each layer of adders is /precisely/ wide enough to count the number
+of bits at that layer. That is, at height /d/ we want the adder to be of
+type:
+
+@
+'Index' ((2^d)+1) -> 'Index' ((2^d)+1) -> 'Index' ((2^(d+1))+1)
+@
+
+We have such an adder in the form of the 'Clash.Class.Num.add' function, as
+defined in the instance 'Clash.Class.Num.ExtendingNum' instance of 'Index'.
+However, we cannot simply use 'fold' to create a tree-structure of
+'Clash.Class.Num.add'es:
+
+#if __GLASGOW_HASKELL__ >= 900
+>>> :{
+let populationCount' :: (KnownNat (n+1), KnownNat (n+2))
+                     => BitVector (n+1) -> Index (n+2)
+    populationCount' = fold add . map fromIntegral . bv2v
+:}
+<BLANKLINE>
+<interactive>:...
+    • Couldn't match type: ((n + 2) + (n + 2)) - 1
+                     with: n + 2
+      Expected: Index (n + 2) -> Index (n + 2) -> Index (n + 2)
+        Actual: Index (n + 2)
+                -> Index (n + 2) -> AResult (Index (n + 2)) (Index (n + 2))
+    • In the first argument of ‘fold’, namely ‘add’
+      In the first argument of ‘(.)’, namely ‘fold add’
+      In the expression: fold add . map fromIntegral . bv2v
+    • Relevant bindings include
+        populationCount' :: BitVector (n + 1) -> Index (n + 2)
+          (bound at ...)
+
+#else
+>>> :{
+let populationCount' :: (KnownNat (n+1), KnownNat (n+2))
+                     => BitVector (n+1) -> Index (n+2)
+    populationCount' = fold add . map fromIntegral . bv2v
+:}
+<BLANKLINE>
+<interactive>:...
+    • Couldn't match type ‘((n + 2) + (n + 2)) - 1’ with ‘n + 2’
+      Expected type: Index (n + 2) -> Index (n + 2) -> Index (n + 2)
+        Actual type: Index (n + 2)
+                     -> Index (n + 2) -> AResult (Index (n + 2)) (Index (n + 2))
+    • In the first argument of ‘fold’, namely ‘add’
+      In the first argument of ‘(.)’, namely ‘fold add’
+      In the expression: fold add . map fromIntegral . bv2v
+    • Relevant bindings include
+        populationCount' :: BitVector (n + 1) -> Index (n + 2)
+          (bound at ...)
+
+#endif
+
+because 'fold' expects a function of type \"@a -> a -> a@\", i.e. a function
+where the arguments and result all have exactly the same type.
+
+In order to accommodate the type of our 'Clash.Class.Num.add', where the
+result is larger than the arguments, we must use a dependently typed fold in
+the form of 'dtfold':
+
+@
+{\-\# LANGUAGE UndecidableInstances \#-\}
+import Data.Singletons.Prelude
+import Data.Proxy
+
+data IIndex (f :: 'TyFun' Nat *) :: *
+type instance 'Apply' IIndex l = 'Index' ((2^l)+1)
+
+populationCount' :: (KnownNat k, KnownNat (2^k))
+                 => BitVector (2^k) -> Index ((2^k)+1)
+populationCount' bv = 'dtfold' (Proxy @IIndex)
+                             fromIntegral
+                             (\\_ x y -> 'Clash.Class.Num.add' x y)
+                             ('bv2v' bv)
+@
+
+And we can test that it works:
+
+>>> :t populationCount' (7 :: BitVector 16)
+populationCount' (7 :: BitVector 16) :: Index 17
+>>> populationCount' (7 :: BitVector 16)
+3
+
+Some final remarks:
+
+  * By using 'dtfold' instead of 'fold', we had to restrict our 'BitVector'
+    argument to have bit-width that is a power of 2.
+  * Even though our original /populationCount/ function specified a structure
+    where all adders had the same width. Most VHDL/(System)Verilog synthesis
+    tools will create a more efficient circuit, i.e. one where the adders
+    have an increasing bit-width for every layer, from the
+    VHDL/(System)Verilog produced by the Clash compiler.
+
+__NB__: The depth, or delay, of the structure produced by
+\"@'dtfold' m f g xs@\" is O(log_2(@'length' xs@)).
+-}
 dtfold :: forall p k a . KnownNat k
        => Proxy (p :: TyFun Nat Type -> Type) -- ^ The /motive/
        -> (a -> (p @@ 0)) -- ^ Function to apply to every element
@@ -2280,7 +2385,7 @@ unconcatBitVector#
    . (KnownNat n, KnownNat m)
   => BitVector (n * m)
   -> Vec n (BitVector m)
-unconcatBitVector# orig = snd (go (toUNat (SNat @ n)))
+unconcatBitVector# orig = snd (go (toUNat (SNat @n)))
   where
     go :: forall p . (p <= n) => UNat p -> (BitVector ((n-p)*m), Vec p (BitVector m))
     go UZero = (orig,Nil)

@@ -121,7 +121,9 @@ common common-options
 library
   import:             common-options
   HS-Source-Dirs:     src-ghc, src-bin-common
-  if impl(ghc >= 8.10.0)
+  if impl(ghc >= 9.0.0)
+    HS-Source-Dirs: src-bin-9.0
+  elif impl(ghc >= 8.10.0)
     HS-Source-Dirs: src-bin-8.10
   elif impl(ghc >= 8.8.0)
     HS-Source-Dirs: src-bin-881
@@ -173,13 +175,17 @@ library
                       ghci                      >= 8.4.0    && < 8.11,
                       uniplate                  >= 1.6.12   && < 1.8,
                       reflection                >= 2.1.2    && < 3.0,
-                      integer-gmp               >= 1.0.1.0  && < 2.0,
                       primitive                 >= 0.5.0.1  && < 1.0,
                       template-haskell          >= 2.8.0.0  && < 2.17,
                       utf8-string               >= 1.0.0.0  && < 1.1.0.0,
                       vector                    >= 0.11     && < 1.0
   if impl(ghc >= 8.10.0)
     Build-Depends:    exceptions                >= 0.10.4   && < 0.11,
+
+  if impl(ghc >= 9.0.0)
+    Build-Depends:    ghc-bignum                >= 1.0      && < 1.1
+  else
+    Build-Depends:    integer-gmp               >= 1.0.1.0  && < 2.0
 
   if flag(use-ghc-paths)
     Build-Depends:    ghc-paths

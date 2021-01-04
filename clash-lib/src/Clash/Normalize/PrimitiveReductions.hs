@@ -44,11 +44,19 @@ import           Data.List.Extra                  (zipEqual)
 import qualified Data.Maybe                       as Maybe
 import           TextShow                         (showt)
 
+#if MIN_VERSION_ghc(9,0,0)
+import           GHC.Builtin.Names
+  (boolTyConKey, typeNatAddTyFamNameKey, typeNatMulTyFamNameKey,
+   typeNatSubTyFamNameKey)
+import           GHC.Types.Unique                 (getKey)
+import           GHC.Types.SrcLoc                 (wiredInSrcSpan)
+#else
 import           PrelNames
   (boolTyConKey, typeNatAddTyFamNameKey, typeNatMulTyFamNameKey,
    typeNatSubTyFamNameKey)
 import           Unique                           (getKey)
 import           SrcLoc                           (wiredInSrcSpan)
+#endif
 
 import           Clash.Core.DataCon               (DataCon)
 import           Clash.Core.Literal               (Literal (..))

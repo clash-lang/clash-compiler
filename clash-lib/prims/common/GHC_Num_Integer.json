@@ -1,0 +1,78 @@
+[ { "Primitive":
+  { "name": "GHC.Num.Integer.IS"
+  , "workInfo": "Never"
+  , "primType": "Constructor"
+  , "comment": "Needed to make the evaluator handle this constructor strictly"
+  }
+}
+,  { "Primitive":
+  { "name": "GHC.Num.Integer.IP"
+  , "workInfo": "Never"
+  , "primType": "Constructor"
+  , "comment": "Needed to make the evaluator handle this constructor strictly"
+  }
+}
+, { "Primitive":
+  { "name": "GHC.Num.Integer.IN"
+  , "workInfo": "Never"
+  , "primType": "Constructor"
+  , "comment": "Needed to make the evaluator handle this constructor strictly"
+  }
+}
+, { "Primitive":
+  { "name": "GHC.Num.Integer.integerFromNatural"
+  , "workInfo": "Never"
+  , "primType": "Function"
+  , "warning": "GHC.Num.Integer.integerFromNatural: No blackbox available without size inference for Natural and Integer"
+  }
+}
+, { "BlackBox" :
+  { "name"      : "GHC.Num.Integer.integerAdd"
+  , "kind"      : "Expression"
+  , "type"      : "integerAdd :: Integer -> Integer -> Integer"
+  , "template"  : "~ARG[0] + ~ARG[1]"
+  }
+}
+, { "BlackBox" :
+  { "name"      : "GHC.Num.Integer.integerSub"
+  , "kind"      : "Expression"
+  , "type"      : "integerSub :: Integer -> Integer -> Integer"
+  , "template"  : "~ARG[0] - ~ARG[1]"
+  }
+}
+, { "BlackBox" :
+  { "name"      : "GHC.Num.Integer.integerQuot"
+  , "kind"      : "Expression"
+  , "type"      : "integerQuot :: Integer -> Integer -> Integer"
+  , "template"  : "~ARG[0] / ~ARG[1]"
+  }
+}
+, { "BlackBox" :
+  { "name"      : "GHC.Num.Integer.integerLe"
+  , "kind"      : "Expression"
+  , "type"      : "integerLe :: Integer -> Integer -> Bool"
+  , "template"  : "~ARG[0] <= ~ARG[1]"
+  }
+}
+, { "BlackBox" :
+  { "name"      : "GHC.Num.Integer.integerGt"
+  , "kind"      : "Expression"
+  , "type"      : "integerGt :: Integer -> Integer -> Bool"
+  , "template"  : "~ARG[0] > ~ARG[1]"
+  }
+}
+, { "BlackBox" :
+  { "name"      : "GHC.Num.Integer.integerLt"
+  , "kind"      : "Expression"
+  , "type"      : "integerLt :: Integer -> Integer -> Bool"
+  , "template"  : "~ARG[0] < ~ARG[1]"
+  }
+}
+, { "BlackBox" :
+  { "name"      : "GHC.Num.Integer.integerGe"
+  , "kind"      : "Expression"
+  , "type"      : "integerGe :: Integer -> Integer -> Bool"
+  , "template"  : "~ARG[0] >= ~ARG[1]"
+  }
+}
+]

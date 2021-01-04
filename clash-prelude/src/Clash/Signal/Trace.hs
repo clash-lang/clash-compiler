@@ -179,7 +179,7 @@ traceSignal# traceMap period traceName signal =
           m
       , signal)
  where
-  width = snatToNum (SNat @ (BitSize a))
+  width = snatToNum (SNat @(BitSize a))
 {-# NOINLINE traceSignal# #-}
 
 -- | Trace a single vector signal: each element in the vector will show up as

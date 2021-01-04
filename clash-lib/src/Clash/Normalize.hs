@@ -32,7 +32,11 @@ import qualified Data.Set                         as Set
 import qualified Data.Set.Lens                    as Lens
 import           Data.Text.Prettyprint.Doc        (vcat)
 
+#if MIN_VERSION_ghc(9,0,0)
+import           GHC.Types.Basic                  (InlineSpec (..))
+#else
 import           BasicTypes                       (InlineSpec (..))
+#endif
 
 import           Clash.Annotations.BitRepresentation.Internal
   (CustomReprs)

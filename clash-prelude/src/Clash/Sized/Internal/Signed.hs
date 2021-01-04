@@ -99,10 +99,15 @@ import Clash.Sized.Internal.Mod       (naturalToInteger)
 import GHC.TypeLits                   (KnownNat, Nat, type (+), natVal)
 import GHC.TypeLits.Extra             (Max)
 import Data.Ix                        (Ix(..))
-import Language.Haskell.TH            (TypeQ, appT, conT, litT, numTyLit, sigE)
+import Language.Haskell.TH            (appT, conT, litT, numTyLit, sigE)
 import Language.Haskell.TH.Syntax     (Lift(..))
 #if MIN_VERSION_template_haskell(2,16,0)
 import Language.Haskell.TH.Compat
+#endif
+#if MIN_VERSION_template_haskell(2,17,0)
+import Language.Haskell.TH            (Quote, Type)
+#else
+import Language.Haskell.TH            (TypeQ)
 #endif
 import Test.QuickCheck.Arbitrary      (Arbitrary (..), CoArbitrary (..),
                                        arbitraryBoundedIntegral,
@@ -157,10 +162,17 @@ import Clash.XException
 -- 3
 -- >>> satAdd SatSymmetric (-2) (-3) :: Signed 3
 -- -3
+#if MIN_VERSION_base(4,15,0)
+data Signed (n :: Nat) =
+    -- | The constructor, 'S', and the field, 'unsafeToInteger', are not
+    -- synthesizable.
+    S { unsafeToInteger :: !Integer}
+#else
 newtype Signed (n :: Nat) =
     -- | The constructor, 'S', and the field, 'unsafeToInteger', are not
     -- synthesizable.
     S { unsafeToInteger :: Integer}
+#endif
   deriving (Data, Generic)
 
 instance NFDataX (Signed n) where
@@ -195,13 +207,13 @@ instance KnownNat n => BitPack (Signed n) where
 
 {-# NOINLINE pack# #-}
 pack# :: forall n . KnownNat n => Signed n -> BitVector n
-pack# (S i) = let m = 1 `shiftL` fromInteger (natVal (Proxy @n))
+pack# (S i) = let m = 1 `shiftL0` fromInteger (natVal (Proxy @n))
               in  if i < 0 then BV 0 (naturalFromInteger (m + i)) else BV 0 (naturalFromInteger i)
 
 {-# NOINLINE unpack# #-}
 unpack# :: forall n . KnownNat n => BitVector n -> Signed n
 unpack# (BV 0 i) =
-  let m = 1 `shiftL` fromInteger (natVal (Proxy @n) - 1)
+  let m = 1 `shiftL0` fromInteger (natVal (Proxy @n) - 1)
       n = naturalToInteger i
   in  if n >= m then S (n-2*m) else S n
 unpack# bv = undefError "Signed.unpack" [bv]
@@ -264,7 +276,7 @@ instance KnownNat n => Enum (Signed n) where
 enumFrom# :: forall n. KnownNat n => Signed n -> [Signed n]
 enumFrom# x = map (fromInteger_INLINE sz mB mask) [unsafeToInteger x .. unsafeToInteger (maxBound :: Signed n)]
   where sz   = fromInteger (natVal (Proxy @n)) - 1
-        mB   = 1 `shiftL` sz
+        mB   = 1 `shiftL0` sz
         mask = mB - 1
 {-# NOINLINE enumFrom# #-}
 
@@ -275,21 +287,21 @@ enumFromThen# x y =
   bound = if x <= y then maxBound else minBound :: Signed n
   toSigneds = map (fromInteger_INLINE sz mB mask)
   sz = fromInteger (natVal (Proxy @n)) - 1
-  mB = 1 `shiftL` sz
+  mB = 1 `shiftL0` sz
   mask = mB - 1
 {-# NOINLINE enumFromThen# #-}
 
 enumFromTo# :: forall n. KnownNat n => Signed n -> Signed n -> [Signed n]
 enumFromTo# x y = map (fromInteger_INLINE sz mB mask) [unsafeToInteger x .. unsafeToInteger y]
   where sz   = fromInteger (natVal (Proxy @n)) - 1
-        mB   = 1 `shiftL` sz
+        mB   = 1 `shiftL0` sz
         mask = mB - 1
 {-# NOINLINE enumFromTo# #-}
 
 enumFromThenTo# :: forall n. KnownNat n => Signed n -> Signed n -> Signed n -> [Signed n]
 enumFromThenTo# x1 x2 y = map (fromInteger_INLINE sz mB mask) [unsafeToInteger x1, unsafeToInteger x2 .. unsafeToInteger y]
   where sz   = fromInteger (natVal (Proxy @n)) - 1
-        mB   = 1 `shiftL` sz
+        mB   = 1 `shiftL0` sz
         mask = mB - 1
 {-# NOINLINE enumFromThenTo# #-}
 
@@ -335,7 +347,7 @@ instance KnownNat n => Num (Signed n) where
         else
           S z
  where
-  m = 1 `shiftL` fromInteger (natVal (Proxy @n) -1)
+  m = 1 `shiftL0` fromInteger (natVal (Proxy @n) -1)
 
 {-# NOINLINE (-#) #-}
 (-#) =
@@ -348,12 +360,12 @@ instance KnownNat n => Num (Signed n) where
         else
           S z
  where
-  m  = 1 `shiftL` fromInteger (natVal (Proxy @n) -1)
+  m  = 1 `shiftL0` fromInteger (natVal (Proxy @n) -1)
 
 {-# NOINLINE (*#) #-}
 (*#) = \(S a) (S b) -> fromInteger_INLINE sz mB mask (a * b)
   where sz   = fromInteger (natVal (Proxy @n)) - 1
-        mB   = 1 `shiftL` sz
+        mB   = 1 `shiftL0` sz
         mask = mB - 1
 
 negate#,abs# :: forall n . KnownNat n => Signed n -> Signed n
@@ -363,7 +375,7 @@ negate# =
     let z = negate n
     in  if z == m then S n else S z
  where
-  m = 1 `shiftL` fromInteger (natVal (Proxy @n) -1)
+  m = 1 `shiftL0` fromInteger (natVal (Proxy @n) -1)
 
 {-# NOINLINE abs# #-}
 abs# =
@@ -371,13 +383,13 @@ abs# =
     let z = abs n
     in  if z == m then S n else S z
  where
-  m = 1 `shiftL` fromInteger (natVal (Proxy @n) -1)
+  m = 1 `shiftL0` fromInteger (natVal (Proxy @n) -1)
 
 {-# NOINLINE fromInteger# #-}
 fromInteger# :: forall n . KnownNat n => Integer -> Signed (n :: Nat)
 fromInteger# = fromInteger_INLINE sz mB mask
   where sz   = fromInteger (natVal (Proxy @n)) - 1
-        mB   = 1 `shiftL` sz
+        mB   = 1 `shiftL0` sz
         mask = mB - 1
 
 {-# INLINE fromInteger_INLINE #-}
@@ -596,7 +608,11 @@ instance KnownNat n => Lift (Signed n) where
   liftTyped = liftTypedFromUntyped
 #endif
 
+#if MIN_VERSION_template_haskell(2,17,0)
+decSigned :: Quote m => Integer -> m Type
+#else
 decSigned :: Integer -> TypeQ
+#endif
 decSigned n = appT (conT ''Signed) (litT $ numTyLit n)
 
 instance KnownNat n => SaturatingNum (Signed n) where
@@ -716,3 +732,12 @@ instance (KnownNat n) => Ix (Signed n) where
     | inRange ab x = fromIntegral $ x - a
     | otherwise = error $ printf "Index %d out of bounds (%d, %d) ab" x a b
   inRange (a, b) x = a <= x && x <= b
+
+-- | Shift left that ties to zero on negative shifts
+shiftL0 :: Integer -> Int -> Integer
+#if MIN_VERSION_base(4,15,0)
+shiftL0 = \a sh -> if sh >= 0 then shiftL a sh else 0
+#else
+shiftL0 = shiftL -- True for use with this module
+#endif
+{-# INLINE shiftL0 #-}

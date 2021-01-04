@@ -30,8 +30,13 @@ import qualified Data.Text                     as T
 import           Data.Semigroup
 #endif
 
+#if MIN_VERSION_ghc(9,0,0)
+import           GHC.Builtin.Names       (ipClassKey)
+import           GHC.Types.Unique        (getKey)
+#else
 import           PrelNames               (ipClassKey)
 import           Unique                  (getKey)
+#endif
 
 import Clash.Core.DataCon
 import Clash.Core.EqSolver

@@ -30,7 +30,9 @@ instance KnownSymbol s => Lift (SSymbol (s :: Symbol)) where
     where
       tt = LitT (StrTyLit (ssymbolToString t))
 
-#if MIN_VERSION_template_haskell(2,16,0)
+#if MIN_VERSION_template_haskell(2,17,0)
+  liftTyped = unsafeCodeCoerce . lift
+#elif MIN_VERSION_template_haskell(2,16,0)
   liftTyped = unsafeTExpCoerce . lift
 #endif
 

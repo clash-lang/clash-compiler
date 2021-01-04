@@ -32,7 +32,11 @@ import Clash.Netlist.Types (PreserveCase(..))
 import Clash.GHC.GenerateBindings
 import Clash.GHC.PartialEval
 
-import Util
+#if MIN_VERSION_ghc(9,0,0)
+import           GHC.Utils.Misc
+#else
+import           Util
+#endif
 
 import Test.Tasty.Clash
 

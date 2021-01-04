@@ -55,10 +55,15 @@ import           Data.Text               (Text)
 import qualified Data.Text               as Text
 import           Data.Text.Lazy          (toStrict)
 import           Data.Text.Prettyprint.Doc.Extra
-import           MonadUtils              (zipWith3M)
 import           TextShow                (showt)
 
+#if MIN_VERSION_ghc(9,0,0)
+import           GHC.Utils.Monad         (zipWith3M)
+import           GHC.Utils.Outputable    (ppr, showSDocUnsafe)
+#else
+import           MonadUtils              (zipWith3M)
 import           Outputable              (ppr, showSDocUnsafe)
+#endif
 
 import           Clash.Annotations.TopEntity
   (TopEntity(..), PortName(..), defSyn)
@@ -478,10 +483,12 @@ mkADT builtInTranslation reprs m tyString tc args = case tyConDataCons (m `looku
           else
             -- Filter out labels belonging to arguments filtered due to being
             -- void. See argHTyss1.
-            let areNotVoids = map not (head areVoids) in
-            let labels1     = filter fst (zip areNotVoids labels0) in
-            let labels2     = map snd labels1 in
-            return (Just labels2)
+            let areNotVoids = case areVoids of
+                                areVoid:_ -> map not areVoid
+                                _ -> error "internal error: insufficient areVoids"
+                labels1     = filter fst (zip areNotVoids labels0)
+                labels2     = map snd labels1
+             in return (Just labels2)
         let hwty = Product tcName labelsM (map stripFiltered elemTys)
         return (FilteredHWType hwty argHTyss1)
 
@@ -1843,7 +1850,9 @@ expandTopEntity ihwtys (oId, ohwty) topEntityM = do
     | isProduct fHwty
     , [fields1] <- fields0
     , ((_:_), [_]) <- partition fst fields1
-    = head [go h t p_ | (h, (False, t), p_) <- zip3 hints fields1 ps1]
+    = case [go h t p_ | (h, (False, t), p_) <- zip3 hints fields1 ps1] of
+        port:_ -> port
+        _ -> error "internal error: insuffient ports"
 
     -- Product types (products, vec, rtree)
     | isProduct fHwty
@@ -1887,7 +1896,9 @@ expandTopEntity ihwtys (oId, ohwty) topEntityM = do
     | isProduct fHwty
     , [fields1] <- fields0
     , ((_:_), [_]) <- partition fst fields1
-    = head [goNoPort h t | (h, (False, t)) <- zip hints fields1]
+    = case [goNoPort h t | (h, (False, t)) <- zip hints fields1] of
+        port:_ -> port
+        _ -> error "internal error: insuffient ports"
 
     -- Product types (products, vec, rtree)
     | isProduct fHwty

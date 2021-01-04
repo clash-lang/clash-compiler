@@ -1,3 +1,10 @@
+{-|
+  Copyright   :  (C) 2021, QBayLogic
+  License     :  BSD2 (see the file LICENSE)
+  Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
+-}
+
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE QuasiQuotes #-}
@@ -14,9 +21,17 @@ import           Clash.Driver.Types     (ClashOpts (..), BindingMap)
 import           Clash.Netlist.Types    (TopEntityT(..))
 
 -- The GHC interface
+#if MIN_VERSION_ghc(9,0,0)
+import qualified GHC.Data.EnumSet       as GHC (member)
+import           GHC.Utils.Panic        (GhcException (..), throwGhcException)
+import qualified GHC
+  (DynFlags, ModSummary (..), extensionFlags, moduleName, moduleNameString)
+#else
 import qualified EnumSet                as GHC (member)
+import           Panic                  (GhcException (..), throwGhcException)
 import qualified GHC                    (DynFlags, ModSummary (..), Module (..),
                                          extensionFlags, moduleNameString)
+#endif
 import           Clash.Core.Name        (nameOcc)
 import           Clash.Core.Var         (varName)
 import           Clash.Normalize.Util   (collectCallGraphUniques, callGraph)
@@ -28,7 +43,6 @@ import           Data.List              (isSuffixOf)
 import qualified Data.Text              as Text
 import qualified Data.HashSet           as HashSet
 import qualified GHC.LanguageExtensions as LangExt (Extension (..))
-import           Panic                  (GhcException (..), throwGhcException)
 
 import           Control.Monad          (forM_, unless, when)
 import           System.Directory       (doesDirectoryExist)

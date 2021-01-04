@@ -4,7 +4,7 @@
 module T1536 where
 
 import Clash.Prelude
-import GHC.Types
+import GHC.Types hiding (One)
 
 topEntity = stepsOf mysteps
 

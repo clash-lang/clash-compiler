@@ -4,6 +4,7 @@
   Maintainer  :  Christiaan Baaij <christiaan.baaij@gmail.com>
 -}
 
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE DeriveAnyClass #-}
 {-# LANGUAGE TemplateHaskell #-}
 
@@ -14,6 +15,15 @@ module GHC.SrcLoc.Extra where
 import Data.Binary
 import Data.Hashable                        (Hashable (..))
 import GHC.Generics
+#if MIN_VERSION_ghc(9,0,0)
+import GHC.Types.SrcLoc
+  (SrcSpan (..), RealSrcLoc, RealSrcSpan, BufSpan (..), BufPos (..), UnhelpfulSpanReason (..),
+   mkRealSrcLoc, mkRealSrcSpan,
+   realSrcSpanStart, realSrcSpanEnd,
+   srcLocFile, srcLocLine, srcLocCol,
+   srcSpanFile, srcSpanStartLine, srcSpanEndLine, srcSpanStartCol, srcSpanEndCol)
+import GHC.Data.FastString (FastString (..), bytesFS, mkFastStringByteList)
+#else
 import SrcLoc
   (SrcSpan (..), RealSrcLoc, RealSrcSpan,
    mkRealSrcLoc, mkRealSrcSpan,
@@ -21,6 +31,7 @@ import SrcLoc
    srcLocFile, srcLocLine, srcLocCol,
    srcSpanFile, srcSpanStartLine, srcSpanEndLine, srcSpanStartCol, srcSpanEndCol)
 import FastString                           (FastString (..), bytesFS, mkFastStringByteList)
+#endif
 
 deriving instance Generic SrcSpan
 instance Hashable SrcSpan
@@ -45,3 +56,17 @@ instance Binary RealSrcLoc where
 instance Binary FastString where
   put str = put $ bytesFS str
   get = mkFastStringByteList <$> get
+
+#if MIN_VERSION_ghc(9,0,0)
+deriving instance Generic BufPos
+instance Binary BufPos
+instance Hashable BufPos
+
+deriving instance Generic UnhelpfulSpanReason
+instance Binary UnhelpfulSpanReason
+instance Hashable UnhelpfulSpanReason
+
+deriving instance Generic BufSpan
+instance Binary BufSpan
+instance Hashable BufSpan
+#endif

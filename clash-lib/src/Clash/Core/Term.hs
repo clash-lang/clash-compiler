@@ -7,6 +7,7 @@
   Term representation in the CoreHW language: System F + LetRec + Case
 -}
 
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE DeriveAnyClass #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE LambdaCase #-}
@@ -63,7 +64,11 @@ import Data.Hashable                           (Hashable)
 import Data.List                               (nub, partition)
 import Data.Text                               (Text)
 import GHC.Generics
+#if MIN_VERSION_ghc(9,0,0)
+import GHC.Types.SrcLoc                        (SrcSpan)
+#else
 import SrcLoc                                  (SrcSpan)
+#endif
 
 -- Internal Modules
 import Clash.Core.DataCon                      (DataCon)

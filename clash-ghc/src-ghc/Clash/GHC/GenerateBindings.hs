@@ -5,6 +5,7 @@
   Maintainer  :  Christiaan Baaij <christiaan.baaij@gmail.com>
 -}
 
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE OverloadedStrings #-}
@@ -28,6 +29,21 @@ import           Data.List               (isPrefixOf)
 import qualified Data.Text               as Text
 import qualified Data.Time.Clock         as Clock
 
+#if MIN_VERSION_ghc(9,0,0)
+import qualified GHC.Types.Basic         as GHC
+import qualified GHC.Core                as GHC
+import qualified GHC.Types.Demand        as GHC
+import qualified GHC.Driver.Session      as GHC
+import qualified GHC.Types.Id.Info       as GHC
+import qualified GHC.Utils.Outputable    as GHC
+import qualified GHC.Types.Name          as GHC hiding (varName)
+import qualified GHC.Core.TyCon          as GHC
+import qualified GHC.Core.Type           as GHC
+import qualified GHC.Builtin.Types       as GHC
+import qualified GHC.Utils.Misc          as GHC
+import qualified GHC.Types.Var           as GHC
+import qualified GHC.Types.SrcLoc        as GHC
+#else
 import qualified BasicTypes              as GHC
 import qualified CoreSyn                 as GHC
 import qualified Demand                  as GHC
@@ -41,6 +57,7 @@ import qualified TysWiredIn              as GHC
 import qualified Util                    as GHC
 import qualified Var                     as GHC
 import qualified SrcLoc                  as GHC
+#endif
 
 import           Clash.Annotations.BitRepresentation.Internal (DataRepr')
 import           Clash.Annotations.Primitive (HDL, extractPrim)
@@ -244,7 +261,11 @@ checkPrimitive primMap v = do
         nrOfArgs = length argTys
         loc = case GHC.getSrcLoc v of
                 GHC.UnhelpfulLoc _ -> ""
+#if MIN_VERSION_ghc(9,0,0)
+                GHC.RealSrcLoc l _ -> showPpr l ++ ": "
+#else
                 GHC.RealSrcLoc l   -> showPpr l ++ ": "
+#endif
         warnIf cond msg = traceIf cond ("\n"++loc++"Warning: "++msg) return ()
       qName <- Text.unpack <$> qualifiedNameString (GHC.varName v)
       let primStr = "primitive " ++ qName ++ " "
@@ -267,7 +288,11 @@ checkPrimitive primMap v = do
         warnIf (inline /= GHC.NoInline)
           (primStr ++ "isn't marked NOINLINE."
           ++ "\nThis might make Clash ignore this primitive.")
+#if MIN_VERSION_ghc(9,0,0)
+        warnIf (GHC.appIsDeadEnd strictness nrOfArgs)
+#else
         warnIf (GHC.appIsBottom strictness nrOfArgs)
+#endif
           ("The Haskell implementation of " ++ primStr
           ++ "produces a result that always results in an error.\n"
           ++ "This can lead to compile failures because GHC can replace entire "

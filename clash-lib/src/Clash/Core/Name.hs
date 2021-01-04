@@ -6,6 +6,7 @@
   Names
 -}
 
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE DeriveAnyClass #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
@@ -26,7 +27,11 @@ import           Data.Text                              (Text, append)
 import           GHC.BasicTypes.Extra                   ()
 import           GHC.Generics                           (Generic)
 import           GHC.SrcLoc.Extra                       ()
+#if MIN_VERSION_ghc(9,0,0)
+import           GHC.Types.SrcLoc                       (SrcSpan, noSrcSpan)
+#else
 import           SrcLoc                                 (SrcSpan, noSrcSpan)
+#endif
 
 import           Clash.Unique
 

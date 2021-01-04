@@ -6,6 +6,7 @@
   I\/O actions that are translatable to HDL
 -}
 
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE BangPatterns, MagicHash, TypeOperators, ScopedTypeVariables, FlexibleContexts #-}
 {-# LANGUAGE DataKinds, GADTs, TypeApplications #-}
 
@@ -43,7 +44,9 @@ module Clash.Explicit.SimIO
 where
 
 import Control.Monad (when)
+#if __GLASGOW_HASKELL__ < 900
 import Data.Coerce
+#endif
 import Data.IORef
 import GHC.TypeLits
 import Prelude hiding (getChar, putChar, getLine)
@@ -61,7 +64,11 @@ import Clash.XException (seqX)
 -- itself is unlikely to be synthesisable to a digital circuit.
 --
 -- See 'mealyIO' as to its use.
+#if __GLASGOW_HASKELL__ >= 900
+data SimIO a = SimIO {unSimIO :: !(IO a)}
+#else
 newtype SimIO a = SimIO {unSimIO :: IO a}
+#endif
 
 instance Functor SimIO where
   fmap = fmapSimIO#
@@ -87,7 +94,11 @@ instance Monad SimIO where
   (>>=)  = bindSimIO#
 
 bindSimIO# :: SimIO a -> (a -> SimIO b) -> SimIO b
+#if __GLASGOW_HASKELL__ >= 900
+bindSimIO# (SimIO m) k = SimIO (m >>= (\x -> x `seqX` unSimIO (k x)))
+#else
 bindSimIO# (SimIO m) k = SimIO (m >>= (\x -> x `seqX` coerce k x))
+#endif
 {-# NOINLINE bindSimIO# #-}
 
 -- | Display a string on /stdout/
@@ -109,7 +120,11 @@ finish i = return (error (show i))
 {-# ANN finish hasBlackBox #-}
 
 -- | Mutable reference
+#if __GLASGOW_HASKELL__ >= 900
+data Reg a = Reg !(IORef a)
+#else
 newtype Reg a = Reg (IORef a)
+#endif
 
 -- | Create a new mutable reference with the given starting value
 reg
@@ -138,7 +153,11 @@ writeReg (Reg r) a = SimIO (writeIORef r a)
 {-# ANN writeReg hasBlackBox #-}
 
 -- | File handle
+#if __GLASGOW_HASKELL__ >= 900
+data File = File !IO.Handle
+#else
 newtype File = File IO.Handle
+#endif
 
 -- | Open a file
 openFile
@@ -154,6 +173,23 @@ openFile
   -- * "w+": Create for update
   -- * "a+": Append, open or create for update at end-of-file
   -> SimIO File
+#if __GLASGOW_HASKELL__ >= 900
+openFile fp "r"   = SimIO $ fmap File (IO.openFile fp IO.ReadMode)
+openFile fp "w"   = SimIO $ fmap File (IO.openFile fp IO.WriteMode)
+openFile fp "a"   = SimIO $ fmap File (IO.openFile fp IO.AppendMode)
+openFile fp "rb"  = SimIO $ fmap File (IO.openBinaryFile fp IO.ReadMode)
+openFile fp "wb"  = SimIO $ fmap File (IO.openBinaryFile fp IO.WriteMode)
+openFile fp "ab"  = SimIO $ fmap File (IO.openBinaryFile fp IO.AppendMode)
+openFile fp "r+"  = SimIO $ fmap File (IO.openFile fp IO.ReadWriteMode)
+openFile fp "w+"  = SimIO $ fmap File (IO.openFile fp IO.WriteMode)
+openFile fp "a+"  = SimIO $ fmap File (IO.openFile fp IO.AppendMode)
+openFile fp "r+b" = SimIO $ fmap File (IO.openBinaryFile fp IO.ReadWriteMode)
+openFile fp "w+b" = SimIO $ fmap File (IO.openBinaryFile fp IO.WriteMode)
+openFile fp "a+b" = SimIO $ fmap File (IO.openBinaryFile fp IO.AppendMode)
+openFile fp "rb+" = SimIO $ fmap File (IO.openBinaryFile fp IO.ReadWriteMode)
+openFile fp "wb+" = SimIO $ fmap File (IO.openBinaryFile fp IO.WriteMode)
+openFile fp "ab+" = SimIO $ fmap File (IO.openBinaryFile fp IO.AppendMode)
+#else
 openFile fp "r"   = coerce (IO.openFile fp IO.ReadMode)
 openFile fp "w"   = coerce (IO.openFile fp IO.WriteMode)
 openFile fp "a"   = coerce (IO.openFile fp IO.AppendMode)
@@ -169,6 +205,7 @@ openFile fp "a+b" = coerce (IO.openBinaryFile fp IO.AppendMode)
 openFile fp "rb+" = coerce (IO.openBinaryFile fp IO.ReadWriteMode)
 openFile fp "wb+" = coerce (IO.openBinaryFile fp IO.WriteMode)
 openFile fp "ab+" = coerce (IO.openBinaryFile fp IO.AppendMode)
+#endif
 openFile _  m     = error ("openFile unknown mode: " ++ show m)
 {-# NOINLINE openFile #-}
 {-# ANN openFile hasBlackBox #-}
