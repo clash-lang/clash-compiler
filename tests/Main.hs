@@ -746,6 +746,7 @@ runClashTest = defaultMain $ clashTestRoot
         , runTest "VecConst" def{hdlSim=False}
         , NEEDS_PRIMS(runTest "FirOddSize" def)
         , NEEDS_PRIMS(runTest "IndexInt" def)
+        , NEEDS_PRIMS(runTest "IndexInt2" def)
         , NEEDS_PRIMS(outputTest ("tests" </> "shouldwork" </> "Vector") [Verilog] [] [] "IndexInt2" "main")
         , NEEDS_PRIMS_GHC(runTest "Concat" def)
         , NEEDS_PRIMS_GHC(runTest "DFold" def)
