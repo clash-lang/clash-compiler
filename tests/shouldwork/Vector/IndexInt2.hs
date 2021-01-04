@@ -9,21 +9,37 @@ import System.Environment (getArgs)
 import System.FilePath ((</>), takeDirectory)
 
 import Clash.Prelude
+import Clash.Explicit.Testbench
+
 import Clash.Netlist.Types
 
-import Test.Tasty.Clash
-import Test.Tasty.Clash.NetlistTest
-
-topEntity :: Vec 4 Bool -> Signed 8 -> (Bool,Bool)
-topEntity xs ix0 = (xs !! ix0, xs !! ix1)
+topEntity :: Vec 4 Bool -> Signed 8 -> (Bool,Bool,Bool)
+topEntity xs ix0 =
+  ( xs !! ix0    -- non-constant index
+  , xs !! ix1    -- constant index, vec is a var
+  , (tail xs :< False) !! ix1 -- constant index, vec is not a var
+  )
   where
     ix1 :: Signed 8
     ix1 = fold (+) (1 :> (-1) :> 1 :> Nil)
+{-# NOINLINE topEntity #-}
+
+testBench :: Signal System Bool
+testBench = done
+ where
+  testVecs       = stimuliGenerator clk rst (map unpack $ 0b0010 :> 0b0100 :> 0b1000 :> Nil)
+  testIxs        = stimuliGenerator clk rst (2 :> 1 :> 0 :> Nil)
+  output         = map unpack $ 0b101 :> 0b110 :> 0b100 :> Nil
+  expectedOutput = outputVerifier' clk rst output
+  done           = expectedOutput (topEntity <$> testVecs <*> testIxs)
+  clk            = tbSystemClockGen (not <$> done)
+  rst            = systemResetGen
+
 
 mainVerilog :: IO ()
 mainVerilog = do
   [topDir] <- getArgs
-  content <- readFile (takeDirectory topDir </> "topEntity.v")
+  content <- readFile (topDir </> show 'topEntity </> "topEntity.v")
   let indexBegins = P.length $ filter (isInfixOf " index begin") $ lines content
   when (indexBegins /= 1) $
-    error ("Expected 1 index blackbox, but found " <> show indexBegins)
+    error ("Expected 1 normal index blackbox, but found " <> show indexBegins)
