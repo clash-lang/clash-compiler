@@ -13,11 +13,11 @@ import Clash.Explicit.Testbench
 
 import Clash.Netlist.Types
 
-topEntity :: Vec 4 Bool -> Signed 8 -> (Bool,Bool,Bool)
+topEntity :: Vec 4 (Unsigned 4) -> Signed 8 -> (Unsigned 4,Unsigned 4,Unsigned 4)
 topEntity xs ix0 =
   ( xs !! ix0    -- non-constant index
-  , xs !! ix1    -- constant index, vec is a var
-  , (tail xs :< False) !! ix1 -- constant index, vec is not a var
+  , xs !! ix1    -- constant index, vec is a Var
+  , (tail xs :< 0xe) !! ix1 -- constant index, vec is an expression
   )
   where
     ix1 :: Signed 8
@@ -27,9 +27,9 @@ topEntity xs ix0 =
 testBench :: Signal System Bool
 testBench = done
  where
-  testVecs       = stimuliGenerator clk rst (map unpack $ 0b0010 :> 0b0100 :> 0b1000 :> Nil)
+  testVecs       = stimuliGenerator clk rst (map unpack $ 0x0010 :> 0x0100 :> 0x1000 :> Nil)
   testIxs        = stimuliGenerator clk rst (2 :> 1 :> 0 :> Nil)
-  output         = map unpack $ 0b101 :> 0b110 :> 0b100 :> Nil
+  output         = map unpack $ 0x101 :> 0x110 :> 0x100 :> Nil
   expectedOutput = outputVerifier' clk rst output
   done           = expectedOutput (topEntity <$> testVecs <*> testIxs)
   clk            = tbSystemClockGen (not <$> done)

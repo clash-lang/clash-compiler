@@ -32,6 +32,7 @@ import           GHC.Stack                          (HasCallStack)
 
 import           Clash.Backend
   (Backend, hdlTypeErrValue, expr, blockDecl)
+import           Clash.Core.TermInfo                (isVar)
 import           Clash.Core.Type
   (Type(LitTy), LitTy(NumTy), coreView)
 import           Clash.Netlist.BlackBox             (isLiteral)
@@ -241,21 +242,21 @@ foldTF' args =
   error $ "Unexpected number of arguments: " ++ show (length (bbInputs args))
 
 indexIntVerilog ::  BlackBoxFunction
-indexIntVerilog _isD _primName args _ty = return ((meta,) <$> bb)
+indexIntVerilog _isD _primName args _ty = return bb
  where
-  meta = emptyBlackBoxMeta{bbKind=bbKi}
-
-  bbKi = case args of
-    [_nTy,_aTy,_kn,_v,Left ix]
-      | isLiteral ix -> TExpr
-    _ -> TDecl
+  meta bbKi = emptyBlackBoxMeta{bbKind=bbKi}
 
   bb = case args of
+    [_nTy,_aTy,_kn,Left v,Left ix] | isLiteral ix && isVar v ->
+      Right (meta TExpr, BBFunction "Clash.Primitives.Sized.Vector.indexIntVerilogTF" 0 indexIntVerilogTF)
     [_nTy,_aTy,_kn,_v,Left ix] | isLiteral ix ->
-      Right (BBFunction "Clash.Primitives.Sized.Vector.indexIntVerilogTF" 0 indexIntVerilogTF)
+      case runParse (pack (I.unindent bbTextLitIx)) of
+        Success t -> Right (meta TDecl, BBTemplate t)
+        _         -> Left "internal error: parse fail"
+
     _ ->
-      BBTemplate <$> case runParse (pack (I.unindent bbText)) of
-        Success t -> Right t
+      case runParse (pack (I.unindent bbText)) of
+        Success t -> Right (meta TDecl, BBTemplate t)
         _         -> Left "internal error: parse fail"
 
   bbText = [I.i|
@@ -269,6 +270,12 @@ indexIntVerilog _isD _primName args _ty = return ((meta,) <$> bb)
     ~ENDGENERATE
     assign ~RESULT = ~SYM[0][~ARG[2]];~ELSEassign ~RESULT = ~ERRORO;~FI
     // index end|]
+
+  bbTextLitIx = [I.i|
+    // index lit begin
+    ~IF~SIZE[~TYP[1]]~THENassign ~RESULT = ~VAR[vec][1][~SIZE[~TYP[1]]-1-~LIT[2]*~SIZE[~TYPO] -: ~SIZE[~TYPO]];~ELSEassign ~RESULT = ~ERRORO;~FI
+    // index lit end|]
+
 
 indexIntVerilogTF :: TemplateFunction
 indexIntVerilogTF = TemplateFunction used valid indexIntVerilogTemplate
