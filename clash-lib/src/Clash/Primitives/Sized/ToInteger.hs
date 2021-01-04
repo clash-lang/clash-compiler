@@ -1,3 +1,12 @@
+{-|
+  Copyright   :  (C) 2020 QBayLogic
+  License     :  BSD2 (see the file LICENSE)
+  Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
+
+  Blackbox implementations for "Clash.Sized.Internal.*.toInteger#".
+-}
+
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE TupleSections #-}
 module Clash.Primitives.Sized.ToInteger
   ( bvToIntegerVerilog
@@ -18,12 +27,21 @@ import Data.Text.Lazy (pack)
 import System.IO (hPutStrLn, stderr)
 import Text.Trifecta.Result (Result(Success))
 
+#if MIN_VERSION_ghc(9,0,0)
+import GHC.Driver.Session (unsafeGlobalDynFlags)
+import GHC.Utils.Error (mkPlainWarnMsg, pprLocErrMsg)
+import GHC.Utils.Outputable
+  (blankLine, empty, int, integer, showSDocUnsafe, text, ($$), ($+$), (<+>))
+import qualified GHC.Utils.Outputable as Outputable
+import GHC.Types.SrcLoc (isGoodSrcSpan)
+#else
 import DynFlags (unsafeGlobalDynFlags)
 import ErrUtils (mkPlainWarnMsg, pprLocErrMsg)
 import Outputable
   (blankLine, empty, int, integer, showSDocUnsafe, text, ($$), ($+$), (<+>))
 import qualified Outputable
 import SrcLoc (isGoodSrcSpan)
+#endif
 
 import Clash.Annotations.Primitive (HDL (Verilog,VHDL))
 import Clash.Core.Type (Type (LitTy), LitTy (NumTy))

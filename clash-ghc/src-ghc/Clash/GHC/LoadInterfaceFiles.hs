@@ -31,6 +31,36 @@ import           Data.Maybe                  (isJust, isNothing,
 import           Data.Word                   (Word8)
 
 -- GHC API
+#if MIN_VERSION_ghc(9,0,0)
+import           GHC.Types.Annotations (Annotation(..))
+import qualified GHC.Types.Annotations as Annotations
+import qualified GHC.Core.Class as Class
+import qualified GHC.Core.FVs as CoreFVs
+import qualified GHC.Core as CoreSyn
+import qualified GHC.Types.Demand as Demand
+import           GHC.Driver.Session as DynFlags (unsafeGlobalDynFlags)
+import qualified GHC
+import qualified GHC.Types.Id as Id
+import qualified GHC.Types.Id.Info as IdInfo
+import qualified GHC.Iface.Syntax as IfaceSyn
+import qualified GHC.Iface.Load as LoadIface
+import qualified GHC.Data.Maybe as Maybes
+import qualified GHC.Core.Make as MkCore
+import qualified GHC.Unit.Module as Module
+import qualified GHC.Unit.Module.Env as ModuleEnv
+import qualified GHC.Utils.Monad as MonadUtils
+import qualified GHC.Types.Name as Name
+import qualified GHC.Types.Name.Env as NameEnv
+import           GHC.Utils.Outputable as Outputable (showPpr, showSDoc, text)
+import qualified GHC.Plugins as GhcPlugins (deserializeWithData, fromSerialized)
+import qualified GHC.IfaceToCore as TcIface
+import qualified GHC.Tc.Utils.Monad as TcRnMonad
+import qualified GHC.Tc.Types as TcRnTypes
+import qualified GHC.Types.Unique.FM as UniqFM
+import qualified GHC.Types.Unique.Set as UniqSet
+import qualified GHC.Types.Var as Var
+import qualified GHC.Unit.Types as UnitTypes
+#else
 import           Annotations (Annotation(..), getAnnTargetName_maybe)
 import qualified Annotations
 import qualified Class
@@ -56,6 +86,7 @@ import qualified TcRnTypes
 import qualified UniqFM
 import qualified UniqSet
 import qualified Var
+#endif
 
 -- Internal Modules
 import           Clash.Annotations.BitRepresentation.Internal
@@ -103,8 +134,13 @@ collectLbBinders LoadedBinders{lbBinders, lbUnlocatable, lbClassOps} =
 runIfl :: GHC.GhcMonad m => GHC.Module -> TcRnTypes.IfL a -> m a
 runIfl modName action = do
   hscEnv <- GHC.getSession
-  let localEnv = TcRnTypes.IfLclEnv modName False (text "runIfl") Nothing
-                   Nothing UniqFM.emptyUFM UniqFM.emptyUFM
+  let localEnv = TcRnTypes.IfLclEnv modName
+#if MIN_VERSION_ghc(9,0,0)
+                   UnitTypes.NotBoot
+#else
+                   False
+#endif
+                   (text "runIfl") Nothing Nothing UniqFM.emptyUFM UniqFM.emptyUFM
   let globalEnv = TcRnTypes.IfGblEnv (text "Clash.runIfl") Nothing
   MonadUtils.liftIO $ TcRnMonad.initTcRnIf 'r' hscEnv globalEnv
                         localEnv action
@@ -115,7 +151,11 @@ loadDecl = TcIface.tcIfaceDecl False
 loadIface :: GHC.Module -> TcRnTypes.IfL (Maybe GHC.ModIface)
 loadIface foundMod = do
   ifaceFailM <- LoadIface.findAndReadIface (Outputable.text "loadIface")
+#if MIN_VERSION_ghc(9,0,0)
+                  (fst (Module.getModuleInstantiation foundMod)) foundMod UnitTypes.NotBoot
+#else
                   (fst (Module.splitModuleInsts foundMod)) foundMod False
+#endif
   case ifaceFailM of
     Maybes.Succeeded (modInfo,_) -> return (Just modInfo)
     Maybes.Failed msg -> let msg' = concat [ $(curLoc)
@@ -232,7 +272,12 @@ loadCustomReprAnnotations anns =
     where
         env         = Annotations.mkAnnEnv anns
         deserialize = GhcPlugins.deserializeWithData :: [Word8] -> DataReprAnn
+#if MIN_VERSION_ghc(9,0,0)
+        reprs       = let (mEnv,nEnv) = Annotations.deserializeAnns deserialize env
+                       in ModuleEnv.moduleEnvElts mEnv <> NameEnv.nameEnvElts nEnv
+#else
         reprs       = UniqFM.eltsUFM (Annotations.deserializeAnns deserialize env)
+#endif
 
         filterNameless
           :: Annotation
@@ -324,7 +369,11 @@ loadExprFromTyThing bndr tyThing = case tyThing of
             dfExpr = MkCore.mkCoreLams dfbndrs dcApp
         in Left (bndr,dfExpr)
       CoreSyn.NoUnfolding
+#if MIN_VERSION_ghc(9,0,0)
+        | Demand.isDeadEndSig $ IdInfo.strictnessInfo _idInfo
+#else
         | Demand.isBottomingSig $ IdInfo.strictnessInfo _idInfo
+#endif
         -> Left
             ( bndr
 #if MIN_VERSION_ghc(8,2,2)
@@ -338,3 +387,10 @@ loadExprFromTyThing bndr tyThing = case tyThing of
             )
       _ -> Right bndr
   _ -> Right bndr
+
+#if MIN_VERSION_ghc(9,0,0)
+-- | Get the 'name' of an annotation target if it exists.
+getAnnTargetName_maybe :: Annotations.AnnTarget name -> Maybe name
+getAnnTargetName_maybe (Annotations.NamedTarget nm) = Just nm
+getAnnTargetName_maybe _                            = Nothing
+#endif

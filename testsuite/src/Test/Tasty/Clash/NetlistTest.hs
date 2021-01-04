@@ -49,7 +49,11 @@ import           Clash.Netlist.BlackBox.Types (HdlSyn(Other))
 import           Clash.Netlist.Types hiding (backend, hdlDir)
 import           Clash.Util
 
+#if MIN_VERSION_ghc(9,0,0)
+import           GHC.Utils.Misc
+#else
 import           Util
+#endif
 
 import qualified Control.Concurrent.Supply as Supply
 import           Control.DeepSeq (force)

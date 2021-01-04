@@ -24,7 +24,11 @@ import Clash.Util
 import Control.DeepSeq
 import qualified Data.Time.Clock as Clock
 
+#if MIN_VERSION_ghc(9,0,0)
+import GHC.Utils.Misc (OverridingBool(..))
+#else
 import Util (OverridingBool(..))
+#endif
 
 genSystemVerilog
   :: String

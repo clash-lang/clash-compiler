@@ -1,3 +1,10 @@
+{-|
+  Copyright  :  (C) 2021 QBayLogic B.V.
+  License    :  BSD2 (see the file LICENSE)
+  Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
+-}
+
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE OverloadedStrings #-}
 
 module Clash.Core.EqSolver where
@@ -11,6 +18,11 @@ import Clash.Core.TyCon
 import Clash.Core.Type
 import Clash.Core.Var
 import Clash.Core.VarEnv (VarSet, elemVarSet, emptyVarSet, mkVarSet)
+#if MIN_VERSION_ghc(9,0,0)
+import Clash.Core.DataCon (dcUniq)
+import GHC.Builtin.Names (unsafeReflDataConKey)
+import GHC.Types.Unique (getKey)
+#endif
 
 -- | Data type that indicates what kind of solution (if any) was found
 data TypeEqSolution
@@ -124,6 +136,12 @@ isAbsurdAlt
   :: TyConMap
   -> Alt
   -> Bool
+#if MIN_VERSION_base(4,15,0)
+isAbsurdAlt _tcm (DataPat dc _ _,_)
+  -- unsafeCoerce is not absurd in the way intended by /isAbsurdAlt/
+  | dcUniq dc == getKey unsafeReflDataConKey
+  = False
+#endif
 isAbsurdAlt tcm alt =
   any (isAbsurdEq tcm exts) (altEqs tcm alt)
  where

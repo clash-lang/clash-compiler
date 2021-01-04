@@ -50,8 +50,14 @@ import           Test.Tasty.HUnit
 -- | GHC version as major.minor.patch1. For example: 8.10.2.
 ghcVersion3 :: String
 ghcVersion3 =
+#ifdef __GLASGOW_HASKELL_PATCHLEVEL2__
+  let ghc_p1 = __GLASGOW_HASKELL_PATCHLEVEL1__
+      ghc_p2 = __GLASGOW_HASKELL_PATCHLEVEL2__ in
+  intercalate "." (map show (versionBranch compilerVersion <> [ghc_p1,ghc_p2]))
+#else
   let ghc_p1 = __GLASGOW_HASKELL_PATCHLEVEL1__ in
   intercalate "." (map show (versionBranch compilerVersion <> [ghc_p1]))
+#endif
 
 -- Directory clash binary is expected to live in
 cabalClashBinDir :: IO String

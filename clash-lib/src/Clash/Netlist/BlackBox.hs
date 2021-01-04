@@ -9,6 +9,7 @@
   Functions to create BlackBox Contexts and fill in BlackBox templates
 -}
 
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE MagicHash #-}
 {-# LANGUAGE OverloadedStrings #-}
@@ -46,7 +47,11 @@ import           System.Console.ANSI
 import           System.IO
   (hPutStrLn, stderr, hFlush, hIsTerminalDevice)
 import           TextShow                      (showt)
+#if MIN_VERSION_ghc(9,0,0)
+import           GHC.Utils.Misc                (OverridingBool(..))
+#else
 import           Util                          (OverridingBool(..))
+#endif
 
 import           Clash.Annotations.Primitive
   ( PrimitiveGuard(HasBlackBox, DontTranslate)
@@ -164,7 +169,9 @@ mkBlackBoxContext bbName resIds args@(lefts -> termArgs) = do
               pure 1
 
         curBBlvl Lens.+= 1
-        (fs,ds) <- unzip <$> replicateM funcPlurality (mkFunInput (head resIds) arg)
+        (fs,ds) <- case resIds of
+          (resId:_) -> unzip <$> replicateM funcPlurality (mkFunInput resId arg)
+          _ -> error "internal error: insufficient resIds"
         curBBlvl Lens.-= 1
 
         let im' = IntMap.insert i fs im
@@ -521,8 +528,20 @@ mkPrimitive bbEParen bbEasD dst pInfo args tickDecls =
                   return (Noop, dstDecl ++ mealyDecls)
                 Nothing -> return (Noop,[])
 
-          | pNm == "Clash.Explicit.SimIO.bindSimIO#" ->
-              collectBindIO dst (lefts args)
+          | pNm == "Clash.Explicit.SimIO.bindSimIO#" -> do
+              (expr,decls) <- collectBindIO dst (lefts args)
+              resM <- resBndr True dst
+              case resM of
+                Just (_,dstNms,dstDecl) -> case expr of
+                  Noop ->
+                    return (Noop,decls)
+                  _ -> case dstNms of
+                    [dstNm] ->
+                      return ( Identifier dstNm Nothing
+                             , dstDecl ++ decls ++ [Assignment dstNm expr])
+                    _ -> error "internal error"
+                _ ->
+                  return (Noop,decls)
 
           | pNm == "Clash.Explicit.SimIO.apSimIO#" -> do
               collectAppIO dst (lefts args) []
@@ -551,10 +570,14 @@ mkPrimitive bbEParen bbEasD dst pInfo args tickDecls =
                   return (Noop, bindDecls)
 
           | pNm == "Clash.Explicit.SimIO.unSimIO#" ->
-              mkExpr False Sequential dst (head (lefts args))
+              case lefts args of
+                (arg:_) -> mkExpr False Sequential dst arg
+                _ -> error "internal error: insufficient arguments"
 
           | pNm == "Clash.Explicit.SimIO.pureSimIO#" -> do
-              (expr,decls) <- mkExpr False Sequential dst (head (lefts args))
+              (expr,decls) <- case lefts args of
+                (arg:_) -> mkExpr False Sequential dst arg
+                _ -> error "internal error: insufficient arguments"
               resM <- resBndr True dst
               case resM of
                 Just (_,dstNms,dstDecl) -> case expr of
@@ -567,6 +590,45 @@ mkPrimitive bbEParen bbEasD dst pInfo args tickDecls =
                     _ -> error "internal error"
                 _ ->
                   return (Noop,decls)
+
+          | pNm == "GHC.Num.Integer.IS" -> do
+              (expr,decls) <- case lefts args of
+                (arg:_) -> mkExpr False Concurrent dst arg
+                _ -> error "internal error: insufficient arguments"
+              iw <- Lens.use intWidth
+              return (N.DataCon (Signed iw) (DC (Void Nothing,-1)) [expr],decls)
+
+          | pNm == "GHC.Num.Integer.IP" -> do
+              (expr,decls) <- case lefts args of
+                (arg:_) -> mkExpr False Concurrent dst arg
+                _ -> error "internal error: insufficient arguments"
+              case expr of
+                N.Literal Nothing (NumLit _) -> return (expr,decls)
+                _ -> error "non-constant ByteArray# not supported"
+
+          | pNm == "GHC.Num.Integer.IN" -> do
+              (expr,decls) <- case lefts args of
+                (arg:_) -> mkExpr False Concurrent dst arg
+                _ -> error "internal error: insufficient arguments"
+              case expr of
+                N.Literal Nothing (NumLit i) ->
+                  return (N.Literal Nothing (NumLit (negate i)),decls)
+                _ -> error "non-constant ByteArray# not supported"
+
+          | pNm == "GHC.Num.Natural.NS" -> do
+              (expr,decls) <- case lefts args of
+                (arg:_) -> mkExpr False Concurrent dst arg
+                _ -> error "internal error: insufficient arguments"
+              iw <- Lens.use intWidth
+              return (N.DataCon (Unsigned iw) (DC (Void Nothing,-1)) [expr],decls)
+
+          | pNm == "GHC.Num.Integer.NB" -> do
+              (expr,decls) <- case lefts args of
+                (arg:_) -> mkExpr False Concurrent dst arg
+                _ -> error "internal error: insufficient arguments"
+              case expr of
+                N.Literal Nothing (NumLit _) -> return (expr,decls)
+                _ -> error "non-constant ByteArray# not supported"
 
           | otherwise ->
               return (BlackBoxE "" [] [] []
@@ -602,7 +664,9 @@ mkPrimitive bbEParen bbEasD dst pInfo args tickDecls =
       -> NetlistMonad (Maybe ([Id],[Identifier],[Declaration]))
       -- Nothing when the binder would have type `Void`
     resBndr mkDec dst' = do
-      resHwTy <- unsafeCoreTypeToHWTypeM' $(curLoc) (head tys)
+      resHwTy <- case tys of
+        (ty1:_) -> unsafeCoreTypeToHWTypeM' $(curLoc) ty1
+        _ -> error "internal error: insufficient types"
       if isVoid resHwTy then
         pure Nothing
       else
@@ -681,8 +745,12 @@ collectMealy dstNm dst tcm (kd:clk:mealyFun:mealyInit:mealyIn:_) = do
                            (mkLocalId (termType tcm e)
                                       (mkUnsafeSystemName "mealyres" 0))
           in  ([(u,e)], u)
+#if __GLASGOW_HASKELL__ >= 900
+      args1 = args0
+#else
       -- Drop the 'State# World' argument
       args1 = init args0
+#endif
       -- Take into account that the state argument is split over multiple
       -- binders because it contained types that are not allowed to occur in
       -- a HDL aggregate type
@@ -741,16 +809,20 @@ collectMealy dstNm dst tcm (kd:clk:mealyFun:mealyInit:mealyIn:_) = do
 
       -- Create the declarations for the "initial state" block
       let sDst = case sBinders of
+                   [] -> error "internal error: insufficient sBinders"
                    [(b,_)] -> CoreId b
                    _       -> MultiId (map fst sBinders)
       (exprInit,initDecls) <- mkExpr False Sequential sDst mealyInit
       let initAssign = case exprInit of
             Identifier _ Nothing -> []
             Noop -> []
-            _ -> [Assignment (id2identifier (fst (head sBinders))) exprInit]
+            _ -> case sBinders of
+              ((b,_):_) -> [Assignment (id2identifier b) exprInit]
+              _ -> error "internal error: insufficient sBinders"
 
       -- Create the declarations that corresponding to the input
       let iDst = case iBinders of
+                   []      -> error "internal error: insufficient iBinders"
                    [(b,_)] -> CoreId b
                    _       -> MultiId (map fst iBinders)
       (exprArg,inpDeclsMisc) <- mkExpr False Concurrent iDst mealyIn
@@ -779,7 +851,9 @@ collectMealy dstNm dst tcm (kd:clk:mealyFun:mealyInit:mealyIn:_) = do
 
       -- Collate everything
       return (clkDecls ++ netDeclsSeq1 ++ netDeclsInp1 ++
-                [ Assignment (id2identifier (fst (head iBinders))) exprArg
+                [ case iBinders of
+                    ((i,_):_) -> Assignment (id2identifier i) exprArg
+                    _ -> error "internal error: insufficient iBinders"
                 , Seq [Initial (map SeqDecl (initDeclsOther ++ initAssign))]
                 , Seq [AlwaysClocked edge clkExpr (map SeqDecl seqDeclsOther)]
                 ] ++ resAssn)
@@ -795,30 +869,33 @@ collectMealy _ _ _ _ = error "internal error"
 
 -- | Collect the sequential declarations for 'bindIO'
 collectBindIO :: NetlistId -> [Term] -> NetlistMonad (Expr,[Declaration])
+#if __GLASGOW_HASKELL__ >= 900
+collectBindIO dst (m:Lam x q@e:_) = do
+#else
 collectBindIO dst (m:Lam x q@(Lam _ e):_) = do
+#endif
   tcm <- Lens.use tcCache
-  ds0 <- collectAction tcm
-  case splitNormalized tcm q of
+  (ds0,subst) <- collectAction tcm
+  let qS = substTm "collectBindIO1" subst q
+  case splitNormalized tcm qS of
     Right (args,bs0,res) -> do
       let Letrec bs _ = inverseTopSortLetBindings (Letrec bs0 (C.Var res))
-      let is0 = mkInScopeSet (Lens.foldMapOf freeIds unitVarSet q)
+      let is0 = mkInScopeSet (Lens.foldMapOf freeIds unitVarSet qS)
       normE <- mkUniqueNormalized is0 Nothing (args,bs,res)
       case normE of
         (_,_,[],_,[],binders,Just result) -> do
           ds1 <- concatMapM (uncurry (mkDeclarations' Sequential)) binders
           netDecls <- concatMapM mkNetDecl binders
-          let assn = Assignment (netlistId1 id id2identifier dst)
-                                (Identifier (id2identifier result) Nothing)
-          return (Noop, (netDecls ++ ds0 ++ ds1 ++ [assn]))
+          return (Identifier (id2identifier result) Nothing, netDecls ++ ds0 ++ ds1)
         _ -> error "internal error"
-    _ -> case e of
+    _ -> case substTm "collectBindIO2" subst e of
       Letrec {} -> error "internal error"
       (collectArgs -> (Prim p,args))
         | primName p == "Clash.Explicit.SimIO.bindSimIO#" -> do
             (expr,ds1) <- collectBindIO dst (lefts args)
             return (expr, ds0 ++ ds1)
-      _ -> do
-        (expr,ds1) <- mkExpr False Sequential dst e
+      eS -> do
+        (expr,ds1) <- mkExpr False Sequential dst eS
         return (expr, ds0 ++ ds1)
  where
   collectAction tcm = case splitNormalized tcm m of
@@ -827,16 +904,19 @@ collectBindIO dst (m:Lam x q@(Lam _ e):_) = do
       let is0 = mkInScopeSet (Lens.foldMapOf freeIds unitVarSet m)
       normE <- mkUniqueNormalized is0 Nothing (args,(x,m):bs,res)
       case normE of
-        (_,_,[],_,[],binders,Just result) -> do
-          let binders1 = tail binders ++ [(fst (head binders), C.Var result)]
+        (_,_,[],_,[],binders@(b:_),Just result) -> do
+          let binders1 = tail binders ++ [(fst b, C.Var result)]
           ds1 <- concatMapM (uncurry (mkDeclarations' Sequential)) binders1
           netDecls <- concatMapM mkNetDecl binders
-          return (netDecls ++ ds1)
+          return (netDecls ++ ds1,extendIdSubst (mkSubst qInScopeSet) x (Var (fst b)))
         _ -> error "internal error"
     _ -> do
-      netDecls <- concatMapM mkNetDecl [(x,m)]
-      ds1 <- mkDeclarations' Sequential x m
-      return (netDecls ++ ds1)
+      ([x'],s) <- mkUnique (mkSubst qInScopeSet) [x]
+      netDecls <- concatMapM mkNetDecl [(x',m)]
+      ds1 <- mkDeclarations' Sequential x' m
+      return (netDecls ++ ds1,s)
+
+  qInScopeSet = mkInScopeSet (Lens.foldMapOf freeIds unitVarSet q)
 
 collectBindIO _ es = error ("internal error:\n" ++ showPpr es)
 
@@ -942,8 +1022,8 @@ mkFunInput resId e =
               case resHTyM1 of
                 -- Special case where coreTypeToHWTypeM determined a type to
                 -- be completely transparent.
-                Just (_resHTy, areVoids@[countEq False -> 1]) -> do
-                  let nonVoidArgI = fromJust (elemIndex False (head areVoids))
+                Just (_resHTy, [areVoids@(countEq False -> 1)]) -> do
+                  let nonVoidArgI = fromJust (elemIndex False areVoids)
                   let arg = Id.unsafeMake (TextS.concat ["~ARG[", showt nonVoidArgI, "]"])
                   let assign = Assignment (Id.unsafeMake "~RESULT") (Identifier arg Nothing)
                   return (Right ((Id.unsafeMake "", tickDecls ++ [assign]), Wire))
@@ -976,9 +1056,8 @@ mkFunInput resId e =
                   return (Right ((Id.unsafeMake "",tickDecls ++ [dcAss]),Wire))
 
                 -- Like SP, we have to retrieve the index BEFORE filtering voids
-                Just (resHTy@(Product _ _ _), areVoids0) -> do
-                  let areVoids1 = head areVoids0
-                      mkArg i    = Id.unsafeMake ("~ARG[" <> showt i <> "]")
+                Just (resHTy@(Product _ _ _), areVoids1:_) -> do
+                  let mkArg i    = Id.unsafeMake ("~ARG[" <> showt i <> "]")
                       dcInps    = [ Identifier (mkArg x) Nothing | x <- originalIndices areVoids1]
                       dcApp     = DataCon resHTy (DC (resHTy,0)) dcInps
                       dcAss     = Assignment (Id.unsafeMake "~RESULT") dcApp

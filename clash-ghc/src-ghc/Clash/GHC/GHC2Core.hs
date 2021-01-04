@@ -48,6 +48,44 @@ import qualified Data.Traversable            as T
 import qualified Text.Read                   as Text
 
 -- GHC API
+#if MIN_VERSION_ghc(9,0,0)
+import GHC.Core.Coercion.Axiom
+  (CoAxiom (co_ax_branches), CoAxBranch (cab_lhs,cab_rhs), fromBranches)
+import GHC.Core.Coercion (coercionType,coercionKind)
+import GHC.Core.FVs  (exprSomeFreeVars)
+import GHC.Core
+  (AltCon (..), Bind (..), CoreExpr, Expr (..), Unfolding (..), Tickish (..),
+   collectArgs, rhssOfAlts, unfoldingTemplate)
+import GHC.Core.DataCon
+  (DataCon, dataConExTyCoVars, dataConName, dataConRepArgTys, dataConTag,
+   dataConTyCon, dataConUnivTyVars, dataConWorkId, dataConFieldLabels, flLabel)
+import GHC.Driver.Session (unsafeGlobalDynFlags)
+import GHC.Core.FamInstEnv (FamInst (..), FamInstEnvs, familyInstances)
+import GHC.Data.FastString (unpackFS, bytesFS)
+import GHC.Types.Id (isDataConId_maybe)
+import GHC.Types.Id.Info (IdDetails (..), unfoldingInfo)
+import GHC.Types.Literal (Literal (..), LitNumType (..))
+import GHC.Unit.Module (moduleName, moduleNameString)
+import GHC.Types.Name
+  (Name, nameModule_maybe, nameOccName, nameUnique, getSrcSpan)
+import GHC.Builtin.Names  (tYPETyConKey, integerTyConKey, naturalTyConKey)
+import GHC.Types.Name.Occurrence (occNameString)
+import GHC.Utils.Outputable (showPpr)
+import GHC.Data.Pair (Pair (..))
+import GHC.Types.SrcLoc (SrcSpan (..), isGoodSrcSpan)
+import GHC.Core.TyCon
+  (AlgTyConRhs (..), TyCon, tyConName, algTyConRhs, isAlgTyCon, isFamilyTyCon,
+   isFunTyCon, isNewTyCon, isPrimTyCon, isTupleTyCon,
+   isClosedSynFamilyTyConWithAxiom_maybe, expandSynTyCon_maybe, tyConArity,
+   tyConDataCons, tyConKind, tyConName, tyConUnique, isClassTyCon)
+import GHC.Core.Type (mkTvSubstPrs, substTy, coreView)
+import GHC.Core.TyCo.Rep (Coercion (..), TyLit (..), Type (..), scaledThing)
+import GHC.Types.Unique (Uniquable (..), Unique, getKey, hasKey)
+import GHC.Types.Var
+  (Id, TyVar, Var, VarBndr (..), idDetails, isTyVar, varName, varType,
+   varUnique, idInfo, isGlobalId)
+import GHC.Types.Var.Set (isEmptyVarSet)
+#else
 import CoAxiom    (CoAxiom (co_ax_branches), CoAxBranch (cab_lhs,cab_rhs),
                    fromBranches)
 import Coercion   (coercionType,coercionKind)
@@ -110,6 +148,7 @@ import Var        (VarBndr (..))
 import Var        (TyVarBndr (..))
 #endif
 import VarSet     (isEmptyVarSet)
+#endif
 
 -- Local imports
 import           Clash.Annotations.Primitive (extractPrim)
@@ -440,7 +479,12 @@ coreToTerm primMap unlocs = term
           -> C.Cast <$> term e <*> coreToType ty1 <*> coreToType ty2
         _ -> term e
     term' (Tick (SourceNote rsp _) e) =
+#if MIN_VERSION_ghc(9,0,0)
+      C.Tick (C.SrcSpan (RealSrcSpan rsp Nothing)) <$>
+             addUsefull (RealSrcSpan rsp Nothing) (term e)
+#else
       C.Tick (C.SrcSpan (RealSrcSpan rsp)) <$> addUsefull (RealSrcSpan rsp) (term e)
+#endif
     term' (Tick _ e) = term e
     term' (Type t) =
       C.TyApp (C.Prim (C.PrimInfo (pack "_TY_") C.undefinedTy C.WorkNever C.SingleResult))
@@ -542,7 +586,11 @@ coreToTerm primMap unlocs = term
       MachChar   c   -> C.CharLiteral c
 #endif
 #if MIN_VERSION_ghc(8,6,0)
+#if MIN_VERSION_ghc(9,0,0)
+      LitNumber lt i -> case lt of
+#else
       LitNumber lt i _ -> case lt of
+#endif
         LitNumInteger -> C.IntegerLiteral i
         LitNumNatural -> C.NaturalLiteral i
         LitNumInt     -> C.IntLiteral i
@@ -661,7 +709,11 @@ hasPrimCo _ = return Nothing
 coreToDataCon :: DataCon
               -> C2C C.DataCon
 coreToDataCon dc = do
+#if MIN_VERSION_ghc(9,0,0)
+    repTys <- mapM (coreToType . scaledThing) (dataConRepArgTys dc)
+#else
     repTys <- mapM coreToType (dataConRepArgTys dc)
+#endif
     dcTy   <- coreToType (varType $ dataConWorkId dc)
     mkDc dcTy repTys
   where
@@ -871,7 +923,11 @@ coreToType' (ForAllTy (TvBndr tv _) ty) = C.ForAllTy <$> coreToTyVar tv <*> core
 #endif
 #if MIN_VERSION_ghc(8,10,0)
 -- TODO after we drop 8.8: save the distinction between => and ->
+#if MIN_VERSION_ghc(9,0,0)
+coreToType' (FunTy _ _ ty1 ty2)             = C.mkFunTy <$> coreToType ty1 <*> coreToType ty2
+#else
 coreToType' (FunTy _ ty1 ty2)             = C.mkFunTy <$> coreToType ty1 <*> coreToType ty2
+#endif
 #else
 coreToType' (FunTy ty1 ty2)             = C.mkFunTy <$> coreToType ty1 <*> coreToType ty2
 #endif

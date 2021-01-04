@@ -43,7 +43,7 @@ common basic-config
     filepath            >=1.4  && <1.5,
     ghc,
     Glob                >=0.9  && <1.0,
-    neat-interpolation  >=0.3  && <0.4,
+    neat-interpolation  >=0.3  && <0.6,
     process             >=1.2  && <1.7,
     tasty               >=1.2  && <1.4,
     tasty-hunit,

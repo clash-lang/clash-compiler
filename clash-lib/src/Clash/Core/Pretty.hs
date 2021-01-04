@@ -7,6 +7,7 @@
   PrettyPrec printing class and instances for CoreHW
 -}
 
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE OverloadedStrings #-}
@@ -40,7 +41,11 @@ import Data.Text.Prettyprint.Doc
 import Data.Text.Prettyprint.Doc.Internal
 import GHC.Show                         (showMultiLineString)
 import Numeric                          (fromRat)
+#if MIN_VERSION_ghc(9,0,0)
+import qualified GHC.Utils.Outputable   as GHC
+#else
 import qualified Outputable             as GHC
+#endif
 import System.Environment               (lookupEnv)
 import System.IO.Unsafe                 (unsafePerformIO)
 import Text.Read                        (readMaybe)

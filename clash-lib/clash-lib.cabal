@@ -165,7 +165,6 @@ Library
                       hashable                >= 1.2.1.0  && < 1.4,
                       haskell-src-meta        >= 0.8      && < 0.9,
                       hint                    >= 0.7      && < 0.10,
-                      integer-gmp             >= 1.0      && < 1.1,
                       interpolate             >= 0.2.0    && < 1.0,
                       lens                    >= 4.10     && < 4.20,
                       mtl                     >= 2.1.2    && < 2.3,
@@ -188,6 +187,11 @@ Library
                       vector                  >= 0.11     && < 1.0,
                       vector-binary-instances >= 0.2.3.5  && < 0.3,
                       unordered-containers    >= 0.2.3.3  && < 0.3
+
+  if impl(ghc >= 9.0.0)
+    build-depends:     ghc-bignum >=1.0 && <1.1
+  else
+    build-depends:     integer-gmp >=1.0 && <1.1
 
   Autogen-Modules:    Paths_clash_lib
 

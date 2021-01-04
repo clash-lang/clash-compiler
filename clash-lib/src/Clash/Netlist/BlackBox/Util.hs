@@ -780,11 +780,13 @@ exprToString
 exprToString (Literal _ (NumLit i)) = Just (show i)
 exprToString (Literal _ (StringLit l)) = Just l
 exprToString (BlackBoxE "Clash.Promoted.Symbol.SSymbol" _ _ _ _ ctx _) =
-  let (e',_,_) = head (bbInputs ctx)
-  in  exprToString e'
+  case bbInputs ctx of
+    (e0,_,_):_ -> exprToString e0
+    _ -> error "internal error: insufficient bbInputs"
 exprToString (BlackBoxE "GHC.CString.unpackCString#" _ _ _ _ ctx _) =
-  let (e',_,_) = head (bbInputs ctx)
-  in  exprToString e'
+  case bbInputs ctx of
+    (e0,_,_):_ -> exprToString e0
+    _ -> error "internal error: insufficient bbInputs"
 exprToString _ = Nothing
 
 prettyBlackBox :: Monad m
@@ -799,11 +801,14 @@ prettyElem
 prettyElem (Text t) = return t
 prettyElem (Component (Decl i 0 args)) = do
   args' <- mapM (\(a,b) -> (,) <$> prettyBlackBox a <*> prettyBlackBox b) args
-  renderOneLine <$>
-    (nest 2 (string "~INST" <+> int i <> line <>
-        string "~OUTPUT" <+> string "=>" <+> string (fst (head args')) <+> string (snd (head args')) <+> string "~" <> line <>
-        vcat (mapM (\(a,b) -> string "~INPUT" <+> string "=>" <+> string a <+> string b <+> string "~") (tail args')))
-      <> line <> string "~INST")
+  case args' of
+    (arg:rest) ->
+      renderOneLine <$>
+        (nest 2 (string "~INST" <+> int i <> line <>
+            string "~OUTPUT" <+> string "=>" <+> string (fst arg) <+> string (snd arg) <+> string "~" <> line <>
+            vcat (mapM (\(a,b) -> string "~INPUT" <+> string "=>" <+> string a <+> string b <+> string "~") rest))
+          <> line <> string "~INST")
+    _ -> error "internal error: insufficient args"
 prettyElem (Component (Decl {})) =
   error $ $(curLoc) ++ "prettyElem can't (yet) render ~INST when subfuncion /= 0!"
 prettyElem Result = return "~RESULT"

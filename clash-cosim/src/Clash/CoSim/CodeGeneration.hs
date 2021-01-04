@@ -125,4 +125,8 @@ coSimTypeGen clks args = do
 
     let ctx = (fixedArgs ++ clkSignalTypes ++ argSignalTypes) `arrowsR` resSignalType
     let varNames = resultName : domName : argNames
+#if MIN_VERSION_template_haskell(2,17,0)
+    return $ ForallT (map (`PlainTV` SpecifiedSpec) varNames) constraints ctx
+#else
     return $ ForallT (map PlainTV varNames) constraints ctx
+#endif

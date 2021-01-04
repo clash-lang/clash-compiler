@@ -6,6 +6,7 @@
   Utility functions used by the normalisation transformations
 -}
 
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecordWildCards #-}
@@ -46,8 +47,13 @@ import qualified Data.HashSet            as HashSet
 import           Data.Text               (Text)
 import qualified Data.Text as Text
 
+#if MIN_VERSION_ghc(9,0,0)
+import           GHC.Builtin.Names       (eqTyConKey)
+import           GHC.Types.Unique        (getKey)
+#else
 import           PrelNames               (eqTyConKey)
 import           Unique                  (getKey)
+#endif
 
 import           Clash.Annotations.Primitive (extractPrim)
 import           Clash.Core.FreeVars

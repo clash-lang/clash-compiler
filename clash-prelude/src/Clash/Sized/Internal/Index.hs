@@ -74,10 +74,15 @@ import Data.Default.Class         (Default (..))
 import Text.Read                  (Read (..), ReadPrec)
 import Text.Printf                (PrintfArg (..), printf)
 import Data.Ix                    (Ix(..))
-import Language.Haskell.TH        (TypeQ, appT, conT, litT, numTyLit, sigE)
+import Language.Haskell.TH        (appT, conT, litT, numTyLit, sigE)
 import Language.Haskell.TH.Syntax (Lift(..))
 #if MIN_VERSION_template_haskell(2,16,0)
 import Language.Haskell.TH.Compat
+#endif
+#if MIN_VERSION_template_haskell(2,17,0)
+import Language.Haskell.TH        (Quote, Type)
+#else
+import Language.Haskell.TH        (TypeQ)
 #endif
 import GHC.Generics               (Generic)
 import GHC.Natural                (Natural, naturalFromInteger)
@@ -133,10 +138,17 @@ import Clash.XException
 -- >>> 2 * 4 :: Index 8
 -- *** Exception: X: Clash.Sized.Index: result 8 is out of bounds: [0..7]
 -- ...
+#if MIN_VERSION_base(4,15,0)
+data Index (n :: Nat) =
+    -- | The constructor, 'I', and the field, 'unsafeToInteger', are not
+    -- synthesizable.
+    I { unsafeToInteger :: !Integer }
+#else
 newtype Index (n :: Nat) =
     -- | The constructor, 'I', and the field, 'unsafeToInteger', are not
     -- synthesizable.
     I { unsafeToInteger :: Integer }
+#endif
   deriving (Data, Generic)
 
 {-# NOINLINE size# #-}
@@ -423,7 +435,11 @@ instance KnownNat n => Lift (Index n) where
   liftTyped = liftTypedFromUntyped
 #endif
 
+#if MIN_VERSION_template_haskell(2,17,0)
+decIndex :: Quote m => Integer -> m Type
+#else
 decIndex :: Integer -> TypeQ
+#endif
 decIndex n = appT (conT ''Index) (litT $ numTyLit n)
 
 instance Show (Index n) where

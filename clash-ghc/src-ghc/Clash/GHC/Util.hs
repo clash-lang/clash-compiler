@@ -1,11 +1,20 @@
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE QuasiQuotes #-}
 
 module Clash.GHC.Util where
 
+#if MIN_VERSION_ghc(9,0,0)
+import GHC.Utils.Outputable (SDoc)
+import GHC.Utils.Error (mkPlainErrMsg)
+import GHC.Plugins
+  (DynFlags, SourceError, ($$), blankLine, empty, isGoodSrcSpan, liftIO,
+   noSrcSpan, text, throwOneError)
+#else
 import Outputable         (SDoc)
 import ErrUtils           (mkPlainErrMsg)
-import GHC                (GhcMonad(..), printException)
 import GhcPlugins         (DynFlags, SourceError, ($$), blankLine, empty, isGoodSrcSpan, liftIO, noSrcSpan, text, throwOneError)
+#endif
+import GHC                (GhcMonad(..), printException)
 
 import Control.Exception  (Exception(..), ErrorCall(..))
 import GHC.Exception      (SomeException)

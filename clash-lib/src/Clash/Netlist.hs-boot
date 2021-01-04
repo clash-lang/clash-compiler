@@ -3,6 +3,7 @@
   License     :  BSD2 (see the file LICENSE)
   Maintainer  :  Christiaan Baaij <christiaan.baaij@gmail.com>
 -}
+{-# LANGUAGE CPP #-}
 
 module Clash.Netlist
   (genComponent
@@ -22,7 +23,12 @@ import Clash.Core.Type      (Type)
 import Clash.Core.Var       (Id)
 import Clash.Netlist.Types  (Expr, HWType, Identifier, NetlistMonad, Component,
                              Declaration, NetlistId, DeclarationType, IdentifierSet)
+
+#if MIN_VERSION_ghc(9,0,0)
+import GHC.Types.SrcLoc     (SrcSpan)
+#else
 import SrcLoc               (SrcSpan)
+#endif
 
 import GHC.Stack (HasCallStack)
 

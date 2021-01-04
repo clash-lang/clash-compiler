@@ -1,0 +1,235 @@
+[ { "BlackBox":
+    { "name": "GHC.Num.Integer.integerToNatural"
+    , "workInfo" : "Never"
+    , "kind": "Expression"
+    , "type": "integerToNatural :: Integer -> Natural"
+    , "template": "$unsigned(~VAR[n][0][(~SIZE[~TYPO]-1):0])"
+    , "warning": "GHC.Num.Integer.integerToNatural: Naturals are dynamically sized in simulation, but fixed-length after synthesis. Use carefully."
+    }
+  }
+, { "BlackBox":
+  { "name": "GHC.Num.Integer.integerToNaturalClamp"
+  , "workInfo" : "Never"
+  , "kind": "Expression"
+  , "type": "integerToNatural :: Integer -> Natural"
+  , "template": "(~ARG[0] < ~SIZE[~TYP[0]]'d0 ? ~SIZE[~TYPO]'d0 : $unsigned(~VAR[n][0][(~SIZE[~TYPO]-1):0]))"
+  , "warning": "GHC.Num.Integer.integerToNatural: Naturals are dynamically sized in simulation, but fixed-length after synthesis. Use carefully."
+  }
+}
+, { "BlackBox" :
+    { "name"      : "GHC.Num.Integer.integerToInt#"
+    , "workInfo"  : "Never"
+    , "kind"      : "Declaration"
+    , "type"      : "integerToInt :: Integer -> Int#"
+    , "template"  : "assign ~RESULT = $signed(~ARG[0]);"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "GHC.Num.Integer.integerMul"
+    , "kind"      : "Expression"
+    , "type"      : "integerMul :: Integer -> Integer -> Integer"
+    , "template"  : "~ARG[0] * ~ARG[1]"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "GHC.Num.Integer.integerNegate"
+    , "kind"      : "Expression"
+    , "type"      : "integerNegate :: Integer -> Integer"
+    , "template"  : "-~ARG[0]"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "GHC.Num.Integer.integerAbs"
+    , "kind"      : "Expression"
+    , "type"      : "integerAbs :: Integer -> Integer"
+    , "template"  : "(~ARG[0] < ~SIZE[~TYPO]'sd0) ? -~ARG[0] : ~ARG[0]"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "GHC.Num.Integer.integerRem"
+    , "kind"      : "Expression"
+    , "type"      : "integerRem :: Integer -> Integer -> Integer"
+    , "template"  : "~ARG[0] % ~ARG[1]"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "GHC.Num.Integer.integerEq"
+    , "kind"      : "Expression"
+    , "type"      : "integerEq :: Integer -> Integer -> Bool"
+    , "template"  : "~ARG[0] == ~ARG[1]"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "GHC.Num.Integer.integerNe"
+    , "kind"      : "Expression"
+    , "type"      : "integerNe :: Integer -> Integer -> Bool"
+    , "template"  : "~ARG[0] != ~ARG[1]"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "GHC.Num.Integer.integerEq#"
+    , "kind"      : "Expression"
+    , "type"      : "integerEq :: Integer -> Integer -> Int#"
+    , "template"  : "(~ARG[0] == ~ARG[1]) ? ~SIZE[~TYPO]'sd1 : ~SIZE[~TYPO]'sd0"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "GHC.Integer.Type.integerNe#"
+    , "kind"      : "Expression"
+    , "type"      : "integerNe# :: Integer -> Integer -> Int#"
+    , "template"  : "(~ARG[0] != ~ARG[1]) ? ~SIZE[~TYPO]'sd1 : ~SIZE[~TYPO]'sd0"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "GHC.Integer.Type.integerLe#"
+    , "kind"      : "Expression"
+    , "type"      : "integerLe :: Integer -> Integer -> Int#"
+    , "template"  : "(~ARG[0] <= ~ARG[1]) ? ~SIZE[~TYPO]'sd1 : ~SIZE[~TYPO]'sd0"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "GHC.Num.Integer.integerGt#"
+    , "kind"      : "Expression"
+    , "type"      : "integerGt# :: Integer -> Integer -> Int#"
+    , "template"  : "(~ARG[0] > ~ARG[1] ? ~SIZE[~TYPO]'sd1 : ~SIZE[~TYPO]'sd0"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "GHC.Num.Integer.integerLt#"
+    , "kind"      : "Expression"
+    , "type"      : "integerLt# :: Integer -> Integer -> Int#"
+    , "template"  : "(~ARG[0] < ~ARG[1]) ? ~SIZE[~TYPO]'sd1 : ~SIZE[~TYPO]'sd0"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "GHC.Num.Integer.integerGe#"
+    , "kind"      : "Expression"
+    , "type"      : "integerGe# :: Integer -> Integer -> Int#"
+    , "template"  : "(~ARG[0] >= ~ARG[1]) ? ~SIZE[~TYPO]'sd1 : ~SIZE[~TYPO]'sd0"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "GHC.Num.Integer.integerShiftR#"
+    , "kind"      : "Expression"
+    , "type"      : "integerShiftR :: Integer -> Word# -> Integer"
+    , "template"  : "~ARG[0] >>> ~ARG[1]"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "GHC.Num.Integer.integerShiftL#"
+    , "kind"      : "Expression"
+    , "type"      : "integerShiftL :: Integer -> Word# -> Integer"
+    , "template"  : "~ARG[0] <<< ~ARG[1]"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "GHC.Num.Integer.integerTestBit#"
+    , "kind"      : "Expression"
+    , "type"      : "integerTestBit :: Integer -> Word# -> Bool"
+    , "template"  : "~VAR[input][0][~ARG[1]] == 1'b1"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "GHC.Num.Integer.integerFromWord#"
+    , "workInfo"  : "Never"
+    , "kind"      : "Declaration"
+    , "type"      : "integerFromWord# :: Word# -> Integer"
+    , "template"  : "assign ~RESULT = $signed(~ARG[0]);"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "GHC.Num.Integer.integerToWord#"
+    , "workInfo"  : "Never"
+    , "kind"      : "Declaration"
+    , "type"      : "integerToWord# :: Integer -> Word#"
+    , "template"  : "assign ~RESULT = $unsigned(~ARG[0]);"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "GHC.Num.Integer.integerToWord64#"
+    , "workInfo"  : "Never"
+    , "kind"      : "Declaration"
+    , "type"      : "integerToWord64# :: Integer -> Word64#"
+    , "comment"   : "only used by 32 bit GHC"
+    , "template"  : "assign ~RESULT = $unsigned(~ARG[0]);"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "GHC.Num.Integer.integerBit#"
+    , "kind"      : "Expression"
+    , "type"      : "integerBit# :: Word# -> Integer"
+    , "template"  : "1 << ~ARG[0]"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "GHC.Num.Integer.integerComplement"
+    , "kind"      : "Expression"
+    , "type"      : "integerComplement :: Integer -> Integer"
+    , "template"  : "~ ~ARG[0]"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "GHC.Num.Integer.integerXor"
+    , "kind"      : "Expression"
+    , "type"      : "integerXor :: Integer -> Integer -> Integer"
+    , "template"  : "~ARG[0] ^ ~ARG[1]"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "GHC.Num.Integer.integerOr"
+    , "kind"      : "Expression"
+    , "type"      : "integerOr :: Integer -> Integer -> Integer"
+    , "template"  : "~ARG[0] | ~ARG[1]"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "GHC.Num.Integer.integerAnd"
+    , "kind"      : "Expression"
+    , "type"      : "andInteger :: Integer -> Integer -> Integer"
+    , "template"  : "~ARG[0] & ~ARG[1]"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "GHC.Num.Integer.integerSignum"
+    , "kind"      : "Expression"
+    , "type"      : "integerSignum :: Integer -> Integer"
+    , "template"  : "(~ARG[0] < ~SIZE[~TYPO]'sd0) ? -~SIZE[~TYPO]'sd1 : ((~ARG[0] == ~SIZE[~TYPO]'sd0) ? ~SIZE[~TYPO]'sd0 : ~SIZE[~TYPO]'sd1)"
+    }
+  }
+  , { "BlackBox" :
+    { "name"      : "GHC.Num.Integer.$wintegerSignum"
+    , "kind"      : "Expression"
+    , "type"      : "integerSignum :: Integer -> Int#"
+    , "template"  : "(~ARG[0] < ~SIZE[~TYPO]'sd0) ? -~SIZE[~TYPO]'sd1 : ((~ARG[0] == ~SIZE[~TYPO]'sd0) ? ~SIZE[~TYPO]'sd0 : ~SIZE[~TYPO]'sd1)"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "GHC.Num.Integer.integerLogBase#"
+    , "kind"      : "Expression"
+    , "type"      : "integerLogBase# :: Integer -> Integer -> Word#"
+    , "imports"   : ["~INCLUDENAME[0].inc"]
+    , "includes" :
+      [ { "name" : "integerLogBase"
+        , "extension" : "inc"
+        , "template" :
+"// integer logBase
+function integer ~INCLUDENAME[0];
+input integer base, value;
+begin
+  for (~INCLUDENAME[0] = 0; value >= base; ~INCLUDENAME[0]=~INCLUDENAME[0]+1)
+    value = value / base;
+end
+endfunction"
+        }
+      ]
+    , "template"  : "~INCLUDENAME[0](~ARG[0],~ARG[1])"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "GHC.Num.Integer.integerCompare"
+    , "kind"      : "Expression"
+    , "type"      : "integerCompare :: Integer -> Integer -> Ordering"
+    , "template"  : "(~ARG[0] < ~ARG[1]) ? -~SIZE[~TYPO]'d0 : ((~ARG[0] == ~ARG[1]) ? ~SIZE[~TYPO]'d1 : ~SIZE[~TYPO]'d2)"
+    }
+  }
+]

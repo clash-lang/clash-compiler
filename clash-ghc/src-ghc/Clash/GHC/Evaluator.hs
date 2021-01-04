@@ -10,6 +10,7 @@
 
 -}
 
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE MagicHash #-}
 {-# LANGUAGE NamedFieldPuns #-}
@@ -25,8 +26,12 @@ import           Data.Either                             (lefts,rights)
 import           Data.List                               (foldl',mapAccumL)
 import qualified Data.Primitive.ByteArray                as BA
 import qualified Data.Text as Text
+#if MIN_VERSION_base(4,15,0)
+import           GHC.Num.Integer                         (Integer (..))
+#else
 import           GHC.Integer.GMP.Internals
   (Integer (..), BigNat (..))
+#endif
 
 import           Clash.Core.DataCon
 import           Clash.Core.Evaluator.Types
@@ -303,11 +308,13 @@ apply _tcm (Lambda x' e) x m =
  where
   subst  = extendIdSubst subst0 x' (Var x)
   subst0 = mkSubst $ extendInScopeSet (mScopeNames m) x
-apply tcm pVal@(PrimVal (PrimInfo{primType}) tys []) x m
+apply tcm pVal@(PrimVal (PrimInfo{primType}) tys vs) x m
   | isUndefinedPrimVal pVal
-  = setTerm (undefinedTm (piResultTys tcm primType (tys++[varType x]))) m
+  = setTerm (undefinedTm ty) m
+ where
+  ty = piResultTys tcm primType (tys ++ map (termType tcm . valToTerm) vs ++ [varType x])
 
-apply _ _ _ m = error $ "Evaluator.apply: Not a lambda: " ++ show m
+apply _ v _ m = error $ "Evaluator.apply: Not a lambda: " ++ show v ++ "\n" ++ show m
 
 -- | Instantiate a type-abstraction
 instantiate :: TyConMap -> Value -> Type -> Machine -> Machine
@@ -346,11 +353,19 @@ scrutinise (Lit l) _altTy alts m = case alts of
        1 | l1 >= ((-2)^(63::Int)) &&  l1 < 2^(63::Int) ->
           Just (IntLiteral l1)
        2 | l1 >= (2^(63::Int)) ->
+#if MIN_VERSION_base(4,15,0)
+          let !(IP ba0) = l1
+#else
           let !(Jp# !(BN# ba0)) = l1
+#endif
               ba1 = BA.ByteArray ba0
           in  Just (ByteArrayLiteral ba1)
        3 | l1 < ((-2)^(63::Int)) ->
+#if MIN_VERSION_base(4,15,0)
+          let !(IN ba0) = l1
+#else
           let !(Jn# !(BN# ba0)) = l1
+#endif
               ba1 = BA.ByteArray ba0
           in  Just (ByteArrayLiteral ba1)
        _ -> Nothing
@@ -363,7 +378,11 @@ scrutinise (Lit l) _altTy alts m = case alts of
        1 | l1 >= 0 &&  l1 < 2^(64::Int) ->
           Just (WordLiteral l1)
        2 | l1 >= (2^(64::Int)) ->
+#if MIN_VERSION_base(4,15,0)
+          let !(IP ba0) = l1
+#else
           let !(Jp# !(BN# ba0)) = l1
+#endif
               ba1 = BA.ByteArray ba0
           in  Just (ByteArrayLiteral ba1)
        _ -> Nothing

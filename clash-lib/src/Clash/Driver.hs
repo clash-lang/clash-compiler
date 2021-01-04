@@ -66,11 +66,19 @@ import           Text.Trifecta.Result
   (Result(Success, Failure), _errDoc)
 import           Text.Read                        (readMaybe)
 
+#if MIN_VERSION_ghc(9,0,0)
+import           GHC.Builtin.Names                 (eqTyConKey, ipClassKey)
+import           GHC.Types.Unique                  (getKey)
+
+import           GHC.Types.SrcLoc                  (SrcSpan)
+import           GHC.Utils.Misc                    (OverridingBool(Auto))
+#else
 import           PrelNames               (eqTyConKey, ipClassKey)
 import           Unique                  (getKey)
 
 import           SrcLoc                           (SrcSpan)
 import           Util                             (OverridingBool(Auto))
+#endif
 import           GHC.BasicTypes.Extra             ()
 
 import           Clash.Annotations.Primitive

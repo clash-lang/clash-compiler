@@ -1,4 +1,4 @@
-{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE CPP, OverloadedStrings #-}
 
 module T1568 where
 
@@ -12,7 +12,11 @@ import Clash.Core.Var
 import Clash.Core.VarEnv
 import Clash.Driver.Types
 
+#if __GLASGOW_HASKELL__ >= 900
+import GHC.Types.Basic
+#else
 import BasicTypes
+#endif
 
 import Test.Tasty.Clash
 import Test.Tasty.Clash.CoreTest

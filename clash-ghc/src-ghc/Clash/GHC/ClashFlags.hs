@@ -14,9 +14,15 @@ module Clash.GHC.ClashFlags
   )
 where
 
+#if MIN_VERSION_ghc(9,0,0)
+import           GHC.Driver.CmdLine
+import           GHC.Utils.Panic
+import           GHC.Types.SrcLoc
+#else
 import           CmdLineParser
 import           Panic
 import           SrcLoc
+#endif
 
 import           Control.Monad
 import           Data.Char                      (isSpace)

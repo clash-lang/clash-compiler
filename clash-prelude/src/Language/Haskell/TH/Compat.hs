@@ -23,7 +23,10 @@ mkTupE = TupE
          . map Just
 #endif
 
-#if MIN_VERSION_template_haskell(2,16,0)
+#if MIN_VERSION_template_haskell(2,17,0)
+liftTypedFromUntyped :: (Lift a, Quote m) => a -> Code m a
+liftTypedFromUntyped = unsafeCodeCoerce . lift
+#elif MIN_VERSION_template_haskell(2,16,0)
 liftTypedFromUntyped :: Lift a => a -> Q (TExp a)
 liftTypedFromUntyped = unsafeTExpCoerce . lift
 #endif

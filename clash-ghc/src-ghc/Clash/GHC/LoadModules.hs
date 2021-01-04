@@ -39,6 +39,9 @@ import           Control.Monad                   (forM, when)
 #if MIN_VERSION_ghc(8,6,0)
 import           Control.Exception               (throwIO)
 #endif
+#if MIN_VERSION_ghc(9,0,0)
+import           Control.Monad.Catch             as MC (try)
+#endif
 import           Control.Monad.IO.Class          (liftIO)
 import           Data.Char                       (isDigit)
 import           Data.Generics.Uniplate.DataOnly (transform)
@@ -68,6 +71,43 @@ import           System.Process                  (runInteractiveCommand,
 #endif
 
 -- GHC API
+#if MIN_VERSION_ghc(9,0,0)
+import qualified GHC.Types.Annotations as Annotations
+import qualified GHC.Core.FVs as CoreFVs
+import qualified GHC.Core as CoreSyn
+import qualified GHC.Core.DataCon as DataCon
+import qualified GHC.Data.Graph.Directed as Digraph
+import qualified GHC.Runtime.Loader as DynamicLoading
+import           GHC.Driver.Session (GeneralFlag (..))
+import qualified GHC.Driver.Session as DynFlags
+import qualified GHC.Data.FastString as FastString
+import qualified GHC
+import qualified GHC.Driver.Main as HscMain
+import qualified GHC.Driver.Types as HscTypes
+import qualified GHC.Utils.Monad as MonadUtils
+import qualified GHC.Utils.Panic as Panic
+import qualified GHC.Serialized as Serialized (deserializeWithData)
+import qualified GHC.Unit.Types as UnitTypes (unitIdString)
+import qualified GHC.Tc.Utils.Monad as TcRnMonad
+import qualified GHC.Tc.Types as TcRnTypes
+import qualified GHC.Iface.Tidy as TidyPgm
+import qualified GHC.Core.TyCon as TyCon
+import qualified GHC.Core.Type as Type
+import qualified GHC.Types.Unique as Unique
+import qualified GHC.Tc.Instance.Family as FamInst
+import qualified GHC.Core.FamInstEnv as FamInstEnv
+import qualified GHC.LanguageExtensions as LangExt
+import qualified GHC.Types.Name as Name
+import qualified GHC.Types.Name.Occurrence as OccName
+import           GHC.Utils.Outputable (ppr)
+import qualified GHC.Utils.Outputable as Outputable
+import qualified GHC.Types.Unique.Set as UniqSet
+import           GHC.Utils.Misc (OverridingBool)
+import qualified GHC.Types.Var as Var
+import qualified GHC.Driver.Ways as Ways
+import qualified GHC.Unit.Module.Env as ModuleEnv
+import qualified GHC.Types.Name.Env as NameEnv
+#else
 import qualified Annotations
 import qualified CoreFVs
 import qualified CoreSyn
@@ -103,6 +143,7 @@ import qualified Outputable
 import qualified UniqSet
 import           Util (OverridingBool)
 import qualified Var
+#endif
 
 -- Internal Modules
 import           Clash.GHC.GHC2Core                           (modNameM, qualifiedNameString')
@@ -161,7 +202,11 @@ loadExternalModule
           , LoadedBinders
           , [CoreSyn.CoreBind]                     -- All bindings
           ) )
+#if MIN_VERSION_ghc(9,0,0)
+loadExternalModule hdl modName0 = MC.try $ do
+#else
 loadExternalModule hdl modName0 = Exception.gtry $ do
+#endif
   let modName1 = GHC.mkModuleName modName0
   foundMod <- GHC.findModule modName1 Nothing
   let errMsg = "Internal error: found  module, but could not load it"
@@ -187,7 +232,13 @@ setupGhc useColor dflagsM idirs = do
         -- Make sure we read the .ghc environment files
         df <- do
           df <- GHC.getSessionDynFlags
+#if MIN_VERSION_ghc(9,0,0)
+          df1 <- liftIO (GHC.interpretPackageEnv df)
+          _ <- GHC.setSessionDynFlags df1
+
+#else
           _ <- GHC.setSessionDynFlags df {DynFlags.pkgDatabase = Nothing}
+#endif
           GHC.getSessionDynFlags
 #else
         df <- GHC.getSessionDynFlags
@@ -209,7 +260,11 @@ setupGhc useColor dflagsM idirs = do
                   , DynFlags.ghcMode  = GHC.CompManager
                   , DynFlags.ghcLink  = GHC.LinkInMemory
                   , DynFlags.hscTarget
+#if MIN_VERSION_ghc(9,0,0)
+                      = if Ways.hostIsProfiled
+#else
                       = if DynFlags.rtsIsProfiled
+#endif
                            then DynFlags.HscNothing
                            else DynFlags.defaultObjectTarget $
 #if !MIN_VERSION_ghc(8,10,0)
@@ -235,8 +290,12 @@ setupGhc useColor dflagsM idirs = do
                ])
       (return ())
 
-
-#if MIN_VERSION_ghc(8,6,0)
+#if MIN_VERSION_ghc(9,0,0)
+  _ <- GHC.setSessionDynFlags dflags3
+  hscenv <- GHC.getSession
+  dflags4 <- MonadUtils.liftIO (DynamicLoading.initializePlugins hscenv dflags3)
+  _ <- GHC.setSessionDynFlags dflags4
+#elif MIN_VERSION_ghc(8,6,0)
   hscenv <- GHC.getSession
   dflags4 <- MonadUtils.liftIO (DynamicLoading.initializePlugins hscenv dflags3)
   _ <- GHC.setSessionDynFlags dflags4
@@ -602,7 +661,11 @@ findAnnotationsByTargets
   => [Annotations.AnnTarget Name.Name]
   -> m [[a]]
 findAnnotationsByTargets targets =
+#if MIN_VERSION_ghc(9,0,0)
+  mapM (GHC.findGlobalAnns Serialized.deserializeWithData) targets
+#else
   mapM (GHC.findGlobalAnns GhcPlugins.deserializeWithData) targets
+#endif
 
 -- | Find all annotations of a certain type in all modules seen so far.
 findAllModuleAnnotations
@@ -614,8 +677,18 @@ findAllModuleAnnotations = do
   hsc_env <- GHC.getSession
   ann_env <- liftIO $ HscTypes.prepareAnnotations hsc_env Nothing
   return $ concat
+#if MIN_VERSION_ghc(9,0,0)
+         $ (\(mEnv,nEnv) -> ModuleEnv.moduleEnvElts mEnv <> NameEnv.nameEnvElts nEnv)
+#else
          $ UniqFM.nonDetEltsUFM
-         $ Annotations.deserializeAnns GhcPlugins.deserializeWithData ann_env
+#endif
+         $ Annotations.deserializeAnns
+#if MIN_VERSION_ghc(9,0,0)
+              Serialized.deserializeWithData
+#else
+              GhcPlugins.deserializeWithData
+#endif
+              ann_env
 
 -- | Find all annotations belonging to all binders seen so far.
 findNamedAnnotations
@@ -860,7 +933,9 @@ removeStrictnessAnnotations pm =
                                           ,GHC.con_args   = rmConDetails (GHC.con_args gadt)
                                           }
     rmCD h98@(GHC.ConDeclH98 {})   = h98  {GHC.con_args = rmConDetails (GHC.con_args h98)}
+#if !MIN_VERSION_ghc(9,0,0)
     rmCD xcon                      = xcon
+#endif
 #else
     rmCD gadt@(GHC.ConDeclGADT {}) = gadt {GHC.con_type = rmSigType (GHC.con_type gadt)}
     rmCD h98@(GHC.ConDeclH98 {})   = h98  {GHC.con_details = rmConDetails (GHC.con_details h98)}
@@ -873,10 +948,16 @@ removeStrictnessAnnotations pm =
 #endif
 
     -- type HsConDeclDetails name = HsConDetails (LBangType name) (Located [LConDeclField name])
-    -- rmConDetails :: GHC.DataId name => GHC.HsConDeclDetails name -> GHC.HsConDeclDetails name
+    -- rmConDetails :: _ => GHC.HsConDeclDetails name -> GHC.HsConDeclDetails name
+#if MIN_VERSION_ghc(9,0,0)
+    rmConDetails (GHC.PrefixCon args) = GHC.PrefixCon (fmap rmHsScaledType args)
+    rmConDetails (GHC.InfixCon l r)   = GHC.InfixCon (rmHsScaledType l) (rmHsScaledType r)
+#else
     rmConDetails (GHC.PrefixCon args) = GHC.PrefixCon (fmap rmHsType args)
-    rmConDetails (GHC.RecCon rec)     = GHC.RecCon ((fmap . fmap . fmap) rmConDeclF rec)
     rmConDetails (GHC.InfixCon l r)   = GHC.InfixCon (rmHsType l) (rmHsType r)
+#endif
+    rmConDetails (GHC.RecCon rec)     = GHC.RecCon ((fmap . fmap . fmap) rmConDeclF rec)
+
 
     -- rmHsType :: GHC.DataId name => GHC.Located (GHC.HsType name) -> GHC.Located (GHC.HsType name)
     rmHsType = transform go
@@ -887,6 +968,13 @@ removeStrictnessAnnotations pm =
         go (GHC.unLoc -> GHC.HsBangTy _ ty) = ty
 #endif
         go ty                               = ty
+
+#if MIN_VERSION_ghc(9,0,0)
+    rmHsScaledType = transform go
+      where
+        go (GHC.HsScaled m (GHC.unLoc -> GHC.HsBangTy _ _ ty)) = GHC.HsScaled m ty
+        go ty = ty
+#endif
 
     -- rmConDeclF :: GHC.DataId name => GHC.ConDeclField name -> GHC.ConDeclField name
     rmConDeclF cdf = cdf {GHC.cd_fld_type = rmHsType (GHC.cd_fld_type cdf)}
@@ -905,7 +993,11 @@ checkForInvalidPrelude guts =
     (x:_) -> throw (ClashException noSrcSpan (msgWrongPrelude x) Nothing)
   where
     pkgs = HscTypes.dep_pkgs . HscTypes.mg_deps $ guts
+#if MIN_VERSION_ghc(9,0,0)
+    pkgIds = map (UnitTypes.unitIdString . fst) pkgs
+#else
     pkgIds = map (GhcPlugins.installedUnitIdString . fst) pkgs
+#endif
     prelude = "clash-prelude-"
     isPrelude pkg = case splitAt (length prelude) pkg of
       (x,y:_) | x == prelude && isDigit y -> True     -- check for a digit so we don't match clash-prelude-extras

@@ -183,8 +183,13 @@ data BiSignalIn (ds :: BiSignalDefault) (dom :: Domain) (n :: Nat)
 --
 -- Wraps (multiple) writing signals. The semantics are such that only one of
 -- the signals may write at a single time step.
+#if MIN_VERSION_base(4,15,0)
+data BiSignalOut (ds :: BiSignalDefault) (dom :: Domain) (n :: Nat)
+  = BiSignalOut ![Signal dom (Maybe (BitVector n))]
+#else
 newtype BiSignalOut (ds :: BiSignalDefault) (dom :: Domain) (n :: Nat)
   = BiSignalOut [Signal dom (Maybe (BitVector n))]
+#endif
 
 type instance HasDomain dom1 (BiSignalOut ds dom2 n) = DomEq dom1 dom2
 type instance TryDomain t (BiSignalOut ds dom n) = 'Found dom

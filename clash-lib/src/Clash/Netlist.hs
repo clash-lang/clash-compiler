@@ -8,6 +8,7 @@
   Create Netlists out of normalized CoreHW Terms
 -}
 
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE MagicHash #-}
 {-# LANGUAGE MultiWayIf #-}
@@ -38,10 +39,19 @@ import           Data.Maybe
 import qualified Data.Set                         as Set
 import           Data.Primitive.ByteArray         (ByteArray (..))
 import qualified Data.Text                        as StrictText
+#if MIN_VERSION_base(4,15,0)
+import           GHC.Num.Integer                  (Integer (..))
+#else
 import           GHC.Integer.GMP.Internals        (Integer (..), BigNat (..))
+#endif
 
+#if MIN_VERSION_ghc(9,0,0)
+import           GHC.Utils.Outputable             (ppr, showSDocUnsafe)
+import           GHC.Types.SrcLoc                 (isGoodSrcSpan)
+#else
 import           Outputable                       (ppr, showSDocUnsafe)
 import           SrcLoc                           (isGoodSrcSpan)
+#endif
 
 import           Clash.Annotations.Primitive      (extractPrim, HDL)
 import           Clash.Annotations.BitRepresentation.ClashLib
@@ -293,11 +303,15 @@ genComponentT compName0 componentExpr = do
 
   case resultM of
     Just result -> do
-      [NetDecl' _ rw _ _ rIM] <- mkNetDecl . head $ filter ((==result) . fst) binders
+      [NetDecl' _ rw _ _ rIM] <- case filter ((==result) . fst) binders of
+        b:_ -> mkNetDecl b
+        _ -> error "internal error: couldn't find result binder"
 
       let (compOutps',resUnwrappers') = case compOutps of
             [oport] -> ([(rw,oport,rIM)],resUnwrappers)
-            _       -> let NetDecl n res resTy = head resUnwrappers
+            _       -> let NetDecl n res resTy = case resUnwrappers of
+                             decl:_ -> decl
+                             _ -> error "internal error: insufficient resUnwrappers"
                        in  (map (Wire,,Nothing) compOutps
                            ,NetDecl' n rw res (Right resTy) Nothing:tail resUnwrappers
                            )
@@ -837,7 +851,11 @@ mkExpr _ _ _ (stripTicks -> Core.Literal l) = do
                             i = toInteger (doubleToWord d)
                         in  return (HW.Literal (Just (BitVector 64,64)) (NumLit i), [])
     NaturalLiteral n -> return (HW.Literal (Just (Unsigned iw,iw)) $ NumLit n, [])
+#if MIN_VERSION_base(4,15,0)
+    ByteArrayLiteral (ByteArray ba) -> return (HW.Literal Nothing (NumLit (IP ba)),[])
+#else
     ByteArrayLiteral (ByteArray ba) -> return (HW.Literal Nothing (NumLit (Jp# (BN# ba))),[])
+#endif
     _ -> error $ $(curLoc) ++ "not an integer or char literal"
 
 mkExpr bbEasD declType bndr app =
@@ -846,7 +864,9 @@ mkExpr bbEasD declType bndr app =
  in  withTicks ticks $ \tickDecls -> do
   hwTys  <- mapM (unsafeCoreTypeToHWTypeM' $(curLoc)) (netlistTypes bndr)
   (_,sp) <- Lens.use curCompNm
-  let hwTyA = head hwTys
+  let hwTyA = case hwTys of
+        hwTy:_ -> hwTy
+        _ -> error ("internal error: unable to extract sufficient hwTys from: " <> show bndr)
   case appF of
     Data dc -> mkDcApplication hwTys bndr dc tmArgs
     Prim pInfo -> mkPrimitive False bbEasD bndr pInfo args tickDecls
@@ -1084,23 +1104,45 @@ mkDcApplication [dstHType] bndr dc args = do
         in  return dc'
       Void {} -> return Noop
       Signed _
+#if MIN_VERSION_base(4,15,0)
+        | dcNm == "GHC.Num.Integer.IS"
+#else
         | dcNm == "GHC.Integer.Type.S#"
-        -> pure (head argExprsFiltered)
+#endif
+        , (a:_) <- argExprsFiltered
+        -> pure a
         -- ByteArray# are non-translatable / void, except when they're literals
+#if MIN_VERSION_base(4,15,0)
+        | dcNm == "GHC.Num.Integer.IP"
+#else
         | dcNm == "GHC.Integer.Type.Jp#"
-        , HW.Literal Nothing (NumLit _) <- head argExprs
-        -> pure (head argExprs)
+#endif
+        , (a@(HW.Literal Nothing (NumLit _)):_) <- argExprs
+        -> pure a
+#if MIN_VERSION_base(4,15,0)
+        | dcNm == "GHC.Num.Integer.IN"
+#else
         | dcNm == "GHC.Integer.Type.Jn#"
+#endif
         -- ByteArray# are non-translatable / void, except when they're literals
-        , HW.Literal Nothing (NumLit i) <- head argExprs
+        , (HW.Literal Nothing (NumLit i):_) <- argExprs
         -> pure (HW.Literal Nothing (NumLit (negate i)))
       Unsigned _
+#if MIN_VERSION_base(4,15,0)
+        | dcNm == "GHC.Num.Natural.NS"
+#else
         | dcNm == "GHC.Natural.NatS#"
-        -> pure (head argExprsFiltered)
+#endif
+        , (a:_) <- argExprsFiltered
+        -> pure a
+#if MIN_VERSION_base(4,15,0)
+        | dcNm == "GHC.Num.Natural.NB"
+#else
         | dcNm == "GHC.Natural.NatJ#"
+#endif
         -- ByteArray# are non-translatable / void, except when they're literals
-        , HW.Literal Nothing (NumLit _) <- head argExprs
-        -> pure (head argExprs)
+        , (a@(HW.Literal Nothing (NumLit _)):_) <- argExprs
+        -> pure a
       _ ->
         error $ $(curLoc) ++ "mkDcApplication undefined for: " ++ show (dstHType,dc,args,argHWTys)
 

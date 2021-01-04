@@ -71,6 +71,15 @@ import           GHC.Integer            (smallInteger)
 import           GHC.Integer.Logarithms (integerLogBase#)
 
 -- GHC API
+#if MIN_VERSION_ghc(9,0,0)
+import           GHC.Builtin.Names
+  (integerTyConKey, typeNatAddTyFamNameKey, typeNatExpTyFamNameKey,
+   typeNatLeqTyFamNameKey, typeNatMulTyFamNameKey, typeNatSubTyFamNameKey,
+   typeNatCmpTyFamNameKey, ordLTDataConKey, ordEQDataConKey, ordGTDataConKey,
+   typeSymbolAppendFamNameKey, typeSymbolCmpTyFamNameKey)
+import           GHC.Types.SrcLoc       (wiredInSrcSpan)
+import           GHC.Types.Unique       (getKey)
+#else
 #if __GLASGOW_HASKELL__ >= 808
 import           PrelNames
   (ordLTDataConKey, ordEQDataConKey, ordGTDataConKey)
@@ -86,6 +95,7 @@ import           PrelNames
    typeSymbolAppendFamNameKey, typeSymbolCmpTyFamNameKey)
 import           SrcLoc                 (wiredInSrcSpan)
 import           Unique                 (getKey)
+#endif
 
 -- Local imports
 import           Clash.Core.DataCon
