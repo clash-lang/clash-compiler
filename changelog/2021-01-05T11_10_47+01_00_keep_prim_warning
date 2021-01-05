@@ -1,0 +1,1 @@
+FIXED: Primitive template warning is now retained when a `HasBlackBox` annotation is present.

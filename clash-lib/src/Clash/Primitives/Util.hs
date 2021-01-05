@@ -123,30 +123,33 @@ addGuards
   -> ResolvedPrimMap
 addGuards = foldl go
  where
-  lookupPrim :: TS.Text -> ResolvedPrimMap -> Maybe ResolvedPrimitive
-  lookupPrim nm primMap = join (extractPrim <$> HashMapStrict.lookup nm primMap)
-
   go primMap (nm, guard) =
     HashMapStrict.insert
       nm
-      (case (lookupPrim nm primMap, guard) of
-        (Nothing, HasBlackBox _) ->
+      (case (prim, guardedPrim, guard) of
+        (Nothing, _, HasBlackBox _) ->
           error $ "No BlackBox definition for '" ++ TS.unpack nm ++ "' even"
                ++ " though this value was annotated with 'HasBlackBox'."
-        (Nothing, WarnNonSynthesizable _ _) ->
+        (Nothing, _, WarnNonSynthesizable _ _) ->
           error $ "No BlackBox definition for '" ++ TS.unpack nm ++ "' even"
                ++ " though this value was annotated with 'WarnNonSynthesizable'"
                ++ ", implying it has a BlackBox."
-        (Nothing, WarnAlways _ _) ->
+        (Nothing, _, WarnAlways _ _) ->
           error $ "No BlackBox definition for '" ++ TS.unpack nm ++ "' even"
                ++ " though this value was annotated with 'WarnAlways'"
                ++ ", implying it has a BlackBox."
-        (Just _, DontTranslate) ->
+        (Nothing, _, DontTranslate) -> DontTranslate
+        (Just _, _, DontTranslate) ->
           error (TS.unpack nm ++ " was annotated with DontTranslate, but a "
                                  ++ "BlackBox definition was found anyway.")
-        (Nothing, DontTranslate) -> DontTranslate
-        (Just p, g) -> fmap (const p) g)
+        (Just _, Just p, HasBlackBox _) -> p
+        (Just p, _, g) -> fmap (const p) g)
       primMap
+   where
+    guardedPrim :: Maybe GuardedResolvedPrimitive
+    guardedPrim = HashMapStrict.lookup nm primMap
+    prim :: Maybe ResolvedPrimitive
+    prim = join (extractPrim <$> guardedPrim)
 
 -- | Generate a set of primitives that are found in the primitive definition
 -- files in the given directories.
