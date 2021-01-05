@@ -51,7 +51,7 @@ circuit (which we call ``macS``).
   mac :: (Num a) => a -> (a, a) -> (a, a)
   mac acc (x, y) = (acc + x * y, acc)
 
-  macS :: (HiddenClockResetEnable dom, Num a) => Signal dom (a, a) -> Signal dom a
+  macS :: (HiddenClockResetEnable dom, Num a, NFDataX a) => Signal dom (a, a) -> Signal dom a
   macS = mealy mac 0
 
 .. _`Mealy machine`: https://en.wikipedia.org/wiki/Mealy_machine
