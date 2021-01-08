@@ -23,8 +23,10 @@ module Clash.Annotations.Primitive
   , warnAlways
   , Primitive(..)
   , PrimitiveGuard(..)
+  , PrimitiveWarning(..)
   , HDL(..)
   , extractPrim
+  , extractWarnings
   ) where
 
 import           Control.DeepSeq                          (NFData)
@@ -138,13 +140,13 @@ dontTranslate :: PrimitiveGuard ()
 dontTranslate = DontTranslate
 
 hasBlackBox :: PrimitiveGuard ()
-hasBlackBox = HasBlackBox ()
+hasBlackBox = HasBlackBox [] ()
 
 warnNonSynthesizable :: String -> PrimitiveGuard ()
-warnNonSynthesizable s = WarnNonSynthesizable s ()
+warnNonSynthesizable s = HasBlackBox [WarnNonSynthesizable s] ()
 
 warnAlways :: String -> PrimitiveGuard ()
-warnAlways s = WarnAlways s ()
+warnAlways s = HasBlackBox [WarnAlways s] ()
 
 data HDL
   = SystemVerilog
@@ -267,15 +269,19 @@ data PrimitiveGuard a
   = DontTranslate
   -- ^ Marks value as not translatable. Clash will error if it finds a blackbox
   -- definition for it, or when it is forced to translate it.
-  | HasBlackBox a
+  | HasBlackBox [PrimitiveWarning] a
   -- ^ Marks a value as having a blackbox. Clash will err if it hasn't found
   -- a blackbox
-  | WarnNonSynthesizable String a
-  -- ^ Marks value as non-synthesizable. This will trigger a warning if
-  -- instantiated in a non-testbench context. Implies @HasBlackBox@.
-  | WarnAlways String a
-  -- ^ Always emit warning upon instantiation. Implies @HasBlackBox@.
     deriving (Show, Read, Data, Generic, NFData, Hashable, Functor, Foldable, Traversable, Binary)
+
+-- | Warning that will be emitted on instantiating a guarded value.
+data PrimitiveWarning
+  = WarnNonSynthesizable String
+  -- ^ Marks value as non-synthesizable. This will trigger a warning if
+  -- instantiated in a non-testbench context.
+  | WarnAlways String
+  -- ^ Always emit warning upon primitive instantiation.
+    deriving (Show, Read, Data, Generic, NFData, Hashable, Binary)
 
 -- | Extract primitive definition from a PrimitiveGuard. Will yield Nothing
 -- for guards of value 'DontTranslate'.
@@ -284,7 +290,15 @@ extractPrim
   -> Maybe a
 extractPrim =
   \case
-    HasBlackBox a            -> Just a
-    WarnNonSynthesizable _ a -> Just a
-    WarnAlways _ a           -> Just a
-    DontTranslate            -> Nothing
+    HasBlackBox _ p -> Just p
+    DontTranslate   -> Nothing
+
+-- | Extract primitive warnings from a PrimitiveGuard. Will yield an empty list
+-- for guards of value 'DontTranslate'.
+extractWarnings
+  :: PrimitiveGuard a
+  -> [PrimitiveWarning]
+extractWarnings =
+  \case
+    HasBlackBox w _ -> w
+    DontTranslate   -> []

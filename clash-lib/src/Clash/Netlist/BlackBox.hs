@@ -49,8 +49,9 @@ import           TextShow                      (showt)
 import           Util                          (OverridingBool(..))
 
 import           Clash.Annotations.Primitive
-  (PrimitiveGuard(HasBlackBox, WarnNonSynthesizable, WarnAlways, DontTranslate),
-   extractPrim)
+  ( PrimitiveGuard(HasBlackBox, DontTranslate)
+  , PrimitiveWarning(WarnNonSynthesizable, WarnAlways)
+  , extractPrim)
 import           Clash.Core.DataCon            as D (dcTag)
 import           Clash.Core.FreeVars           (freeIds)
 import           Clash.Core.Literal            as L (Literal (..))
@@ -281,10 +282,18 @@ extractPrimWarnOrFail
 extractPrimWarnOrFail nm = do
   prim <- HashMap.lookup nm <$> Lens.use primitives
   case prim of
-    Just guardedPrim ->
-      -- See if we need to warn the user, or error because we encountered
-      -- a primitive the user explicitly requested not to translate
-      go guardedPrim
+    Just (HasBlackBox warnings compiledPrim) ->
+      -- See if we need to warn the user
+      if null warnings then return compiledPrim else go warnings compiledPrim
+    Just DontTranslate -> do
+      -- We need to error because we encountered a primitive the user
+      -- explicitly requested not to translate
+      (_,sp) <- Lens.use curCompNm
+      let msg = $(curLoc) ++ "Clash was forced to translate '" ++ unpack nm
+             ++ "', but this value was marked with DontTranslate. Did you forget"
+             ++ " to include a blackbox for one of the constructs using this?"
+             ++ (if debugIsOn then "\n\n" ++ prettyCallStack callStack ++ "\n\n" else [])
+      throw (ClashException sp msg Nothing)
     Nothing -> do
       -- Blackbox requested, but no blackbox found at all!
       (_,sp) <- Lens.use curCompNm
@@ -295,20 +304,11 @@ extractPrimWarnOrFail nm = do
       throw (ClashException sp msg Nothing)
  where
   go
-    :: GuardedCompiledPrimitive
+    :: [PrimitiveWarning]
+    -> CompiledPrimitive
     -> NetlistMonad CompiledPrimitive
-  go (HasBlackBox cp) =
-    return cp
 
-  go DontTranslate = do
-    (_,sp) <- Lens.use curCompNm
-    let msg = $(curLoc) ++ "Clash was forced to translate '" ++ unpack nm
-           ++ "', but this value was marked with DontTranslate. Did you forget"
-           ++ " to include a blackbox for one of the constructs using this?"
-           ++ (if debugIsOn then "\n\n" ++ prettyCallStack callStack ++ "\n\n" else [])
-    throw (ClashException sp msg Nothing)
-
-  go (WarnAlways warning cp) = do
+  go ((WarnAlways warning):ws) cp = do
     primWarn <- opt_primWarn <$> Lens.use clashOpts
     seen <- Set.member nm <$> Lens.use seenPrimitives
     opts <- Lens.use clashOpts
@@ -322,14 +322,15 @@ extractPrimWarnOrFail nm = do
      ++ warning
      ++ " (disable with -fclash-no-prim-warn)"
 
-    seenPrimitives %= Set.insert nm
+    go ws cp
 
-    return cp
-
-  go (WarnNonSynthesizable warning cp) = do
+  go ((WarnNonSynthesizable warning):ws) cp = do
     isTB <- Lens.use isTestBench
-    if isTB then return cp else go (WarnAlways warning cp)
+    if isTB then go ws cp else go ((WarnAlways warning):ws) cp
 
+  go [] cp = do
+    seenPrimitives %= Set.insert nm
+    return cp
 
 mkPrimitive
   :: Bool
