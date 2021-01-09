@@ -5,18 +5,34 @@ index-state: HEAD
 package *
   documentation: False
 
-package clash-lib
-  ghc-options: -Werror
-  tests: True
-  flags: +debug -experimental-evaluator
+  -- Dynamic executables save oozles of space when archiving it on CI
+  executable-dynamic: True
+
 package clash-prelude
   ghc-options: -Werror
   flags: +doctests -experimental-evaluator
   tests: True
   benchmarks: True
+
+  -- clash-prelude unittests fail with dynamic executables
+  executable-dynamic: False
+
+package clash-lib
+  ghc-options: -Werror
+  tests: True
+  flags: +debug -experimental-evaluator
+
+package clash-ghc
+  ghc-options: -Werror
+  flags: -experimental-evalautor
+
 package clash-cosim
   ghc-options: -Werror
   tests: True
+
+  -- clash-cosim unittests fail with dynamic executables
+  executable-dynamic: False
+
 package clash-cores
   ghc-options: -Werror
   tests: True
@@ -26,15 +42,13 @@ package clash-testsuite
   -- enable cosim
   flags: +cosim -experimental-evaluator
 
-package clash-ghc
-  ghc-options: -Werror
-  flags: -experimental-evalautor
-
 package clash-benchmark
   ghc-options: -Werror
   flags: -experimental-evaluator
+
 package clash-profiling
   ghc-options: -Werror
   flags: -experimental-evaluator
+
 package clash-profiling-prepare
   ghc-options: -Werror

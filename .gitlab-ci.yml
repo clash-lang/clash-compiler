@@ -1,58 +1,50 @@
 include:
   - '/.ci/gitlab/publish.yml'
-  - '/.ci/gitlab/benchmark.yml'
-  - '/.ci/gitlab/tests.yml'
+#   - '/.ci/gitlab/benchmark.yml'
 
 stages:
-  # TODO: separate 'test' into 'build' and 'test'.
-  # - build
   - test
   - pack
   - pack-test
   - publish
 
-# Haddock, doctests, unittests, clash-dev testing. These are single threaded
-# tests and therefore suitable for public runners.
-tests-8.4.4:
-  extends: .tests-interruptible
-tests-8.8.4:
-  extends: .tests-interruptible
-tests-8.10.2:
-  extends: .tests-interruptible
-tests-8.6.5-singular-hidden:
-  extends: .tests-interruptible
+# Triggers child pipelines that runs tests for various GHC and Cabal versions.
+# Should be replaced by matrix builds in the future, but currently blocking on:
+# https://gitlab.com/gitlab-org/gitlab/-/issues/270957
+.common:
+  stage: test
+  trigger:
+    include: .ci/gitlab/test.yml
+    strategy: depend
+
+tests-8.4:
+  extends: .common
   variables:
+    GHC_VERSION: 8.4.4
+    CABAL_VERSION: 2.4.1.0
+
+tests-8.6:
+  extends: .common
+  variables:
+    GHC_VERSION: 8.6.5
+    CABAL_VERSION: 3.0.0.0
     MULTIPLE_HIDDEN: "no"
 
-# Testsuite (HDL generation and simulation). Highly parallel and memory
-# intensive, should only picked up by beefy (local) runners.
-testsuite-8.4.4:
-  extends: .testsuite-interruptible
-testsuite-8.8.4:
-  extends: .testsuite-interruptible
-testsuite-8.10.2:
-  extends: .testsuite-interruptible
-testsuite-8.6.5-singular-hidden:
-  extends: .testsuite-interruptible
+tests-8.8:
+  extends: .common
   variables:
-    MULTIPLE_HIDDEN: "no"
+    GHC_VERSION: 8.8.4
+    CABAL_VERSION: 3.2.0.0
 
-# Tests on master. These are marked non-interruptible so we can receive e-mails
-# on failed jobs, without receiving false negatives.
-ghc-8.4.4-master:
-  extends: .tests-non-interruptible
-ghc-8.8.4-master:
-  extends: .tests-non-interruptible
-ghc-8.10.2-master:
-  extends: .tests-non-interruptible
-ghc-8.6.5-singular-hidden-master:
-  extends: .tests-non-interruptible
+tests-8.10:
+  extends: .common
   variables:
-    MULTIPLE_HIDDEN: "no"
+    GHC_VERSION: 8.10.2
+    CABAL_VERSION: 3.0.0.0
 
-# Run benchmarks for isclashfastyet.com
-benchmark-8.10.2:
-  extends: .benchmark
+# # Run benchmarks for isclashfastyet.com
+# benchmark-8.10.2:
+#   extends: .benchmark
 
 # "Publish" a release candidate
 hackage-release-candidate:

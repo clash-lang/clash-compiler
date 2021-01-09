@@ -1,7 +1,7 @@
 #!/bin/bash
 set -xou pipefail
 
-egrep ' $' -n -r . --include=*.{hs,hs-boot,sh} --exclude-dir=dist-newstyle
+grep -E ' $' -n -r . --include=*.{hs,hs-boot,sh} --exclude-dir=dist-newstyle
 if [[ $? == 0 ]]; then
     echo "EOL whitespace detected. See ^"
     exit 1;
@@ -42,26 +42,6 @@ if [[ ${tag_version} != "" && ${version} != ${tag_version} ]]; then
     fi
 fi
 
-# Here to test whether all these variables are set
-echo "RUN_HADDOCK=${RUN_HADDOCK}"
-echo "RUN_LIBTESTS=${RUN_LIBTESTS}"
-echo "RUN_TESTSUITE=${RUN_TESTSUITE}"
-echo "RUN_CLASHDEV=${RUN_CLASHDEV}"
-echo "RUN_BUILD_ALL=${RUN_BUILD_ALL}"
-
-apt-get update -q
-
-if [[ "$GHC_VERSION" = 8.4.* ]]; then
-  CABAL_VERSION="2.4.1.0"
-elif [[ "$GHC_VERSION" = 8.6.* || "$GHC_VERSION" = 8.8.* ]]; then
-  CABAL_VERSION="3.0.0.0"
-elif [[ "$GHC_VERSION" = 8.10.* ]]; then
-  CABAL_VERSION="3.2.0.0"
-else
-  # GHC >= 9.0
-  CABAL_VERSION="3.4.0.0-rc4"
-fi
-
 # GHC files are compressed when building docker image to save space
 cd /root/.ghcup/ghc
 time pixz -d ../${GHC_VERSION}.tpxz
@@ -72,44 +52,53 @@ cd -
 
 cabal --version
 ghc --version
-cp .ci/cabal.project.local .
 
-if [[ "$MULTIPLE_HIDDEN" == "yes" ]]; then
-  sed -i 's/flags: +doctests/flags: +doctests +multiple-hidden/g' cabal.project.local
-elif [[ "$MULTIPLE_HIDDEN" == "no" ]]; then
-  sed -i 's/flags: +doctests/flags: +doctests -multiple-hidden/g' cabal.project.local
-fi
+# File may exist as part of a dist.tar.zst
+if [ ! -f cabal.project.local ]; then
+  cp .ci/cabal.project.local .
 
-if [[ "$CI_COMMIT_BRANCH" =~ "^partial-evaluator-" ]]; then
-  sed -i 's/-experimental-evaluator/+experimental-evaluator/g' cabal.project.local
-fi
+  MULTIPLE_HIDDEN=${MULTIPLE_HIDDEN:-yes}
+  if [[ "$MULTIPLE_HIDDEN" == "yes" ]]; then
+    sed -i 's/flags: +doctests/flags: +doctests +multiple-hidden/g' cabal.project.local
+  elif [[ "$MULTIPLE_HIDDEN" == "no" ]]; then
+    sed -i 's/flags: +doctests/flags: +doctests -multiple-hidden/g' cabal.project.local
+  fi
 
-if [[ "$GHC_VERSION" == 9.*.*.* ]]; then
-  echo "
-   repository head.hackage.ghc.haskell.org
-   url: https://ghc.gitlab.haskell.org/head.hackage/
-   secure: True
-   key-threshold: 3
-   root-keys:
-       7541f32a4ccca4f97aea3b22f5e593ba2c0267546016b992dfadcd2fe944e55d
-       26021a13b401500c8eb2761ca95c61f2d625bfef951b939a8124ed12ecf07329
-       f76d08be13e9a61a377a85e2fb63f4c5435d40f8feb3e12eb05905edb8cdea89
-  " >> cabal.project.local
+  if [[ "$CI_COMMIT_BRANCH" =~ "^partial-evaluator-" ]]; then
+    sed -i 's/-experimental-evaluator/+experimental-evaluator/g' cabal.project.local
+  fi
+
+  if [[ "$GHC_VERSION" == 9.*.*.* ]]; then
+    echo "
+    repository head.hackage.ghc.haskell.org
+    url: https://ghc.gitlab.haskell.org/head.hackage/
+    secure: True
+    key-threshold: 3
+    root-keys:
+        7541f32a4ccca4f97aea3b22f5e593ba2c0267546016b992dfadcd2fe944e55d
+        26021a13b401500c8eb2761ca95c61f2d625bfef951b939a8124ed12ecf07329
+        f76d08be13e9a61a377a85e2fb63f4c5435d40f8feb3e12eb05905edb8cdea89
+    " >> cabal.project.local
+  fi
+
+  # Fix index-state to prevent rebuilds if Hackage changes between build -> test.
+  sed -i "s/HEAD/$(date -u +%FT%TZ)/g" cabal.project.local
 fi
 
 cat cabal.project.local
 
+rm -f ${HOME}/.cabal/config
 cabal user-config init
 sed -i "s/-- ghc-options:/ghc-options: -j$THREADS/g" ${HOME}/.cabal/config
 sed -i "s/^[- ]*jobs:.*/jobs: $CABAL_JOBS/g" ${HOME}/.cabal/config
-echo "store-dir: ${PWD}/cabal-store" >> ${HOME}/.cabal/config
 sed -i "/remote-repo-cache:.*/d" ${HOME}/.cabal/config
-echo "remote-repo-cache: ${PWD}/cabal-packages" >> ${HOME}/.cabal/config
 cat ${HOME}/.cabal/config
+
+set +u
 
 # run new-update first to generate the cabal config file that we can then modify
 # retry 5 times, as hackage servers are not perfectly reliable
 NEXT_WAIT_TIME=0
 until cabal new-update || [ $NEXT_WAIT_TIME -eq 5 ]; do
-   sleep $(( NEXT_WAIT_TIME++ ))
+  sleep $(( NEXT_WAIT_TIME++ ))
 done

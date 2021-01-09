@@ -1,14 +1,42 @@
+.common-publish:
+  image: docker.pkg.github.com/clash-lang/clash-compiler/clash-ci:2020-11-20
+  timeout: 2 hours
+  stage: build
+  variables:
+    GIT_SUBMODULE_STRATEGY: recursive
+    TERM: xterm-color
+  retry:
+    max: 2
+    when:
+      - runner_system_failure
+      - stuck_or_timeout_failure
+  cache:
+    key: cabal-store-$CI_JOB_NAME-$GHC_VERSION
+    when: always
+    paths:
+      - cache.tar.zst
+  before_script:
+    - unset SNAPCRAFT_LOGIN_FILE
+    - unset HACKAGE_PASSWORD
+    - export GHC=ghc-${GHC_VERSION}
+    - export THREADS=$(nproc)
+    - export CABAL_JOBS=$(nproc)
+    - export
+    - apt update && apt install zstd jq -y
+    - tar -xf cache.tar.zst -C / || true
+    - .ci/setup.sh
+  after_script:
+    - tar -cf - $(ls -d /root/.cabal /root/.stack || true) | zstd -T${THREADS} -3 > cache.tar.zst
+  tags:
+    - local
+
 hackage-sdist:
-  extends: .tests
+  extends: .common-publish
   stage: pack
   interruptible: false
   variables:
     GHC_VERSION: 8.10.2
   script:
-    - export THREADS=$(nproc)
-    - export CABAL_JOBS=$(nproc)
-    - export GHC=ghc-${GHC_VERSION}
-    - .ci/setup.sh
     - .ci/build_sdist.sh clash-prelude
     - .ci/build_sdist.sh clash-lib
     - .ci/build_sdist.sh clash-ghc
@@ -22,7 +50,7 @@ hackage-sdist:
     - if: $CI_PIPELINE_SOURCE == "trigger"
 
 .hackage:
-  extends: .tests
+  extends: .common-publish
   interruptible: false
   stage: publish
   cache:
@@ -30,10 +58,6 @@ hackage-sdist:
   variables:
     GHC_VERSION: 8.10.2
   script:
-    - export THREADS=$(nproc)
-    - export CABAL_JOBS=$(nproc)
-    - export GHC=ghc-${GHC_VERSION}
-    - .ci/setup.sh
     - .ci/publish_sdist.sh clash-prelude
     - .ci/publish_sdist.sh clash-lib
     - .ci/publish_sdist.sh clash-ghc
