@@ -1,36 +1,5 @@
-.common-publish:
-  image: docker.pkg.github.com/clash-lang/clash-compiler/clash-ci-8.10.3:2021-01-11
-  timeout: 2 hours
-  stage: build
-  variables:
-    GIT_SUBMODULE_STRATEGY: recursive
-    TERM: xterm-color
-  retry:
-    max: 2
-    when:
-      - runner_system_failure
-      - stuck_or_timeout_failure
-  cache:
-    key: cabal-store-$CI_JOB_NAME-$GHC_VERSION
-    when: always
-    paths:
-      - cache.tar.zst
-  before_script:
-    - unset SNAPCRAFT_LOGIN_FILE
-    - unset HACKAGE_PASSWORD
-    - export GHC=ghc-${GHC_VERSION}
-    - export THREADS=$(nproc)
-    - export CABAL_JOBS=$(nproc)
-    - export
-    - tar -xf cache.tar.zst -C / || true
-    - .ci/setup.sh
-  after_script:
-    - tar -cf - $(ls -d /root/.cabal /root/.stack || true) | zstd -T${THREADS} -3 > cache.tar.zst
-  tags:
-    - local
-
 hackage-sdist:
-  extends: .common-publish
+  extends: .common
   stage: pack
   interruptible: false
   variables:
@@ -49,7 +18,7 @@ hackage-sdist:
     - if: $CI_PIPELINE_SOURCE == "trigger"
 
 .hackage:
-  extends: .common-publish
+  extends: .common
   interruptible: false
   stage: publish
   cache:

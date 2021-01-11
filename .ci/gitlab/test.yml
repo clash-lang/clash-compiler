@@ -1,36 +1,9 @@
+include:
+  - '/.ci/gitlab/common.yml'
+
 stages:
   - build
   - test
-
-.common:
-  image: docker.pkg.github.com/clash-lang/clash-compiler/clash-ci-$GHC_VERSION:2021-01-11
-  timeout: 2 hours
-  stage: build
-  variables:
-    GIT_SUBMODULE_STRATEGY: recursive
-    TERM: xterm-color
-  retry:
-    max: 2
-    when:
-      - runner_system_failure
-      - stuck_or_timeout_failure
-  cache:
-    key: cabal-store-$CI_JOB_NAME-$GHC_VERSION
-    when: always
-    paths:
-      - cache.tar.zst
-  before_script:
-    - unset SNAPCRAFT_LOGIN_FILE
-    - unset HACKAGE_PASSWORD
-    - export THREADS=$(nproc)
-    - export CABAL_JOBS=$(nproc)
-    - export
-    - tar -xf cache.tar.zst -C / || true
-    - .ci/setup.sh
-  after_script:
-    - tar -cf - $(ls -d /root/.cabal /root/.stack || true) | zstd -T${THREADS} -3 > cache.tar.zst
-  tags:
-    - local
 
 .test-common-local:
   extends: .common
@@ -81,26 +54,6 @@ build-clash-dev:
   script:
     - .ci/build_clash_dev.sh
 
-haddock:
-  extends: .common
-  script:
-    - .ci/build_docs.sh
-
-prelude:unittests:
-  extends: .test-common
-  script:
-    - cabal v2-run clash-prelude:unittests
-
-prelude:doctests:
-  extends: .test-common-local
-  script:
-    - cabal v2-run clash-prelude:doctests
-
-lib:unittests:
-  extends: .test-common
-  script:
-    - cabal v2-run clash-lib:unittests
-
 cores:unittests:
   extends: .test-common
   script:
@@ -110,6 +63,22 @@ cosim:unittests:
   extends: .test-common
   script:
     - cabal v2-run clash-cosim:tests
+
+prelude:unittests:
+  extends: .test-common
+  script:
+    - cabal v2-run clash-prelude:unittests
+
+lib:unittests:
+  extends: .test-common
+  script:
+    - cabal v2-run clash-lib:unittests
+
+# Tests run on local fast machines:
+prelude:doctests:
+  extends: .test-common-local
+  script:
+    - cabal v2-run clash-prelude:doctests
 
 suite:vhdl:
   extends: .test-common-local
