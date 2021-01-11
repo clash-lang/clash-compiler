@@ -3,7 +3,7 @@ stages:
   - test
 
 .common:
-  image: docker.pkg.github.com/clash-lang/clash-compiler/clash-ci:2020-11-20
+  image: docker.pkg.github.com/clash-lang/clash-compiler/clash-ci-$GHC_VERSION:2021-01-11
   timeout: 2 hours
   stage: build
   variables:
@@ -25,7 +25,6 @@ stages:
     - export THREADS=$(nproc)
     - export CABAL_JOBS=$(nproc)
     - export
-    - apt update && apt install zstd jq -y
     - tar -xf cache.tar.zst -C / || true
     - .ci/setup.sh
   after_script:
@@ -43,7 +42,6 @@ stages:
     - export THREADS=$(nproc)
     - export CABAL_JOBS=$(nproc)
     - export
-    - apt update && apt install zstd jq -y
     - tar -xf cache.tar.zst -C / || true
     - tar -xf dist.tar.zst -C /
     - .ci/setup.sh

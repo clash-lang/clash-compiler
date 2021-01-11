@@ -3,19 +3,26 @@
 set -xeo pipefail
 
 REPO="docker.pkg.github.com/clash-lang/clash-compiler"
-NAME="clash-ci"
+NAME="clash-ci-"
 DIR=$(dirname "$0")
 now=$(date +%F)
 
-docker build -t "${REPO}/${NAME}:$now" "$DIR"
-docker tag "${REPO}/${NAME}:$now" "${REPO}/${NAME}:latest"
+GHC_VERSIONS="8.4.4 8.6.5 8.8.4 8.10.3 9.0.0.20201227"
+for GHC_VERSION in $GHC_VERSIONS
+do
+  docker build --build-arg ghc_version=${GHC_VERSION} -t "${REPO}/${NAME}${GHC_VERSION}:$now" "$DIR"
+  docker tag "${REPO}/${NAME}${GHC_VERSION}:$now" "${REPO}/${NAME}${GHC_VERSION}:latest"
+done
+
 
 read -p "Push to GitHub? (y/N) " push
 
 if [[ $push =~ ^[Yy]$ ]]; then
-        docker push "${REPO}/${NAME}:$now"
-        docker push "${REPO}/${NAME}:latest"
+  for GHC_VERSION in $GHC_VERSIONS
+  do
+    docker push "${REPO}/${NAME}${GHC_VERSION}:$now"
+    docker push "${REPO}/${NAME}${GHC_VERSION}:latest"
+  done
 else
-        echo "Skipping push to container registry"
+  echo "Skipping push to container registry"
 fi
-

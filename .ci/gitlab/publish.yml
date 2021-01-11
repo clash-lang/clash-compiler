@@ -1,5 +1,5 @@
 .common-publish:
-  image: docker.pkg.github.com/clash-lang/clash-compiler/clash-ci:2020-11-20
+  image: docker.pkg.github.com/clash-lang/clash-compiler/clash-ci-8.10.3:2021-01-11
   timeout: 2 hours
   stage: build
   variables:
@@ -22,7 +22,6 @@
     - export THREADS=$(nproc)
     - export CABAL_JOBS=$(nproc)
     - export
-    - apt update && apt install zstd jq -y
     - tar -xf cache.tar.zst -C / || true
     - .ci/setup.sh
   after_script:
@@ -35,7 +34,7 @@ hackage-sdist:
   stage: pack
   interruptible: false
   variables:
-    GHC_VERSION: 8.10.2
+    GHC_VERSION: 8.10.3
   script:
     - .ci/build_sdist.sh clash-prelude
     - .ci/build_sdist.sh clash-lib
@@ -56,7 +55,7 @@ hackage-sdist:
   cache:
     key: hackage
   variables:
-    GHC_VERSION: 8.10.2
+    GHC_VERSION: 8.10.3
   script:
     - .ci/publish_sdist.sh clash-prelude
     - .ci/publish_sdist.sh clash-lib
