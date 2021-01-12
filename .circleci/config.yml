@@ -92,7 +92,12 @@ aliases:
       command: |
         # Only test on external pull requests
         if [ -n "$CIRCLE_PR_NUMBER" ]; then
-          .ci/test.sh
+          cabal v2-test clash-prelude
+          cabal v2-test clash-lib
+          cabal v2-test clash-cores
+          cabal v2-test clash-cosim
+          cabal v2-run testsuite -- --hide-successes -p .VHDL
+          cabal v2-run testsuite -- --hide-successes -p .Verilog
         fi
 
   # When testing a pull request on CircleCI,
