@@ -48,6 +48,7 @@ hackage-sdist:
 # Create Debian packages.
 debian-bindist:
   extends: .run-on-nightly-and-changes
+  needs: []
   image: docker.pkg.github.com/clash-lang/clash-compiler/bindist-debian-focal:2020-11-20
   stage: pack
   artifacts:
@@ -58,9 +59,11 @@ debian-bindist:
   script:
     - .ci/bindist/linux/debian/scripts/build.sh focal
 
-# Test debian distribution
+# Test debian distribution. Ideally, this would be in the same stage as
+# 'debian-bindist', but we can't yet do that with GitLab CI.
 debian-bindist-test:
   extends: .run-on-nightly-and-changes
+  needs: ["debian-bindist"]
   image: ubuntu:focal
   stage: pack-test
   script:
