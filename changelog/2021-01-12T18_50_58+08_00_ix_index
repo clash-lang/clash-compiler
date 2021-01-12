@@ -1,0 +1,1 @@
+FEATURE: Added `Data.Ix.Ix` instances for `Index` [#1631](https://github.com/clash-lang/clash-compiler/pull/1631)
