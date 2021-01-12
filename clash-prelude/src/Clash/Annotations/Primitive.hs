@@ -3,9 +3,10 @@ Copyright  :  (C) 2017-2019, Myrtle Software, QBayLogic
 License    :  BSD2 (see the file LICENSE)
 Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
 
-Instruct the clash compiler to look for primitive HDL templates in the
-indicated directory. For distribution of new packages with primitive HDL
-templates.
+Instruct the Clash compiler to look for primitive HDL templates provided inline
+or in a specified directory. For distribution of new packages with primitive
+HDL templates. Primitive guards can be added to warn on instantiating
+primitives.
 -}
 
 {-# LANGUAGE DeriveAnyClass #-}
@@ -22,9 +23,11 @@ module Clash.Annotations.Primitive
   , warnNonSynthesizable
   , warnAlways
   , Primitive(..)
-  , PrimitiveGuard(..)
   , HDL(..)
+  , PrimitiveGuard(..)
+  , PrimitiveWarning(..)
   , extractPrim
+  , extractWarnings
   ) where
 
 import           Control.DeepSeq                          (NFData)
@@ -134,18 +137,49 @@ warnAlways nm warning =
     nm
 -}
 
+-- | Marks value as not translatable. Clash will error if it finds a blackbox
+-- definition for it, or when it is forced to translate it. You can annotate a
+-- variable or function @f@ like:
+--
+-- @
+-- {\-\# ANN f dontTranslate \#-\}
+-- @
 dontTranslate :: PrimitiveGuard ()
 dontTranslate = DontTranslate
 
+-- | Marks a value as having a blackbox. Clash will error if it hasn't found
+-- a blackbox. You can annotate a variable or function @f@ like:
+--
+-- @
+-- {\-\# ANN f hasBlackBox \#-\}
+-- @
 hasBlackBox :: PrimitiveGuard ()
-hasBlackBox = HasBlackBox ()
+hasBlackBox = HasBlackBox [] ()
 
+-- | Marks value as non-synthesizable. This will trigger a warning if
+-- instantiated in a non-testbench context. You can annotate a variable or
+-- function @f@ like:
+--
+-- @
+-- {\-\# ANN f (warnNonSynthesizable "Tread carefully, user!") \#-\}
+-- @
+--
+-- Implies `hasBlackBox`.
 warnNonSynthesizable :: String -> PrimitiveGuard ()
-warnNonSynthesizable s = WarnNonSynthesizable s ()
+warnNonSynthesizable s = HasBlackBox [WarnNonSynthesizable s] ()
 
+-- | Always emit warning upon primitive instantiation. You can annotate a
+-- variable or function @f@ like:
+--
+-- @
+-- {\-\# ANN f (warnAlways "Tread carefully, user!") \#-\}
+-- @
+--
+-- Implies `hasBlackBox`.
 warnAlways :: String -> PrimitiveGuard ()
-warnAlways s = WarnAlways s ()
+warnAlways s = HasBlackBox [WarnAlways s] ()
 
+-- | A compilation target HDL.
 data HDL
   = SystemVerilog
   | Verilog
@@ -239,43 +273,29 @@ data Primitive
   -- ^ Description of a primitive for a given 'HDL's as an inline 'String'
   deriving (Show, Read, Data, Generic, NFData, Hashable)
 
--- | Guard primitive functions. This will help Clash generate better error
--- messages. You can annotate a function like:
+-- | Primitive guard to mark a value as either not translatable or as having a
+-- blackbox with an optional extra warning. Helps Clash generate better error
+-- messages.
 --
--- @
--- {\-\# ANN f dontTranslate \#-\}
--- @
---
--- or
---
--- @
--- {\-\# ANN f hasBlackBox \#-\}
--- @
---
--- or
---
--- @
--- {\-\# ANN f (warnNonSynthesizable "Tread carefully, user!") \#-\}
--- @
---
--- or
---
--- @
--- {\-\# ANN f (warnAlways "Tread carefully, user!") \#-\}
--- @
+-- For use, see 'dontTranslate', 'hasBlackBox', 'warnNonSynthesizable' and
+-- 'warnAlways'.
 data PrimitiveGuard a
   = DontTranslate
   -- ^ Marks value as not translatable. Clash will error if it finds a blackbox
   -- definition for it, or when it is forced to translate it.
-  | HasBlackBox a
-  -- ^ Marks a value as having a blackbox. Clash will err if it hasn't found
-  -- a blackbox
-  | WarnNonSynthesizable String a
-  -- ^ Marks value as non-synthesizable. This will trigger a warning if
-  -- instantiated in a non-testbench context. Implies @HasBlackBox@.
-  | WarnAlways String a
-  -- ^ Always emit warning upon instantiation. Implies @HasBlackBox@.
+  | HasBlackBox [PrimitiveWarning] a
+  -- ^ Marks a value as having a blackbox. Clash will error if it hasn't found
+  -- a blackbox.
     deriving (Show, Read, Data, Generic, NFData, Hashable, Functor, Foldable, Traversable, Binary)
+
+-- | Warning that will be emitted on instantiating a guarded value.
+data PrimitiveWarning
+  = WarnNonSynthesizable String
+  -- ^ Marks value as non-synthesizable. This will trigger a warning if
+  -- instantiated in a non-testbench context.
+  | WarnAlways String
+  -- ^ Always emit warning upon primitive instantiation.
+    deriving (Show, Read, Data, Generic, NFData, Hashable, Binary)
 
 -- | Extract primitive definition from a PrimitiveGuard. Will yield Nothing
 -- for guards of value 'DontTranslate'.
@@ -284,7 +304,15 @@ extractPrim
   -> Maybe a
 extractPrim =
   \case
-    HasBlackBox a            -> Just a
-    WarnNonSynthesizable _ a -> Just a
-    WarnAlways _ a           -> Just a
-    DontTranslate            -> Nothing
+    HasBlackBox _ p -> Just p
+    DontTranslate   -> Nothing
+
+-- | Extract primitive warnings from a PrimitiveGuard. Will yield an empty list
+-- for guards of value 'DontTranslate'.
+extractWarnings
+  :: PrimitiveGuard a
+  -> [PrimitiveWarning]
+extractWarnings =
+  \case
+    HasBlackBox w _ -> w
+    DontTranslate   -> []

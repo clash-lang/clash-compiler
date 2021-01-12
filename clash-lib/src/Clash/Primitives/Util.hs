@@ -21,7 +21,6 @@ module Clash.Primitives.Util
   ) where
 
 import           Control.DeepSeq        (force)
-import           Control.Monad          (join)
 import           Data.Aeson.Extra       (decodeOrErr)
 import qualified Data.ByteString.Lazy   as LZ
 import qualified Data.HashMap.Lazy      as HashMap
@@ -39,8 +38,9 @@ import qualified System.FilePath        as FilePath
 import           System.IO.Error        (tryIOError)
 
 import           Clash.Annotations.Primitive
-  ( PrimitiveGuard(HasBlackBox, WarnNonSynthesizable, WarnAlways, DontTranslate)
-  , extractPrim)
+  ( PrimitiveGuard(HasBlackBox, DontTranslate)
+  , PrimitiveWarning(WarnNonSynthesizable)
+  , extractPrim, extractWarnings)
 import           Clash.Core.Term        (Term)
 import           Clash.Core.Type        (Type)
 import           Clash.Primitives.Types
@@ -92,7 +92,7 @@ resolvePrimitive'
   -> UnresolvedPrimitive
   -> IO (TS.Text, GuardedResolvedPrimitive)
 resolvePrimitive' _metaPath (Primitive name wf primType) =
-  return (name, HasBlackBox (Primitive name wf primType))
+  return (name, HasBlackBox [] (Primitive name wf primType))
 resolvePrimitive' metaPath BlackBox{template=t, includes=i, resultNames=r, resultInits=ri, ..} = do
   let resolveSourceM = traverse (traverse (resolveTemplateSource metaPath))
   bb <- BlackBox name workInfo renderVoid multiResult kind () outputReg libraries imports functionPlurality
@@ -101,10 +101,10 @@ resolvePrimitive' metaPath BlackBox{template=t, includes=i, resultNames=r, resul
           <*> traverse resolveSourceM ri
           <*> resolveSourceM t
   case warning of
-    Just w  -> pure (name, WarnNonSynthesizable (TS.unpack w) bb)
-    Nothing -> pure (name, HasBlackBox bb)
+    Just w  -> pure (name, HasBlackBox [WarnNonSynthesizable (TS.unpack w)] bb)
+    Nothing -> pure (name, HasBlackBox [] bb)
 resolvePrimitive' metaPath (BlackBoxHaskell bbName wf usedArgs multiRes funcName t) =
-  (bbName,) . HasBlackBox . BlackBoxHaskell bbName wf usedArgs multiRes funcName <$>
+  (bbName,) . HasBlackBox [] . BlackBoxHaskell bbName wf usedArgs multiRes funcName <$>
     (mapM (resolveTemplateSource metaPath) t)
 
 -- | Interprets contents of json file as list of @Primitive@s. Throws
@@ -123,29 +123,29 @@ addGuards
   -> ResolvedPrimMap
 addGuards = foldl go
  where
-  lookupPrim :: TS.Text -> ResolvedPrimMap -> Maybe ResolvedPrimitive
-  lookupPrim nm primMap = join (extractPrim <$> HashMapStrict.lookup nm primMap)
+  lookupPrim
+    :: TS.Text
+    -> ResolvedPrimMap
+    -> Maybe ([PrimitiveWarning], ResolvedPrimitive)
+  lookupPrim nm primMap = do
+    guardedPrim <- HashMapStrict.lookup nm primMap
+    prim <- extractPrim guardedPrim
+    return (extractWarnings guardedPrim, prim)
 
   go primMap (nm, guard) =
     HashMapStrict.insert
       nm
       (case (lookupPrim nm primMap, guard) of
-        (Nothing, HasBlackBox _) ->
+        (Nothing, DontTranslate) -> DontTranslate
+        (Nothing, HasBlackBox _ ()) ->
           error $ "No BlackBox definition for '" ++ TS.unpack nm ++ "' even"
                ++ " though this value was annotated with 'HasBlackBox'."
-        (Nothing, WarnNonSynthesizable _ _) ->
-          error $ "No BlackBox definition for '" ++ TS.unpack nm ++ "' even"
-               ++ " though this value was annotated with 'WarnNonSynthesizable'"
-               ++ ", implying it has a BlackBox."
-        (Nothing, WarnAlways _ _) ->
-          error $ "No BlackBox definition for '" ++ TS.unpack nm ++ "' even"
-               ++ " though this value was annotated with 'WarnAlways'"
-               ++ ", implying it has a BlackBox."
         (Just _, DontTranslate) ->
           error (TS.unpack nm ++ " was annotated with DontTranslate, but a "
-                                 ++ "BlackBox definition was found anyway.")
-        (Nothing, DontTranslate) -> DontTranslate
-        (Just p, g) -> fmap (const p) g)
+                              ++ "BlackBox definition was found anyway.")
+        (Just (ws1, p), HasBlackBox ws2 ()) ->
+          HasBlackBox (ws1 ++ ws2) p
+      )
       primMap
 
 -- | Generate a set of primitives that are found in the primitive definition
