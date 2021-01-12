@@ -72,7 +72,8 @@ import Data.Bits                  (Bits (..), FiniteBits (..))
 import Data.Data                  (Data)
 import Data.Default.Class         (Default (..))
 import Text.Read                  (Read (..), ReadPrec)
-import Text.Printf                (PrintfArg (..))
+import Text.Printf                (PrintfArg (..), printf)
+import Data.Ix                    (Ix(..))
 import Language.Haskell.TH        (TypeQ, appT, conT, litT, numTyLit, sigE)
 import Language.Haskell.TH.Syntax (Lift(..))
 #if MIN_VERSION_template_haskell(2,16,0)
@@ -457,3 +458,10 @@ shrinkIndex x | natVal x < 3 = case toInteger x of
 
 instance KnownNat n => CoArbitrary (Index n) where
   coarbitrary = coarbitraryIntegral
+
+instance (KnownNat n) => Ix (Index n) where
+  range (a, b) = [a..b]
+  index ab@(a, b) x
+    | inRange ab x = fromIntegral $ x - a
+    | otherwise = error $ printf "Index %d out of bounds (%d, %d)" x a b
+  inRange (a, b) x = a <= x && x <= b
