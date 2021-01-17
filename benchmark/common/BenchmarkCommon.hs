@@ -28,7 +28,11 @@ import Clash.Netlist.Types
   (PreserveCase(..), HWMap, FilteredHWType, TopEntityT, topId)
 import Clash.Primitives.Types
 
+#if MIN_VERSION_ghc(9,0,0)
+import GHC.Utils.Misc (OverridingBool(..))
+#else
 import Util (OverridingBool(..))
+#endif
 
 import qualified Control.Concurrent.Supply as Supply
 import Control.Monad.State.Strict   (State)

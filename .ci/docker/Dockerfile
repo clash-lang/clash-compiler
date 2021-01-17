@@ -8,9 +8,6 @@ ARG DEPS_GHDL="clang gcc gnat llvm-9-dev"
 ARG DEPS_CLASH="libtinfo-dev libtinfo5"
 ARG DEPS_CLASH_COSIM="make"
 
-ARG GHCUP_URL="https://downloads.haskell.org/~ghcup/x86_64-linux-ghcup"
-ARG GHCUP_BIN=/usr/bin/ghcup
-
 RUN apt-get update \
  # GHDL compilation fails without dist-upgrade
  && apt-get dist-upgrade -y \
@@ -31,6 +28,10 @@ RUN apt-get update \
  && make install \
  && cd .. \
  && rm -rf ghdl-0.37
+
+ARG GHCUP_VERSION="0.1.12"
+ARG GHCUP_URL="https://downloads.haskell.org/~ghcup/${GHCUP_VERSION}/x86_64-linux-ghcup-${GHCUP_VERSION}"
+ARG GHCUP_BIN=/usr/bin/ghcup
 
 RUN curl $GHCUP_URL --output $GHCUP_BIN \
  && chmod +x $GHCUP_BIN \

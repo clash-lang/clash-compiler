@@ -922,11 +922,17 @@ instance NFDataX a => NFDataX (SG.First a)
 instance NFDataX a => NFDataX (SG.Last a)
 instance NFDataX a => NFDataX (SG.Max a)
 instance NFDataX a => NFDataX (SG.Min a)
-instance NFDataX a => NFDataX (SG.Option a)
 instance NFDataX a => NFDataX (SG.Product a)
 instance NFDataX a => NFDataX (SG.Sum a)
 instance NFDataX a => NFDataX (M.First a)
 instance NFDataX a => NFDataX (M.Last a)
+
+-- Sg.Option will be removed in 9.2. We can't locally disable deprecation
+-- warnings (i.e., for this instance only) so we're prematurely removing it
+-- instead.
+#if __GLASGOW_HASKELL__ < 900
+instance NFDataX a => NFDataX (SG.Option a)
+#endif
 
 class GDeepErrorX f where
   gDeepErrorX :: HasCallStack => String -> f a
