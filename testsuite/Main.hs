@@ -211,6 +211,8 @@ runClashTest = defaultMain $ clashTestRoot
       [ clashTestGroup "AutoReg"
         [ NEEDS_PRIMS(outputTest ("tests" </> "shouldwork" </> "AutoReg") allTargets [] [] "AutoReg" "main")
         , NEEDS_PRIMS(runTest "T1507" def{hdlSim=False})
+        , let _opts = def{hdlSim=False, hdlTargets=[VHDL]}
+           in NEEDS_PRIMS(runTest "T1632" _opts)
         ]
       , clashTestGroup "Basic"
         [ NEEDS_PRIMS(runTest "AES" def{hdlSim=False})
