@@ -380,9 +380,10 @@ constraintsWantedFor clsNm [ty] = case ty of
   needRecurse :: Type -> Bool
   needRecurse (unfoldType -> (cls,tys)) =
     case tys of
-      [VarT _] -> False
-      [ConT _] -> False  -- we can just drop constraints like: "AutoReg Bool => ..."
       [AppT _ _] -> True
+      [VarT _] -> False  -- gets copied by "filter isOk" above
+      [ConT _] -> False  -- we can just drop constraints like: "AutoReg Bool => ..."
+      [LitT _] -> False  -- or "KnownNat 4 =>"
       [_] -> error ( "Error while deriveAutoReg: don't know how to handle: "
                   ++ pprint cls ++ " (" ++ pprint tys ++ ")" )
       _ -> False  -- see [NOTE: MultiParamTypeClasses]
