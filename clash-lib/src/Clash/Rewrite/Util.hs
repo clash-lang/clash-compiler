@@ -53,7 +53,7 @@ import qualified Data.Set.Ordered.Extra      as OSet
 import           Data.Text                   (Text)
 import qualified Data.Text                   as Text
 
-#ifdef EXPERIMENTAL_EVALUATOR
+#if defined(EXPERIMENTAL_EVALUATOR) || defined(HISTORY)
 import           System.IO.Unsafe            (unsafePerformIO)
 #endif
 
