@@ -375,7 +375,7 @@ test-suite unittests
   import:           common-options
   type:             exitcode-stdio-1.0
   main-is:          unittests.hs
-  ghc-options:      -Wall -Wcompat
+  ghc-options:      -Wall -Wcompat -threaded -with-rtsopts=-N
   hs-source-dirs:   tests
 
   if !flag(unittests)
